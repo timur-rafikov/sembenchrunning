@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain commuting_constraint_aware_timetable_design_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types academic_administration_object - object administrative_entity - academic_administration_object resource_category - academic_administration_object temporal_category - academic_administration_object participant_category - academic_administration_object enrollment_case - participant_category commute_option - administrative_entity meeting_time - administrative_entity academic_officer - administrative_entity curriculum_attribute - administrative_entity delivery_format - administrative_entity commute_token - administrative_entity instructor - administrative_entity safety_certificate - administrative_entity mobility_accommodation - resource_category classroom - resource_category special_permission - resource_category origin_commute_slot - temporal_category destination_commute_slot - temporal_category timetable_proposal - temporal_category enrollment_subcase - enrollment_case section_subcase - enrollment_case primary_student_profile - enrollment_subcase secondary_student_profile - enrollment_subcase course_section - section_subcase)
+
+  (:predicates
+    (enrollment_opened ?enrollment_case - enrollment_case)
+    (eligibility_confirmed ?enrollment_case - enrollment_case)
+    (commute_selection_recorded ?enrollment_case - enrollment_case)
+    (enrollment_closed ?enrollment_case - enrollment_case)
+    (administrative_clearance ?enrollment_case - enrollment_case)
+    (commute_token_verified ?enrollment_case - enrollment_case)
+    (commute_option_available ?commute_option - commute_option)
+    (has_commute_option ?enrollment_case - enrollment_case ?commute_option - commute_option)
+    (meeting_time_available ?meeting_time - meeting_time)
+    (meeting_time_assigned ?enrollment_case - enrollment_case ?meeting_time - meeting_time)
+    (academic_officer_available ?academic_officer - academic_officer)
+    (academic_officer_assigned ?enrollment_case - enrollment_case ?academic_officer - academic_officer)
+    (accommodation_available ?mobility_accommodation - mobility_accommodation)
+    (primary_accommodation_assigned ?primary_student - primary_student_profile ?mobility_accommodation - mobility_accommodation)
+    (secondary_accommodation_assigned ?secondary_student - secondary_student_profile ?mobility_accommodation - mobility_accommodation)
+    (primary_origin_slot_linked ?primary_student - primary_student_profile ?origin_commute_slot - origin_commute_slot)
+    (origin_slot_selected ?origin_commute_slot - origin_commute_slot)
+    (origin_slot_accommodation_flagged ?origin_commute_slot - origin_commute_slot)
+    (primary_commute_verified ?primary_student - primary_student_profile)
+    (secondary_destination_slot_linked ?secondary_student - secondary_student_profile ?destination_commute_slot - destination_commute_slot)
+    (destination_slot_selected ?destination_commute_slot - destination_commute_slot)
+    (destination_slot_accommodation_flagged ?destination_commute_slot - destination_commute_slot)
+    (secondary_commute_verified ?secondary_student - secondary_student_profile)
+    (proposal_available ?timetable_proposal - timetable_proposal)
+    (proposal_compiled ?timetable_proposal - timetable_proposal)
+    (proposal_origin_slot_linked ?timetable_proposal - timetable_proposal ?origin_commute_slot - origin_commute_slot)
+    (proposal_destination_slot_linked ?timetable_proposal - timetable_proposal ?destination_commute_slot - destination_commute_slot)
+    (proposal_origin_accommodation_flag ?timetable_proposal - timetable_proposal)
+    (proposal_destination_accommodation_flag ?timetable_proposal - timetable_proposal)
+    (proposal_feasibility_confirmed ?timetable_proposal - timetable_proposal)
+    (section_primary_student_linked ?course_section - course_section ?primary_student - primary_student_profile)
+    (section_secondary_student_linked ?course_section - course_section ?secondary_student - secondary_student_profile)
+    (section_proposal_linked ?course_section - course_section ?timetable_proposal - timetable_proposal)
+    (classroom_available ?classroom - classroom)
+    (section_classroom_assigned ?course_section - course_section ?classroom - classroom)
+    (classroom_reserved ?classroom - classroom)
+    (proposal_classroom_linked ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    (section_review_ready ?course_section - course_section)
+    (section_document_reviewed ?course_section - course_section)
+    (section_internal_reviewed ?course_section - course_section)
+    (section_curriculum_tagged ?course_section - course_section)
+    (section_schedule_validated ?course_section - course_section)
+    (section_resource_ready ?course_section - course_section)
+    (section_completion_verified ?course_section - course_section)
+    (special_permission_available ?special_permission - special_permission)
+    (section_permission_linked ?course_section - course_section ?special_permission - special_permission)
+    (special_permission_attached ?course_section - course_section)
+    (special_permission_validated ?course_section - course_section)
+    (special_permission_confirmed ?course_section - course_section)
+    (curriculum_attribute_available ?curriculum_attribute - curriculum_attribute)
+    (section_curriculum_attribute_linked ?course_section - course_section ?curriculum_attribute - curriculum_attribute)
+    (delivery_format_available ?delivery_format - delivery_format)
+    (section_delivery_format_linked ?course_section - course_section ?delivery_format - delivery_format)
+    (instructor_available ?instructor - instructor)
+    (section_instructor_linked ?course_section - course_section ?instructor - instructor)
+    (safety_certificate_available ?safety_certificate - safety_certificate)
+    (section_safety_certificate_linked ?course_section - course_section ?safety_certificate - safety_certificate)
+    (commute_token_available ?commute_token - commute_token)
+    (case_commute_token_linked ?enrollment_case - enrollment_case ?commute_token - commute_token)
+    (primary_commute_locked ?primary_student - primary_student_profile)
+    (secondary_commute_locked ?secondary_student - secondary_student_profile)
+    (section_final_approved ?course_section - course_section)
+  )
+  (:action open_enrollment_case
+    :parameters (?enrollment_case - enrollment_case)
+    :precondition
+      (and
+        (not
+          (enrollment_opened ?enrollment_case)
+        )
+        (not
+          (enrollment_closed ?enrollment_case)
+        )
+      )
+    :effect (enrollment_opened ?enrollment_case)
+  )
+  (:action reserve_commute_option
+    :parameters (?enrollment_case - enrollment_case ?commute_option - commute_option)
+    :precondition
+      (and
+        (enrollment_opened ?enrollment_case)
+        (not
+          (commute_selection_recorded ?enrollment_case)
+        )
+        (commute_option_available ?commute_option)
+      )
+    :effect
+      (and
+        (commute_selection_recorded ?enrollment_case)
+        (has_commute_option ?enrollment_case ?commute_option)
+        (not
+          (commute_option_available ?commute_option)
+        )
+      )
+  )
+  (:action assign_meeting_time
+    :parameters (?enrollment_case - enrollment_case ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (enrollment_opened ?enrollment_case)
+        (commute_selection_recorded ?enrollment_case)
+        (meeting_time_available ?meeting_time)
+      )
+    :effect
+      (and
+        (meeting_time_assigned ?enrollment_case ?meeting_time)
+        (not
+          (meeting_time_available ?meeting_time)
+        )
+      )
+  )
+  (:action confirm_enrollment_eligibility
+    :parameters (?enrollment_case - enrollment_case ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (enrollment_opened ?enrollment_case)
+        (commute_selection_recorded ?enrollment_case)
+        (meeting_time_assigned ?enrollment_case ?meeting_time)
+        (not
+          (eligibility_confirmed ?enrollment_case)
+        )
+      )
+    :effect (eligibility_confirmed ?enrollment_case)
+  )
+  (:action release_meeting_time
+    :parameters (?enrollment_case - enrollment_case ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (meeting_time_assigned ?enrollment_case ?meeting_time)
+      )
+    :effect
+      (and
+        (meeting_time_available ?meeting_time)
+        (not
+          (meeting_time_assigned ?enrollment_case ?meeting_time)
+        )
+      )
+  )
+  (:action assign_academic_officer
+    :parameters (?enrollment_case - enrollment_case ?academic_officer - academic_officer)
+    :precondition
+      (and
+        (eligibility_confirmed ?enrollment_case)
+        (academic_officer_available ?academic_officer)
+      )
+    :effect
+      (and
+        (academic_officer_assigned ?enrollment_case ?academic_officer)
+        (not
+          (academic_officer_available ?academic_officer)
+        )
+      )
+  )
+  (:action release_academic_officer
+    :parameters (?enrollment_case - enrollment_case ?academic_officer - academic_officer)
+    :precondition
+      (and
+        (academic_officer_assigned ?enrollment_case ?academic_officer)
+      )
+    :effect
+      (and
+        (academic_officer_available ?academic_officer)
+        (not
+          (academic_officer_assigned ?enrollment_case ?academic_officer)
+        )
+      )
+  )
+  (:action assign_instructor
+    :parameters (?course_section - course_section ?instructor - instructor)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (section_instructor_linked ?course_section ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action release_instructor
+    :parameters (?course_section - course_section ?instructor - instructor)
+    :precondition
+      (and
+        (section_instructor_linked ?course_section ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (section_instructor_linked ?course_section ?instructor)
+        )
+      )
+  )
+  (:action assign_safety_certificate
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (safety_certificate_available ?safety_certificate)
+      )
+    :effect
+      (and
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (not
+          (safety_certificate_available ?safety_certificate)
+        )
+      )
+  )
+  (:action release_safety_certificate
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+      )
+    :effect
+      (and
+        (safety_certificate_available ?safety_certificate)
+        (not
+          (section_safety_certificate_linked ?course_section ?safety_certificate)
+        )
+      )
+  )
+  (:action confirm_origin_commute_slot
+    :parameters (?primary_student - primary_student_profile ?origin_commute_slot - origin_commute_slot ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (eligibility_confirmed ?primary_student)
+        (meeting_time_assigned ?primary_student ?meeting_time)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (not
+          (origin_slot_selected ?origin_commute_slot)
+        )
+        (not
+          (origin_slot_accommodation_flagged ?origin_commute_slot)
+        )
+      )
+    :effect (origin_slot_selected ?origin_commute_slot)
+  )
+  (:action lock_primary_commute
+    :parameters (?primary_student - primary_student_profile ?origin_commute_slot - origin_commute_slot ?academic_officer - academic_officer)
+    :precondition
+      (and
+        (eligibility_confirmed ?primary_student)
+        (academic_officer_assigned ?primary_student ?academic_officer)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (origin_slot_selected ?origin_commute_slot)
+        (not
+          (primary_commute_locked ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (primary_commute_locked ?primary_student)
+        (primary_commute_verified ?primary_student)
+      )
+  )
+  (:action allocate_primary_accommodation
+    :parameters (?primary_student - primary_student_profile ?origin_commute_slot - origin_commute_slot ?mobility_accommodation - mobility_accommodation)
+    :precondition
+      (and
+        (eligibility_confirmed ?primary_student)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (accommodation_available ?mobility_accommodation)
+        (not
+          (primary_commute_locked ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (origin_slot_accommodation_flagged ?origin_commute_slot)
+        (primary_commute_locked ?primary_student)
+        (primary_accommodation_assigned ?primary_student ?mobility_accommodation)
+        (not
+          (accommodation_available ?mobility_accommodation)
+        )
+      )
+  )
+  (:action finalize_primary_commute_plan
+    :parameters (?primary_student - primary_student_profile ?origin_commute_slot - origin_commute_slot ?meeting_time - meeting_time ?mobility_accommodation - mobility_accommodation)
+    :precondition
+      (and
+        (eligibility_confirmed ?primary_student)
+        (meeting_time_assigned ?primary_student ?meeting_time)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (origin_slot_accommodation_flagged ?origin_commute_slot)
+        (primary_accommodation_assigned ?primary_student ?mobility_accommodation)
+        (not
+          (primary_commute_verified ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (origin_slot_selected ?origin_commute_slot)
+        (primary_commute_verified ?primary_student)
+        (accommodation_available ?mobility_accommodation)
+        (not
+          (primary_accommodation_assigned ?primary_student ?mobility_accommodation)
+        )
+      )
+  )
+  (:action confirm_destination_commute_slot
+    :parameters (?secondary_student - secondary_student_profile ?destination_commute_slot - destination_commute_slot ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (eligibility_confirmed ?secondary_student)
+        (meeting_time_assigned ?secondary_student ?meeting_time)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (not
+          (destination_slot_selected ?destination_commute_slot)
+        )
+        (not
+          (destination_slot_accommodation_flagged ?destination_commute_slot)
+        )
+      )
+    :effect (destination_slot_selected ?destination_commute_slot)
+  )
+  (:action lock_secondary_commute
+    :parameters (?secondary_student - secondary_student_profile ?destination_commute_slot - destination_commute_slot ?academic_officer - academic_officer)
+    :precondition
+      (and
+        (eligibility_confirmed ?secondary_student)
+        (academic_officer_assigned ?secondary_student ?academic_officer)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (destination_slot_selected ?destination_commute_slot)
+        (not
+          (secondary_commute_locked ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (secondary_commute_locked ?secondary_student)
+        (secondary_commute_verified ?secondary_student)
+      )
+  )
+  (:action allocate_secondary_accommodation
+    :parameters (?secondary_student - secondary_student_profile ?destination_commute_slot - destination_commute_slot ?mobility_accommodation - mobility_accommodation)
+    :precondition
+      (and
+        (eligibility_confirmed ?secondary_student)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (accommodation_available ?mobility_accommodation)
+        (not
+          (secondary_commute_locked ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_accommodation_flagged ?destination_commute_slot)
+        (secondary_commute_locked ?secondary_student)
+        (secondary_accommodation_assigned ?secondary_student ?mobility_accommodation)
+        (not
+          (accommodation_available ?mobility_accommodation)
+        )
+      )
+  )
+  (:action finalize_secondary_commute_plan
+    :parameters (?secondary_student - secondary_student_profile ?destination_commute_slot - destination_commute_slot ?meeting_time - meeting_time ?mobility_accommodation - mobility_accommodation)
+    :precondition
+      (and
+        (eligibility_confirmed ?secondary_student)
+        (meeting_time_assigned ?secondary_student ?meeting_time)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (destination_slot_accommodation_flagged ?destination_commute_slot)
+        (secondary_accommodation_assigned ?secondary_student ?mobility_accommodation)
+        (not
+          (secondary_commute_verified ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_selected ?destination_commute_slot)
+        (secondary_commute_verified ?secondary_student)
+        (accommodation_available ?mobility_accommodation)
+        (not
+          (secondary_accommodation_assigned ?secondary_student ?mobility_accommodation)
+        )
+      )
+  )
+  (:action compose_timetable_proposal
+    :parameters (?primary_student - primary_student_profile ?secondary_student - secondary_student_profile ?origin_commute_slot - origin_commute_slot ?destination_commute_slot - destination_commute_slot ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (primary_commute_locked ?primary_student)
+        (secondary_commute_locked ?secondary_student)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (origin_slot_selected ?origin_commute_slot)
+        (destination_slot_selected ?destination_commute_slot)
+        (primary_commute_verified ?primary_student)
+        (secondary_commute_verified ?secondary_student)
+        (proposal_available ?timetable_proposal)
+      )
+    :effect
+      (and
+        (proposal_compiled ?timetable_proposal)
+        (proposal_origin_slot_linked ?timetable_proposal ?origin_commute_slot)
+        (proposal_destination_slot_linked ?timetable_proposal ?destination_commute_slot)
+        (not
+          (proposal_available ?timetable_proposal)
+        )
+      )
+  )
+  (:action compose_origin_accommodation_proposal
+    :parameters (?primary_student - primary_student_profile ?secondary_student - secondary_student_profile ?origin_commute_slot - origin_commute_slot ?destination_commute_slot - destination_commute_slot ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (primary_commute_locked ?primary_student)
+        (secondary_commute_locked ?secondary_student)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (origin_slot_accommodation_flagged ?origin_commute_slot)
+        (destination_slot_selected ?destination_commute_slot)
+        (not
+          (primary_commute_verified ?primary_student)
+        )
+        (secondary_commute_verified ?secondary_student)
+        (proposal_available ?timetable_proposal)
+      )
+    :effect
+      (and
+        (proposal_compiled ?timetable_proposal)
+        (proposal_origin_slot_linked ?timetable_proposal ?origin_commute_slot)
+        (proposal_destination_slot_linked ?timetable_proposal ?destination_commute_slot)
+        (proposal_origin_accommodation_flag ?timetable_proposal)
+        (not
+          (proposal_available ?timetable_proposal)
+        )
+      )
+  )
+  (:action compose_destination_accommodation_proposal
+    :parameters (?primary_student - primary_student_profile ?secondary_student - secondary_student_profile ?origin_commute_slot - origin_commute_slot ?destination_commute_slot - destination_commute_slot ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (primary_commute_locked ?primary_student)
+        (secondary_commute_locked ?secondary_student)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (origin_slot_selected ?origin_commute_slot)
+        (destination_slot_accommodation_flagged ?destination_commute_slot)
+        (primary_commute_verified ?primary_student)
+        (not
+          (secondary_commute_verified ?secondary_student)
+        )
+        (proposal_available ?timetable_proposal)
+      )
+    :effect
+      (and
+        (proposal_compiled ?timetable_proposal)
+        (proposal_origin_slot_linked ?timetable_proposal ?origin_commute_slot)
+        (proposal_destination_slot_linked ?timetable_proposal ?destination_commute_slot)
+        (proposal_destination_accommodation_flag ?timetable_proposal)
+        (not
+          (proposal_available ?timetable_proposal)
+        )
+      )
+  )
+  (:action compose_full_accommodation_proposal
+    :parameters (?primary_student - primary_student_profile ?secondary_student - secondary_student_profile ?origin_commute_slot - origin_commute_slot ?destination_commute_slot - destination_commute_slot ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (primary_commute_locked ?primary_student)
+        (secondary_commute_locked ?secondary_student)
+        (primary_origin_slot_linked ?primary_student ?origin_commute_slot)
+        (secondary_destination_slot_linked ?secondary_student ?destination_commute_slot)
+        (origin_slot_accommodation_flagged ?origin_commute_slot)
+        (destination_slot_accommodation_flagged ?destination_commute_slot)
+        (not
+          (primary_commute_verified ?primary_student)
+        )
+        (not
+          (secondary_commute_verified ?secondary_student)
+        )
+        (proposal_available ?timetable_proposal)
+      )
+    :effect
+      (and
+        (proposal_compiled ?timetable_proposal)
+        (proposal_origin_slot_linked ?timetable_proposal ?origin_commute_slot)
+        (proposal_destination_slot_linked ?timetable_proposal ?destination_commute_slot)
+        (proposal_origin_accommodation_flag ?timetable_proposal)
+        (proposal_destination_accommodation_flag ?timetable_proposal)
+        (not
+          (proposal_available ?timetable_proposal)
+        )
+      )
+  )
+  (:action validate_timetable_feasibility
+    :parameters (?timetable_proposal - timetable_proposal ?primary_student - primary_student_profile ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (proposal_compiled ?timetable_proposal)
+        (primary_commute_locked ?primary_student)
+        (meeting_time_assigned ?primary_student ?meeting_time)
+        (not
+          (proposal_feasibility_confirmed ?timetable_proposal)
+        )
+      )
+    :effect (proposal_feasibility_confirmed ?timetable_proposal)
+  )
+  (:action reserve_classroom_for_proposal
+    :parameters (?course_section - course_section ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (section_proposal_linked ?course_section ?timetable_proposal)
+        (section_classroom_assigned ?course_section ?classroom)
+        (classroom_available ?classroom)
+        (proposal_compiled ?timetable_proposal)
+        (proposal_feasibility_confirmed ?timetable_proposal)
+        (not
+          (classroom_reserved ?classroom)
+        )
+      )
+    :effect
+      (and
+        (classroom_reserved ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (not
+          (classroom_available ?classroom)
+        )
+      )
+  )
+  (:action certify_section_room_assignment
+    :parameters (?course_section - course_section ?classroom - classroom ?timetable_proposal - timetable_proposal ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (section_classroom_assigned ?course_section ?classroom)
+        (classroom_reserved ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (meeting_time_assigned ?course_section ?meeting_time)
+        (not
+          (proposal_origin_accommodation_flag ?timetable_proposal)
+        )
+        (not
+          (section_review_ready ?course_section)
+        )
+      )
+    :effect (section_review_ready ?course_section)
+  )
+  (:action attach_curriculum_attribute
+    :parameters (?course_section - course_section ?curriculum_attribute - curriculum_attribute)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (curriculum_attribute_available ?curriculum_attribute)
+        (not
+          (section_curriculum_tagged ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_curriculum_tagged ?course_section)
+        (section_curriculum_attribute_linked ?course_section ?curriculum_attribute)
+        (not
+          (curriculum_attribute_available ?curriculum_attribute)
+        )
+      )
+  )
+  (:action confirm_curriculum_alignment
+    :parameters (?course_section - course_section ?classroom - classroom ?timetable_proposal - timetable_proposal ?meeting_time - meeting_time ?curriculum_attribute - curriculum_attribute)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (section_classroom_assigned ?course_section ?classroom)
+        (classroom_reserved ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (meeting_time_assigned ?course_section ?meeting_time)
+        (proposal_origin_accommodation_flag ?timetable_proposal)
+        (section_curriculum_tagged ?course_section)
+        (section_curriculum_attribute_linked ?course_section ?curriculum_attribute)
+        (not
+          (section_review_ready ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_review_ready ?course_section)
+        (section_schedule_validated ?course_section)
+      )
+  )
+  (:action initiate_section_review
+    :parameters (?course_section - course_section ?instructor - instructor ?academic_officer - academic_officer ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_review_ready ?course_section)
+        (section_instructor_linked ?course_section ?instructor)
+        (academic_officer_assigned ?course_section ?academic_officer)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (not
+          (proposal_destination_accommodation_flag ?timetable_proposal)
+        )
+        (not
+          (section_document_reviewed ?course_section)
+        )
+      )
+    :effect (section_document_reviewed ?course_section)
+  )
+  (:action initiate_section_review_with_destination_accommodation
+    :parameters (?course_section - course_section ?instructor - instructor ?academic_officer - academic_officer ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_review_ready ?course_section)
+        (section_instructor_linked ?course_section ?instructor)
+        (academic_officer_assigned ?course_section ?academic_officer)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (proposal_destination_accommodation_flag ?timetable_proposal)
+        (not
+          (section_document_reviewed ?course_section)
+        )
+      )
+    :effect (section_document_reviewed ?course_section)
+  )
+  (:action complete_internal_review_no_accommodation
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_document_reviewed ?course_section)
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (not
+          (proposal_origin_accommodation_flag ?timetable_proposal)
+        )
+        (not
+          (proposal_destination_accommodation_flag ?timetable_proposal)
+        )
+        (not
+          (section_internal_reviewed ?course_section)
+        )
+      )
+    :effect (section_internal_reviewed ?course_section)
+  )
+  (:action complete_internal_review_origin_accommodation
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_document_reviewed ?course_section)
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (proposal_origin_accommodation_flag ?timetable_proposal)
+        (not
+          (proposal_destination_accommodation_flag ?timetable_proposal)
+        )
+        (not
+          (section_internal_reviewed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_resource_ready ?course_section)
+      )
+  )
+  (:action complete_internal_review_destination_accommodation
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_document_reviewed ?course_section)
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (not
+          (proposal_origin_accommodation_flag ?timetable_proposal)
+        )
+        (proposal_destination_accommodation_flag ?timetable_proposal)
+        (not
+          (section_internal_reviewed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_resource_ready ?course_section)
+      )
+  )
+  (:action complete_internal_review_full_accommodation
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate ?classroom - classroom ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (section_document_reviewed ?course_section)
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (section_classroom_assigned ?course_section ?classroom)
+        (proposal_classroom_linked ?classroom ?timetable_proposal)
+        (proposal_origin_accommodation_flag ?timetable_proposal)
+        (proposal_destination_accommodation_flag ?timetable_proposal)
+        (not
+          (section_internal_reviewed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_resource_ready ?course_section)
+      )
+  )
+  (:action grant_section_clearance
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (section_internal_reviewed ?course_section)
+        (not
+          (section_resource_ready ?course_section)
+        )
+        (not
+          (section_final_approved ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_final_approved ?course_section)
+        (administrative_clearance ?course_section)
+      )
+  )
+  (:action assign_delivery_format
+    :parameters (?course_section - course_section ?delivery_format - delivery_format)
+    :precondition
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_resource_ready ?course_section)
+        (delivery_format_available ?delivery_format)
+      )
+    :effect
+      (and
+        (section_delivery_format_linked ?course_section ?delivery_format)
+        (not
+          (delivery_format_available ?delivery_format)
+        )
+      )
+  )
+  (:action verify_section_completion
+    :parameters (?course_section - course_section ?primary_student - primary_student_profile ?secondary_student - secondary_student_profile ?meeting_time - meeting_time ?delivery_format - delivery_format)
+    :precondition
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_resource_ready ?course_section)
+        (section_delivery_format_linked ?course_section ?delivery_format)
+        (section_primary_student_linked ?course_section ?primary_student)
+        (section_secondary_student_linked ?course_section ?secondary_student)
+        (primary_commute_verified ?primary_student)
+        (secondary_commute_verified ?secondary_student)
+        (meeting_time_assigned ?course_section ?meeting_time)
+        (not
+          (section_completion_verified ?course_section)
+        )
+      )
+    :effect (section_completion_verified ?course_section)
+  )
+  (:action ratify_section_clearance
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (section_internal_reviewed ?course_section)
+        (section_completion_verified ?course_section)
+        (not
+          (section_final_approved ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_final_approved ?course_section)
+        (administrative_clearance ?course_section)
+      )
+  )
+  (:action attach_special_permission
+    :parameters (?course_section - course_section ?special_permission - special_permission ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (eligibility_confirmed ?course_section)
+        (meeting_time_assigned ?course_section ?meeting_time)
+        (special_permission_available ?special_permission)
+        (section_permission_linked ?course_section ?special_permission)
+        (not
+          (special_permission_attached ?course_section)
+        )
+      )
+    :effect
+      (and
+        (special_permission_attached ?course_section)
+        (not
+          (special_permission_available ?special_permission)
+        )
+      )
+  )
+  (:action validate_special_permission
+    :parameters (?course_section - course_section ?academic_officer - academic_officer)
+    :precondition
+      (and
+        (special_permission_attached ?course_section)
+        (academic_officer_assigned ?course_section ?academic_officer)
+        (not
+          (special_permission_validated ?course_section)
+        )
+      )
+    :effect (special_permission_validated ?course_section)
+  )
+  (:action confirm_special_permission
+    :parameters (?course_section - course_section ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (special_permission_validated ?course_section)
+        (section_safety_certificate_linked ?course_section ?safety_certificate)
+        (not
+          (special_permission_confirmed ?course_section)
+        )
+      )
+    :effect (special_permission_confirmed ?course_section)
+  )
+  (:action grant_final_section_approval
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (special_permission_confirmed ?course_section)
+        (not
+          (section_final_approved ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_final_approved ?course_section)
+        (administrative_clearance ?course_section)
+      )
+  )
+  (:action finalize_primary_student_assignment
+    :parameters (?primary_student - primary_student_profile ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (primary_commute_locked ?primary_student)
+        (primary_commute_verified ?primary_student)
+        (proposal_compiled ?timetable_proposal)
+        (proposal_feasibility_confirmed ?timetable_proposal)
+        (not
+          (administrative_clearance ?primary_student)
+        )
+      )
+    :effect (administrative_clearance ?primary_student)
+  )
+  (:action finalize_secondary_student_assignment
+    :parameters (?secondary_student - secondary_student_profile ?timetable_proposal - timetable_proposal)
+    :precondition
+      (and
+        (secondary_commute_locked ?secondary_student)
+        (secondary_commute_verified ?secondary_student)
+        (proposal_compiled ?timetable_proposal)
+        (proposal_feasibility_confirmed ?timetable_proposal)
+        (not
+          (administrative_clearance ?secondary_student)
+        )
+      )
+    :effect (administrative_clearance ?secondary_student)
+  )
+  (:action attach_commute_token
+    :parameters (?enrollment_case - enrollment_case ?commute_token - commute_token ?meeting_time - meeting_time)
+    :precondition
+      (and
+        (administrative_clearance ?enrollment_case)
+        (meeting_time_assigned ?enrollment_case ?meeting_time)
+        (commute_token_available ?commute_token)
+        (not
+          (commute_token_verified ?enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (commute_token_verified ?enrollment_case)
+        (case_commute_token_linked ?enrollment_case ?commute_token)
+        (not
+          (commute_token_available ?commute_token)
+        )
+      )
+  )
+  (:action complete_primary_enrollment
+    :parameters (?primary_student - primary_student_profile ?commute_option - commute_option ?commute_token - commute_token)
+    :precondition
+      (and
+        (commute_token_verified ?primary_student)
+        (has_commute_option ?primary_student ?commute_option)
+        (case_commute_token_linked ?primary_student ?commute_token)
+        (not
+          (enrollment_closed ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (enrollment_closed ?primary_student)
+        (commute_option_available ?commute_option)
+        (commute_token_available ?commute_token)
+      )
+  )
+  (:action complete_secondary_enrollment
+    :parameters (?secondary_student - secondary_student_profile ?commute_option - commute_option ?commute_token - commute_token)
+    :precondition
+      (and
+        (commute_token_verified ?secondary_student)
+        (has_commute_option ?secondary_student ?commute_option)
+        (case_commute_token_linked ?secondary_student ?commute_token)
+        (not
+          (enrollment_closed ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (enrollment_closed ?secondary_student)
+        (commute_option_available ?commute_option)
+        (commute_token_available ?commute_token)
+      )
+  )
+  (:action complete_section_enrollment
+    :parameters (?course_section - course_section ?commute_option - commute_option ?commute_token - commute_token)
+    :precondition
+      (and
+        (commute_token_verified ?course_section)
+        (has_commute_option ?course_section ?commute_option)
+        (case_commute_token_linked ?course_section ?commute_token)
+        (not
+          (enrollment_closed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (enrollment_closed ?course_section)
+        (commute_option_available ?commute_option)
+        (commute_token_available ?commute_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem commuting_constraint_aware_timetable_design_problem)
+  (:domain commuting_constraint_aware_timetable_design_domain)
+  (:objects primary_student_profile_instance - primary_student_profile secondary_student_profile_instance - secondary_student_profile course_section_a - course_section course_section_b - course_section commute_option_a - commute_option commute_option_b - commute_option commute_option_c - commute_option meeting_time_window - meeting_time academic_officer_instance - academic_officer mobility_accommodation_instance - mobility_accommodation origin_commute_slot_instance - origin_commute_slot destination_commute_slot_instance - destination_commute_slot timetable_proposal_instance - timetable_proposal classroom_a - classroom classroom_b - classroom curriculum_attribute_a - curriculum_attribute curriculum_attribute_b - curriculum_attribute delivery_format_a - delivery_format delivery_format_b - delivery_format commute_token_instance - commute_token instructor_instance - instructor special_permission_a - special_permission special_permission_b - special_permission safety_certificate_instance - safety_certificate)
+  (:init
+    (commute_option_available commute_option_a)
+    (commute_option_available commute_option_b)
+    (commute_option_available commute_option_c)
+    (meeting_time_available meeting_time_window)
+    (academic_officer_available academic_officer_instance)
+    (accommodation_available mobility_accommodation_instance)
+    (primary_origin_slot_linked primary_student_profile_instance origin_commute_slot_instance)
+    (secondary_destination_slot_linked secondary_student_profile_instance destination_commute_slot_instance)
+    (proposal_available timetable_proposal_instance)
+    (classroom_available classroom_a)
+    (classroom_available classroom_b)
+    (section_primary_student_linked course_section_a primary_student_profile_instance)
+    (section_primary_student_linked course_section_b primary_student_profile_instance)
+    (section_secondary_student_linked course_section_a secondary_student_profile_instance)
+    (section_secondary_student_linked course_section_b secondary_student_profile_instance)
+    (section_proposal_linked course_section_a timetable_proposal_instance)
+    (section_proposal_linked course_section_b timetable_proposal_instance)
+    (section_classroom_assigned course_section_a classroom_a)
+    (section_classroom_assigned course_section_b classroom_b)
+    (curriculum_attribute_available curriculum_attribute_a)
+    (curriculum_attribute_available curriculum_attribute_b)
+    (delivery_format_available delivery_format_a)
+    (delivery_format_available delivery_format_b)
+    (commute_token_available commute_token_instance)
+    (instructor_available instructor_instance)
+    (special_permission_available special_permission_a)
+    (section_permission_linked course_section_a special_permission_a)
+    (section_permission_linked course_section_b special_permission_b)
+    (safety_certificate_available safety_certificate_instance)
+  )
+  (:goal
+    (and
+      (enrollment_closed primary_student_profile_instance)
+      (enrollment_closed secondary_student_profile_instance)
+      (enrollment_closed course_section_a)
+      (enrollment_closed course_section_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_enrollment_case primary_student_profile_instance)
+(reserve_commute_option primary_student_profile_instance commute_option_a)
+(assign_meeting_time primary_student_profile_instance meeting_time_window)
+(confirm_enrollment_eligibility primary_student_profile_instance meeting_time_window)
+(assign_academic_officer primary_student_profile_instance academic_officer_instance)
+(confirm_origin_commute_slot primary_student_profile_instance origin_commute_slot_instance meeting_time_window)
+(lock_primary_commute primary_student_profile_instance origin_commute_slot_instance academic_officer_instance)
+(release_academic_officer primary_student_profile_instance academic_officer_instance)
+(release_meeting_time primary_student_profile_instance meeting_time_window)
+(open_enrollment_case secondary_student_profile_instance)
+(reserve_commute_option secondary_student_profile_instance commute_option_b)
+(assign_meeting_time secondary_student_profile_instance meeting_time_window)
+(confirm_enrollment_eligibility secondary_student_profile_instance meeting_time_window)
+(assign_academic_officer secondary_student_profile_instance academic_officer_instance)
+(confirm_destination_commute_slot secondary_student_profile_instance destination_commute_slot_instance meeting_time_window)
+(lock_secondary_commute secondary_student_profile_instance destination_commute_slot_instance academic_officer_instance)
+(release_academic_officer secondary_student_profile_instance academic_officer_instance)
+(release_meeting_time secondary_student_profile_instance meeting_time_window)
+(compose_timetable_proposal primary_student_profile_instance secondary_student_profile_instance origin_commute_slot_instance destination_commute_slot_instance timetable_proposal_instance)
+(assign_meeting_time primary_student_profile_instance meeting_time_window)
+(validate_timetable_feasibility timetable_proposal_instance primary_student_profile_instance meeting_time_window)
+(finalize_primary_student_assignment primary_student_profile_instance timetable_proposal_instance)
+(attach_commute_token primary_student_profile_instance commute_token_instance meeting_time_window)
+(complete_primary_enrollment primary_student_profile_instance commute_option_a commute_token_instance)
+(release_meeting_time primary_student_profile_instance meeting_time_window)
+(finalize_secondary_student_assignment secondary_student_profile_instance timetable_proposal_instance)
+(assign_meeting_time secondary_student_profile_instance meeting_time_window)
+(attach_commute_token secondary_student_profile_instance commute_token_instance meeting_time_window)
+(complete_secondary_enrollment secondary_student_profile_instance commute_option_b commute_token_instance)
+(release_meeting_time secondary_student_profile_instance meeting_time_window)
+(open_enrollment_case course_section_a)
+(reserve_commute_option course_section_a commute_option_a)
+(assign_meeting_time course_section_a meeting_time_window)
+(confirm_enrollment_eligibility course_section_a meeting_time_window)
+(reserve_classroom_for_proposal course_section_a classroom_a timetable_proposal_instance)
+(assign_instructor course_section_a instructor_instance)
+(assign_safety_certificate course_section_a safety_certificate_instance)
+(assign_academic_officer course_section_a academic_officer_instance)
+(certify_section_room_assignment course_section_a classroom_a timetable_proposal_instance meeting_time_window)
+(initiate_section_review course_section_a instructor_instance academic_officer_instance classroom_a timetable_proposal_instance)
+(complete_internal_review_no_accommodation course_section_a safety_certificate_instance classroom_a timetable_proposal_instance)
+(grant_section_clearance course_section_a)
+(release_meeting_time course_section_a meeting_time_window)
+(release_academic_officer course_section_a academic_officer_instance)
+(release_instructor course_section_a instructor_instance)
+(release_safety_certificate course_section_a safety_certificate_instance)
+(open_enrollment_case course_section_b)
+(reserve_commute_option course_section_b commute_option_b)
+(assign_meeting_time course_section_b meeting_time_window)
+(confirm_enrollment_eligibility course_section_b meeting_time_window)
+(reserve_classroom_for_proposal course_section_b classroom_b timetable_proposal_instance)
+(assign_instructor course_section_b instructor_instance)
+(assign_safety_certificate course_section_b safety_certificate_instance)
+(assign_academic_officer course_section_b academic_officer_instance)
+(certify_section_room_assignment course_section_b classroom_b timetable_proposal_instance meeting_time_window)
+(initiate_section_review course_section_b instructor_instance academic_officer_instance classroom_b timetable_proposal_instance)
+(complete_internal_review_no_accommodation course_section_b safety_certificate_instance classroom_b timetable_proposal_instance)
+(grant_section_clearance course_section_b)
+(release_meeting_time course_section_b meeting_time_window)
+(release_academic_officer course_section_b academic_officer_instance)
+(release_instructor course_section_b instructor_instance)
+(release_safety_certificate course_section_b safety_certificate_instance)
+(assign_meeting_time course_section_a meeting_time_window)
+(attach_commute_token course_section_a commute_token_instance meeting_time_window)
+(complete_section_enrollment course_section_a commute_option_a commute_token_instance)
+(release_meeting_time course_section_a meeting_time_window)
+(assign_meeting_time course_section_b meeting_time_window)
+(attach_commute_token course_section_b commute_token_instance meeting_time_window)
+(complete_section_enrollment course_section_b commute_option_b commute_token_instance)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_kqkd1lr8/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 69 
+
+Successful plans:
+Value: 69
+ /tmp/val_kqkd1lr8/plan.pddl 69 
+
+
+
+--- stderr ---
+

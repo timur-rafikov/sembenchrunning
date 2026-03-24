@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain base_supply_buffer_management)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types supply_item - object material_category - object module_category - object location_category - object base_location - location_category material_resource - supply_item processing_consumable - supply_item maintenance_tool - supply_item upgrade_module - supply_item consumable_pack - supply_item priority_marker - supply_item power_cell - supply_item exotic_part - supply_item intermediate_component - material_category attachment_module - material_category special_part - material_category supply_variant_a - module_category supply_variant_b - module_category supply_package - module_category intake_group - base_location hub_group - base_location intake_slot - intake_group staging_slot - intake_group production_hub - hub_group)
+  (:predicates
+    (request_open ?base_location - base_location)
+    (primed_for_processing ?base_location - base_location)
+    (material_reserved ?base_location - base_location)
+    (ready_for_dispatch ?base_location - base_location)
+    (marked_deployable ?base_location - base_location)
+    (request_fulfilled ?base_location - base_location)
+    (material_resource_available ?material_resource - material_resource)
+    (bound_material_resource ?base_location - base_location ?material_resource - material_resource)
+    (consumable_available ?processing_consumable - processing_consumable)
+    (bound_processing_consumable ?base_location - base_location ?processing_consumable - processing_consumable)
+    (tool_available ?maintenance_tool - maintenance_tool)
+    (bound_maintenance_tool ?base_location - base_location ?maintenance_tool - maintenance_tool)
+    (component_available ?intermediate_component - intermediate_component)
+    (intake_slot_has_component ?intake_slot - intake_slot ?intermediate_component - intermediate_component)
+    (staging_slot_has_component ?staging_slot - staging_slot ?intermediate_component - intermediate_component)
+    (intake_variant_a_reserved ?intake_slot - intake_slot ?material_variant_a - supply_variant_a)
+    (variant_a_ready ?material_variant_a - supply_variant_a)
+    (variant_a_staged ?material_variant_a - supply_variant_a)
+    (intake_slot_ready ?intake_slot - intake_slot)
+    (staging_variant_b_reserved ?staging_slot - staging_slot ?material_variant_b - supply_variant_b)
+    (variant_b_ready ?material_variant_b - supply_variant_b)
+    (variant_b_staged ?material_variant_b - supply_variant_b)
+    (staging_slot_ready ?staging_slot - staging_slot)
+    (package_available ?supply_package - supply_package)
+    (package_ready ?supply_package - supply_package)
+    (package_contains_variant_a ?supply_package - supply_package ?material_variant_a - supply_variant_a)
+    (package_contains_variant_b ?supply_package - supply_package ?material_variant_b - supply_variant_b)
+    (package_tag_a ?supply_package - supply_package)
+    (package_tag_b ?supply_package - supply_package)
+    (package_locked_for_attachment ?supply_package - supply_package)
+    (hub_controls_intake_slot ?production_hub - production_hub ?intake_slot - intake_slot)
+    (hub_controls_staging_slot ?production_hub - production_hub ?staging_slot - staging_slot)
+    (hub_assigned_supply_package ?production_hub - production_hub ?supply_package - supply_package)
+    (attachment_module_available ?attachment_module - attachment_module)
+    (hub_has_attachment_module ?production_hub - production_hub ?attachment_module - attachment_module)
+    (attachment_module_installed ?attachment_module - attachment_module)
+    (attachment_module_attached_to_package ?attachment_module - attachment_module ?supply_package - supply_package)
+    (hub_integration_ready ?production_hub - production_hub)
+    (hub_module_bound ?production_hub - production_hub)
+    (hub_ready_for_finalization ?production_hub - production_hub)
+    (hub_upgrade_pending ?production_hub - production_hub)
+    (hub_upgrade_staged ?production_hub - production_hub)
+    (hub_consumable_pack_present ?production_hub - production_hub)
+    (hub_finalized ?production_hub - production_hub)
+    (special_part_available ?special_part - special_part)
+    (hub_has_special_part ?production_hub - production_hub ?special_part - special_part)
+    (hub_upgrade_initialized ?production_hub - production_hub)
+    (hub_upgrade_applied ?production_hub - production_hub)
+    (hub_upgrade_complete ?production_hub - production_hub)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (hub_has_upgrade_module ?production_hub - production_hub ?upgrade_module - upgrade_module)
+    (consumable_pack_available ?consumable_pack - consumable_pack)
+    (hub_has_consumable_pack ?production_hub - production_hub ?consumable_pack - consumable_pack)
+    (power_cell_available ?power_cell - power_cell)
+    (hub_has_power_cell ?production_hub - production_hub ?power_cell - power_cell)
+    (exotic_part_available ?exotic_part - exotic_part)
+    (hub_has_exotic_part ?production_hub - production_hub ?exotic_part - exotic_part)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (location_has_priority_marker ?base_location - base_location ?priority_marker - priority_marker)
+    (intake_slot_reserved ?intake_slot - intake_slot)
+    (staging_slot_reserved ?staging_slot - staging_slot)
+    (hub_sealed ?production_hub - production_hub)
+  )
+  (:action open_supply_request
+    :parameters (?base_location - base_location)
+    :precondition
+      (and
+        (not
+          (request_open ?base_location)
+        )
+        (not
+          (ready_for_dispatch ?base_location)
+        )
+      )
+    :effect (request_open ?base_location)
+  )
+  (:action assign_raw_material_to_request
+    :parameters (?base_location - base_location ?material_resource - material_resource)
+    :precondition
+      (and
+        (request_open ?base_location)
+        (not
+          (material_reserved ?base_location)
+        )
+        (material_resource_available ?material_resource)
+      )
+    :effect
+      (and
+        (material_reserved ?base_location)
+        (bound_material_resource ?base_location ?material_resource)
+        (not
+          (material_resource_available ?material_resource)
+        )
+      )
+  )
+  (:action bind_processing_consumable_to_request
+    :parameters (?base_location - base_location ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (request_open ?base_location)
+        (material_reserved ?base_location)
+        (consumable_available ?processing_consumable)
+      )
+    :effect
+      (and
+        (bound_processing_consumable ?base_location ?processing_consumable)
+        (not
+          (consumable_available ?processing_consumable)
+        )
+      )
+  )
+  (:action prime_request_for_processing
+    :parameters (?base_location - base_location ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (request_open ?base_location)
+        (material_reserved ?base_location)
+        (bound_processing_consumable ?base_location ?processing_consumable)
+        (not
+          (primed_for_processing ?base_location)
+        )
+      )
+    :effect (primed_for_processing ?base_location)
+  )
+  (:action release_processing_consumable
+    :parameters (?base_location - base_location ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (bound_processing_consumable ?base_location ?processing_consumable)
+      )
+    :effect
+      (and
+        (consumable_available ?processing_consumable)
+        (not
+          (bound_processing_consumable ?base_location ?processing_consumable)
+        )
+      )
+  )
+  (:action assign_tool_to_location
+    :parameters (?base_location - base_location ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (primed_for_processing ?base_location)
+        (tool_available ?maintenance_tool)
+      )
+    :effect
+      (and
+        (bound_maintenance_tool ?base_location ?maintenance_tool)
+        (not
+          (tool_available ?maintenance_tool)
+        )
+      )
+  )
+  (:action return_tool_to_inventory
+    :parameters (?base_location - base_location ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (bound_maintenance_tool ?base_location ?maintenance_tool)
+      )
+    :effect
+      (and
+        (tool_available ?maintenance_tool)
+        (not
+          (bound_maintenance_tool ?base_location ?maintenance_tool)
+        )
+      )
+  )
+  (:action install_power_cell_on_hub
+    :parameters (?production_hub - production_hub ?power_cell - power_cell)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (power_cell_available ?power_cell)
+      )
+    :effect
+      (and
+        (hub_has_power_cell ?production_hub ?power_cell)
+        (not
+          (power_cell_available ?power_cell)
+        )
+      )
+  )
+  (:action remove_power_cell_from_hub
+    :parameters (?production_hub - production_hub ?power_cell - power_cell)
+    :precondition
+      (and
+        (hub_has_power_cell ?production_hub ?power_cell)
+      )
+    :effect
+      (and
+        (power_cell_available ?power_cell)
+        (not
+          (hub_has_power_cell ?production_hub ?power_cell)
+        )
+      )
+  )
+  (:action install_exotic_part_on_hub
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (exotic_part_available ?exotic_part)
+      )
+    :effect
+      (and
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (not
+          (exotic_part_available ?exotic_part)
+        )
+      )
+  )
+  (:action remove_exotic_part_from_hub
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part)
+    :precondition
+      (and
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+      )
+    :effect
+      (and
+        (exotic_part_available ?exotic_part)
+        (not
+          (hub_has_exotic_part ?production_hub ?exotic_part)
+        )
+      )
+  )
+  (:action prepare_variant_a_on_intake
+    :parameters (?intake_slot - intake_slot ?material_variant_a - supply_variant_a ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (primed_for_processing ?intake_slot)
+        (bound_processing_consumable ?intake_slot ?processing_consumable)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (not
+          (variant_a_ready ?material_variant_a)
+        )
+        (not
+          (variant_a_staged ?material_variant_a)
+        )
+      )
+    :effect (variant_a_ready ?material_variant_a)
+  )
+  (:action process_variant_a_with_tool
+    :parameters (?intake_slot - intake_slot ?material_variant_a - supply_variant_a ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (primed_for_processing ?intake_slot)
+        (bound_maintenance_tool ?intake_slot ?maintenance_tool)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (variant_a_ready ?material_variant_a)
+        (not
+          (intake_slot_reserved ?intake_slot)
+        )
+      )
+    :effect
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (intake_slot_ready ?intake_slot)
+      )
+  )
+  (:action apply_component_to_intake
+    :parameters (?intake_slot - intake_slot ?material_variant_a - supply_variant_a ?intermediate_component - intermediate_component)
+    :precondition
+      (and
+        (primed_for_processing ?intake_slot)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (component_available ?intermediate_component)
+        (not
+          (intake_slot_reserved ?intake_slot)
+        )
+      )
+    :effect
+      (and
+        (variant_a_staged ?material_variant_a)
+        (intake_slot_reserved ?intake_slot)
+        (intake_slot_has_component ?intake_slot ?intermediate_component)
+        (not
+          (component_available ?intermediate_component)
+        )
+      )
+  )
+  (:action complete_intake_processing
+    :parameters (?intake_slot - intake_slot ?material_variant_a - supply_variant_a ?processing_consumable - processing_consumable ?intermediate_component - intermediate_component)
+    :precondition
+      (and
+        (primed_for_processing ?intake_slot)
+        (bound_processing_consumable ?intake_slot ?processing_consumable)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (variant_a_staged ?material_variant_a)
+        (intake_slot_has_component ?intake_slot ?intermediate_component)
+        (not
+          (intake_slot_ready ?intake_slot)
+        )
+      )
+    :effect
+      (and
+        (variant_a_ready ?material_variant_a)
+        (intake_slot_ready ?intake_slot)
+        (component_available ?intermediate_component)
+        (not
+          (intake_slot_has_component ?intake_slot ?intermediate_component)
+        )
+      )
+  )
+  (:action prepare_variant_b_on_staging
+    :parameters (?staging_slot - staging_slot ?material_variant_b - supply_variant_b ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (primed_for_processing ?staging_slot)
+        (bound_processing_consumable ?staging_slot ?processing_consumable)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (not
+          (variant_b_ready ?material_variant_b)
+        )
+        (not
+          (variant_b_staged ?material_variant_b)
+        )
+      )
+    :effect (variant_b_ready ?material_variant_b)
+  )
+  (:action process_variant_b_with_tool
+    :parameters (?staging_slot - staging_slot ?material_variant_b - supply_variant_b ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (primed_for_processing ?staging_slot)
+        (bound_maintenance_tool ?staging_slot ?maintenance_tool)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_b_ready ?material_variant_b)
+        (not
+          (staging_slot_reserved ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (staging_slot_reserved ?staging_slot)
+        (staging_slot_ready ?staging_slot)
+      )
+  )
+  (:action apply_component_to_staging
+    :parameters (?staging_slot - staging_slot ?material_variant_b - supply_variant_b ?intermediate_component - intermediate_component)
+    :precondition
+      (and
+        (primed_for_processing ?staging_slot)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (component_available ?intermediate_component)
+        (not
+          (staging_slot_reserved ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (variant_b_staged ?material_variant_b)
+        (staging_slot_reserved ?staging_slot)
+        (staging_slot_has_component ?staging_slot ?intermediate_component)
+        (not
+          (component_available ?intermediate_component)
+        )
+      )
+  )
+  (:action complete_staging_processing
+    :parameters (?staging_slot - staging_slot ?material_variant_b - supply_variant_b ?processing_consumable - processing_consumable ?intermediate_component - intermediate_component)
+    :precondition
+      (and
+        (primed_for_processing ?staging_slot)
+        (bound_processing_consumable ?staging_slot ?processing_consumable)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_b_staged ?material_variant_b)
+        (staging_slot_has_component ?staging_slot ?intermediate_component)
+        (not
+          (staging_slot_ready ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (variant_b_ready ?material_variant_b)
+        (staging_slot_ready ?staging_slot)
+        (component_available ?intermediate_component)
+        (not
+          (staging_slot_has_component ?staging_slot ?intermediate_component)
+        )
+      )
+  )
+  (:action assemble_supply_package
+    :parameters (?intake_slot - intake_slot ?staging_slot - staging_slot ?material_variant_a - supply_variant_a ?material_variant_b - supply_variant_b ?supply_package - supply_package)
+    :precondition
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (staging_slot_reserved ?staging_slot)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_a_ready ?material_variant_a)
+        (variant_b_ready ?material_variant_b)
+        (intake_slot_ready ?intake_slot)
+        (staging_slot_ready ?staging_slot)
+        (package_available ?supply_package)
+      )
+    :effect
+      (and
+        (package_ready ?supply_package)
+        (package_contains_variant_a ?supply_package ?material_variant_a)
+        (package_contains_variant_b ?supply_package ?material_variant_b)
+        (not
+          (package_available ?supply_package)
+        )
+      )
+  )
+  (:action assemble_supply_package_with_tag_a
+    :parameters (?intake_slot - intake_slot ?staging_slot - staging_slot ?material_variant_a - supply_variant_a ?material_variant_b - supply_variant_b ?supply_package - supply_package)
+    :precondition
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (staging_slot_reserved ?staging_slot)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_a_staged ?material_variant_a)
+        (variant_b_ready ?material_variant_b)
+        (not
+          (intake_slot_ready ?intake_slot)
+        )
+        (staging_slot_ready ?staging_slot)
+        (package_available ?supply_package)
+      )
+    :effect
+      (and
+        (package_ready ?supply_package)
+        (package_contains_variant_a ?supply_package ?material_variant_a)
+        (package_contains_variant_b ?supply_package ?material_variant_b)
+        (package_tag_a ?supply_package)
+        (not
+          (package_available ?supply_package)
+        )
+      )
+  )
+  (:action assemble_supply_package_with_tag_b
+    :parameters (?intake_slot - intake_slot ?staging_slot - staging_slot ?material_variant_a - supply_variant_a ?material_variant_b - supply_variant_b ?supply_package - supply_package)
+    :precondition
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (staging_slot_reserved ?staging_slot)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_a_ready ?material_variant_a)
+        (variant_b_staged ?material_variant_b)
+        (intake_slot_ready ?intake_slot)
+        (not
+          (staging_slot_ready ?staging_slot)
+        )
+        (package_available ?supply_package)
+      )
+    :effect
+      (and
+        (package_ready ?supply_package)
+        (package_contains_variant_a ?supply_package ?material_variant_a)
+        (package_contains_variant_b ?supply_package ?material_variant_b)
+        (package_tag_b ?supply_package)
+        (not
+          (package_available ?supply_package)
+        )
+      )
+  )
+  (:action assemble_supply_package_with_tags_a_b
+    :parameters (?intake_slot - intake_slot ?staging_slot - staging_slot ?material_variant_a - supply_variant_a ?material_variant_b - supply_variant_b ?supply_package - supply_package)
+    :precondition
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (staging_slot_reserved ?staging_slot)
+        (intake_variant_a_reserved ?intake_slot ?material_variant_a)
+        (staging_variant_b_reserved ?staging_slot ?material_variant_b)
+        (variant_a_staged ?material_variant_a)
+        (variant_b_staged ?material_variant_b)
+        (not
+          (intake_slot_ready ?intake_slot)
+        )
+        (not
+          (staging_slot_ready ?staging_slot)
+        )
+        (package_available ?supply_package)
+      )
+    :effect
+      (and
+        (package_ready ?supply_package)
+        (package_contains_variant_a ?supply_package ?material_variant_a)
+        (package_contains_variant_b ?supply_package ?material_variant_b)
+        (package_tag_a ?supply_package)
+        (package_tag_b ?supply_package)
+        (not
+          (package_available ?supply_package)
+        )
+      )
+  )
+  (:action lock_package_for_attachment
+    :parameters (?supply_package - supply_package ?intake_slot - intake_slot ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (package_ready ?supply_package)
+        (intake_slot_reserved ?intake_slot)
+        (bound_processing_consumable ?intake_slot ?processing_consumable)
+        (not
+          (package_locked_for_attachment ?supply_package)
+        )
+      )
+    :effect (package_locked_for_attachment ?supply_package)
+  )
+  (:action attach_module_to_package
+    :parameters (?production_hub - production_hub ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (hub_assigned_supply_package ?production_hub ?supply_package)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_available ?attachment_module)
+        (package_ready ?supply_package)
+        (package_locked_for_attachment ?supply_package)
+        (not
+          (attachment_module_installed ?attachment_module)
+        )
+      )
+    :effect
+      (and
+        (attachment_module_installed ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (not
+          (attachment_module_available ?attachment_module)
+        )
+      )
+  )
+  (:action enable_hub_integration_for_module
+    :parameters (?production_hub - production_hub ?attachment_module - attachment_module ?supply_package - supply_package ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_installed ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (bound_processing_consumable ?production_hub ?processing_consumable)
+        (not
+          (package_tag_a ?supply_package)
+        )
+        (not
+          (hub_integration_ready ?production_hub)
+        )
+      )
+    :effect (hub_integration_ready ?production_hub)
+  )
+  (:action assign_upgrade_module_to_hub
+    :parameters (?production_hub - production_hub ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (upgrade_module_available ?upgrade_module)
+        (not
+          (hub_upgrade_pending ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_upgrade_pending ?production_hub)
+        (hub_has_upgrade_module ?production_hub ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action stage_hub_upgrade_integration
+    :parameters (?production_hub - production_hub ?attachment_module - attachment_module ?supply_package - supply_package ?processing_consumable - processing_consumable ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_installed ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (bound_processing_consumable ?production_hub ?processing_consumable)
+        (package_tag_a ?supply_package)
+        (hub_upgrade_pending ?production_hub)
+        (hub_has_upgrade_module ?production_hub ?upgrade_module)
+        (not
+          (hub_integration_ready ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_integration_ready ?production_hub)
+        (hub_upgrade_staged ?production_hub)
+      )
+  )
+  (:action activate_module_on_hub
+    :parameters (?production_hub - production_hub ?power_cell - power_cell ?maintenance_tool - maintenance_tool ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_integration_ready ?production_hub)
+        (hub_has_power_cell ?production_hub ?power_cell)
+        (bound_maintenance_tool ?production_hub ?maintenance_tool)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (not
+          (package_tag_b ?supply_package)
+        )
+        (not
+          (hub_module_bound ?production_hub)
+        )
+      )
+    :effect (hub_module_bound ?production_hub)
+  )
+  (:action activate_module_on_hub_secondary
+    :parameters (?production_hub - production_hub ?power_cell - power_cell ?maintenance_tool - maintenance_tool ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_integration_ready ?production_hub)
+        (hub_has_power_cell ?production_hub ?power_cell)
+        (bound_maintenance_tool ?production_hub ?maintenance_tool)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (package_tag_b ?supply_package)
+        (not
+          (hub_module_bound ?production_hub)
+        )
+      )
+    :effect (hub_module_bound ?production_hub)
+  )
+  (:action apply_exotic_part_activate_without_consumable
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_module_bound ?production_hub)
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (not
+          (package_tag_a ?supply_package)
+        )
+        (not
+          (package_tag_b ?supply_package)
+        )
+        (not
+          (hub_ready_for_finalization ?production_hub)
+        )
+      )
+    :effect (hub_ready_for_finalization ?production_hub)
+  )
+  (:action apply_exotic_and_attach_consumable_pack_tag_a
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_module_bound ?production_hub)
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (package_tag_a ?supply_package)
+        (not
+          (package_tag_b ?supply_package)
+        )
+        (not
+          (hub_ready_for_finalization ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_consumable_pack_present ?production_hub)
+      )
+  )
+  (:action apply_exotic_and_attach_consumable_pack_tag_b
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_module_bound ?production_hub)
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (not
+          (package_tag_a ?supply_package)
+        )
+        (package_tag_b ?supply_package)
+        (not
+          (hub_ready_for_finalization ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_consumable_pack_present ?production_hub)
+      )
+  )
+  (:action apply_exotic_and_attach_consumable_pack_both_tags
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part ?attachment_module - attachment_module ?supply_package - supply_package)
+    :precondition
+      (and
+        (hub_module_bound ?production_hub)
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (hub_has_attachment_module ?production_hub ?attachment_module)
+        (attachment_module_attached_to_package ?attachment_module ?supply_package)
+        (package_tag_a ?supply_package)
+        (package_tag_b ?supply_package)
+        (not
+          (hub_ready_for_finalization ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_consumable_pack_present ?production_hub)
+      )
+  )
+  (:action seal_hub_and_mark_deployable
+    :parameters (?production_hub - production_hub)
+    :precondition
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (not
+          (hub_consumable_pack_present ?production_hub)
+        )
+        (not
+          (hub_sealed ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_sealed ?production_hub)
+        (marked_deployable ?production_hub)
+      )
+  )
+  (:action attach_consumable_pack_to_hub
+    :parameters (?production_hub - production_hub ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_consumable_pack_present ?production_hub)
+        (consumable_pack_available ?consumable_pack)
+      )
+    :effect
+      (and
+        (hub_has_consumable_pack ?production_hub ?consumable_pack)
+        (not
+          (consumable_pack_available ?consumable_pack)
+        )
+      )
+  )
+  (:action finalize_hub_assembly
+    :parameters (?production_hub - production_hub ?intake_slot - intake_slot ?staging_slot - staging_slot ?processing_consumable - processing_consumable ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_consumable_pack_present ?production_hub)
+        (hub_has_consumable_pack ?production_hub ?consumable_pack)
+        (hub_controls_intake_slot ?production_hub ?intake_slot)
+        (hub_controls_staging_slot ?production_hub ?staging_slot)
+        (intake_slot_ready ?intake_slot)
+        (staging_slot_ready ?staging_slot)
+        (bound_processing_consumable ?production_hub ?processing_consumable)
+        (not
+          (hub_finalized ?production_hub)
+        )
+      )
+    :effect (hub_finalized ?production_hub)
+  )
+  (:action final_seal_and_mark_deployable
+    :parameters (?production_hub - production_hub)
+    :precondition
+      (and
+        (hub_ready_for_finalization ?production_hub)
+        (hub_finalized ?production_hub)
+        (not
+          (hub_sealed ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_sealed ?production_hub)
+        (marked_deployable ?production_hub)
+      )
+  )
+  (:action install_special_part_on_hub
+    :parameters (?production_hub - production_hub ?special_part - special_part ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (primed_for_processing ?production_hub)
+        (bound_processing_consumable ?production_hub ?processing_consumable)
+        (special_part_available ?special_part)
+        (hub_has_special_part ?production_hub ?special_part)
+        (not
+          (hub_upgrade_initialized ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_upgrade_initialized ?production_hub)
+        (not
+          (special_part_available ?special_part)
+        )
+      )
+  )
+  (:action start_upgrade_with_tool
+    :parameters (?production_hub - production_hub ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (hub_upgrade_initialized ?production_hub)
+        (bound_maintenance_tool ?production_hub ?maintenance_tool)
+        (not
+          (hub_upgrade_applied ?production_hub)
+        )
+      )
+    :effect (hub_upgrade_applied ?production_hub)
+  )
+  (:action apply_exotic_part_to_hub
+    :parameters (?production_hub - production_hub ?exotic_part - exotic_part)
+    :precondition
+      (and
+        (hub_upgrade_applied ?production_hub)
+        (hub_has_exotic_part ?production_hub ?exotic_part)
+        (not
+          (hub_upgrade_complete ?production_hub)
+        )
+      )
+    :effect (hub_upgrade_complete ?production_hub)
+  )
+  (:action finalize_hub_upgrade
+    :parameters (?production_hub - production_hub)
+    :precondition
+      (and
+        (hub_upgrade_complete ?production_hub)
+        (not
+          (hub_sealed ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_sealed ?production_hub)
+        (marked_deployable ?production_hub)
+      )
+  )
+  (:action finalize_intake_slot_deployment
+    :parameters (?intake_slot - intake_slot ?supply_package - supply_package)
+    :precondition
+      (and
+        (intake_slot_reserved ?intake_slot)
+        (intake_slot_ready ?intake_slot)
+        (package_ready ?supply_package)
+        (package_locked_for_attachment ?supply_package)
+        (not
+          (marked_deployable ?intake_slot)
+        )
+      )
+    :effect (marked_deployable ?intake_slot)
+  )
+  (:action finalize_staging_slot_deployment
+    :parameters (?staging_slot - staging_slot ?supply_package - supply_package)
+    :precondition
+      (and
+        (staging_slot_reserved ?staging_slot)
+        (staging_slot_ready ?staging_slot)
+        (package_ready ?supply_package)
+        (package_locked_for_attachment ?supply_package)
+        (not
+          (marked_deployable ?staging_slot)
+        )
+      )
+    :effect (marked_deployable ?staging_slot)
+  )
+  (:action fulfill_request_and_assign_priority
+    :parameters (?base_location - base_location ?priority_marker - priority_marker ?processing_consumable - processing_consumable)
+    :precondition
+      (and
+        (marked_deployable ?base_location)
+        (bound_processing_consumable ?base_location ?processing_consumable)
+        (priority_marker_available ?priority_marker)
+        (not
+          (request_fulfilled ?base_location)
+        )
+      )
+    :effect
+      (and
+        (request_fulfilled ?base_location)
+        (location_has_priority_marker ?base_location ?priority_marker)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action finalize_intake_allocation
+    :parameters (?intake_slot - intake_slot ?material_resource - material_resource ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (request_fulfilled ?intake_slot)
+        (bound_material_resource ?intake_slot ?material_resource)
+        (location_has_priority_marker ?intake_slot ?priority_marker)
+        (not
+          (ready_for_dispatch ?intake_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch ?intake_slot)
+        (material_resource_available ?material_resource)
+        (priority_marker_available ?priority_marker)
+      )
+  )
+  (:action finalize_staging_allocation
+    :parameters (?staging_slot - staging_slot ?material_resource - material_resource ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (request_fulfilled ?staging_slot)
+        (bound_material_resource ?staging_slot ?material_resource)
+        (location_has_priority_marker ?staging_slot ?priority_marker)
+        (not
+          (ready_for_dispatch ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch ?staging_slot)
+        (material_resource_available ?material_resource)
+        (priority_marker_available ?priority_marker)
+      )
+  )
+  (:action finalize_hub_allocation
+    :parameters (?production_hub - production_hub ?material_resource - material_resource ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (request_fulfilled ?production_hub)
+        (bound_material_resource ?production_hub ?material_resource)
+        (location_has_priority_marker ?production_hub ?priority_marker)
+        (not
+          (ready_for_dispatch ?production_hub)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch ?production_hub)
+        (material_resource_available ?material_resource)
+        (priority_marker_available ?priority_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem base_supply_buffer_instance)
+  (:domain base_supply_buffer_management)
+  (:objects intake_slot_1 - intake_slot staging_slot_1 - staging_slot production_hub_alpha - production_hub production_hub_beta - production_hub raw_ore_iron - material_resource raw_ore_copper - material_resource raw_polymer - material_resource lubricant_charge - processing_consumable maintenance_tool_kit - maintenance_tool intermediate_frame - intermediate_component material_variant_a_standard - supply_variant_a material_variant_b_standard - supply_variant_b supply_package_empty - supply_package attachment_module_shield - attachment_module attachment_module_scope - attachment_module upgrade_module_speed - upgrade_module upgrade_module_durability - upgrade_module consumable_pack_small - consumable_pack consumable_pack_large - consumable_pack priority_marker_high - priority_marker power_cell_alpha - power_cell special_part_alpha - special_part special_part_beta - special_part exotic_part_x - exotic_part)
+  (:init
+    (material_resource_available raw_ore_iron)
+    (material_resource_available raw_ore_copper)
+    (material_resource_available raw_polymer)
+    (consumable_available lubricant_charge)
+    (tool_available maintenance_tool_kit)
+    (component_available intermediate_frame)
+    (intake_variant_a_reserved intake_slot_1 material_variant_a_standard)
+    (staging_variant_b_reserved staging_slot_1 material_variant_b_standard)
+    (package_available supply_package_empty)
+    (attachment_module_available attachment_module_shield)
+    (attachment_module_available attachment_module_scope)
+    (hub_controls_intake_slot production_hub_alpha intake_slot_1)
+    (hub_controls_intake_slot production_hub_beta intake_slot_1)
+    (hub_controls_staging_slot production_hub_alpha staging_slot_1)
+    (hub_controls_staging_slot production_hub_beta staging_slot_1)
+    (hub_assigned_supply_package production_hub_alpha supply_package_empty)
+    (hub_assigned_supply_package production_hub_beta supply_package_empty)
+    (hub_has_attachment_module production_hub_alpha attachment_module_shield)
+    (hub_has_attachment_module production_hub_beta attachment_module_scope)
+    (upgrade_module_available upgrade_module_speed)
+    (upgrade_module_available upgrade_module_durability)
+    (consumable_pack_available consumable_pack_small)
+    (consumable_pack_available consumable_pack_large)
+    (priority_marker_available priority_marker_high)
+    (power_cell_available power_cell_alpha)
+    (special_part_available special_part_alpha)
+    (hub_has_special_part production_hub_alpha special_part_alpha)
+    (hub_has_special_part production_hub_beta special_part_beta)
+    (exotic_part_available exotic_part_x)
+  )
+  (:goal
+    (and
+      (ready_for_dispatch intake_slot_1)
+      (ready_for_dispatch staging_slot_1)
+      (ready_for_dispatch production_hub_alpha)
+      (ready_for_dispatch production_hub_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_supply_request staging_slot_1)
+(assign_raw_material_to_request staging_slot_1 raw_ore_copper)
+(bind_processing_consumable staging_slot_1 lubricant_charge)
+(prime_request_for_processing staging_slot_1 lubricant_charge)
+(apply_component_to_staging staging_slot_1 material_variant_b_standard intermediate_frame)
+(complete_staging_processing staging_slot_1 material_variant_b_standard lubricant_charge intermediate_frame)
+(release_processing_consumable staging_slot_1 lubricant_charge)
+(open_supply_request intake_slot_1)
+(assign_raw_material_to_request intake_slot_1 raw_ore_iron)
+(bind_processing_consumable intake_slot_1 lubricant_charge)
+(prime_request_for_processing intake_slot_1 lubricant_charge)
+(apply_component_to_intake intake_slot_1 material_variant_a_standard intermediate_frame)
+(complete_intake_processing intake_slot_1 material_variant_a_standard lubricant_charge intermediate_frame)
+(assemble_supply_package intake_slot_1 staging_slot_1 material_variant_a_standard material_variant_b_standard supply_package_empty)
+(lock_package_for_attachment supply_package_empty intake_slot_1 lubricant_charge)
+(finalize_intake_slot_deployment intake_slot_1 supply_package_empty)
+(finalize_staging_slot_deployment staging_slot_1 supply_package_empty)
+(open_supply_request production_hub_alpha)
+(assign_raw_material_to_request production_hub_alpha raw_polymer)
+(release_processing_consumable intake_slot_1 lubricant_charge)
+(bind_processing_consumable production_hub_alpha lubricant_charge)
+(prime_request_for_processing production_hub_alpha lubricant_charge)
+(install_power_cell_on_hub production_hub_alpha power_cell_alpha)
+(attach_module_to_package production_hub_alpha attachment_module_shield supply_package_empty)
+(enable_hub_integration_for_module production_hub_alpha attachment_module_shield supply_package_empty lubricant_charge)
+(assign_tool_to_location production_hub_alpha maintenance_tool_kit)
+(activate_module_on_hub production_hub_alpha power_cell_alpha maintenance_tool_kit attachment_module_shield supply_package_empty)
+(install_exotic_part_on_hub production_hub_alpha exotic_part_x)
+(apply_exotic_part_activate_without_consumable production_hub_alpha exotic_part_x attachment_module_shield supply_package_empty)
+(seal_hub_and_mark_deployable production_hub_alpha)
+(fulfill_request_and_assign_priority production_hub_alpha priority_marker_high lubricant_charge)
+(finalize_hub_allocation production_hub_alpha raw_polymer priority_marker_high)
+(remove_power_cell_from_hub production_hub_alpha power_cell_alpha)
+(remove_exotic_part_from_hub production_hub_alpha exotic_part_x)
+(return_tool_to_inventory production_hub_alpha maintenance_tool_kit)
+(release_processing_consumable production_hub_alpha lubricant_charge)
+(open_supply_request production_hub_beta)
+(assign_raw_material_to_request production_hub_beta raw_polymer)
+(bind_processing_consumable production_hub_beta lubricant_charge)
+(prime_request_for_processing production_hub_beta lubricant_charge)
+(install_power_cell_on_hub production_hub_beta power_cell_alpha)
+(attach_module_to_package production_hub_beta attachment_module_scope supply_package_empty)
+(enable_hub_integration_for_module production_hub_beta attachment_module_scope supply_package_empty lubricant_charge)
+(assign_tool_to_location production_hub_beta maintenance_tool_kit)
+(activate_module_on_hub production_hub_beta power_cell_alpha maintenance_tool_kit attachment_module_scope supply_package_empty)
+(install_exotic_part_on_hub production_hub_beta exotic_part_x)
+(apply_exotic_part_activate_without_consumable production_hub_beta exotic_part_x attachment_module_scope supply_package_empty)
+(seal_hub_and_mark_deployable production_hub_beta)
+(fulfill_request_and_assign_priority production_hub_beta priority_marker_high lubricant_charge)
+(finalize_hub_allocation production_hub_beta raw_polymer priority_marker_high)
+(release_processing_consumable production_hub_beta lubricant_charge)
+(bind_processing_consumable intake_slot_1 lubricant_charge)
+(fulfill_request_and_assign_priority intake_slot_1 priority_marker_high lubricant_charge)
+(finalize_intake_allocation intake_slot_1 raw_ore_iron priority_marker_high)
+(release_processing_consumable intake_slot_1 lubricant_charge)
+(bind_processing_consumable staging_slot_1 lubricant_charge)
+(fulfill_request_and_assign_priority staging_slot_1 priority_marker_high lubricant_charge)
+(finalize_staging_allocation staging_slot_1 raw_ore_copper priority_marker_high)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_krgsz6zv/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_krgsz6zv/plan.pddl 
+
+
+--- stderr ---
+

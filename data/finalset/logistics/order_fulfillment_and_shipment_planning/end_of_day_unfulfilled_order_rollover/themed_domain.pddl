@@ -1,0 +1,936 @@
+(define (domain logistics_end_of_day_unfulfilled_order_rollover)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_class - object asset_class - object load_class - object domain_root - object fulfillment_entity - domain_root release_slot - resource_class order_line_item - resource_class workstation - resource_class load_profile - resource_class manifest_label - resource_class service_level_profile - resource_class equipment_resource - resource_class carrier_option - resource_class package_unit - asset_class container_asset - asset_class handling_instruction - asset_class source_load_id - load_class destination_load_id - load_class transport_unit - load_class fulfillment_location_group - fulfillment_entity shipment_group - fulfillment_entity source_unit - fulfillment_location_group destination_unit - fulfillment_location_group outbound_shipment - shipment_group)
+  (:predicates
+    (release_candidate ?fulfillment_entity - fulfillment_entity)
+    (sourcing_confirmed ?fulfillment_entity - fulfillment_entity)
+    (release_assignment_confirmed ?fulfillment_entity - fulfillment_entity)
+    (marked_for_rollover ?fulfillment_entity - fulfillment_entity)
+    (entity_served ?fulfillment_entity - fulfillment_entity)
+    (eligible_for_rollover ?fulfillment_entity - fulfillment_entity)
+    (release_slot_available ?release_slot - release_slot)
+    (entity_assigned_release_slot ?fulfillment_entity - fulfillment_entity ?release_slot - release_slot)
+    (unallocated_order_line ?order_line_item - order_line_item)
+    (order_line_allocated ?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    (workstation_available ?workstation - workstation)
+    (assigned_workstation ?fulfillment_entity - fulfillment_entity ?workstation - workstation)
+    (available_package_unit ?package_unit - package_unit)
+    (source_assigned_package_unit ?source_unit - source_unit ?package_unit - package_unit)
+    (destination_assigned_package_unit ?destination_unit - destination_unit ?package_unit - package_unit)
+    (source_assigned_load ?source_unit - source_unit ?source_load - source_load_id)
+    (source_load_ready ?source_load - source_load_id)
+    (source_load_has_package ?source_load - source_load_id)
+    (source_unit_reserved ?source_unit - source_unit)
+    (destination_assigned_load ?destination_unit - destination_unit ?destination_load - destination_load_id)
+    (destination_load_ready ?destination_load - destination_load_id)
+    (destination_load_has_package ?destination_load - destination_load_id)
+    (destination_unit_reserved ?destination_unit - destination_unit)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_allocated ?transport_unit - transport_unit)
+    (transport_unit_assigned_source_load ?transport_unit - transport_unit ?source_load - source_load_id)
+    (transport_unit_assigned_destination_load ?transport_unit - transport_unit ?destination_load - destination_load_id)
+    (transport_unit_source_verified ?transport_unit - transport_unit)
+    (transport_unit_destination_verified ?transport_unit - transport_unit)
+    (transport_unit_ready_for_loading ?transport_unit - transport_unit)
+    (shipment_assigned_source_unit ?outbound_shipment_var - outbound_shipment ?source_unit - source_unit)
+    (shipment_assigned_destination_unit ?outbound_shipment_var - outbound_shipment ?destination_unit - destination_unit)
+    (shipment_assigned_transport_unit ?outbound_shipment_var - outbound_shipment ?transport_unit - transport_unit)
+    (container_available ?container_asset - container_asset)
+    (shipment_has_container ?outbound_shipment_var - outbound_shipment ?container_asset - container_asset)
+    (container_staged ?container_asset - container_asset)
+    (container_assigned_to_transport_unit ?container_asset - container_asset ?transport_unit - transport_unit)
+    (shipment_container_verified ?outbound_shipment_var - outbound_shipment)
+    (shipment_container_confirmed ?outbound_shipment_var - outbound_shipment)
+    (shipment_ready_for_manifest ?outbound_shipment_var - outbound_shipment)
+    (shipment_load_profile_reserved ?outbound_shipment_var - outbound_shipment)
+    (shipment_load_profile_confirmed ?outbound_shipment_var - outbound_shipment)
+    (shipment_manifest_label_attached ?outbound_shipment_var - outbound_shipment)
+    (shipment_final_check_passed ?outbound_shipment_var - outbound_shipment)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (shipment_has_handling_instruction ?outbound_shipment_var - outbound_shipment ?handling_instruction - handling_instruction)
+    (shipment_handling_applied ?outbound_shipment_var - outbound_shipment)
+    (shipment_handling_validated ?outbound_shipment_var - outbound_shipment)
+    (shipment_handling_finalized ?outbound_shipment_var - outbound_shipment)
+    (load_profile_available ?load_profile - load_profile)
+    (shipment_assigned_load_profile ?outbound_shipment_var - outbound_shipment ?load_profile - load_profile)
+    (manifest_label_available ?manifest_label - manifest_label)
+    (shipment_assigned_manifest_label ?outbound_shipment_var - outbound_shipment ?manifest_label - manifest_label)
+    (equipment_resource_available ?equipment_resource - equipment_resource)
+    (shipment_assigned_equipment_resource ?outbound_shipment_var - outbound_shipment ?equipment_resource - equipment_resource)
+    (carrier_option_available ?carrier_option - carrier_option)
+    (shipment_assigned_carrier_option ?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option)
+    (service_level_profile_available ?service_level_profile - service_level_profile)
+    (entity_assigned_service_level_profile ?fulfillment_entity - fulfillment_entity ?service_level_profile - service_level_profile)
+    (source_unit_processing ?source_unit - source_unit)
+    (destination_unit_processing ?destination_unit - destination_unit)
+    (shipment_finalized ?outbound_shipment_var - outbound_shipment)
+  )
+  (:action create_release_candidate
+    :parameters (?fulfillment_entity - fulfillment_entity)
+    :precondition
+      (and
+        (not
+          (release_candidate ?fulfillment_entity)
+        )
+        (not
+          (marked_for_rollover ?fulfillment_entity)
+        )
+      )
+    :effect (release_candidate ?fulfillment_entity)
+  )
+  (:action assign_release_slot
+    :parameters (?fulfillment_entity - fulfillment_entity ?release_slot - release_slot)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_entity)
+        (not
+          (release_assignment_confirmed ?fulfillment_entity)
+        )
+        (release_slot_available ?release_slot)
+      )
+    :effect
+      (and
+        (release_assignment_confirmed ?fulfillment_entity)
+        (entity_assigned_release_slot ?fulfillment_entity ?release_slot)
+        (not
+          (release_slot_available ?release_slot)
+        )
+      )
+  )
+  (:action allocate_line_item
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_entity)
+        (release_assignment_confirmed ?fulfillment_entity)
+        (unallocated_order_line ?order_line_item)
+      )
+    :effect
+      (and
+        (order_line_allocated ?fulfillment_entity ?order_line_item)
+        (not
+          (unallocated_order_line ?order_line_item)
+        )
+      )
+  )
+  (:action confirm_line_item_allocation
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_entity)
+        (release_assignment_confirmed ?fulfillment_entity)
+        (order_line_allocated ?fulfillment_entity ?order_line_item)
+        (not
+          (sourcing_confirmed ?fulfillment_entity)
+        )
+      )
+    :effect (sourcing_confirmed ?fulfillment_entity)
+  )
+  (:action revert_line_item_allocation
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (order_line_allocated ?fulfillment_entity ?order_line_item)
+      )
+    :effect
+      (and
+        (unallocated_order_line ?order_line_item)
+        (not
+          (order_line_allocated ?fulfillment_entity ?order_line_item)
+        )
+      )
+  )
+  (:action reserve_workstation
+    :parameters (?fulfillment_entity - fulfillment_entity ?workstation - workstation)
+    :precondition
+      (and
+        (sourcing_confirmed ?fulfillment_entity)
+        (workstation_available ?workstation)
+      )
+    :effect
+      (and
+        (assigned_workstation ?fulfillment_entity ?workstation)
+        (not
+          (workstation_available ?workstation)
+        )
+      )
+  )
+  (:action release_workstation
+    :parameters (?fulfillment_entity - fulfillment_entity ?workstation - workstation)
+    :precondition
+      (and
+        (assigned_workstation ?fulfillment_entity ?workstation)
+      )
+    :effect
+      (and
+        (workstation_available ?workstation)
+        (not
+          (assigned_workstation ?fulfillment_entity ?workstation)
+        )
+      )
+  )
+  (:action reserve_equipment_resource
+    :parameters (?outbound_shipment_var - outbound_shipment ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (equipment_resource_available ?equipment_resource)
+      )
+    :effect
+      (and
+        (shipment_assigned_equipment_resource ?outbound_shipment_var ?equipment_resource)
+        (not
+          (equipment_resource_available ?equipment_resource)
+        )
+      )
+  )
+  (:action release_equipment_resource
+    :parameters (?outbound_shipment_var - outbound_shipment ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (shipment_assigned_equipment_resource ?outbound_shipment_var ?equipment_resource)
+      )
+    :effect
+      (and
+        (equipment_resource_available ?equipment_resource)
+        (not
+          (shipment_assigned_equipment_resource ?outbound_shipment_var ?equipment_resource)
+        )
+      )
+  )
+  (:action reserve_carrier_option
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (carrier_option_available ?carrier_option)
+      )
+    :effect
+      (and
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (not
+          (carrier_option_available ?carrier_option)
+        )
+      )
+  )
+  (:action release_carrier_option
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+      )
+    :effect
+      (and
+        (carrier_option_available ?carrier_option)
+        (not
+          (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        )
+      )
+  )
+  (:action signal_source_load_candidate
+    :parameters (?source_unit - source_unit ?source_load - source_load_id ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (sourcing_confirmed ?source_unit)
+        (order_line_allocated ?source_unit ?order_line_item)
+        (source_assigned_load ?source_unit ?source_load)
+        (not
+          (source_load_ready ?source_load)
+        )
+        (not
+          (source_load_has_package ?source_load)
+        )
+      )
+    :effect (source_load_ready ?source_load)
+  )
+  (:action reserve_source_for_loading
+    :parameters (?source_unit - source_unit ?source_load - source_load_id ?workstation - workstation)
+    :precondition
+      (and
+        (sourcing_confirmed ?source_unit)
+        (assigned_workstation ?source_unit ?workstation)
+        (source_assigned_load ?source_unit ?source_load)
+        (source_load_ready ?source_load)
+        (not
+          (source_unit_processing ?source_unit)
+        )
+      )
+    :effect
+      (and
+        (source_unit_processing ?source_unit)
+        (source_unit_reserved ?source_unit)
+      )
+  )
+  (:action assign_package_to_source_unit
+    :parameters (?source_unit - source_unit ?source_load - source_load_id ?package_unit - package_unit)
+    :precondition
+      (and
+        (sourcing_confirmed ?source_unit)
+        (source_assigned_load ?source_unit ?source_load)
+        (available_package_unit ?package_unit)
+        (not
+          (source_unit_processing ?source_unit)
+        )
+      )
+    :effect
+      (and
+        (source_load_has_package ?source_load)
+        (source_unit_processing ?source_unit)
+        (source_assigned_package_unit ?source_unit ?package_unit)
+        (not
+          (available_package_unit ?package_unit)
+        )
+      )
+  )
+  (:action finalize_source_package_assignment
+    :parameters (?source_unit - source_unit ?source_load - source_load_id ?order_line_item - order_line_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (sourcing_confirmed ?source_unit)
+        (order_line_allocated ?source_unit ?order_line_item)
+        (source_assigned_load ?source_unit ?source_load)
+        (source_load_has_package ?source_load)
+        (source_assigned_package_unit ?source_unit ?package_unit)
+        (not
+          (source_unit_reserved ?source_unit)
+        )
+      )
+    :effect
+      (and
+        (source_load_ready ?source_load)
+        (source_unit_reserved ?source_unit)
+        (available_package_unit ?package_unit)
+        (not
+          (source_assigned_package_unit ?source_unit ?package_unit)
+        )
+      )
+  )
+  (:action signal_destination_load_candidate
+    :parameters (?destination_unit - destination_unit ?destination_load - destination_load_id ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (sourcing_confirmed ?destination_unit)
+        (order_line_allocated ?destination_unit ?order_line_item)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (not
+          (destination_load_ready ?destination_load)
+        )
+        (not
+          (destination_load_has_package ?destination_load)
+        )
+      )
+    :effect (destination_load_ready ?destination_load)
+  )
+  (:action reserve_destination_for_loading
+    :parameters (?destination_unit - destination_unit ?destination_load - destination_load_id ?workstation - workstation)
+    :precondition
+      (and
+        (sourcing_confirmed ?destination_unit)
+        (assigned_workstation ?destination_unit ?workstation)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (destination_load_ready ?destination_load)
+        (not
+          (destination_unit_processing ?destination_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_unit_processing ?destination_unit)
+        (destination_unit_reserved ?destination_unit)
+      )
+  )
+  (:action assign_package_to_destination_unit
+    :parameters (?destination_unit - destination_unit ?destination_load - destination_load_id ?package_unit - package_unit)
+    :precondition
+      (and
+        (sourcing_confirmed ?destination_unit)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (available_package_unit ?package_unit)
+        (not
+          (destination_unit_processing ?destination_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_load_has_package ?destination_load)
+        (destination_unit_processing ?destination_unit)
+        (destination_assigned_package_unit ?destination_unit ?package_unit)
+        (not
+          (available_package_unit ?package_unit)
+        )
+      )
+  )
+  (:action finalize_destination_package_assignment
+    :parameters (?destination_unit - destination_unit ?destination_load - destination_load_id ?order_line_item - order_line_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (sourcing_confirmed ?destination_unit)
+        (order_line_allocated ?destination_unit ?order_line_item)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (destination_load_has_package ?destination_load)
+        (destination_assigned_package_unit ?destination_unit ?package_unit)
+        (not
+          (destination_unit_reserved ?destination_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_load_ready ?destination_load)
+        (destination_unit_reserved ?destination_unit)
+        (available_package_unit ?package_unit)
+        (not
+          (destination_assigned_package_unit ?destination_unit ?package_unit)
+        )
+      )
+  )
+  (:action form_transport_unit
+    :parameters (?source_unit - source_unit ?destination_unit - destination_unit ?source_load - source_load_id ?destination_load - destination_load_id ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_unit_processing ?source_unit)
+        (destination_unit_processing ?destination_unit)
+        (source_assigned_load ?source_unit ?source_load)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (source_load_ready ?source_load)
+        (destination_load_ready ?destination_load)
+        (source_unit_reserved ?source_unit)
+        (destination_unit_reserved ?destination_unit)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_source_load ?transport_unit ?source_load)
+        (transport_unit_assigned_destination_load ?transport_unit ?destination_load)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_mark_source_verified
+    :parameters (?source_unit - source_unit ?destination_unit - destination_unit ?source_load - source_load_id ?destination_load - destination_load_id ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_unit_processing ?source_unit)
+        (destination_unit_processing ?destination_unit)
+        (source_assigned_load ?source_unit ?source_load)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (source_load_has_package ?source_load)
+        (destination_load_ready ?destination_load)
+        (not
+          (source_unit_reserved ?source_unit)
+        )
+        (destination_unit_reserved ?destination_unit)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_source_load ?transport_unit ?source_load)
+        (transport_unit_assigned_destination_load ?transport_unit ?destination_load)
+        (transport_unit_source_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_mark_destination_verified
+    :parameters (?source_unit - source_unit ?destination_unit - destination_unit ?source_load - source_load_id ?destination_load - destination_load_id ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_unit_processing ?source_unit)
+        (destination_unit_processing ?destination_unit)
+        (source_assigned_load ?source_unit ?source_load)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (source_load_ready ?source_load)
+        (destination_load_has_package ?destination_load)
+        (source_unit_reserved ?source_unit)
+        (not
+          (destination_unit_reserved ?destination_unit)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_source_load ?transport_unit ?source_load)
+        (transport_unit_assigned_destination_load ?transport_unit ?destination_load)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_mark_both_verified
+    :parameters (?source_unit - source_unit ?destination_unit - destination_unit ?source_load - source_load_id ?destination_load - destination_load_id ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_unit_processing ?source_unit)
+        (destination_unit_processing ?destination_unit)
+        (source_assigned_load ?source_unit ?source_load)
+        (destination_assigned_load ?destination_unit ?destination_load)
+        (source_load_has_package ?source_load)
+        (destination_load_has_package ?destination_load)
+        (not
+          (source_unit_reserved ?source_unit)
+        )
+        (not
+          (destination_unit_reserved ?destination_unit)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_source_load ?transport_unit ?source_load)
+        (transport_unit_assigned_destination_load ?transport_unit ?destination_load)
+        (transport_unit_source_verified ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action stage_transport_unit_for_loading
+    :parameters (?transport_unit - transport_unit ?source_unit - source_unit ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (source_unit_processing ?source_unit)
+        (order_line_allocated ?source_unit ?order_line_item)
+        (not
+          (transport_unit_ready_for_loading ?transport_unit)
+        )
+      )
+    :effect (transport_unit_ready_for_loading ?transport_unit)
+  )
+  (:action assign_container_to_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (shipment_assigned_transport_unit ?outbound_shipment_var ?transport_unit)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_available ?container_asset)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_ready_for_loading ?transport_unit)
+        (not
+          (container_staged ?container_asset)
+        )
+      )
+    :effect
+      (and
+        (container_staged ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (not
+          (container_available ?container_asset)
+        )
+      )
+  )
+  (:action verify_container_and_mark_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?container_asset - container_asset ?transport_unit - transport_unit ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_staged ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (order_line_allocated ?outbound_shipment_var ?order_line_item)
+        (not
+          (transport_unit_source_verified ?transport_unit)
+        )
+        (not
+          (shipment_container_verified ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_container_verified ?outbound_shipment_var)
+  )
+  (:action apply_load_profile_to_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?load_profile - load_profile)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (load_profile_available ?load_profile)
+        (not
+          (shipment_load_profile_reserved ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_load_profile_reserved ?outbound_shipment_var)
+        (shipment_assigned_load_profile ?outbound_shipment_var ?load_profile)
+        (not
+          (load_profile_available ?load_profile)
+        )
+      )
+  )
+  (:action confirm_load_profile_and_prepare_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?container_asset - container_asset ?transport_unit - transport_unit ?order_line_item - order_line_item ?load_profile - load_profile)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_staged ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (order_line_allocated ?outbound_shipment_var ?order_line_item)
+        (transport_unit_source_verified ?transport_unit)
+        (shipment_load_profile_reserved ?outbound_shipment_var)
+        (shipment_assigned_load_profile ?outbound_shipment_var ?load_profile)
+        (not
+          (shipment_container_verified ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_container_verified ?outbound_shipment_var)
+        (shipment_load_profile_confirmed ?outbound_shipment_var)
+      )
+  )
+  (:action reserve_equipment_and_lock_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?equipment_resource - equipment_resource ?workstation - workstation ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_verified ?outbound_shipment_var)
+        (shipment_assigned_equipment_resource ?outbound_shipment_var ?equipment_resource)
+        (assigned_workstation ?outbound_shipment_var ?workstation)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_container_confirmed ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_container_confirmed ?outbound_shipment_var)
+  )
+  (:action reserve_equipment_and_lock_shipment_confirm
+    :parameters (?outbound_shipment_var - outbound_shipment ?equipment_resource - equipment_resource ?workstation - workstation ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_verified ?outbound_shipment_var)
+        (shipment_assigned_equipment_resource ?outbound_shipment_var ?equipment_resource)
+        (assigned_workstation ?outbound_shipment_var ?workstation)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_container_confirmed ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_container_confirmed ?outbound_shipment_var)
+  )
+  (:action assign_carrier_and_mark_ready_for_manifest
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_confirmed ?outbound_shipment_var)
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (not
+          (transport_unit_source_verified ?transport_unit)
+        )
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_ready_for_manifest ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_ready_for_manifest ?outbound_shipment_var)
+  )
+  (:action assign_carrier_and_attach_manifest_label
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_confirmed ?outbound_shipment_var)
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (transport_unit_source_verified ?transport_unit)
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_ready_for_manifest ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_manifest_label_attached ?outbound_shipment_var)
+      )
+  )
+  (:action assign_carrier_and_attach_manifest_label_variant
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_confirmed ?outbound_shipment_var)
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (not
+          (transport_unit_source_verified ?transport_unit)
+        )
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_ready_for_manifest ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_manifest_label_attached ?outbound_shipment_var)
+      )
+  )
+  (:action assign_carrier_and_attach_manifest_label_alt
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option ?container_asset - container_asset ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_container_confirmed ?outbound_shipment_var)
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (shipment_has_container ?outbound_shipment_var ?container_asset)
+        (container_assigned_to_transport_unit ?container_asset ?transport_unit)
+        (transport_unit_source_verified ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_ready_for_manifest ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_manifest_label_attached ?outbound_shipment_var)
+      )
+  )
+  (:action finalize_shipment_manifest
+    :parameters (?outbound_shipment_var - outbound_shipment)
+    :precondition
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (not
+          (shipment_manifest_label_attached ?outbound_shipment_var)
+        )
+        (not
+          (shipment_finalized ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_finalized ?outbound_shipment_var)
+        (entity_served ?outbound_shipment_var)
+      )
+  )
+  (:action assign_manifest_label_to_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?manifest_label - manifest_label)
+    :precondition
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_manifest_label_attached ?outbound_shipment_var)
+        (manifest_label_available ?manifest_label)
+      )
+    :effect
+      (and
+        (shipment_assigned_manifest_label ?outbound_shipment_var ?manifest_label)
+        (not
+          (manifest_label_available ?manifest_label)
+        )
+      )
+  )
+  (:action perform_shipment_final_checks
+    :parameters (?outbound_shipment_var - outbound_shipment ?source_unit - source_unit ?destination_unit - destination_unit ?order_line_item - order_line_item ?manifest_label - manifest_label)
+    :precondition
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_manifest_label_attached ?outbound_shipment_var)
+        (shipment_assigned_manifest_label ?outbound_shipment_var ?manifest_label)
+        (shipment_assigned_source_unit ?outbound_shipment_var ?source_unit)
+        (shipment_assigned_destination_unit ?outbound_shipment_var ?destination_unit)
+        (source_unit_reserved ?source_unit)
+        (destination_unit_reserved ?destination_unit)
+        (order_line_allocated ?outbound_shipment_var ?order_line_item)
+        (not
+          (shipment_final_check_passed ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_final_check_passed ?outbound_shipment_var)
+  )
+  (:action finalize_shipment_after_checks
+    :parameters (?outbound_shipment_var - outbound_shipment)
+    :precondition
+      (and
+        (shipment_ready_for_manifest ?outbound_shipment_var)
+        (shipment_final_check_passed ?outbound_shipment_var)
+        (not
+          (shipment_finalized ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_finalized ?outbound_shipment_var)
+        (entity_served ?outbound_shipment_var)
+      )
+  )
+  (:action apply_handling_instruction_to_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?handling_instruction - handling_instruction ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (sourcing_confirmed ?outbound_shipment_var)
+        (order_line_allocated ?outbound_shipment_var ?order_line_item)
+        (handling_instruction_available ?handling_instruction)
+        (shipment_has_handling_instruction ?outbound_shipment_var ?handling_instruction)
+        (not
+          (shipment_handling_applied ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_handling_applied ?outbound_shipment_var)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action validate_handling_instruction_assignment
+    :parameters (?outbound_shipment_var - outbound_shipment ?workstation - workstation)
+    :precondition
+      (and
+        (shipment_handling_applied ?outbound_shipment_var)
+        (assigned_workstation ?outbound_shipment_var ?workstation)
+        (not
+          (shipment_handling_validated ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_handling_validated ?outbound_shipment_var)
+  )
+  (:action confirm_handling_instruction_with_carrier
+    :parameters (?outbound_shipment_var - outbound_shipment ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (shipment_handling_validated ?outbound_shipment_var)
+        (shipment_assigned_carrier_option ?outbound_shipment_var ?carrier_option)
+        (not
+          (shipment_handling_finalized ?outbound_shipment_var)
+        )
+      )
+    :effect (shipment_handling_finalized ?outbound_shipment_var)
+  )
+  (:action finalize_shipment_after_handling
+    :parameters (?outbound_shipment_var - outbound_shipment)
+    :precondition
+      (and
+        (shipment_handling_finalized ?outbound_shipment_var)
+        (not
+          (shipment_finalized ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (shipment_finalized ?outbound_shipment_var)
+        (entity_served ?outbound_shipment_var)
+      )
+  )
+  (:action confirm_source_unit_served
+    :parameters (?source_unit - source_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_unit_processing ?source_unit)
+        (source_unit_reserved ?source_unit)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_ready_for_loading ?transport_unit)
+        (not
+          (entity_served ?source_unit)
+        )
+      )
+    :effect (entity_served ?source_unit)
+  )
+  (:action confirm_destination_unit_served
+    :parameters (?destination_unit - destination_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (destination_unit_processing ?destination_unit)
+        (destination_unit_reserved ?destination_unit)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_ready_for_loading ?transport_unit)
+        (not
+          (entity_served ?destination_unit)
+        )
+      )
+    :effect (entity_served ?destination_unit)
+  )
+  (:action mark_entity_eligible_for_rollover
+    :parameters (?fulfillment_entity - fulfillment_entity ?service_level_profile - service_level_profile ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (entity_served ?fulfillment_entity)
+        (order_line_allocated ?fulfillment_entity ?order_line_item)
+        (service_level_profile_available ?service_level_profile)
+        (not
+          (eligible_for_rollover ?fulfillment_entity)
+        )
+      )
+    :effect
+      (and
+        (eligible_for_rollover ?fulfillment_entity)
+        (entity_assigned_service_level_profile ?fulfillment_entity ?service_level_profile)
+        (not
+          (service_level_profile_available ?service_level_profile)
+        )
+      )
+  )
+  (:action execute_rollover_on_source_unit
+    :parameters (?source_unit - source_unit ?release_slot - release_slot ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (eligible_for_rollover ?source_unit)
+        (entity_assigned_release_slot ?source_unit ?release_slot)
+        (entity_assigned_service_level_profile ?source_unit ?service_level_profile)
+        (not
+          (marked_for_rollover ?source_unit)
+        )
+      )
+    :effect
+      (and
+        (marked_for_rollover ?source_unit)
+        (release_slot_available ?release_slot)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+  (:action execute_rollover_on_destination_unit
+    :parameters (?destination_unit - destination_unit ?release_slot - release_slot ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (eligible_for_rollover ?destination_unit)
+        (entity_assigned_release_slot ?destination_unit ?release_slot)
+        (entity_assigned_service_level_profile ?destination_unit ?service_level_profile)
+        (not
+          (marked_for_rollover ?destination_unit)
+        )
+      )
+    :effect
+      (and
+        (marked_for_rollover ?destination_unit)
+        (release_slot_available ?release_slot)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+  (:action execute_rollover_on_outbound_shipment
+    :parameters (?outbound_shipment_var - outbound_shipment ?release_slot - release_slot ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (eligible_for_rollover ?outbound_shipment_var)
+        (entity_assigned_release_slot ?outbound_shipment_var ?release_slot)
+        (entity_assigned_service_level_profile ?outbound_shipment_var ?service_level_profile)
+        (not
+          (marked_for_rollover ?outbound_shipment_var)
+        )
+      )
+    :effect
+      (and
+        (marked_for_rollover ?outbound_shipment_var)
+        (release_slot_available ?release_slot)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+)

@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain overbooking_rerouting_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object allocatable_asset - object option_set - object reservation_root - object reservation_entity - reservation_root transport_option - operational_resource confirmation_method - operational_resource agent_resource - operational_resource priority_benefit - operational_resource compensation_package - operational_resource customer_contact_token - operational_resource fare_quote - operational_resource manual_override - operational_resource compensation_voucher - allocatable_asset inventory_slot - allocatable_asset loyalty_preference - allocatable_asset alternative_segment - option_set carrier_option - option_set reroute_proposal - option_set booking_component - reservation_entity provider_record - reservation_entity primary_booking - booking_component linked_booking - booking_component reservation_case - provider_record)
+  (:predicates
+    (reservation_candidate ?reservation_entity - reservation_entity)
+    (reservation_committed ?reservation_entity - reservation_entity)
+    (reservation_transport_assigned ?reservation_entity - reservation_entity)
+    (reservation_finalized ?reservation_entity - reservation_entity)
+    (ticket_issued ?reservation_entity - reservation_entity)
+    (reconciliation_ready ?reservation_entity - reservation_entity)
+    (transport_option_available ?transport_option - transport_option)
+    (assigned_transport_option ?reservation_entity - reservation_entity ?transport_option - transport_option)
+    (confirmation_method_available ?confirmation_method - confirmation_method)
+    (confirmation_attached ?reservation_entity - reservation_entity ?confirmation_method - confirmation_method)
+    (agent_available ?agent_representative - agent_resource)
+    (assigned_agent ?reservation_entity - reservation_entity ?agent_representative - agent_resource)
+    (voucher_available ?compensation_voucher - compensation_voucher)
+    (voucher_allocated_to_primary_booking ?primary_booking - primary_booking ?compensation_voucher - compensation_voucher)
+    (voucher_allocated_to_linked_booking ?linked_booking - linked_booking ?compensation_voucher - compensation_voucher)
+    (booking_alternative_segment ?primary_booking - primary_booking ?alternative_segment - alternative_segment)
+    (segment_flagged_for_offer ?alternative_segment - alternative_segment)
+    (segment_compensation_offered ?alternative_segment - alternative_segment)
+    (primary_booking_ready ?primary_booking - primary_booking)
+    (linked_booking_carrier_option ?linked_booking - linked_booking ?carrier_option - carrier_option)
+    (carrier_option_flagged ?carrier_option - carrier_option)
+    (carrier_option_compensation_offered ?carrier_option - carrier_option)
+    (linked_booking_ready ?linked_booking - linked_booking)
+    (proposal_available ?reroute_proposal - reroute_proposal)
+    (proposal_active ?reroute_proposal - reroute_proposal)
+    (proposal_includes_segment ?reroute_proposal - reroute_proposal ?alternative_segment - alternative_segment)
+    (proposal_includes_carrier_option ?reroute_proposal - reroute_proposal ?carrier_option - carrier_option)
+    (proposal_priority_flag ?reroute_proposal - reroute_proposal)
+    (proposal_loyalty_flag ?reroute_proposal - reroute_proposal)
+    (proposal_ready_for_ticketing ?reroute_proposal - reroute_proposal)
+    (case_includes_primary_booking ?rebooking_case - reservation_case ?primary_booking - primary_booking)
+    (case_includes_linked_booking ?rebooking_case - reservation_case ?linked_booking - linked_booking)
+    (case_links_proposal ?rebooking_case - reservation_case ?reroute_proposal - reroute_proposal)
+    (inventory_slot_available ?inventory_slot - inventory_slot)
+    (case_inventory_reference ?rebooking_case - reservation_case ?inventory_slot - inventory_slot)
+    (inventory_slot_reserved ?inventory_slot - inventory_slot)
+    (inventory_slot_allocated_to_proposal ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    (case_allocation_confirmed ?rebooking_case - reservation_case)
+    (case_quote_confirmed ?rebooking_case - reservation_case)
+    (case_authorized_for_execution ?rebooking_case - reservation_case)
+    (case_priority_benefit_applied ?rebooking_case - reservation_case)
+    (case_priority_approval ?rebooking_case - reservation_case)
+    (case_final_approval_obtained ?rebooking_case - reservation_case)
+    (case_ready_for_execution ?rebooking_case - reservation_case)
+    (loyalty_preference_available ?loyalty_preference - loyalty_preference)
+    (case_loyalty_preference_link ?rebooking_case - reservation_case ?loyalty_preference - loyalty_preference)
+    (case_loyalty_preference_applied ?rebooking_case - reservation_case)
+    (case_loyalty_agent_verified ?rebooking_case - reservation_case)
+    (case_loyalty_authorized ?rebooking_case - reservation_case)
+    (priority_benefit_available ?priority_benefit - priority_benefit)
+    (case_priority_benefit_link ?rebooking_case - reservation_case ?priority_benefit - priority_benefit)
+    (compensation_package_available ?compensation_package - compensation_package)
+    (case_compensation_package_allocated ?rebooking_case - reservation_case ?compensation_package - compensation_package)
+    (fare_quote_available ?fare_quote - fare_quote)
+    (case_fare_quote_attached ?rebooking_case - reservation_case ?fare_quote - fare_quote)
+    (manual_override_available ?manual_override - manual_override)
+    (case_manual_override_attached ?rebooking_case - reservation_case ?manual_override - manual_override)
+    (customer_contact_token_available ?customer_contact_token - customer_contact_token)
+    (reservation_has_contact_token ?reservation_entity - reservation_entity ?customer_contact_token - customer_contact_token)
+    (primary_booking_prepared ?primary_booking - primary_booking)
+    (linked_booking_prepared ?linked_booking - linked_booking)
+    (case_finalized ?rebooking_case - reservation_case)
+  )
+  (:action initialize_reservation_candidate
+    :parameters (?reservation_entity - reservation_entity)
+    :precondition
+      (and
+        (not
+          (reservation_candidate ?reservation_entity)
+        )
+        (not
+          (reservation_finalized ?reservation_entity)
+        )
+      )
+    :effect (reservation_candidate ?reservation_entity)
+  )
+  (:action assign_transport_option_to_reservation
+    :parameters (?reservation_entity - reservation_entity ?transport_option - transport_option)
+    :precondition
+      (and
+        (reservation_candidate ?reservation_entity)
+        (not
+          (reservation_transport_assigned ?reservation_entity)
+        )
+        (transport_option_available ?transport_option)
+      )
+    :effect
+      (and
+        (reservation_transport_assigned ?reservation_entity)
+        (assigned_transport_option ?reservation_entity ?transport_option)
+        (not
+          (transport_option_available ?transport_option)
+        )
+      )
+  )
+  (:action collect_confirmation
+    :parameters (?reservation_entity - reservation_entity ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_candidate ?reservation_entity)
+        (reservation_transport_assigned ?reservation_entity)
+        (confirmation_method_available ?confirmation_method)
+      )
+    :effect
+      (and
+        (confirmation_attached ?reservation_entity ?confirmation_method)
+        (not
+          (confirmation_method_available ?confirmation_method)
+        )
+      )
+  )
+  (:action commit_confirmation
+    :parameters (?reservation_entity - reservation_entity ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_candidate ?reservation_entity)
+        (reservation_transport_assigned ?reservation_entity)
+        (confirmation_attached ?reservation_entity ?confirmation_method)
+        (not
+          (reservation_committed ?reservation_entity)
+        )
+      )
+    :effect (reservation_committed ?reservation_entity)
+  )
+  (:action rollback_confirmation
+    :parameters (?reservation_entity - reservation_entity ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (confirmation_attached ?reservation_entity ?confirmation_method)
+      )
+    :effect
+      (and
+        (confirmation_method_available ?confirmation_method)
+        (not
+          (confirmation_attached ?reservation_entity ?confirmation_method)
+        )
+      )
+  )
+  (:action assign_agent_to_reservation
+    :parameters (?reservation_entity - reservation_entity ?agent_representative - agent_resource)
+    :precondition
+      (and
+        (reservation_committed ?reservation_entity)
+        (agent_available ?agent_representative)
+      )
+    :effect
+      (and
+        (assigned_agent ?reservation_entity ?agent_representative)
+        (not
+          (agent_available ?agent_representative)
+        )
+      )
+  )
+  (:action release_agent_from_reservation
+    :parameters (?reservation_entity - reservation_entity ?agent_representative - agent_resource)
+    :precondition
+      (and
+        (assigned_agent ?reservation_entity ?agent_representative)
+      )
+    :effect
+      (and
+        (agent_available ?agent_representative)
+        (not
+          (assigned_agent ?reservation_entity ?agent_representative)
+        )
+      )
+  )
+  (:action attach_fare_quote
+    :parameters (?rebooking_case - reservation_case ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (fare_quote_available ?fare_quote)
+      )
+    :effect
+      (and
+        (case_fare_quote_attached ?rebooking_case ?fare_quote)
+        (not
+          (fare_quote_available ?fare_quote)
+        )
+      )
+  )
+  (:action revoke_fare_quote
+    :parameters (?rebooking_case - reservation_case ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (case_fare_quote_attached ?rebooking_case ?fare_quote)
+      )
+    :effect
+      (and
+        (fare_quote_available ?fare_quote)
+        (not
+          (case_fare_quote_attached ?rebooking_case ?fare_quote)
+        )
+      )
+  )
+  (:action attach_manual_override
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (manual_override_available ?manual_override)
+      )
+    :effect
+      (and
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (not
+          (manual_override_available ?manual_override)
+        )
+      )
+  )
+  (:action revoke_manual_override
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override)
+    :precondition
+      (and
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+      )
+    :effect
+      (and
+        (manual_override_available ?manual_override)
+        (not
+          (case_manual_override_attached ?rebooking_case ?manual_override)
+        )
+      )
+  )
+  (:action flag_alternative_segment_for_booking
+    :parameters (?primary_booking - primary_booking ?alternative_segment - alternative_segment ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_committed ?primary_booking)
+        (confirmation_attached ?primary_booking ?confirmation_method)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (not
+          (segment_flagged_for_offer ?alternative_segment)
+        )
+        (not
+          (segment_compensation_offered ?alternative_segment)
+        )
+      )
+    :effect (segment_flagged_for_offer ?alternative_segment)
+  )
+  (:action agent_confirm_segment_for_booking
+    :parameters (?primary_booking - primary_booking ?alternative_segment - alternative_segment ?agent_representative - agent_resource)
+    :precondition
+      (and
+        (reservation_committed ?primary_booking)
+        (assigned_agent ?primary_booking ?agent_representative)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (segment_flagged_for_offer ?alternative_segment)
+        (not
+          (primary_booking_prepared ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (primary_booking_ready ?primary_booking)
+      )
+  )
+  (:action offer_voucher_for_segment
+    :parameters (?primary_booking - primary_booking ?alternative_segment - alternative_segment ?compensation_voucher - compensation_voucher)
+    :precondition
+      (and
+        (reservation_committed ?primary_booking)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (voucher_available ?compensation_voucher)
+        (not
+          (primary_booking_prepared ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (segment_compensation_offered ?alternative_segment)
+        (primary_booking_prepared ?primary_booking)
+        (voucher_allocated_to_primary_booking ?primary_booking ?compensation_voucher)
+        (not
+          (voucher_available ?compensation_voucher)
+        )
+      )
+  )
+  (:action confirm_voucher_allocation_to_booking
+    :parameters (?primary_booking - primary_booking ?alternative_segment - alternative_segment ?confirmation_method - confirmation_method ?compensation_voucher - compensation_voucher)
+    :precondition
+      (and
+        (reservation_committed ?primary_booking)
+        (confirmation_attached ?primary_booking ?confirmation_method)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (segment_compensation_offered ?alternative_segment)
+        (voucher_allocated_to_primary_booking ?primary_booking ?compensation_voucher)
+        (not
+          (primary_booking_ready ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (segment_flagged_for_offer ?alternative_segment)
+        (primary_booking_ready ?primary_booking)
+        (voucher_available ?compensation_voucher)
+        (not
+          (voucher_allocated_to_primary_booking ?primary_booking ?compensation_voucher)
+        )
+      )
+  )
+  (:action flag_carrier_option_for_linked_booking
+    :parameters (?linked_booking - linked_booking ?carrier_option - carrier_option ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_committed ?linked_booking)
+        (confirmation_attached ?linked_booking ?confirmation_method)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (not
+          (carrier_option_flagged ?carrier_option)
+        )
+        (not
+          (carrier_option_compensation_offered ?carrier_option)
+        )
+      )
+    :effect (carrier_option_flagged ?carrier_option)
+  )
+  (:action agent_confirm_carrier_option_for_linked_booking
+    :parameters (?linked_booking - linked_booking ?carrier_option - carrier_option ?agent_representative - agent_resource)
+    :precondition
+      (and
+        (reservation_committed ?linked_booking)
+        (assigned_agent ?linked_booking ?agent_representative)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (carrier_option_flagged ?carrier_option)
+        (not
+          (linked_booking_prepared ?linked_booking)
+        )
+      )
+    :effect
+      (and
+        (linked_booking_prepared ?linked_booking)
+        (linked_booking_ready ?linked_booking)
+      )
+  )
+  (:action offer_voucher_for_linked_booking
+    :parameters (?linked_booking - linked_booking ?carrier_option - carrier_option ?compensation_voucher - compensation_voucher)
+    :precondition
+      (and
+        (reservation_committed ?linked_booking)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (voucher_available ?compensation_voucher)
+        (not
+          (linked_booking_prepared ?linked_booking)
+        )
+      )
+    :effect
+      (and
+        (carrier_option_compensation_offered ?carrier_option)
+        (linked_booking_prepared ?linked_booking)
+        (voucher_allocated_to_linked_booking ?linked_booking ?compensation_voucher)
+        (not
+          (voucher_available ?compensation_voucher)
+        )
+      )
+  )
+  (:action confirm_voucher_allocation_to_linked_booking
+    :parameters (?linked_booking - linked_booking ?carrier_option - carrier_option ?confirmation_method - confirmation_method ?compensation_voucher - compensation_voucher)
+    :precondition
+      (and
+        (reservation_committed ?linked_booking)
+        (confirmation_attached ?linked_booking ?confirmation_method)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (carrier_option_compensation_offered ?carrier_option)
+        (voucher_allocated_to_linked_booking ?linked_booking ?compensation_voucher)
+        (not
+          (linked_booking_ready ?linked_booking)
+        )
+      )
+    :effect
+      (and
+        (carrier_option_flagged ?carrier_option)
+        (linked_booking_ready ?linked_booking)
+        (voucher_available ?compensation_voucher)
+        (not
+          (voucher_allocated_to_linked_booking ?linked_booking ?compensation_voucher)
+        )
+      )
+  )
+  (:action create_reroute_proposal
+    :parameters (?primary_booking - primary_booking ?linked_booking - linked_booking ?alternative_segment - alternative_segment ?carrier_option - carrier_option ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (linked_booking_prepared ?linked_booking)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (segment_flagged_for_offer ?alternative_segment)
+        (carrier_option_flagged ?carrier_option)
+        (primary_booking_ready ?primary_booking)
+        (linked_booking_ready ?linked_booking)
+        (proposal_available ?reroute_proposal)
+      )
+    :effect
+      (and
+        (proposal_active ?reroute_proposal)
+        (proposal_includes_segment ?reroute_proposal ?alternative_segment)
+        (proposal_includes_carrier_option ?reroute_proposal ?carrier_option)
+        (not
+          (proposal_available ?reroute_proposal)
+        )
+      )
+  )
+  (:action create_proposal_with_segment_compensation
+    :parameters (?primary_booking - primary_booking ?linked_booking - linked_booking ?alternative_segment - alternative_segment ?carrier_option - carrier_option ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (linked_booking_prepared ?linked_booking)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (segment_compensation_offered ?alternative_segment)
+        (carrier_option_flagged ?carrier_option)
+        (not
+          (primary_booking_ready ?primary_booking)
+        )
+        (linked_booking_ready ?linked_booking)
+        (proposal_available ?reroute_proposal)
+      )
+    :effect
+      (and
+        (proposal_active ?reroute_proposal)
+        (proposal_includes_segment ?reroute_proposal ?alternative_segment)
+        (proposal_includes_carrier_option ?reroute_proposal ?carrier_option)
+        (proposal_priority_flag ?reroute_proposal)
+        (not
+          (proposal_available ?reroute_proposal)
+        )
+      )
+  )
+  (:action create_proposal_with_loyalty_flag
+    :parameters (?primary_booking - primary_booking ?linked_booking - linked_booking ?alternative_segment - alternative_segment ?carrier_option - carrier_option ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (linked_booking_prepared ?linked_booking)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (segment_flagged_for_offer ?alternative_segment)
+        (carrier_option_compensation_offered ?carrier_option)
+        (primary_booking_ready ?primary_booking)
+        (not
+          (linked_booking_ready ?linked_booking)
+        )
+        (proposal_available ?reroute_proposal)
+      )
+    :effect
+      (and
+        (proposal_active ?reroute_proposal)
+        (proposal_includes_segment ?reroute_proposal ?alternative_segment)
+        (proposal_includes_carrier_option ?reroute_proposal ?carrier_option)
+        (proposal_loyalty_flag ?reroute_proposal)
+        (not
+          (proposal_available ?reroute_proposal)
+        )
+      )
+  )
+  (:action create_proposal_with_priority_and_loyalty_flags
+    :parameters (?primary_booking - primary_booking ?linked_booking - linked_booking ?alternative_segment - alternative_segment ?carrier_option - carrier_option ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (linked_booking_prepared ?linked_booking)
+        (booking_alternative_segment ?primary_booking ?alternative_segment)
+        (linked_booking_carrier_option ?linked_booking ?carrier_option)
+        (segment_compensation_offered ?alternative_segment)
+        (carrier_option_compensation_offered ?carrier_option)
+        (not
+          (primary_booking_ready ?primary_booking)
+        )
+        (not
+          (linked_booking_ready ?linked_booking)
+        )
+        (proposal_available ?reroute_proposal)
+      )
+    :effect
+      (and
+        (proposal_active ?reroute_proposal)
+        (proposal_includes_segment ?reroute_proposal ?alternative_segment)
+        (proposal_includes_carrier_option ?reroute_proposal ?carrier_option)
+        (proposal_priority_flag ?reroute_proposal)
+        (proposal_loyalty_flag ?reroute_proposal)
+        (not
+          (proposal_available ?reroute_proposal)
+        )
+      )
+  )
+  (:action mark_proposal_ready_for_ticketing
+    :parameters (?reroute_proposal - reroute_proposal ?primary_booking - primary_booking ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (proposal_active ?reroute_proposal)
+        (primary_booking_prepared ?primary_booking)
+        (confirmation_attached ?primary_booking ?confirmation_method)
+        (not
+          (proposal_ready_for_ticketing ?reroute_proposal)
+        )
+      )
+    :effect (proposal_ready_for_ticketing ?reroute_proposal)
+  )
+  (:action reserve_inventory_slot_for_proposal
+    :parameters (?rebooking_case - reservation_case ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (case_links_proposal ?rebooking_case ?reroute_proposal)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_available ?inventory_slot)
+        (proposal_active ?reroute_proposal)
+        (proposal_ready_for_ticketing ?reroute_proposal)
+        (not
+          (inventory_slot_reserved ?inventory_slot)
+        )
+      )
+    :effect
+      (and
+        (inventory_slot_reserved ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (not
+          (inventory_slot_available ?inventory_slot)
+        )
+      )
+  )
+  (:action confirm_inventory_allocation_for_case
+    :parameters (?rebooking_case - reservation_case ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_reserved ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (confirmation_attached ?rebooking_case ?confirmation_method)
+        (not
+          (proposal_priority_flag ?reroute_proposal)
+        )
+        (not
+          (case_allocation_confirmed ?rebooking_case)
+        )
+      )
+    :effect (case_allocation_confirmed ?rebooking_case)
+  )
+  (:action apply_priority_benefit_to_case
+    :parameters (?rebooking_case - reservation_case ?priority_benefit - priority_benefit)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (priority_benefit_available ?priority_benefit)
+        (not
+          (case_priority_benefit_applied ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_priority_benefit_applied ?rebooking_case)
+        (case_priority_benefit_link ?rebooking_case ?priority_benefit)
+        (not
+          (priority_benefit_available ?priority_benefit)
+        )
+      )
+  )
+  (:action apply_priority_and_confirm_allocation
+    :parameters (?rebooking_case - reservation_case ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal ?confirmation_method - confirmation_method ?priority_benefit - priority_benefit)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_reserved ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (confirmation_attached ?rebooking_case ?confirmation_method)
+        (proposal_priority_flag ?reroute_proposal)
+        (case_priority_benefit_applied ?rebooking_case)
+        (case_priority_benefit_link ?rebooking_case ?priority_benefit)
+        (not
+          (case_allocation_confirmed ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_allocation_confirmed ?rebooking_case)
+        (case_priority_approval ?rebooking_case)
+      )
+  )
+  (:action confirm_case_quote_and_agent_assignment
+    :parameters (?rebooking_case - reservation_case ?fare_quote - fare_quote ?agent_representative - agent_resource ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_allocation_confirmed ?rebooking_case)
+        (case_fare_quote_attached ?rebooking_case ?fare_quote)
+        (assigned_agent ?rebooking_case ?agent_representative)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (not
+          (proposal_loyalty_flag ?reroute_proposal)
+        )
+        (not
+          (case_quote_confirmed ?rebooking_case)
+        )
+      )
+    :effect (case_quote_confirmed ?rebooking_case)
+  )
+  (:action confirm_case_quote_and_agent_assignment_with_loyalty
+    :parameters (?rebooking_case - reservation_case ?fare_quote - fare_quote ?agent_representative - agent_resource ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_allocation_confirmed ?rebooking_case)
+        (case_fare_quote_attached ?rebooking_case ?fare_quote)
+        (assigned_agent ?rebooking_case ?agent_representative)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (proposal_loyalty_flag ?reroute_proposal)
+        (not
+          (case_quote_confirmed ?rebooking_case)
+        )
+      )
+    :effect (case_quote_confirmed ?rebooking_case)
+  )
+  (:action authorize_case_standard
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_quote_confirmed ?rebooking_case)
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (not
+          (proposal_priority_flag ?reroute_proposal)
+        )
+        (not
+          (proposal_loyalty_flag ?reroute_proposal)
+        )
+        (not
+          (case_authorized_for_execution ?rebooking_case)
+        )
+      )
+    :effect (case_authorized_for_execution ?rebooking_case)
+  )
+  (:action authorize_case_with_priority
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_quote_confirmed ?rebooking_case)
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (proposal_priority_flag ?reroute_proposal)
+        (not
+          (proposal_loyalty_flag ?reroute_proposal)
+        )
+        (not
+          (case_authorized_for_execution ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_final_approval_obtained ?rebooking_case)
+      )
+  )
+  (:action authorize_case_with_loyalty
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_quote_confirmed ?rebooking_case)
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (not
+          (proposal_priority_flag ?reroute_proposal)
+        )
+        (proposal_loyalty_flag ?reroute_proposal)
+        (not
+          (case_authorized_for_execution ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_final_approval_obtained ?rebooking_case)
+      )
+  )
+  (:action authorize_case_with_priority_and_loyalty
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override ?inventory_slot - inventory_slot ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (case_quote_confirmed ?rebooking_case)
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (case_inventory_reference ?rebooking_case ?inventory_slot)
+        (inventory_slot_allocated_to_proposal ?inventory_slot ?reroute_proposal)
+        (proposal_priority_flag ?reroute_proposal)
+        (proposal_loyalty_flag ?reroute_proposal)
+        (not
+          (case_authorized_for_execution ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_final_approval_obtained ?rebooking_case)
+      )
+  )
+  (:action finalize_case_and_issue_tickets
+    :parameters (?rebooking_case - reservation_case)
+    :precondition
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (not
+          (case_final_approval_obtained ?rebooking_case)
+        )
+        (not
+          (case_finalized ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?rebooking_case)
+        (ticket_issued ?rebooking_case)
+      )
+  )
+  (:action allocate_compensation_package
+    :parameters (?rebooking_case - reservation_case ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_final_approval_obtained ?rebooking_case)
+        (compensation_package_available ?compensation_package)
+      )
+    :effect
+      (and
+        (case_compensation_package_allocated ?rebooking_case ?compensation_package)
+        (not
+          (compensation_package_available ?compensation_package)
+        )
+      )
+  )
+  (:action complete_preexecution_checks_and_lock_case
+    :parameters (?rebooking_case - reservation_case ?primary_booking - primary_booking ?linked_booking - linked_booking ?confirmation_method - confirmation_method ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_final_approval_obtained ?rebooking_case)
+        (case_compensation_package_allocated ?rebooking_case ?compensation_package)
+        (case_includes_primary_booking ?rebooking_case ?primary_booking)
+        (case_includes_linked_booking ?rebooking_case ?linked_booking)
+        (primary_booking_ready ?primary_booking)
+        (linked_booking_ready ?linked_booking)
+        (confirmation_attached ?rebooking_case ?confirmation_method)
+        (not
+          (case_ready_for_execution ?rebooking_case)
+        )
+      )
+    :effect (case_ready_for_execution ?rebooking_case)
+  )
+  (:action finalize_case_after_checks_and_issue_tickets
+    :parameters (?rebooking_case - reservation_case)
+    :precondition
+      (and
+        (case_authorized_for_execution ?rebooking_case)
+        (case_ready_for_execution ?rebooking_case)
+        (not
+          (case_finalized ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?rebooking_case)
+        (ticket_issued ?rebooking_case)
+      )
+  )
+  (:action apply_loyalty_preference_to_case
+    :parameters (?rebooking_case - reservation_case ?loyalty_preference - loyalty_preference ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (reservation_committed ?rebooking_case)
+        (confirmation_attached ?rebooking_case ?confirmation_method)
+        (loyalty_preference_available ?loyalty_preference)
+        (case_loyalty_preference_link ?rebooking_case ?loyalty_preference)
+        (not
+          (case_loyalty_preference_applied ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_loyalty_preference_applied ?rebooking_case)
+        (not
+          (loyalty_preference_available ?loyalty_preference)
+        )
+      )
+  )
+  (:action acknowledge_loyalty_application_by_agent
+    :parameters (?rebooking_case - reservation_case ?agent_representative - agent_resource)
+    :precondition
+      (and
+        (case_loyalty_preference_applied ?rebooking_case)
+        (assigned_agent ?rebooking_case ?agent_representative)
+        (not
+          (case_loyalty_agent_verified ?rebooking_case)
+        )
+      )
+    :effect (case_loyalty_agent_verified ?rebooking_case)
+  )
+  (:action finalize_loyalty_approval
+    :parameters (?rebooking_case - reservation_case ?manual_override - manual_override)
+    :precondition
+      (and
+        (case_loyalty_agent_verified ?rebooking_case)
+        (case_manual_override_attached ?rebooking_case ?manual_override)
+        (not
+          (case_loyalty_authorized ?rebooking_case)
+        )
+      )
+    :effect (case_loyalty_authorized ?rebooking_case)
+  )
+  (:action finalize_case_with_loyalty_and_issue_tickets
+    :parameters (?rebooking_case - reservation_case)
+    :precondition
+      (and
+        (case_loyalty_authorized ?rebooking_case)
+        (not
+          (case_finalized ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?rebooking_case)
+        (ticket_issued ?rebooking_case)
+      )
+  )
+  (:action issue_ticket_for_primary_booking
+    :parameters (?primary_booking - primary_booking ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (primary_booking_prepared ?primary_booking)
+        (primary_booking_ready ?primary_booking)
+        (proposal_active ?reroute_proposal)
+        (proposal_ready_for_ticketing ?reroute_proposal)
+        (not
+          (ticket_issued ?primary_booking)
+        )
+      )
+    :effect (ticket_issued ?primary_booking)
+  )
+  (:action issue_ticket_for_linked_booking
+    :parameters (?linked_booking - linked_booking ?reroute_proposal - reroute_proposal)
+    :precondition
+      (and
+        (linked_booking_prepared ?linked_booking)
+        (linked_booking_ready ?linked_booking)
+        (proposal_active ?reroute_proposal)
+        (proposal_ready_for_ticketing ?reroute_proposal)
+        (not
+          (ticket_issued ?linked_booking)
+        )
+      )
+    :effect (ticket_issued ?linked_booking)
+  )
+  (:action prepare_reservation_for_reconciliation
+    :parameters (?reservation_entity - reservation_entity ?customer_contact_token - customer_contact_token ?confirmation_method - confirmation_method)
+    :precondition
+      (and
+        (ticket_issued ?reservation_entity)
+        (confirmation_attached ?reservation_entity ?confirmation_method)
+        (customer_contact_token_available ?customer_contact_token)
+        (not
+          (reconciliation_ready ?reservation_entity)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_ready ?reservation_entity)
+        (reservation_has_contact_token ?reservation_entity ?customer_contact_token)
+        (not
+          (customer_contact_token_available ?customer_contact_token)
+        )
+      )
+  )
+  (:action finalize_primary_booking_and_restore_option
+    :parameters (?primary_booking - primary_booking ?transport_option - transport_option ?customer_contact_token - customer_contact_token)
+    :precondition
+      (and
+        (reconciliation_ready ?primary_booking)
+        (assigned_transport_option ?primary_booking ?transport_option)
+        (reservation_has_contact_token ?primary_booking ?customer_contact_token)
+        (not
+          (reservation_finalized ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?primary_booking)
+        (transport_option_available ?transport_option)
+        (customer_contact_token_available ?customer_contact_token)
+      )
+  )
+  (:action finalize_linked_booking_and_restore_option
+    :parameters (?linked_booking - linked_booking ?transport_option - transport_option ?customer_contact_token - customer_contact_token)
+    :precondition
+      (and
+        (reconciliation_ready ?linked_booking)
+        (assigned_transport_option ?linked_booking ?transport_option)
+        (reservation_has_contact_token ?linked_booking ?customer_contact_token)
+        (not
+          (reservation_finalized ?linked_booking)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?linked_booking)
+        (transport_option_available ?transport_option)
+        (customer_contact_token_available ?customer_contact_token)
+      )
+  )
+  (:action finalize_case_and_restore_option
+    :parameters (?rebooking_case - reservation_case ?transport_option - transport_option ?customer_contact_token - customer_contact_token)
+    :precondition
+      (and
+        (reconciliation_ready ?rebooking_case)
+        (assigned_transport_option ?rebooking_case ?transport_option)
+        (reservation_has_contact_token ?rebooking_case ?customer_contact_token)
+        (not
+          (reservation_finalized ?rebooking_case)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?rebooking_case)
+        (transport_option_available ?transport_option)
+        (customer_contact_token_available ?customer_contact_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem overbooking_rerouting_problem)
+  (:domain overbooking_rerouting_domain)
+  (:objects original_primary_booking - primary_booking linked_booking_record - linked_booking rebooking_case_1 - reservation_case rebooking_case_2 - reservation_case transport_option_1 - transport_option transport_option_2 - transport_option transport_option_3 - transport_option confirmation_method_api - confirmation_method agent_representative_1 - agent_resource compensation_voucher_1 - compensation_voucher alternative_segment_1 - alternative_segment carrier_option_1 - carrier_option reroute_proposal_1 - reroute_proposal inventory_slot_1 - inventory_slot inventory_slot_2 - inventory_slot priority_benefit_1 - priority_benefit priority_benefit_2 - priority_benefit compensation_package_1 - compensation_package compensation_package_2 - compensation_package customer_contact_token_1 - customer_contact_token fare_quote_1 - fare_quote loyalty_preference_1 - loyalty_preference loyalty_preference_2 - loyalty_preference manual_override_1 - manual_override)
+  (:init
+    (transport_option_available transport_option_1)
+    (transport_option_available transport_option_2)
+    (transport_option_available transport_option_3)
+    (confirmation_method_available confirmation_method_api)
+    (agent_available agent_representative_1)
+    (voucher_available compensation_voucher_1)
+    (booking_alternative_segment original_primary_booking alternative_segment_1)
+    (linked_booking_carrier_option linked_booking_record carrier_option_1)
+    (proposal_available reroute_proposal_1)
+    (inventory_slot_available inventory_slot_1)
+    (inventory_slot_available inventory_slot_2)
+    (case_includes_primary_booking rebooking_case_1 original_primary_booking)
+    (case_includes_primary_booking rebooking_case_2 original_primary_booking)
+    (case_includes_linked_booking rebooking_case_1 linked_booking_record)
+    (case_includes_linked_booking rebooking_case_2 linked_booking_record)
+    (case_links_proposal rebooking_case_1 reroute_proposal_1)
+    (case_links_proposal rebooking_case_2 reroute_proposal_1)
+    (case_inventory_reference rebooking_case_1 inventory_slot_1)
+    (case_inventory_reference rebooking_case_2 inventory_slot_2)
+    (priority_benefit_available priority_benefit_1)
+    (priority_benefit_available priority_benefit_2)
+    (compensation_package_available compensation_package_1)
+    (compensation_package_available compensation_package_2)
+    (customer_contact_token_available customer_contact_token_1)
+    (fare_quote_available fare_quote_1)
+    (loyalty_preference_available loyalty_preference_1)
+    (case_loyalty_preference_link rebooking_case_1 loyalty_preference_1)
+    (case_loyalty_preference_link rebooking_case_2 loyalty_preference_2)
+    (manual_override_available manual_override_1)
+  )
+  (:goal
+    (and
+      (reservation_finalized original_primary_booking)
+      (reservation_finalized linked_booking_record)
+      (reservation_finalized rebooking_case_1)
+      (reservation_finalized rebooking_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_reservation_candidate original_primary_booking)
+(initialize_reservation_candidate linked_booking_record)
+(initialize_reservation_candidate rebooking_case_1)
+(initialize_reservation_candidate rebooking_case_2)
+(assign_transport_option_to_reservation original_primary_booking transport_option_1)
+(assign_transport_option_to_reservation linked_booking_record transport_option_2)
+(collect_confirmation original_primary_booking confirmation_method_api)
+(commit_confirmation original_primary_booking confirmation_method_api)
+(assign_agent_to_reservation original_primary_booking agent_representative_1)
+(flag_alternative_segment_for_booking original_primary_booking alternative_segment_1 confirmation_method_api)
+(agent_confirm_segment_for_booking original_primary_booking alternative_segment_1 agent_representative_1)
+(release_agent_from_reservation original_primary_booking agent_representative_1)
+(rollback_confirmation original_primary_booking confirmation_method_api)
+(collect_confirmation linked_booking_record confirmation_method_api)
+(commit_confirmation linked_booking_record confirmation_method_api)
+(assign_agent_to_reservation linked_booking_record agent_representative_1)
+(flag_carrier_option_for_linked_booking linked_booking_record carrier_option_1 confirmation_method_api)
+(agent_confirm_carrier_option_for_linked_booking linked_booking_record carrier_option_1 agent_representative_1)
+(create_reroute_proposal original_primary_booking linked_booking_record alternative_segment_1 carrier_option_1 reroute_proposal_1)
+(release_agent_from_reservation linked_booking_record agent_representative_1)
+(rollback_confirmation linked_booking_record confirmation_method_api)
+(collect_confirmation original_primary_booking confirmation_method_api)
+(mark_proposal_ready_for_ticketing reroute_proposal_1 original_primary_booking confirmation_method_api)
+(rollback_confirmation original_primary_booking confirmation_method_api)
+(issue_ticket_for_primary_booking original_primary_booking reroute_proposal_1)
+(issue_ticket_for_linked_booking linked_booking_record reroute_proposal_1)
+(assign_transport_option_to_reservation rebooking_case_1 transport_option_3)
+(collect_confirmation rebooking_case_1 confirmation_method_api)
+(commit_confirmation rebooking_case_1 confirmation_method_api)
+(attach_fare_quote rebooking_case_1 fare_quote_1)
+(attach_manual_override rebooking_case_1 manual_override_1)
+(reserve_inventory_slot_for_proposal rebooking_case_1 inventory_slot_1 reroute_proposal_1)
+(confirm_inventory_allocation_for_case rebooking_case_1 inventory_slot_1 reroute_proposal_1 confirmation_method_api)
+(assign_agent_to_reservation rebooking_case_1 agent_representative_1)
+(confirm_case_quote_and_agent_assignment rebooking_case_1 fare_quote_1 agent_representative_1 inventory_slot_1 reroute_proposal_1)
+(authorize_case_standard rebooking_case_1 manual_override_1 inventory_slot_1 reroute_proposal_1)
+(finalize_case_and_issue_tickets rebooking_case_1)
+(prepare_reservation_for_reconciliation rebooking_case_1 customer_contact_token_1 confirmation_method_api)
+(finalize_case_and_restore_option rebooking_case_1 transport_option_3 customer_contact_token_1)
+(revoke_fare_quote rebooking_case_1 fare_quote_1)
+(revoke_manual_override rebooking_case_1 manual_override_1)
+(rollback_confirmation rebooking_case_1 confirmation_method_api)
+(release_agent_from_reservation rebooking_case_1 agent_representative_1)
+(assign_transport_option_to_reservation rebooking_case_2 transport_option_3)
+(collect_confirmation rebooking_case_2 confirmation_method_api)
+(commit_confirmation rebooking_case_2 confirmation_method_api)
+(attach_fare_quote rebooking_case_2 fare_quote_1)
+(attach_manual_override rebooking_case_2 manual_override_1)
+(reserve_inventory_slot_for_proposal rebooking_case_2 inventory_slot_2 reroute_proposal_1)
+(confirm_inventory_allocation_for_case rebooking_case_2 inventory_slot_2 reroute_proposal_1 confirmation_method_api)
+(assign_agent_to_reservation rebooking_case_2 agent_representative_1)
+(confirm_case_quote_and_agent_assignment rebooking_case_2 fare_quote_1 agent_representative_1 inventory_slot_2 reroute_proposal_1)
+(authorize_case_standard rebooking_case_2 manual_override_1 inventory_slot_2 reroute_proposal_1)
+(finalize_case_and_issue_tickets rebooking_case_2)
+(prepare_reservation_for_reconciliation rebooking_case_2 customer_contact_token_1 confirmation_method_api)
+(finalize_case_and_restore_option rebooking_case_2 transport_option_3 customer_contact_token_1)
+(revoke_fare_quote rebooking_case_2 fare_quote_1)
+(revoke_manual_override rebooking_case_2 manual_override_1)
+(rollback_confirmation rebooking_case_2 confirmation_method_api)
+(release_agent_from_reservation rebooking_case_2 agent_representative_1)
+(collect_confirmation original_primary_booking confirmation_method_api)
+(prepare_reservation_for_reconciliation original_primary_booking customer_contact_token_1 confirmation_method_api)
+(finalize_primary_booking_and_restore_option original_primary_booking transport_option_1 customer_contact_token_1)
+(collect_confirmation linked_booking_record confirmation_method_api)
+(prepare_reservation_for_reconciliation linked_booking_record customer_contact_token_1 confirmation_method_api)
+(finalize_linked_booking_and_restore_option linked_booking_record transport_option_2 customer_contact_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vvn1l2dh/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_vvn1l2dh/plan.pddl 
+
+
+--- stderr ---
+

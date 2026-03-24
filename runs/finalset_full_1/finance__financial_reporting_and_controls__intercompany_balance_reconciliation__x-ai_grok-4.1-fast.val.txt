@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain intercompany_balance_reconciliation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object operational_artifact - domain_entity document_group - domain_entity key_group - domain_entity reconciliation_subject_root - domain_entity reconciliation_subject - reconciliation_subject_root match_token - operational_artifact transaction_extract - operational_artifact reviewer_role - operational_artifact signatory - operational_artifact checklist - operational_artifact investigation_record - operational_artifact control_procedure - operational_artifact audit_request - operational_artifact supporting_evidence - document_group document_set - document_group audit_note - document_group reconciliation_key_a - key_group reconciliation_key_b - key_group reconciliation_package - key_group ledger_account_group - reconciliation_subject workstream_group - reconciliation_subject ledger_account_a - ledger_account_group ledger_account_b - ledger_account_group reconciliation_workstream - workstream_group)
+
+  (:predicates
+    (recon_subject_initialized ?reconciliation_subject - reconciliation_subject)
+    (recon_subject_ready_for_review ?reconciliation_subject - reconciliation_subject)
+    (match_token_assigned ?reconciliation_subject - reconciliation_subject)
+    (recon_subject_closed ?reconciliation_subject - reconciliation_subject)
+    (recon_subject_certified ?reconciliation_subject - reconciliation_subject)
+    (recon_subject_posting_authorized ?reconciliation_subject - reconciliation_subject)
+    (match_token_available ?match_token - match_token)
+    (allocated_match_token ?reconciliation_subject - reconciliation_subject ?match_token - match_token)
+    (transaction_extract_available ?transaction_extract - transaction_extract)
+    (extract_attached_to_subject ?reconciliation_subject - reconciliation_subject ?transaction_extract - transaction_extract)
+    (reviewer_available ?reviewer_role - reviewer_role)
+    (assigned_reviewer ?reconciliation_subject - reconciliation_subject ?reviewer_role - reviewer_role)
+    (supporting_evidence_available ?supporting_evidence - supporting_evidence)
+    (ledger_account_a_evidence_attached ?ledger_account_a - ledger_account_a ?supporting_evidence - supporting_evidence)
+    (ledger_account_b_evidence_attached ?ledger_account_b - ledger_account_b ?supporting_evidence - supporting_evidence)
+    (ledger_account_a_has_key ?ledger_account_a - ledger_account_a ?reconciliation_key_a - reconciliation_key_a)
+    (reconciliation_key_a_ready ?reconciliation_key_a - reconciliation_key_a)
+    (reconciliation_key_a_evidence_attached ?reconciliation_key_a - reconciliation_key_a)
+    (ledger_account_a_validated ?ledger_account_a - ledger_account_a)
+    (ledger_account_b_has_key ?ledger_account_b - ledger_account_b ?reconciliation_key_b - reconciliation_key_b)
+    (reconciliation_key_b_ready ?reconciliation_key_b - reconciliation_key_b)
+    (reconciliation_key_b_evidence_attached ?reconciliation_key_b - reconciliation_key_b)
+    (ledger_account_b_validated ?ledger_account_b - ledger_account_b)
+    (reconciliation_package_available ?reconciliation_package - reconciliation_package)
+    (reconciliation_package_created ?reconciliation_package - reconciliation_package)
+    (package_contains_key_a ?reconciliation_package - reconciliation_package ?reconciliation_key_a - reconciliation_key_a)
+    (package_contains_key_b ?reconciliation_package - reconciliation_package ?reconciliation_key_b - reconciliation_key_b)
+    (package_side_a_documents_attached ?reconciliation_package - reconciliation_package)
+    (package_side_b_documents_attached ?reconciliation_package - reconciliation_package)
+    (package_ready_for_evidence_attachment ?reconciliation_package - reconciliation_package)
+    (workstream_links_ledger_a ?reconciliation_workstream - reconciliation_workstream ?ledger_account_a - ledger_account_a)
+    (workstream_links_ledger_b ?reconciliation_workstream - reconciliation_workstream ?ledger_account_b - ledger_account_b)
+    (workstream_contains_package ?reconciliation_workstream - reconciliation_workstream ?reconciliation_package - reconciliation_package)
+    (document_set_available ?document_set - document_set)
+    (workstream_has_document_set ?reconciliation_workstream - reconciliation_workstream ?document_set - document_set)
+    (document_set_locked ?document_set - document_set)
+    (document_set_linked_to_package ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    (workstream_documents_locked ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_documents_verified ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_ready_for_approval ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_signatory_assigned ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_signatory_confirmed ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_signatory_verified ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_controls_completed ?reconciliation_workstream - reconciliation_workstream)
+    (audit_note_available ?audit_note - audit_note)
+    (workstream_has_audit_note ?reconciliation_workstream - reconciliation_workstream ?audit_note - audit_note)
+    (workstream_audit_requested ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_audit_assigned ?reconciliation_workstream - reconciliation_workstream)
+    (workstream_audit_completed ?reconciliation_workstream - reconciliation_workstream)
+    (signatory_available ?signatory - signatory)
+    (workstream_assigned_signatory ?reconciliation_workstream - reconciliation_workstream ?signatory - signatory)
+    (checklist_available ?checklist - checklist)
+    (workstream_has_checklist ?reconciliation_workstream - reconciliation_workstream ?checklist - checklist)
+    (control_procedure_available ?control_procedure - control_procedure)
+    (workstream_has_control_procedure ?reconciliation_workstream - reconciliation_workstream ?control_procedure - control_procedure)
+    (audit_request_available ?audit_request - audit_request)
+    (workstream_has_audit_request ?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request)
+    (investigation_record_available ?investigation_record - investigation_record)
+    (recon_subject_has_investigation_record ?reconciliation_subject - reconciliation_subject ?investigation_record - investigation_record)
+    (ledger_account_a_review_completed ?ledger_account_a - ledger_account_a)
+    (ledger_account_b_review_completed ?ledger_account_b - ledger_account_b)
+    (workstream_finalized ?reconciliation_workstream - reconciliation_workstream)
+  )
+  (:action initialize_reconciliation_subject
+    :parameters (?reconciliation_subject - reconciliation_subject)
+    :precondition
+      (and
+        (not
+          (recon_subject_initialized ?reconciliation_subject)
+        )
+        (not
+          (recon_subject_closed ?reconciliation_subject)
+        )
+      )
+    :effect (recon_subject_initialized ?reconciliation_subject)
+  )
+  (:action allocate_match_token
+    :parameters (?reconciliation_subject - reconciliation_subject ?match_token - match_token)
+    :precondition
+      (and
+        (recon_subject_initialized ?reconciliation_subject)
+        (not
+          (match_token_assigned ?reconciliation_subject)
+        )
+        (match_token_available ?match_token)
+      )
+    :effect
+      (and
+        (match_token_assigned ?reconciliation_subject)
+        (allocated_match_token ?reconciliation_subject ?match_token)
+        (not
+          (match_token_available ?match_token)
+        )
+      )
+  )
+  (:action ingest_transaction_extract
+    :parameters (?reconciliation_subject - reconciliation_subject ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_initialized ?reconciliation_subject)
+        (match_token_assigned ?reconciliation_subject)
+        (transaction_extract_available ?transaction_extract)
+      )
+    :effect
+      (and
+        (extract_attached_to_subject ?reconciliation_subject ?transaction_extract)
+        (not
+          (transaction_extract_available ?transaction_extract)
+        )
+      )
+  )
+  (:action mark_subject_ready_for_review
+    :parameters (?reconciliation_subject - reconciliation_subject ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_initialized ?reconciliation_subject)
+        (match_token_assigned ?reconciliation_subject)
+        (extract_attached_to_subject ?reconciliation_subject ?transaction_extract)
+        (not
+          (recon_subject_ready_for_review ?reconciliation_subject)
+        )
+      )
+    :effect (recon_subject_ready_for_review ?reconciliation_subject)
+  )
+  (:action release_transaction_extract
+    :parameters (?reconciliation_subject - reconciliation_subject ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (extract_attached_to_subject ?reconciliation_subject ?transaction_extract)
+      )
+    :effect
+      (and
+        (transaction_extract_available ?transaction_extract)
+        (not
+          (extract_attached_to_subject ?reconciliation_subject ?transaction_extract)
+        )
+      )
+  )
+  (:action assign_reviewer_to_subject
+    :parameters (?reconciliation_subject - reconciliation_subject ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_subject)
+        (reviewer_available ?reviewer_role)
+      )
+    :effect
+      (and
+        (assigned_reviewer ?reconciliation_subject ?reviewer_role)
+        (not
+          (reviewer_available ?reviewer_role)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_subject
+    :parameters (?reconciliation_subject - reconciliation_subject ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (assigned_reviewer ?reconciliation_subject ?reviewer_role)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer_role)
+        (not
+          (assigned_reviewer ?reconciliation_subject ?reviewer_role)
+        )
+      )
+  )
+  (:action apply_control_procedure_to_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?control_procedure - control_procedure)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (control_procedure_available ?control_procedure)
+      )
+    :effect
+      (and
+        (workstream_has_control_procedure ?reconciliation_workstream ?control_procedure)
+        (not
+          (control_procedure_available ?control_procedure)
+        )
+      )
+  )
+  (:action remove_control_procedure_from_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?control_procedure - control_procedure)
+    :precondition
+      (and
+        (workstream_has_control_procedure ?reconciliation_workstream ?control_procedure)
+      )
+    :effect
+      (and
+        (control_procedure_available ?control_procedure)
+        (not
+          (workstream_has_control_procedure ?reconciliation_workstream ?control_procedure)
+        )
+      )
+  )
+  (:action assign_audit_request_to_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (audit_request_available ?audit_request)
+      )
+    :effect
+      (and
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (not
+          (audit_request_available ?audit_request)
+        )
+      )
+  )
+  (:action remove_audit_request_from_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request)
+    :precondition
+      (and
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+      )
+    :effect
+      (and
+        (audit_request_available ?audit_request)
+        (not
+          (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        )
+      )
+  )
+  (:action flag_recon_key_a_ready
+    :parameters (?ledger_account_a - ledger_account_a ?reconciliation_key_a - reconciliation_key_a ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_a)
+        (extract_attached_to_subject ?ledger_account_a ?transaction_extract)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (not
+          (reconciliation_key_a_ready ?reconciliation_key_a)
+        )
+        (not
+          (reconciliation_key_a_evidence_attached ?reconciliation_key_a)
+        )
+      )
+    :effect (reconciliation_key_a_ready ?reconciliation_key_a)
+  )
+  (:action confirm_ledger_a_validation
+    :parameters (?ledger_account_a - ledger_account_a ?reconciliation_key_a - reconciliation_key_a ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_a)
+        (assigned_reviewer ?ledger_account_a ?reviewer_role)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (reconciliation_key_a_ready ?reconciliation_key_a)
+        (not
+          (ledger_account_a_review_completed ?ledger_account_a)
+        )
+      )
+    :effect
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_a_validated ?ledger_account_a)
+      )
+  )
+  (:action attach_supporting_evidence_to_ledger_a
+    :parameters (?ledger_account_a - ledger_account_a ?reconciliation_key_a - reconciliation_key_a ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_a)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (ledger_account_a_review_completed ?ledger_account_a)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_a_evidence_attached ?reconciliation_key_a)
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_a_evidence_attached ?ledger_account_a ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action reconcile_ledger_a_with_evidence
+    :parameters (?ledger_account_a - ledger_account_a ?reconciliation_key_a - reconciliation_key_a ?transaction_extract - transaction_extract ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_a)
+        (extract_attached_to_subject ?ledger_account_a ?transaction_extract)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (reconciliation_key_a_evidence_attached ?reconciliation_key_a)
+        (ledger_account_a_evidence_attached ?ledger_account_a ?supporting_evidence)
+        (not
+          (ledger_account_a_validated ?ledger_account_a)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_a_ready ?reconciliation_key_a)
+        (ledger_account_a_validated ?ledger_account_a)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (ledger_account_a_evidence_attached ?ledger_account_a ?supporting_evidence)
+        )
+      )
+  )
+  (:action flag_recon_key_b_ready
+    :parameters (?ledger_account_b - ledger_account_b ?reconciliation_key_b - reconciliation_key_b ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_b)
+        (extract_attached_to_subject ?ledger_account_b ?transaction_extract)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (not
+          (reconciliation_key_b_ready ?reconciliation_key_b)
+        )
+        (not
+          (reconciliation_key_b_evidence_attached ?reconciliation_key_b)
+        )
+      )
+    :effect (reconciliation_key_b_ready ?reconciliation_key_b)
+  )
+  (:action confirm_ledger_b_validation
+    :parameters (?ledger_account_b - ledger_account_b ?reconciliation_key_b - reconciliation_key_b ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_b)
+        (assigned_reviewer ?ledger_account_b ?reviewer_role)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_b_ready ?reconciliation_key_b)
+        (not
+          (ledger_account_b_review_completed ?ledger_account_b)
+        )
+      )
+    :effect
+      (and
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_b_validated ?ledger_account_b)
+      )
+  )
+  (:action attach_supporting_evidence_to_ledger_b
+    :parameters (?ledger_account_b - ledger_account_b ?reconciliation_key_b - reconciliation_key_b ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_b)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (ledger_account_b_review_completed ?ledger_account_b)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_b_evidence_attached ?reconciliation_key_b)
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_b_evidence_attached ?ledger_account_b ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action reconcile_ledger_b_with_evidence
+    :parameters (?ledger_account_b - ledger_account_b ?reconciliation_key_b - reconciliation_key_b ?transaction_extract - transaction_extract ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?ledger_account_b)
+        (extract_attached_to_subject ?ledger_account_b ?transaction_extract)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_b_evidence_attached ?reconciliation_key_b)
+        (ledger_account_b_evidence_attached ?ledger_account_b ?supporting_evidence)
+        (not
+          (ledger_account_b_validated ?ledger_account_b)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_b_ready ?reconciliation_key_b)
+        (ledger_account_b_validated ?ledger_account_b)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (ledger_account_b_evidence_attached ?ledger_account_b ?supporting_evidence)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_from_keys
+    :parameters (?ledger_account_a - ledger_account_a ?ledger_account_b - ledger_account_b ?reconciliation_key_a - reconciliation_key_a ?reconciliation_key_b - reconciliation_key_b ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_a_ready ?reconciliation_key_a)
+        (reconciliation_key_b_ready ?reconciliation_key_b)
+        (ledger_account_a_validated ?ledger_account_a)
+        (ledger_account_b_validated ?ledger_account_b)
+        (reconciliation_package_available ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_created ?reconciliation_package)
+        (package_contains_key_a ?reconciliation_package ?reconciliation_key_a)
+        (package_contains_key_b ?reconciliation_package ?reconciliation_key_b)
+        (not
+          (reconciliation_package_available ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_side_a_docs
+    :parameters (?ledger_account_a - ledger_account_a ?ledger_account_b - ledger_account_b ?reconciliation_key_a - reconciliation_key_a ?reconciliation_key_b - reconciliation_key_b ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_a_evidence_attached ?reconciliation_key_a)
+        (reconciliation_key_b_ready ?reconciliation_key_b)
+        (not
+          (ledger_account_a_validated ?ledger_account_a)
+        )
+        (ledger_account_b_validated ?ledger_account_b)
+        (reconciliation_package_available ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_created ?reconciliation_package)
+        (package_contains_key_a ?reconciliation_package ?reconciliation_key_a)
+        (package_contains_key_b ?reconciliation_package ?reconciliation_key_b)
+        (package_side_a_documents_attached ?reconciliation_package)
+        (not
+          (reconciliation_package_available ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_side_b_docs
+    :parameters (?ledger_account_a - ledger_account_a ?ledger_account_b - ledger_account_b ?reconciliation_key_a - reconciliation_key_a ?reconciliation_key_b - reconciliation_key_b ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_a_ready ?reconciliation_key_a)
+        (reconciliation_key_b_evidence_attached ?reconciliation_key_b)
+        (ledger_account_a_validated ?ledger_account_a)
+        (not
+          (ledger_account_b_validated ?ledger_account_b)
+        )
+        (reconciliation_package_available ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_created ?reconciliation_package)
+        (package_contains_key_a ?reconciliation_package ?reconciliation_key_a)
+        (package_contains_key_b ?reconciliation_package ?reconciliation_key_b)
+        (package_side_b_documents_attached ?reconciliation_package)
+        (not
+          (reconciliation_package_available ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_both_docs
+    :parameters (?ledger_account_a - ledger_account_a ?ledger_account_b - ledger_account_b ?reconciliation_key_a - reconciliation_key_a ?reconciliation_key_b - reconciliation_key_b ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_a_has_key ?ledger_account_a ?reconciliation_key_a)
+        (ledger_account_b_has_key ?ledger_account_b ?reconciliation_key_b)
+        (reconciliation_key_a_evidence_attached ?reconciliation_key_a)
+        (reconciliation_key_b_evidence_attached ?reconciliation_key_b)
+        (not
+          (ledger_account_a_validated ?ledger_account_a)
+        )
+        (not
+          (ledger_account_b_validated ?ledger_account_b)
+        )
+        (reconciliation_package_available ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_created ?reconciliation_package)
+        (package_contains_key_a ?reconciliation_package ?reconciliation_key_a)
+        (package_contains_key_b ?reconciliation_package ?reconciliation_key_b)
+        (package_side_a_documents_attached ?reconciliation_package)
+        (package_side_b_documents_attached ?reconciliation_package)
+        (not
+          (reconciliation_package_available ?reconciliation_package)
+        )
+      )
+  )
+  (:action mark_package_ready_for_evidence_attachment
+    :parameters (?reconciliation_package - reconciliation_package ?ledger_account_a - ledger_account_a ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (reconciliation_package_created ?reconciliation_package)
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (extract_attached_to_subject ?ledger_account_a ?transaction_extract)
+        (not
+          (package_ready_for_evidence_attachment ?reconciliation_package)
+        )
+      )
+    :effect (package_ready_for_evidence_attachment ?reconciliation_package)
+  )
+  (:action attach_document_set_to_package
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (workstream_contains_package ?reconciliation_workstream ?reconciliation_package)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_available ?document_set)
+        (reconciliation_package_created ?reconciliation_package)
+        (package_ready_for_evidence_attachment ?reconciliation_package)
+        (not
+          (document_set_locked ?document_set)
+        )
+      )
+    :effect
+      (and
+        (document_set_locked ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (not
+          (document_set_available ?document_set)
+        )
+      )
+  )
+  (:action lock_document_set_for_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?document_set - document_set ?reconciliation_package - reconciliation_package ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_locked ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (extract_attached_to_subject ?reconciliation_workstream ?transaction_extract)
+        (not
+          (package_side_a_documents_attached ?reconciliation_package)
+        )
+        (not
+          (workstream_documents_locked ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_documents_locked ?reconciliation_workstream)
+  )
+  (:action assign_signatory_to_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?signatory - signatory)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (signatory_available ?signatory)
+        (not
+          (workstream_signatory_assigned ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_signatory_assigned ?reconciliation_workstream)
+        (workstream_assigned_signatory ?reconciliation_workstream ?signatory)
+        (not
+          (signatory_available ?signatory)
+        )
+      )
+  )
+  (:action assign_signatory_documents
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?document_set - document_set ?reconciliation_package - reconciliation_package ?transaction_extract - transaction_extract ?signatory - signatory)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_locked ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (extract_attached_to_subject ?reconciliation_workstream ?transaction_extract)
+        (package_side_a_documents_attached ?reconciliation_package)
+        (workstream_signatory_assigned ?reconciliation_workstream)
+        (workstream_assigned_signatory ?reconciliation_workstream ?signatory)
+        (not
+          (workstream_documents_locked ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_documents_locked ?reconciliation_workstream)
+        (workstream_signatory_confirmed ?reconciliation_workstream)
+      )
+  )
+  (:action verify_and_lock_workstream_documents
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?control_procedure - control_procedure ?reviewer_role - reviewer_role ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_locked ?reconciliation_workstream)
+        (workstream_has_control_procedure ?reconciliation_workstream ?control_procedure)
+        (assigned_reviewer ?reconciliation_workstream ?reviewer_role)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (not
+          (package_side_b_documents_attached ?reconciliation_package)
+        )
+        (not
+          (workstream_documents_verified ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_documents_verified ?reconciliation_workstream)
+  )
+  (:action verify_and_lock_workstream_documents_alternate
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?control_procedure - control_procedure ?reviewer_role - reviewer_role ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_locked ?reconciliation_workstream)
+        (workstream_has_control_procedure ?reconciliation_workstream ?control_procedure)
+        (assigned_reviewer ?reconciliation_workstream ?reviewer_role)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (package_side_b_documents_attached ?reconciliation_package)
+        (not
+          (workstream_documents_verified ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_documents_verified ?reconciliation_workstream)
+  )
+  (:action prepare_workstream_for_signoff
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_verified ?reconciliation_workstream)
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (not
+          (package_side_a_documents_attached ?reconciliation_package)
+        )
+        (not
+          (package_side_b_documents_attached ?reconciliation_package)
+        )
+        (not
+          (workstream_ready_for_approval ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_ready_for_approval ?reconciliation_workstream)
+  )
+  (:action prepare_workstream_for_signoff_with_signatory
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_verified ?reconciliation_workstream)
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (package_side_a_documents_attached ?reconciliation_package)
+        (not
+          (package_side_b_documents_attached ?reconciliation_package)
+        )
+        (not
+          (workstream_ready_for_approval ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_signatory_verified ?reconciliation_workstream)
+      )
+  )
+  (:action prepare_workstream_for_signoff_with_signatory_alt
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_verified ?reconciliation_workstream)
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (not
+          (package_side_a_documents_attached ?reconciliation_package)
+        )
+        (package_side_b_documents_attached ?reconciliation_package)
+        (not
+          (workstream_ready_for_approval ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_signatory_verified ?reconciliation_workstream)
+      )
+  )
+  (:action prepare_workstream_for_signoff_with_signatory_full
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request ?document_set - document_set ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (workstream_documents_verified ?reconciliation_workstream)
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (workstream_has_document_set ?reconciliation_workstream ?document_set)
+        (document_set_linked_to_package ?document_set ?reconciliation_package)
+        (package_side_a_documents_attached ?reconciliation_package)
+        (package_side_b_documents_attached ?reconciliation_package)
+        (not
+          (workstream_ready_for_approval ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_signatory_verified ?reconciliation_workstream)
+      )
+  )
+  (:action certify_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream)
+    :precondition
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (not
+          (workstream_signatory_verified ?reconciliation_workstream)
+        )
+        (not
+          (workstream_finalized ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_finalized ?reconciliation_workstream)
+        (recon_subject_certified ?reconciliation_workstream)
+      )
+  )
+  (:action attach_checklist_to_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?checklist - checklist)
+    :precondition
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_signatory_verified ?reconciliation_workstream)
+        (checklist_available ?checklist)
+      )
+    :effect
+      (and
+        (workstream_has_checklist ?reconciliation_workstream ?checklist)
+        (not
+          (checklist_available ?checklist)
+        )
+      )
+  )
+  (:action execute_control_procedures
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?ledger_account_a - ledger_account_a ?ledger_account_b - ledger_account_b ?transaction_extract - transaction_extract ?checklist - checklist)
+    :precondition
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_signatory_verified ?reconciliation_workstream)
+        (workstream_has_checklist ?reconciliation_workstream ?checklist)
+        (workstream_links_ledger_a ?reconciliation_workstream ?ledger_account_a)
+        (workstream_links_ledger_b ?reconciliation_workstream ?ledger_account_b)
+        (ledger_account_a_validated ?ledger_account_a)
+        (ledger_account_b_validated ?ledger_account_b)
+        (extract_attached_to_subject ?reconciliation_workstream ?transaction_extract)
+        (not
+          (workstream_controls_completed ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_controls_completed ?reconciliation_workstream)
+  )
+  (:action finalize_and_certify_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream)
+    :precondition
+      (and
+        (workstream_ready_for_approval ?reconciliation_workstream)
+        (workstream_controls_completed ?reconciliation_workstream)
+        (not
+          (workstream_finalized ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_finalized ?reconciliation_workstream)
+        (recon_subject_certified ?reconciliation_workstream)
+      )
+  )
+  (:action request_audit_for_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_note - audit_note ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_ready_for_review ?reconciliation_workstream)
+        (extract_attached_to_subject ?reconciliation_workstream ?transaction_extract)
+        (audit_note_available ?audit_note)
+        (workstream_has_audit_note ?reconciliation_workstream ?audit_note)
+        (not
+          (workstream_audit_requested ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_audit_requested ?reconciliation_workstream)
+        (not
+          (audit_note_available ?audit_note)
+        )
+      )
+  )
+  (:action assign_auditor_to_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (workstream_audit_requested ?reconciliation_workstream)
+        (assigned_reviewer ?reconciliation_workstream ?reviewer_role)
+        (not
+          (workstream_audit_assigned ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_audit_assigned ?reconciliation_workstream)
+  )
+  (:action complete_audit_for_workstream
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?audit_request - audit_request)
+    :precondition
+      (and
+        (workstream_audit_assigned ?reconciliation_workstream)
+        (workstream_has_audit_request ?reconciliation_workstream ?audit_request)
+        (not
+          (workstream_audit_completed ?reconciliation_workstream)
+        )
+      )
+    :effect (workstream_audit_completed ?reconciliation_workstream)
+  )
+  (:action finalize_workstream_after_audit
+    :parameters (?reconciliation_workstream - reconciliation_workstream)
+    :precondition
+      (and
+        (workstream_audit_completed ?reconciliation_workstream)
+        (not
+          (workstream_finalized ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_finalized ?reconciliation_workstream)
+        (recon_subject_certified ?reconciliation_workstream)
+      )
+  )
+  (:action certify_subject_for_ledger_a
+    :parameters (?ledger_account_a - ledger_account_a ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_a_review_completed ?ledger_account_a)
+        (ledger_account_a_validated ?ledger_account_a)
+        (reconciliation_package_created ?reconciliation_package)
+        (package_ready_for_evidence_attachment ?reconciliation_package)
+        (not
+          (recon_subject_certified ?ledger_account_a)
+        )
+      )
+    :effect (recon_subject_certified ?ledger_account_a)
+  )
+  (:action certify_subject_for_ledger_b
+    :parameters (?ledger_account_b - ledger_account_b ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_account_b_review_completed ?ledger_account_b)
+        (ledger_account_b_validated ?ledger_account_b)
+        (reconciliation_package_created ?reconciliation_package)
+        (package_ready_for_evidence_attachment ?reconciliation_package)
+        (not
+          (recon_subject_certified ?ledger_account_b)
+        )
+      )
+    :effect (recon_subject_certified ?ledger_account_b)
+  )
+  (:action log_investigation_and_authorize_posting
+    :parameters (?reconciliation_subject - reconciliation_subject ?investigation_record - investigation_record ?transaction_extract - transaction_extract)
+    :precondition
+      (and
+        (recon_subject_certified ?reconciliation_subject)
+        (extract_attached_to_subject ?reconciliation_subject ?transaction_extract)
+        (investigation_record_available ?investigation_record)
+        (not
+          (recon_subject_posting_authorized ?reconciliation_subject)
+        )
+      )
+    :effect
+      (and
+        (recon_subject_posting_authorized ?reconciliation_subject)
+        (recon_subject_has_investigation_record ?reconciliation_subject ?investigation_record)
+        (not
+          (investigation_record_available ?investigation_record)
+        )
+      )
+  )
+  (:action post_to_ledger_a_and_release_match_token
+    :parameters (?ledger_account_a - ledger_account_a ?match_token - match_token ?investigation_record - investigation_record)
+    :precondition
+      (and
+        (recon_subject_posting_authorized ?ledger_account_a)
+        (allocated_match_token ?ledger_account_a ?match_token)
+        (recon_subject_has_investigation_record ?ledger_account_a ?investigation_record)
+        (not
+          (recon_subject_closed ?ledger_account_a)
+        )
+      )
+    :effect
+      (and
+        (recon_subject_closed ?ledger_account_a)
+        (match_token_available ?match_token)
+        (investigation_record_available ?investigation_record)
+      )
+  )
+  (:action post_to_ledger_b_and_release_match_token
+    :parameters (?ledger_account_b - ledger_account_b ?match_token - match_token ?investigation_record - investigation_record)
+    :precondition
+      (and
+        (recon_subject_posting_authorized ?ledger_account_b)
+        (allocated_match_token ?ledger_account_b ?match_token)
+        (recon_subject_has_investigation_record ?ledger_account_b ?investigation_record)
+        (not
+          (recon_subject_closed ?ledger_account_b)
+        )
+      )
+    :effect
+      (and
+        (recon_subject_closed ?ledger_account_b)
+        (match_token_available ?match_token)
+        (investigation_record_available ?investigation_record)
+      )
+  )
+  (:action close_workstream_and_release_match_token
+    :parameters (?reconciliation_workstream - reconciliation_workstream ?match_token - match_token ?investigation_record - investigation_record)
+    :precondition
+      (and
+        (recon_subject_posting_authorized ?reconciliation_workstream)
+        (allocated_match_token ?reconciliation_workstream ?match_token)
+        (recon_subject_has_investigation_record ?reconciliation_workstream ?investigation_record)
+        (not
+          (recon_subject_closed ?reconciliation_workstream)
+        )
+      )
+    :effect
+      (and
+        (recon_subject_closed ?reconciliation_workstream)
+        (match_token_available ?match_token)
+        (investigation_record_available ?investigation_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem intercompany_reconciliation_scenario)
+  (:domain intercompany_balance_reconciliation)
+  (:objects ledger_account_a_1 - ledger_account_a ledger_account_b_1 - ledger_account_b reconciliation_workstream_1 - reconciliation_workstream reconciliation_workstream_2 - reconciliation_workstream match_token_1 - match_token match_token_2 - match_token match_token_3 - match_token transaction_extract_1 - transaction_extract reviewer_role_1 - reviewer_role supporting_evidence_1 - supporting_evidence reconciliation_key_a_1 - reconciliation_key_a reconciliation_key_b_1 - reconciliation_key_b reconciliation_package_1 - reconciliation_package document_set_1 - document_set document_set_2 - document_set signatory_1 - signatory signatory_2 - signatory checklist_1 - checklist checklist_2 - checklist investigation_record_1 - investigation_record control_procedure_1 - control_procedure audit_note_1 - audit_note audit_note_2 - audit_note audit_request_1 - audit_request)
+  (:init
+    (match_token_available match_token_1)
+    (match_token_available match_token_2)
+    (match_token_available match_token_3)
+    (transaction_extract_available transaction_extract_1)
+    (reviewer_available reviewer_role_1)
+    (supporting_evidence_available supporting_evidence_1)
+    (ledger_account_a_has_key ledger_account_a_1 reconciliation_key_a_1)
+    (ledger_account_b_has_key ledger_account_b_1 reconciliation_key_b_1)
+    (reconciliation_package_available reconciliation_package_1)
+    (document_set_available document_set_1)
+    (document_set_available document_set_2)
+    (workstream_links_ledger_a reconciliation_workstream_1 ledger_account_a_1)
+    (workstream_links_ledger_a reconciliation_workstream_2 ledger_account_a_1)
+    (workstream_links_ledger_b reconciliation_workstream_1 ledger_account_b_1)
+    (workstream_links_ledger_b reconciliation_workstream_2 ledger_account_b_1)
+    (workstream_contains_package reconciliation_workstream_1 reconciliation_package_1)
+    (workstream_contains_package reconciliation_workstream_2 reconciliation_package_1)
+    (workstream_has_document_set reconciliation_workstream_1 document_set_1)
+    (workstream_has_document_set reconciliation_workstream_2 document_set_2)
+    (signatory_available signatory_1)
+    (signatory_available signatory_2)
+    (checklist_available checklist_1)
+    (checklist_available checklist_2)
+    (investigation_record_available investigation_record_1)
+    (control_procedure_available control_procedure_1)
+    (audit_note_available audit_note_1)
+    (workstream_has_audit_note reconciliation_workstream_1 audit_note_1)
+    (workstream_has_audit_note reconciliation_workstream_2 audit_note_2)
+    (audit_request_available audit_request_1)
+  )
+  (:goal
+    (and
+      (recon_subject_closed ledger_account_a_1)
+      (recon_subject_closed ledger_account_b_1)
+      (recon_subject_closed reconciliation_workstream_1)
+      (recon_subject_closed reconciliation_workstream_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_reconciliation_subject ledger_account_a_1)
+(allocate_match_token ledger_account_a_1 match_token_1)
+(ingest_transaction_extract ledger_account_a_1 transaction_extract_1)
+(mark_subject_ready_for_review ledger_account_a_1 transaction_extract_1)
+(assign_reviewer_to_subject ledger_account_a_1 reviewer_role_1)
+(flag_recon_key_a_ready ledger_account_a_1 reconciliation_key_a_1 transaction_extract_1)
+(confirm_ledger_a_validation ledger_account_a_1 reconciliation_key_a_1 reviewer_role_1)
+(release_transaction_extract ledger_account_a_1 transaction_extract_1)
+(unassign_reviewer_from_subject ledger_account_a_1 reviewer_role_1)
+(initialize_reconciliation_subject ledger_account_b_1)
+(allocate_match_token ledger_account_b_1 match_token_2)
+(ingest_transaction_extract ledger_account_b_1 transaction_extract_1)
+(mark_subject_ready_for_review ledger_account_b_1 transaction_extract_1)
+(assign_reviewer_to_subject ledger_account_b_1 reviewer_role_1)
+(flag_recon_key_b_ready ledger_account_b_1 reconciliation_key_b_1 transaction_extract_1)
+(confirm_ledger_b_validation ledger_account_b_1 reconciliation_key_b_1 reviewer_role_1)
+(release_transaction_extract ledger_account_b_1 transaction_extract_1)
+(unassign_reviewer_from_subject ledger_account_b_1 reviewer_role_1)
+(assemble_reconciliation_package_from_keys ledger_account_a_1 ledger_account_b_1 reconciliation_key_a_1 reconciliation_key_b_1 reconciliation_package_1)
+(ingest_transaction_extract ledger_account_a_1 transaction_extract_1)
+(mark_package_ready_for_evidence_attachment reconciliation_package_1 ledger_account_a_1 transaction_extract_1)
+(release_transaction_extract ledger_account_a_1 transaction_extract_1)
+(certify_subject_for_ledger_a ledger_account_a_1 reconciliation_package_1)
+(certify_subject_for_ledger_b ledger_account_b_1 reconciliation_package_1)
+(ingest_transaction_extract ledger_account_a_1 transaction_extract_1)
+(log_investigation_and_authorize_posting ledger_account_a_1 investigation_record_1 transaction_extract_1)
+(post_to_ledger_a_and_release_match_token ledger_account_a_1 match_token_1 investigation_record_1)
+(release_transaction_extract ledger_account_a_1 transaction_extract_1)
+(ingest_transaction_extract ledger_account_b_1 transaction_extract_1)
+(log_investigation_and_authorize_posting ledger_account_b_1 investigation_record_1 transaction_extract_1)
+(post_to_ledger_b_and_release_match_token ledger_account_b_1 match_token_2 investigation_record_1)
+(release_transaction_extract ledger_account_b_1 transaction_extract_1)
+(initialize_reconciliation_subject reconciliation_workstream_1)
+(allocate_match_token reconciliation_workstream_1 match_token_1)
+(ingest_transaction_extract reconciliation_workstream_1 transaction_extract_1)
+(mark_subject_ready_for_review reconciliation_workstream_1 transaction_extract_1)
+(apply_control_procedure_to_workstream reconciliation_workstream_1 control_procedure_1)
+(assign_audit_request_to_workstream reconciliation_workstream_1 audit_request_1)
+(assign_reviewer_to_subject reconciliation_workstream_1 reviewer_role_1)
+(attach_document_set_to_package reconciliation_workstream_1 document_set_1 reconciliation_package_1)
+(lock_document_set_for_workstream reconciliation_workstream_1 document_set_1 reconciliation_package_1 transaction_extract_1)
+(verify_and_lock_workstream_documents reconciliation_workstream_1 control_procedure_1 reviewer_role_1 document_set_1 reconciliation_package_1)
+(prepare_workstream_for_signoff reconciliation_workstream_1 audit_request_1 document_set_1 reconciliation_package_1)
+(certify_workstream reconciliation_workstream_1)
+(log_investigation_and_authorize_posting reconciliation_workstream_1 investigation_record_1 transaction_extract_1)
+(close_workstream_and_release_match_token reconciliation_workstream_1 match_token_1 investigation_record_1)
+(release_transaction_extract reconciliation_workstream_1 transaction_extract_1)
+(unassign_reviewer_from_subject reconciliation_workstream_1 reviewer_role_1)
+(remove_control_procedure_from_workstream reconciliation_workstream_1 control_procedure_1)
+(remove_audit_request_from_workstream reconciliation_workstream_1 audit_request_1)
+(initialize_reconciliation_subject reconciliation_workstream_2)
+(allocate_match_token reconciliation_workstream_2 match_token_2)
+(ingest_transaction_extract reconciliation_workstream_2 transaction_extract_1)
+(mark_subject_ready_for_review reconciliation_workstream_2 transaction_extract_1)
+(apply_control_procedure_to_workstream reconciliation_workstream_2 control_procedure_1)
+(assign_audit_request_to_workstream reconciliation_workstream_2 audit_request_1)
+(assign_reviewer_to_subject reconciliation_workstream_2 reviewer_role_1)
+(attach_document_set_to_package reconciliation_workstream_2 document_set_2 reconciliation_package_1)
+(lock_document_set_for_workstream reconciliation_workstream_2 document_set_2 reconciliation_package_1 transaction_extract_1)
+(verify_and_lock_workstream_documents reconciliation_workstream_2 control_procedure_1 reviewer_role_1 document_set_2 reconciliation_package_1)
+(prepare_workstream_for_signoff reconciliation_workstream_2 audit_request_1 document_set_2 reconciliation_package_1)
+(certify_workstream reconciliation_workstream_2)
+(log_investigation_and_authorize_posting reconciliation_workstream_2 investigation_record_1 transaction_extract_1)
+(close_workstream_and_release_match_token reconciliation_workstream_2 match_token_2 investigation_record_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1sbd7gcg/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_1sbd7gcg/plan.pddl 64 
+
+
+
+--- stderr ---
+

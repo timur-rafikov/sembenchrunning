@@ -1,0 +1,1079 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain dock_congestion_schedule_repair_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object_root - object asset_category - object_root service_category - object_root plan_category - object_root entity_root - object_root affected_entity - entity_root resource_unit - asset_category inspection_activity - asset_category work_team - asset_category authorization_token - asset_category third_party_service - asset_category claim_record - asset_category spare_part - asset_category contractor_resource - asset_category contingency_option - service_category inventory_item - service_category external_provider - service_category berth_slot - plan_category route_option - plan_category repair_schedule - plan_category subunit_type_a - affected_entity subunit_type_b - affected_entity origin_node - subunit_type_a destination_node - subunit_type_a recovery_case - subunit_type_b)
+
+  (:predicates
+    (exception_reported ?affected_entity - affected_entity)
+    (exception_validated ?affected_entity - affected_entity)
+    (exception_triaged ?affected_entity - affected_entity)
+    (service_restored ?affected_entity - affected_entity)
+    (service_available ?affected_entity - affected_entity)
+    (repair_authorized ?affected_entity - affected_entity)
+    (resource_available ?resource_unit - resource_unit)
+    (resource_assigned ?affected_entity - affected_entity ?resource_unit - resource_unit)
+    (inspection_available ?inspection_activity - inspection_activity)
+    (inspection_assigned ?affected_entity - affected_entity ?inspection_activity - inspection_activity)
+    (team_available ?work_team - work_team)
+    (team_assigned ?affected_entity - affected_entity ?work_team - work_team)
+    (contingency_available ?contingency_option - contingency_option)
+    (contingency_allocated_to_origin ?origin_node - origin_node ?contingency_option - contingency_option)
+    (contingency_allocated_to_destination ?destination_node - destination_node ?contingency_option - contingency_option)
+    (berth_candidate_for_origin ?origin_node - origin_node ?berth_slot - berth_slot)
+    (berth_qualified ?berth_slot - berth_slot)
+    (berth_staged ?berth_slot - berth_slot)
+    (origin_qualification_confirmed ?origin_node - origin_node)
+    (route_candidate_for_destination ?destination_node - destination_node ?route_option - route_option)
+    (route_qualified ?route_option - route_option)
+    (route_staged ?route_option - route_option)
+    (destination_qualification_confirmed ?destination_node - destination_node)
+    (schedule_pending ?repair_schedule - repair_schedule)
+    (schedule_reserved ?repair_schedule - repair_schedule)
+    (schedule_linked_to_berth ?repair_schedule - repair_schedule ?berth_slot - berth_slot)
+    (schedule_linked_to_route ?repair_schedule - repair_schedule ?route_option - route_option)
+    (schedule_flag_berth_restriction ?repair_schedule - repair_schedule)
+    (schedule_flag_route_restriction ?repair_schedule - repair_schedule)
+    (schedule_confirmed ?repair_schedule - repair_schedule)
+    (case_linked_to_origin ?recovery_case - recovery_case ?origin_node - origin_node)
+    (case_linked_to_destination ?recovery_case - recovery_case ?destination_node - destination_node)
+    (case_linked_to_schedule ?recovery_case - recovery_case ?repair_schedule - repair_schedule)
+    (inventory_in_stock ?inventory_item - inventory_item)
+    (item_staged_for_case ?recovery_case - recovery_case ?inventory_item - inventory_item)
+    (inventory_allocated ?inventory_item - inventory_item)
+    (inventory_assigned_to_schedule ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    (case_prepared_for_staging ?recovery_case - recovery_case)
+    (case_staged ?recovery_case - recovery_case)
+    (case_quality_checked ?recovery_case - recovery_case)
+    (authorization_granted ?recovery_case - recovery_case)
+    (authorization_confirmed ?recovery_case - recovery_case)
+    (spares_staged ?recovery_case - recovery_case)
+    (repair_sequence_finalized ?recovery_case - recovery_case)
+    (external_provider_available ?external_provider - external_provider)
+    (provider_assigned_to_case ?recovery_case - recovery_case ?external_provider - external_provider)
+    (external_provider_linked ?recovery_case - recovery_case)
+    (contractor_assigned ?recovery_case - recovery_case)
+    (contractor_deployed ?recovery_case - recovery_case)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (authorization_linked_to_case ?recovery_case - recovery_case ?authorization_token - authorization_token)
+    (third_party_service_available ?third_party_service - third_party_service)
+    (third_party_service_linked ?recovery_case - recovery_case ?third_party_service - third_party_service)
+    (spare_part_available ?spare_part - spare_part)
+    (spare_part_allocated ?recovery_case - recovery_case ?spare_part - spare_part)
+    (contractor_resource_available ?contractor_resource - contractor_resource)
+    (contractor_assigned_to_case ?recovery_case - recovery_case ?contractor_resource - contractor_resource)
+    (claim_record_available ?claim_record - claim_record)
+    (claim_linked_to_unit ?affected_entity - affected_entity ?claim_record - claim_record)
+    (origin_ready_for_consolidation ?origin_node - origin_node)
+    (destination_ready_for_consolidation ?destination_node - destination_node)
+    (case_execution_authorized ?recovery_case - recovery_case)
+  )
+  (:action report_dock_congestion_exception
+    :parameters (?affected_entity - affected_entity)
+    :precondition
+      (and
+        (not
+          (exception_reported ?affected_entity)
+        )
+        (not
+          (service_restored ?affected_entity)
+        )
+      )
+    :effect (exception_reported ?affected_entity)
+  )
+  (:action reserve_handling_resource_for_triage
+    :parameters (?affected_entity - affected_entity ?resource_unit - resource_unit)
+    :precondition
+      (and
+        (exception_reported ?affected_entity)
+        (not
+          (exception_triaged ?affected_entity)
+        )
+        (resource_available ?resource_unit)
+      )
+    :effect
+      (and
+        (exception_triaged ?affected_entity)
+        (resource_assigned ?affected_entity ?resource_unit)
+        (not
+          (resource_available ?resource_unit)
+        )
+      )
+  )
+  (:action allocate_inspection_activity_to_unit
+    :parameters (?affected_entity - affected_entity ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_reported ?affected_entity)
+        (exception_triaged ?affected_entity)
+        (inspection_available ?inspection_activity)
+      )
+    :effect
+      (and
+        (inspection_assigned ?affected_entity ?inspection_activity)
+        (not
+          (inspection_available ?inspection_activity)
+        )
+      )
+  )
+  (:action validate_exception_after_inspection
+    :parameters (?affected_entity - affected_entity ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_reported ?affected_entity)
+        (exception_triaged ?affected_entity)
+        (inspection_assigned ?affected_entity ?inspection_activity)
+        (not
+          (exception_validated ?affected_entity)
+        )
+      )
+    :effect (exception_validated ?affected_entity)
+  )
+  (:action release_inspection_activity
+    :parameters (?affected_entity - affected_entity ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (inspection_assigned ?affected_entity ?inspection_activity)
+      )
+    :effect
+      (and
+        (inspection_available ?inspection_activity)
+        (not
+          (inspection_assigned ?affected_entity ?inspection_activity)
+        )
+      )
+  )
+  (:action assign_work_team_to_validated_exception
+    :parameters (?affected_entity - affected_entity ?work_team - work_team)
+    :precondition
+      (and
+        (exception_validated ?affected_entity)
+        (team_available ?work_team)
+      )
+    :effect
+      (and
+        (team_assigned ?affected_entity ?work_team)
+        (not
+          (team_available ?work_team)
+        )
+      )
+  )
+  (:action release_work_team
+    :parameters (?affected_entity - affected_entity ?work_team - work_team)
+    :precondition
+      (and
+        (team_assigned ?affected_entity ?work_team)
+      )
+    :effect
+      (and
+        (team_available ?work_team)
+        (not
+          (team_assigned ?affected_entity ?work_team)
+        )
+      )
+  )
+  (:action allocate_spare_part_to_recovery_case
+    :parameters (?recovery_case - recovery_case ?spare_part - spare_part)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (spare_part_available ?spare_part)
+      )
+    :effect
+      (and
+        (spare_part_allocated ?recovery_case ?spare_part)
+        (not
+          (spare_part_available ?spare_part)
+        )
+      )
+  )
+  (:action release_spare_part_from_recovery_case
+    :parameters (?recovery_case - recovery_case ?spare_part - spare_part)
+    :precondition
+      (and
+        (spare_part_allocated ?recovery_case ?spare_part)
+      )
+    :effect
+      (and
+        (spare_part_available ?spare_part)
+        (not
+          (spare_part_allocated ?recovery_case ?spare_part)
+        )
+      )
+  )
+  (:action assign_contractor_resource_to_case
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (contractor_resource_available ?contractor_resource)
+      )
+    :effect
+      (and
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (not
+          (contractor_resource_available ?contractor_resource)
+        )
+      )
+  )
+  (:action release_contractor_from_case
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource)
+    :precondition
+      (and
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+      )
+    :effect
+      (and
+        (contractor_resource_available ?contractor_resource)
+        (not
+          (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        )
+      )
+  )
+  (:action qualify_berth_slot_for_origin
+    :parameters (?origin_node - origin_node ?berth_slot - berth_slot ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_validated ?origin_node)
+        (inspection_assigned ?origin_node ?inspection_activity)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (not
+          (berth_qualified ?berth_slot)
+        )
+        (not
+          (berth_staged ?berth_slot)
+        )
+      )
+    :effect (berth_qualified ?berth_slot)
+  )
+  (:action confirm_origin_berth_qualification
+    :parameters (?origin_node - origin_node ?berth_slot - berth_slot ?work_team - work_team)
+    :precondition
+      (and
+        (exception_validated ?origin_node)
+        (team_assigned ?origin_node ?work_team)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (berth_qualified ?berth_slot)
+        (not
+          (origin_ready_for_consolidation ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (origin_qualification_confirmed ?origin_node)
+      )
+  )
+  (:action stage_berth_with_contingency
+    :parameters (?origin_node - origin_node ?berth_slot - berth_slot ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (exception_validated ?origin_node)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (contingency_available ?contingency_option)
+        (not
+          (origin_ready_for_consolidation ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (berth_staged ?berth_slot)
+        (origin_ready_for_consolidation ?origin_node)
+        (contingency_allocated_to_origin ?origin_node ?contingency_option)
+        (not
+          (contingency_available ?contingency_option)
+        )
+      )
+  )
+  (:action activate_berth_after_inspection
+    :parameters (?origin_node - origin_node ?berth_slot - berth_slot ?inspection_activity - inspection_activity ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (exception_validated ?origin_node)
+        (inspection_assigned ?origin_node ?inspection_activity)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (berth_staged ?berth_slot)
+        (contingency_allocated_to_origin ?origin_node ?contingency_option)
+        (not
+          (origin_qualification_confirmed ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (berth_qualified ?berth_slot)
+        (origin_qualification_confirmed ?origin_node)
+        (contingency_available ?contingency_option)
+        (not
+          (contingency_allocated_to_origin ?origin_node ?contingency_option)
+        )
+      )
+  )
+  (:action qualify_route_option_for_destination
+    :parameters (?destination_node - destination_node ?route_option - route_option ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_validated ?destination_node)
+        (inspection_assigned ?destination_node ?inspection_activity)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (not
+          (route_qualified ?route_option)
+        )
+        (not
+          (route_staged ?route_option)
+        )
+      )
+    :effect (route_qualified ?route_option)
+  )
+  (:action confirm_destination_route_with_team
+    :parameters (?destination_node - destination_node ?route_option - route_option ?work_team - work_team)
+    :precondition
+      (and
+        (exception_validated ?destination_node)
+        (team_assigned ?destination_node ?work_team)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (route_qualified ?route_option)
+        (not
+          (destination_ready_for_consolidation ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (destination_ready_for_consolidation ?destination_node)
+        (destination_qualification_confirmed ?destination_node)
+      )
+  )
+  (:action stage_route_with_contingency
+    :parameters (?destination_node - destination_node ?route_option - route_option ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (exception_validated ?destination_node)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (contingency_available ?contingency_option)
+        (not
+          (destination_ready_for_consolidation ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (route_staged ?route_option)
+        (destination_ready_for_consolidation ?destination_node)
+        (contingency_allocated_to_destination ?destination_node ?contingency_option)
+        (not
+          (contingency_available ?contingency_option)
+        )
+      )
+  )
+  (:action activate_route_after_inspection
+    :parameters (?destination_node - destination_node ?route_option - route_option ?inspection_activity - inspection_activity ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (exception_validated ?destination_node)
+        (inspection_assigned ?destination_node ?inspection_activity)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (route_staged ?route_option)
+        (contingency_allocated_to_destination ?destination_node ?contingency_option)
+        (not
+          (destination_qualification_confirmed ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (route_qualified ?route_option)
+        (destination_qualification_confirmed ?destination_node)
+        (contingency_available ?contingency_option)
+        (not
+          (contingency_allocated_to_destination ?destination_node ?contingency_option)
+        )
+      )
+  )
+  (:action consolidate_and_reserve_repair_schedule
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?berth_slot - berth_slot ?route_option - route_option ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (destination_ready_for_consolidation ?destination_node)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (berth_qualified ?berth_slot)
+        (route_qualified ?route_option)
+        (origin_qualification_confirmed ?origin_node)
+        (destination_qualification_confirmed ?destination_node)
+        (schedule_pending ?repair_schedule)
+      )
+    :effect
+      (and
+        (schedule_reserved ?repair_schedule)
+        (schedule_linked_to_berth ?repair_schedule ?berth_slot)
+        (schedule_linked_to_route ?repair_schedule ?route_option)
+        (not
+          (schedule_pending ?repair_schedule)
+        )
+      )
+  )
+  (:action consolidate_and_reserve_with_staged_berth
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?berth_slot - berth_slot ?route_option - route_option ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (destination_ready_for_consolidation ?destination_node)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (berth_staged ?berth_slot)
+        (route_qualified ?route_option)
+        (not
+          (origin_qualification_confirmed ?origin_node)
+        )
+        (destination_qualification_confirmed ?destination_node)
+        (schedule_pending ?repair_schedule)
+      )
+    :effect
+      (and
+        (schedule_reserved ?repair_schedule)
+        (schedule_linked_to_berth ?repair_schedule ?berth_slot)
+        (schedule_linked_to_route ?repair_schedule ?route_option)
+        (schedule_flag_berth_restriction ?repair_schedule)
+        (not
+          (schedule_pending ?repair_schedule)
+        )
+      )
+  )
+  (:action consolidate_and_reserve_with_qualified_berth
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?berth_slot - berth_slot ?route_option - route_option ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (destination_ready_for_consolidation ?destination_node)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (berth_qualified ?berth_slot)
+        (route_staged ?route_option)
+        (origin_qualification_confirmed ?origin_node)
+        (not
+          (destination_qualification_confirmed ?destination_node)
+        )
+        (schedule_pending ?repair_schedule)
+      )
+    :effect
+      (and
+        (schedule_reserved ?repair_schedule)
+        (schedule_linked_to_berth ?repair_schedule ?berth_slot)
+        (schedule_linked_to_route ?repair_schedule ?route_option)
+        (schedule_flag_route_restriction ?repair_schedule)
+        (not
+          (schedule_pending ?repair_schedule)
+        )
+      )
+  )
+  (:action consolidate_and_reserve_with_staged_berth_and_route
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?berth_slot - berth_slot ?route_option - route_option ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (destination_ready_for_consolidation ?destination_node)
+        (berth_candidate_for_origin ?origin_node ?berth_slot)
+        (route_candidate_for_destination ?destination_node ?route_option)
+        (berth_staged ?berth_slot)
+        (route_staged ?route_option)
+        (not
+          (origin_qualification_confirmed ?origin_node)
+        )
+        (not
+          (destination_qualification_confirmed ?destination_node)
+        )
+        (schedule_pending ?repair_schedule)
+      )
+    :effect
+      (and
+        (schedule_reserved ?repair_schedule)
+        (schedule_linked_to_berth ?repair_schedule ?berth_slot)
+        (schedule_linked_to_route ?repair_schedule ?route_option)
+        (schedule_flag_berth_restriction ?repair_schedule)
+        (schedule_flag_route_restriction ?repair_schedule)
+        (not
+          (schedule_pending ?repair_schedule)
+        )
+      )
+  )
+  (:action confirm_repair_schedule_at_origin
+    :parameters (?repair_schedule - repair_schedule ?origin_node - origin_node ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (schedule_reserved ?repair_schedule)
+        (origin_ready_for_consolidation ?origin_node)
+        (inspection_assigned ?origin_node ?inspection_activity)
+        (not
+          (schedule_confirmed ?repair_schedule)
+        )
+      )
+    :effect (schedule_confirmed ?repair_schedule)
+  )
+  (:action stage_inventory_item_for_schedule
+    :parameters (?recovery_case - recovery_case ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (case_linked_to_schedule ?recovery_case ?repair_schedule)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_in_stock ?inventory_item)
+        (schedule_reserved ?repair_schedule)
+        (schedule_confirmed ?repair_schedule)
+        (not
+          (inventory_allocated ?inventory_item)
+        )
+      )
+    :effect
+      (and
+        (inventory_allocated ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (not
+          (inventory_in_stock ?inventory_item)
+        )
+      )
+  )
+  (:action mark_case_prepared_for_staging
+    :parameters (?recovery_case - recovery_case ?inventory_item - inventory_item ?repair_schedule - repair_schedule ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_allocated ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (inspection_assigned ?recovery_case ?inspection_activity)
+        (not
+          (schedule_flag_berth_restriction ?repair_schedule)
+        )
+        (not
+          (case_prepared_for_staging ?recovery_case)
+        )
+      )
+    :effect (case_prepared_for_staging ?recovery_case)
+  )
+  (:action assign_authorization_token_to_case
+    :parameters (?recovery_case - recovery_case ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (authorization_token_available ?authorization_token)
+        (not
+          (authorization_granted ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (authorization_granted ?recovery_case)
+        (authorization_linked_to_case ?recovery_case ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action confirm_authorization_and_prepare_case
+    :parameters (?recovery_case - recovery_case ?inventory_item - inventory_item ?repair_schedule - repair_schedule ?inspection_activity - inspection_activity ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_allocated ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (inspection_assigned ?recovery_case ?inspection_activity)
+        (schedule_flag_berth_restriction ?repair_schedule)
+        (authorization_granted ?recovery_case)
+        (authorization_linked_to_case ?recovery_case ?authorization_token)
+        (not
+          (case_prepared_for_staging ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_prepared_for_staging ?recovery_case)
+        (authorization_confirmed ?recovery_case)
+      )
+  )
+  (:action assign_team_and_stage_case
+    :parameters (?recovery_case - recovery_case ?spare_part - spare_part ?work_team - work_team ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_prepared_for_staging ?recovery_case)
+        (spare_part_allocated ?recovery_case ?spare_part)
+        (team_assigned ?recovery_case ?work_team)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (not
+          (schedule_flag_route_restriction ?repair_schedule)
+        )
+        (not
+          (case_staged ?recovery_case)
+        )
+      )
+    :effect (case_staged ?recovery_case)
+  )
+  (:action assign_team_and_stage_case_alternative
+    :parameters (?recovery_case - recovery_case ?spare_part - spare_part ?work_team - work_team ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_prepared_for_staging ?recovery_case)
+        (spare_part_allocated ?recovery_case ?spare_part)
+        (team_assigned ?recovery_case ?work_team)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (schedule_flag_route_restriction ?repair_schedule)
+        (not
+          (case_staged ?recovery_case)
+        )
+      )
+    :effect (case_staged ?recovery_case)
+  )
+  (:action perform_case_quality_check
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_staged ?recovery_case)
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (not
+          (schedule_flag_berth_restriction ?repair_schedule)
+        )
+        (not
+          (schedule_flag_route_restriction ?repair_schedule)
+        )
+        (not
+          (case_quality_checked ?recovery_case)
+        )
+      )
+    :effect (case_quality_checked ?recovery_case)
+  )
+  (:action perform_quality_check_and_stage_spares
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_staged ?recovery_case)
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (schedule_flag_berth_restriction ?repair_schedule)
+        (not
+          (schedule_flag_route_restriction ?repair_schedule)
+        )
+        (not
+          (case_quality_checked ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checked ?recovery_case)
+        (spares_staged ?recovery_case)
+      )
+  )
+  (:action perform_quality_check_and_stage_spares_variant
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_staged ?recovery_case)
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (not
+          (schedule_flag_berth_restriction ?repair_schedule)
+        )
+        (schedule_flag_route_restriction ?repair_schedule)
+        (not
+          (case_quality_checked ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checked ?recovery_case)
+        (spares_staged ?recovery_case)
+      )
+  )
+  (:action perform_quality_check_and_stage_spares_final
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource ?inventory_item - inventory_item ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (case_staged ?recovery_case)
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (item_staged_for_case ?recovery_case ?inventory_item)
+        (inventory_assigned_to_schedule ?inventory_item ?repair_schedule)
+        (schedule_flag_berth_restriction ?repair_schedule)
+        (schedule_flag_route_restriction ?repair_schedule)
+        (not
+          (case_quality_checked ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checked ?recovery_case)
+        (spares_staged ?recovery_case)
+      )
+  )
+  (:action activate_case_for_execution
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_quality_checked ?recovery_case)
+        (not
+          (spares_staged ?recovery_case)
+        )
+        (not
+          (case_execution_authorized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_authorized ?recovery_case)
+        (service_available ?recovery_case)
+      )
+  )
+  (:action allocate_third_party_service_to_case
+    :parameters (?recovery_case - recovery_case ?third_party_service - third_party_service)
+    :precondition
+      (and
+        (case_quality_checked ?recovery_case)
+        (spares_staged ?recovery_case)
+        (third_party_service_available ?third_party_service)
+      )
+    :effect
+      (and
+        (third_party_service_linked ?recovery_case ?third_party_service)
+        (not
+          (third_party_service_available ?third_party_service)
+        )
+      )
+  )
+  (:action finalize_repair_sequence
+    :parameters (?recovery_case - recovery_case ?origin_node - origin_node ?destination_node - destination_node ?inspection_activity - inspection_activity ?third_party_service - third_party_service)
+    :precondition
+      (and
+        (case_quality_checked ?recovery_case)
+        (spares_staged ?recovery_case)
+        (third_party_service_linked ?recovery_case ?third_party_service)
+        (case_linked_to_origin ?recovery_case ?origin_node)
+        (case_linked_to_destination ?recovery_case ?destination_node)
+        (origin_qualification_confirmed ?origin_node)
+        (destination_qualification_confirmed ?destination_node)
+        (inspection_assigned ?recovery_case ?inspection_activity)
+        (not
+          (repair_sequence_finalized ?recovery_case)
+        )
+      )
+    :effect (repair_sequence_finalized ?recovery_case)
+  )
+  (:action authorize_case_execution
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_quality_checked ?recovery_case)
+        (repair_sequence_finalized ?recovery_case)
+        (not
+          (case_execution_authorized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_authorized ?recovery_case)
+        (service_available ?recovery_case)
+      )
+  )
+  (:action assign_external_provider_to_case
+    :parameters (?recovery_case - recovery_case ?external_provider - external_provider ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (exception_validated ?recovery_case)
+        (inspection_assigned ?recovery_case ?inspection_activity)
+        (external_provider_available ?external_provider)
+        (provider_assigned_to_case ?recovery_case ?external_provider)
+        (not
+          (external_provider_linked ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (external_provider_linked ?recovery_case)
+        (not
+          (external_provider_available ?external_provider)
+        )
+      )
+  )
+  (:action assign_contractor_task
+    :parameters (?recovery_case - recovery_case ?work_team - work_team)
+    :precondition
+      (and
+        (external_provider_linked ?recovery_case)
+        (team_assigned ?recovery_case ?work_team)
+        (not
+          (contractor_assigned ?recovery_case)
+        )
+      )
+    :effect (contractor_assigned ?recovery_case)
+  )
+  (:action confirm_contractor_deployment
+    :parameters (?recovery_case - recovery_case ?contractor_resource - contractor_resource)
+    :precondition
+      (and
+        (contractor_assigned ?recovery_case)
+        (contractor_assigned_to_case ?recovery_case ?contractor_resource)
+        (not
+          (contractor_deployed ?recovery_case)
+        )
+      )
+    :effect (contractor_deployed ?recovery_case)
+  )
+  (:action finalize_contractor_and_activate_case
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (contractor_deployed ?recovery_case)
+        (not
+          (case_execution_authorized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_authorized ?recovery_case)
+        (service_available ?recovery_case)
+      )
+  )
+  (:action execute_repair_on_origin_node
+    :parameters (?origin_node - origin_node ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (origin_ready_for_consolidation ?origin_node)
+        (origin_qualification_confirmed ?origin_node)
+        (schedule_reserved ?repair_schedule)
+        (schedule_confirmed ?repair_schedule)
+        (not
+          (service_available ?origin_node)
+        )
+      )
+    :effect (service_available ?origin_node)
+  )
+  (:action execute_repair_on_destination_node
+    :parameters (?destination_node - destination_node ?repair_schedule - repair_schedule)
+    :precondition
+      (and
+        (destination_ready_for_consolidation ?destination_node)
+        (destination_qualification_confirmed ?destination_node)
+        (schedule_reserved ?repair_schedule)
+        (schedule_confirmed ?repair_schedule)
+        (not
+          (service_available ?destination_node)
+        )
+      )
+    :effect (service_available ?destination_node)
+  )
+  (:action file_claim_and_request_authorization
+    :parameters (?affected_entity - affected_entity ?claim_record - claim_record ?inspection_activity - inspection_activity)
+    :precondition
+      (and
+        (service_available ?affected_entity)
+        (inspection_assigned ?affected_entity ?inspection_activity)
+        (claim_record_available ?claim_record)
+        (not
+          (repair_authorized ?affected_entity)
+        )
+      )
+    :effect
+      (and
+        (repair_authorized ?affected_entity)
+        (claim_linked_to_unit ?affected_entity ?claim_record)
+        (not
+          (claim_record_available ?claim_record)
+        )
+      )
+  )
+  (:action finalize_restoration_and_release_resource_origin
+    :parameters (?origin_node - origin_node ?resource_unit - resource_unit ?claim_record - claim_record)
+    :precondition
+      (and
+        (repair_authorized ?origin_node)
+        (resource_assigned ?origin_node ?resource_unit)
+        (claim_linked_to_unit ?origin_node ?claim_record)
+        (not
+          (service_restored ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?origin_node)
+        (resource_available ?resource_unit)
+        (claim_record_available ?claim_record)
+      )
+  )
+  (:action finalize_restoration_and_release_resource_destination
+    :parameters (?destination_node - destination_node ?resource_unit - resource_unit ?claim_record - claim_record)
+    :precondition
+      (and
+        (repair_authorized ?destination_node)
+        (resource_assigned ?destination_node ?resource_unit)
+        (claim_linked_to_unit ?destination_node ?claim_record)
+        (not
+          (service_restored ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?destination_node)
+        (resource_available ?resource_unit)
+        (claim_record_available ?claim_record)
+      )
+  )
+  (:action finalize_restoration_and_release_resource_case
+    :parameters (?recovery_case - recovery_case ?resource_unit - resource_unit ?claim_record - claim_record)
+    :precondition
+      (and
+        (repair_authorized ?recovery_case)
+        (resource_assigned ?recovery_case ?resource_unit)
+        (claim_linked_to_unit ?recovery_case ?claim_record)
+        (not
+          (service_restored ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?recovery_case)
+        (resource_available ?resource_unit)
+        (claim_record_available ?claim_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem dock_congestion_schedule_repair_problem)
+  (:domain dock_congestion_schedule_repair_domain)
+  (:objects origin_node_obj_o1 - origin_node destination_node_obj_o2 - destination_node recovery_case_obj_o3 - recovery_case recovery_case_obj_o4 - recovery_case resource_unit_obj_o5 - resource_unit resource_unit_obj_o6 - resource_unit resource_unit_obj_o7 - resource_unit inspection_activity_obj_o8 - inspection_activity work_team_obj_o9 - work_team contingency_option_obj_o10 - contingency_option berth_slot_obj_o11 - berth_slot route_option_obj_o12 - route_option repair_schedule_obj_o13 - repair_schedule inventory_item_obj_o14 - inventory_item inventory_item_obj_o15 - inventory_item authorization_token_obj_o16 - authorization_token authorization_token_obj_o17 - authorization_token third_party_service_obj_o18 - third_party_service third_party_service_obj_o19 - third_party_service claim_record_obj_o20 - claim_record spare_part_obj_o21 - spare_part external_provider_obj_o22 - external_provider external_provider_obj_o23 - external_provider contractor_resource_obj_o24 - contractor_resource)
+  (:init
+    (resource_available resource_unit_obj_o5)
+    (resource_available resource_unit_obj_o6)
+    (resource_available resource_unit_obj_o7)
+    (inspection_available inspection_activity_obj_o8)
+    (team_available work_team_obj_o9)
+    (contingency_available contingency_option_obj_o10)
+    (berth_candidate_for_origin origin_node_obj_o1 berth_slot_obj_o11)
+    (route_candidate_for_destination destination_node_obj_o2 route_option_obj_o12)
+    (schedule_pending repair_schedule_obj_o13)
+    (inventory_in_stock inventory_item_obj_o14)
+    (inventory_in_stock inventory_item_obj_o15)
+    (case_linked_to_origin recovery_case_obj_o3 origin_node_obj_o1)
+    (case_linked_to_origin recovery_case_obj_o4 origin_node_obj_o1)
+    (case_linked_to_destination recovery_case_obj_o3 destination_node_obj_o2)
+    (case_linked_to_destination recovery_case_obj_o4 destination_node_obj_o2)
+    (case_linked_to_schedule recovery_case_obj_o3 repair_schedule_obj_o13)
+    (case_linked_to_schedule recovery_case_obj_o4 repair_schedule_obj_o13)
+    (item_staged_for_case recovery_case_obj_o3 inventory_item_obj_o14)
+    (item_staged_for_case recovery_case_obj_o4 inventory_item_obj_o15)
+    (authorization_token_available authorization_token_obj_o16)
+    (authorization_token_available authorization_token_obj_o17)
+    (third_party_service_available third_party_service_obj_o18)
+    (third_party_service_available third_party_service_obj_o19)
+    (claim_record_available claim_record_obj_o20)
+    (spare_part_available spare_part_obj_o21)
+    (external_provider_available external_provider_obj_o22)
+    (provider_assigned_to_case recovery_case_obj_o3 external_provider_obj_o22)
+    (provider_assigned_to_case recovery_case_obj_o4 external_provider_obj_o23)
+    (contractor_resource_available contractor_resource_obj_o24)
+  )
+  (:goal
+    (and
+      (service_restored origin_node_obj_o1)
+      (service_restored destination_node_obj_o2)
+      (service_restored recovery_case_obj_o3)
+      (service_restored recovery_case_obj_o4)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(report_dock_congestion_exception origin_node_obj_o1)
+(report_dock_congestion_exception destination_node_obj_o2)
+(report_dock_congestion_exception recovery_case_obj_o3)
+(report_dock_congestion_exception recovery_case_obj_o4)
+(reserve_handling_resource_for_triage origin_node_obj_o1 resource_unit_obj_o5)
+(reserve_handling_resource_for_triage destination_node_obj_o2 resource_unit_obj_o6)
+(reserve_handling_resource_for_triage recovery_case_obj_o3 resource_unit_obj_o7)
+(allocate_inspection_activity_to_unit origin_node_obj_o1 inspection_activity_obj_o8)
+(validate_exception_after_inspection origin_node_obj_o1 inspection_activity_obj_o8)
+(assign_work_team_to_validated_exception origin_node_obj_o1 work_team_obj_o9)
+(qualify_berth_slot_for_origin origin_node_obj_o1 berth_slot_obj_o11 inspection_activity_obj_o8)
+(confirm_origin_berth_qualification origin_node_obj_o1 berth_slot_obj_o11 work_team_obj_o9)
+(release_inspection_activity origin_node_obj_o1 inspection_activity_obj_o8)
+(release_work_team origin_node_obj_o1 work_team_obj_o9)
+(allocate_inspection_activity_to_unit destination_node_obj_o2 inspection_activity_obj_o8)
+(validate_exception_after_inspection destination_node_obj_o2 inspection_activity_obj_o8)
+(assign_work_team_to_validated_exception destination_node_obj_o2 work_team_obj_o9)
+(qualify_route_option_for_destination destination_node_obj_o2 route_option_obj_o12 inspection_activity_obj_o8)
+(confirm_destination_route_with_team destination_node_obj_o2 route_option_obj_o12 work_team_obj_o9)
+(release_inspection_activity destination_node_obj_o2 inspection_activity_obj_o8)
+(release_work_team destination_node_obj_o2 work_team_obj_o9)
+(consolidate_and_reserve_repair_schedule origin_node_obj_o1 destination_node_obj_o2 berth_slot_obj_o11 route_option_obj_o12 repair_schedule_obj_o13)
+(allocate_inspection_activity_to_unit origin_node_obj_o1 inspection_activity_obj_o8)
+(confirm_repair_schedule_at_origin repair_schedule_obj_o13 origin_node_obj_o1 inspection_activity_obj_o8)
+(release_inspection_activity origin_node_obj_o1 inspection_activity_obj_o8)
+(execute_repair_on_origin_node origin_node_obj_o1 repair_schedule_obj_o13)
+(execute_repair_on_destination_node destination_node_obj_o2 repair_schedule_obj_o13)
+(allocate_inspection_activity_to_unit origin_node_obj_o1 inspection_activity_obj_o8)
+(file_claim_and_request_authorization origin_node_obj_o1 claim_record_obj_o20 inspection_activity_obj_o8)
+(release_inspection_activity origin_node_obj_o1 inspection_activity_obj_o8)
+(finalize_restoration_and_release_resource_origin origin_node_obj_o1 resource_unit_obj_o5 claim_record_obj_o20)
+(allocate_inspection_activity_to_unit destination_node_obj_o2 inspection_activity_obj_o8)
+(file_claim_and_request_authorization destination_node_obj_o2 claim_record_obj_o20 inspection_activity_obj_o8)
+(release_inspection_activity destination_node_obj_o2 inspection_activity_obj_o8)
+(finalize_restoration_and_release_resource_destination destination_node_obj_o2 resource_unit_obj_o6 claim_record_obj_o20)
+(reserve_handling_resource_for_triage recovery_case_obj_o4 resource_unit_obj_o5)
+(allocate_inspection_activity_to_unit recovery_case_obj_o3 inspection_activity_obj_o8)
+(validate_exception_after_inspection recovery_case_obj_o3 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o3 inspection_activity_obj_o8)
+(allocate_inspection_activity_to_unit recovery_case_obj_o4 inspection_activity_obj_o8)
+(validate_exception_after_inspection recovery_case_obj_o4 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o4 inspection_activity_obj_o8)
+(stage_inventory_item_for_schedule recovery_case_obj_o3 inventory_item_obj_o14 repair_schedule_obj_o13)
+(stage_inventory_item_for_schedule recovery_case_obj_o4 inventory_item_obj_o15 repair_schedule_obj_o13)
+(allocate_inspection_activity_to_unit recovery_case_obj_o3 inspection_activity_obj_o8)
+(mark_case_prepared_for_staging recovery_case_obj_o3 inventory_item_obj_o14 repair_schedule_obj_o13 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o3 inspection_activity_obj_o8)
+(allocate_inspection_activity_to_unit recovery_case_obj_o4 inspection_activity_obj_o8)
+(mark_case_prepared_for_staging recovery_case_obj_o4 inventory_item_obj_o15 repair_schedule_obj_o13 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o4 inspection_activity_obj_o8)
+(assign_work_team_to_validated_exception recovery_case_obj_o3 work_team_obj_o9)
+(allocate_spare_part_to_recovery_case recovery_case_obj_o3 spare_part_obj_o21)
+(assign_team_and_stage_case recovery_case_obj_o3 spare_part_obj_o21 work_team_obj_o9 inventory_item_obj_o14 repair_schedule_obj_o13)
+(assign_contractor_resource_to_case recovery_case_obj_o3 contractor_resource_obj_o24)
+(perform_case_quality_check recovery_case_obj_o3 contractor_resource_obj_o24 inventory_item_obj_o14 repair_schedule_obj_o13)
+(activate_case_for_execution recovery_case_obj_o3)
+(allocate_inspection_activity_to_unit recovery_case_obj_o3 inspection_activity_obj_o8)
+(file_claim_and_request_authorization recovery_case_obj_o3 claim_record_obj_o20 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o3 inspection_activity_obj_o8)
+(finalize_restoration_and_release_resource_case recovery_case_obj_o3 resource_unit_obj_o7 claim_record_obj_o20)
+(release_work_team recovery_case_obj_o3 work_team_obj_o9)
+(release_contractor_from_case recovery_case_obj_o3 contractor_resource_obj_o24)
+(release_spare_part_from_recovery_case recovery_case_obj_o3 spare_part_obj_o21)
+(assign_work_team_to_validated_exception recovery_case_obj_o4 work_team_obj_o9)
+(allocate_spare_part_to_recovery_case recovery_case_obj_o4 spare_part_obj_o21)
+(assign_team_and_stage_case recovery_case_obj_o4 spare_part_obj_o21 work_team_obj_o9 inventory_item_obj_o15 repair_schedule_obj_o13)
+(assign_contractor_resource_to_case recovery_case_obj_o4 contractor_resource_obj_o24)
+(perform_case_quality_check recovery_case_obj_o4 contractor_resource_obj_o24 inventory_item_obj_o15 repair_schedule_obj_o13)
+(activate_case_for_execution recovery_case_obj_o4)
+(allocate_inspection_activity_to_unit recovery_case_obj_o4 inspection_activity_obj_o8)
+(file_claim_and_request_authorization recovery_case_obj_o4 claim_record_obj_o20 inspection_activity_obj_o8)
+(release_inspection_activity recovery_case_obj_o4 inspection_activity_obj_o8)
+(finalize_restoration_and_release_resource_case recovery_case_obj_o4 resource_unit_obj_o5 claim_record_obj_o20)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_sr0o74jk/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 73 
+
+Successful plans:
+Value: 73
+ /tmp/val_sr0o74jk/plan.pddl 73 
+
+
+
+--- stderr ---
+

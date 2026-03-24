@@ -1,0 +1,937 @@
+(define (domain family_friendly_itinerary_adjustment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object destination_category - domain_object activity_category - domain_object schedule_component_category - domain_object itinerary_component_supertype - domain_object itinerary_component - itinerary_component_supertype destination_option - destination_category activity_candidate - destination_category service_slot - destination_category accessibility_tag - destination_category family_preference_tag - destination_category constraint_token - destination_category amenity_option - destination_category seasonal_or_age_tag - destination_category auxiliary_service_option - activity_category attraction_variant - activity_category preexisting_booking_tag - activity_category day_segment_variant_a - schedule_component_category day_segment_variant_b - schedule_component_category scheduled_instance - schedule_component_category day_slot_supertype - itinerary_component participant_profile_supertype - itinerary_component day_slot_type_a - day_slot_supertype day_slot_type_b - day_slot_supertype travel_participant_profile - participant_profile_supertype)
+
+  (:predicates
+    (itinerary_component_initialized ?itinerary_component - itinerary_component)
+    (itinerary_activity_confirmed ?itinerary_component - itinerary_component)
+    (itinerary_has_tentative_destination ?itinerary_component - itinerary_component)
+    (itinerary_destination_confirmed ?itinerary_component - itinerary_component)
+    (itinerary_component_confirmed ?itinerary_component - itinerary_component)
+    (itinerary_component_constraint_recorded ?itinerary_component - itinerary_component)
+    (destination_option_available ?destination_option - destination_option)
+    (itinerary_tentative_destination_assignment ?itinerary_component - itinerary_component ?destination_option - destination_option)
+    (activity_candidate_available ?activity_candidate - activity_candidate)
+    (itinerary_activity_proposed ?itinerary_component - itinerary_component ?activity_candidate - activity_candidate)
+    (service_slot_available ?service_slot - service_slot)
+    (itinerary_service_assigned ?itinerary_component - itinerary_component ?service_slot - service_slot)
+    (auxiliary_service_option_available ?auxiliary_service_option - auxiliary_service_option)
+    (day_slot_a_aux_service_assigned ?day_slot_type_a - day_slot_type_a ?auxiliary_service_option - auxiliary_service_option)
+    (day_slot_b_aux_service_assigned ?day_slot_type_b - day_slot_type_b ?auxiliary_service_option - auxiliary_service_option)
+    (day_slot_a_segment_variant_link ?day_slot_type_a - day_slot_type_a ?day_segment_variant_a - day_segment_variant_a)
+    (segment_variant_a_primary_flag ?day_segment_variant_a - day_segment_variant_a)
+    (segment_variant_a_secondary_flag ?day_segment_variant_a - day_segment_variant_a)
+    (day_slot_a_segment_selected ?day_slot_type_a - day_slot_type_a)
+    (day_slot_b_segment_variant_link ?day_slot_type_b - day_slot_type_b ?day_segment_variant_b - day_segment_variant_b)
+    (segment_variant_b_primary_flag ?day_segment_variant_b - day_segment_variant_b)
+    (segment_variant_b_secondary_flag ?day_segment_variant_b - day_segment_variant_b)
+    (day_slot_b_segment_selected ?day_slot_type_b - day_slot_type_b)
+    (scheduled_instance_available ?scheduled_activity_instance - scheduled_instance)
+    (scheduled_instance_claimed ?scheduled_activity_instance - scheduled_instance)
+    (scheduled_instance_has_segment_variant_a ?scheduled_activity_instance - scheduled_instance ?day_segment_variant_a - day_segment_variant_a)
+    (scheduled_instance_has_segment_variant_b ?scheduled_activity_instance - scheduled_instance ?day_segment_variant_b - day_segment_variant_b)
+    (scheduled_instance_option_marker_a ?scheduled_activity_instance - scheduled_instance)
+    (scheduled_instance_option_marker_b ?scheduled_activity_instance - scheduled_instance)
+    (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance - scheduled_instance)
+    (participant_assigned_to_day_slot_a ?travel_participant_profile - travel_participant_profile ?day_slot_type_a - day_slot_type_a)
+    (participant_assigned_to_day_slot_b ?travel_participant_profile - travel_participant_profile ?day_slot_type_b - day_slot_type_b)
+    (participant_assigned_to_scheduled_instance ?travel_participant_profile - travel_participant_profile ?scheduled_activity_instance - scheduled_instance)
+    (attraction_variant_available ?attraction_variant - attraction_variant)
+    (profile_has_attraction_variant_option ?travel_participant_profile - travel_participant_profile ?attraction_variant - attraction_variant)
+    (attraction_variant_reserved ?attraction_variant - attraction_variant)
+    (attraction_variant_assigned_to_instance ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    (profile_variant_selection_confirmed ?travel_participant_profile - travel_participant_profile)
+    (profile_special_options_attached ?travel_participant_profile - travel_participant_profile)
+    (profile_special_options_ready ?travel_participant_profile - travel_participant_profile)
+    (profile_accessibility_requested ?travel_participant_profile - travel_participant_profile)
+    (profile_accessibility_processed ?travel_participant_profile - travel_participant_profile)
+    (profile_preference_ready ?travel_participant_profile - travel_participant_profile)
+    (profile_final_checks_done ?travel_participant_profile - travel_participant_profile)
+    (preexisting_booking_tag_available ?preexisting_booking_tag - preexisting_booking_tag)
+    (profile_has_preexisting_booking ?travel_participant_profile - travel_participant_profile ?preexisting_booking_tag - preexisting_booking_tag)
+    (profile_preexisting_booking_acknowledged ?travel_participant_profile - travel_participant_profile)
+    (profile_preexisting_booking_registered ?travel_participant_profile - travel_participant_profile)
+    (profile_preexisting_booking_validated ?travel_participant_profile - travel_participant_profile)
+    (accessibility_tag_available ?accessibility_tag - accessibility_tag)
+    (profile_has_accessibility_tag ?travel_participant_profile - travel_participant_profile ?accessibility_tag - accessibility_tag)
+    (family_preference_tag_available ?family_preference_tag - family_preference_tag)
+    (profile_has_preference_tag ?travel_participant_profile - travel_participant_profile ?family_preference_tag - family_preference_tag)
+    (amenity_option_available ?amenity_option - amenity_option)
+    (profile_has_amenity_option ?travel_participant_profile - travel_participant_profile ?amenity_option - amenity_option)
+    (seasonal_or_age_tag_available ?seasonal_or_age_tag - seasonal_or_age_tag)
+    (profile_has_seasonal_or_age_tag ?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag)
+    (constraint_token_available ?constraint_token - constraint_token)
+    (itinerary_component_has_constraint_token ?itinerary_component - itinerary_component ?constraint_token - constraint_token)
+    (day_slot_a_pacing_confirmed ?day_slot_type_a - day_slot_type_a)
+    (day_slot_b_pacing_confirmed ?day_slot_type_b - day_slot_type_b)
+    (profile_ready_for_confirmation ?travel_participant_profile - travel_participant_profile)
+  )
+  (:action initialize_itinerary_component
+    :parameters (?itinerary_component - itinerary_component)
+    :precondition
+      (and
+        (not
+          (itinerary_component_initialized ?itinerary_component)
+        )
+        (not
+          (itinerary_destination_confirmed ?itinerary_component)
+        )
+      )
+    :effect (itinerary_component_initialized ?itinerary_component)
+  )
+  (:action assign_tentative_destination
+    :parameters (?itinerary_component - itinerary_component ?destination_option - destination_option)
+    :precondition
+      (and
+        (itinerary_component_initialized ?itinerary_component)
+        (not
+          (itinerary_has_tentative_destination ?itinerary_component)
+        )
+        (destination_option_available ?destination_option)
+      )
+    :effect
+      (and
+        (itinerary_has_tentative_destination ?itinerary_component)
+        (itinerary_tentative_destination_assignment ?itinerary_component ?destination_option)
+        (not
+          (destination_option_available ?destination_option)
+        )
+      )
+  )
+  (:action propose_activity_for_component
+    :parameters (?itinerary_component - itinerary_component ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_component_initialized ?itinerary_component)
+        (itinerary_has_tentative_destination ?itinerary_component)
+        (activity_candidate_available ?activity_candidate)
+      )
+    :effect
+      (and
+        (itinerary_activity_proposed ?itinerary_component ?activity_candidate)
+        (not
+          (activity_candidate_available ?activity_candidate)
+        )
+      )
+  )
+  (:action confirm_activity_for_component
+    :parameters (?itinerary_component - itinerary_component ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_component_initialized ?itinerary_component)
+        (itinerary_has_tentative_destination ?itinerary_component)
+        (itinerary_activity_proposed ?itinerary_component ?activity_candidate)
+        (not
+          (itinerary_activity_confirmed ?itinerary_component)
+        )
+      )
+    :effect (itinerary_activity_confirmed ?itinerary_component)
+  )
+  (:action release_activity_candidate
+    :parameters (?itinerary_component - itinerary_component ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_activity_proposed ?itinerary_component ?activity_candidate)
+      )
+    :effect
+      (and
+        (activity_candidate_available ?activity_candidate)
+        (not
+          (itinerary_activity_proposed ?itinerary_component ?activity_candidate)
+        )
+      )
+  )
+  (:action assign_service_slot_to_component
+    :parameters (?itinerary_component - itinerary_component ?service_slot - service_slot)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?itinerary_component)
+        (service_slot_available ?service_slot)
+      )
+    :effect
+      (and
+        (itinerary_service_assigned ?itinerary_component ?service_slot)
+        (not
+          (service_slot_available ?service_slot)
+        )
+      )
+  )
+  (:action release_service_slot_from_component
+    :parameters (?itinerary_component - itinerary_component ?service_slot - service_slot)
+    :precondition
+      (and
+        (itinerary_service_assigned ?itinerary_component ?service_slot)
+      )
+    :effect
+      (and
+        (service_slot_available ?service_slot)
+        (not
+          (itinerary_service_assigned ?itinerary_component ?service_slot)
+        )
+      )
+  )
+  (:action assign_amenity_to_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?amenity_option - amenity_option)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (amenity_option_available ?amenity_option)
+      )
+    :effect
+      (and
+        (profile_has_amenity_option ?travel_participant_profile ?amenity_option)
+        (not
+          (amenity_option_available ?amenity_option)
+        )
+      )
+  )
+  (:action release_amenity_from_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?amenity_option - amenity_option)
+    :precondition
+      (and
+        (profile_has_amenity_option ?travel_participant_profile ?amenity_option)
+      )
+    :effect
+      (and
+        (amenity_option_available ?amenity_option)
+        (not
+          (profile_has_amenity_option ?travel_participant_profile ?amenity_option)
+        )
+      )
+  )
+  (:action assign_seasonal_tag_to_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (seasonal_or_age_tag_available ?seasonal_or_age_tag)
+      )
+    :effect
+      (and
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (not
+          (seasonal_or_age_tag_available ?seasonal_or_age_tag)
+        )
+      )
+  )
+  (:action release_seasonal_tag_from_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag)
+    :precondition
+      (and
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+      )
+    :effect
+      (and
+        (seasonal_or_age_tag_available ?seasonal_or_age_tag)
+        (not
+          (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        )
+      )
+  )
+  (:action select_primary_segment_variant_a
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_segment_variant_a - day_segment_variant_a ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_a)
+        (itinerary_activity_proposed ?day_slot_type_a ?activity_candidate)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (not
+          (segment_variant_a_primary_flag ?day_segment_variant_a)
+        )
+        (not
+          (segment_variant_a_secondary_flag ?day_segment_variant_a)
+        )
+      )
+    :effect (segment_variant_a_primary_flag ?day_segment_variant_a)
+  )
+  (:action confirm_day_slot_a_with_service
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_segment_variant_a - day_segment_variant_a ?service_slot - service_slot)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_a)
+        (itinerary_service_assigned ?day_slot_type_a ?service_slot)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (segment_variant_a_primary_flag ?day_segment_variant_a)
+        (not
+          (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        )
+      )
+    :effect
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+      )
+  )
+  (:action attach_aux_service_option_to_day_slot_a
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_segment_variant_a - day_segment_variant_a ?auxiliary_service_option - auxiliary_service_option)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_a)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (auxiliary_service_option_available ?auxiliary_service_option)
+        (not
+          (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        )
+      )
+    :effect
+      (and
+        (segment_variant_a_secondary_flag ?day_segment_variant_a)
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_a_aux_service_assigned ?day_slot_type_a ?auxiliary_service_option)
+        (not
+          (auxiliary_service_option_available ?auxiliary_service_option)
+        )
+      )
+  )
+  (:action finalize_day_slot_a_segment_selection
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_segment_variant_a - day_segment_variant_a ?activity_candidate - activity_candidate ?auxiliary_service_option - auxiliary_service_option)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_a)
+        (itinerary_activity_proposed ?day_slot_type_a ?activity_candidate)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (segment_variant_a_secondary_flag ?day_segment_variant_a)
+        (day_slot_a_aux_service_assigned ?day_slot_type_a ?auxiliary_service_option)
+        (not
+          (day_slot_a_segment_selected ?day_slot_type_a)
+        )
+      )
+    :effect
+      (and
+        (segment_variant_a_primary_flag ?day_segment_variant_a)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+        (auxiliary_service_option_available ?auxiliary_service_option)
+        (not
+          (day_slot_a_aux_service_assigned ?day_slot_type_a ?auxiliary_service_option)
+        )
+      )
+  )
+  (:action select_primary_segment_variant_b
+    :parameters (?day_slot_type_b - day_slot_type_b ?day_segment_variant_b - day_segment_variant_b ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_b)
+        (itinerary_activity_proposed ?day_slot_type_b ?activity_candidate)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (not
+          (segment_variant_b_primary_flag ?day_segment_variant_b)
+        )
+        (not
+          (segment_variant_b_secondary_flag ?day_segment_variant_b)
+        )
+      )
+    :effect (segment_variant_b_primary_flag ?day_segment_variant_b)
+  )
+  (:action confirm_day_slot_b_with_service
+    :parameters (?day_slot_type_b - day_slot_type_b ?day_segment_variant_b - day_segment_variant_b ?service_slot - service_slot)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_b)
+        (itinerary_service_assigned ?day_slot_type_b ?service_slot)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_b_primary_flag ?day_segment_variant_b)
+        (not
+          (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        )
+      )
+    :effect
+      (and
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_b_segment_selected ?day_slot_type_b)
+      )
+  )
+  (:action attach_aux_service_option_to_day_slot_b
+    :parameters (?day_slot_type_b - day_slot_type_b ?day_segment_variant_b - day_segment_variant_b ?auxiliary_service_option - auxiliary_service_option)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_b)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (auxiliary_service_option_available ?auxiliary_service_option)
+        (not
+          (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        )
+      )
+    :effect
+      (and
+        (segment_variant_b_secondary_flag ?day_segment_variant_b)
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_b_aux_service_assigned ?day_slot_type_b ?auxiliary_service_option)
+        (not
+          (auxiliary_service_option_available ?auxiliary_service_option)
+        )
+      )
+  )
+  (:action finalize_day_slot_b_segment_selection
+    :parameters (?day_slot_type_b - day_slot_type_b ?day_segment_variant_b - day_segment_variant_b ?activity_candidate - activity_candidate ?auxiliary_service_option - auxiliary_service_option)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?day_slot_type_b)
+        (itinerary_activity_proposed ?day_slot_type_b ?activity_candidate)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_b_secondary_flag ?day_segment_variant_b)
+        (day_slot_b_aux_service_assigned ?day_slot_type_b ?auxiliary_service_option)
+        (not
+          (day_slot_b_segment_selected ?day_slot_type_b)
+        )
+      )
+    :effect
+      (and
+        (segment_variant_b_primary_flag ?day_segment_variant_b)
+        (day_slot_b_segment_selected ?day_slot_type_b)
+        (auxiliary_service_option_available ?auxiliary_service_option)
+        (not
+          (day_slot_b_aux_service_assigned ?day_slot_type_b ?auxiliary_service_option)
+        )
+      )
+  )
+  (:action compose_scheduled_activity_instance
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_slot_type_b - day_slot_type_b ?day_segment_variant_a - day_segment_variant_a ?day_segment_variant_b - day_segment_variant_b ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_a_primary_flag ?day_segment_variant_a)
+        (segment_variant_b_primary_flag ?day_segment_variant_b)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+        (day_slot_b_segment_selected ?day_slot_type_b)
+        (scheduled_instance_available ?scheduled_activity_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_has_segment_variant_a ?scheduled_activity_instance ?day_segment_variant_a)
+        (scheduled_instance_has_segment_variant_b ?scheduled_activity_instance ?day_segment_variant_b)
+        (not
+          (scheduled_instance_available ?scheduled_activity_instance)
+        )
+      )
+  )
+  (:action compose_scheduled_activity_instance_with_option_a
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_slot_type_b - day_slot_type_b ?day_segment_variant_a - day_segment_variant_a ?day_segment_variant_b - day_segment_variant_b ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_a_secondary_flag ?day_segment_variant_a)
+        (segment_variant_b_primary_flag ?day_segment_variant_b)
+        (not
+          (day_slot_a_segment_selected ?day_slot_type_a)
+        )
+        (day_slot_b_segment_selected ?day_slot_type_b)
+        (scheduled_instance_available ?scheduled_activity_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_has_segment_variant_a ?scheduled_activity_instance ?day_segment_variant_a)
+        (scheduled_instance_has_segment_variant_b ?scheduled_activity_instance ?day_segment_variant_b)
+        (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_available ?scheduled_activity_instance)
+        )
+      )
+  )
+  (:action compose_scheduled_activity_instance_with_option_b
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_slot_type_b - day_slot_type_b ?day_segment_variant_a - day_segment_variant_a ?day_segment_variant_b - day_segment_variant_b ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_a_primary_flag ?day_segment_variant_a)
+        (segment_variant_b_secondary_flag ?day_segment_variant_b)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+        (not
+          (day_slot_b_segment_selected ?day_slot_type_b)
+        )
+        (scheduled_instance_available ?scheduled_activity_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_has_segment_variant_a ?scheduled_activity_instance ?day_segment_variant_a)
+        (scheduled_instance_has_segment_variant_b ?scheduled_activity_instance ?day_segment_variant_b)
+        (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_available ?scheduled_activity_instance)
+        )
+      )
+  )
+  (:action compose_scheduled_activity_instance_with_options
+    :parameters (?day_slot_type_a - day_slot_type_a ?day_slot_type_b - day_slot_type_b ?day_segment_variant_a - day_segment_variant_a ?day_segment_variant_b - day_segment_variant_b ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_a_segment_variant_link ?day_slot_type_a ?day_segment_variant_a)
+        (day_slot_b_segment_variant_link ?day_slot_type_b ?day_segment_variant_b)
+        (segment_variant_a_secondary_flag ?day_segment_variant_a)
+        (segment_variant_b_secondary_flag ?day_segment_variant_b)
+        (not
+          (day_slot_a_segment_selected ?day_slot_type_a)
+        )
+        (not
+          (day_slot_b_segment_selected ?day_slot_type_b)
+        )
+        (scheduled_instance_available ?scheduled_activity_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_has_segment_variant_a ?scheduled_activity_instance ?day_segment_variant_a)
+        (scheduled_instance_has_segment_variant_b ?scheduled_activity_instance ?day_segment_variant_b)
+        (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_available ?scheduled_activity_instance)
+        )
+      )
+  )
+  (:action prepare_scheduled_instance_for_variant_selection
+    :parameters (?scheduled_activity_instance - scheduled_instance ?day_slot_type_a - day_slot_type_a ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (itinerary_activity_proposed ?day_slot_type_a ?activity_candidate)
+        (not
+          (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance)
+        )
+      )
+    :effect (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance)
+  )
+  (:action reserve_attraction_variant_for_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (participant_assigned_to_scheduled_instance ?travel_participant_profile ?scheduled_activity_instance)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_available ?attraction_variant)
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance)
+        (not
+          (attraction_variant_reserved ?attraction_variant)
+        )
+      )
+    :effect
+      (and
+        (attraction_variant_reserved ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (not
+          (attraction_variant_available ?attraction_variant)
+        )
+      )
+  )
+  (:action confirm_profile_variant_selection
+    :parameters (?travel_participant_profile - travel_participant_profile ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_reserved ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (itinerary_activity_proposed ?travel_participant_profile ?activity_candidate)
+        (not
+          (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        )
+        (not
+          (profile_variant_selection_confirmed ?travel_participant_profile)
+        )
+      )
+    :effect (profile_variant_selection_confirmed ?travel_participant_profile)
+  )
+  (:action request_accessibility_tag_for_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?accessibility_tag - accessibility_tag)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (accessibility_tag_available ?accessibility_tag)
+        (not
+          (profile_accessibility_requested ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_accessibility_requested ?travel_participant_profile)
+        (profile_has_accessibility_tag ?travel_participant_profile ?accessibility_tag)
+        (not
+          (accessibility_tag_available ?accessibility_tag)
+        )
+      )
+  )
+  (:action apply_accessibility_setup
+    :parameters (?travel_participant_profile - travel_participant_profile ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance ?activity_candidate - activity_candidate ?accessibility_tag - accessibility_tag)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_reserved ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (itinerary_activity_proposed ?travel_participant_profile ?activity_candidate)
+        (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        (profile_accessibility_requested ?travel_participant_profile)
+        (profile_has_accessibility_tag ?travel_participant_profile ?accessibility_tag)
+        (not
+          (profile_variant_selection_confirmed ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_variant_selection_confirmed ?travel_participant_profile)
+        (profile_accessibility_processed ?travel_participant_profile)
+      )
+  )
+  (:action attach_amenity_and_prepare_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?amenity_option - amenity_option ?service_slot - service_slot ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_variant_selection_confirmed ?travel_participant_profile)
+        (profile_has_amenity_option ?travel_participant_profile ?amenity_option)
+        (itinerary_service_assigned ?travel_participant_profile ?service_slot)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        )
+        (not
+          (profile_special_options_attached ?travel_participant_profile)
+        )
+      )
+    :effect (profile_special_options_attached ?travel_participant_profile)
+  )
+  (:action attach_amenity_and_prepare_profile_alternative
+    :parameters (?travel_participant_profile - travel_participant_profile ?amenity_option - amenity_option ?service_slot - service_slot ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_variant_selection_confirmed ?travel_participant_profile)
+        (profile_has_amenity_option ?travel_participant_profile ?amenity_option)
+        (itinerary_service_assigned ?travel_participant_profile ?service_slot)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        (not
+          (profile_special_options_attached ?travel_participant_profile)
+        )
+      )
+    :effect (profile_special_options_attached ?travel_participant_profile)
+  )
+  (:action mark_profile_ready_without_instance_options
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_special_options_attached ?travel_participant_profile)
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        )
+        (not
+          (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        )
+        (not
+          (profile_special_options_ready ?travel_participant_profile)
+        )
+      )
+    :effect (profile_special_options_ready ?travel_participant_profile)
+  )
+  (:action mark_profile_ready_with_instance_option_a
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_special_options_attached ?travel_participant_profile)
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        )
+        (not
+          (profile_special_options_ready ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_preference_ready ?travel_participant_profile)
+      )
+  )
+  (:action mark_profile_ready_with_instance_option_b
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_special_options_attached ?travel_participant_profile)
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (not
+          (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        )
+        (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        (not
+          (profile_special_options_ready ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_preference_ready ?travel_participant_profile)
+      )
+  )
+  (:action mark_profile_ready_with_instance_options
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag ?attraction_variant - attraction_variant ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (profile_special_options_attached ?travel_participant_profile)
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (profile_has_attraction_variant_option ?travel_participant_profile ?attraction_variant)
+        (attraction_variant_assigned_to_instance ?attraction_variant ?scheduled_activity_instance)
+        (scheduled_instance_option_marker_a ?scheduled_activity_instance)
+        (scheduled_instance_option_marker_b ?scheduled_activity_instance)
+        (not
+          (profile_special_options_ready ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_preference_ready ?travel_participant_profile)
+      )
+  )
+  (:action finalize_profile_readiness_without_extra_options
+    :parameters (?travel_participant_profile - travel_participant_profile)
+    :precondition
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (not
+          (profile_preference_ready ?travel_participant_profile)
+        )
+        (not
+          (profile_ready_for_confirmation ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_confirmation ?travel_participant_profile)
+        (itinerary_component_confirmed ?travel_participant_profile)
+      )
+  )
+  (:action apply_family_preference_to_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?family_preference_tag - family_preference_tag)
+    :precondition
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_preference_ready ?travel_participant_profile)
+        (family_preference_tag_available ?family_preference_tag)
+      )
+    :effect
+      (and
+        (profile_has_preference_tag ?travel_participant_profile ?family_preference_tag)
+        (not
+          (family_preference_tag_available ?family_preference_tag)
+        )
+      )
+  )
+  (:action perform_profile_final_readiness_checks
+    :parameters (?travel_participant_profile - travel_participant_profile ?day_slot_type_a - day_slot_type_a ?day_slot_type_b - day_slot_type_b ?activity_candidate - activity_candidate ?family_preference_tag - family_preference_tag)
+    :precondition
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_preference_ready ?travel_participant_profile)
+        (profile_has_preference_tag ?travel_participant_profile ?family_preference_tag)
+        (participant_assigned_to_day_slot_a ?travel_participant_profile ?day_slot_type_a)
+        (participant_assigned_to_day_slot_b ?travel_participant_profile ?day_slot_type_b)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+        (day_slot_b_segment_selected ?day_slot_type_b)
+        (itinerary_activity_proposed ?travel_participant_profile ?activity_candidate)
+        (not
+          (profile_final_checks_done ?travel_participant_profile)
+        )
+      )
+    :effect (profile_final_checks_done ?travel_participant_profile)
+  )
+  (:action finalize_profile_readiness
+    :parameters (?travel_participant_profile - travel_participant_profile)
+    :precondition
+      (and
+        (profile_special_options_ready ?travel_participant_profile)
+        (profile_final_checks_done ?travel_participant_profile)
+        (not
+          (profile_ready_for_confirmation ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_confirmation ?travel_participant_profile)
+        (itinerary_component_confirmed ?travel_participant_profile)
+      )
+  )
+  (:action acknowledge_preexisting_booking_for_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?preexisting_booking_tag - preexisting_booking_tag ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_activity_confirmed ?travel_participant_profile)
+        (itinerary_activity_proposed ?travel_participant_profile ?activity_candidate)
+        (preexisting_booking_tag_available ?preexisting_booking_tag)
+        (profile_has_preexisting_booking ?travel_participant_profile ?preexisting_booking_tag)
+        (not
+          (profile_preexisting_booking_acknowledged ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_preexisting_booking_acknowledged ?travel_participant_profile)
+        (not
+          (preexisting_booking_tag_available ?preexisting_booking_tag)
+        )
+      )
+  )
+  (:action register_preexisting_booking_on_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?service_slot - service_slot)
+    :precondition
+      (and
+        (profile_preexisting_booking_acknowledged ?travel_participant_profile)
+        (itinerary_service_assigned ?travel_participant_profile ?service_slot)
+        (not
+          (profile_preexisting_booking_registered ?travel_participant_profile)
+        )
+      )
+    :effect (profile_preexisting_booking_registered ?travel_participant_profile)
+  )
+  (:action validate_preexisting_booking_with_seasonal_tag
+    :parameters (?travel_participant_profile - travel_participant_profile ?seasonal_or_age_tag - seasonal_or_age_tag)
+    :precondition
+      (and
+        (profile_preexisting_booking_registered ?travel_participant_profile)
+        (profile_has_seasonal_or_age_tag ?travel_participant_profile ?seasonal_or_age_tag)
+        (not
+          (profile_preexisting_booking_validated ?travel_participant_profile)
+        )
+      )
+    :effect (profile_preexisting_booking_validated ?travel_participant_profile)
+  )
+  (:action finalize_profile_with_preexisting_booking
+    :parameters (?travel_participant_profile - travel_participant_profile)
+    :precondition
+      (and
+        (profile_preexisting_booking_validated ?travel_participant_profile)
+        (not
+          (profile_ready_for_confirmation ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_confirmation ?travel_participant_profile)
+        (itinerary_component_confirmed ?travel_participant_profile)
+      )
+  )
+  (:action confirm_day_slot_a
+    :parameters (?day_slot_type_a - day_slot_type_a ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_a_pacing_confirmed ?day_slot_type_a)
+        (day_slot_a_segment_selected ?day_slot_type_a)
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance)
+        (not
+          (itinerary_component_confirmed ?day_slot_type_a)
+        )
+      )
+    :effect (itinerary_component_confirmed ?day_slot_type_a)
+  )
+  (:action confirm_day_slot_b
+    :parameters (?day_slot_type_b - day_slot_type_b ?scheduled_activity_instance - scheduled_instance)
+    :precondition
+      (and
+        (day_slot_b_pacing_confirmed ?day_slot_type_b)
+        (day_slot_b_segment_selected ?day_slot_type_b)
+        (scheduled_instance_claimed ?scheduled_activity_instance)
+        (scheduled_instance_ready_for_variant_selection ?scheduled_activity_instance)
+        (not
+          (itinerary_component_confirmed ?day_slot_type_b)
+        )
+      )
+    :effect (itinerary_component_confirmed ?day_slot_type_b)
+  )
+  (:action record_constraint_token_for_component
+    :parameters (?itinerary_component - itinerary_component ?constraint_token - constraint_token ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (itinerary_component_confirmed ?itinerary_component)
+        (itinerary_activity_proposed ?itinerary_component ?activity_candidate)
+        (constraint_token_available ?constraint_token)
+        (not
+          (itinerary_component_constraint_recorded ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_component_constraint_recorded ?itinerary_component)
+        (itinerary_component_has_constraint_token ?itinerary_component ?constraint_token)
+        (not
+          (constraint_token_available ?constraint_token)
+        )
+      )
+  )
+  (:action finalize_destination_assignment_for_day_slot
+    :parameters (?day_slot_type_a - day_slot_type_a ?destination_option - destination_option ?constraint_token - constraint_token)
+    :precondition
+      (and
+        (itinerary_component_constraint_recorded ?day_slot_type_a)
+        (itinerary_tentative_destination_assignment ?day_slot_type_a ?destination_option)
+        (itinerary_component_has_constraint_token ?day_slot_type_a ?constraint_token)
+        (not
+          (itinerary_destination_confirmed ?day_slot_type_a)
+        )
+      )
+    :effect
+      (and
+        (itinerary_destination_confirmed ?day_slot_type_a)
+        (destination_option_available ?destination_option)
+        (constraint_token_available ?constraint_token)
+      )
+  )
+  (:action finalize_destination_assignment_for_day_slot_b
+    :parameters (?day_slot_type_b - day_slot_type_b ?destination_option - destination_option ?constraint_token - constraint_token)
+    :precondition
+      (and
+        (itinerary_component_constraint_recorded ?day_slot_type_b)
+        (itinerary_tentative_destination_assignment ?day_slot_type_b ?destination_option)
+        (itinerary_component_has_constraint_token ?day_slot_type_b ?constraint_token)
+        (not
+          (itinerary_destination_confirmed ?day_slot_type_b)
+        )
+      )
+    :effect
+      (and
+        (itinerary_destination_confirmed ?day_slot_type_b)
+        (destination_option_available ?destination_option)
+        (constraint_token_available ?constraint_token)
+      )
+  )
+  (:action finalize_destination_assignment_for_profile
+    :parameters (?travel_participant_profile - travel_participant_profile ?destination_option - destination_option ?constraint_token - constraint_token)
+    :precondition
+      (and
+        (itinerary_component_constraint_recorded ?travel_participant_profile)
+        (itinerary_tentative_destination_assignment ?travel_participant_profile ?destination_option)
+        (itinerary_component_has_constraint_token ?travel_participant_profile ?constraint_token)
+        (not
+          (itinerary_destination_confirmed ?travel_participant_profile)
+        )
+      )
+    :effect
+      (and
+        (itinerary_destination_confirmed ?travel_participant_profile)
+        (destination_option_available ?destination_option)
+        (constraint_token_available ?constraint_token)
+      )
+  )
+)

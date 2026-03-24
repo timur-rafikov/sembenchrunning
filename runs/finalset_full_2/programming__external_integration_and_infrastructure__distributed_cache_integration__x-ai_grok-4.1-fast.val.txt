@@ -1,0 +1,1074 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain distributed_cache_integration_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types aux_resource_type1 - object aux_resource_type2 - object aux_resource_type3 - object opaque_resource_group - object integration_subject - opaque_resource_group adapter_endpoint - aux_resource_type1 verification_token - aux_resource_type1 operator_action - aux_resource_type1 platform_feature - aux_resource_type1 monitoring_hook - aux_resource_type1 environment_context - aux_resource_type1 runtime_credential - aux_resource_type1 commit_token - aux_resource_type1 configuration_artifact - aux_resource_type2 secret_material - aux_resource_type2 approval_token - aux_resource_type2 cache_cluster - aux_resource_type3 cache_shard - aux_resource_type3 deployment_artifact - aux_resource_type3 subject_instance_subtype - integration_subject coordinator_subtype - integration_subject producer_instance - subject_instance_subtype consumer_instance - subject_instance_subtype integration_coordinator - coordinator_subtype)
+  (:predicates
+    (subject_registered ?integration_subject - integration_subject)
+    (subject_verified ?integration_subject - integration_subject)
+    (subject_adapter_assigned ?integration_subject - integration_subject)
+    (subject_integration_committed ?integration_subject - integration_subject)
+    (ready_for_commit ?integration_subject - integration_subject)
+    (subject_precommit_ready ?integration_subject - integration_subject)
+    (adapter_available ?adapter_endpoint - adapter_endpoint)
+    (subject_adapter_binding ?integration_subject - integration_subject ?adapter_endpoint - adapter_endpoint)
+    (verification_token_available ?verification_token - verification_token)
+    (subject_verification_binding ?integration_subject - integration_subject ?verification_token - verification_token)
+    (operator_action_available ?operator_action - operator_action)
+    (subject_operator_action_binding ?integration_subject - integration_subject ?operator_action - operator_action)
+    (configuration_artifact_available ?configuration_artifact - configuration_artifact)
+    (producer_configuration_binding ?producer_instance - producer_instance ?configuration_artifact - configuration_artifact)
+    (consumer_configuration_binding ?consumer_instance - consumer_instance ?configuration_artifact - configuration_artifact)
+    (producer_cluster_binding ?producer_instance - producer_instance ?cache_cluster - cache_cluster)
+    (cache_cluster_primed ?cache_cluster - cache_cluster)
+    (cache_cluster_configuration_applied ?cache_cluster - cache_cluster)
+    (producer_ready ?producer_instance - producer_instance)
+    (consumer_shard_binding ?consumer_instance - consumer_instance ?cache_shard - cache_shard)
+    (cache_shard_primed ?cache_shard - cache_shard)
+    (cache_shard_configuration_applied ?cache_shard - cache_shard)
+    (consumer_ready ?consumer_instance - consumer_instance)
+    (artifact_pending_assembly ?deployment_artifact - deployment_artifact)
+    (artifact_assembled ?deployment_artifact - deployment_artifact)
+    (artifact_cluster_binding ?deployment_artifact - deployment_artifact ?cache_cluster - cache_cluster)
+    (artifact_shard_binding ?deployment_artifact - deployment_artifact ?cache_shard - cache_shard)
+    (artifact_consumer_only_variant ?deployment_artifact - deployment_artifact)
+    (artifact_producer_only_variant ?deployment_artifact - deployment_artifact)
+    (artifact_prepared ?deployment_artifact - deployment_artifact)
+    (coordinator_claims_producer ?integration_coordinator - integration_coordinator ?producer_instance - producer_instance)
+    (coordinator_claims_consumer ?integration_coordinator - integration_coordinator ?consumer_instance - consumer_instance)
+    (coordinator_artifact_claim ?integration_coordinator - integration_coordinator ?deployment_artifact - deployment_artifact)
+    (secret_material_available ?secret_material - secret_material)
+    (coordinator_claims_secret ?integration_coordinator - integration_coordinator ?secret_material - secret_material)
+    (secret_material_consumed ?secret_material - secret_material)
+    (secret_bound_to_artifact ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    (coordinator_artifact_secured ?integration_coordinator - integration_coordinator)
+    (coordinator_verification_ready ?integration_coordinator - integration_coordinator)
+    (coordinator_verification_milestone ?integration_coordinator - integration_coordinator)
+    (coordinator_platform_feature_claimed ?integration_coordinator - integration_coordinator)
+    (coordinator_platform_feature_activated ?integration_coordinator - integration_coordinator)
+    (coordinator_verified ?integration_coordinator - integration_coordinator)
+    (coordinator_execution_marker ?integration_coordinator - integration_coordinator)
+    (approval_token_available ?approval_token - approval_token)
+    (coordinator_approval_binding ?integration_coordinator - integration_coordinator ?approval_token - approval_token)
+    (coordinator_approval_granted ?integration_coordinator - integration_coordinator)
+    (coordinator_approval_processed ?integration_coordinator - integration_coordinator)
+    (coordinator_approval_verified ?integration_coordinator - integration_coordinator)
+    (platform_feature_available ?platform_feature - platform_feature)
+    (coordinator_platform_feature_binding ?integration_coordinator - integration_coordinator ?platform_feature - platform_feature)
+    (monitoring_hook_available ?monitoring_hook - monitoring_hook)
+    (coordinator_monitoring_hook_binding ?integration_coordinator - integration_coordinator ?monitoring_hook - monitoring_hook)
+    (runtime_credential_available ?runtime_credential - runtime_credential)
+    (coordinator_runtime_credential_binding ?integration_coordinator - integration_coordinator ?runtime_credential - runtime_credential)
+    (commit_token_available ?commit_token - commit_token)
+    (coordinator_commit_token_binding ?integration_coordinator - integration_coordinator ?commit_token - commit_token)
+    (environment_context_available ?environment_context - environment_context)
+    (subject_environment_binding ?integration_subject - integration_subject ?environment_context - environment_context)
+    (producer_processing_flag ?producer_instance - producer_instance)
+    (consumer_processing_flag ?consumer_instance - consumer_instance)
+    (coordinator_committed ?integration_coordinator - integration_coordinator)
+  )
+  (:action register_integration_subject
+    :parameters (?integration_subject - integration_subject)
+    :precondition
+      (and
+        (not
+          (subject_registered ?integration_subject)
+        )
+        (not
+          (subject_integration_committed ?integration_subject)
+        )
+      )
+    :effect (subject_registered ?integration_subject)
+  )
+  (:action assign_adapter_to_subject
+    :parameters (?integration_subject - integration_subject ?adapter_endpoint - adapter_endpoint)
+    :precondition
+      (and
+        (subject_registered ?integration_subject)
+        (not
+          (subject_adapter_assigned ?integration_subject)
+        )
+        (adapter_available ?adapter_endpoint)
+      )
+    :effect
+      (and
+        (subject_adapter_assigned ?integration_subject)
+        (subject_adapter_binding ?integration_subject ?adapter_endpoint)
+        (not
+          (adapter_available ?adapter_endpoint)
+        )
+      )
+  )
+  (:action bind_verification_token_to_subject
+    :parameters (?integration_subject - integration_subject ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_registered ?integration_subject)
+        (subject_adapter_assigned ?integration_subject)
+        (verification_token_available ?verification_token)
+      )
+    :effect
+      (and
+        (subject_verification_binding ?integration_subject ?verification_token)
+        (not
+          (verification_token_available ?verification_token)
+        )
+      )
+  )
+  (:action confirm_subject_verification
+    :parameters (?integration_subject - integration_subject ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_registered ?integration_subject)
+        (subject_adapter_assigned ?integration_subject)
+        (subject_verification_binding ?integration_subject ?verification_token)
+        (not
+          (subject_verified ?integration_subject)
+        )
+      )
+    :effect (subject_verified ?integration_subject)
+  )
+  (:action release_verification_token
+    :parameters (?integration_subject - integration_subject ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_verification_binding ?integration_subject ?verification_token)
+      )
+    :effect
+      (and
+        (verification_token_available ?verification_token)
+        (not
+          (subject_verification_binding ?integration_subject ?verification_token)
+        )
+      )
+  )
+  (:action attach_operator_action_to_subject
+    :parameters (?integration_subject - integration_subject ?operator_action - operator_action)
+    :precondition
+      (and
+        (subject_verified ?integration_subject)
+        (operator_action_available ?operator_action)
+      )
+    :effect
+      (and
+        (subject_operator_action_binding ?integration_subject ?operator_action)
+        (not
+          (operator_action_available ?operator_action)
+        )
+      )
+  )
+  (:action detach_operator_action_from_subject
+    :parameters (?integration_subject - integration_subject ?operator_action - operator_action)
+    :precondition
+      (and
+        (subject_operator_action_binding ?integration_subject ?operator_action)
+      )
+    :effect
+      (and
+        (operator_action_available ?operator_action)
+        (not
+          (subject_operator_action_binding ?integration_subject ?operator_action)
+        )
+      )
+  )
+  (:action claim_runtime_credential_for_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?runtime_credential - runtime_credential)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (runtime_credential_available ?runtime_credential)
+      )
+    :effect
+      (and
+        (coordinator_runtime_credential_binding ?integration_coordinator ?runtime_credential)
+        (not
+          (runtime_credential_available ?runtime_credential)
+        )
+      )
+  )
+  (:action release_runtime_credential_from_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?runtime_credential - runtime_credential)
+    :precondition
+      (and
+        (coordinator_runtime_credential_binding ?integration_coordinator ?runtime_credential)
+      )
+    :effect
+      (and
+        (runtime_credential_available ?runtime_credential)
+        (not
+          (coordinator_runtime_credential_binding ?integration_coordinator ?runtime_credential)
+        )
+      )
+  )
+  (:action claim_commit_token_for_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (commit_token_available ?commit_token)
+      )
+    :effect
+      (and
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (not
+          (commit_token_available ?commit_token)
+        )
+      )
+  )
+  (:action release_commit_token_from_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token)
+    :precondition
+      (and
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+      )
+    :effect
+      (and
+        (commit_token_available ?commit_token)
+        (not
+          (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        )
+      )
+  )
+  (:action prime_cache_cluster_for_producer
+    :parameters (?producer_instance - producer_instance ?cache_cluster - cache_cluster ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_verified ?producer_instance)
+        (subject_verification_binding ?producer_instance ?verification_token)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (not
+          (cache_cluster_primed ?cache_cluster)
+        )
+        (not
+          (cache_cluster_configuration_applied ?cache_cluster)
+        )
+      )
+    :effect (cache_cluster_primed ?cache_cluster)
+  )
+  (:action apply_operator_action_to_producer
+    :parameters (?producer_instance - producer_instance ?cache_cluster - cache_cluster ?operator_action - operator_action)
+    :precondition
+      (and
+        (subject_verified ?producer_instance)
+        (subject_operator_action_binding ?producer_instance ?operator_action)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (cache_cluster_primed ?cache_cluster)
+        (not
+          (producer_processing_flag ?producer_instance)
+        )
+      )
+    :effect
+      (and
+        (producer_processing_flag ?producer_instance)
+        (producer_ready ?producer_instance)
+      )
+  )
+  (:action attach_configuration_to_producer
+    :parameters (?producer_instance - producer_instance ?cache_cluster - cache_cluster ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (subject_verified ?producer_instance)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (configuration_artifact_available ?configuration_artifact)
+        (not
+          (producer_processing_flag ?producer_instance)
+        )
+      )
+    :effect
+      (and
+        (cache_cluster_configuration_applied ?cache_cluster)
+        (producer_processing_flag ?producer_instance)
+        (producer_configuration_binding ?producer_instance ?configuration_artifact)
+        (not
+          (configuration_artifact_available ?configuration_artifact)
+        )
+      )
+  )
+  (:action finalize_producer_priming
+    :parameters (?producer_instance - producer_instance ?cache_cluster - cache_cluster ?verification_token - verification_token ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (subject_verified ?producer_instance)
+        (subject_verification_binding ?producer_instance ?verification_token)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (cache_cluster_configuration_applied ?cache_cluster)
+        (producer_configuration_binding ?producer_instance ?configuration_artifact)
+        (not
+          (producer_ready ?producer_instance)
+        )
+      )
+    :effect
+      (and
+        (cache_cluster_primed ?cache_cluster)
+        (producer_ready ?producer_instance)
+        (configuration_artifact_available ?configuration_artifact)
+        (not
+          (producer_configuration_binding ?producer_instance ?configuration_artifact)
+        )
+      )
+  )
+  (:action prime_cache_shard_for_consumer
+    :parameters (?consumer_instance - consumer_instance ?cache_shard - cache_shard ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_verified ?consumer_instance)
+        (subject_verification_binding ?consumer_instance ?verification_token)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (not
+          (cache_shard_primed ?cache_shard)
+        )
+        (not
+          (cache_shard_configuration_applied ?cache_shard)
+        )
+      )
+    :effect (cache_shard_primed ?cache_shard)
+  )
+  (:action apply_operator_action_to_consumer
+    :parameters (?consumer_instance - consumer_instance ?cache_shard - cache_shard ?operator_action - operator_action)
+    :precondition
+      (and
+        (subject_verified ?consumer_instance)
+        (subject_operator_action_binding ?consumer_instance ?operator_action)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_shard_primed ?cache_shard)
+        (not
+          (consumer_processing_flag ?consumer_instance)
+        )
+      )
+    :effect
+      (and
+        (consumer_processing_flag ?consumer_instance)
+        (consumer_ready ?consumer_instance)
+      )
+  )
+  (:action attach_configuration_to_consumer
+    :parameters (?consumer_instance - consumer_instance ?cache_shard - cache_shard ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (subject_verified ?consumer_instance)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (configuration_artifact_available ?configuration_artifact)
+        (not
+          (consumer_processing_flag ?consumer_instance)
+        )
+      )
+    :effect
+      (and
+        (cache_shard_configuration_applied ?cache_shard)
+        (consumer_processing_flag ?consumer_instance)
+        (consumer_configuration_binding ?consumer_instance ?configuration_artifact)
+        (not
+          (configuration_artifact_available ?configuration_artifact)
+        )
+      )
+  )
+  (:action finalize_consumer_priming
+    :parameters (?consumer_instance - consumer_instance ?cache_shard - cache_shard ?verification_token - verification_token ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (subject_verified ?consumer_instance)
+        (subject_verification_binding ?consumer_instance ?verification_token)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_shard_configuration_applied ?cache_shard)
+        (consumer_configuration_binding ?consumer_instance ?configuration_artifact)
+        (not
+          (consumer_ready ?consumer_instance)
+        )
+      )
+    :effect
+      (and
+        (cache_shard_primed ?cache_shard)
+        (consumer_ready ?consumer_instance)
+        (configuration_artifact_available ?configuration_artifact)
+        (not
+          (consumer_configuration_binding ?consumer_instance ?configuration_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact
+    :parameters (?producer_instance - producer_instance ?consumer_instance - consumer_instance ?cache_cluster - cache_cluster ?cache_shard - cache_shard ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_instance)
+        (consumer_processing_flag ?consumer_instance)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_cluster_primed ?cache_cluster)
+        (cache_shard_primed ?cache_shard)
+        (producer_ready ?producer_instance)
+        (consumer_ready ?consumer_instance)
+        (artifact_pending_assembly ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_assembled ?deployment_artifact)
+        (artifact_cluster_binding ?deployment_artifact ?cache_cluster)
+        (artifact_shard_binding ?deployment_artifact ?cache_shard)
+        (not
+          (artifact_pending_assembly ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_consumer_variant
+    :parameters (?producer_instance - producer_instance ?consumer_instance - consumer_instance ?cache_cluster - cache_cluster ?cache_shard - cache_shard ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_instance)
+        (consumer_processing_flag ?consumer_instance)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_cluster_configuration_applied ?cache_cluster)
+        (cache_shard_primed ?cache_shard)
+        (not
+          (producer_ready ?producer_instance)
+        )
+        (consumer_ready ?consumer_instance)
+        (artifact_pending_assembly ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_assembled ?deployment_artifact)
+        (artifact_cluster_binding ?deployment_artifact ?cache_cluster)
+        (artifact_shard_binding ?deployment_artifact ?cache_shard)
+        (artifact_consumer_only_variant ?deployment_artifact)
+        (not
+          (artifact_pending_assembly ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_producer_variant
+    :parameters (?producer_instance - producer_instance ?consumer_instance - consumer_instance ?cache_cluster - cache_cluster ?cache_shard - cache_shard ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_instance)
+        (consumer_processing_flag ?consumer_instance)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_cluster_primed ?cache_cluster)
+        (cache_shard_configuration_applied ?cache_shard)
+        (producer_ready ?producer_instance)
+        (not
+          (consumer_ready ?consumer_instance)
+        )
+        (artifact_pending_assembly ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_assembled ?deployment_artifact)
+        (artifact_cluster_binding ?deployment_artifact ?cache_cluster)
+        (artifact_shard_binding ?deployment_artifact ?cache_shard)
+        (artifact_producer_only_variant ?deployment_artifact)
+        (not
+          (artifact_pending_assembly ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_both_variants
+    :parameters (?producer_instance - producer_instance ?consumer_instance - consumer_instance ?cache_cluster - cache_cluster ?cache_shard - cache_shard ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_instance)
+        (consumer_processing_flag ?consumer_instance)
+        (producer_cluster_binding ?producer_instance ?cache_cluster)
+        (consumer_shard_binding ?consumer_instance ?cache_shard)
+        (cache_cluster_configuration_applied ?cache_cluster)
+        (cache_shard_configuration_applied ?cache_shard)
+        (not
+          (producer_ready ?producer_instance)
+        )
+        (not
+          (consumer_ready ?consumer_instance)
+        )
+        (artifact_pending_assembly ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_assembled ?deployment_artifact)
+        (artifact_cluster_binding ?deployment_artifact ?cache_cluster)
+        (artifact_shard_binding ?deployment_artifact ?cache_shard)
+        (artifact_consumer_only_variant ?deployment_artifact)
+        (artifact_producer_only_variant ?deployment_artifact)
+        (not
+          (artifact_pending_assembly ?deployment_artifact)
+        )
+      )
+  )
+  (:action prepare_deployment_artifact
+    :parameters (?deployment_artifact - deployment_artifact ?producer_instance - producer_instance ?verification_token - verification_token)
+    :precondition
+      (and
+        (artifact_assembled ?deployment_artifact)
+        (producer_processing_flag ?producer_instance)
+        (subject_verification_binding ?producer_instance ?verification_token)
+        (not
+          (artifact_prepared ?deployment_artifact)
+        )
+      )
+    :effect (artifact_prepared ?deployment_artifact)
+  )
+  (:action consume_and_bind_secret_to_artifact
+    :parameters (?integration_coordinator - integration_coordinator ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (coordinator_artifact_claim ?integration_coordinator ?deployment_artifact)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_material_available ?secret_material)
+        (artifact_assembled ?deployment_artifact)
+        (artifact_prepared ?deployment_artifact)
+        (not
+          (secret_material_consumed ?secret_material)
+        )
+      )
+    :effect
+      (and
+        (secret_material_consumed ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (not
+          (secret_material_available ?secret_material)
+        )
+      )
+  )
+  (:action mark_coordinator_artifact_secured
+    :parameters (?integration_coordinator - integration_coordinator ?secret_material - secret_material ?deployment_artifact - deployment_artifact ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_material_consumed ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (subject_verification_binding ?integration_coordinator ?verification_token)
+        (not
+          (artifact_consumer_only_variant ?deployment_artifact)
+        )
+        (not
+          (coordinator_artifact_secured ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_artifact_secured ?integration_coordinator)
+  )
+  (:action claim_platform_feature_for_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?platform_feature - platform_feature)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (platform_feature_available ?platform_feature)
+        (not
+          (coordinator_platform_feature_claimed ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_platform_feature_claimed ?integration_coordinator)
+        (coordinator_platform_feature_binding ?integration_coordinator ?platform_feature)
+        (not
+          (platform_feature_available ?platform_feature)
+        )
+      )
+  )
+  (:action activate_platform_feature_on_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?secret_material - secret_material ?deployment_artifact - deployment_artifact ?verification_token - verification_token ?platform_feature - platform_feature)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_material_consumed ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (subject_verification_binding ?integration_coordinator ?verification_token)
+        (artifact_consumer_only_variant ?deployment_artifact)
+        (coordinator_platform_feature_claimed ?integration_coordinator)
+        (coordinator_platform_feature_binding ?integration_coordinator ?platform_feature)
+        (not
+          (coordinator_artifact_secured ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_artifact_secured ?integration_coordinator)
+        (coordinator_platform_feature_activated ?integration_coordinator)
+      )
+  )
+  (:action initiate_coordinator_verification_no_producer_variant
+    :parameters (?integration_coordinator - integration_coordinator ?runtime_credential - runtime_credential ?operator_action - operator_action ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_artifact_secured ?integration_coordinator)
+        (coordinator_runtime_credential_binding ?integration_coordinator ?runtime_credential)
+        (subject_operator_action_binding ?integration_coordinator ?operator_action)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (not
+          (artifact_producer_only_variant ?deployment_artifact)
+        )
+        (not
+          (coordinator_verification_ready ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_verification_ready ?integration_coordinator)
+  )
+  (:action initiate_coordinator_verification_with_producer_variant
+    :parameters (?integration_coordinator - integration_coordinator ?runtime_credential - runtime_credential ?operator_action - operator_action ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_artifact_secured ?integration_coordinator)
+        (coordinator_runtime_credential_binding ?integration_coordinator ?runtime_credential)
+        (subject_operator_action_binding ?integration_coordinator ?operator_action)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (artifact_producer_only_variant ?deployment_artifact)
+        (not
+          (coordinator_verification_ready ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_verification_ready ?integration_coordinator)
+  )
+  (:action finalize_coordinator_verification_with_commit_token
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_verification_ready ?integration_coordinator)
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (not
+          (artifact_consumer_only_variant ?deployment_artifact)
+        )
+        (not
+          (artifact_producer_only_variant ?deployment_artifact)
+        )
+        (not
+          (coordinator_verification_milestone ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_verification_milestone ?integration_coordinator)
+  )
+  (:action promote_coordinator_verification_consumer_variant
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_verification_ready ?integration_coordinator)
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (artifact_consumer_only_variant ?deployment_artifact)
+        (not
+          (artifact_producer_only_variant ?deployment_artifact)
+        )
+        (not
+          (coordinator_verification_milestone ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_verified ?integration_coordinator)
+      )
+  )
+  (:action promote_coordinator_verification_producer_variant
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_verification_ready ?integration_coordinator)
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (not
+          (artifact_consumer_only_variant ?deployment_artifact)
+        )
+        (artifact_producer_only_variant ?deployment_artifact)
+        (not
+          (coordinator_verification_milestone ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_verified ?integration_coordinator)
+      )
+  )
+  (:action promote_coordinator_verification_both_variants
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token ?secret_material - secret_material ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (coordinator_verification_ready ?integration_coordinator)
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (coordinator_claims_secret ?integration_coordinator ?secret_material)
+        (secret_bound_to_artifact ?secret_material ?deployment_artifact)
+        (artifact_consumer_only_variant ?deployment_artifact)
+        (artifact_producer_only_variant ?deployment_artifact)
+        (not
+          (coordinator_verification_milestone ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_verified ?integration_coordinator)
+      )
+  )
+  (:action promote_coordinator_to_committed
+    :parameters (?integration_coordinator - integration_coordinator)
+    :precondition
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (not
+          (coordinator_verified ?integration_coordinator)
+        )
+        (not
+          (coordinator_committed ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?integration_coordinator)
+        (ready_for_commit ?integration_coordinator)
+      )
+  )
+  (:action bind_monitoring_hook_to_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?monitoring_hook - monitoring_hook)
+    :precondition
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_verified ?integration_coordinator)
+        (monitoring_hook_available ?monitoring_hook)
+      )
+    :effect
+      (and
+        (coordinator_monitoring_hook_binding ?integration_coordinator ?monitoring_hook)
+        (not
+          (monitoring_hook_available ?monitoring_hook)
+        )
+      )
+  )
+  (:action trigger_coordinator_execution_marker
+    :parameters (?integration_coordinator - integration_coordinator ?producer_instance - producer_instance ?consumer_instance - consumer_instance ?verification_token - verification_token ?monitoring_hook - monitoring_hook)
+    :precondition
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_verified ?integration_coordinator)
+        (coordinator_monitoring_hook_binding ?integration_coordinator ?monitoring_hook)
+        (coordinator_claims_producer ?integration_coordinator ?producer_instance)
+        (coordinator_claims_consumer ?integration_coordinator ?consumer_instance)
+        (producer_ready ?producer_instance)
+        (consumer_ready ?consumer_instance)
+        (subject_verification_binding ?integration_coordinator ?verification_token)
+        (not
+          (coordinator_execution_marker ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_execution_marker ?integration_coordinator)
+  )
+  (:action finalize_coordinator_commit
+    :parameters (?integration_coordinator - integration_coordinator)
+    :precondition
+      (and
+        (coordinator_verification_milestone ?integration_coordinator)
+        (coordinator_execution_marker ?integration_coordinator)
+        (not
+          (coordinator_committed ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?integration_coordinator)
+        (ready_for_commit ?integration_coordinator)
+      )
+  )
+  (:action grant_approval_to_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?approval_token - approval_token ?verification_token - verification_token)
+    :precondition
+      (and
+        (subject_verified ?integration_coordinator)
+        (subject_verification_binding ?integration_coordinator ?verification_token)
+        (approval_token_available ?approval_token)
+        (coordinator_approval_binding ?integration_coordinator ?approval_token)
+        (not
+          (coordinator_approval_granted ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_approval_granted ?integration_coordinator)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action process_coordinator_approval
+    :parameters (?integration_coordinator - integration_coordinator ?operator_action - operator_action)
+    :precondition
+      (and
+        (coordinator_approval_granted ?integration_coordinator)
+        (subject_operator_action_binding ?integration_coordinator ?operator_action)
+        (not
+          (coordinator_approval_processed ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_approval_processed ?integration_coordinator)
+  )
+  (:action apply_commit_token_to_approval
+    :parameters (?integration_coordinator - integration_coordinator ?commit_token - commit_token)
+    :precondition
+      (and
+        (coordinator_approval_processed ?integration_coordinator)
+        (coordinator_commit_token_binding ?integration_coordinator ?commit_token)
+        (not
+          (coordinator_approval_verified ?integration_coordinator)
+        )
+      )
+    :effect (coordinator_approval_verified ?integration_coordinator)
+  )
+  (:action finalize_coordinator_approval_commit
+    :parameters (?integration_coordinator - integration_coordinator)
+    :precondition
+      (and
+        (coordinator_approval_verified ?integration_coordinator)
+        (not
+          (coordinator_committed ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?integration_coordinator)
+        (ready_for_commit ?integration_coordinator)
+      )
+  )
+  (:action mark_producer_ready_for_commit
+    :parameters (?producer_instance - producer_instance ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_instance)
+        (producer_ready ?producer_instance)
+        (artifact_assembled ?deployment_artifact)
+        (artifact_prepared ?deployment_artifact)
+        (not
+          (ready_for_commit ?producer_instance)
+        )
+      )
+    :effect (ready_for_commit ?producer_instance)
+  )
+  (:action mark_consumer_ready_for_commit
+    :parameters (?consumer_instance - consumer_instance ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (consumer_processing_flag ?consumer_instance)
+        (consumer_ready ?consumer_instance)
+        (artifact_assembled ?deployment_artifact)
+        (artifact_prepared ?deployment_artifact)
+        (not
+          (ready_for_commit ?consumer_instance)
+        )
+      )
+    :effect (ready_for_commit ?consumer_instance)
+  )
+  (:action bind_environment_and_mark_subject_precommit
+    :parameters (?integration_subject - integration_subject ?environment_context - environment_context ?verification_token - verification_token)
+    :precondition
+      (and
+        (ready_for_commit ?integration_subject)
+        (subject_verification_binding ?integration_subject ?verification_token)
+        (environment_context_available ?environment_context)
+        (not
+          (subject_precommit_ready ?integration_subject)
+        )
+      )
+    :effect
+      (and
+        (subject_precommit_ready ?integration_subject)
+        (subject_environment_binding ?integration_subject ?environment_context)
+        (not
+          (environment_context_available ?environment_context)
+        )
+      )
+  )
+  (:action finalize_subject_commit_from_producer
+    :parameters (?producer_instance - producer_instance ?adapter_endpoint - adapter_endpoint ?environment_context - environment_context)
+    :precondition
+      (and
+        (subject_precommit_ready ?producer_instance)
+        (subject_adapter_binding ?producer_instance ?adapter_endpoint)
+        (subject_environment_binding ?producer_instance ?environment_context)
+        (not
+          (subject_integration_committed ?producer_instance)
+        )
+      )
+    :effect
+      (and
+        (subject_integration_committed ?producer_instance)
+        (adapter_available ?adapter_endpoint)
+        (environment_context_available ?environment_context)
+      )
+  )
+  (:action finalize_subject_commit_from_consumer
+    :parameters (?consumer_instance - consumer_instance ?adapter_endpoint - adapter_endpoint ?environment_context - environment_context)
+    :precondition
+      (and
+        (subject_precommit_ready ?consumer_instance)
+        (subject_adapter_binding ?consumer_instance ?adapter_endpoint)
+        (subject_environment_binding ?consumer_instance ?environment_context)
+        (not
+          (subject_integration_committed ?consumer_instance)
+        )
+      )
+    :effect
+      (and
+        (subject_integration_committed ?consumer_instance)
+        (adapter_available ?adapter_endpoint)
+        (environment_context_available ?environment_context)
+      )
+  )
+  (:action finalize_subject_commit_from_coordinator
+    :parameters (?integration_coordinator - integration_coordinator ?adapter_endpoint - adapter_endpoint ?environment_context - environment_context)
+    :precondition
+      (and
+        (subject_precommit_ready ?integration_coordinator)
+        (subject_adapter_binding ?integration_coordinator ?adapter_endpoint)
+        (subject_environment_binding ?integration_coordinator ?environment_context)
+        (not
+          (subject_integration_committed ?integration_coordinator)
+        )
+      )
+    :effect
+      (and
+        (subject_integration_committed ?integration_coordinator)
+        (adapter_available ?adapter_endpoint)
+        (environment_context_available ?environment_context)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem distributed_cache_integration_scenario)
+  (:domain distributed_cache_integration_domain)
+  (:objects producer_instance_1 - producer_instance consumer_instance_1 - consumer_instance integration_coordinator_1 - integration_coordinator integration_coordinator_2 - integration_coordinator adapter_endpoint_1 - adapter_endpoint adapter_endpoint_2 - adapter_endpoint adapter_endpoint_3 - adapter_endpoint verification_token_1 - verification_token operator_action_1 - operator_action configuration_artifact_1 - configuration_artifact cache_cluster_1 - cache_cluster cache_shard_1 - cache_shard deployment_artifact_1 - deployment_artifact secret_material_1 - secret_material secret_material_2 - secret_material platform_feature_1 - platform_feature platform_feature_2 - platform_feature monitoring_hook_1 - monitoring_hook monitoring_hook_2 - monitoring_hook environment_context_1 - environment_context runtime_credential_1 - runtime_credential approval_token_1 - approval_token approval_token_2 - approval_token commit_token_1 - commit_token)
+  (:init
+    (adapter_available adapter_endpoint_1)
+    (adapter_available adapter_endpoint_2)
+    (adapter_available adapter_endpoint_3)
+    (verification_token_available verification_token_1)
+    (operator_action_available operator_action_1)
+    (configuration_artifact_available configuration_artifact_1)
+    (producer_cluster_binding producer_instance_1 cache_cluster_1)
+    (consumer_shard_binding consumer_instance_1 cache_shard_1)
+    (artifact_pending_assembly deployment_artifact_1)
+    (secret_material_available secret_material_1)
+    (secret_material_available secret_material_2)
+    (coordinator_claims_producer integration_coordinator_1 producer_instance_1)
+    (coordinator_claims_producer integration_coordinator_2 producer_instance_1)
+    (coordinator_claims_consumer integration_coordinator_1 consumer_instance_1)
+    (coordinator_claims_consumer integration_coordinator_2 consumer_instance_1)
+    (coordinator_artifact_claim integration_coordinator_1 deployment_artifact_1)
+    (coordinator_artifact_claim integration_coordinator_2 deployment_artifact_1)
+    (coordinator_claims_secret integration_coordinator_1 secret_material_1)
+    (coordinator_claims_secret integration_coordinator_2 secret_material_2)
+    (platform_feature_available platform_feature_1)
+    (platform_feature_available platform_feature_2)
+    (monitoring_hook_available monitoring_hook_1)
+    (monitoring_hook_available monitoring_hook_2)
+    (environment_context_available environment_context_1)
+    (runtime_credential_available runtime_credential_1)
+    (approval_token_available approval_token_1)
+    (coordinator_approval_binding integration_coordinator_1 approval_token_1)
+    (coordinator_approval_binding integration_coordinator_2 approval_token_2)
+    (commit_token_available commit_token_1)
+  )
+  (:goal
+    (and
+      (subject_integration_committed producer_instance_1)
+      (subject_integration_committed consumer_instance_1)
+      (subject_integration_committed integration_coordinator_1)
+      (subject_integration_committed integration_coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_integration_subject producer_instance_1)
+(assign_adapter_to_subject producer_instance_1 adapter_endpoint_1)
+(bind_verification_token_to_subject producer_instance_1 verification_token_1)
+(confirm_subject_verification producer_instance_1 verification_token_1)
+(prime_cache_cluster_for_producer producer_instance_1 cache_cluster_1 verification_token_1)
+(attach_configuration_to_producer producer_instance_1 cache_cluster_1 configuration_artifact_1)
+(finalize_producer_priming producer_instance_1 cache_cluster_1 verification_token_1 configuration_artifact_1)
+(release_verification_token producer_instance_1 verification_token_1)
+(register_integration_subject consumer_instance_1)
+(assign_adapter_to_subject consumer_instance_1 adapter_endpoint_2)
+(bind_verification_token_to_subject consumer_instance_1 verification_token_1)
+(confirm_subject_verification consumer_instance_1 verification_token_1)
+(prime_cache_shard_for_consumer consumer_instance_1 cache_shard_1 verification_token_1)
+(attach_configuration_to_consumer consumer_instance_1 cache_shard_1 configuration_artifact_1)
+(finalize_consumer_priming consumer_instance_1 cache_shard_1 verification_token_1 configuration_artifact_1)
+(release_verification_token consumer_instance_1 verification_token_1)
+(assemble_deployment_artifact producer_instance_1 consumer_instance_1 cache_cluster_1 cache_shard_1 deployment_artifact_1)
+(bind_verification_token_to_subject producer_instance_1 verification_token_1)
+(prepare_deployment_artifact deployment_artifact_1 producer_instance_1 verification_token_1)
+(release_verification_token producer_instance_1 verification_token_1)
+(mark_producer_ready_for_commit producer_instance_1 deployment_artifact_1)
+(mark_consumer_ready_for_commit consumer_instance_1 deployment_artifact_1)
+(register_integration_subject integration_coordinator_1)
+(assign_adapter_to_subject integration_coordinator_1 adapter_endpoint_3)
+(bind_verification_token_to_subject integration_coordinator_1 verification_token_1)
+(confirm_subject_verification integration_coordinator_1 verification_token_1)
+(consume_and_bind_secret_to_artifact integration_coordinator_1 secret_material_1 deployment_artifact_1)
+(mark_coordinator_artifact_secured integration_coordinator_1 secret_material_1 deployment_artifact_1 verification_token_1)
+(claim_runtime_credential_for_coordinator integration_coordinator_1 runtime_credential_1)
+(attach_operator_action_to_subject integration_coordinator_1 operator_action_1)
+(claim_commit_token_for_coordinator integration_coordinator_1 commit_token_1)
+(initiate_coordinator_verification_no_producer_variant integration_coordinator_1 runtime_credential_1 operator_action_1 secret_material_1 deployment_artifact_1)
+(finalize_coordinator_verification_with_commit_token integration_coordinator_1 commit_token_1 secret_material_1 deployment_artifact_1)
+(promote_coordinator_to_committed integration_coordinator_1)
+(release_verification_token integration_coordinator_1 verification_token_1)
+(detach_operator_action_from_subject integration_coordinator_1 operator_action_1)
+(release_runtime_credential_from_coordinator integration_coordinator_1 runtime_credential_1)
+(release_commit_token_from_coordinator integration_coordinator_1 commit_token_1)
+(bind_verification_token_to_subject producer_instance_1 verification_token_1)
+(bind_environment_and_mark_subject_precommit producer_instance_1 environment_context_1 verification_token_1)
+(finalize_subject_commit_from_producer producer_instance_1 adapter_endpoint_1 environment_context_1)
+(release_verification_token producer_instance_1 verification_token_1)
+(register_integration_subject integration_coordinator_2)
+(assign_adapter_to_subject integration_coordinator_2 adapter_endpoint_1)
+(bind_verification_token_to_subject integration_coordinator_2 verification_token_1)
+(confirm_subject_verification integration_coordinator_2 verification_token_1)
+(consume_and_bind_secret_to_artifact integration_coordinator_2 secret_material_2 deployment_artifact_1)
+(mark_coordinator_artifact_secured integration_coordinator_2 secret_material_2 deployment_artifact_1 verification_token_1)
+(claim_runtime_credential_for_coordinator integration_coordinator_2 runtime_credential_1)
+(attach_operator_action_to_subject integration_coordinator_2 operator_action_1)
+(claim_commit_token_for_coordinator integration_coordinator_2 commit_token_1)
+(initiate_coordinator_verification_no_producer_variant integration_coordinator_2 runtime_credential_1 operator_action_1 secret_material_2 deployment_artifact_1)
+(finalize_coordinator_verification_with_commit_token integration_coordinator_2 commit_token_1 secret_material_2 deployment_artifact_1)
+(promote_coordinator_to_committed integration_coordinator_2)
+(release_verification_token integration_coordinator_2 verification_token_1)
+(detach_operator_action_from_subject integration_coordinator_2 operator_action_1)
+(release_runtime_credential_from_coordinator integration_coordinator_2 runtime_credential_1)
+(release_commit_token_from_coordinator integration_coordinator_2 commit_token_1)
+(bind_verification_token_to_subject consumer_instance_1 verification_token_1)
+(bind_environment_and_mark_subject_precommit consumer_instance_1 environment_context_1 verification_token_1)
+(finalize_subject_commit_from_consumer consumer_instance_1 adapter_endpoint_2 environment_context_1)
+(release_verification_token consumer_instance_1 verification_token_1)
+(bind_verification_token_to_subject integration_coordinator_1 verification_token_1)
+(bind_environment_and_mark_subject_precommit integration_coordinator_1 environment_context_1 verification_token_1)
+(finalize_subject_commit_from_coordinator integration_coordinator_1 adapter_endpoint_3 environment_context_1)
+(release_verification_token integration_coordinator_1 verification_token_1)
+(bind_verification_token_to_subject integration_coordinator_2 verification_token_1)
+(bind_environment_and_mark_subject_precommit integration_coordinator_2 environment_context_1 verification_token_1)
+(finalize_subject_commit_from_coordinator integration_coordinator_2 adapter_endpoint_1 environment_context_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_s8j_h7k9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 69 
+
+Successful plans:
+Value: 69
+ /tmp/val_s8j_h7k9/plan.pddl 69 
+
+
+
+--- stderr ---
+

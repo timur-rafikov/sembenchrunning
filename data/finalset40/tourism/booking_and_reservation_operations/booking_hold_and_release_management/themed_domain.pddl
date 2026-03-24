@@ -1,0 +1,936 @@
+(define (domain booking_hold_and_release_management_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object auxiliary_resource - object inventory_type - object reservation_entity - object customer_request - reservation_entity sales_channel - operational_resource selectable_option - operational_resource supplier_interface - operational_resource payment_option - operational_resource passenger_profile - operational_resource payment_instrument - operational_resource ticketing_agent - operational_resource confirmation_token - operational_resource ancillary_service - auxiliary_resource ticket - auxiliary_resource promotion_credential - auxiliary_resource inventory_slot_a - inventory_type inventory_slot_b - inventory_type supplier_reservation_record - inventory_type supplier_resource_group_a - customer_request supplier_resource_group_b - customer_request supplier_instance_a - supplier_resource_group_a supplier_instance_b - supplier_resource_group_a booking_workflow - supplier_resource_group_b)
+  (:predicates
+    (request_created ?customer_request - customer_request)
+    (selection_confirmed_entity ?customer_request - customer_request)
+    (sales_channel_bound ?customer_request - customer_request)
+    (committed ?customer_request - customer_request)
+    (ready_for_commit_entity ?customer_request - customer_request)
+    (payment_bound_for_entity ?customer_request - customer_request)
+    (sales_channel_available ?sales_channel - sales_channel)
+    (bound_to_sales_channel_entity ?customer_request - customer_request ?sales_channel - sales_channel)
+    (option_available ?selectable_option - selectable_option)
+    (selected_option_for_entity ?customer_request - customer_request ?selectable_option - selectable_option)
+    (supplier_interface_available ?supplier_interface - supplier_interface)
+    (bound_supplier_interface_for_entity ?customer_request - customer_request ?supplier_interface - supplier_interface)
+    (ancillary_service_available ?ancillary_service - ancillary_service)
+    (supplier_a_ancillary_assigned ?supplier_instance_a - supplier_instance_a ?ancillary_service - ancillary_service)
+    (supplier_b_ancillary_assigned ?supplier_instance_b - supplier_instance_b ?ancillary_service - ancillary_service)
+    (supplier_a_holds_slot_a ?supplier_instance_a - supplier_instance_a ?inventory_slot_a - inventory_slot_a)
+    (inventory_slot_a_hold_pending ?inventory_slot_a - inventory_slot_a)
+    (inventory_slot_a_hold_confirmed ?inventory_slot_a - inventory_slot_a)
+    (supplier_a_allocated ?supplier_instance_a - supplier_instance_a)
+    (supplier_b_holds_slot_b ?supplier_instance_b - supplier_instance_b ?inventory_slot_b - inventory_slot_b)
+    (inventory_slot_b_hold_pending ?inventory_slot_b - inventory_slot_b)
+    (inventory_slot_b_hold_confirmed ?inventory_slot_b - inventory_slot_b)
+    (supplier_b_allocated ?supplier_instance_b - supplier_instance_b)
+    (supplier_reservation_record_available ?supplier_reservation_record - supplier_reservation_record)
+    (supplier_reservation_record_created ?supplier_reservation_record - supplier_reservation_record)
+    (reservation_includes_slot_a ?supplier_reservation_record - supplier_reservation_record ?inventory_slot_a - inventory_slot_a)
+    (reservation_includes_slot_b ?supplier_reservation_record - supplier_reservation_record ?inventory_slot_b - inventory_slot_b)
+    (reservation_marker_agent ?supplier_reservation_record - supplier_reservation_record)
+    (reservation_marker_electronic ?supplier_reservation_record - supplier_reservation_record)
+    (reservation_locked_for_issuance ?supplier_reservation_record - supplier_reservation_record)
+    (workflow_associated_supplier_a ?booking_workflow - booking_workflow ?supplier_instance_a - supplier_instance_a)
+    (workflow_associated_supplier_b ?booking_workflow - booking_workflow ?supplier_instance_b - supplier_instance_b)
+    (workflow_has_reservation_record ?booking_workflow - booking_workflow ?supplier_reservation_record - supplier_reservation_record)
+    (ticket_template_available ?ticket - ticket)
+    (workflow_has_ticket ?booking_workflow - booking_workflow ?ticket - ticket)
+    (ticket_issued ?ticket - ticket)
+    (ticket_assigned_to_reservation ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    (workflow_ticketing_prepared ?booking_workflow - booking_workflow)
+    (workflow_ticketing_agent_allocated ?booking_workflow - booking_workflow)
+    (workflow_confirmation_processed ?booking_workflow - booking_workflow)
+    (workflow_payment_option_bound ?booking_workflow - booking_workflow)
+    (workflow_payment_option_confirmed ?booking_workflow - booking_workflow)
+    (workflow_passenger_info_attached ?booking_workflow - booking_workflow)
+    (workflow_ready_for_finalization ?booking_workflow - booking_workflow)
+    (promotion_credential_available ?promotion_credential - promotion_credential)
+    (workflow_bound_promotion_credential ?booking_workflow - booking_workflow ?promotion_credential - promotion_credential)
+    (workflow_promotion_applied ?booking_workflow - booking_workflow)
+    (workflow_promotion_committed ?booking_workflow - booking_workflow)
+    (workflow_promotion_confirmed ?booking_workflow - booking_workflow)
+    (payment_option_available ?payment_option - payment_option)
+    (workflow_attached_payment_option ?booking_workflow - booking_workflow ?payment_option - payment_option)
+    (passenger_profile_available ?passenger_profile - passenger_profile)
+    (workflow_has_passenger_profile ?booking_workflow - booking_workflow ?passenger_profile - passenger_profile)
+    (ticketing_agent_available ?ticketing_agent - ticketing_agent)
+    (workflow_has_ticketing_agent ?booking_workflow - booking_workflow ?ticketing_agent - ticketing_agent)
+    (confirmation_token_available ?confirmation_token - confirmation_token)
+    (workflow_has_confirmation_token ?booking_workflow - booking_workflow ?confirmation_token - confirmation_token)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (entity_bound_payment_instrument ?customer_request - customer_request ?payment_instrument - payment_instrument)
+    (supplier_a_ready ?supplier_instance_a - supplier_instance_a)
+    (supplier_b_ready ?supplier_instance_b - supplier_instance_b)
+    (workflow_finalized ?booking_workflow - booking_workflow)
+  )
+  (:action create_customer_request
+    :parameters (?customer_request - customer_request)
+    :precondition
+      (and
+        (not
+          (request_created ?customer_request)
+        )
+        (not
+          (committed ?customer_request)
+        )
+      )
+    :effect (request_created ?customer_request)
+  )
+  (:action bind_sales_channel_to_request
+    :parameters (?customer_request - customer_request ?sales_channel - sales_channel)
+    :precondition
+      (and
+        (request_created ?customer_request)
+        (not
+          (sales_channel_bound ?customer_request)
+        )
+        (sales_channel_available ?sales_channel)
+      )
+    :effect
+      (and
+        (sales_channel_bound ?customer_request)
+        (bound_to_sales_channel_entity ?customer_request ?sales_channel)
+        (not
+          (sales_channel_available ?sales_channel)
+        )
+      )
+  )
+  (:action select_option_for_request
+    :parameters (?customer_request - customer_request ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (request_created ?customer_request)
+        (sales_channel_bound ?customer_request)
+        (option_available ?selectable_option)
+      )
+    :effect
+      (and
+        (selected_option_for_entity ?customer_request ?selectable_option)
+        (not
+          (option_available ?selectable_option)
+        )
+      )
+  )
+  (:action confirm_selected_option
+    :parameters (?customer_request - customer_request ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (request_created ?customer_request)
+        (sales_channel_bound ?customer_request)
+        (selected_option_for_entity ?customer_request ?selectable_option)
+        (not
+          (selection_confirmed_entity ?customer_request)
+        )
+      )
+    :effect (selection_confirmed_entity ?customer_request)
+  )
+  (:action release_selected_option
+    :parameters (?customer_request - customer_request ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (selected_option_for_entity ?customer_request ?selectable_option)
+      )
+    :effect
+      (and
+        (option_available ?selectable_option)
+        (not
+          (selected_option_for_entity ?customer_request ?selectable_option)
+        )
+      )
+  )
+  (:action bind_supplier_interface_to_request
+    :parameters (?customer_request - customer_request ?supplier_interface - supplier_interface)
+    :precondition
+      (and
+        (selection_confirmed_entity ?customer_request)
+        (supplier_interface_available ?supplier_interface)
+      )
+    :effect
+      (and
+        (bound_supplier_interface_for_entity ?customer_request ?supplier_interface)
+        (not
+          (supplier_interface_available ?supplier_interface)
+        )
+      )
+  )
+  (:action unbind_supplier_interface_from_request
+    :parameters (?customer_request - customer_request ?supplier_interface - supplier_interface)
+    :precondition
+      (and
+        (bound_supplier_interface_for_entity ?customer_request ?supplier_interface)
+      )
+    :effect
+      (and
+        (supplier_interface_available ?supplier_interface)
+        (not
+          (bound_supplier_interface_for_entity ?customer_request ?supplier_interface)
+        )
+      )
+  )
+  (:action assign_ticketing_agent_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?ticketing_agent - ticketing_agent)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (ticketing_agent_available ?ticketing_agent)
+      )
+    :effect
+      (and
+        (workflow_has_ticketing_agent ?booking_workflow ?ticketing_agent)
+        (not
+          (ticketing_agent_available ?ticketing_agent)
+        )
+      )
+  )
+  (:action unassign_ticketing_agent_from_workflow
+    :parameters (?booking_workflow - booking_workflow ?ticketing_agent - ticketing_agent)
+    :precondition
+      (and
+        (workflow_has_ticketing_agent ?booking_workflow ?ticketing_agent)
+      )
+    :effect
+      (and
+        (ticketing_agent_available ?ticketing_agent)
+        (not
+          (workflow_has_ticketing_agent ?booking_workflow ?ticketing_agent)
+        )
+      )
+  )
+  (:action attach_confirmation_token_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (confirmation_token_available ?confirmation_token)
+      )
+    :effect
+      (and
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (not
+          (confirmation_token_available ?confirmation_token)
+        )
+      )
+  )
+  (:action detach_confirmation_token_from_workflow
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+      )
+    :effect
+      (and
+        (confirmation_token_available ?confirmation_token)
+        (not
+          (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        )
+      )
+  )
+  (:action place_inventory_a_hold
+    :parameters (?supplier_instance_a - supplier_instance_a ?inventory_slot_a - inventory_slot_a ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_a)
+        (selected_option_for_entity ?supplier_instance_a ?selectable_option)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (not
+          (inventory_slot_a_hold_pending ?inventory_slot_a)
+        )
+        (not
+          (inventory_slot_a_hold_confirmed ?inventory_slot_a)
+        )
+      )
+    :effect (inventory_slot_a_hold_pending ?inventory_slot_a)
+  )
+  (:action confirm_supplier_a_hold
+    :parameters (?supplier_instance_a - supplier_instance_a ?inventory_slot_a - inventory_slot_a ?supplier_interface - supplier_interface)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_a)
+        (bound_supplier_interface_for_entity ?supplier_instance_a ?supplier_interface)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (inventory_slot_a_hold_pending ?inventory_slot_a)
+        (not
+          (supplier_a_ready ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_allocated ?supplier_instance_a)
+      )
+  )
+  (:action assign_ancillary_to_supplier_a
+    :parameters (?supplier_instance_a - supplier_instance_a ?inventory_slot_a - inventory_slot_a ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_a)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (supplier_a_ready ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (inventory_slot_a_hold_confirmed ?inventory_slot_a)
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_ancillary_assigned ?supplier_instance_a ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_supplier_a_allocation
+    :parameters (?supplier_instance_a - supplier_instance_a ?inventory_slot_a - inventory_slot_a ?selectable_option - selectable_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_a)
+        (selected_option_for_entity ?supplier_instance_a ?selectable_option)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (inventory_slot_a_hold_confirmed ?inventory_slot_a)
+        (supplier_a_ancillary_assigned ?supplier_instance_a ?ancillary_service)
+        (not
+          (supplier_a_allocated ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (inventory_slot_a_hold_pending ?inventory_slot_a)
+        (supplier_a_allocated ?supplier_instance_a)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (supplier_a_ancillary_assigned ?supplier_instance_a ?ancillary_service)
+        )
+      )
+  )
+  (:action place_inventory_b_hold
+    :parameters (?supplier_instance_b - supplier_instance_b ?inventory_slot_b - inventory_slot_b ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_b)
+        (selected_option_for_entity ?supplier_instance_b ?selectable_option)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (not
+          (inventory_slot_b_hold_pending ?inventory_slot_b)
+        )
+        (not
+          (inventory_slot_b_hold_confirmed ?inventory_slot_b)
+        )
+      )
+    :effect (inventory_slot_b_hold_pending ?inventory_slot_b)
+  )
+  (:action confirm_supplier_b_hold
+    :parameters (?supplier_instance_b - supplier_instance_b ?inventory_slot_b - inventory_slot_b ?supplier_interface - supplier_interface)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_b)
+        (bound_supplier_interface_for_entity ?supplier_instance_b ?supplier_interface)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_b_hold_pending ?inventory_slot_b)
+        (not
+          (supplier_b_ready ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_allocated ?supplier_instance_b)
+      )
+  )
+  (:action assign_ancillary_to_supplier_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?inventory_slot_b - inventory_slot_b ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_b)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (supplier_b_ready ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (inventory_slot_b_hold_confirmed ?inventory_slot_b)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_ancillary_assigned ?supplier_instance_b ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_supplier_b_allocation
+    :parameters (?supplier_instance_b - supplier_instance_b ?inventory_slot_b - inventory_slot_b ?selectable_option - selectable_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (selection_confirmed_entity ?supplier_instance_b)
+        (selected_option_for_entity ?supplier_instance_b ?selectable_option)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_b_hold_confirmed ?inventory_slot_b)
+        (supplier_b_ancillary_assigned ?supplier_instance_b ?ancillary_service)
+        (not
+          (supplier_b_allocated ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (inventory_slot_b_hold_pending ?inventory_slot_b)
+        (supplier_b_allocated ?supplier_instance_b)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (supplier_b_ancillary_assigned ?supplier_instance_b ?ancillary_service)
+        )
+      )
+  )
+  (:action assemble_reservation_record
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?inventory_slot_a - inventory_slot_a ?inventory_slot_b - inventory_slot_b ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_a_hold_pending ?inventory_slot_a)
+        (inventory_slot_b_hold_pending ?inventory_slot_b)
+        (supplier_a_allocated ?supplier_instance_a)
+        (supplier_b_allocated ?supplier_instance_b)
+        (supplier_reservation_record_available ?supplier_reservation_record)
+      )
+    :effect
+      (and
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_includes_slot_a ?supplier_reservation_record ?inventory_slot_a)
+        (reservation_includes_slot_b ?supplier_reservation_record ?inventory_slot_b)
+        (not
+          (supplier_reservation_record_available ?supplier_reservation_record)
+        )
+      )
+  )
+  (:action assemble_reservation_record_with_marker_a
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?inventory_slot_a - inventory_slot_a ?inventory_slot_b - inventory_slot_b ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_a_hold_confirmed ?inventory_slot_a)
+        (inventory_slot_b_hold_pending ?inventory_slot_b)
+        (not
+          (supplier_a_allocated ?supplier_instance_a)
+        )
+        (supplier_b_allocated ?supplier_instance_b)
+        (supplier_reservation_record_available ?supplier_reservation_record)
+      )
+    :effect
+      (and
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_includes_slot_a ?supplier_reservation_record ?inventory_slot_a)
+        (reservation_includes_slot_b ?supplier_reservation_record ?inventory_slot_b)
+        (reservation_marker_agent ?supplier_reservation_record)
+        (not
+          (supplier_reservation_record_available ?supplier_reservation_record)
+        )
+      )
+  )
+  (:action assemble_reservation_record_with_marker_b
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?inventory_slot_a - inventory_slot_a ?inventory_slot_b - inventory_slot_b ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_a_hold_pending ?inventory_slot_a)
+        (inventory_slot_b_hold_confirmed ?inventory_slot_b)
+        (supplier_a_allocated ?supplier_instance_a)
+        (not
+          (supplier_b_allocated ?supplier_instance_b)
+        )
+        (supplier_reservation_record_available ?supplier_reservation_record)
+      )
+    :effect
+      (and
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_includes_slot_a ?supplier_reservation_record ?inventory_slot_a)
+        (reservation_includes_slot_b ?supplier_reservation_record ?inventory_slot_b)
+        (reservation_marker_electronic ?supplier_reservation_record)
+        (not
+          (supplier_reservation_record_available ?supplier_reservation_record)
+        )
+      )
+  )
+  (:action assemble_reservation_record_with_markers_ab
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?inventory_slot_a - inventory_slot_a ?inventory_slot_b - inventory_slot_b ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_a_holds_slot_a ?supplier_instance_a ?inventory_slot_a)
+        (supplier_b_holds_slot_b ?supplier_instance_b ?inventory_slot_b)
+        (inventory_slot_a_hold_confirmed ?inventory_slot_a)
+        (inventory_slot_b_hold_confirmed ?inventory_slot_b)
+        (not
+          (supplier_a_allocated ?supplier_instance_a)
+        )
+        (not
+          (supplier_b_allocated ?supplier_instance_b)
+        )
+        (supplier_reservation_record_available ?supplier_reservation_record)
+      )
+    :effect
+      (and
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_includes_slot_a ?supplier_reservation_record ?inventory_slot_a)
+        (reservation_includes_slot_b ?supplier_reservation_record ?inventory_slot_b)
+        (reservation_marker_agent ?supplier_reservation_record)
+        (reservation_marker_electronic ?supplier_reservation_record)
+        (not
+          (supplier_reservation_record_available ?supplier_reservation_record)
+        )
+      )
+  )
+  (:action lock_reservation_record_for_issuance
+    :parameters (?supplier_reservation_record - supplier_reservation_record ?supplier_instance_a - supplier_instance_a ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (supplier_a_ready ?supplier_instance_a)
+        (selected_option_for_entity ?supplier_instance_a ?selectable_option)
+        (not
+          (reservation_locked_for_issuance ?supplier_reservation_record)
+        )
+      )
+    :effect (reservation_locked_for_issuance ?supplier_reservation_record)
+  )
+  (:action issue_ticket_and_assign_to_reservation
+    :parameters (?booking_workflow - booking_workflow ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (workflow_has_reservation_record ?booking_workflow ?supplier_reservation_record)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_template_available ?ticket)
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_locked_for_issuance ?supplier_reservation_record)
+        (not
+          (ticket_issued ?ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_issued ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (not
+          (ticket_template_available ?ticket)
+        )
+      )
+  )
+  (:action prepare_workflow_for_ticketing
+    :parameters (?booking_workflow - booking_workflow ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_issued ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (selected_option_for_entity ?booking_workflow ?selectable_option)
+        (not
+          (reservation_marker_agent ?supplier_reservation_record)
+        )
+        (not
+          (workflow_ticketing_prepared ?booking_workflow)
+        )
+      )
+    :effect (workflow_ticketing_prepared ?booking_workflow)
+  )
+  (:action attach_payment_option_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?payment_option - payment_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (payment_option_available ?payment_option)
+        (not
+          (workflow_payment_option_bound ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_payment_option_bound ?booking_workflow)
+        (workflow_attached_payment_option ?booking_workflow ?payment_option)
+        (not
+          (payment_option_available ?payment_option)
+        )
+      )
+  )
+  (:action prepare_workflow_with_payment_option
+    :parameters (?booking_workflow - booking_workflow ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record ?selectable_option - selectable_option ?payment_option - payment_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_issued ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (selected_option_for_entity ?booking_workflow ?selectable_option)
+        (reservation_marker_agent ?supplier_reservation_record)
+        (workflow_payment_option_bound ?booking_workflow)
+        (workflow_attached_payment_option ?booking_workflow ?payment_option)
+        (not
+          (workflow_ticketing_prepared ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_ticketing_prepared ?booking_workflow)
+        (workflow_payment_option_confirmed ?booking_workflow)
+      )
+  )
+  (:action allocate_ticketing_agent_for_workflow
+    :parameters (?booking_workflow - booking_workflow ?ticketing_agent - ticketing_agent ?supplier_interface - supplier_interface ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_prepared ?booking_workflow)
+        (workflow_has_ticketing_agent ?booking_workflow ?ticketing_agent)
+        (bound_supplier_interface_for_entity ?booking_workflow ?supplier_interface)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (not
+          (reservation_marker_electronic ?supplier_reservation_record)
+        )
+        (not
+          (workflow_ticketing_agent_allocated ?booking_workflow)
+        )
+      )
+    :effect (workflow_ticketing_agent_allocated ?booking_workflow)
+  )
+  (:action allocate_ticketing_agent_for_workflow_variant
+    :parameters (?booking_workflow - booking_workflow ?ticketing_agent - ticketing_agent ?supplier_interface - supplier_interface ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_prepared ?booking_workflow)
+        (workflow_has_ticketing_agent ?booking_workflow ?ticketing_agent)
+        (bound_supplier_interface_for_entity ?booking_workflow ?supplier_interface)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (reservation_marker_electronic ?supplier_reservation_record)
+        (not
+          (workflow_ticketing_agent_allocated ?booking_workflow)
+        )
+      )
+    :effect (workflow_ticketing_agent_allocated ?booking_workflow)
+  )
+  (:action process_confirmation_token_for_workflow
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_agent_allocated ?booking_workflow)
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (not
+          (reservation_marker_agent ?supplier_reservation_record)
+        )
+        (not
+          (reservation_marker_electronic ?supplier_reservation_record)
+        )
+        (not
+          (workflow_confirmation_processed ?booking_workflow)
+        )
+      )
+    :effect (workflow_confirmation_processed ?booking_workflow)
+  )
+  (:action apply_confirmation_and_attach_passenger_info
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_agent_allocated ?booking_workflow)
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (reservation_marker_agent ?supplier_reservation_record)
+        (not
+          (reservation_marker_electronic ?supplier_reservation_record)
+        )
+        (not
+          (workflow_confirmation_processed ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_passenger_info_attached ?booking_workflow)
+      )
+  )
+  (:action apply_confirmation_and_attach_passenger_info_variant
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_agent_allocated ?booking_workflow)
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (not
+          (reservation_marker_agent ?supplier_reservation_record)
+        )
+        (reservation_marker_electronic ?supplier_reservation_record)
+        (not
+          (workflow_confirmation_processed ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_passenger_info_attached ?booking_workflow)
+      )
+  )
+  (:action apply_confirmation_and_attach_passenger_info_variant_b
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token ?ticket - ticket ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (workflow_ticketing_agent_allocated ?booking_workflow)
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (workflow_has_ticket ?booking_workflow ?ticket)
+        (ticket_assigned_to_reservation ?ticket ?supplier_reservation_record)
+        (reservation_marker_agent ?supplier_reservation_record)
+        (reservation_marker_electronic ?supplier_reservation_record)
+        (not
+          (workflow_confirmation_processed ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_passenger_info_attached ?booking_workflow)
+      )
+  )
+  (:action mark_workflow_ready_for_commit
+    :parameters (?booking_workflow - booking_workflow)
+    :precondition
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (not
+          (workflow_passenger_info_attached ?booking_workflow)
+        )
+        (not
+          (workflow_finalized ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?booking_workflow)
+        (ready_for_commit_entity ?booking_workflow)
+      )
+  )
+  (:action attach_passenger_profile_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_passenger_info_attached ?booking_workflow)
+        (passenger_profile_available ?passenger_profile)
+      )
+    :effect
+      (and
+        (workflow_has_passenger_profile ?booking_workflow ?passenger_profile)
+        (not
+          (passenger_profile_available ?passenger_profile)
+        )
+      )
+  )
+  (:action complete_ticketing_and_validate_workflow
+    :parameters (?booking_workflow - booking_workflow ?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?selectable_option - selectable_option ?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_passenger_info_attached ?booking_workflow)
+        (workflow_has_passenger_profile ?booking_workflow ?passenger_profile)
+        (workflow_associated_supplier_a ?booking_workflow ?supplier_instance_a)
+        (workflow_associated_supplier_b ?booking_workflow ?supplier_instance_b)
+        (supplier_a_allocated ?supplier_instance_a)
+        (supplier_b_allocated ?supplier_instance_b)
+        (selected_option_for_entity ?booking_workflow ?selectable_option)
+        (not
+          (workflow_ready_for_finalization ?booking_workflow)
+        )
+      )
+    :effect (workflow_ready_for_finalization ?booking_workflow)
+  )
+  (:action finalize_workflow_commit
+    :parameters (?booking_workflow - booking_workflow)
+    :precondition
+      (and
+        (workflow_confirmation_processed ?booking_workflow)
+        (workflow_ready_for_finalization ?booking_workflow)
+        (not
+          (workflow_finalized ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?booking_workflow)
+        (ready_for_commit_entity ?booking_workflow)
+      )
+  )
+  (:action bind_promotion_credential_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?promotion_credential - promotion_credential ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (selection_confirmed_entity ?booking_workflow)
+        (selected_option_for_entity ?booking_workflow ?selectable_option)
+        (promotion_credential_available ?promotion_credential)
+        (workflow_bound_promotion_credential ?booking_workflow ?promotion_credential)
+        (not
+          (workflow_promotion_applied ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_promotion_applied ?booking_workflow)
+        (not
+          (promotion_credential_available ?promotion_credential)
+        )
+      )
+  )
+  (:action commit_promotion_binding_to_workflow
+    :parameters (?booking_workflow - booking_workflow ?supplier_interface - supplier_interface)
+    :precondition
+      (and
+        (workflow_promotion_applied ?booking_workflow)
+        (bound_supplier_interface_for_entity ?booking_workflow ?supplier_interface)
+        (not
+          (workflow_promotion_committed ?booking_workflow)
+        )
+      )
+    :effect (workflow_promotion_committed ?booking_workflow)
+  )
+  (:action confirm_promotion_with_token
+    :parameters (?booking_workflow - booking_workflow ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (workflow_promotion_committed ?booking_workflow)
+        (workflow_has_confirmation_token ?booking_workflow ?confirmation_token)
+        (not
+          (workflow_promotion_confirmed ?booking_workflow)
+        )
+      )
+    :effect (workflow_promotion_confirmed ?booking_workflow)
+  )
+  (:action finalize_workflow_after_promotion_confirmation
+    :parameters (?booking_workflow - booking_workflow)
+    :precondition
+      (and
+        (workflow_promotion_confirmed ?booking_workflow)
+        (not
+          (workflow_finalized ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?booking_workflow)
+        (ready_for_commit_entity ?booking_workflow)
+      )
+  )
+  (:action commit_supplier_instance_a
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_allocated ?supplier_instance_a)
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_locked_for_issuance ?supplier_reservation_record)
+        (not
+          (ready_for_commit_entity ?supplier_instance_a)
+        )
+      )
+    :effect (ready_for_commit_entity ?supplier_instance_a)
+  )
+  (:action commit_supplier_instance_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?supplier_reservation_record - supplier_reservation_record)
+    :precondition
+      (and
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_allocated ?supplier_instance_b)
+        (supplier_reservation_record_created ?supplier_reservation_record)
+        (reservation_locked_for_issuance ?supplier_reservation_record)
+        (not
+          (ready_for_commit_entity ?supplier_instance_b)
+        )
+      )
+    :effect (ready_for_commit_entity ?supplier_instance_b)
+  )
+  (:action bind_payment_instrument_to_request
+    :parameters (?customer_request - customer_request ?payment_instrument - payment_instrument ?selectable_option - selectable_option)
+    :precondition
+      (and
+        (ready_for_commit_entity ?customer_request)
+        (selected_option_for_entity ?customer_request ?selectable_option)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (payment_bound_for_entity ?customer_request)
+        )
+      )
+    :effect
+      (and
+        (payment_bound_for_entity ?customer_request)
+        (entity_bound_payment_instrument ?customer_request ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action finalize_supplier_a_reservation_via_channel
+    :parameters (?supplier_instance_a - supplier_instance_a ?sales_channel - sales_channel ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (payment_bound_for_entity ?supplier_instance_a)
+        (bound_to_sales_channel_entity ?supplier_instance_a ?sales_channel)
+        (entity_bound_payment_instrument ?supplier_instance_a ?payment_instrument)
+        (not
+          (committed ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (committed ?supplier_instance_a)
+        (sales_channel_available ?sales_channel)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action finalize_supplier_b_reservation_via_channel
+    :parameters (?supplier_instance_b - supplier_instance_b ?sales_channel - sales_channel ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (payment_bound_for_entity ?supplier_instance_b)
+        (bound_to_sales_channel_entity ?supplier_instance_b ?sales_channel)
+        (entity_bound_payment_instrument ?supplier_instance_b ?payment_instrument)
+        (not
+          (committed ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (committed ?supplier_instance_b)
+        (sales_channel_available ?sales_channel)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action finalize_workflow_reservation_via_channel
+    :parameters (?booking_workflow - booking_workflow ?sales_channel - sales_channel ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (payment_bound_for_entity ?booking_workflow)
+        (bound_to_sales_channel_entity ?booking_workflow ?sales_channel)
+        (entity_bound_payment_instrument ?booking_workflow ?payment_instrument)
+        (not
+          (committed ?booking_workflow)
+        )
+      )
+    :effect
+      (and
+        (committed ?booking_workflow)
+        (sales_channel_available ?sales_channel)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+)

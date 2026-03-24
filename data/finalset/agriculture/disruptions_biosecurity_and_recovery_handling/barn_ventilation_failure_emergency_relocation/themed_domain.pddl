@@ -1,0 +1,936 @@
+(define (domain barn_ventilation_failure_relocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object resource_item - object logistics_asset - object barn_relocation_domain - object site_location - barn_relocation_domain light_transport_unit - operational_resource animal_handling_equipment - operational_resource staff_member - operational_resource site_permit - operational_resource veterinary_supply - operational_resource biosecurity_kit - operational_resource maintenance_equipment - operational_resource clearance_document - operational_resource supply_pack - resource_item animal_container - resource_item external_consultant_person - resource_item evacuation_route_origin - logistics_asset evacuation_route_destination - logistics_asset transport_asset - logistics_asset site_location_group_a - site_location site_location_group_b - site_location source_barn_section - site_location_group_a receiving_barn_section - site_location_group_a response_site - site_location_group_b)
+  (:predicates
+    (incident_reported ?site_location - site_location)
+    (site_staged ?site_location - site_location)
+    (site_triaged ?site_location - site_location)
+    (site_released ?site_location - site_location)
+    (loading_verified ?site_location - site_location)
+    (site_pending_release ?site_location - site_location)
+    (light_transport_unit_available ?light_transport_unit - light_transport_unit)
+    (light_transport_unit_assigned_to_site ?site_location - site_location ?light_transport_unit - light_transport_unit)
+    (handling_equipment_available ?animal_handling_equipment - animal_handling_equipment)
+    (equipment_assigned_to_site ?site_location - site_location ?animal_handling_equipment - animal_handling_equipment)
+    (staff_available ?staff_member - staff_member)
+    (staff_assigned_to_site ?site_location - site_location ?staff_member - staff_member)
+    (supply_pack_available ?supply_pack - supply_pack)
+    (supply_allocated_to_source ?source_barn_section - source_barn_section ?supply_pack - supply_pack)
+    (supply_allocated_to_destination ?receiving_barn_section - receiving_barn_section ?supply_pack - supply_pack)
+    (origin_route_assigned ?source_barn_section - source_barn_section ?evacuation_route_origin - evacuation_route_origin)
+    (origin_route_verified ?evacuation_route_origin - evacuation_route_origin)
+    (origin_route_sanitized ?evacuation_route_origin - evacuation_route_origin)
+    (source_loading_ready ?source_barn_section - source_barn_section)
+    (destination_route_assigned ?receiving_barn_section - receiving_barn_section ?evacuation_route_destination - evacuation_route_destination)
+    (destination_route_verified ?evacuation_route_destination - evacuation_route_destination)
+    (destination_route_sanitized ?evacuation_route_destination - evacuation_route_destination)
+    (destination_loading_ready ?receiving_barn_section - receiving_barn_section)
+    (transport_asset_available ?transport_asset - transport_asset)
+    (transport_asset_allocated ?transport_asset - transport_asset)
+    (transport_assigned_to_origin ?transport_asset - transport_asset ?evacuation_route_origin - evacuation_route_origin)
+    (transport_assigned_to_destination ?transport_asset - transport_asset ?evacuation_route_destination - evacuation_route_destination)
+    (transport_origin_verified ?transport_asset - transport_asset)
+    (transport_destination_verified ?transport_asset - transport_asset)
+    (transport_loading_confirmed ?transport_asset - transport_asset)
+    (response_site_assigned_source ?response_site - response_site ?source_barn_section - source_barn_section)
+    (response_site_assigned_destination ?response_site - response_site ?receiving_barn_section - receiving_barn_section)
+    (response_site_assigned_transport ?response_site - response_site ?transport_asset - transport_asset)
+    (animal_container_available ?animal_container - animal_container)
+    (response_site_has_container ?response_site - response_site ?animal_container - animal_container)
+    (animal_container_allocated ?animal_container - animal_container)
+    (container_assigned_to_transport ?animal_container - animal_container ?transport_asset - transport_asset)
+    (container_manifested_at_response_site ?response_site - response_site)
+    (response_site_loading_started ?response_site - response_site)
+    (response_site_loading_checks_complete ?response_site - response_site)
+    (permit_attached ?response_site - response_site)
+    (permit_verified ?response_site - response_site)
+    (biosecurity_checks_complete ?response_site - response_site)
+    (loading_finalized ?response_site - response_site)
+    (external_consultant_person_available ?external_consultant_person - external_consultant_person)
+    (external_consultant_person_assigned ?response_site - response_site ?external_consultant_person - external_consultant_person)
+    (external_consultant_person_engaged ?response_site - response_site)
+    (expert_inspection_pending ?response_site - response_site)
+    (clearance_document_obtained ?response_site - response_site)
+    (site_permit_available ?site_permit - site_permit)
+    (response_site_has_permit ?response_site - response_site ?site_permit - site_permit)
+    (veterinary_supply_available ?veterinary_supply - veterinary_supply)
+    (response_site_has_veterinary_supply ?response_site - response_site ?veterinary_supply - veterinary_supply)
+    (maintenance_equipment_available ?maintenance_equipment - maintenance_equipment)
+    (response_site_has_maintenance_equipment ?response_site - response_site ?maintenance_equipment - maintenance_equipment)
+    (clearance_document_available ?clearance_document - clearance_document)
+    (response_site_has_clearance_document ?response_site - response_site ?clearance_document - clearance_document)
+    (biosecurity_kit_available ?biosecurity_kit - biosecurity_kit)
+    (site_has_biosecurity_kit ?site_location - site_location ?biosecurity_kit - biosecurity_kit)
+    (source_prepared_flag ?source_barn_section - source_barn_section)
+    (destination_prepared_flag ?receiving_barn_section - receiving_barn_section)
+    (response_site_finalized ?response_site - response_site)
+  )
+  (:action report_ventilation_failure
+    :parameters (?site_location - site_location)
+    :precondition
+      (and
+        (not
+          (incident_reported ?site_location)
+        )
+        (not
+          (site_released ?site_location)
+        )
+      )
+    :effect (incident_reported ?site_location)
+  )
+  (:action assign_light_transport_unit_to_site
+    :parameters (?site_location - site_location ?light_transport_unit - light_transport_unit)
+    :precondition
+      (and
+        (incident_reported ?site_location)
+        (not
+          (site_triaged ?site_location)
+        )
+        (light_transport_unit_available ?light_transport_unit)
+      )
+    :effect
+      (and
+        (site_triaged ?site_location)
+        (light_transport_unit_assigned_to_site ?site_location ?light_transport_unit)
+        (not
+          (light_transport_unit_available ?light_transport_unit)
+        )
+      )
+  )
+  (:action assign_handling_equipment_to_site
+    :parameters (?site_location - site_location ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (incident_reported ?site_location)
+        (site_triaged ?site_location)
+        (handling_equipment_available ?animal_handling_equipment)
+      )
+    :effect
+      (and
+        (equipment_assigned_to_site ?site_location ?animal_handling_equipment)
+        (not
+          (handling_equipment_available ?animal_handling_equipment)
+        )
+      )
+  )
+  (:action confirm_site_staging
+    :parameters (?site_location - site_location ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (incident_reported ?site_location)
+        (site_triaged ?site_location)
+        (equipment_assigned_to_site ?site_location ?animal_handling_equipment)
+        (not
+          (site_staged ?site_location)
+        )
+      )
+    :effect (site_staged ?site_location)
+  )
+  (:action release_handling_equipment_from_site
+    :parameters (?site_location - site_location ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (equipment_assigned_to_site ?site_location ?animal_handling_equipment)
+      )
+    :effect
+      (and
+        (handling_equipment_available ?animal_handling_equipment)
+        (not
+          (equipment_assigned_to_site ?site_location ?animal_handling_equipment)
+        )
+      )
+  )
+  (:action assign_staff_to_site
+    :parameters (?site_location - site_location ?staff_member - staff_member)
+    :precondition
+      (and
+        (site_staged ?site_location)
+        (staff_available ?staff_member)
+      )
+    :effect
+      (and
+        (staff_assigned_to_site ?site_location ?staff_member)
+        (not
+          (staff_available ?staff_member)
+        )
+      )
+  )
+  (:action release_staff_from_site
+    :parameters (?site_location - site_location ?staff_member - staff_member)
+    :precondition
+      (and
+        (staff_assigned_to_site ?site_location ?staff_member)
+      )
+    :effect
+      (and
+        (staff_available ?staff_member)
+        (not
+          (staff_assigned_to_site ?site_location ?staff_member)
+        )
+      )
+  )
+  (:action assign_maintenance_equipment_to_response_site
+    :parameters (?response_site - response_site ?maintenance_equipment - maintenance_equipment)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (maintenance_equipment_available ?maintenance_equipment)
+      )
+    :effect
+      (and
+        (response_site_has_maintenance_equipment ?response_site ?maintenance_equipment)
+        (not
+          (maintenance_equipment_available ?maintenance_equipment)
+        )
+      )
+  )
+  (:action release_maintenance_equipment_from_response_site
+    :parameters (?response_site - response_site ?maintenance_equipment - maintenance_equipment)
+    :precondition
+      (and
+        (response_site_has_maintenance_equipment ?response_site ?maintenance_equipment)
+      )
+    :effect
+      (and
+        (maintenance_equipment_available ?maintenance_equipment)
+        (not
+          (response_site_has_maintenance_equipment ?response_site ?maintenance_equipment)
+        )
+      )
+  )
+  (:action assign_clearance_document_to_response_site
+    :parameters (?response_site - response_site ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (clearance_document_available ?clearance_document)
+      )
+    :effect
+      (and
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (not
+          (clearance_document_available ?clearance_document)
+        )
+      )
+  )
+  (:action remove_clearance_document_from_response_site
+    :parameters (?response_site - response_site ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+      )
+    :effect
+      (and
+        (clearance_document_available ?clearance_document)
+        (not
+          (response_site_has_clearance_document ?response_site ?clearance_document)
+        )
+      )
+  )
+  (:action verify_origin_route
+    :parameters (?source_barn_section - source_barn_section ?evacuation_route_origin - evacuation_route_origin ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (site_staged ?source_barn_section)
+        (equipment_assigned_to_site ?source_barn_section ?animal_handling_equipment)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (not
+          (origin_route_verified ?evacuation_route_origin)
+        )
+        (not
+          (origin_route_sanitized ?evacuation_route_origin)
+        )
+      )
+    :effect (origin_route_verified ?evacuation_route_origin)
+  )
+  (:action assign_staff_to_source_and_mark_ready
+    :parameters (?source_barn_section - source_barn_section ?evacuation_route_origin - evacuation_route_origin ?staff_member - staff_member)
+    :precondition
+      (and
+        (site_staged ?source_barn_section)
+        (staff_assigned_to_site ?source_barn_section ?staff_member)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (origin_route_verified ?evacuation_route_origin)
+        (not
+          (source_prepared_flag ?source_barn_section)
+        )
+      )
+    :effect
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (source_loading_ready ?source_barn_section)
+      )
+  )
+  (:action allocate_supply_to_source_and_sanitize_route
+    :parameters (?source_barn_section - source_barn_section ?evacuation_route_origin - evacuation_route_origin ?supply_pack - supply_pack)
+    :precondition
+      (and
+        (site_staged ?source_barn_section)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (supply_pack_available ?supply_pack)
+        (not
+          (source_prepared_flag ?source_barn_section)
+        )
+      )
+    :effect
+      (and
+        (origin_route_sanitized ?evacuation_route_origin)
+        (source_prepared_flag ?source_barn_section)
+        (supply_allocated_to_source ?source_barn_section ?supply_pack)
+        (not
+          (supply_pack_available ?supply_pack)
+        )
+      )
+  )
+  (:action finalize_source_preparation
+    :parameters (?source_barn_section - source_barn_section ?evacuation_route_origin - evacuation_route_origin ?animal_handling_equipment - animal_handling_equipment ?supply_pack - supply_pack)
+    :precondition
+      (and
+        (site_staged ?source_barn_section)
+        (equipment_assigned_to_site ?source_barn_section ?animal_handling_equipment)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (origin_route_sanitized ?evacuation_route_origin)
+        (supply_allocated_to_source ?source_barn_section ?supply_pack)
+        (not
+          (source_loading_ready ?source_barn_section)
+        )
+      )
+    :effect
+      (and
+        (origin_route_verified ?evacuation_route_origin)
+        (source_loading_ready ?source_barn_section)
+        (supply_pack_available ?supply_pack)
+        (not
+          (supply_allocated_to_source ?source_barn_section ?supply_pack)
+        )
+      )
+  )
+  (:action verify_destination_route
+    :parameters (?receiving_barn_section - receiving_barn_section ?evacuation_route_destination - evacuation_route_destination ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (site_staged ?receiving_barn_section)
+        (equipment_assigned_to_site ?receiving_barn_section ?animal_handling_equipment)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (not
+          (destination_route_verified ?evacuation_route_destination)
+        )
+        (not
+          (destination_route_sanitized ?evacuation_route_destination)
+        )
+      )
+    :effect (destination_route_verified ?evacuation_route_destination)
+  )
+  (:action assign_staff_to_destination_and_mark_ready
+    :parameters (?receiving_barn_section - receiving_barn_section ?evacuation_route_destination - evacuation_route_destination ?staff_member - staff_member)
+    :precondition
+      (and
+        (site_staged ?receiving_barn_section)
+        (staff_assigned_to_site ?receiving_barn_section ?staff_member)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (destination_route_verified ?evacuation_route_destination)
+        (not
+          (destination_prepared_flag ?receiving_barn_section)
+        )
+      )
+    :effect
+      (and
+        (destination_prepared_flag ?receiving_barn_section)
+        (destination_loading_ready ?receiving_barn_section)
+      )
+  )
+  (:action allocate_supply_to_destination_and_sanitize_route
+    :parameters (?receiving_barn_section - receiving_barn_section ?evacuation_route_destination - evacuation_route_destination ?supply_pack - supply_pack)
+    :precondition
+      (and
+        (site_staged ?receiving_barn_section)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (supply_pack_available ?supply_pack)
+        (not
+          (destination_prepared_flag ?receiving_barn_section)
+        )
+      )
+    :effect
+      (and
+        (destination_route_sanitized ?evacuation_route_destination)
+        (destination_prepared_flag ?receiving_barn_section)
+        (supply_allocated_to_destination ?receiving_barn_section ?supply_pack)
+        (not
+          (supply_pack_available ?supply_pack)
+        )
+      )
+  )
+  (:action finalize_destination_preparation
+    :parameters (?receiving_barn_section - receiving_barn_section ?evacuation_route_destination - evacuation_route_destination ?animal_handling_equipment - animal_handling_equipment ?supply_pack - supply_pack)
+    :precondition
+      (and
+        (site_staged ?receiving_barn_section)
+        (equipment_assigned_to_site ?receiving_barn_section ?animal_handling_equipment)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (destination_route_sanitized ?evacuation_route_destination)
+        (supply_allocated_to_destination ?receiving_barn_section ?supply_pack)
+        (not
+          (destination_loading_ready ?receiving_barn_section)
+        )
+      )
+    :effect
+      (and
+        (destination_route_verified ?evacuation_route_destination)
+        (destination_loading_ready ?receiving_barn_section)
+        (supply_pack_available ?supply_pack)
+        (not
+          (supply_allocated_to_destination ?receiving_barn_section ?supply_pack)
+        )
+      )
+  )
+  (:action create_transport_manifest_standard
+    :parameters (?source_barn_section - source_barn_section ?receiving_barn_section - receiving_barn_section ?evacuation_route_origin - evacuation_route_origin ?evacuation_route_destination - evacuation_route_destination ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (destination_prepared_flag ?receiving_barn_section)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (origin_route_verified ?evacuation_route_origin)
+        (destination_route_verified ?evacuation_route_destination)
+        (source_loading_ready ?source_barn_section)
+        (destination_loading_ready ?receiving_barn_section)
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_asset_allocated ?transport_asset)
+        (transport_assigned_to_origin ?transport_asset ?evacuation_route_origin)
+        (transport_assigned_to_destination ?transport_asset ?evacuation_route_destination)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action create_transport_manifest_origin_variant
+    :parameters (?source_barn_section - source_barn_section ?receiving_barn_section - receiving_barn_section ?evacuation_route_origin - evacuation_route_origin ?evacuation_route_destination - evacuation_route_destination ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (destination_prepared_flag ?receiving_barn_section)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (origin_route_sanitized ?evacuation_route_origin)
+        (destination_route_verified ?evacuation_route_destination)
+        (not
+          (source_loading_ready ?source_barn_section)
+        )
+        (destination_loading_ready ?receiving_barn_section)
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_asset_allocated ?transport_asset)
+        (transport_assigned_to_origin ?transport_asset ?evacuation_route_origin)
+        (transport_assigned_to_destination ?transport_asset ?evacuation_route_destination)
+        (transport_origin_verified ?transport_asset)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action create_transport_manifest_destination_variant
+    :parameters (?source_barn_section - source_barn_section ?receiving_barn_section - receiving_barn_section ?evacuation_route_origin - evacuation_route_origin ?evacuation_route_destination - evacuation_route_destination ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (destination_prepared_flag ?receiving_barn_section)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (origin_route_verified ?evacuation_route_origin)
+        (destination_route_sanitized ?evacuation_route_destination)
+        (source_loading_ready ?source_barn_section)
+        (not
+          (destination_loading_ready ?receiving_barn_section)
+        )
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_asset_allocated ?transport_asset)
+        (transport_assigned_to_origin ?transport_asset ?evacuation_route_origin)
+        (transport_assigned_to_destination ?transport_asset ?evacuation_route_destination)
+        (transport_destination_verified ?transport_asset)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action create_transport_manifest_full_variant
+    :parameters (?source_barn_section - source_barn_section ?receiving_barn_section - receiving_barn_section ?evacuation_route_origin - evacuation_route_origin ?evacuation_route_destination - evacuation_route_destination ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (destination_prepared_flag ?receiving_barn_section)
+        (origin_route_assigned ?source_barn_section ?evacuation_route_origin)
+        (destination_route_assigned ?receiving_barn_section ?evacuation_route_destination)
+        (origin_route_sanitized ?evacuation_route_origin)
+        (destination_route_sanitized ?evacuation_route_destination)
+        (not
+          (source_loading_ready ?source_barn_section)
+        )
+        (not
+          (destination_loading_ready ?receiving_barn_section)
+        )
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_asset_allocated ?transport_asset)
+        (transport_assigned_to_origin ?transport_asset ?evacuation_route_origin)
+        (transport_assigned_to_destination ?transport_asset ?evacuation_route_destination)
+        (transport_origin_verified ?transport_asset)
+        (transport_destination_verified ?transport_asset)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action confirm_transport_loading
+    :parameters (?transport_asset - transport_asset ?source_barn_section - source_barn_section ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (transport_asset_allocated ?transport_asset)
+        (source_prepared_flag ?source_barn_section)
+        (equipment_assigned_to_site ?source_barn_section ?animal_handling_equipment)
+        (not
+          (transport_loading_confirmed ?transport_asset)
+        )
+      )
+    :effect (transport_loading_confirmed ?transport_asset)
+  )
+  (:action allocate_container_to_transport
+    :parameters (?response_site - response_site ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (response_site_assigned_transport ?response_site ?transport_asset)
+        (response_site_has_container ?response_site ?animal_container)
+        (animal_container_available ?animal_container)
+        (transport_asset_allocated ?transport_asset)
+        (transport_loading_confirmed ?transport_asset)
+        (not
+          (animal_container_allocated ?animal_container)
+        )
+      )
+    :effect
+      (and
+        (animal_container_allocated ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (not
+          (animal_container_available ?animal_container)
+        )
+      )
+  )
+  (:action register_container_manifest_at_response_site
+    :parameters (?response_site - response_site ?animal_container - animal_container ?transport_asset - transport_asset ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (response_site_has_container ?response_site ?animal_container)
+        (animal_container_allocated ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (equipment_assigned_to_site ?response_site ?animal_handling_equipment)
+        (not
+          (transport_origin_verified ?transport_asset)
+        )
+        (not
+          (container_manifested_at_response_site ?response_site)
+        )
+      )
+    :effect (container_manifested_at_response_site ?response_site)
+  )
+  (:action attach_permit_to_response_site
+    :parameters (?response_site - response_site ?site_permit - site_permit)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (site_permit_available ?site_permit)
+        (not
+          (permit_attached ?response_site)
+        )
+      )
+    :effect
+      (and
+        (permit_attached ?response_site)
+        (response_site_has_permit ?response_site ?site_permit)
+        (not
+          (site_permit_available ?site_permit)
+        )
+      )
+  )
+  (:action verify_permit_and_manifest
+    :parameters (?response_site - response_site ?animal_container - animal_container ?transport_asset - transport_asset ?animal_handling_equipment - animal_handling_equipment ?site_permit - site_permit)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (response_site_has_container ?response_site ?animal_container)
+        (animal_container_allocated ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (equipment_assigned_to_site ?response_site ?animal_handling_equipment)
+        (transport_origin_verified ?transport_asset)
+        (permit_attached ?response_site)
+        (response_site_has_permit ?response_site ?site_permit)
+        (not
+          (container_manifested_at_response_site ?response_site)
+        )
+      )
+    :effect
+      (and
+        (container_manifested_at_response_site ?response_site)
+        (permit_verified ?response_site)
+      )
+  )
+  (:action start_loading_with_maintenance_equipment
+    :parameters (?response_site - response_site ?maintenance_equipment - maintenance_equipment ?staff_member - staff_member ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (container_manifested_at_response_site ?response_site)
+        (response_site_has_maintenance_equipment ?response_site ?maintenance_equipment)
+        (staff_assigned_to_site ?response_site ?staff_member)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (not
+          (transport_destination_verified ?transport_asset)
+        )
+        (not
+          (response_site_loading_started ?response_site)
+        )
+      )
+    :effect (response_site_loading_started ?response_site)
+  )
+  (:action start_loading_with_maintenance_equipment_variant
+    :parameters (?response_site - response_site ?maintenance_equipment - maintenance_equipment ?staff_member - staff_member ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (container_manifested_at_response_site ?response_site)
+        (response_site_has_maintenance_equipment ?response_site ?maintenance_equipment)
+        (staff_assigned_to_site ?response_site ?staff_member)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (transport_destination_verified ?transport_asset)
+        (not
+          (response_site_loading_started ?response_site)
+        )
+      )
+    :effect (response_site_loading_started ?response_site)
+  )
+  (:action perform_clearance_inspection
+    :parameters (?response_site - response_site ?clearance_document - clearance_document ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (response_site_loading_started ?response_site)
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (not
+          (transport_origin_verified ?transport_asset)
+        )
+        (not
+          (transport_destination_verified ?transport_asset)
+        )
+        (not
+          (response_site_loading_checks_complete ?response_site)
+        )
+      )
+    :effect (response_site_loading_checks_complete ?response_site)
+  )
+  (:action perform_clearance_and_biosecurity_checks_origin_variant
+    :parameters (?response_site - response_site ?clearance_document - clearance_document ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (response_site_loading_started ?response_site)
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (transport_origin_verified ?transport_asset)
+        (not
+          (transport_destination_verified ?transport_asset)
+        )
+        (not
+          (response_site_loading_checks_complete ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (biosecurity_checks_complete ?response_site)
+      )
+  )
+  (:action perform_clearance_and_biosecurity_checks_destination_variant
+    :parameters (?response_site - response_site ?clearance_document - clearance_document ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (response_site_loading_started ?response_site)
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (not
+          (transport_origin_verified ?transport_asset)
+        )
+        (transport_destination_verified ?transport_asset)
+        (not
+          (response_site_loading_checks_complete ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (biosecurity_checks_complete ?response_site)
+      )
+  )
+  (:action perform_clearance_and_biosecurity_checks_full_variant
+    :parameters (?response_site - response_site ?clearance_document - clearance_document ?animal_container - animal_container ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (response_site_loading_started ?response_site)
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (response_site_has_container ?response_site ?animal_container)
+        (container_assigned_to_transport ?animal_container ?transport_asset)
+        (transport_origin_verified ?transport_asset)
+        (transport_destination_verified ?transport_asset)
+        (not
+          (response_site_loading_checks_complete ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (biosecurity_checks_complete ?response_site)
+      )
+  )
+  (:action finalize_loading_checks
+    :parameters (?response_site - response_site)
+    :precondition
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (not
+          (biosecurity_checks_complete ?response_site)
+        )
+        (not
+          (response_site_finalized ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_finalized ?response_site)
+        (loading_verified ?response_site)
+      )
+  )
+  (:action allocate_veterinary_supply_to_response_site
+    :parameters (?response_site - response_site ?veterinary_supply - veterinary_supply)
+    :precondition
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (biosecurity_checks_complete ?response_site)
+        (veterinary_supply_available ?veterinary_supply)
+      )
+    :effect
+      (and
+        (response_site_has_veterinary_supply ?response_site ?veterinary_supply)
+        (not
+          (veterinary_supply_available ?veterinary_supply)
+        )
+      )
+  )
+  (:action complete_loading_and_finalize_response_site
+    :parameters (?response_site - response_site ?source_barn_section - source_barn_section ?receiving_barn_section - receiving_barn_section ?animal_handling_equipment - animal_handling_equipment ?veterinary_supply - veterinary_supply)
+    :precondition
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (biosecurity_checks_complete ?response_site)
+        (response_site_has_veterinary_supply ?response_site ?veterinary_supply)
+        (response_site_assigned_source ?response_site ?source_barn_section)
+        (response_site_assigned_destination ?response_site ?receiving_barn_section)
+        (source_loading_ready ?source_barn_section)
+        (destination_loading_ready ?receiving_barn_section)
+        (equipment_assigned_to_site ?response_site ?animal_handling_equipment)
+        (not
+          (loading_finalized ?response_site)
+        )
+      )
+    :effect (loading_finalized ?response_site)
+  )
+  (:action finalize_response_site
+    :parameters (?response_site - response_site)
+    :precondition
+      (and
+        (response_site_loading_checks_complete ?response_site)
+        (loading_finalized ?response_site)
+        (not
+          (response_site_finalized ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_finalized ?response_site)
+        (loading_verified ?response_site)
+      )
+  )
+  (:action engage_external_consultant_person
+    :parameters (?response_site - response_site ?external_consultant_person - external_consultant_person ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (site_staged ?response_site)
+        (equipment_assigned_to_site ?response_site ?animal_handling_equipment)
+        (external_consultant_person_available ?external_consultant_person)
+        (external_consultant_person_assigned ?response_site ?external_consultant_person)
+        (not
+          (external_consultant_person_engaged ?response_site)
+        )
+      )
+    :effect
+      (and
+        (external_consultant_person_engaged ?response_site)
+        (not
+          (external_consultant_person_available ?external_consultant_person)
+        )
+      )
+  )
+  (:action request_expert_inspection
+    :parameters (?response_site - response_site ?staff_member - staff_member)
+    :precondition
+      (and
+        (external_consultant_person_engaged ?response_site)
+        (staff_assigned_to_site ?response_site ?staff_member)
+        (not
+          (expert_inspection_pending ?response_site)
+        )
+      )
+    :effect (expert_inspection_pending ?response_site)
+  )
+  (:action obtain_clearance_document
+    :parameters (?response_site - response_site ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (expert_inspection_pending ?response_site)
+        (response_site_has_clearance_document ?response_site ?clearance_document)
+        (not
+          (clearance_document_obtained ?response_site)
+        )
+      )
+    :effect (clearance_document_obtained ?response_site)
+  )
+  (:action finalize_response_site_after_clearance
+    :parameters (?response_site - response_site)
+    :precondition
+      (and
+        (clearance_document_obtained ?response_site)
+        (not
+          (response_site_finalized ?response_site)
+        )
+      )
+    :effect
+      (and
+        (response_site_finalized ?response_site)
+        (loading_verified ?response_site)
+      )
+  )
+  (:action release_source_section_after_transport
+    :parameters (?source_barn_section - source_barn_section ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (source_prepared_flag ?source_barn_section)
+        (source_loading_ready ?source_barn_section)
+        (transport_asset_allocated ?transport_asset)
+        (transport_loading_confirmed ?transport_asset)
+        (not
+          (loading_verified ?source_barn_section)
+        )
+      )
+    :effect (loading_verified ?source_barn_section)
+  )
+  (:action release_destination_section_after_transport
+    :parameters (?receiving_barn_section - receiving_barn_section ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (destination_prepared_flag ?receiving_barn_section)
+        (destination_loading_ready ?receiving_barn_section)
+        (transport_asset_allocated ?transport_asset)
+        (transport_loading_confirmed ?transport_asset)
+        (not
+          (loading_verified ?receiving_barn_section)
+        )
+      )
+    :effect (loading_verified ?receiving_barn_section)
+  )
+  (:action apply_biosecurity_kit_to_site
+    :parameters (?site_location - site_location ?biosecurity_kit - biosecurity_kit ?animal_handling_equipment - animal_handling_equipment)
+    :precondition
+      (and
+        (loading_verified ?site_location)
+        (equipment_assigned_to_site ?site_location ?animal_handling_equipment)
+        (biosecurity_kit_available ?biosecurity_kit)
+        (not
+          (site_pending_release ?site_location)
+        )
+      )
+    :effect
+      (and
+        (site_pending_release ?site_location)
+        (site_has_biosecurity_kit ?site_location ?biosecurity_kit)
+        (not
+          (biosecurity_kit_available ?biosecurity_kit)
+        )
+      )
+  )
+  (:action release_source_section_after_biosecurity
+    :parameters (?source_barn_section - source_barn_section ?light_transport_unit - light_transport_unit ?biosecurity_kit - biosecurity_kit)
+    :precondition
+      (and
+        (site_pending_release ?source_barn_section)
+        (light_transport_unit_assigned_to_site ?source_barn_section ?light_transport_unit)
+        (site_has_biosecurity_kit ?source_barn_section ?biosecurity_kit)
+        (not
+          (site_released ?source_barn_section)
+        )
+      )
+    :effect
+      (and
+        (site_released ?source_barn_section)
+        (light_transport_unit_available ?light_transport_unit)
+        (biosecurity_kit_available ?biosecurity_kit)
+      )
+  )
+  (:action release_destination_section_after_biosecurity
+    :parameters (?receiving_barn_section - receiving_barn_section ?light_transport_unit - light_transport_unit ?biosecurity_kit - biosecurity_kit)
+    :precondition
+      (and
+        (site_pending_release ?receiving_barn_section)
+        (light_transport_unit_assigned_to_site ?receiving_barn_section ?light_transport_unit)
+        (site_has_biosecurity_kit ?receiving_barn_section ?biosecurity_kit)
+        (not
+          (site_released ?receiving_barn_section)
+        )
+      )
+    :effect
+      (and
+        (site_released ?receiving_barn_section)
+        (light_transport_unit_available ?light_transport_unit)
+        (biosecurity_kit_available ?biosecurity_kit)
+      )
+  )
+  (:action release_response_site_after_biosecurity
+    :parameters (?response_site - response_site ?light_transport_unit - light_transport_unit ?biosecurity_kit - biosecurity_kit)
+    :precondition
+      (and
+        (site_pending_release ?response_site)
+        (light_transport_unit_assigned_to_site ?response_site ?light_transport_unit)
+        (site_has_biosecurity_kit ?response_site ?biosecurity_kit)
+        (not
+          (site_released ?response_site)
+        )
+      )
+    :effect
+      (and
+        (site_released ?response_site)
+        (light_transport_unit_available ?light_transport_unit)
+        (biosecurity_kit_available ?biosecurity_kit)
+      )
+  )
+)

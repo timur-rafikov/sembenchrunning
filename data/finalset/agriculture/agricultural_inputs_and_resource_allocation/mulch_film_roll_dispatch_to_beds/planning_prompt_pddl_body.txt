@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain mulch_film_roll_dispatch)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object material_resource_group - object interface_resource_group - object installation_unit_category - object installation_unit - installation_unit_category field_operator - resource_group work_order - resource_group technician - resource_group spare_part - resource_group transport_unit - resource_group contingency_reserve - resource_group tool - resource_group quality_seal - resource_group material_component - material_resource_group kit_packet - material_resource_group inspection_tag - material_resource_group machine_interface_a - interface_resource_group machine_interface_b - interface_resource_group mulch_film_roll - interface_resource_group bed_component_group_a - installation_unit bed_component_group_b - installation_unit bed_anchor_a - bed_component_group_a bed_anchor_b - bed_component_group_a installation_task_segment - bed_component_group_b)
+  (:predicates
+    (installation_unit_registered ?installation_unit - installation_unit)
+    (installation_unit_scheduled ?installation_unit - installation_unit)
+    (installation_unit_has_operator ?installation_unit - installation_unit)
+    (installation_unit_dispatched ?installation_unit - installation_unit)
+    (installation_unit_signed_off ?installation_unit - installation_unit)
+    (installation_unit_contingency_allocated ?installation_unit - installation_unit)
+    (field_operator_available ?field_operator - field_operator)
+    (installation_unit_assigned_to_operator ?installation_unit - installation_unit ?field_operator - field_operator)
+    (work_order_available ?work_order - work_order)
+    (installation_unit_assigned_work_order ?installation_unit - installation_unit ?work_order - work_order)
+    (technician_available ?technician - technician)
+    (installation_unit_assigned_technician ?installation_unit - installation_unit ?technician - technician)
+    (material_component_available ?material_component - material_component)
+    (bed_anchor_a_bound_material_component ?bed_anchor_a - bed_anchor_a ?material_component - material_component)
+    (bed_anchor_b_bound_material_component ?bed_anchor_b - bed_anchor_b ?material_component - material_component)
+    (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a - bed_anchor_a ?machine_interface_a - machine_interface_a)
+    (machine_interface_a_ready ?machine_interface_a - machine_interface_a)
+    (machine_interface_a_loaded ?machine_interface_a - machine_interface_a)
+    (bed_anchor_a_prepared ?bed_anchor_a - bed_anchor_a)
+    (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b - bed_anchor_b ?machine_interface_b - machine_interface_b)
+    (machine_interface_b_ready ?machine_interface_b - machine_interface_b)
+    (machine_interface_b_loaded ?machine_interface_b - machine_interface_b)
+    (bed_anchor_b_prepared ?bed_anchor_b - bed_anchor_b)
+    (mulch_film_roll_in_storage ?mulch_film_roll - mulch_film_roll)
+    (mulch_film_roll_prepared ?mulch_film_roll - mulch_film_roll)
+    (mulch_film_roll_mapped_to_interface_a ?mulch_film_roll - mulch_film_roll ?machine_interface_a - machine_interface_a)
+    (mulch_film_roll_mapped_to_interface_b ?mulch_film_roll - mulch_film_roll ?machine_interface_b - machine_interface_b)
+    (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll - mulch_film_roll)
+    (mulch_film_roll_requires_spare_integration ?mulch_film_roll - mulch_film_roll)
+    (mulch_film_roll_staged_for_mounting ?mulch_film_roll - mulch_film_roll)
+    (task_segment_assigned_to_anchor_a ?installation_task_segment - installation_task_segment ?bed_anchor_a - bed_anchor_a)
+    (task_segment_assigned_to_anchor_b ?installation_task_segment - installation_task_segment ?bed_anchor_b - bed_anchor_b)
+    (task_segment_assigned_mulch_roll ?installation_task_segment - installation_task_segment ?mulch_film_roll - mulch_film_roll)
+    (kit_packet_available ?kit_packet - kit_packet)
+    (task_segment_assigned_kit_packet ?installation_task_segment - installation_task_segment ?kit_packet - kit_packet)
+    (kit_packet_consumed ?kit_packet - kit_packet)
+    (kit_packet_bound_to_mulch_roll ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    (task_segment_kit_verified ?installation_task_segment - installation_task_segment)
+    (task_segment_tools_assigned ?installation_task_segment - installation_task_segment)
+    (task_segment_quality_inspected ?installation_task_segment - installation_task_segment)
+    (task_segment_reserved_spare_part ?installation_task_segment - installation_task_segment)
+    (task_segment_spare_part_attached ?installation_task_segment - installation_task_segment)
+    (task_segment_inspection_passed ?installation_task_segment - installation_task_segment)
+    (task_segment_executed ?installation_task_segment - installation_task_segment)
+    (inspection_tag_available ?inspection_tag - inspection_tag)
+    (task_segment_assigned_inspection_tag ?installation_task_segment - installation_task_segment ?inspection_tag - inspection_tag)
+    (task_segment_inspection_tag_claimed ?installation_task_segment - installation_task_segment)
+    (task_segment_technician_engaged ?installation_task_segment - installation_task_segment)
+    (task_segment_quality_seal_attached ?installation_task_segment - installation_task_segment)
+    (spare_part_available ?spare_part - spare_part)
+    (task_segment_assigned_spare_part ?installation_task_segment - installation_task_segment ?spare_part - spare_part)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (task_segment_assigned_transport_unit ?installation_task_segment - installation_task_segment ?transport_unit - transport_unit)
+    (tool_available ?tool - tool)
+    (task_segment_assigned_tool ?installation_task_segment - installation_task_segment ?tool - tool)
+    (quality_seal_available ?quality_seal - quality_seal)
+    (task_segment_assigned_quality_seal ?installation_task_segment - installation_task_segment ?quality_seal - quality_seal)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (installation_unit_allocated_contingency_reserve ?installation_unit - installation_unit ?contingency_reserve - contingency_reserve)
+    (bed_anchor_a_engaged ?bed_anchor_a - bed_anchor_a)
+    (bed_anchor_b_engaged ?bed_anchor_b - bed_anchor_b)
+    (task_segment_signoff_recorded ?installation_task_segment - installation_task_segment)
+  )
+  (:action register_installation_unit
+    :parameters (?installation_unit - installation_unit)
+    :precondition
+      (and
+        (not
+          (installation_unit_registered ?installation_unit)
+        )
+        (not
+          (installation_unit_dispatched ?installation_unit)
+        )
+      )
+    :effect (installation_unit_registered ?installation_unit)
+  )
+  (:action assign_field_operator_to_installation_unit
+    :parameters (?installation_unit - installation_unit ?field_operator - field_operator)
+    :precondition
+      (and
+        (installation_unit_registered ?installation_unit)
+        (not
+          (installation_unit_has_operator ?installation_unit)
+        )
+        (field_operator_available ?field_operator)
+      )
+    :effect
+      (and
+        (installation_unit_has_operator ?installation_unit)
+        (installation_unit_assigned_to_operator ?installation_unit ?field_operator)
+        (not
+          (field_operator_available ?field_operator)
+        )
+      )
+  )
+  (:action associate_work_order_with_installation_unit
+    :parameters (?installation_unit - installation_unit ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_registered ?installation_unit)
+        (installation_unit_has_operator ?installation_unit)
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (installation_unit_assigned_work_order ?installation_unit ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action schedule_installation_unit
+    :parameters (?installation_unit - installation_unit ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_registered ?installation_unit)
+        (installation_unit_has_operator ?installation_unit)
+        (installation_unit_assigned_work_order ?installation_unit ?work_order)
+        (not
+          (installation_unit_scheduled ?installation_unit)
+        )
+      )
+    :effect (installation_unit_scheduled ?installation_unit)
+  )
+  (:action release_work_order_from_installation_unit
+    :parameters (?installation_unit - installation_unit ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_assigned_work_order ?installation_unit ?work_order)
+      )
+    :effect
+      (and
+        (work_order_available ?work_order)
+        (not
+          (installation_unit_assigned_work_order ?installation_unit ?work_order)
+        )
+      )
+  )
+  (:action assign_technician_to_installation_unit
+    :parameters (?installation_unit - installation_unit ?technician - technician)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_unit)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (installation_unit_assigned_technician ?installation_unit ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action release_technician_from_installation_unit
+    :parameters (?installation_unit - installation_unit ?technician - technician)
+    :precondition
+      (and
+        (installation_unit_assigned_technician ?installation_unit ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (installation_unit_assigned_technician ?installation_unit ?technician)
+        )
+      )
+  )
+  (:action assign_tool_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?tool - tool)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (tool_available ?tool)
+      )
+    :effect
+      (and
+        (task_segment_assigned_tool ?installation_task_segment ?tool)
+        (not
+          (tool_available ?tool)
+        )
+      )
+  )
+  (:action release_tool_from_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?tool - tool)
+    :precondition
+      (and
+        (task_segment_assigned_tool ?installation_task_segment ?tool)
+      )
+    :effect
+      (and
+        (tool_available ?tool)
+        (not
+          (task_segment_assigned_tool ?installation_task_segment ?tool)
+        )
+      )
+  )
+  (:action assign_quality_seal_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (quality_seal_available ?quality_seal)
+      )
+    :effect
+      (and
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (not
+          (quality_seal_available ?quality_seal)
+        )
+      )
+  )
+  (:action release_quality_seal_from_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal)
+    :precondition
+      (and
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+      )
+    :effect
+      (and
+        (quality_seal_available ?quality_seal)
+        (not
+          (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        )
+      )
+  )
+  (:action prepare_interface_a_for_anchor
+    :parameters (?bed_anchor_a - bed_anchor_a ?machine_interface_a - machine_interface_a ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_a)
+        (installation_unit_assigned_work_order ?bed_anchor_a ?work_order)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (not
+          (machine_interface_a_ready ?machine_interface_a)
+        )
+        (not
+          (machine_interface_a_loaded ?machine_interface_a)
+        )
+      )
+    :effect (machine_interface_a_ready ?machine_interface_a)
+  )
+  (:action technician_setup_for_anchor_a
+    :parameters (?bed_anchor_a - bed_anchor_a ?machine_interface_a - machine_interface_a ?technician - technician)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_a)
+        (installation_unit_assigned_technician ?bed_anchor_a ?technician)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (machine_interface_a_ready ?machine_interface_a)
+        (not
+          (bed_anchor_a_engaged ?bed_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+      )
+  )
+  (:action attach_material_to_anchor_a
+    :parameters (?bed_anchor_a - bed_anchor_a ?machine_interface_a - machine_interface_a ?material_component - material_component)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_a)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (material_component_available ?material_component)
+        (not
+          (bed_anchor_a_engaged ?bed_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (machine_interface_a_loaded ?machine_interface_a)
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_a_bound_material_component ?bed_anchor_a ?material_component)
+        (not
+          (material_component_available ?material_component)
+        )
+      )
+  )
+  (:action complete_anchor_a_preparation
+    :parameters (?bed_anchor_a - bed_anchor_a ?machine_interface_a - machine_interface_a ?work_order - work_order ?material_component - material_component)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_a)
+        (installation_unit_assigned_work_order ?bed_anchor_a ?work_order)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (machine_interface_a_loaded ?machine_interface_a)
+        (bed_anchor_a_bound_material_component ?bed_anchor_a ?material_component)
+        (not
+          (bed_anchor_a_prepared ?bed_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (machine_interface_a_ready ?machine_interface_a)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+        (material_component_available ?material_component)
+        (not
+          (bed_anchor_a_bound_material_component ?bed_anchor_a ?material_component)
+        )
+      )
+  )
+  (:action prepare_interface_b_for_anchor
+    :parameters (?bed_anchor_b - bed_anchor_b ?machine_interface_b - machine_interface_b ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_b)
+        (installation_unit_assigned_work_order ?bed_anchor_b ?work_order)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (not
+          (machine_interface_b_ready ?machine_interface_b)
+        )
+        (not
+          (machine_interface_b_loaded ?machine_interface_b)
+        )
+      )
+    :effect (machine_interface_b_ready ?machine_interface_b)
+  )
+  (:action technician_setup_for_anchor_b
+    :parameters (?bed_anchor_b - bed_anchor_b ?machine_interface_b - machine_interface_b ?technician - technician)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_b)
+        (installation_unit_assigned_technician ?bed_anchor_b ?technician)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_b_ready ?machine_interface_b)
+        (not
+          (bed_anchor_b_engaged ?bed_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_b_prepared ?bed_anchor_b)
+      )
+  )
+  (:action attach_material_to_anchor_b
+    :parameters (?bed_anchor_b - bed_anchor_b ?machine_interface_b - machine_interface_b ?material_component - material_component)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_b)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (material_component_available ?material_component)
+        (not
+          (bed_anchor_b_engaged ?bed_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (machine_interface_b_loaded ?machine_interface_b)
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_b_bound_material_component ?bed_anchor_b ?material_component)
+        (not
+          (material_component_available ?material_component)
+        )
+      )
+  )
+  (:action complete_anchor_b_preparation
+    :parameters (?bed_anchor_b - bed_anchor_b ?machine_interface_b - machine_interface_b ?work_order - work_order ?material_component - material_component)
+    :precondition
+      (and
+        (installation_unit_scheduled ?bed_anchor_b)
+        (installation_unit_assigned_work_order ?bed_anchor_b ?work_order)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_b_loaded ?machine_interface_b)
+        (bed_anchor_b_bound_material_component ?bed_anchor_b ?material_component)
+        (not
+          (bed_anchor_b_prepared ?bed_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (machine_interface_b_ready ?machine_interface_b)
+        (bed_anchor_b_prepared ?bed_anchor_b)
+        (material_component_available ?material_component)
+        (not
+          (bed_anchor_b_bound_material_component ?bed_anchor_b ?material_component)
+        )
+      )
+  )
+  (:action prepare_mulch_roll_basic_configuration
+    :parameters (?bed_anchor_a - bed_anchor_a ?bed_anchor_b - bed_anchor_b ?machine_interface_a - machine_interface_a ?machine_interface_b - machine_interface_b ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_a_ready ?machine_interface_a)
+        (machine_interface_b_ready ?machine_interface_b)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+        (bed_anchor_b_prepared ?bed_anchor_b)
+        (mulch_film_roll_in_storage ?mulch_film_roll)
+      )
+    :effect
+      (and
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_mapped_to_interface_a ?mulch_film_roll ?machine_interface_a)
+        (mulch_film_roll_mapped_to_interface_b ?mulch_film_roll ?machine_interface_b)
+        (not
+          (mulch_film_roll_in_storage ?mulch_film_roll)
+        )
+      )
+  )
+  (:action prepare_mulch_roll_with_inspection_requirement
+    :parameters (?bed_anchor_a - bed_anchor_a ?bed_anchor_b - bed_anchor_b ?machine_interface_a - machine_interface_a ?machine_interface_b - machine_interface_b ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_a_loaded ?machine_interface_a)
+        (machine_interface_b_ready ?machine_interface_b)
+        (not
+          (bed_anchor_a_prepared ?bed_anchor_a)
+        )
+        (bed_anchor_b_prepared ?bed_anchor_b)
+        (mulch_film_roll_in_storage ?mulch_film_roll)
+      )
+    :effect
+      (and
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_mapped_to_interface_a ?mulch_film_roll ?machine_interface_a)
+        (mulch_film_roll_mapped_to_interface_b ?mulch_film_roll ?machine_interface_b)
+        (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        (not
+          (mulch_film_roll_in_storage ?mulch_film_roll)
+        )
+      )
+  )
+  (:action prepare_mulch_roll_with_spare_requirement
+    :parameters (?bed_anchor_a - bed_anchor_a ?bed_anchor_b - bed_anchor_b ?machine_interface_a - machine_interface_a ?machine_interface_b - machine_interface_b ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_a_ready ?machine_interface_a)
+        (machine_interface_b_loaded ?machine_interface_b)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+        (not
+          (bed_anchor_b_prepared ?bed_anchor_b)
+        )
+        (mulch_film_roll_in_storage ?mulch_film_roll)
+      )
+    :effect
+      (and
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_mapped_to_interface_a ?mulch_film_roll ?machine_interface_a)
+        (mulch_film_roll_mapped_to_interface_b ?mulch_film_roll ?machine_interface_b)
+        (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        (not
+          (mulch_film_roll_in_storage ?mulch_film_roll)
+        )
+      )
+  )
+  (:action prepare_mulch_roll_full_configuration
+    :parameters (?bed_anchor_a - bed_anchor_a ?bed_anchor_b - bed_anchor_b ?machine_interface_a - machine_interface_a ?machine_interface_b - machine_interface_b ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_a_mapped_to_interface_a ?bed_anchor_a ?machine_interface_a)
+        (bed_anchor_b_mapped_to_interface_b ?bed_anchor_b ?machine_interface_b)
+        (machine_interface_a_loaded ?machine_interface_a)
+        (machine_interface_b_loaded ?machine_interface_b)
+        (not
+          (bed_anchor_a_prepared ?bed_anchor_a)
+        )
+        (not
+          (bed_anchor_b_prepared ?bed_anchor_b)
+        )
+        (mulch_film_roll_in_storage ?mulch_film_roll)
+      )
+    :effect
+      (and
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_mapped_to_interface_a ?mulch_film_roll ?machine_interface_a)
+        (mulch_film_roll_mapped_to_interface_b ?mulch_film_roll ?machine_interface_b)
+        (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        (not
+          (mulch_film_roll_in_storage ?mulch_film_roll)
+        )
+      )
+  )
+  (:action stage_mulch_film_roll_for_mounting
+    :parameters (?mulch_film_roll - mulch_film_roll ?bed_anchor_a - bed_anchor_a ?work_order - work_order)
+    :precondition
+      (and
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (installation_unit_assigned_work_order ?bed_anchor_a ?work_order)
+        (not
+          (mulch_film_roll_staged_for_mounting ?mulch_film_roll)
+        )
+      )
+    :effect (mulch_film_roll_staged_for_mounting ?mulch_film_roll)
+  )
+  (:action integrate_kit_with_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (task_segment_assigned_mulch_roll ?installation_task_segment ?mulch_film_roll)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_available ?kit_packet)
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_staged_for_mounting ?mulch_film_roll)
+        (not
+          (kit_packet_consumed ?kit_packet)
+        )
+      )
+    :effect
+      (and
+        (kit_packet_consumed ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (not
+          (kit_packet_available ?kit_packet)
+        )
+      )
+  )
+  (:action verify_kit_and_mark_task_segment_prepared
+    :parameters (?installation_task_segment - installation_task_segment ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_consumed ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (installation_unit_assigned_work_order ?installation_task_segment ?work_order)
+        (not
+          (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        )
+        (not
+          (task_segment_kit_verified ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_kit_verified ?installation_task_segment)
+  )
+  (:action assign_spare_part_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?spare_part - spare_part)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (spare_part_available ?spare_part)
+        (not
+          (task_segment_reserved_spare_part ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_reserved_spare_part ?installation_task_segment)
+        (task_segment_assigned_spare_part ?installation_task_segment ?spare_part)
+        (not
+          (spare_part_available ?spare_part)
+        )
+      )
+  )
+  (:action integrate_spare_and_mark_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll ?work_order - work_order ?spare_part - spare_part)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_consumed ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (installation_unit_assigned_work_order ?installation_task_segment ?work_order)
+        (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        (task_segment_reserved_spare_part ?installation_task_segment)
+        (task_segment_assigned_spare_part ?installation_task_segment ?spare_part)
+        (not
+          (task_segment_kit_verified ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_kit_verified ?installation_task_segment)
+        (task_segment_spare_part_attached ?installation_task_segment)
+      )
+  )
+  (:action assign_tools_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?tool - tool ?technician - technician ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_kit_verified ?installation_task_segment)
+        (task_segment_assigned_tool ?installation_task_segment ?tool)
+        (installation_unit_assigned_technician ?installation_task_segment ?technician)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (not
+          (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        )
+        (not
+          (task_segment_tools_assigned ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_tools_assigned ?installation_task_segment)
+  )
+  (:action assign_tools_to_task_segment_alternate
+    :parameters (?installation_task_segment - installation_task_segment ?tool - tool ?technician - technician ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_kit_verified ?installation_task_segment)
+        (task_segment_assigned_tool ?installation_task_segment ?tool)
+        (installation_unit_assigned_technician ?installation_task_segment ?technician)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        (not
+          (task_segment_tools_assigned ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_tools_assigned ?installation_task_segment)
+  )
+  (:action apply_quality_seal_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_tools_assigned ?installation_task_segment)
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (not
+          (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        )
+        (not
+          (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        )
+        (not
+          (task_segment_quality_inspected ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_quality_inspected ?installation_task_segment)
+  )
+  (:action apply_quality_seal_and_record_inspection
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_tools_assigned ?installation_task_segment)
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        (not
+          (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        )
+        (not
+          (task_segment_quality_inspected ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_inspection_passed ?installation_task_segment)
+      )
+  )
+  (:action apply_quality_seal_and_record_inspection_variant
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_tools_assigned ?installation_task_segment)
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (not
+          (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        )
+        (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        (not
+          (task_segment_quality_inspected ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_inspection_passed ?installation_task_segment)
+      )
+  )
+  (:action apply_quality_seal_and_record_inspection_variant_b
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal ?kit_packet - kit_packet ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (task_segment_tools_assigned ?installation_task_segment)
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (task_segment_assigned_kit_packet ?installation_task_segment ?kit_packet)
+        (kit_packet_bound_to_mulch_roll ?kit_packet ?mulch_film_roll)
+        (mulch_film_roll_requires_inspection_tagging ?mulch_film_roll)
+        (mulch_film_roll_requires_spare_integration ?mulch_film_roll)
+        (not
+          (task_segment_quality_inspected ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_inspection_passed ?installation_task_segment)
+      )
+  )
+  (:action finalize_task_segment_signoff
+    :parameters (?installation_task_segment - installation_task_segment)
+    :precondition
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (not
+          (task_segment_inspection_passed ?installation_task_segment)
+        )
+        (not
+          (task_segment_signoff_recorded ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_signoff_recorded ?installation_task_segment)
+        (installation_unit_signed_off ?installation_task_segment)
+      )
+  )
+  (:action assign_transport_unit_to_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_inspection_passed ?installation_task_segment)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (task_segment_assigned_transport_unit ?installation_task_segment ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action execute_task_segment_installation
+    :parameters (?installation_task_segment - installation_task_segment ?bed_anchor_a - bed_anchor_a ?bed_anchor_b - bed_anchor_b ?work_order - work_order ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_inspection_passed ?installation_task_segment)
+        (task_segment_assigned_transport_unit ?installation_task_segment ?transport_unit)
+        (task_segment_assigned_to_anchor_a ?installation_task_segment ?bed_anchor_a)
+        (task_segment_assigned_to_anchor_b ?installation_task_segment ?bed_anchor_b)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+        (bed_anchor_b_prepared ?bed_anchor_b)
+        (installation_unit_assigned_work_order ?installation_task_segment ?work_order)
+        (not
+          (task_segment_executed ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_executed ?installation_task_segment)
+  )
+  (:action finalize_execution_signoff
+    :parameters (?installation_task_segment - installation_task_segment)
+    :precondition
+      (and
+        (task_segment_quality_inspected ?installation_task_segment)
+        (task_segment_executed ?installation_task_segment)
+        (not
+          (task_segment_signoff_recorded ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_signoff_recorded ?installation_task_segment)
+        (installation_unit_signed_off ?installation_task_segment)
+      )
+  )
+  (:action claim_inspection_tag_for_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?inspection_tag - inspection_tag ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_scheduled ?installation_task_segment)
+        (installation_unit_assigned_work_order ?installation_task_segment ?work_order)
+        (inspection_tag_available ?inspection_tag)
+        (task_segment_assigned_inspection_tag ?installation_task_segment ?inspection_tag)
+        (not
+          (task_segment_inspection_tag_claimed ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_inspection_tag_claimed ?installation_task_segment)
+        (not
+          (inspection_tag_available ?inspection_tag)
+        )
+      )
+  )
+  (:action engage_technician_for_tagged_task_segment
+    :parameters (?installation_task_segment - installation_task_segment ?technician - technician)
+    :precondition
+      (and
+        (task_segment_inspection_tag_claimed ?installation_task_segment)
+        (installation_unit_assigned_technician ?installation_task_segment ?technician)
+        (not
+          (task_segment_technician_engaged ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_technician_engaged ?installation_task_segment)
+  )
+  (:action apply_quality_seal_by_technician
+    :parameters (?installation_task_segment - installation_task_segment ?quality_seal - quality_seal)
+    :precondition
+      (and
+        (task_segment_technician_engaged ?installation_task_segment)
+        (task_segment_assigned_quality_seal ?installation_task_segment ?quality_seal)
+        (not
+          (task_segment_quality_seal_attached ?installation_task_segment)
+        )
+      )
+    :effect (task_segment_quality_seal_attached ?installation_task_segment)
+  )
+  (:action finalize_tagged_task_segment_signoff
+    :parameters (?installation_task_segment - installation_task_segment)
+    :precondition
+      (and
+        (task_segment_quality_seal_attached ?installation_task_segment)
+        (not
+          (task_segment_signoff_recorded ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (task_segment_signoff_recorded ?installation_task_segment)
+        (installation_unit_signed_off ?installation_task_segment)
+      )
+  )
+  (:action complete_installation_on_anchor_a
+    :parameters (?bed_anchor_a - bed_anchor_a ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_a_engaged ?bed_anchor_a)
+        (bed_anchor_a_prepared ?bed_anchor_a)
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_staged_for_mounting ?mulch_film_roll)
+        (not
+          (installation_unit_signed_off ?bed_anchor_a)
+        )
+      )
+    :effect (installation_unit_signed_off ?bed_anchor_a)
+  )
+  (:action complete_installation_on_anchor_b
+    :parameters (?bed_anchor_b - bed_anchor_b ?mulch_film_roll - mulch_film_roll)
+    :precondition
+      (and
+        (bed_anchor_b_engaged ?bed_anchor_b)
+        (bed_anchor_b_prepared ?bed_anchor_b)
+        (mulch_film_roll_prepared ?mulch_film_roll)
+        (mulch_film_roll_staged_for_mounting ?mulch_film_roll)
+        (not
+          (installation_unit_signed_off ?bed_anchor_b)
+        )
+      )
+    :effect (installation_unit_signed_off ?bed_anchor_b)
+  )
+  (:action allocate_contingency_to_installation_unit
+    :parameters (?installation_unit - installation_unit ?contingency_reserve - contingency_reserve ?work_order - work_order)
+    :precondition
+      (and
+        (installation_unit_signed_off ?installation_unit)
+        (installation_unit_assigned_work_order ?installation_unit ?work_order)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (installation_unit_contingency_allocated ?installation_unit)
+        )
+      )
+    :effect
+      (and
+        (installation_unit_contingency_allocated ?installation_unit)
+        (installation_unit_allocated_contingency_reserve ?installation_unit ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action dispatch_installation_unit_a_with_operator_and_contingency
+    :parameters (?bed_anchor_a - bed_anchor_a ?field_operator - field_operator ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (installation_unit_contingency_allocated ?bed_anchor_a)
+        (installation_unit_assigned_to_operator ?bed_anchor_a ?field_operator)
+        (installation_unit_allocated_contingency_reserve ?bed_anchor_a ?contingency_reserve)
+        (not
+          (installation_unit_dispatched ?bed_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (installation_unit_dispatched ?bed_anchor_a)
+        (field_operator_available ?field_operator)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action dispatch_installation_unit_b_with_operator_and_contingency
+    :parameters (?bed_anchor_b - bed_anchor_b ?field_operator - field_operator ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (installation_unit_contingency_allocated ?bed_anchor_b)
+        (installation_unit_assigned_to_operator ?bed_anchor_b ?field_operator)
+        (installation_unit_allocated_contingency_reserve ?bed_anchor_b ?contingency_reserve)
+        (not
+          (installation_unit_dispatched ?bed_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (installation_unit_dispatched ?bed_anchor_b)
+        (field_operator_available ?field_operator)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action dispatch_task_segment_with_operator_and_contingency
+    :parameters (?installation_task_segment - installation_task_segment ?field_operator - field_operator ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (installation_unit_contingency_allocated ?installation_task_segment)
+        (installation_unit_assigned_to_operator ?installation_task_segment ?field_operator)
+        (installation_unit_allocated_contingency_reserve ?installation_task_segment ?contingency_reserve)
+        (not
+          (installation_unit_dispatched ?installation_task_segment)
+        )
+      )
+    :effect
+      (and
+        (installation_unit_dispatched ?installation_task_segment)
+        (field_operator_available ?field_operator)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem mulch_film_roll_dispatch_to_beds_problem)
+  (:domain mulch_film_roll_dispatch)
+  (:objects bed_anchor_a_1 - bed_anchor_a bed_anchor_b_1 - bed_anchor_b installation_task_segment_1 - installation_task_segment installation_task_segment_2 - installation_task_segment field_operator_1 - field_operator field_operator_2 - field_operator field_operator_3 - field_operator work_order_1 - work_order technician_1 - technician material_component_1 - material_component machine_interface_a_1 - machine_interface_a machine_interface_b_1 - machine_interface_b mulch_film_roll_1 - mulch_film_roll kit_packet_1 - kit_packet kit_packet_2 - kit_packet spare_part_1 - spare_part spare_part_2 - spare_part transport_unit_1 - transport_unit transport_unit_2 - transport_unit contingency_reserve_1 - contingency_reserve tool_1 - tool inspection_tag_1 - inspection_tag inspection_tag_2 - inspection_tag quality_seal_1 - quality_seal)
+  (:init
+    (field_operator_available field_operator_1)
+    (field_operator_available field_operator_2)
+    (field_operator_available field_operator_3)
+    (work_order_available work_order_1)
+    (technician_available technician_1)
+    (material_component_available material_component_1)
+    (bed_anchor_a_mapped_to_interface_a bed_anchor_a_1 machine_interface_a_1)
+    (bed_anchor_b_mapped_to_interface_b bed_anchor_b_1 machine_interface_b_1)
+    (mulch_film_roll_in_storage mulch_film_roll_1)
+    (kit_packet_available kit_packet_1)
+    (kit_packet_available kit_packet_2)
+    (task_segment_assigned_to_anchor_a installation_task_segment_1 bed_anchor_a_1)
+    (task_segment_assigned_to_anchor_a installation_task_segment_2 bed_anchor_a_1)
+    (task_segment_assigned_to_anchor_b installation_task_segment_1 bed_anchor_b_1)
+    (task_segment_assigned_to_anchor_b installation_task_segment_2 bed_anchor_b_1)
+    (task_segment_assigned_mulch_roll installation_task_segment_1 mulch_film_roll_1)
+    (task_segment_assigned_mulch_roll installation_task_segment_2 mulch_film_roll_1)
+    (task_segment_assigned_kit_packet installation_task_segment_1 kit_packet_1)
+    (task_segment_assigned_kit_packet installation_task_segment_2 kit_packet_2)
+    (spare_part_available spare_part_1)
+    (spare_part_available spare_part_2)
+    (transport_unit_available transport_unit_1)
+    (transport_unit_available transport_unit_2)
+    (contingency_reserve_available contingency_reserve_1)
+    (tool_available tool_1)
+    (inspection_tag_available inspection_tag_1)
+    (task_segment_assigned_inspection_tag installation_task_segment_1 inspection_tag_1)
+    (task_segment_assigned_inspection_tag installation_task_segment_2 inspection_tag_2)
+    (quality_seal_available quality_seal_1)
+  )
+  (:goal
+    (and
+      (installation_unit_dispatched bed_anchor_a_1)
+      (installation_unit_dispatched bed_anchor_b_1)
+      (installation_unit_dispatched installation_task_segment_1)
+      (installation_unit_dispatched installation_task_segment_2)
+    )
+  )
+)

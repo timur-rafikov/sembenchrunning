@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain finance_returned_payment_handling)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_option_base - object artifact_base - object channel_base - object case_entity_base - object returned_payment_case - case_entity_base settlement_channel_option - resource_option_base validation_rule - resource_option_base processing_party - resource_option_base routing_policy - resource_option_base authorization_token - resource_option_base return_reason_code - resource_option_base liquidity_reserve - resource_option_base regulatory_constraint - resource_option_base remediation_option - artifact_base supporting_document - artifact_base external_stakeholder_identity - artifact_base payer_channel_endpoint - channel_base payee_channel_endpoint - channel_base settlement_message - channel_base account_role_base - returned_payment_case processing_node_base - returned_payment_case payer_account - account_role_base payee_account - account_role_base processing_work_item - processing_node_base)
+  (:predicates
+    (case_registered ?returned_case - returned_payment_case)
+    (entity_validated_for_processing ?returned_case - returned_payment_case)
+    (channel_option_bound ?returned_case - returned_payment_case)
+    (entity_released_for_remediation ?returned_case - returned_payment_case)
+    (entity_ready_for_external_interaction ?returned_case - returned_payment_case)
+    (entity_release_approved ?returned_case - returned_payment_case)
+    (settlement_channel_option_available ?settlement_channel_option - settlement_channel_option)
+    (bound_settlement_channel_option ?returned_case - returned_payment_case ?settlement_channel_option - settlement_channel_option)
+    (validation_rule_available ?validation_rule - validation_rule)
+    (bound_validation_rule_for_entity ?returned_case - returned_payment_case ?validation_rule - validation_rule)
+    (processing_party_available ?processing_party - processing_party)
+    (entity_assigned_processing_party ?returned_case - returned_payment_case ?processing_party - processing_party)
+    (remediation_option_available ?remediation_option - remediation_option)
+    (payer_account_remediation_assigned ?payer_account - payer_account ?remediation_option - remediation_option)
+    (payee_account_remediation_assigned ?payee_account - payee_account ?remediation_option - remediation_option)
+    (bound_payer_channel_endpoint ?payer_account - payer_account ?payer_channel_endpoint - payer_channel_endpoint)
+    (payer_channel_endpoint_ready ?payer_channel_endpoint - payer_channel_endpoint)
+    (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint - payer_channel_endpoint)
+    (payer_account_prepared_for_routing ?payer_account - payer_account)
+    (bound_payee_channel_endpoint ?payee_account - payee_account ?payee_channel_endpoint - payee_channel_endpoint)
+    (payee_channel_endpoint_ready ?payee_channel_endpoint - payee_channel_endpoint)
+    (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint - payee_channel_endpoint)
+    (payee_account_prepared_for_routing ?payee_account - payee_account)
+    (settlement_message_available ?settlement_message - settlement_message)
+    (settlement_message_selected ?settlement_message - settlement_message)
+    (settlement_message_bound_to_payer_endpoint ?settlement_message - settlement_message ?payer_channel_endpoint - payer_channel_endpoint)
+    (settlement_message_bound_to_payee_endpoint ?settlement_message - settlement_message ?payee_channel_endpoint - payee_channel_endpoint)
+    (settlement_message_requires_payer_follow_up ?settlement_message - settlement_message)
+    (settlement_message_requires_payee_follow_up ?settlement_message - settlement_message)
+    (settlement_message_ready_for_transmission ?settlement_message - settlement_message)
+    (work_item_associated_with_payer_account ?work_item - processing_work_item ?payer_account - payer_account)
+    (work_item_associated_with_payee_account ?work_item - processing_work_item ?payee_account - payee_account)
+    (work_item_assigned_settlement_message ?work_item - processing_work_item ?settlement_message - settlement_message)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (work_item_attached_supporting_document ?work_item - processing_work_item ?supporting_document - supporting_document)
+    (supporting_document_locked ?supporting_document - supporting_document)
+    (supporting_document_attached_to_message ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    (work_item_documents_ready ?work_item - processing_work_item)
+    (work_item_resources_allocated ?work_item - processing_work_item)
+    (work_item_authorization_requested ?work_item - processing_work_item)
+    (routing_policy_locked_on_work_item ?work_item - processing_work_item)
+    (work_item_policy_verified ?work_item - processing_work_item)
+    (work_item_requires_authorization_token ?work_item - processing_work_item)
+    (work_item_ready_for_execution ?work_item - processing_work_item)
+    (external_stakeholder_available ?external_stakeholder - external_stakeholder_identity)
+    (work_item_bound_to_external_stakeholder ?work_item - processing_work_item ?external_stakeholder - external_stakeholder_identity)
+    (external_stakeholder_binding_confirmed ?work_item - processing_work_item)
+    (processing_party_acknowledged_stakeholder_binding ?work_item - processing_work_item)
+    (regulatory_compliance_confirmed ?work_item - processing_work_item)
+    (routing_policy_available ?routing_policy - routing_policy)
+    (work_item_assigned_routing_policy ?work_item - processing_work_item ?routing_policy - routing_policy)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (work_item_attached_authorization_token ?work_item - processing_work_item ?authorization_token - authorization_token)
+    (liquidity_reserve_available ?liquidity_reserve - liquidity_reserve)
+    (work_item_allocated_liquidity_reserve ?work_item - processing_work_item ?liquidity_reserve - liquidity_reserve)
+    (regulatory_rule_available ?regulatory_rule - regulatory_constraint)
+    (work_item_bound_to_regulatory_rule ?work_item - processing_work_item ?regulatory_rule - regulatory_constraint)
+    (return_reason_code_available ?return_reason_code - return_reason_code)
+    (entity_bound_to_return_reason ?returned_case - returned_payment_case ?return_reason_code - return_reason_code)
+    (payer_account_signaled_for_message_assembly ?payer_account - payer_account)
+    (payee_account_signaled_for_message_assembly ?payee_account - payee_account)
+    (work_item_finalized ?work_item - processing_work_item)
+  )
+  (:action register_returned_payment_case
+    :parameters (?returned_case - returned_payment_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?returned_case)
+        )
+        (not
+          (entity_released_for_remediation ?returned_case)
+        )
+      )
+    :effect (case_registered ?returned_case)
+  )
+  (:action bind_settlement_channel_option_to_case
+    :parameters (?returned_case - returned_payment_case ?settlement_channel_option - settlement_channel_option)
+    :precondition
+      (and
+        (case_registered ?returned_case)
+        (not
+          (channel_option_bound ?returned_case)
+        )
+        (settlement_channel_option_available ?settlement_channel_option)
+      )
+    :effect
+      (and
+        (channel_option_bound ?returned_case)
+        (bound_settlement_channel_option ?returned_case ?settlement_channel_option)
+        (not
+          (settlement_channel_option_available ?settlement_channel_option)
+        )
+      )
+  )
+  (:action apply_validation_rule_to_case
+    :parameters (?returned_case - returned_payment_case ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (case_registered ?returned_case)
+        (channel_option_bound ?returned_case)
+        (validation_rule_available ?validation_rule)
+      )
+    :effect
+      (and
+        (bound_validation_rule_for_entity ?returned_case ?validation_rule)
+        (not
+          (validation_rule_available ?validation_rule)
+        )
+      )
+  )
+  (:action mark_case_validated
+    :parameters (?returned_case - returned_payment_case ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (case_registered ?returned_case)
+        (channel_option_bound ?returned_case)
+        (bound_validation_rule_for_entity ?returned_case ?validation_rule)
+        (not
+          (entity_validated_for_processing ?returned_case)
+        )
+      )
+    :effect (entity_validated_for_processing ?returned_case)
+  )
+  (:action release_validation_rule_from_case
+    :parameters (?returned_case - returned_payment_case ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (bound_validation_rule_for_entity ?returned_case ?validation_rule)
+      )
+    :effect
+      (and
+        (validation_rule_available ?validation_rule)
+        (not
+          (bound_validation_rule_for_entity ?returned_case ?validation_rule)
+        )
+      )
+  )
+  (:action assign_processing_party_to_case
+    :parameters (?returned_case - returned_payment_case ?processing_party - processing_party)
+    :precondition
+      (and
+        (entity_validated_for_processing ?returned_case)
+        (processing_party_available ?processing_party)
+      )
+    :effect
+      (and
+        (entity_assigned_processing_party ?returned_case ?processing_party)
+        (not
+          (processing_party_available ?processing_party)
+        )
+      )
+  )
+  (:action release_processing_party_from_case
+    :parameters (?returned_case - returned_payment_case ?processing_party - processing_party)
+    :precondition
+      (and
+        (entity_assigned_processing_party ?returned_case ?processing_party)
+      )
+    :effect
+      (and
+        (processing_party_available ?processing_party)
+        (not
+          (entity_assigned_processing_party ?returned_case ?processing_party)
+        )
+      )
+  )
+  (:action allocate_liquidity_reserve_to_work_item
+    :parameters (?work_item - processing_work_item ?liquidity_reserve - liquidity_reserve)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (liquidity_reserve_available ?liquidity_reserve)
+      )
+    :effect
+      (and
+        (work_item_allocated_liquidity_reserve ?work_item ?liquidity_reserve)
+        (not
+          (liquidity_reserve_available ?liquidity_reserve)
+        )
+      )
+  )
+  (:action release_liquidity_reserve_from_work_item
+    :parameters (?work_item - processing_work_item ?liquidity_reserve - liquidity_reserve)
+    :precondition
+      (and
+        (work_item_allocated_liquidity_reserve ?work_item ?liquidity_reserve)
+      )
+    :effect
+      (and
+        (liquidity_reserve_available ?liquidity_reserve)
+        (not
+          (work_item_allocated_liquidity_reserve ?work_item ?liquidity_reserve)
+        )
+      )
+  )
+  (:action attach_regulatory_constraint_to_work_item
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (regulatory_rule_available ?regulatory_rule)
+      )
+    :effect
+      (and
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (not
+          (regulatory_rule_available ?regulatory_rule)
+        )
+      )
+  )
+  (:action detach_regulatory_constraint_from_work_item
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint)
+    :precondition
+      (and
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+      )
+    :effect
+      (and
+        (regulatory_rule_available ?regulatory_rule)
+        (not
+          (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        )
+      )
+  )
+  (:action verify_payer_channel_endpoint
+    :parameters (?payer_account - payer_account ?payer_channel_endpoint - payer_channel_endpoint ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payer_account)
+        (bound_validation_rule_for_entity ?payer_account ?validation_rule)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (not
+          (payer_channel_endpoint_ready ?payer_channel_endpoint)
+        )
+        (not
+          (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint)
+        )
+      )
+    :effect (payer_channel_endpoint_ready ?payer_channel_endpoint)
+  )
+  (:action confirm_payer_account_readiness
+    :parameters (?payer_account - payer_account ?payer_channel_endpoint - payer_channel_endpoint ?processing_party - processing_party)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payer_account)
+        (entity_assigned_processing_party ?payer_account ?processing_party)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (payer_channel_endpoint_ready ?payer_channel_endpoint)
+        (not
+          (payer_account_signaled_for_message_assembly ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payer_account_prepared_for_routing ?payer_account)
+      )
+  )
+  (:action reserve_remediation_option_for_payer_account
+    :parameters (?payer_account - payer_account ?payer_channel_endpoint - payer_channel_endpoint ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payer_account)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (remediation_option_available ?remediation_option)
+        (not
+          (payer_account_signaled_for_message_assembly ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint)
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payer_account_remediation_assigned ?payer_account ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action execute_payer_account_remediation
+    :parameters (?payer_account - payer_account ?payer_channel_endpoint - payer_channel_endpoint ?validation_rule - validation_rule ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payer_account)
+        (bound_validation_rule_for_entity ?payer_account ?validation_rule)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint)
+        (payer_account_remediation_assigned ?payer_account ?remediation_option)
+        (not
+          (payer_account_prepared_for_routing ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (payer_channel_endpoint_ready ?payer_channel_endpoint)
+        (payer_account_prepared_for_routing ?payer_account)
+        (remediation_option_available ?remediation_option)
+        (not
+          (payer_account_remediation_assigned ?payer_account ?remediation_option)
+        )
+      )
+  )
+  (:action verify_payee_channel_endpoint
+    :parameters (?payee_account - payee_account ?payee_channel_endpoint - payee_channel_endpoint ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payee_account)
+        (bound_validation_rule_for_entity ?payee_account ?validation_rule)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (not
+          (payee_channel_endpoint_ready ?payee_channel_endpoint)
+        )
+        (not
+          (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint)
+        )
+      )
+    :effect (payee_channel_endpoint_ready ?payee_channel_endpoint)
+  )
+  (:action confirm_payee_account_readiness
+    :parameters (?payee_account - payee_account ?payee_channel_endpoint - payee_channel_endpoint ?processing_party - processing_party)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payee_account)
+        (entity_assigned_processing_party ?payee_account ?processing_party)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payee_channel_endpoint_ready ?payee_channel_endpoint)
+        (not
+          (payee_account_signaled_for_message_assembly ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (payee_account_prepared_for_routing ?payee_account)
+      )
+  )
+  (:action reserve_remediation_option_for_payee_account
+    :parameters (?payee_account - payee_account ?payee_channel_endpoint - payee_channel_endpoint ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payee_account)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (remediation_option_available ?remediation_option)
+        (not
+          (payee_account_signaled_for_message_assembly ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint)
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (payee_account_remediation_assigned ?payee_account ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action execute_payee_account_remediation
+    :parameters (?payee_account - payee_account ?payee_channel_endpoint - payee_channel_endpoint ?validation_rule - validation_rule ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_validated_for_processing ?payee_account)
+        (bound_validation_rule_for_entity ?payee_account ?validation_rule)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint)
+        (payee_account_remediation_assigned ?payee_account ?remediation_option)
+        (not
+          (payee_account_prepared_for_routing ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (payee_channel_endpoint_ready ?payee_channel_endpoint)
+        (payee_account_prepared_for_routing ?payee_account)
+        (remediation_option_available ?remediation_option)
+        (not
+          (payee_account_remediation_assigned ?payee_account ?remediation_option)
+        )
+      )
+  )
+  (:action select_and_bind_settlement_message
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?payer_channel_endpoint - payer_channel_endpoint ?payee_channel_endpoint - payee_channel_endpoint ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payer_channel_endpoint_ready ?payer_channel_endpoint)
+        (payee_channel_endpoint_ready ?payee_channel_endpoint)
+        (payer_account_prepared_for_routing ?payer_account)
+        (payee_account_prepared_for_routing ?payee_account)
+        (settlement_message_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_bound_to_payer_endpoint ?settlement_message ?payer_channel_endpoint)
+        (settlement_message_bound_to_payee_endpoint ?settlement_message ?payee_channel_endpoint)
+        (not
+          (settlement_message_available ?settlement_message)
+        )
+      )
+  )
+  (:action select_and_bind_settlement_message_requires_payer_follow_up
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?payer_channel_endpoint - payer_channel_endpoint ?payee_channel_endpoint - payee_channel_endpoint ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint)
+        (payee_channel_endpoint_ready ?payee_channel_endpoint)
+        (not
+          (payer_account_prepared_for_routing ?payer_account)
+        )
+        (payee_account_prepared_for_routing ?payee_account)
+        (settlement_message_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_bound_to_payer_endpoint ?settlement_message ?payer_channel_endpoint)
+        (settlement_message_bound_to_payee_endpoint ?settlement_message ?payee_channel_endpoint)
+        (settlement_message_requires_payer_follow_up ?settlement_message)
+        (not
+          (settlement_message_available ?settlement_message)
+        )
+      )
+  )
+  (:action select_and_bind_settlement_message_requires_payee_follow_up
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?payer_channel_endpoint - payer_channel_endpoint ?payee_channel_endpoint - payee_channel_endpoint ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payer_channel_endpoint_ready ?payer_channel_endpoint)
+        (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint)
+        (payer_account_prepared_for_routing ?payer_account)
+        (not
+          (payee_account_prepared_for_routing ?payee_account)
+        )
+        (settlement_message_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_bound_to_payer_endpoint ?settlement_message ?payer_channel_endpoint)
+        (settlement_message_bound_to_payee_endpoint ?settlement_message ?payee_channel_endpoint)
+        (settlement_message_requires_payee_follow_up ?settlement_message)
+        (not
+          (settlement_message_available ?settlement_message)
+        )
+      )
+  )
+  (:action select_and_bind_settlement_message_requires_both_follow_up
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?payer_channel_endpoint - payer_channel_endpoint ?payee_channel_endpoint - payee_channel_endpoint ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (bound_payer_channel_endpoint ?payer_account ?payer_channel_endpoint)
+        (bound_payee_channel_endpoint ?payee_account ?payee_channel_endpoint)
+        (payer_channel_endpoint_flagged_for_remediation ?payer_channel_endpoint)
+        (payee_channel_endpoint_flagged_for_remediation ?payee_channel_endpoint)
+        (not
+          (payer_account_prepared_for_routing ?payer_account)
+        )
+        (not
+          (payee_account_prepared_for_routing ?payee_account)
+        )
+        (settlement_message_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_bound_to_payer_endpoint ?settlement_message ?payer_channel_endpoint)
+        (settlement_message_bound_to_payee_endpoint ?settlement_message ?payee_channel_endpoint)
+        (settlement_message_requires_payer_follow_up ?settlement_message)
+        (settlement_message_requires_payee_follow_up ?settlement_message)
+        (not
+          (settlement_message_available ?settlement_message)
+        )
+      )
+  )
+  (:action finalize_settlement_message_for_transmission
+    :parameters (?settlement_message - settlement_message ?payer_account - payer_account ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (settlement_message_selected ?settlement_message)
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (bound_validation_rule_for_entity ?payer_account ?validation_rule)
+        (not
+          (settlement_message_ready_for_transmission ?settlement_message)
+        )
+      )
+    :effect (settlement_message_ready_for_transmission ?settlement_message)
+  )
+  (:action lock_and_attach_supporting_document_to_message
+    :parameters (?work_item - processing_work_item ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (work_item_assigned_settlement_message ?work_item ?settlement_message)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_ready_for_transmission ?settlement_message)
+        (not
+          (supporting_document_locked ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_locked ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action mark_work_item_documents_ready
+    :parameters (?work_item - processing_work_item ?supporting_document - supporting_document ?settlement_message - settlement_message ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_locked ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (bound_validation_rule_for_entity ?work_item ?validation_rule)
+        (not
+          (settlement_message_requires_payer_follow_up ?settlement_message)
+        )
+        (not
+          (work_item_documents_ready ?work_item)
+        )
+      )
+    :effect (work_item_documents_ready ?work_item)
+  )
+  (:action assign_routing_policy_to_work_item
+    :parameters (?work_item - processing_work_item ?routing_policy - routing_policy)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (routing_policy_available ?routing_policy)
+        (not
+          (routing_policy_locked_on_work_item ?work_item)
+        )
+      )
+    :effect
+      (and
+        (routing_policy_locked_on_work_item ?work_item)
+        (work_item_assigned_routing_policy ?work_item ?routing_policy)
+        (not
+          (routing_policy_available ?routing_policy)
+        )
+      )
+  )
+  (:action evaluate_routing_policy_for_work_item
+    :parameters (?work_item - processing_work_item ?supporting_document - supporting_document ?settlement_message - settlement_message ?validation_rule - validation_rule ?routing_policy - routing_policy)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_locked ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (bound_validation_rule_for_entity ?work_item ?validation_rule)
+        (settlement_message_requires_payer_follow_up ?settlement_message)
+        (routing_policy_locked_on_work_item ?work_item)
+        (work_item_assigned_routing_policy ?work_item ?routing_policy)
+        (not
+          (work_item_documents_ready ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_documents_ready ?work_item)
+        (work_item_policy_verified ?work_item)
+      )
+  )
+  (:action authorize_work_item_resources_standard
+    :parameters (?work_item - processing_work_item ?liquidity_reserve - liquidity_reserve ?processing_party - processing_party ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_documents_ready ?work_item)
+        (work_item_allocated_liquidity_reserve ?work_item ?liquidity_reserve)
+        (entity_assigned_processing_party ?work_item ?processing_party)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (not
+          (settlement_message_requires_payee_follow_up ?settlement_message)
+        )
+        (not
+          (work_item_resources_allocated ?work_item)
+        )
+      )
+    :effect (work_item_resources_allocated ?work_item)
+  )
+  (:action authorize_work_item_resources_with_follow_up
+    :parameters (?work_item - processing_work_item ?liquidity_reserve - liquidity_reserve ?processing_party - processing_party ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_documents_ready ?work_item)
+        (work_item_allocated_liquidity_reserve ?work_item ?liquidity_reserve)
+        (entity_assigned_processing_party ?work_item ?processing_party)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (settlement_message_requires_payee_follow_up ?settlement_message)
+        (not
+          (work_item_resources_allocated ?work_item)
+        )
+      )
+    :effect (work_item_resources_allocated ?work_item)
+  )
+  (:action apply_regulatory_constraint_to_work_item_standard
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_resources_allocated ?work_item)
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (not
+          (settlement_message_requires_payer_follow_up ?settlement_message)
+        )
+        (not
+          (settlement_message_requires_payee_follow_up ?settlement_message)
+        )
+        (not
+          (work_item_authorization_requested ?work_item)
+        )
+      )
+    :effect (work_item_authorization_requested ?work_item)
+  )
+  (:action apply_regulatory_constraint_and_prepare_authorization
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_resources_allocated ?work_item)
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (settlement_message_requires_payer_follow_up ?settlement_message)
+        (not
+          (settlement_message_requires_payee_follow_up ?settlement_message)
+        )
+        (not
+          (work_item_authorization_requested ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_requires_authorization_token ?work_item)
+      )
+  )
+  (:action apply_regulatory_constraint_and_prepare_authorization_variant
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_resources_allocated ?work_item)
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (not
+          (settlement_message_requires_payer_follow_up ?settlement_message)
+        )
+        (settlement_message_requires_payee_follow_up ?settlement_message)
+        (not
+          (work_item_authorization_requested ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_requires_authorization_token ?work_item)
+      )
+  )
+  (:action apply_regulatory_constraint_and_prepare_authorization_both
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint ?supporting_document - supporting_document ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (work_item_resources_allocated ?work_item)
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (work_item_attached_supporting_document ?work_item ?supporting_document)
+        (supporting_document_attached_to_message ?supporting_document ?settlement_message)
+        (settlement_message_requires_payer_follow_up ?settlement_message)
+        (settlement_message_requires_payee_follow_up ?settlement_message)
+        (not
+          (work_item_authorization_requested ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_requires_authorization_token ?work_item)
+      )
+  )
+  (:action finalize_work_item_for_external_interaction
+    :parameters (?work_item - processing_work_item)
+    :precondition
+      (and
+        (work_item_authorization_requested ?work_item)
+        (not
+          (work_item_requires_authorization_token ?work_item)
+        )
+        (not
+          (work_item_finalized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_finalized ?work_item)
+        (entity_ready_for_external_interaction ?work_item)
+      )
+  )
+  (:action attach_authorization_token_to_work_item
+    :parameters (?work_item - processing_work_item ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_requires_authorization_token ?work_item)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (work_item_attached_authorization_token ?work_item ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action finalize_work_item_pre_execution_checks
+    :parameters (?work_item - processing_work_item ?payer_account - payer_account ?payee_account - payee_account ?validation_rule - validation_rule ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_requires_authorization_token ?work_item)
+        (work_item_attached_authorization_token ?work_item ?authorization_token)
+        (work_item_associated_with_payer_account ?work_item ?payer_account)
+        (work_item_associated_with_payee_account ?work_item ?payee_account)
+        (payer_account_prepared_for_routing ?payer_account)
+        (payee_account_prepared_for_routing ?payee_account)
+        (bound_validation_rule_for_entity ?work_item ?validation_rule)
+        (not
+          (work_item_ready_for_execution ?work_item)
+        )
+      )
+    :effect (work_item_ready_for_execution ?work_item)
+  )
+  (:action finalize_work_item_for_external_interaction_after_checks
+    :parameters (?work_item - processing_work_item)
+    :precondition
+      (and
+        (work_item_authorization_requested ?work_item)
+        (work_item_ready_for_execution ?work_item)
+        (not
+          (work_item_finalized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_finalized ?work_item)
+        (entity_ready_for_external_interaction ?work_item)
+      )
+  )
+  (:action bind_external_stakeholder_to_work_item
+    :parameters (?work_item - processing_work_item ?external_stakeholder - external_stakeholder_identity ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated_for_processing ?work_item)
+        (bound_validation_rule_for_entity ?work_item ?validation_rule)
+        (external_stakeholder_available ?external_stakeholder)
+        (work_item_bound_to_external_stakeholder ?work_item ?external_stakeholder)
+        (not
+          (external_stakeholder_binding_confirmed ?work_item)
+        )
+      )
+    :effect
+      (and
+        (external_stakeholder_binding_confirmed ?work_item)
+        (not
+          (external_stakeholder_available ?external_stakeholder)
+        )
+      )
+  )
+  (:action confirm_stakeholder_binding_by_party
+    :parameters (?work_item - processing_work_item ?processing_party - processing_party)
+    :precondition
+      (and
+        (external_stakeholder_binding_confirmed ?work_item)
+        (entity_assigned_processing_party ?work_item ?processing_party)
+        (not
+          (processing_party_acknowledged_stakeholder_binding ?work_item)
+        )
+      )
+    :effect (processing_party_acknowledged_stakeholder_binding ?work_item)
+  )
+  (:action confirm_regulatory_compliance
+    :parameters (?work_item - processing_work_item ?regulatory_rule - regulatory_constraint)
+    :precondition
+      (and
+        (processing_party_acknowledged_stakeholder_binding ?work_item)
+        (work_item_bound_to_regulatory_rule ?work_item ?regulatory_rule)
+        (not
+          (regulatory_compliance_confirmed ?work_item)
+        )
+      )
+    :effect (regulatory_compliance_confirmed ?work_item)
+  )
+  (:action finalize_work_item_after_external_stakeholder_interaction
+    :parameters (?work_item - processing_work_item)
+    :precondition
+      (and
+        (regulatory_compliance_confirmed ?work_item)
+        (not
+          (work_item_finalized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_finalized ?work_item)
+        (entity_ready_for_external_interaction ?work_item)
+      )
+  )
+  (:action mark_payer_account_ready_for_external_interaction
+    :parameters (?payer_account - payer_account ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_signaled_for_message_assembly ?payer_account)
+        (payer_account_prepared_for_routing ?payer_account)
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_ready_for_transmission ?settlement_message)
+        (not
+          (entity_ready_for_external_interaction ?payer_account)
+        )
+      )
+    :effect (entity_ready_for_external_interaction ?payer_account)
+  )
+  (:action mark_payee_account_ready_for_external_interaction
+    :parameters (?payee_account - payee_account ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payee_account_signaled_for_message_assembly ?payee_account)
+        (payee_account_prepared_for_routing ?payee_account)
+        (settlement_message_selected ?settlement_message)
+        (settlement_message_ready_for_transmission ?settlement_message)
+        (not
+          (entity_ready_for_external_interaction ?payee_account)
+        )
+      )
+    :effect (entity_ready_for_external_interaction ?payee_account)
+  )
+  (:action authorize_case_release
+    :parameters (?returned_case - returned_payment_case ?return_reason_code - return_reason_code ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_ready_for_external_interaction ?returned_case)
+        (bound_validation_rule_for_entity ?returned_case ?validation_rule)
+        (return_reason_code_available ?return_reason_code)
+        (not
+          (entity_release_approved ?returned_case)
+        )
+      )
+    :effect
+      (and
+        (entity_release_approved ?returned_case)
+        (entity_bound_to_return_reason ?returned_case ?return_reason_code)
+        (not
+          (return_reason_code_available ?return_reason_code)
+        )
+      )
+  )
+  (:action release_payer_account_for_remediation
+    :parameters (?payer_account - payer_account ?settlement_channel_option - settlement_channel_option ?return_reason_code - return_reason_code)
+    :precondition
+      (and
+        (entity_release_approved ?payer_account)
+        (bound_settlement_channel_option ?payer_account ?settlement_channel_option)
+        (entity_bound_to_return_reason ?payer_account ?return_reason_code)
+        (not
+          (entity_released_for_remediation ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (entity_released_for_remediation ?payer_account)
+        (settlement_channel_option_available ?settlement_channel_option)
+        (return_reason_code_available ?return_reason_code)
+      )
+  )
+  (:action release_payee_account_for_remediation
+    :parameters (?payee_account - payee_account ?settlement_channel_option - settlement_channel_option ?return_reason_code - return_reason_code)
+    :precondition
+      (and
+        (entity_release_approved ?payee_account)
+        (bound_settlement_channel_option ?payee_account ?settlement_channel_option)
+        (entity_bound_to_return_reason ?payee_account ?return_reason_code)
+        (not
+          (entity_released_for_remediation ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (entity_released_for_remediation ?payee_account)
+        (settlement_channel_option_available ?settlement_channel_option)
+        (return_reason_code_available ?return_reason_code)
+      )
+  )
+  (:action release_work_item_for_remediation
+    :parameters (?work_item - processing_work_item ?settlement_channel_option - settlement_channel_option ?return_reason_code - return_reason_code)
+    :precondition
+      (and
+        (entity_release_approved ?work_item)
+        (bound_settlement_channel_option ?work_item ?settlement_channel_option)
+        (entity_bound_to_return_reason ?work_item ?return_reason_code)
+        (not
+          (entity_released_for_remediation ?work_item)
+        )
+      )
+    :effect
+      (and
+        (entity_released_for_remediation ?work_item)
+        (settlement_channel_option_available ?settlement_channel_option)
+        (return_reason_code_available ?return_reason_code)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem returned_payment_handling_scenario)
+  (:domain finance_returned_payment_handling)
+  (:objects payer_account_1 - payer_account payee_account_1 - payee_account work_item_1 - processing_work_item work_item_2 - processing_work_item settlement_channel_option_a - settlement_channel_option settlement_channel_option_b - settlement_channel_option settlement_channel_option_c - settlement_channel_option validation_rule_funds_check - validation_rule processing_party_ops_team - processing_party remediation_option_representment - remediation_option payer_channel_endpoint_1 - payer_channel_endpoint payee_channel_endpoint_1 - payee_channel_endpoint settlement_message_template_1 - settlement_message supporting_document_customer_statement - supporting_document supporting_document_bank_confirmation - supporting_document routing_policy_default - routing_policy routing_policy_alternate - routing_policy authorization_token_1 - authorization_token authorization_token_2 - authorization_token return_reason_code_insufficient_funds - return_reason_code liquidity_reserve_bucket_1 - liquidity_reserve external_stakeholder_counterparty_1 - external_stakeholder_identity external_stakeholder_counterparty_2 - external_stakeholder_identity regulatory_time_window_1 - regulatory_constraint)
+  (:init
+    (settlement_channel_option_available settlement_channel_option_a)
+    (settlement_channel_option_available settlement_channel_option_b)
+    (settlement_channel_option_available settlement_channel_option_c)
+    (validation_rule_available validation_rule_funds_check)
+    (processing_party_available processing_party_ops_team)
+    (remediation_option_available remediation_option_representment)
+    (bound_payer_channel_endpoint payer_account_1 payer_channel_endpoint_1)
+    (bound_payee_channel_endpoint payee_account_1 payee_channel_endpoint_1)
+    (settlement_message_available settlement_message_template_1)
+    (supporting_document_available supporting_document_customer_statement)
+    (supporting_document_available supporting_document_bank_confirmation)
+    (work_item_associated_with_payer_account work_item_1 payer_account_1)
+    (work_item_associated_with_payer_account work_item_2 payer_account_1)
+    (work_item_associated_with_payee_account work_item_1 payee_account_1)
+    (work_item_associated_with_payee_account work_item_2 payee_account_1)
+    (work_item_assigned_settlement_message work_item_1 settlement_message_template_1)
+    (work_item_assigned_settlement_message work_item_2 settlement_message_template_1)
+    (work_item_attached_supporting_document work_item_1 supporting_document_customer_statement)
+    (work_item_attached_supporting_document work_item_2 supporting_document_bank_confirmation)
+    (routing_policy_available routing_policy_default)
+    (routing_policy_available routing_policy_alternate)
+    (authorization_token_available authorization_token_1)
+    (authorization_token_available authorization_token_2)
+    (return_reason_code_available return_reason_code_insufficient_funds)
+    (liquidity_reserve_available liquidity_reserve_bucket_1)
+    (external_stakeholder_available external_stakeholder_counterparty_1)
+    (work_item_bound_to_external_stakeholder work_item_1 external_stakeholder_counterparty_1)
+    (work_item_bound_to_external_stakeholder work_item_2 external_stakeholder_counterparty_2)
+    (regulatory_rule_available regulatory_time_window_1)
+  )
+  (:goal
+    (and
+      (entity_released_for_remediation payer_account_1)
+      (entity_released_for_remediation payee_account_1)
+      (entity_released_for_remediation work_item_1)
+      (entity_released_for_remediation work_item_2)
+    )
+  )
+)

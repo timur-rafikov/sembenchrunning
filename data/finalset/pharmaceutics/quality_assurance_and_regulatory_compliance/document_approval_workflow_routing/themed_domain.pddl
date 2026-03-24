@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_document_approval_workflow_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types organizational_role_category - object artifact_role_category - object external_affiliation_category - object controlled_document_root - object controlled_document - controlled_document_root approver_slot - organizational_role_category reviewer_identity - organizational_role_category approver_identity - organizational_role_category regulatory_attachment - organizational_role_category release_certificate - organizational_role_category decision_artifact - organizational_role_category specialist_evidence - organizational_role_category validation_signature - organizational_role_category evidence_artifact - artifact_role_category evidence_bundle - artifact_role_category regulatory_input - artifact_role_category validation_requirement - external_affiliation_category regulatory_requirement - external_affiliation_category approval_package - external_affiliation_category document_subclass_category - controlled_document document_version_role - controlled_document originating_document_subclass - document_subclass_category collaborating_document_subclass - document_subclass_category approval_case - document_version_role)
+  (:predicates
+    (document_draft_registered ?controlled_document - controlled_document)
+    (entity_review_endorsed ?controlled_document - controlled_document)
+    (approver_slot_reserved ?controlled_document - controlled_document)
+    (entity_final_approval_recorded ?controlled_document - controlled_document)
+    (entity_final_release_recorded ?controlled_document - controlled_document)
+    (decision_registered ?controlled_document - controlled_document)
+    (approver_slot_available ?approver_slot - approver_slot)
+    (has_assigned_approver_slot ?controlled_document - controlled_document ?approver_slot - approver_slot)
+    (reviewer_available ?reviewer_identity - reviewer_identity)
+    (entity_has_assigned_reviewer ?controlled_document - controlled_document ?reviewer_identity - reviewer_identity)
+    (approver_available ?approver_identity - approver_identity)
+    (entity_has_assigned_approver ?controlled_document - controlled_document ?approver_identity - approver_identity)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (originating_document_has_evidence ?originating_document_subclass - originating_document_subclass ?evidence_artifact - evidence_artifact)
+    (collaborating_document_has_evidence ?collaborating_document_subclass - collaborating_document_subclass ?evidence_artifact - evidence_artifact)
+    (originating_document_has_validation_requirement ?originating_document_subclass - originating_document_subclass ?validation_requirement - validation_requirement)
+    (validation_requirement_in_progress ?validation_requirement - validation_requirement)
+    (validation_requirement_linked_to_evidence ?validation_requirement - validation_requirement)
+    (originating_document_ready_for_packaging ?originating_document_subclass - originating_document_subclass)
+    (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass - collaborating_document_subclass ?regulatory_requirement - regulatory_requirement)
+    (regulatory_requirement_in_progress ?regulatory_requirement - regulatory_requirement)
+    (regulatory_requirement_linked_to_evidence ?regulatory_requirement - regulatory_requirement)
+    (collaborating_document_ready_for_packaging ?collaborating_document_subclass - collaborating_document_subclass)
+    (approval_package_available ?approval_package - approval_package)
+    (approval_package_compiled ?approval_package - approval_package)
+    (approval_package_has_validation_requirement ?approval_package - approval_package ?validation_requirement - validation_requirement)
+    (approval_package_has_regulatory_requirement ?approval_package - approval_package ?regulatory_requirement - regulatory_requirement)
+    (approval_package_originating_evidence_missing ?approval_package - approval_package)
+    (approval_package_collaborating_evidence_missing ?approval_package - approval_package)
+    (approval_package_finalized ?approval_package - approval_package)
+    (approval_case_includes_originating_document ?approval_case - approval_case ?originating_document_subclass - originating_document_subclass)
+    (approval_case_includes_collaborating_document ?approval_case - approval_case ?collaborating_document_subclass - collaborating_document_subclass)
+    (approval_case_includes_approval_package ?approval_case - approval_case ?approval_package - approval_package)
+    (evidence_bundle_available ?evidence_bundle - evidence_bundle)
+    (approval_case_has_evidence_bundle ?approval_case - approval_case ?evidence_bundle - evidence_bundle)
+    (evidence_bundle_consumed ?evidence_bundle - evidence_bundle)
+    (evidence_bundle_linked_to_package ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    (attachment_and_evidence_validated ?approval_case - approval_case)
+    (specialist_evidence_reserved ?approval_case - approval_case)
+    (signature_checks_completed ?approval_case - approval_case)
+    (regulatory_attachment_attached ?approval_case - approval_case)
+    (regulatory_attachment_verified ?approval_case - approval_case)
+    (evidence_associated_for_signoff ?approval_case - approval_case)
+    (final_quality_checks_complete ?approval_case - approval_case)
+    (regulatory_input_available ?regulatory_input - regulatory_input)
+    (approval_case_has_regulatory_input ?approval_case - approval_case ?regulatory_input - regulatory_input)
+    (regulatory_input_applied ?approval_case - approval_case)
+    (regulatory_input_approved_by_approver ?approval_case - approval_case)
+    (regulatory_input_authorized ?approval_case - approval_case)
+    (regulatory_attachment_available ?regulatory_attachment - regulatory_attachment)
+    (approval_case_has_regulatory_attachment ?approval_case - approval_case ?regulatory_attachment - regulatory_attachment)
+    (release_certificate_available ?release_certificate - release_certificate)
+    (approval_case_has_release_certificate ?approval_case - approval_case ?release_certificate - release_certificate)
+    (specialist_evidence_available ?specialist_evidence - specialist_evidence)
+    (approval_case_has_specialist_evidence ?approval_case - approval_case ?specialist_evidence - specialist_evidence)
+    (validation_signature_available ?validation_signature - validation_signature)
+    (approval_case_has_validation_signature ?approval_case - approval_case ?validation_signature - validation_signature)
+    (decision_artifact_available ?decision_artifact - decision_artifact)
+    (decision_artifact_association ?controlled_document - controlled_document ?decision_artifact - decision_artifact)
+    (originating_document_validation_marked ?originating_document_subclass - originating_document_subclass)
+    (collaborating_document_validation_marked ?collaborating_document_subclass - collaborating_document_subclass)
+    (approval_case_closeout_recorded ?approval_case - approval_case)
+  )
+  (:action register_controlled_document_draft
+    :parameters (?controlled_document - controlled_document)
+    :precondition
+      (and
+        (not
+          (document_draft_registered ?controlled_document)
+        )
+        (not
+          (entity_final_approval_recorded ?controlled_document)
+        )
+      )
+    :effect (document_draft_registered ?controlled_document)
+  )
+  (:action assign_approver_slot_to_document
+    :parameters (?controlled_document - controlled_document ?approver_slot - approver_slot)
+    :precondition
+      (and
+        (document_draft_registered ?controlled_document)
+        (not
+          (approver_slot_reserved ?controlled_document)
+        )
+        (approver_slot_available ?approver_slot)
+      )
+    :effect
+      (and
+        (approver_slot_reserved ?controlled_document)
+        (has_assigned_approver_slot ?controlled_document ?approver_slot)
+        (not
+          (approver_slot_available ?approver_slot)
+        )
+      )
+  )
+  (:action assign_reviewer_to_document
+    :parameters (?controlled_document - controlled_document ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (document_draft_registered ?controlled_document)
+        (approver_slot_reserved ?controlled_document)
+        (reviewer_available ?reviewer_identity)
+      )
+    :effect
+      (and
+        (entity_has_assigned_reviewer ?controlled_document ?reviewer_identity)
+        (not
+          (reviewer_available ?reviewer_identity)
+        )
+      )
+  )
+  (:action record_reviewer_endorsement
+    :parameters (?controlled_document - controlled_document ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (document_draft_registered ?controlled_document)
+        (approver_slot_reserved ?controlled_document)
+        (entity_has_assigned_reviewer ?controlled_document ?reviewer_identity)
+        (not
+          (entity_review_endorsed ?controlled_document)
+        )
+      )
+    :effect (entity_review_endorsed ?controlled_document)
+  )
+  (:action release_reviewer_assignment
+    :parameters (?controlled_document - controlled_document ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_has_assigned_reviewer ?controlled_document ?reviewer_identity)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer_identity)
+        (not
+          (entity_has_assigned_reviewer ?controlled_document ?reviewer_identity)
+        )
+      )
+  )
+  (:action assign_approver_to_document
+    :parameters (?controlled_document - controlled_document ?approver_identity - approver_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?controlled_document)
+        (approver_available ?approver_identity)
+      )
+    :effect
+      (and
+        (entity_has_assigned_approver ?controlled_document ?approver_identity)
+        (not
+          (approver_available ?approver_identity)
+        )
+      )
+  )
+  (:action release_approver_assignment
+    :parameters (?controlled_document - controlled_document ?approver_identity - approver_identity)
+    :precondition
+      (and
+        (entity_has_assigned_approver ?controlled_document ?approver_identity)
+      )
+    :effect
+      (and
+        (approver_available ?approver_identity)
+        (not
+          (entity_has_assigned_approver ?controlled_document ?approver_identity)
+        )
+      )
+  )
+  (:action reserve_specialist_evidence_for_case
+    :parameters (?approval_case - approval_case ?specialist_evidence - specialist_evidence)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (specialist_evidence_available ?specialist_evidence)
+      )
+    :effect
+      (and
+        (approval_case_has_specialist_evidence ?approval_case ?specialist_evidence)
+        (not
+          (specialist_evidence_available ?specialist_evidence)
+        )
+      )
+  )
+  (:action release_specialist_evidence_from_case
+    :parameters (?approval_case - approval_case ?specialist_evidence - specialist_evidence)
+    :precondition
+      (and
+        (approval_case_has_specialist_evidence ?approval_case ?specialist_evidence)
+      )
+    :effect
+      (and
+        (specialist_evidence_available ?specialist_evidence)
+        (not
+          (approval_case_has_specialist_evidence ?approval_case ?specialist_evidence)
+        )
+      )
+  )
+  (:action reserve_validation_signature_for_case
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (validation_signature_available ?validation_signature)
+      )
+    :effect
+      (and
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (not
+          (validation_signature_available ?validation_signature)
+        )
+      )
+  )
+  (:action release_validation_signature_from_case
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature)
+    :precondition
+      (and
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+      )
+    :effect
+      (and
+        (validation_signature_available ?validation_signature)
+        (not
+          (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        )
+      )
+  )
+  (:action start_validation_requirement_for_originating_document
+    :parameters (?originating_document_subclass - originating_document_subclass ?validation_requirement - validation_requirement ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?originating_document_subclass)
+        (entity_has_assigned_reviewer ?originating_document_subclass ?reviewer_identity)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (not
+          (validation_requirement_in_progress ?validation_requirement)
+        )
+        (not
+          (validation_requirement_linked_to_evidence ?validation_requirement)
+        )
+      )
+    :effect (validation_requirement_in_progress ?validation_requirement)
+  )
+  (:action complete_validation_for_originating_document
+    :parameters (?originating_document_subclass - originating_document_subclass ?validation_requirement - validation_requirement ?approver_identity - approver_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?originating_document_subclass)
+        (entity_has_assigned_approver ?originating_document_subclass ?approver_identity)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (validation_requirement_in_progress ?validation_requirement)
+        (not
+          (originating_document_validation_marked ?originating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+      )
+  )
+  (:action attach_evidence_to_originating_validation_requirement
+    :parameters (?originating_document_subclass - originating_document_subclass ?validation_requirement - validation_requirement ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_review_endorsed ?originating_document_subclass)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (originating_document_validation_marked ?originating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (validation_requirement_linked_to_evidence ?validation_requirement)
+        (originating_document_validation_marked ?originating_document_subclass)
+        (originating_document_has_evidence ?originating_document_subclass ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action apply_validation_evidence_and_mark_originating_document
+    :parameters (?originating_document_subclass - originating_document_subclass ?validation_requirement - validation_requirement ?reviewer_identity - reviewer_identity ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_review_endorsed ?originating_document_subclass)
+        (entity_has_assigned_reviewer ?originating_document_subclass ?reviewer_identity)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (validation_requirement_linked_to_evidence ?validation_requirement)
+        (originating_document_has_evidence ?originating_document_subclass ?evidence_artifact)
+        (not
+          (originating_document_ready_for_packaging ?originating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (validation_requirement_in_progress ?validation_requirement)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (originating_document_has_evidence ?originating_document_subclass ?evidence_artifact)
+        )
+      )
+  )
+  (:action start_regulatory_requirement_for_collaborating_document
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?regulatory_requirement - regulatory_requirement ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?collaborating_document_subclass)
+        (entity_has_assigned_reviewer ?collaborating_document_subclass ?reviewer_identity)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (not
+          (regulatory_requirement_in_progress ?regulatory_requirement)
+        )
+        (not
+          (regulatory_requirement_linked_to_evidence ?regulatory_requirement)
+        )
+      )
+    :effect (regulatory_requirement_in_progress ?regulatory_requirement)
+  )
+  (:action complete_regulatory_for_collaborating_document
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?regulatory_requirement - regulatory_requirement ?approver_identity - approver_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?collaborating_document_subclass)
+        (entity_has_assigned_approver ?collaborating_document_subclass ?approver_identity)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (regulatory_requirement_in_progress ?regulatory_requirement)
+        (not
+          (collaborating_document_validation_marked ?collaborating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+      )
+  )
+  (:action attach_evidence_to_collaborating_regulatory_requirement
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?regulatory_requirement - regulatory_requirement ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_review_endorsed ?collaborating_document_subclass)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (collaborating_document_validation_marked ?collaborating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (regulatory_requirement_linked_to_evidence ?regulatory_requirement)
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (collaborating_document_has_evidence ?collaborating_document_subclass ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action apply_regulatory_evidence_and_mark_collaborating_document
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?regulatory_requirement - regulatory_requirement ?reviewer_identity - reviewer_identity ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_review_endorsed ?collaborating_document_subclass)
+        (entity_has_assigned_reviewer ?collaborating_document_subclass ?reviewer_identity)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (regulatory_requirement_linked_to_evidence ?regulatory_requirement)
+        (collaborating_document_has_evidence ?collaborating_document_subclass ?evidence_artifact)
+        (not
+          (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (regulatory_requirement_in_progress ?regulatory_requirement)
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (collaborating_document_has_evidence ?collaborating_document_subclass ?evidence_artifact)
+        )
+      )
+  )
+  (:action compile_approval_package
+    :parameters (?originating_document_subclass - originating_document_subclass ?collaborating_document_subclass - collaborating_document_subclass ?validation_requirement - validation_requirement ?regulatory_requirement - regulatory_requirement ?approval_package - approval_package)
+    :precondition
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (validation_requirement_in_progress ?validation_requirement)
+        (regulatory_requirement_in_progress ?regulatory_requirement)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        (approval_package_available ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_compiled ?approval_package)
+        (approval_package_has_validation_requirement ?approval_package ?validation_requirement)
+        (approval_package_has_regulatory_requirement ?approval_package ?regulatory_requirement)
+        (not
+          (approval_package_available ?approval_package)
+        )
+      )
+  )
+  (:action compile_approval_package_mark_originating_missing
+    :parameters (?originating_document_subclass - originating_document_subclass ?collaborating_document_subclass - collaborating_document_subclass ?validation_requirement - validation_requirement ?regulatory_requirement - regulatory_requirement ?approval_package - approval_package)
+    :precondition
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (validation_requirement_linked_to_evidence ?validation_requirement)
+        (regulatory_requirement_in_progress ?regulatory_requirement)
+        (not
+          (originating_document_ready_for_packaging ?originating_document_subclass)
+        )
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        (approval_package_available ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_compiled ?approval_package)
+        (approval_package_has_validation_requirement ?approval_package ?validation_requirement)
+        (approval_package_has_regulatory_requirement ?approval_package ?regulatory_requirement)
+        (approval_package_originating_evidence_missing ?approval_package)
+        (not
+          (approval_package_available ?approval_package)
+        )
+      )
+  )
+  (:action compile_approval_package_mark_collaborating_missing
+    :parameters (?originating_document_subclass - originating_document_subclass ?collaborating_document_subclass - collaborating_document_subclass ?validation_requirement - validation_requirement ?regulatory_requirement - regulatory_requirement ?approval_package - approval_package)
+    :precondition
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (validation_requirement_in_progress ?validation_requirement)
+        (regulatory_requirement_linked_to_evidence ?regulatory_requirement)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+        (not
+          (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        )
+        (approval_package_available ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_compiled ?approval_package)
+        (approval_package_has_validation_requirement ?approval_package ?validation_requirement)
+        (approval_package_has_regulatory_requirement ?approval_package ?regulatory_requirement)
+        (approval_package_collaborating_evidence_missing ?approval_package)
+        (not
+          (approval_package_available ?approval_package)
+        )
+      )
+  )
+  (:action compile_approval_package_mark_both_missing
+    :parameters (?originating_document_subclass - originating_document_subclass ?collaborating_document_subclass - collaborating_document_subclass ?validation_requirement - validation_requirement ?regulatory_requirement - regulatory_requirement ?approval_package - approval_package)
+    :precondition
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (originating_document_has_validation_requirement ?originating_document_subclass ?validation_requirement)
+        (collaborating_document_has_regulatory_requirement ?collaborating_document_subclass ?regulatory_requirement)
+        (validation_requirement_linked_to_evidence ?validation_requirement)
+        (regulatory_requirement_linked_to_evidence ?regulatory_requirement)
+        (not
+          (originating_document_ready_for_packaging ?originating_document_subclass)
+        )
+        (not
+          (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        )
+        (approval_package_available ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_compiled ?approval_package)
+        (approval_package_has_validation_requirement ?approval_package ?validation_requirement)
+        (approval_package_has_regulatory_requirement ?approval_package ?regulatory_requirement)
+        (approval_package_originating_evidence_missing ?approval_package)
+        (approval_package_collaborating_evidence_missing ?approval_package)
+        (not
+          (approval_package_available ?approval_package)
+        )
+      )
+  )
+  (:action finalize_approval_package
+    :parameters (?approval_package - approval_package ?originating_document_subclass - originating_document_subclass ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (approval_package_compiled ?approval_package)
+        (originating_document_validation_marked ?originating_document_subclass)
+        (entity_has_assigned_reviewer ?originating_document_subclass ?reviewer_identity)
+        (not
+          (approval_package_finalized ?approval_package)
+        )
+      )
+    :effect (approval_package_finalized ?approval_package)
+  )
+  (:action integrate_evidence_bundle_into_case
+    :parameters (?approval_case - approval_case ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (approval_case_includes_approval_package ?approval_case ?approval_package)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_available ?evidence_bundle)
+        (approval_package_compiled ?approval_package)
+        (approval_package_finalized ?approval_package)
+        (not
+          (evidence_bundle_consumed ?evidence_bundle)
+        )
+      )
+    :effect
+      (and
+        (evidence_bundle_consumed ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (not
+          (evidence_bundle_available ?evidence_bundle)
+        )
+      )
+  )
+  (:action start_case_quality_review
+    :parameters (?approval_case - approval_case ?evidence_bundle - evidence_bundle ?approval_package - approval_package ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_consumed ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (entity_has_assigned_reviewer ?approval_case ?reviewer_identity)
+        (not
+          (approval_package_originating_evidence_missing ?approval_package)
+        )
+        (not
+          (attachment_and_evidence_validated ?approval_case)
+        )
+      )
+    :effect (attachment_and_evidence_validated ?approval_case)
+  )
+  (:action attach_regulatory_attachment_to_case
+    :parameters (?approval_case - approval_case ?regulatory_attachment - regulatory_attachment)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (regulatory_attachment_available ?regulatory_attachment)
+        (not
+          (regulatory_attachment_attached ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (regulatory_attachment_attached ?approval_case)
+        (approval_case_has_regulatory_attachment ?approval_case ?regulatory_attachment)
+        (not
+          (regulatory_attachment_available ?regulatory_attachment)
+        )
+      )
+  )
+  (:action process_attachment_and_prepare_case
+    :parameters (?approval_case - approval_case ?evidence_bundle - evidence_bundle ?approval_package - approval_package ?reviewer_identity - reviewer_identity ?regulatory_attachment - regulatory_attachment)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_consumed ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (entity_has_assigned_reviewer ?approval_case ?reviewer_identity)
+        (approval_package_originating_evidence_missing ?approval_package)
+        (regulatory_attachment_attached ?approval_case)
+        (approval_case_has_regulatory_attachment ?approval_case ?regulatory_attachment)
+        (not
+          (attachment_and_evidence_validated ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (attachment_and_evidence_validated ?approval_case)
+        (regulatory_attachment_verified ?approval_case)
+      )
+  )
+  (:action reserve_specialist_evidence_and_mark_case
+    :parameters (?approval_case - approval_case ?specialist_evidence - specialist_evidence ?approver_identity - approver_identity ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (attachment_and_evidence_validated ?approval_case)
+        (approval_case_has_specialist_evidence ?approval_case ?specialist_evidence)
+        (entity_has_assigned_approver ?approval_case ?approver_identity)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (not
+          (approval_package_collaborating_evidence_missing ?approval_package)
+        )
+        (not
+          (specialist_evidence_reserved ?approval_case)
+        )
+      )
+    :effect (specialist_evidence_reserved ?approval_case)
+  )
+  (:action reserve_specialist_evidence_and_mark_case_with_package_flag
+    :parameters (?approval_case - approval_case ?specialist_evidence - specialist_evidence ?approver_identity - approver_identity ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (attachment_and_evidence_validated ?approval_case)
+        (approval_case_has_specialist_evidence ?approval_case ?specialist_evidence)
+        (entity_has_assigned_approver ?approval_case ?approver_identity)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (approval_package_collaborating_evidence_missing ?approval_package)
+        (not
+          (specialist_evidence_reserved ?approval_case)
+        )
+      )
+    :effect (specialist_evidence_reserved ?approval_case)
+  )
+  (:action reserve_validation_signature_and_prepare_case
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (specialist_evidence_reserved ?approval_case)
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (not
+          (approval_package_originating_evidence_missing ?approval_package)
+        )
+        (not
+          (approval_package_collaborating_evidence_missing ?approval_package)
+        )
+        (not
+          (signature_checks_completed ?approval_case)
+        )
+      )
+    :effect (signature_checks_completed ?approval_case)
+  )
+  (:action apply_validation_signature_and_set_case_flags
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (specialist_evidence_reserved ?approval_case)
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (approval_package_originating_evidence_missing ?approval_package)
+        (not
+          (approval_package_collaborating_evidence_missing ?approval_package)
+        )
+        (not
+          (signature_checks_completed ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (signature_checks_completed ?approval_case)
+        (evidence_associated_for_signoff ?approval_case)
+      )
+  )
+  (:action apply_validation_signature_and_set_case_flags_alt
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (specialist_evidence_reserved ?approval_case)
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (not
+          (approval_package_originating_evidence_missing ?approval_package)
+        )
+        (approval_package_collaborating_evidence_missing ?approval_package)
+        (not
+          (signature_checks_completed ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (signature_checks_completed ?approval_case)
+        (evidence_associated_for_signoff ?approval_case)
+      )
+  )
+  (:action apply_validation_signature_and_set_case_flags_combined
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature ?evidence_bundle - evidence_bundle ?approval_package - approval_package)
+    :precondition
+      (and
+        (specialist_evidence_reserved ?approval_case)
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (approval_case_has_evidence_bundle ?approval_case ?evidence_bundle)
+        (evidence_bundle_linked_to_package ?evidence_bundle ?approval_package)
+        (approval_package_originating_evidence_missing ?approval_package)
+        (approval_package_collaborating_evidence_missing ?approval_package)
+        (not
+          (signature_checks_completed ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (signature_checks_completed ?approval_case)
+        (evidence_associated_for_signoff ?approval_case)
+      )
+  )
+  (:action execute_case_closeout
+    :parameters (?approval_case - approval_case)
+    :precondition
+      (and
+        (signature_checks_completed ?approval_case)
+        (not
+          (evidence_associated_for_signoff ?approval_case)
+        )
+        (not
+          (approval_case_closeout_recorded ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (approval_case_closeout_recorded ?approval_case)
+        (entity_final_release_recorded ?approval_case)
+      )
+  )
+  (:action attach_release_certificate_to_case
+    :parameters (?approval_case - approval_case ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (signature_checks_completed ?approval_case)
+        (evidence_associated_for_signoff ?approval_case)
+        (release_certificate_available ?release_certificate)
+      )
+    :effect
+      (and
+        (approval_case_has_release_certificate ?approval_case ?release_certificate)
+        (not
+          (release_certificate_available ?release_certificate)
+        )
+      )
+  )
+  (:action execute_final_quality_release
+    :parameters (?approval_case - approval_case ?originating_document_subclass - originating_document_subclass ?collaborating_document_subclass - collaborating_document_subclass ?reviewer_identity - reviewer_identity ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (signature_checks_completed ?approval_case)
+        (evidence_associated_for_signoff ?approval_case)
+        (approval_case_has_release_certificate ?approval_case ?release_certificate)
+        (approval_case_includes_originating_document ?approval_case ?originating_document_subclass)
+        (approval_case_includes_collaborating_document ?approval_case ?collaborating_document_subclass)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        (entity_has_assigned_reviewer ?approval_case ?reviewer_identity)
+        (not
+          (final_quality_checks_complete ?approval_case)
+        )
+      )
+    :effect (final_quality_checks_complete ?approval_case)
+  )
+  (:action closeout_approval_case
+    :parameters (?approval_case - approval_case)
+    :precondition
+      (and
+        (signature_checks_completed ?approval_case)
+        (final_quality_checks_complete ?approval_case)
+        (not
+          (approval_case_closeout_recorded ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (approval_case_closeout_recorded ?approval_case)
+        (entity_final_release_recorded ?approval_case)
+      )
+  )
+  (:action apply_regulatory_input_to_case
+    :parameters (?approval_case - approval_case ?regulatory_input - regulatory_input ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_review_endorsed ?approval_case)
+        (entity_has_assigned_reviewer ?approval_case ?reviewer_identity)
+        (regulatory_input_available ?regulatory_input)
+        (approval_case_has_regulatory_input ?approval_case ?regulatory_input)
+        (not
+          (regulatory_input_applied ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (regulatory_input_applied ?approval_case)
+        (not
+          (regulatory_input_available ?regulatory_input)
+        )
+      )
+  )
+  (:action approve_regulatory_input
+    :parameters (?approval_case - approval_case ?approver_identity - approver_identity)
+    :precondition
+      (and
+        (regulatory_input_applied ?approval_case)
+        (entity_has_assigned_approver ?approval_case ?approver_identity)
+        (not
+          (regulatory_input_approved_by_approver ?approval_case)
+        )
+      )
+    :effect (regulatory_input_approved_by_approver ?approval_case)
+  )
+  (:action apply_validation_signature_to_regulatory_input
+    :parameters (?approval_case - approval_case ?validation_signature - validation_signature)
+    :precondition
+      (and
+        (regulatory_input_approved_by_approver ?approval_case)
+        (approval_case_has_validation_signature ?approval_case ?validation_signature)
+        (not
+          (regulatory_input_authorized ?approval_case)
+        )
+      )
+    :effect (regulatory_input_authorized ?approval_case)
+  )
+  (:action closeout_case_after_regulatory_input
+    :parameters (?approval_case - approval_case)
+    :precondition
+      (and
+        (regulatory_input_authorized ?approval_case)
+        (not
+          (approval_case_closeout_recorded ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (approval_case_closeout_recorded ?approval_case)
+        (entity_final_release_recorded ?approval_case)
+      )
+  )
+  (:action record_release_on_originating_document
+    :parameters (?originating_document_subclass - originating_document_subclass ?approval_package - approval_package)
+    :precondition
+      (and
+        (originating_document_validation_marked ?originating_document_subclass)
+        (originating_document_ready_for_packaging ?originating_document_subclass)
+        (approval_package_compiled ?approval_package)
+        (approval_package_finalized ?approval_package)
+        (not
+          (entity_final_release_recorded ?originating_document_subclass)
+        )
+      )
+    :effect (entity_final_release_recorded ?originating_document_subclass)
+  )
+  (:action record_release_on_collaborating_document
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?approval_package - approval_package)
+    :precondition
+      (and
+        (collaborating_document_validation_marked ?collaborating_document_subclass)
+        (collaborating_document_ready_for_packaging ?collaborating_document_subclass)
+        (approval_package_compiled ?approval_package)
+        (approval_package_finalized ?approval_package)
+        (not
+          (entity_final_release_recorded ?collaborating_document_subclass)
+        )
+      )
+    :effect (entity_final_release_recorded ?collaborating_document_subclass)
+  )
+  (:action register_decision_artifact_for_controlled_document
+    :parameters (?controlled_document - controlled_document ?decision_artifact - decision_artifact ?reviewer_identity - reviewer_identity)
+    :precondition
+      (and
+        (entity_final_release_recorded ?controlled_document)
+        (entity_has_assigned_reviewer ?controlled_document ?reviewer_identity)
+        (decision_artifact_available ?decision_artifact)
+        (not
+          (decision_registered ?controlled_document)
+        )
+      )
+    :effect
+      (and
+        (decision_registered ?controlled_document)
+        (decision_artifact_association ?controlled_document ?decision_artifact)
+        (not
+          (decision_artifact_available ?decision_artifact)
+        )
+      )
+  )
+  (:action apply_decision_artifact_to_originating_document
+    :parameters (?originating_document_subclass - originating_document_subclass ?approver_slot - approver_slot ?decision_artifact - decision_artifact)
+    :precondition
+      (and
+        (decision_registered ?originating_document_subclass)
+        (has_assigned_approver_slot ?originating_document_subclass ?approver_slot)
+        (decision_artifact_association ?originating_document_subclass ?decision_artifact)
+        (not
+          (entity_final_approval_recorded ?originating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (entity_final_approval_recorded ?originating_document_subclass)
+        (approver_slot_available ?approver_slot)
+        (decision_artifact_available ?decision_artifact)
+      )
+  )
+  (:action apply_decision_artifact_to_collaborating_document
+    :parameters (?collaborating_document_subclass - collaborating_document_subclass ?approver_slot - approver_slot ?decision_artifact - decision_artifact)
+    :precondition
+      (and
+        (decision_registered ?collaborating_document_subclass)
+        (has_assigned_approver_slot ?collaborating_document_subclass ?approver_slot)
+        (decision_artifact_association ?collaborating_document_subclass ?decision_artifact)
+        (not
+          (entity_final_approval_recorded ?collaborating_document_subclass)
+        )
+      )
+    :effect
+      (and
+        (entity_final_approval_recorded ?collaborating_document_subclass)
+        (approver_slot_available ?approver_slot)
+        (decision_artifact_available ?decision_artifact)
+      )
+  )
+  (:action apply_decision_artifact_to_approval_case
+    :parameters (?approval_case - approval_case ?approver_slot - approver_slot ?decision_artifact - decision_artifact)
+    :precondition
+      (and
+        (decision_registered ?approval_case)
+        (has_assigned_approver_slot ?approval_case ?approver_slot)
+        (decision_artifact_association ?approval_case ?decision_artifact)
+        (not
+          (entity_final_approval_recorded ?approval_case)
+        )
+      )
+    :effect
+      (and
+        (entity_final_approval_recorded ?approval_case)
+        (approver_slot_available ?approver_slot)
+        (decision_artifact_available ?decision_artifact)
+      )
+  )
+)

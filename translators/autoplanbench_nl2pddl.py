@@ -12,6 +12,9 @@
 - В sample.json задать domain_nl_path (путь к domain_description_seedN.json). Файл получают
   запуском run_domain_setup.py (шаг PDDL->NL по домену).
 - Опционально: AUTOPLANBENCH_PROMPT_FILE, AUTOPLANBENCH_EXAMPLES_FILE, OPENROUTER_API_KEY.
+- Базовые значения модели/токенов/parallel/timeout: translator_config.yaml (см. translator_settings.py);
+  переменные окружения переопределяют YAML.
+- Логи APB в консоль: SEMBENCH_DEBUG=1 или run_benchmark --debug (stdout/stderr субпроцесса не перехватываются).
 """
 import os
 import json
@@ -22,8 +25,27 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from autoplanbench_utils import apb_debug_inherit_stdio, apb_subprocess_stdio_kwargs
+from translator_settings import (
+  DEFAULT_NL2PDDL_MAX_TOKENS,
+  DEFAULT_NL2PDDL_MODEL,
+  DEFAULT_NL2PDDL_TIMEOUT_S,
+  effective_nl2pddl_parallel,
+  get_nl2pddl_examples_file_override,
+  get_nl2pddl_max_tokens,
+  get_nl2pddl_model_path,
+  get_nl2pddl_openrouter_parallel_timeout_seconds,
+  get_nl2pddl_prompt_file_override,
+  get_nl2pddl_timeout_seconds,
+)
+
 # Emitted by autoplanbench utils/run_translate_nl2pddl.py as a single stdout line.
 _NL2PDDL_USAGE_PREFIX = "AUTOPLANBENCH_NL2PDDL_USAGE:"
+
+# Обратная совместимость импортов из этого модуля
+_DEFAULT_NL2PDDL_MODEL = DEFAULT_NL2PDDL_MODEL
+_DEFAULT_NL2PDDL_MAX_TOKENS = DEFAULT_NL2PDDL_MAX_TOKENS
+_DEFAULT_NL2PDDL_TIMEOUT_S = DEFAULT_NL2PDDL_TIMEOUT_S
 
 
 def _parse_nl2pddl_usage_from_stdout(stdout: str) -> Optional[Dict[str, Any]]:
@@ -35,7 +57,7 @@ def _parse_nl2pddl_usage_from_stdout(stdout: str) -> Optional[Dict[str, Any]]:
       try:
         return json.loads(line[len(_NL2PDDL_USAGE_PREFIX) :])
       except json.JSONDecodeError:
-        return None
+        continue
   return None
 
 
@@ -68,15 +90,14 @@ def nl_to_pddl(
 
   root_path = Path(root)
   default_prompt = root_path / "llm_planning" / "prompt_templates" / "translation_template.txt"
-  prompt_file_env = os.environ.get("AUTOPLANBENCH_PROMPT_FILE")
-  prompt_file_path = prompt_file_env if prompt_file_env else str(default_prompt)
+  prompt_override = get_nl2pddl_prompt_file_override()
+  prompt_file_path = prompt_override if prompt_override else str(default_prompt)
   if not Path(prompt_file_path).exists():
     raise FileNotFoundError(f"Шаблон перевода не найден: {prompt_file_path}")
-  model_path = os.environ.get("AUTOPLANBENCH_NL2PDDL_MODEL", "minimax/minimax-m2.5")
-  # Таймаут для utils/run_translate_nl2pddl.py (секунды). У некоторых доменов/планов перевод может быть долгим.
-  timeout_s = int(os.environ.get("AUTOPLANBENCH_NL2PDDL_TIMEOUT", "600"))
-  # Параллелизм внутри AutoPlanBench (по строкам плана). 1 = последовательно.
-  parallel_n = int(os.environ.get("AUTOPLANBENCH_NL2PDDL_PARALLEL", "1"))
+  model_path = get_nl2pddl_model_path()
+  max_tokens = get_nl2pddl_max_tokens()
+  timeout_s = get_nl2pddl_timeout_seconds()
+  parallel_n = effective_nl2pddl_parallel()
 
   with tempfile.NamedTemporaryFile(
     mode="w", suffix=".txt", delete=False, encoding="utf-8"
@@ -98,28 +119,48 @@ def nl_to_pddl(
         "--plan-file", plan_file,
         "--out", out_file,
         "--model-path", model_path,
+        "--max-tokens", str(max_tokens),
         "--prompt-file", str(prompt_file_path),
+        "--parallel",
+        str(parallel_n),
       ]
-      if parallel_n and parallel_n > 1:
-        cmd.extend(["--parallel", str(parallel_n)])
-      examples_file = os.environ.get("AUTOPLANBENCH_EXAMPLES_FILE")
+      examples_file = get_nl2pddl_examples_file_override()
       if examples_file:
         cmd.extend(["--examples-file", examples_file])
+      if apb_debug_inherit_stdio() or os.environ.get("SEMBENCH_LOG_NL2PDDL_CMD", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+      ):
+        print(
+          f"[sembenchrunning] NL2PDDL subprocess parallel={parallel_n} (APB parallel HTTP if parallel>1): "
+          f"{' '.join(cmd[2:])}",
+          flush=True,
+        )
       started = time.time()
       result = None
       err: Optional[BaseException] = None
       try:
+        stdio_kw = apb_subprocess_stdio_kwargs()
+        sub_env = os.environ.copy()
+        sub_env["OPENROUTER_PARALLEL_HTTP_TIMEOUT_S"] = str(
+          get_nl2pddl_openrouter_parallel_timeout_seconds()
+        )
         result = subprocess.run(
           cmd,
           cwd=root,
-          capture_output=True,
-          text=True,
           timeout=timeout_s,
-          encoding="utf-8",
+          env=sub_env,
+          **stdio_kw,
         )
         if result.returncode != 0:
+          tail = (
+            "(вывод AutoPlanBench в консоли; SEMBENCH_DEBUG)"
+            if apb_debug_inherit_stdio()
+            else (result.stderr or result.stdout or "")
+          )
           raise RuntimeError(
-            f"run_translate_nl2pddl.py завершился с кодом {result.returncode}: {result.stderr or result.stdout}"
+            f"run_translate_nl2pddl.py завершился с кодом {result.returncode}: {tail}"
           )
         out_text = Path(out_file).read_text(encoding="utf-8").strip()
         return out_text
@@ -129,8 +170,11 @@ def nl_to_pddl(
       finally:
         if debug_path:
           try:
-            out_stdout = getattr(result, "stdout", "") or ""
+            raw_out = getattr(result, "stdout", None)
+            out_stdout = (raw_out or "") if raw_out is not None else ""
             usage_parsed = _parse_nl2pddl_usage_from_stdout(out_stdout)
+            raw_err = getattr(result, "stderr", None)
+            err_tail = (raw_err or "") if raw_err is not None else ""
             payload = {
               "tool": "autoplanbench_nl2pddl",
               "cwd": str(root),
@@ -139,11 +183,13 @@ def nl_to_pddl(
               "elapsed_s": round(time.time() - started, 3),
               "cmd": cmd,
               "model_path": model_path,
+              "max_tokens": max_tokens,
               "prompt_file": str(prompt_file_path),
               "examples_file": examples_file,
               "returncode": getattr(result, "returncode", None),
+              "stdio_inherited": bool(apb_debug_inherit_stdio()),
               "stdout": out_stdout[:20000],
-              "stderr": (getattr(result, "stderr", "") or "")[:20000],
+              "stderr": err_tail[:20000],
               "openrouter_usage": usage_parsed,
               "exception": None if err is None else {
                 "type": type(err).__name__,

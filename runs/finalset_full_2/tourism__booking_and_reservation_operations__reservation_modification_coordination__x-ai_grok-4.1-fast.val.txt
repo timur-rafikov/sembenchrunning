@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain reservation_modification_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types booking_auxiliary - object itinerary_artifact - object provider_artifact - object booking_root - object booking - booking_root offer - booking_auxiliary payment_method - booking_auxiliary supplier_slot - booking_auxiliary optional_addon - booking_auxiliary fulfillment_profile - booking_auxiliary modification_token - booking_auxiliary payment_provider - booking_auxiliary billing_document - booking_auxiliary amendment_payload - itinerary_artifact fulfillment_token - itinerary_artifact loyalty_credential - itinerary_artifact provider_resource_primary - provider_artifact provider_resource_secondary - provider_artifact booking_document - provider_artifact booking_component - booking itinerary_component - booking service_instance_primary - booking_component service_instance_secondary - booking_component master_itinerary - itinerary_component)
+  (:predicates
+    (entity_open ?reservation - booking)
+    (entity_confirmed ?reservation - booking)
+    (entity_offer_selected ?reservation - booking)
+    (entity_committed ?reservation - booking)
+    (entity_finalized ?reservation - booking)
+    (entity_modification_registered ?reservation - booking)
+    (offer_available ?offer - offer)
+    (entity_bound_offer ?reservation - booking ?offer - offer)
+    (payment_method_available ?payment_method - payment_method)
+    (entity_payment_attached ?reservation - booking ?payment_method - payment_method)
+    (supplier_slot_available ?supplier_slot - supplier_slot)
+    (entity_supplier_slot_reserved ?reservation - booking ?supplier_slot - supplier_slot)
+    (amendment_payload_available ?amendment_payload - amendment_payload)
+    (service_primary_amendment_applied ?service_instance_primary - service_instance_primary ?amendment_payload - amendment_payload)
+    (service_secondary_amendment_applied ?service_instance_secondary - service_instance_secondary ?amendment_payload - amendment_payload)
+    (service_primary_bound_provider_resource ?service_instance_primary - service_instance_primary ?provider_resource_primary - provider_resource_primary)
+    (provider_resource_primary_provisionally_allocated ?provider_resource_primary - provider_resource_primary)
+    (provider_resource_primary_pending ?provider_resource_primary - provider_resource_primary)
+    (service_instance_primary_confirmed ?service_instance_primary - service_instance_primary)
+    (service_secondary_bound_provider_resource ?service_instance_secondary - service_instance_secondary ?provider_resource_secondary - provider_resource_secondary)
+    (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary - provider_resource_secondary)
+    (provider_resource_secondary_pending ?provider_resource_secondary - provider_resource_secondary)
+    (service_instance_secondary_confirmed ?service_instance_secondary - service_instance_secondary)
+    (booking_document_draft ?booking_document - booking_document)
+    (booking_document_prepared ?booking_document - booking_document)
+    (booking_document_resource_primary_linked ?booking_document - booking_document ?provider_resource_primary - provider_resource_primary)
+    (booking_document_resource_secondary_linked ?booking_document - booking_document ?provider_resource_secondary - provider_resource_secondary)
+    (booking_document_resource_primary_provisional ?booking_document - booking_document)
+    (booking_document_resource_secondary_provisional ?booking_document - booking_document)
+    (booking_document_issued ?booking_document - booking_document)
+    (itinerary_includes_service_primary ?master_itinerary - master_itinerary ?service_instance_primary - service_instance_primary)
+    (itinerary_includes_service_secondary ?master_itinerary - master_itinerary ?service_instance_secondary - service_instance_secondary)
+    (itinerary_links_booking_document ?master_itinerary - master_itinerary ?booking_document - booking_document)
+    (fulfillment_token_available ?fulfillment_token - fulfillment_token)
+    (itinerary_has_fulfillment_token ?master_itinerary - master_itinerary ?fulfillment_token - fulfillment_token)
+    (fulfillment_token_allocated ?fulfillment_token - fulfillment_token)
+    (fulfillment_token_linked_booking_document ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    (itinerary_ready_for_supplier_checks ?master_itinerary - master_itinerary)
+    (itinerary_supplier_confirmation_started ?master_itinerary - master_itinerary)
+    (itinerary_supplier_checks_completed ?master_itinerary - master_itinerary)
+    (itinerary_addon_attached ?master_itinerary - master_itinerary)
+    (itinerary_addon_registered ?master_itinerary - master_itinerary)
+    (itinerary_requires_profile_assignment ?master_itinerary - master_itinerary)
+    (itinerary_profile_assigned ?master_itinerary - master_itinerary)
+    (loyalty_credential_available ?loyalty_credential - loyalty_credential)
+    (itinerary_loyalty_credential_linked ?master_itinerary - master_itinerary ?loyalty_credential - loyalty_credential)
+    (itinerary_loyalty_applied ?master_itinerary - master_itinerary)
+    (itinerary_loyalty_validated ?master_itinerary - master_itinerary)
+    (itinerary_loyalty_finalized ?master_itinerary - master_itinerary)
+    (optional_addon_available ?optional_addon - optional_addon)
+    (itinerary_addon_linked ?master_itinerary - master_itinerary ?optional_addon - optional_addon)
+    (fulfillment_profile_available ?fulfillment_profile - fulfillment_profile)
+    (itinerary_fulfillment_profile_assigned ?master_itinerary - master_itinerary ?fulfillment_profile - fulfillment_profile)
+    (payment_provider_available ?payment_provider - payment_provider)
+    (itinerary_payment_provider_attached ?master_itinerary - master_itinerary ?payment_provider - payment_provider)
+    (billing_document_available ?billing_document - billing_document)
+    (itinerary_billing_document_attached ?master_itinerary - master_itinerary ?billing_document - billing_document)
+    (modification_token_available ?modification_token - modification_token)
+    (entity_modification_token_linked ?reservation - booking ?modification_token - modification_token)
+    (service_instance_primary_ready ?service_instance_primary - service_instance_primary)
+    (service_instance_secondary_ready ?service_instance_secondary - service_instance_secondary)
+    (itinerary_finalized ?master_itinerary - master_itinerary)
+  )
+  (:action initiate_reservation
+    :parameters (?reservation - booking)
+    :precondition
+      (and
+        (not
+          (entity_open ?reservation)
+        )
+        (not
+          (entity_committed ?reservation)
+        )
+      )
+    :effect (entity_open ?reservation)
+  )
+  (:action select_and_bind_offer
+    :parameters (?reservation - booking ?offer - offer)
+    :precondition
+      (and
+        (entity_open ?reservation)
+        (not
+          (entity_offer_selected ?reservation)
+        )
+        (offer_available ?offer)
+      )
+    :effect
+      (and
+        (entity_offer_selected ?reservation)
+        (entity_bound_offer ?reservation ?offer)
+        (not
+          (offer_available ?offer)
+        )
+      )
+  )
+  (:action attach_payment_method_to_reservation
+    :parameters (?reservation - booking ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_open ?reservation)
+        (entity_offer_selected ?reservation)
+        (payment_method_available ?payment_method)
+      )
+    :effect
+      (and
+        (entity_payment_attached ?reservation ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action confirm_payment_for_reservation
+    :parameters (?reservation - booking ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_open ?reservation)
+        (entity_offer_selected ?reservation)
+        (entity_payment_attached ?reservation ?payment_method)
+        (not
+          (entity_confirmed ?reservation)
+        )
+      )
+    :effect (entity_confirmed ?reservation)
+  )
+  (:action release_payment_method_from_reservation
+    :parameters (?reservation - booking ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_payment_attached ?reservation ?payment_method)
+      )
+    :effect
+      (and
+        (payment_method_available ?payment_method)
+        (not
+          (entity_payment_attached ?reservation ?payment_method)
+        )
+      )
+  )
+  (:action reserve_supplier_slot_for_reservation
+    :parameters (?reservation - booking ?supplier_slot - supplier_slot)
+    :precondition
+      (and
+        (entity_confirmed ?reservation)
+        (supplier_slot_available ?supplier_slot)
+      )
+    :effect
+      (and
+        (entity_supplier_slot_reserved ?reservation ?supplier_slot)
+        (not
+          (supplier_slot_available ?supplier_slot)
+        )
+      )
+  )
+  (:action release_supplier_slot_from_reservation
+    :parameters (?reservation - booking ?supplier_slot - supplier_slot)
+    :precondition
+      (and
+        (entity_supplier_slot_reserved ?reservation ?supplier_slot)
+      )
+    :effect
+      (and
+        (supplier_slot_available ?supplier_slot)
+        (not
+          (entity_supplier_slot_reserved ?reservation ?supplier_slot)
+        )
+      )
+  )
+  (:action attach_payment_provider_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?payment_provider - payment_provider)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (payment_provider_available ?payment_provider)
+      )
+    :effect
+      (and
+        (itinerary_payment_provider_attached ?master_itinerary ?payment_provider)
+        (not
+          (payment_provider_available ?payment_provider)
+        )
+      )
+  )
+  (:action detach_payment_provider_from_itinerary
+    :parameters (?master_itinerary - master_itinerary ?payment_provider - payment_provider)
+    :precondition
+      (and
+        (itinerary_payment_provider_attached ?master_itinerary ?payment_provider)
+      )
+    :effect
+      (and
+        (payment_provider_available ?payment_provider)
+        (not
+          (itinerary_payment_provider_attached ?master_itinerary ?payment_provider)
+        )
+      )
+  )
+  (:action attach_billing_document_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (billing_document_available ?billing_document)
+      )
+    :effect
+      (and
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (not
+          (billing_document_available ?billing_document)
+        )
+      )
+  )
+  (:action detach_billing_document_from_itinerary
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document)
+    :precondition
+      (and
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+      )
+    :effect
+      (and
+        (billing_document_available ?billing_document)
+        (not
+          (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        )
+      )
+  )
+  (:action initiate_provider_resource_primary_hold
+    :parameters (?service_instance_primary - service_instance_primary ?provider_resource_primary - provider_resource_primary ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_primary)
+        (entity_payment_attached ?service_instance_primary ?payment_method)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (not
+          (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+        )
+        (not
+          (provider_resource_primary_pending ?provider_resource_primary)
+        )
+      )
+    :effect (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+  )
+  (:action confirm_supplier_slot_for_service_primary
+    :parameters (?service_instance_primary - service_instance_primary ?provider_resource_primary - provider_resource_primary ?supplier_slot - supplier_slot)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_primary)
+        (entity_supplier_slot_reserved ?service_instance_primary ?supplier_slot)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+        (not
+          (service_instance_primary_ready ?service_instance_primary)
+        )
+      )
+    :effect
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+      )
+  )
+  (:action apply_amendment_payload_to_service_primary
+    :parameters (?service_instance_primary - service_instance_primary ?provider_resource_primary - provider_resource_primary ?amendment_payload - amendment_payload)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_primary)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (amendment_payload_available ?amendment_payload)
+        (not
+          (service_instance_primary_ready ?service_instance_primary)
+        )
+      )
+    :effect
+      (and
+        (provider_resource_primary_pending ?provider_resource_primary)
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_primary_amendment_applied ?service_instance_primary ?amendment_payload)
+        (not
+          (amendment_payload_available ?amendment_payload)
+        )
+      )
+  )
+  (:action finalize_amendment_for_service_primary
+    :parameters (?service_instance_primary - service_instance_primary ?provider_resource_primary - provider_resource_primary ?payment_method - payment_method ?amendment_payload - amendment_payload)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_primary)
+        (entity_payment_attached ?service_instance_primary ?payment_method)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (provider_resource_primary_pending ?provider_resource_primary)
+        (service_primary_amendment_applied ?service_instance_primary ?amendment_payload)
+        (not
+          (service_instance_primary_confirmed ?service_instance_primary)
+        )
+      )
+    :effect
+      (and
+        (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+        (amendment_payload_available ?amendment_payload)
+        (not
+          (service_primary_amendment_applied ?service_instance_primary ?amendment_payload)
+        )
+      )
+  )
+  (:action initiate_provider_resource_secondary_hold
+    :parameters (?service_instance_secondary - service_instance_secondary ?provider_resource_secondary - provider_resource_secondary ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_secondary)
+        (entity_payment_attached ?service_instance_secondary ?payment_method)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (not
+          (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+        )
+        (not
+          (provider_resource_secondary_pending ?provider_resource_secondary)
+        )
+      )
+    :effect (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+  )
+  (:action confirm_supplier_slot_for_service_secondary
+    :parameters (?service_instance_secondary - service_instance_secondary ?provider_resource_secondary - provider_resource_secondary ?supplier_slot - supplier_slot)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_secondary)
+        (entity_supplier_slot_reserved ?service_instance_secondary ?supplier_slot)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+        (not
+          (service_instance_secondary_ready ?service_instance_secondary)
+        )
+      )
+    :effect
+      (and
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+      )
+  )
+  (:action apply_amendment_payload_to_service_secondary
+    :parameters (?service_instance_secondary - service_instance_secondary ?provider_resource_secondary - provider_resource_secondary ?amendment_payload - amendment_payload)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_secondary)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (amendment_payload_available ?amendment_payload)
+        (not
+          (service_instance_secondary_ready ?service_instance_secondary)
+        )
+      )
+    :effect
+      (and
+        (provider_resource_secondary_pending ?provider_resource_secondary)
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_secondary_amendment_applied ?service_instance_secondary ?amendment_payload)
+        (not
+          (amendment_payload_available ?amendment_payload)
+        )
+      )
+  )
+  (:action finalize_amendment_for_service_secondary
+    :parameters (?service_instance_secondary - service_instance_secondary ?provider_resource_secondary - provider_resource_secondary ?payment_method - payment_method ?amendment_payload - amendment_payload)
+    :precondition
+      (and
+        (entity_confirmed ?service_instance_secondary)
+        (entity_payment_attached ?service_instance_secondary ?payment_method)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_secondary_pending ?provider_resource_secondary)
+        (service_secondary_amendment_applied ?service_instance_secondary ?amendment_payload)
+        (not
+          (service_instance_secondary_confirmed ?service_instance_secondary)
+        )
+      )
+    :effect
+      (and
+        (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+        (amendment_payload_available ?amendment_payload)
+        (not
+          (service_secondary_amendment_applied ?service_instance_secondary ?amendment_payload)
+        )
+      )
+  )
+  (:action construct_booking_document_with_confirmed_resources
+    :parameters (?service_instance_primary - service_instance_primary ?service_instance_secondary - service_instance_secondary ?provider_resource_primary - provider_resource_primary ?provider_resource_secondary - provider_resource_secondary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+        (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+        (booking_document_draft ?booking_document)
+      )
+    :effect
+      (and
+        (booking_document_prepared ?booking_document)
+        (booking_document_resource_primary_linked ?booking_document ?provider_resource_primary)
+        (booking_document_resource_secondary_linked ?booking_document ?provider_resource_secondary)
+        (not
+          (booking_document_draft ?booking_document)
+        )
+      )
+  )
+  (:action construct_booking_document_with_provisional_resource_primary
+    :parameters (?service_instance_primary - service_instance_primary ?service_instance_secondary - service_instance_secondary ?provider_resource_primary - provider_resource_primary ?provider_resource_secondary - provider_resource_secondary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_primary_pending ?provider_resource_primary)
+        (provider_resource_secondary_provisionally_allocated ?provider_resource_secondary)
+        (not
+          (service_instance_primary_confirmed ?service_instance_primary)
+        )
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+        (booking_document_draft ?booking_document)
+      )
+    :effect
+      (and
+        (booking_document_prepared ?booking_document)
+        (booking_document_resource_primary_linked ?booking_document ?provider_resource_primary)
+        (booking_document_resource_secondary_linked ?booking_document ?provider_resource_secondary)
+        (booking_document_resource_primary_provisional ?booking_document)
+        (not
+          (booking_document_draft ?booking_document)
+        )
+      )
+  )
+  (:action construct_booking_document_with_provisional_resource_secondary
+    :parameters (?service_instance_primary - service_instance_primary ?service_instance_secondary - service_instance_secondary ?provider_resource_primary - provider_resource_primary ?provider_resource_secondary - provider_resource_secondary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_primary_provisionally_allocated ?provider_resource_primary)
+        (provider_resource_secondary_pending ?provider_resource_secondary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+        (not
+          (service_instance_secondary_confirmed ?service_instance_secondary)
+        )
+        (booking_document_draft ?booking_document)
+      )
+    :effect
+      (and
+        (booking_document_prepared ?booking_document)
+        (booking_document_resource_primary_linked ?booking_document ?provider_resource_primary)
+        (booking_document_resource_secondary_linked ?booking_document ?provider_resource_secondary)
+        (booking_document_resource_secondary_provisional ?booking_document)
+        (not
+          (booking_document_draft ?booking_document)
+        )
+      )
+  )
+  (:action construct_booking_document_with_provisional_resources
+    :parameters (?service_instance_primary - service_instance_primary ?service_instance_secondary - service_instance_secondary ?provider_resource_primary - provider_resource_primary ?provider_resource_secondary - provider_resource_secondary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_primary_bound_provider_resource ?service_instance_primary ?provider_resource_primary)
+        (service_secondary_bound_provider_resource ?service_instance_secondary ?provider_resource_secondary)
+        (provider_resource_primary_pending ?provider_resource_primary)
+        (provider_resource_secondary_pending ?provider_resource_secondary)
+        (not
+          (service_instance_primary_confirmed ?service_instance_primary)
+        )
+        (not
+          (service_instance_secondary_confirmed ?service_instance_secondary)
+        )
+        (booking_document_draft ?booking_document)
+      )
+    :effect
+      (and
+        (booking_document_prepared ?booking_document)
+        (booking_document_resource_primary_linked ?booking_document ?provider_resource_primary)
+        (booking_document_resource_secondary_linked ?booking_document ?provider_resource_secondary)
+        (booking_document_resource_primary_provisional ?booking_document)
+        (booking_document_resource_secondary_provisional ?booking_document)
+        (not
+          (booking_document_draft ?booking_document)
+        )
+      )
+  )
+  (:action issue_booking_document
+    :parameters (?booking_document - booking_document ?service_instance_primary - service_instance_primary ?payment_method - payment_method)
+    :precondition
+      (and
+        (booking_document_prepared ?booking_document)
+        (service_instance_primary_ready ?service_instance_primary)
+        (entity_payment_attached ?service_instance_primary ?payment_method)
+        (not
+          (booking_document_issued ?booking_document)
+        )
+      )
+    :effect (booking_document_issued ?booking_document)
+  )
+  (:action allocate_fulfillment_token_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (itinerary_links_booking_document ?master_itinerary ?booking_document)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_available ?fulfillment_token)
+        (booking_document_prepared ?booking_document)
+        (booking_document_issued ?booking_document)
+        (not
+          (fulfillment_token_allocated ?fulfillment_token)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_token_allocated ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (not
+          (fulfillment_token_available ?fulfillment_token)
+        )
+      )
+  )
+  (:action allocate_and_prepare_fulfillment_token
+    :parameters (?master_itinerary - master_itinerary ?fulfillment_token - fulfillment_token ?booking_document - booking_document ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_allocated ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (entity_payment_attached ?master_itinerary ?payment_method)
+        (not
+          (booking_document_resource_primary_provisional ?booking_document)
+        )
+        (not
+          (itinerary_ready_for_supplier_checks ?master_itinerary)
+        )
+      )
+    :effect (itinerary_ready_for_supplier_checks ?master_itinerary)
+  )
+  (:action attach_optional_addon_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?optional_addon - optional_addon)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (optional_addon_available ?optional_addon)
+        (not
+          (itinerary_addon_attached ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_addon_attached ?master_itinerary)
+        (itinerary_addon_linked ?master_itinerary ?optional_addon)
+        (not
+          (optional_addon_available ?optional_addon)
+        )
+      )
+  )
+  (:action register_optional_addon_on_itinerary
+    :parameters (?master_itinerary - master_itinerary ?fulfillment_token - fulfillment_token ?booking_document - booking_document ?payment_method - payment_method ?optional_addon - optional_addon)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_allocated ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (entity_payment_attached ?master_itinerary ?payment_method)
+        (booking_document_resource_primary_provisional ?booking_document)
+        (itinerary_addon_attached ?master_itinerary)
+        (itinerary_addon_linked ?master_itinerary ?optional_addon)
+        (not
+          (itinerary_ready_for_supplier_checks ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_ready_for_supplier_checks ?master_itinerary)
+        (itinerary_addon_registered ?master_itinerary)
+      )
+  )
+  (:action start_supplier_confirmation_checks
+    :parameters (?master_itinerary - master_itinerary ?payment_provider - payment_provider ?supplier_slot - supplier_slot ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_ready_for_supplier_checks ?master_itinerary)
+        (itinerary_payment_provider_attached ?master_itinerary ?payment_provider)
+        (entity_supplier_slot_reserved ?master_itinerary ?supplier_slot)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (not
+          (booking_document_resource_secondary_provisional ?booking_document)
+        )
+        (not
+          (itinerary_supplier_confirmation_started ?master_itinerary)
+        )
+      )
+    :effect (itinerary_supplier_confirmation_started ?master_itinerary)
+  )
+  (:action continue_supplier_confirmation_checks
+    :parameters (?master_itinerary - master_itinerary ?payment_provider - payment_provider ?supplier_slot - supplier_slot ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_ready_for_supplier_checks ?master_itinerary)
+        (itinerary_payment_provider_attached ?master_itinerary ?payment_provider)
+        (entity_supplier_slot_reserved ?master_itinerary ?supplier_slot)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (booking_document_resource_secondary_provisional ?booking_document)
+        (not
+          (itinerary_supplier_confirmation_started ?master_itinerary)
+        )
+      )
+    :effect (itinerary_supplier_confirmation_started ?master_itinerary)
+  )
+  (:action complete_supplier_confirmation_and_mark_ready
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_supplier_confirmation_started ?master_itinerary)
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (not
+          (booking_document_resource_primary_provisional ?booking_document)
+        )
+        (not
+          (booking_document_resource_secondary_provisional ?booking_document)
+        )
+        (not
+          (itinerary_supplier_checks_completed ?master_itinerary)
+        )
+      )
+    :effect (itinerary_supplier_checks_completed ?master_itinerary)
+  )
+  (:action complete_supplier_confirmation_and_require_profile_assignment
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_supplier_confirmation_started ?master_itinerary)
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (booking_document_resource_primary_provisional ?booking_document)
+        (not
+          (booking_document_resource_secondary_provisional ?booking_document)
+        )
+        (not
+          (itinerary_supplier_checks_completed ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_requires_profile_assignment ?master_itinerary)
+      )
+  )
+  (:action complete_supplier_confirmation_variant
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_supplier_confirmation_started ?master_itinerary)
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (not
+          (booking_document_resource_primary_provisional ?booking_document)
+        )
+        (booking_document_resource_secondary_provisional ?booking_document)
+        (not
+          (itinerary_supplier_checks_completed ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_requires_profile_assignment ?master_itinerary)
+      )
+  )
+  (:action complete_supplier_confirmation_variant_alt
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document ?fulfillment_token - fulfillment_token ?booking_document - booking_document)
+    :precondition
+      (and
+        (itinerary_supplier_confirmation_started ?master_itinerary)
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (itinerary_has_fulfillment_token ?master_itinerary ?fulfillment_token)
+        (fulfillment_token_linked_booking_document ?fulfillment_token ?booking_document)
+        (booking_document_resource_primary_provisional ?booking_document)
+        (booking_document_resource_secondary_provisional ?booking_document)
+        (not
+          (itinerary_supplier_checks_completed ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_requires_profile_assignment ?master_itinerary)
+      )
+  )
+  (:action finalize_itinerary
+    :parameters (?master_itinerary - master_itinerary)
+    :precondition
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (not
+          (itinerary_requires_profile_assignment ?master_itinerary)
+        )
+        (not
+          (itinerary_finalized ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?master_itinerary)
+        (entity_finalized ?master_itinerary)
+      )
+  )
+  (:action attach_fulfillment_profile_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?fulfillment_profile - fulfillment_profile)
+    :precondition
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_requires_profile_assignment ?master_itinerary)
+        (fulfillment_profile_available ?fulfillment_profile)
+      )
+    :effect
+      (and
+        (itinerary_fulfillment_profile_assigned ?master_itinerary ?fulfillment_profile)
+        (not
+          (fulfillment_profile_available ?fulfillment_profile)
+        )
+      )
+  )
+  (:action finalize_itinerary_with_profile
+    :parameters (?master_itinerary - master_itinerary ?service_instance_primary - service_instance_primary ?service_instance_secondary - service_instance_secondary ?payment_method - payment_method ?fulfillment_profile - fulfillment_profile)
+    :precondition
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_requires_profile_assignment ?master_itinerary)
+        (itinerary_fulfillment_profile_assigned ?master_itinerary ?fulfillment_profile)
+        (itinerary_includes_service_primary ?master_itinerary ?service_instance_primary)
+        (itinerary_includes_service_secondary ?master_itinerary ?service_instance_secondary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+        (entity_payment_attached ?master_itinerary ?payment_method)
+        (not
+          (itinerary_profile_assigned ?master_itinerary)
+        )
+      )
+    :effect (itinerary_profile_assigned ?master_itinerary)
+  )
+  (:action finalize_itinerary_after_profile
+    :parameters (?master_itinerary - master_itinerary)
+    :precondition
+      (and
+        (itinerary_supplier_checks_completed ?master_itinerary)
+        (itinerary_profile_assigned ?master_itinerary)
+        (not
+          (itinerary_finalized ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?master_itinerary)
+        (entity_finalized ?master_itinerary)
+      )
+  )
+  (:action apply_loyalty_credential_to_itinerary
+    :parameters (?master_itinerary - master_itinerary ?loyalty_credential - loyalty_credential ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_confirmed ?master_itinerary)
+        (entity_payment_attached ?master_itinerary ?payment_method)
+        (loyalty_credential_available ?loyalty_credential)
+        (itinerary_loyalty_credential_linked ?master_itinerary ?loyalty_credential)
+        (not
+          (itinerary_loyalty_applied ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_loyalty_applied ?master_itinerary)
+        (not
+          (loyalty_credential_available ?loyalty_credential)
+        )
+      )
+  )
+  (:action validate_loyalty_credential_for_itinerary
+    :parameters (?master_itinerary - master_itinerary ?supplier_slot - supplier_slot)
+    :precondition
+      (and
+        (itinerary_loyalty_applied ?master_itinerary)
+        (entity_supplier_slot_reserved ?master_itinerary ?supplier_slot)
+        (not
+          (itinerary_loyalty_validated ?master_itinerary)
+        )
+      )
+    :effect (itinerary_loyalty_validated ?master_itinerary)
+  )
+  (:action finalize_loyalty_attachment
+    :parameters (?master_itinerary - master_itinerary ?billing_document - billing_document)
+    :precondition
+      (and
+        (itinerary_loyalty_validated ?master_itinerary)
+        (itinerary_billing_document_attached ?master_itinerary ?billing_document)
+        (not
+          (itinerary_loyalty_finalized ?master_itinerary)
+        )
+      )
+    :effect (itinerary_loyalty_finalized ?master_itinerary)
+  )
+  (:action finalize_itinerary_with_loyalty
+    :parameters (?master_itinerary - master_itinerary)
+    :precondition
+      (and
+        (itinerary_loyalty_finalized ?master_itinerary)
+        (not
+          (itinerary_finalized ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?master_itinerary)
+        (entity_finalized ?master_itinerary)
+      )
+  )
+  (:action finalize_service_instance_primary_booking
+    :parameters (?service_instance_primary - service_instance_primary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_primary_ready ?service_instance_primary)
+        (service_instance_primary_confirmed ?service_instance_primary)
+        (booking_document_prepared ?booking_document)
+        (booking_document_issued ?booking_document)
+        (not
+          (entity_finalized ?service_instance_primary)
+        )
+      )
+    :effect (entity_finalized ?service_instance_primary)
+  )
+  (:action finalize_service_instance_secondary_booking
+    :parameters (?service_instance_secondary - service_instance_secondary ?booking_document - booking_document)
+    :precondition
+      (and
+        (service_instance_secondary_ready ?service_instance_secondary)
+        (service_instance_secondary_confirmed ?service_instance_secondary)
+        (booking_document_prepared ?booking_document)
+        (booking_document_issued ?booking_document)
+        (not
+          (entity_finalized ?service_instance_secondary)
+        )
+      )
+    :effect (entity_finalized ?service_instance_secondary)
+  )
+  (:action apply_reservation_modification_token
+    :parameters (?reservation - booking ?modification_token - modification_token ?payment_method - payment_method)
+    :precondition
+      (and
+        (entity_finalized ?reservation)
+        (entity_payment_attached ?reservation ?payment_method)
+        (modification_token_available ?modification_token)
+        (not
+          (entity_modification_registered ?reservation)
+        )
+      )
+    :effect
+      (and
+        (entity_modification_registered ?reservation)
+        (entity_modification_token_linked ?reservation ?modification_token)
+        (not
+          (modification_token_available ?modification_token)
+        )
+      )
+  )
+  (:action reconcile_modification_for_service_a
+    :parameters (?service_instance_primary - service_instance_primary ?offer - offer ?modification_token - modification_token)
+    :precondition
+      (and
+        (entity_modification_registered ?service_instance_primary)
+        (entity_bound_offer ?service_instance_primary ?offer)
+        (entity_modification_token_linked ?service_instance_primary ?modification_token)
+        (not
+          (entity_committed ?service_instance_primary)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?service_instance_primary)
+        (offer_available ?offer)
+        (modification_token_available ?modification_token)
+      )
+  )
+  (:action reconcile_modification_for_service_b
+    :parameters (?service_instance_secondary - service_instance_secondary ?offer - offer ?modification_token - modification_token)
+    :precondition
+      (and
+        (entity_modification_registered ?service_instance_secondary)
+        (entity_bound_offer ?service_instance_secondary ?offer)
+        (entity_modification_token_linked ?service_instance_secondary ?modification_token)
+        (not
+          (entity_committed ?service_instance_secondary)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?service_instance_secondary)
+        (offer_available ?offer)
+        (modification_token_available ?modification_token)
+      )
+  )
+  (:action reconcile_modification_for_itinerary
+    :parameters (?master_itinerary - master_itinerary ?offer - offer ?modification_token - modification_token)
+    :precondition
+      (and
+        (entity_modification_registered ?master_itinerary)
+        (entity_bound_offer ?master_itinerary ?offer)
+        (entity_modification_token_linked ?master_itinerary ?modification_token)
+        (not
+          (entity_committed ?master_itinerary)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?master_itinerary)
+        (offer_available ?offer)
+        (modification_token_available ?modification_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem reservation_modification_scenario)
+  (:domain reservation_modification_coordination)
+  (:objects service_primary_1 - service_instance_primary service_secondary_1 - service_instance_secondary master_itinerary_1 - master_itinerary master_itinerary_2 - master_itinerary offer_basic - offer offer_flexible - offer offer_premium - offer payment_method_1 - payment_method supplier_slot_1 - supplier_slot amendment_payload_1 - amendment_payload provider_resource_primary_1 - provider_resource_primary provider_resource_secondary_1 - provider_resource_secondary booking_document_1 - booking_document fulfillment_token_1 - fulfillment_token fulfillment_token_2 - fulfillment_token optional_addon_1 - optional_addon optional_addon_2 - optional_addon fulfillment_profile_1 - fulfillment_profile fulfillment_profile_2 - fulfillment_profile modification_token_1 - modification_token payment_provider_1 - payment_provider loyalty_credential_1 - loyalty_credential loyalty_credential_2 - loyalty_credential billing_document_1 - billing_document)
+  (:init
+    (offer_available offer_basic)
+    (offer_available offer_flexible)
+    (offer_available offer_premium)
+    (payment_method_available payment_method_1)
+    (supplier_slot_available supplier_slot_1)
+    (amendment_payload_available amendment_payload_1)
+    (service_primary_bound_provider_resource service_primary_1 provider_resource_primary_1)
+    (service_secondary_bound_provider_resource service_secondary_1 provider_resource_secondary_1)
+    (booking_document_draft booking_document_1)
+    (fulfillment_token_available fulfillment_token_1)
+    (fulfillment_token_available fulfillment_token_2)
+    (itinerary_includes_service_primary master_itinerary_1 service_primary_1)
+    (itinerary_includes_service_primary master_itinerary_2 service_primary_1)
+    (itinerary_includes_service_secondary master_itinerary_1 service_secondary_1)
+    (itinerary_includes_service_secondary master_itinerary_2 service_secondary_1)
+    (itinerary_links_booking_document master_itinerary_1 booking_document_1)
+    (itinerary_links_booking_document master_itinerary_2 booking_document_1)
+    (itinerary_has_fulfillment_token master_itinerary_1 fulfillment_token_1)
+    (itinerary_has_fulfillment_token master_itinerary_2 fulfillment_token_2)
+    (optional_addon_available optional_addon_1)
+    (optional_addon_available optional_addon_2)
+    (fulfillment_profile_available fulfillment_profile_1)
+    (fulfillment_profile_available fulfillment_profile_2)
+    (modification_token_available modification_token_1)
+    (payment_provider_available payment_provider_1)
+    (loyalty_credential_available loyalty_credential_1)
+    (itinerary_loyalty_credential_linked master_itinerary_1 loyalty_credential_1)
+    (itinerary_loyalty_credential_linked master_itinerary_2 loyalty_credential_2)
+    (billing_document_available billing_document_1)
+  )
+  (:goal
+    (and
+      (entity_committed service_primary_1)
+      (entity_committed service_secondary_1)
+      (entity_committed master_itinerary_1)
+      (entity_committed master_itinerary_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_reservation service_secondary_1)
+(select_and_bind_offer service_secondary_1 offer_flexible)
+(attach_payment_method_to_reservation service_secondary_1 payment_method_1)
+(confirm_payment_for_reservation service_secondary_1 payment_method_1)
+(reserve_supplier_slot_for_reservation service_secondary_1 supplier_slot_1)
+(initiate_provider_resource_secondary_hold service_secondary_1 provider_resource_secondary_1 payment_method_1)
+(confirm_supplier_slot_for_service_secondary service_secondary_1 provider_resource_secondary_1 supplier_slot_1)
+(release_supplier_slot_from_reservation service_secondary_1 supplier_slot_1)
+(release_payment_method_from_reservation service_secondary_1 payment_method_1)
+(initiate_reservation service_primary_1)
+(select_and_bind_offer service_primary_1 offer_basic)
+(attach_payment_method_to_reservation service_primary_1 payment_method_1)
+(confirm_payment_for_reservation service_primary_1 payment_method_1)
+(reserve_supplier_slot_for_reservation service_primary_1 supplier_slot_1)
+(initiate_provider_resource_primary_hold service_primary_1 provider_resource_primary_1 payment_method_1)
+(confirm_supplier_slot_for_service_primary service_primary_1 provider_resource_primary_1 supplier_slot_1)
+(release_supplier_slot_from_reservation service_primary_1 supplier_slot_1)
+(construct_booking_document_with_confirmed_resources service_primary_1 service_secondary_1 provider_resource_primary_1 provider_resource_secondary_1 booking_document_1)
+(issue_booking_document booking_document_1 service_primary_1 payment_method_1)
+(finalize_service_instance_primary_booking service_primary_1 booking_document_1)
+(finalize_service_instance_secondary_booking service_secondary_1 booking_document_1)
+(apply_reservation_modification_token service_primary_1 modification_token_1 payment_method_1)
+(reconcile_modification_for_service_a service_primary_1 offer_basic modification_token_1)
+(release_payment_method_from_reservation service_primary_1 payment_method_1)
+(attach_payment_method_to_reservation service_secondary_1 payment_method_1)
+(apply_reservation_modification_token service_secondary_1 modification_token_1 payment_method_1)
+(reconcile_modification_for_service_b service_secondary_1 offer_flexible modification_token_1)
+(release_payment_method_from_reservation service_secondary_1 payment_method_1)
+(initiate_reservation master_itinerary_1)
+(select_and_bind_offer master_itinerary_1 offer_premium)
+(attach_payment_method_to_reservation master_itinerary_1 payment_method_1)
+(confirm_payment_for_reservation master_itinerary_1 payment_method_1)
+(attach_payment_provider_to_itinerary master_itinerary_1 payment_provider_1)
+(attach_billing_document_to_itinerary master_itinerary_1 billing_document_1)
+(allocate_fulfillment_token_to_itinerary master_itinerary_1 fulfillment_token_1 booking_document_1)
+(allocate_and_prepare_fulfillment_token master_itinerary_1 fulfillment_token_1 booking_document_1 payment_method_1)
+(reserve_supplier_slot_for_reservation master_itinerary_1 supplier_slot_1)
+(start_supplier_confirmation_checks master_itinerary_1 payment_provider_1 supplier_slot_1 fulfillment_token_1 booking_document_1)
+(complete_supplier_confirmation_and_mark_ready master_itinerary_1 billing_document_1 fulfillment_token_1 booking_document_1)
+(finalize_itinerary master_itinerary_1)
+(apply_reservation_modification_token master_itinerary_1 modification_token_1 payment_method_1)
+(reconcile_modification_for_itinerary master_itinerary_1 offer_premium modification_token_1)
+(release_payment_method_from_reservation master_itinerary_1 payment_method_1)
+(detach_payment_provider_from_itinerary master_itinerary_1 payment_provider_1)
+(detach_billing_document_from_itinerary master_itinerary_1 billing_document_1)
+(release_supplier_slot_from_reservation master_itinerary_1 supplier_slot_1)
+(initiate_reservation master_itinerary_2)
+(select_and_bind_offer master_itinerary_2 offer_premium)
+(attach_payment_method_to_reservation master_itinerary_2 payment_method_1)
+(confirm_payment_for_reservation master_itinerary_2 payment_method_1)
+(attach_payment_provider_to_itinerary master_itinerary_2 payment_provider_1)
+(attach_billing_document_to_itinerary master_itinerary_2 billing_document_1)
+(allocate_fulfillment_token_to_itinerary master_itinerary_2 fulfillment_token_2 booking_document_1)
+(allocate_and_prepare_fulfillment_token master_itinerary_2 fulfillment_token_2 booking_document_1 payment_method_1)
+(reserve_supplier_slot_for_reservation master_itinerary_2 supplier_slot_1)
+(start_supplier_confirmation_checks master_itinerary_2 payment_provider_1 supplier_slot_1 fulfillment_token_2 booking_document_1)
+(complete_supplier_confirmation_and_mark_ready master_itinerary_2 billing_document_1 fulfillment_token_2 booking_document_1)
+(finalize_itinerary master_itinerary_2)
+(apply_reservation_modification_token master_itinerary_2 modification_token_1 payment_method_1)
+(reconcile_modification_for_itinerary master_itinerary_2 offer_premium modification_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_r3zumz81/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 60 
+
+Successful plans:
+Value: 60
+ /tmp/val_r3zumz81/plan.pddl 60 
+
+
+
+--- stderr ---
+

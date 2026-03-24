@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain customs_hold_response_document_completion)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_entity - object resource - object domain_category - object document_category - object hold_case - document_category broker_contact - administrative_entity document_template - administrative_entity regulatory_reviewer - administrative_entity permit_type - administrative_entity payment_authorisation - administrative_entity regulatory_reference - administrative_entity certification - administrative_entity authority_clearance - administrative_entity supporting_evidence - resource attachment_descriptor - resource external_approval - resource commodity_classification - domain_category customs_jurisdiction - domain_category response_packet - domain_category origin_subcase - hold_case declaration_subcase - hold_case origin_shipment - origin_subcase destination_shipment - origin_subcase declaration_record - declaration_subcase)
+  (:predicates
+    (hold_case_created ?hold_case - hold_case)
+    (case_item_classified ?hold_case - hold_case)
+    (broker_assigned ?hold_case - hold_case)
+    (cleared_for_release ?hold_case - hold_case)
+    (release_recorded ?hold_case - hold_case)
+    (case_has_regulatory_reference ?hold_case - hold_case)
+    (broker_available ?broker_contact - broker_contact)
+    (broker_assigned_to_hold_case ?hold_case - hold_case ?broker_contact - broker_contact)
+    (document_template_available ?document_template - document_template)
+    (case_has_document_template ?hold_case - hold_case ?document_template - document_template)
+    (regulatory_reviewer_available ?regulatory_reviewer - regulatory_reviewer)
+    (reviewer_assigned_to_case ?hold_case - hold_case ?regulatory_reviewer - regulatory_reviewer)
+    (supporting_evidence_available ?supporting_evidence - supporting_evidence)
+    (origin_shipment_evidence_attached ?origin_shipment - origin_shipment ?supporting_evidence - supporting_evidence)
+    (destination_shipment_evidence_attached ?destination_shipment - destination_shipment ?supporting_evidence - supporting_evidence)
+    (origin_has_commodity_classification ?origin_shipment - origin_shipment ?commodity_classification - commodity_classification)
+    (classification_confirmed ?commodity_classification - commodity_classification)
+    (classification_evidence_flag ?commodity_classification - commodity_classification)
+    (origin_assessment_complete ?origin_shipment - origin_shipment)
+    (destination_has_customs_jurisdiction ?destination_shipment - destination_shipment ?customs_jurisdiction - customs_jurisdiction)
+    (customs_jurisdiction_confirmed ?customs_jurisdiction - customs_jurisdiction)
+    (customs_jurisdiction_evidence_flag ?customs_jurisdiction - customs_jurisdiction)
+    (destination_assessment_complete ?destination_shipment - destination_shipment)
+    (response_packet_draft ?response_packet - response_packet)
+    (response_packet_assembled ?response_packet - response_packet)
+    (response_packet_contains_classification ?response_packet - response_packet ?commodity_classification - commodity_classification)
+    (response_packet_contains_jurisdiction ?response_packet - response_packet ?customs_jurisdiction - customs_jurisdiction)
+    (response_packet_origin_validation_flag ?response_packet - response_packet)
+    (response_packet_destination_validation_flag ?response_packet - response_packet)
+    (response_packet_submission_ready ?response_packet - response_packet)
+    (declaration_links_origin ?declaration_record - declaration_record ?origin_shipment - origin_shipment)
+    (declaration_links_destination ?declaration_record - declaration_record ?destination_shipment - destination_shipment)
+    (declaration_in_response_packet ?declaration_record - declaration_record ?response_packet - response_packet)
+    (attachment_descriptor_available ?attachment_descriptor - attachment_descriptor)
+    (declaration_requires_attachment_descriptor ?declaration_record - declaration_record ?attachment_descriptor - attachment_descriptor)
+    (attachment_descriptor_verified ?attachment_descriptor - attachment_descriptor)
+    (attachment_descriptor_linked_to_packet ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    (declaration_attachment_verified ?declaration_record - declaration_record)
+    (declaration_certification_attached ?declaration_record - declaration_record)
+    (declaration_ready_for_final_review ?declaration_record - declaration_record)
+    (declaration_permit_assigned ?declaration_record - declaration_record)
+    (declaration_permit_verified ?declaration_record - declaration_record)
+    (declaration_final_review_signed ?declaration_record - declaration_record)
+    (internal_qc_passed ?declaration_record - declaration_record)
+    (external_approval_available ?external_approval - external_approval)
+    (declaration_has_external_approval ?declaration_record - declaration_record ?external_approval - external_approval)
+    (declaration_external_approval_registered ?declaration_record - declaration_record)
+    (external_approval_acknowledged ?declaration_record - declaration_record)
+    (external_approval_confirmed ?declaration_record - declaration_record)
+    (permit_type_available ?permit_type - permit_type)
+    (declaration_has_permit_type ?declaration_record - declaration_record ?permit_type - permit_type)
+    (payment_authorisation_available ?payment_authorisation - payment_authorisation)
+    (declaration_payment_authorisation_attached ?declaration_record - declaration_record ?payment_authorisation - payment_authorisation)
+    (certification_available ?certification - certification)
+    (declaration_has_certification ?declaration_record - declaration_record ?certification - certification)
+    (authority_clearance_available ?authority_clearance - authority_clearance)
+    (declaration_has_authority_clearance ?declaration_record - declaration_record ?authority_clearance - authority_clearance)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (case_references_regulatory_reference ?hold_case - hold_case ?regulatory_reference - regulatory_reference)
+    (origin_ready ?origin_shipment - origin_shipment)
+    (destination_ready ?destination_shipment - destination_shipment)
+    (declaration_finalized ?declaration_record - declaration_record)
+  )
+  (:action create_hold_case
+    :parameters (?hold_case - hold_case)
+    :precondition
+      (and
+        (not
+          (hold_case_created ?hold_case)
+        )
+        (not
+          (cleared_for_release ?hold_case)
+        )
+      )
+    :effect (hold_case_created ?hold_case)
+  )
+  (:action assign_broker_to_case
+    :parameters (?hold_case - hold_case ?broker_contact - broker_contact)
+    :precondition
+      (and
+        (hold_case_created ?hold_case)
+        (not
+          (broker_assigned ?hold_case)
+        )
+        (broker_available ?broker_contact)
+      )
+    :effect
+      (and
+        (broker_assigned ?hold_case)
+        (broker_assigned_to_hold_case ?hold_case ?broker_contact)
+        (not
+          (broker_available ?broker_contact)
+        )
+      )
+  )
+  (:action attach_document_template
+    :parameters (?hold_case - hold_case ?document_template - document_template)
+    :precondition
+      (and
+        (hold_case_created ?hold_case)
+        (broker_assigned ?hold_case)
+        (document_template_available ?document_template)
+      )
+    :effect
+      (and
+        (case_has_document_template ?hold_case ?document_template)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action confirm_case_classification
+    :parameters (?hold_case - hold_case ?document_template - document_template)
+    :precondition
+      (and
+        (hold_case_created ?hold_case)
+        (broker_assigned ?hold_case)
+        (case_has_document_template ?hold_case ?document_template)
+        (not
+          (case_item_classified ?hold_case)
+        )
+      )
+    :effect (case_item_classified ?hold_case)
+  )
+  (:action detach_document_template
+    :parameters (?hold_case - hold_case ?document_template - document_template)
+    :precondition
+      (and
+        (case_has_document_template ?hold_case ?document_template)
+      )
+    :effect
+      (and
+        (document_template_available ?document_template)
+        (not
+          (case_has_document_template ?hold_case ?document_template)
+        )
+      )
+  )
+  (:action assign_regulatory_reviewer
+    :parameters (?hold_case - hold_case ?regulatory_reviewer - regulatory_reviewer)
+    :precondition
+      (and
+        (case_item_classified ?hold_case)
+        (regulatory_reviewer_available ?regulatory_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_assigned_to_case ?hold_case ?regulatory_reviewer)
+        (not
+          (regulatory_reviewer_available ?regulatory_reviewer)
+        )
+      )
+  )
+  (:action release_regulatory_reviewer
+    :parameters (?hold_case - hold_case ?regulatory_reviewer - regulatory_reviewer)
+    :precondition
+      (and
+        (reviewer_assigned_to_case ?hold_case ?regulatory_reviewer)
+      )
+    :effect
+      (and
+        (regulatory_reviewer_available ?regulatory_reviewer)
+        (not
+          (reviewer_assigned_to_case ?hold_case ?regulatory_reviewer)
+        )
+      )
+  )
+  (:action apply_certification_to_declaration
+    :parameters (?declaration_record - declaration_record ?certification - certification)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (certification_available ?certification)
+      )
+    :effect
+      (and
+        (declaration_has_certification ?declaration_record ?certification)
+        (not
+          (certification_available ?certification)
+        )
+      )
+  )
+  (:action retract_certification_from_declaration
+    :parameters (?declaration_record - declaration_record ?certification - certification)
+    :precondition
+      (and
+        (declaration_has_certification ?declaration_record ?certification)
+      )
+    :effect
+      (and
+        (certification_available ?certification)
+        (not
+          (declaration_has_certification ?declaration_record ?certification)
+        )
+      )
+  )
+  (:action apply_authority_clearance_to_declaration
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (authority_clearance_available ?authority_clearance)
+      )
+    :effect
+      (and
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (not
+          (authority_clearance_available ?authority_clearance)
+        )
+      )
+  )
+  (:action retract_authority_clearance_from_declaration
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance)
+    :precondition
+      (and
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+      )
+    :effect
+      (and
+        (authority_clearance_available ?authority_clearance)
+        (not
+          (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        )
+      )
+  )
+  (:action confirm_origin_classification
+    :parameters (?origin_shipment - origin_shipment ?commodity_classification - commodity_classification ?document_template - document_template)
+    :precondition
+      (and
+        (case_item_classified ?origin_shipment)
+        (case_has_document_template ?origin_shipment ?document_template)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (not
+          (classification_confirmed ?commodity_classification)
+        )
+        (not
+          (classification_evidence_flag ?commodity_classification)
+        )
+      )
+    :effect (classification_confirmed ?commodity_classification)
+  )
+  (:action finalize_origin_assessment
+    :parameters (?origin_shipment - origin_shipment ?commodity_classification - commodity_classification ?regulatory_reviewer - regulatory_reviewer)
+    :precondition
+      (and
+        (case_item_classified ?origin_shipment)
+        (reviewer_assigned_to_case ?origin_shipment ?regulatory_reviewer)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (classification_confirmed ?commodity_classification)
+        (not
+          (origin_ready ?origin_shipment)
+        )
+      )
+    :effect
+      (and
+        (origin_ready ?origin_shipment)
+        (origin_assessment_complete ?origin_shipment)
+      )
+  )
+  (:action attach_supporting_evidence_to_origin
+    :parameters (?origin_shipment - origin_shipment ?commodity_classification - commodity_classification ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_item_classified ?origin_shipment)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (origin_ready ?origin_shipment)
+        )
+      )
+    :effect
+      (and
+        (classification_evidence_flag ?commodity_classification)
+        (origin_ready ?origin_shipment)
+        (origin_shipment_evidence_attached ?origin_shipment ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action resolve_origin_evidence
+    :parameters (?origin_shipment - origin_shipment ?commodity_classification - commodity_classification ?document_template - document_template ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_item_classified ?origin_shipment)
+        (case_has_document_template ?origin_shipment ?document_template)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (classification_evidence_flag ?commodity_classification)
+        (origin_shipment_evidence_attached ?origin_shipment ?supporting_evidence)
+        (not
+          (origin_assessment_complete ?origin_shipment)
+        )
+      )
+    :effect
+      (and
+        (classification_confirmed ?commodity_classification)
+        (origin_assessment_complete ?origin_shipment)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (origin_shipment_evidence_attached ?origin_shipment ?supporting_evidence)
+        )
+      )
+  )
+  (:action confirm_destination_classification
+    :parameters (?destination_shipment - destination_shipment ?customs_jurisdiction - customs_jurisdiction ?document_template - document_template)
+    :precondition
+      (and
+        (case_item_classified ?destination_shipment)
+        (case_has_document_template ?destination_shipment ?document_template)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (not
+          (customs_jurisdiction_confirmed ?customs_jurisdiction)
+        )
+        (not
+          (customs_jurisdiction_evidence_flag ?customs_jurisdiction)
+        )
+      )
+    :effect (customs_jurisdiction_confirmed ?customs_jurisdiction)
+  )
+  (:action finalize_destination_assessment
+    :parameters (?destination_shipment - destination_shipment ?customs_jurisdiction - customs_jurisdiction ?regulatory_reviewer - regulatory_reviewer)
+    :precondition
+      (and
+        (case_item_classified ?destination_shipment)
+        (reviewer_assigned_to_case ?destination_shipment ?regulatory_reviewer)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (customs_jurisdiction_confirmed ?customs_jurisdiction)
+        (not
+          (destination_ready ?destination_shipment)
+        )
+      )
+    :effect
+      (and
+        (destination_ready ?destination_shipment)
+        (destination_assessment_complete ?destination_shipment)
+      )
+  )
+  (:action attach_supporting_evidence_to_destination
+    :parameters (?destination_shipment - destination_shipment ?customs_jurisdiction - customs_jurisdiction ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_item_classified ?destination_shipment)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (destination_ready ?destination_shipment)
+        )
+      )
+    :effect
+      (and
+        (customs_jurisdiction_evidence_flag ?customs_jurisdiction)
+        (destination_ready ?destination_shipment)
+        (destination_shipment_evidence_attached ?destination_shipment ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action resolve_destination_evidence
+    :parameters (?destination_shipment - destination_shipment ?customs_jurisdiction - customs_jurisdiction ?document_template - document_template ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_item_classified ?destination_shipment)
+        (case_has_document_template ?destination_shipment ?document_template)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (customs_jurisdiction_evidence_flag ?customs_jurisdiction)
+        (destination_shipment_evidence_attached ?destination_shipment ?supporting_evidence)
+        (not
+          (destination_assessment_complete ?destination_shipment)
+        )
+      )
+    :effect
+      (and
+        (customs_jurisdiction_confirmed ?customs_jurisdiction)
+        (destination_assessment_complete ?destination_shipment)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (destination_shipment_evidence_attached ?destination_shipment ?supporting_evidence)
+        )
+      )
+  )
+  (:action build_response_packet_from_validated_assessments
+    :parameters (?origin_shipment - origin_shipment ?destination_shipment - destination_shipment ?commodity_classification - commodity_classification ?customs_jurisdiction - customs_jurisdiction ?response_packet - response_packet)
+    :precondition
+      (and
+        (origin_ready ?origin_shipment)
+        (destination_ready ?destination_shipment)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (classification_confirmed ?commodity_classification)
+        (customs_jurisdiction_confirmed ?customs_jurisdiction)
+        (origin_assessment_complete ?origin_shipment)
+        (destination_assessment_complete ?destination_shipment)
+        (response_packet_draft ?response_packet)
+      )
+    :effect
+      (and
+        (response_packet_assembled ?response_packet)
+        (response_packet_contains_classification ?response_packet ?commodity_classification)
+        (response_packet_contains_jurisdiction ?response_packet ?customs_jurisdiction)
+        (not
+          (response_packet_draft ?response_packet)
+        )
+      )
+  )
+  (:action build_packet_with_origin_evidence_validation
+    :parameters (?origin_shipment - origin_shipment ?destination_shipment - destination_shipment ?commodity_classification - commodity_classification ?customs_jurisdiction - customs_jurisdiction ?response_packet - response_packet)
+    :precondition
+      (and
+        (origin_ready ?origin_shipment)
+        (destination_ready ?destination_shipment)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (classification_evidence_flag ?commodity_classification)
+        (customs_jurisdiction_confirmed ?customs_jurisdiction)
+        (not
+          (origin_assessment_complete ?origin_shipment)
+        )
+        (destination_assessment_complete ?destination_shipment)
+        (response_packet_draft ?response_packet)
+      )
+    :effect
+      (and
+        (response_packet_assembled ?response_packet)
+        (response_packet_contains_classification ?response_packet ?commodity_classification)
+        (response_packet_contains_jurisdiction ?response_packet ?customs_jurisdiction)
+        (response_packet_origin_validation_flag ?response_packet)
+        (not
+          (response_packet_draft ?response_packet)
+        )
+      )
+  )
+  (:action build_packet_with_destination_evidence_validation
+    :parameters (?origin_shipment - origin_shipment ?destination_shipment - destination_shipment ?commodity_classification - commodity_classification ?customs_jurisdiction - customs_jurisdiction ?response_packet - response_packet)
+    :precondition
+      (and
+        (origin_ready ?origin_shipment)
+        (destination_ready ?destination_shipment)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (classification_confirmed ?commodity_classification)
+        (customs_jurisdiction_evidence_flag ?customs_jurisdiction)
+        (origin_assessment_complete ?origin_shipment)
+        (not
+          (destination_assessment_complete ?destination_shipment)
+        )
+        (response_packet_draft ?response_packet)
+      )
+    :effect
+      (and
+        (response_packet_assembled ?response_packet)
+        (response_packet_contains_classification ?response_packet ?commodity_classification)
+        (response_packet_contains_jurisdiction ?response_packet ?customs_jurisdiction)
+        (response_packet_destination_validation_flag ?response_packet)
+        (not
+          (response_packet_draft ?response_packet)
+        )
+      )
+  )
+  (:action build_packet_with_origin_and_destination_validations
+    :parameters (?origin_shipment - origin_shipment ?destination_shipment - destination_shipment ?commodity_classification - commodity_classification ?customs_jurisdiction - customs_jurisdiction ?response_packet - response_packet)
+    :precondition
+      (and
+        (origin_ready ?origin_shipment)
+        (destination_ready ?destination_shipment)
+        (origin_has_commodity_classification ?origin_shipment ?commodity_classification)
+        (destination_has_customs_jurisdiction ?destination_shipment ?customs_jurisdiction)
+        (classification_evidence_flag ?commodity_classification)
+        (customs_jurisdiction_evidence_flag ?customs_jurisdiction)
+        (not
+          (origin_assessment_complete ?origin_shipment)
+        )
+        (not
+          (destination_assessment_complete ?destination_shipment)
+        )
+        (response_packet_draft ?response_packet)
+      )
+    :effect
+      (and
+        (response_packet_assembled ?response_packet)
+        (response_packet_contains_classification ?response_packet ?commodity_classification)
+        (response_packet_contains_jurisdiction ?response_packet ?customs_jurisdiction)
+        (response_packet_origin_validation_flag ?response_packet)
+        (response_packet_destination_validation_flag ?response_packet)
+        (not
+          (response_packet_draft ?response_packet)
+        )
+      )
+  )
+  (:action mark_response_packet_submission_ready
+    :parameters (?response_packet - response_packet ?origin_shipment - origin_shipment ?document_template - document_template)
+    :precondition
+      (and
+        (response_packet_assembled ?response_packet)
+        (origin_ready ?origin_shipment)
+        (case_has_document_template ?origin_shipment ?document_template)
+        (not
+          (response_packet_submission_ready ?response_packet)
+        )
+      )
+    :effect (response_packet_submission_ready ?response_packet)
+  )
+  (:action verify_and_attach_descriptor
+    :parameters (?declaration_record - declaration_record ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (declaration_in_response_packet ?declaration_record ?response_packet)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_available ?attachment_descriptor)
+        (response_packet_assembled ?response_packet)
+        (response_packet_submission_ready ?response_packet)
+        (not
+          (attachment_descriptor_verified ?attachment_descriptor)
+        )
+      )
+    :effect
+      (and
+        (attachment_descriptor_verified ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (not
+          (attachment_descriptor_available ?attachment_descriptor)
+        )
+      )
+  )
+  (:action validate_attachment_for_declaration
+    :parameters (?declaration_record - declaration_record ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet ?document_template - document_template)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_verified ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (case_has_document_template ?declaration_record ?document_template)
+        (not
+          (response_packet_origin_validation_flag ?response_packet)
+        )
+        (not
+          (declaration_attachment_verified ?declaration_record)
+        )
+      )
+    :effect (declaration_attachment_verified ?declaration_record)
+  )
+  (:action assign_permit_type_to_declaration
+    :parameters (?declaration_record - declaration_record ?permit_type - permit_type)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (permit_type_available ?permit_type)
+        (not
+          (declaration_permit_assigned ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_permit_assigned ?declaration_record)
+        (declaration_has_permit_type ?declaration_record ?permit_type)
+        (not
+          (permit_type_available ?permit_type)
+        )
+      )
+  )
+  (:action apply_and_verify_permit_for_declaration
+    :parameters (?declaration_record - declaration_record ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet ?document_template - document_template ?permit_type - permit_type)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_verified ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (case_has_document_template ?declaration_record ?document_template)
+        (response_packet_origin_validation_flag ?response_packet)
+        (declaration_permit_assigned ?declaration_record)
+        (declaration_has_permit_type ?declaration_record ?permit_type)
+        (not
+          (declaration_attachment_verified ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_attachment_verified ?declaration_record)
+        (declaration_permit_verified ?declaration_record)
+      )
+  )
+  (:action apply_certification_and_mark_declaration
+    :parameters (?declaration_record - declaration_record ?certification - certification ?regulatory_reviewer - regulatory_reviewer ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_attachment_verified ?declaration_record)
+        (declaration_has_certification ?declaration_record ?certification)
+        (reviewer_assigned_to_case ?declaration_record ?regulatory_reviewer)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (not
+          (response_packet_destination_validation_flag ?response_packet)
+        )
+        (not
+          (declaration_certification_attached ?declaration_record)
+        )
+      )
+    :effect (declaration_certification_attached ?declaration_record)
+  )
+  (:action apply_certification_with_alternate_checks
+    :parameters (?declaration_record - declaration_record ?certification - certification ?regulatory_reviewer - regulatory_reviewer ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_attachment_verified ?declaration_record)
+        (declaration_has_certification ?declaration_record ?certification)
+        (reviewer_assigned_to_case ?declaration_record ?regulatory_reviewer)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (response_packet_destination_validation_flag ?response_packet)
+        (not
+          (declaration_certification_attached ?declaration_record)
+        )
+      )
+    :effect (declaration_certification_attached ?declaration_record)
+  )
+  (:action prepare_declaration_for_final_review
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_certification_attached ?declaration_record)
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (not
+          (response_packet_origin_validation_flag ?response_packet)
+        )
+        (not
+          (response_packet_destination_validation_flag ?response_packet)
+        )
+        (not
+          (declaration_ready_for_final_review ?declaration_record)
+        )
+      )
+    :effect (declaration_ready_for_final_review ?declaration_record)
+  )
+  (:action prepare_declaration_for_final_review_with_origin_validation
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_certification_attached ?declaration_record)
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (response_packet_origin_validation_flag ?response_packet)
+        (not
+          (response_packet_destination_validation_flag ?response_packet)
+        )
+        (not
+          (declaration_ready_for_final_review ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (declaration_final_review_signed ?declaration_record)
+      )
+  )
+  (:action prepare_declaration_for_final_review_with_destination_validation
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_certification_attached ?declaration_record)
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (not
+          (response_packet_origin_validation_flag ?response_packet)
+        )
+        (response_packet_destination_validation_flag ?response_packet)
+        (not
+          (declaration_ready_for_final_review ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (declaration_final_review_signed ?declaration_record)
+      )
+  )
+  (:action prepare_declaration_for_final_review_with_full_validations
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance ?attachment_descriptor - attachment_descriptor ?response_packet - response_packet)
+    :precondition
+      (and
+        (declaration_certification_attached ?declaration_record)
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (declaration_requires_attachment_descriptor ?declaration_record ?attachment_descriptor)
+        (attachment_descriptor_linked_to_packet ?attachment_descriptor ?response_packet)
+        (response_packet_origin_validation_flag ?response_packet)
+        (response_packet_destination_validation_flag ?response_packet)
+        (not
+          (declaration_ready_for_final_review ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (declaration_final_review_signed ?declaration_record)
+      )
+  )
+  (:action finalize_declaration
+    :parameters (?declaration_record - declaration_record)
+    :precondition
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (not
+          (declaration_final_review_signed ?declaration_record)
+        )
+        (not
+          (declaration_finalized ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_finalized ?declaration_record)
+        (release_recorded ?declaration_record)
+      )
+  )
+  (:action attach_payment_authorisation_to_declaration
+    :parameters (?declaration_record - declaration_record ?payment_authorisation - payment_authorisation)
+    :precondition
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (declaration_final_review_signed ?declaration_record)
+        (payment_authorisation_available ?payment_authorisation)
+      )
+    :effect
+      (and
+        (declaration_payment_authorisation_attached ?declaration_record ?payment_authorisation)
+        (not
+          (payment_authorisation_available ?payment_authorisation)
+        )
+      )
+  )
+  (:action perform_internal_quality_check_on_declaration
+    :parameters (?declaration_record - declaration_record ?origin_shipment - origin_shipment ?destination_shipment - destination_shipment ?document_template - document_template ?payment_authorisation - payment_authorisation)
+    :precondition
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (declaration_final_review_signed ?declaration_record)
+        (declaration_payment_authorisation_attached ?declaration_record ?payment_authorisation)
+        (declaration_links_origin ?declaration_record ?origin_shipment)
+        (declaration_links_destination ?declaration_record ?destination_shipment)
+        (origin_assessment_complete ?origin_shipment)
+        (destination_assessment_complete ?destination_shipment)
+        (case_has_document_template ?declaration_record ?document_template)
+        (not
+          (internal_qc_passed ?declaration_record)
+        )
+      )
+    :effect (internal_qc_passed ?declaration_record)
+  )
+  (:action finalize_declaration_after_qc
+    :parameters (?declaration_record - declaration_record)
+    :precondition
+      (and
+        (declaration_ready_for_final_review ?declaration_record)
+        (internal_qc_passed ?declaration_record)
+        (not
+          (declaration_finalized ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_finalized ?declaration_record)
+        (release_recorded ?declaration_record)
+      )
+  )
+  (:action apply_external_approval_to_declaration
+    :parameters (?declaration_record - declaration_record ?external_approval - external_approval ?document_template - document_template)
+    :precondition
+      (and
+        (case_item_classified ?declaration_record)
+        (case_has_document_template ?declaration_record ?document_template)
+        (external_approval_available ?external_approval)
+        (declaration_has_external_approval ?declaration_record ?external_approval)
+        (not
+          (declaration_external_approval_registered ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_external_approval_registered ?declaration_record)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action review_external_approval
+    :parameters (?declaration_record - declaration_record ?regulatory_reviewer - regulatory_reviewer)
+    :precondition
+      (and
+        (declaration_external_approval_registered ?declaration_record)
+        (reviewer_assigned_to_case ?declaration_record ?regulatory_reviewer)
+        (not
+          (external_approval_acknowledged ?declaration_record)
+        )
+      )
+    :effect (external_approval_acknowledged ?declaration_record)
+  )
+  (:action confirm_external_approval_with_authority_clearance
+    :parameters (?declaration_record - declaration_record ?authority_clearance - authority_clearance)
+    :precondition
+      (and
+        (external_approval_acknowledged ?declaration_record)
+        (declaration_has_authority_clearance ?declaration_record ?authority_clearance)
+        (not
+          (external_approval_confirmed ?declaration_record)
+        )
+      )
+    :effect (external_approval_confirmed ?declaration_record)
+  )
+  (:action finalize_declaration_with_external_approval
+    :parameters (?declaration_record - declaration_record)
+    :precondition
+      (and
+        (external_approval_confirmed ?declaration_record)
+        (not
+          (declaration_finalized ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (declaration_finalized ?declaration_record)
+        (release_recorded ?declaration_record)
+      )
+  )
+  (:action mark_origin_shipment_cleared
+    :parameters (?origin_shipment - origin_shipment ?response_packet - response_packet)
+    :precondition
+      (and
+        (origin_ready ?origin_shipment)
+        (origin_assessment_complete ?origin_shipment)
+        (response_packet_assembled ?response_packet)
+        (response_packet_submission_ready ?response_packet)
+        (not
+          (release_recorded ?origin_shipment)
+        )
+      )
+    :effect (release_recorded ?origin_shipment)
+  )
+  (:action mark_destination_shipment_cleared
+    :parameters (?destination_shipment - destination_shipment ?response_packet - response_packet)
+    :precondition
+      (and
+        (destination_ready ?destination_shipment)
+        (destination_assessment_complete ?destination_shipment)
+        (response_packet_assembled ?response_packet)
+        (response_packet_submission_ready ?response_packet)
+        (not
+          (release_recorded ?destination_shipment)
+        )
+      )
+    :effect (release_recorded ?destination_shipment)
+  )
+  (:action attach_regulatory_reference_to_case
+    :parameters (?hold_case - hold_case ?regulatory_reference - regulatory_reference ?document_template - document_template)
+    :precondition
+      (and
+        (release_recorded ?hold_case)
+        (case_has_document_template ?hold_case ?document_template)
+        (regulatory_reference_available ?regulatory_reference)
+        (not
+          (case_has_regulatory_reference ?hold_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_regulatory_reference ?hold_case)
+        (case_references_regulatory_reference ?hold_case ?regulatory_reference)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action clear_origin_shipment_and_release_resources
+    :parameters (?origin_shipment - origin_shipment ?broker_contact - broker_contact ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (case_has_regulatory_reference ?origin_shipment)
+        (broker_assigned_to_hold_case ?origin_shipment ?broker_contact)
+        (case_references_regulatory_reference ?origin_shipment ?regulatory_reference)
+        (not
+          (cleared_for_release ?origin_shipment)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_release ?origin_shipment)
+        (broker_available ?broker_contact)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+  (:action clear_destination_shipment_and_release_resources
+    :parameters (?destination_shipment - destination_shipment ?broker_contact - broker_contact ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (case_has_regulatory_reference ?destination_shipment)
+        (broker_assigned_to_hold_case ?destination_shipment ?broker_contact)
+        (case_references_regulatory_reference ?destination_shipment ?regulatory_reference)
+        (not
+          (cleared_for_release ?destination_shipment)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_release ?destination_shipment)
+        (broker_available ?broker_contact)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+  (:action clear_declaration_and_release_resources
+    :parameters (?declaration_record - declaration_record ?broker_contact - broker_contact ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (case_has_regulatory_reference ?declaration_record)
+        (broker_assigned_to_hold_case ?declaration_record ?broker_contact)
+        (case_references_regulatory_reference ?declaration_record ?regulatory_reference)
+        (not
+          (cleared_for_release ?declaration_record)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_release ?declaration_record)
+        (broker_available ?broker_contact)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem customs_hold_response_problem)
+  (:domain customs_hold_response_document_completion)
+  (:objects origin_shipment_1 - origin_shipment destination_shipment_1 - destination_shipment declaration_record_1 - declaration_record declaration_record_2 - declaration_record broker_contact_1 - broker_contact broker_contact_2 - broker_contact broker_contact_3 - broker_contact document_template_packing_list - document_template regulatory_reviewer_1 - regulatory_reviewer supporting_evidence_invoice - supporting_evidence commodity_classification_hs_1001 - commodity_classification customs_jurisdiction_port_of_entry - customs_jurisdiction response_packet_draft_1 - response_packet attachment_descriptor_commercial_invoice - attachment_descriptor attachment_descriptor_certificate_of_origin - attachment_descriptor permit_type_general_import - permit_type permit_type_special_import - permit_type payment_authorisation_fee - payment_authorisation payment_authorisation_duty - payment_authorisation regulatory_reference_section_12 - regulatory_reference certification_of_origin - certification external_approval_chamber_of_commerce - external_approval external_approval_third_party - external_approval authority_clearance_local_authority - authority_clearance)
+  (:init
+    (broker_available broker_contact_1)
+    (broker_available broker_contact_2)
+    (broker_available broker_contact_3)
+    (document_template_available document_template_packing_list)
+    (regulatory_reviewer_available regulatory_reviewer_1)
+    (supporting_evidence_available supporting_evidence_invoice)
+    (origin_has_commodity_classification origin_shipment_1 commodity_classification_hs_1001)
+    (destination_has_customs_jurisdiction destination_shipment_1 customs_jurisdiction_port_of_entry)
+    (response_packet_draft response_packet_draft_1)
+    (attachment_descriptor_available attachment_descriptor_commercial_invoice)
+    (attachment_descriptor_available attachment_descriptor_certificate_of_origin)
+    (declaration_links_origin declaration_record_1 origin_shipment_1)
+    (declaration_links_origin declaration_record_2 origin_shipment_1)
+    (declaration_links_destination declaration_record_1 destination_shipment_1)
+    (declaration_links_destination declaration_record_2 destination_shipment_1)
+    (declaration_in_response_packet declaration_record_1 response_packet_draft_1)
+    (declaration_in_response_packet declaration_record_2 response_packet_draft_1)
+    (declaration_requires_attachment_descriptor declaration_record_1 attachment_descriptor_commercial_invoice)
+    (declaration_requires_attachment_descriptor declaration_record_2 attachment_descriptor_certificate_of_origin)
+    (permit_type_available permit_type_general_import)
+    (permit_type_available permit_type_special_import)
+    (payment_authorisation_available payment_authorisation_fee)
+    (payment_authorisation_available payment_authorisation_duty)
+    (regulatory_reference_available regulatory_reference_section_12)
+    (certification_available certification_of_origin)
+    (external_approval_available external_approval_chamber_of_commerce)
+    (declaration_has_external_approval declaration_record_1 external_approval_chamber_of_commerce)
+    (declaration_has_external_approval declaration_record_2 external_approval_third_party)
+    (authority_clearance_available authority_clearance_local_authority)
+  )
+  (:goal
+    (and
+      (cleared_for_release origin_shipment_1)
+      (cleared_for_release destination_shipment_1)
+      (cleared_for_release declaration_record_1)
+      (cleared_for_release declaration_record_2)
+    )
+  )
+)

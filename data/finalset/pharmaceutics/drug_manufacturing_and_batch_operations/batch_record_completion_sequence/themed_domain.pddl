@@ -1,0 +1,936 @@
+(define (domain pharmaceutical_batch_completion_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object role_category - object artifact_category - object pharmaceutical_domain_root - object production_entity - pharmaceutical_domain_root equipment_resource - resource_category procedure_step - resource_category technician - resource_category attachment_template - resource_category approval_stamp - resource_category release_checklist - resource_category calibration_certificate - resource_category regulatory_signature - resource_category quality_sample - role_category document_section - role_category qa_acknowledgement - role_category upstream_stage_token - artifact_category downstream_stage_token - artifact_category completion_package - artifact_category processing_unit_group - production_entity document_group - production_entity upstream_processing_unit - processing_unit_group downstream_processing_unit - processing_unit_group document_package - document_group)
+  (:predicates
+    (entity_scheduled ?entity - production_entity)
+    (ready_for_processing ?entity - production_entity)
+    (entity_resource_allocated ?entity - production_entity)
+    (released ?entity - production_entity)
+    (ready_for_release ?entity - production_entity)
+    (checklist_attached ?entity - production_entity)
+    (equipment_available ?equipment - equipment_resource)
+    (equipment_assigned ?entity - production_entity ?equipment - equipment_resource)
+    (procedure_available ?procedure - procedure_step)
+    (procedure_assigned ?entity - production_entity ?procedure - procedure_step)
+    (technician_available ?technician - technician)
+    (technician_assigned ?entity - production_entity ?technician - technician)
+    (sample_available ?sample - quality_sample)
+    (upstream_unit_has_sample ?upstream_unit - upstream_processing_unit ?sample - quality_sample)
+    (downstream_unit_has_sample ?downstream_unit - downstream_processing_unit ?sample - quality_sample)
+    (upstream_unit_has_stage_token ?upstream_unit - upstream_processing_unit ?upstream_stage - upstream_stage_token)
+    (upstream_stage_activated ?upstream_stage - upstream_stage_token)
+    (upstream_stage_sample_collected ?upstream_stage - upstream_stage_token)
+    (upstream_unit_processing_complete ?upstream_unit - upstream_processing_unit)
+    (downstream_unit_has_stage_token ?downstream_unit - downstream_processing_unit ?downstream_stage - downstream_stage_token)
+    (downstream_stage_activated ?downstream_stage - downstream_stage_token)
+    (downstream_stage_sample_collected ?downstream_stage - downstream_stage_token)
+    (downstream_unit_processing_complete ?downstream_unit - downstream_processing_unit)
+    (completion_package_available ?completion_package - completion_package)
+    (completion_package_allocated ?completion_package - completion_package)
+    (completion_package_contains_upstream_stage ?completion_package - completion_package ?upstream_stage - upstream_stage_token)
+    (completion_package_contains_downstream_stage ?completion_package - completion_package ?downstream_stage - downstream_stage_token)
+    (completion_package_includes_upstream_sample ?completion_package - completion_package)
+    (completion_package_includes_downstream_sample ?completion_package - completion_package)
+    (completion_package_validated ?completion_package - completion_package)
+    (document_package_linked_to_upstream_unit ?document_package - document_package ?upstream_unit - upstream_processing_unit)
+    (document_package_linked_to_downstream_unit ?document_package - document_package ?downstream_unit - downstream_processing_unit)
+    (document_includes_completion_package ?document_package - document_package ?completion_package - completion_package)
+    (document_section_available ?document_section - document_section)
+    (document_has_section ?document_package - document_package ?document_section - document_section)
+    (document_section_populated ?document_section - document_section)
+    (document_section_in_completion_package ?document_section - document_section ?completion_package - completion_package)
+    (document_population_in_progress ?document_package - document_package)
+    (document_section_certified ?document_package - document_package)
+    (document_ready_for_final_checks ?document_package - document_package)
+    (attachment_template_attached ?document_package - document_package)
+    (attachment_verified ?document_package - document_package)
+    (approval_process_open ?document_package - document_package)
+    (consolidation_complete ?document_package - document_package)
+    (qa_acknowledgement_available ?qa_acknowledgement - qa_acknowledgement)
+    (document_has_qa_acknowledgement ?document_package - document_package ?qa_acknowledgement - qa_acknowledgement)
+    (document_qa_acknowledged ?document_package - document_package)
+    (document_prepared_for_signature ?document_package - document_package)
+    (document_signed ?document_package - document_package)
+    (attachment_template_available ?attachment_template - attachment_template)
+    (document_has_attachment_template ?document_package - document_package ?attachment_template - attachment_template)
+    (approval_stamp_available ?approval_stamp - approval_stamp)
+    (document_has_approval_stamp ?document_package - document_package ?approval_stamp - approval_stamp)
+    (calibration_certificate_available ?calibration_certificate - calibration_certificate)
+    (document_has_calibration_certificate ?document_package - document_package ?calibration_certificate - calibration_certificate)
+    (regulatory_signature_available ?regulatory_signature - regulatory_signature)
+    (document_has_regulatory_signature ?document_package - document_package ?regulatory_signature - regulatory_signature)
+    (release_checklist_available ?release_checklist - release_checklist)
+    (entity_has_release_checklist ?entity - production_entity ?release_checklist - release_checklist)
+    (upstream_unit_ready ?upstream_unit - upstream_processing_unit)
+    (downstream_unit_ready ?downstream_unit - downstream_processing_unit)
+    (document_finalized ?document_package - document_package)
+  )
+  (:action schedule_production_lot
+    :parameters (?entity - production_entity)
+    :precondition
+      (and
+        (not
+          (entity_scheduled ?entity)
+        )
+        (not
+          (released ?entity)
+        )
+      )
+    :effect (entity_scheduled ?entity)
+  )
+  (:action allocate_equipment_to_lot
+    :parameters (?entity - production_entity ?equipment - equipment_resource)
+    :precondition
+      (and
+        (entity_scheduled ?entity)
+        (not
+          (entity_resource_allocated ?entity)
+        )
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (entity_resource_allocated ?entity)
+        (equipment_assigned ?entity ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action assign_procedure_step_to_entity
+    :parameters (?entity - production_entity ?procedure - procedure_step)
+    :precondition
+      (and
+        (entity_scheduled ?entity)
+        (entity_resource_allocated ?entity)
+        (procedure_available ?procedure)
+      )
+    :effect
+      (and
+        (procedure_assigned ?entity ?procedure)
+        (not
+          (procedure_available ?procedure)
+        )
+      )
+  )
+  (:action mark_entity_ready_for_processing
+    :parameters (?entity - production_entity ?procedure - procedure_step)
+    :precondition
+      (and
+        (entity_scheduled ?entity)
+        (entity_resource_allocated ?entity)
+        (procedure_assigned ?entity ?procedure)
+        (not
+          (ready_for_processing ?entity)
+        )
+      )
+    :effect (ready_for_processing ?entity)
+  )
+  (:action release_procedure_step_from_entity
+    :parameters (?entity - production_entity ?procedure - procedure_step)
+    :precondition
+      (and
+        (procedure_assigned ?entity ?procedure)
+      )
+    :effect
+      (and
+        (procedure_available ?procedure)
+        (not
+          (procedure_assigned ?entity ?procedure)
+        )
+      )
+  )
+  (:action assign_technician_to_entity
+    :parameters (?entity - production_entity ?technician - technician)
+    :precondition
+      (and
+        (ready_for_processing ?entity)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (technician_assigned ?entity ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action unassign_technician_from_entity
+    :parameters (?entity - production_entity ?technician - technician)
+    :precondition
+      (and
+        (technician_assigned ?entity ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (technician_assigned ?entity ?technician)
+        )
+      )
+  )
+  (:action attach_calibration_certificate_to_document
+    :parameters (?document_package - document_package ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (calibration_certificate_available ?calibration_certificate)
+      )
+    :effect
+      (and
+        (document_has_calibration_certificate ?document_package ?calibration_certificate)
+        (not
+          (calibration_certificate_available ?calibration_certificate)
+        )
+      )
+  )
+  (:action detach_calibration_certificate_from_document
+    :parameters (?document_package - document_package ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (document_has_calibration_certificate ?document_package ?calibration_certificate)
+      )
+    :effect
+      (and
+        (calibration_certificate_available ?calibration_certificate)
+        (not
+          (document_has_calibration_certificate ?document_package ?calibration_certificate)
+        )
+      )
+  )
+  (:action attach_regulatory_signature_to_document
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (regulatory_signature_available ?regulatory_signature)
+      )
+    :effect
+      (and
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (not
+          (regulatory_signature_available ?regulatory_signature)
+        )
+      )
+  )
+  (:action detach_regulatory_signature_from_document
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature)
+    :precondition
+      (and
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+      )
+    :effect
+      (and
+        (regulatory_signature_available ?regulatory_signature)
+        (not
+          (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        )
+      )
+  )
+  (:action activate_upstream_stage
+    :parameters (?upstream_unit - upstream_processing_unit ?upstream_stage - upstream_stage_token ?procedure - procedure_step)
+    :precondition
+      (and
+        (ready_for_processing ?upstream_unit)
+        (procedure_assigned ?upstream_unit ?procedure)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (not
+          (upstream_stage_activated ?upstream_stage)
+        )
+        (not
+          (upstream_stage_sample_collected ?upstream_stage)
+        )
+      )
+    :effect (upstream_stage_activated ?upstream_stage)
+  )
+  (:action complete_upstream_stage_with_technician
+    :parameters (?upstream_unit - upstream_processing_unit ?upstream_stage - upstream_stage_token ?technician - technician)
+    :precondition
+      (and
+        (ready_for_processing ?upstream_unit)
+        (technician_assigned ?upstream_unit ?technician)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (upstream_stage_activated ?upstream_stage)
+        (not
+          (upstream_unit_ready ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+      )
+  )
+  (:action collect_sample_for_upstream_stage
+    :parameters (?upstream_unit - upstream_processing_unit ?upstream_stage - upstream_stage_token ?sample - quality_sample)
+    :precondition
+      (and
+        (ready_for_processing ?upstream_unit)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (sample_available ?sample)
+        (not
+          (upstream_unit_ready ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_stage_sample_collected ?upstream_stage)
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_has_sample ?upstream_unit ?sample)
+        (not
+          (sample_available ?sample)
+        )
+      )
+  )
+  (:action process_upstream_stage_with_sample
+    :parameters (?upstream_unit - upstream_processing_unit ?upstream_stage - upstream_stage_token ?procedure - procedure_step ?sample - quality_sample)
+    :precondition
+      (and
+        (ready_for_processing ?upstream_unit)
+        (procedure_assigned ?upstream_unit ?procedure)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (upstream_stage_sample_collected ?upstream_stage)
+        (upstream_unit_has_sample ?upstream_unit ?sample)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_stage_activated ?upstream_stage)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (sample_available ?sample)
+        (not
+          (upstream_unit_has_sample ?upstream_unit ?sample)
+        )
+      )
+  )
+  (:action activate_downstream_stage
+    :parameters (?downstream_unit - downstream_processing_unit ?downstream_stage - downstream_stage_token ?procedure - procedure_step)
+    :precondition
+      (and
+        (ready_for_processing ?downstream_unit)
+        (procedure_assigned ?downstream_unit ?procedure)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (not
+          (downstream_stage_activated ?downstream_stage)
+        )
+        (not
+          (downstream_stage_sample_collected ?downstream_stage)
+        )
+      )
+    :effect (downstream_stage_activated ?downstream_stage)
+  )
+  (:action complete_downstream_stage_with_technician
+    :parameters (?downstream_unit - downstream_processing_unit ?downstream_stage - downstream_stage_token ?technician - technician)
+    :precondition
+      (and
+        (ready_for_processing ?downstream_unit)
+        (technician_assigned ?downstream_unit ?technician)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (downstream_stage_activated ?downstream_stage)
+        (not
+          (downstream_unit_ready ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+      )
+  )
+  (:action collect_sample_for_downstream_stage
+    :parameters (?downstream_unit - downstream_processing_unit ?downstream_stage - downstream_stage_token ?sample - quality_sample)
+    :precondition
+      (and
+        (ready_for_processing ?downstream_unit)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (sample_available ?sample)
+        (not
+          (downstream_unit_ready ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_stage_sample_collected ?downstream_stage)
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_has_sample ?downstream_unit ?sample)
+        (not
+          (sample_available ?sample)
+        )
+      )
+  )
+  (:action process_downstream_stage_with_sample
+    :parameters (?downstream_unit - downstream_processing_unit ?downstream_stage - downstream_stage_token ?procedure - procedure_step ?sample - quality_sample)
+    :precondition
+      (and
+        (ready_for_processing ?downstream_unit)
+        (procedure_assigned ?downstream_unit ?procedure)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (downstream_stage_sample_collected ?downstream_stage)
+        (downstream_unit_has_sample ?downstream_unit ?sample)
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_stage_activated ?downstream_stage)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (sample_available ?sample)
+        (not
+          (downstream_unit_has_sample ?downstream_unit ?sample)
+        )
+      )
+  )
+  (:action assemble_completion_package_standard
+    :parameters (?upstream_unit - upstream_processing_unit ?downstream_unit - downstream_processing_unit ?upstream_stage - upstream_stage_token ?downstream_stage - downstream_stage_token ?completion_package - completion_package)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (upstream_stage_activated ?upstream_stage)
+        (downstream_stage_activated ?downstream_stage)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (completion_package_available ?completion_package)
+      )
+    :effect
+      (and
+        (completion_package_allocated ?completion_package)
+        (completion_package_contains_upstream_stage ?completion_package ?upstream_stage)
+        (completion_package_contains_downstream_stage ?completion_package ?downstream_stage)
+        (not
+          (completion_package_available ?completion_package)
+        )
+      )
+  )
+  (:action assemble_completion_package_with_upstream_sample
+    :parameters (?upstream_unit - upstream_processing_unit ?downstream_unit - downstream_processing_unit ?upstream_stage - upstream_stage_token ?downstream_stage - downstream_stage_token ?completion_package - completion_package)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (upstream_stage_sample_collected ?upstream_stage)
+        (downstream_stage_activated ?downstream_stage)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+        (downstream_unit_processing_complete ?downstream_unit)
+        (completion_package_available ?completion_package)
+      )
+    :effect
+      (and
+        (completion_package_allocated ?completion_package)
+        (completion_package_contains_upstream_stage ?completion_package ?upstream_stage)
+        (completion_package_contains_downstream_stage ?completion_package ?downstream_stage)
+        (completion_package_includes_upstream_sample ?completion_package)
+        (not
+          (completion_package_available ?completion_package)
+        )
+      )
+  )
+  (:action assemble_completion_package_with_downstream_sample
+    :parameters (?upstream_unit - upstream_processing_unit ?downstream_unit - downstream_processing_unit ?upstream_stage - upstream_stage_token ?downstream_stage - downstream_stage_token ?completion_package - completion_package)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (upstream_stage_activated ?upstream_stage)
+        (downstream_stage_sample_collected ?downstream_stage)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+        (completion_package_available ?completion_package)
+      )
+    :effect
+      (and
+        (completion_package_allocated ?completion_package)
+        (completion_package_contains_upstream_stage ?completion_package ?upstream_stage)
+        (completion_package_contains_downstream_stage ?completion_package ?downstream_stage)
+        (completion_package_includes_downstream_sample ?completion_package)
+        (not
+          (completion_package_available ?completion_package)
+        )
+      )
+  )
+  (:action assemble_completion_package_with_both_samples
+    :parameters (?upstream_unit - upstream_processing_unit ?downstream_unit - downstream_processing_unit ?upstream_stage - upstream_stage_token ?downstream_stage - downstream_stage_token ?completion_package - completion_package)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_has_stage_token ?upstream_unit ?upstream_stage)
+        (downstream_unit_has_stage_token ?downstream_unit ?downstream_stage)
+        (upstream_stage_sample_collected ?upstream_stage)
+        (downstream_stage_sample_collected ?downstream_stage)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+        (completion_package_available ?completion_package)
+      )
+    :effect
+      (and
+        (completion_package_allocated ?completion_package)
+        (completion_package_contains_upstream_stage ?completion_package ?upstream_stage)
+        (completion_package_contains_downstream_stage ?completion_package ?downstream_stage)
+        (completion_package_includes_upstream_sample ?completion_package)
+        (completion_package_includes_downstream_sample ?completion_package)
+        (not
+          (completion_package_available ?completion_package)
+        )
+      )
+  )
+  (:action validate_completion_package
+    :parameters (?completion_package - completion_package ?upstream_unit - upstream_processing_unit ?procedure - procedure_step)
+    :precondition
+      (and
+        (completion_package_allocated ?completion_package)
+        (upstream_unit_ready ?upstream_unit)
+        (procedure_assigned ?upstream_unit ?procedure)
+        (not
+          (completion_package_validated ?completion_package)
+        )
+      )
+    :effect (completion_package_validated ?completion_package)
+  )
+  (:action populate_document_section_and_attach
+    :parameters (?document_package - document_package ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (document_includes_completion_package ?document_package ?completion_package)
+        (document_has_section ?document_package ?document_section)
+        (document_section_available ?document_section)
+        (completion_package_allocated ?completion_package)
+        (completion_package_validated ?completion_package)
+        (not
+          (document_section_populated ?document_section)
+        )
+      )
+    :effect
+      (and
+        (document_section_populated ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (not
+          (document_section_available ?document_section)
+        )
+      )
+  )
+  (:action initiate_document_population
+    :parameters (?document_package - document_package ?document_section - document_section ?completion_package - completion_package ?procedure - procedure_step)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (document_has_section ?document_package ?document_section)
+        (document_section_populated ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (procedure_assigned ?document_package ?procedure)
+        (not
+          (completion_package_includes_upstream_sample ?completion_package)
+        )
+        (not
+          (document_population_in_progress ?document_package)
+        )
+      )
+    :effect (document_population_in_progress ?document_package)
+  )
+  (:action attach_template_to_document
+    :parameters (?document_package - document_package ?attachment_template - attachment_template)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (attachment_template_available ?attachment_template)
+        (not
+          (attachment_template_attached ?document_package)
+        )
+      )
+    :effect
+      (and
+        (attachment_template_attached ?document_package)
+        (document_has_attachment_template ?document_package ?attachment_template)
+        (not
+          (attachment_template_available ?attachment_template)
+        )
+      )
+  )
+  (:action attach_template_and_progress_population
+    :parameters (?document_package - document_package ?document_section - document_section ?completion_package - completion_package ?procedure - procedure_step ?attachment_template - attachment_template)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (document_has_section ?document_package ?document_section)
+        (document_section_populated ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (procedure_assigned ?document_package ?procedure)
+        (completion_package_includes_upstream_sample ?completion_package)
+        (attachment_template_attached ?document_package)
+        (document_has_attachment_template ?document_package ?attachment_template)
+        (not
+          (document_population_in_progress ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_population_in_progress ?document_package)
+        (attachment_verified ?document_package)
+      )
+  )
+  (:action certify_document_section_with_certificate
+    :parameters (?document_package - document_package ?calibration_certificate - calibration_certificate ?technician - technician ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_population_in_progress ?document_package)
+        (document_has_calibration_certificate ?document_package ?calibration_certificate)
+        (technician_assigned ?document_package ?technician)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (not
+          (completion_package_includes_downstream_sample ?completion_package)
+        )
+        (not
+          (document_section_certified ?document_package)
+        )
+      )
+    :effect (document_section_certified ?document_package)
+  )
+  (:action certify_document_section_with_existing_flag
+    :parameters (?document_package - document_package ?calibration_certificate - calibration_certificate ?technician - technician ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_population_in_progress ?document_package)
+        (document_has_calibration_certificate ?document_package ?calibration_certificate)
+        (technician_assigned ?document_package ?technician)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (completion_package_includes_downstream_sample ?completion_package)
+        (not
+          (document_section_certified ?document_package)
+        )
+      )
+    :effect (document_section_certified ?document_package)
+  )
+  (:action advance_document_to_final_checks
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_section_certified ?document_package)
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (not
+          (completion_package_includes_upstream_sample ?completion_package)
+        )
+        (not
+          (completion_package_includes_downstream_sample ?completion_package)
+        )
+        (not
+          (document_ready_for_final_checks ?document_package)
+        )
+      )
+    :effect (document_ready_for_final_checks ?document_package)
+  )
+  (:action advance_document_to_final_checks_with_upstream_sample
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_section_certified ?document_package)
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (completion_package_includes_upstream_sample ?completion_package)
+        (not
+          (completion_package_includes_downstream_sample ?completion_package)
+        )
+        (not
+          (document_ready_for_final_checks ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (approval_process_open ?document_package)
+      )
+  )
+  (:action advance_document_to_final_checks_with_downstream_sample
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_section_certified ?document_package)
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (not
+          (completion_package_includes_upstream_sample ?completion_package)
+        )
+        (completion_package_includes_downstream_sample ?completion_package)
+        (not
+          (document_ready_for_final_checks ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (approval_process_open ?document_package)
+      )
+  )
+  (:action advance_document_to_final_checks_with_both_samples
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature ?document_section - document_section ?completion_package - completion_package)
+    :precondition
+      (and
+        (document_section_certified ?document_package)
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (document_has_section ?document_package ?document_section)
+        (document_section_in_completion_package ?document_section ?completion_package)
+        (completion_package_includes_upstream_sample ?completion_package)
+        (completion_package_includes_downstream_sample ?completion_package)
+        (not
+          (document_ready_for_final_checks ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (approval_process_open ?document_package)
+      )
+  )
+  (:action finalize_document_standard
+    :parameters (?document_package - document_package)
+    :precondition
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (not
+          (approval_process_open ?document_package)
+        )
+        (not
+          (document_finalized ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?document_package)
+        (ready_for_release ?document_package)
+      )
+  )
+  (:action attach_approval_stamp_to_document
+    :parameters (?document_package - document_package ?approval_stamp - approval_stamp)
+    :precondition
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (approval_process_open ?document_package)
+        (approval_stamp_available ?approval_stamp)
+      )
+    :effect
+      (and
+        (document_has_approval_stamp ?document_package ?approval_stamp)
+        (not
+          (approval_stamp_available ?approval_stamp)
+        )
+      )
+  )
+  (:action consolidate_document_package
+    :parameters (?document_package - document_package ?upstream_unit - upstream_processing_unit ?downstream_unit - downstream_processing_unit ?procedure - procedure_step ?approval_stamp - approval_stamp)
+    :precondition
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (approval_process_open ?document_package)
+        (document_has_approval_stamp ?document_package ?approval_stamp)
+        (document_package_linked_to_upstream_unit ?document_package ?upstream_unit)
+        (document_package_linked_to_downstream_unit ?document_package ?downstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (procedure_assigned ?document_package ?procedure)
+        (not
+          (consolidation_complete ?document_package)
+        )
+      )
+    :effect (consolidation_complete ?document_package)
+  )
+  (:action finalize_document_after_consolidation
+    :parameters (?document_package - document_package)
+    :precondition
+      (and
+        (document_ready_for_final_checks ?document_package)
+        (consolidation_complete ?document_package)
+        (not
+          (document_finalized ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?document_package)
+        (ready_for_release ?document_package)
+      )
+  )
+  (:action attach_qa_acknowledgement_to_document
+    :parameters (?document_package - document_package ?qa_acknowledgement - qa_acknowledgement ?procedure - procedure_step)
+    :precondition
+      (and
+        (ready_for_processing ?document_package)
+        (procedure_assigned ?document_package ?procedure)
+        (qa_acknowledgement_available ?qa_acknowledgement)
+        (document_has_qa_acknowledgement ?document_package ?qa_acknowledgement)
+        (not
+          (document_qa_acknowledged ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_qa_acknowledged ?document_package)
+        (not
+          (qa_acknowledgement_available ?qa_acknowledgement)
+        )
+      )
+  )
+  (:action prepare_document_for_regulatory_signature
+    :parameters (?document_package - document_package ?technician - technician)
+    :precondition
+      (and
+        (document_qa_acknowledged ?document_package)
+        (technician_assigned ?document_package ?technician)
+        (not
+          (document_prepared_for_signature ?document_package)
+        )
+      )
+    :effect (document_prepared_for_signature ?document_package)
+  )
+  (:action attach_regulatory_signature
+    :parameters (?document_package - document_package ?regulatory_signature - regulatory_signature)
+    :precondition
+      (and
+        (document_prepared_for_signature ?document_package)
+        (document_has_regulatory_signature ?document_package ?regulatory_signature)
+        (not
+          (document_signed ?document_package)
+        )
+      )
+    :effect (document_signed ?document_package)
+  )
+  (:action finalize_document_with_signature
+    :parameters (?document_package - document_package)
+    :precondition
+      (and
+        (document_signed ?document_package)
+        (not
+          (document_finalized ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?document_package)
+        (ready_for_release ?document_package)
+      )
+  )
+  (:action bind_completion_package_to_upstream_unit
+    :parameters (?upstream_unit - upstream_processing_unit ?completion_package - completion_package)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (completion_package_allocated ?completion_package)
+        (completion_package_validated ?completion_package)
+        (not
+          (ready_for_release ?upstream_unit)
+        )
+      )
+    :effect (ready_for_release ?upstream_unit)
+  )
+  (:action bind_completion_package_to_downstream_unit
+    :parameters (?downstream_unit - downstream_processing_unit ?completion_package - completion_package)
+    :precondition
+      (and
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (completion_package_allocated ?completion_package)
+        (completion_package_validated ?completion_package)
+        (not
+          (ready_for_release ?downstream_unit)
+        )
+      )
+    :effect (ready_for_release ?downstream_unit)
+  )
+  (:action attach_release_checklist_to_entity
+    :parameters (?entity - production_entity ?release_checklist - release_checklist ?procedure - procedure_step)
+    :precondition
+      (and
+        (ready_for_release ?entity)
+        (procedure_assigned ?entity ?procedure)
+        (release_checklist_available ?release_checklist)
+        (not
+          (checklist_attached ?entity)
+        )
+      )
+    :effect
+      (and
+        (checklist_attached ?entity)
+        (entity_has_release_checklist ?entity ?release_checklist)
+        (not
+          (release_checklist_available ?release_checklist)
+        )
+      )
+  )
+  (:action release_upstream_unit
+    :parameters (?upstream_unit - upstream_processing_unit ?equipment - equipment_resource ?release_checklist - release_checklist)
+    :precondition
+      (and
+        (checklist_attached ?upstream_unit)
+        (equipment_assigned ?upstream_unit ?equipment)
+        (entity_has_release_checklist ?upstream_unit ?release_checklist)
+        (not
+          (released ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (released ?upstream_unit)
+        (equipment_available ?equipment)
+        (release_checklist_available ?release_checklist)
+      )
+  )
+  (:action release_downstream_unit
+    :parameters (?downstream_unit - downstream_processing_unit ?equipment - equipment_resource ?release_checklist - release_checklist)
+    :precondition
+      (and
+        (checklist_attached ?downstream_unit)
+        (equipment_assigned ?downstream_unit ?equipment)
+        (entity_has_release_checklist ?downstream_unit ?release_checklist)
+        (not
+          (released ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (released ?downstream_unit)
+        (equipment_available ?equipment)
+        (release_checklist_available ?release_checklist)
+      )
+  )
+  (:action release_document_package_action
+    :parameters (?document_package - document_package ?equipment - equipment_resource ?release_checklist - release_checklist)
+    :precondition
+      (and
+        (checklist_attached ?document_package)
+        (equipment_assigned ?document_package ?equipment)
+        (entity_has_release_checklist ?document_package ?release_checklist)
+        (not
+          (released ?document_package)
+        )
+      )
+    :effect
+      (and
+        (released ?document_package)
+        (equipment_available ?equipment)
+        (release_checklist_available ?release_checklist)
+      )
+  )
+)

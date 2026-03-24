@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain partial_disbursement_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_item - entity asset_type - entity infrastructure_type - entity case_root - entity exposure_entity - case_root allocation_slot - resource_item drawdown_request - resource_item authorized_approver - resource_item pricing_option - resource_item fee_schedule - resource_item funding_source - resource_item funding_account - resource_item customer_consent - resource_item supporting_document - asset_type collateral_unit - asset_type product_offer - asset_type disbursement_channel - infrastructure_type payee_account - infrastructure_type disbursement_instruction - infrastructure_type tranche_specification - exposure_entity account_specification - exposure_entity primary_tranche - tranche_specification secondary_tranche - tranche_specification loan_account - account_specification)
+
+  (:predicates
+    (entity_registered ?credit_case - exposure_entity)
+    (entity_exposure_set ?credit_case - exposure_entity)
+    (entity_allocation_reserved ?credit_case - exposure_entity)
+    (disbursed ?credit_case - exposure_entity)
+    (planning_finalized ?credit_case - exposure_entity)
+    (entity_funding_confirmed ?credit_case - exposure_entity)
+    (allocation_slot_available ?allocation_slot - allocation_slot)
+    (entity_allocation_assigned ?credit_case - exposure_entity ?allocation_slot - allocation_slot)
+    (drawdown_request_pending ?drawdown_request - drawdown_request)
+    (entity_drawdown_linked ?credit_case - exposure_entity ?drawdown_request - drawdown_request)
+    (approver_available ?authorized_approver - authorized_approver)
+    (approver_assigned ?credit_case - exposure_entity ?authorized_approver - authorized_approver)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (primary_tranche_has_document ?primary_tranche - primary_tranche ?supporting_document - supporting_document)
+    (secondary_tranche_has_document ?secondary_tranche - secondary_tranche ?supporting_document - supporting_document)
+    (tranche_channel_eligible ?primary_tranche - primary_tranche ?disbursement_channel - disbursement_channel)
+    (channel_selected_by_primary ?disbursement_channel - disbursement_channel)
+    (channel_selected_by_secondary ?disbursement_channel - disbursement_channel)
+    (primary_tranche_ready ?primary_tranche - primary_tranche)
+    (secondary_tranche_payee_assigned ?secondary_tranche - secondary_tranche ?payee_account - payee_account)
+    (payee_account_selected ?payee_account - payee_account)
+    (payee_account_selected_alternate ?payee_account - payee_account)
+    (secondary_tranche_ready ?secondary_tranche - secondary_tranche)
+    (instruction_template_available ?disbursement_instruction - disbursement_instruction)
+    (instruction_assembled ?disbursement_instruction - disbursement_instruction)
+    (instruction_channel_link ?disbursement_instruction - disbursement_instruction ?disbursement_channel - disbursement_channel)
+    (instruction_payee_link ?disbursement_instruction - disbursement_instruction ?payee_account - payee_account)
+    (instruction_requires_pricing ?disbursement_instruction - disbursement_instruction)
+    (instruction_requires_fee_schedule ?disbursement_instruction - disbursement_instruction)
+    (instruction_funded ?disbursement_instruction - disbursement_instruction)
+    (loan_account_primary_tranche_association ?loan_account - loan_account ?primary_tranche - primary_tranche)
+    (loan_account_secondary_tranche_association ?loan_account - loan_account ?secondary_tranche - secondary_tranche)
+    (loan_account_instruction_link ?loan_account - loan_account ?disbursement_instruction - disbursement_instruction)
+    (collateral_unit_available ?collateral_unit - collateral_unit)
+    (loan_account_has_collateral_unit ?loan_account - loan_account ?collateral_unit - collateral_unit)
+    (collateral_unit_reserved ?collateral_unit - collateral_unit)
+    (collateral_pledged_to_instruction ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    (collateral_staged_for_account ?loan_account - loan_account)
+    (collateral_pledge_validated ?loan_account - loan_account)
+    (funding_association_established ?loan_account - loan_account)
+    (pricing_option_assigned ?loan_account - loan_account)
+    (pricing_verified ?loan_account - loan_account)
+    (funding_verified ?loan_account - loan_account)
+    (final_validation_passed ?loan_account - loan_account)
+    (product_offer_available ?product_offer - product_offer)
+    (loan_account_product_assigned ?loan_account - loan_account ?product_offer - product_offer)
+    (product_assigned ?loan_account - loan_account)
+    (product_approval_started ?loan_account - loan_account)
+    (product_approved ?loan_account - loan_account)
+    (pricing_option_available ?pricing_option - pricing_option)
+    (loan_account_pricing_assigned ?loan_account - loan_account ?pricing_option - pricing_option)
+    (fee_schedule_available ?fee_schedule - fee_schedule)
+    (loan_account_fee_schedule_assigned ?loan_account - loan_account ?fee_schedule - fee_schedule)
+    (funding_account_available ?funding_account - funding_account)
+    (loan_account_funding_account_assigned ?loan_account - loan_account ?funding_account - funding_account)
+    (customer_consent_available ?customer_consent - customer_consent)
+    (loan_account_customer_consent_linked ?loan_account - loan_account ?customer_consent - customer_consent)
+    (funding_source_available ?funding_source - funding_source)
+    (entity_funding_source_assigned ?credit_case - exposure_entity ?funding_source - funding_source)
+    (primary_tranche_eligibility_confirmed ?primary_tranche - primary_tranche)
+    (secondary_tranche_eligibility_confirmed ?secondary_tranche - secondary_tranche)
+    (final_approval_recorded ?loan_account - loan_account)
+  )
+  (:action register_credit_case
+    :parameters (?credit_case - exposure_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?credit_case)
+        )
+        (not
+          (disbursed ?credit_case)
+        )
+      )
+    :effect (entity_registered ?credit_case)
+  )
+  (:action assign_allocation_slot_to_entity
+    :parameters (?credit_case - exposure_entity ?allocation_slot - allocation_slot)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (not
+          (entity_allocation_reserved ?credit_case)
+        )
+        (allocation_slot_available ?allocation_slot)
+      )
+    :effect
+      (and
+        (entity_allocation_reserved ?credit_case)
+        (entity_allocation_assigned ?credit_case ?allocation_slot)
+        (not
+          (allocation_slot_available ?allocation_slot)
+        )
+      )
+  )
+  (:action link_drawdown_request_to_case
+    :parameters (?credit_case - exposure_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (entity_allocation_reserved ?credit_case)
+        (drawdown_request_pending ?drawdown_request)
+      )
+    :effect
+      (and
+        (entity_drawdown_linked ?credit_case ?drawdown_request)
+        (not
+          (drawdown_request_pending ?drawdown_request)
+        )
+      )
+  )
+  (:action confirm_case_exposure
+    :parameters (?credit_case - exposure_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (entity_allocation_reserved ?credit_case)
+        (entity_drawdown_linked ?credit_case ?drawdown_request)
+        (not
+          (entity_exposure_set ?credit_case)
+        )
+      )
+    :effect (entity_exposure_set ?credit_case)
+  )
+  (:action unlink_drawdown_request_from_case
+    :parameters (?credit_case - exposure_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_drawdown_linked ?credit_case ?drawdown_request)
+      )
+    :effect
+      (and
+        (drawdown_request_pending ?drawdown_request)
+        (not
+          (entity_drawdown_linked ?credit_case ?drawdown_request)
+        )
+      )
+  )
+  (:action assign_approver
+    :parameters (?credit_case - exposure_entity ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (entity_exposure_set ?credit_case)
+        (approver_available ?authorized_approver)
+      )
+    :effect
+      (and
+        (approver_assigned ?credit_case ?authorized_approver)
+        (not
+          (approver_available ?authorized_approver)
+        )
+      )
+  )
+  (:action unassign_approver
+    :parameters (?credit_case - exposure_entity ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (approver_assigned ?credit_case ?authorized_approver)
+      )
+    :effect
+      (and
+        (approver_available ?authorized_approver)
+        (not
+          (approver_assigned ?credit_case ?authorized_approver)
+        )
+      )
+  )
+  (:action assign_funding_account_to_loan_account
+    :parameters (?loan_account - loan_account ?funding_account - funding_account)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (funding_account_available ?funding_account)
+      )
+    :effect
+      (and
+        (loan_account_funding_account_assigned ?loan_account ?funding_account)
+        (not
+          (funding_account_available ?funding_account)
+        )
+      )
+  )
+  (:action unassign_funding_account_from_loan_account
+    :parameters (?loan_account - loan_account ?funding_account - funding_account)
+    :precondition
+      (and
+        (loan_account_funding_account_assigned ?loan_account ?funding_account)
+      )
+    :effect
+      (and
+        (funding_account_available ?funding_account)
+        (not
+          (loan_account_funding_account_assigned ?loan_account ?funding_account)
+        )
+      )
+  )
+  (:action assign_customer_consent_to_loan_account
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (customer_consent_available ?customer_consent)
+      )
+    :effect
+      (and
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (not
+          (customer_consent_available ?customer_consent)
+        )
+      )
+  )
+  (:action remove_customer_consent_from_loan_account
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent)
+    :precondition
+      (and
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+      )
+    :effect
+      (and
+        (customer_consent_available ?customer_consent)
+        (not
+          (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        )
+      )
+  )
+  (:action reserve_channel_for_primary_tranche
+    :parameters (?primary_tranche - primary_tranche ?disbursement_channel - disbursement_channel ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_exposure_set ?primary_tranche)
+        (entity_drawdown_linked ?primary_tranche ?drawdown_request)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (not
+          (channel_selected_by_primary ?disbursement_channel)
+        )
+        (not
+          (channel_selected_by_secondary ?disbursement_channel)
+        )
+      )
+    :effect (channel_selected_by_primary ?disbursement_channel)
+  )
+  (:action authorize_primary_tranche_channel
+    :parameters (?primary_tranche - primary_tranche ?disbursement_channel - disbursement_channel ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (entity_exposure_set ?primary_tranche)
+        (approver_assigned ?primary_tranche ?authorized_approver)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (channel_selected_by_primary ?disbursement_channel)
+        (not
+          (primary_tranche_eligibility_confirmed ?primary_tranche)
+        )
+      )
+    :effect
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (primary_tranche_ready ?primary_tranche)
+      )
+  )
+  (:action attach_document_to_primary_tranche
+    :parameters (?primary_tranche - primary_tranche ?disbursement_channel - disbursement_channel ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_exposure_set ?primary_tranche)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (supporting_document_available ?supporting_document)
+        (not
+          (primary_tranche_eligibility_confirmed ?primary_tranche)
+        )
+      )
+    :effect
+      (and
+        (channel_selected_by_secondary ?disbursement_channel)
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (primary_tranche_has_document ?primary_tranche ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_primary_tranche_channel_selection
+    :parameters (?primary_tranche - primary_tranche ?disbursement_channel - disbursement_channel ?drawdown_request - drawdown_request ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_exposure_set ?primary_tranche)
+        (entity_drawdown_linked ?primary_tranche ?drawdown_request)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (channel_selected_by_secondary ?disbursement_channel)
+        (primary_tranche_has_document ?primary_tranche ?supporting_document)
+        (not
+          (primary_tranche_ready ?primary_tranche)
+        )
+      )
+    :effect
+      (and
+        (channel_selected_by_primary ?disbursement_channel)
+        (primary_tranche_ready ?primary_tranche)
+        (supporting_document_available ?supporting_document)
+        (not
+          (primary_tranche_has_document ?primary_tranche ?supporting_document)
+        )
+      )
+  )
+  (:action reserve_payee_account_for_secondary_tranche
+    :parameters (?secondary_tranche - secondary_tranche ?payee_account - payee_account ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_exposure_set ?secondary_tranche)
+        (entity_drawdown_linked ?secondary_tranche ?drawdown_request)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (not
+          (payee_account_selected ?payee_account)
+        )
+        (not
+          (payee_account_selected_alternate ?payee_account)
+        )
+      )
+    :effect (payee_account_selected ?payee_account)
+  )
+  (:action authorize_secondary_tranche_payee_account
+    :parameters (?secondary_tranche - secondary_tranche ?payee_account - payee_account ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (entity_exposure_set ?secondary_tranche)
+        (approver_assigned ?secondary_tranche ?authorized_approver)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (payee_account_selected ?payee_account)
+        (not
+          (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        )
+      )
+    :effect
+      (and
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (secondary_tranche_ready ?secondary_tranche)
+      )
+  )
+  (:action attach_document_to_secondary_tranche
+    :parameters (?secondary_tranche - secondary_tranche ?payee_account - payee_account ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_exposure_set ?secondary_tranche)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (supporting_document_available ?supporting_document)
+        (not
+          (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        )
+      )
+    :effect
+      (and
+        (payee_account_selected_alternate ?payee_account)
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (secondary_tranche_has_document ?secondary_tranche ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_secondary_tranche_payee_selection
+    :parameters (?secondary_tranche - secondary_tranche ?payee_account - payee_account ?drawdown_request - drawdown_request ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_exposure_set ?secondary_tranche)
+        (entity_drawdown_linked ?secondary_tranche ?drawdown_request)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (payee_account_selected_alternate ?payee_account)
+        (secondary_tranche_has_document ?secondary_tranche ?supporting_document)
+        (not
+          (secondary_tranche_ready ?secondary_tranche)
+        )
+      )
+    :effect
+      (and
+        (payee_account_selected ?payee_account)
+        (secondary_tranche_ready ?secondary_tranche)
+        (supporting_document_available ?supporting_document)
+        (not
+          (secondary_tranche_has_document ?secondary_tranche ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_disbursement_instruction_channel_primary_payee_primary
+    :parameters (?primary_tranche - primary_tranche ?secondary_tranche - secondary_tranche ?disbursement_channel - disbursement_channel ?payee_account - payee_account ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (channel_selected_by_primary ?disbursement_channel)
+        (payee_account_selected ?payee_account)
+        (primary_tranche_ready ?primary_tranche)
+        (secondary_tranche_ready ?secondary_tranche)
+        (instruction_template_available ?disbursement_instruction)
+      )
+    :effect
+      (and
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_channel_link ?disbursement_instruction ?disbursement_channel)
+        (instruction_payee_link ?disbursement_instruction ?payee_account)
+        (not
+          (instruction_template_available ?disbursement_instruction)
+        )
+      )
+  )
+  (:action assemble_disbursement_instruction_channel_secondary_payee_primary
+    :parameters (?primary_tranche - primary_tranche ?secondary_tranche - secondary_tranche ?disbursement_channel - disbursement_channel ?payee_account - payee_account ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (channel_selected_by_secondary ?disbursement_channel)
+        (payee_account_selected ?payee_account)
+        (not
+          (primary_tranche_ready ?primary_tranche)
+        )
+        (secondary_tranche_ready ?secondary_tranche)
+        (instruction_template_available ?disbursement_instruction)
+      )
+    :effect
+      (and
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_channel_link ?disbursement_instruction ?disbursement_channel)
+        (instruction_payee_link ?disbursement_instruction ?payee_account)
+        (instruction_requires_pricing ?disbursement_instruction)
+        (not
+          (instruction_template_available ?disbursement_instruction)
+        )
+      )
+  )
+  (:action assemble_disbursement_instruction_channel_primary_payee_secondary
+    :parameters (?primary_tranche - primary_tranche ?secondary_tranche - secondary_tranche ?disbursement_channel - disbursement_channel ?payee_account - payee_account ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (channel_selected_by_primary ?disbursement_channel)
+        (payee_account_selected_alternate ?payee_account)
+        (primary_tranche_ready ?primary_tranche)
+        (not
+          (secondary_tranche_ready ?secondary_tranche)
+        )
+        (instruction_template_available ?disbursement_instruction)
+      )
+    :effect
+      (and
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_channel_link ?disbursement_instruction ?disbursement_channel)
+        (instruction_payee_link ?disbursement_instruction ?payee_account)
+        (instruction_requires_fee_schedule ?disbursement_instruction)
+        (not
+          (instruction_template_available ?disbursement_instruction)
+        )
+      )
+  )
+  (:action assemble_disbursement_instruction_channel_secondary_payee_secondary
+    :parameters (?primary_tranche - primary_tranche ?secondary_tranche - secondary_tranche ?disbursement_channel - disbursement_channel ?payee_account - payee_account ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (tranche_channel_eligible ?primary_tranche ?disbursement_channel)
+        (secondary_tranche_payee_assigned ?secondary_tranche ?payee_account)
+        (channel_selected_by_secondary ?disbursement_channel)
+        (payee_account_selected_alternate ?payee_account)
+        (not
+          (primary_tranche_ready ?primary_tranche)
+        )
+        (not
+          (secondary_tranche_ready ?secondary_tranche)
+        )
+        (instruction_template_available ?disbursement_instruction)
+      )
+    :effect
+      (and
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_channel_link ?disbursement_instruction ?disbursement_channel)
+        (instruction_payee_link ?disbursement_instruction ?payee_account)
+        (instruction_requires_pricing ?disbursement_instruction)
+        (instruction_requires_fee_schedule ?disbursement_instruction)
+        (not
+          (instruction_template_available ?disbursement_instruction)
+        )
+      )
+  )
+  (:action mark_instruction_funded
+    :parameters (?disbursement_instruction - disbursement_instruction ?primary_tranche - primary_tranche ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (instruction_assembled ?disbursement_instruction)
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (entity_drawdown_linked ?primary_tranche ?drawdown_request)
+        (not
+          (instruction_funded ?disbursement_instruction)
+        )
+      )
+    :effect (instruction_funded ?disbursement_instruction)
+  )
+  (:action reserve_collateral_for_instruction
+    :parameters (?loan_account - loan_account ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (loan_account_instruction_link ?loan_account ?disbursement_instruction)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_unit_available ?collateral_unit)
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_funded ?disbursement_instruction)
+        (not
+          (collateral_unit_reserved ?collateral_unit)
+        )
+      )
+    :effect
+      (and
+        (collateral_unit_reserved ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (not
+          (collateral_unit_available ?collateral_unit)
+        )
+      )
+  )
+  (:action stage_collateral_allocation
+    :parameters (?loan_account - loan_account ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_unit_reserved ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (entity_drawdown_linked ?loan_account ?drawdown_request)
+        (not
+          (instruction_requires_pricing ?disbursement_instruction)
+        )
+        (not
+          (collateral_staged_for_account ?loan_account)
+        )
+      )
+    :effect (collateral_staged_for_account ?loan_account)
+  )
+  (:action assign_pricing_option_to_account
+    :parameters (?loan_account - loan_account ?pricing_option - pricing_option)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (pricing_option_available ?pricing_option)
+        (not
+          (pricing_option_assigned ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (pricing_option_assigned ?loan_account)
+        (loan_account_pricing_assigned ?loan_account ?pricing_option)
+        (not
+          (pricing_option_available ?pricing_option)
+        )
+      )
+  )
+  (:action apply_pricing_option_to_instruction
+    :parameters (?loan_account - loan_account ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction ?drawdown_request - drawdown_request ?pricing_option - pricing_option)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_unit_reserved ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (entity_drawdown_linked ?loan_account ?drawdown_request)
+        (instruction_requires_pricing ?disbursement_instruction)
+        (pricing_option_assigned ?loan_account)
+        (loan_account_pricing_assigned ?loan_account ?pricing_option)
+        (not
+          (collateral_staged_for_account ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (collateral_staged_for_account ?loan_account)
+        (pricing_verified ?loan_account)
+      )
+  )
+  (:action validate_collateral_with_funding_account
+    :parameters (?loan_account - loan_account ?funding_account - funding_account ?authorized_approver - authorized_approver ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_staged_for_account ?loan_account)
+        (loan_account_funding_account_assigned ?loan_account ?funding_account)
+        (approver_assigned ?loan_account ?authorized_approver)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (not
+          (instruction_requires_fee_schedule ?disbursement_instruction)
+        )
+        (not
+          (collateral_pledge_validated ?loan_account)
+        )
+      )
+    :effect (collateral_pledge_validated ?loan_account)
+  )
+  (:action confirm_collateral_with_funding_account
+    :parameters (?loan_account - loan_account ?funding_account - funding_account ?authorized_approver - authorized_approver ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_staged_for_account ?loan_account)
+        (loan_account_funding_account_assigned ?loan_account ?funding_account)
+        (approver_assigned ?loan_account ?authorized_approver)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (instruction_requires_fee_schedule ?disbursement_instruction)
+        (not
+          (collateral_pledge_validated ?loan_account)
+        )
+      )
+    :effect (collateral_pledge_validated ?loan_account)
+  )
+  (:action establish_funding_association
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_pledge_validated ?loan_account)
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (not
+          (instruction_requires_pricing ?disbursement_instruction)
+        )
+        (not
+          (instruction_requires_fee_schedule ?disbursement_instruction)
+        )
+        (not
+          (funding_association_established ?loan_account)
+        )
+      )
+    :effect (funding_association_established ?loan_account)
+  )
+  (:action establish_and_confirm_funding_association_variant1
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_pledge_validated ?loan_account)
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (instruction_requires_pricing ?disbursement_instruction)
+        (not
+          (instruction_requires_fee_schedule ?disbursement_instruction)
+        )
+        (not
+          (funding_association_established ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (funding_association_established ?loan_account)
+        (funding_verified ?loan_account)
+      )
+  )
+  (:action establish_and_confirm_funding_association_variant2
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_pledge_validated ?loan_account)
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (not
+          (instruction_requires_pricing ?disbursement_instruction)
+        )
+        (instruction_requires_fee_schedule ?disbursement_instruction)
+        (not
+          (funding_association_established ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (funding_association_established ?loan_account)
+        (funding_verified ?loan_account)
+      )
+  )
+  (:action establish_and_confirm_funding_association_variant3
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent ?collateral_unit - collateral_unit ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (collateral_pledge_validated ?loan_account)
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (loan_account_has_collateral_unit ?loan_account ?collateral_unit)
+        (collateral_pledged_to_instruction ?collateral_unit ?disbursement_instruction)
+        (instruction_requires_pricing ?disbursement_instruction)
+        (instruction_requires_fee_schedule ?disbursement_instruction)
+        (not
+          (funding_association_established ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (funding_association_established ?loan_account)
+        (funding_verified ?loan_account)
+      )
+  )
+  (:action finalize_loan_account_planning
+    :parameters (?loan_account - loan_account)
+    :precondition
+      (and
+        (funding_association_established ?loan_account)
+        (not
+          (funding_verified ?loan_account)
+        )
+        (not
+          (final_approval_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?loan_account)
+        (planning_finalized ?loan_account)
+      )
+  )
+  (:action assign_fee_schedule_to_account
+    :parameters (?loan_account - loan_account ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (funding_association_established ?loan_account)
+        (funding_verified ?loan_account)
+        (fee_schedule_available ?fee_schedule)
+      )
+    :effect
+      (and
+        (loan_account_fee_schedule_assigned ?loan_account ?fee_schedule)
+        (not
+          (fee_schedule_available ?fee_schedule)
+        )
+      )
+  )
+  (:action complete_pricing_and_product_validation
+    :parameters (?loan_account - loan_account ?primary_tranche - primary_tranche ?secondary_tranche - secondary_tranche ?drawdown_request - drawdown_request ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (funding_association_established ?loan_account)
+        (funding_verified ?loan_account)
+        (loan_account_fee_schedule_assigned ?loan_account ?fee_schedule)
+        (loan_account_primary_tranche_association ?loan_account ?primary_tranche)
+        (loan_account_secondary_tranche_association ?loan_account ?secondary_tranche)
+        (primary_tranche_ready ?primary_tranche)
+        (secondary_tranche_ready ?secondary_tranche)
+        (entity_drawdown_linked ?loan_account ?drawdown_request)
+        (not
+          (final_validation_passed ?loan_account)
+        )
+      )
+    :effect (final_validation_passed ?loan_account)
+  )
+  (:action finalize_account_after_validations
+    :parameters (?loan_account - loan_account)
+    :precondition
+      (and
+        (funding_association_established ?loan_account)
+        (final_validation_passed ?loan_account)
+        (not
+          (final_approval_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?loan_account)
+        (planning_finalized ?loan_account)
+      )
+  )
+  (:action assign_product_offer_to_account
+    :parameters (?loan_account - loan_account ?product_offer - product_offer ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_exposure_set ?loan_account)
+        (entity_drawdown_linked ?loan_account ?drawdown_request)
+        (product_offer_available ?product_offer)
+        (loan_account_product_assigned ?loan_account ?product_offer)
+        (not
+          (product_assigned ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (product_assigned ?loan_account)
+        (not
+          (product_offer_available ?product_offer)
+        )
+      )
+  )
+  (:action initiate_product_approval
+    :parameters (?loan_account - loan_account ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (product_assigned ?loan_account)
+        (approver_assigned ?loan_account ?authorized_approver)
+        (not
+          (product_approval_started ?loan_account)
+        )
+      )
+    :effect (product_approval_started ?loan_account)
+  )
+  (:action approve_product_for_account
+    :parameters (?loan_account - loan_account ?customer_consent - customer_consent)
+    :precondition
+      (and
+        (product_approval_started ?loan_account)
+        (loan_account_customer_consent_linked ?loan_account ?customer_consent)
+        (not
+          (product_approved ?loan_account)
+        )
+      )
+    :effect (product_approved ?loan_account)
+  )
+  (:action finalize_account_after_product_approval
+    :parameters (?loan_account - loan_account)
+    :precondition
+      (and
+        (product_approved ?loan_account)
+        (not
+          (final_approval_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?loan_account)
+        (planning_finalized ?loan_account)
+      )
+  )
+  (:action finalize_primary_tranche_planning
+    :parameters (?primary_tranche - primary_tranche ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (primary_tranche_eligibility_confirmed ?primary_tranche)
+        (primary_tranche_ready ?primary_tranche)
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_funded ?disbursement_instruction)
+        (not
+          (planning_finalized ?primary_tranche)
+        )
+      )
+    :effect (planning_finalized ?primary_tranche)
+  )
+  (:action finalize_secondary_tranche_planning
+    :parameters (?secondary_tranche - secondary_tranche ?disbursement_instruction - disbursement_instruction)
+    :precondition
+      (and
+        (secondary_tranche_eligibility_confirmed ?secondary_tranche)
+        (secondary_tranche_ready ?secondary_tranche)
+        (instruction_assembled ?disbursement_instruction)
+        (instruction_funded ?disbursement_instruction)
+        (not
+          (planning_finalized ?secondary_tranche)
+        )
+      )
+    :effect (planning_finalized ?secondary_tranche)
+  )
+  (:action assign_funding_source_to_entity
+    :parameters (?credit_case - exposure_entity ?funding_source - funding_source ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (planning_finalized ?credit_case)
+        (entity_drawdown_linked ?credit_case ?drawdown_request)
+        (funding_source_available ?funding_source)
+        (not
+          (entity_funding_confirmed ?credit_case)
+        )
+      )
+    :effect
+      (and
+        (entity_funding_confirmed ?credit_case)
+        (entity_funding_source_assigned ?credit_case ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action execute_partial_disbursement_for_primary_tranche
+    :parameters (?primary_tranche - primary_tranche ?allocation_slot - allocation_slot ?funding_source - funding_source)
+    :precondition
+      (and
+        (entity_funding_confirmed ?primary_tranche)
+        (entity_allocation_assigned ?primary_tranche ?allocation_slot)
+        (entity_funding_source_assigned ?primary_tranche ?funding_source)
+        (not
+          (disbursed ?primary_tranche)
+        )
+      )
+    :effect
+      (and
+        (disbursed ?primary_tranche)
+        (allocation_slot_available ?allocation_slot)
+        (funding_source_available ?funding_source)
+      )
+  )
+  (:action execute_partial_disbursement_for_secondary_tranche
+    :parameters (?secondary_tranche - secondary_tranche ?allocation_slot - allocation_slot ?funding_source - funding_source)
+    :precondition
+      (and
+        (entity_funding_confirmed ?secondary_tranche)
+        (entity_allocation_assigned ?secondary_tranche ?allocation_slot)
+        (entity_funding_source_assigned ?secondary_tranche ?funding_source)
+        (not
+          (disbursed ?secondary_tranche)
+        )
+      )
+    :effect
+      (and
+        (disbursed ?secondary_tranche)
+        (allocation_slot_available ?allocation_slot)
+        (funding_source_available ?funding_source)
+      )
+  )
+  (:action execute_partial_disbursement_for_loan_account
+    :parameters (?loan_account - loan_account ?allocation_slot - allocation_slot ?funding_source - funding_source)
+    :precondition
+      (and
+        (entity_funding_confirmed ?loan_account)
+        (entity_allocation_assigned ?loan_account ?allocation_slot)
+        (entity_funding_source_assigned ?loan_account ?funding_source)
+        (not
+          (disbursed ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (disbursed ?loan_account)
+        (allocation_slot_available ?allocation_slot)
+        (funding_source_available ?funding_source)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem partial_disbursement_planning_problem)
+  (:domain partial_disbursement_planning)
+  (:objects primary_tranche_1 - primary_tranche secondary_tranche_1 - secondary_tranche loan_account_1 - loan_account loan_account_2 - loan_account allocation_slot_1 - allocation_slot allocation_slot_2 - allocation_slot allocation_slot_3 - allocation_slot drawdown_request_1 - drawdown_request approver_1 - authorized_approver supporting_document_1 - supporting_document disbursement_channel_1 - disbursement_channel payee_account_1 - payee_account disbursement_instruction_1 - disbursement_instruction collateral_unit_1 - collateral_unit collateral_unit_2 - collateral_unit pricing_option_standard - pricing_option pricing_option_premium - pricing_option fee_schedule_standard - fee_schedule fee_schedule_extra - fee_schedule funding_source_treasury_pool - funding_source funding_account_operative - funding_account product_offer_basic - product_offer product_offer_premium - product_offer customer_consent_signed - customer_consent)
+  (:init
+    (allocation_slot_available allocation_slot_1)
+    (allocation_slot_available allocation_slot_2)
+    (allocation_slot_available allocation_slot_3)
+    (drawdown_request_pending drawdown_request_1)
+    (approver_available approver_1)
+    (supporting_document_available supporting_document_1)
+    (tranche_channel_eligible primary_tranche_1 disbursement_channel_1)
+    (secondary_tranche_payee_assigned secondary_tranche_1 payee_account_1)
+    (instruction_template_available disbursement_instruction_1)
+    (collateral_unit_available collateral_unit_1)
+    (collateral_unit_available collateral_unit_2)
+    (loan_account_primary_tranche_association loan_account_1 primary_tranche_1)
+    (loan_account_primary_tranche_association loan_account_2 primary_tranche_1)
+    (loan_account_secondary_tranche_association loan_account_1 secondary_tranche_1)
+    (loan_account_secondary_tranche_association loan_account_2 secondary_tranche_1)
+    (loan_account_instruction_link loan_account_1 disbursement_instruction_1)
+    (loan_account_instruction_link loan_account_2 disbursement_instruction_1)
+    (loan_account_has_collateral_unit loan_account_1 collateral_unit_1)
+    (loan_account_has_collateral_unit loan_account_2 collateral_unit_2)
+    (pricing_option_available pricing_option_standard)
+    (pricing_option_available pricing_option_premium)
+    (fee_schedule_available fee_schedule_standard)
+    (fee_schedule_available fee_schedule_extra)
+    (funding_source_available funding_source_treasury_pool)
+    (funding_account_available funding_account_operative)
+    (product_offer_available product_offer_basic)
+    (loan_account_product_assigned loan_account_1 product_offer_basic)
+    (loan_account_product_assigned loan_account_2 product_offer_premium)
+    (customer_consent_available customer_consent_signed)
+  )
+  (:goal
+    (and
+      (disbursed primary_tranche_1)
+      (disbursed secondary_tranche_1)
+      (disbursed loan_account_1)
+      (disbursed loan_account_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_credit_case primary_tranche_1)
+(assign_allocation_slot_to_entity primary_tranche_1 allocation_slot_1)
+(link_drawdown_request_to_case primary_tranche_1 drawdown_request_1)
+(confirm_case_exposure primary_tranche_1 drawdown_request_1)
+(attach_document_to_primary_tranche primary_tranche_1 disbursement_channel_1 supporting_document_1)
+(finalize_primary_tranche_channel_selection primary_tranche_1 disbursement_channel_1 drawdown_request_1 supporting_document_1)
+(unlink_drawdown_request_from_case primary_tranche_1 drawdown_request_1)
+(register_credit_case secondary_tranche_1)
+(assign_allocation_slot_to_entity secondary_tranche_1 allocation_slot_2)
+(link_drawdown_request_to_case secondary_tranche_1 drawdown_request_1)
+(confirm_case_exposure secondary_tranche_1 drawdown_request_1)
+(attach_document_to_secondary_tranche secondary_tranche_1 payee_account_1 supporting_document_1)
+(finalize_secondary_tranche_payee_selection secondary_tranche_1 payee_account_1 drawdown_request_1 supporting_document_1)
+(unlink_drawdown_request_from_case secondary_tranche_1 drawdown_request_1)
+(link_drawdown_request_to_case primary_tranche_1 drawdown_request_1)
+(assemble_disbursement_instruction_channel_primary_payee_primary primary_tranche_1 secondary_tranche_1 disbursement_channel_1 payee_account_1 disbursement_instruction_1)
+(mark_instruction_funded disbursement_instruction_1 primary_tranche_1 drawdown_request_1)
+(unlink_drawdown_request_from_case primary_tranche_1 drawdown_request_1)
+(finalize_primary_tranche_planning primary_tranche_1 disbursement_instruction_1)
+(finalize_secondary_tranche_planning secondary_tranche_1 disbursement_instruction_1)
+(register_credit_case loan_account_1)
+(assign_allocation_slot_to_entity loan_account_1 allocation_slot_3)
+(link_drawdown_request_to_case loan_account_1 drawdown_request_1)
+(confirm_case_exposure loan_account_1 drawdown_request_1)
+(assign_funding_account_to_loan_account loan_account_1 funding_account_operative)
+(assign_customer_consent_to_loan_account loan_account_1 customer_consent_signed)
+(reserve_collateral_for_instruction loan_account_1 collateral_unit_1 disbursement_instruction_1)
+(stage_collateral_allocation loan_account_1 collateral_unit_1 disbursement_instruction_1 drawdown_request_1)
+(assign_approver loan_account_1 approver_1)
+(validate_collateral_with_funding_account loan_account_1 funding_account_operative approver_1 collateral_unit_1 disbursement_instruction_1)
+(establish_funding_association loan_account_1 customer_consent_signed collateral_unit_1 disbursement_instruction_1)
+(finalize_loan_account_planning loan_account_1)
+(assign_funding_source_to_entity loan_account_1 funding_source_treasury_pool drawdown_request_1)
+(execute_partial_disbursement_for_loan_account loan_account_1 allocation_slot_3 funding_source_treasury_pool)
+(unlink_drawdown_request_from_case loan_account_1 drawdown_request_1)
+(unassign_funding_account_from_loan_account loan_account_1 funding_account_operative)
+(remove_customer_consent_from_loan_account loan_account_1 customer_consent_signed)
+(unassign_approver loan_account_1 approver_1)
+(register_credit_case loan_account_2)
+(assign_allocation_slot_to_entity loan_account_2 allocation_slot_3)
+(link_drawdown_request_to_case loan_account_2 drawdown_request_1)
+(confirm_case_exposure loan_account_2 drawdown_request_1)
+(assign_funding_account_to_loan_account loan_account_2 funding_account_operative)
+(assign_customer_consent_to_loan_account loan_account_2 customer_consent_signed)
+(reserve_collateral_for_instruction loan_account_2 collateral_unit_2 disbursement_instruction_1)
+(stage_collateral_allocation loan_account_2 collateral_unit_2 disbursement_instruction_1 drawdown_request_1)
+(assign_approver loan_account_2 approver_1)
+(validate_collateral_with_funding_account loan_account_2 funding_account_operative approver_1 collateral_unit_2 disbursement_instruction_1)
+(establish_funding_association loan_account_2 customer_consent_signed collateral_unit_2 disbursement_instruction_1)
+(finalize_loan_account_planning loan_account_2)
+(assign_funding_source_to_entity loan_account_2 funding_source_treasury_pool drawdown_request_1)
+(execute_partial_disbursement_for_loan_account loan_account_2 allocation_slot_3 funding_source_treasury_pool)
+(unlink_drawdown_request_from_case loan_account_2 drawdown_request_1)
+(link_drawdown_request_to_case primary_tranche_1 drawdown_request_1)
+(assign_funding_source_to_entity primary_tranche_1 funding_source_treasury_pool drawdown_request_1)
+(execute_partial_disbursement_for_primary_tranche primary_tranche_1 allocation_slot_1 funding_source_treasury_pool)
+(unlink_drawdown_request_from_case primary_tranche_1 drawdown_request_1)
+(link_drawdown_request_to_case secondary_tranche_1 drawdown_request_1)
+(assign_funding_source_to_entity secondary_tranche_1 funding_source_treasury_pool drawdown_request_1)
+(execute_partial_disbursement_for_secondary_tranche secondary_tranche_1 allocation_slot_2 funding_source_treasury_pool)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__xhzj3ey/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 60 
+
+Successful plans:
+Value: 60
+ /tmp/val__xhzj3ey/plan.pddl 60 
+
+
+
+--- stderr ---
+

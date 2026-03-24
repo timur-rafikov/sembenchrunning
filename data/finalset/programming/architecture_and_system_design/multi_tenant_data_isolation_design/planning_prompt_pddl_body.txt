@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain multi_tenant_data_isolation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types infrastructure_type - object control_plane_type - object management_entity - object tenant_identifier - object tenant - tenant_identifier resource_pool - infrastructure_type access_request - infrastructure_type operator_credential - infrastructure_type feature_flag - infrastructure_type configuration_artifact - infrastructure_type audit_record - infrastructure_type secret_material - infrastructure_type encryption_key - infrastructure_type policy_token - control_plane_type schema_partition - control_plane_type compliance_artifact - control_plane_type isolation_boundary_a - management_entity isolation_boundary_b - management_entity data_store - management_entity tenant_profile - tenant tenant_metadata - tenant primary_tenant_context - tenant_profile secondary_tenant_context - tenant_profile application_service - tenant_metadata)
+  (:predicates
+    (entity_registered ?tenant - tenant)
+    (entity_activated ?tenant - tenant)
+    (entity_pool_assigned ?tenant - tenant)
+    (entity_enforcement_applied ?tenant - tenant)
+    (isolation_enforcement_committed ?tenant - tenant)
+    (entity_ready_for_enforcement ?tenant - tenant)
+    (resource_pool_available ?resource_pool - resource_pool)
+    (entity_resource_pool_binding ?tenant - tenant ?resource_pool - resource_pool)
+    (access_request_available ?access_request - access_request)
+    (entity_access_request_binding ?tenant - tenant ?access_request - access_request)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (entity_operator_credential_binding ?tenant - tenant ?operator_credential - operator_credential)
+    (policy_token_available ?policy_token - policy_token)
+    (primary_context_policy_bound ?primary_tenant_context - primary_tenant_context ?policy_token - policy_token)
+    (secondary_context_policy_bound ?secondary_tenant_context - secondary_tenant_context ?policy_token - policy_token)
+    (context_bound_isolation_a ?primary_tenant_context - primary_tenant_context ?isolation_boundary_a - isolation_boundary_a)
+    (isolation_a_reserved ?isolation_boundary_a - isolation_boundary_a)
+    (isolation_a_configured ?isolation_boundary_a - isolation_boundary_a)
+    (primary_context_reservation_confirmed ?primary_tenant_context - primary_tenant_context)
+    (context_bound_isolation_b ?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_b - isolation_boundary_b)
+    (isolation_b_reserved ?isolation_boundary_b - isolation_boundary_b)
+    (isolation_b_configured ?isolation_boundary_b - isolation_boundary_b)
+    (secondary_context_reservation_confirmed ?secondary_tenant_context - secondary_tenant_context)
+    (data_store_available ?data_store - data_store)
+    (data_store_allocated ?data_store - data_store)
+    (data_store_bound_to_isolation_a ?data_store - data_store ?isolation_boundary_a - isolation_boundary_a)
+    (data_store_bound_to_isolation_b ?data_store - data_store ?isolation_boundary_b - isolation_boundary_b)
+    (data_store_supports_shared_schema ?data_store - data_store)
+    (data_store_supports_dedicated_schema ?data_store - data_store)
+    (data_store_schema_initialized ?data_store - data_store)
+    (service_bound_to_primary_context ?application_service - application_service ?primary_tenant_context - primary_tenant_context)
+    (service_bound_to_secondary_context ?application_service - application_service ?secondary_tenant_context - secondary_tenant_context)
+    (service_bound_to_data_store ?application_service - application_service ?data_store - data_store)
+    (schema_partition_available ?schema_partition - schema_partition)
+    (service_attached_schema_partition ?application_service - application_service ?schema_partition - schema_partition)
+    (schema_partition_initialized ?schema_partition - schema_partition)
+    (schema_partition_bound_to_data_store ?schema_partition - schema_partition ?data_store - data_store)
+    (service_schema_prepared ?application_service - application_service)
+    (service_secret_bindings_committed ?application_service - application_service)
+    (service_configuration_applied ?application_service - application_service)
+    (service_feature_attached ?application_service - application_service)
+    (service_feature_initialized ?application_service - application_service)
+    (service_config_artifact_attached ?application_service - application_service)
+    (service_dataset_initialized ?application_service - application_service)
+    (compliance_artifact_available ?compliance_artifact - compliance_artifact)
+    (service_compliance_artifact_bound ?application_service - application_service ?compliance_artifact - compliance_artifact)
+    (service_compliance_applied ?application_service - application_service)
+    (service_compliance_stage_bound ?application_service - application_service)
+    (service_compliance_finalized ?application_service - application_service)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (service_feature_flag_binding ?application_service - application_service ?feature_flag - feature_flag)
+    (configuration_artifact_available ?configuration_artifact - configuration_artifact)
+    (service_configuration_artifact_bound ?application_service - application_service ?configuration_artifact - configuration_artifact)
+    (secret_material_available ?secret_material - secret_material)
+    (service_secret_binding ?application_service - application_service ?secret_material - secret_material)
+    (encryption_key_available ?encryption_key - encryption_key)
+    (service_encryption_key_bound ?application_service - application_service ?encryption_key - encryption_key)
+    (audit_record_available ?audit_record - audit_record)
+    (entity_audit_logged ?tenant - tenant ?audit_record - audit_record)
+    (primary_context_reservation_active ?primary_tenant_context - primary_tenant_context)
+    (secondary_context_reservation_active ?secondary_tenant_context - secondary_tenant_context)
+    (service_activation_flag ?application_service - application_service)
+  )
+  (:action register_tenant
+    :parameters (?tenant - tenant)
+    :precondition
+      (and
+        (not
+          (entity_registered ?tenant)
+        )
+        (not
+          (entity_enforcement_applied ?tenant)
+        )
+      )
+    :effect (entity_registered ?tenant)
+  )
+  (:action assign_resource_pool
+    :parameters (?tenant - tenant ?resource_pool - resource_pool)
+    :precondition
+      (and
+        (entity_registered ?tenant)
+        (not
+          (entity_pool_assigned ?tenant)
+        )
+        (resource_pool_available ?resource_pool)
+      )
+    :effect
+      (and
+        (entity_pool_assigned ?tenant)
+        (entity_resource_pool_binding ?tenant ?resource_pool)
+        (not
+          (resource_pool_available ?resource_pool)
+        )
+      )
+  )
+  (:action attach_access_request
+    :parameters (?tenant - tenant ?access_request - access_request)
+    :precondition
+      (and
+        (entity_registered ?tenant)
+        (entity_pool_assigned ?tenant)
+        (access_request_available ?access_request)
+      )
+    :effect
+      (and
+        (entity_access_request_binding ?tenant ?access_request)
+        (not
+          (access_request_available ?access_request)
+        )
+      )
+  )
+  (:action finalize_tenant_activation
+    :parameters (?tenant - tenant ?access_request - access_request)
+    :precondition
+      (and
+        (entity_registered ?tenant)
+        (entity_pool_assigned ?tenant)
+        (entity_access_request_binding ?tenant ?access_request)
+        (not
+          (entity_activated ?tenant)
+        )
+      )
+    :effect (entity_activated ?tenant)
+  )
+  (:action release_access_request
+    :parameters (?tenant - tenant ?access_request - access_request)
+    :precondition
+      (and
+        (entity_access_request_binding ?tenant ?access_request)
+      )
+    :effect
+      (and
+        (access_request_available ?access_request)
+        (not
+          (entity_access_request_binding ?tenant ?access_request)
+        )
+      )
+  )
+  (:action bind_operator_credential_to_tenant
+    :parameters (?tenant - tenant ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (entity_activated ?tenant)
+        (operator_credential_available ?operator_credential)
+      )
+    :effect
+      (and
+        (entity_operator_credential_binding ?tenant ?operator_credential)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action release_operator_credential
+    :parameters (?tenant - tenant ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (entity_operator_credential_binding ?tenant ?operator_credential)
+      )
+    :effect
+      (and
+        (operator_credential_available ?operator_credential)
+        (not
+          (entity_operator_credential_binding ?tenant ?operator_credential)
+        )
+      )
+  )
+  (:action bind_secret_to_service
+    :parameters (?application_service - application_service ?secret_material - secret_material)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (secret_material_available ?secret_material)
+      )
+    :effect
+      (and
+        (service_secret_binding ?application_service ?secret_material)
+        (not
+          (secret_material_available ?secret_material)
+        )
+      )
+  )
+  (:action unbind_secret_from_service
+    :parameters (?application_service - application_service ?secret_material - secret_material)
+    :precondition
+      (and
+        (service_secret_binding ?application_service ?secret_material)
+      )
+    :effect
+      (and
+        (secret_material_available ?secret_material)
+        (not
+          (service_secret_binding ?application_service ?secret_material)
+        )
+      )
+  )
+  (:action bind_encryption_key_to_service
+    :parameters (?application_service - application_service ?encryption_key - encryption_key)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (encryption_key_available ?encryption_key)
+      )
+    :effect
+      (and
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (not
+          (encryption_key_available ?encryption_key)
+        )
+      )
+  )
+  (:action unbind_encryption_key_from_service
+    :parameters (?application_service - application_service ?encryption_key - encryption_key)
+    :precondition
+      (and
+        (service_encryption_key_bound ?application_service ?encryption_key)
+      )
+    :effect
+      (and
+        (encryption_key_available ?encryption_key)
+        (not
+          (service_encryption_key_bound ?application_service ?encryption_key)
+        )
+      )
+  )
+  (:action reserve_isolation_a_for_primary_context
+    :parameters (?primary_tenant_context - primary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?access_request - access_request)
+    :precondition
+      (and
+        (entity_activated ?primary_tenant_context)
+        (entity_access_request_binding ?primary_tenant_context ?access_request)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (not
+          (isolation_a_reserved ?isolation_boundary_a)
+        )
+        (not
+          (isolation_a_configured ?isolation_boundary_a)
+        )
+      )
+    :effect (isolation_a_reserved ?isolation_boundary_a)
+  )
+  (:action confirm_primary_reservation_with_operator
+    :parameters (?primary_tenant_context - primary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (entity_activated ?primary_tenant_context)
+        (entity_operator_credential_binding ?primary_tenant_context ?operator_credential)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (isolation_a_reserved ?isolation_boundary_a)
+        (not
+          (primary_context_reservation_active ?primary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+      )
+  )
+  (:action apply_policy_and_reserve_isolation_a
+    :parameters (?primary_tenant_context - primary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?policy_token - policy_token)
+    :precondition
+      (and
+        (entity_activated ?primary_tenant_context)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (policy_token_available ?policy_token)
+        (not
+          (primary_context_reservation_active ?primary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (isolation_a_configured ?isolation_boundary_a)
+        (primary_context_reservation_active ?primary_tenant_context)
+        (primary_context_policy_bound ?primary_tenant_context ?policy_token)
+        (not
+          (policy_token_available ?policy_token)
+        )
+      )
+  )
+  (:action finalize_primary_reservation
+    :parameters (?primary_tenant_context - primary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?access_request - access_request ?policy_token - policy_token)
+    :precondition
+      (and
+        (entity_activated ?primary_tenant_context)
+        (entity_access_request_binding ?primary_tenant_context ?access_request)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (isolation_a_configured ?isolation_boundary_a)
+        (primary_context_policy_bound ?primary_tenant_context ?policy_token)
+        (not
+          (primary_context_reservation_confirmed ?primary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (isolation_a_reserved ?isolation_boundary_a)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+        (policy_token_available ?policy_token)
+        (not
+          (primary_context_policy_bound ?primary_tenant_context ?policy_token)
+        )
+      )
+  )
+  (:action reserve_isolation_b_for_secondary_context
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_b - isolation_boundary_b ?access_request - access_request)
+    :precondition
+      (and
+        (entity_activated ?secondary_tenant_context)
+        (entity_access_request_binding ?secondary_tenant_context ?access_request)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (not
+          (isolation_b_reserved ?isolation_boundary_b)
+        )
+        (not
+          (isolation_b_configured ?isolation_boundary_b)
+        )
+      )
+    :effect (isolation_b_reserved ?isolation_boundary_b)
+  )
+  (:action confirm_secondary_reservation_with_operator
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_b - isolation_boundary_b ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (entity_activated ?secondary_tenant_context)
+        (entity_operator_credential_binding ?secondary_tenant_context ?operator_credential)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_b_reserved ?isolation_boundary_b)
+        (not
+          (secondary_context_reservation_active ?secondary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+      )
+  )
+  (:action apply_policy_and_reserve_isolation_b
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_b - isolation_boundary_b ?policy_token - policy_token)
+    :precondition
+      (and
+        (entity_activated ?secondary_tenant_context)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (policy_token_available ?policy_token)
+        (not
+          (secondary_context_reservation_active ?secondary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (isolation_b_configured ?isolation_boundary_b)
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (secondary_context_policy_bound ?secondary_tenant_context ?policy_token)
+        (not
+          (policy_token_available ?policy_token)
+        )
+      )
+  )
+  (:action finalize_secondary_reservation
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_b - isolation_boundary_b ?access_request - access_request ?policy_token - policy_token)
+    :precondition
+      (and
+        (entity_activated ?secondary_tenant_context)
+        (entity_access_request_binding ?secondary_tenant_context ?access_request)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_b_configured ?isolation_boundary_b)
+        (secondary_context_policy_bound ?secondary_tenant_context ?policy_token)
+        (not
+          (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (isolation_b_reserved ?isolation_boundary_b)
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        (policy_token_available ?policy_token)
+        (not
+          (secondary_context_policy_bound ?secondary_tenant_context ?policy_token)
+        )
+      )
+  )
+  (:action allocate_and_bind_data_store
+    :parameters (?primary_tenant_context - primary_tenant_context ?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?isolation_boundary_b - isolation_boundary_b ?data_store - data_store)
+    :precondition
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_a_reserved ?isolation_boundary_a)
+        (isolation_b_reserved ?isolation_boundary_b)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        (data_store_available ?data_store)
+      )
+    :effect
+      (and
+        (data_store_allocated ?data_store)
+        (data_store_bound_to_isolation_a ?data_store ?isolation_boundary_a)
+        (data_store_bound_to_isolation_b ?data_store ?isolation_boundary_b)
+        (not
+          (data_store_available ?data_store)
+        )
+      )
+  )
+  (:action allocate_bind_data_store_with_shared_schema_support
+    :parameters (?primary_tenant_context - primary_tenant_context ?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?isolation_boundary_b - isolation_boundary_b ?data_store - data_store)
+    :precondition
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_a_configured ?isolation_boundary_a)
+        (isolation_b_reserved ?isolation_boundary_b)
+        (not
+          (primary_context_reservation_confirmed ?primary_tenant_context)
+        )
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        (data_store_available ?data_store)
+      )
+    :effect
+      (and
+        (data_store_allocated ?data_store)
+        (data_store_bound_to_isolation_a ?data_store ?isolation_boundary_a)
+        (data_store_bound_to_isolation_b ?data_store ?isolation_boundary_b)
+        (data_store_supports_shared_schema ?data_store)
+        (not
+          (data_store_available ?data_store)
+        )
+      )
+  )
+  (:action allocate_bind_data_store_with_dedicated_schema_support
+    :parameters (?primary_tenant_context - primary_tenant_context ?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?isolation_boundary_b - isolation_boundary_b ?data_store - data_store)
+    :precondition
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_a_reserved ?isolation_boundary_a)
+        (isolation_b_configured ?isolation_boundary_b)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+        (not
+          (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        )
+        (data_store_available ?data_store)
+      )
+    :effect
+      (and
+        (data_store_allocated ?data_store)
+        (data_store_bound_to_isolation_a ?data_store ?isolation_boundary_a)
+        (data_store_bound_to_isolation_b ?data_store ?isolation_boundary_b)
+        (data_store_supports_dedicated_schema ?data_store)
+        (not
+          (data_store_available ?data_store)
+        )
+      )
+  )
+  (:action allocate_bind_data_store_with_both_schema_modes
+    :parameters (?primary_tenant_context - primary_tenant_context ?secondary_tenant_context - secondary_tenant_context ?isolation_boundary_a - isolation_boundary_a ?isolation_boundary_b - isolation_boundary_b ?data_store - data_store)
+    :precondition
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (context_bound_isolation_a ?primary_tenant_context ?isolation_boundary_a)
+        (context_bound_isolation_b ?secondary_tenant_context ?isolation_boundary_b)
+        (isolation_a_configured ?isolation_boundary_a)
+        (isolation_b_configured ?isolation_boundary_b)
+        (not
+          (primary_context_reservation_confirmed ?primary_tenant_context)
+        )
+        (not
+          (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        )
+        (data_store_available ?data_store)
+      )
+    :effect
+      (and
+        (data_store_allocated ?data_store)
+        (data_store_bound_to_isolation_a ?data_store ?isolation_boundary_a)
+        (data_store_bound_to_isolation_b ?data_store ?isolation_boundary_b)
+        (data_store_supports_shared_schema ?data_store)
+        (data_store_supports_dedicated_schema ?data_store)
+        (not
+          (data_store_available ?data_store)
+        )
+      )
+  )
+  (:action initialize_data_store_schema
+    :parameters (?data_store - data_store ?primary_tenant_context - primary_tenant_context ?access_request - access_request)
+    :precondition
+      (and
+        (data_store_allocated ?data_store)
+        (primary_context_reservation_active ?primary_tenant_context)
+        (entity_access_request_binding ?primary_tenant_context ?access_request)
+        (not
+          (data_store_schema_initialized ?data_store)
+        )
+      )
+    :effect (data_store_schema_initialized ?data_store)
+  )
+  (:action initialize_schema_partition
+    :parameters (?application_service - application_service ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (service_bound_to_data_store ?application_service ?data_store)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_available ?schema_partition)
+        (data_store_allocated ?data_store)
+        (data_store_schema_initialized ?data_store)
+        (not
+          (schema_partition_initialized ?schema_partition)
+        )
+      )
+    :effect
+      (and
+        (schema_partition_initialized ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (not
+          (schema_partition_available ?schema_partition)
+        )
+      )
+  )
+  (:action attach_schema_partition_to_service
+    :parameters (?application_service - application_service ?schema_partition - schema_partition ?data_store - data_store ?access_request - access_request)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_initialized ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (entity_access_request_binding ?application_service ?access_request)
+        (not
+          (data_store_supports_shared_schema ?data_store)
+        )
+        (not
+          (service_schema_prepared ?application_service)
+        )
+      )
+    :effect (service_schema_prepared ?application_service)
+  )
+  (:action attach_feature_flag_to_service
+    :parameters (?application_service - application_service ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (feature_flag_available ?feature_flag)
+        (not
+          (service_feature_attached ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_feature_attached ?application_service)
+        (service_feature_flag_binding ?application_service ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action apply_feature_flag_and_prepare_service
+    :parameters (?application_service - application_service ?schema_partition - schema_partition ?data_store - data_store ?access_request - access_request ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_initialized ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (entity_access_request_binding ?application_service ?access_request)
+        (data_store_supports_shared_schema ?data_store)
+        (service_feature_attached ?application_service)
+        (service_feature_flag_binding ?application_service ?feature_flag)
+        (not
+          (service_schema_prepared ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_schema_prepared ?application_service)
+        (service_feature_initialized ?application_service)
+      )
+  )
+  (:action bind_secret_material_primary
+    :parameters (?application_service - application_service ?secret_material - secret_material ?operator_credential - operator_credential ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_schema_prepared ?application_service)
+        (service_secret_binding ?application_service ?secret_material)
+        (entity_operator_credential_binding ?application_service ?operator_credential)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (not
+          (data_store_supports_dedicated_schema ?data_store)
+        )
+        (not
+          (service_secret_bindings_committed ?application_service)
+        )
+      )
+    :effect (service_secret_bindings_committed ?application_service)
+  )
+  (:action bind_secret_material_secondary
+    :parameters (?application_service - application_service ?secret_material - secret_material ?operator_credential - operator_credential ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_schema_prepared ?application_service)
+        (service_secret_binding ?application_service ?secret_material)
+        (entity_operator_credential_binding ?application_service ?operator_credential)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (data_store_supports_dedicated_schema ?data_store)
+        (not
+          (service_secret_bindings_committed ?application_service)
+        )
+      )
+    :effect (service_secret_bindings_committed ?application_service)
+  )
+  (:action bind_encryption_key_and_enable_service
+    :parameters (?application_service - application_service ?encryption_key - encryption_key ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_secret_bindings_committed ?application_service)
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (not
+          (data_store_supports_shared_schema ?data_store)
+        )
+        (not
+          (data_store_supports_dedicated_schema ?data_store)
+        )
+        (not
+          (service_configuration_applied ?application_service)
+        )
+      )
+    :effect (service_configuration_applied ?application_service)
+  )
+  (:action bind_encryption_key_and_enable_service_with_config_marker
+    :parameters (?application_service - application_service ?encryption_key - encryption_key ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_secret_bindings_committed ?application_service)
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (data_store_supports_shared_schema ?data_store)
+        (not
+          (data_store_supports_dedicated_schema ?data_store)
+        )
+        (not
+          (service_configuration_applied ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_configuration_applied ?application_service)
+        (service_config_artifact_attached ?application_service)
+      )
+  )
+  (:action bind_encryption_key_and_enable_service_with_shared_schema_marker
+    :parameters (?application_service - application_service ?encryption_key - encryption_key ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_secret_bindings_committed ?application_service)
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (not
+          (data_store_supports_shared_schema ?data_store)
+        )
+        (data_store_supports_dedicated_schema ?data_store)
+        (not
+          (service_configuration_applied ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_configuration_applied ?application_service)
+        (service_config_artifact_attached ?application_service)
+      )
+  )
+  (:action bind_encryption_key_and_enable_service_with_full_schema_and_config
+    :parameters (?application_service - application_service ?encryption_key - encryption_key ?schema_partition - schema_partition ?data_store - data_store)
+    :precondition
+      (and
+        (service_secret_bindings_committed ?application_service)
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (service_attached_schema_partition ?application_service ?schema_partition)
+        (schema_partition_bound_to_data_store ?schema_partition ?data_store)
+        (data_store_supports_shared_schema ?data_store)
+        (data_store_supports_dedicated_schema ?data_store)
+        (not
+          (service_configuration_applied ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_configuration_applied ?application_service)
+        (service_config_artifact_attached ?application_service)
+      )
+  )
+  (:action mark_service_ready_for_activation
+    :parameters (?application_service - application_service)
+    :precondition
+      (and
+        (service_configuration_applied ?application_service)
+        (not
+          (service_config_artifact_attached ?application_service)
+        )
+        (not
+          (service_activation_flag ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_activation_flag ?application_service)
+        (isolation_enforcement_committed ?application_service)
+      )
+  )
+  (:action attach_configuration_artifact
+    :parameters (?application_service - application_service ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (service_configuration_applied ?application_service)
+        (service_config_artifact_attached ?application_service)
+        (configuration_artifact_available ?configuration_artifact)
+      )
+    :effect
+      (and
+        (service_configuration_artifact_bound ?application_service ?configuration_artifact)
+        (not
+          (configuration_artifact_available ?configuration_artifact)
+        )
+      )
+  )
+  (:action initialize_service_dataset
+    :parameters (?application_service - application_service ?primary_tenant_context - primary_tenant_context ?secondary_tenant_context - secondary_tenant_context ?access_request - access_request ?configuration_artifact - configuration_artifact)
+    :precondition
+      (and
+        (service_configuration_applied ?application_service)
+        (service_config_artifact_attached ?application_service)
+        (service_configuration_artifact_bound ?application_service ?configuration_artifact)
+        (service_bound_to_primary_context ?application_service ?primary_tenant_context)
+        (service_bound_to_secondary_context ?application_service ?secondary_tenant_context)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        (entity_access_request_binding ?application_service ?access_request)
+        (not
+          (service_dataset_initialized ?application_service)
+        )
+      )
+    :effect (service_dataset_initialized ?application_service)
+  )
+  (:action finalize_service_activation
+    :parameters (?application_service - application_service)
+    :precondition
+      (and
+        (service_configuration_applied ?application_service)
+        (service_dataset_initialized ?application_service)
+        (not
+          (service_activation_flag ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_activation_flag ?application_service)
+        (isolation_enforcement_committed ?application_service)
+      )
+  )
+  (:action bind_compliance_artifact_to_service
+    :parameters (?application_service - application_service ?compliance_artifact - compliance_artifact ?access_request - access_request)
+    :precondition
+      (and
+        (entity_activated ?application_service)
+        (entity_access_request_binding ?application_service ?access_request)
+        (compliance_artifact_available ?compliance_artifact)
+        (service_compliance_artifact_bound ?application_service ?compliance_artifact)
+        (not
+          (service_compliance_applied ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_compliance_applied ?application_service)
+        (not
+          (compliance_artifact_available ?compliance_artifact)
+        )
+      )
+  )
+  (:action prepare_service_compliance_stage
+    :parameters (?application_service - application_service ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (service_compliance_applied ?application_service)
+        (entity_operator_credential_binding ?application_service ?operator_credential)
+        (not
+          (service_compliance_stage_bound ?application_service)
+        )
+      )
+    :effect (service_compliance_stage_bound ?application_service)
+  )
+  (:action finalize_service_compliance_stage
+    :parameters (?application_service - application_service ?encryption_key - encryption_key)
+    :precondition
+      (and
+        (service_compliance_stage_bound ?application_service)
+        (service_encryption_key_bound ?application_service ?encryption_key)
+        (not
+          (service_compliance_finalized ?application_service)
+        )
+      )
+    :effect (service_compliance_finalized ?application_service)
+  )
+  (:action enforce_service_compliance_and_mark_activation
+    :parameters (?application_service - application_service)
+    :precondition
+      (and
+        (service_compliance_finalized ?application_service)
+        (not
+          (service_activation_flag ?application_service)
+        )
+      )
+    :effect
+      (and
+        (service_activation_flag ?application_service)
+        (isolation_enforcement_committed ?application_service)
+      )
+  )
+  (:action enforce_primary_context_isolation
+    :parameters (?primary_tenant_context - primary_tenant_context ?data_store - data_store)
+    :precondition
+      (and
+        (primary_context_reservation_active ?primary_tenant_context)
+        (primary_context_reservation_confirmed ?primary_tenant_context)
+        (data_store_allocated ?data_store)
+        (data_store_schema_initialized ?data_store)
+        (not
+          (isolation_enforcement_committed ?primary_tenant_context)
+        )
+      )
+    :effect (isolation_enforcement_committed ?primary_tenant_context)
+  )
+  (:action enforce_secondary_context_isolation
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?data_store - data_store)
+    :precondition
+      (and
+        (secondary_context_reservation_active ?secondary_tenant_context)
+        (secondary_context_reservation_confirmed ?secondary_tenant_context)
+        (data_store_allocated ?data_store)
+        (data_store_schema_initialized ?data_store)
+        (not
+          (isolation_enforcement_committed ?secondary_tenant_context)
+        )
+      )
+    :effect (isolation_enforcement_committed ?secondary_tenant_context)
+  )
+  (:action record_audit_and_prepare_enforcement
+    :parameters (?tenant - tenant ?audit_record - audit_record ?access_request - access_request)
+    :precondition
+      (and
+        (isolation_enforcement_committed ?tenant)
+        (entity_access_request_binding ?tenant ?access_request)
+        (audit_record_available ?audit_record)
+        (not
+          (entity_ready_for_enforcement ?tenant)
+        )
+      )
+    :effect
+      (and
+        (entity_ready_for_enforcement ?tenant)
+        (entity_audit_logged ?tenant ?audit_record)
+        (not
+          (audit_record_available ?audit_record)
+        )
+      )
+  )
+  (:action commit_enforcement_and_release_resource_pool
+    :parameters (?primary_tenant_context - primary_tenant_context ?resource_pool - resource_pool ?audit_record - audit_record)
+    :precondition
+      (and
+        (entity_ready_for_enforcement ?primary_tenant_context)
+        (entity_resource_pool_binding ?primary_tenant_context ?resource_pool)
+        (entity_audit_logged ?primary_tenant_context ?audit_record)
+        (not
+          (entity_enforcement_applied ?primary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (entity_enforcement_applied ?primary_tenant_context)
+        (resource_pool_available ?resource_pool)
+        (audit_record_available ?audit_record)
+      )
+  )
+  (:action commit_secondary_enforcement_and_release_resource_pool
+    :parameters (?secondary_tenant_context - secondary_tenant_context ?resource_pool - resource_pool ?audit_record - audit_record)
+    :precondition
+      (and
+        (entity_ready_for_enforcement ?secondary_tenant_context)
+        (entity_resource_pool_binding ?secondary_tenant_context ?resource_pool)
+        (entity_audit_logged ?secondary_tenant_context ?audit_record)
+        (not
+          (entity_enforcement_applied ?secondary_tenant_context)
+        )
+      )
+    :effect
+      (and
+        (entity_enforcement_applied ?secondary_tenant_context)
+        (resource_pool_available ?resource_pool)
+        (audit_record_available ?audit_record)
+      )
+  )
+  (:action commit_service_enforcement_and_release_resource_pool
+    :parameters (?application_service - application_service ?resource_pool - resource_pool ?audit_record - audit_record)
+    :precondition
+      (and
+        (entity_ready_for_enforcement ?application_service)
+        (entity_resource_pool_binding ?application_service ?resource_pool)
+        (entity_audit_logged ?application_service ?audit_record)
+        (not
+          (entity_enforcement_applied ?application_service)
+        )
+      )
+    :effect
+      (and
+        (entity_enforcement_applied ?application_service)
+        (resource_pool_available ?resource_pool)
+        (audit_record_available ?audit_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem tenant_onboarding_scenario)
+  (:domain multi_tenant_data_isolation)
+  (:objects primary_context_1 - primary_tenant_context secondary_context_1 - secondary_tenant_context app_service_1 - application_service app_service_2 - application_service resource_pool_alpha - resource_pool resource_pool_beta - resource_pool resource_pool_gamma - resource_pool access_request_1 - access_request operator_credential_1 - operator_credential policy_token_1 - policy_token isolation_a_1 - isolation_boundary_a isolation_b_1 - isolation_boundary_b data_store_1 - data_store schema_partition_1 - schema_partition schema_partition_2 - schema_partition feature_flag_alpha - feature_flag feature_flag_beta - feature_flag config_artifact_alpha - configuration_artifact config_artifact_beta - configuration_artifact audit_record_1 - audit_record secret_material_1 - secret_material compliance_artifact_1 - compliance_artifact compliance_artifact_2 - compliance_artifact encryption_key_1 - encryption_key)
+  (:init
+    (resource_pool_available resource_pool_alpha)
+    (resource_pool_available resource_pool_beta)
+    (resource_pool_available resource_pool_gamma)
+    (access_request_available access_request_1)
+    (operator_credential_available operator_credential_1)
+    (policy_token_available policy_token_1)
+    (context_bound_isolation_a primary_context_1 isolation_a_1)
+    (context_bound_isolation_b secondary_context_1 isolation_b_1)
+    (data_store_available data_store_1)
+    (schema_partition_available schema_partition_1)
+    (schema_partition_available schema_partition_2)
+    (service_bound_to_primary_context app_service_1 primary_context_1)
+    (service_bound_to_primary_context app_service_2 primary_context_1)
+    (service_bound_to_secondary_context app_service_1 secondary_context_1)
+    (service_bound_to_secondary_context app_service_2 secondary_context_1)
+    (service_bound_to_data_store app_service_1 data_store_1)
+    (service_bound_to_data_store app_service_2 data_store_1)
+    (service_attached_schema_partition app_service_1 schema_partition_1)
+    (service_attached_schema_partition app_service_2 schema_partition_2)
+    (feature_flag_available feature_flag_alpha)
+    (feature_flag_available feature_flag_beta)
+    (configuration_artifact_available config_artifact_alpha)
+    (configuration_artifact_available config_artifact_beta)
+    (audit_record_available audit_record_1)
+    (secret_material_available secret_material_1)
+    (compliance_artifact_available compliance_artifact_1)
+    (service_compliance_artifact_bound app_service_1 compliance_artifact_1)
+    (service_compliance_artifact_bound app_service_2 compliance_artifact_2)
+    (encryption_key_available encryption_key_1)
+  )
+  (:goal
+    (and
+      (entity_enforcement_applied primary_context_1)
+      (entity_enforcement_applied secondary_context_1)
+      (entity_enforcement_applied app_service_1)
+      (entity_enforcement_applied app_service_2)
+    )
+  )
+)

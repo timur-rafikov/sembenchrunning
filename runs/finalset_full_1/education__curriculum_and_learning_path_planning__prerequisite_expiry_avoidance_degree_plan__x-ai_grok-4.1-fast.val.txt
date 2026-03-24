@@ -1,0 +1,1061 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain prerequisite_expiry_avoidance_degree_plan)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object abstract_course_group - entity time_related_class - entity organizational_unit - entity course_requirement_root - entity course_requirement - course_requirement_root academic_term_slot - abstract_course_group prerequisite_verification_token - abstract_course_group instructor_assignment_token - abstract_course_group elective_option - abstract_course_group credit_package - abstract_course_group expiry_intervention_token - abstract_course_group competency_evidence - abstract_course_group accreditation_event - abstract_course_group resource_bundle - time_related_class assessment_record - time_related_class administrative_permission - time_related_class prereq_validity_window - organizational_unit offering_availability_window - organizational_unit milestone_record - organizational_unit course_requirement_variant - course_requirement course_requirement_variant_alt - course_requirement student_profile_a - course_requirement_variant student_profile_b - course_requirement_variant degree_program_record - course_requirement_variant_alt)
+
+  (:predicates
+    (requirement_planned ?course_requirement - course_requirement)
+    (record_finalized ?course_requirement - course_requirement)
+    (verification_requested ?course_requirement - course_requirement)
+    (prerequisite_expiry_avoided ?course_requirement - course_requirement)
+    (record_readiness_certified ?course_requirement - course_requirement)
+    (expiry_intervention_applied_to_record ?course_requirement - course_requirement)
+    (term_slot_available ?academic_term_slot - academic_term_slot)
+    (entity_assigned_to_term_slot ?course_requirement - course_requirement ?academic_term_slot - academic_term_slot)
+    (verification_token_available ?prerequisite_verification_token - prerequisite_verification_token)
+    (verified_with_prereq_token ?course_requirement - course_requirement ?prerequisite_verification_token - prerequisite_verification_token)
+    (instructor_assignment_available ?instructor_assignment_token - instructor_assignment_token)
+    (instructor_assigned_to_record ?course_requirement - course_requirement ?instructor_assignment_token - instructor_assignment_token)
+    (resource_bundle_available ?resource_bundle - resource_bundle)
+    (resource_allocated_to_profile_a ?student_profile_a - student_profile_a ?resource_bundle - resource_bundle)
+    (resource_allocated_to_profile_b ?student_profile_b - student_profile_b ?resource_bundle - resource_bundle)
+    (profile_has_prereq_window ?student_profile_a - student_profile_a ?prereq_validity_window - prereq_validity_window)
+    (prereq_window_active ?prereq_validity_window - prereq_validity_window)
+    (prereq_window_extended ?prereq_validity_window - prereq_validity_window)
+    (profile_prereq_satisfied ?student_profile_a - student_profile_a)
+    (profile_has_offering_window ?student_profile_b - student_profile_b ?offering_availability_window - offering_availability_window)
+    (offering_window_active ?offering_availability_window - offering_availability_window)
+    (offering_window_extended ?offering_availability_window - offering_availability_window)
+    (profile_offering_ready ?student_profile_b - student_profile_b)
+    (milestone_slot_available ?milestone_record - milestone_record)
+    (milestone_record_created ?milestone_record - milestone_record)
+    (milestone_linked_to_prereq_window ?milestone_record - milestone_record ?prereq_validity_window - prereq_validity_window)
+    (milestone_linked_to_offering_window ?milestone_record - milestone_record ?offering_availability_window - offering_availability_window)
+    (milestone_requires_elective ?milestone_record - milestone_record)
+    (milestone_requires_competency ?milestone_record - milestone_record)
+    (assessment_slot_activated ?milestone_record - milestone_record)
+    (program_associated_with_profile_a ?degree_program_record - degree_program_record ?student_profile_a - student_profile_a)
+    (program_associated_with_profile_b ?degree_program_record - degree_program_record ?student_profile_b - student_profile_b)
+    (program_has_milestone ?degree_program_record - degree_program_record ?milestone_record - milestone_record)
+    (assessment_record_available ?assessment_record - assessment_record)
+    (program_has_assessment_record ?degree_program_record - degree_program_record ?assessment_record - assessment_record)
+    (assessment_record_assigned ?assessment_record - assessment_record)
+    (assessment_linked_to_milestone ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    (administrative_checks_started ?degree_program_record - degree_program_record)
+    (admin_approval_received ?degree_program_record - degree_program_record)
+    (multi_criterion_checks_passed ?degree_program_record - degree_program_record)
+    (administrative_permission_granted ?degree_program_record - degree_program_record)
+    (elective_option_acknowledged ?degree_program_record - degree_program_record)
+    (approvals_and_evidence_collected ?degree_program_record - degree_program_record)
+    (certification_checks_triggered ?degree_program_record - degree_program_record)
+    (administrative_permission_available ?administrative_permission - administrative_permission)
+    (program_has_administrative_permission ?degree_program_record - degree_program_record ?administrative_permission - administrative_permission)
+    (targeted_permission_bound ?degree_program_record - degree_program_record)
+    (permission_stage_initialized ?degree_program_record - degree_program_record)
+    (permission_stage_completed ?degree_program_record - degree_program_record)
+    (elective_option_available ?elective_option - elective_option)
+    (elective_option_assigned_to_program ?degree_program_record - degree_program_record ?elective_option - elective_option)
+    (credit_package_available ?credit_package - credit_package)
+    (credit_package_assigned ?degree_program_record - degree_program_record ?credit_package - credit_package)
+    (competency_evidence_available ?competency_evidence - competency_evidence)
+    (competency_evidence_bound_to_program ?degree_program_record - degree_program_record ?competency_evidence - competency_evidence)
+    (accreditation_event_available ?accreditation_event - accreditation_event)
+    (accreditation_event_bound_to_program ?degree_program_record - degree_program_record ?accreditation_event - accreditation_event)
+    (expiry_intervention_token_available ?expiry_intervention_token - expiry_intervention_token)
+    (intervention_applied_to_record ?course_requirement - course_requirement ?expiry_intervention_token - expiry_intervention_token)
+    (profile_a_ready ?student_profile_a - student_profile_a)
+    (profile_b_ready ?student_profile_b - student_profile_b)
+    (readiness_finalized_flag ?degree_program_record - degree_program_record)
+  )
+  (:action plan_course_requirement
+    :parameters (?course_requirement - course_requirement)
+    :precondition
+      (and
+        (not
+          (requirement_planned ?course_requirement)
+        )
+        (not
+          (prerequisite_expiry_avoided ?course_requirement)
+        )
+      )
+    :effect (requirement_planned ?course_requirement)
+  )
+  (:action schedule_requirement_into_term
+    :parameters (?course_requirement - course_requirement ?academic_term_slot - academic_term_slot)
+    :precondition
+      (and
+        (requirement_planned ?course_requirement)
+        (not
+          (verification_requested ?course_requirement)
+        )
+        (term_slot_available ?academic_term_slot)
+      )
+    :effect
+      (and
+        (verification_requested ?course_requirement)
+        (entity_assigned_to_term_slot ?course_requirement ?academic_term_slot)
+        (not
+          (term_slot_available ?academic_term_slot)
+        )
+      )
+  )
+  (:action perform_prerequisite_verification
+    :parameters (?course_requirement - course_requirement ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (requirement_planned ?course_requirement)
+        (verification_requested ?course_requirement)
+        (verification_token_available ?prerequisite_verification_token)
+      )
+    :effect
+      (and
+        (verified_with_prereq_token ?course_requirement ?prerequisite_verification_token)
+        (not
+          (verification_token_available ?prerequisite_verification_token)
+        )
+      )
+  )
+  (:action finalize_requirement_eligibility
+    :parameters (?course_requirement - course_requirement ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (requirement_planned ?course_requirement)
+        (verification_requested ?course_requirement)
+        (verified_with_prereq_token ?course_requirement ?prerequisite_verification_token)
+        (not
+          (record_finalized ?course_requirement)
+        )
+      )
+    :effect (record_finalized ?course_requirement)
+  )
+  (:action release_verification_token
+    :parameters (?course_requirement - course_requirement ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (verified_with_prereq_token ?course_requirement ?prerequisite_verification_token)
+      )
+    :effect
+      (and
+        (verification_token_available ?prerequisite_verification_token)
+        (not
+          (verified_with_prereq_token ?course_requirement ?prerequisite_verification_token)
+        )
+      )
+  )
+  (:action assign_instructor_to_requirement
+    :parameters (?course_requirement - course_requirement ?instructor_assignment_token - instructor_assignment_token)
+    :precondition
+      (and
+        (record_finalized ?course_requirement)
+        (instructor_assignment_available ?instructor_assignment_token)
+      )
+    :effect
+      (and
+        (instructor_assigned_to_record ?course_requirement ?instructor_assignment_token)
+        (not
+          (instructor_assignment_available ?instructor_assignment_token)
+        )
+      )
+  )
+  (:action release_instructor_assignment
+    :parameters (?course_requirement - course_requirement ?instructor_assignment_token - instructor_assignment_token)
+    :precondition
+      (and
+        (instructor_assigned_to_record ?course_requirement ?instructor_assignment_token)
+      )
+    :effect
+      (and
+        (instructor_assignment_available ?instructor_assignment_token)
+        (not
+          (instructor_assigned_to_record ?course_requirement ?instructor_assignment_token)
+        )
+      )
+  )
+  (:action bind_competency_evidence
+    :parameters (?degree_program_record - degree_program_record ?competency_evidence - competency_evidence)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (competency_evidence_available ?competency_evidence)
+      )
+    :effect
+      (and
+        (competency_evidence_bound_to_program ?degree_program_record ?competency_evidence)
+        (not
+          (competency_evidence_available ?competency_evidence)
+        )
+      )
+  )
+  (:action release_competency_evidence
+    :parameters (?degree_program_record - degree_program_record ?competency_evidence - competency_evidence)
+    :precondition
+      (and
+        (competency_evidence_bound_to_program ?degree_program_record ?competency_evidence)
+      )
+    :effect
+      (and
+        (competency_evidence_available ?competency_evidence)
+        (not
+          (competency_evidence_bound_to_program ?degree_program_record ?competency_evidence)
+        )
+      )
+  )
+  (:action attach_accreditation_event
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (accreditation_event_available ?accreditation_event)
+      )
+    :effect
+      (and
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (not
+          (accreditation_event_available ?accreditation_event)
+        )
+      )
+  )
+  (:action detach_accreditation_event
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event)
+    :precondition
+      (and
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+      )
+    :effect
+      (and
+        (accreditation_event_available ?accreditation_event)
+        (not
+          (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        )
+      )
+  )
+  (:action activate_prereq_validity_window
+    :parameters (?student_profile_a - student_profile_a ?prereq_validity_window - prereq_validity_window ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (record_finalized ?student_profile_a)
+        (verified_with_prereq_token ?student_profile_a ?prerequisite_verification_token)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (not
+          (prereq_window_active ?prereq_validity_window)
+        )
+        (not
+          (prereq_window_extended ?prereq_validity_window)
+        )
+      )
+    :effect (prereq_window_active ?prereq_validity_window)
+  )
+  (:action apply_remediation_to_profile
+    :parameters (?student_profile_a - student_profile_a ?prereq_validity_window - prereq_validity_window ?instructor_assignment_token - instructor_assignment_token)
+    :precondition
+      (and
+        (record_finalized ?student_profile_a)
+        (instructor_assigned_to_record ?student_profile_a ?instructor_assignment_token)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (prereq_window_active ?prereq_validity_window)
+        (not
+          (profile_a_ready ?student_profile_a)
+        )
+      )
+    :effect
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_prereq_satisfied ?student_profile_a)
+      )
+  )
+  (:action allocate_resource_bundle_to_profile
+    :parameters (?student_profile_a - student_profile_a ?prereq_validity_window - prereq_validity_window ?resource_bundle - resource_bundle)
+    :precondition
+      (and
+        (record_finalized ?student_profile_a)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (resource_bundle_available ?resource_bundle)
+        (not
+          (profile_a_ready ?student_profile_a)
+        )
+      )
+    :effect
+      (and
+        (prereq_window_extended ?prereq_validity_window)
+        (profile_a_ready ?student_profile_a)
+        (resource_allocated_to_profile_a ?student_profile_a ?resource_bundle)
+        (not
+          (resource_bundle_available ?resource_bundle)
+        )
+      )
+  )
+  (:action restore_prereq_window_for_profile
+    :parameters (?student_profile_a - student_profile_a ?prereq_validity_window - prereq_validity_window ?prerequisite_verification_token - prerequisite_verification_token ?resource_bundle - resource_bundle)
+    :precondition
+      (and
+        (record_finalized ?student_profile_a)
+        (verified_with_prereq_token ?student_profile_a ?prerequisite_verification_token)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (prereq_window_extended ?prereq_validity_window)
+        (resource_allocated_to_profile_a ?student_profile_a ?resource_bundle)
+        (not
+          (profile_prereq_satisfied ?student_profile_a)
+        )
+      )
+    :effect
+      (and
+        (prereq_window_active ?prereq_validity_window)
+        (profile_prereq_satisfied ?student_profile_a)
+        (resource_bundle_available ?resource_bundle)
+        (not
+          (resource_allocated_to_profile_a ?student_profile_a ?resource_bundle)
+        )
+      )
+  )
+  (:action activate_offering_availability_for_cohort
+    :parameters (?student_profile_b - student_profile_b ?offering_availability_window - offering_availability_window ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (record_finalized ?student_profile_b)
+        (verified_with_prereq_token ?student_profile_b ?prerequisite_verification_token)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (not
+          (offering_window_active ?offering_availability_window)
+        )
+        (not
+          (offering_window_extended ?offering_availability_window)
+        )
+      )
+    :effect (offering_window_active ?offering_availability_window)
+  )
+  (:action assign_instructor_to_offering_window
+    :parameters (?student_profile_b - student_profile_b ?offering_availability_window - offering_availability_window ?instructor_assignment_token - instructor_assignment_token)
+    :precondition
+      (and
+        (record_finalized ?student_profile_b)
+        (instructor_assigned_to_record ?student_profile_b ?instructor_assignment_token)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (offering_window_active ?offering_availability_window)
+        (not
+          (profile_b_ready ?student_profile_b)
+        )
+      )
+    :effect
+      (and
+        (profile_b_ready ?student_profile_b)
+        (profile_offering_ready ?student_profile_b)
+      )
+  )
+  (:action allocate_resource_bundle_for_offering_window
+    :parameters (?student_profile_b - student_profile_b ?offering_availability_window - offering_availability_window ?resource_bundle - resource_bundle)
+    :precondition
+      (and
+        (record_finalized ?student_profile_b)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (resource_bundle_available ?resource_bundle)
+        (not
+          (profile_b_ready ?student_profile_b)
+        )
+      )
+    :effect
+      (and
+        (offering_window_extended ?offering_availability_window)
+        (profile_b_ready ?student_profile_b)
+        (resource_allocated_to_profile_b ?student_profile_b ?resource_bundle)
+        (not
+          (resource_bundle_available ?resource_bundle)
+        )
+      )
+  )
+  (:action restore_offering_window_for_cohort
+    :parameters (?student_profile_b - student_profile_b ?offering_availability_window - offering_availability_window ?prerequisite_verification_token - prerequisite_verification_token ?resource_bundle - resource_bundle)
+    :precondition
+      (and
+        (record_finalized ?student_profile_b)
+        (verified_with_prereq_token ?student_profile_b ?prerequisite_verification_token)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (offering_window_extended ?offering_availability_window)
+        (resource_allocated_to_profile_b ?student_profile_b ?resource_bundle)
+        (not
+          (profile_offering_ready ?student_profile_b)
+        )
+      )
+    :effect
+      (and
+        (offering_window_active ?offering_availability_window)
+        (profile_offering_ready ?student_profile_b)
+        (resource_bundle_available ?resource_bundle)
+        (not
+          (resource_allocated_to_profile_b ?student_profile_b ?resource_bundle)
+        )
+      )
+  )
+  (:action assemble_milestone_record
+    :parameters (?student_profile_a - student_profile_a ?student_profile_b - student_profile_b ?prereq_validity_window - prereq_validity_window ?offering_availability_window - offering_availability_window ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_b_ready ?student_profile_b)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (prereq_window_active ?prereq_validity_window)
+        (offering_window_active ?offering_availability_window)
+        (profile_prereq_satisfied ?student_profile_a)
+        (profile_offering_ready ?student_profile_b)
+        (milestone_slot_available ?milestone_record)
+      )
+    :effect
+      (and
+        (milestone_record_created ?milestone_record)
+        (milestone_linked_to_prereq_window ?milestone_record ?prereq_validity_window)
+        (milestone_linked_to_offering_window ?milestone_record ?offering_availability_window)
+        (not
+          (milestone_slot_available ?milestone_record)
+        )
+      )
+  )
+  (:action assemble_milestone_with_elective_flag
+    :parameters (?student_profile_a - student_profile_a ?student_profile_b - student_profile_b ?prereq_validity_window - prereq_validity_window ?offering_availability_window - offering_availability_window ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_b_ready ?student_profile_b)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (prereq_window_extended ?prereq_validity_window)
+        (offering_window_active ?offering_availability_window)
+        (not
+          (profile_prereq_satisfied ?student_profile_a)
+        )
+        (profile_offering_ready ?student_profile_b)
+        (milestone_slot_available ?milestone_record)
+      )
+    :effect
+      (and
+        (milestone_record_created ?milestone_record)
+        (milestone_linked_to_prereq_window ?milestone_record ?prereq_validity_window)
+        (milestone_linked_to_offering_window ?milestone_record ?offering_availability_window)
+        (milestone_requires_elective ?milestone_record)
+        (not
+          (milestone_slot_available ?milestone_record)
+        )
+      )
+  )
+  (:action assemble_milestone_with_competency_flag
+    :parameters (?student_profile_a - student_profile_a ?student_profile_b - student_profile_b ?prereq_validity_window - prereq_validity_window ?offering_availability_window - offering_availability_window ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_b_ready ?student_profile_b)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (prereq_window_active ?prereq_validity_window)
+        (offering_window_extended ?offering_availability_window)
+        (profile_prereq_satisfied ?student_profile_a)
+        (not
+          (profile_offering_ready ?student_profile_b)
+        )
+        (milestone_slot_available ?milestone_record)
+      )
+    :effect
+      (and
+        (milestone_record_created ?milestone_record)
+        (milestone_linked_to_prereq_window ?milestone_record ?prereq_validity_window)
+        (milestone_linked_to_offering_window ?milestone_record ?offering_availability_window)
+        (milestone_requires_competency ?milestone_record)
+        (not
+          (milestone_slot_available ?milestone_record)
+        )
+      )
+  )
+  (:action assemble_comprehensive_milestone_record
+    :parameters (?student_profile_a - student_profile_a ?student_profile_b - student_profile_b ?prereq_validity_window - prereq_validity_window ?offering_availability_window - offering_availability_window ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_b_ready ?student_profile_b)
+        (profile_has_prereq_window ?student_profile_a ?prereq_validity_window)
+        (profile_has_offering_window ?student_profile_b ?offering_availability_window)
+        (prereq_window_extended ?prereq_validity_window)
+        (offering_window_extended ?offering_availability_window)
+        (not
+          (profile_prereq_satisfied ?student_profile_a)
+        )
+        (not
+          (profile_offering_ready ?student_profile_b)
+        )
+        (milestone_slot_available ?milestone_record)
+      )
+    :effect
+      (and
+        (milestone_record_created ?milestone_record)
+        (milestone_linked_to_prereq_window ?milestone_record ?prereq_validity_window)
+        (milestone_linked_to_offering_window ?milestone_record ?offering_availability_window)
+        (milestone_requires_elective ?milestone_record)
+        (milestone_requires_competency ?milestone_record)
+        (not
+          (milestone_slot_available ?milestone_record)
+        )
+      )
+  )
+  (:action activate_assessment_slot
+    :parameters (?milestone_record - milestone_record ?student_profile_a - student_profile_a ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (milestone_record_created ?milestone_record)
+        (profile_a_ready ?student_profile_a)
+        (verified_with_prereq_token ?student_profile_a ?prerequisite_verification_token)
+        (not
+          (assessment_slot_activated ?milestone_record)
+        )
+      )
+    :effect (assessment_slot_activated ?milestone_record)
+  )
+  (:action assign_assessment_artifact_to_milestone
+    :parameters (?degree_program_record - degree_program_record ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (program_has_milestone ?degree_program_record ?milestone_record)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_record_available ?assessment_record)
+        (milestone_record_created ?milestone_record)
+        (assessment_slot_activated ?milestone_record)
+        (not
+          (assessment_record_assigned ?assessment_record)
+        )
+      )
+    :effect
+      (and
+        (assessment_record_assigned ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (not
+          (assessment_record_available ?assessment_record)
+        )
+      )
+  )
+  (:action validate_assessment_and_start_admin_checks
+    :parameters (?degree_program_record - degree_program_record ?assessment_record - assessment_record ?milestone_record - milestone_record ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_record_assigned ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (verified_with_prereq_token ?degree_program_record ?prerequisite_verification_token)
+        (not
+          (milestone_requires_elective ?milestone_record)
+        )
+        (not
+          (administrative_checks_started ?degree_program_record)
+        )
+      )
+    :effect (administrative_checks_started ?degree_program_record)
+  )
+  (:action claim_administrative_permission_for_program
+    :parameters (?degree_program_record - degree_program_record ?elective_option - elective_option)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (elective_option_available ?elective_option)
+        (not
+          (administrative_permission_granted ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (administrative_permission_granted ?degree_program_record)
+        (elective_option_assigned_to_program ?degree_program_record ?elective_option)
+        (not
+          (elective_option_available ?elective_option)
+        )
+      )
+  )
+  (:action apply_elective_and_permission_for_program
+    :parameters (?degree_program_record - degree_program_record ?assessment_record - assessment_record ?milestone_record - milestone_record ?prerequisite_verification_token - prerequisite_verification_token ?elective_option - elective_option)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_record_assigned ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (verified_with_prereq_token ?degree_program_record ?prerequisite_verification_token)
+        (milestone_requires_elective ?milestone_record)
+        (administrative_permission_granted ?degree_program_record)
+        (elective_option_assigned_to_program ?degree_program_record ?elective_option)
+        (not
+          (administrative_checks_started ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (administrative_checks_started ?degree_program_record)
+        (elective_option_acknowledged ?degree_program_record)
+      )
+  )
+  (:action process_admin_checks_evidence_flow
+    :parameters (?degree_program_record - degree_program_record ?competency_evidence - competency_evidence ?instructor_assignment_token - instructor_assignment_token ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (administrative_checks_started ?degree_program_record)
+        (competency_evidence_bound_to_program ?degree_program_record ?competency_evidence)
+        (instructor_assigned_to_record ?degree_program_record ?instructor_assignment_token)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (not
+          (milestone_requires_competency ?milestone_record)
+        )
+        (not
+          (admin_approval_received ?degree_program_record)
+        )
+      )
+    :effect (admin_approval_received ?degree_program_record)
+  )
+  (:action process_admin_checks_evidence_flow_confirm
+    :parameters (?degree_program_record - degree_program_record ?competency_evidence - competency_evidence ?instructor_assignment_token - instructor_assignment_token ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (administrative_checks_started ?degree_program_record)
+        (competency_evidence_bound_to_program ?degree_program_record ?competency_evidence)
+        (instructor_assigned_to_record ?degree_program_record ?instructor_assignment_token)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (milestone_requires_competency ?milestone_record)
+        (not
+          (admin_approval_received ?degree_program_record)
+        )
+      )
+    :effect (admin_approval_received ?degree_program_record)
+  )
+  (:action complete_accreditation_binding_checks
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (admin_approval_received ?degree_program_record)
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (not
+          (milestone_requires_elective ?milestone_record)
+        )
+        (not
+          (milestone_requires_competency ?milestone_record)
+        )
+        (not
+          (multi_criterion_checks_passed ?degree_program_record)
+        )
+      )
+    :effect (multi_criterion_checks_passed ?degree_program_record)
+  )
+  (:action complete_accreditation_and_collect_approvals
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (admin_approval_received ?degree_program_record)
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (milestone_requires_elective ?milestone_record)
+        (not
+          (milestone_requires_competency ?milestone_record)
+        )
+        (not
+          (multi_criterion_checks_passed ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (approvals_and_evidence_collected ?degree_program_record)
+      )
+  )
+  (:action finalize_accreditation_stage_variant_a
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (admin_approval_received ?degree_program_record)
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (not
+          (milestone_requires_elective ?milestone_record)
+        )
+        (milestone_requires_competency ?milestone_record)
+        (not
+          (multi_criterion_checks_passed ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (approvals_and_evidence_collected ?degree_program_record)
+      )
+  )
+  (:action finalize_accreditation_stage_variant_b
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event ?assessment_record - assessment_record ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (admin_approval_received ?degree_program_record)
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (program_has_assessment_record ?degree_program_record ?assessment_record)
+        (assessment_linked_to_milestone ?assessment_record ?milestone_record)
+        (milestone_requires_elective ?milestone_record)
+        (milestone_requires_competency ?milestone_record)
+        (not
+          (multi_criterion_checks_passed ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (approvals_and_evidence_collected ?degree_program_record)
+      )
+  )
+  (:action certify_program_readiness
+    :parameters (?degree_program_record - degree_program_record)
+    :precondition
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (not
+          (approvals_and_evidence_collected ?degree_program_record)
+        )
+        (not
+          (readiness_finalized_flag ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (readiness_finalized_flag ?degree_program_record)
+        (record_readiness_certified ?degree_program_record)
+      )
+  )
+  (:action apply_credit_package_to_program
+    :parameters (?degree_program_record - degree_program_record ?credit_package - credit_package)
+    :precondition
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (approvals_and_evidence_collected ?degree_program_record)
+        (credit_package_available ?credit_package)
+      )
+    :effect
+      (and
+        (credit_package_assigned ?degree_program_record ?credit_package)
+        (not
+          (credit_package_available ?credit_package)
+        )
+      )
+  )
+  (:action complete_program_readiness_checks
+    :parameters (?degree_program_record - degree_program_record ?student_profile_a - student_profile_a ?student_profile_b - student_profile_b ?prerequisite_verification_token - prerequisite_verification_token ?credit_package - credit_package)
+    :precondition
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (approvals_and_evidence_collected ?degree_program_record)
+        (credit_package_assigned ?degree_program_record ?credit_package)
+        (program_associated_with_profile_a ?degree_program_record ?student_profile_a)
+        (program_associated_with_profile_b ?degree_program_record ?student_profile_b)
+        (profile_prereq_satisfied ?student_profile_a)
+        (profile_offering_ready ?student_profile_b)
+        (verified_with_prereq_token ?degree_program_record ?prerequisite_verification_token)
+        (not
+          (certification_checks_triggered ?degree_program_record)
+        )
+      )
+    :effect (certification_checks_triggered ?degree_program_record)
+  )
+  (:action finalize_program_readiness_and_certify
+    :parameters (?degree_program_record - degree_program_record)
+    :precondition
+      (and
+        (multi_criterion_checks_passed ?degree_program_record)
+        (certification_checks_triggered ?degree_program_record)
+        (not
+          (readiness_finalized_flag ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (readiness_finalized_flag ?degree_program_record)
+        (record_readiness_certified ?degree_program_record)
+      )
+  )
+  (:action bind_targeted_permission
+    :parameters (?degree_program_record - degree_program_record ?administrative_permission - administrative_permission ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (record_finalized ?degree_program_record)
+        (verified_with_prereq_token ?degree_program_record ?prerequisite_verification_token)
+        (administrative_permission_available ?administrative_permission)
+        (program_has_administrative_permission ?degree_program_record ?administrative_permission)
+        (not
+          (targeted_permission_bound ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (targeted_permission_bound ?degree_program_record)
+        (not
+          (administrative_permission_available ?administrative_permission)
+        )
+      )
+  )
+  (:action initiate_permission_stage
+    :parameters (?degree_program_record - degree_program_record ?instructor_assignment_token - instructor_assignment_token)
+    :precondition
+      (and
+        (targeted_permission_bound ?degree_program_record)
+        (instructor_assigned_to_record ?degree_program_record ?instructor_assignment_token)
+        (not
+          (permission_stage_initialized ?degree_program_record)
+        )
+      )
+    :effect (permission_stage_initialized ?degree_program_record)
+  )
+  (:action complete_permission_stage
+    :parameters (?degree_program_record - degree_program_record ?accreditation_event - accreditation_event)
+    :precondition
+      (and
+        (permission_stage_initialized ?degree_program_record)
+        (accreditation_event_bound_to_program ?degree_program_record ?accreditation_event)
+        (not
+          (permission_stage_completed ?degree_program_record)
+        )
+      )
+    :effect (permission_stage_completed ?degree_program_record)
+  )
+  (:action finalize_permission_and_certify
+    :parameters (?degree_program_record - degree_program_record)
+    :precondition
+      (and
+        (permission_stage_completed ?degree_program_record)
+        (not
+          (readiness_finalized_flag ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (readiness_finalized_flag ?degree_program_record)
+        (record_readiness_certified ?degree_program_record)
+      )
+  )
+  (:action mark_profile_participation_completed
+    :parameters (?student_profile_a - student_profile_a ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_a_ready ?student_profile_a)
+        (profile_prereq_satisfied ?student_profile_a)
+        (milestone_record_created ?milestone_record)
+        (assessment_slot_activated ?milestone_record)
+        (not
+          (record_readiness_certified ?student_profile_a)
+        )
+      )
+    :effect (record_readiness_certified ?student_profile_a)
+  )
+  (:action mark_cohort_participation_completed
+    :parameters (?student_profile_b - student_profile_b ?milestone_record - milestone_record)
+    :precondition
+      (and
+        (profile_b_ready ?student_profile_b)
+        (profile_offering_ready ?student_profile_b)
+        (milestone_record_created ?milestone_record)
+        (assessment_slot_activated ?milestone_record)
+        (not
+          (record_readiness_certified ?student_profile_b)
+        )
+      )
+    :effect (record_readiness_certified ?student_profile_b)
+  )
+  (:action issue_expiry_intervention
+    :parameters (?course_requirement - course_requirement ?expiry_intervention_token - expiry_intervention_token ?prerequisite_verification_token - prerequisite_verification_token)
+    :precondition
+      (and
+        (record_readiness_certified ?course_requirement)
+        (verified_with_prereq_token ?course_requirement ?prerequisite_verification_token)
+        (expiry_intervention_token_available ?expiry_intervention_token)
+        (not
+          (expiry_intervention_applied_to_record ?course_requirement)
+        )
+      )
+    :effect
+      (and
+        (expiry_intervention_applied_to_record ?course_requirement)
+        (intervention_applied_to_record ?course_requirement ?expiry_intervention_token)
+        (not
+          (expiry_intervention_token_available ?expiry_intervention_token)
+        )
+      )
+  )
+  (:action convert_intervention_into_prereq_validity
+    :parameters (?student_profile_a - student_profile_a ?academic_term_slot - academic_term_slot ?expiry_intervention_token - expiry_intervention_token)
+    :precondition
+      (and
+        (expiry_intervention_applied_to_record ?student_profile_a)
+        (entity_assigned_to_term_slot ?student_profile_a ?academic_term_slot)
+        (intervention_applied_to_record ?student_profile_a ?expiry_intervention_token)
+        (not
+          (prerequisite_expiry_avoided ?student_profile_a)
+        )
+      )
+    :effect
+      (and
+        (prerequisite_expiry_avoided ?student_profile_a)
+        (term_slot_available ?academic_term_slot)
+        (expiry_intervention_token_available ?expiry_intervention_token)
+      )
+  )
+  (:action convert_intervention_into_prereq_validity_for_cohort
+    :parameters (?student_profile_b - student_profile_b ?academic_term_slot - academic_term_slot ?expiry_intervention_token - expiry_intervention_token)
+    :precondition
+      (and
+        (expiry_intervention_applied_to_record ?student_profile_b)
+        (entity_assigned_to_term_slot ?student_profile_b ?academic_term_slot)
+        (intervention_applied_to_record ?student_profile_b ?expiry_intervention_token)
+        (not
+          (prerequisite_expiry_avoided ?student_profile_b)
+        )
+      )
+    :effect
+      (and
+        (prerequisite_expiry_avoided ?student_profile_b)
+        (term_slot_available ?academic_term_slot)
+        (expiry_intervention_token_available ?expiry_intervention_token)
+      )
+  )
+  (:action convert_intervention_into_prereq_validity_for_program
+    :parameters (?degree_program_record - degree_program_record ?academic_term_slot - academic_term_slot ?expiry_intervention_token - expiry_intervention_token)
+    :precondition
+      (and
+        (expiry_intervention_applied_to_record ?degree_program_record)
+        (entity_assigned_to_term_slot ?degree_program_record ?academic_term_slot)
+        (intervention_applied_to_record ?degree_program_record ?expiry_intervention_token)
+        (not
+          (prerequisite_expiry_avoided ?degree_program_record)
+        )
+      )
+    :effect
+      (and
+        (prerequisite_expiry_avoided ?degree_program_record)
+        (term_slot_available ?academic_term_slot)
+        (expiry_intervention_token_available ?expiry_intervention_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem prerequisite_expiry_avoidance_case_instance)
+  (:domain prerequisite_expiry_avoidance_degree_plan)
+  (:objects student_profile_a_1 - student_profile_a student_profile_b_1 - student_profile_b degree_program_record_1 - degree_program_record degree_program_record_2 - degree_program_record term_slot_1 - academic_term_slot term_slot_2 - academic_term_slot term_slot_3 - academic_term_slot verification_token_1 - prerequisite_verification_token instructor_token_1 - instructor_assignment_token resource_bundle_1 - resource_bundle prereq_window_1 - prereq_validity_window offering_window_1 - offering_availability_window milestone_slot_1 - milestone_record assessment_record_1 - assessment_record assessment_record_2 - assessment_record elective_option_1 - elective_option elective_option_2 - elective_option credit_package_1 - credit_package credit_package_2 - credit_package expiry_intervention_token_1 - expiry_intervention_token competency_evidence_1 - competency_evidence administrative_permission_1 - administrative_permission administrative_permission_2 - administrative_permission accreditation_event_1 - accreditation_event)
+  (:init
+    (term_slot_available term_slot_1)
+    (term_slot_available term_slot_2)
+    (term_slot_available term_slot_3)
+    (verification_token_available verification_token_1)
+    (instructor_assignment_available instructor_token_1)
+    (resource_bundle_available resource_bundle_1)
+    (profile_has_prereq_window student_profile_a_1 prereq_window_1)
+    (profile_has_offering_window student_profile_b_1 offering_window_1)
+    (milestone_slot_available milestone_slot_1)
+    (assessment_record_available assessment_record_1)
+    (assessment_record_available assessment_record_2)
+    (program_associated_with_profile_a degree_program_record_1 student_profile_a_1)
+    (program_associated_with_profile_a degree_program_record_2 student_profile_a_1)
+    (program_associated_with_profile_b degree_program_record_1 student_profile_b_1)
+    (program_associated_with_profile_b degree_program_record_2 student_profile_b_1)
+    (program_has_milestone degree_program_record_1 milestone_slot_1)
+    (program_has_milestone degree_program_record_2 milestone_slot_1)
+    (program_has_assessment_record degree_program_record_1 assessment_record_1)
+    (program_has_assessment_record degree_program_record_2 assessment_record_2)
+    (elective_option_available elective_option_1)
+    (elective_option_available elective_option_2)
+    (credit_package_available credit_package_1)
+    (credit_package_available credit_package_2)
+    (expiry_intervention_token_available expiry_intervention_token_1)
+    (competency_evidence_available competency_evidence_1)
+    (administrative_permission_available administrative_permission_1)
+    (program_has_administrative_permission degree_program_record_1 administrative_permission_1)
+    (program_has_administrative_permission degree_program_record_2 administrative_permission_2)
+    (accreditation_event_available accreditation_event_1)
+  )
+  (:goal
+    (and
+      (prerequisite_expiry_avoided student_profile_a_1)
+      (prerequisite_expiry_avoided student_profile_b_1)
+      (prerequisite_expiry_avoided degree_program_record_1)
+      (prerequisite_expiry_avoided degree_program_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(plan_course_requirement student_profile_a_1)
+(schedule_requirement_into_term student_profile_a_1 term_slot_1)
+(perform_prerequisite_verification student_profile_a_1 verification_token_1)
+(finalize_requirement_eligibility student_profile_a_1 verification_token_1)
+(activate_prereq_validity_window student_profile_a_1 prereq_window_1 verification_token_1)
+(release_verification_token student_profile_a_1 verification_token_1)
+(assign_instructor_to_requirement student_profile_a_1 instructor_token_1)
+(apply_remediation_to_profile student_profile_a_1 prereq_window_1 instructor_token_1)
+(release_instructor_assignment student_profile_a_1 instructor_token_1)
+(plan_course_requirement student_profile_b_1)
+(schedule_requirement_into_term student_profile_b_1 term_slot_2)
+(perform_prerequisite_verification student_profile_b_1 verification_token_1)
+(finalize_requirement_eligibility student_profile_b_1 verification_token_1)
+(activate_offering_availability_for_cohort student_profile_b_1 offering_window_1 verification_token_1)
+(assign_instructor_to_requirement student_profile_b_1 instructor_token_1)
+(assign_instructor_to_offering_window student_profile_b_1 offering_window_1 instructor_token_1)
+(release_verification_token student_profile_b_1 verification_token_1)
+(assemble_milestone_record student_profile_a_1 student_profile_b_1 prereq_window_1 offering_window_1 milestone_slot_1)
+(perform_prerequisite_verification student_profile_a_1 verification_token_1)
+(activate_assessment_slot milestone_slot_1 student_profile_a_1 verification_token_1)
+(mark_profile_participation_completed student_profile_a_1 milestone_slot_1)
+(mark_cohort_participation_completed student_profile_b_1 milestone_slot_1)
+(issue_expiry_intervention student_profile_a_1 expiry_intervention_token_1 verification_token_1)
+(convert_intervention_into_prereq_validity student_profile_a_1 term_slot_1 expiry_intervention_token_1)
+(release_verification_token student_profile_a_1 verification_token_1)
+(perform_prerequisite_verification student_profile_b_1 verification_token_1)
+(issue_expiry_intervention student_profile_b_1 expiry_intervention_token_1 verification_token_1)
+(convert_intervention_into_prereq_validity_for_cohort student_profile_b_1 term_slot_2 expiry_intervention_token_1)
+(release_verification_token student_profile_b_1 verification_token_1)
+(release_instructor_assignment student_profile_b_1 instructor_token_1)
+(plan_course_requirement degree_program_record_1)
+(schedule_requirement_into_term degree_program_record_1 term_slot_1)
+(perform_prerequisite_verification degree_program_record_1 verification_token_1)
+(finalize_requirement_eligibility degree_program_record_1 verification_token_1)
+(assign_instructor_to_requirement degree_program_record_1 instructor_token_1)
+(attach_accreditation_event degree_program_record_1 accreditation_event_1)
+(bind_targeted_permission degree_program_record_1 administrative_permission_1 verification_token_1)
+(initiate_permission_stage degree_program_record_1 instructor_token_1)
+(complete_permission_stage degree_program_record_1 accreditation_event_1)
+(finalize_permission_and_certify degree_program_record_1)
+(issue_expiry_intervention degree_program_record_1 expiry_intervention_token_1 verification_token_1)
+(convert_intervention_into_prereq_validity_for_program degree_program_record_1 term_slot_1 expiry_intervention_token_1)
+(release_verification_token degree_program_record_1 verification_token_1)
+(release_instructor_assignment degree_program_record_1 instructor_token_1)
+(detach_accreditation_event degree_program_record_1 accreditation_event_1)
+(plan_course_requirement degree_program_record_2)
+(schedule_requirement_into_term degree_program_record_2 term_slot_2)
+(perform_prerequisite_verification degree_program_record_2 verification_token_1)
+(finalize_requirement_eligibility degree_program_record_2 verification_token_1)
+(assign_instructor_to_requirement degree_program_record_2 instructor_token_1)
+(attach_accreditation_event degree_program_record_2 accreditation_event_1)
+(bind_targeted_permission degree_program_record_2 administrative_permission_2 verification_token_1)
+(initiate_permission_stage degree_program_record_2 instructor_token_1)
+(complete_permission_stage degree_program_record_2 accreditation_event_1)
+(finalize_permission_and_certify degree_program_record_2)
+(issue_expiry_intervention degree_program_record_2 expiry_intervention_token_1 verification_token_1)
+(convert_intervention_into_prereq_validity_for_program degree_program_record_2 term_slot_2 expiry_intervention_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_jlrlk0mu/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_jlrlk0mu/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain cover_crop_insertion_between_main_cycles_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object material_category - object scheduling_category - object field_asset - object field_unit - field_asset cover_crop_seed_lot - resource_category cover_crop_species - resource_category contractor_unit - resource_category fertilizer_product - resource_category operator_group - resource_category regulatory_permit - resource_category inspection_checkpoint - resource_category residue_management_method - resource_category treatment_product - material_category seed_package - material_category termination_method - material_category seeding_method - scheduling_category field_sector - scheduling_category work_order - scheduling_category main_cycle_parcel - field_unit management_block - field_unit source_field_parcel - main_cycle_parcel target_field_parcel - main_cycle_parcel field_management_plan - management_block)
+  (:predicates
+    (field_unit_enrolled ?field_unit_var - field_unit)
+    (field_unit_authorized ?field_unit_var - field_unit)
+    (field_seed_lot_committed ?field_unit_var - field_unit)
+    (field_unit_closed_out ?field_unit_var - field_unit)
+    (execution_complete ?field_unit_var - field_unit)
+    (closeout_verified ?field_unit_var - field_unit)
+    (cover_crop_seed_lot_available ?cover_crop_seed_lot_var - cover_crop_seed_lot)
+    (field_seed_lot_assigned ?field_unit_var - field_unit ?cover_crop_seed_lot_var - cover_crop_seed_lot)
+    (cover_crop_species_available ?cover_crop_species_var - cover_crop_species)
+    (field_crop_assigned ?field_unit_var - field_unit ?cover_crop_species_var - cover_crop_species)
+    (contractor_unit_available ?contractor_unit_var - contractor_unit)
+    (contractor_unit_assigned ?field_unit_var - field_unit ?contractor_unit_var - contractor_unit)
+    (treatment_product_available ?treatment_product_var - treatment_product)
+    (source_parcel_treatment_applied ?source_parcel_var - source_field_parcel ?treatment_product_var - treatment_product)
+    (target_parcel_treatment_applied ?target_parcel_var - target_field_parcel ?treatment_product_var - treatment_product)
+    (source_parcel_seeding_method_linked ?source_parcel_var - source_field_parcel ?seeding_method_var - seeding_method)
+    (seeding_method_ready ?seeding_method_var - seeding_method)
+    (seeding_method_staged ?seeding_method_var - seeding_method)
+    (source_parcel_ready ?source_parcel_var - source_field_parcel)
+    (target_parcel_sector_linked ?target_parcel_var - target_field_parcel ?field_sector_var - field_sector)
+    (field_sector_open ?field_sector_var - field_sector)
+    (field_sector_locked ?field_sector_var - field_sector)
+    (target_parcel_ready ?target_parcel_var - target_field_parcel)
+    (work_order_draft ?work_order_var - work_order)
+    (work_order_created ?work_order_var - work_order)
+    (work_order_seeding_method_linked ?work_order_var - work_order ?seeding_method_var - seeding_method)
+    (work_order_sector_linked ?work_order_var - work_order ?field_sector_var - field_sector)
+    (work_order_source_clearance ?work_order_var - work_order)
+    (work_order_target_clearance ?work_order_var - work_order)
+    (work_order_approved ?work_order_var - work_order)
+    (plan_source_parcel_linked ?field_plan_var - field_management_plan ?source_parcel_var - source_field_parcel)
+    (plan_target_parcel_linked ?field_plan_var - field_management_plan ?target_parcel_var - target_field_parcel)
+    (plan_work_order_linked ?field_plan_var - field_management_plan ?work_order_var - work_order)
+    (seed_package_available ?seed_package_var - seed_package)
+    (plan_seed_package_linked ?field_plan_var - field_management_plan ?seed_package_var - seed_package)
+    (seed_package_staged ?seed_package_var - seed_package)
+    (seed_package_bound_to_work_order ?seed_package_var - seed_package ?work_order_var - work_order)
+    (plan_prepared_for_execution ?field_plan_var - field_management_plan)
+    (plan_in_execution ?field_plan_var - field_management_plan)
+    (plan_execution_ready ?field_plan_var - field_management_plan)
+    (fertilizer_product_reserved_to_plan ?field_plan_var - field_management_plan)
+    (plan_input_verified ?field_plan_var - field_management_plan)
+    (plan_execution_staged ?field_plan_var - field_management_plan)
+    (plan_execution_verified ?field_plan_var - field_management_plan)
+    (termination_method_available ?termination_method_var - termination_method)
+    (plan_termination_method_linked ?field_plan_var - field_management_plan ?termination_method_var - termination_method)
+    (plan_termination_ready ?field_plan_var - field_management_plan)
+    (contractor_unit_mobilized ?field_plan_var - field_management_plan)
+    (plan_residue_ready ?field_plan_var - field_management_plan)
+    (fertilizer_product_available ?fertilizer_product_var - fertilizer_product)
+    (plan_fertilizer_product_linked ?field_plan_var - field_management_plan ?fertilizer_product_var - fertilizer_product)
+    (operator_group_available ?operator_group_var - operator_group)
+    (plan_operator_group_linked ?field_plan_var - field_management_plan ?operator_group_var - operator_group)
+    (inspection_checkpoint_available ?inspection_checkpoint_var - inspection_checkpoint)
+    (plan_inspection_checkpoint_linked ?field_plan_var - field_management_plan ?inspection_checkpoint_var - inspection_checkpoint)
+    (residue_method_available ?residue_method_var - residue_management_method)
+    (plan_residue_method_linked ?field_plan_var - field_management_plan ?residue_method_var - residue_management_method)
+    (field_permit_available ?regulatory_permit_var - regulatory_permit)
+    (field_permit_linked ?field_unit_var - field_unit ?regulatory_permit_var - regulatory_permit)
+    (source_parcel_committed ?source_parcel_var - source_field_parcel)
+    (target_parcel_committed ?target_parcel_var - target_field_parcel)
+    (plan_finalized ?field_plan_var - field_management_plan)
+  )
+  (:action register_cover_crop_field
+    :parameters (?field_unit_var - field_unit)
+    :precondition
+      (and
+        (not
+          (field_unit_enrolled ?field_unit_var)
+        )
+        (not
+          (field_unit_closed_out ?field_unit_var)
+        )
+      )
+    :effect (field_unit_enrolled ?field_unit_var)
+  )
+  (:action allocate_cover_crop_seed_lot
+    :parameters (?field_unit_var - field_unit ?cover_crop_seed_lot_var - cover_crop_seed_lot)
+    :precondition
+      (and
+        (field_unit_enrolled ?field_unit_var)
+        (not
+          (field_seed_lot_committed ?field_unit_var)
+        )
+        (cover_crop_seed_lot_available ?cover_crop_seed_lot_var)
+      )
+    :effect
+      (and
+        (field_seed_lot_committed ?field_unit_var)
+        (field_seed_lot_assigned ?field_unit_var ?cover_crop_seed_lot_var)
+        (not
+          (cover_crop_seed_lot_available ?cover_crop_seed_lot_var)
+        )
+      )
+  )
+  (:action assign_cover_crop_species
+    :parameters (?field_unit_var - field_unit ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_enrolled ?field_unit_var)
+        (field_seed_lot_committed ?field_unit_var)
+        (cover_crop_species_available ?cover_crop_species_var)
+      )
+    :effect
+      (and
+        (field_crop_assigned ?field_unit_var ?cover_crop_species_var)
+        (not
+          (cover_crop_species_available ?cover_crop_species_var)
+        )
+      )
+  )
+  (:action authorize_cover_crop_field
+    :parameters (?field_unit_var - field_unit ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_enrolled ?field_unit_var)
+        (field_seed_lot_committed ?field_unit_var)
+        (field_crop_assigned ?field_unit_var ?cover_crop_species_var)
+        (not
+          (field_unit_authorized ?field_unit_var)
+        )
+      )
+    :effect (field_unit_authorized ?field_unit_var)
+  )
+  (:action release_cover_crop_species
+    :parameters (?field_unit_var - field_unit ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_crop_assigned ?field_unit_var ?cover_crop_species_var)
+      )
+    :effect
+      (and
+        (cover_crop_species_available ?cover_crop_species_var)
+        (not
+          (field_crop_assigned ?field_unit_var ?cover_crop_species_var)
+        )
+      )
+  )
+  (:action assign_contractor_unit_to_field
+    :parameters (?field_unit_var - field_unit ?contractor_unit_var - contractor_unit)
+    :precondition
+      (and
+        (field_unit_authorized ?field_unit_var)
+        (contractor_unit_available ?contractor_unit_var)
+      )
+    :effect
+      (and
+        (contractor_unit_assigned ?field_unit_var ?contractor_unit_var)
+        (not
+          (contractor_unit_available ?contractor_unit_var)
+        )
+      )
+  )
+  (:action release_contractor_unit
+    :parameters (?field_unit_var - field_unit ?contractor_unit_var - contractor_unit)
+    :precondition
+      (and
+        (contractor_unit_assigned ?field_unit_var ?contractor_unit_var)
+      )
+    :effect
+      (and
+        (contractor_unit_available ?contractor_unit_var)
+        (not
+          (contractor_unit_assigned ?field_unit_var ?contractor_unit_var)
+        )
+      )
+  )
+  (:action assign_inspection_checkpoint_to_plan
+    :parameters (?field_plan_var - field_management_plan ?inspection_checkpoint_var - inspection_checkpoint)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (inspection_checkpoint_available ?inspection_checkpoint_var)
+      )
+    :effect
+      (and
+        (plan_inspection_checkpoint_linked ?field_plan_var ?inspection_checkpoint_var)
+        (not
+          (inspection_checkpoint_available ?inspection_checkpoint_var)
+        )
+      )
+  )
+  (:action remove_inspection_checkpoint_from_plan
+    :parameters (?field_plan_var - field_management_plan ?inspection_checkpoint_var - inspection_checkpoint)
+    :precondition
+      (and
+        (plan_inspection_checkpoint_linked ?field_plan_var ?inspection_checkpoint_var)
+      )
+    :effect
+      (and
+        (inspection_checkpoint_available ?inspection_checkpoint_var)
+        (not
+          (plan_inspection_checkpoint_linked ?field_plan_var ?inspection_checkpoint_var)
+        )
+      )
+  )
+  (:action assign_residue_management_method_to_plan
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (residue_method_available ?residue_method_var)
+      )
+    :effect
+      (and
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (not
+          (residue_method_available ?residue_method_var)
+        )
+      )
+  )
+  (:action remove_residue_management_method_from_plan
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method)
+    :precondition
+      (and
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+      )
+    :effect
+      (and
+        (residue_method_available ?residue_method_var)
+        (not
+          (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        )
+      )
+  )
+  (:action authorize_seeding_method
+    :parameters (?source_parcel_var - source_field_parcel ?seeding_method_var - seeding_method ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_authorized ?source_parcel_var)
+        (field_crop_assigned ?source_parcel_var ?cover_crop_species_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (not
+          (seeding_method_ready ?seeding_method_var)
+        )
+        (not
+          (seeding_method_staged ?seeding_method_var)
+        )
+      )
+    :effect (seeding_method_ready ?seeding_method_var)
+  )
+  (:action commit_source_parcel
+    :parameters (?source_parcel_var - source_field_parcel ?seeding_method_var - seeding_method ?contractor_unit_var - contractor_unit)
+    :precondition
+      (and
+        (field_unit_authorized ?source_parcel_var)
+        (contractor_unit_assigned ?source_parcel_var ?contractor_unit_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (seeding_method_ready ?seeding_method_var)
+        (not
+          (source_parcel_committed ?source_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (source_parcel_ready ?source_parcel_var)
+      )
+  )
+  (:action stage_seed_package
+    :parameters (?source_parcel_var - source_field_parcel ?seeding_method_var - seeding_method ?treatment_product_var - treatment_product)
+    :precondition
+      (and
+        (field_unit_authorized ?source_parcel_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (treatment_product_available ?treatment_product_var)
+        (not
+          (source_parcel_committed ?source_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (seeding_method_staged ?seeding_method_var)
+        (source_parcel_committed ?source_parcel_var)
+        (source_parcel_treatment_applied ?source_parcel_var ?treatment_product_var)
+        (not
+          (treatment_product_available ?treatment_product_var)
+        )
+      )
+  )
+  (:action confirm_source_parcel_ready
+    :parameters (?source_parcel_var - source_field_parcel ?seeding_method_var - seeding_method ?cover_crop_species_var - cover_crop_species ?treatment_product_var - treatment_product)
+    :precondition
+      (and
+        (field_unit_authorized ?source_parcel_var)
+        (field_crop_assigned ?source_parcel_var ?cover_crop_species_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (seeding_method_staged ?seeding_method_var)
+        (source_parcel_treatment_applied ?source_parcel_var ?treatment_product_var)
+        (not
+          (source_parcel_ready ?source_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (seeding_method_ready ?seeding_method_var)
+        (source_parcel_ready ?source_parcel_var)
+        (treatment_product_available ?treatment_product_var)
+        (not
+          (source_parcel_treatment_applied ?source_parcel_var ?treatment_product_var)
+        )
+      )
+  )
+  (:action authorize_target_parcel
+    :parameters (?target_parcel_var - target_field_parcel ?field_sector_var - field_sector ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_authorized ?target_parcel_var)
+        (field_crop_assigned ?target_parcel_var ?cover_crop_species_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (not
+          (field_sector_open ?field_sector_var)
+        )
+        (not
+          (field_sector_locked ?field_sector_var)
+        )
+      )
+    :effect (field_sector_open ?field_sector_var)
+  )
+  (:action commit_target_parcel
+    :parameters (?target_parcel_var - target_field_parcel ?field_sector_var - field_sector ?contractor_unit_var - contractor_unit)
+    :precondition
+      (and
+        (field_unit_authorized ?target_parcel_var)
+        (contractor_unit_assigned ?target_parcel_var ?contractor_unit_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (field_sector_open ?field_sector_var)
+        (not
+          (target_parcel_committed ?target_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (target_parcel_committed ?target_parcel_var)
+        (target_parcel_ready ?target_parcel_var)
+      )
+  )
+  (:action stage_target_treatment
+    :parameters (?target_parcel_var - target_field_parcel ?field_sector_var - field_sector ?treatment_product_var - treatment_product)
+    :precondition
+      (and
+        (field_unit_authorized ?target_parcel_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (treatment_product_available ?treatment_product_var)
+        (not
+          (target_parcel_committed ?target_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (field_sector_locked ?field_sector_var)
+        (target_parcel_committed ?target_parcel_var)
+        (target_parcel_treatment_applied ?target_parcel_var ?treatment_product_var)
+        (not
+          (treatment_product_available ?treatment_product_var)
+        )
+      )
+  )
+  (:action confirm_target_parcel_ready
+    :parameters (?target_parcel_var - target_field_parcel ?field_sector_var - field_sector ?cover_crop_species_var - cover_crop_species ?treatment_product_var - treatment_product)
+    :precondition
+      (and
+        (field_unit_authorized ?target_parcel_var)
+        (field_crop_assigned ?target_parcel_var ?cover_crop_species_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (field_sector_locked ?field_sector_var)
+        (target_parcel_treatment_applied ?target_parcel_var ?treatment_product_var)
+        (not
+          (target_parcel_ready ?target_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (field_sector_open ?field_sector_var)
+        (target_parcel_ready ?target_parcel_var)
+        (treatment_product_available ?treatment_product_var)
+        (not
+          (target_parcel_treatment_applied ?target_parcel_var ?treatment_product_var)
+        )
+      )
+  )
+  (:action assemble_work_order
+    :parameters (?source_parcel_var - source_field_parcel ?target_parcel_var - target_field_parcel ?seeding_method_var - seeding_method ?field_sector_var - field_sector ?work_order_var - work_order)
+    :precondition
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (target_parcel_committed ?target_parcel_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (seeding_method_ready ?seeding_method_var)
+        (field_sector_open ?field_sector_var)
+        (source_parcel_ready ?source_parcel_var)
+        (target_parcel_ready ?target_parcel_var)
+        (work_order_draft ?work_order_var)
+      )
+    :effect
+      (and
+        (work_order_created ?work_order_var)
+        (work_order_seeding_method_linked ?work_order_var ?seeding_method_var)
+        (work_order_sector_linked ?work_order_var ?field_sector_var)
+        (not
+          (work_order_draft ?work_order_var)
+        )
+      )
+  )
+  (:action confirm_work_order_source_clearance
+    :parameters (?source_parcel_var - source_field_parcel ?target_parcel_var - target_field_parcel ?seeding_method_var - seeding_method ?field_sector_var - field_sector ?work_order_var - work_order)
+    :precondition
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (target_parcel_committed ?target_parcel_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (seeding_method_staged ?seeding_method_var)
+        (field_sector_open ?field_sector_var)
+        (not
+          (source_parcel_ready ?source_parcel_var)
+        )
+        (target_parcel_ready ?target_parcel_var)
+        (work_order_draft ?work_order_var)
+      )
+    :effect
+      (and
+        (work_order_created ?work_order_var)
+        (work_order_seeding_method_linked ?work_order_var ?seeding_method_var)
+        (work_order_sector_linked ?work_order_var ?field_sector_var)
+        (work_order_source_clearance ?work_order_var)
+        (not
+          (work_order_draft ?work_order_var)
+        )
+      )
+  )
+  (:action confirm_work_order_target_clearance
+    :parameters (?source_parcel_var - source_field_parcel ?target_parcel_var - target_field_parcel ?seeding_method_var - seeding_method ?field_sector_var - field_sector ?work_order_var - work_order)
+    :precondition
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (target_parcel_committed ?target_parcel_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (seeding_method_ready ?seeding_method_var)
+        (field_sector_locked ?field_sector_var)
+        (source_parcel_ready ?source_parcel_var)
+        (not
+          (target_parcel_ready ?target_parcel_var)
+        )
+        (work_order_draft ?work_order_var)
+      )
+    :effect
+      (and
+        (work_order_created ?work_order_var)
+        (work_order_seeding_method_linked ?work_order_var ?seeding_method_var)
+        (work_order_sector_linked ?work_order_var ?field_sector_var)
+        (work_order_target_clearance ?work_order_var)
+        (not
+          (work_order_draft ?work_order_var)
+        )
+      )
+  )
+  (:action confirm_work_order_full_clearance
+    :parameters (?source_parcel_var - source_field_parcel ?target_parcel_var - target_field_parcel ?seeding_method_var - seeding_method ?field_sector_var - field_sector ?work_order_var - work_order)
+    :precondition
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (target_parcel_committed ?target_parcel_var)
+        (source_parcel_seeding_method_linked ?source_parcel_var ?seeding_method_var)
+        (target_parcel_sector_linked ?target_parcel_var ?field_sector_var)
+        (seeding_method_staged ?seeding_method_var)
+        (field_sector_locked ?field_sector_var)
+        (not
+          (source_parcel_ready ?source_parcel_var)
+        )
+        (not
+          (target_parcel_ready ?target_parcel_var)
+        )
+        (work_order_draft ?work_order_var)
+      )
+    :effect
+      (and
+        (work_order_created ?work_order_var)
+        (work_order_seeding_method_linked ?work_order_var ?seeding_method_var)
+        (work_order_sector_linked ?work_order_var ?field_sector_var)
+        (work_order_source_clearance ?work_order_var)
+        (work_order_target_clearance ?work_order_var)
+        (not
+          (work_order_draft ?work_order_var)
+        )
+      )
+  )
+  (:action approve_work_order
+    :parameters (?work_order_var - work_order ?source_parcel_var - source_field_parcel ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (work_order_created ?work_order_var)
+        (source_parcel_committed ?source_parcel_var)
+        (field_crop_assigned ?source_parcel_var ?cover_crop_species_var)
+        (not
+          (work_order_approved ?work_order_var)
+        )
+      )
+    :effect (work_order_approved ?work_order_var)
+  )
+  (:action stage_seed_package_for_work_order
+    :parameters (?field_plan_var - field_management_plan ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (plan_work_order_linked ?field_plan_var ?work_order_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_available ?seed_package_var)
+        (work_order_created ?work_order_var)
+        (work_order_approved ?work_order_var)
+        (not
+          (seed_package_staged ?seed_package_var)
+        )
+      )
+    :effect
+      (and
+        (seed_package_staged ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (not
+          (seed_package_available ?seed_package_var)
+        )
+      )
+  )
+  (:action certify_seed_package_loaded
+    :parameters (?field_plan_var - field_management_plan ?seed_package_var - seed_package ?work_order_var - work_order ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_staged ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (field_crop_assigned ?field_plan_var ?cover_crop_species_var)
+        (not
+          (work_order_source_clearance ?work_order_var)
+        )
+        (not
+          (plan_prepared_for_execution ?field_plan_var)
+        )
+      )
+    :effect (plan_prepared_for_execution ?field_plan_var)
+  )
+  (:action reserve_fertilizer_product
+    :parameters (?field_plan_var - field_management_plan ?fertilizer_product_var - fertilizer_product)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (fertilizer_product_available ?fertilizer_product_var)
+        (not
+          (fertilizer_product_reserved_to_plan ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (fertilizer_product_reserved_to_plan ?field_plan_var)
+        (plan_fertilizer_product_linked ?field_plan_var ?fertilizer_product_var)
+        (not
+          (fertilizer_product_available ?fertilizer_product_var)
+        )
+      )
+  )
+  (:action prepare_plan_for_execution
+    :parameters (?field_plan_var - field_management_plan ?seed_package_var - seed_package ?work_order_var - work_order ?cover_crop_species_var - cover_crop_species ?fertilizer_product_var - fertilizer_product)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_staged ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (field_crop_assigned ?field_plan_var ?cover_crop_species_var)
+        (work_order_source_clearance ?work_order_var)
+        (fertilizer_product_reserved_to_plan ?field_plan_var)
+        (plan_fertilizer_product_linked ?field_plan_var ?fertilizer_product_var)
+        (not
+          (plan_prepared_for_execution ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_prepared_for_execution ?field_plan_var)
+        (plan_input_verified ?field_plan_var)
+      )
+  )
+  (:action advance_plan_execution_route_a
+    :parameters (?field_plan_var - field_management_plan ?inspection_checkpoint_var - inspection_checkpoint ?contractor_unit_var - contractor_unit ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_prepared_for_execution ?field_plan_var)
+        (plan_inspection_checkpoint_linked ?field_plan_var ?inspection_checkpoint_var)
+        (contractor_unit_assigned ?field_plan_var ?contractor_unit_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (not
+          (work_order_target_clearance ?work_order_var)
+        )
+        (not
+          (plan_in_execution ?field_plan_var)
+        )
+      )
+    :effect (plan_in_execution ?field_plan_var)
+  )
+  (:action advance_plan_execution_route_b
+    :parameters (?field_plan_var - field_management_plan ?inspection_checkpoint_var - inspection_checkpoint ?contractor_unit_var - contractor_unit ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_prepared_for_execution ?field_plan_var)
+        (plan_inspection_checkpoint_linked ?field_plan_var ?inspection_checkpoint_var)
+        (contractor_unit_assigned ?field_plan_var ?contractor_unit_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (work_order_target_clearance ?work_order_var)
+        (not
+          (plan_in_execution ?field_plan_var)
+        )
+      )
+    :effect (plan_in_execution ?field_plan_var)
+  )
+  (:action stage_plan_execution_route_a
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_in_execution ?field_plan_var)
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (not
+          (work_order_source_clearance ?work_order_var)
+        )
+        (not
+          (work_order_target_clearance ?work_order_var)
+        )
+        (not
+          (plan_execution_ready ?field_plan_var)
+        )
+      )
+    :effect (plan_execution_ready ?field_plan_var)
+  )
+  (:action stage_plan_execution_route_b
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_in_execution ?field_plan_var)
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (work_order_source_clearance ?work_order_var)
+        (not
+          (work_order_target_clearance ?work_order_var)
+        )
+        (not
+          (plan_execution_ready ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_staged ?field_plan_var)
+      )
+  )
+  (:action stage_plan_execution_route_c
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_in_execution ?field_plan_var)
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (not
+          (work_order_source_clearance ?work_order_var)
+        )
+        (work_order_target_clearance ?work_order_var)
+        (not
+          (plan_execution_ready ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_staged ?field_plan_var)
+      )
+  )
+  (:action stage_plan_execution_route_d
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method ?seed_package_var - seed_package ?work_order_var - work_order)
+    :precondition
+      (and
+        (plan_in_execution ?field_plan_var)
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (plan_seed_package_linked ?field_plan_var ?seed_package_var)
+        (seed_package_bound_to_work_order ?seed_package_var ?work_order_var)
+        (work_order_source_clearance ?work_order_var)
+        (work_order_target_clearance ?work_order_var)
+        (not
+          (plan_execution_ready ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_staged ?field_plan_var)
+      )
+  )
+  (:action close_plan_execution_direct
+    :parameters (?field_plan_var - field_management_plan)
+    :precondition
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (not
+          (plan_execution_staged ?field_plan_var)
+        )
+        (not
+          (plan_finalized ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_plan_var)
+        (execution_complete ?field_plan_var)
+      )
+  )
+  (:action assign_operator_group_to_plan
+    :parameters (?field_plan_var - field_management_plan ?operator_group_var - operator_group)
+    :precondition
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_staged ?field_plan_var)
+        (operator_group_available ?operator_group_var)
+      )
+    :effect
+      (and
+        (plan_operator_group_linked ?field_plan_var ?operator_group_var)
+        (not
+          (operator_group_available ?operator_group_var)
+        )
+      )
+  )
+  (:action verify_operator_group_execution
+    :parameters (?field_plan_var - field_management_plan ?source_parcel_var - source_field_parcel ?target_parcel_var - target_field_parcel ?cover_crop_species_var - cover_crop_species ?operator_group_var - operator_group)
+    :precondition
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_staged ?field_plan_var)
+        (plan_operator_group_linked ?field_plan_var ?operator_group_var)
+        (plan_source_parcel_linked ?field_plan_var ?source_parcel_var)
+        (plan_target_parcel_linked ?field_plan_var ?target_parcel_var)
+        (source_parcel_ready ?source_parcel_var)
+        (target_parcel_ready ?target_parcel_var)
+        (field_crop_assigned ?field_plan_var ?cover_crop_species_var)
+        (not
+          (plan_execution_verified ?field_plan_var)
+        )
+      )
+    :effect (plan_execution_verified ?field_plan_var)
+  )
+  (:action close_plan_execution_after_verification
+    :parameters (?field_plan_var - field_management_plan)
+    :precondition
+      (and
+        (plan_execution_ready ?field_plan_var)
+        (plan_execution_verified ?field_plan_var)
+        (not
+          (plan_finalized ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_plan_var)
+        (execution_complete ?field_plan_var)
+      )
+  )
+  (:action link_termination_method_to_plan
+    :parameters (?field_plan_var - field_management_plan ?termination_method_var - termination_method ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (field_unit_authorized ?field_plan_var)
+        (field_crop_assigned ?field_plan_var ?cover_crop_species_var)
+        (termination_method_available ?termination_method_var)
+        (plan_termination_method_linked ?field_plan_var ?termination_method_var)
+        (not
+          (plan_termination_ready ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_termination_ready ?field_plan_var)
+        (not
+          (termination_method_available ?termination_method_var)
+        )
+      )
+  )
+  (:action mobilize_contractor_unit
+    :parameters (?field_plan_var - field_management_plan ?contractor_unit_var - contractor_unit)
+    :precondition
+      (and
+        (plan_termination_ready ?field_plan_var)
+        (contractor_unit_assigned ?field_plan_var ?contractor_unit_var)
+        (not
+          (contractor_unit_mobilized ?field_plan_var)
+        )
+      )
+    :effect (contractor_unit_mobilized ?field_plan_var)
+  )
+  (:action prepare_residue_management
+    :parameters (?field_plan_var - field_management_plan ?residue_method_var - residue_management_method)
+    :precondition
+      (and
+        (contractor_unit_mobilized ?field_plan_var)
+        (plan_residue_method_linked ?field_plan_var ?residue_method_var)
+        (not
+          (plan_residue_ready ?field_plan_var)
+        )
+      )
+    :effect (plan_residue_ready ?field_plan_var)
+  )
+  (:action finalize_plan_closeout
+    :parameters (?field_plan_var - field_management_plan)
+    :precondition
+      (and
+        (plan_residue_ready ?field_plan_var)
+        (not
+          (plan_finalized ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_plan_var)
+        (execution_complete ?field_plan_var)
+      )
+  )
+  (:action mark_source_parcel_execution_complete
+    :parameters (?source_parcel_var - source_field_parcel ?work_order_var - work_order)
+    :precondition
+      (and
+        (source_parcel_committed ?source_parcel_var)
+        (source_parcel_ready ?source_parcel_var)
+        (work_order_created ?work_order_var)
+        (work_order_approved ?work_order_var)
+        (not
+          (execution_complete ?source_parcel_var)
+        )
+      )
+    :effect (execution_complete ?source_parcel_var)
+  )
+  (:action mark_target_parcel_execution_complete
+    :parameters (?target_parcel_var - target_field_parcel ?work_order_var - work_order)
+    :precondition
+      (and
+        (target_parcel_committed ?target_parcel_var)
+        (target_parcel_ready ?target_parcel_var)
+        (work_order_created ?work_order_var)
+        (work_order_approved ?work_order_var)
+        (not
+          (execution_complete ?target_parcel_var)
+        )
+      )
+    :effect (execution_complete ?target_parcel_var)
+  )
+  (:action certify_field_closeout
+    :parameters (?field_unit_var - field_unit ?regulatory_permit_var - regulatory_permit ?cover_crop_species_var - cover_crop_species)
+    :precondition
+      (and
+        (execution_complete ?field_unit_var)
+        (field_crop_assigned ?field_unit_var ?cover_crop_species_var)
+        (field_permit_available ?regulatory_permit_var)
+        (not
+          (closeout_verified ?field_unit_var)
+        )
+      )
+    :effect
+      (and
+        (closeout_verified ?field_unit_var)
+        (field_permit_linked ?field_unit_var ?regulatory_permit_var)
+        (not
+          (field_permit_available ?regulatory_permit_var)
+        )
+      )
+  )
+  (:action release_source_parcel_resources
+    :parameters (?source_parcel_var - source_field_parcel ?cover_crop_seed_lot_var - cover_crop_seed_lot ?regulatory_permit_var - regulatory_permit)
+    :precondition
+      (and
+        (closeout_verified ?source_parcel_var)
+        (field_seed_lot_assigned ?source_parcel_var ?cover_crop_seed_lot_var)
+        (field_permit_linked ?source_parcel_var ?regulatory_permit_var)
+        (not
+          (field_unit_closed_out ?source_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (field_unit_closed_out ?source_parcel_var)
+        (cover_crop_seed_lot_available ?cover_crop_seed_lot_var)
+        (field_permit_available ?regulatory_permit_var)
+      )
+  )
+  (:action release_target_parcel_resources
+    :parameters (?target_parcel_var - target_field_parcel ?cover_crop_seed_lot_var - cover_crop_seed_lot ?regulatory_permit_var - regulatory_permit)
+    :precondition
+      (and
+        (closeout_verified ?target_parcel_var)
+        (field_seed_lot_assigned ?target_parcel_var ?cover_crop_seed_lot_var)
+        (field_permit_linked ?target_parcel_var ?regulatory_permit_var)
+        (not
+          (field_unit_closed_out ?target_parcel_var)
+        )
+      )
+    :effect
+      (and
+        (field_unit_closed_out ?target_parcel_var)
+        (cover_crop_seed_lot_available ?cover_crop_seed_lot_var)
+        (field_permit_available ?regulatory_permit_var)
+      )
+  )
+  (:action close_management_plan_and_release_resources
+    :parameters (?field_plan_var - field_management_plan ?cover_crop_seed_lot_var - cover_crop_seed_lot ?regulatory_permit_var - regulatory_permit)
+    :precondition
+      (and
+        (closeout_verified ?field_plan_var)
+        (field_seed_lot_assigned ?field_plan_var ?cover_crop_seed_lot_var)
+        (field_permit_linked ?field_plan_var ?regulatory_permit_var)
+        (not
+          (field_unit_closed_out ?field_plan_var)
+        )
+      )
+    :effect
+      (and
+        (field_unit_closed_out ?field_plan_var)
+        (cover_crop_seed_lot_available ?cover_crop_seed_lot_var)
+        (field_permit_available ?regulatory_permit_var)
+      )
+  )
+)

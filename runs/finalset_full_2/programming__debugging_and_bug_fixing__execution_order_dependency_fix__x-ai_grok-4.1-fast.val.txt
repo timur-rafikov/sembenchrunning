@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain execution_order_dependency_fix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_artifact - object external_artifact - object ordering_artifact - object program_entity - object component_instance - program_entity shared_resource - operational_artifact input_event - operational_artifact service_dependency - operational_artifact source_location - operational_artifact runtime_invariant - operational_artifact environment_parameter - operational_artifact timing_spec - operational_artifact reviewer_approval - operational_artifact external_signal - external_artifact configuration_option - external_artifact mock_object - external_artifact ordering_token - ordering_artifact condition_flag - ordering_artifact test_scenario - ordering_artifact execution_context - component_instance patch_context - component_instance execution_context_local - execution_context execution_context_concurrent - execution_context candidate - patch_context)
+  (:predicates
+    (component_registered ?component_instance - component_instance)
+    (entity_initialized ?component_instance - component_instance)
+    (resource_assigned ?component_instance - component_instance)
+    (fix_committed ?component_instance - component_instance)
+    (ready_for_integration ?component_instance - component_instance)
+    (patch_staged ?component_instance - component_instance)
+    (resource_available ?shared_resource - shared_resource)
+    (instance_holds_resource ?component_instance - component_instance ?shared_resource - shared_resource)
+    (input_event_available ?input_event - input_event)
+    (instance_event_binding ?component_instance - component_instance ?input_event - input_event)
+    (dependency_available ?service_dependency - service_dependency)
+    (instance_dependency_bound ?component_instance - component_instance ?service_dependency - service_dependency)
+    (external_signal_available ?external_signal - external_signal)
+    (local_signal_binding ?execution_context_local - execution_context_local ?external_signal - external_signal)
+    (concurrent_signal_binding ?execution_context_concurrent - execution_context_concurrent ?external_signal - external_signal)
+    (context_token_binding ?execution_context_local - execution_context_local ?ordering_token - ordering_token)
+    (ordering_token_asserted ?ordering_token - ordering_token)
+    (ordering_token_claimed ?ordering_token - ordering_token)
+    (local_context_confirmed ?execution_context_local - execution_context_local)
+    (concurrent_flag_binding ?execution_context_concurrent - execution_context_concurrent ?condition_flag - condition_flag)
+    (condition_flag_asserted ?condition_flag - condition_flag)
+    (condition_flag_claimed ?condition_flag - condition_flag)
+    (concurrent_context_confirmed ?execution_context_concurrent - execution_context_concurrent)
+    (test_scenario_available ?test_scenario - test_scenario)
+    (test_scenario_reserved ?test_scenario - test_scenario)
+    (scenario_includes_token ?test_scenario - test_scenario ?ordering_token - ordering_token)
+    (scenario_includes_flag ?test_scenario - test_scenario ?condition_flag - condition_flag)
+    (scenario_branch_a_executed ?test_scenario - test_scenario)
+    (scenario_branch_b_executed ?test_scenario - test_scenario)
+    (scenario_execution_completed ?test_scenario - test_scenario)
+    (candidate_targets_local_context ?patch_candidate - candidate ?execution_context_local - execution_context_local)
+    (candidate_targets_concurrent_context ?patch_candidate - candidate ?execution_context_concurrent - execution_context_concurrent)
+    (candidate_includes_test_scenario ?patch_candidate - candidate ?test_scenario - test_scenario)
+    (config_option_available ?configuration_option - configuration_option)
+    (candidate_uses_config_option ?patch_candidate - candidate ?configuration_option - configuration_option)
+    (config_option_staged ?configuration_option - configuration_option)
+    (config_option_applied_to_scenario ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    (candidate_option_ready ?patch_candidate - candidate)
+    (candidate_instrumented ?patch_candidate - candidate)
+    (candidate_validated ?patch_candidate - candidate)
+    (candidate_has_source_binding ?patch_candidate - candidate)
+    (candidate_source_binding_staged ?patch_candidate - candidate)
+    (candidate_config_confirmed ?patch_candidate - candidate)
+    (candidate_integration_locked ?patch_candidate - candidate)
+    (mock_available ?mock_object - mock_object)
+    (candidate_mock_binding ?patch_candidate - candidate ?mock_object - mock_object)
+    (candidate_source_bound ?patch_candidate - candidate)
+    (candidate_source_ready ?patch_candidate - candidate)
+    (candidate_source_validated ?patch_candidate - candidate)
+    (source_location_available ?source_location - source_location)
+    (candidate_source_location_binding ?patch_candidate - candidate ?source_location - source_location)
+    (invariant_available ?runtime_invariant - runtime_invariant)
+    (candidate_invariant_binding ?patch_candidate - candidate ?runtime_invariant - runtime_invariant)
+    (timing_spec_available ?timing_spec - timing_spec)
+    (candidate_timing_spec_binding ?patch_candidate - candidate ?timing_spec - timing_spec)
+    (reviewer_approval_available ?reviewer_approval - reviewer_approval)
+    (candidate_reviewer_approval_binding ?patch_candidate - candidate ?reviewer_approval - reviewer_approval)
+    (environment_parameter_available ?environment_parameter - environment_parameter)
+    (instance_env_parameter_binding ?component_instance - component_instance ?environment_parameter - environment_parameter)
+    (local_context_ready ?execution_context_local - execution_context_local)
+    (concurrent_context_ready ?execution_context_concurrent - execution_context_concurrent)
+    (candidate_finalized ?patch_candidate - candidate)
+  )
+  (:action register_component_instance
+    :parameters (?component_instance - component_instance)
+    :precondition
+      (and
+        (not
+          (component_registered ?component_instance)
+        )
+        (not
+          (fix_committed ?component_instance)
+        )
+      )
+    :effect (component_registered ?component_instance)
+  )
+  (:action acquire_shared_resource
+    :parameters (?component_instance - component_instance ?shared_resource - shared_resource)
+    :precondition
+      (and
+        (component_registered ?component_instance)
+        (not
+          (resource_assigned ?component_instance)
+        )
+        (resource_available ?shared_resource)
+      )
+    :effect
+      (and
+        (resource_assigned ?component_instance)
+        (instance_holds_resource ?component_instance ?shared_resource)
+        (not
+          (resource_available ?shared_resource)
+        )
+      )
+  )
+  (:action bind_input_event
+    :parameters (?component_instance - component_instance ?input_event - input_event)
+    :precondition
+      (and
+        (component_registered ?component_instance)
+        (resource_assigned ?component_instance)
+        (input_event_available ?input_event)
+      )
+    :effect
+      (and
+        (instance_event_binding ?component_instance ?input_event)
+        (not
+          (input_event_available ?input_event)
+        )
+      )
+  )
+  (:action finalize_event_binding
+    :parameters (?component_instance - component_instance ?input_event - input_event)
+    :precondition
+      (and
+        (component_registered ?component_instance)
+        (resource_assigned ?component_instance)
+        (instance_event_binding ?component_instance ?input_event)
+        (not
+          (entity_initialized ?component_instance)
+        )
+      )
+    :effect (entity_initialized ?component_instance)
+  )
+  (:action release_input_event
+    :parameters (?component_instance - component_instance ?input_event - input_event)
+    :precondition
+      (and
+        (instance_event_binding ?component_instance ?input_event)
+      )
+    :effect
+      (and
+        (input_event_available ?input_event)
+        (not
+          (instance_event_binding ?component_instance ?input_event)
+        )
+      )
+  )
+  (:action attach_service_dependency
+    :parameters (?component_instance - component_instance ?service_dependency - service_dependency)
+    :precondition
+      (and
+        (entity_initialized ?component_instance)
+        (dependency_available ?service_dependency)
+      )
+    :effect
+      (and
+        (instance_dependency_bound ?component_instance ?service_dependency)
+        (not
+          (dependency_available ?service_dependency)
+        )
+      )
+  )
+  (:action detach_service_dependency
+    :parameters (?component_instance - component_instance ?service_dependency - service_dependency)
+    :precondition
+      (and
+        (instance_dependency_bound ?component_instance ?service_dependency)
+      )
+    :effect
+      (and
+        (dependency_available ?service_dependency)
+        (not
+          (instance_dependency_bound ?component_instance ?service_dependency)
+        )
+      )
+  )
+  (:action attach_timing_spec_to_candidate
+    :parameters (?patch_candidate - candidate ?timing_spec - timing_spec)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (timing_spec_available ?timing_spec)
+      )
+    :effect
+      (and
+        (candidate_timing_spec_binding ?patch_candidate ?timing_spec)
+        (not
+          (timing_spec_available ?timing_spec)
+        )
+      )
+  )
+  (:action detach_timing_spec_from_candidate
+    :parameters (?patch_candidate - candidate ?timing_spec - timing_spec)
+    :precondition
+      (and
+        (candidate_timing_spec_binding ?patch_candidate ?timing_spec)
+      )
+    :effect
+      (and
+        (timing_spec_available ?timing_spec)
+        (not
+          (candidate_timing_spec_binding ?patch_candidate ?timing_spec)
+        )
+      )
+  )
+  (:action attach_reviewer_approval_to_candidate
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (reviewer_approval_available ?reviewer_approval)
+      )
+    :effect
+      (and
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (not
+          (reviewer_approval_available ?reviewer_approval)
+        )
+      )
+  )
+  (:action detach_reviewer_approval_from_candidate
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval)
+    :precondition
+      (and
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+      )
+    :effect
+      (and
+        (reviewer_approval_available ?reviewer_approval)
+        (not
+          (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        )
+      )
+  )
+  (:action initiate_local_ordering_token
+    :parameters (?execution_context_local - execution_context_local ?ordering_token - ordering_token ?input_event - input_event)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_local)
+        (instance_event_binding ?execution_context_local ?input_event)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (not
+          (ordering_token_asserted ?ordering_token)
+        )
+        (not
+          (ordering_token_claimed ?ordering_token)
+        )
+      )
+    :effect (ordering_token_asserted ?ordering_token)
+  )
+  (:action confirm_local_ordering_token
+    :parameters (?execution_context_local - execution_context_local ?ordering_token - ordering_token ?service_dependency - service_dependency)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_local)
+        (instance_dependency_bound ?execution_context_local ?service_dependency)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (ordering_token_asserted ?ordering_token)
+        (not
+          (local_context_ready ?execution_context_local)
+        )
+      )
+    :effect
+      (and
+        (local_context_ready ?execution_context_local)
+        (local_context_confirmed ?execution_context_local)
+      )
+  )
+  (:action claim_local_ordering_token_with_signal
+    :parameters (?execution_context_local - execution_context_local ?ordering_token - ordering_token ?external_signal - external_signal)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_local)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (external_signal_available ?external_signal)
+        (not
+          (local_context_ready ?execution_context_local)
+        )
+      )
+    :effect
+      (and
+        (ordering_token_claimed ?ordering_token)
+        (local_context_ready ?execution_context_local)
+        (local_signal_binding ?execution_context_local ?external_signal)
+        (not
+          (external_signal_available ?external_signal)
+        )
+      )
+  )
+  (:action propagate_local_ordering_token
+    :parameters (?execution_context_local - execution_context_local ?ordering_token - ordering_token ?input_event - input_event ?external_signal - external_signal)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_local)
+        (instance_event_binding ?execution_context_local ?input_event)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (ordering_token_claimed ?ordering_token)
+        (local_signal_binding ?execution_context_local ?external_signal)
+        (not
+          (local_context_confirmed ?execution_context_local)
+        )
+      )
+    :effect
+      (and
+        (ordering_token_asserted ?ordering_token)
+        (local_context_confirmed ?execution_context_local)
+        (external_signal_available ?external_signal)
+        (not
+          (local_signal_binding ?execution_context_local ?external_signal)
+        )
+      )
+  )
+  (:action initiate_concurrent_ordering_token
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?condition_flag - condition_flag ?input_event - input_event)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_concurrent)
+        (instance_event_binding ?execution_context_concurrent ?input_event)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (not
+          (condition_flag_asserted ?condition_flag)
+        )
+        (not
+          (condition_flag_claimed ?condition_flag)
+        )
+      )
+    :effect (condition_flag_asserted ?condition_flag)
+  )
+  (:action confirm_concurrent_ordering_token
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?condition_flag - condition_flag ?service_dependency - service_dependency)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_concurrent)
+        (instance_dependency_bound ?execution_context_concurrent ?service_dependency)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (condition_flag_asserted ?condition_flag)
+        (not
+          (concurrent_context_ready ?execution_context_concurrent)
+        )
+      )
+    :effect
+      (and
+        (concurrent_context_ready ?execution_context_concurrent)
+        (concurrent_context_confirmed ?execution_context_concurrent)
+      )
+  )
+  (:action claim_concurrent_ordering_token_with_signal
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?condition_flag - condition_flag ?external_signal - external_signal)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_concurrent)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (external_signal_available ?external_signal)
+        (not
+          (concurrent_context_ready ?execution_context_concurrent)
+        )
+      )
+    :effect
+      (and
+        (condition_flag_claimed ?condition_flag)
+        (concurrent_context_ready ?execution_context_concurrent)
+        (concurrent_signal_binding ?execution_context_concurrent ?external_signal)
+        (not
+          (external_signal_available ?external_signal)
+        )
+      )
+  )
+  (:action propagate_concurrent_ordering_token
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?condition_flag - condition_flag ?input_event - input_event ?external_signal - external_signal)
+    :precondition
+      (and
+        (entity_initialized ?execution_context_concurrent)
+        (instance_event_binding ?execution_context_concurrent ?input_event)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (condition_flag_claimed ?condition_flag)
+        (concurrent_signal_binding ?execution_context_concurrent ?external_signal)
+        (not
+          (concurrent_context_confirmed ?execution_context_concurrent)
+        )
+      )
+    :effect
+      (and
+        (condition_flag_asserted ?condition_flag)
+        (concurrent_context_confirmed ?execution_context_concurrent)
+        (external_signal_available ?external_signal)
+        (not
+          (concurrent_signal_binding ?execution_context_concurrent ?external_signal)
+        )
+      )
+  )
+  (:action reserve_and_bind_test_scenario
+    :parameters (?execution_context_local - execution_context_local ?execution_context_concurrent - execution_context_concurrent ?ordering_token - ordering_token ?condition_flag - condition_flag ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (local_context_ready ?execution_context_local)
+        (concurrent_context_ready ?execution_context_concurrent)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (ordering_token_asserted ?ordering_token)
+        (condition_flag_asserted ?condition_flag)
+        (local_context_confirmed ?execution_context_local)
+        (concurrent_context_confirmed ?execution_context_concurrent)
+        (test_scenario_available ?test_scenario)
+      )
+    :effect
+      (and
+        (test_scenario_reserved ?test_scenario)
+        (scenario_includes_token ?test_scenario ?ordering_token)
+        (scenario_includes_flag ?test_scenario ?condition_flag)
+        (not
+          (test_scenario_available ?test_scenario)
+        )
+      )
+  )
+  (:action reserve_and_bind_test_scenario_branch_a
+    :parameters (?execution_context_local - execution_context_local ?execution_context_concurrent - execution_context_concurrent ?ordering_token - ordering_token ?condition_flag - condition_flag ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (local_context_ready ?execution_context_local)
+        (concurrent_context_ready ?execution_context_concurrent)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (ordering_token_claimed ?ordering_token)
+        (condition_flag_asserted ?condition_flag)
+        (not
+          (local_context_confirmed ?execution_context_local)
+        )
+        (concurrent_context_confirmed ?execution_context_concurrent)
+        (test_scenario_available ?test_scenario)
+      )
+    :effect
+      (and
+        (test_scenario_reserved ?test_scenario)
+        (scenario_includes_token ?test_scenario ?ordering_token)
+        (scenario_includes_flag ?test_scenario ?condition_flag)
+        (scenario_branch_a_executed ?test_scenario)
+        (not
+          (test_scenario_available ?test_scenario)
+        )
+      )
+  )
+  (:action reserve_and_bind_test_scenario_branch_b
+    :parameters (?execution_context_local - execution_context_local ?execution_context_concurrent - execution_context_concurrent ?ordering_token - ordering_token ?condition_flag - condition_flag ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (local_context_ready ?execution_context_local)
+        (concurrent_context_ready ?execution_context_concurrent)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (ordering_token_asserted ?ordering_token)
+        (condition_flag_claimed ?condition_flag)
+        (local_context_confirmed ?execution_context_local)
+        (not
+          (concurrent_context_confirmed ?execution_context_concurrent)
+        )
+        (test_scenario_available ?test_scenario)
+      )
+    :effect
+      (and
+        (test_scenario_reserved ?test_scenario)
+        (scenario_includes_token ?test_scenario ?ordering_token)
+        (scenario_includes_flag ?test_scenario ?condition_flag)
+        (scenario_branch_b_executed ?test_scenario)
+        (not
+          (test_scenario_available ?test_scenario)
+        )
+      )
+  )
+  (:action reserve_and_bind_test_scenario_both_branches
+    :parameters (?execution_context_local - execution_context_local ?execution_context_concurrent - execution_context_concurrent ?ordering_token - ordering_token ?condition_flag - condition_flag ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (local_context_ready ?execution_context_local)
+        (concurrent_context_ready ?execution_context_concurrent)
+        (context_token_binding ?execution_context_local ?ordering_token)
+        (concurrent_flag_binding ?execution_context_concurrent ?condition_flag)
+        (ordering_token_claimed ?ordering_token)
+        (condition_flag_claimed ?condition_flag)
+        (not
+          (local_context_confirmed ?execution_context_local)
+        )
+        (not
+          (concurrent_context_confirmed ?execution_context_concurrent)
+        )
+        (test_scenario_available ?test_scenario)
+      )
+    :effect
+      (and
+        (test_scenario_reserved ?test_scenario)
+        (scenario_includes_token ?test_scenario ?ordering_token)
+        (scenario_includes_flag ?test_scenario ?condition_flag)
+        (scenario_branch_a_executed ?test_scenario)
+        (scenario_branch_b_executed ?test_scenario)
+        (not
+          (test_scenario_available ?test_scenario)
+        )
+      )
+  )
+  (:action execute_test_scenario
+    :parameters (?test_scenario - test_scenario ?execution_context_local - execution_context_local ?input_event - input_event)
+    :precondition
+      (and
+        (test_scenario_reserved ?test_scenario)
+        (local_context_ready ?execution_context_local)
+        (instance_event_binding ?execution_context_local ?input_event)
+        (not
+          (scenario_execution_completed ?test_scenario)
+        )
+      )
+    :effect (scenario_execution_completed ?test_scenario)
+  )
+  (:action stage_configuration_option
+    :parameters (?patch_candidate - candidate ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (candidate_includes_test_scenario ?patch_candidate ?test_scenario)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_available ?configuration_option)
+        (test_scenario_reserved ?test_scenario)
+        (scenario_execution_completed ?test_scenario)
+        (not
+          (config_option_staged ?configuration_option)
+        )
+      )
+    :effect
+      (and
+        (config_option_staged ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (not
+          (config_option_available ?configuration_option)
+        )
+      )
+  )
+  (:action apply_config_option_to_candidate
+    :parameters (?patch_candidate - candidate ?configuration_option - configuration_option ?test_scenario - test_scenario ?input_event - input_event)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_staged ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (instance_event_binding ?patch_candidate ?input_event)
+        (not
+          (scenario_branch_a_executed ?test_scenario)
+        )
+        (not
+          (candidate_option_ready ?patch_candidate)
+        )
+      )
+    :effect (candidate_option_ready ?patch_candidate)
+  )
+  (:action reserve_source_location_for_candidate
+    :parameters (?patch_candidate - candidate ?source_location - source_location)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (source_location_available ?source_location)
+        (not
+          (candidate_has_source_binding ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_has_source_binding ?patch_candidate)
+        (candidate_source_location_binding ?patch_candidate ?source_location)
+        (not
+          (source_location_available ?source_location)
+        )
+      )
+  )
+  (:action stage_source_binding_for_candidate
+    :parameters (?patch_candidate - candidate ?configuration_option - configuration_option ?test_scenario - test_scenario ?input_event - input_event ?source_location - source_location)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_staged ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (instance_event_binding ?patch_candidate ?input_event)
+        (scenario_branch_a_executed ?test_scenario)
+        (candidate_has_source_binding ?patch_candidate)
+        (candidate_source_location_binding ?patch_candidate ?source_location)
+        (not
+          (candidate_option_ready ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_option_ready ?patch_candidate)
+        (candidate_source_binding_staged ?patch_candidate)
+      )
+  )
+  (:action attach_timing_spec_with_dependency
+    :parameters (?patch_candidate - candidate ?timing_spec - timing_spec ?service_dependency - service_dependency ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_option_ready ?patch_candidate)
+        (candidate_timing_spec_binding ?patch_candidate ?timing_spec)
+        (instance_dependency_bound ?patch_candidate ?service_dependency)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (not
+          (scenario_branch_b_executed ?test_scenario)
+        )
+        (not
+          (candidate_instrumented ?patch_candidate)
+        )
+      )
+    :effect (candidate_instrumented ?patch_candidate)
+  )
+  (:action attach_timing_spec_with_dependency_branch
+    :parameters (?patch_candidate - candidate ?timing_spec - timing_spec ?service_dependency - service_dependency ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_option_ready ?patch_candidate)
+        (candidate_timing_spec_binding ?patch_candidate ?timing_spec)
+        (instance_dependency_bound ?patch_candidate ?service_dependency)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (scenario_branch_b_executed ?test_scenario)
+        (not
+          (candidate_instrumented ?patch_candidate)
+        )
+      )
+    :effect (candidate_instrumented ?patch_candidate)
+  )
+  (:action apply_reviewer_approval_mark_candidate
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_instrumented ?patch_candidate)
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (not
+          (scenario_branch_a_executed ?test_scenario)
+        )
+        (not
+          (scenario_branch_b_executed ?test_scenario)
+        )
+        (not
+          (candidate_validated ?patch_candidate)
+        )
+      )
+    :effect (candidate_validated ?patch_candidate)
+  )
+  (:action apply_reviewer_approval_and_confirm_config
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_instrumented ?patch_candidate)
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (scenario_branch_a_executed ?test_scenario)
+        (not
+          (scenario_branch_b_executed ?test_scenario)
+        )
+        (not
+          (candidate_validated ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_config_confirmed ?patch_candidate)
+      )
+  )
+  (:action apply_reviewer_approval_and_confirm_config_alt
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_instrumented ?patch_candidate)
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (not
+          (scenario_branch_a_executed ?test_scenario)
+        )
+        (scenario_branch_b_executed ?test_scenario)
+        (not
+          (candidate_validated ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_config_confirmed ?patch_candidate)
+      )
+  )
+  (:action apply_reviewer_approval_and_confirm_config_both
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval ?configuration_option - configuration_option ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (candidate_instrumented ?patch_candidate)
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (candidate_uses_config_option ?patch_candidate ?configuration_option)
+        (config_option_applied_to_scenario ?configuration_option ?test_scenario)
+        (scenario_branch_a_executed ?test_scenario)
+        (scenario_branch_b_executed ?test_scenario)
+        (not
+          (candidate_validated ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_config_confirmed ?patch_candidate)
+      )
+  )
+  (:action finalize_candidate
+    :parameters (?patch_candidate - candidate)
+    :precondition
+      (and
+        (candidate_validated ?patch_candidate)
+        (not
+          (candidate_config_confirmed ?patch_candidate)
+        )
+        (not
+          (candidate_finalized ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?patch_candidate)
+        (ready_for_integration ?patch_candidate)
+      )
+  )
+  (:action attach_invariant_to_candidate
+    :parameters (?patch_candidate - candidate ?runtime_invariant - runtime_invariant)
+    :precondition
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_config_confirmed ?patch_candidate)
+        (invariant_available ?runtime_invariant)
+      )
+    :effect
+      (and
+        (candidate_invariant_binding ?patch_candidate ?runtime_invariant)
+        (not
+          (invariant_available ?runtime_invariant)
+        )
+      )
+  )
+  (:action lock_candidate_for_integration
+    :parameters (?patch_candidate - candidate ?execution_context_local - execution_context_local ?execution_context_concurrent - execution_context_concurrent ?input_event - input_event ?runtime_invariant - runtime_invariant)
+    :precondition
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_config_confirmed ?patch_candidate)
+        (candidate_invariant_binding ?patch_candidate ?runtime_invariant)
+        (candidate_targets_local_context ?patch_candidate ?execution_context_local)
+        (candidate_targets_concurrent_context ?patch_candidate ?execution_context_concurrent)
+        (local_context_confirmed ?execution_context_local)
+        (concurrent_context_confirmed ?execution_context_concurrent)
+        (instance_event_binding ?patch_candidate ?input_event)
+        (not
+          (candidate_integration_locked ?patch_candidate)
+        )
+      )
+    :effect (candidate_integration_locked ?patch_candidate)
+  )
+  (:action finalize_candidate_integration
+    :parameters (?patch_candidate - candidate)
+    :precondition
+      (and
+        (candidate_validated ?patch_candidate)
+        (candidate_integration_locked ?patch_candidate)
+        (not
+          (candidate_finalized ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?patch_candidate)
+        (ready_for_integration ?patch_candidate)
+      )
+  )
+  (:action bind_mock_to_candidate
+    :parameters (?patch_candidate - candidate ?mock_object - mock_object ?input_event - input_event)
+    :precondition
+      (and
+        (entity_initialized ?patch_candidate)
+        (instance_event_binding ?patch_candidate ?input_event)
+        (mock_available ?mock_object)
+        (candidate_mock_binding ?patch_candidate ?mock_object)
+        (not
+          (candidate_source_bound ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_source_bound ?patch_candidate)
+        (not
+          (mock_available ?mock_object)
+        )
+      )
+  )
+  (:action prepare_candidate_source
+    :parameters (?patch_candidate - candidate ?service_dependency - service_dependency)
+    :precondition
+      (and
+        (candidate_source_bound ?patch_candidate)
+        (instance_dependency_bound ?patch_candidate ?service_dependency)
+        (not
+          (candidate_source_ready ?patch_candidate)
+        )
+      )
+    :effect (candidate_source_ready ?patch_candidate)
+  )
+  (:action validate_candidate_with_reviewer_approval
+    :parameters (?patch_candidate - candidate ?reviewer_approval - reviewer_approval)
+    :precondition
+      (and
+        (candidate_source_ready ?patch_candidate)
+        (candidate_reviewer_approval_binding ?patch_candidate ?reviewer_approval)
+        (not
+          (candidate_source_validated ?patch_candidate)
+        )
+      )
+    :effect (candidate_source_validated ?patch_candidate)
+  )
+  (:action finalize_candidate_source_validation
+    :parameters (?patch_candidate - candidate)
+    :precondition
+      (and
+        (candidate_source_validated ?patch_candidate)
+        (not
+          (candidate_finalized ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?patch_candidate)
+        (ready_for_integration ?patch_candidate)
+      )
+  )
+  (:action mark_local_context_integration_ready
+    :parameters (?execution_context_local - execution_context_local ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (local_context_ready ?execution_context_local)
+        (local_context_confirmed ?execution_context_local)
+        (test_scenario_reserved ?test_scenario)
+        (scenario_execution_completed ?test_scenario)
+        (not
+          (ready_for_integration ?execution_context_local)
+        )
+      )
+    :effect (ready_for_integration ?execution_context_local)
+  )
+  (:action mark_concurrent_context_integration_ready
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?test_scenario - test_scenario)
+    :precondition
+      (and
+        (concurrent_context_ready ?execution_context_concurrent)
+        (concurrent_context_confirmed ?execution_context_concurrent)
+        (test_scenario_reserved ?test_scenario)
+        (scenario_execution_completed ?test_scenario)
+        (not
+          (ready_for_integration ?execution_context_concurrent)
+        )
+      )
+    :effect (ready_for_integration ?execution_context_concurrent)
+  )
+  (:action apply_patch_to_component
+    :parameters (?component_instance - component_instance ?environment_parameter - environment_parameter ?input_event - input_event)
+    :precondition
+      (and
+        (ready_for_integration ?component_instance)
+        (instance_event_binding ?component_instance ?input_event)
+        (environment_parameter_available ?environment_parameter)
+        (not
+          (patch_staged ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (patch_staged ?component_instance)
+        (instance_env_parameter_binding ?component_instance ?environment_parameter)
+        (not
+          (environment_parameter_available ?environment_parameter)
+        )
+      )
+  )
+  (:action apply_patch_and_release_resource_local
+    :parameters (?execution_context_local - execution_context_local ?shared_resource - shared_resource ?environment_parameter - environment_parameter)
+    :precondition
+      (and
+        (patch_staged ?execution_context_local)
+        (instance_holds_resource ?execution_context_local ?shared_resource)
+        (instance_env_parameter_binding ?execution_context_local ?environment_parameter)
+        (not
+          (fix_committed ?execution_context_local)
+        )
+      )
+    :effect
+      (and
+        (fix_committed ?execution_context_local)
+        (resource_available ?shared_resource)
+        (environment_parameter_available ?environment_parameter)
+      )
+  )
+  (:action apply_patch_and_release_resource_concurrent
+    :parameters (?execution_context_concurrent - execution_context_concurrent ?shared_resource - shared_resource ?environment_parameter - environment_parameter)
+    :precondition
+      (and
+        (patch_staged ?execution_context_concurrent)
+        (instance_holds_resource ?execution_context_concurrent ?shared_resource)
+        (instance_env_parameter_binding ?execution_context_concurrent ?environment_parameter)
+        (not
+          (fix_committed ?execution_context_concurrent)
+        )
+      )
+    :effect
+      (and
+        (fix_committed ?execution_context_concurrent)
+        (resource_available ?shared_resource)
+        (environment_parameter_available ?environment_parameter)
+      )
+  )
+  (:action apply_candidate_patch_and_release_resource
+    :parameters (?patch_candidate - candidate ?shared_resource - shared_resource ?environment_parameter - environment_parameter)
+    :precondition
+      (and
+        (patch_staged ?patch_candidate)
+        (instance_holds_resource ?patch_candidate ?shared_resource)
+        (instance_env_parameter_binding ?patch_candidate ?environment_parameter)
+        (not
+          (fix_committed ?patch_candidate)
+        )
+      )
+    :effect
+      (and
+        (fix_committed ?patch_candidate)
+        (resource_available ?shared_resource)
+        (environment_parameter_available ?environment_parameter)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem execution_order_dependency_fix_problem)
+  (:domain execution_order_dependency_fix)
+  (:objects local_execution_context_1 - execution_context_local concurrent_execution_context_1 - execution_context_concurrent candidate_alpha - candidate candidate_beta - candidate shared_resource_lock_a - shared_resource shared_resource_lock_b - shared_resource shared_resource_lock_c - shared_resource input_event_1 - input_event service_dependency_api - service_dependency external_signal_1 - external_signal ordering_token_1 - ordering_token condition_flag_1 - condition_flag test_scenario_repro_1 - test_scenario config_option_feature_x - configuration_option config_option_feature_y - configuration_option source_location_file_a - source_location source_location_file_b - source_location invariant_non_null - runtime_invariant invariant_ordering_constraint - runtime_invariant env_param_ci_mode - environment_parameter timing_spec_short_timeout - timing_spec mock_service_a - mock_object mock_service_b - mock_object reviewer_approval_lead - reviewer_approval)
+  (:init
+    (resource_available shared_resource_lock_a)
+    (resource_available shared_resource_lock_b)
+    (resource_available shared_resource_lock_c)
+    (input_event_available input_event_1)
+    (dependency_available service_dependency_api)
+    (external_signal_available external_signal_1)
+    (context_token_binding local_execution_context_1 ordering_token_1)
+    (concurrent_flag_binding concurrent_execution_context_1 condition_flag_1)
+    (test_scenario_available test_scenario_repro_1)
+    (config_option_available config_option_feature_x)
+    (config_option_available config_option_feature_y)
+    (candidate_targets_local_context candidate_alpha local_execution_context_1)
+    (candidate_targets_local_context candidate_beta local_execution_context_1)
+    (candidate_targets_concurrent_context candidate_alpha concurrent_execution_context_1)
+    (candidate_targets_concurrent_context candidate_beta concurrent_execution_context_1)
+    (candidate_includes_test_scenario candidate_alpha test_scenario_repro_1)
+    (candidate_includes_test_scenario candidate_beta test_scenario_repro_1)
+    (candidate_uses_config_option candidate_alpha config_option_feature_x)
+    (candidate_uses_config_option candidate_beta config_option_feature_y)
+    (source_location_available source_location_file_a)
+    (source_location_available source_location_file_b)
+    (invariant_available invariant_non_null)
+    (invariant_available invariant_ordering_constraint)
+    (environment_parameter_available env_param_ci_mode)
+    (timing_spec_available timing_spec_short_timeout)
+    (mock_available mock_service_a)
+    (candidate_mock_binding candidate_alpha mock_service_a)
+    (candidate_mock_binding candidate_beta mock_service_b)
+    (reviewer_approval_available reviewer_approval_lead)
+  )
+  (:goal
+    (and
+      (fix_committed local_execution_context_1)
+      (fix_committed concurrent_execution_context_1)
+      (fix_committed candidate_alpha)
+      (fix_committed candidate_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_component_instance local_execution_context_1)
+(acquire_shared_resource local_execution_context_1 shared_resource_lock_a)
+(bind_input_event local_execution_context_1 input_event_1)
+(finalize_event_binding local_execution_context_1 input_event_1)
+(attach_service_dependency local_execution_context_1 service_dependency_api)
+(initiate_local_ordering_token local_execution_context_1 ordering_token_1 input_event_1)
+(confirm_local_ordering_token local_execution_context_1 ordering_token_1 service_dependency_api)
+(release_input_event local_execution_context_1 input_event_1)
+(detach_service_dependency local_execution_context_1 service_dependency_api)
+(register_component_instance concurrent_execution_context_1)
+(acquire_shared_resource concurrent_execution_context_1 shared_resource_lock_b)
+(bind_input_event concurrent_execution_context_1 input_event_1)
+(finalize_event_binding concurrent_execution_context_1 input_event_1)
+(attach_service_dependency concurrent_execution_context_1 service_dependency_api)
+(initiate_concurrent_ordering_token concurrent_execution_context_1 condition_flag_1 input_event_1)
+(confirm_concurrent_ordering_token concurrent_execution_context_1 condition_flag_1 service_dependency_api)
+(detach_service_dependency concurrent_execution_context_1 service_dependency_api)
+(reserve_and_bind_test_scenario local_execution_context_1 concurrent_execution_context_1 ordering_token_1 condition_flag_1 test_scenario_repro_1)
+(release_input_event concurrent_execution_context_1 input_event_1)
+(bind_input_event local_execution_context_1 input_event_1)
+(execute_test_scenario test_scenario_repro_1 local_execution_context_1 input_event_1)
+(mark_local_context_integration_ready local_execution_context_1 test_scenario_repro_1)
+(mark_concurrent_context_integration_ready concurrent_execution_context_1 test_scenario_repro_1)
+(apply_patch_to_component local_execution_context_1 env_param_ci_mode input_event_1)
+(apply_patch_and_release_resource_local local_execution_context_1 shared_resource_lock_a env_param_ci_mode)
+(release_input_event local_execution_context_1 input_event_1)
+(bind_input_event concurrent_execution_context_1 input_event_1)
+(apply_patch_to_component concurrent_execution_context_1 env_param_ci_mode input_event_1)
+(apply_patch_and_release_resource_concurrent concurrent_execution_context_1 shared_resource_lock_b env_param_ci_mode)
+(release_input_event concurrent_execution_context_1 input_event_1)
+(register_component_instance candidate_alpha)
+(acquire_shared_resource candidate_alpha shared_resource_lock_a)
+(bind_input_event candidate_alpha input_event_1)
+(finalize_event_binding candidate_alpha input_event_1)
+(attach_reviewer_approval_to_candidate candidate_alpha reviewer_approval_lead)
+(attach_timing_spec_to_candidate candidate_alpha timing_spec_short_timeout)
+(stage_configuration_option candidate_alpha config_option_feature_x test_scenario_repro_1)
+(apply_config_option_to_candidate candidate_alpha config_option_feature_x test_scenario_repro_1 input_event_1)
+(attach_service_dependency candidate_alpha service_dependency_api)
+(attach_timing_spec_with_dependency candidate_alpha timing_spec_short_timeout service_dependency_api config_option_feature_x test_scenario_repro_1)
+(detach_timing_spec_from_candidate candidate_alpha timing_spec_short_timeout)
+(detach_service_dependency candidate_alpha service_dependency_api)
+(apply_reviewer_approval_mark_candidate candidate_alpha reviewer_approval_lead config_option_feature_x test_scenario_repro_1)
+(detach_reviewer_approval_from_candidate candidate_alpha reviewer_approval_lead)
+(finalize_candidate candidate_alpha)
+(apply_patch_to_component candidate_alpha env_param_ci_mode input_event_1)
+(apply_candidate_patch_and_release_resource candidate_alpha shared_resource_lock_a env_param_ci_mode)
+(release_input_event candidate_alpha input_event_1)
+(register_component_instance candidate_beta)
+(acquire_shared_resource candidate_beta shared_resource_lock_b)
+(bind_input_event candidate_beta input_event_1)
+(finalize_event_binding candidate_beta input_event_1)
+(attach_reviewer_approval_to_candidate candidate_beta reviewer_approval_lead)
+(attach_timing_spec_to_candidate candidate_beta timing_spec_short_timeout)
+(stage_configuration_option candidate_beta config_option_feature_y test_scenario_repro_1)
+(apply_config_option_to_candidate candidate_beta config_option_feature_y test_scenario_repro_1 input_event_1)
+(attach_service_dependency candidate_beta service_dependency_api)
+(attach_timing_spec_with_dependency candidate_beta timing_spec_short_timeout service_dependency_api config_option_feature_y test_scenario_repro_1)
+(detach_timing_spec_from_candidate candidate_beta timing_spec_short_timeout)
+(detach_service_dependency candidate_beta service_dependency_api)
+(apply_reviewer_approval_mark_candidate candidate_beta reviewer_approval_lead config_option_feature_y test_scenario_repro_1)
+(detach_reviewer_approval_from_candidate candidate_beta reviewer_approval_lead)
+(finalize_candidate candidate_beta)
+(apply_patch_to_component candidate_beta env_param_ci_mode input_event_1)
+(apply_candidate_patch_and_release_resource candidate_beta shared_resource_lock_b env_param_ci_mode)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_cvnydjyw/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_cvnydjyw/plan.pddl 65 
+
+
+
+--- stderr ---
+

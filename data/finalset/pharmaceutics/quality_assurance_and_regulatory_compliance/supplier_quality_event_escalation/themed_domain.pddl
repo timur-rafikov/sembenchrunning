@@ -1,0 +1,937 @@
+(define (domain supplier_quality_event_escalation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_or_document_group - entity document_or_actor_group - entity package_group - entity case_root - entity quality_case - case_root quality_engineer - resource_or_document_group evidence_item - resource_or_document_group quality_reviewer - resource_or_document_group senior_management_input - resource_or_document_group implementation_plan - resource_or_document_group regulatory_contact - resource_or_document_group validation_requirement - resource_or_document_group discipline_expert - resource_or_document_group external_consultant_person - document_or_actor_group supporting_document - document_or_actor_group escalation_reason - document_or_actor_group impact_assessment - package_group regulatory_filing - package_group escalation_packet - package_group operational_subcase - quality_case remediation_stream - quality_case supplier_case - operational_subcase product_case - operational_subcase capa_record - remediation_stream)
+
+  (:predicates
+    (entity_registered ?quality_case - quality_case)
+    (entity_reviewed ?quality_case - quality_case)
+    (entity_has_assigned_engineer ?quality_case - quality_case)
+    (entity_escalated ?quality_case - quality_case)
+    (entity_execution_authorized ?quality_case - quality_case)
+    (entity_escalation_initiated ?quality_case - quality_case)
+    (engineer_available ?assigned_engineer - quality_engineer)
+    (engineer_assigned_to_case ?quality_case - quality_case ?assigned_engineer - quality_engineer)
+    (evidence_available ?evidence - evidence_item)
+    (entity_evidence_attached ?quality_case - quality_case ?evidence - evidence_item)
+    (reviewer_available ?quality_reviewer - quality_reviewer)
+    (reviewer_assigned ?quality_case - quality_case ?quality_reviewer - quality_reviewer)
+    (consultant_available ?external_consultant_actor - external_consultant_person)
+    (supplier_consultant_assigned ?supplier_case - supplier_case ?external_consultant_actor - external_consultant_person)
+    (product_consultant_assigned ?product_case - product_case ?external_consultant_actor - external_consultant_person)
+    (supplier_case_has_assessment ?supplier_case - supplier_case ?impact_assessment - impact_assessment)
+    (assessment_finalized ?impact_assessment - impact_assessment)
+    (assessment_requires_consultant ?impact_assessment - impact_assessment)
+    (supplier_assessment_completed ?supplier_case - supplier_case)
+    (product_case_has_filing ?product_case - product_case ?regulatory_filing - regulatory_filing)
+    (filing_ready ?regulatory_filing - regulatory_filing)
+    (filing_requires_consultant ?regulatory_filing - regulatory_filing)
+    (product_assessment_completed ?product_case - product_case)
+    (packet_draft_available ?escalation_packet - escalation_packet)
+    (packet_compiled ?escalation_packet - escalation_packet)
+    (packet_includes_assessment ?escalation_packet - escalation_packet ?impact_assessment - impact_assessment)
+    (packet_includes_filing ?escalation_packet - escalation_packet ?regulatory_filing - regulatory_filing)
+    (packet_includes_management_input ?escalation_packet - escalation_packet)
+    (packet_includes_validation_requirement ?escalation_packet - escalation_packet)
+    (packet_verified ?escalation_packet - escalation_packet)
+    (capa_applies_to_supplier_case ?capa_record - capa_record ?supplier_case - supplier_case)
+    (capa_applies_to_product_case ?capa_record - capa_record ?product_case - product_case)
+    (capa_links_to_packet ?capa_record - capa_record ?escalation_packet - escalation_packet)
+    (document_available ?supporting_document - supporting_document)
+    (capa_has_supporting_document ?capa_record - capa_record ?supporting_document - supporting_document)
+    (document_validated ?supporting_document - supporting_document)
+    (document_attached_to_packet ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    (capa_documentation_validated ?capa_record - capa_record)
+    (capa_ready_for_review ?capa_record - capa_record)
+    (management_review_completed ?capa_record - capa_record)
+    (management_input_assigned ?capa_record - capa_record)
+    (management_input_processed ?capa_record - capa_record)
+    (implementation_plan_required ?capa_record - capa_record)
+    (implementation_executed ?capa_record - capa_record)
+    (escalation_reason_available ?escalation_reason - escalation_reason)
+    (capa_has_escalation_reason ?capa_record - capa_record ?escalation_reason - escalation_reason)
+    (management_input_required ?capa_record - capa_record)
+    (management_input_under_expert_review ?capa_record - capa_record)
+    (management_input_expert_approved ?capa_record - capa_record)
+    (management_input_available ?management_input - senior_management_input)
+    (capa_has_management_input ?capa_record - capa_record ?management_input - senior_management_input)
+    (implementation_plan_available ?implementation_plan - implementation_plan)
+    (capa_has_implementation_plan ?capa_record - capa_record ?implementation_plan - implementation_plan)
+    (validation_requirement_available ?validation_requirement - validation_requirement)
+    (capa_has_validation_requirement ?capa_record - capa_record ?validation_requirement - validation_requirement)
+    (discipline_expert_available ?discipline_expert - discipline_expert)
+    (capa_has_discipline_expert ?capa_record - capa_record ?discipline_expert - discipline_expert)
+    (regulatory_contact_available ?regulatory_contact - regulatory_contact)
+    (entity_has_regulatory_contact ?quality_case - quality_case ?regulatory_contact - regulatory_contact)
+    (supplier_case_ready ?supplier_case - supplier_case)
+    (product_case_ready ?product_case - product_case)
+    (capa_finalized ?capa_record - capa_record)
+  )
+  (:action register_supplier_quality_event
+    :parameters (?quality_case - quality_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?quality_case)
+        )
+        (not
+          (entity_escalated ?quality_case)
+        )
+      )
+    :effect (entity_registered ?quality_case)
+  )
+  (:action assign_quality_engineer_to_event
+    :parameters (?quality_case - quality_case ?assigned_engineer - quality_engineer)
+    :precondition
+      (and
+        (entity_registered ?quality_case)
+        (not
+          (entity_has_assigned_engineer ?quality_case)
+        )
+        (engineer_available ?assigned_engineer)
+      )
+    :effect
+      (and
+        (entity_has_assigned_engineer ?quality_case)
+        (engineer_assigned_to_case ?quality_case ?assigned_engineer)
+        (not
+          (engineer_available ?assigned_engineer)
+        )
+      )
+  )
+  (:action attach_evidence_to_event
+    :parameters (?quality_case - quality_case ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_registered ?quality_case)
+        (entity_has_assigned_engineer ?quality_case)
+        (evidence_available ?evidence)
+      )
+    :effect
+      (and
+        (entity_evidence_attached ?quality_case ?evidence)
+        (not
+          (evidence_available ?evidence)
+        )
+      )
+  )
+  (:action complete_investigation_for_event
+    :parameters (?quality_case - quality_case ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_registered ?quality_case)
+        (entity_has_assigned_engineer ?quality_case)
+        (entity_evidence_attached ?quality_case ?evidence)
+        (not
+          (entity_reviewed ?quality_case)
+        )
+      )
+    :effect (entity_reviewed ?quality_case)
+  )
+  (:action detach_evidence_from_event
+    :parameters (?quality_case - quality_case ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_evidence_attached ?quality_case ?evidence)
+      )
+    :effect
+      (and
+        (evidence_available ?evidence)
+        (not
+          (entity_evidence_attached ?quality_case ?evidence)
+        )
+      )
+  )
+  (:action assign_quality_reviewer_to_event
+    :parameters (?quality_case - quality_case ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?quality_case)
+        (reviewer_available ?quality_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_assigned ?quality_case ?quality_reviewer)
+        (not
+          (reviewer_available ?quality_reviewer)
+        )
+      )
+  )
+  (:action unassign_quality_reviewer_from_event
+    :parameters (?quality_case - quality_case ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (reviewer_assigned ?quality_case ?quality_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?quality_reviewer)
+        (not
+          (reviewer_assigned ?quality_case ?quality_reviewer)
+        )
+      )
+  )
+  (:action assign_validation_requirement_to_capa
+    :parameters (?capa_record - capa_record ?validation_requirement - validation_requirement)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (validation_requirement_available ?validation_requirement)
+      )
+    :effect
+      (and
+        (capa_has_validation_requirement ?capa_record ?validation_requirement)
+        (not
+          (validation_requirement_available ?validation_requirement)
+        )
+      )
+  )
+  (:action remove_validation_requirement_from_capa
+    :parameters (?capa_record - capa_record ?validation_requirement - validation_requirement)
+    :precondition
+      (and
+        (capa_has_validation_requirement ?capa_record ?validation_requirement)
+      )
+    :effect
+      (and
+        (validation_requirement_available ?validation_requirement)
+        (not
+          (capa_has_validation_requirement ?capa_record ?validation_requirement)
+        )
+      )
+  )
+  (:action assign_discipline_expert_to_capa
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (discipline_expert_available ?discipline_expert)
+      )
+    :effect
+      (and
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (not
+          (discipline_expert_available ?discipline_expert)
+        )
+      )
+  )
+  (:action remove_discipline_expert_from_capa
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert)
+    :precondition
+      (and
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+      )
+    :effect
+      (and
+        (discipline_expert_available ?discipline_expert)
+        (not
+          (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        )
+      )
+  )
+  (:action finalize_impact_assessment_for_supplier_case
+    :parameters (?supplier_case - supplier_case ?impact_assessment - impact_assessment ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_reviewed ?supplier_case)
+        (entity_evidence_attached ?supplier_case ?evidence)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (not
+          (assessment_finalized ?impact_assessment)
+        )
+        (not
+          (assessment_requires_consultant ?impact_assessment)
+        )
+      )
+    :effect (assessment_finalized ?impact_assessment)
+  )
+  (:action record_supplier_case_assessment_review
+    :parameters (?supplier_case - supplier_case ?impact_assessment - impact_assessment ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?supplier_case)
+        (reviewer_assigned ?supplier_case ?quality_reviewer)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (assessment_finalized ?impact_assessment)
+        (not
+          (supplier_case_ready ?supplier_case)
+        )
+      )
+    :effect
+      (and
+        (supplier_case_ready ?supplier_case)
+        (supplier_assessment_completed ?supplier_case)
+      )
+  )
+  (:action engage_external_consultant_for_supplier_case
+    :parameters (?supplier_case - supplier_case ?impact_assessment - impact_assessment ?external_consultant_actor - external_consultant_person)
+    :precondition
+      (and
+        (entity_reviewed ?supplier_case)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (consultant_available ?external_consultant_actor)
+        (not
+          (supplier_case_ready ?supplier_case)
+        )
+      )
+    :effect
+      (and
+        (assessment_requires_consultant ?impact_assessment)
+        (supplier_case_ready ?supplier_case)
+        (supplier_consultant_assigned ?supplier_case ?external_consultant_actor)
+        (not
+          (consultant_available ?external_consultant_actor)
+        )
+      )
+  )
+  (:action integrate_consultant_assessment_for_supplier_case
+    :parameters (?supplier_case - supplier_case ?impact_assessment - impact_assessment ?evidence - evidence_item ?external_consultant_actor - external_consultant_person)
+    :precondition
+      (and
+        (entity_reviewed ?supplier_case)
+        (entity_evidence_attached ?supplier_case ?evidence)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (assessment_requires_consultant ?impact_assessment)
+        (supplier_consultant_assigned ?supplier_case ?external_consultant_actor)
+        (not
+          (supplier_assessment_completed ?supplier_case)
+        )
+      )
+    :effect
+      (and
+        (assessment_finalized ?impact_assessment)
+        (supplier_assessment_completed ?supplier_case)
+        (consultant_available ?external_consultant_actor)
+        (not
+          (supplier_consultant_assigned ?supplier_case ?external_consultant_actor)
+        )
+      )
+  )
+  (:action mark_filing_ready_for_product_case
+    :parameters (?product_case - product_case ?regulatory_filing - regulatory_filing ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_reviewed ?product_case)
+        (entity_evidence_attached ?product_case ?evidence)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (not
+          (filing_ready ?regulatory_filing)
+        )
+        (not
+          (filing_requires_consultant ?regulatory_filing)
+        )
+      )
+    :effect (filing_ready ?regulatory_filing)
+  )
+  (:action assign_reviewer_to_product_case_assessment
+    :parameters (?product_case - product_case ?regulatory_filing - regulatory_filing ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?product_case)
+        (reviewer_assigned ?product_case ?quality_reviewer)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (filing_ready ?regulatory_filing)
+        (not
+          (product_case_ready ?product_case)
+        )
+      )
+    :effect
+      (and
+        (product_case_ready ?product_case)
+        (product_assessment_completed ?product_case)
+      )
+  )
+  (:action engage_external_consultant_for_product_case
+    :parameters (?product_case - product_case ?regulatory_filing - regulatory_filing ?external_consultant_actor - external_consultant_person)
+    :precondition
+      (and
+        (entity_reviewed ?product_case)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (consultant_available ?external_consultant_actor)
+        (not
+          (product_case_ready ?product_case)
+        )
+      )
+    :effect
+      (and
+        (filing_requires_consultant ?regulatory_filing)
+        (product_case_ready ?product_case)
+        (product_consultant_assigned ?product_case ?external_consultant_actor)
+        (not
+          (consultant_available ?external_consultant_actor)
+        )
+      )
+  )
+  (:action integrate_consultant_assessment_for_product_case
+    :parameters (?product_case - product_case ?regulatory_filing - regulatory_filing ?evidence - evidence_item ?external_consultant_actor - external_consultant_person)
+    :precondition
+      (and
+        (entity_reviewed ?product_case)
+        (entity_evidence_attached ?product_case ?evidence)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (filing_requires_consultant ?regulatory_filing)
+        (product_consultant_assigned ?product_case ?external_consultant_actor)
+        (not
+          (product_assessment_completed ?product_case)
+        )
+      )
+    :effect
+      (and
+        (filing_ready ?regulatory_filing)
+        (product_assessment_completed ?product_case)
+        (consultant_available ?external_consultant_actor)
+        (not
+          (product_consultant_assigned ?product_case ?external_consultant_actor)
+        )
+      )
+  )
+  (:action compile_escalation_packet_standard
+    :parameters (?supplier_case - supplier_case ?product_case - product_case ?impact_assessment - impact_assessment ?regulatory_filing - regulatory_filing ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (supplier_case_ready ?supplier_case)
+        (product_case_ready ?product_case)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (assessment_finalized ?impact_assessment)
+        (filing_ready ?regulatory_filing)
+        (supplier_assessment_completed ?supplier_case)
+        (product_assessment_completed ?product_case)
+        (packet_draft_available ?escalation_packet)
+      )
+    :effect
+      (and
+        (packet_compiled ?escalation_packet)
+        (packet_includes_assessment ?escalation_packet ?impact_assessment)
+        (packet_includes_filing ?escalation_packet ?regulatory_filing)
+        (not
+          (packet_draft_available ?escalation_packet)
+        )
+      )
+  )
+  (:action compile_escalation_packet_with_management_input
+    :parameters (?supplier_case - supplier_case ?product_case - product_case ?impact_assessment - impact_assessment ?regulatory_filing - regulatory_filing ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (supplier_case_ready ?supplier_case)
+        (product_case_ready ?product_case)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (assessment_requires_consultant ?impact_assessment)
+        (filing_ready ?regulatory_filing)
+        (not
+          (supplier_assessment_completed ?supplier_case)
+        )
+        (product_assessment_completed ?product_case)
+        (packet_draft_available ?escalation_packet)
+      )
+    :effect
+      (and
+        (packet_compiled ?escalation_packet)
+        (packet_includes_assessment ?escalation_packet ?impact_assessment)
+        (packet_includes_filing ?escalation_packet ?regulatory_filing)
+        (packet_includes_management_input ?escalation_packet)
+        (not
+          (packet_draft_available ?escalation_packet)
+        )
+      )
+  )
+  (:action compile_escalation_packet_with_validation_requirement
+    :parameters (?supplier_case - supplier_case ?product_case - product_case ?impact_assessment - impact_assessment ?regulatory_filing - regulatory_filing ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (supplier_case_ready ?supplier_case)
+        (product_case_ready ?product_case)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (assessment_finalized ?impact_assessment)
+        (filing_requires_consultant ?regulatory_filing)
+        (supplier_assessment_completed ?supplier_case)
+        (not
+          (product_assessment_completed ?product_case)
+        )
+        (packet_draft_available ?escalation_packet)
+      )
+    :effect
+      (and
+        (packet_compiled ?escalation_packet)
+        (packet_includes_assessment ?escalation_packet ?impact_assessment)
+        (packet_includes_filing ?escalation_packet ?regulatory_filing)
+        (packet_includes_validation_requirement ?escalation_packet)
+        (not
+          (packet_draft_available ?escalation_packet)
+        )
+      )
+  )
+  (:action compile_full_escalation_packet
+    :parameters (?supplier_case - supplier_case ?product_case - product_case ?impact_assessment - impact_assessment ?regulatory_filing - regulatory_filing ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (supplier_case_ready ?supplier_case)
+        (product_case_ready ?product_case)
+        (supplier_case_has_assessment ?supplier_case ?impact_assessment)
+        (product_case_has_filing ?product_case ?regulatory_filing)
+        (assessment_requires_consultant ?impact_assessment)
+        (filing_requires_consultant ?regulatory_filing)
+        (not
+          (supplier_assessment_completed ?supplier_case)
+        )
+        (not
+          (product_assessment_completed ?product_case)
+        )
+        (packet_draft_available ?escalation_packet)
+      )
+    :effect
+      (and
+        (packet_compiled ?escalation_packet)
+        (packet_includes_assessment ?escalation_packet ?impact_assessment)
+        (packet_includes_filing ?escalation_packet ?regulatory_filing)
+        (packet_includes_management_input ?escalation_packet)
+        (packet_includes_validation_requirement ?escalation_packet)
+        (not
+          (packet_draft_available ?escalation_packet)
+        )
+      )
+  )
+  (:action verify_escalation_packet
+    :parameters (?escalation_packet - escalation_packet ?supplier_case - supplier_case ?evidence - evidence_item)
+    :precondition
+      (and
+        (packet_compiled ?escalation_packet)
+        (supplier_case_ready ?supplier_case)
+        (entity_evidence_attached ?supplier_case ?evidence)
+        (not
+          (packet_verified ?escalation_packet)
+        )
+      )
+    :effect (packet_verified ?escalation_packet)
+  )
+  (:action validate_supporting_document_and_attach
+    :parameters (?capa_record - capa_record ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (capa_links_to_packet ?capa_record ?escalation_packet)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_available ?supporting_document)
+        (packet_compiled ?escalation_packet)
+        (packet_verified ?escalation_packet)
+        (not
+          (document_validated ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (document_validated ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (not
+          (document_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_supporting_document_for_capa
+    :parameters (?capa_record - capa_record ?supporting_document - supporting_document ?escalation_packet - escalation_packet ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_validated ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (entity_evidence_attached ?capa_record ?evidence)
+        (not
+          (packet_includes_management_input ?escalation_packet)
+        )
+        (not
+          (capa_documentation_validated ?capa_record)
+        )
+      )
+    :effect (capa_documentation_validated ?capa_record)
+  )
+  (:action attach_management_input_to_capa
+    :parameters (?capa_record - capa_record ?management_input - senior_management_input)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (management_input_available ?management_input)
+        (not
+          (management_input_assigned ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (management_input_assigned ?capa_record)
+        (capa_has_management_input ?capa_record ?management_input)
+        (not
+          (management_input_available ?management_input)
+        )
+      )
+  )
+  (:action process_management_input_and_document_validation
+    :parameters (?capa_record - capa_record ?supporting_document - supporting_document ?escalation_packet - escalation_packet ?evidence - evidence_item ?management_input - senior_management_input)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_validated ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (entity_evidence_attached ?capa_record ?evidence)
+        (packet_includes_management_input ?escalation_packet)
+        (management_input_assigned ?capa_record)
+        (capa_has_management_input ?capa_record ?management_input)
+        (not
+          (capa_documentation_validated ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (capa_documentation_validated ?capa_record)
+        (management_input_processed ?capa_record)
+      )
+  )
+  (:action start_capa_expert_review
+    :parameters (?capa_record - capa_record ?validation_requirement - validation_requirement ?quality_reviewer - quality_reviewer ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_documentation_validated ?capa_record)
+        (capa_has_validation_requirement ?capa_record ?validation_requirement)
+        (reviewer_assigned ?capa_record ?quality_reviewer)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (not
+          (packet_includes_validation_requirement ?escalation_packet)
+        )
+        (not
+          (capa_ready_for_review ?capa_record)
+        )
+      )
+    :effect (capa_ready_for_review ?capa_record)
+  )
+  (:action continue_capa_expert_review_with_validation
+    :parameters (?capa_record - capa_record ?validation_requirement - validation_requirement ?quality_reviewer - quality_reviewer ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_documentation_validated ?capa_record)
+        (capa_has_validation_requirement ?capa_record ?validation_requirement)
+        (reviewer_assigned ?capa_record ?quality_reviewer)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (packet_includes_validation_requirement ?escalation_packet)
+        (not
+          (capa_ready_for_review ?capa_record)
+        )
+      )
+    :effect (capa_ready_for_review ?capa_record)
+  )
+  (:action start_discipline_expert_review
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_ready_for_review ?capa_record)
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (not
+          (packet_includes_management_input ?escalation_packet)
+        )
+        (not
+          (packet_includes_validation_requirement ?escalation_packet)
+        )
+        (not
+          (management_review_completed ?capa_record)
+        )
+      )
+    :effect (management_review_completed ?capa_record)
+  )
+  (:action complete_expert_review_with_management_input
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_ready_for_review ?capa_record)
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (packet_includes_management_input ?escalation_packet)
+        (not
+          (packet_includes_validation_requirement ?escalation_packet)
+        )
+        (not
+          (management_review_completed ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_plan_required ?capa_record)
+      )
+  )
+  (:action complete_expert_review_with_validation_requirement
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_ready_for_review ?capa_record)
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (not
+          (packet_includes_management_input ?escalation_packet)
+        )
+        (packet_includes_validation_requirement ?escalation_packet)
+        (not
+          (management_review_completed ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_plan_required ?capa_record)
+      )
+  )
+  (:action complete_expert_review_with_all_inputs
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert ?supporting_document - supporting_document ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (capa_ready_for_review ?capa_record)
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (capa_has_supporting_document ?capa_record ?supporting_document)
+        (document_attached_to_packet ?supporting_document ?escalation_packet)
+        (packet_includes_management_input ?escalation_packet)
+        (packet_includes_validation_requirement ?escalation_packet)
+        (not
+          (management_review_completed ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_plan_required ?capa_record)
+      )
+  )
+  (:action authorize_capa_execution
+    :parameters (?capa_record - capa_record)
+    :precondition
+      (and
+        (management_review_completed ?capa_record)
+        (not
+          (implementation_plan_required ?capa_record)
+        )
+        (not
+          (capa_finalized ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (capa_finalized ?capa_record)
+        (entity_execution_authorized ?capa_record)
+      )
+  )
+  (:action attach_implementation_plan_to_capa
+    :parameters (?capa_record - capa_record ?implementation_plan - implementation_plan)
+    :precondition
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_plan_required ?capa_record)
+        (implementation_plan_available ?implementation_plan)
+      )
+    :effect
+      (and
+        (capa_has_implementation_plan ?capa_record ?implementation_plan)
+        (not
+          (implementation_plan_available ?implementation_plan)
+        )
+      )
+  )
+  (:action record_implementation_execution
+    :parameters (?capa_record - capa_record ?supplier_case - supplier_case ?product_case - product_case ?evidence - evidence_item ?implementation_plan - implementation_plan)
+    :precondition
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_plan_required ?capa_record)
+        (capa_has_implementation_plan ?capa_record ?implementation_plan)
+        (capa_applies_to_supplier_case ?capa_record ?supplier_case)
+        (capa_applies_to_product_case ?capa_record ?product_case)
+        (supplier_assessment_completed ?supplier_case)
+        (product_assessment_completed ?product_case)
+        (entity_evidence_attached ?capa_record ?evidence)
+        (not
+          (implementation_executed ?capa_record)
+        )
+      )
+    :effect (implementation_executed ?capa_record)
+  )
+  (:action finalize_capa_after_implementation
+    :parameters (?capa_record - capa_record)
+    :precondition
+      (and
+        (management_review_completed ?capa_record)
+        (implementation_executed ?capa_record)
+        (not
+          (capa_finalized ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (capa_finalized ?capa_record)
+        (entity_execution_authorized ?capa_record)
+      )
+  )
+  (:action register_management_input_from_reason
+    :parameters (?capa_record - capa_record ?escalation_reason - escalation_reason ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_reviewed ?capa_record)
+        (entity_evidence_attached ?capa_record ?evidence)
+        (escalation_reason_available ?escalation_reason)
+        (capa_has_escalation_reason ?capa_record ?escalation_reason)
+        (not
+          (management_input_required ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (management_input_required ?capa_record)
+        (not
+          (escalation_reason_available ?escalation_reason)
+        )
+      )
+  )
+  (:action begin_management_input_review
+    :parameters (?capa_record - capa_record ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (management_input_required ?capa_record)
+        (reviewer_assigned ?capa_record ?quality_reviewer)
+        (not
+          (management_input_under_expert_review ?capa_record)
+        )
+      )
+    :effect (management_input_under_expert_review ?capa_record)
+  )
+  (:action assign_expert_for_management_input_review
+    :parameters (?capa_record - capa_record ?discipline_expert - discipline_expert)
+    :precondition
+      (and
+        (management_input_under_expert_review ?capa_record)
+        (capa_has_discipline_expert ?capa_record ?discipline_expert)
+        (not
+          (management_input_expert_approved ?capa_record)
+        )
+      )
+    :effect (management_input_expert_approved ?capa_record)
+  )
+  (:action finalize_management_input_review
+    :parameters (?capa_record - capa_record)
+    :precondition
+      (and
+        (management_input_expert_approved ?capa_record)
+        (not
+          (capa_finalized ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (capa_finalized ?capa_record)
+        (entity_execution_authorized ?capa_record)
+      )
+  )
+  (:action authorize_supplier_case_execution
+    :parameters (?supplier_case - supplier_case ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (supplier_case_ready ?supplier_case)
+        (supplier_assessment_completed ?supplier_case)
+        (packet_compiled ?escalation_packet)
+        (packet_verified ?escalation_packet)
+        (not
+          (entity_execution_authorized ?supplier_case)
+        )
+      )
+    :effect (entity_execution_authorized ?supplier_case)
+  )
+  (:action authorize_product_case_execution
+    :parameters (?product_case - product_case ?escalation_packet - escalation_packet)
+    :precondition
+      (and
+        (product_case_ready ?product_case)
+        (product_assessment_completed ?product_case)
+        (packet_compiled ?escalation_packet)
+        (packet_verified ?escalation_packet)
+        (not
+          (entity_execution_authorized ?product_case)
+        )
+      )
+    :effect (entity_execution_authorized ?product_case)
+  )
+  (:action initiate_event_escalation
+    :parameters (?quality_case - quality_case ?regulatory_contact - regulatory_contact ?evidence - evidence_item)
+    :precondition
+      (and
+        (entity_execution_authorized ?quality_case)
+        (entity_evidence_attached ?quality_case ?evidence)
+        (regulatory_contact_available ?regulatory_contact)
+        (not
+          (entity_escalation_initiated ?quality_case)
+        )
+      )
+    :effect
+      (and
+        (entity_escalation_initiated ?quality_case)
+        (entity_has_regulatory_contact ?quality_case ?regulatory_contact)
+        (not
+          (regulatory_contact_available ?regulatory_contact)
+        )
+      )
+  )
+  (:action propagate_escalation_to_supplier_case
+    :parameters (?supplier_case - supplier_case ?assigned_engineer - quality_engineer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (entity_escalation_initiated ?supplier_case)
+        (engineer_assigned_to_case ?supplier_case ?assigned_engineer)
+        (entity_has_regulatory_contact ?supplier_case ?regulatory_contact)
+        (not
+          (entity_escalated ?supplier_case)
+        )
+      )
+    :effect
+      (and
+        (entity_escalated ?supplier_case)
+        (engineer_available ?assigned_engineer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+  (:action propagate_escalation_to_product_case
+    :parameters (?product_case - product_case ?assigned_engineer - quality_engineer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (entity_escalation_initiated ?product_case)
+        (engineer_assigned_to_case ?product_case ?assigned_engineer)
+        (entity_has_regulatory_contact ?product_case ?regulatory_contact)
+        (not
+          (entity_escalated ?product_case)
+        )
+      )
+    :effect
+      (and
+        (entity_escalated ?product_case)
+        (engineer_available ?assigned_engineer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+  (:action propagate_escalation_to_capa_record
+    :parameters (?capa_record - capa_record ?assigned_engineer - quality_engineer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (entity_escalation_initiated ?capa_record)
+        (engineer_assigned_to_case ?capa_record ?assigned_engineer)
+        (entity_has_regulatory_contact ?capa_record ?regulatory_contact)
+        (not
+          (entity_escalated ?capa_record)
+        )
+      )
+    :effect
+      (and
+        (entity_escalated ?capa_record)
+        (engineer_available ?assigned_engineer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+)

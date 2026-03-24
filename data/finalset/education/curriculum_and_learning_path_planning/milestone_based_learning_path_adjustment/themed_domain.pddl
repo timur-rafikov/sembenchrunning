@@ -1,0 +1,936 @@
+(define (domain milestone_based_learning_path_adjustment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_entity - object resource_entity - object temporal_entity - object academic_concept - object pathway_element - academic_concept course_offering - operational_entity assessment_item - operational_entity instructor - operational_entity elective_option - operational_entity support_service - operational_entity schedule_slot - operational_entity credential - operational_entity accreditation_condition - operational_entity credit_block - resource_entity administrative_document - resource_entity endorsement - resource_entity milestone - temporal_entity milestone_window - temporal_entity adjustment_proposal - temporal_entity pathway_individual_group - pathway_element pathway_program_group - pathway_element student_profile - pathway_individual_group student_cohort - pathway_individual_group academic_program - pathway_program_group)
+  (:predicates
+    (pathway_registered ?pathway_element - pathway_element)
+    (pathway_milestone_validated ?pathway_element - pathway_element)
+    (course_assignment_confirmed_for_entity ?pathway_element - pathway_element)
+    (adjustment_finalized_for_entity ?pathway_element - pathway_element)
+    (approved_for_execution_for_entity ?pathway_element - pathway_element)
+    (adjustment_implemented_for_entity ?pathway_element - pathway_element)
+    (offering_available ?course_offering - course_offering)
+    (course_offering_assigned_to_entity ?pathway_element - pathway_element ?course_offering - course_offering)
+    (assessment_available ?assessment_item - assessment_item)
+    (assessment_assigned_to_entity ?pathway_element - pathway_element ?assessment_item - assessment_item)
+    (instructor_available ?instructor - instructor)
+    (instructor_assigned_to_entity ?pathway_element - pathway_element ?instructor - instructor)
+    (credit_block_available ?credit_block - credit_block)
+    (allocated_credit_block_to_student ?student_profile - student_profile ?credit_block - credit_block)
+    (allocated_credit_block_to_cohort ?student_cohort - student_cohort ?credit_block - credit_block)
+    (milestone_indicated_for_student ?student_profile - student_profile ?milestone - milestone)
+    (milestone_signaled ?milestone - milestone)
+    (milestone_credit_allocated ?milestone - milestone)
+    (student_milestone_confirmed ?student_profile - student_profile)
+    (cohort_milestone_window_assigned ?student_cohort - student_cohort ?milestone_window - milestone_window)
+    (milestone_window_signaled ?milestone_window - milestone_window)
+    (milestone_window_credit_allocated ?milestone_window - milestone_window)
+    (cohort_milestone_confirmed ?student_cohort - student_cohort)
+    (proposal_draft ?adjustment_proposal - adjustment_proposal)
+    (proposal_submitted ?adjustment_proposal - adjustment_proposal)
+    (proposal_includes_milestone ?adjustment_proposal - adjustment_proposal ?milestone - milestone)
+    (proposal_includes_milestone_window ?adjustment_proposal - adjustment_proposal ?milestone_window - milestone_window)
+    (proposal_includes_individual_credit ?adjustment_proposal - adjustment_proposal)
+    (proposal_includes_cohort_credit ?adjustment_proposal - adjustment_proposal)
+    (proposal_finalized ?adjustment_proposal - adjustment_proposal)
+    (program_enrolls_student ?academic_program - academic_program ?student_profile - student_profile)
+    (program_includes_cohort ?academic_program - academic_program ?student_cohort - student_cohort)
+    (program_has_proposal ?academic_program - academic_program ?adjustment_proposal - adjustment_proposal)
+    (document_available ?administrative_document - administrative_document)
+    (program_has_document ?academic_program - academic_program ?administrative_document - administrative_document)
+    (document_attached ?administrative_document - administrative_document)
+    (document_attached_to_proposal ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    (program_review_stage1_passed ?academic_program - academic_program)
+    (program_review_stage2_passed ?academic_program - academic_program)
+    (program_eligible_for_final_approval ?academic_program - academic_program)
+    (program_has_elective_assigned ?academic_program - academic_program)
+    (program_elective_confirmed ?academic_program - academic_program)
+    (program_supports_attached ?academic_program - academic_program)
+    (program_review_acknowledged ?academic_program - academic_program)
+    (endorsement_available ?endorsement - endorsement)
+    (program_has_endorsement ?academic_program - academic_program ?endorsement - endorsement)
+    (program_endorsement_recorded ?academic_program - academic_program)
+    (program_endorsement_acknowledged ?academic_program - academic_program)
+    (program_endorsement_verified ?academic_program - academic_program)
+    (elective_option_available ?elective_option - elective_option)
+    (program_has_elective_option ?academic_program - academic_program ?elective_option - elective_option)
+    (support_service_available ?support_service - support_service)
+    (program_has_support_service ?academic_program - academic_program ?support_service - support_service)
+    (credential_available ?credential - credential)
+    (program_has_credential ?academic_program - academic_program ?credential - credential)
+    (accreditation_condition_available ?accreditation_condition - accreditation_condition)
+    (program_has_accreditation_condition ?academic_program - academic_program ?accreditation_condition - accreditation_condition)
+    (schedule_slot_available ?schedule_slot - schedule_slot)
+    (entity_scheduled_in_slot ?pathway_element - pathway_element ?schedule_slot - schedule_slot)
+    (student_ready_for_proposal ?student_profile - student_profile)
+    (cohort_ready_for_proposal ?student_cohort - student_cohort)
+    (final_approval_recorded ?academic_program - academic_program)
+  )
+  (:action register_pathway_element
+    :parameters (?pathway_element - pathway_element)
+    :precondition
+      (and
+        (not
+          (pathway_registered ?pathway_element)
+        )
+        (not
+          (adjustment_finalized_for_entity ?pathway_element)
+        )
+      )
+    :effect (pathway_registered ?pathway_element)
+  )
+  (:action assign_course_offering
+    :parameters (?pathway_element - pathway_element ?course_offering - course_offering)
+    :precondition
+      (and
+        (pathway_registered ?pathway_element)
+        (not
+          (course_assignment_confirmed_for_entity ?pathway_element)
+        )
+        (offering_available ?course_offering)
+      )
+    :effect
+      (and
+        (course_assignment_confirmed_for_entity ?pathway_element)
+        (course_offering_assigned_to_entity ?pathway_element ?course_offering)
+        (not
+          (offering_available ?course_offering)
+        )
+      )
+  )
+  (:action assign_assessment_to_pathway_element
+    :parameters (?pathway_element - pathway_element ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_registered ?pathway_element)
+        (course_assignment_confirmed_for_entity ?pathway_element)
+        (assessment_available ?assessment_item)
+      )
+    :effect
+      (and
+        (assessment_assigned_to_entity ?pathway_element ?assessment_item)
+        (not
+          (assessment_available ?assessment_item)
+        )
+      )
+  )
+  (:action validate_assessment_result
+    :parameters (?pathway_element - pathway_element ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_registered ?pathway_element)
+        (course_assignment_confirmed_for_entity ?pathway_element)
+        (assessment_assigned_to_entity ?pathway_element ?assessment_item)
+        (not
+          (pathway_milestone_validated ?pathway_element)
+        )
+      )
+    :effect (pathway_milestone_validated ?pathway_element)
+  )
+  (:action release_assessment_assignment
+    :parameters (?pathway_element - pathway_element ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (assessment_assigned_to_entity ?pathway_element ?assessment_item)
+      )
+    :effect
+      (and
+        (assessment_available ?assessment_item)
+        (not
+          (assessment_assigned_to_entity ?pathway_element ?assessment_item)
+        )
+      )
+  )
+  (:action assign_instructor_to_pathway_element
+    :parameters (?pathway_element - pathway_element ?instructor - instructor)
+    :precondition
+      (and
+        (pathway_milestone_validated ?pathway_element)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (instructor_assigned_to_entity ?pathway_element ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action release_instructor_from_pathway
+    :parameters (?pathway_element - pathway_element ?instructor - instructor)
+    :precondition
+      (and
+        (instructor_assigned_to_entity ?pathway_element ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (instructor_assigned_to_entity ?pathway_element ?instructor)
+        )
+      )
+  )
+  (:action attach_credential_to_program
+    :parameters (?academic_program - academic_program ?credential - credential)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (program_has_credential ?academic_program ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action detach_credential_from_program
+    :parameters (?academic_program - academic_program ?credential - credential)
+    :precondition
+      (and
+        (program_has_credential ?academic_program ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (program_has_credential ?academic_program ?credential)
+        )
+      )
+  )
+  (:action attach_accreditation_condition_to_program
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (accreditation_condition_available ?accreditation_condition)
+      )
+    :effect
+      (and
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (not
+          (accreditation_condition_available ?accreditation_condition)
+        )
+      )
+  )
+  (:action release_accreditation_condition_from_program
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition)
+    :precondition
+      (and
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+      )
+    :effect
+      (and
+        (accreditation_condition_available ?accreditation_condition)
+        (not
+          (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        )
+      )
+  )
+  (:action signal_milestone_for_student
+    :parameters (?student_profile - student_profile ?milestone - milestone ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_profile)
+        (assessment_assigned_to_entity ?student_profile ?assessment_item)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (not
+          (milestone_signaled ?milestone)
+        )
+        (not
+          (milestone_credit_allocated ?milestone)
+        )
+      )
+    :effect (milestone_signaled ?milestone)
+  )
+  (:action confirm_student_milestone_with_instructor
+    :parameters (?student_profile - student_profile ?milestone - milestone ?instructor - instructor)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_profile)
+        (instructor_assigned_to_entity ?student_profile ?instructor)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (milestone_signaled ?milestone)
+        (not
+          (student_ready_for_proposal ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (student_milestone_confirmed ?student_profile)
+      )
+  )
+  (:action allocate_credit_block_to_student_for_milestone
+    :parameters (?student_profile - student_profile ?milestone - milestone ?credit_block - credit_block)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_profile)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (credit_block_available ?credit_block)
+        (not
+          (student_ready_for_proposal ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (milestone_credit_allocated ?milestone)
+        (student_ready_for_proposal ?student_profile)
+        (allocated_credit_block_to_student ?student_profile ?credit_block)
+        (not
+          (credit_block_available ?credit_block)
+        )
+      )
+  )
+  (:action process_student_credit_allocation
+    :parameters (?student_profile - student_profile ?milestone - milestone ?assessment_item - assessment_item ?credit_block - credit_block)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_profile)
+        (assessment_assigned_to_entity ?student_profile ?assessment_item)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (milestone_credit_allocated ?milestone)
+        (allocated_credit_block_to_student ?student_profile ?credit_block)
+        (not
+          (student_milestone_confirmed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (milestone_signaled ?milestone)
+        (student_milestone_confirmed ?student_profile)
+        (credit_block_available ?credit_block)
+        (not
+          (allocated_credit_block_to_student ?student_profile ?credit_block)
+        )
+      )
+  )
+  (:action signal_milestone_for_cohort
+    :parameters (?student_cohort - student_cohort ?milestone_window - milestone_window ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_cohort)
+        (assessment_assigned_to_entity ?student_cohort ?assessment_item)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (not
+          (milestone_window_signaled ?milestone_window)
+        )
+        (not
+          (milestone_window_credit_allocated ?milestone_window)
+        )
+      )
+    :effect (milestone_window_signaled ?milestone_window)
+  )
+  (:action confirm_cohort_milestone_with_instructor
+    :parameters (?student_cohort - student_cohort ?milestone_window - milestone_window ?instructor - instructor)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_cohort)
+        (instructor_assigned_to_entity ?student_cohort ?instructor)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_window_signaled ?milestone_window)
+        (not
+          (cohort_ready_for_proposal ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (cohort_ready_for_proposal ?student_cohort)
+        (cohort_milestone_confirmed ?student_cohort)
+      )
+  )
+  (:action allocate_credit_block_to_cohort_for_milestone
+    :parameters (?student_cohort - student_cohort ?milestone_window - milestone_window ?credit_block - credit_block)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_cohort)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (credit_block_available ?credit_block)
+        (not
+          (cohort_ready_for_proposal ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (milestone_window_credit_allocated ?milestone_window)
+        (cohort_ready_for_proposal ?student_cohort)
+        (allocated_credit_block_to_cohort ?student_cohort ?credit_block)
+        (not
+          (credit_block_available ?credit_block)
+        )
+      )
+  )
+  (:action process_cohort_credit_allocation
+    :parameters (?student_cohort - student_cohort ?milestone_window - milestone_window ?assessment_item - assessment_item ?credit_block - credit_block)
+    :precondition
+      (and
+        (pathway_milestone_validated ?student_cohort)
+        (assessment_assigned_to_entity ?student_cohort ?assessment_item)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_window_credit_allocated ?milestone_window)
+        (allocated_credit_block_to_cohort ?student_cohort ?credit_block)
+        (not
+          (cohort_milestone_confirmed ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (milestone_window_signaled ?milestone_window)
+        (cohort_milestone_confirmed ?student_cohort)
+        (credit_block_available ?credit_block)
+        (not
+          (allocated_credit_block_to_cohort ?student_cohort ?credit_block)
+        )
+      )
+  )
+  (:action assemble_proposal_from_ready_student_and_cohort
+    :parameters (?student_profile - student_profile ?student_cohort - student_cohort ?milestone - milestone ?milestone_window - milestone_window ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (cohort_ready_for_proposal ?student_cohort)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_signaled ?milestone)
+        (milestone_window_signaled ?milestone_window)
+        (student_milestone_confirmed ?student_profile)
+        (cohort_milestone_confirmed ?student_cohort)
+        (proposal_draft ?adjustment_proposal)
+      )
+    :effect
+      (and
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_includes_milestone ?adjustment_proposal ?milestone)
+        (proposal_includes_milestone_window ?adjustment_proposal ?milestone_window)
+        (not
+          (proposal_draft ?adjustment_proposal)
+        )
+      )
+  )
+  (:action assemble_proposal_with_individual_credit
+    :parameters (?student_profile - student_profile ?student_cohort - student_cohort ?milestone - milestone ?milestone_window - milestone_window ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (cohort_ready_for_proposal ?student_cohort)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_credit_allocated ?milestone)
+        (milestone_window_signaled ?milestone_window)
+        (not
+          (student_milestone_confirmed ?student_profile)
+        )
+        (cohort_milestone_confirmed ?student_cohort)
+        (proposal_draft ?adjustment_proposal)
+      )
+    :effect
+      (and
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_includes_milestone ?adjustment_proposal ?milestone)
+        (proposal_includes_milestone_window ?adjustment_proposal ?milestone_window)
+        (proposal_includes_individual_credit ?adjustment_proposal)
+        (not
+          (proposal_draft ?adjustment_proposal)
+        )
+      )
+  )
+  (:action assemble_proposal_with_cohort_credit
+    :parameters (?student_profile - student_profile ?student_cohort - student_cohort ?milestone - milestone ?milestone_window - milestone_window ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (cohort_ready_for_proposal ?student_cohort)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_signaled ?milestone)
+        (milestone_window_credit_allocated ?milestone_window)
+        (student_milestone_confirmed ?student_profile)
+        (not
+          (cohort_milestone_confirmed ?student_cohort)
+        )
+        (proposal_draft ?adjustment_proposal)
+      )
+    :effect
+      (and
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_includes_milestone ?adjustment_proposal ?milestone)
+        (proposal_includes_milestone_window ?adjustment_proposal ?milestone_window)
+        (proposal_includes_cohort_credit ?adjustment_proposal)
+        (not
+          (proposal_draft ?adjustment_proposal)
+        )
+      )
+  )
+  (:action assemble_proposal_with_both_credits
+    :parameters (?student_profile - student_profile ?student_cohort - student_cohort ?milestone - milestone ?milestone_window - milestone_window ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (cohort_ready_for_proposal ?student_cohort)
+        (milestone_indicated_for_student ?student_profile ?milestone)
+        (cohort_milestone_window_assigned ?student_cohort ?milestone_window)
+        (milestone_credit_allocated ?milestone)
+        (milestone_window_credit_allocated ?milestone_window)
+        (not
+          (student_milestone_confirmed ?student_profile)
+        )
+        (not
+          (cohort_milestone_confirmed ?student_cohort)
+        )
+        (proposal_draft ?adjustment_proposal)
+      )
+    :effect
+      (and
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_includes_milestone ?adjustment_proposal ?milestone)
+        (proposal_includes_milestone_window ?adjustment_proposal ?milestone_window)
+        (proposal_includes_individual_credit ?adjustment_proposal)
+        (proposal_includes_cohort_credit ?adjustment_proposal)
+        (not
+          (proposal_draft ?adjustment_proposal)
+        )
+      )
+  )
+  (:action finalize_proposal
+    :parameters (?adjustment_proposal - adjustment_proposal ?student_profile - student_profile ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (proposal_submitted ?adjustment_proposal)
+        (student_ready_for_proposal ?student_profile)
+        (assessment_assigned_to_entity ?student_profile ?assessment_item)
+        (not
+          (proposal_finalized ?adjustment_proposal)
+        )
+      )
+    :effect (proposal_finalized ?adjustment_proposal)
+  )
+  (:action attach_administrative_document_to_proposal
+    :parameters (?academic_program - academic_program ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (program_has_proposal ?academic_program ?adjustment_proposal)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_available ?administrative_document)
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_finalized ?adjustment_proposal)
+        (not
+          (document_attached ?administrative_document)
+        )
+      )
+    :effect
+      (and
+        (document_attached ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (not
+          (document_available ?administrative_document)
+        )
+      )
+  )
+  (:action advance_proposal_review_stage1
+    :parameters (?academic_program - academic_program ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (assessment_assigned_to_entity ?academic_program ?assessment_item)
+        (not
+          (proposal_includes_individual_credit ?adjustment_proposal)
+        )
+        (not
+          (program_review_stage1_passed ?academic_program)
+        )
+      )
+    :effect (program_review_stage1_passed ?academic_program)
+  )
+  (:action assign_elective_option_to_program
+    :parameters (?academic_program - academic_program ?elective_option - elective_option)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (elective_option_available ?elective_option)
+        (not
+          (program_has_elective_assigned ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_has_elective_assigned ?academic_program)
+        (program_has_elective_option ?academic_program ?elective_option)
+        (not
+          (elective_option_available ?elective_option)
+        )
+      )
+  )
+  (:action integrate_elective_and_document_into_proposal
+    :parameters (?academic_program - academic_program ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal ?assessment_item - assessment_item ?elective_option - elective_option)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (assessment_assigned_to_entity ?academic_program ?assessment_item)
+        (proposal_includes_individual_credit ?adjustment_proposal)
+        (program_has_elective_assigned ?academic_program)
+        (program_has_elective_option ?academic_program ?elective_option)
+        (not
+          (program_review_stage1_passed ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_review_stage1_passed ?academic_program)
+        (program_elective_confirmed ?academic_program)
+      )
+  )
+  (:action conduct_faculty_review_for_program
+    :parameters (?academic_program - academic_program ?credential - credential ?instructor - instructor ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage1_passed ?academic_program)
+        (program_has_credential ?academic_program ?credential)
+        (instructor_assigned_to_entity ?academic_program ?instructor)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (not
+          (proposal_includes_cohort_credit ?adjustment_proposal)
+        )
+        (not
+          (program_review_stage2_passed ?academic_program)
+        )
+      )
+    :effect (program_review_stage2_passed ?academic_program)
+  )
+  (:action conduct_alternate_faculty_review_for_program
+    :parameters (?academic_program - academic_program ?credential - credential ?instructor - instructor ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage1_passed ?academic_program)
+        (program_has_credential ?academic_program ?credential)
+        (instructor_assigned_to_entity ?academic_program ?instructor)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (proposal_includes_cohort_credit ?adjustment_proposal)
+        (not
+          (program_review_stage2_passed ?academic_program)
+        )
+      )
+    :effect (program_review_stage2_passed ?academic_program)
+  )
+  (:action qualify_program_for_final_approval
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage2_passed ?academic_program)
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (not
+          (proposal_includes_individual_credit ?adjustment_proposal)
+        )
+        (not
+          (proposal_includes_cohort_credit ?adjustment_proposal)
+        )
+        (not
+          (program_eligible_for_final_approval ?academic_program)
+        )
+      )
+    :effect (program_eligible_for_final_approval ?academic_program)
+  )
+  (:action qualify_program_for_final_approval_with_docs
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage2_passed ?academic_program)
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (proposal_includes_individual_credit ?adjustment_proposal)
+        (not
+          (proposal_includes_cohort_credit ?adjustment_proposal)
+        )
+        (not
+          (program_eligible_for_final_approval ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_supports_attached ?academic_program)
+      )
+  )
+  (:action qualify_program_for_final_approval_variant
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage2_passed ?academic_program)
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (not
+          (proposal_includes_individual_credit ?adjustment_proposal)
+        )
+        (proposal_includes_cohort_credit ?adjustment_proposal)
+        (not
+          (program_eligible_for_final_approval ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_supports_attached ?academic_program)
+      )
+  )
+  (:action qualify_program_for_final_approval_with_all_flags
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition ?administrative_document - administrative_document ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (program_review_stage2_passed ?academic_program)
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (program_has_document ?academic_program ?administrative_document)
+        (document_attached_to_proposal ?administrative_document ?adjustment_proposal)
+        (proposal_includes_individual_credit ?adjustment_proposal)
+        (proposal_includes_cohort_credit ?adjustment_proposal)
+        (not
+          (program_eligible_for_final_approval ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_supports_attached ?academic_program)
+      )
+  )
+  (:action record_program_final_approval
+    :parameters (?academic_program - academic_program)
+    :precondition
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (not
+          (program_supports_attached ?academic_program)
+        )
+        (not
+          (final_approval_recorded ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?academic_program)
+        (approved_for_execution_for_entity ?academic_program)
+      )
+  )
+  (:action attach_support_service_to_program
+    :parameters (?academic_program - academic_program ?support_service - support_service)
+    :precondition
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_supports_attached ?academic_program)
+        (support_service_available ?support_service)
+      )
+    :effect
+      (and
+        (program_has_support_service ?academic_program ?support_service)
+        (not
+          (support_service_available ?support_service)
+        )
+      )
+  )
+  (:action authorize_program_for_execution
+    :parameters (?academic_program - academic_program ?student_profile - student_profile ?student_cohort - student_cohort ?assessment_item - assessment_item ?support_service - support_service)
+    :precondition
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_supports_attached ?academic_program)
+        (program_has_support_service ?academic_program ?support_service)
+        (program_enrolls_student ?academic_program ?student_profile)
+        (program_includes_cohort ?academic_program ?student_cohort)
+        (student_milestone_confirmed ?student_profile)
+        (cohort_milestone_confirmed ?student_cohort)
+        (assessment_assigned_to_entity ?academic_program ?assessment_item)
+        (not
+          (program_review_acknowledged ?academic_program)
+        )
+      )
+    :effect (program_review_acknowledged ?academic_program)
+  )
+  (:action finalize_program_approval_post_authorization
+    :parameters (?academic_program - academic_program)
+    :precondition
+      (and
+        (program_eligible_for_final_approval ?academic_program)
+        (program_review_acknowledged ?academic_program)
+        (not
+          (final_approval_recorded ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?academic_program)
+        (approved_for_execution_for_entity ?academic_program)
+      )
+  )
+  (:action record_program_endorsement
+    :parameters (?academic_program - academic_program ?endorsement - endorsement ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (pathway_milestone_validated ?academic_program)
+        (assessment_assigned_to_entity ?academic_program ?assessment_item)
+        (endorsement_available ?endorsement)
+        (program_has_endorsement ?academic_program ?endorsement)
+        (not
+          (program_endorsement_recorded ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (program_endorsement_recorded ?academic_program)
+        (not
+          (endorsement_available ?endorsement)
+        )
+      )
+  )
+  (:action acknowledge_program_endorsement
+    :parameters (?academic_program - academic_program ?instructor - instructor)
+    :precondition
+      (and
+        (program_endorsement_recorded ?academic_program)
+        (instructor_assigned_to_entity ?academic_program ?instructor)
+        (not
+          (program_endorsement_acknowledged ?academic_program)
+        )
+      )
+    :effect (program_endorsement_acknowledged ?academic_program)
+  )
+  (:action verify_program_endorsement_condition
+    :parameters (?academic_program - academic_program ?accreditation_condition - accreditation_condition)
+    :precondition
+      (and
+        (program_endorsement_acknowledged ?academic_program)
+        (program_has_accreditation_condition ?academic_program ?accreditation_condition)
+        (not
+          (program_endorsement_verified ?academic_program)
+        )
+      )
+    :effect (program_endorsement_verified ?academic_program)
+  )
+  (:action finalize_endorsement_approval
+    :parameters (?academic_program - academic_program)
+    :precondition
+      (and
+        (program_endorsement_verified ?academic_program)
+        (not
+          (final_approval_recorded ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?academic_program)
+        (approved_for_execution_for_entity ?academic_program)
+      )
+  )
+  (:action approve_student_for_enactment
+    :parameters (?student_profile - student_profile ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (student_ready_for_proposal ?student_profile)
+        (student_milestone_confirmed ?student_profile)
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_finalized ?adjustment_proposal)
+        (not
+          (approved_for_execution_for_entity ?student_profile)
+        )
+      )
+    :effect (approved_for_execution_for_entity ?student_profile)
+  )
+  (:action approve_cohort_for_enactment
+    :parameters (?student_cohort - student_cohort ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (cohort_ready_for_proposal ?student_cohort)
+        (cohort_milestone_confirmed ?student_cohort)
+        (proposal_submitted ?adjustment_proposal)
+        (proposal_finalized ?adjustment_proposal)
+        (not
+          (approved_for_execution_for_entity ?student_cohort)
+        )
+      )
+    :effect (approved_for_execution_for_entity ?student_cohort)
+  )
+  (:action implement_adjustment_on_pathway_element
+    :parameters (?pathway_element - pathway_element ?schedule_slot - schedule_slot ?assessment_item - assessment_item)
+    :precondition
+      (and
+        (approved_for_execution_for_entity ?pathway_element)
+        (assessment_assigned_to_entity ?pathway_element ?assessment_item)
+        (schedule_slot_available ?schedule_slot)
+        (not
+          (adjustment_implemented_for_entity ?pathway_element)
+        )
+      )
+    :effect
+      (and
+        (adjustment_implemented_for_entity ?pathway_element)
+        (entity_scheduled_in_slot ?pathway_element ?schedule_slot)
+        (not
+          (schedule_slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action finalize_adjustment_for_student_and_release_resources
+    :parameters (?student_profile - student_profile ?course_offering - course_offering ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (adjustment_implemented_for_entity ?student_profile)
+        (course_offering_assigned_to_entity ?student_profile ?course_offering)
+        (entity_scheduled_in_slot ?student_profile ?schedule_slot)
+        (not
+          (adjustment_finalized_for_entity ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (adjustment_finalized_for_entity ?student_profile)
+        (offering_available ?course_offering)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+  (:action finalize_adjustment_for_cohort_and_release_resources
+    :parameters (?student_cohort - student_cohort ?course_offering - course_offering ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (adjustment_implemented_for_entity ?student_cohort)
+        (course_offering_assigned_to_entity ?student_cohort ?course_offering)
+        (entity_scheduled_in_slot ?student_cohort ?schedule_slot)
+        (not
+          (adjustment_finalized_for_entity ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (adjustment_finalized_for_entity ?student_cohort)
+        (offering_available ?course_offering)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+  (:action finalize_adjustment_for_program_and_release_resources
+    :parameters (?academic_program - academic_program ?course_offering - course_offering ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (adjustment_implemented_for_entity ?academic_program)
+        (course_offering_assigned_to_entity ?academic_program ?course_offering)
+        (entity_scheduled_in_slot ?academic_program ?schedule_slot)
+        (not
+          (adjustment_finalized_for_entity ?academic_program)
+        )
+      )
+    :effect
+      (and
+        (adjustment_finalized_for_entity ?academic_program)
+        (offering_available ?course_offering)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+)

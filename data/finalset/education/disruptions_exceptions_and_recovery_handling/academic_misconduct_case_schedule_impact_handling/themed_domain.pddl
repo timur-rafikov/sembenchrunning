@@ -1,0 +1,936 @@
+(define (domain academic_misconduct_schedule_impact_handling_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types admin_concept_type - object resource_concept_type - object document_concept_type - object case_container - object case_component - case_container investigator_availability_token - admin_concept_type evidence_item - admin_concept_type reviewer_agent_token - admin_concept_type policy_exception_template - admin_concept_type support_service - admin_concept_type authorization_document - admin_concept_type sanction_adjustment - admin_concept_type final_decision_artifact - admin_concept_type mitigation_option - resource_concept_type curriculum_requirement - resource_concept_type stakeholder_approval - resource_concept_type schedule_impact_record - document_concept_type recovery_pathway - document_concept_type administrative_action_package - document_concept_type enrollment_container - case_component enrollment_subcontainer - case_component primary_enrollment_record - enrollment_container secondary_enrollment_record - enrollment_container case_file - enrollment_subcontainer)
+  (:predicates
+    (component_intake_registered ?case_component - case_component)
+    (component_assessment_ready ?case_component - case_component)
+    (component_investigation_active ?case_component - case_component)
+    (component_restoration_applied ?case_component - case_component)
+    (component_ready_for_restoration ?case_component - case_component)
+    (component_authorization_received ?case_component - case_component)
+    (investigator_token_available ?investigator_availability_token - investigator_availability_token)
+    (component_assigned_investigator ?case_component - case_component ?investigator_availability_token - investigator_availability_token)
+    (evidence_item_available ?evidence_item - evidence_item)
+    (component_evidence_attached ?case_component - case_component ?evidence_item - evidence_item)
+    (reviewer_token_available ?reviewer_agent_token - reviewer_agent_token)
+    (component_assigned_reviewer ?case_component - case_component ?reviewer_agent_token - reviewer_agent_token)
+    (mitigation_option_available ?mitigation_option - mitigation_option)
+    (primary_enrollment_mitigation_assigned ?primary_enrollment_record - primary_enrollment_record ?mitigation_option - mitigation_option)
+    (secondary_enrollment_mitigation_assigned ?secondary_enrollment_record - secondary_enrollment_record ?mitigation_option - mitigation_option)
+    (primary_enrollment_schedule_impact_link ?primary_enrollment_record - primary_enrollment_record ?schedule_impact_record - schedule_impact_record)
+    (schedule_impact_selected ?schedule_impact_record - schedule_impact_record)
+    (schedule_impact_mitigation_engaged ?schedule_impact_record - schedule_impact_record)
+    (primary_enrollment_ready_for_package ?primary_enrollment_record - primary_enrollment_record)
+    (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record - secondary_enrollment_record ?recovery_pathway - recovery_pathway)
+    (recovery_pathway_selected ?recovery_pathway - recovery_pathway)
+    (recovery_pathway_mitigation_reserved ?recovery_pathway - recovery_pathway)
+    (secondary_enrollment_ready_for_package ?secondary_enrollment_record - secondary_enrollment_record)
+    (administrative_package_token_available ?administrative_action_package - administrative_action_package)
+    (administrative_package_assembled ?administrative_action_package - administrative_action_package)
+    (package_includes_schedule_impact ?administrative_action_package - administrative_action_package ?schedule_impact_record - schedule_impact_record)
+    (package_includes_recovery_pathway ?administrative_action_package - administrative_action_package ?recovery_pathway - recovery_pathway)
+    (administrative_package_flag_variant_a ?administrative_action_package - administrative_action_package)
+    (administrative_package_flag_variant_b ?administrative_action_package - administrative_action_package)
+    (administrative_package_locked_for_fulfillment ?administrative_action_package - administrative_action_package)
+    (case_file_primary_enrollment_link ?case_file - case_file ?primary_enrollment_record - primary_enrollment_record)
+    (case_file_secondary_enrollment_link ?case_file - case_file ?secondary_enrollment_record - secondary_enrollment_record)
+    (case_file_package_link ?case_file - case_file ?administrative_action_package - administrative_action_package)
+    (curriculum_requirement_available ?curriculum_requirement - curriculum_requirement)
+    (case_file_curriculum_requirement_link ?case_file - case_file ?curriculum_requirement - curriculum_requirement)
+    (curriculum_requirement_allocated ?curriculum_requirement - curriculum_requirement)
+    (curriculum_requirement_linked_to_package ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    (case_file_requirements_verified ?case_file - case_file)
+    (case_file_decision_packaging_prepared ?case_file - case_file)
+    (case_file_decision_ready ?case_file - case_file)
+    (case_file_policy_exception_template_applied ?case_file - case_file)
+    (case_file_policy_exception_template_consumed ?case_file - case_file)
+    (case_file_support_attachment_open ?case_file - case_file)
+    (case_file_supports_verified ?case_file - case_file)
+    (stakeholder_approval_available ?stakeholder_approval - stakeholder_approval)
+    (case_file_stakeholder_approval_link ?case_file - case_file ?stakeholder_approval - stakeholder_approval)
+    (case_file_stakeholder_approval_recorded ?case_file - case_file)
+    (case_file_reviewer_followup_initiated ?case_file - case_file)
+    (case_file_reviewer_followup_completed ?case_file - case_file)
+    (policy_exception_template_available ?policy_exception_template - policy_exception_template)
+    (case_file_exception_template_link ?case_file - case_file ?policy_exception_template - policy_exception_template)
+    (support_service_available ?support_service - support_service)
+    (case_file_support_service_link ?case_file - case_file ?support_service - support_service)
+    (sanction_adjustment_available ?sanction_adjustment - sanction_adjustment)
+    (case_file_sanction_adjustment_link ?case_file - case_file ?sanction_adjustment - sanction_adjustment)
+    (final_decision_artifact_available ?final_decision_artifact - final_decision_artifact)
+    (case_file_final_decision_link ?case_file - case_file ?final_decision_artifact - final_decision_artifact)
+    (authorization_document_available ?authorization_document - authorization_document)
+    (component_authorization_document_link ?case_component - case_component ?authorization_document - authorization_document)
+    (primary_enrollment_processing_mark ?primary_enrollment_record - primary_enrollment_record)
+    (secondary_enrollment_processing_mark ?secondary_enrollment_record - secondary_enrollment_record)
+    (case_file_finalized ?case_file - case_file)
+  )
+  (:action register_component_intake
+    :parameters (?case_component - case_component)
+    :precondition
+      (and
+        (not
+          (component_intake_registered ?case_component)
+        )
+        (not
+          (component_restoration_applied ?case_component)
+        )
+      )
+    :effect (component_intake_registered ?case_component)
+  )
+  (:action allocate_investigator_to_component
+    :parameters (?case_component - case_component ?investigator_availability_token - investigator_availability_token)
+    :precondition
+      (and
+        (component_intake_registered ?case_component)
+        (not
+          (component_investigation_active ?case_component)
+        )
+        (investigator_token_available ?investigator_availability_token)
+      )
+    :effect
+      (and
+        (component_investigation_active ?case_component)
+        (component_assigned_investigator ?case_component ?investigator_availability_token)
+        (not
+          (investigator_token_available ?investigator_availability_token)
+        )
+      )
+  )
+  (:action attach_evidence_to_component
+    :parameters (?case_component - case_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_intake_registered ?case_component)
+        (component_investigation_active ?case_component)
+        (evidence_item_available ?evidence_item)
+      )
+    :effect
+      (and
+        (component_evidence_attached ?case_component ?evidence_item)
+        (not
+          (evidence_item_available ?evidence_item)
+        )
+      )
+  )
+  (:action confirm_evidence_assessment_for_component
+    :parameters (?case_component - case_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_intake_registered ?case_component)
+        (component_investigation_active ?case_component)
+        (component_evidence_attached ?case_component ?evidence_item)
+        (not
+          (component_assessment_ready ?case_component)
+        )
+      )
+    :effect (component_assessment_ready ?case_component)
+  )
+  (:action detach_evidence_from_component
+    :parameters (?case_component - case_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_evidence_attached ?case_component ?evidence_item)
+      )
+    :effect
+      (and
+        (evidence_item_available ?evidence_item)
+        (not
+          (component_evidence_attached ?case_component ?evidence_item)
+        )
+      )
+  )
+  (:action assign_reviewer_to_component
+    :parameters (?case_component - case_component ?reviewer_agent_token - reviewer_agent_token)
+    :precondition
+      (and
+        (component_assessment_ready ?case_component)
+        (reviewer_token_available ?reviewer_agent_token)
+      )
+    :effect
+      (and
+        (component_assigned_reviewer ?case_component ?reviewer_agent_token)
+        (not
+          (reviewer_token_available ?reviewer_agent_token)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_component
+    :parameters (?case_component - case_component ?reviewer_agent_token - reviewer_agent_token)
+    :precondition
+      (and
+        (component_assigned_reviewer ?case_component ?reviewer_agent_token)
+      )
+    :effect
+      (and
+        (reviewer_token_available ?reviewer_agent_token)
+        (not
+          (component_assigned_reviewer ?case_component ?reviewer_agent_token)
+        )
+      )
+  )
+  (:action provision_sanction_adjustment_for_case_file
+    :parameters (?case_file - case_file ?sanction_adjustment - sanction_adjustment)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (sanction_adjustment_available ?sanction_adjustment)
+      )
+    :effect
+      (and
+        (case_file_sanction_adjustment_link ?case_file ?sanction_adjustment)
+        (not
+          (sanction_adjustment_available ?sanction_adjustment)
+        )
+      )
+  )
+  (:action release_sanction_adjustment_from_case_file
+    :parameters (?case_file - case_file ?sanction_adjustment - sanction_adjustment)
+    :precondition
+      (and
+        (case_file_sanction_adjustment_link ?case_file ?sanction_adjustment)
+      )
+    :effect
+      (and
+        (sanction_adjustment_available ?sanction_adjustment)
+        (not
+          (case_file_sanction_adjustment_link ?case_file ?sanction_adjustment)
+        )
+      )
+  )
+  (:action provision_final_decision_artifact_for_case_file
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (final_decision_artifact_available ?final_decision_artifact)
+      )
+    :effect
+      (and
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (not
+          (final_decision_artifact_available ?final_decision_artifact)
+        )
+      )
+  )
+  (:action release_final_decision_artifact_from_case_file
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact)
+    :precondition
+      (and
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+      )
+    :effect
+      (and
+        (final_decision_artifact_available ?final_decision_artifact)
+        (not
+          (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        )
+      )
+  )
+  (:action select_schedule_impact_for_primary_enrollment
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?schedule_impact_record - schedule_impact_record ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_assessment_ready ?primary_enrollment_record)
+        (component_evidence_attached ?primary_enrollment_record ?evidence_item)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (not
+          (schedule_impact_selected ?schedule_impact_record)
+        )
+        (not
+          (schedule_impact_mitigation_engaged ?schedule_impact_record)
+        )
+      )
+    :effect (schedule_impact_selected ?schedule_impact_record)
+  )
+  (:action confirm_primary_enrollment_review_and_mark_ready
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?schedule_impact_record - schedule_impact_record ?reviewer_agent_token - reviewer_agent_token)
+    :precondition
+      (and
+        (component_assessment_ready ?primary_enrollment_record)
+        (component_assigned_reviewer ?primary_enrollment_record ?reviewer_agent_token)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (schedule_impact_selected ?schedule_impact_record)
+        (not
+          (primary_enrollment_processing_mark ?primary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+      )
+  )
+  (:action propose_mitigation_for_primary_enrollment
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?schedule_impact_record - schedule_impact_record ?mitigation_option - mitigation_option)
+    :precondition
+      (and
+        (component_assessment_ready ?primary_enrollment_record)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (mitigation_option_available ?mitigation_option)
+        (not
+          (primary_enrollment_processing_mark ?primary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (schedule_impact_mitigation_engaged ?schedule_impact_record)
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (primary_enrollment_mitigation_assigned ?primary_enrollment_record ?mitigation_option)
+        (not
+          (mitigation_option_available ?mitigation_option)
+        )
+      )
+  )
+  (:action apply_mitigation_for_primary_enrollment
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?schedule_impact_record - schedule_impact_record ?evidence_item - evidence_item ?mitigation_option - mitigation_option)
+    :precondition
+      (and
+        (component_assessment_ready ?primary_enrollment_record)
+        (component_evidence_attached ?primary_enrollment_record ?evidence_item)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (schedule_impact_mitigation_engaged ?schedule_impact_record)
+        (primary_enrollment_mitigation_assigned ?primary_enrollment_record ?mitigation_option)
+        (not
+          (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (schedule_impact_selected ?schedule_impact_record)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        (mitigation_option_available ?mitigation_option)
+        (not
+          (primary_enrollment_mitigation_assigned ?primary_enrollment_record ?mitigation_option)
+        )
+      )
+  )
+  (:action select_recovery_pathway_for_secondary_enrollment
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?recovery_pathway - recovery_pathway ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_assessment_ready ?secondary_enrollment_record)
+        (component_evidence_attached ?secondary_enrollment_record ?evidence_item)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (not
+          (recovery_pathway_selected ?recovery_pathway)
+        )
+        (not
+          (recovery_pathway_mitigation_reserved ?recovery_pathway)
+        )
+      )
+    :effect (recovery_pathway_selected ?recovery_pathway)
+  )
+  (:action confirm_secondary_enrollment_review_and_mark_ready
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?recovery_pathway - recovery_pathway ?reviewer_agent_token - reviewer_agent_token)
+    :precondition
+      (and
+        (component_assessment_ready ?secondary_enrollment_record)
+        (component_assigned_reviewer ?secondary_enrollment_record ?reviewer_agent_token)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (recovery_pathway_selected ?recovery_pathway)
+        (not
+          (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+      )
+  )
+  (:action propose_mitigation_for_secondary_enrollment
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?recovery_pathway - recovery_pathway ?mitigation_option - mitigation_option)
+    :precondition
+      (and
+        (component_assessment_ready ?secondary_enrollment_record)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (mitigation_option_available ?mitigation_option)
+        (not
+          (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (recovery_pathway_mitigation_reserved ?recovery_pathway)
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (secondary_enrollment_mitigation_assigned ?secondary_enrollment_record ?mitigation_option)
+        (not
+          (mitigation_option_available ?mitigation_option)
+        )
+      )
+  )
+  (:action apply_mitigation_for_secondary_enrollment
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?recovery_pathway - recovery_pathway ?evidence_item - evidence_item ?mitigation_option - mitigation_option)
+    :precondition
+      (and
+        (component_assessment_ready ?secondary_enrollment_record)
+        (component_evidence_attached ?secondary_enrollment_record ?evidence_item)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (recovery_pathway_mitigation_reserved ?recovery_pathway)
+        (secondary_enrollment_mitigation_assigned ?secondary_enrollment_record ?mitigation_option)
+        (not
+          (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (recovery_pathway_selected ?recovery_pathway)
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        (mitigation_option_available ?mitigation_option)
+        (not
+          (secondary_enrollment_mitigation_assigned ?secondary_enrollment_record ?mitigation_option)
+        )
+      )
+  )
+  (:action assemble_administrative_action_package_basic
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?secondary_enrollment_record - secondary_enrollment_record ?schedule_impact_record - schedule_impact_record ?recovery_pathway - recovery_pathway ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (schedule_impact_selected ?schedule_impact_record)
+        (recovery_pathway_selected ?recovery_pathway)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        (administrative_package_token_available ?administrative_action_package)
+      )
+    :effect
+      (and
+        (administrative_package_assembled ?administrative_action_package)
+        (package_includes_schedule_impact ?administrative_action_package ?schedule_impact_record)
+        (package_includes_recovery_pathway ?administrative_action_package ?recovery_pathway)
+        (not
+          (administrative_package_token_available ?administrative_action_package)
+        )
+      )
+  )
+  (:action assemble_administrative_action_package_with_variant_a
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?secondary_enrollment_record - secondary_enrollment_record ?schedule_impact_record - schedule_impact_record ?recovery_pathway - recovery_pathway ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (schedule_impact_mitigation_engaged ?schedule_impact_record)
+        (recovery_pathway_selected ?recovery_pathway)
+        (not
+          (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        )
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        (administrative_package_token_available ?administrative_action_package)
+      )
+    :effect
+      (and
+        (administrative_package_assembled ?administrative_action_package)
+        (package_includes_schedule_impact ?administrative_action_package ?schedule_impact_record)
+        (package_includes_recovery_pathway ?administrative_action_package ?recovery_pathway)
+        (administrative_package_flag_variant_a ?administrative_action_package)
+        (not
+          (administrative_package_token_available ?administrative_action_package)
+        )
+      )
+  )
+  (:action assemble_administrative_action_package_with_variant_b
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?secondary_enrollment_record - secondary_enrollment_record ?schedule_impact_record - schedule_impact_record ?recovery_pathway - recovery_pathway ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (schedule_impact_selected ?schedule_impact_record)
+        (recovery_pathway_mitigation_reserved ?recovery_pathway)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        (not
+          (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        )
+        (administrative_package_token_available ?administrative_action_package)
+      )
+    :effect
+      (and
+        (administrative_package_assembled ?administrative_action_package)
+        (package_includes_schedule_impact ?administrative_action_package ?schedule_impact_record)
+        (package_includes_recovery_pathway ?administrative_action_package ?recovery_pathway)
+        (administrative_package_flag_variant_b ?administrative_action_package)
+        (not
+          (administrative_package_token_available ?administrative_action_package)
+        )
+      )
+  )
+  (:action assemble_administrative_action_package_with_variants_a_and_b
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?secondary_enrollment_record - secondary_enrollment_record ?schedule_impact_record - schedule_impact_record ?recovery_pathway - recovery_pathway ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (primary_enrollment_schedule_impact_link ?primary_enrollment_record ?schedule_impact_record)
+        (secondary_enrollment_recovery_pathway_link ?secondary_enrollment_record ?recovery_pathway)
+        (schedule_impact_mitigation_engaged ?schedule_impact_record)
+        (recovery_pathway_mitigation_reserved ?recovery_pathway)
+        (not
+          (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        )
+        (not
+          (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        )
+        (administrative_package_token_available ?administrative_action_package)
+      )
+    :effect
+      (and
+        (administrative_package_assembled ?administrative_action_package)
+        (package_includes_schedule_impact ?administrative_action_package ?schedule_impact_record)
+        (package_includes_recovery_pathway ?administrative_action_package ?recovery_pathway)
+        (administrative_package_flag_variant_a ?administrative_action_package)
+        (administrative_package_flag_variant_b ?administrative_action_package)
+        (not
+          (administrative_package_token_available ?administrative_action_package)
+        )
+      )
+  )
+  (:action lock_administrative_package_for_fulfillment
+    :parameters (?administrative_action_package - administrative_action_package ?primary_enrollment_record - primary_enrollment_record ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (administrative_package_assembled ?administrative_action_package)
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (component_evidence_attached ?primary_enrollment_record ?evidence_item)
+        (not
+          (administrative_package_locked_for_fulfillment ?administrative_action_package)
+        )
+      )
+    :effect (administrative_package_locked_for_fulfillment ?administrative_action_package)
+  )
+  (:action allocate_curriculum_requirement_to_package
+    :parameters (?case_file - case_file ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (case_file_package_link ?case_file ?administrative_action_package)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_available ?curriculum_requirement)
+        (administrative_package_assembled ?administrative_action_package)
+        (administrative_package_locked_for_fulfillment ?administrative_action_package)
+        (not
+          (curriculum_requirement_allocated ?curriculum_requirement)
+        )
+      )
+    :effect
+      (and
+        (curriculum_requirement_allocated ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (not
+          (curriculum_requirement_available ?curriculum_requirement)
+        )
+      )
+  )
+  (:action verify_curriculum_requirement_link_for_case_file
+    :parameters (?case_file - case_file ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_allocated ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (component_evidence_attached ?case_file ?evidence_item)
+        (not
+          (administrative_package_flag_variant_a ?administrative_action_package)
+        )
+        (not
+          (case_file_requirements_verified ?case_file)
+        )
+      )
+    :effect (case_file_requirements_verified ?case_file)
+  )
+  (:action apply_policy_exception_template_to_case_file
+    :parameters (?case_file - case_file ?policy_exception_template - policy_exception_template)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (policy_exception_template_available ?policy_exception_template)
+        (not
+          (case_file_policy_exception_template_applied ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_policy_exception_template_applied ?case_file)
+        (case_file_exception_template_link ?case_file ?policy_exception_template)
+        (not
+          (policy_exception_template_available ?policy_exception_template)
+        )
+      )
+  )
+  (:action apply_policy_exception_and_prepare_case_file
+    :parameters (?case_file - case_file ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package ?evidence_item - evidence_item ?policy_exception_template - policy_exception_template)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_allocated ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (component_evidence_attached ?case_file ?evidence_item)
+        (administrative_package_flag_variant_a ?administrative_action_package)
+        (case_file_policy_exception_template_applied ?case_file)
+        (case_file_exception_template_link ?case_file ?policy_exception_template)
+        (not
+          (case_file_requirements_verified ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_requirements_verified ?case_file)
+        (case_file_policy_exception_template_consumed ?case_file)
+      )
+  )
+  (:action stage_sanction_adjustment_for_case_file_initial
+    :parameters (?case_file - case_file ?sanction_adjustment - sanction_adjustment ?reviewer_agent_token - reviewer_agent_token ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_requirements_verified ?case_file)
+        (case_file_sanction_adjustment_link ?case_file ?sanction_adjustment)
+        (component_assigned_reviewer ?case_file ?reviewer_agent_token)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (not
+          (administrative_package_flag_variant_b ?administrative_action_package)
+        )
+        (not
+          (case_file_decision_packaging_prepared ?case_file)
+        )
+      )
+    :effect (case_file_decision_packaging_prepared ?case_file)
+  )
+  (:action stage_sanction_adjustment_for_case_file_followup
+    :parameters (?case_file - case_file ?sanction_adjustment - sanction_adjustment ?reviewer_agent_token - reviewer_agent_token ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_requirements_verified ?case_file)
+        (case_file_sanction_adjustment_link ?case_file ?sanction_adjustment)
+        (component_assigned_reviewer ?case_file ?reviewer_agent_token)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (administrative_package_flag_variant_b ?administrative_action_package)
+        (not
+          (case_file_decision_packaging_prepared ?case_file)
+        )
+      )
+    :effect (case_file_decision_packaging_prepared ?case_file)
+  )
+  (:action prepare_case_file_for_decision_basic
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_decision_packaging_prepared ?case_file)
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (not
+          (administrative_package_flag_variant_a ?administrative_action_package)
+        )
+        (not
+          (administrative_package_flag_variant_b ?administrative_action_package)
+        )
+        (not
+          (case_file_decision_ready ?case_file)
+        )
+      )
+    :effect (case_file_decision_ready ?case_file)
+  )
+  (:action prepare_case_file_for_decision_with_support_attachment
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_decision_packaging_prepared ?case_file)
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (administrative_package_flag_variant_a ?administrative_action_package)
+        (not
+          (administrative_package_flag_variant_b ?administrative_action_package)
+        )
+        (not
+          (case_file_decision_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_support_attachment_open ?case_file)
+      )
+  )
+  (:action prepare_case_file_for_decision_with_support_attachment_variant
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_decision_packaging_prepared ?case_file)
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (not
+          (administrative_package_flag_variant_a ?administrative_action_package)
+        )
+        (administrative_package_flag_variant_b ?administrative_action_package)
+        (not
+          (case_file_decision_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_support_attachment_open ?case_file)
+      )
+  )
+  (:action prepare_case_file_for_decision_with_support_attachment_combined
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact ?curriculum_requirement - curriculum_requirement ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (case_file_decision_packaging_prepared ?case_file)
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (case_file_curriculum_requirement_link ?case_file ?curriculum_requirement)
+        (curriculum_requirement_linked_to_package ?curriculum_requirement ?administrative_action_package)
+        (administrative_package_flag_variant_a ?administrative_action_package)
+        (administrative_package_flag_variant_b ?administrative_action_package)
+        (not
+          (case_file_decision_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_support_attachment_open ?case_file)
+      )
+  )
+  (:action finalize_case_file_and_mark_ready_for_restoration
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (case_file_decision_ready ?case_file)
+        (not
+          (case_file_support_attachment_open ?case_file)
+        )
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (component_ready_for_restoration ?case_file)
+      )
+  )
+  (:action attach_support_service_to_case_file
+    :parameters (?case_file - case_file ?support_service - support_service)
+    :precondition
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_support_attachment_open ?case_file)
+        (support_service_available ?support_service)
+      )
+    :effect
+      (and
+        (case_file_support_service_link ?case_file ?support_service)
+        (not
+          (support_service_available ?support_service)
+        )
+      )
+  )
+  (:action verify_case_file_supports_and_requirements
+    :parameters (?case_file - case_file ?primary_enrollment_record - primary_enrollment_record ?secondary_enrollment_record - secondary_enrollment_record ?evidence_item - evidence_item ?support_service - support_service)
+    :precondition
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_support_attachment_open ?case_file)
+        (case_file_support_service_link ?case_file ?support_service)
+        (case_file_primary_enrollment_link ?case_file ?primary_enrollment_record)
+        (case_file_secondary_enrollment_link ?case_file ?secondary_enrollment_record)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        (component_evidence_attached ?case_file ?evidence_item)
+        (not
+          (case_file_supports_verified ?case_file)
+        )
+      )
+    :effect (case_file_supports_verified ?case_file)
+  )
+  (:action finalize_case_file_and_activate_restoration
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (case_file_decision_ready ?case_file)
+        (case_file_supports_verified ?case_file)
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (component_ready_for_restoration ?case_file)
+      )
+  )
+  (:action record_stakeholder_approval_on_case_file
+    :parameters (?case_file - case_file ?stakeholder_approval - stakeholder_approval ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_assessment_ready ?case_file)
+        (component_evidence_attached ?case_file ?evidence_item)
+        (stakeholder_approval_available ?stakeholder_approval)
+        (case_file_stakeholder_approval_link ?case_file ?stakeholder_approval)
+        (not
+          (case_file_stakeholder_approval_recorded ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_stakeholder_approval_recorded ?case_file)
+        (not
+          (stakeholder_approval_available ?stakeholder_approval)
+        )
+      )
+  )
+  (:action initiate_reviewer_followup_after_approval
+    :parameters (?case_file - case_file ?reviewer_agent_token - reviewer_agent_token)
+    :precondition
+      (and
+        (case_file_stakeholder_approval_recorded ?case_file)
+        (component_assigned_reviewer ?case_file ?reviewer_agent_token)
+        (not
+          (case_file_reviewer_followup_initiated ?case_file)
+        )
+      )
+    :effect (case_file_reviewer_followup_initiated ?case_file)
+  )
+  (:action complete_reviewer_followup_and_record
+    :parameters (?case_file - case_file ?final_decision_artifact - final_decision_artifact)
+    :precondition
+      (and
+        (case_file_reviewer_followup_initiated ?case_file)
+        (case_file_final_decision_link ?case_file ?final_decision_artifact)
+        (not
+          (case_file_reviewer_followup_completed ?case_file)
+        )
+      )
+    :effect (case_file_reviewer_followup_completed ?case_file)
+  )
+  (:action finalize_case_file_after_reviewer_followup
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (case_file_reviewer_followup_completed ?case_file)
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (component_ready_for_restoration ?case_file)
+      )
+  )
+  (:action activate_restoration_for_primary_enrollment
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (primary_enrollment_processing_mark ?primary_enrollment_record)
+        (primary_enrollment_ready_for_package ?primary_enrollment_record)
+        (administrative_package_assembled ?administrative_action_package)
+        (administrative_package_locked_for_fulfillment ?administrative_action_package)
+        (not
+          (component_ready_for_restoration ?primary_enrollment_record)
+        )
+      )
+    :effect (component_ready_for_restoration ?primary_enrollment_record)
+  )
+  (:action activate_restoration_for_secondary_enrollment
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?administrative_action_package - administrative_action_package)
+    :precondition
+      (and
+        (secondary_enrollment_processing_mark ?secondary_enrollment_record)
+        (secondary_enrollment_ready_for_package ?secondary_enrollment_record)
+        (administrative_package_assembled ?administrative_action_package)
+        (administrative_package_locked_for_fulfillment ?administrative_action_package)
+        (not
+          (component_ready_for_restoration ?secondary_enrollment_record)
+        )
+      )
+    :effect (component_ready_for_restoration ?secondary_enrollment_record)
+  )
+  (:action ingest_authorization_document_for_component
+    :parameters (?case_component - case_component ?authorization_document - authorization_document ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (component_ready_for_restoration ?case_component)
+        (component_evidence_attached ?case_component ?evidence_item)
+        (authorization_document_available ?authorization_document)
+        (not
+          (component_authorization_received ?case_component)
+        )
+      )
+    :effect
+      (and
+        (component_authorization_received ?case_component)
+        (component_authorization_document_link ?case_component ?authorization_document)
+        (not
+          (authorization_document_available ?authorization_document)
+        )
+      )
+  )
+  (:action enact_administrative_correction_primary_enrollment
+    :parameters (?primary_enrollment_record - primary_enrollment_record ?investigator_availability_token - investigator_availability_token ?authorization_document - authorization_document)
+    :precondition
+      (and
+        (component_authorization_received ?primary_enrollment_record)
+        (component_assigned_investigator ?primary_enrollment_record ?investigator_availability_token)
+        (component_authorization_document_link ?primary_enrollment_record ?authorization_document)
+        (not
+          (component_restoration_applied ?primary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (component_restoration_applied ?primary_enrollment_record)
+        (investigator_token_available ?investigator_availability_token)
+        (authorization_document_available ?authorization_document)
+      )
+  )
+  (:action enact_administrative_correction_secondary_enrollment
+    :parameters (?secondary_enrollment_record - secondary_enrollment_record ?investigator_availability_token - investigator_availability_token ?authorization_document - authorization_document)
+    :precondition
+      (and
+        (component_authorization_received ?secondary_enrollment_record)
+        (component_assigned_investigator ?secondary_enrollment_record ?investigator_availability_token)
+        (component_authorization_document_link ?secondary_enrollment_record ?authorization_document)
+        (not
+          (component_restoration_applied ?secondary_enrollment_record)
+        )
+      )
+    :effect
+      (and
+        (component_restoration_applied ?secondary_enrollment_record)
+        (investigator_token_available ?investigator_availability_token)
+        (authorization_document_available ?authorization_document)
+      )
+  )
+  (:action enact_administrative_correction_case_file
+    :parameters (?case_file - case_file ?investigator_availability_token - investigator_availability_token ?authorization_document - authorization_document)
+    :precondition
+      (and
+        (component_authorization_received ?case_file)
+        (component_assigned_investigator ?case_file ?investigator_availability_token)
+        (component_authorization_document_link ?case_file ?authorization_document)
+        (not
+          (component_restoration_applied ?case_file)
+        )
+      )
+    :effect
+      (and
+        (component_restoration_applied ?case_file)
+        (investigator_token_available ?investigator_availability_token)
+        (authorization_document_available ?authorization_document)
+      )
+  )
+)

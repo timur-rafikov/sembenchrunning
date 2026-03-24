@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cumulative_gpa_improvement_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types institutional_entity - object assessment_category - object resource_category - object academic_case_base - object academic_entity - academic_case_base administrative_resource - institutional_entity assessment_event - institutional_entity advisor_faculty - institutional_entity endorsement_token - institutional_entity allocated_resource_slot - institutional_entity intervention_trigger - institutional_entity administrative_action_form - institutional_entity escalation_notice - institutional_entity support_service - assessment_category support_evidence_document - assessment_category approval_certificate - assessment_category assessment_opportunity_undergrad - resource_category assessment_opportunity_continuing - resource_category recovery_attempt_record - resource_category student_group - academic_entity profile_group - academic_entity undergraduate_student - student_group continuing_student - student_group student_profile - profile_group)
+  (:predicates
+    (case_initiated ?academic_entity - academic_entity)
+    (remediation_authorized ?academic_entity - academic_entity)
+    (resource_assigned ?academic_entity - academic_entity)
+    (case_closed ?academic_entity - academic_entity)
+    (eligible_for_record_update ?academic_entity - academic_entity)
+    (gpa_update_requested ?academic_entity - academic_entity)
+    (admin_resource_available ?admin_resource - administrative_resource)
+    (resource_assigned_to ?academic_entity - academic_entity ?admin_resource - administrative_resource)
+    (assessment_event_available ?assessment_event - assessment_event)
+    (scheduled_assessment_for ?academic_entity - academic_entity ?assessment_event - assessment_event)
+    (advisor_available ?advisor - advisor_faculty)
+    (advisor_assigned_to ?academic_entity - academic_entity ?advisor - advisor_faculty)
+    (support_service_available ?support_service - support_service)
+    (support_service_attached_to_undergrad ?undergraduate_student - undergraduate_student ?support_service - support_service)
+    (support_service_attached_to_continuing_student ?continuing_student - continuing_student ?support_service - support_service)
+    (has_assessment_opportunity_undergrad ?undergraduate_student - undergraduate_student ?opportunity_a - assessment_opportunity_undergrad)
+    (opportunity_undergrad_confirmed ?opportunity_a - assessment_opportunity_undergrad)
+    (opportunity_undergrad_support_engaged ?opportunity_a - assessment_opportunity_undergrad)
+    (undergrad_ready_for_remediation ?undergraduate_student - undergraduate_student)
+    (has_assessment_opportunity_continuing ?continuing_student - continuing_student ?opportunity_b - assessment_opportunity_continuing)
+    (opportunity_continuing_confirmed ?opportunity_b - assessment_opportunity_continuing)
+    (opportunity_continuing_support_engaged ?opportunity_b - assessment_opportunity_continuing)
+    (continuing_ready_for_remediation ?continuing_student - continuing_student)
+    (recovery_record_slot_available ?recovery_attempt - recovery_attempt_record)
+    (recovery_attempt_record_created ?recovery_attempt - recovery_attempt_record)
+    (record_linked_to_opportunity_a ?recovery_attempt - recovery_attempt_record ?opportunity_a - assessment_opportunity_undergrad)
+    (record_linked_to_opportunity_b ?recovery_attempt - recovery_attempt_record ?opportunity_b - assessment_opportunity_continuing)
+    (record_requires_endorsement ?recovery_attempt - recovery_attempt_record)
+    (record_requires_administrative_review ?recovery_attempt - recovery_attempt_record)
+    (recovery_attempt_executed ?recovery_attempt - recovery_attempt_record)
+    (profile_linked_to_undergraduate ?student_profile - student_profile ?undergraduate_student - undergraduate_student)
+    (profile_linked_to_continuing_student ?student_profile - student_profile ?continuing_student - continuing_student)
+    (profile_linked_to_recovery_record ?student_profile - student_profile ?recovery_attempt - recovery_attempt_record)
+    (evidence_document_available ?evidence_document - support_evidence_document)
+    (profile_has_evidence_document ?student_profile - student_profile ?evidence_document - support_evidence_document)
+    (evidence_document_attached ?evidence_document - support_evidence_document)
+    (evidence_document_linked_to_record ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    (profile_ready_for_evidence_review ?student_profile - student_profile)
+    (evidence_review_completed_for_profile ?student_profile - student_profile)
+    (assessment_result_verified ?student_profile - student_profile)
+    (profile_has_endorsement ?student_profile - student_profile)
+    (endorsement_applied ?student_profile - student_profile)
+    (administrative_approval_recorded ?student_profile - student_profile)
+    (final_approval_granted ?student_profile - student_profile)
+    (approval_certificate_available ?approval_certificate - approval_certificate)
+    (profile_linked_to_approval_certificate ?student_profile - student_profile ?approval_certificate - approval_certificate)
+    (approval_requested_on_profile ?student_profile - student_profile)
+    (approval_in_process ?student_profile - student_profile)
+    (approval_granted ?student_profile - student_profile)
+    (endorsement_token_available ?endorsement_token - endorsement_token)
+    (profile_linked_to_endorsement_token ?student_profile - student_profile ?endorsement_token - endorsement_token)
+    (resource_slot_available ?resource_slot - allocated_resource_slot)
+    (profile_allocated_resource_slot ?student_profile - student_profile ?resource_slot - allocated_resource_slot)
+    (admin_action_form_available ?admin_action_form - administrative_action_form)
+    (profile_linked_to_admin_form ?student_profile - student_profile ?admin_action_form - administrative_action_form)
+    (escalation_notice_available ?escalation_notice - escalation_notice)
+    (profile_linked_to_escalation_notice ?student_profile - student_profile ?escalation_notice - escalation_notice)
+    (intervention_trigger_available ?intervention_trigger - intervention_trigger)
+    (intervention_trigger_assigned_to ?academic_entity - academic_entity ?intervention_trigger - intervention_trigger)
+    (undergrad_prepared ?undergraduate_student - undergraduate_student)
+    (continuing_prepared ?continuing_student - continuing_student)
+    (profile_update_committed ?student_profile - student_profile)
+  )
+  (:action initiate_academic_case
+    :parameters (?academic_entity - academic_entity)
+    :precondition
+      (and
+        (not
+          (case_initiated ?academic_entity)
+        )
+        (not
+          (case_closed ?academic_entity)
+        )
+      )
+    :effect (case_initiated ?academic_entity)
+  )
+  (:action assign_admin_resource
+    :parameters (?academic_entity - academic_entity ?admin_resource - administrative_resource)
+    :precondition
+      (and
+        (case_initiated ?academic_entity)
+        (not
+          (resource_assigned ?academic_entity)
+        )
+        (admin_resource_available ?admin_resource)
+      )
+    :effect
+      (and
+        (resource_assigned ?academic_entity)
+        (resource_assigned_to ?academic_entity ?admin_resource)
+        (not
+          (admin_resource_available ?admin_resource)
+        )
+      )
+  )
+  (:action schedule_assessment_event
+    :parameters (?academic_entity - academic_entity ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (case_initiated ?academic_entity)
+        (resource_assigned ?academic_entity)
+        (assessment_event_available ?assessment_event)
+      )
+    :effect
+      (and
+        (scheduled_assessment_for ?academic_entity ?assessment_event)
+        (not
+          (assessment_event_available ?assessment_event)
+        )
+      )
+  )
+  (:action confirm_assessment_eligibility
+    :parameters (?academic_entity - academic_entity ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (case_initiated ?academic_entity)
+        (resource_assigned ?academic_entity)
+        (scheduled_assessment_for ?academic_entity ?assessment_event)
+        (not
+          (remediation_authorized ?academic_entity)
+        )
+      )
+    :effect (remediation_authorized ?academic_entity)
+  )
+  (:action release_assessment_event
+    :parameters (?academic_entity - academic_entity ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (scheduled_assessment_for ?academic_entity ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_event_available ?assessment_event)
+        (not
+          (scheduled_assessment_for ?academic_entity ?assessment_event)
+        )
+      )
+  )
+  (:action assign_advisor
+    :parameters (?academic_entity - academic_entity ?advisor - advisor_faculty)
+    :precondition
+      (and
+        (remediation_authorized ?academic_entity)
+        (advisor_available ?advisor)
+      )
+    :effect
+      (and
+        (advisor_assigned_to ?academic_entity ?advisor)
+        (not
+          (advisor_available ?advisor)
+        )
+      )
+  )
+  (:action remove_advisor
+    :parameters (?academic_entity - academic_entity ?advisor - advisor_faculty)
+    :precondition
+      (and
+        (advisor_assigned_to ?academic_entity ?advisor)
+      )
+    :effect
+      (and
+        (advisor_available ?advisor)
+        (not
+          (advisor_assigned_to ?academic_entity ?advisor)
+        )
+      )
+  )
+  (:action attach_admin_form_to_profile
+    :parameters (?student_profile - student_profile ?admin_action_form - administrative_action_form)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (admin_action_form_available ?admin_action_form)
+      )
+    :effect
+      (and
+        (profile_linked_to_admin_form ?student_profile ?admin_action_form)
+        (not
+          (admin_action_form_available ?admin_action_form)
+        )
+      )
+  )
+  (:action detach_admin_form_from_profile
+    :parameters (?student_profile - student_profile ?admin_action_form - administrative_action_form)
+    :precondition
+      (and
+        (profile_linked_to_admin_form ?student_profile ?admin_action_form)
+      )
+    :effect
+      (and
+        (admin_action_form_available ?admin_action_form)
+        (not
+          (profile_linked_to_admin_form ?student_profile ?admin_action_form)
+        )
+      )
+  )
+  (:action attach_escalation_notice_to_profile
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (escalation_notice_available ?escalation_notice)
+      )
+    :effect
+      (and
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (not
+          (escalation_notice_available ?escalation_notice)
+        )
+      )
+  )
+  (:action detach_escalation_notice_from_profile
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice)
+    :precondition
+      (and
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+      )
+    :effect
+      (and
+        (escalation_notice_available ?escalation_notice)
+        (not
+          (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        )
+      )
+  )
+  (:action prepare_undergrad_opportunity_a
+    :parameters (?undergraduate_student - undergraduate_student ?opportunity_a - assessment_opportunity_undergrad ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (remediation_authorized ?undergraduate_student)
+        (scheduled_assessment_for ?undergraduate_student ?assessment_event)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (not
+          (opportunity_undergrad_confirmed ?opportunity_a)
+        )
+        (not
+          (opportunity_undergrad_support_engaged ?opportunity_a)
+        )
+      )
+    :effect (opportunity_undergrad_confirmed ?opportunity_a)
+  )
+  (:action authorize_undergrad_intervention
+    :parameters (?undergraduate_student - undergraduate_student ?opportunity_a - assessment_opportunity_undergrad ?advisor - advisor_faculty)
+    :precondition
+      (and
+        (remediation_authorized ?undergraduate_student)
+        (advisor_assigned_to ?undergraduate_student ?advisor)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (opportunity_undergrad_confirmed ?opportunity_a)
+        (not
+          (undergrad_prepared ?undergraduate_student)
+        )
+      )
+    :effect
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+      )
+  )
+  (:action allocate_support_service_to_undergrad_opportunity
+    :parameters (?undergraduate_student - undergraduate_student ?opportunity_a - assessment_opportunity_undergrad ?support_service - support_service)
+    :precondition
+      (and
+        (remediation_authorized ?undergraduate_student)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (support_service_available ?support_service)
+        (not
+          (undergrad_prepared ?undergraduate_student)
+        )
+      )
+    :effect
+      (and
+        (opportunity_undergrad_support_engaged ?opportunity_a)
+        (undergrad_prepared ?undergraduate_student)
+        (support_service_attached_to_undergrad ?undergraduate_student ?support_service)
+        (not
+          (support_service_available ?support_service)
+        )
+      )
+  )
+  (:action finalize_undergrad_intervention_preparation
+    :parameters (?undergraduate_student - undergraduate_student ?opportunity_a - assessment_opportunity_undergrad ?assessment_event - assessment_event ?support_service - support_service)
+    :precondition
+      (and
+        (remediation_authorized ?undergraduate_student)
+        (scheduled_assessment_for ?undergraduate_student ?assessment_event)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (opportunity_undergrad_support_engaged ?opportunity_a)
+        (support_service_attached_to_undergrad ?undergraduate_student ?support_service)
+        (not
+          (undergrad_ready_for_remediation ?undergraduate_student)
+        )
+      )
+    :effect
+      (and
+        (opportunity_undergrad_confirmed ?opportunity_a)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+        (support_service_available ?support_service)
+        (not
+          (support_service_attached_to_undergrad ?undergraduate_student ?support_service)
+        )
+      )
+  )
+  (:action prepare_continuing_opportunity_b
+    :parameters (?continuing_student - continuing_student ?opportunity_b - assessment_opportunity_continuing ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (remediation_authorized ?continuing_student)
+        (scheduled_assessment_for ?continuing_student ?assessment_event)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (not
+          (opportunity_continuing_confirmed ?opportunity_b)
+        )
+        (not
+          (opportunity_continuing_support_engaged ?opportunity_b)
+        )
+      )
+    :effect (opportunity_continuing_confirmed ?opportunity_b)
+  )
+  (:action authorize_continuing_intervention
+    :parameters (?continuing_student - continuing_student ?opportunity_b - assessment_opportunity_continuing ?advisor - advisor_faculty)
+    :precondition
+      (and
+        (remediation_authorized ?continuing_student)
+        (advisor_assigned_to ?continuing_student ?advisor)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_continuing_confirmed ?opportunity_b)
+        (not
+          (continuing_prepared ?continuing_student)
+        )
+      )
+    :effect
+      (and
+        (continuing_prepared ?continuing_student)
+        (continuing_ready_for_remediation ?continuing_student)
+      )
+  )
+  (:action allocate_support_service_to_continuing_opportunity
+    :parameters (?continuing_student - continuing_student ?opportunity_b - assessment_opportunity_continuing ?support_service - support_service)
+    :precondition
+      (and
+        (remediation_authorized ?continuing_student)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (support_service_available ?support_service)
+        (not
+          (continuing_prepared ?continuing_student)
+        )
+      )
+    :effect
+      (and
+        (opportunity_continuing_support_engaged ?opportunity_b)
+        (continuing_prepared ?continuing_student)
+        (support_service_attached_to_continuing_student ?continuing_student ?support_service)
+        (not
+          (support_service_available ?support_service)
+        )
+      )
+  )
+  (:action finalize_continuing_intervention_preparation
+    :parameters (?continuing_student - continuing_student ?opportunity_b - assessment_opportunity_continuing ?assessment_event - assessment_event ?support_service - support_service)
+    :precondition
+      (and
+        (remediation_authorized ?continuing_student)
+        (scheduled_assessment_for ?continuing_student ?assessment_event)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_continuing_support_engaged ?opportunity_b)
+        (support_service_attached_to_continuing_student ?continuing_student ?support_service)
+        (not
+          (continuing_ready_for_remediation ?continuing_student)
+        )
+      )
+    :effect
+      (and
+        (opportunity_continuing_confirmed ?opportunity_b)
+        (continuing_ready_for_remediation ?continuing_student)
+        (support_service_available ?support_service)
+        (not
+          (support_service_attached_to_continuing_student ?continuing_student ?support_service)
+        )
+      )
+  )
+  (:action consolidate_recovery_request_standard
+    :parameters (?undergraduate_student - undergraduate_student ?continuing_student - continuing_student ?opportunity_a - assessment_opportunity_undergrad ?opportunity_b - assessment_opportunity_continuing ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (continuing_prepared ?continuing_student)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_undergrad_confirmed ?opportunity_a)
+        (opportunity_continuing_confirmed ?opportunity_b)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+        (continuing_ready_for_remediation ?continuing_student)
+        (recovery_record_slot_available ?recovery_attempt)
+      )
+    :effect
+      (and
+        (recovery_attempt_record_created ?recovery_attempt)
+        (record_linked_to_opportunity_a ?recovery_attempt ?opportunity_a)
+        (record_linked_to_opportunity_b ?recovery_attempt ?opportunity_b)
+        (not
+          (recovery_record_slot_available ?recovery_attempt)
+        )
+      )
+  )
+  (:action consolidate_recovery_request_requires_endorsement
+    :parameters (?undergraduate_student - undergraduate_student ?continuing_student - continuing_student ?opportunity_a - assessment_opportunity_undergrad ?opportunity_b - assessment_opportunity_continuing ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (continuing_prepared ?continuing_student)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_undergrad_support_engaged ?opportunity_a)
+        (opportunity_continuing_confirmed ?opportunity_b)
+        (not
+          (undergrad_ready_for_remediation ?undergraduate_student)
+        )
+        (continuing_ready_for_remediation ?continuing_student)
+        (recovery_record_slot_available ?recovery_attempt)
+      )
+    :effect
+      (and
+        (recovery_attempt_record_created ?recovery_attempt)
+        (record_linked_to_opportunity_a ?recovery_attempt ?opportunity_a)
+        (record_linked_to_opportunity_b ?recovery_attempt ?opportunity_b)
+        (record_requires_endorsement ?recovery_attempt)
+        (not
+          (recovery_record_slot_available ?recovery_attempt)
+        )
+      )
+  )
+  (:action consolidate_recovery_request_requires_administrative_review
+    :parameters (?undergraduate_student - undergraduate_student ?continuing_student - continuing_student ?opportunity_a - assessment_opportunity_undergrad ?opportunity_b - assessment_opportunity_continuing ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (continuing_prepared ?continuing_student)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_undergrad_confirmed ?opportunity_a)
+        (opportunity_continuing_support_engaged ?opportunity_b)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+        (not
+          (continuing_ready_for_remediation ?continuing_student)
+        )
+        (recovery_record_slot_available ?recovery_attempt)
+      )
+    :effect
+      (and
+        (recovery_attempt_record_created ?recovery_attempt)
+        (record_linked_to_opportunity_a ?recovery_attempt ?opportunity_a)
+        (record_linked_to_opportunity_b ?recovery_attempt ?opportunity_b)
+        (record_requires_administrative_review ?recovery_attempt)
+        (not
+          (recovery_record_slot_available ?recovery_attempt)
+        )
+      )
+  )
+  (:action consolidate_recovery_request_requires_endorsement_and_admin_review
+    :parameters (?undergraduate_student - undergraduate_student ?continuing_student - continuing_student ?opportunity_a - assessment_opportunity_undergrad ?opportunity_b - assessment_opportunity_continuing ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (continuing_prepared ?continuing_student)
+        (has_assessment_opportunity_undergrad ?undergraduate_student ?opportunity_a)
+        (has_assessment_opportunity_continuing ?continuing_student ?opportunity_b)
+        (opportunity_undergrad_support_engaged ?opportunity_a)
+        (opportunity_continuing_support_engaged ?opportunity_b)
+        (not
+          (undergrad_ready_for_remediation ?undergraduate_student)
+        )
+        (not
+          (continuing_ready_for_remediation ?continuing_student)
+        )
+        (recovery_record_slot_available ?recovery_attempt)
+      )
+    :effect
+      (and
+        (recovery_attempt_record_created ?recovery_attempt)
+        (record_linked_to_opportunity_a ?recovery_attempt ?opportunity_a)
+        (record_linked_to_opportunity_b ?recovery_attempt ?opportunity_b)
+        (record_requires_endorsement ?recovery_attempt)
+        (record_requires_administrative_review ?recovery_attempt)
+        (not
+          (recovery_record_slot_available ?recovery_attempt)
+        )
+      )
+  )
+  (:action mark_recovery_attempt_executed
+    :parameters (?recovery_attempt - recovery_attempt_record ?undergraduate_student - undergraduate_student ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (recovery_attempt_record_created ?recovery_attempt)
+        (undergrad_prepared ?undergraduate_student)
+        (scheduled_assessment_for ?undergraduate_student ?assessment_event)
+        (not
+          (recovery_attempt_executed ?recovery_attempt)
+        )
+      )
+    :effect (recovery_attempt_executed ?recovery_attempt)
+  )
+  (:action attach_evidence_document_to_record
+    :parameters (?student_profile - student_profile ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (profile_linked_to_recovery_record ?student_profile ?recovery_attempt)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_available ?evidence_document)
+        (recovery_attempt_record_created ?recovery_attempt)
+        (recovery_attempt_executed ?recovery_attempt)
+        (not
+          (evidence_document_attached ?evidence_document)
+        )
+      )
+    :effect
+      (and
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action authorize_evidence_review_for_profile
+    :parameters (?student_profile - student_profile ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (scheduled_assessment_for ?student_profile ?assessment_event)
+        (not
+          (record_requires_endorsement ?recovery_attempt)
+        )
+        (not
+          (profile_ready_for_evidence_review ?student_profile)
+        )
+      )
+    :effect (profile_ready_for_evidence_review ?student_profile)
+  )
+  (:action assign_endorsement_token_to_profile
+    :parameters (?student_profile - student_profile ?endorsement_token - endorsement_token)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (endorsement_token_available ?endorsement_token)
+        (not
+          (profile_has_endorsement ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_has_endorsement ?student_profile)
+        (profile_linked_to_endorsement_token ?student_profile ?endorsement_token)
+        (not
+          (endorsement_token_available ?endorsement_token)
+        )
+      )
+  )
+  (:action authorize_evidence_review_with_endorsement
+    :parameters (?student_profile - student_profile ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record ?assessment_event - assessment_event ?endorsement_token - endorsement_token)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (scheduled_assessment_for ?student_profile ?assessment_event)
+        (record_requires_endorsement ?recovery_attempt)
+        (profile_has_endorsement ?student_profile)
+        (profile_linked_to_endorsement_token ?student_profile ?endorsement_token)
+        (not
+          (profile_ready_for_evidence_review ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_evidence_review ?student_profile)
+        (endorsement_applied ?student_profile)
+      )
+  )
+  (:action complete_evidence_review_standard
+    :parameters (?student_profile - student_profile ?admin_action_form - administrative_action_form ?advisor - advisor_faculty ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (profile_ready_for_evidence_review ?student_profile)
+        (profile_linked_to_admin_form ?student_profile ?admin_action_form)
+        (advisor_assigned_to ?student_profile ?advisor)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (not
+          (record_requires_administrative_review ?recovery_attempt)
+        )
+        (not
+          (evidence_review_completed_for_profile ?student_profile)
+        )
+      )
+    :effect (evidence_review_completed_for_profile ?student_profile)
+  )
+  (:action complete_evidence_review_administrative
+    :parameters (?student_profile - student_profile ?admin_action_form - administrative_action_form ?advisor - advisor_faculty ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (profile_ready_for_evidence_review ?student_profile)
+        (profile_linked_to_admin_form ?student_profile ?admin_action_form)
+        (advisor_assigned_to ?student_profile ?advisor)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (record_requires_administrative_review ?recovery_attempt)
+        (not
+          (evidence_review_completed_for_profile ?student_profile)
+        )
+      )
+    :effect (evidence_review_completed_for_profile ?student_profile)
+  )
+  (:action finalize_assessment_result_escalation
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (evidence_review_completed_for_profile ?student_profile)
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (not
+          (record_requires_endorsement ?recovery_attempt)
+        )
+        (not
+          (record_requires_administrative_review ?recovery_attempt)
+        )
+        (not
+          (assessment_result_verified ?student_profile)
+        )
+      )
+    :effect (assessment_result_verified ?student_profile)
+  )
+  (:action finalize_assessment_result_endorsement
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (evidence_review_completed_for_profile ?student_profile)
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (record_requires_endorsement ?recovery_attempt)
+        (not
+          (record_requires_administrative_review ?recovery_attempt)
+        )
+        (not
+          (assessment_result_verified ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (assessment_result_verified ?student_profile)
+        (administrative_approval_recorded ?student_profile)
+      )
+  )
+  (:action finalize_assessment_result_admin_review
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (evidence_review_completed_for_profile ?student_profile)
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (not
+          (record_requires_endorsement ?recovery_attempt)
+        )
+        (record_requires_administrative_review ?recovery_attempt)
+        (not
+          (assessment_result_verified ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (assessment_result_verified ?student_profile)
+        (administrative_approval_recorded ?student_profile)
+      )
+  )
+  (:action finalize_assessment_result_endorsement_and_admin_review
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice ?evidence_document - support_evidence_document ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (evidence_review_completed_for_profile ?student_profile)
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (profile_has_evidence_document ?student_profile ?evidence_document)
+        (evidence_document_linked_to_record ?evidence_document ?recovery_attempt)
+        (record_requires_endorsement ?recovery_attempt)
+        (record_requires_administrative_review ?recovery_attempt)
+        (not
+          (assessment_result_verified ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (assessment_result_verified ?student_profile)
+        (administrative_approval_recorded ?student_profile)
+      )
+  )
+  (:action prepare_profile_for_record_update
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (assessment_result_verified ?student_profile)
+        (not
+          (administrative_approval_recorded ?student_profile)
+        )
+        (not
+          (profile_update_committed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_update_committed ?student_profile)
+        (eligible_for_record_update ?student_profile)
+      )
+  )
+  (:action assign_resource_slot_to_profile
+    :parameters (?student_profile - student_profile ?resource_slot - allocated_resource_slot)
+    :precondition
+      (and
+        (assessment_result_verified ?student_profile)
+        (administrative_approval_recorded ?student_profile)
+        (resource_slot_available ?resource_slot)
+      )
+    :effect
+      (and
+        (profile_allocated_resource_slot ?student_profile ?resource_slot)
+        (not
+          (resource_slot_available ?resource_slot)
+        )
+      )
+  )
+  (:action grant_final_approval_for_profile
+    :parameters (?student_profile - student_profile ?undergraduate_student - undergraduate_student ?continuing_student - continuing_student ?assessment_event - assessment_event ?resource_slot - allocated_resource_slot)
+    :precondition
+      (and
+        (assessment_result_verified ?student_profile)
+        (administrative_approval_recorded ?student_profile)
+        (profile_allocated_resource_slot ?student_profile ?resource_slot)
+        (profile_linked_to_undergraduate ?student_profile ?undergraduate_student)
+        (profile_linked_to_continuing_student ?student_profile ?continuing_student)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+        (continuing_ready_for_remediation ?continuing_student)
+        (scheduled_assessment_for ?student_profile ?assessment_event)
+        (not
+          (final_approval_granted ?student_profile)
+        )
+      )
+    :effect (final_approval_granted ?student_profile)
+  )
+  (:action commit_profile_update_after_final_approval
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (assessment_result_verified ?student_profile)
+        (final_approval_granted ?student_profile)
+        (not
+          (profile_update_committed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_update_committed ?student_profile)
+        (eligible_for_record_update ?student_profile)
+      )
+  )
+  (:action request_approval_certificate_for_profile
+    :parameters (?student_profile - student_profile ?approval_certificate - approval_certificate ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (remediation_authorized ?student_profile)
+        (scheduled_assessment_for ?student_profile ?assessment_event)
+        (approval_certificate_available ?approval_certificate)
+        (profile_linked_to_approval_certificate ?student_profile ?approval_certificate)
+        (not
+          (approval_requested_on_profile ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (approval_requested_on_profile ?student_profile)
+        (not
+          (approval_certificate_available ?approval_certificate)
+        )
+      )
+  )
+  (:action initiate_profile_approval_with_advisor
+    :parameters (?student_profile - student_profile ?advisor - advisor_faculty)
+    :precondition
+      (and
+        (approval_requested_on_profile ?student_profile)
+        (advisor_assigned_to ?student_profile ?advisor)
+        (not
+          (approval_in_process ?student_profile)
+        )
+      )
+    :effect (approval_in_process ?student_profile)
+  )
+  (:action grant_profile_approval_with_escalation_notice
+    :parameters (?student_profile - student_profile ?escalation_notice - escalation_notice)
+    :precondition
+      (and
+        (approval_in_process ?student_profile)
+        (profile_linked_to_escalation_notice ?student_profile ?escalation_notice)
+        (not
+          (approval_granted ?student_profile)
+        )
+      )
+    :effect (approval_granted ?student_profile)
+  )
+  (:action commit_profile_update_after_approval
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (approval_granted ?student_profile)
+        (not
+          (profile_update_committed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_update_committed ?student_profile)
+        (eligible_for_record_update ?student_profile)
+      )
+  )
+  (:action apply_recovery_attempt_outcome_for_undergrad
+    :parameters (?undergraduate_student - undergraduate_student ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (undergrad_prepared ?undergraduate_student)
+        (undergrad_ready_for_remediation ?undergraduate_student)
+        (recovery_attempt_record_created ?recovery_attempt)
+        (recovery_attempt_executed ?recovery_attempt)
+        (not
+          (eligible_for_record_update ?undergraduate_student)
+        )
+      )
+    :effect (eligible_for_record_update ?undergraduate_student)
+  )
+  (:action apply_recovery_attempt_outcome_for_continuing_student
+    :parameters (?continuing_student - continuing_student ?recovery_attempt - recovery_attempt_record)
+    :precondition
+      (and
+        (continuing_prepared ?continuing_student)
+        (continuing_ready_for_remediation ?continuing_student)
+        (recovery_attempt_record_created ?recovery_attempt)
+        (recovery_attempt_executed ?recovery_attempt)
+        (not
+          (eligible_for_record_update ?continuing_student)
+        )
+      )
+    :effect (eligible_for_record_update ?continuing_student)
+  )
+  (:action initiate_gpa_update_request
+    :parameters (?academic_entity - academic_entity ?intervention_trigger - intervention_trigger ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (eligible_for_record_update ?academic_entity)
+        (scheduled_assessment_for ?academic_entity ?assessment_event)
+        (intervention_trigger_available ?intervention_trigger)
+        (not
+          (gpa_update_requested ?academic_entity)
+        )
+      )
+    :effect
+      (and
+        (gpa_update_requested ?academic_entity)
+        (intervention_trigger_assigned_to ?academic_entity ?intervention_trigger)
+        (not
+          (intervention_trigger_available ?intervention_trigger)
+        )
+      )
+  )
+  (:action finalize_gpa_update_for_undergrad
+    :parameters (?undergraduate_student - undergraduate_student ?admin_resource - administrative_resource ?intervention_trigger - intervention_trigger)
+    :precondition
+      (and
+        (gpa_update_requested ?undergraduate_student)
+        (resource_assigned_to ?undergraduate_student ?admin_resource)
+        (intervention_trigger_assigned_to ?undergraduate_student ?intervention_trigger)
+        (not
+          (case_closed ?undergraduate_student)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?undergraduate_student)
+        (admin_resource_available ?admin_resource)
+        (intervention_trigger_available ?intervention_trigger)
+      )
+  )
+  (:action finalize_gpa_update_for_continuing_student
+    :parameters (?continuing_student - continuing_student ?admin_resource - administrative_resource ?intervention_trigger - intervention_trigger)
+    :precondition
+      (and
+        (gpa_update_requested ?continuing_student)
+        (resource_assigned_to ?continuing_student ?admin_resource)
+        (intervention_trigger_assigned_to ?continuing_student ?intervention_trigger)
+        (not
+          (case_closed ?continuing_student)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?continuing_student)
+        (admin_resource_available ?admin_resource)
+        (intervention_trigger_available ?intervention_trigger)
+      )
+  )
+  (:action finalize_gpa_update_for_profile
+    :parameters (?student_profile - student_profile ?admin_resource - administrative_resource ?intervention_trigger - intervention_trigger)
+    :precondition
+      (and
+        (gpa_update_requested ?student_profile)
+        (resource_assigned_to ?student_profile ?admin_resource)
+        (intervention_trigger_assigned_to ?student_profile ?intervention_trigger)
+        (not
+          (case_closed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?student_profile)
+        (admin_resource_available ?admin_resource)
+        (intervention_trigger_available ?intervention_trigger)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem student_gpa_improvement_problem_instance)
+  (:domain cumulative_gpa_improvement_planning_domain)
+  (:objects undergraduate_student_1 - undergraduate_student continuing_student_1 - continuing_student student_profile_1 - student_profile student_profile_2 - student_profile admin_resource_1 - administrative_resource admin_resource_2 - administrative_resource admin_resource_3 - administrative_resource assessment_event_1 - assessment_event advisor_faculty_1 - advisor_faculty support_service_1 - support_service opportunity_a_1 - assessment_opportunity_undergrad opportunity_b_1 - assessment_opportunity_continuing recovery_attempt_record_1 - recovery_attempt_record evidence_doc_1 - support_evidence_document evidence_doc_2 - support_evidence_document endorsement_token_1 - endorsement_token endorsement_token_2 - endorsement_token resource_slot_1 - allocated_resource_slot resource_slot_2 - allocated_resource_slot intervention_trigger_1 - intervention_trigger admin_action_form_1 - administrative_action_form approval_certificate_1 - approval_certificate approval_certificate_2 - approval_certificate escalation_notice_1 - escalation_notice)
+  (:init
+    (admin_resource_available admin_resource_1)
+    (admin_resource_available admin_resource_2)
+    (admin_resource_available admin_resource_3)
+    (assessment_event_available assessment_event_1)
+    (advisor_available advisor_faculty_1)
+    (support_service_available support_service_1)
+    (has_assessment_opportunity_undergrad undergraduate_student_1 opportunity_a_1)
+    (has_assessment_opportunity_continuing continuing_student_1 opportunity_b_1)
+    (recovery_record_slot_available recovery_attempt_record_1)
+    (evidence_document_available evidence_doc_1)
+    (evidence_document_available evidence_doc_2)
+    (profile_linked_to_undergraduate student_profile_1 undergraduate_student_1)
+    (profile_linked_to_undergraduate student_profile_2 undergraduate_student_1)
+    (profile_linked_to_continuing_student student_profile_1 continuing_student_1)
+    (profile_linked_to_continuing_student student_profile_2 continuing_student_1)
+    (profile_linked_to_recovery_record student_profile_1 recovery_attempt_record_1)
+    (profile_linked_to_recovery_record student_profile_2 recovery_attempt_record_1)
+    (profile_has_evidence_document student_profile_1 evidence_doc_1)
+    (profile_has_evidence_document student_profile_2 evidence_doc_2)
+    (endorsement_token_available endorsement_token_1)
+    (endorsement_token_available endorsement_token_2)
+    (resource_slot_available resource_slot_1)
+    (resource_slot_available resource_slot_2)
+    (intervention_trigger_available intervention_trigger_1)
+    (admin_action_form_available admin_action_form_1)
+    (approval_certificate_available approval_certificate_1)
+    (profile_linked_to_approval_certificate student_profile_1 approval_certificate_1)
+    (profile_linked_to_approval_certificate student_profile_2 approval_certificate_2)
+    (escalation_notice_available escalation_notice_1)
+  )
+  (:goal
+    (and
+      (case_closed undergraduate_student_1)
+      (case_closed continuing_student_1)
+      (case_closed student_profile_1)
+      (case_closed student_profile_2)
+    )
+  )
+)

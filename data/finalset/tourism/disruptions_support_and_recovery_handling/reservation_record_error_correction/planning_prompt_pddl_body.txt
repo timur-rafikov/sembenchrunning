@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain reservation_record_error_correction)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_group - object communication_group - object resource_group - object record_type - object reservation_record - record_type support_resource - entity_group verification_event - entity_group partner_contact - entity_group policy - entity_group approval_token - entity_group payment_instrument - entity_group refund_offer - entity_group compliance_check - entity_group evidence_document - communication_group documentation_package - communication_group escalation_contact - communication_group resolution_path - resource_group compensation_path - resource_group repair_proposal - resource_group booking_group - reservation_record booking_subgroup - reservation_record primary_booking_item - booking_group secondary_booking_item - booking_group correction_case - booking_subgroup)
+  (:predicates
+    (entity_error_reported ?reservation_record - reservation_record)
+    (entity_verification_completed ?reservation_record - reservation_record)
+    (entity_support_resource_assigned_flag ?reservation_record - reservation_record)
+    (entity_correction_applied ?reservation_record - reservation_record)
+    (entity_ready_for_execution ?reservation_record - reservation_record)
+    (entity_settlement_authorized ?reservation_record - reservation_record)
+    (support_resource_available ?support_resource - support_resource)
+    (entity_support_resource_assigned_to ?reservation_record - reservation_record ?support_resource - support_resource)
+    (verification_event_available ?verification_event - verification_event)
+    (entity_has_verification_event ?reservation_record - reservation_record ?verification_event - verification_event)
+    (partner_contact_available ?partner_contact - partner_contact)
+    (entity_assigned_partner_contact ?reservation_record - reservation_record ?partner_contact - partner_contact)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (primary_booking_item_evidence_reserved ?primary_booking_item - primary_booking_item ?evidence_document - evidence_document)
+    (secondary_booking_item_evidence_reserved ?secondary_booking_item - secondary_booking_item ?evidence_document - evidence_document)
+    (booking_item_resolution_path ?primary_booking_item - primary_booking_item ?resolution_path - resolution_path)
+    (resolution_path_validated ?resolution_path - resolution_path)
+    (resolution_path_evidence_attached ?resolution_path - resolution_path)
+    (primary_booking_item_ready_for_proposal ?primary_booking_item - primary_booking_item)
+    (secondary_booking_item_compensation_path ?secondary_booking_item - secondary_booking_item ?compensation_path - compensation_path)
+    (compensation_path_validated ?compensation_path - compensation_path)
+    (compensation_path_evidence_attached ?compensation_path - compensation_path)
+    (secondary_booking_item_ready_for_proposal ?secondary_booking_item - secondary_booking_item)
+    (repair_proposal_available ?repair_proposal - repair_proposal)
+    (repair_proposal_generated ?repair_proposal - repair_proposal)
+    (repair_proposal_resolution_path ?repair_proposal - repair_proposal ?resolution_path - resolution_path)
+    (repair_proposal_compensation_path ?repair_proposal - repair_proposal ?compensation_path - compensation_path)
+    (repair_proposal_requires_policy_attachment ?repair_proposal - repair_proposal)
+    (repair_proposal_requires_escalation ?repair_proposal - repair_proposal)
+    (repair_proposal_locked ?repair_proposal - repair_proposal)
+    (case_contains_primary_booking_item ?correction_case - correction_case ?primary_booking_item - primary_booking_item)
+    (case_contains_secondary_booking_item ?correction_case - correction_case ?secondary_booking_item - secondary_booking_item)
+    (case_has_repair_proposal ?correction_case - correction_case ?repair_proposal - repair_proposal)
+    (documentation_package_available ?documentation_package - documentation_package)
+    (case_has_documentation_package ?correction_case - correction_case ?documentation_package - documentation_package)
+    (documentation_package_assigned ?documentation_package - documentation_package)
+    (documentation_package_linked_to_proposal ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    (case_documentation_validated ?correction_case - correction_case)
+    (case_approval_requested ?correction_case - correction_case)
+    (case_approval_granted ?correction_case - correction_case)
+    (case_policy_attached ?correction_case - correction_case)
+    (case_policy_validated ?correction_case - correction_case)
+    (case_requires_approval_token ?correction_case - correction_case)
+    (case_final_checks_passed ?correction_case - correction_case)
+    (escalation_contact_available ?escalation_contact - escalation_contact)
+    (case_escalation_contact_assigned ?correction_case - correction_case ?escalation_contact - escalation_contact)
+    (case_escalated ?correction_case - correction_case)
+    (escalation_contact_acknowledged ?correction_case - correction_case)
+    (escalation_compliance_check_passed ?correction_case - correction_case)
+    (policy_available ?policy - policy)
+    (case_policy_linked ?correction_case - correction_case ?policy - policy)
+    (approval_token_available ?approval_token - approval_token)
+    (case_approval_token_attached ?correction_case - correction_case ?approval_token - approval_token)
+    (refund_offer_available ?refund_offer - refund_offer)
+    (case_refund_offer_attached ?correction_case - correction_case ?refund_offer - refund_offer)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (case_compliance_check_assigned ?correction_case - correction_case ?compliance_check - compliance_check)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (entity_payment_instrument_selected ?reservation_record - reservation_record ?payment_instrument - payment_instrument)
+    (primary_booking_item_ready ?primary_booking_item - primary_booking_item)
+    (secondary_booking_item_ready ?secondary_booking_item - secondary_booking_item)
+    (case_finalized ?correction_case - correction_case)
+  )
+  (:action log_reservation_error
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (not
+          (entity_error_reported ?reservation_record)
+        )
+        (not
+          (entity_correction_applied ?reservation_record)
+        )
+      )
+    :effect (entity_error_reported ?reservation_record)
+  )
+  (:action assign_support_resource_to_reservation
+    :parameters (?reservation_record - reservation_record ?support_resource - support_resource)
+    :precondition
+      (and
+        (entity_error_reported ?reservation_record)
+        (not
+          (entity_support_resource_assigned_flag ?reservation_record)
+        )
+        (support_resource_available ?support_resource)
+      )
+    :effect
+      (and
+        (entity_support_resource_assigned_flag ?reservation_record)
+        (entity_support_resource_assigned_to ?reservation_record ?support_resource)
+        (not
+          (support_resource_available ?support_resource)
+        )
+      )
+  )
+  (:action initiate_verification_event
+    :parameters (?reservation_record - reservation_record ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_error_reported ?reservation_record)
+        (entity_support_resource_assigned_flag ?reservation_record)
+        (verification_event_available ?verification_event)
+      )
+    :effect
+      (and
+        (entity_has_verification_event ?reservation_record ?verification_event)
+        (not
+          (verification_event_available ?verification_event)
+        )
+      )
+  )
+  (:action confirm_verification
+    :parameters (?reservation_record - reservation_record ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_error_reported ?reservation_record)
+        (entity_support_resource_assigned_flag ?reservation_record)
+        (entity_has_verification_event ?reservation_record ?verification_event)
+        (not
+          (entity_verification_completed ?reservation_record)
+        )
+      )
+    :effect (entity_verification_completed ?reservation_record)
+  )
+  (:action release_verification_event
+    :parameters (?reservation_record - reservation_record ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_has_verification_event ?reservation_record ?verification_event)
+      )
+    :effect
+      (and
+        (verification_event_available ?verification_event)
+        (not
+          (entity_has_verification_event ?reservation_record ?verification_event)
+        )
+      )
+  )
+  (:action engage_partner_contact
+    :parameters (?reservation_record - reservation_record ?partner_contact - partner_contact)
+    :precondition
+      (and
+        (entity_verification_completed ?reservation_record)
+        (partner_contact_available ?partner_contact)
+      )
+    :effect
+      (and
+        (entity_assigned_partner_contact ?reservation_record ?partner_contact)
+        (not
+          (partner_contact_available ?partner_contact)
+        )
+      )
+  )
+  (:action release_partner_contact
+    :parameters (?reservation_record - reservation_record ?partner_contact - partner_contact)
+    :precondition
+      (and
+        (entity_assigned_partner_contact ?reservation_record ?partner_contact)
+      )
+    :effect
+      (and
+        (partner_contact_available ?partner_contact)
+        (not
+          (entity_assigned_partner_contact ?reservation_record ?partner_contact)
+        )
+      )
+  )
+  (:action attach_refund_offer_to_case
+    :parameters (?correction_case - correction_case ?refund_offer - refund_offer)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (refund_offer_available ?refund_offer)
+      )
+    :effect
+      (and
+        (case_refund_offer_attached ?correction_case ?refund_offer)
+        (not
+          (refund_offer_available ?refund_offer)
+        )
+      )
+  )
+  (:action detach_refund_offer_from_case
+    :parameters (?correction_case - correction_case ?refund_offer - refund_offer)
+    :precondition
+      (and
+        (case_refund_offer_attached ?correction_case ?refund_offer)
+      )
+    :effect
+      (and
+        (refund_offer_available ?refund_offer)
+        (not
+          (case_refund_offer_attached ?correction_case ?refund_offer)
+        )
+      )
+  )
+  (:action attach_compliance_check_to_case
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action detach_compliance_check_from_case
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+      )
+    :effect
+      (and
+        (compliance_check_available ?compliance_check)
+        (not
+          (case_compliance_check_assigned ?correction_case ?compliance_check)
+        )
+      )
+  )
+  (:action validate_resolution_path_for_booking_item
+    :parameters (?primary_booking_item - primary_booking_item ?resolution_path - resolution_path ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_verification_completed ?primary_booking_item)
+        (entity_has_verification_event ?primary_booking_item ?verification_event)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (not
+          (resolution_path_validated ?resolution_path)
+        )
+        (not
+          (resolution_path_evidence_attached ?resolution_path)
+        )
+      )
+    :effect (resolution_path_validated ?resolution_path)
+  )
+  (:action coordinate_partner_for_resolution
+    :parameters (?primary_booking_item - primary_booking_item ?resolution_path - resolution_path ?partner_contact - partner_contact)
+    :precondition
+      (and
+        (entity_verification_completed ?primary_booking_item)
+        (entity_assigned_partner_contact ?primary_booking_item ?partner_contact)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (resolution_path_validated ?resolution_path)
+        (not
+          (primary_booking_item_ready ?primary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+      )
+  )
+  (:action attach_evidence_to_booking_item_for_resolution
+    :parameters (?primary_booking_item - primary_booking_item ?resolution_path - resolution_path ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_verification_completed ?primary_booking_item)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (evidence_document_available ?evidence_document)
+        (not
+          (primary_booking_item_ready ?primary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (resolution_path_evidence_attached ?resolution_path)
+        (primary_booking_item_ready ?primary_booking_item)
+        (primary_booking_item_evidence_reserved ?primary_booking_item ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_evidence_and_validate_resolution
+    :parameters (?primary_booking_item - primary_booking_item ?resolution_path - resolution_path ?verification_event - verification_event ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_verification_completed ?primary_booking_item)
+        (entity_has_verification_event ?primary_booking_item ?verification_event)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (resolution_path_evidence_attached ?resolution_path)
+        (primary_booking_item_evidence_reserved ?primary_booking_item ?evidence_document)
+        (not
+          (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (resolution_path_validated ?resolution_path)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        (evidence_document_available ?evidence_document)
+        (not
+          (primary_booking_item_evidence_reserved ?primary_booking_item ?evidence_document)
+        )
+      )
+  )
+  (:action validate_compensation_path_for_secondary_item
+    :parameters (?secondary_booking_item - secondary_booking_item ?compensation_path - compensation_path ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_verification_completed ?secondary_booking_item)
+        (entity_has_verification_event ?secondary_booking_item ?verification_event)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (not
+          (compensation_path_validated ?compensation_path)
+        )
+        (not
+          (compensation_path_evidence_attached ?compensation_path)
+        )
+      )
+    :effect (compensation_path_validated ?compensation_path)
+  )
+  (:action coordinate_partner_for_compensation
+    :parameters (?secondary_booking_item - secondary_booking_item ?compensation_path - compensation_path ?partner_contact - partner_contact)
+    :precondition
+      (and
+        (entity_verification_completed ?secondary_booking_item)
+        (entity_assigned_partner_contact ?secondary_booking_item ?partner_contact)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (compensation_path_validated ?compensation_path)
+        (not
+          (secondary_booking_item_ready ?secondary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+      )
+  )
+  (:action attach_evidence_to_secondary_item_for_compensation
+    :parameters (?secondary_booking_item - secondary_booking_item ?compensation_path - compensation_path ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_verification_completed ?secondary_booking_item)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (evidence_document_available ?evidence_document)
+        (not
+          (secondary_booking_item_ready ?secondary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (compensation_path_evidence_attached ?compensation_path)
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (secondary_booking_item_evidence_reserved ?secondary_booking_item ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_compensation_evidence_and_validate
+    :parameters (?secondary_booking_item - secondary_booking_item ?compensation_path - compensation_path ?verification_event - verification_event ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_verification_completed ?secondary_booking_item)
+        (entity_has_verification_event ?secondary_booking_item ?verification_event)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (compensation_path_evidence_attached ?compensation_path)
+        (secondary_booking_item_evidence_reserved ?secondary_booking_item ?evidence_document)
+        (not
+          (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (compensation_path_validated ?compensation_path)
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        (evidence_document_available ?evidence_document)
+        (not
+          (secondary_booking_item_evidence_reserved ?secondary_booking_item ?evidence_document)
+        )
+      )
+  )
+  (:action generate_repair_proposal
+    :parameters (?primary_booking_item - primary_booking_item ?secondary_booking_item - secondary_booking_item ?resolution_path - resolution_path ?compensation_path - compensation_path ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (resolution_path_validated ?resolution_path)
+        (compensation_path_validated ?compensation_path)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        (repair_proposal_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_resolution_path ?repair_proposal ?resolution_path)
+        (repair_proposal_compensation_path ?repair_proposal ?compensation_path)
+        (not
+          (repair_proposal_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_policy_flagged
+    :parameters (?primary_booking_item - primary_booking_item ?secondary_booking_item - secondary_booking_item ?resolution_path - resolution_path ?compensation_path - compensation_path ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (resolution_path_evidence_attached ?resolution_path)
+        (compensation_path_validated ?compensation_path)
+        (not
+          (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        )
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        (repair_proposal_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_resolution_path ?repair_proposal ?resolution_path)
+        (repair_proposal_compensation_path ?repair_proposal ?compensation_path)
+        (repair_proposal_requires_policy_attachment ?repair_proposal)
+        (not
+          (repair_proposal_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_escalation_flagged
+    :parameters (?primary_booking_item - primary_booking_item ?secondary_booking_item - secondary_booking_item ?resolution_path - resolution_path ?compensation_path - compensation_path ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (resolution_path_validated ?resolution_path)
+        (compensation_path_evidence_attached ?compensation_path)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        (not
+          (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        )
+        (repair_proposal_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_resolution_path ?repair_proposal ?resolution_path)
+        (repair_proposal_compensation_path ?repair_proposal ?compensation_path)
+        (repair_proposal_requires_escalation ?repair_proposal)
+        (not
+          (repair_proposal_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_with_all_flags
+    :parameters (?primary_booking_item - primary_booking_item ?secondary_booking_item - secondary_booking_item ?resolution_path - resolution_path ?compensation_path - compensation_path ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (booking_item_resolution_path ?primary_booking_item ?resolution_path)
+        (secondary_booking_item_compensation_path ?secondary_booking_item ?compensation_path)
+        (resolution_path_evidence_attached ?resolution_path)
+        (compensation_path_evidence_attached ?compensation_path)
+        (not
+          (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        )
+        (not
+          (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        )
+        (repair_proposal_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_resolution_path ?repair_proposal ?resolution_path)
+        (repair_proposal_compensation_path ?repair_proposal ?compensation_path)
+        (repair_proposal_requires_policy_attachment ?repair_proposal)
+        (repair_proposal_requires_escalation ?repair_proposal)
+        (not
+          (repair_proposal_available ?repair_proposal)
+        )
+      )
+  )
+  (:action lock_repair_proposal
+    :parameters (?repair_proposal - repair_proposal ?primary_booking_item - primary_booking_item ?verification_event - verification_event)
+    :precondition
+      (and
+        (repair_proposal_generated ?repair_proposal)
+        (primary_booking_item_ready ?primary_booking_item)
+        (entity_has_verification_event ?primary_booking_item ?verification_event)
+        (not
+          (repair_proposal_locked ?repair_proposal)
+        )
+      )
+    :effect (repair_proposal_locked ?repair_proposal)
+  )
+  (:action attach_documentation_to_proposal
+    :parameters (?correction_case - correction_case ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (case_has_repair_proposal ?correction_case ?repair_proposal)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_available ?documentation_package)
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_locked ?repair_proposal)
+        (not
+          (documentation_package_assigned ?documentation_package)
+        )
+      )
+    :effect
+      (and
+        (documentation_package_assigned ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (not
+          (documentation_package_available ?documentation_package)
+        )
+      )
+  )
+  (:action validate_documentation_package_for_case
+    :parameters (?correction_case - correction_case ?documentation_package - documentation_package ?repair_proposal - repair_proposal ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_assigned ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (entity_has_verification_event ?correction_case ?verification_event)
+        (not
+          (repair_proposal_requires_policy_attachment ?repair_proposal)
+        )
+        (not
+          (case_documentation_validated ?correction_case)
+        )
+      )
+    :effect (case_documentation_validated ?correction_case)
+  )
+  (:action attach_policy_to_case
+    :parameters (?correction_case - correction_case ?policy - policy)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (policy_available ?policy)
+        (not
+          (case_policy_attached ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_policy_attached ?correction_case)
+        (case_policy_linked ?correction_case ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action apply_policy_and_validate_case
+    :parameters (?correction_case - correction_case ?documentation_package - documentation_package ?repair_proposal - repair_proposal ?verification_event - verification_event ?policy - policy)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_assigned ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (entity_has_verification_event ?correction_case ?verification_event)
+        (repair_proposal_requires_policy_attachment ?repair_proposal)
+        (case_policy_attached ?correction_case)
+        (case_policy_linked ?correction_case ?policy)
+        (not
+          (case_documentation_validated ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_documentation_validated ?correction_case)
+        (case_policy_validated ?correction_case)
+      )
+  )
+  (:action initiate_case_approval_without_escalation
+    :parameters (?correction_case - correction_case ?refund_offer - refund_offer ?partner_contact - partner_contact ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_documentation_validated ?correction_case)
+        (case_refund_offer_attached ?correction_case ?refund_offer)
+        (entity_assigned_partner_contact ?correction_case ?partner_contact)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (not
+          (repair_proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_approval_requested ?correction_case)
+        )
+      )
+    :effect (case_approval_requested ?correction_case)
+  )
+  (:action initiate_case_approval_with_escalation
+    :parameters (?correction_case - correction_case ?refund_offer - refund_offer ?partner_contact - partner_contact ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_documentation_validated ?correction_case)
+        (case_refund_offer_attached ?correction_case ?refund_offer)
+        (entity_assigned_partner_contact ?correction_case ?partner_contact)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (repair_proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_approval_requested ?correction_case)
+        )
+      )
+    :effect (case_approval_requested ?correction_case)
+  )
+  (:action perform_compliance_and_grant_approval
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_approval_requested ?correction_case)
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (not
+          (repair_proposal_requires_policy_attachment ?repair_proposal)
+        )
+        (not
+          (repair_proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_approval_granted ?correction_case)
+        )
+      )
+    :effect (case_approval_granted ?correction_case)
+  )
+  (:action approve_case_and_mark_token_required
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_approval_requested ?correction_case)
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (repair_proposal_requires_policy_attachment ?repair_proposal)
+        (not
+          (repair_proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_approval_granted ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_approval_granted ?correction_case)
+        (case_requires_approval_token ?correction_case)
+      )
+  )
+  (:action approve_case_with_escalation
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_approval_requested ?correction_case)
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (not
+          (repair_proposal_requires_policy_attachment ?repair_proposal)
+        )
+        (repair_proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_approval_granted ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_approval_granted ?correction_case)
+        (case_requires_approval_token ?correction_case)
+      )
+  )
+  (:action approve_case_with_policy_and_escalation
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check ?documentation_package - documentation_package ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_approval_requested ?correction_case)
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (case_has_documentation_package ?correction_case ?documentation_package)
+        (documentation_package_linked_to_proposal ?documentation_package ?repair_proposal)
+        (repair_proposal_requires_policy_attachment ?repair_proposal)
+        (repair_proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_approval_granted ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_approval_granted ?correction_case)
+        (case_requires_approval_token ?correction_case)
+      )
+  )
+  (:action finalize_case_without_token
+    :parameters (?correction_case - correction_case)
+    :precondition
+      (and
+        (case_approval_granted ?correction_case)
+        (not
+          (case_requires_approval_token ?correction_case)
+        )
+        (not
+          (case_finalized ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?correction_case)
+        (entity_ready_for_execution ?correction_case)
+      )
+  )
+  (:action attach_approval_token_to_case
+    :parameters (?correction_case - correction_case ?approval_token - approval_token)
+    :precondition
+      (and
+        (case_approval_granted ?correction_case)
+        (case_requires_approval_token ?correction_case)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (case_approval_token_attached ?correction_case ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action perform_final_checks_before_execution
+    :parameters (?correction_case - correction_case ?primary_booking_item - primary_booking_item ?secondary_booking_item - secondary_booking_item ?verification_event - verification_event ?approval_token - approval_token)
+    :precondition
+      (and
+        (case_approval_granted ?correction_case)
+        (case_requires_approval_token ?correction_case)
+        (case_approval_token_attached ?correction_case ?approval_token)
+        (case_contains_primary_booking_item ?correction_case ?primary_booking_item)
+        (case_contains_secondary_booking_item ?correction_case ?secondary_booking_item)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        (entity_has_verification_event ?correction_case ?verification_event)
+        (not
+          (case_final_checks_passed ?correction_case)
+        )
+      )
+    :effect (case_final_checks_passed ?correction_case)
+  )
+  (:action finalize_case_after_checks
+    :parameters (?correction_case - correction_case)
+    :precondition
+      (and
+        (case_approval_granted ?correction_case)
+        (case_final_checks_passed ?correction_case)
+        (not
+          (case_finalized ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?correction_case)
+        (entity_ready_for_execution ?correction_case)
+      )
+  )
+  (:action escalate_case_to_contact
+    :parameters (?correction_case - correction_case ?escalation_contact - escalation_contact ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_verification_completed ?correction_case)
+        (entity_has_verification_event ?correction_case ?verification_event)
+        (escalation_contact_available ?escalation_contact)
+        (case_escalation_contact_assigned ?correction_case ?escalation_contact)
+        (not
+          (case_escalated ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_escalated ?correction_case)
+        (not
+          (escalation_contact_available ?escalation_contact)
+        )
+      )
+  )
+  (:action acknowledge_escalation_contact
+    :parameters (?correction_case - correction_case ?partner_contact - partner_contact)
+    :precondition
+      (and
+        (case_escalated ?correction_case)
+        (entity_assigned_partner_contact ?correction_case ?partner_contact)
+        (not
+          (escalation_contact_acknowledged ?correction_case)
+        )
+      )
+    :effect (escalation_contact_acknowledged ?correction_case)
+  )
+  (:action perform_compliance_check_for_escalated_case
+    :parameters (?correction_case - correction_case ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (escalation_contact_acknowledged ?correction_case)
+        (case_compliance_check_assigned ?correction_case ?compliance_check)
+        (not
+          (escalation_compliance_check_passed ?correction_case)
+        )
+      )
+    :effect (escalation_compliance_check_passed ?correction_case)
+  )
+  (:action finalize_escalated_case
+    :parameters (?correction_case - correction_case)
+    :precondition
+      (and
+        (escalation_compliance_check_passed ?correction_case)
+        (not
+          (case_finalized ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?correction_case)
+        (entity_ready_for_execution ?correction_case)
+      )
+  )
+  (:action apply_repair_proposal_to_primary_item
+    :parameters (?primary_booking_item - primary_booking_item ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (primary_booking_item_ready ?primary_booking_item)
+        (primary_booking_item_ready_for_proposal ?primary_booking_item)
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_locked ?repair_proposal)
+        (not
+          (entity_ready_for_execution ?primary_booking_item)
+        )
+      )
+    :effect (entity_ready_for_execution ?primary_booking_item)
+  )
+  (:action apply_repair_proposal_to_secondary_item
+    :parameters (?secondary_booking_item - secondary_booking_item ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (secondary_booking_item_ready ?secondary_booking_item)
+        (secondary_booking_item_ready_for_proposal ?secondary_booking_item)
+        (repair_proposal_generated ?repair_proposal)
+        (repair_proposal_locked ?repair_proposal)
+        (not
+          (entity_ready_for_execution ?secondary_booking_item)
+        )
+      )
+    :effect (entity_ready_for_execution ?secondary_booking_item)
+  )
+  (:action authorize_settlement_with_payment_instrument
+    :parameters (?reservation_record - reservation_record ?payment_instrument - payment_instrument ?verification_event - verification_event)
+    :precondition
+      (and
+        (entity_ready_for_execution ?reservation_record)
+        (entity_has_verification_event ?reservation_record ?verification_event)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (entity_settlement_authorized ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_authorized ?reservation_record)
+        (entity_payment_instrument_selected ?reservation_record ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action apply_correction_from_primary_item
+    :parameters (?primary_booking_item - primary_booking_item ?support_resource - support_resource ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_settlement_authorized ?primary_booking_item)
+        (entity_support_resource_assigned_to ?primary_booking_item ?support_resource)
+        (entity_payment_instrument_selected ?primary_booking_item ?payment_instrument)
+        (not
+          (entity_correction_applied ?primary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (entity_correction_applied ?primary_booking_item)
+        (support_resource_available ?support_resource)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action apply_correction_from_secondary_item
+    :parameters (?secondary_booking_item - secondary_booking_item ?support_resource - support_resource ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_settlement_authorized ?secondary_booking_item)
+        (entity_support_resource_assigned_to ?secondary_booking_item ?support_resource)
+        (entity_payment_instrument_selected ?secondary_booking_item ?payment_instrument)
+        (not
+          (entity_correction_applied ?secondary_booking_item)
+        )
+      )
+    :effect
+      (and
+        (entity_correction_applied ?secondary_booking_item)
+        (support_resource_available ?support_resource)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action apply_correction_from_case
+    :parameters (?correction_case - correction_case ?support_resource - support_resource ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_settlement_authorized ?correction_case)
+        (entity_support_resource_assigned_to ?correction_case ?support_resource)
+        (entity_payment_instrument_selected ?correction_case ?payment_instrument)
+        (not
+          (entity_correction_applied ?correction_case)
+        )
+      )
+    :effect
+      (and
+        (entity_correction_applied ?correction_case)
+        (support_resource_available ?support_resource)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem reservation_error_case_1)
+  (:domain reservation_record_error_correction)
+  (:objects primary_booking_item_1 - primary_booking_item secondary_booking_item_1 - secondary_booking_item correction_case_1 - correction_case correction_case_2 - correction_case support_agent_team_alpha - support_resource support_agent_team_beta - support_resource support_agent_automated_queue - support_resource verification_event_call_1 - verification_event airline_partner_contact - partner_contact evidence_doc_receipt_1 - evidence_document direct_amendment_path - resolution_path refund_path_partial - compensation_path repair_proposal_1 - repair_proposal documentation_package_1 - documentation_package documentation_package_2 - documentation_package policy_refund_standard - policy policy_change_standard - policy approval_token_auth_1 - approval_token approval_token_auth_2 - approval_token payment_card_on_file_1 - payment_instrument refund_offer_standard - refund_offer escalation_manager_1 - escalation_contact escalation_manager_2 - escalation_contact compliance_check_1 - compliance_check)
+  (:init
+    (support_resource_available support_agent_team_alpha)
+    (support_resource_available support_agent_team_beta)
+    (support_resource_available support_agent_automated_queue)
+    (verification_event_available verification_event_call_1)
+    (partner_contact_available airline_partner_contact)
+    (evidence_document_available evidence_doc_receipt_1)
+    (booking_item_resolution_path primary_booking_item_1 direct_amendment_path)
+    (secondary_booking_item_compensation_path secondary_booking_item_1 refund_path_partial)
+    (repair_proposal_available repair_proposal_1)
+    (documentation_package_available documentation_package_1)
+    (documentation_package_available documentation_package_2)
+    (case_contains_primary_booking_item correction_case_1 primary_booking_item_1)
+    (case_contains_primary_booking_item correction_case_2 primary_booking_item_1)
+    (case_contains_secondary_booking_item correction_case_1 secondary_booking_item_1)
+    (case_contains_secondary_booking_item correction_case_2 secondary_booking_item_1)
+    (case_has_repair_proposal correction_case_1 repair_proposal_1)
+    (case_has_repair_proposal correction_case_2 repair_proposal_1)
+    (case_has_documentation_package correction_case_1 documentation_package_1)
+    (case_has_documentation_package correction_case_2 documentation_package_2)
+    (policy_available policy_refund_standard)
+    (policy_available policy_change_standard)
+    (approval_token_available approval_token_auth_1)
+    (approval_token_available approval_token_auth_2)
+    (payment_instrument_available payment_card_on_file_1)
+    (refund_offer_available refund_offer_standard)
+    (escalation_contact_available escalation_manager_1)
+    (case_escalation_contact_assigned correction_case_1 escalation_manager_1)
+    (case_escalation_contact_assigned correction_case_2 escalation_manager_2)
+    (compliance_check_available compliance_check_1)
+  )
+  (:goal
+    (and
+      (entity_correction_applied primary_booking_item_1)
+      (entity_correction_applied secondary_booking_item_1)
+      (entity_correction_applied correction_case_1)
+      (entity_correction_applied correction_case_2)
+    )
+  )
+)

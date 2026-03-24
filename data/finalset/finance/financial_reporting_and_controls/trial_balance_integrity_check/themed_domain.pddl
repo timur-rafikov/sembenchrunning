@@ -1,0 +1,936 @@
+(define (domain finance_trial_balance_integrity_check)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types personnel_role_type - object document_type - object package_type - object organizational_unit - object trial_balance_item - organizational_unit reviewer - personnel_role_type supporting_document_role - personnel_role_type approver - personnel_role_type compliance_attachment_role - personnel_role_type quality_review_stamp_role - personnel_role_type exception_tag_role - personnel_role_type accounting_policy_reference_role - personnel_role_type audit_evidence_reference_role - personnel_role_type adjustment_proposal - document_type supporting_schedule - document_type control_rationale_document - document_type reconciliation_checkpoint - package_type variance_issue - package_type reconciliation_package - package_type tb_line_subtype - trial_balance_item tb_case_subtype - trial_balance_item ledger_reconciliation - tb_line_subtype intercompany_reconciliation - tb_line_subtype trial_balance_check_case - tb_case_subtype)
+  (:predicates
+    (tb_item_marked_for_review ?trial_balance_line - trial_balance_item)
+    (evidence_verified ?trial_balance_line - trial_balance_item)
+    (tb_item_review_assigned ?trial_balance_line - trial_balance_item)
+    (tb_item_finalized ?trial_balance_line - trial_balance_item)
+    (ready_for_integrity_signoff ?trial_balance_line - trial_balance_item)
+    (tb_item_exception_tagged_role ?trial_balance_line - trial_balance_item)
+    (reviewer_available ?reviewer - reviewer)
+    (assigned_reviewer ?trial_balance_line - trial_balance_item ?reviewer - reviewer)
+    (supporting_document_role_available ?supporting_document - supporting_document_role)
+    (supporting_document_role_linked ?trial_balance_line - trial_balance_item ?supporting_document - supporting_document_role)
+    (approver_available ?approver - approver)
+    (assigned_approver ?trial_balance_line - trial_balance_item ?approver - approver)
+    (adjustment_proposal_available ?adjustment_proposal - adjustment_proposal)
+    (adjustment_proposal_linked ?ledger_reconciliation - ledger_reconciliation ?adjustment_proposal - adjustment_proposal)
+    (interco_adjustment_proposal_linked ?intercompany_reconciliation - intercompany_reconciliation ?adjustment_proposal - adjustment_proposal)
+    (ledger_recon_checkpoint_linked ?ledger_reconciliation - ledger_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint)
+    (checkpoint_passed ?reconciliation_checkpoint - reconciliation_checkpoint)
+    (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint - reconciliation_checkpoint)
+    (ledger_recon_ready_for_package ?ledger_reconciliation - ledger_reconciliation)
+    (interco_recon_variance_linked ?intercompany_reconciliation - intercompany_reconciliation ?variance_issue - variance_issue)
+    (variance_issue_marked ?variance_issue - variance_issue)
+    (variance_issue_flagged_for_adjustment ?variance_issue - variance_issue)
+    (interco_recon_ready_for_package ?intercompany_reconciliation - intercompany_reconciliation)
+    (reconciliation_package_open ?reconciliation_package - reconciliation_package)
+    (reconciliation_package_populated ?reconciliation_package - reconciliation_package)
+    (package_includes_checkpoint ?reconciliation_package - reconciliation_package ?reconciliation_checkpoint - reconciliation_checkpoint)
+    (package_includes_variance_issue ?reconciliation_package - reconciliation_package ?variance_issue - variance_issue)
+    (reconciliation_package_has_checkpoint_flag ?reconciliation_package - reconciliation_package)
+    (reconciliation_package_has_variance_flag ?reconciliation_package - reconciliation_package)
+    (reconciliation_package_ready_for_schedules ?reconciliation_package - reconciliation_package)
+    (case_has_ledger_recon ?trial_balance_check_case - trial_balance_check_case ?ledger_reconciliation - ledger_reconciliation)
+    (case_has_interco_recon ?trial_balance_check_case - trial_balance_check_case ?intercompany_reconciliation - intercompany_reconciliation)
+    (case_includes_reconciliation_package ?trial_balance_check_case - trial_balance_check_case ?reconciliation_package - reconciliation_package)
+    (supporting_schedule_available ?supporting_schedule - supporting_schedule)
+    (case_has_supporting_schedule ?trial_balance_check_case - trial_balance_check_case ?supporting_schedule - supporting_schedule)
+    (supporting_schedule_included ?supporting_schedule - supporting_schedule)
+    (supporting_schedule_linked_to_package ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    (case_supporting_schedule_reviewed ?trial_balance_check_case - trial_balance_check_case)
+    (case_has_evidence_attached ?trial_balance_check_case - trial_balance_check_case)
+    (case_final_reviewed ?trial_balance_check_case - trial_balance_check_case)
+    (case_compliance_attachment_role_assigned ?trial_balance_check_case - trial_balance_check_case)
+    (case_compliance_attachment_role_confirmed ?trial_balance_check_case - trial_balance_check_case)
+    (case_quality_review_completed ?trial_balance_check_case - trial_balance_check_case)
+    (case_ready_for_final_signoff ?trial_balance_check_case - trial_balance_check_case)
+    (control_rationale_available ?control_rationale_document - control_rationale_document)
+    (case_has_control_rationale ?trial_balance_check_case - trial_balance_check_case ?control_rationale_document - control_rationale_document)
+    (case_control_rationale_attached ?trial_balance_check_case - trial_balance_check_case)
+    (case_control_rationale_reviewed ?trial_balance_check_case - trial_balance_check_case)
+    (case_control_rationale_approved ?trial_balance_check_case - trial_balance_check_case)
+    (compliance_attachment_role_available ?compliance_attachment - compliance_attachment_role)
+    (compliance_attachment_role_linked_to_case ?trial_balance_check_case - trial_balance_check_case ?compliance_attachment - compliance_attachment_role)
+    (quality_review_stamp_role_available ?quality_review_stamp - quality_review_stamp_role)
+    (case_has_quality_review_stamp_role ?trial_balance_check_case - trial_balance_check_case ?quality_review_stamp - quality_review_stamp_role)
+    (accounting_policy_reference_role_available ?accounting_policy_reference - accounting_policy_reference_role)
+    (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case - trial_balance_check_case ?accounting_policy_reference - accounting_policy_reference_role)
+    (audit_evidence_reference_role_available ?audit_evidence_reference - audit_evidence_reference_role)
+    (audit_evidence_reference_linked_to_case ?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role)
+    (exception_tag_role_available ?exception_tag - exception_tag_role)
+    (tb_item_has_exception_tag_role ?trial_balance_line - trial_balance_item ?exception_tag - exception_tag_role)
+    (ledger_recon_checkpoint_evaluated ?ledger_reconciliation - ledger_reconciliation)
+    (interco_recon_checkpoint_evaluated ?intercompany_reconciliation - intercompany_reconciliation)
+    (case_integrity_signed ?trial_balance_check_case - trial_balance_check_case)
+  )
+  (:action mark_tb_item_for_check
+    :parameters (?trial_balance_line - trial_balance_item)
+    :precondition
+      (and
+        (not
+          (tb_item_marked_for_review ?trial_balance_line)
+        )
+        (not
+          (tb_item_finalized ?trial_balance_line)
+        )
+      )
+    :effect (tb_item_marked_for_review ?trial_balance_line)
+  )
+  (:action assign_reviewer_to_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?reviewer - reviewer)
+    :precondition
+      (and
+        (tb_item_marked_for_review ?trial_balance_line)
+        (not
+          (tb_item_review_assigned ?trial_balance_line)
+        )
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (tb_item_review_assigned ?trial_balance_line)
+        (assigned_reviewer ?trial_balance_line ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action attach_supporting_document_role_to_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (tb_item_marked_for_review ?trial_balance_line)
+        (tb_item_review_assigned ?trial_balance_line)
+        (supporting_document_role_available ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_document_role_linked ?trial_balance_line ?supporting_document)
+        (not
+          (supporting_document_role_available ?supporting_document)
+        )
+      )
+  )
+  (:action verify_supporting_document_role_for_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (tb_item_marked_for_review ?trial_balance_line)
+        (tb_item_review_assigned ?trial_balance_line)
+        (supporting_document_role_linked ?trial_balance_line ?supporting_document)
+        (not
+          (evidence_verified ?trial_balance_line)
+        )
+      )
+    :effect (evidence_verified ?trial_balance_line)
+  )
+  (:action unlink_supporting_document_role_from_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (supporting_document_role_linked ?trial_balance_line ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_document_role_available ?supporting_document)
+        (not
+          (supporting_document_role_linked ?trial_balance_line ?supporting_document)
+        )
+      )
+  )
+  (:action assign_approver_to_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?approver - approver)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_line)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (assigned_approver ?trial_balance_line ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_tb_item
+    :parameters (?trial_balance_line - trial_balance_item ?approver - approver)
+    :precondition
+      (and
+        (assigned_approver ?trial_balance_line ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (assigned_approver ?trial_balance_line ?approver)
+        )
+      )
+  )
+  (:action attach_accounting_policy_reference_role_to_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?accounting_policy_reference - accounting_policy_reference_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (accounting_policy_reference_role_available ?accounting_policy_reference)
+      )
+    :effect
+      (and
+        (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case ?accounting_policy_reference)
+        (not
+          (accounting_policy_reference_role_available ?accounting_policy_reference)
+        )
+      )
+  )
+  (:action detach_accounting_policy_reference_role_from_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?accounting_policy_reference - accounting_policy_reference_role)
+    :precondition
+      (and
+        (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case ?accounting_policy_reference)
+      )
+    :effect
+      (and
+        (accounting_policy_reference_role_available ?accounting_policy_reference)
+        (not
+          (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case ?accounting_policy_reference)
+        )
+      )
+  )
+  (:action attach_audit_evidence_reference_role_to_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (audit_evidence_reference_role_available ?audit_evidence_reference)
+      )
+    :effect
+      (and
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (not
+          (audit_evidence_reference_role_available ?audit_evidence_reference)
+        )
+      )
+  )
+  (:action detach_audit_evidence_reference_role_from_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role)
+    :precondition
+      (and
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+      )
+    :effect
+      (and
+        (audit_evidence_reference_role_available ?audit_evidence_reference)
+        (not
+          (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        )
+      )
+  )
+  (:action evaluate_ledger_reconciliation_checkpoint
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (evidence_verified ?ledger_reconciliation)
+        (supporting_document_role_linked ?ledger_reconciliation ?supporting_document)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (not
+          (checkpoint_passed ?reconciliation_checkpoint)
+        )
+        (not
+          (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint)
+        )
+      )
+    :effect (checkpoint_passed ?reconciliation_checkpoint)
+  )
+  (:action confirm_ledger_reconciliation_by_approver
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?approver - approver)
+    :precondition
+      (and
+        (evidence_verified ?ledger_reconciliation)
+        (assigned_approver ?ledger_reconciliation ?approver)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (checkpoint_passed ?reconciliation_checkpoint)
+        (not
+          (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+      )
+  )
+  (:action apply_adjustment_proposal_to_ledger_reconciliation
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (evidence_verified ?ledger_reconciliation)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (adjustment_proposal_available ?adjustment_proposal)
+        (not
+          (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint)
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (adjustment_proposal_linked ?ledger_reconciliation ?adjustment_proposal)
+        (not
+          (adjustment_proposal_available ?adjustment_proposal)
+        )
+      )
+  )
+  (:action finalize_ledger_reconciliation_after_adjustment
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?supporting_document - supporting_document_role ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (evidence_verified ?ledger_reconciliation)
+        (supporting_document_role_linked ?ledger_reconciliation ?supporting_document)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint)
+        (adjustment_proposal_linked ?ledger_reconciliation ?adjustment_proposal)
+        (not
+          (ledger_recon_ready_for_package ?ledger_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_passed ?reconciliation_checkpoint)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+        (adjustment_proposal_available ?adjustment_proposal)
+        (not
+          (adjustment_proposal_linked ?ledger_reconciliation ?adjustment_proposal)
+        )
+      )
+  )
+  (:action evaluate_intercompany_reconciliation_checkpoint
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?variance_issue - variance_issue ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (evidence_verified ?intercompany_reconciliation)
+        (supporting_document_role_linked ?intercompany_reconciliation ?supporting_document)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (not
+          (variance_issue_marked ?variance_issue)
+        )
+        (not
+          (variance_issue_flagged_for_adjustment ?variance_issue)
+        )
+      )
+    :effect (variance_issue_marked ?variance_issue)
+  )
+  (:action confirm_intercompany_reconciliation_by_approver
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?variance_issue - variance_issue ?approver - approver)
+    :precondition
+      (and
+        (evidence_verified ?intercompany_reconciliation)
+        (assigned_approver ?intercompany_reconciliation ?approver)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (variance_issue_marked ?variance_issue)
+        (not
+          (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+      )
+  )
+  (:action apply_adjustment_proposal_to_intercompany_reconciliation
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?variance_issue - variance_issue ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (evidence_verified ?intercompany_reconciliation)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (adjustment_proposal_available ?adjustment_proposal)
+        (not
+          (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (variance_issue_flagged_for_adjustment ?variance_issue)
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (interco_adjustment_proposal_linked ?intercompany_reconciliation ?adjustment_proposal)
+        (not
+          (adjustment_proposal_available ?adjustment_proposal)
+        )
+      )
+  )
+  (:action finalize_intercompany_reconciliation_after_adjustment
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?variance_issue - variance_issue ?supporting_document - supporting_document_role ?adjustment_proposal - adjustment_proposal)
+    :precondition
+      (and
+        (evidence_verified ?intercompany_reconciliation)
+        (supporting_document_role_linked ?intercompany_reconciliation ?supporting_document)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (variance_issue_flagged_for_adjustment ?variance_issue)
+        (interco_adjustment_proposal_linked ?intercompany_reconciliation ?adjustment_proposal)
+        (not
+          (interco_recon_ready_for_package ?intercompany_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (variance_issue_marked ?variance_issue)
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+        (adjustment_proposal_available ?adjustment_proposal)
+        (not
+          (interco_adjustment_proposal_linked ?intercompany_reconciliation ?adjustment_proposal)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_clean
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?intercompany_reconciliation - intercompany_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?variance_issue - variance_issue ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (checkpoint_passed ?reconciliation_checkpoint)
+        (variance_issue_marked ?variance_issue)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+        (reconciliation_package_open ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_populated ?reconciliation_package)
+        (package_includes_checkpoint ?reconciliation_package ?reconciliation_checkpoint)
+        (package_includes_variance_issue ?reconciliation_package ?variance_issue)
+        (not
+          (reconciliation_package_open ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_checkpoint_issue
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?intercompany_reconciliation - intercompany_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?variance_issue - variance_issue ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint)
+        (variance_issue_marked ?variance_issue)
+        (not
+          (ledger_recon_ready_for_package ?ledger_reconciliation)
+        )
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+        (reconciliation_package_open ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_populated ?reconciliation_package)
+        (package_includes_checkpoint ?reconciliation_package ?reconciliation_checkpoint)
+        (package_includes_variance_issue ?reconciliation_package ?variance_issue)
+        (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        (not
+          (reconciliation_package_open ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_variance_issue
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?intercompany_reconciliation - intercompany_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?variance_issue - variance_issue ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (checkpoint_passed ?reconciliation_checkpoint)
+        (variance_issue_flagged_for_adjustment ?variance_issue)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+        (not
+          (interco_recon_ready_for_package ?intercompany_reconciliation)
+        )
+        (reconciliation_package_open ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_populated ?reconciliation_package)
+        (package_includes_checkpoint ?reconciliation_package ?reconciliation_checkpoint)
+        (package_includes_variance_issue ?reconciliation_package ?variance_issue)
+        (reconciliation_package_has_variance_flag ?reconciliation_package)
+        (not
+          (reconciliation_package_open ?reconciliation_package)
+        )
+      )
+  )
+  (:action assemble_reconciliation_package_with_checkpoint_and_variance_issues
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?intercompany_reconciliation - intercompany_reconciliation ?reconciliation_checkpoint - reconciliation_checkpoint ?variance_issue - variance_issue ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (ledger_recon_checkpoint_linked ?ledger_reconciliation ?reconciliation_checkpoint)
+        (interco_recon_variance_linked ?intercompany_reconciliation ?variance_issue)
+        (checkpoint_flagged_for_adjustment ?reconciliation_checkpoint)
+        (variance_issue_flagged_for_adjustment ?variance_issue)
+        (not
+          (ledger_recon_ready_for_package ?ledger_reconciliation)
+        )
+        (not
+          (interco_recon_ready_for_package ?intercompany_reconciliation)
+        )
+        (reconciliation_package_open ?reconciliation_package)
+      )
+    :effect
+      (and
+        (reconciliation_package_populated ?reconciliation_package)
+        (package_includes_checkpoint ?reconciliation_package ?reconciliation_checkpoint)
+        (package_includes_variance_issue ?reconciliation_package ?variance_issue)
+        (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        (reconciliation_package_has_variance_flag ?reconciliation_package)
+        (not
+          (reconciliation_package_open ?reconciliation_package)
+        )
+      )
+  )
+  (:action mark_reconciliation_package_ready_for_schedule_intake
+    :parameters (?reconciliation_package - reconciliation_package ?ledger_reconciliation - ledger_reconciliation ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (reconciliation_package_populated ?reconciliation_package)
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (supporting_document_role_linked ?ledger_reconciliation ?supporting_document)
+        (not
+          (reconciliation_package_ready_for_schedules ?reconciliation_package)
+        )
+      )
+    :effect (reconciliation_package_ready_for_schedules ?reconciliation_package)
+  )
+  (:action include_supporting_schedule_in_case_package
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (case_includes_reconciliation_package ?trial_balance_check_case ?reconciliation_package)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_available ?supporting_schedule)
+        (reconciliation_package_populated ?reconciliation_package)
+        (reconciliation_package_ready_for_schedules ?reconciliation_package)
+        (not
+          (supporting_schedule_included ?supporting_schedule)
+        )
+      )
+    :effect
+      (and
+        (supporting_schedule_included ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (not
+          (supporting_schedule_available ?supporting_schedule)
+        )
+      )
+  )
+  (:action review_supporting_schedule_for_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_included ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (supporting_document_role_linked ?trial_balance_check_case ?supporting_document)
+        (not
+          (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        )
+        (not
+          (case_supporting_schedule_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect (case_supporting_schedule_reviewed ?trial_balance_check_case)
+  )
+  (:action attach_compliance_attachment_role_to_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?compliance_attachment - compliance_attachment_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (compliance_attachment_role_available ?compliance_attachment)
+        (not
+          (case_compliance_attachment_role_assigned ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_compliance_attachment_role_assigned ?trial_balance_check_case)
+        (compliance_attachment_role_linked_to_case ?trial_balance_check_case ?compliance_attachment)
+        (not
+          (compliance_attachment_role_available ?compliance_attachment)
+        )
+      )
+  )
+  (:action link_compliance_attachment_role_and_confirm_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package ?supporting_document - supporting_document_role ?compliance_attachment - compliance_attachment_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_included ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (supporting_document_role_linked ?trial_balance_check_case ?supporting_document)
+        (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        (case_compliance_attachment_role_assigned ?trial_balance_check_case)
+        (compliance_attachment_role_linked_to_case ?trial_balance_check_case ?compliance_attachment)
+        (not
+          (case_supporting_schedule_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_supporting_schedule_reviewed ?trial_balance_check_case)
+        (case_compliance_attachment_role_confirmed ?trial_balance_check_case)
+      )
+  )
+  (:action attach_accounting_policy_reference_role_after_package_validation
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?accounting_policy_reference - accounting_policy_reference_role ?approver - approver ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_supporting_schedule_reviewed ?trial_balance_check_case)
+        (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case ?accounting_policy_reference)
+        (assigned_approver ?trial_balance_check_case ?approver)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (not
+          (reconciliation_package_has_variance_flag ?reconciliation_package)
+        )
+        (not
+          (case_has_evidence_attached ?trial_balance_check_case)
+        )
+      )
+    :effect (case_has_evidence_attached ?trial_balance_check_case)
+  )
+  (:action attach_accounting_policy_reference_role_after_package_exception_validation
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?accounting_policy_reference - accounting_policy_reference_role ?approver - approver ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_supporting_schedule_reviewed ?trial_balance_check_case)
+        (accounting_policy_reference_role_linked_to_case ?trial_balance_check_case ?accounting_policy_reference)
+        (assigned_approver ?trial_balance_check_case ?approver)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (reconciliation_package_has_variance_flag ?reconciliation_package)
+        (not
+          (case_has_evidence_attached ?trial_balance_check_case)
+        )
+      )
+    :effect (case_has_evidence_attached ?trial_balance_check_case)
+  )
+  (:action progress_case_through_multi_evidence_gate
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_has_evidence_attached ?trial_balance_check_case)
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (not
+          (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        )
+        (not
+          (reconciliation_package_has_variance_flag ?reconciliation_package)
+        )
+        (not
+          (case_final_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect (case_final_reviewed ?trial_balance_check_case)
+  )
+  (:action progress_case_through_multi_evidence_and_apply_quality_review
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_has_evidence_attached ?trial_balance_check_case)
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        (not
+          (reconciliation_package_has_variance_flag ?reconciliation_package)
+        )
+        (not
+          (case_final_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_quality_review_completed ?trial_balance_check_case)
+      )
+  )
+  (:action progress_case_through_multi_evidence_and_apply_quality_review_alt
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_has_evidence_attached ?trial_balance_check_case)
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (not
+          (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        )
+        (reconciliation_package_has_variance_flag ?reconciliation_package)
+        (not
+          (case_final_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_quality_review_completed ?trial_balance_check_case)
+      )
+  )
+  (:action progress_case_through_multi_evidence_and_apply_quality_review_full
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role ?supporting_schedule - supporting_schedule ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (case_has_evidence_attached ?trial_balance_check_case)
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (case_has_supporting_schedule ?trial_balance_check_case ?supporting_schedule)
+        (supporting_schedule_linked_to_package ?supporting_schedule ?reconciliation_package)
+        (reconciliation_package_has_checkpoint_flag ?reconciliation_package)
+        (reconciliation_package_has_variance_flag ?reconciliation_package)
+        (not
+          (case_final_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_quality_review_completed ?trial_balance_check_case)
+      )
+  )
+  (:action finalize_case_signoff
+    :parameters (?trial_balance_check_case - trial_balance_check_case)
+    :precondition
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (not
+          (case_quality_review_completed ?trial_balance_check_case)
+        )
+        (not
+          (case_integrity_signed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_integrity_signed ?trial_balance_check_case)
+        (ready_for_integrity_signoff ?trial_balance_check_case)
+      )
+  )
+  (:action apply_quality_review_stamp_role_to_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?quality_review_stamp - quality_review_stamp_role)
+    :precondition
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_quality_review_completed ?trial_balance_check_case)
+        (quality_review_stamp_role_available ?quality_review_stamp)
+      )
+    :effect
+      (and
+        (case_has_quality_review_stamp_role ?trial_balance_check_case ?quality_review_stamp)
+        (not
+          (quality_review_stamp_role_available ?quality_review_stamp)
+        )
+      )
+  )
+  (:action perform_case_finalization_checks
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?ledger_reconciliation - ledger_reconciliation ?intercompany_reconciliation - intercompany_reconciliation ?supporting_document - supporting_document_role ?quality_review_stamp - quality_review_stamp_role)
+    :precondition
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_quality_review_completed ?trial_balance_check_case)
+        (case_has_quality_review_stamp_role ?trial_balance_check_case ?quality_review_stamp)
+        (case_has_ledger_recon ?trial_balance_check_case ?ledger_reconciliation)
+        (case_has_interco_recon ?trial_balance_check_case ?intercompany_reconciliation)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+        (supporting_document_role_linked ?trial_balance_check_case ?supporting_document)
+        (not
+          (case_ready_for_final_signoff ?trial_balance_check_case)
+        )
+      )
+    :effect (case_ready_for_final_signoff ?trial_balance_check_case)
+  )
+  (:action complete_case_signoff_after_final_checks
+    :parameters (?trial_balance_check_case - trial_balance_check_case)
+    :precondition
+      (and
+        (case_final_reviewed ?trial_balance_check_case)
+        (case_ready_for_final_signoff ?trial_balance_check_case)
+        (not
+          (case_integrity_signed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_integrity_signed ?trial_balance_check_case)
+        (ready_for_integrity_signoff ?trial_balance_check_case)
+      )
+  )
+  (:action attach_control_rationale_to_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?control_rationale_document - control_rationale_document ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (evidence_verified ?trial_balance_check_case)
+        (supporting_document_role_linked ?trial_balance_check_case ?supporting_document)
+        (control_rationale_available ?control_rationale_document)
+        (case_has_control_rationale ?trial_balance_check_case ?control_rationale_document)
+        (not
+          (case_control_rationale_attached ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_control_rationale_attached ?trial_balance_check_case)
+        (not
+          (control_rationale_available ?control_rationale_document)
+        )
+      )
+  )
+  (:action review_control_rationale_on_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?approver - approver)
+    :precondition
+      (and
+        (case_control_rationale_attached ?trial_balance_check_case)
+        (assigned_approver ?trial_balance_check_case ?approver)
+        (not
+          (case_control_rationale_reviewed ?trial_balance_check_case)
+        )
+      )
+    :effect (case_control_rationale_reviewed ?trial_balance_check_case)
+  )
+  (:action approve_control_rationale_on_case
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?audit_evidence_reference - audit_evidence_reference_role)
+    :precondition
+      (and
+        (case_control_rationale_reviewed ?trial_balance_check_case)
+        (audit_evidence_reference_linked_to_case ?trial_balance_check_case ?audit_evidence_reference)
+        (not
+          (case_control_rationale_approved ?trial_balance_check_case)
+        )
+      )
+    :effect (case_control_rationale_approved ?trial_balance_check_case)
+  )
+  (:action finalize_case_signoff_after_rationale_approval
+    :parameters (?trial_balance_check_case - trial_balance_check_case)
+    :precondition
+      (and
+        (case_control_rationale_approved ?trial_balance_check_case)
+        (not
+          (case_integrity_signed ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (case_integrity_signed ?trial_balance_check_case)
+        (ready_for_integrity_signoff ?trial_balance_check_case)
+      )
+  )
+  (:action finalize_ledger_reconciliation_signoff
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (ledger_recon_checkpoint_evaluated ?ledger_reconciliation)
+        (ledger_recon_ready_for_package ?ledger_reconciliation)
+        (reconciliation_package_populated ?reconciliation_package)
+        (reconciliation_package_ready_for_schedules ?reconciliation_package)
+        (not
+          (ready_for_integrity_signoff ?ledger_reconciliation)
+        )
+      )
+    :effect (ready_for_integrity_signoff ?ledger_reconciliation)
+  )
+  (:action finalize_intercompany_reconciliation_signoff
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?reconciliation_package - reconciliation_package)
+    :precondition
+      (and
+        (interco_recon_checkpoint_evaluated ?intercompany_reconciliation)
+        (interco_recon_ready_for_package ?intercompany_reconciliation)
+        (reconciliation_package_populated ?reconciliation_package)
+        (reconciliation_package_ready_for_schedules ?reconciliation_package)
+        (not
+          (ready_for_integrity_signoff ?intercompany_reconciliation)
+        )
+      )
+    :effect (ready_for_integrity_signoff ?intercompany_reconciliation)
+  )
+  (:action tag_tb_item_with_exception_role
+    :parameters (?trial_balance_line - trial_balance_item ?exception_tag - exception_tag_role ?supporting_document - supporting_document_role)
+    :precondition
+      (and
+        (ready_for_integrity_signoff ?trial_balance_line)
+        (supporting_document_role_linked ?trial_balance_line ?supporting_document)
+        (exception_tag_role_available ?exception_tag)
+        (not
+          (tb_item_exception_tagged_role ?trial_balance_line)
+        )
+      )
+    :effect
+      (and
+        (tb_item_exception_tagged_role ?trial_balance_line)
+        (tb_item_has_exception_tag_role ?trial_balance_line ?exception_tag)
+        (not
+          (exception_tag_role_available ?exception_tag)
+        )
+      )
+  )
+  (:action route_exception_tagged_ledger_recon_for_rework
+    :parameters (?ledger_reconciliation - ledger_reconciliation ?reviewer - reviewer ?exception_tag - exception_tag_role)
+    :precondition
+      (and
+        (tb_item_exception_tagged_role ?ledger_reconciliation)
+        (assigned_reviewer ?ledger_reconciliation ?reviewer)
+        (tb_item_has_exception_tag_role ?ledger_reconciliation ?exception_tag)
+        (not
+          (tb_item_finalized ?ledger_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (tb_item_finalized ?ledger_reconciliation)
+        (reviewer_available ?reviewer)
+        (exception_tag_role_available ?exception_tag)
+      )
+  )
+  (:action route_exception_tagged_interco_recon_for_rework
+    :parameters (?intercompany_reconciliation - intercompany_reconciliation ?reviewer - reviewer ?exception_tag - exception_tag_role)
+    :precondition
+      (and
+        (tb_item_exception_tagged_role ?intercompany_reconciliation)
+        (assigned_reviewer ?intercompany_reconciliation ?reviewer)
+        (tb_item_has_exception_tag_role ?intercompany_reconciliation ?exception_tag)
+        (not
+          (tb_item_finalized ?intercompany_reconciliation)
+        )
+      )
+    :effect
+      (and
+        (tb_item_finalized ?intercompany_reconciliation)
+        (reviewer_available ?reviewer)
+        (exception_tag_role_available ?exception_tag)
+      )
+  )
+  (:action route_exception_tagged_case_for_rework
+    :parameters (?trial_balance_check_case - trial_balance_check_case ?reviewer - reviewer ?exception_tag - exception_tag_role)
+    :precondition
+      (and
+        (tb_item_exception_tagged_role ?trial_balance_check_case)
+        (assigned_reviewer ?trial_balance_check_case ?reviewer)
+        (tb_item_has_exception_tag_role ?trial_balance_check_case ?exception_tag)
+        (not
+          (tb_item_finalized ?trial_balance_check_case)
+        )
+      )
+    :effect
+      (and
+        (tb_item_finalized ?trial_balance_check_case)
+        (reviewer_available ?reviewer)
+        (exception_tag_role_available ?exception_tag)
+      )
+  )
+)

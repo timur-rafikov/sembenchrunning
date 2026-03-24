@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain intraday_liquidity_buffer_allocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types account_group - object event_group - object slot_group - object target_group - object allocation_target - target_group buffer_unit - account_group payment_event - account_group approval_authority - account_group policy_parameter - account_group priority_class - account_group allocation_batch - account_group reserve_category - account_group execution_trigger - account_group instruction_token - event_group funding_instrument - event_group special_approval_token - event_group source_time_slot - slot_group destination_time_slot - slot_group transfer_order - slot_group entity_group - allocation_target plan_group - allocation_target source_account - entity_group destination_account - entity_group allocation_agent - plan_group)
+  (:predicates
+    (entity_registered ?allocation_target - allocation_target)
+    (entity_validated ?allocation_target - allocation_target)
+    (entity_buffer_reserved ?allocation_target - allocation_target)
+    (allocation_committed ?allocation_target - allocation_target)
+    (ready_for_execution ?allocation_target - allocation_target)
+    (entity_funded ?allocation_target - allocation_target)
+    (buffer_unit_available ?buffer_unit - buffer_unit)
+    (buffer_assigned_to_entity ?allocation_target - allocation_target ?buffer_unit - buffer_unit)
+    (payment_event_unassigned ?payment_event - payment_event)
+    (entity_payment_event_attached ?allocation_target - allocation_target ?payment_event - payment_event)
+    (approval_authority_available ?approval_authority - approval_authority)
+    (approval_assigned_to_entity ?allocation_target - allocation_target ?approval_authority - approval_authority)
+    (instruction_token_available ?instruction_token - instruction_token)
+    (instruction_assigned_to_source ?source_account - source_account ?instruction_token - instruction_token)
+    (instruction_assigned_to_destination ?destination_account - destination_account ?instruction_token - instruction_token)
+    (source_timeslot_linked ?source_account - source_account ?source_time_slot - source_time_slot)
+    (source_timeslot_selected ?source_time_slot - source_time_slot)
+    (source_timeslot_reserved ?source_time_slot - source_time_slot)
+    (source_ready_for_order ?source_account - source_account)
+    (destination_timeslot_linked ?destination_account - destination_account ?destination_time_slot - destination_time_slot)
+    (destination_timeslot_selected ?destination_time_slot - destination_time_slot)
+    (destination_timeslot_reserved ?destination_time_slot - destination_time_slot)
+    (destination_ready_for_order ?destination_account - destination_account)
+    (transfer_order_slot_available ?transfer_order - transfer_order)
+    (transfer_order_created ?transfer_order - transfer_order)
+    (order_linked_to_source_timeslot ?transfer_order - transfer_order ?source_time_slot - source_time_slot)
+    (order_linked_to_destination_timeslot ?transfer_order - transfer_order ?destination_time_slot - destination_time_slot)
+    (transfer_order_requires_source_confirmation ?transfer_order - transfer_order)
+    (transfer_order_requires_destination_confirmation ?transfer_order - transfer_order)
+    (transfer_order_confirmed_for_funding ?transfer_order - transfer_order)
+    (agent_assigned_to_source_account ?allocation_agent - allocation_agent ?source_account - source_account)
+    (agent_assigned_to_destination_account ?allocation_agent - allocation_agent ?destination_account - destination_account)
+    (agent_has_transfer_order ?allocation_agent - allocation_agent ?transfer_order - transfer_order)
+    (funding_instrument_available ?funding_instrument - funding_instrument)
+    (agent_has_funding_instrument ?allocation_agent - allocation_agent ?funding_instrument - funding_instrument)
+    (funding_instrument_allocated ?funding_instrument - funding_instrument)
+    (funding_instrument_assigned_to_order ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    (agent_instrument_binding_initiated ?allocation_agent - allocation_agent)
+    (agent_funding_attached ?allocation_agent - allocation_agent)
+    (agent_instrument_finalised ?allocation_agent - allocation_agent)
+    (policy_parameter_bound_to_agent ?allocation_agent - allocation_agent)
+    (agent_policy_applied_to_order ?allocation_agent - allocation_agent)
+    (agent_priority_confirmed ?allocation_agent - allocation_agent)
+    (agent_preparation_complete ?allocation_agent - allocation_agent)
+    (special_approval_token_available ?special_approval_token - special_approval_token)
+    (special_approval_assigned_to_agent ?allocation_agent - allocation_agent ?special_approval_token - special_approval_token)
+    (agent_special_approval_granted ?allocation_agent - allocation_agent)
+    (agent_authority_verified ?allocation_agent - allocation_agent)
+    (agent_trigger_ready ?allocation_agent - allocation_agent)
+    (policy_parameter_available ?policy_parameter - policy_parameter)
+    (agent_policy_parameter_assigned ?allocation_agent - allocation_agent ?policy_parameter - policy_parameter)
+    (priority_class_available ?priority_class - priority_class)
+    (agent_priority_assigned ?allocation_agent - allocation_agent ?priority_class - priority_class)
+    (reserve_category_available ?reserve_category - reserve_category)
+    (agent_reserve_category_assigned ?allocation_agent - allocation_agent ?reserve_category - reserve_category)
+    (execution_trigger_available ?execution_trigger - execution_trigger)
+    (agent_execution_trigger_assigned ?allocation_agent - allocation_agent ?execution_trigger - execution_trigger)
+    (allocation_batch_available ?allocation_batch - allocation_batch)
+    (entity_assigned_to_batch ?allocation_target - allocation_target ?allocation_batch - allocation_batch)
+    (source_slot_locked ?source_account - source_account)
+    (destination_slot_locked ?destination_account - destination_account)
+    (agent_acknowledged ?allocation_agent - allocation_agent)
+  )
+  (:action register_allocation_target
+    :parameters (?allocation_target - allocation_target)
+    :precondition
+      (and
+        (not
+          (entity_registered ?allocation_target)
+        )
+        (not
+          (allocation_committed ?allocation_target)
+        )
+      )
+    :effect (entity_registered ?allocation_target)
+  )
+  (:action reserve_buffer_for_target
+    :parameters (?allocation_target - allocation_target ?buffer_unit - buffer_unit)
+    :precondition
+      (and
+        (entity_registered ?allocation_target)
+        (not
+          (entity_buffer_reserved ?allocation_target)
+        )
+        (buffer_unit_available ?buffer_unit)
+      )
+    :effect
+      (and
+        (entity_buffer_reserved ?allocation_target)
+        (buffer_assigned_to_entity ?allocation_target ?buffer_unit)
+        (not
+          (buffer_unit_available ?buffer_unit)
+        )
+      )
+  )
+  (:action attach_payment_event_to_target
+    :parameters (?allocation_target - allocation_target ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_registered ?allocation_target)
+        (entity_buffer_reserved ?allocation_target)
+        (payment_event_unassigned ?payment_event)
+      )
+    :effect
+      (and
+        (entity_payment_event_attached ?allocation_target ?payment_event)
+        (not
+          (payment_event_unassigned ?payment_event)
+        )
+      )
+  )
+  (:action validate_registered_target
+    :parameters (?allocation_target - allocation_target ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_registered ?allocation_target)
+        (entity_buffer_reserved ?allocation_target)
+        (entity_payment_event_attached ?allocation_target ?payment_event)
+        (not
+          (entity_validated ?allocation_target)
+        )
+      )
+    :effect (entity_validated ?allocation_target)
+  )
+  (:action release_payment_event
+    :parameters (?allocation_target - allocation_target ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_payment_event_attached ?allocation_target ?payment_event)
+      )
+    :effect
+      (and
+        (payment_event_unassigned ?payment_event)
+        (not
+          (entity_payment_event_attached ?allocation_target ?payment_event)
+        )
+      )
+  )
+  (:action assign_approval_authority
+    :parameters (?allocation_target - allocation_target ?approval_authority - approval_authority)
+    :precondition
+      (and
+        (entity_validated ?allocation_target)
+        (approval_authority_available ?approval_authority)
+      )
+    :effect
+      (and
+        (approval_assigned_to_entity ?allocation_target ?approval_authority)
+        (not
+          (approval_authority_available ?approval_authority)
+        )
+      )
+  )
+  (:action revoke_approval_assignment
+    :parameters (?allocation_target - allocation_target ?approval_authority - approval_authority)
+    :precondition
+      (and
+        (approval_assigned_to_entity ?allocation_target ?approval_authority)
+      )
+    :effect
+      (and
+        (approval_authority_available ?approval_authority)
+        (not
+          (approval_assigned_to_entity ?allocation_target ?approval_authority)
+        )
+      )
+  )
+  (:action assign_reserve_category_to_agent
+    :parameters (?allocation_agent - allocation_agent ?reserve_category - reserve_category)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (reserve_category_available ?reserve_category)
+      )
+    :effect
+      (and
+        (agent_reserve_category_assigned ?allocation_agent ?reserve_category)
+        (not
+          (reserve_category_available ?reserve_category)
+        )
+      )
+  )
+  (:action revoke_reserve_category_from_agent
+    :parameters (?allocation_agent - allocation_agent ?reserve_category - reserve_category)
+    :precondition
+      (and
+        (agent_reserve_category_assigned ?allocation_agent ?reserve_category)
+      )
+    :effect
+      (and
+        (reserve_category_available ?reserve_category)
+        (not
+          (agent_reserve_category_assigned ?allocation_agent ?reserve_category)
+        )
+      )
+  )
+  (:action assign_execution_trigger_to_agent
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (execution_trigger_available ?execution_trigger)
+      )
+    :effect
+      (and
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (not
+          (execution_trigger_available ?execution_trigger)
+        )
+      )
+  )
+  (:action revoke_execution_trigger_from_agent
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger)
+    :precondition
+      (and
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+      )
+    :effect
+      (and
+        (execution_trigger_available ?execution_trigger)
+        (not
+          (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        )
+      )
+  )
+  (:action propose_source_time_slot
+    :parameters (?source_account - source_account ?source_time_slot - source_time_slot ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_validated ?source_account)
+        (entity_payment_event_attached ?source_account ?payment_event)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (not
+          (source_timeslot_selected ?source_time_slot)
+        )
+        (not
+          (source_timeslot_reserved ?source_time_slot)
+        )
+      )
+    :effect (source_timeslot_selected ?source_time_slot)
+  )
+  (:action confirm_source_time_slot_with_authority
+    :parameters (?source_account - source_account ?source_time_slot - source_time_slot ?approval_authority - approval_authority)
+    :precondition
+      (and
+        (entity_validated ?source_account)
+        (approval_assigned_to_entity ?source_account ?approval_authority)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (source_timeslot_selected ?source_time_slot)
+        (not
+          (source_slot_locked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_slot_locked ?source_account)
+        (source_ready_for_order ?source_account)
+      )
+  )
+  (:action reserve_source_time_slot_with_instruction
+    :parameters (?source_account - source_account ?source_time_slot - source_time_slot ?instruction_token - instruction_token)
+    :precondition
+      (and
+        (entity_validated ?source_account)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (instruction_token_available ?instruction_token)
+        (not
+          (source_slot_locked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_timeslot_reserved ?source_time_slot)
+        (source_slot_locked ?source_account)
+        (instruction_assigned_to_source ?source_account ?instruction_token)
+        (not
+          (instruction_token_available ?instruction_token)
+        )
+      )
+  )
+  (:action exchange_instruction_and_confirm_source_slot
+    :parameters (?source_account - source_account ?source_time_slot - source_time_slot ?payment_event - payment_event ?instruction_token - instruction_token)
+    :precondition
+      (and
+        (entity_validated ?source_account)
+        (entity_payment_event_attached ?source_account ?payment_event)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (source_timeslot_reserved ?source_time_slot)
+        (instruction_assigned_to_source ?source_account ?instruction_token)
+        (not
+          (source_ready_for_order ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_timeslot_selected ?source_time_slot)
+        (source_ready_for_order ?source_account)
+        (instruction_token_available ?instruction_token)
+        (not
+          (instruction_assigned_to_source ?source_account ?instruction_token)
+        )
+      )
+  )
+  (:action propose_destination_time_slot
+    :parameters (?destination_account - destination_account ?destination_time_slot - destination_time_slot ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_validated ?destination_account)
+        (entity_payment_event_attached ?destination_account ?payment_event)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (not
+          (destination_timeslot_selected ?destination_time_slot)
+        )
+        (not
+          (destination_timeslot_reserved ?destination_time_slot)
+        )
+      )
+    :effect (destination_timeslot_selected ?destination_time_slot)
+  )
+  (:action confirm_destination_time_slot_with_authority
+    :parameters (?destination_account - destination_account ?destination_time_slot - destination_time_slot ?approval_authority - approval_authority)
+    :precondition
+      (and
+        (entity_validated ?destination_account)
+        (approval_assigned_to_entity ?destination_account ?approval_authority)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (destination_timeslot_selected ?destination_time_slot)
+        (not
+          (destination_slot_locked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_locked ?destination_account)
+        (destination_ready_for_order ?destination_account)
+      )
+  )
+  (:action reserve_destination_time_slot_with_instruction
+    :parameters (?destination_account - destination_account ?destination_time_slot - destination_time_slot ?instruction_token - instruction_token)
+    :precondition
+      (and
+        (entity_validated ?destination_account)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (instruction_token_available ?instruction_token)
+        (not
+          (destination_slot_locked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (destination_timeslot_reserved ?destination_time_slot)
+        (destination_slot_locked ?destination_account)
+        (instruction_assigned_to_destination ?destination_account ?instruction_token)
+        (not
+          (instruction_token_available ?instruction_token)
+        )
+      )
+  )
+  (:action exchange_instruction_and_confirm_destination_slot
+    :parameters (?destination_account - destination_account ?destination_time_slot - destination_time_slot ?payment_event - payment_event ?instruction_token - instruction_token)
+    :precondition
+      (and
+        (entity_validated ?destination_account)
+        (entity_payment_event_attached ?destination_account ?payment_event)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (destination_timeslot_reserved ?destination_time_slot)
+        (instruction_assigned_to_destination ?destination_account ?instruction_token)
+        (not
+          (destination_ready_for_order ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (destination_timeslot_selected ?destination_time_slot)
+        (destination_ready_for_order ?destination_account)
+        (instruction_token_available ?instruction_token)
+        (not
+          (instruction_assigned_to_destination ?destination_account ?instruction_token)
+        )
+      )
+  )
+  (:action construct_transfer_order_basic
+    :parameters (?source_account - source_account ?destination_account - destination_account ?source_time_slot - source_time_slot ?destination_time_slot - destination_time_slot ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (source_slot_locked ?source_account)
+        (destination_slot_locked ?destination_account)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (source_timeslot_selected ?source_time_slot)
+        (destination_timeslot_selected ?destination_time_slot)
+        (source_ready_for_order ?source_account)
+        (destination_ready_for_order ?destination_account)
+        (transfer_order_slot_available ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (order_linked_to_source_timeslot ?transfer_order ?source_time_slot)
+        (order_linked_to_destination_timeslot ?transfer_order ?destination_time_slot)
+        (not
+          (transfer_order_slot_available ?transfer_order)
+        )
+      )
+  )
+  (:action construct_transfer_order_source_locked
+    :parameters (?source_account - source_account ?destination_account - destination_account ?source_time_slot - source_time_slot ?destination_time_slot - destination_time_slot ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (source_slot_locked ?source_account)
+        (destination_slot_locked ?destination_account)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (source_timeslot_reserved ?source_time_slot)
+        (destination_timeslot_selected ?destination_time_slot)
+        (not
+          (source_ready_for_order ?source_account)
+        )
+        (destination_ready_for_order ?destination_account)
+        (transfer_order_slot_available ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (order_linked_to_source_timeslot ?transfer_order ?source_time_slot)
+        (order_linked_to_destination_timeslot ?transfer_order ?destination_time_slot)
+        (transfer_order_requires_source_confirmation ?transfer_order)
+        (not
+          (transfer_order_slot_available ?transfer_order)
+        )
+      )
+  )
+  (:action construct_transfer_order_destination_locked
+    :parameters (?source_account - source_account ?destination_account - destination_account ?source_time_slot - source_time_slot ?destination_time_slot - destination_time_slot ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (source_slot_locked ?source_account)
+        (destination_slot_locked ?destination_account)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (source_timeslot_selected ?source_time_slot)
+        (destination_timeslot_reserved ?destination_time_slot)
+        (source_ready_for_order ?source_account)
+        (not
+          (destination_ready_for_order ?destination_account)
+        )
+        (transfer_order_slot_available ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (order_linked_to_source_timeslot ?transfer_order ?source_time_slot)
+        (order_linked_to_destination_timeslot ?transfer_order ?destination_time_slot)
+        (transfer_order_requires_destination_confirmation ?transfer_order)
+        (not
+          (transfer_order_slot_available ?transfer_order)
+        )
+      )
+  )
+  (:action construct_transfer_order_both_locked
+    :parameters (?source_account - source_account ?destination_account - destination_account ?source_time_slot - source_time_slot ?destination_time_slot - destination_time_slot ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (source_slot_locked ?source_account)
+        (destination_slot_locked ?destination_account)
+        (source_timeslot_linked ?source_account ?source_time_slot)
+        (destination_timeslot_linked ?destination_account ?destination_time_slot)
+        (source_timeslot_reserved ?source_time_slot)
+        (destination_timeslot_reserved ?destination_time_slot)
+        (not
+          (source_ready_for_order ?source_account)
+        )
+        (not
+          (destination_ready_for_order ?destination_account)
+        )
+        (transfer_order_slot_available ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (order_linked_to_source_timeslot ?transfer_order ?source_time_slot)
+        (order_linked_to_destination_timeslot ?transfer_order ?destination_time_slot)
+        (transfer_order_requires_source_confirmation ?transfer_order)
+        (transfer_order_requires_destination_confirmation ?transfer_order)
+        (not
+          (transfer_order_slot_available ?transfer_order)
+        )
+      )
+  )
+  (:action confirm_transfer_order_for_funding
+    :parameters (?transfer_order - transfer_order ?source_account - source_account ?payment_event - payment_event)
+    :precondition
+      (and
+        (transfer_order_created ?transfer_order)
+        (source_slot_locked ?source_account)
+        (entity_payment_event_attached ?source_account ?payment_event)
+        (not
+          (transfer_order_confirmed_for_funding ?transfer_order)
+        )
+      )
+    :effect (transfer_order_confirmed_for_funding ?transfer_order)
+  )
+  (:action allocate_funding_instrument_to_order
+    :parameters (?allocation_agent - allocation_agent ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (agent_has_transfer_order ?allocation_agent ?transfer_order)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_available ?funding_instrument)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_confirmed_for_funding ?transfer_order)
+        (not
+          (funding_instrument_allocated ?funding_instrument)
+        )
+      )
+    :effect
+      (and
+        (funding_instrument_allocated ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (not
+          (funding_instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action bind_funding_instrument_to_agent_for_order
+    :parameters (?allocation_agent - allocation_agent ?funding_instrument - funding_instrument ?transfer_order - transfer_order ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_allocated ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (entity_payment_event_attached ?allocation_agent ?payment_event)
+        (not
+          (transfer_order_requires_source_confirmation ?transfer_order)
+        )
+        (not
+          (agent_instrument_binding_initiated ?allocation_agent)
+        )
+      )
+    :effect (agent_instrument_binding_initiated ?allocation_agent)
+  )
+  (:action assign_policy_parameter_to_agent
+    :parameters (?allocation_agent - allocation_agent ?policy_parameter - policy_parameter)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (policy_parameter_available ?policy_parameter)
+        (not
+          (policy_parameter_bound_to_agent ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (policy_parameter_bound_to_agent ?allocation_agent)
+        (agent_policy_parameter_assigned ?allocation_agent ?policy_parameter)
+        (not
+          (policy_parameter_available ?policy_parameter)
+        )
+      )
+  )
+  (:action apply_policy_and_instrument_to_agent_order
+    :parameters (?allocation_agent - allocation_agent ?funding_instrument - funding_instrument ?transfer_order - transfer_order ?payment_event - payment_event ?policy_parameter - policy_parameter)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_allocated ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (entity_payment_event_attached ?allocation_agent ?payment_event)
+        (transfer_order_requires_source_confirmation ?transfer_order)
+        (policy_parameter_bound_to_agent ?allocation_agent)
+        (agent_policy_parameter_assigned ?allocation_agent ?policy_parameter)
+        (not
+          (agent_instrument_binding_initiated ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_instrument_binding_initiated ?allocation_agent)
+        (agent_policy_applied_to_order ?allocation_agent)
+      )
+  )
+  (:action attach_instrument_with_reserve_and_authority
+    :parameters (?allocation_agent - allocation_agent ?reserve_category - reserve_category ?approval_authority - approval_authority ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_instrument_binding_initiated ?allocation_agent)
+        (agent_reserve_category_assigned ?allocation_agent ?reserve_category)
+        (approval_assigned_to_entity ?allocation_agent ?approval_authority)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (not
+          (transfer_order_requires_destination_confirmation ?transfer_order)
+        )
+        (not
+          (agent_funding_attached ?allocation_agent)
+        )
+      )
+    :effect (agent_funding_attached ?allocation_agent)
+  )
+  (:action attach_instrument_with_reserve_and_authority_confirm
+    :parameters (?allocation_agent - allocation_agent ?reserve_category - reserve_category ?approval_authority - approval_authority ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_instrument_binding_initiated ?allocation_agent)
+        (agent_reserve_category_assigned ?allocation_agent ?reserve_category)
+        (approval_assigned_to_entity ?allocation_agent ?approval_authority)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (transfer_order_requires_destination_confirmation ?transfer_order)
+        (not
+          (agent_funding_attached ?allocation_agent)
+        )
+      )
+    :effect (agent_funding_attached ?allocation_agent)
+  )
+  (:action stage_execution_trigger_for_agent
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_funding_attached ?allocation_agent)
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (not
+          (transfer_order_requires_source_confirmation ?transfer_order)
+        )
+        (not
+          (transfer_order_requires_destination_confirmation ?transfer_order)
+        )
+        (not
+          (agent_instrument_finalised ?allocation_agent)
+        )
+      )
+    :effect (agent_instrument_finalised ?allocation_agent)
+  )
+  (:action stage_execution_trigger_and_confirm_priority_variant_a
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_funding_attached ?allocation_agent)
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (transfer_order_requires_source_confirmation ?transfer_order)
+        (not
+          (transfer_order_requires_destination_confirmation ?transfer_order)
+        )
+        (not
+          (agent_instrument_finalised ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_priority_confirmed ?allocation_agent)
+      )
+  )
+  (:action stage_execution_trigger_and_confirm_priority_variant_b
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_funding_attached ?allocation_agent)
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (not
+          (transfer_order_requires_source_confirmation ?transfer_order)
+        )
+        (transfer_order_requires_destination_confirmation ?transfer_order)
+        (not
+          (agent_instrument_finalised ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_priority_confirmed ?allocation_agent)
+      )
+  )
+  (:action stage_execution_trigger_and_confirm_priority_variant_c
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger ?funding_instrument - funding_instrument ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (agent_funding_attached ?allocation_agent)
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (agent_has_funding_instrument ?allocation_agent ?funding_instrument)
+        (funding_instrument_assigned_to_order ?funding_instrument ?transfer_order)
+        (transfer_order_requires_source_confirmation ?transfer_order)
+        (transfer_order_requires_destination_confirmation ?transfer_order)
+        (not
+          (agent_instrument_finalised ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_priority_confirmed ?allocation_agent)
+      )
+  )
+  (:action agent_acknowledge_and_mark_ready
+    :parameters (?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (not
+          (agent_priority_confirmed ?allocation_agent)
+        )
+        (not
+          (agent_acknowledged ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_acknowledged ?allocation_agent)
+        (ready_for_execution ?allocation_agent)
+      )
+  )
+  (:action assign_priority_class_to_agent
+    :parameters (?allocation_agent - allocation_agent ?priority_class - priority_class)
+    :precondition
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_priority_confirmed ?allocation_agent)
+        (priority_class_available ?priority_class)
+      )
+    :effect
+      (and
+        (agent_priority_assigned ?allocation_agent ?priority_class)
+        (not
+          (priority_class_available ?priority_class)
+        )
+      )
+  )
+  (:action prepare_agent_for_execution
+    :parameters (?allocation_agent - allocation_agent ?source_account - source_account ?destination_account - destination_account ?payment_event - payment_event ?priority_class - priority_class)
+    :precondition
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_priority_confirmed ?allocation_agent)
+        (agent_priority_assigned ?allocation_agent ?priority_class)
+        (agent_assigned_to_source_account ?allocation_agent ?source_account)
+        (agent_assigned_to_destination_account ?allocation_agent ?destination_account)
+        (source_ready_for_order ?source_account)
+        (destination_ready_for_order ?destination_account)
+        (entity_payment_event_attached ?allocation_agent ?payment_event)
+        (not
+          (agent_preparation_complete ?allocation_agent)
+        )
+      )
+    :effect (agent_preparation_complete ?allocation_agent)
+  )
+  (:action confirm_agent_readiness
+    :parameters (?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (agent_instrument_finalised ?allocation_agent)
+        (agent_preparation_complete ?allocation_agent)
+        (not
+          (agent_acknowledged ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_acknowledged ?allocation_agent)
+        (ready_for_execution ?allocation_agent)
+      )
+  )
+  (:action grant_special_approval_to_agent
+    :parameters (?allocation_agent - allocation_agent ?special_approval_token - special_approval_token ?payment_event - payment_event)
+    :precondition
+      (and
+        (entity_validated ?allocation_agent)
+        (entity_payment_event_attached ?allocation_agent ?payment_event)
+        (special_approval_token_available ?special_approval_token)
+        (special_approval_assigned_to_agent ?allocation_agent ?special_approval_token)
+        (not
+          (agent_special_approval_granted ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_special_approval_granted ?allocation_agent)
+        (not
+          (special_approval_token_available ?special_approval_token)
+        )
+      )
+  )
+  (:action agent_acknowledge_special_approval
+    :parameters (?allocation_agent - allocation_agent ?approval_authority - approval_authority)
+    :precondition
+      (and
+        (agent_special_approval_granted ?allocation_agent)
+        (approval_assigned_to_entity ?allocation_agent ?approval_authority)
+        (not
+          (agent_authority_verified ?allocation_agent)
+        )
+      )
+    :effect (agent_authority_verified ?allocation_agent)
+  )
+  (:action attach_execution_trigger_to_agent_post_authority
+    :parameters (?allocation_agent - allocation_agent ?execution_trigger - execution_trigger)
+    :precondition
+      (and
+        (agent_authority_verified ?allocation_agent)
+        (agent_execution_trigger_assigned ?allocation_agent ?execution_trigger)
+        (not
+          (agent_trigger_ready ?allocation_agent)
+        )
+      )
+    :effect (agent_trigger_ready ?allocation_agent)
+  )
+  (:action finalise_authority_and_mark_agent_ready
+    :parameters (?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (agent_trigger_ready ?allocation_agent)
+        (not
+          (agent_acknowledged ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_acknowledged ?allocation_agent)
+        (ready_for_execution ?allocation_agent)
+      )
+  )
+  (:action finalise_source_account_allocation
+    :parameters (?source_account - source_account ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (source_slot_locked ?source_account)
+        (source_ready_for_order ?source_account)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_confirmed_for_funding ?transfer_order)
+        (not
+          (ready_for_execution ?source_account)
+        )
+      )
+    :effect (ready_for_execution ?source_account)
+  )
+  (:action finalise_destination_account_allocation
+    :parameters (?destination_account - destination_account ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (destination_slot_locked ?destination_account)
+        (destination_ready_for_order ?destination_account)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_confirmed_for_funding ?transfer_order)
+        (not
+          (ready_for_execution ?destination_account)
+        )
+      )
+    :effect (ready_for_execution ?destination_account)
+  )
+  (:action fund_allocation_for_target
+    :parameters (?allocation_target - allocation_target ?allocation_batch - allocation_batch ?payment_event - payment_event)
+    :precondition
+      (and
+        (ready_for_execution ?allocation_target)
+        (entity_payment_event_attached ?allocation_target ?payment_event)
+        (allocation_batch_available ?allocation_batch)
+        (not
+          (entity_funded ?allocation_target)
+        )
+      )
+    :effect
+      (and
+        (entity_funded ?allocation_target)
+        (entity_assigned_to_batch ?allocation_target ?allocation_batch)
+        (not
+          (allocation_batch_available ?allocation_batch)
+        )
+      )
+  )
+  (:action commit_allocation_on_source_account
+    :parameters (?source_account - source_account ?buffer_unit - buffer_unit ?allocation_batch - allocation_batch)
+    :precondition
+      (and
+        (entity_funded ?source_account)
+        (buffer_assigned_to_entity ?source_account ?buffer_unit)
+        (entity_assigned_to_batch ?source_account ?allocation_batch)
+        (not
+          (allocation_committed ?source_account)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?source_account)
+        (buffer_unit_available ?buffer_unit)
+        (allocation_batch_available ?allocation_batch)
+      )
+  )
+  (:action commit_allocation_on_destination_account
+    :parameters (?destination_account - destination_account ?buffer_unit - buffer_unit ?allocation_batch - allocation_batch)
+    :precondition
+      (and
+        (entity_funded ?destination_account)
+        (buffer_assigned_to_entity ?destination_account ?buffer_unit)
+        (entity_assigned_to_batch ?destination_account ?allocation_batch)
+        (not
+          (allocation_committed ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?destination_account)
+        (buffer_unit_available ?buffer_unit)
+        (allocation_batch_available ?allocation_batch)
+      )
+  )
+  (:action commit_allocation_on_agent
+    :parameters (?allocation_agent - allocation_agent ?buffer_unit - buffer_unit ?allocation_batch - allocation_batch)
+    :precondition
+      (and
+        (entity_funded ?allocation_agent)
+        (buffer_assigned_to_entity ?allocation_agent ?buffer_unit)
+        (entity_assigned_to_batch ?allocation_agent ?allocation_batch)
+        (not
+          (allocation_committed ?allocation_agent)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?allocation_agent)
+        (buffer_unit_available ?buffer_unit)
+        (allocation_batch_available ?allocation_batch)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem intraday_buffer_allocation_scenario)
+  (:domain intraday_liquidity_buffer_allocation_domain)
+  (:objects source_account_main - source_account destination_account_clearing - destination_account allocation_agent_alpha - allocation_agent allocation_agent_beta - allocation_agent buffer_unit_a - buffer_unit buffer_unit_b - buffer_unit buffer_unit_c - buffer_unit payment_event_0900 - payment_event approval_authority_treasury - approval_authority instruction_token_rule_1 - instruction_token source_time_slot_09_10 - source_time_slot destination_time_slot_10_11 - destination_time_slot transfer_order_slot_1 - transfer_order funding_instrument_a - funding_instrument funding_instrument_b - funding_instrument policy_parameter_regulatory - policy_parameter policy_parameter_internal - policy_parameter priority_high - priority_class priority_medium - priority_class allocation_batch_morning - allocation_batch reserve_category_regulatory - reserve_category special_approval_token_exemption - special_approval_token special_approval_token_escalation - special_approval_token execution_trigger_manual - execution_trigger)
+  (:init
+    (buffer_unit_available buffer_unit_a)
+    (buffer_unit_available buffer_unit_b)
+    (buffer_unit_available buffer_unit_c)
+    (payment_event_unassigned payment_event_0900)
+    (approval_authority_available approval_authority_treasury)
+    (instruction_token_available instruction_token_rule_1)
+    (source_timeslot_linked source_account_main source_time_slot_09_10)
+    (destination_timeslot_linked destination_account_clearing destination_time_slot_10_11)
+    (transfer_order_slot_available transfer_order_slot_1)
+    (funding_instrument_available funding_instrument_a)
+    (funding_instrument_available funding_instrument_b)
+    (agent_assigned_to_source_account allocation_agent_alpha source_account_main)
+    (agent_assigned_to_source_account allocation_agent_beta source_account_main)
+    (agent_assigned_to_destination_account allocation_agent_alpha destination_account_clearing)
+    (agent_assigned_to_destination_account allocation_agent_beta destination_account_clearing)
+    (agent_has_transfer_order allocation_agent_alpha transfer_order_slot_1)
+    (agent_has_transfer_order allocation_agent_beta transfer_order_slot_1)
+    (agent_has_funding_instrument allocation_agent_alpha funding_instrument_a)
+    (agent_has_funding_instrument allocation_agent_beta funding_instrument_b)
+    (policy_parameter_available policy_parameter_regulatory)
+    (policy_parameter_available policy_parameter_internal)
+    (priority_class_available priority_high)
+    (priority_class_available priority_medium)
+    (allocation_batch_available allocation_batch_morning)
+    (reserve_category_available reserve_category_regulatory)
+    (special_approval_token_available special_approval_token_exemption)
+    (special_approval_assigned_to_agent allocation_agent_alpha special_approval_token_exemption)
+    (special_approval_assigned_to_agent allocation_agent_beta special_approval_token_escalation)
+    (execution_trigger_available execution_trigger_manual)
+  )
+  (:goal
+    (and
+      (allocation_committed source_account_main)
+      (allocation_committed destination_account_clearing)
+      (allocation_committed allocation_agent_alpha)
+      (allocation_committed allocation_agent_beta)
+    )
+  )
+)

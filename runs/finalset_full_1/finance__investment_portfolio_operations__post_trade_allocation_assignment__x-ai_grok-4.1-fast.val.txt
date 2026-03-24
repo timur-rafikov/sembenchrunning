@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain post_trade_allocation_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types allocation_component - object allocation_attribute - object business_artifact - object allocatable_root - object allocatable_entity - allocatable_root allocation_method - allocation_component security - allocation_component allocator - allocation_component approval_policy - allocation_component execution_profile - allocation_component allocation_profile - allocation_component compliance_check - allocation_component custody_instruction - allocation_component allocation_preference - allocation_attribute lot - allocation_attribute reason_code - allocation_attribute account_rule - business_artifact model_rule - business_artifact allocation_ticket - business_artifact account_type - allocatable_entity model_type - allocatable_entity client_account - account_type model_portfolio - account_type trade_instruction - model_type)
+  (:predicates
+    (allocation_candidate_registered ?allocatable_entity - allocatable_entity)
+    (allocation_initialized ?allocatable_entity - allocatable_entity)
+    (allocation_method_attached ?allocatable_entity - allocatable_entity)
+    (allocation_committed ?allocatable_entity - allocatable_entity)
+    (ready_for_assignment ?allocatable_entity - allocatable_entity)
+    (allocation_profile_attached ?allocatable_entity - allocatable_entity)
+    (allocation_method_available ?allocation_method - allocation_method)
+    (allocation_uses_method ?allocatable_entity - allocatable_entity ?allocation_method - allocation_method)
+    (security_available ?security - security)
+    (entity_has_security ?allocatable_entity - allocatable_entity ?security - security)
+    (allocator_available ?allocator - allocator)
+    (entity_has_allocator ?allocatable_entity - allocatable_entity ?allocator - allocator)
+    (allocation_preference_available ?allocation_preference - allocation_preference)
+    (account_has_preference ?client_account - client_account ?allocation_preference - allocation_preference)
+    (model_has_preference ?model_portfolio - model_portfolio ?allocation_preference - allocation_preference)
+    (account_rule_applicable ?client_account - client_account ?account_rule - account_rule)
+    (account_rule_flagged ?account_rule - account_rule)
+    (account_rule_preference_applied ?account_rule - account_rule)
+    (account_rule_confirmed ?client_account - client_account)
+    (model_rule_applicable ?model_portfolio - model_portfolio ?model_rule - model_rule)
+    (model_rule_flagged ?model_rule - model_rule)
+    (model_rule_preference_applied ?model_rule - model_rule)
+    (model_rule_confirmed ?model_portfolio - model_portfolio)
+    (ticket_unpopulated ?allocation_ticket - allocation_ticket)
+    (ticket_populated ?allocation_ticket - allocation_ticket)
+    (ticket_linked_account_rule ?allocation_ticket - allocation_ticket ?account_rule - account_rule)
+    (ticket_linked_model_rule ?allocation_ticket - allocation_ticket ?model_rule - model_rule)
+    (ticket_account_pref_flag ?allocation_ticket - allocation_ticket)
+    (ticket_model_pref_flag ?allocation_ticket - allocation_ticket)
+    (ticket_ready_for_lot_assignment ?allocation_ticket - allocation_ticket)
+    (instruction_targets_account ?trade_instruction - trade_instruction ?client_account - client_account)
+    (instruction_targets_model ?trade_instruction - trade_instruction ?model_portfolio - model_portfolio)
+    (instruction_linked_ticket ?trade_instruction - trade_instruction ?allocation_ticket - allocation_ticket)
+    (lot_available ?lot - lot)
+    (instruction_has_lot ?trade_instruction - trade_instruction ?lot - lot)
+    (lot_locked ?lot - lot)
+    (lot_assigned_to_ticket ?lot - lot ?allocation_ticket - allocation_ticket)
+    (instruction_lot_match_confirmed ?trade_instruction - trade_instruction)
+    (instruction_ready_for_validation ?trade_instruction - trade_instruction)
+    (instruction_validation_performed ?trade_instruction - trade_instruction)
+    (approval_policy_attached ?trade_instruction - trade_instruction)
+    (approval_policy_validated ?trade_instruction - trade_instruction)
+    (compliance_checks_passed ?trade_instruction - trade_instruction)
+    (final_checks_completed ?trade_instruction - trade_instruction)
+    (reason_code_available ?reason_code - reason_code)
+    (instruction_has_reason_code ?trade_instruction - trade_instruction ?reason_code - reason_code)
+    (instruction_reason_code_applied ?trade_instruction - trade_instruction)
+    (approval_requested ?trade_instruction - trade_instruction)
+    (instruction_approved ?trade_instruction - trade_instruction)
+    (approval_policy_available ?approval_policy - approval_policy)
+    (instruction_linked_approval_policy ?trade_instruction - trade_instruction ?approval_policy - approval_policy)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (instruction_linked_execution_profile ?trade_instruction - trade_instruction ?execution_profile - execution_profile)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (instruction_has_compliance_check ?trade_instruction - trade_instruction ?compliance_check - compliance_check)
+    (custody_instruction_available ?custody_instruction - custody_instruction)
+    (instruction_has_custody_instruction ?trade_instruction - trade_instruction ?custody_instruction - custody_instruction)
+    (allocation_profile_available ?allocation_profile - allocation_profile)
+    (entity_has_allocation_profile ?allocatable_entity - allocatable_entity ?allocation_profile - allocation_profile)
+    (account_eligibility_flag ?client_account - client_account)
+    (model_eligibility_flag ?model_portfolio - model_portfolio)
+    (instruction_finalized ?trade_instruction - trade_instruction)
+  )
+  (:action create_allocation_candidate
+    :parameters (?allocatable_entity - allocatable_entity)
+    :precondition
+      (and
+        (not
+          (allocation_candidate_registered ?allocatable_entity)
+        )
+        (not
+          (allocation_committed ?allocatable_entity)
+        )
+      )
+    :effect (allocation_candidate_registered ?allocatable_entity)
+  )
+  (:action attach_allocation_method
+    :parameters (?allocatable_entity - allocatable_entity ?allocation_method - allocation_method)
+    :precondition
+      (and
+        (allocation_candidate_registered ?allocatable_entity)
+        (not
+          (allocation_method_attached ?allocatable_entity)
+        )
+        (allocation_method_available ?allocation_method)
+      )
+    :effect
+      (and
+        (allocation_method_attached ?allocatable_entity)
+        (allocation_uses_method ?allocatable_entity ?allocation_method)
+        (not
+          (allocation_method_available ?allocation_method)
+        )
+      )
+  )
+  (:action link_security_to_allocatable
+    :parameters (?allocatable_entity - allocatable_entity ?security - security)
+    :precondition
+      (and
+        (allocation_candidate_registered ?allocatable_entity)
+        (allocation_method_attached ?allocatable_entity)
+        (security_available ?security)
+      )
+    :effect
+      (and
+        (entity_has_security ?allocatable_entity ?security)
+        (not
+          (security_available ?security)
+        )
+      )
+  )
+  (:action initialize_allocation_candidate
+    :parameters (?allocatable_entity - allocatable_entity ?security - security)
+    :precondition
+      (and
+        (allocation_candidate_registered ?allocatable_entity)
+        (allocation_method_attached ?allocatable_entity)
+        (entity_has_security ?allocatable_entity ?security)
+        (not
+          (allocation_initialized ?allocatable_entity)
+        )
+      )
+    :effect (allocation_initialized ?allocatable_entity)
+  )
+  (:action release_security_from_allocatable
+    :parameters (?allocatable_entity - allocatable_entity ?security - security)
+    :precondition
+      (and
+        (entity_has_security ?allocatable_entity ?security)
+      )
+    :effect
+      (and
+        (security_available ?security)
+        (not
+          (entity_has_security ?allocatable_entity ?security)
+        )
+      )
+  )
+  (:action assign_allocator
+    :parameters (?allocatable_entity - allocatable_entity ?allocator - allocator)
+    :precondition
+      (and
+        (allocation_initialized ?allocatable_entity)
+        (allocator_available ?allocator)
+      )
+    :effect
+      (and
+        (entity_has_allocator ?allocatable_entity ?allocator)
+        (not
+          (allocator_available ?allocator)
+        )
+      )
+  )
+  (:action release_allocator
+    :parameters (?allocatable_entity - allocatable_entity ?allocator - allocator)
+    :precondition
+      (and
+        (entity_has_allocator ?allocatable_entity ?allocator)
+      )
+    :effect
+      (and
+        (allocator_available ?allocator)
+        (not
+          (entity_has_allocator ?allocatable_entity ?allocator)
+        )
+      )
+  )
+  (:action attach_compliance_check_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (instruction_has_compliance_check ?trade_instruction ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action detach_compliance_check_from_instruction
+    :parameters (?trade_instruction - trade_instruction ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (instruction_has_compliance_check ?trade_instruction ?compliance_check)
+      )
+    :effect
+      (and
+        (compliance_check_available ?compliance_check)
+        (not
+          (instruction_has_compliance_check ?trade_instruction ?compliance_check)
+        )
+      )
+  )
+  (:action attach_custody_instruction_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (custody_instruction_available ?custody_instruction)
+      )
+    :effect
+      (and
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (not
+          (custody_instruction_available ?custody_instruction)
+        )
+      )
+  )
+  (:action detach_custody_instruction_from_instruction
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction)
+    :precondition
+      (and
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+      )
+    :effect
+      (and
+        (custody_instruction_available ?custody_instruction)
+        (not
+          (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        )
+      )
+  )
+  (:action evaluate_account_rule_for_security
+    :parameters (?client_account - client_account ?account_rule - account_rule ?security - security)
+    :precondition
+      (and
+        (allocation_initialized ?client_account)
+        (entity_has_security ?client_account ?security)
+        (account_rule_applicable ?client_account ?account_rule)
+        (not
+          (account_rule_flagged ?account_rule)
+        )
+        (not
+          (account_rule_preference_applied ?account_rule)
+        )
+      )
+    :effect (account_rule_flagged ?account_rule)
+  )
+  (:action confirm_account_eligibility_with_allocator
+    :parameters (?client_account - client_account ?account_rule - account_rule ?allocator - allocator)
+    :precondition
+      (and
+        (allocation_initialized ?client_account)
+        (entity_has_allocator ?client_account ?allocator)
+        (account_rule_applicable ?client_account ?account_rule)
+        (account_rule_flagged ?account_rule)
+        (not
+          (account_eligibility_flag ?client_account)
+        )
+      )
+    :effect
+      (and
+        (account_eligibility_flag ?client_account)
+        (account_rule_confirmed ?client_account)
+      )
+  )
+  (:action apply_allocation_preference_to_account
+    :parameters (?client_account - client_account ?account_rule - account_rule ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (allocation_initialized ?client_account)
+        (account_rule_applicable ?client_account ?account_rule)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (account_eligibility_flag ?client_account)
+        )
+      )
+    :effect
+      (and
+        (account_rule_preference_applied ?account_rule)
+        (account_eligibility_flag ?client_account)
+        (account_has_preference ?client_account ?allocation_preference)
+        (not
+          (allocation_preference_available ?allocation_preference)
+        )
+      )
+  )
+  (:action finalize_account_preference_assignment
+    :parameters (?client_account - client_account ?account_rule - account_rule ?security - security ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (allocation_initialized ?client_account)
+        (entity_has_security ?client_account ?security)
+        (account_rule_applicable ?client_account ?account_rule)
+        (account_rule_preference_applied ?account_rule)
+        (account_has_preference ?client_account ?allocation_preference)
+        (not
+          (account_rule_confirmed ?client_account)
+        )
+      )
+    :effect
+      (and
+        (account_rule_flagged ?account_rule)
+        (account_rule_confirmed ?client_account)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (account_has_preference ?client_account ?allocation_preference)
+        )
+      )
+  )
+  (:action evaluate_model_rule_for_security
+    :parameters (?model_portfolio - model_portfolio ?model_rule - model_rule ?security - security)
+    :precondition
+      (and
+        (allocation_initialized ?model_portfolio)
+        (entity_has_security ?model_portfolio ?security)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (not
+          (model_rule_flagged ?model_rule)
+        )
+        (not
+          (model_rule_preference_applied ?model_rule)
+        )
+      )
+    :effect (model_rule_flagged ?model_rule)
+  )
+  (:action confirm_model_eligibility_with_allocator
+    :parameters (?model_portfolio - model_portfolio ?model_rule - model_rule ?allocator - allocator)
+    :precondition
+      (and
+        (allocation_initialized ?model_portfolio)
+        (entity_has_allocator ?model_portfolio ?allocator)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (model_rule_flagged ?model_rule)
+        (not
+          (model_eligibility_flag ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (model_eligibility_flag ?model_portfolio)
+        (model_rule_confirmed ?model_portfolio)
+      )
+  )
+  (:action apply_allocation_preference_to_model
+    :parameters (?model_portfolio - model_portfolio ?model_rule - model_rule ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (allocation_initialized ?model_portfolio)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (model_eligibility_flag ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (model_rule_preference_applied ?model_rule)
+        (model_eligibility_flag ?model_portfolio)
+        (model_has_preference ?model_portfolio ?allocation_preference)
+        (not
+          (allocation_preference_available ?allocation_preference)
+        )
+      )
+  )
+  (:action finalize_model_preference_assignment
+    :parameters (?model_portfolio - model_portfolio ?model_rule - model_rule ?security - security ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (allocation_initialized ?model_portfolio)
+        (entity_has_security ?model_portfolio ?security)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (model_rule_preference_applied ?model_rule)
+        (model_has_preference ?model_portfolio ?allocation_preference)
+        (not
+          (model_rule_confirmed ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (model_rule_flagged ?model_rule)
+        (model_rule_confirmed ?model_portfolio)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (model_has_preference ?model_portfolio ?allocation_preference)
+        )
+      )
+  )
+  (:action build_allocation_ticket
+    :parameters (?client_account - client_account ?model_portfolio - model_portfolio ?account_rule - account_rule ?model_rule - model_rule ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (account_eligibility_flag ?client_account)
+        (model_eligibility_flag ?model_portfolio)
+        (account_rule_applicable ?client_account ?account_rule)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (account_rule_flagged ?account_rule)
+        (model_rule_flagged ?model_rule)
+        (account_rule_confirmed ?client_account)
+        (model_rule_confirmed ?model_portfolio)
+        (ticket_unpopulated ?allocation_ticket)
+      )
+    :effect
+      (and
+        (ticket_populated ?allocation_ticket)
+        (ticket_linked_account_rule ?allocation_ticket ?account_rule)
+        (ticket_linked_model_rule ?allocation_ticket ?model_rule)
+        (not
+          (ticket_unpopulated ?allocation_ticket)
+        )
+      )
+  )
+  (:action build_allocation_ticket_with_account_preference
+    :parameters (?client_account - client_account ?model_portfolio - model_portfolio ?account_rule - account_rule ?model_rule - model_rule ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (account_eligibility_flag ?client_account)
+        (model_eligibility_flag ?model_portfolio)
+        (account_rule_applicable ?client_account ?account_rule)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (account_rule_preference_applied ?account_rule)
+        (model_rule_flagged ?model_rule)
+        (not
+          (account_rule_confirmed ?client_account)
+        )
+        (model_rule_confirmed ?model_portfolio)
+        (ticket_unpopulated ?allocation_ticket)
+      )
+    :effect
+      (and
+        (ticket_populated ?allocation_ticket)
+        (ticket_linked_account_rule ?allocation_ticket ?account_rule)
+        (ticket_linked_model_rule ?allocation_ticket ?model_rule)
+        (ticket_account_pref_flag ?allocation_ticket)
+        (not
+          (ticket_unpopulated ?allocation_ticket)
+        )
+      )
+  )
+  (:action build_allocation_ticket_with_model_preference
+    :parameters (?client_account - client_account ?model_portfolio - model_portfolio ?account_rule - account_rule ?model_rule - model_rule ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (account_eligibility_flag ?client_account)
+        (model_eligibility_flag ?model_portfolio)
+        (account_rule_applicable ?client_account ?account_rule)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (account_rule_flagged ?account_rule)
+        (model_rule_preference_applied ?model_rule)
+        (account_rule_confirmed ?client_account)
+        (not
+          (model_rule_confirmed ?model_portfolio)
+        )
+        (ticket_unpopulated ?allocation_ticket)
+      )
+    :effect
+      (and
+        (ticket_populated ?allocation_ticket)
+        (ticket_linked_account_rule ?allocation_ticket ?account_rule)
+        (ticket_linked_model_rule ?allocation_ticket ?model_rule)
+        (ticket_model_pref_flag ?allocation_ticket)
+        (not
+          (ticket_unpopulated ?allocation_ticket)
+        )
+      )
+  )
+  (:action build_allocation_ticket_with_both_preferences
+    :parameters (?client_account - client_account ?model_portfolio - model_portfolio ?account_rule - account_rule ?model_rule - model_rule ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (account_eligibility_flag ?client_account)
+        (model_eligibility_flag ?model_portfolio)
+        (account_rule_applicable ?client_account ?account_rule)
+        (model_rule_applicable ?model_portfolio ?model_rule)
+        (account_rule_preference_applied ?account_rule)
+        (model_rule_preference_applied ?model_rule)
+        (not
+          (account_rule_confirmed ?client_account)
+        )
+        (not
+          (model_rule_confirmed ?model_portfolio)
+        )
+        (ticket_unpopulated ?allocation_ticket)
+      )
+    :effect
+      (and
+        (ticket_populated ?allocation_ticket)
+        (ticket_linked_account_rule ?allocation_ticket ?account_rule)
+        (ticket_linked_model_rule ?allocation_ticket ?model_rule)
+        (ticket_account_pref_flag ?allocation_ticket)
+        (ticket_model_pref_flag ?allocation_ticket)
+        (not
+          (ticket_unpopulated ?allocation_ticket)
+        )
+      )
+  )
+  (:action prepare_ticket_for_lot_assignment
+    :parameters (?allocation_ticket - allocation_ticket ?client_account - client_account ?security - security)
+    :precondition
+      (and
+        (ticket_populated ?allocation_ticket)
+        (account_eligibility_flag ?client_account)
+        (entity_has_security ?client_account ?security)
+        (not
+          (ticket_ready_for_lot_assignment ?allocation_ticket)
+        )
+      )
+    :effect (ticket_ready_for_lot_assignment ?allocation_ticket)
+  )
+  (:action lock_lot_and_assign_to_ticket
+    :parameters (?trade_instruction - trade_instruction ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (instruction_linked_ticket ?trade_instruction ?allocation_ticket)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_available ?lot)
+        (ticket_populated ?allocation_ticket)
+        (ticket_ready_for_lot_assignment ?allocation_ticket)
+        (not
+          (lot_locked ?lot)
+        )
+      )
+    :effect
+      (and
+        (lot_locked ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (not
+          (lot_available ?lot)
+        )
+      )
+  )
+  (:action confirm_instruction_lot_match
+    :parameters (?trade_instruction - trade_instruction ?lot - lot ?allocation_ticket - allocation_ticket ?security - security)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_locked ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (entity_has_security ?trade_instruction ?security)
+        (not
+          (ticket_account_pref_flag ?allocation_ticket)
+        )
+        (not
+          (instruction_lot_match_confirmed ?trade_instruction)
+        )
+      )
+    :effect (instruction_lot_match_confirmed ?trade_instruction)
+  )
+  (:action assign_approval_policy_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?approval_policy - approval_policy)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (approval_policy_available ?approval_policy)
+        (not
+          (approval_policy_attached ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (approval_policy_attached ?trade_instruction)
+        (instruction_linked_approval_policy ?trade_instruction ?approval_policy)
+        (not
+          (approval_policy_available ?approval_policy)
+        )
+      )
+  )
+  (:action apply_approval_policy_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?lot - lot ?allocation_ticket - allocation_ticket ?security - security ?approval_policy - approval_policy)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_locked ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (entity_has_security ?trade_instruction ?security)
+        (ticket_account_pref_flag ?allocation_ticket)
+        (approval_policy_attached ?trade_instruction)
+        (instruction_linked_approval_policy ?trade_instruction ?approval_policy)
+        (not
+          (instruction_lot_match_confirmed ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_lot_match_confirmed ?trade_instruction)
+        (approval_policy_validated ?trade_instruction)
+      )
+  )
+  (:action mark_instruction_ready_for_approval_with_compliance
+    :parameters (?trade_instruction - trade_instruction ?compliance_check - compliance_check ?allocator - allocator ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_lot_match_confirmed ?trade_instruction)
+        (instruction_has_compliance_check ?trade_instruction ?compliance_check)
+        (entity_has_allocator ?trade_instruction ?allocator)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (not
+          (ticket_model_pref_flag ?allocation_ticket)
+        )
+        (not
+          (instruction_ready_for_validation ?trade_instruction)
+        )
+      )
+    :effect (instruction_ready_for_validation ?trade_instruction)
+  )
+  (:action mark_instruction_ready_for_approval_post_ticket
+    :parameters (?trade_instruction - trade_instruction ?compliance_check - compliance_check ?allocator - allocator ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_lot_match_confirmed ?trade_instruction)
+        (instruction_has_compliance_check ?trade_instruction ?compliance_check)
+        (entity_has_allocator ?trade_instruction ?allocator)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (ticket_model_pref_flag ?allocation_ticket)
+        (not
+          (instruction_ready_for_validation ?trade_instruction)
+        )
+      )
+    :effect (instruction_ready_for_validation ?trade_instruction)
+  )
+  (:action execute_custody_and_compliance_checks
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_ready_for_validation ?trade_instruction)
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (not
+          (ticket_account_pref_flag ?allocation_ticket)
+        )
+        (not
+          (ticket_model_pref_flag ?allocation_ticket)
+        )
+        (not
+          (instruction_validation_performed ?trade_instruction)
+        )
+      )
+    :effect (instruction_validation_performed ?trade_instruction)
+  )
+  (:action execute_custody_and_compliance_checks_with_account_pref
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_ready_for_validation ?trade_instruction)
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (ticket_account_pref_flag ?allocation_ticket)
+        (not
+          (ticket_model_pref_flag ?allocation_ticket)
+        )
+        (not
+          (instruction_validation_performed ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (compliance_checks_passed ?trade_instruction)
+      )
+  )
+  (:action execute_custody_and_compliance_checks_with_model_pref
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_ready_for_validation ?trade_instruction)
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (not
+          (ticket_account_pref_flag ?allocation_ticket)
+        )
+        (ticket_model_pref_flag ?allocation_ticket)
+        (not
+          (instruction_validation_performed ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (compliance_checks_passed ?trade_instruction)
+      )
+  )
+  (:action execute_custody_and_compliance_checks_with_both_prefs
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction ?lot - lot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (instruction_ready_for_validation ?trade_instruction)
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (instruction_has_lot ?trade_instruction ?lot)
+        (lot_assigned_to_ticket ?lot ?allocation_ticket)
+        (ticket_account_pref_flag ?allocation_ticket)
+        (ticket_model_pref_flag ?allocation_ticket)
+        (not
+          (instruction_validation_performed ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (compliance_checks_passed ?trade_instruction)
+      )
+  )
+  (:action finalize_instruction_without_compliance
+    :parameters (?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (not
+          (compliance_checks_passed ?trade_instruction)
+        )
+        (not
+          (instruction_finalized ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_finalized ?trade_instruction)
+        (ready_for_assignment ?trade_instruction)
+      )
+  )
+  (:action attach_execution_profile_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (compliance_checks_passed ?trade_instruction)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (instruction_linked_execution_profile ?trade_instruction ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action perform_final_allocation_checks
+    :parameters (?trade_instruction - trade_instruction ?client_account - client_account ?model_portfolio - model_portfolio ?security - security ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (compliance_checks_passed ?trade_instruction)
+        (instruction_linked_execution_profile ?trade_instruction ?execution_profile)
+        (instruction_targets_account ?trade_instruction ?client_account)
+        (instruction_targets_model ?trade_instruction ?model_portfolio)
+        (account_rule_confirmed ?client_account)
+        (model_rule_confirmed ?model_portfolio)
+        (entity_has_security ?trade_instruction ?security)
+        (not
+          (final_checks_completed ?trade_instruction)
+        )
+      )
+    :effect (final_checks_completed ?trade_instruction)
+  )
+  (:action finalize_instruction_after_checks
+    :parameters (?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (instruction_validation_performed ?trade_instruction)
+        (final_checks_completed ?trade_instruction)
+        (not
+          (instruction_finalized ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_finalized ?trade_instruction)
+        (ready_for_assignment ?trade_instruction)
+      )
+  )
+  (:action apply_reason_code_to_instruction
+    :parameters (?trade_instruction - trade_instruction ?reason_code - reason_code ?security - security)
+    :precondition
+      (and
+        (allocation_initialized ?trade_instruction)
+        (entity_has_security ?trade_instruction ?security)
+        (reason_code_available ?reason_code)
+        (instruction_has_reason_code ?trade_instruction ?reason_code)
+        (not
+          (instruction_reason_code_applied ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_reason_code_applied ?trade_instruction)
+        (not
+          (reason_code_available ?reason_code)
+        )
+      )
+  )
+  (:action request_approval_for_instruction
+    :parameters (?trade_instruction - trade_instruction ?allocator - allocator)
+    :precondition
+      (and
+        (instruction_reason_code_applied ?trade_instruction)
+        (entity_has_allocator ?trade_instruction ?allocator)
+        (not
+          (approval_requested ?trade_instruction)
+        )
+      )
+    :effect (approval_requested ?trade_instruction)
+  )
+  (:action record_approval_for_instruction
+    :parameters (?trade_instruction - trade_instruction ?custody_instruction - custody_instruction)
+    :precondition
+      (and
+        (approval_requested ?trade_instruction)
+        (instruction_has_custody_instruction ?trade_instruction ?custody_instruction)
+        (not
+          (instruction_approved ?trade_instruction)
+        )
+      )
+    :effect (instruction_approved ?trade_instruction)
+  )
+  (:action finalize_instruction_after_approval
+    :parameters (?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (instruction_approved ?trade_instruction)
+        (not
+          (instruction_finalized ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_finalized ?trade_instruction)
+        (ready_for_assignment ?trade_instruction)
+      )
+  )
+  (:action perform_account_assignment
+    :parameters (?client_account - client_account ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (account_eligibility_flag ?client_account)
+        (account_rule_confirmed ?client_account)
+        (ticket_populated ?allocation_ticket)
+        (ticket_ready_for_lot_assignment ?allocation_ticket)
+        (not
+          (ready_for_assignment ?client_account)
+        )
+      )
+    :effect (ready_for_assignment ?client_account)
+  )
+  (:action perform_model_assignment
+    :parameters (?model_portfolio - model_portfolio ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (model_eligibility_flag ?model_portfolio)
+        (model_rule_confirmed ?model_portfolio)
+        (ticket_populated ?allocation_ticket)
+        (ticket_ready_for_lot_assignment ?allocation_ticket)
+        (not
+          (ready_for_assignment ?model_portfolio)
+        )
+      )
+    :effect (ready_for_assignment ?model_portfolio)
+  )
+  (:action attach_allocation_profile_to_allocatable
+    :parameters (?allocatable_entity - allocatable_entity ?allocation_profile - allocation_profile ?security - security)
+    :precondition
+      (and
+        (ready_for_assignment ?allocatable_entity)
+        (entity_has_security ?allocatable_entity ?security)
+        (allocation_profile_available ?allocation_profile)
+        (not
+          (allocation_profile_attached ?allocatable_entity)
+        )
+      )
+    :effect
+      (and
+        (allocation_profile_attached ?allocatable_entity)
+        (entity_has_allocation_profile ?allocatable_entity ?allocation_profile)
+        (not
+          (allocation_profile_available ?allocation_profile)
+        )
+      )
+  )
+  (:action commit_assignment_for_account
+    :parameters (?client_account - client_account ?allocation_method - allocation_method ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (allocation_profile_attached ?client_account)
+        (allocation_uses_method ?client_account ?allocation_method)
+        (entity_has_allocation_profile ?client_account ?allocation_profile)
+        (not
+          (allocation_committed ?client_account)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?client_account)
+        (allocation_method_available ?allocation_method)
+        (allocation_profile_available ?allocation_profile)
+      )
+  )
+  (:action commit_assignment_for_model
+    :parameters (?model_portfolio - model_portfolio ?allocation_method - allocation_method ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (allocation_profile_attached ?model_portfolio)
+        (allocation_uses_method ?model_portfolio ?allocation_method)
+        (entity_has_allocation_profile ?model_portfolio ?allocation_profile)
+        (not
+          (allocation_committed ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?model_portfolio)
+        (allocation_method_available ?allocation_method)
+        (allocation_profile_available ?allocation_profile)
+      )
+  )
+  (:action commit_assignment_for_instruction
+    :parameters (?trade_instruction - trade_instruction ?allocation_method - allocation_method ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (allocation_profile_attached ?trade_instruction)
+        (allocation_uses_method ?trade_instruction ?allocation_method)
+        (entity_has_allocation_profile ?trade_instruction ?allocation_profile)
+        (not
+          (allocation_committed ?trade_instruction)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?trade_instruction)
+        (allocation_method_available ?allocation_method)
+        (allocation_profile_available ?allocation_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem post_trade_allocation_assignment_problem)
+  (:domain post_trade_allocation_assignment_domain)
+  (:objects client_account_1 - client_account model_portfolio_1 - model_portfolio trade_instruction_1 - trade_instruction trade_instruction_2 - trade_instruction allocation_method_pro_rata - allocation_method allocation_method_model_based - allocation_method allocation_method_mandate_specific - allocation_method security_1 - security allocator_primary - allocator allocation_preference_1 - allocation_preference account_rule_primary - account_rule model_rule_primary - model_rule allocation_ticket_1 - allocation_ticket lot_1 - lot lot_2 - lot approval_policy_standard - approval_policy approval_policy_escalation - approval_policy execution_profile_standard - execution_profile execution_profile_high_priority - execution_profile allocation_profile_default - allocation_profile compliance_check_regulatory - compliance_check reason_code_manual_override - reason_code reason_code_tax_lot_preference - reason_code custody_instruction_1 - custody_instruction)
+  (:init
+    (allocation_method_available allocation_method_pro_rata)
+    (allocation_method_available allocation_method_model_based)
+    (allocation_method_available allocation_method_mandate_specific)
+    (security_available security_1)
+    (allocator_available allocator_primary)
+    (allocation_preference_available allocation_preference_1)
+    (account_rule_applicable client_account_1 account_rule_primary)
+    (model_rule_applicable model_portfolio_1 model_rule_primary)
+    (ticket_unpopulated allocation_ticket_1)
+    (lot_available lot_1)
+    (lot_available lot_2)
+    (instruction_targets_account trade_instruction_1 client_account_1)
+    (instruction_targets_account trade_instruction_2 client_account_1)
+    (instruction_targets_model trade_instruction_1 model_portfolio_1)
+    (instruction_targets_model trade_instruction_2 model_portfolio_1)
+    (instruction_linked_ticket trade_instruction_1 allocation_ticket_1)
+    (instruction_linked_ticket trade_instruction_2 allocation_ticket_1)
+    (instruction_has_lot trade_instruction_1 lot_1)
+    (instruction_has_lot trade_instruction_2 lot_2)
+    (approval_policy_available approval_policy_standard)
+    (approval_policy_available approval_policy_escalation)
+    (execution_profile_available execution_profile_standard)
+    (execution_profile_available execution_profile_high_priority)
+    (allocation_profile_available allocation_profile_default)
+    (compliance_check_available compliance_check_regulatory)
+    (reason_code_available reason_code_manual_override)
+    (instruction_has_reason_code trade_instruction_1 reason_code_manual_override)
+    (instruction_has_reason_code trade_instruction_2 reason_code_tax_lot_preference)
+    (custody_instruction_available custody_instruction_1)
+  )
+  (:goal
+    (and
+      (allocation_committed client_account_1)
+      (allocation_committed model_portfolio_1)
+      (allocation_committed trade_instruction_1)
+      (allocation_committed trade_instruction_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_allocation_candidate client_account_1)
+(attach_allocation_method client_account_1 allocation_method_pro_rata)
+(link_security_to_allocatable client_account_1 security_1)
+(initialize_allocation_candidate client_account_1 security_1)
+(assign_allocator client_account_1 allocator_primary)
+(evaluate_account_rule_for_security client_account_1 account_rule_primary security_1)
+(confirm_account_eligibility_with_allocator client_account_1 account_rule_primary allocator_primary)
+(release_security_from_allocatable client_account_1 security_1)
+(release_allocator client_account_1 allocator_primary)
+(create_allocation_candidate model_portfolio_1)
+(attach_allocation_method model_portfolio_1 allocation_method_model_based)
+(link_security_to_allocatable model_portfolio_1 security_1)
+(initialize_allocation_candidate model_portfolio_1 security_1)
+(assign_allocator model_portfolio_1 allocator_primary)
+(evaluate_model_rule_for_security model_portfolio_1 model_rule_primary security_1)
+(confirm_model_eligibility_with_allocator model_portfolio_1 model_rule_primary allocator_primary)
+(release_security_from_allocatable model_portfolio_1 security_1)
+(release_allocator model_portfolio_1 allocator_primary)
+(build_allocation_ticket client_account_1 model_portfolio_1 account_rule_primary model_rule_primary allocation_ticket_1)
+(link_security_to_allocatable client_account_1 security_1)
+(prepare_ticket_for_lot_assignment allocation_ticket_1 client_account_1 security_1)
+(release_security_from_allocatable client_account_1 security_1)
+(create_allocation_candidate trade_instruction_1)
+(attach_allocation_method trade_instruction_1 allocation_method_mandate_specific)
+(link_security_to_allocatable trade_instruction_1 security_1)
+(initialize_allocation_candidate trade_instruction_1 security_1)
+(lock_lot_and_assign_to_ticket trade_instruction_1 lot_1 allocation_ticket_1)
+(attach_compliance_check_to_instruction trade_instruction_1 compliance_check_regulatory)
+(assign_allocator trade_instruction_1 allocator_primary)
+(confirm_instruction_lot_match trade_instruction_1 lot_1 allocation_ticket_1 security_1)
+(mark_instruction_ready_for_approval_with_compliance trade_instruction_1 compliance_check_regulatory allocator_primary lot_1 allocation_ticket_1)
+(attach_custody_instruction_to_instruction trade_instruction_1 custody_instruction_1)
+(execute_custody_and_compliance_checks trade_instruction_1 custody_instruction_1 lot_1 allocation_ticket_1)
+(finalize_instruction_without_compliance trade_instruction_1)
+(attach_allocation_profile_to_allocatable trade_instruction_1 allocation_profile_default security_1)
+(commit_assignment_for_instruction trade_instruction_1 allocation_method_mandate_specific allocation_profile_default)
+(release_security_from_allocatable trade_instruction_1 security_1)
+(release_allocator trade_instruction_1 allocator_primary)
+(detach_compliance_check_from_instruction trade_instruction_1 compliance_check_regulatory)
+(detach_custody_instruction_from_instruction trade_instruction_1 custody_instruction_1)
+(create_allocation_candidate trade_instruction_2)
+(attach_allocation_method trade_instruction_2 allocation_method_mandate_specific)
+(link_security_to_allocatable trade_instruction_2 security_1)
+(initialize_allocation_candidate trade_instruction_2 security_1)
+(lock_lot_and_assign_to_ticket trade_instruction_2 lot_2 allocation_ticket_1)
+(attach_compliance_check_to_instruction trade_instruction_2 compliance_check_regulatory)
+(assign_allocator trade_instruction_2 allocator_primary)
+(confirm_instruction_lot_match trade_instruction_2 lot_2 allocation_ticket_1 security_1)
+(mark_instruction_ready_for_approval_with_compliance trade_instruction_2 compliance_check_regulatory allocator_primary lot_2 allocation_ticket_1)
+(attach_custody_instruction_to_instruction trade_instruction_2 custody_instruction_1)
+(execute_custody_and_compliance_checks trade_instruction_2 custody_instruction_1 lot_2 allocation_ticket_1)
+(finalize_instruction_without_compliance trade_instruction_2)
+(attach_allocation_profile_to_allocatable trade_instruction_2 allocation_profile_default security_1)
+(commit_assignment_for_instruction trade_instruction_2 allocation_method_mandate_specific allocation_profile_default)
+(perform_account_assignment client_account_1 allocation_ticket_1)
+(perform_model_assignment model_portfolio_1 allocation_ticket_1)
+(link_security_to_allocatable client_account_1 security_1)
+(attach_allocation_profile_to_allocatable client_account_1 allocation_profile_default security_1)
+(commit_assignment_for_account client_account_1 allocation_method_pro_rata allocation_profile_default)
+(release_security_from_allocatable client_account_1 security_1)
+(link_security_to_allocatable model_portfolio_1 security_1)
+(attach_allocation_profile_to_allocatable model_portfolio_1 allocation_profile_default security_1)
+(commit_assignment_for_model model_portfolio_1 allocation_method_model_based allocation_profile_default)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_g856cakh/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_g856cakh/plan.pddl 
+
+
+--- stderr ---
+

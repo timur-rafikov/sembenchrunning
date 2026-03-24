@@ -1,0 +1,936 @@
+(define (domain trip_duration_allocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object temporal_category - object attribute_category - object itinerary_component_category - object itinerary_element - itinerary_component_category time_allocation_unit - resource_category activity_template - resource_category service_option - resource_category site_attribute - resource_category traveler_constraint - resource_category available_time_budget - resource_category upgrade_option - resource_category temporal_preference_token - resource_category experience_preference_token - temporal_category booking_option - temporal_category preference_tag - temporal_category route_leg - attribute_category time_window_slot - attribute_category allocation_package - attribute_category stop_slot_category - itinerary_element day_schedule_category - itinerary_element stop_slot_a - stop_slot_category stop_slot_b - stop_slot_category itinerary_day - day_schedule_category)
+  (:predicates
+    (itinerary_element_initialized ?itinerary_component - itinerary_element)
+    (itinerary_element_confirmed ?itinerary_component - itinerary_element)
+    (itinerary_element_provisionally_allocated ?itinerary_component - itinerary_element)
+    (itinerary_element_finalized ?itinerary_component - itinerary_element)
+    (itinerary_element_ready ?itinerary_component - itinerary_element)
+    (itinerary_element_budget_assigned ?itinerary_component - itinerary_element)
+    (time_allocation_unit_available ?time_allocation_unit - time_allocation_unit)
+    (itinerary_element_assigned_time_unit ?itinerary_component - itinerary_element ?time_allocation_unit - time_allocation_unit)
+    (activity_template_available ?activity_template - activity_template)
+    (itinerary_element_assigned_activity ?itinerary_component - itinerary_element ?activity_template - activity_template)
+    (service_option_available ?service_option - service_option)
+    (itinerary_element_assigned_service_option ?itinerary_component - itinerary_element ?service_option - service_option)
+    (experience_preference_available ?experience_preference - experience_preference_token)
+    (stop_slot_a_assigned_preference ?stop_slot_a - stop_slot_a ?experience_preference - experience_preference_token)
+    (stop_slot_b_assigned_preference ?stop_slot_b - stop_slot_b ?experience_preference - experience_preference_token)
+    (stop_slot_a_assigned_route_leg ?stop_slot_a - stop_slot_a ?route_leg - route_leg)
+    (route_leg_marked_active ?route_leg - route_leg)
+    (route_leg_preference_applied ?route_leg - route_leg)
+    (stop_slot_a_ready_for_package ?stop_slot_a - stop_slot_a)
+    (stop_slot_b_assigned_time_window ?stop_slot_b - stop_slot_b ?time_window_slot - time_window_slot)
+    (time_window_marked_active ?time_window_slot - time_window_slot)
+    (time_window_preference_applied ?time_window_slot - time_window_slot)
+    (stop_slot_b_ready_for_package ?stop_slot_b - stop_slot_b)
+    (allocation_package_available ?allocation_package - allocation_package)
+    (allocation_package_ready_for_booking ?allocation_package - allocation_package)
+    (allocation_package_assigned_route_leg ?allocation_package - allocation_package ?route_leg - route_leg)
+    (allocation_package_assigned_time_window ?allocation_package - allocation_package ?time_window_slot - time_window_slot)
+    (allocation_package_flag_leg_preference ?allocation_package - allocation_package)
+    (allocation_package_flag_window_preference ?allocation_package - allocation_package)
+    (allocation_package_bound_to_day ?allocation_package - allocation_package)
+    (itinerary_element_assigned_stop_slot_a ?itinerary_day - itinerary_day ?stop_slot_a - stop_slot_a)
+    (itinerary_element_assigned_stop_slot_b ?itinerary_day - itinerary_day ?stop_slot_b - stop_slot_b)
+    (itinerary_element_assigned_allocation_package ?itinerary_day - itinerary_day ?allocation_package - allocation_package)
+    (booking_option_available ?booking_option - booking_option)
+    (itinerary_element_assigned_booking_option ?itinerary_day - itinerary_day ?booking_option - booking_option)
+    (booking_option_reserved ?booking_option - booking_option)
+    (booking_option_assigned_to_package ?booking_option - booking_option ?allocation_package - allocation_package)
+    (itinerary_element_booking_locked ?itinerary_day - itinerary_day)
+    (itinerary_element_booking_confirmed ?itinerary_day - itinerary_day)
+    (itinerary_element_preferences_applied ?itinerary_day - itinerary_day)
+    (itinerary_element_has_site_attribute ?itinerary_day - itinerary_day)
+    (itinerary_element_site_attribute_applied ?itinerary_day - itinerary_day)
+    (itinerary_element_preference_tags_applied ?itinerary_day - itinerary_day)
+    (itinerary_element_final_checks_passed ?itinerary_day - itinerary_day)
+    (preference_tag_available ?preference_tag - preference_tag)
+    (itinerary_element_assigned_preference_tag ?itinerary_day - itinerary_day ?preference_tag - preference_tag)
+    (itinerary_element_preference_tag_marked ?itinerary_day - itinerary_day)
+    (itinerary_element_preference_tag_locked ?itinerary_day - itinerary_day)
+    (itinerary_element_temporal_preference_applied ?itinerary_day - itinerary_day)
+    (site_attribute_available ?site_attribute - site_attribute)
+    (itinerary_element_assigned_site_attribute ?itinerary_day - itinerary_day ?site_attribute - site_attribute)
+    (traveler_constraint_available ?traveler_constraint - traveler_constraint)
+    (itinerary_element_assigned_traveler_constraint ?itinerary_day - itinerary_day ?traveler_constraint - traveler_constraint)
+    (upgrade_option_available ?upgrade_option - upgrade_option)
+    (itinerary_element_assigned_upgrade_option ?itinerary_day - itinerary_day ?upgrade_option - upgrade_option)
+    (temporal_preference_available ?temporal_preference - temporal_preference_token)
+    (itinerary_element_assigned_temporal_preference ?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token)
+    (available_time_budget_available ?available_time_budget - available_time_budget)
+    (itinerary_element_assigned_available_time_budget ?itinerary_component - itinerary_element ?available_time_budget - available_time_budget)
+    (stop_slot_a_local_allocation_flag ?stop_slot_a - stop_slot_a)
+    (stop_slot_b_local_allocation_flag ?stop_slot_b - stop_slot_b)
+    (itinerary_element_readiness_locked ?itinerary_day - itinerary_day)
+  )
+  (:action initialize_itinerary_element
+    :parameters (?itinerary_component - itinerary_element)
+    :precondition
+      (and
+        (not
+          (itinerary_element_initialized ?itinerary_component)
+        )
+        (not
+          (itinerary_element_finalized ?itinerary_component)
+        )
+      )
+    :effect (itinerary_element_initialized ?itinerary_component)
+  )
+  (:action provision_time_allocation_unit_to_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?time_allocation_unit - time_allocation_unit)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_component)
+        (not
+          (itinerary_element_provisionally_allocated ?itinerary_component)
+        )
+        (time_allocation_unit_available ?time_allocation_unit)
+      )
+    :effect
+      (and
+        (itinerary_element_provisionally_allocated ?itinerary_component)
+        (itinerary_element_assigned_time_unit ?itinerary_component ?time_allocation_unit)
+        (not
+          (time_allocation_unit_available ?time_allocation_unit)
+        )
+      )
+  )
+  (:action propose_activity_for_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_component)
+        (itinerary_element_provisionally_allocated ?itinerary_component)
+        (activity_template_available ?activity_template)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_activity ?itinerary_component ?activity_template)
+        (not
+          (activity_template_available ?activity_template)
+        )
+      )
+  )
+  (:action confirm_proposed_activity_for_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_component)
+        (itinerary_element_provisionally_allocated ?itinerary_component)
+        (itinerary_element_assigned_activity ?itinerary_component ?activity_template)
+        (not
+          (itinerary_element_confirmed ?itinerary_component)
+        )
+      )
+    :effect (itinerary_element_confirmed ?itinerary_component)
+  )
+  (:action release_proposed_activity_from_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_assigned_activity ?itinerary_component ?activity_template)
+      )
+    :effect
+      (and
+        (activity_template_available ?activity_template)
+        (not
+          (itinerary_element_assigned_activity ?itinerary_component ?activity_template)
+        )
+      )
+  )
+  (:action attach_service_option_to_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_component)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_service_option ?itinerary_component ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action detach_service_option_from_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_element_assigned_service_option ?itinerary_component ?service_option)
+      )
+    :effect
+      (and
+        (service_option_available ?service_option)
+        (not
+          (itinerary_element_assigned_service_option ?itinerary_component ?service_option)
+        )
+      )
+  )
+  (:action attach_upgrade_option_to_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?upgrade_option - upgrade_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (upgrade_option_available ?upgrade_option)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_upgrade_option ?itinerary_day ?upgrade_option)
+        (not
+          (upgrade_option_available ?upgrade_option)
+        )
+      )
+  )
+  (:action release_upgrade_option_from_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?upgrade_option - upgrade_option)
+    :precondition
+      (and
+        (itinerary_element_assigned_upgrade_option ?itinerary_day ?upgrade_option)
+      )
+    :effect
+      (and
+        (upgrade_option_available ?upgrade_option)
+        (not
+          (itinerary_element_assigned_upgrade_option ?itinerary_day ?upgrade_option)
+        )
+      )
+  )
+  (:action attach_temporal_preference_to_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (temporal_preference_available ?temporal_preference)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (not
+          (temporal_preference_available ?temporal_preference)
+        )
+      )
+  )
+  (:action release_temporal_preference_from_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+      )
+    :effect
+      (and
+        (temporal_preference_available ?temporal_preference)
+        (not
+          (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        )
+      )
+  )
+  (:action activate_route_leg_for_stop_slot_a
+    :parameters (?stop_slot_a - stop_slot_a ?route_leg - route_leg ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_a)
+        (itinerary_element_assigned_activity ?stop_slot_a ?activity_template)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (not
+          (route_leg_marked_active ?route_leg)
+        )
+        (not
+          (route_leg_preference_applied ?route_leg)
+        )
+      )
+    :effect (route_leg_marked_active ?route_leg)
+  )
+  (:action assign_service_option_to_stop_slot_a
+    :parameters (?stop_slot_a - stop_slot_a ?route_leg - route_leg ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_a)
+        (itinerary_element_assigned_service_option ?stop_slot_a ?service_option)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (route_leg_marked_active ?route_leg)
+        (not
+          (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        )
+      )
+    :effect
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+      )
+  )
+  (:action assign_experience_preference_to_stop_slot_a
+    :parameters (?stop_slot_a - stop_slot_a ?route_leg - route_leg ?experience_preference - experience_preference_token)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_a)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (experience_preference_available ?experience_preference)
+        (not
+          (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        )
+      )
+    :effect
+      (and
+        (route_leg_preference_applied ?route_leg)
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_a_assigned_preference ?stop_slot_a ?experience_preference)
+        (not
+          (experience_preference_available ?experience_preference)
+        )
+      )
+  )
+  (:action finalize_preference_assignment_for_stop_slot_a
+    :parameters (?stop_slot_a - stop_slot_a ?route_leg - route_leg ?activity_template - activity_template ?experience_preference - experience_preference_token)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_a)
+        (itinerary_element_assigned_activity ?stop_slot_a ?activity_template)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (route_leg_preference_applied ?route_leg)
+        (stop_slot_a_assigned_preference ?stop_slot_a ?experience_preference)
+        (not
+          (stop_slot_a_ready_for_package ?stop_slot_a)
+        )
+      )
+    :effect
+      (and
+        (route_leg_marked_active ?route_leg)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+        (experience_preference_available ?experience_preference)
+        (not
+          (stop_slot_a_assigned_preference ?stop_slot_a ?experience_preference)
+        )
+      )
+  )
+  (:action activate_time_window_for_stop_slot_b
+    :parameters (?stop_slot_b - stop_slot_b ?time_window_slot - time_window_slot ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_b)
+        (itinerary_element_assigned_activity ?stop_slot_b ?activity_template)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (not
+          (time_window_marked_active ?time_window_slot)
+        )
+        (not
+          (time_window_preference_applied ?time_window_slot)
+        )
+      )
+    :effect (time_window_marked_active ?time_window_slot)
+  )
+  (:action assign_service_option_to_stop_slot_b
+    :parameters (?stop_slot_b - stop_slot_b ?time_window_slot - time_window_slot ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_b)
+        (itinerary_element_assigned_service_option ?stop_slot_b ?service_option)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (time_window_marked_active ?time_window_slot)
+        (not
+          (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        )
+      )
+    :effect
+      (and
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+      )
+  )
+  (:action assign_experience_preference_to_stop_slot_b
+    :parameters (?stop_slot_b - stop_slot_b ?time_window_slot - time_window_slot ?experience_preference - experience_preference_token)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_b)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (experience_preference_available ?experience_preference)
+        (not
+          (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        )
+      )
+    :effect
+      (and
+        (time_window_preference_applied ?time_window_slot)
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_b_assigned_preference ?stop_slot_b ?experience_preference)
+        (not
+          (experience_preference_available ?experience_preference)
+        )
+      )
+  )
+  (:action finalize_preference_assignment_for_stop_slot_b
+    :parameters (?stop_slot_b - stop_slot_b ?time_window_slot - time_window_slot ?activity_template - activity_template ?experience_preference - experience_preference_token)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?stop_slot_b)
+        (itinerary_element_assigned_activity ?stop_slot_b ?activity_template)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (time_window_preference_applied ?time_window_slot)
+        (stop_slot_b_assigned_preference ?stop_slot_b ?experience_preference)
+        (not
+          (stop_slot_b_ready_for_package ?stop_slot_b)
+        )
+      )
+    :effect
+      (and
+        (time_window_marked_active ?time_window_slot)
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+        (experience_preference_available ?experience_preference)
+        (not
+          (stop_slot_b_assigned_preference ?stop_slot_b ?experience_preference)
+        )
+      )
+  )
+  (:action assemble_allocation_package_basic
+    :parameters (?stop_slot_a - stop_slot_a ?stop_slot_b - stop_slot_b ?route_leg - route_leg ?time_window_slot - time_window_slot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (route_leg_marked_active ?route_leg)
+        (time_window_marked_active ?time_window_slot)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_assigned_route_leg ?allocation_package ?route_leg)
+        (allocation_package_assigned_time_window ?allocation_package ?time_window_slot)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_leg_preference
+    :parameters (?stop_slot_a - stop_slot_a ?stop_slot_b - stop_slot_b ?route_leg - route_leg ?time_window_slot - time_window_slot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (route_leg_preference_applied ?route_leg)
+        (time_window_marked_active ?time_window_slot)
+        (not
+          (stop_slot_a_ready_for_package ?stop_slot_a)
+        )
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_assigned_route_leg ?allocation_package ?route_leg)
+        (allocation_package_assigned_time_window ?allocation_package ?time_window_slot)
+        (allocation_package_flag_leg_preference ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_window_preference
+    :parameters (?stop_slot_a - stop_slot_a ?stop_slot_b - stop_slot_b ?route_leg - route_leg ?time_window_slot - time_window_slot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (route_leg_marked_active ?route_leg)
+        (time_window_preference_applied ?time_window_slot)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+        (not
+          (stop_slot_b_ready_for_package ?stop_slot_b)
+        )
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_assigned_route_leg ?allocation_package ?route_leg)
+        (allocation_package_assigned_time_window ?allocation_package ?time_window_slot)
+        (allocation_package_flag_window_preference ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_leg_and_window_preferences
+    :parameters (?stop_slot_a - stop_slot_a ?stop_slot_b - stop_slot_b ?route_leg - route_leg ?time_window_slot - time_window_slot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_a_assigned_route_leg ?stop_slot_a ?route_leg)
+        (stop_slot_b_assigned_time_window ?stop_slot_b ?time_window_slot)
+        (route_leg_preference_applied ?route_leg)
+        (time_window_preference_applied ?time_window_slot)
+        (not
+          (stop_slot_a_ready_for_package ?stop_slot_a)
+        )
+        (not
+          (stop_slot_b_ready_for_package ?stop_slot_b)
+        )
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_assigned_route_leg ?allocation_package ?route_leg)
+        (allocation_package_assigned_time_window ?allocation_package ?time_window_slot)
+        (allocation_package_flag_leg_preference ?allocation_package)
+        (allocation_package_flag_window_preference ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action bind_allocation_package_to_stop_slot_a
+    :parameters (?allocation_package - allocation_package ?stop_slot_a - stop_slot_a ?activity_template - activity_template)
+    :precondition
+      (and
+        (allocation_package_ready_for_booking ?allocation_package)
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (itinerary_element_assigned_activity ?stop_slot_a ?activity_template)
+        (not
+          (allocation_package_bound_to_day ?allocation_package)
+        )
+      )
+    :effect (allocation_package_bound_to_day ?allocation_package)
+  )
+  (:action reserve_booking_option_for_itinerary_element_and_package
+    :parameters (?itinerary_day - itinerary_day ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (itinerary_element_assigned_allocation_package ?itinerary_day ?allocation_package)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_available ?booking_option)
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_bound_to_day ?allocation_package)
+        (not
+          (booking_option_reserved ?booking_option)
+        )
+      )
+    :effect
+      (and
+        (booking_option_reserved ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (not
+          (booking_option_available ?booking_option)
+        )
+      )
+  )
+  (:action confirm_booking_option_for_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?booking_option - booking_option ?allocation_package - allocation_package ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_reserved ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (itinerary_element_assigned_activity ?itinerary_day ?activity_template)
+        (not
+          (allocation_package_flag_leg_preference ?allocation_package)
+        )
+        (not
+          (itinerary_element_booking_locked ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_booking_locked ?itinerary_day)
+  )
+  (:action assign_site_attribute_to_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?site_attribute - site_attribute)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (site_attribute_available ?site_attribute)
+        (not
+          (itinerary_element_has_site_attribute ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_has_site_attribute ?itinerary_day)
+        (itinerary_element_assigned_site_attribute ?itinerary_day ?site_attribute)
+        (not
+          (site_attribute_available ?site_attribute)
+        )
+      )
+  )
+  (:action apply_site_attribute_and_lock_itinerary_element_for_booking
+    :parameters (?itinerary_day - itinerary_day ?booking_option - booking_option ?allocation_package - allocation_package ?activity_template - activity_template ?site_attribute - site_attribute)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_reserved ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (itinerary_element_assigned_activity ?itinerary_day ?activity_template)
+        (allocation_package_flag_leg_preference ?allocation_package)
+        (itinerary_element_has_site_attribute ?itinerary_day)
+        (itinerary_element_assigned_site_attribute ?itinerary_day ?site_attribute)
+        (not
+          (itinerary_element_booking_locked ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_booking_locked ?itinerary_day)
+        (itinerary_element_site_attribute_applied ?itinerary_day)
+      )
+  )
+  (:action finalize_booking_for_itinerary_element_variant_a
+    :parameters (?itinerary_day - itinerary_day ?upgrade_option - upgrade_option ?service_option - service_option ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_locked ?itinerary_day)
+        (itinerary_element_assigned_upgrade_option ?itinerary_day ?upgrade_option)
+        (itinerary_element_assigned_service_option ?itinerary_day ?service_option)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (not
+          (allocation_package_flag_window_preference ?allocation_package)
+        )
+        (not
+          (itinerary_element_booking_confirmed ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_booking_confirmed ?itinerary_day)
+  )
+  (:action finalize_booking_for_itinerary_element_variant_b
+    :parameters (?itinerary_day - itinerary_day ?upgrade_option - upgrade_option ?service_option - service_option ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_locked ?itinerary_day)
+        (itinerary_element_assigned_upgrade_option ?itinerary_day ?upgrade_option)
+        (itinerary_element_assigned_service_option ?itinerary_day ?service_option)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (allocation_package_flag_window_preference ?allocation_package)
+        (not
+          (itinerary_element_booking_confirmed ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_booking_confirmed ?itinerary_day)
+  )
+  (:action apply_temporal_preference_and_mark_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_confirmed ?itinerary_day)
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (not
+          (allocation_package_flag_leg_preference ?allocation_package)
+        )
+        (not
+          (allocation_package_flag_window_preference ?allocation_package)
+        )
+        (not
+          (itinerary_element_preferences_applied ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_preferences_applied ?itinerary_day)
+  )
+  (:action apply_temporal_preference_and_add_preference_tag_variant1
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_confirmed ?itinerary_day)
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (allocation_package_flag_leg_preference ?allocation_package)
+        (not
+          (allocation_package_flag_window_preference ?allocation_package)
+        )
+        (not
+          (itinerary_element_preferences_applied ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_preference_tags_applied ?itinerary_day)
+      )
+  )
+  (:action apply_temporal_preference_and_add_preference_tag_variant2
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_confirmed ?itinerary_day)
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (not
+          (allocation_package_flag_leg_preference ?allocation_package)
+        )
+        (allocation_package_flag_window_preference ?allocation_package)
+        (not
+          (itinerary_element_preferences_applied ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_preference_tags_applied ?itinerary_day)
+      )
+  )
+  (:action apply_temporal_preference_and_add_preference_tag_variant3
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token ?booking_option - booking_option ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (itinerary_element_booking_confirmed ?itinerary_day)
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (itinerary_element_assigned_booking_option ?itinerary_day ?booking_option)
+        (booking_option_assigned_to_package ?booking_option ?allocation_package)
+        (allocation_package_flag_leg_preference ?allocation_package)
+        (allocation_package_flag_window_preference ?allocation_package)
+        (not
+          (itinerary_element_preferences_applied ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_preference_tags_applied ?itinerary_day)
+      )
+  )
+  (:action finalize_itinerary_element_preferences_and_mark_ready
+    :parameters (?itinerary_day - itinerary_day)
+    :precondition
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (not
+          (itinerary_element_preference_tags_applied ?itinerary_day)
+        )
+        (not
+          (itinerary_element_readiness_locked ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_readiness_locked ?itinerary_day)
+        (itinerary_element_ready ?itinerary_day)
+      )
+  )
+  (:action apply_traveler_constraint_to_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?traveler_constraint - traveler_constraint)
+    :precondition
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_preference_tags_applied ?itinerary_day)
+        (traveler_constraint_available ?traveler_constraint)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_traveler_constraint ?itinerary_day ?traveler_constraint)
+        (not
+          (traveler_constraint_available ?traveler_constraint)
+        )
+      )
+  )
+  (:action perform_final_checks_for_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?stop_slot_a - stop_slot_a ?stop_slot_b - stop_slot_b ?activity_template - activity_template ?traveler_constraint - traveler_constraint)
+    :precondition
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_preference_tags_applied ?itinerary_day)
+        (itinerary_element_assigned_traveler_constraint ?itinerary_day ?traveler_constraint)
+        (itinerary_element_assigned_stop_slot_a ?itinerary_day ?stop_slot_a)
+        (itinerary_element_assigned_stop_slot_b ?itinerary_day ?stop_slot_b)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+        (itinerary_element_assigned_activity ?itinerary_day ?activity_template)
+        (not
+          (itinerary_element_final_checks_passed ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_final_checks_passed ?itinerary_day)
+  )
+  (:action finalize_itinerary_element_and_mark_ready
+    :parameters (?itinerary_day - itinerary_day)
+    :precondition
+      (and
+        (itinerary_element_preferences_applied ?itinerary_day)
+        (itinerary_element_final_checks_passed ?itinerary_day)
+        (not
+          (itinerary_element_readiness_locked ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_readiness_locked ?itinerary_day)
+        (itinerary_element_ready ?itinerary_day)
+      )
+  )
+  (:action apply_preference_tag_to_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?preference_tag - preference_tag ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_day)
+        (itinerary_element_assigned_activity ?itinerary_day ?activity_template)
+        (preference_tag_available ?preference_tag)
+        (itinerary_element_assigned_preference_tag ?itinerary_day ?preference_tag)
+        (not
+          (itinerary_element_preference_tag_marked ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_preference_tag_marked ?itinerary_day)
+        (not
+          (preference_tag_available ?preference_tag)
+        )
+      )
+  )
+  (:action lock_itinerary_element_preference_tag_for_service
+    :parameters (?itinerary_day - itinerary_day ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_element_preference_tag_marked ?itinerary_day)
+        (itinerary_element_assigned_service_option ?itinerary_day ?service_option)
+        (not
+          (itinerary_element_preference_tag_locked ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_preference_tag_locked ?itinerary_day)
+  )
+  (:action apply_temporal_preference_lock_for_itinerary_element
+    :parameters (?itinerary_day - itinerary_day ?temporal_preference - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_preference_tag_locked ?itinerary_day)
+        (itinerary_element_assigned_temporal_preference ?itinerary_day ?temporal_preference)
+        (not
+          (itinerary_element_temporal_preference_applied ?itinerary_day)
+        )
+      )
+    :effect (itinerary_element_temporal_preference_applied ?itinerary_day)
+  )
+  (:action finalize_tag_flow_and_mark_itinerary_element_ready
+    :parameters (?itinerary_day - itinerary_day)
+    :precondition
+      (and
+        (itinerary_element_temporal_preference_applied ?itinerary_day)
+        (not
+          (itinerary_element_readiness_locked ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_readiness_locked ?itinerary_day)
+        (itinerary_element_ready ?itinerary_day)
+      )
+  )
+  (:action confirm_stop_slot_a_allocation_from_package
+    :parameters (?stop_slot_a - stop_slot_a ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_a_local_allocation_flag ?stop_slot_a)
+        (stop_slot_a_ready_for_package ?stop_slot_a)
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_bound_to_day ?allocation_package)
+        (not
+          (itinerary_element_ready ?stop_slot_a)
+        )
+      )
+    :effect (itinerary_element_ready ?stop_slot_a)
+  )
+  (:action confirm_stop_slot_b_allocation_from_package
+    :parameters (?stop_slot_b - stop_slot_b ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (stop_slot_b_local_allocation_flag ?stop_slot_b)
+        (stop_slot_b_ready_for_package ?stop_slot_b)
+        (allocation_package_ready_for_booking ?allocation_package)
+        (allocation_package_bound_to_day ?allocation_package)
+        (not
+          (itinerary_element_ready ?stop_slot_b)
+        )
+      )
+    :effect (itinerary_element_ready ?stop_slot_b)
+  )
+  (:action apply_available_time_budget_to_itinerary_element
+    :parameters (?itinerary_component - itinerary_element ?available_time_budget - available_time_budget ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_ready ?itinerary_component)
+        (itinerary_element_assigned_activity ?itinerary_component ?activity_template)
+        (available_time_budget_available ?available_time_budget)
+        (not
+          (itinerary_element_budget_assigned ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_budget_assigned ?itinerary_component)
+        (itinerary_element_assigned_available_time_budget ?itinerary_component ?available_time_budget)
+        (not
+          (available_time_budget_available ?available_time_budget)
+        )
+      )
+  )
+  (:action finalize_stop_slot_a_and_release_time_unit
+    :parameters (?stop_slot_a - stop_slot_a ?time_allocation_unit - time_allocation_unit ?available_time_budget - available_time_budget)
+    :precondition
+      (and
+        (itinerary_element_budget_assigned ?stop_slot_a)
+        (itinerary_element_assigned_time_unit ?stop_slot_a ?time_allocation_unit)
+        (itinerary_element_assigned_available_time_budget ?stop_slot_a ?available_time_budget)
+        (not
+          (itinerary_element_finalized ?stop_slot_a)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?stop_slot_a)
+        (time_allocation_unit_available ?time_allocation_unit)
+        (available_time_budget_available ?available_time_budget)
+      )
+  )
+  (:action finalize_stop_slot_b_and_release_time_unit
+    :parameters (?stop_slot_b - stop_slot_b ?time_allocation_unit - time_allocation_unit ?available_time_budget - available_time_budget)
+    :precondition
+      (and
+        (itinerary_element_budget_assigned ?stop_slot_b)
+        (itinerary_element_assigned_time_unit ?stop_slot_b ?time_allocation_unit)
+        (itinerary_element_assigned_available_time_budget ?stop_slot_b ?available_time_budget)
+        (not
+          (itinerary_element_finalized ?stop_slot_b)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?stop_slot_b)
+        (time_allocation_unit_available ?time_allocation_unit)
+        (available_time_budget_available ?available_time_budget)
+      )
+  )
+  (:action finalize_itinerary_element_and_release_time_unit
+    :parameters (?itinerary_day - itinerary_day ?time_allocation_unit - time_allocation_unit ?available_time_budget - available_time_budget)
+    :precondition
+      (and
+        (itinerary_element_budget_assigned ?itinerary_day)
+        (itinerary_element_assigned_time_unit ?itinerary_day ?time_allocation_unit)
+        (itinerary_element_assigned_available_time_budget ?itinerary_day ?available_time_budget)
+        (not
+          (itinerary_element_finalized ?itinerary_day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?itinerary_day)
+        (time_allocation_unit_available ?time_allocation_unit)
+        (available_time_budget_available ?available_time_budget)
+      )
+  )
+)

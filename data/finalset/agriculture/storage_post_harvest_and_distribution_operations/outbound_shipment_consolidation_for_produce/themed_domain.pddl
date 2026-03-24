@@ -1,0 +1,936 @@
+(define (domain outbound_shipment_consolidation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types warehouse_resource - object facility_resource - object logistics_resource - object traceable_entity_type - object inventory_entity - traceable_entity_type dock_bay - warehouse_resource grading_station - warehouse_resource conditioning_unit - warehouse_resource label_template - warehouse_resource loading_equipment - warehouse_resource departure_time_slot - warehouse_resource temperature_profile - warehouse_resource security_seal - warehouse_resource pallet - facility_resource case_box - facility_resource quality_certificate - facility_resource storage_zone - logistics_resource delivery_channel - logistics_resource outbound_shipment - logistics_resource storage_related - inventory_entity operational_unit - inventory_entity cold_storage_slot - storage_related ambient_storage_slot - storage_related consolidation_manifest - operational_unit)
+  (:predicates
+    (asset_registered ?asset - inventory_entity)
+    (asset_ready_for_assignment ?asset - inventory_entity)
+    (asset_assigned_to_dock ?asset - inventory_entity)
+    (asset_scheduled_for_departure ?asset - inventory_entity)
+    (asset_ready_for_release ?asset - inventory_entity)
+    (asset_release_scheduled ?asset - inventory_entity)
+    (dock_bay_available ?dock_bay - dock_bay)
+    (bound_to_dock_bay ?asset - inventory_entity ?dock_bay - dock_bay)
+    (grading_station_available ?grading_station - grading_station)
+    (assigned_to_grading_station ?asset - inventory_entity ?grading_station - grading_station)
+    (conditioning_unit_available ?conditioning_unit - conditioning_unit)
+    (assigned_to_conditioning_unit ?asset - inventory_entity ?conditioning_unit - conditioning_unit)
+    (pallet_available ?pallet - pallet)
+    (cold_slot_pallet_assigned ?cold_slot - cold_storage_slot ?pallet - pallet)
+    (ambient_slot_pallet_assigned ?ambient_slot - ambient_storage_slot ?pallet - pallet)
+    (slot_assigned_to_zone ?cold_slot - cold_storage_slot ?storage_zone - storage_zone)
+    (storage_zone_staged ?storage_zone - storage_zone)
+    (storage_zone_pallet_allocated ?storage_zone - storage_zone)
+    (slot_marked_for_loading ?cold_slot - cold_storage_slot)
+    (slot_assigned_to_delivery_channel ?ambient_slot - ambient_storage_slot ?delivery_channel - delivery_channel)
+    (delivery_channel_staged ?delivery_channel - delivery_channel)
+    (delivery_channel_pallet_allocated ?delivery_channel - delivery_channel)
+    (ambient_slot_marked_for_loading ?ambient_slot - ambient_storage_slot)
+    (shipment_available ?outbound_shipment - outbound_shipment)
+    (shipment_staged ?outbound_shipment - outbound_shipment)
+    (shipment_assigned_to_storage_zone ?outbound_shipment - outbound_shipment ?storage_zone - storage_zone)
+    (shipment_assigned_to_delivery_channel ?outbound_shipment - outbound_shipment ?delivery_channel - delivery_channel)
+    (shipment_requires_cold_handling ?outbound_shipment - outbound_shipment)
+    (shipment_requires_ambient_handling ?outbound_shipment - outbound_shipment)
+    (shipment_ready_for_containerization ?outbound_shipment - outbound_shipment)
+    (manifest_assigned_cold_slot ?manifest - consolidation_manifest ?cold_slot - cold_storage_slot)
+    (manifest_assigned_ambient_slot ?manifest - consolidation_manifest ?ambient_slot - ambient_storage_slot)
+    (manifest_assigned_to_shipment ?manifest - consolidation_manifest ?outbound_shipment - outbound_shipment)
+    (case_box_available ?case_box - case_box)
+    (manifest_assigned_case_template ?manifest - consolidation_manifest ?case_box - case_box)
+    (case_box_assigned ?case_box - case_box)
+    (case_box_assigned_to_shipment ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    (manifest_ready_for_loading ?manifest - consolidation_manifest)
+    (manifest_loading_initiated ?manifest - consolidation_manifest)
+    (loading_checks_completed ?manifest - consolidation_manifest)
+    (label_template_assigned ?manifest - consolidation_manifest)
+    (label_confirmed_for_manifest ?manifest - consolidation_manifest)
+    (manifest_ready_for_equipment_allocation ?manifest - consolidation_manifest)
+    (loading_operations_performed ?manifest - consolidation_manifest)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (manifest_assigned_quality_certificate ?manifest - consolidation_manifest ?quality_certificate - quality_certificate)
+    (quality_certificate_attached ?manifest - consolidation_manifest)
+    (manifest_conditioning_completed ?manifest - consolidation_manifest)
+    (manifest_sealed ?manifest - consolidation_manifest)
+    (label_template_available ?label_template - label_template)
+    (manifest_assigned_label_template ?manifest - consolidation_manifest ?label_template - label_template)
+    (loading_equipment_available ?loading_equipment - loading_equipment)
+    (manifest_assigned_loading_equipment ?manifest - consolidation_manifest ?loading_equipment - loading_equipment)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (manifest_assigned_temperature_profile ?manifest - consolidation_manifest ?temperature_profile - temperature_profile)
+    (security_seal_available ?security_seal - security_seal)
+    (manifest_assigned_security_seal ?manifest - consolidation_manifest ?security_seal - security_seal)
+    (departure_slot_available ?departure_time_slot - departure_time_slot)
+    (asset_assigned_to_departure_slot ?asset - inventory_entity ?departure_time_slot - departure_time_slot)
+    (cold_slot_ready_for_assembly ?cold_slot - cold_storage_slot)
+    (ambient_slot_ready_for_assembly ?ambient_slot - ambient_storage_slot)
+    (manifest_finalized ?manifest - consolidation_manifest)
+  )
+  (:action receive_and_register_asset
+    :parameters (?asset - inventory_entity)
+    :precondition
+      (and
+        (not
+          (asset_registered ?asset)
+        )
+        (not
+          (asset_scheduled_for_departure ?asset)
+        )
+      )
+    :effect (asset_registered ?asset)
+  )
+  (:action assign_asset_to_dock_bay
+    :parameters (?asset - inventory_entity ?dock_bay - dock_bay)
+    :precondition
+      (and
+        (asset_registered ?asset)
+        (not
+          (asset_assigned_to_dock ?asset)
+        )
+        (dock_bay_available ?dock_bay)
+      )
+    :effect
+      (and
+        (asset_assigned_to_dock ?asset)
+        (bound_to_dock_bay ?asset ?dock_bay)
+        (not
+          (dock_bay_available ?dock_bay)
+        )
+      )
+  )
+  (:action start_grading
+    :parameters (?asset - inventory_entity ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_registered ?asset)
+        (asset_assigned_to_dock ?asset)
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (assigned_to_grading_station ?asset ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action complete_grading
+    :parameters (?asset - inventory_entity ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_registered ?asset)
+        (asset_assigned_to_dock ?asset)
+        (assigned_to_grading_station ?asset ?grading_station)
+        (not
+          (asset_ready_for_assignment ?asset)
+        )
+      )
+    :effect (asset_ready_for_assignment ?asset)
+  )
+  (:action release_grading_station
+    :parameters (?asset - inventory_entity ?grading_station - grading_station)
+    :precondition
+      (and
+        (assigned_to_grading_station ?asset ?grading_station)
+      )
+    :effect
+      (and
+        (grading_station_available ?grading_station)
+        (not
+          (assigned_to_grading_station ?asset ?grading_station)
+        )
+      )
+  )
+  (:action assign_asset_to_conditioning_unit
+    :parameters (?asset - inventory_entity ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?asset)
+        (conditioning_unit_available ?conditioning_unit)
+      )
+    :effect
+      (and
+        (assigned_to_conditioning_unit ?asset ?conditioning_unit)
+        (not
+          (conditioning_unit_available ?conditioning_unit)
+        )
+      )
+  )
+  (:action release_conditioning_unit
+    :parameters (?asset - inventory_entity ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (assigned_to_conditioning_unit ?asset ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_available ?conditioning_unit)
+        (not
+          (assigned_to_conditioning_unit ?asset ?conditioning_unit)
+        )
+      )
+  )
+  (:action assign_temperature_profile_to_manifest
+    :parameters (?manifest - consolidation_manifest ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (manifest_assigned_temperature_profile ?manifest ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action remove_temperature_profile_from_manifest
+    :parameters (?manifest - consolidation_manifest ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (manifest_assigned_temperature_profile ?manifest ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (manifest_assigned_temperature_profile ?manifest ?temperature_profile)
+        )
+      )
+  )
+  (:action assign_security_seal_to_manifest
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (security_seal_available ?security_seal)
+      )
+    :effect
+      (and
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (not
+          (security_seal_available ?security_seal)
+        )
+      )
+  )
+  (:action remove_security_seal_from_manifest
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal)
+    :precondition
+      (and
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+      )
+    :effect
+      (and
+        (security_seal_available ?security_seal)
+        (not
+          (manifest_assigned_security_seal ?manifest ?security_seal)
+        )
+      )
+  )
+  (:action stage_storage_zone_for_slot
+    :parameters (?cold_slot - cold_storage_slot ?storage_zone - storage_zone ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?cold_slot)
+        (assigned_to_grading_station ?cold_slot ?grading_station)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (not
+          (storage_zone_staged ?storage_zone)
+        )
+        (not
+          (storage_zone_pallet_allocated ?storage_zone)
+        )
+      )
+    :effect (storage_zone_staged ?storage_zone)
+  )
+  (:action confirm_conditioning_and_mark_slot
+    :parameters (?cold_slot - cold_storage_slot ?storage_zone - storage_zone ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?cold_slot)
+        (assigned_to_conditioning_unit ?cold_slot ?conditioning_unit)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (storage_zone_staged ?storage_zone)
+        (not
+          (cold_slot_ready_for_assembly ?cold_slot)
+        )
+      )
+    :effect
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (slot_marked_for_loading ?cold_slot)
+      )
+  )
+  (:action allocate_pallet_to_slot
+    :parameters (?cold_slot - cold_storage_slot ?storage_zone - storage_zone ?pallet - pallet)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?cold_slot)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (pallet_available ?pallet)
+        (not
+          (cold_slot_ready_for_assembly ?cold_slot)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_pallet_allocated ?storage_zone)
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (cold_slot_pallet_assigned ?cold_slot ?pallet)
+        (not
+          (pallet_available ?pallet)
+        )
+      )
+  )
+  (:action finalize_slot_pallet_assignment
+    :parameters (?cold_slot - cold_storage_slot ?storage_zone - storage_zone ?grading_station - grading_station ?pallet - pallet)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?cold_slot)
+        (assigned_to_grading_station ?cold_slot ?grading_station)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (storage_zone_pallet_allocated ?storage_zone)
+        (cold_slot_pallet_assigned ?cold_slot ?pallet)
+        (not
+          (slot_marked_for_loading ?cold_slot)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_staged ?storage_zone)
+        (slot_marked_for_loading ?cold_slot)
+        (pallet_available ?pallet)
+        (not
+          (cold_slot_pallet_assigned ?cold_slot ?pallet)
+        )
+      )
+  )
+  (:action stage_delivery_channel_for_ambient_slot
+    :parameters (?ambient_slot - ambient_storage_slot ?delivery_channel - delivery_channel ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?ambient_slot)
+        (assigned_to_grading_station ?ambient_slot ?grading_station)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (not
+          (delivery_channel_staged ?delivery_channel)
+        )
+        (not
+          (delivery_channel_pallet_allocated ?delivery_channel)
+        )
+      )
+    :effect (delivery_channel_staged ?delivery_channel)
+  )
+  (:action assign_conditioning_and_mark_ambient_slot
+    :parameters (?ambient_slot - ambient_storage_slot ?delivery_channel - delivery_channel ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?ambient_slot)
+        (assigned_to_conditioning_unit ?ambient_slot ?conditioning_unit)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (delivery_channel_staged ?delivery_channel)
+        (not
+          (ambient_slot_ready_for_assembly ?ambient_slot)
+        )
+      )
+    :effect
+      (and
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (ambient_slot_marked_for_loading ?ambient_slot)
+      )
+  )
+  (:action allocate_pallet_to_ambient_slot
+    :parameters (?ambient_slot - ambient_storage_slot ?delivery_channel - delivery_channel ?pallet - pallet)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?ambient_slot)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (pallet_available ?pallet)
+        (not
+          (ambient_slot_ready_for_assembly ?ambient_slot)
+        )
+      )
+    :effect
+      (and
+        (delivery_channel_pallet_allocated ?delivery_channel)
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (ambient_slot_pallet_assigned ?ambient_slot ?pallet)
+        (not
+          (pallet_available ?pallet)
+        )
+      )
+  )
+  (:action finalize_ambient_slot_pallet_assignment
+    :parameters (?ambient_slot - ambient_storage_slot ?delivery_channel - delivery_channel ?grading_station - grading_station ?pallet - pallet)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?ambient_slot)
+        (assigned_to_grading_station ?ambient_slot ?grading_station)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (delivery_channel_pallet_allocated ?delivery_channel)
+        (ambient_slot_pallet_assigned ?ambient_slot ?pallet)
+        (not
+          (ambient_slot_marked_for_loading ?ambient_slot)
+        )
+      )
+    :effect
+      (and
+        (delivery_channel_staged ?delivery_channel)
+        (ambient_slot_marked_for_loading ?ambient_slot)
+        (pallet_available ?pallet)
+        (not
+          (ambient_slot_pallet_assigned ?ambient_slot ?pallet)
+        )
+      )
+  )
+  (:action assemble_outbound_shipment
+    :parameters (?cold_slot - cold_storage_slot ?ambient_slot - ambient_storage_slot ?storage_zone - storage_zone ?delivery_channel - delivery_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (storage_zone_staged ?storage_zone)
+        (delivery_channel_staged ?delivery_channel)
+        (slot_marked_for_loading ?cold_slot)
+        (ambient_slot_marked_for_loading ?ambient_slot)
+        (shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?outbound_shipment)
+        (shipment_assigned_to_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_delivery_channel ?outbound_shipment ?delivery_channel)
+        (not
+          (shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_outbound_shipment_mark_cold_requirement
+    :parameters (?cold_slot - cold_storage_slot ?ambient_slot - ambient_storage_slot ?storage_zone - storage_zone ?delivery_channel - delivery_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (storage_zone_pallet_allocated ?storage_zone)
+        (delivery_channel_staged ?delivery_channel)
+        (not
+          (slot_marked_for_loading ?cold_slot)
+        )
+        (ambient_slot_marked_for_loading ?ambient_slot)
+        (shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?outbound_shipment)
+        (shipment_assigned_to_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_delivery_channel ?outbound_shipment ?delivery_channel)
+        (shipment_requires_cold_handling ?outbound_shipment)
+        (not
+          (shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_outbound_shipment_mark_ambient_requirement
+    :parameters (?cold_slot - cold_storage_slot ?ambient_slot - ambient_storage_slot ?storage_zone - storage_zone ?delivery_channel - delivery_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (storage_zone_staged ?storage_zone)
+        (delivery_channel_pallet_allocated ?delivery_channel)
+        (slot_marked_for_loading ?cold_slot)
+        (not
+          (ambient_slot_marked_for_loading ?ambient_slot)
+        )
+        (shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?outbound_shipment)
+        (shipment_assigned_to_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_delivery_channel ?outbound_shipment ?delivery_channel)
+        (shipment_requires_ambient_handling ?outbound_shipment)
+        (not
+          (shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_outbound_shipment_mark_mixed_requirements
+    :parameters (?cold_slot - cold_storage_slot ?ambient_slot - ambient_storage_slot ?storage_zone - storage_zone ?delivery_channel - delivery_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (slot_assigned_to_zone ?cold_slot ?storage_zone)
+        (slot_assigned_to_delivery_channel ?ambient_slot ?delivery_channel)
+        (storage_zone_pallet_allocated ?storage_zone)
+        (delivery_channel_pallet_allocated ?delivery_channel)
+        (not
+          (slot_marked_for_loading ?cold_slot)
+        )
+        (not
+          (ambient_slot_marked_for_loading ?ambient_slot)
+        )
+        (shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?outbound_shipment)
+        (shipment_assigned_to_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_delivery_channel ?outbound_shipment ?delivery_channel)
+        (shipment_requires_cold_handling ?outbound_shipment)
+        (shipment_requires_ambient_handling ?outbound_shipment)
+        (not
+          (shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action mark_shipment_ready_for_containerization
+    :parameters (?outbound_shipment - outbound_shipment ?cold_slot - cold_storage_slot ?grading_station - grading_station)
+    :precondition
+      (and
+        (shipment_staged ?outbound_shipment)
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (assigned_to_grading_station ?cold_slot ?grading_station)
+        (not
+          (shipment_ready_for_containerization ?outbound_shipment)
+        )
+      )
+    :effect (shipment_ready_for_containerization ?outbound_shipment)
+  )
+  (:action assign_case_to_manifest
+    :parameters (?manifest - consolidation_manifest ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (manifest_assigned_to_shipment ?manifest ?outbound_shipment)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_available ?case_box)
+        (shipment_staged ?outbound_shipment)
+        (shipment_ready_for_containerization ?outbound_shipment)
+        (not
+          (case_box_assigned ?case_box)
+        )
+      )
+    :effect
+      (and
+        (case_box_assigned ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (not
+          (case_box_available ?case_box)
+        )
+      )
+  )
+  (:action confirm_case_assignment_and_mark_manifest_ready_for_loading
+    :parameters (?manifest - consolidation_manifest ?case_box - case_box ?outbound_shipment - outbound_shipment ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (assigned_to_grading_station ?manifest ?grading_station)
+        (not
+          (shipment_requires_cold_handling ?outbound_shipment)
+        )
+        (not
+          (manifest_ready_for_loading ?manifest)
+        )
+      )
+    :effect (manifest_ready_for_loading ?manifest)
+  )
+  (:action apply_label_template_to_manifest
+    :parameters (?manifest - consolidation_manifest ?label_template - label_template)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (label_template_available ?label_template)
+        (not
+          (label_template_assigned ?manifest)
+        )
+      )
+    :effect
+      (and
+        (label_template_assigned ?manifest)
+        (manifest_assigned_label_template ?manifest ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action confirm_label_and_mark_manifest_ready_for_loading
+    :parameters (?manifest - consolidation_manifest ?case_box - case_box ?outbound_shipment - outbound_shipment ?grading_station - grading_station ?label_template - label_template)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (assigned_to_grading_station ?manifest ?grading_station)
+        (shipment_requires_cold_handling ?outbound_shipment)
+        (label_template_assigned ?manifest)
+        (manifest_assigned_label_template ?manifest ?label_template)
+        (not
+          (manifest_ready_for_loading ?manifest)
+        )
+      )
+    :effect
+      (and
+        (manifest_ready_for_loading ?manifest)
+        (label_confirmed_for_manifest ?manifest)
+      )
+  )
+  (:action allocate_loading_equipment_and_start_loading
+    :parameters (?manifest - consolidation_manifest ?temperature_profile - temperature_profile ?conditioning_unit - conditioning_unit ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_ready_for_loading ?manifest)
+        (manifest_assigned_temperature_profile ?manifest ?temperature_profile)
+        (assigned_to_conditioning_unit ?manifest ?conditioning_unit)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (not
+          (shipment_requires_ambient_handling ?outbound_shipment)
+        )
+        (not
+          (manifest_loading_initiated ?manifest)
+        )
+      )
+    :effect (manifest_loading_initiated ?manifest)
+  )
+  (:action allocate_loading_equipment_and_start_loading_alt
+    :parameters (?manifest - consolidation_manifest ?temperature_profile - temperature_profile ?conditioning_unit - conditioning_unit ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_ready_for_loading ?manifest)
+        (manifest_assigned_temperature_profile ?manifest ?temperature_profile)
+        (assigned_to_conditioning_unit ?manifest ?conditioning_unit)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (shipment_requires_ambient_handling ?outbound_shipment)
+        (not
+          (manifest_loading_initiated ?manifest)
+        )
+      )
+    :effect (manifest_loading_initiated ?manifest)
+  )
+  (:action perform_loading_inspection_standard
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_loading_initiated ?manifest)
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (not
+          (shipment_requires_cold_handling ?outbound_shipment)
+        )
+        (not
+          (shipment_requires_ambient_handling ?outbound_shipment)
+        )
+        (not
+          (loading_checks_completed ?manifest)
+        )
+      )
+    :effect (loading_checks_completed ?manifest)
+  )
+  (:action perform_loading_inspection_with_cold_requirement
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_loading_initiated ?manifest)
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (shipment_requires_cold_handling ?outbound_shipment)
+        (not
+          (shipment_requires_ambient_handling ?outbound_shipment)
+        )
+        (not
+          (loading_checks_completed ?manifest)
+        )
+      )
+    :effect
+      (and
+        (loading_checks_completed ?manifest)
+        (manifest_ready_for_equipment_allocation ?manifest)
+      )
+  )
+  (:action perform_loading_inspection_with_ambient_requirement
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_loading_initiated ?manifest)
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (not
+          (shipment_requires_cold_handling ?outbound_shipment)
+        )
+        (shipment_requires_ambient_handling ?outbound_shipment)
+        (not
+          (loading_checks_completed ?manifest)
+        )
+      )
+    :effect
+      (and
+        (loading_checks_completed ?manifest)
+        (manifest_ready_for_equipment_allocation ?manifest)
+      )
+  )
+  (:action perform_loading_inspection_for_mixed_requirements
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal ?case_box - case_box ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (manifest_loading_initiated ?manifest)
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (manifest_assigned_case_template ?manifest ?case_box)
+        (case_box_assigned_to_shipment ?case_box ?outbound_shipment)
+        (shipment_requires_cold_handling ?outbound_shipment)
+        (shipment_requires_ambient_handling ?outbound_shipment)
+        (not
+          (loading_checks_completed ?manifest)
+        )
+      )
+    :effect
+      (and
+        (loading_checks_completed ?manifest)
+        (manifest_ready_for_equipment_allocation ?manifest)
+      )
+  )
+  (:action finalize_manifest_without_equipment_allocation
+    :parameters (?manifest - consolidation_manifest)
+    :precondition
+      (and
+        (loading_checks_completed ?manifest)
+        (not
+          (manifest_ready_for_equipment_allocation ?manifest)
+        )
+        (not
+          (manifest_finalized ?manifest)
+        )
+      )
+    :effect
+      (and
+        (manifest_finalized ?manifest)
+        (asset_ready_for_release ?manifest)
+      )
+  )
+  (:action assign_loading_equipment_to_manifest
+    :parameters (?manifest - consolidation_manifest ?loading_equipment - loading_equipment)
+    :precondition
+      (and
+        (loading_checks_completed ?manifest)
+        (manifest_ready_for_equipment_allocation ?manifest)
+        (loading_equipment_available ?loading_equipment)
+      )
+    :effect
+      (and
+        (manifest_assigned_loading_equipment ?manifest ?loading_equipment)
+        (not
+          (loading_equipment_available ?loading_equipment)
+        )
+      )
+  )
+  (:action execute_loading_operations
+    :parameters (?manifest - consolidation_manifest ?cold_slot - cold_storage_slot ?ambient_slot - ambient_storage_slot ?grading_station - grading_station ?loading_equipment - loading_equipment)
+    :precondition
+      (and
+        (loading_checks_completed ?manifest)
+        (manifest_ready_for_equipment_allocation ?manifest)
+        (manifest_assigned_loading_equipment ?manifest ?loading_equipment)
+        (manifest_assigned_cold_slot ?manifest ?cold_slot)
+        (manifest_assigned_ambient_slot ?manifest ?ambient_slot)
+        (slot_marked_for_loading ?cold_slot)
+        (ambient_slot_marked_for_loading ?ambient_slot)
+        (assigned_to_grading_station ?manifest ?grading_station)
+        (not
+          (loading_operations_performed ?manifest)
+        )
+      )
+    :effect (loading_operations_performed ?manifest)
+  )
+  (:action finalize_manifest_after_loading
+    :parameters (?manifest - consolidation_manifest)
+    :precondition
+      (and
+        (loading_checks_completed ?manifest)
+        (loading_operations_performed ?manifest)
+        (not
+          (manifest_finalized ?manifest)
+        )
+      )
+    :effect
+      (and
+        (manifest_finalized ?manifest)
+        (asset_ready_for_release ?manifest)
+      )
+  )
+  (:action attach_quality_certificate_to_manifest
+    :parameters (?manifest - consolidation_manifest ?quality_certificate - quality_certificate ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_ready_for_assignment ?manifest)
+        (assigned_to_grading_station ?manifest ?grading_station)
+        (quality_certificate_available ?quality_certificate)
+        (manifest_assigned_quality_certificate ?manifest ?quality_certificate)
+        (not
+          (quality_certificate_attached ?manifest)
+        )
+      )
+    :effect
+      (and
+        (quality_certificate_attached ?manifest)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action verify_certificate_and_mark_manifest
+    :parameters (?manifest - consolidation_manifest ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (quality_certificate_attached ?manifest)
+        (assigned_to_conditioning_unit ?manifest ?conditioning_unit)
+        (not
+          (manifest_conditioning_completed ?manifest)
+        )
+      )
+    :effect (manifest_conditioning_completed ?manifest)
+  )
+  (:action apply_security_seal_to_manifest
+    :parameters (?manifest - consolidation_manifest ?security_seal - security_seal)
+    :precondition
+      (and
+        (manifest_conditioning_completed ?manifest)
+        (manifest_assigned_security_seal ?manifest ?security_seal)
+        (not
+          (manifest_sealed ?manifest)
+        )
+      )
+    :effect (manifest_sealed ?manifest)
+  )
+  (:action finalize_manifest_after_seal
+    :parameters (?manifest - consolidation_manifest)
+    :precondition
+      (and
+        (manifest_sealed ?manifest)
+        (not
+          (manifest_finalized ?manifest)
+        )
+      )
+    :effect
+      (and
+        (manifest_finalized ?manifest)
+        (asset_ready_for_release ?manifest)
+      )
+  )
+  (:action finalize_slot_before_loading
+    :parameters (?cold_slot - cold_storage_slot ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (cold_slot_ready_for_assembly ?cold_slot)
+        (slot_marked_for_loading ?cold_slot)
+        (shipment_staged ?outbound_shipment)
+        (shipment_ready_for_containerization ?outbound_shipment)
+        (not
+          (asset_ready_for_release ?cold_slot)
+        )
+      )
+    :effect (asset_ready_for_release ?cold_slot)
+  )
+  (:action finalize_ambient_slot_before_loading
+    :parameters (?ambient_slot - ambient_storage_slot ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (ambient_slot_ready_for_assembly ?ambient_slot)
+        (ambient_slot_marked_for_loading ?ambient_slot)
+        (shipment_staged ?outbound_shipment)
+        (shipment_ready_for_containerization ?outbound_shipment)
+        (not
+          (asset_ready_for_release ?ambient_slot)
+        )
+      )
+    :effect (asset_ready_for_release ?ambient_slot)
+  )
+  (:action schedule_asset_release
+    :parameters (?asset - inventory_entity ?departure_time_slot - departure_time_slot ?grading_station - grading_station)
+    :precondition
+      (and
+        (asset_ready_for_release ?asset)
+        (assigned_to_grading_station ?asset ?grading_station)
+        (departure_slot_available ?departure_time_slot)
+        (not
+          (asset_release_scheduled ?asset)
+        )
+      )
+    :effect
+      (and
+        (asset_release_scheduled ?asset)
+        (asset_assigned_to_departure_slot ?asset ?departure_time_slot)
+        (not
+          (departure_slot_available ?departure_time_slot)
+        )
+      )
+  )
+  (:action assign_slot_to_dock_and_schedule_departure
+    :parameters (?cold_slot - cold_storage_slot ?dock_bay - dock_bay ?departure_time_slot - departure_time_slot)
+    :precondition
+      (and
+        (asset_release_scheduled ?cold_slot)
+        (bound_to_dock_bay ?cold_slot ?dock_bay)
+        (asset_assigned_to_departure_slot ?cold_slot ?departure_time_slot)
+        (not
+          (asset_scheduled_for_departure ?cold_slot)
+        )
+      )
+    :effect
+      (and
+        (asset_scheduled_for_departure ?cold_slot)
+        (dock_bay_available ?dock_bay)
+        (departure_slot_available ?departure_time_slot)
+      )
+  )
+  (:action assign_ambient_slot_to_dock_and_schedule_departure
+    :parameters (?ambient_slot - ambient_storage_slot ?dock_bay - dock_bay ?departure_time_slot - departure_time_slot)
+    :precondition
+      (and
+        (asset_release_scheduled ?ambient_slot)
+        (bound_to_dock_bay ?ambient_slot ?dock_bay)
+        (asset_assigned_to_departure_slot ?ambient_slot ?departure_time_slot)
+        (not
+          (asset_scheduled_for_departure ?ambient_slot)
+        )
+      )
+    :effect
+      (and
+        (asset_scheduled_for_departure ?ambient_slot)
+        (dock_bay_available ?dock_bay)
+        (departure_slot_available ?departure_time_slot)
+      )
+  )
+  (:action assign_manifest_to_dock_and_schedule_departure
+    :parameters (?manifest - consolidation_manifest ?dock_bay - dock_bay ?departure_time_slot - departure_time_slot)
+    :precondition
+      (and
+        (asset_release_scheduled ?manifest)
+        (bound_to_dock_bay ?manifest ?dock_bay)
+        (asset_assigned_to_departure_slot ?manifest ?departure_time_slot)
+        (not
+          (asset_scheduled_for_departure ?manifest)
+        )
+      )
+    :effect
+      (and
+        (asset_scheduled_for_departure ?manifest)
+        (dock_bay_available ?dock_bay)
+        (departure_slot_available ?departure_time_slot)
+      )
+  )
+)

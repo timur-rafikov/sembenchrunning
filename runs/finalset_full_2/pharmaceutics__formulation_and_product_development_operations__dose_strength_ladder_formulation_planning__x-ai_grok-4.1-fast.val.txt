@@ -1,0 +1,1079 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_dose_strength_ladder_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_supertype - object strength_node_supertype - object component_supertype - object development_entity_supertype - object development_entity - development_entity_supertype raw_material_batch - resource_supertype analytical_resource - resource_supertype equipment_or_expertise - resource_supertype packaging_option - resource_supertype regulatory_document - resource_supertype evidence_item - resource_supertype manufacturing_process - resource_supertype critical_quality_attribute - resource_supertype excipient_material - strength_node_supertype stability_protocol - strength_node_supertype risk_item - strength_node_supertype strength_profile_low - component_supertype strength_profile_high - component_supertype formulation_prototype - component_supertype dose_level_supertype - development_entity formulation_campaign_supertype - development_entity dose_level - dose_level_supertype dose_level_variant - dose_level_supertype formulation_campaign - formulation_campaign_supertype)
+  (:predicates
+    (development_entity_registered ?development_entity - development_entity)
+    (development_entity_validated ?development_entity - development_entity)
+    (development_entity_raw_material_assigned ?development_entity - development_entity)
+    (scale_up_ready ?development_entity - development_entity)
+    (evidence_package_assembled ?development_entity - development_entity)
+    (evidence_validated ?development_entity - development_entity)
+    (raw_material_available ?raw_material_batch - raw_material_batch)
+    (development_entity_assigned_raw_material ?development_entity - development_entity ?raw_material_batch - raw_material_batch)
+    (analytical_resource_available ?analytical_resource - analytical_resource)
+    (development_entity_assigned_analytical_resource ?development_entity - development_entity ?analytical_resource - analytical_resource)
+    (equipment_available ?equipment_or_expertise - equipment_or_expertise)
+    (development_entity_assigned_equipment ?development_entity - development_entity ?equipment_or_expertise - equipment_or_expertise)
+    (excipient_available ?excipient_material - excipient_material)
+    (dose_excipient_assigned ?dose_level - dose_level ?excipient_material - excipient_material)
+    (dose_variant_excipient_assigned ?dose_level_variant - dose_level_variant ?excipient_material - excipient_material)
+    (dose_low_profile_linked ?dose_level - dose_level ?strength_profile_low - strength_profile_low)
+    (low_profile_precheck_passed ?strength_profile_low - strength_profile_low)
+    (low_profile_compatibility_initiated ?strength_profile_low - strength_profile_low)
+    (dose_level_process_ready ?dose_level - dose_level)
+    (variant_high_profile_linked ?dose_level_variant - dose_level_variant ?strength_profile_high - strength_profile_high)
+    (high_profile_precheck_passed ?strength_profile_high - strength_profile_high)
+    (high_profile_compatibility_initiated ?strength_profile_high - strength_profile_high)
+    (dose_variant_process_ready ?dose_level_variant - dose_level_variant)
+    (prototype_slot_unallocated ?formulation_prototype - formulation_prototype)
+    (prototype_registered ?formulation_prototype - formulation_prototype)
+    (prototype_linked_low_profile ?formulation_prototype - formulation_prototype ?strength_profile_low - strength_profile_low)
+    (prototype_linked_high_profile ?formulation_prototype - formulation_prototype ?strength_profile_high - strength_profile_high)
+    (prototype_ready_for_scaleup_low ?formulation_prototype - formulation_prototype)
+    (prototype_ready_for_scaleup_high ?formulation_prototype - formulation_prototype)
+    (prototype_quality_tested ?formulation_prototype - formulation_prototype)
+    (campaign_includes_dose_level ?formulation_campaign - formulation_campaign ?dose_level - dose_level)
+    (campaign_includes_dose_variant ?formulation_campaign - formulation_campaign ?dose_level_variant - dose_level_variant)
+    (campaign_includes_prototype ?formulation_campaign - formulation_campaign ?formulation_prototype - formulation_prototype)
+    (stability_protocol_available ?stability_protocol - stability_protocol)
+    (campaign_has_stability_protocol ?formulation_campaign - formulation_campaign ?stability_protocol - stability_protocol)
+    (stability_protocol_assigned ?stability_protocol - stability_protocol)
+    (stability_protocol_linked_to_prototype ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    (campaign_process_mapped ?formulation_campaign - formulation_campaign)
+    (campaign_process_confirmed ?formulation_campaign - formulation_campaign)
+    (campaign_stability_evidence_aggregated ?formulation_campaign - formulation_campaign)
+    (campaign_packaging_reserved ?formulation_campaign - formulation_campaign)
+    (campaign_packaging_confirmed ?formulation_campaign - formulation_campaign)
+    (campaign_regulatory_ready ?formulation_campaign - formulation_campaign)
+    (campaign_process_validation_completed ?formulation_campaign - formulation_campaign)
+    (risk_item_available ?risk_item - risk_item)
+    (campaign_has_risk_item ?formulation_campaign - formulation_campaign ?risk_item - risk_item)
+    (campaign_risk_acknowledged ?formulation_campaign - formulation_campaign)
+    (campaign_risk_mitigation_assigned ?formulation_campaign - formulation_campaign)
+    (campaign_risk_mitigation_completed ?formulation_campaign - formulation_campaign)
+    (packaging_option_available ?packaging_option - packaging_option)
+    (campaign_packaging_assigned ?formulation_campaign - formulation_campaign ?packaging_option - packaging_option)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (campaign_regulatory_document_assigned ?formulation_campaign - formulation_campaign ?regulatory_document - regulatory_document)
+    (manufacturing_process_available ?manufacturing_process - manufacturing_process)
+    (campaign_manufacturing_process_assigned ?formulation_campaign - formulation_campaign ?manufacturing_process - manufacturing_process)
+    (critical_quality_attribute_available ?critical_quality_attribute - critical_quality_attribute)
+    (campaign_cqa_assigned ?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute)
+    (evidence_item_available ?evidence_item - evidence_item)
+    (entity_has_evidence_item ?development_entity - development_entity ?evidence_item - evidence_item)
+    (dose_level_ready_for_prototype ?dose_level - dose_level)
+    (dose_variant_ready_for_prototype ?dose_level_variant - dose_level_variant)
+    (campaign_finalized ?formulation_campaign - formulation_campaign)
+  )
+  (:action register_development_entity
+    :parameters (?development_entity - development_entity)
+    :precondition
+      (and
+        (not
+          (development_entity_registered ?development_entity)
+        )
+        (not
+          (scale_up_ready ?development_entity)
+        )
+      )
+    :effect (development_entity_registered ?development_entity)
+  )
+  (:action assign_raw_material_to_development_entity
+    :parameters (?development_entity - development_entity ?raw_material_batch - raw_material_batch)
+    :precondition
+      (and
+        (development_entity_registered ?development_entity)
+        (not
+          (development_entity_raw_material_assigned ?development_entity)
+        )
+        (raw_material_available ?raw_material_batch)
+      )
+    :effect
+      (and
+        (development_entity_raw_material_assigned ?development_entity)
+        (development_entity_assigned_raw_material ?development_entity ?raw_material_batch)
+        (not
+          (raw_material_available ?raw_material_batch)
+        )
+      )
+  )
+  (:action reserve_analytical_resource_for_development_entity
+    :parameters (?development_entity - development_entity ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_registered ?development_entity)
+        (development_entity_raw_material_assigned ?development_entity)
+        (analytical_resource_available ?analytical_resource)
+      )
+    :effect
+      (and
+        (development_entity_assigned_analytical_resource ?development_entity ?analytical_resource)
+        (not
+          (analytical_resource_available ?analytical_resource)
+        )
+      )
+  )
+  (:action validate_development_entity_analytically
+    :parameters (?development_entity - development_entity ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_registered ?development_entity)
+        (development_entity_raw_material_assigned ?development_entity)
+        (development_entity_assigned_analytical_resource ?development_entity ?analytical_resource)
+        (not
+          (development_entity_validated ?development_entity)
+        )
+      )
+    :effect (development_entity_validated ?development_entity)
+  )
+  (:action release_analytical_resource_from_development_entity
+    :parameters (?development_entity - development_entity ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_assigned_analytical_resource ?development_entity ?analytical_resource)
+      )
+    :effect
+      (and
+        (analytical_resource_available ?analytical_resource)
+        (not
+          (development_entity_assigned_analytical_resource ?development_entity ?analytical_resource)
+        )
+      )
+  )
+  (:action reserve_equipment_for_development_entity
+    :parameters (?development_entity - development_entity ?equipment_or_expertise - equipment_or_expertise)
+    :precondition
+      (and
+        (development_entity_validated ?development_entity)
+        (equipment_available ?equipment_or_expertise)
+      )
+    :effect
+      (and
+        (development_entity_assigned_equipment ?development_entity ?equipment_or_expertise)
+        (not
+          (equipment_available ?equipment_or_expertise)
+        )
+      )
+  )
+  (:action release_equipment_from_development_entity
+    :parameters (?development_entity - development_entity ?equipment_or_expertise - equipment_or_expertise)
+    :precondition
+      (and
+        (development_entity_assigned_equipment ?development_entity ?equipment_or_expertise)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_or_expertise)
+        (not
+          (development_entity_assigned_equipment ?development_entity ?equipment_or_expertise)
+        )
+      )
+  )
+  (:action assign_manufacturing_process_to_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?manufacturing_process - manufacturing_process)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (manufacturing_process_available ?manufacturing_process)
+      )
+    :effect
+      (and
+        (campaign_manufacturing_process_assigned ?formulation_campaign ?manufacturing_process)
+        (not
+          (manufacturing_process_available ?manufacturing_process)
+        )
+      )
+  )
+  (:action release_manufacturing_process_from_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?manufacturing_process - manufacturing_process)
+    :precondition
+      (and
+        (campaign_manufacturing_process_assigned ?formulation_campaign ?manufacturing_process)
+      )
+    :effect
+      (and
+        (manufacturing_process_available ?manufacturing_process)
+        (not
+          (campaign_manufacturing_process_assigned ?formulation_campaign ?manufacturing_process)
+        )
+      )
+  )
+  (:action assign_cqa_to_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (critical_quality_attribute_available ?critical_quality_attribute)
+      )
+    :effect
+      (and
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (not
+          (critical_quality_attribute_available ?critical_quality_attribute)
+        )
+      )
+  )
+  (:action release_cqa_from_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute)
+    :precondition
+      (and
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+      )
+    :effect
+      (and
+        (critical_quality_attribute_available ?critical_quality_attribute)
+        (not
+          (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        )
+      )
+  )
+  (:action perform_low_profile_precheck
+    :parameters (?dose_level - dose_level ?strength_profile_low - strength_profile_low ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level)
+        (development_entity_assigned_analytical_resource ?dose_level ?analytical_resource)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (not
+          (low_profile_precheck_passed ?strength_profile_low)
+        )
+        (not
+          (low_profile_compatibility_initiated ?strength_profile_low)
+        )
+      )
+    :effect (low_profile_precheck_passed ?strength_profile_low)
+  )
+  (:action execute_low_profile_equipment_evaluation
+    :parameters (?dose_level - dose_level ?strength_profile_low - strength_profile_low ?equipment_or_expertise - equipment_or_expertise)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level)
+        (development_entity_assigned_equipment ?dose_level ?equipment_or_expertise)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (low_profile_precheck_passed ?strength_profile_low)
+        (not
+          (dose_level_ready_for_prototype ?dose_level)
+        )
+      )
+    :effect
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_level_process_ready ?dose_level)
+      )
+  )
+  (:action initiate_excipient_compatibility_test
+    :parameters (?dose_level - dose_level ?strength_profile_low - strength_profile_low ?excipient_material - excipient_material)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (excipient_available ?excipient_material)
+        (not
+          (dose_level_ready_for_prototype ?dose_level)
+        )
+      )
+    :effect
+      (and
+        (low_profile_compatibility_initiated ?strength_profile_low)
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_excipient_assigned ?dose_level ?excipient_material)
+        (not
+          (excipient_available ?excipient_material)
+        )
+      )
+  )
+  (:action finalize_excipient_compatibility_for_dose
+    :parameters (?dose_level - dose_level ?strength_profile_low - strength_profile_low ?analytical_resource - analytical_resource ?excipient_material - excipient_material)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level)
+        (development_entity_assigned_analytical_resource ?dose_level ?analytical_resource)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (low_profile_compatibility_initiated ?strength_profile_low)
+        (dose_excipient_assigned ?dose_level ?excipient_material)
+        (not
+          (dose_level_process_ready ?dose_level)
+        )
+      )
+    :effect
+      (and
+        (low_profile_precheck_passed ?strength_profile_low)
+        (dose_level_process_ready ?dose_level)
+        (excipient_available ?excipient_material)
+        (not
+          (dose_excipient_assigned ?dose_level ?excipient_material)
+        )
+      )
+  )
+  (:action perform_high_profile_precheck
+    :parameters (?dose_level_variant - dose_level_variant ?strength_profile_high - strength_profile_high ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level_variant)
+        (development_entity_assigned_analytical_resource ?dose_level_variant ?analytical_resource)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (not
+          (high_profile_precheck_passed ?strength_profile_high)
+        )
+        (not
+          (high_profile_compatibility_initiated ?strength_profile_high)
+        )
+      )
+    :effect (high_profile_precheck_passed ?strength_profile_high)
+  )
+  (:action execute_high_profile_equipment_evaluation
+    :parameters (?dose_level_variant - dose_level_variant ?strength_profile_high - strength_profile_high ?equipment_or_expertise - equipment_or_expertise)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level_variant)
+        (development_entity_assigned_equipment ?dose_level_variant ?equipment_or_expertise)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (high_profile_precheck_passed ?strength_profile_high)
+        (not
+          (dose_variant_ready_for_prototype ?dose_level_variant)
+        )
+      )
+    :effect
+      (and
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_variant_process_ready ?dose_level_variant)
+      )
+  )
+  (:action initiate_variant_excipient_compatibility_test
+    :parameters (?dose_level_variant - dose_level_variant ?strength_profile_high - strength_profile_high ?excipient_material - excipient_material)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level_variant)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (excipient_available ?excipient_material)
+        (not
+          (dose_variant_ready_for_prototype ?dose_level_variant)
+        )
+      )
+    :effect
+      (and
+        (high_profile_compatibility_initiated ?strength_profile_high)
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_variant_excipient_assigned ?dose_level_variant ?excipient_material)
+        (not
+          (excipient_available ?excipient_material)
+        )
+      )
+  )
+  (:action finalize_variant_excipient_compatibility_for_dose_variant
+    :parameters (?dose_level_variant - dose_level_variant ?strength_profile_high - strength_profile_high ?analytical_resource - analytical_resource ?excipient_material - excipient_material)
+    :precondition
+      (and
+        (development_entity_validated ?dose_level_variant)
+        (development_entity_assigned_analytical_resource ?dose_level_variant ?analytical_resource)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (high_profile_compatibility_initiated ?strength_profile_high)
+        (dose_variant_excipient_assigned ?dose_level_variant ?excipient_material)
+        (not
+          (dose_variant_process_ready ?dose_level_variant)
+        )
+      )
+    :effect
+      (and
+        (high_profile_precheck_passed ?strength_profile_high)
+        (dose_variant_process_ready ?dose_level_variant)
+        (excipient_available ?excipient_material)
+        (not
+          (dose_variant_excipient_assigned ?dose_level_variant ?excipient_material)
+        )
+      )
+  )
+  (:action assemble_formulation_prototype
+    :parameters (?dose_level - dose_level ?dose_level_variant - dose_level_variant ?strength_profile_low - strength_profile_low ?strength_profile_high - strength_profile_high ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (low_profile_precheck_passed ?strength_profile_low)
+        (high_profile_precheck_passed ?strength_profile_high)
+        (dose_level_process_ready ?dose_level)
+        (dose_variant_process_ready ?dose_level_variant)
+        (prototype_slot_unallocated ?formulation_prototype)
+      )
+    :effect
+      (and
+        (prototype_registered ?formulation_prototype)
+        (prototype_linked_low_profile ?formulation_prototype ?strength_profile_low)
+        (prototype_linked_high_profile ?formulation_prototype ?strength_profile_high)
+        (not
+          (prototype_slot_unallocated ?formulation_prototype)
+        )
+      )
+  )
+  (:action initialize_prototype_for_low_profile
+    :parameters (?dose_level - dose_level ?dose_level_variant - dose_level_variant ?strength_profile_low - strength_profile_low ?strength_profile_high - strength_profile_high ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (low_profile_compatibility_initiated ?strength_profile_low)
+        (high_profile_precheck_passed ?strength_profile_high)
+        (not
+          (dose_level_process_ready ?dose_level)
+        )
+        (dose_variant_process_ready ?dose_level_variant)
+        (prototype_slot_unallocated ?formulation_prototype)
+      )
+    :effect
+      (and
+        (prototype_registered ?formulation_prototype)
+        (prototype_linked_low_profile ?formulation_prototype ?strength_profile_low)
+        (prototype_linked_high_profile ?formulation_prototype ?strength_profile_high)
+        (prototype_ready_for_scaleup_low ?formulation_prototype)
+        (not
+          (prototype_slot_unallocated ?formulation_prototype)
+        )
+      )
+  )
+  (:action initialize_prototype_for_high_profile
+    :parameters (?dose_level - dose_level ?dose_level_variant - dose_level_variant ?strength_profile_low - strength_profile_low ?strength_profile_high - strength_profile_high ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (low_profile_precheck_passed ?strength_profile_low)
+        (high_profile_compatibility_initiated ?strength_profile_high)
+        (dose_level_process_ready ?dose_level)
+        (not
+          (dose_variant_process_ready ?dose_level_variant)
+        )
+        (prototype_slot_unallocated ?formulation_prototype)
+      )
+    :effect
+      (and
+        (prototype_registered ?formulation_prototype)
+        (prototype_linked_low_profile ?formulation_prototype ?strength_profile_low)
+        (prototype_linked_high_profile ?formulation_prototype ?strength_profile_high)
+        (prototype_ready_for_scaleup_high ?formulation_prototype)
+        (not
+          (prototype_slot_unallocated ?formulation_prototype)
+        )
+      )
+  )
+  (:action initialize_prototype_for_both_profiles
+    :parameters (?dose_level - dose_level ?dose_level_variant - dose_level_variant ?strength_profile_low - strength_profile_low ?strength_profile_high - strength_profile_high ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_low_profile_linked ?dose_level ?strength_profile_low)
+        (variant_high_profile_linked ?dose_level_variant ?strength_profile_high)
+        (low_profile_compatibility_initiated ?strength_profile_low)
+        (high_profile_compatibility_initiated ?strength_profile_high)
+        (not
+          (dose_level_process_ready ?dose_level)
+        )
+        (not
+          (dose_variant_process_ready ?dose_level_variant)
+        )
+        (prototype_slot_unallocated ?formulation_prototype)
+      )
+    :effect
+      (and
+        (prototype_registered ?formulation_prototype)
+        (prototype_linked_low_profile ?formulation_prototype ?strength_profile_low)
+        (prototype_linked_high_profile ?formulation_prototype ?strength_profile_high)
+        (prototype_ready_for_scaleup_low ?formulation_prototype)
+        (prototype_ready_for_scaleup_high ?formulation_prototype)
+        (not
+          (prototype_slot_unallocated ?formulation_prototype)
+        )
+      )
+  )
+  (:action record_prototype_quality_test
+    :parameters (?formulation_prototype - formulation_prototype ?dose_level - dose_level ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (prototype_registered ?formulation_prototype)
+        (dose_level_ready_for_prototype ?dose_level)
+        (development_entity_assigned_analytical_resource ?dose_level ?analytical_resource)
+        (not
+          (prototype_quality_tested ?formulation_prototype)
+        )
+      )
+    :effect (prototype_quality_tested ?formulation_prototype)
+  )
+  (:action assign_stability_protocol_to_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (campaign_includes_prototype ?formulation_campaign ?formulation_prototype)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_available ?stability_protocol)
+        (prototype_registered ?formulation_prototype)
+        (prototype_quality_tested ?formulation_prototype)
+        (not
+          (stability_protocol_assigned ?stability_protocol)
+        )
+      )
+    :effect
+      (and
+        (stability_protocol_assigned ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (not
+          (stability_protocol_available ?stability_protocol)
+        )
+      )
+  )
+  (:action confirm_stability_assignment_and_flag_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_assigned ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (development_entity_assigned_analytical_resource ?formulation_campaign ?analytical_resource)
+        (not
+          (prototype_ready_for_scaleup_low ?formulation_prototype)
+        )
+        (not
+          (campaign_process_mapped ?formulation_campaign)
+        )
+      )
+    :effect (campaign_process_mapped ?formulation_campaign)
+  )
+  (:action reserve_packaging_for_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?packaging_option - packaging_option)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (packaging_option_available ?packaging_option)
+        (not
+          (campaign_packaging_reserved ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_packaging_reserved ?formulation_campaign)
+        (campaign_packaging_assigned ?formulation_campaign ?packaging_option)
+        (not
+          (packaging_option_available ?packaging_option)
+        )
+      )
+  )
+  (:action assign_packaging_and_confirm_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype ?analytical_resource - analytical_resource ?packaging_option - packaging_option)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_assigned ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (development_entity_assigned_analytical_resource ?formulation_campaign ?analytical_resource)
+        (prototype_ready_for_scaleup_low ?formulation_prototype)
+        (campaign_packaging_reserved ?formulation_campaign)
+        (campaign_packaging_assigned ?formulation_campaign ?packaging_option)
+        (not
+          (campaign_process_mapped ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_process_mapped ?formulation_campaign)
+        (campaign_packaging_confirmed ?formulation_campaign)
+      )
+  )
+  (:action confirm_campaign_manufacturing_process
+    :parameters (?formulation_campaign - formulation_campaign ?manufacturing_process - manufacturing_process ?equipment_or_expertise - equipment_or_expertise ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_mapped ?formulation_campaign)
+        (campaign_manufacturing_process_assigned ?formulation_campaign ?manufacturing_process)
+        (development_entity_assigned_equipment ?formulation_campaign ?equipment_or_expertise)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (not
+          (prototype_ready_for_scaleup_high ?formulation_prototype)
+        )
+        (not
+          (campaign_process_confirmed ?formulation_campaign)
+        )
+      )
+    :effect (campaign_process_confirmed ?formulation_campaign)
+  )
+  (:action confirm_campaign_manufacturing_process_alternative
+    :parameters (?formulation_campaign - formulation_campaign ?manufacturing_process - manufacturing_process ?equipment_or_expertise - equipment_or_expertise ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_mapped ?formulation_campaign)
+        (campaign_manufacturing_process_assigned ?formulation_campaign ?manufacturing_process)
+        (development_entity_assigned_equipment ?formulation_campaign ?equipment_or_expertise)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (prototype_ready_for_scaleup_high ?formulation_prototype)
+        (not
+          (campaign_process_confirmed ?formulation_campaign)
+        )
+      )
+    :effect (campaign_process_confirmed ?formulation_campaign)
+  )
+  (:action aggregate_campaign_stability_evidence
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_confirmed ?formulation_campaign)
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (not
+          (prototype_ready_for_scaleup_low ?formulation_prototype)
+        )
+        (not
+          (prototype_ready_for_scaleup_high ?formulation_prototype)
+        )
+        (not
+          (campaign_stability_evidence_aggregated ?formulation_campaign)
+        )
+      )
+    :effect (campaign_stability_evidence_aggregated ?formulation_campaign)
+  )
+  (:action aggregate_campaign_stability_and_regulatory_prep
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_confirmed ?formulation_campaign)
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (prototype_ready_for_scaleup_low ?formulation_prototype)
+        (not
+          (prototype_ready_for_scaleup_high ?formulation_prototype)
+        )
+        (not
+          (campaign_stability_evidence_aggregated ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_regulatory_ready ?formulation_campaign)
+      )
+  )
+  (:action aggregate_campaign_evidence_and_regulatory_prep
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_confirmed ?formulation_campaign)
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (not
+          (prototype_ready_for_scaleup_low ?formulation_prototype)
+        )
+        (prototype_ready_for_scaleup_high ?formulation_prototype)
+        (not
+          (campaign_stability_evidence_aggregated ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_regulatory_ready ?formulation_campaign)
+      )
+  )
+  (:action aggregate_campaign_evidence_and_regulatory_prep_alternative
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute ?stability_protocol - stability_protocol ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (campaign_process_confirmed ?formulation_campaign)
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (campaign_has_stability_protocol ?formulation_campaign ?stability_protocol)
+        (stability_protocol_linked_to_prototype ?stability_protocol ?formulation_prototype)
+        (prototype_ready_for_scaleup_low ?formulation_prototype)
+        (prototype_ready_for_scaleup_high ?formulation_prototype)
+        (not
+          (campaign_stability_evidence_aggregated ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_regulatory_ready ?formulation_campaign)
+      )
+  )
+  (:action finalize_campaign_evidence_package
+    :parameters (?formulation_campaign - formulation_campaign)
+    :precondition
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (not
+          (campaign_regulatory_ready ?formulation_campaign)
+        )
+        (not
+          (campaign_finalized ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_finalized ?formulation_campaign)
+        (evidence_package_assembled ?formulation_campaign)
+      )
+  )
+  (:action assign_regulatory_document_to_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_regulatory_ready ?formulation_campaign)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (campaign_regulatory_document_assigned ?formulation_campaign ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action perform_cross_functional_validation
+    :parameters (?formulation_campaign - formulation_campaign ?dose_level - dose_level ?dose_level_variant - dose_level_variant ?analytical_resource - analytical_resource ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_regulatory_ready ?formulation_campaign)
+        (campaign_regulatory_document_assigned ?formulation_campaign ?regulatory_document)
+        (campaign_includes_dose_level ?formulation_campaign ?dose_level)
+        (campaign_includes_dose_variant ?formulation_campaign ?dose_level_variant)
+        (dose_level_process_ready ?dose_level)
+        (dose_variant_process_ready ?dose_level_variant)
+        (development_entity_assigned_analytical_resource ?formulation_campaign ?analytical_resource)
+        (not
+          (campaign_process_validation_completed ?formulation_campaign)
+        )
+      )
+    :effect (campaign_process_validation_completed ?formulation_campaign)
+  )
+  (:action finalize_campaign_and_assemble_evidence
+    :parameters (?formulation_campaign - formulation_campaign)
+    :precondition
+      (and
+        (campaign_stability_evidence_aggregated ?formulation_campaign)
+        (campaign_process_validation_completed ?formulation_campaign)
+        (not
+          (campaign_finalized ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_finalized ?formulation_campaign)
+        (evidence_package_assembled ?formulation_campaign)
+      )
+  )
+  (:action acknowledge_campaign_risk_item
+    :parameters (?formulation_campaign - formulation_campaign ?risk_item - risk_item ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (development_entity_validated ?formulation_campaign)
+        (development_entity_assigned_analytical_resource ?formulation_campaign ?analytical_resource)
+        (risk_item_available ?risk_item)
+        (campaign_has_risk_item ?formulation_campaign ?risk_item)
+        (not
+          (campaign_risk_acknowledged ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_risk_acknowledged ?formulation_campaign)
+        (not
+          (risk_item_available ?risk_item)
+        )
+      )
+  )
+  (:action initiate_risk_mitigation_for_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?equipment_or_expertise - equipment_or_expertise)
+    :precondition
+      (and
+        (campaign_risk_acknowledged ?formulation_campaign)
+        (development_entity_assigned_equipment ?formulation_campaign ?equipment_or_expertise)
+        (not
+          (campaign_risk_mitigation_assigned ?formulation_campaign)
+        )
+      )
+    :effect (campaign_risk_mitigation_assigned ?formulation_campaign)
+  )
+  (:action complete_risk_mitigation_for_campaign
+    :parameters (?formulation_campaign - formulation_campaign ?critical_quality_attribute - critical_quality_attribute)
+    :precondition
+      (and
+        (campaign_risk_mitigation_assigned ?formulation_campaign)
+        (campaign_cqa_assigned ?formulation_campaign ?critical_quality_attribute)
+        (not
+          (campaign_risk_mitigation_completed ?formulation_campaign)
+        )
+      )
+    :effect (campaign_risk_mitigation_completed ?formulation_campaign)
+  )
+  (:action finalize_campaign_post_risk_mitigation
+    :parameters (?formulation_campaign - formulation_campaign)
+    :precondition
+      (and
+        (campaign_risk_mitigation_completed ?formulation_campaign)
+        (not
+          (campaign_finalized ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (campaign_finalized ?formulation_campaign)
+        (evidence_package_assembled ?formulation_campaign)
+      )
+  )
+  (:action promote_dose_level
+    :parameters (?dose_level - dose_level ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_level_ready_for_prototype ?dose_level)
+        (dose_level_process_ready ?dose_level)
+        (prototype_registered ?formulation_prototype)
+        (prototype_quality_tested ?formulation_prototype)
+        (not
+          (evidence_package_assembled ?dose_level)
+        )
+      )
+    :effect (evidence_package_assembled ?dose_level)
+  )
+  (:action promote_dose_variant
+    :parameters (?dose_level_variant - dose_level_variant ?formulation_prototype - formulation_prototype)
+    :precondition
+      (and
+        (dose_variant_ready_for_prototype ?dose_level_variant)
+        (dose_variant_process_ready ?dose_level_variant)
+        (prototype_registered ?formulation_prototype)
+        (prototype_quality_tested ?formulation_prototype)
+        (not
+          (evidence_package_assembled ?dose_level_variant)
+        )
+      )
+    :effect (evidence_package_assembled ?dose_level_variant)
+  )
+  (:action attach_evidence_item_to_entity
+    :parameters (?development_entity - development_entity ?evidence_item - evidence_item ?analytical_resource - analytical_resource)
+    :precondition
+      (and
+        (evidence_package_assembled ?development_entity)
+        (development_entity_assigned_analytical_resource ?development_entity ?analytical_resource)
+        (evidence_item_available ?evidence_item)
+        (not
+          (evidence_validated ?development_entity)
+        )
+      )
+    :effect
+      (and
+        (evidence_validated ?development_entity)
+        (entity_has_evidence_item ?development_entity ?evidence_item)
+        (not
+          (evidence_item_available ?evidence_item)
+        )
+      )
+  )
+  (:action finalize_dose_level_with_evidence
+    :parameters (?dose_level - dose_level ?raw_material_batch - raw_material_batch ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (evidence_validated ?dose_level)
+        (development_entity_assigned_raw_material ?dose_level ?raw_material_batch)
+        (entity_has_evidence_item ?dose_level ?evidence_item)
+        (not
+          (scale_up_ready ?dose_level)
+        )
+      )
+    :effect
+      (and
+        (scale_up_ready ?dose_level)
+        (raw_material_available ?raw_material_batch)
+        (evidence_item_available ?evidence_item)
+      )
+  )
+  (:action finalize_dose_variant_with_evidence
+    :parameters (?dose_level_variant - dose_level_variant ?raw_material_batch - raw_material_batch ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (evidence_validated ?dose_level_variant)
+        (development_entity_assigned_raw_material ?dose_level_variant ?raw_material_batch)
+        (entity_has_evidence_item ?dose_level_variant ?evidence_item)
+        (not
+          (scale_up_ready ?dose_level_variant)
+        )
+      )
+    :effect
+      (and
+        (scale_up_ready ?dose_level_variant)
+        (raw_material_available ?raw_material_batch)
+        (evidence_item_available ?evidence_item)
+      )
+  )
+  (:action finalize_campaign_with_evidence
+    :parameters (?formulation_campaign - formulation_campaign ?raw_material_batch - raw_material_batch ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (evidence_validated ?formulation_campaign)
+        (development_entity_assigned_raw_material ?formulation_campaign ?raw_material_batch)
+        (entity_has_evidence_item ?formulation_campaign ?evidence_item)
+        (not
+          (scale_up_ready ?formulation_campaign)
+        )
+      )
+    :effect
+      (and
+        (scale_up_ready ?formulation_campaign)
+        (raw_material_available ?raw_material_batch)
+        (evidence_item_available ?evidence_item)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem dose_strength_ladder_planning_problem)
+  (:domain pharmaceutics_dose_strength_ladder_planning_domain)
+  (:objects dose_level_instance - dose_level dose_level_variant_instance - dose_level_variant formulation_campaign_instance_1 - formulation_campaign formulation_campaign_instance_2 - formulation_campaign raw_material_batch_instance_1 - raw_material_batch raw_material_batch_instance_2 - raw_material_batch raw_material_batch_instance_3 - raw_material_batch analytical_resource_instance - analytical_resource equipment_or_expertise_instance - equipment_or_expertise excipient_material_instance - excipient_material strength_profile_low_instance - strength_profile_low strength_profile_high_instance - strength_profile_high formulation_prototype_instance - formulation_prototype stability_protocol_instance_1 - stability_protocol stability_protocol_instance_2 - stability_protocol packaging_option_instance_1 - packaging_option packaging_option_instance_2 - packaging_option regulatory_document_instance_1 - regulatory_document regulatory_document_instance_2 - regulatory_document evidence_item_instance - evidence_item manufacturing_process_instance - manufacturing_process risk_item_instance_1 - risk_item risk_item_instance_2 - risk_item critical_quality_attribute_instance - critical_quality_attribute)
+  (:init
+    (raw_material_available raw_material_batch_instance_1)
+    (raw_material_available raw_material_batch_instance_2)
+    (raw_material_available raw_material_batch_instance_3)
+    (analytical_resource_available analytical_resource_instance)
+    (equipment_available equipment_or_expertise_instance)
+    (excipient_available excipient_material_instance)
+    (dose_low_profile_linked dose_level_instance strength_profile_low_instance)
+    (variant_high_profile_linked dose_level_variant_instance strength_profile_high_instance)
+    (prototype_slot_unallocated formulation_prototype_instance)
+    (stability_protocol_available stability_protocol_instance_1)
+    (stability_protocol_available stability_protocol_instance_2)
+    (campaign_includes_dose_level formulation_campaign_instance_1 dose_level_instance)
+    (campaign_includes_dose_level formulation_campaign_instance_2 dose_level_instance)
+    (campaign_includes_dose_variant formulation_campaign_instance_1 dose_level_variant_instance)
+    (campaign_includes_dose_variant formulation_campaign_instance_2 dose_level_variant_instance)
+    (campaign_includes_prototype formulation_campaign_instance_1 formulation_prototype_instance)
+    (campaign_includes_prototype formulation_campaign_instance_2 formulation_prototype_instance)
+    (campaign_has_stability_protocol formulation_campaign_instance_1 stability_protocol_instance_1)
+    (campaign_has_stability_protocol formulation_campaign_instance_2 stability_protocol_instance_2)
+    (packaging_option_available packaging_option_instance_1)
+    (packaging_option_available packaging_option_instance_2)
+    (regulatory_document_available regulatory_document_instance_1)
+    (regulatory_document_available regulatory_document_instance_2)
+    (evidence_item_available evidence_item_instance)
+    (manufacturing_process_available manufacturing_process_instance)
+    (risk_item_available risk_item_instance_1)
+    (campaign_has_risk_item formulation_campaign_instance_1 risk_item_instance_1)
+    (campaign_has_risk_item formulation_campaign_instance_2 risk_item_instance_2)
+    (critical_quality_attribute_available critical_quality_attribute_instance)
+  )
+  (:goal
+    (and
+      (scale_up_ready dose_level_instance)
+      (scale_up_ready dose_level_variant_instance)
+      (scale_up_ready formulation_campaign_instance_1)
+      (scale_up_ready formulation_campaign_instance_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_development_entity dose_level_instance)
+(register_development_entity dose_level_variant_instance)
+(register_development_entity formulation_campaign_instance_1)
+(register_development_entity formulation_campaign_instance_2)
+(assign_raw_material_to_development_entity dose_level_instance raw_material_batch_instance_1)
+(reserve_analytical_resource_for_development_entity dose_level_instance analytical_resource_instance)
+(validate_development_entity_analytically dose_level_instance analytical_resource_instance)
+(perform_low_profile_precheck dose_level_instance strength_profile_low_instance analytical_resource_instance)
+(reserve_equipment_for_development_entity dose_level_instance equipment_or_expertise_instance)
+(execute_low_profile_equipment_evaluation dose_level_instance strength_profile_low_instance equipment_or_expertise_instance)
+(release_equipment_from_development_entity dose_level_instance equipment_or_expertise_instance)
+(release_analytical_resource_from_development_entity dose_level_instance analytical_resource_instance)
+(assign_raw_material_to_development_entity dose_level_variant_instance raw_material_batch_instance_2)
+(reserve_analytical_resource_for_development_entity dose_level_variant_instance analytical_resource_instance)
+(validate_development_entity_analytically dose_level_variant_instance analytical_resource_instance)
+(perform_high_profile_precheck dose_level_variant_instance strength_profile_high_instance analytical_resource_instance)
+(reserve_equipment_for_development_entity dose_level_variant_instance equipment_or_expertise_instance)
+(execute_high_profile_equipment_evaluation dose_level_variant_instance strength_profile_high_instance equipment_or_expertise_instance)
+(release_equipment_from_development_entity dose_level_variant_instance equipment_or_expertise_instance)
+(release_analytical_resource_from_development_entity dose_level_variant_instance analytical_resource_instance)
+(assemble_formulation_prototype dose_level_instance dose_level_variant_instance strength_profile_low_instance strength_profile_high_instance formulation_prototype_instance)
+(reserve_analytical_resource_for_development_entity dose_level_instance analytical_resource_instance)
+(record_prototype_quality_test formulation_prototype_instance dose_level_instance analytical_resource_instance)
+(release_analytical_resource_from_development_entity dose_level_instance analytical_resource_instance)
+(promote_dose_level dose_level_instance formulation_prototype_instance)
+(promote_dose_variant dose_level_variant_instance formulation_prototype_instance)
+(reserve_analytical_resource_for_development_entity dose_level_instance analytical_resource_instance)
+(attach_evidence_item_to_entity dose_level_instance evidence_item_instance analytical_resource_instance)
+(finalize_dose_level_with_evidence dose_level_instance raw_material_batch_instance_1 evidence_item_instance)
+(release_analytical_resource_from_development_entity dose_level_instance analytical_resource_instance)
+(reserve_analytical_resource_for_development_entity dose_level_variant_instance analytical_resource_instance)
+(attach_evidence_item_to_entity dose_level_variant_instance evidence_item_instance analytical_resource_instance)
+(finalize_dose_variant_with_evidence dose_level_variant_instance raw_material_batch_instance_2 evidence_item_instance)
+(release_analytical_resource_from_development_entity dose_level_variant_instance analytical_resource_instance)
+(assign_raw_material_to_development_entity formulation_campaign_instance_1 raw_material_batch_instance_3)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(validate_development_entity_analytically formulation_campaign_instance_1 analytical_resource_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(assign_manufacturing_process_to_campaign formulation_campaign_instance_1 manufacturing_process_instance)
+(assign_cqa_to_campaign formulation_campaign_instance_1 critical_quality_attribute_instance)
+(assign_stability_protocol_to_campaign formulation_campaign_instance_1 stability_protocol_instance_1 formulation_prototype_instance)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(confirm_stability_assignment_and_flag_campaign formulation_campaign_instance_1 stability_protocol_instance_1 formulation_prototype_instance analytical_resource_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(reserve_equipment_for_development_entity formulation_campaign_instance_1 equipment_or_expertise_instance)
+(confirm_campaign_manufacturing_process formulation_campaign_instance_1 manufacturing_process_instance equipment_or_expertise_instance stability_protocol_instance_1 formulation_prototype_instance)
+(release_equipment_from_development_entity formulation_campaign_instance_1 equipment_or_expertise_instance)
+(aggregate_campaign_stability_evidence formulation_campaign_instance_1 critical_quality_attribute_instance stability_protocol_instance_1 formulation_prototype_instance)
+(finalize_campaign_evidence_package formulation_campaign_instance_1)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(attach_evidence_item_to_entity formulation_campaign_instance_1 evidence_item_instance analytical_resource_instance)
+(finalize_campaign_with_evidence formulation_campaign_instance_1 raw_material_batch_instance_3 evidence_item_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_1 analytical_resource_instance)
+(release_cqa_from_campaign formulation_campaign_instance_1 critical_quality_attribute_instance)
+(release_manufacturing_process_from_campaign formulation_campaign_instance_1 manufacturing_process_instance)
+(assign_raw_material_to_development_entity formulation_campaign_instance_2 raw_material_batch_instance_1)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+(validate_development_entity_analytically formulation_campaign_instance_2 analytical_resource_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+(assign_manufacturing_process_to_campaign formulation_campaign_instance_2 manufacturing_process_instance)
+(assign_cqa_to_campaign formulation_campaign_instance_2 critical_quality_attribute_instance)
+(assign_stability_protocol_to_campaign formulation_campaign_instance_2 stability_protocol_instance_2 formulation_prototype_instance)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+(confirm_stability_assignment_and_flag_campaign formulation_campaign_instance_2 stability_protocol_instance_2 formulation_prototype_instance analytical_resource_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+(reserve_equipment_for_development_entity formulation_campaign_instance_2 equipment_or_expertise_instance)
+(confirm_campaign_manufacturing_process formulation_campaign_instance_2 manufacturing_process_instance equipment_or_expertise_instance stability_protocol_instance_2 formulation_prototype_instance)
+(release_equipment_from_development_entity formulation_campaign_instance_2 equipment_or_expertise_instance)
+(aggregate_campaign_stability_evidence formulation_campaign_instance_2 critical_quality_attribute_instance stability_protocol_instance_2 formulation_prototype_instance)
+(finalize_campaign_evidence_package formulation_campaign_instance_2)
+(reserve_analytical_resource_for_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+(attach_evidence_item_to_entity formulation_campaign_instance_2 evidence_item_instance analytical_resource_instance)
+(finalize_campaign_with_evidence formulation_campaign_instance_2 raw_material_batch_instance_1 evidence_item_instance)
+(release_analytical_resource_from_development_entity formulation_campaign_instance_2 analytical_resource_instance)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_7f268elw/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 74 
+
+Successful plans:
+Value: 74
+ /tmp/val_7f268elw/plan.pddl 74 
+
+
+
+--- stderr ---
+

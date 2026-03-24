@@ -1,0 +1,936 @@
+(define (domain vaccination_or_health_document_check_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types agent_or_resource - object document_or_template - object policy_or_requirement - object subject_root - object subject_record - subject_root inspector_unit - agent_or_resource presented_health_credential - agent_or_resource verification_check_item - agent_or_resource special_handling_label - agent_or_resource processing_profile - agent_or_resource credential_batch - agent_or_resource evidence_type - agent_or_resource approver_signature - agent_or_resource supporting_document - document_or_template validation_profile - document_or_template policy_exception - document_or_template entry_rule_profile - policy_or_requirement destination_rule_profile - policy_or_requirement screening_record - policy_or_requirement traveler_record_supergroup - subject_record inspection_case_supergroup - subject_record traveler_record_category_a - traveler_record_supergroup traveler_record_category_b - traveler_record_supergroup inspection_case_file - inspection_case_supergroup)
+  (:predicates
+    (subject_record_created ?subject_record - subject_record)
+    (subject_record_initially_verified ?subject_record - subject_record)
+    (subject_record_assigned ?subject_record - subject_record)
+    (entry_authorization_granted ?subject_record - subject_record)
+    (ready_for_final_adjudication ?subject_record - subject_record)
+    (eligibility_flag_set ?subject_record - subject_record)
+    (inspector_unit_available ?inspector_unit - inspector_unit)
+    (assigned_inspector ?subject_record - subject_record ?inspector_unit - inspector_unit)
+    (presented_credential_unlinked ?presented_health_credential - presented_health_credential)
+    (credential_linked_to_subject ?subject_record - subject_record ?presented_health_credential - presented_health_credential)
+    (verification_check_item_available ?verification_check_item - verification_check_item)
+    (verification_item_assigned ?subject_record - subject_record ?verification_check_item - verification_check_item)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (traveler_a_has_supporting_document ?traveler_record_category_a - traveler_record_category_a ?supporting_document - supporting_document)
+    (traveler_b_has_supporting_document ?traveler_record_category_b - traveler_record_category_b ?supporting_document - supporting_document)
+    (traveler_a_has_entry_rule ?traveler_record_category_a - traveler_record_category_a ?entry_rule_profile - entry_rule_profile)
+    (entry_rule_match_marked ?entry_rule_profile - entry_rule_profile)
+    (entry_rule_supporting_document_present ?entry_rule_profile - entry_rule_profile)
+    (traveler_a_requirements_satisfied ?traveler_record_category_a - traveler_record_category_a)
+    (traveler_b_has_destination_rule ?traveler_record_category_b - traveler_record_category_b ?destination_rule_profile - destination_rule_profile)
+    (destination_rule_match_marked ?destination_rule_profile - destination_rule_profile)
+    (destination_rule_supporting_document_present ?destination_rule_profile - destination_rule_profile)
+    (traveler_b_requirements_satisfied ?traveler_record_category_b - traveler_record_category_b)
+    (screening_record_available ?screening_record - screening_record)
+    (screening_record_constructed ?screening_record - screening_record)
+    (screening_record_has_entry_rule ?screening_record - screening_record ?entry_rule_profile - entry_rule_profile)
+    (screening_record_has_destination_rule ?screening_record - screening_record ?destination_rule_profile - destination_rule_profile)
+    (screening_record_entry_support_present ?screening_record - screening_record)
+    (screening_record_destination_support_present ?screening_record - screening_record)
+    (screening_record_finalized ?screening_record - screening_record)
+    (inspection_case_file_includes_traveler_a ?inspection_case_file - inspection_case_file ?traveler_record_category_a - traveler_record_category_a)
+    (inspection_case_file_includes_traveler_b ?inspection_case_file - inspection_case_file ?traveler_record_category_b - traveler_record_category_b)
+    (inspection_case_file_links_screening_record ?inspection_case_file - inspection_case_file ?screening_record - screening_record)
+    (validation_profile_available ?validation_profile - validation_profile)
+    (inspection_case_file_has_validation_profile ?inspection_case_file - inspection_case_file ?validation_profile - validation_profile)
+    (validation_profile_bound ?validation_profile - validation_profile)
+    (validation_profile_links_screening_record ?validation_profile - validation_profile ?screening_record - screening_record)
+    (inspection_case_file_validation_initiated ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_evidence_bound ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_validation_complete ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_has_special_handling_label ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_special_handling_marked ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_processing_profile_applicable ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_processing_completed ?inspection_case_file - inspection_case_file)
+    (policy_exception_available ?policy_exception - policy_exception)
+    (inspection_case_file_has_policy_exception ?inspection_case_file - inspection_case_file ?policy_exception - policy_exception)
+    (inspection_case_file_policy_exception_flag ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_exception_reviewed ?inspection_case_file - inspection_case_file)
+    (inspection_case_file_exception_approved ?inspection_case_file - inspection_case_file)
+    (special_handling_label_available ?special_handling_label - special_handling_label)
+    (inspection_case_file_links_special_handling_label ?inspection_case_file - inspection_case_file ?special_handling_label - special_handling_label)
+    (processing_profile_available ?processing_profile - processing_profile)
+    (inspection_case_file_has_processing_profile ?inspection_case_file - inspection_case_file ?processing_profile - processing_profile)
+    (evidence_type_available ?evidence_type - evidence_type)
+    (inspection_case_file_has_evidence_type ?inspection_case_file - inspection_case_file ?evidence_type - evidence_type)
+    (approver_signature_available ?approver_signature - approver_signature)
+    (inspection_case_file_has_approver_signature ?inspection_case_file - inspection_case_file ?approver_signature - approver_signature)
+    (credential_batch_available ?credential_batch - credential_batch)
+    (subject_record_linked_to_credential_batch ?subject_record - subject_record ?credential_batch - credential_batch)
+    (traveler_a_processing_flag ?traveler_record_category_a - traveler_record_category_a)
+    (traveler_b_processing_flag ?traveler_record_category_b - traveler_record_category_b)
+    (inspection_case_file_finalization_flag ?inspection_case_file - inspection_case_file)
+  )
+  (:action create_subject_record
+    :parameters (?subject_record - subject_record)
+    :precondition
+      (and
+        (not
+          (subject_record_created ?subject_record)
+        )
+        (not
+          (entry_authorization_granted ?subject_record)
+        )
+      )
+    :effect (subject_record_created ?subject_record)
+  )
+  (:action assign_inspector_to_subject
+    :parameters (?subject_record - subject_record ?inspector_unit - inspector_unit)
+    :precondition
+      (and
+        (subject_record_created ?subject_record)
+        (not
+          (subject_record_assigned ?subject_record)
+        )
+        (inspector_unit_available ?inspector_unit)
+      )
+    :effect
+      (and
+        (subject_record_assigned ?subject_record)
+        (assigned_inspector ?subject_record ?inspector_unit)
+        (not
+          (inspector_unit_available ?inspector_unit)
+        )
+      )
+  )
+  (:action link_presented_credential_to_subject
+    :parameters (?subject_record - subject_record ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_created ?subject_record)
+        (subject_record_assigned ?subject_record)
+        (presented_credential_unlinked ?presented_health_credential)
+      )
+    :effect
+      (and
+        (credential_linked_to_subject ?subject_record ?presented_health_credential)
+        (not
+          (presented_credential_unlinked ?presented_health_credential)
+        )
+      )
+  )
+  (:action perform_initial_verification
+    :parameters (?subject_record - subject_record ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_created ?subject_record)
+        (subject_record_assigned ?subject_record)
+        (credential_linked_to_subject ?subject_record ?presented_health_credential)
+        (not
+          (subject_record_initially_verified ?subject_record)
+        )
+      )
+    :effect (subject_record_initially_verified ?subject_record)
+  )
+  (:action unlink_presented_credential_from_subject
+    :parameters (?subject_record - subject_record ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (credential_linked_to_subject ?subject_record ?presented_health_credential)
+      )
+    :effect
+      (and
+        (presented_credential_unlinked ?presented_health_credential)
+        (not
+          (credential_linked_to_subject ?subject_record ?presented_health_credential)
+        )
+      )
+  )
+  (:action assign_verification_item_to_subject
+    :parameters (?subject_record - subject_record ?verification_check_item - verification_check_item)
+    :precondition
+      (and
+        (subject_record_initially_verified ?subject_record)
+        (verification_check_item_available ?verification_check_item)
+      )
+    :effect
+      (and
+        (verification_item_assigned ?subject_record ?verification_check_item)
+        (not
+          (verification_check_item_available ?verification_check_item)
+        )
+      )
+  )
+  (:action release_verification_item_from_subject
+    :parameters (?subject_record - subject_record ?verification_check_item - verification_check_item)
+    :precondition
+      (and
+        (verification_item_assigned ?subject_record ?verification_check_item)
+      )
+    :effect
+      (and
+        (verification_check_item_available ?verification_check_item)
+        (not
+          (verification_item_assigned ?subject_record ?verification_check_item)
+        )
+      )
+  )
+  (:action bind_evidence_type_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (evidence_type_available ?evidence_type)
+      )
+    :effect
+      (and
+        (inspection_case_file_has_evidence_type ?inspection_case_file ?evidence_type)
+        (not
+          (evidence_type_available ?evidence_type)
+        )
+      )
+  )
+  (:action unbind_evidence_type_from_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (inspection_case_file_has_evidence_type ?inspection_case_file ?evidence_type)
+      )
+    :effect
+      (and
+        (evidence_type_available ?evidence_type)
+        (not
+          (inspection_case_file_has_evidence_type ?inspection_case_file ?evidence_type)
+        )
+      )
+  )
+  (:action assign_approver_signature_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (approver_signature_available ?approver_signature)
+      )
+    :effect
+      (and
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (not
+          (approver_signature_available ?approver_signature)
+        )
+      )
+  )
+  (:action release_approver_signature_from_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature)
+    :precondition
+      (and
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+      )
+    :effect
+      (and
+        (approver_signature_available ?approver_signature)
+        (not
+          (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        )
+      )
+  )
+  (:action mark_entry_rule_match
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?entry_rule_profile - entry_rule_profile ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_a)
+        (credential_linked_to_subject ?traveler_record_category_a ?presented_health_credential)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (not
+          (entry_rule_match_marked ?entry_rule_profile)
+        )
+        (not
+          (entry_rule_supporting_document_present ?entry_rule_profile)
+        )
+      )
+    :effect (entry_rule_match_marked ?entry_rule_profile)
+  )
+  (:action apply_check_item_for_traveler_a
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?entry_rule_profile - entry_rule_profile ?verification_check_item - verification_check_item)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_a)
+        (verification_item_assigned ?traveler_record_category_a ?verification_check_item)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (entry_rule_match_marked ?entry_rule_profile)
+        (not
+          (traveler_a_processing_flag ?traveler_record_category_a)
+        )
+      )
+    :effect
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+      )
+  )
+  (:action attach_supporting_document_to_traveler_a_entry_profile
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?entry_rule_profile - entry_rule_profile ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_a)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (supporting_document_available ?supporting_document)
+        (not
+          (traveler_a_processing_flag ?traveler_record_category_a)
+        )
+      )
+    :effect
+      (and
+        (entry_rule_supporting_document_present ?entry_rule_profile)
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_a_has_supporting_document ?traveler_record_category_a ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action reconcile_entry_support_and_mark_traveler_a
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?entry_rule_profile - entry_rule_profile ?presented_health_credential - presented_health_credential ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_a)
+        (credential_linked_to_subject ?traveler_record_category_a ?presented_health_credential)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (entry_rule_supporting_document_present ?entry_rule_profile)
+        (traveler_a_has_supporting_document ?traveler_record_category_a ?supporting_document)
+        (not
+          (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        )
+      )
+    :effect
+      (and
+        (entry_rule_match_marked ?entry_rule_profile)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        (supporting_document_available ?supporting_document)
+        (not
+          (traveler_a_has_supporting_document ?traveler_record_category_a ?supporting_document)
+        )
+      )
+  )
+  (:action mark_destination_rule_match
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?destination_rule_profile - destination_rule_profile ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_b)
+        (credential_linked_to_subject ?traveler_record_category_b ?presented_health_credential)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (not
+          (destination_rule_match_marked ?destination_rule_profile)
+        )
+        (not
+          (destination_rule_supporting_document_present ?destination_rule_profile)
+        )
+      )
+    :effect (destination_rule_match_marked ?destination_rule_profile)
+  )
+  (:action apply_check_item_for_traveler_b
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?destination_rule_profile - destination_rule_profile ?verification_check_item - verification_check_item)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_b)
+        (verification_item_assigned ?traveler_record_category_b ?verification_check_item)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (destination_rule_match_marked ?destination_rule_profile)
+        (not
+          (traveler_b_processing_flag ?traveler_record_category_b)
+        )
+      )
+    :effect
+      (and
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+      )
+  )
+  (:action attach_supporting_document_to_traveler_b_destination_profile
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?destination_rule_profile - destination_rule_profile ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_b)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (supporting_document_available ?supporting_document)
+        (not
+          (traveler_b_processing_flag ?traveler_record_category_b)
+        )
+      )
+    :effect
+      (and
+        (destination_rule_supporting_document_present ?destination_rule_profile)
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_b_has_supporting_document ?traveler_record_category_b ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action reconcile_destination_support_and_mark_traveler_b
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?destination_rule_profile - destination_rule_profile ?presented_health_credential - presented_health_credential ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_record_initially_verified ?traveler_record_category_b)
+        (credential_linked_to_subject ?traveler_record_category_b ?presented_health_credential)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (destination_rule_supporting_document_present ?destination_rule_profile)
+        (traveler_b_has_supporting_document ?traveler_record_category_b ?supporting_document)
+        (not
+          (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        )
+      )
+    :effect
+      (and
+        (destination_rule_match_marked ?destination_rule_profile)
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        (supporting_document_available ?supporting_document)
+        (not
+          (traveler_b_has_supporting_document ?traveler_record_category_b ?supporting_document)
+        )
+      )
+  )
+  (:action construct_screening_record_standard
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?traveler_record_category_b - traveler_record_category_b ?entry_rule_profile - entry_rule_profile ?destination_rule_profile - destination_rule_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (entry_rule_match_marked ?entry_rule_profile)
+        (destination_rule_match_marked ?destination_rule_profile)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        (screening_record_available ?screening_record)
+      )
+    :effect
+      (and
+        (screening_record_constructed ?screening_record)
+        (screening_record_has_entry_rule ?screening_record ?entry_rule_profile)
+        (screening_record_has_destination_rule ?screening_record ?destination_rule_profile)
+        (not
+          (screening_record_available ?screening_record)
+        )
+      )
+  )
+  (:action construct_screening_record_with_entry_support
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?traveler_record_category_b - traveler_record_category_b ?entry_rule_profile - entry_rule_profile ?destination_rule_profile - destination_rule_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (entry_rule_supporting_document_present ?entry_rule_profile)
+        (destination_rule_match_marked ?destination_rule_profile)
+        (not
+          (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        )
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        (screening_record_available ?screening_record)
+      )
+    :effect
+      (and
+        (screening_record_constructed ?screening_record)
+        (screening_record_has_entry_rule ?screening_record ?entry_rule_profile)
+        (screening_record_has_destination_rule ?screening_record ?destination_rule_profile)
+        (screening_record_entry_support_present ?screening_record)
+        (not
+          (screening_record_available ?screening_record)
+        )
+      )
+  )
+  (:action construct_screening_record_with_destination_support
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?traveler_record_category_b - traveler_record_category_b ?entry_rule_profile - entry_rule_profile ?destination_rule_profile - destination_rule_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (entry_rule_match_marked ?entry_rule_profile)
+        (destination_rule_supporting_document_present ?destination_rule_profile)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        (not
+          (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        )
+        (screening_record_available ?screening_record)
+      )
+    :effect
+      (and
+        (screening_record_constructed ?screening_record)
+        (screening_record_has_entry_rule ?screening_record ?entry_rule_profile)
+        (screening_record_has_destination_rule ?screening_record ?destination_rule_profile)
+        (screening_record_destination_support_present ?screening_record)
+        (not
+          (screening_record_available ?screening_record)
+        )
+      )
+  )
+  (:action construct_screening_record_with_both_supports
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?traveler_record_category_b - traveler_record_category_b ?entry_rule_profile - entry_rule_profile ?destination_rule_profile - destination_rule_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_a_has_entry_rule ?traveler_record_category_a ?entry_rule_profile)
+        (traveler_b_has_destination_rule ?traveler_record_category_b ?destination_rule_profile)
+        (entry_rule_supporting_document_present ?entry_rule_profile)
+        (destination_rule_supporting_document_present ?destination_rule_profile)
+        (not
+          (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        )
+        (not
+          (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        )
+        (screening_record_available ?screening_record)
+      )
+    :effect
+      (and
+        (screening_record_constructed ?screening_record)
+        (screening_record_has_entry_rule ?screening_record ?entry_rule_profile)
+        (screening_record_has_destination_rule ?screening_record ?destination_rule_profile)
+        (screening_record_entry_support_present ?screening_record)
+        (screening_record_destination_support_present ?screening_record)
+        (not
+          (screening_record_available ?screening_record)
+        )
+      )
+  )
+  (:action finalize_screening_record
+    :parameters (?screening_record - screening_record ?traveler_record_category_a - traveler_record_category_a ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (screening_record_constructed ?screening_record)
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (credential_linked_to_subject ?traveler_record_category_a ?presented_health_credential)
+        (not
+          (screening_record_finalized ?screening_record)
+        )
+      )
+    :effect (screening_record_finalized ?screening_record)
+  )
+  (:action apply_validation_profile_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (inspection_case_file_links_screening_record ?inspection_case_file ?screening_record)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_available ?validation_profile)
+        (screening_record_constructed ?screening_record)
+        (screening_record_finalized ?screening_record)
+        (not
+          (validation_profile_bound ?validation_profile)
+        )
+      )
+    :effect
+      (and
+        (validation_profile_bound ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (not
+          (validation_profile_available ?validation_profile)
+        )
+      )
+  )
+  (:action initiate_inspection_case_file_validation
+    :parameters (?inspection_case_file - inspection_case_file ?validation_profile - validation_profile ?screening_record - screening_record ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_bound ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (credential_linked_to_subject ?inspection_case_file ?presented_health_credential)
+        (not
+          (screening_record_entry_support_present ?screening_record)
+        )
+        (not
+          (inspection_case_file_validation_initiated ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_validation_initiated ?inspection_case_file)
+  )
+  (:action assign_special_handling_label_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?special_handling_label - special_handling_label)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (special_handling_label_available ?special_handling_label)
+        (not
+          (inspection_case_file_has_special_handling_label ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_has_special_handling_label ?inspection_case_file)
+        (inspection_case_file_links_special_handling_label ?inspection_case_file ?special_handling_label)
+        (not
+          (special_handling_label_available ?special_handling_label)
+        )
+      )
+  )
+  (:action apply_special_handling_and_initiate_inspection_case_file_validation
+    :parameters (?inspection_case_file - inspection_case_file ?validation_profile - validation_profile ?screening_record - screening_record ?presented_health_credential - presented_health_credential ?special_handling_label - special_handling_label)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_bound ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (credential_linked_to_subject ?inspection_case_file ?presented_health_credential)
+        (screening_record_entry_support_present ?screening_record)
+        (inspection_case_file_has_special_handling_label ?inspection_case_file)
+        (inspection_case_file_links_special_handling_label ?inspection_case_file ?special_handling_label)
+        (not
+          (inspection_case_file_validation_initiated ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_validation_initiated ?inspection_case_file)
+        (inspection_case_file_special_handling_marked ?inspection_case_file)
+      )
+  )
+  (:action bind_inspection_case_file_evidence_primary
+    :parameters (?inspection_case_file - inspection_case_file ?evidence_type - evidence_type ?verification_check_item - verification_check_item ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_validation_initiated ?inspection_case_file)
+        (inspection_case_file_has_evidence_type ?inspection_case_file ?evidence_type)
+        (verification_item_assigned ?inspection_case_file ?verification_check_item)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (not
+          (screening_record_destination_support_present ?screening_record)
+        )
+        (not
+          (inspection_case_file_evidence_bound ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_evidence_bound ?inspection_case_file)
+  )
+  (:action bind_inspection_case_file_evidence_secondary
+    :parameters (?inspection_case_file - inspection_case_file ?evidence_type - evidence_type ?verification_check_item - verification_check_item ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_validation_initiated ?inspection_case_file)
+        (inspection_case_file_has_evidence_type ?inspection_case_file ?evidence_type)
+        (verification_item_assigned ?inspection_case_file ?verification_check_item)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (screening_record_destination_support_present ?screening_record)
+        (not
+          (inspection_case_file_evidence_bound ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_evidence_bound ?inspection_case_file)
+  )
+  (:action complete_inspection_case_file_validation_step
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_evidence_bound ?inspection_case_file)
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (not
+          (screening_record_entry_support_present ?screening_record)
+        )
+        (not
+          (screening_record_destination_support_present ?screening_record)
+        )
+        (not
+          (inspection_case_file_validation_complete ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_validation_complete ?inspection_case_file)
+  )
+  (:action complete_inspection_case_file_validation_with_entry_support
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_evidence_bound ?inspection_case_file)
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (screening_record_entry_support_present ?screening_record)
+        (not
+          (screening_record_destination_support_present ?screening_record)
+        )
+        (not
+          (inspection_case_file_validation_complete ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+      )
+  )
+  (:action complete_inspection_case_file_validation_with_destination_support
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_evidence_bound ?inspection_case_file)
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (not
+          (screening_record_entry_support_present ?screening_record)
+        )
+        (screening_record_destination_support_present ?screening_record)
+        (not
+          (inspection_case_file_validation_complete ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+      )
+  )
+  (:action complete_inspection_case_file_validation_with_both_supports
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature ?validation_profile - validation_profile ?screening_record - screening_record)
+    :precondition
+      (and
+        (inspection_case_file_evidence_bound ?inspection_case_file)
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (inspection_case_file_has_validation_profile ?inspection_case_file ?validation_profile)
+        (validation_profile_links_screening_record ?validation_profile ?screening_record)
+        (screening_record_entry_support_present ?screening_record)
+        (screening_record_destination_support_present ?screening_record)
+        (not
+          (inspection_case_file_validation_complete ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+      )
+  )
+  (:action finalize_inspection_case_file_and_mark_ready_for_adjudication
+    :parameters (?inspection_case_file - inspection_case_file)
+    :precondition
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (not
+          (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+        )
+        (not
+          (inspection_case_file_finalization_flag ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_finalization_flag ?inspection_case_file)
+        (ready_for_final_adjudication ?inspection_case_file)
+      )
+  )
+  (:action apply_processing_profile_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?processing_profile - processing_profile)
+    :precondition
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+        (processing_profile_available ?processing_profile)
+      )
+    :effect
+      (and
+        (inspection_case_file_has_processing_profile ?inspection_case_file ?processing_profile)
+        (not
+          (processing_profile_available ?processing_profile)
+        )
+      )
+  )
+  (:action execute_inspection_case_file_processing_checks
+    :parameters (?inspection_case_file - inspection_case_file ?traveler_record_category_a - traveler_record_category_a ?traveler_record_category_b - traveler_record_category_b ?presented_health_credential - presented_health_credential ?processing_profile - processing_profile)
+    :precondition
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_profile_applicable ?inspection_case_file)
+        (inspection_case_file_has_processing_profile ?inspection_case_file ?processing_profile)
+        (inspection_case_file_includes_traveler_a ?inspection_case_file ?traveler_record_category_a)
+        (inspection_case_file_includes_traveler_b ?inspection_case_file ?traveler_record_category_b)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        (credential_linked_to_subject ?inspection_case_file ?presented_health_credential)
+        (not
+          (inspection_case_file_processing_completed ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_processing_completed ?inspection_case_file)
+  )
+  (:action finalize_inspection_case_file_after_processing
+    :parameters (?inspection_case_file - inspection_case_file)
+    :precondition
+      (and
+        (inspection_case_file_validation_complete ?inspection_case_file)
+        (inspection_case_file_processing_completed ?inspection_case_file)
+        (not
+          (inspection_case_file_finalization_flag ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_finalization_flag ?inspection_case_file)
+        (ready_for_final_adjudication ?inspection_case_file)
+      )
+  )
+  (:action apply_policy_exception_to_inspection_case_file
+    :parameters (?inspection_case_file - inspection_case_file ?policy_exception - policy_exception ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (subject_record_initially_verified ?inspection_case_file)
+        (credential_linked_to_subject ?inspection_case_file ?presented_health_credential)
+        (policy_exception_available ?policy_exception)
+        (inspection_case_file_has_policy_exception ?inspection_case_file ?policy_exception)
+        (not
+          (inspection_case_file_policy_exception_flag ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_policy_exception_flag ?inspection_case_file)
+        (not
+          (policy_exception_available ?policy_exception)
+        )
+      )
+  )
+  (:action acknowledge_inspection_case_file_policy_exception_review
+    :parameters (?inspection_case_file - inspection_case_file ?verification_check_item - verification_check_item)
+    :precondition
+      (and
+        (inspection_case_file_policy_exception_flag ?inspection_case_file)
+        (verification_item_assigned ?inspection_case_file ?verification_check_item)
+        (not
+          (inspection_case_file_exception_reviewed ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_exception_reviewed ?inspection_case_file)
+  )
+  (:action approve_inspection_case_file_policy_exception_with_signature
+    :parameters (?inspection_case_file - inspection_case_file ?approver_signature - approver_signature)
+    :precondition
+      (and
+        (inspection_case_file_exception_reviewed ?inspection_case_file)
+        (inspection_case_file_has_approver_signature ?inspection_case_file ?approver_signature)
+        (not
+          (inspection_case_file_exception_approved ?inspection_case_file)
+        )
+      )
+    :effect (inspection_case_file_exception_approved ?inspection_case_file)
+  )
+  (:action finalize_inspection_case_file_with_exception
+    :parameters (?inspection_case_file - inspection_case_file)
+    :precondition
+      (and
+        (inspection_case_file_exception_approved ?inspection_case_file)
+        (not
+          (inspection_case_file_finalization_flag ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (inspection_case_file_finalization_flag ?inspection_case_file)
+        (ready_for_final_adjudication ?inspection_case_file)
+      )
+  )
+  (:action mark_traveler_a_ready_for_adjudication
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_a_processing_flag ?traveler_record_category_a)
+        (traveler_a_requirements_satisfied ?traveler_record_category_a)
+        (screening_record_constructed ?screening_record)
+        (screening_record_finalized ?screening_record)
+        (not
+          (ready_for_final_adjudication ?traveler_record_category_a)
+        )
+      )
+    :effect (ready_for_final_adjudication ?traveler_record_category_a)
+  )
+  (:action mark_traveler_b_ready_for_adjudication
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?screening_record - screening_record)
+    :precondition
+      (and
+        (traveler_b_processing_flag ?traveler_record_category_b)
+        (traveler_b_requirements_satisfied ?traveler_record_category_b)
+        (screening_record_constructed ?screening_record)
+        (screening_record_finalized ?screening_record)
+        (not
+          (ready_for_final_adjudication ?traveler_record_category_b)
+        )
+      )
+    :effect (ready_for_final_adjudication ?traveler_record_category_b)
+  )
+  (:action mark_subject_eligibility_and_assign_credential_batch
+    :parameters (?subject_record - subject_record ?credential_batch - credential_batch ?presented_health_credential - presented_health_credential)
+    :precondition
+      (and
+        (ready_for_final_adjudication ?subject_record)
+        (credential_linked_to_subject ?subject_record ?presented_health_credential)
+        (credential_batch_available ?credential_batch)
+        (not
+          (eligibility_flag_set ?subject_record)
+        )
+      )
+    :effect
+      (and
+        (eligibility_flag_set ?subject_record)
+        (subject_record_linked_to_credential_batch ?subject_record ?credential_batch)
+        (not
+          (credential_batch_available ?credential_batch)
+        )
+      )
+  )
+  (:action reconcile_traveler_a_with_inspector_and_grant_entry
+    :parameters (?traveler_record_category_a - traveler_record_category_a ?inspector_unit - inspector_unit ?credential_batch - credential_batch)
+    :precondition
+      (and
+        (eligibility_flag_set ?traveler_record_category_a)
+        (assigned_inspector ?traveler_record_category_a ?inspector_unit)
+        (subject_record_linked_to_credential_batch ?traveler_record_category_a ?credential_batch)
+        (not
+          (entry_authorization_granted ?traveler_record_category_a)
+        )
+      )
+    :effect
+      (and
+        (entry_authorization_granted ?traveler_record_category_a)
+        (inspector_unit_available ?inspector_unit)
+        (credential_batch_available ?credential_batch)
+      )
+  )
+  (:action reconcile_traveler_b_with_inspector_and_grant_entry
+    :parameters (?traveler_record_category_b - traveler_record_category_b ?inspector_unit - inspector_unit ?credential_batch - credential_batch)
+    :precondition
+      (and
+        (eligibility_flag_set ?traveler_record_category_b)
+        (assigned_inspector ?traveler_record_category_b ?inspector_unit)
+        (subject_record_linked_to_credential_batch ?traveler_record_category_b ?credential_batch)
+        (not
+          (entry_authorization_granted ?traveler_record_category_b)
+        )
+      )
+    :effect
+      (and
+        (entry_authorization_granted ?traveler_record_category_b)
+        (inspector_unit_available ?inspector_unit)
+        (credential_batch_available ?credential_batch)
+      )
+  )
+  (:action reconcile_inspection_case_file_with_inspector_and_grant_entry
+    :parameters (?inspection_case_file - inspection_case_file ?inspector_unit - inspector_unit ?credential_batch - credential_batch)
+    :precondition
+      (and
+        (eligibility_flag_set ?inspection_case_file)
+        (assigned_inspector ?inspection_case_file ?inspector_unit)
+        (subject_record_linked_to_credential_batch ?inspection_case_file ?credential_batch)
+        (not
+          (entry_authorization_granted ?inspection_case_file)
+        )
+      )
+    :effect
+      (and
+        (entry_authorization_granted ?inspection_case_file)
+        (inspector_unit_available ?inspector_unit)
+        (credential_batch_available ?credential_batch)
+      )
+  )
+)

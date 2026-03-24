@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_reservation_confirmation_tracking)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object resource_item - object document_type - object case_root - object reservation_case - case_root booking_option - domain_entity confirmation_channel - domain_entity supplier_agent - domain_entity option_attribute - domain_entity customer_profile_token - domain_entity confirmation_proof - domain_entity supplier_option_detail - domain_entity supplier_reference_token - domain_entity auxiliary_resource - resource_item attachment_document - resource_item policy_reference - resource_item supplier_requirement - document_type supplier_confirmation - document_type final_booking_record - document_type supplier_record_type - reservation_case consolidated_case_type - reservation_case supplier_instance_a - supplier_record_type supplier_instance_b - supplier_record_type consolidated_booking - consolidated_case_type)
+  (:predicates
+    (reservation_case_open ?reservation_case - reservation_case)
+    (reservation_case_committed ?reservation_case - reservation_case)
+    (reservation_option_selected ?reservation_case - reservation_case)
+    (confirmation_propagated ?reservation_case - reservation_case)
+    (reservation_case_finalized ?reservation_case - reservation_case)
+    (propagation_requested ?reservation_case - reservation_case)
+    (option_available ?booking_option - booking_option)
+    (reservation_option_reserved ?reservation_case - reservation_case ?booking_option - booking_option)
+    (confirmation_channel_available ?confirmation_channel - confirmation_channel)
+    (reservation_case_channel_allocated ?reservation_case - reservation_case ?confirmation_channel - confirmation_channel)
+    (supplier_agent_available ?supplier_agent - supplier_agent)
+    (reservation_assigned_agent ?reservation_case - reservation_case ?supplier_agent - supplier_agent)
+    (auxiliary_resource_available ?auxiliary_resource - auxiliary_resource)
+    (supplier_a_aux_resource_bound ?supplier_instance_a - supplier_instance_a ?auxiliary_resource - auxiliary_resource)
+    (supplier_b_aux_resource_bound ?supplier_instance_b - supplier_instance_b ?auxiliary_resource - auxiliary_resource)
+    (supplier_instance_requires ?supplier_instance_a - supplier_instance_a ?supplier_requirement - supplier_requirement)
+    (supplier_requirement_verified ?supplier_requirement - supplier_requirement)
+    (supplier_requirement_allocated ?supplier_requirement - supplier_requirement)
+    (supplier_a_confirmation_received ?supplier_instance_a - supplier_instance_a)
+    (supplier_b_confirmation_linked ?supplier_instance_b - supplier_instance_b ?supplier_confirmation - supplier_confirmation)
+    (supplier_confirmation_verified ?supplier_confirmation - supplier_confirmation)
+    (supplier_confirmation_allocated ?supplier_confirmation - supplier_confirmation)
+    (supplier_b_confirmation_received ?supplier_instance_b - supplier_instance_b)
+    (final_booking_record_available ?final_booking_record - final_booking_record)
+    (final_booking_record_allocated ?final_booking_record - final_booking_record)
+    (final_booking_record_bound_to_requirement ?final_booking_record - final_booking_record ?supplier_requirement - supplier_requirement)
+    (final_booking_record_linked_confirmation ?final_booking_record - final_booking_record ?supplier_confirmation - supplier_confirmation)
+    (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record - final_booking_record)
+    (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record - final_booking_record)
+    (final_booking_record_ready_for_attachment ?final_booking_record - final_booking_record)
+    (consolidated_linked_supplier_a ?consolidated_booking - consolidated_booking ?supplier_instance_a - supplier_instance_a)
+    (consolidated_linked_supplier_b ?consolidated_booking - consolidated_booking ?supplier_instance_b - supplier_instance_b)
+    (consolidated_linked_final_record ?consolidated_booking - consolidated_booking ?final_booking_record - final_booking_record)
+    (attachment_available ?attachment_document - attachment_document)
+    (consolidated_has_attachment ?consolidated_booking - consolidated_booking ?attachment_document - attachment_document)
+    (attachment_bound ?attachment_document - attachment_document)
+    (attachment_bound_to_record ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    (consolidated_ready ?consolidated_booking - consolidated_booking)
+    (attachments_bound ?consolidated_booking - consolidated_booking)
+    (finalization_steps_completed ?consolidated_booking - consolidated_booking)
+    (option_attribute_reserved ?consolidated_booking - consolidated_booking)
+    (option_attribute_processed ?consolidated_booking - consolidated_booking)
+    (consolidated_customer_profile_token_required ?consolidated_booking - consolidated_booking)
+    (final_checks_passed ?consolidated_booking - consolidated_booking)
+    (policy_available ?policy_reference - policy_reference)
+    (consolidated_policy_selected ?consolidated_booking - consolidated_booking ?policy_reference - policy_reference)
+    (policy_attached ?consolidated_booking - consolidated_booking)
+    (policy_reviewed ?consolidated_booking - consolidated_booking)
+    (policy_approved ?consolidated_booking - consolidated_booking)
+    (option_attribute_available ?option_attribute - option_attribute)
+    (consolidated_option_attribute_attached ?consolidated_booking - consolidated_booking ?option_attribute - option_attribute)
+    (customer_profile_token_available ?customer_profile_token - customer_profile_token)
+    (consolidated_customer_profile_attached ?consolidated_booking - consolidated_booking ?customer_profile_token - customer_profile_token)
+    (supplier_option_detail_available ?supplier_option_detail - supplier_option_detail)
+    (consolidated_supplier_option_detail_attached ?consolidated_booking - consolidated_booking ?supplier_option_detail - supplier_option_detail)
+    (supplier_reference_token_available ?supplier_reference_token - supplier_reference_token)
+    (consolidated_supplier_reference_attached ?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token)
+    (confirmation_proof_available ?confirmation_proof - confirmation_proof)
+    (reservation_confirmation_proof_linked ?reservation_case - reservation_case ?confirmation_proof - confirmation_proof)
+    (supplier_a_ready ?supplier_instance_a - supplier_instance_a)
+    (supplier_b_ready ?supplier_instance_b - supplier_instance_b)
+    (consolidated_finalization_flag ?consolidated_booking - consolidated_booking)
+  )
+  (:action create_reservation_case
+    :parameters (?reservation_case - reservation_case)
+    :precondition
+      (and
+        (not
+          (reservation_case_open ?reservation_case)
+        )
+        (not
+          (confirmation_propagated ?reservation_case)
+        )
+      )
+    :effect (reservation_case_open ?reservation_case)
+  )
+  (:action select_booking_option
+    :parameters (?reservation_case - reservation_case ?booking_option - booking_option)
+    :precondition
+      (and
+        (reservation_case_open ?reservation_case)
+        (not
+          (reservation_option_selected ?reservation_case)
+        )
+        (option_available ?booking_option)
+      )
+    :effect
+      (and
+        (reservation_option_selected ?reservation_case)
+        (reservation_option_reserved ?reservation_case ?booking_option)
+        (not
+          (option_available ?booking_option)
+        )
+      )
+  )
+  (:action allocate_confirmation_channel
+    :parameters (?reservation_case - reservation_case ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_open ?reservation_case)
+        (reservation_option_selected ?reservation_case)
+        (confirmation_channel_available ?confirmation_channel)
+      )
+    :effect
+      (and
+        (reservation_case_channel_allocated ?reservation_case ?confirmation_channel)
+        (not
+          (confirmation_channel_available ?confirmation_channel)
+        )
+      )
+  )
+  (:action commit_reservation_case
+    :parameters (?reservation_case - reservation_case ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_open ?reservation_case)
+        (reservation_option_selected ?reservation_case)
+        (reservation_case_channel_allocated ?reservation_case ?confirmation_channel)
+        (not
+          (reservation_case_committed ?reservation_case)
+        )
+      )
+    :effect (reservation_case_committed ?reservation_case)
+  )
+  (:action release_confirmation_channel
+    :parameters (?reservation_case - reservation_case ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_channel_allocated ?reservation_case ?confirmation_channel)
+      )
+    :effect
+      (and
+        (confirmation_channel_available ?confirmation_channel)
+        (not
+          (reservation_case_channel_allocated ?reservation_case ?confirmation_channel)
+        )
+      )
+  )
+  (:action assign_supplier_agent
+    :parameters (?reservation_case - reservation_case ?supplier_agent - supplier_agent)
+    :precondition
+      (and
+        (reservation_case_committed ?reservation_case)
+        (supplier_agent_available ?supplier_agent)
+      )
+    :effect
+      (and
+        (reservation_assigned_agent ?reservation_case ?supplier_agent)
+        (not
+          (supplier_agent_available ?supplier_agent)
+        )
+      )
+  )
+  (:action release_supplier_agent
+    :parameters (?reservation_case - reservation_case ?supplier_agent - supplier_agent)
+    :precondition
+      (and
+        (reservation_assigned_agent ?reservation_case ?supplier_agent)
+      )
+    :effect
+      (and
+        (supplier_agent_available ?supplier_agent)
+        (not
+          (reservation_assigned_agent ?reservation_case ?supplier_agent)
+        )
+      )
+  )
+  (:action attach_supplier_option_detail
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_option_detail - supplier_option_detail)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (supplier_option_detail_available ?supplier_option_detail)
+      )
+    :effect
+      (and
+        (consolidated_supplier_option_detail_attached ?consolidated_booking ?supplier_option_detail)
+        (not
+          (supplier_option_detail_available ?supplier_option_detail)
+        )
+      )
+  )
+  (:action detach_supplier_option_detail
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_option_detail - supplier_option_detail)
+    :precondition
+      (and
+        (consolidated_supplier_option_detail_attached ?consolidated_booking ?supplier_option_detail)
+      )
+    :effect
+      (and
+        (supplier_option_detail_available ?supplier_option_detail)
+        (not
+          (consolidated_supplier_option_detail_attached ?consolidated_booking ?supplier_option_detail)
+        )
+      )
+  )
+  (:action attach_supplier_reference_token
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (supplier_reference_token_available ?supplier_reference_token)
+      )
+    :effect
+      (and
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (not
+          (supplier_reference_token_available ?supplier_reference_token)
+        )
+      )
+  )
+  (:action detach_supplier_reference_token
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token)
+    :precondition
+      (and
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+      )
+    :effect
+      (and
+        (supplier_reference_token_available ?supplier_reference_token)
+        (not
+          (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        )
+      )
+  )
+  (:action claim_supplier_requirement
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_requirement - supplier_requirement ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_a)
+        (reservation_case_channel_allocated ?supplier_instance_a ?confirmation_channel)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (not
+          (supplier_requirement_verified ?supplier_requirement)
+        )
+        (not
+          (supplier_requirement_allocated ?supplier_requirement)
+        )
+      )
+    :effect (supplier_requirement_verified ?supplier_requirement)
+  )
+  (:action verify_supplier_requirement
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_requirement - supplier_requirement ?supplier_agent - supplier_agent)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_a)
+        (reservation_assigned_agent ?supplier_instance_a ?supplier_agent)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_requirement_verified ?supplier_requirement)
+        (not
+          (supplier_a_ready ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+      )
+  )
+  (:action allocate_auxiliary_resource_to_supplier_instance
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_requirement - supplier_requirement ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_a)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (supplier_a_ready ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (supplier_requirement_allocated ?supplier_requirement)
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_aux_resource_bound ?supplier_instance_a ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_supplier_confirmation_with_auxiliary_resource
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_requirement - supplier_requirement ?confirmation_channel - confirmation_channel ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_a)
+        (reservation_case_channel_allocated ?supplier_instance_a ?confirmation_channel)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_requirement_allocated ?supplier_requirement)
+        (supplier_a_aux_resource_bound ?supplier_instance_a ?auxiliary_resource)
+        (not
+          (supplier_a_confirmation_received ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (supplier_requirement_verified ?supplier_requirement)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (supplier_a_aux_resource_bound ?supplier_instance_a ?auxiliary_resource)
+        )
+      )
+  )
+  (:action claim_supplier_requirement_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?supplier_confirmation - supplier_confirmation ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_b)
+        (reservation_case_channel_allocated ?supplier_instance_b ?confirmation_channel)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (not
+          (supplier_confirmation_verified ?supplier_confirmation)
+        )
+        (not
+          (supplier_confirmation_allocated ?supplier_confirmation)
+        )
+      )
+    :effect (supplier_confirmation_verified ?supplier_confirmation)
+  )
+  (:action verify_supplier_requirement_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?supplier_confirmation - supplier_confirmation ?supplier_agent - supplier_agent)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_b)
+        (reservation_assigned_agent ?supplier_instance_b ?supplier_agent)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_confirmation_verified ?supplier_confirmation)
+        (not
+          (supplier_b_ready ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_confirmation_received ?supplier_instance_b)
+      )
+  )
+  (:action allocate_auxiliary_resource_to_supplier_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?supplier_confirmation - supplier_confirmation ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_b)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (supplier_b_ready ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (supplier_confirmation_allocated ?supplier_confirmation)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_aux_resource_bound ?supplier_instance_b ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_supplier_b_confirmation_with_auxiliary_resource
+    :parameters (?supplier_instance_b - supplier_instance_b ?supplier_confirmation - supplier_confirmation ?confirmation_channel - confirmation_channel ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (reservation_case_committed ?supplier_instance_b)
+        (reservation_case_channel_allocated ?supplier_instance_b ?confirmation_channel)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_confirmation_allocated ?supplier_confirmation)
+        (supplier_b_aux_resource_bound ?supplier_instance_b ?auxiliary_resource)
+        (not
+          (supplier_b_confirmation_received ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (supplier_confirmation_verified ?supplier_confirmation)
+        (supplier_b_confirmation_received ?supplier_instance_b)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (supplier_b_aux_resource_bound ?supplier_instance_b ?auxiliary_resource)
+        )
+      )
+  )
+  (:action allocate_final_booking_record
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?supplier_requirement - supplier_requirement ?supplier_confirmation - supplier_confirmation ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_requirement_verified ?supplier_requirement)
+        (supplier_confirmation_verified ?supplier_confirmation)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+        (supplier_b_confirmation_received ?supplier_instance_b)
+        (final_booking_record_available ?final_booking_record)
+      )
+    :effect
+      (and
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_bound_to_requirement ?final_booking_record ?supplier_requirement)
+        (final_booking_record_linked_confirmation ?final_booking_record ?supplier_confirmation)
+        (not
+          (final_booking_record_available ?final_booking_record)
+        )
+      )
+  )
+  (:action issue_final_booking_record_variant_a
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?supplier_requirement - supplier_requirement ?supplier_confirmation - supplier_confirmation ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_requirement_allocated ?supplier_requirement)
+        (supplier_confirmation_verified ?supplier_confirmation)
+        (not
+          (supplier_a_confirmation_received ?supplier_instance_a)
+        )
+        (supplier_b_confirmation_received ?supplier_instance_b)
+        (final_booking_record_available ?final_booking_record)
+      )
+    :effect
+      (and
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_bound_to_requirement ?final_booking_record ?supplier_requirement)
+        (final_booking_record_linked_confirmation ?final_booking_record ?supplier_confirmation)
+        (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        (not
+          (final_booking_record_available ?final_booking_record)
+        )
+      )
+  )
+  (:action issue_final_booking_record_variant_b
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?supplier_requirement - supplier_requirement ?supplier_confirmation - supplier_confirmation ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_requirement_verified ?supplier_requirement)
+        (supplier_confirmation_allocated ?supplier_confirmation)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+        (not
+          (supplier_b_confirmation_received ?supplier_instance_b)
+        )
+        (final_booking_record_available ?final_booking_record)
+      )
+    :effect
+      (and
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_bound_to_requirement ?final_booking_record ?supplier_requirement)
+        (final_booking_record_linked_confirmation ?final_booking_record ?supplier_confirmation)
+        (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        (not
+          (final_booking_record_available ?final_booking_record)
+        )
+      )
+  )
+  (:action issue_final_booking_record_combined_variants
+    :parameters (?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?supplier_requirement - supplier_requirement ?supplier_confirmation - supplier_confirmation ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_instance_requires ?supplier_instance_a ?supplier_requirement)
+        (supplier_b_confirmation_linked ?supplier_instance_b ?supplier_confirmation)
+        (supplier_requirement_allocated ?supplier_requirement)
+        (supplier_confirmation_allocated ?supplier_confirmation)
+        (not
+          (supplier_a_confirmation_received ?supplier_instance_a)
+        )
+        (not
+          (supplier_b_confirmation_received ?supplier_instance_b)
+        )
+        (final_booking_record_available ?final_booking_record)
+      )
+    :effect
+      (and
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_bound_to_requirement ?final_booking_record ?supplier_requirement)
+        (final_booking_record_linked_confirmation ?final_booking_record ?supplier_confirmation)
+        (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        (not
+          (final_booking_record_available ?final_booking_record)
+        )
+      )
+  )
+  (:action prepare_booking_record_for_attachment
+    :parameters (?final_booking_record - final_booking_record ?supplier_instance_a - supplier_instance_a ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (final_booking_record_allocated ?final_booking_record)
+        (supplier_a_ready ?supplier_instance_a)
+        (reservation_case_channel_allocated ?supplier_instance_a ?confirmation_channel)
+        (not
+          (final_booking_record_ready_for_attachment ?final_booking_record)
+        )
+      )
+    :effect (final_booking_record_ready_for_attachment ?final_booking_record)
+  )
+  (:action attach_document_to_booking_record
+    :parameters (?consolidated_booking - consolidated_booking ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (consolidated_linked_final_record ?consolidated_booking ?final_booking_record)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_available ?attachment_document)
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_ready_for_attachment ?final_booking_record)
+        (not
+          (attachment_bound ?attachment_document)
+        )
+      )
+    :effect
+      (and
+        (attachment_bound ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (not
+          (attachment_available ?attachment_document)
+        )
+      )
+  )
+  (:action prepare_consolidated_for_attachment_processing
+    :parameters (?consolidated_booking - consolidated_booking ?attachment_document - attachment_document ?final_booking_record - final_booking_record ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (reservation_case_channel_allocated ?consolidated_booking ?confirmation_channel)
+        (not
+          (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        )
+        (not
+          (consolidated_ready ?consolidated_booking)
+        )
+      )
+    :effect (consolidated_ready ?consolidated_booking)
+  )
+  (:action attach_option_attribute_to_consolidated_booking
+    :parameters (?consolidated_booking - consolidated_booking ?option_attribute - option_attribute)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (option_attribute_available ?option_attribute)
+        (not
+          (option_attribute_reserved ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (option_attribute_reserved ?consolidated_booking)
+        (consolidated_option_attribute_attached ?consolidated_booking ?option_attribute)
+        (not
+          (option_attribute_available ?option_attribute)
+        )
+      )
+  )
+  (:action process_option_attribute_and_mark
+    :parameters (?consolidated_booking - consolidated_booking ?attachment_document - attachment_document ?final_booking_record - final_booking_record ?confirmation_channel - confirmation_channel ?option_attribute - option_attribute)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (reservation_case_channel_allocated ?consolidated_booking ?confirmation_channel)
+        (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        (option_attribute_reserved ?consolidated_booking)
+        (consolidated_option_attribute_attached ?consolidated_booking ?option_attribute)
+        (not
+          (consolidated_ready ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (consolidated_ready ?consolidated_booking)
+        (option_attribute_processed ?consolidated_booking)
+      )
+  )
+  (:action bind_supplier_option_detail_and_mark_attachments
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_option_detail - supplier_option_detail ?supplier_agent - supplier_agent ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (consolidated_ready ?consolidated_booking)
+        (consolidated_supplier_option_detail_attached ?consolidated_booking ?supplier_option_detail)
+        (reservation_assigned_agent ?consolidated_booking ?supplier_agent)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (not
+          (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        )
+        (not
+          (attachments_bound ?consolidated_booking)
+        )
+      )
+    :effect (attachments_bound ?consolidated_booking)
+  )
+  (:action bind_supplier_option_detail_and_mark_attachments_alt
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_option_detail - supplier_option_detail ?supplier_agent - supplier_agent ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (consolidated_ready ?consolidated_booking)
+        (consolidated_supplier_option_detail_attached ?consolidated_booking ?supplier_option_detail)
+        (reservation_assigned_agent ?consolidated_booking ?supplier_agent)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        (not
+          (attachments_bound ?consolidated_booking)
+        )
+      )
+    :effect (attachments_bound ?consolidated_booking)
+  )
+  (:action bind_supplier_reference_and_mark_variant_1
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (attachments_bound ?consolidated_booking)
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (not
+          (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        )
+        (not
+          (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        )
+        (not
+          (finalization_steps_completed ?consolidated_booking)
+        )
+      )
+    :effect (finalization_steps_completed ?consolidated_booking)
+  )
+  (:action bind_supplier_reference_and_mark_variant_2
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (attachments_bound ?consolidated_booking)
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        (not
+          (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        )
+        (not
+          (finalization_steps_completed ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (consolidated_customer_profile_token_required ?consolidated_booking)
+      )
+  )
+  (:action bind_supplier_reference_and_mark_variant_3
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (attachments_bound ?consolidated_booking)
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (not
+          (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        )
+        (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        (not
+          (finalization_steps_completed ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (consolidated_customer_profile_token_required ?consolidated_booking)
+      )
+  )
+  (:action bind_supplier_reference_and_mark_variant_4
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token ?attachment_document - attachment_document ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (attachments_bound ?consolidated_booking)
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (consolidated_has_attachment ?consolidated_booking ?attachment_document)
+        (attachment_bound_to_record ?attachment_document ?final_booking_record)
+        (final_booking_record_flag_missing_supplier_a_confirmation ?final_booking_record)
+        (final_booking_record_flag_missing_supplier_b_confirmation ?final_booking_record)
+        (not
+          (finalization_steps_completed ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (consolidated_customer_profile_token_required ?consolidated_booking)
+      )
+  )
+  (:action finalize_consolidated_booking
+    :parameters (?consolidated_booking - consolidated_booking)
+    :precondition
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (not
+          (consolidated_customer_profile_token_required ?consolidated_booking)
+        )
+        (not
+          (consolidated_finalization_flag ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (consolidated_finalization_flag ?consolidated_booking)
+        (reservation_case_finalized ?consolidated_booking)
+      )
+  )
+  (:action attach_customer_profile_token
+    :parameters (?consolidated_booking - consolidated_booking ?customer_profile_token - customer_profile_token)
+    :precondition
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (consolidated_customer_profile_token_required ?consolidated_booking)
+        (customer_profile_token_available ?customer_profile_token)
+      )
+    :effect
+      (and
+        (consolidated_customer_profile_attached ?consolidated_booking ?customer_profile_token)
+        (not
+          (customer_profile_token_available ?customer_profile_token)
+        )
+      )
+  )
+  (:action perform_final_checks
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_instance_a - supplier_instance_a ?supplier_instance_b - supplier_instance_b ?confirmation_channel - confirmation_channel ?customer_profile_token - customer_profile_token)
+    :precondition
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (consolidated_customer_profile_token_required ?consolidated_booking)
+        (consolidated_customer_profile_attached ?consolidated_booking ?customer_profile_token)
+        (consolidated_linked_supplier_a ?consolidated_booking ?supplier_instance_a)
+        (consolidated_linked_supplier_b ?consolidated_booking ?supplier_instance_b)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+        (supplier_b_confirmation_received ?supplier_instance_b)
+        (reservation_case_channel_allocated ?consolidated_booking ?confirmation_channel)
+        (not
+          (final_checks_passed ?consolidated_booking)
+        )
+      )
+    :effect (final_checks_passed ?consolidated_booking)
+  )
+  (:action complete_consolidated_finalization
+    :parameters (?consolidated_booking - consolidated_booking)
+    :precondition
+      (and
+        (finalization_steps_completed ?consolidated_booking)
+        (final_checks_passed ?consolidated_booking)
+        (not
+          (consolidated_finalization_flag ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (consolidated_finalization_flag ?consolidated_booking)
+        (reservation_case_finalized ?consolidated_booking)
+      )
+  )
+  (:action apply_policy_reference
+    :parameters (?consolidated_booking - consolidated_booking ?policy_reference - policy_reference ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_committed ?consolidated_booking)
+        (reservation_case_channel_allocated ?consolidated_booking ?confirmation_channel)
+        (policy_available ?policy_reference)
+        (consolidated_policy_selected ?consolidated_booking ?policy_reference)
+        (not
+          (policy_attached ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (policy_attached ?consolidated_booking)
+        (not
+          (policy_available ?policy_reference)
+        )
+      )
+  )
+  (:action perform_policy_review
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_agent - supplier_agent)
+    :precondition
+      (and
+        (policy_attached ?consolidated_booking)
+        (reservation_assigned_agent ?consolidated_booking ?supplier_agent)
+        (not
+          (policy_reviewed ?consolidated_booking)
+        )
+      )
+    :effect (policy_reviewed ?consolidated_booking)
+  )
+  (:action approve_policy
+    :parameters (?consolidated_booking - consolidated_booking ?supplier_reference_token - supplier_reference_token)
+    :precondition
+      (and
+        (policy_reviewed ?consolidated_booking)
+        (consolidated_supplier_reference_attached ?consolidated_booking ?supplier_reference_token)
+        (not
+          (policy_approved ?consolidated_booking)
+        )
+      )
+    :effect (policy_approved ?consolidated_booking)
+  )
+  (:action finalize_after_policy_approval
+    :parameters (?consolidated_booking - consolidated_booking)
+    :precondition
+      (and
+        (policy_approved ?consolidated_booking)
+        (not
+          (consolidated_finalization_flag ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (consolidated_finalization_flag ?consolidated_booking)
+        (reservation_case_finalized ?consolidated_booking)
+      )
+  )
+  (:action finalize_supplier_a_with_booking_record
+    :parameters (?supplier_instance_a - supplier_instance_a ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_a_ready ?supplier_instance_a)
+        (supplier_a_confirmation_received ?supplier_instance_a)
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_ready_for_attachment ?final_booking_record)
+        (not
+          (reservation_case_finalized ?supplier_instance_a)
+        )
+      )
+    :effect (reservation_case_finalized ?supplier_instance_a)
+  )
+  (:action finalize_supplier_b_with_booking_record
+    :parameters (?supplier_instance_b - supplier_instance_b ?final_booking_record - final_booking_record)
+    :precondition
+      (and
+        (supplier_b_ready ?supplier_instance_b)
+        (supplier_b_confirmation_received ?supplier_instance_b)
+        (final_booking_record_allocated ?final_booking_record)
+        (final_booking_record_ready_for_attachment ?final_booking_record)
+        (not
+          (reservation_case_finalized ?supplier_instance_b)
+        )
+      )
+    :effect (reservation_case_finalized ?supplier_instance_b)
+  )
+  (:action attach_confirmation_proof_to_reservation_case
+    :parameters (?reservation_case - reservation_case ?confirmation_proof - confirmation_proof ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_case_finalized ?reservation_case)
+        (reservation_case_channel_allocated ?reservation_case ?confirmation_channel)
+        (confirmation_proof_available ?confirmation_proof)
+        (not
+          (propagation_requested ?reservation_case)
+        )
+      )
+    :effect
+      (and
+        (propagation_requested ?reservation_case)
+        (reservation_confirmation_proof_linked ?reservation_case ?confirmation_proof)
+        (not
+          (confirmation_proof_available ?confirmation_proof)
+        )
+      )
+  )
+  (:action propagate_confirmation_to_supplier_instance_a
+    :parameters (?supplier_instance_a - supplier_instance_a ?booking_option - booking_option ?confirmation_proof - confirmation_proof)
+    :precondition
+      (and
+        (propagation_requested ?supplier_instance_a)
+        (reservation_option_reserved ?supplier_instance_a ?booking_option)
+        (reservation_confirmation_proof_linked ?supplier_instance_a ?confirmation_proof)
+        (not
+          (confirmation_propagated ?supplier_instance_a)
+        )
+      )
+    :effect
+      (and
+        (confirmation_propagated ?supplier_instance_a)
+        (option_available ?booking_option)
+        (confirmation_proof_available ?confirmation_proof)
+      )
+  )
+  (:action propagate_confirmation_to_supplier_instance_b
+    :parameters (?supplier_instance_b - supplier_instance_b ?booking_option - booking_option ?confirmation_proof - confirmation_proof)
+    :precondition
+      (and
+        (propagation_requested ?supplier_instance_b)
+        (reservation_option_reserved ?supplier_instance_b ?booking_option)
+        (reservation_confirmation_proof_linked ?supplier_instance_b ?confirmation_proof)
+        (not
+          (confirmation_propagated ?supplier_instance_b)
+        )
+      )
+    :effect
+      (and
+        (confirmation_propagated ?supplier_instance_b)
+        (option_available ?booking_option)
+        (confirmation_proof_available ?confirmation_proof)
+      )
+  )
+  (:action propagate_confirmation_to_consolidated_booking
+    :parameters (?consolidated_booking - consolidated_booking ?booking_option - booking_option ?confirmation_proof - confirmation_proof)
+    :precondition
+      (and
+        (propagation_requested ?consolidated_booking)
+        (reservation_option_reserved ?consolidated_booking ?booking_option)
+        (reservation_confirmation_proof_linked ?consolidated_booking ?confirmation_proof)
+        (not
+          (confirmation_propagated ?consolidated_booking)
+        )
+      )
+    :effect
+      (and
+        (confirmation_propagated ?consolidated_booking)
+        (option_available ?booking_option)
+        (confirmation_proof_available ?confirmation_proof)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem reservation_confirmation_scenario)
+  (:domain tourism_reservation_confirmation_tracking)
+  (:objects supplier_instance_a_1 - supplier_instance_a supplier_instance_b_1 - supplier_instance_b consolidated_booking_main - consolidated_booking consolidated_booking_secondary - consolidated_booking booking_option_standard - booking_option booking_option_premium - booking_option booking_option_fallback - booking_option confirmation_channel_1 - confirmation_channel supplier_agent_1 - supplier_agent auxiliary_resource_voucher - auxiliary_resource supplier_requirement_document - supplier_requirement supplier_confirmation_record_1 - supplier_confirmation final_booking_record_1 - final_booking_record attachment_document_1 - attachment_document attachment_document_2 - attachment_document option_attribute_promotional - option_attribute option_attribute_seat - option_attribute customer_profile_token_primary - customer_profile_token customer_profile_token_secondary - customer_profile_token confirmation_proof_1 - confirmation_proof supplier_option_detail_1 - supplier_option_detail policy_reference_1 - policy_reference policy_reference_2 - policy_reference supplier_reference_token_1 - supplier_reference_token)
+  (:init
+    (option_available booking_option_standard)
+    (option_available booking_option_premium)
+    (option_available booking_option_fallback)
+    (confirmation_channel_available confirmation_channel_1)
+    (supplier_agent_available supplier_agent_1)
+    (auxiliary_resource_available auxiliary_resource_voucher)
+    (supplier_instance_requires supplier_instance_a_1 supplier_requirement_document)
+    (supplier_b_confirmation_linked supplier_instance_b_1 supplier_confirmation_record_1)
+    (final_booking_record_available final_booking_record_1)
+    (attachment_available attachment_document_1)
+    (attachment_available attachment_document_2)
+    (consolidated_linked_supplier_a consolidated_booking_main supplier_instance_a_1)
+    (consolidated_linked_supplier_a consolidated_booking_secondary supplier_instance_a_1)
+    (consolidated_linked_supplier_b consolidated_booking_main supplier_instance_b_1)
+    (consolidated_linked_supplier_b consolidated_booking_secondary supplier_instance_b_1)
+    (consolidated_linked_final_record consolidated_booking_main final_booking_record_1)
+    (consolidated_linked_final_record consolidated_booking_secondary final_booking_record_1)
+    (consolidated_has_attachment consolidated_booking_main attachment_document_1)
+    (consolidated_has_attachment consolidated_booking_secondary attachment_document_2)
+    (option_attribute_available option_attribute_promotional)
+    (option_attribute_available option_attribute_seat)
+    (customer_profile_token_available customer_profile_token_primary)
+    (customer_profile_token_available customer_profile_token_secondary)
+    (confirmation_proof_available confirmation_proof_1)
+    (supplier_option_detail_available supplier_option_detail_1)
+    (policy_available policy_reference_1)
+    (consolidated_policy_selected consolidated_booking_main policy_reference_1)
+    (consolidated_policy_selected consolidated_booking_secondary policy_reference_2)
+    (supplier_reference_token_available supplier_reference_token_1)
+  )
+  (:goal
+    (and
+      (confirmation_propagated supplier_instance_a_1)
+      (confirmation_propagated supplier_instance_b_1)
+      (confirmation_propagated consolidated_booking_main)
+      (confirmation_propagated consolidated_booking_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_reservation_case supplier_instance_a_1)
+(select_booking_option supplier_instance_a_1 booking_option_standard)
+(allocate_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(commit_reservation_case supplier_instance_a_1 confirmation_channel_1)
+(assign_supplier_agent supplier_instance_a_1 supplier_agent_1)
+(claim_supplier_requirement supplier_instance_a_1 supplier_requirement_document confirmation_channel_1)
+(verify_supplier_requirement supplier_instance_a_1 supplier_requirement_document supplier_agent_1)
+(release_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(create_reservation_case supplier_instance_b_1)
+(select_booking_option supplier_instance_b_1 booking_option_premium)
+(allocate_confirmation_channel supplier_instance_b_1 confirmation_channel_1)
+(commit_reservation_case supplier_instance_b_1 confirmation_channel_1)
+(release_supplier_agent supplier_instance_a_1 supplier_agent_1)
+(assign_supplier_agent supplier_instance_b_1 supplier_agent_1)
+(claim_supplier_requirement_b supplier_instance_b_1 supplier_confirmation_record_1 confirmation_channel_1)
+(verify_supplier_requirement_b supplier_instance_b_1 supplier_confirmation_record_1 supplier_agent_1)
+(allocate_final_booking_record supplier_instance_a_1 supplier_instance_b_1 supplier_requirement_document supplier_confirmation_record_1 final_booking_record_1)
+(release_confirmation_channel supplier_instance_b_1 confirmation_channel_1)
+(allocate_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(prepare_booking_record_for_attachment final_booking_record_1 supplier_instance_a_1 confirmation_channel_1)
+(release_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(create_reservation_case consolidated_booking_main)
+(select_booking_option consolidated_booking_main booking_option_fallback)
+(allocate_confirmation_channel consolidated_booking_main confirmation_channel_1)
+(commit_reservation_case consolidated_booking_main confirmation_channel_1)
+(attach_supplier_option_detail consolidated_booking_main supplier_option_detail_1)
+(attach_supplier_reference_token consolidated_booking_main supplier_reference_token_1)
+(attach_document_to_booking_record consolidated_booking_main attachment_document_1 final_booking_record_1)
+(prepare_consolidated_for_attachment_processing consolidated_booking_main attachment_document_1 final_booking_record_1 confirmation_channel_1)
+(release_supplier_agent supplier_instance_b_1 supplier_agent_1)
+(assign_supplier_agent consolidated_booking_main supplier_agent_1)
+(bind_supplier_option_detail_and_mark_attachments consolidated_booking_main supplier_option_detail_1 supplier_agent_1 attachment_document_1 final_booking_record_1)
+(bind_supplier_reference_and_mark_variant_1 consolidated_booking_main supplier_reference_token_1 attachment_document_1 final_booking_record_1)
+(finalize_consolidated_booking consolidated_booking_main)
+(attach_confirmation_proof_to_reservation_case consolidated_booking_main confirmation_proof_1 confirmation_channel_1)
+(propagate_confirmation_to_consolidated_booking consolidated_booking_main booking_option_fallback confirmation_proof_1)
+(release_confirmation_channel consolidated_booking_main confirmation_channel_1)
+(create_reservation_case consolidated_booking_secondary)
+(select_booking_option consolidated_booking_secondary booking_option_fallback)
+(allocate_confirmation_channel consolidated_booking_secondary confirmation_channel_1)
+(commit_reservation_case consolidated_booking_secondary confirmation_channel_1)
+(detach_supplier_option_detail consolidated_booking_main supplier_option_detail_1)
+(detach_supplier_reference_token consolidated_booking_main supplier_reference_token_1)
+(attach_supplier_option_detail consolidated_booking_secondary supplier_option_detail_1)
+(attach_supplier_reference_token consolidated_booking_secondary supplier_reference_token_1)
+(attach_document_to_booking_record consolidated_booking_secondary attachment_document_2 final_booking_record_1)
+(prepare_consolidated_for_attachment_processing consolidated_booking_secondary attachment_document_2 final_booking_record_1 confirmation_channel_1)
+(release_supplier_agent consolidated_booking_main supplier_agent_1)
+(assign_supplier_agent consolidated_booking_secondary supplier_agent_1)
+(bind_supplier_option_detail_and_mark_attachments consolidated_booking_secondary supplier_option_detail_1 supplier_agent_1 attachment_document_2 final_booking_record_1)
+(bind_supplier_reference_and_mark_variant_1 consolidated_booking_secondary supplier_reference_token_1 attachment_document_2 final_booking_record_1)
+(finalize_consolidated_booking consolidated_booking_secondary)
+(attach_confirmation_proof_to_reservation_case consolidated_booking_secondary confirmation_proof_1 confirmation_channel_1)
+(propagate_confirmation_to_consolidated_booking consolidated_booking_secondary booking_option_fallback confirmation_proof_1)
+(release_confirmation_channel consolidated_booking_secondary confirmation_channel_1)
+(finalize_supplier_a_with_booking_record supplier_instance_a_1 final_booking_record_1)
+(finalize_supplier_b_with_booking_record supplier_instance_b_1 final_booking_record_1)
+(allocate_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(attach_confirmation_proof_to_reservation_case supplier_instance_a_1 confirmation_proof_1 confirmation_channel_1)
+(propagate_confirmation_to_supplier_instance_a supplier_instance_a_1 booking_option_standard confirmation_proof_1)
+(release_confirmation_channel supplier_instance_a_1 confirmation_channel_1)
+(allocate_confirmation_channel supplier_instance_b_1 confirmation_channel_1)
+(attach_confirmation_proof_to_reservation_case supplier_instance_b_1 confirmation_proof_1 confirmation_channel_1)
+(propagate_confirmation_to_supplier_instance_b supplier_instance_b_1 booking_option_premium confirmation_proof_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ar9vtxit/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_ar9vtxit/plan.pddl 64 
+
+
+
+--- stderr ---
+

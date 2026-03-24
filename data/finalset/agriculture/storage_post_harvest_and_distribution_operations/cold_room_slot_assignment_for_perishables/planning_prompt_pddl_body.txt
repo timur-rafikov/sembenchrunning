@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cold_room_slot_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types facility_resource_supertype - object processing_resource_supertype - object logistics_resource_supertype - object domain_entity_root - object batch_entity - domain_entity_root grading_station - facility_resource_supertype grader_equipment - facility_resource_supertype conditioning_unit - facility_resource_supertype label - facility_resource_supertype certificate - facility_resource_supertype transport_window - facility_resource_supertype temperature_profile - facility_resource_supertype humidity_profile - facility_resource_supertype packaging_material - processing_resource_supertype tray - processing_resource_supertype special_handling_code - processing_resource_supertype temperature_zone - logistics_resource_supertype distribution_channel - logistics_resource_supertype outbound_container - logistics_resource_supertype physical_lot_subtype - batch_entity storage_unit_subtype - batch_entity producer_pallet - physical_lot_subtype alternate_pallet - physical_lot_subtype storage_slot - storage_unit_subtype)
+  (:predicates
+    (entity_checked_in ?entity - batch_entity)
+    (entity_conditioned ?entity - batch_entity)
+    (entity_assigned_for_grading ?entity - batch_entity)
+    (entity_final_channel_assignment ?entity - batch_entity)
+    (entity_ready_for_channel_assignment ?entity - batch_entity)
+    (entity_scheduled_for_transport ?entity - batch_entity)
+    (grading_station_available ?grading_station - grading_station)
+    (entity_assigned_to_grading_station ?entity - batch_entity ?grading_station - grading_station)
+    (grader_available ?grader - grader_equipment)
+    (entity_assigned_to_grader ?entity - batch_entity ?grader - grader_equipment)
+    (conditioning_unit_available ?conditioning_unit - conditioning_unit)
+    (entity_assigned_to_conditioning_unit ?entity - batch_entity ?conditioning_unit - conditioning_unit)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (producer_pallet_assigned_packaging ?producer_pallet - producer_pallet ?packaging_material - packaging_material)
+    (alternate_pallet_assigned_packaging ?alternate_pallet - alternate_pallet ?packaging_material - packaging_material)
+    (placement_compatible_with_zone ?producer_pallet - producer_pallet ?temperature_zone - temperature_zone)
+    (zone_reserved ?temperature_zone - temperature_zone)
+    (zone_tagged ?temperature_zone - temperature_zone)
+    (placement_confirmed ?producer_pallet - producer_pallet)
+    (placement_compatible_with_channel ?alternate_pallet - alternate_pallet ?distribution_channel - distribution_channel)
+    (channel_reserved ?distribution_channel - distribution_channel)
+    (channel_tagged ?distribution_channel - distribution_channel)
+    (channel_placement_confirmed ?alternate_pallet - alternate_pallet)
+    (container_available ?outbound_container - outbound_container)
+    (container_allocated ?outbound_container - outbound_container)
+    (container_linked_to_zone ?outbound_container - outbound_container ?temperature_zone - temperature_zone)
+    (container_linked_to_channel ?outbound_container - outbound_container ?distribution_channel - distribution_channel)
+    (container_has_temperature_tag ?outbound_container - outbound_container)
+    (container_has_humidity_tag ?outbound_container - outbound_container)
+    (container_staged ?outbound_container - outbound_container)
+    (slot_contains_producer_pallet ?storage_slot - storage_slot ?producer_pallet - producer_pallet)
+    (slot_contains_alternate_pallet ?storage_slot - storage_slot ?alternate_pallet - alternate_pallet)
+    (slot_linked_to_container ?storage_slot - storage_slot ?outbound_container - outbound_container)
+    (tray_available ?tray - tray)
+    (slot_has_tray ?storage_slot - storage_slot ?tray - tray)
+    (tray_loaded ?tray - tray)
+    (tray_loaded_into_container ?tray - tray ?outbound_container - outbound_container)
+    (slot_ready_for_profile_assignment ?storage_slot - storage_slot)
+    (slot_temperature_profile_applied ?storage_slot - storage_slot)
+    (slot_environment_profiles_confirmed ?storage_slot - storage_slot)
+    (label_attached ?storage_slot - storage_slot)
+    (label_verified ?storage_slot - storage_slot)
+    (slot_documentation_required ?storage_slot - storage_slot)
+    (slot_qc_passed ?storage_slot - storage_slot)
+    (special_handling_code_available ?special_handling_code - special_handling_code)
+    (slot_assigned_special_handling_code ?storage_slot - storage_slot ?special_handling_code - special_handling_code)
+    (slot_has_special_handling ?storage_slot - storage_slot)
+    (slot_label_confirmed ?storage_slot - storage_slot)
+    (slot_documentation_verified ?storage_slot - storage_slot)
+    (label_available ?label - label)
+    (slot_assigned_label ?storage_slot - storage_slot ?label - label)
+    (certificate_available ?certificate - certificate)
+    (slot_assigned_certificate ?storage_slot - storage_slot ?certificate - certificate)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (slot_assigned_temperature_profile ?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    (humidity_profile_available ?humidity_profile - humidity_profile)
+    (slot_assigned_humidity_profile ?storage_slot - storage_slot ?humidity_profile - humidity_profile)
+    (transport_window_available ?transport_window - transport_window)
+    (entity_assigned_transport_window ?entity - batch_entity ?transport_window - transport_window)
+    (pallet_preplacement_flag ?producer_pallet - producer_pallet)
+    (alternate_pallet_preplacement_flag ?alternate_pallet - alternate_pallet)
+    (slot_finalized ?storage_slot - storage_slot)
+  )
+  (:action check_in_entity
+    :parameters (?entity - batch_entity)
+    :precondition
+      (and
+        (not
+          (entity_checked_in ?entity)
+        )
+        (not
+          (entity_final_channel_assignment ?entity)
+        )
+      )
+    :effect (entity_checked_in ?entity)
+  )
+  (:action assign_entity_to_grading_station
+    :parameters (?entity - batch_entity ?grading_station - grading_station)
+    :precondition
+      (and
+        (entity_checked_in ?entity)
+        (not
+          (entity_assigned_for_grading ?entity)
+        )
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (entity_assigned_for_grading ?entity)
+        (entity_assigned_to_grading_station ?entity ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action assign_entity_to_grader
+    :parameters (?entity - batch_entity ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_checked_in ?entity)
+        (entity_assigned_for_grading ?entity)
+        (grader_available ?grader)
+      )
+    :effect
+      (and
+        (entity_assigned_to_grader ?entity ?grader)
+        (not
+          (grader_available ?grader)
+        )
+      )
+  )
+  (:action confirm_grading_completion
+    :parameters (?entity - batch_entity ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_checked_in ?entity)
+        (entity_assigned_for_grading ?entity)
+        (entity_assigned_to_grader ?entity ?grader)
+        (not
+          (entity_conditioned ?entity)
+        )
+      )
+    :effect (entity_conditioned ?entity)
+  )
+  (:action release_grader
+    :parameters (?entity - batch_entity ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_assigned_to_grader ?entity ?grader)
+      )
+    :effect
+      (and
+        (grader_available ?grader)
+        (not
+          (entity_assigned_to_grader ?entity ?grader)
+        )
+      )
+  )
+  (:action assign_conditioning_unit_to_entity
+    :parameters (?entity - batch_entity ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (entity_conditioned ?entity)
+        (conditioning_unit_available ?conditioning_unit)
+      )
+    :effect
+      (and
+        (entity_assigned_to_conditioning_unit ?entity ?conditioning_unit)
+        (not
+          (conditioning_unit_available ?conditioning_unit)
+        )
+      )
+  )
+  (:action release_conditioning_unit
+    :parameters (?entity - batch_entity ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (entity_assigned_to_conditioning_unit ?entity ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_available ?conditioning_unit)
+        (not
+          (entity_assigned_to_conditioning_unit ?entity ?conditioning_unit)
+        )
+      )
+  )
+  (:action assign_temperature_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (slot_assigned_temperature_profile ?storage_slot ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action release_temperature_profile_from_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (slot_assigned_temperature_profile ?storage_slot ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (slot_assigned_temperature_profile ?storage_slot ?temperature_profile)
+        )
+      )
+  )
+  (:action assign_humidity_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (humidity_profile_available ?humidity_profile)
+      )
+    :effect
+      (and
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (not
+          (humidity_profile_available ?humidity_profile)
+        )
+      )
+  )
+  (:action release_humidity_profile_from_slot
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile)
+    :precondition
+      (and
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+      )
+    :effect
+      (and
+        (humidity_profile_available ?humidity_profile)
+        (not
+          (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        )
+      )
+  )
+  (:action reserve_temperature_zone_for_pallet
+    :parameters (?producer_pallet - producer_pallet ?temperature_zone - temperature_zone ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_conditioned ?producer_pallet)
+        (entity_assigned_to_grader ?producer_pallet ?grader)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (not
+          (zone_reserved ?temperature_zone)
+        )
+        (not
+          (zone_tagged ?temperature_zone)
+        )
+      )
+    :effect (zone_reserved ?temperature_zone)
+  )
+  (:action confirm_zone_reservation_for_pallet
+    :parameters (?producer_pallet - producer_pallet ?temperature_zone - temperature_zone ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (entity_conditioned ?producer_pallet)
+        (entity_assigned_to_conditioning_unit ?producer_pallet ?conditioning_unit)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (zone_reserved ?temperature_zone)
+        (not
+          (pallet_preplacement_flag ?producer_pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (placement_confirmed ?producer_pallet)
+      )
+  )
+  (:action tag_zone_and_assign_packaging_to_pallet
+    :parameters (?producer_pallet - producer_pallet ?temperature_zone - temperature_zone ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (entity_conditioned ?producer_pallet)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (packaging_material_available ?packaging_material)
+        (not
+          (pallet_preplacement_flag ?producer_pallet)
+        )
+      )
+    :effect
+      (and
+        (zone_tagged ?temperature_zone)
+        (pallet_preplacement_flag ?producer_pallet)
+        (producer_pallet_assigned_packaging ?producer_pallet ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action finalize_zone_placement_for_pallet
+    :parameters (?producer_pallet - producer_pallet ?temperature_zone - temperature_zone ?grader - grader_equipment ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (entity_conditioned ?producer_pallet)
+        (entity_assigned_to_grader ?producer_pallet ?grader)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (zone_tagged ?temperature_zone)
+        (producer_pallet_assigned_packaging ?producer_pallet ?packaging_material)
+        (not
+          (placement_confirmed ?producer_pallet)
+        )
+      )
+    :effect
+      (and
+        (zone_reserved ?temperature_zone)
+        (placement_confirmed ?producer_pallet)
+        (packaging_material_available ?packaging_material)
+        (not
+          (producer_pallet_assigned_packaging ?producer_pallet ?packaging_material)
+        )
+      )
+  )
+  (:action reserve_distribution_channel_for_pallet
+    :parameters (?alternate_pallet - alternate_pallet ?distribution_channel - distribution_channel ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_conditioned ?alternate_pallet)
+        (entity_assigned_to_grader ?alternate_pallet ?grader)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (not
+          (channel_reserved ?distribution_channel)
+        )
+        (not
+          (channel_tagged ?distribution_channel)
+        )
+      )
+    :effect (channel_reserved ?distribution_channel)
+  )
+  (:action confirm_channel_reservation_for_alternate_pallet
+    :parameters (?alternate_pallet - alternate_pallet ?distribution_channel - distribution_channel ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (entity_conditioned ?alternate_pallet)
+        (entity_assigned_to_conditioning_unit ?alternate_pallet ?conditioning_unit)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (channel_reserved ?distribution_channel)
+        (not
+          (alternate_pallet_preplacement_flag ?alternate_pallet)
+        )
+      )
+    :effect
+      (and
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (channel_placement_confirmed ?alternate_pallet)
+      )
+  )
+  (:action tag_channel_and_assign_packaging_to_alternate_pallet
+    :parameters (?alternate_pallet - alternate_pallet ?distribution_channel - distribution_channel ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (entity_conditioned ?alternate_pallet)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (packaging_material_available ?packaging_material)
+        (not
+          (alternate_pallet_preplacement_flag ?alternate_pallet)
+        )
+      )
+    :effect
+      (and
+        (channel_tagged ?distribution_channel)
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (alternate_pallet_assigned_packaging ?alternate_pallet ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action finalize_channel_placement_for_alternate_pallet
+    :parameters (?alternate_pallet - alternate_pallet ?distribution_channel - distribution_channel ?grader - grader_equipment ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (entity_conditioned ?alternate_pallet)
+        (entity_assigned_to_grader ?alternate_pallet ?grader)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (channel_tagged ?distribution_channel)
+        (alternate_pallet_assigned_packaging ?alternate_pallet ?packaging_material)
+        (not
+          (channel_placement_confirmed ?alternate_pallet)
+        )
+      )
+    :effect
+      (and
+        (channel_reserved ?distribution_channel)
+        (channel_placement_confirmed ?alternate_pallet)
+        (packaging_material_available ?packaging_material)
+        (not
+          (alternate_pallet_assigned_packaging ?alternate_pallet ?packaging_material)
+        )
+      )
+  )
+  (:action assemble_outbound_container
+    :parameters (?producer_pallet - producer_pallet ?alternate_pallet - alternate_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (zone_reserved ?temperature_zone)
+        (channel_reserved ?distribution_channel)
+        (placement_confirmed ?producer_pallet)
+        (channel_placement_confirmed ?alternate_pallet)
+        (container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (container_allocated ?outbound_container)
+        (container_linked_to_zone ?outbound_container ?temperature_zone)
+        (container_linked_to_channel ?outbound_container ?distribution_channel)
+        (not
+          (container_available ?outbound_container)
+        )
+      )
+  )
+  (:action assemble_and_apply_temperature_tag_to_container
+    :parameters (?producer_pallet - producer_pallet ?alternate_pallet - alternate_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (zone_tagged ?temperature_zone)
+        (channel_reserved ?distribution_channel)
+        (not
+          (placement_confirmed ?producer_pallet)
+        )
+        (channel_placement_confirmed ?alternate_pallet)
+        (container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (container_allocated ?outbound_container)
+        (container_linked_to_zone ?outbound_container ?temperature_zone)
+        (container_linked_to_channel ?outbound_container ?distribution_channel)
+        (container_has_temperature_tag ?outbound_container)
+        (not
+          (container_available ?outbound_container)
+        )
+      )
+  )
+  (:action assemble_and_apply_humidity_tag_to_container
+    :parameters (?producer_pallet - producer_pallet ?alternate_pallet - alternate_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (zone_reserved ?temperature_zone)
+        (channel_tagged ?distribution_channel)
+        (placement_confirmed ?producer_pallet)
+        (not
+          (channel_placement_confirmed ?alternate_pallet)
+        )
+        (container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (container_allocated ?outbound_container)
+        (container_linked_to_zone ?outbound_container ?temperature_zone)
+        (container_linked_to_channel ?outbound_container ?distribution_channel)
+        (container_has_humidity_tag ?outbound_container)
+        (not
+          (container_available ?outbound_container)
+        )
+      )
+  )
+  (:action assemble_container_with_environmental_tags
+    :parameters (?producer_pallet - producer_pallet ?alternate_pallet - alternate_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (placement_compatible_with_zone ?producer_pallet ?temperature_zone)
+        (placement_compatible_with_channel ?alternate_pallet ?distribution_channel)
+        (zone_tagged ?temperature_zone)
+        (channel_tagged ?distribution_channel)
+        (not
+          (placement_confirmed ?producer_pallet)
+        )
+        (not
+          (channel_placement_confirmed ?alternate_pallet)
+        )
+        (container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (container_allocated ?outbound_container)
+        (container_linked_to_zone ?outbound_container ?temperature_zone)
+        (container_linked_to_channel ?outbound_container ?distribution_channel)
+        (container_has_temperature_tag ?outbound_container)
+        (container_has_humidity_tag ?outbound_container)
+        (not
+          (container_available ?outbound_container)
+        )
+      )
+  )
+  (:action stage_container_for_packing
+    :parameters (?outbound_container - outbound_container ?producer_pallet - producer_pallet ?grader - grader_equipment)
+    :precondition
+      (and
+        (container_allocated ?outbound_container)
+        (pallet_preplacement_flag ?producer_pallet)
+        (entity_assigned_to_grader ?producer_pallet ?grader)
+        (not
+          (container_staged ?outbound_container)
+        )
+      )
+    :effect (container_staged ?outbound_container)
+  )
+  (:action load_tray_into_container
+    :parameters (?storage_slot - storage_slot ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (slot_linked_to_container ?storage_slot ?outbound_container)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_available ?tray)
+        (container_allocated ?outbound_container)
+        (container_staged ?outbound_container)
+        (not
+          (tray_loaded ?tray)
+        )
+      )
+    :effect
+      (and
+        (tray_loaded ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (not
+          (tray_available ?tray)
+        )
+      )
+  )
+  (:action lock_slot_after_tray_loading
+    :parameters (?storage_slot - storage_slot ?tray - tray ?outbound_container - outbound_container ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (entity_assigned_to_grader ?storage_slot ?grader)
+        (not
+          (container_has_temperature_tag ?outbound_container)
+        )
+        (not
+          (slot_ready_for_profile_assignment ?storage_slot)
+        )
+      )
+    :effect (slot_ready_for_profile_assignment ?storage_slot)
+  )
+  (:action apply_label_to_slot
+    :parameters (?storage_slot - storage_slot ?label - label)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (label_available ?label)
+        (not
+          (label_attached ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (label_attached ?storage_slot)
+        (slot_assigned_label ?storage_slot ?label)
+        (not
+          (label_available ?label)
+        )
+      )
+  )
+  (:action verify_label_and_prepare_slot_for_packing
+    :parameters (?storage_slot - storage_slot ?tray - tray ?outbound_container - outbound_container ?grader - grader_equipment ?label - label)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (entity_assigned_to_grader ?storage_slot ?grader)
+        (container_has_temperature_tag ?outbound_container)
+        (label_attached ?storage_slot)
+        (slot_assigned_label ?storage_slot ?label)
+        (not
+          (slot_ready_for_profile_assignment ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_profile_assignment ?storage_slot)
+        (label_verified ?storage_slot)
+      )
+  )
+  (:action apply_temperature_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile ?conditioning_unit - conditioning_unit ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_ready_for_profile_assignment ?storage_slot)
+        (slot_assigned_temperature_profile ?storage_slot ?temperature_profile)
+        (entity_assigned_to_conditioning_unit ?storage_slot ?conditioning_unit)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (not
+          (container_has_humidity_tag ?outbound_container)
+        )
+        (not
+          (slot_temperature_profile_applied ?storage_slot)
+        )
+      )
+    :effect (slot_temperature_profile_applied ?storage_slot)
+  )
+  (:action attach_temperature_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile ?conditioning_unit - conditioning_unit ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_ready_for_profile_assignment ?storage_slot)
+        (slot_assigned_temperature_profile ?storage_slot ?temperature_profile)
+        (entity_assigned_to_conditioning_unit ?storage_slot ?conditioning_unit)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (container_has_humidity_tag ?outbound_container)
+        (not
+          (slot_temperature_profile_applied ?storage_slot)
+        )
+      )
+    :effect (slot_temperature_profile_applied ?storage_slot)
+  )
+  (:action confirm_humidity_profile_and_finalize_environment
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_temperature_profile_applied ?storage_slot)
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (not
+          (container_has_temperature_tag ?outbound_container)
+        )
+        (not
+          (container_has_humidity_tag ?outbound_container)
+        )
+        (not
+          (slot_environment_profiles_confirmed ?storage_slot)
+        )
+      )
+    :effect (slot_environment_profiles_confirmed ?storage_slot)
+  )
+  (:action mark_slot_documentation_required_and_confirm_environment
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_temperature_profile_applied ?storage_slot)
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (container_has_temperature_tag ?outbound_container)
+        (not
+          (container_has_humidity_tag ?outbound_container)
+        )
+        (not
+          (slot_environment_profiles_confirmed ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_documentation_required ?storage_slot)
+      )
+  )
+  (:action mark_slot_documentation_required_path_2
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_temperature_profile_applied ?storage_slot)
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (not
+          (container_has_temperature_tag ?outbound_container)
+        )
+        (container_has_humidity_tag ?outbound_container)
+        (not
+          (slot_environment_profiles_confirmed ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_documentation_required ?storage_slot)
+      )
+  )
+  (:action mark_slot_documentation_required_path_3
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile ?tray - tray ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (slot_temperature_profile_applied ?storage_slot)
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (slot_has_tray ?storage_slot ?tray)
+        (tray_loaded_into_container ?tray ?outbound_container)
+        (container_has_temperature_tag ?outbound_container)
+        (container_has_humidity_tag ?outbound_container)
+        (not
+          (slot_environment_profiles_confirmed ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_documentation_required ?storage_slot)
+      )
+  )
+  (:action finalize_slot_if_no_documentation
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (not
+          (slot_documentation_required ?storage_slot)
+        )
+        (not
+          (slot_finalized ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot)
+        (entity_ready_for_channel_assignment ?storage_slot)
+      )
+  )
+  (:action attach_certificate_to_slot
+    :parameters (?storage_slot - storage_slot ?certificate - certificate)
+    :precondition
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_documentation_required ?storage_slot)
+        (certificate_available ?certificate)
+      )
+    :effect
+      (and
+        (slot_assigned_certificate ?storage_slot ?certificate)
+        (not
+          (certificate_available ?certificate)
+        )
+      )
+  )
+  (:action run_slot_final_qc_and_mark_ready
+    :parameters (?storage_slot - storage_slot ?producer_pallet - producer_pallet ?alternate_pallet - alternate_pallet ?grader - grader_equipment ?certificate - certificate)
+    :precondition
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_documentation_required ?storage_slot)
+        (slot_assigned_certificate ?storage_slot ?certificate)
+        (slot_contains_producer_pallet ?storage_slot ?producer_pallet)
+        (slot_contains_alternate_pallet ?storage_slot ?alternate_pallet)
+        (placement_confirmed ?producer_pallet)
+        (channel_placement_confirmed ?alternate_pallet)
+        (entity_assigned_to_grader ?storage_slot ?grader)
+        (not
+          (slot_qc_passed ?storage_slot)
+        )
+      )
+    :effect (slot_qc_passed ?storage_slot)
+  )
+  (:action finalize_slot_post_qc
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_environment_profiles_confirmed ?storage_slot)
+        (slot_qc_passed ?storage_slot)
+        (not
+          (slot_finalized ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot)
+        (entity_ready_for_channel_assignment ?storage_slot)
+      )
+  )
+  (:action apply_special_handling_code_to_slot
+    :parameters (?storage_slot - storage_slot ?special_handling_code - special_handling_code ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_conditioned ?storage_slot)
+        (entity_assigned_to_grader ?storage_slot ?grader)
+        (special_handling_code_available ?special_handling_code)
+        (slot_assigned_special_handling_code ?storage_slot ?special_handling_code)
+        (not
+          (slot_has_special_handling ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_has_special_handling ?storage_slot)
+        (not
+          (special_handling_code_available ?special_handling_code)
+        )
+      )
+  )
+  (:action confirm_label_after_special_handling
+    :parameters (?storage_slot - storage_slot ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (slot_has_special_handling ?storage_slot)
+        (entity_assigned_to_conditioning_unit ?storage_slot ?conditioning_unit)
+        (not
+          (slot_label_confirmed ?storage_slot)
+        )
+      )
+    :effect (slot_label_confirmed ?storage_slot)
+  )
+  (:action verify_special_handling_requirements
+    :parameters (?storage_slot - storage_slot ?humidity_profile - humidity_profile)
+    :precondition
+      (and
+        (slot_label_confirmed ?storage_slot)
+        (slot_assigned_humidity_profile ?storage_slot ?humidity_profile)
+        (not
+          (slot_documentation_verified ?storage_slot)
+        )
+      )
+    :effect (slot_documentation_verified ?storage_slot)
+  )
+  (:action finalize_slot_post_special_handling
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_documentation_verified ?storage_slot)
+        (not
+          (slot_finalized ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot)
+        (entity_ready_for_channel_assignment ?storage_slot)
+      )
+  )
+  (:action release_producer_pallet_for_channel_assignment
+    :parameters (?producer_pallet - producer_pallet ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (pallet_preplacement_flag ?producer_pallet)
+        (placement_confirmed ?producer_pallet)
+        (container_allocated ?outbound_container)
+        (container_staged ?outbound_container)
+        (not
+          (entity_ready_for_channel_assignment ?producer_pallet)
+        )
+      )
+    :effect (entity_ready_for_channel_assignment ?producer_pallet)
+  )
+  (:action release_alternate_pallet_for_channel_assignment
+    :parameters (?alternate_pallet - alternate_pallet ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (alternate_pallet_preplacement_flag ?alternate_pallet)
+        (channel_placement_confirmed ?alternate_pallet)
+        (container_allocated ?outbound_container)
+        (container_staged ?outbound_container)
+        (not
+          (entity_ready_for_channel_assignment ?alternate_pallet)
+        )
+      )
+    :effect (entity_ready_for_channel_assignment ?alternate_pallet)
+  )
+  (:action schedule_entity_transport_window
+    :parameters (?entity - batch_entity ?transport_window - transport_window ?grader - grader_equipment)
+    :precondition
+      (and
+        (entity_ready_for_channel_assignment ?entity)
+        (entity_assigned_to_grader ?entity ?grader)
+        (transport_window_available ?transport_window)
+        (not
+          (entity_scheduled_for_transport ?entity)
+        )
+      )
+    :effect
+      (and
+        (entity_scheduled_for_transport ?entity)
+        (entity_assigned_transport_window ?entity ?transport_window)
+        (not
+          (transport_window_available ?transport_window)
+        )
+      )
+  )
+  (:action assign_producer_pallet_to_dispatch_channel
+    :parameters (?producer_pallet - producer_pallet ?grading_station - grading_station ?transport_window - transport_window)
+    :precondition
+      (and
+        (entity_scheduled_for_transport ?producer_pallet)
+        (entity_assigned_to_grading_station ?producer_pallet ?grading_station)
+        (entity_assigned_transport_window ?producer_pallet ?transport_window)
+        (not
+          (entity_final_channel_assignment ?producer_pallet)
+        )
+      )
+    :effect
+      (and
+        (entity_final_channel_assignment ?producer_pallet)
+        (grading_station_available ?grading_station)
+        (transport_window_available ?transport_window)
+      )
+  )
+  (:action assign_alternate_pallet_to_dispatch_channel
+    :parameters (?alternate_pallet - alternate_pallet ?grading_station - grading_station ?transport_window - transport_window)
+    :precondition
+      (and
+        (entity_scheduled_for_transport ?alternate_pallet)
+        (entity_assigned_to_grading_station ?alternate_pallet ?grading_station)
+        (entity_assigned_transport_window ?alternate_pallet ?transport_window)
+        (not
+          (entity_final_channel_assignment ?alternate_pallet)
+        )
+      )
+    :effect
+      (and
+        (entity_final_channel_assignment ?alternate_pallet)
+        (grading_station_available ?grading_station)
+        (transport_window_available ?transport_window)
+      )
+  )
+  (:action assign_slot_to_dispatch_channel
+    :parameters (?storage_slot - storage_slot ?grading_station - grading_station ?transport_window - transport_window)
+    :precondition
+      (and
+        (entity_scheduled_for_transport ?storage_slot)
+        (entity_assigned_to_grading_station ?storage_slot ?grading_station)
+        (entity_assigned_transport_window ?storage_slot ?transport_window)
+        (not
+          (entity_final_channel_assignment ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_final_channel_assignment ?storage_slot)
+        (grading_station_available ?grading_station)
+        (transport_window_available ?transport_window)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem cold_room_slot_assignment_scenario)
+  (:domain cold_room_slot_assignment)
+  (:objects producer_pallet_1 - producer_pallet alternate_pallet_1 - alternate_pallet storage_slot_1 - storage_slot storage_slot_2 - storage_slot grading_station_1 - grading_station grading_station_2 - grading_station grading_station_3 - grading_station grader_unit_1 - grader_equipment conditioning_unit_1 - conditioning_unit packaging_material_1 - packaging_material temperature_zone_1 - temperature_zone distribution_channel_1 - distribution_channel outbound_container_1 - outbound_container tray_1 - tray tray_2 - tray label_1 - label label_2 - label certificate_1 - certificate certificate_2 - certificate transport_window_1 - transport_window temperature_profile_1 - temperature_profile special_handling_code_1 - special_handling_code special_handling_code_2 - special_handling_code humidity_profile_1 - humidity_profile)
+  (:init
+    (grading_station_available grading_station_1)
+    (grading_station_available grading_station_2)
+    (grading_station_available grading_station_3)
+    (grader_available grader_unit_1)
+    (conditioning_unit_available conditioning_unit_1)
+    (packaging_material_available packaging_material_1)
+    (placement_compatible_with_zone producer_pallet_1 temperature_zone_1)
+    (placement_compatible_with_channel alternate_pallet_1 distribution_channel_1)
+    (container_available outbound_container_1)
+    (tray_available tray_1)
+    (tray_available tray_2)
+    (slot_contains_producer_pallet storage_slot_1 producer_pallet_1)
+    (slot_contains_producer_pallet storage_slot_2 producer_pallet_1)
+    (slot_contains_alternate_pallet storage_slot_1 alternate_pallet_1)
+    (slot_contains_alternate_pallet storage_slot_2 alternate_pallet_1)
+    (slot_linked_to_container storage_slot_1 outbound_container_1)
+    (slot_linked_to_container storage_slot_2 outbound_container_1)
+    (slot_has_tray storage_slot_1 tray_1)
+    (slot_has_tray storage_slot_2 tray_2)
+    (label_available label_1)
+    (label_available label_2)
+    (certificate_available certificate_1)
+    (certificate_available certificate_2)
+    (transport_window_available transport_window_1)
+    (temperature_profile_available temperature_profile_1)
+    (special_handling_code_available special_handling_code_1)
+    (slot_assigned_special_handling_code storage_slot_1 special_handling_code_1)
+    (slot_assigned_special_handling_code storage_slot_2 special_handling_code_2)
+    (humidity_profile_available humidity_profile_1)
+  )
+  (:goal
+    (and
+      (entity_final_channel_assignment producer_pallet_1)
+      (entity_final_channel_assignment alternate_pallet_1)
+      (entity_final_channel_assignment storage_slot_1)
+      (entity_final_channel_assignment storage_slot_2)
+    )
+  )
+)

@@ -1,0 +1,1062 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain same_day_delivery_dispatch)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object operational_element_group - object infrastructure_asset_group - object dispatch_category - object dispatch_entity - dispatch_category transport_mode - resource_category time_window - resource_category crew_member - resource_category vehicle_attribute - resource_category cargo_manifest - resource_category handover_token - resource_category equipment - resource_category handling_instruction - resource_category parcel - operational_element_group stop - operational_element_group customer_credential - operational_element_group origin_node - infrastructure_asset_group destination_node - infrastructure_asset_group vehicle_asset - infrastructure_asset_group task_leg_group - dispatch_entity plan_group - dispatch_entity pickup_leg - task_leg_group delivery_leg - task_leg_group route_plan - plan_group)
+  (:predicates
+    (dispatch_registered ?dispatch_entity - dispatch_entity)
+    (dispatch_time_window_confirmed ?dispatch_entity - dispatch_entity)
+    (dispatch_mode_reserved ?dispatch_entity - dispatch_entity)
+    (dispatch_completed ?dispatch_entity - dispatch_entity)
+    (dispatch_ready_for_handover ?dispatch_entity - dispatch_entity)
+    (dispatch_handover_authorized ?dispatch_entity - dispatch_entity)
+    (transport_mode_available ?transport_mode - transport_mode)
+    (dispatch_assigned_mode ?dispatch_entity - dispatch_entity ?transport_mode - transport_mode)
+    (time_window_available ?time_window - time_window)
+    (dispatch_assigned_time_window ?dispatch_entity - dispatch_entity ?time_window - time_window)
+    (crew_available ?crew_member - crew_member)
+    (dispatch_assigned_crew ?dispatch_entity - dispatch_entity ?crew_member - crew_member)
+    (parcel_available ?parcel - parcel)
+    (pickup_leg_assigned_parcel ?pickup_leg - pickup_leg ?parcel - parcel)
+    (delivery_leg_assigned_parcel ?delivery_leg - delivery_leg ?parcel - parcel)
+    (pickup_leg_origin_node ?pickup_leg - pickup_leg ?origin_node - origin_node)
+    (origin_node_reserved ?origin_node - origin_node)
+    (origin_node_has_staged_parcel ?origin_node - origin_node)
+    (pickup_leg_loaded ?pickup_leg - pickup_leg)
+    (delivery_leg_destination_node ?delivery_leg - delivery_leg ?destination_node - destination_node)
+    (destination_node_reserved ?destination_node - destination_node)
+    (destination_node_has_staged_parcel ?destination_node - destination_node)
+    (delivery_leg_loaded ?delivery_leg - delivery_leg)
+    (vehicle_available ?vehicle_asset - vehicle_asset)
+    (vehicle_assigned ?vehicle_asset - vehicle_asset)
+    (vehicle_assigned_origin ?vehicle_asset - vehicle_asset ?origin_node - origin_node)
+    (vehicle_assigned_destination ?vehicle_asset - vehicle_asset ?destination_node - destination_node)
+    (vehicle_prepared_for_origin ?vehicle_asset - vehicle_asset)
+    (vehicle_prepared_for_destination ?vehicle_asset - vehicle_asset)
+    (vehicle_ready ?vehicle_asset - vehicle_asset)
+    (plan_includes_pickup_leg ?route_plan - route_plan ?pickup_leg - pickup_leg)
+    (plan_includes_delivery_leg ?route_plan - route_plan ?delivery_leg - delivery_leg)
+    (plan_assigned_vehicle ?route_plan - route_plan ?vehicle_asset - vehicle_asset)
+    (stop_available ?stop - stop)
+    (plan_includes_stop ?route_plan - route_plan ?stop - stop)
+    (stop_assigned ?stop - stop)
+    (stop_assigned_vehicle ?stop - stop ?vehicle_asset - vehicle_asset)
+    (plan_stops_confirmed ?route_plan - route_plan)
+    (plan_configuration_validated ?route_plan - route_plan)
+    (plan_verification_passed ?route_plan - route_plan)
+    (plan_attribute_bound ?route_plan - route_plan)
+    (plan_attribute_verified ?route_plan - route_plan)
+    (plan_manifest_required ?route_plan - route_plan)
+    (plan_execution_ready ?route_plan - route_plan)
+    (customer_credential_available ?customer_credential - customer_credential)
+    (plan_bound_customer_credential ?route_plan - route_plan ?customer_credential - customer_credential)
+    (plan_authorized_by_customer ?route_plan - route_plan)
+    (plan_authorization_initiated ?route_plan - route_plan)
+    (plan_authorization_confirmed ?route_plan - route_plan)
+    (vehicle_attribute_available ?vehicle_attribute - vehicle_attribute)
+    (plan_has_vehicle_attribute ?route_plan - route_plan ?vehicle_attribute - vehicle_attribute)
+    (cargo_manifest_available ?cargo_manifest - cargo_manifest)
+    (plan_bound_manifest ?route_plan - route_plan ?cargo_manifest - cargo_manifest)
+    (equipment_available ?equipment - equipment)
+    (plan_assigned_equipment ?route_plan - route_plan ?equipment - equipment)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (plan_assigned_handling_instruction ?route_plan - route_plan ?handling_instruction - handling_instruction)
+    (handover_token_available ?handover_token - handover_token)
+    (dispatch_handover_token_assigned ?dispatch_entity - dispatch_entity ?handover_token - handover_token)
+    (pickup_leg_ready ?pickup_leg - pickup_leg)
+    (delivery_leg_ready ?delivery_leg - delivery_leg)
+    (plan_executable ?route_plan - route_plan)
+  )
+  (:action register_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity)
+    :precondition
+      (and
+        (not
+          (dispatch_registered ?dispatch_entity)
+        )
+        (not
+          (dispatch_completed ?dispatch_entity)
+        )
+      )
+    :effect (dispatch_registered ?dispatch_entity)
+  )
+  (:action reserve_transport_mode_for_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (dispatch_registered ?dispatch_entity)
+        (not
+          (dispatch_mode_reserved ?dispatch_entity)
+        )
+        (transport_mode_available ?transport_mode)
+      )
+    :effect
+      (and
+        (dispatch_mode_reserved ?dispatch_entity)
+        (dispatch_assigned_mode ?dispatch_entity ?transport_mode)
+        (not
+          (transport_mode_available ?transport_mode)
+        )
+      )
+  )
+  (:action offer_time_window_to_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_registered ?dispatch_entity)
+        (dispatch_mode_reserved ?dispatch_entity)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (dispatch_assigned_time_window ?dispatch_entity ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_time_window_for_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_registered ?dispatch_entity)
+        (dispatch_mode_reserved ?dispatch_entity)
+        (dispatch_assigned_time_window ?dispatch_entity ?time_window)
+        (not
+          (dispatch_time_window_confirmed ?dispatch_entity)
+        )
+      )
+    :effect (dispatch_time_window_confirmed ?dispatch_entity)
+  )
+  (:action release_time_window_from_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_assigned_time_window ?dispatch_entity ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (dispatch_assigned_time_window ?dispatch_entity ?time_window)
+        )
+      )
+  )
+  (:action assign_crew_to_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?crew_member - crew_member)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?dispatch_entity)
+        (crew_available ?crew_member)
+      )
+    :effect
+      (and
+        (dispatch_assigned_crew ?dispatch_entity ?crew_member)
+        (not
+          (crew_available ?crew_member)
+        )
+      )
+  )
+  (:action release_crew_from_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?crew_member - crew_member)
+    :precondition
+      (and
+        (dispatch_assigned_crew ?dispatch_entity ?crew_member)
+      )
+    :effect
+      (and
+        (crew_available ?crew_member)
+        (not
+          (dispatch_assigned_crew ?dispatch_entity ?crew_member)
+        )
+      )
+  )
+  (:action assign_equipment_to_route_plan
+    :parameters (?route_plan - route_plan ?equipment - equipment)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (plan_assigned_equipment ?route_plan ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action remove_equipment_from_route_plan
+    :parameters (?route_plan - route_plan ?equipment - equipment)
+    :precondition
+      (and
+        (plan_assigned_equipment ?route_plan ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (plan_assigned_equipment ?route_plan ?equipment)
+        )
+      )
+  )
+  (:action assign_handling_instruction_to_route_plan
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (handling_instruction_available ?handling_instruction)
+      )
+    :effect
+      (and
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action remove_handling_instruction_from_route_plan
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+      )
+    :effect
+      (and
+        (handling_instruction_available ?handling_instruction)
+        (not
+          (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        )
+      )
+  )
+  (:action claim_origin_node_for_pickup_leg
+    :parameters (?pickup_leg - pickup_leg ?origin_node - origin_node ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?pickup_leg)
+        (dispatch_assigned_time_window ?pickup_leg ?time_window)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (not
+          (origin_node_reserved ?origin_node)
+        )
+        (not
+          (origin_node_has_staged_parcel ?origin_node)
+        )
+      )
+    :effect (origin_node_reserved ?origin_node)
+  )
+  (:action confirm_pickup_leg_loading
+    :parameters (?pickup_leg - pickup_leg ?origin_node - origin_node ?crew_member - crew_member)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?pickup_leg)
+        (dispatch_assigned_crew ?pickup_leg ?crew_member)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (origin_node_reserved ?origin_node)
+        (not
+          (pickup_leg_ready ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (pickup_leg_loaded ?pickup_leg)
+      )
+  )
+  (:action stage_parcel_at_origin
+    :parameters (?pickup_leg - pickup_leg ?origin_node - origin_node ?parcel - parcel)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?pickup_leg)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (parcel_available ?parcel)
+        (not
+          (pickup_leg_ready ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_node_has_staged_parcel ?origin_node)
+        (pickup_leg_ready ?pickup_leg)
+        (pickup_leg_assigned_parcel ?pickup_leg ?parcel)
+        (not
+          (parcel_available ?parcel)
+        )
+      )
+  )
+  (:action finalize_pickup_leg_staging
+    :parameters (?pickup_leg - pickup_leg ?origin_node - origin_node ?time_window - time_window ?parcel - parcel)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?pickup_leg)
+        (dispatch_assigned_time_window ?pickup_leg ?time_window)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (origin_node_has_staged_parcel ?origin_node)
+        (pickup_leg_assigned_parcel ?pickup_leg ?parcel)
+        (not
+          (pickup_leg_loaded ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_node_reserved ?origin_node)
+        (pickup_leg_loaded ?pickup_leg)
+        (parcel_available ?parcel)
+        (not
+          (pickup_leg_assigned_parcel ?pickup_leg ?parcel)
+        )
+      )
+  )
+  (:action claim_destination_node_for_delivery_leg
+    :parameters (?delivery_leg - delivery_leg ?destination_node - destination_node ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?delivery_leg)
+        (dispatch_assigned_time_window ?delivery_leg ?time_window)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (not
+          (destination_node_reserved ?destination_node)
+        )
+        (not
+          (destination_node_has_staged_parcel ?destination_node)
+        )
+      )
+    :effect (destination_node_reserved ?destination_node)
+  )
+  (:action confirm_delivery_leg_loading
+    :parameters (?delivery_leg - delivery_leg ?destination_node - destination_node ?crew_member - crew_member)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?delivery_leg)
+        (dispatch_assigned_crew ?delivery_leg ?crew_member)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (delivery_leg_ready ?delivery_leg)
+        )
+      )
+    :effect
+      (and
+        (delivery_leg_ready ?delivery_leg)
+        (delivery_leg_loaded ?delivery_leg)
+      )
+  )
+  (:action stage_parcel_at_destination
+    :parameters (?delivery_leg - delivery_leg ?destination_node - destination_node ?parcel - parcel)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?delivery_leg)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (parcel_available ?parcel)
+        (not
+          (delivery_leg_ready ?delivery_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_node_has_staged_parcel ?destination_node)
+        (delivery_leg_ready ?delivery_leg)
+        (delivery_leg_assigned_parcel ?delivery_leg ?parcel)
+        (not
+          (parcel_available ?parcel)
+        )
+      )
+  )
+  (:action finalize_delivery_leg_staging
+    :parameters (?delivery_leg - delivery_leg ?destination_node - destination_node ?time_window - time_window ?parcel - parcel)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?delivery_leg)
+        (dispatch_assigned_time_window ?delivery_leg ?time_window)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (destination_node_has_staged_parcel ?destination_node)
+        (delivery_leg_assigned_parcel ?delivery_leg ?parcel)
+        (not
+          (delivery_leg_loaded ?delivery_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_node_reserved ?destination_node)
+        (delivery_leg_loaded ?delivery_leg)
+        (parcel_available ?parcel)
+        (not
+          (delivery_leg_assigned_parcel ?delivery_leg ?parcel)
+        )
+      )
+  )
+  (:action assign_vehicle_to_leg_pair_when_both_nodes_ready
+    :parameters (?pickup_leg - pickup_leg ?delivery_leg - delivery_leg ?origin_node - origin_node ?destination_node - destination_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (delivery_leg_ready ?delivery_leg)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (pickup_leg_loaded ?pickup_leg)
+        (delivery_leg_loaded ?delivery_leg)
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_assigned_origin ?vehicle_asset ?origin_node)
+        (vehicle_assigned_destination ?vehicle_asset ?destination_node)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_vehicle_to_leg_pair_with_origin_prepared
+    :parameters (?pickup_leg - pickup_leg ?delivery_leg - delivery_leg ?origin_node - origin_node ?destination_node - destination_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (delivery_leg_ready ?delivery_leg)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (origin_node_has_staged_parcel ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (pickup_leg_loaded ?pickup_leg)
+        )
+        (delivery_leg_loaded ?delivery_leg)
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_assigned_origin ?vehicle_asset ?origin_node)
+        (vehicle_assigned_destination ?vehicle_asset ?destination_node)
+        (vehicle_prepared_for_origin ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_vehicle_to_leg_pair_with_destination_prepared
+    :parameters (?pickup_leg - pickup_leg ?delivery_leg - delivery_leg ?origin_node - origin_node ?destination_node - destination_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (delivery_leg_ready ?delivery_leg)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_has_staged_parcel ?destination_node)
+        (pickup_leg_loaded ?pickup_leg)
+        (not
+          (delivery_leg_loaded ?delivery_leg)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_assigned_origin ?vehicle_asset ?origin_node)
+        (vehicle_assigned_destination ?vehicle_asset ?destination_node)
+        (vehicle_prepared_for_destination ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_vehicle_to_leg_pair_with_both_prepared
+    :parameters (?pickup_leg - pickup_leg ?delivery_leg - delivery_leg ?origin_node - origin_node ?destination_node - destination_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (delivery_leg_ready ?delivery_leg)
+        (pickup_leg_origin_node ?pickup_leg ?origin_node)
+        (delivery_leg_destination_node ?delivery_leg ?destination_node)
+        (origin_node_has_staged_parcel ?origin_node)
+        (destination_node_has_staged_parcel ?destination_node)
+        (not
+          (pickup_leg_loaded ?pickup_leg)
+        )
+        (not
+          (delivery_leg_loaded ?delivery_leg)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_assigned_origin ?vehicle_asset ?origin_node)
+        (vehicle_assigned_destination ?vehicle_asset ?destination_node)
+        (vehicle_prepared_for_origin ?vehicle_asset)
+        (vehicle_prepared_for_destination ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action confirm_vehicle_ready
+    :parameters (?vehicle_asset - vehicle_asset ?pickup_leg - pickup_leg ?time_window - time_window)
+    :precondition
+      (and
+        (vehicle_assigned ?vehicle_asset)
+        (pickup_leg_ready ?pickup_leg)
+        (dispatch_assigned_time_window ?pickup_leg ?time_window)
+        (not
+          (vehicle_ready ?vehicle_asset)
+        )
+      )
+    :effect (vehicle_ready ?vehicle_asset)
+  )
+  (:action allocate_stop_to_vehicle
+    :parameters (?route_plan - route_plan ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (plan_assigned_vehicle ?route_plan ?vehicle_asset)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_available ?stop)
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_ready ?vehicle_asset)
+        (not
+          (stop_assigned ?stop)
+        )
+      )
+    :effect
+      (and
+        (stop_assigned ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (not
+          (stop_available ?stop)
+        )
+      )
+  )
+  (:action confirm_stop_allocation_and_plan_check
+    :parameters (?route_plan - route_plan ?stop - stop ?vehicle_asset - vehicle_asset ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (dispatch_assigned_time_window ?route_plan ?time_window)
+        (not
+          (vehicle_prepared_for_origin ?vehicle_asset)
+        )
+        (not
+          (plan_stops_confirmed ?route_plan)
+        )
+      )
+    :effect (plan_stops_confirmed ?route_plan)
+  )
+  (:action attach_vehicle_attribute_to_plan
+    :parameters (?route_plan - route_plan ?vehicle_attribute - vehicle_attribute)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (vehicle_attribute_available ?vehicle_attribute)
+        (not
+          (plan_attribute_bound ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_attribute_bound ?route_plan)
+        (plan_has_vehicle_attribute ?route_plan ?vehicle_attribute)
+        (not
+          (vehicle_attribute_available ?vehicle_attribute)
+        )
+      )
+  )
+  (:action validate_plan_attribute_and_allocations
+    :parameters (?route_plan - route_plan ?stop - stop ?vehicle_asset - vehicle_asset ?time_window - time_window ?vehicle_attribute - vehicle_attribute)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (dispatch_assigned_time_window ?route_plan ?time_window)
+        (vehicle_prepared_for_origin ?vehicle_asset)
+        (plan_attribute_bound ?route_plan)
+        (plan_has_vehicle_attribute ?route_plan ?vehicle_attribute)
+        (not
+          (plan_stops_confirmed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_stops_confirmed ?route_plan)
+        (plan_attribute_verified ?route_plan)
+      )
+  )
+  (:action validate_plan_configuration
+    :parameters (?route_plan - route_plan ?equipment - equipment ?crew_member - crew_member ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_stops_confirmed ?route_plan)
+        (plan_assigned_equipment ?route_plan ?equipment)
+        (dispatch_assigned_crew ?route_plan ?crew_member)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (not
+          (vehicle_prepared_for_destination ?vehicle_asset)
+        )
+        (not
+          (plan_configuration_validated ?route_plan)
+        )
+      )
+    :effect (plan_configuration_validated ?route_plan)
+  )
+  (:action validate_plan_configuration_with_vehicle_prepared
+    :parameters (?route_plan - route_plan ?equipment - equipment ?crew_member - crew_member ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_stops_confirmed ?route_plan)
+        (plan_assigned_equipment ?route_plan ?equipment)
+        (dispatch_assigned_crew ?route_plan ?crew_member)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (vehicle_prepared_for_destination ?vehicle_asset)
+        (not
+          (plan_configuration_validated ?route_plan)
+        )
+      )
+    :effect (plan_configuration_validated ?route_plan)
+  )
+  (:action perform_plan_verification_a
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_configuration_validated ?route_plan)
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (not
+          (vehicle_prepared_for_origin ?vehicle_asset)
+        )
+        (not
+          (vehicle_prepared_for_destination ?vehicle_asset)
+        )
+        (not
+          (plan_verification_passed ?route_plan)
+        )
+      )
+    :effect (plan_verification_passed ?route_plan)
+  )
+  (:action perform_plan_verification_and_require_manifest
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_configuration_validated ?route_plan)
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (vehicle_prepared_for_origin ?vehicle_asset)
+        (not
+          (vehicle_prepared_for_destination ?vehicle_asset)
+        )
+        (not
+          (plan_verification_passed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_manifest_required ?route_plan)
+      )
+  )
+  (:action perform_plan_verification_variant_b
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_configuration_validated ?route_plan)
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (not
+          (vehicle_prepared_for_origin ?vehicle_asset)
+        )
+        (vehicle_prepared_for_destination ?vehicle_asset)
+        (not
+          (plan_verification_passed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_manifest_required ?route_plan)
+      )
+  )
+  (:action perform_plan_verification_variant_c
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction ?stop - stop ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_configuration_validated ?route_plan)
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (plan_includes_stop ?route_plan ?stop)
+        (stop_assigned_vehicle ?stop ?vehicle_asset)
+        (vehicle_prepared_for_origin ?vehicle_asset)
+        (vehicle_prepared_for_destination ?vehicle_asset)
+        (not
+          (plan_verification_passed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_manifest_required ?route_plan)
+      )
+  )
+  (:action finalize_plan_if_no_manifest_required
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (plan_verification_passed ?route_plan)
+        (not
+          (plan_manifest_required ?route_plan)
+        )
+        (not
+          (plan_executable ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_executable ?route_plan)
+        (dispatch_ready_for_handover ?route_plan)
+      )
+  )
+  (:action bind_manifest_to_plan
+    :parameters (?route_plan - route_plan ?cargo_manifest - cargo_manifest)
+    :precondition
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_manifest_required ?route_plan)
+        (cargo_manifest_available ?cargo_manifest)
+      )
+    :effect
+      (and
+        (plan_bound_manifest ?route_plan ?cargo_manifest)
+        (not
+          (cargo_manifest_available ?cargo_manifest)
+        )
+      )
+  )
+  (:action perform_execution_checks_and_mark_plan_execution_ready
+    :parameters (?route_plan - route_plan ?pickup_leg - pickup_leg ?delivery_leg - delivery_leg ?time_window - time_window ?cargo_manifest - cargo_manifest)
+    :precondition
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_manifest_required ?route_plan)
+        (plan_bound_manifest ?route_plan ?cargo_manifest)
+        (plan_includes_pickup_leg ?route_plan ?pickup_leg)
+        (plan_includes_delivery_leg ?route_plan ?delivery_leg)
+        (pickup_leg_loaded ?pickup_leg)
+        (delivery_leg_loaded ?delivery_leg)
+        (dispatch_assigned_time_window ?route_plan ?time_window)
+        (not
+          (plan_execution_ready ?route_plan)
+        )
+      )
+    :effect (plan_execution_ready ?route_plan)
+  )
+  (:action finalize_plan_after_checks
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (plan_verification_passed ?route_plan)
+        (plan_execution_ready ?route_plan)
+        (not
+          (plan_executable ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_executable ?route_plan)
+        (dispatch_ready_for_handover ?route_plan)
+      )
+  )
+  (:action authorize_plan_with_bound_customer_credential
+    :parameters (?route_plan - route_plan ?customer_credential - customer_credential ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_time_window_confirmed ?route_plan)
+        (dispatch_assigned_time_window ?route_plan ?time_window)
+        (customer_credential_available ?customer_credential)
+        (plan_bound_customer_credential ?route_plan ?customer_credential)
+        (not
+          (plan_authorized_by_customer ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized_by_customer ?route_plan)
+        (not
+          (customer_credential_available ?customer_credential)
+        )
+      )
+  )
+  (:action initiate_plan_authorization
+    :parameters (?route_plan - route_plan ?crew_member - crew_member)
+    :precondition
+      (and
+        (plan_authorized_by_customer ?route_plan)
+        (dispatch_assigned_crew ?route_plan ?crew_member)
+        (not
+          (plan_authorization_initiated ?route_plan)
+        )
+      )
+    :effect (plan_authorization_initiated ?route_plan)
+  )
+  (:action confirm_plan_authorization_with_handling_instruction
+    :parameters (?route_plan - route_plan ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (plan_authorization_initiated ?route_plan)
+        (plan_assigned_handling_instruction ?route_plan ?handling_instruction)
+        (not
+          (plan_authorization_confirmed ?route_plan)
+        )
+      )
+    :effect (plan_authorization_confirmed ?route_plan)
+  )
+  (:action finalize_plan_post_authorization
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (plan_authorization_confirmed ?route_plan)
+        (not
+          (plan_executable ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_executable ?route_plan)
+        (dispatch_ready_for_handover ?route_plan)
+      )
+  )
+  (:action mark_pickup_leg_ready_for_handover
+    :parameters (?pickup_leg - pickup_leg ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (pickup_leg_ready ?pickup_leg)
+        (pickup_leg_loaded ?pickup_leg)
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_ready ?vehicle_asset)
+        (not
+          (dispatch_ready_for_handover ?pickup_leg)
+        )
+      )
+    :effect (dispatch_ready_for_handover ?pickup_leg)
+  )
+  (:action mark_delivery_leg_ready_for_handover
+    :parameters (?delivery_leg - delivery_leg ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (delivery_leg_ready ?delivery_leg)
+        (delivery_leg_loaded ?delivery_leg)
+        (vehicle_assigned ?vehicle_asset)
+        (vehicle_ready ?vehicle_asset)
+        (not
+          (dispatch_ready_for_handover ?delivery_leg)
+        )
+      )
+    :effect (dispatch_ready_for_handover ?delivery_leg)
+  )
+  (:action activate_handover_token_for_dispatch_entity
+    :parameters (?dispatch_entity - dispatch_entity ?handover_token - handover_token ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_ready_for_handover ?dispatch_entity)
+        (dispatch_assigned_time_window ?dispatch_entity ?time_window)
+        (handover_token_available ?handover_token)
+        (not
+          (dispatch_handover_authorized ?dispatch_entity)
+        )
+      )
+    :effect
+      (and
+        (dispatch_handover_authorized ?dispatch_entity)
+        (dispatch_handover_token_assigned ?dispatch_entity ?handover_token)
+        (not
+          (handover_token_available ?handover_token)
+        )
+      )
+  )
+  (:action complete_pickup_leg_and_release_resources
+    :parameters (?pickup_leg - pickup_leg ?transport_mode - transport_mode ?handover_token - handover_token)
+    :precondition
+      (and
+        (dispatch_handover_authorized ?pickup_leg)
+        (dispatch_assigned_mode ?pickup_leg ?transport_mode)
+        (dispatch_handover_token_assigned ?pickup_leg ?handover_token)
+        (not
+          (dispatch_completed ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (dispatch_completed ?pickup_leg)
+        (transport_mode_available ?transport_mode)
+        (handover_token_available ?handover_token)
+      )
+  )
+  (:action complete_delivery_leg_and_release_resources
+    :parameters (?delivery_leg - delivery_leg ?transport_mode - transport_mode ?handover_token - handover_token)
+    :precondition
+      (and
+        (dispatch_handover_authorized ?delivery_leg)
+        (dispatch_assigned_mode ?delivery_leg ?transport_mode)
+        (dispatch_handover_token_assigned ?delivery_leg ?handover_token)
+        (not
+          (dispatch_completed ?delivery_leg)
+        )
+      )
+    :effect
+      (and
+        (dispatch_completed ?delivery_leg)
+        (transport_mode_available ?transport_mode)
+        (handover_token_available ?handover_token)
+      )
+  )
+  (:action complete_route_plan_and_release_resources
+    :parameters (?route_plan - route_plan ?transport_mode - transport_mode ?handover_token - handover_token)
+    :precondition
+      (and
+        (dispatch_handover_authorized ?route_plan)
+        (dispatch_assigned_mode ?route_plan ?transport_mode)
+        (dispatch_handover_token_assigned ?route_plan ?handover_token)
+        (not
+          (dispatch_completed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (dispatch_completed ?route_plan)
+        (transport_mode_available ?transport_mode)
+        (handover_token_available ?handover_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem same_day_delivery_dispatch_instance)
+  (:domain same_day_delivery_dispatch)
+  (:objects pickup_leg_1 - pickup_leg delivery_leg_1 - delivery_leg route_plan_alpha - route_plan route_plan_beta - route_plan mode_van_1 - transport_mode mode_bike_1 - transport_mode mode_courier_1 - transport_mode time_window_morning - time_window crew_member_1 - crew_member parcel_1 - parcel origin_node_warehouse - origin_node destination_node_customer_1 - destination_node vehicle_veh_1 - vehicle_asset stop_customer_a - stop stop_customer_b - stop attr_refrigerated - vehicle_attribute attr_liftgate - vehicle_attribute manifest_1 - cargo_manifest manifest_2 - cargo_manifest handover_token_1 - handover_token equipment_liftgate - equipment credential_customer_a - customer_credential credential_customer_b - customer_credential instruction_fragile - handling_instruction)
+  (:init
+    (transport_mode_available mode_van_1)
+    (transport_mode_available mode_bike_1)
+    (transport_mode_available mode_courier_1)
+    (time_window_available time_window_morning)
+    (crew_available crew_member_1)
+    (parcel_available parcel_1)
+    (pickup_leg_origin_node pickup_leg_1 origin_node_warehouse)
+    (delivery_leg_destination_node delivery_leg_1 destination_node_customer_1)
+    (vehicle_available vehicle_veh_1)
+    (stop_available stop_customer_a)
+    (stop_available stop_customer_b)
+    (plan_includes_pickup_leg route_plan_alpha pickup_leg_1)
+    (plan_includes_pickup_leg route_plan_beta pickup_leg_1)
+    (plan_includes_delivery_leg route_plan_alpha delivery_leg_1)
+    (plan_includes_delivery_leg route_plan_beta delivery_leg_1)
+    (plan_assigned_vehicle route_plan_alpha vehicle_veh_1)
+    (plan_assigned_vehicle route_plan_beta vehicle_veh_1)
+    (plan_includes_stop route_plan_alpha stop_customer_a)
+    (plan_includes_stop route_plan_beta stop_customer_b)
+    (vehicle_attribute_available attr_refrigerated)
+    (vehicle_attribute_available attr_liftgate)
+    (cargo_manifest_available manifest_1)
+    (cargo_manifest_available manifest_2)
+    (handover_token_available handover_token_1)
+    (equipment_available equipment_liftgate)
+    (customer_credential_available credential_customer_a)
+    (plan_bound_customer_credential route_plan_alpha credential_customer_a)
+    (plan_bound_customer_credential route_plan_beta credential_customer_b)
+    (handling_instruction_available instruction_fragile)
+  )
+  (:goal
+    (and
+      (dispatch_completed pickup_leg_1)
+      (dispatch_completed delivery_leg_1)
+      (dispatch_completed route_plan_alpha)
+      (dispatch_completed route_plan_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_dispatch_entity pickup_leg_1)
+(reserve_transport_mode_for_dispatch_entity pickup_leg_1 mode_courier_1)
+(offer_time_window_to_dispatch_entity pickup_leg_1 time_window_morning)
+(confirm_time_window_for_dispatch_entity pickup_leg_1 time_window_morning)
+(claim_origin_node_for_pickup_leg pickup_leg_1 origin_node_warehouse time_window_morning)
+(assign_crew_to_dispatch_entity pickup_leg_1 crew_member_1)
+(confirm_pickup_leg_loading pickup_leg_1 origin_node_warehouse crew_member_1)
+(release_crew_from_dispatch_entity pickup_leg_1 crew_member_1)
+(release_time_window_from_dispatch_entity pickup_leg_1 time_window_morning)
+(register_dispatch_entity delivery_leg_1)
+(reserve_transport_mode_for_dispatch_entity delivery_leg_1 mode_bike_1)
+(offer_time_window_to_dispatch_entity delivery_leg_1 time_window_morning)
+(confirm_time_window_for_dispatch_entity delivery_leg_1 time_window_morning)
+(claim_destination_node_for_delivery_leg delivery_leg_1 destination_node_customer_1 time_window_morning)
+(assign_crew_to_dispatch_entity delivery_leg_1 crew_member_1)
+(confirm_delivery_leg_loading delivery_leg_1 destination_node_customer_1 crew_member_1)
+(release_crew_from_dispatch_entity delivery_leg_1 crew_member_1)
+(release_time_window_from_dispatch_entity delivery_leg_1 time_window_morning)
+(offer_time_window_to_dispatch_entity pickup_leg_1 time_window_morning)
+(assign_vehicle_to_leg_pair_when_both_nodes_ready pickup_leg_1 delivery_leg_1 origin_node_warehouse destination_node_customer_1 vehicle_veh_1)
+(confirm_vehicle_ready vehicle_veh_1 pickup_leg_1 time_window_morning)
+(mark_pickup_leg_ready_for_handover pickup_leg_1 vehicle_veh_1)
+(mark_delivery_leg_ready_for_handover delivery_leg_1 vehicle_veh_1)
+(activate_handover_token_for_dispatch_entity pickup_leg_1 handover_token_1 time_window_morning)
+(complete_pickup_leg_and_release_resources pickup_leg_1 mode_courier_1 handover_token_1)
+(offer_time_window_to_dispatch_entity delivery_leg_1 time_window_morning)
+(activate_handover_token_for_dispatch_entity delivery_leg_1 handover_token_1 time_window_morning)
+(complete_delivery_leg_and_release_resources delivery_leg_1 mode_bike_1 handover_token_1)
+(register_dispatch_entity route_plan_alpha)
+(reserve_transport_mode_for_dispatch_entity route_plan_alpha mode_van_1)
+(offer_time_window_to_dispatch_entity route_plan_alpha time_window_morning)
+(confirm_time_window_for_dispatch_entity route_plan_alpha time_window_morning)
+(allocate_stop_to_vehicle route_plan_alpha stop_customer_a vehicle_veh_1)
+(confirm_stop_allocation_and_plan_check route_plan_alpha stop_customer_a vehicle_veh_1 time_window_morning)
+(assign_crew_to_dispatch_entity route_plan_alpha crew_member_1)
+(assign_equipment_to_route_plan route_plan_alpha equipment_liftgate)
+(validate_plan_configuration route_plan_alpha equipment_liftgate crew_member_1 stop_customer_a vehicle_veh_1)
+(assign_handling_instruction_to_route_plan route_plan_alpha instruction_fragile)
+(perform_plan_verification_a route_plan_alpha instruction_fragile stop_customer_a vehicle_veh_1)
+(finalize_plan_if_no_manifest_required route_plan_alpha)
+(activate_handover_token_for_dispatch_entity route_plan_alpha handover_token_1 time_window_morning)
+(complete_route_plan_and_release_resources route_plan_alpha mode_van_1 handover_token_1)
+(release_crew_from_dispatch_entity route_plan_alpha crew_member_1)
+(remove_equipment_from_route_plan route_plan_alpha equipment_liftgate)
+(remove_handling_instruction_from_route_plan route_plan_alpha instruction_fragile)
+(register_dispatch_entity route_plan_beta)
+(reserve_transport_mode_for_dispatch_entity route_plan_beta mode_courier_1)
+(offer_time_window_to_dispatch_entity route_plan_beta time_window_morning)
+(confirm_time_window_for_dispatch_entity route_plan_beta time_window_morning)
+(allocate_stop_to_vehicle route_plan_beta stop_customer_b vehicle_veh_1)
+(confirm_stop_allocation_and_plan_check route_plan_beta stop_customer_b vehicle_veh_1 time_window_morning)
+(assign_crew_to_dispatch_entity route_plan_beta crew_member_1)
+(assign_equipment_to_route_plan route_plan_beta equipment_liftgate)
+(validate_plan_configuration route_plan_beta equipment_liftgate crew_member_1 stop_customer_b vehicle_veh_1)
+(assign_handling_instruction_to_route_plan route_plan_beta instruction_fragile)
+(perform_plan_verification_a route_plan_beta instruction_fragile stop_customer_b vehicle_veh_1)
+(finalize_plan_if_no_manifest_required route_plan_beta)
+(activate_handover_token_for_dispatch_entity route_plan_beta handover_token_1 time_window_morning)
+(complete_route_plan_and_release_resources route_plan_beta mode_courier_1 handover_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_j1th15gf/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_j1th15gf/plan.pddl 
+
+
+--- stderr ---
+

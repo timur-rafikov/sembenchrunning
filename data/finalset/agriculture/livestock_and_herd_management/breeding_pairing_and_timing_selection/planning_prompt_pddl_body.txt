@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain livestock_breeding_pairing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object physical_item - object location_or_event - object case_root - object case_record - case_root breeding_resource - resource service_time_slot - resource technician - resource breeding_protocol - resource post_service_procedure - resource service_certificate - resource genetic_profile - resource pregnancy_test - resource consumable_unit - physical_item biological_sample - physical_item owner_consent - physical_item female_pen - location_or_event male_pen - location_or_event service_event - location_or_event individual_case - case_record pairing_case_type - case_record female_animal - individual_case male_animal - individual_case pairing_record - pairing_case_type)
+  (:predicates
+    (case_enrolled ?breeding_case - case_record)
+    (case_confirmed ?breeding_case - case_record)
+    (case_paired ?breeding_case - case_record)
+    (service_certified ?breeding_case - case_record)
+    (ready_for_certification ?breeding_case - case_record)
+    (service_recorded ?breeding_case - case_record)
+    (resource_available ?breeding_resource - breeding_resource)
+    (assigned_resource ?breeding_case - case_record ?breeding_resource - breeding_resource)
+    (time_slot_available ?service_time_slot - service_time_slot)
+    (assigned_time_slot ?breeding_case - case_record ?service_time_slot - service_time_slot)
+    (technician_available ?technician - technician)
+    (assigned_technician ?breeding_case - case_record ?technician - technician)
+    (consumable_available ?consumable_unit - consumable_unit)
+    (consumable_applied_to_female ?female_subject - female_animal ?consumable_unit - consumable_unit)
+    (consumable_applied_to_male ?male_subject - male_animal ?consumable_unit - consumable_unit)
+    (female_assigned_pen ?female_subject - female_animal ?female_pen - female_pen)
+    (pen_reserved ?female_pen - female_pen)
+    (pen_treated ?female_pen - female_pen)
+    (female_ready ?female_subject - female_animal)
+    (male_assigned_pen ?male_subject - male_animal ?male_pen - male_pen)
+    (male_pen_reserved ?male_pen - male_pen)
+    (male_pen_treated ?male_pen - male_pen)
+    (male_ready ?male_subject - male_animal)
+    (service_event_available ?service_event - service_event)
+    (service_event_allocated ?service_event - service_event)
+    (service_event_has_female_pen ?service_event - service_event ?female_pen - female_pen)
+    (service_event_has_male_pen ?service_event - service_event ?male_pen - male_pen)
+    (female_sample_collected ?service_event - service_event)
+    (male_sample_collected ?service_event - service_event)
+    (service_event_executed ?service_event - service_event)
+    (pairing_has_female ?pairing_record - pairing_record ?female_subject - female_animal)
+    (pairing_has_male ?pairing_record - pairing_record ?male_subject - male_animal)
+    (pairing_has_service_event ?pairing_record - pairing_record ?service_event - service_event)
+    (sample_available ?biological_sample - biological_sample)
+    (pairing_has_sample ?pairing_record - pairing_record ?biological_sample - biological_sample)
+    (sample_processed ?biological_sample - biological_sample)
+    (sample_associated_with_event ?biological_sample - biological_sample ?service_event - service_event)
+    (pairing_lab_assigned ?pairing_record - pairing_record)
+    (pairing_lab_processed ?pairing_record - pairing_record)
+    (pairing_ready_for_finalization ?pairing_record - pairing_record)
+    (protocol_bound ?pairing_record - pairing_record)
+    (protocol_applied ?pairing_record - pairing_record)
+    (post_service_ready ?pairing_record - pairing_record)
+    (operational_preconditions_met ?pairing_record - pairing_record)
+    (owner_consent_available ?owner_consent - owner_consent)
+    (pairing_has_consent ?pairing_record - pairing_record ?owner_consent - owner_consent)
+    (consent_applied_to_pairing ?pairing_record - pairing_record)
+    (consent_verified_by_technician ?pairing_record - pairing_record)
+    (consent_and_test_verified ?pairing_record - pairing_record)
+    (protocol_available ?breeding_protocol - breeding_protocol)
+    (pairing_has_protocol ?pairing_record - pairing_record ?breeding_protocol - breeding_protocol)
+    (post_service_procedure_available ?post_service_procedure - post_service_procedure)
+    (pairing_has_post_service_procedure ?pairing_record - pairing_record ?post_service_procedure - post_service_procedure)
+    (genetic_profile_available ?genetic_profile - genetic_profile)
+    (pairing_has_genetic_profile ?pairing_record - pairing_record ?genetic_profile - genetic_profile)
+    (pregnancy_test_available ?pregnancy_test - pregnancy_test)
+    (pairing_has_pregnancy_test ?pairing_record - pairing_record ?pregnancy_test - pregnancy_test)
+    (service_certificate_available ?service_certificate - service_certificate)
+    (case_has_service_certificate ?breeding_case - case_record ?service_certificate - service_certificate)
+    (female_prepared ?female_subject - female_animal)
+    (male_prepared ?male_subject - male_animal)
+    (pairing_finalized ?pairing_record - pairing_record)
+  )
+  (:action register_breeding_case
+    :parameters (?breeding_case - case_record)
+    :precondition
+      (and
+        (not
+          (case_enrolled ?breeding_case)
+        )
+        (not
+          (service_certified ?breeding_case)
+        )
+      )
+    :effect (case_enrolled ?breeding_case)
+  )
+  (:action allocate_breeding_resource_to_case
+    :parameters (?breeding_case - case_record ?breeding_resource - breeding_resource)
+    :precondition
+      (and
+        (case_enrolled ?breeding_case)
+        (not
+          (case_paired ?breeding_case)
+        )
+        (resource_available ?breeding_resource)
+      )
+    :effect
+      (and
+        (case_paired ?breeding_case)
+        (assigned_resource ?breeding_case ?breeding_resource)
+        (not
+          (resource_available ?breeding_resource)
+        )
+      )
+  )
+  (:action reserve_service_time_slot_for_case
+    :parameters (?breeding_case - case_record ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_enrolled ?breeding_case)
+        (case_paired ?breeding_case)
+        (time_slot_available ?service_time_slot)
+      )
+    :effect
+      (and
+        (assigned_time_slot ?breeding_case ?service_time_slot)
+        (not
+          (time_slot_available ?service_time_slot)
+        )
+      )
+  )
+  (:action confirm_service_booking_for_case
+    :parameters (?breeding_case - case_record ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_enrolled ?breeding_case)
+        (case_paired ?breeding_case)
+        (assigned_time_slot ?breeding_case ?service_time_slot)
+        (not
+          (case_confirmed ?breeding_case)
+        )
+      )
+    :effect (case_confirmed ?breeding_case)
+  )
+  (:action release_service_time_slot
+    :parameters (?breeding_case - case_record ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (assigned_time_slot ?breeding_case ?service_time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?service_time_slot)
+        (not
+          (assigned_time_slot ?breeding_case ?service_time_slot)
+        )
+      )
+  )
+  (:action assign_technician_to_confirmed_case
+    :parameters (?breeding_case - case_record ?technician - technician)
+    :precondition
+      (and
+        (case_confirmed ?breeding_case)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (assigned_technician ?breeding_case ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action unassign_technician_from_case
+    :parameters (?breeding_case - case_record ?technician - technician)
+    :precondition
+      (and
+        (assigned_technician ?breeding_case ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (assigned_technician ?breeding_case ?technician)
+        )
+      )
+  )
+  (:action bind_genetic_profile_to_pairing
+    :parameters (?pairing_record - pairing_record ?genetic_profile - genetic_profile)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (genetic_profile_available ?genetic_profile)
+      )
+    :effect
+      (and
+        (pairing_has_genetic_profile ?pairing_record ?genetic_profile)
+        (not
+          (genetic_profile_available ?genetic_profile)
+        )
+      )
+  )
+  (:action unbind_genetic_profile_from_pairing
+    :parameters (?pairing_record - pairing_record ?genetic_profile - genetic_profile)
+    :precondition
+      (and
+        (pairing_has_genetic_profile ?pairing_record ?genetic_profile)
+      )
+    :effect
+      (and
+        (genetic_profile_available ?genetic_profile)
+        (not
+          (pairing_has_genetic_profile ?pairing_record ?genetic_profile)
+        )
+      )
+  )
+  (:action assign_pregnancy_test_to_pairing
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (pregnancy_test_available ?pregnancy_test)
+      )
+    :effect
+      (and
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (not
+          (pregnancy_test_available ?pregnancy_test)
+        )
+      )
+  )
+  (:action unassign_pregnancy_test_from_pairing
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test)
+    :precondition
+      (and
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+      )
+    :effect
+      (and
+        (pregnancy_test_available ?pregnancy_test)
+        (not
+          (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        )
+      )
+  )
+  (:action reserve_female_pen_for_service
+    :parameters (?female_subject - female_animal ?female_pen - female_pen ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_confirmed ?female_subject)
+        (assigned_time_slot ?female_subject ?service_time_slot)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (not
+          (pen_reserved ?female_pen)
+        )
+        (not
+          (pen_treated ?female_pen)
+        )
+      )
+    :effect (pen_reserved ?female_pen)
+  )
+  (:action perform_female_pen_preparation
+    :parameters (?female_subject - female_animal ?female_pen - female_pen ?technician - technician)
+    :precondition
+      (and
+        (case_confirmed ?female_subject)
+        (assigned_technician ?female_subject ?technician)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (pen_reserved ?female_pen)
+        (not
+          (female_prepared ?female_subject)
+        )
+      )
+    :effect
+      (and
+        (female_prepared ?female_subject)
+        (female_ready ?female_subject)
+      )
+  )
+  (:action administer_consumable_to_female
+    :parameters (?female_subject - female_animal ?female_pen - female_pen ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (case_confirmed ?female_subject)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (consumable_available ?consumable_unit)
+        (not
+          (female_prepared ?female_subject)
+        )
+      )
+    :effect
+      (and
+        (pen_treated ?female_pen)
+        (female_prepared ?female_subject)
+        (consumable_applied_to_female ?female_subject ?consumable_unit)
+        (not
+          (consumable_available ?consumable_unit)
+        )
+      )
+  )
+  (:action finalize_female_preparation
+    :parameters (?female_subject - female_animal ?female_pen - female_pen ?service_time_slot - service_time_slot ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (case_confirmed ?female_subject)
+        (assigned_time_slot ?female_subject ?service_time_slot)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (pen_treated ?female_pen)
+        (consumable_applied_to_female ?female_subject ?consumable_unit)
+        (not
+          (female_ready ?female_subject)
+        )
+      )
+    :effect
+      (and
+        (pen_reserved ?female_pen)
+        (female_ready ?female_subject)
+        (consumable_available ?consumable_unit)
+        (not
+          (consumable_applied_to_female ?female_subject ?consumable_unit)
+        )
+      )
+  )
+  (:action reserve_male_pen_for_service
+    :parameters (?male_subject - male_animal ?male_pen - male_pen ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_confirmed ?male_subject)
+        (assigned_time_slot ?male_subject ?service_time_slot)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (not
+          (male_pen_reserved ?male_pen)
+        )
+        (not
+          (male_pen_treated ?male_pen)
+        )
+      )
+    :effect (male_pen_reserved ?male_pen)
+  )
+  (:action perform_male_pen_preparation
+    :parameters (?male_subject - male_animal ?male_pen - male_pen ?technician - technician)
+    :precondition
+      (and
+        (case_confirmed ?male_subject)
+        (assigned_technician ?male_subject ?technician)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (male_pen_reserved ?male_pen)
+        (not
+          (male_prepared ?male_subject)
+        )
+      )
+    :effect
+      (and
+        (male_prepared ?male_subject)
+        (male_ready ?male_subject)
+      )
+  )
+  (:action administer_consumable_to_male
+    :parameters (?male_subject - male_animal ?male_pen - male_pen ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (case_confirmed ?male_subject)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (consumable_available ?consumable_unit)
+        (not
+          (male_prepared ?male_subject)
+        )
+      )
+    :effect
+      (and
+        (male_pen_treated ?male_pen)
+        (male_prepared ?male_subject)
+        (consumable_applied_to_male ?male_subject ?consumable_unit)
+        (not
+          (consumable_available ?consumable_unit)
+        )
+      )
+  )
+  (:action finalize_male_preparation
+    :parameters (?male_subject - male_animal ?male_pen - male_pen ?service_time_slot - service_time_slot ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (case_confirmed ?male_subject)
+        (assigned_time_slot ?male_subject ?service_time_slot)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (male_pen_treated ?male_pen)
+        (consumable_applied_to_male ?male_subject ?consumable_unit)
+        (not
+          (male_ready ?male_subject)
+        )
+      )
+    :effect
+      (and
+        (male_pen_reserved ?male_pen)
+        (male_ready ?male_subject)
+        (consumable_available ?consumable_unit)
+        (not
+          (consumable_applied_to_male ?male_subject ?consumable_unit)
+        )
+      )
+  )
+  (:action assemble_service_event
+    :parameters (?female_subject - female_animal ?male_subject - male_animal ?female_pen - female_pen ?male_pen - male_pen ?service_event - service_event)
+    :precondition
+      (and
+        (female_prepared ?female_subject)
+        (male_prepared ?male_subject)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (pen_reserved ?female_pen)
+        (male_pen_reserved ?male_pen)
+        (female_ready ?female_subject)
+        (male_ready ?male_subject)
+        (service_event_available ?service_event)
+      )
+    :effect
+      (and
+        (service_event_allocated ?service_event)
+        (service_event_has_female_pen ?service_event ?female_pen)
+        (service_event_has_male_pen ?service_event ?male_pen)
+        (not
+          (service_event_available ?service_event)
+        )
+      )
+  )
+  (:action assemble_service_event_with_female_sample
+    :parameters (?female_subject - female_animal ?male_subject - male_animal ?female_pen - female_pen ?male_pen - male_pen ?service_event - service_event)
+    :precondition
+      (and
+        (female_prepared ?female_subject)
+        (male_prepared ?male_subject)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (pen_treated ?female_pen)
+        (male_pen_reserved ?male_pen)
+        (not
+          (female_ready ?female_subject)
+        )
+        (male_ready ?male_subject)
+        (service_event_available ?service_event)
+      )
+    :effect
+      (and
+        (service_event_allocated ?service_event)
+        (service_event_has_female_pen ?service_event ?female_pen)
+        (service_event_has_male_pen ?service_event ?male_pen)
+        (female_sample_collected ?service_event)
+        (not
+          (service_event_available ?service_event)
+        )
+      )
+  )
+  (:action assemble_service_event_with_male_sample
+    :parameters (?female_subject - female_animal ?male_subject - male_animal ?female_pen - female_pen ?male_pen - male_pen ?service_event - service_event)
+    :precondition
+      (and
+        (female_prepared ?female_subject)
+        (male_prepared ?male_subject)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (pen_reserved ?female_pen)
+        (male_pen_treated ?male_pen)
+        (female_ready ?female_subject)
+        (not
+          (male_ready ?male_subject)
+        )
+        (service_event_available ?service_event)
+      )
+    :effect
+      (and
+        (service_event_allocated ?service_event)
+        (service_event_has_female_pen ?service_event ?female_pen)
+        (service_event_has_male_pen ?service_event ?male_pen)
+        (male_sample_collected ?service_event)
+        (not
+          (service_event_available ?service_event)
+        )
+      )
+  )
+  (:action assemble_service_event_with_both_samples
+    :parameters (?female_subject - female_animal ?male_subject - male_animal ?female_pen - female_pen ?male_pen - male_pen ?service_event - service_event)
+    :precondition
+      (and
+        (female_prepared ?female_subject)
+        (male_prepared ?male_subject)
+        (female_assigned_pen ?female_subject ?female_pen)
+        (male_assigned_pen ?male_subject ?male_pen)
+        (pen_treated ?female_pen)
+        (male_pen_treated ?male_pen)
+        (not
+          (female_ready ?female_subject)
+        )
+        (not
+          (male_ready ?male_subject)
+        )
+        (service_event_available ?service_event)
+      )
+    :effect
+      (and
+        (service_event_allocated ?service_event)
+        (service_event_has_female_pen ?service_event ?female_pen)
+        (service_event_has_male_pen ?service_event ?male_pen)
+        (female_sample_collected ?service_event)
+        (male_sample_collected ?service_event)
+        (not
+          (service_event_available ?service_event)
+        )
+      )
+  )
+  (:action execute_service_event
+    :parameters (?service_event - service_event ?female_subject - female_animal ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (service_event_allocated ?service_event)
+        (female_prepared ?female_subject)
+        (assigned_time_slot ?female_subject ?service_time_slot)
+        (not
+          (service_event_executed ?service_event)
+        )
+      )
+    :effect (service_event_executed ?service_event)
+  )
+  (:action process_biological_sample
+    :parameters (?pairing_record - pairing_record ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (pairing_has_service_event ?pairing_record ?service_event)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_available ?biological_sample)
+        (service_event_allocated ?service_event)
+        (service_event_executed ?service_event)
+        (not
+          (sample_processed ?biological_sample)
+        )
+      )
+    :effect
+      (and
+        (sample_processed ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (not
+          (sample_available ?biological_sample)
+        )
+      )
+  )
+  (:action stage_pairing_for_lab_processing
+    :parameters (?pairing_record - pairing_record ?biological_sample - biological_sample ?service_event - service_event ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_processed ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (assigned_time_slot ?pairing_record ?service_time_slot)
+        (not
+          (female_sample_collected ?service_event)
+        )
+        (not
+          (pairing_lab_assigned ?pairing_record)
+        )
+      )
+    :effect (pairing_lab_assigned ?pairing_record)
+  )
+  (:action assign_breeding_protocol_to_pairing
+    :parameters (?pairing_record - pairing_record ?breeding_protocol - breeding_protocol)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (protocol_available ?breeding_protocol)
+        (not
+          (protocol_bound ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (protocol_bound ?pairing_record)
+        (pairing_has_protocol ?pairing_record ?breeding_protocol)
+        (not
+          (protocol_available ?breeding_protocol)
+        )
+      )
+  )
+  (:action apply_protocol_and_stage_pairing
+    :parameters (?pairing_record - pairing_record ?biological_sample - biological_sample ?service_event - service_event ?service_time_slot - service_time_slot ?breeding_protocol - breeding_protocol)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_processed ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (assigned_time_slot ?pairing_record ?service_time_slot)
+        (female_sample_collected ?service_event)
+        (protocol_bound ?pairing_record)
+        (pairing_has_protocol ?pairing_record ?breeding_protocol)
+        (not
+          (pairing_lab_assigned ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_lab_assigned ?pairing_record)
+        (protocol_applied ?pairing_record)
+      )
+  )
+  (:action complete_lab_processing_for_female_sample
+    :parameters (?pairing_record - pairing_record ?genetic_profile - genetic_profile ?technician - technician ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_assigned ?pairing_record)
+        (pairing_has_genetic_profile ?pairing_record ?genetic_profile)
+        (assigned_technician ?pairing_record ?technician)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (not
+          (male_sample_collected ?service_event)
+        )
+        (not
+          (pairing_lab_processed ?pairing_record)
+        )
+      )
+    :effect (pairing_lab_processed ?pairing_record)
+  )
+  (:action complete_lab_processing_for_male_sample
+    :parameters (?pairing_record - pairing_record ?genetic_profile - genetic_profile ?technician - technician ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_assigned ?pairing_record)
+        (pairing_has_genetic_profile ?pairing_record ?genetic_profile)
+        (assigned_technician ?pairing_record ?technician)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (male_sample_collected ?service_event)
+        (not
+          (pairing_lab_processed ?pairing_record)
+        )
+      )
+    :effect (pairing_lab_processed ?pairing_record)
+  )
+  (:action promote_pairing_after_lab_processing
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_processed ?pairing_record)
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (not
+          (female_sample_collected ?service_event)
+        )
+        (not
+          (male_sample_collected ?service_event)
+        )
+        (not
+          (pairing_ready_for_finalization ?pairing_record)
+        )
+      )
+    :effect (pairing_ready_for_finalization ?pairing_record)
+  )
+  (:action finalize_pairing_checks_variant_a
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_processed ?pairing_record)
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (female_sample_collected ?service_event)
+        (not
+          (male_sample_collected ?service_event)
+        )
+        (not
+          (pairing_ready_for_finalization ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (post_service_ready ?pairing_record)
+      )
+  )
+  (:action finalize_pairing_checks_variant_b
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_processed ?pairing_record)
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (not
+          (female_sample_collected ?service_event)
+        )
+        (male_sample_collected ?service_event)
+        (not
+          (pairing_ready_for_finalization ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (post_service_ready ?pairing_record)
+      )
+  )
+  (:action finalize_pairing_checks_variant_c
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test ?biological_sample - biological_sample ?service_event - service_event)
+    :precondition
+      (and
+        (pairing_lab_processed ?pairing_record)
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (pairing_has_sample ?pairing_record ?biological_sample)
+        (sample_associated_with_event ?biological_sample ?service_event)
+        (female_sample_collected ?service_event)
+        (male_sample_collected ?service_event)
+        (not
+          (pairing_ready_for_finalization ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (post_service_ready ?pairing_record)
+      )
+  )
+  (:action finalize_pairing_record
+    :parameters (?pairing_record - pairing_record)
+    :precondition
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (not
+          (post_service_ready ?pairing_record)
+        )
+        (not
+          (pairing_finalized ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_finalized ?pairing_record)
+        (ready_for_certification ?pairing_record)
+      )
+  )
+  (:action assign_post_service_procedure_to_pairing
+    :parameters (?pairing_record - pairing_record ?post_service_procedure - post_service_procedure)
+    :precondition
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (post_service_ready ?pairing_record)
+        (post_service_procedure_available ?post_service_procedure)
+      )
+    :effect
+      (and
+        (pairing_has_post_service_procedure ?pairing_record ?post_service_procedure)
+        (not
+          (post_service_procedure_available ?post_service_procedure)
+        )
+      )
+  )
+  (:action apply_operational_preconditions_to_pairing
+    :parameters (?pairing_record - pairing_record ?female_subject - female_animal ?male_subject - male_animal ?service_time_slot - service_time_slot ?post_service_procedure - post_service_procedure)
+    :precondition
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (post_service_ready ?pairing_record)
+        (pairing_has_post_service_procedure ?pairing_record ?post_service_procedure)
+        (pairing_has_female ?pairing_record ?female_subject)
+        (pairing_has_male ?pairing_record ?male_subject)
+        (female_ready ?female_subject)
+        (male_ready ?male_subject)
+        (assigned_time_slot ?pairing_record ?service_time_slot)
+        (not
+          (operational_preconditions_met ?pairing_record)
+        )
+      )
+    :effect (operational_preconditions_met ?pairing_record)
+  )
+  (:action finalize_pairing_and_mark_ready_for_certification
+    :parameters (?pairing_record - pairing_record)
+    :precondition
+      (and
+        (pairing_ready_for_finalization ?pairing_record)
+        (operational_preconditions_met ?pairing_record)
+        (not
+          (pairing_finalized ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_finalized ?pairing_record)
+        (ready_for_certification ?pairing_record)
+      )
+  )
+  (:action apply_owner_consent_to_pairing
+    :parameters (?pairing_record - pairing_record ?owner_consent - owner_consent ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (case_confirmed ?pairing_record)
+        (assigned_time_slot ?pairing_record ?service_time_slot)
+        (owner_consent_available ?owner_consent)
+        (pairing_has_consent ?pairing_record ?owner_consent)
+        (not
+          (consent_applied_to_pairing ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (consent_applied_to_pairing ?pairing_record)
+        (not
+          (owner_consent_available ?owner_consent)
+        )
+      )
+  )
+  (:action verify_consent_by_technician
+    :parameters (?pairing_record - pairing_record ?technician - technician)
+    :precondition
+      (and
+        (consent_applied_to_pairing ?pairing_record)
+        (assigned_technician ?pairing_record ?technician)
+        (not
+          (consent_verified_by_technician ?pairing_record)
+        )
+      )
+    :effect (consent_verified_by_technician ?pairing_record)
+  )
+  (:action confirm_pregnancy_test_for_pairing
+    :parameters (?pairing_record - pairing_record ?pregnancy_test - pregnancy_test)
+    :precondition
+      (and
+        (consent_verified_by_technician ?pairing_record)
+        (pairing_has_pregnancy_test ?pairing_record ?pregnancy_test)
+        (not
+          (consent_and_test_verified ?pairing_record)
+        )
+      )
+    :effect (consent_and_test_verified ?pairing_record)
+  )
+  (:action finalize_consent_and_mark_ready_for_certification
+    :parameters (?pairing_record - pairing_record)
+    :precondition
+      (and
+        (consent_and_test_verified ?pairing_record)
+        (not
+          (pairing_finalized ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (pairing_finalized ?pairing_record)
+        (ready_for_certification ?pairing_record)
+      )
+  )
+  (:action certify_female_subject_from_event
+    :parameters (?female_subject - female_animal ?service_event - service_event)
+    :precondition
+      (and
+        (female_prepared ?female_subject)
+        (female_ready ?female_subject)
+        (service_event_allocated ?service_event)
+        (service_event_executed ?service_event)
+        (not
+          (ready_for_certification ?female_subject)
+        )
+      )
+    :effect (ready_for_certification ?female_subject)
+  )
+  (:action certify_male_subject_from_event
+    :parameters (?male_subject - male_animal ?service_event - service_event)
+    :precondition
+      (and
+        (male_prepared ?male_subject)
+        (male_ready ?male_subject)
+        (service_event_allocated ?service_event)
+        (service_event_executed ?service_event)
+        (not
+          (ready_for_certification ?male_subject)
+        )
+      )
+    :effect (ready_for_certification ?male_subject)
+  )
+  (:action issue_service_certificate_for_case
+    :parameters (?breeding_case - case_record ?service_certificate - service_certificate ?service_time_slot - service_time_slot)
+    :precondition
+      (and
+        (ready_for_certification ?breeding_case)
+        (assigned_time_slot ?breeding_case ?service_time_slot)
+        (service_certificate_available ?service_certificate)
+        (not
+          (service_recorded ?breeding_case)
+        )
+      )
+    :effect
+      (and
+        (service_recorded ?breeding_case)
+        (case_has_service_certificate ?breeding_case ?service_certificate)
+        (not
+          (service_certificate_available ?service_certificate)
+        )
+      )
+  )
+  (:action release_female_and_resource
+    :parameters (?female_subject - female_animal ?breeding_resource - breeding_resource ?service_certificate - service_certificate)
+    :precondition
+      (and
+        (service_recorded ?female_subject)
+        (assigned_resource ?female_subject ?breeding_resource)
+        (case_has_service_certificate ?female_subject ?service_certificate)
+        (not
+          (service_certified ?female_subject)
+        )
+      )
+    :effect
+      (and
+        (service_certified ?female_subject)
+        (resource_available ?breeding_resource)
+        (service_certificate_available ?service_certificate)
+      )
+  )
+  (:action release_male_and_resource
+    :parameters (?male_subject - male_animal ?breeding_resource - breeding_resource ?service_certificate - service_certificate)
+    :precondition
+      (and
+        (service_recorded ?male_subject)
+        (assigned_resource ?male_subject ?breeding_resource)
+        (case_has_service_certificate ?male_subject ?service_certificate)
+        (not
+          (service_certified ?male_subject)
+        )
+      )
+    :effect
+      (and
+        (service_certified ?male_subject)
+        (resource_available ?breeding_resource)
+        (service_certificate_available ?service_certificate)
+      )
+  )
+  (:action finalize_pairing_and_release_resource
+    :parameters (?pairing_record - pairing_record ?breeding_resource - breeding_resource ?service_certificate - service_certificate)
+    :precondition
+      (and
+        (service_recorded ?pairing_record)
+        (assigned_resource ?pairing_record ?breeding_resource)
+        (case_has_service_certificate ?pairing_record ?service_certificate)
+        (not
+          (service_certified ?pairing_record)
+        )
+      )
+    :effect
+      (and
+        (service_certified ?pairing_record)
+        (resource_available ?breeding_resource)
+        (service_certificate_available ?service_certificate)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem breeding_pairing_timing_problem)
+  (:domain livestock_breeding_pairing_domain)
+  (:objects female_subject_1 - female_animal male_subject_1 - male_animal pairing_record_1 - pairing_record pairing_record_2 - pairing_record breeding_resource_1 - breeding_resource breeding_resource_2 - breeding_resource breeding_resource_3 - breeding_resource service_time_slot_1 - service_time_slot technician_1 - technician consumable_unit_1 - consumable_unit female_pen_1 - female_pen male_pen_1 - male_pen service_event_1 - service_event biological_sample_1 - biological_sample biological_sample_2 - biological_sample breeding_protocol_1 - breeding_protocol breeding_protocol_2 - breeding_protocol post_service_procedure_1 - post_service_procedure post_service_procedure_2 - post_service_procedure service_certificate_1 - service_certificate genetic_profile_1 - genetic_profile owner_consent_1 - owner_consent owner_consent_2 - owner_consent pregnancy_test_1 - pregnancy_test)
+  (:init
+    (resource_available breeding_resource_1)
+    (resource_available breeding_resource_2)
+    (resource_available breeding_resource_3)
+    (time_slot_available service_time_slot_1)
+    (technician_available technician_1)
+    (consumable_available consumable_unit_1)
+    (female_assigned_pen female_subject_1 female_pen_1)
+    (male_assigned_pen male_subject_1 male_pen_1)
+    (service_event_available service_event_1)
+    (sample_available biological_sample_1)
+    (sample_available biological_sample_2)
+    (pairing_has_female pairing_record_1 female_subject_1)
+    (pairing_has_female pairing_record_2 female_subject_1)
+    (pairing_has_male pairing_record_1 male_subject_1)
+    (pairing_has_male pairing_record_2 male_subject_1)
+    (pairing_has_service_event pairing_record_1 service_event_1)
+    (pairing_has_service_event pairing_record_2 service_event_1)
+    (pairing_has_sample pairing_record_1 biological_sample_1)
+    (pairing_has_sample pairing_record_2 biological_sample_2)
+    (protocol_available breeding_protocol_1)
+    (protocol_available breeding_protocol_2)
+    (post_service_procedure_available post_service_procedure_1)
+    (post_service_procedure_available post_service_procedure_2)
+    (service_certificate_available service_certificate_1)
+    (genetic_profile_available genetic_profile_1)
+    (owner_consent_available owner_consent_1)
+    (pairing_has_consent pairing_record_1 owner_consent_1)
+    (pairing_has_consent pairing_record_2 owner_consent_2)
+    (pregnancy_test_available pregnancy_test_1)
+  )
+  (:goal
+    (and
+      (service_certified female_subject_1)
+      (service_certified male_subject_1)
+      (service_certified pairing_record_1)
+      (service_certified pairing_record_2)
+    )
+  )
+)

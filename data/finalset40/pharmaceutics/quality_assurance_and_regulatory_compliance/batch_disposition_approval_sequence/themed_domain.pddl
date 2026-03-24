@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_batch_disposition_approval_sequence)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types organizational_resource - object artifact_category - object dependency_category - object case_root - object disposition_case - case_root approver_slot - organizational_resource investigation_report - organizational_resource discipline_reviewer - organizational_resource executive_justification - organizational_resource approval_template - organizational_resource electronic_signature_token - organizational_resource validation_evidence - organizational_resource technical_expert - organizational_resource supporting_evidence - artifact_category supporting_document - artifact_category regulatory_authority_contact - artifact_category validation_protocol - dependency_category regulatory_checklist - dependency_category disposition_packet - dependency_category responsible_unit_group - disposition_case case_component - disposition_case manufacturing_unit - responsible_unit_group quality_unit - responsible_unit_group approval_docket - case_component)
+  (:predicates
+    (disposition_case_initiated ?disposition_case - disposition_case)
+    (entity_reviewed ?disposition_case - disposition_case)
+    (disposition_case_has_assigned_approver ?disposition_case - disposition_case)
+    (final_disposition_recorded ?disposition_case - disposition_case)
+    (entity_ready_for_electronic_signature ?disposition_case - disposition_case)
+    (disposition_case_electronically_signed ?disposition_case - disposition_case)
+    (approver_slot_available ?approver_slot - approver_slot)
+    (disposition_case_assigned_to_approver_slot ?disposition_case - disposition_case ?approver_slot - approver_slot)
+    (investigation_report_available ?investigation_report - investigation_report)
+    (entity_has_investigation_report ?disposition_case - disposition_case ?investigation_report - investigation_report)
+    (discipline_reviewer_available ?discipline_reviewer - discipline_reviewer)
+    (disposition_case_assigned_to_discipline_reviewer ?disposition_case - disposition_case ?discipline_reviewer - discipline_reviewer)
+    (supporting_evidence_available ?supporting_evidence - supporting_evidence)
+    (manufacturing_unit_has_supporting_evidence ?manufacturing_unit - manufacturing_unit ?supporting_evidence - supporting_evidence)
+    (quality_unit_has_supporting_evidence ?quality_unit - quality_unit ?supporting_evidence - supporting_evidence)
+    (manufacturing_unit_has_validation_protocol ?manufacturing_unit - manufacturing_unit ?validation_protocol - validation_protocol)
+    (validation_protocol_verified ?validation_protocol - validation_protocol)
+    (validation_protocol_pending_verification ?validation_protocol - validation_protocol)
+    (manufacturing_unit_validation_cleared ?manufacturing_unit - manufacturing_unit)
+    (quality_unit_has_regulatory_checklist ?quality_unit - quality_unit ?regulatory_checklist - regulatory_checklist)
+    (regulatory_checklist_verified ?regulatory_checklist - regulatory_checklist)
+    (regulatory_checklist_pending_verification ?regulatory_checklist - regulatory_checklist)
+    (quality_unit_validation_cleared ?quality_unit - quality_unit)
+    (disposition_packet_available ?disposition_packet - disposition_packet)
+    (disposition_packet_assembled ?disposition_packet - disposition_packet)
+    (disposition_packet_has_validation_protocol ?disposition_packet - disposition_packet ?validation_protocol - validation_protocol)
+    (disposition_packet_has_regulatory_checklist ?disposition_packet - disposition_packet ?regulatory_checklist - regulatory_checklist)
+    (disposition_packet_requires_executive_justification ?disposition_packet - disposition_packet)
+    (disposition_packet_requires_regulatory_contact ?disposition_packet - disposition_packet)
+    (disposition_packet_verified ?disposition_packet - disposition_packet)
+    (approval_docket_associated_with_manufacturing_unit ?approval_docket - approval_docket ?manufacturing_unit - manufacturing_unit)
+    (approval_docket_associated_with_quality_unit ?approval_docket - approval_docket ?quality_unit - quality_unit)
+    (approval_docket_associated_with_disposition_packet ?approval_docket - approval_docket ?disposition_packet - disposition_packet)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (approval_docket_has_supporting_document ?approval_docket - approval_docket ?supporting_document - supporting_document)
+    (supporting_document_attached ?supporting_document - supporting_document)
+    (supporting_document_linked_to_packet ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    (approval_docket_documentation_verified ?approval_docket - approval_docket)
+    (approval_docket_ready_for_expert_review ?approval_docket - approval_docket)
+    (approval_docket_technical_cleared ?approval_docket - approval_docket)
+    (approval_docket_has_executive_justification ?approval_docket - approval_docket)
+    (approval_docket_executive_justification_verified ?approval_docket - approval_docket)
+    (approval_docket_requires_approval_template ?approval_docket - approval_docket)
+    (approval_docket_unit_clearances_confirmed ?approval_docket - approval_docket)
+    (regulatory_contact_available ?regulatory_authority_contact - regulatory_authority_contact)
+    (approval_docket_has_regulatory_contact ?approval_docket - approval_docket ?regulatory_authority_contact - regulatory_authority_contact)
+    (approval_docket_regulatory_contact_engaged ?approval_docket - approval_docket)
+    (approval_docket_regulatory_contact_acknowledged ?approval_docket - approval_docket)
+    (approval_docket_regulatory_clearance_recorded ?approval_docket - approval_docket)
+    (executive_justification_available ?executive_justification - executive_justification)
+    (approval_docket_linked_to_executive_justification ?approval_docket - approval_docket ?executive_justification - executive_justification)
+    (approval_template_available ?approval_template - approval_template)
+    (approval_docket_template_attached ?approval_docket - approval_docket ?approval_template - approval_template)
+    (validation_evidence_available ?validation_evidence - validation_evidence)
+    (approval_docket_has_validation_evidence ?approval_docket - approval_docket ?validation_evidence - validation_evidence)
+    (technical_expert_available ?technical_expert - technical_expert)
+    (approval_docket_technical_expert_assigned ?approval_docket - approval_docket ?technical_expert - technical_expert)
+    (electronic_signature_token_available ?electronic_signature_token - electronic_signature_token)
+    (disposition_case_has_electronic_signature_token ?disposition_case - disposition_case ?electronic_signature_token - electronic_signature_token)
+    (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit - manufacturing_unit)
+    (quality_unit_ready_for_packet_assembly ?quality_unit - quality_unit)
+    (approval_docket_ready_for_signature ?approval_docket - approval_docket)
+  )
+  (:action initiate_disposition_case
+    :parameters (?disposition_case - disposition_case)
+    :precondition
+      (and
+        (not
+          (disposition_case_initiated ?disposition_case)
+        )
+        (not
+          (final_disposition_recorded ?disposition_case)
+        )
+      )
+    :effect (disposition_case_initiated ?disposition_case)
+  )
+  (:action assign_approver_slot_to_case
+    :parameters (?disposition_case - disposition_case ?approver_slot - approver_slot)
+    :precondition
+      (and
+        (disposition_case_initiated ?disposition_case)
+        (not
+          (disposition_case_has_assigned_approver ?disposition_case)
+        )
+        (approver_slot_available ?approver_slot)
+      )
+    :effect
+      (and
+        (disposition_case_has_assigned_approver ?disposition_case)
+        (disposition_case_assigned_to_approver_slot ?disposition_case ?approver_slot)
+        (not
+          (approver_slot_available ?approver_slot)
+        )
+      )
+  )
+  (:action attach_investigation_report_to_case
+    :parameters (?disposition_case - disposition_case ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (disposition_case_initiated ?disposition_case)
+        (disposition_case_has_assigned_approver ?disposition_case)
+        (investigation_report_available ?investigation_report)
+      )
+    :effect
+      (and
+        (entity_has_investigation_report ?disposition_case ?investigation_report)
+        (not
+          (investigation_report_available ?investigation_report)
+        )
+      )
+  )
+  (:action complete_case_review
+    :parameters (?disposition_case - disposition_case ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (disposition_case_initiated ?disposition_case)
+        (disposition_case_has_assigned_approver ?disposition_case)
+        (entity_has_investigation_report ?disposition_case ?investigation_report)
+        (not
+          (entity_reviewed ?disposition_case)
+        )
+      )
+    :effect (entity_reviewed ?disposition_case)
+  )
+  (:action release_investigation_report
+    :parameters (?disposition_case - disposition_case ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_has_investigation_report ?disposition_case ?investigation_report)
+      )
+    :effect
+      (and
+        (investigation_report_available ?investigation_report)
+        (not
+          (entity_has_investigation_report ?disposition_case ?investigation_report)
+        )
+      )
+  )
+  (:action assign_discipline_reviewer_to_case
+    :parameters (?disposition_case - disposition_case ?discipline_reviewer - discipline_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?disposition_case)
+        (discipline_reviewer_available ?discipline_reviewer)
+      )
+    :effect
+      (and
+        (disposition_case_assigned_to_discipline_reviewer ?disposition_case ?discipline_reviewer)
+        (not
+          (discipline_reviewer_available ?discipline_reviewer)
+        )
+      )
+  )
+  (:action release_discipline_reviewer_from_case
+    :parameters (?disposition_case - disposition_case ?discipline_reviewer - discipline_reviewer)
+    :precondition
+      (and
+        (disposition_case_assigned_to_discipline_reviewer ?disposition_case ?discipline_reviewer)
+      )
+    :effect
+      (and
+        (discipline_reviewer_available ?discipline_reviewer)
+        (not
+          (disposition_case_assigned_to_discipline_reviewer ?disposition_case ?discipline_reviewer)
+        )
+      )
+  )
+  (:action assign_validation_evidence_to_docket
+    :parameters (?approval_docket - approval_docket ?validation_evidence - validation_evidence)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (validation_evidence_available ?validation_evidence)
+      )
+    :effect
+      (and
+        (approval_docket_has_validation_evidence ?approval_docket ?validation_evidence)
+        (not
+          (validation_evidence_available ?validation_evidence)
+        )
+      )
+  )
+  (:action release_validation_evidence_from_docket
+    :parameters (?approval_docket - approval_docket ?validation_evidence - validation_evidence)
+    :precondition
+      (and
+        (approval_docket_has_validation_evidence ?approval_docket ?validation_evidence)
+      )
+    :effect
+      (and
+        (validation_evidence_available ?validation_evidence)
+        (not
+          (approval_docket_has_validation_evidence ?approval_docket ?validation_evidence)
+        )
+      )
+  )
+  (:action assign_technical_expert_to_docket
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (technical_expert_available ?technical_expert)
+      )
+    :effect
+      (and
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (not
+          (technical_expert_available ?technical_expert)
+        )
+      )
+  )
+  (:action release_technical_expert_from_docket
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert)
+    :precondition
+      (and
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+      )
+    :effect
+      (and
+        (technical_expert_available ?technical_expert)
+        (not
+          (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        )
+      )
+  )
+  (:action initiate_validation_protocol_verification
+    :parameters (?manufacturing_unit - manufacturing_unit ?validation_protocol - validation_protocol ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_reviewed ?manufacturing_unit)
+        (entity_has_investigation_report ?manufacturing_unit ?investigation_report)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (not
+          (validation_protocol_verified ?validation_protocol)
+        )
+        (not
+          (validation_protocol_pending_verification ?validation_protocol)
+        )
+      )
+    :effect (validation_protocol_verified ?validation_protocol)
+  )
+  (:action confirm_manufacturing_unit_validation_and_mark_ready
+    :parameters (?manufacturing_unit - manufacturing_unit ?validation_protocol - validation_protocol ?discipline_reviewer - discipline_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?manufacturing_unit)
+        (disposition_case_assigned_to_discipline_reviewer ?manufacturing_unit ?discipline_reviewer)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (validation_protocol_verified ?validation_protocol)
+        (not
+          (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+      )
+  )
+  (:action manufacturing_attach_supporting_evidence
+    :parameters (?manufacturing_unit - manufacturing_unit ?validation_protocol - validation_protocol ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_reviewed ?manufacturing_unit)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        )
+      )
+    :effect
+      (and
+        (validation_protocol_pending_verification ?validation_protocol)
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (manufacturing_unit_has_supporting_evidence ?manufacturing_unit ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action complete_manufacturing_evidence_verification
+    :parameters (?manufacturing_unit - manufacturing_unit ?validation_protocol - validation_protocol ?investigation_report - investigation_report ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_reviewed ?manufacturing_unit)
+        (entity_has_investigation_report ?manufacturing_unit ?investigation_report)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (validation_protocol_pending_verification ?validation_protocol)
+        (manufacturing_unit_has_supporting_evidence ?manufacturing_unit ?supporting_evidence)
+        (not
+          (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        )
+      )
+    :effect
+      (and
+        (validation_protocol_verified ?validation_protocol)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (manufacturing_unit_has_supporting_evidence ?manufacturing_unit ?supporting_evidence)
+        )
+      )
+  )
+  (:action initiate_quality_checklist_verification
+    :parameters (?quality_unit - quality_unit ?regulatory_checklist - regulatory_checklist ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_reviewed ?quality_unit)
+        (entity_has_investigation_report ?quality_unit ?investigation_report)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (not
+          (regulatory_checklist_verified ?regulatory_checklist)
+        )
+        (not
+          (regulatory_checklist_pending_verification ?regulatory_checklist)
+        )
+      )
+    :effect (regulatory_checklist_verified ?regulatory_checklist)
+  )
+  (:action confirm_quality_unit_validation_and_mark_ready
+    :parameters (?quality_unit - quality_unit ?regulatory_checklist - regulatory_checklist ?discipline_reviewer - discipline_reviewer)
+    :precondition
+      (and
+        (entity_reviewed ?quality_unit)
+        (disposition_case_assigned_to_discipline_reviewer ?quality_unit ?discipline_reviewer)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (regulatory_checklist_verified ?regulatory_checklist)
+        (not
+          (quality_unit_ready_for_packet_assembly ?quality_unit)
+        )
+      )
+    :effect
+      (and
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (quality_unit_validation_cleared ?quality_unit)
+      )
+  )
+  (:action quality_attach_supporting_evidence
+    :parameters (?quality_unit - quality_unit ?regulatory_checklist - regulatory_checklist ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_reviewed ?quality_unit)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (quality_unit_ready_for_packet_assembly ?quality_unit)
+        )
+      )
+    :effect
+      (and
+        (regulatory_checklist_pending_verification ?regulatory_checklist)
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (quality_unit_has_supporting_evidence ?quality_unit ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action complete_quality_evidence_verification
+    :parameters (?quality_unit - quality_unit ?regulatory_checklist - regulatory_checklist ?investigation_report - investigation_report ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_reviewed ?quality_unit)
+        (entity_has_investigation_report ?quality_unit ?investigation_report)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (regulatory_checklist_pending_verification ?regulatory_checklist)
+        (quality_unit_has_supporting_evidence ?quality_unit ?supporting_evidence)
+        (not
+          (quality_unit_validation_cleared ?quality_unit)
+        )
+      )
+    :effect
+      (and
+        (regulatory_checklist_verified ?regulatory_checklist)
+        (quality_unit_validation_cleared ?quality_unit)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (quality_unit_has_supporting_evidence ?quality_unit ?supporting_evidence)
+        )
+      )
+  )
+  (:action assemble_disposition_packet_standard
+    :parameters (?manufacturing_unit - manufacturing_unit ?quality_unit - quality_unit ?validation_protocol - validation_protocol ?regulatory_checklist - regulatory_checklist ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (validation_protocol_verified ?validation_protocol)
+        (regulatory_checklist_verified ?regulatory_checklist)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        (quality_unit_validation_cleared ?quality_unit)
+        (disposition_packet_available ?disposition_packet)
+      )
+    :effect
+      (and
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_has_validation_protocol ?disposition_packet ?validation_protocol)
+        (disposition_packet_has_regulatory_checklist ?disposition_packet ?regulatory_checklist)
+        (not
+          (disposition_packet_available ?disposition_packet)
+        )
+      )
+  )
+  (:action assemble_disposition_packet_with_executive_flag
+    :parameters (?manufacturing_unit - manufacturing_unit ?quality_unit - quality_unit ?validation_protocol - validation_protocol ?regulatory_checklist - regulatory_checklist ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (validation_protocol_pending_verification ?validation_protocol)
+        (regulatory_checklist_verified ?regulatory_checklist)
+        (not
+          (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        )
+        (quality_unit_validation_cleared ?quality_unit)
+        (disposition_packet_available ?disposition_packet)
+      )
+    :effect
+      (and
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_has_validation_protocol ?disposition_packet ?validation_protocol)
+        (disposition_packet_has_regulatory_checklist ?disposition_packet ?regulatory_checklist)
+        (disposition_packet_requires_executive_justification ?disposition_packet)
+        (not
+          (disposition_packet_available ?disposition_packet)
+        )
+      )
+  )
+  (:action assemble_disposition_packet_with_regulatory_flag
+    :parameters (?manufacturing_unit - manufacturing_unit ?quality_unit - quality_unit ?validation_protocol - validation_protocol ?regulatory_checklist - regulatory_checklist ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (validation_protocol_verified ?validation_protocol)
+        (regulatory_checklist_pending_verification ?regulatory_checklist)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        (not
+          (quality_unit_validation_cleared ?quality_unit)
+        )
+        (disposition_packet_available ?disposition_packet)
+      )
+    :effect
+      (and
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_has_validation_protocol ?disposition_packet ?validation_protocol)
+        (disposition_packet_has_regulatory_checklist ?disposition_packet ?regulatory_checklist)
+        (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        (not
+          (disposition_packet_available ?disposition_packet)
+        )
+      )
+  )
+  (:action assemble_disposition_packet_full
+    :parameters (?manufacturing_unit - manufacturing_unit ?quality_unit - quality_unit ?validation_protocol - validation_protocol ?regulatory_checklist - regulatory_checklist ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (manufacturing_unit_has_validation_protocol ?manufacturing_unit ?validation_protocol)
+        (quality_unit_has_regulatory_checklist ?quality_unit ?regulatory_checklist)
+        (validation_protocol_pending_verification ?validation_protocol)
+        (regulatory_checklist_pending_verification ?regulatory_checklist)
+        (not
+          (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        )
+        (not
+          (quality_unit_validation_cleared ?quality_unit)
+        )
+        (disposition_packet_available ?disposition_packet)
+      )
+    :effect
+      (and
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_has_validation_protocol ?disposition_packet ?validation_protocol)
+        (disposition_packet_has_regulatory_checklist ?disposition_packet ?regulatory_checklist)
+        (disposition_packet_requires_executive_justification ?disposition_packet)
+        (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        (not
+          (disposition_packet_available ?disposition_packet)
+        )
+      )
+  )
+  (:action verify_disposition_packet
+    :parameters (?disposition_packet - disposition_packet ?manufacturing_unit - manufacturing_unit ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (disposition_packet_assembled ?disposition_packet)
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (entity_has_investigation_report ?manufacturing_unit ?investigation_report)
+        (not
+          (disposition_packet_verified ?disposition_packet)
+        )
+      )
+    :effect (disposition_packet_verified ?disposition_packet)
+  )
+  (:action attach_supporting_document_to_docket
+    :parameters (?approval_docket - approval_docket ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (approval_docket_associated_with_disposition_packet ?approval_docket ?disposition_packet)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_verified ?disposition_packet)
+        (not
+          (supporting_document_attached ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action validate_packet_documentation_and_mark_docket
+    :parameters (?approval_docket - approval_docket ?supporting_document - supporting_document ?disposition_packet - disposition_packet ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (entity_has_investigation_report ?approval_docket ?investigation_report)
+        (not
+          (disposition_packet_requires_executive_justification ?disposition_packet)
+        )
+        (not
+          (approval_docket_documentation_verified ?approval_docket)
+        )
+      )
+    :effect (approval_docket_documentation_verified ?approval_docket)
+  )
+  (:action attach_executive_justification_to_docket
+    :parameters (?approval_docket - approval_docket ?executive_justification - executive_justification)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (executive_justification_available ?executive_justification)
+        (not
+          (approval_docket_has_executive_justification ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_has_executive_justification ?approval_docket)
+        (approval_docket_linked_to_executive_justification ?approval_docket ?executive_justification)
+        (not
+          (executive_justification_available ?executive_justification)
+        )
+      )
+  )
+  (:action process_executive_justification_and_verify_docket
+    :parameters (?approval_docket - approval_docket ?supporting_document - supporting_document ?disposition_packet - disposition_packet ?investigation_report - investigation_report ?executive_justification - executive_justification)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (entity_has_investigation_report ?approval_docket ?investigation_report)
+        (disposition_packet_requires_executive_justification ?disposition_packet)
+        (approval_docket_has_executive_justification ?approval_docket)
+        (approval_docket_linked_to_executive_justification ?approval_docket ?executive_justification)
+        (not
+          (approval_docket_documentation_verified ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_documentation_verified ?approval_docket)
+        (approval_docket_executive_justification_verified ?approval_docket)
+      )
+  )
+  (:action initiate_technical_clearance_non_regulatory
+    :parameters (?approval_docket - approval_docket ?validation_evidence - validation_evidence ?discipline_reviewer - discipline_reviewer ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_documentation_verified ?approval_docket)
+        (approval_docket_has_validation_evidence ?approval_docket ?validation_evidence)
+        (disposition_case_assigned_to_discipline_reviewer ?approval_docket ?discipline_reviewer)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (not
+          (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        )
+        (not
+          (approval_docket_ready_for_expert_review ?approval_docket)
+        )
+      )
+    :effect (approval_docket_ready_for_expert_review ?approval_docket)
+  )
+  (:action initiate_technical_clearance_with_regulatory_path
+    :parameters (?approval_docket - approval_docket ?validation_evidence - validation_evidence ?discipline_reviewer - discipline_reviewer ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_documentation_verified ?approval_docket)
+        (approval_docket_has_validation_evidence ?approval_docket ?validation_evidence)
+        (disposition_case_assigned_to_discipline_reviewer ?approval_docket ?discipline_reviewer)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        (not
+          (approval_docket_ready_for_expert_review ?approval_docket)
+        )
+      )
+    :effect (approval_docket_ready_for_expert_review ?approval_docket)
+  )
+  (:action assign_technical_expert_clearance_standard
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_ready_for_expert_review ?approval_docket)
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (not
+          (disposition_packet_requires_executive_justification ?disposition_packet)
+        )
+        (not
+          (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        )
+        (not
+          (approval_docket_technical_cleared ?approval_docket)
+        )
+      )
+    :effect (approval_docket_technical_cleared ?approval_docket)
+  )
+  (:action assign_technical_expert_and_flag_template
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_ready_for_expert_review ?approval_docket)
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (disposition_packet_requires_executive_justification ?disposition_packet)
+        (not
+          (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        )
+        (not
+          (approval_docket_technical_cleared ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_requires_approval_template ?approval_docket)
+      )
+  )
+  (:action assign_technical_expert_regulatory_variant
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_ready_for_expert_review ?approval_docket)
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (not
+          (disposition_packet_requires_executive_justification ?disposition_packet)
+        )
+        (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        (not
+          (approval_docket_technical_cleared ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_requires_approval_template ?approval_docket)
+      )
+  )
+  (:action assign_technical_expert_full_variant
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert ?supporting_document - supporting_document ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (approval_docket_ready_for_expert_review ?approval_docket)
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (approval_docket_has_supporting_document ?approval_docket ?supporting_document)
+        (supporting_document_linked_to_packet ?supporting_document ?disposition_packet)
+        (disposition_packet_requires_executive_justification ?disposition_packet)
+        (disposition_packet_requires_regulatory_contact ?disposition_packet)
+        (not
+          (approval_docket_technical_cleared ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_requires_approval_template ?approval_docket)
+      )
+  )
+  (:action flag_docket_ready_for_signature
+    :parameters (?approval_docket - approval_docket)
+    :precondition
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (not
+          (approval_docket_requires_approval_template ?approval_docket)
+        )
+        (not
+          (approval_docket_ready_for_signature ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_ready_for_signature ?approval_docket)
+        (entity_ready_for_electronic_signature ?approval_docket)
+      )
+  )
+  (:action attach_approval_template_to_docket
+    :parameters (?approval_docket - approval_docket ?approval_template - approval_template)
+    :precondition
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_requires_approval_template ?approval_docket)
+        (approval_template_available ?approval_template)
+      )
+    :effect
+      (and
+        (approval_docket_template_attached ?approval_docket ?approval_template)
+        (not
+          (approval_template_available ?approval_template)
+        )
+      )
+  )
+  (:action confirm_unit_clearances_for_docket
+    :parameters (?approval_docket - approval_docket ?manufacturing_unit - manufacturing_unit ?quality_unit - quality_unit ?investigation_report - investigation_report ?approval_template - approval_template)
+    :precondition
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_requires_approval_template ?approval_docket)
+        (approval_docket_template_attached ?approval_docket ?approval_template)
+        (approval_docket_associated_with_manufacturing_unit ?approval_docket ?manufacturing_unit)
+        (approval_docket_associated_with_quality_unit ?approval_docket ?quality_unit)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        (quality_unit_validation_cleared ?quality_unit)
+        (entity_has_investigation_report ?approval_docket ?investigation_report)
+        (not
+          (approval_docket_unit_clearances_confirmed ?approval_docket)
+        )
+      )
+    :effect (approval_docket_unit_clearances_confirmed ?approval_docket)
+  )
+  (:action finalize_docket_unit_clearances
+    :parameters (?approval_docket - approval_docket)
+    :precondition
+      (and
+        (approval_docket_technical_cleared ?approval_docket)
+        (approval_docket_unit_clearances_confirmed ?approval_docket)
+        (not
+          (approval_docket_ready_for_signature ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_ready_for_signature ?approval_docket)
+        (entity_ready_for_electronic_signature ?approval_docket)
+      )
+  )
+  (:action engage_regulatory_contact_for_docket
+    :parameters (?approval_docket - approval_docket ?regulatory_authority_contact - regulatory_authority_contact ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_reviewed ?approval_docket)
+        (entity_has_investigation_report ?approval_docket ?investigation_report)
+        (regulatory_contact_available ?regulatory_authority_contact)
+        (approval_docket_has_regulatory_contact ?approval_docket ?regulatory_authority_contact)
+        (not
+          (approval_docket_regulatory_contact_engaged ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_regulatory_contact_engaged ?approval_docket)
+        (not
+          (regulatory_contact_available ?regulatory_authority_contact)
+        )
+      )
+  )
+  (:action acknowledge_regulatory_contact_by_reviewer
+    :parameters (?approval_docket - approval_docket ?discipline_reviewer - discipline_reviewer)
+    :precondition
+      (and
+        (approval_docket_regulatory_contact_engaged ?approval_docket)
+        (disposition_case_assigned_to_discipline_reviewer ?approval_docket ?discipline_reviewer)
+        (not
+          (approval_docket_regulatory_contact_acknowledged ?approval_docket)
+        )
+      )
+    :effect (approval_docket_regulatory_contact_acknowledged ?approval_docket)
+  )
+  (:action record_regulatory_clearance
+    :parameters (?approval_docket - approval_docket ?technical_expert - technical_expert)
+    :precondition
+      (and
+        (approval_docket_regulatory_contact_acknowledged ?approval_docket)
+        (approval_docket_technical_expert_assigned ?approval_docket ?technical_expert)
+        (not
+          (approval_docket_regulatory_clearance_recorded ?approval_docket)
+        )
+      )
+    :effect (approval_docket_regulatory_clearance_recorded ?approval_docket)
+  )
+  (:action finalize_regulatory_clearance_and_mark_ready
+    :parameters (?approval_docket - approval_docket)
+    :precondition
+      (and
+        (approval_docket_regulatory_clearance_recorded ?approval_docket)
+        (not
+          (approval_docket_ready_for_signature ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (approval_docket_ready_for_signature ?approval_docket)
+        (entity_ready_for_electronic_signature ?approval_docket)
+      )
+  )
+  (:action record_final_decision_for_manufacturing_unit
+    :parameters (?manufacturing_unit - manufacturing_unit ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (manufacturing_unit_ready_for_packet_assembly ?manufacturing_unit)
+        (manufacturing_unit_validation_cleared ?manufacturing_unit)
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_verified ?disposition_packet)
+        (not
+          (entity_ready_for_electronic_signature ?manufacturing_unit)
+        )
+      )
+    :effect (entity_ready_for_electronic_signature ?manufacturing_unit)
+  )
+  (:action record_final_decision_for_quality_unit
+    :parameters (?quality_unit - quality_unit ?disposition_packet - disposition_packet)
+    :precondition
+      (and
+        (quality_unit_ready_for_packet_assembly ?quality_unit)
+        (quality_unit_validation_cleared ?quality_unit)
+        (disposition_packet_assembled ?disposition_packet)
+        (disposition_packet_verified ?disposition_packet)
+        (not
+          (entity_ready_for_electronic_signature ?quality_unit)
+        )
+      )
+    :effect (entity_ready_for_electronic_signature ?quality_unit)
+  )
+  (:action assign_electronic_signature_to_case
+    :parameters (?disposition_case - disposition_case ?electronic_signature_token - electronic_signature_token ?investigation_report - investigation_report)
+    :precondition
+      (and
+        (entity_ready_for_electronic_signature ?disposition_case)
+        (entity_has_investigation_report ?disposition_case ?investigation_report)
+        (electronic_signature_token_available ?electronic_signature_token)
+        (not
+          (disposition_case_electronically_signed ?disposition_case)
+        )
+      )
+    :effect
+      (and
+        (disposition_case_electronically_signed ?disposition_case)
+        (disposition_case_has_electronic_signature_token ?disposition_case ?electronic_signature_token)
+        (not
+          (electronic_signature_token_available ?electronic_signature_token)
+        )
+      )
+  )
+  (:action apply_signature_and_release_manufacturing_unit
+    :parameters (?manufacturing_unit - manufacturing_unit ?approver_slot - approver_slot ?electronic_signature_token - electronic_signature_token)
+    :precondition
+      (and
+        (disposition_case_electronically_signed ?manufacturing_unit)
+        (disposition_case_assigned_to_approver_slot ?manufacturing_unit ?approver_slot)
+        (disposition_case_has_electronic_signature_token ?manufacturing_unit ?electronic_signature_token)
+        (not
+          (final_disposition_recorded ?manufacturing_unit)
+        )
+      )
+    :effect
+      (and
+        (final_disposition_recorded ?manufacturing_unit)
+        (approver_slot_available ?approver_slot)
+        (electronic_signature_token_available ?electronic_signature_token)
+      )
+  )
+  (:action apply_signature_and_release_quality_unit
+    :parameters (?quality_unit - quality_unit ?approver_slot - approver_slot ?electronic_signature_token - electronic_signature_token)
+    :precondition
+      (and
+        (disposition_case_electronically_signed ?quality_unit)
+        (disposition_case_assigned_to_approver_slot ?quality_unit ?approver_slot)
+        (disposition_case_has_electronic_signature_token ?quality_unit ?electronic_signature_token)
+        (not
+          (final_disposition_recorded ?quality_unit)
+        )
+      )
+    :effect
+      (and
+        (final_disposition_recorded ?quality_unit)
+        (approver_slot_available ?approver_slot)
+        (electronic_signature_token_available ?electronic_signature_token)
+      )
+  )
+  (:action apply_signature_and_release_docket
+    :parameters (?approval_docket - approval_docket ?approver_slot - approver_slot ?electronic_signature_token - electronic_signature_token)
+    :precondition
+      (and
+        (disposition_case_electronically_signed ?approval_docket)
+        (disposition_case_assigned_to_approver_slot ?approval_docket ?approver_slot)
+        (disposition_case_has_electronic_signature_token ?approval_docket ?electronic_signature_token)
+        (not
+          (final_disposition_recorded ?approval_docket)
+        )
+      )
+    :effect
+      (and
+        (final_disposition_recorded ?approval_docket)
+        (approver_slot_available ?approver_slot)
+        (electronic_signature_token_available ?electronic_signature_token)
+      )
+  )
+)

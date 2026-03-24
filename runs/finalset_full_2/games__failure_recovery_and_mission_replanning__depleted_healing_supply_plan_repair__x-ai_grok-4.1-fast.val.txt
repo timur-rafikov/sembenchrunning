@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain depleted_healing_supply_repair_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_class - entity item_class - entity location_class - entity base_type - entity repair_target - base_type repair_source - resource_class repair_item - resource_class equipment_module - resource_class upgrade_token - resource_class priority_resource - resource_class reserve_supply - resource_class tool_attachment - resource_class special_attachment - resource_class consumable_pack - item_class component_module - item_class mission_marker - item_class route_marker_a - location_class route_marker_b - location_class repair_station - location_class primary_role_group - repair_target secondary_role_group - repair_target primary_unit - primary_role_group secondary_unit - primary_role_group coordinator_agent - secondary_role_group)
+
+  (:predicates
+    (objective_flagged_for_repair ?objective - repair_target)
+    (repair_ready ?objective - repair_target)
+    (objective_claimed ?objective - repair_target)
+    (objective_repaired ?objective - repair_target)
+    (repair_target_committed ?objective - repair_target)
+    (reserve_applied ?objective - repair_target)
+    (repair_source_available ?healing_source - repair_source)
+    (repair_target_assigned_repair_source ?objective - repair_target ?healing_source - repair_source)
+    (repair_item_available ?healing_item - repair_item)
+    (repair_target_assigned_repair_item ?objective - repair_target ?healing_item - repair_item)
+    (equipment_module_available ?equipment_module - equipment_module)
+    (attached_equipment_module ?objective - repair_target ?equipment_module - equipment_module)
+    (consumable_pack_available ?consumable_pack - consumable_pack)
+    (primary_unit_loaded_pack ?primary_unit - primary_unit ?consumable_pack - consumable_pack)
+    (secondary_unit_loaded_pack ?secondary_unit - secondary_unit ?consumable_pack - consumable_pack)
+    (primary_unit_at_route_marker_a ?primary_unit - primary_unit ?route_marker_a - route_marker_a)
+    (route_marker_a_confirmed ?route_marker_a - route_marker_a)
+    (route_marker_a_consumed ?route_marker_a - route_marker_a)
+    (primary_unit_salvage_progress ?primary_unit - primary_unit)
+    (secondary_unit_at_route_marker_b ?secondary_unit - secondary_unit ?route_marker_b - route_marker_b)
+    (route_marker_b_confirmed ?route_marker_b - route_marker_b)
+    (route_marker_b_consumed ?route_marker_b - route_marker_b)
+    (secondary_unit_salvage_progress ?secondary_unit - secondary_unit)
+    (repair_station_available ?repair_station - repair_station)
+    (repair_station_configured ?repair_station - repair_station)
+    (repair_station_linked_to_route_a ?repair_station - repair_station ?route_marker_a - route_marker_a)
+    (repair_station_linked_to_route_b ?repair_station - repair_station ?route_marker_b - route_marker_b)
+    (repair_station_marker_a_registered ?repair_station - repair_station)
+    (repair_station_marker_b_registered ?repair_station - repair_station)
+    (repair_station_staged ?repair_station - repair_station)
+    (coordinator_assigned_primary_unit ?coordinator_agent - coordinator_agent ?primary_unit - primary_unit)
+    (coordinator_assigned_secondary_unit ?coordinator_agent - coordinator_agent ?secondary_unit - secondary_unit)
+    (coordinator_assigned_repair_station ?coordinator_agent - coordinator_agent ?repair_station - repair_station)
+    (component_module_available ?component_module - component_module)
+    (coordinator_assigned_component_module ?coordinator_agent - coordinator_agent ?component_module - component_module)
+    (component_module_staged ?component_module - component_module)
+    (component_module_attached_to_repair_station ?component_module - component_module ?repair_station - repair_station)
+    (coordinator_component_binding_complete ?coordinator_agent - coordinator_agent)
+    (coordinator_component_attachment_ready ?coordinator_agent - coordinator_agent)
+    (coordinator_upgrade_applied ?coordinator_agent - coordinator_agent)
+    (coordinator_upgrade_token_claimed ?coordinator_agent - coordinator_agent)
+    (coordinator_upgrade_ready ?coordinator_agent - coordinator_agent)
+    (coordinator_aux_resources_attached ?coordinator_agent - coordinator_agent)
+    (coordinator_final_prep_complete ?coordinator_agent - coordinator_agent)
+    (mission_marker_available ?mission_marker - mission_marker)
+    (coordinator_assigned_mission_marker ?coordinator_agent - coordinator_agent ?mission_marker - mission_marker)
+    (coordinator_mission_marker_claimed ?coordinator_agent - coordinator_agent)
+    (coordinator_mission_marker_staged ?coordinator_agent - coordinator_agent)
+    (coordinator_mission_marker_applied ?coordinator_agent - coordinator_agent)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (coordinator_assigned_upgrade_token ?coordinator_agent - coordinator_agent ?upgrade_token - upgrade_token)
+    (priority_resource_available ?priority_resource - priority_resource)
+    (coordinator_assigned_priority_resource ?coordinator_agent - coordinator_agent ?priority_resource - priority_resource)
+    (tool_attachment_available ?tool_attachment - tool_attachment)
+    (coordinator_assigned_tool_attachment ?coordinator_agent - coordinator_agent ?tool_attachment - tool_attachment)
+    (special_attachment_available ?special_attachment - special_attachment)
+    (coordinator_assigned_special_attachment ?coordinator_agent - coordinator_agent ?special_attachment - special_attachment)
+    (reserve_supply_available ?reserve_supply - reserve_supply)
+    (repair_target_assigned_reserve_supply ?objective - repair_target ?reserve_supply - reserve_supply)
+    (primary_unit_ready ?primary_unit - primary_unit)
+    (secondary_unit_ready ?secondary_unit - secondary_unit)
+    (coordinator_finalized ?coordinator_agent - coordinator_agent)
+  )
+  (:action mark_objective_for_repair
+    :parameters (?objective - repair_target)
+    :precondition
+      (and
+        (not
+          (objective_flagged_for_repair ?objective)
+        )
+        (not
+          (objective_repaired ?objective)
+        )
+      )
+    :effect (objective_flagged_for_repair ?objective)
+  )
+  (:action assign_healing_source_to_objective
+    :parameters (?objective - repair_target ?healing_source - repair_source)
+    :precondition
+      (and
+        (objective_flagged_for_repair ?objective)
+        (not
+          (objective_claimed ?objective)
+        )
+        (repair_source_available ?healing_source)
+      )
+    :effect
+      (and
+        (objective_claimed ?objective)
+        (repair_target_assigned_repair_source ?objective ?healing_source)
+        (not
+          (repair_source_available ?healing_source)
+        )
+      )
+  )
+  (:action assign_healing_item_to_objective
+    :parameters (?objective - repair_target ?healing_item - repair_item)
+    :precondition
+      (and
+        (objective_flagged_for_repair ?objective)
+        (objective_claimed ?objective)
+        (repair_item_available ?healing_item)
+      )
+    :effect
+      (and
+        (repair_target_assigned_repair_item ?objective ?healing_item)
+        (not
+          (repair_item_available ?healing_item)
+        )
+      )
+  )
+  (:action validate_objective_for_repair
+    :parameters (?objective - repair_target ?healing_item - repair_item)
+    :precondition
+      (and
+        (objective_flagged_for_repair ?objective)
+        (objective_claimed ?objective)
+        (repair_target_assigned_repair_item ?objective ?healing_item)
+        (not
+          (repair_ready ?objective)
+        )
+      )
+    :effect (repair_ready ?objective)
+  )
+  (:action reclaim_repair_item
+    :parameters (?objective - repair_target ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_target_assigned_repair_item ?objective ?healing_item)
+      )
+    :effect
+      (and
+        (repair_item_available ?healing_item)
+        (not
+          (repair_target_assigned_repair_item ?objective ?healing_item)
+        )
+      )
+  )
+  (:action attach_equipment_module_to_objective
+    :parameters (?objective - repair_target ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (repair_ready ?objective)
+        (equipment_module_available ?equipment_module)
+      )
+    :effect
+      (and
+        (attached_equipment_module ?objective ?equipment_module)
+        (not
+          (equipment_module_available ?equipment_module)
+        )
+      )
+  )
+  (:action detach_equipment_module_from_objective
+    :parameters (?objective - repair_target ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (attached_equipment_module ?objective ?equipment_module)
+      )
+    :effect
+      (and
+        (equipment_module_available ?equipment_module)
+        (not
+          (attached_equipment_module ?objective ?equipment_module)
+        )
+      )
+  )
+  (:action attach_tool_attachment_to_coordinator
+    :parameters (?coordinator_agent - coordinator_agent ?tool_attachment - tool_attachment)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (tool_attachment_available ?tool_attachment)
+      )
+    :effect
+      (and
+        (coordinator_assigned_tool_attachment ?coordinator_agent ?tool_attachment)
+        (not
+          (tool_attachment_available ?tool_attachment)
+        )
+      )
+  )
+  (:action detach_tool_attachment_from_coordinator
+    :parameters (?coordinator_agent - coordinator_agent ?tool_attachment - tool_attachment)
+    :precondition
+      (and
+        (coordinator_assigned_tool_attachment ?coordinator_agent ?tool_attachment)
+      )
+    :effect
+      (and
+        (tool_attachment_available ?tool_attachment)
+        (not
+          (coordinator_assigned_tool_attachment ?coordinator_agent ?tool_attachment)
+        )
+      )
+  )
+  (:action attach_special_attachment_to_coordinator
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (special_attachment_available ?special_attachment)
+      )
+    :effect
+      (and
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (not
+          (special_attachment_available ?special_attachment)
+        )
+      )
+  )
+  (:action detach_special_attachment_from_coordinator
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment)
+    :precondition
+      (and
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+      )
+    :effect
+      (and
+        (special_attachment_available ?special_attachment)
+        (not
+          (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        )
+      )
+  )
+  (:action primary_confirm_route_marker_a
+    :parameters (?primary_unit - primary_unit ?route_marker_a - route_marker_a ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_ready ?primary_unit)
+        (repair_target_assigned_repair_item ?primary_unit ?healing_item)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (not
+          (route_marker_a_confirmed ?route_marker_a)
+        )
+        (not
+          (route_marker_a_consumed ?route_marker_a)
+        )
+      )
+    :effect (route_marker_a_confirmed ?route_marker_a)
+  )
+  (:action primary_apply_module_at_route_marker_a
+    :parameters (?primary_unit - primary_unit ?route_marker_a - route_marker_a ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (repair_ready ?primary_unit)
+        (attached_equipment_module ?primary_unit ?equipment_module)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (route_marker_a_confirmed ?route_marker_a)
+        (not
+          (primary_unit_ready ?primary_unit)
+        )
+      )
+    :effect
+      (and
+        (primary_unit_ready ?primary_unit)
+        (primary_unit_salvage_progress ?primary_unit)
+      )
+  )
+  (:action primary_use_consumable_pack_at_route_marker_a
+    :parameters (?primary_unit - primary_unit ?route_marker_a - route_marker_a ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (repair_ready ?primary_unit)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (consumable_pack_available ?consumable_pack)
+        (not
+          (primary_unit_ready ?primary_unit)
+        )
+      )
+    :effect
+      (and
+        (route_marker_a_consumed ?route_marker_a)
+        (primary_unit_ready ?primary_unit)
+        (primary_unit_loaded_pack ?primary_unit ?consumable_pack)
+        (not
+          (consumable_pack_available ?consumable_pack)
+        )
+      )
+  )
+  (:action primary_finalize_salvage_at_route_marker_a
+    :parameters (?primary_unit - primary_unit ?route_marker_a - route_marker_a ?healing_item - repair_item ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (repair_ready ?primary_unit)
+        (repair_target_assigned_repair_item ?primary_unit ?healing_item)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (route_marker_a_consumed ?route_marker_a)
+        (primary_unit_loaded_pack ?primary_unit ?consumable_pack)
+        (not
+          (primary_unit_salvage_progress ?primary_unit)
+        )
+      )
+    :effect
+      (and
+        (route_marker_a_confirmed ?route_marker_a)
+        (primary_unit_salvage_progress ?primary_unit)
+        (consumable_pack_available ?consumable_pack)
+        (not
+          (primary_unit_loaded_pack ?primary_unit ?consumable_pack)
+        )
+      )
+  )
+  (:action secondary_confirm_route_marker_b
+    :parameters (?secondary_unit - secondary_unit ?route_marker_b - route_marker_b ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_ready ?secondary_unit)
+        (repair_target_assigned_repair_item ?secondary_unit ?healing_item)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (not
+          (route_marker_b_confirmed ?route_marker_b)
+        )
+        (not
+          (route_marker_b_consumed ?route_marker_b)
+        )
+      )
+    :effect (route_marker_b_confirmed ?route_marker_b)
+  )
+  (:action secondary_apply_module_at_route_marker_b
+    :parameters (?secondary_unit - secondary_unit ?route_marker_b - route_marker_b ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (repair_ready ?secondary_unit)
+        (attached_equipment_module ?secondary_unit ?equipment_module)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_b_confirmed ?route_marker_b)
+        (not
+          (secondary_unit_ready ?secondary_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_unit_ready ?secondary_unit)
+        (secondary_unit_salvage_progress ?secondary_unit)
+      )
+  )
+  (:action secondary_use_consumable_pack_at_route_marker_b
+    :parameters (?secondary_unit - secondary_unit ?route_marker_b - route_marker_b ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (repair_ready ?secondary_unit)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (consumable_pack_available ?consumable_pack)
+        (not
+          (secondary_unit_ready ?secondary_unit)
+        )
+      )
+    :effect
+      (and
+        (route_marker_b_consumed ?route_marker_b)
+        (secondary_unit_ready ?secondary_unit)
+        (secondary_unit_loaded_pack ?secondary_unit ?consumable_pack)
+        (not
+          (consumable_pack_available ?consumable_pack)
+        )
+      )
+  )
+  (:action secondary_finalize_salvage_at_route_marker_b
+    :parameters (?secondary_unit - secondary_unit ?route_marker_b - route_marker_b ?healing_item - repair_item ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (repair_ready ?secondary_unit)
+        (repair_target_assigned_repair_item ?secondary_unit ?healing_item)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_b_consumed ?route_marker_b)
+        (secondary_unit_loaded_pack ?secondary_unit ?consumable_pack)
+        (not
+          (secondary_unit_salvage_progress ?secondary_unit)
+        )
+      )
+    :effect
+      (and
+        (route_marker_b_confirmed ?route_marker_b)
+        (secondary_unit_salvage_progress ?secondary_unit)
+        (consumable_pack_available ?consumable_pack)
+        (not
+          (secondary_unit_loaded_pack ?secondary_unit ?consumable_pack)
+        )
+      )
+  )
+  (:action synthesize_repair_station
+    :parameters (?primary_unit - primary_unit ?secondary_unit - secondary_unit ?route_marker_a - route_marker_a ?route_marker_b - route_marker_b ?repair_station - repair_station)
+    :precondition
+      (and
+        (primary_unit_ready ?primary_unit)
+        (secondary_unit_ready ?secondary_unit)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_a_confirmed ?route_marker_a)
+        (route_marker_b_confirmed ?route_marker_b)
+        (primary_unit_salvage_progress ?primary_unit)
+        (secondary_unit_salvage_progress ?secondary_unit)
+        (repair_station_available ?repair_station)
+      )
+    :effect
+      (and
+        (repair_station_configured ?repair_station)
+        (repair_station_linked_to_route_a ?repair_station ?route_marker_a)
+        (repair_station_linked_to_route_b ?repair_station ?route_marker_b)
+        (not
+          (repair_station_available ?repair_station)
+        )
+      )
+  )
+  (:action synthesize_repair_station_with_marker_a
+    :parameters (?primary_unit - primary_unit ?secondary_unit - secondary_unit ?route_marker_a - route_marker_a ?route_marker_b - route_marker_b ?repair_station - repair_station)
+    :precondition
+      (and
+        (primary_unit_ready ?primary_unit)
+        (secondary_unit_ready ?secondary_unit)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_a_consumed ?route_marker_a)
+        (route_marker_b_confirmed ?route_marker_b)
+        (not
+          (primary_unit_salvage_progress ?primary_unit)
+        )
+        (secondary_unit_salvage_progress ?secondary_unit)
+        (repair_station_available ?repair_station)
+      )
+    :effect
+      (and
+        (repair_station_configured ?repair_station)
+        (repair_station_linked_to_route_a ?repair_station ?route_marker_a)
+        (repair_station_linked_to_route_b ?repair_station ?route_marker_b)
+        (repair_station_marker_a_registered ?repair_station)
+        (not
+          (repair_station_available ?repair_station)
+        )
+      )
+  )
+  (:action synthesize_repair_station_with_marker_b
+    :parameters (?primary_unit - primary_unit ?secondary_unit - secondary_unit ?route_marker_a - route_marker_a ?route_marker_b - route_marker_b ?repair_station - repair_station)
+    :precondition
+      (and
+        (primary_unit_ready ?primary_unit)
+        (secondary_unit_ready ?secondary_unit)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_a_confirmed ?route_marker_a)
+        (route_marker_b_consumed ?route_marker_b)
+        (primary_unit_salvage_progress ?primary_unit)
+        (not
+          (secondary_unit_salvage_progress ?secondary_unit)
+        )
+        (repair_station_available ?repair_station)
+      )
+    :effect
+      (and
+        (repair_station_configured ?repair_station)
+        (repair_station_linked_to_route_a ?repair_station ?route_marker_a)
+        (repair_station_linked_to_route_b ?repair_station ?route_marker_b)
+        (repair_station_marker_b_registered ?repair_station)
+        (not
+          (repair_station_available ?repair_station)
+        )
+      )
+  )
+  (:action configure_repair_station_with_both_markers
+    :parameters (?primary_unit - primary_unit ?secondary_unit - secondary_unit ?route_marker_a - route_marker_a ?route_marker_b - route_marker_b ?repair_station - repair_station)
+    :precondition
+      (and
+        (primary_unit_ready ?primary_unit)
+        (secondary_unit_ready ?secondary_unit)
+        (primary_unit_at_route_marker_a ?primary_unit ?route_marker_a)
+        (secondary_unit_at_route_marker_b ?secondary_unit ?route_marker_b)
+        (route_marker_a_consumed ?route_marker_a)
+        (route_marker_b_consumed ?route_marker_b)
+        (not
+          (primary_unit_salvage_progress ?primary_unit)
+        )
+        (not
+          (secondary_unit_salvage_progress ?secondary_unit)
+        )
+        (repair_station_available ?repair_station)
+      )
+    :effect
+      (and
+        (repair_station_configured ?repair_station)
+        (repair_station_linked_to_route_a ?repair_station ?route_marker_a)
+        (repair_station_linked_to_route_b ?repair_station ?route_marker_b)
+        (repair_station_marker_a_registered ?repair_station)
+        (repair_station_marker_b_registered ?repair_station)
+        (not
+          (repair_station_available ?repair_station)
+        )
+      )
+  )
+  (:action stage_repair_station
+    :parameters (?repair_station - repair_station ?primary_unit - primary_unit ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_station_configured ?repair_station)
+        (primary_unit_ready ?primary_unit)
+        (repair_target_assigned_repair_item ?primary_unit ?healing_item)
+        (not
+          (repair_station_staged ?repair_station)
+        )
+      )
+    :effect (repair_station_staged ?repair_station)
+  )
+  (:action stage_component_module_to_repair_station
+    :parameters (?coordinator_agent - coordinator_agent ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (coordinator_assigned_repair_station ?coordinator_agent ?repair_station)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_available ?component_module)
+        (repair_station_configured ?repair_station)
+        (repair_station_staged ?repair_station)
+        (not
+          (component_module_staged ?component_module)
+        )
+      )
+    :effect
+      (and
+        (component_module_staged ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (not
+          (component_module_available ?component_module)
+        )
+      )
+  )
+  (:action coordinator_stage_component_for_assembly
+    :parameters (?coordinator_agent - coordinator_agent ?component_module - component_module ?repair_station - repair_station ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_staged ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (repair_target_assigned_repair_item ?coordinator_agent ?healing_item)
+        (not
+          (repair_station_marker_a_registered ?repair_station)
+        )
+        (not
+          (coordinator_component_binding_complete ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_component_binding_complete ?coordinator_agent)
+  )
+  (:action coordinator_claim_upgrade_token
+    :parameters (?coordinator_agent - coordinator_agent ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (upgrade_token_available ?upgrade_token)
+        (not
+          (coordinator_upgrade_token_claimed ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_upgrade_token_claimed ?coordinator_agent)
+        (coordinator_assigned_upgrade_token ?coordinator_agent ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action coordinator_stage_upgrade_with_component
+    :parameters (?coordinator_agent - coordinator_agent ?component_module - component_module ?repair_station - repair_station ?healing_item - repair_item ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_staged ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (repair_target_assigned_repair_item ?coordinator_agent ?healing_item)
+        (repair_station_marker_a_registered ?repair_station)
+        (coordinator_upgrade_token_claimed ?coordinator_agent)
+        (coordinator_assigned_upgrade_token ?coordinator_agent ?upgrade_token)
+        (not
+          (coordinator_component_binding_complete ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_component_binding_complete ?coordinator_agent)
+        (coordinator_upgrade_ready ?coordinator_agent)
+      )
+  )
+  (:action coordinator_attach_tool_and_progress_variant_a
+    :parameters (?coordinator_agent - coordinator_agent ?tool_attachment - tool_attachment ?equipment_module - equipment_module ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_binding_complete ?coordinator_agent)
+        (coordinator_assigned_tool_attachment ?coordinator_agent ?tool_attachment)
+        (attached_equipment_module ?coordinator_agent ?equipment_module)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (not
+          (repair_station_marker_b_registered ?repair_station)
+        )
+        (not
+          (coordinator_component_attachment_ready ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_component_attachment_ready ?coordinator_agent)
+  )
+  (:action coordinator_attach_tool_and_progress_variant_b
+    :parameters (?coordinator_agent - coordinator_agent ?tool_attachment - tool_attachment ?equipment_module - equipment_module ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_binding_complete ?coordinator_agent)
+        (coordinator_assigned_tool_attachment ?coordinator_agent ?tool_attachment)
+        (attached_equipment_module ?coordinator_agent ?equipment_module)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (repair_station_marker_b_registered ?repair_station)
+        (not
+          (coordinator_component_attachment_ready ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_component_attachment_ready ?coordinator_agent)
+  )
+  (:action coordinator_attach_special_attachment
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_attachment_ready ?coordinator_agent)
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (not
+          (repair_station_marker_a_registered ?repair_station)
+        )
+        (not
+          (repair_station_marker_b_registered ?repair_station)
+        )
+        (not
+          (coordinator_upgrade_applied ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_upgrade_applied ?coordinator_agent)
+  )
+  (:action coordinator_attach_special_and_enable_aux
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_attachment_ready ?coordinator_agent)
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (repair_station_marker_a_registered ?repair_station)
+        (not
+          (repair_station_marker_b_registered ?repair_station)
+        )
+        (not
+          (coordinator_upgrade_applied ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_aux_resources_attached ?coordinator_agent)
+      )
+  )
+  (:action coordinator_attach_special_and_enable_aux_variant_b
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_attachment_ready ?coordinator_agent)
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (not
+          (repair_station_marker_a_registered ?repair_station)
+        )
+        (repair_station_marker_b_registered ?repair_station)
+        (not
+          (coordinator_upgrade_applied ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_aux_resources_attached ?coordinator_agent)
+      )
+  )
+  (:action coordinator_attach_special_and_enable_aux_variant_c
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment ?component_module - component_module ?repair_station - repair_station)
+    :precondition
+      (and
+        (coordinator_component_attachment_ready ?coordinator_agent)
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (coordinator_assigned_component_module ?coordinator_agent ?component_module)
+        (component_module_attached_to_repair_station ?component_module ?repair_station)
+        (repair_station_marker_a_registered ?repair_station)
+        (repair_station_marker_b_registered ?repair_station)
+        (not
+          (coordinator_upgrade_applied ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_aux_resources_attached ?coordinator_agent)
+      )
+  )
+  (:action coordinator_commit_finalization_primary
+    :parameters (?coordinator_agent - coordinator_agent)
+    :precondition
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (not
+          (coordinator_aux_resources_attached ?coordinator_agent)
+        )
+        (not
+          (coordinator_finalized ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_agent)
+        (repair_target_committed ?coordinator_agent)
+      )
+  )
+  (:action coordinator_attach_priority_resource
+    :parameters (?coordinator_agent - coordinator_agent ?priority_resource - priority_resource)
+    :precondition
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_aux_resources_attached ?coordinator_agent)
+        (priority_resource_available ?priority_resource)
+      )
+    :effect
+      (and
+        (coordinator_assigned_priority_resource ?coordinator_agent ?priority_resource)
+        (not
+          (priority_resource_available ?priority_resource)
+        )
+      )
+  )
+  (:action coordinator_finalize_precommit_checks
+    :parameters (?coordinator_agent - coordinator_agent ?primary_unit - primary_unit ?secondary_unit - secondary_unit ?healing_item - repair_item ?priority_resource - priority_resource)
+    :precondition
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_aux_resources_attached ?coordinator_agent)
+        (coordinator_assigned_priority_resource ?coordinator_agent ?priority_resource)
+        (coordinator_assigned_primary_unit ?coordinator_agent ?primary_unit)
+        (coordinator_assigned_secondary_unit ?coordinator_agent ?secondary_unit)
+        (primary_unit_salvage_progress ?primary_unit)
+        (secondary_unit_salvage_progress ?secondary_unit)
+        (repair_target_assigned_repair_item ?coordinator_agent ?healing_item)
+        (not
+          (coordinator_final_prep_complete ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_final_prep_complete ?coordinator_agent)
+  )
+  (:action coordinator_finalize_and_commit
+    :parameters (?coordinator_agent - coordinator_agent)
+    :precondition
+      (and
+        (coordinator_upgrade_applied ?coordinator_agent)
+        (coordinator_final_prep_complete ?coordinator_agent)
+        (not
+          (coordinator_finalized ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_agent)
+        (repair_target_committed ?coordinator_agent)
+      )
+  )
+  (:action coordinator_claim_mission_marker
+    :parameters (?coordinator_agent - coordinator_agent ?mission_marker - mission_marker ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_ready ?coordinator_agent)
+        (repair_target_assigned_repair_item ?coordinator_agent ?healing_item)
+        (mission_marker_available ?mission_marker)
+        (coordinator_assigned_mission_marker ?coordinator_agent ?mission_marker)
+        (not
+          (coordinator_mission_marker_claimed ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_mission_marker_claimed ?coordinator_agent)
+        (not
+          (mission_marker_available ?mission_marker)
+        )
+      )
+  )
+  (:action coordinator_stage_mission_marker_module
+    :parameters (?coordinator_agent - coordinator_agent ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (coordinator_mission_marker_claimed ?coordinator_agent)
+        (attached_equipment_module ?coordinator_agent ?equipment_module)
+        (not
+          (coordinator_mission_marker_staged ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_mission_marker_staged ?coordinator_agent)
+  )
+  (:action coordinator_attach_special_after_marker
+    :parameters (?coordinator_agent - coordinator_agent ?special_attachment - special_attachment)
+    :precondition
+      (and
+        (coordinator_mission_marker_staged ?coordinator_agent)
+        (coordinator_assigned_special_attachment ?coordinator_agent ?special_attachment)
+        (not
+          (coordinator_mission_marker_applied ?coordinator_agent)
+        )
+      )
+    :effect (coordinator_mission_marker_applied ?coordinator_agent)
+  )
+  (:action coordinator_commit_mission_marker
+    :parameters (?coordinator_agent - coordinator_agent)
+    :precondition
+      (and
+        (coordinator_mission_marker_applied ?coordinator_agent)
+        (not
+          (coordinator_finalized ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_agent)
+        (repair_target_committed ?coordinator_agent)
+      )
+  )
+  (:action primary_unit_commit_readiness
+    :parameters (?primary_unit - primary_unit ?repair_station - repair_station)
+    :precondition
+      (and
+        (primary_unit_ready ?primary_unit)
+        (primary_unit_salvage_progress ?primary_unit)
+        (repair_station_configured ?repair_station)
+        (repair_station_staged ?repair_station)
+        (not
+          (repair_target_committed ?primary_unit)
+        )
+      )
+    :effect (repair_target_committed ?primary_unit)
+  )
+  (:action secondary_unit_commit_readiness
+    :parameters (?secondary_unit - secondary_unit ?repair_station - repair_station)
+    :precondition
+      (and
+        (secondary_unit_ready ?secondary_unit)
+        (secondary_unit_salvage_progress ?secondary_unit)
+        (repair_station_configured ?repair_station)
+        (repair_station_staged ?repair_station)
+        (not
+          (repair_target_committed ?secondary_unit)
+        )
+      )
+    :effect (repair_target_committed ?secondary_unit)
+  )
+  (:action apply_reserve_supply_to_entity
+    :parameters (?objective - repair_target ?reserve_supply - reserve_supply ?healing_item - repair_item)
+    :precondition
+      (and
+        (repair_target_committed ?objective)
+        (repair_target_assigned_repair_item ?objective ?healing_item)
+        (reserve_supply_available ?reserve_supply)
+        (not
+          (reserve_applied ?objective)
+        )
+      )
+    :effect
+      (and
+        (reserve_applied ?objective)
+        (repair_target_assigned_reserve_supply ?objective ?reserve_supply)
+        (not
+          (reserve_supply_available ?reserve_supply)
+        )
+      )
+  )
+  (:action primary_apply_reserve_and_reclaim_healing_source
+    :parameters (?primary_unit - primary_unit ?healing_source - repair_source ?reserve_supply - reserve_supply)
+    :precondition
+      (and
+        (reserve_applied ?primary_unit)
+        (repair_target_assigned_repair_source ?primary_unit ?healing_source)
+        (repair_target_assigned_reserve_supply ?primary_unit ?reserve_supply)
+        (not
+          (objective_repaired ?primary_unit)
+        )
+      )
+    :effect
+      (and
+        (objective_repaired ?primary_unit)
+        (repair_source_available ?healing_source)
+        (reserve_supply_available ?reserve_supply)
+      )
+  )
+  (:action secondary_apply_reserve_and_reclaim_healing_source
+    :parameters (?secondary_unit - secondary_unit ?healing_source - repair_source ?reserve_supply - reserve_supply)
+    :precondition
+      (and
+        (reserve_applied ?secondary_unit)
+        (repair_target_assigned_repair_source ?secondary_unit ?healing_source)
+        (repair_target_assigned_reserve_supply ?secondary_unit ?reserve_supply)
+        (not
+          (objective_repaired ?secondary_unit)
+        )
+      )
+    :effect
+      (and
+        (objective_repaired ?secondary_unit)
+        (repair_source_available ?healing_source)
+        (reserve_supply_available ?reserve_supply)
+      )
+  )
+  (:action coordinator_apply_reserve_and_reclaim_healing_source
+    :parameters (?coordinator_agent - coordinator_agent ?healing_source - repair_source ?reserve_supply - reserve_supply)
+    :precondition
+      (and
+        (reserve_applied ?coordinator_agent)
+        (repair_target_assigned_repair_source ?coordinator_agent ?healing_source)
+        (repair_target_assigned_reserve_supply ?coordinator_agent ?reserve_supply)
+        (not
+          (objective_repaired ?coordinator_agent)
+        )
+      )
+    :effect
+      (and
+        (objective_repaired ?coordinator_agent)
+        (repair_source_available ?healing_source)
+        (reserve_supply_available ?reserve_supply)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem depleted_healing_supply_repair_problem)
+  (:domain depleted_healing_supply_repair_domain)
+  (:objects primary_unit_alpha - primary_unit secondary_unit_alpha - secondary_unit coordinator_alpha - coordinator_agent coordinator_beta - coordinator_agent healing_source_camp_1 - repair_source healing_source_cache_2 - repair_source healing_source_cache_3 - repair_source healing_item_medkit_1 - repair_item equipment_module_patch_1 - equipment_module consumable_pack_bandages_1 - consumable_pack route_a_waypoint_1 - route_marker_a route_b_waypoint_1 - route_marker_b repair_station_field_bench_1 - repair_station component_panel_1 - component_module component_panel_2 - component_module upgrade_token_overclock_1 - upgrade_token upgrade_token_speed_1 - upgrade_token priority_resource_emergency_band_1 - priority_resource priority_resource_meds_2 - priority_resource reserve_supply_backpack_1 - reserve_supply tool_attachment_wrench_1 - tool_attachment mission_marker_alpha - mission_marker mission_marker_beta - mission_marker special_attachment_stabilizer_1 - special_attachment)
+  (:init
+    (repair_source_available healing_source_camp_1)
+    (repair_source_available healing_source_cache_2)
+    (repair_source_available healing_source_cache_3)
+    (repair_item_available healing_item_medkit_1)
+    (equipment_module_available equipment_module_patch_1)
+    (consumable_pack_available consumable_pack_bandages_1)
+    (primary_unit_at_route_marker_a primary_unit_alpha route_a_waypoint_1)
+    (secondary_unit_at_route_marker_b secondary_unit_alpha route_b_waypoint_1)
+    (repair_station_available repair_station_field_bench_1)
+    (component_module_available component_panel_1)
+    (component_module_available component_panel_2)
+    (coordinator_assigned_primary_unit coordinator_alpha primary_unit_alpha)
+    (coordinator_assigned_primary_unit coordinator_beta primary_unit_alpha)
+    (coordinator_assigned_secondary_unit coordinator_alpha secondary_unit_alpha)
+    (coordinator_assigned_secondary_unit coordinator_beta secondary_unit_alpha)
+    (coordinator_assigned_repair_station coordinator_alpha repair_station_field_bench_1)
+    (coordinator_assigned_repair_station coordinator_beta repair_station_field_bench_1)
+    (coordinator_assigned_component_module coordinator_alpha component_panel_1)
+    (coordinator_assigned_component_module coordinator_beta component_panel_2)
+    (upgrade_token_available upgrade_token_overclock_1)
+    (upgrade_token_available upgrade_token_speed_1)
+    (priority_resource_available priority_resource_emergency_band_1)
+    (priority_resource_available priority_resource_meds_2)
+    (reserve_supply_available reserve_supply_backpack_1)
+    (tool_attachment_available tool_attachment_wrench_1)
+    (mission_marker_available mission_marker_alpha)
+    (coordinator_assigned_mission_marker coordinator_alpha mission_marker_alpha)
+    (coordinator_assigned_mission_marker coordinator_beta mission_marker_beta)
+    (special_attachment_available special_attachment_stabilizer_1)
+  )
+  (:goal
+    (and
+      (objective_repaired primary_unit_alpha)
+      (objective_repaired secondary_unit_alpha)
+      (objective_repaired coordinator_alpha)
+      (objective_repaired coordinator_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(mark_objective_for_repair primary_unit_alpha)
+(assign_healing_source_to_objective primary_unit_alpha healing_source_camp_1)
+(assign_healing_item_to_objective primary_unit_alpha healing_item_medkit_1)
+(validate_objective_for_repair primary_unit_alpha healing_item_medkit_1)
+(primary_use_consumable_pack_at_route_marker_a primary_unit_alpha route_a_waypoint_1 consumable_pack_bandages_1)
+(primary_finalize_salvage_at_route_marker_a primary_unit_alpha route_a_waypoint_1 healing_item_medkit_1 consumable_pack_bandages_1)
+(reclaim_repair_item primary_unit_alpha healing_item_medkit_1)
+(mark_objective_for_repair secondary_unit_alpha)
+(assign_healing_source_to_objective secondary_unit_alpha healing_source_cache_2)
+(assign_healing_item_to_objective secondary_unit_alpha healing_item_medkit_1)
+(validate_objective_for_repair secondary_unit_alpha healing_item_medkit_1)
+(secondary_use_consumable_pack_at_route_marker_b secondary_unit_alpha route_b_waypoint_1 consumable_pack_bandages_1)
+(secondary_finalize_salvage_at_route_marker_b secondary_unit_alpha route_b_waypoint_1 healing_item_medkit_1 consumable_pack_bandages_1)
+(reclaim_repair_item secondary_unit_alpha healing_item_medkit_1)
+(synthesize_repair_station primary_unit_alpha secondary_unit_alpha route_a_waypoint_1 route_b_waypoint_1 repair_station_field_bench_1)
+(assign_healing_item_to_objective primary_unit_alpha healing_item_medkit_1)
+(stage_repair_station repair_station_field_bench_1 primary_unit_alpha healing_item_medkit_1)
+(reclaim_repair_item primary_unit_alpha healing_item_medkit_1)
+(primary_unit_commit_readiness primary_unit_alpha repair_station_field_bench_1)
+(secondary_unit_commit_readiness secondary_unit_alpha repair_station_field_bench_1)
+(assign_healing_item_to_objective primary_unit_alpha healing_item_medkit_1)
+(apply_reserve_supply_to_entity primary_unit_alpha reserve_supply_backpack_1 healing_item_medkit_1)
+(primary_apply_reserve_and_reclaim_healing_source primary_unit_alpha healing_source_camp_1 reserve_supply_backpack_1)
+(reclaim_repair_item primary_unit_alpha healing_item_medkit_1)
+(assign_healing_item_to_objective secondary_unit_alpha healing_item_medkit_1)
+(apply_reserve_supply_to_entity secondary_unit_alpha reserve_supply_backpack_1 healing_item_medkit_1)
+(secondary_apply_reserve_and_reclaim_healing_source secondary_unit_alpha healing_source_cache_2 reserve_supply_backpack_1)
+(reclaim_repair_item secondary_unit_alpha healing_item_medkit_1)
+(mark_objective_for_repair coordinator_alpha)
+(assign_healing_source_to_objective coordinator_alpha healing_source_camp_1)
+(assign_healing_item_to_objective coordinator_alpha healing_item_medkit_1)
+(validate_objective_for_repair coordinator_alpha healing_item_medkit_1)
+(stage_component_module_to_repair_station coordinator_alpha component_panel_1 repair_station_field_bench_1)
+(coordinator_stage_component_for_assembly coordinator_alpha component_panel_1 repair_station_field_bench_1 healing_item_medkit_1)
+(attach_tool_attachment_to_coordinator coordinator_alpha tool_attachment_wrench_1)
+(attach_equipment_module_to_objective coordinator_alpha equipment_module_patch_1)
+(coordinator_attach_tool_and_progress_variant_a coordinator_alpha tool_attachment_wrench_1 equipment_module_patch_1 component_panel_1 repair_station_field_bench_1)
+(attach_special_attachment_to_coordinator coordinator_alpha special_attachment_stabilizer_1)
+(coordinator_attach_special_attachment coordinator_alpha special_attachment_stabilizer_1 component_panel_1 repair_station_field_bench_1)
+(coordinator_commit_finalization_primary coordinator_alpha)
+(detach_tool_attachment_from_coordinator coordinator_alpha tool_attachment_wrench_1)
+(detach_special_attachment_from_coordinator coordinator_alpha special_attachment_stabilizer_1)
+(detach_equipment_module_from_objective coordinator_alpha equipment_module_patch_1)
+(reclaim_repair_item coordinator_alpha healing_item_medkit_1)
+(mark_objective_for_repair coordinator_beta)
+(assign_healing_source_to_objective coordinator_beta healing_source_cache_2)
+(assign_healing_item_to_objective coordinator_beta healing_item_medkit_1)
+(validate_objective_for_repair coordinator_beta healing_item_medkit_1)
+(stage_component_module_to_repair_station coordinator_beta component_panel_2 repair_station_field_bench_1)
+(coordinator_stage_component_for_assembly coordinator_beta component_panel_2 repair_station_field_bench_1 healing_item_medkit_1)
+(attach_tool_attachment_to_coordinator coordinator_beta tool_attachment_wrench_1)
+(attach_equipment_module_to_objective coordinator_beta equipment_module_patch_1)
+(coordinator_attach_tool_and_progress_variant_a coordinator_beta tool_attachment_wrench_1 equipment_module_patch_1 component_panel_2 repair_station_field_bench_1)
+(attach_special_attachment_to_coordinator coordinator_beta special_attachment_stabilizer_1)
+(coordinator_attach_special_attachment coordinator_beta special_attachment_stabilizer_1 component_panel_2 repair_station_field_bench_1)
+(coordinator_commit_finalization_primary coordinator_beta)
+(assign_healing_item_to_objective coordinator_alpha healing_item_medkit_1)
+(apply_reserve_supply_to_entity coordinator_alpha reserve_supply_backpack_1 healing_item_medkit_1)
+(coordinator_apply_reserve_and_reclaim_healing_source coordinator_alpha healing_source_camp_1 reserve_supply_backpack_1)
+(reclaim_repair_item coordinator_alpha healing_item_medkit_1)
+(assign_healing_item_to_objective coordinator_beta healing_item_medkit_1)
+(apply_reserve_supply_to_entity coordinator_beta reserve_supply_backpack_1 healing_item_medkit_1)
+(coordinator_apply_reserve_and_reclaim_healing_source coordinator_beta healing_source_cache_2 reserve_supply_backpack_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_sdo3d904/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_sdo3d904/plan.pddl 
+
+
+--- stderr ---
+

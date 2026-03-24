@@ -1,0 +1,937 @@
+(define (domain hidden_objective_quest_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_type - entity interaction_category - entity container_category - entity objective_category - entity objective - objective_category trigger_token - resource_type detection_method - resource_type agent - resource_type optional_modifier_token - resource_type validation_key - resource_type finalization_token - resource_type resource_token_a - resource_type resource_token_b - resource_type consumable_clue - interaction_category evidence_fragment - interaction_category assignment_marker - interaction_category location_variant_a - container_category location_variant_b - container_category hidden_node - container_category objective_container_type - objective objective_container_type_alt - objective primary_objective - objective_container_type secondary_objective - objective_container_type mission - objective_container_type_alt)
+
+  (:predicates
+    (objective_discovered ?objective - objective)
+    (subject_prevalidated ?objective - objective)
+    (objective_triggered ?objective - objective)
+    (completed_subject ?objective - objective)
+    (completion_flag_subject ?objective - objective)
+    (finalization_pending_subject ?objective - objective)
+    (trigger_available ?trigger_token - trigger_token)
+    (trigger_bound_to_subject ?objective - objective ?trigger_token - trigger_token)
+    (detection_method_available ?detection_method - detection_method)
+    (detection_method_bound ?objective - objective ?detection_method - detection_method)
+    (agent_available ?agent - agent)
+    (agent_assigned ?objective - objective ?agent - agent)
+    (clue_available ?consumable_clue - consumable_clue)
+    (primary_clue_bound ?primary_objective - primary_objective ?consumable_clue - consumable_clue)
+    (secondary_clue_bound ?secondary_objective - secondary_objective ?consumable_clue - consumable_clue)
+    (primary_at_location_a ?primary_objective - primary_objective ?location_variant_a - location_variant_a)
+    (location_a_scanned ?location_variant_a - location_variant_a)
+    (location_a_clued ?location_variant_a - location_variant_a)
+    (primary_site_ready ?primary_objective - primary_objective)
+    (secondary_at_location_b ?secondary_objective - secondary_objective ?location_variant_b - location_variant_b)
+    (location_b_scanned ?location_variant_b - location_variant_b)
+    (location_b_clued ?location_variant_b - location_variant_b)
+    (secondary_site_ready ?secondary_objective - secondary_objective)
+    (node_locked ?hidden_node - hidden_node)
+    (node_ready ?hidden_node - hidden_node)
+    (node_linked_location_a ?hidden_node - hidden_node ?location_variant_a - location_variant_a)
+    (node_linked_location_b ?hidden_node - hidden_node ?location_variant_b - location_variant_b)
+    (node_stage_a ?hidden_node - hidden_node)
+    (node_stage_b ?hidden_node - hidden_node)
+    (node_verified ?hidden_node - hidden_node)
+    (mission_has_primary ?mission - mission ?primary_objective - primary_objective)
+    (mission_has_secondary ?mission - mission ?secondary_objective - secondary_objective)
+    (mission_has_node ?mission - mission ?hidden_node - hidden_node)
+    (evidence_available ?evidence_fragment - evidence_fragment)
+    (mission_has_evidence ?mission - mission ?evidence_fragment - evidence_fragment)
+    (evidence_integrated ?evidence_fragment - evidence_fragment)
+    (evidence_linked_to_node ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    (mission_prepared ?mission - mission)
+    (mission_resources_bound ?mission - mission)
+    (mission_validated ?mission - mission)
+    (modifier_applied ?mission - mission)
+    (modifier_confirmed ?mission - mission)
+    (validation_confirmed ?mission - mission)
+    (final_checks_passed ?mission - mission)
+    (assignment_marker_available ?assignment_marker - assignment_marker)
+    (mission_has_assignment_marker ?mission - mission ?assignment_marker - assignment_marker)
+    (assignment_applied ?mission - mission)
+    (assignment_acknowledged ?mission - mission)
+    (assignment_validated ?mission - mission)
+    (modifier_token_available ?optional_modifier_token - optional_modifier_token)
+    (modifier_bound ?mission - mission ?optional_modifier_token - optional_modifier_token)
+    (validation_key_available ?validation_key - validation_key)
+    (validation_key_bound ?mission - mission ?validation_key - validation_key)
+    (resource_token_a_available ?resource_token_a - resource_token_a)
+    (resource_token_a_bound ?mission - mission ?resource_token_a - resource_token_a)
+    (resource_token_b_available ?resource_token_b - resource_token_b)
+    (resource_token_b_bound ?mission - mission ?resource_token_b - resource_token_b)
+    (finalization_token_available ?finalization_token - finalization_token)
+    (finalization_token_bound ?objective - objective ?finalization_token - finalization_token)
+    (primary_engaged ?primary_objective - primary_objective)
+    (secondary_engaged ?secondary_objective - secondary_objective)
+    (mission_finalized ?mission - mission)
+  )
+  (:action discover_objective
+    :parameters (?objective - objective)
+    :precondition
+      (and
+        (not
+          (objective_discovered ?objective)
+        )
+        (not
+          (completed_subject ?objective)
+        )
+      )
+    :effect (objective_discovered ?objective)
+  )
+  (:action attach_trigger_to_objective
+    :parameters (?objective - objective ?trigger_token - trigger_token)
+    :precondition
+      (and
+        (objective_discovered ?objective)
+        (not
+          (objective_triggered ?objective)
+        )
+        (trigger_available ?trigger_token)
+      )
+    :effect
+      (and
+        (objective_triggered ?objective)
+        (trigger_bound_to_subject ?objective ?trigger_token)
+        (not
+          (trigger_available ?trigger_token)
+        )
+      )
+  )
+  (:action attach_detection_method_to_objective
+    :parameters (?objective - objective ?detection_method - detection_method)
+    :precondition
+      (and
+        (objective_discovered ?objective)
+        (objective_triggered ?objective)
+        (detection_method_available ?detection_method)
+      )
+    :effect
+      (and
+        (detection_method_bound ?objective ?detection_method)
+        (not
+          (detection_method_available ?detection_method)
+        )
+      )
+  )
+  (:action validate_objective_with_method
+    :parameters (?objective - objective ?detection_method - detection_method)
+    :precondition
+      (and
+        (objective_discovered ?objective)
+        (objective_triggered ?objective)
+        (detection_method_bound ?objective ?detection_method)
+        (not
+          (subject_prevalidated ?objective)
+        )
+      )
+    :effect (subject_prevalidated ?objective)
+  )
+  (:action detach_detection_method_from_objective
+    :parameters (?objective - objective ?detection_method - detection_method)
+    :precondition
+      (and
+        (detection_method_bound ?objective ?detection_method)
+      )
+    :effect
+      (and
+        (detection_method_available ?detection_method)
+        (not
+          (detection_method_bound ?objective ?detection_method)
+        )
+      )
+  )
+  (:action assign_agent_to_objective
+    :parameters (?objective - objective ?agent - agent)
+    :precondition
+      (and
+        (subject_prevalidated ?objective)
+        (agent_available ?agent)
+      )
+    :effect
+      (and
+        (agent_assigned ?objective ?agent)
+        (not
+          (agent_available ?agent)
+        )
+      )
+  )
+  (:action release_agent_from_objective
+    :parameters (?objective - objective ?agent - agent)
+    :precondition
+      (and
+        (agent_assigned ?objective ?agent)
+      )
+    :effect
+      (and
+        (agent_available ?agent)
+        (not
+          (agent_assigned ?objective ?agent)
+        )
+      )
+  )
+  (:action bind_resource_a_to_mission
+    :parameters (?mission - mission ?resource_token_a - resource_token_a)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (resource_token_a_available ?resource_token_a)
+      )
+    :effect
+      (and
+        (resource_token_a_bound ?mission ?resource_token_a)
+        (not
+          (resource_token_a_available ?resource_token_a)
+        )
+      )
+  )
+  (:action unbind_resource_a_from_mission
+    :parameters (?mission - mission ?resource_token_a - resource_token_a)
+    :precondition
+      (and
+        (resource_token_a_bound ?mission ?resource_token_a)
+      )
+    :effect
+      (and
+        (resource_token_a_available ?resource_token_a)
+        (not
+          (resource_token_a_bound ?mission ?resource_token_a)
+        )
+      )
+  )
+  (:action bind_resource_b_to_mission
+    :parameters (?mission - mission ?resource_token_b - resource_token_b)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (resource_token_b_available ?resource_token_b)
+      )
+    :effect
+      (and
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (not
+          (resource_token_b_available ?resource_token_b)
+        )
+      )
+  )
+  (:action unbind_resource_b_from_mission
+    :parameters (?mission - mission ?resource_token_b - resource_token_b)
+    :precondition
+      (and
+        (resource_token_b_bound ?mission ?resource_token_b)
+      )
+    :effect
+      (and
+        (resource_token_b_available ?resource_token_b)
+        (not
+          (resource_token_b_bound ?mission ?resource_token_b)
+        )
+      )
+  )
+  (:action scan_primary_location_a
+    :parameters (?primary_objective - primary_objective ?location_variant_a - location_variant_a ?detection_method - detection_method)
+    :precondition
+      (and
+        (subject_prevalidated ?primary_objective)
+        (detection_method_bound ?primary_objective ?detection_method)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (not
+          (location_a_scanned ?location_variant_a)
+        )
+        (not
+          (location_a_clued ?location_variant_a)
+        )
+      )
+    :effect (location_a_scanned ?location_variant_a)
+  )
+  (:action confirm_primary_location_a_with_agent
+    :parameters (?primary_objective - primary_objective ?location_variant_a - location_variant_a ?agent - agent)
+    :precondition
+      (and
+        (subject_prevalidated ?primary_objective)
+        (agent_assigned ?primary_objective ?agent)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (location_a_scanned ?location_variant_a)
+        (not
+          (primary_engaged ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (primary_engaged ?primary_objective)
+        (primary_site_ready ?primary_objective)
+      )
+  )
+  (:action apply_clue_to_primary_location_a
+    :parameters (?primary_objective - primary_objective ?location_variant_a - location_variant_a ?consumable_clue - consumable_clue)
+    :precondition
+      (and
+        (subject_prevalidated ?primary_objective)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (clue_available ?consumable_clue)
+        (not
+          (primary_engaged ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (location_a_clued ?location_variant_a)
+        (primary_engaged ?primary_objective)
+        (primary_clue_bound ?primary_objective ?consumable_clue)
+        (not
+          (clue_available ?consumable_clue)
+        )
+      )
+  )
+  (:action process_primary_location_a_with_clue
+    :parameters (?primary_objective - primary_objective ?location_variant_a - location_variant_a ?detection_method - detection_method ?consumable_clue - consumable_clue)
+    :precondition
+      (and
+        (subject_prevalidated ?primary_objective)
+        (detection_method_bound ?primary_objective ?detection_method)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (location_a_clued ?location_variant_a)
+        (primary_clue_bound ?primary_objective ?consumable_clue)
+        (not
+          (primary_site_ready ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (location_a_scanned ?location_variant_a)
+        (primary_site_ready ?primary_objective)
+        (clue_available ?consumable_clue)
+        (not
+          (primary_clue_bound ?primary_objective ?consumable_clue)
+        )
+      )
+  )
+  (:action scan_secondary_location_b
+    :parameters (?secondary_objective - secondary_objective ?location_variant_b - location_variant_b ?detection_method - detection_method)
+    :precondition
+      (and
+        (subject_prevalidated ?secondary_objective)
+        (detection_method_bound ?secondary_objective ?detection_method)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (not
+          (location_b_scanned ?location_variant_b)
+        )
+        (not
+          (location_b_clued ?location_variant_b)
+        )
+      )
+    :effect (location_b_scanned ?location_variant_b)
+  )
+  (:action confirm_secondary_location_b_with_agent
+    :parameters (?secondary_objective - secondary_objective ?location_variant_b - location_variant_b ?agent - agent)
+    :precondition
+      (and
+        (subject_prevalidated ?secondary_objective)
+        (agent_assigned ?secondary_objective ?agent)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_b_scanned ?location_variant_b)
+        (not
+          (secondary_engaged ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (secondary_engaged ?secondary_objective)
+        (secondary_site_ready ?secondary_objective)
+      )
+  )
+  (:action apply_clue_to_secondary_location_b
+    :parameters (?secondary_objective - secondary_objective ?location_variant_b - location_variant_b ?consumable_clue - consumable_clue)
+    :precondition
+      (and
+        (subject_prevalidated ?secondary_objective)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (clue_available ?consumable_clue)
+        (not
+          (secondary_engaged ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (location_b_clued ?location_variant_b)
+        (secondary_engaged ?secondary_objective)
+        (secondary_clue_bound ?secondary_objective ?consumable_clue)
+        (not
+          (clue_available ?consumable_clue)
+        )
+      )
+  )
+  (:action process_secondary_location_b_with_clue
+    :parameters (?secondary_objective - secondary_objective ?location_variant_b - location_variant_b ?detection_method - detection_method ?consumable_clue - consumable_clue)
+    :precondition
+      (and
+        (subject_prevalidated ?secondary_objective)
+        (detection_method_bound ?secondary_objective ?detection_method)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_b_clued ?location_variant_b)
+        (secondary_clue_bound ?secondary_objective ?consumable_clue)
+        (not
+          (secondary_site_ready ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (location_b_scanned ?location_variant_b)
+        (secondary_site_ready ?secondary_objective)
+        (clue_available ?consumable_clue)
+        (not
+          (secondary_clue_bound ?secondary_objective ?consumable_clue)
+        )
+      )
+  )
+  (:action assemble_hidden_node
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?location_variant_a - location_variant_a ?location_variant_b - location_variant_b ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (primary_engaged ?primary_objective)
+        (secondary_engaged ?secondary_objective)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_a_scanned ?location_variant_a)
+        (location_b_scanned ?location_variant_b)
+        (primary_site_ready ?primary_objective)
+        (secondary_site_ready ?secondary_objective)
+        (node_locked ?hidden_node)
+      )
+    :effect
+      (and
+        (node_ready ?hidden_node)
+        (node_linked_location_a ?hidden_node ?location_variant_a)
+        (node_linked_location_b ?hidden_node ?location_variant_b)
+        (not
+          (node_locked ?hidden_node)
+        )
+      )
+  )
+  (:action assemble_hidden_node_variant_a
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?location_variant_a - location_variant_a ?location_variant_b - location_variant_b ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (primary_engaged ?primary_objective)
+        (secondary_engaged ?secondary_objective)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_a_clued ?location_variant_a)
+        (location_b_scanned ?location_variant_b)
+        (not
+          (primary_site_ready ?primary_objective)
+        )
+        (secondary_site_ready ?secondary_objective)
+        (node_locked ?hidden_node)
+      )
+    :effect
+      (and
+        (node_ready ?hidden_node)
+        (node_linked_location_a ?hidden_node ?location_variant_a)
+        (node_linked_location_b ?hidden_node ?location_variant_b)
+        (node_stage_a ?hidden_node)
+        (not
+          (node_locked ?hidden_node)
+        )
+      )
+  )
+  (:action assemble_hidden_node_variant_b
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?location_variant_a - location_variant_a ?location_variant_b - location_variant_b ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (primary_engaged ?primary_objective)
+        (secondary_engaged ?secondary_objective)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_a_scanned ?location_variant_a)
+        (location_b_clued ?location_variant_b)
+        (primary_site_ready ?primary_objective)
+        (not
+          (secondary_site_ready ?secondary_objective)
+        )
+        (node_locked ?hidden_node)
+      )
+    :effect
+      (and
+        (node_ready ?hidden_node)
+        (node_linked_location_a ?hidden_node ?location_variant_a)
+        (node_linked_location_b ?hidden_node ?location_variant_b)
+        (node_stage_b ?hidden_node)
+        (not
+          (node_locked ?hidden_node)
+        )
+      )
+  )
+  (:action assemble_hidden_node_both_variants
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?location_variant_a - location_variant_a ?location_variant_b - location_variant_b ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (primary_engaged ?primary_objective)
+        (secondary_engaged ?secondary_objective)
+        (primary_at_location_a ?primary_objective ?location_variant_a)
+        (secondary_at_location_b ?secondary_objective ?location_variant_b)
+        (location_a_clued ?location_variant_a)
+        (location_b_clued ?location_variant_b)
+        (not
+          (primary_site_ready ?primary_objective)
+        )
+        (not
+          (secondary_site_ready ?secondary_objective)
+        )
+        (node_locked ?hidden_node)
+      )
+    :effect
+      (and
+        (node_ready ?hidden_node)
+        (node_linked_location_a ?hidden_node ?location_variant_a)
+        (node_linked_location_b ?hidden_node ?location_variant_b)
+        (node_stage_a ?hidden_node)
+        (node_stage_b ?hidden_node)
+        (not
+          (node_locked ?hidden_node)
+        )
+      )
+  )
+  (:action verify_node_with_primary
+    :parameters (?hidden_node - hidden_node ?primary_objective - primary_objective ?detection_method - detection_method)
+    :precondition
+      (and
+        (node_ready ?hidden_node)
+        (primary_engaged ?primary_objective)
+        (detection_method_bound ?primary_objective ?detection_method)
+        (not
+          (node_verified ?hidden_node)
+        )
+      )
+    :effect (node_verified ?hidden_node)
+  )
+  (:action integrate_evidence_into_node
+    :parameters (?mission - mission ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (mission_has_node ?mission ?hidden_node)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_available ?evidence_fragment)
+        (node_ready ?hidden_node)
+        (node_verified ?hidden_node)
+        (not
+          (evidence_integrated ?evidence_fragment)
+        )
+      )
+    :effect
+      (and
+        (evidence_integrated ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (not
+          (evidence_available ?evidence_fragment)
+        )
+      )
+  )
+  (:action prepare_mission_with_evidence
+    :parameters (?mission - mission ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node ?detection_method - detection_method)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_integrated ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (detection_method_bound ?mission ?detection_method)
+        (not
+          (node_stage_a ?hidden_node)
+        )
+        (not
+          (mission_prepared ?mission)
+        )
+      )
+    :effect (mission_prepared ?mission)
+  )
+  (:action apply_modifier_to_mission
+    :parameters (?mission - mission ?optional_modifier_token - optional_modifier_token)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (modifier_token_available ?optional_modifier_token)
+        (not
+          (modifier_applied ?mission)
+        )
+      )
+    :effect
+      (and
+        (modifier_applied ?mission)
+        (modifier_bound ?mission ?optional_modifier_token)
+        (not
+          (modifier_token_available ?optional_modifier_token)
+        )
+      )
+  )
+  (:action apply_modifier_and_prepare_mission
+    :parameters (?mission - mission ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node ?detection_method - detection_method ?optional_modifier_token - optional_modifier_token)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_integrated ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (detection_method_bound ?mission ?detection_method)
+        (node_stage_a ?hidden_node)
+        (modifier_applied ?mission)
+        (modifier_bound ?mission ?optional_modifier_token)
+        (not
+          (mission_prepared ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_prepared ?mission)
+        (modifier_confirmed ?mission)
+      )
+  )
+  (:action bind_resource_and_mark_mission_ready
+    :parameters (?mission - mission ?resource_token_a - resource_token_a ?agent - agent ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_prepared ?mission)
+        (resource_token_a_bound ?mission ?resource_token_a)
+        (agent_assigned ?mission ?agent)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (not
+          (node_stage_b ?hidden_node)
+        )
+        (not
+          (mission_resources_bound ?mission)
+        )
+      )
+    :effect (mission_resources_bound ?mission)
+  )
+  (:action confirm_resource_and_mark_mission_ready
+    :parameters (?mission - mission ?resource_token_a - resource_token_a ?agent - agent ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_prepared ?mission)
+        (resource_token_a_bound ?mission ?resource_token_a)
+        (agent_assigned ?mission ?agent)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (node_stage_b ?hidden_node)
+        (not
+          (mission_resources_bound ?mission)
+        )
+      )
+    :effect (mission_resources_bound ?mission)
+  )
+  (:action validate_mission_with_resource_b
+    :parameters (?mission - mission ?resource_token_b - resource_token_b ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_resources_bound ?mission)
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (not
+          (node_stage_a ?hidden_node)
+        )
+        (not
+          (node_stage_b ?hidden_node)
+        )
+        (not
+          (mission_validated ?mission)
+        )
+      )
+    :effect (mission_validated ?mission)
+  )
+  (:action validate_and_confirm_mission_resources_variant_a
+    :parameters (?mission - mission ?resource_token_b - resource_token_b ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_resources_bound ?mission)
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (node_stage_a ?hidden_node)
+        (not
+          (node_stage_b ?hidden_node)
+        )
+        (not
+          (mission_validated ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_validated ?mission)
+        (validation_confirmed ?mission)
+      )
+  )
+  (:action validate_and_confirm_mission_resources_variant_b
+    :parameters (?mission - mission ?resource_token_b - resource_token_b ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_resources_bound ?mission)
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (not
+          (node_stage_a ?hidden_node)
+        )
+        (node_stage_b ?hidden_node)
+        (not
+          (mission_validated ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_validated ?mission)
+        (validation_confirmed ?mission)
+      )
+  )
+  (:action validate_and_confirm_mission_resources_full
+    :parameters (?mission - mission ?resource_token_b - resource_token_b ?evidence_fragment - evidence_fragment ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (mission_resources_bound ?mission)
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (mission_has_evidence ?mission ?evidence_fragment)
+        (evidence_linked_to_node ?evidence_fragment ?hidden_node)
+        (node_stage_a ?hidden_node)
+        (node_stage_b ?hidden_node)
+        (not
+          (mission_validated ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_validated ?mission)
+        (validation_confirmed ?mission)
+      )
+  )
+  (:action mark_mission_for_finalization
+    :parameters (?mission - mission)
+    :precondition
+      (and
+        (mission_validated ?mission)
+        (not
+          (validation_confirmed ?mission)
+        )
+        (not
+          (mission_finalized ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?mission)
+        (completion_flag_subject ?mission)
+      )
+  )
+  (:action bind_validation_key_to_mission
+    :parameters (?mission - mission ?validation_key - validation_key)
+    :precondition
+      (and
+        (mission_validated ?mission)
+        (validation_confirmed ?mission)
+        (validation_key_available ?validation_key)
+      )
+    :effect
+      (and
+        (validation_key_bound ?mission ?validation_key)
+        (not
+          (validation_key_available ?validation_key)
+        )
+      )
+  )
+  (:action perform_mission_completion_checks
+    :parameters (?mission - mission ?primary_objective - primary_objective ?secondary_objective - secondary_objective ?detection_method - detection_method ?validation_key - validation_key)
+    :precondition
+      (and
+        (mission_validated ?mission)
+        (validation_confirmed ?mission)
+        (validation_key_bound ?mission ?validation_key)
+        (mission_has_primary ?mission ?primary_objective)
+        (mission_has_secondary ?mission ?secondary_objective)
+        (primary_site_ready ?primary_objective)
+        (secondary_site_ready ?secondary_objective)
+        (detection_method_bound ?mission ?detection_method)
+        (not
+          (final_checks_passed ?mission)
+        )
+      )
+    :effect (final_checks_passed ?mission)
+  )
+  (:action finalize_mission
+    :parameters (?mission - mission)
+    :precondition
+      (and
+        (mission_validated ?mission)
+        (final_checks_passed ?mission)
+        (not
+          (mission_finalized ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?mission)
+        (completion_flag_subject ?mission)
+      )
+  )
+  (:action apply_assignment_to_mission
+    :parameters (?mission - mission ?assignment_marker - assignment_marker ?detection_method - detection_method)
+    :precondition
+      (and
+        (subject_prevalidated ?mission)
+        (detection_method_bound ?mission ?detection_method)
+        (assignment_marker_available ?assignment_marker)
+        (mission_has_assignment_marker ?mission ?assignment_marker)
+        (not
+          (assignment_applied ?mission)
+        )
+      )
+    :effect
+      (and
+        (assignment_applied ?mission)
+        (not
+          (assignment_marker_available ?assignment_marker)
+        )
+      )
+  )
+  (:action acknowledge_assignment_with_agent
+    :parameters (?mission - mission ?agent - agent)
+    :precondition
+      (and
+        (assignment_applied ?mission)
+        (agent_assigned ?mission ?agent)
+        (not
+          (assignment_acknowledged ?mission)
+        )
+      )
+    :effect (assignment_acknowledged ?mission)
+  )
+  (:action validate_assignment_with_resource_b
+    :parameters (?mission - mission ?resource_token_b - resource_token_b)
+    :precondition
+      (and
+        (assignment_acknowledged ?mission)
+        (resource_token_b_bound ?mission ?resource_token_b)
+        (not
+          (assignment_validated ?mission)
+        )
+      )
+    :effect (assignment_validated ?mission)
+  )
+  (:action finalize_mission_from_assignment
+    :parameters (?mission - mission)
+    :precondition
+      (and
+        (assignment_validated ?mission)
+        (not
+          (mission_finalized ?mission)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?mission)
+        (completion_flag_subject ?mission)
+      )
+  )
+  (:action complete_primary_objective_from_node
+    :parameters (?primary_objective - primary_objective ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (primary_engaged ?primary_objective)
+        (primary_site_ready ?primary_objective)
+        (node_ready ?hidden_node)
+        (node_verified ?hidden_node)
+        (not
+          (completion_flag_subject ?primary_objective)
+        )
+      )
+    :effect (completion_flag_subject ?primary_objective)
+  )
+  (:action complete_secondary_objective_from_node
+    :parameters (?secondary_objective - secondary_objective ?hidden_node - hidden_node)
+    :precondition
+      (and
+        (secondary_engaged ?secondary_objective)
+        (secondary_site_ready ?secondary_objective)
+        (node_ready ?hidden_node)
+        (node_verified ?hidden_node)
+        (not
+          (completion_flag_subject ?secondary_objective)
+        )
+      )
+    :effect (completion_flag_subject ?secondary_objective)
+  )
+  (:action bind_finalization_token_to_objective
+    :parameters (?objective - objective ?finalization_token - finalization_token ?detection_method - detection_method)
+    :precondition
+      (and
+        (completion_flag_subject ?objective)
+        (detection_method_bound ?objective ?detection_method)
+        (finalization_token_available ?finalization_token)
+        (not
+          (finalization_pending_subject ?objective)
+        )
+      )
+    :effect
+      (and
+        (finalization_pending_subject ?objective)
+        (finalization_token_bound ?objective ?finalization_token)
+        (not
+          (finalization_token_available ?finalization_token)
+        )
+      )
+  )
+  (:action finalize_primary_objective_with_token
+    :parameters (?primary_objective - primary_objective ?trigger_token - trigger_token ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (finalization_pending_subject ?primary_objective)
+        (trigger_bound_to_subject ?primary_objective ?trigger_token)
+        (finalization_token_bound ?primary_objective ?finalization_token)
+        (not
+          (completed_subject ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (completed_subject ?primary_objective)
+        (trigger_available ?trigger_token)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+  (:action finalize_secondary_objective_with_token
+    :parameters (?secondary_objective - secondary_objective ?trigger_token - trigger_token ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (finalization_pending_subject ?secondary_objective)
+        (trigger_bound_to_subject ?secondary_objective ?trigger_token)
+        (finalization_token_bound ?secondary_objective ?finalization_token)
+        (not
+          (completed_subject ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (completed_subject ?secondary_objective)
+        (trigger_available ?trigger_token)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+  (:action finalize_mission_with_token
+    :parameters (?mission - mission ?trigger_token - trigger_token ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (finalization_pending_subject ?mission)
+        (trigger_bound_to_subject ?mission ?trigger_token)
+        (finalization_token_bound ?mission ?finalization_token)
+        (not
+          (completed_subject ?mission)
+        )
+      )
+    :effect
+      (and
+        (completed_subject ?mission)
+        (trigger_available ?trigger_token)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+)

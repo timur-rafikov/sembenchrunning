@@ -1,0 +1,1080 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain third_party_library_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types external_artifact_category - object environment_descriptor_category - object build_artifact_category - object integration_target_category - object integration_target - integration_target_category library_source - external_artifact_category api_binding - external_artifact_category configuration_template - external_artifact_category policy - external_artifact_category approval_token - external_artifact_category credential - external_artifact_category observability_hook - external_artifact_category compatibility_report - external_artifact_category auxiliary_artifact - environment_descriptor_category config_file - environment_descriptor_category performance_target - environment_descriptor_category runtime_environment_descriptor - build_artifact_category test_environment_descriptor - build_artifact_category connector_build - build_artifact_category component_role_category - integration_target integrator_role_category - integration_target runtime_component - component_role_category test_component - component_role_category integrator - integrator_role_category)
+  (:predicates
+    (integration_target_registered ?integration_target - integration_target)
+    (configured_for_integration ?integration_target - integration_target)
+    (library_selected ?integration_target - integration_target)
+    (integration_deployed ?integration_target - integration_target)
+    (release_approved_for_target ?integration_target - integration_target)
+    (credentials_bound ?integration_target - integration_target)
+    (library_available ?library_source - library_source)
+    (uses_library ?integration_target - integration_target ?library_source - library_source)
+    (binding_available ?api_binding - api_binding)
+    (binding_attached ?integration_target - integration_target ?api_binding - api_binding)
+    (config_template_available ?configuration_template - configuration_template)
+    (config_applied ?integration_target - integration_target ?configuration_template - configuration_template)
+    (auxiliary_artifact_available ?auxiliary_artifact - auxiliary_artifact)
+    (runtime_has_auxiliary_artifact ?runtime_component - runtime_component ?auxiliary_artifact - auxiliary_artifact)
+    (test_has_auxiliary_artifact ?test_component - test_component ?auxiliary_artifact - auxiliary_artifact)
+    (runtime_env_attached_to_component ?runtime_component - runtime_component ?runtime_environment_descriptor - runtime_environment_descriptor)
+    (environment_reserved ?runtime_environment_descriptor - runtime_environment_descriptor)
+    (environment_configured ?runtime_environment_descriptor - runtime_environment_descriptor)
+    (component_ready ?runtime_component - runtime_component)
+    (test_env_attached ?test_component - test_component ?test_environment_descriptor - test_environment_descriptor)
+    (test_environment_reserved ?test_environment_descriptor - test_environment_descriptor)
+    (test_environment_configured ?test_environment_descriptor - test_environment_descriptor)
+    (test_component_ready ?test_component - test_component)
+    (connector_build_available ?connector_build - connector_build)
+    (connector_packaged ?connector_build - connector_build)
+    (connector_built_for_runtime_environment ?connector_build - connector_build ?runtime_environment_descriptor - runtime_environment_descriptor)
+    (connector_built_for_test_environment ?connector_build - connector_build ?test_environment_descriptor - test_environment_descriptor)
+    (connector_flag_runtime_ready ?connector_build - connector_build)
+    (connector_flag_test_ready ?connector_build - connector_build)
+    (connector_verified ?connector_build - connector_build)
+    (integrator_assigned_runtime_component ?integrator - integrator ?runtime_component - runtime_component)
+    (integrator_assigned_test_component ?integrator - integrator ?test_component - test_component)
+    (integrator_assigned_connector ?integrator - integrator ?connector_build - connector_build)
+    (config_file_available ?config_file - config_file)
+    (integrator_has_config_file ?integrator - integrator ?config_file - config_file)
+    (config_file_applied ?config_file - config_file)
+    (config_file_associated_with_connector ?config_file - config_file ?connector_build - connector_build)
+    (integrator_prevalidation_ready ?integrator - integrator)
+    (integrator_observability_configured ?integrator - integrator)
+    (integrator_compatibility_verified ?integrator - integrator)
+    (policy_attached_to_integrator ?integrator - integrator)
+    (policy_validated_for_integrator ?integrator - integrator)
+    (approval_requested ?integrator - integrator)
+    (integrator_final_checks_passed ?integrator - integrator)
+    (performance_target_available ?performance_target - performance_target)
+    (integrator_has_performance_target ?integrator - integrator ?performance_target - performance_target)
+    (performance_target_attached_to_integrator ?integrator - integrator)
+    (performance_check_in_progress ?integrator - integrator)
+    (performance_check_passed ?integrator - integrator)
+    (policy_available ?policy - policy)
+    (integrator_has_policy ?integrator - integrator ?policy - policy)
+    (approval_token_available ?approval_token - approval_token)
+    (integrator_has_approval_token ?integrator - integrator ?approval_token - approval_token)
+    (observability_hook_available ?observability_hook - observability_hook)
+    (integrator_has_observability_hook ?integrator - integrator ?observability_hook - observability_hook)
+    (compatibility_report_available ?compatibility_report - compatibility_report)
+    (integrator_has_compatibility_report ?integrator - integrator ?compatibility_report - compatibility_report)
+    (credential_available ?credential - credential)
+    (target_has_credential ?integration_target - integration_target ?credential - credential)
+    (runtime_component_staged ?runtime_component - runtime_component)
+    (test_component_staged ?test_component - test_component)
+    (release_signoff_recorded ?integrator - integrator)
+  )
+  (:action register_integration_target
+    :parameters (?integration_target - integration_target)
+    :precondition
+      (and
+        (not
+          (integration_target_registered ?integration_target)
+        )
+        (not
+          (integration_deployed ?integration_target)
+        )
+      )
+    :effect (integration_target_registered ?integration_target)
+  )
+  (:action select_library_for_target
+    :parameters (?integration_target - integration_target ?library_source - library_source)
+    :precondition
+      (and
+        (integration_target_registered ?integration_target)
+        (not
+          (library_selected ?integration_target)
+        )
+        (library_available ?library_source)
+      )
+    :effect
+      (and
+        (library_selected ?integration_target)
+        (uses_library ?integration_target ?library_source)
+        (not
+          (library_available ?library_source)
+        )
+      )
+  )
+  (:action attach_api_binding
+    :parameters (?integration_target - integration_target ?api_binding - api_binding)
+    :precondition
+      (and
+        (integration_target_registered ?integration_target)
+        (library_selected ?integration_target)
+        (binding_available ?api_binding)
+      )
+    :effect
+      (and
+        (binding_attached ?integration_target ?api_binding)
+        (not
+          (binding_available ?api_binding)
+        )
+      )
+  )
+  (:action confirm_api_binding
+    :parameters (?integration_target - integration_target ?api_binding - api_binding)
+    :precondition
+      (and
+        (integration_target_registered ?integration_target)
+        (library_selected ?integration_target)
+        (binding_attached ?integration_target ?api_binding)
+        (not
+          (configured_for_integration ?integration_target)
+        )
+      )
+    :effect (configured_for_integration ?integration_target)
+  )
+  (:action detach_api_binding
+    :parameters (?integration_target - integration_target ?api_binding - api_binding)
+    :precondition
+      (and
+        (binding_attached ?integration_target ?api_binding)
+      )
+    :effect
+      (and
+        (binding_available ?api_binding)
+        (not
+          (binding_attached ?integration_target ?api_binding)
+        )
+      )
+  )
+  (:action apply_configuration_template
+    :parameters (?integration_target - integration_target ?configuration_template - configuration_template)
+    :precondition
+      (and
+        (configured_for_integration ?integration_target)
+        (config_template_available ?configuration_template)
+      )
+    :effect
+      (and
+        (config_applied ?integration_target ?configuration_template)
+        (not
+          (config_template_available ?configuration_template)
+        )
+      )
+  )
+  (:action remove_configuration_template
+    :parameters (?integration_target - integration_target ?configuration_template - configuration_template)
+    :precondition
+      (and
+        (config_applied ?integration_target ?configuration_template)
+      )
+    :effect
+      (and
+        (config_template_available ?configuration_template)
+        (not
+          (config_applied ?integration_target ?configuration_template)
+        )
+      )
+  )
+  (:action attach_observability_hook
+    :parameters (?integrator - integrator ?observability_hook - observability_hook)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (observability_hook_available ?observability_hook)
+      )
+    :effect
+      (and
+        (integrator_has_observability_hook ?integrator ?observability_hook)
+        (not
+          (observability_hook_available ?observability_hook)
+        )
+      )
+  )
+  (:action detach_observability_hook
+    :parameters (?integrator - integrator ?observability_hook - observability_hook)
+    :precondition
+      (and
+        (integrator_has_observability_hook ?integrator ?observability_hook)
+      )
+    :effect
+      (and
+        (observability_hook_available ?observability_hook)
+        (not
+          (integrator_has_observability_hook ?integrator ?observability_hook)
+        )
+      )
+  )
+  (:action attach_compatibility_report
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (compatibility_report_available ?compatibility_report)
+      )
+    :effect
+      (and
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (not
+          (compatibility_report_available ?compatibility_report)
+        )
+      )
+  )
+  (:action detach_compatibility_report
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report)
+    :precondition
+      (and
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+      )
+    :effect
+      (and
+        (compatibility_report_available ?compatibility_report)
+        (not
+          (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        )
+      )
+  )
+  (:action reserve_runtime_environment
+    :parameters (?runtime_component - runtime_component ?runtime_environment_descriptor - runtime_environment_descriptor ?api_binding - api_binding)
+    :precondition
+      (and
+        (configured_for_integration ?runtime_component)
+        (binding_attached ?runtime_component ?api_binding)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (not
+          (environment_reserved ?runtime_environment_descriptor)
+        )
+        (not
+          (environment_configured ?runtime_environment_descriptor)
+        )
+      )
+    :effect (environment_reserved ?runtime_environment_descriptor)
+  )
+  (:action stage_runtime_component
+    :parameters (?runtime_component - runtime_component ?runtime_environment_descriptor - runtime_environment_descriptor ?configuration_template - configuration_template)
+    :precondition
+      (and
+        (configured_for_integration ?runtime_component)
+        (config_applied ?runtime_component ?configuration_template)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (environment_reserved ?runtime_environment_descriptor)
+        (not
+          (runtime_component_staged ?runtime_component)
+        )
+      )
+    :effect
+      (and
+        (runtime_component_staged ?runtime_component)
+        (component_ready ?runtime_component)
+      )
+  )
+  (:action attach_auxiliary_artifact_to_runtime
+    :parameters (?runtime_component - runtime_component ?runtime_environment_descriptor - runtime_environment_descriptor ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (configured_for_integration ?runtime_component)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (auxiliary_artifact_available ?auxiliary_artifact)
+        (not
+          (runtime_component_staged ?runtime_component)
+        )
+      )
+    :effect
+      (and
+        (environment_configured ?runtime_environment_descriptor)
+        (runtime_component_staged ?runtime_component)
+        (runtime_has_auxiliary_artifact ?runtime_component ?auxiliary_artifact)
+        (not
+          (auxiliary_artifact_available ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action finalize_auxiliary_artifact_application
+    :parameters (?runtime_component - runtime_component ?runtime_environment_descriptor - runtime_environment_descriptor ?api_binding - api_binding ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (configured_for_integration ?runtime_component)
+        (binding_attached ?runtime_component ?api_binding)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (environment_configured ?runtime_environment_descriptor)
+        (runtime_has_auxiliary_artifact ?runtime_component ?auxiliary_artifact)
+        (not
+          (component_ready ?runtime_component)
+        )
+      )
+    :effect
+      (and
+        (environment_reserved ?runtime_environment_descriptor)
+        (component_ready ?runtime_component)
+        (auxiliary_artifact_available ?auxiliary_artifact)
+        (not
+          (runtime_has_auxiliary_artifact ?runtime_component ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action reserve_test_environment
+    :parameters (?test_component - test_component ?test_environment_descriptor - test_environment_descriptor ?api_binding - api_binding)
+    :precondition
+      (and
+        (configured_for_integration ?test_component)
+        (binding_attached ?test_component ?api_binding)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (not
+          (test_environment_reserved ?test_environment_descriptor)
+        )
+        (not
+          (test_environment_configured ?test_environment_descriptor)
+        )
+      )
+    :effect (test_environment_reserved ?test_environment_descriptor)
+  )
+  (:action stage_test_component
+    :parameters (?test_component - test_component ?test_environment_descriptor - test_environment_descriptor ?configuration_template - configuration_template)
+    :precondition
+      (and
+        (configured_for_integration ?test_component)
+        (config_applied ?test_component ?configuration_template)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (test_environment_reserved ?test_environment_descriptor)
+        (not
+          (test_component_staged ?test_component)
+        )
+      )
+    :effect
+      (and
+        (test_component_staged ?test_component)
+        (test_component_ready ?test_component)
+      )
+  )
+  (:action attach_auxiliary_artifact_to_test
+    :parameters (?test_component - test_component ?test_environment_descriptor - test_environment_descriptor ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (configured_for_integration ?test_component)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (auxiliary_artifact_available ?auxiliary_artifact)
+        (not
+          (test_component_staged ?test_component)
+        )
+      )
+    :effect
+      (and
+        (test_environment_configured ?test_environment_descriptor)
+        (test_component_staged ?test_component)
+        (test_has_auxiliary_artifact ?test_component ?auxiliary_artifact)
+        (not
+          (auxiliary_artifact_available ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action finalize_auxiliary_artifact_application_test
+    :parameters (?test_component - test_component ?test_environment_descriptor - test_environment_descriptor ?api_binding - api_binding ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (configured_for_integration ?test_component)
+        (binding_attached ?test_component ?api_binding)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (test_environment_configured ?test_environment_descriptor)
+        (test_has_auxiliary_artifact ?test_component ?auxiliary_artifact)
+        (not
+          (test_component_ready ?test_component)
+        )
+      )
+    :effect
+      (and
+        (test_environment_reserved ?test_environment_descriptor)
+        (test_component_ready ?test_component)
+        (auxiliary_artifact_available ?auxiliary_artifact)
+        (not
+          (test_has_auxiliary_artifact ?test_component ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action assemble_connector_with_both_envs
+    :parameters (?runtime_component - runtime_component ?test_component - test_component ?runtime_environment_descriptor - runtime_environment_descriptor ?test_environment_descriptor - test_environment_descriptor ?connector_build - connector_build)
+    :precondition
+      (and
+        (runtime_component_staged ?runtime_component)
+        (test_component_staged ?test_component)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (environment_reserved ?runtime_environment_descriptor)
+        (test_environment_reserved ?test_environment_descriptor)
+        (component_ready ?runtime_component)
+        (test_component_ready ?test_component)
+        (connector_build_available ?connector_build)
+      )
+    :effect
+      (and
+        (connector_packaged ?connector_build)
+        (connector_built_for_runtime_environment ?connector_build ?runtime_environment_descriptor)
+        (connector_built_for_test_environment ?connector_build ?test_environment_descriptor)
+        (not
+          (connector_build_available ?connector_build)
+        )
+      )
+  )
+  (:action assemble_connector_runtime_primary
+    :parameters (?runtime_component - runtime_component ?test_component - test_component ?runtime_environment_descriptor - runtime_environment_descriptor ?test_environment_descriptor - test_environment_descriptor ?connector_build - connector_build)
+    :precondition
+      (and
+        (runtime_component_staged ?runtime_component)
+        (test_component_staged ?test_component)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (environment_configured ?runtime_environment_descriptor)
+        (test_environment_reserved ?test_environment_descriptor)
+        (not
+          (component_ready ?runtime_component)
+        )
+        (test_component_ready ?test_component)
+        (connector_build_available ?connector_build)
+      )
+    :effect
+      (and
+        (connector_packaged ?connector_build)
+        (connector_built_for_runtime_environment ?connector_build ?runtime_environment_descriptor)
+        (connector_built_for_test_environment ?connector_build ?test_environment_descriptor)
+        (connector_flag_runtime_ready ?connector_build)
+        (not
+          (connector_build_available ?connector_build)
+        )
+      )
+  )
+  (:action assemble_connector_test_primary
+    :parameters (?runtime_component - runtime_component ?test_component - test_component ?runtime_environment_descriptor - runtime_environment_descriptor ?test_environment_descriptor - test_environment_descriptor ?connector_build - connector_build)
+    :precondition
+      (and
+        (runtime_component_staged ?runtime_component)
+        (test_component_staged ?test_component)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (environment_reserved ?runtime_environment_descriptor)
+        (test_environment_configured ?test_environment_descriptor)
+        (component_ready ?runtime_component)
+        (not
+          (test_component_ready ?test_component)
+        )
+        (connector_build_available ?connector_build)
+      )
+    :effect
+      (and
+        (connector_packaged ?connector_build)
+        (connector_built_for_runtime_environment ?connector_build ?runtime_environment_descriptor)
+        (connector_built_for_test_environment ?connector_build ?test_environment_descriptor)
+        (connector_flag_test_ready ?connector_build)
+        (not
+          (connector_build_available ?connector_build)
+        )
+      )
+  )
+  (:action assemble_connector_both_primary
+    :parameters (?runtime_component - runtime_component ?test_component - test_component ?runtime_environment_descriptor - runtime_environment_descriptor ?test_environment_descriptor - test_environment_descriptor ?connector_build - connector_build)
+    :precondition
+      (and
+        (runtime_component_staged ?runtime_component)
+        (test_component_staged ?test_component)
+        (runtime_env_attached_to_component ?runtime_component ?runtime_environment_descriptor)
+        (test_env_attached ?test_component ?test_environment_descriptor)
+        (environment_configured ?runtime_environment_descriptor)
+        (test_environment_configured ?test_environment_descriptor)
+        (not
+          (component_ready ?runtime_component)
+        )
+        (not
+          (test_component_ready ?test_component)
+        )
+        (connector_build_available ?connector_build)
+      )
+    :effect
+      (and
+        (connector_packaged ?connector_build)
+        (connector_built_for_runtime_environment ?connector_build ?runtime_environment_descriptor)
+        (connector_built_for_test_environment ?connector_build ?test_environment_descriptor)
+        (connector_flag_runtime_ready ?connector_build)
+        (connector_flag_test_ready ?connector_build)
+        (not
+          (connector_build_available ?connector_build)
+        )
+      )
+  )
+  (:action mark_connector_verified
+    :parameters (?connector_build - connector_build ?runtime_component - runtime_component ?api_binding - api_binding)
+    :precondition
+      (and
+        (connector_packaged ?connector_build)
+        (runtime_component_staged ?runtime_component)
+        (binding_attached ?runtime_component ?api_binding)
+        (not
+          (connector_verified ?connector_build)
+        )
+      )
+    :effect (connector_verified ?connector_build)
+  )
+  (:action apply_config_file_to_connector
+    :parameters (?integrator - integrator ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (integrator_assigned_connector ?integrator ?connector_build)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_available ?config_file)
+        (connector_packaged ?connector_build)
+        (connector_verified ?connector_build)
+        (not
+          (config_file_applied ?config_file)
+        )
+      )
+    :effect
+      (and
+        (config_file_applied ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (not
+          (config_file_available ?config_file)
+        )
+      )
+  )
+  (:action prepare_integrator_for_validation
+    :parameters (?integrator - integrator ?config_file - config_file ?connector_build - connector_build ?api_binding - api_binding)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_applied ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (binding_attached ?integrator ?api_binding)
+        (not
+          (connector_flag_runtime_ready ?connector_build)
+        )
+        (not
+          (integrator_prevalidation_ready ?integrator)
+        )
+      )
+    :effect (integrator_prevalidation_ready ?integrator)
+  )
+  (:action attach_policy_to_integrator
+    :parameters (?integrator - integrator ?policy - policy)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (policy_available ?policy)
+        (not
+          (policy_attached_to_integrator ?integrator)
+        )
+      )
+    :effect
+      (and
+        (policy_attached_to_integrator ?integrator)
+        (integrator_has_policy ?integrator ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action finalize_integrator_policy_and_config
+    :parameters (?integrator - integrator ?config_file - config_file ?connector_build - connector_build ?api_binding - api_binding ?policy - policy)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_applied ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (binding_attached ?integrator ?api_binding)
+        (connector_flag_runtime_ready ?connector_build)
+        (policy_attached_to_integrator ?integrator)
+        (integrator_has_policy ?integrator ?policy)
+        (not
+          (integrator_prevalidation_ready ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_prevalidation_ready ?integrator)
+        (policy_validated_for_integrator ?integrator)
+      )
+  )
+  (:action attach_observability_and_validate_integrator
+    :parameters (?integrator - integrator ?observability_hook - observability_hook ?configuration_template - configuration_template ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_prevalidation_ready ?integrator)
+        (integrator_has_observability_hook ?integrator ?observability_hook)
+        (config_applied ?integrator ?configuration_template)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (not
+          (connector_flag_test_ready ?connector_build)
+        )
+        (not
+          (integrator_observability_configured ?integrator)
+        )
+      )
+    :effect (integrator_observability_configured ?integrator)
+  )
+  (:action attach_observability_and_validate_integrator_alt
+    :parameters (?integrator - integrator ?observability_hook - observability_hook ?configuration_template - configuration_template ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_prevalidation_ready ?integrator)
+        (integrator_has_observability_hook ?integrator ?observability_hook)
+        (config_applied ?integrator ?configuration_template)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (connector_flag_test_ready ?connector_build)
+        (not
+          (integrator_observability_configured ?integrator)
+        )
+      )
+    :effect (integrator_observability_configured ?integrator)
+  )
+  (:action validate_integrator_compatibility
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_observability_configured ?integrator)
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (not
+          (connector_flag_runtime_ready ?connector_build)
+        )
+        (not
+          (connector_flag_test_ready ?connector_build)
+        )
+        (not
+          (integrator_compatibility_verified ?integrator)
+        )
+      )
+    :effect (integrator_compatibility_verified ?integrator)
+  )
+  (:action validate_integrator_and_flag_approval
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_observability_configured ?integrator)
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (connector_flag_runtime_ready ?connector_build)
+        (not
+          (connector_flag_test_ready ?connector_build)
+        )
+        (not
+          (integrator_compatibility_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (approval_requested ?integrator)
+      )
+  )
+  (:action validate_integrator_and_flag_approval_alt1
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_observability_configured ?integrator)
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (not
+          (connector_flag_runtime_ready ?connector_build)
+        )
+        (connector_flag_test_ready ?connector_build)
+        (not
+          (integrator_compatibility_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (approval_requested ?integrator)
+      )
+  )
+  (:action validate_integrator_and_flag_approval_alt2
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report ?config_file - config_file ?connector_build - connector_build)
+    :precondition
+      (and
+        (integrator_observability_configured ?integrator)
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (integrator_has_config_file ?integrator ?config_file)
+        (config_file_associated_with_connector ?config_file ?connector_build)
+        (connector_flag_runtime_ready ?connector_build)
+        (connector_flag_test_ready ?connector_build)
+        (not
+          (integrator_compatibility_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (approval_requested ?integrator)
+      )
+  )
+  (:action auto_approve_release
+    :parameters (?integrator - integrator)
+    :precondition
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (not
+          (approval_requested ?integrator)
+        )
+        (not
+          (release_signoff_recorded ?integrator)
+        )
+      )
+    :effect
+      (and
+        (release_signoff_recorded ?integrator)
+        (release_approved_for_target ?integrator)
+      )
+  )
+  (:action attach_approval_token
+    :parameters (?integrator - integrator ?approval_token - approval_token)
+    :precondition
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (approval_requested ?integrator)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (integrator_has_approval_token ?integrator ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action complete_release_checks_with_approval
+    :parameters (?integrator - integrator ?runtime_component - runtime_component ?test_component - test_component ?api_binding - api_binding ?approval_token - approval_token)
+    :precondition
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (approval_requested ?integrator)
+        (integrator_has_approval_token ?integrator ?approval_token)
+        (integrator_assigned_runtime_component ?integrator ?runtime_component)
+        (integrator_assigned_test_component ?integrator ?test_component)
+        (component_ready ?runtime_component)
+        (test_component_ready ?test_component)
+        (binding_attached ?integrator ?api_binding)
+        (not
+          (integrator_final_checks_passed ?integrator)
+        )
+      )
+    :effect (integrator_final_checks_passed ?integrator)
+  )
+  (:action finalize_release_post_checks
+    :parameters (?integrator - integrator)
+    :precondition
+      (and
+        (integrator_compatibility_verified ?integrator)
+        (integrator_final_checks_passed ?integrator)
+        (not
+          (release_signoff_recorded ?integrator)
+        )
+      )
+    :effect
+      (and
+        (release_signoff_recorded ?integrator)
+        (release_approved_for_target ?integrator)
+      )
+  )
+  (:action reserve_performance_target_for_integrator
+    :parameters (?integrator - integrator ?performance_target - performance_target ?api_binding - api_binding)
+    :precondition
+      (and
+        (configured_for_integration ?integrator)
+        (binding_attached ?integrator ?api_binding)
+        (performance_target_available ?performance_target)
+        (integrator_has_performance_target ?integrator ?performance_target)
+        (not
+          (performance_target_attached_to_integrator ?integrator)
+        )
+      )
+    :effect
+      (and
+        (performance_target_attached_to_integrator ?integrator)
+        (not
+          (performance_target_available ?performance_target)
+        )
+      )
+  )
+  (:action start_performance_validation
+    :parameters (?integrator - integrator ?configuration_template - configuration_template)
+    :precondition
+      (and
+        (performance_target_attached_to_integrator ?integrator)
+        (config_applied ?integrator ?configuration_template)
+        (not
+          (performance_check_in_progress ?integrator)
+        )
+      )
+    :effect (performance_check_in_progress ?integrator)
+  )
+  (:action approve_performance_validation
+    :parameters (?integrator - integrator ?compatibility_report - compatibility_report)
+    :precondition
+      (and
+        (performance_check_in_progress ?integrator)
+        (integrator_has_compatibility_report ?integrator ?compatibility_report)
+        (not
+          (performance_check_passed ?integrator)
+        )
+      )
+    :effect (performance_check_passed ?integrator)
+  )
+  (:action finalize_performance_release
+    :parameters (?integrator - integrator)
+    :precondition
+      (and
+        (performance_check_passed ?integrator)
+        (not
+          (release_signoff_recorded ?integrator)
+        )
+      )
+    :effect
+      (and
+        (release_signoff_recorded ?integrator)
+        (release_approved_for_target ?integrator)
+      )
+  )
+  (:action mark_runtime_component_ready_for_deployment
+    :parameters (?runtime_component - runtime_component ?connector_build - connector_build)
+    :precondition
+      (and
+        (runtime_component_staged ?runtime_component)
+        (component_ready ?runtime_component)
+        (connector_packaged ?connector_build)
+        (connector_verified ?connector_build)
+        (not
+          (release_approved_for_target ?runtime_component)
+        )
+      )
+    :effect (release_approved_for_target ?runtime_component)
+  )
+  (:action mark_test_component_ready_for_deployment
+    :parameters (?test_component - test_component ?connector_build - connector_build)
+    :precondition
+      (and
+        (test_component_staged ?test_component)
+        (test_component_ready ?test_component)
+        (connector_packaged ?connector_build)
+        (connector_verified ?connector_build)
+        (not
+          (release_approved_for_target ?test_component)
+        )
+      )
+    :effect (release_approved_for_target ?test_component)
+  )
+  (:action bind_credential_to_target
+    :parameters (?integration_target - integration_target ?credential - credential ?api_binding - api_binding)
+    :precondition
+      (and
+        (release_approved_for_target ?integration_target)
+        (binding_attached ?integration_target ?api_binding)
+        (credential_available ?credential)
+        (not
+          (credentials_bound ?integration_target)
+        )
+      )
+    :effect
+      (and
+        (credentials_bound ?integration_target)
+        (target_has_credential ?integration_target ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action activate_integration_on_runtime_component
+    :parameters (?runtime_component - runtime_component ?library_source - library_source ?credential - credential)
+    :precondition
+      (and
+        (credentials_bound ?runtime_component)
+        (uses_library ?runtime_component ?library_source)
+        (target_has_credential ?runtime_component ?credential)
+        (not
+          (integration_deployed ?runtime_component)
+        )
+      )
+    :effect
+      (and
+        (integration_deployed ?runtime_component)
+        (library_available ?library_source)
+        (credential_available ?credential)
+      )
+  )
+  (:action activate_integration_on_test_component
+    :parameters (?test_component - test_component ?library_source - library_source ?credential - credential)
+    :precondition
+      (and
+        (credentials_bound ?test_component)
+        (uses_library ?test_component ?library_source)
+        (target_has_credential ?test_component ?credential)
+        (not
+          (integration_deployed ?test_component)
+        )
+      )
+    :effect
+      (and
+        (integration_deployed ?test_component)
+        (library_available ?library_source)
+        (credential_available ?credential)
+      )
+  )
+  (:action propagate_credential_to_integrator
+    :parameters (?integrator - integrator ?library_source - library_source ?credential - credential)
+    :precondition
+      (and
+        (credentials_bound ?integrator)
+        (uses_library ?integrator ?library_source)
+        (target_has_credential ?integrator ?credential)
+        (not
+          (integration_deployed ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integration_deployed ?integrator)
+        (library_available ?library_source)
+        (credential_available ?credential)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem third_party_library_integration_problem)
+  (:domain third_party_library_integration)
+  (:objects prod_runtime_instance - runtime_component staging_runtime_instance - test_component integrator_alpha - integrator integrator_beta - integrator lib_candidate_a - library_source lib_candidate_b - library_source lib_candidate_c - library_source api_binding_adapter_v1 - api_binding config_template_default - configuration_template example_helper_snippet - auxiliary_artifact prod_runtime_env_descriptor - runtime_environment_descriptor staging_env_descriptor - test_environment_descriptor connector_build_base - connector_build connector_config_v1 - config_file connector_config_v2 - config_file security_policy_s1 - policy license_policy_s2 - policy approval_token_manager_1 - approval_token approval_token_manager_2 - approval_token credential_integration_key - credential observability_hook_prometheus - observability_hook performance_target_p99 - performance_target performance_target_latency - performance_target compat_report_initial - compatibility_report)
+  (:init
+    (library_available lib_candidate_a)
+    (library_available lib_candidate_b)
+    (library_available lib_candidate_c)
+    (binding_available api_binding_adapter_v1)
+    (config_template_available config_template_default)
+    (auxiliary_artifact_available example_helper_snippet)
+    (runtime_env_attached_to_component prod_runtime_instance prod_runtime_env_descriptor)
+    (test_env_attached staging_runtime_instance staging_env_descriptor)
+    (connector_build_available connector_build_base)
+    (config_file_available connector_config_v1)
+    (config_file_available connector_config_v2)
+    (integrator_assigned_runtime_component integrator_alpha prod_runtime_instance)
+    (integrator_assigned_runtime_component integrator_beta prod_runtime_instance)
+    (integrator_assigned_test_component integrator_alpha staging_runtime_instance)
+    (integrator_assigned_test_component integrator_beta staging_runtime_instance)
+    (integrator_assigned_connector integrator_alpha connector_build_base)
+    (integrator_assigned_connector integrator_beta connector_build_base)
+    (integrator_has_config_file integrator_alpha connector_config_v1)
+    (integrator_has_config_file integrator_beta connector_config_v2)
+    (policy_available security_policy_s1)
+    (policy_available license_policy_s2)
+    (approval_token_available approval_token_manager_1)
+    (approval_token_available approval_token_manager_2)
+    (credential_available credential_integration_key)
+    (observability_hook_available observability_hook_prometheus)
+    (performance_target_available performance_target_p99)
+    (integrator_has_performance_target integrator_alpha performance_target_p99)
+    (integrator_has_performance_target integrator_beta performance_target_latency)
+    (compatibility_report_available compat_report_initial)
+  )
+  (:goal
+    (and
+      (integration_deployed prod_runtime_instance)
+      (integration_deployed staging_runtime_instance)
+      (integration_deployed integrator_alpha)
+      (integration_deployed integrator_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register-integration_target prod_runtime_instance)
+(register-integration_target staging_runtime_instance)
+(register-integration_target integrator_alpha)
+(register-integration_target integrator_beta)
+(select-library_for_target prod_runtime_instance lib_candidate_a)
+(select-library_for_target staging_runtime_instance lib_candidate_b)
+(select-library_for_target integrator_alpha lib_candidate_c)
+(attach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(confirm-api_binding prod_runtime_instance api_binding_adapter_v1)
+(detach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(attach-api_binding staging_runtime_instance api_binding_adapter_v1)
+(confirm-api_binding staging_runtime_instance api_binding_adapter_v1)
+(detach-api_binding staging_runtime_instance api_binding_adapter_v1)
+(attach-api_binding integrator_alpha api_binding_adapter_v1)
+(confirm-api_binding integrator_alpha api_binding_adapter_v1)
+(detach-api_binding integrator_alpha api_binding_adapter_v1)
+(attach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(reserve-runtime_environment prod_runtime_instance prod_runtime_env_descriptor api_binding_adapter_v1)
+(apply-configuration_template prod_runtime_instance config_template_default)
+(stage-runtime_component prod_runtime_instance prod_runtime_env_descriptor config_template_default)
+(remove-configuration_template prod_runtime_instance config_template_default)
+(detach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(attach-api_binding staging_runtime_instance api_binding_adapter_v1)
+(reserve-test_environment staging_runtime_instance staging_env_descriptor api_binding_adapter_v1)
+(apply-configuration_template staging_runtime_instance config_template_default)
+(stage-test_component staging_runtime_instance staging_env_descriptor config_template_default)
+(remove-configuration_template staging_runtime_instance config_template_default)
+(detach-api_binding staging_runtime_instance api_binding_adapter_v1)
+(attach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(assemble-connector_with_both_envs prod_runtime_instance staging_runtime_instance prod_runtime_env_descriptor staging_env_descriptor connector_build_base)
+(mark-connector_verified connector_build_base prod_runtime_instance api_binding_adapter_v1)
+(detach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(mark-runtime_component_ready_for_deployment prod_runtime_instance connector_build_base)
+(mark-test_component_ready_for_deployment staging_runtime_instance connector_build_base)
+(attach-api_binding prod_runtime_instance api_binding_adapter_v1)
+(bind-credential_to_target prod_runtime_instance credential_integration_key api_binding_adapter_v1)
+(activate-integration_on_runtime_component prod_runtime_instance lib_candidate_a credential_integration_key)
+(select-library_for_target integrator_beta lib_candidate_a)
+(attach-api_binding integrator_beta api_binding_adapter_v1)
+(confirm-api_binding integrator_beta api_binding_adapter_v1)
+(detach-api_binding integrator_beta api_binding_adapter_v1)
+(apply-config_file_to_connector integrator_alpha connector_config_v1 connector_build_base)
+(attach-api_binding integrator_alpha api_binding_adapter_v1)
+(prepare-integrator_for_validation integrator_alpha connector_config_v1 connector_build_base api_binding_adapter_v1)
+(detach-api_binding integrator_alpha api_binding_adapter_v1)
+(attach-policy_to_integrator integrator_alpha security_policy_s1)
+(attach-observability_hook integrator_alpha observability_hook_prometheus)
+(apply-configuration_template integrator_alpha config_template_default)
+(attach-observability_and_validate_integrator integrator_alpha observability_hook_prometheus config_template_default connector_config_v1 connector_build_base)
+(attach-compatibility_report integrator_alpha compat_report_initial)
+(validate-integrator_compatibility integrator_alpha compat_report_initial connector_config_v1 connector_build_base)
+(detach-observability_hook integrator_alpha observability_hook_prometheus)
+(remove-configuration_template integrator_alpha config_template_default)
+(detach-compatibility_report integrator_alpha compat_report_initial)
+(auto-approve_release integrator_alpha)
+(apply-config_file_to_connector integrator_beta connector_config_v2 connector_build_base)
+(attach-api_binding integrator_beta api_binding_adapter_v1)
+(prepare-integrator_for_validation integrator_beta connector_config_v2 connector_build_base api_binding_adapter_v1)
+(detach-api_binding integrator_beta api_binding_adapter_v1)
+(attach-policy_to_integrator integrator_beta license_policy_s2)
+(attach-observability_hook integrator_beta observability_hook_prometheus)
+(apply-configuration_template integrator_beta config_template_default)
+(attach-observability_and_validate_integrator integrator_beta observability_hook_prometheus config_template_default connector_config_v2 connector_build_base)
+(attach-compatibility_report integrator_beta compat_report_initial)
+(validate-integrator_compatibility integrator_beta compat_report_initial connector_config_v2 connector_build_base)
+(detach-observability_hook integrator_beta observability_hook_prometheus)
+(remove-configuration_template integrator_beta config_template_default)
+(detach-compatibility_report integrator_beta compat_report_initial)
+(auto-approve_release integrator_beta)
+(attach-api_binding integrator_alpha api_binding_adapter_v1)
+(bind-credential_to_target integrator_alpha credential_integration_key api_binding_adapter_v1)
+(propagate-credential_to_integrator integrator_alpha lib_candidate_c credential_integration_key)
+(attach-api_binding integrator_beta api_binding_adapter_v1)
+(bind-credential_to_target integrator_beta credential_integration_key api_binding_adapter_v1)
+(propagate-credential_to_integrator integrator_beta lib_candidate_a credential_integration_key)
+(attach-api_binding staging_runtime_instance api_binding_adapter_v1)
+(bind-credential_to_target staging_runtime_instance credential_integration_key api_binding_adapter_v1)
+(activate-integration_on_test_component staging_runtime_instance lib_candidate_b credential_integration_key)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_y3szm25m/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_y3szm25m/plan.pddl 
+
+
+--- stderr ---
+

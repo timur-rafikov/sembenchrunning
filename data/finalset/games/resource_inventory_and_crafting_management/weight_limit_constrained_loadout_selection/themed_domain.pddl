@@ -1,0 +1,937 @@
+(define (domain weight_limited_loadout_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types game_object - object equipment_type - game_object attachment_type - game_object modifier_type - game_object entity_base - game_object candidate_item - entity_base supply_stack - equipment_type crafting_recipe - equipment_type maintenance_kit - equipment_type accessory - equipment_type utility_mod - equipment_type stowage_tag - equipment_type power_upgrade - equipment_type calibration_unit - equipment_type consumable - attachment_type component_module - attachment_type mission_modifier - attachment_type attachment_variant_a - modifier_type attachment_variant_b - modifier_type gear_item - modifier_type slot_group - candidate_item slot_variant - candidate_item primary_slot - slot_group secondary_slot - slot_group loadout_profile - slot_variant)
+
+  (:predicates
+    (candidate_selected ?candidate - candidate_item)
+    (entity_prepared ?candidate - candidate_item)
+    (supply_reserved ?candidate - candidate_item)
+    (entity_stowed ?candidate - candidate_item)
+    (eligible_for_stowage_entity ?candidate - candidate_item)
+    (stowage_preserved ?candidate - candidate_item)
+    (supply_available ?supply - supply_stack)
+    (entity_has_supply_reservation ?candidate - candidate_item ?supply - supply_stack)
+    (recipe_available ?recipe - crafting_recipe)
+    (entity_bound_to_crafting_recipe ?candidate - candidate_item ?recipe - crafting_recipe)
+    (maintenance_kit_available ?maintenance_kit - maintenance_kit)
+    (maintenance_kit_assigned_to_entity ?candidate - candidate_item ?maintenance_kit - maintenance_kit)
+    (consumable_available ?consumable - consumable)
+    (consumable_attached_to_primary_slot ?primary_slot - primary_slot ?consumable - consumable)
+    (consumable_attached_to_secondary_slot ?secondary_slot - secondary_slot ?consumable - consumable)
+    (primary_slot_compatible_with_attachment_a ?primary_slot - primary_slot ?attachment_a - attachment_variant_a)
+    (attachment_a_staged ?attachment_a - attachment_variant_a)
+    (attachment_a_consumable_applied ?attachment_a - attachment_variant_a)
+    (primary_slot_installed ?primary_slot - primary_slot)
+    (secondary_slot_compatible_with_attachment_b ?secondary_slot - secondary_slot ?attachment_b - attachment_variant_b)
+    (attachment_b_staged ?attachment_b - attachment_variant_b)
+    (attachment_b_consumable_applied ?attachment_b - attachment_variant_b)
+    (secondary_slot_installed ?secondary_slot - secondary_slot)
+    (gear_template_available ?gear - gear_item)
+    (gear_assembled ?gear - gear_item)
+    (gear_has_attachment_a ?gear - gear_item ?attachment_a - attachment_variant_a)
+    (gear_has_attachment_b ?gear - gear_item ?attachment_b - attachment_variant_b)
+    (gear_attachment_a_confirmed ?gear - gear_item)
+    (gear_attachment_b_confirmed ?gear - gear_item)
+    (gear_initialized ?gear - gear_item)
+    (profile_has_primary_slot ?profile - loadout_profile ?primary_slot - primary_slot)
+    (profile_has_secondary_slot ?profile - loadout_profile ?secondary_slot - secondary_slot)
+    (profile_has_gear_template ?profile - loadout_profile ?gear - gear_item)
+    (module_available ?module - component_module)
+    (profile_has_module_slot ?profile - loadout_profile ?module - component_module)
+    (module_installed ?module - component_module)
+    (module_attached_to_gear ?module - component_module ?gear - gear_item)
+    (profile_module_unlocked ?profile - loadout_profile)
+    (profile_module_pending_activation ?profile - loadout_profile)
+    (profile_module_validated ?profile - loadout_profile)
+    (profile_accessory_installed ?profile - loadout_profile)
+    (profile_accessory_confirmed ?profile - loadout_profile)
+    (profile_activation_confirmed ?profile - loadout_profile)
+    (profile_assembly_complete ?profile - loadout_profile)
+    (mission_modifier_available ?mission_modifier - mission_modifier)
+    (profile_has_mission_modifier ?profile - loadout_profile ?mission_modifier - mission_modifier)
+    (modifier_bound ?profile - loadout_profile)
+    (modifier_prepared ?profile - loadout_profile)
+    (modifier_validated ?profile - loadout_profile)
+    (accessory_available ?accessory - accessory)
+    (profile_has_accessory ?profile - loadout_profile ?accessory - accessory)
+    (utility_mod_available ?utility_mod - utility_mod)
+    (profile_has_utility_mod ?profile - loadout_profile ?utility_mod - utility_mod)
+    (power_upgrade_available ?power_upgrade - power_upgrade)
+    (profile_has_power_upgrade ?profile - loadout_profile ?power_upgrade - power_upgrade)
+    (calibration_unit_available ?calibration_unit - calibration_unit)
+    (profile_calibrated ?profile - loadout_profile ?calibration_unit - calibration_unit)
+    (stowage_tag_available ?stowage_tag - stowage_tag)
+    (stowage_assigned ?candidate - candidate_item ?stowage_tag - stowage_tag)
+    (primary_slot_prepared ?primary_slot - primary_slot)
+    (secondary_slot_prepared ?secondary_slot - secondary_slot)
+    (profile_locked ?profile - loadout_profile)
+  )
+  (:action select_candidate
+    :parameters (?candidate - candidate_item)
+    :precondition
+      (and
+        (not
+          (candidate_selected ?candidate)
+        )
+        (not
+          (entity_stowed ?candidate)
+        )
+      )
+    :effect (candidate_selected ?candidate)
+  )
+  (:action reserve_supply_for_candidate
+    :parameters (?candidate - candidate_item ?supply - supply_stack)
+    :precondition
+      (and
+        (candidate_selected ?candidate)
+        (not
+          (supply_reserved ?candidate)
+        )
+        (supply_available ?supply)
+      )
+    :effect
+      (and
+        (supply_reserved ?candidate)
+        (entity_has_supply_reservation ?candidate ?supply)
+        (not
+          (supply_available ?supply)
+        )
+      )
+  )
+  (:action bind_recipe_to_candidate
+    :parameters (?candidate - candidate_item ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (candidate_selected ?candidate)
+        (supply_reserved ?candidate)
+        (recipe_available ?recipe)
+      )
+    :effect
+      (and
+        (entity_bound_to_crafting_recipe ?candidate ?recipe)
+        (not
+          (recipe_available ?recipe)
+        )
+      )
+  )
+  (:action finalize_candidate_preparation
+    :parameters (?candidate - candidate_item ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (candidate_selected ?candidate)
+        (supply_reserved ?candidate)
+        (entity_bound_to_crafting_recipe ?candidate ?recipe)
+        (not
+          (entity_prepared ?candidate)
+        )
+      )
+    :effect (entity_prepared ?candidate)
+  )
+  (:action release_recipe_from_candidate
+    :parameters (?candidate - candidate_item ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (entity_bound_to_crafting_recipe ?candidate ?recipe)
+      )
+    :effect
+      (and
+        (recipe_available ?recipe)
+        (not
+          (entity_bound_to_crafting_recipe ?candidate ?recipe)
+        )
+      )
+  )
+  (:action assign_maintenance_kit_to_candidate
+    :parameters (?candidate - candidate_item ?maintenance_kit - maintenance_kit)
+    :precondition
+      (and
+        (entity_prepared ?candidate)
+        (maintenance_kit_available ?maintenance_kit)
+      )
+    :effect
+      (and
+        (maintenance_kit_assigned_to_entity ?candidate ?maintenance_kit)
+        (not
+          (maintenance_kit_available ?maintenance_kit)
+        )
+      )
+  )
+  (:action release_maintenance_kit_from_candidate
+    :parameters (?candidate - candidate_item ?maintenance_kit - maintenance_kit)
+    :precondition
+      (and
+        (maintenance_kit_assigned_to_entity ?candidate ?maintenance_kit)
+      )
+    :effect
+      (and
+        (maintenance_kit_available ?maintenance_kit)
+        (not
+          (maintenance_kit_assigned_to_entity ?candidate ?maintenance_kit)
+        )
+      )
+  )
+  (:action install_power_upgrade_on_profile
+    :parameters (?profile - loadout_profile ?power_upgrade - power_upgrade)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (power_upgrade_available ?power_upgrade)
+      )
+    :effect
+      (and
+        (profile_has_power_upgrade ?profile ?power_upgrade)
+        (not
+          (power_upgrade_available ?power_upgrade)
+        )
+      )
+  )
+  (:action remove_power_upgrade_from_profile
+    :parameters (?profile - loadout_profile ?power_upgrade - power_upgrade)
+    :precondition
+      (and
+        (profile_has_power_upgrade ?profile ?power_upgrade)
+      )
+    :effect
+      (and
+        (power_upgrade_available ?power_upgrade)
+        (not
+          (profile_has_power_upgrade ?profile ?power_upgrade)
+        )
+      )
+  )
+  (:action install_calibration_on_profile
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (calibration_unit_available ?calibration_unit)
+      )
+    :effect
+      (and
+        (profile_calibrated ?profile ?calibration_unit)
+        (not
+          (calibration_unit_available ?calibration_unit)
+        )
+      )
+  )
+  (:action remove_calibration_from_profile
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit)
+    :precondition
+      (and
+        (profile_calibrated ?profile ?calibration_unit)
+      )
+    :effect
+      (and
+        (calibration_unit_available ?calibration_unit)
+        (not
+          (profile_calibrated ?profile ?calibration_unit)
+        )
+      )
+  )
+  (:action stage_attachment_a_on_primary_slot
+    :parameters (?primary_slot - primary_slot ?attachment_a - attachment_variant_a ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (entity_prepared ?primary_slot)
+        (entity_bound_to_crafting_recipe ?primary_slot ?recipe)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (not
+          (attachment_a_staged ?attachment_a)
+        )
+        (not
+          (attachment_a_consumable_applied ?attachment_a)
+        )
+      )
+    :effect (attachment_a_staged ?attachment_a)
+  )
+  (:action apply_maintenance_and_lock_primary_slot_attachment
+    :parameters (?primary_slot - primary_slot ?attachment_a - attachment_variant_a ?maintenance_kit - maintenance_kit)
+    :precondition
+      (and
+        (entity_prepared ?primary_slot)
+        (maintenance_kit_assigned_to_entity ?primary_slot ?maintenance_kit)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (attachment_a_staged ?attachment_a)
+        (not
+          (primary_slot_prepared ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (primary_slot_installed ?primary_slot)
+      )
+  )
+  (:action apply_consumable_to_primary_slot_attachment
+    :parameters (?primary_slot - primary_slot ?attachment_a - attachment_variant_a ?consumable - consumable)
+    :precondition
+      (and
+        (entity_prepared ?primary_slot)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (consumable_available ?consumable)
+        (not
+          (primary_slot_prepared ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (attachment_a_consumable_applied ?attachment_a)
+        (primary_slot_prepared ?primary_slot)
+        (consumable_attached_to_primary_slot ?primary_slot ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_primary_slot_attachment
+    :parameters (?primary_slot - primary_slot ?attachment_a - attachment_variant_a ?recipe - crafting_recipe ?consumable - consumable)
+    :precondition
+      (and
+        (entity_prepared ?primary_slot)
+        (entity_bound_to_crafting_recipe ?primary_slot ?recipe)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (attachment_a_consumable_applied ?attachment_a)
+        (consumable_attached_to_primary_slot ?primary_slot ?consumable)
+        (not
+          (primary_slot_installed ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (attachment_a_staged ?attachment_a)
+        (primary_slot_installed ?primary_slot)
+        (consumable_available ?consumable)
+        (not
+          (consumable_attached_to_primary_slot ?primary_slot ?consumable)
+        )
+      )
+  )
+  (:action stage_attachment_b_on_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?attachment_b - attachment_variant_b ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (entity_prepared ?secondary_slot)
+        (entity_bound_to_crafting_recipe ?secondary_slot ?recipe)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (not
+          (attachment_b_staged ?attachment_b)
+        )
+        (not
+          (attachment_b_consumable_applied ?attachment_b)
+        )
+      )
+    :effect (attachment_b_staged ?attachment_b)
+  )
+  (:action apply_maintenance_and_lock_secondary_slot_attachment
+    :parameters (?secondary_slot - secondary_slot ?attachment_b - attachment_variant_b ?maintenance_kit - maintenance_kit)
+    :precondition
+      (and
+        (entity_prepared ?secondary_slot)
+        (maintenance_kit_assigned_to_entity ?secondary_slot ?maintenance_kit)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_b_staged ?attachment_b)
+        (not
+          (secondary_slot_prepared ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_prepared ?secondary_slot)
+        (secondary_slot_installed ?secondary_slot)
+      )
+  )
+  (:action apply_consumable_to_secondary_slot_attachment
+    :parameters (?secondary_slot - secondary_slot ?attachment_b - attachment_variant_b ?consumable - consumable)
+    :precondition
+      (and
+        (entity_prepared ?secondary_slot)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (consumable_available ?consumable)
+        (not
+          (secondary_slot_prepared ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (attachment_b_consumable_applied ?attachment_b)
+        (secondary_slot_prepared ?secondary_slot)
+        (consumable_attached_to_secondary_slot ?secondary_slot ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_attachment
+    :parameters (?secondary_slot - secondary_slot ?attachment_b - attachment_variant_b ?recipe - crafting_recipe ?consumable - consumable)
+    :precondition
+      (and
+        (entity_prepared ?secondary_slot)
+        (entity_bound_to_crafting_recipe ?secondary_slot ?recipe)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_b_consumable_applied ?attachment_b)
+        (consumable_attached_to_secondary_slot ?secondary_slot ?consumable)
+        (not
+          (secondary_slot_installed ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (attachment_b_staged ?attachment_b)
+        (secondary_slot_installed ?secondary_slot)
+        (consumable_available ?consumable)
+        (not
+          (consumable_attached_to_secondary_slot ?secondary_slot ?consumable)
+        )
+      )
+  )
+  (:action assemble_gear_from_prepared_slots
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?attachment_a - attachment_variant_a ?attachment_b - attachment_variant_b ?gear - gear_item)
+    :precondition
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (secondary_slot_prepared ?secondary_slot)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_a_staged ?attachment_a)
+        (attachment_b_staged ?attachment_b)
+        (primary_slot_installed ?primary_slot)
+        (secondary_slot_installed ?secondary_slot)
+        (gear_template_available ?gear)
+      )
+    :effect
+      (and
+        (gear_assembled ?gear)
+        (gear_has_attachment_a ?gear ?attachment_a)
+        (gear_has_attachment_b ?gear ?attachment_b)
+        (not
+          (gear_template_available ?gear)
+        )
+      )
+  )
+  (:action assemble_gear_with_attachment_a_confirmed
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?attachment_a - attachment_variant_a ?attachment_b - attachment_variant_b ?gear - gear_item)
+    :precondition
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (secondary_slot_prepared ?secondary_slot)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_a_consumable_applied ?attachment_a)
+        (attachment_b_staged ?attachment_b)
+        (not
+          (primary_slot_installed ?primary_slot)
+        )
+        (secondary_slot_installed ?secondary_slot)
+        (gear_template_available ?gear)
+      )
+    :effect
+      (and
+        (gear_assembled ?gear)
+        (gear_has_attachment_a ?gear ?attachment_a)
+        (gear_has_attachment_b ?gear ?attachment_b)
+        (gear_attachment_a_confirmed ?gear)
+        (not
+          (gear_template_available ?gear)
+        )
+      )
+  )
+  (:action assemble_gear_with_attachment_b_confirmed
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?attachment_a - attachment_variant_a ?attachment_b - attachment_variant_b ?gear - gear_item)
+    :precondition
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (secondary_slot_prepared ?secondary_slot)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_a_staged ?attachment_a)
+        (attachment_b_consumable_applied ?attachment_b)
+        (primary_slot_installed ?primary_slot)
+        (not
+          (secondary_slot_installed ?secondary_slot)
+        )
+        (gear_template_available ?gear)
+      )
+    :effect
+      (and
+        (gear_assembled ?gear)
+        (gear_has_attachment_a ?gear ?attachment_a)
+        (gear_has_attachment_b ?gear ?attachment_b)
+        (gear_attachment_b_confirmed ?gear)
+        (not
+          (gear_template_available ?gear)
+        )
+      )
+  )
+  (:action assemble_gear_with_both_attachments_confirmed
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?attachment_a - attachment_variant_a ?attachment_b - attachment_variant_b ?gear - gear_item)
+    :precondition
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (secondary_slot_prepared ?secondary_slot)
+        (primary_slot_compatible_with_attachment_a ?primary_slot ?attachment_a)
+        (secondary_slot_compatible_with_attachment_b ?secondary_slot ?attachment_b)
+        (attachment_a_consumable_applied ?attachment_a)
+        (attachment_b_consumable_applied ?attachment_b)
+        (not
+          (primary_slot_installed ?primary_slot)
+        )
+        (not
+          (secondary_slot_installed ?secondary_slot)
+        )
+        (gear_template_available ?gear)
+      )
+    :effect
+      (and
+        (gear_assembled ?gear)
+        (gear_has_attachment_a ?gear ?attachment_a)
+        (gear_has_attachment_b ?gear ?attachment_b)
+        (gear_attachment_a_confirmed ?gear)
+        (gear_attachment_b_confirmed ?gear)
+        (not
+          (gear_template_available ?gear)
+        )
+      )
+  )
+  (:action validate_assembled_gear_for_module_installation
+    :parameters (?gear - gear_item ?primary_slot - primary_slot ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (gear_assembled ?gear)
+        (primary_slot_prepared ?primary_slot)
+        (entity_bound_to_crafting_recipe ?primary_slot ?recipe)
+        (not
+          (gear_initialized ?gear)
+        )
+      )
+    :effect (gear_initialized ?gear)
+  )
+  (:action attach_module_to_gear_for_profile
+    :parameters (?profile - loadout_profile ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (profile_has_gear_template ?profile ?gear)
+        (profile_has_module_slot ?profile ?module)
+        (module_available ?module)
+        (gear_assembled ?gear)
+        (gear_initialized ?gear)
+        (not
+          (module_installed ?module)
+        )
+      )
+    :effect
+      (and
+        (module_installed ?module)
+        (module_attached_to_gear ?module ?gear)
+        (not
+          (module_available ?module)
+        )
+      )
+  )
+  (:action prepare_profile_for_module_activation
+    :parameters (?profile - loadout_profile ?module - component_module ?gear - gear_item ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (profile_has_module_slot ?profile ?module)
+        (module_installed ?module)
+        (module_attached_to_gear ?module ?gear)
+        (entity_bound_to_crafting_recipe ?profile ?recipe)
+        (not
+          (gear_attachment_a_confirmed ?gear)
+        )
+        (not
+          (profile_module_unlocked ?profile)
+        )
+      )
+    :effect (profile_module_unlocked ?profile)
+  )
+  (:action install_accessory_on_profile
+    :parameters (?profile - loadout_profile ?accessory - accessory)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (accessory_available ?accessory)
+        (not
+          (profile_accessory_installed ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_accessory_installed ?profile)
+        (profile_has_accessory ?profile ?accessory)
+        (not
+          (accessory_available ?accessory)
+        )
+      )
+  )
+  (:action confirm_module_and_accessory_on_profile
+    :parameters (?profile - loadout_profile ?module - component_module ?gear - gear_item ?recipe - crafting_recipe ?accessory - accessory)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (profile_has_module_slot ?profile ?module)
+        (module_installed ?module)
+        (module_attached_to_gear ?module ?gear)
+        (entity_bound_to_crafting_recipe ?profile ?recipe)
+        (gear_attachment_a_confirmed ?gear)
+        (profile_accessory_installed ?profile)
+        (profile_has_accessory ?profile ?accessory)
+        (not
+          (profile_module_unlocked ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_module_unlocked ?profile)
+        (profile_accessory_confirmed ?profile)
+      )
+  )
+  (:action prime_profile_for_activation
+    :parameters (?profile - loadout_profile ?power_upgrade - power_upgrade ?maintenance_kit - maintenance_kit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_unlocked ?profile)
+        (profile_has_power_upgrade ?profile ?power_upgrade)
+        (maintenance_kit_assigned_to_entity ?profile ?maintenance_kit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (not
+          (gear_attachment_b_confirmed ?gear)
+        )
+        (not
+          (profile_module_pending_activation ?profile)
+        )
+      )
+    :effect (profile_module_pending_activation ?profile)
+  )
+  (:action prime_profile_for_activation_alternate
+    :parameters (?profile - loadout_profile ?power_upgrade - power_upgrade ?maintenance_kit - maintenance_kit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_unlocked ?profile)
+        (profile_has_power_upgrade ?profile ?power_upgrade)
+        (maintenance_kit_assigned_to_entity ?profile ?maintenance_kit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (gear_attachment_b_confirmed ?gear)
+        (not
+          (profile_module_pending_activation ?profile)
+        )
+      )
+    :effect (profile_module_pending_activation ?profile)
+  )
+  (:action validate_profile_activation_with_calibration
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_pending_activation ?profile)
+        (profile_calibrated ?profile ?calibration_unit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (not
+          (gear_attachment_a_confirmed ?gear)
+        )
+        (not
+          (gear_attachment_b_confirmed ?gear)
+        )
+        (not
+          (profile_module_validated ?profile)
+        )
+      )
+    :effect (profile_module_validated ?profile)
+  )
+  (:action validate_profile_activation_with_calibration_and_attachment_a_confirmed
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_pending_activation ?profile)
+        (profile_calibrated ?profile ?calibration_unit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (gear_attachment_a_confirmed ?gear)
+        (not
+          (gear_attachment_b_confirmed ?gear)
+        )
+        (not
+          (profile_module_validated ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_module_validated ?profile)
+        (profile_activation_confirmed ?profile)
+      )
+  )
+  (:action validate_profile_activation_with_calibration_and_attachment_b_confirmed
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_pending_activation ?profile)
+        (profile_calibrated ?profile ?calibration_unit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (not
+          (gear_attachment_a_confirmed ?gear)
+        )
+        (gear_attachment_b_confirmed ?gear)
+        (not
+          (profile_module_validated ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_module_validated ?profile)
+        (profile_activation_confirmed ?profile)
+      )
+  )
+  (:action validate_profile_activation_with_all_attachments_confirmed
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit ?module - component_module ?gear - gear_item)
+    :precondition
+      (and
+        (profile_module_pending_activation ?profile)
+        (profile_calibrated ?profile ?calibration_unit)
+        (profile_has_module_slot ?profile ?module)
+        (module_attached_to_gear ?module ?gear)
+        (gear_attachment_a_confirmed ?gear)
+        (gear_attachment_b_confirmed ?gear)
+        (not
+          (profile_module_validated ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_module_validated ?profile)
+        (profile_activation_confirmed ?profile)
+      )
+  )
+  (:action mark_profile_eligible_for_stowage
+    :parameters (?profile - loadout_profile)
+    :precondition
+      (and
+        (profile_module_validated ?profile)
+        (not
+          (profile_activation_confirmed ?profile)
+        )
+        (not
+          (profile_locked ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_locked ?profile)
+        (eligible_for_stowage_entity ?profile)
+      )
+  )
+  (:action install_utility_mod_on_profile
+    :parameters (?profile - loadout_profile ?utility_mod - utility_mod)
+    :precondition
+      (and
+        (profile_module_validated ?profile)
+        (profile_activation_confirmed ?profile)
+        (utility_mod_available ?utility_mod)
+      )
+    :effect
+      (and
+        (profile_has_utility_mod ?profile ?utility_mod)
+        (not
+          (utility_mod_available ?utility_mod)
+        )
+      )
+  )
+  (:action finalize_profile_module_installation
+    :parameters (?profile - loadout_profile ?primary_slot - primary_slot ?secondary_slot - secondary_slot ?recipe - crafting_recipe ?utility_mod - utility_mod)
+    :precondition
+      (and
+        (profile_module_validated ?profile)
+        (profile_activation_confirmed ?profile)
+        (profile_has_utility_mod ?profile ?utility_mod)
+        (profile_has_primary_slot ?profile ?primary_slot)
+        (profile_has_secondary_slot ?profile ?secondary_slot)
+        (primary_slot_installed ?primary_slot)
+        (secondary_slot_installed ?secondary_slot)
+        (entity_bound_to_crafting_recipe ?profile ?recipe)
+        (not
+          (profile_assembly_complete ?profile)
+        )
+      )
+    :effect (profile_assembly_complete ?profile)
+  )
+  (:action confirm_profile_ready_for_stowage
+    :parameters (?profile - loadout_profile)
+    :precondition
+      (and
+        (profile_module_validated ?profile)
+        (profile_assembly_complete ?profile)
+        (not
+          (profile_locked ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_locked ?profile)
+        (eligible_for_stowage_entity ?profile)
+      )
+  )
+  (:action apply_mission_modifier_to_profile
+    :parameters (?profile - loadout_profile ?mission_modifier - mission_modifier ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (entity_prepared ?profile)
+        (entity_bound_to_crafting_recipe ?profile ?recipe)
+        (mission_modifier_available ?mission_modifier)
+        (profile_has_mission_modifier ?profile ?mission_modifier)
+        (not
+          (modifier_bound ?profile)
+        )
+      )
+    :effect
+      (and
+        (modifier_bound ?profile)
+        (not
+          (mission_modifier_available ?mission_modifier)
+        )
+      )
+  )
+  (:action prepare_profile_modifier_installation
+    :parameters (?profile - loadout_profile ?maintenance_kit - maintenance_kit)
+    :precondition
+      (and
+        (modifier_bound ?profile)
+        (maintenance_kit_assigned_to_entity ?profile ?maintenance_kit)
+        (not
+          (modifier_prepared ?profile)
+        )
+      )
+    :effect (modifier_prepared ?profile)
+  )
+  (:action install_modifier_on_profile_with_calibration
+    :parameters (?profile - loadout_profile ?calibration_unit - calibration_unit)
+    :precondition
+      (and
+        (modifier_prepared ?profile)
+        (profile_calibrated ?profile ?calibration_unit)
+        (not
+          (modifier_validated ?profile)
+        )
+      )
+    :effect (modifier_validated ?profile)
+  )
+  (:action finalize_modifier_application_on_profile
+    :parameters (?profile - loadout_profile)
+    :precondition
+      (and
+        (modifier_validated ?profile)
+        (not
+          (profile_locked ?profile)
+        )
+      )
+    :effect
+      (and
+        (profile_locked ?profile)
+        (eligible_for_stowage_entity ?profile)
+      )
+  )
+  (:action mark_primary_slot_eligible_for_stowage
+    :parameters (?primary_slot - primary_slot ?gear - gear_item)
+    :precondition
+      (and
+        (primary_slot_prepared ?primary_slot)
+        (primary_slot_installed ?primary_slot)
+        (gear_assembled ?gear)
+        (gear_initialized ?gear)
+        (not
+          (eligible_for_stowage_entity ?primary_slot)
+        )
+      )
+    :effect (eligible_for_stowage_entity ?primary_slot)
+  )
+  (:action mark_secondary_slot_eligible_for_stowage
+    :parameters (?secondary_slot - secondary_slot ?gear - gear_item)
+    :precondition
+      (and
+        (secondary_slot_prepared ?secondary_slot)
+        (secondary_slot_installed ?secondary_slot)
+        (gear_assembled ?gear)
+        (gear_initialized ?gear)
+        (not
+          (eligible_for_stowage_entity ?secondary_slot)
+        )
+      )
+    :effect (eligible_for_stowage_entity ?secondary_slot)
+  )
+  (:action apply_stowage_tag_to_candidate
+    :parameters (?candidate - candidate_item ?stowage_tag - stowage_tag ?recipe - crafting_recipe)
+    :precondition
+      (and
+        (eligible_for_stowage_entity ?candidate)
+        (entity_bound_to_crafting_recipe ?candidate ?recipe)
+        (stowage_tag_available ?stowage_tag)
+        (not
+          (stowage_preserved ?candidate)
+        )
+      )
+    :effect
+      (and
+        (stowage_preserved ?candidate)
+        (stowage_assigned ?candidate ?stowage_tag)
+        (not
+          (stowage_tag_available ?stowage_tag)
+        )
+      )
+  )
+  (:action commit_primary_slot_with_stowage_tag
+    :parameters (?primary_slot - primary_slot ?supply - supply_stack ?stowage_tag - stowage_tag)
+    :precondition
+      (and
+        (stowage_preserved ?primary_slot)
+        (entity_has_supply_reservation ?primary_slot ?supply)
+        (stowage_assigned ?primary_slot ?stowage_tag)
+        (not
+          (entity_stowed ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_stowed ?primary_slot)
+        (supply_available ?supply)
+        (stowage_tag_available ?stowage_tag)
+      )
+  )
+  (:action commit_secondary_slot_with_stowage_tag
+    :parameters (?secondary_slot - secondary_slot ?supply - supply_stack ?stowage_tag - stowage_tag)
+    :precondition
+      (and
+        (stowage_preserved ?secondary_slot)
+        (entity_has_supply_reservation ?secondary_slot ?supply)
+        (stowage_assigned ?secondary_slot ?stowage_tag)
+        (not
+          (entity_stowed ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_stowed ?secondary_slot)
+        (supply_available ?supply)
+        (stowage_tag_available ?stowage_tag)
+      )
+  )
+  (:action commit_profile_with_stowage_tag
+    :parameters (?profile - loadout_profile ?supply - supply_stack ?stowage_tag - stowage_tag)
+    :precondition
+      (and
+        (stowage_preserved ?profile)
+        (entity_has_supply_reservation ?profile ?supply)
+        (stowage_assigned ?profile ?stowage_tag)
+        (not
+          (entity_stowed ?profile)
+        )
+      )
+    :effect
+      (and
+        (entity_stowed ?profile)
+        (supply_available ?supply)
+        (stowage_tag_available ?stowage_tag)
+      )
+  )
+)

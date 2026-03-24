@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain transfer_credit_evaluation_follow_through_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object document_category - object decision_category - object case_root_type - object case_component - case_root_type evaluator_availability_slot - resource_category transfer_course_record - resource_category department_representative - resource_category catalog_reference - resource_category policy_rule_reference - resource_category follow_up_task - resource_category subject_matter_expert - resource_category policy_exception_request - resource_category supporting_document - document_category document_bundle - document_category department_approval_token - document_category articulation_decision_slot - decision_category department_decision_slot - decision_category evaluation_packet - decision_category individual_role - case_component case_artifact - case_component student_profile - individual_role academic_advisor - individual_role transfer_evaluation_case - case_artifact)
+  (:predicates
+    (entity_intake_registered ?case_participant - case_component)
+    (entity_initial_review_completed ?case_participant - case_component)
+    (entity_evaluator_assigned ?case_participant - case_component)
+    (entity_follow_through_completed ?case_participant - case_component)
+    (final_decision_recorded ?case_participant - case_component)
+    (follow_up_assigned ?case_participant - case_component)
+    (evaluator_slot_available ?evaluator_availability_slot - evaluator_availability_slot)
+    (entity_assigned_evaluator_slot ?case_participant - case_component ?evaluator_availability_slot - evaluator_availability_slot)
+    (course_record_available ?transfer_course_record - transfer_course_record)
+    (entity_course_under_review ?case_participant - case_component ?transfer_course_record - transfer_course_record)
+    (department_representative_available ?department_representative - department_representative)
+    (department_representative_assigned ?case_participant - case_component ?department_representative - department_representative)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (student_has_document ?student_profile - student_profile ?supporting_document - supporting_document)
+    (advisor_has_document ?academic_advisor - academic_advisor ?supporting_document - supporting_document)
+    (student_has_articulation_slot ?student_profile - student_profile ?articulation_decision_slot - articulation_decision_slot)
+    (articulation_slot_flagged_for_review ?articulation_decision_slot - articulation_decision_slot)
+    (articulation_slot_has_evidence ?articulation_decision_slot - articulation_decision_slot)
+    (student_ready_for_packet ?student_profile - student_profile)
+    (advisor_has_department_slot ?academic_advisor - academic_advisor ?department_decision_slot - department_decision_slot)
+    (department_slot_flagged_for_review ?department_decision_slot - department_decision_slot)
+    (department_slot_has_evidence ?department_decision_slot - department_decision_slot)
+    (advisor_ready_for_packet ?academic_advisor - academic_advisor)
+    (evaluation_packet_available ?evaluation_packet - evaluation_packet)
+    (evaluation_packet_routed ?evaluation_packet - evaluation_packet)
+    (packet_associated_with_articulation_slot ?evaluation_packet - evaluation_packet ?articulation_decision_slot - articulation_decision_slot)
+    (packet_associated_with_department_slot ?evaluation_packet - evaluation_packet ?department_decision_slot - department_decision_slot)
+    (packet_requires_catalog_reference ?evaluation_packet - evaluation_packet)
+    (packet_requires_subject_matter_expert ?evaluation_packet - evaluation_packet)
+    (evaluation_packet_review_ready ?evaluation_packet - evaluation_packet)
+    (case_assigned_to_student ?transfer_evaluation_case - transfer_evaluation_case ?student_profile - student_profile)
+    (case_assigned_to_advisor ?transfer_evaluation_case - transfer_evaluation_case ?academic_advisor - academic_advisor)
+    (case_associated_with_evaluation_packet ?transfer_evaluation_case - transfer_evaluation_case ?evaluation_packet - evaluation_packet)
+    (document_bundle_available ?document_bundle - document_bundle)
+    (case_has_document_bundle ?transfer_evaluation_case - transfer_evaluation_case ?document_bundle - document_bundle)
+    (document_bundle_processed ?document_bundle - document_bundle)
+    (document_bundle_attached_to_packet ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    (case_ready_for_decision_processing ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_specialist_coordination_ready ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_decision_initiated ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_catalog_reference_attached ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_catalog_reference_processed ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_reference_attached ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_ready_for_recording ?transfer_evaluation_case - transfer_evaluation_case)
+    (department_approval_token_available ?department_approval_token - department_approval_token)
+    (case_linked_to_department_approval_token ?transfer_evaluation_case - transfer_evaluation_case ?department_approval_token - department_approval_token)
+    (case_has_department_approval ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_rep_action_taken ?transfer_evaluation_case - transfer_evaluation_case)
+    (case_rep_action_processed ?transfer_evaluation_case - transfer_evaluation_case)
+    (catalog_reference_available ?catalog_reference - catalog_reference)
+    (case_linked_to_catalog_reference ?transfer_evaluation_case - transfer_evaluation_case ?catalog_reference - catalog_reference)
+    (policy_rule_reference_available ?policy_rule_reference - policy_rule_reference)
+    (case_linked_to_policy_reference ?transfer_evaluation_case - transfer_evaluation_case ?policy_rule_reference - policy_rule_reference)
+    (subject_matter_expert_available ?subject_matter_expert - subject_matter_expert)
+    (subject_matter_expert_assigned_to_case ?transfer_evaluation_case - transfer_evaluation_case ?subject_matter_expert - subject_matter_expert)
+    (policy_exception_request_available ?policy_exception_request - policy_exception_request)
+    (policy_exception_assigned_to_case ?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request)
+    (follow_up_task_available ?follow_up_task - follow_up_task)
+    (entity_follow_up_task_linked ?case_participant - case_component ?follow_up_task - follow_up_task)
+    (student_evidence_collected ?student_profile - student_profile)
+    (advisor_evidence_collected ?academic_advisor - academic_advisor)
+    (case_outcome_recorded ?transfer_evaluation_case - transfer_evaluation_case)
+  )
+  (:action create_transfer_evaluation_intake
+    :parameters (?case_participant - case_component)
+    :precondition
+      (and
+        (not
+          (entity_intake_registered ?case_participant)
+        )
+        (not
+          (entity_follow_through_completed ?case_participant)
+        )
+      )
+    :effect (entity_intake_registered ?case_participant)
+  )
+  (:action assign_evaluator_slot_to_entity
+    :parameters (?case_participant - case_component ?evaluator_availability_slot - evaluator_availability_slot)
+    :precondition
+      (and
+        (entity_intake_registered ?case_participant)
+        (not
+          (entity_evaluator_assigned ?case_participant)
+        )
+        (evaluator_slot_available ?evaluator_availability_slot)
+      )
+    :effect
+      (and
+        (entity_evaluator_assigned ?case_participant)
+        (entity_assigned_evaluator_slot ?case_participant ?evaluator_availability_slot)
+        (not
+          (evaluator_slot_available ?evaluator_availability_slot)
+        )
+      )
+  )
+  (:action assign_course_record_to_entity
+    :parameters (?case_participant - case_component ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_intake_registered ?case_participant)
+        (entity_evaluator_assigned ?case_participant)
+        (course_record_available ?transfer_course_record)
+      )
+    :effect
+      (and
+        (entity_course_under_review ?case_participant ?transfer_course_record)
+        (not
+          (course_record_available ?transfer_course_record)
+        )
+      )
+  )
+  (:action record_initial_review_completion
+    :parameters (?case_participant - case_component ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_intake_registered ?case_participant)
+        (entity_evaluator_assigned ?case_participant)
+        (entity_course_under_review ?case_participant ?transfer_course_record)
+        (not
+          (entity_initial_review_completed ?case_participant)
+        )
+      )
+    :effect (entity_initial_review_completed ?case_participant)
+  )
+  (:action release_course_record_from_entity
+    :parameters (?case_participant - case_component ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_course_under_review ?case_participant ?transfer_course_record)
+      )
+    :effect
+      (and
+        (course_record_available ?transfer_course_record)
+        (not
+          (entity_course_under_review ?case_participant ?transfer_course_record)
+        )
+      )
+  )
+  (:action assign_department_representative_to_entity
+    :parameters (?case_participant - case_component ?department_representative - department_representative)
+    :precondition
+      (and
+        (entity_initial_review_completed ?case_participant)
+        (department_representative_available ?department_representative)
+      )
+    :effect
+      (and
+        (department_representative_assigned ?case_participant ?department_representative)
+        (not
+          (department_representative_available ?department_representative)
+        )
+      )
+  )
+  (:action release_department_representative_from_entity
+    :parameters (?case_participant - case_component ?department_representative - department_representative)
+    :precondition
+      (and
+        (department_representative_assigned ?case_participant ?department_representative)
+      )
+    :effect
+      (and
+        (department_representative_available ?department_representative)
+        (not
+          (department_representative_assigned ?case_participant ?department_representative)
+        )
+      )
+  )
+  (:action assign_subject_matter_expert_to_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (subject_matter_expert_available ?subject_matter_expert)
+      )
+    :effect
+      (and
+        (subject_matter_expert_assigned_to_case ?transfer_evaluation_case ?subject_matter_expert)
+        (not
+          (subject_matter_expert_available ?subject_matter_expert)
+        )
+      )
+  )
+  (:action unassign_subject_matter_expert_from_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (subject_matter_expert_assigned_to_case ?transfer_evaluation_case ?subject_matter_expert)
+      )
+    :effect
+      (and
+        (subject_matter_expert_available ?subject_matter_expert)
+        (not
+          (subject_matter_expert_assigned_to_case ?transfer_evaluation_case ?subject_matter_expert)
+        )
+      )
+  )
+  (:action assign_policy_exception_to_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (policy_exception_request_available ?policy_exception_request)
+      )
+    :effect
+      (and
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (not
+          (policy_exception_request_available ?policy_exception_request)
+        )
+      )
+  )
+  (:action unassign_policy_exception_from_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request)
+    :precondition
+      (and
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+      )
+    :effect
+      (and
+        (policy_exception_request_available ?policy_exception_request)
+        (not
+          (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        )
+      )
+  )
+  (:action request_articulation_review_for_student_course
+    :parameters (?student_profile - student_profile ?articulation_decision_slot - articulation_decision_slot ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_initial_review_completed ?student_profile)
+        (entity_course_under_review ?student_profile ?transfer_course_record)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (not
+          (articulation_slot_flagged_for_review ?articulation_decision_slot)
+        )
+        (not
+          (articulation_slot_has_evidence ?articulation_decision_slot)
+        )
+      )
+    :effect (articulation_slot_flagged_for_review ?articulation_decision_slot)
+  )
+  (:action engage_department_rep_and_mark_student_ready
+    :parameters (?student_profile - student_profile ?articulation_decision_slot - articulation_decision_slot ?department_representative - department_representative)
+    :precondition
+      (and
+        (entity_initial_review_completed ?student_profile)
+        (department_representative_assigned ?student_profile ?department_representative)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (articulation_slot_flagged_for_review ?articulation_decision_slot)
+        (not
+          (student_evidence_collected ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (student_evidence_collected ?student_profile)
+        (student_ready_for_packet ?student_profile)
+      )
+  )
+  (:action attach_supporting_document_to_student
+    :parameters (?student_profile - student_profile ?articulation_decision_slot - articulation_decision_slot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_initial_review_completed ?student_profile)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (supporting_document_available ?supporting_document)
+        (not
+          (student_evidence_collected ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (articulation_slot_has_evidence ?articulation_decision_slot)
+        (student_evidence_collected ?student_profile)
+        (student_has_document ?student_profile ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action process_student_document_and_flag_slot
+    :parameters (?student_profile - student_profile ?articulation_decision_slot - articulation_decision_slot ?transfer_course_record - transfer_course_record ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_initial_review_completed ?student_profile)
+        (entity_course_under_review ?student_profile ?transfer_course_record)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (articulation_slot_has_evidence ?articulation_decision_slot)
+        (student_has_document ?student_profile ?supporting_document)
+        (not
+          (student_ready_for_packet ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (articulation_slot_flagged_for_review ?articulation_decision_slot)
+        (student_ready_for_packet ?student_profile)
+        (supporting_document_available ?supporting_document)
+        (not
+          (student_has_document ?student_profile ?supporting_document)
+        )
+      )
+  )
+  (:action request_department_review_for_advisor_course
+    :parameters (?academic_advisor - academic_advisor ?department_decision_slot - department_decision_slot ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_initial_review_completed ?academic_advisor)
+        (entity_course_under_review ?academic_advisor ?transfer_course_record)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (not
+          (department_slot_flagged_for_review ?department_decision_slot)
+        )
+        (not
+          (department_slot_has_evidence ?department_decision_slot)
+        )
+      )
+    :effect (department_slot_flagged_for_review ?department_decision_slot)
+  )
+  (:action engage_department_rep_for_advisor_and_mark_ready
+    :parameters (?academic_advisor - academic_advisor ?department_decision_slot - department_decision_slot ?department_representative - department_representative)
+    :precondition
+      (and
+        (entity_initial_review_completed ?academic_advisor)
+        (department_representative_assigned ?academic_advisor ?department_representative)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (department_slot_flagged_for_review ?department_decision_slot)
+        (not
+          (advisor_evidence_collected ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_evidence_collected ?academic_advisor)
+        (advisor_ready_for_packet ?academic_advisor)
+      )
+  )
+  (:action attach_supporting_document_by_advisor
+    :parameters (?academic_advisor - academic_advisor ?department_decision_slot - department_decision_slot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_initial_review_completed ?academic_advisor)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (supporting_document_available ?supporting_document)
+        (not
+          (advisor_evidence_collected ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (department_slot_has_evidence ?department_decision_slot)
+        (advisor_evidence_collected ?academic_advisor)
+        (advisor_has_document ?academic_advisor ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action process_advisor_document_and_flag_slot
+    :parameters (?academic_advisor - academic_advisor ?department_decision_slot - department_decision_slot ?transfer_course_record - transfer_course_record ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_initial_review_completed ?academic_advisor)
+        (entity_course_under_review ?academic_advisor ?transfer_course_record)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (department_slot_has_evidence ?department_decision_slot)
+        (advisor_has_document ?academic_advisor ?supporting_document)
+        (not
+          (advisor_ready_for_packet ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (department_slot_flagged_for_review ?department_decision_slot)
+        (advisor_ready_for_packet ?academic_advisor)
+        (supporting_document_available ?supporting_document)
+        (not
+          (advisor_has_document ?academic_advisor ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_evaluation_packet_and_associate_slots
+    :parameters (?student_profile - student_profile ?academic_advisor - academic_advisor ?articulation_decision_slot - articulation_decision_slot ?department_decision_slot - department_decision_slot ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (student_evidence_collected ?student_profile)
+        (advisor_evidence_collected ?academic_advisor)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (articulation_slot_flagged_for_review ?articulation_decision_slot)
+        (department_slot_flagged_for_review ?department_decision_slot)
+        (student_ready_for_packet ?student_profile)
+        (advisor_ready_for_packet ?academic_advisor)
+        (evaluation_packet_available ?evaluation_packet)
+      )
+    :effect
+      (and
+        (evaluation_packet_routed ?evaluation_packet)
+        (packet_associated_with_articulation_slot ?evaluation_packet ?articulation_decision_slot)
+        (packet_associated_with_department_slot ?evaluation_packet ?department_decision_slot)
+        (not
+          (evaluation_packet_available ?evaluation_packet)
+        )
+      )
+  )
+  (:action assemble_packet_with_catalog_requirement
+    :parameters (?student_profile - student_profile ?academic_advisor - academic_advisor ?articulation_decision_slot - articulation_decision_slot ?department_decision_slot - department_decision_slot ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (student_evidence_collected ?student_profile)
+        (advisor_evidence_collected ?academic_advisor)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (articulation_slot_has_evidence ?articulation_decision_slot)
+        (department_slot_flagged_for_review ?department_decision_slot)
+        (not
+          (student_ready_for_packet ?student_profile)
+        )
+        (advisor_ready_for_packet ?academic_advisor)
+        (evaluation_packet_available ?evaluation_packet)
+      )
+    :effect
+      (and
+        (evaluation_packet_routed ?evaluation_packet)
+        (packet_associated_with_articulation_slot ?evaluation_packet ?articulation_decision_slot)
+        (packet_associated_with_department_slot ?evaluation_packet ?department_decision_slot)
+        (packet_requires_catalog_reference ?evaluation_packet)
+        (not
+          (evaluation_packet_available ?evaluation_packet)
+        )
+      )
+  )
+  (:action assemble_packet_with_policy_requirement
+    :parameters (?student_profile - student_profile ?academic_advisor - academic_advisor ?articulation_decision_slot - articulation_decision_slot ?department_decision_slot - department_decision_slot ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (student_evidence_collected ?student_profile)
+        (advisor_evidence_collected ?academic_advisor)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (articulation_slot_flagged_for_review ?articulation_decision_slot)
+        (department_slot_has_evidence ?department_decision_slot)
+        (student_ready_for_packet ?student_profile)
+        (not
+          (advisor_ready_for_packet ?academic_advisor)
+        )
+        (evaluation_packet_available ?evaluation_packet)
+      )
+    :effect
+      (and
+        (evaluation_packet_routed ?evaluation_packet)
+        (packet_associated_with_articulation_slot ?evaluation_packet ?articulation_decision_slot)
+        (packet_associated_with_department_slot ?evaluation_packet ?department_decision_slot)
+        (packet_requires_subject_matter_expert ?evaluation_packet)
+        (not
+          (evaluation_packet_available ?evaluation_packet)
+        )
+      )
+  )
+  (:action assemble_packet_with_catalog_and_policy_requirements
+    :parameters (?student_profile - student_profile ?academic_advisor - academic_advisor ?articulation_decision_slot - articulation_decision_slot ?department_decision_slot - department_decision_slot ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (student_evidence_collected ?student_profile)
+        (advisor_evidence_collected ?academic_advisor)
+        (student_has_articulation_slot ?student_profile ?articulation_decision_slot)
+        (advisor_has_department_slot ?academic_advisor ?department_decision_slot)
+        (articulation_slot_has_evidence ?articulation_decision_slot)
+        (department_slot_has_evidence ?department_decision_slot)
+        (not
+          (student_ready_for_packet ?student_profile)
+        )
+        (not
+          (advisor_ready_for_packet ?academic_advisor)
+        )
+        (evaluation_packet_available ?evaluation_packet)
+      )
+    :effect
+      (and
+        (evaluation_packet_routed ?evaluation_packet)
+        (packet_associated_with_articulation_slot ?evaluation_packet ?articulation_decision_slot)
+        (packet_associated_with_department_slot ?evaluation_packet ?department_decision_slot)
+        (packet_requires_catalog_reference ?evaluation_packet)
+        (packet_requires_subject_matter_expert ?evaluation_packet)
+        (not
+          (evaluation_packet_available ?evaluation_packet)
+        )
+      )
+  )
+  (:action mark_packet_review_ready
+    :parameters (?evaluation_packet - evaluation_packet ?student_profile - student_profile ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (evaluation_packet_routed ?evaluation_packet)
+        (student_evidence_collected ?student_profile)
+        (entity_course_under_review ?student_profile ?transfer_course_record)
+        (not
+          (evaluation_packet_review_ready ?evaluation_packet)
+        )
+      )
+    :effect (evaluation_packet_review_ready ?evaluation_packet)
+  )
+  (:action create_document_bundle_and_attach
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (case_associated_with_evaluation_packet ?transfer_evaluation_case ?evaluation_packet)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_available ?document_bundle)
+        (evaluation_packet_routed ?evaluation_packet)
+        (evaluation_packet_review_ready ?evaluation_packet)
+        (not
+          (document_bundle_processed ?document_bundle)
+        )
+      )
+    :effect
+      (and
+        (document_bundle_processed ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (not
+          (document_bundle_available ?document_bundle)
+        )
+      )
+  )
+  (:action mark_case_ready_for_decision_without_catalog
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_processed ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (entity_course_under_review ?transfer_evaluation_case ?transfer_course_record)
+        (not
+          (packet_requires_catalog_reference ?evaluation_packet)
+        )
+        (not
+          (case_ready_for_decision_processing ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_ready_for_decision_processing ?transfer_evaluation_case)
+  )
+  (:action attach_catalog_reference_to_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?catalog_reference - catalog_reference)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (catalog_reference_available ?catalog_reference)
+        (not
+          (case_catalog_reference_attached ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_catalog_reference_attached ?transfer_evaluation_case)
+        (case_linked_to_catalog_reference ?transfer_evaluation_case ?catalog_reference)
+        (not
+          (catalog_reference_available ?catalog_reference)
+        )
+      )
+  )
+  (:action process_catalog_reference_and_mark_case_ready
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet ?transfer_course_record - transfer_course_record ?catalog_reference - catalog_reference)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_processed ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (entity_course_under_review ?transfer_evaluation_case ?transfer_course_record)
+        (packet_requires_catalog_reference ?evaluation_packet)
+        (case_catalog_reference_attached ?transfer_evaluation_case)
+        (case_linked_to_catalog_reference ?transfer_evaluation_case ?catalog_reference)
+        (not
+          (case_ready_for_decision_processing ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_decision_processing ?transfer_evaluation_case)
+        (case_catalog_reference_processed ?transfer_evaluation_case)
+      )
+  )
+  (:action engage_sme_and_mark_case_for_specialist_review
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?subject_matter_expert - subject_matter_expert ?department_representative - department_representative ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_ready_for_decision_processing ?transfer_evaluation_case)
+        (subject_matter_expert_assigned_to_case ?transfer_evaluation_case ?subject_matter_expert)
+        (department_representative_assigned ?transfer_evaluation_case ?department_representative)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (not
+          (packet_requires_subject_matter_expert ?evaluation_packet)
+        )
+        (not
+          (case_specialist_coordination_ready ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_specialist_coordination_ready ?transfer_evaluation_case)
+  )
+  (:action engage_sme_and_mark_case_for_specialist_review_with_policy_flag
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?subject_matter_expert - subject_matter_expert ?department_representative - department_representative ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_ready_for_decision_processing ?transfer_evaluation_case)
+        (subject_matter_expert_assigned_to_case ?transfer_evaluation_case ?subject_matter_expert)
+        (department_representative_assigned ?transfer_evaluation_case ?department_representative)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (packet_requires_subject_matter_expert ?evaluation_packet)
+        (not
+          (case_specialist_coordination_ready ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_specialist_coordination_ready ?transfer_evaluation_case)
+  )
+  (:action record_sme_response_and_mark_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_specialist_coordination_ready ?transfer_evaluation_case)
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (not
+          (packet_requires_catalog_reference ?evaluation_packet)
+        )
+        (not
+          (packet_requires_subject_matter_expert ?evaluation_packet)
+        )
+        (not
+          (case_decision_initiated ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_decision_initiated ?transfer_evaluation_case)
+  )
+  (:action record_sme_response_and_attach_reference_and_mark_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_specialist_coordination_ready ?transfer_evaluation_case)
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (packet_requires_catalog_reference ?evaluation_packet)
+        (not
+          (packet_requires_subject_matter_expert ?evaluation_packet)
+        )
+        (not
+          (case_decision_initiated ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_reference_attached ?transfer_evaluation_case)
+      )
+  )
+  (:action record_sme_response_and_attach_reference_variant
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_specialist_coordination_ready ?transfer_evaluation_case)
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (not
+          (packet_requires_catalog_reference ?evaluation_packet)
+        )
+        (packet_requires_subject_matter_expert ?evaluation_packet)
+        (not
+          (case_decision_initiated ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_reference_attached ?transfer_evaluation_case)
+      )
+  )
+  (:action record_sme_response_and_attach_reference_alternate
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request ?document_bundle - document_bundle ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (case_specialist_coordination_ready ?transfer_evaluation_case)
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (case_has_document_bundle ?transfer_evaluation_case ?document_bundle)
+        (document_bundle_attached_to_packet ?document_bundle ?evaluation_packet)
+        (packet_requires_catalog_reference ?evaluation_packet)
+        (packet_requires_subject_matter_expert ?evaluation_packet)
+        (not
+          (case_decision_initiated ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_reference_attached ?transfer_evaluation_case)
+      )
+  )
+  (:action finalize_case_without_references
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case)
+    :precondition
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (not
+          (case_reference_attached ?transfer_evaluation_case)
+        )
+        (not
+          (case_outcome_recorded ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_outcome_recorded ?transfer_evaluation_case)
+        (final_decision_recorded ?transfer_evaluation_case)
+      )
+  )
+  (:action attach_policy_reference_to_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_rule_reference - policy_rule_reference)
+    :precondition
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_reference_attached ?transfer_evaluation_case)
+        (policy_rule_reference_available ?policy_rule_reference)
+      )
+    :effect
+      (and
+        (case_linked_to_policy_reference ?transfer_evaluation_case ?policy_rule_reference)
+        (not
+          (policy_rule_reference_available ?policy_rule_reference)
+        )
+      )
+  )
+  (:action finalize_case_with_checklist
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?student_profile - student_profile ?academic_advisor - academic_advisor ?transfer_course_record - transfer_course_record ?policy_rule_reference - policy_rule_reference)
+    :precondition
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_reference_attached ?transfer_evaluation_case)
+        (case_linked_to_policy_reference ?transfer_evaluation_case ?policy_rule_reference)
+        (case_assigned_to_student ?transfer_evaluation_case ?student_profile)
+        (case_assigned_to_advisor ?transfer_evaluation_case ?academic_advisor)
+        (student_ready_for_packet ?student_profile)
+        (advisor_ready_for_packet ?academic_advisor)
+        (entity_course_under_review ?transfer_evaluation_case ?transfer_course_record)
+        (not
+          (case_ready_for_recording ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_ready_for_recording ?transfer_evaluation_case)
+  )
+  (:action record_case_outcome_and_notify_participants
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case)
+    :precondition
+      (and
+        (case_decision_initiated ?transfer_evaluation_case)
+        (case_ready_for_recording ?transfer_evaluation_case)
+        (not
+          (case_outcome_recorded ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_outcome_recorded ?transfer_evaluation_case)
+        (final_decision_recorded ?transfer_evaluation_case)
+      )
+  )
+  (:action consume_department_approval_and_mark_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?department_approval_token - department_approval_token ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (entity_initial_review_completed ?transfer_evaluation_case)
+        (entity_course_under_review ?transfer_evaluation_case ?transfer_course_record)
+        (department_approval_token_available ?department_approval_token)
+        (case_linked_to_department_approval_token ?transfer_evaluation_case ?department_approval_token)
+        (not
+          (case_has_department_approval ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_department_approval ?transfer_evaluation_case)
+        (not
+          (department_approval_token_available ?department_approval_token)
+        )
+      )
+  )
+  (:action department_rep_take_action_on_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?department_representative - department_representative)
+    :precondition
+      (and
+        (case_has_department_approval ?transfer_evaluation_case)
+        (department_representative_assigned ?transfer_evaluation_case ?department_representative)
+        (not
+          (case_rep_action_taken ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_rep_action_taken ?transfer_evaluation_case)
+  )
+  (:action assign_exception_request_and_mark
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?policy_exception_request - policy_exception_request)
+    :precondition
+      (and
+        (case_rep_action_taken ?transfer_evaluation_case)
+        (policy_exception_assigned_to_case ?transfer_evaluation_case ?policy_exception_request)
+        (not
+          (case_rep_action_processed ?transfer_evaluation_case)
+        )
+      )
+    :effect (case_rep_action_processed ?transfer_evaluation_case)
+  )
+  (:action record_case_outcome_after_rep_action
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case)
+    :precondition
+      (and
+        (case_rep_action_processed ?transfer_evaluation_case)
+        (not
+          (case_outcome_recorded ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (case_outcome_recorded ?transfer_evaluation_case)
+        (final_decision_recorded ?transfer_evaluation_case)
+      )
+  )
+  (:action finalize_student_follow_up_from_packet
+    :parameters (?student_profile - student_profile ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (student_evidence_collected ?student_profile)
+        (student_ready_for_packet ?student_profile)
+        (evaluation_packet_routed ?evaluation_packet)
+        (evaluation_packet_review_ready ?evaluation_packet)
+        (not
+          (final_decision_recorded ?student_profile)
+        )
+      )
+    :effect (final_decision_recorded ?student_profile)
+  )
+  (:action finalize_advisor_follow_up_from_packet
+    :parameters (?academic_advisor - academic_advisor ?evaluation_packet - evaluation_packet)
+    :precondition
+      (and
+        (advisor_evidence_collected ?academic_advisor)
+        (advisor_ready_for_packet ?academic_advisor)
+        (evaluation_packet_routed ?evaluation_packet)
+        (evaluation_packet_review_ready ?evaluation_packet)
+        (not
+          (final_decision_recorded ?academic_advisor)
+        )
+      )
+    :effect (final_decision_recorded ?academic_advisor)
+  )
+  (:action assign_follow_up_task_to_entity
+    :parameters (?case_participant - case_component ?follow_up_task - follow_up_task ?transfer_course_record - transfer_course_record)
+    :precondition
+      (and
+        (final_decision_recorded ?case_participant)
+        (entity_course_under_review ?case_participant ?transfer_course_record)
+        (follow_up_task_available ?follow_up_task)
+        (not
+          (follow_up_assigned ?case_participant)
+        )
+      )
+    :effect
+      (and
+        (follow_up_assigned ?case_participant)
+        (entity_follow_up_task_linked ?case_participant ?follow_up_task)
+        (not
+          (follow_up_task_available ?follow_up_task)
+        )
+      )
+  )
+  (:action complete_follow_up_and_release_evaluator_slot_for_student
+    :parameters (?student_profile - student_profile ?evaluator_availability_slot - evaluator_availability_slot ?follow_up_task - follow_up_task)
+    :precondition
+      (and
+        (follow_up_assigned ?student_profile)
+        (entity_assigned_evaluator_slot ?student_profile ?evaluator_availability_slot)
+        (entity_follow_up_task_linked ?student_profile ?follow_up_task)
+        (not
+          (entity_follow_through_completed ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (entity_follow_through_completed ?student_profile)
+        (evaluator_slot_available ?evaluator_availability_slot)
+        (follow_up_task_available ?follow_up_task)
+      )
+  )
+  (:action complete_follow_up_and_release_evaluator_slot_for_advisor
+    :parameters (?academic_advisor - academic_advisor ?evaluator_availability_slot - evaluator_availability_slot ?follow_up_task - follow_up_task)
+    :precondition
+      (and
+        (follow_up_assigned ?academic_advisor)
+        (entity_assigned_evaluator_slot ?academic_advisor ?evaluator_availability_slot)
+        (entity_follow_up_task_linked ?academic_advisor ?follow_up_task)
+        (not
+          (entity_follow_through_completed ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (entity_follow_through_completed ?academic_advisor)
+        (evaluator_slot_available ?evaluator_availability_slot)
+        (follow_up_task_available ?follow_up_task)
+      )
+  )
+  (:action complete_follow_up_and_release_evaluator_slot_for_case
+    :parameters (?transfer_evaluation_case - transfer_evaluation_case ?evaluator_availability_slot - evaluator_availability_slot ?follow_up_task - follow_up_task)
+    :precondition
+      (and
+        (follow_up_assigned ?transfer_evaluation_case)
+        (entity_assigned_evaluator_slot ?transfer_evaluation_case ?evaluator_availability_slot)
+        (entity_follow_up_task_linked ?transfer_evaluation_case ?follow_up_task)
+        (not
+          (entity_follow_through_completed ?transfer_evaluation_case)
+        )
+      )
+    :effect
+      (and
+        (entity_follow_through_completed ?transfer_evaluation_case)
+        (evaluator_slot_available ?evaluator_availability_slot)
+        (follow_up_task_available ?follow_up_task)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem transfer_credit_evaluation_follow_through_problem)
+  (:domain transfer_credit_evaluation_follow_through_domain)
+  (:objects student_profile_1 - student_profile academic_advisor_1 - academic_advisor transfer_case_1 - transfer_evaluation_case transfer_case_2 - transfer_evaluation_case evaluator_slot_1 - evaluator_availability_slot evaluator_slot_2 - evaluator_availability_slot evaluator_slot_3 - evaluator_availability_slot transfer_course_1 - transfer_course_record department_representative_1 - department_representative supporting_document_1 - supporting_document articulation_slot_1 - articulation_decision_slot department_slot_1 - department_decision_slot evaluation_packet_1 - evaluation_packet document_bundle_1 - document_bundle document_bundle_2 - document_bundle catalog_reference_1 - catalog_reference catalog_reference_2 - catalog_reference policy_rule_reference_1 - policy_rule_reference policy_rule_reference_2 - policy_rule_reference follow_up_task_1 - follow_up_task subject_matter_expert_1 - subject_matter_expert department_approval_token_1 - department_approval_token department_approval_token_2 - department_approval_token policy_exception_request_1 - policy_exception_request)
+  (:init
+    (evaluator_slot_available evaluator_slot_1)
+    (evaluator_slot_available evaluator_slot_2)
+    (evaluator_slot_available evaluator_slot_3)
+    (course_record_available transfer_course_1)
+    (department_representative_available department_representative_1)
+    (supporting_document_available supporting_document_1)
+    (student_has_articulation_slot student_profile_1 articulation_slot_1)
+    (advisor_has_department_slot academic_advisor_1 department_slot_1)
+    (evaluation_packet_available evaluation_packet_1)
+    (document_bundle_available document_bundle_1)
+    (document_bundle_available document_bundle_2)
+    (case_assigned_to_student transfer_case_1 student_profile_1)
+    (case_assigned_to_student transfer_case_2 student_profile_1)
+    (case_assigned_to_advisor transfer_case_1 academic_advisor_1)
+    (case_assigned_to_advisor transfer_case_2 academic_advisor_1)
+    (case_associated_with_evaluation_packet transfer_case_1 evaluation_packet_1)
+    (case_associated_with_evaluation_packet transfer_case_2 evaluation_packet_1)
+    (case_has_document_bundle transfer_case_1 document_bundle_1)
+    (case_has_document_bundle transfer_case_2 document_bundle_2)
+    (catalog_reference_available catalog_reference_1)
+    (catalog_reference_available catalog_reference_2)
+    (policy_rule_reference_available policy_rule_reference_1)
+    (policy_rule_reference_available policy_rule_reference_2)
+    (follow_up_task_available follow_up_task_1)
+    (subject_matter_expert_available subject_matter_expert_1)
+    (department_approval_token_available department_approval_token_1)
+    (case_linked_to_department_approval_token transfer_case_1 department_approval_token_1)
+    (case_linked_to_department_approval_token transfer_case_2 department_approval_token_2)
+    (policy_exception_request_available policy_exception_request_1)
+  )
+  (:goal
+    (and
+      (entity_follow_through_completed student_profile_1)
+      (entity_follow_through_completed academic_advisor_1)
+      (entity_follow_through_completed transfer_case_1)
+      (entity_follow_through_completed transfer_case_2)
+    )
+  )
+)

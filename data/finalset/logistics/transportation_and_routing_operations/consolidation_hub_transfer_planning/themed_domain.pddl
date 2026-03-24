@@ -1,0 +1,936 @@
+(define (domain consolidation_hub_transfer_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_family - object schedule_family - object leg_family - object transfer_entity_family - object transfer_entity - transfer_entity_family vehicle_unit - resource_family departure_slot - resource_family dock_slot - resource_family routing_profile - resource_family handling_equipment - resource_family delivery_container - resource_family lifting_equipment - resource_family safety_certificate - resource_family freight_item - schedule_family load_unit - schedule_family operator_certificate - schedule_family origin_leg - leg_family destination_leg - leg_family transfer_manifest - leg_family node_role - transfer_entity hub_role - transfer_entity origin_node - node_role destination_node - node_role hub_plan - hub_role)
+  (:predicates
+    (transfer_entity_registered ?transfer_task - transfer_entity)
+    (transfer_entity_confirmed ?transfer_task - transfer_entity)
+    (transfer_entity_vehicle_assigned ?transfer_task - transfer_entity)
+    (entity_released ?transfer_task - transfer_entity)
+    (accepted_for_dispatch ?transfer_task - transfer_entity)
+    (final_delivery_committed ?transfer_task - transfer_entity)
+    (vehicle_available ?vehicle_unit - vehicle_unit)
+    (transfer_entity_assigned_vehicle ?transfer_task - transfer_entity ?vehicle_unit - vehicle_unit)
+    (departure_slot_available ?departure_slot - departure_slot)
+    (transfer_entity_slot_assigned ?transfer_task - transfer_entity ?departure_slot - departure_slot)
+    (dock_available ?dock_slot - dock_slot)
+    (transfer_entity_dock_assigned ?transfer_task - transfer_entity ?dock_slot - dock_slot)
+    (freight_item_available ?freight_item - freight_item)
+    (origin_item_staged ?origin_node - origin_node ?freight_item - freight_item)
+    (destination_item_staged ?destination_node - destination_node ?freight_item - freight_item)
+    (origin_leg_linked ?origin_node - origin_node ?origin_leg - origin_leg)
+    (origin_leg_prepped ?origin_leg - origin_leg)
+    (origin_leg_item_staged ?origin_leg - origin_leg)
+    (origin_node_staging_complete ?origin_node - origin_node)
+    (destination_leg_linked ?destination_node - destination_node ?destination_leg - destination_leg)
+    (destination_leg_prepped ?destination_leg - destination_leg)
+    (destination_leg_item_staged ?destination_leg - destination_leg)
+    (destination_node_staging_complete ?destination_node - destination_node)
+    (manifest_available ?transfer_manifest - transfer_manifest)
+    (manifest_staged ?transfer_manifest - transfer_manifest)
+    (manifest_assigned_origin_leg ?transfer_manifest - transfer_manifest ?origin_leg - origin_leg)
+    (manifest_assigned_destination_leg ?transfer_manifest - transfer_manifest ?destination_leg - destination_leg)
+    (manifest_origin_ready ?transfer_manifest - transfer_manifest)
+    (manifest_destination_ready ?transfer_manifest - transfer_manifest)
+    (manifest_ready_for_departure ?transfer_manifest - transfer_manifest)
+    (hub_plan_origin_link ?hub_plan - hub_plan ?origin_node - origin_node)
+    (hub_plan_destination_link ?hub_plan - hub_plan ?destination_node - destination_node)
+    (hub_plan_manifest_link ?hub_plan - hub_plan ?transfer_manifest - transfer_manifest)
+    (load_unit_available ?load_unit - load_unit)
+    (hub_plan_load_unit_link ?hub_plan - hub_plan ?load_unit - load_unit)
+    (load_unit_reserved ?load_unit - load_unit)
+    (load_unit_bound_to_manifest ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    (hub_plan_phase1_initialized ?hub_plan - hub_plan)
+    (hub_plan_phase2_initialized ?hub_plan - hub_plan)
+    (hub_plan_processing_active ?hub_plan - hub_plan)
+    (routing_profile_reserved ?hub_plan - hub_plan)
+    (hub_plan_profile_confirmed ?hub_plan - hub_plan)
+    (hub_plan_ready_for_equipment ?hub_plan - hub_plan)
+    (hub_plan_equipment_assigned ?hub_plan - hub_plan)
+    (operator_certificate_available ?operator_certificate - operator_certificate)
+    (hub_plan_assigned_operator_certificate ?hub_plan - hub_plan ?operator_certificate - operator_certificate)
+    (hub_plan_operator_cleared ?hub_plan - hub_plan)
+    (hub_plan_operator_stage_cleared ?hub_plan - hub_plan)
+    (hub_plan_operator_final_cleared ?hub_plan - hub_plan)
+    (routing_profile_available ?routing_profile - routing_profile)
+    (hub_plan_routing_profile_binding ?hub_plan - hub_plan ?routing_profile - routing_profile)
+    (handling_equipment_available ?handling_equipment - handling_equipment)
+    (hub_plan_handling_equipment_binding ?hub_plan - hub_plan ?handling_equipment - handling_equipment)
+    (lifting_equipment_available ?lifting_equipment - lifting_equipment)
+    (hub_plan_lifting_equipment_binding ?hub_plan - hub_plan ?lifting_equipment - lifting_equipment)
+    (safety_certificate_available ?safety_certificate - safety_certificate)
+    (hub_plan_safety_certificate_binding ?hub_plan - hub_plan ?safety_certificate - safety_certificate)
+    (delivery_container_available ?delivery_container - delivery_container)
+    (transfer_entity_delivery_container_binding ?transfer_task - transfer_entity ?delivery_container - delivery_container)
+    (origin_reserved_for_loading ?origin_node - origin_node)
+    (destination_reserved_for_processing ?destination_node - destination_node)
+    (hub_plan_completed ?hub_plan - hub_plan)
+  )
+  (:action register_transfer_entity
+    :parameters (?transfer_task - transfer_entity)
+    :precondition
+      (and
+        (not
+          (transfer_entity_registered ?transfer_task)
+        )
+        (not
+          (entity_released ?transfer_task)
+        )
+      )
+    :effect (transfer_entity_registered ?transfer_task)
+  )
+  (:action assign_vehicle_to_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (transfer_entity_registered ?transfer_task)
+        (not
+          (transfer_entity_vehicle_assigned ?transfer_task)
+        )
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (transfer_entity_vehicle_assigned ?transfer_task)
+        (transfer_entity_assigned_vehicle ?transfer_task ?vehicle_unit)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action assign_departure_slot_to_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_registered ?transfer_task)
+        (transfer_entity_vehicle_assigned ?transfer_task)
+        (departure_slot_available ?departure_slot)
+      )
+    :effect
+      (and
+        (transfer_entity_slot_assigned ?transfer_task ?departure_slot)
+        (not
+          (departure_slot_available ?departure_slot)
+        )
+      )
+  )
+  (:action confirm_transfer_entity_after_slot_assignment
+    :parameters (?transfer_task - transfer_entity ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_registered ?transfer_task)
+        (transfer_entity_vehicle_assigned ?transfer_task)
+        (transfer_entity_slot_assigned ?transfer_task ?departure_slot)
+        (not
+          (transfer_entity_confirmed ?transfer_task)
+        )
+      )
+    :effect (transfer_entity_confirmed ?transfer_task)
+  )
+  (:action release_departure_slot_from_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_slot_assigned ?transfer_task ?departure_slot)
+      )
+    :effect
+      (and
+        (departure_slot_available ?departure_slot)
+        (not
+          (transfer_entity_slot_assigned ?transfer_task ?departure_slot)
+        )
+      )
+  )
+  (:action assign_dock_to_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?dock_slot - dock_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?transfer_task)
+        (dock_available ?dock_slot)
+      )
+    :effect
+      (and
+        (transfer_entity_dock_assigned ?transfer_task ?dock_slot)
+        (not
+          (dock_available ?dock_slot)
+        )
+      )
+  )
+  (:action release_dock_from_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?dock_slot - dock_slot)
+    :precondition
+      (and
+        (transfer_entity_dock_assigned ?transfer_task ?dock_slot)
+      )
+    :effect
+      (and
+        (dock_available ?dock_slot)
+        (not
+          (transfer_entity_dock_assigned ?transfer_task ?dock_slot)
+        )
+      )
+  )
+  (:action reserve_lifting_equipment_for_hub_plan
+    :parameters (?hub_plan - hub_plan ?lifting_equipment - lifting_equipment)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (lifting_equipment_available ?lifting_equipment)
+      )
+    :effect
+      (and
+        (hub_plan_lifting_equipment_binding ?hub_plan ?lifting_equipment)
+        (not
+          (lifting_equipment_available ?lifting_equipment)
+        )
+      )
+  )
+  (:action release_lifting_equipment_from_hub_plan
+    :parameters (?hub_plan - hub_plan ?lifting_equipment - lifting_equipment)
+    :precondition
+      (and
+        (hub_plan_lifting_equipment_binding ?hub_plan ?lifting_equipment)
+      )
+    :effect
+      (and
+        (lifting_equipment_available ?lifting_equipment)
+        (not
+          (hub_plan_lifting_equipment_binding ?hub_plan ?lifting_equipment)
+        )
+      )
+  )
+  (:action reserve_safety_certificate_for_hub_plan
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (safety_certificate_available ?safety_certificate)
+      )
+    :effect
+      (and
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (not
+          (safety_certificate_available ?safety_certificate)
+        )
+      )
+  )
+  (:action release_safety_certificate_from_hub_plan
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+      )
+    :effect
+      (and
+        (safety_certificate_available ?safety_certificate)
+        (not
+          (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        )
+      )
+  )
+  (:action prepare_origin_leg
+    :parameters (?origin_node - origin_node ?origin_leg - origin_leg ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?origin_node)
+        (transfer_entity_slot_assigned ?origin_node ?departure_slot)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (not
+          (origin_leg_prepped ?origin_leg)
+        )
+        (not
+          (origin_leg_item_staged ?origin_leg)
+        )
+      )
+    :effect (origin_leg_prepped ?origin_leg)
+  )
+  (:action allocate_origin_node_for_loading
+    :parameters (?origin_node - origin_node ?origin_leg - origin_leg ?dock_slot - dock_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?origin_node)
+        (transfer_entity_dock_assigned ?origin_node ?dock_slot)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (origin_leg_prepped ?origin_leg)
+        (not
+          (origin_reserved_for_loading ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (origin_node_staging_complete ?origin_node)
+      )
+  )
+  (:action stage_item_on_origin_leg
+    :parameters (?origin_node - origin_node ?origin_leg - origin_leg ?freight_item - freight_item)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?origin_node)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (freight_item_available ?freight_item)
+        (not
+          (origin_reserved_for_loading ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_item_staged ?origin_leg)
+        (origin_reserved_for_loading ?origin_node)
+        (origin_item_staged ?origin_node ?freight_item)
+        (not
+          (freight_item_available ?freight_item)
+        )
+      )
+  )
+  (:action load_item_from_origin_leg
+    :parameters (?origin_node - origin_node ?origin_leg - origin_leg ?departure_slot - departure_slot ?freight_item - freight_item)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?origin_node)
+        (transfer_entity_slot_assigned ?origin_node ?departure_slot)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (origin_leg_item_staged ?origin_leg)
+        (origin_item_staged ?origin_node ?freight_item)
+        (not
+          (origin_node_staging_complete ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_prepped ?origin_leg)
+        (origin_node_staging_complete ?origin_node)
+        (freight_item_available ?freight_item)
+        (not
+          (origin_item_staged ?origin_node ?freight_item)
+        )
+      )
+  )
+  (:action prepare_destination_leg
+    :parameters (?destination_node - destination_node ?destination_leg - destination_leg ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?destination_node)
+        (transfer_entity_slot_assigned ?destination_node ?departure_slot)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (not
+          (destination_leg_prepped ?destination_leg)
+        )
+        (not
+          (destination_leg_item_staged ?destination_leg)
+        )
+      )
+    :effect (destination_leg_prepped ?destination_leg)
+  )
+  (:action allocate_destination_node_for_processing
+    :parameters (?destination_node - destination_node ?destination_leg - destination_leg ?dock_slot - dock_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?destination_node)
+        (transfer_entity_dock_assigned ?destination_node ?dock_slot)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (destination_leg_prepped ?destination_leg)
+        (not
+          (destination_reserved_for_processing ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (destination_reserved_for_processing ?destination_node)
+        (destination_node_staging_complete ?destination_node)
+      )
+  )
+  (:action stage_item_on_destination_leg
+    :parameters (?destination_node - destination_node ?destination_leg - destination_leg ?freight_item - freight_item)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?destination_node)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (freight_item_available ?freight_item)
+        (not
+          (destination_reserved_for_processing ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_item_staged ?destination_leg)
+        (destination_reserved_for_processing ?destination_node)
+        (destination_item_staged ?destination_node ?freight_item)
+        (not
+          (freight_item_available ?freight_item)
+        )
+      )
+  )
+  (:action load_item_for_destination_leg
+    :parameters (?destination_node - destination_node ?destination_leg - destination_leg ?departure_slot - departure_slot ?freight_item - freight_item)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?destination_node)
+        (transfer_entity_slot_assigned ?destination_node ?departure_slot)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (destination_leg_item_staged ?destination_leg)
+        (destination_item_staged ?destination_node ?freight_item)
+        (not
+          (destination_node_staging_complete ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_prepped ?destination_leg)
+        (destination_node_staging_complete ?destination_node)
+        (freight_item_available ?freight_item)
+        (not
+          (destination_item_staged ?destination_node ?freight_item)
+        )
+      )
+  )
+  (:action stage_transfer_manifest
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?origin_leg - origin_leg ?destination_leg - destination_leg ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (destination_reserved_for_processing ?destination_node)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (origin_leg_prepped ?origin_leg)
+        (destination_leg_prepped ?destination_leg)
+        (origin_node_staging_complete ?origin_node)
+        (destination_node_staging_complete ?destination_node)
+        (manifest_available ?transfer_manifest)
+      )
+    :effect
+      (and
+        (manifest_staged ?transfer_manifest)
+        (manifest_assigned_origin_leg ?transfer_manifest ?origin_leg)
+        (manifest_assigned_destination_leg ?transfer_manifest ?destination_leg)
+        (not
+          (manifest_available ?transfer_manifest)
+        )
+      )
+  )
+  (:action stage_transfer_manifest_with_origin_ready
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?origin_leg - origin_leg ?destination_leg - destination_leg ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (destination_reserved_for_processing ?destination_node)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (origin_leg_item_staged ?origin_leg)
+        (destination_leg_prepped ?destination_leg)
+        (not
+          (origin_node_staging_complete ?origin_node)
+        )
+        (destination_node_staging_complete ?destination_node)
+        (manifest_available ?transfer_manifest)
+      )
+    :effect
+      (and
+        (manifest_staged ?transfer_manifest)
+        (manifest_assigned_origin_leg ?transfer_manifest ?origin_leg)
+        (manifest_assigned_destination_leg ?transfer_manifest ?destination_leg)
+        (manifest_origin_ready ?transfer_manifest)
+        (not
+          (manifest_available ?transfer_manifest)
+        )
+      )
+  )
+  (:action stage_transfer_manifest_with_destination_ready
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?origin_leg - origin_leg ?destination_leg - destination_leg ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (destination_reserved_for_processing ?destination_node)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (origin_leg_prepped ?origin_leg)
+        (destination_leg_item_staged ?destination_leg)
+        (origin_node_staging_complete ?origin_node)
+        (not
+          (destination_node_staging_complete ?destination_node)
+        )
+        (manifest_available ?transfer_manifest)
+      )
+    :effect
+      (and
+        (manifest_staged ?transfer_manifest)
+        (manifest_assigned_origin_leg ?transfer_manifest ?origin_leg)
+        (manifest_assigned_destination_leg ?transfer_manifest ?destination_leg)
+        (manifest_destination_ready ?transfer_manifest)
+        (not
+          (manifest_available ?transfer_manifest)
+        )
+      )
+  )
+  (:action stage_transfer_manifest_with_origin_and_destination_ready
+    :parameters (?origin_node - origin_node ?destination_node - destination_node ?origin_leg - origin_leg ?destination_leg - destination_leg ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (destination_reserved_for_processing ?destination_node)
+        (origin_leg_linked ?origin_node ?origin_leg)
+        (destination_leg_linked ?destination_node ?destination_leg)
+        (origin_leg_item_staged ?origin_leg)
+        (destination_leg_item_staged ?destination_leg)
+        (not
+          (origin_node_staging_complete ?origin_node)
+        )
+        (not
+          (destination_node_staging_complete ?destination_node)
+        )
+        (manifest_available ?transfer_manifest)
+      )
+    :effect
+      (and
+        (manifest_staged ?transfer_manifest)
+        (manifest_assigned_origin_leg ?transfer_manifest ?origin_leg)
+        (manifest_assigned_destination_leg ?transfer_manifest ?destination_leg)
+        (manifest_origin_ready ?transfer_manifest)
+        (manifest_destination_ready ?transfer_manifest)
+        (not
+          (manifest_available ?transfer_manifest)
+        )
+      )
+  )
+  (:action mark_manifest_ready_for_departure
+    :parameters (?transfer_manifest - transfer_manifest ?origin_node - origin_node ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (manifest_staged ?transfer_manifest)
+        (origin_reserved_for_loading ?origin_node)
+        (transfer_entity_slot_assigned ?origin_node ?departure_slot)
+        (not
+          (manifest_ready_for_departure ?transfer_manifest)
+        )
+      )
+    :effect (manifest_ready_for_departure ?transfer_manifest)
+  )
+  (:action assign_load_unit_to_manifest
+    :parameters (?hub_plan - hub_plan ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (hub_plan_manifest_link ?hub_plan ?transfer_manifest)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_available ?load_unit)
+        (manifest_staged ?transfer_manifest)
+        (manifest_ready_for_departure ?transfer_manifest)
+        (not
+          (load_unit_reserved ?load_unit)
+        )
+      )
+    :effect
+      (and
+        (load_unit_reserved ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action initialize_hub_plan_phase_one
+    :parameters (?hub_plan - hub_plan ?load_unit - load_unit ?transfer_manifest - transfer_manifest ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_reserved ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (transfer_entity_slot_assigned ?hub_plan ?departure_slot)
+        (not
+          (manifest_origin_ready ?transfer_manifest)
+        )
+        (not
+          (hub_plan_phase1_initialized ?hub_plan)
+        )
+      )
+    :effect (hub_plan_phase1_initialized ?hub_plan)
+  )
+  (:action reserve_routing_profile_for_hub_plan
+    :parameters (?hub_plan - hub_plan ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (routing_profile_available ?routing_profile)
+        (not
+          (routing_profile_reserved ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (routing_profile_reserved ?hub_plan)
+        (hub_plan_routing_profile_binding ?hub_plan ?routing_profile)
+        (not
+          (routing_profile_available ?routing_profile)
+        )
+      )
+  )
+  (:action confirm_routing_profile_and_initialize_phase
+    :parameters (?hub_plan - hub_plan ?load_unit - load_unit ?transfer_manifest - transfer_manifest ?departure_slot - departure_slot ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_reserved ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (transfer_entity_slot_assigned ?hub_plan ?departure_slot)
+        (manifest_origin_ready ?transfer_manifest)
+        (routing_profile_reserved ?hub_plan)
+        (hub_plan_routing_profile_binding ?hub_plan ?routing_profile)
+        (not
+          (hub_plan_phase1_initialized ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_phase1_initialized ?hub_plan)
+        (hub_plan_profile_confirmed ?hub_plan)
+      )
+  )
+  (:action reserve_lifting_equipment_and_stage
+    :parameters (?hub_plan - hub_plan ?lifting_equipment - lifting_equipment ?dock_slot - dock_slot ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase1_initialized ?hub_plan)
+        (hub_plan_lifting_equipment_binding ?hub_plan ?lifting_equipment)
+        (transfer_entity_dock_assigned ?hub_plan ?dock_slot)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (not
+          (manifest_destination_ready ?transfer_manifest)
+        )
+        (not
+          (hub_plan_phase2_initialized ?hub_plan)
+        )
+      )
+    :effect (hub_plan_phase2_initialized ?hub_plan)
+  )
+  (:action confirm_lifting_equipment_and_stage
+    :parameters (?hub_plan - hub_plan ?lifting_equipment - lifting_equipment ?dock_slot - dock_slot ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase1_initialized ?hub_plan)
+        (hub_plan_lifting_equipment_binding ?hub_plan ?lifting_equipment)
+        (transfer_entity_dock_assigned ?hub_plan ?dock_slot)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (manifest_destination_ready ?transfer_manifest)
+        (not
+          (hub_plan_phase2_initialized ?hub_plan)
+        )
+      )
+    :effect (hub_plan_phase2_initialized ?hub_plan)
+  )
+  (:action authorize_hub_plan_with_safety_certificate
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase2_initialized ?hub_plan)
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (not
+          (manifest_origin_ready ?transfer_manifest)
+        )
+        (not
+          (manifest_destination_ready ?transfer_manifest)
+        )
+        (not
+          (hub_plan_processing_active ?hub_plan)
+        )
+      )
+    :effect (hub_plan_processing_active ?hub_plan)
+  )
+  (:action authorize_hub_plan_and_mark_ready_for_equipment
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase2_initialized ?hub_plan)
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (manifest_origin_ready ?transfer_manifest)
+        (not
+          (manifest_destination_ready ?transfer_manifest)
+        )
+        (not
+          (hub_plan_processing_active ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_ready_for_equipment ?hub_plan)
+      )
+  )
+  (:action authorize_hub_plan_and_confirm_equipment_ready
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase2_initialized ?hub_plan)
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (not
+          (manifest_origin_ready ?transfer_manifest)
+        )
+        (manifest_destination_ready ?transfer_manifest)
+        (not
+          (hub_plan_processing_active ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_ready_for_equipment ?hub_plan)
+      )
+  )
+  (:action authorize_hub_plan_and_complete_equipment_readiness
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate ?load_unit - load_unit ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (hub_plan_phase2_initialized ?hub_plan)
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (hub_plan_load_unit_link ?hub_plan ?load_unit)
+        (load_unit_bound_to_manifest ?load_unit ?transfer_manifest)
+        (manifest_origin_ready ?transfer_manifest)
+        (manifest_destination_ready ?transfer_manifest)
+        (not
+          (hub_plan_processing_active ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_ready_for_equipment ?hub_plan)
+      )
+  )
+  (:action finalize_hub_plan
+    :parameters (?hub_plan - hub_plan)
+    :precondition
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (not
+          (hub_plan_ready_for_equipment ?hub_plan)
+        )
+        (not
+          (hub_plan_completed ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_completed ?hub_plan)
+        (accepted_for_dispatch ?hub_plan)
+      )
+  )
+  (:action assign_handling_equipment_to_hub_plan
+    :parameters (?hub_plan - hub_plan ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_ready_for_equipment ?hub_plan)
+        (handling_equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (hub_plan_handling_equipment_binding ?hub_plan ?handling_equipment)
+        (not
+          (handling_equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action sequence_hub_plan_processing_activities
+    :parameters (?hub_plan - hub_plan ?origin_node - origin_node ?destination_node - destination_node ?departure_slot - departure_slot ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_ready_for_equipment ?hub_plan)
+        (hub_plan_handling_equipment_binding ?hub_plan ?handling_equipment)
+        (hub_plan_origin_link ?hub_plan ?origin_node)
+        (hub_plan_destination_link ?hub_plan ?destination_node)
+        (origin_node_staging_complete ?origin_node)
+        (destination_node_staging_complete ?destination_node)
+        (transfer_entity_slot_assigned ?hub_plan ?departure_slot)
+        (not
+          (hub_plan_equipment_assigned ?hub_plan)
+        )
+      )
+    :effect (hub_plan_equipment_assigned ?hub_plan)
+  )
+  (:action finalize_hub_plan_with_equipment
+    :parameters (?hub_plan - hub_plan)
+    :precondition
+      (and
+        (hub_plan_processing_active ?hub_plan)
+        (hub_plan_equipment_assigned ?hub_plan)
+        (not
+          (hub_plan_completed ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_completed ?hub_plan)
+        (accepted_for_dispatch ?hub_plan)
+      )
+  )
+  (:action apply_operator_certificate_to_hub_plan
+    :parameters (?hub_plan - hub_plan ?operator_certificate - operator_certificate ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (transfer_entity_confirmed ?hub_plan)
+        (transfer_entity_slot_assigned ?hub_plan ?departure_slot)
+        (operator_certificate_available ?operator_certificate)
+        (hub_plan_assigned_operator_certificate ?hub_plan ?operator_certificate)
+        (not
+          (hub_plan_operator_cleared ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_operator_cleared ?hub_plan)
+        (not
+          (operator_certificate_available ?operator_certificate)
+        )
+      )
+  )
+  (:action advance_hub_plan_operator_stage
+    :parameters (?hub_plan - hub_plan ?dock_slot - dock_slot)
+    :precondition
+      (and
+        (hub_plan_operator_cleared ?hub_plan)
+        (transfer_entity_dock_assigned ?hub_plan ?dock_slot)
+        (not
+          (hub_plan_operator_stage_cleared ?hub_plan)
+        )
+      )
+    :effect (hub_plan_operator_stage_cleared ?hub_plan)
+  )
+  (:action approve_operator_with_safety_certificate
+    :parameters (?hub_plan - hub_plan ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (hub_plan_operator_stage_cleared ?hub_plan)
+        (hub_plan_safety_certificate_binding ?hub_plan ?safety_certificate)
+        (not
+          (hub_plan_operator_final_cleared ?hub_plan)
+        )
+      )
+    :effect (hub_plan_operator_final_cleared ?hub_plan)
+  )
+  (:action finalize_hub_plan_after_operator_clearance
+    :parameters (?hub_plan - hub_plan)
+    :precondition
+      (and
+        (hub_plan_operator_final_cleared ?hub_plan)
+        (not
+          (hub_plan_completed ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (hub_plan_completed ?hub_plan)
+        (accepted_for_dispatch ?hub_plan)
+      )
+  )
+  (:action origin_node_accept_manifest
+    :parameters (?origin_node - origin_node ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (origin_reserved_for_loading ?origin_node)
+        (origin_node_staging_complete ?origin_node)
+        (manifest_staged ?transfer_manifest)
+        (manifest_ready_for_departure ?transfer_manifest)
+        (not
+          (accepted_for_dispatch ?origin_node)
+        )
+      )
+    :effect (accepted_for_dispatch ?origin_node)
+  )
+  (:action destination_node_accept_manifest
+    :parameters (?destination_node - destination_node ?transfer_manifest - transfer_manifest)
+    :precondition
+      (and
+        (destination_reserved_for_processing ?destination_node)
+        (destination_node_staging_complete ?destination_node)
+        (manifest_staged ?transfer_manifest)
+        (manifest_ready_for_departure ?transfer_manifest)
+        (not
+          (accepted_for_dispatch ?destination_node)
+        )
+      )
+    :effect (accepted_for_dispatch ?destination_node)
+  )
+  (:action bind_delivery_container_to_transfer_entity
+    :parameters (?transfer_task - transfer_entity ?delivery_container - delivery_container ?departure_slot - departure_slot)
+    :precondition
+      (and
+        (accepted_for_dispatch ?transfer_task)
+        (transfer_entity_slot_assigned ?transfer_task ?departure_slot)
+        (delivery_container_available ?delivery_container)
+        (not
+          (final_delivery_committed ?transfer_task)
+        )
+      )
+    :effect
+      (and
+        (final_delivery_committed ?transfer_task)
+        (transfer_entity_delivery_container_binding ?transfer_task ?delivery_container)
+        (not
+          (delivery_container_available ?delivery_container)
+        )
+      )
+  )
+  (:action finalize_origin_delivery_and_release_vehicle
+    :parameters (?origin_node - origin_node ?vehicle_unit - vehicle_unit ?delivery_container - delivery_container)
+    :precondition
+      (and
+        (final_delivery_committed ?origin_node)
+        (transfer_entity_assigned_vehicle ?origin_node ?vehicle_unit)
+        (transfer_entity_delivery_container_binding ?origin_node ?delivery_container)
+        (not
+          (entity_released ?origin_node)
+        )
+      )
+    :effect
+      (and
+        (entity_released ?origin_node)
+        (vehicle_available ?vehicle_unit)
+        (delivery_container_available ?delivery_container)
+      )
+  )
+  (:action finalize_destination_delivery_and_release_vehicle
+    :parameters (?destination_node - destination_node ?vehicle_unit - vehicle_unit ?delivery_container - delivery_container)
+    :precondition
+      (and
+        (final_delivery_committed ?destination_node)
+        (transfer_entity_assigned_vehicle ?destination_node ?vehicle_unit)
+        (transfer_entity_delivery_container_binding ?destination_node ?delivery_container)
+        (not
+          (entity_released ?destination_node)
+        )
+      )
+    :effect
+      (and
+        (entity_released ?destination_node)
+        (vehicle_available ?vehicle_unit)
+        (delivery_container_available ?delivery_container)
+      )
+  )
+  (:action finalize_hub_plan_and_release_vehicle
+    :parameters (?hub_plan - hub_plan ?vehicle_unit - vehicle_unit ?delivery_container - delivery_container)
+    :precondition
+      (and
+        (final_delivery_committed ?hub_plan)
+        (transfer_entity_assigned_vehicle ?hub_plan ?vehicle_unit)
+        (transfer_entity_delivery_container_binding ?hub_plan ?delivery_container)
+        (not
+          (entity_released ?hub_plan)
+        )
+      )
+    :effect
+      (and
+        (entity_released ?hub_plan)
+        (vehicle_available ?vehicle_unit)
+        (delivery_container_available ?delivery_container)
+      )
+  )
+)

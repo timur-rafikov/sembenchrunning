@@ -1,0 +1,937 @@
+(define (domain pharmaceutics_renal_dose_adjustment_dispense_review)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object clinical_entity - domain_object clinical_artifact - domain_object pharmacy_resource - domain_object order_supertype - domain_object medication_order - order_supertype pharmacist_reviewer - clinical_entity renal_function_result - clinical_entity verifier - clinical_entity auxiliary_material - clinical_entity final_check_item - clinical_entity patient_instruction_template - clinical_entity dosing_device - clinical_entity clinical_consult_note - clinical_entity substitution_option - clinical_artifact label_template - clinical_artifact override_authorization - clinical_artifact renal_adjustment_rule - pharmacy_resource packaging_profile - pharmacy_resource medication_package - pharmacy_resource dispensing_personnel_group - medication_order dispensing_unit_group - medication_order pharmacy_technician - dispensing_personnel_group dispensing_pharmacist_assistant - dispensing_personnel_group dispense_task - dispensing_unit_group)
+
+  (:predicates
+    (order_received ?medication_order - medication_order)
+    (clinical_assessment_completed ?medication_order - medication_order)
+    (order_assigned ?medication_order - medication_order)
+    (processing_finalized ?medication_order - medication_order)
+    (ready_for_dispatch ?medication_order - medication_order)
+    (patient_instructions_generated ?medication_order - medication_order)
+    (pharmacist_available ?pharmacist_reviewer - pharmacist_reviewer)
+    (assigned_to_reviewer ?medication_order - medication_order ?pharmacist_reviewer - pharmacist_reviewer)
+    (renal_result_unlinked ?renal_function_result - renal_function_result)
+    (linked_to_renal_result ?medication_order - medication_order ?renal_function_result - renal_function_result)
+    (verifier_available ?verifier - verifier)
+    (assigned_to_verifier ?medication_order - medication_order ?verifier - verifier)
+    (substitution_option_available ?substitution_option - substitution_option)
+    (technician_selected_substitution ?pharmacy_technician - pharmacy_technician ?substitution_option - substitution_option)
+    (assistant_selected_substitution ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?substitution_option - substitution_option)
+    (assigned_renal_adjustment_rule ?pharmacy_technician - pharmacy_technician ?renal_adjustment_rule - renal_adjustment_rule)
+    (renal_rule_flag_for_review ?renal_adjustment_rule - renal_adjustment_rule)
+    (renal_rule_flag_for_substitution ?renal_adjustment_rule - renal_adjustment_rule)
+    (technician_rule_acknowledged ?pharmacy_technician - pharmacy_technician)
+    (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?packaging_profile - packaging_profile)
+    (packaging_profile_selected ?packaging_profile - packaging_profile)
+    (packaging_profile_alternative_selected ?packaging_profile - packaging_profile)
+    (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant)
+    (package_slot_available ?medication_package - medication_package)
+    (package_reserved ?medication_package - medication_package)
+    (package_bound_to_renal_rule ?medication_package - medication_package ?renal_adjustment_rule - renal_adjustment_rule)
+    (package_bound_to_packaging_profile ?medication_package - medication_package ?packaging_profile - packaging_profile)
+    (label_option_a_selected ?medication_package - medication_package)
+    (label_option_b_selected ?medication_package - medication_package)
+    (package_prepared ?medication_package - medication_package)
+    (task_assigned_to_technician ?dispense_task - dispense_task ?pharmacy_technician - pharmacy_technician)
+    (task_assigned_to_assistant ?dispense_task - dispense_task ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant)
+    (task_associated_package ?dispense_task - dispense_task ?medication_package - medication_package)
+    (label_template_available ?label_template - label_template)
+    (task_bound_label_template ?dispense_task - dispense_task ?label_template - label_template)
+    (label_template_allocated ?label_template - label_template)
+    (label_template_applied_to_package ?label_template - label_template ?medication_package - medication_package)
+    (materials_staged_for_task ?dispense_task - dispense_task)
+    (dosing_device_allocated ?dispense_task - dispense_task)
+    (attachments_finalized ?dispense_task - dispense_task)
+    (auxiliary_material_allocated ?dispense_task - dispense_task)
+    (auxiliary_material_attached ?dispense_task - dispense_task)
+    (final_check_required ?dispense_task - dispense_task)
+    (final_check_completed ?dispense_task - dispense_task)
+    (override_authorization_available ?override_authorization - override_authorization)
+    (task_bound_override_authorization ?dispense_task - dispense_task ?override_authorization - override_authorization)
+    (override_attached_to_task ?dispense_task - dispense_task)
+    (override_processed ?dispense_task - dispense_task)
+    (override_confirmed ?dispense_task - dispense_task)
+    (auxiliary_material_available ?auxiliary_material - auxiliary_material)
+    (task_bound_auxiliary_material ?dispense_task - dispense_task ?auxiliary_material - auxiliary_material)
+    (final_check_item_available ?final_check_item - final_check_item)
+    (task_bound_final_check_item ?dispense_task - dispense_task ?final_check_item - final_check_item)
+    (dosing_device_available ?dosing_device - dosing_device)
+    (task_bound_dosing_device ?dispense_task - dispense_task ?dosing_device - dosing_device)
+    (clinical_consult_note_available ?clinical_consult_note - clinical_consult_note)
+    (task_bound_clinical_consult_note ?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note)
+    (patient_instruction_template_available ?patient_instruction_template - patient_instruction_template)
+    (order_bound_instruction_template ?medication_order - medication_order ?patient_instruction_template - patient_instruction_template)
+    (technician_ready_for_packaging ?pharmacy_technician - pharmacy_technician)
+    (assistant_ready_for_packaging ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant)
+    (task_signature_recorded ?dispense_task - dispense_task)
+  )
+  (:action receive_medication_order
+    :parameters (?medication_order - medication_order)
+    :precondition
+      (and
+        (not
+          (order_received ?medication_order)
+        )
+        (not
+          (processing_finalized ?medication_order)
+        )
+      )
+    :effect (order_received ?medication_order)
+  )
+  (:action assign_pharmacist_reviewer
+    :parameters (?medication_order - medication_order ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (order_received ?medication_order)
+        (not
+          (order_assigned ?medication_order)
+        )
+        (pharmacist_available ?pharmacist_reviewer)
+      )
+    :effect
+      (and
+        (order_assigned ?medication_order)
+        (assigned_to_reviewer ?medication_order ?pharmacist_reviewer)
+        (not
+          (pharmacist_available ?pharmacist_reviewer)
+        )
+      )
+  )
+  (:action link_renal_result_to_order
+    :parameters (?medication_order - medication_order ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (order_received ?medication_order)
+        (order_assigned ?medication_order)
+        (renal_result_unlinked ?renal_function_result)
+      )
+    :effect
+      (and
+        (linked_to_renal_result ?medication_order ?renal_function_result)
+        (not
+          (renal_result_unlinked ?renal_function_result)
+        )
+      )
+  )
+  (:action complete_clinical_assessment
+    :parameters (?medication_order - medication_order ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (order_received ?medication_order)
+        (order_assigned ?medication_order)
+        (linked_to_renal_result ?medication_order ?renal_function_result)
+        (not
+          (clinical_assessment_completed ?medication_order)
+        )
+      )
+    :effect (clinical_assessment_completed ?medication_order)
+  )
+  (:action unlink_renal_result_from_order
+    :parameters (?medication_order - medication_order ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (linked_to_renal_result ?medication_order ?renal_function_result)
+      )
+    :effect
+      (and
+        (renal_result_unlinked ?renal_function_result)
+        (not
+          (linked_to_renal_result ?medication_order ?renal_function_result)
+        )
+      )
+  )
+  (:action assign_verifier
+    :parameters (?medication_order - medication_order ?verifier - verifier)
+    :precondition
+      (and
+        (clinical_assessment_completed ?medication_order)
+        (verifier_available ?verifier)
+      )
+    :effect
+      (and
+        (assigned_to_verifier ?medication_order ?verifier)
+        (not
+          (verifier_available ?verifier)
+        )
+      )
+  )
+  (:action release_verifier_from_order
+    :parameters (?medication_order - medication_order ?verifier - verifier)
+    :precondition
+      (and
+        (assigned_to_verifier ?medication_order ?verifier)
+      )
+    :effect
+      (and
+        (verifier_available ?verifier)
+        (not
+          (assigned_to_verifier ?medication_order ?verifier)
+        )
+      )
+  )
+  (:action allocate_dosing_device_to_task
+    :parameters (?dispense_task - dispense_task ?dosing_device - dosing_device)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (dosing_device_available ?dosing_device)
+      )
+    :effect
+      (and
+        (task_bound_dosing_device ?dispense_task ?dosing_device)
+        (not
+          (dosing_device_available ?dosing_device)
+        )
+      )
+  )
+  (:action release_dosing_device_from_task
+    :parameters (?dispense_task - dispense_task ?dosing_device - dosing_device)
+    :precondition
+      (and
+        (task_bound_dosing_device ?dispense_task ?dosing_device)
+      )
+    :effect
+      (and
+        (dosing_device_available ?dosing_device)
+        (not
+          (task_bound_dosing_device ?dispense_task ?dosing_device)
+        )
+      )
+  )
+  (:action attach_clinical_consult_note_to_task
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (clinical_consult_note_available ?clinical_consult_note)
+      )
+    :effect
+      (and
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (not
+          (clinical_consult_note_available ?clinical_consult_note)
+        )
+      )
+  )
+  (:action detach_clinical_consult_note_from_task
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note)
+    :precondition
+      (and
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+      )
+    :effect
+      (and
+        (clinical_consult_note_available ?clinical_consult_note)
+        (not
+          (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        )
+      )
+  )
+  (:action flag_renal_adjustment_rule_for_task
+    :parameters (?pharmacy_technician - pharmacy_technician ?renal_adjustment_rule - renal_adjustment_rule ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (clinical_assessment_completed ?pharmacy_technician)
+        (linked_to_renal_result ?pharmacy_technician ?renal_function_result)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (not
+          (renal_rule_flag_for_review ?renal_adjustment_rule)
+        )
+        (not
+          (renal_rule_flag_for_substitution ?renal_adjustment_rule)
+        )
+      )
+    :effect (renal_rule_flag_for_review ?renal_adjustment_rule)
+  )
+  (:action confirm_renal_rule_handling_by_technician
+    :parameters (?pharmacy_technician - pharmacy_technician ?renal_adjustment_rule - renal_adjustment_rule ?verifier - verifier)
+    :precondition
+      (and
+        (clinical_assessment_completed ?pharmacy_technician)
+        (assigned_to_verifier ?pharmacy_technician ?verifier)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (renal_rule_flag_for_review ?renal_adjustment_rule)
+        (not
+          (technician_ready_for_packaging ?pharmacy_technician)
+        )
+      )
+    :effect
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (technician_rule_acknowledged ?pharmacy_technician)
+      )
+  )
+  (:action select_substitution_option_for_rule
+    :parameters (?pharmacy_technician - pharmacy_technician ?renal_adjustment_rule - renal_adjustment_rule ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (clinical_assessment_completed ?pharmacy_technician)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (substitution_option_available ?substitution_option)
+        (not
+          (technician_ready_for_packaging ?pharmacy_technician)
+        )
+      )
+    :effect
+      (and
+        (renal_rule_flag_for_substitution ?renal_adjustment_rule)
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (technician_selected_substitution ?pharmacy_technician ?substitution_option)
+        (not
+          (substitution_option_available ?substitution_option)
+        )
+      )
+  )
+  (:action apply_substitution_and_mark_rule_resolved
+    :parameters (?pharmacy_technician - pharmacy_technician ?renal_adjustment_rule - renal_adjustment_rule ?renal_function_result - renal_function_result ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (clinical_assessment_completed ?pharmacy_technician)
+        (linked_to_renal_result ?pharmacy_technician ?renal_function_result)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (renal_rule_flag_for_substitution ?renal_adjustment_rule)
+        (technician_selected_substitution ?pharmacy_technician ?substitution_option)
+        (not
+          (technician_rule_acknowledged ?pharmacy_technician)
+        )
+      )
+    :effect
+      (and
+        (renal_rule_flag_for_review ?renal_adjustment_rule)
+        (technician_rule_acknowledged ?pharmacy_technician)
+        (substitution_option_available ?substitution_option)
+        (not
+          (technician_selected_substitution ?pharmacy_technician ?substitution_option)
+        )
+      )
+  )
+  (:action select_packaging_profile
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?packaging_profile - packaging_profile ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispensing_pharmacist_assistant)
+        (linked_to_renal_result ?dispensing_pharmacist_assistant ?renal_function_result)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (not
+          (packaging_profile_selected ?packaging_profile)
+        )
+        (not
+          (packaging_profile_alternative_selected ?packaging_profile)
+        )
+      )
+    :effect (packaging_profile_selected ?packaging_profile)
+  )
+  (:action confirm_packaging_profile_selection
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?packaging_profile - packaging_profile ?verifier - verifier)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispensing_pharmacist_assistant)
+        (assigned_to_verifier ?dispensing_pharmacist_assistant ?verifier)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (packaging_profile_selected ?packaging_profile)
+        (not
+          (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        )
+      )
+    :effect
+      (and
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+      )
+  )
+  (:action assistant_select_substitution_option
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?packaging_profile - packaging_profile ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispensing_pharmacist_assistant)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (substitution_option_available ?substitution_option)
+        (not
+          (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        )
+      )
+    :effect
+      (and
+        (packaging_profile_alternative_selected ?packaging_profile)
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assistant_selected_substitution ?dispensing_pharmacist_assistant ?substitution_option)
+        (not
+          (substitution_option_available ?substitution_option)
+        )
+      )
+  )
+  (:action finalize_packaging_profile_selection
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?packaging_profile - packaging_profile ?renal_function_result - renal_function_result ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispensing_pharmacist_assistant)
+        (linked_to_renal_result ?dispensing_pharmacist_assistant ?renal_function_result)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (packaging_profile_alternative_selected ?packaging_profile)
+        (assistant_selected_substitution ?dispensing_pharmacist_assistant ?substitution_option)
+        (not
+          (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        )
+      )
+    :effect
+      (and
+        (packaging_profile_selected ?packaging_profile)
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        (substitution_option_available ?substitution_option)
+        (not
+          (assistant_selected_substitution ?dispensing_pharmacist_assistant ?substitution_option)
+        )
+      )
+  )
+  (:action assemble_medication_package
+    :parameters (?pharmacy_technician - pharmacy_technician ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?renal_adjustment_rule - renal_adjustment_rule ?packaging_profile - packaging_profile ?medication_package - medication_package)
+    :precondition
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (renal_rule_flag_for_review ?renal_adjustment_rule)
+        (packaging_profile_selected ?packaging_profile)
+        (technician_rule_acknowledged ?pharmacy_technician)
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        (package_slot_available ?medication_package)
+      )
+    :effect
+      (and
+        (package_reserved ?medication_package)
+        (package_bound_to_renal_rule ?medication_package ?renal_adjustment_rule)
+        (package_bound_to_packaging_profile ?medication_package ?packaging_profile)
+        (not
+          (package_slot_available ?medication_package)
+        )
+      )
+  )
+  (:action assemble_medication_package_label_option_a
+    :parameters (?pharmacy_technician - pharmacy_technician ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?renal_adjustment_rule - renal_adjustment_rule ?packaging_profile - packaging_profile ?medication_package - medication_package)
+    :precondition
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (renal_rule_flag_for_substitution ?renal_adjustment_rule)
+        (packaging_profile_selected ?packaging_profile)
+        (not
+          (technician_rule_acknowledged ?pharmacy_technician)
+        )
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        (package_slot_available ?medication_package)
+      )
+    :effect
+      (and
+        (package_reserved ?medication_package)
+        (package_bound_to_renal_rule ?medication_package ?renal_adjustment_rule)
+        (package_bound_to_packaging_profile ?medication_package ?packaging_profile)
+        (label_option_a_selected ?medication_package)
+        (not
+          (package_slot_available ?medication_package)
+        )
+      )
+  )
+  (:action assemble_medication_package_label_option_b
+    :parameters (?pharmacy_technician - pharmacy_technician ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?renal_adjustment_rule - renal_adjustment_rule ?packaging_profile - packaging_profile ?medication_package - medication_package)
+    :precondition
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (renal_rule_flag_for_review ?renal_adjustment_rule)
+        (packaging_profile_alternative_selected ?packaging_profile)
+        (technician_rule_acknowledged ?pharmacy_technician)
+        (not
+          (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        )
+        (package_slot_available ?medication_package)
+      )
+    :effect
+      (and
+        (package_reserved ?medication_package)
+        (package_bound_to_renal_rule ?medication_package ?renal_adjustment_rule)
+        (package_bound_to_packaging_profile ?medication_package ?packaging_profile)
+        (label_option_b_selected ?medication_package)
+        (not
+          (package_slot_available ?medication_package)
+        )
+      )
+  )
+  (:action assemble_medication_package_with_both_label_options
+    :parameters (?pharmacy_technician - pharmacy_technician ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?renal_adjustment_rule - renal_adjustment_rule ?packaging_profile - packaging_profile ?medication_package - medication_package)
+    :precondition
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assigned_renal_adjustment_rule ?pharmacy_technician ?renal_adjustment_rule)
+        (assistant_assigned_packaging_profile ?dispensing_pharmacist_assistant ?packaging_profile)
+        (renal_rule_flag_for_substitution ?renal_adjustment_rule)
+        (packaging_profile_alternative_selected ?packaging_profile)
+        (not
+          (technician_rule_acknowledged ?pharmacy_technician)
+        )
+        (not
+          (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        )
+        (package_slot_available ?medication_package)
+      )
+    :effect
+      (and
+        (package_reserved ?medication_package)
+        (package_bound_to_renal_rule ?medication_package ?renal_adjustment_rule)
+        (package_bound_to_packaging_profile ?medication_package ?packaging_profile)
+        (label_option_a_selected ?medication_package)
+        (label_option_b_selected ?medication_package)
+        (not
+          (package_slot_available ?medication_package)
+        )
+      )
+  )
+  (:action mark_package_prepared
+    :parameters (?medication_package - medication_package ?pharmacy_technician - pharmacy_technician ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (package_reserved ?medication_package)
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (linked_to_renal_result ?pharmacy_technician ?renal_function_result)
+        (not
+          (package_prepared ?medication_package)
+        )
+      )
+    :effect (package_prepared ?medication_package)
+  )
+  (:action allocate_label_template_to_package
+    :parameters (?dispense_task - dispense_task ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (task_associated_package ?dispense_task ?medication_package)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_available ?label_template)
+        (package_reserved ?medication_package)
+        (package_prepared ?medication_package)
+        (not
+          (label_template_allocated ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_allocated ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action stage_materials_for_task
+    :parameters (?dispense_task - dispense_task ?label_template - label_template ?medication_package - medication_package ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_allocated ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (linked_to_renal_result ?dispense_task ?renal_function_result)
+        (not
+          (label_option_a_selected ?medication_package)
+        )
+        (not
+          (materials_staged_for_task ?dispense_task)
+        )
+      )
+    :effect (materials_staged_for_task ?dispense_task)
+  )
+  (:action allocate_auxiliary_material_to_task
+    :parameters (?dispense_task - dispense_task ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (auxiliary_material_available ?auxiliary_material)
+        (not
+          (auxiliary_material_allocated ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (auxiliary_material_allocated ?dispense_task)
+        (task_bound_auxiliary_material ?dispense_task ?auxiliary_material)
+        (not
+          (auxiliary_material_available ?auxiliary_material)
+        )
+      )
+  )
+  (:action attach_auxiliary_material_and_stage_materials
+    :parameters (?dispense_task - dispense_task ?label_template - label_template ?medication_package - medication_package ?renal_function_result - renal_function_result ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_allocated ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (linked_to_renal_result ?dispense_task ?renal_function_result)
+        (label_option_a_selected ?medication_package)
+        (auxiliary_material_allocated ?dispense_task)
+        (task_bound_auxiliary_material ?dispense_task ?auxiliary_material)
+        (not
+          (materials_staged_for_task ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (materials_staged_for_task ?dispense_task)
+        (auxiliary_material_attached ?dispense_task)
+      )
+  )
+  (:action confirm_dosing_device_allocation
+    :parameters (?dispense_task - dispense_task ?dosing_device - dosing_device ?verifier - verifier ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (materials_staged_for_task ?dispense_task)
+        (task_bound_dosing_device ?dispense_task ?dosing_device)
+        (assigned_to_verifier ?dispense_task ?verifier)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (not
+          (label_option_b_selected ?medication_package)
+        )
+        (not
+          (dosing_device_allocated ?dispense_task)
+        )
+      )
+    :effect (dosing_device_allocated ?dispense_task)
+  )
+  (:action confirm_dosing_device_allocation_with_label_option_b
+    :parameters (?dispense_task - dispense_task ?dosing_device - dosing_device ?verifier - verifier ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (materials_staged_for_task ?dispense_task)
+        (task_bound_dosing_device ?dispense_task ?dosing_device)
+        (assigned_to_verifier ?dispense_task ?verifier)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (label_option_b_selected ?medication_package)
+        (not
+          (dosing_device_allocated ?dispense_task)
+        )
+      )
+    :effect (dosing_device_allocated ?dispense_task)
+  )
+  (:action finalize_task_attachments_standard
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (dosing_device_allocated ?dispense_task)
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (not
+          (label_option_a_selected ?medication_package)
+        )
+        (not
+          (label_option_b_selected ?medication_package)
+        )
+        (not
+          (attachments_finalized ?dispense_task)
+        )
+      )
+    :effect (attachments_finalized ?dispense_task)
+  )
+  (:action finalize_task_attachments_and_require_final_check
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (dosing_device_allocated ?dispense_task)
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (label_option_a_selected ?medication_package)
+        (not
+          (label_option_b_selected ?medication_package)
+        )
+        (not
+          (attachments_finalized ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_required ?dispense_task)
+      )
+  )
+  (:action finalize_task_attachments_label_option_b
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (dosing_device_allocated ?dispense_task)
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (not
+          (label_option_a_selected ?medication_package)
+        )
+        (label_option_b_selected ?medication_package)
+        (not
+          (attachments_finalized ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_required ?dispense_task)
+      )
+  )
+  (:action finalize_task_attachments_comprehensive
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note ?label_template - label_template ?medication_package - medication_package)
+    :precondition
+      (and
+        (dosing_device_allocated ?dispense_task)
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (task_bound_label_template ?dispense_task ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package)
+        (label_option_a_selected ?medication_package)
+        (label_option_b_selected ?medication_package)
+        (not
+          (attachments_finalized ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_required ?dispense_task)
+      )
+  )
+  (:action sign_off_task_and_mark_ready_for_release
+    :parameters (?dispense_task - dispense_task)
+    :precondition
+      (and
+        (attachments_finalized ?dispense_task)
+        (not
+          (final_check_required ?dispense_task)
+        )
+        (not
+          (task_signature_recorded ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (task_signature_recorded ?dispense_task)
+        (ready_for_dispatch ?dispense_task)
+      )
+  )
+  (:action bind_final_check_item_to_task
+    :parameters (?dispense_task - dispense_task ?final_check_item - final_check_item)
+    :precondition
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_required ?dispense_task)
+        (final_check_item_available ?final_check_item)
+      )
+    :effect
+      (and
+        (task_bound_final_check_item ?dispense_task ?final_check_item)
+        (not
+          (final_check_item_available ?final_check_item)
+        )
+      )
+  )
+  (:action perform_final_check
+    :parameters (?dispense_task - dispense_task ?pharmacy_technician - pharmacy_technician ?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?renal_function_result - renal_function_result ?final_check_item - final_check_item)
+    :precondition
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_required ?dispense_task)
+        (task_bound_final_check_item ?dispense_task ?final_check_item)
+        (task_assigned_to_technician ?dispense_task ?pharmacy_technician)
+        (task_assigned_to_assistant ?dispense_task ?dispensing_pharmacist_assistant)
+        (technician_rule_acknowledged ?pharmacy_technician)
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        (linked_to_renal_result ?dispense_task ?renal_function_result)
+        (not
+          (final_check_completed ?dispense_task)
+        )
+      )
+    :effect (final_check_completed ?dispense_task)
+  )
+  (:action complete_final_check_and_mark_task_ready_for_release
+    :parameters (?dispense_task - dispense_task)
+    :precondition
+      (and
+        (attachments_finalized ?dispense_task)
+        (final_check_completed ?dispense_task)
+        (not
+          (task_signature_recorded ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (task_signature_recorded ?dispense_task)
+        (ready_for_dispatch ?dispense_task)
+      )
+  )
+  (:action apply_override_authorization_to_task
+    :parameters (?dispense_task - dispense_task ?override_authorization - override_authorization ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (clinical_assessment_completed ?dispense_task)
+        (linked_to_renal_result ?dispense_task ?renal_function_result)
+        (override_authorization_available ?override_authorization)
+        (task_bound_override_authorization ?dispense_task ?override_authorization)
+        (not
+          (override_attached_to_task ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (override_attached_to_task ?dispense_task)
+        (not
+          (override_authorization_available ?override_authorization)
+        )
+      )
+  )
+  (:action process_override_on_task
+    :parameters (?dispense_task - dispense_task ?verifier - verifier)
+    :precondition
+      (and
+        (override_attached_to_task ?dispense_task)
+        (assigned_to_verifier ?dispense_task ?verifier)
+        (not
+          (override_processed ?dispense_task)
+        )
+      )
+    :effect (override_processed ?dispense_task)
+  )
+  (:action confirm_override_and_attach_consult
+    :parameters (?dispense_task - dispense_task ?clinical_consult_note - clinical_consult_note)
+    :precondition
+      (and
+        (override_processed ?dispense_task)
+        (task_bound_clinical_consult_note ?dispense_task ?clinical_consult_note)
+        (not
+          (override_confirmed ?dispense_task)
+        )
+      )
+    :effect (override_confirmed ?dispense_task)
+  )
+  (:action finalize_override_and_mark_task_ready_for_release
+    :parameters (?dispense_task - dispense_task)
+    :precondition
+      (and
+        (override_confirmed ?dispense_task)
+        (not
+          (task_signature_recorded ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (task_signature_recorded ?dispense_task)
+        (ready_for_dispatch ?dispense_task)
+      )
+  )
+  (:action technician_mark_task_ready_for_release
+    :parameters (?pharmacy_technician - pharmacy_technician ?medication_package - medication_package)
+    :precondition
+      (and
+        (technician_ready_for_packaging ?pharmacy_technician)
+        (technician_rule_acknowledged ?pharmacy_technician)
+        (package_reserved ?medication_package)
+        (package_prepared ?medication_package)
+        (not
+          (ready_for_dispatch ?pharmacy_technician)
+        )
+      )
+    :effect (ready_for_dispatch ?pharmacy_technician)
+  )
+  (:action assistant_mark_task_ready_for_release
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?medication_package - medication_package)
+    :precondition
+      (and
+        (assistant_ready_for_packaging ?dispensing_pharmacist_assistant)
+        (assistant_confirmed_packaging_ready ?dispensing_pharmacist_assistant)
+        (package_reserved ?medication_package)
+        (package_prepared ?medication_package)
+        (not
+          (ready_for_dispatch ?dispensing_pharmacist_assistant)
+        )
+      )
+    :effect (ready_for_dispatch ?dispensing_pharmacist_assistant)
+  )
+  (:action generate_patient_instructions_and_bind_template
+    :parameters (?medication_order - medication_order ?patient_instruction_template - patient_instruction_template ?renal_function_result - renal_function_result)
+    :precondition
+      (and
+        (ready_for_dispatch ?medication_order)
+        (linked_to_renal_result ?medication_order ?renal_function_result)
+        (patient_instruction_template_available ?patient_instruction_template)
+        (not
+          (patient_instructions_generated ?medication_order)
+        )
+      )
+    :effect
+      (and
+        (patient_instructions_generated ?medication_order)
+        (order_bound_instruction_template ?medication_order ?patient_instruction_template)
+        (not
+          (patient_instruction_template_available ?patient_instruction_template)
+        )
+      )
+  )
+  (:action record_task_closure_and_release_reviewer
+    :parameters (?pharmacy_technician - pharmacy_technician ?pharmacist_reviewer - pharmacist_reviewer ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (patient_instructions_generated ?pharmacy_technician)
+        (assigned_to_reviewer ?pharmacy_technician ?pharmacist_reviewer)
+        (order_bound_instruction_template ?pharmacy_technician ?patient_instruction_template)
+        (not
+          (processing_finalized ?pharmacy_technician)
+        )
+      )
+    :effect
+      (and
+        (processing_finalized ?pharmacy_technician)
+        (pharmacist_available ?pharmacist_reviewer)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+  (:action record_task_closure_and_release_reviewer_by_assistant
+    :parameters (?dispensing_pharmacist_assistant - dispensing_pharmacist_assistant ?pharmacist_reviewer - pharmacist_reviewer ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (patient_instructions_generated ?dispensing_pharmacist_assistant)
+        (assigned_to_reviewer ?dispensing_pharmacist_assistant ?pharmacist_reviewer)
+        (order_bound_instruction_template ?dispensing_pharmacist_assistant ?patient_instruction_template)
+        (not
+          (processing_finalized ?dispensing_pharmacist_assistant)
+        )
+      )
+    :effect
+      (and
+        (processing_finalized ?dispensing_pharmacist_assistant)
+        (pharmacist_available ?pharmacist_reviewer)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+  (:action record_task_closure_and_release_reviewer_for_task
+    :parameters (?dispense_task - dispense_task ?pharmacist_reviewer - pharmacist_reviewer ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (patient_instructions_generated ?dispense_task)
+        (assigned_to_reviewer ?dispense_task ?pharmacist_reviewer)
+        (order_bound_instruction_template ?dispense_task ?patient_instruction_template)
+        (not
+          (processing_finalized ?dispense_task)
+        )
+      )
+    :effect
+      (and
+        (processing_finalized ?dispense_task)
+        (pharmacist_available ?pharmacist_reviewer)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+)

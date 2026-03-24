@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain customs_hold_release_follow_up_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object organizational_resource_group - generic_object asset_group - generic_object logistics_asset_group - generic_object case_group - generic_object customs_hold_case - case_group release_channel - organizational_resource_group supporting_document - organizational_resource_group customs_broker - organizational_resource_group special_authorization - organizational_resource_group remediation_plan - organizational_resource_group release_certificate - organizational_resource_group external_service - organizational_resource_group legal_clearance - organizational_resource_group alternate_routing_option - asset_group cargo_unit - asset_group regulatory_contact - asset_group origin_checkpoint - logistics_asset_group destination_checkpoint - logistics_asset_group contingency_shipment - logistics_asset_group transport_leg_group - customs_hold_case follow_up_group - customs_hold_case primary_transport_leg - transport_leg_group secondary_transport_leg - transport_leg_group recovery_job - follow_up_group)
+
+  (:predicates
+    (subject_logged ?customs_hold_case - customs_hold_case)
+    (subject_verified_for_release_actions ?customs_hold_case - customs_hold_case)
+    (release_action_initiated ?customs_hold_case - customs_hold_case)
+    (subject_closed_or_released ?customs_hold_case - customs_hold_case)
+    (subject_marked_for_follow_up ?customs_hold_case - customs_hold_case)
+    (subject_has_certification ?customs_hold_case - customs_hold_case)
+    (release_channel_available ?release_channel - release_channel)
+    (subject_assigned_channel ?customs_hold_case - customs_hold_case ?release_channel - release_channel)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (subject_has_document ?customs_hold_case - customs_hold_case ?supporting_document - supporting_document)
+    (broker_available ?customs_broker - customs_broker)
+    (subject_has_broker ?customs_hold_case - customs_hold_case ?customs_broker - customs_broker)
+    (alternate_routing_option_available ?alternate_routing_option - alternate_routing_option)
+    (primary_leg_assigned_routing_option ?primary_transport_leg - primary_transport_leg ?alternate_routing_option - alternate_routing_option)
+    (secondary_leg_assigned_routing_option ?secondary_transport_leg - secondary_transport_leg ?alternate_routing_option - alternate_routing_option)
+    (leg_origin_checkpoint_link ?primary_transport_leg - primary_transport_leg ?origin_checkpoint - origin_checkpoint)
+    (origin_checkpoint_ready ?origin_checkpoint - origin_checkpoint)
+    (origin_checkpoint_alt_routing_flag ?origin_checkpoint - origin_checkpoint)
+    (primary_leg_ready ?primary_transport_leg - primary_transport_leg)
+    (leg_destination_checkpoint_link ?secondary_transport_leg - secondary_transport_leg ?destination_checkpoint - destination_checkpoint)
+    (destination_checkpoint_ready ?destination_checkpoint - destination_checkpoint)
+    (destination_checkpoint_alt_routing_flag ?destination_checkpoint - destination_checkpoint)
+    (secondary_leg_ready ?secondary_transport_leg - secondary_transport_leg)
+    (contingency_shipment_available ?contingency_shipment - contingency_shipment)
+    (contingency_shipment_confirmed ?contingency_shipment - contingency_shipment)
+    (contingency_shipment_origin_checkpoint_link ?contingency_shipment - contingency_shipment ?origin_checkpoint - origin_checkpoint)
+    (contingency_shipment_destination_checkpoint_link ?contingency_shipment - contingency_shipment ?destination_checkpoint - destination_checkpoint)
+    (contingency_shipment_requires_authorization ?contingency_shipment - contingency_shipment)
+    (contingency_shipment_requires_external_service ?contingency_shipment - contingency_shipment)
+    (contingency_shipment_manifested ?contingency_shipment - contingency_shipment)
+    (recovery_job_assigned_primary_leg ?recovery_job - recovery_job ?primary_transport_leg - primary_transport_leg)
+    (recovery_job_assigned_secondary_leg ?recovery_job - recovery_job ?secondary_transport_leg - secondary_transport_leg)
+    (recovery_job_assigned_contingency_shipment ?recovery_job - recovery_job ?contingency_shipment - contingency_shipment)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (recovery_job_assigned_cargo_unit ?recovery_job - recovery_job ?cargo_unit - cargo_unit)
+    (cargo_unit_staged ?cargo_unit - cargo_unit)
+    (cargo_unit_associated_with_contingency_shipment ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    (recovery_job_authorization_ready ?recovery_job - recovery_job)
+    (recovery_job_external_service_confirmed ?recovery_job - recovery_job)
+    (recovery_job_ready_for_finalization ?recovery_job - recovery_job)
+    (special_authorization_attached ?recovery_job - recovery_job)
+    (recovery_job_authorization_recorded ?recovery_job - recovery_job)
+    (recovery_job_requires_remediation ?recovery_job - recovery_job)
+    (recovery_job_verified_for_activation ?recovery_job - recovery_job)
+    (regulatory_contact_available ?regulatory_contact - regulatory_contact)
+    (recovery_job_assigned_regulatory_contact ?recovery_job - recovery_job ?regulatory_contact - regulatory_contact)
+    (regulatory_contact_engaged ?recovery_job - recovery_job)
+    (regulatory_contact_approval_requested ?recovery_job - recovery_job)
+    (regulatory_contact_approval_received ?recovery_job - recovery_job)
+    (special_authorization_available ?special_authorization - special_authorization)
+    (recovery_job_attached_authorization ?recovery_job - recovery_job ?special_authorization - special_authorization)
+    (remediation_plan_available ?remediation_plan - remediation_plan)
+    (recovery_job_assigned_remediation_plan ?recovery_job - recovery_job ?remediation_plan - remediation_plan)
+    (external_service_available ?external_service - external_service)
+    (recovery_job_assigned_external_service ?recovery_job - recovery_job ?external_service - external_service)
+    (legal_clearance_available ?legal_clearance - legal_clearance)
+    (recovery_job_assigned_legal_clearance ?recovery_job - recovery_job ?legal_clearance - legal_clearance)
+    (release_certificate_available ?release_certificate - release_certificate)
+    (subject_bound_to_release_certificate ?customs_hold_case - customs_hold_case ?release_certificate - release_certificate)
+    (primary_leg_prepared ?primary_transport_leg - primary_transport_leg)
+    (secondary_leg_prepared ?secondary_transport_leg - secondary_transport_leg)
+    (recovery_job_activated ?recovery_job - recovery_job)
+  )
+  (:action log_customs_hold_case
+    :parameters (?customs_hold_case - customs_hold_case)
+    :precondition
+      (and
+        (not
+          (subject_logged ?customs_hold_case)
+        )
+        (not
+          (subject_closed_or_released ?customs_hold_case)
+        )
+      )
+    :effect (subject_logged ?customs_hold_case)
+  )
+  (:action assign_release_channel_to_case
+    :parameters (?customs_hold_case - customs_hold_case ?release_channel - release_channel)
+    :precondition
+      (and
+        (subject_logged ?customs_hold_case)
+        (not
+          (release_action_initiated ?customs_hold_case)
+        )
+        (release_channel_available ?release_channel)
+      )
+    :effect
+      (and
+        (release_action_initiated ?customs_hold_case)
+        (subject_assigned_channel ?customs_hold_case ?release_channel)
+        (not
+          (release_channel_available ?release_channel)
+        )
+      )
+  )
+  (:action attach_supporting_document_to_case
+    :parameters (?customs_hold_case - customs_hold_case ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_logged ?customs_hold_case)
+        (release_action_initiated ?customs_hold_case)
+        (supporting_document_available ?supporting_document)
+      )
+    :effect
+      (and
+        (subject_has_document ?customs_hold_case ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action validate_case_with_document
+    :parameters (?customs_hold_case - customs_hold_case ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_logged ?customs_hold_case)
+        (release_action_initiated ?customs_hold_case)
+        (subject_has_document ?customs_hold_case ?supporting_document)
+        (not
+          (subject_verified_for_release_actions ?customs_hold_case)
+        )
+      )
+    :effect (subject_verified_for_release_actions ?customs_hold_case)
+  )
+  (:action detach_supporting_document_from_case
+    :parameters (?customs_hold_case - customs_hold_case ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_has_document ?customs_hold_case ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_document_available ?supporting_document)
+        (not
+          (subject_has_document ?customs_hold_case ?supporting_document)
+        )
+      )
+  )
+  (:action assign_broker_to_case
+    :parameters (?customs_hold_case - customs_hold_case ?customs_broker - customs_broker)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?customs_hold_case)
+        (broker_available ?customs_broker)
+      )
+    :effect
+      (and
+        (subject_has_broker ?customs_hold_case ?customs_broker)
+        (not
+          (broker_available ?customs_broker)
+        )
+      )
+  )
+  (:action unassign_broker_from_case
+    :parameters (?customs_hold_case - customs_hold_case ?customs_broker - customs_broker)
+    :precondition
+      (and
+        (subject_has_broker ?customs_hold_case ?customs_broker)
+      )
+    :effect
+      (and
+        (broker_available ?customs_broker)
+        (not
+          (subject_has_broker ?customs_hold_case ?customs_broker)
+        )
+      )
+  )
+  (:action assign_external_service_to_job
+    :parameters (?recovery_job - recovery_job ?external_service - external_service)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (external_service_available ?external_service)
+      )
+    :effect
+      (and
+        (recovery_job_assigned_external_service ?recovery_job ?external_service)
+        (not
+          (external_service_available ?external_service)
+        )
+      )
+  )
+  (:action unassign_external_service_from_job
+    :parameters (?recovery_job - recovery_job ?external_service - external_service)
+    :precondition
+      (and
+        (recovery_job_assigned_external_service ?recovery_job ?external_service)
+      )
+    :effect
+      (and
+        (external_service_available ?external_service)
+        (not
+          (recovery_job_assigned_external_service ?recovery_job ?external_service)
+        )
+      )
+  )
+  (:action assign_legal_clearance_to_job
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (legal_clearance_available ?legal_clearance)
+      )
+    :effect
+      (and
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (not
+          (legal_clearance_available ?legal_clearance)
+        )
+      )
+  )
+  (:action unassign_legal_clearance_from_job
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance)
+    :precondition
+      (and
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+      )
+    :effect
+      (and
+        (legal_clearance_available ?legal_clearance)
+        (not
+          (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        )
+      )
+  )
+  (:action validate_origin_checkpoint_and_mark_ready
+    :parameters (?primary_transport_leg - primary_transport_leg ?origin_checkpoint - origin_checkpoint ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?primary_transport_leg)
+        (subject_has_document ?primary_transport_leg ?supporting_document)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (not
+          (origin_checkpoint_ready ?origin_checkpoint)
+        )
+        (not
+          (origin_checkpoint_alt_routing_flag ?origin_checkpoint)
+        )
+      )
+    :effect (origin_checkpoint_ready ?origin_checkpoint)
+  )
+  (:action confirm_primary_leg_origin_clearance
+    :parameters (?primary_transport_leg - primary_transport_leg ?origin_checkpoint - origin_checkpoint ?customs_broker - customs_broker)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?primary_transport_leg)
+        (subject_has_broker ?primary_transport_leg ?customs_broker)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (origin_checkpoint_ready ?origin_checkpoint)
+        (not
+          (primary_leg_prepared ?primary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (primary_leg_ready ?primary_transport_leg)
+      )
+  )
+  (:action apply_alternate_routing_to_primary_leg
+    :parameters (?primary_transport_leg - primary_transport_leg ?origin_checkpoint - origin_checkpoint ?alternate_routing_option - alternate_routing_option)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?primary_transport_leg)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (alternate_routing_option_available ?alternate_routing_option)
+        (not
+          (primary_leg_prepared ?primary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_checkpoint_alt_routing_flag ?origin_checkpoint)
+        (primary_leg_prepared ?primary_transport_leg)
+        (primary_leg_assigned_routing_option ?primary_transport_leg ?alternate_routing_option)
+        (not
+          (alternate_routing_option_available ?alternate_routing_option)
+        )
+      )
+  )
+  (:action confirm_primary_leg_routing_and_stage_cargo
+    :parameters (?primary_transport_leg - primary_transport_leg ?origin_checkpoint - origin_checkpoint ?supporting_document - supporting_document ?alternate_routing_option - alternate_routing_option)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?primary_transport_leg)
+        (subject_has_document ?primary_transport_leg ?supporting_document)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (origin_checkpoint_alt_routing_flag ?origin_checkpoint)
+        (primary_leg_assigned_routing_option ?primary_transport_leg ?alternate_routing_option)
+        (not
+          (primary_leg_ready ?primary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_checkpoint_ready ?origin_checkpoint)
+        (primary_leg_ready ?primary_transport_leg)
+        (alternate_routing_option_available ?alternate_routing_option)
+        (not
+          (primary_leg_assigned_routing_option ?primary_transport_leg ?alternate_routing_option)
+        )
+      )
+  )
+  (:action validate_destination_checkpoint_and_mark_ready
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?destination_checkpoint - destination_checkpoint ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?secondary_transport_leg)
+        (subject_has_document ?secondary_transport_leg ?supporting_document)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (not
+          (destination_checkpoint_ready ?destination_checkpoint)
+        )
+        (not
+          (destination_checkpoint_alt_routing_flag ?destination_checkpoint)
+        )
+      )
+    :effect (destination_checkpoint_ready ?destination_checkpoint)
+  )
+  (:action confirm_secondary_leg_destination_clearance
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?destination_checkpoint - destination_checkpoint ?customs_broker - customs_broker)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?secondary_transport_leg)
+        (subject_has_broker ?secondary_transport_leg ?customs_broker)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (destination_checkpoint_ready ?destination_checkpoint)
+        (not
+          (secondary_leg_prepared ?secondary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (secondary_leg_ready ?secondary_transport_leg)
+      )
+  )
+  (:action apply_alternate_routing_to_secondary_leg
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?destination_checkpoint - destination_checkpoint ?alternate_routing_option - alternate_routing_option)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?secondary_transport_leg)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (alternate_routing_option_available ?alternate_routing_option)
+        (not
+          (secondary_leg_prepared ?secondary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_checkpoint_alt_routing_flag ?destination_checkpoint)
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (secondary_leg_assigned_routing_option ?secondary_transport_leg ?alternate_routing_option)
+        (not
+          (alternate_routing_option_available ?alternate_routing_option)
+        )
+      )
+  )
+  (:action confirm_secondary_leg_routing_and_stage_cargo
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?destination_checkpoint - destination_checkpoint ?supporting_document - supporting_document ?alternate_routing_option - alternate_routing_option)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?secondary_transport_leg)
+        (subject_has_document ?secondary_transport_leg ?supporting_document)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (destination_checkpoint_alt_routing_flag ?destination_checkpoint)
+        (secondary_leg_assigned_routing_option ?secondary_transport_leg ?alternate_routing_option)
+        (not
+          (secondary_leg_ready ?secondary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_checkpoint_ready ?destination_checkpoint)
+        (secondary_leg_ready ?secondary_transport_leg)
+        (alternate_routing_option_available ?alternate_routing_option)
+        (not
+          (secondary_leg_assigned_routing_option ?secondary_transport_leg ?alternate_routing_option)
+        )
+      )
+  )
+  (:action allocate_contingency_shipment
+    :parameters (?primary_transport_leg - primary_transport_leg ?secondary_transport_leg - secondary_transport_leg ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (origin_checkpoint_ready ?origin_checkpoint)
+        (destination_checkpoint_ready ?destination_checkpoint)
+        (primary_leg_ready ?primary_transport_leg)
+        (secondary_leg_ready ?secondary_transport_leg)
+        (contingency_shipment_available ?contingency_shipment)
+      )
+    :effect
+      (and
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_origin_checkpoint_link ?contingency_shipment ?origin_checkpoint)
+        (contingency_shipment_destination_checkpoint_link ?contingency_shipment ?destination_checkpoint)
+        (not
+          (contingency_shipment_available ?contingency_shipment)
+        )
+      )
+  )
+  (:action allocate_contingency_shipment_with_authorization_requirement
+    :parameters (?primary_transport_leg - primary_transport_leg ?secondary_transport_leg - secondary_transport_leg ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (origin_checkpoint_alt_routing_flag ?origin_checkpoint)
+        (destination_checkpoint_ready ?destination_checkpoint)
+        (not
+          (primary_leg_ready ?primary_transport_leg)
+        )
+        (secondary_leg_ready ?secondary_transport_leg)
+        (contingency_shipment_available ?contingency_shipment)
+      )
+    :effect
+      (and
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_origin_checkpoint_link ?contingency_shipment ?origin_checkpoint)
+        (contingency_shipment_destination_checkpoint_link ?contingency_shipment ?destination_checkpoint)
+        (contingency_shipment_requires_authorization ?contingency_shipment)
+        (not
+          (contingency_shipment_available ?contingency_shipment)
+        )
+      )
+  )
+  (:action allocate_contingency_shipment_with_external_service_requirement
+    :parameters (?primary_transport_leg - primary_transport_leg ?secondary_transport_leg - secondary_transport_leg ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (origin_checkpoint_ready ?origin_checkpoint)
+        (destination_checkpoint_alt_routing_flag ?destination_checkpoint)
+        (primary_leg_ready ?primary_transport_leg)
+        (not
+          (secondary_leg_ready ?secondary_transport_leg)
+        )
+        (contingency_shipment_available ?contingency_shipment)
+      )
+    :effect
+      (and
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_origin_checkpoint_link ?contingency_shipment ?origin_checkpoint)
+        (contingency_shipment_destination_checkpoint_link ?contingency_shipment ?destination_checkpoint)
+        (contingency_shipment_requires_external_service ?contingency_shipment)
+        (not
+          (contingency_shipment_available ?contingency_shipment)
+        )
+      )
+  )
+  (:action allocate_contingency_shipment_with_authorization_and_service_requirements
+    :parameters (?primary_transport_leg - primary_transport_leg ?secondary_transport_leg - secondary_transport_leg ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (leg_origin_checkpoint_link ?primary_transport_leg ?origin_checkpoint)
+        (leg_destination_checkpoint_link ?secondary_transport_leg ?destination_checkpoint)
+        (origin_checkpoint_alt_routing_flag ?origin_checkpoint)
+        (destination_checkpoint_alt_routing_flag ?destination_checkpoint)
+        (not
+          (primary_leg_ready ?primary_transport_leg)
+        )
+        (not
+          (secondary_leg_ready ?secondary_transport_leg)
+        )
+        (contingency_shipment_available ?contingency_shipment)
+      )
+    :effect
+      (and
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_origin_checkpoint_link ?contingency_shipment ?origin_checkpoint)
+        (contingency_shipment_destination_checkpoint_link ?contingency_shipment ?destination_checkpoint)
+        (contingency_shipment_requires_authorization ?contingency_shipment)
+        (contingency_shipment_requires_external_service ?contingency_shipment)
+        (not
+          (contingency_shipment_available ?contingency_shipment)
+        )
+      )
+  )
+  (:action manifest_contingency_shipment
+    :parameters (?contingency_shipment - contingency_shipment ?primary_transport_leg - primary_transport_leg ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (primary_leg_prepared ?primary_transport_leg)
+        (subject_has_document ?primary_transport_leg ?supporting_document)
+        (not
+          (contingency_shipment_manifested ?contingency_shipment)
+        )
+      )
+    :effect (contingency_shipment_manifested ?contingency_shipment)
+  )
+  (:action stage_cargo_unit_to_contingency_shipment
+    :parameters (?recovery_job - recovery_job ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (recovery_job_assigned_contingency_shipment ?recovery_job ?contingency_shipment)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_available ?cargo_unit)
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_manifested ?contingency_shipment)
+        (not
+          (cargo_unit_staged ?cargo_unit)
+        )
+      )
+    :effect
+      (and
+        (cargo_unit_staged ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action prepare_job_manifest
+    :parameters (?recovery_job - recovery_job ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_staged ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (subject_has_document ?recovery_job ?supporting_document)
+        (not
+          (contingency_shipment_requires_authorization ?contingency_shipment)
+        )
+        (not
+          (recovery_job_authorization_ready ?recovery_job)
+        )
+      )
+    :effect (recovery_job_authorization_ready ?recovery_job)
+  )
+  (:action attach_special_authorization_to_job
+    :parameters (?recovery_job - recovery_job ?special_authorization - special_authorization)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (special_authorization_available ?special_authorization)
+        (not
+          (special_authorization_attached ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (special_authorization_attached ?recovery_job)
+        (recovery_job_attached_authorization ?recovery_job ?special_authorization)
+        (not
+          (special_authorization_available ?special_authorization)
+        )
+      )
+  )
+  (:action record_job_authorization_and_mark_ready
+    :parameters (?recovery_job - recovery_job ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment ?supporting_document - supporting_document ?special_authorization - special_authorization)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_staged ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (subject_has_document ?recovery_job ?supporting_document)
+        (contingency_shipment_requires_authorization ?contingency_shipment)
+        (special_authorization_attached ?recovery_job)
+        (recovery_job_attached_authorization ?recovery_job ?special_authorization)
+        (not
+          (recovery_job_authorization_ready ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_authorization_ready ?recovery_job)
+        (recovery_job_authorization_recorded ?recovery_job)
+      )
+  )
+  (:action schedule_external_service_for_job
+    :parameters (?recovery_job - recovery_job ?external_service - external_service ?customs_broker - customs_broker ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_authorization_ready ?recovery_job)
+        (recovery_job_assigned_external_service ?recovery_job ?external_service)
+        (subject_has_broker ?recovery_job ?customs_broker)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (not
+          (contingency_shipment_requires_external_service ?contingency_shipment)
+        )
+        (not
+          (recovery_job_external_service_confirmed ?recovery_job)
+        )
+      )
+    :effect (recovery_job_external_service_confirmed ?recovery_job)
+  )
+  (:action confirm_external_service_for_job
+    :parameters (?recovery_job - recovery_job ?external_service - external_service ?customs_broker - customs_broker ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_authorization_ready ?recovery_job)
+        (recovery_job_assigned_external_service ?recovery_job ?external_service)
+        (subject_has_broker ?recovery_job ?customs_broker)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (contingency_shipment_requires_external_service ?contingency_shipment)
+        (not
+          (recovery_job_external_service_confirmed ?recovery_job)
+        )
+      )
+    :effect (recovery_job_external_service_confirmed ?recovery_job)
+  )
+  (:action assign_legal_clearance_and_mark_job_ready
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_external_service_confirmed ?recovery_job)
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (not
+          (contingency_shipment_requires_authorization ?contingency_shipment)
+        )
+        (not
+          (contingency_shipment_requires_external_service ?contingency_shipment)
+        )
+        (not
+          (recovery_job_ready_for_finalization ?recovery_job)
+        )
+      )
+    :effect (recovery_job_ready_for_finalization ?recovery_job)
+  )
+  (:action assign_legal_clearance_and_mark_job_for_remediation
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_external_service_confirmed ?recovery_job)
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (contingency_shipment_requires_authorization ?contingency_shipment)
+        (not
+          (contingency_shipment_requires_external_service ?contingency_shipment)
+        )
+        (not
+          (recovery_job_ready_for_finalization ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_requires_remediation ?recovery_job)
+      )
+  )
+  (:action assign_legal_clearance_and_mark_job_for_remediation_with_service
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_external_service_confirmed ?recovery_job)
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (not
+          (contingency_shipment_requires_authorization ?contingency_shipment)
+        )
+        (contingency_shipment_requires_external_service ?contingency_shipment)
+        (not
+          (recovery_job_ready_for_finalization ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_requires_remediation ?recovery_job)
+      )
+  )
+  (:action assign_legal_clearance_and_mark_job_for_remediation_with_auth_and_service
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance ?cargo_unit - cargo_unit ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (recovery_job_external_service_confirmed ?recovery_job)
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (recovery_job_assigned_cargo_unit ?recovery_job ?cargo_unit)
+        (cargo_unit_associated_with_contingency_shipment ?cargo_unit ?contingency_shipment)
+        (contingency_shipment_requires_authorization ?contingency_shipment)
+        (contingency_shipment_requires_external_service ?contingency_shipment)
+        (not
+          (recovery_job_ready_for_finalization ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_requires_remediation ?recovery_job)
+      )
+  )
+  (:action activate_follow_up_job_direct
+    :parameters (?recovery_job - recovery_job)
+    :precondition
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (not
+          (recovery_job_requires_remediation ?recovery_job)
+        )
+        (not
+          (recovery_job_activated ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_activated ?recovery_job)
+        (subject_marked_for_follow_up ?recovery_job)
+      )
+  )
+  (:action attach_remediation_plan_to_job
+    :parameters (?recovery_job - recovery_job ?remediation_plan - remediation_plan)
+    :precondition
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_requires_remediation ?recovery_job)
+        (remediation_plan_available ?remediation_plan)
+      )
+    :effect
+      (and
+        (recovery_job_assigned_remediation_plan ?recovery_job ?remediation_plan)
+        (not
+          (remediation_plan_available ?remediation_plan)
+        )
+      )
+  )
+  (:action validate_job_execution_prerequisites
+    :parameters (?recovery_job - recovery_job ?primary_transport_leg - primary_transport_leg ?secondary_transport_leg - secondary_transport_leg ?supporting_document - supporting_document ?remediation_plan - remediation_plan)
+    :precondition
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_requires_remediation ?recovery_job)
+        (recovery_job_assigned_remediation_plan ?recovery_job ?remediation_plan)
+        (recovery_job_assigned_primary_leg ?recovery_job ?primary_transport_leg)
+        (recovery_job_assigned_secondary_leg ?recovery_job ?secondary_transport_leg)
+        (primary_leg_ready ?primary_transport_leg)
+        (secondary_leg_ready ?secondary_transport_leg)
+        (subject_has_document ?recovery_job ?supporting_document)
+        (not
+          (recovery_job_verified_for_activation ?recovery_job)
+        )
+      )
+    :effect (recovery_job_verified_for_activation ?recovery_job)
+  )
+  (:action activate_follow_up_job_verified
+    :parameters (?recovery_job - recovery_job)
+    :precondition
+      (and
+        (recovery_job_ready_for_finalization ?recovery_job)
+        (recovery_job_verified_for_activation ?recovery_job)
+        (not
+          (recovery_job_activated ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_activated ?recovery_job)
+        (subject_marked_for_follow_up ?recovery_job)
+      )
+  )
+  (:action engage_regulatory_contact_for_job
+    :parameters (?recovery_job - recovery_job ?regulatory_contact - regulatory_contact ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_verified_for_release_actions ?recovery_job)
+        (subject_has_document ?recovery_job ?supporting_document)
+        (regulatory_contact_available ?regulatory_contact)
+        (recovery_job_assigned_regulatory_contact ?recovery_job ?regulatory_contact)
+        (not
+          (regulatory_contact_engaged ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (regulatory_contact_engaged ?recovery_job)
+        (not
+          (regulatory_contact_available ?regulatory_contact)
+        )
+      )
+  )
+  (:action request_regulatory_approval
+    :parameters (?recovery_job - recovery_job ?customs_broker - customs_broker)
+    :precondition
+      (and
+        (regulatory_contact_engaged ?recovery_job)
+        (subject_has_broker ?recovery_job ?customs_broker)
+        (not
+          (regulatory_contact_approval_requested ?recovery_job)
+        )
+      )
+    :effect (regulatory_contact_approval_requested ?recovery_job)
+  )
+  (:action record_regulatory_approval
+    :parameters (?recovery_job - recovery_job ?legal_clearance - legal_clearance)
+    :precondition
+      (and
+        (regulatory_contact_approval_requested ?recovery_job)
+        (recovery_job_assigned_legal_clearance ?recovery_job ?legal_clearance)
+        (not
+          (regulatory_contact_approval_received ?recovery_job)
+        )
+      )
+    :effect (regulatory_contact_approval_received ?recovery_job)
+  )
+  (:action activate_job_after_regulatory_approval
+    :parameters (?recovery_job - recovery_job)
+    :precondition
+      (and
+        (regulatory_contact_approval_received ?recovery_job)
+        (not
+          (recovery_job_activated ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (recovery_job_activated ?recovery_job)
+        (subject_marked_for_follow_up ?recovery_job)
+      )
+  )
+  (:action execute_physical_release_on_primary_leg
+    :parameters (?primary_transport_leg - primary_transport_leg ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (primary_leg_prepared ?primary_transport_leg)
+        (primary_leg_ready ?primary_transport_leg)
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_manifested ?contingency_shipment)
+        (not
+          (subject_marked_for_follow_up ?primary_transport_leg)
+        )
+      )
+    :effect (subject_marked_for_follow_up ?primary_transport_leg)
+  )
+  (:action execute_physical_release_on_secondary_leg
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?contingency_shipment - contingency_shipment)
+    :precondition
+      (and
+        (secondary_leg_prepared ?secondary_transport_leg)
+        (secondary_leg_ready ?secondary_transport_leg)
+        (contingency_shipment_confirmed ?contingency_shipment)
+        (contingency_shipment_manifested ?contingency_shipment)
+        (not
+          (subject_marked_for_follow_up ?secondary_transport_leg)
+        )
+      )
+    :effect (subject_marked_for_follow_up ?secondary_transport_leg)
+  )
+  (:action issue_release_certificate_and_bind_to_case
+    :parameters (?customs_hold_case - customs_hold_case ?release_certificate - release_certificate ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (subject_marked_for_follow_up ?customs_hold_case)
+        (subject_has_document ?customs_hold_case ?supporting_document)
+        (release_certificate_available ?release_certificate)
+        (not
+          (subject_has_certification ?customs_hold_case)
+        )
+      )
+    :effect
+      (and
+        (subject_has_certification ?customs_hold_case)
+        (subject_bound_to_release_certificate ?customs_hold_case ?release_certificate)
+        (not
+          (release_certificate_available ?release_certificate)
+        )
+      )
+  )
+  (:action finalize_case_and_release_resources
+    :parameters (?primary_transport_leg - primary_transport_leg ?release_channel - release_channel ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (subject_has_certification ?primary_transport_leg)
+        (subject_assigned_channel ?primary_transport_leg ?release_channel)
+        (subject_bound_to_release_certificate ?primary_transport_leg ?release_certificate)
+        (not
+          (subject_closed_or_released ?primary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (subject_closed_or_released ?primary_transport_leg)
+        (release_channel_available ?release_channel)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+  (:action finalize_secondary_case_and_release_resources
+    :parameters (?secondary_transport_leg - secondary_transport_leg ?release_channel - release_channel ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (subject_has_certification ?secondary_transport_leg)
+        (subject_assigned_channel ?secondary_transport_leg ?release_channel)
+        (subject_bound_to_release_certificate ?secondary_transport_leg ?release_certificate)
+        (not
+          (subject_closed_or_released ?secondary_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (subject_closed_or_released ?secondary_transport_leg)
+        (release_channel_available ?release_channel)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+  (:action finalize_job_and_release_resources
+    :parameters (?recovery_job - recovery_job ?release_channel - release_channel ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (subject_has_certification ?recovery_job)
+        (subject_assigned_channel ?recovery_job ?release_channel)
+        (subject_bound_to_release_certificate ?recovery_job ?release_certificate)
+        (not
+          (subject_closed_or_released ?recovery_job)
+        )
+      )
+    :effect
+      (and
+        (subject_closed_or_released ?recovery_job)
+        (release_channel_available ?release_channel)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem customs_hold_release_follow_up_problem)
+  (:domain customs_hold_release_follow_up_domain)
+  (:objects primary_leg_1 - primary_transport_leg secondary_leg_1 - secondary_transport_leg recovery_job_1 - recovery_job recovery_job_2 - recovery_job release_channel_1 - release_channel release_channel_2 - release_channel release_channel_3 - release_channel supporting_document_1 - supporting_document customs_broker_1 - customs_broker alt_routing_option_1 - alternate_routing_option origin_checkpoint_1 - origin_checkpoint destination_checkpoint_1 - destination_checkpoint contingency_shipment_1 - contingency_shipment cargo_unit_1 - cargo_unit cargo_unit_2 - cargo_unit special_authorization_1 - special_authorization special_authorization_2 - special_authorization remediation_plan_1 - remediation_plan remediation_plan_2 - remediation_plan release_certificate_1 - release_certificate external_service_1 - external_service regulatory_contact_1 - regulatory_contact regulatory_contact_2 - regulatory_contact legal_clearance_1 - legal_clearance)
+  (:init
+    (release_channel_available release_channel_1)
+    (release_channel_available release_channel_2)
+    (release_channel_available release_channel_3)
+    (supporting_document_available supporting_document_1)
+    (broker_available customs_broker_1)
+    (alternate_routing_option_available alt_routing_option_1)
+    (leg_origin_checkpoint_link primary_leg_1 origin_checkpoint_1)
+    (leg_destination_checkpoint_link secondary_leg_1 destination_checkpoint_1)
+    (contingency_shipment_available contingency_shipment_1)
+    (cargo_unit_available cargo_unit_1)
+    (cargo_unit_available cargo_unit_2)
+    (recovery_job_assigned_primary_leg recovery_job_1 primary_leg_1)
+    (recovery_job_assigned_primary_leg recovery_job_2 primary_leg_1)
+    (recovery_job_assigned_secondary_leg recovery_job_1 secondary_leg_1)
+    (recovery_job_assigned_secondary_leg recovery_job_2 secondary_leg_1)
+    (recovery_job_assigned_contingency_shipment recovery_job_1 contingency_shipment_1)
+    (recovery_job_assigned_contingency_shipment recovery_job_2 contingency_shipment_1)
+    (recovery_job_assigned_cargo_unit recovery_job_1 cargo_unit_1)
+    (recovery_job_assigned_cargo_unit recovery_job_2 cargo_unit_2)
+    (special_authorization_available special_authorization_1)
+    (special_authorization_available special_authorization_2)
+    (remediation_plan_available remediation_plan_1)
+    (remediation_plan_available remediation_plan_2)
+    (release_certificate_available release_certificate_1)
+    (external_service_available external_service_1)
+    (regulatory_contact_available regulatory_contact_1)
+    (recovery_job_assigned_regulatory_contact recovery_job_1 regulatory_contact_1)
+    (recovery_job_assigned_regulatory_contact recovery_job_2 regulatory_contact_2)
+    (legal_clearance_available legal_clearance_1)
+  )
+  (:goal
+    (and
+      (subject_closed_or_released primary_leg_1)
+      (subject_closed_or_released secondary_leg_1)
+      (subject_closed_or_released recovery_job_1)
+      (subject_closed_or_released recovery_job_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(log_customs_hold_case primary_leg_1)
+(assign_release_channel_to_case primary_leg_1 release_channel_1)
+(attach_supporting_document_to_case primary_leg_1 supporting_document_1)
+(validate_case_with_document primary_leg_1 supporting_document_1)
+(assign_broker_to_case primary_leg_1 customs_broker_1)
+(validate_origin_checkpoint_and_mark_ready primary_leg_1 origin_checkpoint_1 supporting_document_1)
+(confirm_primary_leg_origin_clearance primary_leg_1 origin_checkpoint_1 customs_broker_1)
+(detach_supporting_document_from_case primary_leg_1 supporting_document_1)
+(unassign_broker_from_case primary_leg_1 customs_broker_1)
+(log_customs_hold_case secondary_leg_1)
+(assign_release_channel_to_case secondary_leg_1 release_channel_2)
+(attach_supporting_document_to_case secondary_leg_1 supporting_document_1)
+(validate_case_with_document secondary_leg_1 supporting_document_1)
+(assign_broker_to_case secondary_leg_1 customs_broker_1)
+(validate_destination_checkpoint_and_mark_ready secondary_leg_1 destination_checkpoint_1 supporting_document_1)
+(confirm_secondary_leg_destination_clearance secondary_leg_1 destination_checkpoint_1 customs_broker_1)
+(detach_supporting_document_from_case secondary_leg_1 supporting_document_1)
+(unassign_broker_from_case secondary_leg_1 customs_broker_1)
+(allocate_contingency_shipment primary_leg_1 secondary_leg_1 origin_checkpoint_1 destination_checkpoint_1 contingency_shipment_1)
+(attach_supporting_document_to_case primary_leg_1 supporting_document_1)
+(manifest_contingency_shipment contingency_shipment_1 primary_leg_1 supporting_document_1)
+(detach_supporting_document_from_case primary_leg_1 supporting_document_1)
+(log_customs_hold_case recovery_job_1)
+(assign_release_channel_to_case recovery_job_1 release_channel_3)
+(attach_supporting_document_to_case recovery_job_1 supporting_document_1)
+(validate_case_with_document recovery_job_1 supporting_document_1)
+(stage_cargo_unit_to_contingency_shipment recovery_job_1 cargo_unit_1 contingency_shipment_1)
+(prepare_job_manifest recovery_job_1 cargo_unit_1 contingency_shipment_1 supporting_document_1)
+(assign_external_service_to_job recovery_job_1 external_service_1)
+(assign_broker_to_case recovery_job_1 customs_broker_1)
+(schedule_external_service_for_job recovery_job_1 external_service_1 customs_broker_1 cargo_unit_1 contingency_shipment_1)
+(assign_legal_clearance_to_job recovery_job_1 legal_clearance_1)
+(assign_legal_clearance_and_mark_job_ready recovery_job_1 legal_clearance_1 cargo_unit_1 contingency_shipment_1)
+(activate_follow_up_job_direct recovery_job_1)
+(issue_release_certificate_and_bind_to_case recovery_job_1 release_certificate_1 supporting_document_1)
+(finalize_job_and_release_resources recovery_job_1 release_channel_3 release_certificate_1)
+(detach_supporting_document_from_case recovery_job_1 supporting_document_1)
+(unassign_broker_from_case recovery_job_1 customs_broker_1)
+(unassign_external_service_from_job recovery_job_1 external_service_1)
+(unassign_legal_clearance_from_job recovery_job_1 legal_clearance_1)
+(log_customs_hold_case recovery_job_2)
+(assign_release_channel_to_case recovery_job_2 release_channel_3)
+(attach_supporting_document_to_case recovery_job_2 supporting_document_1)
+(validate_case_with_document recovery_job_2 supporting_document_1)
+(stage_cargo_unit_to_contingency_shipment recovery_job_2 cargo_unit_2 contingency_shipment_1)
+(prepare_job_manifest recovery_job_2 cargo_unit_2 contingency_shipment_1 supporting_document_1)
+(assign_external_service_to_job recovery_job_2 external_service_1)
+(assign_broker_to_case recovery_job_2 customs_broker_1)
+(schedule_external_service_for_job recovery_job_2 external_service_1 customs_broker_1 cargo_unit_2 contingency_shipment_1)
+(assign_legal_clearance_to_job recovery_job_2 legal_clearance_1)
+(assign_legal_clearance_and_mark_job_ready recovery_job_2 legal_clearance_1 cargo_unit_2 contingency_shipment_1)
+(activate_follow_up_job_direct recovery_job_2)
+(issue_release_certificate_and_bind_to_case recovery_job_2 release_certificate_1 supporting_document_1)
+(finalize_job_and_release_resources recovery_job_2 release_channel_3 release_certificate_1)
+(detach_supporting_document_from_case recovery_job_2 supporting_document_1)
+(execute_physical_release_on_primary_leg primary_leg_1 contingency_shipment_1)
+(execute_physical_release_on_secondary_leg secondary_leg_1 contingency_shipment_1)
+(attach_supporting_document_to_case primary_leg_1 supporting_document_1)
+(issue_release_certificate_and_bind_to_case primary_leg_1 release_certificate_1 supporting_document_1)
+(finalize_case_and_release_resources primary_leg_1 release_channel_1 release_certificate_1)
+(detach_supporting_document_from_case primary_leg_1 supporting_document_1)
+(attach_supporting_document_to_case secondary_leg_1 supporting_document_1)
+(issue_release_certificate_and_bind_to_case secondary_leg_1 release_certificate_1 supporting_document_1)
+(finalize_secondary_case_and_release_resources secondary_leg_1 release_channel_2 release_certificate_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_hywmbkqj/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_hywmbkqj/plan.pddl 64 
+
+
+
+--- stderr ---
+

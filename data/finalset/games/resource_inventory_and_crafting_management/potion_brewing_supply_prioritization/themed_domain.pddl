@@ -1,0 +1,936 @@
+(define (domain potion_brewing_supply_prioritization)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types material_type - object auxiliary_resource - object processing_token - object potion_type - object brew_order - potion_type supply_batch - material_type ingredient_item - material_type tool - material_type finishing_additive - material_type packaging_material - material_type preservative - material_type catalyst - material_type enchantment_reagent - material_type supplement_item - auxiliary_resource label_template - auxiliary_resource attachment_component - auxiliary_resource infusion_slot - processing_token focus_slot - processing_token vial_container - processing_token workstation - brew_order brewer_unit - brew_order primary_station - workstation secondary_station - workstation brewer - brewer_unit)
+  (:predicates
+    (entity_created ?brew_order - brew_order)
+    (entity_staged ?brew_order - brew_order)
+    (entity_supply_reserved ?brew_order - brew_order)
+    (entity_resources_committed ?brew_order - brew_order)
+    (ready_for_transfer ?brew_order - brew_order)
+    (entity_preservative_applied ?brew_order - brew_order)
+    (supply_batch_available ?supply_batch - supply_batch)
+    (batch_assigned_to_entity ?brew_order - brew_order ?supply_batch - supply_batch)
+    (ingredient_available ?ingredient_item - ingredient_item)
+    (ingredient_assigned_to_entity ?brew_order - brew_order ?ingredient_item - ingredient_item)
+    (tool_available ?tool - tool)
+    (tool_assigned_to_entity ?brew_order - brew_order ?tool - tool)
+    (supplement_available ?supplement_item - supplement_item)
+    (supplement_applied_to_primary ?primary_station - primary_station ?supplement_item - supplement_item)
+    (supplement_applied_to_secondary ?secondary_station - secondary_station ?supplement_item - supplement_item)
+    (primary_station_has_infusion_slot ?primary_station - primary_station ?infusion_slot - infusion_slot)
+    (infusion_slot_reserved ?infusion_slot - infusion_slot)
+    (infusion_slot_supplemented ?infusion_slot - infusion_slot)
+    (primary_station_ready ?primary_station - primary_station)
+    (secondary_station_has_focus_slot ?secondary_station - secondary_station ?focus_slot - focus_slot)
+    (focus_slot_reserved ?focus_slot - focus_slot)
+    (focus_slot_supplemented ?focus_slot - focus_slot)
+    (secondary_station_ready ?secondary_station - secondary_station)
+    (vial_available ?vial_container - vial_container)
+    (vial_reserved ?vial_container - vial_container)
+    (vial_linked_to_infusion_slot ?vial_container - vial_container ?infusion_slot - infusion_slot)
+    (vial_linked_to_focus_slot ?vial_container - vial_container ?focus_slot - focus_slot)
+    (vial_requires_label ?vial_container - vial_container)
+    (vial_requires_packaging ?vial_container - vial_container)
+    (vial_filled ?vial_container - vial_container)
+    (brewer_primary_link ?brewer - brewer ?primary_station - primary_station)
+    (brewer_secondary_link ?brewer - brewer ?secondary_station - secondary_station)
+    (brewer_vial_link ?brewer - brewer ?vial_container - vial_container)
+    (label_template_available ?label_template - label_template)
+    (brewer_has_label_template ?brewer - brewer ?label_template - label_template)
+    (label_template_applied ?label_template - label_template)
+    (label_attached_to_vial ?label_template - label_template ?vial_container - vial_container)
+    (brewer_prepped_for_finishing ?brewer - brewer)
+    (brewer_assembly_complete ?brewer - brewer)
+    (brewer_ready_for_finalization ?brewer - brewer)
+    (finishing_additive_attached_flag ?brewer - brewer)
+    (brewer_labeling_ready ?brewer - brewer)
+    (packaging_attached ?brewer - brewer)
+    (final_checks_passed ?brewer - brewer)
+    (attachment_component_available ?attachment_component - attachment_component)
+    (brewer_has_attachment_component ?brewer - brewer ?attachment_component - attachment_component)
+    (special_ingredient_reserved ?brewer - brewer)
+    (special_attachment_applied ?brewer - brewer)
+    (special_attachment_ready ?brewer - brewer)
+    (finishing_additive_available ?finishing_additive - finishing_additive)
+    (finishing_additive_attached ?brewer - brewer ?finishing_additive - finishing_additive)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (packaging_attached_to_brewer ?brewer - brewer ?packaging_material - packaging_material)
+    (catalyst_available ?catalyst - catalyst)
+    (catalyst_attached_to_brewer ?brewer - brewer ?catalyst - catalyst)
+    (enchantment_reagent_available ?enchantment_reagent - enchantment_reagent)
+    (enchantment_reagent_attached ?brewer - brewer ?enchantment_reagent - enchantment_reagent)
+    (preservative_available ?preservative - preservative)
+    (preservative_bound_to_entity ?brew_order - brew_order ?preservative - preservative)
+    (primary_station_setup_in_progress ?primary_station - primary_station)
+    (secondary_station_setup_in_progress ?secondary_station - secondary_station)
+    (brewer_marked_for_delivery ?brewer - brewer)
+  )
+  (:action create_brew_order
+    :parameters (?brew_order - brew_order)
+    :precondition
+      (and
+        (not
+          (entity_created ?brew_order)
+        )
+        (not
+          (entity_resources_committed ?brew_order)
+        )
+      )
+    :effect (entity_created ?brew_order)
+  )
+  (:action assign_supply_batch_to_order
+    :parameters (?brew_order - brew_order ?supply_batch - supply_batch)
+    :precondition
+      (and
+        (entity_created ?brew_order)
+        (not
+          (entity_supply_reserved ?brew_order)
+        )
+        (supply_batch_available ?supply_batch)
+      )
+    :effect
+      (and
+        (entity_supply_reserved ?brew_order)
+        (batch_assigned_to_entity ?brew_order ?supply_batch)
+        (not
+          (supply_batch_available ?supply_batch)
+        )
+      )
+  )
+  (:action stage_ingredient_for_order
+    :parameters (?brew_order - brew_order ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_created ?brew_order)
+        (entity_supply_reserved ?brew_order)
+        (ingredient_available ?ingredient_item)
+      )
+    :effect
+      (and
+        (ingredient_assigned_to_entity ?brew_order ?ingredient_item)
+        (not
+          (ingredient_available ?ingredient_item)
+        )
+      )
+  )
+  (:action confirm_ingredient_staging
+    :parameters (?brew_order - brew_order ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_created ?brew_order)
+        (entity_supply_reserved ?brew_order)
+        (ingredient_assigned_to_entity ?brew_order ?ingredient_item)
+        (not
+          (entity_staged ?brew_order)
+        )
+      )
+    :effect (entity_staged ?brew_order)
+  )
+  (:action unstage_ingredient_from_order
+    :parameters (?brew_order - brew_order ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (ingredient_assigned_to_entity ?brew_order ?ingredient_item)
+      )
+    :effect
+      (and
+        (ingredient_available ?ingredient_item)
+        (not
+          (ingredient_assigned_to_entity ?brew_order ?ingredient_item)
+        )
+      )
+  )
+  (:action assign_tool_to_order
+    :parameters (?brew_order - brew_order ?tool - tool)
+    :precondition
+      (and
+        (entity_staged ?brew_order)
+        (tool_available ?tool)
+      )
+    :effect
+      (and
+        (tool_assigned_to_entity ?brew_order ?tool)
+        (not
+          (tool_available ?tool)
+        )
+      )
+  )
+  (:action release_tool_from_order
+    :parameters (?brew_order - brew_order ?tool - tool)
+    :precondition
+      (and
+        (tool_assigned_to_entity ?brew_order ?tool)
+      )
+    :effect
+      (and
+        (tool_available ?tool)
+        (not
+          (tool_assigned_to_entity ?brew_order ?tool)
+        )
+      )
+  )
+  (:action attach_catalyst_to_brewer
+    :parameters (?brewer - brewer ?catalyst - catalyst)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (catalyst_available ?catalyst)
+      )
+    :effect
+      (and
+        (catalyst_attached_to_brewer ?brewer ?catalyst)
+        (not
+          (catalyst_available ?catalyst)
+        )
+      )
+  )
+  (:action detach_catalyst_from_brewer
+    :parameters (?brewer - brewer ?catalyst - catalyst)
+    :precondition
+      (and
+        (catalyst_attached_to_brewer ?brewer ?catalyst)
+      )
+    :effect
+      (and
+        (catalyst_available ?catalyst)
+        (not
+          (catalyst_attached_to_brewer ?brewer ?catalyst)
+        )
+      )
+  )
+  (:action attach_enchantment_reagent_to_brewer
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (enchantment_reagent_available ?enchantment_reagent)
+      )
+    :effect
+      (and
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (not
+          (enchantment_reagent_available ?enchantment_reagent)
+        )
+      )
+  )
+  (:action detach_enchantment_reagent_from_brewer
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent)
+    :precondition
+      (and
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+      )
+    :effect
+      (and
+        (enchantment_reagent_available ?enchantment_reagent)
+        (not
+          (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        )
+      )
+  )
+  (:action primary_reserve_infusion_slot
+    :parameters (?primary_station - primary_station ?infusion_slot - infusion_slot ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_staged ?primary_station)
+        (ingredient_assigned_to_entity ?primary_station ?ingredient_item)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (not
+          (infusion_slot_reserved ?infusion_slot)
+        )
+        (not
+          (infusion_slot_supplemented ?infusion_slot)
+        )
+      )
+    :effect (infusion_slot_reserved ?infusion_slot)
+  )
+  (:action prepare_primary_station
+    :parameters (?primary_station - primary_station ?infusion_slot - infusion_slot ?tool - tool)
+    :precondition
+      (and
+        (entity_staged ?primary_station)
+        (tool_assigned_to_entity ?primary_station ?tool)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (infusion_slot_reserved ?infusion_slot)
+        (not
+          (primary_station_setup_in_progress ?primary_station)
+        )
+      )
+    :effect
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (primary_station_ready ?primary_station)
+      )
+  )
+  (:action apply_supplement_to_primary_station
+    :parameters (?primary_station - primary_station ?infusion_slot - infusion_slot ?supplement_item - supplement_item)
+    :precondition
+      (and
+        (entity_staged ?primary_station)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (supplement_available ?supplement_item)
+        (not
+          (primary_station_setup_in_progress ?primary_station)
+        )
+      )
+    :effect
+      (and
+        (infusion_slot_supplemented ?infusion_slot)
+        (primary_station_setup_in_progress ?primary_station)
+        (supplement_applied_to_primary ?primary_station ?supplement_item)
+        (not
+          (supplement_available ?supplement_item)
+        )
+      )
+  )
+  (:action complete_primary_station_preparation
+    :parameters (?primary_station - primary_station ?infusion_slot - infusion_slot ?ingredient_item - ingredient_item ?supplement_item - supplement_item)
+    :precondition
+      (and
+        (entity_staged ?primary_station)
+        (ingredient_assigned_to_entity ?primary_station ?ingredient_item)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (infusion_slot_supplemented ?infusion_slot)
+        (supplement_applied_to_primary ?primary_station ?supplement_item)
+        (not
+          (primary_station_ready ?primary_station)
+        )
+      )
+    :effect
+      (and
+        (infusion_slot_reserved ?infusion_slot)
+        (primary_station_ready ?primary_station)
+        (supplement_available ?supplement_item)
+        (not
+          (supplement_applied_to_primary ?primary_station ?supplement_item)
+        )
+      )
+  )
+  (:action secondary_reserve_focus_slot
+    :parameters (?secondary_station - secondary_station ?focus_slot - focus_slot ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_staged ?secondary_station)
+        (ingredient_assigned_to_entity ?secondary_station ?ingredient_item)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (not
+          (focus_slot_reserved ?focus_slot)
+        )
+        (not
+          (focus_slot_supplemented ?focus_slot)
+        )
+      )
+    :effect (focus_slot_reserved ?focus_slot)
+  )
+  (:action prepare_secondary_station
+    :parameters (?secondary_station - secondary_station ?focus_slot - focus_slot ?tool - tool)
+    :precondition
+      (and
+        (entity_staged ?secondary_station)
+        (tool_assigned_to_entity ?secondary_station ?tool)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (focus_slot_reserved ?focus_slot)
+        (not
+          (secondary_station_setup_in_progress ?secondary_station)
+        )
+      )
+    :effect
+      (and
+        (secondary_station_setup_in_progress ?secondary_station)
+        (secondary_station_ready ?secondary_station)
+      )
+  )
+  (:action apply_supplement_to_secondary_station
+    :parameters (?secondary_station - secondary_station ?focus_slot - focus_slot ?supplement_item - supplement_item)
+    :precondition
+      (and
+        (entity_staged ?secondary_station)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (supplement_available ?supplement_item)
+        (not
+          (secondary_station_setup_in_progress ?secondary_station)
+        )
+      )
+    :effect
+      (and
+        (focus_slot_supplemented ?focus_slot)
+        (secondary_station_setup_in_progress ?secondary_station)
+        (supplement_applied_to_secondary ?secondary_station ?supplement_item)
+        (not
+          (supplement_available ?supplement_item)
+        )
+      )
+  )
+  (:action complete_secondary_station_preparation
+    :parameters (?secondary_station - secondary_station ?focus_slot - focus_slot ?ingredient_item - ingredient_item ?supplement_item - supplement_item)
+    :precondition
+      (and
+        (entity_staged ?secondary_station)
+        (ingredient_assigned_to_entity ?secondary_station ?ingredient_item)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (focus_slot_supplemented ?focus_slot)
+        (supplement_applied_to_secondary ?secondary_station ?supplement_item)
+        (not
+          (secondary_station_ready ?secondary_station)
+        )
+      )
+    :effect
+      (and
+        (focus_slot_reserved ?focus_slot)
+        (secondary_station_ready ?secondary_station)
+        (supplement_available ?supplement_item)
+        (not
+          (supplement_applied_to_secondary ?secondary_station ?supplement_item)
+        )
+      )
+  )
+  (:action combine_stations_into_vial
+    :parameters (?primary_station - primary_station ?secondary_station - secondary_station ?infusion_slot - infusion_slot ?focus_slot - focus_slot ?vial_container - vial_container)
+    :precondition
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (secondary_station_setup_in_progress ?secondary_station)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (infusion_slot_reserved ?infusion_slot)
+        (focus_slot_reserved ?focus_slot)
+        (primary_station_ready ?primary_station)
+        (secondary_station_ready ?secondary_station)
+        (vial_available ?vial_container)
+      )
+    :effect
+      (and
+        (vial_reserved ?vial_container)
+        (vial_linked_to_infusion_slot ?vial_container ?infusion_slot)
+        (vial_linked_to_focus_slot ?vial_container ?focus_slot)
+        (not
+          (vial_available ?vial_container)
+        )
+      )
+  )
+  (:action combine_stations_into_vial_with_infusion_supplement
+    :parameters (?primary_station - primary_station ?secondary_station - secondary_station ?infusion_slot - infusion_slot ?focus_slot - focus_slot ?vial_container - vial_container)
+    :precondition
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (secondary_station_setup_in_progress ?secondary_station)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (infusion_slot_supplemented ?infusion_slot)
+        (focus_slot_reserved ?focus_slot)
+        (not
+          (primary_station_ready ?primary_station)
+        )
+        (secondary_station_ready ?secondary_station)
+        (vial_available ?vial_container)
+      )
+    :effect
+      (and
+        (vial_reserved ?vial_container)
+        (vial_linked_to_infusion_slot ?vial_container ?infusion_slot)
+        (vial_linked_to_focus_slot ?vial_container ?focus_slot)
+        (vial_requires_label ?vial_container)
+        (not
+          (vial_available ?vial_container)
+        )
+      )
+  )
+  (:action combine_stations_into_vial_with_focus_supplement
+    :parameters (?primary_station - primary_station ?secondary_station - secondary_station ?infusion_slot - infusion_slot ?focus_slot - focus_slot ?vial_container - vial_container)
+    :precondition
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (secondary_station_setup_in_progress ?secondary_station)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (infusion_slot_reserved ?infusion_slot)
+        (focus_slot_supplemented ?focus_slot)
+        (primary_station_ready ?primary_station)
+        (not
+          (secondary_station_ready ?secondary_station)
+        )
+        (vial_available ?vial_container)
+      )
+    :effect
+      (and
+        (vial_reserved ?vial_container)
+        (vial_linked_to_infusion_slot ?vial_container ?infusion_slot)
+        (vial_linked_to_focus_slot ?vial_container ?focus_slot)
+        (vial_requires_packaging ?vial_container)
+        (not
+          (vial_available ?vial_container)
+        )
+      )
+  )
+  (:action combine_stations_into_vial_with_both_supplements
+    :parameters (?primary_station - primary_station ?secondary_station - secondary_station ?infusion_slot - infusion_slot ?focus_slot - focus_slot ?vial_container - vial_container)
+    :precondition
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (secondary_station_setup_in_progress ?secondary_station)
+        (primary_station_has_infusion_slot ?primary_station ?infusion_slot)
+        (secondary_station_has_focus_slot ?secondary_station ?focus_slot)
+        (infusion_slot_supplemented ?infusion_slot)
+        (focus_slot_supplemented ?focus_slot)
+        (not
+          (primary_station_ready ?primary_station)
+        )
+        (not
+          (secondary_station_ready ?secondary_station)
+        )
+        (vial_available ?vial_container)
+      )
+    :effect
+      (and
+        (vial_reserved ?vial_container)
+        (vial_linked_to_infusion_slot ?vial_container ?infusion_slot)
+        (vial_linked_to_focus_slot ?vial_container ?focus_slot)
+        (vial_requires_label ?vial_container)
+        (vial_requires_packaging ?vial_container)
+        (not
+          (vial_available ?vial_container)
+        )
+      )
+  )
+  (:action flag_vial_as_filled
+    :parameters (?vial_container - vial_container ?primary_station - primary_station ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (vial_reserved ?vial_container)
+        (primary_station_setup_in_progress ?primary_station)
+        (ingredient_assigned_to_entity ?primary_station ?ingredient_item)
+        (not
+          (vial_filled ?vial_container)
+        )
+      )
+    :effect (vial_filled ?vial_container)
+  )
+  (:action apply_label_template_to_vial
+    :parameters (?brewer - brewer ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (brewer_vial_link ?brewer ?vial_container)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_template_available ?label_template)
+        (vial_reserved ?vial_container)
+        (vial_filled ?vial_container)
+        (not
+          (label_template_applied ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_applied ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action prepare_brewer_for_finishing
+    :parameters (?brewer - brewer ?label_template - label_template ?vial_container - vial_container ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_template_applied ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (ingredient_assigned_to_entity ?brewer ?ingredient_item)
+        (not
+          (vial_requires_label ?vial_container)
+        )
+        (not
+          (brewer_prepped_for_finishing ?brewer)
+        )
+      )
+    :effect (brewer_prepped_for_finishing ?brewer)
+  )
+  (:action attach_finishing_additive_to_brewer
+    :parameters (?brewer - brewer ?finishing_additive - finishing_additive)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (finishing_additive_available ?finishing_additive)
+        (not
+          (finishing_additive_attached_flag ?brewer)
+        )
+      )
+    :effect
+      (and
+        (finishing_additive_attached_flag ?brewer)
+        (finishing_additive_attached ?brewer ?finishing_additive)
+        (not
+          (finishing_additive_available ?finishing_additive)
+        )
+      )
+  )
+  (:action prepare_brewer_with_label_and_additive
+    :parameters (?brewer - brewer ?label_template - label_template ?vial_container - vial_container ?ingredient_item - ingredient_item ?finishing_additive - finishing_additive)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_template_applied ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (ingredient_assigned_to_entity ?brewer ?ingredient_item)
+        (vial_requires_label ?vial_container)
+        (finishing_additive_attached_flag ?brewer)
+        (finishing_additive_attached ?brewer ?finishing_additive)
+        (not
+          (brewer_prepped_for_finishing ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_prepped_for_finishing ?brewer)
+        (brewer_labeling_ready ?brewer)
+      )
+  )
+  (:action perform_finishing_assembly_step_a
+    :parameters (?brewer - brewer ?catalyst - catalyst ?tool - tool ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_prepped_for_finishing ?brewer)
+        (catalyst_attached_to_brewer ?brewer ?catalyst)
+        (tool_assigned_to_entity ?brewer ?tool)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (not
+          (vial_requires_packaging ?vial_container)
+        )
+        (not
+          (brewer_assembly_complete ?brewer)
+        )
+      )
+    :effect (brewer_assembly_complete ?brewer)
+  )
+  (:action perform_finishing_assembly_step_b
+    :parameters (?brewer - brewer ?catalyst - catalyst ?tool - tool ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_prepped_for_finishing ?brewer)
+        (catalyst_attached_to_brewer ?brewer ?catalyst)
+        (tool_assigned_to_entity ?brewer ?tool)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (vial_requires_packaging ?vial_container)
+        (not
+          (brewer_assembly_complete ?brewer)
+        )
+      )
+    :effect (brewer_assembly_complete ?brewer)
+  )
+  (:action apply_enchantment_and_mark_brewer
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_assembly_complete ?brewer)
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (not
+          (vial_requires_label ?vial_container)
+        )
+        (not
+          (vial_requires_packaging ?vial_container)
+        )
+        (not
+          (brewer_ready_for_finalization ?brewer)
+        )
+      )
+    :effect (brewer_ready_for_finalization ?brewer)
+  )
+  (:action apply_enchantment_and_mark_brewer_with_packaging
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_assembly_complete ?brewer)
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (vial_requires_label ?vial_container)
+        (not
+          (vial_requires_packaging ?vial_container)
+        )
+        (not
+          (brewer_ready_for_finalization ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (packaging_attached ?brewer)
+      )
+  )
+  (:action apply_enchantment_and_mark_brewer_with_packaging_variant
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_assembly_complete ?brewer)
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (not
+          (vial_requires_label ?vial_container)
+        )
+        (vial_requires_packaging ?vial_container)
+        (not
+          (brewer_ready_for_finalization ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (packaging_attached ?brewer)
+      )
+  )
+  (:action apply_enchantment_and_mark_brewer_full
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent ?label_template - label_template ?vial_container - vial_container)
+    :precondition
+      (and
+        (brewer_assembly_complete ?brewer)
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (brewer_has_label_template ?brewer ?label_template)
+        (label_attached_to_vial ?label_template ?vial_container)
+        (vial_requires_label ?vial_container)
+        (vial_requires_packaging ?vial_container)
+        (not
+          (brewer_ready_for_finalization ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (packaging_attached ?brewer)
+      )
+  )
+  (:action finalize_brewer_direct
+    :parameters (?brewer - brewer)
+    :precondition
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (not
+          (packaging_attached ?brewer)
+        )
+        (not
+          (brewer_marked_for_delivery ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_marked_for_delivery ?brewer)
+        (ready_for_transfer ?brewer)
+      )
+  )
+  (:action attach_packaging_material_to_brewer
+    :parameters (?brewer - brewer ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (packaging_attached ?brewer)
+        (packaging_material_available ?packaging_material)
+      )
+    :effect
+      (and
+        (packaging_attached_to_brewer ?brewer ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action perform_final_qc_and_mark
+    :parameters (?brewer - brewer ?primary_station - primary_station ?secondary_station - secondary_station ?ingredient_item - ingredient_item ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (packaging_attached ?brewer)
+        (packaging_attached_to_brewer ?brewer ?packaging_material)
+        (brewer_primary_link ?brewer ?primary_station)
+        (brewer_secondary_link ?brewer ?secondary_station)
+        (primary_station_ready ?primary_station)
+        (secondary_station_ready ?secondary_station)
+        (ingredient_assigned_to_entity ?brewer ?ingredient_item)
+        (not
+          (final_checks_passed ?brewer)
+        )
+      )
+    :effect (final_checks_passed ?brewer)
+  )
+  (:action finalize_brewer_after_qc
+    :parameters (?brewer - brewer)
+    :precondition
+      (and
+        (brewer_ready_for_finalization ?brewer)
+        (final_checks_passed ?brewer)
+        (not
+          (brewer_marked_for_delivery ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_marked_for_delivery ?brewer)
+        (ready_for_transfer ?brewer)
+      )
+  )
+  (:action reserve_attachment_component
+    :parameters (?brewer - brewer ?attachment_component - attachment_component ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (entity_staged ?brewer)
+        (ingredient_assigned_to_entity ?brewer ?ingredient_item)
+        (attachment_component_available ?attachment_component)
+        (brewer_has_attachment_component ?brewer ?attachment_component)
+        (not
+          (special_ingredient_reserved ?brewer)
+        )
+      )
+    :effect
+      (and
+        (special_ingredient_reserved ?brewer)
+        (not
+          (attachment_component_available ?attachment_component)
+        )
+      )
+  )
+  (:action attach_special_component_with_tool
+    :parameters (?brewer - brewer ?tool - tool)
+    :precondition
+      (and
+        (special_ingredient_reserved ?brewer)
+        (tool_assigned_to_entity ?brewer ?tool)
+        (not
+          (special_attachment_applied ?brewer)
+        )
+      )
+    :effect (special_attachment_applied ?brewer)
+  )
+  (:action finalize_special_attachment
+    :parameters (?brewer - brewer ?enchantment_reagent - enchantment_reagent)
+    :precondition
+      (and
+        (special_attachment_applied ?brewer)
+        (enchantment_reagent_attached ?brewer ?enchantment_reagent)
+        (not
+          (special_attachment_ready ?brewer)
+        )
+      )
+    :effect (special_attachment_ready ?brewer)
+  )
+  (:action finalize_brewer_with_special_attachment
+    :parameters (?brewer - brewer)
+    :precondition
+      (and
+        (special_attachment_ready ?brewer)
+        (not
+          (brewer_marked_for_delivery ?brewer)
+        )
+      )
+    :effect
+      (and
+        (brewer_marked_for_delivery ?brewer)
+        (ready_for_transfer ?brewer)
+      )
+  )
+  (:action mark_primary_station_ready_for_transfer
+    :parameters (?primary_station - primary_station ?vial_container - vial_container)
+    :precondition
+      (and
+        (primary_station_setup_in_progress ?primary_station)
+        (primary_station_ready ?primary_station)
+        (vial_reserved ?vial_container)
+        (vial_filled ?vial_container)
+        (not
+          (ready_for_transfer ?primary_station)
+        )
+      )
+    :effect (ready_for_transfer ?primary_station)
+  )
+  (:action mark_secondary_station_ready_for_transfer
+    :parameters (?secondary_station - secondary_station ?vial_container - vial_container)
+    :precondition
+      (and
+        (secondary_station_setup_in_progress ?secondary_station)
+        (secondary_station_ready ?secondary_station)
+        (vial_reserved ?vial_container)
+        (vial_filled ?vial_container)
+        (not
+          (ready_for_transfer ?secondary_station)
+        )
+      )
+    :effect (ready_for_transfer ?secondary_station)
+  )
+  (:action apply_preservative_to_brew_order
+    :parameters (?brew_order - brew_order ?preservative - preservative ?ingredient_item - ingredient_item)
+    :precondition
+      (and
+        (ready_for_transfer ?brew_order)
+        (ingredient_assigned_to_entity ?brew_order ?ingredient_item)
+        (preservative_available ?preservative)
+        (not
+          (entity_preservative_applied ?brew_order)
+        )
+      )
+    :effect
+      (and
+        (entity_preservative_applied ?brew_order)
+        (preservative_bound_to_entity ?brew_order ?preservative)
+        (not
+          (preservative_available ?preservative)
+        )
+      )
+  )
+  (:action reclaim_and_commit_supply_batch
+    :parameters (?primary_station - primary_station ?supply_batch - supply_batch ?preservative - preservative)
+    :precondition
+      (and
+        (entity_preservative_applied ?primary_station)
+        (batch_assigned_to_entity ?primary_station ?supply_batch)
+        (preservative_bound_to_entity ?primary_station ?preservative)
+        (not
+          (entity_resources_committed ?primary_station)
+        )
+      )
+    :effect
+      (and
+        (entity_resources_committed ?primary_station)
+        (supply_batch_available ?supply_batch)
+        (preservative_available ?preservative)
+      )
+  )
+  (:action reclaim_and_commit_supply_batch_secondary
+    :parameters (?secondary_station - secondary_station ?supply_batch - supply_batch ?preservative - preservative)
+    :precondition
+      (and
+        (entity_preservative_applied ?secondary_station)
+        (batch_assigned_to_entity ?secondary_station ?supply_batch)
+        (preservative_bound_to_entity ?secondary_station ?preservative)
+        (not
+          (entity_resources_committed ?secondary_station)
+        )
+      )
+    :effect
+      (and
+        (entity_resources_committed ?secondary_station)
+        (supply_batch_available ?supply_batch)
+        (preservative_available ?preservative)
+      )
+  )
+  (:action reclaim_and_commit_supply_batch_brewer
+    :parameters (?brewer - brewer ?supply_batch - supply_batch ?preservative - preservative)
+    :precondition
+      (and
+        (entity_preservative_applied ?brewer)
+        (batch_assigned_to_entity ?brewer ?supply_batch)
+        (preservative_bound_to_entity ?brewer ?preservative)
+        (not
+          (entity_resources_committed ?brewer)
+        )
+      )
+    :effect
+      (and
+        (entity_resources_committed ?brewer)
+        (supply_batch_available ?supply_batch)
+        (preservative_available ?preservative)
+      )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain failed_delivery_attempt_resolution_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object route_category - object location_category - object exception_case_category - object delivery_exception_case - exception_case_category delivery_resource - resource_category contact_attempt_slot - resource_category field_service_partner - resource_category compensation_option - resource_category escalation_token - resource_category case_priority - resource_category remediation_action_template - resource_category claim_template - resource_category resolution_option - route_category package_item - route_category customer_response_template - route_category local_route_segment - location_category partner_route_segment - location_category contingency_reroute_plan - location_category local_case_type - delivery_exception_case partner_case_type - delivery_exception_case local_recovery_task - local_case_type partner_recovery_task - local_case_type failed_delivery_case - partner_case_type)
+  (:predicates
+    (case_opened ?failed_delivery_case - delivery_exception_case)
+    (recovery_ready ?failed_delivery_case - delivery_exception_case)
+    (resource_reserved_for_case ?failed_delivery_case - delivery_exception_case)
+    (case_closed ?failed_delivery_case - delivery_exception_case)
+    (recovery_complete ?failed_delivery_case - delivery_exception_case)
+    (closure_prepared ?failed_delivery_case - delivery_exception_case)
+    (resource_available ?delivery_resource - delivery_resource)
+    (resource_assigned_to_case ?failed_delivery_case - delivery_exception_case ?delivery_resource - delivery_resource)
+    (contact_slot_available ?contact_attempt_slot - contact_attempt_slot)
+    (contact_slot_reserved_for_case ?failed_delivery_case - delivery_exception_case ?contact_attempt_slot - contact_attempt_slot)
+    (field_partner_available ?field_service_partner - field_service_partner)
+    (field_partner_assigned_to_case ?failed_delivery_case - delivery_exception_case ?field_service_partner - field_service_partner)
+    (resolution_option_available ?resolution_option - resolution_option)
+    (local_resolution_option_selected ?local_recovery_task - local_recovery_task ?resolution_option - resolution_option)
+    (partner_resolution_option_selected ?partner_recovery_task - partner_recovery_task ?resolution_option - resolution_option)
+    (local_task_route_linked ?local_recovery_task - local_recovery_task ?local_route_segment - local_route_segment)
+    (local_route_segment_ready ?local_route_segment - local_route_segment)
+    (local_route_segment_deferred ?local_route_segment - local_route_segment)
+    (local_task_reconciled ?local_recovery_task - local_recovery_task)
+    (partner_task_route_linked ?partner_recovery_task - partner_recovery_task ?partner_route_segment - partner_route_segment)
+    (partner_route_segment_ready ?partner_route_segment - partner_route_segment)
+    (partner_route_segment_deferred ?partner_route_segment - partner_route_segment)
+    (partner_task_reconciled ?partner_recovery_task - partner_recovery_task)
+    (contingency_reroute_plan_draft ?contingency_reroute_plan - contingency_reroute_plan)
+    (contingency_reroute_plan_composed ?contingency_reroute_plan - contingency_reroute_plan)
+    (plan_binds_local_segment ?contingency_reroute_plan - contingency_reroute_plan ?local_route_segment - local_route_segment)
+    (plan_binds_partner_segment ?contingency_reroute_plan - contingency_reroute_plan ?partner_route_segment - partner_route_segment)
+    (local_contingency_variant_selected ?contingency_reroute_plan - contingency_reroute_plan)
+    (partner_contingency_variant_selected ?contingency_reroute_plan - contingency_reroute_plan)
+    (contingency_reroute_plan_authorized ?contingency_reroute_plan - contingency_reroute_plan)
+    (case_local_task_linked ?failed_delivery_case - failed_delivery_case ?local_recovery_task - local_recovery_task)
+    (case_partner_task_linked ?failed_delivery_case - failed_delivery_case ?partner_recovery_task - partner_recovery_task)
+    (case_reroute_plan_linked ?failed_delivery_case - failed_delivery_case ?contingency_reroute_plan - contingency_reroute_plan)
+    (package_available ?package_item - package_item)
+    (case_package_linked ?failed_delivery_case - failed_delivery_case ?package_item - package_item)
+    (package_reserved_for_plan ?package_item - package_item)
+    (package_bound_to_plan ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    (execution_ready ?failed_delivery_case - failed_delivery_case)
+    (remediation_bundle_prepared ?failed_delivery_case - failed_delivery_case)
+    (claim_dossier_prepared ?failed_delivery_case - failed_delivery_case)
+    (compensation_assigned ?failed_delivery_case - failed_delivery_case)
+    (contingency_approved ?failed_delivery_case - failed_delivery_case)
+    (claim_review_required ?failed_delivery_case - failed_delivery_case)
+    (closure_review_complete ?failed_delivery_case - failed_delivery_case)
+    (customer_response_template_available ?customer_response_template - customer_response_template)
+    (case_customer_response_template_linked ?failed_delivery_case - failed_delivery_case ?customer_response_template - customer_response_template)
+    (customer_response_prepared ?failed_delivery_case - failed_delivery_case)
+    (customer_response_dispatched ?failed_delivery_case - failed_delivery_case)
+    (customer_response_acknowledged ?failed_delivery_case - failed_delivery_case)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (compensation_option_linked_to_case ?failed_delivery_case - failed_delivery_case ?compensation_option - compensation_option)
+    (escalation_token_available ?escalation_token - escalation_token)
+    (escalation_token_linked_to_case ?failed_delivery_case - failed_delivery_case ?escalation_token - escalation_token)
+    (remediation_template_available ?remediation_action_template - remediation_action_template)
+    (remediation_template_linked_to_case ?failed_delivery_case - failed_delivery_case ?remediation_action_template - remediation_action_template)
+    (claim_template_available ?claim_template - claim_template)
+    (claim_template_linked_to_case ?failed_delivery_case - failed_delivery_case ?claim_template - claim_template)
+    (case_priority_available ?case_priority - case_priority)
+    (case_priority_linked_to_case ?failed_delivery_case - delivery_exception_case ?case_priority - case_priority)
+    (local_task_dispatched ?local_recovery_task - local_recovery_task)
+    (partner_task_dispatched ?partner_recovery_task - partner_recovery_task)
+    (resolution_recorded ?failed_delivery_case - failed_delivery_case)
+  )
+  (:action open_failed_delivery_case
+    :parameters (?failed_delivery_case - delivery_exception_case)
+    :precondition
+      (and
+        (not
+          (case_opened ?failed_delivery_case)
+        )
+        (not
+          (case_closed ?failed_delivery_case)
+        )
+      )
+    :effect (case_opened ?failed_delivery_case)
+  )
+  (:action reserve_delivery_resource
+    :parameters (?failed_delivery_case - delivery_exception_case ?delivery_resource - delivery_resource)
+    :precondition
+      (and
+        (case_opened ?failed_delivery_case)
+        (not
+          (resource_reserved_for_case ?failed_delivery_case)
+        )
+        (resource_available ?delivery_resource)
+      )
+    :effect
+      (and
+        (resource_reserved_for_case ?failed_delivery_case)
+        (resource_assigned_to_case ?failed_delivery_case ?delivery_resource)
+        (not
+          (resource_available ?delivery_resource)
+        )
+      )
+  )
+  (:action reserve_contact_attempt_slot
+    :parameters (?failed_delivery_case - delivery_exception_case ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (case_opened ?failed_delivery_case)
+        (resource_reserved_for_case ?failed_delivery_case)
+        (contact_slot_available ?contact_attempt_slot)
+      )
+    :effect
+      (and
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (not
+          (contact_slot_available ?contact_attempt_slot)
+        )
+      )
+  )
+  (:action confirm_recovery_readiness
+    :parameters (?failed_delivery_case - delivery_exception_case ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (case_opened ?failed_delivery_case)
+        (resource_reserved_for_case ?failed_delivery_case)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (not
+          (recovery_ready ?failed_delivery_case)
+        )
+      )
+    :effect (recovery_ready ?failed_delivery_case)
+  )
+  (:action release_contact_attempt_slot
+    :parameters (?failed_delivery_case - delivery_exception_case ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+      )
+    :effect
+      (and
+        (contact_slot_available ?contact_attempt_slot)
+        (not
+          (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        )
+      )
+  )
+  (:action assign_field_partner
+    :parameters (?failed_delivery_case - delivery_exception_case ?field_service_partner - field_service_partner)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (field_partner_available ?field_service_partner)
+      )
+    :effect
+      (and
+        (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+        (not
+          (field_partner_available ?field_service_partner)
+        )
+      )
+  )
+  (:action release_field_partner
+    :parameters (?failed_delivery_case - delivery_exception_case ?field_service_partner - field_service_partner)
+    :precondition
+      (and
+        (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+      )
+    :effect
+      (and
+        (field_partner_available ?field_service_partner)
+        (not
+          (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+        )
+      )
+  )
+  (:action attach_remediation_template
+    :parameters (?failed_delivery_case - failed_delivery_case ?remediation_action_template - remediation_action_template)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (remediation_template_available ?remediation_action_template)
+      )
+    :effect
+      (and
+        (remediation_template_linked_to_case ?failed_delivery_case ?remediation_action_template)
+        (not
+          (remediation_template_available ?remediation_action_template)
+        )
+      )
+  )
+  (:action detach_remediation_template
+    :parameters (?failed_delivery_case - failed_delivery_case ?remediation_action_template - remediation_action_template)
+    :precondition
+      (and
+        (remediation_template_linked_to_case ?failed_delivery_case ?remediation_action_template)
+      )
+    :effect
+      (and
+        (remediation_template_available ?remediation_action_template)
+        (not
+          (remediation_template_linked_to_case ?failed_delivery_case ?remediation_action_template)
+        )
+      )
+  )
+  (:action attach_claim_template
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (claim_template_available ?claim_template)
+      )
+    :effect
+      (and
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (not
+          (claim_template_available ?claim_template)
+        )
+      )
+  )
+  (:action detach_claim_template
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template)
+    :precondition
+      (and
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+      )
+    :effect
+      (and
+        (claim_template_available ?claim_template)
+        (not
+          (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        )
+      )
+  )
+  (:action confirm_local_route_segment
+    :parameters (?local_recovery_task - local_recovery_task ?local_route_segment - local_route_segment ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (recovery_ready ?local_recovery_task)
+        (contact_slot_reserved_for_case ?local_recovery_task ?contact_attempt_slot)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (not
+          (local_route_segment_ready ?local_route_segment)
+        )
+        (not
+          (local_route_segment_deferred ?local_route_segment)
+        )
+      )
+    :effect (local_route_segment_ready ?local_route_segment)
+  )
+  (:action dispatch_local_recovery_task
+    :parameters (?local_recovery_task - local_recovery_task ?local_route_segment - local_route_segment ?field_service_partner - field_service_partner)
+    :precondition
+      (and
+        (recovery_ready ?local_recovery_task)
+        (field_partner_assigned_to_case ?local_recovery_task ?field_service_partner)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (local_route_segment_ready ?local_route_segment)
+        (not
+          (local_task_dispatched ?local_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (local_task_reconciled ?local_recovery_task)
+      )
+  )
+  (:action select_local_resolution_option
+    :parameters (?local_recovery_task - local_recovery_task ?local_route_segment - local_route_segment ?resolution_option - resolution_option)
+    :precondition
+      (and
+        (recovery_ready ?local_recovery_task)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (resolution_option_available ?resolution_option)
+        (not
+          (local_task_dispatched ?local_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (local_route_segment_deferred ?local_route_segment)
+        (local_task_dispatched ?local_recovery_task)
+        (local_resolution_option_selected ?local_recovery_task ?resolution_option)
+        (not
+          (resolution_option_available ?resolution_option)
+        )
+      )
+  )
+  (:action restore_local_resolution_option
+    :parameters (?local_recovery_task - local_recovery_task ?local_route_segment - local_route_segment ?contact_attempt_slot - contact_attempt_slot ?resolution_option - resolution_option)
+    :precondition
+      (and
+        (recovery_ready ?local_recovery_task)
+        (contact_slot_reserved_for_case ?local_recovery_task ?contact_attempt_slot)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (local_route_segment_deferred ?local_route_segment)
+        (local_resolution_option_selected ?local_recovery_task ?resolution_option)
+        (not
+          (local_task_reconciled ?local_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (local_route_segment_ready ?local_route_segment)
+        (local_task_reconciled ?local_recovery_task)
+        (resolution_option_available ?resolution_option)
+        (not
+          (local_resolution_option_selected ?local_recovery_task ?resolution_option)
+        )
+      )
+  )
+  (:action confirm_partner_route_segment
+    :parameters (?partner_recovery_task - partner_recovery_task ?partner_route_segment - partner_route_segment ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (recovery_ready ?partner_recovery_task)
+        (contact_slot_reserved_for_case ?partner_recovery_task ?contact_attempt_slot)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (not
+          (partner_route_segment_ready ?partner_route_segment)
+        )
+        (not
+          (partner_route_segment_deferred ?partner_route_segment)
+        )
+      )
+    :effect (partner_route_segment_ready ?partner_route_segment)
+  )
+  (:action dispatch_partner_recovery_task
+    :parameters (?partner_recovery_task - partner_recovery_task ?partner_route_segment - partner_route_segment ?field_service_partner - field_service_partner)
+    :precondition
+      (and
+        (recovery_ready ?partner_recovery_task)
+        (field_partner_assigned_to_case ?partner_recovery_task ?field_service_partner)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (partner_route_segment_ready ?partner_route_segment)
+        (not
+          (partner_task_dispatched ?partner_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (partner_task_dispatched ?partner_recovery_task)
+        (partner_task_reconciled ?partner_recovery_task)
+      )
+  )
+  (:action select_partner_resolution_option
+    :parameters (?partner_recovery_task - partner_recovery_task ?partner_route_segment - partner_route_segment ?resolution_option - resolution_option)
+    :precondition
+      (and
+        (recovery_ready ?partner_recovery_task)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (resolution_option_available ?resolution_option)
+        (not
+          (partner_task_dispatched ?partner_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (partner_route_segment_deferred ?partner_route_segment)
+        (partner_task_dispatched ?partner_recovery_task)
+        (partner_resolution_option_selected ?partner_recovery_task ?resolution_option)
+        (not
+          (resolution_option_available ?resolution_option)
+        )
+      )
+  )
+  (:action restore_partner_resolution_option
+    :parameters (?partner_recovery_task - partner_recovery_task ?partner_route_segment - partner_route_segment ?contact_attempt_slot - contact_attempt_slot ?resolution_option - resolution_option)
+    :precondition
+      (and
+        (recovery_ready ?partner_recovery_task)
+        (contact_slot_reserved_for_case ?partner_recovery_task ?contact_attempt_slot)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (partner_route_segment_deferred ?partner_route_segment)
+        (partner_resolution_option_selected ?partner_recovery_task ?resolution_option)
+        (not
+          (partner_task_reconciled ?partner_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (partner_route_segment_ready ?partner_route_segment)
+        (partner_task_reconciled ?partner_recovery_task)
+        (resolution_option_available ?resolution_option)
+        (not
+          (partner_resolution_option_selected ?partner_recovery_task ?resolution_option)
+        )
+      )
+  )
+  (:action compose_contingency_reroute_plan
+    :parameters (?local_recovery_task - local_recovery_task ?partner_recovery_task - partner_recovery_task ?local_route_segment - local_route_segment ?partner_route_segment - partner_route_segment ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (partner_task_dispatched ?partner_recovery_task)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (local_route_segment_ready ?local_route_segment)
+        (partner_route_segment_ready ?partner_route_segment)
+        (local_task_reconciled ?local_recovery_task)
+        (partner_task_reconciled ?partner_recovery_task)
+        (contingency_reroute_plan_draft ?contingency_reroute_plan)
+      )
+    :effect
+      (and
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (plan_binds_local_segment ?contingency_reroute_plan ?local_route_segment)
+        (plan_binds_partner_segment ?contingency_reroute_plan ?partner_route_segment)
+        (not
+          (contingency_reroute_plan_draft ?contingency_reroute_plan)
+        )
+      )
+  )
+  (:action compose_local_contingency_plan
+    :parameters (?local_recovery_task - local_recovery_task ?partner_recovery_task - partner_recovery_task ?local_route_segment - local_route_segment ?partner_route_segment - partner_route_segment ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (partner_task_dispatched ?partner_recovery_task)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (local_route_segment_deferred ?local_route_segment)
+        (partner_route_segment_ready ?partner_route_segment)
+        (not
+          (local_task_reconciled ?local_recovery_task)
+        )
+        (partner_task_reconciled ?partner_recovery_task)
+        (contingency_reroute_plan_draft ?contingency_reroute_plan)
+      )
+    :effect
+      (and
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (plan_binds_local_segment ?contingency_reroute_plan ?local_route_segment)
+        (plan_binds_partner_segment ?contingency_reroute_plan ?partner_route_segment)
+        (local_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (contingency_reroute_plan_draft ?contingency_reroute_plan)
+        )
+      )
+  )
+  (:action compose_partner_contingency_plan
+    :parameters (?local_recovery_task - local_recovery_task ?partner_recovery_task - partner_recovery_task ?local_route_segment - local_route_segment ?partner_route_segment - partner_route_segment ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (partner_task_dispatched ?partner_recovery_task)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (local_route_segment_ready ?local_route_segment)
+        (partner_route_segment_deferred ?partner_route_segment)
+        (local_task_reconciled ?local_recovery_task)
+        (not
+          (partner_task_reconciled ?partner_recovery_task)
+        )
+        (contingency_reroute_plan_draft ?contingency_reroute_plan)
+      )
+    :effect
+      (and
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (plan_binds_local_segment ?contingency_reroute_plan ?local_route_segment)
+        (plan_binds_partner_segment ?contingency_reroute_plan ?partner_route_segment)
+        (partner_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (contingency_reroute_plan_draft ?contingency_reroute_plan)
+        )
+      )
+  )
+  (:action compose_dual_contingency_plan
+    :parameters (?local_recovery_task - local_recovery_task ?partner_recovery_task - partner_recovery_task ?local_route_segment - local_route_segment ?partner_route_segment - partner_route_segment ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (partner_task_dispatched ?partner_recovery_task)
+        (local_task_route_linked ?local_recovery_task ?local_route_segment)
+        (partner_task_route_linked ?partner_recovery_task ?partner_route_segment)
+        (local_route_segment_deferred ?local_route_segment)
+        (partner_route_segment_deferred ?partner_route_segment)
+        (not
+          (local_task_reconciled ?local_recovery_task)
+        )
+        (not
+          (partner_task_reconciled ?partner_recovery_task)
+        )
+        (contingency_reroute_plan_draft ?contingency_reroute_plan)
+      )
+    :effect
+      (and
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (plan_binds_local_segment ?contingency_reroute_plan ?local_route_segment)
+        (plan_binds_partner_segment ?contingency_reroute_plan ?partner_route_segment)
+        (local_contingency_variant_selected ?contingency_reroute_plan)
+        (partner_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (contingency_reroute_plan_draft ?contingency_reroute_plan)
+        )
+      )
+  )
+  (:action authorize_contingency_reroute_plan
+    :parameters (?contingency_reroute_plan - contingency_reroute_plan ?local_recovery_task - local_recovery_task ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (local_task_dispatched ?local_recovery_task)
+        (contact_slot_reserved_for_case ?local_recovery_task ?contact_attempt_slot)
+        (not
+          (contingency_reroute_plan_authorized ?contingency_reroute_plan)
+        )
+      )
+    :effect (contingency_reroute_plan_authorized ?contingency_reroute_plan)
+  )
+  (:action bind_package_to_plan
+    :parameters (?failed_delivery_case - failed_delivery_case ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (case_reroute_plan_linked ?failed_delivery_case ?contingency_reroute_plan)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_available ?package_item)
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (contingency_reroute_plan_authorized ?contingency_reroute_plan)
+        (not
+          (package_reserved_for_plan ?package_item)
+        )
+      )
+    :effect
+      (and
+        (package_reserved_for_plan ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (not
+          (package_available ?package_item)
+        )
+      )
+  )
+  (:action confirm_execution_readiness
+    :parameters (?failed_delivery_case - failed_delivery_case ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_reserved_for_plan ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (not
+          (local_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (not
+          (execution_ready ?failed_delivery_case)
+        )
+      )
+    :effect (execution_ready ?failed_delivery_case)
+  )
+  (:action assign_compensation_option
+    :parameters (?failed_delivery_case - failed_delivery_case ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (compensation_option_available ?compensation_option)
+        (not
+          (compensation_assigned ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (compensation_assigned ?failed_delivery_case)
+        (compensation_option_linked_to_case ?failed_delivery_case ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action confirm_compensation_linkage
+    :parameters (?failed_delivery_case - failed_delivery_case ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan ?contact_attempt_slot - contact_attempt_slot ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_reserved_for_plan ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (local_contingency_variant_selected ?contingency_reroute_plan)
+        (compensation_assigned ?failed_delivery_case)
+        (compensation_option_linked_to_case ?failed_delivery_case ?compensation_option)
+        (not
+          (execution_ready ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (execution_ready ?failed_delivery_case)
+        (contingency_approved ?failed_delivery_case)
+      )
+  )
+  (:action prepare_customer_response_with_partner_support
+    :parameters (?failed_delivery_case - failed_delivery_case ?remediation_action_template - remediation_action_template ?field_service_partner - field_service_partner ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (execution_ready ?failed_delivery_case)
+        (remediation_template_linked_to_case ?failed_delivery_case ?remediation_action_template)
+        (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (not
+          (partner_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (not
+          (remediation_bundle_prepared ?failed_delivery_case)
+        )
+      )
+    :effect (remediation_bundle_prepared ?failed_delivery_case)
+  )
+  (:action prepare_customer_response_with_compensation_support
+    :parameters (?failed_delivery_case - failed_delivery_case ?remediation_action_template - remediation_action_template ?field_service_partner - field_service_partner ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (execution_ready ?failed_delivery_case)
+        (remediation_template_linked_to_case ?failed_delivery_case ?remediation_action_template)
+        (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (partner_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (remediation_bundle_prepared ?failed_delivery_case)
+        )
+      )
+    :effect (remediation_bundle_prepared ?failed_delivery_case)
+  )
+  (:action prepare_claim_dossier
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (remediation_bundle_prepared ?failed_delivery_case)
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (not
+          (local_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (not
+          (partner_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (not
+          (claim_dossier_prepared ?failed_delivery_case)
+        )
+      )
+    :effect (claim_dossier_prepared ?failed_delivery_case)
+  )
+  (:action prepare_claim_dossier_local_variant
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (remediation_bundle_prepared ?failed_delivery_case)
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (local_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (partner_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (not
+          (claim_dossier_prepared ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (claim_review_required ?failed_delivery_case)
+      )
+  )
+  (:action prepare_claim_dossier_partner_variant
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (remediation_bundle_prepared ?failed_delivery_case)
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (not
+          (local_contingency_variant_selected ?contingency_reroute_plan)
+        )
+        (partner_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (claim_dossier_prepared ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (claim_review_required ?failed_delivery_case)
+      )
+  )
+  (:action prepare_claim_dossier_dual_variant
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template ?package_item - package_item ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (remediation_bundle_prepared ?failed_delivery_case)
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (case_package_linked ?failed_delivery_case ?package_item)
+        (package_bound_to_plan ?package_item ?contingency_reroute_plan)
+        (local_contingency_variant_selected ?contingency_reroute_plan)
+        (partner_contingency_variant_selected ?contingency_reroute_plan)
+        (not
+          (claim_dossier_prepared ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (claim_review_required ?failed_delivery_case)
+      )
+  )
+  (:action record_resolution_complete
+    :parameters (?failed_delivery_case - failed_delivery_case)
+    :precondition
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (not
+          (claim_review_required ?failed_delivery_case)
+        )
+        (not
+          (resolution_recorded ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (resolution_recorded ?failed_delivery_case)
+        (recovery_complete ?failed_delivery_case)
+      )
+  )
+  (:action attach_escalation_token
+    :parameters (?failed_delivery_case - failed_delivery_case ?escalation_token - escalation_token)
+    :precondition
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (claim_review_required ?failed_delivery_case)
+        (escalation_token_available ?escalation_token)
+      )
+    :effect
+      (and
+        (escalation_token_linked_to_case ?failed_delivery_case ?escalation_token)
+        (not
+          (escalation_token_available ?escalation_token)
+        )
+      )
+  )
+  (:action complete_escalated_recovery
+    :parameters (?failed_delivery_case - failed_delivery_case ?local_recovery_task - local_recovery_task ?partner_recovery_task - partner_recovery_task ?contact_attempt_slot - contact_attempt_slot ?escalation_token - escalation_token)
+    :precondition
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (claim_review_required ?failed_delivery_case)
+        (escalation_token_linked_to_case ?failed_delivery_case ?escalation_token)
+        (case_local_task_linked ?failed_delivery_case ?local_recovery_task)
+        (case_partner_task_linked ?failed_delivery_case ?partner_recovery_task)
+        (local_task_reconciled ?local_recovery_task)
+        (partner_task_reconciled ?partner_recovery_task)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (not
+          (closure_review_complete ?failed_delivery_case)
+        )
+      )
+    :effect (closure_review_complete ?failed_delivery_case)
+  )
+  (:action finalize_escalated_resolution
+    :parameters (?failed_delivery_case - failed_delivery_case)
+    :precondition
+      (and
+        (claim_dossier_prepared ?failed_delivery_case)
+        (closure_review_complete ?failed_delivery_case)
+        (not
+          (resolution_recorded ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (resolution_recorded ?failed_delivery_case)
+        (recovery_complete ?failed_delivery_case)
+      )
+  )
+  (:action draft_customer_response
+    :parameters (?failed_delivery_case - failed_delivery_case ?customer_response_template - customer_response_template ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (recovery_ready ?failed_delivery_case)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (customer_response_template_available ?customer_response_template)
+        (case_customer_response_template_linked ?failed_delivery_case ?customer_response_template)
+        (not
+          (customer_response_prepared ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (customer_response_prepared ?failed_delivery_case)
+        (not
+          (customer_response_template_available ?customer_response_template)
+        )
+      )
+  )
+  (:action dispatch_customer_response
+    :parameters (?failed_delivery_case - failed_delivery_case ?field_service_partner - field_service_partner)
+    :precondition
+      (and
+        (customer_response_prepared ?failed_delivery_case)
+        (field_partner_assigned_to_case ?failed_delivery_case ?field_service_partner)
+        (not
+          (customer_response_dispatched ?failed_delivery_case)
+        )
+      )
+    :effect (customer_response_dispatched ?failed_delivery_case)
+  )
+  (:action acknowledge_customer_response
+    :parameters (?failed_delivery_case - failed_delivery_case ?claim_template - claim_template)
+    :precondition
+      (and
+        (customer_response_dispatched ?failed_delivery_case)
+        (claim_template_linked_to_case ?failed_delivery_case ?claim_template)
+        (not
+          (customer_response_acknowledged ?failed_delivery_case)
+        )
+      )
+    :effect (customer_response_acknowledged ?failed_delivery_case)
+  )
+  (:action finalize_customer_response_resolution
+    :parameters (?failed_delivery_case - failed_delivery_case)
+    :precondition
+      (and
+        (customer_response_acknowledged ?failed_delivery_case)
+        (not
+          (resolution_recorded ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (resolution_recorded ?failed_delivery_case)
+        (recovery_complete ?failed_delivery_case)
+      )
+  )
+  (:action complete_local_task_recovery
+    :parameters (?local_recovery_task - local_recovery_task ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (local_task_dispatched ?local_recovery_task)
+        (local_task_reconciled ?local_recovery_task)
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (contingency_reroute_plan_authorized ?contingency_reroute_plan)
+        (not
+          (recovery_complete ?local_recovery_task)
+        )
+      )
+    :effect (recovery_complete ?local_recovery_task)
+  )
+  (:action complete_partner_task_recovery
+    :parameters (?partner_recovery_task - partner_recovery_task ?contingency_reroute_plan - contingency_reroute_plan)
+    :precondition
+      (and
+        (partner_task_dispatched ?partner_recovery_task)
+        (partner_task_reconciled ?partner_recovery_task)
+        (contingency_reroute_plan_composed ?contingency_reroute_plan)
+        (contingency_reroute_plan_authorized ?contingency_reroute_plan)
+        (not
+          (recovery_complete ?partner_recovery_task)
+        )
+      )
+    :effect (recovery_complete ?partner_recovery_task)
+  )
+  (:action assign_case_priority
+    :parameters (?failed_delivery_case - delivery_exception_case ?case_priority - case_priority ?contact_attempt_slot - contact_attempt_slot)
+    :precondition
+      (and
+        (recovery_complete ?failed_delivery_case)
+        (contact_slot_reserved_for_case ?failed_delivery_case ?contact_attempt_slot)
+        (case_priority_available ?case_priority)
+        (not
+          (closure_prepared ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (closure_prepared ?failed_delivery_case)
+        (case_priority_linked_to_case ?failed_delivery_case ?case_priority)
+        (not
+          (case_priority_available ?case_priority)
+        )
+      )
+  )
+  (:action finalize_local_case_closure
+    :parameters (?local_recovery_task - local_recovery_task ?delivery_resource - delivery_resource ?case_priority - case_priority)
+    :precondition
+      (and
+        (closure_prepared ?local_recovery_task)
+        (resource_assigned_to_case ?local_recovery_task ?delivery_resource)
+        (case_priority_linked_to_case ?local_recovery_task ?case_priority)
+        (not
+          (case_closed ?local_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?local_recovery_task)
+        (resource_available ?delivery_resource)
+        (case_priority_available ?case_priority)
+      )
+  )
+  (:action finalize_partner_case_closure
+    :parameters (?partner_recovery_task - partner_recovery_task ?delivery_resource - delivery_resource ?case_priority - case_priority)
+    :precondition
+      (and
+        (closure_prepared ?partner_recovery_task)
+        (resource_assigned_to_case ?partner_recovery_task ?delivery_resource)
+        (case_priority_linked_to_case ?partner_recovery_task ?case_priority)
+        (not
+          (case_closed ?partner_recovery_task)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?partner_recovery_task)
+        (resource_available ?delivery_resource)
+        (case_priority_available ?case_priority)
+      )
+  )
+  (:action finalize_exception_case_closure
+    :parameters (?failed_delivery_case - failed_delivery_case ?delivery_resource - delivery_resource ?case_priority - case_priority)
+    :precondition
+      (and
+        (closure_prepared ?failed_delivery_case)
+        (resource_assigned_to_case ?failed_delivery_case ?delivery_resource)
+        (case_priority_linked_to_case ?failed_delivery_case ?case_priority)
+        (not
+          (case_closed ?failed_delivery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?failed_delivery_case)
+        (resource_available ?delivery_resource)
+        (case_priority_available ?case_priority)
+      )
+  )
+)

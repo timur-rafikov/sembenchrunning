@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain traversal_tool_unlock_dependency_path)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types item_group - object resource_group - object structure_group - object node_group - object traversal_node - node_group traversal_tool - item_group obstacle_token - item_group activation_switch - item_group upgrade_module - item_group access_module - item_group terrain_marker - item_group upgrade_token - item_group timed_charge - item_group consumable_key - resource_group local_artifact - resource_group endorsement_flag - resource_group approach_marker - structure_group approach_anchor - structure_group locked_structure - structure_group entry_group - traversal_node branch_group - traversal_node primary_entry - entry_group secondary_entry - entry_group player_agent - branch_group)
+  (:predicates
+    (node_scouted ?traversal_node - traversal_node)
+    (traversal_prepared ?traversal_node - traversal_node)
+    (tool_reserved_on_node ?traversal_node - traversal_node)
+    (node_unlocked_final ?traversal_node - traversal_node)
+    (certified_for_unlock ?traversal_node - traversal_node)
+    (node_configured ?traversal_node - traversal_node)
+    (tool_available ?traversal_tool - traversal_tool)
+    (assigned_traversal_tool ?traversal_node - traversal_node ?traversal_tool - traversal_tool)
+    (obstacle_token_available ?obstacle_token - obstacle_token)
+    (traversal_obstacle_link ?traversal_node - traversal_node ?obstacle_token - obstacle_token)
+    (switch_available ?activation_switch - activation_switch)
+    (switch_bound_to_node ?traversal_node - traversal_node ?activation_switch - activation_switch)
+    (artifact_available ?consumable_key - consumable_key)
+    (artifact_loaded_on_route ?primary_entry - primary_entry ?consumable_key - consumable_key)
+    (artifact_loaded_on_branch ?secondary_entry - secondary_entry ?consumable_key - consumable_key)
+    (route_to_marker ?primary_entry - primary_entry ?approach_marker - approach_marker)
+    (marker_flag_a ?approach_marker - approach_marker)
+    (marker_flag_b ?approach_marker - approach_marker)
+    (route_ready ?primary_entry - primary_entry)
+    (branch_to_anchor ?secondary_entry - secondary_entry ?approach_anchor - approach_anchor)
+    (anchor_flag_a ?approach_anchor - approach_anchor)
+    (anchor_flag_b ?approach_anchor - approach_anchor)
+    (branch_ready ?secondary_entry - secondary_entry)
+    (structure_locked ?locked_structure - locked_structure)
+    (structure_assembled ?locked_structure - locked_structure)
+    (structure_to_marker ?locked_structure - locked_structure ?approach_marker - approach_marker)
+    (structure_to_anchor ?locked_structure - locked_structure ?approach_anchor - approach_anchor)
+    (structure_flag_1 ?locked_structure - locked_structure)
+    (structure_flag_2 ?locked_structure - locked_structure)
+    (structure_activated ?locked_structure - locked_structure)
+    (agent_route_link ?player_agent - player_agent ?primary_entry - primary_entry)
+    (agent_branch_link ?player_agent - player_agent ?secondary_entry - secondary_entry)
+    (agent_structure_link ?player_agent - player_agent ?locked_structure - locked_structure)
+    (artifact_in_storage ?local_artifact - local_artifact)
+    (agent_has_artifact ?player_agent - player_agent ?local_artifact - local_artifact)
+    (artifact_committed ?local_artifact - local_artifact)
+    (artifact_to_structure ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    (agent_cert_step_1 ?player_agent - player_agent)
+    (agent_cert_step_2 ?player_agent - player_agent)
+    (agent_cert_step_3 ?player_agent - player_agent)
+    (agent_has_any_upgrade_module ?player_agent - player_agent)
+    (agent_upgrade_flag ?player_agent - player_agent)
+    (agent_extra_flag ?player_agent - player_agent)
+    (agent_ready_final ?player_agent - player_agent)
+    (endorsement_available ?endorsement_flag - endorsement_flag)
+    (agent_has_endorsement ?player_agent - player_agent ?endorsement_flag - endorsement_flag)
+    (endorsement_applied ?player_agent - player_agent)
+    (endorsement_step ?player_agent - player_agent)
+    (endorsement_ready ?player_agent - player_agent)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (agent_has_upgrade ?player_agent - player_agent ?upgrade_module - upgrade_module)
+    (access_module_available ?access_module - access_module)
+    (agent_has_access_module ?player_agent - player_agent ?access_module - access_module)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (agent_has_upgrade_token ?player_agent - player_agent ?upgrade_token - upgrade_token)
+    (timed_charge_available ?timed_charge - timed_charge)
+    (agent_has_timed_charge ?player_agent - player_agent ?timed_charge - timed_charge)
+    (terrain_marker_available ?terrain_marker - terrain_marker)
+    (node_to_terrain_marker ?traversal_node - traversal_node ?terrain_marker - terrain_marker)
+    (route_flagged ?primary_entry - primary_entry)
+    (branch_flagged ?secondary_entry - secondary_entry)
+    (agent_finalized ?player_agent - player_agent)
+  )
+  (:action scout_node
+    :parameters (?traversal_node - traversal_node)
+    :precondition
+      (and
+        (not
+          (node_scouted ?traversal_node)
+        )
+        (not
+          (node_unlocked_final ?traversal_node)
+        )
+      )
+    :effect (node_scouted ?traversal_node)
+  )
+  (:action assign_tool_to_node
+    :parameters (?traversal_node - traversal_node ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (node_scouted ?traversal_node)
+        (not
+          (tool_reserved_on_node ?traversal_node)
+        )
+        (tool_available ?traversal_tool)
+      )
+    :effect
+      (and
+        (tool_reserved_on_node ?traversal_node)
+        (assigned_traversal_tool ?traversal_node ?traversal_tool)
+        (not
+          (tool_available ?traversal_tool)
+        )
+      )
+  )
+  (:action apply_obstacle_to_node
+    :parameters (?traversal_node - traversal_node ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (node_scouted ?traversal_node)
+        (tool_reserved_on_node ?traversal_node)
+        (obstacle_token_available ?obstacle_token)
+      )
+    :effect
+      (and
+        (traversal_obstacle_link ?traversal_node ?obstacle_token)
+        (not
+          (obstacle_token_available ?obstacle_token)
+        )
+      )
+  )
+  (:action finalize_node_preparation
+    :parameters (?traversal_node - traversal_node ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (node_scouted ?traversal_node)
+        (tool_reserved_on_node ?traversal_node)
+        (traversal_obstacle_link ?traversal_node ?obstacle_token)
+        (not
+          (traversal_prepared ?traversal_node)
+        )
+      )
+    :effect (traversal_prepared ?traversal_node)
+  )
+  (:action remove_obstacle_from_node
+    :parameters (?traversal_node - traversal_node ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (traversal_obstacle_link ?traversal_node ?obstacle_token)
+      )
+    :effect
+      (and
+        (obstacle_token_available ?obstacle_token)
+        (not
+          (traversal_obstacle_link ?traversal_node ?obstacle_token)
+        )
+      )
+  )
+  (:action bind_switch_to_node
+    :parameters (?traversal_node - traversal_node ?activation_switch - activation_switch)
+    :precondition
+      (and
+        (traversal_prepared ?traversal_node)
+        (switch_available ?activation_switch)
+      )
+    :effect
+      (and
+        (switch_bound_to_node ?traversal_node ?activation_switch)
+        (not
+          (switch_available ?activation_switch)
+        )
+      )
+  )
+  (:action unbind_switch_from_node
+    :parameters (?traversal_node - traversal_node ?activation_switch - activation_switch)
+    :precondition
+      (and
+        (switch_bound_to_node ?traversal_node ?activation_switch)
+      )
+    :effect
+      (and
+        (switch_available ?activation_switch)
+        (not
+          (switch_bound_to_node ?traversal_node ?activation_switch)
+        )
+      )
+  )
+  (:action attach_upgrade_token_to_agent
+    :parameters (?player_agent - player_agent ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (upgrade_token_available ?upgrade_token)
+      )
+    :effect
+      (and
+        (agent_has_upgrade_token ?player_agent ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action detach_upgrade_token_from_agent
+    :parameters (?player_agent - player_agent ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (agent_has_upgrade_token ?player_agent ?upgrade_token)
+      )
+    :effect
+      (and
+        (upgrade_token_available ?upgrade_token)
+        (not
+          (agent_has_upgrade_token ?player_agent ?upgrade_token)
+        )
+      )
+  )
+  (:action attach_timed_charge_to_agent
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (timed_charge_available ?timed_charge)
+      )
+    :effect
+      (and
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (not
+          (timed_charge_available ?timed_charge)
+        )
+      )
+  )
+  (:action detach_timed_charge_from_agent
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge)
+    :precondition
+      (and
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+      )
+    :effect
+      (and
+        (timed_charge_available ?timed_charge)
+        (not
+          (agent_has_timed_charge ?player_agent ?timed_charge)
+        )
+      )
+  )
+  (:action flag_approach_marker_a
+    :parameters (?primary_entry - primary_entry ?approach_marker - approach_marker ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (traversal_prepared ?primary_entry)
+        (traversal_obstacle_link ?primary_entry ?obstacle_token)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (not
+          (marker_flag_a ?approach_marker)
+        )
+        (not
+          (marker_flag_b ?approach_marker)
+        )
+      )
+    :effect (marker_flag_a ?approach_marker)
+  )
+  (:action activate_route_with_bound_switch
+    :parameters (?primary_entry - primary_entry ?approach_marker - approach_marker ?activation_switch - activation_switch)
+    :precondition
+      (and
+        (traversal_prepared ?primary_entry)
+        (switch_bound_to_node ?primary_entry ?activation_switch)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (marker_flag_a ?approach_marker)
+        (not
+          (route_flagged ?primary_entry)
+        )
+      )
+    :effect
+      (and
+        (route_flagged ?primary_entry)
+        (route_ready ?primary_entry)
+      )
+  )
+  (:action stage_artifact_on_route
+    :parameters (?primary_entry - primary_entry ?approach_marker - approach_marker ?consumable_key - consumable_key)
+    :precondition
+      (and
+        (traversal_prepared ?primary_entry)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (artifact_available ?consumable_key)
+        (not
+          (route_flagged ?primary_entry)
+        )
+      )
+    :effect
+      (and
+        (marker_flag_b ?approach_marker)
+        (route_flagged ?primary_entry)
+        (artifact_loaded_on_route ?primary_entry ?consumable_key)
+        (not
+          (artifact_available ?consumable_key)
+        )
+      )
+  )
+  (:action process_route_marker_exchange
+    :parameters (?primary_entry - primary_entry ?approach_marker - approach_marker ?obstacle_token - obstacle_token ?consumable_key - consumable_key)
+    :precondition
+      (and
+        (traversal_prepared ?primary_entry)
+        (traversal_obstacle_link ?primary_entry ?obstacle_token)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (marker_flag_b ?approach_marker)
+        (artifact_loaded_on_route ?primary_entry ?consumable_key)
+        (not
+          (route_ready ?primary_entry)
+        )
+      )
+    :effect
+      (and
+        (marker_flag_a ?approach_marker)
+        (route_ready ?primary_entry)
+        (artifact_available ?consumable_key)
+        (not
+          (artifact_loaded_on_route ?primary_entry ?consumable_key)
+        )
+      )
+  )
+  (:action flag_approach_anchor_a
+    :parameters (?secondary_entry - secondary_entry ?approach_anchor - approach_anchor ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (traversal_prepared ?secondary_entry)
+        (traversal_obstacle_link ?secondary_entry ?obstacle_token)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (not
+          (anchor_flag_a ?approach_anchor)
+        )
+        (not
+          (anchor_flag_b ?approach_anchor)
+        )
+      )
+    :effect (anchor_flag_a ?approach_anchor)
+  )
+  (:action activate_branch_with_bound_switch
+    :parameters (?secondary_entry - secondary_entry ?approach_anchor - approach_anchor ?activation_switch - activation_switch)
+    :precondition
+      (and
+        (traversal_prepared ?secondary_entry)
+        (switch_bound_to_node ?secondary_entry ?activation_switch)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (anchor_flag_a ?approach_anchor)
+        (not
+          (branch_flagged ?secondary_entry)
+        )
+      )
+    :effect
+      (and
+        (branch_flagged ?secondary_entry)
+        (branch_ready ?secondary_entry)
+      )
+  )
+  (:action stage_artifact_on_branch
+    :parameters (?secondary_entry - secondary_entry ?approach_anchor - approach_anchor ?consumable_key - consumable_key)
+    :precondition
+      (and
+        (traversal_prepared ?secondary_entry)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (artifact_available ?consumable_key)
+        (not
+          (branch_flagged ?secondary_entry)
+        )
+      )
+    :effect
+      (and
+        (anchor_flag_b ?approach_anchor)
+        (branch_flagged ?secondary_entry)
+        (artifact_loaded_on_branch ?secondary_entry ?consumable_key)
+        (not
+          (artifact_available ?consumable_key)
+        )
+      )
+  )
+  (:action process_branch_anchor_exchange
+    :parameters (?secondary_entry - secondary_entry ?approach_anchor - approach_anchor ?obstacle_token - obstacle_token ?consumable_key - consumable_key)
+    :precondition
+      (and
+        (traversal_prepared ?secondary_entry)
+        (traversal_obstacle_link ?secondary_entry ?obstacle_token)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (anchor_flag_b ?approach_anchor)
+        (artifact_loaded_on_branch ?secondary_entry ?consumable_key)
+        (not
+          (branch_ready ?secondary_entry)
+        )
+      )
+    :effect
+      (and
+        (anchor_flag_a ?approach_anchor)
+        (branch_ready ?secondary_entry)
+        (artifact_available ?consumable_key)
+        (not
+          (artifact_loaded_on_branch ?secondary_entry ?consumable_key)
+        )
+      )
+  )
+  (:action assemble_locked_structure
+    :parameters (?primary_entry - primary_entry ?secondary_entry - secondary_entry ?approach_marker - approach_marker ?approach_anchor - approach_anchor ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (route_flagged ?primary_entry)
+        (branch_flagged ?secondary_entry)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (marker_flag_a ?approach_marker)
+        (anchor_flag_a ?approach_anchor)
+        (route_ready ?primary_entry)
+        (branch_ready ?secondary_entry)
+        (structure_locked ?locked_structure)
+      )
+    :effect
+      (and
+        (structure_assembled ?locked_structure)
+        (structure_to_marker ?locked_structure ?approach_marker)
+        (structure_to_anchor ?locked_structure ?approach_anchor)
+        (not
+          (structure_locked ?locked_structure)
+        )
+      )
+  )
+  (:action assemble_structure_with_flag_1
+    :parameters (?primary_entry - primary_entry ?secondary_entry - secondary_entry ?approach_marker - approach_marker ?approach_anchor - approach_anchor ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (route_flagged ?primary_entry)
+        (branch_flagged ?secondary_entry)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (marker_flag_b ?approach_marker)
+        (anchor_flag_a ?approach_anchor)
+        (not
+          (route_ready ?primary_entry)
+        )
+        (branch_ready ?secondary_entry)
+        (structure_locked ?locked_structure)
+      )
+    :effect
+      (and
+        (structure_assembled ?locked_structure)
+        (structure_to_marker ?locked_structure ?approach_marker)
+        (structure_to_anchor ?locked_structure ?approach_anchor)
+        (structure_flag_1 ?locked_structure)
+        (not
+          (structure_locked ?locked_structure)
+        )
+      )
+  )
+  (:action assemble_structure_with_flag_2
+    :parameters (?primary_entry - primary_entry ?secondary_entry - secondary_entry ?approach_marker - approach_marker ?approach_anchor - approach_anchor ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (route_flagged ?primary_entry)
+        (branch_flagged ?secondary_entry)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (marker_flag_a ?approach_marker)
+        (anchor_flag_b ?approach_anchor)
+        (route_ready ?primary_entry)
+        (not
+          (branch_ready ?secondary_entry)
+        )
+        (structure_locked ?locked_structure)
+      )
+    :effect
+      (and
+        (structure_assembled ?locked_structure)
+        (structure_to_marker ?locked_structure ?approach_marker)
+        (structure_to_anchor ?locked_structure ?approach_anchor)
+        (structure_flag_2 ?locked_structure)
+        (not
+          (structure_locked ?locked_structure)
+        )
+      )
+  )
+  (:action assemble_structure_with_flags_1_and_2
+    :parameters (?primary_entry - primary_entry ?secondary_entry - secondary_entry ?approach_marker - approach_marker ?approach_anchor - approach_anchor ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (route_flagged ?primary_entry)
+        (branch_flagged ?secondary_entry)
+        (route_to_marker ?primary_entry ?approach_marker)
+        (branch_to_anchor ?secondary_entry ?approach_anchor)
+        (marker_flag_b ?approach_marker)
+        (anchor_flag_b ?approach_anchor)
+        (not
+          (route_ready ?primary_entry)
+        )
+        (not
+          (branch_ready ?secondary_entry)
+        )
+        (structure_locked ?locked_structure)
+      )
+    :effect
+      (and
+        (structure_assembled ?locked_structure)
+        (structure_to_marker ?locked_structure ?approach_marker)
+        (structure_to_anchor ?locked_structure ?approach_anchor)
+        (structure_flag_1 ?locked_structure)
+        (structure_flag_2 ?locked_structure)
+        (not
+          (structure_locked ?locked_structure)
+        )
+      )
+  )
+  (:action activate_structure
+    :parameters (?locked_structure - locked_structure ?primary_entry - primary_entry ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (structure_assembled ?locked_structure)
+        (route_flagged ?primary_entry)
+        (traversal_obstacle_link ?primary_entry ?obstacle_token)
+        (not
+          (structure_activated ?locked_structure)
+        )
+      )
+    :effect (structure_activated ?locked_structure)
+  )
+  (:action commit_artifact_to_structure
+    :parameters (?player_agent - player_agent ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (agent_structure_link ?player_agent ?locked_structure)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_in_storage ?local_artifact)
+        (structure_assembled ?locked_structure)
+        (structure_activated ?locked_structure)
+        (not
+          (artifact_committed ?local_artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_committed ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (not
+          (artifact_in_storage ?local_artifact)
+        )
+      )
+  )
+  (:action grant_agent_cert_step_1
+    :parameters (?player_agent - player_agent ?local_artifact - local_artifact ?locked_structure - locked_structure ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_committed ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (traversal_obstacle_link ?player_agent ?obstacle_token)
+        (not
+          (structure_flag_1 ?locked_structure)
+        )
+        (not
+          (agent_cert_step_1 ?player_agent)
+        )
+      )
+    :effect (agent_cert_step_1 ?player_agent)
+  )
+  (:action attach_upgrade_module_to_agent
+    :parameters (?player_agent - player_agent ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (upgrade_module_available ?upgrade_module)
+        (not
+          (agent_has_any_upgrade_module ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_has_any_upgrade_module ?player_agent)
+        (agent_has_upgrade ?player_agent ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action apply_agent_upgrade_with_artifact
+    :parameters (?player_agent - player_agent ?local_artifact - local_artifact ?locked_structure - locked_structure ?obstacle_token - obstacle_token ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_committed ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (traversal_obstacle_link ?player_agent ?obstacle_token)
+        (structure_flag_1 ?locked_structure)
+        (agent_has_any_upgrade_module ?player_agent)
+        (agent_has_upgrade ?player_agent ?upgrade_module)
+        (not
+          (agent_cert_step_1 ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_cert_step_1 ?player_agent)
+        (agent_upgrade_flag ?player_agent)
+      )
+  )
+  (:action grant_agent_cert_step_2_primary
+    :parameters (?player_agent - player_agent ?upgrade_token - upgrade_token ?activation_switch - activation_switch ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_1 ?player_agent)
+        (agent_has_upgrade_token ?player_agent ?upgrade_token)
+        (switch_bound_to_node ?player_agent ?activation_switch)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (not
+          (structure_flag_2 ?locked_structure)
+        )
+        (not
+          (agent_cert_step_2 ?player_agent)
+        )
+      )
+    :effect (agent_cert_step_2 ?player_agent)
+  )
+  (:action grant_agent_cert_step_2_secondary
+    :parameters (?player_agent - player_agent ?upgrade_token - upgrade_token ?activation_switch - activation_switch ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_1 ?player_agent)
+        (agent_has_upgrade_token ?player_agent ?upgrade_token)
+        (switch_bound_to_node ?player_agent ?activation_switch)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (structure_flag_2 ?locked_structure)
+        (not
+          (agent_cert_step_2 ?player_agent)
+        )
+      )
+    :effect (agent_cert_step_2 ?player_agent)
+  )
+  (:action grant_agent_cert_step_3_initial
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_2 ?player_agent)
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (not
+          (structure_flag_1 ?locked_structure)
+        )
+        (not
+          (structure_flag_2 ?locked_structure)
+        )
+        (not
+          (agent_cert_step_3 ?player_agent)
+        )
+      )
+    :effect (agent_cert_step_3 ?player_agent)
+  )
+  (:action grant_agent_cert_step_3_with_flag
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_2 ?player_agent)
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (structure_flag_1 ?locked_structure)
+        (not
+          (structure_flag_2 ?locked_structure)
+        )
+        (not
+          (agent_cert_step_3 ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_extra_flag ?player_agent)
+      )
+  )
+  (:action grant_agent_cert_step_3_alt1
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_2 ?player_agent)
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (not
+          (structure_flag_1 ?locked_structure)
+        )
+        (structure_flag_2 ?locked_structure)
+        (not
+          (agent_cert_step_3 ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_extra_flag ?player_agent)
+      )
+  )
+  (:action grant_agent_cert_step_3_alt2
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge ?local_artifact - local_artifact ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (agent_cert_step_2 ?player_agent)
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (agent_has_artifact ?player_agent ?local_artifact)
+        (artifact_to_structure ?local_artifact ?locked_structure)
+        (structure_flag_1 ?locked_structure)
+        (structure_flag_2 ?locked_structure)
+        (not
+          (agent_cert_step_3 ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_extra_flag ?player_agent)
+      )
+  )
+  (:action finalize_agent_certification
+    :parameters (?player_agent - player_agent)
+    :precondition
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (not
+          (agent_extra_flag ?player_agent)
+        )
+        (not
+          (agent_finalized ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?player_agent)
+        (certified_for_unlock ?player_agent)
+      )
+  )
+  (:action attach_access_module_to_agent
+    :parameters (?player_agent - player_agent ?access_module - access_module)
+    :precondition
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_extra_flag ?player_agent)
+        (access_module_available ?access_module)
+      )
+    :effect
+      (and
+        (agent_has_access_module ?player_agent ?access_module)
+        (not
+          (access_module_available ?access_module)
+        )
+      )
+  )
+  (:action mark_agent_ready_for_final_unlock
+    :parameters (?player_agent - player_agent ?primary_entry - primary_entry ?secondary_entry - secondary_entry ?obstacle_token - obstacle_token ?access_module - access_module)
+    :precondition
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_extra_flag ?player_agent)
+        (agent_has_access_module ?player_agent ?access_module)
+        (agent_route_link ?player_agent ?primary_entry)
+        (agent_branch_link ?player_agent ?secondary_entry)
+        (route_ready ?primary_entry)
+        (branch_ready ?secondary_entry)
+        (traversal_obstacle_link ?player_agent ?obstacle_token)
+        (not
+          (agent_ready_final ?player_agent)
+        )
+      )
+    :effect (agent_ready_final ?player_agent)
+  )
+  (:action finalize_agent_certification_after_ready
+    :parameters (?player_agent - player_agent)
+    :precondition
+      (and
+        (agent_cert_step_3 ?player_agent)
+        (agent_ready_final ?player_agent)
+        (not
+          (agent_finalized ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?player_agent)
+        (certified_for_unlock ?player_agent)
+      )
+  )
+  (:action apply_endorsement_to_agent
+    :parameters (?player_agent - player_agent ?endorsement_flag - endorsement_flag ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (traversal_prepared ?player_agent)
+        (traversal_obstacle_link ?player_agent ?obstacle_token)
+        (endorsement_available ?endorsement_flag)
+        (agent_has_endorsement ?player_agent ?endorsement_flag)
+        (not
+          (endorsement_applied ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (endorsement_applied ?player_agent)
+        (not
+          (endorsement_available ?endorsement_flag)
+        )
+      )
+  )
+  (:action record_endorsement_step
+    :parameters (?player_agent - player_agent ?activation_switch - activation_switch)
+    :precondition
+      (and
+        (endorsement_applied ?player_agent)
+        (switch_bound_to_node ?player_agent ?activation_switch)
+        (not
+          (endorsement_step ?player_agent)
+        )
+      )
+    :effect (endorsement_step ?player_agent)
+  )
+  (:action finalize_endorsement
+    :parameters (?player_agent - player_agent ?timed_charge - timed_charge)
+    :precondition
+      (and
+        (endorsement_step ?player_agent)
+        (agent_has_timed_charge ?player_agent ?timed_charge)
+        (not
+          (endorsement_ready ?player_agent)
+        )
+      )
+    :effect (endorsement_ready ?player_agent)
+  )
+  (:action finalize_agent_certification_from_endorsement
+    :parameters (?player_agent - player_agent)
+    :precondition
+      (and
+        (endorsement_ready ?player_agent)
+        (not
+          (agent_finalized ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?player_agent)
+        (certified_for_unlock ?player_agent)
+      )
+  )
+  (:action certify_route_for_unlock
+    :parameters (?primary_entry - primary_entry ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (route_flagged ?primary_entry)
+        (route_ready ?primary_entry)
+        (structure_assembled ?locked_structure)
+        (structure_activated ?locked_structure)
+        (not
+          (certified_for_unlock ?primary_entry)
+        )
+      )
+    :effect (certified_for_unlock ?primary_entry)
+  )
+  (:action certify_branch_for_unlock
+    :parameters (?secondary_entry - secondary_entry ?locked_structure - locked_structure)
+    :precondition
+      (and
+        (branch_flagged ?secondary_entry)
+        (branch_ready ?secondary_entry)
+        (structure_assembled ?locked_structure)
+        (structure_activated ?locked_structure)
+        (not
+          (certified_for_unlock ?secondary_entry)
+        )
+      )
+    :effect (certified_for_unlock ?secondary_entry)
+  )
+  (:action configure_node_with_terrain_marker
+    :parameters (?traversal_node - traversal_node ?terrain_marker - terrain_marker ?obstacle_token - obstacle_token)
+    :precondition
+      (and
+        (certified_for_unlock ?traversal_node)
+        (traversal_obstacle_link ?traversal_node ?obstacle_token)
+        (terrain_marker_available ?terrain_marker)
+        (not
+          (node_configured ?traversal_node)
+        )
+      )
+    :effect
+      (and
+        (node_configured ?traversal_node)
+        (node_to_terrain_marker ?traversal_node ?terrain_marker)
+        (not
+          (terrain_marker_available ?terrain_marker)
+        )
+      )
+  )
+  (:action unlock_node_and_return_tool
+    :parameters (?primary_entry - primary_entry ?traversal_tool - traversal_tool ?terrain_marker - terrain_marker)
+    :precondition
+      (and
+        (node_configured ?primary_entry)
+        (assigned_traversal_tool ?primary_entry ?traversal_tool)
+        (node_to_terrain_marker ?primary_entry ?terrain_marker)
+        (not
+          (node_unlocked_final ?primary_entry)
+        )
+      )
+    :effect
+      (and
+        (node_unlocked_final ?primary_entry)
+        (tool_available ?traversal_tool)
+        (terrain_marker_available ?terrain_marker)
+      )
+  )
+  (:action unlock_branch_and_return_tool
+    :parameters (?secondary_entry - secondary_entry ?traversal_tool - traversal_tool ?terrain_marker - terrain_marker)
+    :precondition
+      (and
+        (node_configured ?secondary_entry)
+        (assigned_traversal_tool ?secondary_entry ?traversal_tool)
+        (node_to_terrain_marker ?secondary_entry ?terrain_marker)
+        (not
+          (node_unlocked_final ?secondary_entry)
+        )
+      )
+    :effect
+      (and
+        (node_unlocked_final ?secondary_entry)
+        (tool_available ?traversal_tool)
+        (terrain_marker_available ?terrain_marker)
+      )
+  )
+  (:action finalize_unlock_and_release_tool
+    :parameters (?player_agent - player_agent ?traversal_tool - traversal_tool ?terrain_marker - terrain_marker)
+    :precondition
+      (and
+        (node_configured ?player_agent)
+        (assigned_traversal_tool ?player_agent ?traversal_tool)
+        (node_to_terrain_marker ?player_agent ?terrain_marker)
+        (not
+          (node_unlocked_final ?player_agent)
+        )
+      )
+    :effect
+      (and
+        (node_unlocked_final ?player_agent)
+        (tool_available ?traversal_tool)
+        (terrain_marker_available ?terrain_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem traversal_tool_unlock_scenario)
+  (:domain traversal_tool_unlock_dependency_path)
+  (:objects primary_entry_1 - primary_entry secondary_entry_1 - secondary_entry player_agent_1 - player_agent player_agent_2 - player_agent grappling_hook - traversal_tool climbing_gear - traversal_tool glide_device - traversal_tool barrier_token - obstacle_token activation_switch_1 - activation_switch consumable_key_1 - consumable_key approach_marker_1 - approach_marker approach_anchor_1 - approach_anchor locked_structure_1 - locked_structure local_artifact_1 - local_artifact local_artifact_2 - local_artifact upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module access_module_1 - access_module access_module_2 - access_module terrain_marker_1 - terrain_marker upgrade_token_1 - upgrade_token endorsement_flag_1 - endorsement_flag endorsement_flag_2 - endorsement_flag timed_charge_1 - timed_charge)
+  (:init
+    (tool_available grappling_hook)
+    (tool_available climbing_gear)
+    (tool_available glide_device)
+    (obstacle_token_available barrier_token)
+    (switch_available activation_switch_1)
+    (artifact_available consumable_key_1)
+    (route_to_marker primary_entry_1 approach_marker_1)
+    (branch_to_anchor secondary_entry_1 approach_anchor_1)
+    (structure_locked locked_structure_1)
+    (artifact_in_storage local_artifact_1)
+    (artifact_in_storage local_artifact_2)
+    (agent_route_link player_agent_1 primary_entry_1)
+    (agent_route_link player_agent_2 primary_entry_1)
+    (agent_branch_link player_agent_1 secondary_entry_1)
+    (agent_branch_link player_agent_2 secondary_entry_1)
+    (agent_structure_link player_agent_1 locked_structure_1)
+    (agent_structure_link player_agent_2 locked_structure_1)
+    (agent_has_artifact player_agent_1 local_artifact_1)
+    (agent_has_artifact player_agent_2 local_artifact_2)
+    (upgrade_module_available upgrade_module_1)
+    (upgrade_module_available upgrade_module_2)
+    (access_module_available access_module_1)
+    (access_module_available access_module_2)
+    (terrain_marker_available terrain_marker_1)
+    (upgrade_token_available upgrade_token_1)
+    (endorsement_available endorsement_flag_1)
+    (agent_has_endorsement player_agent_1 endorsement_flag_1)
+    (agent_has_endorsement player_agent_2 endorsement_flag_2)
+    (timed_charge_available timed_charge_1)
+  )
+  (:goal
+    (and
+      (node_unlocked_final primary_entry_1)
+      (node_unlocked_final secondary_entry_1)
+      (node_unlocked_final player_agent_1)
+      (node_unlocked_final player_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(scout_node primary_entry_1)
+(scout_node secondary_entry_1)
+(scout_node player_agent_1)
+(scout_node player_agent_2)
+(assign_tool_to_node primary_entry_1 grappling_hook)
+(apply_obstacle_to_node primary_entry_1 barrier_token)
+(finalize_node_preparation primary_entry_1 barrier_token)
+(stage_artifact_on_route primary_entry_1 approach_marker_1 consumable_key_1)
+(process_route_marker_exchange primary_entry_1 approach_marker_1 barrier_token consumable_key_1)
+(remove_obstacle_from_node primary_entry_1 barrier_token)
+(assign_tool_to_node secondary_entry_1 climbing_gear)
+(apply_obstacle_to_node secondary_entry_1 barrier_token)
+(finalize_node_preparation secondary_entry_1 barrier_token)
+(stage_artifact_on_branch secondary_entry_1 approach_anchor_1 consumable_key_1)
+(process_branch_anchor_exchange secondary_entry_1 approach_anchor_1 barrier_token consumable_key_1)
+(assemble_locked_structure primary_entry_1 secondary_entry_1 approach_marker_1 approach_anchor_1 locked_structure_1)
+(remove_obstacle_from_node secondary_entry_1 barrier_token)
+(apply_obstacle_to_node primary_entry_1 barrier_token)
+(activate_structure locked_structure_1 primary_entry_1 barrier_token)
+(certify_route_for_unlock primary_entry_1 locked_structure_1)
+(certify_branch_for_unlock secondary_entry_1 locked_structure_1)
+(configure_node_with_terrain_marker primary_entry_1 terrain_marker_1 barrier_token)
+(unlock_node_and_return_tool primary_entry_1 grappling_hook terrain_marker_1)
+(remove_obstacle_from_node primary_entry_1 barrier_token)
+(apply_obstacle_to_node secondary_entry_1 barrier_token)
+(configure_node_with_terrain_marker secondary_entry_1 terrain_marker_1 barrier_token)
+(unlock_branch_and_return_tool secondary_entry_1 climbing_gear terrain_marker_1)
+(remove_obstacle_from_node secondary_entry_1 barrier_token)
+(assign_tool_to_node player_agent_1 glide_device)
+(apply_obstacle_to_node player_agent_1 barrier_token)
+(finalize_node_preparation player_agent_1 barrier_token)
+(commit_artifact_to_structure player_agent_1 local_artifact_1 locked_structure_1)
+(grant_agent_cert_step_1 player_agent_1 local_artifact_1 locked_structure_1 barrier_token)
+(bind_switch_to_node player_agent_1 activation_switch_1)
+(attach_upgrade_token_to_agent player_agent_1 upgrade_token_1)
+(grant_agent_cert_step_2_primary player_agent_1 upgrade_token_1 activation_switch_1 local_artifact_1 locked_structure_1)
+(attach_timed_charge_to_agent player_agent_1 timed_charge_1)
+(grant_agent_cert_step_3_initial player_agent_1 timed_charge_1 local_artifact_1 locked_structure_1)
+(finalize_agent_certification player_agent_1)
+(configure_node_with_terrain_marker player_agent_1 terrain_marker_1 barrier_token)
+(finalize_unlock_and_release_tool player_agent_1 glide_device terrain_marker_1)
+(remove_obstacle_from_node player_agent_1 barrier_token)
+(unbind_switch_from_node player_agent_1 activation_switch_1)
+(detach_upgrade_token_from_agent player_agent_1 upgrade_token_1)
+(detach_timed_charge_from_agent player_agent_1 timed_charge_1)
+(assign_tool_to_node player_agent_2 grappling_hook)
+(apply_obstacle_to_node player_agent_2 barrier_token)
+(finalize_node_preparation player_agent_2 barrier_token)
+(commit_artifact_to_structure player_agent_2 local_artifact_2 locked_structure_1)
+(grant_agent_cert_step_1 player_agent_2 local_artifact_2 locked_structure_1 barrier_token)
+(bind_switch_to_node player_agent_2 activation_switch_1)
+(attach_upgrade_token_to_agent player_agent_2 upgrade_token_1)
+(grant_agent_cert_step_2_primary player_agent_2 upgrade_token_1 activation_switch_1 local_artifact_2 locked_structure_1)
+(attach_timed_charge_to_agent player_agent_2 timed_charge_1)
+(grant_agent_cert_step_3_initial player_agent_2 timed_charge_1 local_artifact_2 locked_structure_1)
+(finalize_agent_certification player_agent_2)
+(configure_node_with_terrain_marker player_agent_2 terrain_marker_1 barrier_token)
+(finalize_unlock_and_release_tool player_agent_2 grappling_hook terrain_marker_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mvlvq0sl/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_mvlvq0sl/plan.pddl 58 
+
+
+
+--- stderr ---
+

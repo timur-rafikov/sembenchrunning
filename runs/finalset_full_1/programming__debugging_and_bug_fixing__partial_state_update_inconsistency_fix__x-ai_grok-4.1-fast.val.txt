@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain bugfix_release_pipeline)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types pipeline_resource - object artifact_cluster - object environment_cluster - object issue - object ticket - issue patch_candidate - pipeline_resource test_case - pipeline_resource reviewer - pipeline_resource feature_flag - pipeline_resource deployment_credential - pipeline_resource correlation_token - pipeline_resource monitoring_hook - pipeline_resource external_attestation - pipeline_resource auxiliary_artifact - artifact_cluster configuration_artifact - artifact_cluster external_linkage_token - artifact_cluster backend_runtime - environment_cluster frontend_runtime - environment_cluster release_bundle - environment_cluster backend_component_class - ticket frontend_component_class - ticket backend_component - backend_component_class frontend_component - backend_component_class release_candidate - frontend_component_class)
+  (:predicates
+    (entity_open ?bug_report - ticket)
+    (entity_verified ?bug_report - ticket)
+    (entity_patch_recorded ?bug_report - ticket)
+    (entity_resolved ?bug_report - ticket)
+    (ready_for_release ?bug_report - ticket)
+    (entity_committed ?bug_report - ticket)
+    (patch_available ?patch_candidate - patch_candidate)
+    (assigned_patch ?bug_report - ticket ?patch_candidate - patch_candidate)
+    (test_available ?test_case - test_case)
+    (test_attached_to_entity ?bug_report - ticket ?test_case - test_case)
+    (reviewer_available ?reviewer - reviewer)
+    (assigned_reviewer ?bug_report - ticket ?reviewer - reviewer)
+    (aux_artifact_available ?auxiliary_artifact - auxiliary_artifact)
+    (component_has_aux_artifact ?backend_component - backend_component ?auxiliary_artifact - auxiliary_artifact)
+    (frontend_has_aux_artifact ?frontend_component - frontend_component ?auxiliary_artifact - auxiliary_artifact)
+    (bound_backend_to_runtime ?backend_component - backend_component ?backend_runtime - backend_runtime)
+    (backend_runtime_ready ?backend_runtime - backend_runtime)
+    (backend_runtime_prelim_ready ?backend_runtime - backend_runtime)
+    (backend_component_ready ?backend_component - backend_component)
+    (bound_frontend_to_runtime ?frontend_component - frontend_component ?frontend_runtime - frontend_runtime)
+    (frontend_runtime_ready ?frontend_runtime - frontend_runtime)
+    (frontend_runtime_prelim_ready ?frontend_runtime - frontend_runtime)
+    (frontend_component_ready ?frontend_component - frontend_component)
+    (release_bundle_available ?release_bundle - release_bundle)
+    (release_bundle_claimed ?release_bundle - release_bundle)
+    (bundle_bound_to_backend_runtime ?release_bundle - release_bundle ?backend_runtime - backend_runtime)
+    (bundle_bound_to_frontend_runtime ?release_bundle - release_bundle ?frontend_runtime - frontend_runtime)
+    (bundle_verified_backend ?release_bundle - release_bundle)
+    (bundle_verified_frontend ?release_bundle - release_bundle)
+    (bundle_finalized ?release_bundle - release_bundle)
+    (release_candidate_targets_backend_component ?release_candidate - release_candidate ?backend_component - backend_component)
+    (release_candidate_targets_frontend_component ?release_candidate - release_candidate ?frontend_component - frontend_component)
+    (release_candidate_includes_release_bundle ?release_candidate - release_candidate ?release_bundle - release_bundle)
+    (config_available ?configuration_artifact - configuration_artifact)
+    (release_candidate_has_config ?release_candidate - release_candidate ?configuration_artifact - configuration_artifact)
+    (config_locked ?configuration_artifact - configuration_artifact)
+    (config_bound_to_bundle ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    (release_candidate_initialized ?release_candidate - release_candidate)
+    (release_candidate_monitoring_attached ?release_candidate - release_candidate)
+    (release_candidate_ready_for_finalization ?release_candidate - release_candidate)
+    (release_candidate_feature_flag_claimed ?release_candidate - release_candidate)
+    (release_candidate_feature_flag_verified ?release_candidate - release_candidate)
+    (release_candidate_additional_checks_passed ?release_candidate - release_candidate)
+    (release_candidate_precommit_checks_passed ?release_candidate - release_candidate)
+    (external_linkage_available ?external_linkage_token - external_linkage_token)
+    (release_candidate_has_external_linkage ?release_candidate - release_candidate ?external_linkage_token - external_linkage_token)
+    (release_candidate_external_linkage_bound ?release_candidate - release_candidate)
+    (release_candidate_external_linkage_verified ?release_candidate - release_candidate)
+    (release_candidate_external_attestation_seen ?release_candidate - release_candidate)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (release_candidate_has_feature_flag ?release_candidate - release_candidate ?feature_flag - feature_flag)
+    (deployment_credential_available ?deployment_credential - deployment_credential)
+    (release_candidate_has_deployment_credential ?release_candidate - release_candidate ?deployment_credential - deployment_credential)
+    (monitoring_hook_available ?monitoring_hook - monitoring_hook)
+    (release_candidate_has_monitoring_hook ?release_candidate - release_candidate ?monitoring_hook - monitoring_hook)
+    (external_attestation_available ?external_attestation - external_attestation)
+    (release_candidate_has_external_attestation ?release_candidate - release_candidate ?external_attestation - external_attestation)
+    (correlation_token_available ?correlation_token - correlation_token)
+    (entity_bound_to_correlation ?bug_report - ticket ?correlation_token - correlation_token)
+    (backend_component_prepared ?backend_component - backend_component)
+    (frontend_component_prepared ?frontend_component - frontend_component)
+    (release_candidate_commit_ready ?release_candidate - release_candidate)
+  )
+  (:action create_bug_report
+    :parameters (?bug_report - ticket)
+    :precondition
+      (and
+        (not
+          (entity_open ?bug_report)
+        )
+        (not
+          (entity_resolved ?bug_report)
+        )
+      )
+    :effect (entity_open ?bug_report)
+  )
+  (:action assign_patch_to_bug
+    :parameters (?bug_report - ticket ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (entity_open ?bug_report)
+        (not
+          (entity_patch_recorded ?bug_report)
+        )
+        (patch_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (entity_patch_recorded ?bug_report)
+        (assigned_patch ?bug_report ?patch_candidate)
+        (not
+          (patch_available ?patch_candidate)
+        )
+      )
+  )
+  (:action attach_test_to_bug
+    :parameters (?bug_report - ticket ?test_case - test_case)
+    :precondition
+      (and
+        (entity_open ?bug_report)
+        (entity_patch_recorded ?bug_report)
+        (test_available ?test_case)
+      )
+    :effect
+      (and
+        (test_attached_to_entity ?bug_report ?test_case)
+        (not
+          (test_available ?test_case)
+        )
+      )
+  )
+  (:action promote_bug_to_verified
+    :parameters (?bug_report - ticket ?test_case - test_case)
+    :precondition
+      (and
+        (entity_open ?bug_report)
+        (entity_patch_recorded ?bug_report)
+        (test_attached_to_entity ?bug_report ?test_case)
+        (not
+          (entity_verified ?bug_report)
+        )
+      )
+    :effect (entity_verified ?bug_report)
+  )
+  (:action release_test_from_bug
+    :parameters (?bug_report - ticket ?test_case - test_case)
+    :precondition
+      (and
+        (test_attached_to_entity ?bug_report ?test_case)
+      )
+    :effect
+      (and
+        (test_available ?test_case)
+        (not
+          (test_attached_to_entity ?bug_report ?test_case)
+        )
+      )
+  )
+  (:action assign_reviewer_to_bug
+    :parameters (?bug_report - ticket ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_verified ?bug_report)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (assigned_reviewer ?bug_report ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_bug
+    :parameters (?bug_report - ticket ?reviewer - reviewer)
+    :precondition
+      (and
+        (assigned_reviewer ?bug_report ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (assigned_reviewer ?bug_report ?reviewer)
+        )
+      )
+  )
+  (:action attach_monitoring_hook_to_candidate
+    :parameters (?release_candidate - release_candidate ?monitoring_hook - monitoring_hook)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (monitoring_hook_available ?monitoring_hook)
+      )
+    :effect
+      (and
+        (release_candidate_has_monitoring_hook ?release_candidate ?monitoring_hook)
+        (not
+          (monitoring_hook_available ?monitoring_hook)
+        )
+      )
+  )
+  (:action detach_monitoring_hook_from_candidate
+    :parameters (?release_candidate - release_candidate ?monitoring_hook - monitoring_hook)
+    :precondition
+      (and
+        (release_candidate_has_monitoring_hook ?release_candidate ?monitoring_hook)
+      )
+    :effect
+      (and
+        (monitoring_hook_available ?monitoring_hook)
+        (not
+          (release_candidate_has_monitoring_hook ?release_candidate ?monitoring_hook)
+        )
+      )
+  )
+  (:action attach_external_attestation_to_candidate
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (external_attestation_available ?external_attestation)
+      )
+    :effect
+      (and
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (not
+          (external_attestation_available ?external_attestation)
+        )
+      )
+  )
+  (:action detach_external_attestation_from_candidate
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation)
+    :precondition
+      (and
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+      )
+    :effect
+      (and
+        (external_attestation_available ?external_attestation)
+        (not
+          (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        )
+      )
+  )
+  (:action prepare_backend_runtime_for_test
+    :parameters (?backend_component - backend_component ?backend_runtime - backend_runtime ?test_case - test_case)
+    :precondition
+      (and
+        (entity_verified ?backend_component)
+        (test_attached_to_entity ?backend_component ?test_case)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (not
+          (backend_runtime_ready ?backend_runtime)
+        )
+        (not
+          (backend_runtime_prelim_ready ?backend_runtime)
+        )
+      )
+    :effect (backend_runtime_ready ?backend_runtime)
+  )
+  (:action approve_backend_runtime_by_reviewer
+    :parameters (?backend_component - backend_component ?backend_runtime - backend_runtime ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_verified ?backend_component)
+        (assigned_reviewer ?backend_component ?reviewer)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (backend_runtime_ready ?backend_runtime)
+        (not
+          (backend_component_prepared ?backend_component)
+        )
+      )
+    :effect
+      (and
+        (backend_component_prepared ?backend_component)
+        (backend_component_ready ?backend_component)
+      )
+  )
+  (:action attach_auxiliary_artifact_to_backend_component
+    :parameters (?backend_component - backend_component ?backend_runtime - backend_runtime ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (entity_verified ?backend_component)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (aux_artifact_available ?auxiliary_artifact)
+        (not
+          (backend_component_prepared ?backend_component)
+        )
+      )
+    :effect
+      (and
+        (backend_runtime_prelim_ready ?backend_runtime)
+        (backend_component_prepared ?backend_component)
+        (component_has_aux_artifact ?backend_component ?auxiliary_artifact)
+        (not
+          (aux_artifact_available ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action finalize_backend_runtime_preparation
+    :parameters (?backend_component - backend_component ?backend_runtime - backend_runtime ?test_case - test_case ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (entity_verified ?backend_component)
+        (test_attached_to_entity ?backend_component ?test_case)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (backend_runtime_prelim_ready ?backend_runtime)
+        (component_has_aux_artifact ?backend_component ?auxiliary_artifact)
+        (not
+          (backend_component_ready ?backend_component)
+        )
+      )
+    :effect
+      (and
+        (backend_runtime_ready ?backend_runtime)
+        (backend_component_ready ?backend_component)
+        (aux_artifact_available ?auxiliary_artifact)
+        (not
+          (component_has_aux_artifact ?backend_component ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action prepare_frontend_runtime_for_test
+    :parameters (?frontend_component - frontend_component ?frontend_runtime - frontend_runtime ?test_case - test_case)
+    :precondition
+      (and
+        (entity_verified ?frontend_component)
+        (test_attached_to_entity ?frontend_component ?test_case)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (not
+          (frontend_runtime_ready ?frontend_runtime)
+        )
+        (not
+          (frontend_runtime_prelim_ready ?frontend_runtime)
+        )
+      )
+    :effect (frontend_runtime_ready ?frontend_runtime)
+  )
+  (:action approve_frontend_runtime_by_reviewer
+    :parameters (?frontend_component - frontend_component ?frontend_runtime - frontend_runtime ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_verified ?frontend_component)
+        (assigned_reviewer ?frontend_component ?reviewer)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (frontend_runtime_ready ?frontend_runtime)
+        (not
+          (frontend_component_prepared ?frontend_component)
+        )
+      )
+    :effect
+      (and
+        (frontend_component_prepared ?frontend_component)
+        (frontend_component_ready ?frontend_component)
+      )
+  )
+  (:action attach_auxiliary_artifact_to_frontend_component
+    :parameters (?frontend_component - frontend_component ?frontend_runtime - frontend_runtime ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (entity_verified ?frontend_component)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (aux_artifact_available ?auxiliary_artifact)
+        (not
+          (frontend_component_prepared ?frontend_component)
+        )
+      )
+    :effect
+      (and
+        (frontend_runtime_prelim_ready ?frontend_runtime)
+        (frontend_component_prepared ?frontend_component)
+        (frontend_has_aux_artifact ?frontend_component ?auxiliary_artifact)
+        (not
+          (aux_artifact_available ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action finalize_frontend_runtime_preparation
+    :parameters (?frontend_component - frontend_component ?frontend_runtime - frontend_runtime ?test_case - test_case ?auxiliary_artifact - auxiliary_artifact)
+    :precondition
+      (and
+        (entity_verified ?frontend_component)
+        (test_attached_to_entity ?frontend_component ?test_case)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (frontend_runtime_prelim_ready ?frontend_runtime)
+        (frontend_has_aux_artifact ?frontend_component ?auxiliary_artifact)
+        (not
+          (frontend_component_ready ?frontend_component)
+        )
+      )
+    :effect
+      (and
+        (frontend_runtime_ready ?frontend_runtime)
+        (frontend_component_ready ?frontend_component)
+        (aux_artifact_available ?auxiliary_artifact)
+        (not
+          (frontend_has_aux_artifact ?frontend_component ?auxiliary_artifact)
+        )
+      )
+  )
+  (:action assemble_release_bundle
+    :parameters (?backend_component - backend_component ?frontend_component - frontend_component ?backend_runtime - backend_runtime ?frontend_runtime - frontend_runtime ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (backend_component_prepared ?backend_component)
+        (frontend_component_prepared ?frontend_component)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (backend_runtime_ready ?backend_runtime)
+        (frontend_runtime_ready ?frontend_runtime)
+        (backend_component_ready ?backend_component)
+        (frontend_component_ready ?frontend_component)
+        (release_bundle_available ?release_bundle)
+      )
+    :effect
+      (and
+        (release_bundle_claimed ?release_bundle)
+        (bundle_bound_to_backend_runtime ?release_bundle ?backend_runtime)
+        (bundle_bound_to_frontend_runtime ?release_bundle ?frontend_runtime)
+        (not
+          (release_bundle_available ?release_bundle)
+        )
+      )
+  )
+  (:action assemble_release_bundle_backend_secondary
+    :parameters (?backend_component - backend_component ?frontend_component - frontend_component ?backend_runtime - backend_runtime ?frontend_runtime - frontend_runtime ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (backend_component_prepared ?backend_component)
+        (frontend_component_prepared ?frontend_component)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (backend_runtime_prelim_ready ?backend_runtime)
+        (frontend_runtime_ready ?frontend_runtime)
+        (not
+          (backend_component_ready ?backend_component)
+        )
+        (frontend_component_ready ?frontend_component)
+        (release_bundle_available ?release_bundle)
+      )
+    :effect
+      (and
+        (release_bundle_claimed ?release_bundle)
+        (bundle_bound_to_backend_runtime ?release_bundle ?backend_runtime)
+        (bundle_bound_to_frontend_runtime ?release_bundle ?frontend_runtime)
+        (bundle_verified_backend ?release_bundle)
+        (not
+          (release_bundle_available ?release_bundle)
+        )
+      )
+  )
+  (:action assemble_release_bundle_frontend_secondary
+    :parameters (?backend_component - backend_component ?frontend_component - frontend_component ?backend_runtime - backend_runtime ?frontend_runtime - frontend_runtime ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (backend_component_prepared ?backend_component)
+        (frontend_component_prepared ?frontend_component)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (backend_runtime_ready ?backend_runtime)
+        (frontend_runtime_prelim_ready ?frontend_runtime)
+        (backend_component_ready ?backend_component)
+        (not
+          (frontend_component_ready ?frontend_component)
+        )
+        (release_bundle_available ?release_bundle)
+      )
+    :effect
+      (and
+        (release_bundle_claimed ?release_bundle)
+        (bundle_bound_to_backend_runtime ?release_bundle ?backend_runtime)
+        (bundle_bound_to_frontend_runtime ?release_bundle ?frontend_runtime)
+        (bundle_verified_frontend ?release_bundle)
+        (not
+          (release_bundle_available ?release_bundle)
+        )
+      )
+  )
+  (:action assemble_release_bundle_both_secondaries
+    :parameters (?backend_component - backend_component ?frontend_component - frontend_component ?backend_runtime - backend_runtime ?frontend_runtime - frontend_runtime ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (backend_component_prepared ?backend_component)
+        (frontend_component_prepared ?frontend_component)
+        (bound_backend_to_runtime ?backend_component ?backend_runtime)
+        (bound_frontend_to_runtime ?frontend_component ?frontend_runtime)
+        (backend_runtime_prelim_ready ?backend_runtime)
+        (frontend_runtime_prelim_ready ?frontend_runtime)
+        (not
+          (backend_component_ready ?backend_component)
+        )
+        (not
+          (frontend_component_ready ?frontend_component)
+        )
+        (release_bundle_available ?release_bundle)
+      )
+    :effect
+      (and
+        (release_bundle_claimed ?release_bundle)
+        (bundle_bound_to_backend_runtime ?release_bundle ?backend_runtime)
+        (bundle_bound_to_frontend_runtime ?release_bundle ?frontend_runtime)
+        (bundle_verified_backend ?release_bundle)
+        (bundle_verified_frontend ?release_bundle)
+        (not
+          (release_bundle_available ?release_bundle)
+        )
+      )
+  )
+  (:action finalize_release_bundle_for_component
+    :parameters (?release_bundle - release_bundle ?backend_component - backend_component ?test_case - test_case)
+    :precondition
+      (and
+        (release_bundle_claimed ?release_bundle)
+        (backend_component_prepared ?backend_component)
+        (test_attached_to_entity ?backend_component ?test_case)
+        (not
+          (bundle_finalized ?release_bundle)
+        )
+      )
+    :effect (bundle_finalized ?release_bundle)
+  )
+  (:action attach_config_to_candidate
+    :parameters (?release_candidate - release_candidate ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (release_candidate_includes_release_bundle ?release_candidate ?release_bundle)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_available ?configuration_artifact)
+        (release_bundle_claimed ?release_bundle)
+        (bundle_finalized ?release_bundle)
+        (not
+          (config_locked ?configuration_artifact)
+        )
+      )
+    :effect
+      (and
+        (config_locked ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (not
+          (config_available ?configuration_artifact)
+        )
+      )
+  )
+  (:action lock_config_and_prepare_candidate
+    :parameters (?release_candidate - release_candidate ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle ?test_case - test_case)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_locked ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (test_attached_to_entity ?release_candidate ?test_case)
+        (not
+          (bundle_verified_backend ?release_bundle)
+        )
+        (not
+          (release_candidate_initialized ?release_candidate)
+        )
+      )
+    :effect (release_candidate_initialized ?release_candidate)
+  )
+  (:action claim_feature_flag_for_candidate
+    :parameters (?release_candidate - release_candidate ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (feature_flag_available ?feature_flag)
+        (not
+          (release_candidate_feature_flag_claimed ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_feature_flag_claimed ?release_candidate)
+        (release_candidate_has_feature_flag ?release_candidate ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action verify_feature_flag_and_prepare_candidate
+    :parameters (?release_candidate - release_candidate ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle ?test_case - test_case ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_locked ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (test_attached_to_entity ?release_candidate ?test_case)
+        (bundle_verified_backend ?release_bundle)
+        (release_candidate_feature_flag_claimed ?release_candidate)
+        (release_candidate_has_feature_flag ?release_candidate ?feature_flag)
+        (not
+          (release_candidate_initialized ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_initialized ?release_candidate)
+        (release_candidate_feature_flag_verified ?release_candidate)
+      )
+  )
+  (:action attach_monitoring_and_prepare_candidate
+    :parameters (?release_candidate - release_candidate ?monitoring_hook - monitoring_hook ?reviewer - reviewer ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_initialized ?release_candidate)
+        (release_candidate_has_monitoring_hook ?release_candidate ?monitoring_hook)
+        (assigned_reviewer ?release_candidate ?reviewer)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (not
+          (bundle_verified_frontend ?release_bundle)
+        )
+        (not
+          (release_candidate_monitoring_attached ?release_candidate)
+        )
+      )
+    :effect (release_candidate_monitoring_attached ?release_candidate)
+  )
+  (:action attach_monitoring_and_prepare_candidate_alternate
+    :parameters (?release_candidate - release_candidate ?monitoring_hook - monitoring_hook ?reviewer - reviewer ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_initialized ?release_candidate)
+        (release_candidate_has_monitoring_hook ?release_candidate ?monitoring_hook)
+        (assigned_reviewer ?release_candidate ?reviewer)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (bundle_verified_frontend ?release_bundle)
+        (not
+          (release_candidate_monitoring_attached ?release_candidate)
+        )
+      )
+    :effect (release_candidate_monitoring_attached ?release_candidate)
+  )
+  (:action bind_external_attestation_and_prepare_candidate
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_monitoring_attached ?release_candidate)
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (not
+          (bundle_verified_backend ?release_bundle)
+        )
+        (not
+          (bundle_verified_frontend ?release_bundle)
+        )
+        (not
+          (release_candidate_ready_for_finalization ?release_candidate)
+        )
+      )
+    :effect (release_candidate_ready_for_finalization ?release_candidate)
+  )
+  (:action bind_external_attestation_and_prepare_candidate_variant
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_monitoring_attached ?release_candidate)
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (bundle_verified_backend ?release_bundle)
+        (not
+          (bundle_verified_frontend ?release_bundle)
+        )
+        (not
+          (release_candidate_ready_for_finalization ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_additional_checks_passed ?release_candidate)
+      )
+  )
+  (:action bind_external_attestation_and_prepare_candidate_variant_b
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_monitoring_attached ?release_candidate)
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (not
+          (bundle_verified_backend ?release_bundle)
+        )
+        (bundle_verified_frontend ?release_bundle)
+        (not
+          (release_candidate_ready_for_finalization ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_additional_checks_passed ?release_candidate)
+      )
+  )
+  (:action bind_external_attestation_and_prepare_candidate_variant_c
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation ?configuration_artifact - configuration_artifact ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (release_candidate_monitoring_attached ?release_candidate)
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (release_candidate_has_config ?release_candidate ?configuration_artifact)
+        (config_bound_to_bundle ?configuration_artifact ?release_bundle)
+        (bundle_verified_backend ?release_bundle)
+        (bundle_verified_frontend ?release_bundle)
+        (not
+          (release_candidate_ready_for_finalization ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_additional_checks_passed ?release_candidate)
+      )
+  )
+  (:action promote_candidate_to_commit_gate
+    :parameters (?release_candidate - release_candidate)
+    :precondition
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (not
+          (release_candidate_additional_checks_passed ?release_candidate)
+        )
+        (not
+          (release_candidate_commit_ready ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_commit_ready ?release_candidate)
+        (ready_for_release ?release_candidate)
+      )
+  )
+  (:action attach_deployment_credential_to_candidate
+    :parameters (?release_candidate - release_candidate ?deployment_credential - deployment_credential)
+    :precondition
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_additional_checks_passed ?release_candidate)
+        (deployment_credential_available ?deployment_credential)
+      )
+    :effect
+      (and
+        (release_candidate_has_deployment_credential ?release_candidate ?deployment_credential)
+        (not
+          (deployment_credential_available ?deployment_credential)
+        )
+      )
+  )
+  (:action run_final_precommit_checks
+    :parameters (?release_candidate - release_candidate ?backend_component - backend_component ?frontend_component - frontend_component ?test_case - test_case ?deployment_credential - deployment_credential)
+    :precondition
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_additional_checks_passed ?release_candidate)
+        (release_candidate_has_deployment_credential ?release_candidate ?deployment_credential)
+        (release_candidate_targets_backend_component ?release_candidate ?backend_component)
+        (release_candidate_targets_frontend_component ?release_candidate ?frontend_component)
+        (backend_component_ready ?backend_component)
+        (frontend_component_ready ?frontend_component)
+        (test_attached_to_entity ?release_candidate ?test_case)
+        (not
+          (release_candidate_precommit_checks_passed ?release_candidate)
+        )
+      )
+    :effect (release_candidate_precommit_checks_passed ?release_candidate)
+  )
+  (:action confirm_candidate_commit_gate
+    :parameters (?release_candidate - release_candidate)
+    :precondition
+      (and
+        (release_candidate_ready_for_finalization ?release_candidate)
+        (release_candidate_precommit_checks_passed ?release_candidate)
+        (not
+          (release_candidate_commit_ready ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_commit_ready ?release_candidate)
+        (ready_for_release ?release_candidate)
+      )
+  )
+  (:action bind_external_linkage_to_candidate
+    :parameters (?release_candidate - release_candidate ?external_linkage_token - external_linkage_token ?test_case - test_case)
+    :precondition
+      (and
+        (entity_verified ?release_candidate)
+        (test_attached_to_entity ?release_candidate ?test_case)
+        (external_linkage_available ?external_linkage_token)
+        (release_candidate_has_external_linkage ?release_candidate ?external_linkage_token)
+        (not
+          (release_candidate_external_linkage_bound ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_external_linkage_bound ?release_candidate)
+        (not
+          (external_linkage_available ?external_linkage_token)
+        )
+      )
+  )
+  (:action perform_external_linkage_check
+    :parameters (?release_candidate - release_candidate ?reviewer - reviewer)
+    :precondition
+      (and
+        (release_candidate_external_linkage_bound ?release_candidate)
+        (assigned_reviewer ?release_candidate ?reviewer)
+        (not
+          (release_candidate_external_linkage_verified ?release_candidate)
+        )
+      )
+    :effect (release_candidate_external_linkage_verified ?release_candidate)
+  )
+  (:action apply_external_attestation_to_candidate
+    :parameters (?release_candidate - release_candidate ?external_attestation - external_attestation)
+    :precondition
+      (and
+        (release_candidate_external_linkage_verified ?release_candidate)
+        (release_candidate_has_external_attestation ?release_candidate ?external_attestation)
+        (not
+          (release_candidate_external_attestation_seen ?release_candidate)
+        )
+      )
+    :effect (release_candidate_external_attestation_seen ?release_candidate)
+  )
+  (:action finalize_candidate_after_external_checks
+    :parameters (?release_candidate - release_candidate)
+    :precondition
+      (and
+        (release_candidate_external_attestation_seen ?release_candidate)
+        (not
+          (release_candidate_commit_ready ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (release_candidate_commit_ready ?release_candidate)
+        (ready_for_release ?release_candidate)
+      )
+  )
+  (:action finalize_backend_component_resolution
+    :parameters (?backend_component - backend_component ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (backend_component_prepared ?backend_component)
+        (backend_component_ready ?backend_component)
+        (release_bundle_claimed ?release_bundle)
+        (bundle_finalized ?release_bundle)
+        (not
+          (ready_for_release ?backend_component)
+        )
+      )
+    :effect (ready_for_release ?backend_component)
+  )
+  (:action finalize_frontend_component_resolution
+    :parameters (?frontend_component - frontend_component ?release_bundle - release_bundle)
+    :precondition
+      (and
+        (frontend_component_prepared ?frontend_component)
+        (frontend_component_ready ?frontend_component)
+        (release_bundle_claimed ?release_bundle)
+        (bundle_finalized ?release_bundle)
+        (not
+          (ready_for_release ?frontend_component)
+        )
+      )
+    :effect (ready_for_release ?frontend_component)
+  )
+  (:action finalize_ticket_with_correlation
+    :parameters (?bug_report - ticket ?correlation_token - correlation_token ?test_case - test_case)
+    :precondition
+      (and
+        (ready_for_release ?bug_report)
+        (test_attached_to_entity ?bug_report ?test_case)
+        (correlation_token_available ?correlation_token)
+        (not
+          (entity_committed ?bug_report)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?bug_report)
+        (entity_bound_to_correlation ?bug_report ?correlation_token)
+        (not
+          (correlation_token_available ?correlation_token)
+        )
+      )
+  )
+  (:action commit_fix_and_release_backend_component
+    :parameters (?backend_component - backend_component ?patch_candidate - patch_candidate ?correlation_token - correlation_token)
+    :precondition
+      (and
+        (entity_committed ?backend_component)
+        (assigned_patch ?backend_component ?patch_candidate)
+        (entity_bound_to_correlation ?backend_component ?correlation_token)
+        (not
+          (entity_resolved ?backend_component)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?backend_component)
+        (patch_available ?patch_candidate)
+        (correlation_token_available ?correlation_token)
+      )
+  )
+  (:action commit_fix_and_release_frontend_component
+    :parameters (?frontend_component - frontend_component ?patch_candidate - patch_candidate ?correlation_token - correlation_token)
+    :precondition
+      (and
+        (entity_committed ?frontend_component)
+        (assigned_patch ?frontend_component ?patch_candidate)
+        (entity_bound_to_correlation ?frontend_component ?correlation_token)
+        (not
+          (entity_resolved ?frontend_component)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?frontend_component)
+        (patch_available ?patch_candidate)
+        (correlation_token_available ?correlation_token)
+      )
+  )
+  (:action commit_candidate_release_and_rotate_correlation_token
+    :parameters (?release_candidate - release_candidate ?patch_candidate - patch_candidate ?correlation_token - correlation_token)
+    :precondition
+      (and
+        (entity_committed ?release_candidate)
+        (assigned_patch ?release_candidate ?patch_candidate)
+        (entity_bound_to_correlation ?release_candidate ?correlation_token)
+        (not
+          (entity_resolved ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?release_candidate)
+        (patch_available ?patch_candidate)
+        (correlation_token_available ?correlation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem partial_state_update_inconsistency_scenario)
+  (:domain bugfix_release_pipeline)
+  (:objects backend_component_1 - backend_component frontend_component_1 - frontend_component release_candidate_1 - release_candidate release_candidate_2 - release_candidate patch_candidate_1 - patch_candidate patch_candidate_2 - patch_candidate patch_candidate_3 - patch_candidate test_case_1 - test_case reviewer_1 - reviewer aux_artifact_1 - auxiliary_artifact backend_runtime_1 - backend_runtime frontend_runtime_1 - frontend_runtime release_bundle_alpha - release_bundle config_artifact_a - configuration_artifact config_artifact_b - configuration_artifact feature_flag_x - feature_flag feature_flag_y - feature_flag deployment_credential_a - deployment_credential deployment_credential_b - deployment_credential correlation_token_1 - correlation_token monitoring_hook_1 - monitoring_hook external_linkage_1 - external_linkage_token external_linkage_2 - external_linkage_token external_attestation_1 - external_attestation)
+  (:init
+    (patch_available patch_candidate_1)
+    (patch_available patch_candidate_2)
+    (patch_available patch_candidate_3)
+    (test_available test_case_1)
+    (reviewer_available reviewer_1)
+    (aux_artifact_available aux_artifact_1)
+    (bound_backend_to_runtime backend_component_1 backend_runtime_1)
+    (bound_frontend_to_runtime frontend_component_1 frontend_runtime_1)
+    (release_bundle_available release_bundle_alpha)
+    (config_available config_artifact_a)
+    (config_available config_artifact_b)
+    (release_candidate_targets_backend_component release_candidate_1 backend_component_1)
+    (release_candidate_targets_backend_component release_candidate_2 backend_component_1)
+    (release_candidate_targets_frontend_component release_candidate_1 frontend_component_1)
+    (release_candidate_targets_frontend_component release_candidate_2 frontend_component_1)
+    (release_candidate_includes_release_bundle release_candidate_1 release_bundle_alpha)
+    (release_candidate_includes_release_bundle release_candidate_2 release_bundle_alpha)
+    (release_candidate_has_config release_candidate_1 config_artifact_a)
+    (release_candidate_has_config release_candidate_2 config_artifact_b)
+    (feature_flag_available feature_flag_x)
+    (feature_flag_available feature_flag_y)
+    (deployment_credential_available deployment_credential_a)
+    (deployment_credential_available deployment_credential_b)
+    (correlation_token_available correlation_token_1)
+    (monitoring_hook_available monitoring_hook_1)
+    (external_linkage_available external_linkage_1)
+    (release_candidate_has_external_linkage release_candidate_1 external_linkage_1)
+    (release_candidate_has_external_linkage release_candidate_2 external_linkage_2)
+    (external_attestation_available external_attestation_1)
+  )
+  (:goal
+    (and
+      (entity_resolved backend_component_1)
+      (entity_resolved frontend_component_1)
+      (entity_resolved release_candidate_1)
+      (entity_resolved release_candidate_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_bug_report backend_component_1)
+(assign_patch_to_bug backend_component_1 patch_candidate_1)
+(attach_test_to_bug backend_component_1 test_case_1)
+(promote_bug_to_verified backend_component_1 test_case_1)
+(assign_reviewer_to_bug backend_component_1 reviewer_1)
+(prepare_backend_runtime_for_test backend_component_1 backend_runtime_1 test_case_1)
+(approve_backend_runtime_by_reviewer backend_component_1 backend_runtime_1 reviewer_1)
+(release_reviewer_from_bug backend_component_1 reviewer_1)
+(release_test_from_bug backend_component_1 test_case_1)
+(create_bug_report frontend_component_1)
+(assign_patch_to_bug frontend_component_1 patch_candidate_2)
+(attach_test_to_bug frontend_component_1 test_case_1)
+(promote_bug_to_verified frontend_component_1 test_case_1)
+(assign_reviewer_to_bug frontend_component_1 reviewer_1)
+(prepare_frontend_runtime_for_test frontend_component_1 frontend_runtime_1 test_case_1)
+(approve_frontend_runtime_by_reviewer frontend_component_1 frontend_runtime_1 reviewer_1)
+(release_reviewer_from_bug frontend_component_1 reviewer_1)
+(release_test_from_bug frontend_component_1 test_case_1)
+(assemble_release_bundle backend_component_1 frontend_component_1 backend_runtime_1 frontend_runtime_1 release_bundle_alpha)
+(attach_test_to_bug backend_component_1 test_case_1)
+(finalize_release_bundle_for_component release_bundle_alpha backend_component_1 test_case_1)
+(finalize_backend_component_resolution backend_component_1 release_bundle_alpha)
+(finalize_frontend_component_resolution frontend_component_1 release_bundle_alpha)
+(finalize_ticket_with_correlation backend_component_1 correlation_token_1 test_case_1)
+(commit_fix_and_release_backend_component backend_component_1 patch_candidate_1 correlation_token_1)
+(release_test_from_bug backend_component_1 test_case_1)
+(attach_test_to_bug frontend_component_1 test_case_1)
+(finalize_ticket_with_correlation frontend_component_1 correlation_token_1 test_case_1)
+(commit_fix_and_release_frontend_component frontend_component_1 patch_candidate_2 correlation_token_1)
+(release_test_from_bug frontend_component_1 test_case_1)
+(create_bug_report release_candidate_1)
+(assign_patch_to_bug release_candidate_1 patch_candidate_3)
+(attach_test_to_bug release_candidate_1 test_case_1)
+(promote_bug_to_verified release_candidate_1 test_case_1)
+(attach_config_to_candidate release_candidate_1 config_artifact_a release_bundle_alpha)
+(lock_config_and_prepare_candidate release_candidate_1 config_artifact_a release_bundle_alpha test_case_1)
+(claim_feature_flag_for_candidate release_candidate_1 feature_flag_x)
+(assign_reviewer_to_bug release_candidate_1 reviewer_1)
+(attach_monitoring_hook_to_candidate release_candidate_1 monitoring_hook_1)
+(attach_monitoring_and_prepare_candidate release_candidate_1 monitoring_hook_1 reviewer_1 config_artifact_a release_bundle_alpha)
+(attach_external_attestation_to_candidate release_candidate_1 external_attestation_1)
+(bind_external_attestation_and_prepare_candidate release_candidate_1 external_attestation_1 config_artifact_a release_bundle_alpha)
+(promote_candidate_to_commit_gate release_candidate_1)
+(finalize_ticket_with_correlation release_candidate_1 correlation_token_1 test_case_1)
+(commit_candidate_release_and_rotate_correlation_token release_candidate_1 patch_candidate_3 correlation_token_1)
+(release_test_from_bug release_candidate_1 test_case_1)
+(release_reviewer_from_bug release_candidate_1 reviewer_1)
+(detach_monitoring_hook_from_candidate release_candidate_1 monitoring_hook_1)
+(detach_external_attestation_from_candidate release_candidate_1 external_attestation_1)
+(create_bug_report release_candidate_2)
+(assign_patch_to_bug release_candidate_2 patch_candidate_3)
+(attach_test_to_bug release_candidate_2 test_case_1)
+(promote_bug_to_verified release_candidate_2 test_case_1)
+(attach_config_to_candidate release_candidate_2 config_artifact_b release_bundle_alpha)
+(lock_config_and_prepare_candidate release_candidate_2 config_artifact_b release_bundle_alpha test_case_1)
+(claim_feature_flag_for_candidate release_candidate_2 feature_flag_y)
+(assign_reviewer_to_bug release_candidate_2 reviewer_1)
+(attach_monitoring_hook_to_candidate release_candidate_2 monitoring_hook_1)
+(attach_monitoring_and_prepare_candidate release_candidate_2 monitoring_hook_1 reviewer_1 config_artifact_b release_bundle_alpha)
+(attach_external_attestation_to_candidate release_candidate_2 external_attestation_1)
+(bind_external_attestation_and_prepare_candidate release_candidate_2 external_attestation_1 config_artifact_b release_bundle_alpha)
+(promote_candidate_to_commit_gate release_candidate_2)
+(finalize_ticket_with_correlation release_candidate_2 correlation_token_1 test_case_1)
+(commit_candidate_release_and_rotate_correlation_token release_candidate_2 patch_candidate_3 correlation_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1ux94xnr/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_1ux94xnr/plan.pddl 64 
+
+
+
+--- stderr ---
+

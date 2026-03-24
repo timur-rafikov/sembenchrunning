@@ -1,0 +1,936 @@
+(define (domain multi_party_supply_sharing_coordination_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types agent_role_base - object role_support_base - object equipment_base - object slot_root - object player_slot - slot_root supply_node - agent_role_base specialist_unit - agent_role_base support_unit - agent_role_base upgrade_token - agent_role_base role_tool - agent_role_base mission_marker - agent_role_base upgrade_module - agent_role_base mission_seed - agent_role_base resource_token - role_support_base resource_crate - role_support_base mission_asset - role_support_base route_a - equipment_base route_b - equipment_base shared_container - equipment_base slot_group - player_slot slot_group_alt - player_slot subteam_a - slot_group subteam_b - slot_group party_coordinator - slot_group_alt)
+  (:predicates
+    (participant_claimed ?player_slot - player_slot)
+    (participant_prepared ?player_slot - player_slot)
+    (participant_assigned_node ?player_slot - player_slot)
+    (participant_delivery_committed ?player_slot - player_slot)
+    (participant_ready_for_distribution ?player_slot - player_slot)
+    (participant_delivery_authorized ?player_slot - player_slot)
+    (supply_node_available ?supply_node - supply_node)
+    (participant_assigned_supply_node ?player_slot - player_slot ?supply_node - supply_node)
+    (specialist_available ?specialist_unit - specialist_unit)
+    (participant_assigned_specialist ?player_slot - player_slot ?specialist_unit - specialist_unit)
+    (support_unit_available ?support_unit - support_unit)
+    (participant_assigned_support_unit ?player_slot - player_slot ?support_unit - support_unit)
+    (resource_token_available ?resource_token - resource_token)
+    (subteam_a_has_resource_token ?subteam_a - subteam_a ?resource_token - resource_token)
+    (subteam_b_has_resource_token ?subteam_b - subteam_b ?resource_token - resource_token)
+    (subteam_a_has_route ?subteam_a - subteam_a ?route_a - route_a)
+    (route_a_ready ?route_a - route_a)
+    (route_a_prepared ?route_a - route_a)
+    (subteam_a_ready ?subteam_a - subteam_a)
+    (subteam_b_has_route ?subteam_b - subteam_b ?route_b - route_b)
+    (route_b_ready ?route_b - route_b)
+    (route_b_prepared ?route_b - route_b)
+    (subteam_b_ready ?subteam_b - subteam_b)
+    (container_available ?shared_container - shared_container)
+    (container_reserved ?shared_container - shared_container)
+    (container_connected_route_a ?shared_container - shared_container ?route_a - route_a)
+    (container_connected_route_b ?shared_container - shared_container ?route_b - route_b)
+    (container_route_a_prepared ?shared_container - shared_container)
+    (container_route_b_prepared ?shared_container - shared_container)
+    (container_processing_ready ?shared_container - shared_container)
+    (coordinator_assigned_subteam_a ?party_coordinator - party_coordinator ?subteam_a - subteam_a)
+    (coordinator_assigned_subteam_b ?party_coordinator - party_coordinator ?subteam_b - subteam_b)
+    (coordinator_assigned_container ?party_coordinator - party_coordinator ?shared_container - shared_container)
+    (crate_available ?resource_crate - resource_crate)
+    (coordinator_has_crate ?party_coordinator - party_coordinator ?resource_crate - resource_crate)
+    (crate_processed ?resource_crate - resource_crate)
+    (crate_attached_to_container ?resource_crate - resource_crate ?shared_container - shared_container)
+    (coordinator_crates_ready ?party_coordinator - party_coordinator)
+    (coordinator_module_engaged ?party_coordinator - party_coordinator)
+    (coordinator_sequence_ready ?party_coordinator - party_coordinator)
+    (coordinator_upgrade_flag ?party_coordinator - party_coordinator)
+    (coordinator_upgrade_applied ?party_coordinator - party_coordinator)
+    (coordinator_tool_attached ?party_coordinator - party_coordinator)
+    (coordinator_distribution_executed ?party_coordinator - party_coordinator)
+    (mission_asset_available ?mission_asset - mission_asset)
+    (coordinator_bound_mission_asset ?party_coordinator - party_coordinator ?mission_asset - mission_asset)
+    (coordinator_asset_verified ?party_coordinator - party_coordinator)
+    (coordinator_asset_prepared ?party_coordinator - party_coordinator)
+    (coordinator_asset_ready ?party_coordinator - party_coordinator)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (coordinator_bound_upgrade_token ?party_coordinator - party_coordinator ?upgrade_token - upgrade_token)
+    (role_tool_available ?role_tool - role_tool)
+    (coordinator_has_role_tool ?party_coordinator - party_coordinator ?role_tool - role_tool)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (coordinator_has_upgrade_module ?party_coordinator - party_coordinator ?upgrade_module - upgrade_module)
+    (mission_seed_available ?mission_seed - mission_seed)
+    (coordinator_has_mission_seed ?party_coordinator - party_coordinator ?mission_seed - mission_seed)
+    (mission_marker_available ?mission_marker - mission_marker)
+    (participant_assigned_mission_marker ?player_slot - player_slot ?mission_marker - mission_marker)
+    (subteam_a_ready_for_transfer ?subteam_a - subteam_a)
+    (subteam_b_ready_for_transfer ?subteam_b - subteam_b)
+    (coordinator_finalized ?party_coordinator - party_coordinator)
+  )
+  (:action claim_player_slot
+    :parameters (?player_slot - player_slot)
+    :precondition
+      (and
+        (not
+          (participant_claimed ?player_slot)
+        )
+        (not
+          (participant_delivery_committed ?player_slot)
+        )
+      )
+    :effect (participant_claimed ?player_slot)
+  )
+  (:action bind_slot_to_supply_node
+    :parameters (?player_slot - player_slot ?supply_node - supply_node)
+    :precondition
+      (and
+        (participant_claimed ?player_slot)
+        (not
+          (participant_assigned_node ?player_slot)
+        )
+        (supply_node_available ?supply_node)
+      )
+    :effect
+      (and
+        (participant_assigned_node ?player_slot)
+        (participant_assigned_supply_node ?player_slot ?supply_node)
+        (not
+          (supply_node_available ?supply_node)
+        )
+      )
+  )
+  (:action assign_specialist_to_slot
+    :parameters (?player_slot - player_slot ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_claimed ?player_slot)
+        (participant_assigned_node ?player_slot)
+        (specialist_available ?specialist_unit)
+      )
+    :effect
+      (and
+        (participant_assigned_specialist ?player_slot ?specialist_unit)
+        (not
+          (specialist_available ?specialist_unit)
+        )
+      )
+  )
+  (:action activate_slot_with_specialist
+    :parameters (?player_slot - player_slot ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_claimed ?player_slot)
+        (participant_assigned_node ?player_slot)
+        (participant_assigned_specialist ?player_slot ?specialist_unit)
+        (not
+          (participant_prepared ?player_slot)
+        )
+      )
+    :effect (participant_prepared ?player_slot)
+  )
+  (:action release_specialist_from_slot
+    :parameters (?player_slot - player_slot ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_assigned_specialist ?player_slot ?specialist_unit)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist_unit)
+        (not
+          (participant_assigned_specialist ?player_slot ?specialist_unit)
+        )
+      )
+  )
+  (:action assign_support_unit_to_slot
+    :parameters (?player_slot - player_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (participant_prepared ?player_slot)
+        (support_unit_available ?support_unit)
+      )
+    :effect
+      (and
+        (participant_assigned_support_unit ?player_slot ?support_unit)
+        (not
+          (support_unit_available ?support_unit)
+        )
+      )
+  )
+  (:action release_support_from_slot
+    :parameters (?player_slot - player_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (participant_assigned_support_unit ?player_slot ?support_unit)
+      )
+    :effect
+      (and
+        (support_unit_available ?support_unit)
+        (not
+          (participant_assigned_support_unit ?player_slot ?support_unit)
+        )
+      )
+  )
+  (:action attach_upgrade_module_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (upgrade_module_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (coordinator_has_upgrade_module ?party_coordinator ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action detach_upgrade_module_from_coordinator
+    :parameters (?party_coordinator - party_coordinator ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (coordinator_has_upgrade_module ?party_coordinator ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_module_available ?upgrade_module)
+        (not
+          (coordinator_has_upgrade_module ?party_coordinator ?upgrade_module)
+        )
+      )
+  )
+  (:action attach_mission_seed_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (mission_seed_available ?mission_seed)
+      )
+    :effect
+      (and
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (not
+          (mission_seed_available ?mission_seed)
+        )
+      )
+  )
+  (:action detach_mission_seed_from_coordinator
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed)
+    :precondition
+      (and
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+      )
+    :effect
+      (and
+        (mission_seed_available ?mission_seed)
+        (not
+          (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        )
+      )
+  )
+  (:action set_route_a_ready
+    :parameters (?subteam_a - subteam_a ?route_a - route_a ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_prepared ?subteam_a)
+        (participant_assigned_specialist ?subteam_a ?specialist_unit)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (not
+          (route_a_ready ?route_a)
+        )
+        (not
+          (route_a_prepared ?route_a)
+        )
+      )
+    :effect (route_a_ready ?route_a)
+  )
+  (:action finalize_route_a_with_support
+    :parameters (?subteam_a - subteam_a ?route_a - route_a ?support_unit - support_unit)
+    :precondition
+      (and
+        (participant_prepared ?subteam_a)
+        (participant_assigned_support_unit ?subteam_a ?support_unit)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (route_a_ready ?route_a)
+        (not
+          (subteam_a_ready_for_transfer ?subteam_a)
+        )
+      )
+    :effect
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_a_ready ?subteam_a)
+      )
+  )
+  (:action attach_resource_token_to_subteam_a
+    :parameters (?subteam_a - subteam_a ?route_a - route_a ?resource_token - resource_token)
+    :precondition
+      (and
+        (participant_prepared ?subteam_a)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (resource_token_available ?resource_token)
+        (not
+          (subteam_a_ready_for_transfer ?subteam_a)
+        )
+      )
+    :effect
+      (and
+        (route_a_prepared ?route_a)
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_a_has_resource_token ?subteam_a ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action transfer_resource_on_route_a
+    :parameters (?subteam_a - subteam_a ?route_a - route_a ?specialist_unit - specialist_unit ?resource_token - resource_token)
+    :precondition
+      (and
+        (participant_prepared ?subteam_a)
+        (participant_assigned_specialist ?subteam_a ?specialist_unit)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (route_a_prepared ?route_a)
+        (subteam_a_has_resource_token ?subteam_a ?resource_token)
+        (not
+          (subteam_a_ready ?subteam_a)
+        )
+      )
+    :effect
+      (and
+        (route_a_ready ?route_a)
+        (subteam_a_ready ?subteam_a)
+        (resource_token_available ?resource_token)
+        (not
+          (subteam_a_has_resource_token ?subteam_a ?resource_token)
+        )
+      )
+  )
+  (:action set_route_b_ready
+    :parameters (?subteam_b - subteam_b ?route_b - route_b ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_prepared ?subteam_b)
+        (participant_assigned_specialist ?subteam_b ?specialist_unit)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (not
+          (route_b_ready ?route_b)
+        )
+        (not
+          (route_b_prepared ?route_b)
+        )
+      )
+    :effect (route_b_ready ?route_b)
+  )
+  (:action finalize_route_b_with_support
+    :parameters (?subteam_b - subteam_b ?route_b - route_b ?support_unit - support_unit)
+    :precondition
+      (and
+        (participant_prepared ?subteam_b)
+        (participant_assigned_support_unit ?subteam_b ?support_unit)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_b_ready ?route_b)
+        (not
+          (subteam_b_ready_for_transfer ?subteam_b)
+        )
+      )
+    :effect
+      (and
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_b_ready ?subteam_b)
+      )
+  )
+  (:action attach_resource_token_to_subteam_b
+    :parameters (?subteam_b - subteam_b ?route_b - route_b ?resource_token - resource_token)
+    :precondition
+      (and
+        (participant_prepared ?subteam_b)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (resource_token_available ?resource_token)
+        (not
+          (subteam_b_ready_for_transfer ?subteam_b)
+        )
+      )
+    :effect
+      (and
+        (route_b_prepared ?route_b)
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_b_has_resource_token ?subteam_b ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action transfer_resource_on_route_b
+    :parameters (?subteam_b - subteam_b ?route_b - route_b ?specialist_unit - specialist_unit ?resource_token - resource_token)
+    :precondition
+      (and
+        (participant_prepared ?subteam_b)
+        (participant_assigned_specialist ?subteam_b ?specialist_unit)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_b_prepared ?route_b)
+        (subteam_b_has_resource_token ?subteam_b ?resource_token)
+        (not
+          (subteam_b_ready ?subteam_b)
+        )
+      )
+    :effect
+      (and
+        (route_b_ready ?route_b)
+        (subteam_b_ready ?subteam_b)
+        (resource_token_available ?resource_token)
+        (not
+          (subteam_b_has_resource_token ?subteam_b ?resource_token)
+        )
+      )
+  )
+  (:action assemble_container_from_routes
+    :parameters (?subteam_a - subteam_a ?subteam_b - subteam_b ?route_a - route_a ?route_b - route_b ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_a_ready ?route_a)
+        (route_b_ready ?route_b)
+        (subteam_a_ready ?subteam_a)
+        (subteam_b_ready ?subteam_b)
+        (container_available ?shared_container)
+      )
+    :effect
+      (and
+        (container_reserved ?shared_container)
+        (container_connected_route_a ?shared_container ?route_a)
+        (container_connected_route_b ?shared_container ?route_b)
+        (not
+          (container_available ?shared_container)
+        )
+      )
+  )
+  (:action assemble_container_route_a_prepared
+    :parameters (?subteam_a - subteam_a ?subteam_b - subteam_b ?route_a - route_a ?route_b - route_b ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_a_prepared ?route_a)
+        (route_b_ready ?route_b)
+        (not
+          (subteam_a_ready ?subteam_a)
+        )
+        (subteam_b_ready ?subteam_b)
+        (container_available ?shared_container)
+      )
+    :effect
+      (and
+        (container_reserved ?shared_container)
+        (container_connected_route_a ?shared_container ?route_a)
+        (container_connected_route_b ?shared_container ?route_b)
+        (container_route_a_prepared ?shared_container)
+        (not
+          (container_available ?shared_container)
+        )
+      )
+  )
+  (:action assemble_container_route_b_prepared
+    :parameters (?subteam_a - subteam_a ?subteam_b - subteam_b ?route_a - route_a ?route_b - route_b ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_a_ready ?route_a)
+        (route_b_prepared ?route_b)
+        (subteam_a_ready ?subteam_a)
+        (not
+          (subteam_b_ready ?subteam_b)
+        )
+        (container_available ?shared_container)
+      )
+    :effect
+      (and
+        (container_reserved ?shared_container)
+        (container_connected_route_a ?shared_container ?route_a)
+        (container_connected_route_b ?shared_container ?route_b)
+        (container_route_b_prepared ?shared_container)
+        (not
+          (container_available ?shared_container)
+        )
+      )
+  )
+  (:action assemble_container_routes_both_prepared
+    :parameters (?subteam_a - subteam_a ?subteam_b - subteam_b ?route_a - route_a ?route_b - route_b ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_a_has_route ?subteam_a ?route_a)
+        (subteam_b_has_route ?subteam_b ?route_b)
+        (route_a_prepared ?route_a)
+        (route_b_prepared ?route_b)
+        (not
+          (subteam_a_ready ?subteam_a)
+        )
+        (not
+          (subteam_b_ready ?subteam_b)
+        )
+        (container_available ?shared_container)
+      )
+    :effect
+      (and
+        (container_reserved ?shared_container)
+        (container_connected_route_a ?shared_container ?route_a)
+        (container_connected_route_b ?shared_container ?route_b)
+        (container_route_a_prepared ?shared_container)
+        (container_route_b_prepared ?shared_container)
+        (not
+          (container_available ?shared_container)
+        )
+      )
+  )
+  (:action mark_container_ready_for_processing
+    :parameters (?shared_container - shared_container ?subteam_a - subteam_a ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (container_reserved ?shared_container)
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (participant_assigned_specialist ?subteam_a ?specialist_unit)
+        (not
+          (container_processing_ready ?shared_container)
+        )
+      )
+    :effect (container_processing_ready ?shared_container)
+  )
+  (:action process_and_attach_crate_to_container
+    :parameters (?party_coordinator - party_coordinator ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (coordinator_assigned_container ?party_coordinator ?shared_container)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_available ?resource_crate)
+        (container_reserved ?shared_container)
+        (container_processing_ready ?shared_container)
+        (not
+          (crate_processed ?resource_crate)
+        )
+      )
+    :effect
+      (and
+        (crate_processed ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (not
+          (crate_available ?resource_crate)
+        )
+      )
+  )
+  (:action finalize_crate_processing_for_coordinator
+    :parameters (?party_coordinator - party_coordinator ?resource_crate - resource_crate ?shared_container - shared_container ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_processed ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (participant_assigned_specialist ?party_coordinator ?specialist_unit)
+        (not
+          (container_route_a_prepared ?shared_container)
+        )
+        (not
+          (coordinator_crates_ready ?party_coordinator)
+        )
+      )
+    :effect (coordinator_crates_ready ?party_coordinator)
+  )
+  (:action attach_upgrade_token_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (upgrade_token_available ?upgrade_token)
+        (not
+          (coordinator_upgrade_flag ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_upgrade_flag ?party_coordinator)
+        (coordinator_bound_upgrade_token ?party_coordinator ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action enable_coordinator_processing_with_upgrade
+    :parameters (?party_coordinator - party_coordinator ?resource_crate - resource_crate ?shared_container - shared_container ?specialist_unit - specialist_unit ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_processed ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (participant_assigned_specialist ?party_coordinator ?specialist_unit)
+        (container_route_a_prepared ?shared_container)
+        (coordinator_upgrade_flag ?party_coordinator)
+        (coordinator_bound_upgrade_token ?party_coordinator ?upgrade_token)
+        (not
+          (coordinator_crates_ready ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_crates_ready ?party_coordinator)
+        (coordinator_upgrade_applied ?party_coordinator)
+      )
+  )
+  (:action initiate_module_sequence
+    :parameters (?party_coordinator - party_coordinator ?upgrade_module - upgrade_module ?support_unit - support_unit ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_crates_ready ?party_coordinator)
+        (coordinator_has_upgrade_module ?party_coordinator ?upgrade_module)
+        (participant_assigned_support_unit ?party_coordinator ?support_unit)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (not
+          (container_route_b_prepared ?shared_container)
+        )
+        (not
+          (coordinator_module_engaged ?party_coordinator)
+        )
+      )
+    :effect (coordinator_module_engaged ?party_coordinator)
+  )
+  (:action initiate_module_sequence_alternate
+    :parameters (?party_coordinator - party_coordinator ?upgrade_module - upgrade_module ?support_unit - support_unit ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_crates_ready ?party_coordinator)
+        (coordinator_has_upgrade_module ?party_coordinator ?upgrade_module)
+        (participant_assigned_support_unit ?party_coordinator ?support_unit)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (container_route_b_prepared ?shared_container)
+        (not
+          (coordinator_module_engaged ?party_coordinator)
+        )
+      )
+    :effect (coordinator_module_engaged ?party_coordinator)
+  )
+  (:action complete_module_sequence_set_ready
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_module_engaged ?party_coordinator)
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (not
+          (container_route_a_prepared ?shared_container)
+        )
+        (not
+          (container_route_b_prepared ?shared_container)
+        )
+        (not
+          (coordinator_sequence_ready ?party_coordinator)
+        )
+      )
+    :effect (coordinator_sequence_ready ?party_coordinator)
+  )
+  (:action complete_module_sequence_set_ready_with_tool
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_module_engaged ?party_coordinator)
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (container_route_a_prepared ?shared_container)
+        (not
+          (container_route_b_prepared ?shared_container)
+        )
+        (not
+          (coordinator_sequence_ready ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_tool_attached ?party_coordinator)
+      )
+  )
+  (:action complete_module_sequence_attach_tool_variant
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_module_engaged ?party_coordinator)
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (not
+          (container_route_a_prepared ?shared_container)
+        )
+        (container_route_b_prepared ?shared_container)
+        (not
+          (coordinator_sequence_ready ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_tool_attached ?party_coordinator)
+      )
+  )
+  (:action complete_module_sequence_attach_tool_both_flags
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed ?resource_crate - resource_crate ?shared_container - shared_container)
+    :precondition
+      (and
+        (coordinator_module_engaged ?party_coordinator)
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (coordinator_has_crate ?party_coordinator ?resource_crate)
+        (crate_attached_to_container ?resource_crate ?shared_container)
+        (container_route_a_prepared ?shared_container)
+        (container_route_b_prepared ?shared_container)
+        (not
+          (coordinator_sequence_ready ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_tool_attached ?party_coordinator)
+      )
+  )
+  (:action finalize_coordinator_sequence
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (not
+          (coordinator_tool_attached ?party_coordinator)
+        )
+        (not
+          (coordinator_finalized ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?party_coordinator)
+        (participant_ready_for_distribution ?party_coordinator)
+      )
+  )
+  (:action attach_role_tool_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?role_tool - role_tool)
+    :precondition
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_tool_attached ?party_coordinator)
+        (role_tool_available ?role_tool)
+      )
+    :effect
+      (and
+        (coordinator_has_role_tool ?party_coordinator ?role_tool)
+        (not
+          (role_tool_available ?role_tool)
+        )
+      )
+  )
+  (:action execute_coordinator_distribution_action
+    :parameters (?party_coordinator - party_coordinator ?subteam_a - subteam_a ?subteam_b - subteam_b ?specialist_unit - specialist_unit ?role_tool - role_tool)
+    :precondition
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_tool_attached ?party_coordinator)
+        (coordinator_has_role_tool ?party_coordinator ?role_tool)
+        (coordinator_assigned_subteam_a ?party_coordinator ?subteam_a)
+        (coordinator_assigned_subteam_b ?party_coordinator ?subteam_b)
+        (subteam_a_ready ?subteam_a)
+        (subteam_b_ready ?subteam_b)
+        (participant_assigned_specialist ?party_coordinator ?specialist_unit)
+        (not
+          (coordinator_distribution_executed ?party_coordinator)
+        )
+      )
+    :effect (coordinator_distribution_executed ?party_coordinator)
+  )
+  (:action confirm_coordinator_distribution
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (coordinator_sequence_ready ?party_coordinator)
+        (coordinator_distribution_executed ?party_coordinator)
+        (not
+          (coordinator_finalized ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?party_coordinator)
+        (participant_ready_for_distribution ?party_coordinator)
+      )
+  )
+  (:action attach_mission_asset_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?mission_asset - mission_asset ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_prepared ?party_coordinator)
+        (participant_assigned_specialist ?party_coordinator ?specialist_unit)
+        (mission_asset_available ?mission_asset)
+        (coordinator_bound_mission_asset ?party_coordinator ?mission_asset)
+        (not
+          (coordinator_asset_verified ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_asset_verified ?party_coordinator)
+        (not
+          (mission_asset_available ?mission_asset)
+        )
+      )
+  )
+  (:action prepare_coordinator_with_asset_support
+    :parameters (?party_coordinator - party_coordinator ?support_unit - support_unit)
+    :precondition
+      (and
+        (coordinator_asset_verified ?party_coordinator)
+        (participant_assigned_support_unit ?party_coordinator ?support_unit)
+        (not
+          (coordinator_asset_prepared ?party_coordinator)
+        )
+      )
+    :effect (coordinator_asset_prepared ?party_coordinator)
+  )
+  (:action verify_coordinator_asset_with_seed
+    :parameters (?party_coordinator - party_coordinator ?mission_seed - mission_seed)
+    :precondition
+      (and
+        (coordinator_asset_prepared ?party_coordinator)
+        (coordinator_has_mission_seed ?party_coordinator ?mission_seed)
+        (not
+          (coordinator_asset_ready ?party_coordinator)
+        )
+      )
+    :effect (coordinator_asset_ready ?party_coordinator)
+  )
+  (:action confirm_coordinator_asset_and_mark_distribution
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (coordinator_asset_ready ?party_coordinator)
+        (not
+          (coordinator_finalized ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?party_coordinator)
+        (participant_ready_for_distribution ?party_coordinator)
+      )
+  )
+  (:action commit_subteam_a_delivery
+    :parameters (?subteam_a - subteam_a ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_a_ready_for_transfer ?subteam_a)
+        (subteam_a_ready ?subteam_a)
+        (container_reserved ?shared_container)
+        (container_processing_ready ?shared_container)
+        (not
+          (participant_ready_for_distribution ?subteam_a)
+        )
+      )
+    :effect (participant_ready_for_distribution ?subteam_a)
+  )
+  (:action commit_subteam_b_delivery
+    :parameters (?subteam_b - subteam_b ?shared_container - shared_container)
+    :precondition
+      (and
+        (subteam_b_ready_for_transfer ?subteam_b)
+        (subteam_b_ready ?subteam_b)
+        (container_reserved ?shared_container)
+        (container_processing_ready ?shared_container)
+        (not
+          (participant_ready_for_distribution ?subteam_b)
+        )
+      )
+    :effect (participant_ready_for_distribution ?subteam_b)
+  )
+  (:action assign_mission_marker_to_slot
+    :parameters (?player_slot - player_slot ?mission_marker - mission_marker ?specialist_unit - specialist_unit)
+    :precondition
+      (and
+        (participant_ready_for_distribution ?player_slot)
+        (participant_assigned_specialist ?player_slot ?specialist_unit)
+        (mission_marker_available ?mission_marker)
+        (not
+          (participant_delivery_authorized ?player_slot)
+        )
+      )
+    :effect
+      (and
+        (participant_delivery_authorized ?player_slot)
+        (participant_assigned_mission_marker ?player_slot ?mission_marker)
+        (not
+          (mission_marker_available ?mission_marker)
+        )
+      )
+  )
+  (:action commit_subteam_a_delivery_and_release_node
+    :parameters (?subteam_a - subteam_a ?supply_node - supply_node ?mission_marker - mission_marker)
+    :precondition
+      (and
+        (participant_delivery_authorized ?subteam_a)
+        (participant_assigned_supply_node ?subteam_a ?supply_node)
+        (participant_assigned_mission_marker ?subteam_a ?mission_marker)
+        (not
+          (participant_delivery_committed ?subteam_a)
+        )
+      )
+    :effect
+      (and
+        (participant_delivery_committed ?subteam_a)
+        (supply_node_available ?supply_node)
+        (mission_marker_available ?mission_marker)
+      )
+  )
+  (:action commit_subteam_b_delivery_and_release_node
+    :parameters (?subteam_b - subteam_b ?supply_node - supply_node ?mission_marker - mission_marker)
+    :precondition
+      (and
+        (participant_delivery_authorized ?subteam_b)
+        (participant_assigned_supply_node ?subteam_b ?supply_node)
+        (participant_assigned_mission_marker ?subteam_b ?mission_marker)
+        (not
+          (participant_delivery_committed ?subteam_b)
+        )
+      )
+    :effect
+      (and
+        (participant_delivery_committed ?subteam_b)
+        (supply_node_available ?supply_node)
+        (mission_marker_available ?mission_marker)
+      )
+  )
+  (:action commit_coordinator_delivery_and_release_node
+    :parameters (?party_coordinator - party_coordinator ?supply_node - supply_node ?mission_marker - mission_marker)
+    :precondition
+      (and
+        (participant_delivery_authorized ?party_coordinator)
+        (participant_assigned_supply_node ?party_coordinator ?supply_node)
+        (participant_assigned_mission_marker ?party_coordinator ?mission_marker)
+        (not
+          (participant_delivery_committed ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (participant_delivery_committed ?party_coordinator)
+        (supply_node_available ?supply_node)
+        (mission_marker_available ?mission_marker)
+      )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain luggage_storage_stop_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types infrastructure_asset_category - object transport_mode_category - object service_component_category - object facility_category - object itinerary - facility_category vehicle_resource_token - infrastructure_asset_category time_slot - infrastructure_asset_category operator_entity - infrastructure_asset_category payment_option - infrastructure_asset_category access_permit - infrastructure_asset_category storage_receipt - infrastructure_asset_category equipment_unit - infrastructure_asset_category service_slot - infrastructure_asset_category luggage_unit - transport_mode_category storage_container - transport_mode_category conditional_offer - transport_mode_category pickup_location_option - service_component_category dropoff_location_option - service_component_category transfer_vehicle_instance - service_component_category leg_category - itinerary facility_role_category - itinerary incoming_leg - leg_category outgoing_leg - leg_category storage_facility - facility_role_category)
+  (:predicates
+    (booking_registered ?itinerary - itinerary)
+    (booking_confirmed ?itinerary - itinerary)
+    (booking_vehicle_reserved ?itinerary - itinerary)
+    (handoff_completed ?itinerary - itinerary)
+    (handoff_acknowledged ?itinerary - itinerary)
+    (storage_assigned ?itinerary - itinerary)
+    (vehicle_token_available ?vehicle_token - vehicle_resource_token)
+    (booking_vehicle_token_binding ?itinerary - itinerary ?vehicle_token - vehicle_resource_token)
+    (time_slot_available ?time_slot - time_slot)
+    (booking_time_slot_binding ?itinerary - itinerary ?time_slot - time_slot)
+    (operator_available ?operator - operator_entity)
+    (booking_operator_assignment ?itinerary - itinerary ?operator - operator_entity)
+    (luggage_unit_available ?luggage_unit - luggage_unit)
+    (incoming_leg_luggage_staged ?incoming_leg - incoming_leg ?luggage_unit - luggage_unit)
+    (outgoing_leg_luggage_staged ?outgoing_leg - outgoing_leg ?luggage_unit - luggage_unit)
+    (incoming_leg_pickup_option ?incoming_leg - incoming_leg ?pickup_option - pickup_location_option)
+    (pickup_option_ready ?pickup_option - pickup_location_option)
+    (pickup_option_reserved ?pickup_option - pickup_location_option)
+    (incoming_leg_ready ?incoming_leg - incoming_leg)
+    (outgoing_leg_dropoff_option ?outgoing_leg - outgoing_leg ?dropoff_option - dropoff_location_option)
+    (dropoff_option_ready ?dropoff_option - dropoff_location_option)
+    (dropoff_option_reserved ?dropoff_option - dropoff_location_option)
+    (outgoing_leg_ready ?outgoing_leg - outgoing_leg)
+    (vehicle_instance_available ?vehicle_instance - transfer_vehicle_instance)
+    (vehicle_instance_allocated ?vehicle_instance - transfer_vehicle_instance)
+    (vehicle_instance_assigned_pickup ?vehicle_instance - transfer_vehicle_instance ?pickup_option - pickup_location_option)
+    (vehicle_instance_assigned_dropoff ?vehicle_instance - transfer_vehicle_instance ?dropoff_option - dropoff_location_option)
+    (vehicle_pickup_confirmed ?vehicle_instance - transfer_vehicle_instance)
+    (vehicle_dropoff_confirmed ?vehicle_instance - transfer_vehicle_instance)
+    (vehicle_prepared ?vehicle_instance - transfer_vehicle_instance)
+    (storage_facility_serves_incoming_leg ?storage_facility - storage_facility ?incoming_leg - incoming_leg)
+    (storage_facility_serves_outgoing_leg ?storage_facility - storage_facility ?outgoing_leg - outgoing_leg)
+    (storage_facility_assigned_vehicle_instance ?storage_facility - storage_facility ?vehicle_instance - transfer_vehicle_instance)
+    (storage_container_available ?storage_container - storage_container)
+    (storage_facility_has_container ?storage_facility - storage_facility ?storage_container - storage_container)
+    (storage_container_reserved ?storage_container - storage_container)
+    (storage_container_assigned_vehicle_instance ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    (storage_facility_container_provisioned ?storage_facility - storage_facility)
+    (storage_facility_equipment_ready ?storage_facility - storage_facility)
+    (facility_ready_for_handoff ?storage_facility - storage_facility)
+    (facility_payment_activated ?storage_facility - storage_facility)
+    (facility_payment_confirmed ?storage_facility - storage_facility)
+    (facility_access_ready ?storage_facility - storage_facility)
+    (facility_final_handoff_processed ?storage_facility - storage_facility)
+    (conditional_offer_available ?conditional_offer - conditional_offer)
+    (storage_facility_conditional_offer_binding ?storage_facility - storage_facility ?conditional_offer - conditional_offer)
+    (facility_offer_active ?storage_facility - storage_facility)
+    (facility_offer_authorized ?storage_facility - storage_facility)
+    (facility_offer_executed ?storage_facility - storage_facility)
+    (payment_option_available ?payment_option - payment_option)
+    (facility_payment_option_binding ?storage_facility - storage_facility ?payment_option - payment_option)
+    (access_permit_available ?access_permit - access_permit)
+    (facility_access_permit_binding ?storage_facility - storage_facility ?access_permit - access_permit)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (facility_equipment_assignment ?storage_facility - storage_facility ?equipment_unit - equipment_unit)
+    (service_slot_available ?service_slot - service_slot)
+    (facility_service_slot_assignment ?storage_facility - storage_facility ?service_slot - service_slot)
+    (storage_receipt_available ?storage_receipt - storage_receipt)
+    (booking_storage_receipt_binding ?itinerary - itinerary ?storage_receipt - storage_receipt)
+    (incoming_leg_buffered ?incoming_leg - incoming_leg)
+    (outgoing_leg_buffered ?outgoing_leg - outgoing_leg)
+    (facility_finalized ?storage_facility - storage_facility)
+  )
+  (:action register_itinerary
+    :parameters (?itinerary - itinerary)
+    :precondition
+      (and
+        (not
+          (booking_registered ?itinerary)
+        )
+        (not
+          (handoff_completed ?itinerary)
+        )
+      )
+    :effect (booking_registered ?itinerary)
+  )
+  (:action reserve_vehicle_for_itinerary
+    :parameters (?itinerary - itinerary ?vehicle_token - vehicle_resource_token)
+    :precondition
+      (and
+        (booking_registered ?itinerary)
+        (not
+          (booking_vehicle_reserved ?itinerary)
+        )
+        (vehicle_token_available ?vehicle_token)
+      )
+    :effect
+      (and
+        (booking_vehicle_reserved ?itinerary)
+        (booking_vehicle_token_binding ?itinerary ?vehicle_token)
+        (not
+          (vehicle_token_available ?vehicle_token)
+        )
+      )
+  )
+  (:action allocate_time_slot_to_itinerary
+    :parameters (?itinerary - itinerary ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_registered ?itinerary)
+        (booking_vehicle_reserved ?itinerary)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (booking_time_slot_binding ?itinerary ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_itinerary_schedule
+    :parameters (?itinerary - itinerary ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_registered ?itinerary)
+        (booking_vehicle_reserved ?itinerary)
+        (booking_time_slot_binding ?itinerary ?time_slot)
+        (not
+          (booking_confirmed ?itinerary)
+        )
+      )
+    :effect (booking_confirmed ?itinerary)
+  )
+  (:action release_time_slot_for_itinerary
+    :parameters (?itinerary - itinerary ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_time_slot_binding ?itinerary ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (booking_time_slot_binding ?itinerary ?time_slot)
+        )
+      )
+  )
+  (:action assign_operator_to_itinerary
+    :parameters (?itinerary - itinerary ?operator - operator_entity)
+    :precondition
+      (and
+        (booking_confirmed ?itinerary)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (booking_operator_assignment ?itinerary ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_itinerary
+    :parameters (?itinerary - itinerary ?operator - operator_entity)
+    :precondition
+      (and
+        (booking_operator_assignment ?itinerary ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (booking_operator_assignment ?itinerary ?operator)
+        )
+      )
+  )
+  (:action provision_equipment_to_facility
+    :parameters (?storage_facility - storage_facility ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (facility_equipment_assignment ?storage_facility ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action release_equipment_from_facility
+    :parameters (?storage_facility - storage_facility ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (facility_equipment_assignment ?storage_facility ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_unit)
+        (not
+          (facility_equipment_assignment ?storage_facility ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_service_slot_to_facility
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (service_slot_available ?service_slot)
+      )
+    :effect
+      (and
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (not
+          (service_slot_available ?service_slot)
+        )
+      )
+  )
+  (:action release_service_slot_from_facility
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot)
+    :precondition
+      (and
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+      )
+    :effect
+      (and
+        (service_slot_available ?service_slot)
+        (not
+          (facility_service_slot_assignment ?storage_facility ?service_slot)
+        )
+      )
+  )
+  (:action prepare_incoming_leg_pickup
+    :parameters (?incoming_leg - incoming_leg ?pickup_option - pickup_location_option ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_confirmed ?incoming_leg)
+        (booking_time_slot_binding ?incoming_leg ?time_slot)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (not
+          (pickup_option_ready ?pickup_option)
+        )
+        (not
+          (pickup_option_reserved ?pickup_option)
+        )
+      )
+    :effect (pickup_option_ready ?pickup_option)
+  )
+  (:action confirm_incoming_pickup_with_operator
+    :parameters (?incoming_leg - incoming_leg ?pickup_option - pickup_location_option ?operator - operator_entity)
+    :precondition
+      (and
+        (booking_confirmed ?incoming_leg)
+        (booking_operator_assignment ?incoming_leg ?operator)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (pickup_option_ready ?pickup_option)
+        (not
+          (incoming_leg_buffered ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (incoming_leg_ready ?incoming_leg)
+      )
+  )
+  (:action reserve_pickup_option_and_container
+    :parameters (?incoming_leg - incoming_leg ?pickup_option - pickup_location_option ?luggage_unit - luggage_unit)
+    :precondition
+      (and
+        (booking_confirmed ?incoming_leg)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (luggage_unit_available ?luggage_unit)
+        (not
+          (incoming_leg_buffered ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_option_reserved ?pickup_option)
+        (incoming_leg_buffered ?incoming_leg)
+        (incoming_leg_luggage_staged ?incoming_leg ?luggage_unit)
+        (not
+          (luggage_unit_available ?luggage_unit)
+        )
+      )
+  )
+  (:action finalize_incoming_pickup
+    :parameters (?incoming_leg - incoming_leg ?pickup_option - pickup_location_option ?time_slot - time_slot ?luggage_unit - luggage_unit)
+    :precondition
+      (and
+        (booking_confirmed ?incoming_leg)
+        (booking_time_slot_binding ?incoming_leg ?time_slot)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (pickup_option_reserved ?pickup_option)
+        (incoming_leg_luggage_staged ?incoming_leg ?luggage_unit)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_option_ready ?pickup_option)
+        (incoming_leg_ready ?incoming_leg)
+        (luggage_unit_available ?luggage_unit)
+        (not
+          (incoming_leg_luggage_staged ?incoming_leg ?luggage_unit)
+        )
+      )
+  )
+  (:action prepare_outgoing_leg_dropoff
+    :parameters (?outgoing_leg - outgoing_leg ?dropoff_option - dropoff_location_option ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_confirmed ?outgoing_leg)
+        (booking_time_slot_binding ?outgoing_leg ?time_slot)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (not
+          (dropoff_option_ready ?dropoff_option)
+        )
+        (not
+          (dropoff_option_reserved ?dropoff_option)
+        )
+      )
+    :effect (dropoff_option_ready ?dropoff_option)
+  )
+  (:action confirm_outgoing_dropoff_with_operator
+    :parameters (?outgoing_leg - outgoing_leg ?dropoff_option - dropoff_location_option ?operator - operator_entity)
+    :precondition
+      (and
+        (booking_confirmed ?outgoing_leg)
+        (booking_operator_assignment ?outgoing_leg ?operator)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (dropoff_option_ready ?dropoff_option)
+        (not
+          (outgoing_leg_buffered ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (outgoing_leg_buffered ?outgoing_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+      )
+  )
+  (:action reserve_dropoff_option_and_container
+    :parameters (?outgoing_leg - outgoing_leg ?dropoff_option - dropoff_location_option ?luggage_unit - luggage_unit)
+    :precondition
+      (and
+        (booking_confirmed ?outgoing_leg)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (luggage_unit_available ?luggage_unit)
+        (not
+          (outgoing_leg_buffered ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (dropoff_option_reserved ?dropoff_option)
+        (outgoing_leg_buffered ?outgoing_leg)
+        (outgoing_leg_luggage_staged ?outgoing_leg ?luggage_unit)
+        (not
+          (luggage_unit_available ?luggage_unit)
+        )
+      )
+  )
+  (:action finalize_outgoing_dropoff
+    :parameters (?outgoing_leg - outgoing_leg ?dropoff_option - dropoff_location_option ?time_slot - time_slot ?luggage_unit - luggage_unit)
+    :precondition
+      (and
+        (booking_confirmed ?outgoing_leg)
+        (booking_time_slot_binding ?outgoing_leg ?time_slot)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (dropoff_option_reserved ?dropoff_option)
+        (outgoing_leg_luggage_staged ?outgoing_leg ?luggage_unit)
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (dropoff_option_ready ?dropoff_option)
+        (outgoing_leg_ready ?outgoing_leg)
+        (luggage_unit_available ?luggage_unit)
+        (not
+          (outgoing_leg_luggage_staged ?outgoing_leg ?luggage_unit)
+        )
+      )
+  )
+  (:action assign_transfer_vehicle_instance
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?pickup_option - pickup_location_option ?dropoff_option - dropoff_location_option ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (outgoing_leg_buffered ?outgoing_leg)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (pickup_option_ready ?pickup_option)
+        (dropoff_option_ready ?dropoff_option)
+        (incoming_leg_ready ?incoming_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (vehicle_instance_available ?vehicle_instance)
+      )
+    :effect
+      (and
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_instance_assigned_pickup ?vehicle_instance ?pickup_option)
+        (vehicle_instance_assigned_dropoff ?vehicle_instance ?dropoff_option)
+        (not
+          (vehicle_instance_available ?vehicle_instance)
+        )
+      )
+  )
+  (:action assign_transfer_vehicle_for_reserved_pickup
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?pickup_option - pickup_location_option ?dropoff_option - dropoff_location_option ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (outgoing_leg_buffered ?outgoing_leg)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (pickup_option_reserved ?pickup_option)
+        (dropoff_option_ready ?dropoff_option)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+        (outgoing_leg_ready ?outgoing_leg)
+        (vehicle_instance_available ?vehicle_instance)
+      )
+    :effect
+      (and
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_instance_assigned_pickup ?vehicle_instance ?pickup_option)
+        (vehicle_instance_assigned_dropoff ?vehicle_instance ?dropoff_option)
+        (vehicle_pickup_confirmed ?vehicle_instance)
+        (not
+          (vehicle_instance_available ?vehicle_instance)
+        )
+      )
+  )
+  (:action assign_transfer_vehicle_for_reserved_dropoff
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?pickup_option - pickup_location_option ?dropoff_option - dropoff_location_option ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (outgoing_leg_buffered ?outgoing_leg)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (pickup_option_ready ?pickup_option)
+        (dropoff_option_reserved ?dropoff_option)
+        (incoming_leg_ready ?incoming_leg)
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+        (vehicle_instance_available ?vehicle_instance)
+      )
+    :effect
+      (and
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_instance_assigned_pickup ?vehicle_instance ?pickup_option)
+        (vehicle_instance_assigned_dropoff ?vehicle_instance ?dropoff_option)
+        (vehicle_dropoff_confirmed ?vehicle_instance)
+        (not
+          (vehicle_instance_available ?vehicle_instance)
+        )
+      )
+  )
+  (:action assign_transfer_vehicle_with_both_reservations
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?pickup_option - pickup_location_option ?dropoff_option - dropoff_location_option ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (outgoing_leg_buffered ?outgoing_leg)
+        (incoming_leg_pickup_option ?incoming_leg ?pickup_option)
+        (outgoing_leg_dropoff_option ?outgoing_leg ?dropoff_option)
+        (pickup_option_reserved ?pickup_option)
+        (dropoff_option_reserved ?dropoff_option)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+        (vehicle_instance_available ?vehicle_instance)
+      )
+    :effect
+      (and
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_instance_assigned_pickup ?vehicle_instance ?pickup_option)
+        (vehicle_instance_assigned_dropoff ?vehicle_instance ?dropoff_option)
+        (vehicle_pickup_confirmed ?vehicle_instance)
+        (vehicle_dropoff_confirmed ?vehicle_instance)
+        (not
+          (vehicle_instance_available ?vehicle_instance)
+        )
+      )
+  )
+  (:action prepare_vehicle_for_handling
+    :parameters (?vehicle_instance - transfer_vehicle_instance ?incoming_leg - incoming_leg ?time_slot - time_slot)
+    :precondition
+      (and
+        (vehicle_instance_allocated ?vehicle_instance)
+        (incoming_leg_buffered ?incoming_leg)
+        (booking_time_slot_binding ?incoming_leg ?time_slot)
+        (not
+          (vehicle_prepared ?vehicle_instance)
+        )
+      )
+    :effect (vehicle_prepared ?vehicle_instance)
+  )
+  (:action reserve_storage_container_for_facility
+    :parameters (?storage_facility - storage_facility ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (storage_facility_assigned_vehicle_instance ?storage_facility ?vehicle_instance)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_available ?storage_container)
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_prepared ?vehicle_instance)
+        (not
+          (storage_container_reserved ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (storage_container_reserved ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (not
+          (storage_container_available ?storage_container)
+        )
+      )
+  )
+  (:action provision_storage_container
+    :parameters (?storage_facility - storage_facility ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_reserved ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (booking_time_slot_binding ?storage_facility ?time_slot)
+        (not
+          (vehicle_pickup_confirmed ?vehicle_instance)
+        )
+        (not
+          (storage_facility_container_provisioned ?storage_facility)
+        )
+      )
+    :effect (storage_facility_container_provisioned ?storage_facility)
+  )
+  (:action activate_payment_option
+    :parameters (?storage_facility - storage_facility ?payment_option - payment_option)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (payment_option_available ?payment_option)
+        (not
+          (facility_payment_activated ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_payment_activated ?storage_facility)
+        (facility_payment_option_binding ?storage_facility ?payment_option)
+        (not
+          (payment_option_available ?payment_option)
+        )
+      )
+  )
+  (:action apply_payment_and_provision_offer
+    :parameters (?storage_facility - storage_facility ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance ?time_slot - time_slot ?payment_option - payment_option)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_reserved ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (booking_time_slot_binding ?storage_facility ?time_slot)
+        (vehicle_pickup_confirmed ?vehicle_instance)
+        (facility_payment_activated ?storage_facility)
+        (facility_payment_option_binding ?storage_facility ?payment_option)
+        (not
+          (storage_facility_container_provisioned ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (storage_facility_container_provisioned ?storage_facility)
+        (facility_payment_confirmed ?storage_facility)
+      )
+  )
+  (:action stage_facility_for_handoff_with_equipment
+    :parameters (?storage_facility - storage_facility ?equipment_unit - equipment_unit ?operator - operator_entity ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_container_provisioned ?storage_facility)
+        (facility_equipment_assignment ?storage_facility ?equipment_unit)
+        (booking_operator_assignment ?storage_facility ?operator)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (not
+          (vehicle_dropoff_confirmed ?vehicle_instance)
+        )
+        (not
+          (storage_facility_equipment_ready ?storage_facility)
+        )
+      )
+    :effect (storage_facility_equipment_ready ?storage_facility)
+  )
+  (:action complete_facility_equipment_staging
+    :parameters (?storage_facility - storage_facility ?equipment_unit - equipment_unit ?operator - operator_entity ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_container_provisioned ?storage_facility)
+        (facility_equipment_assignment ?storage_facility ?equipment_unit)
+        (booking_operator_assignment ?storage_facility ?operator)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (vehicle_dropoff_confirmed ?vehicle_instance)
+        (not
+          (storage_facility_equipment_ready ?storage_facility)
+        )
+      )
+    :effect (storage_facility_equipment_ready ?storage_facility)
+  )
+  (:action authorize_facility_service_slot
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_equipment_ready ?storage_facility)
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (not
+          (vehicle_pickup_confirmed ?vehicle_instance)
+        )
+        (not
+          (vehicle_dropoff_confirmed ?vehicle_instance)
+        )
+        (not
+          (facility_ready_for_handoff ?storage_facility)
+        )
+      )
+    :effect (facility_ready_for_handoff ?storage_facility)
+  )
+  (:action authorize_facility_service_slot_with_vehicle
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_equipment_ready ?storage_facility)
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (vehicle_pickup_confirmed ?vehicle_instance)
+        (not
+          (vehicle_dropoff_confirmed ?vehicle_instance)
+        )
+        (not
+          (facility_ready_for_handoff ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_access_ready ?storage_facility)
+      )
+  )
+  (:action authorize_facility_service_slot_variant
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_equipment_ready ?storage_facility)
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (not
+          (vehicle_pickup_confirmed ?vehicle_instance)
+        )
+        (vehicle_dropoff_confirmed ?vehicle_instance)
+        (not
+          (facility_ready_for_handoff ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_access_ready ?storage_facility)
+      )
+  )
+  (:action authorize_facility_service_slot_full
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot ?storage_container - storage_container ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (storage_facility_equipment_ready ?storage_facility)
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (storage_facility_has_container ?storage_facility ?storage_container)
+        (storage_container_assigned_vehicle_instance ?storage_container ?vehicle_instance)
+        (vehicle_pickup_confirmed ?vehicle_instance)
+        (vehicle_dropoff_confirmed ?vehicle_instance)
+        (not
+          (facility_ready_for_handoff ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_access_ready ?storage_facility)
+      )
+  )
+  (:action finalize_container_preparation
+    :parameters (?storage_facility - storage_facility)
+    :precondition
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (not
+          (facility_access_ready ?storage_facility)
+        )
+        (not
+          (facility_finalized ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized ?storage_facility)
+        (handoff_acknowledged ?storage_facility)
+      )
+  )
+  (:action assign_access_permit_to_facility
+    :parameters (?storage_facility - storage_facility ?access_permit - access_permit)
+    :precondition
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_access_ready ?storage_facility)
+        (access_permit_available ?access_permit)
+      )
+    :effect
+      (and
+        (facility_access_permit_binding ?storage_facility ?access_permit)
+        (not
+          (access_permit_available ?access_permit)
+        )
+      )
+  )
+  (:action execute_final_handoff
+    :parameters (?storage_facility - storage_facility ?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?time_slot - time_slot ?access_permit - access_permit)
+    :precondition
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_access_ready ?storage_facility)
+        (facility_access_permit_binding ?storage_facility ?access_permit)
+        (storage_facility_serves_incoming_leg ?storage_facility ?incoming_leg)
+        (storage_facility_serves_outgoing_leg ?storage_facility ?outgoing_leg)
+        (incoming_leg_ready ?incoming_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (booking_time_slot_binding ?storage_facility ?time_slot)
+        (not
+          (facility_final_handoff_processed ?storage_facility)
+        )
+      )
+    :effect (facility_final_handoff_processed ?storage_facility)
+  )
+  (:action acknowledge_final_handoff_for_facility
+    :parameters (?storage_facility - storage_facility)
+    :precondition
+      (and
+        (facility_ready_for_handoff ?storage_facility)
+        (facility_final_handoff_processed ?storage_facility)
+        (not
+          (facility_finalized ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized ?storage_facility)
+        (handoff_acknowledged ?storage_facility)
+      )
+  )
+  (:action apply_conditional_offer_to_facility
+    :parameters (?storage_facility - storage_facility ?conditional_offer - conditional_offer ?time_slot - time_slot)
+    :precondition
+      (and
+        (booking_confirmed ?storage_facility)
+        (booking_time_slot_binding ?storage_facility ?time_slot)
+        (conditional_offer_available ?conditional_offer)
+        (storage_facility_conditional_offer_binding ?storage_facility ?conditional_offer)
+        (not
+          (facility_offer_active ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_offer_active ?storage_facility)
+        (not
+          (conditional_offer_available ?conditional_offer)
+        )
+      )
+  )
+  (:action authorize_offer_by_operator
+    :parameters (?storage_facility - storage_facility ?operator - operator_entity)
+    :precondition
+      (and
+        (facility_offer_active ?storage_facility)
+        (booking_operator_assignment ?storage_facility ?operator)
+        (not
+          (facility_offer_authorized ?storage_facility)
+        )
+      )
+    :effect (facility_offer_authorized ?storage_facility)
+  )
+  (:action bind_service_slot_to_offer
+    :parameters (?storage_facility - storage_facility ?service_slot - service_slot)
+    :precondition
+      (and
+        (facility_offer_authorized ?storage_facility)
+        (facility_service_slot_assignment ?storage_facility ?service_slot)
+        (not
+          (facility_offer_executed ?storage_facility)
+        )
+      )
+    :effect (facility_offer_executed ?storage_facility)
+  )
+  (:action acknowledge_offer_execution
+    :parameters (?storage_facility - storage_facility)
+    :precondition
+      (and
+        (facility_offer_executed ?storage_facility)
+        (not
+          (facility_finalized ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized ?storage_facility)
+        (handoff_acknowledged ?storage_facility)
+      )
+  )
+  (:action complete_incoming_leg_handoff_with_vehicle
+    :parameters (?incoming_leg - incoming_leg ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (incoming_leg_buffered ?incoming_leg)
+        (incoming_leg_ready ?incoming_leg)
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_prepared ?vehicle_instance)
+        (not
+          (handoff_acknowledged ?incoming_leg)
+        )
+      )
+    :effect (handoff_acknowledged ?incoming_leg)
+  )
+  (:action complete_outgoing_leg_handoff_with_vehicle
+    :parameters (?outgoing_leg - outgoing_leg ?vehicle_instance - transfer_vehicle_instance)
+    :precondition
+      (and
+        (outgoing_leg_buffered ?outgoing_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (vehicle_instance_allocated ?vehicle_instance)
+        (vehicle_prepared ?vehicle_instance)
+        (not
+          (handoff_acknowledged ?outgoing_leg)
+        )
+      )
+    :effect (handoff_acknowledged ?outgoing_leg)
+  )
+  (:action issue_storage_receipt_to_itinerary
+    :parameters (?itinerary - itinerary ?storage_receipt - storage_receipt ?time_slot - time_slot)
+    :precondition
+      (and
+        (handoff_acknowledged ?itinerary)
+        (booking_time_slot_binding ?itinerary ?time_slot)
+        (storage_receipt_available ?storage_receipt)
+        (not
+          (storage_assigned ?itinerary)
+        )
+      )
+    :effect
+      (and
+        (storage_assigned ?itinerary)
+        (booking_storage_receipt_binding ?itinerary ?storage_receipt)
+        (not
+          (storage_receipt_available ?storage_receipt)
+        )
+      )
+  )
+  (:action finalize_incoming_leg_and_release_vehicle_token
+    :parameters (?incoming_leg - incoming_leg ?vehicle_token - vehicle_resource_token ?storage_receipt - storage_receipt)
+    :precondition
+      (and
+        (storage_assigned ?incoming_leg)
+        (booking_vehicle_token_binding ?incoming_leg ?vehicle_token)
+        (booking_storage_receipt_binding ?incoming_leg ?storage_receipt)
+        (not
+          (handoff_completed ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (handoff_completed ?incoming_leg)
+        (vehicle_token_available ?vehicle_token)
+        (storage_receipt_available ?storage_receipt)
+      )
+  )
+  (:action finalize_outgoing_leg_and_release_vehicle_token
+    :parameters (?outgoing_leg - outgoing_leg ?vehicle_token - vehicle_resource_token ?storage_receipt - storage_receipt)
+    :precondition
+      (and
+        (storage_assigned ?outgoing_leg)
+        (booking_vehicle_token_binding ?outgoing_leg ?vehicle_token)
+        (booking_storage_receipt_binding ?outgoing_leg ?storage_receipt)
+        (not
+          (handoff_completed ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (handoff_completed ?outgoing_leg)
+        (vehicle_token_available ?vehicle_token)
+        (storage_receipt_available ?storage_receipt)
+      )
+  )
+  (:action finalize_facility_and_release_vehicle_token
+    :parameters (?storage_facility - storage_facility ?vehicle_token - vehicle_resource_token ?storage_receipt - storage_receipt)
+    :precondition
+      (and
+        (storage_assigned ?storage_facility)
+        (booking_vehicle_token_binding ?storage_facility ?vehicle_token)
+        (booking_storage_receipt_binding ?storage_facility ?storage_receipt)
+        (not
+          (handoff_completed ?storage_facility)
+        )
+      )
+    :effect
+      (and
+        (handoff_completed ?storage_facility)
+        (vehicle_token_available ?vehicle_token)
+        (storage_receipt_available ?storage_receipt)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem itinerary_luggage_storage_scenario)
+  (:domain luggage_storage_stop_integration)
+  (:objects incoming_leg_1 - incoming_leg outgoing_leg_1 - outgoing_leg central_storage_facility - storage_facility satellite_storage_facility - storage_facility vehicle_token_1 - vehicle_resource_token vehicle_token_2 - vehicle_resource_token vehicle_token_3 - vehicle_resource_token timeslot_1 - time_slot operator_staff_1 - operator_entity luggage_unit_1 - luggage_unit pickup_option_main_entrance - pickup_location_option dropoff_option_main_exit - dropoff_location_option transfer_shuttle_1 - transfer_vehicle_instance storage_container_101 - storage_container storage_container_102 - storage_container payment_option_card - payment_option payment_option_cash - payment_option access_permit_standard - access_permit access_permit_express - access_permit storage_receipt_1 - storage_receipt equipment_trolley_1 - equipment_unit conditional_offer_discount - conditional_offer conditional_offer_priority - conditional_offer service_slot_10am - service_slot)
+  (:init
+    (vehicle_token_available vehicle_token_1)
+    (vehicle_token_available vehicle_token_2)
+    (vehicle_token_available vehicle_token_3)
+    (time_slot_available timeslot_1)
+    (operator_available operator_staff_1)
+    (luggage_unit_available luggage_unit_1)
+    (incoming_leg_pickup_option incoming_leg_1 pickup_option_main_entrance)
+    (outgoing_leg_dropoff_option outgoing_leg_1 dropoff_option_main_exit)
+    (vehicle_instance_available transfer_shuttle_1)
+    (storage_container_available storage_container_101)
+    (storage_container_available storage_container_102)
+    (storage_facility_serves_incoming_leg central_storage_facility incoming_leg_1)
+    (storage_facility_serves_incoming_leg satellite_storage_facility incoming_leg_1)
+    (storage_facility_serves_outgoing_leg central_storage_facility outgoing_leg_1)
+    (storage_facility_serves_outgoing_leg satellite_storage_facility outgoing_leg_1)
+    (storage_facility_assigned_vehicle_instance central_storage_facility transfer_shuttle_1)
+    (storage_facility_assigned_vehicle_instance satellite_storage_facility transfer_shuttle_1)
+    (storage_facility_has_container central_storage_facility storage_container_101)
+    (storage_facility_has_container satellite_storage_facility storage_container_102)
+    (payment_option_available payment_option_card)
+    (payment_option_available payment_option_cash)
+    (access_permit_available access_permit_standard)
+    (access_permit_available access_permit_express)
+    (storage_receipt_available storage_receipt_1)
+    (equipment_available equipment_trolley_1)
+    (conditional_offer_available conditional_offer_discount)
+    (storage_facility_conditional_offer_binding central_storage_facility conditional_offer_discount)
+    (storage_facility_conditional_offer_binding satellite_storage_facility conditional_offer_priority)
+    (service_slot_available service_slot_10am)
+  )
+  (:goal
+    (and
+      (handoff_completed incoming_leg_1)
+      (handoff_completed outgoing_leg_1)
+      (handoff_completed central_storage_facility)
+      (handoff_completed satellite_storage_facility)
+    )
+  )
+)

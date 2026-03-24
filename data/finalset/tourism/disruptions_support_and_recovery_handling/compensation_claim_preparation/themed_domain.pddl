@@ -1,0 +1,936 @@
+(define (domain tourism_compensation_claim_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_pool_type - object document_type_group - object external_resource - object case_root_type - object compensation_case - case_root_type support_agent - entity_pool_type evidence_document - entity_pool_type third_party_contact - entity_pool_type consent_form - entity_pool_type assessment_checklist - entity_pool_type submission_channel - entity_pool_type policy_document - entity_pool_type incident_report - entity_pool_type remedy_option - document_type_group supporting_document - document_type_group regulatory_reference - document_type_group itinerary_disruption_event - external_resource booking_disruption_event - external_resource claim_package - external_resource itinerary_subtype_holder - compensation_case dossier_subtype_holder - compensation_case itinerary_component - itinerary_subtype_holder service_booking - itinerary_subtype_holder claim_dossier - dossier_subtype_holder)
+  (:predicates
+    (case_registered ?compensation_case - compensation_case)
+    (case_compiled ?compensation_case - compensation_case)
+    (case_assigned ?compensation_case - compensation_case)
+    (submission_dispatched ?compensation_case - compensation_case)
+    (ready_for_submission ?compensation_case - compensation_case)
+    (packaged_for_submission ?compensation_case - compensation_case)
+    (agent_available ?support_agent - support_agent)
+    (case_assigned_to_agent ?compensation_case - compensation_case ?support_agent - support_agent)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (has_evidence ?compensation_case - compensation_case ?evidence_document - evidence_document)
+    (third_party_contact_available ?third_party_contact - third_party_contact)
+    (case_linked_to_third_party_contact ?compensation_case - compensation_case ?third_party_contact - third_party_contact)
+    (remedy_option_available ?remedy_option - remedy_option)
+    (itinerary_component_offered_remedy ?itinerary_component - itinerary_component ?remedy_option - remedy_option)
+    (service_booking_offered_remedy ?service_booking - service_booking ?remedy_option - remedy_option)
+    (itinerary_component_has_disruption_event ?itinerary_component - itinerary_component ?itinerary_disruption_event - itinerary_disruption_event)
+    (itinerary_event_validated ?itinerary_disruption_event - itinerary_disruption_event)
+    (itinerary_event_action_pending ?itinerary_disruption_event - itinerary_disruption_event)
+    (itinerary_component_ready ?itinerary_component - itinerary_component)
+    (service_booking_has_disruption_event ?service_booking - service_booking ?booking_disruption_event - booking_disruption_event)
+    (booking_event_validated ?booking_disruption_event - booking_disruption_event)
+    (booking_event_action_pending ?booking_disruption_event - booking_disruption_event)
+    (service_booking_ready ?service_booking - service_booking)
+    (claim_package_available ?claim_package - claim_package)
+    (claim_package_assembled ?claim_package - claim_package)
+    (claim_package_includes_itinerary_event ?claim_package - claim_package ?itinerary_disruption_event - itinerary_disruption_event)
+    (claim_package_includes_booking_event ?claim_package - claim_package ?booking_disruption_event - booking_disruption_event)
+    (claim_package_includes_itinerary_action_pending ?claim_package - claim_package)
+    (claim_package_includes_booking_action_pending ?claim_package - claim_package)
+    (claim_package_locked ?claim_package - claim_package)
+    (dossier_references_itinerary_component ?claim_dossier - claim_dossier ?itinerary_component - itinerary_component)
+    (dossier_references_service_booking ?claim_dossier - claim_dossier ?service_booking - service_booking)
+    (dossier_references_claim_package ?claim_dossier - claim_dossier ?claim_package - claim_package)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (dossier_includes_supporting_document ?claim_dossier - claim_dossier ?supporting_document - supporting_document)
+    (supporting_document_registered ?supporting_document - supporting_document)
+    (supporting_document_attached_to_package ?supporting_document - supporting_document ?claim_package - claim_package)
+    (dossier_bound_to_package ?claim_dossier - claim_dossier)
+    (dossier_policy_processed ?claim_dossier - claim_dossier)
+    (dossier_review_started ?claim_dossier - claim_dossier)
+    (consent_form_attached ?claim_dossier - claim_dossier)
+    (dossier_consent_recorded ?claim_dossier - claim_dossier)
+    (assessment_checklist_attached ?claim_dossier - claim_dossier)
+    (dossier_review_approved ?claim_dossier - claim_dossier)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (dossier_includes_regulatory_reference ?claim_dossier - claim_dossier ?regulatory_reference - regulatory_reference)
+    (regulatory_reference_applied ?claim_dossier - claim_dossier)
+    (regulatory_reference_acknowledged ?claim_dossier - claim_dossier)
+    (regulatory_reference_processed ?claim_dossier - claim_dossier)
+    (consent_form_available ?consent_form - consent_form)
+    (dossier_linked_to_consent_form ?claim_dossier - claim_dossier ?consent_form - consent_form)
+    (assessment_checklist_available ?assessment_checklist - assessment_checklist)
+    (dossier_has_assessment_checklist ?claim_dossier - claim_dossier ?assessment_checklist - assessment_checklist)
+    (policy_document_available ?policy_document - policy_document)
+    (dossier_includes_policy_document ?claim_dossier - claim_dossier ?policy_document - policy_document)
+    (incident_report_available ?incident_report - incident_report)
+    (dossier_includes_incident_report ?claim_dossier - claim_dossier ?incident_report - incident_report)
+    (submission_channel_available ?submission_channel - submission_channel)
+    (case_linked_to_submission_channel ?compensation_case - compensation_case ?submission_channel - submission_channel)
+    (itinerary_component_actioned ?itinerary_component - itinerary_component)
+    (service_booking_actioned ?service_booking - service_booking)
+    (dossier_finalized ?claim_dossier - claim_dossier)
+  )
+  (:action log_compensation_case
+    :parameters (?compensation_case - compensation_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?compensation_case)
+        )
+        (not
+          (submission_dispatched ?compensation_case)
+        )
+      )
+    :effect (case_registered ?compensation_case)
+  )
+  (:action assign_support_agent_to_case
+    :parameters (?compensation_case - compensation_case ?support_agent - support_agent)
+    :precondition
+      (and
+        (case_registered ?compensation_case)
+        (not
+          (case_assigned ?compensation_case)
+        )
+        (agent_available ?support_agent)
+      )
+    :effect
+      (and
+        (case_assigned ?compensation_case)
+        (case_assigned_to_agent ?compensation_case ?support_agent)
+        (not
+          (agent_available ?support_agent)
+        )
+      )
+  )
+  (:action attach_evidence_document_to_case
+    :parameters (?compensation_case - compensation_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_registered ?compensation_case)
+        (case_assigned ?compensation_case)
+        (evidence_document_available ?evidence_document)
+      )
+    :effect
+      (and
+        (has_evidence ?compensation_case ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action compile_case_dossier
+    :parameters (?compensation_case - compensation_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_registered ?compensation_case)
+        (case_assigned ?compensation_case)
+        (has_evidence ?compensation_case ?evidence_document)
+        (not
+          (case_compiled ?compensation_case)
+        )
+      )
+    :effect (case_compiled ?compensation_case)
+  )
+  (:action release_evidence_document_from_case
+    :parameters (?compensation_case - compensation_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (has_evidence ?compensation_case ?evidence_document)
+      )
+    :effect
+      (and
+        (evidence_document_available ?evidence_document)
+        (not
+          (has_evidence ?compensation_case ?evidence_document)
+        )
+      )
+  )
+  (:action link_third_party_contact_to_case
+    :parameters (?compensation_case - compensation_case ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (case_compiled ?compensation_case)
+        (third_party_contact_available ?third_party_contact)
+      )
+    :effect
+      (and
+        (case_linked_to_third_party_contact ?compensation_case ?third_party_contact)
+        (not
+          (third_party_contact_available ?third_party_contact)
+        )
+      )
+  )
+  (:action unlink_third_party_contact_from_case
+    :parameters (?compensation_case - compensation_case ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (case_linked_to_third_party_contact ?compensation_case ?third_party_contact)
+      )
+    :effect
+      (and
+        (third_party_contact_available ?third_party_contact)
+        (not
+          (case_linked_to_third_party_contact ?compensation_case ?third_party_contact)
+        )
+      )
+  )
+  (:action attach_policy_document_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?policy_document - policy_document)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (policy_document_available ?policy_document)
+      )
+    :effect
+      (and
+        (dossier_includes_policy_document ?claim_dossier ?policy_document)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action detach_policy_document_from_dossier
+    :parameters (?claim_dossier - claim_dossier ?policy_document - policy_document)
+    :precondition
+      (and
+        (dossier_includes_policy_document ?claim_dossier ?policy_document)
+      )
+    :effect
+      (and
+        (policy_document_available ?policy_document)
+        (not
+          (dossier_includes_policy_document ?claim_dossier ?policy_document)
+        )
+      )
+  )
+  (:action attach_incident_report_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (incident_report_available ?incident_report)
+      )
+    :effect
+      (and
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (not
+          (incident_report_available ?incident_report)
+        )
+      )
+  )
+  (:action detach_incident_report_from_dossier
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report)
+    :precondition
+      (and
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+      )
+    :effect
+      (and
+        (incident_report_available ?incident_report)
+        (not
+          (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        )
+      )
+  )
+  (:action validate_itinerary_event_for_component
+    :parameters (?itinerary_component - itinerary_component ?itinerary_disruption_event - itinerary_disruption_event ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_compiled ?itinerary_component)
+        (has_evidence ?itinerary_component ?evidence_document)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (not
+          (itinerary_event_validated ?itinerary_disruption_event)
+        )
+        (not
+          (itinerary_event_action_pending ?itinerary_disruption_event)
+        )
+      )
+    :effect (itinerary_event_validated ?itinerary_disruption_event)
+  )
+  (:action confirm_itinerary_component_with_contact
+    :parameters (?itinerary_component - itinerary_component ?itinerary_disruption_event - itinerary_disruption_event ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (case_compiled ?itinerary_component)
+        (case_linked_to_third_party_contact ?itinerary_component ?third_party_contact)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (itinerary_event_validated ?itinerary_disruption_event)
+        (not
+          (itinerary_component_actioned ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (itinerary_component_ready ?itinerary_component)
+      )
+  )
+  (:action offer_remedy_for_itinerary_component
+    :parameters (?itinerary_component - itinerary_component ?itinerary_disruption_event - itinerary_disruption_event ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (case_compiled ?itinerary_component)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (remedy_option_available ?remedy_option)
+        (not
+          (itinerary_component_actioned ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_event_action_pending ?itinerary_disruption_event)
+        (itinerary_component_actioned ?itinerary_component)
+        (itinerary_component_offered_remedy ?itinerary_component ?remedy_option)
+        (not
+          (remedy_option_available ?remedy_option)
+        )
+      )
+  )
+  (:action finalize_remedy_for_itinerary_component
+    :parameters (?itinerary_component - itinerary_component ?itinerary_disruption_event - itinerary_disruption_event ?evidence_document - evidence_document ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (case_compiled ?itinerary_component)
+        (has_evidence ?itinerary_component ?evidence_document)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (itinerary_event_action_pending ?itinerary_disruption_event)
+        (itinerary_component_offered_remedy ?itinerary_component ?remedy_option)
+        (not
+          (itinerary_component_ready ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_event_validated ?itinerary_disruption_event)
+        (itinerary_component_ready ?itinerary_component)
+        (remedy_option_available ?remedy_option)
+        (not
+          (itinerary_component_offered_remedy ?itinerary_component ?remedy_option)
+        )
+      )
+  )
+  (:action validate_booking_event_for_booking
+    :parameters (?service_booking - service_booking ?booking_disruption_event - booking_disruption_event ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_compiled ?service_booking)
+        (has_evidence ?service_booking ?evidence_document)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (not
+          (booking_event_validated ?booking_disruption_event)
+        )
+        (not
+          (booking_event_action_pending ?booking_disruption_event)
+        )
+      )
+    :effect (booking_event_validated ?booking_disruption_event)
+  )
+  (:action confirm_service_booking_with_contact
+    :parameters (?service_booking - service_booking ?booking_disruption_event - booking_disruption_event ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (case_compiled ?service_booking)
+        (case_linked_to_third_party_contact ?service_booking ?third_party_contact)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (booking_event_validated ?booking_disruption_event)
+        (not
+          (service_booking_actioned ?service_booking)
+        )
+      )
+    :effect
+      (and
+        (service_booking_actioned ?service_booking)
+        (service_booking_ready ?service_booking)
+      )
+  )
+  (:action offer_remedy_for_service_booking
+    :parameters (?service_booking - service_booking ?booking_disruption_event - booking_disruption_event ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (case_compiled ?service_booking)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (remedy_option_available ?remedy_option)
+        (not
+          (service_booking_actioned ?service_booking)
+        )
+      )
+    :effect
+      (and
+        (booking_event_action_pending ?booking_disruption_event)
+        (service_booking_actioned ?service_booking)
+        (service_booking_offered_remedy ?service_booking ?remedy_option)
+        (not
+          (remedy_option_available ?remedy_option)
+        )
+      )
+  )
+  (:action finalize_remedy_for_service_booking
+    :parameters (?service_booking - service_booking ?booking_disruption_event - booking_disruption_event ?evidence_document - evidence_document ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (case_compiled ?service_booking)
+        (has_evidence ?service_booking ?evidence_document)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (booking_event_action_pending ?booking_disruption_event)
+        (service_booking_offered_remedy ?service_booking ?remedy_option)
+        (not
+          (service_booking_ready ?service_booking)
+        )
+      )
+    :effect
+      (and
+        (booking_event_validated ?booking_disruption_event)
+        (service_booking_ready ?service_booking)
+        (remedy_option_available ?remedy_option)
+        (not
+          (service_booking_offered_remedy ?service_booking ?remedy_option)
+        )
+      )
+  )
+  (:action assemble_claim_package_fully_validated
+    :parameters (?itinerary_component - itinerary_component ?service_booking - service_booking ?itinerary_disruption_event - itinerary_disruption_event ?booking_disruption_event - booking_disruption_event ?claim_package - claim_package)
+    :precondition
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (service_booking_actioned ?service_booking)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (itinerary_event_validated ?itinerary_disruption_event)
+        (booking_event_validated ?booking_disruption_event)
+        (itinerary_component_ready ?itinerary_component)
+        (service_booking_ready ?service_booking)
+        (claim_package_available ?claim_package)
+      )
+    :effect
+      (and
+        (claim_package_assembled ?claim_package)
+        (claim_package_includes_itinerary_event ?claim_package ?itinerary_disruption_event)
+        (claim_package_includes_booking_event ?claim_package ?booking_disruption_event)
+        (not
+          (claim_package_available ?claim_package)
+        )
+      )
+  )
+  (:action assemble_claim_package_itinerary_action_pending
+    :parameters (?itinerary_component - itinerary_component ?service_booking - service_booking ?itinerary_disruption_event - itinerary_disruption_event ?booking_disruption_event - booking_disruption_event ?claim_package - claim_package)
+    :precondition
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (service_booking_actioned ?service_booking)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (itinerary_event_action_pending ?itinerary_disruption_event)
+        (booking_event_validated ?booking_disruption_event)
+        (not
+          (itinerary_component_ready ?itinerary_component)
+        )
+        (service_booking_ready ?service_booking)
+        (claim_package_available ?claim_package)
+      )
+    :effect
+      (and
+        (claim_package_assembled ?claim_package)
+        (claim_package_includes_itinerary_event ?claim_package ?itinerary_disruption_event)
+        (claim_package_includes_booking_event ?claim_package ?booking_disruption_event)
+        (claim_package_includes_itinerary_action_pending ?claim_package)
+        (not
+          (claim_package_available ?claim_package)
+        )
+      )
+  )
+  (:action assemble_claim_package_booking_action_pending
+    :parameters (?itinerary_component - itinerary_component ?service_booking - service_booking ?itinerary_disruption_event - itinerary_disruption_event ?booking_disruption_event - booking_disruption_event ?claim_package - claim_package)
+    :precondition
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (service_booking_actioned ?service_booking)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (itinerary_event_validated ?itinerary_disruption_event)
+        (booking_event_action_pending ?booking_disruption_event)
+        (itinerary_component_ready ?itinerary_component)
+        (not
+          (service_booking_ready ?service_booking)
+        )
+        (claim_package_available ?claim_package)
+      )
+    :effect
+      (and
+        (claim_package_assembled ?claim_package)
+        (claim_package_includes_itinerary_event ?claim_package ?itinerary_disruption_event)
+        (claim_package_includes_booking_event ?claim_package ?booking_disruption_event)
+        (claim_package_includes_booking_action_pending ?claim_package)
+        (not
+          (claim_package_available ?claim_package)
+        )
+      )
+  )
+  (:action assemble_claim_package_both_actions_pending
+    :parameters (?itinerary_component - itinerary_component ?service_booking - service_booking ?itinerary_disruption_event - itinerary_disruption_event ?booking_disruption_event - booking_disruption_event ?claim_package - claim_package)
+    :precondition
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (service_booking_actioned ?service_booking)
+        (itinerary_component_has_disruption_event ?itinerary_component ?itinerary_disruption_event)
+        (service_booking_has_disruption_event ?service_booking ?booking_disruption_event)
+        (itinerary_event_action_pending ?itinerary_disruption_event)
+        (booking_event_action_pending ?booking_disruption_event)
+        (not
+          (itinerary_component_ready ?itinerary_component)
+        )
+        (not
+          (service_booking_ready ?service_booking)
+        )
+        (claim_package_available ?claim_package)
+      )
+    :effect
+      (and
+        (claim_package_assembled ?claim_package)
+        (claim_package_includes_itinerary_event ?claim_package ?itinerary_disruption_event)
+        (claim_package_includes_booking_event ?claim_package ?booking_disruption_event)
+        (claim_package_includes_itinerary_action_pending ?claim_package)
+        (claim_package_includes_booking_action_pending ?claim_package)
+        (not
+          (claim_package_available ?claim_package)
+        )
+      )
+  )
+  (:action confirm_claim_package_for_component
+    :parameters (?claim_package - claim_package ?itinerary_component - itinerary_component ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (claim_package_assembled ?claim_package)
+        (itinerary_component_actioned ?itinerary_component)
+        (has_evidence ?itinerary_component ?evidence_document)
+        (not
+          (claim_package_locked ?claim_package)
+        )
+      )
+    :effect (claim_package_locked ?claim_package)
+  )
+  (:action register_supporting_document_in_package
+    :parameters (?claim_dossier - claim_dossier ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (dossier_references_claim_package ?claim_dossier ?claim_package)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (claim_package_assembled ?claim_package)
+        (claim_package_locked ?claim_package)
+        (not
+          (supporting_document_registered ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_registered ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action bind_dossier_to_package
+    :parameters (?claim_dossier - claim_dossier ?supporting_document - supporting_document ?claim_package - claim_package ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_registered ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (has_evidence ?claim_dossier ?evidence_document)
+        (not
+          (claim_package_includes_itinerary_action_pending ?claim_package)
+        )
+        (not
+          (dossier_bound_to_package ?claim_dossier)
+        )
+      )
+    :effect (dossier_bound_to_package ?claim_dossier)
+  )
+  (:action attach_consent_form_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?consent_form - consent_form)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (consent_form_available ?consent_form)
+        (not
+          (consent_form_attached ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (consent_form_attached ?claim_dossier)
+        (dossier_linked_to_consent_form ?claim_dossier ?consent_form)
+        (not
+          (consent_form_available ?consent_form)
+        )
+      )
+  )
+  (:action bind_dossier_to_package_with_consent
+    :parameters (?claim_dossier - claim_dossier ?supporting_document - supporting_document ?claim_package - claim_package ?evidence_document - evidence_document ?consent_form - consent_form)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_registered ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (has_evidence ?claim_dossier ?evidence_document)
+        (claim_package_includes_itinerary_action_pending ?claim_package)
+        (consent_form_attached ?claim_dossier)
+        (dossier_linked_to_consent_form ?claim_dossier ?consent_form)
+        (not
+          (dossier_bound_to_package ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_bound_to_package ?claim_dossier)
+        (dossier_consent_recorded ?claim_dossier)
+      )
+  )
+  (:action apply_policy_document_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?policy_document - policy_document ?third_party_contact - third_party_contact ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_bound_to_package ?claim_dossier)
+        (dossier_includes_policy_document ?claim_dossier ?policy_document)
+        (case_linked_to_third_party_contact ?claim_dossier ?third_party_contact)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (not
+          (claim_package_includes_booking_action_pending ?claim_package)
+        )
+        (not
+          (dossier_policy_processed ?claim_dossier)
+        )
+      )
+    :effect (dossier_policy_processed ?claim_dossier)
+  )
+  (:action process_policy_document_for_dossier
+    :parameters (?claim_dossier - claim_dossier ?policy_document - policy_document ?third_party_contact - third_party_contact ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_bound_to_package ?claim_dossier)
+        (dossier_includes_policy_document ?claim_dossier ?policy_document)
+        (case_linked_to_third_party_contact ?claim_dossier ?third_party_contact)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (claim_package_includes_booking_action_pending ?claim_package)
+        (not
+          (dossier_policy_processed ?claim_dossier)
+        )
+      )
+    :effect (dossier_policy_processed ?claim_dossier)
+  )
+  (:action register_incident_report_on_dossier
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_policy_processed ?claim_dossier)
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (not
+          (claim_package_includes_itinerary_action_pending ?claim_package)
+        )
+        (not
+          (claim_package_includes_booking_action_pending ?claim_package)
+        )
+        (not
+          (dossier_review_started ?claim_dossier)
+        )
+      )
+    :effect (dossier_review_started ?claim_dossier)
+  )
+  (:action register_incident_and_attach_review_flag
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_policy_processed ?claim_dossier)
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (claim_package_includes_itinerary_action_pending ?claim_package)
+        (not
+          (claim_package_includes_booking_action_pending ?claim_package)
+        )
+        (not
+          (dossier_review_started ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_review_started ?claim_dossier)
+        (assessment_checklist_attached ?claim_dossier)
+      )
+  )
+  (:action register_incident_and_attach_review_flag_variant
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_policy_processed ?claim_dossier)
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (not
+          (claim_package_includes_itinerary_action_pending ?claim_package)
+        )
+        (claim_package_includes_booking_action_pending ?claim_package)
+        (not
+          (dossier_review_started ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_review_started ?claim_dossier)
+        (assessment_checklist_attached ?claim_dossier)
+      )
+  )
+  (:action register_incident_and_attach_review_flag_final
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report ?supporting_document - supporting_document ?claim_package - claim_package)
+    :precondition
+      (and
+        (dossier_policy_processed ?claim_dossier)
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (dossier_includes_supporting_document ?claim_dossier ?supporting_document)
+        (supporting_document_attached_to_package ?supporting_document ?claim_package)
+        (claim_package_includes_itinerary_action_pending ?claim_package)
+        (claim_package_includes_booking_action_pending ?claim_package)
+        (not
+          (dossier_review_started ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_review_started ?claim_dossier)
+        (assessment_checklist_attached ?claim_dossier)
+      )
+  )
+  (:action finalize_dossier_without_checklist
+    :parameters (?claim_dossier - claim_dossier)
+    :precondition
+      (and
+        (dossier_review_started ?claim_dossier)
+        (not
+          (assessment_checklist_attached ?claim_dossier)
+        )
+        (not
+          (dossier_finalized ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_finalized ?claim_dossier)
+        (ready_for_submission ?claim_dossier)
+      )
+  )
+  (:action attach_assessment_checklist_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?assessment_checklist - assessment_checklist)
+    :precondition
+      (and
+        (dossier_review_started ?claim_dossier)
+        (assessment_checklist_attached ?claim_dossier)
+        (assessment_checklist_available ?assessment_checklist)
+      )
+    :effect
+      (and
+        (dossier_has_assessment_checklist ?claim_dossier ?assessment_checklist)
+        (not
+          (assessment_checklist_available ?assessment_checklist)
+        )
+      )
+  )
+  (:action apply_assessment_checklist_and_mark_review_passed
+    :parameters (?claim_dossier - claim_dossier ?itinerary_component - itinerary_component ?service_booking - service_booking ?evidence_document - evidence_document ?assessment_checklist - assessment_checklist)
+    :precondition
+      (and
+        (dossier_review_started ?claim_dossier)
+        (assessment_checklist_attached ?claim_dossier)
+        (dossier_has_assessment_checklist ?claim_dossier ?assessment_checklist)
+        (dossier_references_itinerary_component ?claim_dossier ?itinerary_component)
+        (dossier_references_service_booking ?claim_dossier ?service_booking)
+        (itinerary_component_ready ?itinerary_component)
+        (service_booking_ready ?service_booking)
+        (has_evidence ?claim_dossier ?evidence_document)
+        (not
+          (dossier_review_approved ?claim_dossier)
+        )
+      )
+    :effect (dossier_review_approved ?claim_dossier)
+  )
+  (:action finalize_dossier_post_review
+    :parameters (?claim_dossier - claim_dossier)
+    :precondition
+      (and
+        (dossier_review_started ?claim_dossier)
+        (dossier_review_approved ?claim_dossier)
+        (not
+          (dossier_finalized ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_finalized ?claim_dossier)
+        (ready_for_submission ?claim_dossier)
+      )
+  )
+  (:action apply_regulatory_reference_to_dossier
+    :parameters (?claim_dossier - claim_dossier ?regulatory_reference - regulatory_reference ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_compiled ?claim_dossier)
+        (has_evidence ?claim_dossier ?evidence_document)
+        (regulatory_reference_available ?regulatory_reference)
+        (dossier_includes_regulatory_reference ?claim_dossier ?regulatory_reference)
+        (not
+          (regulatory_reference_applied ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (regulatory_reference_applied ?claim_dossier)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action acknowledge_regulatory_reference_for_dossier
+    :parameters (?claim_dossier - claim_dossier ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (regulatory_reference_applied ?claim_dossier)
+        (case_linked_to_third_party_contact ?claim_dossier ?third_party_contact)
+        (not
+          (regulatory_reference_acknowledged ?claim_dossier)
+        )
+      )
+    :effect (regulatory_reference_acknowledged ?claim_dossier)
+  )
+  (:action process_incident_report_against_regulatory_reference
+    :parameters (?claim_dossier - claim_dossier ?incident_report - incident_report)
+    :precondition
+      (and
+        (regulatory_reference_acknowledged ?claim_dossier)
+        (dossier_includes_incident_report ?claim_dossier ?incident_report)
+        (not
+          (regulatory_reference_processed ?claim_dossier)
+        )
+      )
+    :effect (regulatory_reference_processed ?claim_dossier)
+  )
+  (:action finalize_dossier_after_regulatory_processing
+    :parameters (?claim_dossier - claim_dossier)
+    :precondition
+      (and
+        (regulatory_reference_processed ?claim_dossier)
+        (not
+          (dossier_finalized ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_finalized ?claim_dossier)
+        (ready_for_submission ?claim_dossier)
+      )
+  )
+  (:action mark_itinerary_component_ready_for_submission
+    :parameters (?itinerary_component - itinerary_component ?claim_package - claim_package)
+    :precondition
+      (and
+        (itinerary_component_actioned ?itinerary_component)
+        (itinerary_component_ready ?itinerary_component)
+        (claim_package_assembled ?claim_package)
+        (claim_package_locked ?claim_package)
+        (not
+          (ready_for_submission ?itinerary_component)
+        )
+      )
+    :effect (ready_for_submission ?itinerary_component)
+  )
+  (:action mark_service_booking_ready_for_submission
+    :parameters (?service_booking - service_booking ?claim_package - claim_package)
+    :precondition
+      (and
+        (service_booking_actioned ?service_booking)
+        (service_booking_ready ?service_booking)
+        (claim_package_assembled ?claim_package)
+        (claim_package_locked ?claim_package)
+        (not
+          (ready_for_submission ?service_booking)
+        )
+      )
+    :effect (ready_for_submission ?service_booking)
+  )
+  (:action package_case_for_submission
+    :parameters (?compensation_case - compensation_case ?submission_channel - submission_channel ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_submission ?compensation_case)
+        (has_evidence ?compensation_case ?evidence_document)
+        (submission_channel_available ?submission_channel)
+        (not
+          (packaged_for_submission ?compensation_case)
+        )
+      )
+    :effect
+      (and
+        (packaged_for_submission ?compensation_case)
+        (case_linked_to_submission_channel ?compensation_case ?submission_channel)
+        (not
+          (submission_channel_available ?submission_channel)
+        )
+      )
+  )
+  (:action dispatch_itinerary_component_to_submission_channel
+    :parameters (?itinerary_component - itinerary_component ?support_agent - support_agent ?submission_channel - submission_channel)
+    :precondition
+      (and
+        (packaged_for_submission ?itinerary_component)
+        (case_assigned_to_agent ?itinerary_component ?support_agent)
+        (case_linked_to_submission_channel ?itinerary_component ?submission_channel)
+        (not
+          (submission_dispatched ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (submission_dispatched ?itinerary_component)
+        (agent_available ?support_agent)
+        (submission_channel_available ?submission_channel)
+      )
+  )
+  (:action dispatch_service_booking_to_submission_channel
+    :parameters (?service_booking - service_booking ?support_agent - support_agent ?submission_channel - submission_channel)
+    :precondition
+      (and
+        (packaged_for_submission ?service_booking)
+        (case_assigned_to_agent ?service_booking ?support_agent)
+        (case_linked_to_submission_channel ?service_booking ?submission_channel)
+        (not
+          (submission_dispatched ?service_booking)
+        )
+      )
+    :effect
+      (and
+        (submission_dispatched ?service_booking)
+        (agent_available ?support_agent)
+        (submission_channel_available ?submission_channel)
+      )
+  )
+  (:action dispatch_dossier_to_submission_channel
+    :parameters (?claim_dossier - claim_dossier ?support_agent - support_agent ?submission_channel - submission_channel)
+    :precondition
+      (and
+        (packaged_for_submission ?claim_dossier)
+        (case_assigned_to_agent ?claim_dossier ?support_agent)
+        (case_linked_to_submission_channel ?claim_dossier ?submission_channel)
+        (not
+          (submission_dispatched ?claim_dossier)
+        )
+      )
+    :effect
+      (and
+        (submission_dispatched ?claim_dossier)
+        (agent_available ?support_agent)
+        (submission_channel_available ?submission_channel)
+      )
+  )
+)

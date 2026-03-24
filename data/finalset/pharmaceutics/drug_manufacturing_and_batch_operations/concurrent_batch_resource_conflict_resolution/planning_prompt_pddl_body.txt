@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain concurrent_batch_resource_conflict_resolution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_base - object aux_type_20 - object aux_type_21 - object production_entity_abstract - object batch - production_entity_abstract equipment_resource - resource_base transient_resource - resource_base support_equipment - resource_base packaging_slot - resource_base quality_inspector - resource_base release_document - resource_base calibration_certificate - resource_base regulatory_signoff - resource_base consumable_material - aux_type_20 qc_sample_container - aux_type_20 approval_token - aux_type_20 equipment_port_a - aux_type_21 equipment_port_b - aux_type_21 shared_unit - aux_type_21 processing_segment - batch record_container - batch upstream_segment - processing_segment downstream_segment - processing_segment batch_record - record_container)
+  (:predicates
+    (batch_initiated ?batch - batch)
+    (production_entity_activated ?batch - batch)
+    (primary_equipment_allocated ?batch - batch)
+    (release_activated ?batch - batch)
+    (production_entity_completed ?batch - batch)
+    (entity_release_requested ?batch - batch)
+    (equipment_available ?equipment_resource - equipment_resource)
+    (equipment_allocated_to_entity ?batch - batch ?equipment_resource - equipment_resource)
+    (transient_resource_available ?transient_resource - transient_resource)
+    (transient_assigned_to_entity ?batch - batch ?transient_resource - transient_resource)
+    (support_equipment_available ?support_equipment - support_equipment)
+    (support_equipment_allocated_to_entity ?batch - batch ?support_equipment - support_equipment)
+    (consumable_available ?consumable_material - consumable_material)
+    (consumable_assigned_to_upstream_entity ?upstream_segment - upstream_segment ?consumable_material - consumable_material)
+    (consumable_assigned_to_downstream_entity ?downstream_segment - downstream_segment ?consumable_material - consumable_material)
+    (segment_port_compatibility ?upstream_segment - upstream_segment ?equipment_port_a - equipment_port_a)
+    (port_a_staged ?equipment_port_a - equipment_port_a)
+    (port_a_engaged ?equipment_port_a - equipment_port_a)
+    (upstream_segment_ready ?upstream_segment - upstream_segment)
+    (segment_port_b_compatibility ?downstream_segment - downstream_segment ?equipment_port_b - equipment_port_b)
+    (port_b_staged ?equipment_port_b - equipment_port_b)
+    (port_b_engaged ?equipment_port_b - equipment_port_b)
+    (downstream_segment_ready ?downstream_segment - downstream_segment)
+    (shared_unit_available ?shared_unit - shared_unit)
+    (shared_unit_reserved ?shared_unit - shared_unit)
+    (shared_unit_port_a_link ?shared_unit - shared_unit ?equipment_port_a - equipment_port_a)
+    (shared_unit_port_b_link ?shared_unit - shared_unit ?equipment_port_b - equipment_port_b)
+    (shared_unit_requires_manual_setup ?shared_unit - shared_unit)
+    (shared_unit_requires_automated_setup ?shared_unit - shared_unit)
+    (shared_unit_ready_for_qc_sampling ?shared_unit - shared_unit)
+    (record_associated_with_upstream_segment ?batch_record - batch_record ?upstream_segment - upstream_segment)
+    (record_associated_with_downstream_segment ?batch_record - batch_record ?downstream_segment - downstream_segment)
+    (record_associated_with_shared_unit ?batch_record - batch_record ?shared_unit - shared_unit)
+    (qc_sample_container_available ?qc_sample_container - qc_sample_container)
+    (record_linked_to_qc_sample_container ?batch_record - batch_record ?qc_sample_container - qc_sample_container)
+    (qc_sample_collected ?qc_sample_container - qc_sample_container)
+    (qc_sample_assigned_to_entity ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    (record_qc_sample_registered ?batch_record - batch_record)
+    (record_qc_sample_validated ?batch_record - batch_record)
+    (record_qc_inspector_ready ?batch_record - batch_record)
+    (record_has_managerial_approval ?batch_record - batch_record)
+    (record_approval_attached ?batch_record - batch_record)
+    (record_inspector_attached ?batch_record - batch_record)
+    (record_documentation_complete ?batch_record - batch_record)
+    (approval_available ?approval_token - approval_token)
+    (record_linked_to_approval_token ?batch_record - batch_record ?approval_token - approval_token)
+    (record_approval_applied ?batch_record - batch_record)
+    (record_ready_for_signoff ?batch_record - batch_record)
+    (record_regulatory_approved ?batch_record - batch_record)
+    (packaging_slot_available ?packaging_slot - packaging_slot)
+    (record_linked_to_packaging_slot ?batch_record - batch_record ?packaging_slot - packaging_slot)
+    (quality_inspector_available ?quality_inspector - quality_inspector)
+    (inspector_assigned_to_record ?batch_record - batch_record ?quality_inspector - quality_inspector)
+    (calibration_certificate_available ?calibration_certificate - calibration_certificate)
+    (record_linked_to_calibration_certificate ?batch_record - batch_record ?calibration_certificate - calibration_certificate)
+    (regulatory_signoff_available ?regulatory_signoff - regulatory_signoff)
+    (record_linked_to_regulatory_signoff ?batch_record - batch_record ?regulatory_signoff - regulatory_signoff)
+    (release_document_available ?release_document - release_document)
+    (release_document_assigned_to_entity ?batch - batch ?release_document - release_document)
+    (upstream_segment_prepared ?upstream_segment - upstream_segment)
+    (downstream_segment_prepared ?downstream_segment - downstream_segment)
+    (record_verification_flag ?batch_record - batch_record)
+  )
+  (:action initiate_batch
+    :parameters (?batch - batch)
+    :precondition
+      (and
+        (not
+          (batch_initiated ?batch)
+        )
+        (not
+          (release_activated ?batch)
+        )
+      )
+    :effect (batch_initiated ?batch)
+  )
+  (:action allocate_equipment_to_batch
+    :parameters (?batch - batch ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (not
+          (primary_equipment_allocated ?batch)
+        )
+        (equipment_available ?equipment_resource)
+      )
+    :effect
+      (and
+        (primary_equipment_allocated ?batch)
+        (equipment_allocated_to_entity ?batch ?equipment_resource)
+        (not
+          (equipment_available ?equipment_resource)
+        )
+      )
+  )
+  (:action assign_transient_resource_to_batch
+    :parameters (?batch - batch ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (primary_equipment_allocated ?batch)
+        (transient_resource_available ?transient_resource)
+      )
+    :effect
+      (and
+        (transient_assigned_to_entity ?batch ?transient_resource)
+        (not
+          (transient_resource_available ?transient_resource)
+        )
+      )
+  )
+  (:action activate_batch
+    :parameters (?batch - batch ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (primary_equipment_allocated ?batch)
+        (transient_assigned_to_entity ?batch ?transient_resource)
+        (not
+          (production_entity_activated ?batch)
+        )
+      )
+    :effect (production_entity_activated ?batch)
+  )
+  (:action release_transient_resource
+    :parameters (?batch - batch ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (transient_assigned_to_entity ?batch ?transient_resource)
+      )
+    :effect
+      (and
+        (transient_resource_available ?transient_resource)
+        (not
+          (transient_assigned_to_entity ?batch ?transient_resource)
+        )
+      )
+  )
+  (:action allocate_support_equipment_to_batch
+    :parameters (?batch - batch ?support_equipment - support_equipment)
+    :precondition
+      (and
+        (production_entity_activated ?batch)
+        (support_equipment_available ?support_equipment)
+      )
+    :effect
+      (and
+        (support_equipment_allocated_to_entity ?batch ?support_equipment)
+        (not
+          (support_equipment_available ?support_equipment)
+        )
+      )
+  )
+  (:action release_support_equipment_from_batch
+    :parameters (?batch - batch ?support_equipment - support_equipment)
+    :precondition
+      (and
+        (support_equipment_allocated_to_entity ?batch ?support_equipment)
+      )
+    :effect
+      (and
+        (support_equipment_available ?support_equipment)
+        (not
+          (support_equipment_allocated_to_entity ?batch ?support_equipment)
+        )
+      )
+  )
+  (:action attach_calibration_certificate_to_record
+    :parameters (?batch_record - batch_record ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (calibration_certificate_available ?calibration_certificate)
+      )
+    :effect
+      (and
+        (record_linked_to_calibration_certificate ?batch_record ?calibration_certificate)
+        (not
+          (calibration_certificate_available ?calibration_certificate)
+        )
+      )
+  )
+  (:action detach_calibration_certificate_from_record
+    :parameters (?batch_record - batch_record ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (record_linked_to_calibration_certificate ?batch_record ?calibration_certificate)
+      )
+    :effect
+      (and
+        (calibration_certificate_available ?calibration_certificate)
+        (not
+          (record_linked_to_calibration_certificate ?batch_record ?calibration_certificate)
+        )
+      )
+  )
+  (:action attach_regulatory_signoff_to_record
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (regulatory_signoff_available ?regulatory_signoff)
+      )
+    :effect
+      (and
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (not
+          (regulatory_signoff_available ?regulatory_signoff)
+        )
+      )
+  )
+  (:action detach_regulatory_signoff_from_record
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff)
+    :precondition
+      (and
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+      )
+    :effect
+      (and
+        (regulatory_signoff_available ?regulatory_signoff)
+        (not
+          (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        )
+      )
+  )
+  (:action stage_port_a_for_upstream_segment
+    :parameters (?upstream_segment - upstream_segment ?equipment_port_a - equipment_port_a ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (production_entity_activated ?upstream_segment)
+        (transient_assigned_to_entity ?upstream_segment ?transient_resource)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (not
+          (port_a_staged ?equipment_port_a)
+        )
+        (not
+          (port_a_engaged ?equipment_port_a)
+        )
+      )
+    :effect (port_a_staged ?equipment_port_a)
+  )
+  (:action prepare_upstream_segment_with_support_equipment
+    :parameters (?upstream_segment - upstream_segment ?equipment_port_a - equipment_port_a ?support_equipment - support_equipment)
+    :precondition
+      (and
+        (production_entity_activated ?upstream_segment)
+        (support_equipment_allocated_to_entity ?upstream_segment ?support_equipment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (port_a_staged ?equipment_port_a)
+        (not
+          (upstream_segment_prepared ?upstream_segment)
+        )
+      )
+    :effect
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (upstream_segment_ready ?upstream_segment)
+      )
+  )
+  (:action assign_consumable_to_upstream_segment_and_lock_port
+    :parameters (?upstream_segment - upstream_segment ?equipment_port_a - equipment_port_a ?consumable_material - consumable_material)
+    :precondition
+      (and
+        (production_entity_activated ?upstream_segment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (consumable_available ?consumable_material)
+        (not
+          (upstream_segment_prepared ?upstream_segment)
+        )
+      )
+    :effect
+      (and
+        (port_a_engaged ?equipment_port_a)
+        (upstream_segment_prepared ?upstream_segment)
+        (consumable_assigned_to_upstream_entity ?upstream_segment ?consumable_material)
+        (not
+          (consumable_available ?consumable_material)
+        )
+      )
+  )
+  (:action finalize_upstream_segment_consumable_usage
+    :parameters (?upstream_segment - upstream_segment ?equipment_port_a - equipment_port_a ?transient_resource - transient_resource ?consumable_material - consumable_material)
+    :precondition
+      (and
+        (production_entity_activated ?upstream_segment)
+        (transient_assigned_to_entity ?upstream_segment ?transient_resource)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (port_a_engaged ?equipment_port_a)
+        (consumable_assigned_to_upstream_entity ?upstream_segment ?consumable_material)
+        (not
+          (upstream_segment_ready ?upstream_segment)
+        )
+      )
+    :effect
+      (and
+        (port_a_staged ?equipment_port_a)
+        (upstream_segment_ready ?upstream_segment)
+        (consumable_available ?consumable_material)
+        (not
+          (consumable_assigned_to_upstream_entity ?upstream_segment ?consumable_material)
+        )
+      )
+  )
+  (:action stage_port_b_for_downstream_segment
+    :parameters (?downstream_segment - downstream_segment ?equipment_port_b - equipment_port_b ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (production_entity_activated ?downstream_segment)
+        (transient_assigned_to_entity ?downstream_segment ?transient_resource)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (not
+          (port_b_staged ?equipment_port_b)
+        )
+        (not
+          (port_b_engaged ?equipment_port_b)
+        )
+      )
+    :effect (port_b_staged ?equipment_port_b)
+  )
+  (:action prepare_downstream_segment_with_support_equipment
+    :parameters (?downstream_segment - downstream_segment ?equipment_port_b - equipment_port_b ?support_equipment - support_equipment)
+    :precondition
+      (and
+        (production_entity_activated ?downstream_segment)
+        (support_equipment_allocated_to_entity ?downstream_segment ?support_equipment)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_b_staged ?equipment_port_b)
+        (not
+          (downstream_segment_prepared ?downstream_segment)
+        )
+      )
+    :effect
+      (and
+        (downstream_segment_prepared ?downstream_segment)
+        (downstream_segment_ready ?downstream_segment)
+      )
+  )
+  (:action assign_consumable_to_downstream_segment_and_lock_port
+    :parameters (?downstream_segment - downstream_segment ?equipment_port_b - equipment_port_b ?consumable_material - consumable_material)
+    :precondition
+      (and
+        (production_entity_activated ?downstream_segment)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (consumable_available ?consumable_material)
+        (not
+          (downstream_segment_prepared ?downstream_segment)
+        )
+      )
+    :effect
+      (and
+        (port_b_engaged ?equipment_port_b)
+        (downstream_segment_prepared ?downstream_segment)
+        (consumable_assigned_to_downstream_entity ?downstream_segment ?consumable_material)
+        (not
+          (consumable_available ?consumable_material)
+        )
+      )
+  )
+  (:action finalize_downstream_segment_consumable_usage
+    :parameters (?downstream_segment - downstream_segment ?equipment_port_b - equipment_port_b ?transient_resource - transient_resource ?consumable_material - consumable_material)
+    :precondition
+      (and
+        (production_entity_activated ?downstream_segment)
+        (transient_assigned_to_entity ?downstream_segment ?transient_resource)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_b_engaged ?equipment_port_b)
+        (consumable_assigned_to_downstream_entity ?downstream_segment ?consumable_material)
+        (not
+          (downstream_segment_ready ?downstream_segment)
+        )
+      )
+    :effect
+      (and
+        (port_b_staged ?equipment_port_b)
+        (downstream_segment_ready ?downstream_segment)
+        (consumable_available ?consumable_material)
+        (not
+          (consumable_assigned_to_downstream_entity ?downstream_segment ?consumable_material)
+        )
+      )
+  )
+  (:action reserve_shared_unit_with_ports_staged
+    :parameters (?upstream_segment - upstream_segment ?downstream_segment - downstream_segment ?equipment_port_a - equipment_port_a ?equipment_port_b - equipment_port_b ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (downstream_segment_prepared ?downstream_segment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_a_staged ?equipment_port_a)
+        (port_b_staged ?equipment_port_b)
+        (upstream_segment_ready ?upstream_segment)
+        (downstream_segment_ready ?downstream_segment)
+        (shared_unit_available ?shared_unit)
+      )
+    :effect
+      (and
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_port_a_link ?shared_unit ?equipment_port_a)
+        (shared_unit_port_b_link ?shared_unit ?equipment_port_b)
+        (not
+          (shared_unit_available ?shared_unit)
+        )
+      )
+  )
+  (:action reserve_shared_unit_with_port_a_engaged
+    :parameters (?upstream_segment - upstream_segment ?downstream_segment - downstream_segment ?equipment_port_a - equipment_port_a ?equipment_port_b - equipment_port_b ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (downstream_segment_prepared ?downstream_segment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_a_engaged ?equipment_port_a)
+        (port_b_staged ?equipment_port_b)
+        (not
+          (upstream_segment_ready ?upstream_segment)
+        )
+        (downstream_segment_ready ?downstream_segment)
+        (shared_unit_available ?shared_unit)
+      )
+    :effect
+      (and
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_port_a_link ?shared_unit ?equipment_port_a)
+        (shared_unit_port_b_link ?shared_unit ?equipment_port_b)
+        (shared_unit_requires_manual_setup ?shared_unit)
+        (not
+          (shared_unit_available ?shared_unit)
+        )
+      )
+  )
+  (:action reserve_shared_unit_with_port_b_engaged
+    :parameters (?upstream_segment - upstream_segment ?downstream_segment - downstream_segment ?equipment_port_a - equipment_port_a ?equipment_port_b - equipment_port_b ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (downstream_segment_prepared ?downstream_segment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_a_staged ?equipment_port_a)
+        (port_b_engaged ?equipment_port_b)
+        (upstream_segment_ready ?upstream_segment)
+        (not
+          (downstream_segment_ready ?downstream_segment)
+        )
+        (shared_unit_available ?shared_unit)
+      )
+    :effect
+      (and
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_port_a_link ?shared_unit ?equipment_port_a)
+        (shared_unit_port_b_link ?shared_unit ?equipment_port_b)
+        (shared_unit_requires_automated_setup ?shared_unit)
+        (not
+          (shared_unit_available ?shared_unit)
+        )
+      )
+  )
+  (:action reserve_shared_unit_with_both_ports_engaged
+    :parameters (?upstream_segment - upstream_segment ?downstream_segment - downstream_segment ?equipment_port_a - equipment_port_a ?equipment_port_b - equipment_port_b ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (downstream_segment_prepared ?downstream_segment)
+        (segment_port_compatibility ?upstream_segment ?equipment_port_a)
+        (segment_port_b_compatibility ?downstream_segment ?equipment_port_b)
+        (port_a_engaged ?equipment_port_a)
+        (port_b_engaged ?equipment_port_b)
+        (not
+          (upstream_segment_ready ?upstream_segment)
+        )
+        (not
+          (downstream_segment_ready ?downstream_segment)
+        )
+        (shared_unit_available ?shared_unit)
+      )
+    :effect
+      (and
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_port_a_link ?shared_unit ?equipment_port_a)
+        (shared_unit_port_b_link ?shared_unit ?equipment_port_b)
+        (shared_unit_requires_manual_setup ?shared_unit)
+        (shared_unit_requires_automated_setup ?shared_unit)
+        (not
+          (shared_unit_available ?shared_unit)
+        )
+      )
+  )
+  (:action stage_shared_unit_for_processing
+    :parameters (?shared_unit - shared_unit ?upstream_segment - upstream_segment ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (shared_unit_reserved ?shared_unit)
+        (upstream_segment_prepared ?upstream_segment)
+        (transient_assigned_to_entity ?upstream_segment ?transient_resource)
+        (not
+          (shared_unit_ready_for_qc_sampling ?shared_unit)
+        )
+      )
+    :effect (shared_unit_ready_for_qc_sampling ?shared_unit)
+  )
+  (:action collect_and_assign_qc_sample_to_unit
+    :parameters (?batch_record - batch_record ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (record_associated_with_shared_unit ?batch_record ?shared_unit)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_container_available ?qc_sample_container)
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_ready_for_qc_sampling ?shared_unit)
+        (not
+          (qc_sample_collected ?qc_sample_container)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_collected ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (not
+          (qc_sample_container_available ?qc_sample_container)
+        )
+      )
+  )
+  (:action validate_qc_sample_for_record
+    :parameters (?batch_record - batch_record ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_collected ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (transient_assigned_to_entity ?batch_record ?transient_resource)
+        (not
+          (shared_unit_requires_manual_setup ?shared_unit)
+        )
+        (not
+          (record_qc_sample_registered ?batch_record)
+        )
+      )
+    :effect (record_qc_sample_registered ?batch_record)
+  )
+  (:action assign_packaging_slot_to_record
+    :parameters (?batch_record - batch_record ?packaging_slot - packaging_slot)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (packaging_slot_available ?packaging_slot)
+        (not
+          (record_has_managerial_approval ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_has_managerial_approval ?batch_record)
+        (record_linked_to_packaging_slot ?batch_record ?packaging_slot)
+        (not
+          (packaging_slot_available ?packaging_slot)
+        )
+      )
+  )
+  (:action process_qc_sample_and_attach_approval
+    :parameters (?batch_record - batch_record ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit ?transient_resource - transient_resource ?packaging_slot - packaging_slot)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_collected ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (transient_assigned_to_entity ?batch_record ?transient_resource)
+        (shared_unit_requires_manual_setup ?shared_unit)
+        (record_has_managerial_approval ?batch_record)
+        (record_linked_to_packaging_slot ?batch_record ?packaging_slot)
+        (not
+          (record_qc_sample_registered ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_qc_sample_registered ?batch_record)
+        (record_approval_attached ?batch_record)
+      )
+  )
+  (:action perform_calibrated_qc_inspection
+    :parameters (?batch_record - batch_record ?calibration_certificate - calibration_certificate ?support_equipment - support_equipment ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_registered ?batch_record)
+        (record_linked_to_calibration_certificate ?batch_record ?calibration_certificate)
+        (support_equipment_allocated_to_entity ?batch_record ?support_equipment)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (not
+          (shared_unit_requires_automated_setup ?shared_unit)
+        )
+        (not
+          (record_qc_sample_validated ?batch_record)
+        )
+      )
+    :effect (record_qc_sample_validated ?batch_record)
+  )
+  (:action perform_calibrated_qc_inspection_variant
+    :parameters (?batch_record - batch_record ?calibration_certificate - calibration_certificate ?support_equipment - support_equipment ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_registered ?batch_record)
+        (record_linked_to_calibration_certificate ?batch_record ?calibration_certificate)
+        (support_equipment_allocated_to_entity ?batch_record ?support_equipment)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (shared_unit_requires_automated_setup ?shared_unit)
+        (not
+          (record_qc_sample_validated ?batch_record)
+        )
+      )
+    :effect (record_qc_sample_validated ?batch_record)
+  )
+  (:action apply_regulatory_signoff_and_mark_record_reviewed
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_validated ?batch_record)
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (not
+          (shared_unit_requires_manual_setup ?shared_unit)
+        )
+        (not
+          (shared_unit_requires_automated_setup ?shared_unit)
+        )
+        (not
+          (record_qc_inspector_ready ?batch_record)
+        )
+      )
+    :effect (record_qc_inspector_ready ?batch_record)
+  )
+  (:action apply_regulatory_signoff_and_attach_inspector
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_validated ?batch_record)
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (shared_unit_requires_manual_setup ?shared_unit)
+        (not
+          (shared_unit_requires_automated_setup ?shared_unit)
+        )
+        (not
+          (record_qc_inspector_ready ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_inspector_attached ?batch_record)
+      )
+  )
+  (:action apply_regulatory_signoff_and_attach_inspector_alt
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_validated ?batch_record)
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (not
+          (shared_unit_requires_manual_setup ?shared_unit)
+        )
+        (shared_unit_requires_automated_setup ?shared_unit)
+        (not
+          (record_qc_inspector_ready ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_inspector_attached ?batch_record)
+      )
+  )
+  (:action apply_regulatory_signoff_and_attach_inspector_complete
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff ?qc_sample_container - qc_sample_container ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (record_qc_sample_validated ?batch_record)
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (record_linked_to_qc_sample_container ?batch_record ?qc_sample_container)
+        (qc_sample_assigned_to_entity ?qc_sample_container ?shared_unit)
+        (shared_unit_requires_manual_setup ?shared_unit)
+        (shared_unit_requires_automated_setup ?shared_unit)
+        (not
+          (record_qc_inspector_ready ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_inspector_attached ?batch_record)
+      )
+  )
+  (:action complete_record_without_inspector
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (not
+          (record_inspector_attached ?batch_record)
+        )
+        (not
+          (record_verification_flag ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_verification_flag ?batch_record)
+        (production_entity_completed ?batch_record)
+      )
+  )
+  (:action assign_qc_inspector_to_record
+    :parameters (?batch_record - batch_record ?quality_inspector - quality_inspector)
+    :precondition
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_inspector_attached ?batch_record)
+        (quality_inspector_available ?quality_inspector)
+      )
+    :effect
+      (and
+        (inspector_assigned_to_record ?batch_record ?quality_inspector)
+        (not
+          (quality_inspector_available ?quality_inspector)
+        )
+      )
+  )
+  (:action complete_record_documentation_and_mark_verified
+    :parameters (?batch_record - batch_record ?upstream_segment - upstream_segment ?downstream_segment - downstream_segment ?transient_resource - transient_resource ?quality_inspector - quality_inspector)
+    :precondition
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_inspector_attached ?batch_record)
+        (inspector_assigned_to_record ?batch_record ?quality_inspector)
+        (record_associated_with_upstream_segment ?batch_record ?upstream_segment)
+        (record_associated_with_downstream_segment ?batch_record ?downstream_segment)
+        (upstream_segment_ready ?upstream_segment)
+        (downstream_segment_ready ?downstream_segment)
+        (transient_assigned_to_entity ?batch_record ?transient_resource)
+        (not
+          (record_documentation_complete ?batch_record)
+        )
+      )
+    :effect (record_documentation_complete ?batch_record)
+  )
+  (:action finalize_record_and_mark_ready_for_release
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (record_qc_inspector_ready ?batch_record)
+        (record_documentation_complete ?batch_record)
+        (not
+          (record_verification_flag ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_verification_flag ?batch_record)
+        (production_entity_completed ?batch_record)
+      )
+  )
+  (:action apply_approval_token_to_record
+    :parameters (?batch_record - batch_record ?approval_token - approval_token ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (production_entity_activated ?batch_record)
+        (transient_assigned_to_entity ?batch_record ?transient_resource)
+        (approval_available ?approval_token)
+        (record_linked_to_approval_token ?batch_record ?approval_token)
+        (not
+          (record_approval_applied ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_approval_applied ?batch_record)
+        (not
+          (approval_available ?approval_token)
+        )
+      )
+  )
+  (:action mark_record_ready_for_signoff
+    :parameters (?batch_record - batch_record ?support_equipment - support_equipment)
+    :precondition
+      (and
+        (record_approval_applied ?batch_record)
+        (support_equipment_allocated_to_entity ?batch_record ?support_equipment)
+        (not
+          (record_ready_for_signoff ?batch_record)
+        )
+      )
+    :effect (record_ready_for_signoff ?batch_record)
+  )
+  (:action execute_regulatory_signoff_on_record
+    :parameters (?batch_record - batch_record ?regulatory_signoff - regulatory_signoff)
+    :precondition
+      (and
+        (record_ready_for_signoff ?batch_record)
+        (record_linked_to_regulatory_signoff ?batch_record ?regulatory_signoff)
+        (not
+          (record_regulatory_approved ?batch_record)
+        )
+      )
+    :effect (record_regulatory_approved ?batch_record)
+  )
+  (:action finalize_record_after_regulatory_approval
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (record_regulatory_approved ?batch_record)
+        (not
+          (record_verification_flag ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_verification_flag ?batch_record)
+        (production_entity_completed ?batch_record)
+      )
+  )
+  (:action complete_upstream_segment_work
+    :parameters (?upstream_segment - upstream_segment ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (upstream_segment_prepared ?upstream_segment)
+        (upstream_segment_ready ?upstream_segment)
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_ready_for_qc_sampling ?shared_unit)
+        (not
+          (production_entity_completed ?upstream_segment)
+        )
+      )
+    :effect (production_entity_completed ?upstream_segment)
+  )
+  (:action complete_downstream_segment_work
+    :parameters (?downstream_segment - downstream_segment ?shared_unit - shared_unit)
+    :precondition
+      (and
+        (downstream_segment_prepared ?downstream_segment)
+        (downstream_segment_ready ?downstream_segment)
+        (shared_unit_reserved ?shared_unit)
+        (shared_unit_ready_for_qc_sampling ?shared_unit)
+        (not
+          (production_entity_completed ?downstream_segment)
+        )
+      )
+    :effect (production_entity_completed ?downstream_segment)
+  )
+  (:action apply_release_document_to_batch
+    :parameters (?batch - batch ?release_document - release_document ?transient_resource - transient_resource)
+    :precondition
+      (and
+        (production_entity_completed ?batch)
+        (transient_assigned_to_entity ?batch ?transient_resource)
+        (release_document_available ?release_document)
+        (not
+          (entity_release_requested ?batch)
+        )
+      )
+    :effect
+      (and
+        (entity_release_requested ?batch)
+        (release_document_assigned_to_entity ?batch ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action activate_release_for_upstream_segment
+    :parameters (?upstream_segment - upstream_segment ?equipment_resource - equipment_resource ?release_document - release_document)
+    :precondition
+      (and
+        (entity_release_requested ?upstream_segment)
+        (equipment_allocated_to_entity ?upstream_segment ?equipment_resource)
+        (release_document_assigned_to_entity ?upstream_segment ?release_document)
+        (not
+          (release_activated ?upstream_segment)
+        )
+      )
+    :effect
+      (and
+        (release_activated ?upstream_segment)
+        (equipment_available ?equipment_resource)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action activate_release_for_downstream_segment
+    :parameters (?downstream_segment - downstream_segment ?equipment_resource - equipment_resource ?release_document - release_document)
+    :precondition
+      (and
+        (entity_release_requested ?downstream_segment)
+        (equipment_allocated_to_entity ?downstream_segment ?equipment_resource)
+        (release_document_assigned_to_entity ?downstream_segment ?release_document)
+        (not
+          (release_activated ?downstream_segment)
+        )
+      )
+    :effect
+      (and
+        (release_activated ?downstream_segment)
+        (equipment_available ?equipment_resource)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action activate_release_for_batch_record
+    :parameters (?batch_record - batch_record ?equipment_resource - equipment_resource ?release_document - release_document)
+    :precondition
+      (and
+        (entity_release_requested ?batch_record)
+        (equipment_allocated_to_entity ?batch_record ?equipment_resource)
+        (release_document_assigned_to_entity ?batch_record ?release_document)
+        (not
+          (release_activated ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (release_activated ?batch_record)
+        (equipment_available ?equipment_resource)
+        (release_document_available ?release_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem concurrent_batch_conflict_case)
+  (:domain concurrent_batch_resource_conflict_resolution)
+  (:objects upstream_segment_1 - upstream_segment downstream_segment_1 - downstream_segment batch_record_1 - batch_record batch_record_2 - batch_record equipment_slot_1 - equipment_resource equipment_slot_2 - equipment_resource equipment_slot_3 - equipment_resource operator_1 - transient_resource support_equipment_1 - support_equipment consumable_reagent_1 - consumable_material equipment_port_a_1 - equipment_port_a equipment_port_b_1 - equipment_port_b shared_unit_1 - shared_unit qc_sample_container_1 - qc_sample_container qc_sample_container_2 - qc_sample_container packaging_slot_1 - packaging_slot packaging_slot_2 - packaging_slot quality_inspector_1 - quality_inspector quality_inspector_2 - quality_inspector release_document_1 - release_document calibration_certificate_1 - calibration_certificate approval_token_1 - approval_token approval_token_2 - approval_token regulatory_signoff_1 - regulatory_signoff)
+  (:init
+    (equipment_available equipment_slot_1)
+    (equipment_available equipment_slot_2)
+    (equipment_available equipment_slot_3)
+    (transient_resource_available operator_1)
+    (support_equipment_available support_equipment_1)
+    (consumable_available consumable_reagent_1)
+    (segment_port_compatibility upstream_segment_1 equipment_port_a_1)
+    (segment_port_b_compatibility downstream_segment_1 equipment_port_b_1)
+    (shared_unit_available shared_unit_1)
+    (qc_sample_container_available qc_sample_container_1)
+    (qc_sample_container_available qc_sample_container_2)
+    (record_associated_with_upstream_segment batch_record_1 upstream_segment_1)
+    (record_associated_with_upstream_segment batch_record_2 upstream_segment_1)
+    (record_associated_with_downstream_segment batch_record_1 downstream_segment_1)
+    (record_associated_with_downstream_segment batch_record_2 downstream_segment_1)
+    (record_associated_with_shared_unit batch_record_1 shared_unit_1)
+    (record_associated_with_shared_unit batch_record_2 shared_unit_1)
+    (record_linked_to_qc_sample_container batch_record_1 qc_sample_container_1)
+    (record_linked_to_qc_sample_container batch_record_2 qc_sample_container_2)
+    (packaging_slot_available packaging_slot_1)
+    (packaging_slot_available packaging_slot_2)
+    (quality_inspector_available quality_inspector_1)
+    (quality_inspector_available quality_inspector_2)
+    (release_document_available release_document_1)
+    (calibration_certificate_available calibration_certificate_1)
+    (approval_available approval_token_1)
+    (record_linked_to_approval_token batch_record_1 approval_token_1)
+    (record_linked_to_approval_token batch_record_2 approval_token_2)
+    (regulatory_signoff_available regulatory_signoff_1)
+  )
+  (:goal
+    (and
+      (release_activated upstream_segment_1)
+      (release_activated downstream_segment_1)
+      (release_activated batch_record_1)
+      (release_activated batch_record_2)
+    )
+  )
+)

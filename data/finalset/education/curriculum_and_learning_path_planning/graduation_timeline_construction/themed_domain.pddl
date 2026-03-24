@@ -1,0 +1,936 @@
+(define (domain graduation_timeline_construction)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_resource - object document_and_credit_category - object event_category - object academic_entity_category - object academic_actor - academic_entity_category advisor_slot - administrative_resource course_offering - administrative_resource faculty_advisor - administrative_resource scholarship_offer - administrative_resource academic_distinction - administrative_resource ceremony_date - administrative_resource committee_evaluator - administrative_resource registrar_clearance - administrative_resource credit_unit - document_and_credit_category degree_requirement - document_and_credit_category reference_document - document_and_credit_category academic_term_slot - event_category ceremony_venue - event_category commencement_session - event_category student_profile - academic_actor degree_audit_base - academic_actor undergraduate_profile - student_profile transfer_profile - student_profile degree_audit_case - degree_audit_base)
+  (:predicates
+    (profile_initialized ?candidate - academic_actor)
+    (has_preliminary_clearance ?candidate - academic_actor)
+    (has_advisor ?candidate - academic_actor)
+    (degree_conferral_recorded ?candidate - academic_actor)
+    (degree_audit_verified_flag ?candidate - academic_actor)
+    (ready_for_conferral ?candidate - academic_actor)
+    (advisor_slot_available ?advisor_slot - advisor_slot)
+    (assigned_advisor_slot ?candidate - academic_actor ?advisor_slot - advisor_slot)
+    (course_offering_available ?course_offering - course_offering)
+    (enrollment_reservation ?candidate - academic_actor ?course_offering - course_offering)
+    (faculty_available ?faculty_advisor - faculty_advisor)
+    (faculty_assigned ?candidate - academic_actor ?faculty_advisor - faculty_advisor)
+    (credit_unit_available ?credit_unit - credit_unit)
+    (credit_reserved_for_undergrad ?undergrad_profile - undergraduate_profile ?credit_unit - credit_unit)
+    (credit_reserved_for_transfer_profile ?transfer_profile - transfer_profile ?credit_unit - credit_unit)
+    (profile_assigned_term_slot ?undergrad_profile - undergraduate_profile ?term_slot - academic_term_slot)
+    (term_slot_confirmed ?term_slot - academic_term_slot)
+    (term_slot_credit_allocated ?term_slot - academic_term_slot)
+    (undergrad_ready_for_commencement ?undergrad_profile - undergraduate_profile)
+    (assigned_ceremony_venue ?transfer_profile - transfer_profile ?ceremony_venue - ceremony_venue)
+    (ceremony_venue_reserved ?ceremony_venue - ceremony_venue)
+    (ceremony_venue_allocated ?ceremony_venue - ceremony_venue)
+    (transfer_ready_for_commencement ?transfer_profile - transfer_profile)
+    (commencement_session_available ?commencement_session - commencement_session)
+    (commencement_session_reserved ?commencement_session - commencement_session)
+    (session_assigned_term_slot ?commencement_session - commencement_session ?term_slot - academic_term_slot)
+    (session_assigned_venue ?commencement_session - commencement_session ?ceremony_venue - ceremony_venue)
+    (session_ready_for_undergraduate ?commencement_session - commencement_session)
+    (session_ready_for_transfer ?commencement_session - commencement_session)
+    (session_ready_for_conferral ?commencement_session - commencement_session)
+    (audit_case_for_undergraduate ?audit_case - degree_audit_case ?undergrad_profile - undergraduate_profile)
+    (audit_case_for_transfer ?audit_case - degree_audit_case ?transfer_profile - transfer_profile)
+    (audit_case_assigned_session ?audit_case - degree_audit_case ?commencement_session - commencement_session)
+    (requirement_document_available ?degree_requirement - degree_requirement)
+    (audit_case_has_requirement ?audit_case - degree_audit_case ?degree_requirement - degree_requirement)
+    (requirement_document_verified ?degree_requirement - degree_requirement)
+    (requirement_assigned_to_session ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    (audit_case_step_completed ?audit_case - degree_audit_case)
+    (committee_review_started ?audit_case - degree_audit_case)
+    (committee_review_completed ?audit_case - degree_audit_case)
+    (scholarship_assigned_flag ?audit_case - degree_audit_case)
+    (scholarship_confirmation_flag ?audit_case - degree_audit_case)
+    (audit_case_additional_verification ?audit_case - degree_audit_case)
+    (audit_case_authorized_for_conferral ?audit_case - degree_audit_case)
+    (reference_document_available ?reference_document - reference_document)
+    (audit_case_has_reference ?audit_case - degree_audit_case ?reference_document - reference_document)
+    (reference_attached_to_audit_case ?audit_case - degree_audit_case)
+    (faculty_confirmed_reference ?audit_case - degree_audit_case)
+    (post_reference_clearance_recorded ?audit_case - degree_audit_case)
+    (scholarship_offer_available ?scholarship_offer - scholarship_offer)
+    (audit_case_scholarship_assigned ?audit_case - degree_audit_case ?scholarship_offer - scholarship_offer)
+    (distinction_available ?academic_distinction - academic_distinction)
+    (audit_case_has_distinction ?audit_case - degree_audit_case ?academic_distinction - academic_distinction)
+    (committee_evaluator_available ?committee_evaluator - committee_evaluator)
+    (audit_case_assigned_evaluator ?audit_case - degree_audit_case ?committee_evaluator - committee_evaluator)
+    (registrar_clearance_available ?registrar_clearance - registrar_clearance)
+    (audit_case_assigned_clearance ?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance)
+    (ceremony_date_available ?ceremony_date - ceremony_date)
+    (candidate_assigned_ceremony_date ?candidate - academic_actor ?ceremony_date - ceremony_date)
+    (undergrad_term_processed ?undergrad_profile - undergraduate_profile)
+    (transfer_term_processed ?transfer_profile - transfer_profile)
+    (audit_case_sealed ?audit_case - degree_audit_case)
+  )
+  (:action create_candidate_record
+    :parameters (?candidate - academic_actor)
+    :precondition
+      (and
+        (not
+          (profile_initialized ?candidate)
+        )
+        (not
+          (degree_conferral_recorded ?candidate)
+        )
+      )
+    :effect (profile_initialized ?candidate)
+  )
+  (:action assign_advisor_slot
+    :parameters (?candidate - academic_actor ?advisor_slot - advisor_slot)
+    :precondition
+      (and
+        (profile_initialized ?candidate)
+        (not
+          (has_advisor ?candidate)
+        )
+        (advisor_slot_available ?advisor_slot)
+      )
+    :effect
+      (and
+        (has_advisor ?candidate)
+        (assigned_advisor_slot ?candidate ?advisor_slot)
+        (not
+          (advisor_slot_available ?advisor_slot)
+        )
+      )
+  )
+  (:action reserve_course_enrollment
+    :parameters (?candidate - academic_actor ?course_offering - course_offering)
+    :precondition
+      (and
+        (profile_initialized ?candidate)
+        (has_advisor ?candidate)
+        (course_offering_available ?course_offering)
+      )
+    :effect
+      (and
+        (enrollment_reservation ?candidate ?course_offering)
+        (not
+          (course_offering_available ?course_offering)
+        )
+      )
+  )
+  (:action finalize_enrollment
+    :parameters (?candidate - academic_actor ?course_offering - course_offering)
+    :precondition
+      (and
+        (profile_initialized ?candidate)
+        (has_advisor ?candidate)
+        (enrollment_reservation ?candidate ?course_offering)
+        (not
+          (has_preliminary_clearance ?candidate)
+        )
+      )
+    :effect (has_preliminary_clearance ?candidate)
+  )
+  (:action cancel_course_enrollment
+    :parameters (?candidate - academic_actor ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_reservation ?candidate ?course_offering)
+      )
+    :effect
+      (and
+        (course_offering_available ?course_offering)
+        (not
+          (enrollment_reservation ?candidate ?course_offering)
+        )
+      )
+  )
+  (:action assign_faculty_approver
+    :parameters (?candidate - academic_actor ?faculty_advisor - faculty_advisor)
+    :precondition
+      (and
+        (has_preliminary_clearance ?candidate)
+        (faculty_available ?faculty_advisor)
+      )
+    :effect
+      (and
+        (faculty_assigned ?candidate ?faculty_advisor)
+        (not
+          (faculty_available ?faculty_advisor)
+        )
+      )
+  )
+  (:action release_faculty_approver
+    :parameters (?candidate - academic_actor ?faculty_advisor - faculty_advisor)
+    :precondition
+      (and
+        (faculty_assigned ?candidate ?faculty_advisor)
+      )
+    :effect
+      (and
+        (faculty_available ?faculty_advisor)
+        (not
+          (faculty_assigned ?candidate ?faculty_advisor)
+        )
+      )
+  )
+  (:action assign_committee_evaluator_to_audit
+    :parameters (?audit_case - degree_audit_case ?committee_evaluator - committee_evaluator)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (committee_evaluator_available ?committee_evaluator)
+      )
+    :effect
+      (and
+        (audit_case_assigned_evaluator ?audit_case ?committee_evaluator)
+        (not
+          (committee_evaluator_available ?committee_evaluator)
+        )
+      )
+  )
+  (:action unassign_committee_evaluator_from_audit
+    :parameters (?audit_case - degree_audit_case ?committee_evaluator - committee_evaluator)
+    :precondition
+      (and
+        (audit_case_assigned_evaluator ?audit_case ?committee_evaluator)
+      )
+    :effect
+      (and
+        (committee_evaluator_available ?committee_evaluator)
+        (not
+          (audit_case_assigned_evaluator ?audit_case ?committee_evaluator)
+        )
+      )
+  )
+  (:action assign_registrar_clearance_to_audit
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (registrar_clearance_available ?registrar_clearance)
+      )
+    :effect
+      (and
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (not
+          (registrar_clearance_available ?registrar_clearance)
+        )
+      )
+  )
+  (:action release_registrar_clearance_from_audit
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+      )
+    :effect
+      (and
+        (registrar_clearance_available ?registrar_clearance)
+        (not
+          (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        )
+      )
+  )
+  (:action confirm_term_slot_for_undergrad_profile
+    :parameters (?undergrad_profile - undergraduate_profile ?term_slot - academic_term_slot ?course_offering - course_offering)
+    :precondition
+      (and
+        (has_preliminary_clearance ?undergrad_profile)
+        (enrollment_reservation ?undergrad_profile ?course_offering)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (not
+          (term_slot_confirmed ?term_slot)
+        )
+        (not
+          (term_slot_credit_allocated ?term_slot)
+        )
+      )
+    :effect (term_slot_confirmed ?term_slot)
+  )
+  (:action approve_undergrad_term_by_faculty
+    :parameters (?undergrad_profile - undergraduate_profile ?term_slot - academic_term_slot ?faculty_advisor - faculty_advisor)
+    :precondition
+      (and
+        (has_preliminary_clearance ?undergrad_profile)
+        (faculty_assigned ?undergrad_profile ?faculty_advisor)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (term_slot_confirmed ?term_slot)
+        (not
+          (undergrad_term_processed ?undergrad_profile)
+        )
+      )
+    :effect
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+      )
+  )
+  (:action allocate_credit_unit_to_undergrad_profile
+    :parameters (?undergrad_profile - undergraduate_profile ?term_slot - academic_term_slot ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (has_preliminary_clearance ?undergrad_profile)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (credit_unit_available ?credit_unit)
+        (not
+          (undergrad_term_processed ?undergrad_profile)
+        )
+      )
+    :effect
+      (and
+        (term_slot_credit_allocated ?term_slot)
+        (undergrad_term_processed ?undergrad_profile)
+        (credit_reserved_for_undergrad ?undergrad_profile ?credit_unit)
+        (not
+          (credit_unit_available ?credit_unit)
+        )
+      )
+  )
+  (:action commit_undergrad_credit_allocation
+    :parameters (?undergrad_profile - undergraduate_profile ?term_slot - academic_term_slot ?course_offering - course_offering ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (has_preliminary_clearance ?undergrad_profile)
+        (enrollment_reservation ?undergrad_profile ?course_offering)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (term_slot_credit_allocated ?term_slot)
+        (credit_reserved_for_undergrad ?undergrad_profile ?credit_unit)
+        (not
+          (undergrad_ready_for_commencement ?undergrad_profile)
+        )
+      )
+    :effect
+      (and
+        (term_slot_confirmed ?term_slot)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+        (credit_unit_available ?credit_unit)
+        (not
+          (credit_reserved_for_undergrad ?undergrad_profile ?credit_unit)
+        )
+      )
+  )
+  (:action confirm_ceremony_venue_for_transfer_profile
+    :parameters (?transfer_profile - transfer_profile ?ceremony_venue - ceremony_venue ?course_offering - course_offering)
+    :precondition
+      (and
+        (has_preliminary_clearance ?transfer_profile)
+        (enrollment_reservation ?transfer_profile ?course_offering)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (not
+          (ceremony_venue_reserved ?ceremony_venue)
+        )
+        (not
+          (ceremony_venue_allocated ?ceremony_venue)
+        )
+      )
+    :effect (ceremony_venue_reserved ?ceremony_venue)
+  )
+  (:action approve_transfer_venue_by_faculty
+    :parameters (?transfer_profile - transfer_profile ?ceremony_venue - ceremony_venue ?faculty_advisor - faculty_advisor)
+    :precondition
+      (and
+        (has_preliminary_clearance ?transfer_profile)
+        (faculty_assigned ?transfer_profile ?faculty_advisor)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (ceremony_venue_reserved ?ceremony_venue)
+        (not
+          (transfer_term_processed ?transfer_profile)
+        )
+      )
+    :effect
+      (and
+        (transfer_term_processed ?transfer_profile)
+        (transfer_ready_for_commencement ?transfer_profile)
+      )
+  )
+  (:action allocate_credit_unit_to_transfer_profile
+    :parameters (?transfer_profile - transfer_profile ?ceremony_venue - ceremony_venue ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (has_preliminary_clearance ?transfer_profile)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (credit_unit_available ?credit_unit)
+        (not
+          (transfer_term_processed ?transfer_profile)
+        )
+      )
+    :effect
+      (and
+        (ceremony_venue_allocated ?ceremony_venue)
+        (transfer_term_processed ?transfer_profile)
+        (credit_reserved_for_transfer_profile ?transfer_profile ?credit_unit)
+        (not
+          (credit_unit_available ?credit_unit)
+        )
+      )
+  )
+  (:action commit_transfer_credit_allocation
+    :parameters (?transfer_profile - transfer_profile ?ceremony_venue - ceremony_venue ?course_offering - course_offering ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (has_preliminary_clearance ?transfer_profile)
+        (enrollment_reservation ?transfer_profile ?course_offering)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (ceremony_venue_allocated ?ceremony_venue)
+        (credit_reserved_for_transfer_profile ?transfer_profile ?credit_unit)
+        (not
+          (transfer_ready_for_commencement ?transfer_profile)
+        )
+      )
+    :effect
+      (and
+        (ceremony_venue_reserved ?ceremony_venue)
+        (transfer_ready_for_commencement ?transfer_profile)
+        (credit_unit_available ?credit_unit)
+        (not
+          (credit_reserved_for_transfer_profile ?transfer_profile ?credit_unit)
+        )
+      )
+  )
+  (:action allocate_commencement_session_primary
+    :parameters (?undergrad_profile - undergraduate_profile ?transfer_profile - transfer_profile ?term_slot - academic_term_slot ?ceremony_venue - ceremony_venue ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (transfer_term_processed ?transfer_profile)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (term_slot_confirmed ?term_slot)
+        (ceremony_venue_reserved ?ceremony_venue)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+        (transfer_ready_for_commencement ?transfer_profile)
+        (commencement_session_available ?commencement_session)
+      )
+    :effect
+      (and
+        (commencement_session_reserved ?commencement_session)
+        (session_assigned_term_slot ?commencement_session ?term_slot)
+        (session_assigned_venue ?commencement_session ?ceremony_venue)
+        (not
+          (commencement_session_available ?commencement_session)
+        )
+      )
+  )
+  (:action allocate_commencement_session_variant_1
+    :parameters (?undergrad_profile - undergraduate_profile ?transfer_profile - transfer_profile ?term_slot - academic_term_slot ?ceremony_venue - ceremony_venue ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (transfer_term_processed ?transfer_profile)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (term_slot_credit_allocated ?term_slot)
+        (ceremony_venue_reserved ?ceremony_venue)
+        (not
+          (undergrad_ready_for_commencement ?undergrad_profile)
+        )
+        (transfer_ready_for_commencement ?transfer_profile)
+        (commencement_session_available ?commencement_session)
+      )
+    :effect
+      (and
+        (commencement_session_reserved ?commencement_session)
+        (session_assigned_term_slot ?commencement_session ?term_slot)
+        (session_assigned_venue ?commencement_session ?ceremony_venue)
+        (session_ready_for_undergraduate ?commencement_session)
+        (not
+          (commencement_session_available ?commencement_session)
+        )
+      )
+  )
+  (:action allocate_commencement_session_variant_2
+    :parameters (?undergrad_profile - undergraduate_profile ?transfer_profile - transfer_profile ?term_slot - academic_term_slot ?ceremony_venue - ceremony_venue ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (transfer_term_processed ?transfer_profile)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (term_slot_confirmed ?term_slot)
+        (ceremony_venue_allocated ?ceremony_venue)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+        (not
+          (transfer_ready_for_commencement ?transfer_profile)
+        )
+        (commencement_session_available ?commencement_session)
+      )
+    :effect
+      (and
+        (commencement_session_reserved ?commencement_session)
+        (session_assigned_term_slot ?commencement_session ?term_slot)
+        (session_assigned_venue ?commencement_session ?ceremony_venue)
+        (session_ready_for_transfer ?commencement_session)
+        (not
+          (commencement_session_available ?commencement_session)
+        )
+      )
+  )
+  (:action allocate_commencement_session_variant_3
+    :parameters (?undergrad_profile - undergraduate_profile ?transfer_profile - transfer_profile ?term_slot - academic_term_slot ?ceremony_venue - ceremony_venue ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (transfer_term_processed ?transfer_profile)
+        (profile_assigned_term_slot ?undergrad_profile ?term_slot)
+        (assigned_ceremony_venue ?transfer_profile ?ceremony_venue)
+        (term_slot_credit_allocated ?term_slot)
+        (ceremony_venue_allocated ?ceremony_venue)
+        (not
+          (undergrad_ready_for_commencement ?undergrad_profile)
+        )
+        (not
+          (transfer_ready_for_commencement ?transfer_profile)
+        )
+        (commencement_session_available ?commencement_session)
+      )
+    :effect
+      (and
+        (commencement_session_reserved ?commencement_session)
+        (session_assigned_term_slot ?commencement_session ?term_slot)
+        (session_assigned_venue ?commencement_session ?ceremony_venue)
+        (session_ready_for_undergraduate ?commencement_session)
+        (session_ready_for_transfer ?commencement_session)
+        (not
+          (commencement_session_available ?commencement_session)
+        )
+      )
+  )
+  (:action mark_session_ready_for_conferral
+    :parameters (?commencement_session - commencement_session ?undergrad_profile - undergraduate_profile ?course_offering - course_offering)
+    :precondition
+      (and
+        (commencement_session_reserved ?commencement_session)
+        (undergrad_term_processed ?undergrad_profile)
+        (enrollment_reservation ?undergrad_profile ?course_offering)
+        (not
+          (session_ready_for_conferral ?commencement_session)
+        )
+      )
+    :effect (session_ready_for_conferral ?commencement_session)
+  )
+  (:action verify_and_attach_degree_requirement_document
+    :parameters (?audit_case - degree_audit_case ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (audit_case_assigned_session ?audit_case ?commencement_session)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_document_available ?degree_requirement)
+        (commencement_session_reserved ?commencement_session)
+        (session_ready_for_conferral ?commencement_session)
+        (not
+          (requirement_document_verified ?degree_requirement)
+        )
+      )
+    :effect
+      (and
+        (requirement_document_verified ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (not
+          (requirement_document_available ?degree_requirement)
+        )
+      )
+  )
+  (:action complete_requirement_verification_step
+    :parameters (?audit_case - degree_audit_case ?degree_requirement - degree_requirement ?commencement_session - commencement_session ?course_offering - course_offering)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_document_verified ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (enrollment_reservation ?audit_case ?course_offering)
+        (not
+          (session_ready_for_undergraduate ?commencement_session)
+        )
+        (not
+          (audit_case_step_completed ?audit_case)
+        )
+      )
+    :effect (audit_case_step_completed ?audit_case)
+  )
+  (:action assign_scholarship_to_audit_case
+    :parameters (?audit_case - degree_audit_case ?scholarship_offer - scholarship_offer)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (scholarship_offer_available ?scholarship_offer)
+        (not
+          (scholarship_assigned_flag ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (scholarship_assigned_flag ?audit_case)
+        (audit_case_scholarship_assigned ?audit_case ?scholarship_offer)
+        (not
+          (scholarship_offer_available ?scholarship_offer)
+        )
+      )
+  )
+  (:action confirm_scholarship_and_requirements_for_audit
+    :parameters (?audit_case - degree_audit_case ?degree_requirement - degree_requirement ?commencement_session - commencement_session ?course_offering - course_offering ?scholarship_offer - scholarship_offer)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_document_verified ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (enrollment_reservation ?audit_case ?course_offering)
+        (session_ready_for_undergraduate ?commencement_session)
+        (scholarship_assigned_flag ?audit_case)
+        (audit_case_scholarship_assigned ?audit_case ?scholarship_offer)
+        (not
+          (audit_case_step_completed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (audit_case_step_completed ?audit_case)
+        (scholarship_confirmation_flag ?audit_case)
+      )
+  )
+  (:action initiate_committee_evaluation
+    :parameters (?audit_case - degree_audit_case ?committee_evaluator - committee_evaluator ?faculty_advisor - faculty_advisor ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (audit_case_step_completed ?audit_case)
+        (audit_case_assigned_evaluator ?audit_case ?committee_evaluator)
+        (faculty_assigned ?audit_case ?faculty_advisor)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (not
+          (session_ready_for_transfer ?commencement_session)
+        )
+        (not
+          (committee_review_started ?audit_case)
+        )
+      )
+    :effect (committee_review_started ?audit_case)
+  )
+  (:action initiate_committee_evaluation_alternate
+    :parameters (?audit_case - degree_audit_case ?committee_evaluator - committee_evaluator ?faculty_advisor - faculty_advisor ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (audit_case_step_completed ?audit_case)
+        (audit_case_assigned_evaluator ?audit_case ?committee_evaluator)
+        (faculty_assigned ?audit_case ?faculty_advisor)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (session_ready_for_transfer ?commencement_session)
+        (not
+          (committee_review_started ?audit_case)
+        )
+      )
+    :effect (committee_review_started ?audit_case)
+  )
+  (:action complete_committee_evaluation
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (committee_review_started ?audit_case)
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (not
+          (session_ready_for_undergraduate ?commencement_session)
+        )
+        (not
+          (session_ready_for_transfer ?commencement_session)
+        )
+        (not
+          (committee_review_completed ?audit_case)
+        )
+      )
+    :effect (committee_review_completed ?audit_case)
+  )
+  (:action complete_committee_evaluation_and_mark_verified_variant_1
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (committee_review_started ?audit_case)
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (session_ready_for_undergraduate ?commencement_session)
+        (not
+          (session_ready_for_transfer ?commencement_session)
+        )
+        (not
+          (committee_review_completed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_additional_verification ?audit_case)
+      )
+  )
+  (:action complete_committee_evaluation_and_mark_verified_variant_2
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (committee_review_started ?audit_case)
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (not
+          (session_ready_for_undergraduate ?commencement_session)
+        )
+        (session_ready_for_transfer ?commencement_session)
+        (not
+          (committee_review_completed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_additional_verification ?audit_case)
+      )
+  )
+  (:action complete_committee_evaluation_and_mark_verified_variant_3
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance ?degree_requirement - degree_requirement ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (committee_review_started ?audit_case)
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (audit_case_has_requirement ?audit_case ?degree_requirement)
+        (requirement_assigned_to_session ?degree_requirement ?commencement_session)
+        (session_ready_for_undergraduate ?commencement_session)
+        (session_ready_for_transfer ?commencement_session)
+        (not
+          (committee_review_completed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_additional_verification ?audit_case)
+      )
+  )
+  (:action finalize_degree_audit_case_documentation
+    :parameters (?audit_case - degree_audit_case)
+    :precondition
+      (and
+        (committee_review_completed ?audit_case)
+        (not
+          (audit_case_additional_verification ?audit_case)
+        )
+        (not
+          (audit_case_sealed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (audit_case_sealed ?audit_case)
+        (degree_audit_verified_flag ?audit_case)
+      )
+  )
+  (:action assign_academic_distinction_to_audit_case
+    :parameters (?audit_case - degree_audit_case ?academic_distinction - academic_distinction)
+    :precondition
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_additional_verification ?audit_case)
+        (distinction_available ?academic_distinction)
+      )
+    :effect
+      (and
+        (audit_case_has_distinction ?audit_case ?academic_distinction)
+        (not
+          (distinction_available ?academic_distinction)
+        )
+      )
+  )
+  (:action authorize_audit_case_for_conferral
+    :parameters (?audit_case - degree_audit_case ?undergrad_profile - undergraduate_profile ?transfer_profile - transfer_profile ?course_offering - course_offering ?academic_distinction - academic_distinction)
+    :precondition
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_additional_verification ?audit_case)
+        (audit_case_has_distinction ?audit_case ?academic_distinction)
+        (audit_case_for_undergraduate ?audit_case ?undergrad_profile)
+        (audit_case_for_transfer ?audit_case ?transfer_profile)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+        (transfer_ready_for_commencement ?transfer_profile)
+        (enrollment_reservation ?audit_case ?course_offering)
+        (not
+          (audit_case_authorized_for_conferral ?audit_case)
+        )
+      )
+    :effect (audit_case_authorized_for_conferral ?audit_case)
+  )
+  (:action finalize_degree_audit_case_authorization
+    :parameters (?audit_case - degree_audit_case)
+    :precondition
+      (and
+        (committee_review_completed ?audit_case)
+        (audit_case_authorized_for_conferral ?audit_case)
+        (not
+          (audit_case_sealed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (audit_case_sealed ?audit_case)
+        (degree_audit_verified_flag ?audit_case)
+      )
+  )
+  (:action attach_reference_document_to_audit_case
+    :parameters (?audit_case - degree_audit_case ?reference_document - reference_document ?course_offering - course_offering)
+    :precondition
+      (and
+        (has_preliminary_clearance ?audit_case)
+        (enrollment_reservation ?audit_case ?course_offering)
+        (reference_document_available ?reference_document)
+        (audit_case_has_reference ?audit_case ?reference_document)
+        (not
+          (reference_attached_to_audit_case ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (reference_attached_to_audit_case ?audit_case)
+        (not
+          (reference_document_available ?reference_document)
+        )
+      )
+  )
+  (:action faculty_confirm_reference_document
+    :parameters (?audit_case - degree_audit_case ?faculty_advisor - faculty_advisor)
+    :precondition
+      (and
+        (reference_attached_to_audit_case ?audit_case)
+        (faculty_assigned ?audit_case ?faculty_advisor)
+        (not
+          (faculty_confirmed_reference ?audit_case)
+        )
+      )
+    :effect (faculty_confirmed_reference ?audit_case)
+  )
+  (:action record_registrar_clearance_for_audit
+    :parameters (?audit_case - degree_audit_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (faculty_confirmed_reference ?audit_case)
+        (audit_case_assigned_clearance ?audit_case ?registrar_clearance)
+        (not
+          (post_reference_clearance_recorded ?audit_case)
+        )
+      )
+    :effect (post_reference_clearance_recorded ?audit_case)
+  )
+  (:action finalize_audit_case_post_reference
+    :parameters (?audit_case - degree_audit_case)
+    :precondition
+      (and
+        (post_reference_clearance_recorded ?audit_case)
+        (not
+          (audit_case_sealed ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (audit_case_sealed ?audit_case)
+        (degree_audit_verified_flag ?audit_case)
+      )
+  )
+  (:action finalize_undergrad_conferral
+    :parameters (?undergrad_profile - undergraduate_profile ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (undergrad_term_processed ?undergrad_profile)
+        (undergrad_ready_for_commencement ?undergrad_profile)
+        (commencement_session_reserved ?commencement_session)
+        (session_ready_for_conferral ?commencement_session)
+        (not
+          (degree_audit_verified_flag ?undergrad_profile)
+        )
+      )
+    :effect (degree_audit_verified_flag ?undergrad_profile)
+  )
+  (:action finalize_transfer_conferral
+    :parameters (?transfer_profile - transfer_profile ?commencement_session - commencement_session)
+    :precondition
+      (and
+        (transfer_term_processed ?transfer_profile)
+        (transfer_ready_for_commencement ?transfer_profile)
+        (commencement_session_reserved ?commencement_session)
+        (session_ready_for_conferral ?commencement_session)
+        (not
+          (degree_audit_verified_flag ?transfer_profile)
+        )
+      )
+    :effect (degree_audit_verified_flag ?transfer_profile)
+  )
+  (:action assign_ceremony_date_to_candidate
+    :parameters (?candidate - academic_actor ?ceremony_date - ceremony_date ?course_offering - course_offering)
+    :precondition
+      (and
+        (degree_audit_verified_flag ?candidate)
+        (enrollment_reservation ?candidate ?course_offering)
+        (ceremony_date_available ?ceremony_date)
+        (not
+          (ready_for_conferral ?candidate)
+        )
+      )
+    :effect
+      (and
+        (ready_for_conferral ?candidate)
+        (candidate_assigned_ceremony_date ?candidate ?ceremony_date)
+        (not
+          (ceremony_date_available ?ceremony_date)
+        )
+      )
+  )
+  (:action confirm_conferral_for_undergraduate_profile
+    :parameters (?undergrad_profile - undergraduate_profile ?advisor_slot - advisor_slot ?ceremony_date - ceremony_date)
+    :precondition
+      (and
+        (ready_for_conferral ?undergrad_profile)
+        (assigned_advisor_slot ?undergrad_profile ?advisor_slot)
+        (candidate_assigned_ceremony_date ?undergrad_profile ?ceremony_date)
+        (not
+          (degree_conferral_recorded ?undergrad_profile)
+        )
+      )
+    :effect
+      (and
+        (degree_conferral_recorded ?undergrad_profile)
+        (advisor_slot_available ?advisor_slot)
+        (ceremony_date_available ?ceremony_date)
+      )
+  )
+  (:action confirm_conferral_for_transfer_profile
+    :parameters (?transfer_profile - transfer_profile ?advisor_slot - advisor_slot ?ceremony_date - ceremony_date)
+    :precondition
+      (and
+        (ready_for_conferral ?transfer_profile)
+        (assigned_advisor_slot ?transfer_profile ?advisor_slot)
+        (candidate_assigned_ceremony_date ?transfer_profile ?ceremony_date)
+        (not
+          (degree_conferral_recorded ?transfer_profile)
+        )
+      )
+    :effect
+      (and
+        (degree_conferral_recorded ?transfer_profile)
+        (advisor_slot_available ?advisor_slot)
+        (ceremony_date_available ?ceremony_date)
+      )
+  )
+  (:action confirm_conferral_for_audit_case
+    :parameters (?audit_case - degree_audit_case ?advisor_slot - advisor_slot ?ceremony_date - ceremony_date)
+    :precondition
+      (and
+        (ready_for_conferral ?audit_case)
+        (assigned_advisor_slot ?audit_case ?advisor_slot)
+        (candidate_assigned_ceremony_date ?audit_case ?ceremony_date)
+        (not
+          (degree_conferral_recorded ?audit_case)
+        )
+      )
+    :effect
+      (and
+        (degree_conferral_recorded ?audit_case)
+        (advisor_slot_available ?advisor_slot)
+        (ceremony_date_available ?ceremony_date)
+      )
+  )
+)

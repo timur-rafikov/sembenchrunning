@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain wildfire_asset_protection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object resource_category - generic_object logistics_category - generic_object logistics_node_category - generic_object asset_category - generic_object asset_unit - asset_category containment_resource - resource_category inspection_tool - resource_category personnel - resource_category authorization_document - resource_category specialized_equipment - resource_category mitigation_plan - resource_category inspection_kit - resource_category external_support - resource_category supply_item - logistics_category repair_material - logistics_category credential - logistics_category resource_location - logistics_node_category transport_node - logistics_node_category contingency_asset - logistics_node_category production_site_category - asset_unit infrastructure_site_category - asset_unit local_management_unit - production_site_category response_crew_unit - production_site_category response_team_unit - infrastructure_site_category)
+
+  (:predicates
+    (unit_identified_for_response ?asset - asset_unit)
+    (unit_assessed ?asset - asset_unit)
+    (containment_assigned_to_unit ?asset - asset_unit)
+    (unit_secured_or_protected ?asset - asset_unit)
+    (operational_verification_completed ?asset - asset_unit)
+    (unit_salvaged_or_recovered ?asset - asset_unit)
+    (containment_resource_available ?containment_resource - containment_resource)
+    (resource_assigned_to_unit ?asset - asset_unit ?containment_resource - containment_resource)
+    (inspection_tool_available ?inspection_tool - inspection_tool)
+    (assessment_recorded_for_unit ?asset - asset_unit ?inspection_tool - inspection_tool)
+    (personnel_available ?responder - personnel)
+    (personnel_assigned_to_unit ?asset - asset_unit ?responder - personnel)
+    (supply_item_available ?supply_item - supply_item)
+    (supply_item_staged ?local_unit - local_management_unit ?supply_item - supply_item)
+    (supply_item_assigned_to_crew ?crew - response_crew_unit ?supply_item - supply_item)
+    (unit_has_resource_location ?local_unit - local_management_unit ?location - resource_location)
+    (location_ready ?location - resource_location)
+    (location_reserved ?location - resource_location)
+    (local_management_unit_ready ?local_unit - local_management_unit)
+    (crew_has_transport_node ?crew - response_crew_unit ?transport_node - transport_node)
+    (transport_node_ready ?transport_node - transport_node)
+    (transport_node_reserved ?transport_node - transport_node)
+    (crew_ready_state ?crew - response_crew_unit)
+    (contingency_asset_available ?contingency_asset - contingency_asset)
+    (contingency_asset_deployed ?contingency_asset - contingency_asset)
+    (contingency_asset_linked_to_location ?contingency_asset - contingency_asset ?location - resource_location)
+    (contingency_asset_linked_to_transport ?contingency_asset - contingency_asset ?transport_node - transport_node)
+    (contingency_asset_option_flag_a ?contingency_asset - contingency_asset)
+    (contingency_asset_option_flag_b ?contingency_asset - contingency_asset)
+    (contingency_asset_certified ?contingency_asset - contingency_asset)
+    (team_linked_to_local_unit ?team - response_team_unit ?local_unit - local_management_unit)
+    (team_linked_to_crew_unit ?team - response_team_unit ?crew - response_crew_unit)
+    (team_has_contingency_asset ?team - response_team_unit ?contingency_asset - contingency_asset)
+    (repair_material_available ?repair_material - repair_material)
+    (team_has_material ?team - response_team_unit ?repair_material - repair_material)
+    (material_allocated ?repair_material - repair_material)
+    (material_linked_to_contingency_asset ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    (team_certified_for_repair ?team - response_team_unit)
+    (team_ready_for_special_ops ?team - response_team_unit)
+    (team_has_external_support ?team - response_team_unit)
+    (team_has_authorization ?team - response_team_unit)
+    (authorization_acknowledged ?team - response_team_unit)
+    (team_has_documentation ?team - response_team_unit)
+    (repair_completed_by_team ?team - response_team_unit)
+    (external_credential_available ?credential - credential)
+    (team_has_credential ?team - response_team_unit ?credential - credential)
+    (authorization_granted ?team - response_team_unit)
+    (authorization_task_completed ?team - response_team_unit)
+    (external_support_accepted ?team - response_team_unit)
+    (permit_available ?permit - authorization_document)
+    (permit_assigned_to_team ?team - response_team_unit ?permit - authorization_document)
+    (specialized_equipment_available ?specialized_equipment - specialized_equipment)
+    (specialized_equipment_assigned ?team - response_team_unit ?specialized_equipment - specialized_equipment)
+    (inspection_kit_available ?inspection_kit - inspection_kit)
+    (inspection_kit_assigned ?team - response_team_unit ?inspection_kit - inspection_kit)
+    (external_support_available ?external_support - external_support)
+    (external_support_assigned ?team - response_team_unit ?external_support - external_support)
+    (mitigation_plan_available ?mitigation_plan - mitigation_plan)
+    (unit_has_mitigation_plan ?asset - asset_unit ?mitigation_plan - mitigation_plan)
+    (local_unit_precondition_flag ?local_unit - local_management_unit)
+    (crew_precondition_flag ?crew - response_crew_unit)
+    (team_closeout_recorded ?team - response_team_unit)
+  )
+  (:action identify_unit_for_response
+    :parameters (?asset - asset_unit)
+    :precondition
+      (and
+        (not
+          (unit_identified_for_response ?asset)
+        )
+        (not
+          (unit_secured_or_protected ?asset)
+        )
+      )
+    :effect (unit_identified_for_response ?asset)
+  )
+  (:action assign_containment_resource_to_unit
+    :parameters (?asset - asset_unit ?containment_resource - containment_resource)
+    :precondition
+      (and
+        (unit_identified_for_response ?asset)
+        (not
+          (containment_assigned_to_unit ?asset)
+        )
+        (containment_resource_available ?containment_resource)
+      )
+    :effect
+      (and
+        (containment_assigned_to_unit ?asset)
+        (resource_assigned_to_unit ?asset ?containment_resource)
+        (not
+          (containment_resource_available ?containment_resource)
+        )
+      )
+  )
+  (:action record_unit_inspection
+    :parameters (?asset - asset_unit ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_identified_for_response ?asset)
+        (containment_assigned_to_unit ?asset)
+        (inspection_tool_available ?inspection_tool)
+      )
+    :effect
+      (and
+        (assessment_recorded_for_unit ?asset ?inspection_tool)
+        (not
+          (inspection_tool_available ?inspection_tool)
+        )
+      )
+  )
+  (:action finalize_unit_inspection
+    :parameters (?asset - asset_unit ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_identified_for_response ?asset)
+        (containment_assigned_to_unit ?asset)
+        (assessment_recorded_for_unit ?asset ?inspection_tool)
+        (not
+          (unit_assessed ?asset)
+        )
+      )
+    :effect (unit_assessed ?asset)
+  )
+  (:action release_assessment_tool
+    :parameters (?asset - asset_unit ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (assessment_recorded_for_unit ?asset ?inspection_tool)
+      )
+    :effect
+      (and
+        (inspection_tool_available ?inspection_tool)
+        (not
+          (assessment_recorded_for_unit ?asset ?inspection_tool)
+        )
+      )
+  )
+  (:action assign_personnel_to_unit
+    :parameters (?asset - asset_unit ?responder - personnel)
+    :precondition
+      (and
+        (unit_assessed ?asset)
+        (personnel_available ?responder)
+      )
+    :effect
+      (and
+        (personnel_assigned_to_unit ?asset ?responder)
+        (not
+          (personnel_available ?responder)
+        )
+      )
+  )
+  (:action release_personnel_from_unit
+    :parameters (?asset - asset_unit ?responder - personnel)
+    :precondition
+      (and
+        (personnel_assigned_to_unit ?asset ?responder)
+      )
+    :effect
+      (and
+        (personnel_available ?responder)
+        (not
+          (personnel_assigned_to_unit ?asset ?responder)
+        )
+      )
+  )
+  (:action assign_inspection_kit_to_team
+    :parameters (?team - response_team_unit ?inspection_kit - inspection_kit)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (inspection_kit_available ?inspection_kit)
+      )
+    :effect
+      (and
+        (inspection_kit_assigned ?team ?inspection_kit)
+        (not
+          (inspection_kit_available ?inspection_kit)
+        )
+      )
+  )
+  (:action release_inspection_kit_from_team
+    :parameters (?team - response_team_unit ?inspection_kit - inspection_kit)
+    :precondition
+      (and
+        (inspection_kit_assigned ?team ?inspection_kit)
+      )
+    :effect
+      (and
+        (inspection_kit_available ?inspection_kit)
+        (not
+          (inspection_kit_assigned ?team ?inspection_kit)
+        )
+      )
+  )
+  (:action assign_external_support_to_team
+    :parameters (?team - response_team_unit ?external_support - external_support)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (external_support_available ?external_support)
+      )
+    :effect
+      (and
+        (external_support_assigned ?team ?external_support)
+        (not
+          (external_support_available ?external_support)
+        )
+      )
+  )
+  (:action release_external_support_from_team
+    :parameters (?team - response_team_unit ?external_support - external_support)
+    :precondition
+      (and
+        (external_support_assigned ?team ?external_support)
+      )
+    :effect
+      (and
+        (external_support_available ?external_support)
+        (not
+          (external_support_assigned ?team ?external_support)
+        )
+      )
+  )
+  (:action prepare_resource_location
+    :parameters (?local_unit - local_management_unit ?location - resource_location ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_assessed ?local_unit)
+        (assessment_recorded_for_unit ?local_unit ?inspection_tool)
+        (unit_has_resource_location ?local_unit ?location)
+        (not
+          (location_ready ?location)
+        )
+        (not
+          (location_reserved ?location)
+        )
+      )
+    :effect (location_ready ?location)
+  )
+  (:action stage_local_unit_with_personnel
+    :parameters (?local_unit - local_management_unit ?location - resource_location ?responder - personnel)
+    :precondition
+      (and
+        (unit_assessed ?local_unit)
+        (personnel_assigned_to_unit ?local_unit ?responder)
+        (unit_has_resource_location ?local_unit ?location)
+        (location_ready ?location)
+        (not
+          (local_unit_precondition_flag ?local_unit)
+        )
+      )
+    :effect
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (local_management_unit_ready ?local_unit)
+      )
+  )
+  (:action stage_supply_item_and_reserve_location
+    :parameters (?local_unit - local_management_unit ?location - resource_location ?supply_item - supply_item)
+    :precondition
+      (and
+        (unit_assessed ?local_unit)
+        (unit_has_resource_location ?local_unit ?location)
+        (supply_item_available ?supply_item)
+        (not
+          (local_unit_precondition_flag ?local_unit)
+        )
+      )
+    :effect
+      (and
+        (location_reserved ?location)
+        (local_unit_precondition_flag ?local_unit)
+        (supply_item_staged ?local_unit ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_location_staging_and_restore_supply
+    :parameters (?local_unit - local_management_unit ?location - resource_location ?inspection_tool - inspection_tool ?supply_item - supply_item)
+    :precondition
+      (and
+        (unit_assessed ?local_unit)
+        (assessment_recorded_for_unit ?local_unit ?inspection_tool)
+        (unit_has_resource_location ?local_unit ?location)
+        (location_reserved ?location)
+        (supply_item_staged ?local_unit ?supply_item)
+        (not
+          (local_management_unit_ready ?local_unit)
+        )
+      )
+    :effect
+      (and
+        (location_ready ?location)
+        (local_management_unit_ready ?local_unit)
+        (supply_item_available ?supply_item)
+        (not
+          (supply_item_staged ?local_unit ?supply_item)
+        )
+      )
+  )
+  (:action prepare_transport_node_for_crew
+    :parameters (?crew - response_crew_unit ?transport_node - transport_node ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_assessed ?crew)
+        (assessment_recorded_for_unit ?crew ?inspection_tool)
+        (crew_has_transport_node ?crew ?transport_node)
+        (not
+          (transport_node_ready ?transport_node)
+        )
+        (not
+          (transport_node_reserved ?transport_node)
+        )
+      )
+    :effect (transport_node_ready ?transport_node)
+  )
+  (:action stage_personnel_and_mark_crew_ready
+    :parameters (?crew - response_crew_unit ?transport_node - transport_node ?responder - personnel)
+    :precondition
+      (and
+        (unit_assessed ?crew)
+        (personnel_assigned_to_unit ?crew ?responder)
+        (crew_has_transport_node ?crew ?transport_node)
+        (transport_node_ready ?transport_node)
+        (not
+          (crew_precondition_flag ?crew)
+        )
+      )
+    :effect
+      (and
+        (crew_precondition_flag ?crew)
+        (crew_ready_state ?crew)
+      )
+  )
+  (:action reserve_transport_and_assign_supply_to_crew
+    :parameters (?crew - response_crew_unit ?transport_node - transport_node ?supply_item - supply_item)
+    :precondition
+      (and
+        (unit_assessed ?crew)
+        (crew_has_transport_node ?crew ?transport_node)
+        (supply_item_available ?supply_item)
+        (not
+          (crew_precondition_flag ?crew)
+        )
+      )
+    :effect
+      (and
+        (transport_node_reserved ?transport_node)
+        (crew_precondition_flag ?crew)
+        (supply_item_assigned_to_crew ?crew ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_crew_staging_and_restore_supply
+    :parameters (?crew - response_crew_unit ?transport_node - transport_node ?inspection_tool - inspection_tool ?supply_item - supply_item)
+    :precondition
+      (and
+        (unit_assessed ?crew)
+        (assessment_recorded_for_unit ?crew ?inspection_tool)
+        (crew_has_transport_node ?crew ?transport_node)
+        (transport_node_reserved ?transport_node)
+        (supply_item_assigned_to_crew ?crew ?supply_item)
+        (not
+          (crew_ready_state ?crew)
+        )
+      )
+    :effect
+      (and
+        (transport_node_ready ?transport_node)
+        (crew_ready_state ?crew)
+        (supply_item_available ?supply_item)
+        (not
+          (supply_item_assigned_to_crew ?crew ?supply_item)
+        )
+      )
+  )
+  (:action deploy_contingency_asset
+    :parameters (?local_unit - local_management_unit ?crew - response_crew_unit ?location - resource_location ?transport_node - transport_node ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (crew_precondition_flag ?crew)
+        (unit_has_resource_location ?local_unit ?location)
+        (crew_has_transport_node ?crew ?transport_node)
+        (location_ready ?location)
+        (transport_node_ready ?transport_node)
+        (local_management_unit_ready ?local_unit)
+        (crew_ready_state ?crew)
+        (contingency_asset_available ?contingency_asset)
+      )
+    :effect
+      (and
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_linked_to_location ?contingency_asset ?location)
+        (contingency_asset_linked_to_transport ?contingency_asset ?transport_node)
+        (not
+          (contingency_asset_available ?contingency_asset)
+        )
+      )
+  )
+  (:action deploy_contingency_asset_option_a
+    :parameters (?local_unit - local_management_unit ?crew - response_crew_unit ?location - resource_location ?transport_node - transport_node ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (crew_precondition_flag ?crew)
+        (unit_has_resource_location ?local_unit ?location)
+        (crew_has_transport_node ?crew ?transport_node)
+        (location_reserved ?location)
+        (transport_node_ready ?transport_node)
+        (not
+          (local_management_unit_ready ?local_unit)
+        )
+        (crew_ready_state ?crew)
+        (contingency_asset_available ?contingency_asset)
+      )
+    :effect
+      (and
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_linked_to_location ?contingency_asset ?location)
+        (contingency_asset_linked_to_transport ?contingency_asset ?transport_node)
+        (contingency_asset_option_flag_a ?contingency_asset)
+        (not
+          (contingency_asset_available ?contingency_asset)
+        )
+      )
+  )
+  (:action deploy_contingency_asset_option_b
+    :parameters (?local_unit - local_management_unit ?crew - response_crew_unit ?location - resource_location ?transport_node - transport_node ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (crew_precondition_flag ?crew)
+        (unit_has_resource_location ?local_unit ?location)
+        (crew_has_transport_node ?crew ?transport_node)
+        (location_ready ?location)
+        (transport_node_reserved ?transport_node)
+        (local_management_unit_ready ?local_unit)
+        (not
+          (crew_ready_state ?crew)
+        )
+        (contingency_asset_available ?contingency_asset)
+      )
+    :effect
+      (and
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_linked_to_location ?contingency_asset ?location)
+        (contingency_asset_linked_to_transport ?contingency_asset ?transport_node)
+        (contingency_asset_option_flag_b ?contingency_asset)
+        (not
+          (contingency_asset_available ?contingency_asset)
+        )
+      )
+  )
+  (:action deploy_contingency_asset_options_a_and_b
+    :parameters (?local_unit - local_management_unit ?crew - response_crew_unit ?location - resource_location ?transport_node - transport_node ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (crew_precondition_flag ?crew)
+        (unit_has_resource_location ?local_unit ?location)
+        (crew_has_transport_node ?crew ?transport_node)
+        (location_reserved ?location)
+        (transport_node_reserved ?transport_node)
+        (not
+          (local_management_unit_ready ?local_unit)
+        )
+        (not
+          (crew_ready_state ?crew)
+        )
+        (contingency_asset_available ?contingency_asset)
+      )
+    :effect
+      (and
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_linked_to_location ?contingency_asset ?location)
+        (contingency_asset_linked_to_transport ?contingency_asset ?transport_node)
+        (contingency_asset_option_flag_a ?contingency_asset)
+        (contingency_asset_option_flag_b ?contingency_asset)
+        (not
+          (contingency_asset_available ?contingency_asset)
+        )
+      )
+  )
+  (:action certify_contingency_asset
+    :parameters (?contingency_asset - contingency_asset ?local_unit - local_management_unit ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (contingency_asset_deployed ?contingency_asset)
+        (local_unit_precondition_flag ?local_unit)
+        (assessment_recorded_for_unit ?local_unit ?inspection_tool)
+        (not
+          (contingency_asset_certified ?contingency_asset)
+        )
+      )
+    :effect (contingency_asset_certified ?contingency_asset)
+  )
+  (:action allocate_repair_material_and_link_to_asset
+    :parameters (?team - response_team_unit ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (team_has_contingency_asset ?team ?contingency_asset)
+        (team_has_material ?team ?repair_material)
+        (repair_material_available ?repair_material)
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_certified ?contingency_asset)
+        (not
+          (material_allocated ?repair_material)
+        )
+      )
+    :effect
+      (and
+        (material_allocated ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (not
+          (repair_material_available ?repair_material)
+        )
+      )
+  )
+  (:action certify_team_for_repair
+    :parameters (?team - response_team_unit ?repair_material - repair_material ?contingency_asset - contingency_asset ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (team_has_material ?team ?repair_material)
+        (material_allocated ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (assessment_recorded_for_unit ?team ?inspection_tool)
+        (not
+          (contingency_asset_option_flag_a ?contingency_asset)
+        )
+        (not
+          (team_certified_for_repair ?team)
+        )
+      )
+    :effect (team_certified_for_repair ?team)
+  )
+  (:action assign_permit_to_team
+    :parameters (?team - response_team_unit ?permit - authorization_document)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (permit_available ?permit)
+        (not
+          (team_has_authorization ?team)
+        )
+      )
+    :effect
+      (and
+        (team_has_authorization ?team)
+        (permit_assigned_to_team ?team ?permit)
+        (not
+          (permit_available ?permit)
+        )
+      )
+  )
+  (:action acknowledge_permit_and_certify_team_for_repair
+    :parameters (?team - response_team_unit ?repair_material - repair_material ?contingency_asset - contingency_asset ?inspection_tool - inspection_tool ?permit - authorization_document)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (team_has_material ?team ?repair_material)
+        (material_allocated ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (assessment_recorded_for_unit ?team ?inspection_tool)
+        (contingency_asset_option_flag_a ?contingency_asset)
+        (team_has_authorization ?team)
+        (permit_assigned_to_team ?team ?permit)
+        (not
+          (team_certified_for_repair ?team)
+        )
+      )
+    :effect
+      (and
+        (team_certified_for_repair ?team)
+        (authorization_acknowledged ?team)
+      )
+  )
+  (:action prepare_team_for_special_ops_variant_1
+    :parameters (?team - response_team_unit ?inspection_kit - inspection_kit ?responder - personnel ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_certified_for_repair ?team)
+        (inspection_kit_assigned ?team ?inspection_kit)
+        (personnel_assigned_to_unit ?team ?responder)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (not
+          (contingency_asset_option_flag_b ?contingency_asset)
+        )
+        (not
+          (team_ready_for_special_ops ?team)
+        )
+      )
+    :effect (team_ready_for_special_ops ?team)
+  )
+  (:action prepare_team_for_special_ops_variant_2
+    :parameters (?team - response_team_unit ?inspection_kit - inspection_kit ?responder - personnel ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_certified_for_repair ?team)
+        (inspection_kit_assigned ?team ?inspection_kit)
+        (personnel_assigned_to_unit ?team ?responder)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (contingency_asset_option_flag_b ?contingency_asset)
+        (not
+          (team_ready_for_special_ops ?team)
+        )
+      )
+    :effect (team_ready_for_special_ops ?team)
+  )
+  (:action accept_external_support_for_team
+    :parameters (?team - response_team_unit ?external_support - external_support ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_ready_for_special_ops ?team)
+        (external_support_assigned ?team ?external_support)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (not
+          (contingency_asset_option_flag_a ?contingency_asset)
+        )
+        (not
+          (contingency_asset_option_flag_b ?contingency_asset)
+        )
+        (not
+          (team_has_external_support ?team)
+        )
+      )
+    :effect (team_has_external_support ?team)
+  )
+  (:action accept_external_support_and_add_documentation_variant_1
+    :parameters (?team - response_team_unit ?external_support - external_support ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_ready_for_special_ops ?team)
+        (external_support_assigned ?team ?external_support)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (contingency_asset_option_flag_a ?contingency_asset)
+        (not
+          (contingency_asset_option_flag_b ?contingency_asset)
+        )
+        (not
+          (team_has_external_support ?team)
+        )
+      )
+    :effect
+      (and
+        (team_has_external_support ?team)
+        (team_has_documentation ?team)
+      )
+  )
+  (:action accept_external_support_and_add_documentation_variant_2
+    :parameters (?team - response_team_unit ?external_support - external_support ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_ready_for_special_ops ?team)
+        (external_support_assigned ?team ?external_support)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (not
+          (contingency_asset_option_flag_a ?contingency_asset)
+        )
+        (contingency_asset_option_flag_b ?contingency_asset)
+        (not
+          (team_has_external_support ?team)
+        )
+      )
+    :effect
+      (and
+        (team_has_external_support ?team)
+        (team_has_documentation ?team)
+      )
+  )
+  (:action accept_external_support_and_add_documentation_variant_3
+    :parameters (?team - response_team_unit ?external_support - external_support ?repair_material - repair_material ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (team_ready_for_special_ops ?team)
+        (external_support_assigned ?team ?external_support)
+        (team_has_material ?team ?repair_material)
+        (material_linked_to_contingency_asset ?repair_material ?contingency_asset)
+        (contingency_asset_option_flag_a ?contingency_asset)
+        (contingency_asset_option_flag_b ?contingency_asset)
+        (not
+          (team_has_external_support ?team)
+        )
+      )
+    :effect
+      (and
+        (team_has_external_support ?team)
+        (team_has_documentation ?team)
+      )
+  )
+  (:action record_team_closeout_and_verification
+    :parameters (?team - response_team_unit)
+    :precondition
+      (and
+        (team_has_external_support ?team)
+        (not
+          (team_has_documentation ?team)
+        )
+        (not
+          (team_closeout_recorded ?team)
+        )
+      )
+    :effect
+      (and
+        (team_closeout_recorded ?team)
+        (operational_verification_completed ?team)
+      )
+  )
+  (:action assign_specialized_equipment_to_team
+    :parameters (?team - response_team_unit ?specialized_equipment - specialized_equipment)
+    :precondition
+      (and
+        (team_has_external_support ?team)
+        (team_has_documentation ?team)
+        (specialized_equipment_available ?specialized_equipment)
+      )
+    :effect
+      (and
+        (specialized_equipment_assigned ?team ?specialized_equipment)
+        (not
+          (specialized_equipment_available ?specialized_equipment)
+        )
+      )
+  )
+  (:action complete_repair_by_team
+    :parameters (?team - response_team_unit ?local_unit - local_management_unit ?crew - response_crew_unit ?inspection_tool - inspection_tool ?specialized_equipment - specialized_equipment)
+    :precondition
+      (and
+        (team_has_external_support ?team)
+        (team_has_documentation ?team)
+        (specialized_equipment_assigned ?team ?specialized_equipment)
+        (team_linked_to_local_unit ?team ?local_unit)
+        (team_linked_to_crew_unit ?team ?crew)
+        (local_management_unit_ready ?local_unit)
+        (crew_ready_state ?crew)
+        (assessment_recorded_for_unit ?team ?inspection_tool)
+        (not
+          (repair_completed_by_team ?team)
+        )
+      )
+    :effect (repair_completed_by_team ?team)
+  )
+  (:action finalize_team_closeout
+    :parameters (?team - response_team_unit)
+    :precondition
+      (and
+        (team_has_external_support ?team)
+        (repair_completed_by_team ?team)
+        (not
+          (team_closeout_recorded ?team)
+        )
+      )
+    :effect
+      (and
+        (team_closeout_recorded ?team)
+        (operational_verification_completed ?team)
+      )
+  )
+  (:action grant_authorization_to_team
+    :parameters (?team - response_team_unit ?credential - credential ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (unit_assessed ?team)
+        (assessment_recorded_for_unit ?team ?inspection_tool)
+        (external_credential_available ?credential)
+        (team_has_credential ?team ?credential)
+        (not
+          (authorization_granted ?team)
+        )
+      )
+    :effect
+      (and
+        (authorization_granted ?team)
+        (not
+          (external_credential_available ?credential)
+        )
+      )
+  )
+  (:action complete_authorization_task_for_team
+    :parameters (?team - response_team_unit ?responder - personnel)
+    :precondition
+      (and
+        (authorization_granted ?team)
+        (personnel_assigned_to_unit ?team ?responder)
+        (not
+          (authorization_task_completed ?team)
+        )
+      )
+    :effect (authorization_task_completed ?team)
+  )
+  (:action accept_external_support_engagement
+    :parameters (?team - response_team_unit ?external_support - external_support)
+    :precondition
+      (and
+        (authorization_task_completed ?team)
+        (external_support_assigned ?team ?external_support)
+        (not
+          (external_support_accepted ?team)
+        )
+      )
+    :effect (external_support_accepted ?team)
+  )
+  (:action record_team_closeout_after_support
+    :parameters (?team - response_team_unit)
+    :precondition
+      (and
+        (external_support_accepted ?team)
+        (not
+          (team_closeout_recorded ?team)
+        )
+      )
+    :effect
+      (and
+        (team_closeout_recorded ?team)
+        (operational_verification_completed ?team)
+      )
+  )
+  (:action record_local_unit_operational_verification
+    :parameters (?local_unit - local_management_unit ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (local_unit_precondition_flag ?local_unit)
+        (local_management_unit_ready ?local_unit)
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_certified ?contingency_asset)
+        (not
+          (operational_verification_completed ?local_unit)
+        )
+      )
+    :effect (operational_verification_completed ?local_unit)
+  )
+  (:action record_crew_operational_verification
+    :parameters (?crew - response_crew_unit ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (crew_precondition_flag ?crew)
+        (crew_ready_state ?crew)
+        (contingency_asset_deployed ?contingency_asset)
+        (contingency_asset_certified ?contingency_asset)
+        (not
+          (operational_verification_completed ?crew)
+        )
+      )
+    :effect (operational_verification_completed ?crew)
+  )
+  (:action apply_mitigation_plan_and_mark_unit_salvaged
+    :parameters (?asset - asset_unit ?mitigation_plan - mitigation_plan ?inspection_tool - inspection_tool)
+    :precondition
+      (and
+        (operational_verification_completed ?asset)
+        (assessment_recorded_for_unit ?asset ?inspection_tool)
+        (mitigation_plan_available ?mitigation_plan)
+        (not
+          (unit_salvaged_or_recovered ?asset)
+        )
+      )
+    :effect
+      (and
+        (unit_salvaged_or_recovered ?asset)
+        (unit_has_mitigation_plan ?asset ?mitigation_plan)
+        (not
+          (mitigation_plan_available ?mitigation_plan)
+        )
+      )
+  )
+  (:action secure_local_unit_and_release_containment_resource
+    :parameters (?local_unit - local_management_unit ?containment_resource - containment_resource ?mitigation_plan - mitigation_plan)
+    :precondition
+      (and
+        (unit_salvaged_or_recovered ?local_unit)
+        (resource_assigned_to_unit ?local_unit ?containment_resource)
+        (unit_has_mitigation_plan ?local_unit ?mitigation_plan)
+        (not
+          (unit_secured_or_protected ?local_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_secured_or_protected ?local_unit)
+        (containment_resource_available ?containment_resource)
+        (mitigation_plan_available ?mitigation_plan)
+      )
+  )
+  (:action secure_crew_and_release_containment_resource
+    :parameters (?crew - response_crew_unit ?containment_resource - containment_resource ?mitigation_plan - mitigation_plan)
+    :precondition
+      (and
+        (unit_salvaged_or_recovered ?crew)
+        (resource_assigned_to_unit ?crew ?containment_resource)
+        (unit_has_mitigation_plan ?crew ?mitigation_plan)
+        (not
+          (unit_secured_or_protected ?crew)
+        )
+      )
+    :effect
+      (and
+        (unit_secured_or_protected ?crew)
+        (containment_resource_available ?containment_resource)
+        (mitigation_plan_available ?mitigation_plan)
+      )
+  )
+  (:action secure_team_and_release_containment_resource
+    :parameters (?team - response_team_unit ?containment_resource - containment_resource ?mitigation_plan - mitigation_plan)
+    :precondition
+      (and
+        (unit_salvaged_or_recovered ?team)
+        (resource_assigned_to_unit ?team ?containment_resource)
+        (unit_has_mitigation_plan ?team ?mitigation_plan)
+        (not
+          (unit_secured_or_protected ?team)
+        )
+      )
+    :effect
+      (and
+        (unit_secured_or_protected ?team)
+        (containment_resource_available ?containment_resource)
+        (mitigation_plan_available ?mitigation_plan)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem wildfire_risk_asset_protection_case)
+  (:domain wildfire_asset_protection)
+  (:objects local_unit_alpha - local_management_unit crew_alpha - response_crew_unit team_lead_alpha - response_team_unit team_lead_bravo - response_team_unit containment_resource_1 - containment_resource containment_resource_2 - containment_resource containment_resource_3 - containment_resource inspection_drone_1 - inspection_tool responder_1 - personnel supply_item_1 - supply_item staging_area_1 - resource_location transport_truck_1 - transport_node contingency_container_1 - contingency_asset repair_material_kit_1 - repair_material repair_material_kit_2 - repair_material permit_alpha - authorization_document permit_bravo - authorization_document specialized_equipment_1 - specialized_equipment specialized_equipment_2 - specialized_equipment mitigation_plan_alpha - mitigation_plan inspection_kit_alpha - inspection_kit credential_alpha - credential credential_bravo - credential external_contractor_1 - external_support)
+  (:init
+    (containment_resource_available containment_resource_1)
+    (containment_resource_available containment_resource_2)
+    (containment_resource_available containment_resource_3)
+    (inspection_tool_available inspection_drone_1)
+    (personnel_available responder_1)
+    (supply_item_available supply_item_1)
+    (unit_has_resource_location local_unit_alpha staging_area_1)
+    (crew_has_transport_node crew_alpha transport_truck_1)
+    (contingency_asset_available contingency_container_1)
+    (repair_material_available repair_material_kit_1)
+    (repair_material_available repair_material_kit_2)
+    (team_linked_to_local_unit team_lead_alpha local_unit_alpha)
+    (team_linked_to_local_unit team_lead_bravo local_unit_alpha)
+    (team_linked_to_crew_unit team_lead_alpha crew_alpha)
+    (team_linked_to_crew_unit team_lead_bravo crew_alpha)
+    (team_has_contingency_asset team_lead_alpha contingency_container_1)
+    (team_has_contingency_asset team_lead_bravo contingency_container_1)
+    (team_has_material team_lead_alpha repair_material_kit_1)
+    (team_has_material team_lead_bravo repair_material_kit_2)
+    (permit_available permit_alpha)
+    (permit_available permit_bravo)
+    (specialized_equipment_available specialized_equipment_1)
+    (specialized_equipment_available specialized_equipment_2)
+    (mitigation_plan_available mitigation_plan_alpha)
+    (inspection_kit_available inspection_kit_alpha)
+    (external_credential_available credential_alpha)
+    (team_has_credential team_lead_alpha credential_alpha)
+    (team_has_credential team_lead_bravo credential_bravo)
+    (external_support_available external_contractor_1)
+  )
+  (:goal
+    (and
+      (unit_secured_or_protected local_unit_alpha)
+      (unit_secured_or_protected crew_alpha)
+      (unit_secured_or_protected team_lead_alpha)
+      (unit_secured_or_protected team_lead_bravo)
+    )
+  )
+)

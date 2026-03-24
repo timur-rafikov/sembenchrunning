@@ -1,0 +1,1009 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain coursework_backlog_clearance_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object allocatable_resource - domain_object resource - domain_object assessment - domain_object case_supertype - domain_object backlog_case - case_supertype resource_slot - allocatable_resource assessment_opportunity - allocatable_resource consultation_slot - allocatable_resource policy_exception - allocatable_resource administrative_permission - allocatable_resource time_token - allocatable_resource remediation_option - allocatable_resource accommodation_request - allocatable_resource support_asset - resource evidence_document - resource instructor_annotation - resource module_component - assessment assessment_component - assessment clearance_plan - assessment student_item_group - backlog_case course_item_group - backlog_case assignment_record - student_item_group exam_record - student_item_group course_enrolment - course_item_group)
+
+  (:predicates
+    (backlog_case_registered ?backlog_case - backlog_case)
+    (record_eligible_for_planning ?backlog_case - backlog_case)
+    (record_resource_allocated ?backlog_case - backlog_case)
+    (record_cleared ?backlog_case - backlog_case)
+    (record_item_finalized ?backlog_case - backlog_case)
+    (remediation_active ?backlog_case - backlog_case)
+    (resource_slot_available ?resource_slot - resource_slot)
+    (record_assigned_resource_slot ?backlog_case - backlog_case ?resource_slot - resource_slot)
+    (assessment_opportunity_available ?assessment_opportunity - assessment_opportunity)
+    (record_scheduled_assessment_opportunity ?backlog_case - backlog_case ?assessment_opportunity - assessment_opportunity)
+    (consultation_slot_available ?consultation_slot - consultation_slot)
+    (record_assigned_consultation ?backlog_case - backlog_case ?consultation_slot - consultation_slot)
+    (support_asset_available ?support_asset - support_asset)
+    (assignment_assigned_support_asset ?assignment_record - assignment_record ?support_asset - support_asset)
+    (exam_assigned_support_asset ?exam_record - exam_record ?support_asset - support_asset)
+    (assignment_associated_with_component ?assignment_record - assignment_record ?module_component - module_component)
+    (module_component_primary_scheduled ?module_component - module_component)
+    (module_component_support_assigned ?module_component - module_component)
+    (assignment_component_validated ?assignment_record - assignment_record)
+    (exam_associated_with_component ?exam_record - exam_record ?assessment_component - assessment_component)
+    (assessment_component_primary_scheduled ?assessment_component - assessment_component)
+    (assessment_component_support_assigned ?assessment_component - assessment_component)
+    (exam_component_validated ?exam_record - exam_record)
+    (clearance_plan_draft ?clearance_plan - clearance_plan)
+    (clearance_plan_compiled ?clearance_plan - clearance_plan)
+    (plan_includes_module_component ?clearance_plan - clearance_plan ?module_component - module_component)
+    (plan_includes_assessment_component ?clearance_plan - clearance_plan ?assessment_component - assessment_component)
+    (clearance_plan_requires_instructor_review ?clearance_plan - clearance_plan)
+    (clearance_plan_requires_admin_approval ?clearance_plan - clearance_plan)
+    (clearance_plan_scheduled_execution ?clearance_plan - clearance_plan)
+    (enrolment_has_assignment ?course_enrolment - course_enrolment ?assignment_record - assignment_record)
+    (enrolment_has_exam ?course_enrolment - course_enrolment ?exam_record - exam_record)
+    (enrolment_has_plan ?course_enrolment - course_enrolment ?clearance_plan - clearance_plan)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (enrolment_requires_evidence ?course_enrolment - course_enrolment ?evidence_document - evidence_document)
+    (evidence_document_verified ?evidence_document - evidence_document)
+    (evidence_attached_to_plan ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    (enrolment_evidence_verified ?course_enrolment - course_enrolment)
+    (enrolment_pre_approval_flag ?course_enrolment - course_enrolment)
+    (enrolment_ready_for_finalization ?course_enrolment - course_enrolment)
+    (enrolment_policy_exception_granted ?course_enrolment - course_enrolment)
+    (enrolment_policy_exception_acknowledged ?course_enrolment - course_enrolment)
+    (enrolment_instructor_approved ?course_enrolment - course_enrolment)
+    (enrolment_record_finalized ?course_enrolment - course_enrolment)
+    (instructor_annotation_available ?instructor_annotation - instructor_annotation)
+    (enrolment_has_instructor_annotation ?course_enrolment - course_enrolment ?instructor_annotation - instructor_annotation)
+    (instructor_annotation_recorded ?course_enrolment - course_enrolment)
+    (instructor_annotation_acknowledged ?course_enrolment - course_enrolment)
+    (instructor_annotation_finalized ?course_enrolment - course_enrolment)
+    (policy_exception_available ?policy_exception - policy_exception)
+    (enrolment_linked_policy_exception ?course_enrolment - course_enrolment ?policy_exception - policy_exception)
+    (administrative_permission_available ?administrative_permission - administrative_permission)
+    (enrolment_granted_administrative_permission ?course_enrolment - course_enrolment ?administrative_permission - administrative_permission)
+    (remediation_option_available ?remediation_option - remediation_option)
+    (enrolment_assigned_remediation_option ?course_enrolment - course_enrolment ?remediation_option - remediation_option)
+    (accommodation_request_pending ?accommodation_request - accommodation_request)
+    (enrolment_accommodation_assigned ?course_enrolment - course_enrolment ?accommodation_request - accommodation_request)
+    (time_token_available ?time_token - time_token)
+    (record_linked_time_token ?backlog_case - backlog_case ?time_token - time_token)
+    (assignment_ready_for_plan ?assignment_record - assignment_record)
+    (exam_ready_for_plan ?exam_record - exam_record)
+    (enrolment_outcome_recorded ?course_enrolment - course_enrolment)
+  )
+  (:action register_backlog_case
+    :parameters (?backlog_case - backlog_case)
+    :precondition
+      (and
+        (not
+          (backlog_case_registered ?backlog_case)
+        )
+        (not
+          (record_cleared ?backlog_case)
+        )
+      )
+    :effect (backlog_case_registered ?backlog_case)
+  )
+  (:action assign_resource_slot_to_case
+    :parameters (?backlog_case - backlog_case ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (backlog_case_registered ?backlog_case)
+        (not
+          (record_resource_allocated ?backlog_case)
+        )
+        (resource_slot_available ?resource_slot)
+      )
+    :effect
+      (and
+        (record_resource_allocated ?backlog_case)
+        (record_assigned_resource_slot ?backlog_case ?resource_slot)
+        (not
+          (resource_slot_available ?resource_slot)
+        )
+      )
+  )
+  (:action schedule_assessment_opportunity_for_case
+    :parameters (?backlog_case - backlog_case ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (backlog_case_registered ?backlog_case)
+        (record_resource_allocated ?backlog_case)
+        (assessment_opportunity_available ?assessment_opportunity)
+      )
+    :effect
+      (and
+        (record_scheduled_assessment_opportunity ?backlog_case ?assessment_opportunity)
+        (not
+          (assessment_opportunity_available ?assessment_opportunity)
+        )
+      )
+  )
+  (:action confirm_case_for_planning
+    :parameters (?backlog_case - backlog_case ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (backlog_case_registered ?backlog_case)
+        (record_resource_allocated ?backlog_case)
+        (record_scheduled_assessment_opportunity ?backlog_case ?assessment_opportunity)
+        (not
+          (record_eligible_for_planning ?backlog_case)
+        )
+      )
+    :effect (record_eligible_for_planning ?backlog_case)
+  )
+  (:action release_assessment_opportunity
+    :parameters (?backlog_case - backlog_case ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_scheduled_assessment_opportunity ?backlog_case ?assessment_opportunity)
+      )
+    :effect
+      (and
+        (assessment_opportunity_available ?assessment_opportunity)
+        (not
+          (record_scheduled_assessment_opportunity ?backlog_case ?assessment_opportunity)
+        )
+      )
+  )
+  (:action assign_consultation_to_case
+    :parameters (?backlog_case - backlog_case ?consultation_slot - consultation_slot)
+    :precondition
+      (and
+        (record_eligible_for_planning ?backlog_case)
+        (consultation_slot_available ?consultation_slot)
+      )
+    :effect
+      (and
+        (record_assigned_consultation ?backlog_case ?consultation_slot)
+        (not
+          (consultation_slot_available ?consultation_slot)
+        )
+      )
+  )
+  (:action release_consultation_from_case
+    :parameters (?backlog_case - backlog_case ?consultation_slot - consultation_slot)
+    :precondition
+      (and
+        (record_assigned_consultation ?backlog_case ?consultation_slot)
+      )
+    :effect
+      (and
+        (consultation_slot_available ?consultation_slot)
+        (not
+          (record_assigned_consultation ?backlog_case ?consultation_slot)
+        )
+      )
+  )
+  (:action assign_remediation_option_to_enrolment
+    :parameters (?course_enrolment - course_enrolment ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (remediation_option_available ?remediation_option)
+      )
+    :effect
+      (and
+        (enrolment_assigned_remediation_option ?course_enrolment ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action revoke_remediation_option_from_enrolment
+    :parameters (?course_enrolment - course_enrolment ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (enrolment_assigned_remediation_option ?course_enrolment ?remediation_option)
+      )
+    :effect
+      (and
+        (remediation_option_available ?remediation_option)
+        (not
+          (enrolment_assigned_remediation_option ?course_enrolment ?remediation_option)
+        )
+      )
+  )
+  (:action assign_accommodation_request_to_enrolment
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (accommodation_request_pending ?accommodation_request)
+      )
+    :effect
+      (and
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (not
+          (accommodation_request_pending ?accommodation_request)
+        )
+      )
+  )
+  (:action revoke_accommodation_request_from_enrolment
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+      )
+    :effect
+      (and
+        (accommodation_request_pending ?accommodation_request)
+        (not
+          (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        )
+      )
+  )
+  (:action activate_component_for_assignment
+    :parameters (?assignment_record - assignment_record ?module_component - module_component ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_eligible_for_planning ?assignment_record)
+        (record_scheduled_assessment_opportunity ?assignment_record ?assessment_opportunity)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (not
+          (module_component_primary_scheduled ?module_component)
+        )
+        (not
+          (module_component_support_assigned ?module_component)
+        )
+      )
+    :effect (module_component_primary_scheduled ?module_component)
+  )
+  (:action finalize_assignment_component_after_consultation
+    :parameters (?assignment_record - assignment_record ?module_component - module_component ?consultation_slot - consultation_slot)
+    :precondition
+      (and
+        (record_eligible_for_planning ?assignment_record)
+        (record_assigned_consultation ?assignment_record ?consultation_slot)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (module_component_primary_scheduled ?module_component)
+        (not
+          (assignment_ready_for_plan ?assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (assignment_component_validated ?assignment_record)
+      )
+  )
+  (:action attach_support_asset_to_component
+    :parameters (?assignment_record - assignment_record ?module_component - module_component ?support_asset - support_asset)
+    :precondition
+      (and
+        (record_eligible_for_planning ?assignment_record)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (support_asset_available ?support_asset)
+        (not
+          (assignment_ready_for_plan ?assignment_record)
+        )
+      )
+    :effect
+      (and
+        (module_component_support_assigned ?module_component)
+        (assignment_ready_for_plan ?assignment_record)
+        (assignment_assigned_support_asset ?assignment_record ?support_asset)
+        (not
+          (support_asset_available ?support_asset)
+        )
+      )
+  )
+  (:action complete_support_on_assignment_component
+    :parameters (?assignment_record - assignment_record ?module_component - module_component ?assessment_opportunity - assessment_opportunity ?support_asset - support_asset)
+    :precondition
+      (and
+        (record_eligible_for_planning ?assignment_record)
+        (record_scheduled_assessment_opportunity ?assignment_record ?assessment_opportunity)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (module_component_support_assigned ?module_component)
+        (assignment_assigned_support_asset ?assignment_record ?support_asset)
+        (not
+          (assignment_component_validated ?assignment_record)
+        )
+      )
+    :effect
+      (and
+        (module_component_primary_scheduled ?module_component)
+        (assignment_component_validated ?assignment_record)
+        (support_asset_available ?support_asset)
+        (not
+          (assignment_assigned_support_asset ?assignment_record ?support_asset)
+        )
+      )
+  )
+  (:action activate_assessment_component_for_exam
+    :parameters (?exam_record - exam_record ?assessment_component - assessment_component ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_eligible_for_planning ?exam_record)
+        (record_scheduled_assessment_opportunity ?exam_record ?assessment_opportunity)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (not
+          (assessment_component_primary_scheduled ?assessment_component)
+        )
+        (not
+          (assessment_component_support_assigned ?assessment_component)
+        )
+      )
+    :effect (assessment_component_primary_scheduled ?assessment_component)
+  )
+  (:action finalize_exam_component_after_consultation
+    :parameters (?exam_record - exam_record ?assessment_component - assessment_component ?consultation_slot - consultation_slot)
+    :precondition
+      (and
+        (record_eligible_for_planning ?exam_record)
+        (record_assigned_consultation ?exam_record ?consultation_slot)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (assessment_component_primary_scheduled ?assessment_component)
+        (not
+          (exam_ready_for_plan ?exam_record)
+        )
+      )
+    :effect
+      (and
+        (exam_ready_for_plan ?exam_record)
+        (exam_component_validated ?exam_record)
+      )
+  )
+  (:action attach_support_asset_to_assessment_component
+    :parameters (?exam_record - exam_record ?assessment_component - assessment_component ?support_asset - support_asset)
+    :precondition
+      (and
+        (record_eligible_for_planning ?exam_record)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (support_asset_available ?support_asset)
+        (not
+          (exam_ready_for_plan ?exam_record)
+        )
+      )
+    :effect
+      (and
+        (assessment_component_support_assigned ?assessment_component)
+        (exam_ready_for_plan ?exam_record)
+        (exam_assigned_support_asset ?exam_record ?support_asset)
+        (not
+          (support_asset_available ?support_asset)
+        )
+      )
+  )
+  (:action complete_support_on_exam_component
+    :parameters (?exam_record - exam_record ?assessment_component - assessment_component ?assessment_opportunity - assessment_opportunity ?support_asset - support_asset)
+    :precondition
+      (and
+        (record_eligible_for_planning ?exam_record)
+        (record_scheduled_assessment_opportunity ?exam_record ?assessment_opportunity)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (assessment_component_support_assigned ?assessment_component)
+        (exam_assigned_support_asset ?exam_record ?support_asset)
+        (not
+          (exam_component_validated ?exam_record)
+        )
+      )
+    :effect
+      (and
+        (assessment_component_primary_scheduled ?assessment_component)
+        (exam_component_validated ?exam_record)
+        (support_asset_available ?support_asset)
+        (not
+          (exam_assigned_support_asset ?exam_record ?support_asset)
+        )
+      )
+  )
+  (:action compile_clearance_plan
+    :parameters (?assignment_record - assignment_record ?exam_record - exam_record ?module_component - module_component ?assessment_component - assessment_component ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (exam_ready_for_plan ?exam_record)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (module_component_primary_scheduled ?module_component)
+        (assessment_component_primary_scheduled ?assessment_component)
+        (assignment_component_validated ?assignment_record)
+        (exam_component_validated ?exam_record)
+        (clearance_plan_draft ?clearance_plan)
+      )
+    :effect
+      (and
+        (clearance_plan_compiled ?clearance_plan)
+        (plan_includes_module_component ?clearance_plan ?module_component)
+        (plan_includes_assessment_component ?clearance_plan ?assessment_component)
+        (not
+          (clearance_plan_draft ?clearance_plan)
+        )
+      )
+  )
+  (:action compile_clearance_plan_with_instructor_review
+    :parameters (?assignment_record - assignment_record ?exam_record - exam_record ?module_component - module_component ?assessment_component - assessment_component ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (exam_ready_for_plan ?exam_record)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (module_component_support_assigned ?module_component)
+        (assessment_component_primary_scheduled ?assessment_component)
+        (not
+          (assignment_component_validated ?assignment_record)
+        )
+        (exam_component_validated ?exam_record)
+        (clearance_plan_draft ?clearance_plan)
+      )
+    :effect
+      (and
+        (clearance_plan_compiled ?clearance_plan)
+        (plan_includes_module_component ?clearance_plan ?module_component)
+        (plan_includes_assessment_component ?clearance_plan ?assessment_component)
+        (clearance_plan_requires_instructor_review ?clearance_plan)
+        (not
+          (clearance_plan_draft ?clearance_plan)
+        )
+      )
+  )
+  (:action compile_clearance_plan_with_admin_approval
+    :parameters (?assignment_record - assignment_record ?exam_record - exam_record ?module_component - module_component ?assessment_component - assessment_component ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (exam_ready_for_plan ?exam_record)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (module_component_primary_scheduled ?module_component)
+        (assessment_component_support_assigned ?assessment_component)
+        (assignment_component_validated ?assignment_record)
+        (not
+          (exam_component_validated ?exam_record)
+        )
+        (clearance_plan_draft ?clearance_plan)
+      )
+    :effect
+      (and
+        (clearance_plan_compiled ?clearance_plan)
+        (plan_includes_module_component ?clearance_plan ?module_component)
+        (plan_includes_assessment_component ?clearance_plan ?assessment_component)
+        (clearance_plan_requires_admin_approval ?clearance_plan)
+        (not
+          (clearance_plan_draft ?clearance_plan)
+        )
+      )
+  )
+  (:action compile_clearance_plan_with_both_reviews
+    :parameters (?assignment_record - assignment_record ?exam_record - exam_record ?module_component - module_component ?assessment_component - assessment_component ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (exam_ready_for_plan ?exam_record)
+        (assignment_associated_with_component ?assignment_record ?module_component)
+        (exam_associated_with_component ?exam_record ?assessment_component)
+        (module_component_support_assigned ?module_component)
+        (assessment_component_support_assigned ?assessment_component)
+        (not
+          (assignment_component_validated ?assignment_record)
+        )
+        (not
+          (exam_component_validated ?exam_record)
+        )
+        (clearance_plan_draft ?clearance_plan)
+      )
+    :effect
+      (and
+        (clearance_plan_compiled ?clearance_plan)
+        (plan_includes_module_component ?clearance_plan ?module_component)
+        (plan_includes_assessment_component ?clearance_plan ?assessment_component)
+        (clearance_plan_requires_instructor_review ?clearance_plan)
+        (clearance_plan_requires_admin_approval ?clearance_plan)
+        (not
+          (clearance_plan_draft ?clearance_plan)
+        )
+      )
+  )
+  (:action schedule_clearance_plan_execution
+    :parameters (?clearance_plan - clearance_plan ?assignment_record - assignment_record ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (clearance_plan_compiled ?clearance_plan)
+        (assignment_ready_for_plan ?assignment_record)
+        (record_scheduled_assessment_opportunity ?assignment_record ?assessment_opportunity)
+        (not
+          (clearance_plan_scheduled_execution ?clearance_plan)
+        )
+      )
+    :effect (clearance_plan_scheduled_execution ?clearance_plan)
+  )
+  (:action attach_evidence_document_to_plan
+    :parameters (?course_enrolment - course_enrolment ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (enrolment_has_plan ?course_enrolment ?clearance_plan)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_document_available ?evidence_document)
+        (clearance_plan_compiled ?clearance_plan)
+        (clearance_plan_scheduled_execution ?clearance_plan)
+        (not
+          (evidence_document_verified ?evidence_document)
+        )
+      )
+    :effect
+      (and
+        (evidence_document_verified ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action verify_enrolment_from_evidence
+    :parameters (?course_enrolment - course_enrolment ?evidence_document - evidence_document ?clearance_plan - clearance_plan ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_document_verified ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (record_scheduled_assessment_opportunity ?course_enrolment ?assessment_opportunity)
+        (not
+          (clearance_plan_requires_instructor_review ?clearance_plan)
+        )
+        (not
+          (enrolment_evidence_verified ?course_enrolment)
+        )
+      )
+    :effect (enrolment_evidence_verified ?course_enrolment)
+  )
+  (:action request_policy_exception_for_enrolment
+    :parameters (?course_enrolment - course_enrolment ?policy_exception - policy_exception)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (policy_exception_available ?policy_exception)
+        (not
+          (enrolment_policy_exception_granted ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_policy_exception_granted ?course_enrolment)
+        (enrolment_linked_policy_exception ?course_enrolment ?policy_exception)
+        (not
+          (policy_exception_available ?policy_exception)
+        )
+      )
+  )
+  (:action apply_policy_exception_to_enrolment_and_update_status
+    :parameters (?course_enrolment - course_enrolment ?evidence_document - evidence_document ?clearance_plan - clearance_plan ?assessment_opportunity - assessment_opportunity ?policy_exception - policy_exception)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_document_verified ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (record_scheduled_assessment_opportunity ?course_enrolment ?assessment_opportunity)
+        (clearance_plan_requires_instructor_review ?clearance_plan)
+        (enrolment_policy_exception_granted ?course_enrolment)
+        (enrolment_linked_policy_exception ?course_enrolment ?policy_exception)
+        (not
+          (enrolment_evidence_verified ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_evidence_verified ?course_enrolment)
+        (enrolment_policy_exception_acknowledged ?course_enrolment)
+      )
+  )
+  (:action submit_enrolment_for_pre_approval
+    :parameters (?course_enrolment - course_enrolment ?remediation_option - remediation_option ?consultation_slot - consultation_slot ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_evidence_verified ?course_enrolment)
+        (enrolment_assigned_remediation_option ?course_enrolment ?remediation_option)
+        (record_assigned_consultation ?course_enrolment ?consultation_slot)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (not
+          (clearance_plan_requires_admin_approval ?clearance_plan)
+        )
+        (not
+          (enrolment_pre_approval_flag ?course_enrolment)
+        )
+      )
+    :effect (enrolment_pre_approval_flag ?course_enrolment)
+  )
+  (:action confirm_enrolment_pre_approval
+    :parameters (?course_enrolment - course_enrolment ?remediation_option - remediation_option ?consultation_slot - consultation_slot ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_evidence_verified ?course_enrolment)
+        (enrolment_assigned_remediation_option ?course_enrolment ?remediation_option)
+        (record_assigned_consultation ?course_enrolment ?consultation_slot)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (clearance_plan_requires_admin_approval ?clearance_plan)
+        (not
+          (enrolment_pre_approval_flag ?course_enrolment)
+        )
+      )
+    :effect (enrolment_pre_approval_flag ?course_enrolment)
+  )
+  (:action mark_enrolment_ready_for_finalization
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_pre_approval_flag ?course_enrolment)
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (not
+          (clearance_plan_requires_instructor_review ?clearance_plan)
+        )
+        (not
+          (clearance_plan_requires_admin_approval ?clearance_plan)
+        )
+        (not
+          (enrolment_ready_for_finalization ?course_enrolment)
+        )
+      )
+    :effect (enrolment_ready_for_finalization ?course_enrolment)
+  )
+  (:action mark_enrolment_ready_and_instructor_approve
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_pre_approval_flag ?course_enrolment)
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (clearance_plan_requires_instructor_review ?clearance_plan)
+        (not
+          (clearance_plan_requires_admin_approval ?clearance_plan)
+        )
+        (not
+          (enrolment_ready_for_finalization ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_instructor_approved ?course_enrolment)
+      )
+  )
+  (:action mark_enrolment_ready_and_instructor_approve_alt
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_pre_approval_flag ?course_enrolment)
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (not
+          (clearance_plan_requires_instructor_review ?clearance_plan)
+        )
+        (clearance_plan_requires_admin_approval ?clearance_plan)
+        (not
+          (enrolment_ready_for_finalization ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_instructor_approved ?course_enrolment)
+      )
+  )
+  (:action mark_enrolment_ready_and_instructor_approve_final
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request ?evidence_document - evidence_document ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (enrolment_pre_approval_flag ?course_enrolment)
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (enrolment_requires_evidence ?course_enrolment ?evidence_document)
+        (evidence_attached_to_plan ?evidence_document ?clearance_plan)
+        (clearance_plan_requires_instructor_review ?clearance_plan)
+        (clearance_plan_requires_admin_approval ?clearance_plan)
+        (not
+          (enrolment_ready_for_finalization ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_instructor_approved ?course_enrolment)
+      )
+  )
+  (:action finalize_enrolment_and_record_case_outcome
+    :parameters (?course_enrolment - course_enrolment)
+    :precondition
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (not
+          (enrolment_instructor_approved ?course_enrolment)
+        )
+        (not
+          (enrolment_outcome_recorded ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_outcome_recorded ?course_enrolment)
+        (record_item_finalized ?course_enrolment)
+      )
+  )
+  (:action grant_administrative_permission_to_enrolment
+    :parameters (?course_enrolment - course_enrolment ?administrative_permission - administrative_permission)
+    :precondition
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_instructor_approved ?course_enrolment)
+        (administrative_permission_available ?administrative_permission)
+      )
+    :effect
+      (and
+        (enrolment_granted_administrative_permission ?course_enrolment ?administrative_permission)
+        (not
+          (administrative_permission_available ?administrative_permission)
+        )
+      )
+  )
+  (:action record_enrolment_clearance_with_permissions
+    :parameters (?course_enrolment - course_enrolment ?assignment_record - assignment_record ?exam_record - exam_record ?assessment_opportunity - assessment_opportunity ?administrative_permission - administrative_permission)
+    :precondition
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_instructor_approved ?course_enrolment)
+        (enrolment_granted_administrative_permission ?course_enrolment ?administrative_permission)
+        (enrolment_has_assignment ?course_enrolment ?assignment_record)
+        (enrolment_has_exam ?course_enrolment ?exam_record)
+        (assignment_component_validated ?assignment_record)
+        (exam_component_validated ?exam_record)
+        (record_scheduled_assessment_opportunity ?course_enrolment ?assessment_opportunity)
+        (not
+          (enrolment_record_finalized ?course_enrolment)
+        )
+      )
+    :effect (enrolment_record_finalized ?course_enrolment)
+  )
+  (:action finalize_enrolment_and_record_case_outcome_alternate
+    :parameters (?course_enrolment - course_enrolment)
+    :precondition
+      (and
+        (enrolment_ready_for_finalization ?course_enrolment)
+        (enrolment_record_finalized ?course_enrolment)
+        (not
+          (enrolment_outcome_recorded ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_outcome_recorded ?course_enrolment)
+        (record_item_finalized ?course_enrolment)
+      )
+  )
+  (:action record_instructor_annotation_on_enrolment
+    :parameters (?course_enrolment - course_enrolment ?instructor_annotation - instructor_annotation ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_eligible_for_planning ?course_enrolment)
+        (record_scheduled_assessment_opportunity ?course_enrolment ?assessment_opportunity)
+        (instructor_annotation_available ?instructor_annotation)
+        (enrolment_has_instructor_annotation ?course_enrolment ?instructor_annotation)
+        (not
+          (instructor_annotation_recorded ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (instructor_annotation_recorded ?course_enrolment)
+        (not
+          (instructor_annotation_available ?instructor_annotation)
+        )
+      )
+  )
+  (:action acknowledge_instructor_annotation
+    :parameters (?course_enrolment - course_enrolment ?consultation_slot - consultation_slot)
+    :precondition
+      (and
+        (instructor_annotation_recorded ?course_enrolment)
+        (record_assigned_consultation ?course_enrolment ?consultation_slot)
+        (not
+          (instructor_annotation_acknowledged ?course_enrolment)
+        )
+      )
+    :effect (instructor_annotation_acknowledged ?course_enrolment)
+  )
+  (:action finalize_instructor_annotation
+    :parameters (?course_enrolment - course_enrolment ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (instructor_annotation_acknowledged ?course_enrolment)
+        (enrolment_accommodation_assigned ?course_enrolment ?accommodation_request)
+        (not
+          (instructor_annotation_finalized ?course_enrolment)
+        )
+      )
+    :effect (instructor_annotation_finalized ?course_enrolment)
+  )
+  (:action finalize_enrolment_after_annotation
+    :parameters (?course_enrolment - course_enrolment)
+    :precondition
+      (and
+        (instructor_annotation_finalized ?course_enrolment)
+        (not
+          (enrolment_outcome_recorded ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (enrolment_outcome_recorded ?course_enrolment)
+        (record_item_finalized ?course_enrolment)
+      )
+  )
+  (:action record_assignment_final_clearance
+    :parameters (?assignment_record - assignment_record ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (assignment_ready_for_plan ?assignment_record)
+        (assignment_component_validated ?assignment_record)
+        (clearance_plan_compiled ?clearance_plan)
+        (clearance_plan_scheduled_execution ?clearance_plan)
+        (not
+          (record_item_finalized ?assignment_record)
+        )
+      )
+    :effect (record_item_finalized ?assignment_record)
+  )
+  (:action record_exam_final_clearance
+    :parameters (?exam_record - exam_record ?clearance_plan - clearance_plan)
+    :precondition
+      (and
+        (exam_ready_for_plan ?exam_record)
+        (exam_component_validated ?exam_record)
+        (clearance_plan_compiled ?clearance_plan)
+        (clearance_plan_scheduled_execution ?clearance_plan)
+        (not
+          (record_item_finalized ?exam_record)
+        )
+      )
+    :effect (record_item_finalized ?exam_record)
+  )
+  (:action assign_time_token_to_backlog_case
+    :parameters (?backlog_case - backlog_case ?time_token - time_token ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (record_item_finalized ?backlog_case)
+        (record_scheduled_assessment_opportunity ?backlog_case ?assessment_opportunity)
+        (time_token_available ?time_token)
+        (not
+          (remediation_active ?backlog_case)
+        )
+      )
+    :effect
+      (and
+        (remediation_active ?backlog_case)
+        (record_linked_time_token ?backlog_case ?time_token)
+        (not
+          (time_token_available ?time_token)
+        )
+      )
+  )
+  (:action apply_remediation_and_mark_assignment_cleared
+    :parameters (?assignment_record - assignment_record ?resource_slot - resource_slot ?time_token - time_token)
+    :precondition
+      (and
+        (remediation_active ?assignment_record)
+        (record_assigned_resource_slot ?assignment_record ?resource_slot)
+        (record_linked_time_token ?assignment_record ?time_token)
+        (not
+          (record_cleared ?assignment_record)
+        )
+      )
+    :effect
+      (and
+        (record_cleared ?assignment_record)
+        (resource_slot_available ?resource_slot)
+        (time_token_available ?time_token)
+      )
+  )
+  (:action apply_remediation_and_mark_exam_cleared
+    :parameters (?exam_record - exam_record ?resource_slot - resource_slot ?time_token - time_token)
+    :precondition
+      (and
+        (remediation_active ?exam_record)
+        (record_assigned_resource_slot ?exam_record ?resource_slot)
+        (record_linked_time_token ?exam_record ?time_token)
+        (not
+          (record_cleared ?exam_record)
+        )
+      )
+    :effect
+      (and
+        (record_cleared ?exam_record)
+        (resource_slot_available ?resource_slot)
+        (time_token_available ?time_token)
+      )
+  )
+  (:action apply_remediation_and_mark_enrolment_cleared
+    :parameters (?course_enrolment - course_enrolment ?resource_slot - resource_slot ?time_token - time_token)
+    :precondition
+      (and
+        (remediation_active ?course_enrolment)
+        (record_assigned_resource_slot ?course_enrolment ?resource_slot)
+        (record_linked_time_token ?course_enrolment ?time_token)
+        (not
+          (record_cleared ?course_enrolment)
+        )
+      )
+    :effect
+      (and
+        (record_cleared ?course_enrolment)
+        (resource_slot_available ?resource_slot)
+        (time_token_available ?time_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem student_backlog_clearance_case)
+  (:domain coursework_backlog_clearance_planning_domain)
+  (:objects assignment_record_ar1 - assignment_record exam_record_er1 - exam_record course_enrolment_ce1 - course_enrolment course_enrolment_ce2 - course_enrolment resource_slot_tutor_1 - resource_slot resource_slot_tutor_2 - resource_slot resource_slot_grader_1 - resource_slot assessment_opportunity_resit_1 - assessment_opportunity consultation_slot_advisor_1 - consultation_slot support_asset_tutoring_session_1 - support_asset module_component_week1 - module_component assessment_component_project - assessment_component clearance_plan_draft_1 - clearance_plan evidence_document_submission_1 - evidence_document evidence_document_approval_1 - evidence_document policy_exception_request_1 - policy_exception policy_exception_request_2 - policy_exception administrative_permission_grant_1 - administrative_permission administrative_permission_grant_2 - administrative_permission time_token_slot_1 - time_token remediation_option_resit - remediation_option instructor_annotation_note_1 - instructor_annotation instructor_annotation_note_2 - instructor_annotation accommodation_request_1 - accommodation_request)
+  (:init
+    (resource_slot_available resource_slot_tutor_1)
+    (resource_slot_available resource_slot_tutor_2)
+    (resource_slot_available resource_slot_grader_1)
+    (assessment_opportunity_available assessment_opportunity_resit_1)
+    (consultation_slot_available consultation_slot_advisor_1)
+    (support_asset_available support_asset_tutoring_session_1)
+    (assignment_associated_with_component assignment_record_ar1 module_component_week1)
+    (exam_associated_with_component exam_record_er1 assessment_component_project)
+    (clearance_plan_draft clearance_plan_draft_1)
+    (evidence_document_available evidence_document_submission_1)
+    (evidence_document_available evidence_document_approval_1)
+    (enrolment_has_assignment course_enrolment_ce1 assignment_record_ar1)
+    (enrolment_has_assignment course_enrolment_ce2 assignment_record_ar1)
+    (enrolment_has_exam course_enrolment_ce1 exam_record_er1)
+    (enrolment_has_exam course_enrolment_ce2 exam_record_er1)
+    (enrolment_has_plan course_enrolment_ce1 clearance_plan_draft_1)
+    (enrolment_has_plan course_enrolment_ce2 clearance_plan_draft_1)
+    (enrolment_requires_evidence course_enrolment_ce1 evidence_document_submission_1)
+    (enrolment_requires_evidence course_enrolment_ce2 evidence_document_approval_1)
+    (policy_exception_available policy_exception_request_1)
+    (policy_exception_available policy_exception_request_2)
+    (administrative_permission_available administrative_permission_grant_1)
+    (administrative_permission_available administrative_permission_grant_2)
+    (time_token_available time_token_slot_1)
+    (remediation_option_available remediation_option_resit)
+    (instructor_annotation_available instructor_annotation_note_1)
+    (enrolment_has_instructor_annotation course_enrolment_ce1 instructor_annotation_note_1)
+    (enrolment_has_instructor_annotation course_enrolment_ce2 instructor_annotation_note_2)
+    (accommodation_request_pending accommodation_request_1)
+  )
+  (:goal
+    (and
+      (record_cleared assignment_record_ar1)
+      (record_cleared exam_record_er1)
+      (record_cleared course_enrolment_ce1)
+      (record_cleared course_enrolment_ce2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_backlog_case assignment_record_ar1)
+(assign_resource_slot_to_case assignment_record_ar1 resource_slot_tutor_1)
+(schedule_assessment_opportunity_for_case assignment_record_ar1 assessment_opportunity_resit_1)
+(confirm_case_for_planning assignment_record_ar1 assessment_opportunity_resit_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_gnkso32c/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_gnkso32c/plan.pddl 
+
+
+--- stderr ---
+

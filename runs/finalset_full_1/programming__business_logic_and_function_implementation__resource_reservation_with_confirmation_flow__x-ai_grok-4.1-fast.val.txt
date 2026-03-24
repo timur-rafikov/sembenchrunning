@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain resource_reservation_with_confirmation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types reservation_component - object catalog_category - object resource_descriptor_category - object reservation_domain - object reservation_context - reservation_domain resource_unit - reservation_component confirmation_channel - reservation_component operator - reservation_component billing_profile - reservation_component customer_profile - reservation_component confirmation_token - reservation_component fulfillment_resource - reservation_component credential - reservation_component addon_option - catalog_category fulfillment_item - catalog_category external_approver - catalog_category resource_variant - resource_descriptor_category time_slot - resource_descriptor_category allocation_ticket - resource_descriptor_category requester_role - reservation_context coordinator_role - reservation_context customer_reservation - requester_role provider_reservation - requester_role reservation_aggregate - coordinator_role)
+  (:predicates
+    (reservation_context_initialized ?reservation_context - reservation_context)
+    (confirmation_acknowledged_on_subject ?reservation_context - reservation_context)
+    (resource_hold_placed ?reservation_context - reservation_context)
+    (allocation_committed ?reservation_context - reservation_context)
+    (finalization_acknowledged ?reservation_context - reservation_context)
+    (confirmation_token_consumed ?reservation_context - reservation_context)
+    (resource_unit_available ?resource_unit - resource_unit)
+    (context_resource_assignment ?reservation_context - reservation_context ?resource_unit - resource_unit)
+    (confirmation_channel_available ?confirmation_channel - confirmation_channel)
+    (confirmation_channel_attached ?reservation_context - reservation_context ?confirmation_channel - confirmation_channel)
+    (operator_available ?operator - operator)
+    (operator_assigned_to_context ?reservation_context - reservation_context ?operator - operator)
+    (addon_option_available ?addon_option - addon_option)
+    (customer_addon_assigned ?customer_reservation - customer_reservation ?addon_option - addon_option)
+    (provider_addon_assigned ?provider_reservation - provider_reservation ?addon_option - addon_option)
+    (customer_variant_selected ?customer_reservation - customer_reservation ?resource_variant - resource_variant)
+    (variant_locked_by_requester ?resource_variant - resource_variant)
+    (variant_locked_by_provider ?resource_variant - resource_variant)
+    (customer_reservation_ready ?customer_reservation - customer_reservation)
+    (provider_timeslot_selected ?provider_reservation - provider_reservation ?time_slot - time_slot)
+    (timeslot_locked_by_requester ?time_slot - time_slot)
+    (timeslot_locked_by_provider ?time_slot - time_slot)
+    (provider_reservation_ready ?provider_reservation - provider_reservation)
+    (allocation_ticket_available ?allocation_ticket - allocation_ticket)
+    (allocation_ticket_reserved ?allocation_ticket - allocation_ticket)
+    (ticket_bound_to_variant ?allocation_ticket - allocation_ticket ?resource_variant - resource_variant)
+    (ticket_bound_to_timeslot ?allocation_ticket - allocation_ticket ?time_slot - time_slot)
+    (ticket_billing_attached_flag ?allocation_ticket - allocation_ticket)
+    (ticket_fulfillment_item_attached_flag ?allocation_ticket - allocation_ticket)
+    (ticket_ready_for_pairing ?allocation_ticket - allocation_ticket)
+    (aggregate_has_customer_reservation ?reservation_aggregate - reservation_aggregate ?customer_reservation - customer_reservation)
+    (aggregate_has_provider_reservation ?reservation_aggregate - reservation_aggregate ?provider_reservation - provider_reservation)
+    (aggregate_has_allocation_ticket ?reservation_aggregate - reservation_aggregate ?allocation_ticket - allocation_ticket)
+    (fulfillment_item_available ?fulfillment_item - fulfillment_item)
+    (aggregate_has_fulfillment_item ?reservation_aggregate - reservation_aggregate ?fulfillment_item - fulfillment_item)
+    (fulfillment_item_reserved ?fulfillment_item - fulfillment_item)
+    (fulfillment_item_bound_to_ticket ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    (billing_profile_attached ?reservation_aggregate - reservation_aggregate)
+    (billing_profile_confirmed ?reservation_aggregate - reservation_aggregate)
+    (orchestration_step_ready ?reservation_aggregate - reservation_aggregate)
+    (billing_profile_selected ?reservation_aggregate - reservation_aggregate)
+    (billing_profile_attachment_confirmed ?reservation_aggregate - reservation_aggregate)
+    (customer_profile_attached ?reservation_aggregate - reservation_aggregate)
+    (fulfillment_orchestration_executed ?reservation_aggregate - reservation_aggregate)
+    (external_approver_available ?external_approver - external_approver)
+    (aggregate_external_approver_assoc ?reservation_aggregate - reservation_aggregate ?external_approver - external_approver)
+    (external_approver_claimed ?reservation_aggregate - reservation_aggregate)
+    (external_approval_step_initialized ?reservation_aggregate - reservation_aggregate)
+    (external_approval_finalized ?reservation_aggregate - reservation_aggregate)
+    (billing_profile_available ?billing_profile - billing_profile)
+    (aggregate_billing_profile_assoc ?reservation_aggregate - reservation_aggregate ?billing_profile - billing_profile)
+    (customer_profile_available ?customer_profile - customer_profile)
+    (aggregate_customer_profile_assoc ?reservation_aggregate - reservation_aggregate ?customer_profile - customer_profile)
+    (fulfillment_resource_available ?fulfillment_resource - fulfillment_resource)
+    (aggregate_fulfillment_resource_assoc ?reservation_aggregate - reservation_aggregate ?fulfillment_resource - fulfillment_resource)
+    (credential_available ?credential - credential)
+    (aggregate_credential_assoc ?reservation_aggregate - reservation_aggregate ?credential - credential)
+    (confirmation_token_available ?confirmation_token - confirmation_token)
+    (context_token_bound ?reservation_context - reservation_context ?confirmation_token - confirmation_token)
+    (customer_fragment_prepared ?customer_reservation - customer_reservation)
+    (provider_fragment_prepared ?provider_reservation - provider_reservation)
+    (aggregate_finalized ?reservation_aggregate - reservation_aggregate)
+  )
+  (:action initialize_reservation_context
+    :parameters (?reservation_context - reservation_context)
+    :precondition
+      (and
+        (not
+          (reservation_context_initialized ?reservation_context)
+        )
+        (not
+          (allocation_committed ?reservation_context)
+        )
+      )
+    :effect (reservation_context_initialized ?reservation_context)
+  )
+  (:action place_resource_hold
+    :parameters (?reservation_context - reservation_context ?resource_unit - resource_unit)
+    :precondition
+      (and
+        (reservation_context_initialized ?reservation_context)
+        (not
+          (resource_hold_placed ?reservation_context)
+        )
+        (resource_unit_available ?resource_unit)
+      )
+    :effect
+      (and
+        (resource_hold_placed ?reservation_context)
+        (context_resource_assignment ?reservation_context ?resource_unit)
+        (not
+          (resource_unit_available ?resource_unit)
+        )
+      )
+  )
+  (:action attach_confirmation_channel_to_context
+    :parameters (?reservation_context - reservation_context ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_context_initialized ?reservation_context)
+        (resource_hold_placed ?reservation_context)
+        (confirmation_channel_available ?confirmation_channel)
+      )
+    :effect
+      (and
+        (confirmation_channel_attached ?reservation_context ?confirmation_channel)
+        (not
+          (confirmation_channel_available ?confirmation_channel)
+        )
+      )
+  )
+  (:action confirm_channel_for_context
+    :parameters (?reservation_context - reservation_context ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (reservation_context_initialized ?reservation_context)
+        (resource_hold_placed ?reservation_context)
+        (confirmation_channel_attached ?reservation_context ?confirmation_channel)
+        (not
+          (confirmation_acknowledged_on_subject ?reservation_context)
+        )
+      )
+    :effect (confirmation_acknowledged_on_subject ?reservation_context)
+  )
+  (:action release_confirmation_channel_from_context
+    :parameters (?reservation_context - reservation_context ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (confirmation_channel_attached ?reservation_context ?confirmation_channel)
+      )
+    :effect
+      (and
+        (confirmation_channel_available ?confirmation_channel)
+        (not
+          (confirmation_channel_attached ?reservation_context ?confirmation_channel)
+        )
+      )
+  )
+  (:action assign_operator_to_context
+    :parameters (?reservation_context - reservation_context ?operator - operator)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_context)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_context ?reservation_context ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_context
+    :parameters (?reservation_context - reservation_context ?operator - operator)
+    :precondition
+      (and
+        (operator_assigned_to_context ?reservation_context ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned_to_context ?reservation_context ?operator)
+        )
+      )
+  )
+  (:action attach_fulfillment_resource_to_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (fulfillment_resource_available ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (aggregate_fulfillment_resource_assoc ?reservation_aggregate ?fulfillment_resource)
+        (not
+          (fulfillment_resource_available ?fulfillment_resource)
+        )
+      )
+  )
+  (:action detach_fulfillment_resource_from_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (aggregate_fulfillment_resource_assoc ?reservation_aggregate ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (fulfillment_resource_available ?fulfillment_resource)
+        (not
+          (aggregate_fulfillment_resource_assoc ?reservation_aggregate ?fulfillment_resource)
+        )
+      )
+  )
+  (:action attach_credential_to_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action detach_credential_from_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential)
+    :precondition
+      (and
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        )
+      )
+  )
+  (:action prepare_customer_reservation_variant
+    :parameters (?customer_reservation - customer_reservation ?resource_variant - resource_variant ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?customer_reservation)
+        (confirmation_channel_attached ?customer_reservation ?confirmation_channel)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (not
+          (variant_locked_by_requester ?resource_variant)
+        )
+        (not
+          (variant_locked_by_provider ?resource_variant)
+        )
+      )
+    :effect (variant_locked_by_requester ?resource_variant)
+  )
+  (:action confirm_customer_reservation_readiness
+    :parameters (?customer_reservation - customer_reservation ?resource_variant - resource_variant ?operator - operator)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?customer_reservation)
+        (operator_assigned_to_context ?customer_reservation ?operator)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (variant_locked_by_requester ?resource_variant)
+        (not
+          (customer_fragment_prepared ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (customer_reservation_ready ?customer_reservation)
+      )
+  )
+  (:action attach_addon_option_to_customer_reservation
+    :parameters (?customer_reservation - customer_reservation ?resource_variant - resource_variant ?addon_option - addon_option)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?customer_reservation)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (addon_option_available ?addon_option)
+        (not
+          (customer_fragment_prepared ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (variant_locked_by_provider ?resource_variant)
+        (customer_fragment_prepared ?customer_reservation)
+        (customer_addon_assigned ?customer_reservation ?addon_option)
+        (not
+          (addon_option_available ?addon_option)
+        )
+      )
+  )
+  (:action finalize_customer_addon_assignment
+    :parameters (?customer_reservation - customer_reservation ?resource_variant - resource_variant ?confirmation_channel - confirmation_channel ?addon_option - addon_option)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?customer_reservation)
+        (confirmation_channel_attached ?customer_reservation ?confirmation_channel)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (variant_locked_by_provider ?resource_variant)
+        (customer_addon_assigned ?customer_reservation ?addon_option)
+        (not
+          (customer_reservation_ready ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (variant_locked_by_requester ?resource_variant)
+        (customer_reservation_ready ?customer_reservation)
+        (addon_option_available ?addon_option)
+        (not
+          (customer_addon_assigned ?customer_reservation ?addon_option)
+        )
+      )
+  )
+  (:action prepare_provider_reservation_timeslot
+    :parameters (?provider_reservation - provider_reservation ?time_slot - time_slot ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?provider_reservation)
+        (confirmation_channel_attached ?provider_reservation ?confirmation_channel)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (not
+          (timeslot_locked_by_requester ?time_slot)
+        )
+        (not
+          (timeslot_locked_by_provider ?time_slot)
+        )
+      )
+    :effect (timeslot_locked_by_requester ?time_slot)
+  )
+  (:action confirm_provider_reservation_readiness
+    :parameters (?provider_reservation - provider_reservation ?time_slot - time_slot ?operator - operator)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?provider_reservation)
+        (operator_assigned_to_context ?provider_reservation ?operator)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (timeslot_locked_by_requester ?time_slot)
+        (not
+          (provider_fragment_prepared ?provider_reservation)
+        )
+      )
+    :effect
+      (and
+        (provider_fragment_prepared ?provider_reservation)
+        (provider_reservation_ready ?provider_reservation)
+      )
+  )
+  (:action attach_addon_option_to_provider_reservation
+    :parameters (?provider_reservation - provider_reservation ?time_slot - time_slot ?addon_option - addon_option)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?provider_reservation)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (addon_option_available ?addon_option)
+        (not
+          (provider_fragment_prepared ?provider_reservation)
+        )
+      )
+    :effect
+      (and
+        (timeslot_locked_by_provider ?time_slot)
+        (provider_fragment_prepared ?provider_reservation)
+        (provider_addon_assigned ?provider_reservation ?addon_option)
+        (not
+          (addon_option_available ?addon_option)
+        )
+      )
+  )
+  (:action finalize_provider_addon_assignment
+    :parameters (?provider_reservation - provider_reservation ?time_slot - time_slot ?confirmation_channel - confirmation_channel ?addon_option - addon_option)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?provider_reservation)
+        (confirmation_channel_attached ?provider_reservation ?confirmation_channel)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (timeslot_locked_by_provider ?time_slot)
+        (provider_addon_assigned ?provider_reservation ?addon_option)
+        (not
+          (provider_reservation_ready ?provider_reservation)
+        )
+      )
+    :effect
+      (and
+        (timeslot_locked_by_requester ?time_slot)
+        (provider_reservation_ready ?provider_reservation)
+        (addon_option_available ?addon_option)
+        (not
+          (provider_addon_assigned ?provider_reservation ?addon_option)
+        )
+      )
+  )
+  (:action create_allocation_ticket
+    :parameters (?customer_reservation - customer_reservation ?provider_reservation - provider_reservation ?resource_variant - resource_variant ?time_slot - time_slot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (provider_fragment_prepared ?provider_reservation)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (variant_locked_by_requester ?resource_variant)
+        (timeslot_locked_by_requester ?time_slot)
+        (customer_reservation_ready ?customer_reservation)
+        (provider_reservation_ready ?provider_reservation)
+        (allocation_ticket_available ?allocation_ticket)
+      )
+    :effect
+      (and
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_bound_to_variant ?allocation_ticket ?resource_variant)
+        (ticket_bound_to_timeslot ?allocation_ticket ?time_slot)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action create_allocation_ticket_with_billing
+    :parameters (?customer_reservation - customer_reservation ?provider_reservation - provider_reservation ?resource_variant - resource_variant ?time_slot - time_slot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (provider_fragment_prepared ?provider_reservation)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (variant_locked_by_provider ?resource_variant)
+        (timeslot_locked_by_requester ?time_slot)
+        (not
+          (customer_reservation_ready ?customer_reservation)
+        )
+        (provider_reservation_ready ?provider_reservation)
+        (allocation_ticket_available ?allocation_ticket)
+      )
+    :effect
+      (and
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_bound_to_variant ?allocation_ticket ?resource_variant)
+        (ticket_bound_to_timeslot ?allocation_ticket ?time_slot)
+        (ticket_billing_attached_flag ?allocation_ticket)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action create_allocation_ticket_with_items
+    :parameters (?customer_reservation - customer_reservation ?provider_reservation - provider_reservation ?resource_variant - resource_variant ?time_slot - time_slot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (provider_fragment_prepared ?provider_reservation)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (variant_locked_by_requester ?resource_variant)
+        (timeslot_locked_by_provider ?time_slot)
+        (customer_reservation_ready ?customer_reservation)
+        (not
+          (provider_reservation_ready ?provider_reservation)
+        )
+        (allocation_ticket_available ?allocation_ticket)
+      )
+    :effect
+      (and
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_bound_to_variant ?allocation_ticket ?resource_variant)
+        (ticket_bound_to_timeslot ?allocation_ticket ?time_slot)
+        (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action create_allocation_ticket_complete
+    :parameters (?customer_reservation - customer_reservation ?provider_reservation - provider_reservation ?resource_variant - resource_variant ?time_slot - time_slot ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (provider_fragment_prepared ?provider_reservation)
+        (customer_variant_selected ?customer_reservation ?resource_variant)
+        (provider_timeslot_selected ?provider_reservation ?time_slot)
+        (variant_locked_by_provider ?resource_variant)
+        (timeslot_locked_by_provider ?time_slot)
+        (not
+          (customer_reservation_ready ?customer_reservation)
+        )
+        (not
+          (provider_reservation_ready ?provider_reservation)
+        )
+        (allocation_ticket_available ?allocation_ticket)
+      )
+    :effect
+      (and
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_bound_to_variant ?allocation_ticket ?resource_variant)
+        (ticket_bound_to_timeslot ?allocation_ticket ?time_slot)
+        (ticket_billing_attached_flag ?allocation_ticket)
+        (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action finalize_allocation_ticket
+    :parameters (?allocation_ticket - allocation_ticket ?customer_reservation - customer_reservation ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (allocation_ticket_reserved ?allocation_ticket)
+        (customer_fragment_prepared ?customer_reservation)
+        (confirmation_channel_attached ?customer_reservation ?confirmation_channel)
+        (not
+          (ticket_ready_for_pairing ?allocation_ticket)
+        )
+      )
+    :effect (ticket_ready_for_pairing ?allocation_ticket)
+  )
+  (:action reserve_fulfillment_item_for_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (aggregate_has_allocation_ticket ?reservation_aggregate ?allocation_ticket)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_available ?fulfillment_item)
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_ready_for_pairing ?allocation_ticket)
+        (not
+          (fulfillment_item_reserved ?fulfillment_item)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_item_reserved ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (not
+          (fulfillment_item_available ?fulfillment_item)
+        )
+      )
+  )
+  (:action prepare_fulfillment_item_for_allocation
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_reserved ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (confirmation_channel_attached ?reservation_aggregate ?confirmation_channel)
+        (not
+          (ticket_billing_attached_flag ?allocation_ticket)
+        )
+        (not
+          (billing_profile_attached ?reservation_aggregate)
+        )
+      )
+    :effect (billing_profile_attached ?reservation_aggregate)
+  )
+  (:action attach_billing_profile_to_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?billing_profile - billing_profile)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (billing_profile_available ?billing_profile)
+        (not
+          (billing_profile_selected ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (billing_profile_selected ?reservation_aggregate)
+        (aggregate_billing_profile_assoc ?reservation_aggregate ?billing_profile)
+        (not
+          (billing_profile_available ?billing_profile)
+        )
+      )
+  )
+  (:action finalize_billing_profile_attachment
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket ?confirmation_channel - confirmation_channel ?billing_profile - billing_profile)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_reserved ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (confirmation_channel_attached ?reservation_aggregate ?confirmation_channel)
+        (ticket_billing_attached_flag ?allocation_ticket)
+        (billing_profile_selected ?reservation_aggregate)
+        (aggregate_billing_profile_assoc ?reservation_aggregate ?billing_profile)
+        (not
+          (billing_profile_attached ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (billing_profile_attached ?reservation_aggregate)
+        (billing_profile_attachment_confirmed ?reservation_aggregate)
+      )
+  )
+  (:action orchestrate_fulfillment_attach_resource_phase1
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_resource - fulfillment_resource ?operator - operator ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_attached ?reservation_aggregate)
+        (aggregate_fulfillment_resource_assoc ?reservation_aggregate ?fulfillment_resource)
+        (operator_assigned_to_context ?reservation_aggregate ?operator)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (not
+          (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        )
+        (not
+          (billing_profile_confirmed ?reservation_aggregate)
+        )
+      )
+    :effect (billing_profile_confirmed ?reservation_aggregate)
+  )
+  (:action orchestrate_fulfillment_attach_resource_phase2
+    :parameters (?reservation_aggregate - reservation_aggregate ?fulfillment_resource - fulfillment_resource ?operator - operator ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_attached ?reservation_aggregate)
+        (aggregate_fulfillment_resource_assoc ?reservation_aggregate ?fulfillment_resource)
+        (operator_assigned_to_context ?reservation_aggregate ?operator)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        (not
+          (billing_profile_confirmed ?reservation_aggregate)
+        )
+      )
+    :effect (billing_profile_confirmed ?reservation_aggregate)
+  )
+  (:action orchestrate_fulfillment_with_credential_phase1
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_confirmed ?reservation_aggregate)
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (not
+          (ticket_billing_attached_flag ?allocation_ticket)
+        )
+        (not
+          (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        )
+        (not
+          (orchestration_step_ready ?reservation_aggregate)
+        )
+      )
+    :effect (orchestration_step_ready ?reservation_aggregate)
+  )
+  (:action orchestrate_fulfillment_with_credential_phase2
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_confirmed ?reservation_aggregate)
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (ticket_billing_attached_flag ?allocation_ticket)
+        (not
+          (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        )
+        (not
+          (orchestration_step_ready ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (customer_profile_attached ?reservation_aggregate)
+      )
+  )
+  (:action orchestrate_fulfillment_with_credential_phase3
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_confirmed ?reservation_aggregate)
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (not
+          (ticket_billing_attached_flag ?allocation_ticket)
+        )
+        (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        (not
+          (orchestration_step_ready ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (customer_profile_attached ?reservation_aggregate)
+      )
+  )
+  (:action orchestrate_fulfillment_with_credential_phase4
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential ?fulfillment_item - fulfillment_item ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (billing_profile_confirmed ?reservation_aggregate)
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (aggregate_has_fulfillment_item ?reservation_aggregate ?fulfillment_item)
+        (fulfillment_item_bound_to_ticket ?fulfillment_item ?allocation_ticket)
+        (ticket_billing_attached_flag ?allocation_ticket)
+        (ticket_fulfillment_item_attached_flag ?allocation_ticket)
+        (not
+          (orchestration_step_ready ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (customer_profile_attached ?reservation_aggregate)
+      )
+  )
+  (:action acknowledge_aggregate_readiness
+    :parameters (?reservation_aggregate - reservation_aggregate)
+    :precondition
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (not
+          (customer_profile_attached ?reservation_aggregate)
+        )
+        (not
+          (aggregate_finalized ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (aggregate_finalized ?reservation_aggregate)
+        (finalization_acknowledged ?reservation_aggregate)
+      )
+  )
+  (:action attach_customer_profile_to_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?customer_profile - customer_profile)
+    :precondition
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (customer_profile_attached ?reservation_aggregate)
+        (customer_profile_available ?customer_profile)
+      )
+    :effect
+      (and
+        (aggregate_customer_profile_assoc ?reservation_aggregate ?customer_profile)
+        (not
+          (customer_profile_available ?customer_profile)
+        )
+      )
+  )
+  (:action apply_aggregate_finalization
+    :parameters (?reservation_aggregate - reservation_aggregate ?customer_reservation - customer_reservation ?provider_reservation - provider_reservation ?confirmation_channel - confirmation_channel ?customer_profile - customer_profile)
+    :precondition
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (customer_profile_attached ?reservation_aggregate)
+        (aggregate_customer_profile_assoc ?reservation_aggregate ?customer_profile)
+        (aggregate_has_customer_reservation ?reservation_aggregate ?customer_reservation)
+        (aggregate_has_provider_reservation ?reservation_aggregate ?provider_reservation)
+        (customer_reservation_ready ?customer_reservation)
+        (provider_reservation_ready ?provider_reservation)
+        (confirmation_channel_attached ?reservation_aggregate ?confirmation_channel)
+        (not
+          (fulfillment_orchestration_executed ?reservation_aggregate)
+        )
+      )
+    :effect (fulfillment_orchestration_executed ?reservation_aggregate)
+  )
+  (:action finalize_aggregate_and_propagate
+    :parameters (?reservation_aggregate - reservation_aggregate)
+    :precondition
+      (and
+        (orchestration_step_ready ?reservation_aggregate)
+        (fulfillment_orchestration_executed ?reservation_aggregate)
+        (not
+          (aggregate_finalized ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (aggregate_finalized ?reservation_aggregate)
+        (finalization_acknowledged ?reservation_aggregate)
+      )
+  )
+  (:action claim_external_approver_for_aggregate
+    :parameters (?reservation_aggregate - reservation_aggregate ?external_approver - external_approver ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (confirmation_acknowledged_on_subject ?reservation_aggregate)
+        (confirmation_channel_attached ?reservation_aggregate ?confirmation_channel)
+        (external_approver_available ?external_approver)
+        (aggregate_external_approver_assoc ?reservation_aggregate ?external_approver)
+        (not
+          (external_approver_claimed ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (external_approver_claimed ?reservation_aggregate)
+        (not
+          (external_approver_available ?external_approver)
+        )
+      )
+  )
+  (:action initialize_external_approval_step
+    :parameters (?reservation_aggregate - reservation_aggregate ?operator - operator)
+    :precondition
+      (and
+        (external_approver_claimed ?reservation_aggregate)
+        (operator_assigned_to_context ?reservation_aggregate ?operator)
+        (not
+          (external_approval_step_initialized ?reservation_aggregate)
+        )
+      )
+    :effect (external_approval_step_initialized ?reservation_aggregate)
+  )
+  (:action finalize_external_approval_step
+    :parameters (?reservation_aggregate - reservation_aggregate ?credential - credential)
+    :precondition
+      (and
+        (external_approval_step_initialized ?reservation_aggregate)
+        (aggregate_credential_assoc ?reservation_aggregate ?credential)
+        (not
+          (external_approval_finalized ?reservation_aggregate)
+        )
+      )
+    :effect (external_approval_finalized ?reservation_aggregate)
+  )
+  (:action acknowledge_external_approval_complete
+    :parameters (?reservation_aggregate - reservation_aggregate)
+    :precondition
+      (and
+        (external_approval_finalized ?reservation_aggregate)
+        (not
+          (aggregate_finalized ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (aggregate_finalized ?reservation_aggregate)
+        (finalization_acknowledged ?reservation_aggregate)
+      )
+  )
+  (:action propagate_finalization_to_customer_reservation
+    :parameters (?customer_reservation - customer_reservation ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (customer_fragment_prepared ?customer_reservation)
+        (customer_reservation_ready ?customer_reservation)
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_ready_for_pairing ?allocation_ticket)
+        (not
+          (finalization_acknowledged ?customer_reservation)
+        )
+      )
+    :effect (finalization_acknowledged ?customer_reservation)
+  )
+  (:action propagate_finalization_to_provider_reservation
+    :parameters (?provider_reservation - provider_reservation ?allocation_ticket - allocation_ticket)
+    :precondition
+      (and
+        (provider_fragment_prepared ?provider_reservation)
+        (provider_reservation_ready ?provider_reservation)
+        (allocation_ticket_reserved ?allocation_ticket)
+        (ticket_ready_for_pairing ?allocation_ticket)
+        (not
+          (finalization_acknowledged ?provider_reservation)
+        )
+      )
+    :effect (finalization_acknowledged ?provider_reservation)
+  )
+  (:action consume_confirmation_token_and_bind_to_context
+    :parameters (?reservation_context - reservation_context ?confirmation_token - confirmation_token ?confirmation_channel - confirmation_channel)
+    :precondition
+      (and
+        (finalization_acknowledged ?reservation_context)
+        (confirmation_channel_attached ?reservation_context ?confirmation_channel)
+        (confirmation_token_available ?confirmation_token)
+        (not
+          (confirmation_token_consumed ?reservation_context)
+        )
+      )
+    :effect
+      (and
+        (confirmation_token_consumed ?reservation_context)
+        (context_token_bound ?reservation_context ?confirmation_token)
+        (not
+          (confirmation_token_available ?confirmation_token)
+        )
+      )
+  )
+  (:action commit_customer_reservation_with_token
+    :parameters (?customer_reservation - customer_reservation ?resource_unit - resource_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (confirmation_token_consumed ?customer_reservation)
+        (context_resource_assignment ?customer_reservation ?resource_unit)
+        (context_token_bound ?customer_reservation ?confirmation_token)
+        (not
+          (allocation_committed ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?customer_reservation)
+        (resource_unit_available ?resource_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action commit_provider_reservation_with_token
+    :parameters (?provider_reservation - provider_reservation ?resource_unit - resource_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (confirmation_token_consumed ?provider_reservation)
+        (context_resource_assignment ?provider_reservation ?resource_unit)
+        (context_token_bound ?provider_reservation ?confirmation_token)
+        (not
+          (allocation_committed ?provider_reservation)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?provider_reservation)
+        (resource_unit_available ?resource_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action commit_aggregate_with_token
+    :parameters (?reservation_aggregate - reservation_aggregate ?resource_unit - resource_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (confirmation_token_consumed ?reservation_aggregate)
+        (context_resource_assignment ?reservation_aggregate ?resource_unit)
+        (context_token_bound ?reservation_aggregate ?confirmation_token)
+        (not
+          (allocation_committed ?reservation_aggregate)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?reservation_aggregate)
+        (resource_unit_available ?resource_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem reservation_scenario_1)
+  (:domain resource_reservation_with_confirmation)
+  (:objects customer_reservation_1 - customer_reservation provider_reservation_1 - provider_reservation reservation_aggregate_1 - reservation_aggregate reservation_aggregate_2 - reservation_aggregate resource_unit_a - resource_unit resource_unit_b - resource_unit resource_unit_c - resource_unit confirmation_channel_email - confirmation_channel operator_1 - operator addon_option_wifi - addon_option resource_variant_standard - resource_variant time_slot_morning - time_slot allocation_ticket_1 - allocation_ticket fulfillment_item_1 - fulfillment_item fulfillment_item_2 - fulfillment_item billing_profile_standard - billing_profile billing_profile_premium - billing_profile customer_profile_alice - customer_profile customer_profile_bob - customer_profile confirmation_token_alpha - confirmation_token fulfillment_resource_truck_1 - fulfillment_resource external_approver_cert_1 - external_approver external_approver_cert_2 - external_approver credential_api_key_1 - credential)
+  (:init
+    (resource_unit_available resource_unit_a)
+    (resource_unit_available resource_unit_b)
+    (resource_unit_available resource_unit_c)
+    (confirmation_channel_available confirmation_channel_email)
+    (operator_available operator_1)
+    (addon_option_available addon_option_wifi)
+    (customer_variant_selected customer_reservation_1 resource_variant_standard)
+    (provider_timeslot_selected provider_reservation_1 time_slot_morning)
+    (allocation_ticket_available allocation_ticket_1)
+    (fulfillment_item_available fulfillment_item_1)
+    (fulfillment_item_available fulfillment_item_2)
+    (aggregate_has_customer_reservation reservation_aggregate_1 customer_reservation_1)
+    (aggregate_has_customer_reservation reservation_aggregate_2 customer_reservation_1)
+    (aggregate_has_provider_reservation reservation_aggregate_1 provider_reservation_1)
+    (aggregate_has_provider_reservation reservation_aggregate_2 provider_reservation_1)
+    (aggregate_has_allocation_ticket reservation_aggregate_1 allocation_ticket_1)
+    (aggregate_has_allocation_ticket reservation_aggregate_2 allocation_ticket_1)
+    (aggregate_has_fulfillment_item reservation_aggregate_1 fulfillment_item_1)
+    (aggregate_has_fulfillment_item reservation_aggregate_2 fulfillment_item_2)
+    (billing_profile_available billing_profile_standard)
+    (billing_profile_available billing_profile_premium)
+    (customer_profile_available customer_profile_alice)
+    (customer_profile_available customer_profile_bob)
+    (confirmation_token_available confirmation_token_alpha)
+    (fulfillment_resource_available fulfillment_resource_truck_1)
+    (external_approver_available external_approver_cert_1)
+    (aggregate_external_approver_assoc reservation_aggregate_1 external_approver_cert_1)
+    (aggregate_external_approver_assoc reservation_aggregate_2 external_approver_cert_2)
+    (credential_available credential_api_key_1)
+  )
+  (:goal
+    (and
+      (allocation_committed customer_reservation_1)
+      (allocation_committed provider_reservation_1)
+      (allocation_committed reservation_aggregate_1)
+      (allocation_committed reservation_aggregate_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_reservation_context customer_reservation_1)
+(place_resource_hold customer_reservation_1 resource_unit_a)
+(attach_confirmation_channel_to_context customer_reservation_1 confirmation_channel_email)
+(confirm_channel_for_context customer_reservation_1 confirmation_channel_email)
+(assign_operator_to_context customer_reservation_1 operator_1)
+(prepare_customer_reservation_variant customer_reservation_1 resource_variant_standard confirmation_channel_email)
+(confirm_customer_reservation_readiness customer_reservation_1 resource_variant_standard operator_1)
+(release_operator_from_context customer_reservation_1 operator_1)
+(release_confirmation_channel_from_context customer_reservation_1 confirmation_channel_email)
+(initialize_reservation_context provider_reservation_1)
+(place_resource_hold provider_reservation_1 resource_unit_b)
+(attach_confirmation_channel_to_context provider_reservation_1 confirmation_channel_email)
+(confirm_channel_for_context provider_reservation_1 confirmation_channel_email)
+(assign_operator_to_context provider_reservation_1 operator_1)
+(prepare_provider_reservation_timeslot provider_reservation_1 time_slot_morning confirmation_channel_email)
+(confirm_provider_reservation_readiness provider_reservation_1 time_slot_morning operator_1)
+(release_operator_from_context provider_reservation_1 operator_1)
+(release_confirmation_channel_from_context provider_reservation_1 confirmation_channel_email)
+(create_allocation_ticket customer_reservation_1 provider_reservation_1 resource_variant_standard time_slot_morning allocation_ticket_1)
+(attach_confirmation_channel_to_context customer_reservation_1 confirmation_channel_email)
+(finalize_allocation_ticket allocation_ticket_1 customer_reservation_1 confirmation_channel_email)
+(propagate_finalization_to_customer_reservation customer_reservation_1 allocation_ticket_1)
+(propagate_finalization_to_provider_reservation provider_reservation_1 allocation_ticket_1)
+(release_confirmation_channel_from_context customer_reservation_1 confirmation_channel_email)
+(initialize_reservation_context reservation_aggregate_1)
+(place_resource_hold reservation_aggregate_1 resource_unit_c)
+(attach_confirmation_channel_to_context reservation_aggregate_1 confirmation_channel_email)
+(confirm_channel_for_context reservation_aggregate_1 confirmation_channel_email)
+(attach_credential_to_aggregate reservation_aggregate_1 credential_api_key_1)
+(claim_external_approver_for_aggregate reservation_aggregate_1 external_approver_cert_1 confirmation_channel_email)
+(assign_operator_to_context reservation_aggregate_1 operator_1)
+(initialize_external_approval_step reservation_aggregate_1 operator_1)
+(finalize_external_approval_step reservation_aggregate_1 credential_api_key_1)
+(acknowledge_external_approval_complete reservation_aggregate_1)
+(release_operator_from_context reservation_aggregate_1 operator_1)
+(detach_credential_from_aggregate reservation_aggregate_1 credential_api_key_1)
+(release_confirmation_channel_from_context reservation_aggregate_1 confirmation_channel_email)
+(attach_confirmation_channel_to_context customer_reservation_1 confirmation_channel_email)
+(consume_confirmation_token_and_bind_to_context customer_reservation_1 confirmation_token_alpha confirmation_channel_email)
+(commit_customer_reservation_with_token customer_reservation_1 resource_unit_a confirmation_token_alpha)
+(release_confirmation_channel_from_context customer_reservation_1 confirmation_channel_email)
+(initialize_reservation_context reservation_aggregate_2)
+(place_resource_hold reservation_aggregate_2 resource_unit_a)
+(attach_confirmation_channel_to_context reservation_aggregate_2 confirmation_channel_email)
+(confirm_channel_for_context reservation_aggregate_2 confirmation_channel_email)
+(attach_credential_to_aggregate reservation_aggregate_2 credential_api_key_1)
+(claim_external_approver_for_aggregate reservation_aggregate_2 external_approver_cert_2 confirmation_channel_email)
+(assign_operator_to_context reservation_aggregate_2 operator_1)
+(initialize_external_approval_step reservation_aggregate_2 operator_1)
+(finalize_external_approval_step reservation_aggregate_2 credential_api_key_1)
+(acknowledge_external_approval_complete reservation_aggregate_2)
+(release_operator_from_context reservation_aggregate_2 operator_1)
+(detach_credential_from_aggregate reservation_aggregate_2 credential_api_key_1)
+(release_confirmation_channel_from_context reservation_aggregate_2 confirmation_channel_email)
+(attach_confirmation_channel_to_context provider_reservation_1 confirmation_channel_email)
+(consume_confirmation_token_and_bind_to_context provider_reservation_1 confirmation_token_alpha confirmation_channel_email)
+(commit_provider_reservation_with_token provider_reservation_1 resource_unit_b confirmation_token_alpha)
+(release_confirmation_channel_from_context provider_reservation_1 confirmation_channel_email)
+(attach_confirmation_channel_to_context reservation_aggregate_1 confirmation_channel_email)
+(consume_confirmation_token_and_bind_to_context reservation_aggregate_1 confirmation_token_alpha confirmation_channel_email)
+(commit_aggregate_with_token reservation_aggregate_1 resource_unit_c confirmation_token_alpha)
+(release_confirmation_channel_from_context reservation_aggregate_1 confirmation_channel_email)
+(attach_confirmation_channel_to_context reservation_aggregate_2 confirmation_channel_email)
+(consume_confirmation_token_and_bind_to_context reservation_aggregate_2 confirmation_token_alpha confirmation_channel_email)
+(commit_aggregate_with_token reservation_aggregate_2 resource_unit_a confirmation_token_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__o16cr11/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val__o16cr11/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pasture_rotation_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object auxiliary_resource_type - entity consumable_type - entity infrastructure_type - entity livestock_asset_root - entity herd_subject - livestock_asset_root pasture_plot - auxiliary_resource_type grazing_plan - auxiliary_resource_type handling_facility - auxiliary_resource_type condition_report - auxiliary_resource_type procedure_kit - auxiliary_resource_type vaccine_batch - auxiliary_resource_type veterinary_kit - auxiliary_resource_type lab_certificate - auxiliary_resource_type supplement_feed - consumable_type forage_batch - consumable_type movement_permit - consumable_type origin_field_section - infrastructure_type destination_field_section - infrastructure_type movement_asset - infrastructure_type livestock_grouping - herd_subject management_record - herd_subject production_group - livestock_grouping grazing_group - livestock_grouping operation_record - management_record)
+
+  (:predicates
+    (herd_registered ?herd_subject - herd_subject)
+    (ready_for_operation ?herd_subject - herd_subject)
+    (pasture_assigned ?herd_subject - herd_subject)
+    (movement_completed ?herd_subject - herd_subject)
+    (processing_complete ?herd_subject - herd_subject)
+    (treatment_administered ?herd_subject - herd_subject)
+    (pasture_plot_available ?pasture_plot - pasture_plot)
+    (assigned_to_pasture ?herd_subject - herd_subject ?pasture_plot - pasture_plot)
+    (grazing_plan_available ?grazing_plan - grazing_plan)
+    (assigned_grazing_plan ?herd_subject - herd_subject ?grazing_plan - grazing_plan)
+    (facility_available ?handling_facility - handling_facility)
+    (assigned_to_facility ?herd_subject - herd_subject ?handling_facility - handling_facility)
+    (supplement_feed_available ?supplement_feed - supplement_feed)
+    (production_group_assigned_supplement ?production_group - production_group ?supplement_feed - supplement_feed)
+    (grazing_group_assigned_supplement ?grazing_group - grazing_group ?supplement_feed - supplement_feed)
+    (production_group_origin_section ?production_group - production_group ?origin_section - origin_field_section)
+    (origin_section_staged ?origin_section - origin_field_section)
+    (origin_section_feed_staged ?origin_section - origin_field_section)
+    (production_group_feed_applied ?production_group - production_group)
+    (grazing_group_destination_section ?grazing_group - grazing_group ?destination_section - destination_field_section)
+    (destination_section_staged ?destination_section - destination_field_section)
+    (destination_section_feed_staged ?destination_section - destination_field_section)
+    (grazing_group_feed_applied ?grazing_group - grazing_group)
+    (movement_asset_available ?movement_asset - movement_asset)
+    (movement_asset_staged ?movement_asset - movement_asset)
+    (movement_asset_assigned_origin ?movement_asset - movement_asset ?origin_section - origin_field_section)
+    (movement_asset_assigned_destination ?movement_asset - movement_asset ?destination_section - destination_field_section)
+    (movement_asset_origin_ready ?movement_asset - movement_asset)
+    (movement_asset_destination_ready ?movement_asset - movement_asset)
+    (movement_asset_loaded ?movement_asset - movement_asset)
+    (record_for_production_group ?operation_record - operation_record ?production_group - production_group)
+    (record_for_grazing_group ?operation_record - operation_record ?grazing_group - grazing_group)
+    (record_for_movement_asset ?operation_record - operation_record ?movement_asset - movement_asset)
+    (forage_batch_available ?forage_batch - forage_batch)
+    (record_for_forage_batch ?operation_record - operation_record ?forage_batch - forage_batch)
+    (forage_batch_reserved ?forage_batch - forage_batch)
+    (forage_batch_assigned_to_asset ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    (record_verified ?operation_record - operation_record)
+    (record_staged ?operation_record - operation_record)
+    (record_equipment_loaded ?operation_record - operation_record)
+    (report_attached_to_record ?operation_record - operation_record)
+    (record_report_validated ?operation_record - operation_record)
+    (record_checks_passed ?operation_record - operation_record)
+    (record_ready_for_execution ?operation_record - operation_record)
+    (movement_permit_available ?movement_permit - movement_permit)
+    (record_has_movement_permit ?operation_record - operation_record ?movement_permit - movement_permit)
+    (movement_permit_attached ?operation_record - operation_record)
+    (facility_check_passed ?operation_record - operation_record)
+    (lab_certificate_attached ?operation_record - operation_record)
+    (condition_report_available ?condition_report - condition_report)
+    (record_has_condition_report ?operation_record - operation_record ?condition_report - condition_report)
+    (procedure_kit_available ?procedure_kit - procedure_kit)
+    (record_has_procedure_kit ?operation_record - operation_record ?procedure_kit - procedure_kit)
+    (veterinary_kit_available ?veterinary_kit - veterinary_kit)
+    (record_has_veterinary_kit ?operation_record - operation_record ?veterinary_kit - veterinary_kit)
+    (lab_certificate_available ?lab_certificate - lab_certificate)
+    (record_has_lab_certificate ?operation_record - operation_record ?lab_certificate - lab_certificate)
+    (vaccine_batch_available ?vaccine_batch - vaccine_batch)
+    (assigned_vaccine_batch ?herd_subject - herd_subject ?vaccine_batch - vaccine_batch)
+    (production_group_processed_at_facility ?production_group - production_group)
+    (grazing_group_processed_at_facility ?grazing_group - grazing_group)
+    (record_finalized ?operation_record - operation_record)
+  )
+  (:action register_herd_subject
+    :parameters (?herd_subject - herd_subject)
+    :precondition
+      (and
+        (not
+          (herd_registered ?herd_subject)
+        )
+        (not
+          (movement_completed ?herd_subject)
+        )
+      )
+    :effect (herd_registered ?herd_subject)
+  )
+  (:action assign_herd_to_pasture
+    :parameters (?herd_subject - herd_subject ?pasture_plot - pasture_plot)
+    :precondition
+      (and
+        (herd_registered ?herd_subject)
+        (not
+          (pasture_assigned ?herd_subject)
+        )
+        (pasture_plot_available ?pasture_plot)
+      )
+    :effect
+      (and
+        (pasture_assigned ?herd_subject)
+        (assigned_to_pasture ?herd_subject ?pasture_plot)
+        (not
+          (pasture_plot_available ?pasture_plot)
+        )
+      )
+  )
+  (:action attach_grazing_plan
+    :parameters (?herd_subject - herd_subject ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (herd_registered ?herd_subject)
+        (pasture_assigned ?herd_subject)
+        (grazing_plan_available ?grazing_plan)
+      )
+    :effect
+      (and
+        (assigned_grazing_plan ?herd_subject ?grazing_plan)
+        (not
+          (grazing_plan_available ?grazing_plan)
+        )
+      )
+  )
+  (:action confirm_grazing_plan
+    :parameters (?herd_subject - herd_subject ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (herd_registered ?herd_subject)
+        (pasture_assigned ?herd_subject)
+        (assigned_grazing_plan ?herd_subject ?grazing_plan)
+        (not
+          (ready_for_operation ?herd_subject)
+        )
+      )
+    :effect (ready_for_operation ?herd_subject)
+  )
+  (:action revoke_grazing_plan
+    :parameters (?herd_subject - herd_subject ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (assigned_grazing_plan ?herd_subject ?grazing_plan)
+      )
+    :effect
+      (and
+        (grazing_plan_available ?grazing_plan)
+        (not
+          (assigned_grazing_plan ?herd_subject ?grazing_plan)
+        )
+      )
+  )
+  (:action assign_herd_to_facility
+    :parameters (?herd_subject - herd_subject ?handling_facility - handling_facility)
+    :precondition
+      (and
+        (ready_for_operation ?herd_subject)
+        (facility_available ?handling_facility)
+      )
+    :effect
+      (and
+        (assigned_to_facility ?herd_subject ?handling_facility)
+        (not
+          (facility_available ?handling_facility)
+        )
+      )
+  )
+  (:action release_herd_from_facility
+    :parameters (?herd_subject - herd_subject ?handling_facility - handling_facility)
+    :precondition
+      (and
+        (assigned_to_facility ?herd_subject ?handling_facility)
+      )
+    :effect
+      (and
+        (facility_available ?handling_facility)
+        (not
+          (assigned_to_facility ?herd_subject ?handling_facility)
+        )
+      )
+  )
+  (:action attach_veterinary_kit_to_record
+    :parameters (?operation_record - operation_record ?veterinary_kit - veterinary_kit)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (veterinary_kit_available ?veterinary_kit)
+      )
+    :effect
+      (and
+        (record_has_veterinary_kit ?operation_record ?veterinary_kit)
+        (not
+          (veterinary_kit_available ?veterinary_kit)
+        )
+      )
+  )
+  (:action detach_veterinary_kit_from_record
+    :parameters (?operation_record - operation_record ?veterinary_kit - veterinary_kit)
+    :precondition
+      (and
+        (record_has_veterinary_kit ?operation_record ?veterinary_kit)
+      )
+    :effect
+      (and
+        (veterinary_kit_available ?veterinary_kit)
+        (not
+          (record_has_veterinary_kit ?operation_record ?veterinary_kit)
+        )
+      )
+  )
+  (:action attach_lab_certificate_to_record
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (lab_certificate_available ?lab_certificate)
+      )
+    :effect
+      (and
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (not
+          (lab_certificate_available ?lab_certificate)
+        )
+      )
+  )
+  (:action detach_lab_certificate_from_record
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate)
+    :precondition
+      (and
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+      )
+    :effect
+      (and
+        (lab_certificate_available ?lab_certificate)
+        (not
+          (record_has_lab_certificate ?operation_record ?lab_certificate)
+        )
+      )
+  )
+  (:action stage_origin_section_for_production_group
+    :parameters (?production_group - production_group ?origin_section - origin_field_section ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (ready_for_operation ?production_group)
+        (assigned_grazing_plan ?production_group ?grazing_plan)
+        (production_group_origin_section ?production_group ?origin_section)
+        (not
+          (origin_section_staged ?origin_section)
+        )
+        (not
+          (origin_section_feed_staged ?origin_section)
+        )
+      )
+    :effect (origin_section_staged ?origin_section)
+  )
+  (:action process_group_at_facility
+    :parameters (?production_group - production_group ?origin_section - origin_field_section ?handling_facility - handling_facility)
+    :precondition
+      (and
+        (ready_for_operation ?production_group)
+        (assigned_to_facility ?production_group ?handling_facility)
+        (production_group_origin_section ?production_group ?origin_section)
+        (origin_section_staged ?origin_section)
+        (not
+          (production_group_processed_at_facility ?production_group)
+        )
+      )
+    :effect
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (production_group_feed_applied ?production_group)
+      )
+  )
+  (:action stage_supplement_feed_for_group
+    :parameters (?production_group - production_group ?origin_section - origin_field_section ?supplement_feed - supplement_feed)
+    :precondition
+      (and
+        (ready_for_operation ?production_group)
+        (production_group_origin_section ?production_group ?origin_section)
+        (supplement_feed_available ?supplement_feed)
+        (not
+          (production_group_processed_at_facility ?production_group)
+        )
+      )
+    :effect
+      (and
+        (origin_section_feed_staged ?origin_section)
+        (production_group_processed_at_facility ?production_group)
+        (production_group_assigned_supplement ?production_group ?supplement_feed)
+        (not
+          (supplement_feed_available ?supplement_feed)
+        )
+      )
+  )
+  (:action apply_supplement_feed
+    :parameters (?production_group - production_group ?origin_section - origin_field_section ?grazing_plan - grazing_plan ?supplement_feed - supplement_feed)
+    :precondition
+      (and
+        (ready_for_operation ?production_group)
+        (assigned_grazing_plan ?production_group ?grazing_plan)
+        (production_group_origin_section ?production_group ?origin_section)
+        (origin_section_feed_staged ?origin_section)
+        (production_group_assigned_supplement ?production_group ?supplement_feed)
+        (not
+          (production_group_feed_applied ?production_group)
+        )
+      )
+    :effect
+      (and
+        (origin_section_staged ?origin_section)
+        (production_group_feed_applied ?production_group)
+        (supplement_feed_available ?supplement_feed)
+        (not
+          (production_group_assigned_supplement ?production_group ?supplement_feed)
+        )
+      )
+  )
+  (:action stage_destination_section_for_grazing_group
+    :parameters (?grazing_group - grazing_group ?destination_section - destination_field_section ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (ready_for_operation ?grazing_group)
+        (assigned_grazing_plan ?grazing_group ?grazing_plan)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (not
+          (destination_section_staged ?destination_section)
+        )
+        (not
+          (destination_section_feed_staged ?destination_section)
+        )
+      )
+    :effect (destination_section_staged ?destination_section)
+  )
+  (:action process_grazing_group_at_facility
+    :parameters (?grazing_group - grazing_group ?destination_section - destination_field_section ?handling_facility - handling_facility)
+    :precondition
+      (and
+        (ready_for_operation ?grazing_group)
+        (assigned_to_facility ?grazing_group ?handling_facility)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (destination_section_staged ?destination_section)
+        (not
+          (grazing_group_processed_at_facility ?grazing_group)
+        )
+      )
+    :effect
+      (and
+        (grazing_group_processed_at_facility ?grazing_group)
+        (grazing_group_feed_applied ?grazing_group)
+      )
+  )
+  (:action stage_supplement_feed_for_grazing_group
+    :parameters (?grazing_group - grazing_group ?destination_section - destination_field_section ?supplement_feed - supplement_feed)
+    :precondition
+      (and
+        (ready_for_operation ?grazing_group)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (supplement_feed_available ?supplement_feed)
+        (not
+          (grazing_group_processed_at_facility ?grazing_group)
+        )
+      )
+    :effect
+      (and
+        (destination_section_feed_staged ?destination_section)
+        (grazing_group_processed_at_facility ?grazing_group)
+        (grazing_group_assigned_supplement ?grazing_group ?supplement_feed)
+        (not
+          (supplement_feed_available ?supplement_feed)
+        )
+      )
+  )
+  (:action apply_supplement_feed_to_grazing_group
+    :parameters (?grazing_group - grazing_group ?destination_section - destination_field_section ?grazing_plan - grazing_plan ?supplement_feed - supplement_feed)
+    :precondition
+      (and
+        (ready_for_operation ?grazing_group)
+        (assigned_grazing_plan ?grazing_group ?grazing_plan)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (destination_section_feed_staged ?destination_section)
+        (grazing_group_assigned_supplement ?grazing_group ?supplement_feed)
+        (not
+          (grazing_group_feed_applied ?grazing_group)
+        )
+      )
+    :effect
+      (and
+        (destination_section_staged ?destination_section)
+        (grazing_group_feed_applied ?grazing_group)
+        (supplement_feed_available ?supplement_feed)
+        (not
+          (grazing_group_assigned_supplement ?grazing_group ?supplement_feed)
+        )
+      )
+  )
+  (:action stage_movement_asset_standard
+    :parameters (?production_group - production_group ?grazing_group - grazing_group ?origin_section - origin_field_section ?destination_section - destination_field_section ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (grazing_group_processed_at_facility ?grazing_group)
+        (production_group_origin_section ?production_group ?origin_section)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (origin_section_staged ?origin_section)
+        (destination_section_staged ?destination_section)
+        (production_group_feed_applied ?production_group)
+        (grazing_group_feed_applied ?grazing_group)
+        (movement_asset_available ?movement_asset)
+      )
+    :effect
+      (and
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_assigned_origin ?movement_asset ?origin_section)
+        (movement_asset_assigned_destination ?movement_asset ?destination_section)
+        (not
+          (movement_asset_available ?movement_asset)
+        )
+      )
+  )
+  (:action stage_movement_asset_origin_feed
+    :parameters (?production_group - production_group ?grazing_group - grazing_group ?origin_section - origin_field_section ?destination_section - destination_field_section ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (grazing_group_processed_at_facility ?grazing_group)
+        (production_group_origin_section ?production_group ?origin_section)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (origin_section_feed_staged ?origin_section)
+        (destination_section_staged ?destination_section)
+        (not
+          (production_group_feed_applied ?production_group)
+        )
+        (grazing_group_feed_applied ?grazing_group)
+        (movement_asset_available ?movement_asset)
+      )
+    :effect
+      (and
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_assigned_origin ?movement_asset ?origin_section)
+        (movement_asset_assigned_destination ?movement_asset ?destination_section)
+        (movement_asset_origin_ready ?movement_asset)
+        (not
+          (movement_asset_available ?movement_asset)
+        )
+      )
+  )
+  (:action stage_movement_asset_destination_feed
+    :parameters (?production_group - production_group ?grazing_group - grazing_group ?origin_section - origin_field_section ?destination_section - destination_field_section ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (grazing_group_processed_at_facility ?grazing_group)
+        (production_group_origin_section ?production_group ?origin_section)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (origin_section_staged ?origin_section)
+        (destination_section_feed_staged ?destination_section)
+        (production_group_feed_applied ?production_group)
+        (not
+          (grazing_group_feed_applied ?grazing_group)
+        )
+        (movement_asset_available ?movement_asset)
+      )
+    :effect
+      (and
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_assigned_origin ?movement_asset ?origin_section)
+        (movement_asset_assigned_destination ?movement_asset ?destination_section)
+        (movement_asset_destination_ready ?movement_asset)
+        (not
+          (movement_asset_available ?movement_asset)
+        )
+      )
+  )
+  (:action stage_movement_asset_both_feeds
+    :parameters (?production_group - production_group ?grazing_group - grazing_group ?origin_section - origin_field_section ?destination_section - destination_field_section ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (grazing_group_processed_at_facility ?grazing_group)
+        (production_group_origin_section ?production_group ?origin_section)
+        (grazing_group_destination_section ?grazing_group ?destination_section)
+        (origin_section_feed_staged ?origin_section)
+        (destination_section_feed_staged ?destination_section)
+        (not
+          (production_group_feed_applied ?production_group)
+        )
+        (not
+          (grazing_group_feed_applied ?grazing_group)
+        )
+        (movement_asset_available ?movement_asset)
+      )
+    :effect
+      (and
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_assigned_origin ?movement_asset ?origin_section)
+        (movement_asset_assigned_destination ?movement_asset ?destination_section)
+        (movement_asset_origin_ready ?movement_asset)
+        (movement_asset_destination_ready ?movement_asset)
+        (not
+          (movement_asset_available ?movement_asset)
+        )
+      )
+  )
+  (:action mark_asset_loaded
+    :parameters (?movement_asset - movement_asset ?production_group - production_group ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (movement_asset_staged ?movement_asset)
+        (production_group_processed_at_facility ?production_group)
+        (assigned_grazing_plan ?production_group ?grazing_plan)
+        (not
+          (movement_asset_loaded ?movement_asset)
+        )
+      )
+    :effect (movement_asset_loaded ?movement_asset)
+  )
+  (:action reserve_forage_for_record
+    :parameters (?operation_record - operation_record ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (record_for_movement_asset ?operation_record ?movement_asset)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_available ?forage_batch)
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_loaded ?movement_asset)
+        (not
+          (forage_batch_reserved ?forage_batch)
+        )
+      )
+    :effect
+      (and
+        (forage_batch_reserved ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (not
+          (forage_batch_available ?forage_batch)
+        )
+      )
+  )
+  (:action verify_record_for_move
+    :parameters (?operation_record - operation_record ?forage_batch - forage_batch ?movement_asset - movement_asset ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_reserved ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (assigned_grazing_plan ?operation_record ?grazing_plan)
+        (not
+          (movement_asset_origin_ready ?movement_asset)
+        )
+        (not
+          (record_verified ?operation_record)
+        )
+      )
+    :effect (record_verified ?operation_record)
+  )
+  (:action attach_condition_report_to_record
+    :parameters (?operation_record - operation_record ?condition_report - condition_report)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (condition_report_available ?condition_report)
+        (not
+          (report_attached_to_record ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (report_attached_to_record ?operation_record)
+        (record_has_condition_report ?operation_record ?condition_report)
+        (not
+          (condition_report_available ?condition_report)
+        )
+      )
+  )
+  (:action finalize_record_with_report
+    :parameters (?operation_record - operation_record ?forage_batch - forage_batch ?movement_asset - movement_asset ?grazing_plan - grazing_plan ?condition_report - condition_report)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_reserved ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (assigned_grazing_plan ?operation_record ?grazing_plan)
+        (movement_asset_origin_ready ?movement_asset)
+        (report_attached_to_record ?operation_record)
+        (record_has_condition_report ?operation_record ?condition_report)
+        (not
+          (record_verified ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_verified ?operation_record)
+        (record_report_validated ?operation_record)
+      )
+  )
+  (:action prepare_record_for_operation_initial
+    :parameters (?operation_record - operation_record ?veterinary_kit - veterinary_kit ?handling_facility - handling_facility ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_verified ?operation_record)
+        (record_has_veterinary_kit ?operation_record ?veterinary_kit)
+        (assigned_to_facility ?operation_record ?handling_facility)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (not
+          (movement_asset_destination_ready ?movement_asset)
+        )
+        (not
+          (record_staged ?operation_record)
+        )
+      )
+    :effect (record_staged ?operation_record)
+  )
+  (:action prepare_record_for_operation_followup
+    :parameters (?operation_record - operation_record ?veterinary_kit - veterinary_kit ?handling_facility - handling_facility ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_verified ?operation_record)
+        (record_has_veterinary_kit ?operation_record ?veterinary_kit)
+        (assigned_to_facility ?operation_record ?handling_facility)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (movement_asset_destination_ready ?movement_asset)
+        (not
+          (record_staged ?operation_record)
+        )
+      )
+    :effect (record_staged ?operation_record)
+  )
+  (:action authorize_record_with_lab_certificate
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_staged ?operation_record)
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (not
+          (movement_asset_origin_ready ?movement_asset)
+        )
+        (not
+          (movement_asset_destination_ready ?movement_asset)
+        )
+        (not
+          (record_equipment_loaded ?operation_record)
+        )
+      )
+    :effect (record_equipment_loaded ?operation_record)
+  )
+  (:action authorize_record_with_lab_and_asset
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_staged ?operation_record)
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (movement_asset_origin_ready ?movement_asset)
+        (not
+          (movement_asset_destination_ready ?movement_asset)
+        )
+        (not
+          (record_equipment_loaded ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_checks_passed ?operation_record)
+      )
+  )
+  (:action authorize_record_with_lab_alternative
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_staged ?operation_record)
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (not
+          (movement_asset_origin_ready ?movement_asset)
+        )
+        (movement_asset_destination_ready ?movement_asset)
+        (not
+          (record_equipment_loaded ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_checks_passed ?operation_record)
+      )
+  )
+  (:action authorize_record_with_lab_all_checks
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate ?forage_batch - forage_batch ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (record_staged ?operation_record)
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (record_for_forage_batch ?operation_record ?forage_batch)
+        (forage_batch_assigned_to_asset ?forage_batch ?movement_asset)
+        (movement_asset_origin_ready ?movement_asset)
+        (movement_asset_destination_ready ?movement_asset)
+        (not
+          (record_equipment_loaded ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_checks_passed ?operation_record)
+      )
+  )
+  (:action finalize_record_processing
+    :parameters (?operation_record - operation_record)
+    :precondition
+      (and
+        (record_equipment_loaded ?operation_record)
+        (not
+          (record_checks_passed ?operation_record)
+        )
+        (not
+          (record_finalized ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?operation_record)
+        (processing_complete ?operation_record)
+      )
+  )
+  (:action attach_procedure_kit_to_record
+    :parameters (?operation_record - operation_record ?procedure_kit - procedure_kit)
+    :precondition
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_checks_passed ?operation_record)
+        (procedure_kit_available ?procedure_kit)
+      )
+    :effect
+      (and
+        (record_has_procedure_kit ?operation_record ?procedure_kit)
+        (not
+          (procedure_kit_available ?procedure_kit)
+        )
+      )
+  )
+  (:action complete_record_preparation
+    :parameters (?operation_record - operation_record ?production_group - production_group ?grazing_group - grazing_group ?grazing_plan - grazing_plan ?procedure_kit - procedure_kit)
+    :precondition
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_checks_passed ?operation_record)
+        (record_has_procedure_kit ?operation_record ?procedure_kit)
+        (record_for_production_group ?operation_record ?production_group)
+        (record_for_grazing_group ?operation_record ?grazing_group)
+        (production_group_feed_applied ?production_group)
+        (grazing_group_feed_applied ?grazing_group)
+        (assigned_grazing_plan ?operation_record ?grazing_plan)
+        (not
+          (record_ready_for_execution ?operation_record)
+        )
+      )
+    :effect (record_ready_for_execution ?operation_record)
+  )
+  (:action close_record_and_mark_operation
+    :parameters (?operation_record - operation_record)
+    :precondition
+      (and
+        (record_equipment_loaded ?operation_record)
+        (record_ready_for_execution ?operation_record)
+        (not
+          (record_finalized ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?operation_record)
+        (processing_complete ?operation_record)
+      )
+  )
+  (:action apply_movement_permit_to_record
+    :parameters (?operation_record - operation_record ?movement_permit - movement_permit ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (ready_for_operation ?operation_record)
+        (assigned_grazing_plan ?operation_record ?grazing_plan)
+        (movement_permit_available ?movement_permit)
+        (record_has_movement_permit ?operation_record ?movement_permit)
+        (not
+          (movement_permit_attached ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (movement_permit_attached ?operation_record)
+        (not
+          (movement_permit_available ?movement_permit)
+        )
+      )
+  )
+  (:action perform_facility_check
+    :parameters (?operation_record - operation_record ?handling_facility - handling_facility)
+    :precondition
+      (and
+        (movement_permit_attached ?operation_record)
+        (assigned_to_facility ?operation_record ?handling_facility)
+        (not
+          (facility_check_passed ?operation_record)
+        )
+      )
+    :effect (facility_check_passed ?operation_record)
+  )
+  (:action attach_lab_certificate_after_facility_check
+    :parameters (?operation_record - operation_record ?lab_certificate - lab_certificate)
+    :precondition
+      (and
+        (facility_check_passed ?operation_record)
+        (record_has_lab_certificate ?operation_record ?lab_certificate)
+        (not
+          (lab_certificate_attached ?operation_record)
+        )
+      )
+    :effect (lab_certificate_attached ?operation_record)
+  )
+  (:action finalize_record_after_facility_and_lab
+    :parameters (?operation_record - operation_record)
+    :precondition
+      (and
+        (lab_certificate_attached ?operation_record)
+        (not
+          (record_finalized ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?operation_record)
+        (processing_complete ?operation_record)
+      )
+  )
+  (:action mark_production_group_as_processed
+    :parameters (?production_group - production_group ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (production_group_processed_at_facility ?production_group)
+        (production_group_feed_applied ?production_group)
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_loaded ?movement_asset)
+        (not
+          (processing_complete ?production_group)
+        )
+      )
+    :effect (processing_complete ?production_group)
+  )
+  (:action mark_grazing_group_as_processed
+    :parameters (?grazing_group - grazing_group ?movement_asset - movement_asset)
+    :precondition
+      (and
+        (grazing_group_processed_at_facility ?grazing_group)
+        (grazing_group_feed_applied ?grazing_group)
+        (movement_asset_staged ?movement_asset)
+        (movement_asset_loaded ?movement_asset)
+        (not
+          (processing_complete ?grazing_group)
+        )
+      )
+    :effect (processing_complete ?grazing_group)
+  )
+  (:action administer_vaccine
+    :parameters (?herd_subject - herd_subject ?vaccine_batch - vaccine_batch ?grazing_plan - grazing_plan)
+    :precondition
+      (and
+        (processing_complete ?herd_subject)
+        (assigned_grazing_plan ?herd_subject ?grazing_plan)
+        (vaccine_batch_available ?vaccine_batch)
+        (not
+          (treatment_administered ?herd_subject)
+        )
+      )
+    :effect
+      (and
+        (treatment_administered ?herd_subject)
+        (assigned_vaccine_batch ?herd_subject ?vaccine_batch)
+        (not
+          (vaccine_batch_available ?vaccine_batch)
+        )
+      )
+  )
+  (:action complete_move_and_release_pasture
+    :parameters (?production_group - production_group ?pasture_plot - pasture_plot ?vaccine_batch - vaccine_batch)
+    :precondition
+      (and
+        (treatment_administered ?production_group)
+        (assigned_to_pasture ?production_group ?pasture_plot)
+        (assigned_vaccine_batch ?production_group ?vaccine_batch)
+        (not
+          (movement_completed ?production_group)
+        )
+      )
+    :effect
+      (and
+        (movement_completed ?production_group)
+        (pasture_plot_available ?pasture_plot)
+        (vaccine_batch_available ?vaccine_batch)
+      )
+  )
+  (:action complete_move_and_release_pasture_grazing_group
+    :parameters (?grazing_group - grazing_group ?pasture_plot - pasture_plot ?vaccine_batch - vaccine_batch)
+    :precondition
+      (and
+        (treatment_administered ?grazing_group)
+        (assigned_to_pasture ?grazing_group ?pasture_plot)
+        (assigned_vaccine_batch ?grazing_group ?vaccine_batch)
+        (not
+          (movement_completed ?grazing_group)
+        )
+      )
+    :effect
+      (and
+        (movement_completed ?grazing_group)
+        (pasture_plot_available ?pasture_plot)
+        (vaccine_batch_available ?vaccine_batch)
+      )
+  )
+  (:action complete_move_and_release_pasture_record
+    :parameters (?operation_record - operation_record ?pasture_plot - pasture_plot ?vaccine_batch - vaccine_batch)
+    :precondition
+      (and
+        (treatment_administered ?operation_record)
+        (assigned_to_pasture ?operation_record ?pasture_plot)
+        (assigned_vaccine_batch ?operation_record ?vaccine_batch)
+        (not
+          (movement_completed ?operation_record)
+        )
+      )
+    :effect
+      (and
+        (movement_completed ?operation_record)
+        (pasture_plot_available ?pasture_plot)
+        (vaccine_batch_available ?vaccine_batch)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem pasture_rotation_scenario)
+  (:domain pasture_rotation_planning)
+  (:objects production_group_1 - production_group grazing_group_1 - grazing_group operation_record_1 - operation_record operation_record_2 - operation_record pasture_plot_1 - pasture_plot pasture_plot_2 - pasture_plot pasture_plot_3 - pasture_plot grazing_plan_1 - grazing_plan handling_facility_1 - handling_facility supplement_feed_1 - supplement_feed origin_section_1 - origin_field_section destination_section_1 - destination_field_section movement_asset_1 - movement_asset forage_batch_1 - forage_batch forage_batch_2 - forage_batch condition_report_1 - condition_report condition_report_2 - condition_report procedure_kit_1 - procedure_kit procedure_kit_2 - procedure_kit vaccine_batch_1 - vaccine_batch veterinary_kit_1 - veterinary_kit movement_permit_1 - movement_permit movement_permit_2 - movement_permit lab_certificate_1 - lab_certificate)
+  (:init
+    (pasture_plot_available pasture_plot_1)
+    (pasture_plot_available pasture_plot_2)
+    (pasture_plot_available pasture_plot_3)
+    (grazing_plan_available grazing_plan_1)
+    (facility_available handling_facility_1)
+    (supplement_feed_available supplement_feed_1)
+    (production_group_origin_section production_group_1 origin_section_1)
+    (grazing_group_destination_section grazing_group_1 destination_section_1)
+    (movement_asset_available movement_asset_1)
+    (forage_batch_available forage_batch_1)
+    (forage_batch_available forage_batch_2)
+    (record_for_production_group operation_record_1 production_group_1)
+    (record_for_production_group operation_record_2 production_group_1)
+    (record_for_grazing_group operation_record_1 grazing_group_1)
+    (record_for_grazing_group operation_record_2 grazing_group_1)
+    (record_for_movement_asset operation_record_1 movement_asset_1)
+    (record_for_movement_asset operation_record_2 movement_asset_1)
+    (record_for_forage_batch operation_record_1 forage_batch_1)
+    (record_for_forage_batch operation_record_2 forage_batch_2)
+    (condition_report_available condition_report_1)
+    (condition_report_available condition_report_2)
+    (procedure_kit_available procedure_kit_1)
+    (procedure_kit_available procedure_kit_2)
+    (vaccine_batch_available vaccine_batch_1)
+    (veterinary_kit_available veterinary_kit_1)
+    (movement_permit_available movement_permit_1)
+    (record_has_movement_permit operation_record_1 movement_permit_1)
+    (record_has_movement_permit operation_record_2 movement_permit_2)
+    (lab_certificate_available lab_certificate_1)
+  )
+  (:goal
+    (and
+      (movement_completed production_group_1)
+      (movement_completed grazing_group_1)
+      (movement_completed operation_record_1)
+      (movement_completed operation_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_herd_subject production_group_1)
+(assign_herd_to_pasture production_group_1 pasture_plot_1)
+(attach_grazing_plan production_group_1 grazing_plan_1)
+(confirm_grazing_plan production_group_1 grazing_plan_1)
+(assign_herd_to_facility production_group_1 handling_facility_1)
+(stage_origin_section_for_production_group production_group_1 origin_section_1 grazing_plan_1)
+(process_group_at_facility production_group_1 origin_section_1 handling_facility_1)
+(release_herd_from_facility production_group_1 handling_facility_1)
+(revoke_grazing_plan production_group_1 grazing_plan_1)
+(register_herd_subject grazing_group_1)
+(assign_herd_to_pasture grazing_group_1 pasture_plot_2)
+(attach_grazing_plan grazing_group_1 grazing_plan_1)
+(confirm_grazing_plan grazing_group_1 grazing_plan_1)
+(assign_herd_to_facility grazing_group_1 handling_facility_1)
+(stage_destination_section_for_grazing_group grazing_group_1 destination_section_1 grazing_plan_1)
+(process_grazing_group_at_facility grazing_group_1 destination_section_1 handling_facility_1)
+(release_herd_from_facility grazing_group_1 handling_facility_1)
+(stage_movement_asset_standard production_group_1 grazing_group_1 origin_section_1 destination_section_1 movement_asset_1)
+(revoke_grazing_plan grazing_group_1 grazing_plan_1)
+(attach_grazing_plan production_group_1 grazing_plan_1)
+(mark_asset_loaded movement_asset_1 production_group_1 grazing_plan_1)
+(mark_production_group_as_processed production_group_1 movement_asset_1)
+(mark_grazing_group_as_processed grazing_group_1 movement_asset_1)
+(register_herd_subject operation_record_1)
+(assign_herd_to_pasture operation_record_1 pasture_plot_3)
+(revoke_grazing_plan production_group_1 grazing_plan_1)
+(attach_grazing_plan operation_record_1 grazing_plan_1)
+(confirm_grazing_plan operation_record_1 grazing_plan_1)
+(attach_veterinary_kit_to_record operation_record_1 veterinary_kit_1)
+(attach_lab_certificate_to_record operation_record_1 lab_certificate_1)
+(reserve_forage_for_record operation_record_1 forage_batch_1 movement_asset_1)
+(verify_record_for_move operation_record_1 forage_batch_1 movement_asset_1 grazing_plan_1)
+(assign_herd_to_facility operation_record_1 handling_facility_1)
+(prepare_record_for_operation_initial operation_record_1 veterinary_kit_1 handling_facility_1 forage_batch_1 movement_asset_1)
+(release_herd_from_facility operation_record_1 handling_facility_1)
+(authorize_record_with_lab_certificate operation_record_1 lab_certificate_1 forage_batch_1 movement_asset_1)
+(detach_veterinary_kit_from_record operation_record_1 veterinary_kit_1)
+(detach_lab_certificate_from_record operation_record_1 lab_certificate_1)
+(finalize_record_processing operation_record_1)
+(administer_vaccine operation_record_1 vaccine_batch_1 grazing_plan_1)
+(complete_move_and_release_pasture_record operation_record_1 pasture_plot_3 vaccine_batch_1)
+(register_herd_subject operation_record_2)
+(assign_herd_to_pasture operation_record_2 pasture_plot_3)
+(revoke_grazing_plan operation_record_1 grazing_plan_1)
+(attach_grazing_plan operation_record_2 grazing_plan_1)
+(confirm_grazing_plan operation_record_2 grazing_plan_1)
+(attach_veterinary_kit_to_record operation_record_2 veterinary_kit_1)
+(attach_lab_certificate_to_record operation_record_2 lab_certificate_1)
+(reserve_forage_for_record operation_record_2 forage_batch_2 movement_asset_1)
+(verify_record_for_move operation_record_2 forage_batch_2 movement_asset_1 grazing_plan_1)
+(assign_herd_to_facility operation_record_2 handling_facility_1)
+(prepare_record_for_operation_initial operation_record_2 veterinary_kit_1 handling_facility_1 forage_batch_2 movement_asset_1)
+(release_herd_from_facility operation_record_2 handling_facility_1)
+(authorize_record_with_lab_certificate operation_record_2 lab_certificate_1 forage_batch_2 movement_asset_1)
+(detach_veterinary_kit_from_record operation_record_2 veterinary_kit_1)
+(detach_lab_certificate_from_record operation_record_2 lab_certificate_1)
+(finalize_record_processing operation_record_2)
+(administer_vaccine operation_record_2 vaccine_batch_1 grazing_plan_1)
+(complete_move_and_release_pasture_record operation_record_2 pasture_plot_3 vaccine_batch_1)
+(revoke_grazing_plan operation_record_2 grazing_plan_1)
+(attach_grazing_plan production_group_1 grazing_plan_1)
+(administer_vaccine production_group_1 vaccine_batch_1 grazing_plan_1)
+(complete_move_and_release_pasture production_group_1 pasture_plot_1 vaccine_batch_1)
+(revoke_grazing_plan production_group_1 grazing_plan_1)
+(attach_grazing_plan grazing_group_1 grazing_plan_1)
+(administer_vaccine grazing_group_1 vaccine_batch_1 grazing_plan_1)
+(complete_move_and_release_pasture_grazing_group grazing_group_1 pasture_plot_2 vaccine_batch_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_p21cwlpt/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_p21cwlpt/plan.pddl 67 
+
+
+
+--- stderr ---
+

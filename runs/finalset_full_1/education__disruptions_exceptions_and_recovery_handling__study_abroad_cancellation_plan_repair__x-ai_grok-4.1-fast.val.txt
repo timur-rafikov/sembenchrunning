@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain study_abroad_cancellation_plan_repair)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category - entity document_category - entity schedule_category - entity case_component_root - entity case_component - case_component_root partner_channel - resource_category course_offer - resource_category administrative_role_slot - resource_category financial_adjustment_token - resource_category operational_authorization - resource_category linking_token - resource_category approval_credential - resource_category external_clearance - resource_category credit_transfer_proposal - document_category degree_requirement - document_category consent_document - document_category host_course_slot - schedule_category host_course_offer - schedule_category repair_package - schedule_category student_record_component - case_component workflow_component - case_component home_unit_component - student_record_component host_unit_component - student_record_component repair_workstream - workflow_component)
+
+  (:predicates
+    (case_component_initiated ?study_case - case_component)
+    (component_ready_for_repair ?study_case - case_component)
+    (case_channel_allocated ?study_case - case_component)
+    (component_record_relinked ?study_case - case_component)
+    (ready_for_finalization ?study_case - case_component)
+    (finalization_authorized ?study_case - case_component)
+    (partner_channel_available ?partner_channel - partner_channel)
+    (case_channel_assignment ?study_case - case_component ?partner_channel - partner_channel)
+    (course_offer_available ?course_offer - course_offer)
+    (case_linked_course_offer ?study_case - case_component ?course_offer - course_offer)
+    (administrative_role_slot_available ?administrative_role_slot - administrative_role_slot)
+    (case_assigned_role_slot ?study_case - case_component ?administrative_role_slot - administrative_role_slot)
+    (credit_transfer_proposal_available ?credit_transfer_proposal - credit_transfer_proposal)
+    (home_component_linked_transfer_proposal ?home_unit_component - home_unit_component ?credit_transfer_proposal - credit_transfer_proposal)
+    (host_component_linked_transfer_proposal ?host_unit_component - host_unit_component ?credit_transfer_proposal - credit_transfer_proposal)
+    (home_component_host_slot_link ?home_unit_component - home_unit_component ?host_course_slot - host_course_slot)
+    (host_slot_flagged_for_replacement ?host_course_slot - host_course_slot)
+    (host_slot_replacement_proposed ?host_course_slot - host_course_slot)
+    (home_component_repair_ready ?home_unit_component - home_unit_component)
+    (host_component_course_offer_association ?host_unit_component - host_unit_component ?host_course_offer - host_course_offer)
+    (host_offer_flagged_for_repair ?host_course_offer - host_course_offer)
+    (host_offer_has_transfer_proposal ?host_course_offer - host_course_offer)
+    (host_component_repair_ready ?host_unit_component - host_unit_component)
+    (repair_package_staged ?repair_package - repair_package)
+    (repair_package_created ?repair_package - repair_package)
+    (repair_package_includes_host_slot ?repair_package - repair_package ?host_course_slot - host_course_slot)
+    (repair_package_includes_host_offer ?repair_package - repair_package ?host_course_offer - host_course_offer)
+    (repair_package_ready_for_requirement_binding ?repair_package - repair_package)
+    (repair_package_ready_for_approval_integration ?repair_package - repair_package)
+    (repair_package_validated ?repair_package - repair_package)
+    (workstream_links_home_component ?repair_workstream - repair_workstream ?home_unit_component - home_unit_component)
+    (workstream_links_host_component ?repair_workstream - repair_workstream ?host_unit_component - host_unit_component)
+    (workstream_attached_package ?repair_workstream - repair_workstream ?repair_package - repair_package)
+    (degree_requirement_available ?degree_requirement - degree_requirement)
+    (workstream_linked_requirement ?repair_workstream - repair_workstream ?degree_requirement - degree_requirement)
+    (degree_requirement_validated ?degree_requirement - degree_requirement)
+    (requirement_bound_to_package ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    (workstream_package_accepted ?repair_workstream - repair_workstream)
+    (workstream_approval_credential_bound ?repair_workstream - repair_workstream)
+    (workstream_ready_for_final_approval ?repair_workstream - repair_workstream)
+    (workstream_financial_token_bound ?repair_workstream - repair_workstream)
+    (workstream_financial_and_requirement_bound ?repair_workstream - repair_workstream)
+    (workstream_authorization_present ?repair_workstream - repair_workstream)
+    (workstream_verified ?repair_workstream - repair_workstream)
+    (consent_document_available ?consent_document - consent_document)
+    (workstream_consent_association ?repair_workstream - repair_workstream ?consent_document - consent_document)
+    (workstream_consent_bound ?repair_workstream - repair_workstream)
+    (workstream_consent_processed ?repair_workstream - repair_workstream)
+    (workstream_external_clearance_verified ?repair_workstream - repair_workstream)
+    (financial_adjustment_token_available ?financial_adjustment_token - financial_adjustment_token)
+    (workstream_financial_token_linked ?repair_workstream - repair_workstream ?financial_adjustment_token - financial_adjustment_token)
+    (operational_authorization_available ?operational_authorization - operational_authorization)
+    (workstream_operational_authorization_bound ?repair_workstream - repair_workstream ?operational_authorization - operational_authorization)
+    (approval_credential_available ?approval_credential - approval_credential)
+    (workstream_has_approval_credential ?repair_workstream - repair_workstream ?approval_credential - approval_credential)
+    (external_clearance_available ?external_clearance - external_clearance)
+    (workstream_has_external_clearance ?repair_workstream - repair_workstream ?external_clearance - external_clearance)
+    (linking_token_available ?linking_token - linking_token)
+    (component_linking_token_bound ?study_case - case_component ?linking_token - linking_token)
+    (home_component_ready_for_assembly ?home_unit_component - home_unit_component)
+    (host_component_ready_for_assembly ?host_unit_component - host_unit_component)
+    (finalization_marker_set ?repair_workstream - repair_workstream)
+  )
+  (:action initiate_study_case
+    :parameters (?study_case - case_component)
+    :precondition
+      (and
+        (not
+          (case_component_initiated ?study_case)
+        )
+        (not
+          (component_record_relinked ?study_case)
+        )
+      )
+    :effect (case_component_initiated ?study_case)
+  )
+  (:action assign_partner_channel_to_case
+    :parameters (?study_case - case_component ?partner_channel - partner_channel)
+    :precondition
+      (and
+        (case_component_initiated ?study_case)
+        (not
+          (case_channel_allocated ?study_case)
+        )
+        (partner_channel_available ?partner_channel)
+      )
+    :effect
+      (and
+        (case_channel_allocated ?study_case)
+        (case_channel_assignment ?study_case ?partner_channel)
+        (not
+          (partner_channel_available ?partner_channel)
+        )
+      )
+  )
+  (:action associate_course_offer_with_case
+    :parameters (?study_case - case_component ?course_offer - course_offer)
+    :precondition
+      (and
+        (case_component_initiated ?study_case)
+        (case_channel_allocated ?study_case)
+        (course_offer_available ?course_offer)
+      )
+    :effect
+      (and
+        (case_linked_course_offer ?study_case ?course_offer)
+        (not
+          (course_offer_available ?course_offer)
+        )
+      )
+  )
+  (:action open_repair_workstream
+    :parameters (?study_case - case_component ?course_offer - course_offer)
+    :precondition
+      (and
+        (case_component_initiated ?study_case)
+        (case_channel_allocated ?study_case)
+        (case_linked_course_offer ?study_case ?course_offer)
+        (not
+          (component_ready_for_repair ?study_case)
+        )
+      )
+    :effect (component_ready_for_repair ?study_case)
+  )
+  (:action release_course_offer
+    :parameters (?study_case - case_component ?course_offer - course_offer)
+    :precondition
+      (and
+        (case_linked_course_offer ?study_case ?course_offer)
+      )
+    :effect
+      (and
+        (course_offer_available ?course_offer)
+        (not
+          (case_linked_course_offer ?study_case ?course_offer)
+        )
+      )
+  )
+  (:action assign_administrative_role_slot
+    :parameters (?study_case - case_component ?administrative_role_slot - administrative_role_slot)
+    :precondition
+      (and
+        (component_ready_for_repair ?study_case)
+        (administrative_role_slot_available ?administrative_role_slot)
+      )
+    :effect
+      (and
+        (case_assigned_role_slot ?study_case ?administrative_role_slot)
+        (not
+          (administrative_role_slot_available ?administrative_role_slot)
+        )
+      )
+  )
+  (:action release_administrative_role_slot
+    :parameters (?study_case - case_component ?administrative_role_slot - administrative_role_slot)
+    :precondition
+      (and
+        (case_assigned_role_slot ?study_case ?administrative_role_slot)
+      )
+    :effect
+      (and
+        (administrative_role_slot_available ?administrative_role_slot)
+        (not
+          (case_assigned_role_slot ?study_case ?administrative_role_slot)
+        )
+      )
+  )
+  (:action attach_approval_credential_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (approval_credential_available ?approval_credential)
+      )
+    :effect
+      (and
+        (workstream_has_approval_credential ?repair_workstream ?approval_credential)
+        (not
+          (approval_credential_available ?approval_credential)
+        )
+      )
+  )
+  (:action detach_approval_credential_from_workstream
+    :parameters (?repair_workstream - repair_workstream ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (workstream_has_approval_credential ?repair_workstream ?approval_credential)
+      )
+    :effect
+      (and
+        (approval_credential_available ?approval_credential)
+        (not
+          (workstream_has_approval_credential ?repair_workstream ?approval_credential)
+        )
+      )
+  )
+  (:action attach_external_clearance_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (external_clearance_available ?external_clearance)
+      )
+    :effect
+      (and
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (not
+          (external_clearance_available ?external_clearance)
+        )
+      )
+  )
+  (:action detach_external_clearance_from_workstream
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+      )
+    :effect
+      (and
+        (external_clearance_available ?external_clearance)
+        (not
+          (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        )
+      )
+  )
+  (:action flag_host_course_slot_for_replacement
+    :parameters (?home_unit_component - home_unit_component ?host_course_slot - host_course_slot ?course_offer - course_offer)
+    :precondition
+      (and
+        (component_ready_for_repair ?home_unit_component)
+        (case_linked_course_offer ?home_unit_component ?course_offer)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (not
+          (host_slot_flagged_for_replacement ?host_course_slot)
+        )
+        (not
+          (host_slot_replacement_proposed ?host_course_slot)
+        )
+      )
+    :effect (host_slot_flagged_for_replacement ?host_course_slot)
+  )
+  (:action mark_home_component_replacement_ready
+    :parameters (?home_unit_component - home_unit_component ?host_course_slot - host_course_slot ?administrative_role_slot - administrative_role_slot)
+    :precondition
+      (and
+        (component_ready_for_repair ?home_unit_component)
+        (case_assigned_role_slot ?home_unit_component ?administrative_role_slot)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_slot_flagged_for_replacement ?host_course_slot)
+        (not
+          (home_component_ready_for_assembly ?home_unit_component)
+        )
+      )
+    :effect
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (home_component_repair_ready ?home_unit_component)
+      )
+  )
+  (:action apply_credit_transfer_proposal
+    :parameters (?home_unit_component - home_unit_component ?host_course_slot - host_course_slot ?credit_transfer_proposal - credit_transfer_proposal)
+    :precondition
+      (and
+        (component_ready_for_repair ?home_unit_component)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (credit_transfer_proposal_available ?credit_transfer_proposal)
+        (not
+          (home_component_ready_for_assembly ?home_unit_component)
+        )
+      )
+    :effect
+      (and
+        (host_slot_replacement_proposed ?host_course_slot)
+        (home_component_ready_for_assembly ?home_unit_component)
+        (home_component_linked_transfer_proposal ?home_unit_component ?credit_transfer_proposal)
+        (not
+          (credit_transfer_proposal_available ?credit_transfer_proposal)
+        )
+      )
+  )
+  (:action finalize_credit_transfer_and_restore_host_slot
+    :parameters (?home_unit_component - home_unit_component ?host_course_slot - host_course_slot ?course_offer - course_offer ?credit_transfer_proposal - credit_transfer_proposal)
+    :precondition
+      (and
+        (component_ready_for_repair ?home_unit_component)
+        (case_linked_course_offer ?home_unit_component ?course_offer)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_slot_replacement_proposed ?host_course_slot)
+        (home_component_linked_transfer_proposal ?home_unit_component ?credit_transfer_proposal)
+        (not
+          (home_component_repair_ready ?home_unit_component)
+        )
+      )
+    :effect
+      (and
+        (host_slot_flagged_for_replacement ?host_course_slot)
+        (home_component_repair_ready ?home_unit_component)
+        (credit_transfer_proposal_available ?credit_transfer_proposal)
+        (not
+          (home_component_linked_transfer_proposal ?home_unit_component ?credit_transfer_proposal)
+        )
+      )
+  )
+  (:action flag_host_course_offer_for_repair
+    :parameters (?host_unit_component - host_unit_component ?host_course_offer - host_course_offer ?course_offer - course_offer)
+    :precondition
+      (and
+        (component_ready_for_repair ?host_unit_component)
+        (case_linked_course_offer ?host_unit_component ?course_offer)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (not
+          (host_offer_flagged_for_repair ?host_course_offer)
+        )
+        (not
+          (host_offer_has_transfer_proposal ?host_course_offer)
+        )
+      )
+    :effect (host_offer_flagged_for_repair ?host_course_offer)
+  )
+  (:action assign_administrative_role_to_host_component
+    :parameters (?host_unit_component - host_unit_component ?host_course_offer - host_course_offer ?administrative_role_slot - administrative_role_slot)
+    :precondition
+      (and
+        (component_ready_for_repair ?host_unit_component)
+        (case_assigned_role_slot ?host_unit_component ?administrative_role_slot)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_offer_flagged_for_repair ?host_course_offer)
+        (not
+          (host_component_ready_for_assembly ?host_unit_component)
+        )
+      )
+    :effect
+      (and
+        (host_component_ready_for_assembly ?host_unit_component)
+        (host_component_repair_ready ?host_unit_component)
+      )
+  )
+  (:action apply_credit_transfer_proposal_to_host_component
+    :parameters (?host_unit_component - host_unit_component ?host_course_offer - host_course_offer ?credit_transfer_proposal - credit_transfer_proposal)
+    :precondition
+      (and
+        (component_ready_for_repair ?host_unit_component)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (credit_transfer_proposal_available ?credit_transfer_proposal)
+        (not
+          (host_component_ready_for_assembly ?host_unit_component)
+        )
+      )
+    :effect
+      (and
+        (host_offer_has_transfer_proposal ?host_course_offer)
+        (host_component_ready_for_assembly ?host_unit_component)
+        (host_component_linked_transfer_proposal ?host_unit_component ?credit_transfer_proposal)
+        (not
+          (credit_transfer_proposal_available ?credit_transfer_proposal)
+        )
+      )
+  )
+  (:action finalize_host_transfer_and_restore_offer
+    :parameters (?host_unit_component - host_unit_component ?host_course_offer - host_course_offer ?course_offer - course_offer ?credit_transfer_proposal - credit_transfer_proposal)
+    :precondition
+      (and
+        (component_ready_for_repair ?host_unit_component)
+        (case_linked_course_offer ?host_unit_component ?course_offer)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_offer_has_transfer_proposal ?host_course_offer)
+        (host_component_linked_transfer_proposal ?host_unit_component ?credit_transfer_proposal)
+        (not
+          (host_component_repair_ready ?host_unit_component)
+        )
+      )
+    :effect
+      (and
+        (host_offer_flagged_for_repair ?host_course_offer)
+        (host_component_repair_ready ?host_unit_component)
+        (credit_transfer_proposal_available ?credit_transfer_proposal)
+        (not
+          (host_component_linked_transfer_proposal ?host_unit_component ?credit_transfer_proposal)
+        )
+      )
+  )
+  (:action assemble_repair_package
+    :parameters (?home_unit_component - home_unit_component ?host_unit_component - host_unit_component ?host_course_slot - host_course_slot ?host_course_offer - host_course_offer ?repair_package - repair_package)
+    :precondition
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (host_component_ready_for_assembly ?host_unit_component)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_slot_flagged_for_replacement ?host_course_slot)
+        (host_offer_flagged_for_repair ?host_course_offer)
+        (home_component_repair_ready ?home_unit_component)
+        (host_component_repair_ready ?host_unit_component)
+        (repair_package_staged ?repair_package)
+      )
+    :effect
+      (and
+        (repair_package_created ?repair_package)
+        (repair_package_includes_host_slot ?repair_package ?host_course_slot)
+        (repair_package_includes_host_offer ?repair_package ?host_course_offer)
+        (not
+          (repair_package_staged ?repair_package)
+        )
+      )
+  )
+  (:action assemble_repair_package_variant_slot
+    :parameters (?home_unit_component - home_unit_component ?host_unit_component - host_unit_component ?host_course_slot - host_course_slot ?host_course_offer - host_course_offer ?repair_package - repair_package)
+    :precondition
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (host_component_ready_for_assembly ?host_unit_component)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_slot_replacement_proposed ?host_course_slot)
+        (host_offer_flagged_for_repair ?host_course_offer)
+        (not
+          (home_component_repair_ready ?home_unit_component)
+        )
+        (host_component_repair_ready ?host_unit_component)
+        (repair_package_staged ?repair_package)
+      )
+    :effect
+      (and
+        (repair_package_created ?repair_package)
+        (repair_package_includes_host_slot ?repair_package ?host_course_slot)
+        (repair_package_includes_host_offer ?repair_package ?host_course_offer)
+        (repair_package_ready_for_requirement_binding ?repair_package)
+        (not
+          (repair_package_staged ?repair_package)
+        )
+      )
+  )
+  (:action assemble_repair_package_variant_offer
+    :parameters (?home_unit_component - home_unit_component ?host_unit_component - host_unit_component ?host_course_slot - host_course_slot ?host_course_offer - host_course_offer ?repair_package - repair_package)
+    :precondition
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (host_component_ready_for_assembly ?host_unit_component)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_slot_flagged_for_replacement ?host_course_slot)
+        (host_offer_has_transfer_proposal ?host_course_offer)
+        (home_component_repair_ready ?home_unit_component)
+        (not
+          (host_component_repair_ready ?host_unit_component)
+        )
+        (repair_package_staged ?repair_package)
+      )
+    :effect
+      (and
+        (repair_package_created ?repair_package)
+        (repair_package_includes_host_slot ?repair_package ?host_course_slot)
+        (repair_package_includes_host_offer ?repair_package ?host_course_offer)
+        (repair_package_ready_for_approval_integration ?repair_package)
+        (not
+          (repair_package_staged ?repair_package)
+        )
+      )
+  )
+  (:action assemble_repair_package_variant_full
+    :parameters (?home_unit_component - home_unit_component ?host_unit_component - host_unit_component ?host_course_slot - host_course_slot ?host_course_offer - host_course_offer ?repair_package - repair_package)
+    :precondition
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (host_component_ready_for_assembly ?host_unit_component)
+        (home_component_host_slot_link ?home_unit_component ?host_course_slot)
+        (host_component_course_offer_association ?host_unit_component ?host_course_offer)
+        (host_slot_replacement_proposed ?host_course_slot)
+        (host_offer_has_transfer_proposal ?host_course_offer)
+        (not
+          (home_component_repair_ready ?home_unit_component)
+        )
+        (not
+          (host_component_repair_ready ?host_unit_component)
+        )
+        (repair_package_staged ?repair_package)
+      )
+    :effect
+      (and
+        (repair_package_created ?repair_package)
+        (repair_package_includes_host_slot ?repair_package ?host_course_slot)
+        (repair_package_includes_host_offer ?repair_package ?host_course_offer)
+        (repair_package_ready_for_requirement_binding ?repair_package)
+        (repair_package_ready_for_approval_integration ?repair_package)
+        (not
+          (repair_package_staged ?repair_package)
+        )
+      )
+  )
+  (:action validate_repair_package
+    :parameters (?repair_package - repair_package ?home_unit_component - home_unit_component ?course_offer - course_offer)
+    :precondition
+      (and
+        (repair_package_created ?repair_package)
+        (home_component_ready_for_assembly ?home_unit_component)
+        (case_linked_course_offer ?home_unit_component ?course_offer)
+        (not
+          (repair_package_validated ?repair_package)
+        )
+      )
+    :effect (repair_package_validated ?repair_package)
+  )
+  (:action bind_degree_requirement_to_package
+    :parameters (?repair_workstream - repair_workstream ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (workstream_attached_package ?repair_workstream ?repair_package)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (degree_requirement_available ?degree_requirement)
+        (repair_package_created ?repair_package)
+        (repair_package_validated ?repair_package)
+        (not
+          (degree_requirement_validated ?degree_requirement)
+        )
+      )
+    :effect
+      (and
+        (degree_requirement_validated ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (not
+          (degree_requirement_available ?degree_requirement)
+        )
+      )
+  )
+  (:action accept_package_for_workstream
+    :parameters (?repair_workstream - repair_workstream ?degree_requirement - degree_requirement ?repair_package - repair_package ?course_offer - course_offer)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (degree_requirement_validated ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (case_linked_course_offer ?repair_workstream ?course_offer)
+        (not
+          (repair_package_ready_for_requirement_binding ?repair_package)
+        )
+        (not
+          (workstream_package_accepted ?repair_workstream)
+        )
+      )
+    :effect (workstream_package_accepted ?repair_workstream)
+  )
+  (:action attach_financial_adjustment_token_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?financial_adjustment_token - financial_adjustment_token)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (financial_adjustment_token_available ?financial_adjustment_token)
+        (not
+          (workstream_financial_token_bound ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_financial_token_bound ?repair_workstream)
+        (workstream_financial_token_linked ?repair_workstream ?financial_adjustment_token)
+        (not
+          (financial_adjustment_token_available ?financial_adjustment_token)
+        )
+      )
+  )
+  (:action bind_requirement_and_financial_token_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?degree_requirement - degree_requirement ?repair_package - repair_package ?course_offer - course_offer ?financial_adjustment_token - financial_adjustment_token)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (degree_requirement_validated ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (case_linked_course_offer ?repair_workstream ?course_offer)
+        (repair_package_ready_for_requirement_binding ?repair_package)
+        (workstream_financial_token_bound ?repair_workstream)
+        (workstream_financial_token_linked ?repair_workstream ?financial_adjustment_token)
+        (not
+          (workstream_package_accepted ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_package_accepted ?repair_workstream)
+        (workstream_financial_and_requirement_bound ?repair_workstream)
+      )
+  )
+  (:action link_approval_credential_and_prepare_workstream
+    :parameters (?repair_workstream - repair_workstream ?approval_credential - approval_credential ?administrative_role_slot - administrative_role_slot ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_package_accepted ?repair_workstream)
+        (workstream_has_approval_credential ?repair_workstream ?approval_credential)
+        (case_assigned_role_slot ?repair_workstream ?administrative_role_slot)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (not
+          (repair_package_ready_for_approval_integration ?repair_package)
+        )
+        (not
+          (workstream_approval_credential_bound ?repair_workstream)
+        )
+      )
+    :effect (workstream_approval_credential_bound ?repair_workstream)
+  )
+  (:action finalize_approval_credential_binding
+    :parameters (?repair_workstream - repair_workstream ?approval_credential - approval_credential ?administrative_role_slot - administrative_role_slot ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_package_accepted ?repair_workstream)
+        (workstream_has_approval_credential ?repair_workstream ?approval_credential)
+        (case_assigned_role_slot ?repair_workstream ?administrative_role_slot)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (repair_package_ready_for_approval_integration ?repair_package)
+        (not
+          (workstream_approval_credential_bound ?repair_workstream)
+        )
+      )
+    :effect (workstream_approval_credential_bound ?repair_workstream)
+  )
+  (:action stage_external_clearance_review
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_approval_credential_bound ?repair_workstream)
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (not
+          (repair_package_ready_for_requirement_binding ?repair_package)
+        )
+        (not
+          (repair_package_ready_for_approval_integration ?repair_package)
+        )
+        (not
+          (workstream_ready_for_final_approval ?repair_workstream)
+        )
+      )
+    :effect (workstream_ready_for_final_approval ?repair_workstream)
+  )
+  (:action stage_external_clearance_and_attach_authorization
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_approval_credential_bound ?repair_workstream)
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (repair_package_ready_for_requirement_binding ?repair_package)
+        (not
+          (repair_package_ready_for_approval_integration ?repair_package)
+        )
+        (not
+          (workstream_ready_for_final_approval ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_authorization_present ?repair_workstream)
+      )
+  )
+  (:action apply_external_clearance_variant_1
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_approval_credential_bound ?repair_workstream)
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (not
+          (repair_package_ready_for_requirement_binding ?repair_package)
+        )
+        (repair_package_ready_for_approval_integration ?repair_package)
+        (not
+          (workstream_ready_for_final_approval ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_authorization_present ?repair_workstream)
+      )
+  )
+  (:action apply_external_clearance_variant_2
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance ?degree_requirement - degree_requirement ?repair_package - repair_package)
+    :precondition
+      (and
+        (workstream_approval_credential_bound ?repair_workstream)
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (workstream_linked_requirement ?repair_workstream ?degree_requirement)
+        (requirement_bound_to_package ?degree_requirement ?repair_package)
+        (repair_package_ready_for_requirement_binding ?repair_package)
+        (repair_package_ready_for_approval_integration ?repair_package)
+        (not
+          (workstream_ready_for_final_approval ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_authorization_present ?repair_workstream)
+      )
+  )
+  (:action mark_workstream_finalization_ready
+    :parameters (?repair_workstream - repair_workstream)
+    :precondition
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (not
+          (workstream_authorization_present ?repair_workstream)
+        )
+        (not
+          (finalization_marker_set ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (finalization_marker_set ?repair_workstream)
+        (ready_for_finalization ?repair_workstream)
+      )
+  )
+  (:action attach_operational_authorization_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?operational_authorization - operational_authorization)
+    :precondition
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_authorization_present ?repair_workstream)
+        (operational_authorization_available ?operational_authorization)
+      )
+    :effect
+      (and
+        (workstream_operational_authorization_bound ?repair_workstream ?operational_authorization)
+        (not
+          (operational_authorization_available ?operational_authorization)
+        )
+      )
+  )
+  (:action verify_workstream_and_mark_verified
+    :parameters (?repair_workstream - repair_workstream ?home_unit_component - home_unit_component ?host_unit_component - host_unit_component ?course_offer - course_offer ?operational_authorization - operational_authorization)
+    :precondition
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_authorization_present ?repair_workstream)
+        (workstream_operational_authorization_bound ?repair_workstream ?operational_authorization)
+        (workstream_links_home_component ?repair_workstream ?home_unit_component)
+        (workstream_links_host_component ?repair_workstream ?host_unit_component)
+        (home_component_repair_ready ?home_unit_component)
+        (host_component_repair_ready ?host_unit_component)
+        (case_linked_course_offer ?repair_workstream ?course_offer)
+        (not
+          (workstream_verified ?repair_workstream)
+        )
+      )
+    :effect (workstream_verified ?repair_workstream)
+  )
+  (:action finalize_workstream_ready_after_verification
+    :parameters (?repair_workstream - repair_workstream)
+    :precondition
+      (and
+        (workstream_ready_for_final_approval ?repair_workstream)
+        (workstream_verified ?repair_workstream)
+        (not
+          (finalization_marker_set ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (finalization_marker_set ?repair_workstream)
+        (ready_for_finalization ?repair_workstream)
+      )
+  )
+  (:action bind_consent_document_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?consent_document - consent_document ?course_offer - course_offer)
+    :precondition
+      (and
+        (component_ready_for_repair ?repair_workstream)
+        (case_linked_course_offer ?repair_workstream ?course_offer)
+        (consent_document_available ?consent_document)
+        (workstream_consent_association ?repair_workstream ?consent_document)
+        (not
+          (workstream_consent_bound ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (workstream_consent_bound ?repair_workstream)
+        (not
+          (consent_document_available ?consent_document)
+        )
+      )
+  )
+  (:action process_bound_consent_document
+    :parameters (?repair_workstream - repair_workstream ?administrative_role_slot - administrative_role_slot)
+    :precondition
+      (and
+        (workstream_consent_bound ?repair_workstream)
+        (case_assigned_role_slot ?repair_workstream ?administrative_role_slot)
+        (not
+          (workstream_consent_processed ?repair_workstream)
+        )
+      )
+    :effect (workstream_consent_processed ?repair_workstream)
+  )
+  (:action verify_external_clearance_after_consent
+    :parameters (?repair_workstream - repair_workstream ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (workstream_consent_processed ?repair_workstream)
+        (workstream_has_external_clearance ?repair_workstream ?external_clearance)
+        (not
+          (workstream_external_clearance_verified ?repair_workstream)
+        )
+      )
+    :effect (workstream_external_clearance_verified ?repair_workstream)
+  )
+  (:action finalize_workstream_after_consent_verification
+    :parameters (?repair_workstream - repair_workstream)
+    :precondition
+      (and
+        (workstream_external_clearance_verified ?repair_workstream)
+        (not
+          (finalization_marker_set ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (finalization_marker_set ?repair_workstream)
+        (ready_for_finalization ?repair_workstream)
+      )
+  )
+  (:action finalize_home_component_repair
+    :parameters (?home_unit_component - home_unit_component ?repair_package - repair_package)
+    :precondition
+      (and
+        (home_component_ready_for_assembly ?home_unit_component)
+        (home_component_repair_ready ?home_unit_component)
+        (repair_package_created ?repair_package)
+        (repair_package_validated ?repair_package)
+        (not
+          (ready_for_finalization ?home_unit_component)
+        )
+      )
+    :effect (ready_for_finalization ?home_unit_component)
+  )
+  (:action finalize_host_component_repair
+    :parameters (?host_unit_component - host_unit_component ?repair_package - repair_package)
+    :precondition
+      (and
+        (host_component_ready_for_assembly ?host_unit_component)
+        (host_component_repair_ready ?host_unit_component)
+        (repair_package_created ?repair_package)
+        (repair_package_validated ?repair_package)
+        (not
+          (ready_for_finalization ?host_unit_component)
+        )
+      )
+    :effect (ready_for_finalization ?host_unit_component)
+  )
+  (:action authorize_finalization_and_bind_linking_token
+    :parameters (?study_case - case_component ?linking_token - linking_token ?course_offer - course_offer)
+    :precondition
+      (and
+        (ready_for_finalization ?study_case)
+        (case_linked_course_offer ?study_case ?course_offer)
+        (linking_token_available ?linking_token)
+        (not
+          (finalization_authorized ?study_case)
+        )
+      )
+    :effect
+      (and
+        (finalization_authorized ?study_case)
+        (component_linking_token_bound ?study_case ?linking_token)
+        (not
+          (linking_token_available ?linking_token)
+        )
+      )
+  )
+  (:action apply_relink_to_home_component
+    :parameters (?home_unit_component - home_unit_component ?partner_channel - partner_channel ?linking_token - linking_token)
+    :precondition
+      (and
+        (finalization_authorized ?home_unit_component)
+        (case_channel_assignment ?home_unit_component ?partner_channel)
+        (component_linking_token_bound ?home_unit_component ?linking_token)
+        (not
+          (component_record_relinked ?home_unit_component)
+        )
+      )
+    :effect
+      (and
+        (component_record_relinked ?home_unit_component)
+        (partner_channel_available ?partner_channel)
+        (linking_token_available ?linking_token)
+      )
+  )
+  (:action apply_relink_to_host_component
+    :parameters (?host_unit_component - host_unit_component ?partner_channel - partner_channel ?linking_token - linking_token)
+    :precondition
+      (and
+        (finalization_authorized ?host_unit_component)
+        (case_channel_assignment ?host_unit_component ?partner_channel)
+        (component_linking_token_bound ?host_unit_component ?linking_token)
+        (not
+          (component_record_relinked ?host_unit_component)
+        )
+      )
+    :effect
+      (and
+        (component_record_relinked ?host_unit_component)
+        (partner_channel_available ?partner_channel)
+        (linking_token_available ?linking_token)
+      )
+  )
+  (:action apply_relink_to_workstream
+    :parameters (?repair_workstream - repair_workstream ?partner_channel - partner_channel ?linking_token - linking_token)
+    :precondition
+      (and
+        (finalization_authorized ?repair_workstream)
+        (case_channel_assignment ?repair_workstream ?partner_channel)
+        (component_linking_token_bound ?repair_workstream ?linking_token)
+        (not
+          (component_record_relinked ?repair_workstream)
+        )
+      )
+    :effect
+      (and
+        (component_record_relinked ?repair_workstream)
+        (partner_channel_available ?partner_channel)
+        (linking_token_available ?linking_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem study_case_repair_instance)
+  (:domain study_abroad_cancellation_plan_repair)
+  (:objects home_unit_component_primary - home_unit_component host_unit_component_primary - host_unit_component repair_workstream_primary - repair_workstream repair_workstream_secondary - repair_workstream partner_channel_liaison_a - partner_channel partner_channel_liaison_b - partner_channel partner_channel_liaison_c - partner_channel course_offer_host_1 - course_offer administrative_role_slot_1 - administrative_role_slot credit_transfer_proposal_1 - credit_transfer_proposal host_course_slot_1 - host_course_slot host_course_offer_1 - host_course_offer repair_package_draft_1 - repair_package degree_requirement_core - degree_requirement degree_requirement_elective - degree_requirement financial_adjustment_token_1 - financial_adjustment_token financial_adjustment_token_2 - financial_adjustment_token operational_authorization_1 - operational_authorization operational_authorization_2 - operational_authorization linking_token_1 - linking_token approval_credential_1 - approval_credential consent_document_1 - consent_document consent_document_2 - consent_document external_clearance_1 - external_clearance)
+  (:init
+    (partner_channel_available partner_channel_liaison_a)
+    (partner_channel_available partner_channel_liaison_b)
+    (partner_channel_available partner_channel_liaison_c)
+    (course_offer_available course_offer_host_1)
+    (administrative_role_slot_available administrative_role_slot_1)
+    (credit_transfer_proposal_available credit_transfer_proposal_1)
+    (home_component_host_slot_link home_unit_component_primary host_course_slot_1)
+    (host_component_course_offer_association host_unit_component_primary host_course_offer_1)
+    (repair_package_staged repair_package_draft_1)
+    (degree_requirement_available degree_requirement_core)
+    (degree_requirement_available degree_requirement_elective)
+    (workstream_links_home_component repair_workstream_primary home_unit_component_primary)
+    (workstream_links_home_component repair_workstream_secondary home_unit_component_primary)
+    (workstream_links_host_component repair_workstream_primary host_unit_component_primary)
+    (workstream_links_host_component repair_workstream_secondary host_unit_component_primary)
+    (workstream_attached_package repair_workstream_primary repair_package_draft_1)
+    (workstream_attached_package repair_workstream_secondary repair_package_draft_1)
+    (workstream_linked_requirement repair_workstream_primary degree_requirement_core)
+    (workstream_linked_requirement repair_workstream_secondary degree_requirement_elective)
+    (financial_adjustment_token_available financial_adjustment_token_1)
+    (financial_adjustment_token_available financial_adjustment_token_2)
+    (operational_authorization_available operational_authorization_1)
+    (operational_authorization_available operational_authorization_2)
+    (linking_token_available linking_token_1)
+    (approval_credential_available approval_credential_1)
+    (consent_document_available consent_document_1)
+    (workstream_consent_association repair_workstream_primary consent_document_1)
+    (workstream_consent_association repair_workstream_secondary consent_document_2)
+    (external_clearance_available external_clearance_1)
+  )
+  (:goal
+    (and
+      (component_record_relinked home_unit_component_primary)
+      (component_record_relinked host_unit_component_primary)
+      (component_record_relinked repair_workstream_primary)
+      (component_record_relinked repair_workstream_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate-study_case home_unit_component_primary)
+(assign_partner_channel_to_case home_unit_component_primary partner_channel_liaison_a)
+(associate_course_offer_with_case home_unit_component_primary course_offer_host_1)
+(open_repair_workstream home_unit_component_primary course_offer_host_1)
+(flag_host_course_slot_for_replacement home_unit_component_primary host_course_slot_1 course_offer_host_1)
+(assign_administrative_role_slot home_unit_component_primary administrative_role_slot_1)
+(mark_home_component_replacement_ready home_unit_component_primary host_course_slot_1 administrative_role_slot_1)
+(release_administrative_role_slot home_unit_component_primary administrative_role_slot_1)
+(release_course_offer home_unit_component_primary course_offer_host_1)
+(initiate_study_case host_unit_component_primary)
+(assign_partner_channel_to_case host_unit_component_primary partner_channel_liaison_b)
+(associate_course_offer_with_case host_unit_component_primary course_offer_host_1)
+(open_repair_workstream host_unit_component_primary course_offer_host_1)
+(flag_host_course_offer_for_repair host_unit_component_primary host_course_offer_1 course_offer_host_1)
+(assign_administrative_role_slot host_unit_component_primary administrative_role_slot_1)
+(assign_administrative_role_to_host_component host_unit_component_primary host_course_offer_1 administrative_role_slot_1)
+(release_administrative_role_slot host_unit_component_primary administrative_role_slot_1)
+(release_course_offer host_unit_component_primary course_offer_host_1)
+(assemble_repair_package home_unit_component_primary host_unit_component_primary host_course_slot_1 host_course_offer_1 repair_package_draft_1)
+(associate_course_offer_with_case home_unit_component_primary course_offer_host_1)
+(validate_repair_package repair_package_draft_1 home_unit_component_primary course_offer_host_1)
+(release_course_offer home_unit_component_primary course_offer_host_1)
+(finalize_home_component_repair home_unit_component_primary repair_package_draft_1)
+(finalize_host_component_repair host_unit_component_primary repair_package_draft_1)
+(initiate_study_case repair_workstream_primary)
+(assign_partner_channel_to_case repair_workstream_primary partner_channel_liaison_c)
+(associate_course_offer_with_case repair_workstream_primary course_offer_host_1)
+(open_repair_workstream repair_workstream_primary course_offer_host_1)
+(bind_degree_requirement_to_package repair_workstream_primary degree_requirement_core repair_package_draft_1)
+(accept_package_for_workstream repair_workstream_primary degree_requirement_core repair_package_draft_1 course_offer_host_1)
+(assign_administrative_role_slot repair_workstream_primary administrative_role_slot_1)
+(attach_approval_credential_to_workstream repair_workstream_primary approval_credential_1)
+(link_approval_credential_and_prepare_workstream repair_workstream_primary approval_credential_1 administrative_role_slot_1 degree_requirement_core repair_package_draft_1)
+(attach_external_clearance_to_workstream repair_workstream_primary external_clearance_1)
+(stage_external_clearance_review repair_workstream_primary external_clearance_1 degree_requirement_core repair_package_draft_1)
+(mark_workstream_finalization_ready repair_workstream_primary)
+(authorize_finalization_and_bind_linking_token repair_workstream_primary linking_token_1 course_offer_host_1)
+(release_course_offer repair_workstream_primary course_offer_host_1)
+(release_administrative_role_slot repair_workstream_primary administrative_role_slot_1)
+(detach_approval_credential_from_workstream repair_workstream_primary approval_credential_1)
+(detach_external_clearance_from_workstream repair_workstream_primary external_clearance_1)
+(apply_relink_to_workstream repair_workstream_primary partner_channel_liaison_c linking_token_1)
+(initiate_study_case repair_workstream_secondary)
+(assign_partner_channel_to_case repair_workstream_secondary partner_channel_liaison_c)
+(associate_course_offer_with_case repair_workstream_secondary course_offer_host_1)
+(open_repair_workstream repair_workstream_secondary course_offer_host_1)
+(bind_degree_requirement_to_package repair_workstream_secondary degree_requirement_elective repair_package_draft_1)
+(accept_package_for_workstream repair_workstream_secondary degree_requirement_elective repair_package_draft_1 course_offer_host_1)
+(assign_administrative_role_slot repair_workstream_secondary administrative_role_slot_1)
+(attach_approval_credential_to_workstream repair_workstream_secondary approval_credential_1)
+(link_approval_credential_and_prepare_workstream repair_workstream_secondary approval_credential_1 administrative_role_slot_1 degree_requirement_elective repair_package_draft_1)
+(attach_external_clearance_to_workstream repair_workstream_secondary external_clearance_1)
+(stage_external_clearance_review repair_workstream_secondary external_clearance_1 degree_requirement_elective repair_package_draft_1)
+(mark_workstream_finalization_ready repair_workstream_secondary)
+(authorize_finalization_and_bind_linking_token repair_workstream_secondary linking_token_1 course_offer_host_1)
+(release_course_offer repair_workstream_secondary course_offer_host_1)
+(release_administrative_role_slot repair_workstream_secondary administrative_role_slot_1)
+(detach_approval_credential_from_workstream repair_workstream_secondary approval_credential_1)
+(detach_external_clearance_from_workstream repair_workstream_secondary external_clearance_1)
+(apply_relink_to_workstream repair_workstream_secondary partner_channel_liaison_c linking_token_1)
+(associate_course_offer_with_case home_unit_component_primary course_offer_host_1)
+(authorize_finalization_and_bind_linking_token home_unit_component_primary linking_token_1 course_offer_host_1)
+(apply_relink_to_home_component home_unit_component_primary partner_channel_liaison_a linking_token_1)
+(release_course_offer home_unit_component_primary course_offer_host_1)
+(associate_course_offer_with_case host_unit_component_primary course_offer_host_1)
+(authorize_finalization_and_bind_linking_token host_unit_component_primary linking_token_1 course_offer_host_1)
+(apply_relink_to_host_component host_unit_component_primary partner_channel_liaison_b linking_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_4gqk0syi/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_4gqk0syi/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutical_batch_rework_rejection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object artifact - object control_point_category - object production_entity_root - object production_batch - production_entity_root manufacturing_line - resource process_step - resource qualified_operator - resource label_asset - resource packaging_material_batch - resource disposition_document - resource validation_document - resource qa_signatory - resource work_order - artifact qc_sample - artifact quality_representative - artifact rework_hold_point - control_point_category rejection_hold_point - control_point_category packaging_unit_category - control_point_category processing_branch - production_batch documentation_branch - production_batch primary_stage_instance - processing_branch secondary_stage_instance - processing_branch batch_record - documentation_branch)
+  (:predicates
+    (batch_registered ?production_batch - production_batch)
+    (entity_open ?production_batch - production_batch)
+    (batch_allocated ?production_batch - production_batch)
+    (entity_finalized ?production_batch - production_batch)
+    (entity_release_ready ?production_batch - production_batch)
+    (entity_disposition_recorded ?production_batch - production_batch)
+    (manufacturing_line_available ?manufacturing_line - manufacturing_line)
+    (entity_assigned_to_line ?production_batch - production_batch ?manufacturing_line - manufacturing_line)
+    (process_step_available ?process_step - process_step)
+    (entity_assigned_to_process_step ?production_batch - production_batch ?process_step - process_step)
+    (operator_available ?qualified_operator - qualified_operator)
+    (operator_assigned_to_entity ?production_batch - production_batch ?qualified_operator - qualified_operator)
+    (work_order_available ?rework_workorder - work_order)
+    (work_order_for_primary_stage ?primary_stage_instance - primary_stage_instance ?rework_workorder - work_order)
+    (work_order_for_secondary_stage ?secondary_stage_instance - secondary_stage_instance ?rework_workorder - work_order)
+    (stage_has_rework_hold_point ?primary_stage_instance - primary_stage_instance ?rework_hold_point - rework_hold_point)
+    (rework_hold_raised ?rework_hold_point - rework_hold_point)
+    (work_order_issued ?rework_hold_point - rework_hold_point)
+    (primary_stage_completed ?primary_stage_instance - primary_stage_instance)
+    (stage_has_rejection_hold_point ?secondary_stage_instance - secondary_stage_instance ?rejection_hold_point - rejection_hold_point)
+    (rejection_hold_raised ?rejection_hold_point - rejection_hold_point)
+    (rejection_workorder_issued ?rejection_hold_point - rejection_hold_point)
+    (secondary_stage_completed ?secondary_stage_instance - secondary_stage_instance)
+    (packaging_unit_available ?finished_packaging_unit - packaging_unit_category)
+    (packaging_unit_allocated ?finished_packaging_unit - packaging_unit_category)
+    (packaging_unit_assigned_rework_hold ?finished_packaging_unit - packaging_unit_category ?rework_hold_point - rework_hold_point)
+    (packaging_unit_assigned_rejection_hold ?finished_packaging_unit - packaging_unit_category ?rejection_hold_point - rejection_hold_point)
+    (packaging_unit_rework_flag ?finished_packaging_unit - packaging_unit_category)
+    (packaging_unit_rejection_flag ?finished_packaging_unit - packaging_unit_category)
+    (packaging_unit_packaged ?finished_packaging_unit - packaging_unit_category)
+    (record_covers_primary_stage ?batch_record - batch_record ?primary_stage_instance - primary_stage_instance)
+    (record_covers_secondary_stage ?batch_record - batch_record ?secondary_stage_instance - secondary_stage_instance)
+    (record_covers_packaging_unit ?batch_record - batch_record ?finished_packaging_unit - packaging_unit_category)
+    (qc_sample_available ?qc_sample - qc_sample)
+    (record_has_sample ?batch_record - batch_record ?qc_sample - qc_sample)
+    (qc_sample_tested ?qc_sample - qc_sample)
+    (qc_sample_assigned_to_packaging_unit ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    (record_marked_for_analysis ?batch_record - batch_record)
+    (analysis_ready ?batch_record - batch_record)
+    (qa_review_started ?batch_record - batch_record)
+    (label_assigned_to_record ?batch_record - batch_record)
+    (label_registered_on_record ?batch_record - batch_record)
+    (qa_review_completed ?batch_record - batch_record)
+    (release_checklist_completed ?batch_record - batch_record)
+    (quality_representative_available ?quality_representative - quality_representative)
+    (record_has_quality_representative ?batch_record - batch_record ?quality_representative - quality_representative)
+    (quality_representative_assigned ?batch_record - batch_record)
+    (quality_rep_tasks_completed ?batch_record - batch_record)
+    (qa_signatory_applied ?batch_record - batch_record)
+    (label_asset_available ?label_asset - label_asset)
+    (record_has_label_asset ?batch_record - batch_record ?label_asset - label_asset)
+    (packaging_material_available ?packaging_material_batch - packaging_material_batch)
+    (record_has_packaging_material ?batch_record - batch_record ?packaging_material_batch - packaging_material_batch)
+    (validation_document_available ?validation_document - validation_document)
+    (record_has_validation_document ?batch_record - batch_record ?validation_document - validation_document)
+    (qa_signatory_available ?qa_signatory - qa_signatory)
+    (record_has_qa_signatory ?batch_record - batch_record ?qa_signatory - qa_signatory)
+    (disposition_document_available ?disposition_document - disposition_document)
+    (entity_linked_to_disposition_document ?production_batch - production_batch ?disposition_document - disposition_document)
+    (primary_stage_prepared ?primary_stage_instance - primary_stage_instance)
+    (secondary_stage_prepared ?secondary_stage_instance - secondary_stage_instance)
+    (record_signoff_complete ?batch_record - batch_record)
+  )
+  (:action intake_batch
+    :parameters (?production_batch - production_batch)
+    :precondition
+      (and
+        (not
+          (batch_registered ?production_batch)
+        )
+        (not
+          (entity_finalized ?production_batch)
+        )
+      )
+    :effect (batch_registered ?production_batch)
+  )
+  (:action assign_batch_to_line
+    :parameters (?production_batch - production_batch ?manufacturing_line - manufacturing_line)
+    :precondition
+      (and
+        (batch_registered ?production_batch)
+        (not
+          (batch_allocated ?production_batch)
+        )
+        (manufacturing_line_available ?manufacturing_line)
+      )
+    :effect
+      (and
+        (batch_allocated ?production_batch)
+        (entity_assigned_to_line ?production_batch ?manufacturing_line)
+        (not
+          (manufacturing_line_available ?manufacturing_line)
+        )
+      )
+  )
+  (:action assign_batch_to_process_step
+    :parameters (?production_batch - production_batch ?process_step - process_step)
+    :precondition
+      (and
+        (batch_registered ?production_batch)
+        (batch_allocated ?production_batch)
+        (process_step_available ?process_step)
+      )
+    :effect
+      (and
+        (entity_assigned_to_process_step ?production_batch ?process_step)
+        (not
+          (process_step_available ?process_step)
+        )
+      )
+  )
+  (:action open_batch_record
+    :parameters (?production_batch - production_batch ?process_step - process_step)
+    :precondition
+      (and
+        (batch_registered ?production_batch)
+        (batch_allocated ?production_batch)
+        (entity_assigned_to_process_step ?production_batch ?process_step)
+        (not
+          (entity_open ?production_batch)
+        )
+      )
+    :effect (entity_open ?production_batch)
+  )
+  (:action release_process_step
+    :parameters (?production_batch - production_batch ?process_step - process_step)
+    :precondition
+      (and
+        (entity_assigned_to_process_step ?production_batch ?process_step)
+      )
+    :effect
+      (and
+        (process_step_available ?process_step)
+        (not
+          (entity_assigned_to_process_step ?production_batch ?process_step)
+        )
+      )
+  )
+  (:action assign_operator_to_batch
+    :parameters (?production_batch - production_batch ?qualified_operator - qualified_operator)
+    :precondition
+      (and
+        (entity_open ?production_batch)
+        (operator_available ?qualified_operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_entity ?production_batch ?qualified_operator)
+        (not
+          (operator_available ?qualified_operator)
+        )
+      )
+  )
+  (:action release_operator_from_batch
+    :parameters (?production_batch - production_batch ?qualified_operator - qualified_operator)
+    :precondition
+      (and
+        (operator_assigned_to_entity ?production_batch ?qualified_operator)
+      )
+    :effect
+      (and
+        (operator_available ?qualified_operator)
+        (not
+          (operator_assigned_to_entity ?production_batch ?qualified_operator)
+        )
+      )
+  )
+  (:action attach_validation_document_to_record
+    :parameters (?batch_record - batch_record ?validation_document - validation_document)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (validation_document_available ?validation_document)
+      )
+    :effect
+      (and
+        (record_has_validation_document ?batch_record ?validation_document)
+        (not
+          (validation_document_available ?validation_document)
+        )
+      )
+  )
+  (:action detach_validation_document_from_record
+    :parameters (?batch_record - batch_record ?validation_document - validation_document)
+    :precondition
+      (and
+        (record_has_validation_document ?batch_record ?validation_document)
+      )
+    :effect
+      (and
+        (validation_document_available ?validation_document)
+        (not
+          (record_has_validation_document ?batch_record ?validation_document)
+        )
+      )
+  )
+  (:action attach_qa_signatory_to_record
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (qa_signatory_available ?qa_signatory)
+      )
+    :effect
+      (and
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (not
+          (qa_signatory_available ?qa_signatory)
+        )
+      )
+  )
+  (:action detach_qa_signatory_from_record
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory)
+    :precondition
+      (and
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+      )
+    :effect
+      (and
+        (qa_signatory_available ?qa_signatory)
+        (not
+          (record_has_qa_signatory ?batch_record ?qa_signatory)
+        )
+      )
+  )
+  (:action raise_rework_hold_point
+    :parameters (?primary_stage_instance - primary_stage_instance ?rework_hold_point - rework_hold_point ?process_step - process_step)
+    :precondition
+      (and
+        (entity_open ?primary_stage_instance)
+        (entity_assigned_to_process_step ?primary_stage_instance ?process_step)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (not
+          (rework_hold_raised ?rework_hold_point)
+        )
+        (not
+          (work_order_issued ?rework_hold_point)
+        )
+      )
+    :effect (rework_hold_raised ?rework_hold_point)
+  )
+  (:action acknowledge_rework_hold_and_prepare_stage
+    :parameters (?primary_stage_instance - primary_stage_instance ?rework_hold_point - rework_hold_point ?qualified_operator - qualified_operator)
+    :precondition
+      (and
+        (entity_open ?primary_stage_instance)
+        (operator_assigned_to_entity ?primary_stage_instance ?qualified_operator)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (rework_hold_raised ?rework_hold_point)
+        (not
+          (primary_stage_prepared ?primary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (primary_stage_completed ?primary_stage_instance)
+      )
+  )
+  (:action issue_rework_workorder_for_stage
+    :parameters (?primary_stage_instance - primary_stage_instance ?rework_hold_point - rework_hold_point ?rework_workorder - work_order)
+    :precondition
+      (and
+        (entity_open ?primary_stage_instance)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (work_order_available ?rework_workorder)
+        (not
+          (primary_stage_prepared ?primary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (work_order_issued ?rework_hold_point)
+        (primary_stage_prepared ?primary_stage_instance)
+        (work_order_for_primary_stage ?primary_stage_instance ?rework_workorder)
+        (not
+          (work_order_available ?rework_workorder)
+        )
+      )
+  )
+  (:action complete_rework_and_update_stage
+    :parameters (?primary_stage_instance - primary_stage_instance ?rework_hold_point - rework_hold_point ?process_step - process_step ?rework_workorder - work_order)
+    :precondition
+      (and
+        (entity_open ?primary_stage_instance)
+        (entity_assigned_to_process_step ?primary_stage_instance ?process_step)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (work_order_issued ?rework_hold_point)
+        (work_order_for_primary_stage ?primary_stage_instance ?rework_workorder)
+        (not
+          (primary_stage_completed ?primary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (rework_hold_raised ?rework_hold_point)
+        (primary_stage_completed ?primary_stage_instance)
+        (work_order_available ?rework_workorder)
+        (not
+          (work_order_for_primary_stage ?primary_stage_instance ?rework_workorder)
+        )
+      )
+  )
+  (:action raise_rejection_hold_point
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?rejection_hold_point - rejection_hold_point ?process_step - process_step)
+    :precondition
+      (and
+        (entity_open ?secondary_stage_instance)
+        (entity_assigned_to_process_step ?secondary_stage_instance ?process_step)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (not
+          (rejection_hold_raised ?rejection_hold_point)
+        )
+        (not
+          (rejection_workorder_issued ?rejection_hold_point)
+        )
+      )
+    :effect (rejection_hold_raised ?rejection_hold_point)
+  )
+  (:action acknowledge_rejection_hold_and_prepare_stage
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?rejection_hold_point - rejection_hold_point ?qualified_operator - qualified_operator)
+    :precondition
+      (and
+        (entity_open ?secondary_stage_instance)
+        (operator_assigned_to_entity ?secondary_stage_instance ?qualified_operator)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (rejection_hold_raised ?rejection_hold_point)
+        (not
+          (secondary_stage_prepared ?secondary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (secondary_stage_completed ?secondary_stage_instance)
+      )
+  )
+  (:action issue_rejection_workorder_for_stage
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?rejection_hold_point - rejection_hold_point ?rework_workorder - work_order)
+    :precondition
+      (and
+        (entity_open ?secondary_stage_instance)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (work_order_available ?rework_workorder)
+        (not
+          (secondary_stage_prepared ?secondary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (rejection_workorder_issued ?rejection_hold_point)
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (work_order_for_secondary_stage ?secondary_stage_instance ?rework_workorder)
+        (not
+          (work_order_available ?rework_workorder)
+        )
+      )
+  )
+  (:action complete_rejection_and_update_stage
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?rejection_hold_point - rejection_hold_point ?process_step - process_step ?rework_workorder - work_order)
+    :precondition
+      (and
+        (entity_open ?secondary_stage_instance)
+        (entity_assigned_to_process_step ?secondary_stage_instance ?process_step)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (rejection_workorder_issued ?rejection_hold_point)
+        (work_order_for_secondary_stage ?secondary_stage_instance ?rework_workorder)
+        (not
+          (secondary_stage_completed ?secondary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (rejection_hold_raised ?rejection_hold_point)
+        (secondary_stage_completed ?secondary_stage_instance)
+        (work_order_available ?rework_workorder)
+        (not
+          (work_order_for_secondary_stage ?secondary_stage_instance ?rework_workorder)
+        )
+      )
+  )
+  (:action allocate_packaging_unit_for_finalization
+    :parameters (?primary_stage_instance - primary_stage_instance ?secondary_stage_instance - secondary_stage_instance ?rework_hold_point - rework_hold_point ?rejection_hold_point - rejection_hold_point ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (rework_hold_raised ?rework_hold_point)
+        (rejection_hold_raised ?rejection_hold_point)
+        (primary_stage_completed ?primary_stage_instance)
+        (secondary_stage_completed ?secondary_stage_instance)
+        (packaging_unit_available ?finished_packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_assigned_rework_hold ?finished_packaging_unit ?rework_hold_point)
+        (packaging_unit_assigned_rejection_hold ?finished_packaging_unit ?rejection_hold_point)
+        (not
+          (packaging_unit_available ?finished_packaging_unit)
+        )
+      )
+  )
+  (:action allocate_packaging_unit_with_rework_flag
+    :parameters (?primary_stage_instance - primary_stage_instance ?secondary_stage_instance - secondary_stage_instance ?rework_hold_point - rework_hold_point ?rejection_hold_point - rejection_hold_point ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (work_order_issued ?rework_hold_point)
+        (rejection_hold_raised ?rejection_hold_point)
+        (not
+          (primary_stage_completed ?primary_stage_instance)
+        )
+        (secondary_stage_completed ?secondary_stage_instance)
+        (packaging_unit_available ?finished_packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_assigned_rework_hold ?finished_packaging_unit ?rework_hold_point)
+        (packaging_unit_assigned_rejection_hold ?finished_packaging_unit ?rejection_hold_point)
+        (packaging_unit_rework_flag ?finished_packaging_unit)
+        (not
+          (packaging_unit_available ?finished_packaging_unit)
+        )
+      )
+  )
+  (:action allocate_packaging_unit_with_rejection_flag
+    :parameters (?primary_stage_instance - primary_stage_instance ?secondary_stage_instance - secondary_stage_instance ?rework_hold_point - rework_hold_point ?rejection_hold_point - rejection_hold_point ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (rework_hold_raised ?rework_hold_point)
+        (rejection_workorder_issued ?rejection_hold_point)
+        (primary_stage_completed ?primary_stage_instance)
+        (not
+          (secondary_stage_completed ?secondary_stage_instance)
+        )
+        (packaging_unit_available ?finished_packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_assigned_rework_hold ?finished_packaging_unit ?rework_hold_point)
+        (packaging_unit_assigned_rejection_hold ?finished_packaging_unit ?rejection_hold_point)
+        (packaging_unit_rejection_flag ?finished_packaging_unit)
+        (not
+          (packaging_unit_available ?finished_packaging_unit)
+        )
+      )
+  )
+  (:action allocate_packaging_unit_with_both_flags
+    :parameters (?primary_stage_instance - primary_stage_instance ?secondary_stage_instance - secondary_stage_instance ?rework_hold_point - rework_hold_point ?rejection_hold_point - rejection_hold_point ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (stage_has_rework_hold_point ?primary_stage_instance ?rework_hold_point)
+        (stage_has_rejection_hold_point ?secondary_stage_instance ?rejection_hold_point)
+        (work_order_issued ?rework_hold_point)
+        (rejection_workorder_issued ?rejection_hold_point)
+        (not
+          (primary_stage_completed ?primary_stage_instance)
+        )
+        (not
+          (secondary_stage_completed ?secondary_stage_instance)
+        )
+        (packaging_unit_available ?finished_packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_assigned_rework_hold ?finished_packaging_unit ?rework_hold_point)
+        (packaging_unit_assigned_rejection_hold ?finished_packaging_unit ?rejection_hold_point)
+        (packaging_unit_rework_flag ?finished_packaging_unit)
+        (packaging_unit_rejection_flag ?finished_packaging_unit)
+        (not
+          (packaging_unit_available ?finished_packaging_unit)
+        )
+      )
+  )
+  (:action seal_packaging_unit
+    :parameters (?finished_packaging_unit - packaging_unit_category ?primary_stage_instance - primary_stage_instance ?process_step - process_step)
+    :precondition
+      (and
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (primary_stage_prepared ?primary_stage_instance)
+        (entity_assigned_to_process_step ?primary_stage_instance ?process_step)
+        (not
+          (packaging_unit_packaged ?finished_packaging_unit)
+        )
+      )
+    :effect (packaging_unit_packaged ?finished_packaging_unit)
+  )
+  (:action collect_and_register_qc_sample
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (record_covers_packaging_unit ?batch_record ?finished_packaging_unit)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_available ?qc_sample)
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_packaged ?finished_packaging_unit)
+        (not
+          (qc_sample_tested ?qc_sample)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_tested ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (not
+          (qc_sample_available ?qc_sample)
+        )
+      )
+  )
+  (:action initiate_sample_analysis
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category ?process_step - process_step)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_tested ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (entity_assigned_to_process_step ?batch_record ?process_step)
+        (not
+          (packaging_unit_rework_flag ?finished_packaging_unit)
+        )
+        (not
+          (record_marked_for_analysis ?batch_record)
+        )
+      )
+    :effect (record_marked_for_analysis ?batch_record)
+  )
+  (:action assign_label_asset_to_record
+    :parameters (?batch_record - batch_record ?label_asset - label_asset)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (label_asset_available ?label_asset)
+        (not
+          (label_assigned_to_record ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (label_assigned_to_record ?batch_record)
+        (record_has_label_asset ?batch_record ?label_asset)
+        (not
+          (label_asset_available ?label_asset)
+        )
+      )
+  )
+  (:action apply_label_and_prepare_record_for_analysis
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category ?process_step - process_step ?label_asset - label_asset)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_tested ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (entity_assigned_to_process_step ?batch_record ?process_step)
+        (packaging_unit_rework_flag ?finished_packaging_unit)
+        (label_assigned_to_record ?batch_record)
+        (record_has_label_asset ?batch_record ?label_asset)
+        (not
+          (record_marked_for_analysis ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_marked_for_analysis ?batch_record)
+        (label_registered_on_record ?batch_record)
+      )
+  )
+  (:action confirm_validation_and_mark_record_ready
+    :parameters (?batch_record - batch_record ?validation_document - validation_document ?qualified_operator - qualified_operator ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (record_marked_for_analysis ?batch_record)
+        (record_has_validation_document ?batch_record ?validation_document)
+        (operator_assigned_to_entity ?batch_record ?qualified_operator)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (not
+          (packaging_unit_rejection_flag ?finished_packaging_unit)
+        )
+        (not
+          (analysis_ready ?batch_record)
+        )
+      )
+    :effect (analysis_ready ?batch_record)
+  )
+  (:action confirm_validation_and_mark_record_ready_alternative
+    :parameters (?batch_record - batch_record ?validation_document - validation_document ?qualified_operator - qualified_operator ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (record_marked_for_analysis ?batch_record)
+        (record_has_validation_document ?batch_record ?validation_document)
+        (operator_assigned_to_entity ?batch_record ?qualified_operator)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (packaging_unit_rejection_flag ?finished_packaging_unit)
+        (not
+          (analysis_ready ?batch_record)
+        )
+      )
+    :effect (analysis_ready ?batch_record)
+  )
+  (:action start_qa_review
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (analysis_ready ?batch_record)
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (not
+          (packaging_unit_rework_flag ?finished_packaging_unit)
+        )
+        (not
+          (packaging_unit_rejection_flag ?finished_packaging_unit)
+        )
+        (not
+          (qa_review_started ?batch_record)
+        )
+      )
+    :effect (qa_review_started ?batch_record)
+  )
+  (:action start_qa_review_with_label
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (analysis_ready ?batch_record)
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (packaging_unit_rework_flag ?finished_packaging_unit)
+        (not
+          (packaging_unit_rejection_flag ?finished_packaging_unit)
+        )
+        (not
+          (qa_review_started ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qa_review_started ?batch_record)
+        (qa_review_completed ?batch_record)
+      )
+  )
+  (:action start_qa_review_with_sample_result
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (analysis_ready ?batch_record)
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (not
+          (packaging_unit_rework_flag ?finished_packaging_unit)
+        )
+        (packaging_unit_rejection_flag ?finished_packaging_unit)
+        (not
+          (qa_review_started ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qa_review_started ?batch_record)
+        (qa_review_completed ?batch_record)
+      )
+  )
+  (:action finalize_qa_review
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory ?qc_sample - qc_sample ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (analysis_ready ?batch_record)
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (record_has_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned_to_packaging_unit ?qc_sample ?finished_packaging_unit)
+        (packaging_unit_rework_flag ?finished_packaging_unit)
+        (packaging_unit_rejection_flag ?finished_packaging_unit)
+        (not
+          (qa_review_started ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qa_review_started ?batch_record)
+        (qa_review_completed ?batch_record)
+      )
+  )
+  (:action finalize_qc_report_and_mark_release_ready
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (qa_review_started ?batch_record)
+        (not
+          (qa_review_completed ?batch_record)
+        )
+        (not
+          (record_signoff_complete ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_signoff_complete ?batch_record)
+        (entity_release_ready ?batch_record)
+      )
+  )
+  (:action attach_packaging_material_to_record
+    :parameters (?batch_record - batch_record ?packaging_material_batch - packaging_material_batch)
+    :precondition
+      (and
+        (qa_review_started ?batch_record)
+        (qa_review_completed ?batch_record)
+        (packaging_material_available ?packaging_material_batch)
+      )
+    :effect
+      (and
+        (record_has_packaging_material ?batch_record ?packaging_material_batch)
+        (not
+          (packaging_material_available ?packaging_material_batch)
+        )
+      )
+  )
+  (:action complete_release_checklist
+    :parameters (?batch_record - batch_record ?primary_stage_instance - primary_stage_instance ?secondary_stage_instance - secondary_stage_instance ?process_step - process_step ?packaging_material_batch - packaging_material_batch)
+    :precondition
+      (and
+        (qa_review_started ?batch_record)
+        (qa_review_completed ?batch_record)
+        (record_has_packaging_material ?batch_record ?packaging_material_batch)
+        (record_covers_primary_stage ?batch_record ?primary_stage_instance)
+        (record_covers_secondary_stage ?batch_record ?secondary_stage_instance)
+        (primary_stage_completed ?primary_stage_instance)
+        (secondary_stage_completed ?secondary_stage_instance)
+        (entity_assigned_to_process_step ?batch_record ?process_step)
+        (not
+          (release_checklist_completed ?batch_record)
+        )
+      )
+    :effect (release_checklist_completed ?batch_record)
+  )
+  (:action finalize_release_and_mark_batch_release
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (qa_review_started ?batch_record)
+        (release_checklist_completed ?batch_record)
+        (not
+          (record_signoff_complete ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_signoff_complete ?batch_record)
+        (entity_release_ready ?batch_record)
+      )
+  )
+  (:action assign_quality_representative_to_record
+    :parameters (?batch_record - batch_record ?quality_representative - quality_representative ?process_step - process_step)
+    :precondition
+      (and
+        (entity_open ?batch_record)
+        (entity_assigned_to_process_step ?batch_record ?process_step)
+        (quality_representative_available ?quality_representative)
+        (record_has_quality_representative ?batch_record ?quality_representative)
+        (not
+          (quality_representative_assigned ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (quality_representative_assigned ?batch_record)
+        (not
+          (quality_representative_available ?quality_representative)
+        )
+      )
+  )
+  (:action complete_quality_representative_tasks
+    :parameters (?batch_record - batch_record ?qualified_operator - qualified_operator)
+    :precondition
+      (and
+        (quality_representative_assigned ?batch_record)
+        (operator_assigned_to_entity ?batch_record ?qualified_operator)
+        (not
+          (quality_rep_tasks_completed ?batch_record)
+        )
+      )
+    :effect (quality_rep_tasks_completed ?batch_record)
+  )
+  (:action apply_qa_signatory
+    :parameters (?batch_record - batch_record ?qa_signatory - qa_signatory)
+    :precondition
+      (and
+        (quality_rep_tasks_completed ?batch_record)
+        (record_has_qa_signatory ?batch_record ?qa_signatory)
+        (not
+          (qa_signatory_applied ?batch_record)
+        )
+      )
+    :effect (qa_signatory_applied ?batch_record)
+  )
+  (:action finalize_record_and_mark_release
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (qa_signatory_applied ?batch_record)
+        (not
+          (record_signoff_complete ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_signoff_complete ?batch_record)
+        (entity_release_ready ?batch_record)
+      )
+  )
+  (:action apply_release_to_primary_stage
+    :parameters (?primary_stage_instance - primary_stage_instance ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (primary_stage_prepared ?primary_stage_instance)
+        (primary_stage_completed ?primary_stage_instance)
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_packaged ?finished_packaging_unit)
+        (not
+          (entity_release_ready ?primary_stage_instance)
+        )
+      )
+    :effect (entity_release_ready ?primary_stage_instance)
+  )
+  (:action apply_release_to_secondary_stage
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?finished_packaging_unit - packaging_unit_category)
+    :precondition
+      (and
+        (secondary_stage_prepared ?secondary_stage_instance)
+        (secondary_stage_completed ?secondary_stage_instance)
+        (packaging_unit_allocated ?finished_packaging_unit)
+        (packaging_unit_packaged ?finished_packaging_unit)
+        (not
+          (entity_release_ready ?secondary_stage_instance)
+        )
+      )
+    :effect (entity_release_ready ?secondary_stage_instance)
+  )
+  (:action create_disposition_document_for_batch
+    :parameters (?production_batch - production_batch ?disposition_document - disposition_document ?process_step - process_step)
+    :precondition
+      (and
+        (entity_release_ready ?production_batch)
+        (entity_assigned_to_process_step ?production_batch ?process_step)
+        (disposition_document_available ?disposition_document)
+        (not
+          (entity_disposition_recorded ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (entity_disposition_recorded ?production_batch)
+        (entity_linked_to_disposition_document ?production_batch ?disposition_document)
+        (not
+          (disposition_document_available ?disposition_document)
+        )
+      )
+  )
+  (:action execute_disposition_and_finalize_primary_stage
+    :parameters (?primary_stage_instance - primary_stage_instance ?manufacturing_line - manufacturing_line ?disposition_document - disposition_document)
+    :precondition
+      (and
+        (entity_disposition_recorded ?primary_stage_instance)
+        (entity_assigned_to_line ?primary_stage_instance ?manufacturing_line)
+        (entity_linked_to_disposition_document ?primary_stage_instance ?disposition_document)
+        (not
+          (entity_finalized ?primary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?primary_stage_instance)
+        (manufacturing_line_available ?manufacturing_line)
+        (disposition_document_available ?disposition_document)
+      )
+  )
+  (:action execute_disposition_and_finalize_secondary_stage
+    :parameters (?secondary_stage_instance - secondary_stage_instance ?manufacturing_line - manufacturing_line ?disposition_document - disposition_document)
+    :precondition
+      (and
+        (entity_disposition_recorded ?secondary_stage_instance)
+        (entity_assigned_to_line ?secondary_stage_instance ?manufacturing_line)
+        (entity_linked_to_disposition_document ?secondary_stage_instance ?disposition_document)
+        (not
+          (entity_finalized ?secondary_stage_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?secondary_stage_instance)
+        (manufacturing_line_available ?manufacturing_line)
+        (disposition_document_available ?disposition_document)
+      )
+  )
+  (:action execute_disposition_and_finalize_record
+    :parameters (?batch_record - batch_record ?manufacturing_line - manufacturing_line ?disposition_document - disposition_document)
+    :precondition
+      (and
+        (entity_disposition_recorded ?batch_record)
+        (entity_assigned_to_line ?batch_record ?manufacturing_line)
+        (entity_linked_to_disposition_document ?batch_record ?disposition_document)
+        (not
+          (entity_finalized ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?batch_record)
+        (manufacturing_line_available ?manufacturing_line)
+        (disposition_document_available ?disposition_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem rework_vs_rejection_scenario_1)
+  (:domain pharmaceutical_batch_rework_rejection_domain)
+  (:objects primary_stage_instance_1 - primary_stage_instance secondary_stage_instance_1 - secondary_stage_instance batch_record_a - batch_record batch_record_b - batch_record manufacturing_line_1 - manufacturing_line manufacturing_line_2 - manufacturing_line manufacturing_line_3 - manufacturing_line compression_step - process_step qualified_operator_1 - qualified_operator rework_workorder_1 - work_order rework_hold_point_1 - rework_hold_point rejection_hold_point_1 - rejection_hold_point packaging_unit_1 - packaging_unit_category qc_sample_1 - qc_sample qc_sample_2 - qc_sample label_asset_1 - label_asset label_asset_2 - label_asset packaging_material_batch_1 - packaging_material_batch packaging_material_batch_2 - packaging_material_batch disposition_document_1 - disposition_document validation_document_1 - validation_document quality_representative_1 - quality_representative quality_representative_2 - quality_representative qa_signatory_1 - qa_signatory)
+  (:init
+    (manufacturing_line_available manufacturing_line_1)
+    (manufacturing_line_available manufacturing_line_2)
+    (manufacturing_line_available manufacturing_line_3)
+    (process_step_available compression_step)
+    (operator_available qualified_operator_1)
+    (work_order_available rework_workorder_1)
+    (stage_has_rework_hold_point primary_stage_instance_1 rework_hold_point_1)
+    (stage_has_rejection_hold_point secondary_stage_instance_1 rejection_hold_point_1)
+    (packaging_unit_available packaging_unit_1)
+    (qc_sample_available qc_sample_1)
+    (qc_sample_available qc_sample_2)
+    (record_covers_primary_stage batch_record_a primary_stage_instance_1)
+    (record_covers_primary_stage batch_record_b primary_stage_instance_1)
+    (record_covers_secondary_stage batch_record_a secondary_stage_instance_1)
+    (record_covers_secondary_stage batch_record_b secondary_stage_instance_1)
+    (record_covers_packaging_unit batch_record_a packaging_unit_1)
+    (record_covers_packaging_unit batch_record_b packaging_unit_1)
+    (record_has_sample batch_record_a qc_sample_1)
+    (record_has_sample batch_record_b qc_sample_2)
+    (label_asset_available label_asset_1)
+    (label_asset_available label_asset_2)
+    (packaging_material_available packaging_material_batch_1)
+    (packaging_material_available packaging_material_batch_2)
+    (disposition_document_available disposition_document_1)
+    (validation_document_available validation_document_1)
+    (quality_representative_available quality_representative_1)
+    (record_has_quality_representative batch_record_a quality_representative_1)
+    (record_has_quality_representative batch_record_b quality_representative_2)
+    (qa_signatory_available qa_signatory_1)
+  )
+  (:goal
+    (and
+      (entity_finalized primary_stage_instance_1)
+      (entity_finalized secondary_stage_instance_1)
+      (entity_finalized batch_record_a)
+      (entity_finalized batch_record_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(intake_batch primary_stage_instance_1)
+(intake_batch secondary_stage_instance_1)
+(intake_batch batch_record_a)
+(intake_batch batch_record_b)
+(assign_batch_to_line primary_stage_instance_1 manufacturing_line_1)
+(assign_batch_to_process_step primary_stage_instance_1 compression_step)
+(open_batch_record primary_stage_instance_1 compression_step)
+(assign_operator_to_batch primary_stage_instance_1 qualified_operator_1)
+(raise_rework_hold_point primary_stage_instance_1 rework_hold_point_1 compression_step)
+(acknowledge_rework_hold_and_prepare_stage primary_stage_instance_1 rework_hold_point_1 qualified_operator_1)
+(release_process_step primary_stage_instance_1 compression_step)
+(release_operator_from_batch primary_stage_instance_1 qualified_operator_1)
+(assign_batch_to_line secondary_stage_instance_1 manufacturing_line_2)
+(assign_batch_to_process_step secondary_stage_instance_1 compression_step)
+(open_batch_record secondary_stage_instance_1 compression_step)
+(assign_operator_to_batch secondary_stage_instance_1 qualified_operator_1)
+(raise_rejection_hold_point secondary_stage_instance_1 rejection_hold_point_1 compression_step)
+(acknowledge_rejection_hold_and_prepare_stage secondary_stage_instance_1 rejection_hold_point_1 qualified_operator_1)
+(release_process_step secondary_stage_instance_1 compression_step)
+(release_operator_from_batch secondary_stage_instance_1 qualified_operator_1)
+(allocate_packaging_unit_for_finalization primary_stage_instance_1 secondary_stage_instance_1 rework_hold_point_1 rejection_hold_point_1 packaging_unit_1)
+(assign_batch_to_process_step primary_stage_instance_1 compression_step)
+(seal_packaging_unit packaging_unit_1 primary_stage_instance_1 compression_step)
+(apply_release_to_primary_stage primary_stage_instance_1 packaging_unit_1)
+(apply_release_to_secondary_stage secondary_stage_instance_1 packaging_unit_1)
+(create_disposition_document_for_batch primary_stage_instance_1 compression_step disposition_document_1)
+(execute_disposition_and_finalize_primary_stage primary_stage_instance_1 manufacturing_line_1 disposition_document_1)
+(release_process_step primary_stage_instance_1 compression_step)
+(assign_batch_to_process_step secondary_stage_instance_1 compression_step)
+(create_disposition_document_for_batch secondary_stage_instance_1 compression_step disposition_document_1)
+(execute_disposition_and_finalize_secondary_stage secondary_stage_instance_1 manufacturing_line_2 disposition_document_1)
+(release_process_step secondary_stage_instance_1 compression_step)
+(assign_batch_to_line batch_record_a manufacturing_line_1)
+(assign_batch_to_process_step batch_record_a compression_step)
+(open_batch_record batch_record_a compression_step)
+(assign_operator_to_batch batch_record_a qualified_operator_1)
+(attach_validation_document_to_record batch_record_a validation_document_1)
+(collect_and_register_qc_sample batch_record_a qc_sample_1 packaging_unit_1)
+(initiate_sample_analysis batch_record_a qc_sample_1 packaging_unit_1 compression_step)
+(confirm_validation_and_mark_record_ready batch_record_a validation_document_1 qualified_operator_1 qc_sample_1 packaging_unit_1)
+(attach_qa_signatory_to_record batch_record_a qa_signatory_1)
+(start_qa_review batch_record_a qa_signatory_1 qc_sample_1 packaging_unit_1)
+(finalize_qc_report_and_mark_release_ready batch_record_a)
+(create_disposition_document_for_batch batch_record_a compression_step disposition_document_1)
+(execute_disposition_and_finalize_record batch_record_a manufacturing_line_1 disposition_document_1)
+(release_process_step batch_record_a compression_step)
+(release_operator_from_batch batch_record_a qualified_operator_1)
+(detach_validation_document_from_record batch_record_a validation_document_1)
+(detach_qa_signatory_from_record batch_record_a qa_signatory_1)
+(assign_batch_to_line batch_record_b manufacturing_line_1)
+(assign_batch_to_process_step batch_record_b compression_step)
+(open_batch_record batch_record_b compression_step)
+(assign_operator_to_batch batch_record_b qualified_operator_1)
+(attach_validation_document_to_record batch_record_b validation_document_1)
+(collect_and_register_qc_sample batch_record_b qc_sample_2 packaging_unit_1)
+(initiate_sample_analysis batch_record_b qc_sample_2 packaging_unit_1 compression_step)
+(confirm_validation_and_mark_record_ready batch_record_b validation_document_1 qualified_operator_1 qc_sample_2 packaging_unit_1)
+(attach_qa_signatory_to_record batch_record_b qa_signatory_1)
+(start_qa_review batch_record_b qa_signatory_1 qc_sample_2 packaging_unit_1)
+(finalize_qc_report_and_mark_release_ready batch_record_b)
+(create_disposition_document_for_batch batch_record_b compression_step disposition_document_1)
+(execute_disposition_and_finalize_record batch_record_b manufacturing_line_1 disposition_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_c5ajxim6/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_c5ajxim6/plan.pddl 
+
+
+--- stderr ---
+

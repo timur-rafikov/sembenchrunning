@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain assignment_deadline_load_distribution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category_support - entity resource_category_materials - entity resource_category_schedule - entity assessment_category - entity assessable_entity - assessment_category available_timeslot - resource_category_support submission_window - resource_category_support teaching_assistant - resource_category_support accommodation_policy - resource_category_support resubmission_token - resource_category_support remediation_option - resource_category_support rubric_element - resource_category_support external_review - resource_category_support extension_request - resource_category_materials assessment_component - resource_category_materials learning_objective - resource_category_materials deadline_option - resource_category_schedule assessment_session - resource_category_schedule grading_batch - resource_category_schedule participant_group - assessable_entity actor_group - assessable_entity student - participant_group peer_student - participant_group course_offering - actor_group)
+
+  (:predicates
+    (assessment_registered ?assessment_item - assessable_entity)
+    (entity_ready_for_processing ?assessment_item - assessable_entity)
+    (assessment_scheduled ?assessment_item - assessable_entity)
+    (academic_record_updated_for_entity ?assessment_item - assessable_entity)
+    (final_grades_finalized ?assessment_item - assessable_entity)
+    (entity_grade_committed ?assessment_item - assessable_entity)
+    (timeslot_available ?timeslot - available_timeslot)
+    (entity_assigned_timeslot ?assessment_item - assessable_entity ?timeslot - available_timeslot)
+    (submission_window_available ?submission_window - submission_window)
+    (entity_linked_submission_window ?assessment_item - assessable_entity ?submission_window - submission_window)
+    (ta_available ?teaching_assistant - teaching_assistant)
+    (ta_assigned_to_entity ?assessment_item - assessable_entity ?teaching_assistant - teaching_assistant)
+    (extension_request_available ?extension_request - extension_request)
+    (student_has_extension ?student - student ?extension_request - extension_request)
+    (peer_has_extension ?peer_student - peer_student ?extension_request - extension_request)
+    (deadline_option_assigned ?student - student ?deadline_option - deadline_option)
+    (deadline_option_confirmed ?deadline_option - deadline_option)
+    (deadline_option_reserved ?deadline_option - deadline_option)
+    (student_confirmed ?student - student)
+    (peer_assigned_session ?peer_student - peer_student ?assessment_session - assessment_session)
+    (session_confirmed ?assessment_session - assessment_session)
+    (session_reserved ?assessment_session - assessment_session)
+    (peer_confirmed ?peer_student - peer_student)
+    (batch_available ?grading_batch - grading_batch)
+    (grading_batch_initialized ?grading_batch - grading_batch)
+    (batch_has_deadline_option ?grading_batch - grading_batch ?deadline_option - deadline_option)
+    (batch_has_session ?grading_batch - grading_batch ?assessment_session - assessment_session)
+    (batch_includes_extension_cases ?grading_batch - grading_batch)
+    (batch_requires_moderation ?grading_batch - grading_batch)
+    (batch_ready_for_evaluation ?grading_batch - grading_batch)
+    (student_enrolled_in_course ?course_offering - course_offering ?student - student)
+    (peer_enrolled_in_course ?course_offering - course_offering ?peer_student - peer_student)
+    (course_has_grading_batch ?course_offering - course_offering ?grading_batch - grading_batch)
+    (component_available ?assessment_component - assessment_component)
+    (course_has_component ?course_offering - course_offering ?assessment_component - assessment_component)
+    (component_locked ?assessment_component - assessment_component)
+    (component_associated_with_batch ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    (course_components_finalized ?course_offering - course_offering)
+    (course_ready_for_review ?course_offering - course_offering)
+    (course_moderation_active ?course_offering - course_offering)
+    (accommodation_attached ?course_offering - course_offering)
+    (accommodation_confirmed ?course_offering - course_offering)
+    (course_moderation_passed ?course_offering - course_offering)
+    (course_scores_locked ?course_offering - course_offering)
+    (learning_objective_available ?learning_objective - learning_objective)
+    (course_maps_to_learning_objective ?course_offering - course_offering ?learning_objective - learning_objective)
+    (objective_confirmed ?course_offering - course_offering)
+    (objective_reviewed ?course_offering - course_offering)
+    (objective_finalized ?course_offering - course_offering)
+    (accommodation_policy_available ?accommodation_policy - accommodation_policy)
+    (course_has_accommodation_policy ?course_offering - course_offering ?accommodation_policy - accommodation_policy)
+    (resubmission_token_available ?resubmission_token - resubmission_token)
+    (course_resubmission_token_assigned ?course_offering - course_offering ?resubmission_token - resubmission_token)
+    (rubric_element_available ?rubric_element - rubric_element)
+    (course_has_rubric_element ?course_offering - course_offering ?rubric_element - rubric_element)
+    (external_review_available ?external_review - external_review)
+    (course_has_external_review ?course_offering - course_offering ?external_review - external_review)
+    (remediation_option_available ?remediation_option - remediation_option)
+    (entity_remediation_assigned ?assessment_item - assessable_entity ?remediation_option - remediation_option)
+    (student_batch_eligible ?student - student)
+    (peer_batch_eligible ?peer_student - peer_student)
+    (final_approval_recorded ?course_offering - course_offering)
+  )
+  (:action create_assessment_item
+    :parameters (?assessment_item - assessable_entity)
+    :precondition
+      (and
+        (not
+          (assessment_registered ?assessment_item)
+        )
+        (not
+          (academic_record_updated_for_entity ?assessment_item)
+        )
+      )
+    :effect (assessment_registered ?assessment_item)
+  )
+  (:action assign_timeslot_to_assessment
+    :parameters (?assessment_item - assessable_entity ?timeslot - available_timeslot)
+    :precondition
+      (and
+        (assessment_registered ?assessment_item)
+        (not
+          (assessment_scheduled ?assessment_item)
+        )
+        (timeslot_available ?timeslot)
+      )
+    :effect
+      (and
+        (assessment_scheduled ?assessment_item)
+        (entity_assigned_timeslot ?assessment_item ?timeslot)
+        (not
+          (timeslot_available ?timeslot)
+        )
+      )
+  )
+  (:action allocate_submission_window
+    :parameters (?assessment_item - assessable_entity ?submission_window - submission_window)
+    :precondition
+      (and
+        (assessment_registered ?assessment_item)
+        (assessment_scheduled ?assessment_item)
+        (submission_window_available ?submission_window)
+      )
+    :effect
+      (and
+        (entity_linked_submission_window ?assessment_item ?submission_window)
+        (not
+          (submission_window_available ?submission_window)
+        )
+      )
+  )
+  (:action confirm_assessment_readiness
+    :parameters (?assessment_item - assessable_entity ?submission_window - submission_window)
+    :precondition
+      (and
+        (assessment_registered ?assessment_item)
+        (assessment_scheduled ?assessment_item)
+        (entity_linked_submission_window ?assessment_item ?submission_window)
+        (not
+          (entity_ready_for_processing ?assessment_item)
+        )
+      )
+    :effect (entity_ready_for_processing ?assessment_item)
+  )
+  (:action release_submission_window
+    :parameters (?assessment_item - assessable_entity ?submission_window - submission_window)
+    :precondition
+      (and
+        (entity_linked_submission_window ?assessment_item ?submission_window)
+      )
+    :effect
+      (and
+        (submission_window_available ?submission_window)
+        (not
+          (entity_linked_submission_window ?assessment_item ?submission_window)
+        )
+      )
+  )
+  (:action assign_ta_to_assessment
+    :parameters (?assessment_item - assessable_entity ?teaching_assistant - teaching_assistant)
+    :precondition
+      (and
+        (entity_ready_for_processing ?assessment_item)
+        (ta_available ?teaching_assistant)
+      )
+    :effect
+      (and
+        (ta_assigned_to_entity ?assessment_item ?teaching_assistant)
+        (not
+          (ta_available ?teaching_assistant)
+        )
+      )
+  )
+  (:action release_ta_from_assessment
+    :parameters (?assessment_item - assessable_entity ?teaching_assistant - teaching_assistant)
+    :precondition
+      (and
+        (ta_assigned_to_entity ?assessment_item ?teaching_assistant)
+      )
+    :effect
+      (and
+        (ta_available ?teaching_assistant)
+        (not
+          (ta_assigned_to_entity ?assessment_item ?teaching_assistant)
+        )
+      )
+  )
+  (:action attach_rubric_element_to_course
+    :parameters (?course_offering - course_offering ?rubric_element - rubric_element)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (rubric_element_available ?rubric_element)
+      )
+    :effect
+      (and
+        (course_has_rubric_element ?course_offering ?rubric_element)
+        (not
+          (rubric_element_available ?rubric_element)
+        )
+      )
+  )
+  (:action detach_rubric_element_from_course
+    :parameters (?course_offering - course_offering ?rubric_element - rubric_element)
+    :precondition
+      (and
+        (course_has_rubric_element ?course_offering ?rubric_element)
+      )
+    :effect
+      (and
+        (rubric_element_available ?rubric_element)
+        (not
+          (course_has_rubric_element ?course_offering ?rubric_element)
+        )
+      )
+  )
+  (:action attach_external_review_to_course
+    :parameters (?course_offering - course_offering ?external_review - external_review)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (external_review_available ?external_review)
+      )
+    :effect
+      (and
+        (course_has_external_review ?course_offering ?external_review)
+        (not
+          (external_review_available ?external_review)
+        )
+      )
+  )
+  (:action detach_external_review_from_course
+    :parameters (?course_offering - course_offering ?external_review - external_review)
+    :precondition
+      (and
+        (course_has_external_review ?course_offering ?external_review)
+      )
+    :effect
+      (and
+        (external_review_available ?external_review)
+        (not
+          (course_has_external_review ?course_offering ?external_review)
+        )
+      )
+  )
+  (:action propose_deadline_option
+    :parameters (?student - student ?deadline_option - deadline_option ?submission_window - submission_window)
+    :precondition
+      (and
+        (entity_ready_for_processing ?student)
+        (entity_linked_submission_window ?student ?submission_window)
+        (deadline_option_assigned ?student ?deadline_option)
+        (not
+          (deadline_option_confirmed ?deadline_option)
+        )
+        (not
+          (deadline_option_reserved ?deadline_option)
+        )
+      )
+    :effect (deadline_option_confirmed ?deadline_option)
+  )
+  (:action ta_confirm_student_deadline
+    :parameters (?student - student ?deadline_option - deadline_option ?teaching_assistant - teaching_assistant)
+    :precondition
+      (and
+        (entity_ready_for_processing ?student)
+        (ta_assigned_to_entity ?student ?teaching_assistant)
+        (deadline_option_assigned ?student ?deadline_option)
+        (deadline_option_confirmed ?deadline_option)
+        (not
+          (student_batch_eligible ?student)
+        )
+      )
+    :effect
+      (and
+        (student_batch_eligible ?student)
+        (student_confirmed ?student)
+      )
+  )
+  (:action process_extension_for_student
+    :parameters (?student - student ?deadline_option - deadline_option ?extension_request - extension_request)
+    :precondition
+      (and
+        (entity_ready_for_processing ?student)
+        (deadline_option_assigned ?student ?deadline_option)
+        (extension_request_available ?extension_request)
+        (not
+          (student_batch_eligible ?student)
+        )
+      )
+    :effect
+      (and
+        (deadline_option_reserved ?deadline_option)
+        (student_batch_eligible ?student)
+        (student_has_extension ?student ?extension_request)
+        (not
+          (extension_request_available ?extension_request)
+        )
+      )
+  )
+  (:action finalize_extension_assignment
+    :parameters (?student - student ?deadline_option - deadline_option ?submission_window - submission_window ?extension_request - extension_request)
+    :precondition
+      (and
+        (entity_ready_for_processing ?student)
+        (entity_linked_submission_window ?student ?submission_window)
+        (deadline_option_assigned ?student ?deadline_option)
+        (deadline_option_reserved ?deadline_option)
+        (student_has_extension ?student ?extension_request)
+        (not
+          (student_confirmed ?student)
+        )
+      )
+    :effect
+      (and
+        (deadline_option_confirmed ?deadline_option)
+        (student_confirmed ?student)
+        (extension_request_available ?extension_request)
+        (not
+          (student_has_extension ?student ?extension_request)
+        )
+      )
+  )
+  (:action propose_session_for_peer_review
+    :parameters (?peer_student - peer_student ?assessment_session - assessment_session ?submission_window - submission_window)
+    :precondition
+      (and
+        (entity_ready_for_processing ?peer_student)
+        (entity_linked_submission_window ?peer_student ?submission_window)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (not
+          (session_confirmed ?assessment_session)
+        )
+        (not
+          (session_reserved ?assessment_session)
+        )
+      )
+    :effect (session_confirmed ?assessment_session)
+  )
+  (:action ta_confirm_peer_session
+    :parameters (?peer_student - peer_student ?assessment_session - assessment_session ?teaching_assistant - teaching_assistant)
+    :precondition
+      (and
+        (entity_ready_for_processing ?peer_student)
+        (ta_assigned_to_entity ?peer_student ?teaching_assistant)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (session_confirmed ?assessment_session)
+        (not
+          (peer_batch_eligible ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (peer_batch_eligible ?peer_student)
+        (peer_confirmed ?peer_student)
+      )
+  )
+  (:action process_peer_extension_request
+    :parameters (?peer_student - peer_student ?assessment_session - assessment_session ?extension_request - extension_request)
+    :precondition
+      (and
+        (entity_ready_for_processing ?peer_student)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (extension_request_available ?extension_request)
+        (not
+          (peer_batch_eligible ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (session_reserved ?assessment_session)
+        (peer_batch_eligible ?peer_student)
+        (peer_has_extension ?peer_student ?extension_request)
+        (not
+          (extension_request_available ?extension_request)
+        )
+      )
+  )
+  (:action finalize_peer_extension_assignment
+    :parameters (?peer_student - peer_student ?assessment_session - assessment_session ?submission_window - submission_window ?extension_request - extension_request)
+    :precondition
+      (and
+        (entity_ready_for_processing ?peer_student)
+        (entity_linked_submission_window ?peer_student ?submission_window)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (session_reserved ?assessment_session)
+        (peer_has_extension ?peer_student ?extension_request)
+        (not
+          (peer_confirmed ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (session_confirmed ?assessment_session)
+        (peer_confirmed ?peer_student)
+        (extension_request_available ?extension_request)
+        (not
+          (peer_has_extension ?peer_student ?extension_request)
+        )
+      )
+  )
+  (:action assemble_grading_batch_standard
+    :parameters (?student - student ?peer_student - peer_student ?deadline_option - deadline_option ?assessment_session - assessment_session ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (student_batch_eligible ?student)
+        (peer_batch_eligible ?peer_student)
+        (deadline_option_assigned ?student ?deadline_option)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (deadline_option_confirmed ?deadline_option)
+        (session_confirmed ?assessment_session)
+        (student_confirmed ?student)
+        (peer_confirmed ?peer_student)
+        (batch_available ?grading_batch)
+      )
+    :effect
+      (and
+        (grading_batch_initialized ?grading_batch)
+        (batch_has_deadline_option ?grading_batch ?deadline_option)
+        (batch_has_session ?grading_batch ?assessment_session)
+        (not
+          (batch_available ?grading_batch)
+        )
+      )
+  )
+  (:action assemble_grading_batch_with_reserved_deadline
+    :parameters (?student - student ?peer_student - peer_student ?deadline_option - deadline_option ?assessment_session - assessment_session ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (student_batch_eligible ?student)
+        (peer_batch_eligible ?peer_student)
+        (deadline_option_assigned ?student ?deadline_option)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (deadline_option_reserved ?deadline_option)
+        (session_confirmed ?assessment_session)
+        (not
+          (student_confirmed ?student)
+        )
+        (peer_confirmed ?peer_student)
+        (batch_available ?grading_batch)
+      )
+    :effect
+      (and
+        (grading_batch_initialized ?grading_batch)
+        (batch_has_deadline_option ?grading_batch ?deadline_option)
+        (batch_has_session ?grading_batch ?assessment_session)
+        (batch_includes_extension_cases ?grading_batch)
+        (not
+          (batch_available ?grading_batch)
+        )
+      )
+  )
+  (:action assemble_grading_batch_with_session_reserved
+    :parameters (?student - student ?peer_student - peer_student ?deadline_option - deadline_option ?assessment_session - assessment_session ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (student_batch_eligible ?student)
+        (peer_batch_eligible ?peer_student)
+        (deadline_option_assigned ?student ?deadline_option)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (deadline_option_confirmed ?deadline_option)
+        (session_reserved ?assessment_session)
+        (student_confirmed ?student)
+        (not
+          (peer_confirmed ?peer_student)
+        )
+        (batch_available ?grading_batch)
+      )
+    :effect
+      (and
+        (grading_batch_initialized ?grading_batch)
+        (batch_has_deadline_option ?grading_batch ?deadline_option)
+        (batch_has_session ?grading_batch ?assessment_session)
+        (batch_requires_moderation ?grading_batch)
+        (not
+          (batch_available ?grading_batch)
+        )
+      )
+  )
+  (:action assemble_grading_batch_with_extension_and_session_reservations
+    :parameters (?student - student ?peer_student - peer_student ?deadline_option - deadline_option ?assessment_session - assessment_session ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (student_batch_eligible ?student)
+        (peer_batch_eligible ?peer_student)
+        (deadline_option_assigned ?student ?deadline_option)
+        (peer_assigned_session ?peer_student ?assessment_session)
+        (deadline_option_reserved ?deadline_option)
+        (session_reserved ?assessment_session)
+        (not
+          (student_confirmed ?student)
+        )
+        (not
+          (peer_confirmed ?peer_student)
+        )
+        (batch_available ?grading_batch)
+      )
+    :effect
+      (and
+        (grading_batch_initialized ?grading_batch)
+        (batch_has_deadline_option ?grading_batch ?deadline_option)
+        (batch_has_session ?grading_batch ?assessment_session)
+        (batch_includes_extension_cases ?grading_batch)
+        (batch_requires_moderation ?grading_batch)
+        (not
+          (batch_available ?grading_batch)
+        )
+      )
+  )
+  (:action mark_batch_ready_for_evaluation
+    :parameters (?grading_batch - grading_batch ?student - student ?submission_window - submission_window)
+    :precondition
+      (and
+        (grading_batch_initialized ?grading_batch)
+        (student_batch_eligible ?student)
+        (entity_linked_submission_window ?student ?submission_window)
+        (not
+          (batch_ready_for_evaluation ?grading_batch)
+        )
+      )
+    :effect (batch_ready_for_evaluation ?grading_batch)
+  )
+  (:action lock_assessment_component_and_attach_to_batch
+    :parameters (?course_offering - course_offering ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (course_has_grading_batch ?course_offering ?grading_batch)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_available ?assessment_component)
+        (grading_batch_initialized ?grading_batch)
+        (batch_ready_for_evaluation ?grading_batch)
+        (not
+          (component_locked ?assessment_component)
+        )
+      )
+    :effect
+      (and
+        (component_locked ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (not
+          (component_available ?assessment_component)
+        )
+      )
+  )
+  (:action prepare_course_for_moderation
+    :parameters (?course_offering - course_offering ?assessment_component - assessment_component ?grading_batch - grading_batch ?submission_window - submission_window)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_locked ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (entity_linked_submission_window ?course_offering ?submission_window)
+        (not
+          (batch_includes_extension_cases ?grading_batch)
+        )
+        (not
+          (course_components_finalized ?course_offering)
+        )
+      )
+    :effect (course_components_finalized ?course_offering)
+  )
+  (:action assign_accommodation_policy_to_course
+    :parameters (?course_offering - course_offering ?accommodation_policy - accommodation_policy)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (accommodation_policy_available ?accommodation_policy)
+        (not
+          (accommodation_attached ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (accommodation_attached ?course_offering)
+        (course_has_accommodation_policy ?course_offering ?accommodation_policy)
+        (not
+          (accommodation_policy_available ?accommodation_policy)
+        )
+      )
+  )
+  (:action apply_accommodation_and_mark_components
+    :parameters (?course_offering - course_offering ?assessment_component - assessment_component ?grading_batch - grading_batch ?submission_window - submission_window ?accommodation_policy - accommodation_policy)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_locked ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (entity_linked_submission_window ?course_offering ?submission_window)
+        (batch_includes_extension_cases ?grading_batch)
+        (accommodation_attached ?course_offering)
+        (course_has_accommodation_policy ?course_offering ?accommodation_policy)
+        (not
+          (course_components_finalized ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (course_components_finalized ?course_offering)
+        (accommodation_confirmed ?course_offering)
+      )
+  )
+  (:action assign_rubric_and_prepare_course_for_review
+    :parameters (?course_offering - course_offering ?rubric_element - rubric_element ?teaching_assistant - teaching_assistant ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_components_finalized ?course_offering)
+        (course_has_rubric_element ?course_offering ?rubric_element)
+        (ta_assigned_to_entity ?course_offering ?teaching_assistant)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (not
+          (batch_requires_moderation ?grading_batch)
+        )
+        (not
+          (course_ready_for_review ?course_offering)
+        )
+      )
+    :effect (course_ready_for_review ?course_offering)
+  )
+  (:action assign_rubric_and_prepare_course_for_review_variant
+    :parameters (?course_offering - course_offering ?rubric_element - rubric_element ?teaching_assistant - teaching_assistant ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_components_finalized ?course_offering)
+        (course_has_rubric_element ?course_offering ?rubric_element)
+        (ta_assigned_to_entity ?course_offering ?teaching_assistant)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (batch_requires_moderation ?grading_batch)
+        (not
+          (course_ready_for_review ?course_offering)
+        )
+      )
+    :effect (course_ready_for_review ?course_offering)
+  )
+  (:action initiate_external_review
+    :parameters (?course_offering - course_offering ?external_review - external_review ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_ready_for_review ?course_offering)
+        (course_has_external_review ?course_offering ?external_review)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (not
+          (batch_includes_extension_cases ?grading_batch)
+        )
+        (not
+          (batch_requires_moderation ?grading_batch)
+        )
+        (not
+          (course_moderation_active ?course_offering)
+        )
+      )
+    :effect (course_moderation_active ?course_offering)
+  )
+  (:action initiate_external_review_with_extension
+    :parameters (?course_offering - course_offering ?external_review - external_review ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_ready_for_review ?course_offering)
+        (course_has_external_review ?course_offering ?external_review)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (batch_includes_extension_cases ?grading_batch)
+        (not
+          (batch_requires_moderation ?grading_batch)
+        )
+        (not
+          (course_moderation_active ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (course_moderation_active ?course_offering)
+        (course_moderation_passed ?course_offering)
+      )
+  )
+  (:action initiate_external_review_with_peer_flag
+    :parameters (?course_offering - course_offering ?external_review - external_review ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_ready_for_review ?course_offering)
+        (course_has_external_review ?course_offering ?external_review)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (not
+          (batch_includes_extension_cases ?grading_batch)
+        )
+        (batch_requires_moderation ?grading_batch)
+        (not
+          (course_moderation_active ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (course_moderation_active ?course_offering)
+        (course_moderation_passed ?course_offering)
+      )
+  )
+  (:action initiate_full_external_review
+    :parameters (?course_offering - course_offering ?external_review - external_review ?assessment_component - assessment_component ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (course_ready_for_review ?course_offering)
+        (course_has_external_review ?course_offering ?external_review)
+        (course_has_component ?course_offering ?assessment_component)
+        (component_associated_with_batch ?assessment_component ?grading_batch)
+        (batch_includes_extension_cases ?grading_batch)
+        (batch_requires_moderation ?grading_batch)
+        (not
+          (course_moderation_active ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (course_moderation_active ?course_offering)
+        (course_moderation_passed ?course_offering)
+      )
+  )
+  (:action record_moderation_approval
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (course_moderation_active ?course_offering)
+        (not
+          (course_moderation_passed ?course_offering)
+        )
+        (not
+          (final_approval_recorded ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?course_offering)
+        (final_grades_finalized ?course_offering)
+      )
+  )
+  (:action assign_resubmission_token_to_course
+    :parameters (?course_offering - course_offering ?resubmission_token - resubmission_token)
+    :precondition
+      (and
+        (course_moderation_active ?course_offering)
+        (course_moderation_passed ?course_offering)
+        (resubmission_token_available ?resubmission_token)
+      )
+    :effect
+      (and
+        (course_resubmission_token_assigned ?course_offering ?resubmission_token)
+        (not
+          (resubmission_token_available ?resubmission_token)
+        )
+      )
+  )
+  (:action lock_course_for_finalization
+    :parameters (?course_offering - course_offering ?student - student ?peer_student - peer_student ?submission_window - submission_window ?resubmission_token - resubmission_token)
+    :precondition
+      (and
+        (course_moderation_active ?course_offering)
+        (course_moderation_passed ?course_offering)
+        (course_resubmission_token_assigned ?course_offering ?resubmission_token)
+        (student_enrolled_in_course ?course_offering ?student)
+        (peer_enrolled_in_course ?course_offering ?peer_student)
+        (student_confirmed ?student)
+        (peer_confirmed ?peer_student)
+        (entity_linked_submission_window ?course_offering ?submission_window)
+        (not
+          (course_scores_locked ?course_offering)
+        )
+      )
+    :effect (course_scores_locked ?course_offering)
+  )
+  (:action finalize_course_and_release_grades
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (course_moderation_active ?course_offering)
+        (course_scores_locked ?course_offering)
+        (not
+          (final_approval_recorded ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?course_offering)
+        (final_grades_finalized ?course_offering)
+      )
+  )
+  (:action associate_learning_objective_with_course
+    :parameters (?course_offering - course_offering ?learning_objective - learning_objective ?submission_window - submission_window)
+    :precondition
+      (and
+        (entity_ready_for_processing ?course_offering)
+        (entity_linked_submission_window ?course_offering ?submission_window)
+        (learning_objective_available ?learning_objective)
+        (course_maps_to_learning_objective ?course_offering ?learning_objective)
+        (not
+          (objective_confirmed ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (objective_confirmed ?course_offering)
+        (not
+          (learning_objective_available ?learning_objective)
+        )
+      )
+  )
+  (:action confirm_objective_mapping
+    :parameters (?course_offering - course_offering ?teaching_assistant - teaching_assistant)
+    :precondition
+      (and
+        (objective_confirmed ?course_offering)
+        (ta_assigned_to_entity ?course_offering ?teaching_assistant)
+        (not
+          (objective_reviewed ?course_offering)
+        )
+      )
+    :effect (objective_reviewed ?course_offering)
+  )
+  (:action record_external_review_result
+    :parameters (?course_offering - course_offering ?external_review - external_review)
+    :precondition
+      (and
+        (objective_reviewed ?course_offering)
+        (course_has_external_review ?course_offering ?external_review)
+        (not
+          (objective_finalized ?course_offering)
+        )
+      )
+    :effect (objective_finalized ?course_offering)
+  )
+  (:action finalize_course_from_external_review
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (objective_finalized ?course_offering)
+        (not
+          (final_approval_recorded ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?course_offering)
+        (final_grades_finalized ?course_offering)
+      )
+  )
+  (:action finalize_student_grade_from_batch
+    :parameters (?student - student ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (student_batch_eligible ?student)
+        (student_confirmed ?student)
+        (grading_batch_initialized ?grading_batch)
+        (batch_ready_for_evaluation ?grading_batch)
+        (not
+          (final_grades_finalized ?student)
+        )
+      )
+    :effect (final_grades_finalized ?student)
+  )
+  (:action finalize_peer_student_grade_from_batch
+    :parameters (?peer_student - peer_student ?grading_batch - grading_batch)
+    :precondition
+      (and
+        (peer_batch_eligible ?peer_student)
+        (peer_confirmed ?peer_student)
+        (grading_batch_initialized ?grading_batch)
+        (batch_ready_for_evaluation ?grading_batch)
+        (not
+          (final_grades_finalized ?peer_student)
+        )
+      )
+    :effect (final_grades_finalized ?peer_student)
+  )
+  (:action assign_remediation_to_assessment
+    :parameters (?assessment_item - assessable_entity ?remediation_option - remediation_option ?submission_window - submission_window)
+    :precondition
+      (and
+        (final_grades_finalized ?assessment_item)
+        (entity_linked_submission_window ?assessment_item ?submission_window)
+        (remediation_option_available ?remediation_option)
+        (not
+          (entity_grade_committed ?assessment_item)
+        )
+      )
+    :effect
+      (and
+        (entity_grade_committed ?assessment_item)
+        (entity_remediation_assigned ?assessment_item ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action finalize_student_record_and_release_timeslot
+    :parameters (?student - student ?timeslot - available_timeslot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_grade_committed ?student)
+        (entity_assigned_timeslot ?student ?timeslot)
+        (entity_remediation_assigned ?student ?remediation_option)
+        (not
+          (academic_record_updated_for_entity ?student)
+        )
+      )
+    :effect
+      (and
+        (academic_record_updated_for_entity ?student)
+        (timeslot_available ?timeslot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+  (:action finalize_peer_record_and_release_timeslot
+    :parameters (?peer_student - peer_student ?timeslot - available_timeslot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_grade_committed ?peer_student)
+        (entity_assigned_timeslot ?peer_student ?timeslot)
+        (entity_remediation_assigned ?peer_student ?remediation_option)
+        (not
+          (academic_record_updated_for_entity ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (academic_record_updated_for_entity ?peer_student)
+        (timeslot_available ?timeslot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+  (:action finalize_course_record_and_release_timeslot
+    :parameters (?course_offering - course_offering ?timeslot - available_timeslot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (entity_grade_committed ?course_offering)
+        (entity_assigned_timeslot ?course_offering ?timeslot)
+        (entity_remediation_assigned ?course_offering ?remediation_option)
+        (not
+          (academic_record_updated_for_entity ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (academic_record_updated_for_entity ?course_offering)
+        (timeslot_available ?timeslot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem assignment_deadline_load_scenario)
+  (:domain assignment_deadline_load_distribution)
+  (:objects student_1 - student peer_student_1 - peer_student course_offering_cs101 - course_offering course_offering_cs102 - course_offering timeslot_slot_1 - available_timeslot timeslot_slot_2 - available_timeslot timeslot_slot_3 - available_timeslot submission_window_primary - submission_window teaching_assistant_1 - teaching_assistant extension_token_1 - extension_request deadline_option_standard - deadline_option assessment_session_peer_review - assessment_session grading_batch_initial - grading_batch component_report - assessment_component component_code - assessment_component accommodation_policy_disability - accommodation_policy accommodation_policy_deferral - accommodation_policy resubmission_token_1 - resubmission_token resubmission_token_2 - resubmission_token remediation_option_makeup - remediation_option rubric_element_criterion1 - rubric_element learning_objective_lo1 - learning_objective learning_objective_lo2 - learning_objective external_review_agency1 - external_review)
+  (:init
+    (timeslot_available timeslot_slot_1)
+    (timeslot_available timeslot_slot_2)
+    (timeslot_available timeslot_slot_3)
+    (submission_window_available submission_window_primary)
+    (ta_available teaching_assistant_1)
+    (extension_request_available extension_token_1)
+    (deadline_option_assigned student_1 deadline_option_standard)
+    (peer_assigned_session peer_student_1 assessment_session_peer_review)
+    (batch_available grading_batch_initial)
+    (component_available component_report)
+    (component_available component_code)
+    (student_enrolled_in_course course_offering_cs101 student_1)
+    (student_enrolled_in_course course_offering_cs102 student_1)
+    (peer_enrolled_in_course course_offering_cs101 peer_student_1)
+    (peer_enrolled_in_course course_offering_cs102 peer_student_1)
+    (course_has_grading_batch course_offering_cs101 grading_batch_initial)
+    (course_has_grading_batch course_offering_cs102 grading_batch_initial)
+    (course_has_component course_offering_cs101 component_report)
+    (course_has_component course_offering_cs102 component_code)
+    (accommodation_policy_available accommodation_policy_disability)
+    (accommodation_policy_available accommodation_policy_deferral)
+    (resubmission_token_available resubmission_token_1)
+    (resubmission_token_available resubmission_token_2)
+    (remediation_option_available remediation_option_makeup)
+    (rubric_element_available rubric_element_criterion1)
+    (learning_objective_available learning_objective_lo1)
+    (course_maps_to_learning_objective course_offering_cs101 learning_objective_lo1)
+    (course_maps_to_learning_objective course_offering_cs102 learning_objective_lo2)
+    (external_review_available external_review_agency1)
+  )
+  (:goal
+    (and
+      (academic_record_updated_for_entity student_1)
+      (academic_record_updated_for_entity peer_student_1)
+      (academic_record_updated_for_entity course_offering_cs101)
+      (academic_record_updated_for_entity course_offering_cs102)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_assessment_item student_1)
+(create_assessment_item peer_student_1)
+(create_assessment_item course_offering_cs101)
+(create_assessment_item course_offering_cs102)
+(assign_timeslot_to_assessment student_1 timeslot_slot_1)
+(assign_timeslot_to_assessment peer_student_1 timeslot_slot_2)
+(assign_timeslot_to_assessment course_offering_cs101 timeslot_slot_3)
+(allocate_submission_window student_1 submission_window_primary)
+(allocate_submission_window peer_student_1 submission_window_primary)
+(allocate_submission_window course_offering_cs101 submission_window_primary)
+(allocate_submission_window course_offering_cs102 submission_window_primary)
+(confirm_assessment_readiness student_1 submission_window_primary)
+(confirm_assessment_readiness peer_student_1 submission_window_primary)
+(confirm_assessment_readiness course_offering_cs101 submission_window_primary)
+(confirm_assessment_readiness course_offering_cs102 submission_window_primary)
+(assign_ta_to_assessment student_1 teaching_assistant_1)
+(assign_ta_to_assessment peer_student_1 teaching_assistant_1)
+(assign_ta_to_assessment course_offering_cs101 teaching_assistant_1)
+(assign_ta_to_assessment course_offering_cs102 teaching_assistant_1)
+(propose_deadline_option student_1 deadline_option_standard submission_window_primary)
+(ta_confirm_student_deadline student_1 deadline_option_standard teaching_assistant_1)
+(propose_session_for_peer_review peer_student_1 assessment_session_peer_review submission_window_primary)
+(ta_confirm_peer_session peer_student_1 assessment_session_peer_review teaching_assistant_1)
+(assemble_grading_batch_standard student_1 peer_student_1 deadline_option_standard assessment_session_peer_review grading_batch_initial)
+(mark_batch_ready_for_evaluation grading_batch_initial student_1 submission_window_primary)
+(lock_assessment_component_and_attach_to_batch course_offering_cs101 component_report grading_batch_initial)
+(lock_assessment_component_and_attach_to_batch course_offering_cs102 component_code grading_batch_initial)
+(prepare_course_for_moderation course_offering_cs101 component_report grading_batch_initial submission_window_primary)
+(prepare_course_for_moderation course_offering_cs102 component_code grading_batch_initial submission_window_primary)
+(attach_rubric_element_to_course course_offering_cs101 rubric_element_criterion1)
+(attach_rubric_element_to_course course_offering_cs102 rubric_element_criterion1)
+(assign_rubric_and_prepare_course_for_review course_offering_cs101 rubric_element_criterion1 teaching_assistant_1 component_report grading_batch_initial)
+(assign_rubric_and_prepare_course_for_review course_offering_cs102 rubric_element_criterion1 teaching_assistant_1 component_code grading_batch_initial)
+(initiate_external_review course_offering_cs101 external_review_agency1 component_report grading_batch_initial)
+(initiate_external_review course_offering_cs102 external_review_agency1 component_code grading_batch_initial)
+(record_moderation_approval course_offering_cs101)
+(record_moderation_approval course_offering_cs102)
+(assign_resubmission_token_to_course course_offering_cs101 resubmission_token_1)
+(assign_resubmission_token_to_course course_offering_cs102 resubmission_token_2)
+(lock_course_for_finalization course_offering_cs101 student_1 peer_student_1 submission_window_primary resubmission_token_1)
+(lock_course_for_finalization course_offering_cs102 student_1 peer_student_1 submission_window_primary resubmission_token_2)
+(finalize_course_and_release_grades course_offering_cs101)
+(finalize_course_and_release_grades course_offering_cs102)
+(record_external_review_result course_offering_cs101 external_review_agency1)
+(record_external_review_result course_offering_cs102 external_review_agency1)
+(finalize_course_from_external_review course_offering_cs101)
+(finalize_course_from_external_review course_offering_cs102)
+(finalize_student_grade_from_batch student_1 grading_batch_initial)
+(finalize_peer_student_grade_from_batch peer_student_1 grading_batch_initial)
+(assign_remediation_to_assessment student_1 remediation_option_makeup submission_window_primary)
+(assign_remediation_to_assessment peer_student_1 remediation_option_makeup submission_window_primary)
+(assign_remediation_to_assessment course_offering_cs101 remediation_option_makeup submission_window_primary)
+(assign_remediation_to_assessment course_offering_cs102 remediation_option_makeup submission_window_primary)
+(finalize_student_record_and_release_timeslot student_1 timeslot_slot_1 remediation_option_makeup)
+(finalize_peer_record_and_release_timeslot peer_student_1 timeslot_slot_2 remediation_option_makeup)
+(finalize_course_record_and_release_timeslot course_offering_cs101 timeslot_slot_3 remediation_option_makeup)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vwq5k3iv/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_vwq5k3iv/plan.pddl 
+
+
+--- stderr ---
+

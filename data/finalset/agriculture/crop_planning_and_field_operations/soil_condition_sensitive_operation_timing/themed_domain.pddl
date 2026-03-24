@@ -1,0 +1,936 @@
+(define (domain soil_condition_sensitive_operation_timing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_asset_category - object task_category - object resource_category - object operation_abstract_category - object field_operation - operation_abstract_category machine_unit - physical_asset_category operation_type - physical_asset_category crew - physical_asset_category equipment_attachment_spec - physical_asset_category application_profile - physical_asset_category season_timing_slot - physical_asset_category implement_variant - physical_asset_category inspection_record - physical_asset_category input_resource - task_category inventory_item - task_category permit - task_category soil_condition_slot - resource_category weather_window - resource_category work_order - resource_category mechanized_operation_category - field_operation field_parcel_category - field_operation mechanized_operation - mechanized_operation_category manual_operation - mechanized_operation_category field_parcel - field_parcel_category)
+  (:predicates
+    (execution_registered ?field_operation - field_operation)
+    (execution_confirmed ?field_operation - field_operation)
+    (execution_has_assignment ?field_operation - field_operation)
+    (execution_completed ?field_operation - field_operation)
+    (execution_staged ?field_operation - field_operation)
+    (execution_scheduled ?field_operation - field_operation)
+    (machine_available ?machine_unit - machine_unit)
+    (execution_assigned_to_machine ?field_operation - field_operation ?machine_unit - machine_unit)
+    (execution_type_available ?operation_type - operation_type)
+    (execution_has_type ?field_operation - field_operation ?operation_type - operation_type)
+    (crew_available ?crew - crew)
+    (execution_assigned_to_crew ?field_operation - field_operation ?crew - crew)
+    (input_resource_available ?input_resource - input_resource)
+    (mechanized_operation_reserved_input ?mechanized_operation - mechanized_operation ?input_resource - input_resource)
+    (manual_operation_reserved_input ?manual_operation - manual_operation ?input_resource - input_resource)
+    (mechanized_operation_assigned_soil_slot ?mechanized_operation - mechanized_operation ?soil_condition_slot - soil_condition_slot)
+    (soil_condition_slot_ready ?soil_condition_slot - soil_condition_slot)
+    (soil_condition_slot_prepped ?soil_condition_slot - soil_condition_slot)
+    (mechanized_operation_ready_for_dispatch ?mechanized_operation - mechanized_operation)
+    (manual_operation_assigned_weather_window ?manual_operation - manual_operation ?weather_window - weather_window)
+    (weather_window_ready ?weather_window - weather_window)
+    (weather_window_prepped ?weather_window - weather_window)
+    (manual_operation_ready_for_dispatch ?manual_operation - manual_operation)
+    (work_order_pending ?work_order - work_order)
+    (work_order_assembled ?work_order - work_order)
+    (work_order_associated_soil_slot ?work_order - work_order ?soil_condition_slot - soil_condition_slot)
+    (work_order_associated_weather_window ?work_order - work_order ?weather_window - weather_window)
+    (work_order_requires_implement_variant ?work_order - work_order)
+    (work_order_requires_attachment_spec ?work_order - work_order)
+    (work_order_dispatched ?work_order - work_order)
+    (parcel_has_mechanized_operation ?field_parcel - field_parcel ?mechanized_operation - mechanized_operation)
+    (parcel_has_manual_operation ?field_parcel - field_parcel ?manual_operation - manual_operation)
+    (parcel_has_work_order ?field_parcel - field_parcel ?work_order - work_order)
+    (inventory_item_available ?inventory_item - inventory_item)
+    (parcel_allocated_inventory_item ?field_parcel - field_parcel ?inventory_item - inventory_item)
+    (inventory_item_staged ?inventory_item - inventory_item)
+    (inventory_item_bound_to_work_order ?inventory_item - inventory_item ?work_order - work_order)
+    (parcel_inventory_validated ?field_parcel - field_parcel)
+    (parcel_inventory_allocated ?field_parcel - field_parcel)
+    (parcel_preexecution_checks_passed ?field_parcel - field_parcel)
+    (parcel_attachment_configured ?field_parcel - field_parcel)
+    (parcel_implement_variant_applied ?field_parcel - field_parcel)
+    (parcel_permit_and_inspection_confirmed ?field_parcel - field_parcel)
+    (parcel_execution_authorized ?field_parcel - field_parcel)
+    (permit_available ?permit - permit)
+    (parcel_bound_to_permit ?field_parcel - field_parcel ?permit - permit)
+    (parcel_permit_bound ?field_parcel - field_parcel)
+    (parcel_crew_assigned ?field_parcel - field_parcel)
+    (parcel_inspection_passed ?field_parcel - field_parcel)
+    (attachment_spec_available ?equipment_attachment_spec - equipment_attachment_spec)
+    (parcel_bound_attachment_spec ?field_parcel - field_parcel ?equipment_attachment_spec - equipment_attachment_spec)
+    (application_profile_available ?application_profile - application_profile)
+    (parcel_bound_application_profile ?field_parcel - field_parcel ?application_profile - application_profile)
+    (implement_variant_available ?implement_variant - implement_variant)
+    (parcel_bound_implement_variant ?field_parcel - field_parcel ?implement_variant - implement_variant)
+    (inspection_record_available ?inspection_record - inspection_record)
+    (parcel_bound_inspection_record ?field_parcel - field_parcel ?inspection_record - inspection_record)
+    (season_timing_slot_available ?season_timing_slot - season_timing_slot)
+    (execution_assigned_to_season_slot ?field_operation - field_operation ?season_timing_slot - season_timing_slot)
+    (mechanized_operation_inputs_staged ?mechanized_operation - mechanized_operation)
+    (manual_operation_inputs_staged ?manual_operation - manual_operation)
+    (parcel_staging_confirmed ?field_parcel - field_parcel)
+  )
+  (:action register_operation
+    :parameters (?field_operation - field_operation)
+    :precondition
+      (and
+        (not
+          (execution_registered ?field_operation)
+        )
+        (not
+          (execution_completed ?field_operation)
+        )
+      )
+    :effect (execution_registered ?field_operation)
+  )
+  (:action assign_machine_to_operation
+    :parameters (?field_operation - field_operation ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (execution_registered ?field_operation)
+        (not
+          (execution_has_assignment ?field_operation)
+        )
+        (machine_available ?machine_unit)
+      )
+    :effect
+      (and
+        (execution_has_assignment ?field_operation)
+        (execution_assigned_to_machine ?field_operation ?machine_unit)
+        (not
+          (machine_available ?machine_unit)
+        )
+      )
+  )
+  (:action link_operation_to_type
+    :parameters (?field_operation - field_operation ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_registered ?field_operation)
+        (execution_has_assignment ?field_operation)
+        (execution_type_available ?operation_type)
+      )
+    :effect
+      (and
+        (execution_has_type ?field_operation ?operation_type)
+        (not
+          (execution_type_available ?operation_type)
+        )
+      )
+  )
+  (:action confirm_operation_type
+    :parameters (?field_operation - field_operation ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_registered ?field_operation)
+        (execution_has_assignment ?field_operation)
+        (execution_has_type ?field_operation ?operation_type)
+        (not
+          (execution_confirmed ?field_operation)
+        )
+      )
+    :effect (execution_confirmed ?field_operation)
+  )
+  (:action unlink_operation_from_type
+    :parameters (?field_operation - field_operation ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_has_type ?field_operation ?operation_type)
+      )
+    :effect
+      (and
+        (execution_type_available ?operation_type)
+        (not
+          (execution_has_type ?field_operation ?operation_type)
+        )
+      )
+  )
+  (:action assign_crew_to_operation
+    :parameters (?field_operation - field_operation ?crew - crew)
+    :precondition
+      (and
+        (execution_confirmed ?field_operation)
+        (crew_available ?crew)
+      )
+    :effect
+      (and
+        (execution_assigned_to_crew ?field_operation ?crew)
+        (not
+          (crew_available ?crew)
+        )
+      )
+  )
+  (:action unassign_crew_from_operation
+    :parameters (?field_operation - field_operation ?crew - crew)
+    :precondition
+      (and
+        (execution_assigned_to_crew ?field_operation ?crew)
+      )
+    :effect
+      (and
+        (crew_available ?crew)
+        (not
+          (execution_assigned_to_crew ?field_operation ?crew)
+        )
+      )
+  )
+  (:action bind_implement_variant_to_parcel
+    :parameters (?field_parcel - field_parcel ?implement_variant - implement_variant)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (implement_variant_available ?implement_variant)
+      )
+    :effect
+      (and
+        (parcel_bound_implement_variant ?field_parcel ?implement_variant)
+        (not
+          (implement_variant_available ?implement_variant)
+        )
+      )
+  )
+  (:action release_implement_variant_from_parcel
+    :parameters (?field_parcel - field_parcel ?implement_variant - implement_variant)
+    :precondition
+      (and
+        (parcel_bound_implement_variant ?field_parcel ?implement_variant)
+      )
+    :effect
+      (and
+        (implement_variant_available ?implement_variant)
+        (not
+          (parcel_bound_implement_variant ?field_parcel ?implement_variant)
+        )
+      )
+  )
+  (:action bind_inspection_record_to_parcel
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (inspection_record_available ?inspection_record)
+      )
+    :effect
+      (and
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (not
+          (inspection_record_available ?inspection_record)
+        )
+      )
+  )
+  (:action release_inspection_record_from_parcel
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record)
+    :precondition
+      (and
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+      )
+    :effect
+      (and
+        (inspection_record_available ?inspection_record)
+        (not
+          (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        )
+      )
+  )
+  (:action assess_soil_slot_for_mechanized_operation
+    :parameters (?mechanized_operation - mechanized_operation ?soil_condition_slot - soil_condition_slot ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_confirmed ?mechanized_operation)
+        (execution_has_type ?mechanized_operation ?operation_type)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (not
+          (soil_condition_slot_ready ?soil_condition_slot)
+        )
+        (not
+          (soil_condition_slot_prepped ?soil_condition_slot)
+        )
+      )
+    :effect (soil_condition_slot_ready ?soil_condition_slot)
+  )
+  (:action confirm_mechanized_operation_conditions
+    :parameters (?mechanized_operation - mechanized_operation ?soil_condition_slot - soil_condition_slot ?crew - crew)
+    :precondition
+      (and
+        (execution_confirmed ?mechanized_operation)
+        (execution_assigned_to_crew ?mechanized_operation ?crew)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (soil_condition_slot_ready ?soil_condition_slot)
+        (not
+          (mechanized_operation_inputs_staged ?mechanized_operation)
+        )
+      )
+    :effect
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+      )
+  )
+  (:action stage_input_for_mechanized_operation
+    :parameters (?mechanized_operation - mechanized_operation ?soil_condition_slot - soil_condition_slot ?input_resource - input_resource)
+    :precondition
+      (and
+        (execution_confirmed ?mechanized_operation)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (input_resource_available ?input_resource)
+        (not
+          (mechanized_operation_inputs_staged ?mechanized_operation)
+        )
+      )
+    :effect
+      (and
+        (soil_condition_slot_prepped ?soil_condition_slot)
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (mechanized_operation_reserved_input ?mechanized_operation ?input_resource)
+        (not
+          (input_resource_available ?input_resource)
+        )
+      )
+  )
+  (:action finalize_mechanized_operation_preparations
+    :parameters (?mechanized_operation - mechanized_operation ?soil_condition_slot - soil_condition_slot ?operation_type - operation_type ?input_resource - input_resource)
+    :precondition
+      (and
+        (execution_confirmed ?mechanized_operation)
+        (execution_has_type ?mechanized_operation ?operation_type)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (soil_condition_slot_prepped ?soil_condition_slot)
+        (mechanized_operation_reserved_input ?mechanized_operation ?input_resource)
+        (not
+          (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        )
+      )
+    :effect
+      (and
+        (soil_condition_slot_ready ?soil_condition_slot)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        (input_resource_available ?input_resource)
+        (not
+          (mechanized_operation_reserved_input ?mechanized_operation ?input_resource)
+        )
+      )
+  )
+  (:action assess_weather_window_for_manual_operation
+    :parameters (?manual_operation - manual_operation ?weather_window - weather_window ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_confirmed ?manual_operation)
+        (execution_has_type ?manual_operation ?operation_type)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (not
+          (weather_window_ready ?weather_window)
+        )
+        (not
+          (weather_window_prepped ?weather_window)
+        )
+      )
+    :effect (weather_window_ready ?weather_window)
+  )
+  (:action confirm_manual_operation_conditions
+    :parameters (?manual_operation - manual_operation ?weather_window - weather_window ?crew - crew)
+    :precondition
+      (and
+        (execution_confirmed ?manual_operation)
+        (execution_assigned_to_crew ?manual_operation ?crew)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (weather_window_ready ?weather_window)
+        (not
+          (manual_operation_inputs_staged ?manual_operation)
+        )
+      )
+    :effect
+      (and
+        (manual_operation_inputs_staged ?manual_operation)
+        (manual_operation_ready_for_dispatch ?manual_operation)
+      )
+  )
+  (:action stage_input_for_manual_operation
+    :parameters (?manual_operation - manual_operation ?weather_window - weather_window ?input_resource - input_resource)
+    :precondition
+      (and
+        (execution_confirmed ?manual_operation)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (input_resource_available ?input_resource)
+        (not
+          (manual_operation_inputs_staged ?manual_operation)
+        )
+      )
+    :effect
+      (and
+        (weather_window_prepped ?weather_window)
+        (manual_operation_inputs_staged ?manual_operation)
+        (manual_operation_reserved_input ?manual_operation ?input_resource)
+        (not
+          (input_resource_available ?input_resource)
+        )
+      )
+  )
+  (:action finalize_manual_operation_preparations
+    :parameters (?manual_operation - manual_operation ?weather_window - weather_window ?operation_type - operation_type ?input_resource - input_resource)
+    :precondition
+      (and
+        (execution_confirmed ?manual_operation)
+        (execution_has_type ?manual_operation ?operation_type)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (weather_window_prepped ?weather_window)
+        (manual_operation_reserved_input ?manual_operation ?input_resource)
+        (not
+          (manual_operation_ready_for_dispatch ?manual_operation)
+        )
+      )
+    :effect
+      (and
+        (weather_window_ready ?weather_window)
+        (manual_operation_ready_for_dispatch ?manual_operation)
+        (input_resource_available ?input_resource)
+        (not
+          (manual_operation_reserved_input ?manual_operation ?input_resource)
+        )
+      )
+  )
+  (:action assemble_work_order
+    :parameters (?mechanized_operation - mechanized_operation ?manual_operation - manual_operation ?soil_condition_slot - soil_condition_slot ?weather_window - weather_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (manual_operation_inputs_staged ?manual_operation)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (soil_condition_slot_ready ?soil_condition_slot)
+        (weather_window_ready ?weather_window)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        (manual_operation_ready_for_dispatch ?manual_operation)
+        (work_order_pending ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_associated_soil_slot ?work_order ?soil_condition_slot)
+        (work_order_associated_weather_window ?work_order ?weather_window)
+        (not
+          (work_order_pending ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_variant_requirement
+    :parameters (?mechanized_operation - mechanized_operation ?manual_operation - manual_operation ?soil_condition_slot - soil_condition_slot ?weather_window - weather_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (manual_operation_inputs_staged ?manual_operation)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (soil_condition_slot_prepped ?soil_condition_slot)
+        (weather_window_ready ?weather_window)
+        (not
+          (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        )
+        (manual_operation_ready_for_dispatch ?manual_operation)
+        (work_order_pending ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_associated_soil_slot ?work_order ?soil_condition_slot)
+        (work_order_associated_weather_window ?work_order ?weather_window)
+        (work_order_requires_implement_variant ?work_order)
+        (not
+          (work_order_pending ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_attachment_requirement
+    :parameters (?mechanized_operation - mechanized_operation ?manual_operation - manual_operation ?soil_condition_slot - soil_condition_slot ?weather_window - weather_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (manual_operation_inputs_staged ?manual_operation)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (soil_condition_slot_ready ?soil_condition_slot)
+        (weather_window_prepped ?weather_window)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        (not
+          (manual_operation_ready_for_dispatch ?manual_operation)
+        )
+        (work_order_pending ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_associated_soil_slot ?work_order ?soil_condition_slot)
+        (work_order_associated_weather_window ?work_order ?weather_window)
+        (work_order_requires_attachment_spec ?work_order)
+        (not
+          (work_order_pending ?work_order)
+        )
+      )
+  )
+  (:action assemble_full_work_order
+    :parameters (?mechanized_operation - mechanized_operation ?manual_operation - manual_operation ?soil_condition_slot - soil_condition_slot ?weather_window - weather_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (manual_operation_inputs_staged ?manual_operation)
+        (mechanized_operation_assigned_soil_slot ?mechanized_operation ?soil_condition_slot)
+        (manual_operation_assigned_weather_window ?manual_operation ?weather_window)
+        (soil_condition_slot_prepped ?soil_condition_slot)
+        (weather_window_prepped ?weather_window)
+        (not
+          (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        )
+        (not
+          (manual_operation_ready_for_dispatch ?manual_operation)
+        )
+        (work_order_pending ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_associated_soil_slot ?work_order ?soil_condition_slot)
+        (work_order_associated_weather_window ?work_order ?weather_window)
+        (work_order_requires_implement_variant ?work_order)
+        (work_order_requires_attachment_spec ?work_order)
+        (not
+          (work_order_pending ?work_order)
+        )
+      )
+  )
+  (:action dispatch_work_order
+    :parameters (?work_order - work_order ?mechanized_operation - mechanized_operation ?operation_type - operation_type)
+    :precondition
+      (and
+        (work_order_assembled ?work_order)
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (execution_has_type ?mechanized_operation ?operation_type)
+        (not
+          (work_order_dispatched ?work_order)
+        )
+      )
+    :effect (work_order_dispatched ?work_order)
+  )
+  (:action reserve_inventory_for_work_order
+    :parameters (?field_parcel - field_parcel ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (parcel_has_work_order ?field_parcel ?work_order)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_available ?inventory_item)
+        (work_order_assembled ?work_order)
+        (work_order_dispatched ?work_order)
+        (not
+          (inventory_item_staged ?inventory_item)
+        )
+      )
+    :effect
+      (and
+        (inventory_item_staged ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (not
+          (inventory_item_available ?inventory_item)
+        )
+      )
+  )
+  (:action validate_parcel_inventory
+    :parameters (?field_parcel - field_parcel ?inventory_item - inventory_item ?work_order - work_order ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_staged ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (execution_has_type ?field_parcel ?operation_type)
+        (not
+          (work_order_requires_implement_variant ?work_order)
+        )
+        (not
+          (parcel_inventory_validated ?field_parcel)
+        )
+      )
+    :effect (parcel_inventory_validated ?field_parcel)
+  )
+  (:action assign_attachment_spec_to_parcel
+    :parameters (?field_parcel - field_parcel ?equipment_attachment_spec - equipment_attachment_spec)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (attachment_spec_available ?equipment_attachment_spec)
+        (not
+          (parcel_attachment_configured ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_attachment_configured ?field_parcel)
+        (parcel_bound_attachment_spec ?field_parcel ?equipment_attachment_spec)
+        (not
+          (attachment_spec_available ?equipment_attachment_spec)
+        )
+      )
+  )
+  (:action apply_attachment_and_inventory_to_parcel
+    :parameters (?field_parcel - field_parcel ?inventory_item - inventory_item ?work_order - work_order ?operation_type - operation_type ?equipment_attachment_spec - equipment_attachment_spec)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_staged ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (execution_has_type ?field_parcel ?operation_type)
+        (work_order_requires_implement_variant ?work_order)
+        (parcel_attachment_configured ?field_parcel)
+        (parcel_bound_attachment_spec ?field_parcel ?equipment_attachment_spec)
+        (not
+          (parcel_inventory_validated ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_inventory_validated ?field_parcel)
+        (parcel_implement_variant_applied ?field_parcel)
+      )
+  )
+  (:action stage_parcel_resources_for_execution
+    :parameters (?field_parcel - field_parcel ?implement_variant - implement_variant ?crew - crew ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_validated ?field_parcel)
+        (parcel_bound_implement_variant ?field_parcel ?implement_variant)
+        (execution_assigned_to_crew ?field_parcel ?crew)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (not
+          (work_order_requires_attachment_spec ?work_order)
+        )
+        (not
+          (parcel_inventory_allocated ?field_parcel)
+        )
+      )
+    :effect (parcel_inventory_allocated ?field_parcel)
+  )
+  (:action stage_parcel_resources_for_execution_with_variant
+    :parameters (?field_parcel - field_parcel ?implement_variant - implement_variant ?crew - crew ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_validated ?field_parcel)
+        (parcel_bound_implement_variant ?field_parcel ?implement_variant)
+        (execution_assigned_to_crew ?field_parcel ?crew)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (work_order_requires_attachment_spec ?work_order)
+        (not
+          (parcel_inventory_allocated ?field_parcel)
+        )
+      )
+    :effect (parcel_inventory_allocated ?field_parcel)
+  )
+  (:action prepare_parcel_for_execution
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_allocated ?field_parcel)
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (not
+          (work_order_requires_implement_variant ?work_order)
+        )
+        (not
+          (work_order_requires_attachment_spec ?work_order)
+        )
+        (not
+          (parcel_preexecution_checks_passed ?field_parcel)
+        )
+      )
+    :effect (parcel_preexecution_checks_passed ?field_parcel)
+  )
+  (:action prepare_parcel_for_execution_and_confirm_permits
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_allocated ?field_parcel)
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (work_order_requires_implement_variant ?work_order)
+        (not
+          (work_order_requires_attachment_spec ?work_order)
+        )
+        (not
+          (parcel_preexecution_checks_passed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_permit_and_inspection_confirmed ?field_parcel)
+      )
+  )
+  (:action confirm_parcel_execution_ready_with_inventory
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_allocated ?field_parcel)
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (not
+          (work_order_requires_implement_variant ?work_order)
+        )
+        (work_order_requires_attachment_spec ?work_order)
+        (not
+          (parcel_preexecution_checks_passed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_permit_and_inspection_confirmed ?field_parcel)
+      )
+  )
+  (:action finalize_parcel_execution_preparation
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record ?inventory_item - inventory_item ?work_order - work_order)
+    :precondition
+      (and
+        (parcel_inventory_allocated ?field_parcel)
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (parcel_allocated_inventory_item ?field_parcel ?inventory_item)
+        (inventory_item_bound_to_work_order ?inventory_item ?work_order)
+        (work_order_requires_implement_variant ?work_order)
+        (work_order_requires_attachment_spec ?work_order)
+        (not
+          (parcel_preexecution_checks_passed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_permit_and_inspection_confirmed ?field_parcel)
+      )
+  )
+  (:action acknowledge_parcel_staging
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (not
+          (parcel_permit_and_inspection_confirmed ?field_parcel)
+        )
+        (not
+          (parcel_staging_confirmed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_staging_confirmed ?field_parcel)
+        (execution_staged ?field_parcel)
+      )
+  )
+  (:action assign_application_profile_to_parcel
+    :parameters (?field_parcel - field_parcel ?application_profile - application_profile)
+    :precondition
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_permit_and_inspection_confirmed ?field_parcel)
+        (application_profile_available ?application_profile)
+      )
+    :effect
+      (and
+        (parcel_bound_application_profile ?field_parcel ?application_profile)
+        (not
+          (application_profile_available ?application_profile)
+        )
+      )
+  )
+  (:action authorize_parcel_execution
+    :parameters (?field_parcel - field_parcel ?mechanized_operation - mechanized_operation ?manual_operation - manual_operation ?operation_type - operation_type ?application_profile - application_profile)
+    :precondition
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_permit_and_inspection_confirmed ?field_parcel)
+        (parcel_bound_application_profile ?field_parcel ?application_profile)
+        (parcel_has_mechanized_operation ?field_parcel ?mechanized_operation)
+        (parcel_has_manual_operation ?field_parcel ?manual_operation)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        (manual_operation_ready_for_dispatch ?manual_operation)
+        (execution_has_type ?field_parcel ?operation_type)
+        (not
+          (parcel_execution_authorized ?field_parcel)
+        )
+      )
+    :effect (parcel_execution_authorized ?field_parcel)
+  )
+  (:action confirm_parcel_ready_for_scheduling
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (parcel_preexecution_checks_passed ?field_parcel)
+        (parcel_execution_authorized ?field_parcel)
+        (not
+          (parcel_staging_confirmed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_staging_confirmed ?field_parcel)
+        (execution_staged ?field_parcel)
+      )
+  )
+  (:action apply_permit_to_parcel
+    :parameters (?field_parcel - field_parcel ?permit - permit ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_confirmed ?field_parcel)
+        (execution_has_type ?field_parcel ?operation_type)
+        (permit_available ?permit)
+        (parcel_bound_to_permit ?field_parcel ?permit)
+        (not
+          (parcel_permit_bound ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_permit_bound ?field_parcel)
+        (not
+          (permit_available ?permit)
+        )
+      )
+  )
+  (:action assign_crew_after_permit
+    :parameters (?field_parcel - field_parcel ?crew - crew)
+    :precondition
+      (and
+        (parcel_permit_bound ?field_parcel)
+        (execution_assigned_to_crew ?field_parcel ?crew)
+        (not
+          (parcel_crew_assigned ?field_parcel)
+        )
+      )
+    :effect (parcel_crew_assigned ?field_parcel)
+  )
+  (:action record_inspection_confirmation
+    :parameters (?field_parcel - field_parcel ?inspection_record - inspection_record)
+    :precondition
+      (and
+        (parcel_crew_assigned ?field_parcel)
+        (parcel_bound_inspection_record ?field_parcel ?inspection_record)
+        (not
+          (parcel_inspection_passed ?field_parcel)
+        )
+      )
+    :effect (parcel_inspection_passed ?field_parcel)
+  )
+  (:action finalize_parcel_staging
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (parcel_inspection_passed ?field_parcel)
+        (not
+          (parcel_staging_confirmed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (parcel_staging_confirmed ?field_parcel)
+        (execution_staged ?field_parcel)
+      )
+  )
+  (:action complete_mechanized_operation_execution
+    :parameters (?mechanized_operation - mechanized_operation ?work_order - work_order)
+    :precondition
+      (and
+        (mechanized_operation_inputs_staged ?mechanized_operation)
+        (mechanized_operation_ready_for_dispatch ?mechanized_operation)
+        (work_order_assembled ?work_order)
+        (work_order_dispatched ?work_order)
+        (not
+          (execution_staged ?mechanized_operation)
+        )
+      )
+    :effect (execution_staged ?mechanized_operation)
+  )
+  (:action complete_manual_operation_execution
+    :parameters (?manual_operation - manual_operation ?work_order - work_order)
+    :precondition
+      (and
+        (manual_operation_inputs_staged ?manual_operation)
+        (manual_operation_ready_for_dispatch ?manual_operation)
+        (work_order_assembled ?work_order)
+        (work_order_dispatched ?work_order)
+        (not
+          (execution_staged ?manual_operation)
+        )
+      )
+    :effect (execution_staged ?manual_operation)
+  )
+  (:action schedule_operation_in_season_window
+    :parameters (?field_operation - field_operation ?season_timing_slot - season_timing_slot ?operation_type - operation_type)
+    :precondition
+      (and
+        (execution_staged ?field_operation)
+        (execution_has_type ?field_operation ?operation_type)
+        (season_timing_slot_available ?season_timing_slot)
+        (not
+          (execution_scheduled ?field_operation)
+        )
+      )
+    :effect
+      (and
+        (execution_scheduled ?field_operation)
+        (execution_assigned_to_season_slot ?field_operation ?season_timing_slot)
+        (not
+          (season_timing_slot_available ?season_timing_slot)
+        )
+      )
+  )
+  (:action finalize_mechanized_operation_and_release_resources
+    :parameters (?mechanized_operation - mechanized_operation ?machine_unit - machine_unit ?season_timing_slot - season_timing_slot)
+    :precondition
+      (and
+        (execution_scheduled ?mechanized_operation)
+        (execution_assigned_to_machine ?mechanized_operation ?machine_unit)
+        (execution_assigned_to_season_slot ?mechanized_operation ?season_timing_slot)
+        (not
+          (execution_completed ?mechanized_operation)
+        )
+      )
+    :effect
+      (and
+        (execution_completed ?mechanized_operation)
+        (machine_available ?machine_unit)
+        (season_timing_slot_available ?season_timing_slot)
+      )
+  )
+  (:action finalize_manual_operation_and_release_resources
+    :parameters (?manual_operation - manual_operation ?machine_unit - machine_unit ?season_timing_slot - season_timing_slot)
+    :precondition
+      (and
+        (execution_scheduled ?manual_operation)
+        (execution_assigned_to_machine ?manual_operation ?machine_unit)
+        (execution_assigned_to_season_slot ?manual_operation ?season_timing_slot)
+        (not
+          (execution_completed ?manual_operation)
+        )
+      )
+    :effect
+      (and
+        (execution_completed ?manual_operation)
+        (machine_available ?machine_unit)
+        (season_timing_slot_available ?season_timing_slot)
+      )
+  )
+  (:action finalize_parcel_operation_and_release_resources
+    :parameters (?field_parcel - field_parcel ?machine_unit - machine_unit ?season_timing_slot - season_timing_slot)
+    :precondition
+      (and
+        (execution_scheduled ?field_parcel)
+        (execution_assigned_to_machine ?field_parcel ?machine_unit)
+        (execution_assigned_to_season_slot ?field_parcel ?season_timing_slot)
+        (not
+          (execution_completed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (execution_completed ?field_parcel)
+        (machine_available ?machine_unit)
+        (season_timing_slot_available ?season_timing_slot)
+      )
+  )
+)

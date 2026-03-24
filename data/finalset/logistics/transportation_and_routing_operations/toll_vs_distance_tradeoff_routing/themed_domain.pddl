@@ -1,0 +1,936 @@
+(define (domain toll_vs_distance_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_class - object spatial_element_class - object asset_class - object transport_entity_class - object transport_request - transport_entity_class toll_option - operational_resource_class route_segment - operational_resource_class carrier_unit - operational_resource_class special_service - operational_resource_class priority_class - operational_resource_class toll_zone - operational_resource_class vehicle_capability - operational_resource_class access_permit - operational_resource_class cargo_unit - spatial_element_class container - spatial_element_class contract_clause - spatial_element_class origin_node - asset_class destination_node - asset_class transfer_bundle - asset_class pickup_category - transport_request delivery_category - transport_request pickup_node - pickup_category delivery_node - pickup_category route_plan - delivery_category)
+  (:predicates
+    (request_initialized ?transport_request - transport_request)
+    (entity_confirmed ?transport_request - transport_request)
+    (vehicle_allocated ?transport_request - transport_request)
+    (delivered ?transport_request - transport_request)
+    (resource_completed ?transport_request - transport_request)
+    (toll_choice_selected ?transport_request - transport_request)
+    (toll_option_available ?toll_option - toll_option)
+    (assigned_toll_option ?transport_request - transport_request ?toll_option - toll_option)
+    (route_segment_available ?route_segment - route_segment)
+    (route_segment_reserved_for_request ?transport_request - transport_request ?route_segment - route_segment)
+    (carrier_available ?carrier_unit - carrier_unit)
+    (assigned_carrier ?transport_request - transport_request ?carrier_unit - carrier_unit)
+    (cargo_available ?cargo_unit - cargo_unit)
+    (pickup_loaded_with_cargo ?pickup_node - pickup_node ?cargo_unit - cargo_unit)
+    (delivery_loaded_with_cargo ?delivery_node - delivery_node ?cargo_unit - cargo_unit)
+    (pickup_at_origin ?pickup_node - pickup_node ?origin_node - origin_node)
+    (origin_node_active ?origin_node - origin_node)
+    (origin_node_reserved ?origin_node - origin_node)
+    (pickup_processed ?pickup_node - pickup_node)
+    (delivery_at_destination ?delivery_node - delivery_node ?destination_node - destination_node)
+    (destination_node_active ?destination_node - destination_node)
+    (destination_node_reserved ?destination_node - destination_node)
+    (delivery_processed ?delivery_node - delivery_node)
+    (transfer_bundle_ready ?transfer_bundle - transfer_bundle)
+    (transfer_bundle_active ?transfer_bundle - transfer_bundle)
+    (transfer_bundle_origin_link ?transfer_bundle - transfer_bundle ?origin_node - origin_node)
+    (transfer_bundle_destination_link ?transfer_bundle - transfer_bundle ?destination_node - destination_node)
+    (transfer_bundle_processed_at_origin ?transfer_bundle - transfer_bundle)
+    (transfer_bundle_processed_at_destination ?transfer_bundle - transfer_bundle)
+    (transfer_bundle_dispatch_ready ?transfer_bundle - transfer_bundle)
+    (route_plan_has_pickup ?route_plan - route_plan ?pickup_node - pickup_node)
+    (route_plan_has_delivery ?route_plan - route_plan ?delivery_node - delivery_node)
+    (route_plan_has_bundle ?route_plan - route_plan ?transfer_bundle - transfer_bundle)
+    (container_available ?container - container)
+    (route_plan_has_container ?route_plan - route_plan ?container - container)
+    (container_assigned ?container - container)
+    (container_in_bundle ?container - container ?transfer_bundle - transfer_bundle)
+    (route_plan_container_registered ?route_plan - route_plan)
+    (route_plan_container_confirmed ?route_plan - route_plan)
+    (route_plan_authorized ?route_plan - route_plan)
+    (route_plan_special_service_attached ?route_plan - route_plan)
+    (route_plan_service_verified ?route_plan - route_plan)
+    (route_plan_authorization_confirmed ?route_plan - route_plan)
+    (route_plan_finalized ?route_plan - route_plan)
+    (contract_clause_available ?contract_clause - contract_clause)
+    (route_plan_has_contract_clause ?route_plan - route_plan ?contract_clause - contract_clause)
+    (route_plan_contract_bound ?route_plan - route_plan)
+    (route_plan_contract_verified ?route_plan - route_plan)
+    (route_plan_contract_authorized ?route_plan - route_plan)
+    (special_service_available ?special_service - special_service)
+    (route_plan_has_special_service ?route_plan - route_plan ?special_service - special_service)
+    (priority_class_available ?priority_class - priority_class)
+    (route_plan_has_priority_class ?route_plan - route_plan ?priority_class - priority_class)
+    (vehicle_capability_available ?vehicle_capability - vehicle_capability)
+    (route_plan_has_vehicle_capability ?route_plan - route_plan ?vehicle_capability - vehicle_capability)
+    (access_permit_available ?access_permit - access_permit)
+    (route_plan_has_access_permit ?route_plan - route_plan ?access_permit - access_permit)
+    (toll_zone_available ?toll_zone - toll_zone)
+    (assigned_toll_zone ?transport_request - transport_request ?toll_zone - toll_zone)
+    (pickup_ready ?pickup_node - pickup_node)
+    (delivery_ready ?delivery_node - delivery_node)
+    (route_plan_completed ?route_plan - route_plan)
+  )
+  (:action initialize_transport_request
+    :parameters (?transport_request - transport_request)
+    :precondition
+      (and
+        (not
+          (request_initialized ?transport_request)
+        )
+        (not
+          (delivered ?transport_request)
+        )
+      )
+    :effect (request_initialized ?transport_request)
+  )
+  (:action assign_toll_option_and_allocate_vehicle
+    :parameters (?transport_request - transport_request ?toll_option - toll_option)
+    :precondition
+      (and
+        (request_initialized ?transport_request)
+        (not
+          (vehicle_allocated ?transport_request)
+        )
+        (toll_option_available ?toll_option)
+      )
+    :effect
+      (and
+        (vehicle_allocated ?transport_request)
+        (assigned_toll_option ?transport_request ?toll_option)
+        (not
+          (toll_option_available ?toll_option)
+        )
+      )
+  )
+  (:action reserve_route_segment_for_request
+    :parameters (?transport_request - transport_request ?route_segment - route_segment)
+    :precondition
+      (and
+        (request_initialized ?transport_request)
+        (vehicle_allocated ?transport_request)
+        (route_segment_available ?route_segment)
+      )
+    :effect
+      (and
+        (route_segment_reserved_for_request ?transport_request ?route_segment)
+        (not
+          (route_segment_available ?route_segment)
+        )
+      )
+  )
+  (:action confirm_route_for_request
+    :parameters (?transport_request - transport_request ?route_segment - route_segment)
+    :precondition
+      (and
+        (request_initialized ?transport_request)
+        (vehicle_allocated ?transport_request)
+        (route_segment_reserved_for_request ?transport_request ?route_segment)
+        (not
+          (entity_confirmed ?transport_request)
+        )
+      )
+    :effect (entity_confirmed ?transport_request)
+  )
+  (:action release_route_segment_reservation
+    :parameters (?transport_request - transport_request ?route_segment - route_segment)
+    :precondition
+      (and
+        (route_segment_reserved_for_request ?transport_request ?route_segment)
+      )
+    :effect
+      (and
+        (route_segment_available ?route_segment)
+        (not
+          (route_segment_reserved_for_request ?transport_request ?route_segment)
+        )
+      )
+  )
+  (:action assign_carrier_to_request
+    :parameters (?transport_request - transport_request ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (entity_confirmed ?transport_request)
+        (carrier_available ?carrier_unit)
+      )
+    :effect
+      (and
+        (assigned_carrier ?transport_request ?carrier_unit)
+        (not
+          (carrier_available ?carrier_unit)
+        )
+      )
+  )
+  (:action release_carrier_from_request
+    :parameters (?transport_request - transport_request ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (assigned_carrier ?transport_request ?carrier_unit)
+      )
+    :effect
+      (and
+        (carrier_available ?carrier_unit)
+        (not
+          (assigned_carrier ?transport_request ?carrier_unit)
+        )
+      )
+  )
+  (:action attach_vehicle_capability_to_route_plan
+    :parameters (?route_plan - route_plan ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (vehicle_capability_available ?vehicle_capability)
+      )
+    :effect
+      (and
+        (route_plan_has_vehicle_capability ?route_plan ?vehicle_capability)
+        (not
+          (vehicle_capability_available ?vehicle_capability)
+        )
+      )
+  )
+  (:action detach_vehicle_capability_from_route_plan
+    :parameters (?route_plan - route_plan ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (route_plan_has_vehicle_capability ?route_plan ?vehicle_capability)
+      )
+    :effect
+      (and
+        (vehicle_capability_available ?vehicle_capability)
+        (not
+          (route_plan_has_vehicle_capability ?route_plan ?vehicle_capability)
+        )
+      )
+  )
+  (:action attach_access_permit_to_route_plan
+    :parameters (?route_plan - route_plan ?access_permit - access_permit)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (access_permit_available ?access_permit)
+      )
+    :effect
+      (and
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (not
+          (access_permit_available ?access_permit)
+        )
+      )
+  )
+  (:action detach_access_permit_from_route_plan
+    :parameters (?route_plan - route_plan ?access_permit - access_permit)
+    :precondition
+      (and
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+      )
+    :effect
+      (and
+        (access_permit_available ?access_permit)
+        (not
+          (route_plan_has_access_permit ?route_plan ?access_permit)
+        )
+      )
+  )
+  (:action activate_origin_node_for_pickup
+    :parameters (?pickup_node - pickup_node ?origin_node - origin_node ?route_segment - route_segment)
+    :precondition
+      (and
+        (entity_confirmed ?pickup_node)
+        (route_segment_reserved_for_request ?pickup_node ?route_segment)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (not
+          (origin_node_active ?origin_node)
+        )
+        (not
+          (origin_node_reserved ?origin_node)
+        )
+      )
+    :effect (origin_node_active ?origin_node)
+  )
+  (:action reserve_pickup_and_mark_loaded
+    :parameters (?pickup_node - pickup_node ?origin_node - origin_node ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (entity_confirmed ?pickup_node)
+        (assigned_carrier ?pickup_node ?carrier_unit)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (origin_node_active ?origin_node)
+        (not
+          (pickup_ready ?pickup_node)
+        )
+      )
+    :effect
+      (and
+        (pickup_ready ?pickup_node)
+        (pickup_processed ?pickup_node)
+      )
+  )
+  (:action load_cargo_at_pickup_node
+    :parameters (?pickup_node - pickup_node ?origin_node - origin_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_confirmed ?pickup_node)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (pickup_ready ?pickup_node)
+        )
+      )
+    :effect
+      (and
+        (origin_node_reserved ?origin_node)
+        (pickup_ready ?pickup_node)
+        (pickup_loaded_with_cargo ?pickup_node ?cargo_unit)
+        (not
+          (cargo_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_pickup_loading
+    :parameters (?pickup_node - pickup_node ?origin_node - origin_node ?route_segment - route_segment ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_confirmed ?pickup_node)
+        (route_segment_reserved_for_request ?pickup_node ?route_segment)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (origin_node_reserved ?origin_node)
+        (pickup_loaded_with_cargo ?pickup_node ?cargo_unit)
+        (not
+          (pickup_processed ?pickup_node)
+        )
+      )
+    :effect
+      (and
+        (origin_node_active ?origin_node)
+        (pickup_processed ?pickup_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (pickup_loaded_with_cargo ?pickup_node ?cargo_unit)
+        )
+      )
+  )
+  (:action activate_destination_node_for_delivery
+    :parameters (?delivery_node - delivery_node ?destination_node - destination_node ?route_segment - route_segment)
+    :precondition
+      (and
+        (entity_confirmed ?delivery_node)
+        (route_segment_reserved_for_request ?delivery_node ?route_segment)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (not
+          (destination_node_active ?destination_node)
+        )
+        (not
+          (destination_node_reserved ?destination_node)
+        )
+      )
+    :effect (destination_node_active ?destination_node)
+  )
+  (:action reserve_delivery_and_mark_ready
+    :parameters (?delivery_node - delivery_node ?destination_node - destination_node ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (entity_confirmed ?delivery_node)
+        (assigned_carrier ?delivery_node ?carrier_unit)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (destination_node_active ?destination_node)
+        (not
+          (delivery_ready ?delivery_node)
+        )
+      )
+    :effect
+      (and
+        (delivery_ready ?delivery_node)
+        (delivery_processed ?delivery_node)
+      )
+  )
+  (:action assign_cargo_to_delivery_node
+    :parameters (?delivery_node - delivery_node ?destination_node - destination_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_confirmed ?delivery_node)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (delivery_ready ?delivery_node)
+        )
+      )
+    :effect
+      (and
+        (destination_node_reserved ?destination_node)
+        (delivery_ready ?delivery_node)
+        (delivery_loaded_with_cargo ?delivery_node ?cargo_unit)
+        (not
+          (cargo_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_delivery_unloading
+    :parameters (?delivery_node - delivery_node ?destination_node - destination_node ?route_segment - route_segment ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_confirmed ?delivery_node)
+        (route_segment_reserved_for_request ?delivery_node ?route_segment)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (destination_node_reserved ?destination_node)
+        (delivery_loaded_with_cargo ?delivery_node ?cargo_unit)
+        (not
+          (delivery_processed ?delivery_node)
+        )
+      )
+    :effect
+      (and
+        (destination_node_active ?destination_node)
+        (delivery_processed ?delivery_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (delivery_loaded_with_cargo ?delivery_node ?cargo_unit)
+        )
+      )
+  )
+  (:action assemble_and_activate_transfer_bundle
+    :parameters (?pickup_node - pickup_node ?delivery_node - delivery_node ?origin_node - origin_node ?destination_node - destination_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (pickup_ready ?pickup_node)
+        (delivery_ready ?delivery_node)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (origin_node_active ?origin_node)
+        (destination_node_active ?destination_node)
+        (pickup_processed ?pickup_node)
+        (delivery_processed ?delivery_node)
+        (transfer_bundle_ready ?transfer_bundle)
+      )
+    :effect
+      (and
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_origin_link ?transfer_bundle ?origin_node)
+        (transfer_bundle_destination_link ?transfer_bundle ?destination_node)
+        (not
+          (transfer_bundle_ready ?transfer_bundle)
+        )
+      )
+  )
+  (:action assemble_and_activate_transfer_bundle_with_origin_processing
+    :parameters (?pickup_node - pickup_node ?delivery_node - delivery_node ?origin_node - origin_node ?destination_node - destination_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (pickup_ready ?pickup_node)
+        (delivery_ready ?delivery_node)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_active ?destination_node)
+        (not
+          (pickup_processed ?pickup_node)
+        )
+        (delivery_processed ?delivery_node)
+        (transfer_bundle_ready ?transfer_bundle)
+      )
+    :effect
+      (and
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_origin_link ?transfer_bundle ?origin_node)
+        (transfer_bundle_destination_link ?transfer_bundle ?destination_node)
+        (transfer_bundle_processed_at_origin ?transfer_bundle)
+        (not
+          (transfer_bundle_ready ?transfer_bundle)
+        )
+      )
+  )
+  (:action assemble_and_activate_transfer_bundle_with_destination_processing
+    :parameters (?pickup_node - pickup_node ?delivery_node - delivery_node ?origin_node - origin_node ?destination_node - destination_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (pickup_ready ?pickup_node)
+        (delivery_ready ?delivery_node)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (origin_node_active ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (pickup_processed ?pickup_node)
+        (not
+          (delivery_processed ?delivery_node)
+        )
+        (transfer_bundle_ready ?transfer_bundle)
+      )
+    :effect
+      (and
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_origin_link ?transfer_bundle ?origin_node)
+        (transfer_bundle_destination_link ?transfer_bundle ?destination_node)
+        (transfer_bundle_processed_at_destination ?transfer_bundle)
+        (not
+          (transfer_bundle_ready ?transfer_bundle)
+        )
+      )
+  )
+  (:action assemble_and_activate_transfer_bundle_with_both_processing
+    :parameters (?pickup_node - pickup_node ?delivery_node - delivery_node ?origin_node - origin_node ?destination_node - destination_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (pickup_ready ?pickup_node)
+        (delivery_ready ?delivery_node)
+        (pickup_at_origin ?pickup_node ?origin_node)
+        (delivery_at_destination ?delivery_node ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (pickup_processed ?pickup_node)
+        )
+        (not
+          (delivery_processed ?delivery_node)
+        )
+        (transfer_bundle_ready ?transfer_bundle)
+      )
+    :effect
+      (and
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_origin_link ?transfer_bundle ?origin_node)
+        (transfer_bundle_destination_link ?transfer_bundle ?destination_node)
+        (transfer_bundle_processed_at_origin ?transfer_bundle)
+        (transfer_bundle_processed_at_destination ?transfer_bundle)
+        (not
+          (transfer_bundle_ready ?transfer_bundle)
+        )
+      )
+  )
+  (:action mark_bundle_dispatch_ready
+    :parameters (?transfer_bundle - transfer_bundle ?pickup_node - pickup_node ?route_segment - route_segment)
+    :precondition
+      (and
+        (transfer_bundle_active ?transfer_bundle)
+        (pickup_ready ?pickup_node)
+        (route_segment_reserved_for_request ?pickup_node ?route_segment)
+        (not
+          (transfer_bundle_dispatch_ready ?transfer_bundle)
+        )
+      )
+    :effect (transfer_bundle_dispatch_ready ?transfer_bundle)
+  )
+  (:action assign_container_to_route_plan_and_bundle
+    :parameters (?route_plan - route_plan ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (route_plan_has_bundle ?route_plan ?transfer_bundle)
+        (route_plan_has_container ?route_plan ?container)
+        (container_available ?container)
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_dispatch_ready ?transfer_bundle)
+        (not
+          (container_assigned ?container)
+        )
+      )
+    :effect
+      (and
+        (container_assigned ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action register_container_on_route_plan
+    :parameters (?route_plan - route_plan ?container - container ?transfer_bundle - transfer_bundle ?route_segment - route_segment)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (route_plan_has_container ?route_plan ?container)
+        (container_assigned ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (route_segment_reserved_for_request ?route_plan ?route_segment)
+        (not
+          (transfer_bundle_processed_at_origin ?transfer_bundle)
+        )
+        (not
+          (route_plan_container_registered ?route_plan)
+        )
+      )
+    :effect (route_plan_container_registered ?route_plan)
+  )
+  (:action attach_special_service_to_route_plan
+    :parameters (?route_plan - route_plan ?special_service - special_service)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (special_service_available ?special_service)
+        (not
+          (route_plan_special_service_attached ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_special_service_attached ?route_plan)
+        (route_plan_has_special_service ?route_plan ?special_service)
+        (not
+          (special_service_available ?special_service)
+        )
+      )
+  )
+  (:action verify_service_and_register_container_on_route_plan
+    :parameters (?route_plan - route_plan ?container - container ?transfer_bundle - transfer_bundle ?route_segment - route_segment ?special_service - special_service)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (route_plan_has_container ?route_plan ?container)
+        (container_assigned ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (route_segment_reserved_for_request ?route_plan ?route_segment)
+        (transfer_bundle_processed_at_origin ?transfer_bundle)
+        (route_plan_special_service_attached ?route_plan)
+        (route_plan_has_special_service ?route_plan ?special_service)
+        (not
+          (route_plan_container_registered ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_container_registered ?route_plan)
+        (route_plan_service_verified ?route_plan)
+      )
+  )
+  (:action authorize_route_plan_for_carrier_and_capability
+    :parameters (?route_plan - route_plan ?vehicle_capability - vehicle_capability ?carrier_unit - carrier_unit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_registered ?route_plan)
+        (route_plan_has_vehicle_capability ?route_plan ?vehicle_capability)
+        (assigned_carrier ?route_plan ?carrier_unit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (not
+          (transfer_bundle_processed_at_destination ?transfer_bundle)
+        )
+        (not
+          (route_plan_container_confirmed ?route_plan)
+        )
+      )
+    :effect (route_plan_container_confirmed ?route_plan)
+  )
+  (:action authorize_route_plan_with_registered_container
+    :parameters (?route_plan - route_plan ?vehicle_capability - vehicle_capability ?carrier_unit - carrier_unit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_registered ?route_plan)
+        (route_plan_has_vehicle_capability ?route_plan ?vehicle_capability)
+        (assigned_carrier ?route_plan ?carrier_unit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (transfer_bundle_processed_at_destination ?transfer_bundle)
+        (not
+          (route_plan_container_confirmed ?route_plan)
+        )
+      )
+    :effect (route_plan_container_confirmed ?route_plan)
+  )
+  (:action apply_access_permit_to_route_plan
+    :parameters (?route_plan - route_plan ?access_permit - access_permit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_confirmed ?route_plan)
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (not
+          (transfer_bundle_processed_at_origin ?transfer_bundle)
+        )
+        (not
+          (transfer_bundle_processed_at_destination ?transfer_bundle)
+        )
+        (not
+          (route_plan_authorized ?route_plan)
+        )
+      )
+    :effect (route_plan_authorized ?route_plan)
+  )
+  (:action apply_access_permit_and_confirm_authorization
+    :parameters (?route_plan - route_plan ?access_permit - access_permit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_confirmed ?route_plan)
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (transfer_bundle_processed_at_origin ?transfer_bundle)
+        (not
+          (transfer_bundle_processed_at_destination ?transfer_bundle)
+        )
+        (not
+          (route_plan_authorized ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_authorization_confirmed ?route_plan)
+      )
+  )
+  (:action apply_access_permit_and_confirm_authorization_destination
+    :parameters (?route_plan - route_plan ?access_permit - access_permit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_confirmed ?route_plan)
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (not
+          (transfer_bundle_processed_at_origin ?transfer_bundle)
+        )
+        (transfer_bundle_processed_at_destination ?transfer_bundle)
+        (not
+          (route_plan_authorized ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_authorization_confirmed ?route_plan)
+      )
+  )
+  (:action apply_access_permit_and_confirm_authorization_both_processed
+    :parameters (?route_plan - route_plan ?access_permit - access_permit ?container - container ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (route_plan_container_confirmed ?route_plan)
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (route_plan_has_container ?route_plan ?container)
+        (container_in_bundle ?container ?transfer_bundle)
+        (transfer_bundle_processed_at_origin ?transfer_bundle)
+        (transfer_bundle_processed_at_destination ?transfer_bundle)
+        (not
+          (route_plan_authorized ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_authorization_confirmed ?route_plan)
+      )
+  )
+  (:action finalize_route_plan_and_mark_resource_completed
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_plan_authorized ?route_plan)
+        (not
+          (route_plan_authorization_confirmed ?route_plan)
+        )
+        (not
+          (route_plan_completed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_completed ?route_plan)
+        (resource_completed ?route_plan)
+      )
+  )
+  (:action assign_priority_class_to_route_plan
+    :parameters (?route_plan - route_plan ?priority_class - priority_class)
+    :precondition
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_authorization_confirmed ?route_plan)
+        (priority_class_available ?priority_class)
+      )
+    :effect
+      (and
+        (route_plan_has_priority_class ?route_plan ?priority_class)
+        (not
+          (priority_class_available ?priority_class)
+        )
+      )
+  )
+  (:action finalize_route_plan_loading
+    :parameters (?route_plan - route_plan ?pickup_node - pickup_node ?delivery_node - delivery_node ?route_segment - route_segment ?priority_class - priority_class)
+    :precondition
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_authorization_confirmed ?route_plan)
+        (route_plan_has_priority_class ?route_plan ?priority_class)
+        (route_plan_has_pickup ?route_plan ?pickup_node)
+        (route_plan_has_delivery ?route_plan ?delivery_node)
+        (pickup_processed ?pickup_node)
+        (delivery_processed ?delivery_node)
+        (route_segment_reserved_for_request ?route_plan ?route_segment)
+        (not
+          (route_plan_finalized ?route_plan)
+        )
+      )
+    :effect (route_plan_finalized ?route_plan)
+  )
+  (:action complete_route_plan_execution
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_plan_authorized ?route_plan)
+        (route_plan_finalized ?route_plan)
+        (not
+          (route_plan_completed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_completed ?route_plan)
+        (resource_completed ?route_plan)
+      )
+  )
+  (:action bind_contract_clause_to_route_plan
+    :parameters (?route_plan - route_plan ?contract_clause - contract_clause ?route_segment - route_segment)
+    :precondition
+      (and
+        (entity_confirmed ?route_plan)
+        (route_segment_reserved_for_request ?route_plan ?route_segment)
+        (contract_clause_available ?contract_clause)
+        (route_plan_has_contract_clause ?route_plan ?contract_clause)
+        (not
+          (route_plan_contract_bound ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_contract_bound ?route_plan)
+        (not
+          (contract_clause_available ?contract_clause)
+        )
+      )
+  )
+  (:action verify_contract_binding_with_carrier
+    :parameters (?route_plan - route_plan ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (route_plan_contract_bound ?route_plan)
+        (assigned_carrier ?route_plan ?carrier_unit)
+        (not
+          (route_plan_contract_verified ?route_plan)
+        )
+      )
+    :effect (route_plan_contract_verified ?route_plan)
+  )
+  (:action authorize_route_plan_contract_with_permit
+    :parameters (?route_plan - route_plan ?access_permit - access_permit)
+    :precondition
+      (and
+        (route_plan_contract_verified ?route_plan)
+        (route_plan_has_access_permit ?route_plan ?access_permit)
+        (not
+          (route_plan_contract_authorized ?route_plan)
+        )
+      )
+    :effect (route_plan_contract_authorized ?route_plan)
+  )
+  (:action complete_route_plan_after_contract_authorization
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_plan_contract_authorized ?route_plan)
+        (not
+          (route_plan_completed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_completed ?route_plan)
+        (resource_completed ?route_plan)
+      )
+  )
+  (:action complete_pickup_node_resource
+    :parameters (?pickup_node - pickup_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (pickup_ready ?pickup_node)
+        (pickup_processed ?pickup_node)
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_dispatch_ready ?transfer_bundle)
+        (not
+          (resource_completed ?pickup_node)
+        )
+      )
+    :effect (resource_completed ?pickup_node)
+  )
+  (:action complete_delivery_node_resource
+    :parameters (?delivery_node - delivery_node ?transfer_bundle - transfer_bundle)
+    :precondition
+      (and
+        (delivery_ready ?delivery_node)
+        (delivery_processed ?delivery_node)
+        (transfer_bundle_active ?transfer_bundle)
+        (transfer_bundle_dispatch_ready ?transfer_bundle)
+        (not
+          (resource_completed ?delivery_node)
+        )
+      )
+    :effect (resource_completed ?delivery_node)
+  )
+  (:action select_toll_zone_for_request
+    :parameters (?transport_request - transport_request ?toll_zone - toll_zone ?route_segment - route_segment)
+    :precondition
+      (and
+        (resource_completed ?transport_request)
+        (route_segment_reserved_for_request ?transport_request ?route_segment)
+        (toll_zone_available ?toll_zone)
+        (not
+          (toll_choice_selected ?transport_request)
+        )
+      )
+    :effect
+      (and
+        (toll_choice_selected ?transport_request)
+        (assigned_toll_zone ?transport_request ?toll_zone)
+        (not
+          (toll_zone_available ?toll_zone)
+        )
+      )
+  )
+  (:action apply_toll_option_to_pickup_and_release_toll_zone
+    :parameters (?pickup_node - pickup_node ?toll_option - toll_option ?toll_zone - toll_zone)
+    :precondition
+      (and
+        (toll_choice_selected ?pickup_node)
+        (assigned_toll_option ?pickup_node ?toll_option)
+        (assigned_toll_zone ?pickup_node ?toll_zone)
+        (not
+          (delivered ?pickup_node)
+        )
+      )
+    :effect
+      (and
+        (delivered ?pickup_node)
+        (toll_option_available ?toll_option)
+        (toll_zone_available ?toll_zone)
+      )
+  )
+  (:action apply_toll_option_to_delivery_and_release_toll_zone
+    :parameters (?delivery_node - delivery_node ?toll_option - toll_option ?toll_zone - toll_zone)
+    :precondition
+      (and
+        (toll_choice_selected ?delivery_node)
+        (assigned_toll_option ?delivery_node ?toll_option)
+        (assigned_toll_zone ?delivery_node ?toll_zone)
+        (not
+          (delivered ?delivery_node)
+        )
+      )
+    :effect
+      (and
+        (delivered ?delivery_node)
+        (toll_option_available ?toll_option)
+        (toll_zone_available ?toll_zone)
+      )
+  )
+  (:action apply_toll_option_to_route_plan_and_release_toll_zone
+    :parameters (?route_plan - route_plan ?toll_option - toll_option ?toll_zone - toll_zone)
+    :precondition
+      (and
+        (toll_choice_selected ?route_plan)
+        (assigned_toll_option ?route_plan ?toll_option)
+        (assigned_toll_zone ?route_plan ?toll_zone)
+        (not
+          (delivered ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (delivered ?route_plan)
+        (toll_option_available ?toll_option)
+        (toll_zone_available ?toll_zone)
+      )
+  )
+)

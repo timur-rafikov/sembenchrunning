@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain anomaly_detection_pipeline)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types processing_resource - object feature_type - object bin_type - object data_item_root - object data_item - data_item_root detector_worker - processing_resource computed_feature - processing_resource validator - processing_resource explanation_method - processing_resource postprocessor - processing_resource evidence_token - processing_resource scoring_model - processing_resource explanation_template - processing_resource calibration_param - feature_type data_segment - feature_type reference_profile - feature_type feature_bin_raw - bin_type feature_bin_agg - bin_type anomaly_candidate - bin_type record_subtype_a - data_item record_subtype_b - data_item raw_record - record_subtype_a aggregated_record - record_subtype_a detection_pipeline - record_subtype_b)
+  (:predicates
+    (data_item_discovered ?data_item - data_item)
+    (evaluation_completed ?data_item - data_item)
+    (evaluation_allocated ?data_item - data_item)
+    (anomaly_flagged ?data_item - data_item)
+    (ready_for_evidence ?data_item - data_item)
+    (evidence_bound ?data_item - data_item)
+    (worker_available ?detector_worker - detector_worker)
+    (assigned_to_worker ?data_item - data_item ?detector_worker - detector_worker)
+    (feature_available ?feature - computed_feature)
+    (feature_computed ?data_item - data_item ?feature - computed_feature)
+    (validator_available ?validator - validator)
+    (assigned_validator ?data_item - data_item ?validator - validator)
+    (calibration_param_available ?calibration_param - calibration_param)
+    (raw_record_has_calibration ?raw_record - raw_record ?calibration_param - calibration_param)
+    (agg_record_has_calibration ?aggregated_record - aggregated_record ?calibration_param - calibration_param)
+    (has_feature_bin_raw ?raw_record - raw_record ?feature_bin_raw - feature_bin_raw)
+    (feature_bin_raw_vote_yes ?feature_bin_raw - feature_bin_raw)
+    (feature_bin_raw_vote_no ?feature_bin_raw - feature_bin_raw)
+    (raw_record_vote_confirmed ?raw_record - raw_record)
+    (has_feature_bin_agg ?aggregated_record - aggregated_record ?feature_bin_agg - feature_bin_agg)
+    (feature_bin_agg_vote_yes ?feature_bin_agg - feature_bin_agg)
+    (feature_bin_agg_vote_no ?feature_bin_agg - feature_bin_agg)
+    (agg_record_vote_confirmed ?aggregated_record - aggregated_record)
+    (candidate_slot_available ?anomaly_candidate - anomaly_candidate)
+    (candidate_allocated ?anomaly_candidate - anomaly_candidate)
+    (candidate_has_raw_bin ?anomaly_candidate - anomaly_candidate ?feature_bin_raw - feature_bin_raw)
+    (candidate_has_agg_bin ?anomaly_candidate - anomaly_candidate ?feature_bin_agg - feature_bin_agg)
+    (candidate_confirmed_by_raw_votes ?anomaly_candidate - anomaly_candidate)
+    (candidate_confirmed_by_agg_votes ?anomaly_candidate - anomaly_candidate)
+    (candidate_ready_for_segment_attachment ?anomaly_candidate - anomaly_candidate)
+    (pipeline_includes_raw_record ?detection_pipeline - detection_pipeline ?raw_record - raw_record)
+    (pipeline_includes_agg_record ?detection_pipeline - detection_pipeline ?aggregated_record - aggregated_record)
+    (pipeline_associated_with_candidate ?detection_pipeline - detection_pipeline ?anomaly_candidate - anomaly_candidate)
+    (data_segment_available ?data_segment - data_segment)
+    (pipeline_has_data_segment ?detection_pipeline - detection_pipeline ?data_segment - data_segment)
+    (data_segment_consumed ?data_segment - data_segment)
+    (data_segment_attached_to_candidate ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    (pipeline_segment_binding_complete ?detection_pipeline - detection_pipeline)
+    (pipeline_model_bound ?detection_pipeline - detection_pipeline)
+    (pipeline_ready_for_postprocessing ?detection_pipeline - detection_pipeline)
+    (explanation_method_reserved ?detection_pipeline - detection_pipeline)
+    (pipeline_explanation_prepared ?detection_pipeline - detection_pipeline)
+    (postprocessing_configured ?detection_pipeline - detection_pipeline)
+    (postprocessing_complete ?detection_pipeline - detection_pipeline)
+    (reference_profile_available ?reference_profile - reference_profile)
+    (pipeline_has_reference_profile ?detection_pipeline - detection_pipeline ?reference_profile - reference_profile)
+    (reference_profile_assigned ?detection_pipeline - detection_pipeline)
+    (reference_prepared ?detection_pipeline - detection_pipeline)
+    (reference_explanation_applied ?detection_pipeline - detection_pipeline)
+    (explanation_method_available ?explanation_method - explanation_method)
+    (pipeline_has_explanation_method ?detection_pipeline - detection_pipeline ?explanation_method - explanation_method)
+    (postprocessor_available ?postprocessor - postprocessor)
+    (pipeline_has_postprocessor ?detection_pipeline - detection_pipeline ?postprocessor - postprocessor)
+    (scoring_model_available ?scoring_model - scoring_model)
+    (pipeline_has_scoring_model ?detection_pipeline - detection_pipeline ?scoring_model - scoring_model)
+    (explanation_template_available ?explanation_template - explanation_template)
+    (pipeline_has_explanation_template ?detection_pipeline - detection_pipeline ?explanation_template - explanation_template)
+    (evidence_token_available ?evidence_token - evidence_token)
+    (data_item_has_evidence ?data_item - data_item ?evidence_token - evidence_token)
+    (raw_record_vote_flagged ?raw_record - raw_record)
+    (agg_record_vote_flagged ?aggregated_record - aggregated_record)
+    (pipeline_finalized ?detection_pipeline - detection_pipeline)
+  )
+  (:action discover_data_item
+    :parameters (?data_item - data_item)
+    :precondition
+      (and
+        (not
+          (data_item_discovered ?data_item)
+        )
+        (not
+          (anomaly_flagged ?data_item)
+        )
+      )
+    :effect (data_item_discovered ?data_item)
+  )
+  (:action allocate_detector_worker
+    :parameters (?data_item - data_item ?detector_worker - detector_worker)
+    :precondition
+      (and
+        (data_item_discovered ?data_item)
+        (not
+          (evaluation_allocated ?data_item)
+        )
+        (worker_available ?detector_worker)
+      )
+    :effect
+      (and
+        (evaluation_allocated ?data_item)
+        (assigned_to_worker ?data_item ?detector_worker)
+        (not
+          (worker_available ?detector_worker)
+        )
+      )
+  )
+  (:action compute_feature_for_item
+    :parameters (?data_item - data_item ?feature - computed_feature)
+    :precondition
+      (and
+        (data_item_discovered ?data_item)
+        (evaluation_allocated ?data_item)
+        (feature_available ?feature)
+      )
+    :effect
+      (and
+        (feature_computed ?data_item ?feature)
+        (not
+          (feature_available ?feature)
+        )
+      )
+  )
+  (:action complete_feature_evaluation
+    :parameters (?data_item - data_item ?feature - computed_feature)
+    :precondition
+      (and
+        (data_item_discovered ?data_item)
+        (evaluation_allocated ?data_item)
+        (feature_computed ?data_item ?feature)
+        (not
+          (evaluation_completed ?data_item)
+        )
+      )
+    :effect (evaluation_completed ?data_item)
+  )
+  (:action release_feature_assignment
+    :parameters (?data_item - data_item ?feature - computed_feature)
+    :precondition
+      (and
+        (feature_computed ?data_item ?feature)
+      )
+    :effect
+      (and
+        (feature_available ?feature)
+        (not
+          (feature_computed ?data_item ?feature)
+        )
+      )
+  )
+  (:action assign_validator_to_item
+    :parameters (?data_item - data_item ?validator - validator)
+    :precondition
+      (and
+        (evaluation_completed ?data_item)
+        (validator_available ?validator)
+      )
+    :effect
+      (and
+        (assigned_validator ?data_item ?validator)
+        (not
+          (validator_available ?validator)
+        )
+      )
+  )
+  (:action release_validator_from_item
+    :parameters (?data_item - data_item ?validator - validator)
+    :precondition
+      (and
+        (assigned_validator ?data_item ?validator)
+      )
+    :effect
+      (and
+        (validator_available ?validator)
+        (not
+          (assigned_validator ?data_item ?validator)
+        )
+      )
+  )
+  (:action bind_scoring_model_to_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (scoring_model_available ?scoring_model)
+      )
+    :effect
+      (and
+        (pipeline_has_scoring_model ?detection_pipeline ?scoring_model)
+        (not
+          (scoring_model_available ?scoring_model)
+        )
+      )
+  )
+  (:action unbind_scoring_model_from_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (pipeline_has_scoring_model ?detection_pipeline ?scoring_model)
+      )
+    :effect
+      (and
+        (scoring_model_available ?scoring_model)
+        (not
+          (pipeline_has_scoring_model ?detection_pipeline ?scoring_model)
+        )
+      )
+  )
+  (:action bind_explanation_template_to_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (explanation_template_available ?explanation_template)
+      )
+    :effect
+      (and
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (not
+          (explanation_template_available ?explanation_template)
+        )
+      )
+  )
+  (:action unbind_explanation_template_from_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template)
+    :precondition
+      (and
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+      )
+    :effect
+      (and
+        (explanation_template_available ?explanation_template)
+        (not
+          (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        )
+      )
+  )
+  (:action vote_raw_feature_bin_yes
+    :parameters (?raw_record - raw_record ?feature_bin_raw - feature_bin_raw ?feature - computed_feature)
+    :precondition
+      (and
+        (evaluation_completed ?raw_record)
+        (feature_computed ?raw_record ?feature)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (not
+          (feature_bin_raw_vote_yes ?feature_bin_raw)
+        )
+        (not
+          (feature_bin_raw_vote_no ?feature_bin_raw)
+        )
+      )
+    :effect (feature_bin_raw_vote_yes ?feature_bin_raw)
+  )
+  (:action confirm_raw_vote_with_validator
+    :parameters (?raw_record - raw_record ?feature_bin_raw - feature_bin_raw ?validator - validator)
+    :precondition
+      (and
+        (evaluation_completed ?raw_record)
+        (assigned_validator ?raw_record ?validator)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (feature_bin_raw_vote_yes ?feature_bin_raw)
+        (not
+          (raw_record_vote_flagged ?raw_record)
+        )
+      )
+    :effect
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (raw_record_vote_confirmed ?raw_record)
+      )
+  )
+  (:action apply_calibration_to_raw_record
+    :parameters (?raw_record - raw_record ?feature_bin_raw - feature_bin_raw ?calibration_param - calibration_param)
+    :precondition
+      (and
+        (evaluation_completed ?raw_record)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (calibration_param_available ?calibration_param)
+        (not
+          (raw_record_vote_flagged ?raw_record)
+        )
+      )
+    :effect
+      (and
+        (feature_bin_raw_vote_no ?feature_bin_raw)
+        (raw_record_vote_flagged ?raw_record)
+        (raw_record_has_calibration ?raw_record ?calibration_param)
+        (not
+          (calibration_param_available ?calibration_param)
+        )
+      )
+  )
+  (:action reconcile_raw_bin_votes
+    :parameters (?raw_record - raw_record ?feature_bin_raw - feature_bin_raw ?feature - computed_feature ?calibration_param - calibration_param)
+    :precondition
+      (and
+        (evaluation_completed ?raw_record)
+        (feature_computed ?raw_record ?feature)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (feature_bin_raw_vote_no ?feature_bin_raw)
+        (raw_record_has_calibration ?raw_record ?calibration_param)
+        (not
+          (raw_record_vote_confirmed ?raw_record)
+        )
+      )
+    :effect
+      (and
+        (feature_bin_raw_vote_yes ?feature_bin_raw)
+        (raw_record_vote_confirmed ?raw_record)
+        (calibration_param_available ?calibration_param)
+        (not
+          (raw_record_has_calibration ?raw_record ?calibration_param)
+        )
+      )
+  )
+  (:action vote_agg_feature_bin_yes
+    :parameters (?aggregated_record - aggregated_record ?feature_bin_agg - feature_bin_agg ?feature - computed_feature)
+    :precondition
+      (and
+        (evaluation_completed ?aggregated_record)
+        (feature_computed ?aggregated_record ?feature)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (not
+          (feature_bin_agg_vote_yes ?feature_bin_agg)
+        )
+        (not
+          (feature_bin_agg_vote_no ?feature_bin_agg)
+        )
+      )
+    :effect (feature_bin_agg_vote_yes ?feature_bin_agg)
+  )
+  (:action confirm_agg_vote_with_validator
+    :parameters (?aggregated_record - aggregated_record ?feature_bin_agg - feature_bin_agg ?validator - validator)
+    :precondition
+      (and
+        (evaluation_completed ?aggregated_record)
+        (assigned_validator ?aggregated_record ?validator)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_agg_vote_yes ?feature_bin_agg)
+        (not
+          (agg_record_vote_flagged ?aggregated_record)
+        )
+      )
+    :effect
+      (and
+        (agg_record_vote_flagged ?aggregated_record)
+        (agg_record_vote_confirmed ?aggregated_record)
+      )
+  )
+  (:action apply_calibration_to_agg_record
+    :parameters (?aggregated_record - aggregated_record ?feature_bin_agg - feature_bin_agg ?calibration_param - calibration_param)
+    :precondition
+      (and
+        (evaluation_completed ?aggregated_record)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (calibration_param_available ?calibration_param)
+        (not
+          (agg_record_vote_flagged ?aggregated_record)
+        )
+      )
+    :effect
+      (and
+        (feature_bin_agg_vote_no ?feature_bin_agg)
+        (agg_record_vote_flagged ?aggregated_record)
+        (agg_record_has_calibration ?aggregated_record ?calibration_param)
+        (not
+          (calibration_param_available ?calibration_param)
+        )
+      )
+  )
+  (:action reconcile_agg_bin_votes
+    :parameters (?aggregated_record - aggregated_record ?feature_bin_agg - feature_bin_agg ?feature - computed_feature ?calibration_param - calibration_param)
+    :precondition
+      (and
+        (evaluation_completed ?aggregated_record)
+        (feature_computed ?aggregated_record ?feature)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_agg_vote_no ?feature_bin_agg)
+        (agg_record_has_calibration ?aggregated_record ?calibration_param)
+        (not
+          (agg_record_vote_confirmed ?aggregated_record)
+        )
+      )
+    :effect
+      (and
+        (feature_bin_agg_vote_yes ?feature_bin_agg)
+        (agg_record_vote_confirmed ?aggregated_record)
+        (calibration_param_available ?calibration_param)
+        (not
+          (agg_record_has_calibration ?aggregated_record ?calibration_param)
+        )
+      )
+  )
+  (:action assemble_candidate_from_bins
+    :parameters (?raw_record - raw_record ?aggregated_record - aggregated_record ?feature_bin_raw - feature_bin_raw ?feature_bin_agg - feature_bin_agg ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (agg_record_vote_flagged ?aggregated_record)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_raw_vote_yes ?feature_bin_raw)
+        (feature_bin_agg_vote_yes ?feature_bin_agg)
+        (raw_record_vote_confirmed ?raw_record)
+        (agg_record_vote_confirmed ?aggregated_record)
+        (candidate_slot_available ?anomaly_candidate)
+      )
+    :effect
+      (and
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_has_raw_bin ?anomaly_candidate ?feature_bin_raw)
+        (candidate_has_agg_bin ?anomaly_candidate ?feature_bin_agg)
+        (not
+          (candidate_slot_available ?anomaly_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_raw_votes
+    :parameters (?raw_record - raw_record ?aggregated_record - aggregated_record ?feature_bin_raw - feature_bin_raw ?feature_bin_agg - feature_bin_agg ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (agg_record_vote_flagged ?aggregated_record)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_raw_vote_no ?feature_bin_raw)
+        (feature_bin_agg_vote_yes ?feature_bin_agg)
+        (not
+          (raw_record_vote_confirmed ?raw_record)
+        )
+        (agg_record_vote_confirmed ?aggregated_record)
+        (candidate_slot_available ?anomaly_candidate)
+      )
+    :effect
+      (and
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_has_raw_bin ?anomaly_candidate ?feature_bin_raw)
+        (candidate_has_agg_bin ?anomaly_candidate ?feature_bin_agg)
+        (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        (not
+          (candidate_slot_available ?anomaly_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_agg_votes
+    :parameters (?raw_record - raw_record ?aggregated_record - aggregated_record ?feature_bin_raw - feature_bin_raw ?feature_bin_agg - feature_bin_agg ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (agg_record_vote_flagged ?aggregated_record)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_raw_vote_yes ?feature_bin_raw)
+        (feature_bin_agg_vote_no ?feature_bin_agg)
+        (raw_record_vote_confirmed ?raw_record)
+        (not
+          (agg_record_vote_confirmed ?aggregated_record)
+        )
+        (candidate_slot_available ?anomaly_candidate)
+      )
+    :effect
+      (and
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_has_raw_bin ?anomaly_candidate ?feature_bin_raw)
+        (candidate_has_agg_bin ?anomaly_candidate ?feature_bin_agg)
+        (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        (not
+          (candidate_slot_available ?anomaly_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_both_votes
+    :parameters (?raw_record - raw_record ?aggregated_record - aggregated_record ?feature_bin_raw - feature_bin_raw ?feature_bin_agg - feature_bin_agg ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (agg_record_vote_flagged ?aggregated_record)
+        (has_feature_bin_raw ?raw_record ?feature_bin_raw)
+        (has_feature_bin_agg ?aggregated_record ?feature_bin_agg)
+        (feature_bin_raw_vote_no ?feature_bin_raw)
+        (feature_bin_agg_vote_no ?feature_bin_agg)
+        (not
+          (raw_record_vote_confirmed ?raw_record)
+        )
+        (not
+          (agg_record_vote_confirmed ?aggregated_record)
+        )
+        (candidate_slot_available ?anomaly_candidate)
+      )
+    :effect
+      (and
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_has_raw_bin ?anomaly_candidate ?feature_bin_raw)
+        (candidate_has_agg_bin ?anomaly_candidate ?feature_bin_agg)
+        (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        (not
+          (candidate_slot_available ?anomaly_candidate)
+        )
+      )
+  )
+  (:action mark_candidate_ready_for_attachment
+    :parameters (?anomaly_candidate - anomaly_candidate ?raw_record - raw_record ?feature - computed_feature)
+    :precondition
+      (and
+        (candidate_allocated ?anomaly_candidate)
+        (raw_record_vote_flagged ?raw_record)
+        (feature_computed ?raw_record ?feature)
+        (not
+          (candidate_ready_for_segment_attachment ?anomaly_candidate)
+        )
+      )
+    :effect (candidate_ready_for_segment_attachment ?anomaly_candidate)
+  )
+  (:action attach_data_segment_to_candidate
+    :parameters (?detection_pipeline - detection_pipeline ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (pipeline_associated_with_candidate ?detection_pipeline ?anomaly_candidate)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_available ?data_segment)
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_ready_for_segment_attachment ?anomaly_candidate)
+        (not
+          (data_segment_consumed ?data_segment)
+        )
+      )
+    :effect
+      (and
+        (data_segment_consumed ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (not
+          (data_segment_available ?data_segment)
+        )
+      )
+  )
+  (:action complete_pipeline_segment_binding
+    :parameters (?detection_pipeline - detection_pipeline ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate ?feature - computed_feature)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_consumed ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (feature_computed ?detection_pipeline ?feature)
+        (not
+          (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        )
+        (not
+          (pipeline_segment_binding_complete ?detection_pipeline)
+        )
+      )
+    :effect (pipeline_segment_binding_complete ?detection_pipeline)
+  )
+  (:action assign_explanation_method_to_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_method - explanation_method)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (explanation_method_available ?explanation_method)
+        (not
+          (explanation_method_reserved ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (explanation_method_reserved ?detection_pipeline)
+        (pipeline_has_explanation_method ?detection_pipeline ?explanation_method)
+        (not
+          (explanation_method_available ?explanation_method)
+        )
+      )
+  )
+  (:action prepare_pipeline_with_explanation_method
+    :parameters (?detection_pipeline - detection_pipeline ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate ?feature - computed_feature ?explanation_method - explanation_method)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_consumed ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (feature_computed ?detection_pipeline ?feature)
+        (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        (explanation_method_reserved ?detection_pipeline)
+        (pipeline_has_explanation_method ?detection_pipeline ?explanation_method)
+        (not
+          (pipeline_segment_binding_complete ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_segment_binding_complete ?detection_pipeline)
+        (pipeline_explanation_prepared ?detection_pipeline)
+      )
+  )
+  (:action bind_model_to_pipeline_stage1
+    :parameters (?detection_pipeline - detection_pipeline ?scoring_model - scoring_model ?validator - validator ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_segment_binding_complete ?detection_pipeline)
+        (pipeline_has_scoring_model ?detection_pipeline ?scoring_model)
+        (assigned_validator ?detection_pipeline ?validator)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (not
+          (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        )
+        (not
+          (pipeline_model_bound ?detection_pipeline)
+        )
+      )
+    :effect (pipeline_model_bound ?detection_pipeline)
+  )
+  (:action bind_model_to_pipeline_stage2
+    :parameters (?detection_pipeline - detection_pipeline ?scoring_model - scoring_model ?validator - validator ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_segment_binding_complete ?detection_pipeline)
+        (pipeline_has_scoring_model ?detection_pipeline ?scoring_model)
+        (assigned_validator ?detection_pipeline ?validator)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        (not
+          (pipeline_model_bound ?detection_pipeline)
+        )
+      )
+    :effect (pipeline_model_bound ?detection_pipeline)
+  )
+  (:action enable_postprocessing_stage_basic
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_model_bound ?detection_pipeline)
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (not
+          (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        )
+        (not
+          (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        )
+        (not
+          (pipeline_ready_for_postprocessing ?detection_pipeline)
+        )
+      )
+    :effect (pipeline_ready_for_postprocessing ?detection_pipeline)
+  )
+  (:action enable_postprocessing_with_raw_confirmation
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_model_bound ?detection_pipeline)
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        (not
+          (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        )
+        (not
+          (pipeline_ready_for_postprocessing ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_configured ?detection_pipeline)
+      )
+  )
+  (:action enable_postprocessing_with_agg_confirmation
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_model_bound ?detection_pipeline)
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (not
+          (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        )
+        (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        (not
+          (pipeline_ready_for_postprocessing ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_configured ?detection_pipeline)
+      )
+  )
+  (:action enable_postprocessing_with_both_confirmations
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template ?data_segment - data_segment ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (pipeline_model_bound ?detection_pipeline)
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (pipeline_has_data_segment ?detection_pipeline ?data_segment)
+        (data_segment_attached_to_candidate ?data_segment ?anomaly_candidate)
+        (candidate_confirmed_by_raw_votes ?anomaly_candidate)
+        (candidate_confirmed_by_agg_votes ?anomaly_candidate)
+        (not
+          (pipeline_ready_for_postprocessing ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_configured ?detection_pipeline)
+      )
+  )
+  (:action finalize_pipeline_basic
+    :parameters (?detection_pipeline - detection_pipeline)
+    :precondition
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (not
+          (postprocessing_configured ?detection_pipeline)
+        )
+        (not
+          (pipeline_finalized ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?detection_pipeline)
+        (ready_for_evidence ?detection_pipeline)
+      )
+  )
+  (:action attach_postprocessor_to_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?postprocessor - postprocessor)
+    :precondition
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_configured ?detection_pipeline)
+        (postprocessor_available ?postprocessor)
+      )
+    :effect
+      (and
+        (pipeline_has_postprocessor ?detection_pipeline ?postprocessor)
+        (not
+          (postprocessor_available ?postprocessor)
+        )
+      )
+  )
+  (:action run_postprocessing_and_mark_complete
+    :parameters (?detection_pipeline - detection_pipeline ?raw_record - raw_record ?aggregated_record - aggregated_record ?feature - computed_feature ?postprocessor - postprocessor)
+    :precondition
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_configured ?detection_pipeline)
+        (pipeline_has_postprocessor ?detection_pipeline ?postprocessor)
+        (pipeline_includes_raw_record ?detection_pipeline ?raw_record)
+        (pipeline_includes_agg_record ?detection_pipeline ?aggregated_record)
+        (raw_record_vote_confirmed ?raw_record)
+        (agg_record_vote_confirmed ?aggregated_record)
+        (feature_computed ?detection_pipeline ?feature)
+        (not
+          (postprocessing_complete ?detection_pipeline)
+        )
+      )
+    :effect (postprocessing_complete ?detection_pipeline)
+  )
+  (:action finalize_pipeline_after_postprocessing
+    :parameters (?detection_pipeline - detection_pipeline)
+    :precondition
+      (and
+        (pipeline_ready_for_postprocessing ?detection_pipeline)
+        (postprocessing_complete ?detection_pipeline)
+        (not
+          (pipeline_finalized ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?detection_pipeline)
+        (ready_for_evidence ?detection_pipeline)
+      )
+  )
+  (:action assign_reference_profile_to_pipeline
+    :parameters (?detection_pipeline - detection_pipeline ?reference_profile - reference_profile ?feature - computed_feature)
+    :precondition
+      (and
+        (evaluation_completed ?detection_pipeline)
+        (feature_computed ?detection_pipeline ?feature)
+        (reference_profile_available ?reference_profile)
+        (pipeline_has_reference_profile ?detection_pipeline ?reference_profile)
+        (not
+          (reference_profile_assigned ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (reference_profile_assigned ?detection_pipeline)
+        (not
+          (reference_profile_available ?reference_profile)
+        )
+      )
+  )
+  (:action prepare_pipeline_reference_binding
+    :parameters (?detection_pipeline - detection_pipeline ?validator - validator)
+    :precondition
+      (and
+        (reference_profile_assigned ?detection_pipeline)
+        (assigned_validator ?detection_pipeline ?validator)
+        (not
+          (reference_prepared ?detection_pipeline)
+        )
+      )
+    :effect (reference_prepared ?detection_pipeline)
+  )
+  (:action apply_explanation_template_to_reference
+    :parameters (?detection_pipeline - detection_pipeline ?explanation_template - explanation_template)
+    :precondition
+      (and
+        (reference_prepared ?detection_pipeline)
+        (pipeline_has_explanation_template ?detection_pipeline ?explanation_template)
+        (not
+          (reference_explanation_applied ?detection_pipeline)
+        )
+      )
+    :effect (reference_explanation_applied ?detection_pipeline)
+  )
+  (:action finalize_pipeline_with_reference_explanation
+    :parameters (?detection_pipeline - detection_pipeline)
+    :precondition
+      (and
+        (reference_explanation_applied ?detection_pipeline)
+        (not
+          (pipeline_finalized ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?detection_pipeline)
+        (ready_for_evidence ?detection_pipeline)
+      )
+  )
+  (:action flag_raw_record_ready_for_evidence
+    :parameters (?raw_record - raw_record ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (raw_record_vote_flagged ?raw_record)
+        (raw_record_vote_confirmed ?raw_record)
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_ready_for_segment_attachment ?anomaly_candidate)
+        (not
+          (ready_for_evidence ?raw_record)
+        )
+      )
+    :effect (ready_for_evidence ?raw_record)
+  )
+  (:action flag_agg_record_ready_for_evidence
+    :parameters (?aggregated_record - aggregated_record ?anomaly_candidate - anomaly_candidate)
+    :precondition
+      (and
+        (agg_record_vote_flagged ?aggregated_record)
+        (agg_record_vote_confirmed ?aggregated_record)
+        (candidate_allocated ?anomaly_candidate)
+        (candidate_ready_for_segment_attachment ?anomaly_candidate)
+        (not
+          (ready_for_evidence ?aggregated_record)
+        )
+      )
+    :effect (ready_for_evidence ?aggregated_record)
+  )
+  (:action bind_evidence_to_data_item
+    :parameters (?data_item - data_item ?evidence_token - evidence_token ?feature - computed_feature)
+    :precondition
+      (and
+        (ready_for_evidence ?data_item)
+        (feature_computed ?data_item ?feature)
+        (evidence_token_available ?evidence_token)
+        (not
+          (evidence_bound ?data_item)
+        )
+      )
+    :effect
+      (and
+        (evidence_bound ?data_item)
+        (data_item_has_evidence ?data_item ?evidence_token)
+        (not
+          (evidence_token_available ?evidence_token)
+        )
+      )
+  )
+  (:action flag_raw_record_and_release_worker
+    :parameters (?raw_record - raw_record ?detector_worker - detector_worker ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_bound ?raw_record)
+        (assigned_to_worker ?raw_record ?detector_worker)
+        (data_item_has_evidence ?raw_record ?evidence_token)
+        (not
+          (anomaly_flagged ?raw_record)
+        )
+      )
+    :effect
+      (and
+        (anomaly_flagged ?raw_record)
+        (worker_available ?detector_worker)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+  (:action flag_agg_record_and_release_worker
+    :parameters (?aggregated_record - aggregated_record ?detector_worker - detector_worker ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_bound ?aggregated_record)
+        (assigned_to_worker ?aggregated_record ?detector_worker)
+        (data_item_has_evidence ?aggregated_record ?evidence_token)
+        (not
+          (anomaly_flagged ?aggregated_record)
+        )
+      )
+    :effect
+      (and
+        (anomaly_flagged ?aggregated_record)
+        (worker_available ?detector_worker)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+  (:action flag_pipeline_and_release_worker
+    :parameters (?detection_pipeline - detection_pipeline ?detector_worker - detector_worker ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_bound ?detection_pipeline)
+        (assigned_to_worker ?detection_pipeline ?detector_worker)
+        (data_item_has_evidence ?detection_pipeline ?evidence_token)
+        (not
+          (anomaly_flagged ?detection_pipeline)
+        )
+      )
+    :effect
+      (and
+        (anomaly_flagged ?detection_pipeline)
+        (worker_available ?detector_worker)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem anomaly_detection_problem)
+  (:domain anomaly_detection_pipeline)
+  (:objects raw_record_1 - raw_record aggregated_record_1 - aggregated_record detection_pipeline_1 - detection_pipeline detection_pipeline_2 - detection_pipeline detector_worker_1 - detector_worker detector_worker_2 - detector_worker detector_worker_3 - detector_worker feature_1 - computed_feature validator_1 - validator calibration_param_1 - calibration_param feature_bin_raw_1 - feature_bin_raw feature_bin_agg_1 - feature_bin_agg anomaly_candidate_1 - anomaly_candidate data_segment_1 - data_segment data_segment_2 - data_segment explanation_method_1 - explanation_method explanation_method_2 - explanation_method postprocessor_1 - postprocessor postprocessor_2 - postprocessor evidence_token_1 - evidence_token scoring_model_1 - scoring_model reference_profile_1 - reference_profile reference_profile_2 - reference_profile explanation_template_1 - explanation_template)
+  (:init
+    (worker_available detector_worker_1)
+    (worker_available detector_worker_2)
+    (worker_available detector_worker_3)
+    (feature_available feature_1)
+    (validator_available validator_1)
+    (calibration_param_available calibration_param_1)
+    (has_feature_bin_raw raw_record_1 feature_bin_raw_1)
+    (has_feature_bin_agg aggregated_record_1 feature_bin_agg_1)
+    (candidate_slot_available anomaly_candidate_1)
+    (data_segment_available data_segment_1)
+    (data_segment_available data_segment_2)
+    (pipeline_includes_raw_record detection_pipeline_1 raw_record_1)
+    (pipeline_includes_raw_record detection_pipeline_2 raw_record_1)
+    (pipeline_includes_agg_record detection_pipeline_1 aggregated_record_1)
+    (pipeline_includes_agg_record detection_pipeline_2 aggregated_record_1)
+    (pipeline_associated_with_candidate detection_pipeline_1 anomaly_candidate_1)
+    (pipeline_associated_with_candidate detection_pipeline_2 anomaly_candidate_1)
+    (pipeline_has_data_segment detection_pipeline_1 data_segment_1)
+    (pipeline_has_data_segment detection_pipeline_2 data_segment_2)
+    (explanation_method_available explanation_method_1)
+    (explanation_method_available explanation_method_2)
+    (postprocessor_available postprocessor_1)
+    (postprocessor_available postprocessor_2)
+    (evidence_token_available evidence_token_1)
+    (scoring_model_available scoring_model_1)
+    (reference_profile_available reference_profile_1)
+    (pipeline_has_reference_profile detection_pipeline_1 reference_profile_1)
+    (pipeline_has_reference_profile detection_pipeline_2 reference_profile_2)
+    (explanation_template_available explanation_template_1)
+  )
+  (:goal
+    (and
+      (anomaly_flagged raw_record_1)
+      (anomaly_flagged aggregated_record_1)
+      (anomaly_flagged detection_pipeline_1)
+      (anomaly_flagged detection_pipeline_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_data_item raw_record_1)
+(discover_data_item aggregated_record_1)
+(discover_data_item detection_pipeline_1)
+(discover_data_item detection_pipeline_2)
+(allocate_detector_worker raw_record_1 detector_worker_1)
+(allocate_detector_worker aggregated_record_1 detector_worker_2)
+(allocate_detector_worker detection_pipeline_1 detector_worker_3)
+(compute_feature_for_item raw_record_1 feature_1)
+(complete_feature_evaluation raw_record_1 feature_1)
+(vote_raw_feature_bin_yes raw_record_1 feature_bin_raw_1 feature_1)
+(assign_validator_to_item raw_record_1 validator_1)
+(confirm_raw_vote_with_validator raw_record_1 feature_bin_raw_1 validator_1)
+(release_validator_from_item raw_record_1 validator_1)
+(release_feature_assignment raw_record_1 feature_1)
+(compute_feature_for_item aggregated_record_1 feature_1)
+(complete_feature_evaluation aggregated_record_1 feature_1)
+(vote_agg_feature_bin_yes aggregated_record_1 feature_bin_agg_1 feature_1)
+(assign_validator_to_item aggregated_record_1 validator_1)
+(confirm_agg_vote_with_validator aggregated_record_1 feature_bin_agg_1 validator_1)
+(release_validator_from_item aggregated_record_1 validator_1)
+(release_feature_assignment aggregated_record_1 feature_1)
+(assemble_candidate_from_bins raw_record_1 aggregated_record_1 feature_bin_raw_1 feature_bin_agg_1 anomaly_candidate_1)
+(compute_feature_for_item raw_record_1 feature_1)
+(mark_candidate_ready_for_attachment anomaly_candidate_1 raw_record_1 feature_1)
+(release_feature_assignment raw_record_1 feature_1)
+(compute_feature_for_item detection_pipeline_1 feature_1)
+(complete_feature_evaluation detection_pipeline_1 feature_1)
+(attach_data_segment_to_candidate detection_pipeline_1 data_segment_1 anomaly_candidate_1)
+(complete_pipeline_segment_binding detection_pipeline_1 data_segment_1 anomaly_candidate_1 feature_1)
+(bind_scoring_model_to_pipeline detection_pipeline_1 scoring_model_1)
+(assign_validator_to_item detection_pipeline_1 validator_1)
+(bind_model_to_pipeline_stage1 detection_pipeline_1 scoring_model_1 validator_1 data_segment_1 anomaly_candidate_1)
+(release_validator_from_item detection_pipeline_1 validator_1)
+(bind_explanation_template_to_pipeline detection_pipeline_1 explanation_template_1)
+(enable_postprocessing_stage_basic detection_pipeline_1 explanation_template_1 data_segment_1 anomaly_candidate_1)
+(finalize_pipeline_basic detection_pipeline_1)
+(bind_evidence_to_data_item detection_pipeline_1 evidence_token_1 feature_1)
+(flag_pipeline_and_release_worker detection_pipeline_1 detector_worker_3 evidence_token_1)
+(allocate_detector_worker detection_pipeline_2 detector_worker_3)
+(release_feature_assignment detection_pipeline_1 feature_1)
+(compute_feature_for_item detection_pipeline_2 feature_1)
+(complete_feature_evaluation detection_pipeline_2 feature_1)
+(unbind_scoring_model_from_pipeline detection_pipeline_1 scoring_model_1)
+(bind_scoring_model_to_pipeline detection_pipeline_2 scoring_model_1)
+(attach_data_segment_to_candidate detection_pipeline_2 data_segment_2 anomaly_candidate_1)
+(complete_pipeline_segment_binding detection_pipeline_2 data_segment_2 anomaly_candidate_1 feature_1)
+(assign_validator_to_item detection_pipeline_2 validator_1)
+(bind_model_to_pipeline_stage1 detection_pipeline_2 scoring_model_1 validator_1 data_segment_2 anomaly_candidate_1)
+(release_validator_from_item detection_pipeline_2 validator_1)
+(unbind_explanation_template_from_pipeline detection_pipeline_1 explanation_template_1)
+(bind_explanation_template_to_pipeline detection_pipeline_2 explanation_template_1)
+(enable_postprocessing_stage_basic detection_pipeline_2 explanation_template_1 data_segment_2 anomaly_candidate_1)
+(finalize_pipeline_basic detection_pipeline_2)
+(bind_evidence_to_data_item detection_pipeline_2 evidence_token_1 feature_1)
+(flag_pipeline_and_release_worker detection_pipeline_2 detector_worker_3 evidence_token_1)
+(flag_raw_record_ready_for_evidence raw_record_1 anomaly_candidate_1)
+(flag_agg_record_ready_for_evidence aggregated_record_1 anomaly_candidate_1)
+(release_feature_assignment detection_pipeline_2 feature_1)
+(compute_feature_for_item raw_record_1 feature_1)
+(bind_evidence_to_data_item raw_record_1 evidence_token_1 feature_1)
+(flag_raw_record_and_release_worker raw_record_1 detector_worker_1 evidence_token_1)
+(release_feature_assignment raw_record_1 feature_1)
+(compute_feature_for_item aggregated_record_1 feature_1)
+(bind_evidence_to_data_item aggregated_record_1 evidence_token_1 feature_1)
+(flag_agg_record_and_release_worker aggregated_record_1 detector_worker_2 evidence_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_x0ondfwz/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_x0ondfwz/plan.pddl 65 
+
+
+
+--- stderr ---
+

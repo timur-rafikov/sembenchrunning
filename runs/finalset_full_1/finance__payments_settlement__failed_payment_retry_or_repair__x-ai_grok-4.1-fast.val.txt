@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain payments_settlement_failed_payment_retry_or_repair)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_class - object service_class - object routing_class - object payment_root_type - object payment_instruction - payment_root_type settlement_channel - resource_class validation_service - resource_class manual_operator - resource_class remediation_code - resource_class policy_template - resource_class operational_ticket - resource_class authorization_credential - resource_class third_party_approval - resource_class repair_artifact - service_class message_attachment - service_class remediation_authorizer - service_class payer_route_option - routing_class payee_route_option - routing_class settlement_message - routing_class payment_subtype_group_a - payment_instruction payment_subtype_group_b - payment_instruction payer_side_payment_entity - payment_subtype_group_a payee_side_payment_entity - payment_subtype_group_a processing_component - payment_subtype_group_b)
+  (:predicates
+    (payment_ingested ?payment_instruction - payment_instruction)
+    (entity_authorized ?payment_instruction - payment_instruction)
+    (payment_channel_allocated ?payment_instruction - payment_instruction)
+    (released_for_retry_or_repair ?payment_instruction - payment_instruction)
+    (entity_processing_completed ?payment_instruction - payment_instruction)
+    (entity_retry_registered ?payment_instruction - payment_instruction)
+    (settlement_channel_available ?settlement_channel - settlement_channel)
+    (entity_assigned_settlement_channel ?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    (validation_service_available ?validation_service - validation_service)
+    (validation_service_allocated_to_entity ?payment_instruction - payment_instruction ?validation_service - validation_service)
+    (manual_operator_available ?manual_operator - manual_operator)
+    (operator_assigned_to_entity ?payment_instruction - payment_instruction ?manual_operator - manual_operator)
+    (repair_artifact_available ?repair_artifact - repair_artifact)
+    (payer_entity_has_repair_artifact ?payer_entity - payer_side_payment_entity ?repair_artifact - repair_artifact)
+    (payee_entity_has_repair_artifact ?payee_entity - payee_side_payment_entity ?repair_artifact - repair_artifact)
+    (payer_entity_selected_route ?payer_entity - payer_side_payment_entity ?payer_route_option - payer_route_option)
+    (payer_route_ready ?payer_route_option - payer_route_option)
+    (payer_route_has_attachment ?payer_route_option - payer_route_option)
+    (payer_routing_confirmed ?payer_entity - payer_side_payment_entity)
+    (payee_entity_selected_route ?payee_entity - payee_side_payment_entity ?payee_route_option - payee_route_option)
+    (payee_route_ready ?payee_route_option - payee_route_option)
+    (payee_route_has_attachment ?payee_route_option - payee_route_option)
+    (payee_routing_confirmed ?payee_entity - payee_side_payment_entity)
+    (settlement_message_slot_available ?settlement_message - settlement_message)
+    (settlement_message_enqueued ?settlement_message - settlement_message)
+    (message_linked_to_payer_route ?settlement_message - settlement_message ?payer_route_option - payer_route_option)
+    (message_linked_to_payee_route ?settlement_message - settlement_message ?payee_route_option - payee_route_option)
+    (message_has_payer_attachment_flag ?settlement_message - settlement_message)
+    (message_has_payee_attachment_flag ?settlement_message - settlement_message)
+    (message_marked_for_submission ?settlement_message - settlement_message)
+    (component_assigned_to_payer_entity ?processing_component - processing_component ?payer_entity - payer_side_payment_entity)
+    (component_assigned_to_payee_entity ?processing_component - processing_component ?payee_entity - payee_side_payment_entity)
+    (component_has_settlement_message ?processing_component - processing_component ?settlement_message - settlement_message)
+    (message_attachment_available ?message_attachment - message_attachment)
+    (component_has_message_attachment ?processing_component - processing_component ?message_attachment - message_attachment)
+    (attachment_consumed ?message_attachment - message_attachment)
+    (attachment_linked_to_message ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    (processing_component_enrichment_ready ?processing_component - processing_component)
+    (processing_component_approval_initiated ?processing_component - processing_component)
+    (processing_component_authorized ?processing_component - processing_component)
+    (processing_component_remediation_code_applied ?processing_component - processing_component)
+    (processing_component_enrichment_applied ?processing_component - processing_component)
+    (processing_component_policy_template_attached ?processing_component - processing_component)
+    (processing_component_final_checks_passed ?processing_component - processing_component)
+    (remediation_authorizer_available ?remediation_authorizer - remediation_authorizer)
+    (processing_component_has_remediation_authorizer ?processing_component - processing_component ?remediation_authorizer - remediation_authorizer)
+    (processing_component_remediation_authorized ?processing_component - processing_component)
+    (processing_component_operator_signed_off ?processing_component - processing_component)
+    (processing_component_third_party_approved ?processing_component - processing_component)
+    (remediation_code_available ?remediation_code - remediation_code)
+    (processing_component_has_remediation_code ?processing_component - processing_component ?remediation_code - remediation_code)
+    (policy_template_available ?policy_template - policy_template)
+    (processing_component_bound_policy_template ?processing_component - processing_component ?policy_template - policy_template)
+    (authorization_credential_available ?authorization_credential - authorization_credential)
+    (processing_component_has_authorization_credential ?processing_component - processing_component ?authorization_credential - authorization_credential)
+    (third_party_approval_available ?third_party_approval - third_party_approval)
+    (processing_component_third_party_approval_bound ?processing_component - processing_component ?third_party_approval - third_party_approval)
+    (operational_ticket_available ?operational_ticket - operational_ticket)
+    (entity_bound_to_operational_ticket ?payment_instruction - payment_instruction ?operational_ticket - operational_ticket)
+    (payer_entity_ready_for_message_composition ?payer_entity - payer_side_payment_entity)
+    (payee_entity_ready_for_message_composition ?payee_entity - payee_side_payment_entity)
+    (processing_component_finalized ?processing_component - processing_component)
+  )
+  (:action ingest_payment_instruction
+    :parameters (?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (payment_ingested ?payment_instruction)
+        )
+        (not
+          (released_for_retry_or_repair ?payment_instruction)
+        )
+      )
+    :effect (payment_ingested ?payment_instruction)
+  )
+  (:action assign_settlement_channel_to_payment
+    :parameters (?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    :precondition
+      (and
+        (payment_ingested ?payment_instruction)
+        (not
+          (payment_channel_allocated ?payment_instruction)
+        )
+        (settlement_channel_available ?settlement_channel)
+      )
+    :effect
+      (and
+        (payment_channel_allocated ?payment_instruction)
+        (entity_assigned_settlement_channel ?payment_instruction ?settlement_channel)
+        (not
+          (settlement_channel_available ?settlement_channel)
+        )
+      )
+  )
+  (:action assign_validation_service_to_payment
+    :parameters (?payment_instruction - payment_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (payment_ingested ?payment_instruction)
+        (payment_channel_allocated ?payment_instruction)
+        (validation_service_available ?validation_service)
+      )
+    :effect
+      (and
+        (validation_service_allocated_to_entity ?payment_instruction ?validation_service)
+        (not
+          (validation_service_available ?validation_service)
+        )
+      )
+  )
+  (:action authorize_payment_after_validation
+    :parameters (?payment_instruction - payment_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (payment_ingested ?payment_instruction)
+        (payment_channel_allocated ?payment_instruction)
+        (validation_service_allocated_to_entity ?payment_instruction ?validation_service)
+        (not
+          (entity_authorized ?payment_instruction)
+        )
+      )
+    :effect (entity_authorized ?payment_instruction)
+  )
+  (:action release_validation_service_from_payment
+    :parameters (?payment_instruction - payment_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (validation_service_allocated_to_entity ?payment_instruction ?validation_service)
+      )
+    :effect
+      (and
+        (validation_service_available ?validation_service)
+        (not
+          (validation_service_allocated_to_entity ?payment_instruction ?validation_service)
+        )
+      )
+  )
+  (:action assign_manual_operator_to_payment
+    :parameters (?payment_instruction - payment_instruction ?manual_operator - manual_operator)
+    :precondition
+      (and
+        (entity_authorized ?payment_instruction)
+        (manual_operator_available ?manual_operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_entity ?payment_instruction ?manual_operator)
+        (not
+          (manual_operator_available ?manual_operator)
+        )
+      )
+  )
+  (:action release_manual_operator_from_payment
+    :parameters (?payment_instruction - payment_instruction ?manual_operator - manual_operator)
+    :precondition
+      (and
+        (operator_assigned_to_entity ?payment_instruction ?manual_operator)
+      )
+    :effect
+      (and
+        (manual_operator_available ?manual_operator)
+        (not
+          (operator_assigned_to_entity ?payment_instruction ?manual_operator)
+        )
+      )
+  )
+  (:action assign_authorization_credential_to_component
+    :parameters (?processing_component - processing_component ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (authorization_credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (processing_component_has_authorization_credential ?processing_component ?authorization_credential)
+        (not
+          (authorization_credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action release_authorization_credential_from_component
+    :parameters (?processing_component - processing_component ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (processing_component_has_authorization_credential ?processing_component ?authorization_credential)
+      )
+    :effect
+      (and
+        (authorization_credential_available ?authorization_credential)
+        (not
+          (processing_component_has_authorization_credential ?processing_component ?authorization_credential)
+        )
+      )
+  )
+  (:action assign_third_party_approval_to_component
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (third_party_approval_available ?third_party_approval)
+      )
+    :effect
+      (and
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (not
+          (third_party_approval_available ?third_party_approval)
+        )
+      )
+  )
+  (:action release_third_party_approval_from_component
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval)
+    :precondition
+      (and
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+      )
+    :effect
+      (and
+        (third_party_approval_available ?third_party_approval)
+        (not
+          (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        )
+      )
+  )
+  (:action evaluate_payer_route_option
+    :parameters (?payer_entity - payer_side_payment_entity ?payer_route_option - payer_route_option ?validation_service - validation_service)
+    :precondition
+      (and
+        (entity_authorized ?payer_entity)
+        (validation_service_allocated_to_entity ?payer_entity ?validation_service)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (not
+          (payer_route_ready ?payer_route_option)
+        )
+        (not
+          (payer_route_has_attachment ?payer_route_option)
+        )
+      )
+    :effect (payer_route_ready ?payer_route_option)
+  )
+  (:action operator_confirm_payer_routing
+    :parameters (?payer_entity - payer_side_payment_entity ?payer_route_option - payer_route_option ?manual_operator - manual_operator)
+    :precondition
+      (and
+        (entity_authorized ?payer_entity)
+        (operator_assigned_to_entity ?payer_entity ?manual_operator)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payer_route_ready ?payer_route_option)
+        (not
+          (payer_entity_ready_for_message_composition ?payer_entity)
+        )
+      )
+    :effect
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payer_routing_confirmed ?payer_entity)
+      )
+  )
+  (:action attach_repair_artifact_to_payer_entity
+    :parameters (?payer_entity - payer_side_payment_entity ?payer_route_option - payer_route_option ?repair_artifact - repair_artifact)
+    :precondition
+      (and
+        (entity_authorized ?payer_entity)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (repair_artifact_available ?repair_artifact)
+        (not
+          (payer_entity_ready_for_message_composition ?payer_entity)
+        )
+      )
+    :effect
+      (and
+        (payer_route_has_attachment ?payer_route_option)
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payer_entity_has_repair_artifact ?payer_entity ?repair_artifact)
+        (not
+          (repair_artifact_available ?repair_artifact)
+        )
+      )
+  )
+  (:action finalize_payer_route_with_artifact
+    :parameters (?payer_entity - payer_side_payment_entity ?payer_route_option - payer_route_option ?validation_service - validation_service ?repair_artifact - repair_artifact)
+    :precondition
+      (and
+        (entity_authorized ?payer_entity)
+        (validation_service_allocated_to_entity ?payer_entity ?validation_service)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payer_route_has_attachment ?payer_route_option)
+        (payer_entity_has_repair_artifact ?payer_entity ?repair_artifact)
+        (not
+          (payer_routing_confirmed ?payer_entity)
+        )
+      )
+    :effect
+      (and
+        (payer_route_ready ?payer_route_option)
+        (payer_routing_confirmed ?payer_entity)
+        (repair_artifact_available ?repair_artifact)
+        (not
+          (payer_entity_has_repair_artifact ?payer_entity ?repair_artifact)
+        )
+      )
+  )
+  (:action evaluate_payee_route_option
+    :parameters (?payee_entity - payee_side_payment_entity ?payee_route_option - payee_route_option ?validation_service - validation_service)
+    :precondition
+      (and
+        (entity_authorized ?payee_entity)
+        (validation_service_allocated_to_entity ?payee_entity ?validation_service)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (not
+          (payee_route_ready ?payee_route_option)
+        )
+        (not
+          (payee_route_has_attachment ?payee_route_option)
+        )
+      )
+    :effect (payee_route_ready ?payee_route_option)
+  )
+  (:action operator_confirm_payee_routing
+    :parameters (?payee_entity - payee_side_payment_entity ?payee_route_option - payee_route_option ?manual_operator - manual_operator)
+    :precondition
+      (and
+        (entity_authorized ?payee_entity)
+        (operator_assigned_to_entity ?payee_entity ?manual_operator)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payee_route_ready ?payee_route_option)
+        (not
+          (payee_entity_ready_for_message_composition ?payee_entity)
+        )
+      )
+    :effect
+      (and
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payee_routing_confirmed ?payee_entity)
+      )
+  )
+  (:action attach_repair_artifact_to_payee_entity
+    :parameters (?payee_entity - payee_side_payment_entity ?payee_route_option - payee_route_option ?repair_artifact - repair_artifact)
+    :precondition
+      (and
+        (entity_authorized ?payee_entity)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (repair_artifact_available ?repair_artifact)
+        (not
+          (payee_entity_ready_for_message_composition ?payee_entity)
+        )
+      )
+    :effect
+      (and
+        (payee_route_has_attachment ?payee_route_option)
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payee_entity_has_repair_artifact ?payee_entity ?repair_artifact)
+        (not
+          (repair_artifact_available ?repair_artifact)
+        )
+      )
+  )
+  (:action finalize_payee_route_with_artifact
+    :parameters (?payee_entity - payee_side_payment_entity ?payee_route_option - payee_route_option ?validation_service - validation_service ?repair_artifact - repair_artifact)
+    :precondition
+      (and
+        (entity_authorized ?payee_entity)
+        (validation_service_allocated_to_entity ?payee_entity ?validation_service)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payee_route_has_attachment ?payee_route_option)
+        (payee_entity_has_repair_artifact ?payee_entity ?repair_artifact)
+        (not
+          (payee_routing_confirmed ?payee_entity)
+        )
+      )
+    :effect
+      (and
+        (payee_route_ready ?payee_route_option)
+        (payee_routing_confirmed ?payee_entity)
+        (repair_artifact_available ?repair_artifact)
+        (not
+          (payee_entity_has_repair_artifact ?payee_entity ?repair_artifact)
+        )
+      )
+  )
+  (:action compose_settlement_message
+    :parameters (?payer_entity - payer_side_payment_entity ?payee_entity - payee_side_payment_entity ?payer_route_option - payer_route_option ?payee_route_option - payee_route_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payer_route_ready ?payer_route_option)
+        (payee_route_ready ?payee_route_option)
+        (payer_routing_confirmed ?payer_entity)
+        (payee_routing_confirmed ?payee_entity)
+        (settlement_message_slot_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_enqueued ?settlement_message)
+        (message_linked_to_payer_route ?settlement_message ?payer_route_option)
+        (message_linked_to_payee_route ?settlement_message ?payee_route_option)
+        (not
+          (settlement_message_slot_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_payer_attachment
+    :parameters (?payer_entity - payer_side_payment_entity ?payee_entity - payee_side_payment_entity ?payer_route_option - payer_route_option ?payee_route_option - payee_route_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payer_route_has_attachment ?payer_route_option)
+        (payee_route_ready ?payee_route_option)
+        (not
+          (payer_routing_confirmed ?payer_entity)
+        )
+        (payee_routing_confirmed ?payee_entity)
+        (settlement_message_slot_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_enqueued ?settlement_message)
+        (message_linked_to_payer_route ?settlement_message ?payer_route_option)
+        (message_linked_to_payee_route ?settlement_message ?payee_route_option)
+        (message_has_payer_attachment_flag ?settlement_message)
+        (not
+          (settlement_message_slot_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_payee_attachment
+    :parameters (?payer_entity - payer_side_payment_entity ?payee_entity - payee_side_payment_entity ?payer_route_option - payer_route_option ?payee_route_option - payee_route_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payer_route_ready ?payer_route_option)
+        (payee_route_has_attachment ?payee_route_option)
+        (payer_routing_confirmed ?payer_entity)
+        (not
+          (payee_routing_confirmed ?payee_entity)
+        )
+        (settlement_message_slot_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_enqueued ?settlement_message)
+        (message_linked_to_payer_route ?settlement_message ?payer_route_option)
+        (message_linked_to_payee_route ?settlement_message ?payee_route_option)
+        (message_has_payee_attachment_flag ?settlement_message)
+        (not
+          (settlement_message_slot_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_both_attachments
+    :parameters (?payer_entity - payer_side_payment_entity ?payee_entity - payee_side_payment_entity ?payer_route_option - payer_route_option ?payee_route_option - payee_route_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payer_entity_selected_route ?payer_entity ?payer_route_option)
+        (payee_entity_selected_route ?payee_entity ?payee_route_option)
+        (payer_route_has_attachment ?payer_route_option)
+        (payee_route_has_attachment ?payee_route_option)
+        (not
+          (payer_routing_confirmed ?payer_entity)
+        )
+        (not
+          (payee_routing_confirmed ?payee_entity)
+        )
+        (settlement_message_slot_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_enqueued ?settlement_message)
+        (message_linked_to_payer_route ?settlement_message ?payer_route_option)
+        (message_linked_to_payee_route ?settlement_message ?payee_route_option)
+        (message_has_payer_attachment_flag ?settlement_message)
+        (message_has_payee_attachment_flag ?settlement_message)
+        (not
+          (settlement_message_slot_available ?settlement_message)
+        )
+      )
+  )
+  (:action mark_settlement_message_ready_for_submission
+    :parameters (?settlement_message - settlement_message ?payer_entity - payer_side_payment_entity ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_message_enqueued ?settlement_message)
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (validation_service_allocated_to_entity ?payer_entity ?validation_service)
+        (not
+          (message_marked_for_submission ?settlement_message)
+        )
+      )
+    :effect (message_marked_for_submission ?settlement_message)
+  )
+  (:action consume_attachment_and_link_to_message
+    :parameters (?processing_component - processing_component ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (component_has_settlement_message ?processing_component ?settlement_message)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (message_attachment_available ?message_attachment)
+        (settlement_message_enqueued ?settlement_message)
+        (message_marked_for_submission ?settlement_message)
+        (not
+          (attachment_consumed ?message_attachment)
+        )
+      )
+    :effect
+      (and
+        (attachment_consumed ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (not
+          (message_attachment_available ?message_attachment)
+        )
+      )
+  )
+  (:action prepare_component_for_enrichment
+    :parameters (?processing_component - processing_component ?message_attachment - message_attachment ?settlement_message - settlement_message ?validation_service - validation_service)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_consumed ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (validation_service_allocated_to_entity ?processing_component ?validation_service)
+        (not
+          (message_has_payer_attachment_flag ?settlement_message)
+        )
+        (not
+          (processing_component_enrichment_ready ?processing_component)
+        )
+      )
+    :effect (processing_component_enrichment_ready ?processing_component)
+  )
+  (:action apply_remediation_code_to_component
+    :parameters (?processing_component - processing_component ?remediation_code - remediation_code)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (remediation_code_available ?remediation_code)
+        (not
+          (processing_component_remediation_code_applied ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_remediation_code_applied ?processing_component)
+        (processing_component_has_remediation_code ?processing_component ?remediation_code)
+        (not
+          (remediation_code_available ?remediation_code)
+        )
+      )
+  )
+  (:action enrich_component_with_attachment_and_code
+    :parameters (?processing_component - processing_component ?message_attachment - message_attachment ?settlement_message - settlement_message ?validation_service - validation_service ?remediation_code - remediation_code)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_consumed ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (validation_service_allocated_to_entity ?processing_component ?validation_service)
+        (message_has_payer_attachment_flag ?settlement_message)
+        (processing_component_remediation_code_applied ?processing_component)
+        (processing_component_has_remediation_code ?processing_component ?remediation_code)
+        (not
+          (processing_component_enrichment_ready ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_enrichment_ready ?processing_component)
+        (processing_component_enrichment_applied ?processing_component)
+      )
+  )
+  (:action start_component_authorization_flow_no_payee_attachment
+    :parameters (?processing_component - processing_component ?authorization_credential - authorization_credential ?manual_operator - manual_operator ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_enrichment_ready ?processing_component)
+        (processing_component_has_authorization_credential ?processing_component ?authorization_credential)
+        (operator_assigned_to_entity ?processing_component ?manual_operator)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (not
+          (message_has_payee_attachment_flag ?settlement_message)
+        )
+        (not
+          (processing_component_approval_initiated ?processing_component)
+        )
+      )
+    :effect (processing_component_approval_initiated ?processing_component)
+  )
+  (:action start_component_authorization_flow_with_payee_attachment
+    :parameters (?processing_component - processing_component ?authorization_credential - authorization_credential ?manual_operator - manual_operator ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_enrichment_ready ?processing_component)
+        (processing_component_has_authorization_credential ?processing_component ?authorization_credential)
+        (operator_assigned_to_entity ?processing_component ?manual_operator)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (message_has_payee_attachment_flag ?settlement_message)
+        (not
+          (processing_component_approval_initiated ?processing_component)
+        )
+      )
+    :effect (processing_component_approval_initiated ?processing_component)
+  )
+  (:action complete_component_authorization_without_policy_template
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_approval_initiated ?processing_component)
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (not
+          (message_has_payer_attachment_flag ?settlement_message)
+        )
+        (not
+          (message_has_payee_attachment_flag ?settlement_message)
+        )
+        (not
+          (processing_component_authorized ?processing_component)
+        )
+      )
+    :effect (processing_component_authorized ?processing_component)
+  )
+  (:action complete_component_authorization_with_payer_attachment
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_approval_initiated ?processing_component)
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (message_has_payer_attachment_flag ?settlement_message)
+        (not
+          (message_has_payee_attachment_flag ?settlement_message)
+        )
+        (not
+          (processing_component_authorized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_policy_template_attached ?processing_component)
+      )
+  )
+  (:action complete_component_authorization_with_payee_attachment
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_approval_initiated ?processing_component)
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (not
+          (message_has_payer_attachment_flag ?settlement_message)
+        )
+        (message_has_payee_attachment_flag ?settlement_message)
+        (not
+          (processing_component_authorized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_policy_template_attached ?processing_component)
+      )
+  )
+  (:action complete_component_authorization_with_both_attachments
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval ?message_attachment - message_attachment ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_component_approval_initiated ?processing_component)
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (component_has_message_attachment ?processing_component ?message_attachment)
+        (attachment_linked_to_message ?message_attachment ?settlement_message)
+        (message_has_payer_attachment_flag ?settlement_message)
+        (message_has_payee_attachment_flag ?settlement_message)
+        (not
+          (processing_component_authorized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_policy_template_attached ?processing_component)
+      )
+  )
+  (:action finalize_component_enrichment
+    :parameters (?processing_component - processing_component)
+    :precondition
+      (and
+        (processing_component_authorized ?processing_component)
+        (not
+          (processing_component_policy_template_attached ?processing_component)
+        )
+        (not
+          (processing_component_finalized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_finalized ?processing_component)
+        (entity_processing_completed ?processing_component)
+      )
+  )
+  (:action bind_policy_template_to_component
+    :parameters (?processing_component - processing_component ?policy_template - policy_template)
+    :precondition
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_policy_template_attached ?processing_component)
+        (policy_template_available ?policy_template)
+      )
+    :effect
+      (and
+        (processing_component_bound_policy_template ?processing_component ?policy_template)
+        (not
+          (policy_template_available ?policy_template)
+        )
+      )
+  )
+  (:action execute_final_checks_on_component
+    :parameters (?processing_component - processing_component ?payer_entity - payer_side_payment_entity ?payee_entity - payee_side_payment_entity ?validation_service - validation_service ?policy_template - policy_template)
+    :precondition
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_policy_template_attached ?processing_component)
+        (processing_component_bound_policy_template ?processing_component ?policy_template)
+        (component_assigned_to_payer_entity ?processing_component ?payer_entity)
+        (component_assigned_to_payee_entity ?processing_component ?payee_entity)
+        (payer_routing_confirmed ?payer_entity)
+        (payee_routing_confirmed ?payee_entity)
+        (validation_service_allocated_to_entity ?processing_component ?validation_service)
+        (not
+          (processing_component_final_checks_passed ?processing_component)
+        )
+      )
+    :effect (processing_component_final_checks_passed ?processing_component)
+  )
+  (:action finalize_component_and_mark_processing
+    :parameters (?processing_component - processing_component)
+    :precondition
+      (and
+        (processing_component_authorized ?processing_component)
+        (processing_component_final_checks_passed ?processing_component)
+        (not
+          (processing_component_finalized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_finalized ?processing_component)
+        (entity_processing_completed ?processing_component)
+      )
+  )
+  (:action assign_remediation_authorizer_to_component
+    :parameters (?processing_component - processing_component ?remediation_authorizer - remediation_authorizer ?validation_service - validation_service)
+    :precondition
+      (and
+        (entity_authorized ?processing_component)
+        (validation_service_allocated_to_entity ?processing_component ?validation_service)
+        (remediation_authorizer_available ?remediation_authorizer)
+        (processing_component_has_remediation_authorizer ?processing_component ?remediation_authorizer)
+        (not
+          (processing_component_remediation_authorized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_remediation_authorized ?processing_component)
+        (not
+          (remediation_authorizer_available ?remediation_authorizer)
+        )
+      )
+  )
+  (:action operator_signoff_on_component
+    :parameters (?processing_component - processing_component ?manual_operator - manual_operator)
+    :precondition
+      (and
+        (processing_component_remediation_authorized ?processing_component)
+        (operator_assigned_to_entity ?processing_component ?manual_operator)
+        (not
+          (processing_component_operator_signed_off ?processing_component)
+        )
+      )
+    :effect (processing_component_operator_signed_off ?processing_component)
+  )
+  (:action bind_third_party_approval_to_component
+    :parameters (?processing_component - processing_component ?third_party_approval - third_party_approval)
+    :precondition
+      (and
+        (processing_component_operator_signed_off ?processing_component)
+        (processing_component_third_party_approval_bound ?processing_component ?third_party_approval)
+        (not
+          (processing_component_third_party_approved ?processing_component)
+        )
+      )
+    :effect (processing_component_third_party_approved ?processing_component)
+  )
+  (:action finalize_remediation_approval_and_mark_processing
+    :parameters (?processing_component - processing_component)
+    :precondition
+      (and
+        (processing_component_third_party_approved ?processing_component)
+        (not
+          (processing_component_finalized ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (processing_component_finalized ?processing_component)
+        (entity_processing_completed ?processing_component)
+      )
+  )
+  (:action finalize_payer_entity_processing_for_message
+    :parameters (?payer_entity - payer_side_payment_entity ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_entity_ready_for_message_composition ?payer_entity)
+        (payer_routing_confirmed ?payer_entity)
+        (settlement_message_enqueued ?settlement_message)
+        (message_marked_for_submission ?settlement_message)
+        (not
+          (entity_processing_completed ?payer_entity)
+        )
+      )
+    :effect (entity_processing_completed ?payer_entity)
+  )
+  (:action finalize_payee_entity_processing_for_message
+    :parameters (?payee_entity - payee_side_payment_entity ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payee_entity_ready_for_message_composition ?payee_entity)
+        (payee_routing_confirmed ?payee_entity)
+        (settlement_message_enqueued ?settlement_message)
+        (message_marked_for_submission ?settlement_message)
+        (not
+          (entity_processing_completed ?payee_entity)
+        )
+      )
+    :effect (entity_processing_completed ?payee_entity)
+  )
+  (:action register_retry_and_bind_operational_ticket
+    :parameters (?payment_instruction - payment_instruction ?operational_ticket - operational_ticket ?validation_service - validation_service)
+    :precondition
+      (and
+        (entity_processing_completed ?payment_instruction)
+        (validation_service_allocated_to_entity ?payment_instruction ?validation_service)
+        (operational_ticket_available ?operational_ticket)
+        (not
+          (entity_retry_registered ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (entity_retry_registered ?payment_instruction)
+        (entity_bound_to_operational_ticket ?payment_instruction ?operational_ticket)
+        (not
+          (operational_ticket_available ?operational_ticket)
+        )
+      )
+  )
+  (:action initiate_retry_for_payer_entity
+    :parameters (?payer_entity - payer_side_payment_entity ?settlement_channel - settlement_channel ?operational_ticket - operational_ticket)
+    :precondition
+      (and
+        (entity_retry_registered ?payer_entity)
+        (entity_assigned_settlement_channel ?payer_entity ?settlement_channel)
+        (entity_bound_to_operational_ticket ?payer_entity ?operational_ticket)
+        (not
+          (released_for_retry_or_repair ?payer_entity)
+        )
+      )
+    :effect
+      (and
+        (released_for_retry_or_repair ?payer_entity)
+        (settlement_channel_available ?settlement_channel)
+        (operational_ticket_available ?operational_ticket)
+      )
+  )
+  (:action initiate_retry_for_payee_entity
+    :parameters (?payee_entity - payee_side_payment_entity ?settlement_channel - settlement_channel ?operational_ticket - operational_ticket)
+    :precondition
+      (and
+        (entity_retry_registered ?payee_entity)
+        (entity_assigned_settlement_channel ?payee_entity ?settlement_channel)
+        (entity_bound_to_operational_ticket ?payee_entity ?operational_ticket)
+        (not
+          (released_for_retry_or_repair ?payee_entity)
+        )
+      )
+    :effect
+      (and
+        (released_for_retry_or_repair ?payee_entity)
+        (settlement_channel_available ?settlement_channel)
+        (operational_ticket_available ?operational_ticket)
+      )
+  )
+  (:action initiate_retry_for_processing_component
+    :parameters (?processing_component - processing_component ?settlement_channel - settlement_channel ?operational_ticket - operational_ticket)
+    :precondition
+      (and
+        (entity_retry_registered ?processing_component)
+        (entity_assigned_settlement_channel ?processing_component ?settlement_channel)
+        (entity_bound_to_operational_ticket ?processing_component ?operational_ticket)
+        (not
+          (released_for_retry_or_repair ?processing_component)
+        )
+      )
+    :effect
+      (and
+        (released_for_retry_or_repair ?processing_component)
+        (settlement_channel_available ?settlement_channel)
+        (operational_ticket_available ?operational_ticket)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem failed_payment_retry_or_repair_problem)
+  (:domain payments_settlement_failed_payment_retry_or_repair)
+  (:objects payer_entity_1 - payer_side_payment_entity payee_entity_1 - payee_side_payment_entity processing_component_1 - processing_component processing_component_2 - processing_component settlement_channel_ach - settlement_channel settlement_channel_rtp - settlement_channel settlement_channel_correspondent - settlement_channel validation_service_primary - validation_service manual_operator_1 - manual_operator repair_artifact_1 - repair_artifact payer_route_option_default - payer_route_option payee_route_option_default - payee_route_option settlement_message_slot_1 - settlement_message message_attachment_invoice - message_attachment message_attachment_remittance - message_attachment remediation_code_incorrect_account - remediation_code remediation_code_missing_remittance - remediation_code policy_template_reconciliation - policy_template policy_template_compliance - policy_template operational_ticket_1 - operational_ticket authorization_credential_manager - authorization_credential remediation_authorizer_ops_lead - remediation_authorizer remediation_authorizer_compliance - remediation_authorizer third_party_approval_audit_team - third_party_approval)
+  (:init
+    (settlement_channel_available settlement_channel_ach)
+    (settlement_channel_available settlement_channel_rtp)
+    (settlement_channel_available settlement_channel_correspondent)
+    (validation_service_available validation_service_primary)
+    (manual_operator_available manual_operator_1)
+    (repair_artifact_available repair_artifact_1)
+    (payer_entity_selected_route payer_entity_1 payer_route_option_default)
+    (payee_entity_selected_route payee_entity_1 payee_route_option_default)
+    (settlement_message_slot_available settlement_message_slot_1)
+    (message_attachment_available message_attachment_invoice)
+    (message_attachment_available message_attachment_remittance)
+    (component_assigned_to_payer_entity processing_component_1 payer_entity_1)
+    (component_assigned_to_payer_entity processing_component_2 payer_entity_1)
+    (component_assigned_to_payee_entity processing_component_1 payee_entity_1)
+    (component_assigned_to_payee_entity processing_component_2 payee_entity_1)
+    (component_has_settlement_message processing_component_1 settlement_message_slot_1)
+    (component_has_settlement_message processing_component_2 settlement_message_slot_1)
+    (component_has_message_attachment processing_component_1 message_attachment_invoice)
+    (component_has_message_attachment processing_component_2 message_attachment_remittance)
+    (remediation_code_available remediation_code_incorrect_account)
+    (remediation_code_available remediation_code_missing_remittance)
+    (policy_template_available policy_template_reconciliation)
+    (policy_template_available policy_template_compliance)
+    (operational_ticket_available operational_ticket_1)
+    (authorization_credential_available authorization_credential_manager)
+    (remediation_authorizer_available remediation_authorizer_ops_lead)
+    (processing_component_has_remediation_authorizer processing_component_1 remediation_authorizer_ops_lead)
+    (processing_component_has_remediation_authorizer processing_component_2 remediation_authorizer_compliance)
+    (third_party_approval_available third_party_approval_audit_team)
+  )
+  (:goal
+    (and
+      (released_for_retry_or_repair payer_entity_1)
+      (released_for_retry_or_repair payee_entity_1)
+      (released_for_retry_or_repair processing_component_1)
+      (released_for_retry_or_repair processing_component_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(ingest_payment_instruction payer_entity_1)
+(assign_settlement_channel_to_payment payer_entity_1 settlement_channel_rtp)
+(assign_validation_service_to_payment payer_entity_1 validation_service_primary)
+(authorize_payment_after_validation payer_entity_1 validation_service_primary)
+(evaluate_payer_route_option payer_entity_1 payer_route_option_default validation_service_primary)
+(assign_manual_operator_to_payment payer_entity_1 manual_operator_1)
+(operator_confirm_payer_routing payer_entity_1 payer_route_option_default manual_operator_1)
+(release_manual_operator_from_payment payer_entity_1 manual_operator_1)
+(release_validation_service_from_payment payer_entity_1 validation_service_primary)
+(ingest_payment_instruction payee_entity_1)
+(assign_settlement_channel_to_payment payee_entity_1 settlement_channel_correspondent)
+(assign_validation_service_to_payment payee_entity_1 validation_service_primary)
+(authorize_payment_after_validation payee_entity_1 validation_service_primary)
+(evaluate_payee_route_option payee_entity_1 payee_route_option_default validation_service_primary)
+(assign_manual_operator_to_payment payee_entity_1 manual_operator_1)
+(operator_confirm_payee_routing payee_entity_1 payee_route_option_default manual_operator_1)
+(release_manual_operator_from_payment payee_entity_1 manual_operator_1)
+(release_validation_service_from_payment payee_entity_1 validation_service_primary)
+(compose_settlement_message payer_entity_1 payee_entity_1 payer_route_option_default payee_route_option_default settlement_message_slot_1)
+(assign_validation_service_to_payment payer_entity_1 validation_service_primary)
+(mark_settlement_message_ready_for_submission settlement_message_slot_1 payer_entity_1 validation_service_primary)
+(finalize_payer_entity_processing_for_message payer_entity_1 settlement_message_slot_1)
+(finalize_payee_entity_processing_for_message payee_entity_1 settlement_message_slot_1)
+(release_validation_service_from_payment payer_entity_1 validation_service_primary)
+(ingest_payment_instruction processing_component_1)
+(assign_settlement_channel_to_payment processing_component_1 settlement_channel_ach)
+(assign_validation_service_to_payment processing_component_1 validation_service_primary)
+(authorize_payment_after_validation processing_component_1 validation_service_primary)
+(consume_attachment_and_link_to_message processing_component_1 message_attachment_invoice settlement_message_slot_1)
+(prepare_component_for_enrichment processing_component_1 message_attachment_invoice settlement_message_slot_1 validation_service_primary)
+(assign_third_party_approval_to_component processing_component_1 third_party_approval_audit_team)
+(assign_authorization_credential_to_component processing_component_1 authorization_credential_manager)
+(assign_manual_operator_to_payment processing_component_1 manual_operator_1)
+(start_component_authorization_flow_no_payee_attachment processing_component_1 authorization_credential_manager manual_operator_1 message_attachment_invoice settlement_message_slot_1)
+(complete_component_authorization_without_policy_template processing_component_1 third_party_approval_audit_team message_attachment_invoice settlement_message_slot_1)
+(finalize_component_enrichment processing_component_1)
+(register_retry_and_bind_operational_ticket processing_component_1 operational_ticket_1 validation_service_primary)
+(initiate_retry_for_processing_component processing_component_1 settlement_channel_ach operational_ticket_1)
+(release_validation_service_from_payment processing_component_1 validation_service_primary)
+(release_manual_operator_from_payment processing_component_1 manual_operator_1)
+(release_authorization_credential_from_component processing_component_1 authorization_credential_manager)
+(release_third_party_approval_from_component processing_component_1 third_party_approval_audit_team)
+(ingest_payment_instruction processing_component_2)
+(assign_settlement_channel_to_payment processing_component_2 settlement_channel_ach)
+(assign_validation_service_to_payment processing_component_2 validation_service_primary)
+(authorize_payment_after_validation processing_component_2 validation_service_primary)
+(consume_attachment_and_link_to_message processing_component_2 message_attachment_remittance settlement_message_slot_1)
+(prepare_component_for_enrichment processing_component_2 message_attachment_remittance settlement_message_slot_1 validation_service_primary)
+(assign_third_party_approval_to_component processing_component_2 third_party_approval_audit_team)
+(assign_authorization_credential_to_component processing_component_2 authorization_credential_manager)
+(assign_manual_operator_to_payment processing_component_2 manual_operator_1)
+(start_component_authorization_flow_no_payee_attachment processing_component_2 authorization_credential_manager manual_operator_1 message_attachment_remittance settlement_message_slot_1)
+(complete_component_authorization_without_policy_template processing_component_2 third_party_approval_audit_team message_attachment_remittance settlement_message_slot_1)
+(finalize_component_enrichment processing_component_2)
+(register_retry_and_bind_operational_ticket processing_component_2 operational_ticket_1 validation_service_primary)
+(initiate_retry_for_processing_component processing_component_2 settlement_channel_ach operational_ticket_1)
+(release_validation_service_from_payment processing_component_2 validation_service_primary)
+(release_manual_operator_from_payment processing_component_2 manual_operator_1)
+(release_authorization_credential_from_component processing_component_2 authorization_credential_manager)
+(release_third_party_approval_from_component processing_component_2 third_party_approval_audit_team)
+(assign_validation_service_to_payment payer_entity_1 validation_service_primary)
+(register_retry_and_bind_operational_ticket payer_entity_1 operational_ticket_1 validation_service_primary)
+(initiate_retry_for_payer_entity payer_entity_1 settlement_channel_rtp operational_ticket_1)
+(release_validation_service_from_payment payer_entity_1 validation_service_primary)
+(assign_validation_service_to_payment payee_entity_1 validation_service_primary)
+(register_retry_and_bind_operational_ticket payee_entity_1 operational_ticket_1 validation_service_primary)
+(initiate_retry_for_payee_entity payee_entity_1 settlement_channel_correspondent operational_ticket_1)
+(release_validation_service_from_payment payee_entity_1 validation_service_primary)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__pyxaseg/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 68 
+
+Successful plans:
+Value: 68
+ /tmp/val__pyxaseg/plan.pddl 68 
+
+
+
+--- stderr ---
+

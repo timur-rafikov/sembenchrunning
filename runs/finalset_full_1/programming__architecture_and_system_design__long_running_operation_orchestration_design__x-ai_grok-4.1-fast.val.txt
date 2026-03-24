@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain long_running_operation_orchestration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object asset_category - object channel_category - object domain_entity_root - object long_running_operation - domain_entity_root resource_token - operational_resource_type task_definition - operational_resource_type external_connector - operational_resource_type policy - operational_resource_type attachment - operational_resource_type lease - operational_resource_type credential - operational_resource_type plugin - operational_resource_type data_artifact - asset_category package - asset_category extension - asset_category input_channel - channel_category output_channel - channel_category work_unit - channel_category coordinator_role - long_running_operation participant_role - long_running_operation coordinator_instance - coordinator_role worker_pool - coordinator_role workflow_engine - participant_role)
+  (:predicates
+    (orchestration_operation_requested ?long_running_operation - long_running_operation)
+    (entity_activated ?long_running_operation - long_running_operation)
+    (orchestration_operation_has_resource_claim ?long_running_operation - long_running_operation)
+    (entity_finalized ?long_running_operation - long_running_operation)
+    (entity_completion_published ?long_running_operation - long_running_operation)
+    (entity_completion_signaled ?long_running_operation - long_running_operation)
+    (resource_token_available ?resource_token - resource_token)
+    (orchestration_operation_bound_to_resource ?long_running_operation - long_running_operation ?resource_token - resource_token)
+    (task_definition_available ?task_definition - task_definition)
+    (orchestration_operation_bound_to_task ?long_running_operation - long_running_operation ?task_definition - task_definition)
+    (connector_available ?external_connector - external_connector)
+    (orchestration_operation_bound_to_connector ?long_running_operation - long_running_operation ?external_connector - external_connector)
+    (data_artifact_available ?data_artifact - data_artifact)
+    (coordinator_has_data_artifact ?coordinator_instance - coordinator_instance ?data_artifact - data_artifact)
+    (worker_pool_has_data_artifact ?worker_pool - worker_pool ?data_artifact - data_artifact)
+    (coordinator_has_input_channel ?coordinator_instance - coordinator_instance ?input_channel - input_channel)
+    (input_channel_claimed ?input_channel - input_channel)
+    (input_channel_populated ?input_channel - input_channel)
+    (coordinator_input_finalized ?coordinator_instance - coordinator_instance)
+    (worker_pool_has_output_channel ?worker_pool - worker_pool ?output_channel - output_channel)
+    (output_channel_claimed ?output_channel - output_channel)
+    (output_channel_populated ?output_channel - output_channel)
+    (worker_pool_output_finalized ?worker_pool - worker_pool)
+    (work_unit_allocated ?work_unit - work_unit)
+    (work_unit_composed ?work_unit - work_unit)
+    (work_unit_input_channel ?work_unit - work_unit ?input_channel - input_channel)
+    (work_unit_output_channel ?work_unit - work_unit ?output_channel - output_channel)
+    (work_unit_input_artifact_attached ?work_unit - work_unit)
+    (work_unit_output_artifact_attached ?work_unit - work_unit)
+    (work_unit_locked ?work_unit - work_unit)
+    (workflow_engine_bound_to_coordinator ?workflow_engine - workflow_engine ?coordinator_instance - coordinator_instance)
+    (workflow_engine_bound_to_worker_pool ?workflow_engine - workflow_engine ?worker_pool - worker_pool)
+    (workflow_engine_bound_to_work_unit ?workflow_engine - workflow_engine ?work_unit - work_unit)
+    (package_available ?package - package)
+    (workflow_engine_has_package ?workflow_engine - workflow_engine ?package - package)
+    (package_locked ?package - package)
+    (package_assigned_to_work_unit ?package - package ?work_unit - work_unit)
+    (workflow_engine_validated_package ?workflow_engine - workflow_engine)
+    (workflow_engine_artifacts_attached ?workflow_engine - workflow_engine)
+    (workflow_engine_ready_for_approval ?workflow_engine - workflow_engine)
+    (workflow_engine_policy_applied ?workflow_engine - workflow_engine)
+    (workflow_engine_policy_validated ?workflow_engine - workflow_engine)
+    (approval_artifact_attached ?workflow_engine - workflow_engine)
+    (workflow_engine_ready_for_trigger ?workflow_engine - workflow_engine)
+    (extension_available ?extension - extension)
+    (workflow_engine_has_extension ?workflow_engine - workflow_engine ?extension - extension)
+    (workflow_engine_extension_applied ?workflow_engine - workflow_engine)
+    (workflow_engine_extension_validated ?workflow_engine - workflow_engine)
+    (extension_engaged ?workflow_engine - workflow_engine)
+    (policy_available ?policy - policy)
+    (workflow_engine_has_policy ?workflow_engine - workflow_engine ?policy - policy)
+    (attachment_available ?attachment - attachment)
+    (workflow_engine_has_attachment ?workflow_engine - workflow_engine ?attachment - attachment)
+    (credential_available ?credential - credential)
+    (workflow_engine_has_credential ?workflow_engine - workflow_engine ?credential - credential)
+    (plugin_available ?plugin - plugin)
+    (workflow_engine_has_plugin ?workflow_engine - workflow_engine ?plugin - plugin)
+    (lease_available ?lease - lease)
+    (orchestration_operation_has_lease ?long_running_operation - long_running_operation ?lease - lease)
+    (coordinator_ready ?coordinator_instance - coordinator_instance)
+    (worker_pool_ready ?worker_pool - worker_pool)
+    (execution_triggered ?workflow_engine - workflow_engine)
+  )
+  (:action create_orchestration_operation_request
+    :parameters (?long_running_operation - long_running_operation)
+    :precondition
+      (and
+        (not
+          (orchestration_operation_requested ?long_running_operation)
+        )
+        (not
+          (entity_finalized ?long_running_operation)
+        )
+      )
+    :effect (orchestration_operation_requested ?long_running_operation)
+  )
+  (:action assign_resource_token_to_orchestration_operation
+    :parameters (?long_running_operation - long_running_operation ?resource_token - resource_token)
+    :precondition
+      (and
+        (orchestration_operation_requested ?long_running_operation)
+        (not
+          (orchestration_operation_has_resource_claim ?long_running_operation)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (orchestration_operation_has_resource_claim ?long_running_operation)
+        (orchestration_operation_bound_to_resource ?long_running_operation ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action bind_task_definition_to_orchestration_operation
+    :parameters (?long_running_operation - long_running_operation ?task_definition - task_definition)
+    :precondition
+      (and
+        (orchestration_operation_requested ?long_running_operation)
+        (orchestration_operation_has_resource_claim ?long_running_operation)
+        (task_definition_available ?task_definition)
+      )
+    :effect
+      (and
+        (orchestration_operation_bound_to_task ?long_running_operation ?task_definition)
+        (not
+          (task_definition_available ?task_definition)
+        )
+      )
+  )
+  (:action activate_orchestration_operation
+    :parameters (?long_running_operation - long_running_operation ?task_definition - task_definition)
+    :precondition
+      (and
+        (orchestration_operation_requested ?long_running_operation)
+        (orchestration_operation_has_resource_claim ?long_running_operation)
+        (orchestration_operation_bound_to_task ?long_running_operation ?task_definition)
+        (not
+          (entity_activated ?long_running_operation)
+        )
+      )
+    :effect (entity_activated ?long_running_operation)
+  )
+  (:action release_task_definition
+    :parameters (?long_running_operation - long_running_operation ?task_definition - task_definition)
+    :precondition
+      (and
+        (orchestration_operation_bound_to_task ?long_running_operation ?task_definition)
+      )
+    :effect
+      (and
+        (task_definition_available ?task_definition)
+        (not
+          (orchestration_operation_bound_to_task ?long_running_operation ?task_definition)
+        )
+      )
+  )
+  (:action attach_external_connector_to_orchestration_operation
+    :parameters (?long_running_operation - long_running_operation ?external_connector - external_connector)
+    :precondition
+      (and
+        (entity_activated ?long_running_operation)
+        (connector_available ?external_connector)
+      )
+    :effect
+      (and
+        (orchestration_operation_bound_to_connector ?long_running_operation ?external_connector)
+        (not
+          (connector_available ?external_connector)
+        )
+      )
+  )
+  (:action detach_external_connector_from_orchestration_operation
+    :parameters (?long_running_operation - long_running_operation ?external_connector - external_connector)
+    :precondition
+      (and
+        (orchestration_operation_bound_to_connector ?long_running_operation ?external_connector)
+      )
+    :effect
+      (and
+        (connector_available ?external_connector)
+        (not
+          (orchestration_operation_bound_to_connector ?long_running_operation ?external_connector)
+        )
+      )
+  )
+  (:action attach_credential_to_engine
+    :parameters (?workflow_engine - workflow_engine ?credential - credential)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (workflow_engine_has_credential ?workflow_engine ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action detach_credential_from_engine
+    :parameters (?workflow_engine - workflow_engine ?credential - credential)
+    :precondition
+      (and
+        (workflow_engine_has_credential ?workflow_engine ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (workflow_engine_has_credential ?workflow_engine ?credential)
+        )
+      )
+  )
+  (:action attach_plugin_to_engine
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (plugin_available ?plugin)
+      )
+    :effect
+      (and
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (not
+          (plugin_available ?plugin)
+        )
+      )
+  )
+  (:action detach_plugin_from_engine
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin)
+    :precondition
+      (and
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+      )
+    :effect
+      (and
+        (plugin_available ?plugin)
+        (not
+          (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        )
+      )
+  )
+  (:action coordinator_claim_input_channel
+    :parameters (?coordinator_instance - coordinator_instance ?input_channel - input_channel ?task_definition - task_definition)
+    :precondition
+      (and
+        (entity_activated ?coordinator_instance)
+        (orchestration_operation_bound_to_task ?coordinator_instance ?task_definition)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (not
+          (input_channel_claimed ?input_channel)
+        )
+        (not
+          (input_channel_populated ?input_channel)
+        )
+      )
+    :effect (input_channel_claimed ?input_channel)
+  )
+  (:action coordinator_confirm_connector_and_lock
+    :parameters (?coordinator_instance - coordinator_instance ?input_channel - input_channel ?external_connector - external_connector)
+    :precondition
+      (and
+        (entity_activated ?coordinator_instance)
+        (orchestration_operation_bound_to_connector ?coordinator_instance ?external_connector)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (input_channel_claimed ?input_channel)
+        (not
+          (coordinator_ready ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (coordinator_input_finalized ?coordinator_instance)
+      )
+  )
+  (:action coordinator_attach_data_artifact
+    :parameters (?coordinator_instance - coordinator_instance ?input_channel - input_channel ?data_artifact - data_artifact)
+    :precondition
+      (and
+        (entity_activated ?coordinator_instance)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (data_artifact_available ?data_artifact)
+        (not
+          (coordinator_ready ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (input_channel_populated ?input_channel)
+        (coordinator_ready ?coordinator_instance)
+        (coordinator_has_data_artifact ?coordinator_instance ?data_artifact)
+        (not
+          (data_artifact_available ?data_artifact)
+        )
+      )
+  )
+  (:action coordinator_finalize_input
+    :parameters (?coordinator_instance - coordinator_instance ?input_channel - input_channel ?task_definition - task_definition ?data_artifact - data_artifact)
+    :precondition
+      (and
+        (entity_activated ?coordinator_instance)
+        (orchestration_operation_bound_to_task ?coordinator_instance ?task_definition)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (input_channel_populated ?input_channel)
+        (coordinator_has_data_artifact ?coordinator_instance ?data_artifact)
+        (not
+          (coordinator_input_finalized ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (input_channel_claimed ?input_channel)
+        (coordinator_input_finalized ?coordinator_instance)
+        (data_artifact_available ?data_artifact)
+        (not
+          (coordinator_has_data_artifact ?coordinator_instance ?data_artifact)
+        )
+      )
+  )
+  (:action worker_pool_claim_output_channel
+    :parameters (?worker_pool - worker_pool ?output_channel - output_channel ?task_definition - task_definition)
+    :precondition
+      (and
+        (entity_activated ?worker_pool)
+        (orchestration_operation_bound_to_task ?worker_pool ?task_definition)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (not
+          (output_channel_claimed ?output_channel)
+        )
+        (not
+          (output_channel_populated ?output_channel)
+        )
+      )
+    :effect (output_channel_claimed ?output_channel)
+  )
+  (:action worker_pool_confirm_connector_and_lock
+    :parameters (?worker_pool - worker_pool ?output_channel - output_channel ?external_connector - external_connector)
+    :precondition
+      (and
+        (entity_activated ?worker_pool)
+        (orchestration_operation_bound_to_connector ?worker_pool ?external_connector)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (output_channel_claimed ?output_channel)
+        (not
+          (worker_pool_ready ?worker_pool)
+        )
+      )
+    :effect
+      (and
+        (worker_pool_ready ?worker_pool)
+        (worker_pool_output_finalized ?worker_pool)
+      )
+  )
+  (:action worker_pool_attach_data_artifact
+    :parameters (?worker_pool - worker_pool ?output_channel - output_channel ?data_artifact - data_artifact)
+    :precondition
+      (and
+        (entity_activated ?worker_pool)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (data_artifact_available ?data_artifact)
+        (not
+          (worker_pool_ready ?worker_pool)
+        )
+      )
+    :effect
+      (and
+        (output_channel_populated ?output_channel)
+        (worker_pool_ready ?worker_pool)
+        (worker_pool_has_data_artifact ?worker_pool ?data_artifact)
+        (not
+          (data_artifact_available ?data_artifact)
+        )
+      )
+  )
+  (:action worker_pool_finalize_output
+    :parameters (?worker_pool - worker_pool ?output_channel - output_channel ?task_definition - task_definition ?data_artifact - data_artifact)
+    :precondition
+      (and
+        (entity_activated ?worker_pool)
+        (orchestration_operation_bound_to_task ?worker_pool ?task_definition)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (output_channel_populated ?output_channel)
+        (worker_pool_has_data_artifact ?worker_pool ?data_artifact)
+        (not
+          (worker_pool_output_finalized ?worker_pool)
+        )
+      )
+    :effect
+      (and
+        (output_channel_claimed ?output_channel)
+        (worker_pool_output_finalized ?worker_pool)
+        (data_artifact_available ?data_artifact)
+        (not
+          (worker_pool_has_data_artifact ?worker_pool ?data_artifact)
+        )
+      )
+  )
+  (:action compose_work_unit
+    :parameters (?coordinator_instance - coordinator_instance ?worker_pool - worker_pool ?input_channel - input_channel ?output_channel - output_channel ?work_unit - work_unit)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (worker_pool_ready ?worker_pool)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (input_channel_claimed ?input_channel)
+        (output_channel_claimed ?output_channel)
+        (coordinator_input_finalized ?coordinator_instance)
+        (worker_pool_output_finalized ?worker_pool)
+        (work_unit_allocated ?work_unit)
+      )
+    :effect
+      (and
+        (work_unit_composed ?work_unit)
+        (work_unit_input_channel ?work_unit ?input_channel)
+        (work_unit_output_channel ?work_unit ?output_channel)
+        (not
+          (work_unit_allocated ?work_unit)
+        )
+      )
+  )
+  (:action compose_work_unit_with_input_attachment
+    :parameters (?coordinator_instance - coordinator_instance ?worker_pool - worker_pool ?input_channel - input_channel ?output_channel - output_channel ?work_unit - work_unit)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (worker_pool_ready ?worker_pool)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (input_channel_populated ?input_channel)
+        (output_channel_claimed ?output_channel)
+        (not
+          (coordinator_input_finalized ?coordinator_instance)
+        )
+        (worker_pool_output_finalized ?worker_pool)
+        (work_unit_allocated ?work_unit)
+      )
+    :effect
+      (and
+        (work_unit_composed ?work_unit)
+        (work_unit_input_channel ?work_unit ?input_channel)
+        (work_unit_output_channel ?work_unit ?output_channel)
+        (work_unit_input_artifact_attached ?work_unit)
+        (not
+          (work_unit_allocated ?work_unit)
+        )
+      )
+  )
+  (:action compose_work_unit_with_output_attachment
+    :parameters (?coordinator_instance - coordinator_instance ?worker_pool - worker_pool ?input_channel - input_channel ?output_channel - output_channel ?work_unit - work_unit)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (worker_pool_ready ?worker_pool)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (input_channel_claimed ?input_channel)
+        (output_channel_populated ?output_channel)
+        (coordinator_input_finalized ?coordinator_instance)
+        (not
+          (worker_pool_output_finalized ?worker_pool)
+        )
+        (work_unit_allocated ?work_unit)
+      )
+    :effect
+      (and
+        (work_unit_composed ?work_unit)
+        (work_unit_input_channel ?work_unit ?input_channel)
+        (work_unit_output_channel ?work_unit ?output_channel)
+        (work_unit_output_artifact_attached ?work_unit)
+        (not
+          (work_unit_allocated ?work_unit)
+        )
+      )
+  )
+  (:action compose_work_unit_with_both_attachments
+    :parameters (?coordinator_instance - coordinator_instance ?worker_pool - worker_pool ?input_channel - input_channel ?output_channel - output_channel ?work_unit - work_unit)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (worker_pool_ready ?worker_pool)
+        (coordinator_has_input_channel ?coordinator_instance ?input_channel)
+        (worker_pool_has_output_channel ?worker_pool ?output_channel)
+        (input_channel_populated ?input_channel)
+        (output_channel_populated ?output_channel)
+        (not
+          (coordinator_input_finalized ?coordinator_instance)
+        )
+        (not
+          (worker_pool_output_finalized ?worker_pool)
+        )
+        (work_unit_allocated ?work_unit)
+      )
+    :effect
+      (and
+        (work_unit_composed ?work_unit)
+        (work_unit_input_channel ?work_unit ?input_channel)
+        (work_unit_output_channel ?work_unit ?output_channel)
+        (work_unit_input_artifact_attached ?work_unit)
+        (work_unit_output_artifact_attached ?work_unit)
+        (not
+          (work_unit_allocated ?work_unit)
+        )
+      )
+  )
+  (:action lock_work_unit_for_execution
+    :parameters (?work_unit - work_unit ?coordinator_instance - coordinator_instance ?task_definition - task_definition)
+    :precondition
+      (and
+        (work_unit_composed ?work_unit)
+        (coordinator_ready ?coordinator_instance)
+        (orchestration_operation_bound_to_task ?coordinator_instance ?task_definition)
+        (not
+          (work_unit_locked ?work_unit)
+        )
+      )
+    :effect (work_unit_locked ?work_unit)
+  )
+  (:action attach_package_to_workflow_engine_and_lock
+    :parameters (?workflow_engine - workflow_engine ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (workflow_engine_bound_to_work_unit ?workflow_engine ?work_unit)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_available ?package)
+        (work_unit_composed ?work_unit)
+        (work_unit_locked ?work_unit)
+        (not
+          (package_locked ?package)
+        )
+      )
+    :effect
+      (and
+        (package_locked ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action validate_package_on_workflow_engine_and_mark
+    :parameters (?workflow_engine - workflow_engine ?package - package ?work_unit - work_unit ?task_definition - task_definition)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_locked ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (orchestration_operation_bound_to_task ?workflow_engine ?task_definition)
+        (not
+          (work_unit_input_artifact_attached ?work_unit)
+        )
+        (not
+          (workflow_engine_validated_package ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_validated_package ?workflow_engine)
+  )
+  (:action bind_policy_to_workflow_engine
+    :parameters (?workflow_engine - workflow_engine ?policy - policy)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (policy_available ?policy)
+        (not
+          (workflow_engine_policy_applied ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_policy_applied ?workflow_engine)
+        (workflow_engine_has_policy ?workflow_engine ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action apply_policy_and_finalize_package
+    :parameters (?workflow_engine - workflow_engine ?package - package ?work_unit - work_unit ?task_definition - task_definition ?policy - policy)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_locked ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (orchestration_operation_bound_to_task ?workflow_engine ?task_definition)
+        (work_unit_input_artifact_attached ?work_unit)
+        (workflow_engine_policy_applied ?workflow_engine)
+        (workflow_engine_has_policy ?workflow_engine ?policy)
+        (not
+          (workflow_engine_validated_package ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_validated_package ?workflow_engine)
+        (workflow_engine_policy_validated ?workflow_engine)
+      )
+  )
+  (:action apply_credential_and_prepare_workflow_engine_stage1
+    :parameters (?workflow_engine - workflow_engine ?credential - credential ?external_connector - external_connector ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_validated_package ?workflow_engine)
+        (workflow_engine_has_credential ?workflow_engine ?credential)
+        (orchestration_operation_bound_to_connector ?workflow_engine ?external_connector)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (not
+          (work_unit_output_artifact_attached ?work_unit)
+        )
+        (not
+          (workflow_engine_artifacts_attached ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_artifacts_attached ?workflow_engine)
+  )
+  (:action apply_credential_and_prepare_workflow_engine_stage2
+    :parameters (?workflow_engine - workflow_engine ?credential - credential ?external_connector - external_connector ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_validated_package ?workflow_engine)
+        (workflow_engine_has_credential ?workflow_engine ?credential)
+        (orchestration_operation_bound_to_connector ?workflow_engine ?external_connector)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (work_unit_output_artifact_attached ?work_unit)
+        (not
+          (workflow_engine_artifacts_attached ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_artifacts_attached ?workflow_engine)
+  )
+  (:action attach_plugin_and_prepare_approval
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_artifacts_attached ?workflow_engine)
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (not
+          (work_unit_input_artifact_attached ?work_unit)
+        )
+        (not
+          (work_unit_output_artifact_attached ?work_unit)
+        )
+        (not
+          (workflow_engine_ready_for_approval ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_ready_for_approval ?workflow_engine)
+  )
+  (:action attach_plugin_and_prepare_approval_with_artifact
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_artifacts_attached ?workflow_engine)
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (work_unit_input_artifact_attached ?work_unit)
+        (not
+          (work_unit_output_artifact_attached ?work_unit)
+        )
+        (not
+          (workflow_engine_ready_for_approval ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (approval_artifact_attached ?workflow_engine)
+      )
+  )
+  (:action attach_plugin_and_prepare_approval_variant
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_artifacts_attached ?workflow_engine)
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (not
+          (work_unit_input_artifact_attached ?work_unit)
+        )
+        (work_unit_output_artifact_attached ?work_unit)
+        (not
+          (workflow_engine_ready_for_approval ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (approval_artifact_attached ?workflow_engine)
+      )
+  )
+  (:action attach_plugin_and_prepare_approval_all
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin ?package - package ?work_unit - work_unit)
+    :precondition
+      (and
+        (workflow_engine_artifacts_attached ?workflow_engine)
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (workflow_engine_has_package ?workflow_engine ?package)
+        (package_assigned_to_work_unit ?package ?work_unit)
+        (work_unit_input_artifact_attached ?work_unit)
+        (work_unit_output_artifact_attached ?work_unit)
+        (not
+          (workflow_engine_ready_for_approval ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (approval_artifact_attached ?workflow_engine)
+      )
+  )
+  (:action approve_and_trigger_execution
+    :parameters (?workflow_engine - workflow_engine)
+    :precondition
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (not
+          (approval_artifact_attached ?workflow_engine)
+        )
+        (not
+          (execution_triggered ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (execution_triggered ?workflow_engine)
+        (entity_completion_published ?workflow_engine)
+      )
+  )
+  (:action attach_attachment_to_workflow_engine
+    :parameters (?workflow_engine - workflow_engine ?attachment - attachment)
+    :precondition
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (approval_artifact_attached ?workflow_engine)
+        (attachment_available ?attachment)
+      )
+    :effect
+      (and
+        (workflow_engine_has_attachment ?workflow_engine ?attachment)
+        (not
+          (attachment_available ?attachment)
+        )
+      )
+  )
+  (:action workflow_engine_finalize_validation
+    :parameters (?workflow_engine - workflow_engine ?coordinator_instance - coordinator_instance ?worker_pool - worker_pool ?task_definition - task_definition ?attachment - attachment)
+    :precondition
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (approval_artifact_attached ?workflow_engine)
+        (workflow_engine_has_attachment ?workflow_engine ?attachment)
+        (workflow_engine_bound_to_coordinator ?workflow_engine ?coordinator_instance)
+        (workflow_engine_bound_to_worker_pool ?workflow_engine ?worker_pool)
+        (coordinator_input_finalized ?coordinator_instance)
+        (worker_pool_output_finalized ?worker_pool)
+        (orchestration_operation_bound_to_task ?workflow_engine ?task_definition)
+        (not
+          (workflow_engine_ready_for_trigger ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_ready_for_trigger ?workflow_engine)
+  )
+  (:action workflow_engine_publish_and_trigger_execution
+    :parameters (?workflow_engine - workflow_engine)
+    :precondition
+      (and
+        (workflow_engine_ready_for_approval ?workflow_engine)
+        (workflow_engine_ready_for_trigger ?workflow_engine)
+        (not
+          (execution_triggered ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (execution_triggered ?workflow_engine)
+        (entity_completion_published ?workflow_engine)
+      )
+  )
+  (:action enforce_extension_prerequisite
+    :parameters (?workflow_engine - workflow_engine ?extension - extension ?task_definition - task_definition)
+    :precondition
+      (and
+        (entity_activated ?workflow_engine)
+        (orchestration_operation_bound_to_task ?workflow_engine ?task_definition)
+        (extension_available ?extension)
+        (workflow_engine_has_extension ?workflow_engine ?extension)
+        (not
+          (workflow_engine_extension_applied ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (workflow_engine_extension_applied ?workflow_engine)
+        (not
+          (extension_available ?extension)
+        )
+      )
+  )
+  (:action validate_extension_and_set_flag
+    :parameters (?workflow_engine - workflow_engine ?external_connector - external_connector)
+    :precondition
+      (and
+        (workflow_engine_extension_applied ?workflow_engine)
+        (orchestration_operation_bound_to_connector ?workflow_engine ?external_connector)
+        (not
+          (workflow_engine_extension_validated ?workflow_engine)
+        )
+      )
+    :effect (workflow_engine_extension_validated ?workflow_engine)
+  )
+  (:action apply_plugin_for_extension_validation
+    :parameters (?workflow_engine - workflow_engine ?plugin - plugin)
+    :precondition
+      (and
+        (workflow_engine_extension_validated ?workflow_engine)
+        (workflow_engine_has_plugin ?workflow_engine ?plugin)
+        (not
+          (extension_engaged ?workflow_engine)
+        )
+      )
+    :effect (extension_engaged ?workflow_engine)
+  )
+  (:action finalize_extension_and_publish
+    :parameters (?workflow_engine - workflow_engine)
+    :precondition
+      (and
+        (extension_engaged ?workflow_engine)
+        (not
+          (execution_triggered ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (execution_triggered ?workflow_engine)
+        (entity_completion_published ?workflow_engine)
+      )
+  )
+  (:action publish_completion_from_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?work_unit - work_unit)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator_instance)
+        (coordinator_input_finalized ?coordinator_instance)
+        (work_unit_composed ?work_unit)
+        (work_unit_locked ?work_unit)
+        (not
+          (entity_completion_published ?coordinator_instance)
+        )
+      )
+    :effect (entity_completion_published ?coordinator_instance)
+  )
+  (:action publish_completion_from_worker_pool
+    :parameters (?worker_pool - worker_pool ?work_unit - work_unit)
+    :precondition
+      (and
+        (worker_pool_ready ?worker_pool)
+        (worker_pool_output_finalized ?worker_pool)
+        (work_unit_composed ?work_unit)
+        (work_unit_locked ?work_unit)
+        (not
+          (entity_completion_published ?worker_pool)
+        )
+      )
+    :effect (entity_completion_published ?worker_pool)
+  )
+  (:action finalize_orchestration_operation_and_claim_lease
+    :parameters (?long_running_operation - long_running_operation ?lease - lease ?task_definition - task_definition)
+    :precondition
+      (and
+        (entity_completion_published ?long_running_operation)
+        (orchestration_operation_bound_to_task ?long_running_operation ?task_definition)
+        (lease_available ?lease)
+        (not
+          (entity_completion_signaled ?long_running_operation)
+        )
+      )
+    :effect
+      (and
+        (entity_completion_signaled ?long_running_operation)
+        (orchestration_operation_has_lease ?long_running_operation ?lease)
+        (not
+          (lease_available ?lease)
+        )
+      )
+  )
+  (:action finalize_coordinator_and_release_token
+    :parameters (?coordinator_instance - coordinator_instance ?resource_token - resource_token ?lease - lease)
+    :precondition
+      (and
+        (entity_completion_signaled ?coordinator_instance)
+        (orchestration_operation_bound_to_resource ?coordinator_instance ?resource_token)
+        (orchestration_operation_has_lease ?coordinator_instance ?lease)
+        (not
+          (entity_finalized ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?coordinator_instance)
+        (resource_token_available ?resource_token)
+        (lease_available ?lease)
+      )
+  )
+  (:action finalize_worker_pool_and_release_token
+    :parameters (?worker_pool - worker_pool ?resource_token - resource_token ?lease - lease)
+    :precondition
+      (and
+        (entity_completion_signaled ?worker_pool)
+        (orchestration_operation_bound_to_resource ?worker_pool ?resource_token)
+        (orchestration_operation_has_lease ?worker_pool ?lease)
+        (not
+          (entity_finalized ?worker_pool)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?worker_pool)
+        (resource_token_available ?resource_token)
+        (lease_available ?lease)
+      )
+  )
+  (:action finalize_workflow_engine_and_release_token
+    :parameters (?workflow_engine - workflow_engine ?resource_token - resource_token ?lease - lease)
+    :precondition
+      (and
+        (entity_completion_signaled ?workflow_engine)
+        (orchestration_operation_bound_to_resource ?workflow_engine ?resource_token)
+        (orchestration_operation_has_lease ?workflow_engine ?lease)
+        (not
+          (entity_finalized ?workflow_engine)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?workflow_engine)
+        (resource_token_available ?resource_token)
+        (lease_available ?lease)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem orchestration_scenario)
+  (:domain long_running_operation_orchestration)
+  (:objects coordinator_instance_1 - coordinator_instance worker_pool_1 - worker_pool workflow_engine_alpha - workflow_engine workflow_engine_beta - workflow_engine resource_token_a - resource_token resource_token_b - resource_token resource_token_c - resource_token task_definition_main - task_definition external_connector_main - external_connector data_artifact_input - data_artifact input_channel_1 - input_channel output_channel_1 - output_channel work_unit_1 - work_unit package_v1 - package package_v2 - package policy_retry - policy policy_security - policy attachment_logging - attachment attachment_metrics - attachment lease_primary - lease credential_admin - credential extension_monitoring - extension extension_tracing - extension plugin_auth - plugin)
+  (:init
+    (resource_token_available resource_token_a)
+    (resource_token_available resource_token_b)
+    (resource_token_available resource_token_c)
+    (task_definition_available task_definition_main)
+    (connector_available external_connector_main)
+    (data_artifact_available data_artifact_input)
+    (coordinator_has_input_channel coordinator_instance_1 input_channel_1)
+    (worker_pool_has_output_channel worker_pool_1 output_channel_1)
+    (work_unit_allocated work_unit_1)
+    (package_available package_v1)
+    (package_available package_v2)
+    (workflow_engine_bound_to_coordinator workflow_engine_alpha coordinator_instance_1)
+    (workflow_engine_bound_to_coordinator workflow_engine_beta coordinator_instance_1)
+    (workflow_engine_bound_to_worker_pool workflow_engine_alpha worker_pool_1)
+    (workflow_engine_bound_to_worker_pool workflow_engine_beta worker_pool_1)
+    (workflow_engine_bound_to_work_unit workflow_engine_alpha work_unit_1)
+    (workflow_engine_bound_to_work_unit workflow_engine_beta work_unit_1)
+    (workflow_engine_has_package workflow_engine_alpha package_v1)
+    (workflow_engine_has_package workflow_engine_beta package_v2)
+    (policy_available policy_retry)
+    (policy_available policy_security)
+    (attachment_available attachment_logging)
+    (attachment_available attachment_metrics)
+    (lease_available lease_primary)
+    (credential_available credential_admin)
+    (extension_available extension_monitoring)
+    (workflow_engine_has_extension workflow_engine_alpha extension_monitoring)
+    (workflow_engine_has_extension workflow_engine_beta extension_tracing)
+    (plugin_available plugin_auth)
+  )
+  (:goal
+    (and
+      (entity_finalized coordinator_instance_1)
+      (entity_finalized worker_pool_1)
+      (entity_finalized workflow_engine_alpha)
+      (entity_finalized workflow_engine_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_orchestration_operation_request coordinator_instance_1)
+(assign_resource_token_to_orchestration_operation coordinator_instance_1 resource_token_a)
+(bind_task_definition_to_orchestration_operation coordinator_instance_1 task_definition_main)
+(activate_orchestration_operation coordinator_instance_1 task_definition_main)
+(attach_external_connector_to_orchestration_operation coordinator_instance_1 external_connector_main)
+(coordinator_claim_input_channel coordinator_instance_1 input_channel_1 task_definition_main)
+(coordinator_confirm_connector_and_lock coordinator_instance_1 input_channel_1 external_connector_main)
+(detach_external_connector_from_orchestration_operation coordinator_instance_1 external_connector_main)
+(release_task_definition coordinator_instance_1 task_definition_main)
+(create_orchestration_operation_request worker_pool_1)
+(assign_resource_token_to_orchestration_operation worker_pool_1 resource_token_b)
+(bind_task_definition_to_orchestration_operation worker_pool_1 task_definition_main)
+(activate_orchestration_operation worker_pool_1 task_definition_main)
+(attach_external_connector_to_orchestration_operation worker_pool_1 external_connector_main)
+(worker_pool_claim_output_channel worker_pool_1 output_channel_1 task_definition_main)
+(worker_pool_confirm_connector_and_lock worker_pool_1 output_channel_1 external_connector_main)
+(detach_external_connector_from_orchestration_operation worker_pool_1 external_connector_main)
+(release_task_definition worker_pool_1 task_definition_main)
+(compose_work_unit coordinator_instance_1 worker_pool_1 input_channel_1 output_channel_1 work_unit_1)
+(bind_task_definition_to_orchestration_operation coordinator_instance_1 task_definition_main)
+(lock_work_unit_for_execution work_unit_1 coordinator_instance_1 task_definition_main)
+(release_task_definition coordinator_instance_1 task_definition_main)
+(publish_completion_from_coordinator coordinator_instance_1 work_unit_1)
+(publish_completion_from_worker_pool worker_pool_1 work_unit_1)
+(create_orchestration_operation_request workflow_engine_alpha)
+(assign_resource_token_to_orchestration_operation workflow_engine_alpha resource_token_c)
+(bind_task_definition_to_orchestration_operation workflow_engine_alpha task_definition_main)
+(activate_orchestration_operation workflow_engine_alpha task_definition_main)
+(attach_credential_to_engine workflow_engine_alpha credential_admin)
+(attach_external_connector_to_orchestration_operation workflow_engine_alpha external_connector_main)
+(attach_package_to_workflow_engine_and_lock workflow_engine_alpha package_v1 work_unit_1)
+(validate_package_on_workflow_engine_and_mark workflow_engine_alpha package_v1 work_unit_1 task_definition_main)
+(apply_credential_and_prepare_workflow_engine_stage1 workflow_engine_alpha credential_admin external_connector_main package_v1 work_unit_1)
+(attach_plugin_to_engine workflow_engine_alpha plugin_auth)
+(attach_plugin_and_prepare_approval workflow_engine_alpha plugin_auth package_v1 work_unit_1)
+(approve_and_trigger_execution workflow_engine_alpha)
+(detach_external_connector_from_orchestration_operation workflow_engine_alpha external_connector_main)
+(detach_credential_from_engine workflow_engine_alpha credential_admin)
+(detach_plugin_from_engine workflow_engine_alpha plugin_auth)
+(finalize_orchestration_operation_and_claim_lease workflow_engine_alpha lease_primary task_definition_main)
+(finalize_workflow_engine_and_release_token workflow_engine_alpha resource_token_c lease_primary)
+(release_task_definition workflow_engine_alpha task_definition_main)
+(create_orchestration_operation_request workflow_engine_beta)
+(assign_resource_token_to_orchestration_operation workflow_engine_beta resource_token_c)
+(bind_task_definition_to_orchestration_operation workflow_engine_beta task_definition_main)
+(activate_orchestration_operation workflow_engine_beta task_definition_main)
+(attach_credential_to_engine workflow_engine_beta credential_admin)
+(attach_external_connector_to_orchestration_operation workflow_engine_beta external_connector_main)
+(attach_package_to_workflow_engine_and_lock workflow_engine_beta package_v2 work_unit_1)
+(validate_package_on_workflow_engine_and_mark workflow_engine_beta package_v2 work_unit_1 task_definition_main)
+(apply_credential_and_prepare_workflow_engine_stage1 workflow_engine_beta credential_admin external_connector_main package_v2 work_unit_1)
+(attach_plugin_to_engine workflow_engine_beta plugin_auth)
+(attach_plugin_and_prepare_approval workflow_engine_beta plugin_auth package_v2 work_unit_1)
+(approve_and_trigger_execution workflow_engine_beta)
+(detach_external_connector_from_orchestration_operation workflow_engine_beta external_connector_main)
+(detach_credential_from_engine workflow_engine_beta credential_admin)
+(detach_plugin_from_engine workflow_engine_beta plugin_auth)
+(finalize_orchestration_operation_and_claim_lease workflow_engine_beta lease_primary task_definition_main)
+(finalize_workflow_engine_and_release_token workflow_engine_beta resource_token_c lease_primary)
+(release_task_definition workflow_engine_beta task_definition_main)
+(bind_task_definition_to_orchestration_operation coordinator_instance_1 task_definition_main)
+(finalize_orchestration_operation_and_claim_lease coordinator_instance_1 lease_primary task_definition_main)
+(finalize_coordinator_and_release_token coordinator_instance_1 resource_token_a lease_primary)
+(release_task_definition coordinator_instance_1 task_definition_main)
+(bind_task_definition_to_orchestration_operation worker_pool_1 task_definition_main)
+(finalize_orchestration_operation_and_claim_lease worker_pool_1 lease_primary task_definition_main)
+(finalize_worker_pool_and_release_token worker_pool_1 resource_token_b lease_primary)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_n2l7qn5r/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_n2l7qn5r/plan.pddl 67 
+
+
+
+--- stderr ---
+

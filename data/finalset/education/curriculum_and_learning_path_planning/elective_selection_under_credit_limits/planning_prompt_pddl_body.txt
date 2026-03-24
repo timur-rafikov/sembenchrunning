@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain elective_selection_under_credit_limits)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types plan_component - object plan_resource - object classification_group - object academic_entity_root - object academic_entity - academic_entity_root elective_offer - plan_component course_offering - plan_component advisor - plan_component endorsement_slot - plan_component scheduling_preference - plan_component finalization_token - plan_component administrative_resource - plan_component faculty_approval_token - plan_component credit_unit_token - plan_resource program_requirement - plan_resource course_approval_record - plan_resource elective_category_primary - classification_group elective_category_secondary - classification_group elective_package - classification_group student_group_type - academic_entity plan_group_type - academic_entity primary_student - student_group_type secondary_student - student_group_type academic_plan - plan_group_type)
+  (:predicates
+    (plan_initialized ?academic_entity - academic_entity)
+    (entity_ready_for_review ?academic_entity - academic_entity)
+    (has_reserved_elective ?academic_entity - academic_entity)
+    (selection_finalized ?academic_entity - academic_entity)
+    (entity_certified ?academic_entity - academic_entity)
+    (selection_confirmed ?academic_entity - academic_entity)
+    (elective_offer_available ?elective_offer - elective_offer)
+    (reserved_offer_for ?academic_entity - academic_entity ?elective_offer - elective_offer)
+    (course_offering_available ?course_offering - course_offering)
+    (requested_course_for ?academic_entity - academic_entity ?course_offering - course_offering)
+    (advisor_available ?advisor - advisor)
+    (advisor_assigned_to ?academic_entity - academic_entity ?advisor - advisor)
+    (credit_token_available ?credit_unit_token - credit_unit_token)
+    (primary_student_allocated_credit_token ?primary_student - primary_student ?credit_unit_token - credit_unit_token)
+    (secondary_student_allocated_credit_token ?secondary_student - secondary_student ?credit_unit_token - credit_unit_token)
+    (eligible_for_category_primary ?primary_student - primary_student ?elective_category_primary - elective_category_primary)
+    (category_primary_slot_marked ?elective_category_primary - elective_category_primary)
+    (category_primary_slot_locked ?elective_category_primary - elective_category_primary)
+    (primary_student_category_fulfilled ?primary_student - primary_student)
+    (eligible_for_category_secondary ?secondary_student - secondary_student ?elective_category_secondary - elective_category_secondary)
+    (category_secondary_slot_marked ?elective_category_secondary - elective_category_secondary)
+    (category_secondary_slot_locked ?elective_category_secondary - elective_category_secondary)
+    (secondary_student_category_fulfilled ?secondary_student - secondary_student)
+    (package_pending_assembly ?elective_package - elective_package)
+    (package_ready ?elective_package - elective_package)
+    (package_linked_category_primary ?elective_package - elective_package ?elective_category_primary - elective_category_primary)
+    (package_linked_category_secondary ?elective_package - elective_package ?elective_category_secondary - elective_category_secondary)
+    (package_has_primary_slot ?elective_package - elective_package)
+    (package_has_secondary_slot ?elective_package - elective_package)
+    (package_committed ?elective_package - elective_package)
+    (plan_assigned_primary_student ?academic_plan - academic_plan ?primary_student - primary_student)
+    (plan_assigned_secondary_student ?academic_plan - academic_plan ?secondary_student - secondary_student)
+    (plan_includes_package ?academic_plan - academic_plan ?elective_package - elective_package)
+    (requirement_available ?program_requirement - program_requirement)
+    (plan_has_requirement ?academic_plan - academic_plan ?program_requirement - program_requirement)
+    (requirement_satisfied ?program_requirement - program_requirement)
+    (requirement_satisfied_by_package ?program_requirement - program_requirement ?elective_package - elective_package)
+    (plan_requirement_verified ?academic_plan - academic_plan)
+    (plan_requirement_compliance_met ?academic_plan - academic_plan)
+    (plan_ready_for_final_checks ?academic_plan - academic_plan)
+    (endorsement_requested ?academic_plan - academic_plan)
+    (endorsement_recorded ?academic_plan - academic_plan)
+    (scheduling_preferences_applied ?academic_plan - academic_plan)
+    (plan_certification_prepared ?academic_plan - academic_plan)
+    (course_approval_available ?course_approval_record - course_approval_record)
+    (plan_has_approval_record ?academic_plan - academic_plan ?course_approval_record - course_approval_record)
+    (approval_applied_to_plan ?academic_plan - academic_plan)
+    (approval_acknowledged ?academic_plan - academic_plan)
+    (approval_finalized ?academic_plan - academic_plan)
+    (endorsement_slot_available ?endorsement_slot - endorsement_slot)
+    (plan_assigned_endorsement_slot ?academic_plan - academic_plan ?endorsement_slot - endorsement_slot)
+    (scheduling_preference_available ?scheduling_preference - scheduling_preference)
+    (plan_assigned_scheduling_preference ?academic_plan - academic_plan ?scheduling_preference - scheduling_preference)
+    (administrative_resource_available ?administrative_resource - administrative_resource)
+    (plan_assigned_administrative_resource ?academic_plan - academic_plan ?administrative_resource - administrative_resource)
+    (faculty_approval_token_available ?faculty_approval_token - faculty_approval_token)
+    (plan_assigned_faculty_approval_token ?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token)
+    (finalization_token_available ?finalization_token - finalization_token)
+    (entity_assigned_finalization_token ?academic_entity - academic_entity ?finalization_token - finalization_token)
+    (primary_student_slot_processed ?primary_student - primary_student)
+    (secondary_student_slot_processed ?secondary_student - secondary_student)
+    (plan_finalization_flag ?academic_plan - academic_plan)
+  )
+  (:action initialize_plan_record
+    :parameters (?academic_entity - academic_entity)
+    :precondition
+      (and
+        (not
+          (plan_initialized ?academic_entity)
+        )
+        (not
+          (selection_finalized ?academic_entity)
+        )
+      )
+    :effect (plan_initialized ?academic_entity)
+  )
+  (:action reserve_elective_offer
+    :parameters (?academic_entity - academic_entity ?elective_offer - elective_offer)
+    :precondition
+      (and
+        (plan_initialized ?academic_entity)
+        (not
+          (has_reserved_elective ?academic_entity)
+        )
+        (elective_offer_available ?elective_offer)
+      )
+    :effect
+      (and
+        (has_reserved_elective ?academic_entity)
+        (reserved_offer_for ?academic_entity ?elective_offer)
+        (not
+          (elective_offer_available ?elective_offer)
+        )
+      )
+  )
+  (:action place_tentative_course_request
+    :parameters (?academic_entity - academic_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (plan_initialized ?academic_entity)
+        (has_reserved_elective ?academic_entity)
+        (course_offering_available ?course_offering)
+      )
+    :effect
+      (and
+        (requested_course_for ?academic_entity ?course_offering)
+        (not
+          (course_offering_available ?course_offering)
+        )
+      )
+  )
+  (:action mark_plan_ready_for_review
+    :parameters (?academic_entity - academic_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (plan_initialized ?academic_entity)
+        (has_reserved_elective ?academic_entity)
+        (requested_course_for ?academic_entity ?course_offering)
+        (not
+          (entity_ready_for_review ?academic_entity)
+        )
+      )
+    :effect (entity_ready_for_review ?academic_entity)
+  )
+  (:action rollback_course_request
+    :parameters (?academic_entity - academic_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (requested_course_for ?academic_entity ?course_offering)
+      )
+    :effect
+      (and
+        (course_offering_available ?course_offering)
+        (not
+          (requested_course_for ?academic_entity ?course_offering)
+        )
+      )
+  )
+  (:action assign_advisor_to_plan
+    :parameters (?academic_entity - academic_entity ?advisor - advisor)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_entity)
+        (advisor_available ?advisor)
+      )
+    :effect
+      (and
+        (advisor_assigned_to ?academic_entity ?advisor)
+        (not
+          (advisor_available ?advisor)
+        )
+      )
+  )
+  (:action release_advisor_assignment
+    :parameters (?academic_entity - academic_entity ?advisor - advisor)
+    :precondition
+      (and
+        (advisor_assigned_to ?academic_entity ?advisor)
+      )
+    :effect
+      (and
+        (advisor_available ?advisor)
+        (not
+          (advisor_assigned_to ?academic_entity ?advisor)
+        )
+      )
+  )
+  (:action assign_administrative_resource
+    :parameters (?academic_plan - academic_plan ?administrative_resource - administrative_resource)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (administrative_resource_available ?administrative_resource)
+      )
+    :effect
+      (and
+        (plan_assigned_administrative_resource ?academic_plan ?administrative_resource)
+        (not
+          (administrative_resource_available ?administrative_resource)
+        )
+      )
+  )
+  (:action release_administrative_resource
+    :parameters (?academic_plan - academic_plan ?administrative_resource - administrative_resource)
+    :precondition
+      (and
+        (plan_assigned_administrative_resource ?academic_plan ?administrative_resource)
+      )
+    :effect
+      (and
+        (administrative_resource_available ?administrative_resource)
+        (not
+          (plan_assigned_administrative_resource ?academic_plan ?administrative_resource)
+        )
+      )
+  )
+  (:action assign_faculty_approval_token
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (faculty_approval_token_available ?faculty_approval_token)
+      )
+    :effect
+      (and
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (not
+          (faculty_approval_token_available ?faculty_approval_token)
+        )
+      )
+  )
+  (:action release_faculty_approval_token
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token)
+    :precondition
+      (and
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+      )
+    :effect
+      (and
+        (faculty_approval_token_available ?faculty_approval_token)
+        (not
+          (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        )
+      )
+  )
+  (:action open_primary_category_slot
+    :parameters (?primary_student - primary_student ?elective_category_primary - elective_category_primary ?course_offering - course_offering)
+    :precondition
+      (and
+        (entity_ready_for_review ?primary_student)
+        (requested_course_for ?primary_student ?course_offering)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (not
+          (category_primary_slot_marked ?elective_category_primary)
+        )
+        (not
+          (category_primary_slot_locked ?elective_category_primary)
+        )
+      )
+    :effect (category_primary_slot_marked ?elective_category_primary)
+  )
+  (:action lock_primary_category_for_student
+    :parameters (?primary_student - primary_student ?elective_category_primary - elective_category_primary ?advisor - advisor)
+    :precondition
+      (and
+        (entity_ready_for_review ?primary_student)
+        (advisor_assigned_to ?primary_student ?advisor)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (category_primary_slot_marked ?elective_category_primary)
+        (not
+          (primary_student_slot_processed ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (primary_student_category_fulfilled ?primary_student)
+      )
+  )
+  (:action allocate_credit_token_primary_category
+    :parameters (?primary_student - primary_student ?elective_category_primary - elective_category_primary ?credit_unit_token - credit_unit_token)
+    :precondition
+      (and
+        (entity_ready_for_review ?primary_student)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (credit_token_available ?credit_unit_token)
+        (not
+          (primary_student_slot_processed ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (category_primary_slot_locked ?elective_category_primary)
+        (primary_student_slot_processed ?primary_student)
+        (primary_student_allocated_credit_token ?primary_student ?credit_unit_token)
+        (not
+          (credit_token_available ?credit_unit_token)
+        )
+      )
+  )
+  (:action confirm_primary_category_allocation
+    :parameters (?primary_student - primary_student ?elective_category_primary - elective_category_primary ?course_offering - course_offering ?credit_unit_token - credit_unit_token)
+    :precondition
+      (and
+        (entity_ready_for_review ?primary_student)
+        (requested_course_for ?primary_student ?course_offering)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (category_primary_slot_locked ?elective_category_primary)
+        (primary_student_allocated_credit_token ?primary_student ?credit_unit_token)
+        (not
+          (primary_student_category_fulfilled ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (category_primary_slot_marked ?elective_category_primary)
+        (primary_student_category_fulfilled ?primary_student)
+        (credit_token_available ?credit_unit_token)
+        (not
+          (primary_student_allocated_credit_token ?primary_student ?credit_unit_token)
+        )
+      )
+  )
+  (:action open_secondary_category_slot
+    :parameters (?secondary_student - secondary_student ?elective_category_secondary - elective_category_secondary ?course_offering - course_offering)
+    :precondition
+      (and
+        (entity_ready_for_review ?secondary_student)
+        (requested_course_for ?secondary_student ?course_offering)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (not
+          (category_secondary_slot_marked ?elective_category_secondary)
+        )
+        (not
+          (category_secondary_slot_locked ?elective_category_secondary)
+        )
+      )
+    :effect (category_secondary_slot_marked ?elective_category_secondary)
+  )
+  (:action lock_secondary_category_for_student
+    :parameters (?secondary_student - secondary_student ?elective_category_secondary - elective_category_secondary ?advisor - advisor)
+    :precondition
+      (and
+        (entity_ready_for_review ?secondary_student)
+        (advisor_assigned_to ?secondary_student ?advisor)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_secondary_slot_marked ?elective_category_secondary)
+        (not
+          (secondary_student_slot_processed ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (secondary_student_slot_processed ?secondary_student)
+        (secondary_student_category_fulfilled ?secondary_student)
+      )
+  )
+  (:action allocate_credit_token_secondary_category
+    :parameters (?secondary_student - secondary_student ?elective_category_secondary - elective_category_secondary ?credit_unit_token - credit_unit_token)
+    :precondition
+      (and
+        (entity_ready_for_review ?secondary_student)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (credit_token_available ?credit_unit_token)
+        (not
+          (secondary_student_slot_processed ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (category_secondary_slot_locked ?elective_category_secondary)
+        (secondary_student_slot_processed ?secondary_student)
+        (secondary_student_allocated_credit_token ?secondary_student ?credit_unit_token)
+        (not
+          (credit_token_available ?credit_unit_token)
+        )
+      )
+  )
+  (:action confirm_secondary_category_allocation
+    :parameters (?secondary_student - secondary_student ?elective_category_secondary - elective_category_secondary ?course_offering - course_offering ?credit_unit_token - credit_unit_token)
+    :precondition
+      (and
+        (entity_ready_for_review ?secondary_student)
+        (requested_course_for ?secondary_student ?course_offering)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_secondary_slot_locked ?elective_category_secondary)
+        (secondary_student_allocated_credit_token ?secondary_student ?credit_unit_token)
+        (not
+          (secondary_student_category_fulfilled ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (category_secondary_slot_marked ?elective_category_secondary)
+        (secondary_student_category_fulfilled ?secondary_student)
+        (credit_token_available ?credit_unit_token)
+        (not
+          (secondary_student_allocated_credit_token ?secondary_student ?credit_unit_token)
+        )
+      )
+  )
+  (:action assemble_elective_package
+    :parameters (?primary_student - primary_student ?secondary_student - secondary_student ?elective_category_primary - elective_category_primary ?elective_category_secondary - elective_category_secondary ?elective_package - elective_package)
+    :precondition
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (secondary_student_slot_processed ?secondary_student)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_primary_slot_marked ?elective_category_primary)
+        (category_secondary_slot_marked ?elective_category_secondary)
+        (primary_student_category_fulfilled ?primary_student)
+        (secondary_student_category_fulfilled ?secondary_student)
+        (package_pending_assembly ?elective_package)
+      )
+    :effect
+      (and
+        (package_ready ?elective_package)
+        (package_linked_category_primary ?elective_package ?elective_category_primary)
+        (package_linked_category_secondary ?elective_package ?elective_category_secondary)
+        (not
+          (package_pending_assembly ?elective_package)
+        )
+      )
+  )
+  (:action assemble_package_with_primary_flag
+    :parameters (?primary_student - primary_student ?secondary_student - secondary_student ?elective_category_primary - elective_category_primary ?elective_category_secondary - elective_category_secondary ?elective_package - elective_package)
+    :precondition
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (secondary_student_slot_processed ?secondary_student)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_primary_slot_locked ?elective_category_primary)
+        (category_secondary_slot_marked ?elective_category_secondary)
+        (not
+          (primary_student_category_fulfilled ?primary_student)
+        )
+        (secondary_student_category_fulfilled ?secondary_student)
+        (package_pending_assembly ?elective_package)
+      )
+    :effect
+      (and
+        (package_ready ?elective_package)
+        (package_linked_category_primary ?elective_package ?elective_category_primary)
+        (package_linked_category_secondary ?elective_package ?elective_category_secondary)
+        (package_has_primary_slot ?elective_package)
+        (not
+          (package_pending_assembly ?elective_package)
+        )
+      )
+  )
+  (:action assemble_package_with_secondary_flag
+    :parameters (?primary_student - primary_student ?secondary_student - secondary_student ?elective_category_primary - elective_category_primary ?elective_category_secondary - elective_category_secondary ?elective_package - elective_package)
+    :precondition
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (secondary_student_slot_processed ?secondary_student)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_primary_slot_marked ?elective_category_primary)
+        (category_secondary_slot_locked ?elective_category_secondary)
+        (primary_student_category_fulfilled ?primary_student)
+        (not
+          (secondary_student_category_fulfilled ?secondary_student)
+        )
+        (package_pending_assembly ?elective_package)
+      )
+    :effect
+      (and
+        (package_ready ?elective_package)
+        (package_linked_category_primary ?elective_package ?elective_category_primary)
+        (package_linked_category_secondary ?elective_package ?elective_category_secondary)
+        (package_has_secondary_slot ?elective_package)
+        (not
+          (package_pending_assembly ?elective_package)
+        )
+      )
+  )
+  (:action assemble_package_with_both_flags
+    :parameters (?primary_student - primary_student ?secondary_student - secondary_student ?elective_category_primary - elective_category_primary ?elective_category_secondary - elective_category_secondary ?elective_package - elective_package)
+    :precondition
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (secondary_student_slot_processed ?secondary_student)
+        (eligible_for_category_primary ?primary_student ?elective_category_primary)
+        (eligible_for_category_secondary ?secondary_student ?elective_category_secondary)
+        (category_primary_slot_locked ?elective_category_primary)
+        (category_secondary_slot_locked ?elective_category_secondary)
+        (not
+          (primary_student_category_fulfilled ?primary_student)
+        )
+        (not
+          (secondary_student_category_fulfilled ?secondary_student)
+        )
+        (package_pending_assembly ?elective_package)
+      )
+    :effect
+      (and
+        (package_ready ?elective_package)
+        (package_linked_category_primary ?elective_package ?elective_category_primary)
+        (package_linked_category_secondary ?elective_package ?elective_category_secondary)
+        (package_has_primary_slot ?elective_package)
+        (package_has_secondary_slot ?elective_package)
+        (not
+          (package_pending_assembly ?elective_package)
+        )
+      )
+  )
+  (:action commit_elective_package
+    :parameters (?elective_package - elective_package ?primary_student - primary_student ?course_offering - course_offering)
+    :precondition
+      (and
+        (package_ready ?elective_package)
+        (primary_student_slot_processed ?primary_student)
+        (requested_course_for ?primary_student ?course_offering)
+        (not
+          (package_committed ?elective_package)
+        )
+      )
+    :effect (package_committed ?elective_package)
+  )
+  (:action satisfy_program_requirement
+    :parameters (?academic_plan - academic_plan ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (plan_includes_package ?academic_plan ?elective_package)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_available ?program_requirement)
+        (package_ready ?elective_package)
+        (package_committed ?elective_package)
+        (not
+          (requirement_satisfied ?program_requirement)
+        )
+      )
+    :effect
+      (and
+        (requirement_satisfied ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (not
+          (requirement_available ?program_requirement)
+        )
+      )
+  )
+  (:action verify_requirement_and_mark_plan
+    :parameters (?academic_plan - academic_plan ?program_requirement - program_requirement ?elective_package - elective_package ?course_offering - course_offering)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (requested_course_for ?academic_plan ?course_offering)
+        (not
+          (package_has_primary_slot ?elective_package)
+        )
+        (not
+          (plan_requirement_verified ?academic_plan)
+        )
+      )
+    :effect (plan_requirement_verified ?academic_plan)
+  )
+  (:action reserve_endorsement_slot_for_plan
+    :parameters (?academic_plan - academic_plan ?endorsement_slot - endorsement_slot)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (endorsement_slot_available ?endorsement_slot)
+        (not
+          (endorsement_requested ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (endorsement_requested ?academic_plan)
+        (plan_assigned_endorsement_slot ?academic_plan ?endorsement_slot)
+        (not
+          (endorsement_slot_available ?endorsement_slot)
+        )
+      )
+  )
+  (:action finalize_endorsement_and_mark_plan
+    :parameters (?academic_plan - academic_plan ?program_requirement - program_requirement ?elective_package - elective_package ?course_offering - course_offering ?endorsement_slot - endorsement_slot)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (requested_course_for ?academic_plan ?course_offering)
+        (package_has_primary_slot ?elective_package)
+        (endorsement_requested ?academic_plan)
+        (plan_assigned_endorsement_slot ?academic_plan ?endorsement_slot)
+        (not
+          (plan_requirement_verified ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_requirement_verified ?academic_plan)
+        (endorsement_recorded ?academic_plan)
+      )
+  )
+  (:action complete_administrative_verification
+    :parameters (?academic_plan - academic_plan ?administrative_resource - administrative_resource ?advisor - advisor ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_verified ?academic_plan)
+        (plan_assigned_administrative_resource ?academic_plan ?administrative_resource)
+        (advisor_assigned_to ?academic_plan ?advisor)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (not
+          (package_has_secondary_slot ?elective_package)
+        )
+        (not
+          (plan_requirement_compliance_met ?academic_plan)
+        )
+      )
+    :effect (plan_requirement_compliance_met ?academic_plan)
+  )
+  (:action confirm_administrative_verification
+    :parameters (?academic_plan - academic_plan ?administrative_resource - administrative_resource ?advisor - advisor ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_verified ?academic_plan)
+        (plan_assigned_administrative_resource ?academic_plan ?administrative_resource)
+        (advisor_assigned_to ?academic_plan ?advisor)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (package_has_secondary_slot ?elective_package)
+        (not
+          (plan_requirement_compliance_met ?academic_plan)
+        )
+      )
+    :effect (plan_requirement_compliance_met ?academic_plan)
+  )
+  (:action apply_faculty_approval
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_compliance_met ?academic_plan)
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (not
+          (package_has_primary_slot ?elective_package)
+        )
+        (not
+          (package_has_secondary_slot ?elective_package)
+        )
+        (not
+          (plan_ready_for_final_checks ?academic_plan)
+        )
+      )
+    :effect (plan_ready_for_final_checks ?academic_plan)
+  )
+  (:action apply_faculty_approval_variant_a
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_compliance_met ?academic_plan)
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (package_has_primary_slot ?elective_package)
+        (not
+          (package_has_secondary_slot ?elective_package)
+        )
+        (not
+          (plan_ready_for_final_checks ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (scheduling_preferences_applied ?academic_plan)
+      )
+  )
+  (:action apply_faculty_approval_variant_b
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_compliance_met ?academic_plan)
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (not
+          (package_has_primary_slot ?elective_package)
+        )
+        (package_has_secondary_slot ?elective_package)
+        (not
+          (plan_ready_for_final_checks ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (scheduling_preferences_applied ?academic_plan)
+      )
+  )
+  (:action apply_faculty_approval_variant_c
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token ?program_requirement - program_requirement ?elective_package - elective_package)
+    :precondition
+      (and
+        (plan_requirement_compliance_met ?academic_plan)
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (plan_has_requirement ?academic_plan ?program_requirement)
+        (requirement_satisfied_by_package ?program_requirement ?elective_package)
+        (package_has_primary_slot ?elective_package)
+        (package_has_secondary_slot ?elective_package)
+        (not
+          (plan_ready_for_final_checks ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (scheduling_preferences_applied ?academic_plan)
+      )
+  )
+  (:action certify_plan_stage1
+    :parameters (?academic_plan - academic_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (not
+          (scheduling_preferences_applied ?academic_plan)
+        )
+        (not
+          (plan_finalization_flag ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_flag ?academic_plan)
+        (entity_certified ?academic_plan)
+      )
+  )
+  (:action assign_scheduling_preference_to_plan
+    :parameters (?academic_plan - academic_plan ?scheduling_preference - scheduling_preference)
+    :precondition
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (scheduling_preferences_applied ?academic_plan)
+        (scheduling_preference_available ?scheduling_preference)
+      )
+    :effect
+      (and
+        (plan_assigned_scheduling_preference ?academic_plan ?scheduling_preference)
+        (not
+          (scheduling_preference_available ?scheduling_preference)
+        )
+      )
+  )
+  (:action prepare_plan_for_certification
+    :parameters (?academic_plan - academic_plan ?primary_student - primary_student ?secondary_student - secondary_student ?course_offering - course_offering ?scheduling_preference - scheduling_preference)
+    :precondition
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (scheduling_preferences_applied ?academic_plan)
+        (plan_assigned_scheduling_preference ?academic_plan ?scheduling_preference)
+        (plan_assigned_primary_student ?academic_plan ?primary_student)
+        (plan_assigned_secondary_student ?academic_plan ?secondary_student)
+        (primary_student_category_fulfilled ?primary_student)
+        (secondary_student_category_fulfilled ?secondary_student)
+        (requested_course_for ?academic_plan ?course_offering)
+        (not
+          (plan_certification_prepared ?academic_plan)
+        )
+      )
+    :effect (plan_certification_prepared ?academic_plan)
+  )
+  (:action certify_plan_stage2
+    :parameters (?academic_plan - academic_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_checks ?academic_plan)
+        (plan_certification_prepared ?academic_plan)
+        (not
+          (plan_finalization_flag ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_flag ?academic_plan)
+        (entity_certified ?academic_plan)
+      )
+  )
+  (:action apply_course_approval
+    :parameters (?academic_plan - academic_plan ?course_approval_record - course_approval_record ?course_offering - course_offering)
+    :precondition
+      (and
+        (entity_ready_for_review ?academic_plan)
+        (requested_course_for ?academic_plan ?course_offering)
+        (course_approval_available ?course_approval_record)
+        (plan_has_approval_record ?academic_plan ?course_approval_record)
+        (not
+          (approval_applied_to_plan ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (approval_applied_to_plan ?academic_plan)
+        (not
+          (course_approval_available ?course_approval_record)
+        )
+      )
+  )
+  (:action acknowledge_approval_assignment
+    :parameters (?academic_plan - academic_plan ?advisor - advisor)
+    :precondition
+      (and
+        (approval_applied_to_plan ?academic_plan)
+        (advisor_assigned_to ?academic_plan ?advisor)
+        (not
+          (approval_acknowledged ?academic_plan)
+        )
+      )
+    :effect (approval_acknowledged ?academic_plan)
+  )
+  (:action finalize_approval_assignment
+    :parameters (?academic_plan - academic_plan ?faculty_approval_token - faculty_approval_token)
+    :precondition
+      (and
+        (approval_acknowledged ?academic_plan)
+        (plan_assigned_faculty_approval_token ?academic_plan ?faculty_approval_token)
+        (not
+          (approval_finalized ?academic_plan)
+        )
+      )
+    :effect (approval_finalized ?academic_plan)
+  )
+  (:action finalize_plan_after_approval
+    :parameters (?academic_plan - academic_plan)
+    :precondition
+      (and
+        (approval_finalized ?academic_plan)
+        (not
+          (plan_finalization_flag ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_flag ?academic_plan)
+        (entity_certified ?academic_plan)
+      )
+  )
+  (:action certify_student_plan_primary
+    :parameters (?primary_student - primary_student ?elective_package - elective_package)
+    :precondition
+      (and
+        (primary_student_slot_processed ?primary_student)
+        (primary_student_category_fulfilled ?primary_student)
+        (package_ready ?elective_package)
+        (package_committed ?elective_package)
+        (not
+          (entity_certified ?primary_student)
+        )
+      )
+    :effect (entity_certified ?primary_student)
+  )
+  (:action certify_student_plan_secondary
+    :parameters (?secondary_student - secondary_student ?elective_package - elective_package)
+    :precondition
+      (and
+        (secondary_student_slot_processed ?secondary_student)
+        (secondary_student_category_fulfilled ?secondary_student)
+        (package_ready ?elective_package)
+        (package_committed ?elective_package)
+        (not
+          (entity_certified ?secondary_student)
+        )
+      )
+    :effect (entity_certified ?secondary_student)
+  )
+  (:action record_student_confirmation
+    :parameters (?academic_entity - academic_entity ?finalization_token - finalization_token ?course_offering - course_offering)
+    :precondition
+      (and
+        (entity_certified ?academic_entity)
+        (requested_course_for ?academic_entity ?course_offering)
+        (finalization_token_available ?finalization_token)
+        (not
+          (selection_confirmed ?academic_entity)
+        )
+      )
+    :effect
+      (and
+        (selection_confirmed ?academic_entity)
+        (entity_assigned_finalization_token ?academic_entity ?finalization_token)
+        (not
+          (finalization_token_available ?finalization_token)
+        )
+      )
+  )
+  (:action finalize_student_selection
+    :parameters (?primary_student - primary_student ?elective_offer - elective_offer ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (selection_confirmed ?primary_student)
+        (reserved_offer_for ?primary_student ?elective_offer)
+        (entity_assigned_finalization_token ?primary_student ?finalization_token)
+        (not
+          (selection_finalized ?primary_student)
+        )
+      )
+    :effect
+      (and
+        (selection_finalized ?primary_student)
+        (elective_offer_available ?elective_offer)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+  (:action finalize_secondary_student_selection
+    :parameters (?secondary_student - secondary_student ?elective_offer - elective_offer ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (selection_confirmed ?secondary_student)
+        (reserved_offer_for ?secondary_student ?elective_offer)
+        (entity_assigned_finalization_token ?secondary_student ?finalization_token)
+        (not
+          (selection_finalized ?secondary_student)
+        )
+      )
+    :effect
+      (and
+        (selection_finalized ?secondary_student)
+        (elective_offer_available ?elective_offer)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+  (:action finalize_plan_selection
+    :parameters (?academic_plan - academic_plan ?elective_offer - elective_offer ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (selection_confirmed ?academic_plan)
+        (reserved_offer_for ?academic_plan ?elective_offer)
+        (entity_assigned_finalization_token ?academic_plan ?finalization_token)
+        (not
+          (selection_finalized ?academic_plan)
+        )
+      )
+    :effect
+      (and
+        (selection_finalized ?academic_plan)
+        (elective_offer_available ?elective_offer)
+        (finalization_token_available ?finalization_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem elective_selection_problem)
+  (:domain elective_selection_under_credit_limits)
+  (:objects student_primary_1 - primary_student student_secondary_1 - secondary_student academic_plan_1 - academic_plan academic_plan_2 - academic_plan elective_offer_a - elective_offer elective_offer_b - elective_offer elective_offer_c - elective_offer course_offering_x - course_offering advisor_jones - advisor credit_token_1 - credit_unit_token category_core - elective_category_primary category_elective - elective_category_secondary elective_package_alpha - elective_package requirement_module_a - program_requirement requirement_module_b - program_requirement endorsement_slot_1 - endorsement_slot endorsement_slot_2 - endorsement_slot scheduling_pref_morning - scheduling_preference scheduling_pref_evening - scheduling_preference finalization_token_1 - finalization_token admin_resource_office - administrative_resource approval_record_1 - course_approval_record approval_record_2 - course_approval_record faculty_approval_token_1 - faculty_approval_token)
+  (:init
+    (elective_offer_available elective_offer_a)
+    (elective_offer_available elective_offer_b)
+    (elective_offer_available elective_offer_c)
+    (course_offering_available course_offering_x)
+    (advisor_available advisor_jones)
+    (credit_token_available credit_token_1)
+    (eligible_for_category_primary student_primary_1 category_core)
+    (eligible_for_category_secondary student_secondary_1 category_elective)
+    (package_pending_assembly elective_package_alpha)
+    (requirement_available requirement_module_a)
+    (requirement_available requirement_module_b)
+    (plan_assigned_primary_student academic_plan_1 student_primary_1)
+    (plan_assigned_primary_student academic_plan_2 student_primary_1)
+    (plan_assigned_secondary_student academic_plan_1 student_secondary_1)
+    (plan_assigned_secondary_student academic_plan_2 student_secondary_1)
+    (plan_includes_package academic_plan_1 elective_package_alpha)
+    (plan_includes_package academic_plan_2 elective_package_alpha)
+    (plan_has_requirement academic_plan_1 requirement_module_a)
+    (plan_has_requirement academic_plan_2 requirement_module_b)
+    (endorsement_slot_available endorsement_slot_1)
+    (endorsement_slot_available endorsement_slot_2)
+    (scheduling_preference_available scheduling_pref_morning)
+    (scheduling_preference_available scheduling_pref_evening)
+    (finalization_token_available finalization_token_1)
+    (administrative_resource_available admin_resource_office)
+    (course_approval_available approval_record_1)
+    (plan_has_approval_record academic_plan_1 approval_record_1)
+    (plan_has_approval_record academic_plan_2 approval_record_2)
+    (faculty_approval_token_available faculty_approval_token_1)
+  )
+  (:goal
+    (and
+      (selection_finalized student_primary_1)
+      (selection_finalized student_secondary_1)
+      (selection_finalized academic_plan_1)
+      (selection_finalized academic_plan_2)
+    )
+  )
+)

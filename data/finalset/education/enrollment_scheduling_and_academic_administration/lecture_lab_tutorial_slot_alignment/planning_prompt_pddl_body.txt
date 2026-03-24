@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain lecture_lab_tutorial_alignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object entity_cluster_root - generic_object slot_cluster_root - generic_object resource_cluster_root - generic_object top_enrollment_type - generic_object scheduling_entity - top_enrollment_type registration_slot_token - entity_cluster_root timeslot_preference - entity_cluster_root instructor_availability - entity_cluster_root session_type_attribute - entity_cluster_root scheduling_profile - entity_cluster_root deadline_token - entity_cluster_root room_feature_token - entity_cluster_root special_approval_token - entity_cluster_root ancillary_resource_token - slot_cluster_root room_timeslot_block - slot_cluster_root external_approval_token - slot_cluster_root lecture_timeslot - resource_cluster_root lab_timeslot - resource_cluster_root physical_room - resource_cluster_root lecture_component_type - scheduling_entity tutorial_component_type - scheduling_entity lecture_section - lecture_component_type lab_section - lecture_component_type course_offering - tutorial_component_type)
+
+  (:predicates
+    (submitted ?enrollment_case - scheduling_entity)
+    (timeslot_confirmed ?enrollment_case - scheduling_entity)
+    (provisionally_assigned ?enrollment_case - scheduling_entity)
+    (scheduling_finalized ?enrollment_case - scheduling_entity)
+    (confirmation_issued ?enrollment_case - scheduling_entity)
+    (deadline_applied ?enrollment_case - scheduling_entity)
+    (registration_slot_available ?registration_slot_token - registration_slot_token)
+    (assigned_registration_slot ?enrollment_case - scheduling_entity ?registration_slot_token - registration_slot_token)
+    (timeslot_preference_available ?timeslot_preference - timeslot_preference)
+    (reserved_timeslot ?enrollment_case - scheduling_entity ?timeslot_preference - timeslot_preference)
+    (instructor_available ?instructor_availability - instructor_availability)
+    (instructor_assigned ?enrollment_case - scheduling_entity ?instructor_availability - instructor_availability)
+    (ancillary_resource_available ?ancillary_resource_token - ancillary_resource_token)
+    (lecture_section_resource_reserved ?lecture_section - lecture_section ?ancillary_resource_token - ancillary_resource_token)
+    (lab_section_resource_reserved ?lab_or_tutorial_section - lab_section ?ancillary_resource_token - ancillary_resource_token)
+    (lecture_section_timeslot_link ?lecture_section - lecture_section ?lecture_timeslot - lecture_timeslot)
+    (lecture_timeslot_ready ?lecture_timeslot - lecture_timeslot)
+    (lecture_timeslot_resource_reserved ?lecture_timeslot - lecture_timeslot)
+    (lecture_section_ready ?lecture_section - lecture_section)
+    (lab_section_timeslot_link ?lab_or_tutorial_section - lab_section ?lab_or_tutorial_timeslot - lab_timeslot)
+    (lab_timeslot_ready ?lab_or_tutorial_timeslot - lab_timeslot)
+    (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot - lab_timeslot)
+    (lab_section_ready ?lab_or_tutorial_section - lab_section)
+    (room_available ?physical_room - physical_room)
+    (room_allocated ?physical_room - physical_room)
+    (room_lecture_timeslot_binding ?physical_room - physical_room ?lecture_timeslot - lecture_timeslot)
+    (room_lab_timeslot_binding ?physical_room - physical_room ?lab_or_tutorial_timeslot - lab_timeslot)
+    (room_ready_for_lecture ?physical_room - physical_room)
+    (room_ready_for_lab ?physical_room - physical_room)
+    (room_session_confirmed ?physical_room - physical_room)
+    (offering_has_lecture_section ?course_offering - course_offering ?lecture_section - lecture_section)
+    (offering_has_lab_section ?course_offering - course_offering ?lab_or_tutorial_section - lab_section)
+    (offering_room_candidate ?course_offering - course_offering ?physical_room - physical_room)
+    (room_timeslot_block_available ?room_timeslot_block - room_timeslot_block)
+    (offering_room_block_link ?course_offering - course_offering ?room_timeslot_block - room_timeslot_block)
+    (room_block_allocated ?room_timeslot_block - room_timeslot_block)
+    (room_block_bound_to_room ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    (offering_room_binding_staged ?course_offering - course_offering)
+    (offering_features_bound ?course_offering - course_offering)
+    (offering_special_approval_stage ?course_offering - course_offering)
+    (offering_session_type_locked ?course_offering - course_offering)
+    (offering_equipment_check_passed ?course_offering - course_offering)
+    (offering_profile_attached ?course_offering - course_offering)
+    (offering_final_checks_passed ?course_offering - course_offering)
+    (external_approval_token_available ?external_approval_token - external_approval_token)
+    (offering_external_approval_link ?course_offering - course_offering ?external_approval_token - external_approval_token)
+    (offering_external_approval_applied ?course_offering - course_offering)
+    (offering_instructor_approval_staged ?course_offering - course_offering)
+    (offering_instructor_approval_confirmed ?course_offering - course_offering)
+    (session_type_attribute_available ?session_type_attribute - session_type_attribute)
+    (offering_session_type_link ?course_offering - course_offering ?session_type_attribute - session_type_attribute)
+    (scheduling_profile_available ?scheduling_profile - scheduling_profile)
+    (offering_scheduling_profile_link ?course_offering - course_offering ?scheduling_profile - scheduling_profile)
+    (room_feature_token_available ?room_feature_token - room_feature_token)
+    (offering_room_feature_link ?course_offering - course_offering ?room_feature_token - room_feature_token)
+    (special_approval_token_available ?special_approval_token - special_approval_token)
+    (offering_special_approval_link ?course_offering - course_offering ?special_approval_token - special_approval_token)
+    (deadline_token_available ?deadline_token - deadline_token)
+    (deadline_link ?enrollment_case - scheduling_entity ?deadline_token - deadline_token)
+    (lecture_section_prepared ?lecture_section - lecture_section)
+    (lab_section_prepared ?lab_or_tutorial_section - lab_section)
+    (offering_confirmation_token_issued ?course_offering - course_offering)
+  )
+  (:action submit_enrollment_case
+    :parameters (?enrollment_case - scheduling_entity)
+    :precondition
+      (and
+        (not
+          (submitted ?enrollment_case)
+        )
+        (not
+          (scheduling_finalized ?enrollment_case)
+        )
+      )
+    :effect (submitted ?enrollment_case)
+  )
+  (:action assign_provisional_registration_slot
+    :parameters (?enrollment_case - scheduling_entity ?registration_slot_token - registration_slot_token)
+    :precondition
+      (and
+        (submitted ?enrollment_case)
+        (not
+          (provisionally_assigned ?enrollment_case)
+        )
+        (registration_slot_available ?registration_slot_token)
+      )
+    :effect
+      (and
+        (provisionally_assigned ?enrollment_case)
+        (assigned_registration_slot ?enrollment_case ?registration_slot_token)
+        (not
+          (registration_slot_available ?registration_slot_token)
+        )
+      )
+  )
+  (:action reserve_timeslot_for_case
+    :parameters (?enrollment_case - scheduling_entity ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (submitted ?enrollment_case)
+        (provisionally_assigned ?enrollment_case)
+        (timeslot_preference_available ?timeslot_preference)
+      )
+    :effect
+      (and
+        (reserved_timeslot ?enrollment_case ?timeslot_preference)
+        (not
+          (timeslot_preference_available ?timeslot_preference)
+        )
+      )
+  )
+  (:action confirm_case_timeslot
+    :parameters (?enrollment_case - scheduling_entity ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (submitted ?enrollment_case)
+        (provisionally_assigned ?enrollment_case)
+        (reserved_timeslot ?enrollment_case ?timeslot_preference)
+        (not
+          (timeslot_confirmed ?enrollment_case)
+        )
+      )
+    :effect (timeslot_confirmed ?enrollment_case)
+  )
+  (:action release_case_timeslot_reservation
+    :parameters (?enrollment_case - scheduling_entity ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (reserved_timeslot ?enrollment_case ?timeslot_preference)
+      )
+    :effect
+      (and
+        (timeslot_preference_available ?timeslot_preference)
+        (not
+          (reserved_timeslot ?enrollment_case ?timeslot_preference)
+        )
+      )
+  )
+  (:action assign_instructor_to_case
+    :parameters (?enrollment_case - scheduling_entity ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (timeslot_confirmed ?enrollment_case)
+        (instructor_available ?instructor_availability)
+      )
+    :effect
+      (and
+        (instructor_assigned ?enrollment_case ?instructor_availability)
+        (not
+          (instructor_available ?instructor_availability)
+        )
+      )
+  )
+  (:action unassign_instructor_from_case
+    :parameters (?enrollment_case - scheduling_entity ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (instructor_assigned ?enrollment_case ?instructor_availability)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor_availability)
+        (not
+          (instructor_assigned ?enrollment_case ?instructor_availability)
+        )
+      )
+  )
+  (:action assign_room_feature_to_offering
+    :parameters (?course_offering - course_offering ?room_feature_token - room_feature_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (room_feature_token_available ?room_feature_token)
+      )
+    :effect
+      (and
+        (offering_room_feature_link ?course_offering ?room_feature_token)
+        (not
+          (room_feature_token_available ?room_feature_token)
+        )
+      )
+  )
+  (:action release_room_feature_from_offering
+    :parameters (?course_offering - course_offering ?room_feature_token - room_feature_token)
+    :precondition
+      (and
+        (offering_room_feature_link ?course_offering ?room_feature_token)
+      )
+    :effect
+      (and
+        (room_feature_token_available ?room_feature_token)
+        (not
+          (offering_room_feature_link ?course_offering ?room_feature_token)
+        )
+      )
+  )
+  (:action assign_special_approval_to_offering
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (special_approval_token_available ?special_approval_token)
+      )
+    :effect
+      (and
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (not
+          (special_approval_token_available ?special_approval_token)
+        )
+      )
+  )
+  (:action release_special_approval_from_offering
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token)
+    :precondition
+      (and
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+      )
+    :effect
+      (and
+        (special_approval_token_available ?special_approval_token)
+        (not
+          (offering_special_approval_link ?course_offering ?special_approval_token)
+        )
+      )
+  )
+  (:action claim_lecture_timeslot_for_section
+    :parameters (?lecture_section - lecture_section ?lecture_timeslot - lecture_timeslot ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (timeslot_confirmed ?lecture_section)
+        (reserved_timeslot ?lecture_section ?timeslot_preference)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (not
+          (lecture_timeslot_ready ?lecture_timeslot)
+        )
+        (not
+          (lecture_timeslot_resource_reserved ?lecture_timeslot)
+        )
+      )
+    :effect (lecture_timeslot_ready ?lecture_timeslot)
+  )
+  (:action prepare_lecture_section_with_instructor
+    :parameters (?lecture_section - lecture_section ?lecture_timeslot - lecture_timeslot ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (timeslot_confirmed ?lecture_section)
+        (instructor_assigned ?lecture_section ?instructor_availability)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lecture_timeslot_ready ?lecture_timeslot)
+        (not
+          (lecture_section_prepared ?lecture_section)
+        )
+      )
+    :effect
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lecture_section_ready ?lecture_section)
+      )
+  )
+  (:action reserve_ancillary_resource_for_lecture
+    :parameters (?lecture_section - lecture_section ?lecture_timeslot - lecture_timeslot ?ancillary_resource_token - ancillary_resource_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?lecture_section)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (ancillary_resource_available ?ancillary_resource_token)
+        (not
+          (lecture_section_prepared ?lecture_section)
+        )
+      )
+    :effect
+      (and
+        (lecture_timeslot_resource_reserved ?lecture_timeslot)
+        (lecture_section_prepared ?lecture_section)
+        (lecture_section_resource_reserved ?lecture_section ?ancillary_resource_token)
+        (not
+          (ancillary_resource_available ?ancillary_resource_token)
+        )
+      )
+  )
+  (:action finalize_lecture_resource_allocation
+    :parameters (?lecture_section - lecture_section ?lecture_timeslot - lecture_timeslot ?timeslot_preference - timeslot_preference ?ancillary_resource_token - ancillary_resource_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?lecture_section)
+        (reserved_timeslot ?lecture_section ?timeslot_preference)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lecture_timeslot_resource_reserved ?lecture_timeslot)
+        (lecture_section_resource_reserved ?lecture_section ?ancillary_resource_token)
+        (not
+          (lecture_section_ready ?lecture_section)
+        )
+      )
+    :effect
+      (and
+        (lecture_timeslot_ready ?lecture_timeslot)
+        (lecture_section_ready ?lecture_section)
+        (ancillary_resource_available ?ancillary_resource_token)
+        (not
+          (lecture_section_resource_reserved ?lecture_section ?ancillary_resource_token)
+        )
+      )
+  )
+  (:action claim_lab_timeslot_for_section
+    :parameters (?lab_or_tutorial_section - lab_section ?lab_or_tutorial_timeslot - lab_timeslot ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (timeslot_confirmed ?lab_or_tutorial_section)
+        (reserved_timeslot ?lab_or_tutorial_section ?timeslot_preference)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (not
+          (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+        )
+        (not
+          (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot)
+        )
+      )
+    :effect (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+  )
+  (:action prepare_lab_section_with_instructor
+    :parameters (?lab_or_tutorial_section - lab_section ?lab_or_tutorial_timeslot - lab_timeslot ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (timeslot_confirmed ?lab_or_tutorial_section)
+        (instructor_assigned ?lab_or_tutorial_section ?instructor_availability)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+        (not
+          (lab_section_prepared ?lab_or_tutorial_section)
+        )
+      )
+    :effect
+      (and
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lab_section_ready ?lab_or_tutorial_section)
+      )
+  )
+  (:action reserve_ancillary_resource_for_lab
+    :parameters (?lab_or_tutorial_section - lab_section ?lab_or_tutorial_timeslot - lab_timeslot ?ancillary_resource_token - ancillary_resource_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?lab_or_tutorial_section)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (ancillary_resource_available ?ancillary_resource_token)
+        (not
+          (lab_section_prepared ?lab_or_tutorial_section)
+        )
+      )
+    :effect
+      (and
+        (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot)
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lab_section_resource_reserved ?lab_or_tutorial_section ?ancillary_resource_token)
+        (not
+          (ancillary_resource_available ?ancillary_resource_token)
+        )
+      )
+  )
+  (:action finalize_lab_resource_allocation
+    :parameters (?lab_or_tutorial_section - lab_section ?lab_or_tutorial_timeslot - lab_timeslot ?timeslot_preference - timeslot_preference ?ancillary_resource_token - ancillary_resource_token)
+    :precondition
+      (and
+        (timeslot_confirmed ?lab_or_tutorial_section)
+        (reserved_timeslot ?lab_or_tutorial_section ?timeslot_preference)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot)
+        (lab_section_resource_reserved ?lab_or_tutorial_section ?ancillary_resource_token)
+        (not
+          (lab_section_ready ?lab_or_tutorial_section)
+        )
+      )
+    :effect
+      (and
+        (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+        (lab_section_ready ?lab_or_tutorial_section)
+        (ancillary_resource_available ?ancillary_resource_token)
+        (not
+          (lab_section_resource_reserved ?lab_or_tutorial_section ?ancillary_resource_token)
+        )
+      )
+  )
+  (:action tokenize_composite_section_basic
+    :parameters (?lecture_section - lecture_section ?lab_or_tutorial_section - lab_section ?lecture_timeslot - lecture_timeslot ?lab_or_tutorial_timeslot - lab_timeslot ?physical_room - physical_room)
+    :precondition
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lecture_timeslot_ready ?lecture_timeslot)
+        (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+        (lecture_section_ready ?lecture_section)
+        (lab_section_ready ?lab_or_tutorial_section)
+        (room_available ?physical_room)
+      )
+    :effect
+      (and
+        (room_allocated ?physical_room)
+        (room_lecture_timeslot_binding ?physical_room ?lecture_timeslot)
+        (room_lab_timeslot_binding ?physical_room ?lab_or_tutorial_timeslot)
+        (not
+          (room_available ?physical_room)
+        )
+      )
+  )
+  (:action tokenize_composite_section_lecture_ok
+    :parameters (?lecture_section - lecture_section ?lab_or_tutorial_section - lab_section ?lecture_timeslot - lecture_timeslot ?lab_or_tutorial_timeslot - lab_timeslot ?physical_room - physical_room)
+    :precondition
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lecture_timeslot_resource_reserved ?lecture_timeslot)
+        (lab_timeslot_ready ?lab_or_tutorial_timeslot)
+        (not
+          (lecture_section_ready ?lecture_section)
+        )
+        (lab_section_ready ?lab_or_tutorial_section)
+        (room_available ?physical_room)
+      )
+    :effect
+      (and
+        (room_allocated ?physical_room)
+        (room_lecture_timeslot_binding ?physical_room ?lecture_timeslot)
+        (room_lab_timeslot_binding ?physical_room ?lab_or_tutorial_timeslot)
+        (room_ready_for_lecture ?physical_room)
+        (not
+          (room_available ?physical_room)
+        )
+      )
+  )
+  (:action tokenize_composite_section_lab_ok
+    :parameters (?lecture_section - lecture_section ?lab_or_tutorial_section - lab_section ?lecture_timeslot - lecture_timeslot ?lab_or_tutorial_timeslot - lab_timeslot ?physical_room - physical_room)
+    :precondition
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lecture_timeslot_ready ?lecture_timeslot)
+        (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot)
+        (lecture_section_ready ?lecture_section)
+        (not
+          (lab_section_ready ?lab_or_tutorial_section)
+        )
+        (room_available ?physical_room)
+      )
+    :effect
+      (and
+        (room_allocated ?physical_room)
+        (room_lecture_timeslot_binding ?physical_room ?lecture_timeslot)
+        (room_lab_timeslot_binding ?physical_room ?lab_or_tutorial_timeslot)
+        (room_ready_for_lab ?physical_room)
+        (not
+          (room_available ?physical_room)
+        )
+      )
+  )
+  (:action tokenize_composite_section_full_ok
+    :parameters (?lecture_section - lecture_section ?lab_or_tutorial_section - lab_section ?lecture_timeslot - lecture_timeslot ?lab_or_tutorial_timeslot - lab_timeslot ?physical_room - physical_room)
+    :precondition
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lecture_section_timeslot_link ?lecture_section ?lecture_timeslot)
+        (lab_section_timeslot_link ?lab_or_tutorial_section ?lab_or_tutorial_timeslot)
+        (lecture_timeslot_resource_reserved ?lecture_timeslot)
+        (lab_timeslot_resource_reserved ?lab_or_tutorial_timeslot)
+        (not
+          (lecture_section_ready ?lecture_section)
+        )
+        (not
+          (lab_section_ready ?lab_or_tutorial_section)
+        )
+        (room_available ?physical_room)
+      )
+    :effect
+      (and
+        (room_allocated ?physical_room)
+        (room_lecture_timeslot_binding ?physical_room ?lecture_timeslot)
+        (room_lab_timeslot_binding ?physical_room ?lab_or_tutorial_timeslot)
+        (room_ready_for_lecture ?physical_room)
+        (room_ready_for_lab ?physical_room)
+        (not
+          (room_available ?physical_room)
+        )
+      )
+  )
+  (:action lock_room_session_for_section
+    :parameters (?physical_room - physical_room ?lecture_section - lecture_section ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (room_allocated ?physical_room)
+        (lecture_section_prepared ?lecture_section)
+        (reserved_timeslot ?lecture_section ?timeslot_preference)
+        (not
+          (room_session_confirmed ?physical_room)
+        )
+      )
+    :effect (room_session_confirmed ?physical_room)
+  )
+  (:action allocate_room_block_to_offering
+    :parameters (?course_offering - course_offering ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (offering_room_candidate ?course_offering ?physical_room)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_timeslot_block_available ?room_timeslot_block)
+        (room_allocated ?physical_room)
+        (room_session_confirmed ?physical_room)
+        (not
+          (room_block_allocated ?room_timeslot_block)
+        )
+      )
+    :effect
+      (and
+        (room_block_allocated ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (not
+          (room_timeslot_block_available ?room_timeslot_block)
+        )
+      )
+  )
+  (:action stage_offering_room_binding
+    :parameters (?course_offering - course_offering ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_allocated ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (reserved_timeslot ?course_offering ?timeslot_preference)
+        (not
+          (room_ready_for_lecture ?physical_room)
+        )
+        (not
+          (offering_room_binding_staged ?course_offering)
+        )
+      )
+    :effect (offering_room_binding_staged ?course_offering)
+  )
+  (:action assign_session_type_to_offering
+    :parameters (?course_offering - course_offering ?session_type_attribute - session_type_attribute)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (session_type_attribute_available ?session_type_attribute)
+        (not
+          (offering_session_type_locked ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_session_type_locked ?course_offering)
+        (offering_session_type_link ?course_offering ?session_type_attribute)
+        (not
+          (session_type_attribute_available ?session_type_attribute)
+        )
+      )
+  )
+  (:action stage_offering_with_session_type_and_block
+    :parameters (?course_offering - course_offering ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room ?timeslot_preference - timeslot_preference ?session_type_attribute - session_type_attribute)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_allocated ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (reserved_timeslot ?course_offering ?timeslot_preference)
+        (room_ready_for_lecture ?physical_room)
+        (offering_session_type_locked ?course_offering)
+        (offering_session_type_link ?course_offering ?session_type_attribute)
+        (not
+          (offering_room_binding_staged ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_room_binding_staged ?course_offering)
+        (offering_equipment_check_passed ?course_offering)
+      )
+  )
+  (:action bind_room_features_to_offering
+    :parameters (?course_offering - course_offering ?room_feature_token - room_feature_token ?instructor_availability - instructor_availability ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_room_binding_staged ?course_offering)
+        (offering_room_feature_link ?course_offering ?room_feature_token)
+        (instructor_assigned ?course_offering ?instructor_availability)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (not
+          (room_ready_for_lab ?physical_room)
+        )
+        (not
+          (offering_features_bound ?course_offering)
+        )
+      )
+    :effect (offering_features_bound ?course_offering)
+  )
+  (:action bind_room_features_to_offering_with_room_flag
+    :parameters (?course_offering - course_offering ?room_feature_token - room_feature_token ?instructor_availability - instructor_availability ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_room_binding_staged ?course_offering)
+        (offering_room_feature_link ?course_offering ?room_feature_token)
+        (instructor_assigned ?course_offering ?instructor_availability)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (room_ready_for_lab ?physical_room)
+        (not
+          (offering_features_bound ?course_offering)
+        )
+      )
+    :effect (offering_features_bound ?course_offering)
+  )
+  (:action apply_special_approval
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_features_bound ?course_offering)
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (not
+          (room_ready_for_lecture ?physical_room)
+        )
+        (not
+          (room_ready_for_lab ?physical_room)
+        )
+        (not
+          (offering_special_approval_stage ?course_offering)
+        )
+      )
+    :effect (offering_special_approval_stage ?course_offering)
+  )
+  (:action apply_special_approval_and_stage_profile
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_features_bound ?course_offering)
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (room_ready_for_lecture ?physical_room)
+        (not
+          (room_ready_for_lab ?physical_room)
+        )
+        (not
+          (offering_special_approval_stage ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_profile_attached ?course_offering)
+      )
+  )
+  (:action apply_special_approval_and_attach_profile_variant
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_features_bound ?course_offering)
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (not
+          (room_ready_for_lecture ?physical_room)
+        )
+        (room_ready_for_lab ?physical_room)
+        (not
+          (offering_special_approval_stage ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_profile_attached ?course_offering)
+      )
+  )
+  (:action apply_special_approval_and_attach_profile_combined
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token ?room_timeslot_block - room_timeslot_block ?physical_room - physical_room)
+    :precondition
+      (and
+        (offering_features_bound ?course_offering)
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (offering_room_block_link ?course_offering ?room_timeslot_block)
+        (room_block_bound_to_room ?room_timeslot_block ?physical_room)
+        (room_ready_for_lecture ?physical_room)
+        (room_ready_for_lab ?physical_room)
+        (not
+          (offering_special_approval_stage ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_profile_attached ?course_offering)
+      )
+  )
+  (:action issue_offering_confirmation
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (not
+          (offering_profile_attached ?course_offering)
+        )
+        (not
+          (offering_confirmation_token_issued ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_confirmation_token_issued ?course_offering)
+        (confirmation_issued ?course_offering)
+      )
+  )
+  (:action assign_scheduling_profile_to_offering
+    :parameters (?course_offering - course_offering ?scheduling_profile - scheduling_profile)
+    :precondition
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_profile_attached ?course_offering)
+        (scheduling_profile_available ?scheduling_profile)
+      )
+    :effect
+      (and
+        (offering_scheduling_profile_link ?course_offering ?scheduling_profile)
+        (not
+          (scheduling_profile_available ?scheduling_profile)
+        )
+      )
+  )
+  (:action finalize_offering_checks
+    :parameters (?course_offering - course_offering ?lecture_section - lecture_section ?lab_or_tutorial_section - lab_section ?timeslot_preference - timeslot_preference ?scheduling_profile - scheduling_profile)
+    :precondition
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_profile_attached ?course_offering)
+        (offering_scheduling_profile_link ?course_offering ?scheduling_profile)
+        (offering_has_lecture_section ?course_offering ?lecture_section)
+        (offering_has_lab_section ?course_offering ?lab_or_tutorial_section)
+        (lecture_section_ready ?lecture_section)
+        (lab_section_ready ?lab_or_tutorial_section)
+        (reserved_timeslot ?course_offering ?timeslot_preference)
+        (not
+          (offering_final_checks_passed ?course_offering)
+        )
+      )
+    :effect (offering_final_checks_passed ?course_offering)
+  )
+  (:action confirm_offering
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_special_approval_stage ?course_offering)
+        (offering_final_checks_passed ?course_offering)
+        (not
+          (offering_confirmation_token_issued ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_confirmation_token_issued ?course_offering)
+        (confirmation_issued ?course_offering)
+      )
+  )
+  (:action apply_external_approval_to_offering
+    :parameters (?course_offering - course_offering ?external_approval_token - external_approval_token ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (timeslot_confirmed ?course_offering)
+        (reserved_timeslot ?course_offering ?timeslot_preference)
+        (external_approval_token_available ?external_approval_token)
+        (offering_external_approval_link ?course_offering ?external_approval_token)
+        (not
+          (offering_external_approval_applied ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_external_approval_applied ?course_offering)
+        (not
+          (external_approval_token_available ?external_approval_token)
+        )
+      )
+  )
+  (:action stage_instructor_approval
+    :parameters (?course_offering - course_offering ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (offering_external_approval_applied ?course_offering)
+        (instructor_assigned ?course_offering ?instructor_availability)
+        (not
+          (offering_instructor_approval_staged ?course_offering)
+        )
+      )
+    :effect (offering_instructor_approval_staged ?course_offering)
+  )
+  (:action confirm_instructor_approval
+    :parameters (?course_offering - course_offering ?special_approval_token - special_approval_token)
+    :precondition
+      (and
+        (offering_instructor_approval_staged ?course_offering)
+        (offering_special_approval_link ?course_offering ?special_approval_token)
+        (not
+          (offering_instructor_approval_confirmed ?course_offering)
+        )
+      )
+    :effect (offering_instructor_approval_confirmed ?course_offering)
+  )
+  (:action issue_offering_confirmation_after_instructor
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_instructor_approval_confirmed ?course_offering)
+        (not
+          (offering_confirmation_token_issued ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_confirmation_token_issued ?course_offering)
+        (confirmation_issued ?course_offering)
+      )
+  )
+  (:action confirm_lecture_section
+    :parameters (?lecture_section - lecture_section ?physical_room - physical_room)
+    :precondition
+      (and
+        (lecture_section_prepared ?lecture_section)
+        (lecture_section_ready ?lecture_section)
+        (room_allocated ?physical_room)
+        (room_session_confirmed ?physical_room)
+        (not
+          (confirmation_issued ?lecture_section)
+        )
+      )
+    :effect (confirmation_issued ?lecture_section)
+  )
+  (:action confirm_lab_section
+    :parameters (?lab_or_tutorial_section - lab_section ?physical_room - physical_room)
+    :precondition
+      (and
+        (lab_section_prepared ?lab_or_tutorial_section)
+        (lab_section_ready ?lab_or_tutorial_section)
+        (room_allocated ?physical_room)
+        (room_session_confirmed ?physical_room)
+        (not
+          (confirmation_issued ?lab_or_tutorial_section)
+        )
+      )
+    :effect (confirmation_issued ?lab_or_tutorial_section)
+  )
+  (:action apply_deadline_to_case
+    :parameters (?enrollment_case - scheduling_entity ?deadline_token - deadline_token ?timeslot_preference - timeslot_preference)
+    :precondition
+      (and
+        (confirmation_issued ?enrollment_case)
+        (reserved_timeslot ?enrollment_case ?timeslot_preference)
+        (deadline_token_available ?deadline_token)
+        (not
+          (deadline_applied ?enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (deadline_applied ?enrollment_case)
+        (deadline_link ?enrollment_case ?deadline_token)
+        (not
+          (deadline_token_available ?deadline_token)
+        )
+      )
+  )
+  (:action finalize_lecture_section_allocation
+    :parameters (?lecture_section - lecture_section ?registration_slot_token - registration_slot_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (deadline_applied ?lecture_section)
+        (assigned_registration_slot ?lecture_section ?registration_slot_token)
+        (deadline_link ?lecture_section ?deadline_token)
+        (not
+          (scheduling_finalized ?lecture_section)
+        )
+      )
+    :effect
+      (and
+        (scheduling_finalized ?lecture_section)
+        (registration_slot_available ?registration_slot_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+  (:action finalize_lab_section_allocation
+    :parameters (?lab_or_tutorial_section - lab_section ?registration_slot_token - registration_slot_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (deadline_applied ?lab_or_tutorial_section)
+        (assigned_registration_slot ?lab_or_tutorial_section ?registration_slot_token)
+        (deadline_link ?lab_or_tutorial_section ?deadline_token)
+        (not
+          (scheduling_finalized ?lab_or_tutorial_section)
+        )
+      )
+    :effect
+      (and
+        (scheduling_finalized ?lab_or_tutorial_section)
+        (registration_slot_available ?registration_slot_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+  (:action finalize_offering_allocation
+    :parameters (?course_offering - course_offering ?registration_slot_token - registration_slot_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (deadline_applied ?course_offering)
+        (assigned_registration_slot ?course_offering ?registration_slot_token)
+        (deadline_link ?course_offering ?deadline_token)
+        (not
+          (scheduling_finalized ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (scheduling_finalized ?course_offering)
+        (registration_slot_available ?registration_slot_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem semester_enrollment_scheduling_problem)
+  (:domain lecture_lab_tutorial_alignment_domain)
+  (:objects lecture_section_1 - lecture_section lab_section_1 - lab_section course_offering_1 - course_offering course_offering_2 - course_offering registration_slot_token_1 - registration_slot_token registration_slot_token_2 - registration_slot_token registration_slot_token_3 - registration_slot_token timeslot_preference_1 - timeslot_preference instructor_availability_1 - instructor_availability ancillary_resource_1 - ancillary_resource_token lecture_timeslot_1 - lecture_timeslot lab_timeslot_1 - lab_timeslot room_101 - physical_room room_timeslot_block_1 - room_timeslot_block room_timeslot_block_2 - room_timeslot_block session_type_lecture - session_type_attribute session_type_lab - session_type_attribute scheduling_profile_standard - scheduling_profile scheduling_profile_lab - scheduling_profile deadline_token_1 - deadline_token room_feature_token_projector - room_feature_token external_approval_token_dept - external_approval_token external_approval_token_prog - external_approval_token special_approval_token_1 - special_approval_token)
+  (:init
+    (registration_slot_available registration_slot_token_1)
+    (registration_slot_available registration_slot_token_2)
+    (registration_slot_available registration_slot_token_3)
+    (timeslot_preference_available timeslot_preference_1)
+    (instructor_available instructor_availability_1)
+    (ancillary_resource_available ancillary_resource_1)
+    (lecture_section_timeslot_link lecture_section_1 lecture_timeslot_1)
+    (lab_section_timeslot_link lab_section_1 lab_timeslot_1)
+    (room_available room_101)
+    (room_timeslot_block_available room_timeslot_block_1)
+    (room_timeslot_block_available room_timeslot_block_2)
+    (offering_has_lecture_section course_offering_1 lecture_section_1)
+    (offering_has_lecture_section course_offering_2 lecture_section_1)
+    (offering_has_lab_section course_offering_1 lab_section_1)
+    (offering_has_lab_section course_offering_2 lab_section_1)
+    (offering_room_candidate course_offering_1 room_101)
+    (offering_room_candidate course_offering_2 room_101)
+    (offering_room_block_link course_offering_1 room_timeslot_block_1)
+    (offering_room_block_link course_offering_2 room_timeslot_block_2)
+    (session_type_attribute_available session_type_lecture)
+    (session_type_attribute_available session_type_lab)
+    (scheduling_profile_available scheduling_profile_standard)
+    (scheduling_profile_available scheduling_profile_lab)
+    (deadline_token_available deadline_token_1)
+    (room_feature_token_available room_feature_token_projector)
+    (external_approval_token_available external_approval_token_dept)
+    (offering_external_approval_link course_offering_1 external_approval_token_dept)
+    (offering_external_approval_link course_offering_2 external_approval_token_prog)
+    (special_approval_token_available special_approval_token_1)
+  )
+  (:goal
+    (and
+      (scheduling_finalized lecture_section_1)
+      (scheduling_finalized lab_section_1)
+      (scheduling_finalized course_offering_1)
+      (scheduling_finalized course_offering_2)
+    )
+  )
+)

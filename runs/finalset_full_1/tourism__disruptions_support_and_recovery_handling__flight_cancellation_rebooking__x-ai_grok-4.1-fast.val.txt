@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain flight_cancellation_rebooking)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object service_resource - object entity_supertype - object case_root - object case_subject - case_root contact_channel - resource flight_segment - resource onsite_staff - resource document_type - resource compensation_option - resource compensation_document - resource supplier_confirmation - resource external_approval - resource inventory_item - service_resource accommodation_option - service_resource third_party_partner - service_resource original_flight_option - entity_supertype alternate_flight_option - entity_supertype rebooking_proposal - entity_supertype passenger_group - case_subject case_file - case_subject primary_passenger_record - passenger_group co_traveller_record - passenger_group service_case - case_file)
+  (:predicates
+    (case_created ?case_entity - case_subject)
+    (case_triaged ?case_entity - case_subject)
+    (case_channel_allocated ?case_entity - case_subject)
+    (contact_channel_confirmed ?case_entity - case_subject)
+    (case_resolution_ready ?case_entity - case_subject)
+    (compensation_initiated ?case_entity - case_subject)
+    (contact_channel_available ?contact_channel - contact_channel)
+    (case_assigned_contact_channel ?case_entity - case_subject ?contact_channel - contact_channel)
+    (flight_segment_available ?flight_segment - flight_segment)
+    (case_links_flight_segment ?case_entity - case_subject ?flight_segment - flight_segment)
+    (onsite_staff_available ?onsite_staff - onsite_staff)
+    (case_assigned_onsite_staff ?case_entity - case_subject ?onsite_staff - onsite_staff)
+    (inventory_item_available ?inventory_item - inventory_item)
+    (primary_passenger_inventory_allocated ?primary_passenger - primary_passenger_record ?inventory_item - inventory_item)
+    (co_traveller_inventory_allocated ?co_traveller - co_traveller_record ?inventory_item - inventory_item)
+    (primary_passenger_original_option_link ?primary_passenger - primary_passenger_record ?original_flight_option - original_flight_option)
+    (original_option_assessed ?original_flight_option - original_flight_option)
+    (original_option_allocation_recorded ?original_flight_option - original_flight_option)
+    (primary_passenger_option_confirmed ?primary_passenger - primary_passenger_record)
+    (co_traveller_alternate_option_link ?co_traveller - co_traveller_record ?alternate_flight_option - alternate_flight_option)
+    (alternate_option_assessed ?alternate_flight_option - alternate_flight_option)
+    (alternate_option_allocation_recorded ?alternate_flight_option - alternate_flight_option)
+    (co_traveller_option_confirmed ?co_traveller - co_traveller_record)
+    (rebooking_proposal_available ?rebooking_proposal - rebooking_proposal)
+    (rebooking_proposal_reserved ?rebooking_proposal - rebooking_proposal)
+    (proposal_includes_original_option ?rebooking_proposal - rebooking_proposal ?original_flight_option - original_flight_option)
+    (proposal_includes_alternate_option ?rebooking_proposal - rebooking_proposal ?alternate_flight_option - alternate_flight_option)
+    (proposal_requires_supplier_confirmation ?rebooking_proposal - rebooking_proposal)
+    (proposal_requires_third_party_approval ?rebooking_proposal - rebooking_proposal)
+    (rebooking_proposal_selected ?rebooking_proposal - rebooking_proposal)
+    (service_case_links_primary_passenger ?service_case - service_case ?primary_passenger - primary_passenger_record)
+    (service_case_links_co_traveller ?service_case - service_case ?co_traveller - co_traveller_record)
+    (service_case_links_proposal ?service_case - service_case ?rebooking_proposal - rebooking_proposal)
+    (accommodation_option_available ?accommodation_option - accommodation_option)
+    (service_case_links_accommodation_option ?service_case - service_case ?accommodation_option - accommodation_option)
+    (accommodation_option_allocated ?accommodation_option - accommodation_option)
+    (accommodation_option_assigned_to_proposal ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    (service_case_proposal_validated ?service_case - service_case)
+    (service_case_supplier_confirmed ?service_case - service_case)
+    (service_case_ready_for_finalization ?service_case - service_case)
+    (service_case_has_document ?service_case - service_case)
+    (service_case_document_verified ?service_case - service_case)
+    (service_case_ready_for_compensation_selection ?service_case - service_case)
+    (service_case_final_checks_completed ?service_case - service_case)
+    (third_party_partner_available ?third_party_partner - third_party_partner)
+    (service_case_links_third_party_partner ?service_case - service_case ?third_party_partner - third_party_partner)
+    (service_case_third_party_requested ?service_case - service_case)
+    (service_case_third_party_registered ?service_case - service_case)
+    (service_case_external_approval_recorded ?service_case - service_case)
+    (document_type_available ?document_type - document_type)
+    (service_case_links_document_type ?service_case - service_case ?document_type - document_type)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (service_case_compensation_option_selected ?service_case - service_case ?compensation_option - compensation_option)
+    (supplier_confirmation_available ?supplier_confirmation - supplier_confirmation)
+    (service_case_supplier_confirmation_link ?service_case - service_case ?supplier_confirmation - supplier_confirmation)
+    (external_approval_available ?external_approval - external_approval)
+    (service_case_links_external_approval ?service_case - service_case ?external_approval - external_approval)
+    (compensation_document_available ?compensation_document - compensation_document)
+    (case_links_compensation_document ?case_entity - case_subject ?compensation_document - compensation_document)
+    (primary_passenger_assessed ?primary_passenger - primary_passenger_record)
+    (co_traveller_assessed ?co_traveller - co_traveller_record)
+    (service_case_closed ?service_case - service_case)
+  )
+  (:action create_disruption_case
+    :parameters (?case_entity - case_subject)
+    :precondition
+      (and
+        (not
+          (case_created ?case_entity)
+        )
+        (not
+          (contact_channel_confirmed ?case_entity)
+        )
+      )
+    :effect (case_created ?case_entity)
+  )
+  (:action allocate_contact_channel_to_case
+    :parameters (?case_entity - case_subject ?contact_channel - contact_channel)
+    :precondition
+      (and
+        (case_created ?case_entity)
+        (not
+          (case_channel_allocated ?case_entity)
+        )
+        (contact_channel_available ?contact_channel)
+      )
+    :effect
+      (and
+        (case_channel_allocated ?case_entity)
+        (case_assigned_contact_channel ?case_entity ?contact_channel)
+        (not
+          (contact_channel_available ?contact_channel)
+        )
+      )
+  )
+  (:action link_flight_segment_to_case
+    :parameters (?case_entity - case_subject ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_created ?case_entity)
+        (case_channel_allocated ?case_entity)
+        (flight_segment_available ?flight_segment)
+      )
+    :effect
+      (and
+        (case_links_flight_segment ?case_entity ?flight_segment)
+        (not
+          (flight_segment_available ?flight_segment)
+        )
+      )
+  )
+  (:action triage_case
+    :parameters (?case_entity - case_subject ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_created ?case_entity)
+        (case_channel_allocated ?case_entity)
+        (case_links_flight_segment ?case_entity ?flight_segment)
+        (not
+          (case_triaged ?case_entity)
+        )
+      )
+    :effect (case_triaged ?case_entity)
+  )
+  (:action release_flight_segment_from_case
+    :parameters (?case_entity - case_subject ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_links_flight_segment ?case_entity ?flight_segment)
+      )
+    :effect
+      (and
+        (flight_segment_available ?flight_segment)
+        (not
+          (case_links_flight_segment ?case_entity ?flight_segment)
+        )
+      )
+  )
+  (:action assign_onsite_staff_to_case
+    :parameters (?case_entity - case_subject ?onsite_staff - onsite_staff)
+    :precondition
+      (and
+        (case_triaged ?case_entity)
+        (onsite_staff_available ?onsite_staff)
+      )
+    :effect
+      (and
+        (case_assigned_onsite_staff ?case_entity ?onsite_staff)
+        (not
+          (onsite_staff_available ?onsite_staff)
+        )
+      )
+  )
+  (:action release_onsite_staff_from_case
+    :parameters (?case_entity - case_subject ?onsite_staff - onsite_staff)
+    :precondition
+      (and
+        (case_assigned_onsite_staff ?case_entity ?onsite_staff)
+      )
+    :effect
+      (and
+        (onsite_staff_available ?onsite_staff)
+        (not
+          (case_assigned_onsite_staff ?case_entity ?onsite_staff)
+        )
+      )
+  )
+  (:action attach_supplier_confirmation_to_service_case
+    :parameters (?service_case - service_case ?supplier_confirmation - supplier_confirmation)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (supplier_confirmation_available ?supplier_confirmation)
+      )
+    :effect
+      (and
+        (service_case_supplier_confirmation_link ?service_case ?supplier_confirmation)
+        (not
+          (supplier_confirmation_available ?supplier_confirmation)
+        )
+      )
+  )
+  (:action release_supplier_confirmation_from_service_case
+    :parameters (?service_case - service_case ?supplier_confirmation - supplier_confirmation)
+    :precondition
+      (and
+        (service_case_supplier_confirmation_link ?service_case ?supplier_confirmation)
+      )
+    :effect
+      (and
+        (supplier_confirmation_available ?supplier_confirmation)
+        (not
+          (service_case_supplier_confirmation_link ?service_case ?supplier_confirmation)
+        )
+      )
+  )
+  (:action attach_external_approval_to_service_case
+    :parameters (?service_case - service_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (external_approval_available ?external_approval)
+      )
+    :effect
+      (and
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action release_external_approval_from_service_case
+    :parameters (?service_case - service_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (service_case_links_external_approval ?service_case ?external_approval)
+      )
+    :effect
+      (and
+        (external_approval_available ?external_approval)
+        (not
+          (service_case_links_external_approval ?service_case ?external_approval)
+        )
+      )
+  )
+  (:action assess_original_option_for_primary_passenger
+    :parameters (?primary_passenger - primary_passenger_record ?original_flight_option - original_flight_option ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_triaged ?primary_passenger)
+        (case_links_flight_segment ?primary_passenger ?flight_segment)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (not
+          (original_option_assessed ?original_flight_option)
+        )
+        (not
+          (original_option_allocation_recorded ?original_flight_option)
+        )
+      )
+    :effect (original_option_assessed ?original_flight_option)
+  )
+  (:action confirm_primary_passenger_original_option
+    :parameters (?primary_passenger - primary_passenger_record ?original_flight_option - original_flight_option ?onsite_staff - onsite_staff)
+    :precondition
+      (and
+        (case_triaged ?primary_passenger)
+        (case_assigned_onsite_staff ?primary_passenger ?onsite_staff)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (original_option_assessed ?original_flight_option)
+        (not
+          (primary_passenger_assessed ?primary_passenger)
+        )
+      )
+    :effect
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (primary_passenger_option_confirmed ?primary_passenger)
+      )
+  )
+  (:action allocate_inventory_to_primary_passenger
+    :parameters (?primary_passenger - primary_passenger_record ?original_flight_option - original_flight_option ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (case_triaged ?primary_passenger)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (inventory_item_available ?inventory_item)
+        (not
+          (primary_passenger_assessed ?primary_passenger)
+        )
+      )
+    :effect
+      (and
+        (original_option_allocation_recorded ?original_flight_option)
+        (primary_passenger_assessed ?primary_passenger)
+        (primary_passenger_inventory_allocated ?primary_passenger ?inventory_item)
+        (not
+          (inventory_item_available ?inventory_item)
+        )
+      )
+  )
+  (:action commit_primary_passenger_inventory_allocation
+    :parameters (?primary_passenger - primary_passenger_record ?original_flight_option - original_flight_option ?flight_segment - flight_segment ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (case_triaged ?primary_passenger)
+        (case_links_flight_segment ?primary_passenger ?flight_segment)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (original_option_allocation_recorded ?original_flight_option)
+        (primary_passenger_inventory_allocated ?primary_passenger ?inventory_item)
+        (not
+          (primary_passenger_option_confirmed ?primary_passenger)
+        )
+      )
+    :effect
+      (and
+        (original_option_assessed ?original_flight_option)
+        (primary_passenger_option_confirmed ?primary_passenger)
+        (inventory_item_available ?inventory_item)
+        (not
+          (primary_passenger_inventory_allocated ?primary_passenger ?inventory_item)
+        )
+      )
+  )
+  (:action assess_alternate_option_for_co_traveller
+    :parameters (?co_traveller - co_traveller_record ?alternate_flight_option - alternate_flight_option ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_triaged ?co_traveller)
+        (case_links_flight_segment ?co_traveller ?flight_segment)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (not
+          (alternate_option_assessed ?alternate_flight_option)
+        )
+        (not
+          (alternate_option_allocation_recorded ?alternate_flight_option)
+        )
+      )
+    :effect (alternate_option_assessed ?alternate_flight_option)
+  )
+  (:action confirm_co_traveller_alternate_option
+    :parameters (?co_traveller - co_traveller_record ?alternate_flight_option - alternate_flight_option ?onsite_staff - onsite_staff)
+    :precondition
+      (and
+        (case_triaged ?co_traveller)
+        (case_assigned_onsite_staff ?co_traveller ?onsite_staff)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (alternate_option_assessed ?alternate_flight_option)
+        (not
+          (co_traveller_assessed ?co_traveller)
+        )
+      )
+    :effect
+      (and
+        (co_traveller_assessed ?co_traveller)
+        (co_traveller_option_confirmed ?co_traveller)
+      )
+  )
+  (:action allocate_inventory_to_co_traveller
+    :parameters (?co_traveller - co_traveller_record ?alternate_flight_option - alternate_flight_option ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (case_triaged ?co_traveller)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (inventory_item_available ?inventory_item)
+        (not
+          (co_traveller_assessed ?co_traveller)
+        )
+      )
+    :effect
+      (and
+        (alternate_option_allocation_recorded ?alternate_flight_option)
+        (co_traveller_assessed ?co_traveller)
+        (co_traveller_inventory_allocated ?co_traveller ?inventory_item)
+        (not
+          (inventory_item_available ?inventory_item)
+        )
+      )
+  )
+  (:action commit_co_traveller_inventory_allocation
+    :parameters (?co_traveller - co_traveller_record ?alternate_flight_option - alternate_flight_option ?flight_segment - flight_segment ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (case_triaged ?co_traveller)
+        (case_links_flight_segment ?co_traveller ?flight_segment)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (alternate_option_allocation_recorded ?alternate_flight_option)
+        (co_traveller_inventory_allocated ?co_traveller ?inventory_item)
+        (not
+          (co_traveller_option_confirmed ?co_traveller)
+        )
+      )
+    :effect
+      (and
+        (alternate_option_assessed ?alternate_flight_option)
+        (co_traveller_option_confirmed ?co_traveller)
+        (inventory_item_available ?inventory_item)
+        (not
+          (co_traveller_inventory_allocated ?co_traveller ?inventory_item)
+        )
+      )
+  )
+  (:action assemble_rebooking_proposal_standard
+    :parameters (?primary_passenger - primary_passenger_record ?co_traveller - co_traveller_record ?original_flight_option - original_flight_option ?alternate_flight_option - alternate_flight_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (co_traveller_assessed ?co_traveller)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (original_option_assessed ?original_flight_option)
+        (alternate_option_assessed ?alternate_flight_option)
+        (primary_passenger_option_confirmed ?primary_passenger)
+        (co_traveller_option_confirmed ?co_traveller)
+        (rebooking_proposal_available ?rebooking_proposal)
+      )
+    :effect
+      (and
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (proposal_includes_original_option ?rebooking_proposal ?original_flight_option)
+        (proposal_includes_alternate_option ?rebooking_proposal ?alternate_flight_option)
+        (not
+          (rebooking_proposal_available ?rebooking_proposal)
+        )
+      )
+  )
+  (:action assemble_rebooking_proposal_with_supplier_requirement
+    :parameters (?primary_passenger - primary_passenger_record ?co_traveller - co_traveller_record ?original_flight_option - original_flight_option ?alternate_flight_option - alternate_flight_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (co_traveller_assessed ?co_traveller)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (original_option_allocation_recorded ?original_flight_option)
+        (alternate_option_assessed ?alternate_flight_option)
+        (not
+          (primary_passenger_option_confirmed ?primary_passenger)
+        )
+        (co_traveller_option_confirmed ?co_traveller)
+        (rebooking_proposal_available ?rebooking_proposal)
+      )
+    :effect
+      (and
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (proposal_includes_original_option ?rebooking_proposal ?original_flight_option)
+        (proposal_includes_alternate_option ?rebooking_proposal ?alternate_flight_option)
+        (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        (not
+          (rebooking_proposal_available ?rebooking_proposal)
+        )
+      )
+  )
+  (:action assemble_rebooking_proposal_with_third_party_requirement
+    :parameters (?primary_passenger - primary_passenger_record ?co_traveller - co_traveller_record ?original_flight_option - original_flight_option ?alternate_flight_option - alternate_flight_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (co_traveller_assessed ?co_traveller)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (original_option_assessed ?original_flight_option)
+        (alternate_option_allocation_recorded ?alternate_flight_option)
+        (primary_passenger_option_confirmed ?primary_passenger)
+        (not
+          (co_traveller_option_confirmed ?co_traveller)
+        )
+        (rebooking_proposal_available ?rebooking_proposal)
+      )
+    :effect
+      (and
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (proposal_includes_original_option ?rebooking_proposal ?original_flight_option)
+        (proposal_includes_alternate_option ?rebooking_proposal ?alternate_flight_option)
+        (proposal_requires_third_party_approval ?rebooking_proposal)
+        (not
+          (rebooking_proposal_available ?rebooking_proposal)
+        )
+      )
+  )
+  (:action assemble_rebooking_proposal_with_all_requirements
+    :parameters (?primary_passenger - primary_passenger_record ?co_traveller - co_traveller_record ?original_flight_option - original_flight_option ?alternate_flight_option - alternate_flight_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (co_traveller_assessed ?co_traveller)
+        (primary_passenger_original_option_link ?primary_passenger ?original_flight_option)
+        (co_traveller_alternate_option_link ?co_traveller ?alternate_flight_option)
+        (original_option_allocation_recorded ?original_flight_option)
+        (alternate_option_allocation_recorded ?alternate_flight_option)
+        (not
+          (primary_passenger_option_confirmed ?primary_passenger)
+        )
+        (not
+          (co_traveller_option_confirmed ?co_traveller)
+        )
+        (rebooking_proposal_available ?rebooking_proposal)
+      )
+    :effect
+      (and
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (proposal_includes_original_option ?rebooking_proposal ?original_flight_option)
+        (proposal_includes_alternate_option ?rebooking_proposal ?alternate_flight_option)
+        (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        (proposal_requires_third_party_approval ?rebooking_proposal)
+        (not
+          (rebooking_proposal_available ?rebooking_proposal)
+        )
+      )
+  )
+  (:action select_rebooking_proposal_for_passenger
+    :parameters (?rebooking_proposal - rebooking_proposal ?primary_passenger - primary_passenger_record ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (primary_passenger_assessed ?primary_passenger)
+        (case_links_flight_segment ?primary_passenger ?flight_segment)
+        (not
+          (rebooking_proposal_selected ?rebooking_proposal)
+        )
+      )
+    :effect (rebooking_proposal_selected ?rebooking_proposal)
+  )
+  (:action attach_accommodation_option_to_proposal
+    :parameters (?service_case - service_case ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (service_case_links_proposal ?service_case ?rebooking_proposal)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_available ?accommodation_option)
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (rebooking_proposal_selected ?rebooking_proposal)
+        (not
+          (accommodation_option_allocated ?accommodation_option)
+        )
+      )
+    :effect
+      (and
+        (accommodation_option_allocated ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (not
+          (accommodation_option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action validate_rebooking_proposal
+    :parameters (?service_case - service_case ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_allocated ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (case_links_flight_segment ?service_case ?flight_segment)
+        (not
+          (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        )
+        (not
+          (service_case_proposal_validated ?service_case)
+        )
+      )
+    :effect (service_case_proposal_validated ?service_case)
+  )
+  (:action attach_document_to_service_case
+    :parameters (?service_case - service_case ?document_type - document_type)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (document_type_available ?document_type)
+        (not
+          (service_case_has_document ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_has_document ?service_case)
+        (service_case_links_document_type ?service_case ?document_type)
+        (not
+          (document_type_available ?document_type)
+        )
+      )
+  )
+  (:action apply_documentation_and_mark_case_validated
+    :parameters (?service_case - service_case ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal ?flight_segment - flight_segment ?document_type - document_type)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_allocated ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (case_links_flight_segment ?service_case ?flight_segment)
+        (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        (service_case_has_document ?service_case)
+        (service_case_links_document_type ?service_case ?document_type)
+        (not
+          (service_case_proposal_validated ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_proposal_validated ?service_case)
+        (service_case_document_verified ?service_case)
+      )
+  )
+  (:action record_supplier_confirmation
+    :parameters (?service_case - service_case ?supplier_confirmation - supplier_confirmation ?onsite_staff - onsite_staff ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_proposal_validated ?service_case)
+        (service_case_supplier_confirmation_link ?service_case ?supplier_confirmation)
+        (case_assigned_onsite_staff ?service_case ?onsite_staff)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (not
+          (proposal_requires_third_party_approval ?rebooking_proposal)
+        )
+        (not
+          (service_case_supplier_confirmed ?service_case)
+        )
+      )
+    :effect (service_case_supplier_confirmed ?service_case)
+  )
+  (:action record_supplier_confirmation_alternate
+    :parameters (?service_case - service_case ?supplier_confirmation - supplier_confirmation ?onsite_staff - onsite_staff ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_proposal_validated ?service_case)
+        (service_case_supplier_confirmation_link ?service_case ?supplier_confirmation)
+        (case_assigned_onsite_staff ?service_case ?onsite_staff)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (proposal_requires_third_party_approval ?rebooking_proposal)
+        (not
+          (service_case_supplier_confirmed ?service_case)
+        )
+      )
+    :effect (service_case_supplier_confirmed ?service_case)
+  )
+  (:action record_external_approval_and_mark
+    :parameters (?service_case - service_case ?external_approval - external_approval ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_supplier_confirmed ?service_case)
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (not
+          (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        )
+        (not
+          (proposal_requires_third_party_approval ?rebooking_proposal)
+        )
+        (not
+          (service_case_ready_for_finalization ?service_case)
+        )
+      )
+    :effect (service_case_ready_for_finalization ?service_case)
+  )
+  (:action record_external_approval_and_mark_with_flag
+    :parameters (?service_case - service_case ?external_approval - external_approval ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_supplier_confirmed ?service_case)
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        (not
+          (proposal_requires_third_party_approval ?rebooking_proposal)
+        )
+        (not
+          (service_case_ready_for_finalization ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_ready_for_compensation_selection ?service_case)
+      )
+  )
+  (:action record_external_approval_and_mark_alternate
+    :parameters (?service_case - service_case ?external_approval - external_approval ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_supplier_confirmed ?service_case)
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (not
+          (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        )
+        (proposal_requires_third_party_approval ?rebooking_proposal)
+        (not
+          (service_case_ready_for_finalization ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_ready_for_compensation_selection ?service_case)
+      )
+  )
+  (:action record_external_approval_and_mark_full
+    :parameters (?service_case - service_case ?external_approval - external_approval ?accommodation_option - accommodation_option ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (service_case_supplier_confirmed ?service_case)
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (service_case_links_accommodation_option ?service_case ?accommodation_option)
+        (accommodation_option_assigned_to_proposal ?accommodation_option ?rebooking_proposal)
+        (proposal_requires_supplier_confirmation ?rebooking_proposal)
+        (proposal_requires_third_party_approval ?rebooking_proposal)
+        (not
+          (service_case_ready_for_finalization ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_ready_for_compensation_selection ?service_case)
+      )
+  )
+  (:action final_approve_service_case
+    :parameters (?service_case - service_case)
+    :precondition
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (not
+          (service_case_ready_for_compensation_selection ?service_case)
+        )
+        (not
+          (service_case_closed ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_closed ?service_case)
+        (case_resolution_ready ?service_case)
+      )
+  )
+  (:action select_compensation_option_for_service_case
+    :parameters (?service_case - service_case ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_ready_for_compensation_selection ?service_case)
+        (compensation_option_available ?compensation_option)
+      )
+    :effect
+      (and
+        (service_case_compensation_option_selected ?service_case ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action perform_final_checks_for_service_case
+    :parameters (?service_case - service_case ?primary_passenger - primary_passenger_record ?co_traveller - co_traveller_record ?flight_segment - flight_segment ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_ready_for_compensation_selection ?service_case)
+        (service_case_compensation_option_selected ?service_case ?compensation_option)
+        (service_case_links_primary_passenger ?service_case ?primary_passenger)
+        (service_case_links_co_traveller ?service_case ?co_traveller)
+        (primary_passenger_option_confirmed ?primary_passenger)
+        (co_traveller_option_confirmed ?co_traveller)
+        (case_links_flight_segment ?service_case ?flight_segment)
+        (not
+          (service_case_final_checks_completed ?service_case)
+        )
+      )
+    :effect (service_case_final_checks_completed ?service_case)
+  )
+  (:action close_service_case_after_final_checks
+    :parameters (?service_case - service_case)
+    :precondition
+      (and
+        (service_case_ready_for_finalization ?service_case)
+        (service_case_final_checks_completed ?service_case)
+        (not
+          (service_case_closed ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_closed ?service_case)
+        (case_resolution_ready ?service_case)
+      )
+  )
+  (:action request_third_party_approval
+    :parameters (?service_case - service_case ?third_party_partner - third_party_partner ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_triaged ?service_case)
+        (case_links_flight_segment ?service_case ?flight_segment)
+        (third_party_partner_available ?third_party_partner)
+        (service_case_links_third_party_partner ?service_case ?third_party_partner)
+        (not
+          (service_case_third_party_requested ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_third_party_requested ?service_case)
+        (not
+          (third_party_partner_available ?third_party_partner)
+        )
+      )
+  )
+  (:action register_third_party_approval
+    :parameters (?service_case - service_case ?onsite_staff - onsite_staff)
+    :precondition
+      (and
+        (service_case_third_party_requested ?service_case)
+        (case_assigned_onsite_staff ?service_case ?onsite_staff)
+        (not
+          (service_case_third_party_registered ?service_case)
+        )
+      )
+    :effect (service_case_third_party_registered ?service_case)
+  )
+  (:action record_external_approval
+    :parameters (?service_case - service_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (service_case_third_party_registered ?service_case)
+        (service_case_links_external_approval ?service_case ?external_approval)
+        (not
+          (service_case_external_approval_recorded ?service_case)
+        )
+      )
+    :effect (service_case_external_approval_recorded ?service_case)
+  )
+  (:action close_service_case_after_external_approval
+    :parameters (?service_case - service_case)
+    :precondition
+      (and
+        (service_case_external_approval_recorded ?service_case)
+        (not
+          (service_case_closed ?service_case)
+        )
+      )
+    :effect
+      (and
+        (service_case_closed ?service_case)
+        (case_resolution_ready ?service_case)
+      )
+  )
+  (:action resolve_primary_passenger_case
+    :parameters (?primary_passenger - primary_passenger_record ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (primary_passenger_assessed ?primary_passenger)
+        (primary_passenger_option_confirmed ?primary_passenger)
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (rebooking_proposal_selected ?rebooking_proposal)
+        (not
+          (case_resolution_ready ?primary_passenger)
+        )
+      )
+    :effect (case_resolution_ready ?primary_passenger)
+  )
+  (:action resolve_co_traveller_case
+    :parameters (?co_traveller - co_traveller_record ?rebooking_proposal - rebooking_proposal)
+    :precondition
+      (and
+        (co_traveller_assessed ?co_traveller)
+        (co_traveller_option_confirmed ?co_traveller)
+        (rebooking_proposal_reserved ?rebooking_proposal)
+        (rebooking_proposal_selected ?rebooking_proposal)
+        (not
+          (case_resolution_ready ?co_traveller)
+        )
+      )
+    :effect (case_resolution_ready ?co_traveller)
+  )
+  (:action initiate_compensation_for_case
+    :parameters (?case_entity - case_subject ?compensation_document - compensation_document ?flight_segment - flight_segment)
+    :precondition
+      (and
+        (case_resolution_ready ?case_entity)
+        (case_links_flight_segment ?case_entity ?flight_segment)
+        (compensation_document_available ?compensation_document)
+        (not
+          (compensation_initiated ?case_entity)
+        )
+      )
+    :effect
+      (and
+        (compensation_initiated ?case_entity)
+        (case_links_compensation_document ?case_entity ?compensation_document)
+        (not
+          (compensation_document_available ?compensation_document)
+        )
+      )
+  )
+  (:action assign_contact_channel_to_primary_passenger
+    :parameters (?primary_passenger - primary_passenger_record ?contact_channel - contact_channel ?compensation_document - compensation_document)
+    :precondition
+      (and
+        (compensation_initiated ?primary_passenger)
+        (case_assigned_contact_channel ?primary_passenger ?contact_channel)
+        (case_links_compensation_document ?primary_passenger ?compensation_document)
+        (not
+          (contact_channel_confirmed ?primary_passenger)
+        )
+      )
+    :effect
+      (and
+        (contact_channel_confirmed ?primary_passenger)
+        (contact_channel_available ?contact_channel)
+        (compensation_document_available ?compensation_document)
+      )
+  )
+  (:action assign_contact_channel_to_co_traveller
+    :parameters (?co_traveller - co_traveller_record ?contact_channel - contact_channel ?compensation_document - compensation_document)
+    :precondition
+      (and
+        (compensation_initiated ?co_traveller)
+        (case_assigned_contact_channel ?co_traveller ?contact_channel)
+        (case_links_compensation_document ?co_traveller ?compensation_document)
+        (not
+          (contact_channel_confirmed ?co_traveller)
+        )
+      )
+    :effect
+      (and
+        (contact_channel_confirmed ?co_traveller)
+        (contact_channel_available ?contact_channel)
+        (compensation_document_available ?compensation_document)
+      )
+  )
+  (:action assign_contact_channel_to_service_case
+    :parameters (?service_case - service_case ?contact_channel - contact_channel ?compensation_document - compensation_document)
+    :precondition
+      (and
+        (compensation_initiated ?service_case)
+        (case_assigned_contact_channel ?service_case ?contact_channel)
+        (case_links_compensation_document ?service_case ?compensation_document)
+        (not
+          (contact_channel_confirmed ?service_case)
+        )
+      )
+    :effect
+      (and
+        (contact_channel_confirmed ?service_case)
+        (contact_channel_available ?contact_channel)
+        (compensation_document_available ?compensation_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem flight_cancellation_rebooking_example)
+  (:domain flight_cancellation_rebooking)
+  (:objects primary_passenger_record_1 - primary_passenger_record co_traveller_record_1 - co_traveller_record service_case_1 - service_case service_case_2 - service_case contact_channel_call_centre - contact_channel contact_channel_mobile_app - contact_channel contact_channel_checkin_desk - contact_channel flight_segment_1 - flight_segment onsite_staff_agent_1 - onsite_staff hotel_room_voucher_1 - inventory_item original_flight_option_a - original_flight_option alternate_flight_option_b - alternate_flight_option rebooking_proposal_slot_1 - rebooking_proposal accommodation_option_hotel_1 - accommodation_option accommodation_option_hotel_2 - accommodation_option document_type_itinerary - document_type document_type_voucher - document_type compensation_option_refund - compensation_option compensation_option_voucher - compensation_option compensation_document_1 - compensation_document supplier_confirmation_1 - supplier_confirmation third_party_approval_partner_1 - third_party_partner third_party_approval_partner_2 - third_party_partner external_approval_1 - external_approval)
+  (:init
+    (contact_channel_available contact_channel_call_centre)
+    (contact_channel_available contact_channel_mobile_app)
+    (contact_channel_available contact_channel_checkin_desk)
+    (flight_segment_available flight_segment_1)
+    (onsite_staff_available onsite_staff_agent_1)
+    (inventory_item_available hotel_room_voucher_1)
+    (primary_passenger_original_option_link primary_passenger_record_1 original_flight_option_a)
+    (co_traveller_alternate_option_link co_traveller_record_1 alternate_flight_option_b)
+    (rebooking_proposal_available rebooking_proposal_slot_1)
+    (accommodation_option_available accommodation_option_hotel_1)
+    (accommodation_option_available accommodation_option_hotel_2)
+    (service_case_links_primary_passenger service_case_1 primary_passenger_record_1)
+    (service_case_links_primary_passenger service_case_2 primary_passenger_record_1)
+    (service_case_links_co_traveller service_case_1 co_traveller_record_1)
+    (service_case_links_co_traveller service_case_2 co_traveller_record_1)
+    (service_case_links_proposal service_case_1 rebooking_proposal_slot_1)
+    (service_case_links_proposal service_case_2 rebooking_proposal_slot_1)
+    (service_case_links_accommodation_option service_case_1 accommodation_option_hotel_1)
+    (service_case_links_accommodation_option service_case_2 accommodation_option_hotel_2)
+    (document_type_available document_type_itinerary)
+    (document_type_available document_type_voucher)
+    (compensation_option_available compensation_option_refund)
+    (compensation_option_available compensation_option_voucher)
+    (compensation_document_available compensation_document_1)
+    (supplier_confirmation_available supplier_confirmation_1)
+    (third_party_partner_available third_party_approval_partner_1)
+    (service_case_links_third_party_partner service_case_1 third_party_approval_partner_1)
+    (service_case_links_third_party_partner service_case_2 third_party_approval_partner_2)
+    (external_approval_available external_approval_1)
+  )
+  (:goal
+    (and
+      (contact_channel_confirmed primary_passenger_record_1)
+      (contact_channel_confirmed co_traveller_record_1)
+      (contact_channel_confirmed service_case_1)
+      (contact_channel_confirmed service_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_disruption_case primary_passenger_record_1)
+(allocate_contact_channel_to_case primary_passenger_record_1 contact_channel_call_centre)
+(link_flight_segment_to_case primary_passenger_record_1 flight_segment_1)
+(triage_case primary_passenger_record_1 flight_segment_1)
+(assess_original_option_for_primary_passenger primary_passenger_record_1 original_flight_option_a flight_segment_1)
+(assign_onsite_staff_to_case primary_passenger_record_1 onsite_staff_agent_1)
+(confirm_primary_passenger_original_option primary_passenger_record_1 original_flight_option_a onsite_staff_agent_1)
+(release_onsite_staff_from_case primary_passenger_record_1 onsite_staff_agent_1)
+(release_flight_segment_from_case primary_passenger_record_1 flight_segment_1)
+(create_disruption_case co_traveller_record_1)
+(allocate_contact_channel_to_case co_traveller_record_1 contact_channel_mobile_app)
+(link_flight_segment_to_case co_traveller_record_1 flight_segment_1)
+(triage_case co_traveller_record_1 flight_segment_1)
+(assess_alternate_option_for_co_traveller co_traveller_record_1 alternate_flight_option_b flight_segment_1)
+(assign_onsite_staff_to_case co_traveller_record_1 onsite_staff_agent_1)
+(confirm_co_traveller_alternate_option co_traveller_record_1 alternate_flight_option_b onsite_staff_agent_1)
+(release_onsite_staff_from_case co_traveller_record_1 onsite_staff_agent_1)
+(release_flight_segment_from_case co_traveller_record_1 flight_segment_1)
+(assemble_rebooking_proposal_standard primary_passenger_record_1 co_traveller_record_1 original_flight_option_a alternate_flight_option_b rebooking_proposal_slot_1)
+(link_flight_segment_to_case primary_passenger_record_1 flight_segment_1)
+(select_rebooking_proposal_for_passenger rebooking_proposal_slot_1 primary_passenger_record_1 flight_segment_1)
+(resolve_primary_passenger_case primary_passenger_record_1 rebooking_proposal_slot_1)
+(initiate_compensation_for_case primary_passenger_record_1 compensation_document_1 flight_segment_1)
+(assign_contact_channel_to_primary_passenger primary_passenger_record_1 contact_channel_call_centre compensation_document_1)
+(release_flight_segment_from_case primary_passenger_record_1 flight_segment_1)
+(resolve_co_traveller_case co_traveller_record_1 rebooking_proposal_slot_1)
+(link_flight_segment_to_case co_traveller_record_1 flight_segment_1)
+(initiate_compensation_for_case co_traveller_record_1 compensation_document_1 flight_segment_1)
+(assign_contact_channel_to_co_traveller co_traveller_record_1 contact_channel_mobile_app compensation_document_1)
+(release_flight_segment_from_case co_traveller_record_1 flight_segment_1)
+(create_disruption_case service_case_1)
+(allocate_contact_channel_to_case service_case_1 contact_channel_checkin_desk)
+(link_flight_segment_to_case service_case_1 flight_segment_1)
+(triage_case service_case_1 flight_segment_1)
+(attach_accommodation_option_to_proposal service_case_1 accommodation_option_hotel_1 rebooking_proposal_slot_1)
+(validate_rebooking_proposal service_case_1 accommodation_option_hotel_1 rebooking_proposal_slot_1 flight_segment_1)
+(attach_supplier_confirmation_to_service_case service_case_1 supplier_confirmation_1)
+(assign_onsite_staff_to_case service_case_1 onsite_staff_agent_1)
+(record_supplier_confirmation service_case_1 supplier_confirmation_1 onsite_staff_agent_1 accommodation_option_hotel_1 rebooking_proposal_slot_1)
+(attach_external_approval_to_service_case service_case_1 external_approval_1)
+(record_external_approval_and_mark service_case_1 external_approval_1 accommodation_option_hotel_1 rebooking_proposal_slot_1)
+(final_approve_service_case service_case_1)
+(initiate_compensation_for_case service_case_1 compensation_document_1 flight_segment_1)
+(assign_contact_channel_to_service_case service_case_1 contact_channel_checkin_desk compensation_document_1)
+(release_flight_segment_from_case service_case_1 flight_segment_1)
+(release_onsite_staff_from_case service_case_1 onsite_staff_agent_1)
+(release_supplier_confirmation_from_service_case service_case_1 supplier_confirmation_1)
+(release_external_approval_from_service_case service_case_1 external_approval_1)
+(create_disruption_case service_case_2)
+(allocate_contact_channel_to_case service_case_2 contact_channel_call_centre)
+(link_flight_segment_to_case service_case_2 flight_segment_1)
+(triage_case service_case_2 flight_segment_1)
+(attach_accommodation_option_to_proposal service_case_2 accommodation_option_hotel_2 rebooking_proposal_slot_1)
+(validate_rebooking_proposal service_case_2 accommodation_option_hotel_2 rebooking_proposal_slot_1 flight_segment_1)
+(attach_supplier_confirmation_to_service_case service_case_2 supplier_confirmation_1)
+(assign_onsite_staff_to_case service_case_2 onsite_staff_agent_1)
+(record_supplier_confirmation service_case_2 supplier_confirmation_1 onsite_staff_agent_1 accommodation_option_hotel_2 rebooking_proposal_slot_1)
+(attach_external_approval_to_service_case service_case_2 external_approval_1)
+(record_external_approval_and_mark service_case_2 external_approval_1 accommodation_option_hotel_2 rebooking_proposal_slot_1)
+(final_approve_service_case service_case_2)
+(initiate_compensation_for_case service_case_2 compensation_document_1 flight_segment_1)
+(assign_contact_channel_to_service_case service_case_2 contact_channel_call_centre compensation_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_q38sc6xe/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_q38sc6xe/plan.pddl 62 
+
+
+
+--- stderr ---
+

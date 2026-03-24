@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain return_trip_backhaul_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types location_cluster - object mode_cluster - object resource_cluster - object request_group - object backhaul_request - request_group carrier_unit - location_cluster time_window - location_cluster transfer_facility - location_cluster equipment_type - location_cluster service_option - location_cluster return_constraint - location_cluster special_equipment - location_cluster priority_marker - location_cluster cargo_unit - mode_cluster cargo_batch - mode_cluster authorization_token - mode_cluster outbound_leg - resource_cluster return_leg - resource_cluster container_unit - resource_cluster vehicle_group - backhaul_request service_group - backhaul_request outbound_vehicle - vehicle_group return_vehicle - vehicle_group assignment_task - service_group)
+  (:predicates
+    (request_registered ?request - backhaul_request)
+    (entity_ready_for_assignment ?request - backhaul_request)
+    (carrier_reserved_for_entity ?request - backhaul_request)
+    (return_assignment_applied ?request - backhaul_request)
+    (ready_for_dispatch ?request - backhaul_request)
+    (entity_finalized ?request - backhaul_request)
+    (carrier_available ?carrier_unit - carrier_unit)
+    (entity_carrier_assignment ?request - backhaul_request ?carrier_unit - carrier_unit)
+    (time_window_available ?time_window - time_window)
+    (scheduled_in_time_window ?request - backhaul_request ?time_window - time_window)
+    (facility_available ?transfer_facility - transfer_facility)
+    (assigned_facility ?request - backhaul_request ?transfer_facility - transfer_facility)
+    (cargo_unit_unassigned ?cargo_unit - cargo_unit)
+    (vehicle_has_cargo_unit ?outbound_vehicle - outbound_vehicle ?cargo_unit - cargo_unit)
+    (return_vehicle_has_cargo_unit ?return_vehicle - return_vehicle ?cargo_unit - cargo_unit)
+    (vehicle_assigned_outbound_leg ?outbound_vehicle - outbound_vehicle ?outbound_leg - outbound_leg)
+    (outbound_leg_reserved ?outbound_leg - outbound_leg)
+    (outbound_leg_has_cargo ?outbound_leg - outbound_leg)
+    (outbound_vehicle_ready ?outbound_vehicle - outbound_vehicle)
+    (return_vehicle_assigned_return_leg ?return_vehicle - return_vehicle ?return_leg - return_leg)
+    (return_leg_reserved ?return_leg - return_leg)
+    (return_leg_has_cargo ?return_leg - return_leg)
+    (return_vehicle_ready ?return_vehicle - return_vehicle)
+    (container_available ?container_unit - container_unit)
+    (container_allocated ?container_unit - container_unit)
+    (container_links_outbound_leg ?container_unit - container_unit ?outbound_leg - outbound_leg)
+    (container_links_return_leg ?container_unit - container_unit ?return_leg - return_leg)
+    (container_outbound_ready ?container_unit - container_unit)
+    (container_return_ready ?container_unit - container_unit)
+    (container_ready_for_loading ?container_unit - container_unit)
+    (task_assigned_outbound_vehicle ?assignment_task - assignment_task ?outbound_vehicle - outbound_vehicle)
+    (task_assigned_return_vehicle ?assignment_task - assignment_task ?return_vehicle - return_vehicle)
+    (task_assigned_container ?assignment_task - assignment_task ?container_unit - container_unit)
+    (cargo_batch_available ?cargo_batch - cargo_batch)
+    (task_has_cargo_batch ?assignment_task - assignment_task ?cargo_batch - cargo_batch)
+    (cargo_batch_loaded ?cargo_batch - cargo_batch)
+    (cargo_batch_in_container ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    (task_loading_prepared ?assignment_task - assignment_task)
+    (task_equipment_attached ?assignment_task - assignment_task)
+    (task_authorized ?assignment_task - assignment_task)
+    (task_equipment_allocated ?assignment_task - assignment_task)
+    (task_equipment_verified ?assignment_task - assignment_task)
+    (task_pending_services ?assignment_task - assignment_task)
+    (task_loading_validated ?assignment_task - assignment_task)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (task_associated_authorization ?assignment_task - assignment_task ?authorization_token - authorization_token)
+    (task_authorization_attached ?assignment_task - assignment_task)
+    (task_authorization_verified ?assignment_task - assignment_task)
+    (task_authorization_finalized ?assignment_task - assignment_task)
+    (equipment_available ?equipment_type - equipment_type)
+    (task_equipment_assigned ?assignment_task - assignment_task ?equipment_type - equipment_type)
+    (service_option_available ?service_option - service_option)
+    (task_service_assigned ?assignment_task - assignment_task ?service_option - service_option)
+    (special_equipment_available ?special_equipment - special_equipment)
+    (task_special_equipment_assigned ?assignment_task - assignment_task ?special_equipment - special_equipment)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (task_priority_assigned ?assignment_task - assignment_task ?priority_marker - priority_marker)
+    (return_constraint_available ?return_constraint - return_constraint)
+    (entity_return_constraint_assigned ?request - backhaul_request ?return_constraint - return_constraint)
+    (outbound_vehicle_prepared ?outbound_vehicle - outbound_vehicle)
+    (return_vehicle_prepared ?return_vehicle - return_vehicle)
+    (task_finalized ?assignment_task - assignment_task)
+  )
+  (:action register_backhaul_request
+    :parameters (?request - backhaul_request)
+    :precondition
+      (and
+        (not
+          (request_registered ?request)
+        )
+        (not
+          (return_assignment_applied ?request)
+        )
+      )
+    :effect (request_registered ?request)
+  )
+  (:action assign_carrier_to_request
+    :parameters (?request - backhaul_request ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (request_registered ?request)
+        (not
+          (carrier_reserved_for_entity ?request)
+        )
+        (carrier_available ?carrier_unit)
+      )
+    :effect
+      (and
+        (carrier_reserved_for_entity ?request)
+        (entity_carrier_assignment ?request ?carrier_unit)
+        (not
+          (carrier_available ?carrier_unit)
+        )
+      )
+  )
+  (:action reserve_time_window_for_request
+    :parameters (?request - backhaul_request ?time_window - time_window)
+    :precondition
+      (and
+        (request_registered ?request)
+        (carrier_reserved_for_entity ?request)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (scheduled_in_time_window ?request ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action mark_request_ready_for_assignment
+    :parameters (?request - backhaul_request ?time_window - time_window)
+    :precondition
+      (and
+        (request_registered ?request)
+        (carrier_reserved_for_entity ?request)
+        (scheduled_in_time_window ?request ?time_window)
+        (not
+          (entity_ready_for_assignment ?request)
+        )
+      )
+    :effect (entity_ready_for_assignment ?request)
+  )
+  (:action release_time_window_for_request
+    :parameters (?request - backhaul_request ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled_in_time_window ?request ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (scheduled_in_time_window ?request ?time_window)
+        )
+      )
+  )
+  (:action assign_transfer_facility_to_request
+    :parameters (?request - backhaul_request ?transfer_facility - transfer_facility)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?request)
+        (facility_available ?transfer_facility)
+      )
+    :effect
+      (and
+        (assigned_facility ?request ?transfer_facility)
+        (not
+          (facility_available ?transfer_facility)
+        )
+      )
+  )
+  (:action release_transfer_facility_from_request
+    :parameters (?request - backhaul_request ?transfer_facility - transfer_facility)
+    :precondition
+      (and
+        (assigned_facility ?request ?transfer_facility)
+      )
+    :effect
+      (and
+        (facility_available ?transfer_facility)
+        (not
+          (assigned_facility ?request ?transfer_facility)
+        )
+      )
+  )
+  (:action attach_special_equipment_to_task
+    :parameters (?assignment_task - assignment_task ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (special_equipment_available ?special_equipment)
+      )
+    :effect
+      (and
+        (task_special_equipment_assigned ?assignment_task ?special_equipment)
+        (not
+          (special_equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action detach_special_equipment_from_task
+    :parameters (?assignment_task - assignment_task ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (task_special_equipment_assigned ?assignment_task ?special_equipment)
+      )
+    :effect
+      (and
+        (special_equipment_available ?special_equipment)
+        (not
+          (task_special_equipment_assigned ?assignment_task ?special_equipment)
+        )
+      )
+  )
+  (:action assign_priority_marker_to_task
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (priority_marker_available ?priority_marker)
+      )
+    :effect
+      (and
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action detach_priority_marker_from_task
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (task_priority_assigned ?assignment_task ?priority_marker)
+      )
+    :effect
+      (and
+        (priority_marker_available ?priority_marker)
+        (not
+          (task_priority_assigned ?assignment_task ?priority_marker)
+        )
+      )
+  )
+  (:action reserve_outbound_leg
+    :parameters (?outbound_vehicle - outbound_vehicle ?outbound_leg - outbound_leg ?time_window - time_window)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?outbound_vehicle)
+        (scheduled_in_time_window ?outbound_vehicle ?time_window)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (not
+          (outbound_leg_reserved ?outbound_leg)
+        )
+        (not
+          (outbound_leg_has_cargo ?outbound_leg)
+        )
+      )
+    :effect (outbound_leg_reserved ?outbound_leg)
+  )
+  (:action prepare_outbound_vehicle_at_facility
+    :parameters (?outbound_vehicle - outbound_vehicle ?outbound_leg - outbound_leg ?transfer_facility - transfer_facility)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?outbound_vehicle)
+        (assigned_facility ?outbound_vehicle ?transfer_facility)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (outbound_leg_reserved ?outbound_leg)
+        (not
+          (outbound_vehicle_prepared ?outbound_vehicle)
+        )
+      )
+    :effect
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (outbound_vehicle_ready ?outbound_vehicle)
+      )
+  )
+  (:action stage_cargo_on_outbound_leg
+    :parameters (?outbound_vehicle - outbound_vehicle ?outbound_leg - outbound_leg ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?outbound_vehicle)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (cargo_unit_unassigned ?cargo_unit)
+        (not
+          (outbound_vehicle_prepared ?outbound_vehicle)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_has_cargo ?outbound_leg)
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (vehicle_has_cargo_unit ?outbound_vehicle ?cargo_unit)
+        (not
+          (cargo_unit_unassigned ?cargo_unit)
+        )
+      )
+  )
+  (:action load_cargo_onto_outbound_leg
+    :parameters (?outbound_vehicle - outbound_vehicle ?outbound_leg - outbound_leg ?time_window - time_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?outbound_vehicle)
+        (scheduled_in_time_window ?outbound_vehicle ?time_window)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (outbound_leg_has_cargo ?outbound_leg)
+        (vehicle_has_cargo_unit ?outbound_vehicle ?cargo_unit)
+        (not
+          (outbound_vehicle_ready ?outbound_vehicle)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_reserved ?outbound_leg)
+        (outbound_vehicle_ready ?outbound_vehicle)
+        (cargo_unit_unassigned ?cargo_unit)
+        (not
+          (vehicle_has_cargo_unit ?outbound_vehicle ?cargo_unit)
+        )
+      )
+  )
+  (:action reserve_return_leg
+    :parameters (?return_vehicle - return_vehicle ?return_leg - return_leg ?time_window - time_window)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?return_vehicle)
+        (scheduled_in_time_window ?return_vehicle ?time_window)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (not
+          (return_leg_reserved ?return_leg)
+        )
+        (not
+          (return_leg_has_cargo ?return_leg)
+        )
+      )
+    :effect (return_leg_reserved ?return_leg)
+  )
+  (:action prepare_return_vehicle_at_facility
+    :parameters (?return_vehicle - return_vehicle ?return_leg - return_leg ?transfer_facility - transfer_facility)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?return_vehicle)
+        (assigned_facility ?return_vehicle ?transfer_facility)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (return_leg_reserved ?return_leg)
+        (not
+          (return_vehicle_prepared ?return_vehicle)
+        )
+      )
+    :effect
+      (and
+        (return_vehicle_prepared ?return_vehicle)
+        (return_vehicle_ready ?return_vehicle)
+      )
+  )
+  (:action stage_cargo_on_return_leg
+    :parameters (?return_vehicle - return_vehicle ?return_leg - return_leg ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?return_vehicle)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (cargo_unit_unassigned ?cargo_unit)
+        (not
+          (return_vehicle_prepared ?return_vehicle)
+        )
+      )
+    :effect
+      (and
+        (return_leg_has_cargo ?return_leg)
+        (return_vehicle_prepared ?return_vehicle)
+        (return_vehicle_has_cargo_unit ?return_vehicle ?cargo_unit)
+        (not
+          (cargo_unit_unassigned ?cargo_unit)
+        )
+      )
+  )
+  (:action load_cargo_onto_return_leg
+    :parameters (?return_vehicle - return_vehicle ?return_leg - return_leg ?time_window - time_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?return_vehicle)
+        (scheduled_in_time_window ?return_vehicle ?time_window)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (return_leg_has_cargo ?return_leg)
+        (return_vehicle_has_cargo_unit ?return_vehicle ?cargo_unit)
+        (not
+          (return_vehicle_ready ?return_vehicle)
+        )
+      )
+    :effect
+      (and
+        (return_leg_reserved ?return_leg)
+        (return_vehicle_ready ?return_vehicle)
+        (cargo_unit_unassigned ?cargo_unit)
+        (not
+          (return_vehicle_has_cargo_unit ?return_vehicle ?cargo_unit)
+        )
+      )
+  )
+  (:action allocate_container_and_link_legs
+    :parameters (?outbound_vehicle - outbound_vehicle ?return_vehicle - return_vehicle ?outbound_leg - outbound_leg ?return_leg - return_leg ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (return_vehicle_prepared ?return_vehicle)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (outbound_leg_reserved ?outbound_leg)
+        (return_leg_reserved ?return_leg)
+        (outbound_vehicle_ready ?outbound_vehicle)
+        (return_vehicle_ready ?return_vehicle)
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_links_outbound_leg ?container_unit ?outbound_leg)
+        (container_links_return_leg ?container_unit ?return_leg)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_outbound_staged
+    :parameters (?outbound_vehicle - outbound_vehicle ?return_vehicle - return_vehicle ?outbound_leg - outbound_leg ?return_leg - return_leg ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (return_vehicle_prepared ?return_vehicle)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (outbound_leg_has_cargo ?outbound_leg)
+        (return_leg_reserved ?return_leg)
+        (not
+          (outbound_vehicle_ready ?outbound_vehicle)
+        )
+        (return_vehicle_ready ?return_vehicle)
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_links_outbound_leg ?container_unit ?outbound_leg)
+        (container_links_return_leg ?container_unit ?return_leg)
+        (container_outbound_ready ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_return_staged
+    :parameters (?outbound_vehicle - outbound_vehicle ?return_vehicle - return_vehicle ?outbound_leg - outbound_leg ?return_leg - return_leg ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (return_vehicle_prepared ?return_vehicle)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (outbound_leg_reserved ?outbound_leg)
+        (return_leg_has_cargo ?return_leg)
+        (outbound_vehicle_ready ?outbound_vehicle)
+        (not
+          (return_vehicle_ready ?return_vehicle)
+        )
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_links_outbound_leg ?container_unit ?outbound_leg)
+        (container_links_return_leg ?container_unit ?return_leg)
+        (container_return_ready ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_both_legs_staged
+    :parameters (?outbound_vehicle - outbound_vehicle ?return_vehicle - return_vehicle ?outbound_leg - outbound_leg ?return_leg - return_leg ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (return_vehicle_prepared ?return_vehicle)
+        (vehicle_assigned_outbound_leg ?outbound_vehicle ?outbound_leg)
+        (return_vehicle_assigned_return_leg ?return_vehicle ?return_leg)
+        (outbound_leg_has_cargo ?outbound_leg)
+        (return_leg_has_cargo ?return_leg)
+        (not
+          (outbound_vehicle_ready ?outbound_vehicle)
+        )
+        (not
+          (return_vehicle_ready ?return_vehicle)
+        )
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_links_outbound_leg ?container_unit ?outbound_leg)
+        (container_links_return_leg ?container_unit ?return_leg)
+        (container_outbound_ready ?container_unit)
+        (container_return_ready ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action mark_container_ready_for_loading
+    :parameters (?container_unit - container_unit ?outbound_vehicle - outbound_vehicle ?time_window - time_window)
+    :precondition
+      (and
+        (container_allocated ?container_unit)
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (scheduled_in_time_window ?outbound_vehicle ?time_window)
+        (not
+          (container_ready_for_loading ?container_unit)
+        )
+      )
+    :effect (container_ready_for_loading ?container_unit)
+  )
+  (:action load_cargo_batch_into_container
+    :parameters (?assignment_task - assignment_task ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (task_assigned_container ?assignment_task ?container_unit)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_available ?cargo_batch)
+        (container_allocated ?container_unit)
+        (container_ready_for_loading ?container_unit)
+        (not
+          (cargo_batch_loaded ?cargo_batch)
+        )
+      )
+    :effect
+      (and
+        (cargo_batch_loaded ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (not
+          (cargo_batch_available ?cargo_batch)
+        )
+      )
+  )
+  (:action prepare_task_for_loading
+    :parameters (?assignment_task - assignment_task ?cargo_batch - cargo_batch ?container_unit - container_unit ?time_window - time_window)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_loaded ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (scheduled_in_time_window ?assignment_task ?time_window)
+        (not
+          (container_outbound_ready ?container_unit)
+        )
+        (not
+          (task_loading_prepared ?assignment_task)
+        )
+      )
+    :effect (task_loading_prepared ?assignment_task)
+  )
+  (:action assign_equipment_to_task
+    :parameters (?assignment_task - assignment_task ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (equipment_available ?equipment_type)
+        (not
+          (task_equipment_allocated ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_equipment_allocated ?assignment_task)
+        (task_equipment_assigned ?assignment_task ?equipment_type)
+        (not
+          (equipment_available ?equipment_type)
+        )
+      )
+  )
+  (:action verify_task_equipment_and_prepare_loading
+    :parameters (?assignment_task - assignment_task ?cargo_batch - cargo_batch ?container_unit - container_unit ?time_window - time_window ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_loaded ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (scheduled_in_time_window ?assignment_task ?time_window)
+        (container_outbound_ready ?container_unit)
+        (task_equipment_allocated ?assignment_task)
+        (task_equipment_assigned ?assignment_task ?equipment_type)
+        (not
+          (task_loading_prepared ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_loading_prepared ?assignment_task)
+        (task_equipment_verified ?assignment_task)
+      )
+  )
+  (:action apply_loading_equipment_and_stage
+    :parameters (?assignment_task - assignment_task ?special_equipment - special_equipment ?transfer_facility - transfer_facility ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_loading_prepared ?assignment_task)
+        (task_special_equipment_assigned ?assignment_task ?special_equipment)
+        (assigned_facility ?assignment_task ?transfer_facility)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (not
+          (container_return_ready ?container_unit)
+        )
+        (not
+          (task_equipment_attached ?assignment_task)
+        )
+      )
+    :effect (task_equipment_attached ?assignment_task)
+  )
+  (:action confirm_loading_with_equipment
+    :parameters (?assignment_task - assignment_task ?special_equipment - special_equipment ?transfer_facility - transfer_facility ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_loading_prepared ?assignment_task)
+        (task_special_equipment_assigned ?assignment_task ?special_equipment)
+        (assigned_facility ?assignment_task ?transfer_facility)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (container_return_ready ?container_unit)
+        (not
+          (task_equipment_attached ?assignment_task)
+        )
+      )
+    :effect (task_equipment_attached ?assignment_task)
+  )
+  (:action authorize_task_without_service_flag
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_equipment_attached ?assignment_task)
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (not
+          (container_outbound_ready ?container_unit)
+        )
+        (not
+          (container_return_ready ?container_unit)
+        )
+        (not
+          (task_authorized ?assignment_task)
+        )
+      )
+    :effect (task_authorized ?assignment_task)
+  )
+  (:action authorize_task_with_outbound_service_flag
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_equipment_attached ?assignment_task)
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (container_outbound_ready ?container_unit)
+        (not
+          (container_return_ready ?container_unit)
+        )
+        (not
+          (task_authorized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_authorized ?assignment_task)
+        (task_pending_services ?assignment_task)
+      )
+  )
+  (:action authorize_task_with_return_service_flag
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_equipment_attached ?assignment_task)
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (not
+          (container_outbound_ready ?container_unit)
+        )
+        (container_return_ready ?container_unit)
+        (not
+          (task_authorized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_authorized ?assignment_task)
+        (task_pending_services ?assignment_task)
+      )
+  )
+  (:action authorize_task_with_both_service_flags
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker ?cargo_batch - cargo_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (task_equipment_attached ?assignment_task)
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (task_has_cargo_batch ?assignment_task ?cargo_batch)
+        (cargo_batch_in_container ?cargo_batch ?container_unit)
+        (container_outbound_ready ?container_unit)
+        (container_return_ready ?container_unit)
+        (not
+          (task_authorized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_authorized ?assignment_task)
+        (task_pending_services ?assignment_task)
+      )
+  )
+  (:action finalize_task_without_pending_services
+    :parameters (?assignment_task - assignment_task)
+    :precondition
+      (and
+        (task_authorized ?assignment_task)
+        (not
+          (task_pending_services ?assignment_task)
+        )
+        (not
+          (task_finalized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?assignment_task)
+        (ready_for_dispatch ?assignment_task)
+      )
+  )
+  (:action assign_service_option_to_task
+    :parameters (?assignment_task - assignment_task ?service_option - service_option)
+    :precondition
+      (and
+        (task_authorized ?assignment_task)
+        (task_pending_services ?assignment_task)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (task_service_assigned ?assignment_task ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action apply_service_and_validate_loading
+    :parameters (?assignment_task - assignment_task ?outbound_vehicle - outbound_vehicle ?return_vehicle - return_vehicle ?time_window - time_window ?service_option - service_option)
+    :precondition
+      (and
+        (task_authorized ?assignment_task)
+        (task_pending_services ?assignment_task)
+        (task_service_assigned ?assignment_task ?service_option)
+        (task_assigned_outbound_vehicle ?assignment_task ?outbound_vehicle)
+        (task_assigned_return_vehicle ?assignment_task ?return_vehicle)
+        (outbound_vehicle_ready ?outbound_vehicle)
+        (return_vehicle_ready ?return_vehicle)
+        (scheduled_in_time_window ?assignment_task ?time_window)
+        (not
+          (task_loading_validated ?assignment_task)
+        )
+      )
+    :effect (task_loading_validated ?assignment_task)
+  )
+  (:action finalize_task_after_loading_validation
+    :parameters (?assignment_task - assignment_task)
+    :precondition
+      (and
+        (task_authorized ?assignment_task)
+        (task_loading_validated ?assignment_task)
+        (not
+          (task_finalized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?assignment_task)
+        (ready_for_dispatch ?assignment_task)
+      )
+  )
+  (:action attach_authorization_token_to_task
+    :parameters (?assignment_task - assignment_task ?authorization_token - authorization_token ?time_window - time_window)
+    :precondition
+      (and
+        (entity_ready_for_assignment ?assignment_task)
+        (scheduled_in_time_window ?assignment_task ?time_window)
+        (authorization_token_available ?authorization_token)
+        (task_associated_authorization ?assignment_task ?authorization_token)
+        (not
+          (task_authorization_attached ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_authorization_attached ?assignment_task)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action verify_authorization_with_facility
+    :parameters (?assignment_task - assignment_task ?transfer_facility - transfer_facility)
+    :precondition
+      (and
+        (task_authorization_attached ?assignment_task)
+        (assigned_facility ?assignment_task ?transfer_facility)
+        (not
+          (task_authorization_verified ?assignment_task)
+        )
+      )
+    :effect (task_authorization_verified ?assignment_task)
+  )
+  (:action confirm_authorization_with_priority
+    :parameters (?assignment_task - assignment_task ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (task_authorization_verified ?assignment_task)
+        (task_priority_assigned ?assignment_task ?priority_marker)
+        (not
+          (task_authorization_finalized ?assignment_task)
+        )
+      )
+    :effect (task_authorization_finalized ?assignment_task)
+  )
+  (:action finalize_task_after_authorization
+    :parameters (?assignment_task - assignment_task)
+    :precondition
+      (and
+        (task_authorization_finalized ?assignment_task)
+        (not
+          (task_finalized ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?assignment_task)
+        (ready_for_dispatch ?assignment_task)
+      )
+  )
+  (:action mark_outbound_vehicle_ready_for_dispatch
+    :parameters (?outbound_vehicle - outbound_vehicle ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_vehicle_prepared ?outbound_vehicle)
+        (outbound_vehicle_ready ?outbound_vehicle)
+        (container_allocated ?container_unit)
+        (container_ready_for_loading ?container_unit)
+        (not
+          (ready_for_dispatch ?outbound_vehicle)
+        )
+      )
+    :effect (ready_for_dispatch ?outbound_vehicle)
+  )
+  (:action mark_return_vehicle_ready_for_dispatch
+    :parameters (?return_vehicle - return_vehicle ?container_unit - container_unit)
+    :precondition
+      (and
+        (return_vehicle_prepared ?return_vehicle)
+        (return_vehicle_ready ?return_vehicle)
+        (container_allocated ?container_unit)
+        (container_ready_for_loading ?container_unit)
+        (not
+          (ready_for_dispatch ?return_vehicle)
+        )
+      )
+    :effect (ready_for_dispatch ?return_vehicle)
+  )
+  (:action finalize_request_and_apply_return_constraint
+    :parameters (?request - backhaul_request ?return_constraint - return_constraint ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_dispatch ?request)
+        (scheduled_in_time_window ?request ?time_window)
+        (return_constraint_available ?return_constraint)
+        (not
+          (entity_finalized ?request)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?request)
+        (entity_return_constraint_assigned ?request ?return_constraint)
+        (not
+          (return_constraint_available ?return_constraint)
+        )
+      )
+  )
+  (:action apply_return_assignment_flags_to_outbound_vehicle
+    :parameters (?outbound_vehicle - outbound_vehicle ?carrier_unit - carrier_unit ?return_constraint - return_constraint)
+    :precondition
+      (and
+        (entity_finalized ?outbound_vehicle)
+        (entity_carrier_assignment ?outbound_vehicle ?carrier_unit)
+        (entity_return_constraint_assigned ?outbound_vehicle ?return_constraint)
+        (not
+          (return_assignment_applied ?outbound_vehicle)
+        )
+      )
+    :effect
+      (and
+        (return_assignment_applied ?outbound_vehicle)
+        (carrier_available ?carrier_unit)
+        (return_constraint_available ?return_constraint)
+      )
+  )
+  (:action apply_return_assignment_flags_to_return_vehicle
+    :parameters (?return_vehicle - return_vehicle ?carrier_unit - carrier_unit ?return_constraint - return_constraint)
+    :precondition
+      (and
+        (entity_finalized ?return_vehicle)
+        (entity_carrier_assignment ?return_vehicle ?carrier_unit)
+        (entity_return_constraint_assigned ?return_vehicle ?return_constraint)
+        (not
+          (return_assignment_applied ?return_vehicle)
+        )
+      )
+    :effect
+      (and
+        (return_assignment_applied ?return_vehicle)
+        (carrier_available ?carrier_unit)
+        (return_constraint_available ?return_constraint)
+      )
+  )
+  (:action apply_return_assignment_flags_to_task
+    :parameters (?assignment_task - assignment_task ?carrier_unit - carrier_unit ?return_constraint - return_constraint)
+    :precondition
+      (and
+        (entity_finalized ?assignment_task)
+        (entity_carrier_assignment ?assignment_task ?carrier_unit)
+        (entity_return_constraint_assigned ?assignment_task ?return_constraint)
+        (not
+          (return_assignment_applied ?assignment_task)
+        )
+      )
+    :effect
+      (and
+        (return_assignment_applied ?assignment_task)
+        (carrier_available ?carrier_unit)
+        (return_constraint_available ?return_constraint)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem return_trip_backhaul_scenario)
+  (:domain return_trip_backhaul_assignment_domain)
+  (:objects outbound_vehicle_1 - outbound_vehicle return_vehicle_1 - return_vehicle assignment_task_1 - assignment_task assignment_task_2 - assignment_task carrier_1 - carrier_unit carrier_2 - carrier_unit carrier_3 - carrier_unit time_window_1 - time_window transfer_facility_a - transfer_facility cargo_unit_1 - cargo_unit outbound_leg_1 - outbound_leg return_leg_1 - return_leg container_1 - container_unit cargo_batch_1 - cargo_batch cargo_batch_2 - cargo_batch equipment_liftgate - equipment_type equipment_refrigeration - equipment_type service_expedited - service_option service_fragile_handling - service_option constraint_weight_limit - return_constraint special_equipment_forklift - special_equipment auth_token_1 - authorization_token auth_token_2 - authorization_token priority_marker_urgent - priority_marker)
+  (:init
+    (carrier_available carrier_1)
+    (carrier_available carrier_2)
+    (carrier_available carrier_3)
+    (time_window_available time_window_1)
+    (facility_available transfer_facility_a)
+    (cargo_unit_unassigned cargo_unit_1)
+    (vehicle_assigned_outbound_leg outbound_vehicle_1 outbound_leg_1)
+    (return_vehicle_assigned_return_leg return_vehicle_1 return_leg_1)
+    (container_available container_1)
+    (cargo_batch_available cargo_batch_1)
+    (cargo_batch_available cargo_batch_2)
+    (task_assigned_outbound_vehicle assignment_task_1 outbound_vehicle_1)
+    (task_assigned_outbound_vehicle assignment_task_2 outbound_vehicle_1)
+    (task_assigned_return_vehicle assignment_task_1 return_vehicle_1)
+    (task_assigned_return_vehicle assignment_task_2 return_vehicle_1)
+    (task_assigned_container assignment_task_1 container_1)
+    (task_assigned_container assignment_task_2 container_1)
+    (task_has_cargo_batch assignment_task_1 cargo_batch_1)
+    (task_has_cargo_batch assignment_task_2 cargo_batch_2)
+    (equipment_available equipment_liftgate)
+    (equipment_available equipment_refrigeration)
+    (service_option_available service_expedited)
+    (service_option_available service_fragile_handling)
+    (return_constraint_available constraint_weight_limit)
+    (special_equipment_available special_equipment_forklift)
+    (authorization_token_available auth_token_1)
+    (task_associated_authorization assignment_task_1 auth_token_1)
+    (task_associated_authorization assignment_task_2 auth_token_2)
+    (priority_marker_available priority_marker_urgent)
+  )
+  (:goal
+    (and
+      (return_assignment_applied outbound_vehicle_1)
+      (return_assignment_applied return_vehicle_1)
+      (return_assignment_applied assignment_task_1)
+      (return_assignment_applied assignment_task_2)
+    )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain duration_target_realignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types execution_domain - object instrument_domain - object trade_leg_domain - object case_category - object realignment_case - case_category execution_desk - execution_domain analytics_signal - execution_domain approval_unit - execution_domain broker_lp - execution_domain allocation_template - execution_domain post_trade_assignment_record - execution_domain execution_parameter - execution_domain counterparty_constraint - execution_domain instrument_candidate - instrument_domain settlement_account - instrument_domain compliance_rule - instrument_domain sell_leg - trade_leg_domain buy_leg - trade_leg_domain order_ticket - trade_leg_domain portfolio_role_group - realignment_case portfolio_segment_group - realignment_case source_portfolio - portfolio_role_group target_portfolio - portfolio_role_group rebalancing_plan - portfolio_segment_group)
+  (:predicates
+    (initialized_for_entity ?realignment_case - realignment_case)
+    (requires_approval ?realignment_case - realignment_case)
+    (execution_desk_assigned ?realignment_case - realignment_case)
+    (completed_for_entity ?realignment_case - realignment_case)
+    (execution_confirmed_for_entity ?realignment_case - realignment_case)
+    (post_trade_assignment_started ?realignment_case - realignment_case)
+    (execution_desk_available ?execution_desk - execution_desk)
+    (assigned_to_execution_desk ?realignment_case - realignment_case ?execution_desk - execution_desk)
+    (analytics_signal_available ?analytics_signal - analytics_signal)
+    (linked_to_signal ?realignment_case - realignment_case ?analytics_signal - analytics_signal)
+    (approval_unit_available ?approval_unit - approval_unit)
+    (linked_to_approval_unit ?realignment_case - realignment_case ?approval_unit - approval_unit)
+    (instrument_candidate_available ?instrument_candidate - instrument_candidate)
+    (candidate_reserved_for_source ?source_portfolio - source_portfolio ?instrument_candidate - instrument_candidate)
+    (candidate_reserved_for_target ?target_portfolio - target_portfolio ?instrument_candidate - instrument_candidate)
+    (source_portfolio_has_sell_leg ?source_portfolio - source_portfolio ?sell_leg - sell_leg)
+    (sell_leg_selected ?sell_leg - sell_leg)
+    (sell_leg_candidate_assigned ?sell_leg - sell_leg)
+    (source_portfolio_ready ?source_portfolio - source_portfolio)
+    (target_portfolio_has_buy_leg ?target_portfolio - target_portfolio ?buy_leg - buy_leg)
+    (buy_leg_selected ?buy_leg - buy_leg)
+    (buy_leg_candidate_assigned ?buy_leg - buy_leg)
+    (target_portfolio_ready ?target_portfolio - target_portfolio)
+    (order_ticket_available ?order_ticket - order_ticket)
+    (order_ticket_assembled ?order_ticket - order_ticket)
+    (ticket_has_sell_leg ?order_ticket - order_ticket ?sell_leg - sell_leg)
+    (ticket_has_buy_leg ?order_ticket - order_ticket ?buy_leg - buy_leg)
+    (ticket_sell_leg_candidate_assigned ?order_ticket - order_ticket)
+    (ticket_buy_leg_candidate_assigned ?order_ticket - order_ticket)
+    (order_ticket_settlement_ready ?order_ticket - order_ticket)
+    (plan_links_to_source_portfolio ?rebalancing_plan - rebalancing_plan ?source_portfolio - source_portfolio)
+    (plan_links_to_target_portfolio ?rebalancing_plan - rebalancing_plan ?target_portfolio - target_portfolio)
+    (plan_links_to_order_ticket ?rebalancing_plan - rebalancing_plan ?order_ticket - order_ticket)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (plan_links_to_settlement_account ?rebalancing_plan - rebalancing_plan ?settlement_account - settlement_account)
+    (settlement_account_assigned ?settlement_account - settlement_account)
+    (settlement_account_assigned_to_ticket ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    (plan_prepared_for_broker_assignment ?rebalancing_plan - rebalancing_plan)
+    (plan_broker_assignment_done ?rebalancing_plan - rebalancing_plan)
+    (plan_pre_trade_ready ?rebalancing_plan - rebalancing_plan)
+    (broker_assigned_to_plan ?rebalancing_plan - rebalancing_plan)
+    (broker_assignment_verified ?rebalancing_plan - rebalancing_plan)
+    (allocation_template_requested ?rebalancing_plan - rebalancing_plan)
+    (plan_batched ?rebalancing_plan - rebalancing_plan)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (plan_linked_to_compliance_rule ?rebalancing_plan - rebalancing_plan ?compliance_rule - compliance_rule)
+    (compliance_check_requested ?rebalancing_plan - rebalancing_plan)
+    (compliance_check_in_progress ?rebalancing_plan - rebalancing_plan)
+    (compliance_approved ?rebalancing_plan - rebalancing_plan)
+    (broker_available ?broker_lp - broker_lp)
+    (plan_linked_to_broker ?rebalancing_plan - rebalancing_plan ?broker_lp - broker_lp)
+    (allocation_template_available ?allocation_template - allocation_template)
+    (plan_has_allocation_template ?rebalancing_plan - rebalancing_plan ?allocation_template - allocation_template)
+    (execution_parameter_available ?execution_parameter - execution_parameter)
+    (plan_has_execution_parameter ?rebalancing_plan - rebalancing_plan ?execution_parameter - execution_parameter)
+    (counterparty_constraint_available ?counterparty_constraint - counterparty_constraint)
+    (plan_has_counterparty_constraint ?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint)
+    (post_trade_assignment_record_available ?post_trade_assignment_record - post_trade_assignment_record)
+    (linked_to_post_trade_record ?realignment_case - realignment_case ?post_trade_assignment_record - post_trade_assignment_record)
+    (source_portfolio_prepared ?source_portfolio - source_portfolio)
+    (target_portfolio_prepared ?target_portfolio - target_portfolio)
+    (plan_finalized_for_execution ?rebalancing_plan - rebalancing_plan)
+  )
+  (:action register_realignment_case
+    :parameters (?realignment_case - realignment_case)
+    :precondition
+      (and
+        (not
+          (initialized_for_entity ?realignment_case)
+        )
+        (not
+          (completed_for_entity ?realignment_case)
+        )
+      )
+    :effect (initialized_for_entity ?realignment_case)
+  )
+  (:action assign_execution_desk_to_case
+    :parameters (?realignment_case - realignment_case ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (initialized_for_entity ?realignment_case)
+        (not
+          (execution_desk_assigned ?realignment_case)
+        )
+        (execution_desk_available ?execution_desk)
+      )
+    :effect
+      (and
+        (execution_desk_assigned ?realignment_case)
+        (assigned_to_execution_desk ?realignment_case ?execution_desk)
+        (not
+          (execution_desk_available ?execution_desk)
+        )
+      )
+  )
+  (:action attach_analytics_signal_to_case
+    :parameters (?realignment_case - realignment_case ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (initialized_for_entity ?realignment_case)
+        (execution_desk_assigned ?realignment_case)
+        (analytics_signal_available ?analytics_signal)
+      )
+    :effect
+      (and
+        (linked_to_signal ?realignment_case ?analytics_signal)
+        (not
+          (analytics_signal_available ?analytics_signal)
+        )
+      )
+  )
+  (:action mark_case_approval_required
+    :parameters (?realignment_case - realignment_case ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (initialized_for_entity ?realignment_case)
+        (execution_desk_assigned ?realignment_case)
+        (linked_to_signal ?realignment_case ?analytics_signal)
+        (not
+          (requires_approval ?realignment_case)
+        )
+      )
+    :effect (requires_approval ?realignment_case)
+  )
+  (:action release_analytics_signal_from_case
+    :parameters (?realignment_case - realignment_case ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (linked_to_signal ?realignment_case ?analytics_signal)
+      )
+    :effect
+      (and
+        (analytics_signal_available ?analytics_signal)
+        (not
+          (linked_to_signal ?realignment_case ?analytics_signal)
+        )
+      )
+  )
+  (:action assign_approval_unit_to_case
+    :parameters (?realignment_case - realignment_case ?approval_unit - approval_unit)
+    :precondition
+      (and
+        (requires_approval ?realignment_case)
+        (approval_unit_available ?approval_unit)
+      )
+    :effect
+      (and
+        (linked_to_approval_unit ?realignment_case ?approval_unit)
+        (not
+          (approval_unit_available ?approval_unit)
+        )
+      )
+  )
+  (:action release_approval_unit_from_case
+    :parameters (?realignment_case - realignment_case ?approval_unit - approval_unit)
+    :precondition
+      (and
+        (linked_to_approval_unit ?realignment_case ?approval_unit)
+      )
+    :effect
+      (and
+        (approval_unit_available ?approval_unit)
+        (not
+          (linked_to_approval_unit ?realignment_case ?approval_unit)
+        )
+      )
+  )
+  (:action attach_execution_parameter_to_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (execution_parameter_available ?execution_parameter)
+      )
+    :effect
+      (and
+        (plan_has_execution_parameter ?rebalancing_plan ?execution_parameter)
+        (not
+          (execution_parameter_available ?execution_parameter)
+        )
+      )
+  )
+  (:action detach_execution_parameter_from_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (plan_has_execution_parameter ?rebalancing_plan ?execution_parameter)
+      )
+    :effect
+      (and
+        (execution_parameter_available ?execution_parameter)
+        (not
+          (plan_has_execution_parameter ?rebalancing_plan ?execution_parameter)
+        )
+      )
+  )
+  (:action attach_counterparty_constraint_to_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (counterparty_constraint_available ?counterparty_constraint)
+      )
+    :effect
+      (and
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (not
+          (counterparty_constraint_available ?counterparty_constraint)
+        )
+      )
+  )
+  (:action detach_counterparty_constraint_from_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint)
+    :precondition
+      (and
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+      )
+    :effect
+      (and
+        (counterparty_constraint_available ?counterparty_constraint)
+        (not
+          (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        )
+      )
+  )
+  (:action select_sell_leg_for_source_portfolio
+    :parameters (?source_portfolio - source_portfolio ?sell_leg - sell_leg ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (requires_approval ?source_portfolio)
+        (linked_to_signal ?source_portfolio ?analytics_signal)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (not
+          (sell_leg_selected ?sell_leg)
+        )
+        (not
+          (sell_leg_candidate_assigned ?sell_leg)
+        )
+      )
+    :effect (sell_leg_selected ?sell_leg)
+  )
+  (:action approve_and_finalize_source_leg
+    :parameters (?source_portfolio - source_portfolio ?sell_leg - sell_leg ?approval_unit - approval_unit)
+    :precondition
+      (and
+        (requires_approval ?source_portfolio)
+        (linked_to_approval_unit ?source_portfolio ?approval_unit)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (sell_leg_selected ?sell_leg)
+        (not
+          (source_portfolio_prepared ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (source_portfolio_ready ?source_portfolio)
+      )
+  )
+  (:action assign_candidate_to_sell_leg
+    :parameters (?source_portfolio - source_portfolio ?sell_leg - sell_leg ?instrument_candidate - instrument_candidate)
+    :precondition
+      (and
+        (requires_approval ?source_portfolio)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (instrument_candidate_available ?instrument_candidate)
+        (not
+          (source_portfolio_prepared ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (sell_leg_candidate_assigned ?sell_leg)
+        (source_portfolio_prepared ?source_portfolio)
+        (candidate_reserved_for_source ?source_portfolio ?instrument_candidate)
+        (not
+          (instrument_candidate_available ?instrument_candidate)
+        )
+      )
+  )
+  (:action finalize_sell_leg_candidate
+    :parameters (?source_portfolio - source_portfolio ?sell_leg - sell_leg ?analytics_signal - analytics_signal ?instrument_candidate - instrument_candidate)
+    :precondition
+      (and
+        (requires_approval ?source_portfolio)
+        (linked_to_signal ?source_portfolio ?analytics_signal)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (sell_leg_candidate_assigned ?sell_leg)
+        (candidate_reserved_for_source ?source_portfolio ?instrument_candidate)
+        (not
+          (source_portfolio_ready ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (sell_leg_selected ?sell_leg)
+        (source_portfolio_ready ?source_portfolio)
+        (instrument_candidate_available ?instrument_candidate)
+        (not
+          (candidate_reserved_for_source ?source_portfolio ?instrument_candidate)
+        )
+      )
+  )
+  (:action select_buy_leg_for_target_portfolio
+    :parameters (?target_portfolio - target_portfolio ?buy_leg - buy_leg ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (requires_approval ?target_portfolio)
+        (linked_to_signal ?target_portfolio ?analytics_signal)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (not
+          (buy_leg_selected ?buy_leg)
+        )
+        (not
+          (buy_leg_candidate_assigned ?buy_leg)
+        )
+      )
+    :effect (buy_leg_selected ?buy_leg)
+  )
+  (:action approve_and_finalize_target_leg
+    :parameters (?target_portfolio - target_portfolio ?buy_leg - buy_leg ?approval_unit - approval_unit)
+    :precondition
+      (and
+        (requires_approval ?target_portfolio)
+        (linked_to_approval_unit ?target_portfolio ?approval_unit)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (buy_leg_selected ?buy_leg)
+        (not
+          (target_portfolio_prepared ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (target_portfolio_prepared ?target_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+      )
+  )
+  (:action assign_candidate_to_buy_leg
+    :parameters (?target_portfolio - target_portfolio ?buy_leg - buy_leg ?instrument_candidate - instrument_candidate)
+    :precondition
+      (and
+        (requires_approval ?target_portfolio)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (instrument_candidate_available ?instrument_candidate)
+        (not
+          (target_portfolio_prepared ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (buy_leg_candidate_assigned ?buy_leg)
+        (target_portfolio_prepared ?target_portfolio)
+        (candidate_reserved_for_target ?target_portfolio ?instrument_candidate)
+        (not
+          (instrument_candidate_available ?instrument_candidate)
+        )
+      )
+  )
+  (:action finalize_buy_leg_candidate
+    :parameters (?target_portfolio - target_portfolio ?buy_leg - buy_leg ?analytics_signal - analytics_signal ?instrument_candidate - instrument_candidate)
+    :precondition
+      (and
+        (requires_approval ?target_portfolio)
+        (linked_to_signal ?target_portfolio ?analytics_signal)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (buy_leg_candidate_assigned ?buy_leg)
+        (candidate_reserved_for_target ?target_portfolio ?instrument_candidate)
+        (not
+          (target_portfolio_ready ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (buy_leg_selected ?buy_leg)
+        (target_portfolio_ready ?target_portfolio)
+        (instrument_candidate_available ?instrument_candidate)
+        (not
+          (candidate_reserved_for_target ?target_portfolio ?instrument_candidate)
+        )
+      )
+  )
+  (:action assemble_order_ticket
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?sell_leg - sell_leg ?buy_leg - buy_leg ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (target_portfolio_prepared ?target_portfolio)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (sell_leg_selected ?sell_leg)
+        (buy_leg_selected ?buy_leg)
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (order_ticket_available ?order_ticket)
+      )
+    :effect
+      (and
+        (order_ticket_assembled ?order_ticket)
+        (ticket_has_sell_leg ?order_ticket ?sell_leg)
+        (ticket_has_buy_leg ?order_ticket ?buy_leg)
+        (not
+          (order_ticket_available ?order_ticket)
+        )
+      )
+  )
+  (:action assemble_order_ticket_with_sell_candidate_assigned
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?sell_leg - sell_leg ?buy_leg - buy_leg ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (target_portfolio_prepared ?target_portfolio)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (sell_leg_candidate_assigned ?sell_leg)
+        (buy_leg_selected ?buy_leg)
+        (not
+          (source_portfolio_ready ?source_portfolio)
+        )
+        (target_portfolio_ready ?target_portfolio)
+        (order_ticket_available ?order_ticket)
+      )
+    :effect
+      (and
+        (order_ticket_assembled ?order_ticket)
+        (ticket_has_sell_leg ?order_ticket ?sell_leg)
+        (ticket_has_buy_leg ?order_ticket ?buy_leg)
+        (ticket_sell_leg_candidate_assigned ?order_ticket)
+        (not
+          (order_ticket_available ?order_ticket)
+        )
+      )
+  )
+  (:action assemble_order_ticket_with_buy_candidate_assigned
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?sell_leg - sell_leg ?buy_leg - buy_leg ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (target_portfolio_prepared ?target_portfolio)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (sell_leg_selected ?sell_leg)
+        (buy_leg_candidate_assigned ?buy_leg)
+        (source_portfolio_ready ?source_portfolio)
+        (not
+          (target_portfolio_ready ?target_portfolio)
+        )
+        (order_ticket_available ?order_ticket)
+      )
+    :effect
+      (and
+        (order_ticket_assembled ?order_ticket)
+        (ticket_has_sell_leg ?order_ticket ?sell_leg)
+        (ticket_has_buy_leg ?order_ticket ?buy_leg)
+        (ticket_buy_leg_candidate_assigned ?order_ticket)
+        (not
+          (order_ticket_available ?order_ticket)
+        )
+      )
+  )
+  (:action assemble_order_ticket_with_both_candidates_assigned
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?sell_leg - sell_leg ?buy_leg - buy_leg ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (target_portfolio_prepared ?target_portfolio)
+        (source_portfolio_has_sell_leg ?source_portfolio ?sell_leg)
+        (target_portfolio_has_buy_leg ?target_portfolio ?buy_leg)
+        (sell_leg_candidate_assigned ?sell_leg)
+        (buy_leg_candidate_assigned ?buy_leg)
+        (not
+          (source_portfolio_ready ?source_portfolio)
+        )
+        (not
+          (target_portfolio_ready ?target_portfolio)
+        )
+        (order_ticket_available ?order_ticket)
+      )
+    :effect
+      (and
+        (order_ticket_assembled ?order_ticket)
+        (ticket_has_sell_leg ?order_ticket ?sell_leg)
+        (ticket_has_buy_leg ?order_ticket ?buy_leg)
+        (ticket_sell_leg_candidate_assigned ?order_ticket)
+        (ticket_buy_leg_candidate_assigned ?order_ticket)
+        (not
+          (order_ticket_available ?order_ticket)
+        )
+      )
+  )
+  (:action mark_order_ticket_settlement_ready
+    :parameters (?order_ticket - order_ticket ?source_portfolio - source_portfolio ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (order_ticket_assembled ?order_ticket)
+        (source_portfolio_prepared ?source_portfolio)
+        (linked_to_signal ?source_portfolio ?analytics_signal)
+        (not
+          (order_ticket_settlement_ready ?order_ticket)
+        )
+      )
+    :effect (order_ticket_settlement_ready ?order_ticket)
+  )
+  (:action assign_settlement_account_to_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (plan_links_to_order_ticket ?rebalancing_plan ?order_ticket)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_available ?settlement_account)
+        (order_ticket_assembled ?order_ticket)
+        (order_ticket_settlement_ready ?order_ticket)
+        (not
+          (settlement_account_assigned ?settlement_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action validate_settlement_and_prepare_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?settlement_account - settlement_account ?order_ticket - order_ticket ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (linked_to_signal ?rebalancing_plan ?analytics_signal)
+        (not
+          (ticket_sell_leg_candidate_assigned ?order_ticket)
+        )
+        (not
+          (plan_prepared_for_broker_assignment ?rebalancing_plan)
+        )
+      )
+    :effect (plan_prepared_for_broker_assignment ?rebalancing_plan)
+  )
+  (:action assign_broker_to_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?broker_lp - broker_lp)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (broker_available ?broker_lp)
+        (not
+          (broker_assigned_to_plan ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (broker_assigned_to_plan ?rebalancing_plan)
+        (plan_linked_to_broker ?rebalancing_plan ?broker_lp)
+        (not
+          (broker_available ?broker_lp)
+        )
+      )
+  )
+  (:action attach_broker_and_prepare_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?settlement_account - settlement_account ?order_ticket - order_ticket ?analytics_signal - analytics_signal ?broker_lp - broker_lp)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (linked_to_signal ?rebalancing_plan ?analytics_signal)
+        (ticket_sell_leg_candidate_assigned ?order_ticket)
+        (broker_assigned_to_plan ?rebalancing_plan)
+        (plan_linked_to_broker ?rebalancing_plan ?broker_lp)
+        (not
+          (plan_prepared_for_broker_assignment ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_prepared_for_broker_assignment ?rebalancing_plan)
+        (broker_assignment_verified ?rebalancing_plan)
+      )
+  )
+  (:action apply_execution_parameter_and_mark_for_broker_assignment
+    :parameters (?rebalancing_plan - rebalancing_plan ?execution_parameter - execution_parameter ?approval_unit - approval_unit ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_prepared_for_broker_assignment ?rebalancing_plan)
+        (plan_has_execution_parameter ?rebalancing_plan ?execution_parameter)
+        (linked_to_approval_unit ?rebalancing_plan ?approval_unit)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (not
+          (ticket_buy_leg_candidate_assigned ?order_ticket)
+        )
+        (not
+          (plan_broker_assignment_done ?rebalancing_plan)
+        )
+      )
+    :effect (plan_broker_assignment_done ?rebalancing_plan)
+  )
+  (:action finalize_broker_assignment_with_candidate
+    :parameters (?rebalancing_plan - rebalancing_plan ?execution_parameter - execution_parameter ?approval_unit - approval_unit ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_prepared_for_broker_assignment ?rebalancing_plan)
+        (plan_has_execution_parameter ?rebalancing_plan ?execution_parameter)
+        (linked_to_approval_unit ?rebalancing_plan ?approval_unit)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (ticket_buy_leg_candidate_assigned ?order_ticket)
+        (not
+          (plan_broker_assignment_done ?rebalancing_plan)
+        )
+      )
+    :effect (plan_broker_assignment_done ?rebalancing_plan)
+  )
+  (:action evaluate_counterparty_and_mark_pre_trade_ready
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_broker_assignment_done ?rebalancing_plan)
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (not
+          (ticket_sell_leg_candidate_assigned ?order_ticket)
+        )
+        (not
+          (ticket_buy_leg_candidate_assigned ?order_ticket)
+        )
+        (not
+          (plan_pre_trade_ready ?rebalancing_plan)
+        )
+      )
+    :effect (plan_pre_trade_ready ?rebalancing_plan)
+  )
+  (:action evaluate_counterparty_with_sell_candidate_and_request_allocation_template
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_broker_assignment_done ?rebalancing_plan)
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (ticket_sell_leg_candidate_assigned ?order_ticket)
+        (not
+          (ticket_buy_leg_candidate_assigned ?order_ticket)
+        )
+        (not
+          (plan_pre_trade_ready ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (allocation_template_requested ?rebalancing_plan)
+      )
+  )
+  (:action evaluate_counterparty_with_buy_candidate_and_request_allocation_template
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_broker_assignment_done ?rebalancing_plan)
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (not
+          (ticket_sell_leg_candidate_assigned ?order_ticket)
+        )
+        (ticket_buy_leg_candidate_assigned ?order_ticket)
+        (not
+          (plan_pre_trade_ready ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (allocation_template_requested ?rebalancing_plan)
+      )
+  )
+  (:action evaluate_counterparty_with_both_candidates_and_request_allocation_template
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint ?settlement_account - settlement_account ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (plan_broker_assignment_done ?rebalancing_plan)
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (plan_links_to_settlement_account ?rebalancing_plan ?settlement_account)
+        (settlement_account_assigned_to_ticket ?settlement_account ?order_ticket)
+        (ticket_sell_leg_candidate_assigned ?order_ticket)
+        (ticket_buy_leg_candidate_assigned ?order_ticket)
+        (not
+          (plan_pre_trade_ready ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (allocation_template_requested ?rebalancing_plan)
+      )
+  )
+  (:action finalize_pre_trade_without_allocation_template
+    :parameters (?rebalancing_plan - rebalancing_plan)
+    :precondition
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (not
+          (allocation_template_requested ?rebalancing_plan)
+        )
+        (not
+          (plan_finalized_for_execution ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_for_execution ?rebalancing_plan)
+        (execution_confirmed_for_entity ?rebalancing_plan)
+      )
+  )
+  (:action apply_allocation_template_to_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (allocation_template_requested ?rebalancing_plan)
+        (allocation_template_available ?allocation_template)
+      )
+    :effect
+      (and
+        (plan_has_allocation_template ?rebalancing_plan ?allocation_template)
+        (not
+          (allocation_template_available ?allocation_template)
+        )
+      )
+  )
+  (:action batch_and_prepare_plan_for_execution
+    :parameters (?rebalancing_plan - rebalancing_plan ?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?analytics_signal - analytics_signal ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (allocation_template_requested ?rebalancing_plan)
+        (plan_has_allocation_template ?rebalancing_plan ?allocation_template)
+        (plan_links_to_source_portfolio ?rebalancing_plan ?source_portfolio)
+        (plan_links_to_target_portfolio ?rebalancing_plan ?target_portfolio)
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (linked_to_signal ?rebalancing_plan ?analytics_signal)
+        (not
+          (plan_batched ?rebalancing_plan)
+        )
+      )
+    :effect (plan_batched ?rebalancing_plan)
+  )
+  (:action finalize_pre_trade_with_batching
+    :parameters (?rebalancing_plan - rebalancing_plan)
+    :precondition
+      (and
+        (plan_pre_trade_ready ?rebalancing_plan)
+        (plan_batched ?rebalancing_plan)
+        (not
+          (plan_finalized_for_execution ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_for_execution ?rebalancing_plan)
+        (execution_confirmed_for_entity ?rebalancing_plan)
+      )
+  )
+  (:action request_compliance_check
+    :parameters (?rebalancing_plan - rebalancing_plan ?compliance_rule - compliance_rule ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_plan)
+        (linked_to_signal ?rebalancing_plan ?analytics_signal)
+        (compliance_rule_available ?compliance_rule)
+        (plan_linked_to_compliance_rule ?rebalancing_plan ?compliance_rule)
+        (not
+          (compliance_check_requested ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (compliance_check_requested ?rebalancing_plan)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action start_compliance_check
+    :parameters (?rebalancing_plan - rebalancing_plan ?approval_unit - approval_unit)
+    :precondition
+      (and
+        (compliance_check_requested ?rebalancing_plan)
+        (linked_to_approval_unit ?rebalancing_plan ?approval_unit)
+        (not
+          (compliance_check_in_progress ?rebalancing_plan)
+        )
+      )
+    :effect (compliance_check_in_progress ?rebalancing_plan)
+  )
+  (:action complete_compliance_check
+    :parameters (?rebalancing_plan - rebalancing_plan ?counterparty_constraint - counterparty_constraint)
+    :precondition
+      (and
+        (compliance_check_in_progress ?rebalancing_plan)
+        (plan_has_counterparty_constraint ?rebalancing_plan ?counterparty_constraint)
+        (not
+          (compliance_approved ?rebalancing_plan)
+        )
+      )
+    :effect (compliance_approved ?rebalancing_plan)
+  )
+  (:action finalize_post_compliance_and_mark_execution_ready
+    :parameters (?rebalancing_plan - rebalancing_plan)
+    :precondition
+      (and
+        (compliance_approved ?rebalancing_plan)
+        (not
+          (plan_finalized_for_execution ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_for_execution ?rebalancing_plan)
+        (execution_confirmed_for_entity ?rebalancing_plan)
+      )
+  )
+  (:action trigger_execution_for_source_portfolio
+    :parameters (?source_portfolio - source_portfolio ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (source_portfolio_prepared ?source_portfolio)
+        (source_portfolio_ready ?source_portfolio)
+        (order_ticket_assembled ?order_ticket)
+        (order_ticket_settlement_ready ?order_ticket)
+        (not
+          (execution_confirmed_for_entity ?source_portfolio)
+        )
+      )
+    :effect (execution_confirmed_for_entity ?source_portfolio)
+  )
+  (:action trigger_execution_for_target_portfolio
+    :parameters (?target_portfolio - target_portfolio ?order_ticket - order_ticket)
+    :precondition
+      (and
+        (target_portfolio_prepared ?target_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (order_ticket_assembled ?order_ticket)
+        (order_ticket_settlement_ready ?order_ticket)
+        (not
+          (execution_confirmed_for_entity ?target_portfolio)
+        )
+      )
+    :effect (execution_confirmed_for_entity ?target_portfolio)
+  )
+  (:action create_post_trade_assignment_for_case
+    :parameters (?realignment_case - realignment_case ?post_trade_assignment_record - post_trade_assignment_record ?analytics_signal - analytics_signal)
+    :precondition
+      (and
+        (execution_confirmed_for_entity ?realignment_case)
+        (linked_to_signal ?realignment_case ?analytics_signal)
+        (post_trade_assignment_record_available ?post_trade_assignment_record)
+        (not
+          (post_trade_assignment_started ?realignment_case)
+        )
+      )
+    :effect
+      (and
+        (post_trade_assignment_started ?realignment_case)
+        (linked_to_post_trade_record ?realignment_case ?post_trade_assignment_record)
+        (not
+          (post_trade_assignment_record_available ?post_trade_assignment_record)
+        )
+      )
+  )
+  (:action finalize_post_trade_assignment_for_source_portfolio
+    :parameters (?source_portfolio - source_portfolio ?execution_desk - execution_desk ?post_trade_assignment_record - post_trade_assignment_record)
+    :precondition
+      (and
+        (post_trade_assignment_started ?source_portfolio)
+        (assigned_to_execution_desk ?source_portfolio ?execution_desk)
+        (linked_to_post_trade_record ?source_portfolio ?post_trade_assignment_record)
+        (not
+          (completed_for_entity ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (completed_for_entity ?source_portfolio)
+        (execution_desk_available ?execution_desk)
+        (post_trade_assignment_record_available ?post_trade_assignment_record)
+      )
+  )
+  (:action finalize_post_trade_assignment_for_target_portfolio
+    :parameters (?target_portfolio - target_portfolio ?execution_desk - execution_desk ?post_trade_assignment_record - post_trade_assignment_record)
+    :precondition
+      (and
+        (post_trade_assignment_started ?target_portfolio)
+        (assigned_to_execution_desk ?target_portfolio ?execution_desk)
+        (linked_to_post_trade_record ?target_portfolio ?post_trade_assignment_record)
+        (not
+          (completed_for_entity ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (completed_for_entity ?target_portfolio)
+        (execution_desk_available ?execution_desk)
+        (post_trade_assignment_record_available ?post_trade_assignment_record)
+      )
+  )
+  (:action finalize_post_trade_assignment_for_plan
+    :parameters (?rebalancing_plan - rebalancing_plan ?execution_desk - execution_desk ?post_trade_assignment_record - post_trade_assignment_record)
+    :precondition
+      (and
+        (post_trade_assignment_started ?rebalancing_plan)
+        (assigned_to_execution_desk ?rebalancing_plan ?execution_desk)
+        (linked_to_post_trade_record ?rebalancing_plan ?post_trade_assignment_record)
+        (not
+          (completed_for_entity ?rebalancing_plan)
+        )
+      )
+    :effect
+      (and
+        (completed_for_entity ?rebalancing_plan)
+        (execution_desk_available ?execution_desk)
+        (post_trade_assignment_record_available ?post_trade_assignment_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem duration_target_realignment_problem)
+  (:domain duration_target_realignment)
+  (:objects source_portfolio_1 - source_portfolio target_portfolio_1 - target_portfolio rebalancing_plan_a - rebalancing_plan rebalancing_plan_b - rebalancing_plan execution_desk_1 - execution_desk execution_desk_2 - execution_desk execution_desk_3 - execution_desk analytics_signal_1 - analytics_signal approval_unit_1 - approval_unit instrument_candidate_1 - instrument_candidate sell_leg_1 - sell_leg buy_leg_1 - buy_leg order_ticket_1 - order_ticket settlement_account_1 - settlement_account settlement_account_2 - settlement_account broker_lp_1 - broker_lp broker_lp_2 - broker_lp allocation_template_1 - allocation_template allocation_template_2 - allocation_template post_trade_assignment_record_1 - post_trade_assignment_record execution_parameter_vwap - execution_parameter compliance_rule_1 - compliance_rule compliance_rule_2 - compliance_rule counterparty_constraint_1 - counterparty_constraint)
+  (:init
+    (execution_desk_available execution_desk_1)
+    (execution_desk_available execution_desk_2)
+    (execution_desk_available execution_desk_3)
+    (analytics_signal_available analytics_signal_1)
+    (approval_unit_available approval_unit_1)
+    (instrument_candidate_available instrument_candidate_1)
+    (source_portfolio_has_sell_leg source_portfolio_1 sell_leg_1)
+    (target_portfolio_has_buy_leg target_portfolio_1 buy_leg_1)
+    (order_ticket_available order_ticket_1)
+    (settlement_account_available settlement_account_1)
+    (settlement_account_available settlement_account_2)
+    (plan_links_to_source_portfolio rebalancing_plan_a source_portfolio_1)
+    (plan_links_to_source_portfolio rebalancing_plan_b source_portfolio_1)
+    (plan_links_to_target_portfolio rebalancing_plan_a target_portfolio_1)
+    (plan_links_to_target_portfolio rebalancing_plan_b target_portfolio_1)
+    (plan_links_to_order_ticket rebalancing_plan_a order_ticket_1)
+    (plan_links_to_order_ticket rebalancing_plan_b order_ticket_1)
+    (plan_links_to_settlement_account rebalancing_plan_a settlement_account_1)
+    (plan_links_to_settlement_account rebalancing_plan_b settlement_account_2)
+    (broker_available broker_lp_1)
+    (broker_available broker_lp_2)
+    (allocation_template_available allocation_template_1)
+    (allocation_template_available allocation_template_2)
+    (post_trade_assignment_record_available post_trade_assignment_record_1)
+    (execution_parameter_available execution_parameter_vwap)
+    (compliance_rule_available compliance_rule_1)
+    (plan_linked_to_compliance_rule rebalancing_plan_a compliance_rule_1)
+    (plan_linked_to_compliance_rule rebalancing_plan_b compliance_rule_2)
+    (counterparty_constraint_available counterparty_constraint_1)
+  )
+  (:goal
+    (and
+      (completed_for_entity source_portfolio_1)
+      (completed_for_entity target_portfolio_1)
+      (completed_for_entity rebalancing_plan_a)
+      (completed_for_entity rebalancing_plan_b)
+    )
+  )
+)

@@ -1,0 +1,1057 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain exposure_limit_enforcement_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_grouping - object dimension_grouping - object proposal_grouping - object portfolio_root - object portfolio - portfolio_root limit_profile - resource_grouping security - resource_grouping broker - resource_grouping liquidity_slot - resource_grouping settlement_instruction - resource_grouping client_account - resource_grouping pretrade_approval - resource_grouping execution_authorization - resource_grouping adjustment_instruction - dimension_grouping allocation_template - dimension_grouping strategy_tag - dimension_grouping source_exposure_bucket - proposal_grouping target_exposure_bucket - proposal_grouping trade_proposal - proposal_grouping portfolio_subtype - portfolio plan_subtype - portfolio source_portfolio - portfolio_subtype target_portfolio - portfolio_subtype execution_plan - plan_subtype)
+  (:predicates
+    (entity_registered ?portfolio - portfolio)
+    (entity_ready ?portfolio - portfolio)
+    (entity_limit_attached ?portfolio - portfolio)
+    (entity_finalized ?portfolio - portfolio)
+    (entity_recorded ?portfolio - portfolio)
+    (entity_post_trade_assignment_attached ?portfolio - portfolio)
+    (limit_profile_available ?limit_profile - limit_profile)
+    (entity_assigned_limit_profile ?portfolio - portfolio ?limit_profile - limit_profile)
+    (security_available ?security - security)
+    (entity_selected_security ?portfolio - portfolio ?security - security)
+    (broker_available ?broker - broker)
+    (entity_assigned_broker ?portfolio - portfolio ?broker - broker)
+    (adjustment_instruction_available ?adjustment_instruction - adjustment_instruction)
+    (source_portfolio_bound_adjustment ?source_portfolio - source_portfolio ?adjustment_instruction - adjustment_instruction)
+    (target_portfolio_bound_adjustment ?target_portfolio - target_portfolio ?adjustment_instruction - adjustment_instruction)
+    (source_portfolio_in_bucket ?source_portfolio - source_portfolio ?source_exposure_bucket - source_exposure_bucket)
+    (source_bucket_selected ?source_exposure_bucket - source_exposure_bucket)
+    (source_bucket_adjustment_marked ?source_exposure_bucket - source_exposure_bucket)
+    (source_portfolio_selection_confirmed ?source_portfolio - source_portfolio)
+    (target_portfolio_in_bucket ?target_portfolio - target_portfolio ?target_exposure_bucket - target_exposure_bucket)
+    (target_bucket_selected ?target_exposure_bucket - target_exposure_bucket)
+    (target_bucket_adjustment_marked ?target_exposure_bucket - target_exposure_bucket)
+    (target_portfolio_selection_confirmed ?target_portfolio - target_portfolio)
+    (proposal_available ?trade_proposal - trade_proposal)
+    (proposal_reserved ?trade_proposal - trade_proposal)
+    (proposal_linked_source_bucket ?trade_proposal - trade_proposal ?source_exposure_bucket - source_exposure_bucket)
+    (proposal_linked_target_bucket ?trade_proposal - trade_proposal ?target_exposure_bucket - target_exposure_bucket)
+    (proposal_requires_liquidity_slot ?trade_proposal - trade_proposal)
+    (proposal_requires_additional_liquidity ?trade_proposal - trade_proposal)
+    (proposal_committed ?trade_proposal - trade_proposal)
+    (plan_linked_to_source_portfolio ?execution_plan - execution_plan ?source_portfolio - source_portfolio)
+    (plan_linked_to_target_portfolio ?execution_plan - execution_plan ?target_portfolio - target_portfolio)
+    (plan_has_trade_proposal ?execution_plan - execution_plan ?trade_proposal - trade_proposal)
+    (allocation_template_available ?allocation_template - allocation_template)
+    (plan_bound_allocation_template ?execution_plan - execution_plan ?allocation_template - allocation_template)
+    (allocation_template_reserved ?allocation_template - allocation_template)
+    (allocation_template_bound_to_proposal ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    (plan_resources_reserved ?execution_plan - execution_plan)
+    (plan_liquidity_confirmed ?execution_plan - execution_plan)
+    (plan_authorized ?execution_plan - execution_plan)
+    (plan_liquidity_reserved ?execution_plan - execution_plan)
+    (plan_liquidity_binding_acknowledged ?execution_plan - execution_plan)
+    (plan_settlement_attached ?execution_plan - execution_plan)
+    (plan_final_checks_passed ?execution_plan - execution_plan)
+    (strategy_tag_available ?strategy_tag - strategy_tag)
+    (plan_assigned_strategy_tag ?execution_plan - execution_plan ?strategy_tag - strategy_tag)
+    (plan_strategy_tag_attached ?execution_plan - execution_plan)
+    (plan_broker_assigned ?execution_plan - execution_plan)
+    (plan_broker_authorized ?execution_plan - execution_plan)
+    (liquidity_slot_available ?liquidity_slot - liquidity_slot)
+    (plan_assigned_liquidity_slot ?execution_plan - execution_plan ?liquidity_slot - liquidity_slot)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (plan_assigned_settlement_instruction ?execution_plan - execution_plan ?settlement_instruction - settlement_instruction)
+    (pretrade_approval_available ?pretrade_approval - pretrade_approval)
+    (plan_assigned_pretrade_approval ?execution_plan - execution_plan ?pretrade_approval - pretrade_approval)
+    (execution_authorization_available ?execution_authorization - execution_authorization)
+    (plan_assigned_execution_authorization ?execution_plan - execution_plan ?execution_authorization - execution_authorization)
+    (client_account_available ?client_account - client_account)
+    (entity_assigned_client_account ?portfolio - portfolio ?client_account - client_account)
+    (source_portfolio_ready ?source_portfolio - source_portfolio)
+    (target_portfolio_ready ?target_portfolio - target_portfolio)
+    (plan_post_trade_assignment_recorded ?execution_plan - execution_plan)
+  )
+  (:action register_portfolio
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (not
+          (entity_registered ?portfolio)
+        )
+        (not
+          (entity_finalized ?portfolio)
+        )
+      )
+    :effect (entity_registered ?portfolio)
+  )
+  (:action attach_limit_profile_to_portfolio
+    :parameters (?portfolio - portfolio ?limit_profile - limit_profile)
+    :precondition
+      (and
+        (entity_registered ?portfolio)
+        (not
+          (entity_limit_attached ?portfolio)
+        )
+        (limit_profile_available ?limit_profile)
+      )
+    :effect
+      (and
+        (entity_limit_attached ?portfolio)
+        (entity_assigned_limit_profile ?portfolio ?limit_profile)
+        (not
+          (limit_profile_available ?limit_profile)
+        )
+      )
+  )
+  (:action nominate_security_for_portfolio
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (entity_registered ?portfolio)
+        (entity_limit_attached ?portfolio)
+        (security_available ?security)
+      )
+    :effect
+      (and
+        (entity_selected_security ?portfolio ?security)
+        (not
+          (security_available ?security)
+        )
+      )
+  )
+  (:action finalize_security_nomination
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (entity_registered ?portfolio)
+        (entity_limit_attached ?portfolio)
+        (entity_selected_security ?portfolio ?security)
+        (not
+          (entity_ready ?portfolio)
+        )
+      )
+    :effect (entity_ready ?portfolio)
+  )
+  (:action release_security_nomination
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (entity_selected_security ?portfolio ?security)
+      )
+    :effect
+      (and
+        (security_available ?security)
+        (not
+          (entity_selected_security ?portfolio ?security)
+        )
+      )
+  )
+  (:action assign_broker_to_portfolio
+    :parameters (?portfolio - portfolio ?broker - broker)
+    :precondition
+      (and
+        (entity_ready ?portfolio)
+        (broker_available ?broker)
+      )
+    :effect
+      (and
+        (entity_assigned_broker ?portfolio ?broker)
+        (not
+          (broker_available ?broker)
+        )
+      )
+  )
+  (:action unassign_broker_from_portfolio
+    :parameters (?portfolio - portfolio ?broker - broker)
+    :precondition
+      (and
+        (entity_assigned_broker ?portfolio ?broker)
+      )
+    :effect
+      (and
+        (broker_available ?broker)
+        (not
+          (entity_assigned_broker ?portfolio ?broker)
+        )
+      )
+  )
+  (:action attach_pretrade_approval_to_plan
+    :parameters (?execution_plan - execution_plan ?pretrade_approval - pretrade_approval)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (pretrade_approval_available ?pretrade_approval)
+      )
+    :effect
+      (and
+        (plan_assigned_pretrade_approval ?execution_plan ?pretrade_approval)
+        (not
+          (pretrade_approval_available ?pretrade_approval)
+        )
+      )
+  )
+  (:action detach_pretrade_approval_from_plan
+    :parameters (?execution_plan - execution_plan ?pretrade_approval - pretrade_approval)
+    :precondition
+      (and
+        (plan_assigned_pretrade_approval ?execution_plan ?pretrade_approval)
+      )
+    :effect
+      (and
+        (pretrade_approval_available ?pretrade_approval)
+        (not
+          (plan_assigned_pretrade_approval ?execution_plan ?pretrade_approval)
+        )
+      )
+  )
+  (:action attach_execution_authorization_to_plan
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (execution_authorization_available ?execution_authorization)
+      )
+    :effect
+      (and
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (not
+          (execution_authorization_available ?execution_authorization)
+        )
+      )
+  )
+  (:action detach_execution_authorization_from_plan
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization)
+    :precondition
+      (and
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+      )
+    :effect
+      (and
+        (execution_authorization_available ?execution_authorization)
+        (not
+          (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        )
+      )
+  )
+  (:action select_source_bucket_for_security
+    :parameters (?source_portfolio - source_portfolio ?source_exposure_bucket - source_exposure_bucket ?security - security)
+    :precondition
+      (and
+        (entity_ready ?source_portfolio)
+        (entity_selected_security ?source_portfolio ?security)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (not
+          (source_bucket_selected ?source_exposure_bucket)
+        )
+        (not
+          (source_bucket_adjustment_marked ?source_exposure_bucket)
+        )
+      )
+    :effect (source_bucket_selected ?source_exposure_bucket)
+  )
+  (:action confirm_source_bucket_selection
+    :parameters (?source_portfolio - source_portfolio ?source_exposure_bucket - source_exposure_bucket ?broker - broker)
+    :precondition
+      (and
+        (entity_ready ?source_portfolio)
+        (entity_assigned_broker ?source_portfolio ?broker)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (not
+          (source_portfolio_ready ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+      )
+  )
+  (:action apply_adjustment_to_source_bucket
+    :parameters (?source_portfolio - source_portfolio ?source_exposure_bucket - source_exposure_bucket ?adjustment_instruction - adjustment_instruction)
+    :precondition
+      (and
+        (entity_ready ?source_portfolio)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (adjustment_instruction_available ?adjustment_instruction)
+        (not
+          (source_portfolio_ready ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_adjustment_marked ?source_exposure_bucket)
+        (source_portfolio_ready ?source_portfolio)
+        (source_portfolio_bound_adjustment ?source_portfolio ?adjustment_instruction)
+        (not
+          (adjustment_instruction_available ?adjustment_instruction)
+        )
+      )
+  )
+  (:action consolidate_source_bucket_selection_with_adjustment
+    :parameters (?source_portfolio - source_portfolio ?source_exposure_bucket - source_exposure_bucket ?security - security ?adjustment_instruction - adjustment_instruction)
+    :precondition
+      (and
+        (entity_ready ?source_portfolio)
+        (entity_selected_security ?source_portfolio ?security)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (source_bucket_adjustment_marked ?source_exposure_bucket)
+        (source_portfolio_bound_adjustment ?source_portfolio ?adjustment_instruction)
+        (not
+          (source_portfolio_selection_confirmed ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_selected ?source_exposure_bucket)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+        (adjustment_instruction_available ?adjustment_instruction)
+        (not
+          (source_portfolio_bound_adjustment ?source_portfolio ?adjustment_instruction)
+        )
+      )
+  )
+  (:action select_target_bucket_for_security
+    :parameters (?target_portfolio - target_portfolio ?target_exposure_bucket - target_exposure_bucket ?security - security)
+    :precondition
+      (and
+        (entity_ready ?target_portfolio)
+        (entity_selected_security ?target_portfolio ?security)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (not
+          (target_bucket_selected ?target_exposure_bucket)
+        )
+        (not
+          (target_bucket_adjustment_marked ?target_exposure_bucket)
+        )
+      )
+    :effect (target_bucket_selected ?target_exposure_bucket)
+  )
+  (:action confirm_target_bucket_selection
+    :parameters (?target_portfolio - target_portfolio ?target_exposure_bucket - target_exposure_bucket ?broker - broker)
+    :precondition
+      (and
+        (entity_ready ?target_portfolio)
+        (entity_assigned_broker ?target_portfolio ?broker)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (not
+          (target_portfolio_ready ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (target_portfolio_ready ?target_portfolio)
+        (target_portfolio_selection_confirmed ?target_portfolio)
+      )
+  )
+  (:action apply_adjustment_to_target_bucket
+    :parameters (?target_portfolio - target_portfolio ?target_exposure_bucket - target_exposure_bucket ?adjustment_instruction - adjustment_instruction)
+    :precondition
+      (and
+        (entity_ready ?target_portfolio)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (adjustment_instruction_available ?adjustment_instruction)
+        (not
+          (target_portfolio_ready ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_adjustment_marked ?target_exposure_bucket)
+        (target_portfolio_ready ?target_portfolio)
+        (target_portfolio_bound_adjustment ?target_portfolio ?adjustment_instruction)
+        (not
+          (adjustment_instruction_available ?adjustment_instruction)
+        )
+      )
+  )
+  (:action consolidate_target_bucket_selection_with_adjustment
+    :parameters (?target_portfolio - target_portfolio ?target_exposure_bucket - target_exposure_bucket ?security - security ?adjustment_instruction - adjustment_instruction)
+    :precondition
+      (and
+        (entity_ready ?target_portfolio)
+        (entity_selected_security ?target_portfolio ?security)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (target_bucket_adjustment_marked ?target_exposure_bucket)
+        (target_portfolio_bound_adjustment ?target_portfolio ?adjustment_instruction)
+        (not
+          (target_portfolio_selection_confirmed ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_selected ?target_exposure_bucket)
+        (target_portfolio_selection_confirmed ?target_portfolio)
+        (adjustment_instruction_available ?adjustment_instruction)
+        (not
+          (target_portfolio_bound_adjustment ?target_portfolio ?adjustment_instruction)
+        )
+      )
+  )
+  (:action create_trade_proposal_standard
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+        (target_portfolio_selection_confirmed ?target_portfolio)
+        (proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?trade_proposal)
+        (proposal_linked_source_bucket ?trade_proposal ?source_exposure_bucket)
+        (proposal_linked_target_bucket ?trade_proposal ?target_exposure_bucket)
+        (not
+          (proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action create_trade_proposal_with_source_adjustment
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (source_bucket_adjustment_marked ?source_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (not
+          (source_portfolio_selection_confirmed ?source_portfolio)
+        )
+        (target_portfolio_selection_confirmed ?target_portfolio)
+        (proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?trade_proposal)
+        (proposal_linked_source_bucket ?trade_proposal ?source_exposure_bucket)
+        (proposal_linked_target_bucket ?trade_proposal ?target_exposure_bucket)
+        (proposal_requires_liquidity_slot ?trade_proposal)
+        (not
+          (proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action create_trade_proposal_with_target_adjustment
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (target_bucket_adjustment_marked ?target_exposure_bucket)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+        (not
+          (target_portfolio_selection_confirmed ?target_portfolio)
+        )
+        (proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?trade_proposal)
+        (proposal_linked_source_bucket ?trade_proposal ?source_exposure_bucket)
+        (proposal_linked_target_bucket ?trade_proposal ?target_exposure_bucket)
+        (proposal_requires_additional_liquidity ?trade_proposal)
+        (not
+          (proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action create_trade_proposal_with_both_adjustments
+    :parameters (?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (target_portfolio_ready ?target_portfolio)
+        (source_portfolio_in_bucket ?source_portfolio ?source_exposure_bucket)
+        (target_portfolio_in_bucket ?target_portfolio ?target_exposure_bucket)
+        (source_bucket_adjustment_marked ?source_exposure_bucket)
+        (target_bucket_adjustment_marked ?target_exposure_bucket)
+        (not
+          (source_portfolio_selection_confirmed ?source_portfolio)
+        )
+        (not
+          (target_portfolio_selection_confirmed ?target_portfolio)
+        )
+        (proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?trade_proposal)
+        (proposal_linked_source_bucket ?trade_proposal ?source_exposure_bucket)
+        (proposal_linked_target_bucket ?trade_proposal ?target_exposure_bucket)
+        (proposal_requires_liquidity_slot ?trade_proposal)
+        (proposal_requires_additional_liquidity ?trade_proposal)
+        (not
+          (proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action commit_trade_proposal
+    :parameters (?trade_proposal - trade_proposal ?source_portfolio - source_portfolio ?security - security)
+    :precondition
+      (and
+        (proposal_reserved ?trade_proposal)
+        (source_portfolio_ready ?source_portfolio)
+        (entity_selected_security ?source_portfolio ?security)
+        (not
+          (proposal_committed ?trade_proposal)
+        )
+      )
+    :effect (proposal_committed ?trade_proposal)
+  )
+  (:action bind_allocation_template_to_plan_and_proposal
+    :parameters (?execution_plan - execution_plan ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (plan_has_trade_proposal ?execution_plan ?trade_proposal)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_available ?allocation_template)
+        (proposal_reserved ?trade_proposal)
+        (proposal_committed ?trade_proposal)
+        (not
+          (allocation_template_reserved ?allocation_template)
+        )
+      )
+    :effect
+      (and
+        (allocation_template_reserved ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (not
+          (allocation_template_available ?allocation_template)
+        )
+      )
+  )
+  (:action reserve_plan_resources
+    :parameters (?execution_plan - execution_plan ?allocation_template - allocation_template ?trade_proposal - trade_proposal ?security - security)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_reserved ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (entity_selected_security ?execution_plan ?security)
+        (not
+          (proposal_requires_liquidity_slot ?trade_proposal)
+        )
+        (not
+          (plan_resources_reserved ?execution_plan)
+        )
+      )
+    :effect (plan_resources_reserved ?execution_plan)
+  )
+  (:action reserve_liquidity_slot_for_plan
+    :parameters (?execution_plan - execution_plan ?liquidity_slot - liquidity_slot)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (liquidity_slot_available ?liquidity_slot)
+        (not
+          (plan_liquidity_reserved ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_liquidity_reserved ?execution_plan)
+        (plan_assigned_liquidity_slot ?execution_plan ?liquidity_slot)
+        (not
+          (liquidity_slot_available ?liquidity_slot)
+        )
+      )
+  )
+  (:action associate_liquidity_slot_and_confirm_plan
+    :parameters (?execution_plan - execution_plan ?allocation_template - allocation_template ?trade_proposal - trade_proposal ?security - security ?liquidity_slot - liquidity_slot)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_reserved ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (entity_selected_security ?execution_plan ?security)
+        (proposal_requires_liquidity_slot ?trade_proposal)
+        (plan_liquidity_reserved ?execution_plan)
+        (plan_assigned_liquidity_slot ?execution_plan ?liquidity_slot)
+        (not
+          (plan_resources_reserved ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_resources_reserved ?execution_plan)
+        (plan_liquidity_binding_acknowledged ?execution_plan)
+      )
+  )
+  (:action reserve_broker_and_approval_for_plan
+    :parameters (?execution_plan - execution_plan ?pretrade_approval - pretrade_approval ?broker - broker ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_resources_reserved ?execution_plan)
+        (plan_assigned_pretrade_approval ?execution_plan ?pretrade_approval)
+        (entity_assigned_broker ?execution_plan ?broker)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (not
+          (proposal_requires_additional_liquidity ?trade_proposal)
+        )
+        (not
+          (plan_liquidity_confirmed ?execution_plan)
+        )
+      )
+    :effect (plan_liquidity_confirmed ?execution_plan)
+  )
+  (:action confirm_broker_and_approval_for_plan
+    :parameters (?execution_plan - execution_plan ?pretrade_approval - pretrade_approval ?broker - broker ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_resources_reserved ?execution_plan)
+        (plan_assigned_pretrade_approval ?execution_plan ?pretrade_approval)
+        (entity_assigned_broker ?execution_plan ?broker)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (proposal_requires_additional_liquidity ?trade_proposal)
+        (not
+          (plan_liquidity_confirmed ?execution_plan)
+        )
+      )
+    :effect (plan_liquidity_confirmed ?execution_plan)
+  )
+  (:action authorize_plan_execution
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_liquidity_confirmed ?execution_plan)
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (not
+          (proposal_requires_liquidity_slot ?trade_proposal)
+        )
+        (not
+          (proposal_requires_additional_liquidity ?trade_proposal)
+        )
+        (not
+          (plan_authorized ?execution_plan)
+        )
+      )
+    :effect (plan_authorized ?execution_plan)
+  )
+  (:action authorize_plan_with_settlement_attachment
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_liquidity_confirmed ?execution_plan)
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (proposal_requires_liquidity_slot ?trade_proposal)
+        (not
+          (proposal_requires_additional_liquidity ?trade_proposal)
+        )
+        (not
+          (plan_authorized ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_settlement_attached ?execution_plan)
+      )
+  )
+  (:action authorize_plan_with_settlement_and_confirm
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_liquidity_confirmed ?execution_plan)
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (not
+          (proposal_requires_liquidity_slot ?trade_proposal)
+        )
+        (proposal_requires_additional_liquidity ?trade_proposal)
+        (not
+          (plan_authorized ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_settlement_attached ?execution_plan)
+      )
+  )
+  (:action authorize_plan_with_full_settlement_confirm
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization ?allocation_template - allocation_template ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (plan_liquidity_confirmed ?execution_plan)
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (plan_bound_allocation_template ?execution_plan ?allocation_template)
+        (allocation_template_bound_to_proposal ?allocation_template ?trade_proposal)
+        (proposal_requires_liquidity_slot ?trade_proposal)
+        (proposal_requires_additional_liquidity ?trade_proposal)
+        (not
+          (plan_authorized ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_settlement_attached ?execution_plan)
+      )
+  )
+  (:action finalize_plan_without_settlement
+    :parameters (?execution_plan - execution_plan)
+    :precondition
+      (and
+        (plan_authorized ?execution_plan)
+        (not
+          (plan_settlement_attached ?execution_plan)
+        )
+        (not
+          (plan_post_trade_assignment_recorded ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_post_trade_assignment_recorded ?execution_plan)
+        (entity_recorded ?execution_plan)
+      )
+  )
+  (:action attach_settlement_instruction_to_plan
+    :parameters (?execution_plan - execution_plan ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_settlement_attached ?execution_plan)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (plan_assigned_settlement_instruction ?execution_plan ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action prepare_plan_for_execution
+    :parameters (?execution_plan - execution_plan ?source_portfolio - source_portfolio ?target_portfolio - target_portfolio ?security - security ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_settlement_attached ?execution_plan)
+        (plan_assigned_settlement_instruction ?execution_plan ?settlement_instruction)
+        (plan_linked_to_source_portfolio ?execution_plan ?source_portfolio)
+        (plan_linked_to_target_portfolio ?execution_plan ?target_portfolio)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+        (target_portfolio_selection_confirmed ?target_portfolio)
+        (entity_selected_security ?execution_plan ?security)
+        (not
+          (plan_final_checks_passed ?execution_plan)
+        )
+      )
+    :effect (plan_final_checks_passed ?execution_plan)
+  )
+  (:action finalize_execution_plan_and_mark_executed
+    :parameters (?execution_plan - execution_plan)
+    :precondition
+      (and
+        (plan_authorized ?execution_plan)
+        (plan_final_checks_passed ?execution_plan)
+        (not
+          (plan_post_trade_assignment_recorded ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_post_trade_assignment_recorded ?execution_plan)
+        (entity_recorded ?execution_plan)
+      )
+  )
+  (:action attach_strategy_tag_to_plan
+    :parameters (?execution_plan - execution_plan ?strategy_tag - strategy_tag ?security - security)
+    :precondition
+      (and
+        (entity_ready ?execution_plan)
+        (entity_selected_security ?execution_plan ?security)
+        (strategy_tag_available ?strategy_tag)
+        (plan_assigned_strategy_tag ?execution_plan ?strategy_tag)
+        (not
+          (plan_strategy_tag_attached ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_strategy_tag_attached ?execution_plan)
+        (not
+          (strategy_tag_available ?strategy_tag)
+        )
+      )
+  )
+  (:action assign_broker_to_plan
+    :parameters (?execution_plan - execution_plan ?broker - broker)
+    :precondition
+      (and
+        (plan_strategy_tag_attached ?execution_plan)
+        (entity_assigned_broker ?execution_plan ?broker)
+        (not
+          (plan_broker_assigned ?execution_plan)
+        )
+      )
+    :effect (plan_broker_assigned ?execution_plan)
+  )
+  (:action apply_execution_authorization_to_plan
+    :parameters (?execution_plan - execution_plan ?execution_authorization - execution_authorization)
+    :precondition
+      (and
+        (plan_broker_assigned ?execution_plan)
+        (plan_assigned_execution_authorization ?execution_plan ?execution_authorization)
+        (not
+          (plan_broker_authorized ?execution_plan)
+        )
+      )
+    :effect (plan_broker_authorized ?execution_plan)
+  )
+  (:action finalize_plan_with_broker_authorization
+    :parameters (?execution_plan - execution_plan)
+    :precondition
+      (and
+        (plan_broker_authorized ?execution_plan)
+        (not
+          (plan_post_trade_assignment_recorded ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_post_trade_assignment_recorded ?execution_plan)
+        (entity_recorded ?execution_plan)
+      )
+  )
+  (:action complete_source_portfolio_execution
+    :parameters (?source_portfolio - source_portfolio ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_portfolio_ready ?source_portfolio)
+        (source_portfolio_selection_confirmed ?source_portfolio)
+        (proposal_reserved ?trade_proposal)
+        (proposal_committed ?trade_proposal)
+        (not
+          (entity_recorded ?source_portfolio)
+        )
+      )
+    :effect (entity_recorded ?source_portfolio)
+  )
+  (:action complete_target_portfolio_execution
+    :parameters (?target_portfolio - target_portfolio ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (target_portfolio_ready ?target_portfolio)
+        (target_portfolio_selection_confirmed ?target_portfolio)
+        (proposal_reserved ?trade_proposal)
+        (proposal_committed ?trade_proposal)
+        (not
+          (entity_recorded ?target_portfolio)
+        )
+      )
+    :effect (entity_recorded ?target_portfolio)
+  )
+  (:action assign_client_account_to_portfolio_post_trade
+    :parameters (?portfolio - portfolio ?client_account - client_account ?security - security)
+    :precondition
+      (and
+        (entity_recorded ?portfolio)
+        (entity_selected_security ?portfolio ?security)
+        (client_account_available ?client_account)
+        (not
+          (entity_post_trade_assignment_attached ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (entity_post_trade_assignment_attached ?portfolio)
+        (entity_assigned_client_account ?portfolio ?client_account)
+        (not
+          (client_account_available ?client_account)
+        )
+      )
+  )
+  (:action finalize_source_portfolio_post_trade
+    :parameters (?source_portfolio - source_portfolio ?limit_profile - limit_profile ?client_account - client_account)
+    :precondition
+      (and
+        (entity_post_trade_assignment_attached ?source_portfolio)
+        (entity_assigned_limit_profile ?source_portfolio ?limit_profile)
+        (entity_assigned_client_account ?source_portfolio ?client_account)
+        (not
+          (entity_finalized ?source_portfolio)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?source_portfolio)
+        (limit_profile_available ?limit_profile)
+        (client_account_available ?client_account)
+      )
+  )
+  (:action finalize_target_portfolio_post_trade
+    :parameters (?target_portfolio - target_portfolio ?limit_profile - limit_profile ?client_account - client_account)
+    :precondition
+      (and
+        (entity_post_trade_assignment_attached ?target_portfolio)
+        (entity_assigned_limit_profile ?target_portfolio ?limit_profile)
+        (entity_assigned_client_account ?target_portfolio ?client_account)
+        (not
+          (entity_finalized ?target_portfolio)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?target_portfolio)
+        (limit_profile_available ?limit_profile)
+        (client_account_available ?client_account)
+      )
+  )
+  (:action finalize_plan_post_trade_assignment
+    :parameters (?execution_plan - execution_plan ?limit_profile - limit_profile ?client_account - client_account)
+    :precondition
+      (and
+        (entity_post_trade_assignment_attached ?execution_plan)
+        (entity_assigned_limit_profile ?execution_plan ?limit_profile)
+        (entity_assigned_client_account ?execution_plan ?client_account)
+        (not
+          (entity_finalized ?execution_plan)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?execution_plan)
+        (limit_profile_available ?limit_profile)
+        (client_account_available ?client_account)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem exposure_limit_enforcement_problem)
+  (:domain exposure_limit_enforcement_domain)
+  (:objects source_portfolio_1 - source_portfolio target_portfolio_1 - target_portfolio execution_plan_1 - execution_plan execution_plan_2 - execution_plan limit_profile_a - limit_profile limit_profile_b - limit_profile limit_profile_c - limit_profile security_candidate_1 - security broker_1 - broker adjustment_instruction_1 - adjustment_instruction source_exposure_bucket_1 - source_exposure_bucket target_exposure_bucket_1 - target_exposure_bucket trade_proposal_1 - trade_proposal allocation_template_a - allocation_template allocation_template_b - allocation_template liquidity_slot_a - liquidity_slot liquidity_slot_b - liquidity_slot settlement_instruction_a - settlement_instruction settlement_instruction_b - settlement_instruction client_account_a - client_account pretrade_approval_a - pretrade_approval strategy_tag_alpha - strategy_tag strategy_tag_beta - strategy_tag execution_authorization_a - execution_authorization)
+  (:init
+    (limit_profile_available limit_profile_a)
+    (limit_profile_available limit_profile_b)
+    (limit_profile_available limit_profile_c)
+    (security_available security_candidate_1)
+    (broker_available broker_1)
+    (adjustment_instruction_available adjustment_instruction_1)
+    (source_portfolio_in_bucket source_portfolio_1 source_exposure_bucket_1)
+    (target_portfolio_in_bucket target_portfolio_1 target_exposure_bucket_1)
+    (proposal_available trade_proposal_1)
+    (allocation_template_available allocation_template_a)
+    (allocation_template_available allocation_template_b)
+    (plan_linked_to_source_portfolio execution_plan_1 source_portfolio_1)
+    (plan_linked_to_source_portfolio execution_plan_2 source_portfolio_1)
+    (plan_linked_to_target_portfolio execution_plan_1 target_portfolio_1)
+    (plan_linked_to_target_portfolio execution_plan_2 target_portfolio_1)
+    (plan_has_trade_proposal execution_plan_1 trade_proposal_1)
+    (plan_has_trade_proposal execution_plan_2 trade_proposal_1)
+    (plan_bound_allocation_template execution_plan_1 allocation_template_a)
+    (plan_bound_allocation_template execution_plan_2 allocation_template_b)
+    (liquidity_slot_available liquidity_slot_a)
+    (liquidity_slot_available liquidity_slot_b)
+    (settlement_instruction_available settlement_instruction_a)
+    (settlement_instruction_available settlement_instruction_b)
+    (client_account_available client_account_a)
+    (pretrade_approval_available pretrade_approval_a)
+    (strategy_tag_available strategy_tag_alpha)
+    (plan_assigned_strategy_tag execution_plan_1 strategy_tag_alpha)
+    (plan_assigned_strategy_tag execution_plan_2 strategy_tag_beta)
+    (execution_authorization_available execution_authorization_a)
+  )
+  (:goal
+    (and
+      (entity_finalized source_portfolio_1)
+      (entity_finalized target_portfolio_1)
+      (entity_finalized execution_plan_1)
+      (entity_finalized execution_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_portfolio target_portfolio_1)
+(attach_limit_profile_to_portfolio target_portfolio_1 limit_profile_b)
+(nominate_security_for_portfolio target_portfolio_1 security_candidate_1)
+(finalize_security_nomination target_portfolio_1 security_candidate_1)
+(apply_adjustment_to_target_bucket target_portfolio_1 target_exposure_bucket_1 adjustment_instruction_1)
+(consolidate_target_bucket_selection_with_adjustment target_portfolio_1 target_exposure_bucket_1 security_candidate_1 adjustment_instruction_1)
+(release_security_nomination target_portfolio_1 security_candidate_1)
+(register_portfolio source_portfolio_1)
+(attach_limit_profile_to_portfolio source_portfolio_1 limit_profile_a)
+(nominate_security_for_portfolio source_portfolio_1 security_candidate_1)
+(finalize_security_nomination source_portfolio_1 security_candidate_1)
+(apply_adjustment_to_source_bucket source_portfolio_1 source_exposure_bucket_1 adjustment_instruction_1)
+(consolidate_source_bucket_selection_with_adjustment source_portfolio_1 source_exposure_bucket_1 security_candidate_1 adjustment_instruction_1)
+(create_trade_proposal_standard source_portfolio_1 target_portfolio_1 source_exposure_bucket_1 target_exposure_bucket_1 trade_proposal_1)
+(commit_trade_proposal trade_proposal_1 source_portfolio_1 security_candidate_1)
+(complete_source_portfolio_execution source_portfolio_1 trade_proposal_1)
+(complete_target_portfolio_execution target_portfolio_1 trade_proposal_1)
+(assign_client_account_to_portfolio_post_trade source_portfolio_1 client_account_a security_candidate_1)
+(finalize_source_portfolio_post_trade source_portfolio_1 limit_profile_a client_account_a)
+(release_security_nomination source_portfolio_1 security_candidate_1)
+(nominate_security_for_portfolio target_portfolio_1 security_candidate_1)
+(assign_client_account_to_portfolio_post_trade target_portfolio_1 client_account_a security_candidate_1)
+(finalize_target_portfolio_post_trade target_portfolio_1 limit_profile_b client_account_a)
+(register_portfolio execution_plan_1)
+(attach_limit_profile_to_portfolio execution_plan_1 limit_profile_c)
+(nominate_security_for_portfolio execution_plan_1 security_candidate_1)
+(finalize_security_nomination execution_plan_1 security_candidate_1)
+(attach_pretrade_approval_to_plan execution_plan_1 pretrade_approval_a)
+(attach_execution_authorization_to_plan execution_plan_1 execution_authorization_a)
+(assign_broker_to_portfolio execution_plan_1 broker_1)
+(bind_allocation_template_to_plan execution_plan_1 allocation_template_a trade_proposal_1)
+(reserve_plan_resources execution_plan_1 allocation_template_a trade_proposal_1 security_candidate_1)
+(reserve_broker_and_approval_for_plan execution_plan_1 pretrade_approval_a broker_1 allocation_template_a trade_proposal_1)
+(authorize_plan_execution execution_plan_1 execution_authorization_a allocation_template_a trade_proposal_1)
+(finalize_plan_without_settlement execution_plan_1)
+(assign_client_account_to_portfolio_post_trade execution_plan_1 client_account_a security_candidate_1)
+(finalize_plan_post_trade_assignment execution_plan_1 limit_profile_c client_account_a)
+(release_security_nomination execution_plan_1 security_candidate_1)
+(detach_pretrade_approval_from_plan execution_plan_1 pretrade_approval_a)
+(detach_execution_authorization_from_plan execution_plan_1 execution_authorization_a)
+(unassign_broker_from_portfolio execution_plan_1 broker_1)
+(register_portfolio execution_plan_2)
+(attach_limit_profile_to_portfolio execution_plan_2 limit_profile_a)
+(nominate_security_for_portfolio execution_plan_2 security_candidate_1)
+(finalize_security_nomination execution_plan_2 security_candidate_1)
+(attach_pretrade_approval_to_plan execution_plan_2 pretrade_approval_a)
+(attach_execution_authorization_to_plan execution_plan_2 execution_authorization_a)
+(assign_broker_to_portfolio execution_plan_2 broker_1)
+(bind_allocation_template_to_plan execution_plan_2 allocation_template_b trade_proposal_1)
+(reserve_plan_resources execution_plan_2 allocation_template_b trade_proposal_1 security_candidate_1)
+(reserve_broker_and_approval_for_plan execution_plan_2 pretrade_approval_a broker_1 allocation_template_b trade_proposal_1)
+(authorize_plan_execution execution_plan_2 execution_authorization_a allocation_template_b trade_proposal_1)
+(finalize_plan_without_settlement execution_plan_2)
+(assign_client_account_to_portfolio_post_trade execution_plan_2 client_account_a security_candidate_1)
+(finalize_plan_post_trade_assignment execution_plan_2 limit_profile_a client_account_a)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vn1ap18j/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_vn1ap18j/plan.pddl 
+
+
+--- stderr ---
+

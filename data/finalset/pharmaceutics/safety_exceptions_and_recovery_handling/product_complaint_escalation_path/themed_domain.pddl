@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_product_complaint_escalation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object organizational_unit - object product - object record_root - object record - record_root escalation_channel - operational_resource investigator - operational_resource technical_specialist - operational_resource regulatory_submission - operational_resource logistics_resource - operational_resource notification_template - operational_resource communication_asset - operational_resource authority_notice - operational_resource external_resource - organizational_unit sample_or_evidence_item - organizational_unit stakeholder_entity - organizational_unit containment_action - product mitigation_action - product recovery_or_recall_event - product record_subcategory - record product_record - record site_record - record_subcategory distribution_record - record_subcategory product_record_dossier - product_record)
+  (:predicates
+    (record_registered ?record - record)
+    (record_under_investigation ?record - record)
+    (record_assigned ?record - record)
+    (record_finalized ?record - record)
+    (action_executed ?record - record)
+    (record_notification_prepared ?record - record)
+    (escalation_channel_available ?escalation_channel - escalation_channel)
+    (record_assigned_to_channel ?record - record ?escalation_channel - escalation_channel)
+    (investigator_available ?investigator - investigator)
+    (investigator_assigned_to_case ?record - record ?investigator - investigator)
+    (specialist_available ?technical_specialist - technical_specialist)
+    (specialist_assigned_to_case ?record - record ?technical_specialist - technical_specialist)
+    (external_resource_available ?external_resource - external_resource)
+    (site_allocated_external_resource ?site_record - site_record ?external_resource - external_resource)
+    (distribution_allocated_external_resource ?distribution_record - distribution_record ?external_resource - external_resource)
+    (site_has_containment_action ?site_record - site_record ?containment_action - containment_action)
+    (containment_initiated ?containment_action - containment_action)
+    (containment_resourced ?containment_action - containment_action)
+    (site_containment_confirmed ?site_record - site_record)
+    (distribution_has_mitigation_action ?distribution_record - distribution_record ?mitigation_action - mitigation_action)
+    (mitigation_initiated ?mitigation_action - mitigation_action)
+    (mitigation_resourced ?mitigation_action - mitigation_action)
+    (distribution_mitigation_confirmed ?distribution_record - distribution_record)
+    (recovery_event_proposed ?recovery_or_recall_event - recovery_or_recall_event)
+    (recovery_event_initialized ?recovery_or_recall_event - recovery_or_recall_event)
+    (recovery_event_linked_containment ?recovery_or_recall_event - recovery_or_recall_event ?containment_action - containment_action)
+    (recovery_event_linked_mitigation ?recovery_or_recall_event - recovery_or_recall_event ?mitigation_action - mitigation_action)
+    (recovery_event_local_approval ?recovery_or_recall_event - recovery_or_recall_event)
+    (recovery_event_regulatory_approval ?recovery_or_recall_event - recovery_or_recall_event)
+    (recovery_event_executed ?recovery_or_recall_event - recovery_or_recall_event)
+    (dossier_linked_site ?product_record_dossier - product_record_dossier ?site_record - site_record)
+    (dossier_linked_distribution ?product_record_dossier - product_record_dossier ?distribution_record - distribution_record)
+    (dossier_linked_recovery_event ?product_record_dossier - product_record_dossier ?recovery_or_recall_event - recovery_or_recall_event)
+    (sample_in_custody ?sample_or_evidence_item - sample_or_evidence_item)
+    (dossier_has_sample ?product_record_dossier - product_record_dossier ?sample_or_evidence_item - sample_or_evidence_item)
+    (sample_processed ?sample_or_evidence_item - sample_or_evidence_item)
+    (sample_linked_recovery_event ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    (dossier_review_started ?product_record_dossier - product_record_dossier)
+    (dossier_submitted_for_authority_review ?product_record_dossier - product_record_dossier)
+    (dossier_authorized_for_execution ?product_record_dossier - product_record_dossier)
+    (regulatory_submission_attached ?product_record_dossier - product_record_dossier)
+    (regulatory_submission_acknowledged ?product_record_dossier - product_record_dossier)
+    (communication_asset_attached ?product_record_dossier - product_record_dossier)
+    (dossier_execution_confirmed ?product_record_dossier - product_record_dossier)
+    (stakeholder_available ?stakeholder_entity - stakeholder_entity)
+    (dossier_linked_stakeholder ?product_record_dossier - product_record_dossier ?stakeholder_entity - stakeholder_entity)
+    (dossier_stakeholder_engaged ?product_record_dossier - product_record_dossier)
+    (dossier_stakeholder_acknowledged ?product_record_dossier - product_record_dossier)
+    (dossier_stakeholder_confirmation_received ?product_record_dossier - product_record_dossier)
+    (regulatory_submission_template_available ?regulatory_submission - regulatory_submission)
+    (dossier_linked_regulatory_submission ?product_record_dossier - product_record_dossier ?regulatory_submission - regulatory_submission)
+    (logistics_resource_available ?logistics_resource - logistics_resource)
+    (dossier_linked_logistics_resource ?product_record_dossier - product_record_dossier ?logistics_resource - logistics_resource)
+    (communication_asset_available ?communication_asset - communication_asset)
+    (dossier_linked_communication_asset ?product_record_dossier - product_record_dossier ?communication_asset - communication_asset)
+    (authority_notice_available ?authority_notice - authority_notice)
+    (dossier_linked_authority_notice ?product_record_dossier - product_record_dossier ?authority_notice - authority_notice)
+    (notification_template_available ?notification_template - notification_template)
+    (record_linked_notification_template ?record - record ?notification_template - notification_template)
+    (site_ready_for_recovery ?site_record - site_record)
+    (distribution_ready_for_recovery ?distribution_record - distribution_record)
+    (dossier_closed ?product_record_dossier - product_record_dossier)
+  )
+  (:action register_complaint_case
+    :parameters (?record - record)
+    :precondition
+      (and
+        (not
+          (record_registered ?record)
+        )
+        (not
+          (record_finalized ?record)
+        )
+      )
+    :effect (record_registered ?record)
+  )
+  (:action assign_case_to_escalation_channel
+    :parameters (?record - record ?escalation_channel - escalation_channel)
+    :precondition
+      (and
+        (record_registered ?record)
+        (not
+          (record_assigned ?record)
+        )
+        (escalation_channel_available ?escalation_channel)
+      )
+    :effect
+      (and
+        (record_assigned ?record)
+        (record_assigned_to_channel ?record ?escalation_channel)
+        (not
+          (escalation_channel_available ?escalation_channel)
+        )
+      )
+  )
+  (:action assign_investigator_to_case
+    :parameters (?record - record ?investigator - investigator)
+    :precondition
+      (and
+        (record_registered ?record)
+        (record_assigned ?record)
+        (investigator_available ?investigator)
+      )
+    :effect
+      (and
+        (investigator_assigned_to_case ?record ?investigator)
+        (not
+          (investigator_available ?investigator)
+        )
+      )
+  )
+  (:action open_investigation_for_case
+    :parameters (?record - record ?investigator - investigator)
+    :precondition
+      (and
+        (record_registered ?record)
+        (record_assigned ?record)
+        (investigator_assigned_to_case ?record ?investigator)
+        (not
+          (record_under_investigation ?record)
+        )
+      )
+    :effect (record_under_investigation ?record)
+  )
+  (:action release_investigator_from_case
+    :parameters (?record - record ?investigator - investigator)
+    :precondition
+      (and
+        (investigator_assigned_to_case ?record ?investigator)
+      )
+    :effect
+      (and
+        (investigator_available ?investigator)
+        (not
+          (investigator_assigned_to_case ?record ?investigator)
+        )
+      )
+  )
+  (:action assign_specialist_to_case
+    :parameters (?record - record ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (record_under_investigation ?record)
+        (specialist_available ?technical_specialist)
+      )
+    :effect
+      (and
+        (specialist_assigned_to_case ?record ?technical_specialist)
+        (not
+          (specialist_available ?technical_specialist)
+        )
+      )
+  )
+  (:action release_specialist_from_case
+    :parameters (?record - record ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (specialist_assigned_to_case ?record ?technical_specialist)
+      )
+    :effect
+      (and
+        (specialist_available ?technical_specialist)
+        (not
+          (specialist_assigned_to_case ?record ?technical_specialist)
+        )
+      )
+  )
+  (:action assign_communication_asset_to_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?communication_asset - communication_asset)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (communication_asset_available ?communication_asset)
+      )
+    :effect
+      (and
+        (dossier_linked_communication_asset ?product_record_dossier ?communication_asset)
+        (not
+          (communication_asset_available ?communication_asset)
+        )
+      )
+  )
+  (:action release_communication_asset_from_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?communication_asset - communication_asset)
+    :precondition
+      (and
+        (dossier_linked_communication_asset ?product_record_dossier ?communication_asset)
+      )
+    :effect
+      (and
+        (communication_asset_available ?communication_asset)
+        (not
+          (dossier_linked_communication_asset ?product_record_dossier ?communication_asset)
+        )
+      )
+  )
+  (:action assign_authority_notice_to_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (authority_notice_available ?authority_notice)
+      )
+    :effect
+      (and
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (not
+          (authority_notice_available ?authority_notice)
+        )
+      )
+  )
+  (:action release_authority_notice_from_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice)
+    :precondition
+      (and
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+      )
+    :effect
+      (and
+        (authority_notice_available ?authority_notice)
+        (not
+          (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        )
+      )
+  )
+  (:action initiate_containment_action_at_site
+    :parameters (?site_record - site_record ?containment_action - containment_action ?investigator - investigator)
+    :precondition
+      (and
+        (record_under_investigation ?site_record)
+        (investigator_assigned_to_case ?site_record ?investigator)
+        (site_has_containment_action ?site_record ?containment_action)
+        (not
+          (containment_initiated ?containment_action)
+        )
+        (not
+          (containment_resourced ?containment_action)
+        )
+      )
+    :effect (containment_initiated ?containment_action)
+  )
+  (:action verify_containment_at_site
+    :parameters (?site_record - site_record ?containment_action - containment_action ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (record_under_investigation ?site_record)
+        (specialist_assigned_to_case ?site_record ?technical_specialist)
+        (site_has_containment_action ?site_record ?containment_action)
+        (containment_initiated ?containment_action)
+        (not
+          (site_ready_for_recovery ?site_record)
+        )
+      )
+    :effect
+      (and
+        (site_ready_for_recovery ?site_record)
+        (site_containment_confirmed ?site_record)
+      )
+  )
+  (:action allocate_external_resource_to_site_containment
+    :parameters (?site_record - site_record ?containment_action - containment_action ?external_resource - external_resource)
+    :precondition
+      (and
+        (record_under_investigation ?site_record)
+        (site_has_containment_action ?site_record ?containment_action)
+        (external_resource_available ?external_resource)
+        (not
+          (site_ready_for_recovery ?site_record)
+        )
+      )
+    :effect
+      (and
+        (containment_resourced ?containment_action)
+        (site_ready_for_recovery ?site_record)
+        (site_allocated_external_resource ?site_record ?external_resource)
+        (not
+          (external_resource_available ?external_resource)
+        )
+      )
+  )
+  (:action finalize_containment_at_site
+    :parameters (?site_record - site_record ?containment_action - containment_action ?investigator - investigator ?external_resource - external_resource)
+    :precondition
+      (and
+        (record_under_investigation ?site_record)
+        (investigator_assigned_to_case ?site_record ?investigator)
+        (site_has_containment_action ?site_record ?containment_action)
+        (containment_resourced ?containment_action)
+        (site_allocated_external_resource ?site_record ?external_resource)
+        (not
+          (site_containment_confirmed ?site_record)
+        )
+      )
+    :effect
+      (and
+        (containment_initiated ?containment_action)
+        (site_containment_confirmed ?site_record)
+        (external_resource_available ?external_resource)
+        (not
+          (site_allocated_external_resource ?site_record ?external_resource)
+        )
+      )
+  )
+  (:action initiate_mitigation_action_for_distribution
+    :parameters (?distribution_record - distribution_record ?mitigation_action - mitigation_action ?investigator - investigator)
+    :precondition
+      (and
+        (record_under_investigation ?distribution_record)
+        (investigator_assigned_to_case ?distribution_record ?investigator)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (not
+          (mitigation_initiated ?mitigation_action)
+        )
+        (not
+          (mitigation_resourced ?mitigation_action)
+        )
+      )
+    :effect (mitigation_initiated ?mitigation_action)
+  )
+  (:action verify_mitigation_at_distribution_with_specialist
+    :parameters (?distribution_record - distribution_record ?mitigation_action - mitigation_action ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (record_under_investigation ?distribution_record)
+        (specialist_assigned_to_case ?distribution_record ?technical_specialist)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (mitigation_initiated ?mitigation_action)
+        (not
+          (distribution_ready_for_recovery ?distribution_record)
+        )
+      )
+    :effect
+      (and
+        (distribution_ready_for_recovery ?distribution_record)
+        (distribution_mitigation_confirmed ?distribution_record)
+      )
+  )
+  (:action allocate_external_resource_to_distribution_mitigation
+    :parameters (?distribution_record - distribution_record ?mitigation_action - mitigation_action ?external_resource - external_resource)
+    :precondition
+      (and
+        (record_under_investigation ?distribution_record)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (external_resource_available ?external_resource)
+        (not
+          (distribution_ready_for_recovery ?distribution_record)
+        )
+      )
+    :effect
+      (and
+        (mitigation_resourced ?mitigation_action)
+        (distribution_ready_for_recovery ?distribution_record)
+        (distribution_allocated_external_resource ?distribution_record ?external_resource)
+        (not
+          (external_resource_available ?external_resource)
+        )
+      )
+  )
+  (:action finalize_mitigation_at_distribution
+    :parameters (?distribution_record - distribution_record ?mitigation_action - mitigation_action ?investigator - investigator ?external_resource - external_resource)
+    :precondition
+      (and
+        (record_under_investigation ?distribution_record)
+        (investigator_assigned_to_case ?distribution_record ?investigator)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (mitigation_resourced ?mitigation_action)
+        (distribution_allocated_external_resource ?distribution_record ?external_resource)
+        (not
+          (distribution_mitigation_confirmed ?distribution_record)
+        )
+      )
+    :effect
+      (and
+        (mitigation_initiated ?mitigation_action)
+        (distribution_mitigation_confirmed ?distribution_record)
+        (external_resource_available ?external_resource)
+        (not
+          (distribution_allocated_external_resource ?distribution_record ?external_resource)
+        )
+      )
+  )
+  (:action initialize_recovery_or_recall_event
+    :parameters (?site_record - site_record ?distribution_record - distribution_record ?containment_action - containment_action ?mitigation_action - mitigation_action ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (site_ready_for_recovery ?site_record)
+        (distribution_ready_for_recovery ?distribution_record)
+        (site_has_containment_action ?site_record ?containment_action)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (containment_initiated ?containment_action)
+        (mitigation_initiated ?mitigation_action)
+        (site_containment_confirmed ?site_record)
+        (distribution_mitigation_confirmed ?distribution_record)
+        (recovery_event_proposed ?recovery_or_recall_event)
+      )
+    :effect
+      (and
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_linked_containment ?recovery_or_recall_event ?containment_action)
+        (recovery_event_linked_mitigation ?recovery_or_recall_event ?mitigation_action)
+        (not
+          (recovery_event_proposed ?recovery_or_recall_event)
+        )
+      )
+  )
+  (:action initialize_recovery_event_with_local_approval
+    :parameters (?site_record - site_record ?distribution_record - distribution_record ?containment_action - containment_action ?mitigation_action - mitigation_action ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (site_ready_for_recovery ?site_record)
+        (distribution_ready_for_recovery ?distribution_record)
+        (site_has_containment_action ?site_record ?containment_action)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (containment_resourced ?containment_action)
+        (mitigation_initiated ?mitigation_action)
+        (not
+          (site_containment_confirmed ?site_record)
+        )
+        (distribution_mitigation_confirmed ?distribution_record)
+        (recovery_event_proposed ?recovery_or_recall_event)
+      )
+    :effect
+      (and
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_linked_containment ?recovery_or_recall_event ?containment_action)
+        (recovery_event_linked_mitigation ?recovery_or_recall_event ?mitigation_action)
+        (recovery_event_local_approval ?recovery_or_recall_event)
+        (not
+          (recovery_event_proposed ?recovery_or_recall_event)
+        )
+      )
+  )
+  (:action initialize_recovery_event_with_regulatory_approval
+    :parameters (?site_record - site_record ?distribution_record - distribution_record ?containment_action - containment_action ?mitigation_action - mitigation_action ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (site_ready_for_recovery ?site_record)
+        (distribution_ready_for_recovery ?distribution_record)
+        (site_has_containment_action ?site_record ?containment_action)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (containment_initiated ?containment_action)
+        (mitigation_resourced ?mitigation_action)
+        (site_containment_confirmed ?site_record)
+        (not
+          (distribution_mitigation_confirmed ?distribution_record)
+        )
+        (recovery_event_proposed ?recovery_or_recall_event)
+      )
+    :effect
+      (and
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_linked_containment ?recovery_or_recall_event ?containment_action)
+        (recovery_event_linked_mitigation ?recovery_or_recall_event ?mitigation_action)
+        (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        (not
+          (recovery_event_proposed ?recovery_or_recall_event)
+        )
+      )
+  )
+  (:action initialize_recovery_event_with_full_approvals
+    :parameters (?site_record - site_record ?distribution_record - distribution_record ?containment_action - containment_action ?mitigation_action - mitigation_action ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (site_ready_for_recovery ?site_record)
+        (distribution_ready_for_recovery ?distribution_record)
+        (site_has_containment_action ?site_record ?containment_action)
+        (distribution_has_mitigation_action ?distribution_record ?mitigation_action)
+        (containment_resourced ?containment_action)
+        (mitigation_resourced ?mitigation_action)
+        (not
+          (site_containment_confirmed ?site_record)
+        )
+        (not
+          (distribution_mitigation_confirmed ?distribution_record)
+        )
+        (recovery_event_proposed ?recovery_or_recall_event)
+      )
+    :effect
+      (and
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_linked_containment ?recovery_or_recall_event ?containment_action)
+        (recovery_event_linked_mitigation ?recovery_or_recall_event ?mitigation_action)
+        (recovery_event_local_approval ?recovery_or_recall_event)
+        (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        (not
+          (recovery_event_proposed ?recovery_or_recall_event)
+        )
+      )
+  )
+  (:action execute_recovery_event
+    :parameters (?recovery_or_recall_event - recovery_or_recall_event ?site_record - site_record ?investigator - investigator)
+    :precondition
+      (and
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (site_ready_for_recovery ?site_record)
+        (investigator_assigned_to_case ?site_record ?investigator)
+        (not
+          (recovery_event_executed ?recovery_or_recall_event)
+        )
+      )
+    :effect (recovery_event_executed ?recovery_or_recall_event)
+  )
+  (:action assign_sample_to_recovery_event
+    :parameters (?product_record_dossier - product_record_dossier ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (dossier_linked_recovery_event ?product_record_dossier ?recovery_or_recall_event)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_in_custody ?sample_or_evidence_item)
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_executed ?recovery_or_recall_event)
+        (not
+          (sample_processed ?sample_or_evidence_item)
+        )
+      )
+    :effect
+      (and
+        (sample_processed ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (not
+          (sample_in_custody ?sample_or_evidence_item)
+        )
+      )
+  )
+  (:action process_sample_and_initiate_dossier_review
+    :parameters (?product_record_dossier - product_record_dossier ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event ?investigator - investigator)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_processed ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (investigator_assigned_to_case ?product_record_dossier ?investigator)
+        (not
+          (recovery_event_local_approval ?recovery_or_recall_event)
+        )
+        (not
+          (dossier_review_started ?product_record_dossier)
+        )
+      )
+    :effect (dossier_review_started ?product_record_dossier)
+  )
+  (:action attach_regulatory_submission_to_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?regulatory_submission - regulatory_submission)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (regulatory_submission_template_available ?regulatory_submission)
+        (not
+          (regulatory_submission_attached ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (regulatory_submission_attached ?product_record_dossier)
+        (dossier_linked_regulatory_submission ?product_record_dossier ?regulatory_submission)
+        (not
+          (regulatory_submission_template_available ?regulatory_submission)
+        )
+      )
+  )
+  (:action submit_regulatory_and_start_dossier_review
+    :parameters (?product_record_dossier - product_record_dossier ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event ?investigator - investigator ?regulatory_submission - regulatory_submission)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_processed ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (investigator_assigned_to_case ?product_record_dossier ?investigator)
+        (recovery_event_local_approval ?recovery_or_recall_event)
+        (regulatory_submission_attached ?product_record_dossier)
+        (dossier_linked_regulatory_submission ?product_record_dossier ?regulatory_submission)
+        (not
+          (dossier_review_started ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_review_started ?product_record_dossier)
+        (regulatory_submission_acknowledged ?product_record_dossier)
+      )
+  )
+  (:action prepare_dossier_for_authority_review
+    :parameters (?product_record_dossier - product_record_dossier ?communication_asset - communication_asset ?technical_specialist - technical_specialist ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_review_started ?product_record_dossier)
+        (dossier_linked_communication_asset ?product_record_dossier ?communication_asset)
+        (specialist_assigned_to_case ?product_record_dossier ?technical_specialist)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (not
+          (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        )
+        (not
+          (dossier_submitted_for_authority_review ?product_record_dossier)
+        )
+      )
+    :effect (dossier_submitted_for_authority_review ?product_record_dossier)
+  )
+  (:action finalize_dossier_for_authority_review
+    :parameters (?product_record_dossier - product_record_dossier ?communication_asset - communication_asset ?technical_specialist - technical_specialist ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_review_started ?product_record_dossier)
+        (dossier_linked_communication_asset ?product_record_dossier ?communication_asset)
+        (specialist_assigned_to_case ?product_record_dossier ?technical_specialist)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        (not
+          (dossier_submitted_for_authority_review ?product_record_dossier)
+        )
+      )
+    :effect (dossier_submitted_for_authority_review ?product_record_dossier)
+  )
+  (:action authorize_dossier_by_authority
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_submitted_for_authority_review ?product_record_dossier)
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (not
+          (recovery_event_local_approval ?recovery_or_recall_event)
+        )
+        (not
+          (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        )
+        (not
+          (dossier_authorized_for_execution ?product_record_dossier)
+        )
+      )
+    :effect (dossier_authorized_for_execution ?product_record_dossier)
+  )
+  (:action authorize_dossier_and_attach_communication_asset
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_submitted_for_authority_review ?product_record_dossier)
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (recovery_event_local_approval ?recovery_or_recall_event)
+        (not
+          (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        )
+        (not
+          (dossier_authorized_for_execution ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (communication_asset_attached ?product_record_dossier)
+      )
+  )
+  (:action authorize_dossier_and_prepare_communications
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_submitted_for_authority_review ?product_record_dossier)
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (not
+          (recovery_event_local_approval ?recovery_or_recall_event)
+        )
+        (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        (not
+          (dossier_authorized_for_execution ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (communication_asset_attached ?product_record_dossier)
+      )
+  )
+  (:action authorize_dossier_and_finalize_communications
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice ?sample_or_evidence_item - sample_or_evidence_item ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (dossier_submitted_for_authority_review ?product_record_dossier)
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (dossier_has_sample ?product_record_dossier ?sample_or_evidence_item)
+        (sample_linked_recovery_event ?sample_or_evidence_item ?recovery_or_recall_event)
+        (recovery_event_local_approval ?recovery_or_recall_event)
+        (recovery_event_regulatory_approval ?recovery_or_recall_event)
+        (not
+          (dossier_authorized_for_execution ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (communication_asset_attached ?product_record_dossier)
+      )
+  )
+  (:action seal_and_finalize_dossier
+    :parameters (?product_record_dossier - product_record_dossier)
+    :precondition
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (not
+          (communication_asset_attached ?product_record_dossier)
+        )
+        (not
+          (dossier_closed ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_closed ?product_record_dossier)
+        (action_executed ?product_record_dossier)
+      )
+  )
+  (:action assign_logistics_resource_to_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (communication_asset_attached ?product_record_dossier)
+        (logistics_resource_available ?logistics_resource)
+      )
+    :effect
+      (and
+        (dossier_linked_logistics_resource ?product_record_dossier ?logistics_resource)
+        (not
+          (logistics_resource_available ?logistics_resource)
+        )
+      )
+  )
+  (:action confirm_dossier_execution
+    :parameters (?product_record_dossier - product_record_dossier ?site_record - site_record ?distribution_record - distribution_record ?investigator - investigator ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (communication_asset_attached ?product_record_dossier)
+        (dossier_linked_logistics_resource ?product_record_dossier ?logistics_resource)
+        (dossier_linked_site ?product_record_dossier ?site_record)
+        (dossier_linked_distribution ?product_record_dossier ?distribution_record)
+        (site_containment_confirmed ?site_record)
+        (distribution_mitigation_confirmed ?distribution_record)
+        (investigator_assigned_to_case ?product_record_dossier ?investigator)
+        (not
+          (dossier_execution_confirmed ?product_record_dossier)
+        )
+      )
+    :effect (dossier_execution_confirmed ?product_record_dossier)
+  )
+  (:action finalize_and_close_dossier_execution
+    :parameters (?product_record_dossier - product_record_dossier)
+    :precondition
+      (and
+        (dossier_authorized_for_execution ?product_record_dossier)
+        (dossier_execution_confirmed ?product_record_dossier)
+        (not
+          (dossier_closed ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_closed ?product_record_dossier)
+        (action_executed ?product_record_dossier)
+      )
+  )
+  (:action engage_stakeholder_for_dossier
+    :parameters (?product_record_dossier - product_record_dossier ?stakeholder_entity - stakeholder_entity ?investigator - investigator)
+    :precondition
+      (and
+        (record_under_investigation ?product_record_dossier)
+        (investigator_assigned_to_case ?product_record_dossier ?investigator)
+        (stakeholder_available ?stakeholder_entity)
+        (dossier_linked_stakeholder ?product_record_dossier ?stakeholder_entity)
+        (not
+          (dossier_stakeholder_engaged ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_stakeholder_engaged ?product_record_dossier)
+        (not
+          (stakeholder_available ?stakeholder_entity)
+        )
+      )
+  )
+  (:action record_stakeholder_acknowledgement
+    :parameters (?product_record_dossier - product_record_dossier ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (dossier_stakeholder_engaged ?product_record_dossier)
+        (specialist_assigned_to_case ?product_record_dossier ?technical_specialist)
+        (not
+          (dossier_stakeholder_acknowledged ?product_record_dossier)
+        )
+      )
+    :effect (dossier_stakeholder_acknowledged ?product_record_dossier)
+  )
+  (:action obtain_stakeholder_confirmation
+    :parameters (?product_record_dossier - product_record_dossier ?authority_notice - authority_notice)
+    :precondition
+      (and
+        (dossier_stakeholder_acknowledged ?product_record_dossier)
+        (dossier_linked_authority_notice ?product_record_dossier ?authority_notice)
+        (not
+          (dossier_stakeholder_confirmation_received ?product_record_dossier)
+        )
+      )
+    :effect (dossier_stakeholder_confirmation_received ?product_record_dossier)
+  )
+  (:action finalize_dossier_after_stakeholder_confirmation
+    :parameters (?product_record_dossier - product_record_dossier)
+    :precondition
+      (and
+        (dossier_stakeholder_confirmation_received ?product_record_dossier)
+        (not
+          (dossier_closed ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_closed ?product_record_dossier)
+        (action_executed ?product_record_dossier)
+      )
+  )
+  (:action record_site_recovery_completion
+    :parameters (?site_record - site_record ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (site_ready_for_recovery ?site_record)
+        (site_containment_confirmed ?site_record)
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_executed ?recovery_or_recall_event)
+        (not
+          (action_executed ?site_record)
+        )
+      )
+    :effect (action_executed ?site_record)
+  )
+  (:action record_distribution_recovery_completion
+    :parameters (?distribution_record - distribution_record ?recovery_or_recall_event - recovery_or_recall_event)
+    :precondition
+      (and
+        (distribution_ready_for_recovery ?distribution_record)
+        (distribution_mitigation_confirmed ?distribution_record)
+        (recovery_event_initialized ?recovery_or_recall_event)
+        (recovery_event_executed ?recovery_or_recall_event)
+        (not
+          (action_executed ?distribution_record)
+        )
+      )
+    :effect (action_executed ?distribution_record)
+  )
+  (:action prepare_notification_for_case
+    :parameters (?record - record ?notification_template - notification_template ?investigator - investigator)
+    :precondition
+      (and
+        (action_executed ?record)
+        (investigator_assigned_to_case ?record ?investigator)
+        (notification_template_available ?notification_template)
+        (not
+          (record_notification_prepared ?record)
+        )
+      )
+    :effect
+      (and
+        (record_notification_prepared ?record)
+        (record_linked_notification_template ?record ?notification_template)
+        (not
+          (notification_template_available ?notification_template)
+        )
+      )
+  )
+  (:action complete_site_case_and_release_channel
+    :parameters (?site_record - site_record ?escalation_channel - escalation_channel ?notification_template - notification_template)
+    :precondition
+      (and
+        (record_notification_prepared ?site_record)
+        (record_assigned_to_channel ?site_record ?escalation_channel)
+        (record_linked_notification_template ?site_record ?notification_template)
+        (not
+          (record_finalized ?site_record)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?site_record)
+        (escalation_channel_available ?escalation_channel)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action complete_distribution_case_and_release_channel
+    :parameters (?distribution_record - distribution_record ?escalation_channel - escalation_channel ?notification_template - notification_template)
+    :precondition
+      (and
+        (record_notification_prepared ?distribution_record)
+        (record_assigned_to_channel ?distribution_record ?escalation_channel)
+        (record_linked_notification_template ?distribution_record ?notification_template)
+        (not
+          (record_finalized ?distribution_record)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?distribution_record)
+        (escalation_channel_available ?escalation_channel)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action complete_dossier_and_release_channel
+    :parameters (?product_record_dossier - product_record_dossier ?escalation_channel - escalation_channel ?notification_template - notification_template)
+    :precondition
+      (and
+        (record_notification_prepared ?product_record_dossier)
+        (record_assigned_to_channel ?product_record_dossier ?escalation_channel)
+        (record_linked_notification_template ?product_record_dossier ?notification_template)
+        (not
+          (record_finalized ?product_record_dossier)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?product_record_dossier)
+        (escalation_channel_available ?escalation_channel)
+        (notification_template_available ?notification_template)
+      )
+  )
+)

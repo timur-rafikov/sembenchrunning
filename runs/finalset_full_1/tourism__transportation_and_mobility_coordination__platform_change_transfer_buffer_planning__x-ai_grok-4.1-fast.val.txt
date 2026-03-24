@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain platform_change_transfer_buffer_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object resource_or_attribute - domain_object facility_component - domain_object buffer_component - domain_object domain_entity - domain_object transfer_event - domain_entity local_mobility_option - resource_or_attribute walking_time_estimate - resource_or_attribute station_gate - resource_or_attribute priority_pass - resource_or_attribute passenger_id - resource_or_attribute time_slot_token - resource_or_attribute staff_resource - resource_or_attribute equipment_reservation_token - resource_or_attribute assistance_equipment - facility_component access_path - facility_component authorization_token - facility_component arrival_buffer_zone - buffer_component departure_buffer_zone - buffer_component buffer_allocation - buffer_component leg_category - transfer_event plan_category - transfer_event incoming_leg - leg_category outgoing_leg - leg_category transfer_plan - plan_category)
+
+  (:predicates
+    (transfer_event_initialized ?transfer_event - transfer_event)
+    (transfer_event_validated ?transfer_event - transfer_event)
+    (mobility_option_reserved ?transfer_event - transfer_event)
+    (transfer_event_completed ?transfer_event - transfer_event)
+    (transfer_event_ready ?transfer_event - transfer_event)
+    (time_slot_assigned ?transfer_event - transfer_event)
+    (mobility_option_available ?local_mobility_option - local_mobility_option)
+    (mobility_assigned_to_transfer_event ?transfer_event - transfer_event ?local_mobility_option - local_mobility_option)
+    (walking_time_available ?walking_time_estimate - walking_time_estimate)
+    (walking_estimate_assigned ?transfer_event - transfer_event ?walking_time_estimate - walking_time_estimate)
+    (gate_available ?station_gate - station_gate)
+    (gate_assigned_to_transfer_event ?transfer_event - transfer_event ?station_gate - station_gate)
+    (equipment_available ?assistance_equipment - assistance_equipment)
+    (equipment_allocated_to_incoming_leg ?incoming_leg - incoming_leg ?assistance_equipment - assistance_equipment)
+    (equipment_allocated_to_outgoing_leg ?outgoing_leg - outgoing_leg ?assistance_equipment - assistance_equipment)
+    (arrival_buffer_assigned ?incoming_leg - incoming_leg ?arrival_buffer_zone - arrival_buffer_zone)
+    (arrival_buffer_reserved ?arrival_buffer_zone - arrival_buffer_zone)
+    (arrival_buffer_equipment_reserved ?arrival_buffer_zone - arrival_buffer_zone)
+    (incoming_leg_ready ?incoming_leg - incoming_leg)
+    (departure_buffer_assigned ?outgoing_leg - outgoing_leg ?departure_buffer_zone - departure_buffer_zone)
+    (departure_buffer_reserved ?departure_buffer_zone - departure_buffer_zone)
+    (departure_buffer_equipment_reserved ?departure_buffer_zone - departure_buffer_zone)
+    (outgoing_leg_ready ?outgoing_leg - outgoing_leg)
+    (buffer_available ?buffer_allocation - buffer_allocation)
+    (buffer_allocated ?buffer_allocation - buffer_allocation)
+    (allocation_binds_arrival_buffer ?buffer_allocation - buffer_allocation ?arrival_buffer_zone - arrival_buffer_zone)
+    (allocation_binds_departure_buffer ?buffer_allocation - buffer_allocation ?departure_buffer_zone - departure_buffer_zone)
+    (allocation_requires_arrival_confirmation ?buffer_allocation - buffer_allocation)
+    (allocation_requires_departure_confirmation ?buffer_allocation - buffer_allocation)
+    (allocation_confirmed ?buffer_allocation - buffer_allocation)
+    (plan_includes_incoming_leg ?transfer_plan - transfer_plan ?incoming_leg - incoming_leg)
+    (plan_includes_outgoing_leg ?transfer_plan - transfer_plan ?outgoing_leg - outgoing_leg)
+    (plan_assigned_allocation ?transfer_plan - transfer_plan ?buffer_allocation - buffer_allocation)
+    (access_path_available ?access_path - access_path)
+    (plan_assigned_access_path ?transfer_plan - transfer_plan ?access_path - access_path)
+    (access_path_reserved ?access_path - access_path)
+    (access_path_binds_allocation ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    (plan_access_confirmed ?transfer_plan - transfer_plan)
+    (plan_staff_assigned ?transfer_plan - transfer_plan)
+    (plan_equipment_assigned ?transfer_plan - transfer_plan)
+    (plan_has_priority_pass ?transfer_plan - transfer_plan)
+    (plan_priority_validated ?transfer_plan - transfer_plan)
+    (plan_checks_passed ?transfer_plan - transfer_plan)
+    (plan_ready_for_finalization ?transfer_plan - transfer_plan)
+    (auth_token_available ?authorization_token - authorization_token)
+    (auth_token_assigned_to_plan ?transfer_plan - transfer_plan ?authorization_token - authorization_token)
+    (plan_authorized ?transfer_plan - transfer_plan)
+    (gate_checks_passed ?transfer_plan - transfer_plan)
+    (gate_authorized ?transfer_plan - transfer_plan)
+    (priority_pass_available ?priority_pass - priority_pass)
+    (plan_bound_priority_pass ?transfer_plan - transfer_plan ?priority_pass - priority_pass)
+    (passenger_present ?passenger_id - passenger_id)
+    (plan_assigned_passenger ?transfer_plan - transfer_plan ?passenger_id - passenger_id)
+    (staff_available ?staff_resource - staff_resource)
+    (staff_assigned_to_plan ?transfer_plan - transfer_plan ?staff_resource - staff_resource)
+    (equipment_reservation_available ?equipment_reservation_token - equipment_reservation_token)
+    (equipment_assigned_to_plan ?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token)
+    (time_slot_available ?time_slot_token - time_slot_token)
+    (transfer_event_assigned_time_slot ?transfer_event - transfer_event ?time_slot_token - time_slot_token)
+    (incoming_leg_prepared ?incoming_leg - incoming_leg)
+    (outgoing_leg_prepared ?outgoing_leg - outgoing_leg)
+    (plan_finalized ?transfer_plan - transfer_plan)
+  )
+  (:action create_transfer_event
+    :parameters (?transfer_event - transfer_event)
+    :precondition
+      (and
+        (not
+          (transfer_event_initialized ?transfer_event)
+        )
+        (not
+          (transfer_event_completed ?transfer_event)
+        )
+      )
+    :effect (transfer_event_initialized ?transfer_event)
+  )
+  (:action reserve_mobility_option_for_transfer
+    :parameters (?transfer_event - transfer_event ?local_mobility_option - local_mobility_option)
+    :precondition
+      (and
+        (transfer_event_initialized ?transfer_event)
+        (not
+          (mobility_option_reserved ?transfer_event)
+        )
+        (mobility_option_available ?local_mobility_option)
+      )
+    :effect
+      (and
+        (mobility_option_reserved ?transfer_event)
+        (mobility_assigned_to_transfer_event ?transfer_event ?local_mobility_option)
+        (not
+          (mobility_option_available ?local_mobility_option)
+        )
+      )
+  )
+  (:action assign_walking_time_estimate
+    :parameters (?transfer_event - transfer_event ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_initialized ?transfer_event)
+        (mobility_option_reserved ?transfer_event)
+        (walking_time_available ?walking_time_estimate)
+      )
+    :effect
+      (and
+        (walking_estimate_assigned ?transfer_event ?walking_time_estimate)
+        (not
+          (walking_time_available ?walking_time_estimate)
+        )
+      )
+  )
+  (:action confirm_transfer_feasibility
+    :parameters (?transfer_event - transfer_event ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_initialized ?transfer_event)
+        (mobility_option_reserved ?transfer_event)
+        (walking_estimate_assigned ?transfer_event ?walking_time_estimate)
+        (not
+          (transfer_event_validated ?transfer_event)
+        )
+      )
+    :effect (transfer_event_validated ?transfer_event)
+  )
+  (:action release_walking_time_estimate
+    :parameters (?transfer_event - transfer_event ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (walking_estimate_assigned ?transfer_event ?walking_time_estimate)
+      )
+    :effect
+      (and
+        (walking_time_available ?walking_time_estimate)
+        (not
+          (walking_estimate_assigned ?transfer_event ?walking_time_estimate)
+        )
+      )
+  )
+  (:action assign_gate_to_transfer
+    :parameters (?transfer_event - transfer_event ?station_gate - station_gate)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_event)
+        (gate_available ?station_gate)
+      )
+    :effect
+      (and
+        (gate_assigned_to_transfer_event ?transfer_event ?station_gate)
+        (not
+          (gate_available ?station_gate)
+        )
+      )
+  )
+  (:action release_gate_from_transfer
+    :parameters (?transfer_event - transfer_event ?station_gate - station_gate)
+    :precondition
+      (and
+        (gate_assigned_to_transfer_event ?transfer_event ?station_gate)
+      )
+    :effect
+      (and
+        (gate_available ?station_gate)
+        (not
+          (gate_assigned_to_transfer_event ?transfer_event ?station_gate)
+        )
+      )
+  )
+  (:action assign_staff_to_plan
+    :parameters (?transfer_plan - transfer_plan ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (staff_available ?staff_resource)
+      )
+    :effect
+      (and
+        (staff_assigned_to_plan ?transfer_plan ?staff_resource)
+        (not
+          (staff_available ?staff_resource)
+        )
+      )
+  )
+  (:action release_staff_from_plan
+    :parameters (?transfer_plan - transfer_plan ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (staff_assigned_to_plan ?transfer_plan ?staff_resource)
+      )
+    :effect
+      (and
+        (staff_available ?staff_resource)
+        (not
+          (staff_assigned_to_plan ?transfer_plan ?staff_resource)
+        )
+      )
+  )
+  (:action assign_equipment_reservation_to_plan
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (equipment_reservation_available ?equipment_reservation_token)
+      )
+    :effect
+      (and
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (not
+          (equipment_reservation_available ?equipment_reservation_token)
+        )
+      )
+  )
+  (:action release_equipment_reservation_from_plan
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token)
+    :precondition
+      (and
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+      )
+    :effect
+      (and
+        (equipment_reservation_available ?equipment_reservation_token)
+        (not
+          (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        )
+      )
+  )
+  (:action claim_arrival_buffer_zone
+    :parameters (?incoming_leg - incoming_leg ?arrival_buffer_zone - arrival_buffer_zone ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_validated ?incoming_leg)
+        (walking_estimate_assigned ?incoming_leg ?walking_time_estimate)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (not
+          (arrival_buffer_reserved ?arrival_buffer_zone)
+        )
+        (not
+          (arrival_buffer_equipment_reserved ?arrival_buffer_zone)
+        )
+      )
+    :effect (arrival_buffer_reserved ?arrival_buffer_zone)
+  )
+  (:action mark_incoming_leg_ready
+    :parameters (?incoming_leg - incoming_leg ?arrival_buffer_zone - arrival_buffer_zone ?station_gate - station_gate)
+    :precondition
+      (and
+        (transfer_event_validated ?incoming_leg)
+        (gate_assigned_to_transfer_event ?incoming_leg ?station_gate)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (arrival_buffer_reserved ?arrival_buffer_zone)
+        (not
+          (incoming_leg_prepared ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (incoming_leg_ready ?incoming_leg)
+      )
+  )
+  (:action assign_equipment_to_incoming_leg
+    :parameters (?incoming_leg - incoming_leg ?arrival_buffer_zone - arrival_buffer_zone ?assistance_equipment - assistance_equipment)
+    :precondition
+      (and
+        (transfer_event_validated ?incoming_leg)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (equipment_available ?assistance_equipment)
+        (not
+          (incoming_leg_prepared ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (arrival_buffer_equipment_reserved ?arrival_buffer_zone)
+        (incoming_leg_prepared ?incoming_leg)
+        (equipment_allocated_to_incoming_leg ?incoming_leg ?assistance_equipment)
+        (not
+          (equipment_available ?assistance_equipment)
+        )
+      )
+  )
+  (:action finalize_equipment_assignment_for_incoming_leg
+    :parameters (?incoming_leg - incoming_leg ?arrival_buffer_zone - arrival_buffer_zone ?walking_time_estimate - walking_time_estimate ?assistance_equipment - assistance_equipment)
+    :precondition
+      (and
+        (transfer_event_validated ?incoming_leg)
+        (walking_estimate_assigned ?incoming_leg ?walking_time_estimate)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (arrival_buffer_equipment_reserved ?arrival_buffer_zone)
+        (equipment_allocated_to_incoming_leg ?incoming_leg ?assistance_equipment)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (arrival_buffer_reserved ?arrival_buffer_zone)
+        (incoming_leg_ready ?incoming_leg)
+        (equipment_available ?assistance_equipment)
+        (not
+          (equipment_allocated_to_incoming_leg ?incoming_leg ?assistance_equipment)
+        )
+      )
+  )
+  (:action claim_departure_buffer_zone
+    :parameters (?outgoing_leg - outgoing_leg ?departure_buffer_zone - departure_buffer_zone ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_validated ?outgoing_leg)
+        (walking_estimate_assigned ?outgoing_leg ?walking_time_estimate)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (not
+          (departure_buffer_reserved ?departure_buffer_zone)
+        )
+        (not
+          (departure_buffer_equipment_reserved ?departure_buffer_zone)
+        )
+      )
+    :effect (departure_buffer_reserved ?departure_buffer_zone)
+  )
+  (:action mark_outgoing_leg_ready
+    :parameters (?outgoing_leg - outgoing_leg ?departure_buffer_zone - departure_buffer_zone ?station_gate - station_gate)
+    :precondition
+      (and
+        (transfer_event_validated ?outgoing_leg)
+        (gate_assigned_to_transfer_event ?outgoing_leg ?station_gate)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (departure_buffer_reserved ?departure_buffer_zone)
+        (not
+          (outgoing_leg_prepared ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (outgoing_leg_prepared ?outgoing_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+      )
+  )
+  (:action assign_equipment_to_outgoing_leg
+    :parameters (?outgoing_leg - outgoing_leg ?departure_buffer_zone - departure_buffer_zone ?assistance_equipment - assistance_equipment)
+    :precondition
+      (and
+        (transfer_event_validated ?outgoing_leg)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (equipment_available ?assistance_equipment)
+        (not
+          (outgoing_leg_prepared ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (departure_buffer_equipment_reserved ?departure_buffer_zone)
+        (outgoing_leg_prepared ?outgoing_leg)
+        (equipment_allocated_to_outgoing_leg ?outgoing_leg ?assistance_equipment)
+        (not
+          (equipment_available ?assistance_equipment)
+        )
+      )
+  )
+  (:action finalize_equipment_assignment_for_outgoing_leg
+    :parameters (?outgoing_leg - outgoing_leg ?departure_buffer_zone - departure_buffer_zone ?walking_time_estimate - walking_time_estimate ?assistance_equipment - assistance_equipment)
+    :precondition
+      (and
+        (transfer_event_validated ?outgoing_leg)
+        (walking_estimate_assigned ?outgoing_leg ?walking_time_estimate)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (departure_buffer_equipment_reserved ?departure_buffer_zone)
+        (equipment_allocated_to_outgoing_leg ?outgoing_leg ?assistance_equipment)
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (departure_buffer_reserved ?departure_buffer_zone)
+        (outgoing_leg_ready ?outgoing_leg)
+        (equipment_available ?assistance_equipment)
+        (not
+          (equipment_allocated_to_outgoing_leg ?outgoing_leg ?assistance_equipment)
+        )
+      )
+  )
+  (:action allocate_transfer_buffer
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?arrival_buffer_zone - arrival_buffer_zone ?departure_buffer_zone - departure_buffer_zone ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (outgoing_leg_prepared ?outgoing_leg)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (arrival_buffer_reserved ?arrival_buffer_zone)
+        (departure_buffer_reserved ?departure_buffer_zone)
+        (incoming_leg_ready ?incoming_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (buffer_available ?buffer_allocation)
+      )
+    :effect
+      (and
+        (buffer_allocated ?buffer_allocation)
+        (allocation_binds_arrival_buffer ?buffer_allocation ?arrival_buffer_zone)
+        (allocation_binds_departure_buffer ?buffer_allocation ?departure_buffer_zone)
+        (not
+          (buffer_available ?buffer_allocation)
+        )
+      )
+  )
+  (:action allocate_buffer_with_arrival_confirmation
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?arrival_buffer_zone - arrival_buffer_zone ?departure_buffer_zone - departure_buffer_zone ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (outgoing_leg_prepared ?outgoing_leg)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (arrival_buffer_equipment_reserved ?arrival_buffer_zone)
+        (departure_buffer_reserved ?departure_buffer_zone)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+        (outgoing_leg_ready ?outgoing_leg)
+        (buffer_available ?buffer_allocation)
+      )
+    :effect
+      (and
+        (buffer_allocated ?buffer_allocation)
+        (allocation_binds_arrival_buffer ?buffer_allocation ?arrival_buffer_zone)
+        (allocation_binds_departure_buffer ?buffer_allocation ?departure_buffer_zone)
+        (allocation_requires_arrival_confirmation ?buffer_allocation)
+        (not
+          (buffer_available ?buffer_allocation)
+        )
+      )
+  )
+  (:action allocate_buffer_with_departure_confirmation
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?arrival_buffer_zone - arrival_buffer_zone ?departure_buffer_zone - departure_buffer_zone ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (outgoing_leg_prepared ?outgoing_leg)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (arrival_buffer_reserved ?arrival_buffer_zone)
+        (departure_buffer_equipment_reserved ?departure_buffer_zone)
+        (incoming_leg_ready ?incoming_leg)
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+        (buffer_available ?buffer_allocation)
+      )
+    :effect
+      (and
+        (buffer_allocated ?buffer_allocation)
+        (allocation_binds_arrival_buffer ?buffer_allocation ?arrival_buffer_zone)
+        (allocation_binds_departure_buffer ?buffer_allocation ?departure_buffer_zone)
+        (allocation_requires_departure_confirmation ?buffer_allocation)
+        (not
+          (buffer_available ?buffer_allocation)
+        )
+      )
+  )
+  (:action allocate_buffer_with_both_confirmations
+    :parameters (?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?arrival_buffer_zone - arrival_buffer_zone ?departure_buffer_zone - departure_buffer_zone ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (outgoing_leg_prepared ?outgoing_leg)
+        (arrival_buffer_assigned ?incoming_leg ?arrival_buffer_zone)
+        (departure_buffer_assigned ?outgoing_leg ?departure_buffer_zone)
+        (arrival_buffer_equipment_reserved ?arrival_buffer_zone)
+        (departure_buffer_equipment_reserved ?departure_buffer_zone)
+        (not
+          (incoming_leg_ready ?incoming_leg)
+        )
+        (not
+          (outgoing_leg_ready ?outgoing_leg)
+        )
+        (buffer_available ?buffer_allocation)
+      )
+    :effect
+      (and
+        (buffer_allocated ?buffer_allocation)
+        (allocation_binds_arrival_buffer ?buffer_allocation ?arrival_buffer_zone)
+        (allocation_binds_departure_buffer ?buffer_allocation ?departure_buffer_zone)
+        (allocation_requires_arrival_confirmation ?buffer_allocation)
+        (allocation_requires_departure_confirmation ?buffer_allocation)
+        (not
+          (buffer_available ?buffer_allocation)
+        )
+      )
+  )
+  (:action confirm_allocation_for_arrival_leg
+    :parameters (?buffer_allocation - buffer_allocation ?incoming_leg - incoming_leg ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (buffer_allocated ?buffer_allocation)
+        (incoming_leg_prepared ?incoming_leg)
+        (walking_estimate_assigned ?incoming_leg ?walking_time_estimate)
+        (not
+          (allocation_confirmed ?buffer_allocation)
+        )
+      )
+    :effect (allocation_confirmed ?buffer_allocation)
+  )
+  (:action reserve_access_path_for_plan
+    :parameters (?transfer_plan - transfer_plan ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (plan_assigned_allocation ?transfer_plan ?buffer_allocation)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_available ?access_path)
+        (buffer_allocated ?buffer_allocation)
+        (allocation_confirmed ?buffer_allocation)
+        (not
+          (access_path_reserved ?access_path)
+        )
+      )
+    :effect
+      (and
+        (access_path_reserved ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (not
+          (access_path_available ?access_path)
+        )
+      )
+  )
+  (:action validate_access_path_and_mark_plan
+    :parameters (?transfer_plan - transfer_plan ?access_path - access_path ?buffer_allocation - buffer_allocation ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_reserved ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (walking_estimate_assigned ?transfer_plan ?walking_time_estimate)
+        (not
+          (allocation_requires_arrival_confirmation ?buffer_allocation)
+        )
+        (not
+          (plan_access_confirmed ?transfer_plan)
+        )
+      )
+    :effect (plan_access_confirmed ?transfer_plan)
+  )
+  (:action assign_priority_pass_to_plan
+    :parameters (?transfer_plan - transfer_plan ?priority_pass - priority_pass)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (priority_pass_available ?priority_pass)
+        (not
+          (plan_has_priority_pass ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_priority_pass ?transfer_plan)
+        (plan_bound_priority_pass ?transfer_plan ?priority_pass)
+        (not
+          (priority_pass_available ?priority_pass)
+        )
+      )
+  )
+  (:action confirm_plan_access_and_priority
+    :parameters (?transfer_plan - transfer_plan ?access_path - access_path ?buffer_allocation - buffer_allocation ?walking_time_estimate - walking_time_estimate ?priority_pass - priority_pass)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_reserved ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (walking_estimate_assigned ?transfer_plan ?walking_time_estimate)
+        (allocation_requires_arrival_confirmation ?buffer_allocation)
+        (plan_has_priority_pass ?transfer_plan)
+        (plan_bound_priority_pass ?transfer_plan ?priority_pass)
+        (not
+          (plan_access_confirmed ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_access_confirmed ?transfer_plan)
+        (plan_priority_validated ?transfer_plan)
+      )
+  )
+  (:action assign_staff_and_mark_plan
+    :parameters (?transfer_plan - transfer_plan ?staff_resource - staff_resource ?station_gate - station_gate ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_access_confirmed ?transfer_plan)
+        (staff_assigned_to_plan ?transfer_plan ?staff_resource)
+        (gate_assigned_to_transfer_event ?transfer_plan ?station_gate)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (not
+          (allocation_requires_departure_confirmation ?buffer_allocation)
+        )
+        (not
+          (plan_staff_assigned ?transfer_plan)
+        )
+      )
+    :effect (plan_staff_assigned ?transfer_plan)
+  )
+  (:action assign_staff_and_mark_plan_confirmation
+    :parameters (?transfer_plan - transfer_plan ?staff_resource - staff_resource ?station_gate - station_gate ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_access_confirmed ?transfer_plan)
+        (staff_assigned_to_plan ?transfer_plan ?staff_resource)
+        (gate_assigned_to_transfer_event ?transfer_plan ?station_gate)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (allocation_requires_departure_confirmation ?buffer_allocation)
+        (not
+          (plan_staff_assigned ?transfer_plan)
+        )
+      )
+    :effect (plan_staff_assigned ?transfer_plan)
+  )
+  (:action bind_equipment_to_plan
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_staff_assigned ?transfer_plan)
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (not
+          (allocation_requires_arrival_confirmation ?buffer_allocation)
+        )
+        (not
+          (allocation_requires_departure_confirmation ?buffer_allocation)
+        )
+        (not
+          (plan_equipment_assigned ?transfer_plan)
+        )
+      )
+    :effect (plan_equipment_assigned ?transfer_plan)
+  )
+  (:action bind_equipment_and_flag_checks
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_staff_assigned ?transfer_plan)
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (allocation_requires_arrival_confirmation ?buffer_allocation)
+        (not
+          (allocation_requires_departure_confirmation ?buffer_allocation)
+        )
+        (not
+          (plan_equipment_assigned ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_checks_passed ?transfer_plan)
+      )
+  )
+  (:action bind_equipment_and_flag_checks_alt
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_staff_assigned ?transfer_plan)
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (not
+          (allocation_requires_arrival_confirmation ?buffer_allocation)
+        )
+        (allocation_requires_departure_confirmation ?buffer_allocation)
+        (not
+          (plan_equipment_assigned ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_checks_passed ?transfer_plan)
+      )
+  )
+  (:action bind_equipment_and_flag_checks_full
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token ?access_path - access_path ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (plan_staff_assigned ?transfer_plan)
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (plan_assigned_access_path ?transfer_plan ?access_path)
+        (access_path_binds_allocation ?access_path ?buffer_allocation)
+        (allocation_requires_arrival_confirmation ?buffer_allocation)
+        (allocation_requires_departure_confirmation ?buffer_allocation)
+        (not
+          (plan_equipment_assigned ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_checks_passed ?transfer_plan)
+      )
+  )
+  (:action finalize_plan_readiness
+    :parameters (?transfer_plan - transfer_plan)
+    :precondition
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (not
+          (plan_checks_passed ?transfer_plan)
+        )
+        (not
+          (plan_finalized ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transfer_plan)
+        (transfer_event_ready ?transfer_plan)
+      )
+  )
+  (:action assign_passenger_to_plan
+    :parameters (?transfer_plan - transfer_plan ?passenger_id - passenger_id)
+    :precondition
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_checks_passed ?transfer_plan)
+        (passenger_present ?passenger_id)
+      )
+    :effect
+      (and
+        (plan_assigned_passenger ?transfer_plan ?passenger_id)
+        (not
+          (passenger_present ?passenger_id)
+        )
+      )
+  )
+  (:action validate_plan_with_resources
+    :parameters (?transfer_plan - transfer_plan ?incoming_leg - incoming_leg ?outgoing_leg - outgoing_leg ?walking_time_estimate - walking_time_estimate ?passenger_id - passenger_id)
+    :precondition
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_checks_passed ?transfer_plan)
+        (plan_assigned_passenger ?transfer_plan ?passenger_id)
+        (plan_includes_incoming_leg ?transfer_plan ?incoming_leg)
+        (plan_includes_outgoing_leg ?transfer_plan ?outgoing_leg)
+        (incoming_leg_ready ?incoming_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (walking_estimate_assigned ?transfer_plan ?walking_time_estimate)
+        (not
+          (plan_ready_for_finalization ?transfer_plan)
+        )
+      )
+    :effect (plan_ready_for_finalization ?transfer_plan)
+  )
+  (:action finalize_plan
+    :parameters (?transfer_plan - transfer_plan)
+    :precondition
+      (and
+        (plan_equipment_assigned ?transfer_plan)
+        (plan_ready_for_finalization ?transfer_plan)
+        (not
+          (plan_finalized ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transfer_plan)
+        (transfer_event_ready ?transfer_plan)
+      )
+  )
+  (:action authorize_plan_with_token
+    :parameters (?transfer_plan - transfer_plan ?authorization_token - authorization_token ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_validated ?transfer_plan)
+        (walking_estimate_assigned ?transfer_plan ?walking_time_estimate)
+        (auth_token_available ?authorization_token)
+        (auth_token_assigned_to_plan ?transfer_plan ?authorization_token)
+        (not
+          (plan_authorized ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?transfer_plan)
+        (not
+          (auth_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action perform_gate_check
+    :parameters (?transfer_plan - transfer_plan ?station_gate - station_gate)
+    :precondition
+      (and
+        (plan_authorized ?transfer_plan)
+        (gate_assigned_to_transfer_event ?transfer_plan ?station_gate)
+        (not
+          (gate_checks_passed ?transfer_plan)
+        )
+      )
+    :effect (gate_checks_passed ?transfer_plan)
+  )
+  (:action authorize_gate_with_equipment_token
+    :parameters (?transfer_plan - transfer_plan ?equipment_reservation_token - equipment_reservation_token)
+    :precondition
+      (and
+        (gate_checks_passed ?transfer_plan)
+        (equipment_assigned_to_plan ?transfer_plan ?equipment_reservation_token)
+        (not
+          (gate_authorized ?transfer_plan)
+        )
+      )
+    :effect (gate_authorized ?transfer_plan)
+  )
+  (:action finalize_gate_authorization
+    :parameters (?transfer_plan - transfer_plan)
+    :precondition
+      (and
+        (gate_authorized ?transfer_plan)
+        (not
+          (plan_finalized ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transfer_plan)
+        (transfer_event_ready ?transfer_plan)
+      )
+  )
+  (:action complete_incoming_leg_finalization
+    :parameters (?incoming_leg - incoming_leg ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (incoming_leg_prepared ?incoming_leg)
+        (incoming_leg_ready ?incoming_leg)
+        (buffer_allocated ?buffer_allocation)
+        (allocation_confirmed ?buffer_allocation)
+        (not
+          (transfer_event_ready ?incoming_leg)
+        )
+      )
+    :effect (transfer_event_ready ?incoming_leg)
+  )
+  (:action complete_outgoing_leg_finalization
+    :parameters (?outgoing_leg - outgoing_leg ?buffer_allocation - buffer_allocation)
+    :precondition
+      (and
+        (outgoing_leg_prepared ?outgoing_leg)
+        (outgoing_leg_ready ?outgoing_leg)
+        (buffer_allocated ?buffer_allocation)
+        (allocation_confirmed ?buffer_allocation)
+        (not
+          (transfer_event_ready ?outgoing_leg)
+        )
+      )
+    :effect (transfer_event_ready ?outgoing_leg)
+  )
+  (:action assign_time_slot_to_transfer
+    :parameters (?transfer_event - transfer_event ?time_slot_token - time_slot_token ?walking_time_estimate - walking_time_estimate)
+    :precondition
+      (and
+        (transfer_event_ready ?transfer_event)
+        (walking_estimate_assigned ?transfer_event ?walking_time_estimate)
+        (time_slot_available ?time_slot_token)
+        (not
+          (time_slot_assigned ?transfer_event)
+        )
+      )
+    :effect
+      (and
+        (time_slot_assigned ?transfer_event)
+        (transfer_event_assigned_time_slot ?transfer_event ?time_slot_token)
+        (not
+          (time_slot_available ?time_slot_token)
+        )
+      )
+  )
+  (:action complete_incoming_leg_and_release_resources
+    :parameters (?incoming_leg - incoming_leg ?local_mobility_option - local_mobility_option ?time_slot_token - time_slot_token)
+    :precondition
+      (and
+        (time_slot_assigned ?incoming_leg)
+        (mobility_assigned_to_transfer_event ?incoming_leg ?local_mobility_option)
+        (transfer_event_assigned_time_slot ?incoming_leg ?time_slot_token)
+        (not
+          (transfer_event_completed ?incoming_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_event_completed ?incoming_leg)
+        (mobility_option_available ?local_mobility_option)
+        (time_slot_available ?time_slot_token)
+      )
+  )
+  (:action complete_outgoing_leg_and_release_resources
+    :parameters (?outgoing_leg - outgoing_leg ?local_mobility_option - local_mobility_option ?time_slot_token - time_slot_token)
+    :precondition
+      (and
+        (time_slot_assigned ?outgoing_leg)
+        (mobility_assigned_to_transfer_event ?outgoing_leg ?local_mobility_option)
+        (transfer_event_assigned_time_slot ?outgoing_leg ?time_slot_token)
+        (not
+          (transfer_event_completed ?outgoing_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_event_completed ?outgoing_leg)
+        (mobility_option_available ?local_mobility_option)
+        (time_slot_available ?time_slot_token)
+      )
+  )
+  (:action complete_plan_and_release_resources
+    :parameters (?transfer_plan - transfer_plan ?local_mobility_option - local_mobility_option ?time_slot_token - time_slot_token)
+    :precondition
+      (and
+        (time_slot_assigned ?transfer_plan)
+        (mobility_assigned_to_transfer_event ?transfer_plan ?local_mobility_option)
+        (transfer_event_assigned_time_slot ?transfer_plan ?time_slot_token)
+        (not
+          (transfer_event_completed ?transfer_plan)
+        )
+      )
+    :effect
+      (and
+        (transfer_event_completed ?transfer_plan)
+        (mobility_option_available ?local_mobility_option)
+        (time_slot_available ?time_slot_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem platform_transfer_buffer_case)
+  (:domain platform_change_transfer_buffer_planning)
+  (:objects incoming_leg_1 - incoming_leg outgoing_leg_1 - outgoing_leg transfer_plan_1 - transfer_plan transfer_plan_2 - transfer_plan mobility_option_1 - local_mobility_option mobility_option_2 - local_mobility_option mobility_option_3 - local_mobility_option walking_time_estimate_1 - walking_time_estimate station_gate_1 - station_gate assistance_equipment_1 - assistance_equipment arrival_buffer_zone_1 - arrival_buffer_zone departure_buffer_zone_1 - departure_buffer_zone buffer_allocation_1 - buffer_allocation access_path_1 - access_path access_path_2 - access_path priority_pass_1 - priority_pass priority_pass_2 - priority_pass passenger_1 - passenger_id passenger_2 - passenger_id time_slot_token_1 - time_slot_token staff_resource_1 - staff_resource auth_token_1 - authorization_token auth_token_2 - authorization_token equipment_reservation_1 - equipment_reservation_token)
+  (:init
+    (mobility_option_available mobility_option_1)
+    (mobility_option_available mobility_option_2)
+    (mobility_option_available mobility_option_3)
+    (walking_time_available walking_time_estimate_1)
+    (gate_available station_gate_1)
+    (equipment_available assistance_equipment_1)
+    (arrival_buffer_assigned incoming_leg_1 arrival_buffer_zone_1)
+    (departure_buffer_assigned outgoing_leg_1 departure_buffer_zone_1)
+    (buffer_available buffer_allocation_1)
+    (access_path_available access_path_1)
+    (access_path_available access_path_2)
+    (plan_includes_incoming_leg transfer_plan_1 incoming_leg_1)
+    (plan_includes_incoming_leg transfer_plan_2 incoming_leg_1)
+    (plan_includes_outgoing_leg transfer_plan_1 outgoing_leg_1)
+    (plan_includes_outgoing_leg transfer_plan_2 outgoing_leg_1)
+    (plan_assigned_allocation transfer_plan_1 buffer_allocation_1)
+    (plan_assigned_allocation transfer_plan_2 buffer_allocation_1)
+    (plan_assigned_access_path transfer_plan_1 access_path_1)
+    (plan_assigned_access_path transfer_plan_2 access_path_2)
+    (priority_pass_available priority_pass_1)
+    (priority_pass_available priority_pass_2)
+    (passenger_present passenger_1)
+    (passenger_present passenger_2)
+    (time_slot_available time_slot_token_1)
+    (staff_available staff_resource_1)
+    (auth_token_available auth_token_1)
+    (auth_token_assigned_to_plan transfer_plan_1 auth_token_1)
+    (auth_token_assigned_to_plan transfer_plan_2 auth_token_2)
+    (equipment_reservation_available equipment_reservation_1)
+  )
+  (:goal
+    (and
+      (transfer_event_completed incoming_leg_1)
+      (transfer_event_completed outgoing_leg_1)
+      (transfer_event_completed transfer_plan_1)
+      (transfer_event_completed transfer_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create-transfer_event incoming_leg_1)
+(create-transfer_event outgoing_leg_1)
+(create-transfer_event transfer_plan_1)
+(create-transfer_event transfer_plan_2)
+(reserve-mobility_option_for_transfer incoming_leg_1 mobility_option_1)
+(assign-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(confirm-transfer_feasibility incoming_leg_1 walking_time_estimate_1)
+(assign-gate_to_transfer incoming_leg_1 station_gate_1)
+(claim-arrival_buffer_zone incoming_leg_1 arrival_buffer_zone_1 walking_time_estimate_1)
+(mark-incoming_leg_ready incoming_leg_1 arrival_buffer_zone_1 station_gate_1)
+(release-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(reserve-mobility_option_for_transfer outgoing_leg_1 mobility_option_2)
+(assign-walking_time_estimate outgoing_leg_1 walking_time_estimate_1)
+(confirm-transfer_feasibility outgoing_leg_1 walking_time_estimate_1)
+(claim-departure_buffer_zone outgoing_leg_1 departure_buffer_zone_1 walking_time_estimate_1)
+(release-gate_from_transfer incoming_leg_1 station_gate_1)
+(assign-gate_to_transfer outgoing_leg_1 station_gate_1)
+(mark-outgoing_leg_ready outgoing_leg_1 departure_buffer_zone_1 station_gate_1)
+(release-walking_time_estimate outgoing_leg_1 walking_time_estimate_1)
+(allocate-transfer_buffer incoming_leg_1 outgoing_leg_1 arrival_buffer_zone_1 departure_buffer_zone_1 buffer_allocation_1)
+(assign-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(confirm-allocation_for_arrival_leg buffer_allocation_1 incoming_leg_1 walking_time_estimate_1)
+(complete-incoming_leg_finalization incoming_leg_1 buffer_allocation_1)
+(complete-outgoing_leg_finalization outgoing_leg_1 buffer_allocation_1)
+(release-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(reserve-mobility_option_for_transfer transfer_plan_1 mobility_option_3)
+(assign-walking_time_estimate transfer_plan_1 walking_time_estimate_1)
+(confirm-transfer_feasibility transfer_plan_1 walking_time_estimate_1)
+(assign-staff_to_plan transfer_plan_1 staff_resource_1)
+(assign-equipment_reservation_to_plan transfer_plan_1 equipment_reservation_1)
+(release-gate_from_transfer outgoing_leg_1 station_gate_1)
+(assign-gate_to_transfer transfer_plan_1 station_gate_1)
+(reserve-access_path_for_plan transfer_plan_1 access_path_1 buffer_allocation_1)
+(validate-access_path_and_mark_plan transfer_plan_1 access_path_1 buffer_allocation_1 walking_time_estimate_1)
+(assign-staff_and_mark_plan transfer_plan_1 staff_resource_1 station_gate_1 access_path_1 buffer_allocation_1)
+(bind-equipment_to_plan transfer_plan_1 equipment_reservation_1 access_path_1 buffer_allocation_1)
+(finalize-plan_readiness transfer_plan_1)
+(assign-time_slot_to_transfer transfer_plan_1 time_slot_token_1 walking_time_estimate_1)
+(complete-plan_and_release_resources transfer_plan_1 mobility_option_3 time_slot_token_1)
+(release-staff_from_plan transfer_plan_1 staff_resource_1)
+(release-equipment_reservation_from_plan transfer_plan_1 equipment_reservation_1)
+(release-gate_from_transfer transfer_plan_1 station_gate_1)
+(release-walking_time_estimate transfer_plan_1 walking_time_estimate_1)
+(reserve-mobility_option_for_transfer transfer_plan_2 mobility_option_3)
+(assign-walking_time_estimate transfer_plan_2 walking_time_estimate_1)
+(confirm-transfer_feasibility transfer_plan_2 walking_time_estimate_1)
+(assign-staff_to_plan transfer_plan_2 staff_resource_1)
+(assign-equipment_reservation_to_plan transfer_plan_2 equipment_reservation_1)
+(assign-gate_to_transfer transfer_plan_2 station_gate_1)
+(reserve-access_path_for_plan transfer_plan_2 access_path_2 buffer_allocation_1)
+(validate-access_path_and_mark_plan transfer_plan_2 access_path_2 buffer_allocation_1 walking_time_estimate_1)
+(assign-staff_and_mark_plan transfer_plan_2 staff_resource_1 station_gate_1 access_path_2 buffer_allocation_1)
+(bind-equipment_to_plan transfer_plan_2 equipment_reservation_1 access_path_2 buffer_allocation_1)
+(finalize-plan_readiness transfer_plan_2)
+(assign-time_slot_to_transfer transfer_plan_2 time_slot_token_1 walking_time_estimate_1)
+(complete-plan_and_release_resources transfer_plan_2 mobility_option_3 time_slot_token_1)
+(release-walking_time_estimate transfer_plan_2 walking_time_estimate_1)
+(assign-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(assign-time_slot_to_transfer incoming_leg_1 time_slot_token_1 walking_time_estimate_1)
+(complete-incoming_leg_and_release_resources incoming_leg_1 mobility_option_1 time_slot_token_1)
+(release-walking_time_estimate incoming_leg_1 walking_time_estimate_1)
+(assign-walking_time_estimate outgoing_leg_1 walking_time_estimate_1)
+(assign-time_slot_to_transfer outgoing_leg_1 time_slot_token_1 walking_time_estimate_1)
+(complete-outgoing_leg_and_release_resources outgoing_leg_1 mobility_option_2 time_slot_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__hxu1znz/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val__hxu1znz/plan.pddl 
+
+
+--- stderr ---
+

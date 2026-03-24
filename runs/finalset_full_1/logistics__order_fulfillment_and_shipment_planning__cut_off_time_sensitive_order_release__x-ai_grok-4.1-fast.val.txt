@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain cut_off_sensitive_order_release_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types logistics_entity - object fulfillment_support_type - logistics_entity shipment_token_type - logistics_entity transport_network_type - logistics_entity order_root_type - logistics_entity customer_order - order_root_type source_location - fulfillment_support_type release_window - fulfillment_support_type handling_resource - fulfillment_support_type routing_option - fulfillment_support_type stowage_profile - fulfillment_support_type service_level_profile - fulfillment_support_type equipment_requirement - fulfillment_support_type temperature_profile - fulfillment_support_type fulfillment_item - shipment_token_type pack_unit - shipment_token_type carrier_preference - shipment_token_type source_shipment_segment - transport_network_type destination_shipment_segment - transport_network_type transport_unit - transport_network_type order_segment - customer_order shipment_group - customer_order source_fulfillment_unit - order_segment destination_fulfillment_unit - order_segment shipment - shipment_group)
+
+  (:predicates
+    (order_intake_logged ?customer_order - customer_order)
+    (processing_release_approved ?customer_order - customer_order)
+    (source_location_selected ?customer_order - customer_order)
+    (outbound_closed ?customer_order - customer_order)
+    (outbound_ready ?customer_order - customer_order)
+    (outbound_committed ?customer_order - customer_order)
+    (source_location_available ?source_location - source_location)
+    (source_location_linked ?customer_order - customer_order ?source_location - source_location)
+    (release_window_available ?release_window - release_window)
+    (release_window_linked ?customer_order - customer_order ?release_window - release_window)
+    (handling_resource_available ?handling_resource - handling_resource)
+    (handling_resource_linked ?customer_order - customer_order ?handling_resource - handling_resource)
+    (fulfillment_item_available ?fulfillment_item - fulfillment_item)
+    (source_item_linked ?source_fulfillment_unit - source_fulfillment_unit ?fulfillment_item - fulfillment_item)
+    (destination_item_linked ?destination_fulfillment_unit - destination_fulfillment_unit ?fulfillment_item - fulfillment_item)
+    (source_segment_linked ?source_fulfillment_unit - source_fulfillment_unit ?source_shipment_segment - source_shipment_segment)
+    (source_segment_open ?source_shipment_segment - source_shipment_segment)
+    (source_segment_reserved ?source_shipment_segment - source_shipment_segment)
+    (source_fulfillment_unit_ready ?source_fulfillment_unit - source_fulfillment_unit)
+    (destination_segment_linked ?destination_fulfillment_unit - destination_fulfillment_unit ?destination_shipment_segment - destination_shipment_segment)
+    (destination_segment_open ?destination_shipment_segment - destination_shipment_segment)
+    (destination_segment_reserved ?destination_shipment_segment - destination_shipment_segment)
+    (destination_fulfillment_unit_ready ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_reserved ?transport_unit - transport_unit)
+    (transport_source_segment_linked ?transport_unit - transport_unit ?source_shipment_segment - source_shipment_segment)
+    (transport_destination_segment_linked ?transport_unit - transport_unit ?destination_shipment_segment - destination_shipment_segment)
+    (transport_source_leg_ready ?transport_unit - transport_unit)
+    (transport_destination_leg_ready ?transport_unit - transport_unit)
+    (transport_unit_staged ?transport_unit - transport_unit)
+    (shipment_source_linked ?shipment - shipment ?source_fulfillment_unit - source_fulfillment_unit)
+    (shipment_destination_linked ?shipment - shipment ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (shipment_transport_unit_linked ?shipment - shipment ?transport_unit - transport_unit)
+    (pack_unit_available ?pack_unit - pack_unit)
+    (shipment_pack_unit_linked ?shipment - shipment ?pack_unit - pack_unit)
+    (pack_unit_reserved ?pack_unit - pack_unit)
+    (pack_unit_transport_linked ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    (shipment_packaged ?shipment - shipment)
+    (shipment_configuration_complete ?shipment - shipment)
+    (temperature_compliant ?shipment - shipment)
+    (routing_option_selected ?shipment - shipment)
+    (shipment_plan_validated ?shipment - shipment)
+    (stowage_planning_open ?shipment - shipment)
+    (shipment_manifest_assembled ?shipment - shipment)
+    (carrier_preference_available ?carrier_preference - carrier_preference)
+    (carrier_preference_linked ?shipment - shipment ?carrier_preference - carrier_preference)
+    (carrier_preference_selected ?shipment - shipment)
+    (carrier_booking_prepared ?shipment - shipment)
+    (carrier_manifest_ready ?shipment - shipment)
+    (routing_option_available ?routing_option - routing_option)
+    (routing_option_linked ?shipment - shipment ?routing_option - routing_option)
+    (stowage_profile_available ?stowage_profile - stowage_profile)
+    (stowage_profile_linked ?shipment - shipment ?stowage_profile - stowage_profile)
+    (equipment_requirement_available ?equipment_requirement - equipment_requirement)
+    (equipment_requirement_linked ?shipment - shipment ?equipment_requirement - equipment_requirement)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (temperature_profile_linked ?shipment - shipment ?temperature_profile - temperature_profile)
+    (service_level_profile_available ?service_level_profile - service_level_profile)
+    (service_level_linked ?customer_order - customer_order ?service_level_profile - service_level_profile)
+    (source_fulfillment_unit_activated ?source_fulfillment_unit - source_fulfillment_unit)
+    (destination_fulfillment_unit_activated ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (dispatch_cleared ?shipment - shipment)
+  )
+  (:action register_customer_order
+    :parameters (?customer_order - customer_order)
+    :precondition
+      (and
+        (not
+          (order_intake_logged ?customer_order)
+        )
+        (not
+          (outbound_closed ?customer_order)
+        )
+      )
+    :effect (order_intake_logged ?customer_order)
+  )
+  (:action assign_source_location
+    :parameters (?customer_order - customer_order ?source_location - source_location)
+    :precondition
+      (and
+        (order_intake_logged ?customer_order)
+        (not
+          (source_location_selected ?customer_order)
+        )
+        (source_location_available ?source_location)
+      )
+    :effect
+      (and
+        (source_location_selected ?customer_order)
+        (source_location_linked ?customer_order ?source_location)
+        (not
+          (source_location_available ?source_location)
+        )
+      )
+  )
+  (:action attach_release_window
+    :parameters (?customer_order - customer_order ?release_window - release_window)
+    :precondition
+      (and
+        (order_intake_logged ?customer_order)
+        (source_location_selected ?customer_order)
+        (release_window_available ?release_window)
+      )
+    :effect
+      (and
+        (release_window_linked ?customer_order ?release_window)
+        (not
+          (release_window_available ?release_window)
+        )
+      )
+  )
+  (:action authorize_processing_release
+    :parameters (?customer_order - customer_order ?release_window - release_window)
+    :precondition
+      (and
+        (order_intake_logged ?customer_order)
+        (source_location_selected ?customer_order)
+        (release_window_linked ?customer_order ?release_window)
+        (not
+          (processing_release_approved ?customer_order)
+        )
+      )
+    :effect (processing_release_approved ?customer_order)
+  )
+  (:action reopen_release_window
+    :parameters (?customer_order - customer_order ?release_window - release_window)
+    :precondition
+      (and
+        (release_window_linked ?customer_order ?release_window)
+      )
+    :effect
+      (and
+        (release_window_available ?release_window)
+        (not
+          (release_window_linked ?customer_order ?release_window)
+        )
+      )
+  )
+  (:action allocate_handling_resource
+    :parameters (?customer_order - customer_order ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (processing_release_approved ?customer_order)
+        (handling_resource_available ?handling_resource)
+      )
+    :effect
+      (and
+        (handling_resource_linked ?customer_order ?handling_resource)
+        (not
+          (handling_resource_available ?handling_resource)
+        )
+      )
+  )
+  (:action free_handling_resource
+    :parameters (?customer_order - customer_order ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (handling_resource_linked ?customer_order ?handling_resource)
+      )
+    :effect
+      (and
+        (handling_resource_available ?handling_resource)
+        (not
+          (handling_resource_linked ?customer_order ?handling_resource)
+        )
+      )
+  )
+  (:action attach_equipment_requirement
+    :parameters (?shipment - shipment ?equipment_requirement - equipment_requirement)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (equipment_requirement_available ?equipment_requirement)
+      )
+    :effect
+      (and
+        (equipment_requirement_linked ?shipment ?equipment_requirement)
+        (not
+          (equipment_requirement_available ?equipment_requirement)
+        )
+      )
+  )
+  (:action detach_equipment_requirement
+    :parameters (?shipment - shipment ?equipment_requirement - equipment_requirement)
+    :precondition
+      (and
+        (equipment_requirement_linked ?shipment ?equipment_requirement)
+      )
+    :effect
+      (and
+        (equipment_requirement_available ?equipment_requirement)
+        (not
+          (equipment_requirement_linked ?shipment ?equipment_requirement)
+        )
+      )
+  )
+  (:action attach_temperature_profile
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action detach_temperature_profile
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (temperature_profile_linked ?shipment ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (temperature_profile_linked ?shipment ?temperature_profile)
+        )
+      )
+  )
+  (:action open_source_segment
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?release_window - release_window)
+    :precondition
+      (and
+        (processing_release_approved ?source_fulfillment_unit)
+        (release_window_linked ?source_fulfillment_unit ?release_window)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (not
+          (source_segment_open ?source_shipment_segment)
+        )
+        (not
+          (source_segment_reserved ?source_shipment_segment)
+        )
+      )
+    :effect (source_segment_open ?source_shipment_segment)
+  )
+  (:action activate_source_unit
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (processing_release_approved ?source_fulfillment_unit)
+        (handling_resource_linked ?source_fulfillment_unit ?handling_resource)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (source_segment_open ?source_shipment_segment)
+        (not
+          (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+      )
+  )
+  (:action reserve_source_item
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?fulfillment_item - fulfillment_item)
+    :precondition
+      (and
+        (processing_release_approved ?source_fulfillment_unit)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (fulfillment_item_available ?fulfillment_item)
+        (not
+          (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (source_segment_reserved ?source_shipment_segment)
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (source_item_linked ?source_fulfillment_unit ?fulfillment_item)
+        (not
+          (fulfillment_item_available ?fulfillment_item)
+        )
+      )
+  )
+  (:action finalize_source_segment
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?release_window - release_window ?fulfillment_item - fulfillment_item)
+    :precondition
+      (and
+        (processing_release_approved ?source_fulfillment_unit)
+        (release_window_linked ?source_fulfillment_unit ?release_window)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (source_segment_reserved ?source_shipment_segment)
+        (source_item_linked ?source_fulfillment_unit ?fulfillment_item)
+        (not
+          (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (source_segment_open ?source_shipment_segment)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        (fulfillment_item_available ?fulfillment_item)
+        (not
+          (source_item_linked ?source_fulfillment_unit ?fulfillment_item)
+        )
+      )
+  )
+  (:action open_destination_segment
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_shipment_segment - destination_shipment_segment ?release_window - release_window)
+    :precondition
+      (and
+        (processing_release_approved ?destination_fulfillment_unit)
+        (release_window_linked ?destination_fulfillment_unit ?release_window)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (not
+          (destination_segment_open ?destination_shipment_segment)
+        )
+        (not
+          (destination_segment_reserved ?destination_shipment_segment)
+        )
+      )
+    :effect (destination_segment_open ?destination_shipment_segment)
+  )
+  (:action activate_destination_unit
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_shipment_segment - destination_shipment_segment ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (processing_release_approved ?destination_fulfillment_unit)
+        (handling_resource_linked ?destination_fulfillment_unit ?handling_resource)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (destination_segment_open ?destination_shipment_segment)
+        (not
+          (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+      )
+  )
+  (:action reserve_destination_item
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_shipment_segment - destination_shipment_segment ?fulfillment_item - fulfillment_item)
+    :precondition
+      (and
+        (processing_release_approved ?destination_fulfillment_unit)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (fulfillment_item_available ?fulfillment_item)
+        (not
+          (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_reserved ?destination_shipment_segment)
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (destination_item_linked ?destination_fulfillment_unit ?fulfillment_item)
+        (not
+          (fulfillment_item_available ?fulfillment_item)
+        )
+      )
+  )
+  (:action finalize_destination_segment
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_shipment_segment - destination_shipment_segment ?release_window - release_window ?fulfillment_item - fulfillment_item)
+    :precondition
+      (and
+        (processing_release_approved ?destination_fulfillment_unit)
+        (release_window_linked ?destination_fulfillment_unit ?release_window)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (destination_segment_reserved ?destination_shipment_segment)
+        (destination_item_linked ?destination_fulfillment_unit ?fulfillment_item)
+        (not
+          (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_open ?destination_shipment_segment)
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        (fulfillment_item_available ?fulfillment_item)
+        (not
+          (destination_item_linked ?destination_fulfillment_unit ?fulfillment_item)
+        )
+      )
+  )
+  (:action reserve_transport_unit_for_segments
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?destination_shipment_segment - destination_shipment_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (source_segment_open ?source_shipment_segment)
+        (destination_segment_open ?destination_shipment_segment)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_source_segment_linked ?transport_unit ?source_shipment_segment)
+        (transport_destination_segment_linked ?transport_unit ?destination_shipment_segment)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_source_ready
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?destination_shipment_segment - destination_shipment_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (source_segment_reserved ?source_shipment_segment)
+        (destination_segment_open ?destination_shipment_segment)
+        (not
+          (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        )
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_source_segment_linked ?transport_unit ?source_shipment_segment)
+        (transport_destination_segment_linked ?transport_unit ?destination_shipment_segment)
+        (transport_source_leg_ready ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_destination_ready
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?destination_shipment_segment - destination_shipment_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (source_segment_open ?source_shipment_segment)
+        (destination_segment_reserved ?destination_shipment_segment)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        (not
+          (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_source_segment_linked ?transport_unit ?source_shipment_segment)
+        (transport_destination_segment_linked ?transport_unit ?destination_shipment_segment)
+        (transport_destination_leg_ready ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_bidirectional_ready
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?source_shipment_segment - source_shipment_segment ?destination_shipment_segment - destination_shipment_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (source_segment_linked ?source_fulfillment_unit ?source_shipment_segment)
+        (destination_segment_linked ?destination_fulfillment_unit ?destination_shipment_segment)
+        (source_segment_reserved ?source_shipment_segment)
+        (destination_segment_reserved ?destination_shipment_segment)
+        (not
+          (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        )
+        (not
+          (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_source_segment_linked ?transport_unit ?source_shipment_segment)
+        (transport_destination_segment_linked ?transport_unit ?destination_shipment_segment)
+        (transport_source_leg_ready ?transport_unit)
+        (transport_destination_leg_ready ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action stage_transport_unit
+    :parameters (?transport_unit - transport_unit ?source_fulfillment_unit - source_fulfillment_unit ?release_window - release_window)
+    :precondition
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (release_window_linked ?source_fulfillment_unit ?release_window)
+        (not
+          (transport_unit_staged ?transport_unit)
+        )
+      )
+    :effect (transport_unit_staged ?transport_unit)
+  )
+  (:action reserve_pack_unit
+    :parameters (?shipment - shipment ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (shipment_transport_unit_linked ?shipment ?transport_unit)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_available ?pack_unit)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_staged ?transport_unit)
+        (not
+          (pack_unit_reserved ?pack_unit)
+        )
+      )
+    :effect
+      (and
+        (pack_unit_reserved ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (not
+          (pack_unit_available ?pack_unit)
+        )
+      )
+  )
+  (:action package_shipment
+    :parameters (?shipment - shipment ?pack_unit - pack_unit ?transport_unit - transport_unit ?release_window - release_window)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_reserved ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (release_window_linked ?shipment ?release_window)
+        (not
+          (transport_source_leg_ready ?transport_unit)
+        )
+        (not
+          (shipment_packaged ?shipment)
+        )
+      )
+    :effect (shipment_packaged ?shipment)
+  )
+  (:action select_routing_option
+    :parameters (?shipment - shipment ?routing_option - routing_option)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (routing_option_available ?routing_option)
+        (not
+          (routing_option_selected ?shipment)
+        )
+      )
+    :effect
+      (and
+        (routing_option_selected ?shipment)
+        (routing_option_linked ?shipment ?routing_option)
+        (not
+          (routing_option_available ?routing_option)
+        )
+      )
+  )
+  (:action validate_shipment_plan
+    :parameters (?shipment - shipment ?pack_unit - pack_unit ?transport_unit - transport_unit ?release_window - release_window ?routing_option - routing_option)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_reserved ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (release_window_linked ?shipment ?release_window)
+        (transport_source_leg_ready ?transport_unit)
+        (routing_option_selected ?shipment)
+        (routing_option_linked ?shipment ?routing_option)
+        (not
+          (shipment_packaged ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_packaged ?shipment)
+        (shipment_plan_validated ?shipment)
+      )
+  )
+  (:action configure_shipment_equipment_without_destination_leg
+    :parameters (?shipment - shipment ?equipment_requirement - equipment_requirement ?handling_resource - handling_resource ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_packaged ?shipment)
+        (equipment_requirement_linked ?shipment ?equipment_requirement)
+        (handling_resource_linked ?shipment ?handling_resource)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (not
+          (transport_destination_leg_ready ?transport_unit)
+        )
+        (not
+          (shipment_configuration_complete ?shipment)
+        )
+      )
+    :effect (shipment_configuration_complete ?shipment)
+  )
+  (:action configure_shipment_equipment_with_destination_leg
+    :parameters (?shipment - shipment ?equipment_requirement - equipment_requirement ?handling_resource - handling_resource ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_packaged ?shipment)
+        (equipment_requirement_linked ?shipment ?equipment_requirement)
+        (handling_resource_linked ?shipment ?handling_resource)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (transport_destination_leg_ready ?transport_unit)
+        (not
+          (shipment_configuration_complete ?shipment)
+        )
+      )
+    :effect (shipment_configuration_complete ?shipment)
+  )
+  (:action certify_shipment_temperature_compliance_source_leg
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_configuration_complete ?shipment)
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (not
+          (transport_source_leg_ready ?transport_unit)
+        )
+        (not
+          (transport_destination_leg_ready ?transport_unit)
+        )
+        (not
+          (temperature_compliant ?shipment)
+        )
+      )
+    :effect (temperature_compliant ?shipment)
+  )
+  (:action certify_shipment_temperature_compliance_destination_leg
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_configuration_complete ?shipment)
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (transport_source_leg_ready ?transport_unit)
+        (not
+          (transport_destination_leg_ready ?transport_unit)
+        )
+        (not
+          (temperature_compliant ?shipment)
+        )
+      )
+    :effect
+      (and
+        (temperature_compliant ?shipment)
+        (stowage_planning_open ?shipment)
+      )
+  )
+  (:action certify_shipment_temperature_compliance_partial
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_configuration_complete ?shipment)
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (not
+          (transport_source_leg_ready ?transport_unit)
+        )
+        (transport_destination_leg_ready ?transport_unit)
+        (not
+          (temperature_compliant ?shipment)
+        )
+      )
+    :effect
+      (and
+        (temperature_compliant ?shipment)
+        (stowage_planning_open ?shipment)
+      )
+  )
+  (:action certify_shipment_temperature_compliance_full
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile ?pack_unit - pack_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_configuration_complete ?shipment)
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (shipment_pack_unit_linked ?shipment ?pack_unit)
+        (pack_unit_transport_linked ?pack_unit ?transport_unit)
+        (transport_source_leg_ready ?transport_unit)
+        (transport_destination_leg_ready ?transport_unit)
+        (not
+          (temperature_compliant ?shipment)
+        )
+      )
+    :effect
+      (and
+        (temperature_compliant ?shipment)
+        (stowage_planning_open ?shipment)
+      )
+  )
+  (:action grant_dispatch_clearance
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (temperature_compliant ?shipment)
+        (not
+          (stowage_planning_open ?shipment)
+        )
+        (not
+          (dispatch_cleared ?shipment)
+        )
+      )
+    :effect
+      (and
+        (dispatch_cleared ?shipment)
+        (outbound_ready ?shipment)
+      )
+  )
+  (:action assign_stowage_profile
+    :parameters (?shipment - shipment ?stowage_profile - stowage_profile)
+    :precondition
+      (and
+        (temperature_compliant ?shipment)
+        (stowage_planning_open ?shipment)
+        (stowage_profile_available ?stowage_profile)
+      )
+    :effect
+      (and
+        (stowage_profile_linked ?shipment ?stowage_profile)
+        (not
+          (stowage_profile_available ?stowage_profile)
+        )
+      )
+  )
+  (:action assemble_shipment_manifest
+    :parameters (?shipment - shipment ?source_fulfillment_unit - source_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?release_window - release_window ?stowage_profile - stowage_profile)
+    :precondition
+      (and
+        (temperature_compliant ?shipment)
+        (stowage_planning_open ?shipment)
+        (stowage_profile_linked ?shipment ?stowage_profile)
+        (shipment_source_linked ?shipment ?source_fulfillment_unit)
+        (shipment_destination_linked ?shipment ?destination_fulfillment_unit)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        (release_window_linked ?shipment ?release_window)
+        (not
+          (shipment_manifest_assembled ?shipment)
+        )
+      )
+    :effect (shipment_manifest_assembled ?shipment)
+  )
+  (:action finalize_dispatch_clearance
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (temperature_compliant ?shipment)
+        (shipment_manifest_assembled ?shipment)
+        (not
+          (dispatch_cleared ?shipment)
+        )
+      )
+    :effect
+      (and
+        (dispatch_cleared ?shipment)
+        (outbound_ready ?shipment)
+      )
+  )
+  (:action select_carrier_preference
+    :parameters (?shipment - shipment ?carrier_preference - carrier_preference ?release_window - release_window)
+    :precondition
+      (and
+        (processing_release_approved ?shipment)
+        (release_window_linked ?shipment ?release_window)
+        (carrier_preference_available ?carrier_preference)
+        (carrier_preference_linked ?shipment ?carrier_preference)
+        (not
+          (carrier_preference_selected ?shipment)
+        )
+      )
+    :effect
+      (and
+        (carrier_preference_selected ?shipment)
+        (not
+          (carrier_preference_available ?carrier_preference)
+        )
+      )
+  )
+  (:action prepare_carrier_booking
+    :parameters (?shipment - shipment ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (carrier_preference_selected ?shipment)
+        (handling_resource_linked ?shipment ?handling_resource)
+        (not
+          (carrier_booking_prepared ?shipment)
+        )
+      )
+    :effect (carrier_booking_prepared ?shipment)
+  )
+  (:action confirm_carrier_manifest
+    :parameters (?shipment - shipment ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (carrier_booking_prepared ?shipment)
+        (temperature_profile_linked ?shipment ?temperature_profile)
+        (not
+          (carrier_manifest_ready ?shipment)
+        )
+      )
+    :effect (carrier_manifest_ready ?shipment)
+  )
+  (:action commit_dispatch_clearance
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (carrier_manifest_ready ?shipment)
+        (not
+          (dispatch_cleared ?shipment)
+        )
+      )
+    :effect
+      (and
+        (dispatch_cleared ?shipment)
+        (outbound_ready ?shipment)
+      )
+  )
+  (:action release_source_fulfillment_unit
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (source_fulfillment_unit_activated ?source_fulfillment_unit)
+        (source_fulfillment_unit_ready ?source_fulfillment_unit)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_staged ?transport_unit)
+        (not
+          (outbound_ready ?source_fulfillment_unit)
+        )
+      )
+    :effect (outbound_ready ?source_fulfillment_unit)
+  )
+  (:action release_destination_fulfillment_unit
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (destination_fulfillment_unit_activated ?destination_fulfillment_unit)
+        (destination_fulfillment_unit_ready ?destination_fulfillment_unit)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_staged ?transport_unit)
+        (not
+          (outbound_ready ?destination_fulfillment_unit)
+        )
+      )
+    :effect (outbound_ready ?destination_fulfillment_unit)
+  )
+  (:action commit_outbound_release_with_service_level
+    :parameters (?customer_order - customer_order ?service_level_profile - service_level_profile ?release_window - release_window)
+    :precondition
+      (and
+        (outbound_ready ?customer_order)
+        (release_window_linked ?customer_order ?release_window)
+        (service_level_profile_available ?service_level_profile)
+        (not
+          (outbound_committed ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (outbound_committed ?customer_order)
+        (service_level_linked ?customer_order ?service_level_profile)
+        (not
+          (service_level_profile_available ?service_level_profile)
+        )
+      )
+  )
+  (:action close_source_fulfillment_unit
+    :parameters (?source_fulfillment_unit - source_fulfillment_unit ?source_location - source_location ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (outbound_committed ?source_fulfillment_unit)
+        (source_location_linked ?source_fulfillment_unit ?source_location)
+        (service_level_linked ?source_fulfillment_unit ?service_level_profile)
+        (not
+          (outbound_closed ?source_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (outbound_closed ?source_fulfillment_unit)
+        (source_location_available ?source_location)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+  (:action close_destination_fulfillment_unit
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?source_location - source_location ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (outbound_committed ?destination_fulfillment_unit)
+        (source_location_linked ?destination_fulfillment_unit ?source_location)
+        (service_level_linked ?destination_fulfillment_unit ?service_level_profile)
+        (not
+          (outbound_closed ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (outbound_closed ?destination_fulfillment_unit)
+        (source_location_available ?source_location)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+  (:action close_shipment_outbound
+    :parameters (?shipment - shipment ?source_location - source_location ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (outbound_committed ?shipment)
+        (source_location_linked ?shipment ?source_location)
+        (service_level_linked ?shipment ?service_level_profile)
+        (not
+          (outbound_closed ?shipment)
+        )
+      )
+    :effect
+      (and
+        (outbound_closed ?shipment)
+        (source_location_available ?source_location)
+        (service_level_profile_available ?service_level_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem cut_off_sensitive_order_release_problem)
+  (:domain cut_off_sensitive_order_release_domain)
+  (:objects source_fulfillment_unit_a - source_fulfillment_unit destination_fulfillment_unit_a - destination_fulfillment_unit shipment_a - shipment shipment_b - shipment warehouse_a - source_location warehouse_b - source_location warehouse_c - source_location cutoff_window_a - release_window pack_station_a - handling_resource fulfillment_item_a - fulfillment_item source_shipment_segment_a - source_shipment_segment destination_shipment_segment_a - destination_shipment_segment transport_unit_a - transport_unit pack_unit_a - pack_unit pack_unit_b - pack_unit routing_option_a - routing_option routing_option_b - routing_option stowage_profile_a - stowage_profile stowage_profile_b - stowage_profile express_service_level - service_level_profile refrigerated_equipment_requirement - equipment_requirement carrier_preference_a - carrier_preference carrier_preference_b - carrier_preference cold_chain_profile - temperature_profile)
+  (:init
+    (source_location_available warehouse_a)
+    (source_location_available warehouse_b)
+    (source_location_available warehouse_c)
+    (release_window_available cutoff_window_a)
+    (handling_resource_available pack_station_a)
+    (fulfillment_item_available fulfillment_item_a)
+    (source_segment_linked source_fulfillment_unit_a source_shipment_segment_a)
+    (destination_segment_linked destination_fulfillment_unit_a destination_shipment_segment_a)
+    (transport_unit_available transport_unit_a)
+    (pack_unit_available pack_unit_a)
+    (pack_unit_available pack_unit_b)
+    (shipment_source_linked shipment_a source_fulfillment_unit_a)
+    (shipment_source_linked shipment_b source_fulfillment_unit_a)
+    (shipment_destination_linked shipment_a destination_fulfillment_unit_a)
+    (shipment_destination_linked shipment_b destination_fulfillment_unit_a)
+    (shipment_transport_unit_linked shipment_a transport_unit_a)
+    (shipment_transport_unit_linked shipment_b transport_unit_a)
+    (shipment_pack_unit_linked shipment_a pack_unit_a)
+    (shipment_pack_unit_linked shipment_b pack_unit_b)
+    (routing_option_available routing_option_a)
+    (routing_option_available routing_option_b)
+    (stowage_profile_available stowage_profile_a)
+    (stowage_profile_available stowage_profile_b)
+    (service_level_profile_available express_service_level)
+    (equipment_requirement_available refrigerated_equipment_requirement)
+    (carrier_preference_available carrier_preference_a)
+    (carrier_preference_linked shipment_a carrier_preference_a)
+    (carrier_preference_linked shipment_b carrier_preference_b)
+    (temperature_profile_available cold_chain_profile)
+  )
+  (:goal
+    (and
+      (outbound_closed source_fulfillment_unit_a)
+      (outbound_closed destination_fulfillment_unit_a)
+      (outbound_closed shipment_a)
+      (outbound_closed shipment_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_customer_order source_fulfillment_unit_a)
+(register_customer_order destination_fulfillment_unit_a)
+(register_customer_order shipment_a)
+(register_customer_order shipment_b)
+(assign_source_location source_fulfillment_unit_a warehouse_a)
+(assign_source_location destination_fulfillment_unit_a warehouse_b)
+(assign_source_location shipment_a warehouse_c)
+(attach_release_window source_fulfillment_unit_a cutoff_window_a)
+(authorize_processing_release source_fulfillment_unit_a cutoff_window_a)
+(open_source_segment source_fulfillment_unit_a source_shipment_segment_a cutoff_window_a)
+(allocate_handling_resource source_fulfillment_unit_a pack_station_a)
+(activate_source_unit source_fulfillment_unit_a source_shipment_segment_a pack_station_a)
+(free_handling_resource source_fulfillment_unit_a pack_station_a)
+(reopen_release_window source_fulfillment_unit_a cutoff_window_a)
+(attach_release_window destination_fulfillment_unit_a cutoff_window_a)
+(authorize_processing_release destination_fulfillment_unit_a cutoff_window_a)
+(open_destination_segment destination_fulfillment_unit_a destination_shipment_segment_a cutoff_window_a)
+(allocate_handling_resource destination_fulfillment_unit_a pack_station_a)
+(activate_destination_unit destination_fulfillment_unit_a destination_shipment_segment_a pack_station_a)
+(free_handling_resource destination_fulfillment_unit_a pack_station_a)
+(reserve_transport_unit_for_segments source_fulfillment_unit_a destination_fulfillment_unit_a source_shipment_segment_a destination_shipment_segment_a transport_unit_a)
+(reopen_release_window destination_fulfillment_unit_a cutoff_window_a)
+(attach_release_window source_fulfillment_unit_a cutoff_window_a)
+(stage_transport_unit transport_unit_a source_fulfillment_unit_a cutoff_window_a)
+(reopen_release_window source_fulfillment_unit_a cutoff_window_a)
+(attach_release_window shipment_a cutoff_window_a)
+(authorize_processing_release shipment_a cutoff_window_a)
+(attach_equipment_requirement shipment_a refrigerated_equipment_requirement)
+(attach_temperature_profile shipment_a cold_chain_profile)
+(select_routing_option shipment_a routing_option_a)
+(reserve_pack_unit shipment_a pack_unit_a transport_unit_a)
+(package_shipment shipment_a pack_unit_a transport_unit_a cutoff_window_a)
+(allocate_handling_resource shipment_a pack_station_a)
+(configure_shipment_equipment_without_destination_leg shipment_a refrigerated_equipment_requirement pack_station_a pack_unit_a transport_unit_a)
+(free_handling_resource shipment_a pack_station_a)
+(certify_shipment_temperature_compliance_source_leg shipment_a cold_chain_profile pack_unit_a transport_unit_a)
+(grant_dispatch_clearance shipment_a)
+(commit_outbound_release_with_service_level shipment_a express_service_level cutoff_window_a)
+(close_shipment_outbound shipment_a warehouse_c express_service_level)
+(reopen_release_window shipment_a cutoff_window_a)
+(detach_equipment_requirement shipment_a refrigerated_equipment_requirement)
+(detach_temperature_profile shipment_a cold_chain_profile)
+(assign_source_location shipment_b warehouse_c)
+(attach_release_window shipment_b cutoff_window_a)
+(authorize_processing_release shipment_b cutoff_window_a)
+(attach_equipment_requirement shipment_b refrigerated_equipment_requirement)
+(attach_temperature_profile shipment_b cold_chain_profile)
+(select_routing_option shipment_b routing_option_b)
+(reserve_pack_unit shipment_b pack_unit_b transport_unit_a)
+(package_shipment shipment_b pack_unit_b transport_unit_a cutoff_window_a)
+(allocate_handling_resource shipment_b pack_station_a)
+(configure_shipment_equipment_without_destination_leg shipment_b refrigerated_equipment_requirement pack_station_a pack_unit_b transport_unit_a)
+(free_handling_resource shipment_b pack_station_a)
+(certify_shipment_temperature_compliance_source_leg shipment_b cold_chain_profile pack_unit_b transport_unit_a)
+(grant_dispatch_clearance shipment_b)
+(commit_outbound_release_with_service_level shipment_b express_service_level cutoff_window_a)
+(close_shipment_outbound shipment_b warehouse_c express_service_level)
+(reopen_release_window shipment_b cutoff_window_a)
+(release_source_fulfillment_unit source_fulfillment_unit_a transport_unit_a)
+(release_destination_fulfillment_unit destination_fulfillment_unit_a transport_unit_a)
+(attach_release_window source_fulfillment_unit_a cutoff_window_a)
+(commit_outbound_release_with_service_level source_fulfillment_unit_a express_service_level cutoff_window_a)
+(close_source_fulfillment_unit source_fulfillment_unit_a warehouse_a express_service_level)
+(reopen_release_window source_fulfillment_unit_a cutoff_window_a)
+(attach_release_window destination_fulfillment_unit_a cutoff_window_a)
+(commit_outbound_release_with_service_level destination_fulfillment_unit_a express_service_level cutoff_window_a)
+(close_destination_fulfillment_unit destination_fulfillment_unit_a warehouse_b express_service_level)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mb_zq99k/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_mb_zq99k/plan.pddl 67 
+
+
+
+--- stderr ---
+

@@ -22,7 +22,16 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from autoplanbench_utils import ensure_domain_json  # noqa: E402
+from autoplanbench_utils import (  # noqa: E402
+  apb_debug_inherit_stdio,
+  apb_subprocess_stdio_kwargs,
+  ensure_domain_json,
+)
+from translator_settings import (  # noqa: E402
+  get_domain_setup_llm,
+  get_pddl2nl_timeout_seconds,
+  reload_translator_config,
+)
 from dataset_contracts import (  # noqa: E402
   derive_section_key,
   extract_sample_coords,
@@ -67,13 +76,16 @@ def write_domain_and_problem_nl(sample_dir: Path, domain_nl_json: Path, domain_p
   result = subprocess.run(
     cmd,
     cwd=str(apb_root),
-    capture_output=True,
-    text=True,
     timeout=max(1, int(timeout_seconds)),
-    encoding="utf-8",
+    **apb_subprocess_stdio_kwargs(),
   )
   if result.returncode != 0:
-    raise RuntimeError(f"run_save_descriptions failed: {result.stderr or result.stdout}")
+    tail = (
+      "(вывод в консоли; SEMBENCH_DEBUG)"
+      if apb_debug_inherit_stdio()
+      else (result.stderr or result.stdout or "")
+    )
+    raise RuntimeError(f"run_save_descriptions failed: {tail}")
 
 
 def main():
@@ -82,17 +94,48 @@ def main():
                       help="Корень датасета (все файлы сохраняются здесь)")
   parser.add_argument("--autoplanbench-root", type=Path, default=None,
                       help="Корень autoplanbench (по умолчанию AUTOPLANBENCH_ROOT)")
-  parser.add_argument("--llm", type=str, default="gpt-5-mini", help="Модель для PDDL->NL")
+  parser.add_argument(
+    "--translator-config",
+    type=Path,
+    default=None,
+    help="YAML параметров переводчика (см. translator_config.yaml / SEMBENCH_TRANSLATOR_CONFIG).",
+  )
+  parser.add_argument(
+    "--llm",
+    type=str,
+    default=None,
+    help=(
+      "Модель для PDDL->NL домена (run_domain_setup). "
+      "Если не задано: domain_setup.llm из translator_config.yaml."
+    ),
+  )
   parser.add_argument("--seed", type=int, default=0, help="Seed для domain_description_seedN.json")
   parser.add_argument("--skip-nl-files", action="store_true",
                       help="Только domain_description JSON, не генерировать domain_and_problem_nl.txt по сэмплам")
   parser.add_argument(
     "--pddl2nl-timeout-seconds",
     type=int,
-    default=600,
-    help="Таймаут run_save_descriptions.py на один сэмпл.",
+    default=None,
+    help=(
+      "Таймаут run_save_descriptions.py на один сэмпл (секунды). "
+      "Если не задано: pddl2nl_sample.timeout_seconds из translator_config.yaml."
+    ),
   )
   args = parser.parse_args()
+
+  if args.translator_config is not None:
+    p = Path(args.translator_config).expanduser()
+    if not p.is_file():
+      raise SystemExit(f"--translator-config must be an existing file: {p}")
+    os.environ["SEMBENCH_TRANSLATOR_CONFIG"] = str(p.resolve())
+    reload_translator_config()
+
+  llm = args.llm or get_domain_setup_llm()
+  pddl2nl_timeout = (
+    args.pddl2nl_timeout_seconds
+    if args.pddl2nl_timeout_seconds is not None
+    else get_pddl2nl_timeout_seconds()
+  )
 
   apb_root = args.autoplanbench_root or Path(os.environ.get("AUTOPLANBENCH_ROOT", ""))
   if not apb_root.is_dir():
@@ -127,7 +170,7 @@ def main():
     if not json_path.exists():
       ensure_domain_json(
         dataset_dir, section_key, domain_pddl, problem_pddl,
-        apb_root, args.llm, args.seed,
+        apb_root, llm, args.seed,
       )
     rel_json = json_path.relative_to(dataset_dir).as_posix()
     for sp_dir, _ in items:
@@ -160,7 +203,7 @@ def main():
             p_pddl,
             apb_root,
             nl_file,
-            args.pddl2nl_timeout_seconds,
+            pddl2nl_timeout,
           )
         except Exception as e:
           print(f"[prepare] Skip {sample_dir}: {e}", flush=True)

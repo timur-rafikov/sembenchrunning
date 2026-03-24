@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain logistics_partial_order_salvage)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object logistics_resource_category - generic_object transport_resource_category - generic_object document_category - generic_object organizational_unit - generic_object salvage_subject - organizational_unit carrier_slot - logistics_resource_category routing_option - logistics_resource_category service_partner - logistics_resource_category compliance_document - logistics_resource_category authorization_token - logistics_resource_category compensation_option - logistics_resource_category repair_service_center - logistics_resource_category payment_reference - logistics_resource_category substitute_item - transport_resource_category package_batch - transport_resource_category claim_file - transport_resource_category origin_leg - document_category destination_leg - document_category salvage_shipment - document_category order_segment_group - salvage_subject order_segment_variant - salvage_subject primary_fulfillment_unit - order_segment_group secondary_fulfillment_unit - order_segment_group recovery_case - order_segment_variant)
+
+  (:predicates
+    (salvage_subject_shortfall_detected ?salvage_subject - salvage_subject)
+    (salvage_subject_triage_completed ?salvage_subject - salvage_subject)
+    (salvage_subject_carrier_slot_reserved ?salvage_subject - salvage_subject)
+    (salvage_subject_salvaged ?salvage_subject - salvage_subject)
+    (salvage_subject_ready_for_finalization ?salvage_subject - salvage_subject)
+    (salvage_subject_finalization_completed ?salvage_subject - salvage_subject)
+    (carrier_slot_available ?carrier_slot - carrier_slot)
+    (assigned_carrier_slot_to_salvage_subject ?salvage_subject - salvage_subject ?carrier_slot - carrier_slot)
+    (routing_option_available ?routing_option - routing_option)
+    (assigned_routing_option_to_salvage_subject ?salvage_subject - salvage_subject ?routing_option - routing_option)
+    (service_partner_available ?service_partner - service_partner)
+    (assigned_service_partner_to_salvage_subject ?salvage_subject - salvage_subject ?service_partner - service_partner)
+    (substitute_item_available ?substitute_item - substitute_item)
+    (pfu_allocated_substitute_item ?primary_fulfillment_unit - primary_fulfillment_unit ?substitute_item - substitute_item)
+    (sfu_allocated_substitute_item ?secondary_fulfillment_unit - secondary_fulfillment_unit ?substitute_item - substitute_item)
+    (pfu_origin_leg_assigned ?primary_fulfillment_unit - primary_fulfillment_unit ?origin_leg - origin_leg)
+    (origin_leg_reserved ?origin_leg - origin_leg)
+    (origin_leg_staged ?origin_leg - origin_leg)
+    (pfu_origin_confirmed ?primary_fulfillment_unit - primary_fulfillment_unit)
+    (sfu_destination_leg_assigned ?secondary_fulfillment_unit - secondary_fulfillment_unit ?destination_leg - destination_leg)
+    (destination_leg_reserved ?destination_leg - destination_leg)
+    (destination_leg_staged ?destination_leg - destination_leg)
+    (sfu_destination_confirmed ?secondary_fulfillment_unit - secondary_fulfillment_unit)
+    (salvage_shipment_draft ?salvage_shipment - salvage_shipment)
+    (salvage_shipment_confirmed ?salvage_shipment - salvage_shipment)
+    (salvage_shipment_origin_leg ?salvage_shipment - salvage_shipment ?origin_leg - origin_leg)
+    (salvage_shipment_destination_leg ?salvage_shipment - salvage_shipment ?destination_leg - destination_leg)
+    (salvage_shipment_origin_unconfirmed ?salvage_shipment - salvage_shipment)
+    (salvage_shipment_destination_unconfirmed ?salvage_shipment - salvage_shipment)
+    (salvage_shipment_ready_for_packaging ?salvage_shipment - salvage_shipment)
+    (case_primary_fulfillment_unit ?recovery_case - recovery_case ?primary_fulfillment_unit - primary_fulfillment_unit)
+    (case_secondary_fulfillment_unit ?recovery_case - recovery_case ?secondary_fulfillment_unit - secondary_fulfillment_unit)
+    (case_salvage_shipment ?recovery_case - recovery_case ?salvage_shipment - salvage_shipment)
+    (package_batch_available ?package_batch - package_batch)
+    (case_package_batch ?recovery_case - recovery_case ?package_batch - package_batch)
+    (package_batch_allocated ?package_batch - package_batch)
+    (package_batch_assigned_to_shipment ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    (packing_initiated_for_case ?recovery_case - recovery_case)
+    (packing_completed ?recovery_case - recovery_case)
+    (packaging_quality_passed ?recovery_case - recovery_case)
+    (compliance_document_attached ?recovery_case - recovery_case)
+    (packaging_verified_with_documents ?recovery_case - recovery_case)
+    (authorization_document_present ?recovery_case - recovery_case)
+    (dispatch_ready ?recovery_case - recovery_case)
+    (claim_file_available ?claim_file - claim_file)
+    (case_claim_file_linked ?recovery_case - recovery_case ?claim_file - claim_file)
+    (claim_linked_to_case ?recovery_case - recovery_case)
+    (claim_validated ?recovery_case - recovery_case)
+    (claim_approved ?recovery_case - recovery_case)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (case_compliance_document ?recovery_case - recovery_case ?compliance_document - compliance_document)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (case_authorization_token ?recovery_case - recovery_case ?authorization_token - authorization_token)
+    (repair_center_available ?repair_service_center - repair_service_center)
+    (case_assigned_repair_center ?recovery_case - recovery_case ?repair_service_center - repair_service_center)
+    (payment_reference_available ?payment_reference - payment_reference)
+    (case_payment_reference ?recovery_case - recovery_case ?payment_reference - payment_reference)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (salvage_subject_compensation_selected ?salvage_subject - salvage_subject ?compensation_option - compensation_option)
+    (primary_fulfillment_unit_ready ?primary_fulfillment_unit - primary_fulfillment_unit)
+    (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit - secondary_fulfillment_unit)
+    (case_closed ?recovery_case - recovery_case)
+  )
+  (:action detect_shortfall_and_open_case
+    :parameters (?salvage_subject - salvage_subject)
+    :precondition
+      (and
+        (not
+          (salvage_subject_shortfall_detected ?salvage_subject)
+        )
+        (not
+          (salvage_subject_salvaged ?salvage_subject)
+        )
+      )
+    :effect (salvage_subject_shortfall_detected ?salvage_subject)
+  )
+  (:action reserve_carrier_slot_for_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?carrier_slot - carrier_slot)
+    :precondition
+      (and
+        (salvage_subject_shortfall_detected ?salvage_subject)
+        (not
+          (salvage_subject_carrier_slot_reserved ?salvage_subject)
+        )
+        (carrier_slot_available ?carrier_slot)
+      )
+    :effect
+      (and
+        (salvage_subject_carrier_slot_reserved ?salvage_subject)
+        (assigned_carrier_slot_to_salvage_subject ?salvage_subject ?carrier_slot)
+        (not
+          (carrier_slot_available ?carrier_slot)
+        )
+      )
+  )
+  (:action assign_routing_option_for_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_shortfall_detected ?salvage_subject)
+        (salvage_subject_carrier_slot_reserved ?salvage_subject)
+        (routing_option_available ?routing_option)
+      )
+    :effect
+      (and
+        (assigned_routing_option_to_salvage_subject ?salvage_subject ?routing_option)
+        (not
+          (routing_option_available ?routing_option)
+        )
+      )
+  )
+  (:action confirm_routing_for_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_shortfall_detected ?salvage_subject)
+        (salvage_subject_carrier_slot_reserved ?salvage_subject)
+        (assigned_routing_option_to_salvage_subject ?salvage_subject ?routing_option)
+        (not
+          (salvage_subject_triage_completed ?salvage_subject)
+        )
+      )
+    :effect (salvage_subject_triage_completed ?salvage_subject)
+  )
+  (:action release_routing_option
+    :parameters (?salvage_subject - salvage_subject ?routing_option - routing_option)
+    :precondition
+      (and
+        (assigned_routing_option_to_salvage_subject ?salvage_subject ?routing_option)
+      )
+    :effect
+      (and
+        (routing_option_available ?routing_option)
+        (not
+          (assigned_routing_option_to_salvage_subject ?salvage_subject ?routing_option)
+        )
+      )
+  )
+  (:action assign_service_partner_to_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?service_partner - service_partner)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?salvage_subject)
+        (service_partner_available ?service_partner)
+      )
+    :effect
+      (and
+        (assigned_service_partner_to_salvage_subject ?salvage_subject ?service_partner)
+        (not
+          (service_partner_available ?service_partner)
+        )
+      )
+  )
+  (:action release_service_partner_from_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?service_partner - service_partner)
+    :precondition
+      (and
+        (assigned_service_partner_to_salvage_subject ?salvage_subject ?service_partner)
+      )
+    :effect
+      (and
+        (service_partner_available ?service_partner)
+        (not
+          (assigned_service_partner_to_salvage_subject ?salvage_subject ?service_partner)
+        )
+      )
+  )
+  (:action assign_repair_center_to_case
+    :parameters (?recovery_case - recovery_case ?repair_service_center - repair_service_center)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (repair_center_available ?repair_service_center)
+      )
+    :effect
+      (and
+        (case_assigned_repair_center ?recovery_case ?repair_service_center)
+        (not
+          (repair_center_available ?repair_service_center)
+        )
+      )
+  )
+  (:action release_repair_center_from_case
+    :parameters (?recovery_case - recovery_case ?repair_service_center - repair_service_center)
+    :precondition
+      (and
+        (case_assigned_repair_center ?recovery_case ?repair_service_center)
+      )
+    :effect
+      (and
+        (repair_center_available ?repair_service_center)
+        (not
+          (case_assigned_repair_center ?recovery_case ?repair_service_center)
+        )
+      )
+  )
+  (:action assign_payment_reference_to_case
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (payment_reference_available ?payment_reference)
+      )
+    :effect
+      (and
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (not
+          (payment_reference_available ?payment_reference)
+        )
+      )
+  )
+  (:action release_payment_reference_from_case
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference)
+    :precondition
+      (and
+        (case_payment_reference ?recovery_case ?payment_reference)
+      )
+    :effect
+      (and
+        (payment_reference_available ?payment_reference)
+        (not
+          (case_payment_reference ?recovery_case ?payment_reference)
+        )
+      )
+  )
+  (:action reserve_origin_leg
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?origin_leg - origin_leg ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?primary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?primary_fulfillment_unit ?routing_option)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (not
+          (origin_leg_reserved ?origin_leg)
+        )
+        (not
+          (origin_leg_staged ?origin_leg)
+        )
+      )
+    :effect (origin_leg_reserved ?origin_leg)
+  )
+  (:action confirm_pfu_origin_and_mark_ready
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?origin_leg - origin_leg ?service_partner - service_partner)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?primary_fulfillment_unit)
+        (assigned_service_partner_to_salvage_subject ?primary_fulfillment_unit ?service_partner)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (origin_leg_reserved ?origin_leg)
+        (not
+          (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+      )
+  )
+  (:action allocate_substitute_and_stage_origin_for_pfu
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?origin_leg - origin_leg ?substitute_item - substitute_item)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?primary_fulfillment_unit)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (substitute_item_available ?substitute_item)
+        (not
+          (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_staged ?origin_leg)
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (pfu_allocated_substitute_item ?primary_fulfillment_unit ?substitute_item)
+        (not
+          (substitute_item_available ?substitute_item)
+        )
+      )
+  )
+  (:action commit_substitute_for_pfu_and_reserve_origin
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?origin_leg - origin_leg ?routing_option - routing_option ?substitute_item - substitute_item)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?primary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?primary_fulfillment_unit ?routing_option)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (origin_leg_staged ?origin_leg)
+        (pfu_allocated_substitute_item ?primary_fulfillment_unit ?substitute_item)
+        (not
+          (pfu_origin_confirmed ?primary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_reserved ?origin_leg)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+        (substitute_item_available ?substitute_item)
+        (not
+          (pfu_allocated_substitute_item ?primary_fulfillment_unit ?substitute_item)
+        )
+      )
+  )
+  (:action reserve_destination_leg_for_sfu
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?destination_leg - destination_leg ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?secondary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?secondary_fulfillment_unit ?routing_option)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (not
+          (destination_leg_reserved ?destination_leg)
+        )
+        (not
+          (destination_leg_staged ?destination_leg)
+        )
+      )
+    :effect (destination_leg_reserved ?destination_leg)
+  )
+  (:action confirm_sfu_destination_and_mark_ready
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?destination_leg - destination_leg ?service_partner - service_partner)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?secondary_fulfillment_unit)
+        (assigned_service_partner_to_salvage_subject ?secondary_fulfillment_unit ?service_partner)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (destination_leg_reserved ?destination_leg)
+        (not
+          (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+      )
+  )
+  (:action allocate_substitute_and_stage_destination_for_sfu
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?destination_leg - destination_leg ?substitute_item - substitute_item)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?secondary_fulfillment_unit)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (substitute_item_available ?substitute_item)
+        (not
+          (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_staged ?destination_leg)
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (sfu_allocated_substitute_item ?secondary_fulfillment_unit ?substitute_item)
+        (not
+          (substitute_item_available ?substitute_item)
+        )
+      )
+  )
+  (:action commit_substitute_for_sfu_and_confirm_destination
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?destination_leg - destination_leg ?routing_option - routing_option ?substitute_item - substitute_item)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?secondary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?secondary_fulfillment_unit ?routing_option)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (destination_leg_staged ?destination_leg)
+        (sfu_allocated_substitute_item ?secondary_fulfillment_unit ?substitute_item)
+        (not
+          (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_reserved ?destination_leg)
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        (substitute_item_available ?substitute_item)
+        (not
+          (sfu_allocated_substitute_item ?secondary_fulfillment_unit ?substitute_item)
+        )
+      )
+  )
+  (:action create_salvage_shipment
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?secondary_fulfillment_unit - secondary_fulfillment_unit ?origin_leg - origin_leg ?destination_leg - destination_leg ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (origin_leg_reserved ?origin_leg)
+        (destination_leg_reserved ?destination_leg)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        (salvage_shipment_draft ?salvage_shipment)
+      )
+    :effect
+      (and
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_origin_leg ?salvage_shipment ?origin_leg)
+        (salvage_shipment_destination_leg ?salvage_shipment ?destination_leg)
+        (not
+          (salvage_shipment_draft ?salvage_shipment)
+        )
+      )
+  )
+  (:action create_salvage_shipment_with_origin_unconfirmed
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?secondary_fulfillment_unit - secondary_fulfillment_unit ?origin_leg - origin_leg ?destination_leg - destination_leg ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (origin_leg_staged ?origin_leg)
+        (destination_leg_reserved ?destination_leg)
+        (not
+          (pfu_origin_confirmed ?primary_fulfillment_unit)
+        )
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        (salvage_shipment_draft ?salvage_shipment)
+      )
+    :effect
+      (and
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_origin_leg ?salvage_shipment ?origin_leg)
+        (salvage_shipment_destination_leg ?salvage_shipment ?destination_leg)
+        (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        (not
+          (salvage_shipment_draft ?salvage_shipment)
+        )
+      )
+  )
+  (:action create_salvage_shipment_with_destination_unconfirmed
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?secondary_fulfillment_unit - secondary_fulfillment_unit ?origin_leg - origin_leg ?destination_leg - destination_leg ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (origin_leg_reserved ?origin_leg)
+        (destination_leg_staged ?destination_leg)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+        (not
+          (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        )
+        (salvage_shipment_draft ?salvage_shipment)
+      )
+    :effect
+      (and
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_origin_leg ?salvage_shipment ?origin_leg)
+        (salvage_shipment_destination_leg ?salvage_shipment ?destination_leg)
+        (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        (not
+          (salvage_shipment_draft ?salvage_shipment)
+        )
+      )
+  )
+  (:action create_salvage_shipment_partial_confirmation
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?secondary_fulfillment_unit - secondary_fulfillment_unit ?origin_leg - origin_leg ?destination_leg - destination_leg ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (pfu_origin_leg_assigned ?primary_fulfillment_unit ?origin_leg)
+        (sfu_destination_leg_assigned ?secondary_fulfillment_unit ?destination_leg)
+        (origin_leg_staged ?origin_leg)
+        (destination_leg_staged ?destination_leg)
+        (not
+          (pfu_origin_confirmed ?primary_fulfillment_unit)
+        )
+        (not
+          (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        )
+        (salvage_shipment_draft ?salvage_shipment)
+      )
+    :effect
+      (and
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_origin_leg ?salvage_shipment ?origin_leg)
+        (salvage_shipment_destination_leg ?salvage_shipment ?destination_leg)
+        (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        (not
+          (salvage_shipment_draft ?salvage_shipment)
+        )
+      )
+  )
+  (:action mark_shipment_ready_for_packaging
+    :parameters (?salvage_shipment - salvage_shipment ?primary_fulfillment_unit - primary_fulfillment_unit ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?primary_fulfillment_unit ?routing_option)
+        (not
+          (salvage_shipment_ready_for_packaging ?salvage_shipment)
+        )
+      )
+    :effect (salvage_shipment_ready_for_packaging ?salvage_shipment)
+  )
+  (:action allocate_package_batch_to_shipment
+    :parameters (?recovery_case - recovery_case ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (case_salvage_shipment ?recovery_case ?salvage_shipment)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_available ?package_batch)
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_ready_for_packaging ?salvage_shipment)
+        (not
+          (package_batch_allocated ?package_batch)
+        )
+      )
+    :effect
+      (and
+        (package_batch_allocated ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (not
+          (package_batch_available ?package_batch)
+        )
+      )
+  )
+  (:action initiate_packing_for_case
+    :parameters (?recovery_case - recovery_case ?package_batch - package_batch ?salvage_shipment - salvage_shipment ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_allocated ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (assigned_routing_option_to_salvage_subject ?recovery_case ?routing_option)
+        (not
+          (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        )
+        (not
+          (packing_initiated_for_case ?recovery_case)
+        )
+      )
+    :effect (packing_initiated_for_case ?recovery_case)
+  )
+  (:action attach_compliance_document_to_case
+    :parameters (?recovery_case - recovery_case ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (compliance_document_available ?compliance_document)
+        (not
+          (compliance_document_attached ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (compliance_document_attached ?recovery_case)
+        (case_compliance_document ?recovery_case ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action initiate_packing_with_compliance_document
+    :parameters (?recovery_case - recovery_case ?package_batch - package_batch ?salvage_shipment - salvage_shipment ?routing_option - routing_option ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_allocated ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (assigned_routing_option_to_salvage_subject ?recovery_case ?routing_option)
+        (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        (compliance_document_attached ?recovery_case)
+        (case_compliance_document ?recovery_case ?compliance_document)
+        (not
+          (packing_initiated_for_case ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (packing_initiated_for_case ?recovery_case)
+        (packaging_verified_with_documents ?recovery_case)
+      )
+  )
+  (:action complete_packing_with_repair_center
+    :parameters (?recovery_case - recovery_case ?repair_service_center - repair_service_center ?service_partner - service_partner ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_initiated_for_case ?recovery_case)
+        (case_assigned_repair_center ?recovery_case ?repair_service_center)
+        (assigned_service_partner_to_salvage_subject ?recovery_case ?service_partner)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (not
+          (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        )
+        (not
+          (packing_completed ?recovery_case)
+        )
+      )
+    :effect (packing_completed ?recovery_case)
+  )
+  (:action complete_packing_with_repair_center_variant
+    :parameters (?recovery_case - recovery_case ?repair_service_center - repair_service_center ?service_partner - service_partner ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_initiated_for_case ?recovery_case)
+        (case_assigned_repair_center ?recovery_case ?repair_service_center)
+        (assigned_service_partner_to_salvage_subject ?recovery_case ?service_partner)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        (not
+          (packing_completed ?recovery_case)
+        )
+      )
+    :effect (packing_completed ?recovery_case)
+  )
+  (:action conduct_packaging_quality_check
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_completed ?recovery_case)
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (not
+          (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        )
+        (not
+          (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        )
+        (not
+          (packaging_quality_passed ?recovery_case)
+        )
+      )
+    :effect (packaging_quality_passed ?recovery_case)
+  )
+  (:action finalize_packaging_with_authorization_variant_a
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_completed ?recovery_case)
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        (not
+          (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        )
+        (not
+          (packaging_quality_passed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (authorization_document_present ?recovery_case)
+      )
+  )
+  (:action finalize_packaging_with_authorization_variant_b
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_completed ?recovery_case)
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (not
+          (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        )
+        (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        (not
+          (packaging_quality_passed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (authorization_document_present ?recovery_case)
+      )
+  )
+  (:action finalize_packaging_with_authorization_variant_c
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference ?package_batch - package_batch ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (packing_completed ?recovery_case)
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (case_package_batch ?recovery_case ?package_batch)
+        (package_batch_assigned_to_shipment ?package_batch ?salvage_shipment)
+        (salvage_shipment_origin_unconfirmed ?salvage_shipment)
+        (salvage_shipment_destination_unconfirmed ?salvage_shipment)
+        (not
+          (packaging_quality_passed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (authorization_document_present ?recovery_case)
+      )
+  )
+  (:action finalize_case_and_mark_order_ready
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (not
+          (authorization_document_present ?recovery_case)
+        )
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (salvage_subject_ready_for_finalization ?recovery_case)
+      )
+  )
+  (:action attach_authorization_token_to_case
+    :parameters (?recovery_case - recovery_case ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (authorization_document_present ?recovery_case)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (case_authorization_token ?recovery_case ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action validate_shipment_and_mark_dispatch_ready
+    :parameters (?recovery_case - recovery_case ?primary_fulfillment_unit - primary_fulfillment_unit ?secondary_fulfillment_unit - secondary_fulfillment_unit ?routing_option - routing_option ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (authorization_document_present ?recovery_case)
+        (case_authorization_token ?recovery_case ?authorization_token)
+        (case_primary_fulfillment_unit ?recovery_case ?primary_fulfillment_unit)
+        (case_secondary_fulfillment_unit ?recovery_case ?secondary_fulfillment_unit)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        (assigned_routing_option_to_salvage_subject ?recovery_case ?routing_option)
+        (not
+          (dispatch_ready ?recovery_case)
+        )
+      )
+    :effect (dispatch_ready ?recovery_case)
+  )
+  (:action finalize_case_post_validation
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (packaging_quality_passed ?recovery_case)
+        (dispatch_ready ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (salvage_subject_ready_for_finalization ?recovery_case)
+      )
+  )
+  (:action attach_claim_file_to_case
+    :parameters (?recovery_case - recovery_case ?claim_file - claim_file ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_triage_completed ?recovery_case)
+        (assigned_routing_option_to_salvage_subject ?recovery_case ?routing_option)
+        (claim_file_available ?claim_file)
+        (case_claim_file_linked ?recovery_case ?claim_file)
+        (not
+          (claim_linked_to_case ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (claim_linked_to_case ?recovery_case)
+        (not
+          (claim_file_available ?claim_file)
+        )
+      )
+  )
+  (:action validate_claim_for_case
+    :parameters (?recovery_case - recovery_case ?service_partner - service_partner)
+    :precondition
+      (and
+        (claim_linked_to_case ?recovery_case)
+        (assigned_service_partner_to_salvage_subject ?recovery_case ?service_partner)
+        (not
+          (claim_validated ?recovery_case)
+        )
+      )
+    :effect (claim_validated ?recovery_case)
+  )
+  (:action approve_claim_and_stage_payment_reference
+    :parameters (?recovery_case - recovery_case ?payment_reference - payment_reference)
+    :precondition
+      (and
+        (claim_validated ?recovery_case)
+        (case_payment_reference ?recovery_case ?payment_reference)
+        (not
+          (claim_approved ?recovery_case)
+        )
+      )
+    :effect (claim_approved ?recovery_case)
+  )
+  (:action finalize_case_after_claim_approval
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (claim_approved ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (salvage_subject_ready_for_finalization ?recovery_case)
+      )
+  )
+  (:action finalize_salvage_subject_via_primary_fulfillment
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (primary_fulfillment_unit_ready ?primary_fulfillment_unit)
+        (pfu_origin_confirmed ?primary_fulfillment_unit)
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_ready_for_packaging ?salvage_shipment)
+        (not
+          (salvage_subject_ready_for_finalization ?primary_fulfillment_unit)
+        )
+      )
+    :effect (salvage_subject_ready_for_finalization ?primary_fulfillment_unit)
+  )
+  (:action finalize_salvage_subject_via_secondary_fulfillment
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?salvage_shipment - salvage_shipment)
+    :precondition
+      (and
+        (secondary_fulfillment_unit_ready ?secondary_fulfillment_unit)
+        (sfu_destination_confirmed ?secondary_fulfillment_unit)
+        (salvage_shipment_confirmed ?salvage_shipment)
+        (salvage_shipment_ready_for_packaging ?salvage_shipment)
+        (not
+          (salvage_subject_ready_for_finalization ?secondary_fulfillment_unit)
+        )
+      )
+    :effect (salvage_subject_ready_for_finalization ?secondary_fulfillment_unit)
+  )
+  (:action initiate_compensation_for_salvage_subject
+    :parameters (?salvage_subject - salvage_subject ?compensation_option - compensation_option ?routing_option - routing_option)
+    :precondition
+      (and
+        (salvage_subject_ready_for_finalization ?salvage_subject)
+        (assigned_routing_option_to_salvage_subject ?salvage_subject ?routing_option)
+        (compensation_option_available ?compensation_option)
+        (not
+          (salvage_subject_finalization_completed ?salvage_subject)
+        )
+      )
+    :effect
+      (and
+        (salvage_subject_finalization_completed ?salvage_subject)
+        (salvage_subject_compensation_selected ?salvage_subject ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action apply_compensation_release_resources_for_pfu
+    :parameters (?primary_fulfillment_unit - primary_fulfillment_unit ?carrier_slot - carrier_slot ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (salvage_subject_finalization_completed ?primary_fulfillment_unit)
+        (assigned_carrier_slot_to_salvage_subject ?primary_fulfillment_unit ?carrier_slot)
+        (salvage_subject_compensation_selected ?primary_fulfillment_unit ?compensation_option)
+        (not
+          (salvage_subject_salvaged ?primary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (salvage_subject_salvaged ?primary_fulfillment_unit)
+        (carrier_slot_available ?carrier_slot)
+        (compensation_option_available ?compensation_option)
+      )
+  )
+  (:action apply_compensation_release_resources_for_sfu
+    :parameters (?secondary_fulfillment_unit - secondary_fulfillment_unit ?carrier_slot - carrier_slot ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (salvage_subject_finalization_completed ?secondary_fulfillment_unit)
+        (assigned_carrier_slot_to_salvage_subject ?secondary_fulfillment_unit ?carrier_slot)
+        (salvage_subject_compensation_selected ?secondary_fulfillment_unit ?compensation_option)
+        (not
+          (salvage_subject_salvaged ?secondary_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (salvage_subject_salvaged ?secondary_fulfillment_unit)
+        (carrier_slot_available ?carrier_slot)
+        (compensation_option_available ?compensation_option)
+      )
+  )
+  (:action apply_compensation_release_resources_for_case
+    :parameters (?recovery_case - recovery_case ?carrier_slot - carrier_slot ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (salvage_subject_finalization_completed ?recovery_case)
+        (assigned_carrier_slot_to_salvage_subject ?recovery_case ?carrier_slot)
+        (salvage_subject_compensation_selected ?recovery_case ?compensation_option)
+        (not
+          (salvage_subject_salvaged ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (salvage_subject_salvaged ?recovery_case)
+        (carrier_slot_available ?carrier_slot)
+        (compensation_option_available ?compensation_option)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem partial_order_salvage_problem)
+  (:domain logistics_partial_order_salvage)
+  (:objects pfu_1 - primary_fulfillment_unit sfu_1 - secondary_fulfillment_unit recovery_case_1 - recovery_case recovery_case_2 - recovery_case carrier_slot_1 - carrier_slot carrier_slot_2 - carrier_slot carrier_slot_3 - carrier_slot routing_option_1 - routing_option service_partner_1 - service_partner substitute_item_1 - substitute_item origin_leg_1 - origin_leg destination_leg_1 - destination_leg salvage_shipment_draft_1 - salvage_shipment package_batch_a - package_batch package_batch_b - package_batch compliance_doc_a - compliance_document compliance_doc_b - compliance_document authorization_token_a - authorization_token authorization_token_b - authorization_token compensation_option_credit - compensation_option repair_center_alpha - repair_service_center claim_file_1 - claim_file claim_file_2 - claim_file payment_reference_1 - payment_reference)
+  (:init
+    (carrier_slot_available carrier_slot_1)
+    (carrier_slot_available carrier_slot_2)
+    (carrier_slot_available carrier_slot_3)
+    (routing_option_available routing_option_1)
+    (service_partner_available service_partner_1)
+    (substitute_item_available substitute_item_1)
+    (pfu_origin_leg_assigned pfu_1 origin_leg_1)
+    (sfu_destination_leg_assigned sfu_1 destination_leg_1)
+    (salvage_shipment_draft salvage_shipment_draft_1)
+    (package_batch_available package_batch_a)
+    (package_batch_available package_batch_b)
+    (case_primary_fulfillment_unit recovery_case_1 pfu_1)
+    (case_primary_fulfillment_unit recovery_case_2 pfu_1)
+    (case_secondary_fulfillment_unit recovery_case_1 sfu_1)
+    (case_secondary_fulfillment_unit recovery_case_2 sfu_1)
+    (case_salvage_shipment recovery_case_1 salvage_shipment_draft_1)
+    (case_salvage_shipment recovery_case_2 salvage_shipment_draft_1)
+    (case_package_batch recovery_case_1 package_batch_a)
+    (case_package_batch recovery_case_2 package_batch_b)
+    (compliance_document_available compliance_doc_a)
+    (compliance_document_available compliance_doc_b)
+    (authorization_token_available authorization_token_a)
+    (authorization_token_available authorization_token_b)
+    (compensation_option_available compensation_option_credit)
+    (repair_center_available repair_center_alpha)
+    (claim_file_available claim_file_1)
+    (case_claim_file_linked recovery_case_1 claim_file_1)
+    (case_claim_file_linked recovery_case_2 claim_file_2)
+    (payment_reference_available payment_reference_1)
+  )
+  (:goal
+    (and
+      (salvage_subject_salvaged pfu_1)
+      (salvage_subject_salvaged sfu_1)
+      (salvage_subject_salvaged recovery_case_1)
+      (salvage_subject_salvaged recovery_case_2)
+    )
+  )
+)

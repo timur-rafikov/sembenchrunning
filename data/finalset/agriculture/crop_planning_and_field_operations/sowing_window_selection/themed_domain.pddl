@@ -1,0 +1,937 @@
+(define (domain sowing_window_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object resource_category - generic_entity supply_category - generic_entity time_window_category - generic_entity land_unit - generic_entity field_parcel - land_unit machinery_unit - resource_category seed_variety - resource_category operator_team - resource_category equipment_type - resource_category task_requirement - resource_category irrigation_slot - resource_category fertilizer_type - resource_category pest_control_agent - resource_category input_material - supply_category input_batch - supply_category regulatory_constraint - supply_category sowing_window - time_window_category weather_window - time_window_category operation_slot - time_window_category subfield_unit - field_parcel subfield_partition - field_parcel field_plan - subfield_unit field_schedule - subfield_unit management_unit - subfield_partition)
+
+  (:predicates
+    (parcel_registered ?field_parcel - field_parcel)
+    (entity_configured ?field_parcel - field_parcel)
+    (machinery_allocated_flag ?field_parcel - field_parcel)
+    (confirmed_for_sowing ?field_parcel - field_parcel)
+    (execution_ready ?field_parcel - field_parcel)
+    (ready_for_allocation ?field_parcel - field_parcel)
+    (machinery_available ?machinery_unit - machinery_unit)
+    (entity_assigned_machinery ?field_parcel - field_parcel ?machinery_unit - machinery_unit)
+    (seed_variety_available ?seed_variety - seed_variety)
+    (entity_assigned_seed_variety ?field_parcel - field_parcel ?seed_variety - seed_variety)
+    (operator_team_available ?operator_team - operator_team)
+    (assigned_operator_team ?field_parcel - field_parcel ?operator_team - operator_team)
+    (input_material_available ?input_material - input_material)
+    (plan_input_allocated ?field_plan - field_plan ?input_material - input_material)
+    (schedule_input_allocated ?field_schedule - field_schedule ?input_material - input_material)
+    (plan_sowing_window_candidate ?field_plan - field_plan ?sowing_window - sowing_window)
+    (sowing_window_confirmed ?sowing_window - sowing_window)
+    (sowing_window_allocated ?sowing_window - sowing_window)
+    (plan_slot_ready ?field_plan - field_plan)
+    (schedule_weather_window_candidate ?field_schedule - field_schedule ?weather_window - weather_window)
+    (weather_window_confirmed ?weather_window - weather_window)
+    (weather_window_allocated ?weather_window - weather_window)
+    (schedule_slot_ready ?field_schedule - field_schedule)
+    (operation_slot_template_available ?operation_slot - operation_slot)
+    (operation_slot_created ?operation_slot - operation_slot)
+    (slot_has_sowing_window ?operation_slot - operation_slot ?sowing_window - sowing_window)
+    (slot_has_weather_window ?operation_slot - operation_slot ?weather_window - weather_window)
+    (slot_requires_equipment_setup ?operation_slot - operation_slot)
+    (slot_requires_operator_setup ?operation_slot - operation_slot)
+    (slot_prepared_for_execution ?operation_slot - operation_slot)
+    (management_unit_has_plan ?management_unit - management_unit ?field_plan - field_plan)
+    (management_unit_has_schedule ?management_unit - management_unit ?field_schedule - field_schedule)
+    (management_unit_slot_assignment ?management_unit - management_unit ?operation_slot - operation_slot)
+    (input_batch_available ?input_batch - input_batch)
+    (management_unit_has_batch ?management_unit - management_unit ?input_batch - input_batch)
+    (input_batch_reserved ?input_batch - input_batch)
+    (batch_assigned_to_slot ?input_batch - input_batch ?operation_slot - operation_slot)
+    (management_unit_prepared ?management_unit - management_unit)
+    (management_unit_inputs_reserved ?management_unit - management_unit)
+    (management_unit_inputs_verified ?management_unit - management_unit)
+    (management_unit_equipment_approval ?management_unit - management_unit)
+    (management_unit_equipment_configured ?management_unit - management_unit)
+    (management_unit_inputs_confirmed ?management_unit - management_unit)
+    (management_unit_ready_for_final_confirmation ?management_unit - management_unit)
+    (regulatory_constraint_available ?regulatory_constraint - regulatory_constraint)
+    (management_unit_regulatory_requirement ?management_unit - management_unit ?regulatory_constraint - regulatory_constraint)
+    (management_unit_regulatory_approved ?management_unit - management_unit)
+    (management_unit_approval_acknowledged ?management_unit - management_unit)
+    (management_unit_final_approval ?management_unit - management_unit)
+    (equipment_type_available ?equipment_type - equipment_type)
+    (management_unit_assigned_equipment_type ?management_unit - management_unit ?equipment_type - equipment_type)
+    (task_requirement_available ?task_requirement - task_requirement)
+    (management_unit_has_task_requirement ?management_unit - management_unit ?task_requirement - task_requirement)
+    (fertilizer_available ?fertilizer_type - fertilizer_type)
+    (management_unit_assigned_fertilizer ?management_unit - management_unit ?fertilizer_type - fertilizer_type)
+    (pest_control_agent_available ?pest_control_agent - pest_control_agent)
+    (management_unit_assigned_pest_agent ?management_unit - management_unit ?pest_control_agent - pest_control_agent)
+    (irrigation_slot_available ?irrigation_slot - irrigation_slot)
+    (assigned_irrigation_slot ?field_parcel - field_parcel ?irrigation_slot - irrigation_slot)
+    (plan_prepared ?field_plan - field_plan)
+    (schedule_prepared ?field_schedule - field_schedule)
+    (management_unit_confirmation_recorded ?management_unit - management_unit)
+  )
+  (:action register_field_parcel
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (not
+          (parcel_registered ?field_parcel)
+        )
+        (not
+          (confirmed_for_sowing ?field_parcel)
+        )
+      )
+    :effect (parcel_registered ?field_parcel)
+  )
+  (:action assign_machinery_to_parcel
+    :parameters (?field_parcel - field_parcel ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (not
+          (machinery_allocated_flag ?field_parcel)
+        )
+        (machinery_available ?machinery_unit)
+      )
+    :effect
+      (and
+        (machinery_allocated_flag ?field_parcel)
+        (entity_assigned_machinery ?field_parcel ?machinery_unit)
+        (not
+          (machinery_available ?machinery_unit)
+        )
+      )
+  )
+  (:action reserve_seed_for_parcel
+    :parameters (?field_parcel - field_parcel ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (machinery_allocated_flag ?field_parcel)
+        (seed_variety_available ?seed_variety)
+      )
+    :effect
+      (and
+        (entity_assigned_seed_variety ?field_parcel ?seed_variety)
+        (not
+          (seed_variety_available ?seed_variety)
+        )
+      )
+  )
+  (:action confirm_seed_assignment
+    :parameters (?field_parcel - field_parcel ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (machinery_allocated_flag ?field_parcel)
+        (entity_assigned_seed_variety ?field_parcel ?seed_variety)
+        (not
+          (entity_configured ?field_parcel)
+        )
+      )
+    :effect (entity_configured ?field_parcel)
+  )
+  (:action release_seed_reservation
+    :parameters (?field_parcel - field_parcel ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_assigned_seed_variety ?field_parcel ?seed_variety)
+      )
+    :effect
+      (and
+        (seed_variety_available ?seed_variety)
+        (not
+          (entity_assigned_seed_variety ?field_parcel ?seed_variety)
+        )
+      )
+  )
+  (:action assign_operator_to_parcel
+    :parameters (?field_parcel - field_parcel ?operator_team - operator_team)
+    :precondition
+      (and
+        (entity_configured ?field_parcel)
+        (operator_team_available ?operator_team)
+      )
+    :effect
+      (and
+        (assigned_operator_team ?field_parcel ?operator_team)
+        (not
+          (operator_team_available ?operator_team)
+        )
+      )
+  )
+  (:action release_operator_from_parcel
+    :parameters (?field_parcel - field_parcel ?operator_team - operator_team)
+    :precondition
+      (and
+        (assigned_operator_team ?field_parcel ?operator_team)
+      )
+    :effect
+      (and
+        (operator_team_available ?operator_team)
+        (not
+          (assigned_operator_team ?field_parcel ?operator_team)
+        )
+      )
+  )
+  (:action allocate_fertilizer_to_unit
+    :parameters (?management_unit - management_unit ?fertilizer_type - fertilizer_type)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (fertilizer_available ?fertilizer_type)
+      )
+    :effect
+      (and
+        (management_unit_assigned_fertilizer ?management_unit ?fertilizer_type)
+        (not
+          (fertilizer_available ?fertilizer_type)
+        )
+      )
+  )
+  (:action release_fertilizer_from_unit
+    :parameters (?management_unit - management_unit ?fertilizer_type - fertilizer_type)
+    :precondition
+      (and
+        (management_unit_assigned_fertilizer ?management_unit ?fertilizer_type)
+      )
+    :effect
+      (and
+        (fertilizer_available ?fertilizer_type)
+        (not
+          (management_unit_assigned_fertilizer ?management_unit ?fertilizer_type)
+        )
+      )
+  )
+  (:action allocate_pest_agent_to_unit
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (pest_control_agent_available ?pest_control_agent)
+      )
+    :effect
+      (and
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (not
+          (pest_control_agent_available ?pest_control_agent)
+        )
+      )
+  )
+  (:action release_pest_agent_from_unit
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent)
+    :precondition
+      (and
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+      )
+    :effect
+      (and
+        (pest_control_agent_available ?pest_control_agent)
+        (not
+          (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        )
+      )
+  )
+  (:action propose_sowing_window_for_plan
+    :parameters (?field_plan - field_plan ?sowing_window - sowing_window ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_configured ?field_plan)
+        (entity_assigned_seed_variety ?field_plan ?seed_variety)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (not
+          (sowing_window_confirmed ?sowing_window)
+        )
+        (not
+          (sowing_window_allocated ?sowing_window)
+        )
+      )
+    :effect (sowing_window_confirmed ?sowing_window)
+  )
+  (:action lock_sowing_window_for_plan
+    :parameters (?field_plan - field_plan ?sowing_window - sowing_window ?operator_team - operator_team)
+    :precondition
+      (and
+        (entity_configured ?field_plan)
+        (assigned_operator_team ?field_plan ?operator_team)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (sowing_window_confirmed ?sowing_window)
+        (not
+          (plan_prepared ?field_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_prepared ?field_plan)
+        (plan_slot_ready ?field_plan)
+      )
+  )
+  (:action allocate_input_to_plan
+    :parameters (?field_plan - field_plan ?sowing_window - sowing_window ?input_material - input_material)
+    :precondition
+      (and
+        (entity_configured ?field_plan)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (input_material_available ?input_material)
+        (not
+          (plan_prepared ?field_plan)
+        )
+      )
+    :effect
+      (and
+        (sowing_window_allocated ?sowing_window)
+        (plan_prepared ?field_plan)
+        (plan_input_allocated ?field_plan ?input_material)
+        (not
+          (input_material_available ?input_material)
+        )
+      )
+  )
+  (:action finalize_input_and_confirm_window_for_plan
+    :parameters (?field_plan - field_plan ?sowing_window - sowing_window ?seed_variety - seed_variety ?input_material - input_material)
+    :precondition
+      (and
+        (entity_configured ?field_plan)
+        (entity_assigned_seed_variety ?field_plan ?seed_variety)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (sowing_window_allocated ?sowing_window)
+        (plan_input_allocated ?field_plan ?input_material)
+        (not
+          (plan_slot_ready ?field_plan)
+        )
+      )
+    :effect
+      (and
+        (sowing_window_confirmed ?sowing_window)
+        (plan_slot_ready ?field_plan)
+        (input_material_available ?input_material)
+        (not
+          (plan_input_allocated ?field_plan ?input_material)
+        )
+      )
+  )
+  (:action propose_weather_window_for_schedule
+    :parameters (?field_schedule - field_schedule ?weather_window - weather_window ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_configured ?field_schedule)
+        (entity_assigned_seed_variety ?field_schedule ?seed_variety)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (not
+          (weather_window_confirmed ?weather_window)
+        )
+        (not
+          (weather_window_allocated ?weather_window)
+        )
+      )
+    :effect (weather_window_confirmed ?weather_window)
+  )
+  (:action lock_weather_window_for_schedule
+    :parameters (?field_schedule - field_schedule ?weather_window - weather_window ?operator_team - operator_team)
+    :precondition
+      (and
+        (entity_configured ?field_schedule)
+        (assigned_operator_team ?field_schedule ?operator_team)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (weather_window_confirmed ?weather_window)
+        (not
+          (schedule_prepared ?field_schedule)
+        )
+      )
+    :effect
+      (and
+        (schedule_prepared ?field_schedule)
+        (schedule_slot_ready ?field_schedule)
+      )
+  )
+  (:action allocate_input_to_schedule
+    :parameters (?field_schedule - field_schedule ?weather_window - weather_window ?input_material - input_material)
+    :precondition
+      (and
+        (entity_configured ?field_schedule)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (input_material_available ?input_material)
+        (not
+          (schedule_prepared ?field_schedule)
+        )
+      )
+    :effect
+      (and
+        (weather_window_allocated ?weather_window)
+        (schedule_prepared ?field_schedule)
+        (schedule_input_allocated ?field_schedule ?input_material)
+        (not
+          (input_material_available ?input_material)
+        )
+      )
+  )
+  (:action finalize_input_and_confirm_window_for_schedule
+    :parameters (?field_schedule - field_schedule ?weather_window - weather_window ?seed_variety - seed_variety ?input_material - input_material)
+    :precondition
+      (and
+        (entity_configured ?field_schedule)
+        (entity_assigned_seed_variety ?field_schedule ?seed_variety)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (weather_window_allocated ?weather_window)
+        (schedule_input_allocated ?field_schedule ?input_material)
+        (not
+          (schedule_slot_ready ?field_schedule)
+        )
+      )
+    :effect
+      (and
+        (weather_window_confirmed ?weather_window)
+        (schedule_slot_ready ?field_schedule)
+        (input_material_available ?input_material)
+        (not
+          (schedule_input_allocated ?field_schedule ?input_material)
+        )
+      )
+  )
+  (:action form_operation_slot_from_matches
+    :parameters (?field_plan - field_plan ?field_schedule - field_schedule ?sowing_window - sowing_window ?weather_window - weather_window ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (plan_prepared ?field_plan)
+        (schedule_prepared ?field_schedule)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (sowing_window_confirmed ?sowing_window)
+        (weather_window_confirmed ?weather_window)
+        (plan_slot_ready ?field_plan)
+        (schedule_slot_ready ?field_schedule)
+        (operation_slot_template_available ?operation_slot)
+      )
+    :effect
+      (and
+        (operation_slot_created ?operation_slot)
+        (slot_has_sowing_window ?operation_slot ?sowing_window)
+        (slot_has_weather_window ?operation_slot ?weather_window)
+        (not
+          (operation_slot_template_available ?operation_slot)
+        )
+      )
+  )
+  (:action form_provisional_operation_slot_input_first
+    :parameters (?field_plan - field_plan ?field_schedule - field_schedule ?sowing_window - sowing_window ?weather_window - weather_window ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (plan_prepared ?field_plan)
+        (schedule_prepared ?field_schedule)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (sowing_window_allocated ?sowing_window)
+        (weather_window_confirmed ?weather_window)
+        (not
+          (plan_slot_ready ?field_plan)
+        )
+        (schedule_slot_ready ?field_schedule)
+        (operation_slot_template_available ?operation_slot)
+      )
+    :effect
+      (and
+        (operation_slot_created ?operation_slot)
+        (slot_has_sowing_window ?operation_slot ?sowing_window)
+        (slot_has_weather_window ?operation_slot ?weather_window)
+        (slot_requires_equipment_setup ?operation_slot)
+        (not
+          (operation_slot_template_available ?operation_slot)
+        )
+      )
+  )
+  (:action form_provisional_operation_slot_weather_first
+    :parameters (?field_plan - field_plan ?field_schedule - field_schedule ?sowing_window - sowing_window ?weather_window - weather_window ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (plan_prepared ?field_plan)
+        (schedule_prepared ?field_schedule)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (sowing_window_confirmed ?sowing_window)
+        (weather_window_allocated ?weather_window)
+        (plan_slot_ready ?field_plan)
+        (not
+          (schedule_slot_ready ?field_schedule)
+        )
+        (operation_slot_template_available ?operation_slot)
+      )
+    :effect
+      (and
+        (operation_slot_created ?operation_slot)
+        (slot_has_sowing_window ?operation_slot ?sowing_window)
+        (slot_has_weather_window ?operation_slot ?weather_window)
+        (slot_requires_operator_setup ?operation_slot)
+        (not
+          (operation_slot_template_available ?operation_slot)
+        )
+      )
+  )
+  (:action form_comprehensive_provisional_operation_slot
+    :parameters (?field_plan - field_plan ?field_schedule - field_schedule ?sowing_window - sowing_window ?weather_window - weather_window ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (plan_prepared ?field_plan)
+        (schedule_prepared ?field_schedule)
+        (plan_sowing_window_candidate ?field_plan ?sowing_window)
+        (schedule_weather_window_candidate ?field_schedule ?weather_window)
+        (sowing_window_allocated ?sowing_window)
+        (weather_window_allocated ?weather_window)
+        (not
+          (plan_slot_ready ?field_plan)
+        )
+        (not
+          (schedule_slot_ready ?field_schedule)
+        )
+        (operation_slot_template_available ?operation_slot)
+      )
+    :effect
+      (and
+        (operation_slot_created ?operation_slot)
+        (slot_has_sowing_window ?operation_slot ?sowing_window)
+        (slot_has_weather_window ?operation_slot ?weather_window)
+        (slot_requires_equipment_setup ?operation_slot)
+        (slot_requires_operator_setup ?operation_slot)
+        (not
+          (operation_slot_template_available ?operation_slot)
+        )
+      )
+  )
+  (:action confirm_slot_preparation
+    :parameters (?operation_slot - operation_slot ?field_plan - field_plan ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (operation_slot_created ?operation_slot)
+        (plan_prepared ?field_plan)
+        (entity_assigned_seed_variety ?field_plan ?seed_variety)
+        (not
+          (slot_prepared_for_execution ?operation_slot)
+        )
+      )
+    :effect (slot_prepared_for_execution ?operation_slot)
+  )
+  (:action reserve_input_batch_for_unit_and_slot
+    :parameters (?management_unit - management_unit ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (management_unit_slot_assignment ?management_unit ?operation_slot)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (input_batch_available ?input_batch)
+        (operation_slot_created ?operation_slot)
+        (slot_prepared_for_execution ?operation_slot)
+        (not
+          (input_batch_reserved ?input_batch)
+        )
+      )
+    :effect
+      (and
+        (input_batch_reserved ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (not
+          (input_batch_available ?input_batch)
+        )
+      )
+  )
+  (:action mark_management_unit_prepared_for_slot
+    :parameters (?management_unit - management_unit ?input_batch - input_batch ?operation_slot - operation_slot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (input_batch_reserved ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (entity_assigned_seed_variety ?management_unit ?seed_variety)
+        (not
+          (slot_requires_equipment_setup ?operation_slot)
+        )
+        (not
+          (management_unit_prepared ?management_unit)
+        )
+      )
+    :effect (management_unit_prepared ?management_unit)
+  )
+  (:action assign_equipment_type_to_management_unit
+    :parameters (?management_unit - management_unit ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (equipment_type_available ?equipment_type)
+        (not
+          (management_unit_equipment_approval ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_equipment_approval ?management_unit)
+        (management_unit_assigned_equipment_type ?management_unit ?equipment_type)
+        (not
+          (equipment_type_available ?equipment_type)
+        )
+      )
+  )
+  (:action prepare_unit_with_equipment_and_batch
+    :parameters (?management_unit - management_unit ?input_batch - input_batch ?operation_slot - operation_slot ?seed_variety - seed_variety ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (input_batch_reserved ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (entity_assigned_seed_variety ?management_unit ?seed_variety)
+        (slot_requires_equipment_setup ?operation_slot)
+        (management_unit_equipment_approval ?management_unit)
+        (management_unit_assigned_equipment_type ?management_unit ?equipment_type)
+        (not
+          (management_unit_prepared ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_prepared ?management_unit)
+        (management_unit_equipment_configured ?management_unit)
+      )
+  )
+  (:action reserve_unit_inputs_primary
+    :parameters (?management_unit - management_unit ?fertilizer_type - fertilizer_type ?operator_team - operator_team ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_prepared ?management_unit)
+        (management_unit_assigned_fertilizer ?management_unit ?fertilizer_type)
+        (assigned_operator_team ?management_unit ?operator_team)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (not
+          (slot_requires_operator_setup ?operation_slot)
+        )
+        (not
+          (management_unit_inputs_reserved ?management_unit)
+        )
+      )
+    :effect (management_unit_inputs_reserved ?management_unit)
+  )
+  (:action reserve_unit_inputs_secondary
+    :parameters (?management_unit - management_unit ?fertilizer_type - fertilizer_type ?operator_team - operator_team ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_prepared ?management_unit)
+        (management_unit_assigned_fertilizer ?management_unit ?fertilizer_type)
+        (assigned_operator_team ?management_unit ?operator_team)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (slot_requires_operator_setup ?operation_slot)
+        (not
+          (management_unit_inputs_reserved ?management_unit)
+        )
+      )
+    :effect (management_unit_inputs_reserved ?management_unit)
+  )
+  (:action confirm_unit_inputs_step1
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_inputs_reserved ?management_unit)
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (not
+          (slot_requires_equipment_setup ?operation_slot)
+        )
+        (not
+          (slot_requires_operator_setup ?operation_slot)
+        )
+        (not
+          (management_unit_inputs_verified ?management_unit)
+        )
+      )
+    :effect (management_unit_inputs_verified ?management_unit)
+  )
+  (:action confirm_unit_inputs_and_flag_step2
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_inputs_reserved ?management_unit)
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (slot_requires_equipment_setup ?operation_slot)
+        (not
+          (slot_requires_operator_setup ?operation_slot)
+        )
+        (not
+          (management_unit_inputs_verified ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_inputs_confirmed ?management_unit)
+      )
+  )
+  (:action confirm_unit_inputs_and_flag_step3
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_inputs_reserved ?management_unit)
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (not
+          (slot_requires_equipment_setup ?operation_slot)
+        )
+        (slot_requires_operator_setup ?operation_slot)
+        (not
+          (management_unit_inputs_verified ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_inputs_confirmed ?management_unit)
+      )
+  )
+  (:action confirm_unit_inputs_and_flag_step4
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent ?input_batch - input_batch ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (management_unit_inputs_reserved ?management_unit)
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (management_unit_has_batch ?management_unit ?input_batch)
+        (batch_assigned_to_slot ?input_batch ?operation_slot)
+        (slot_requires_equipment_setup ?operation_slot)
+        (slot_requires_operator_setup ?operation_slot)
+        (not
+          (management_unit_inputs_verified ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_inputs_confirmed ?management_unit)
+      )
+  )
+  (:action finalize_unit_confirmation
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (not
+          (management_unit_inputs_confirmed ?management_unit)
+        )
+        (not
+          (management_unit_confirmation_recorded ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_confirmation_recorded ?management_unit)
+        (execution_ready ?management_unit)
+      )
+  )
+  (:action assign_task_requirement_to_unit
+    :parameters (?management_unit - management_unit ?task_requirement - task_requirement)
+    :precondition
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_inputs_confirmed ?management_unit)
+        (task_requirement_available ?task_requirement)
+      )
+    :effect
+      (and
+        (management_unit_has_task_requirement ?management_unit ?task_requirement)
+        (not
+          (task_requirement_available ?task_requirement)
+        )
+      )
+  )
+  (:action prepare_unit_for_execution
+    :parameters (?management_unit - management_unit ?field_plan - field_plan ?field_schedule - field_schedule ?seed_variety - seed_variety ?task_requirement - task_requirement)
+    :precondition
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_inputs_confirmed ?management_unit)
+        (management_unit_has_task_requirement ?management_unit ?task_requirement)
+        (management_unit_has_plan ?management_unit ?field_plan)
+        (management_unit_has_schedule ?management_unit ?field_schedule)
+        (plan_slot_ready ?field_plan)
+        (schedule_slot_ready ?field_schedule)
+        (entity_assigned_seed_variety ?management_unit ?seed_variety)
+        (not
+          (management_unit_ready_for_final_confirmation ?management_unit)
+        )
+      )
+    :effect (management_unit_ready_for_final_confirmation ?management_unit)
+  )
+  (:action confirm_unit_execution
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_inputs_verified ?management_unit)
+        (management_unit_ready_for_final_confirmation ?management_unit)
+        (not
+          (management_unit_confirmation_recorded ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_confirmation_recorded ?management_unit)
+        (execution_ready ?management_unit)
+      )
+  )
+  (:action apply_regulatory_requirement_to_unit
+    :parameters (?management_unit - management_unit ?regulatory_constraint - regulatory_constraint ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_configured ?management_unit)
+        (entity_assigned_seed_variety ?management_unit ?seed_variety)
+        (regulatory_constraint_available ?regulatory_constraint)
+        (management_unit_regulatory_requirement ?management_unit ?regulatory_constraint)
+        (not
+          (management_unit_regulatory_approved ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_regulatory_approved ?management_unit)
+        (not
+          (regulatory_constraint_available ?regulatory_constraint)
+        )
+      )
+  )
+  (:action record_regulatory_approval
+    :parameters (?management_unit - management_unit ?operator_team - operator_team)
+    :precondition
+      (and
+        (management_unit_regulatory_approved ?management_unit)
+        (assigned_operator_team ?management_unit ?operator_team)
+        (not
+          (management_unit_approval_acknowledged ?management_unit)
+        )
+      )
+    :effect (management_unit_approval_acknowledged ?management_unit)
+  )
+  (:action assign_pest_control_approval_to_unit
+    :parameters (?management_unit - management_unit ?pest_control_agent - pest_control_agent)
+    :precondition
+      (and
+        (management_unit_approval_acknowledged ?management_unit)
+        (management_unit_assigned_pest_agent ?management_unit ?pest_control_agent)
+        (not
+          (management_unit_final_approval ?management_unit)
+        )
+      )
+    :effect (management_unit_final_approval ?management_unit)
+  )
+  (:action finalize_unit_approval
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_final_approval ?management_unit)
+        (not
+          (management_unit_confirmation_recorded ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_confirmation_recorded ?management_unit)
+        (execution_ready ?management_unit)
+      )
+  )
+  (:action execute_plan_on_operation_slot
+    :parameters (?field_plan - field_plan ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (plan_prepared ?field_plan)
+        (plan_slot_ready ?field_plan)
+        (operation_slot_created ?operation_slot)
+        (slot_prepared_for_execution ?operation_slot)
+        (not
+          (execution_ready ?field_plan)
+        )
+      )
+    :effect (execution_ready ?field_plan)
+  )
+  (:action execute_schedule_on_operation_slot
+    :parameters (?field_schedule - field_schedule ?operation_slot - operation_slot)
+    :precondition
+      (and
+        (schedule_prepared ?field_schedule)
+        (schedule_slot_ready ?field_schedule)
+        (operation_slot_created ?operation_slot)
+        (slot_prepared_for_execution ?operation_slot)
+        (not
+          (execution_ready ?field_schedule)
+        )
+      )
+    :effect (execution_ready ?field_schedule)
+  )
+  (:action associate_irrigation_and_set_parcel_ready
+    :parameters (?field_parcel - field_parcel ?irrigation_slot - irrigation_slot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (execution_ready ?field_parcel)
+        (entity_assigned_seed_variety ?field_parcel ?seed_variety)
+        (irrigation_slot_available ?irrigation_slot)
+        (not
+          (ready_for_allocation ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (ready_for_allocation ?field_parcel)
+        (assigned_irrigation_slot ?field_parcel ?irrigation_slot)
+        (not
+          (irrigation_slot_available ?irrigation_slot)
+        )
+      )
+  )
+  (:action confirm_plan_assignment_and_release_resources
+    :parameters (?field_plan - field_plan ?machinery_unit - machinery_unit ?irrigation_slot - irrigation_slot)
+    :precondition
+      (and
+        (ready_for_allocation ?field_plan)
+        (entity_assigned_machinery ?field_plan ?machinery_unit)
+        (assigned_irrigation_slot ?field_plan ?irrigation_slot)
+        (not
+          (confirmed_for_sowing ?field_plan)
+        )
+      )
+    :effect
+      (and
+        (confirmed_for_sowing ?field_plan)
+        (machinery_available ?machinery_unit)
+        (irrigation_slot_available ?irrigation_slot)
+      )
+  )
+  (:action confirm_schedule_assignment_and_release_resources
+    :parameters (?field_schedule - field_schedule ?machinery_unit - machinery_unit ?irrigation_slot - irrigation_slot)
+    :precondition
+      (and
+        (ready_for_allocation ?field_schedule)
+        (entity_assigned_machinery ?field_schedule ?machinery_unit)
+        (assigned_irrigation_slot ?field_schedule ?irrigation_slot)
+        (not
+          (confirmed_for_sowing ?field_schedule)
+        )
+      )
+    :effect
+      (and
+        (confirmed_for_sowing ?field_schedule)
+        (machinery_available ?machinery_unit)
+        (irrigation_slot_available ?irrigation_slot)
+      )
+  )
+  (:action confirm_unit_assignment_and_release_resources
+    :parameters (?management_unit - management_unit ?machinery_unit - machinery_unit ?irrigation_slot - irrigation_slot)
+    :precondition
+      (and
+        (ready_for_allocation ?management_unit)
+        (entity_assigned_machinery ?management_unit ?machinery_unit)
+        (assigned_irrigation_slot ?management_unit ?irrigation_slot)
+        (not
+          (confirmed_for_sowing ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (confirmed_for_sowing ?management_unit)
+        (machinery_available ?machinery_unit)
+        (irrigation_slot_available ?irrigation_slot)
+      )
+  )
+)

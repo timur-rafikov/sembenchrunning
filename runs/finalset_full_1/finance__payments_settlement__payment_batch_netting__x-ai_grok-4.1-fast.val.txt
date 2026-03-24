@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain payment_batch_netting_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object auxiliary_resource_type - object netting_group_type - object instruction_supertype - object processing_entity - instruction_supertype release_token - operational_resource_type validation_service - operational_resource_type processing_operator - operational_resource_type fee_schedule - operational_resource_type settlement_convention - operational_resource_type compliance_credential - operational_resource_type clearing_instruction - operational_resource_type authorization_token - operational_resource_type funding_source - auxiliary_resource_type settlement_file - auxiliary_resource_type regulatory_document - auxiliary_resource_type net_group_debit - netting_group_type net_group_credit - netting_group_type settlement_batch - netting_group_type participant_account_super - processing_entity session_super - processing_entity participant_account_debit - participant_account_super participant_account_credit - participant_account_super netting_engine_session - session_super)
+  (:predicates
+    (instruction_ingested ?payment_instruction - processing_entity)
+    (approved_for_netting ?payment_instruction - processing_entity)
+    (validation_initiated ?payment_instruction - processing_entity)
+    (settlement_posted ?payment_instruction - processing_entity)
+    (ready_for_settlement_posting ?processing_entity - processing_entity)
+    (settlement_authorized ?processing_entity - processing_entity)
+    (release_token_available ?release_token - release_token)
+    (assigned_release_token ?payment_instruction - processing_entity ?release_token - release_token)
+    (validation_service_available ?validation_service - validation_service)
+    (assigned_validation_service ?payment_instruction - processing_entity ?validation_service - validation_service)
+    (processing_operator_available ?processing_operator - processing_operator)
+    (assigned_processing_operator ?payment_instruction - processing_entity ?processing_operator - processing_operator)
+    (funding_source_available ?funding_source - funding_source)
+    (debit_account_funding_reserved ?debit_account - participant_account_debit ?funding_source - funding_source)
+    (credit_account_funding_reserved ?credit_account - participant_account_credit ?funding_source - funding_source)
+    (linked_to_net_group_debit ?debit_account - participant_account_debit ?net_group_debit - net_group_debit)
+    (debit_net_group_confirmed ?net_group_debit - net_group_debit)
+    (debit_net_group_funding_reserved ?net_group_debit - net_group_debit)
+    (debit_account_ready_for_batch ?debit_account - participant_account_debit)
+    (linked_to_net_group_credit ?credit_account - participant_account_credit ?net_group_credit - net_group_credit)
+    (credit_net_group_confirmed ?net_group_credit - net_group_credit)
+    (credit_net_group_funding_reserved ?net_group_credit - net_group_credit)
+    (credit_account_ready_for_batch ?credit_account - participant_account_credit)
+    (batch_open ?settlement_batch - settlement_batch)
+    (batch_created ?settlement_batch - settlement_batch)
+    (batch_linked_to_debit_group ?settlement_batch - settlement_batch ?net_group_debit - net_group_debit)
+    (batch_linked_to_credit_group ?settlement_batch - settlement_batch ?net_group_credit - net_group_credit)
+    (batch_requires_debit_confirmation ?settlement_batch - settlement_batch)
+    (batch_requires_credit_confirmation ?settlement_batch - settlement_batch)
+    (batch_ready_for_posting ?settlement_batch - settlement_batch)
+    (session_linked_debit_account ?netting_session - netting_engine_session ?debit_account - participant_account_debit)
+    (session_linked_credit_account ?netting_session - netting_engine_session ?credit_account - participant_account_credit)
+    (session_linked_batch ?netting_session - netting_engine_session ?settlement_batch - settlement_batch)
+    (settlement_file_available ?settlement_file - settlement_file)
+    (session_attached_settlement_file ?netting_session - netting_engine_session ?settlement_file - settlement_file)
+    (settlement_file_certified ?settlement_file - settlement_file)
+    (settlement_file_for_batch ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    (session_file_assembly_initiated ?netting_session - netting_engine_session)
+    (session_certification_started ?netting_session - netting_engine_session)
+    (session_pre_execution_checks_passed ?netting_session - netting_engine_session)
+    (session_fee_schedule_attached ?netting_session - netting_engine_session)
+    (session_fee_schedule_verified ?netting_session - netting_engine_session)
+    (session_convention_attached ?netting_session - netting_engine_session)
+    (session_execution_ready ?netting_session - netting_engine_session)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (session_has_regulatory_document ?netting_session - netting_engine_session ?regulatory_document - regulatory_document)
+    (session_regulatory_document_attached ?netting_session - netting_engine_session)
+    (session_regulatory_document_verified ?netting_session - netting_engine_session)
+    (session_authorized_for_settlement ?netting_session - netting_engine_session)
+    (fee_schedule_available ?fee_schedule - fee_schedule)
+    (session_has_fee_schedule ?netting_session - netting_engine_session ?fee_schedule - fee_schedule)
+    (settlement_convention_available ?settlement_convention - settlement_convention)
+    (session_has_settlement_convention ?netting_session - netting_engine_session ?settlement_convention - settlement_convention)
+    (clearing_instruction_available ?clearing_instruction - clearing_instruction)
+    (session_has_clearing_instruction ?netting_session - netting_engine_session ?clearing_instruction - clearing_instruction)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (session_has_authorization_token ?netting_session - netting_engine_session ?authorization_token - authorization_token)
+    (compliance_credential_available ?compliance_credential - compliance_credential)
+    (entity_has_compliance_credential ?payment_instruction - processing_entity ?compliance_credential - compliance_credential)
+    (debit_account_confirmed_for_batch ?debit_account - participant_account_debit)
+    (credit_account_confirmed_for_batch ?credit_account - participant_account_credit)
+    (session_finalized ?netting_session - netting_engine_session)
+  )
+  (:action ingest_instruction
+    :parameters (?payment_instruction - processing_entity)
+    :precondition
+      (and
+        (not
+          (instruction_ingested ?payment_instruction)
+        )
+        (not
+          (settlement_posted ?payment_instruction)
+        )
+      )
+    :effect (instruction_ingested ?payment_instruction)
+  )
+  (:action assign_release_token
+    :parameters (?payment_instruction - processing_entity ?release_token - release_token)
+    :precondition
+      (and
+        (instruction_ingested ?payment_instruction)
+        (not
+          (validation_initiated ?payment_instruction)
+        )
+        (release_token_available ?release_token)
+      )
+    :effect
+      (and
+        (validation_initiated ?payment_instruction)
+        (assigned_release_token ?payment_instruction ?release_token)
+        (not
+          (release_token_available ?release_token)
+        )
+      )
+  )
+  (:action assign_validation_service
+    :parameters (?payment_instruction - processing_entity ?validation_service - validation_service)
+    :precondition
+      (and
+        (instruction_ingested ?payment_instruction)
+        (validation_initiated ?payment_instruction)
+        (validation_service_available ?validation_service)
+      )
+    :effect
+      (and
+        (assigned_validation_service ?payment_instruction ?validation_service)
+        (not
+          (validation_service_available ?validation_service)
+        )
+      )
+  )
+  (:action finalize_instruction_validation
+    :parameters (?payment_instruction - processing_entity ?validation_service - validation_service)
+    :precondition
+      (and
+        (instruction_ingested ?payment_instruction)
+        (validation_initiated ?payment_instruction)
+        (assigned_validation_service ?payment_instruction ?validation_service)
+        (not
+          (approved_for_netting ?payment_instruction)
+        )
+      )
+    :effect (approved_for_netting ?payment_instruction)
+  )
+  (:action release_validation_service
+    :parameters (?payment_instruction - processing_entity ?validation_service - validation_service)
+    :precondition
+      (and
+        (assigned_validation_service ?payment_instruction ?validation_service)
+      )
+    :effect
+      (and
+        (validation_service_available ?validation_service)
+        (not
+          (assigned_validation_service ?payment_instruction ?validation_service)
+        )
+      )
+  )
+  (:action assign_processing_operator
+    :parameters (?payment_instruction - processing_entity ?processing_operator - processing_operator)
+    :precondition
+      (and
+        (approved_for_netting ?payment_instruction)
+        (processing_operator_available ?processing_operator)
+      )
+    :effect
+      (and
+        (assigned_processing_operator ?payment_instruction ?processing_operator)
+        (not
+          (processing_operator_available ?processing_operator)
+        )
+      )
+  )
+  (:action release_processing_operator
+    :parameters (?payment_instruction - processing_entity ?processing_operator - processing_operator)
+    :precondition
+      (and
+        (assigned_processing_operator ?payment_instruction ?processing_operator)
+      )
+    :effect
+      (and
+        (processing_operator_available ?processing_operator)
+        (not
+          (assigned_processing_operator ?payment_instruction ?processing_operator)
+        )
+      )
+  )
+  (:action assign_clearing_instruction_to_session
+    :parameters (?netting_session - netting_engine_session ?clearing_instruction - clearing_instruction)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (clearing_instruction_available ?clearing_instruction)
+      )
+    :effect
+      (and
+        (session_has_clearing_instruction ?netting_session ?clearing_instruction)
+        (not
+          (clearing_instruction_available ?clearing_instruction)
+        )
+      )
+  )
+  (:action detach_clearing_instruction_from_session
+    :parameters (?netting_session - netting_engine_session ?clearing_instruction - clearing_instruction)
+    :precondition
+      (and
+        (session_has_clearing_instruction ?netting_session ?clearing_instruction)
+      )
+    :effect
+      (and
+        (clearing_instruction_available ?clearing_instruction)
+        (not
+          (session_has_clearing_instruction ?netting_session ?clearing_instruction)
+        )
+      )
+  )
+  (:action attach_authorization_token_to_session
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action remove_authorization_token_from_session
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (session_has_authorization_token ?netting_session ?authorization_token)
+      )
+    :effect
+      (and
+        (authorization_token_available ?authorization_token)
+        (not
+          (session_has_authorization_token ?netting_session ?authorization_token)
+        )
+      )
+  )
+  (:action signal_debit_group_confirmation
+    :parameters (?debit_account - participant_account_debit ?net_group_debit - net_group_debit ?validation_service - validation_service)
+    :precondition
+      (and
+        (approved_for_netting ?debit_account)
+        (assigned_validation_service ?debit_account ?validation_service)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (not
+          (debit_net_group_confirmed ?net_group_debit)
+        )
+        (not
+          (debit_net_group_funding_reserved ?net_group_debit)
+        )
+      )
+    :effect (debit_net_group_confirmed ?net_group_debit)
+  )
+  (:action operator_confirm_debit_account
+    :parameters (?debit_account - participant_account_debit ?net_group_debit - net_group_debit ?processing_operator - processing_operator)
+    :precondition
+      (and
+        (approved_for_netting ?debit_account)
+        (assigned_processing_operator ?debit_account ?processing_operator)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (debit_net_group_confirmed ?net_group_debit)
+        (not
+          (debit_account_confirmed_for_batch ?debit_account)
+        )
+      )
+    :effect
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (debit_account_ready_for_batch ?debit_account)
+      )
+  )
+  (:action reserve_funding_for_debit_account
+    :parameters (?debit_account - participant_account_debit ?net_group_debit - net_group_debit ?funding_source - funding_source)
+    :precondition
+      (and
+        (approved_for_netting ?debit_account)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (funding_source_available ?funding_source)
+        (not
+          (debit_account_confirmed_for_batch ?debit_account)
+        )
+      )
+    :effect
+      (and
+        (debit_net_group_funding_reserved ?net_group_debit)
+        (debit_account_confirmed_for_batch ?debit_account)
+        (debit_account_funding_reserved ?debit_account ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action finalize_debit_funding_reservation
+    :parameters (?debit_account - participant_account_debit ?net_group_debit - net_group_debit ?validation_service - validation_service ?funding_source - funding_source)
+    :precondition
+      (and
+        (approved_for_netting ?debit_account)
+        (assigned_validation_service ?debit_account ?validation_service)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (debit_net_group_funding_reserved ?net_group_debit)
+        (debit_account_funding_reserved ?debit_account ?funding_source)
+        (not
+          (debit_account_ready_for_batch ?debit_account)
+        )
+      )
+    :effect
+      (and
+        (debit_net_group_confirmed ?net_group_debit)
+        (debit_account_ready_for_batch ?debit_account)
+        (funding_source_available ?funding_source)
+        (not
+          (debit_account_funding_reserved ?debit_account ?funding_source)
+        )
+      )
+  )
+  (:action signal_credit_group_confirmation
+    :parameters (?credit_account - participant_account_credit ?net_group_credit - net_group_credit ?validation_service - validation_service)
+    :precondition
+      (and
+        (approved_for_netting ?credit_account)
+        (assigned_validation_service ?credit_account ?validation_service)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (not
+          (credit_net_group_confirmed ?net_group_credit)
+        )
+        (not
+          (credit_net_group_funding_reserved ?net_group_credit)
+        )
+      )
+    :effect (credit_net_group_confirmed ?net_group_credit)
+  )
+  (:action operator_confirm_credit_account
+    :parameters (?credit_account - participant_account_credit ?net_group_credit - net_group_credit ?processing_operator - processing_operator)
+    :precondition
+      (and
+        (approved_for_netting ?credit_account)
+        (assigned_processing_operator ?credit_account ?processing_operator)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (credit_net_group_confirmed ?net_group_credit)
+        (not
+          (credit_account_confirmed_for_batch ?credit_account)
+        )
+      )
+    :effect
+      (and
+        (credit_account_confirmed_for_batch ?credit_account)
+        (credit_account_ready_for_batch ?credit_account)
+      )
+  )
+  (:action reserve_funding_for_credit_account
+    :parameters (?credit_account - participant_account_credit ?net_group_credit - net_group_credit ?funding_source - funding_source)
+    :precondition
+      (and
+        (approved_for_netting ?credit_account)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (funding_source_available ?funding_source)
+        (not
+          (credit_account_confirmed_for_batch ?credit_account)
+        )
+      )
+    :effect
+      (and
+        (credit_net_group_funding_reserved ?net_group_credit)
+        (credit_account_confirmed_for_batch ?credit_account)
+        (credit_account_funding_reserved ?credit_account ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action finalize_credit_funding_reservation
+    :parameters (?credit_account - participant_account_credit ?net_group_credit - net_group_credit ?validation_service - validation_service ?funding_source - funding_source)
+    :precondition
+      (and
+        (approved_for_netting ?credit_account)
+        (assigned_validation_service ?credit_account ?validation_service)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (credit_net_group_funding_reserved ?net_group_credit)
+        (credit_account_funding_reserved ?credit_account ?funding_source)
+        (not
+          (credit_account_ready_for_batch ?credit_account)
+        )
+      )
+    :effect
+      (and
+        (credit_net_group_confirmed ?net_group_credit)
+        (credit_account_ready_for_batch ?credit_account)
+        (funding_source_available ?funding_source)
+        (not
+          (credit_account_funding_reserved ?credit_account ?funding_source)
+        )
+      )
+  )
+  (:action create_settlement_batch
+    :parameters (?debit_account - participant_account_debit ?credit_account - participant_account_credit ?net_group_debit - net_group_debit ?net_group_credit - net_group_credit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (credit_account_confirmed_for_batch ?credit_account)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (debit_net_group_confirmed ?net_group_debit)
+        (credit_net_group_confirmed ?net_group_credit)
+        (debit_account_ready_for_batch ?debit_account)
+        (credit_account_ready_for_batch ?credit_account)
+        (batch_open ?settlement_batch)
+      )
+    :effect
+      (and
+        (batch_created ?settlement_batch)
+        (batch_linked_to_debit_group ?settlement_batch ?net_group_debit)
+        (batch_linked_to_credit_group ?settlement_batch ?net_group_credit)
+        (not
+          (batch_open ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_with_debit_flag
+    :parameters (?debit_account - participant_account_debit ?credit_account - participant_account_credit ?net_group_debit - net_group_debit ?net_group_credit - net_group_credit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (credit_account_confirmed_for_batch ?credit_account)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (debit_net_group_funding_reserved ?net_group_debit)
+        (credit_net_group_confirmed ?net_group_credit)
+        (not
+          (debit_account_ready_for_batch ?debit_account)
+        )
+        (credit_account_ready_for_batch ?credit_account)
+        (batch_open ?settlement_batch)
+      )
+    :effect
+      (and
+        (batch_created ?settlement_batch)
+        (batch_linked_to_debit_group ?settlement_batch ?net_group_debit)
+        (batch_linked_to_credit_group ?settlement_batch ?net_group_credit)
+        (batch_requires_debit_confirmation ?settlement_batch)
+        (not
+          (batch_open ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_with_credit_flag
+    :parameters (?debit_account - participant_account_debit ?credit_account - participant_account_credit ?net_group_debit - net_group_debit ?net_group_credit - net_group_credit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (credit_account_confirmed_for_batch ?credit_account)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (debit_net_group_confirmed ?net_group_debit)
+        (credit_net_group_funding_reserved ?net_group_credit)
+        (debit_account_ready_for_batch ?debit_account)
+        (not
+          (credit_account_ready_for_batch ?credit_account)
+        )
+        (batch_open ?settlement_batch)
+      )
+    :effect
+      (and
+        (batch_created ?settlement_batch)
+        (batch_linked_to_debit_group ?settlement_batch ?net_group_debit)
+        (batch_linked_to_credit_group ?settlement_batch ?net_group_credit)
+        (batch_requires_credit_confirmation ?settlement_batch)
+        (not
+          (batch_open ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_with_both_flags
+    :parameters (?debit_account - participant_account_debit ?credit_account - participant_account_credit ?net_group_debit - net_group_debit ?net_group_credit - net_group_credit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (credit_account_confirmed_for_batch ?credit_account)
+        (linked_to_net_group_debit ?debit_account ?net_group_debit)
+        (linked_to_net_group_credit ?credit_account ?net_group_credit)
+        (debit_net_group_funding_reserved ?net_group_debit)
+        (credit_net_group_funding_reserved ?net_group_credit)
+        (not
+          (debit_account_ready_for_batch ?debit_account)
+        )
+        (not
+          (credit_account_ready_for_batch ?credit_account)
+        )
+        (batch_open ?settlement_batch)
+      )
+    :effect
+      (and
+        (batch_created ?settlement_batch)
+        (batch_linked_to_debit_group ?settlement_batch ?net_group_debit)
+        (batch_linked_to_credit_group ?settlement_batch ?net_group_credit)
+        (batch_requires_debit_confirmation ?settlement_batch)
+        (batch_requires_credit_confirmation ?settlement_batch)
+        (not
+          (batch_open ?settlement_batch)
+        )
+      )
+  )
+  (:action seal_settlement_batch
+    :parameters (?settlement_batch - settlement_batch ?debit_account - participant_account_debit ?validation_service - validation_service)
+    :precondition
+      (and
+        (batch_created ?settlement_batch)
+        (debit_account_confirmed_for_batch ?debit_account)
+        (assigned_validation_service ?debit_account ?validation_service)
+        (not
+          (batch_ready_for_posting ?settlement_batch)
+        )
+      )
+    :effect (batch_ready_for_posting ?settlement_batch)
+  )
+  (:action certify_and_attach_settlement_file
+    :parameters (?netting_session - netting_engine_session ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (session_linked_batch ?netting_session ?settlement_batch)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_available ?settlement_file)
+        (batch_created ?settlement_batch)
+        (batch_ready_for_posting ?settlement_batch)
+        (not
+          (settlement_file_certified ?settlement_file)
+        )
+      )
+    :effect
+      (and
+        (settlement_file_certified ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (not
+          (settlement_file_available ?settlement_file)
+        )
+      )
+  )
+  (:action initiate_session_file_assembly
+    :parameters (?netting_session - netting_engine_session ?settlement_file - settlement_file ?settlement_batch - settlement_batch ?validation_service - validation_service)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_certified ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (assigned_validation_service ?netting_session ?validation_service)
+        (not
+          (batch_requires_debit_confirmation ?settlement_batch)
+        )
+        (not
+          (session_file_assembly_initiated ?netting_session)
+        )
+      )
+    :effect (session_file_assembly_initiated ?netting_session)
+  )
+  (:action attach_fee_schedule_to_session
+    :parameters (?netting_session - netting_engine_session ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (fee_schedule_available ?fee_schedule)
+        (not
+          (session_fee_schedule_attached ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_fee_schedule_attached ?netting_session)
+        (session_has_fee_schedule ?netting_session ?fee_schedule)
+        (not
+          (fee_schedule_available ?fee_schedule)
+        )
+      )
+  )
+  (:action attach_fee_schedule_and_mark_file_assembly
+    :parameters (?netting_session - netting_engine_session ?settlement_file - settlement_file ?settlement_batch - settlement_batch ?validation_service - validation_service ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_certified ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (assigned_validation_service ?netting_session ?validation_service)
+        (batch_requires_debit_confirmation ?settlement_batch)
+        (session_fee_schedule_attached ?netting_session)
+        (session_has_fee_schedule ?netting_session ?fee_schedule)
+        (not
+          (session_file_assembly_initiated ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_file_assembly_initiated ?netting_session)
+        (session_fee_schedule_verified ?netting_session)
+      )
+  )
+  (:action start_session_certification
+    :parameters (?netting_session - netting_engine_session ?clearing_instruction - clearing_instruction ?processing_operator - processing_operator ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_file_assembly_initiated ?netting_session)
+        (session_has_clearing_instruction ?netting_session ?clearing_instruction)
+        (assigned_processing_operator ?netting_session ?processing_operator)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (not
+          (batch_requires_credit_confirmation ?settlement_batch)
+        )
+        (not
+          (session_certification_started ?netting_session)
+        )
+      )
+    :effect (session_certification_started ?netting_session)
+  )
+  (:action continue_session_certification
+    :parameters (?netting_session - netting_engine_session ?clearing_instruction - clearing_instruction ?processing_operator - processing_operator ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_file_assembly_initiated ?netting_session)
+        (session_has_clearing_instruction ?netting_session ?clearing_instruction)
+        (assigned_processing_operator ?netting_session ?processing_operator)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (batch_requires_credit_confirmation ?settlement_batch)
+        (not
+          (session_certification_started ?netting_session)
+        )
+      )
+    :effect (session_certification_started ?netting_session)
+  )
+  (:action apply_authorization_and_mark_prechecks
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_certification_started ?netting_session)
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (not
+          (batch_requires_debit_confirmation ?settlement_batch)
+        )
+        (not
+          (batch_requires_credit_confirmation ?settlement_batch)
+        )
+        (not
+          (session_pre_execution_checks_passed ?netting_session)
+        )
+      )
+    :effect (session_pre_execution_checks_passed ?netting_session)
+  )
+  (:action apply_authorization_and_attach_convention_and_mark_prechecks
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_certification_started ?netting_session)
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (batch_requires_debit_confirmation ?settlement_batch)
+        (not
+          (batch_requires_credit_confirmation ?settlement_batch)
+        )
+        (not
+          (session_pre_execution_checks_passed ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_convention_attached ?netting_session)
+      )
+  )
+  (:action apply_authorization_and_attach_convention_variant
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_certification_started ?netting_session)
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (not
+          (batch_requires_debit_confirmation ?settlement_batch)
+        )
+        (batch_requires_credit_confirmation ?settlement_batch)
+        (not
+          (session_pre_execution_checks_passed ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_convention_attached ?netting_session)
+      )
+  )
+  (:action apply_authorization_and_attach_convention_full
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token ?settlement_file - settlement_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (session_certification_started ?netting_session)
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (session_attached_settlement_file ?netting_session ?settlement_file)
+        (settlement_file_for_batch ?settlement_file ?settlement_batch)
+        (batch_requires_debit_confirmation ?settlement_batch)
+        (batch_requires_credit_confirmation ?settlement_batch)
+        (not
+          (session_pre_execution_checks_passed ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_convention_attached ?netting_session)
+      )
+  )
+  (:action finalize_session_checks_and_mark_ready
+    :parameters (?netting_session - netting_engine_session)
+    :precondition
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (not
+          (session_convention_attached ?netting_session)
+        )
+        (not
+          (session_finalized ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_finalized ?netting_session)
+        (ready_for_settlement_posting ?netting_session)
+      )
+  )
+  (:action attach_settlement_convention_to_session
+    :parameters (?netting_session - netting_engine_session ?settlement_convention - settlement_convention)
+    :precondition
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_convention_attached ?netting_session)
+        (settlement_convention_available ?settlement_convention)
+      )
+    :effect
+      (and
+        (session_has_settlement_convention ?netting_session ?settlement_convention)
+        (not
+          (settlement_convention_available ?settlement_convention)
+        )
+      )
+  )
+  (:action complete_session_preexecution_checks
+    :parameters (?netting_session - netting_engine_session ?debit_account - participant_account_debit ?credit_account - participant_account_credit ?validation_service - validation_service ?settlement_convention - settlement_convention)
+    :precondition
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_convention_attached ?netting_session)
+        (session_has_settlement_convention ?netting_session ?settlement_convention)
+        (session_linked_debit_account ?netting_session ?debit_account)
+        (session_linked_credit_account ?netting_session ?credit_account)
+        (debit_account_ready_for_batch ?debit_account)
+        (credit_account_ready_for_batch ?credit_account)
+        (assigned_validation_service ?netting_session ?validation_service)
+        (not
+          (session_execution_ready ?netting_session)
+        )
+      )
+    :effect (session_execution_ready ?netting_session)
+  )
+  (:action finalize_session_for_posting
+    :parameters (?netting_session - netting_engine_session)
+    :precondition
+      (and
+        (session_pre_execution_checks_passed ?netting_session)
+        (session_execution_ready ?netting_session)
+        (not
+          (session_finalized ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_finalized ?netting_session)
+        (ready_for_settlement_posting ?netting_session)
+      )
+  )
+  (:action attach_regulatory_document_to_session
+    :parameters (?netting_session - netting_engine_session ?regulatory_document - regulatory_document ?validation_service - validation_service)
+    :precondition
+      (and
+        (approved_for_netting ?netting_session)
+        (assigned_validation_service ?netting_session ?validation_service)
+        (regulatory_document_available ?regulatory_document)
+        (session_has_regulatory_document ?netting_session ?regulatory_document)
+        (not
+          (session_regulatory_document_attached ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_regulatory_document_attached ?netting_session)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action verify_session_regulatory_document
+    :parameters (?netting_session - netting_engine_session ?processing_operator - processing_operator)
+    :precondition
+      (and
+        (session_regulatory_document_attached ?netting_session)
+        (assigned_processing_operator ?netting_session ?processing_operator)
+        (not
+          (session_regulatory_document_verified ?netting_session)
+        )
+      )
+    :effect (session_regulatory_document_verified ?netting_session)
+  )
+  (:action apply_authorization_to_verified_session
+    :parameters (?netting_session - netting_engine_session ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (session_regulatory_document_verified ?netting_session)
+        (session_has_authorization_token ?netting_session ?authorization_token)
+        (not
+          (session_authorized_for_settlement ?netting_session)
+        )
+      )
+    :effect (session_authorized_for_settlement ?netting_session)
+  )
+  (:action finalize_session_after_authorization
+    :parameters (?netting_session - netting_engine_session)
+    :precondition
+      (and
+        (session_authorized_for_settlement ?netting_session)
+        (not
+          (session_finalized ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (session_finalized ?netting_session)
+        (ready_for_settlement_posting ?netting_session)
+      )
+  )
+  (:action post_settlement_to_debit_account
+    :parameters (?debit_account - participant_account_debit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (debit_account_confirmed_for_batch ?debit_account)
+        (debit_account_ready_for_batch ?debit_account)
+        (batch_created ?settlement_batch)
+        (batch_ready_for_posting ?settlement_batch)
+        (not
+          (ready_for_settlement_posting ?debit_account)
+        )
+      )
+    :effect (ready_for_settlement_posting ?debit_account)
+  )
+  (:action post_settlement_to_credit_account
+    :parameters (?credit_account - participant_account_credit ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (credit_account_confirmed_for_batch ?credit_account)
+        (credit_account_ready_for_batch ?credit_account)
+        (batch_created ?settlement_batch)
+        (batch_ready_for_posting ?settlement_batch)
+        (not
+          (ready_for_settlement_posting ?credit_account)
+        )
+      )
+    :effect (ready_for_settlement_posting ?credit_account)
+  )
+  (:action attach_compliance_credential_to_instruction
+    :parameters (?payment_instruction - processing_entity ?compliance_credential - compliance_credential ?validation_service - validation_service)
+    :precondition
+      (and
+        (ready_for_settlement_posting ?payment_instruction)
+        (assigned_validation_service ?payment_instruction ?validation_service)
+        (compliance_credential_available ?compliance_credential)
+        (not
+          (settlement_authorized ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (settlement_authorized ?payment_instruction)
+        (entity_has_compliance_credential ?payment_instruction ?compliance_credential)
+        (not
+          (compliance_credential_available ?compliance_credential)
+        )
+      )
+  )
+  (:action finalize_debit_account_posting_and_release_token
+    :parameters (?debit_account - participant_account_debit ?release_token - release_token ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (settlement_authorized ?debit_account)
+        (assigned_release_token ?debit_account ?release_token)
+        (entity_has_compliance_credential ?debit_account ?compliance_credential)
+        (not
+          (settlement_posted ?debit_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_posted ?debit_account)
+        (release_token_available ?release_token)
+        (compliance_credential_available ?compliance_credential)
+      )
+  )
+  (:action finalize_credit_account_posting_and_release_token
+    :parameters (?credit_account - participant_account_credit ?release_token - release_token ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (settlement_authorized ?credit_account)
+        (assigned_release_token ?credit_account ?release_token)
+        (entity_has_compliance_credential ?credit_account ?compliance_credential)
+        (not
+          (settlement_posted ?credit_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_posted ?credit_account)
+        (release_token_available ?release_token)
+        (compliance_credential_available ?compliance_credential)
+      )
+  )
+  (:action finalize_session_posting_and_release_token
+    :parameters (?netting_session - netting_engine_session ?release_token - release_token ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (settlement_authorized ?netting_session)
+        (assigned_release_token ?netting_session ?release_token)
+        (entity_has_compliance_credential ?netting_session ?compliance_credential)
+        (not
+          (settlement_posted ?netting_session)
+        )
+      )
+    :effect
+      (and
+        (settlement_posted ?netting_session)
+        (release_token_available ?release_token)
+        (compliance_credential_available ?compliance_credential)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem payment_batch_netting_problem)
+  (:domain payment_batch_netting_domain)
+  (:objects debit_account_1 - participant_account_debit credit_account_1 - participant_account_credit netting_session_1 - netting_engine_session netting_session_2 - netting_engine_session release_token_1 - release_token release_token_2 - release_token release_token_3 - release_token validation_service_1 - validation_service processing_operator_1 - processing_operator funding_source_1 - funding_source net_group_debit_1 - net_group_debit net_group_credit_1 - net_group_credit settlement_batch_1 - settlement_batch settlement_file_1 - settlement_file settlement_file_2 - settlement_file fee_schedule_1 - fee_schedule fee_schedule_2 - fee_schedule settlement_convention_1 - settlement_convention settlement_convention_2 - settlement_convention compliance_credential_1 - compliance_credential clearing_instruction_1 - clearing_instruction regulatory_doc_1 - regulatory_document regulatory_doc_2 - regulatory_document authorization_token_1 - authorization_token)
+  (:init
+    (release_token_available release_token_1)
+    (release_token_available release_token_2)
+    (release_token_available release_token_3)
+    (validation_service_available validation_service_1)
+    (processing_operator_available processing_operator_1)
+    (funding_source_available funding_source_1)
+    (linked_to_net_group_debit debit_account_1 net_group_debit_1)
+    (linked_to_net_group_credit credit_account_1 net_group_credit_1)
+    (batch_open settlement_batch_1)
+    (settlement_file_available settlement_file_1)
+    (settlement_file_available settlement_file_2)
+    (session_linked_debit_account netting_session_1 debit_account_1)
+    (session_linked_debit_account netting_session_2 debit_account_1)
+    (session_linked_credit_account netting_session_1 credit_account_1)
+    (session_linked_credit_account netting_session_2 credit_account_1)
+    (session_linked_batch netting_session_1 settlement_batch_1)
+    (session_linked_batch netting_session_2 settlement_batch_1)
+    (session_attached_settlement_file netting_session_1 settlement_file_1)
+    (session_attached_settlement_file netting_session_2 settlement_file_2)
+    (fee_schedule_available fee_schedule_1)
+    (fee_schedule_available fee_schedule_2)
+    (settlement_convention_available settlement_convention_1)
+    (settlement_convention_available settlement_convention_2)
+    (compliance_credential_available compliance_credential_1)
+    (clearing_instruction_available clearing_instruction_1)
+    (regulatory_document_available regulatory_doc_1)
+    (session_has_regulatory_document netting_session_1 regulatory_doc_1)
+    (session_has_regulatory_document netting_session_2 regulatory_doc_2)
+    (authorization_token_available authorization_token_1)
+  )
+  (:goal
+    (and
+      (settlement_posted debit_account_1)
+      (settlement_posted credit_account_1)
+      (settlement_posted netting_session_1)
+      (settlement_posted netting_session_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(ingest_instruction debit_account_1)
+(ingest_instruction credit_account_1)
+(ingest_instruction netting_session_1)
+(ingest_instruction netting_session_2)
+(assign_release_token debit_account_1 release_token_1)
+(assign_validation_service debit_account_1 validation_service_1)
+(finalize_instruction_validation debit_account_1 validation_service_1)
+(signal_debit_group_confirmation debit_account_1 net_group_debit_1 validation_service_1)
+(release_validation_service debit_account_1 validation_service_1)
+(assign_processing_operator debit_account_1 processing_operator_1)
+(operator_confirm_debit_account debit_account_1 net_group_debit_1 processing_operator_1)
+(release_processing_operator debit_account_1 processing_operator_1)
+(assign_release_token credit_account_1 release_token_2)
+(assign_validation_service credit_account_1 validation_service_1)
+(finalize_instruction_validation credit_account_1 validation_service_1)
+(signal_credit_group_confirmation credit_account_1 net_group_credit_1 validation_service_1)
+(release_validation_service credit_account_1 validation_service_1)
+(assign_processing_operator credit_account_1 processing_operator_1)
+(operator_confirm_credit_account credit_account_1 net_group_credit_1 processing_operator_1)
+(release_processing_operator credit_account_1 processing_operator_1)
+(create_settlement_batch debit_account_1 credit_account_1 net_group_debit_1 net_group_credit_1 settlement_batch_1)
+(assign_validation_service debit_account_1 validation_service_1)
+(seal_settlement_batch settlement_batch_1 debit_account_1 validation_service_1)
+(post_settlement_to_debit_account debit_account_1 settlement_batch_1)
+(post_settlement_to_credit_account credit_account_1 settlement_batch_1)
+(attach_compliance_credential_to_instruction debit_account_1 compliance_credential_1 validation_service_1)
+(finalize_debit_account_posting_and_release_token debit_account_1 release_token_1 compliance_credential_1)
+(release_validation_service debit_account_1 validation_service_1)
+(assign_validation_service credit_account_1 validation_service_1)
+(attach_compliance_credential_to_instruction credit_account_1 compliance_credential_1 validation_service_1)
+(finalize_credit_account_posting_and_release_token credit_account_1 release_token_2 compliance_credential_1)
+(release_validation_service credit_account_1 validation_service_1)
+(assign_release_token netting_session_1 release_token_3)
+(assign_validation_service netting_session_1 validation_service_1)
+(finalize_instruction_validation netting_session_1 validation_service_1)
+(certify_and_attach_settlement_file netting_session_1 settlement_file_1 settlement_batch_1)
+(initiate_session_file_assembly netting_session_1 settlement_file_1 settlement_batch_1 validation_service_1)
+(assign_clearing_instruction_to_session netting_session_1 clearing_instruction_1)
+(assign_processing_operator netting_session_1 processing_operator_1)
+(start_session_certification netting_session_1 clearing_instruction_1 processing_operator_1 settlement_file_1 settlement_batch_1)
+(attach_authorization_token_to_session netting_session_1 authorization_token_1)
+(apply_authorization_and_mark_prechecks netting_session_1 authorization_token_1 settlement_file_1 settlement_batch_1)
+(finalize_session_checks_and_mark_ready netting_session_1)
+(attach_compliance_credential_to_instruction netting_session_1 compliance_credential_1 validation_service_1)
+(finalize_session_posting_and_release_token netting_session_1 release_token_3 compliance_credential_1)
+(release_validation_service netting_session_1 validation_service_1)
+(release_processing_operator netting_session_1 processing_operator_1)
+(detach_clearing_instruction_from_session netting_session_1 clearing_instruction_1)
+(remove_authorization_token_from_session netting_session_1 authorization_token_1)
+(assign_release_token netting_session_2 release_token_1)
+(assign_validation_service netting_session_2 validation_service_1)
+(finalize_instruction_validation netting_session_2 validation_service_1)
+(certify_and_attach_settlement_file netting_session_2 settlement_file_2 settlement_batch_1)
+(initiate_session_file_assembly netting_session_2 settlement_file_2 settlement_batch_1 validation_service_1)
+(assign_clearing_instruction_to_session netting_session_2 clearing_instruction_1)
+(assign_processing_operator netting_session_2 processing_operator_1)
+(start_session_certification netting_session_2 clearing_instruction_1 processing_operator_1 settlement_file_2 settlement_batch_1)
+(attach_authorization_token_to_session netting_session_2 authorization_token_1)
+(apply_authorization_and_mark_prechecks netting_session_2 authorization_token_1 settlement_file_2 settlement_batch_1)
+(finalize_session_checks_and_mark_ready netting_session_2)
+(attach_compliance_credential_to_instruction netting_session_2 compliance_credential_1 validation_service_1)
+(finalize_session_posting_and_release_token netting_session_2 release_token_1 compliance_credential_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_4vww048o/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_4vww048o/plan.pddl 62 
+
+
+
+--- stderr ---
+

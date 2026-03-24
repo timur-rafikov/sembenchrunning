@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain ammunition_distribution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity - object item_entity - object ammo_type - object actor_entity - object unit - actor_entity supply_crate - resource_entity ammo_profile - resource_entity maintenance_tool - resource_entity upgrade_module - resource_entity tactical_module - resource_entity mission_token - resource_entity maintenance_part - resource_entity calibration_kit - resource_entity ammo_stabilizer - item_entity assembly_component - item_entity tactical_marker - item_entity primary_ammo_variant - ammo_type secondary_ammo_variant - ammo_type ammo_package_slot - ammo_type phase_group_a - unit phase_group_b - unit phase_a_unit - phase_group_a phase_b_unit - phase_group_a weapon_unit - phase_group_b)
+  (:predicates
+    (resupply_requested ?unit - unit)
+    (prepared_for_provisioning ?unit - unit)
+    (resupply_allocated ?unit - unit)
+    (provisioning_completed ?unit - unit)
+    (ready_for_deployment ?unit - unit)
+    (preobjective_prepared ?unit - unit)
+    (supply_crate_available ?supply_crate - supply_crate)
+    (supply_crate_assigned ?unit - unit ?supply_crate - supply_crate)
+    (ammo_profile_available ?ammo_profile - ammo_profile)
+    (ammo_profile_assigned ?unit - unit ?ammo_profile - ammo_profile)
+    (maintenance_tool_available ?maintenance_tool - maintenance_tool)
+    (maintenance_tool_assigned ?unit - unit ?maintenance_tool - maintenance_tool)
+    (stabilizer_available ?ammo_stabilizer - ammo_stabilizer)
+    (stabilizer_assigned_phase_a ?phase_a_unit - phase_a_unit ?ammo_stabilizer - ammo_stabilizer)
+    (stabilizer_assigned_phase_b ?phase_b_unit - phase_b_unit ?ammo_stabilizer - ammo_stabilizer)
+    (primary_variant_compatible_with_unit ?phase_a_unit - phase_a_unit ?primary_ammo_variant - primary_ammo_variant)
+    (primary_variant_reserved ?primary_ammo_variant - primary_ammo_variant)
+    (primary_variant_stabilized ?primary_ammo_variant - primary_ammo_variant)
+    (phase_a_variant_committed ?phase_a_unit - phase_a_unit)
+    (secondary_variant_compatible_with_unit ?phase_b_unit - phase_b_unit ?secondary_ammo_variant - secondary_ammo_variant)
+    (secondary_variant_reserved ?secondary_ammo_variant - secondary_ammo_variant)
+    (secondary_variant_stabilized ?secondary_ammo_variant - secondary_ammo_variant)
+    (phase_b_variant_committed ?phase_b_unit - phase_b_unit)
+    (package_slot_available ?ammo_package - ammo_package_slot)
+    (package_built ?ammo_package - ammo_package_slot)
+    (package_contains_primary_variant ?ammo_package - ammo_package_slot ?primary_ammo_variant - primary_ammo_variant)
+    (package_contains_secondary_variant ?ammo_package - ammo_package_slot ?secondary_ammo_variant - secondary_ammo_variant)
+    (package_flag_primary_stabilized ?ammo_package - ammo_package_slot)
+    (package_flag_secondary_stabilized ?ammo_package - ammo_package_slot)
+    (package_tested ?ammo_package - ammo_package_slot)
+    (weapon_assigned_to_phase_a_unit ?weapon_unit - weapon_unit ?phase_a_unit - phase_a_unit)
+    (weapon_assigned_to_phase_b_unit ?weapon_unit - weapon_unit ?phase_b_unit - phase_b_unit)
+    (weapon_package_linked ?weapon_unit - weapon_unit ?ammo_package - ammo_package_slot)
+    (assembly_component_available ?assembly_component - assembly_component)
+    (weapon_has_component ?weapon_unit - weapon_unit ?assembly_component - assembly_component)
+    (assembly_component_used ?assembly_component - assembly_component)
+    (component_integrated_in_package ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    (weapon_integration_complete ?weapon_unit - weapon_unit)
+    (weapon_validation_complete ?weapon_unit - weapon_unit)
+    (weapon_calibration_completed ?weapon_unit - weapon_unit)
+    (upgrade_module_attached_flag ?weapon_unit - weapon_unit)
+    (upgrade_integration_complete ?weapon_unit - weapon_unit)
+    (weapon_activation_ready ?weapon_unit - weapon_unit)
+    (weapon_activation_armed ?weapon_unit - weapon_unit)
+    (tactical_marker_available ?tactical_marker - tactical_marker)
+    (weapon_tactical_marker_link ?weapon_unit - weapon_unit ?tactical_marker - tactical_marker)
+    (tactical_marker_applied ?weapon_unit - weapon_unit)
+    (weapon_marker_processed ?weapon_unit - weapon_unit)
+    (weapon_marker_validated ?weapon_unit - weapon_unit)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (weapon_upgrade_link ?weapon_unit - weapon_unit ?upgrade_module - upgrade_module)
+    (tactical_module_available ?tactical_module - tactical_module)
+    (weapon_tactical_module_attached ?weapon_unit - weapon_unit ?tactical_module - tactical_module)
+    (maintenance_part_available ?maintenance_part - maintenance_part)
+    (weapon_maintenance_part_assigned ?weapon_unit - weapon_unit ?maintenance_part - maintenance_part)
+    (calibration_kit_available ?calibration_kit - calibration_kit)
+    (weapon_has_calibration_kit ?weapon_unit - weapon_unit ?calibration_kit - calibration_kit)
+    (mission_token_available ?mission_token - mission_token)
+    (mission_token_assigned ?unit - unit ?mission_token - mission_token)
+    (phase_a_ready ?phase_a_unit - phase_a_unit)
+    (phase_b_ready ?phase_b_unit - phase_b_unit)
+    (weapon_finalized_flag ?weapon_unit - weapon_unit)
+  )
+  (:action request_resupply
+    :parameters (?unit - unit)
+    :precondition
+      (and
+        (not
+          (resupply_requested ?unit)
+        )
+        (not
+          (provisioning_completed ?unit)
+        )
+      )
+    :effect (resupply_requested ?unit)
+  )
+  (:action assign_supply_crate_to_unit
+    :parameters (?unit - unit ?supply_crate - supply_crate)
+    :precondition
+      (and
+        (resupply_requested ?unit)
+        (not
+          (resupply_allocated ?unit)
+        )
+        (supply_crate_available ?supply_crate)
+      )
+    :effect
+      (and
+        (resupply_allocated ?unit)
+        (supply_crate_assigned ?unit ?supply_crate)
+        (not
+          (supply_crate_available ?supply_crate)
+        )
+      )
+  )
+  (:action assign_ammo_profile_to_unit
+    :parameters (?unit - unit ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (resupply_requested ?unit)
+        (resupply_allocated ?unit)
+        (ammo_profile_available ?ammo_profile)
+      )
+    :effect
+      (and
+        (ammo_profile_assigned ?unit ?ammo_profile)
+        (not
+          (ammo_profile_available ?ammo_profile)
+        )
+      )
+  )
+  (:action finalize_ammo_profile_assignment
+    :parameters (?unit - unit ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (resupply_requested ?unit)
+        (resupply_allocated ?unit)
+        (ammo_profile_assigned ?unit ?ammo_profile)
+        (not
+          (prepared_for_provisioning ?unit)
+        )
+      )
+    :effect (prepared_for_provisioning ?unit)
+  )
+  (:action release_ammo_profile
+    :parameters (?unit - unit ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (ammo_profile_assigned ?unit ?ammo_profile)
+      )
+    :effect
+      (and
+        (ammo_profile_available ?ammo_profile)
+        (not
+          (ammo_profile_assigned ?unit ?ammo_profile)
+        )
+      )
+  )
+  (:action reserve_maintenance_tool_for_unit
+    :parameters (?unit - unit ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (prepared_for_provisioning ?unit)
+        (maintenance_tool_available ?maintenance_tool)
+      )
+    :effect
+      (and
+        (maintenance_tool_assigned ?unit ?maintenance_tool)
+        (not
+          (maintenance_tool_available ?maintenance_tool)
+        )
+      )
+  )
+  (:action release_maintenance_tool_from_unit
+    :parameters (?unit - unit ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (maintenance_tool_assigned ?unit ?maintenance_tool)
+      )
+    :effect
+      (and
+        (maintenance_tool_available ?maintenance_tool)
+        (not
+          (maintenance_tool_assigned ?unit ?maintenance_tool)
+        )
+      )
+  )
+  (:action assign_maintenance_part_to_weapon
+    :parameters (?weapon_unit - weapon_unit ?maintenance_part - maintenance_part)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (maintenance_part_available ?maintenance_part)
+      )
+    :effect
+      (and
+        (weapon_maintenance_part_assigned ?weapon_unit ?maintenance_part)
+        (not
+          (maintenance_part_available ?maintenance_part)
+        )
+      )
+  )
+  (:action remove_maintenance_part_from_weapon
+    :parameters (?weapon_unit - weapon_unit ?maintenance_part - maintenance_part)
+    :precondition
+      (and
+        (weapon_maintenance_part_assigned ?weapon_unit ?maintenance_part)
+      )
+    :effect
+      (and
+        (maintenance_part_available ?maintenance_part)
+        (not
+          (weapon_maintenance_part_assigned ?weapon_unit ?maintenance_part)
+        )
+      )
+  )
+  (:action assign_calibration_kit_to_weapon
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (calibration_kit_available ?calibration_kit)
+      )
+    :effect
+      (and
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (not
+          (calibration_kit_available ?calibration_kit)
+        )
+      )
+  )
+  (:action remove_calibration_kit_from_weapon
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit)
+    :precondition
+      (and
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+      )
+    :effect
+      (and
+        (calibration_kit_available ?calibration_kit)
+        (not
+          (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        )
+      )
+  )
+  (:action reserve_primary_variant_for_phase_a
+    :parameters (?phase_a_unit - phase_a_unit ?primary_ammo_variant - primary_ammo_variant ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_a_unit)
+        (ammo_profile_assigned ?phase_a_unit ?ammo_profile)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (not
+          (primary_variant_reserved ?primary_ammo_variant)
+        )
+        (not
+          (primary_variant_stabilized ?primary_ammo_variant)
+        )
+      )
+    :effect (primary_variant_reserved ?primary_ammo_variant)
+  )
+  (:action commit_primary_variant_with_tool_phase_a
+    :parameters (?phase_a_unit - phase_a_unit ?primary_ammo_variant - primary_ammo_variant ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_a_unit)
+        (maintenance_tool_assigned ?phase_a_unit ?maintenance_tool)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (primary_variant_reserved ?primary_ammo_variant)
+        (not
+          (phase_a_ready ?phase_a_unit)
+        )
+      )
+    :effect
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_a_variant_committed ?phase_a_unit)
+      )
+  )
+  (:action apply_stabilizer_to_primary_variant_phase_a
+    :parameters (?phase_a_unit - phase_a_unit ?primary_ammo_variant - primary_ammo_variant ?ammo_stabilizer - ammo_stabilizer)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_a_unit)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (stabilizer_available ?ammo_stabilizer)
+        (not
+          (phase_a_ready ?phase_a_unit)
+        )
+      )
+    :effect
+      (and
+        (primary_variant_stabilized ?primary_ammo_variant)
+        (phase_a_ready ?phase_a_unit)
+        (stabilizer_assigned_phase_a ?phase_a_unit ?ammo_stabilizer)
+        (not
+          (stabilizer_available ?ammo_stabilizer)
+        )
+      )
+  )
+  (:action finalize_stabilized_primary_variant_phase_a
+    :parameters (?phase_a_unit - phase_a_unit ?primary_ammo_variant - primary_ammo_variant ?ammo_profile - ammo_profile ?ammo_stabilizer - ammo_stabilizer)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_a_unit)
+        (ammo_profile_assigned ?phase_a_unit ?ammo_profile)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (primary_variant_stabilized ?primary_ammo_variant)
+        (stabilizer_assigned_phase_a ?phase_a_unit ?ammo_stabilizer)
+        (not
+          (phase_a_variant_committed ?phase_a_unit)
+        )
+      )
+    :effect
+      (and
+        (primary_variant_reserved ?primary_ammo_variant)
+        (phase_a_variant_committed ?phase_a_unit)
+        (stabilizer_available ?ammo_stabilizer)
+        (not
+          (stabilizer_assigned_phase_a ?phase_a_unit ?ammo_stabilizer)
+        )
+      )
+  )
+  (:action reserve_secondary_variant_for_phase_b
+    :parameters (?phase_b_unit - phase_b_unit ?secondary_ammo_variant - secondary_ammo_variant ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_b_unit)
+        (ammo_profile_assigned ?phase_b_unit ?ammo_profile)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (not
+          (secondary_variant_reserved ?secondary_ammo_variant)
+        )
+        (not
+          (secondary_variant_stabilized ?secondary_ammo_variant)
+        )
+      )
+    :effect (secondary_variant_reserved ?secondary_ammo_variant)
+  )
+  (:action commit_secondary_variant_with_tool_phase_b
+    :parameters (?phase_b_unit - phase_b_unit ?secondary_ammo_variant - secondary_ammo_variant ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_b_unit)
+        (maintenance_tool_assigned ?phase_b_unit ?maintenance_tool)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (secondary_variant_reserved ?secondary_ammo_variant)
+        (not
+          (phase_b_ready ?phase_b_unit)
+        )
+      )
+    :effect
+      (and
+        (phase_b_ready ?phase_b_unit)
+        (phase_b_variant_committed ?phase_b_unit)
+      )
+  )
+  (:action apply_stabilizer_to_secondary_variant_phase_b
+    :parameters (?phase_b_unit - phase_b_unit ?secondary_ammo_variant - secondary_ammo_variant ?ammo_stabilizer - ammo_stabilizer)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_b_unit)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (stabilizer_available ?ammo_stabilizer)
+        (not
+          (phase_b_ready ?phase_b_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_variant_stabilized ?secondary_ammo_variant)
+        (phase_b_ready ?phase_b_unit)
+        (stabilizer_assigned_phase_b ?phase_b_unit ?ammo_stabilizer)
+        (not
+          (stabilizer_available ?ammo_stabilizer)
+        )
+      )
+  )
+  (:action finalize_stabilized_secondary_variant_phase_b
+    :parameters (?phase_b_unit - phase_b_unit ?secondary_ammo_variant - secondary_ammo_variant ?ammo_profile - ammo_profile ?ammo_stabilizer - ammo_stabilizer)
+    :precondition
+      (and
+        (prepared_for_provisioning ?phase_b_unit)
+        (ammo_profile_assigned ?phase_b_unit ?ammo_profile)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (secondary_variant_stabilized ?secondary_ammo_variant)
+        (stabilizer_assigned_phase_b ?phase_b_unit ?ammo_stabilizer)
+        (not
+          (phase_b_variant_committed ?phase_b_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_variant_reserved ?secondary_ammo_variant)
+        (phase_b_variant_committed ?phase_b_unit)
+        (stabilizer_available ?ammo_stabilizer)
+        (not
+          (stabilizer_assigned_phase_b ?phase_b_unit ?ammo_stabilizer)
+        )
+      )
+  )
+  (:action assemble_ammo_package
+    :parameters (?phase_a_unit - phase_a_unit ?phase_b_unit - phase_b_unit ?primary_ammo_variant - primary_ammo_variant ?secondary_ammo_variant - secondary_ammo_variant ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_b_ready ?phase_b_unit)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (primary_variant_reserved ?primary_ammo_variant)
+        (secondary_variant_reserved ?secondary_ammo_variant)
+        (phase_a_variant_committed ?phase_a_unit)
+        (phase_b_variant_committed ?phase_b_unit)
+        (package_slot_available ?ammo_package)
+      )
+    :effect
+      (and
+        (package_built ?ammo_package)
+        (package_contains_primary_variant ?ammo_package ?primary_ammo_variant)
+        (package_contains_secondary_variant ?ammo_package ?secondary_ammo_variant)
+        (not
+          (package_slot_available ?ammo_package)
+        )
+      )
+  )
+  (:action assemble_ammo_package_primary_stabilized
+    :parameters (?phase_a_unit - phase_a_unit ?phase_b_unit - phase_b_unit ?primary_ammo_variant - primary_ammo_variant ?secondary_ammo_variant - secondary_ammo_variant ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_b_ready ?phase_b_unit)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (primary_variant_stabilized ?primary_ammo_variant)
+        (secondary_variant_reserved ?secondary_ammo_variant)
+        (not
+          (phase_a_variant_committed ?phase_a_unit)
+        )
+        (phase_b_variant_committed ?phase_b_unit)
+        (package_slot_available ?ammo_package)
+      )
+    :effect
+      (and
+        (package_built ?ammo_package)
+        (package_contains_primary_variant ?ammo_package ?primary_ammo_variant)
+        (package_contains_secondary_variant ?ammo_package ?secondary_ammo_variant)
+        (package_flag_primary_stabilized ?ammo_package)
+        (not
+          (package_slot_available ?ammo_package)
+        )
+      )
+  )
+  (:action assemble_ammo_package_secondary_stabilized
+    :parameters (?phase_a_unit - phase_a_unit ?phase_b_unit - phase_b_unit ?primary_ammo_variant - primary_ammo_variant ?secondary_ammo_variant - secondary_ammo_variant ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_b_ready ?phase_b_unit)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (primary_variant_reserved ?primary_ammo_variant)
+        (secondary_variant_stabilized ?secondary_ammo_variant)
+        (phase_a_variant_committed ?phase_a_unit)
+        (not
+          (phase_b_variant_committed ?phase_b_unit)
+        )
+        (package_slot_available ?ammo_package)
+      )
+    :effect
+      (and
+        (package_built ?ammo_package)
+        (package_contains_primary_variant ?ammo_package ?primary_ammo_variant)
+        (package_contains_secondary_variant ?ammo_package ?secondary_ammo_variant)
+        (package_flag_secondary_stabilized ?ammo_package)
+        (not
+          (package_slot_available ?ammo_package)
+        )
+      )
+  )
+  (:action assemble_ammo_package_both_stabilized
+    :parameters (?phase_a_unit - phase_a_unit ?phase_b_unit - phase_b_unit ?primary_ammo_variant - primary_ammo_variant ?secondary_ammo_variant - secondary_ammo_variant ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_b_ready ?phase_b_unit)
+        (primary_variant_compatible_with_unit ?phase_a_unit ?primary_ammo_variant)
+        (secondary_variant_compatible_with_unit ?phase_b_unit ?secondary_ammo_variant)
+        (primary_variant_stabilized ?primary_ammo_variant)
+        (secondary_variant_stabilized ?secondary_ammo_variant)
+        (not
+          (phase_a_variant_committed ?phase_a_unit)
+        )
+        (not
+          (phase_b_variant_committed ?phase_b_unit)
+        )
+        (package_slot_available ?ammo_package)
+      )
+    :effect
+      (and
+        (package_built ?ammo_package)
+        (package_contains_primary_variant ?ammo_package ?primary_ammo_variant)
+        (package_contains_secondary_variant ?ammo_package ?secondary_ammo_variant)
+        (package_flag_primary_stabilized ?ammo_package)
+        (package_flag_secondary_stabilized ?ammo_package)
+        (not
+          (package_slot_available ?ammo_package)
+        )
+      )
+  )
+  (:action test_ammo_package
+    :parameters (?ammo_package - ammo_package_slot ?phase_a_unit - phase_a_unit ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (package_built ?ammo_package)
+        (phase_a_ready ?phase_a_unit)
+        (ammo_profile_assigned ?phase_a_unit ?ammo_profile)
+        (not
+          (package_tested ?ammo_package)
+        )
+      )
+    :effect (package_tested ?ammo_package)
+  )
+  (:action integrate_component_into_package_for_weapon
+    :parameters (?weapon_unit - weapon_unit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (weapon_package_linked ?weapon_unit ?ammo_package)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (assembly_component_available ?assembly_component)
+        (package_built ?ammo_package)
+        (package_tested ?ammo_package)
+        (not
+          (assembly_component_used ?assembly_component)
+        )
+      )
+    :effect
+      (and
+        (assembly_component_used ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (not
+          (assembly_component_available ?assembly_component)
+        )
+      )
+  )
+  (:action validate_component_integration_for_weapon
+    :parameters (?weapon_unit - weapon_unit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (assembly_component_used ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (ammo_profile_assigned ?weapon_unit ?ammo_profile)
+        (not
+          (package_flag_primary_stabilized ?ammo_package)
+        )
+        (not
+          (weapon_integration_complete ?weapon_unit)
+        )
+      )
+    :effect (weapon_integration_complete ?weapon_unit)
+  )
+  (:action attach_upgrade_module_to_weapon
+    :parameters (?weapon_unit - weapon_unit ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (upgrade_module_available ?upgrade_module)
+        (not
+          (upgrade_module_attached_flag ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (upgrade_module_attached_flag ?weapon_unit)
+        (weapon_upgrade_link ?weapon_unit ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action finalize_upgrade_integration_for_weapon
+    :parameters (?weapon_unit - weapon_unit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot ?ammo_profile - ammo_profile ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (assembly_component_used ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (ammo_profile_assigned ?weapon_unit ?ammo_profile)
+        (package_flag_primary_stabilized ?ammo_package)
+        (upgrade_module_attached_flag ?weapon_unit)
+        (weapon_upgrade_link ?weapon_unit ?upgrade_module)
+        (not
+          (weapon_integration_complete ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_integration_complete ?weapon_unit)
+        (upgrade_integration_complete ?weapon_unit)
+      )
+  )
+  (:action validate_weapon_with_maintenance_part
+    :parameters (?weapon_unit - weapon_unit ?maintenance_part - maintenance_part ?maintenance_tool - maintenance_tool ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_integration_complete ?weapon_unit)
+        (weapon_maintenance_part_assigned ?weapon_unit ?maintenance_part)
+        (maintenance_tool_assigned ?weapon_unit ?maintenance_tool)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (not
+          (package_flag_secondary_stabilized ?ammo_package)
+        )
+        (not
+          (weapon_validation_complete ?weapon_unit)
+        )
+      )
+    :effect (weapon_validation_complete ?weapon_unit)
+  )
+  (:action validate_weapon_with_maintenance_part_alternate
+    :parameters (?weapon_unit - weapon_unit ?maintenance_part - maintenance_part ?maintenance_tool - maintenance_tool ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_integration_complete ?weapon_unit)
+        (weapon_maintenance_part_assigned ?weapon_unit ?maintenance_part)
+        (maintenance_tool_assigned ?weapon_unit ?maintenance_tool)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (package_flag_secondary_stabilized ?ammo_package)
+        (not
+          (weapon_validation_complete ?weapon_unit)
+        )
+      )
+    :effect (weapon_validation_complete ?weapon_unit)
+  )
+  (:action apply_calibration_kit_and_validate_weapon
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_validation_complete ?weapon_unit)
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (not
+          (package_flag_primary_stabilized ?ammo_package)
+        )
+        (not
+          (package_flag_secondary_stabilized ?ammo_package)
+        )
+        (not
+          (weapon_calibration_completed ?weapon_unit)
+        )
+      )
+    :effect (weapon_calibration_completed ?weapon_unit)
+  )
+  (:action apply_calibration_with_primary_package_flag
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_validation_complete ?weapon_unit)
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (package_flag_primary_stabilized ?ammo_package)
+        (not
+          (package_flag_secondary_stabilized ?ammo_package)
+        )
+        (not
+          (weapon_calibration_completed ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_ready ?weapon_unit)
+      )
+  )
+  (:action apply_calibration_with_secondary_package_flag
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_validation_complete ?weapon_unit)
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (not
+          (package_flag_primary_stabilized ?ammo_package)
+        )
+        (package_flag_secondary_stabilized ?ammo_package)
+        (not
+          (weapon_calibration_completed ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_ready ?weapon_unit)
+      )
+  )
+  (:action apply_calibration_with_both_package_flags
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit ?assembly_component - assembly_component ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (weapon_validation_complete ?weapon_unit)
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (weapon_has_component ?weapon_unit ?assembly_component)
+        (component_integrated_in_package ?assembly_component ?ammo_package)
+        (package_flag_primary_stabilized ?ammo_package)
+        (package_flag_secondary_stabilized ?ammo_package)
+        (not
+          (weapon_calibration_completed ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_ready ?weapon_unit)
+      )
+  )
+  (:action lock_weapon_for_activation
+    :parameters (?weapon_unit - weapon_unit)
+    :precondition
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (not
+          (weapon_activation_ready ?weapon_unit)
+        )
+        (not
+          (weapon_finalized_flag ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_finalized_flag ?weapon_unit)
+        (ready_for_deployment ?weapon_unit)
+      )
+  )
+  (:action attach_tactical_module_to_weapon
+    :parameters (?weapon_unit - weapon_unit ?tactical_module - tactical_module)
+    :precondition
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_ready ?weapon_unit)
+        (tactical_module_available ?tactical_module)
+      )
+    :effect
+      (and
+        (weapon_tactical_module_attached ?weapon_unit ?tactical_module)
+        (not
+          (tactical_module_available ?tactical_module)
+        )
+      )
+  )
+  (:action validate_weapon_with_tactical_module_and_parts
+    :parameters (?weapon_unit - weapon_unit ?phase_a_unit - phase_a_unit ?phase_b_unit - phase_b_unit ?ammo_profile - ammo_profile ?tactical_module - tactical_module)
+    :precondition
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_ready ?weapon_unit)
+        (weapon_tactical_module_attached ?weapon_unit ?tactical_module)
+        (weapon_assigned_to_phase_a_unit ?weapon_unit ?phase_a_unit)
+        (weapon_assigned_to_phase_b_unit ?weapon_unit ?phase_b_unit)
+        (phase_a_variant_committed ?phase_a_unit)
+        (phase_b_variant_committed ?phase_b_unit)
+        (ammo_profile_assigned ?weapon_unit ?ammo_profile)
+        (not
+          (weapon_activation_armed ?weapon_unit)
+        )
+      )
+    :effect (weapon_activation_armed ?weapon_unit)
+  )
+  (:action activate_weapon_system
+    :parameters (?weapon_unit - weapon_unit)
+    :precondition
+      (and
+        (weapon_calibration_completed ?weapon_unit)
+        (weapon_activation_armed ?weapon_unit)
+        (not
+          (weapon_finalized_flag ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_finalized_flag ?weapon_unit)
+        (ready_for_deployment ?weapon_unit)
+      )
+  )
+  (:action apply_tactical_marker_to_weapon
+    :parameters (?weapon_unit - weapon_unit ?tactical_marker - tactical_marker ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (prepared_for_provisioning ?weapon_unit)
+        (ammo_profile_assigned ?weapon_unit ?ammo_profile)
+        (tactical_marker_available ?tactical_marker)
+        (weapon_tactical_marker_link ?weapon_unit ?tactical_marker)
+        (not
+          (tactical_marker_applied ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (tactical_marker_applied ?weapon_unit)
+        (not
+          (tactical_marker_available ?tactical_marker)
+        )
+      )
+  )
+  (:action process_tactical_marker_with_tool
+    :parameters (?weapon_unit - weapon_unit ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (tactical_marker_applied ?weapon_unit)
+        (maintenance_tool_assigned ?weapon_unit ?maintenance_tool)
+        (not
+          (weapon_marker_processed ?weapon_unit)
+        )
+      )
+    :effect (weapon_marker_processed ?weapon_unit)
+  )
+  (:action validate_marker_with_calibration_kit
+    :parameters (?weapon_unit - weapon_unit ?calibration_kit - calibration_kit)
+    :precondition
+      (and
+        (weapon_marker_processed ?weapon_unit)
+        (weapon_has_calibration_kit ?weapon_unit ?calibration_kit)
+        (not
+          (weapon_marker_validated ?weapon_unit)
+        )
+      )
+    :effect (weapon_marker_validated ?weapon_unit)
+  )
+  (:action finalize_marker_activation
+    :parameters (?weapon_unit - weapon_unit)
+    :precondition
+      (and
+        (weapon_marker_validated ?weapon_unit)
+        (not
+          (weapon_finalized_flag ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (weapon_finalized_flag ?weapon_unit)
+        (ready_for_deployment ?weapon_unit)
+      )
+  )
+  (:action finalize_phase_a_unit_provisioning
+    :parameters (?phase_a_unit - phase_a_unit ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_a_ready ?phase_a_unit)
+        (phase_a_variant_committed ?phase_a_unit)
+        (package_built ?ammo_package)
+        (package_tested ?ammo_package)
+        (not
+          (ready_for_deployment ?phase_a_unit)
+        )
+      )
+    :effect (ready_for_deployment ?phase_a_unit)
+  )
+  (:action finalize_phase_b_unit_provisioning
+    :parameters (?phase_b_unit - phase_b_unit ?ammo_package - ammo_package_slot)
+    :precondition
+      (and
+        (phase_b_ready ?phase_b_unit)
+        (phase_b_variant_committed ?phase_b_unit)
+        (package_built ?ammo_package)
+        (package_tested ?ammo_package)
+        (not
+          (ready_for_deployment ?phase_b_unit)
+        )
+      )
+    :effect (ready_for_deployment ?phase_b_unit)
+  )
+  (:action consume_mission_token_for_unit_prep
+    :parameters (?unit - unit ?mission_token - mission_token ?ammo_profile - ammo_profile)
+    :precondition
+      (and
+        (ready_for_deployment ?unit)
+        (ammo_profile_assigned ?unit ?ammo_profile)
+        (mission_token_available ?mission_token)
+        (not
+          (preobjective_prepared ?unit)
+        )
+      )
+    :effect
+      (and
+        (preobjective_prepared ?unit)
+        (mission_token_assigned ?unit ?mission_token)
+        (not
+          (mission_token_available ?mission_token)
+        )
+      )
+  )
+  (:action activate_resupply_for_phase_a_unit
+    :parameters (?phase_a_unit - phase_a_unit ?supply_crate - supply_crate ?mission_token - mission_token)
+    :precondition
+      (and
+        (preobjective_prepared ?phase_a_unit)
+        (supply_crate_assigned ?phase_a_unit ?supply_crate)
+        (mission_token_assigned ?phase_a_unit ?mission_token)
+        (not
+          (provisioning_completed ?phase_a_unit)
+        )
+      )
+    :effect
+      (and
+        (provisioning_completed ?phase_a_unit)
+        (supply_crate_available ?supply_crate)
+        (mission_token_available ?mission_token)
+      )
+  )
+  (:action activate_resupply_for_phase_b_unit
+    :parameters (?phase_b_unit - phase_b_unit ?supply_crate - supply_crate ?mission_token - mission_token)
+    :precondition
+      (and
+        (preobjective_prepared ?phase_b_unit)
+        (supply_crate_assigned ?phase_b_unit ?supply_crate)
+        (mission_token_assigned ?phase_b_unit ?mission_token)
+        (not
+          (provisioning_completed ?phase_b_unit)
+        )
+      )
+    :effect
+      (and
+        (provisioning_completed ?phase_b_unit)
+        (supply_crate_available ?supply_crate)
+        (mission_token_available ?mission_token)
+      )
+  )
+  (:action activate_resupply_for_weapon_system
+    :parameters (?weapon_unit - weapon_unit ?supply_crate - supply_crate ?mission_token - mission_token)
+    :precondition
+      (and
+        (preobjective_prepared ?weapon_unit)
+        (supply_crate_assigned ?weapon_unit ?supply_crate)
+        (mission_token_assigned ?weapon_unit ?mission_token)
+        (not
+          (provisioning_completed ?weapon_unit)
+        )
+      )
+    :effect
+      (and
+        (provisioning_completed ?weapon_unit)
+        (supply_crate_available ?supply_crate)
+        (mission_token_available ?mission_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem ammunition_distribution_scenario)
+  (:domain ammunition_distribution)
+  (:objects unit_phase_a_1 - phase_a_unit unit_phase_b_1 - phase_b_unit weapon_unit_alpha - weapon_unit weapon_unit_bravo - weapon_unit supply_crate_1 - supply_crate supply_crate_2 - supply_crate supply_crate_3 - supply_crate ammo_profile_standard - ammo_profile maintenance_tool_1 - maintenance_tool ammo_stabilizer_1 - ammo_stabilizer primary_variant_1 - primary_ammo_variant secondary_variant_1 - secondary_ammo_variant ammo_package_slot_1 - ammo_package_slot assembly_component_a - assembly_component assembly_component_b - assembly_component upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module tactical_module_1 - tactical_module tactical_module_2 - tactical_module mission_token_alpha - mission_token maintenance_part_1 - maintenance_part tactical_marker_1 - tactical_marker tactical_marker_2 - tactical_marker calibration_kit_1 - calibration_kit)
+  (:init
+    (supply_crate_available supply_crate_1)
+    (supply_crate_available supply_crate_2)
+    (supply_crate_available supply_crate_3)
+    (ammo_profile_available ammo_profile_standard)
+    (maintenance_tool_available maintenance_tool_1)
+    (stabilizer_available ammo_stabilizer_1)
+    (primary_variant_compatible_with_unit unit_phase_a_1 primary_variant_1)
+    (secondary_variant_compatible_with_unit unit_phase_b_1 secondary_variant_1)
+    (package_slot_available ammo_package_slot_1)
+    (assembly_component_available assembly_component_a)
+    (assembly_component_available assembly_component_b)
+    (weapon_assigned_to_phase_a_unit weapon_unit_alpha unit_phase_a_1)
+    (weapon_assigned_to_phase_a_unit weapon_unit_bravo unit_phase_a_1)
+    (weapon_assigned_to_phase_b_unit weapon_unit_alpha unit_phase_b_1)
+    (weapon_assigned_to_phase_b_unit weapon_unit_bravo unit_phase_b_1)
+    (weapon_package_linked weapon_unit_alpha ammo_package_slot_1)
+    (weapon_package_linked weapon_unit_bravo ammo_package_slot_1)
+    (weapon_has_component weapon_unit_alpha assembly_component_a)
+    (weapon_has_component weapon_unit_bravo assembly_component_b)
+    (upgrade_module_available upgrade_module_1)
+    (upgrade_module_available upgrade_module_2)
+    (tactical_module_available tactical_module_1)
+    (tactical_module_available tactical_module_2)
+    (mission_token_available mission_token_alpha)
+    (maintenance_part_available maintenance_part_1)
+    (tactical_marker_available tactical_marker_1)
+    (weapon_tactical_marker_link weapon_unit_alpha tactical_marker_1)
+    (weapon_tactical_marker_link weapon_unit_bravo tactical_marker_2)
+    (calibration_kit_available calibration_kit_1)
+  )
+  (:goal
+    (and
+      (provisioning_completed unit_phase_a_1)
+      (provisioning_completed unit_phase_b_1)
+      (provisioning_completed weapon_unit_alpha)
+      (provisioning_completed weapon_unit_bravo)
+    )
+  )
+)

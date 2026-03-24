@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain storage_condition_matching_by_product_type)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_entity - object resource_class - physical_entity service_class - physical_entity attribute_class - physical_entity item_category - physical_entity product_unit - item_category grading_station - resource_class quality_test_kit - resource_class conditioning_unit - resource_class certification - resource_class transport_manifest - resource_class release_window - resource_class storage_service_option - resource_class processing_instruction - resource_class label_or_tag - service_class product_specification - service_class customer_order_reference - service_class temperature_profile - attribute_class distribution_channel_profile - attribute_class shipment_unit - attribute_class batch_category - product_unit container_category - product_unit perishable_batch - batch_category semi_perishable_batch - batch_category storage_container - container_category)
+
+  (:predicates
+    (received_at_intake ?product_unit - product_unit)
+    (quality_approved_item ?product_unit - product_unit)
+    (assigned_to_grading ?product_unit - product_unit)
+    (release_scheduled ?product_unit - product_unit)
+    (staged_for_outbound ?product_unit - product_unit)
+    (release_ready ?product_unit - product_unit)
+    (grading_station_available ?grading_station - grading_station)
+    (assigned_to_grading_station ?product_unit - product_unit ?grading_station - grading_station)
+    (test_kit_available ?quality_test_kit - quality_test_kit)
+    (allocated_test_kit_for_item ?product_unit - product_unit ?quality_test_kit - quality_test_kit)
+    (conditioning_unit_available ?conditioning_unit - conditioning_unit)
+    (assigned_to_conditioning_unit ?product_unit - product_unit ?conditioning_unit - conditioning_unit)
+    (label_available ?label_or_tag - label_or_tag)
+    (label_attached_to_perishable_batch ?perishable_batch - perishable_batch ?label_or_tag - label_or_tag)
+    (label_attached_to_semi_perishable_batch ?semi_perishable_batch - semi_perishable_batch ?label_or_tag - label_or_tag)
+    (assigned_temperature_profile ?perishable_batch - perishable_batch ?temperature_profile - temperature_profile)
+    (temperature_profile_candidate ?temperature_profile - temperature_profile)
+    (temperature_profile_reserved ?temperature_profile - temperature_profile)
+    (batch_profile_confirmed ?perishable_batch - perishable_batch)
+    (assigned_channel_profile ?semi_perishable_batch - semi_perishable_batch ?distribution_channel_profile - distribution_channel_profile)
+    (channel_profile_candidate ?distribution_channel_profile - distribution_channel_profile)
+    (channel_profile_reserved ?distribution_channel_profile - distribution_channel_profile)
+    (batch_channel_confirmed ?semi_perishable_batch - semi_perishable_batch)
+    (shipment_unit_available ?shipment_unit - shipment_unit)
+    (shipment_reserved ?shipment_unit - shipment_unit)
+    (shipment_assigned_temperature_profile ?shipment_unit - shipment_unit ?temperature_profile - temperature_profile)
+    (shipment_assigned_channel_profile ?shipment_unit - shipment_unit ?distribution_channel_profile - distribution_channel_profile)
+    (shipment_flag_temperature_profile_present ?shipment_unit - shipment_unit)
+    (shipment_flag_channel_profile_present ?shipment_unit - shipment_unit)
+    (shipment_staged_for_container_loading ?shipment_unit - shipment_unit)
+    (container_contains_perishable_batch ?storage_container - storage_container ?perishable_batch - perishable_batch)
+    (container_contains_semi_perishable_batch ?storage_container - storage_container ?semi_perishable_batch - semi_perishable_batch)
+    (container_assigned_to_shipment ?storage_container - storage_container ?shipment_unit - shipment_unit)
+    (product_spec_available ?product_specification - product_specification)
+    (container_has_product_spec ?storage_container - storage_container ?product_specification - product_specification)
+    (product_spec_applied ?product_specification - product_specification)
+    (spec_attached_to_shipment ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    (container_inspected ?storage_container - storage_container)
+    (container_packaged ?storage_container - storage_container)
+    (container_manifested_for_shipment ?storage_container - storage_container)
+    (certification_bound ?storage_container - storage_container)
+    (container_quality_verified ?storage_container - storage_container)
+    (container_ready_for_loading ?storage_container - storage_container)
+    (container_sealed ?storage_container - storage_container)
+    (order_reference_available ?customer_order_reference - customer_order_reference)
+    (container_linked_to_order ?storage_container - storage_container ?customer_order_reference - customer_order_reference)
+    (order_associated_with_container ?storage_container - storage_container)
+    (container_order_inspection_passed ?storage_container - storage_container)
+    (container_order_finalized ?storage_container - storage_container)
+    (certification_available ?certification - certification)
+    (container_has_certification ?storage_container - storage_container ?certification - certification)
+    (transport_manifest_available ?transport_manifest - transport_manifest)
+    (container_has_transport_manifest ?storage_container - storage_container ?transport_manifest - transport_manifest)
+    (storage_service_option_available ?storage_service_option - storage_service_option)
+    (container_assigned_storage_service_option ?storage_container - storage_container ?storage_service_option - storage_service_option)
+    (processing_instruction_available ?processing_instruction - processing_instruction)
+    (container_assigned_processing_instruction ?storage_container - storage_container ?processing_instruction - processing_instruction)
+    (release_window_available ?release_window - release_window)
+    (release_window_assigned_to_unit ?product_unit - product_unit ?release_window - release_window)
+    (batch_ready_for_shipment ?perishable_batch - perishable_batch)
+    (semi_batch_ready_for_shipment ?semi_perishable_batch - semi_perishable_batch)
+    (container_ready_for_release ?storage_container - storage_container)
+  )
+  (:action register_product_intake
+    :parameters (?product_unit - product_unit)
+    :precondition
+      (and
+        (not
+          (received_at_intake ?product_unit)
+        )
+        (not
+          (release_scheduled ?product_unit)
+        )
+      )
+    :effect (received_at_intake ?product_unit)
+  )
+  (:action assign_grading_station
+    :parameters (?product_unit - product_unit ?grading_station - grading_station)
+    :precondition
+      (and
+        (received_at_intake ?product_unit)
+        (not
+          (assigned_to_grading ?product_unit)
+        )
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (assigned_to_grading ?product_unit)
+        (assigned_to_grading_station ?product_unit ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action assign_quality_test_kit
+    :parameters (?product_unit - product_unit ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (received_at_intake ?product_unit)
+        (assigned_to_grading ?product_unit)
+        (test_kit_available ?quality_test_kit)
+      )
+    :effect
+      (and
+        (allocated_test_kit_for_item ?product_unit ?quality_test_kit)
+        (not
+          (test_kit_available ?quality_test_kit)
+        )
+      )
+  )
+  (:action finalize_quality_test
+    :parameters (?product_unit - product_unit ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (received_at_intake ?product_unit)
+        (assigned_to_grading ?product_unit)
+        (allocated_test_kit_for_item ?product_unit ?quality_test_kit)
+        (not
+          (quality_approved_item ?product_unit)
+        )
+      )
+    :effect (quality_approved_item ?product_unit)
+  )
+  (:action release_quality_test_kit
+    :parameters (?product_unit - product_unit ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (allocated_test_kit_for_item ?product_unit ?quality_test_kit)
+      )
+    :effect
+      (and
+        (test_kit_available ?quality_test_kit)
+        (not
+          (allocated_test_kit_for_item ?product_unit ?quality_test_kit)
+        )
+      )
+  )
+  (:action assign_conditioning_unit
+    :parameters (?product_unit - product_unit ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (quality_approved_item ?product_unit)
+        (conditioning_unit_available ?conditioning_unit)
+      )
+    :effect
+      (and
+        (assigned_to_conditioning_unit ?product_unit ?conditioning_unit)
+        (not
+          (conditioning_unit_available ?conditioning_unit)
+        )
+      )
+  )
+  (:action release_conditioning_unit
+    :parameters (?product_unit - product_unit ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (assigned_to_conditioning_unit ?product_unit ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_available ?conditioning_unit)
+        (not
+          (assigned_to_conditioning_unit ?product_unit ?conditioning_unit)
+        )
+      )
+  )
+  (:action assign_storage_service_option_to_container
+    :parameters (?storage_container - storage_container ?storage_service_option - storage_service_option)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (storage_service_option_available ?storage_service_option)
+      )
+    :effect
+      (and
+        (container_assigned_storage_service_option ?storage_container ?storage_service_option)
+        (not
+          (storage_service_option_available ?storage_service_option)
+        )
+      )
+  )
+  (:action remove_storage_service_option_from_container
+    :parameters (?storage_container - storage_container ?storage_service_option - storage_service_option)
+    :precondition
+      (and
+        (container_assigned_storage_service_option ?storage_container ?storage_service_option)
+      )
+    :effect
+      (and
+        (storage_service_option_available ?storage_service_option)
+        (not
+          (container_assigned_storage_service_option ?storage_container ?storage_service_option)
+        )
+      )
+  )
+  (:action assign_processing_instruction_to_container
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (processing_instruction_available ?processing_instruction)
+      )
+    :effect
+      (and
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (not
+          (processing_instruction_available ?processing_instruction)
+        )
+      )
+  )
+  (:action remove_processing_instruction_from_container
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction)
+    :precondition
+      (and
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+      )
+    :effect
+      (and
+        (processing_instruction_available ?processing_instruction)
+        (not
+          (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        )
+      )
+  )
+  (:action mark_temperature_profile_candidate_for_batch
+    :parameters (?perishable_batch - perishable_batch ?temperature_profile - temperature_profile ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (quality_approved_item ?perishable_batch)
+        (allocated_test_kit_for_item ?perishable_batch ?quality_test_kit)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (not
+          (temperature_profile_candidate ?temperature_profile)
+        )
+        (not
+          (temperature_profile_reserved ?temperature_profile)
+        )
+      )
+    :effect (temperature_profile_candidate ?temperature_profile)
+  )
+  (:action confirm_temperature_profile_for_batch
+    :parameters (?perishable_batch - perishable_batch ?temperature_profile - temperature_profile ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (quality_approved_item ?perishable_batch)
+        (assigned_to_conditioning_unit ?perishable_batch ?conditioning_unit)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (temperature_profile_candidate ?temperature_profile)
+        (not
+          (batch_ready_for_shipment ?perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (batch_profile_confirmed ?perishable_batch)
+      )
+  )
+  (:action reserve_temperature_profile_and_attach_label
+    :parameters (?perishable_batch - perishable_batch ?temperature_profile - temperature_profile ?label_or_tag - label_or_tag)
+    :precondition
+      (and
+        (quality_approved_item ?perishable_batch)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (label_available ?label_or_tag)
+        (not
+          (batch_ready_for_shipment ?perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (temperature_profile_reserved ?temperature_profile)
+        (batch_ready_for_shipment ?perishable_batch)
+        (label_attached_to_perishable_batch ?perishable_batch ?label_or_tag)
+        (not
+          (label_available ?label_or_tag)
+        )
+      )
+  )
+  (:action finalize_temperature_profile_selection
+    :parameters (?perishable_batch - perishable_batch ?temperature_profile - temperature_profile ?quality_test_kit - quality_test_kit ?label_or_tag - label_or_tag)
+    :precondition
+      (and
+        (quality_approved_item ?perishable_batch)
+        (allocated_test_kit_for_item ?perishable_batch ?quality_test_kit)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (temperature_profile_reserved ?temperature_profile)
+        (label_attached_to_perishable_batch ?perishable_batch ?label_or_tag)
+        (not
+          (batch_profile_confirmed ?perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (temperature_profile_candidate ?temperature_profile)
+        (batch_profile_confirmed ?perishable_batch)
+        (label_available ?label_or_tag)
+        (not
+          (label_attached_to_perishable_batch ?perishable_batch ?label_or_tag)
+        )
+      )
+  )
+  (:action mark_channel_profile_candidate_for_batch
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?distribution_channel_profile - distribution_channel_profile ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (quality_approved_item ?semi_perishable_batch)
+        (allocated_test_kit_for_item ?semi_perishable_batch ?quality_test_kit)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (not
+          (channel_profile_candidate ?distribution_channel_profile)
+        )
+        (not
+          (channel_profile_reserved ?distribution_channel_profile)
+        )
+      )
+    :effect (channel_profile_candidate ?distribution_channel_profile)
+  )
+  (:action confirm_channel_profile_for_batch
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?distribution_channel_profile - distribution_channel_profile ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (quality_approved_item ?semi_perishable_batch)
+        (assigned_to_conditioning_unit ?semi_perishable_batch ?conditioning_unit)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (channel_profile_candidate ?distribution_channel_profile)
+        (not
+          (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (batch_channel_confirmed ?semi_perishable_batch)
+      )
+  )
+  (:action reserve_channel_profile_and_attach_label
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?distribution_channel_profile - distribution_channel_profile ?label_or_tag - label_or_tag)
+    :precondition
+      (and
+        (quality_approved_item ?semi_perishable_batch)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (label_available ?label_or_tag)
+        (not
+          (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_reserved ?distribution_channel_profile)
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (label_attached_to_semi_perishable_batch ?semi_perishable_batch ?label_or_tag)
+        (not
+          (label_available ?label_or_tag)
+        )
+      )
+  )
+  (:action finalize_channel_profile_selection
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?distribution_channel_profile - distribution_channel_profile ?quality_test_kit - quality_test_kit ?label_or_tag - label_or_tag)
+    :precondition
+      (and
+        (quality_approved_item ?semi_perishable_batch)
+        (allocated_test_kit_for_item ?semi_perishable_batch ?quality_test_kit)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (channel_profile_reserved ?distribution_channel_profile)
+        (label_attached_to_semi_perishable_batch ?semi_perishable_batch ?label_or_tag)
+        (not
+          (batch_channel_confirmed ?semi_perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_candidate ?distribution_channel_profile)
+        (batch_channel_confirmed ?semi_perishable_batch)
+        (label_available ?label_or_tag)
+        (not
+          (label_attached_to_semi_perishable_batch ?semi_perishable_batch ?label_or_tag)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_standard
+    :parameters (?perishable_batch - perishable_batch ?semi_perishable_batch - semi_perishable_batch ?temperature_profile - temperature_profile ?distribution_channel_profile - distribution_channel_profile ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (temperature_profile_candidate ?temperature_profile)
+        (channel_profile_candidate ?distribution_channel_profile)
+        (batch_profile_confirmed ?perishable_batch)
+        (batch_channel_confirmed ?semi_perishable_batch)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_assigned_temperature_profile ?shipment_unit ?temperature_profile)
+        (shipment_assigned_channel_profile ?shipment_unit ?distribution_channel_profile)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_temperature_flag
+    :parameters (?perishable_batch - perishable_batch ?semi_perishable_batch - semi_perishable_batch ?temperature_profile - temperature_profile ?distribution_channel_profile - distribution_channel_profile ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (temperature_profile_reserved ?temperature_profile)
+        (channel_profile_candidate ?distribution_channel_profile)
+        (not
+          (batch_profile_confirmed ?perishable_batch)
+        )
+        (batch_channel_confirmed ?semi_perishable_batch)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_assigned_temperature_profile ?shipment_unit ?temperature_profile)
+        (shipment_assigned_channel_profile ?shipment_unit ?distribution_channel_profile)
+        (shipment_flag_temperature_profile_present ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_channel_flag
+    :parameters (?perishable_batch - perishable_batch ?semi_perishable_batch - semi_perishable_batch ?temperature_profile - temperature_profile ?distribution_channel_profile - distribution_channel_profile ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (temperature_profile_candidate ?temperature_profile)
+        (channel_profile_reserved ?distribution_channel_profile)
+        (batch_profile_confirmed ?perishable_batch)
+        (not
+          (batch_channel_confirmed ?semi_perishable_batch)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_assigned_temperature_profile ?shipment_unit ?temperature_profile)
+        (shipment_assigned_channel_profile ?shipment_unit ?distribution_channel_profile)
+        (shipment_flag_channel_profile_present ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_both_flags
+    :parameters (?perishable_batch - perishable_batch ?semi_perishable_batch - semi_perishable_batch ?temperature_profile - temperature_profile ?distribution_channel_profile - distribution_channel_profile ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (assigned_temperature_profile ?perishable_batch ?temperature_profile)
+        (assigned_channel_profile ?semi_perishable_batch ?distribution_channel_profile)
+        (temperature_profile_reserved ?temperature_profile)
+        (channel_profile_reserved ?distribution_channel_profile)
+        (not
+          (batch_profile_confirmed ?perishable_batch)
+        )
+        (not
+          (batch_channel_confirmed ?semi_perishable_batch)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_assigned_temperature_profile ?shipment_unit ?temperature_profile)
+        (shipment_assigned_channel_profile ?shipment_unit ?distribution_channel_profile)
+        (shipment_flag_temperature_profile_present ?shipment_unit)
+        (shipment_flag_channel_profile_present ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action stage_shipment_unit_for_loading
+    :parameters (?shipment_unit - shipment_unit ?perishable_batch - perishable_batch ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (shipment_reserved ?shipment_unit)
+        (batch_ready_for_shipment ?perishable_batch)
+        (allocated_test_kit_for_item ?perishable_batch ?quality_test_kit)
+        (not
+          (shipment_staged_for_container_loading ?shipment_unit)
+        )
+      )
+    :effect (shipment_staged_for_container_loading ?shipment_unit)
+  )
+  (:action apply_product_spec_to_container
+    :parameters (?storage_container - storage_container ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (container_assigned_to_shipment ?storage_container ?shipment_unit)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (product_spec_available ?product_specification)
+        (shipment_reserved ?shipment_unit)
+        (shipment_staged_for_container_loading ?shipment_unit)
+        (not
+          (product_spec_applied ?product_specification)
+        )
+      )
+    :effect
+      (and
+        (product_spec_applied ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (not
+          (product_spec_available ?product_specification)
+        )
+      )
+  )
+  (:action inspect_container_for_packaging
+    :parameters (?storage_container - storage_container ?product_specification - product_specification ?shipment_unit - shipment_unit ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (product_spec_applied ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (allocated_test_kit_for_item ?storage_container ?quality_test_kit)
+        (not
+          (shipment_flag_temperature_profile_present ?shipment_unit)
+        )
+        (not
+          (container_inspected ?storage_container)
+        )
+      )
+    :effect (container_inspected ?storage_container)
+  )
+  (:action attach_certification_to_container
+    :parameters (?storage_container - storage_container ?certification - certification)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (certification_available ?certification)
+        (not
+          (certification_bound ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (certification_bound ?storage_container)
+        (container_has_certification ?storage_container ?certification)
+        (not
+          (certification_available ?certification)
+        )
+      )
+  )
+  (:action inspect_container_with_certification
+    :parameters (?storage_container - storage_container ?product_specification - product_specification ?shipment_unit - shipment_unit ?quality_test_kit - quality_test_kit ?certification - certification)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (product_spec_applied ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (allocated_test_kit_for_item ?storage_container ?quality_test_kit)
+        (shipment_flag_temperature_profile_present ?shipment_unit)
+        (certification_bound ?storage_container)
+        (container_has_certification ?storage_container ?certification)
+        (not
+          (container_inspected ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_inspected ?storage_container)
+        (container_quality_verified ?storage_container)
+      )
+  )
+  (:action package_container_with_service_option_variant_a
+    :parameters (?storage_container - storage_container ?storage_service_option - storage_service_option ?conditioning_unit - conditioning_unit ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_inspected ?storage_container)
+        (container_assigned_storage_service_option ?storage_container ?storage_service_option)
+        (assigned_to_conditioning_unit ?storage_container ?conditioning_unit)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (not
+          (shipment_flag_channel_profile_present ?shipment_unit)
+        )
+        (not
+          (container_packaged ?storage_container)
+        )
+      )
+    :effect (container_packaged ?storage_container)
+  )
+  (:action package_container_with_service_option_variant_b
+    :parameters (?storage_container - storage_container ?storage_service_option - storage_service_option ?conditioning_unit - conditioning_unit ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_inspected ?storage_container)
+        (container_assigned_storage_service_option ?storage_container ?storage_service_option)
+        (assigned_to_conditioning_unit ?storage_container ?conditioning_unit)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (shipment_flag_channel_profile_present ?shipment_unit)
+        (not
+          (container_packaged ?storage_container)
+        )
+      )
+    :effect (container_packaged ?storage_container)
+  )
+  (:action generate_container_manifest_variant1
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_packaged ?storage_container)
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (not
+          (shipment_flag_temperature_profile_present ?shipment_unit)
+        )
+        (not
+          (shipment_flag_channel_profile_present ?shipment_unit)
+        )
+        (not
+          (container_manifested_for_shipment ?storage_container)
+        )
+      )
+    :effect (container_manifested_for_shipment ?storage_container)
+  )
+  (:action generate_container_manifest_variant2
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_packaged ?storage_container)
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (shipment_flag_temperature_profile_present ?shipment_unit)
+        (not
+          (shipment_flag_channel_profile_present ?shipment_unit)
+        )
+        (not
+          (container_manifested_for_shipment ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_ready_for_loading ?storage_container)
+      )
+  )
+  (:action generate_container_manifest_variant3
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_packaged ?storage_container)
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (not
+          (shipment_flag_temperature_profile_present ?shipment_unit)
+        )
+        (shipment_flag_channel_profile_present ?shipment_unit)
+        (not
+          (container_manifested_for_shipment ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_ready_for_loading ?storage_container)
+      )
+  )
+  (:action generate_container_manifest_variant4
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction ?product_specification - product_specification ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (container_packaged ?storage_container)
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (container_has_product_spec ?storage_container ?product_specification)
+        (spec_attached_to_shipment ?product_specification ?shipment_unit)
+        (shipment_flag_temperature_profile_present ?shipment_unit)
+        (shipment_flag_channel_profile_present ?shipment_unit)
+        (not
+          (container_manifested_for_shipment ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_ready_for_loading ?storage_container)
+      )
+  )
+  (:action stage_container_for_outbound
+    :parameters (?storage_container - storage_container)
+    :precondition
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (not
+          (container_ready_for_loading ?storage_container)
+        )
+        (not
+          (container_ready_for_release ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_ready_for_release ?storage_container)
+        (staged_for_outbound ?storage_container)
+      )
+  )
+  (:action attach_transport_manifest_to_container
+    :parameters (?storage_container - storage_container ?transport_manifest - transport_manifest)
+    :precondition
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_ready_for_loading ?storage_container)
+        (transport_manifest_available ?transport_manifest)
+      )
+    :effect
+      (and
+        (container_has_transport_manifest ?storage_container ?transport_manifest)
+        (not
+          (transport_manifest_available ?transport_manifest)
+        )
+      )
+  )
+  (:action seal_container_for_shipping
+    :parameters (?storage_container - storage_container ?perishable_batch - perishable_batch ?semi_perishable_batch - semi_perishable_batch ?quality_test_kit - quality_test_kit ?transport_manifest - transport_manifest)
+    :precondition
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_ready_for_loading ?storage_container)
+        (container_has_transport_manifest ?storage_container ?transport_manifest)
+        (container_contains_perishable_batch ?storage_container ?perishable_batch)
+        (container_contains_semi_perishable_batch ?storage_container ?semi_perishable_batch)
+        (batch_profile_confirmed ?perishable_batch)
+        (batch_channel_confirmed ?semi_perishable_batch)
+        (allocated_test_kit_for_item ?storage_container ?quality_test_kit)
+        (not
+          (container_sealed ?storage_container)
+        )
+      )
+    :effect (container_sealed ?storage_container)
+  )
+  (:action stage_container_after_sealing
+    :parameters (?storage_container - storage_container)
+    :precondition
+      (and
+        (container_manifested_for_shipment ?storage_container)
+        (container_sealed ?storage_container)
+        (not
+          (container_ready_for_release ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_ready_for_release ?storage_container)
+        (staged_for_outbound ?storage_container)
+      )
+  )
+  (:action bind_order_reference_to_container
+    :parameters (?storage_container - storage_container ?customer_order_reference - customer_order_reference ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (quality_approved_item ?storage_container)
+        (allocated_test_kit_for_item ?storage_container ?quality_test_kit)
+        (order_reference_available ?customer_order_reference)
+        (container_linked_to_order ?storage_container ?customer_order_reference)
+        (not
+          (order_associated_with_container ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (order_associated_with_container ?storage_container)
+        (not
+          (order_reference_available ?customer_order_reference)
+        )
+      )
+  )
+  (:action verify_order_binding
+    :parameters (?storage_container - storage_container ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (order_associated_with_container ?storage_container)
+        (assigned_to_conditioning_unit ?storage_container ?conditioning_unit)
+        (not
+          (container_order_inspection_passed ?storage_container)
+        )
+      )
+    :effect (container_order_inspection_passed ?storage_container)
+  )
+  (:action finalize_order_binding
+    :parameters (?storage_container - storage_container ?processing_instruction - processing_instruction)
+    :precondition
+      (and
+        (container_order_inspection_passed ?storage_container)
+        (container_assigned_processing_instruction ?storage_container ?processing_instruction)
+        (not
+          (container_order_finalized ?storage_container)
+        )
+      )
+    :effect (container_order_finalized ?storage_container)
+  )
+  (:action stage_container_after_order_finalization
+    :parameters (?storage_container - storage_container)
+    :precondition
+      (and
+        (container_order_finalized ?storage_container)
+        (not
+          (container_ready_for_release ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (container_ready_for_release ?storage_container)
+        (staged_for_outbound ?storage_container)
+      )
+  )
+  (:action mark_perishable_batch_staged_for_outbound
+    :parameters (?perishable_batch - perishable_batch ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_shipment ?perishable_batch)
+        (batch_profile_confirmed ?perishable_batch)
+        (shipment_reserved ?shipment_unit)
+        (shipment_staged_for_container_loading ?shipment_unit)
+        (not
+          (staged_for_outbound ?perishable_batch)
+        )
+      )
+    :effect (staged_for_outbound ?perishable_batch)
+  )
+  (:action mark_semi_perishable_batch_staged_for_outbound
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (semi_batch_ready_for_shipment ?semi_perishable_batch)
+        (batch_channel_confirmed ?semi_perishable_batch)
+        (shipment_reserved ?shipment_unit)
+        (shipment_staged_for_container_loading ?shipment_unit)
+        (not
+          (staged_for_outbound ?semi_perishable_batch)
+        )
+      )
+    :effect (staged_for_outbound ?semi_perishable_batch)
+  )
+  (:action schedule_product_release
+    :parameters (?product_unit - product_unit ?release_window - release_window ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (staged_for_outbound ?product_unit)
+        (allocated_test_kit_for_item ?product_unit ?quality_test_kit)
+        (release_window_available ?release_window)
+        (not
+          (release_ready ?product_unit)
+        )
+      )
+    :effect
+      (and
+        (release_ready ?product_unit)
+        (release_window_assigned_to_unit ?product_unit ?release_window)
+        (not
+          (release_window_available ?release_window)
+        )
+      )
+  )
+  (:action finalize_release_and_free_station_for_perishable_batch
+    :parameters (?perishable_batch - perishable_batch ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_ready ?perishable_batch)
+        (assigned_to_grading_station ?perishable_batch ?grading_station)
+        (release_window_assigned_to_unit ?perishable_batch ?release_window)
+        (not
+          (release_scheduled ?perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?perishable_batch)
+        (grading_station_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_and_free_station_for_semi_perishable_batch
+    :parameters (?semi_perishable_batch - semi_perishable_batch ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_ready ?semi_perishable_batch)
+        (assigned_to_grading_station ?semi_perishable_batch ?grading_station)
+        (release_window_assigned_to_unit ?semi_perishable_batch ?release_window)
+        (not
+          (release_scheduled ?semi_perishable_batch)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?semi_perishable_batch)
+        (grading_station_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_and_free_station_for_container
+    :parameters (?storage_container - storage_container ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_ready ?storage_container)
+        (assigned_to_grading_station ?storage_container ?grading_station)
+        (release_window_assigned_to_unit ?storage_container ?release_window)
+        (not
+          (release_scheduled ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?storage_container)
+        (grading_station_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem storage_condition_matching_problem)
+  (:domain storage_condition_matching_by_product_type)
+  (:objects perishable_batch_1 - perishable_batch semi_perishable_batch_1 - semi_perishable_batch container_1 - storage_container container_2 - storage_container grading_station_1 - grading_station grading_station_2 - grading_station grading_station_3 - grading_station test_kit_1 - quality_test_kit conditioning_unit_1 - conditioning_unit label_tag_1 - label_or_tag temperature_profile_cold - temperature_profile distribution_channel_profile_retail - distribution_channel_profile shipment_unit_1 - shipment_unit product_spec_a - product_specification product_spec_b - product_specification cert_phytosanitary - certification cert_organic - certification transport_manifest_1 - transport_manifest transport_manifest_2 - transport_manifest release_window_slot_1 - release_window storage_service_refrigerated_bay - storage_service_option order_ref_1001 - customer_order_reference order_ref_1002 - customer_order_reference processing_instruction_pre_cool - processing_instruction)
+  (:init
+    (grading_station_available grading_station_1)
+    (grading_station_available grading_station_2)
+    (grading_station_available grading_station_3)
+    (test_kit_available test_kit_1)
+    (conditioning_unit_available conditioning_unit_1)
+    (label_available label_tag_1)
+    (assigned_temperature_profile perishable_batch_1 temperature_profile_cold)
+    (assigned_channel_profile semi_perishable_batch_1 distribution_channel_profile_retail)
+    (shipment_unit_available shipment_unit_1)
+    (product_spec_available product_spec_a)
+    (product_spec_available product_spec_b)
+    (container_contains_perishable_batch container_1 perishable_batch_1)
+    (container_contains_perishable_batch container_2 perishable_batch_1)
+    (container_contains_semi_perishable_batch container_1 semi_perishable_batch_1)
+    (container_contains_semi_perishable_batch container_2 semi_perishable_batch_1)
+    (container_assigned_to_shipment container_1 shipment_unit_1)
+    (container_assigned_to_shipment container_2 shipment_unit_1)
+    (container_has_product_spec container_1 product_spec_a)
+    (container_has_product_spec container_2 product_spec_b)
+    (certification_available cert_phytosanitary)
+    (certification_available cert_organic)
+    (transport_manifest_available transport_manifest_1)
+    (transport_manifest_available transport_manifest_2)
+    (release_window_available release_window_slot_1)
+    (storage_service_option_available storage_service_refrigerated_bay)
+    (order_reference_available order_ref_1001)
+    (container_linked_to_order container_1 order_ref_1001)
+    (container_linked_to_order container_2 order_ref_1002)
+    (processing_instruction_available processing_instruction_pre_cool)
+  )
+  (:goal
+    (and
+      (release_scheduled perishable_batch_1)
+      (release_scheduled semi_perishable_batch_1)
+      (release_scheduled container_1)
+      (release_scheduled container_2)
+    )
+  )
+)

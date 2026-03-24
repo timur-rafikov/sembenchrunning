@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_recovery_allocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_token_group - object administrative_token_group - object control_token_group - object domain_root - object case_entity - domain_root recovery_fund_bucket - operational_token_group valuation_model - operational_token_group collateral_record - operational_token_group external_approval - operational_token_group settlement_option - operational_token_group recovery_fund_token - operational_token_group valuation_adjustment - operational_token_group allocation_strategy - operational_token_group entitlement_marker - administrative_token_group collateral_item - administrative_token_group legal_remedy - administrative_token_group recovery_resource - control_token_group resource_share_group - control_token_group allocation_record - control_token_group obligation_category - case_entity case_category - case_entity primary_obligation - obligation_category co_obligation - obligation_category recovery_case - case_category)
+  (:predicates
+    (entity_registered ?entity - case_entity)
+    (entity_configured ?entity - case_entity)
+    (entity_fund_assignment_recorded ?entity - case_entity)
+    (entity_recovered ?entity - case_entity)
+    (entity_ready_for_reservation ?entity - case_entity)
+    (entity_reservation_confirmed ?entity - case_entity)
+    (fund_bucket_available ?fund_bucket - recovery_fund_bucket)
+    (entity_linked_fund_bucket ?entity - case_entity ?fund_bucket - recovery_fund_bucket)
+    (valuation_model_available ?valuation_model - valuation_model)
+    (entity_valuation_model_attached ?entity - case_entity ?valuation_model - valuation_model)
+    (collateral_record_available ?collateral_record - collateral_record)
+    (entity_attached_collateral_record ?entity - case_entity ?collateral_record - collateral_record)
+    (entitlement_marker_available ?entitlement_marker - entitlement_marker)
+    (primary_obligation_entitlement_attached ?primary_obligation - primary_obligation ?entitlement_marker - entitlement_marker)
+    (co_obligation_entitlement_attached ?co_obligation - co_obligation ?entitlement_marker - entitlement_marker)
+    (primary_obligation_linked_resource ?primary_obligation - primary_obligation ?recovery_resource - recovery_resource)
+    (recovery_resource_preselected ?recovery_resource - recovery_resource)
+    (recovery_resource_entitlement_locked ?recovery_resource - recovery_resource)
+    (primary_obligation_resource_confirmed ?primary_obligation - primary_obligation)
+    (co_obligation_linked_share_group ?co_obligation - co_obligation ?resource_share_group - resource_share_group)
+    (resource_share_group_preselected ?resource_share_group - resource_share_group)
+    (resource_share_group_entitlement_locked ?resource_share_group - resource_share_group)
+    (co_obligation_resource_confirmed ?co_obligation - co_obligation)
+    (allocation_record_available ?allocation_record - allocation_record)
+    (allocation_record_prepared ?allocation_record - allocation_record)
+    (allocation_record_includes_resource ?allocation_record - allocation_record ?recovery_resource - recovery_resource)
+    (allocation_record_includes_share_group ?allocation_record - allocation_record ?resource_share_group - resource_share_group)
+    (allocation_record_primary_flag ?allocation_record - allocation_record)
+    (allocation_record_secondary_flag ?allocation_record - allocation_record)
+    (allocation_record_valuation_validated ?allocation_record - allocation_record)
+    (case_has_primary_obligation ?recovery_case - recovery_case ?primary_obligation - primary_obligation)
+    (case_has_co_obligation ?recovery_case - recovery_case ?co_obligation - co_obligation)
+    (case_has_allocation_record ?recovery_case - recovery_case ?allocation_record - allocation_record)
+    (collateral_item_available ?collateral_item - collateral_item)
+    (case_has_collateral_item ?recovery_case - recovery_case ?collateral_item - collateral_item)
+    (collateral_item_consumed ?collateral_item - collateral_item)
+    (collateral_item_allocated_to_record ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    (case_collateral_validated ?recovery_case - recovery_case)
+    (case_strategy_staged ?recovery_case - recovery_case)
+    (case_strategy_applied ?recovery_case - recovery_case)
+    (case_external_approval_attached ?recovery_case - recovery_case)
+    (case_external_approval_verified ?recovery_case - recovery_case)
+    (case_ready_for_settlement_option ?recovery_case - recovery_case)
+    (case_ready_for_finalization ?recovery_case - recovery_case)
+    (legal_remedy_available ?legal_remedy - legal_remedy)
+    (case_has_legal_remedy ?recovery_case - recovery_case ?legal_remedy - legal_remedy)
+    (case_legal_remedy_applied ?recovery_case - recovery_case)
+    (case_legal_remedy_verified ?recovery_case - recovery_case)
+    (case_legal_remedy_executed ?recovery_case - recovery_case)
+    (external_approval_available ?external_approval - external_approval)
+    (case_has_external_approval ?recovery_case - recovery_case ?external_approval - external_approval)
+    (settlement_option_available ?settlement_option - settlement_option)
+    (case_settlement_option_attached ?recovery_case - recovery_case ?settlement_option - settlement_option)
+    (valuation_adjustment_available ?valuation_adjustment - valuation_adjustment)
+    (case_valuation_adjustment_attached ?recovery_case - recovery_case ?valuation_adjustment - valuation_adjustment)
+    (allocation_strategy_available ?allocation_strategy - allocation_strategy)
+    (case_allocation_strategy_attached ?recovery_case - recovery_case ?allocation_strategy - allocation_strategy)
+    (recovery_fund_token_available ?recovery_fund_token - recovery_fund_token)
+    (entity_bound_fund_token ?entity - case_entity ?recovery_fund_token - recovery_fund_token)
+    (primary_obligation_ready ?primary_obligation - primary_obligation)
+    (co_obligation_ready ?co_obligation - co_obligation)
+    (case_closed ?recovery_case - recovery_case)
+  )
+  (:action register_case_entity
+    :parameters (?entity - case_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?entity)
+        )
+        (not
+          (entity_recovered ?entity)
+        )
+      )
+    :effect (entity_registered ?entity)
+  )
+  (:action assign_fund_bucket_to_entity
+    :parameters (?entity - case_entity ?fund_bucket - recovery_fund_bucket)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (not
+          (entity_fund_assignment_recorded ?entity)
+        )
+        (fund_bucket_available ?fund_bucket)
+      )
+    :effect
+      (and
+        (entity_fund_assignment_recorded ?entity)
+        (entity_linked_fund_bucket ?entity ?fund_bucket)
+        (not
+          (fund_bucket_available ?fund_bucket)
+        )
+      )
+  )
+  (:action attach_valuation_model_to_entity
+    :parameters (?entity - case_entity ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (entity_fund_assignment_recorded ?entity)
+        (valuation_model_available ?valuation_model)
+      )
+    :effect
+      (and
+        (entity_valuation_model_attached ?entity ?valuation_model)
+        (not
+          (valuation_model_available ?valuation_model)
+        )
+      )
+  )
+  (:action complete_entity_configuration
+    :parameters (?entity - case_entity ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (entity_fund_assignment_recorded ?entity)
+        (entity_valuation_model_attached ?entity ?valuation_model)
+        (not
+          (entity_configured ?entity)
+        )
+      )
+    :effect (entity_configured ?entity)
+  )
+  (:action release_valuation_model
+    :parameters (?entity - case_entity ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_valuation_model_attached ?entity ?valuation_model)
+      )
+    :effect
+      (and
+        (valuation_model_available ?valuation_model)
+        (not
+          (entity_valuation_model_attached ?entity ?valuation_model)
+        )
+      )
+  )
+  (:action attach_collateral_record_to_entity
+    :parameters (?entity - case_entity ?collateral_record - collateral_record)
+    :precondition
+      (and
+        (entity_configured ?entity)
+        (collateral_record_available ?collateral_record)
+      )
+    :effect
+      (and
+        (entity_attached_collateral_record ?entity ?collateral_record)
+        (not
+          (collateral_record_available ?collateral_record)
+        )
+      )
+  )
+  (:action detach_collateral_record_from_entity
+    :parameters (?entity - case_entity ?collateral_record - collateral_record)
+    :precondition
+      (and
+        (entity_attached_collateral_record ?entity ?collateral_record)
+      )
+    :effect
+      (and
+        (collateral_record_available ?collateral_record)
+        (not
+          (entity_attached_collateral_record ?entity ?collateral_record)
+        )
+      )
+  )
+  (:action attach_valuation_adjustment_to_case
+    :parameters (?recovery_case - recovery_case ?valuation_adjustment - valuation_adjustment)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (valuation_adjustment_available ?valuation_adjustment)
+      )
+    :effect
+      (and
+        (case_valuation_adjustment_attached ?recovery_case ?valuation_adjustment)
+        (not
+          (valuation_adjustment_available ?valuation_adjustment)
+        )
+      )
+  )
+  (:action detach_valuation_adjustment_from_case
+    :parameters (?recovery_case - recovery_case ?valuation_adjustment - valuation_adjustment)
+    :precondition
+      (and
+        (case_valuation_adjustment_attached ?recovery_case ?valuation_adjustment)
+      )
+    :effect
+      (and
+        (valuation_adjustment_available ?valuation_adjustment)
+        (not
+          (case_valuation_adjustment_attached ?recovery_case ?valuation_adjustment)
+        )
+      )
+  )
+  (:action attach_allocation_strategy_to_case
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (allocation_strategy_available ?allocation_strategy)
+      )
+    :effect
+      (and
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (not
+          (allocation_strategy_available ?allocation_strategy)
+        )
+      )
+  )
+  (:action detach_allocation_strategy_from_case
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy)
+    :precondition
+      (and
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+      )
+    :effect
+      (and
+        (allocation_strategy_available ?allocation_strategy)
+        (not
+          (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        )
+      )
+  )
+  (:action preselect_recovery_resource_for_primary_obligation
+    :parameters (?primary_obligation - primary_obligation ?recovery_resource - recovery_resource ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_configured ?primary_obligation)
+        (entity_valuation_model_attached ?primary_obligation ?valuation_model)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (not
+          (recovery_resource_preselected ?recovery_resource)
+        )
+        (not
+          (recovery_resource_entitlement_locked ?recovery_resource)
+        )
+      )
+    :effect (recovery_resource_preselected ?recovery_resource)
+  )
+  (:action confirm_primary_obligation_resource_with_collateral
+    :parameters (?primary_obligation - primary_obligation ?recovery_resource - recovery_resource ?collateral_record - collateral_record)
+    :precondition
+      (and
+        (entity_configured ?primary_obligation)
+        (entity_attached_collateral_record ?primary_obligation ?collateral_record)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (recovery_resource_preselected ?recovery_resource)
+        (not
+          (primary_obligation_ready ?primary_obligation)
+        )
+      )
+    :effect
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+      )
+  )
+  (:action attach_entitlement_to_primary_obligation_resource
+    :parameters (?primary_obligation - primary_obligation ?recovery_resource - recovery_resource ?entitlement_marker - entitlement_marker)
+    :precondition
+      (and
+        (entity_configured ?primary_obligation)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (entitlement_marker_available ?entitlement_marker)
+        (not
+          (primary_obligation_ready ?primary_obligation)
+        )
+      )
+    :effect
+      (and
+        (recovery_resource_entitlement_locked ?recovery_resource)
+        (primary_obligation_ready ?primary_obligation)
+        (primary_obligation_entitlement_attached ?primary_obligation ?entitlement_marker)
+        (not
+          (entitlement_marker_available ?entitlement_marker)
+        )
+      )
+  )
+  (:action reconcile_primary_obligation_resource_selection
+    :parameters (?primary_obligation - primary_obligation ?recovery_resource - recovery_resource ?valuation_model - valuation_model ?entitlement_marker - entitlement_marker)
+    :precondition
+      (and
+        (entity_configured ?primary_obligation)
+        (entity_valuation_model_attached ?primary_obligation ?valuation_model)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (recovery_resource_entitlement_locked ?recovery_resource)
+        (primary_obligation_entitlement_attached ?primary_obligation ?entitlement_marker)
+        (not
+          (primary_obligation_resource_confirmed ?primary_obligation)
+        )
+      )
+    :effect
+      (and
+        (recovery_resource_preselected ?recovery_resource)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+        (entitlement_marker_available ?entitlement_marker)
+        (not
+          (primary_obligation_entitlement_attached ?primary_obligation ?entitlement_marker)
+        )
+      )
+  )
+  (:action preselect_share_group_for_co_obligation
+    :parameters (?co_obligation - co_obligation ?resource_share_group - resource_share_group ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_configured ?co_obligation)
+        (entity_valuation_model_attached ?co_obligation ?valuation_model)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (not
+          (resource_share_group_preselected ?resource_share_group)
+        )
+        (not
+          (resource_share_group_entitlement_locked ?resource_share_group)
+        )
+      )
+    :effect (resource_share_group_preselected ?resource_share_group)
+  )
+  (:action confirm_co_obligation_share_group_with_collateral
+    :parameters (?co_obligation - co_obligation ?resource_share_group - resource_share_group ?collateral_record - collateral_record)
+    :precondition
+      (and
+        (entity_configured ?co_obligation)
+        (entity_attached_collateral_record ?co_obligation ?collateral_record)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (resource_share_group_preselected ?resource_share_group)
+        (not
+          (co_obligation_ready ?co_obligation)
+        )
+      )
+    :effect
+      (and
+        (co_obligation_ready ?co_obligation)
+        (co_obligation_resource_confirmed ?co_obligation)
+      )
+  )
+  (:action attach_entitlement_to_co_obligation_share_group
+    :parameters (?co_obligation - co_obligation ?resource_share_group - resource_share_group ?entitlement_marker - entitlement_marker)
+    :precondition
+      (and
+        (entity_configured ?co_obligation)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (entitlement_marker_available ?entitlement_marker)
+        (not
+          (co_obligation_ready ?co_obligation)
+        )
+      )
+    :effect
+      (and
+        (resource_share_group_entitlement_locked ?resource_share_group)
+        (co_obligation_ready ?co_obligation)
+        (co_obligation_entitlement_attached ?co_obligation ?entitlement_marker)
+        (not
+          (entitlement_marker_available ?entitlement_marker)
+        )
+      )
+  )
+  (:action reconcile_co_obligation_share_group_selection
+    :parameters (?co_obligation - co_obligation ?resource_share_group - resource_share_group ?valuation_model - valuation_model ?entitlement_marker - entitlement_marker)
+    :precondition
+      (and
+        (entity_configured ?co_obligation)
+        (entity_valuation_model_attached ?co_obligation ?valuation_model)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (resource_share_group_entitlement_locked ?resource_share_group)
+        (co_obligation_entitlement_attached ?co_obligation ?entitlement_marker)
+        (not
+          (co_obligation_resource_confirmed ?co_obligation)
+        )
+      )
+    :effect
+      (and
+        (resource_share_group_preselected ?resource_share_group)
+        (co_obligation_resource_confirmed ?co_obligation)
+        (entitlement_marker_available ?entitlement_marker)
+        (not
+          (co_obligation_entitlement_attached ?co_obligation ?entitlement_marker)
+        )
+      )
+  )
+  (:action create_allocation_record_basic
+    :parameters (?primary_obligation - primary_obligation ?co_obligation - co_obligation ?recovery_resource - recovery_resource ?resource_share_group - resource_share_group ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (co_obligation_ready ?co_obligation)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (recovery_resource_preselected ?recovery_resource)
+        (resource_share_group_preselected ?resource_share_group)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+        (co_obligation_resource_confirmed ?co_obligation)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_includes_resource ?allocation_record ?recovery_resource)
+        (allocation_record_includes_share_group ?allocation_record ?resource_share_group)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_primary_indicator
+    :parameters (?primary_obligation - primary_obligation ?co_obligation - co_obligation ?recovery_resource - recovery_resource ?resource_share_group - resource_share_group ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (co_obligation_ready ?co_obligation)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (recovery_resource_entitlement_locked ?recovery_resource)
+        (resource_share_group_preselected ?resource_share_group)
+        (not
+          (primary_obligation_resource_confirmed ?primary_obligation)
+        )
+        (co_obligation_resource_confirmed ?co_obligation)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_includes_resource ?allocation_record ?recovery_resource)
+        (allocation_record_includes_share_group ?allocation_record ?resource_share_group)
+        (allocation_record_primary_flag ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_co_indicator
+    :parameters (?primary_obligation - primary_obligation ?co_obligation - co_obligation ?recovery_resource - recovery_resource ?resource_share_group - resource_share_group ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (co_obligation_ready ?co_obligation)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (recovery_resource_preselected ?recovery_resource)
+        (resource_share_group_entitlement_locked ?resource_share_group)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+        (not
+          (co_obligation_resource_confirmed ?co_obligation)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_includes_resource ?allocation_record ?recovery_resource)
+        (allocation_record_includes_share_group ?allocation_record ?resource_share_group)
+        (allocation_record_secondary_flag ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_both_indicators
+    :parameters (?primary_obligation - primary_obligation ?co_obligation - co_obligation ?recovery_resource - recovery_resource ?resource_share_group - resource_share_group ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (co_obligation_ready ?co_obligation)
+        (primary_obligation_linked_resource ?primary_obligation ?recovery_resource)
+        (co_obligation_linked_share_group ?co_obligation ?resource_share_group)
+        (recovery_resource_entitlement_locked ?recovery_resource)
+        (resource_share_group_entitlement_locked ?resource_share_group)
+        (not
+          (primary_obligation_resource_confirmed ?primary_obligation)
+        )
+        (not
+          (co_obligation_resource_confirmed ?co_obligation)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_includes_resource ?allocation_record ?recovery_resource)
+        (allocation_record_includes_share_group ?allocation_record ?resource_share_group)
+        (allocation_record_primary_flag ?allocation_record)
+        (allocation_record_secondary_flag ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action validate_allocation_record_valuation
+    :parameters (?allocation_record - allocation_record ?primary_obligation - primary_obligation ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (allocation_record_prepared ?allocation_record)
+        (primary_obligation_ready ?primary_obligation)
+        (entity_valuation_model_attached ?primary_obligation ?valuation_model)
+        (not
+          (allocation_record_valuation_validated ?allocation_record)
+        )
+      )
+    :effect (allocation_record_valuation_validated ?allocation_record)
+  )
+  (:action consume_collateral_item_for_allocation
+    :parameters (?recovery_case - recovery_case ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (case_has_allocation_record ?recovery_case ?allocation_record)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_available ?collateral_item)
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_valuation_validated ?allocation_record)
+        (not
+          (collateral_item_consumed ?collateral_item)
+        )
+      )
+    :effect
+      (and
+        (collateral_item_consumed ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (not
+          (collateral_item_available ?collateral_item)
+        )
+      )
+  )
+  (:action validate_case_collateral_for_allocation
+    :parameters (?recovery_case - recovery_case ?collateral_item - collateral_item ?allocation_record - allocation_record ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_consumed ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (entity_valuation_model_attached ?recovery_case ?valuation_model)
+        (not
+          (allocation_record_primary_flag ?allocation_record)
+        )
+        (not
+          (case_collateral_validated ?recovery_case)
+        )
+      )
+    :effect (case_collateral_validated ?recovery_case)
+  )
+  (:action attach_external_approval_to_case
+    :parameters (?recovery_case - recovery_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (external_approval_available ?external_approval)
+        (not
+          (case_external_approval_attached ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_external_approval_attached ?recovery_case)
+        (case_has_external_approval ?recovery_case ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action verify_external_approval_and_validate_collateral
+    :parameters (?recovery_case - recovery_case ?collateral_item - collateral_item ?allocation_record - allocation_record ?valuation_model - valuation_model ?external_approval - external_approval)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_consumed ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (entity_valuation_model_attached ?recovery_case ?valuation_model)
+        (allocation_record_primary_flag ?allocation_record)
+        (case_external_approval_attached ?recovery_case)
+        (case_has_external_approval ?recovery_case ?external_approval)
+        (not
+          (case_collateral_validated ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_collateral_validated ?recovery_case)
+        (case_external_approval_verified ?recovery_case)
+      )
+  )
+  (:action stage_case_strategy_preexecution
+    :parameters (?recovery_case - recovery_case ?valuation_adjustment - valuation_adjustment ?collateral_record - collateral_record ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_collateral_validated ?recovery_case)
+        (case_valuation_adjustment_attached ?recovery_case ?valuation_adjustment)
+        (entity_attached_collateral_record ?recovery_case ?collateral_record)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (not
+          (allocation_record_secondary_flag ?allocation_record)
+        )
+        (not
+          (case_strategy_staged ?recovery_case)
+        )
+      )
+    :effect (case_strategy_staged ?recovery_case)
+  )
+  (:action stage_case_strategy_preexecution_with_record_flag
+    :parameters (?recovery_case - recovery_case ?valuation_adjustment - valuation_adjustment ?collateral_record - collateral_record ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_collateral_validated ?recovery_case)
+        (case_valuation_adjustment_attached ?recovery_case ?valuation_adjustment)
+        (entity_attached_collateral_record ?recovery_case ?collateral_record)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (allocation_record_secondary_flag ?allocation_record)
+        (not
+          (case_strategy_staged ?recovery_case)
+        )
+      )
+    :effect (case_strategy_staged ?recovery_case)
+  )
+  (:action apply_allocation_strategy_to_case_standard
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_strategy_staged ?recovery_case)
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (not
+          (allocation_record_primary_flag ?allocation_record)
+        )
+        (not
+          (allocation_record_secondary_flag ?allocation_record)
+        )
+        (not
+          (case_strategy_applied ?recovery_case)
+        )
+      )
+    :effect (case_strategy_applied ?recovery_case)
+  )
+  (:action apply_allocation_strategy_and_prepare_settlement
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_strategy_staged ?recovery_case)
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (allocation_record_primary_flag ?allocation_record)
+        (not
+          (allocation_record_secondary_flag ?allocation_record)
+        )
+        (not
+          (case_strategy_applied ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_settlement_option ?recovery_case)
+      )
+  )
+  (:action apply_allocation_strategy_with_co_flag
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_strategy_staged ?recovery_case)
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (not
+          (allocation_record_primary_flag ?allocation_record)
+        )
+        (allocation_record_secondary_flag ?allocation_record)
+        (not
+          (case_strategy_applied ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_settlement_option ?recovery_case)
+      )
+  )
+  (:action apply_allocation_strategy_with_both_flags
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy ?collateral_item - collateral_item ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (case_strategy_staged ?recovery_case)
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (case_has_collateral_item ?recovery_case ?collateral_item)
+        (collateral_item_allocated_to_record ?collateral_item ?allocation_record)
+        (allocation_record_primary_flag ?allocation_record)
+        (allocation_record_secondary_flag ?allocation_record)
+        (not
+          (case_strategy_applied ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_settlement_option ?recovery_case)
+      )
+  )
+  (:action finalize_case_no_settlement_option
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_strategy_applied ?recovery_case)
+        (not
+          (case_ready_for_settlement_option ?recovery_case)
+        )
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (entity_ready_for_reservation ?recovery_case)
+      )
+  )
+  (:action attach_settlement_option_to_case
+    :parameters (?recovery_case - recovery_case ?settlement_option - settlement_option)
+    :precondition
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_settlement_option ?recovery_case)
+        (settlement_option_available ?settlement_option)
+      )
+    :effect
+      (and
+        (case_settlement_option_attached ?recovery_case ?settlement_option)
+        (not
+          (settlement_option_available ?settlement_option)
+        )
+      )
+  )
+  (:action prepare_case_for_finalization
+    :parameters (?recovery_case - recovery_case ?primary_obligation - primary_obligation ?co_obligation - co_obligation ?valuation_model - valuation_model ?settlement_option - settlement_option)
+    :precondition
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_settlement_option ?recovery_case)
+        (case_settlement_option_attached ?recovery_case ?settlement_option)
+        (case_has_primary_obligation ?recovery_case ?primary_obligation)
+        (case_has_co_obligation ?recovery_case ?co_obligation)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+        (co_obligation_resource_confirmed ?co_obligation)
+        (entity_valuation_model_attached ?recovery_case ?valuation_model)
+        (not
+          (case_ready_for_finalization ?recovery_case)
+        )
+      )
+    :effect (case_ready_for_finalization ?recovery_case)
+  )
+  (:action finalize_case_with_checks
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_strategy_applied ?recovery_case)
+        (case_ready_for_finalization ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (entity_ready_for_reservation ?recovery_case)
+      )
+  )
+  (:action apply_legal_remedy_to_case
+    :parameters (?recovery_case - recovery_case ?legal_remedy - legal_remedy ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_configured ?recovery_case)
+        (entity_valuation_model_attached ?recovery_case ?valuation_model)
+        (legal_remedy_available ?legal_remedy)
+        (case_has_legal_remedy ?recovery_case ?legal_remedy)
+        (not
+          (case_legal_remedy_applied ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_legal_remedy_applied ?recovery_case)
+        (not
+          (legal_remedy_available ?legal_remedy)
+        )
+      )
+  )
+  (:action verify_legal_remedy_and_collateral
+    :parameters (?recovery_case - recovery_case ?collateral_record - collateral_record)
+    :precondition
+      (and
+        (case_legal_remedy_applied ?recovery_case)
+        (entity_attached_collateral_record ?recovery_case ?collateral_record)
+        (not
+          (case_legal_remedy_verified ?recovery_case)
+        )
+      )
+    :effect (case_legal_remedy_verified ?recovery_case)
+  )
+  (:action execute_legal_remedy_strategy
+    :parameters (?recovery_case - recovery_case ?allocation_strategy - allocation_strategy)
+    :precondition
+      (and
+        (case_legal_remedy_verified ?recovery_case)
+        (case_allocation_strategy_attached ?recovery_case ?allocation_strategy)
+        (not
+          (case_legal_remedy_executed ?recovery_case)
+        )
+      )
+    :effect (case_legal_remedy_executed ?recovery_case)
+  )
+  (:action finalize_case_after_legal_remedy
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_legal_remedy_executed ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (entity_ready_for_reservation ?recovery_case)
+      )
+  )
+  (:action finalize_primary_obligation_allocation
+    :parameters (?primary_obligation - primary_obligation ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (primary_obligation_ready ?primary_obligation)
+        (primary_obligation_resource_confirmed ?primary_obligation)
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_valuation_validated ?allocation_record)
+        (not
+          (entity_ready_for_reservation ?primary_obligation)
+        )
+      )
+    :effect (entity_ready_for_reservation ?primary_obligation)
+  )
+  (:action finalize_co_obligation_allocation
+    :parameters (?co_obligation - co_obligation ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (co_obligation_ready ?co_obligation)
+        (co_obligation_resource_confirmed ?co_obligation)
+        (allocation_record_prepared ?allocation_record)
+        (allocation_record_valuation_validated ?allocation_record)
+        (not
+          (entity_ready_for_reservation ?co_obligation)
+        )
+      )
+    :effect (entity_ready_for_reservation ?co_obligation)
+  )
+  (:action reserve_recovery_fund_token_for_entity
+    :parameters (?entity - case_entity ?recovery_fund_token - recovery_fund_token ?valuation_model - valuation_model)
+    :precondition
+      (and
+        (entity_ready_for_reservation ?entity)
+        (entity_valuation_model_attached ?entity ?valuation_model)
+        (recovery_fund_token_available ?recovery_fund_token)
+        (not
+          (entity_reservation_confirmed ?entity)
+        )
+      )
+    :effect
+      (and
+        (entity_reservation_confirmed ?entity)
+        (entity_bound_fund_token ?entity ?recovery_fund_token)
+        (not
+          (recovery_fund_token_available ?recovery_fund_token)
+        )
+      )
+  )
+  (:action commit_reserved_fund_to_primary_obligation
+    :parameters (?primary_obligation - primary_obligation ?fund_bucket - recovery_fund_bucket ?recovery_fund_token - recovery_fund_token)
+    :precondition
+      (and
+        (entity_reservation_confirmed ?primary_obligation)
+        (entity_linked_fund_bucket ?primary_obligation ?fund_bucket)
+        (entity_bound_fund_token ?primary_obligation ?recovery_fund_token)
+        (not
+          (entity_recovered ?primary_obligation)
+        )
+      )
+    :effect
+      (and
+        (entity_recovered ?primary_obligation)
+        (fund_bucket_available ?fund_bucket)
+        (recovery_fund_token_available ?recovery_fund_token)
+      )
+  )
+  (:action commit_reserved_fund_to_co_obligation
+    :parameters (?co_obligation - co_obligation ?fund_bucket - recovery_fund_bucket ?recovery_fund_token - recovery_fund_token)
+    :precondition
+      (and
+        (entity_reservation_confirmed ?co_obligation)
+        (entity_linked_fund_bucket ?co_obligation ?fund_bucket)
+        (entity_bound_fund_token ?co_obligation ?recovery_fund_token)
+        (not
+          (entity_recovered ?co_obligation)
+        )
+      )
+    :effect
+      (and
+        (entity_recovered ?co_obligation)
+        (fund_bucket_available ?fund_bucket)
+        (recovery_fund_token_available ?recovery_fund_token)
+      )
+  )
+  (:action commit_reserved_fund_to_case
+    :parameters (?recovery_case - recovery_case ?fund_bucket - recovery_fund_bucket ?recovery_fund_token - recovery_fund_token)
+    :precondition
+      (and
+        (entity_reservation_confirmed ?recovery_case)
+        (entity_linked_fund_bucket ?recovery_case ?fund_bucket)
+        (entity_bound_fund_token ?recovery_case ?recovery_fund_token)
+        (not
+          (entity_recovered ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (entity_recovered ?recovery_case)
+        (fund_bucket_available ?fund_bucket)
+        (recovery_fund_token_available ?recovery_fund_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem recovery_allocation_scenario)
+  (:domain finance_recovery_allocation_domain)
+  (:objects primary_obligation_1 - primary_obligation co_obligation_1 - co_obligation recovery_case_1 - recovery_case recovery_case_2 - recovery_case fund_bucket_1 - recovery_fund_bucket fund_bucket_2 - recovery_fund_bucket fund_bucket_3 - recovery_fund_bucket valuation_model_default - valuation_model collateral_record_1 - collateral_record entitlement_marker_1 - entitlement_marker recovery_resource_1 - recovery_resource resource_share_group_1 - resource_share_group allocation_record_1 - allocation_record collateral_item_1 - collateral_item collateral_item_2 - collateral_item external_approval_1 - external_approval external_approval_2 - external_approval settlement_option_1 - settlement_option settlement_option_2 - settlement_option recovery_fund_token_1 - recovery_fund_token valuation_adjustment_1 - valuation_adjustment legal_remedy_1 - legal_remedy legal_remedy_2 - legal_remedy allocation_strategy_1 - allocation_strategy)
+  (:init
+    (fund_bucket_available fund_bucket_1)
+    (fund_bucket_available fund_bucket_2)
+    (fund_bucket_available fund_bucket_3)
+    (valuation_model_available valuation_model_default)
+    (collateral_record_available collateral_record_1)
+    (entitlement_marker_available entitlement_marker_1)
+    (primary_obligation_linked_resource primary_obligation_1 recovery_resource_1)
+    (co_obligation_linked_share_group co_obligation_1 resource_share_group_1)
+    (allocation_record_available allocation_record_1)
+    (collateral_item_available collateral_item_1)
+    (collateral_item_available collateral_item_2)
+    (case_has_primary_obligation recovery_case_1 primary_obligation_1)
+    (case_has_primary_obligation recovery_case_2 primary_obligation_1)
+    (case_has_co_obligation recovery_case_1 co_obligation_1)
+    (case_has_co_obligation recovery_case_2 co_obligation_1)
+    (case_has_allocation_record recovery_case_1 allocation_record_1)
+    (case_has_allocation_record recovery_case_2 allocation_record_1)
+    (case_has_collateral_item recovery_case_1 collateral_item_1)
+    (case_has_collateral_item recovery_case_2 collateral_item_2)
+    (external_approval_available external_approval_1)
+    (external_approval_available external_approval_2)
+    (settlement_option_available settlement_option_1)
+    (settlement_option_available settlement_option_2)
+    (recovery_fund_token_available recovery_fund_token_1)
+    (valuation_adjustment_available valuation_adjustment_1)
+    (legal_remedy_available legal_remedy_1)
+    (case_has_legal_remedy recovery_case_1 legal_remedy_1)
+    (case_has_legal_remedy recovery_case_2 legal_remedy_2)
+    (allocation_strategy_available allocation_strategy_1)
+  )
+  (:goal
+    (and
+      (entity_recovered primary_obligation_1)
+      (entity_recovered co_obligation_1)
+      (entity_recovered recovery_case_1)
+      (entity_recovered recovery_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_case_entity primary_obligation_1)
+(register_case_entity co_obligation_1)
+(register_case_entity recovery_case_1)
+(register_case_entity recovery_case_2)
+(assign_fund_bucket_to_entity primary_obligation_1 fund_bucket_1)
+(attach_valuation_model_to_entity primary_obligation_1 valuation_model_default)
+(complete_entity_configuration primary_obligation_1 valuation_model_default)
+(attach_collateral_record_to_entity primary_obligation_1 collateral_record_1)
+(preselect_recovery_resource_for_primary_obligation primary_obligation_1 recovery_resource_1 valuation_model_default)
+(confirm_primary_obligation_resource_with_collateral primary_obligation_1 recovery_resource_1 collateral_record_1)
+(detach_collateral_record_from_entity primary_obligation_1 collateral_record_1)
+(assign_fund_bucket_to_entity co_obligation_1 fund_bucket_2)
+(release_valuation_model primary_obligation_1 valuation_model_default)
+(attach_valuation_model_to_entity co_obligation_1 valuation_model_default)
+(complete_entity_configuration co_obligation_1 valuation_model_default)
+(attach_collateral_record_to_entity co_obligation_1 collateral_record_1)
+(preselect_share_group_for_co_obligation co_obligation_1 resource_share_group_1 valuation_model_default)
+(confirm_co_obligation_share_group_with_collateral co_obligation_1 resource_share_group_1 collateral_record_1)
+(detach_collateral_record_from_entity co_obligation_1 collateral_record_1)
+(create_allocation_record_basic primary_obligation_1 co_obligation_1 recovery_resource_1 resource_share_group_1 allocation_record_1)
+(release_valuation_model co_obligation_1 valuation_model_default)
+(attach_valuation_model_to_entity primary_obligation_1 valuation_model_default)
+(validate_allocation_record_valuation allocation_record_1 primary_obligation_1 valuation_model_default)
+(finalize_primary_obligation_allocation primary_obligation_1 allocation_record_1)
+(reserve_recovery_fund_token_for_entity primary_obligation_1 recovery_fund_token_1 valuation_model_default)
+(commit_reserved_fund_to_primary_obligation primary_obligation_1 fund_bucket_1 recovery_fund_token_1)
+(assign_fund_bucket_to_entity recovery_case_1 fund_bucket_3)
+(release_valuation_model primary_obligation_1 valuation_model_default)
+(attach_valuation_model_to_entity recovery_case_1 valuation_model_default)
+(complete_entity_configuration recovery_case_1 valuation_model_default)
+(attach_collateral_record_to_entity recovery_case_1 collateral_record_1)
+(apply_legal_remedy_to_case recovery_case_1 legal_remedy_1 valuation_model_default)
+(verify_legal_remedy_and_collateral recovery_case_1 collateral_record_1)
+(attach_allocation_strategy_to_case recovery_case_1 allocation_strategy_1)
+(execute_legal_remedy_strategy recovery_case_1 allocation_strategy_1)
+(finalize_case_after_legal_remedy recovery_case_1)
+(assign_fund_bucket_to_entity recovery_case_2 fund_bucket_1)
+(release_valuation_model recovery_case_1 valuation_model_default)
+(attach_valuation_model_to_entity recovery_case_2 valuation_model_default)
+(complete_entity_configuration recovery_case_2 valuation_model_default)
+(consume_collateral_item_for_allocation recovery_case_2 collateral_item_2 allocation_record_1)
+(validate_case_collateral_for_allocation recovery_case_2 collateral_item_2 allocation_record_1 valuation_model_default)
+(attach_valuation_adjustment_to_case recovery_case_2 valuation_adjustment_1)
+(detach_collateral_record_from_entity recovery_case_1 collateral_record_1)
+(attach_collateral_record_to_entity recovery_case_2 collateral_record_1)
+(stage_case_strategy_preexecution recovery_case_2 valuation_adjustment_1 collateral_record_1 collateral_item_2 allocation_record_1)
+(detach_allocation_strategy_from_case recovery_case_1 allocation_strategy_1)
+(attach_allocation_strategy_to_case recovery_case_2 allocation_strategy_1)
+(apply_allocation_strategy_to_case_standard recovery_case_2 allocation_strategy_1 collateral_item_2 allocation_record_1)
+(finalize_case_no_settlement_option recovery_case_2)
+(finalize_co_obligation_allocation co_obligation_1 allocation_record_1)
+(release_valuation_model recovery_case_2 valuation_model_default)
+(attach_valuation_model_to_entity co_obligation_1 valuation_model_default)
+(reserve_recovery_fund_token_for_entity co_obligation_1 recovery_fund_token_1 valuation_model_default)
+(commit_reserved_fund_to_co_obligation co_obligation_1 fund_bucket_2 recovery_fund_token_1)
+(release_valuation_model co_obligation_1 valuation_model_default)
+(attach_valuation_model_to_entity recovery_case_1 valuation_model_default)
+(reserve_recovery_fund_token_for_entity recovery_case_1 recovery_fund_token_1 valuation_model_default)
+(commit_reserved_fund_to_case recovery_case_1 fund_bucket_3 recovery_fund_token_1)
+(release_valuation_model recovery_case_1 valuation_model_default)
+(attach_valuation_model_to_entity recovery_case_2 valuation_model_default)
+(reserve_recovery_fund_token_for_entity recovery_case_2 recovery_fund_token_1 valuation_model_default)
+(commit_reserved_fund_to_case recovery_case_2 fund_bucket_1 recovery_fund_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2lcyrgq2/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_2lcyrgq2/plan.pddl 63 
+
+
+
+--- stderr ---
+

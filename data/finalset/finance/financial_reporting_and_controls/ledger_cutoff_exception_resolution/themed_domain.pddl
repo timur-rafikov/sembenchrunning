@@ -1,0 +1,936 @@
+(define (domain ledger_cutoff_exception_resolution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object activity_type - object artifact_type - object exception_case_root - object cutoff_exception_case - exception_case_root approver_role - resource_group investigator - resource_group sme_reviewer - resource_group control_checklist - resource_group signoff - resource_group audit_reference - resource_group adjustment_code - resource_group escalation_reason - resource_group supporting_document - activity_type workpaper - activity_type policy_reference - activity_type ledger_discrepancy_record - artifact_type counterparty_discrepancy_record - artifact_type resolution_packet - artifact_type case_segment - cutoff_exception_case case_subsegment - cutoff_exception_case general_ledger_segment - case_segment subledger_segment - case_segment finance_processor - case_subsegment)
+  (:predicates
+    (entity_initiated ?cutoff_exception_case - cutoff_exception_case)
+    (entity_ready_for_processing ?cutoff_exception_case - cutoff_exception_case)
+    (entity_approver_assigned ?cutoff_exception_case - cutoff_exception_case)
+    (entity_closed_for_cutoff ?cutoff_exception_case - cutoff_exception_case)
+    (entity_signed_off ?cutoff_exception_case - cutoff_exception_case)
+    (entity_approval_obtained ?cutoff_exception_case - cutoff_exception_case)
+    (approver_available ?approver_role - approver_role)
+    (entity_assigned_approver ?cutoff_exception_case - cutoff_exception_case ?approver_role - approver_role)
+    (investigator_available ?investigator - investigator)
+    (entity_assigned_investigator ?cutoff_exception_case - cutoff_exception_case ?investigator - investigator)
+    (sme_available ?sme_reviewer - sme_reviewer)
+    (entity_assigned_sme_reviewer ?cutoff_exception_case - cutoff_exception_case ?sme_reviewer - sme_reviewer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (gl_has_supporting_document ?general_ledger_segment - general_ledger_segment ?supporting_document - supporting_document)
+    (subledger_has_supporting_document ?subledger_segment - subledger_segment ?supporting_document - supporting_document)
+    (gl_has_discrepancy_record ?general_ledger_segment - general_ledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record)
+    (ledger_discrepancy_flagged ?ledger_discrepancy_record - ledger_discrepancy_record)
+    (ledger_discrepancy_has_documentation ?ledger_discrepancy_record - ledger_discrepancy_record)
+    (gl_investigation_validated ?general_ledger_segment - general_ledger_segment)
+    (subledger_has_discrepancy_record ?subledger_segment - subledger_segment ?counterparty_discrepancy_record - counterparty_discrepancy_record)
+    (counterparty_discrepancy_flagged ?counterparty_discrepancy_record - counterparty_discrepancy_record)
+    (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record - counterparty_discrepancy_record)
+    (subledger_investigation_validated ?subledger_segment - subledger_segment)
+    (resolution_packet_available ?resolution_packet - resolution_packet)
+    (resolution_packet_created ?resolution_packet - resolution_packet)
+    (packet_includes_ledger_discrepancy ?resolution_packet - resolution_packet ?ledger_discrepancy_record - ledger_discrepancy_record)
+    (packet_includes_counterparty_discrepancy ?resolution_packet - resolution_packet ?counterparty_discrepancy_record - counterparty_discrepancy_record)
+    (packet_requires_sme_review ?resolution_packet - resolution_packet)
+    (packet_requires_policy_approval ?resolution_packet - resolution_packet)
+    (packet_validated ?resolution_packet - resolution_packet)
+    (processor_responsible_for_gl_segment ?finance_processor - finance_processor ?general_ledger_segment - general_ledger_segment)
+    (processor_responsible_for_subledger_segment ?finance_processor - finance_processor ?subledger_segment - subledger_segment)
+    (processor_has_resolution_packet ?finance_processor - finance_processor ?resolution_packet - resolution_packet)
+    (workpaper_available ?workpaper - workpaper)
+    (processor_has_workpaper ?finance_processor - finance_processor ?workpaper - workpaper)
+    (workpaper_bound ?workpaper - workpaper)
+    (workpaper_attached_to_packet ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    (processor_has_adjustments_bound ?finance_processor - finance_processor)
+    (processor_review_complete ?finance_processor - finance_processor)
+    (workpaper_reviewed_by_processor ?finance_processor - finance_processor)
+    (processor_has_control_checklist ?finance_processor - finance_processor)
+    (processor_control_checklist_completed ?finance_processor - finance_processor)
+    (processor_quality_check_passed ?finance_processor - finance_processor)
+    (processor_finalized_package ?finance_processor - finance_processor)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (processor_attached_policy_reference ?finance_processor - finance_processor ?policy_reference - policy_reference)
+    (processor_policy_applied ?finance_processor - finance_processor)
+    (processor_policy_sme_validated ?finance_processor - finance_processor)
+    (processor_policy_approved ?finance_processor - finance_processor)
+    (control_checklist_available ?control_checklist - control_checklist)
+    (processor_attached_control_checklist ?finance_processor - finance_processor ?control_checklist - control_checklist)
+    (signoff_available ?signoff - signoff)
+    (processor_has_signoff ?finance_processor - finance_processor ?signoff - signoff)
+    (adjustment_code_available ?adjustment_code - adjustment_code)
+    (processor_bound_adjustment_code ?finance_processor - finance_processor ?adjustment_code - adjustment_code)
+    (escalation_reason_available ?escalation_reason - escalation_reason)
+    (processor_bound_escalation_reason ?finance_processor - finance_processor ?escalation_reason - escalation_reason)
+    (audit_reference_available ?audit_reference - audit_reference)
+    (entity_linked_audit_reference ?cutoff_exception_case - cutoff_exception_case ?audit_reference - audit_reference)
+    (gl_ready_for_packet_assembly ?general_ledger_segment - general_ledger_segment)
+    (subledger_ready_for_packet_assembly ?subledger_segment - subledger_segment)
+    (processor_marked_closed ?finance_processor - finance_processor)
+  )
+  (:action create_cutoff_exception_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case)
+    :precondition
+      (and
+        (not
+          (entity_initiated ?cutoff_exception_case)
+        )
+        (not
+          (entity_closed_for_cutoff ?cutoff_exception_case)
+        )
+      )
+    :effect (entity_initiated ?cutoff_exception_case)
+  )
+  (:action assign_approver_to_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_initiated ?cutoff_exception_case)
+        (not
+          (entity_approver_assigned ?cutoff_exception_case)
+        )
+        (approver_available ?approver_role)
+      )
+    :effect
+      (and
+        (entity_approver_assigned ?cutoff_exception_case)
+        (entity_assigned_approver ?cutoff_exception_case ?approver_role)
+        (not
+          (approver_available ?approver_role)
+        )
+      )
+  )
+  (:action assign_investigator_to_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?investigator - investigator)
+    :precondition
+      (and
+        (entity_initiated ?cutoff_exception_case)
+        (entity_approver_assigned ?cutoff_exception_case)
+        (investigator_available ?investigator)
+      )
+    :effect
+      (and
+        (entity_assigned_investigator ?cutoff_exception_case ?investigator)
+        (not
+          (investigator_available ?investigator)
+        )
+      )
+  )
+  (:action mark_case_ready_for_processing
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?investigator - investigator)
+    :precondition
+      (and
+        (entity_initiated ?cutoff_exception_case)
+        (entity_approver_assigned ?cutoff_exception_case)
+        (entity_assigned_investigator ?cutoff_exception_case ?investigator)
+        (not
+          (entity_ready_for_processing ?cutoff_exception_case)
+        )
+      )
+    :effect (entity_ready_for_processing ?cutoff_exception_case)
+  )
+  (:action release_investigator_from_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?investigator - investigator)
+    :precondition
+      (and
+        (entity_assigned_investigator ?cutoff_exception_case ?investigator)
+      )
+    :effect
+      (and
+        (investigator_available ?investigator)
+        (not
+          (entity_assigned_investigator ?cutoff_exception_case ?investigator)
+        )
+      )
+  )
+  (:action assign_sme_to_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?sme_reviewer - sme_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_processing ?cutoff_exception_case)
+        (sme_available ?sme_reviewer)
+      )
+    :effect
+      (and
+        (entity_assigned_sme_reviewer ?cutoff_exception_case ?sme_reviewer)
+        (not
+          (sme_available ?sme_reviewer)
+        )
+      )
+  )
+  (:action release_sme_from_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?sme_reviewer - sme_reviewer)
+    :precondition
+      (and
+        (entity_assigned_sme_reviewer ?cutoff_exception_case ?sme_reviewer)
+      )
+    :effect
+      (and
+        (sme_available ?sme_reviewer)
+        (not
+          (entity_assigned_sme_reviewer ?cutoff_exception_case ?sme_reviewer)
+        )
+      )
+  )
+  (:action bind_adjustment_code_to_processor
+    :parameters (?finance_processor - finance_processor ?adjustment_code - adjustment_code)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (adjustment_code_available ?adjustment_code)
+      )
+    :effect
+      (and
+        (processor_bound_adjustment_code ?finance_processor ?adjustment_code)
+        (not
+          (adjustment_code_available ?adjustment_code)
+        )
+      )
+  )
+  (:action unbind_adjustment_code_from_processor
+    :parameters (?finance_processor - finance_processor ?adjustment_code - adjustment_code)
+    :precondition
+      (and
+        (processor_bound_adjustment_code ?finance_processor ?adjustment_code)
+      )
+    :effect
+      (and
+        (adjustment_code_available ?adjustment_code)
+        (not
+          (processor_bound_adjustment_code ?finance_processor ?adjustment_code)
+        )
+      )
+  )
+  (:action bind_escalation_reason_to_processor
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (escalation_reason_available ?escalation_reason)
+      )
+    :effect
+      (and
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (not
+          (escalation_reason_available ?escalation_reason)
+        )
+      )
+  )
+  (:action unbind_escalation_reason_from_processor
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+      )
+    :effect
+      (and
+        (escalation_reason_available ?escalation_reason)
+        (not
+          (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        )
+      )
+  )
+  (:action flag_ledger_discrepancy
+    :parameters (?general_ledger_segment - general_ledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?investigator - investigator)
+    :precondition
+      (and
+        (entity_ready_for_processing ?general_ledger_segment)
+        (entity_assigned_investigator ?general_ledger_segment ?investigator)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (not
+          (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+        )
+        (not
+          (ledger_discrepancy_has_documentation ?ledger_discrepancy_record)
+        )
+      )
+    :effect (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+  )
+  (:action sme_review_gl_discrepancy
+    :parameters (?general_ledger_segment - general_ledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?sme_reviewer - sme_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_processing ?general_ledger_segment)
+        (entity_assigned_sme_reviewer ?general_ledger_segment ?sme_reviewer)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+        (not
+          (gl_ready_for_packet_assembly ?general_ledger_segment)
+        )
+      )
+    :effect
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (gl_investigation_validated ?general_ledger_segment)
+      )
+  )
+  (:action attach_supporting_document_to_gl_segment
+    :parameters (?general_ledger_segment - general_ledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_ready_for_processing ?general_ledger_segment)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (supporting_document_available ?supporting_document)
+        (not
+          (gl_ready_for_packet_assembly ?general_ledger_segment)
+        )
+      )
+    :effect
+      (and
+        (ledger_discrepancy_has_documentation ?ledger_discrepancy_record)
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (gl_has_supporting_document ?general_ledger_segment ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_gl_supporting_documentation
+    :parameters (?general_ledger_segment - general_ledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?investigator - investigator ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_ready_for_processing ?general_ledger_segment)
+        (entity_assigned_investigator ?general_ledger_segment ?investigator)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (ledger_discrepancy_has_documentation ?ledger_discrepancy_record)
+        (gl_has_supporting_document ?general_ledger_segment ?supporting_document)
+        (not
+          (gl_investigation_validated ?general_ledger_segment)
+        )
+      )
+    :effect
+      (and
+        (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+        (gl_investigation_validated ?general_ledger_segment)
+        (supporting_document_available ?supporting_document)
+        (not
+          (gl_has_supporting_document ?general_ledger_segment ?supporting_document)
+        )
+      )
+  )
+  (:action flag_counterparty_discrepancy
+    :parameters (?subledger_segment - subledger_segment ?counterparty_discrepancy_record - counterparty_discrepancy_record ?investigator - investigator)
+    :precondition
+      (and
+        (entity_ready_for_processing ?subledger_segment)
+        (entity_assigned_investigator ?subledger_segment ?investigator)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (not
+          (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+        )
+        (not
+          (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record)
+        )
+      )
+    :effect (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+  )
+  (:action sme_review_subledger_discrepancy
+    :parameters (?subledger_segment - subledger_segment ?counterparty_discrepancy_record - counterparty_discrepancy_record ?sme_reviewer - sme_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_processing ?subledger_segment)
+        (entity_assigned_sme_reviewer ?subledger_segment ?sme_reviewer)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+        (not
+          (subledger_ready_for_packet_assembly ?subledger_segment)
+        )
+      )
+    :effect
+      (and
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (subledger_investigation_validated ?subledger_segment)
+      )
+  )
+  (:action attach_supporting_document_to_subledger_segment
+    :parameters (?subledger_segment - subledger_segment ?counterparty_discrepancy_record - counterparty_discrepancy_record ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_ready_for_processing ?subledger_segment)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (supporting_document_available ?supporting_document)
+        (not
+          (subledger_ready_for_packet_assembly ?subledger_segment)
+        )
+      )
+    :effect
+      (and
+        (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record)
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (subledger_has_supporting_document ?subledger_segment ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_subledger_supporting_documentation
+    :parameters (?subledger_segment - subledger_segment ?counterparty_discrepancy_record - counterparty_discrepancy_record ?investigator - investigator ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_ready_for_processing ?subledger_segment)
+        (entity_assigned_investigator ?subledger_segment ?investigator)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record)
+        (subledger_has_supporting_document ?subledger_segment ?supporting_document)
+        (not
+          (subledger_investigation_validated ?subledger_segment)
+        )
+      )
+    :effect
+      (and
+        (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+        (subledger_investigation_validated ?subledger_segment)
+        (supporting_document_available ?supporting_document)
+        (not
+          (subledger_has_supporting_document ?subledger_segment ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_resolution_packet
+    :parameters (?general_ledger_segment - general_ledger_segment ?subledger_segment - subledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?counterparty_discrepancy_record - counterparty_discrepancy_record ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+        (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+        (gl_investigation_validated ?general_ledger_segment)
+        (subledger_investigation_validated ?subledger_segment)
+        (resolution_packet_available ?resolution_packet)
+      )
+    :effect
+      (and
+        (resolution_packet_created ?resolution_packet)
+        (packet_includes_ledger_discrepancy ?resolution_packet ?ledger_discrepancy_record)
+        (packet_includes_counterparty_discrepancy ?resolution_packet ?counterparty_discrepancy_record)
+        (not
+          (resolution_packet_available ?resolution_packet)
+        )
+      )
+  )
+  (:action assemble_resolution_packet_with_gl_evidence
+    :parameters (?general_ledger_segment - general_ledger_segment ?subledger_segment - subledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?counterparty_discrepancy_record - counterparty_discrepancy_record ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (ledger_discrepancy_has_documentation ?ledger_discrepancy_record)
+        (counterparty_discrepancy_flagged ?counterparty_discrepancy_record)
+        (not
+          (gl_investigation_validated ?general_ledger_segment)
+        )
+        (subledger_investigation_validated ?subledger_segment)
+        (resolution_packet_available ?resolution_packet)
+      )
+    :effect
+      (and
+        (resolution_packet_created ?resolution_packet)
+        (packet_includes_ledger_discrepancy ?resolution_packet ?ledger_discrepancy_record)
+        (packet_includes_counterparty_discrepancy ?resolution_packet ?counterparty_discrepancy_record)
+        (packet_requires_sme_review ?resolution_packet)
+        (not
+          (resolution_packet_available ?resolution_packet)
+        )
+      )
+  )
+  (:action assemble_resolution_packet_with_gl_flag
+    :parameters (?general_ledger_segment - general_ledger_segment ?subledger_segment - subledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?counterparty_discrepancy_record - counterparty_discrepancy_record ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (ledger_discrepancy_flagged ?ledger_discrepancy_record)
+        (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record)
+        (gl_investigation_validated ?general_ledger_segment)
+        (not
+          (subledger_investigation_validated ?subledger_segment)
+        )
+        (resolution_packet_available ?resolution_packet)
+      )
+    :effect
+      (and
+        (resolution_packet_created ?resolution_packet)
+        (packet_includes_ledger_discrepancy ?resolution_packet ?ledger_discrepancy_record)
+        (packet_includes_counterparty_discrepancy ?resolution_packet ?counterparty_discrepancy_record)
+        (packet_requires_policy_approval ?resolution_packet)
+        (not
+          (resolution_packet_available ?resolution_packet)
+        )
+      )
+  )
+  (:action assemble_complete_resolution_packet
+    :parameters (?general_ledger_segment - general_ledger_segment ?subledger_segment - subledger_segment ?ledger_discrepancy_record - ledger_discrepancy_record ?counterparty_discrepancy_record - counterparty_discrepancy_record ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (gl_has_discrepancy_record ?general_ledger_segment ?ledger_discrepancy_record)
+        (subledger_has_discrepancy_record ?subledger_segment ?counterparty_discrepancy_record)
+        (ledger_discrepancy_has_documentation ?ledger_discrepancy_record)
+        (counterparty_discrepancy_has_documentation ?counterparty_discrepancy_record)
+        (not
+          (gl_investigation_validated ?general_ledger_segment)
+        )
+        (not
+          (subledger_investigation_validated ?subledger_segment)
+        )
+        (resolution_packet_available ?resolution_packet)
+      )
+    :effect
+      (and
+        (resolution_packet_created ?resolution_packet)
+        (packet_includes_ledger_discrepancy ?resolution_packet ?ledger_discrepancy_record)
+        (packet_includes_counterparty_discrepancy ?resolution_packet ?counterparty_discrepancy_record)
+        (packet_requires_sme_review ?resolution_packet)
+        (packet_requires_policy_approval ?resolution_packet)
+        (not
+          (resolution_packet_available ?resolution_packet)
+        )
+      )
+  )
+  (:action validate_resolution_packet
+    :parameters (?resolution_packet - resolution_packet ?general_ledger_segment - general_ledger_segment ?investigator - investigator)
+    :precondition
+      (and
+        (resolution_packet_created ?resolution_packet)
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (entity_assigned_investigator ?general_ledger_segment ?investigator)
+        (not
+          (packet_validated ?resolution_packet)
+        )
+      )
+    :effect (packet_validated ?resolution_packet)
+  )
+  (:action attach_workpaper_to_resolution_packet
+    :parameters (?finance_processor - finance_processor ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (processor_has_resolution_packet ?finance_processor ?resolution_packet)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_available ?workpaper)
+        (resolution_packet_created ?resolution_packet)
+        (packet_validated ?resolution_packet)
+        (not
+          (workpaper_bound ?workpaper)
+        )
+      )
+    :effect
+      (and
+        (workpaper_bound ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (not
+          (workpaper_available ?workpaper)
+        )
+      )
+  )
+  (:action bind_workpaper_metadata
+    :parameters (?finance_processor - finance_processor ?workpaper - workpaper ?resolution_packet - resolution_packet ?investigator - investigator)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_bound ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (entity_assigned_investigator ?finance_processor ?investigator)
+        (not
+          (packet_requires_sme_review ?resolution_packet)
+        )
+        (not
+          (processor_has_adjustments_bound ?finance_processor)
+        )
+      )
+    :effect (processor_has_adjustments_bound ?finance_processor)
+  )
+  (:action assign_control_checklist_to_processor
+    :parameters (?finance_processor - finance_processor ?control_checklist - control_checklist)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (control_checklist_available ?control_checklist)
+        (not
+          (processor_has_control_checklist ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_has_control_checklist ?finance_processor)
+        (processor_attached_control_checklist ?finance_processor ?control_checklist)
+        (not
+          (control_checklist_available ?control_checklist)
+        )
+      )
+  )
+  (:action complete_checklist_and_bind_metadata
+    :parameters (?finance_processor - finance_processor ?workpaper - workpaper ?resolution_packet - resolution_packet ?investigator - investigator ?control_checklist - control_checklist)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_bound ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (entity_assigned_investigator ?finance_processor ?investigator)
+        (packet_requires_sme_review ?resolution_packet)
+        (processor_has_control_checklist ?finance_processor)
+        (processor_attached_control_checklist ?finance_processor ?control_checklist)
+        (not
+          (processor_has_adjustments_bound ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_has_adjustments_bound ?finance_processor)
+        (processor_control_checklist_completed ?finance_processor)
+      )
+  )
+  (:action processor_perform_adjustment_review
+    :parameters (?finance_processor - finance_processor ?adjustment_code - adjustment_code ?sme_reviewer - sme_reviewer ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_has_adjustments_bound ?finance_processor)
+        (processor_bound_adjustment_code ?finance_processor ?adjustment_code)
+        (entity_assigned_sme_reviewer ?finance_processor ?sme_reviewer)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (not
+          (packet_requires_policy_approval ?resolution_packet)
+        )
+        (not
+          (processor_review_complete ?finance_processor)
+        )
+      )
+    :effect (processor_review_complete ?finance_processor)
+  )
+  (:action processor_perform_adjustment_review_variant
+    :parameters (?finance_processor - finance_processor ?adjustment_code - adjustment_code ?sme_reviewer - sme_reviewer ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_has_adjustments_bound ?finance_processor)
+        (processor_bound_adjustment_code ?finance_processor ?adjustment_code)
+        (entity_assigned_sme_reviewer ?finance_processor ?sme_reviewer)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (packet_requires_policy_approval ?resolution_packet)
+        (not
+          (processor_review_complete ?finance_processor)
+        )
+      )
+    :effect (processor_review_complete ?finance_processor)
+  )
+  (:action apply_escalation_reason_and_mark_reviewed
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_review_complete ?finance_processor)
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (not
+          (packet_requires_sme_review ?resolution_packet)
+        )
+        (not
+          (packet_requires_policy_approval ?resolution_packet)
+        )
+        (not
+          (workpaper_reviewed_by_processor ?finance_processor)
+        )
+      )
+    :effect (workpaper_reviewed_by_processor ?finance_processor)
+  )
+  (:action apply_escalation_and_mark_quality_checked
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_review_complete ?finance_processor)
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (packet_requires_sme_review ?resolution_packet)
+        (not
+          (packet_requires_policy_approval ?resolution_packet)
+        )
+        (not
+          (workpaper_reviewed_by_processor ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_quality_check_passed ?finance_processor)
+      )
+  )
+  (:action apply_escalation_and_mark_quality_checked_variant
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_review_complete ?finance_processor)
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (not
+          (packet_requires_sme_review ?resolution_packet)
+        )
+        (packet_requires_policy_approval ?resolution_packet)
+        (not
+          (workpaper_reviewed_by_processor ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_quality_check_passed ?finance_processor)
+      )
+  )
+  (:action apply_escalation_and_mark_quality_checked_full
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason ?workpaper - workpaper ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (processor_review_complete ?finance_processor)
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (processor_has_workpaper ?finance_processor ?workpaper)
+        (workpaper_attached_to_packet ?workpaper ?resolution_packet)
+        (packet_requires_sme_review ?resolution_packet)
+        (packet_requires_policy_approval ?resolution_packet)
+        (not
+          (workpaper_reviewed_by_processor ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_quality_check_passed ?finance_processor)
+      )
+  )
+  (:action processor_final_signoff
+    :parameters (?finance_processor - finance_processor)
+    :precondition
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (not
+          (processor_quality_check_passed ?finance_processor)
+        )
+        (not
+          (processor_marked_closed ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_marked_closed ?finance_processor)
+        (entity_signed_off ?finance_processor)
+      )
+  )
+  (:action record_signoff_for_processor
+    :parameters (?finance_processor - finance_processor ?signoff - signoff)
+    :precondition
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_quality_check_passed ?finance_processor)
+        (signoff_available ?signoff)
+      )
+    :effect
+      (and
+        (processor_has_signoff ?finance_processor ?signoff)
+        (not
+          (signoff_available ?signoff)
+        )
+      )
+  )
+  (:action finalize_resolution_package_by_processor
+    :parameters (?finance_processor - finance_processor ?general_ledger_segment - general_ledger_segment ?subledger_segment - subledger_segment ?investigator - investigator ?signoff - signoff)
+    :precondition
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_quality_check_passed ?finance_processor)
+        (processor_has_signoff ?finance_processor ?signoff)
+        (processor_responsible_for_gl_segment ?finance_processor ?general_ledger_segment)
+        (processor_responsible_for_subledger_segment ?finance_processor ?subledger_segment)
+        (gl_investigation_validated ?general_ledger_segment)
+        (subledger_investigation_validated ?subledger_segment)
+        (entity_assigned_investigator ?finance_processor ?investigator)
+        (not
+          (processor_finalized_package ?finance_processor)
+        )
+      )
+    :effect (processor_finalized_package ?finance_processor)
+  )
+  (:action processor_publish_final_signoff
+    :parameters (?finance_processor - finance_processor)
+    :precondition
+      (and
+        (workpaper_reviewed_by_processor ?finance_processor)
+        (processor_finalized_package ?finance_processor)
+        (not
+          (processor_marked_closed ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_marked_closed ?finance_processor)
+        (entity_signed_off ?finance_processor)
+      )
+  )
+  (:action apply_policy_reference
+    :parameters (?finance_processor - finance_processor ?policy_reference - policy_reference ?investigator - investigator)
+    :precondition
+      (and
+        (entity_ready_for_processing ?finance_processor)
+        (entity_assigned_investigator ?finance_processor ?investigator)
+        (policy_reference_available ?policy_reference)
+        (processor_attached_policy_reference ?finance_processor ?policy_reference)
+        (not
+          (processor_policy_applied ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_policy_applied ?finance_processor)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action sme_validate_policy_application
+    :parameters (?finance_processor - finance_processor ?sme_reviewer - sme_reviewer)
+    :precondition
+      (and
+        (processor_policy_applied ?finance_processor)
+        (entity_assigned_sme_reviewer ?finance_processor ?sme_reviewer)
+        (not
+          (processor_policy_sme_validated ?finance_processor)
+        )
+      )
+    :effect (processor_policy_sme_validated ?finance_processor)
+  )
+  (:action approve_escalation_reason_for_processor
+    :parameters (?finance_processor - finance_processor ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (processor_policy_sme_validated ?finance_processor)
+        (processor_bound_escalation_reason ?finance_processor ?escalation_reason)
+        (not
+          (processor_policy_approved ?finance_processor)
+        )
+      )
+    :effect (processor_policy_approved ?finance_processor)
+  )
+  (:action processor_finalize_after_policy_approval
+    :parameters (?finance_processor - finance_processor)
+    :precondition
+      (and
+        (processor_policy_approved ?finance_processor)
+        (not
+          (processor_marked_closed ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_marked_closed ?finance_processor)
+        (entity_signed_off ?finance_processor)
+      )
+  )
+  (:action finalize_gl_segment_signoff
+    :parameters (?general_ledger_segment - general_ledger_segment ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (gl_ready_for_packet_assembly ?general_ledger_segment)
+        (gl_investigation_validated ?general_ledger_segment)
+        (resolution_packet_created ?resolution_packet)
+        (packet_validated ?resolution_packet)
+        (not
+          (entity_signed_off ?general_ledger_segment)
+        )
+      )
+    :effect (entity_signed_off ?general_ledger_segment)
+  )
+  (:action finalize_subledger_segment_signoff
+    :parameters (?subledger_segment - subledger_segment ?resolution_packet - resolution_packet)
+    :precondition
+      (and
+        (subledger_ready_for_packet_assembly ?subledger_segment)
+        (subledger_investigation_validated ?subledger_segment)
+        (resolution_packet_created ?resolution_packet)
+        (packet_validated ?resolution_packet)
+        (not
+          (entity_signed_off ?subledger_segment)
+        )
+      )
+    :effect (entity_signed_off ?subledger_segment)
+  )
+  (:action record_audit_reference_and_approve_case
+    :parameters (?cutoff_exception_case - cutoff_exception_case ?audit_reference - audit_reference ?investigator - investigator)
+    :precondition
+      (and
+        (entity_signed_off ?cutoff_exception_case)
+        (entity_assigned_investigator ?cutoff_exception_case ?investigator)
+        (audit_reference_available ?audit_reference)
+        (not
+          (entity_approval_obtained ?cutoff_exception_case)
+        )
+      )
+    :effect
+      (and
+        (entity_approval_obtained ?cutoff_exception_case)
+        (entity_linked_audit_reference ?cutoff_exception_case ?audit_reference)
+        (not
+          (audit_reference_available ?audit_reference)
+        )
+      )
+  )
+  (:action close_gl_segment_and_release_approver
+    :parameters (?general_ledger_segment - general_ledger_segment ?approver_role - approver_role ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (entity_approval_obtained ?general_ledger_segment)
+        (entity_assigned_approver ?general_ledger_segment ?approver_role)
+        (entity_linked_audit_reference ?general_ledger_segment ?audit_reference)
+        (not
+          (entity_closed_for_cutoff ?general_ledger_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_closed_for_cutoff ?general_ledger_segment)
+        (approver_available ?approver_role)
+        (audit_reference_available ?audit_reference)
+      )
+  )
+  (:action close_subledger_segment_and_release_approver
+    :parameters (?subledger_segment - subledger_segment ?approver_role - approver_role ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (entity_approval_obtained ?subledger_segment)
+        (entity_assigned_approver ?subledger_segment ?approver_role)
+        (entity_linked_audit_reference ?subledger_segment ?audit_reference)
+        (not
+          (entity_closed_for_cutoff ?subledger_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_closed_for_cutoff ?subledger_segment)
+        (approver_available ?approver_role)
+        (audit_reference_available ?audit_reference)
+      )
+  )
+  (:action close_processor_and_release_approver
+    :parameters (?finance_processor - finance_processor ?approver_role - approver_role ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (entity_approval_obtained ?finance_processor)
+        (entity_assigned_approver ?finance_processor ?approver_role)
+        (entity_linked_audit_reference ?finance_processor ?audit_reference)
+        (not
+          (entity_closed_for_cutoff ?finance_processor)
+        )
+      )
+    :effect
+      (and
+        (entity_closed_for_cutoff ?finance_processor)
+        (approver_available ?approver_role)
+        (audit_reference_available ?audit_reference)
+      )
+  )
+)

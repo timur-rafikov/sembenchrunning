@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain event_limited_currency_spending)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object purchasable_root - base_object resource_root - base_object item_root - base_object event_scope - base_object purchase_target - event_scope currency_option - purchasable_root material - purchasable_root tool - purchasable_root cosmetic_upgrade_token - purchasable_root special_material - purchasable_root voucher - purchasable_root optional_augment - purchasable_root unique_catalyst - purchasable_root consumable - resource_root component - resource_root cosmetic_token - resource_root resource_source_a - item_root resource_source_b - item_root bundle - item_root physical_slot_category - purchase_target loadout_slot_category - purchase_target slot_a - physical_slot_category slot_b - physical_slot_category loadout - loadout_slot_category)
+
+  (:predicates
+    (purchase_target_selected ?entity_slot - purchase_target)
+    (purchase_target_reserved ?entity_slot - purchase_target)
+    (purchase_target_currency_bound ?entity_slot - purchase_target)
+    (purchase_target_acquired ?entity_slot - purchase_target)
+    (purchase_target_ready_for_event ?entity_slot - purchase_target)
+    (purchase_target_spend_authorized ?entity_slot - purchase_target)
+    (currency_available ?currency_option - currency_option)
+    (currency_assigned_to_purchase_target ?entity_slot - purchase_target ?currency_option - currency_option)
+    (material_available ?material - material)
+    (material_assigned_to_purchase_target ?entity_slot - purchase_target ?material - material)
+    (tool_available ?tool - tool)
+    (tool_assigned_to_purchase_target ?entity_slot - purchase_target ?tool - tool)
+    (consumable_available ?consumable - consumable)
+    (consumable_reserved_for_slot_a ?slot_a - slot_a ?consumable - consumable)
+    (consumable_reserved_for_slot_b ?slot_b - slot_b ?consumable - consumable)
+    (slot_a_resource_source ?slot_a - slot_a ?resource_source_a - resource_source_a)
+    (resource_source_a_reserved ?resource_source_a - resource_source_a)
+    (resource_source_a_tagged ?resource_source_a - resource_source_a)
+    (slot_a_ready ?slot_a - slot_a)
+    (slot_b_resource_source ?slot_b - slot_b ?resource_source_b - resource_source_b)
+    (resource_source_b_reserved ?resource_source_b - resource_source_b)
+    (resource_source_b_tagged ?resource_source_b - resource_source_b)
+    (slot_b_ready ?slot_b - slot_b)
+    (bundle_available ?bundle - bundle)
+    (bundle_assembled ?bundle - bundle)
+    (bundle_linked_to_source_a ?bundle - bundle ?resource_source_a - resource_source_a)
+    (bundle_linked_to_source_b ?bundle - bundle ?resource_source_b - resource_source_b)
+    (bundle_variant_alpha ?bundle - bundle)
+    (bundle_variant_beta ?bundle - bundle)
+    (bundle_finalized ?bundle - bundle)
+    (loadout_has_slot_a ?loadout - loadout ?slot_a - slot_a)
+    (loadout_has_slot_b ?loadout - loadout ?slot_b - slot_b)
+    (loadout_linked_bundle ?loadout - loadout ?bundle - bundle)
+    (component_available ?component - component)
+    (loadout_has_component ?loadout - loadout ?component - component)
+    (component_staged ?component - component)
+    (component_assigned_to_bundle ?component - component ?bundle - bundle)
+    (loadout_modifier_ready ?loadout - loadout)
+    (loadout_modifier_applied ?loadout - loadout)
+    (loadout_ready_for_finalization ?loadout - loadout)
+    (loadout_cosmetic_upgrade_enabled ?loadout - loadout)
+    (loadout_cosmetic_stage_complete ?loadout - loadout)
+    (loadout_has_augments ?loadout - loadout)
+    (loadout_modifiers_satisfied ?loadout - loadout)
+    (cosmetic_token_available ?cosmetic_token - cosmetic_token)
+    (loadout_cosmetic_assigned ?loadout - loadout ?cosmetic_token - cosmetic_token)
+    (loadout_cosmetic_reserved ?loadout - loadout)
+    (loadout_cosmetic_applied ?loadout - loadout)
+    (loadout_cosmetic_finalized ?loadout - loadout)
+    (cosmetic_upgrade_token_available ?cosmetic_upgrade_token - cosmetic_upgrade_token)
+    (loadout_cosmetic_upgrade_token_assigned ?loadout - loadout ?cosmetic_upgrade_token - cosmetic_upgrade_token)
+    (special_material_available ?special_material - special_material)
+    (loadout_special_material_attached ?loadout - loadout ?special_material - special_material)
+    (optional_augment_available ?optional_augment - optional_augment)
+    (loadout_optional_augment_attached ?loadout - loadout ?optional_augment - optional_augment)
+    (unique_catalyst_available ?unique_catalyst - unique_catalyst)
+    (loadout_unique_catalyst_attached ?loadout - loadout ?unique_catalyst - unique_catalyst)
+    (voucher_available ?voucher - voucher)
+    (voucher_assigned_to_purchase_target ?entity_slot - purchase_target ?voucher - voucher)
+    (slot_a_locked ?slot_a - slot_a)
+    (slot_b_locked ?slot_b - slot_b)
+    (loadout_finalized ?loadout - loadout)
+  )
+  (:action select_candidate_slot
+    :parameters (?entity_slot - purchase_target)
+    :precondition
+      (and
+        (not
+          (purchase_target_selected ?entity_slot)
+        )
+        (not
+          (purchase_target_acquired ?entity_slot)
+        )
+      )
+    :effect (purchase_target_selected ?entity_slot)
+  )
+  (:action assign_currency_option_to_slot
+    :parameters (?entity_slot - purchase_target ?currency_option - currency_option)
+    :precondition
+      (and
+        (purchase_target_selected ?entity_slot)
+        (not
+          (purchase_target_currency_bound ?entity_slot)
+        )
+        (currency_available ?currency_option)
+      )
+    :effect
+      (and
+        (purchase_target_currency_bound ?entity_slot)
+        (currency_assigned_to_purchase_target ?entity_slot ?currency_option)
+        (not
+          (currency_available ?currency_option)
+        )
+      )
+  )
+  (:action assign_material_to_slot
+    :parameters (?entity_slot - purchase_target ?material - material)
+    :precondition
+      (and
+        (purchase_target_selected ?entity_slot)
+        (purchase_target_currency_bound ?entity_slot)
+        (material_available ?material)
+      )
+    :effect
+      (and
+        (material_assigned_to_purchase_target ?entity_slot ?material)
+        (not
+          (material_available ?material)
+        )
+      )
+  )
+  (:action confirm_slot_reservation
+    :parameters (?entity_slot - purchase_target ?material - material)
+    :precondition
+      (and
+        (purchase_target_selected ?entity_slot)
+        (purchase_target_currency_bound ?entity_slot)
+        (material_assigned_to_purchase_target ?entity_slot ?material)
+        (not
+          (purchase_target_reserved ?entity_slot)
+        )
+      )
+    :effect (purchase_target_reserved ?entity_slot)
+  )
+  (:action release_material_from_slot
+    :parameters (?entity_slot - purchase_target ?material - material)
+    :precondition
+      (and
+        (material_assigned_to_purchase_target ?entity_slot ?material)
+      )
+    :effect
+      (and
+        (material_available ?material)
+        (not
+          (material_assigned_to_purchase_target ?entity_slot ?material)
+        )
+      )
+  )
+  (:action attach_tool_to_slot
+    :parameters (?entity_slot - purchase_target ?tool - tool)
+    :precondition
+      (and
+        (purchase_target_reserved ?entity_slot)
+        (tool_available ?tool)
+      )
+    :effect
+      (and
+        (tool_assigned_to_purchase_target ?entity_slot ?tool)
+        (not
+          (tool_available ?tool)
+        )
+      )
+  )
+  (:action detach_tool_from_slot
+    :parameters (?entity_slot - purchase_target ?tool - tool)
+    :precondition
+      (and
+        (tool_assigned_to_purchase_target ?entity_slot ?tool)
+      )
+    :effect
+      (and
+        (tool_available ?tool)
+        (not
+          (tool_assigned_to_purchase_target ?entity_slot ?tool)
+        )
+      )
+  )
+  (:action attach_optional_augment_to_loadout
+    :parameters (?loadout - loadout ?optional_augment - optional_augment)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (optional_augment_available ?optional_augment)
+      )
+    :effect
+      (and
+        (loadout_optional_augment_attached ?loadout ?optional_augment)
+        (not
+          (optional_augment_available ?optional_augment)
+        )
+      )
+  )
+  (:action detach_optional_augment_from_loadout
+    :parameters (?loadout - loadout ?optional_augment - optional_augment)
+    :precondition
+      (and
+        (loadout_optional_augment_attached ?loadout ?optional_augment)
+      )
+    :effect
+      (and
+        (optional_augment_available ?optional_augment)
+        (not
+          (loadout_optional_augment_attached ?loadout ?optional_augment)
+        )
+      )
+  )
+  (:action attach_unique_catalyst_to_loadout
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (unique_catalyst_available ?unique_catalyst)
+      )
+    :effect
+      (and
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (not
+          (unique_catalyst_available ?unique_catalyst)
+        )
+      )
+  )
+  (:action detach_unique_catalyst_from_loadout
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst)
+    :precondition
+      (and
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+      )
+    :effect
+      (and
+        (unique_catalyst_available ?unique_catalyst)
+        (not
+          (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        )
+      )
+  )
+  (:action reserve_resource_source_for_slot_a
+    :parameters (?slot_a - slot_a ?resource_source_a - resource_source_a ?material - material)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_a)
+        (material_assigned_to_purchase_target ?slot_a ?material)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (not
+          (resource_source_a_reserved ?resource_source_a)
+        )
+        (not
+          (resource_source_a_tagged ?resource_source_a)
+        )
+      )
+    :effect (resource_source_a_reserved ?resource_source_a)
+  )
+  (:action prepare_slot_a_with_tool
+    :parameters (?slot_a - slot_a ?resource_source_a - resource_source_a ?tool - tool)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_a)
+        (tool_assigned_to_purchase_target ?slot_a ?tool)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (resource_source_a_reserved ?resource_source_a)
+        (not
+          (slot_a_locked ?slot_a)
+        )
+      )
+    :effect
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_a_ready ?slot_a)
+      )
+  )
+  (:action reserve_consumable_for_slot_a
+    :parameters (?slot_a - slot_a ?resource_source_a - resource_source_a ?consumable - consumable)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_a)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (consumable_available ?consumable)
+        (not
+          (slot_a_locked ?slot_a)
+        )
+      )
+    :effect
+      (and
+        (resource_source_a_tagged ?resource_source_a)
+        (slot_a_locked ?slot_a)
+        (consumable_reserved_for_slot_a ?slot_a ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_slot_a_reservation
+    :parameters (?slot_a - slot_a ?resource_source_a - resource_source_a ?material - material ?consumable - consumable)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_a)
+        (material_assigned_to_purchase_target ?slot_a ?material)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (resource_source_a_tagged ?resource_source_a)
+        (consumable_reserved_for_slot_a ?slot_a ?consumable)
+        (not
+          (slot_a_ready ?slot_a)
+        )
+      )
+    :effect
+      (and
+        (resource_source_a_reserved ?resource_source_a)
+        (slot_a_ready ?slot_a)
+        (consumable_available ?consumable)
+        (not
+          (consumable_reserved_for_slot_a ?slot_a ?consumable)
+        )
+      )
+  )
+  (:action reserve_resource_source_for_slot_b
+    :parameters (?slot_b - slot_b ?resource_source_b - resource_source_b ?material - material)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_b)
+        (material_assigned_to_purchase_target ?slot_b ?material)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (not
+          (resource_source_b_reserved ?resource_source_b)
+        )
+        (not
+          (resource_source_b_tagged ?resource_source_b)
+        )
+      )
+    :effect (resource_source_b_reserved ?resource_source_b)
+  )
+  (:action prepare_slot_b_with_tool
+    :parameters (?slot_b - slot_b ?resource_source_b - resource_source_b ?tool - tool)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_b)
+        (tool_assigned_to_purchase_target ?slot_b ?tool)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_b_reserved ?resource_source_b)
+        (not
+          (slot_b_locked ?slot_b)
+        )
+      )
+    :effect
+      (and
+        (slot_b_locked ?slot_b)
+        (slot_b_ready ?slot_b)
+      )
+  )
+  (:action reserve_consumable_for_slot_b
+    :parameters (?slot_b - slot_b ?resource_source_b - resource_source_b ?consumable - consumable)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_b)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (consumable_available ?consumable)
+        (not
+          (slot_b_locked ?slot_b)
+        )
+      )
+    :effect
+      (and
+        (resource_source_b_tagged ?resource_source_b)
+        (slot_b_locked ?slot_b)
+        (consumable_reserved_for_slot_b ?slot_b ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_slot_b_reservation
+    :parameters (?slot_b - slot_b ?resource_source_b - resource_source_b ?material - material ?consumable - consumable)
+    :precondition
+      (and
+        (purchase_target_reserved ?slot_b)
+        (material_assigned_to_purchase_target ?slot_b ?material)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_b_tagged ?resource_source_b)
+        (consumable_reserved_for_slot_b ?slot_b ?consumable)
+        (not
+          (slot_b_ready ?slot_b)
+        )
+      )
+    :effect
+      (and
+        (resource_source_b_reserved ?resource_source_b)
+        (slot_b_ready ?slot_b)
+        (consumable_available ?consumable)
+        (not
+          (consumable_reserved_for_slot_b ?slot_b ?consumable)
+        )
+      )
+  )
+  (:action assemble_bundle_from_slots
+    :parameters (?slot_a - slot_a ?slot_b - slot_b ?resource_source_a - resource_source_a ?resource_source_b - resource_source_b ?bundle - bundle)
+    :precondition
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_b_locked ?slot_b)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_a_reserved ?resource_source_a)
+        (resource_source_b_reserved ?resource_source_b)
+        (slot_a_ready ?slot_a)
+        (slot_b_ready ?slot_b)
+        (bundle_available ?bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?bundle)
+        (bundle_linked_to_source_a ?bundle ?resource_source_a)
+        (bundle_linked_to_source_b ?bundle ?resource_source_b)
+        (not
+          (bundle_available ?bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_variant_alpha
+    :parameters (?slot_a - slot_a ?slot_b - slot_b ?resource_source_a - resource_source_a ?resource_source_b - resource_source_b ?bundle - bundle)
+    :precondition
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_b_locked ?slot_b)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_a_tagged ?resource_source_a)
+        (resource_source_b_reserved ?resource_source_b)
+        (not
+          (slot_a_ready ?slot_a)
+        )
+        (slot_b_ready ?slot_b)
+        (bundle_available ?bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?bundle)
+        (bundle_linked_to_source_a ?bundle ?resource_source_a)
+        (bundle_linked_to_source_b ?bundle ?resource_source_b)
+        (bundle_variant_alpha ?bundle)
+        (not
+          (bundle_available ?bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_variant_beta
+    :parameters (?slot_a - slot_a ?slot_b - slot_b ?resource_source_a - resource_source_a ?resource_source_b - resource_source_b ?bundle - bundle)
+    :precondition
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_b_locked ?slot_b)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_a_reserved ?resource_source_a)
+        (resource_source_b_tagged ?resource_source_b)
+        (slot_a_ready ?slot_a)
+        (not
+          (slot_b_ready ?slot_b)
+        )
+        (bundle_available ?bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?bundle)
+        (bundle_linked_to_source_a ?bundle ?resource_source_a)
+        (bundle_linked_to_source_b ?bundle ?resource_source_b)
+        (bundle_variant_beta ?bundle)
+        (not
+          (bundle_available ?bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_all_variants
+    :parameters (?slot_a - slot_a ?slot_b - slot_b ?resource_source_a - resource_source_a ?resource_source_b - resource_source_b ?bundle - bundle)
+    :precondition
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_b_locked ?slot_b)
+        (slot_a_resource_source ?slot_a ?resource_source_a)
+        (slot_b_resource_source ?slot_b ?resource_source_b)
+        (resource_source_a_tagged ?resource_source_a)
+        (resource_source_b_tagged ?resource_source_b)
+        (not
+          (slot_a_ready ?slot_a)
+        )
+        (not
+          (slot_b_ready ?slot_b)
+        )
+        (bundle_available ?bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?bundle)
+        (bundle_linked_to_source_a ?bundle ?resource_source_a)
+        (bundle_linked_to_source_b ?bundle ?resource_source_b)
+        (bundle_variant_alpha ?bundle)
+        (bundle_variant_beta ?bundle)
+        (not
+          (bundle_available ?bundle)
+        )
+      )
+  )
+  (:action finalize_bundle_for_slot_a
+    :parameters (?bundle - bundle ?slot_a - slot_a ?material - material)
+    :precondition
+      (and
+        (bundle_assembled ?bundle)
+        (slot_a_locked ?slot_a)
+        (material_assigned_to_purchase_target ?slot_a ?material)
+        (not
+          (bundle_finalized ?bundle)
+        )
+      )
+    :effect (bundle_finalized ?bundle)
+  )
+  (:action stage_component_for_loadout_bundle
+    :parameters (?loadout - loadout ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (loadout_linked_bundle ?loadout ?bundle)
+        (loadout_has_component ?loadout ?component)
+        (component_available ?component)
+        (bundle_assembled ?bundle)
+        (bundle_finalized ?bundle)
+        (not
+          (component_staged ?component)
+        )
+      )
+    :effect
+      (and
+        (component_staged ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action activate_loadout_modifier_sequence
+    :parameters (?loadout - loadout ?component - component ?bundle - bundle ?material - material)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (loadout_has_component ?loadout ?component)
+        (component_staged ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (material_assigned_to_purchase_target ?loadout ?material)
+        (not
+          (bundle_variant_alpha ?bundle)
+        )
+        (not
+          (loadout_modifier_ready ?loadout)
+        )
+      )
+    :effect (loadout_modifier_ready ?loadout)
+  )
+  (:action assign_cosmetic_upgrade_token_to_loadout
+    :parameters (?loadout - loadout ?cosmetic_upgrade_token - cosmetic_upgrade_token)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (cosmetic_upgrade_token_available ?cosmetic_upgrade_token)
+        (not
+          (loadout_cosmetic_upgrade_enabled ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_cosmetic_upgrade_enabled ?loadout)
+        (loadout_cosmetic_upgrade_token_assigned ?loadout ?cosmetic_upgrade_token)
+        (not
+          (cosmetic_upgrade_token_available ?cosmetic_upgrade_token)
+        )
+      )
+  )
+  (:action attach_component_and_cosmetic_to_loadout
+    :parameters (?loadout - loadout ?component - component ?bundle - bundle ?material - material ?cosmetic_upgrade_token - cosmetic_upgrade_token)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (loadout_has_component ?loadout ?component)
+        (component_staged ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (material_assigned_to_purchase_target ?loadout ?material)
+        (bundle_variant_alpha ?bundle)
+        (loadout_cosmetic_upgrade_enabled ?loadout)
+        (loadout_cosmetic_upgrade_token_assigned ?loadout ?cosmetic_upgrade_token)
+        (not
+          (loadout_modifier_ready ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_modifier_ready ?loadout)
+        (loadout_cosmetic_stage_complete ?loadout)
+      )
+  )
+  (:action execute_modifier_sequence_branch_a
+    :parameters (?loadout - loadout ?optional_augment - optional_augment ?tool - tool ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_ready ?loadout)
+        (loadout_optional_augment_attached ?loadout ?optional_augment)
+        (tool_assigned_to_purchase_target ?loadout ?tool)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (not
+          (bundle_variant_beta ?bundle)
+        )
+        (not
+          (loadout_modifier_applied ?loadout)
+        )
+      )
+    :effect (loadout_modifier_applied ?loadout)
+  )
+  (:action execute_modifier_sequence_branch_b
+    :parameters (?loadout - loadout ?optional_augment - optional_augment ?tool - tool ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_ready ?loadout)
+        (loadout_optional_augment_attached ?loadout ?optional_augment)
+        (tool_assigned_to_purchase_target ?loadout ?tool)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (bundle_variant_beta ?bundle)
+        (not
+          (loadout_modifier_applied ?loadout)
+        )
+      )
+    :effect (loadout_modifier_applied ?loadout)
+  )
+  (:action execute_modifier_sequence_stage_three
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_applied ?loadout)
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (not
+          (bundle_variant_alpha ?bundle)
+        )
+        (not
+          (bundle_variant_beta ?bundle)
+        )
+        (not
+          (loadout_ready_for_finalization ?loadout)
+        )
+      )
+    :effect (loadout_ready_for_finalization ?loadout)
+  )
+  (:action execute_modifier_sequence_stage_four
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_applied ?loadout)
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (bundle_variant_alpha ?bundle)
+        (not
+          (bundle_variant_beta ?bundle)
+        )
+        (not
+          (loadout_ready_for_finalization ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_has_augments ?loadout)
+      )
+  )
+  (:action execute_modifier_sequence_stage_five
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_applied ?loadout)
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (not
+          (bundle_variant_alpha ?bundle)
+        )
+        (bundle_variant_beta ?bundle)
+        (not
+          (loadout_ready_for_finalization ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_has_augments ?loadout)
+      )
+  )
+  (:action execute_modifier_sequence_stage_six
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst ?component - component ?bundle - bundle)
+    :precondition
+      (and
+        (loadout_modifier_applied ?loadout)
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (loadout_has_component ?loadout ?component)
+        (component_assigned_to_bundle ?component ?bundle)
+        (bundle_variant_alpha ?bundle)
+        (bundle_variant_beta ?bundle)
+        (not
+          (loadout_ready_for_finalization ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_has_augments ?loadout)
+      )
+  )
+  (:action finalize_loadout
+    :parameters (?loadout - loadout)
+    :precondition
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (not
+          (loadout_has_augments ?loadout)
+        )
+        (not
+          (loadout_finalized ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_finalized ?loadout)
+        (purchase_target_ready_for_event ?loadout)
+      )
+  )
+  (:action attach_special_material_to_loadout
+    :parameters (?loadout - loadout ?special_material - special_material)
+    :precondition
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_has_augments ?loadout)
+        (special_material_available ?special_material)
+      )
+    :effect
+      (and
+        (loadout_special_material_attached ?loadout ?special_material)
+        (not
+          (special_material_available ?special_material)
+        )
+      )
+  )
+  (:action verify_loadout_readiness
+    :parameters (?loadout - loadout ?slot_a - slot_a ?slot_b - slot_b ?material - material ?special_material - special_material)
+    :precondition
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_has_augments ?loadout)
+        (loadout_special_material_attached ?loadout ?special_material)
+        (loadout_has_slot_a ?loadout ?slot_a)
+        (loadout_has_slot_b ?loadout ?slot_b)
+        (slot_a_ready ?slot_a)
+        (slot_b_ready ?slot_b)
+        (material_assigned_to_purchase_target ?loadout ?material)
+        (not
+          (loadout_modifiers_satisfied ?loadout)
+        )
+      )
+    :effect (loadout_modifiers_satisfied ?loadout)
+  )
+  (:action accept_loadout_and_mark_ready
+    :parameters (?loadout - loadout)
+    :precondition
+      (and
+        (loadout_ready_for_finalization ?loadout)
+        (loadout_modifiers_satisfied ?loadout)
+        (not
+          (loadout_finalized ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_finalized ?loadout)
+        (purchase_target_ready_for_event ?loadout)
+      )
+  )
+  (:action reserve_cosmetic_for_loadout
+    :parameters (?loadout - loadout ?cosmetic_token - cosmetic_token ?material - material)
+    :precondition
+      (and
+        (purchase_target_reserved ?loadout)
+        (material_assigned_to_purchase_target ?loadout ?material)
+        (cosmetic_token_available ?cosmetic_token)
+        (loadout_cosmetic_assigned ?loadout ?cosmetic_token)
+        (not
+          (loadout_cosmetic_reserved ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_cosmetic_reserved ?loadout)
+        (not
+          (cosmetic_token_available ?cosmetic_token)
+        )
+      )
+  )
+  (:action apply_tool_for_cosmetic_on_loadout
+    :parameters (?loadout - loadout ?tool - tool)
+    :precondition
+      (and
+        (loadout_cosmetic_reserved ?loadout)
+        (tool_assigned_to_purchase_target ?loadout ?tool)
+        (not
+          (loadout_cosmetic_applied ?loadout)
+        )
+      )
+    :effect (loadout_cosmetic_applied ?loadout)
+  )
+  (:action apply_unique_catalyst_for_cosmetic
+    :parameters (?loadout - loadout ?unique_catalyst - unique_catalyst)
+    :precondition
+      (and
+        (loadout_cosmetic_applied ?loadout)
+        (loadout_unique_catalyst_attached ?loadout ?unique_catalyst)
+        (not
+          (loadout_cosmetic_finalized ?loadout)
+        )
+      )
+    :effect (loadout_cosmetic_finalized ?loadout)
+  )
+  (:action finalize_cosmetic_and_mark_loadout_ready
+    :parameters (?loadout - loadout)
+    :precondition
+      (and
+        (loadout_cosmetic_finalized ?loadout)
+        (not
+          (loadout_finalized ?loadout)
+        )
+      )
+    :effect
+      (and
+        (loadout_finalized ?loadout)
+        (purchase_target_ready_for_event ?loadout)
+      )
+  )
+  (:action mark_slot_a_ready
+    :parameters (?slot_a - slot_a ?bundle - bundle)
+    :precondition
+      (and
+        (slot_a_locked ?slot_a)
+        (slot_a_ready ?slot_a)
+        (bundle_assembled ?bundle)
+        (bundle_finalized ?bundle)
+        (not
+          (purchase_target_ready_for_event ?slot_a)
+        )
+      )
+    :effect (purchase_target_ready_for_event ?slot_a)
+  )
+  (:action mark_slot_b_ready
+    :parameters (?slot_b - slot_b ?bundle - bundle)
+    :precondition
+      (and
+        (slot_b_locked ?slot_b)
+        (slot_b_ready ?slot_b)
+        (bundle_assembled ?bundle)
+        (bundle_finalized ?bundle)
+        (not
+          (purchase_target_ready_for_event ?slot_b)
+        )
+      )
+    :effect (purchase_target_ready_for_event ?slot_b)
+  )
+  (:action authorize_spend_for_slot
+    :parameters (?entity_slot - purchase_target ?voucher - voucher ?material - material)
+    :precondition
+      (and
+        (purchase_target_ready_for_event ?entity_slot)
+        (material_assigned_to_purchase_target ?entity_slot ?material)
+        (voucher_available ?voucher)
+        (not
+          (purchase_target_spend_authorized ?entity_slot)
+        )
+      )
+    :effect
+      (and
+        (purchase_target_spend_authorized ?entity_slot)
+        (voucher_assigned_to_purchase_target ?entity_slot ?voucher)
+        (not
+          (voucher_available ?voucher)
+        )
+      )
+  )
+  (:action spend_currency_on_slot_a
+    :parameters (?slot_a - slot_a ?currency_option - currency_option ?voucher - voucher)
+    :precondition
+      (and
+        (purchase_target_spend_authorized ?slot_a)
+        (currency_assigned_to_purchase_target ?slot_a ?currency_option)
+        (voucher_assigned_to_purchase_target ?slot_a ?voucher)
+        (not
+          (purchase_target_acquired ?slot_a)
+        )
+      )
+    :effect
+      (and
+        (purchase_target_acquired ?slot_a)
+        (currency_available ?currency_option)
+        (voucher_available ?voucher)
+      )
+  )
+  (:action spend_currency_on_slot_b
+    :parameters (?slot_b - slot_b ?currency_option - currency_option ?voucher - voucher)
+    :precondition
+      (and
+        (purchase_target_spend_authorized ?slot_b)
+        (currency_assigned_to_purchase_target ?slot_b ?currency_option)
+        (voucher_assigned_to_purchase_target ?slot_b ?voucher)
+        (not
+          (purchase_target_acquired ?slot_b)
+        )
+      )
+    :effect
+      (and
+        (purchase_target_acquired ?slot_b)
+        (currency_available ?currency_option)
+        (voucher_available ?voucher)
+      )
+  )
+  (:action spend_currency_on_loadout
+    :parameters (?loadout - loadout ?currency_option - currency_option ?voucher - voucher)
+    :precondition
+      (and
+        (purchase_target_spend_authorized ?loadout)
+        (currency_assigned_to_purchase_target ?loadout ?currency_option)
+        (voucher_assigned_to_purchase_target ?loadout ?voucher)
+        (not
+          (purchase_target_acquired ?loadout)
+        )
+      )
+    :effect
+      (and
+        (purchase_target_acquired ?loadout)
+        (currency_available ?currency_option)
+        (voucher_available ?voucher)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem event_spend_instance)
+  (:domain event_limited_currency_spending)
+  (:objects slot_a_1 - slot_a slot_b_1 - slot_b loadout_1 - loadout loadout_2 - loadout currency_option_1 - currency_option currency_option_2 - currency_option currency_option_3 - currency_option material_1 - material tool_1 - tool consumable_1 - consumable resource_source_a_1 - resource_source_a resource_source_b_1 - resource_source_b bundle_1 - bundle component_1 - component component_2 - component cosmetic_upgrade_token_1 - cosmetic_upgrade_token cosmetic_upgrade_token_2 - cosmetic_upgrade_token special_material_1 - special_material special_material_2 - special_material voucher_1 - voucher optional_augment_1 - optional_augment cosmetic_token_1 - cosmetic_token cosmetic_token_2 - cosmetic_token unique_catalyst_1 - unique_catalyst)
+  (:init
+    (currency_available currency_option_1)
+    (currency_available currency_option_2)
+    (currency_available currency_option_3)
+    (material_available material_1)
+    (tool_available tool_1)
+    (consumable_available consumable_1)
+    (slot_a_resource_source slot_a_1 resource_source_a_1)
+    (slot_b_resource_source slot_b_1 resource_source_b_1)
+    (bundle_available bundle_1)
+    (component_available component_1)
+    (component_available component_2)
+    (loadout_has_slot_a loadout_1 slot_a_1)
+    (loadout_has_slot_a loadout_2 slot_a_1)
+    (loadout_has_slot_b loadout_1 slot_b_1)
+    (loadout_has_slot_b loadout_2 slot_b_1)
+    (loadout_linked_bundle loadout_1 bundle_1)
+    (loadout_linked_bundle loadout_2 bundle_1)
+    (loadout_has_component loadout_1 component_1)
+    (loadout_has_component loadout_2 component_2)
+    (cosmetic_upgrade_token_available cosmetic_upgrade_token_1)
+    (cosmetic_upgrade_token_available cosmetic_upgrade_token_2)
+    (special_material_available special_material_1)
+    (special_material_available special_material_2)
+    (voucher_available voucher_1)
+    (optional_augment_available optional_augment_1)
+    (cosmetic_token_available cosmetic_token_1)
+    (loadout_cosmetic_assigned loadout_1 cosmetic_token_1)
+    (loadout_cosmetic_assigned loadout_2 cosmetic_token_2)
+    (unique_catalyst_available unique_catalyst_1)
+  )
+  (:goal
+    (and
+      (purchase_target_acquired slot_a_1)
+      (purchase_target_acquired slot_b_1)
+      (purchase_target_acquired loadout_1)
+      (purchase_target_acquired loadout_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(select_candidate_slot slot_a_1)
+(assign_currency_option_to_slot slot_a_1 currency_option_1)
+(assign_material_to_slot slot_a_1 material_1)
+(confirm_slot_reservation slot_a_1 material_1)
+(reserve_consumable_for_slot_a slot_a_1 resource_source_a_1 consumable_1)
+(release_material_from_slot slot_a_1 material_1)
+(select_candidate_slot slot_b_1)
+(assign_currency_option_to_slot slot_b_1 currency_option_2)
+(assign_material_to_slot slot_b_1 material_1)
+(confirm_slot_reservation slot_b_1 material_1)
+(reserve_resource_source_for_slot_b slot_b_1 resource_source_b_1 material_1)
+(attach_tool_to_slot slot_b_1 tool_1)
+(prepare_slot_b_with_tool slot_b_1 resource_source_b_1 tool_1)
+(assemble_bundle_with_variant_alpha slot_a_1 slot_b_1 resource_source_a_1 resource_source_b_1 bundle_1)
+(release_material_from_slot slot_b_1 material_1)
+(assign_material_to_slot slot_a_1 material_1)
+(finalize_bundle_for_slot_a bundle_1 slot_a_1 material_1)
+(finalize_slot_a_reservation slot_a_1 resource_source_a_1 material_1 consumable_1)
+(mark_slot_a_ready slot_a_1 bundle_1)
+(mark_slot_b_ready slot_b_1 bundle_1)
+(authorize_spend_for_slot slot_a_1 voucher_1 material_1)
+(spend_currency_on_slot_a slot_a_1 currency_option_1 voucher_1)
+(release_material_from_slot slot_a_1 material_1)
+(assign_material_to_slot slot_b_1 material_1)
+(authorize_spend_for_slot slot_b_1 voucher_1 material_1)
+(spend_currency_on_slot_b slot_b_1 currency_option_2 voucher_1)
+(release_material_from_slot slot_b_1 material_1)
+(select_candidate_slot loadout_1)
+(assign_currency_option_to_slot loadout_1 currency_option_3)
+(assign_material_to_slot loadout_1 material_1)
+(confirm_slot_reservation loadout_1 material_1)
+(stage_component_for_loadout_bundle loadout_1 component_1 bundle_1)
+(assign_cosmetic_upgrade_token_to_loadout loadout_1 cosmetic_upgrade_token_1)
+(attach_component_and_cosmetic_to_loadout loadout_1 component_1 bundle_1 material_1 cosmetic_upgrade_token_1)
+(detach_tool_from_slot slot_b_1 tool_1)
+(attach_optional_augment_to_loadout loadout_1 optional_augment_1)
+(attach_tool_to_slot loadout_1 tool_1)
+(execute_modifier_sequence_branch_a loadout_1 optional_augment_1 tool_1 component_1 bundle_1)
+(attach_unique_catalyst_to_loadout loadout_1 unique_catalyst_1)
+(execute_modifier_sequence_stage_four loadout_1 unique_catalyst_1 component_1 bundle_1)
+(attach_special_material_to_loadout loadout_1 special_material_1)
+(verify_loadout_readiness loadout_1 slot_a_1 slot_b_1 material_1 special_material_1)
+(accept_loadout_and_mark_ready loadout_1)
+(authorize_spend_for_slot loadout_1 voucher_1 material_1)
+(spend_currency_on_loadout loadout_1 currency_option_3 voucher_1)
+(detach_tool_from_slot loadout_1 tool_1)
+(detach_optional_augment_from_loadout loadout_1 optional_augment_1)
+(detach_unique_catalyst_from_loadout loadout_1 unique_catalyst_1)
+(release_material_from_slot loadout_1 material_1)
+(select_candidate_slot loadout_2)
+(assign_currency_option_to_slot loadout_2 currency_option_1)
+(assign_material_to_slot loadout_2 material_1)
+(confirm_slot_reservation loadout_2 material_1)
+(stage_component_for_loadout_bundle loadout_2 component_2 bundle_1)
+(assign_cosmetic_upgrade_token_to_loadout loadout_2 cosmetic_upgrade_token_2)
+(attach_component_and_cosmetic_to_loadout loadout_2 component_2 bundle_1 material_1 cosmetic_upgrade_token_2)
+(attach_optional_augment_to_loadout loadout_2 optional_augment_1)
+(attach_tool_to_slot loadout_2 tool_1)
+(execute_modifier_sequence_branch_a loadout_2 optional_augment_1 tool_1 component_2 bundle_1)
+(attach_unique_catalyst_to_loadout loadout_2 unique_catalyst_1)
+(execute_modifier_sequence_stage_four loadout_2 unique_catalyst_1 component_2 bundle_1)
+(attach_special_material_to_loadout loadout_2 special_material_2)
+(verify_loadout_readiness loadout_2 slot_a_1 slot_b_1 material_1 special_material_2)
+(accept_loadout_and_mark_ready loadout_2)
+(authorize_spend_for_slot loadout_2 voucher_1 material_1)
+(spend_currency_on_loadout loadout_2 currency_option_1 voucher_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_h88xe7k6/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 66 
+
+Successful plans:
+Value: 66
+ /tmp/val_h88xe7k6/plan.pddl 66 
+
+
+
+--- stderr ---
+

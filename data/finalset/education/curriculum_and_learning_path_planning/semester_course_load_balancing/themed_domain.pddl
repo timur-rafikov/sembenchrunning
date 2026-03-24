@@ -1,0 +1,937 @@
+(define (domain semester_course_load_balancing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category - entity schedule_category - entity component_category - entity academic_entity - entity registrable_entity - academic_entity course_section - resource_category course_offering - resource_category advisor - resource_category special_project_option - resource_category resource_token - resource_category credit_unit - resource_category capacity_slot - resource_category external_certification - resource_category elective_option - schedule_category milestone_template - schedule_category portfolio_artifact - schedule_category timeslot_group_a - component_category timeslot_group_b - component_category scheduled_course_instance - component_category student_category - registrable_entity cohort - registrable_entity student_primary - student_category student_secondary - student_category semester_plan - cohort)
+
+  (:predicates
+    (enrollment_created ?course_request - registrable_entity)
+    (enrollment_approved ?course_request - registrable_entity)
+    (enrollment_section_claimed ?course_request - registrable_entity)
+    (enrollment_confirmed ?course_request - registrable_entity)
+    (enrollment_registered ?course_request - registrable_entity)
+    (enrollment_credit_assigned ?course_request - registrable_entity)
+    (section_available ?course_section - course_section)
+    (enrollment_assigned_to_section ?course_request - registrable_entity ?course_section - course_section)
+    (offering_available ?course_offering - course_offering)
+    (enrollment_offering_linked ?course_request - registrable_entity ?course_offering - course_offering)
+    (advisor_available ?advisor - advisor)
+    (enrollment_advisor_assigned ?course_request - registrable_entity ?advisor - advisor)
+    (elective_option_available ?elective_option - elective_option)
+    (student_primary_elective_attached ?student_primary - student_primary ?elective_option - elective_option)
+    (student_secondary_elective_attached ?student_secondary - student_secondary ?elective_option - elective_option)
+    (student_timeslot_group_a_assigned ?student_primary - student_primary ?timeslot_group_a - timeslot_group_a)
+    (timeslot_group_a_ready ?timeslot_group_a - timeslot_group_a)
+    (timeslot_group_a_confirmed ?timeslot_group_a - timeslot_group_a)
+    (student_primary_token_confirmed ?student_primary - student_primary)
+    (student_secondary_timeslot_group_b_assigned ?student_secondary - student_secondary ?timeslot_group_b - timeslot_group_b)
+    (timeslot_group_b_ready ?timeslot_group_b - timeslot_group_b)
+    (timeslot_group_b_confirmed ?timeslot_group_b - timeslot_group_b)
+    (student_secondary_token_confirmed ?student_secondary - student_secondary)
+    (scheduled_instance_slot_available ?scheduled_course_instance - scheduled_course_instance)
+    (scheduled_instance_created ?scheduled_course_instance - scheduled_course_instance)
+    (scheduled_instance_timeslot_a_attached ?scheduled_course_instance - scheduled_course_instance ?timeslot_group_a - timeslot_group_a)
+    (scheduled_instance_timeslot_b_attached ?scheduled_course_instance - scheduled_course_instance ?timeslot_group_b - timeslot_group_b)
+    (scheduled_instance_variant_a ?scheduled_course_instance - scheduled_course_instance)
+    (scheduled_instance_variant_b ?scheduled_course_instance - scheduled_course_instance)
+    (scheduled_instance_activated ?scheduled_course_instance - scheduled_course_instance)
+    (plan_has_primary_student ?semester_plan - semester_plan ?student_primary - student_primary)
+    (plan_has_secondary_student ?semester_plan - semester_plan ?student_secondary - student_secondary)
+    (plan_includes_scheduled_instance ?semester_plan - semester_plan ?scheduled_course_instance - scheduled_course_instance)
+    (milestone_template_available ?milestone_template - milestone_template)
+    (plan_has_milestone_template ?semester_plan - semester_plan ?milestone_template - milestone_template)
+    (milestone_template_attached ?milestone_template - milestone_template)
+    (milestone_template_linked_instance ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    (plan_stage_one_approved ?semester_plan - semester_plan)
+    (plan_capacity_allocated ?semester_plan - semester_plan)
+    (plan_ready_for_final_review ?semester_plan - semester_plan)
+    (plan_has_special_project_option ?semester_plan - semester_plan)
+    (plan_special_project_confirmed ?semester_plan - semester_plan)
+    (plan_evidence_collected ?semester_plan - semester_plan)
+    (plan_final_checks_completed ?semester_plan - semester_plan)
+    (portfolio_artifact_available ?portfolio_artifact - portfolio_artifact)
+    (plan_has_portfolio_artifact ?semester_plan - semester_plan ?portfolio_artifact - portfolio_artifact)
+    (plan_artifact_attached ?semester_plan - semester_plan)
+    (plan_artifact_verified ?semester_plan - semester_plan)
+    (plan_artifact_approved ?semester_plan - semester_plan)
+    (special_project_option_available ?special_project_option - special_project_option)
+    (plan_special_project_option_linked ?semester_plan - semester_plan ?special_project_option - special_project_option)
+    (resource_token_available ?resource_token - resource_token)
+    (plan_resource_attached ?semester_plan - semester_plan ?resource_token - resource_token)
+    (capacity_slot_available ?capacity_slot - capacity_slot)
+    (plan_capacity_slot_reserved ?semester_plan - semester_plan ?capacity_slot - capacity_slot)
+    (external_certification_available ?external_certification - external_certification)
+    (plan_external_certification_attached ?semester_plan - semester_plan ?external_certification - external_certification)
+    (credit_unit_available ?credit_unit - credit_unit)
+    (enrollment_credit_linked ?course_request - registrable_entity ?credit_unit - credit_unit)
+    (student_primary_token_acquired ?student_primary - student_primary)
+    (student_secondary_token_acquired ?student_secondary - student_secondary)
+    (plan_finalized ?semester_plan - semester_plan)
+  )
+  (:action create_course_request
+    :parameters (?course_request - registrable_entity)
+    :precondition
+      (and
+        (not
+          (enrollment_created ?course_request)
+        )
+        (not
+          (enrollment_confirmed ?course_request)
+        )
+      )
+    :effect (enrollment_created ?course_request)
+  )
+  (:action assign_request_to_section
+    :parameters (?course_request - registrable_entity ?course_section - course_section)
+    :precondition
+      (and
+        (enrollment_created ?course_request)
+        (not
+          (enrollment_section_claimed ?course_request)
+        )
+        (section_available ?course_section)
+      )
+    :effect
+      (and
+        (enrollment_section_claimed ?course_request)
+        (enrollment_assigned_to_section ?course_request ?course_section)
+        (not
+          (section_available ?course_section)
+        )
+      )
+  )
+  (:action link_request_to_offering
+    :parameters (?course_request - registrable_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_created ?course_request)
+        (enrollment_section_claimed ?course_request)
+        (offering_available ?course_offering)
+      )
+    :effect
+      (and
+        (enrollment_offering_linked ?course_request ?course_offering)
+        (not
+          (offering_available ?course_offering)
+        )
+      )
+  )
+  (:action approve_course_request
+    :parameters (?course_request - registrable_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_created ?course_request)
+        (enrollment_section_claimed ?course_request)
+        (enrollment_offering_linked ?course_request ?course_offering)
+        (not
+          (enrollment_approved ?course_request)
+        )
+      )
+    :effect (enrollment_approved ?course_request)
+  )
+  (:action release_offering_for_request
+    :parameters (?course_request - registrable_entity ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_offering_linked ?course_request ?course_offering)
+      )
+    :effect
+      (and
+        (offering_available ?course_offering)
+        (not
+          (enrollment_offering_linked ?course_request ?course_offering)
+        )
+      )
+  )
+  (:action assign_advisor_to_request
+    :parameters (?course_request - registrable_entity ?advisor - advisor)
+    :precondition
+      (and
+        (enrollment_approved ?course_request)
+        (advisor_available ?advisor)
+      )
+    :effect
+      (and
+        (enrollment_advisor_assigned ?course_request ?advisor)
+        (not
+          (advisor_available ?advisor)
+        )
+      )
+  )
+  (:action unassign_advisor_from_request
+    :parameters (?course_request - registrable_entity ?advisor - advisor)
+    :precondition
+      (and
+        (enrollment_advisor_assigned ?course_request ?advisor)
+      )
+    :effect
+      (and
+        (advisor_available ?advisor)
+        (not
+          (enrollment_advisor_assigned ?course_request ?advisor)
+        )
+      )
+  )
+  (:action reserve_capacity_slot_for_plan
+    :parameters (?semester_plan - semester_plan ?capacity_slot - capacity_slot)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (capacity_slot_available ?capacity_slot)
+      )
+    :effect
+      (and
+        (plan_capacity_slot_reserved ?semester_plan ?capacity_slot)
+        (not
+          (capacity_slot_available ?capacity_slot)
+        )
+      )
+  )
+  (:action release_capacity_slot_from_plan
+    :parameters (?semester_plan - semester_plan ?capacity_slot - capacity_slot)
+    :precondition
+      (and
+        (plan_capacity_slot_reserved ?semester_plan ?capacity_slot)
+      )
+    :effect
+      (and
+        (capacity_slot_available ?capacity_slot)
+        (not
+          (plan_capacity_slot_reserved ?semester_plan ?capacity_slot)
+        )
+      )
+  )
+  (:action reserve_external_certification_for_plan
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (external_certification_available ?external_certification)
+      )
+    :effect
+      (and
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (not
+          (external_certification_available ?external_certification)
+        )
+      )
+  )
+  (:action release_external_certification_from_plan
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification)
+    :precondition
+      (and
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+      )
+    :effect
+      (and
+        (external_certification_available ?external_certification)
+        (not
+          (plan_external_certification_attached ?semester_plan ?external_certification)
+        )
+      )
+  )
+  (:action acquire_timeslot_a_for_student_primary
+    :parameters (?student_primary - student_primary ?timeslot_group_a - timeslot_group_a ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_approved ?student_primary)
+        (enrollment_offering_linked ?student_primary ?course_offering)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (not
+          (timeslot_group_a_ready ?timeslot_group_a)
+        )
+        (not
+          (timeslot_group_a_confirmed ?timeslot_group_a)
+        )
+      )
+    :effect (timeslot_group_a_ready ?timeslot_group_a)
+  )
+  (:action confirm_timeslot_a_for_student_primary
+    :parameters (?student_primary - student_primary ?timeslot_group_a - timeslot_group_a ?advisor - advisor)
+    :precondition
+      (and
+        (enrollment_approved ?student_primary)
+        (enrollment_advisor_assigned ?student_primary ?advisor)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (timeslot_group_a_ready ?timeslot_group_a)
+        (not
+          (student_primary_token_acquired ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_primary_token_confirmed ?student_primary)
+      )
+  )
+  (:action assign_elective_and_confirm_timeslot_a_for_student_primary
+    :parameters (?student_primary - student_primary ?timeslot_group_a - timeslot_group_a ?elective_option - elective_option)
+    :precondition
+      (and
+        (enrollment_approved ?student_primary)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (elective_option_available ?elective_option)
+        (not
+          (student_primary_token_acquired ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (timeslot_group_a_confirmed ?timeslot_group_a)
+        (student_primary_token_acquired ?student_primary)
+        (student_primary_elective_attached ?student_primary ?elective_option)
+        (not
+          (elective_option_available ?elective_option)
+        )
+      )
+  )
+  (:action finalize_timeslot_a_and_elective_for_student_primary
+    :parameters (?student_primary - student_primary ?timeslot_group_a - timeslot_group_a ?course_offering - course_offering ?elective_option - elective_option)
+    :precondition
+      (and
+        (enrollment_approved ?student_primary)
+        (enrollment_offering_linked ?student_primary ?course_offering)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (timeslot_group_a_confirmed ?timeslot_group_a)
+        (student_primary_elective_attached ?student_primary ?elective_option)
+        (not
+          (student_primary_token_confirmed ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (timeslot_group_a_ready ?timeslot_group_a)
+        (student_primary_token_confirmed ?student_primary)
+        (elective_option_available ?elective_option)
+        (not
+          (student_primary_elective_attached ?student_primary ?elective_option)
+        )
+      )
+  )
+  (:action acquire_timeslot_b_for_student_secondary
+    :parameters (?student_secondary - student_secondary ?timeslot_group_b - timeslot_group_b ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_approved ?student_secondary)
+        (enrollment_offering_linked ?student_secondary ?course_offering)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (not
+          (timeslot_group_b_ready ?timeslot_group_b)
+        )
+        (not
+          (timeslot_group_b_confirmed ?timeslot_group_b)
+        )
+      )
+    :effect (timeslot_group_b_ready ?timeslot_group_b)
+  )
+  (:action confirm_timeslot_b_for_student_secondary
+    :parameters (?student_secondary - student_secondary ?timeslot_group_b - timeslot_group_b ?advisor - advisor)
+    :precondition
+      (and
+        (enrollment_approved ?student_secondary)
+        (enrollment_advisor_assigned ?student_secondary ?advisor)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_b_ready ?timeslot_group_b)
+        (not
+          (student_secondary_token_acquired ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (student_secondary_token_acquired ?student_secondary)
+        (student_secondary_token_confirmed ?student_secondary)
+      )
+  )
+  (:action assign_elective_and_confirm_timeslot_b_for_student_secondary
+    :parameters (?student_secondary - student_secondary ?timeslot_group_b - timeslot_group_b ?elective_option - elective_option)
+    :precondition
+      (and
+        (enrollment_approved ?student_secondary)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (elective_option_available ?elective_option)
+        (not
+          (student_secondary_token_acquired ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (timeslot_group_b_confirmed ?timeslot_group_b)
+        (student_secondary_token_acquired ?student_secondary)
+        (student_secondary_elective_attached ?student_secondary ?elective_option)
+        (not
+          (elective_option_available ?elective_option)
+        )
+      )
+  )
+  (:action finalize_timeslot_b_and_elective_for_student_secondary
+    :parameters (?student_secondary - student_secondary ?timeslot_group_b - timeslot_group_b ?course_offering - course_offering ?elective_option - elective_option)
+    :precondition
+      (and
+        (enrollment_approved ?student_secondary)
+        (enrollment_offering_linked ?student_secondary ?course_offering)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_b_confirmed ?timeslot_group_b)
+        (student_secondary_elective_attached ?student_secondary ?elective_option)
+        (not
+          (student_secondary_token_confirmed ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (timeslot_group_b_ready ?timeslot_group_b)
+        (student_secondary_token_confirmed ?student_secondary)
+        (elective_option_available ?elective_option)
+        (not
+          (student_secondary_elective_attached ?student_secondary ?elective_option)
+        )
+      )
+  )
+  (:action create_scheduled_course_instance
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?timeslot_group_a - timeslot_group_a ?timeslot_group_b - timeslot_group_b ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_secondary_token_acquired ?student_secondary)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_a_ready ?timeslot_group_a)
+        (timeslot_group_b_ready ?timeslot_group_b)
+        (student_primary_token_confirmed ?student_primary)
+        (student_secondary_token_confirmed ?student_secondary)
+        (scheduled_instance_slot_available ?scheduled_course_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_timeslot_a_attached ?scheduled_course_instance ?timeslot_group_a)
+        (scheduled_instance_timeslot_b_attached ?scheduled_course_instance ?timeslot_group_b)
+        (not
+          (scheduled_instance_slot_available ?scheduled_course_instance)
+        )
+      )
+  )
+  (:action create_scheduled_course_instance_with_variant_a
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?timeslot_group_a - timeslot_group_a ?timeslot_group_b - timeslot_group_b ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_secondary_token_acquired ?student_secondary)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_a_confirmed ?timeslot_group_a)
+        (timeslot_group_b_ready ?timeslot_group_b)
+        (not
+          (student_primary_token_confirmed ?student_primary)
+        )
+        (student_secondary_token_confirmed ?student_secondary)
+        (scheduled_instance_slot_available ?scheduled_course_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_timeslot_a_attached ?scheduled_course_instance ?timeslot_group_a)
+        (scheduled_instance_timeslot_b_attached ?scheduled_course_instance ?timeslot_group_b)
+        (scheduled_instance_variant_a ?scheduled_course_instance)
+        (not
+          (scheduled_instance_slot_available ?scheduled_course_instance)
+        )
+      )
+  )
+  (:action create_scheduled_course_instance_with_variant_b
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?timeslot_group_a - timeslot_group_a ?timeslot_group_b - timeslot_group_b ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_secondary_token_acquired ?student_secondary)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_a_ready ?timeslot_group_a)
+        (timeslot_group_b_confirmed ?timeslot_group_b)
+        (student_primary_token_confirmed ?student_primary)
+        (not
+          (student_secondary_token_confirmed ?student_secondary)
+        )
+        (scheduled_instance_slot_available ?scheduled_course_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_timeslot_a_attached ?scheduled_course_instance ?timeslot_group_a)
+        (scheduled_instance_timeslot_b_attached ?scheduled_course_instance ?timeslot_group_b)
+        (scheduled_instance_variant_b ?scheduled_course_instance)
+        (not
+          (scheduled_instance_slot_available ?scheduled_course_instance)
+        )
+      )
+  )
+  (:action create_scheduled_course_instance_with_variants_ab
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?timeslot_group_a - timeslot_group_a ?timeslot_group_b - timeslot_group_b ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_secondary_token_acquired ?student_secondary)
+        (student_timeslot_group_a_assigned ?student_primary ?timeslot_group_a)
+        (student_secondary_timeslot_group_b_assigned ?student_secondary ?timeslot_group_b)
+        (timeslot_group_a_confirmed ?timeslot_group_a)
+        (timeslot_group_b_confirmed ?timeslot_group_b)
+        (not
+          (student_primary_token_confirmed ?student_primary)
+        )
+        (not
+          (student_secondary_token_confirmed ?student_secondary)
+        )
+        (scheduled_instance_slot_available ?scheduled_course_instance)
+      )
+    :effect
+      (and
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_timeslot_a_attached ?scheduled_course_instance ?timeslot_group_a)
+        (scheduled_instance_timeslot_b_attached ?scheduled_course_instance ?timeslot_group_b)
+        (scheduled_instance_variant_a ?scheduled_course_instance)
+        (scheduled_instance_variant_b ?scheduled_course_instance)
+        (not
+          (scheduled_instance_slot_available ?scheduled_course_instance)
+        )
+      )
+  )
+  (:action activate_scheduled_course_instance
+    :parameters (?scheduled_course_instance - scheduled_course_instance ?student_primary - student_primary ?course_offering - course_offering)
+    :precondition
+      (and
+        (scheduled_instance_created ?scheduled_course_instance)
+        (student_primary_token_acquired ?student_primary)
+        (enrollment_offering_linked ?student_primary ?course_offering)
+        (not
+          (scheduled_instance_activated ?scheduled_course_instance)
+        )
+      )
+    :effect (scheduled_instance_activated ?scheduled_course_instance)
+  )
+  (:action attach_milestone_template_to_plan_for_instance
+    :parameters (?semester_plan - semester_plan ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (plan_includes_scheduled_instance ?semester_plan ?scheduled_course_instance)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_available ?milestone_template)
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_activated ?scheduled_course_instance)
+        (not
+          (milestone_template_attached ?milestone_template)
+        )
+      )
+    :effect
+      (and
+        (milestone_template_attached ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (not
+          (milestone_template_available ?milestone_template)
+        )
+      )
+  )
+  (:action approve_milestone_attachment_for_plan
+    :parameters (?semester_plan - semester_plan ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_attached ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (enrollment_offering_linked ?semester_plan ?course_offering)
+        (not
+          (scheduled_instance_variant_a ?scheduled_course_instance)
+        )
+        (not
+          (plan_stage_one_approved ?semester_plan)
+        )
+      )
+    :effect (plan_stage_one_approved ?semester_plan)
+  )
+  (:action attach_special_project_option_to_plan
+    :parameters (?semester_plan - semester_plan ?special_project_option - special_project_option)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (special_project_option_available ?special_project_option)
+        (not
+          (plan_has_special_project_option ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_special_project_option ?semester_plan)
+        (plan_special_project_option_linked ?semester_plan ?special_project_option)
+        (not
+          (special_project_option_available ?special_project_option)
+        )
+      )
+  )
+  (:action confirm_special_project_and_milestone_for_plan
+    :parameters (?semester_plan - semester_plan ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance ?course_offering - course_offering ?special_project_option - special_project_option)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_attached ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (enrollment_offering_linked ?semester_plan ?course_offering)
+        (scheduled_instance_variant_a ?scheduled_course_instance)
+        (plan_has_special_project_option ?semester_plan)
+        (plan_special_project_option_linked ?semester_plan ?special_project_option)
+        (not
+          (plan_stage_one_approved ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_stage_one_approved ?semester_plan)
+        (plan_special_project_confirmed ?semester_plan)
+      )
+  )
+  (:action reserve_capacity_and_advance_plan
+    :parameters (?semester_plan - semester_plan ?capacity_slot - capacity_slot ?advisor - advisor ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_stage_one_approved ?semester_plan)
+        (plan_capacity_slot_reserved ?semester_plan ?capacity_slot)
+        (enrollment_advisor_assigned ?semester_plan ?advisor)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (not
+          (scheduled_instance_variant_b ?scheduled_course_instance)
+        )
+        (not
+          (plan_capacity_allocated ?semester_plan)
+        )
+      )
+    :effect (plan_capacity_allocated ?semester_plan)
+  )
+  (:action finalize_plan_capacity_and_advance
+    :parameters (?semester_plan - semester_plan ?capacity_slot - capacity_slot ?advisor - advisor ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_stage_one_approved ?semester_plan)
+        (plan_capacity_slot_reserved ?semester_plan ?capacity_slot)
+        (enrollment_advisor_assigned ?semester_plan ?advisor)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (scheduled_instance_variant_b ?scheduled_course_instance)
+        (not
+          (plan_capacity_allocated ?semester_plan)
+        )
+      )
+    :effect (plan_capacity_allocated ?semester_plan)
+  )
+  (:action apply_certification_and_mark_plan_stage_three
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_capacity_allocated ?semester_plan)
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (not
+          (scheduled_instance_variant_a ?scheduled_course_instance)
+        )
+        (not
+          (scheduled_instance_variant_b ?scheduled_course_instance)
+        )
+        (not
+          (plan_ready_for_final_review ?semester_plan)
+        )
+      )
+    :effect (plan_ready_for_final_review ?semester_plan)
+  )
+  (:action apply_certification_and_collect_evidence
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_capacity_allocated ?semester_plan)
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (scheduled_instance_variant_a ?scheduled_course_instance)
+        (not
+          (scheduled_instance_variant_b ?scheduled_course_instance)
+        )
+        (not
+          (plan_ready_for_final_review ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_evidence_collected ?semester_plan)
+      )
+  )
+  (:action apply_certification_and_collect_evidence_variant
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_capacity_allocated ?semester_plan)
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (not
+          (scheduled_instance_variant_a ?scheduled_course_instance)
+        )
+        (scheduled_instance_variant_b ?scheduled_course_instance)
+        (not
+          (plan_ready_for_final_review ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_evidence_collected ?semester_plan)
+      )
+  )
+  (:action apply_certification_and_collect_evidence_final
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification ?milestone_template - milestone_template ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (plan_capacity_allocated ?semester_plan)
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (plan_has_milestone_template ?semester_plan ?milestone_template)
+        (milestone_template_linked_instance ?milestone_template ?scheduled_course_instance)
+        (scheduled_instance_variant_a ?scheduled_course_instance)
+        (scheduled_instance_variant_b ?scheduled_course_instance)
+        (not
+          (plan_ready_for_final_review ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_evidence_collected ?semester_plan)
+      )
+  )
+  (:action finalize_plan_for_enrollment
+    :parameters (?semester_plan - semester_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (not
+          (plan_evidence_collected ?semester_plan)
+        )
+        (not
+          (plan_finalized ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?semester_plan)
+        (enrollment_registered ?semester_plan)
+      )
+  )
+  (:action attach_resource_token_to_plan
+    :parameters (?semester_plan - semester_plan ?resource_token - resource_token)
+    :precondition
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_evidence_collected ?semester_plan)
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (plan_resource_attached ?semester_plan ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action aggregate_plan_approvals_and_mark_ready
+    :parameters (?semester_plan - semester_plan ?student_primary - student_primary ?student_secondary - student_secondary ?course_offering - course_offering ?resource_token - resource_token)
+    :precondition
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_evidence_collected ?semester_plan)
+        (plan_resource_attached ?semester_plan ?resource_token)
+        (plan_has_primary_student ?semester_plan ?student_primary)
+        (plan_has_secondary_student ?semester_plan ?student_secondary)
+        (student_primary_token_confirmed ?student_primary)
+        (student_secondary_token_confirmed ?student_secondary)
+        (enrollment_offering_linked ?semester_plan ?course_offering)
+        (not
+          (plan_final_checks_completed ?semester_plan)
+        )
+      )
+    :effect (plan_final_checks_completed ?semester_plan)
+  )
+  (:action finalize_aggregated_plan_for_enrollment
+    :parameters (?semester_plan - semester_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_review ?semester_plan)
+        (plan_final_checks_completed ?semester_plan)
+        (not
+          (plan_finalized ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?semester_plan)
+        (enrollment_registered ?semester_plan)
+      )
+  )
+  (:action attach_portfolio_artifact_to_plan
+    :parameters (?semester_plan - semester_plan ?portfolio_artifact - portfolio_artifact ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_approved ?semester_plan)
+        (enrollment_offering_linked ?semester_plan ?course_offering)
+        (portfolio_artifact_available ?portfolio_artifact)
+        (plan_has_portfolio_artifact ?semester_plan ?portfolio_artifact)
+        (not
+          (plan_artifact_attached ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_artifact_attached ?semester_plan)
+        (not
+          (portfolio_artifact_available ?portfolio_artifact)
+        )
+      )
+  )
+  (:action verify_plan_artifact
+    :parameters (?semester_plan - semester_plan ?advisor - advisor)
+    :precondition
+      (and
+        (plan_artifact_attached ?semester_plan)
+        (enrollment_advisor_assigned ?semester_plan ?advisor)
+        (not
+          (plan_artifact_verified ?semester_plan)
+        )
+      )
+    :effect (plan_artifact_verified ?semester_plan)
+  )
+  (:action approve_plan_certification
+    :parameters (?semester_plan - semester_plan ?external_certification - external_certification)
+    :precondition
+      (and
+        (plan_artifact_verified ?semester_plan)
+        (plan_external_certification_attached ?semester_plan ?external_certification)
+        (not
+          (plan_artifact_approved ?semester_plan)
+        )
+      )
+    :effect (plan_artifact_approved ?semester_plan)
+  )
+  (:action finalize_plan_after_certification
+    :parameters (?semester_plan - semester_plan)
+    :precondition
+      (and
+        (plan_artifact_approved ?semester_plan)
+        (not
+          (plan_finalized ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?semester_plan)
+        (enrollment_registered ?semester_plan)
+      )
+  )
+  (:action confirm_student_primary_enrollment
+    :parameters (?student_primary - student_primary ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_primary_token_acquired ?student_primary)
+        (student_primary_token_confirmed ?student_primary)
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_activated ?scheduled_course_instance)
+        (not
+          (enrollment_registered ?student_primary)
+        )
+      )
+    :effect (enrollment_registered ?student_primary)
+  )
+  (:action confirm_student_secondary_enrollment
+    :parameters (?student_secondary - student_secondary ?scheduled_course_instance - scheduled_course_instance)
+    :precondition
+      (and
+        (student_secondary_token_acquired ?student_secondary)
+        (student_secondary_token_confirmed ?student_secondary)
+        (scheduled_instance_created ?scheduled_course_instance)
+        (scheduled_instance_activated ?scheduled_course_instance)
+        (not
+          (enrollment_registered ?student_secondary)
+        )
+      )
+    :effect (enrollment_registered ?student_secondary)
+  )
+  (:action allocate_credit_unit_to_request
+    :parameters (?course_request - registrable_entity ?credit_unit - credit_unit ?course_offering - course_offering)
+    :precondition
+      (and
+        (enrollment_registered ?course_request)
+        (enrollment_offering_linked ?course_request ?course_offering)
+        (credit_unit_available ?credit_unit)
+        (not
+          (enrollment_credit_assigned ?course_request)
+        )
+      )
+    :effect
+      (and
+        (enrollment_credit_assigned ?course_request)
+        (enrollment_credit_linked ?course_request ?credit_unit)
+        (not
+          (credit_unit_available ?credit_unit)
+        )
+      )
+  )
+  (:action fulfill_credit_and_confirm_student_primary
+    :parameters (?student_primary - student_primary ?course_section - course_section ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (enrollment_credit_assigned ?student_primary)
+        (enrollment_assigned_to_section ?student_primary ?course_section)
+        (enrollment_credit_linked ?student_primary ?credit_unit)
+        (not
+          (enrollment_confirmed ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?student_primary)
+        (section_available ?course_section)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+  (:action fulfill_credit_and_confirm_student_secondary
+    :parameters (?student_secondary - student_secondary ?course_section - course_section ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (enrollment_credit_assigned ?student_secondary)
+        (enrollment_assigned_to_section ?student_secondary ?course_section)
+        (enrollment_credit_linked ?student_secondary ?credit_unit)
+        (not
+          (enrollment_confirmed ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?student_secondary)
+        (section_available ?course_section)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+  (:action fulfill_credit_and_confirm_plan
+    :parameters (?semester_plan - semester_plan ?course_section - course_section ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (enrollment_credit_assigned ?semester_plan)
+        (enrollment_assigned_to_section ?semester_plan ?course_section)
+        (enrollment_credit_linked ?semester_plan ?credit_unit)
+        (not
+          (enrollment_confirmed ?semester_plan)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?semester_plan)
+        (section_available ?course_section)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+)

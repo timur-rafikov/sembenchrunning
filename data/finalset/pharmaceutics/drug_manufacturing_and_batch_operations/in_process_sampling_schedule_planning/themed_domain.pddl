@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_in_process_sampling_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object consumable_or_sample_resource - object sampling_entity - object plan_root - object sampling_plan - plan_root quality_reviewer - operational_resource assay_method - operational_resource technician - operational_resource protocol_document - operational_resource qc_checklist - operational_resource release_document - operational_resource calibration_certificate - operational_resource regulatory_document - operational_resource sampling_kit - consumable_or_sample_resource sample_vial - consumable_or_sample_resource sponsor_document - consumable_or_sample_resource production_sampling_point - sampling_entity qc_sampling_point - sampling_entity sample_container - sampling_entity plan_stage_allocation - sampling_plan plan_batch_assignment - sampling_plan process_unit_production - plan_stage_allocation process_unit_qc - plan_stage_allocation production_batch - plan_batch_assignment)
+  (:predicates
+    (sampling_unit_initialized_flag ?sampling_plan - sampling_plan)
+    (sampling_unit_assay_method_confirmed_flag ?sampling_plan - sampling_plan)
+    (sampling_unit_reviewer_assignment_flag ?sampling_plan - sampling_plan)
+    (release_authorized_flag ?sampling_plan - sampling_plan)
+    (ready_for_release_flag ?sampling_plan - sampling_plan)
+    (sampling_unit_finalized_flag ?sampling_plan - sampling_plan)
+    (quality_reviewer_available ?quality_reviewer - quality_reviewer)
+    (sampling_unit_assigned_reviewer ?sampling_plan - sampling_plan ?quality_reviewer - quality_reviewer)
+    (assay_method_available ?assay_method - assay_method)
+    (sampling_unit_assigned_assay_method ?sampling_plan - sampling_plan ?assay_method - assay_method)
+    (technician_available ?technician - technician)
+    (sampling_unit_assigned_technician ?sampling_plan - sampling_plan ?technician - technician)
+    (sampling_kit_available ?sampling_kit - sampling_kit)
+    (sampling_unit_assigned_sampling_kit_production ?process_unit_production - process_unit_production ?sampling_kit - sampling_kit)
+    (sampling_unit_assigned_sampling_kit_qc ?process_unit_qc - process_unit_qc ?sampling_kit - sampling_kit)
+    (sampling_unit_has_production_sampling_point ?process_unit_production - process_unit_production ?production_sampling_point - production_sampling_point)
+    (sampling_point_scheduled_production ?production_sampling_point - production_sampling_point)
+    (production_sampling_point_kit_allocated ?production_sampling_point - production_sampling_point)
+    (sampling_unit_sample_collected_flag_production ?process_unit_production - process_unit_production)
+    (sampling_unit_has_qc_sampling_point ?process_unit_qc - process_unit_qc ?qc_sampling_point - qc_sampling_point)
+    (sampling_point_scheduled_qc ?qc_sampling_point - qc_sampling_point)
+    (qc_sampling_point_kit_allocated ?qc_sampling_point - qc_sampling_point)
+    (sampling_unit_sample_collected_flag_qc ?process_unit_qc - process_unit_qc)
+    (container_available ?sample_container - sample_container)
+    (container_created_flag ?sample_container - sample_container)
+    (container_linked_to_production_point ?sample_container - sample_container ?production_sampling_point - production_sampling_point)
+    (container_linked_to_qc_point ?sample_container - sample_container ?qc_sampling_point - qc_sampling_point)
+    (container_requires_protocol_attachment_flag ?sample_container - sample_container)
+    (container_requires_calibration_certificate_flag ?sample_container - sample_container)
+    (container_checked_in_to_lab_flag ?sample_container - sample_container)
+    (batch_linked_to_production_unit ?production_batch - production_batch ?process_unit_production - process_unit_production)
+    (batch_linked_to_qc_unit ?production_batch - production_batch ?process_unit_qc - process_unit_qc)
+    (batch_assigned_container ?production_batch - production_batch ?sample_container - sample_container)
+    (sample_vial_available ?sample_vial - sample_vial)
+    (batch_assigned_vial ?production_batch - production_batch ?sample_vial - sample_vial)
+    (vial_allocated_for_analysis_flag ?sample_vial - sample_vial)
+    (vial_linked_to_container ?sample_vial - sample_vial ?sample_container - sample_container)
+    (batch_lab_receipt_flag ?production_batch - production_batch)
+    (batch_prepared_for_analysis_flag ?production_batch - production_batch)
+    (batch_analysis_complete_flag ?production_batch - production_batch)
+    (batch_protocol_attached_flag ?production_batch - production_batch)
+    (batch_protocol_verified_flag ?production_batch - production_batch)
+    (batch_documentation_complete_flag ?production_batch - production_batch)
+    (batch_internal_checks_complete_flag ?production_batch - production_batch)
+    (sponsor_document_available ?sponsor_document - sponsor_document)
+    (batch_attached_sponsor_document ?production_batch - production_batch ?sponsor_document - sponsor_document)
+    (batch_sponsor_document_registered_flag ?production_batch - production_batch)
+    (batch_sponsor_checked_flag ?production_batch - production_batch)
+    (batch_regulatory_doc_attached_flag ?production_batch - production_batch)
+    (protocol_document_available ?protocol_document - protocol_document)
+    (batch_attached_protocol_document ?production_batch - production_batch ?protocol_document - protocol_document)
+    (qc_checklist_available ?qc_checklist - qc_checklist)
+    (batch_attached_qc_checklist ?production_batch - production_batch ?qc_checklist - qc_checklist)
+    (calibration_certificate_available ?calibration_certificate - calibration_certificate)
+    (batch_attached_calibration_certificate ?production_batch - production_batch ?calibration_certificate - calibration_certificate)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (batch_attached_regulatory_document ?production_batch - production_batch ?regulatory_document - regulatory_document)
+    (release_document_available ?release_document - release_document)
+    (sampling_unit_attached_release_document ?sampling_plan - sampling_plan ?release_document - release_document)
+    (sampling_unit_ready_flag_production ?process_unit_production - process_unit_production)
+    (sampling_unit_ready_flag_qc ?process_unit_qc - process_unit_qc)
+    (batch_release_recorded_flag ?production_batch - production_batch)
+  )
+  (:action initialize_sampling_plan
+    :parameters (?sampling_plan - sampling_plan)
+    :precondition
+      (and
+        (not
+          (sampling_unit_initialized_flag ?sampling_plan)
+        )
+        (not
+          (release_authorized_flag ?sampling_plan)
+        )
+      )
+    :effect (sampling_unit_initialized_flag ?sampling_plan)
+  )
+  (:action assign_quality_reviewer_to_plan
+    :parameters (?sampling_plan - sampling_plan ?quality_reviewer - quality_reviewer)
+    :precondition
+      (and
+        (sampling_unit_initialized_flag ?sampling_plan)
+        (not
+          (sampling_unit_reviewer_assignment_flag ?sampling_plan)
+        )
+        (quality_reviewer_available ?quality_reviewer)
+      )
+    :effect
+      (and
+        (sampling_unit_reviewer_assignment_flag ?sampling_plan)
+        (sampling_unit_assigned_reviewer ?sampling_plan ?quality_reviewer)
+        (not
+          (quality_reviewer_available ?quality_reviewer)
+        )
+      )
+  )
+  (:action assign_assay_method_to_plan
+    :parameters (?sampling_plan - sampling_plan ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_initialized_flag ?sampling_plan)
+        (sampling_unit_reviewer_assignment_flag ?sampling_plan)
+        (assay_method_available ?assay_method)
+      )
+    :effect
+      (and
+        (sampling_unit_assigned_assay_method ?sampling_plan ?assay_method)
+        (not
+          (assay_method_available ?assay_method)
+        )
+      )
+  )
+  (:action confirm_assay_method_assignment
+    :parameters (?sampling_plan - sampling_plan ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_initialized_flag ?sampling_plan)
+        (sampling_unit_reviewer_assignment_flag ?sampling_plan)
+        (sampling_unit_assigned_assay_method ?sampling_plan ?assay_method)
+        (not
+          (sampling_unit_assay_method_confirmed_flag ?sampling_plan)
+        )
+      )
+    :effect (sampling_unit_assay_method_confirmed_flag ?sampling_plan)
+  )
+  (:action unassign_assay_method_from_plan
+    :parameters (?sampling_plan - sampling_plan ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_assigned_assay_method ?sampling_plan ?assay_method)
+      )
+    :effect
+      (and
+        (assay_method_available ?assay_method)
+        (not
+          (sampling_unit_assigned_assay_method ?sampling_plan ?assay_method)
+        )
+      )
+  )
+  (:action assign_technician_to_plan
+    :parameters (?sampling_plan - sampling_plan ?technician - technician)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?sampling_plan)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (sampling_unit_assigned_technician ?sampling_plan ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action release_technician_from_plan
+    :parameters (?sampling_plan - sampling_plan ?technician - technician)
+    :precondition
+      (and
+        (sampling_unit_assigned_technician ?sampling_plan ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (sampling_unit_assigned_technician ?sampling_plan ?technician)
+        )
+      )
+  )
+  (:action attach_calibration_certificate_to_batch
+    :parameters (?production_batch - production_batch ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (calibration_certificate_available ?calibration_certificate)
+      )
+    :effect
+      (and
+        (batch_attached_calibration_certificate ?production_batch ?calibration_certificate)
+        (not
+          (calibration_certificate_available ?calibration_certificate)
+        )
+      )
+  )
+  (:action detach_calibration_certificate_from_batch
+    :parameters (?production_batch - production_batch ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (batch_attached_calibration_certificate ?production_batch ?calibration_certificate)
+      )
+    :effect
+      (and
+        (calibration_certificate_available ?calibration_certificate)
+        (not
+          (batch_attached_calibration_certificate ?production_batch ?calibration_certificate)
+        )
+      )
+  )
+  (:action attach_regulatory_document_to_batch
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action detach_regulatory_document_from_batch
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+      )
+    :effect
+      (and
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        )
+      )
+  )
+  (:action schedule_production_sampling_point
+    :parameters (?process_unit_production - process_unit_production ?production_sampling_point - production_sampling_point ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_production)
+        (sampling_unit_assigned_assay_method ?process_unit_production ?assay_method)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (not
+          (sampling_point_scheduled_production ?production_sampling_point)
+        )
+        (not
+          (production_sampling_point_kit_allocated ?production_sampling_point)
+        )
+      )
+    :effect (sampling_point_scheduled_production ?production_sampling_point)
+  )
+  (:action perform_production_sampling_collection
+    :parameters (?process_unit_production - process_unit_production ?production_sampling_point - production_sampling_point ?technician - technician)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_production)
+        (sampling_unit_assigned_technician ?process_unit_production ?technician)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_point_scheduled_production ?production_sampling_point)
+        (not
+          (sampling_unit_ready_flag_production ?process_unit_production)
+        )
+      )
+    :effect
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+      )
+  )
+  (:action allocate_sampling_kit_to_production_point
+    :parameters (?process_unit_production - process_unit_production ?production_sampling_point - production_sampling_point ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_production)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_kit_available ?sampling_kit)
+        (not
+          (sampling_unit_ready_flag_production ?process_unit_production)
+        )
+      )
+    :effect
+      (and
+        (production_sampling_point_kit_allocated ?production_sampling_point)
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_assigned_sampling_kit_production ?process_unit_production ?sampling_kit)
+        (not
+          (sampling_kit_available ?sampling_kit)
+        )
+      )
+  )
+  (:action complete_production_sampling_with_kit
+    :parameters (?process_unit_production - process_unit_production ?production_sampling_point - production_sampling_point ?assay_method - assay_method ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_production)
+        (sampling_unit_assigned_assay_method ?process_unit_production ?assay_method)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (production_sampling_point_kit_allocated ?production_sampling_point)
+        (sampling_unit_assigned_sampling_kit_production ?process_unit_production ?sampling_kit)
+        (not
+          (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        )
+      )
+    :effect
+      (and
+        (sampling_point_scheduled_production ?production_sampling_point)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        (sampling_kit_available ?sampling_kit)
+        (not
+          (sampling_unit_assigned_sampling_kit_production ?process_unit_production ?sampling_kit)
+        )
+      )
+  )
+  (:action schedule_qc_sampling_point
+    :parameters (?process_unit_qc - process_unit_qc ?qc_sampling_point - qc_sampling_point ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_qc)
+        (sampling_unit_assigned_assay_method ?process_unit_qc ?assay_method)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (not
+          (sampling_point_scheduled_qc ?qc_sampling_point)
+        )
+        (not
+          (qc_sampling_point_kit_allocated ?qc_sampling_point)
+        )
+      )
+    :effect (sampling_point_scheduled_qc ?qc_sampling_point)
+  )
+  (:action perform_qc_sampling_collection
+    :parameters (?process_unit_qc - process_unit_qc ?qc_sampling_point - qc_sampling_point ?technician - technician)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_qc)
+        (sampling_unit_assigned_technician ?process_unit_qc ?technician)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (sampling_point_scheduled_qc ?qc_sampling_point)
+        (not
+          (sampling_unit_ready_flag_qc ?process_unit_qc)
+        )
+      )
+    :effect
+      (and
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+      )
+  )
+  (:action allocate_sampling_kit_to_qc_point
+    :parameters (?process_unit_qc - process_unit_qc ?qc_sampling_point - qc_sampling_point ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_qc)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (sampling_kit_available ?sampling_kit)
+        (not
+          (sampling_unit_ready_flag_qc ?process_unit_qc)
+        )
+      )
+    :effect
+      (and
+        (qc_sampling_point_kit_allocated ?qc_sampling_point)
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_assigned_sampling_kit_qc ?process_unit_qc ?sampling_kit)
+        (not
+          (sampling_kit_available ?sampling_kit)
+        )
+      )
+  )
+  (:action complete_qc_sampling_with_kit
+    :parameters (?process_unit_qc - process_unit_qc ?qc_sampling_point - qc_sampling_point ?assay_method - assay_method ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?process_unit_qc)
+        (sampling_unit_assigned_assay_method ?process_unit_qc ?assay_method)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (qc_sampling_point_kit_allocated ?qc_sampling_point)
+        (sampling_unit_assigned_sampling_kit_qc ?process_unit_qc ?sampling_kit)
+        (not
+          (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        )
+      )
+    :effect
+      (and
+        (sampling_point_scheduled_qc ?qc_sampling_point)
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        (sampling_kit_available ?sampling_kit)
+        (not
+          (sampling_unit_assigned_sampling_kit_qc ?process_unit_qc ?sampling_kit)
+        )
+      )
+  )
+  (:action create_and_link_sample_container
+    :parameters (?process_unit_production - process_unit_production ?process_unit_qc - process_unit_qc ?production_sampling_point - production_sampling_point ?qc_sampling_point - qc_sampling_point ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (sampling_point_scheduled_production ?production_sampling_point)
+        (sampling_point_scheduled_qc ?qc_sampling_point)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        (container_available ?sample_container)
+      )
+    :effect
+      (and
+        (container_created_flag ?sample_container)
+        (container_linked_to_production_point ?sample_container ?production_sampling_point)
+        (container_linked_to_qc_point ?sample_container ?qc_sampling_point)
+        (not
+          (container_available ?sample_container)
+        )
+      )
+  )
+  (:action create_and_mark_container_requires_protocol
+    :parameters (?process_unit_production - process_unit_production ?process_unit_qc - process_unit_qc ?production_sampling_point - production_sampling_point ?qc_sampling_point - qc_sampling_point ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (production_sampling_point_kit_allocated ?production_sampling_point)
+        (sampling_point_scheduled_qc ?qc_sampling_point)
+        (not
+          (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        )
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        (container_available ?sample_container)
+      )
+    :effect
+      (and
+        (container_created_flag ?sample_container)
+        (container_linked_to_production_point ?sample_container ?production_sampling_point)
+        (container_linked_to_qc_point ?sample_container ?qc_sampling_point)
+        (container_requires_protocol_attachment_flag ?sample_container)
+        (not
+          (container_available ?sample_container)
+        )
+      )
+  )
+  (:action create_and_mark_container_requires_calibration
+    :parameters (?process_unit_production - process_unit_production ?process_unit_qc - process_unit_qc ?production_sampling_point - production_sampling_point ?qc_sampling_point - qc_sampling_point ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (sampling_point_scheduled_production ?production_sampling_point)
+        (qc_sampling_point_kit_allocated ?qc_sampling_point)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        (not
+          (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        )
+        (container_available ?sample_container)
+      )
+    :effect
+      (and
+        (container_created_flag ?sample_container)
+        (container_linked_to_production_point ?sample_container ?production_sampling_point)
+        (container_linked_to_qc_point ?sample_container ?qc_sampling_point)
+        (container_requires_calibration_certificate_flag ?sample_container)
+        (not
+          (container_available ?sample_container)
+        )
+      )
+  )
+  (:action create_and_mark_container_requires_protocol_and_calibration
+    :parameters (?process_unit_production - process_unit_production ?process_unit_qc - process_unit_qc ?production_sampling_point - production_sampling_point ?qc_sampling_point - qc_sampling_point ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_has_production_sampling_point ?process_unit_production ?production_sampling_point)
+        (sampling_unit_has_qc_sampling_point ?process_unit_qc ?qc_sampling_point)
+        (production_sampling_point_kit_allocated ?production_sampling_point)
+        (qc_sampling_point_kit_allocated ?qc_sampling_point)
+        (not
+          (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        )
+        (not
+          (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        )
+        (container_available ?sample_container)
+      )
+    :effect
+      (and
+        (container_created_flag ?sample_container)
+        (container_linked_to_production_point ?sample_container ?production_sampling_point)
+        (container_linked_to_qc_point ?sample_container ?qc_sampling_point)
+        (container_requires_protocol_attachment_flag ?sample_container)
+        (container_requires_calibration_certificate_flag ?sample_container)
+        (not
+          (container_available ?sample_container)
+        )
+      )
+  )
+  (:action check_in_container_to_lab
+    :parameters (?sample_container - sample_container ?process_unit_production - process_unit_production ?assay_method - assay_method)
+    :precondition
+      (and
+        (container_created_flag ?sample_container)
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_assigned_assay_method ?process_unit_production ?assay_method)
+        (not
+          (container_checked_in_to_lab_flag ?sample_container)
+        )
+      )
+    :effect (container_checked_in_to_lab_flag ?sample_container)
+  )
+  (:action vialize_sample_and_link_to_container
+    :parameters (?production_batch - production_batch ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (batch_assigned_container ?production_batch ?sample_container)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (sample_vial_available ?sample_vial)
+        (container_created_flag ?sample_container)
+        (container_checked_in_to_lab_flag ?sample_container)
+        (not
+          (vial_allocated_for_analysis_flag ?sample_vial)
+        )
+      )
+    :effect
+      (and
+        (vial_allocated_for_analysis_flag ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (not
+          (sample_vial_available ?sample_vial)
+        )
+      )
+  )
+  (:action record_batch_lab_receipt
+    :parameters (?production_batch - production_batch ?sample_vial - sample_vial ?sample_container - sample_container ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_allocated_for_analysis_flag ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (sampling_unit_assigned_assay_method ?production_batch ?assay_method)
+        (not
+          (container_requires_protocol_attachment_flag ?sample_container)
+        )
+        (not
+          (batch_lab_receipt_flag ?production_batch)
+        )
+      )
+    :effect (batch_lab_receipt_flag ?production_batch)
+  )
+  (:action attach_protocol_document_to_batch
+    :parameters (?production_batch - production_batch ?protocol_document - protocol_document)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (protocol_document_available ?protocol_document)
+        (not
+          (batch_protocol_attached_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_protocol_attached_flag ?production_batch)
+        (batch_attached_protocol_document ?production_batch ?protocol_document)
+        (not
+          (protocol_document_available ?protocol_document)
+        )
+      )
+  )
+  (:action receive_container_and_verify_protocol
+    :parameters (?production_batch - production_batch ?sample_vial - sample_vial ?sample_container - sample_container ?assay_method - assay_method ?protocol_document - protocol_document)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_allocated_for_analysis_flag ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (sampling_unit_assigned_assay_method ?production_batch ?assay_method)
+        (container_requires_protocol_attachment_flag ?sample_container)
+        (batch_protocol_attached_flag ?production_batch)
+        (batch_attached_protocol_document ?production_batch ?protocol_document)
+        (not
+          (batch_lab_receipt_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_lab_receipt_flag ?production_batch)
+        (batch_protocol_verified_flag ?production_batch)
+      )
+  )
+  (:action prepare_batch_for_analysis_standard_path
+    :parameters (?production_batch - production_batch ?calibration_certificate - calibration_certificate ?technician - technician ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_lab_receipt_flag ?production_batch)
+        (batch_attached_calibration_certificate ?production_batch ?calibration_certificate)
+        (sampling_unit_assigned_technician ?production_batch ?technician)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (not
+          (container_requires_calibration_certificate_flag ?sample_container)
+        )
+        (not
+          (batch_prepared_for_analysis_flag ?production_batch)
+        )
+      )
+    :effect (batch_prepared_for_analysis_flag ?production_batch)
+  )
+  (:action prepare_batch_for_analysis_calibrated_path
+    :parameters (?production_batch - production_batch ?calibration_certificate - calibration_certificate ?technician - technician ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_lab_receipt_flag ?production_batch)
+        (batch_attached_calibration_certificate ?production_batch ?calibration_certificate)
+        (sampling_unit_assigned_technician ?production_batch ?technician)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (container_requires_calibration_certificate_flag ?sample_container)
+        (not
+          (batch_prepared_for_analysis_flag ?production_batch)
+        )
+      )
+    :effect (batch_prepared_for_analysis_flag ?production_batch)
+  )
+  (:action finalize_analysis_preparation_no_container_flags
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_prepared_for_analysis_flag ?production_batch)
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (not
+          (container_requires_protocol_attachment_flag ?sample_container)
+        )
+        (not
+          (container_requires_calibration_certificate_flag ?sample_container)
+        )
+        (not
+          (batch_analysis_complete_flag ?production_batch)
+        )
+      )
+    :effect (batch_analysis_complete_flag ?production_batch)
+  )
+  (:action finalize_analysis_preparation_with_protocol_flag
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_prepared_for_analysis_flag ?production_batch)
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (container_requires_protocol_attachment_flag ?sample_container)
+        (not
+          (container_requires_calibration_certificate_flag ?sample_container)
+        )
+        (not
+          (batch_analysis_complete_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_documentation_complete_flag ?production_batch)
+      )
+  )
+  (:action finalize_analysis_preparation_with_alternate_flags
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_prepared_for_analysis_flag ?production_batch)
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (not
+          (container_requires_protocol_attachment_flag ?sample_container)
+        )
+        (container_requires_calibration_certificate_flag ?sample_container)
+        (not
+          (batch_analysis_complete_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_documentation_complete_flag ?production_batch)
+      )
+  )
+  (:action finalize_analysis_preparation_with_all_flags
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document ?sample_vial - sample_vial ?sample_container - sample_container)
+    :precondition
+      (and
+        (batch_prepared_for_analysis_flag ?production_batch)
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (batch_assigned_vial ?production_batch ?sample_vial)
+        (vial_linked_to_container ?sample_vial ?sample_container)
+        (container_requires_protocol_attachment_flag ?sample_container)
+        (container_requires_calibration_certificate_flag ?sample_container)
+        (not
+          (batch_analysis_complete_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_documentation_complete_flag ?production_batch)
+      )
+  )
+  (:action record_batch_release_and_mark_ready
+    :parameters (?production_batch - production_batch)
+    :precondition
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (not
+          (batch_documentation_complete_flag ?production_batch)
+        )
+        (not
+          (batch_release_recorded_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_release_recorded_flag ?production_batch)
+        (ready_for_release_flag ?production_batch)
+      )
+  )
+  (:action attach_qc_checklist_to_batch
+    :parameters (?production_batch - production_batch ?qc_checklist - qc_checklist)
+    :precondition
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_documentation_complete_flag ?production_batch)
+        (qc_checklist_available ?qc_checklist)
+      )
+    :effect
+      (and
+        (batch_attached_qc_checklist ?production_batch ?qc_checklist)
+        (not
+          (qc_checklist_available ?qc_checklist)
+        )
+      )
+  )
+  (:action perform_internal_qa_checks
+    :parameters (?production_batch - production_batch ?process_unit_production - process_unit_production ?process_unit_qc - process_unit_qc ?assay_method - assay_method ?qc_checklist - qc_checklist)
+    :precondition
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_documentation_complete_flag ?production_batch)
+        (batch_attached_qc_checklist ?production_batch ?qc_checklist)
+        (batch_linked_to_production_unit ?production_batch ?process_unit_production)
+        (batch_linked_to_qc_unit ?production_batch ?process_unit_qc)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        (sampling_unit_assigned_assay_method ?production_batch ?assay_method)
+        (not
+          (batch_internal_checks_complete_flag ?production_batch)
+        )
+      )
+    :effect (batch_internal_checks_complete_flag ?production_batch)
+  )
+  (:action record_final_qa_release
+    :parameters (?production_batch - production_batch)
+    :precondition
+      (and
+        (batch_analysis_complete_flag ?production_batch)
+        (batch_internal_checks_complete_flag ?production_batch)
+        (not
+          (batch_release_recorded_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_release_recorded_flag ?production_batch)
+        (ready_for_release_flag ?production_batch)
+      )
+  )
+  (:action attach_sponsor_document_to_batch
+    :parameters (?production_batch - production_batch ?sponsor_document - sponsor_document ?assay_method - assay_method)
+    :precondition
+      (and
+        (sampling_unit_assay_method_confirmed_flag ?production_batch)
+        (sampling_unit_assigned_assay_method ?production_batch ?assay_method)
+        (sponsor_document_available ?sponsor_document)
+        (batch_attached_sponsor_document ?production_batch ?sponsor_document)
+        (not
+          (batch_sponsor_document_registered_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_sponsor_document_registered_flag ?production_batch)
+        (not
+          (sponsor_document_available ?sponsor_document)
+        )
+      )
+  )
+  (:action complete_sponsor_review_for_batch
+    :parameters (?production_batch - production_batch ?technician - technician)
+    :precondition
+      (and
+        (batch_sponsor_document_registered_flag ?production_batch)
+        (sampling_unit_assigned_technician ?production_batch ?technician)
+        (not
+          (batch_sponsor_checked_flag ?production_batch)
+        )
+      )
+    :effect (batch_sponsor_checked_flag ?production_batch)
+  )
+  (:action mark_regulatory_review_complete
+    :parameters (?production_batch - production_batch ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (batch_sponsor_checked_flag ?production_batch)
+        (batch_attached_regulatory_document ?production_batch ?regulatory_document)
+        (not
+          (batch_regulatory_doc_attached_flag ?production_batch)
+        )
+      )
+    :effect (batch_regulatory_doc_attached_flag ?production_batch)
+  )
+  (:action record_regulatory_release
+    :parameters (?production_batch - production_batch)
+    :precondition
+      (and
+        (batch_regulatory_doc_attached_flag ?production_batch)
+        (not
+          (batch_release_recorded_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_release_recorded_flag ?production_batch)
+        (ready_for_release_flag ?production_batch)
+      )
+  )
+  (:action record_production_unit_release
+    :parameters (?process_unit_production - process_unit_production ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_production ?process_unit_production)
+        (sampling_unit_sample_collected_flag_production ?process_unit_production)
+        (container_created_flag ?sample_container)
+        (container_checked_in_to_lab_flag ?sample_container)
+        (not
+          (ready_for_release_flag ?process_unit_production)
+        )
+      )
+    :effect (ready_for_release_flag ?process_unit_production)
+  )
+  (:action record_qc_unit_release
+    :parameters (?process_unit_qc - process_unit_qc ?sample_container - sample_container)
+    :precondition
+      (and
+        (sampling_unit_ready_flag_qc ?process_unit_qc)
+        (sampling_unit_sample_collected_flag_qc ?process_unit_qc)
+        (container_created_flag ?sample_container)
+        (container_checked_in_to_lab_flag ?sample_container)
+        (not
+          (ready_for_release_flag ?process_unit_qc)
+        )
+      )
+    :effect (ready_for_release_flag ?process_unit_qc)
+  )
+  (:action finalize_sampling_plan_and_attach_release_document
+    :parameters (?sampling_plan - sampling_plan ?release_document - release_document ?assay_method - assay_method)
+    :precondition
+      (and
+        (ready_for_release_flag ?sampling_plan)
+        (sampling_unit_assigned_assay_method ?sampling_plan ?assay_method)
+        (release_document_available ?release_document)
+        (not
+          (sampling_unit_finalized_flag ?sampling_plan)
+        )
+      )
+    :effect
+      (and
+        (sampling_unit_finalized_flag ?sampling_plan)
+        (sampling_unit_attached_release_document ?sampling_plan ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action authorize_production_unit_release
+    :parameters (?process_unit_production - process_unit_production ?quality_reviewer - quality_reviewer ?release_document - release_document)
+    :precondition
+      (and
+        (sampling_unit_finalized_flag ?process_unit_production)
+        (sampling_unit_assigned_reviewer ?process_unit_production ?quality_reviewer)
+        (sampling_unit_attached_release_document ?process_unit_production ?release_document)
+        (not
+          (release_authorized_flag ?process_unit_production)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_flag ?process_unit_production)
+        (quality_reviewer_available ?quality_reviewer)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action authorize_qc_unit_release
+    :parameters (?process_unit_qc - process_unit_qc ?quality_reviewer - quality_reviewer ?release_document - release_document)
+    :precondition
+      (and
+        (sampling_unit_finalized_flag ?process_unit_qc)
+        (sampling_unit_assigned_reviewer ?process_unit_qc ?quality_reviewer)
+        (sampling_unit_attached_release_document ?process_unit_qc ?release_document)
+        (not
+          (release_authorized_flag ?process_unit_qc)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_flag ?process_unit_qc)
+        (quality_reviewer_available ?quality_reviewer)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action authorize_batch_release
+    :parameters (?production_batch - production_batch ?quality_reviewer - quality_reviewer ?release_document - release_document)
+    :precondition
+      (and
+        (sampling_unit_finalized_flag ?production_batch)
+        (sampling_unit_assigned_reviewer ?production_batch ?quality_reviewer)
+        (sampling_unit_attached_release_document ?production_batch ?release_document)
+        (not
+          (release_authorized_flag ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_flag ?production_batch)
+        (quality_reviewer_available ?quality_reviewer)
+        (release_document_available ?release_document)
+      )
+  )
+)

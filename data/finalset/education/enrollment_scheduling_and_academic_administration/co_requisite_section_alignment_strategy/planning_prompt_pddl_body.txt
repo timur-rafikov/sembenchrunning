@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain co_requisite_section_alignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_root - object scheduling_root - object resource_root - object case_root - object enrollment_case - case_root section_offering - entity_root course_component - entity_root instructor - entity_root special_resourcing_need - entity_root delivery_mode - entity_root justification_document - entity_root external_approver - entity_root internal_approver - entity_root support_resource - scheduling_root classroom - scheduling_root external_approver_token - scheduling_root primary_timeslot - resource_root coreq_timeslot - resource_root alignment_proposal - resource_root section_role_root - enrollment_case section_subrole_root - enrollment_case primary_section_instance - section_role_root coreq_section_instance - section_role_root course_section_record - section_subrole_root)
+  (:predicates
+    (enrollment_case_open ?enrollment_case - enrollment_case)
+    (entity_active ?enrollment_case - enrollment_case)
+    (case_offering_attached ?enrollment_case - enrollment_case)
+    (entity_assignment_confirmed ?enrollment_case - enrollment_case)
+    (entity_enrollment_confirmed ?enrollment_case - enrollment_case)
+    (enrollment_case_finalized ?enrollment_case - enrollment_case)
+    (section_offering_available ?section_offering - section_offering)
+    (entity_selected_offering ?enrollment_case - enrollment_case ?section_offering - section_offering)
+    (course_component_available ?course_component - course_component)
+    (entity_attached_component ?enrollment_case - enrollment_case ?course_component - course_component)
+    (instructor_available ?instructor - instructor)
+    (entity_assigned_instructor ?enrollment_case - enrollment_case ?instructor - instructor)
+    (support_resource_available ?support_resource - support_resource)
+    (primary_section_claims_support_resource ?primary_section_instance - primary_section_instance ?support_resource - support_resource)
+    (coreq_section_claims_support_resource ?coreq_section_instance - coreq_section_instance ?support_resource - support_resource)
+    (primary_section_has_timeslot ?primary_section_instance - primary_section_instance ?primary_timeslot - primary_timeslot)
+    (primary_timeslot_provisionally_reserved ?primary_timeslot - primary_timeslot)
+    (primary_timeslot_claimed ?primary_timeslot - primary_timeslot)
+    (primary_section_timeslot_confirmed ?primary_section_instance - primary_section_instance)
+    (coreq_section_has_timeslot ?coreq_section_instance - coreq_section_instance ?coreq_timeslot - coreq_timeslot)
+    (coreq_timeslot_provisionally_reserved ?coreq_timeslot - coreq_timeslot)
+    (coreq_timeslot_claimed ?coreq_timeslot - coreq_timeslot)
+    (coreq_section_timeslot_confirmed ?coreq_section_instance - coreq_section_instance)
+    (alignment_proposal_available ?alignment_proposal - alignment_proposal)
+    (alignment_proposal_active ?alignment_proposal - alignment_proposal)
+    (proposal_includes_primary_timeslot ?alignment_proposal - alignment_proposal ?primary_timeslot - primary_timeslot)
+    (proposal_includes_coreq_timeslot ?alignment_proposal - alignment_proposal ?coreq_timeslot - coreq_timeslot)
+    (proposal_primary_slot_ready ?alignment_proposal - alignment_proposal)
+    (proposal_coreq_slot_ready ?alignment_proposal - alignment_proposal)
+    (proposal_locked ?alignment_proposal - alignment_proposal)
+    (section_record_has_primary_instance ?course_section_record - course_section_record ?primary_section_instance - primary_section_instance)
+    (section_record_has_coreq_instance ?course_section_record - course_section_record ?coreq_section_instance - coreq_section_instance)
+    (section_record_has_alignment_proposal ?course_section_record - course_section_record ?alignment_proposal - alignment_proposal)
+    (classroom_available ?classroom - classroom)
+    (section_record_claims_classroom ?course_section_record - course_section_record ?classroom - classroom)
+    (classroom_locked ?classroom - classroom)
+    (classroom_allocated_to_proposal ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    (section_record_classroom_locked ?course_section_record - course_section_record)
+    (resource_allocation_confirmed ?course_section_record - course_section_record)
+    (allocations_validated ?course_section_record - course_section_record)
+    (special_resourcing_attached_flag ?course_section_record - course_section_record)
+    (special_resourcing_validated ?course_section_record - course_section_record)
+    (allocation_conditions_met ?course_section_record - course_section_record)
+    (final_validation_complete ?course_section_record - course_section_record)
+    (external_approver_token_available ?external_approver_token - external_approver_token)
+    (section_has_external_approver_token ?course_section_record - course_section_record ?external_approver_token - external_approver_token)
+    (external_approver_token_attached ?course_section_record - course_section_record)
+    (instructor_assignment_locked ?course_section_record - course_section_record)
+    (internal_approval_attached ?course_section_record - course_section_record)
+    (special_resourcing_need_available ?special_resourcing_need - special_resourcing_need)
+    (section_assigned_special_resourcing_need ?course_section_record - course_section_record ?special_resourcing_need - special_resourcing_need)
+    (delivery_mode_available ?delivery_mode - delivery_mode)
+    (section_assigned_delivery_mode ?course_section_record - course_section_record ?delivery_mode - delivery_mode)
+    (external_approver_available ?external_approver - external_approver)
+    (section_assigned_external_approver ?course_section_record - course_section_record ?external_approver - external_approver)
+    (internal_approver_available ?internal_approver - internal_approver)
+    (section_assigned_internal_approver ?course_section_record - course_section_record ?internal_approver - internal_approver)
+    (justification_document_available ?justification_document - justification_document)
+    (entity_has_justification_document ?enrollment_case - enrollment_case ?justification_document - justification_document)
+    (primary_section_reservation_active ?primary_section_instance - primary_section_instance)
+    (coreq_section_reservation_active ?coreq_section_instance - coreq_section_instance)
+    (final_approval_applied ?course_section_record - course_section_record)
+  )
+  (:action open_enrollment_case
+    :parameters (?enrollment_case - enrollment_case)
+    :precondition
+      (and
+        (not
+          (enrollment_case_open ?enrollment_case)
+        )
+        (not
+          (entity_assignment_confirmed ?enrollment_case)
+        )
+      )
+    :effect (enrollment_case_open ?enrollment_case)
+  )
+  (:action select_section_offering_for_case
+    :parameters (?enrollment_case - enrollment_case ?section_offering - section_offering)
+    :precondition
+      (and
+        (enrollment_case_open ?enrollment_case)
+        (not
+          (case_offering_attached ?enrollment_case)
+        )
+        (section_offering_available ?section_offering)
+      )
+    :effect
+      (and
+        (case_offering_attached ?enrollment_case)
+        (entity_selected_offering ?enrollment_case ?section_offering)
+        (not
+          (section_offering_available ?section_offering)
+        )
+      )
+  )
+  (:action attach_course_component_to_case
+    :parameters (?enrollment_case - enrollment_case ?course_component - course_component)
+    :precondition
+      (and
+        (enrollment_case_open ?enrollment_case)
+        (case_offering_attached ?enrollment_case)
+        (course_component_available ?course_component)
+      )
+    :effect
+      (and
+        (entity_attached_component ?enrollment_case ?course_component)
+        (not
+          (course_component_available ?course_component)
+        )
+      )
+  )
+  (:action confirm_component_attachment
+    :parameters (?enrollment_case - enrollment_case ?course_component - course_component)
+    :precondition
+      (and
+        (enrollment_case_open ?enrollment_case)
+        (case_offering_attached ?enrollment_case)
+        (entity_attached_component ?enrollment_case ?course_component)
+        (not
+          (entity_active ?enrollment_case)
+        )
+      )
+    :effect (entity_active ?enrollment_case)
+  )
+  (:action detach_course_component_from_case
+    :parameters (?enrollment_case - enrollment_case ?course_component - course_component)
+    :precondition
+      (and
+        (entity_attached_component ?enrollment_case ?course_component)
+      )
+    :effect
+      (and
+        (course_component_available ?course_component)
+        (not
+          (entity_attached_component ?enrollment_case ?course_component)
+        )
+      )
+  )
+  (:action assign_instructor_to_entity
+    :parameters (?enrollment_case - enrollment_case ?instructor - instructor)
+    :precondition
+      (and
+        (entity_active ?enrollment_case)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (entity_assigned_instructor ?enrollment_case ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action unassign_instructor_from_entity
+    :parameters (?enrollment_case - enrollment_case ?instructor - instructor)
+    :precondition
+      (and
+        (entity_assigned_instructor ?enrollment_case ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (entity_assigned_instructor ?enrollment_case ?instructor)
+        )
+      )
+  )
+  (:action attach_external_approver_to_section_record
+    :parameters (?course_section_record - course_section_record ?external_approver - external_approver)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (external_approver_available ?external_approver)
+      )
+    :effect
+      (and
+        (section_assigned_external_approver ?course_section_record ?external_approver)
+        (not
+          (external_approver_available ?external_approver)
+        )
+      )
+  )
+  (:action detach_external_approver_from_section_record
+    :parameters (?course_section_record - course_section_record ?external_approver - external_approver)
+    :precondition
+      (and
+        (section_assigned_external_approver ?course_section_record ?external_approver)
+      )
+    :effect
+      (and
+        (external_approver_available ?external_approver)
+        (not
+          (section_assigned_external_approver ?course_section_record ?external_approver)
+        )
+      )
+  )
+  (:action attach_internal_approver_to_section_record
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (internal_approver_available ?internal_approver)
+      )
+    :effect
+      (and
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (not
+          (internal_approver_available ?internal_approver)
+        )
+      )
+  )
+  (:action detach_internal_approver_from_section_record
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver)
+    :precondition
+      (and
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+      )
+    :effect
+      (and
+        (internal_approver_available ?internal_approver)
+        (not
+          (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        )
+      )
+  )
+  (:action reserve_primary_timeslot_provisionally
+    :parameters (?primary_section_instance - primary_section_instance ?primary_timeslot - primary_timeslot ?course_component - course_component)
+    :precondition
+      (and
+        (entity_active ?primary_section_instance)
+        (entity_attached_component ?primary_section_instance ?course_component)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (not
+          (primary_timeslot_provisionally_reserved ?primary_timeslot)
+        )
+        (not
+          (primary_timeslot_claimed ?primary_timeslot)
+        )
+      )
+    :effect (primary_timeslot_provisionally_reserved ?primary_timeslot)
+  )
+  (:action confirm_primary_timeslot_claim
+    :parameters (?primary_section_instance - primary_section_instance ?primary_timeslot - primary_timeslot ?instructor - instructor)
+    :precondition
+      (and
+        (entity_active ?primary_section_instance)
+        (entity_assigned_instructor ?primary_section_instance ?instructor)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (primary_timeslot_provisionally_reserved ?primary_timeslot)
+        (not
+          (primary_section_reservation_active ?primary_section_instance)
+        )
+      )
+    :effect
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+      )
+  )
+  (:action claim_support_resource_for_primary_section
+    :parameters (?primary_section_instance - primary_section_instance ?primary_timeslot - primary_timeslot ?support_resource - support_resource)
+    :precondition
+      (and
+        (entity_active ?primary_section_instance)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (support_resource_available ?support_resource)
+        (not
+          (primary_section_reservation_active ?primary_section_instance)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_claimed ?primary_timeslot)
+        (primary_section_reservation_active ?primary_section_instance)
+        (primary_section_claims_support_resource ?primary_section_instance ?support_resource)
+        (not
+          (support_resource_available ?support_resource)
+        )
+      )
+  )
+  (:action finalize_primary_timeslot_allocation
+    :parameters (?primary_section_instance - primary_section_instance ?primary_timeslot - primary_timeslot ?course_component - course_component ?support_resource - support_resource)
+    :precondition
+      (and
+        (entity_active ?primary_section_instance)
+        (entity_attached_component ?primary_section_instance ?course_component)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (primary_timeslot_claimed ?primary_timeslot)
+        (primary_section_claims_support_resource ?primary_section_instance ?support_resource)
+        (not
+          (primary_section_timeslot_confirmed ?primary_section_instance)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_provisionally_reserved ?primary_timeslot)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+        (support_resource_available ?support_resource)
+        (not
+          (primary_section_claims_support_resource ?primary_section_instance ?support_resource)
+        )
+      )
+  )
+  (:action reserve_coreq_timeslot_provisionally
+    :parameters (?coreq_section_instance - coreq_section_instance ?coreq_timeslot - coreq_timeslot ?course_component - course_component)
+    :precondition
+      (and
+        (entity_active ?coreq_section_instance)
+        (entity_attached_component ?coreq_section_instance ?course_component)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (not
+          (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+        )
+        (not
+          (coreq_timeslot_claimed ?coreq_timeslot)
+        )
+      )
+    :effect (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+  )
+  (:action confirm_coreq_timeslot_claim
+    :parameters (?coreq_section_instance - coreq_section_instance ?coreq_timeslot - coreq_timeslot ?instructor - instructor)
+    :precondition
+      (and
+        (entity_active ?coreq_section_instance)
+        (entity_assigned_instructor ?coreq_section_instance ?instructor)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+        (not
+          (coreq_section_reservation_active ?coreq_section_instance)
+        )
+      )
+    :effect
+      (and
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+      )
+  )
+  (:action claim_support_resource_for_coreq_section
+    :parameters (?coreq_section_instance - coreq_section_instance ?coreq_timeslot - coreq_timeslot ?support_resource - support_resource)
+    :precondition
+      (and
+        (entity_active ?coreq_section_instance)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (support_resource_available ?support_resource)
+        (not
+          (coreq_section_reservation_active ?coreq_section_instance)
+        )
+      )
+    :effect
+      (and
+        (coreq_timeslot_claimed ?coreq_timeslot)
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (coreq_section_claims_support_resource ?coreq_section_instance ?support_resource)
+        (not
+          (support_resource_available ?support_resource)
+        )
+      )
+  )
+  (:action finalize_coreq_timeslot_allocation
+    :parameters (?coreq_section_instance - coreq_section_instance ?coreq_timeslot - coreq_timeslot ?course_component - course_component ?support_resource - support_resource)
+    :precondition
+      (and
+        (entity_active ?coreq_section_instance)
+        (entity_attached_component ?coreq_section_instance ?course_component)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (coreq_timeslot_claimed ?coreq_timeslot)
+        (coreq_section_claims_support_resource ?coreq_section_instance ?support_resource)
+        (not
+          (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        )
+      )
+    :effect
+      (and
+        (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        (support_resource_available ?support_resource)
+        (not
+          (coreq_section_claims_support_resource ?coreq_section_instance ?support_resource)
+        )
+      )
+  )
+  (:action compose_alignment_proposal_from_confirmed_reservations
+    :parameters (?primary_section_instance - primary_section_instance ?coreq_section_instance - coreq_section_instance ?primary_timeslot - primary_timeslot ?coreq_timeslot - coreq_timeslot ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (primary_timeslot_provisionally_reserved ?primary_timeslot)
+        (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        (alignment_proposal_available ?alignment_proposal)
+      )
+    :effect
+      (and
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_includes_primary_timeslot ?alignment_proposal ?primary_timeslot)
+        (proposal_includes_coreq_timeslot ?alignment_proposal ?coreq_timeslot)
+        (not
+          (alignment_proposal_available ?alignment_proposal)
+        )
+      )
+  )
+  (:action compose_alignment_proposal_with_primary_claimed
+    :parameters (?primary_section_instance - primary_section_instance ?coreq_section_instance - coreq_section_instance ?primary_timeslot - primary_timeslot ?coreq_timeslot - coreq_timeslot ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (primary_timeslot_claimed ?primary_timeslot)
+        (coreq_timeslot_provisionally_reserved ?coreq_timeslot)
+        (not
+          (primary_section_timeslot_confirmed ?primary_section_instance)
+        )
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        (alignment_proposal_available ?alignment_proposal)
+      )
+    :effect
+      (and
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_includes_primary_timeslot ?alignment_proposal ?primary_timeslot)
+        (proposal_includes_coreq_timeslot ?alignment_proposal ?coreq_timeslot)
+        (proposal_primary_slot_ready ?alignment_proposal)
+        (not
+          (alignment_proposal_available ?alignment_proposal)
+        )
+      )
+  )
+  (:action compose_alignment_proposal_with_coreq_claimed
+    :parameters (?primary_section_instance - primary_section_instance ?coreq_section_instance - coreq_section_instance ?primary_timeslot - primary_timeslot ?coreq_timeslot - coreq_timeslot ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (primary_timeslot_provisionally_reserved ?primary_timeslot)
+        (coreq_timeslot_claimed ?coreq_timeslot)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+        (not
+          (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        )
+        (alignment_proposal_available ?alignment_proposal)
+      )
+    :effect
+      (and
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_includes_primary_timeslot ?alignment_proposal ?primary_timeslot)
+        (proposal_includes_coreq_timeslot ?alignment_proposal ?coreq_timeslot)
+        (proposal_coreq_slot_ready ?alignment_proposal)
+        (not
+          (alignment_proposal_available ?alignment_proposal)
+        )
+      )
+  )
+  (:action compose_alignment_proposal_with_both_claims
+    :parameters (?primary_section_instance - primary_section_instance ?coreq_section_instance - coreq_section_instance ?primary_timeslot - primary_timeslot ?coreq_timeslot - coreq_timeslot ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (primary_section_has_timeslot ?primary_section_instance ?primary_timeslot)
+        (coreq_section_has_timeslot ?coreq_section_instance ?coreq_timeslot)
+        (primary_timeslot_claimed ?primary_timeslot)
+        (coreq_timeslot_claimed ?coreq_timeslot)
+        (not
+          (primary_section_timeslot_confirmed ?primary_section_instance)
+        )
+        (not
+          (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        )
+        (alignment_proposal_available ?alignment_proposal)
+      )
+    :effect
+      (and
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_includes_primary_timeslot ?alignment_proposal ?primary_timeslot)
+        (proposal_includes_coreq_timeslot ?alignment_proposal ?coreq_timeslot)
+        (proposal_primary_slot_ready ?alignment_proposal)
+        (proposal_coreq_slot_ready ?alignment_proposal)
+        (not
+          (alignment_proposal_available ?alignment_proposal)
+        )
+      )
+  )
+  (:action finalize_alignment_proposal_lock
+    :parameters (?alignment_proposal - alignment_proposal ?primary_section_instance - primary_section_instance ?course_component - course_component)
+    :precondition
+      (and
+        (alignment_proposal_active ?alignment_proposal)
+        (primary_section_reservation_active ?primary_section_instance)
+        (entity_attached_component ?primary_section_instance ?course_component)
+        (not
+          (proposal_locked ?alignment_proposal)
+        )
+      )
+    :effect (proposal_locked ?alignment_proposal)
+  )
+  (:action allocate_classroom_to_proposal
+    :parameters (?course_section_record - course_section_record ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (section_record_has_alignment_proposal ?course_section_record ?alignment_proposal)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_available ?classroom)
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_locked ?alignment_proposal)
+        (not
+          (classroom_locked ?classroom)
+        )
+      )
+    :effect
+      (and
+        (classroom_locked ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (not
+          (classroom_available ?classroom)
+        )
+      )
+  )
+  (:action confirm_classroom_allocation_for_section_record
+    :parameters (?course_section_record - course_section_record ?classroom - classroom ?alignment_proposal - alignment_proposal ?course_component - course_component)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_locked ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (entity_attached_component ?course_section_record ?course_component)
+        (not
+          (proposal_primary_slot_ready ?alignment_proposal)
+        )
+        (not
+          (section_record_classroom_locked ?course_section_record)
+        )
+      )
+    :effect (section_record_classroom_locked ?course_section_record)
+  )
+  (:action attach_special_resourcing_need_to_section_record
+    :parameters (?course_section_record - course_section_record ?special_resourcing_need - special_resourcing_need)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (special_resourcing_need_available ?special_resourcing_need)
+        (not
+          (special_resourcing_attached_flag ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (special_resourcing_attached_flag ?course_section_record)
+        (section_assigned_special_resourcing_need ?course_section_record ?special_resourcing_need)
+        (not
+          (special_resourcing_need_available ?special_resourcing_need)
+        )
+      )
+  )
+  (:action apply_special_resourcing_to_section_record
+    :parameters (?course_section_record - course_section_record ?classroom - classroom ?alignment_proposal - alignment_proposal ?course_component - course_component ?special_resourcing_need - special_resourcing_need)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_locked ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (entity_attached_component ?course_section_record ?course_component)
+        (proposal_primary_slot_ready ?alignment_proposal)
+        (special_resourcing_attached_flag ?course_section_record)
+        (section_assigned_special_resourcing_need ?course_section_record ?special_resourcing_need)
+        (not
+          (section_record_classroom_locked ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (section_record_classroom_locked ?course_section_record)
+        (special_resourcing_validated ?course_section_record)
+      )
+  )
+  (:action finalize_resource_allocation_phase1
+    :parameters (?course_section_record - course_section_record ?external_approver - external_approver ?instructor - instructor ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (section_record_classroom_locked ?course_section_record)
+        (section_assigned_external_approver ?course_section_record ?external_approver)
+        (entity_assigned_instructor ?course_section_record ?instructor)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (not
+          (proposal_coreq_slot_ready ?alignment_proposal)
+        )
+        (not
+          (resource_allocation_confirmed ?course_section_record)
+        )
+      )
+    :effect (resource_allocation_confirmed ?course_section_record)
+  )
+  (:action finalize_resource_allocation_phase2
+    :parameters (?course_section_record - course_section_record ?external_approver - external_approver ?instructor - instructor ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (section_record_classroom_locked ?course_section_record)
+        (section_assigned_external_approver ?course_section_record ?external_approver)
+        (entity_assigned_instructor ?course_section_record ?instructor)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (proposal_coreq_slot_ready ?alignment_proposal)
+        (not
+          (resource_allocation_confirmed ?course_section_record)
+        )
+      )
+    :effect (resource_allocation_confirmed ?course_section_record)
+  )
+  (:action attach_internal_approver_and_lock_allocations
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (resource_allocation_confirmed ?course_section_record)
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (not
+          (proposal_primary_slot_ready ?alignment_proposal)
+        )
+        (not
+          (proposal_coreq_slot_ready ?alignment_proposal)
+        )
+        (not
+          (allocations_validated ?course_section_record)
+        )
+      )
+    :effect (allocations_validated ?course_section_record)
+  )
+  (:action attach_internal_approver_and_flag_allocations
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (resource_allocation_confirmed ?course_section_record)
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (proposal_primary_slot_ready ?alignment_proposal)
+        (not
+          (proposal_coreq_slot_ready ?alignment_proposal)
+        )
+        (not
+          (allocations_validated ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (allocations_validated ?course_section_record)
+        (allocation_conditions_met ?course_section_record)
+      )
+  )
+  (:action attach_internal_approver_and_flag_allocations_variant
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (resource_allocation_confirmed ?course_section_record)
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (not
+          (proposal_primary_slot_ready ?alignment_proposal)
+        )
+        (proposal_coreq_slot_ready ?alignment_proposal)
+        (not
+          (allocations_validated ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (allocations_validated ?course_section_record)
+        (allocation_conditions_met ?course_section_record)
+      )
+  )
+  (:action attach_internal_approver_and_finalize_allocations
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver ?classroom - classroom ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (resource_allocation_confirmed ?course_section_record)
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (section_record_claims_classroom ?course_section_record ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?alignment_proposal)
+        (proposal_primary_slot_ready ?alignment_proposal)
+        (proposal_coreq_slot_ready ?alignment_proposal)
+        (not
+          (allocations_validated ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (allocations_validated ?course_section_record)
+        (allocation_conditions_met ?course_section_record)
+      )
+  )
+  (:action apply_final_validation_and_confirm_section_record
+    :parameters (?course_section_record - course_section_record)
+    :precondition
+      (and
+        (allocations_validated ?course_section_record)
+        (not
+          (allocation_conditions_met ?course_section_record)
+        )
+        (not
+          (final_approval_applied ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (final_approval_applied ?course_section_record)
+        (entity_enrollment_confirmed ?course_section_record)
+      )
+  )
+  (:action assign_delivery_mode_to_section_record
+    :parameters (?course_section_record - course_section_record ?delivery_mode - delivery_mode)
+    :precondition
+      (and
+        (allocations_validated ?course_section_record)
+        (allocation_conditions_met ?course_section_record)
+        (delivery_mode_available ?delivery_mode)
+      )
+    :effect
+      (and
+        (section_assigned_delivery_mode ?course_section_record ?delivery_mode)
+        (not
+          (delivery_mode_available ?delivery_mode)
+        )
+      )
+  )
+  (:action validate_section_record_before_approval
+    :parameters (?course_section_record - course_section_record ?primary_section_instance - primary_section_instance ?coreq_section_instance - coreq_section_instance ?course_component - course_component ?delivery_mode - delivery_mode)
+    :precondition
+      (and
+        (allocations_validated ?course_section_record)
+        (allocation_conditions_met ?course_section_record)
+        (section_assigned_delivery_mode ?course_section_record ?delivery_mode)
+        (section_record_has_primary_instance ?course_section_record ?primary_section_instance)
+        (section_record_has_coreq_instance ?course_section_record ?coreq_section_instance)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        (entity_attached_component ?course_section_record ?course_component)
+        (not
+          (final_validation_complete ?course_section_record)
+        )
+      )
+    :effect (final_validation_complete ?course_section_record)
+  )
+  (:action propagate_final_approval_flag
+    :parameters (?course_section_record - course_section_record)
+    :precondition
+      (and
+        (allocations_validated ?course_section_record)
+        (final_validation_complete ?course_section_record)
+        (not
+          (final_approval_applied ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (final_approval_applied ?course_section_record)
+        (entity_enrollment_confirmed ?course_section_record)
+      )
+  )
+  (:action consume_external_approver_token_for_section_record
+    :parameters (?course_section_record - course_section_record ?external_approver_token - external_approver_token ?course_component - course_component)
+    :precondition
+      (and
+        (entity_active ?course_section_record)
+        (entity_attached_component ?course_section_record ?course_component)
+        (external_approver_token_available ?external_approver_token)
+        (section_has_external_approver_token ?course_section_record ?external_approver_token)
+        (not
+          (external_approver_token_attached ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (external_approver_token_attached ?course_section_record)
+        (not
+          (external_approver_token_available ?external_approver_token)
+        )
+      )
+  )
+  (:action lock_instructor_assignment
+    :parameters (?course_section_record - course_section_record ?instructor - instructor)
+    :precondition
+      (and
+        (external_approver_token_attached ?course_section_record)
+        (entity_assigned_instructor ?course_section_record ?instructor)
+        (not
+          (instructor_assignment_locked ?course_section_record)
+        )
+      )
+    :effect (instructor_assignment_locked ?course_section_record)
+  )
+  (:action attach_internal_approval_flag
+    :parameters (?course_section_record - course_section_record ?internal_approver - internal_approver)
+    :precondition
+      (and
+        (instructor_assignment_locked ?course_section_record)
+        (section_assigned_internal_approver ?course_section_record ?internal_approver)
+        (not
+          (internal_approval_attached ?course_section_record)
+        )
+      )
+    :effect (internal_approval_attached ?course_section_record)
+  )
+  (:action finalize_internal_approval_and_propagate
+    :parameters (?course_section_record - course_section_record)
+    :precondition
+      (and
+        (internal_approval_attached ?course_section_record)
+        (not
+          (final_approval_applied ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (final_approval_applied ?course_section_record)
+        (entity_enrollment_confirmed ?course_section_record)
+      )
+  )
+  (:action propagate_enrollment_confirmation_to_primary_instance
+    :parameters (?primary_section_instance - primary_section_instance ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (primary_section_reservation_active ?primary_section_instance)
+        (primary_section_timeslot_confirmed ?primary_section_instance)
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_locked ?alignment_proposal)
+        (not
+          (entity_enrollment_confirmed ?primary_section_instance)
+        )
+      )
+    :effect (entity_enrollment_confirmed ?primary_section_instance)
+  )
+  (:action propagate_enrollment_confirmation_to_coreq_instance
+    :parameters (?coreq_section_instance - coreq_section_instance ?alignment_proposal - alignment_proposal)
+    :precondition
+      (and
+        (coreq_section_reservation_active ?coreq_section_instance)
+        (coreq_section_timeslot_confirmed ?coreq_section_instance)
+        (alignment_proposal_active ?alignment_proposal)
+        (proposal_locked ?alignment_proposal)
+        (not
+          (entity_enrollment_confirmed ?coreq_section_instance)
+        )
+      )
+    :effect (entity_enrollment_confirmed ?coreq_section_instance)
+  )
+  (:action finalize_case_with_justification
+    :parameters (?enrollment_case - enrollment_case ?justification_document - justification_document ?course_component - course_component)
+    :precondition
+      (and
+        (entity_enrollment_confirmed ?enrollment_case)
+        (entity_attached_component ?enrollment_case ?course_component)
+        (justification_document_available ?justification_document)
+        (not
+          (enrollment_case_finalized ?enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (enrollment_case_finalized ?enrollment_case)
+        (entity_has_justification_document ?enrollment_case ?justification_document)
+        (not
+          (justification_document_available ?justification_document)
+        )
+      )
+  )
+  (:action assign_case_to_primary_section_instance
+    :parameters (?primary_section_instance - primary_section_instance ?section_offering - section_offering ?justification_document - justification_document)
+    :precondition
+      (and
+        (enrollment_case_finalized ?primary_section_instance)
+        (entity_selected_offering ?primary_section_instance ?section_offering)
+        (entity_has_justification_document ?primary_section_instance ?justification_document)
+        (not
+          (entity_assignment_confirmed ?primary_section_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_assignment_confirmed ?primary_section_instance)
+        (section_offering_available ?section_offering)
+        (justification_document_available ?justification_document)
+      )
+  )
+  (:action assign_case_to_coreq_section_instance
+    :parameters (?coreq_section_instance - coreq_section_instance ?section_offering - section_offering ?justification_document - justification_document)
+    :precondition
+      (and
+        (enrollment_case_finalized ?coreq_section_instance)
+        (entity_selected_offering ?coreq_section_instance ?section_offering)
+        (entity_has_justification_document ?coreq_section_instance ?justification_document)
+        (not
+          (entity_assignment_confirmed ?coreq_section_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_assignment_confirmed ?coreq_section_instance)
+        (section_offering_available ?section_offering)
+        (justification_document_available ?justification_document)
+      )
+  )
+  (:action assign_case_to_course_section_record
+    :parameters (?course_section_record - course_section_record ?section_offering - section_offering ?justification_document - justification_document)
+    :precondition
+      (and
+        (enrollment_case_finalized ?course_section_record)
+        (entity_selected_offering ?course_section_record ?section_offering)
+        (entity_has_justification_document ?course_section_record ?justification_document)
+        (not
+          (entity_assignment_confirmed ?course_section_record)
+        )
+      )
+    :effect
+      (and
+        (entity_assignment_confirmed ?course_section_record)
+        (section_offering_available ?section_offering)
+        (justification_document_available ?justification_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem co_requisite_alignment_problem)
+  (:domain co_requisite_section_alignment_domain)
+  (:objects primary_section_instance_1 - primary_section_instance coreq_section_instance_1 - coreq_section_instance course_section_record_1 - course_section_record course_section_record_2 - course_section_record section_offering_1 - section_offering section_offering_2 - section_offering section_offering_3 - section_offering course_component_lecture - course_component instructor_1 - instructor support_resource_1 - support_resource primary_timeslot_1 - primary_timeslot coreq_timeslot_1 - coreq_timeslot alignment_proposal_1 - alignment_proposal classroom_a - classroom classroom_b - classroom special_resourcing_need_1 - special_resourcing_need special_resourcing_need_2 - special_resourcing_need delivery_mode_online - delivery_mode delivery_mode_in_person - delivery_mode justification_document_1 - justification_document external_approver_1 - external_approver external_approver_token_1 - external_approver_token external_approver_token_2 - external_approver_token internal_approver_1 - internal_approver)
+  (:init
+    (section_offering_available section_offering_1)
+    (section_offering_available section_offering_2)
+    (section_offering_available section_offering_3)
+    (course_component_available course_component_lecture)
+    (instructor_available instructor_1)
+    (support_resource_available support_resource_1)
+    (primary_section_has_timeslot primary_section_instance_1 primary_timeslot_1)
+    (coreq_section_has_timeslot coreq_section_instance_1 coreq_timeslot_1)
+    (alignment_proposal_available alignment_proposal_1)
+    (classroom_available classroom_a)
+    (classroom_available classroom_b)
+    (section_record_has_primary_instance course_section_record_1 primary_section_instance_1)
+    (section_record_has_primary_instance course_section_record_2 primary_section_instance_1)
+    (section_record_has_coreq_instance course_section_record_1 coreq_section_instance_1)
+    (section_record_has_coreq_instance course_section_record_2 coreq_section_instance_1)
+    (section_record_has_alignment_proposal course_section_record_1 alignment_proposal_1)
+    (section_record_has_alignment_proposal course_section_record_2 alignment_proposal_1)
+    (section_record_claims_classroom course_section_record_1 classroom_a)
+    (section_record_claims_classroom course_section_record_2 classroom_b)
+    (special_resourcing_need_available special_resourcing_need_1)
+    (special_resourcing_need_available special_resourcing_need_2)
+    (delivery_mode_available delivery_mode_online)
+    (delivery_mode_available delivery_mode_in_person)
+    (justification_document_available justification_document_1)
+    (external_approver_available external_approver_1)
+    (external_approver_token_available external_approver_token_1)
+    (section_has_external_approver_token course_section_record_1 external_approver_token_1)
+    (section_has_external_approver_token course_section_record_2 external_approver_token_2)
+    (internal_approver_available internal_approver_1)
+  )
+  (:goal
+    (and
+      (entity_assignment_confirmed primary_section_instance_1)
+      (entity_assignment_confirmed coreq_section_instance_1)
+      (entity_assignment_confirmed course_section_record_1)
+      (entity_assignment_confirmed course_section_record_2)
+    )
+  )
+)

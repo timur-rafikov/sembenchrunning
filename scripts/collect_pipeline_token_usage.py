@@ -4,7 +4,8 @@
 
 Этапы пайплайна:
   1) Планирование (один запрос OpenRouter на сэмпл) — openrouter_response.usage; плюс в run JSON
-     может быть pipeline_usage.totals (сумма этапов: планирование + nl2pddl + нули для pddl2nl_prompt).
+     может быть pipeline_usage.totals (сумма этапов с tracked=true: planning + pddl2nl_prompt + nl2pddl;
+     на практике pddl2nl_prompt обычно tracked=false и не даёт вклада; domain_setup в totals не входит).
   2) PDDL->NL промпт сэмпла (autoplanbench_pddl2nl): run_save_descriptions --type full — без LLM
      на этом шаге. Отдельно domain setup (run_domain_setup): токены в domain_llm_usage_seedN.json
      и в pipeline_usage.domain_setup в run JSON (если прогон обновлял pipeline_usage).
@@ -27,18 +28,49 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# Запуск: python scripts/collect_pipeline_token_usage.py — корень репо должен быть в PYTHONPATH
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+  sys.path.insert(0, str(_ROOT))
+
+from pipeline_usage import annotate_nl2pddl_openrouter_usage, normalize_openrouter_usage_counts
+
 
 def _usage_from_run(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+  u: Optional[Dict[str, Any]] = None
   resp = data.get("openrouter_response")
-  if not isinstance(resp, dict):
-    return None
-  u = resp.get("usage")
-  return u if isinstance(u, dict) else None
+  if isinstance(resp, dict):
+    us = resp.get("usage")
+    if isinstance(us, dict) and us:
+      u = us
+  if u is None:
+    rec = data.get("openrouter_usage_recovered")
+    if isinstance(rec, dict) and rec:
+      u = rec
+  return u if isinstance(u, dict) and u else None
+
+
+def _total_tokens_from_usage(u: Dict[str, Any], pt: float, ct: float) -> float:
+  """Итоговый total: не занижаем относительно pt+ct при противоречивых полях от провайдера."""
+  summed = pt + ct
+  raw = u.get("total_tokens")
+  tt = 0.0
+  if raw is not None:
+    try:
+      tt = float(raw)
+    except (TypeError, ValueError):
+      tt = 0.0
+  if summed <= 0:
+    return tt if tt > 0 else 0.0
+  if tt <= 0:
+    return summed
+  return max(tt, summed)
 
 
 def _nl2pddl_requests_from_debug(data: Dict[str, Any]) -> Optional[Tuple[int, int, int]]:
@@ -58,15 +90,12 @@ def _nl2pddl_openrouter_usage_numbers(usage: Any) -> Tuple[float, float, float, 
   """Returns (prompt_tokens, completion_tokens, total_tokens, cost) from openrouter_usage dict."""
   if not isinstance(usage, dict):
     return 0.0, 0.0, 0.0, 0.0
+  norm = normalize_openrouter_usage_counts(usage)
+  pt = float(norm["prompt_tokens"])
+  ct = float(norm["completion_tokens"])
+  tt = float(norm["total_tokens"])
   try:
-    pt = float(usage.get("prompt_tokens") or 0)
-    ct = float(usage.get("completion_tokens") or 0)
-    tt = float(usage.get("total_tokens") or 0)
-  except (TypeError, ValueError):
-    return 0.0, 0.0, 0.0, 0.0
-  cost_raw = usage.get("cost")
-  try:
-    cost_f = float(cost_raw) if cost_raw is not None else 0.0
+    cost_f = float(norm["cost"])
   except (TypeError, ValueError):
     cost_f = 0.0
   return pt, ct, tt, cost_f
@@ -125,24 +154,30 @@ def collect_last_run_translator(output_dir: Path) -> Dict[str, Any]:
   if isinstance(run_data, dict):
     out["example_id"] = run_data.get("id")
     out["model"] = run_data.get("model_name") or run_data.get("model")
-    if run_data.get("error"):
-      out["planning"] = {"has_usage": False, "note": "top-level error payload"}
+    u_plan = _usage_from_run(run_data)
+    if u_plan:
+      norm = normalize_openrouter_usage_counts(u_plan)
+      u_eff = {**u_plan, **norm}
+      pt = float(norm["prompt_tokens"])
+      ct = float(norm["completion_tokens"])
+      tt = _total_tokens_from_usage(u_eff, pt, ct)
+      cost = u_eff.get("cost")
+      note = None
+      if run_data.get("error"):
+        note = "usage present despite top-level error (or from openrouter_usage_recovered)"
+      out["planning"] = {
+        "has_usage": True,
+        "prompt_tokens": pt,
+        "completion_tokens": ct,
+        "total_tokens": tt,
+        "cost": float(cost) if cost is not None else None,
+        **({"note": note} if note else {}),
+      }
     else:
-      u = _usage_from_run(run_data)
-      if u:
-        pt = float(u.get("prompt_tokens") or 0)
-        ct = float(u.get("completion_tokens") or 0)
-        tt = float(u.get("total_tokens") or (pt + ct))
-        cost = u.get("cost")
-        out["planning"] = {
-          "has_usage": True,
-          "prompt_tokens": pt,
-          "completion_tokens": ct,
-          "total_tokens": tt,
-          "cost": float(cost) if cost is not None else None,
-        }
-      else:
-        out["planning"] = {"has_usage": False, "note": "no openrouter_response.usage"}
+      out["planning"] = {
+        "has_usage": False,
+        "note": "top-level error or no usage" if run_data.get("error") else "no openrouter_response.usage",
+      }
     pu = run_data.get("pipeline_usage")
     if isinstance(pu, dict):
       out["pipeline_usage"] = pu
@@ -230,6 +265,8 @@ def collect_runs(output_dir: Path) -> Tuple[List[Dict], Dict[str, Any]]:
   for path in sorted(output_dir.rglob("*.json")):
     if not path.is_file():
       continue
+    if "__" not in path.stem:
+      continue
     if path.name.endswith("__nl2pddl_debug.json"):
       continue
     if path.name in ("metrics.jsonl",) or "metrics" in path.name and path.suffix == ".jsonl":
@@ -275,10 +312,12 @@ def collect_runs(output_dir: Path) -> Tuple[List[Dict], Dict[str, Any]]:
     totals["runs_with_usage"] += 1
     if top_err:
       totals["runs_usage_despite_top_level_error"] += 1
-    pt = float(u.get("prompt_tokens") or 0)
-    ct = float(u.get("completion_tokens") or 0)
-    tt = float(u.get("total_tokens") or (pt + ct))
-    cost = u.get("cost")
+    norm = normalize_openrouter_usage_counts(u)
+    u_eff = {**u, **norm}
+    pt = float(norm["prompt_tokens"])
+    ct = float(norm["completion_tokens"])
+    tt = _total_tokens_from_usage(u_eff, pt, ct)
+    cost = u_eff.get("cost")
     cost_f = float(cost) if cost is not None else 0.0
 
     by_model[model]["prompt_tokens"] += pt
@@ -315,6 +354,8 @@ def collect_pipeline_usage_from_run_jsons(output_dir: Path) -> Dict[str, Any]:
   for path in sorted(output_dir.rglob("*.json")):
     if not path.is_file():
       continue
+    if "__" not in path.stem:
+      continue
     if path.name.endswith("__nl2pddl_debug.json"):
       continue
     try:
@@ -340,7 +381,11 @@ def collect_pipeline_usage_from_run_jsons(output_dir: Path) -> Dict[str, Any]:
   return {
     "runs_with_pipeline_usage": runs_with,
     "totals": acc,
-    "note": "totals = planning + pddl2nl_prompt (0 LLM) + nl2pddl + domain_setup (domain_llm_usage_seedN.json)",
+    "note": (
+      "totals в каждом run = planning + pddl2nl_prompt + nl2pddl (только tracked=true); "
+      "domain_setup в totals не входит (общий файл на много сэмплов). "
+      "Domain отдельно: data/**/domain_llm_usage_seed*.json + блок DOMAIN SETUP в этом отчёте."
+    ),
   }
 
 
@@ -351,6 +396,8 @@ def collect_nl2pddl_from_pipeline_usage_in_runs(output_dir: Path) -> Dict[str, A
   runs_with_untracked_nl2pddl = 0
   for path in sorted(output_dir.rglob("*.json")):
     if not path.is_file():
+      continue
+    if "__" not in path.stem:
       continue
     if path.name.endswith("__nl2pddl_debug.json"):
       continue
@@ -392,6 +439,7 @@ def collect_nl2pddl_debug(output_dir: Path) -> Dict[str, Any]:
   sum_api_rounds_with_usage_log = 0
   sum_api_rounds_without_usage_log = 0
   debug_files_without_openrouter_usage = 0
+  nl2pddl_untracked_token_rows = 0
   for path in sorted(output_dir.rglob("*__nl2pddl_debug.json")):
     if not path.is_file():
       continue
@@ -419,17 +467,27 @@ def collect_nl2pddl_debug(output_dir: Path) -> Dict[str, Any]:
     ou = data.get("openrouter_usage")
     api_n = int(entry.get("from_api") or 0)
     if isinstance(ou, dict) and ou:
-      pt, ct, tt, cf = _nl2pddl_openrouter_usage_numbers(ou)
+      st = (data.get("stdout") or "") if isinstance(data.get("stdout"), str) else ""
+      se = (data.get("stderr") or "") if isinstance(data.get("stderr"), str) else ""
+      ann = annotate_nl2pddl_openrouter_usage(dict(ou), stdout_text=st, stderr_text=se)
+      tracked = ann.get("tracked") is True
+      pt, ct, tt, cf = _nl2pddl_openrouter_usage_numbers(ann)
+      entry["openrouter_usage"] = ann
+      entry["nl2pddl_usage_tracked"] = tracked
       if pt or ct or tt or cf:
         files_with_usage += 1
-      sum_pt += pt
-      sum_ct += ct
-      sum_tt += tt
-      sum_cost += cf
-      entry["openrouter_usage"] = ou
-      sum_api_rounds_with_usage_log += api_n
+      if tracked:
+        sum_pt += pt
+        sum_ct += ct
+        sum_tt += tt
+        sum_cost += cf
+        sum_api_rounds_with_usage_log += api_n
+      else:
+        nl2pddl_untracked_token_rows += 1
+        sum_api_rounds_without_usage_log += api_n
     else:
       entry["openrouter_usage"] = None
+      entry["nl2pddl_usage_tracked"] = None
       sum_api_rounds_without_usage_log += api_n
       debug_files_without_openrouter_usage += 1
 
@@ -439,7 +497,8 @@ def collect_nl2pddl_debug(output_dir: Path) -> Dict[str, Any]:
     "stage": "nl2pddl",
     "note": (
       "translation_http_rounds from AutoPlanBench stdout; "
-      "openrouter_usage from autoplanbench stdout line (AUTOPLANBENCH_NL2PDDL_USAGE) stored by sembenchrunning"
+      "openrouter_usage from autoplanbench stdout line (AUTOPLANBENCH_NL2PDDL_USAGE) stored by sembenchrunning. "
+      "Суммы токенов NL2PDDL только при tracked=true (как в pipeline_usage.totals)."
     ),
     "sum_translation_rounds": sum_total,
     "sum_from_cache": sum_cache,
@@ -452,6 +511,7 @@ def collect_nl2pddl_debug(output_dir: Path) -> Dict[str, Any]:
     "debug_files_without_openrouter_usage": debug_files_without_openrouter_usage,
     "sum_api_rounds_with_usage_log": sum_api_rounds_with_usage_log,
     "sum_api_rounds_without_usage_log": sum_api_rounds_without_usage_log,
+    "debug_files_with_untracked_nl2pddl_usage": nl2pddl_untracked_token_rows,
     "debug_files_total": len(per_file),
     "files": per_file,
   }
@@ -647,6 +707,11 @@ def main() -> None:
   if nl2pddl["sum_openrouter_cost"] > 0:
     print(f"  Сумма NL2PDDL cost (OpenRouter): {nl2pddl['sum_openrouter_cost']:.6f}")
   print(f"  Debug без openrouter_usage (факт по ним из логов неизвестен): {nl2pddl.get('debug_files_without_openrouter_usage', 0)}")
+  if int(nl2pddl.get("debug_files_with_untracked_nl2pddl_usage") or 0) > 0:
+    print(
+      f"  Debug с openrouter_usage, но tracked=false (не в pipeline totals): "
+      f"{nl2pddl['debug_files_with_untracked_nl2pddl_usage']}"
+    )
   if int(nl2pddl.get("sum_api_rounds_without_usage_log") or 0) > 0:
     print(
       f"  API-раундов в debug без записанного usage: {nl2pddl['sum_api_rounds_without_usage_log']} "
@@ -692,14 +757,14 @@ def main() -> None:
   print("Справка: что уже в отчёте и что может отсутствовать")
   print("=" * 60)
   print("  УЖЕ учтено выше (если в артефактах есть данные):")
-  print("    • Планирование — сумма по openrouter_response.usage (блок «ПЛАНИРОВАНИЕ»).")
-  print("    • NL->PDDL — токены из openrouter_usage в *__nl2pddl_debug.json (блок «NL->PDDL»).")
-  print("    • Сводка по этапам в одном run — pipeline_usage.totals (блок «pipeline_usage в run JSON»).")
+  print("    • Планирование — openrouter_response.usage или openrouter_usage_recovered при ошибке API.")
+  print("    • NL->PDDL — openrouter_usage в *__nl2pddl_debug.json (суммы только tracked=true, как в pipeline_usage).")
+  print("    • pipeline_usage.totals в run JSON — planning + nl2pddl + этапы с tracked=true (pddl2nl обычно false); domain_setup в totals НЕ входит.")
+  print("    • Domain setup — отдельно: data/**/domain_llm_usage_seed*.json (дедуп по пути).")
   print("  Может НЕ попасть в суммы или попасть неполно:")
   print("    • Run без записанного pipeline_usage — в «Сводка pipeline_usage» не входят (см. число файлов).")
-  print("    • NL->PDDL: debug без поля openrouter_usage (старый autoplanbench) — только rounds, токены=0.")
-  print("    • Domain setup: отдельный блок по data/**/domain_llm_usage_seed*.json; в pipeline_usage.totals — только после merge в run.")
-  print("    • Промпт сэмпла (pddl2nl для одного run): LLM на этом шаге не вызывается (шаблоны).")
+  print("    • NL->PDDL: debug без openrouter_usage или tracked=false — в сумме токенов NL2PDDL не участвует.")
+  print("    • Промпт сэмпла (pddl2nl): LLM нет; этап в pipeline_usage с tracked=false.")
 
   if args.json_out:
     payload = {
@@ -717,8 +782,8 @@ def main() -> None:
         "total_tokens": g_tt,
         "cost": g_cost,
         "note": (
-          "факт только из записанных usage: planning + NL2PDDL (где есть openrouter_usage) + domain_llm; "
-          "при дырах в NL2PDDL полный расход — из биллинга OpenRouter"
+          "planning + NL2PDDL (tracked в debug) + domain dedup; pipeline_usage.totals по run без domain_setup; "
+          "полный биллинг — кабинет OpenRouter"
         ),
       },
       "last_run": last_run,

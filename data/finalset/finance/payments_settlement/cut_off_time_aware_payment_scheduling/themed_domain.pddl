@@ -1,0 +1,936 @@
+(define (domain cut_off_time_aware_payment_scheduling)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object messaging_resource - object channel_resource - object instruction_category - object payment_entity - instruction_category cutoff_slot - operational_resource settlement_leg_detail - operational_resource processing_agent - operational_resource routing_preference_flag - operational_resource execution_profile - operational_resource scheduling_window_token - operational_resource authorization_credential - operational_resource settlement_instrument_reference - operational_resource compliance_payload - messaging_resource message_template - messaging_resource exception_waiver_token - messaging_resource origin_channel - channel_resource destination_channel - channel_resource outbound_settlement_message - channel_resource participant_category - payment_entity participant_subcategory - payment_entity originating_participant - participant_category receiving_participant - participant_category payment_message_container - participant_subcategory)
+  (:predicates
+    (entity_staged ?payment_instruction - payment_entity)
+    (entity_validated ?payment_instruction - payment_entity)
+    (cutoff_slot_allocated ?payment_instruction - payment_entity)
+    (released_to_settlement ?payment_instruction - payment_entity)
+    (ready_for_release ?payment_instruction - payment_entity)
+    (release_scheduled ?payment_instruction - payment_entity)
+    (cutoff_slot_available ?cutoff_slot - cutoff_slot)
+    (entity_assigned_cutoff_slot ?payment_instruction - payment_entity ?cutoff_slot - cutoff_slot)
+    (settlement_leg_available ?settlement_leg_detail - settlement_leg_detail)
+    (entity_settlement_leg_assigned ?payment_instruction - payment_entity ?settlement_leg_detail - settlement_leg_detail)
+    (processing_agent_available ?processing_agent - processing_agent)
+    (entity_assigned_processing_agent ?payment_instruction - payment_entity ?processing_agent - processing_agent)
+    (compliance_payload_available ?compliance_payload - compliance_payload)
+    (originator_attached_compliance_payload ?originating_participant - originating_participant ?compliance_payload - compliance_payload)
+    (receiver_attached_compliance_payload ?receiving_participant - receiving_participant ?compliance_payload - compliance_payload)
+    (participant_bound_to_origin_channel ?originating_participant - originating_participant ?origin_channel - origin_channel)
+    (origin_channel_primary_ready ?origin_channel - origin_channel)
+    (origin_channel_secondary_ready ?origin_channel - origin_channel)
+    (origin_participant_ready ?originating_participant - originating_participant)
+    (participant_bound_to_destination_channel ?receiving_participant - receiving_participant ?destination_channel - destination_channel)
+    (destination_channel_primary_ready ?destination_channel - destination_channel)
+    (destination_channel_secondary_ready ?destination_channel - destination_channel)
+    (receiving_participant_ready ?receiving_participant - receiving_participant)
+    (outbound_message_pending_assembly ?outbound_settlement_message - outbound_settlement_message)
+    (outbound_message_assembled ?outbound_settlement_message - outbound_settlement_message)
+    (message_assigned_origin_channel ?outbound_settlement_message - outbound_settlement_message ?origin_channel - origin_channel)
+    (message_assigned_destination_channel ?outbound_settlement_message - outbound_settlement_message ?destination_channel - destination_channel)
+    (message_requires_origin_authorization ?outbound_settlement_message - outbound_settlement_message)
+    (message_requires_destination_authorization ?outbound_settlement_message - outbound_settlement_message)
+    (outbound_message_ready_for_dispatch ?outbound_settlement_message - outbound_settlement_message)
+    (container_bound_to_origin_participant ?payment_message_container - payment_message_container ?originating_participant - originating_participant)
+    (container_bound_to_receiving_participant ?payment_message_container - payment_message_container ?receiving_participant - receiving_participant)
+    (container_contains_outbound_message ?payment_message_container - payment_message_container ?outbound_settlement_message - outbound_settlement_message)
+    (message_template_available ?message_template - message_template)
+    (container_bound_to_message_template ?payment_message_container - payment_message_container ?message_template - message_template)
+    (message_template_assigned ?message_template - message_template)
+    (message_template_assigned_to_message ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    (container_prepared_for_enrichment ?payment_message_container - payment_message_container)
+    (container_enriched ?payment_message_container - payment_message_container)
+    (container_authorized ?payment_message_container - payment_message_container)
+    (container_has_routing_preference ?payment_message_container - payment_message_container)
+    (container_routing_preference_applied ?payment_message_container - payment_message_container)
+    (container_requires_execution_profile ?payment_message_container - payment_message_container)
+    (container_finalized ?payment_message_container - payment_message_container)
+    (exception_token_available ?exception_waiver_token - exception_waiver_token)
+    (container_bound_to_exception_token ?payment_message_container - payment_message_container ?exception_waiver_token - exception_waiver_token)
+    (container_has_exception_token ?payment_message_container - payment_message_container)
+    (container_exception_assigned_to_agent ?payment_message_container - payment_message_container)
+    (container_exception_authorized ?payment_message_container - payment_message_container)
+    (routing_preference_flag_available ?routing_preference_flag - routing_preference_flag)
+    (container_assigned_routing_preference ?payment_message_container - payment_message_container ?routing_preference_flag - routing_preference_flag)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (container_bound_to_execution_profile ?payment_message_container - payment_message_container ?execution_profile - execution_profile)
+    (authorization_credential_available ?authorization_credential - authorization_credential)
+    (container_bound_to_authorization_credential ?payment_message_container - payment_message_container ?authorization_credential - authorization_credential)
+    (settlement_instrument_reference_available ?settlement_instrument_reference - settlement_instrument_reference)
+    (container_bound_to_settlement_instrument ?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference)
+    (scheduling_window_token_available ?scheduling_window_token - scheduling_window_token)
+    (entity_assigned_scheduling_window ?payment_instruction - payment_entity ?scheduling_window_token - scheduling_window_token)
+    (origin_participant_prepared_for_outbound ?originating_participant - originating_participant)
+    (receiving_participant_prepared_for_outbound ?receiving_participant - receiving_participant)
+    (container_finalized_for_release ?payment_message_container - payment_message_container)
+  )
+  (:action stage_payment_instruction
+    :parameters (?payment_instruction - payment_entity)
+    :precondition
+      (and
+        (not
+          (entity_staged ?payment_instruction)
+        )
+        (not
+          (released_to_settlement ?payment_instruction)
+        )
+      )
+    :effect (entity_staged ?payment_instruction)
+  )
+  (:action assign_cutoff_slot_to_instruction
+    :parameters (?payment_instruction - payment_entity ?cutoff_slot - cutoff_slot)
+    :precondition
+      (and
+        (entity_staged ?payment_instruction)
+        (not
+          (cutoff_slot_allocated ?payment_instruction)
+        )
+        (cutoff_slot_available ?cutoff_slot)
+      )
+    :effect
+      (and
+        (cutoff_slot_allocated ?payment_instruction)
+        (entity_assigned_cutoff_slot ?payment_instruction ?cutoff_slot)
+        (not
+          (cutoff_slot_available ?cutoff_slot)
+        )
+      )
+  )
+  (:action assign_settlement_leg_to_instruction
+    :parameters (?payment_instruction - payment_entity ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_staged ?payment_instruction)
+        (cutoff_slot_allocated ?payment_instruction)
+        (settlement_leg_available ?settlement_leg_detail)
+      )
+    :effect
+      (and
+        (entity_settlement_leg_assigned ?payment_instruction ?settlement_leg_detail)
+        (not
+          (settlement_leg_available ?settlement_leg_detail)
+        )
+      )
+  )
+  (:action complete_instruction_validation
+    :parameters (?payment_instruction - payment_entity ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_staged ?payment_instruction)
+        (cutoff_slot_allocated ?payment_instruction)
+        (entity_settlement_leg_assigned ?payment_instruction ?settlement_leg_detail)
+        (not
+          (entity_validated ?payment_instruction)
+        )
+      )
+    :effect (entity_validated ?payment_instruction)
+  )
+  (:action detach_settlement_leg_from_instruction
+    :parameters (?payment_instruction - payment_entity ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_settlement_leg_assigned ?payment_instruction ?settlement_leg_detail)
+      )
+    :effect
+      (and
+        (settlement_leg_available ?settlement_leg_detail)
+        (not
+          (entity_settlement_leg_assigned ?payment_instruction ?settlement_leg_detail)
+        )
+      )
+  )
+  (:action allocate_processing_agent_to_instruction
+    :parameters (?payment_instruction - payment_entity ?processing_agent - processing_agent)
+    :precondition
+      (and
+        (entity_validated ?payment_instruction)
+        (processing_agent_available ?processing_agent)
+      )
+    :effect
+      (and
+        (entity_assigned_processing_agent ?payment_instruction ?processing_agent)
+        (not
+          (processing_agent_available ?processing_agent)
+        )
+      )
+  )
+  (:action release_processing_agent_from_instruction
+    :parameters (?payment_instruction - payment_entity ?processing_agent - processing_agent)
+    :precondition
+      (and
+        (entity_assigned_processing_agent ?payment_instruction ?processing_agent)
+      )
+    :effect
+      (and
+        (processing_agent_available ?processing_agent)
+        (not
+          (entity_assigned_processing_agent ?payment_instruction ?processing_agent)
+        )
+      )
+  )
+  (:action assign_authorization_credential_to_container
+    :parameters (?payment_message_container - payment_message_container ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (authorization_credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (container_bound_to_authorization_credential ?payment_message_container ?authorization_credential)
+        (not
+          (authorization_credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action release_authorization_credential_from_container
+    :parameters (?payment_message_container - payment_message_container ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (container_bound_to_authorization_credential ?payment_message_container ?authorization_credential)
+      )
+    :effect
+      (and
+        (authorization_credential_available ?authorization_credential)
+        (not
+          (container_bound_to_authorization_credential ?payment_message_container ?authorization_credential)
+        )
+      )
+  )
+  (:action assign_settlement_instrument_to_container
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (settlement_instrument_reference_available ?settlement_instrument_reference)
+      )
+    :effect
+      (and
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (not
+          (settlement_instrument_reference_available ?settlement_instrument_reference)
+        )
+      )
+  )
+  (:action release_settlement_instrument_from_container
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference)
+    :precondition
+      (and
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+      )
+    :effect
+      (and
+        (settlement_instrument_reference_available ?settlement_instrument_reference)
+        (not
+          (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        )
+      )
+  )
+  (:action mark_origin_channel_primary_ready
+    :parameters (?originating_participant - originating_participant ?origin_channel - origin_channel ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_validated ?originating_participant)
+        (entity_settlement_leg_assigned ?originating_participant ?settlement_leg_detail)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (not
+          (origin_channel_primary_ready ?origin_channel)
+        )
+        (not
+          (origin_channel_secondary_ready ?origin_channel)
+        )
+      )
+    :effect (origin_channel_primary_ready ?origin_channel)
+  )
+  (:action confirm_origin_participant_for_primary_channel
+    :parameters (?originating_participant - originating_participant ?origin_channel - origin_channel ?processing_agent - processing_agent)
+    :precondition
+      (and
+        (entity_validated ?originating_participant)
+        (entity_assigned_processing_agent ?originating_participant ?processing_agent)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (origin_channel_primary_ready ?origin_channel)
+        (not
+          (origin_participant_prepared_for_outbound ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (origin_participant_ready ?originating_participant)
+      )
+  )
+  (:action attach_compliance_payload_to_origin_and_mark
+    :parameters (?originating_participant - originating_participant ?origin_channel - origin_channel ?compliance_payload - compliance_payload)
+    :precondition
+      (and
+        (entity_validated ?originating_participant)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (compliance_payload_available ?compliance_payload)
+        (not
+          (origin_participant_prepared_for_outbound ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_secondary_ready ?origin_channel)
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (originator_attached_compliance_payload ?originating_participant ?compliance_payload)
+        (not
+          (compliance_payload_available ?compliance_payload)
+        )
+      )
+  )
+  (:action process_origin_channel_with_payload_and_confirm
+    :parameters (?originating_participant - originating_participant ?origin_channel - origin_channel ?settlement_leg_detail - settlement_leg_detail ?compliance_payload - compliance_payload)
+    :precondition
+      (and
+        (entity_validated ?originating_participant)
+        (entity_settlement_leg_assigned ?originating_participant ?settlement_leg_detail)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (origin_channel_secondary_ready ?origin_channel)
+        (originator_attached_compliance_payload ?originating_participant ?compliance_payload)
+        (not
+          (origin_participant_ready ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_primary_ready ?origin_channel)
+        (origin_participant_ready ?originating_participant)
+        (compliance_payload_available ?compliance_payload)
+        (not
+          (originator_attached_compliance_payload ?originating_participant ?compliance_payload)
+        )
+      )
+  )
+  (:action mark_destination_channel_primary_ready
+    :parameters (?receiving_participant - receiving_participant ?destination_channel - destination_channel ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_validated ?receiving_participant)
+        (entity_settlement_leg_assigned ?receiving_participant ?settlement_leg_detail)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (not
+          (destination_channel_primary_ready ?destination_channel)
+        )
+        (not
+          (destination_channel_secondary_ready ?destination_channel)
+        )
+      )
+    :effect (destination_channel_primary_ready ?destination_channel)
+  )
+  (:action confirm_receiving_participant_for_primary_channel
+    :parameters (?receiving_participant - receiving_participant ?destination_channel - destination_channel ?processing_agent - processing_agent)
+    :precondition
+      (and
+        (entity_validated ?receiving_participant)
+        (entity_assigned_processing_agent ?receiving_participant ?processing_agent)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (destination_channel_primary_ready ?destination_channel)
+        (not
+          (receiving_participant_prepared_for_outbound ?receiving_participant)
+        )
+      )
+    :effect
+      (and
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (receiving_participant_ready ?receiving_participant)
+      )
+  )
+  (:action attach_compliance_payload_to_receiver_and_mark
+    :parameters (?receiving_participant - receiving_participant ?destination_channel - destination_channel ?compliance_payload - compliance_payload)
+    :precondition
+      (and
+        (entity_validated ?receiving_participant)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (compliance_payload_available ?compliance_payload)
+        (not
+          (receiving_participant_prepared_for_outbound ?receiving_participant)
+        )
+      )
+    :effect
+      (and
+        (destination_channel_secondary_ready ?destination_channel)
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (receiver_attached_compliance_payload ?receiving_participant ?compliance_payload)
+        (not
+          (compliance_payload_available ?compliance_payload)
+        )
+      )
+  )
+  (:action process_destination_channel_with_payload_and_confirm
+    :parameters (?receiving_participant - receiving_participant ?destination_channel - destination_channel ?settlement_leg_detail - settlement_leg_detail ?compliance_payload - compliance_payload)
+    :precondition
+      (and
+        (entity_validated ?receiving_participant)
+        (entity_settlement_leg_assigned ?receiving_participant ?settlement_leg_detail)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (destination_channel_secondary_ready ?destination_channel)
+        (receiver_attached_compliance_payload ?receiving_participant ?compliance_payload)
+        (not
+          (receiving_participant_ready ?receiving_participant)
+        )
+      )
+    :effect
+      (and
+        (destination_channel_primary_ready ?destination_channel)
+        (receiving_participant_ready ?receiving_participant)
+        (compliance_payload_available ?compliance_payload)
+        (not
+          (receiver_attached_compliance_payload ?receiving_participant ?compliance_payload)
+        )
+      )
+  )
+  (:action assemble_outbound_message_primary
+    :parameters (?originating_participant - originating_participant ?receiving_participant - receiving_participant ?origin_channel - origin_channel ?destination_channel - destination_channel ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (origin_channel_primary_ready ?origin_channel)
+        (destination_channel_primary_ready ?destination_channel)
+        (origin_participant_ready ?originating_participant)
+        (receiving_participant_ready ?receiving_participant)
+        (outbound_message_pending_assembly ?outbound_settlement_message)
+      )
+    :effect
+      (and
+        (outbound_message_assembled ?outbound_settlement_message)
+        (message_assigned_origin_channel ?outbound_settlement_message ?origin_channel)
+        (message_assigned_destination_channel ?outbound_settlement_message ?destination_channel)
+        (not
+          (outbound_message_pending_assembly ?outbound_settlement_message)
+        )
+      )
+  )
+  (:action assemble_outbound_message_origin_secondary
+    :parameters (?originating_participant - originating_participant ?receiving_participant - receiving_participant ?origin_channel - origin_channel ?destination_channel - destination_channel ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (origin_channel_secondary_ready ?origin_channel)
+        (destination_channel_primary_ready ?destination_channel)
+        (not
+          (origin_participant_ready ?originating_participant)
+        )
+        (receiving_participant_ready ?receiving_participant)
+        (outbound_message_pending_assembly ?outbound_settlement_message)
+      )
+    :effect
+      (and
+        (outbound_message_assembled ?outbound_settlement_message)
+        (message_assigned_origin_channel ?outbound_settlement_message ?origin_channel)
+        (message_assigned_destination_channel ?outbound_settlement_message ?destination_channel)
+        (message_requires_origin_authorization ?outbound_settlement_message)
+        (not
+          (outbound_message_pending_assembly ?outbound_settlement_message)
+        )
+      )
+  )
+  (:action assemble_outbound_message_destination_secondary
+    :parameters (?originating_participant - originating_participant ?receiving_participant - receiving_participant ?origin_channel - origin_channel ?destination_channel - destination_channel ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (origin_channel_primary_ready ?origin_channel)
+        (destination_channel_secondary_ready ?destination_channel)
+        (origin_participant_ready ?originating_participant)
+        (not
+          (receiving_participant_ready ?receiving_participant)
+        )
+        (outbound_message_pending_assembly ?outbound_settlement_message)
+      )
+    :effect
+      (and
+        (outbound_message_assembled ?outbound_settlement_message)
+        (message_assigned_origin_channel ?outbound_settlement_message ?origin_channel)
+        (message_assigned_destination_channel ?outbound_settlement_message ?destination_channel)
+        (message_requires_destination_authorization ?outbound_settlement_message)
+        (not
+          (outbound_message_pending_assembly ?outbound_settlement_message)
+        )
+      )
+  )
+  (:action assemble_outbound_message_both_secondary
+    :parameters (?originating_participant - originating_participant ?receiving_participant - receiving_participant ?origin_channel - origin_channel ?destination_channel - destination_channel ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (participant_bound_to_origin_channel ?originating_participant ?origin_channel)
+        (participant_bound_to_destination_channel ?receiving_participant ?destination_channel)
+        (origin_channel_secondary_ready ?origin_channel)
+        (destination_channel_secondary_ready ?destination_channel)
+        (not
+          (origin_participant_ready ?originating_participant)
+        )
+        (not
+          (receiving_participant_ready ?receiving_participant)
+        )
+        (outbound_message_pending_assembly ?outbound_settlement_message)
+      )
+    :effect
+      (and
+        (outbound_message_assembled ?outbound_settlement_message)
+        (message_assigned_origin_channel ?outbound_settlement_message ?origin_channel)
+        (message_assigned_destination_channel ?outbound_settlement_message ?destination_channel)
+        (message_requires_origin_authorization ?outbound_settlement_message)
+        (message_requires_destination_authorization ?outbound_settlement_message)
+        (not
+          (outbound_message_pending_assembly ?outbound_settlement_message)
+        )
+      )
+  )
+  (:action mark_outbound_message_ready_for_dispatch
+    :parameters (?outbound_settlement_message - outbound_settlement_message ?originating_participant - originating_participant ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (outbound_message_assembled ?outbound_settlement_message)
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (entity_settlement_leg_assigned ?originating_participant ?settlement_leg_detail)
+        (not
+          (outbound_message_ready_for_dispatch ?outbound_settlement_message)
+        )
+      )
+    :effect (outbound_message_ready_for_dispatch ?outbound_settlement_message)
+  )
+  (:action bind_message_template_to_container
+    :parameters (?payment_message_container - payment_message_container ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (container_contains_outbound_message ?payment_message_container ?outbound_settlement_message)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_available ?message_template)
+        (outbound_message_assembled ?outbound_settlement_message)
+        (outbound_message_ready_for_dispatch ?outbound_settlement_message)
+        (not
+          (message_template_assigned ?message_template)
+        )
+      )
+    :effect
+      (and
+        (message_template_assigned ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (not
+          (message_template_available ?message_template)
+        )
+      )
+  )
+  (:action prepare_container_for_enrichment
+    :parameters (?payment_message_container - payment_message_container ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (entity_settlement_leg_assigned ?payment_message_container ?settlement_leg_detail)
+        (not
+          (message_requires_origin_authorization ?outbound_settlement_message)
+        )
+        (not
+          (container_prepared_for_enrichment ?payment_message_container)
+        )
+      )
+    :effect (container_prepared_for_enrichment ?payment_message_container)
+  )
+  (:action assign_routing_preference_to_container
+    :parameters (?payment_message_container - payment_message_container ?routing_preference_flag - routing_preference_flag)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (routing_preference_flag_available ?routing_preference_flag)
+        (not
+          (container_has_routing_preference ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_has_routing_preference ?payment_message_container)
+        (container_assigned_routing_preference ?payment_message_container ?routing_preference_flag)
+        (not
+          (routing_preference_flag_available ?routing_preference_flag)
+        )
+      )
+  )
+  (:action apply_routing_and_prepare_container_for_enrichment
+    :parameters (?payment_message_container - payment_message_container ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message ?settlement_leg_detail - settlement_leg_detail ?routing_preference_flag - routing_preference_flag)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (entity_settlement_leg_assigned ?payment_message_container ?settlement_leg_detail)
+        (message_requires_origin_authorization ?outbound_settlement_message)
+        (container_has_routing_preference ?payment_message_container)
+        (container_assigned_routing_preference ?payment_message_container ?routing_preference_flag)
+        (not
+          (container_prepared_for_enrichment ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_prepared_for_enrichment ?payment_message_container)
+        (container_routing_preference_applied ?payment_message_container)
+      )
+  )
+  (:action enrich_container_with_authorization_credential
+    :parameters (?payment_message_container - payment_message_container ?authorization_credential - authorization_credential ?processing_agent - processing_agent ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_prepared_for_enrichment ?payment_message_container)
+        (container_bound_to_authorization_credential ?payment_message_container ?authorization_credential)
+        (entity_assigned_processing_agent ?payment_message_container ?processing_agent)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (not
+          (message_requires_destination_authorization ?outbound_settlement_message)
+        )
+        (not
+          (container_enriched ?payment_message_container)
+        )
+      )
+    :effect (container_enriched ?payment_message_container)
+  )
+  (:action enrich_container_with_authorization_credential_secondary
+    :parameters (?payment_message_container - payment_message_container ?authorization_credential - authorization_credential ?processing_agent - processing_agent ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_prepared_for_enrichment ?payment_message_container)
+        (container_bound_to_authorization_credential ?payment_message_container ?authorization_credential)
+        (entity_assigned_processing_agent ?payment_message_container ?processing_agent)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (message_requires_destination_authorization ?outbound_settlement_message)
+        (not
+          (container_enriched ?payment_message_container)
+        )
+      )
+    :effect (container_enriched ?payment_message_container)
+  )
+  (:action authorize_container_plain
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_enriched ?payment_message_container)
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (not
+          (message_requires_origin_authorization ?outbound_settlement_message)
+        )
+        (not
+          (message_requires_destination_authorization ?outbound_settlement_message)
+        )
+        (not
+          (container_authorized ?payment_message_container)
+        )
+      )
+    :effect (container_authorized ?payment_message_container)
+  )
+  (:action authorize_container_and_flag_for_execution_profile
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_enriched ?payment_message_container)
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (message_requires_origin_authorization ?outbound_settlement_message)
+        (not
+          (message_requires_destination_authorization ?outbound_settlement_message)
+        )
+        (not
+          (container_authorized ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_authorized ?payment_message_container)
+        (container_requires_execution_profile ?payment_message_container)
+      )
+  )
+  (:action authorize_container_and_flag_for_execution_profile_exception
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_enriched ?payment_message_container)
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (not
+          (message_requires_origin_authorization ?outbound_settlement_message)
+        )
+        (message_requires_destination_authorization ?outbound_settlement_message)
+        (not
+          (container_authorized ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_authorized ?payment_message_container)
+        (container_requires_execution_profile ?payment_message_container)
+      )
+  )
+  (:action authorize_container_and_flag_for_execution_profile_both
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference ?message_template - message_template ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (container_enriched ?payment_message_container)
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (container_bound_to_message_template ?payment_message_container ?message_template)
+        (message_template_assigned_to_message ?message_template ?outbound_settlement_message)
+        (message_requires_origin_authorization ?outbound_settlement_message)
+        (message_requires_destination_authorization ?outbound_settlement_message)
+        (not
+          (container_authorized ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_authorized ?payment_message_container)
+        (container_requires_execution_profile ?payment_message_container)
+      )
+  )
+  (:action finalize_container_for_release_without_profile
+    :parameters (?payment_message_container - payment_message_container)
+    :precondition
+      (and
+        (container_authorized ?payment_message_container)
+        (not
+          (container_requires_execution_profile ?payment_message_container)
+        )
+        (not
+          (container_finalized_for_release ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_finalized_for_release ?payment_message_container)
+        (ready_for_release ?payment_message_container)
+      )
+  )
+  (:action attach_execution_profile_to_container
+    :parameters (?payment_message_container - payment_message_container ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (container_authorized ?payment_message_container)
+        (container_requires_execution_profile ?payment_message_container)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (container_bound_to_execution_profile ?payment_message_container ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action finalize_container_after_enrichment_and_profile
+    :parameters (?payment_message_container - payment_message_container ?originating_participant - originating_participant ?receiving_participant - receiving_participant ?settlement_leg_detail - settlement_leg_detail ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (container_authorized ?payment_message_container)
+        (container_requires_execution_profile ?payment_message_container)
+        (container_bound_to_execution_profile ?payment_message_container ?execution_profile)
+        (container_bound_to_origin_participant ?payment_message_container ?originating_participant)
+        (container_bound_to_receiving_participant ?payment_message_container ?receiving_participant)
+        (origin_participant_ready ?originating_participant)
+        (receiving_participant_ready ?receiving_participant)
+        (entity_settlement_leg_assigned ?payment_message_container ?settlement_leg_detail)
+        (not
+          (container_finalized ?payment_message_container)
+        )
+      )
+    :effect (container_finalized ?payment_message_container)
+  )
+  (:action finalize_container_for_release_with_profile
+    :parameters (?payment_message_container - payment_message_container)
+    :precondition
+      (and
+        (container_authorized ?payment_message_container)
+        (container_finalized ?payment_message_container)
+        (not
+          (container_finalized_for_release ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_finalized_for_release ?payment_message_container)
+        (ready_for_release ?payment_message_container)
+      )
+  )
+  (:action assign_exception_token_to_container
+    :parameters (?payment_message_container - payment_message_container ?exception_waiver_token - exception_waiver_token ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (entity_validated ?payment_message_container)
+        (entity_settlement_leg_assigned ?payment_message_container ?settlement_leg_detail)
+        (exception_token_available ?exception_waiver_token)
+        (container_bound_to_exception_token ?payment_message_container ?exception_waiver_token)
+        (not
+          (container_has_exception_token ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_has_exception_token ?payment_message_container)
+        (not
+          (exception_token_available ?exception_waiver_token)
+        )
+      )
+  )
+  (:action assign_exception_to_processing_agent
+    :parameters (?payment_message_container - payment_message_container ?processing_agent - processing_agent)
+    :precondition
+      (and
+        (container_has_exception_token ?payment_message_container)
+        (entity_assigned_processing_agent ?payment_message_container ?processing_agent)
+        (not
+          (container_exception_assigned_to_agent ?payment_message_container)
+        )
+      )
+    :effect (container_exception_assigned_to_agent ?payment_message_container)
+  )
+  (:action authorize_exception_for_container
+    :parameters (?payment_message_container - payment_message_container ?settlement_instrument_reference - settlement_instrument_reference)
+    :precondition
+      (and
+        (container_exception_assigned_to_agent ?payment_message_container)
+        (container_bound_to_settlement_instrument ?payment_message_container ?settlement_instrument_reference)
+        (not
+          (container_exception_authorized ?payment_message_container)
+        )
+      )
+    :effect (container_exception_authorized ?payment_message_container)
+  )
+  (:action finalize_container_post_exception_resolution
+    :parameters (?payment_message_container - payment_message_container)
+    :precondition
+      (and
+        (container_exception_authorized ?payment_message_container)
+        (not
+          (container_finalized_for_release ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (container_finalized_for_release ?payment_message_container)
+        (ready_for_release ?payment_message_container)
+      )
+  )
+  (:action mark_origin_participant_ready_for_dispatch
+    :parameters (?originating_participant - originating_participant ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (origin_participant_prepared_for_outbound ?originating_participant)
+        (origin_participant_ready ?originating_participant)
+        (outbound_message_assembled ?outbound_settlement_message)
+        (outbound_message_ready_for_dispatch ?outbound_settlement_message)
+        (not
+          (ready_for_release ?originating_participant)
+        )
+      )
+    :effect (ready_for_release ?originating_participant)
+  )
+  (:action mark_receiving_participant_ready_for_dispatch
+    :parameters (?receiving_participant - receiving_participant ?outbound_settlement_message - outbound_settlement_message)
+    :precondition
+      (and
+        (receiving_participant_prepared_for_outbound ?receiving_participant)
+        (receiving_participant_ready ?receiving_participant)
+        (outbound_message_assembled ?outbound_settlement_message)
+        (outbound_message_ready_for_dispatch ?outbound_settlement_message)
+        (not
+          (ready_for_release ?receiving_participant)
+        )
+      )
+    :effect (ready_for_release ?receiving_participant)
+  )
+  (:action schedule_instruction_for_window
+    :parameters (?payment_instruction - payment_entity ?scheduling_window_token - scheduling_window_token ?settlement_leg_detail - settlement_leg_detail)
+    :precondition
+      (and
+        (ready_for_release ?payment_instruction)
+        (entity_settlement_leg_assigned ?payment_instruction ?settlement_leg_detail)
+        (scheduling_window_token_available ?scheduling_window_token)
+        (not
+          (release_scheduled ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?payment_instruction)
+        (entity_assigned_scheduling_window ?payment_instruction ?scheduling_window_token)
+        (not
+          (scheduling_window_token_available ?scheduling_window_token)
+        )
+      )
+  )
+  (:action release_scheduled_instruction_from_origin
+    :parameters (?originating_participant - originating_participant ?cutoff_slot - cutoff_slot ?scheduling_window_token - scheduling_window_token)
+    :precondition
+      (and
+        (release_scheduled ?originating_participant)
+        (entity_assigned_cutoff_slot ?originating_participant ?cutoff_slot)
+        (entity_assigned_scheduling_window ?originating_participant ?scheduling_window_token)
+        (not
+          (released_to_settlement ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (released_to_settlement ?originating_participant)
+        (cutoff_slot_available ?cutoff_slot)
+        (scheduling_window_token_available ?scheduling_window_token)
+      )
+  )
+  (:action release_scheduled_instruction_from_receiver
+    :parameters (?receiving_participant - receiving_participant ?cutoff_slot - cutoff_slot ?scheduling_window_token - scheduling_window_token)
+    :precondition
+      (and
+        (release_scheduled ?receiving_participant)
+        (entity_assigned_cutoff_slot ?receiving_participant ?cutoff_slot)
+        (entity_assigned_scheduling_window ?receiving_participant ?scheduling_window_token)
+        (not
+          (released_to_settlement ?receiving_participant)
+        )
+      )
+    :effect
+      (and
+        (released_to_settlement ?receiving_participant)
+        (cutoff_slot_available ?cutoff_slot)
+        (scheduling_window_token_available ?scheduling_window_token)
+      )
+  )
+  (:action release_scheduled_container
+    :parameters (?payment_message_container - payment_message_container ?cutoff_slot - cutoff_slot ?scheduling_window_token - scheduling_window_token)
+    :precondition
+      (and
+        (release_scheduled ?payment_message_container)
+        (entity_assigned_cutoff_slot ?payment_message_container ?cutoff_slot)
+        (entity_assigned_scheduling_window ?payment_message_container ?scheduling_window_token)
+        (not
+          (released_to_settlement ?payment_message_container)
+        )
+      )
+    :effect
+      (and
+        (released_to_settlement ?payment_message_container)
+        (cutoff_slot_available ?cutoff_slot)
+        (scheduling_window_token_available ?scheduling_window_token)
+      )
+  )
+)

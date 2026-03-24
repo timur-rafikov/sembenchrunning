@@ -1,0 +1,1078 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain accommodation_checkin_document_readiness)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object requirement_category - object document_category - object case_root - object reservation_case - case_root verifier_resource - resource_category document_instance - resource_category frontline_staff - resource_category preference_code - resource_category payment_method - resource_category eligibility_code - resource_category staff_credential - resource_category supervisor_authorization - resource_category supporting_evidence_type - requirement_category identity_document_type - requirement_category manager_approval_token - requirement_category lead_requirement_profile - document_category co_requirement_profile - document_category accommodation_option - document_category lead_guest_subtype - reservation_case co_guest_subtype - reservation_case lead_guest - lead_guest_subtype co_guest - lead_guest_subtype reservation_record - co_guest_subtype)
+  (:predicates
+    (checkin_subject_opened ?checkin_case - reservation_case)
+    (initial_verification_completed ?checkin_case - reservation_case)
+    (verifier_assigned ?checkin_case - reservation_case)
+    (ready_for_checkin ?checkin_case - reservation_case)
+    (verification_consolidated ?checkin_case - reservation_case)
+    (eligibility_assigned ?checkin_case - reservation_case)
+    (verifier_resource_available ?verifier_resource - verifier_resource)
+    (checkin_subject_assigned_verifier ?checkin_case - reservation_case ?verifier_resource - verifier_resource)
+    (document_available ?document_instance - document_instance)
+    (checkin_subject_has_document ?checkin_case - reservation_case ?document_instance - document_instance)
+    (frontline_staff_available ?frontline_staff - frontline_staff)
+    (checkin_subject_assigned_staff ?checkin_case - reservation_case ?frontline_staff - frontline_staff)
+    (supporting_evidence_available ?supporting_evidence_type - supporting_evidence_type)
+    (lead_has_evidence ?lead_guest - lead_guest ?supporting_evidence_type - supporting_evidence_type)
+    (co_has_evidence ?co_guest - co_guest ?supporting_evidence_type - supporting_evidence_type)
+    (lead_has_requirement_profile ?lead_guest - lead_guest ?lead_requirement_profile - lead_requirement_profile)
+    (requirement_verified_by_document ?lead_requirement_profile - lead_requirement_profile)
+    (requirement_verified_by_evidence ?lead_requirement_profile - lead_requirement_profile)
+    (lead_requirements_cleared ?lead_guest - lead_guest)
+    (co_has_requirement_profile ?co_guest - co_guest ?co_requirement_profile - co_requirement_profile)
+    (co_requirement_verified_by_document ?co_requirement_profile - co_requirement_profile)
+    (co_requirement_verified_by_evidence ?co_requirement_profile - co_requirement_profile)
+    (co_requirements_cleared ?co_guest - co_guest)
+    (option_available ?accommodation_option - accommodation_option)
+    (option_reserved ?accommodation_option - accommodation_option)
+    (option_matches_lead_requirement ?accommodation_option - accommodation_option ?lead_requirement_profile - lead_requirement_profile)
+    (option_matches_co_requirement ?accommodation_option - accommodation_option ?co_requirement_profile - co_requirement_profile)
+    (option_lead_evidence_marker ?accommodation_option - accommodation_option)
+    (option_co_evidence_marker ?accommodation_option - accommodation_option)
+    (option_lock ?accommodation_option - accommodation_option)
+    (reservation_has_lead ?reservation_record - reservation_record ?lead_guest - lead_guest)
+    (reservation_has_co_guest ?reservation_record - reservation_record ?co_guest - co_guest)
+    (reservation_has_option ?reservation_record - reservation_record ?accommodation_option - accommodation_option)
+    (identity_document_type_available ?identity_document_type - identity_document_type)
+    (reservation_has_identity_document_type ?reservation_record - reservation_record ?identity_document_type - identity_document_type)
+    (identity_document_type_assigned ?identity_document_type - identity_document_type)
+    (identity_doc_type_associated_with_option ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    (reservation_identity_verification_started ?reservation_record - reservation_record)
+    (reservation_identity_verified_stage2 ?reservation_record - reservation_record)
+    (reservation_identity_verification_finalized ?reservation_record - reservation_record)
+    (reservation_preference_applied ?reservation_record - reservation_record)
+    (reservation_preference_confirmed ?reservation_record - reservation_record)
+    (payment_check_required ?reservation_record - reservation_record)
+    (payment_confirmed ?reservation_record - reservation_record)
+    (manager_approval_token_available ?manager_approval_token - manager_approval_token)
+    (reservation_has_manager_approval ?reservation_record - reservation_record ?manager_approval_token - manager_approval_token)
+    (manager_approval_applied ?reservation_record - reservation_record)
+    (manager_approval_acknowledged ?reservation_record - reservation_record)
+    (supervisor_authorization_applied ?reservation_record - reservation_record)
+    (preference_code_available ?preference_code - preference_code)
+    (reservation_has_preference_code ?reservation_record - reservation_record ?preference_code - preference_code)
+    (payment_method_available ?payment_method - payment_method)
+    (reservation_payment_method_assigned ?reservation_record - reservation_record ?payment_method - payment_method)
+    (staff_credential_available ?staff_credential - staff_credential)
+    (reservation_has_staff_credential ?reservation_record - reservation_record ?staff_credential - staff_credential)
+    (supervisor_authorization_available ?supervisor_authorization - supervisor_authorization)
+    (reservation_has_supervisor_authorization ?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization)
+    (eligibility_code_available ?eligibility_code - eligibility_code)
+    (checkin_subject_assigned_eligibility_code ?checkin_case - reservation_case ?eligibility_code - eligibility_code)
+    (guest_requirements_processed ?lead_guest - lead_guest)
+    (co_guest_requirements_processed ?co_guest - co_guest)
+    (reservation_readiness_emitted ?reservation_record - reservation_record)
+  )
+  (:action open_checkin_case
+    :parameters (?checkin_case - reservation_case)
+    :precondition
+      (and
+        (not
+          (checkin_subject_opened ?checkin_case)
+        )
+        (not
+          (ready_for_checkin ?checkin_case)
+        )
+      )
+    :effect (checkin_subject_opened ?checkin_case)
+  )
+  (:action assign_verifier_to_case
+    :parameters (?checkin_case - reservation_case ?verifier_resource - verifier_resource)
+    :precondition
+      (and
+        (checkin_subject_opened ?checkin_case)
+        (not
+          (verifier_assigned ?checkin_case)
+        )
+        (verifier_resource_available ?verifier_resource)
+      )
+    :effect
+      (and
+        (verifier_assigned ?checkin_case)
+        (checkin_subject_assigned_verifier ?checkin_case ?verifier_resource)
+        (not
+          (verifier_resource_available ?verifier_resource)
+        )
+      )
+  )
+  (:action attach_document_to_case
+    :parameters (?checkin_case - reservation_case ?document_instance - document_instance)
+    :precondition
+      (and
+        (checkin_subject_opened ?checkin_case)
+        (verifier_assigned ?checkin_case)
+        (document_available ?document_instance)
+      )
+    :effect
+      (and
+        (checkin_subject_has_document ?checkin_case ?document_instance)
+        (not
+          (document_available ?document_instance)
+        )
+      )
+  )
+  (:action complete_initial_verification
+    :parameters (?checkin_case - reservation_case ?document_instance - document_instance)
+    :precondition
+      (and
+        (checkin_subject_opened ?checkin_case)
+        (verifier_assigned ?checkin_case)
+        (checkin_subject_has_document ?checkin_case ?document_instance)
+        (not
+          (initial_verification_completed ?checkin_case)
+        )
+      )
+    :effect (initial_verification_completed ?checkin_case)
+  )
+  (:action release_document_from_case
+    :parameters (?checkin_case - reservation_case ?document_instance - document_instance)
+    :precondition
+      (and
+        (checkin_subject_has_document ?checkin_case ?document_instance)
+      )
+    :effect
+      (and
+        (document_available ?document_instance)
+        (not
+          (checkin_subject_has_document ?checkin_case ?document_instance)
+        )
+      )
+  )
+  (:action assign_staff_to_case
+    :parameters (?checkin_case - reservation_case ?frontline_staff - frontline_staff)
+    :precondition
+      (and
+        (initial_verification_completed ?checkin_case)
+        (frontline_staff_available ?frontline_staff)
+      )
+    :effect
+      (and
+        (checkin_subject_assigned_staff ?checkin_case ?frontline_staff)
+        (not
+          (frontline_staff_available ?frontline_staff)
+        )
+      )
+  )
+  (:action unassign_staff_from_case
+    :parameters (?checkin_case - reservation_case ?frontline_staff - frontline_staff)
+    :precondition
+      (and
+        (checkin_subject_assigned_staff ?checkin_case ?frontline_staff)
+      )
+    :effect
+      (and
+        (frontline_staff_available ?frontline_staff)
+        (not
+          (checkin_subject_assigned_staff ?checkin_case ?frontline_staff)
+        )
+      )
+  )
+  (:action attach_staff_credential_to_reservation
+    :parameters (?reservation_record - reservation_record ?staff_credential - staff_credential)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (staff_credential_available ?staff_credential)
+      )
+    :effect
+      (and
+        (reservation_has_staff_credential ?reservation_record ?staff_credential)
+        (not
+          (staff_credential_available ?staff_credential)
+        )
+      )
+  )
+  (:action detach_staff_credential_from_reservation
+    :parameters (?reservation_record - reservation_record ?staff_credential - staff_credential)
+    :precondition
+      (and
+        (reservation_has_staff_credential ?reservation_record ?staff_credential)
+      )
+    :effect
+      (and
+        (staff_credential_available ?staff_credential)
+        (not
+          (reservation_has_staff_credential ?reservation_record ?staff_credential)
+        )
+      )
+  )
+  (:action attach_supervisor_authorization_to_reservation
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (supervisor_authorization_available ?supervisor_authorization)
+      )
+    :effect
+      (and
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (not
+          (supervisor_authorization_available ?supervisor_authorization)
+        )
+      )
+  )
+  (:action detach_supervisor_authorization_from_reservation
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization)
+    :precondition
+      (and
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+      )
+    :effect
+      (and
+        (supervisor_authorization_available ?supervisor_authorization)
+        (not
+          (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        )
+      )
+  )
+  (:action verify_lead_requirement_with_document
+    :parameters (?lead_guest - lead_guest ?lead_requirement_profile - lead_requirement_profile ?document_instance - document_instance)
+    :precondition
+      (and
+        (initial_verification_completed ?lead_guest)
+        (checkin_subject_has_document ?lead_guest ?document_instance)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (not
+          (requirement_verified_by_document ?lead_requirement_profile)
+        )
+        (not
+          (requirement_verified_by_evidence ?lead_requirement_profile)
+        )
+      )
+    :effect (requirement_verified_by_document ?lead_requirement_profile)
+  )
+  (:action finalize_lead_requirement_with_staff
+    :parameters (?lead_guest - lead_guest ?lead_requirement_profile - lead_requirement_profile ?frontline_staff - frontline_staff)
+    :precondition
+      (and
+        (initial_verification_completed ?lead_guest)
+        (checkin_subject_assigned_staff ?lead_guest ?frontline_staff)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (requirement_verified_by_document ?lead_requirement_profile)
+        (not
+          (guest_requirements_processed ?lead_guest)
+        )
+      )
+    :effect
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (lead_requirements_cleared ?lead_guest)
+      )
+  )
+  (:action verify_lead_requirement_with_evidence
+    :parameters (?lead_guest - lead_guest ?lead_requirement_profile - lead_requirement_profile ?supporting_evidence_type - supporting_evidence_type)
+    :precondition
+      (and
+        (initial_verification_completed ?lead_guest)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (supporting_evidence_available ?supporting_evidence_type)
+        (not
+          (guest_requirements_processed ?lead_guest)
+        )
+      )
+    :effect
+      (and
+        (requirement_verified_by_evidence ?lead_requirement_profile)
+        (guest_requirements_processed ?lead_guest)
+        (lead_has_evidence ?lead_guest ?supporting_evidence_type)
+        (not
+          (supporting_evidence_available ?supporting_evidence_type)
+        )
+      )
+  )
+  (:action resolve_lead_requirement_with_document_and_evidence
+    :parameters (?lead_guest - lead_guest ?lead_requirement_profile - lead_requirement_profile ?document_instance - document_instance ?supporting_evidence_type - supporting_evidence_type)
+    :precondition
+      (and
+        (initial_verification_completed ?lead_guest)
+        (checkin_subject_has_document ?lead_guest ?document_instance)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (requirement_verified_by_evidence ?lead_requirement_profile)
+        (lead_has_evidence ?lead_guest ?supporting_evidence_type)
+        (not
+          (lead_requirements_cleared ?lead_guest)
+        )
+      )
+    :effect
+      (and
+        (requirement_verified_by_document ?lead_requirement_profile)
+        (lead_requirements_cleared ?lead_guest)
+        (supporting_evidence_available ?supporting_evidence_type)
+        (not
+          (lead_has_evidence ?lead_guest ?supporting_evidence_type)
+        )
+      )
+  )
+  (:action verify_co_requirement_with_document
+    :parameters (?co_guest - co_guest ?co_requirement_profile - co_requirement_profile ?document_instance - document_instance)
+    :precondition
+      (and
+        (initial_verification_completed ?co_guest)
+        (checkin_subject_has_document ?co_guest ?document_instance)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (not
+          (co_requirement_verified_by_document ?co_requirement_profile)
+        )
+        (not
+          (co_requirement_verified_by_evidence ?co_requirement_profile)
+        )
+      )
+    :effect (co_requirement_verified_by_document ?co_requirement_profile)
+  )
+  (:action finalize_co_requirement_with_staff
+    :parameters (?co_guest - co_guest ?co_requirement_profile - co_requirement_profile ?frontline_staff - frontline_staff)
+    :precondition
+      (and
+        (initial_verification_completed ?co_guest)
+        (checkin_subject_assigned_staff ?co_guest ?frontline_staff)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (co_requirement_verified_by_document ?co_requirement_profile)
+        (not
+          (co_guest_requirements_processed ?co_guest)
+        )
+      )
+    :effect
+      (and
+        (co_guest_requirements_processed ?co_guest)
+        (co_requirements_cleared ?co_guest)
+      )
+  )
+  (:action verify_co_requirement_with_evidence
+    :parameters (?co_guest - co_guest ?co_requirement_profile - co_requirement_profile ?supporting_evidence_type - supporting_evidence_type)
+    :precondition
+      (and
+        (initial_verification_completed ?co_guest)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (supporting_evidence_available ?supporting_evidence_type)
+        (not
+          (co_guest_requirements_processed ?co_guest)
+        )
+      )
+    :effect
+      (and
+        (co_requirement_verified_by_evidence ?co_requirement_profile)
+        (co_guest_requirements_processed ?co_guest)
+        (co_has_evidence ?co_guest ?supporting_evidence_type)
+        (not
+          (supporting_evidence_available ?supporting_evidence_type)
+        )
+      )
+  )
+  (:action resolve_co_requirement_with_document_and_evidence
+    :parameters (?co_guest - co_guest ?co_requirement_profile - co_requirement_profile ?document_instance - document_instance ?supporting_evidence_type - supporting_evidence_type)
+    :precondition
+      (and
+        (initial_verification_completed ?co_guest)
+        (checkin_subject_has_document ?co_guest ?document_instance)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (co_requirement_verified_by_evidence ?co_requirement_profile)
+        (co_has_evidence ?co_guest ?supporting_evidence_type)
+        (not
+          (co_requirements_cleared ?co_guest)
+        )
+      )
+    :effect
+      (and
+        (co_requirement_verified_by_document ?co_requirement_profile)
+        (co_requirements_cleared ?co_guest)
+        (supporting_evidence_available ?supporting_evidence_type)
+        (not
+          (co_has_evidence ?co_guest ?supporting_evidence_type)
+        )
+      )
+  )
+  (:action match_and_reserve_accommodation_option
+    :parameters (?lead_guest - lead_guest ?co_guest - co_guest ?lead_requirement_profile - lead_requirement_profile ?co_requirement_profile - co_requirement_profile ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (co_guest_requirements_processed ?co_guest)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (requirement_verified_by_document ?lead_requirement_profile)
+        (co_requirement_verified_by_document ?co_requirement_profile)
+        (lead_requirements_cleared ?lead_guest)
+        (co_requirements_cleared ?co_guest)
+        (option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (option_reserved ?accommodation_option)
+        (option_matches_lead_requirement ?accommodation_option ?lead_requirement_profile)
+        (option_matches_co_requirement ?accommodation_option ?co_requirement_profile)
+        (not
+          (option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action reserve_option_with_lead_evidence
+    :parameters (?lead_guest - lead_guest ?co_guest - co_guest ?lead_requirement_profile - lead_requirement_profile ?co_requirement_profile - co_requirement_profile ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (co_guest_requirements_processed ?co_guest)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (requirement_verified_by_evidence ?lead_requirement_profile)
+        (co_requirement_verified_by_document ?co_requirement_profile)
+        (not
+          (lead_requirements_cleared ?lead_guest)
+        )
+        (co_requirements_cleared ?co_guest)
+        (option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (option_reserved ?accommodation_option)
+        (option_matches_lead_requirement ?accommodation_option ?lead_requirement_profile)
+        (option_matches_co_requirement ?accommodation_option ?co_requirement_profile)
+        (option_lead_evidence_marker ?accommodation_option)
+        (not
+          (option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action reserve_option_with_co_evidence
+    :parameters (?lead_guest - lead_guest ?co_guest - co_guest ?lead_requirement_profile - lead_requirement_profile ?co_requirement_profile - co_requirement_profile ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (co_guest_requirements_processed ?co_guest)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (requirement_verified_by_document ?lead_requirement_profile)
+        (co_requirement_verified_by_evidence ?co_requirement_profile)
+        (lead_requirements_cleared ?lead_guest)
+        (not
+          (co_requirements_cleared ?co_guest)
+        )
+        (option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (option_reserved ?accommodation_option)
+        (option_matches_lead_requirement ?accommodation_option ?lead_requirement_profile)
+        (option_matches_co_requirement ?accommodation_option ?co_requirement_profile)
+        (option_co_evidence_marker ?accommodation_option)
+        (not
+          (option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action reserve_option_with_both_evidence
+    :parameters (?lead_guest - lead_guest ?co_guest - co_guest ?lead_requirement_profile - lead_requirement_profile ?co_requirement_profile - co_requirement_profile ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (co_guest_requirements_processed ?co_guest)
+        (lead_has_requirement_profile ?lead_guest ?lead_requirement_profile)
+        (co_has_requirement_profile ?co_guest ?co_requirement_profile)
+        (requirement_verified_by_evidence ?lead_requirement_profile)
+        (co_requirement_verified_by_evidence ?co_requirement_profile)
+        (not
+          (lead_requirements_cleared ?lead_guest)
+        )
+        (not
+          (co_requirements_cleared ?co_guest)
+        )
+        (option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (option_reserved ?accommodation_option)
+        (option_matches_lead_requirement ?accommodation_option ?lead_requirement_profile)
+        (option_matches_co_requirement ?accommodation_option ?co_requirement_profile)
+        (option_lead_evidence_marker ?accommodation_option)
+        (option_co_evidence_marker ?accommodation_option)
+        (not
+          (option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action lock_accommodation_option_for_guest
+    :parameters (?accommodation_option - accommodation_option ?lead_guest - lead_guest ?document_instance - document_instance)
+    :precondition
+      (and
+        (option_reserved ?accommodation_option)
+        (guest_requirements_processed ?lead_guest)
+        (checkin_subject_has_document ?lead_guest ?document_instance)
+        (not
+          (option_lock ?accommodation_option)
+        )
+      )
+    :effect (option_lock ?accommodation_option)
+  )
+  (:action assign_identity_document_type_to_reservation_and_option
+    :parameters (?reservation_record - reservation_record ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (reservation_has_option ?reservation_record ?accommodation_option)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_document_type_available ?identity_document_type)
+        (option_reserved ?accommodation_option)
+        (option_lock ?accommodation_option)
+        (not
+          (identity_document_type_assigned ?identity_document_type)
+        )
+      )
+    :effect
+      (and
+        (identity_document_type_assigned ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (not
+          (identity_document_type_available ?identity_document_type)
+        )
+      )
+  )
+  (:action start_identity_verification_for_reservation
+    :parameters (?reservation_record - reservation_record ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option ?document_instance - document_instance)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_document_type_assigned ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (checkin_subject_has_document ?reservation_record ?document_instance)
+        (not
+          (option_lead_evidence_marker ?accommodation_option)
+        )
+        (not
+          (reservation_identity_verification_started ?reservation_record)
+        )
+      )
+    :effect (reservation_identity_verification_started ?reservation_record)
+  )
+  (:action apply_preference_code_to_reservation
+    :parameters (?reservation_record - reservation_record ?preference_code - preference_code)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (preference_code_available ?preference_code)
+        (not
+          (reservation_preference_applied ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_preference_applied ?reservation_record)
+        (reservation_has_preference_code ?reservation_record ?preference_code)
+        (not
+          (preference_code_available ?preference_code)
+        )
+      )
+  )
+  (:action confirm_identity_and_preference_for_reservation
+    :parameters (?reservation_record - reservation_record ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option ?document_instance - document_instance ?preference_code - preference_code)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_document_type_assigned ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (checkin_subject_has_document ?reservation_record ?document_instance)
+        (option_lead_evidence_marker ?accommodation_option)
+        (reservation_preference_applied ?reservation_record)
+        (reservation_has_preference_code ?reservation_record ?preference_code)
+        (not
+          (reservation_identity_verification_started ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_identity_verification_started ?reservation_record)
+        (reservation_preference_confirmed ?reservation_record)
+      )
+  )
+  (:action apply_staff_credential_in_verification
+    :parameters (?reservation_record - reservation_record ?staff_credential - staff_credential ?frontline_staff - frontline_staff ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verification_started ?reservation_record)
+        (reservation_has_staff_credential ?reservation_record ?staff_credential)
+        (checkin_subject_assigned_staff ?reservation_record ?frontline_staff)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (not
+          (option_co_evidence_marker ?accommodation_option)
+        )
+        (not
+          (reservation_identity_verified_stage2 ?reservation_record)
+        )
+      )
+    :effect (reservation_identity_verified_stage2 ?reservation_record)
+  )
+  (:action apply_staff_credential_after_option_evidence
+    :parameters (?reservation_record - reservation_record ?staff_credential - staff_credential ?frontline_staff - frontline_staff ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verification_started ?reservation_record)
+        (reservation_has_staff_credential ?reservation_record ?staff_credential)
+        (checkin_subject_assigned_staff ?reservation_record ?frontline_staff)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (option_co_evidence_marker ?accommodation_option)
+        (not
+          (reservation_identity_verified_stage2 ?reservation_record)
+        )
+      )
+    :effect (reservation_identity_verified_stage2 ?reservation_record)
+  )
+  (:action finalize_supervisor_authorization
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verified_stage2 ?reservation_record)
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (not
+          (option_lead_evidence_marker ?accommodation_option)
+        )
+        (not
+          (option_co_evidence_marker ?accommodation_option)
+        )
+        (not
+          (reservation_identity_verification_finalized ?reservation_record)
+        )
+      )
+    :effect (reservation_identity_verification_finalized ?reservation_record)
+  )
+  (:action finalize_supervisor_authorization_and_mark_payment_required
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verified_stage2 ?reservation_record)
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (option_lead_evidence_marker ?accommodation_option)
+        (not
+          (option_co_evidence_marker ?accommodation_option)
+        )
+        (not
+          (reservation_identity_verification_finalized ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_check_required ?reservation_record)
+      )
+  )
+  (:action finalize_supervisor_authorization_and_mark_payment_required_variant
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verified_stage2 ?reservation_record)
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (not
+          (option_lead_evidence_marker ?accommodation_option)
+        )
+        (option_co_evidence_marker ?accommodation_option)
+        (not
+          (reservation_identity_verification_finalized ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_check_required ?reservation_record)
+      )
+  )
+  (:action finalize_supervisor_authorization_and_mark_payment_required_both
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization ?identity_document_type - identity_document_type ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (reservation_identity_verified_stage2 ?reservation_record)
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (reservation_has_identity_document_type ?reservation_record ?identity_document_type)
+        (identity_doc_type_associated_with_option ?identity_document_type ?accommodation_option)
+        (option_lead_evidence_marker ?accommodation_option)
+        (option_co_evidence_marker ?accommodation_option)
+        (not
+          (reservation_identity_verification_finalized ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_check_required ?reservation_record)
+      )
+  )
+  (:action emit_reservation_readiness
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (not
+          (payment_check_required ?reservation_record)
+        )
+        (not
+          (reservation_readiness_emitted ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_readiness_emitted ?reservation_record)
+        (verification_consolidated ?reservation_record)
+      )
+  )
+  (:action assign_payment_method_to_reservation
+    :parameters (?reservation_record - reservation_record ?payment_method - payment_method)
+    :precondition
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_check_required ?reservation_record)
+        (payment_method_available ?payment_method)
+      )
+    :effect
+      (and
+        (reservation_payment_method_assigned ?reservation_record ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action confirm_payment_and_guest_linkage
+    :parameters (?reservation_record - reservation_record ?lead_guest - lead_guest ?co_guest - co_guest ?document_instance - document_instance ?payment_method - payment_method)
+    :precondition
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_check_required ?reservation_record)
+        (reservation_payment_method_assigned ?reservation_record ?payment_method)
+        (reservation_has_lead ?reservation_record ?lead_guest)
+        (reservation_has_co_guest ?reservation_record ?co_guest)
+        (lead_requirements_cleared ?lead_guest)
+        (co_requirements_cleared ?co_guest)
+        (checkin_subject_has_document ?reservation_record ?document_instance)
+        (not
+          (payment_confirmed ?reservation_record)
+        )
+      )
+    :effect (payment_confirmed ?reservation_record)
+  )
+  (:action finalize_reservation_readiness_after_payment
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (reservation_identity_verification_finalized ?reservation_record)
+        (payment_confirmed ?reservation_record)
+        (not
+          (reservation_readiness_emitted ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_readiness_emitted ?reservation_record)
+        (verification_consolidated ?reservation_record)
+      )
+  )
+  (:action apply_manager_approval_to_reservation
+    :parameters (?reservation_record - reservation_record ?manager_approval_token - manager_approval_token ?document_instance - document_instance)
+    :precondition
+      (and
+        (initial_verification_completed ?reservation_record)
+        (checkin_subject_has_document ?reservation_record ?document_instance)
+        (manager_approval_token_available ?manager_approval_token)
+        (reservation_has_manager_approval ?reservation_record ?manager_approval_token)
+        (not
+          (manager_approval_applied ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (manager_approval_applied ?reservation_record)
+        (not
+          (manager_approval_token_available ?manager_approval_token)
+        )
+      )
+  )
+  (:action staff_acknowledge_manager_approval
+    :parameters (?reservation_record - reservation_record ?frontline_staff - frontline_staff)
+    :precondition
+      (and
+        (manager_approval_applied ?reservation_record)
+        (checkin_subject_assigned_staff ?reservation_record ?frontline_staff)
+        (not
+          (manager_approval_acknowledged ?reservation_record)
+        )
+      )
+    :effect (manager_approval_acknowledged ?reservation_record)
+  )
+  (:action confirm_supervisor_authorization
+    :parameters (?reservation_record - reservation_record ?supervisor_authorization - supervisor_authorization)
+    :precondition
+      (and
+        (manager_approval_acknowledged ?reservation_record)
+        (reservation_has_supervisor_authorization ?reservation_record ?supervisor_authorization)
+        (not
+          (supervisor_authorization_applied ?reservation_record)
+        )
+      )
+    :effect (supervisor_authorization_applied ?reservation_record)
+  )
+  (:action finalize_readiness_after_supervisor_authorization
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (supervisor_authorization_applied ?reservation_record)
+        (not
+          (reservation_readiness_emitted ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_readiness_emitted ?reservation_record)
+        (verification_consolidated ?reservation_record)
+      )
+  )
+  (:action grant_checkin_clearance_to_lead_guest
+    :parameters (?lead_guest - lead_guest ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (guest_requirements_processed ?lead_guest)
+        (lead_requirements_cleared ?lead_guest)
+        (option_reserved ?accommodation_option)
+        (option_lock ?accommodation_option)
+        (not
+          (verification_consolidated ?lead_guest)
+        )
+      )
+    :effect (verification_consolidated ?lead_guest)
+  )
+  (:action grant_checkin_clearance_to_co_guest
+    :parameters (?co_guest - co_guest ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (co_guest_requirements_processed ?co_guest)
+        (co_requirements_cleared ?co_guest)
+        (option_reserved ?accommodation_option)
+        (option_lock ?accommodation_option)
+        (not
+          (verification_consolidated ?co_guest)
+        )
+      )
+    :effect (verification_consolidated ?co_guest)
+  )
+  (:action assign_eligibility_code_to_case
+    :parameters (?checkin_case - reservation_case ?eligibility_code - eligibility_code ?document_instance - document_instance)
+    :precondition
+      (and
+        (verification_consolidated ?checkin_case)
+        (checkin_subject_has_document ?checkin_case ?document_instance)
+        (eligibility_code_available ?eligibility_code)
+        (not
+          (eligibility_assigned ?checkin_case)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assigned ?checkin_case)
+        (checkin_subject_assigned_eligibility_code ?checkin_case ?eligibility_code)
+        (not
+          (eligibility_code_available ?eligibility_code)
+        )
+      )
+  )
+  (:action authorize_lead_guest_final_checkin
+    :parameters (?lead_guest - lead_guest ?verifier_resource - verifier_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_assigned ?lead_guest)
+        (checkin_subject_assigned_verifier ?lead_guest ?verifier_resource)
+        (checkin_subject_assigned_eligibility_code ?lead_guest ?eligibility_code)
+        (not
+          (ready_for_checkin ?lead_guest)
+        )
+      )
+    :effect
+      (and
+        (ready_for_checkin ?lead_guest)
+        (verifier_resource_available ?verifier_resource)
+        (eligibility_code_available ?eligibility_code)
+      )
+  )
+  (:action authorize_co_guest_final_checkin
+    :parameters (?co_guest - co_guest ?verifier_resource - verifier_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_assigned ?co_guest)
+        (checkin_subject_assigned_verifier ?co_guest ?verifier_resource)
+        (checkin_subject_assigned_eligibility_code ?co_guest ?eligibility_code)
+        (not
+          (ready_for_checkin ?co_guest)
+        )
+      )
+    :effect
+      (and
+        (ready_for_checkin ?co_guest)
+        (verifier_resource_available ?verifier_resource)
+        (eligibility_code_available ?eligibility_code)
+      )
+  )
+  (:action authorize_reservation_final_checkin
+    :parameters (?reservation_record - reservation_record ?verifier_resource - verifier_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_assigned ?reservation_record)
+        (checkin_subject_assigned_verifier ?reservation_record ?verifier_resource)
+        (checkin_subject_assigned_eligibility_code ?reservation_record ?eligibility_code)
+        (not
+          (ready_for_checkin ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (ready_for_checkin ?reservation_record)
+        (verifier_resource_available ?verifier_resource)
+        (eligibility_code_available ?eligibility_code)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem accommodation_checkin_readiness_problem)
+  (:domain accommodation_checkin_document_readiness)
+  (:objects lead_guest_1 - lead_guest co_guest_1 - co_guest reservation_1 - reservation_record reservation_2 - reservation_record verifier_1 - verifier_resource verifier_2 - verifier_resource verifier_3 - verifier_resource document_1 - document_instance staff_1 - frontline_staff evidence_type_1 - supporting_evidence_type lead_requirement_profile_1 - lead_requirement_profile co_requirement_profile_1 - co_requirement_profile accommodation_option_1 - accommodation_option id_document_type_1 - identity_document_type id_document_type_2 - identity_document_type preference_code_1 - preference_code preference_code_2 - preference_code payment_method_1 - payment_method payment_method_2 - payment_method eligibility_code_1 - eligibility_code staff_credential_1 - staff_credential manager_approval_token_1 - manager_approval_token manager_approval_token_2 - manager_approval_token supervisor_authorization_1 - supervisor_authorization)
+  (:init
+    (verifier_resource_available verifier_1)
+    (verifier_resource_available verifier_2)
+    (verifier_resource_available verifier_3)
+    (document_available document_1)
+    (frontline_staff_available staff_1)
+    (supporting_evidence_available evidence_type_1)
+    (lead_has_requirement_profile lead_guest_1 lead_requirement_profile_1)
+    (co_has_requirement_profile co_guest_1 co_requirement_profile_1)
+    (option_available accommodation_option_1)
+    (identity_document_type_available id_document_type_1)
+    (identity_document_type_available id_document_type_2)
+    (reservation_has_lead reservation_1 lead_guest_1)
+    (reservation_has_lead reservation_2 lead_guest_1)
+    (reservation_has_co_guest reservation_1 co_guest_1)
+    (reservation_has_co_guest reservation_2 co_guest_1)
+    (reservation_has_option reservation_1 accommodation_option_1)
+    (reservation_has_option reservation_2 accommodation_option_1)
+    (reservation_has_identity_document_type reservation_1 id_document_type_1)
+    (reservation_has_identity_document_type reservation_2 id_document_type_2)
+    (preference_code_available preference_code_1)
+    (preference_code_available preference_code_2)
+    (payment_method_available payment_method_1)
+    (payment_method_available payment_method_2)
+    (eligibility_code_available eligibility_code_1)
+    (staff_credential_available staff_credential_1)
+    (manager_approval_token_available manager_approval_token_1)
+    (reservation_has_manager_approval reservation_1 manager_approval_token_1)
+    (reservation_has_manager_approval reservation_2 manager_approval_token_2)
+    (supervisor_authorization_available supervisor_authorization_1)
+  )
+  (:goal
+    (and
+      (ready_for_checkin lead_guest_1)
+      (ready_for_checkin co_guest_1)
+      (ready_for_checkin reservation_1)
+      (ready_for_checkin reservation_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_checkin_case lead_guest_1)
+(assign_verifier_to_case lead_guest_1 verifier_1)
+(attach_document_to_case lead_guest_1 document_1)
+(complete_initial_verification lead_guest_1 document_1)
+(release_document_from_case lead_guest_1 document_1)
+(open_checkin_case co_guest_1)
+(assign_verifier_to_case co_guest_1 verifier_2)
+(attach_document_to_case co_guest_1 document_1)
+(complete_initial_verification co_guest_1 document_1)
+(release_document_from_case co_guest_1 document_1)
+(assign_staff_to_case co_guest_1 staff_1)
+(attach_document_to_case co_guest_1 document_1)
+(verify_co_requirement_with_document co_guest_1 co_requirement_profile_1 document_1)
+(finalize_co_requirement_with_staff co_guest_1 co_requirement_profile_1 staff_1)
+(verify_lead_requirement_with_evidence lead_guest_1 lead_requirement_profile_1 evidence_type_1)
+(reserve_option_with_lead_evidence lead_guest_1 co_guest_1 lead_requirement_profile_1 co_requirement_profile_1 accommodation_option_1)
+(release_document_from_case co_guest_1 document_1)
+(attach_document_to_case lead_guest_1 document_1)
+(lock_accommodation_option_for_guest accommodation_option_1 lead_guest_1 document_1)
+(resolve_lead_requirement_with_document_and_evidence lead_guest_1 lead_requirement_profile_1 document_1 evidence_type_1)
+(grant_checkin_clearance_to_lead_guest lead_guest_1 accommodation_option_1)
+(grant_checkin_clearance_to_co_guest co_guest_1 accommodation_option_1)
+(release_document_from_case lead_guest_1 document_1)
+(unassign_staff_from_case co_guest_1 staff_1)
+(open_checkin_case reservation_1)
+(assign_verifier_to_case reservation_1 verifier_3)
+(attach_document_to_case reservation_1 document_1)
+(complete_initial_verification reservation_1 document_1)
+(apply_preference_code_to_reservation reservation_1 preference_code_1)
+(assign_identity_document_type_to_reservation_and_option reservation_1 id_document_type_1 accommodation_option_1)
+(confirm_identity_and_preference_for_reservation reservation_1 id_document_type_1 accommodation_option_1 document_1 preference_code_1)
+(attach_staff_credential_to_reservation reservation_1 staff_credential_1)
+(assign_staff_to_case reservation_1 staff_1)
+(apply_staff_credential_in_verification reservation_1 staff_credential_1 staff_1 id_document_type_1 accommodation_option_1)
+(attach_supervisor_authorization_to_reservation reservation_1 supervisor_authorization_1)
+(finalize_supervisor_authorization_and_mark_payment_required reservation_1 supervisor_authorization_1 id_document_type_1 accommodation_option_1)
+(assign_payment_method_to_reservation reservation_1 payment_method_1)
+(confirm_payment_and_guest_linkage reservation_1 lead_guest_1 co_guest_1 document_1 payment_method_1)
+(finalize_reservation_readiness_after_payment reservation_1)
+(assign_eligibility_code_to_case reservation_1 eligibility_code_1 document_1)
+(release_document_from_case reservation_1 document_1)
+(unassign_staff_from_case reservation_1 staff_1)
+(detach_staff_credential_from_reservation reservation_1 staff_credential_1)
+(detach_supervisor_authorization_from_reservation reservation_1 supervisor_authorization_1)
+(authorize_reservation_final_checkin reservation_1 verifier_3 eligibility_code_1)
+(open_checkin_case reservation_2)
+(assign_verifier_to_case reservation_2 verifier_3)
+(attach_document_to_case reservation_2 document_1)
+(complete_initial_verification reservation_2 document_1)
+(apply_preference_code_to_reservation reservation_2 preference_code_2)
+(assign_identity_document_type_to_reservation_and_option reservation_2 id_document_type_2 accommodation_option_1)
+(confirm_identity_and_preference_for_reservation reservation_2 id_document_type_2 accommodation_option_1 document_1 preference_code_2)
+(attach_staff_credential_to_reservation reservation_2 staff_credential_1)
+(assign_staff_to_case reservation_2 staff_1)
+(apply_staff_credential_in_verification reservation_2 staff_credential_1 staff_1 id_document_type_2 accommodation_option_1)
+(attach_supervisor_authorization_to_reservation reservation_2 supervisor_authorization_1)
+(finalize_supervisor_authorization_and_mark_payment_required reservation_2 supervisor_authorization_1 id_document_type_2 accommodation_option_1)
+(assign_payment_method_to_reservation reservation_2 payment_method_2)
+(confirm_payment_and_guest_linkage reservation_2 lead_guest_1 co_guest_1 document_1 payment_method_2)
+(finalize_reservation_readiness_after_payment reservation_2)
+(assign_eligibility_code_to_case reservation_2 eligibility_code_1 document_1)
+(release_document_from_case reservation_2 document_1)
+(unassign_staff_from_case reservation_2 staff_1)
+(detach_staff_credential_from_reservation reservation_2 staff_credential_1)
+(detach_supervisor_authorization_from_reservation reservation_2 supervisor_authorization_1)
+(authorize_reservation_final_checkin reservation_2 verifier_3 eligibility_code_1)
+(attach_document_to_case lead_guest_1 document_1)
+(assign_eligibility_code_to_case lead_guest_1 eligibility_code_1 document_1)
+(authorize_lead_guest_final_checkin lead_guest_1 verifier_1 eligibility_code_1)
+(release_document_from_case lead_guest_1 document_1)
+(attach_document_to_case co_guest_1 document_1)
+(assign_eligibility_code_to_case co_guest_1 eligibility_code_1 document_1)
+(authorize_co_guest_final_checkin co_guest_1 verifier_2 eligibility_code_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_cirv7off/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 73 
+
+Successful plans:
+Value: 73
+ /tmp/val_cirv7off/plan.pddl 73 
+
+
+
+--- stderr ---
+

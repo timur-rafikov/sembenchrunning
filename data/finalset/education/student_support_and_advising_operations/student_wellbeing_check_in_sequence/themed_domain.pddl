@@ -1,0 +1,936 @@
+(define (domain student_wellbeing_check_in)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object service_resource - object issue_category - object person_role_group - object student_profile - person_role_group support_staff_contact - operational_resource appointment_slot - operational_resource service_representative - operational_resource community_partner - operational_resource outcome_package - operational_resource accommodation_option - operational_resource specialist_availability - operational_resource external_specialist - operational_resource support_service_program - service_resource document_template - service_resource assessment_tool - service_resource concern_academic - issue_category concern_wellbeing - issue_category referral_packet - issue_category student_subgroup - student_profile case_subgroup - student_profile primary_advisor_role - student_subgroup secondary_advisor_role - student_subgroup student_case_record - case_subgroup)
+  (:predicates
+    (intake_initiated ?student_profile - student_profile)
+    (participant_active ?student_profile - student_profile)
+    (support_staff_assigned ?student_profile - student_profile)
+    (followup_activated ?student_profile - student_profile)
+    (participant_ready_for_activation ?student_profile - student_profile)
+    (participant_consent_recorded ?student_profile - student_profile)
+    (staff_available ?support_staff_contact - support_staff_contact)
+    (participant_assigned_staff ?student_profile - student_profile ?support_staff_contact - support_staff_contact)
+    (appointment_slot_available ?appointment_slot - appointment_slot)
+    (participant_reserved_appointment ?student_profile - student_profile ?appointment_slot - appointment_slot)
+    (service_representative_available ?service_representative - service_representative)
+    (participant_assigned_service_representative ?student_profile - student_profile ?service_representative - service_representative)
+    (support_program_available ?support_service_program - support_service_program)
+    (advisor_selected_service_program ?primary_advisor_role - primary_advisor_role ?support_service_program - support_service_program)
+    (secondary_advisor_selected_service_program ?secondary_advisor_role - secondary_advisor_role ?support_service_program - support_service_program)
+    (primary_advisor_flagged_academic_concern ?primary_advisor_role - primary_advisor_role ?concern_academic - concern_academic)
+    (concern_academic_flagged ?concern_academic - concern_academic)
+    (concern_academic_assigned_program ?concern_academic - concern_academic)
+    (primary_advisor_confirmed ?primary_advisor_role - primary_advisor_role)
+    (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role - secondary_advisor_role ?concern_wellbeing - concern_wellbeing)
+    (concern_wellbeing_flagged ?concern_wellbeing - concern_wellbeing)
+    (concern_wellbeing_assigned_program ?concern_wellbeing - concern_wellbeing)
+    (secondary_advisor_confirmed ?secondary_advisor_role - secondary_advisor_role)
+    (referral_packet_pending ?referral_packet - referral_packet)
+    (referral_packet_created ?referral_packet - referral_packet)
+    (referral_packet_includes_academic_concern ?referral_packet - referral_packet ?concern_academic - concern_academic)
+    (referral_packet_includes_wellbeing_concern ?referral_packet - referral_packet ?concern_wellbeing - concern_wellbeing)
+    (referral_packet_flag_primary_unconfirmed ?referral_packet - referral_packet)
+    (referral_packet_flag_secondary_unconfirmed ?referral_packet - referral_packet)
+    (referral_packet_ready_for_document_processing ?referral_packet - referral_packet)
+    (case_has_primary_advisor ?student_case_record - student_case_record ?primary_advisor_role - primary_advisor_role)
+    (case_has_secondary_advisor ?student_case_record - student_case_record ?secondary_advisor_role - secondary_advisor_role)
+    (case_linked_referral_packet ?student_case_record - student_case_record ?referral_packet - referral_packet)
+    (document_template_available ?document_template - document_template)
+    (case_has_document_template ?student_case_record - student_case_record ?document_template - document_template)
+    (document_attached ?document_template - document_template)
+    (document_attached_to_referral_packet ?document_template - document_template ?referral_packet - referral_packet)
+    (case_documents_validated ?student_case_record - student_case_record)
+    (case_specialist_assigned ?student_case_record - student_case_record)
+    (case_specialist_review_complete ?student_case_record - student_case_record)
+    (community_partner_engaged ?student_case_record - student_case_record)
+    (case_partner_documents_attached ?student_case_record - student_case_record)
+    (case_approved_for_outcomes ?student_case_record - student_case_record)
+    (case_interventions_scheduled ?student_case_record - student_case_record)
+    (assessment_tool_available ?assessment_tool - assessment_tool)
+    (case_has_assessment_tool ?student_case_record - student_case_record ?assessment_tool - assessment_tool)
+    (case_assessment_scheduled ?student_case_record - student_case_record)
+    (assessment_in_progress ?student_case_record - student_case_record)
+    (assessment_completed ?student_case_record - student_case_record)
+    (community_partner_available ?community_partner - community_partner)
+    (case_linked_community_partner ?student_case_record - student_case_record ?community_partner - community_partner)
+    (outcome_package_available ?outcome_package - outcome_package)
+    (case_assigned_outcome_package ?student_case_record - student_case_record ?outcome_package - outcome_package)
+    (specialist_available ?specialist_availability - specialist_availability)
+    (case_assigned_specialist_availability ?student_case_record - student_case_record ?specialist_availability - specialist_availability)
+    (external_specialist_available ?external_specialist - external_specialist)
+    (case_assigned_external_specialist ?student_case_record - student_case_record ?external_specialist - external_specialist)
+    (accommodation_option_available ?accommodation_option - accommodation_option)
+    (participant_has_accommodation ?student_profile - student_profile ?accommodation_option - accommodation_option)
+    (primary_advisor_ready ?primary_advisor_role - primary_advisor_role)
+    (secondary_advisor_ready ?secondary_advisor_role - secondary_advisor_role)
+    (case_closed ?student_case_record - student_case_record)
+  )
+  (:action initiate_wellbeing_checkin
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (not
+          (intake_initiated ?student_profile)
+        )
+        (not
+          (followup_activated ?student_profile)
+        )
+      )
+    :effect (intake_initiated ?student_profile)
+  )
+  (:action assign_support_staff_to_student
+    :parameters (?student_profile - student_profile ?support_staff_contact - support_staff_contact)
+    :precondition
+      (and
+        (intake_initiated ?student_profile)
+        (not
+          (support_staff_assigned ?student_profile)
+        )
+        (staff_available ?support_staff_contact)
+      )
+    :effect
+      (and
+        (support_staff_assigned ?student_profile)
+        (participant_assigned_staff ?student_profile ?support_staff_contact)
+        (not
+          (staff_available ?support_staff_contact)
+        )
+      )
+  )
+  (:action reserve_appointment_slot_for_student
+    :parameters (?student_profile - student_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_initiated ?student_profile)
+        (support_staff_assigned ?student_profile)
+        (appointment_slot_available ?appointment_slot)
+      )
+    :effect
+      (and
+        (participant_reserved_appointment ?student_profile ?appointment_slot)
+        (not
+          (appointment_slot_available ?appointment_slot)
+        )
+      )
+  )
+  (:action confirm_appointment
+    :parameters (?student_profile - student_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_initiated ?student_profile)
+        (support_staff_assigned ?student_profile)
+        (participant_reserved_appointment ?student_profile ?appointment_slot)
+        (not
+          (participant_active ?student_profile)
+        )
+      )
+    :effect (participant_active ?student_profile)
+  )
+  (:action release_appointment_slot
+    :parameters (?student_profile - student_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_reserved_appointment ?student_profile ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_slot_available ?appointment_slot)
+        (not
+          (participant_reserved_appointment ?student_profile ?appointment_slot)
+        )
+      )
+  )
+  (:action assign_service_representative_to_student
+    :parameters (?student_profile - student_profile ?service_representative - service_representative)
+    :precondition
+      (and
+        (participant_active ?student_profile)
+        (service_representative_available ?service_representative)
+      )
+    :effect
+      (and
+        (participant_assigned_service_representative ?student_profile ?service_representative)
+        (not
+          (service_representative_available ?service_representative)
+        )
+      )
+  )
+  (:action unassign_service_representative_from_student
+    :parameters (?student_profile - student_profile ?service_representative - service_representative)
+    :precondition
+      (and
+        (participant_assigned_service_representative ?student_profile ?service_representative)
+      )
+    :effect
+      (and
+        (service_representative_available ?service_representative)
+        (not
+          (participant_assigned_service_representative ?student_profile ?service_representative)
+        )
+      )
+  )
+  (:action assign_specialist_availability_to_case
+    :parameters (?student_case_record - student_case_record ?specialist_availability - specialist_availability)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (specialist_available ?specialist_availability)
+      )
+    :effect
+      (and
+        (case_assigned_specialist_availability ?student_case_record ?specialist_availability)
+        (not
+          (specialist_available ?specialist_availability)
+        )
+      )
+  )
+  (:action release_specialist_availability
+    :parameters (?student_case_record - student_case_record ?specialist_availability - specialist_availability)
+    :precondition
+      (and
+        (case_assigned_specialist_availability ?student_case_record ?specialist_availability)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist_availability)
+        (not
+          (case_assigned_specialist_availability ?student_case_record ?specialist_availability)
+        )
+      )
+  )
+  (:action assign_external_specialist_to_case
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (external_specialist_available ?external_specialist)
+      )
+    :effect
+      (and
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (not
+          (external_specialist_available ?external_specialist)
+        )
+      )
+  )
+  (:action unassign_external_specialist_from_case
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist)
+    :precondition
+      (and
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+      )
+    :effect
+      (and
+        (external_specialist_available ?external_specialist)
+        (not
+          (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        )
+      )
+  )
+  (:action primary_advisor_flag_academic_concern
+    :parameters (?primary_advisor_role - primary_advisor_role ?concern_academic - concern_academic ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_active ?primary_advisor_role)
+        (participant_reserved_appointment ?primary_advisor_role ?appointment_slot)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (not
+          (concern_academic_flagged ?concern_academic)
+        )
+        (not
+          (concern_academic_assigned_program ?concern_academic)
+        )
+      )
+    :effect (concern_academic_flagged ?concern_academic)
+  )
+  (:action primary_advisor_confirm_academic_concern
+    :parameters (?primary_advisor_role - primary_advisor_role ?concern_academic - concern_academic ?service_representative - service_representative)
+    :precondition
+      (and
+        (participant_active ?primary_advisor_role)
+        (participant_assigned_service_representative ?primary_advisor_role ?service_representative)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (concern_academic_flagged ?concern_academic)
+        (not
+          (primary_advisor_ready ?primary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (primary_advisor_confirmed ?primary_advisor_role)
+      )
+  )
+  (:action primary_advisor_assign_service_program
+    :parameters (?primary_advisor_role - primary_advisor_role ?concern_academic - concern_academic ?support_service_program - support_service_program)
+    :precondition
+      (and
+        (participant_active ?primary_advisor_role)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (support_program_available ?support_service_program)
+        (not
+          (primary_advisor_ready ?primary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (concern_academic_assigned_program ?concern_academic)
+        (primary_advisor_ready ?primary_advisor_role)
+        (advisor_selected_service_program ?primary_advisor_role ?support_service_program)
+        (not
+          (support_program_available ?support_service_program)
+        )
+      )
+  )
+  (:action primary_advisor_finalize_service_selection
+    :parameters (?primary_advisor_role - primary_advisor_role ?concern_academic - concern_academic ?appointment_slot - appointment_slot ?support_service_program - support_service_program)
+    :precondition
+      (and
+        (participant_active ?primary_advisor_role)
+        (participant_reserved_appointment ?primary_advisor_role ?appointment_slot)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (concern_academic_assigned_program ?concern_academic)
+        (advisor_selected_service_program ?primary_advisor_role ?support_service_program)
+        (not
+          (primary_advisor_confirmed ?primary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (concern_academic_flagged ?concern_academic)
+        (primary_advisor_confirmed ?primary_advisor_role)
+        (support_program_available ?support_service_program)
+        (not
+          (advisor_selected_service_program ?primary_advisor_role ?support_service_program)
+        )
+      )
+  )
+  (:action secondary_advisor_flag_wellbeing_concern
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?concern_wellbeing - concern_wellbeing ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_active ?secondary_advisor_role)
+        (participant_reserved_appointment ?secondary_advisor_role ?appointment_slot)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (not
+          (concern_wellbeing_flagged ?concern_wellbeing)
+        )
+        (not
+          (concern_wellbeing_assigned_program ?concern_wellbeing)
+        )
+      )
+    :effect (concern_wellbeing_flagged ?concern_wellbeing)
+  )
+  (:action secondary_advisor_confirm_wellbeing_concern
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?concern_wellbeing - concern_wellbeing ?service_representative - service_representative)
+    :precondition
+      (and
+        (participant_active ?secondary_advisor_role)
+        (participant_assigned_service_representative ?secondary_advisor_role ?service_representative)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_wellbeing_flagged ?concern_wellbeing)
+        (not
+          (secondary_advisor_ready ?secondary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+      )
+  )
+  (:action secondary_advisor_assign_service_program
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?concern_wellbeing - concern_wellbeing ?support_service_program - support_service_program)
+    :precondition
+      (and
+        (participant_active ?secondary_advisor_role)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (support_program_available ?support_service_program)
+        (not
+          (secondary_advisor_ready ?secondary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (concern_wellbeing_assigned_program ?concern_wellbeing)
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (secondary_advisor_selected_service_program ?secondary_advisor_role ?support_service_program)
+        (not
+          (support_program_available ?support_service_program)
+        )
+      )
+  )
+  (:action secondary_advisor_finalize_service_selection
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?concern_wellbeing - concern_wellbeing ?appointment_slot - appointment_slot ?support_service_program - support_service_program)
+    :precondition
+      (and
+        (participant_active ?secondary_advisor_role)
+        (participant_reserved_appointment ?secondary_advisor_role ?appointment_slot)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_wellbeing_assigned_program ?concern_wellbeing)
+        (secondary_advisor_selected_service_program ?secondary_advisor_role ?support_service_program)
+        (not
+          (secondary_advisor_confirmed ?secondary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (concern_wellbeing_flagged ?concern_wellbeing)
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+        (support_program_available ?support_service_program)
+        (not
+          (secondary_advisor_selected_service_program ?secondary_advisor_role ?support_service_program)
+        )
+      )
+  )
+  (:action assemble_referral_packet
+    :parameters (?primary_advisor_role - primary_advisor_role ?secondary_advisor_role - secondary_advisor_role ?concern_academic - concern_academic ?concern_wellbeing - concern_wellbeing ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_academic_flagged ?concern_academic)
+        (concern_wellbeing_flagged ?concern_wellbeing)
+        (primary_advisor_confirmed ?primary_advisor_role)
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+        (referral_packet_pending ?referral_packet)
+      )
+    :effect
+      (and
+        (referral_packet_created ?referral_packet)
+        (referral_packet_includes_academic_concern ?referral_packet ?concern_academic)
+        (referral_packet_includes_wellbeing_concern ?referral_packet ?concern_wellbeing)
+        (not
+          (referral_packet_pending ?referral_packet)
+        )
+      )
+  )
+  (:action assemble_referral_packet_primary_pending
+    :parameters (?primary_advisor_role - primary_advisor_role ?secondary_advisor_role - secondary_advisor_role ?concern_academic - concern_academic ?concern_wellbeing - concern_wellbeing ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_academic_assigned_program ?concern_academic)
+        (concern_wellbeing_flagged ?concern_wellbeing)
+        (not
+          (primary_advisor_confirmed ?primary_advisor_role)
+        )
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+        (referral_packet_pending ?referral_packet)
+      )
+    :effect
+      (and
+        (referral_packet_created ?referral_packet)
+        (referral_packet_includes_academic_concern ?referral_packet ?concern_academic)
+        (referral_packet_includes_wellbeing_concern ?referral_packet ?concern_wellbeing)
+        (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        (not
+          (referral_packet_pending ?referral_packet)
+        )
+      )
+  )
+  (:action assemble_referral_packet_secondary_pending
+    :parameters (?primary_advisor_role - primary_advisor_role ?secondary_advisor_role - secondary_advisor_role ?concern_academic - concern_academic ?concern_wellbeing - concern_wellbeing ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_academic_flagged ?concern_academic)
+        (concern_wellbeing_assigned_program ?concern_wellbeing)
+        (primary_advisor_confirmed ?primary_advisor_role)
+        (not
+          (secondary_advisor_confirmed ?secondary_advisor_role)
+        )
+        (referral_packet_pending ?referral_packet)
+      )
+    :effect
+      (and
+        (referral_packet_created ?referral_packet)
+        (referral_packet_includes_academic_concern ?referral_packet ?concern_academic)
+        (referral_packet_includes_wellbeing_concern ?referral_packet ?concern_wellbeing)
+        (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        (not
+          (referral_packet_pending ?referral_packet)
+        )
+      )
+  )
+  (:action assemble_referral_packet_both_pending
+    :parameters (?primary_advisor_role - primary_advisor_role ?secondary_advisor_role - secondary_advisor_role ?concern_academic - concern_academic ?concern_wellbeing - concern_wellbeing ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (primary_advisor_flagged_academic_concern ?primary_advisor_role ?concern_academic)
+        (secondary_advisor_flagged_wellbeing_concern ?secondary_advisor_role ?concern_wellbeing)
+        (concern_academic_assigned_program ?concern_academic)
+        (concern_wellbeing_assigned_program ?concern_wellbeing)
+        (not
+          (primary_advisor_confirmed ?primary_advisor_role)
+        )
+        (not
+          (secondary_advisor_confirmed ?secondary_advisor_role)
+        )
+        (referral_packet_pending ?referral_packet)
+      )
+    :effect
+      (and
+        (referral_packet_created ?referral_packet)
+        (referral_packet_includes_academic_concern ?referral_packet ?concern_academic)
+        (referral_packet_includes_wellbeing_concern ?referral_packet ?concern_wellbeing)
+        (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        (not
+          (referral_packet_pending ?referral_packet)
+        )
+      )
+  )
+  (:action mark_packet_ready_for_documents
+    :parameters (?referral_packet - referral_packet ?primary_advisor_role - primary_advisor_role ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (referral_packet_created ?referral_packet)
+        (primary_advisor_ready ?primary_advisor_role)
+        (participant_reserved_appointment ?primary_advisor_role ?appointment_slot)
+        (not
+          (referral_packet_ready_for_document_processing ?referral_packet)
+        )
+      )
+    :effect (referral_packet_ready_for_document_processing ?referral_packet)
+  )
+  (:action attach_document_to_referral_packet
+    :parameters (?student_case_record - student_case_record ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (case_linked_referral_packet ?student_case_record ?referral_packet)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_template_available ?document_template)
+        (referral_packet_created ?referral_packet)
+        (referral_packet_ready_for_document_processing ?referral_packet)
+        (not
+          (document_attached ?document_template)
+        )
+      )
+    :effect
+      (and
+        (document_attached ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action validate_case_documents
+    :parameters (?student_case_record - student_case_record ?document_template - document_template ?referral_packet - referral_packet ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (participant_reserved_appointment ?student_case_record ?appointment_slot)
+        (not
+          (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        )
+        (not
+          (case_documents_validated ?student_case_record)
+        )
+      )
+    :effect (case_documents_validated ?student_case_record)
+  )
+  (:action engage_community_partner
+    :parameters (?student_case_record - student_case_record ?community_partner - community_partner)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (community_partner_available ?community_partner)
+        (not
+          (community_partner_engaged ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (community_partner_engaged ?student_case_record)
+        (case_linked_community_partner ?student_case_record ?community_partner)
+        (not
+          (community_partner_available ?community_partner)
+        )
+      )
+  )
+  (:action finalize_documents_and_partner_engagement
+    :parameters (?student_case_record - student_case_record ?document_template - document_template ?referral_packet - referral_packet ?appointment_slot - appointment_slot ?community_partner - community_partner)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (participant_reserved_appointment ?student_case_record ?appointment_slot)
+        (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        (community_partner_engaged ?student_case_record)
+        (case_linked_community_partner ?student_case_record ?community_partner)
+        (not
+          (case_documents_validated ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_documents_validated ?student_case_record)
+        (case_partner_documents_attached ?student_case_record)
+      )
+  )
+  (:action request_specialist_assignment
+    :parameters (?student_case_record - student_case_record ?specialist_availability - specialist_availability ?service_representative - service_representative ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_documents_validated ?student_case_record)
+        (case_assigned_specialist_availability ?student_case_record ?specialist_availability)
+        (participant_assigned_service_representative ?student_case_record ?service_representative)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (not
+          (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        )
+        (not
+          (case_specialist_assigned ?student_case_record)
+        )
+      )
+    :effect (case_specialist_assigned ?student_case_record)
+  )
+  (:action confirm_specialist_assignment
+    :parameters (?student_case_record - student_case_record ?specialist_availability - specialist_availability ?service_representative - service_representative ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_documents_validated ?student_case_record)
+        (case_assigned_specialist_availability ?student_case_record ?specialist_availability)
+        (participant_assigned_service_representative ?student_case_record ?service_representative)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        (not
+          (case_specialist_assigned ?student_case_record)
+        )
+      )
+    :effect (case_specialist_assigned ?student_case_record)
+  )
+  (:action perform_external_specialist_review
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_specialist_assigned ?student_case_record)
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (not
+          (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        )
+        (not
+          (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        )
+        (not
+          (case_specialist_review_complete ?student_case_record)
+        )
+      )
+    :effect (case_specialist_review_complete ?student_case_record)
+  )
+  (:action approve_case_for_outcome_assignment_variant1
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_specialist_assigned ?student_case_record)
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        (not
+          (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        )
+        (not
+          (case_specialist_review_complete ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_approved_for_outcomes ?student_case_record)
+      )
+  )
+  (:action approve_case_for_outcome_assignment_variant2
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_specialist_assigned ?student_case_record)
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (not
+          (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        )
+        (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        (not
+          (case_specialist_review_complete ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_approved_for_outcomes ?student_case_record)
+      )
+  )
+  (:action approve_case_for_outcome_assignment_variant3
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist ?document_template - document_template ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (case_specialist_assigned ?student_case_record)
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (case_has_document_template ?student_case_record ?document_template)
+        (document_attached_to_referral_packet ?document_template ?referral_packet)
+        (referral_packet_flag_primary_unconfirmed ?referral_packet)
+        (referral_packet_flag_secondary_unconfirmed ?referral_packet)
+        (not
+          (case_specialist_review_complete ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_approved_for_outcomes ?student_case_record)
+      )
+  )
+  (:action initiate_case_closure
+    :parameters (?student_case_record - student_case_record)
+    :precondition
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (not
+          (case_approved_for_outcomes ?student_case_record)
+        )
+        (not
+          (case_closed ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?student_case_record)
+        (participant_ready_for_activation ?student_case_record)
+      )
+  )
+  (:action assign_outcome_package_to_case
+    :parameters (?student_case_record - student_case_record ?outcome_package - outcome_package)
+    :precondition
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_approved_for_outcomes ?student_case_record)
+        (outcome_package_available ?outcome_package)
+      )
+    :effect
+      (and
+        (case_assigned_outcome_package ?student_case_record ?outcome_package)
+        (not
+          (outcome_package_available ?outcome_package)
+        )
+      )
+  )
+  (:action schedule_interventions_for_case
+    :parameters (?student_case_record - student_case_record ?primary_advisor_role - primary_advisor_role ?secondary_advisor_role - secondary_advisor_role ?appointment_slot - appointment_slot ?outcome_package - outcome_package)
+    :precondition
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_approved_for_outcomes ?student_case_record)
+        (case_assigned_outcome_package ?student_case_record ?outcome_package)
+        (case_has_primary_advisor ?student_case_record ?primary_advisor_role)
+        (case_has_secondary_advisor ?student_case_record ?secondary_advisor_role)
+        (primary_advisor_confirmed ?primary_advisor_role)
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+        (participant_reserved_appointment ?student_case_record ?appointment_slot)
+        (not
+          (case_interventions_scheduled ?student_case_record)
+        )
+      )
+    :effect (case_interventions_scheduled ?student_case_record)
+  )
+  (:action finalize_case_closure
+    :parameters (?student_case_record - student_case_record)
+    :precondition
+      (and
+        (case_specialist_review_complete ?student_case_record)
+        (case_interventions_scheduled ?student_case_record)
+        (not
+          (case_closed ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?student_case_record)
+        (participant_ready_for_activation ?student_case_record)
+      )
+  )
+  (:action attach_assessment_tool_to_case
+    :parameters (?student_case_record - student_case_record ?assessment_tool - assessment_tool ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_active ?student_case_record)
+        (participant_reserved_appointment ?student_case_record ?appointment_slot)
+        (assessment_tool_available ?assessment_tool)
+        (case_has_assessment_tool ?student_case_record ?assessment_tool)
+        (not
+          (case_assessment_scheduled ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_assessment_scheduled ?student_case_record)
+        (not
+          (assessment_tool_available ?assessment_tool)
+        )
+      )
+  )
+  (:action start_assessment_on_case
+    :parameters (?student_case_record - student_case_record ?service_representative - service_representative)
+    :precondition
+      (and
+        (case_assessment_scheduled ?student_case_record)
+        (participant_assigned_service_representative ?student_case_record ?service_representative)
+        (not
+          (assessment_in_progress ?student_case_record)
+        )
+      )
+    :effect (assessment_in_progress ?student_case_record)
+  )
+  (:action complete_case_assessment
+    :parameters (?student_case_record - student_case_record ?external_specialist - external_specialist)
+    :precondition
+      (and
+        (assessment_in_progress ?student_case_record)
+        (case_assigned_external_specialist ?student_case_record ?external_specialist)
+        (not
+          (assessment_completed ?student_case_record)
+        )
+      )
+    :effect (assessment_completed ?student_case_record)
+  )
+  (:action finalize_case_after_assessment
+    :parameters (?student_case_record - student_case_record)
+    :precondition
+      (and
+        (assessment_completed ?student_case_record)
+        (not
+          (case_closed ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?student_case_record)
+        (participant_ready_for_activation ?student_case_record)
+      )
+  )
+  (:action activate_followup_for_primary_advisor
+    :parameters (?primary_advisor_role - primary_advisor_role ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (primary_advisor_ready ?primary_advisor_role)
+        (primary_advisor_confirmed ?primary_advisor_role)
+        (referral_packet_created ?referral_packet)
+        (referral_packet_ready_for_document_processing ?referral_packet)
+        (not
+          (participant_ready_for_activation ?primary_advisor_role)
+        )
+      )
+    :effect (participant_ready_for_activation ?primary_advisor_role)
+  )
+  (:action activate_followup_for_secondary_advisor
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?referral_packet - referral_packet)
+    :precondition
+      (and
+        (secondary_advisor_ready ?secondary_advisor_role)
+        (secondary_advisor_confirmed ?secondary_advisor_role)
+        (referral_packet_created ?referral_packet)
+        (referral_packet_ready_for_document_processing ?referral_packet)
+        (not
+          (participant_ready_for_activation ?secondary_advisor_role)
+        )
+      )
+    :effect (participant_ready_for_activation ?secondary_advisor_role)
+  )
+  (:action record_consent_and_accommodation_selection
+    :parameters (?student_profile - student_profile ?accommodation_option - accommodation_option ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (participant_ready_for_activation ?student_profile)
+        (participant_reserved_appointment ?student_profile ?appointment_slot)
+        (accommodation_option_available ?accommodation_option)
+        (not
+          (participant_consent_recorded ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (participant_consent_recorded ?student_profile)
+        (participant_has_accommodation ?student_profile ?accommodation_option)
+        (not
+          (accommodation_option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action activate_case_followup
+    :parameters (?primary_advisor_role - primary_advisor_role ?support_staff_contact - support_staff_contact ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (participant_consent_recorded ?primary_advisor_role)
+        (participant_assigned_staff ?primary_advisor_role ?support_staff_contact)
+        (participant_has_accommodation ?primary_advisor_role ?accommodation_option)
+        (not
+          (followup_activated ?primary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (followup_activated ?primary_advisor_role)
+        (staff_available ?support_staff_contact)
+        (accommodation_option_available ?accommodation_option)
+      )
+  )
+  (:action activate_case_followup_for_secondary_advisor
+    :parameters (?secondary_advisor_role - secondary_advisor_role ?support_staff_contact - support_staff_contact ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (participant_consent_recorded ?secondary_advisor_role)
+        (participant_assigned_staff ?secondary_advisor_role ?support_staff_contact)
+        (participant_has_accommodation ?secondary_advisor_role ?accommodation_option)
+        (not
+          (followup_activated ?secondary_advisor_role)
+        )
+      )
+    :effect
+      (and
+        (followup_activated ?secondary_advisor_role)
+        (staff_available ?support_staff_contact)
+        (accommodation_option_available ?accommodation_option)
+      )
+  )
+  (:action activate_case_followup_for_case
+    :parameters (?student_case_record - student_case_record ?support_staff_contact - support_staff_contact ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (participant_consent_recorded ?student_case_record)
+        (participant_assigned_staff ?student_case_record ?support_staff_contact)
+        (participant_has_accommodation ?student_case_record ?accommodation_option)
+        (not
+          (followup_activated ?student_case_record)
+        )
+      )
+    :effect
+      (and
+        (followup_activated ?student_case_record)
+        (staff_available ?support_staff_contact)
+        (accommodation_option_available ?accommodation_option)
+      )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain empty_miles_reduction_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object asset_category - object node_category - object shipment_category - object logistics_entity - shipment_category tractor_or_trailer_asset - resource_category time_window - resource_category yard_handling_equipment - resource_category route_permit - resource_category operator_credential - resource_category consignment_destination_record - resource_category special_equipment - resource_category regulatory_document - resource_category cargo_item - asset_category container_bay - asset_category service_stop_instruction - asset_category pickup_transfer_node - node_category delivery_transfer_node - node_category trip_segment - node_category origin_category - logistics_entity routing_agent_category - logistics_entity origin_hub - origin_category destination_hub - origin_category vehicle_unit - routing_agent_category)
+  (:predicates
+    (logistics_registered ?shipment_order - logistics_entity)
+    (scheduled ?shipment_order - logistics_entity)
+    (logistics_asset_reserved ?shipment_order - logistics_entity)
+    (dispatch_finalized ?shipment_order - logistics_entity)
+    (ready_for_dispatch ?shipment_order - logistics_entity)
+    (logistics_committed ?shipment_order - logistics_entity)
+    (asset_available ?tractor_or_trailer_asset - tractor_or_trailer_asset)
+    (assigned_asset_to_logistics ?shipment_order - logistics_entity ?tractor_or_trailer_asset - tractor_or_trailer_asset)
+    (time_window_available ?time_window - time_window)
+    (assigned_time_window ?shipment_order - logistics_entity ?time_window - time_window)
+    (yard_equipment_available ?yard_handling_equipment - yard_handling_equipment)
+    (assigned_yard_equipment_to_logistics ?shipment_order - logistics_entity ?yard_handling_equipment - yard_handling_equipment)
+    (cargo_item_available ?cargo_item - cargo_item)
+    (cargo_staged_at_origin ?origin_hub - origin_hub ?cargo_item - cargo_item)
+    (cargo_staged_at_destination ?destination_hub - destination_hub ?cargo_item - cargo_item)
+    (origin_connected_to_pickup_node ?origin_hub - origin_hub ?pickup_transfer_node - pickup_transfer_node)
+    (pickup_node_reserved ?pickup_transfer_node - pickup_transfer_node)
+    (pickup_node_staged ?pickup_transfer_node - pickup_transfer_node)
+    (origin_hub_has_load ?origin_hub - origin_hub)
+    (destination_connected_to_delivery_node ?destination_hub - destination_hub ?delivery_transfer_node - delivery_transfer_node)
+    (delivery_node_reserved ?delivery_transfer_node - delivery_transfer_node)
+    (delivery_node_staged ?delivery_transfer_node - delivery_transfer_node)
+    (destination_hub_has_load ?destination_hub - destination_hub)
+    (trip_available ?trip_segment - trip_segment)
+    (trip_committed ?trip_segment - trip_segment)
+    (trip_has_pickup_node ?trip_segment - trip_segment ?pickup_transfer_node - pickup_transfer_node)
+    (trip_has_delivery_node ?trip_segment - trip_segment ?delivery_transfer_node - delivery_transfer_node)
+    (trip_pickup_staged ?trip_segment - trip_segment)
+    (trip_delivery_staged ?trip_segment - trip_segment)
+    (trip_loading_ready ?trip_segment - trip_segment)
+    (vehicle_at_origin ?vehicle_unit - vehicle_unit ?origin_hub - origin_hub)
+    (vehicle_at_destination ?vehicle_unit - vehicle_unit ?destination_hub - destination_hub)
+    (vehicle_assigned_to_trip ?vehicle_unit - vehicle_unit ?trip_segment - trip_segment)
+    (container_bay_available ?container_bay - container_bay)
+    (vehicle_has_container_bay ?vehicle_unit - vehicle_unit ?container_bay - container_bay)
+    (container_bay_in_use ?container_bay - container_bay)
+    (container_assigned_to_trip ?container_bay - container_bay ?trip_segment - trip_segment)
+    (vehicle_stowage_verified ?vehicle_unit - vehicle_unit)
+    (vehicle_preload_confirmed ?vehicle_unit - vehicle_unit)
+    (vehicle_ready_for_activation ?vehicle_unit - vehicle_unit)
+    (vehicle_permit_attached ?vehicle_unit - vehicle_unit)
+    (vehicle_permit_verified ?vehicle_unit - vehicle_unit)
+    (vehicle_credentials_attached ?vehicle_unit - vehicle_unit)
+    (vehicle_final_checks_passed ?vehicle_unit - vehicle_unit)
+    (service_stop_instruction_available ?service_stop_instruction - service_stop_instruction)
+    (vehicle_has_service_stop_instruction ?vehicle_unit - vehicle_unit ?service_stop_instruction - service_stop_instruction)
+    (vehicle_service_stop_claimed ?vehicle_unit - vehicle_unit)
+    (vehicle_service_stop_ready ?vehicle_unit - vehicle_unit)
+    (vehicle_service_stop_verified ?vehicle_unit - vehicle_unit)
+    (route_permit_available ?route_permit - route_permit)
+    (vehicle_assigned_permit ?vehicle_unit - vehicle_unit ?route_permit - route_permit)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (vehicle_assigned_credential ?vehicle_unit - vehicle_unit ?operator_credential - operator_credential)
+    (special_equipment_available ?special_equipment - special_equipment)
+    (vehicle_assigned_special_equipment ?vehicle_unit - vehicle_unit ?special_equipment - special_equipment)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (vehicle_assigned_regulatory_document ?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document)
+    (destination_record_available ?consignment_destination_record - consignment_destination_record)
+    (logistics_linked_to_destination_record ?shipment_order - logistics_entity ?consignment_destination_record - consignment_destination_record)
+    (origin_hub_allocated ?origin_hub - origin_hub)
+    (destination_hub_allocated ?destination_hub - destination_hub)
+    (dispatch_acknowledged ?vehicle_unit - vehicle_unit)
+  )
+  (:action register_logistics_entity
+    :parameters (?shipment_order - logistics_entity)
+    :precondition
+      (and
+        (not
+          (logistics_registered ?shipment_order)
+        )
+        (not
+          (dispatch_finalized ?shipment_order)
+        )
+      )
+    :effect (logistics_registered ?shipment_order)
+  )
+  (:action reserve_asset_for_logistics_entity
+    :parameters (?shipment_order - logistics_entity ?tractor_or_trailer_asset - tractor_or_trailer_asset)
+    :precondition
+      (and
+        (logistics_registered ?shipment_order)
+        (not
+          (logistics_asset_reserved ?shipment_order)
+        )
+        (asset_available ?tractor_or_trailer_asset)
+      )
+    :effect
+      (and
+        (logistics_asset_reserved ?shipment_order)
+        (assigned_asset_to_logistics ?shipment_order ?tractor_or_trailer_asset)
+        (not
+          (asset_available ?tractor_or_trailer_asset)
+        )
+      )
+  )
+  (:action assign_time_window_to_logistics_entity
+    :parameters (?shipment_order - logistics_entity ?time_window - time_window)
+    :precondition
+      (and
+        (logistics_registered ?shipment_order)
+        (logistics_asset_reserved ?shipment_order)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (assigned_time_window ?shipment_order ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_time_window_assignment
+    :parameters (?shipment_order - logistics_entity ?time_window - time_window)
+    :precondition
+      (and
+        (logistics_registered ?shipment_order)
+        (logistics_asset_reserved ?shipment_order)
+        (assigned_time_window ?shipment_order ?time_window)
+        (not
+          (scheduled ?shipment_order)
+        )
+      )
+    :effect (scheduled ?shipment_order)
+  )
+  (:action release_time_window_from_logistics_entity
+    :parameters (?shipment_order - logistics_entity ?time_window - time_window)
+    :precondition
+      (and
+        (assigned_time_window ?shipment_order ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (assigned_time_window ?shipment_order ?time_window)
+        )
+      )
+  )
+  (:action attach_yard_equipment_to_logistics_entity
+    :parameters (?shipment_order - logistics_entity ?yard_handling_equipment - yard_handling_equipment)
+    :precondition
+      (and
+        (scheduled ?shipment_order)
+        (yard_equipment_available ?yard_handling_equipment)
+      )
+    :effect
+      (and
+        (assigned_yard_equipment_to_logistics ?shipment_order ?yard_handling_equipment)
+        (not
+          (yard_equipment_available ?yard_handling_equipment)
+        )
+      )
+  )
+  (:action detach_yard_equipment_from_logistics_entity
+    :parameters (?shipment_order - logistics_entity ?yard_handling_equipment - yard_handling_equipment)
+    :precondition
+      (and
+        (assigned_yard_equipment_to_logistics ?shipment_order ?yard_handling_equipment)
+      )
+    :effect
+      (and
+        (yard_equipment_available ?yard_handling_equipment)
+        (not
+          (assigned_yard_equipment_to_logistics ?shipment_order ?yard_handling_equipment)
+        )
+      )
+  )
+  (:action attach_special_equipment_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (special_equipment_available ?special_equipment)
+      )
+    :effect
+      (and
+        (vehicle_assigned_special_equipment ?vehicle_unit ?special_equipment)
+        (not
+          (special_equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action detach_special_equipment_from_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (vehicle_assigned_special_equipment ?vehicle_unit ?special_equipment)
+      )
+    :effect
+      (and
+        (special_equipment_available ?special_equipment)
+        (not
+          (vehicle_assigned_special_equipment ?vehicle_unit ?special_equipment)
+        )
+      )
+  )
+  (:action attach_regulatory_document_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action detach_regulatory_document_from_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+      )
+    :effect
+      (and
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        )
+      )
+  )
+  (:action claim_pickup_node_for_origin
+    :parameters (?origin_hub - origin_hub ?pickup_transfer_node - pickup_transfer_node ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?origin_hub)
+        (assigned_time_window ?origin_hub ?time_window)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (not
+          (pickup_node_reserved ?pickup_transfer_node)
+        )
+        (not
+          (pickup_node_staged ?pickup_transfer_node)
+        )
+      )
+    :effect (pickup_node_reserved ?pickup_transfer_node)
+  )
+  (:action schedule_local_handling_at_origin
+    :parameters (?origin_hub - origin_hub ?pickup_transfer_node - pickup_transfer_node ?yard_handling_equipment - yard_handling_equipment)
+    :precondition
+      (and
+        (scheduled ?origin_hub)
+        (assigned_yard_equipment_to_logistics ?origin_hub ?yard_handling_equipment)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (pickup_node_reserved ?pickup_transfer_node)
+        (not
+          (origin_hub_allocated ?origin_hub)
+        )
+      )
+    :effect
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (origin_hub_has_load ?origin_hub)
+      )
+  )
+  (:action stage_cargo_at_origin
+    :parameters (?origin_hub - origin_hub ?pickup_transfer_node - pickup_transfer_node ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (scheduled ?origin_hub)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (cargo_item_available ?cargo_item)
+        (not
+          (origin_hub_allocated ?origin_hub)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_staged ?pickup_transfer_node)
+        (origin_hub_allocated ?origin_hub)
+        (cargo_staged_at_origin ?origin_hub ?cargo_item)
+        (not
+          (cargo_item_available ?cargo_item)
+        )
+      )
+  )
+  (:action confirm_pickup_and_update_staging
+    :parameters (?origin_hub - origin_hub ?pickup_transfer_node - pickup_transfer_node ?time_window - time_window ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (scheduled ?origin_hub)
+        (assigned_time_window ?origin_hub ?time_window)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (pickup_node_staged ?pickup_transfer_node)
+        (cargo_staged_at_origin ?origin_hub ?cargo_item)
+        (not
+          (origin_hub_has_load ?origin_hub)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_reserved ?pickup_transfer_node)
+        (origin_hub_has_load ?origin_hub)
+        (cargo_item_available ?cargo_item)
+        (not
+          (cargo_staged_at_origin ?origin_hub ?cargo_item)
+        )
+      )
+  )
+  (:action claim_delivery_node_for_destination
+    :parameters (?destination_hub - destination_hub ?delivery_transfer_node - delivery_transfer_node ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?destination_hub)
+        (assigned_time_window ?destination_hub ?time_window)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (not
+          (delivery_node_reserved ?delivery_transfer_node)
+        )
+        (not
+          (delivery_node_staged ?delivery_transfer_node)
+        )
+      )
+    :effect (delivery_node_reserved ?delivery_transfer_node)
+  )
+  (:action schedule_local_handling_at_destination
+    :parameters (?destination_hub - destination_hub ?delivery_transfer_node - delivery_transfer_node ?yard_handling_equipment - yard_handling_equipment)
+    :precondition
+      (and
+        (scheduled ?destination_hub)
+        (assigned_yard_equipment_to_logistics ?destination_hub ?yard_handling_equipment)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (delivery_node_reserved ?delivery_transfer_node)
+        (not
+          (destination_hub_allocated ?destination_hub)
+        )
+      )
+    :effect
+      (and
+        (destination_hub_allocated ?destination_hub)
+        (destination_hub_has_load ?destination_hub)
+      )
+  )
+  (:action stage_cargo_at_destination
+    :parameters (?destination_hub - destination_hub ?delivery_transfer_node - delivery_transfer_node ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (scheduled ?destination_hub)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (cargo_item_available ?cargo_item)
+        (not
+          (destination_hub_allocated ?destination_hub)
+        )
+      )
+    :effect
+      (and
+        (delivery_node_staged ?delivery_transfer_node)
+        (destination_hub_allocated ?destination_hub)
+        (cargo_staged_at_destination ?destination_hub ?cargo_item)
+        (not
+          (cargo_item_available ?cargo_item)
+        )
+      )
+  )
+  (:action confirm_delivery_and_update_staging
+    :parameters (?destination_hub - destination_hub ?delivery_transfer_node - delivery_transfer_node ?time_window - time_window ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (scheduled ?destination_hub)
+        (assigned_time_window ?destination_hub ?time_window)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (delivery_node_staged ?delivery_transfer_node)
+        (cargo_staged_at_destination ?destination_hub ?cargo_item)
+        (not
+          (destination_hub_has_load ?destination_hub)
+        )
+      )
+    :effect
+      (and
+        (delivery_node_reserved ?delivery_transfer_node)
+        (destination_hub_has_load ?destination_hub)
+        (cargo_item_available ?cargo_item)
+        (not
+          (cargo_staged_at_destination ?destination_hub ?cargo_item)
+        )
+      )
+  )
+  (:action construct_trip_segment
+    :parameters (?origin_hub - origin_hub ?destination_hub - destination_hub ?pickup_transfer_node - pickup_transfer_node ?delivery_transfer_node - delivery_transfer_node ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (destination_hub_allocated ?destination_hub)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (pickup_node_reserved ?pickup_transfer_node)
+        (delivery_node_reserved ?delivery_transfer_node)
+        (origin_hub_has_load ?origin_hub)
+        (destination_hub_has_load ?destination_hub)
+        (trip_available ?trip_segment)
+      )
+    :effect
+      (and
+        (trip_committed ?trip_segment)
+        (trip_has_pickup_node ?trip_segment ?pickup_transfer_node)
+        (trip_has_delivery_node ?trip_segment ?delivery_transfer_node)
+        (not
+          (trip_available ?trip_segment)
+        )
+      )
+  )
+  (:action construct_trip_with_pickup_staged
+    :parameters (?origin_hub - origin_hub ?destination_hub - destination_hub ?pickup_transfer_node - pickup_transfer_node ?delivery_transfer_node - delivery_transfer_node ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (destination_hub_allocated ?destination_hub)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (pickup_node_staged ?pickup_transfer_node)
+        (delivery_node_reserved ?delivery_transfer_node)
+        (not
+          (origin_hub_has_load ?origin_hub)
+        )
+        (destination_hub_has_load ?destination_hub)
+        (trip_available ?trip_segment)
+      )
+    :effect
+      (and
+        (trip_committed ?trip_segment)
+        (trip_has_pickup_node ?trip_segment ?pickup_transfer_node)
+        (trip_has_delivery_node ?trip_segment ?delivery_transfer_node)
+        (trip_pickup_staged ?trip_segment)
+        (not
+          (trip_available ?trip_segment)
+        )
+      )
+  )
+  (:action construct_trip_with_delivery_staged
+    :parameters (?origin_hub - origin_hub ?destination_hub - destination_hub ?pickup_transfer_node - pickup_transfer_node ?delivery_transfer_node - delivery_transfer_node ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (destination_hub_allocated ?destination_hub)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (pickup_node_reserved ?pickup_transfer_node)
+        (delivery_node_staged ?delivery_transfer_node)
+        (origin_hub_has_load ?origin_hub)
+        (not
+          (destination_hub_has_load ?destination_hub)
+        )
+        (trip_available ?trip_segment)
+      )
+    :effect
+      (and
+        (trip_committed ?trip_segment)
+        (trip_has_pickup_node ?trip_segment ?pickup_transfer_node)
+        (trip_has_delivery_node ?trip_segment ?delivery_transfer_node)
+        (trip_delivery_staged ?trip_segment)
+        (not
+          (trip_available ?trip_segment)
+        )
+      )
+  )
+  (:action construct_trip_with_both_nodes_staged
+    :parameters (?origin_hub - origin_hub ?destination_hub - destination_hub ?pickup_transfer_node - pickup_transfer_node ?delivery_transfer_node - delivery_transfer_node ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (destination_hub_allocated ?destination_hub)
+        (origin_connected_to_pickup_node ?origin_hub ?pickup_transfer_node)
+        (destination_connected_to_delivery_node ?destination_hub ?delivery_transfer_node)
+        (pickup_node_staged ?pickup_transfer_node)
+        (delivery_node_staged ?delivery_transfer_node)
+        (not
+          (origin_hub_has_load ?origin_hub)
+        )
+        (not
+          (destination_hub_has_load ?destination_hub)
+        )
+        (trip_available ?trip_segment)
+      )
+    :effect
+      (and
+        (trip_committed ?trip_segment)
+        (trip_has_pickup_node ?trip_segment ?pickup_transfer_node)
+        (trip_has_delivery_node ?trip_segment ?delivery_transfer_node)
+        (trip_pickup_staged ?trip_segment)
+        (trip_delivery_staged ?trip_segment)
+        (not
+          (trip_available ?trip_segment)
+        )
+      )
+  )
+  (:action mark_trip_loading_ready
+    :parameters (?trip_segment - trip_segment ?origin_hub - origin_hub ?time_window - time_window)
+    :precondition
+      (and
+        (trip_committed ?trip_segment)
+        (origin_hub_allocated ?origin_hub)
+        (assigned_time_window ?origin_hub ?time_window)
+        (not
+          (trip_loading_ready ?trip_segment)
+        )
+      )
+    :effect (trip_loading_ready ?trip_segment)
+  )
+  (:action assign_container_to_trip_and_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (vehicle_assigned_to_trip ?vehicle_unit ?trip_segment)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_bay_available ?container_bay)
+        (trip_committed ?trip_segment)
+        (trip_loading_ready ?trip_segment)
+        (not
+          (container_bay_in_use ?container_bay)
+        )
+      )
+    :effect
+      (and
+        (container_bay_in_use ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (not
+          (container_bay_available ?container_bay)
+        )
+      )
+  )
+  (:action verify_container_stowage_on_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?container_bay - container_bay ?trip_segment - trip_segment ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_bay_in_use ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (assigned_time_window ?vehicle_unit ?time_window)
+        (not
+          (trip_pickup_staged ?trip_segment)
+        )
+        (not
+          (vehicle_stowage_verified ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_stowage_verified ?vehicle_unit)
+  )
+  (:action attach_route_permit_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?route_permit - route_permit)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (route_permit_available ?route_permit)
+        (not
+          (vehicle_permit_attached ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_permit_attached ?vehicle_unit)
+        (vehicle_assigned_permit ?vehicle_unit ?route_permit)
+        (not
+          (route_permit_available ?route_permit)
+        )
+      )
+  )
+  (:action validate_permit_and_container_assignment
+    :parameters (?vehicle_unit - vehicle_unit ?container_bay - container_bay ?trip_segment - trip_segment ?time_window - time_window ?route_permit - route_permit)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_bay_in_use ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (assigned_time_window ?vehicle_unit ?time_window)
+        (trip_pickup_staged ?trip_segment)
+        (vehicle_permit_attached ?vehicle_unit)
+        (vehicle_assigned_permit ?vehicle_unit ?route_permit)
+        (not
+          (vehicle_stowage_verified ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_stowage_verified ?vehicle_unit)
+        (vehicle_permit_verified ?vehicle_unit)
+      )
+  )
+  (:action inspect_vehicle_for_loading
+    :parameters (?vehicle_unit - vehicle_unit ?special_equipment - special_equipment ?yard_handling_equipment - yard_handling_equipment ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_stowage_verified ?vehicle_unit)
+        (vehicle_assigned_special_equipment ?vehicle_unit ?special_equipment)
+        (assigned_yard_equipment_to_logistics ?vehicle_unit ?yard_handling_equipment)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (not
+          (trip_delivery_staged ?trip_segment)
+        )
+        (not
+          (vehicle_preload_confirmed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_preload_confirmed ?vehicle_unit)
+  )
+  (:action reinspect_vehicle_for_loading
+    :parameters (?vehicle_unit - vehicle_unit ?special_equipment - special_equipment ?yard_handling_equipment - yard_handling_equipment ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_stowage_verified ?vehicle_unit)
+        (vehicle_assigned_special_equipment ?vehicle_unit ?special_equipment)
+        (assigned_yard_equipment_to_logistics ?vehicle_unit ?yard_handling_equipment)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (trip_delivery_staged ?trip_segment)
+        (not
+          (vehicle_preload_confirmed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_preload_confirmed ?vehicle_unit)
+  )
+  (:action apply_regulatory_doc_and_mark_vehicle_checks
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_preload_confirmed ?vehicle_unit)
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (not
+          (trip_pickup_staged ?trip_segment)
+        )
+        (not
+          (trip_delivery_staged ?trip_segment)
+        )
+        (not
+          (vehicle_ready_for_activation ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_ready_for_activation ?vehicle_unit)
+  )
+  (:action attach_credentials_and_mark_vehicle_ready
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_preload_confirmed ?vehicle_unit)
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (trip_pickup_staged ?trip_segment)
+        (not
+          (trip_delivery_staged ?trip_segment)
+        )
+        (not
+          (vehicle_ready_for_activation ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_credentials_attached ?vehicle_unit)
+      )
+  )
+  (:action attach_credentials_and_mark_vehicle_ready_alternate
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_preload_confirmed ?vehicle_unit)
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (not
+          (trip_pickup_staged ?trip_segment)
+        )
+        (trip_delivery_staged ?trip_segment)
+        (not
+          (vehicle_ready_for_activation ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_credentials_attached ?vehicle_unit)
+      )
+  )
+  (:action attach_credentials_and_mark_vehicle_ready_full
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document ?container_bay - container_bay ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (vehicle_preload_confirmed ?vehicle_unit)
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (vehicle_has_container_bay ?vehicle_unit ?container_bay)
+        (container_assigned_to_trip ?container_bay ?trip_segment)
+        (trip_pickup_staged ?trip_segment)
+        (trip_delivery_staged ?trip_segment)
+        (not
+          (vehicle_ready_for_activation ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_credentials_attached ?vehicle_unit)
+      )
+  )
+  (:action acknowledge_vehicle_preparation_and_mark_dispatch_ready
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (not
+          (vehicle_credentials_attached ?vehicle_unit)
+        )
+        (not
+          (dispatch_acknowledged ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_acknowledged ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action assign_operator_credential_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_credentials_attached ?vehicle_unit)
+        (operator_credential_available ?operator_credential)
+      )
+    :effect
+      (and
+        (vehicle_assigned_credential ?vehicle_unit ?operator_credential)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action final_vehicle_activation_check
+    :parameters (?vehicle_unit - vehicle_unit ?origin_hub - origin_hub ?destination_hub - destination_hub ?time_window - time_window ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_credentials_attached ?vehicle_unit)
+        (vehicle_assigned_credential ?vehicle_unit ?operator_credential)
+        (vehicle_at_origin ?vehicle_unit ?origin_hub)
+        (vehicle_at_destination ?vehicle_unit ?destination_hub)
+        (origin_hub_has_load ?origin_hub)
+        (destination_hub_has_load ?destination_hub)
+        (assigned_time_window ?vehicle_unit ?time_window)
+        (not
+          (vehicle_final_checks_passed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_final_checks_passed ?vehicle_unit)
+  )
+  (:action finalize_vehicle_activation_and_acknowledge_dispatch
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_ready_for_activation ?vehicle_unit)
+        (vehicle_final_checks_passed ?vehicle_unit)
+        (not
+          (dispatch_acknowledged ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_acknowledged ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action claim_service_stop
+    :parameters (?vehicle_unit - vehicle_unit ?service_stop_instruction - service_stop_instruction ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?vehicle_unit)
+        (assigned_time_window ?vehicle_unit ?time_window)
+        (service_stop_instruction_available ?service_stop_instruction)
+        (vehicle_has_service_stop_instruction ?vehicle_unit ?service_stop_instruction)
+        (not
+          (vehicle_service_stop_claimed ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_service_stop_claimed ?vehicle_unit)
+        (not
+          (service_stop_instruction_available ?service_stop_instruction)
+        )
+      )
+  )
+  (:action prepare_service_stop_on_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?yard_handling_equipment - yard_handling_equipment)
+    :precondition
+      (and
+        (vehicle_service_stop_claimed ?vehicle_unit)
+        (assigned_yard_equipment_to_logistics ?vehicle_unit ?yard_handling_equipment)
+        (not
+          (vehicle_service_stop_ready ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_service_stop_ready ?vehicle_unit)
+  )
+  (:action verify_regulatory_documents_for_service_stop
+    :parameters (?vehicle_unit - vehicle_unit ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (vehicle_service_stop_ready ?vehicle_unit)
+        (vehicle_assigned_regulatory_document ?vehicle_unit ?regulatory_document)
+        (not
+          (vehicle_service_stop_verified ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_service_stop_verified ?vehicle_unit)
+  )
+  (:action acknowledge_service_stop_and_mark_dispatch_ready
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_service_stop_verified ?vehicle_unit)
+        (not
+          (dispatch_acknowledged ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_acknowledged ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action mark_origin_hub_ready_for_dispatch
+    :parameters (?origin_hub - origin_hub ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (origin_hub_allocated ?origin_hub)
+        (origin_hub_has_load ?origin_hub)
+        (trip_committed ?trip_segment)
+        (trip_loading_ready ?trip_segment)
+        (not
+          (ready_for_dispatch ?origin_hub)
+        )
+      )
+    :effect (ready_for_dispatch ?origin_hub)
+  )
+  (:action mark_destination_hub_ready_for_dispatch
+    :parameters (?destination_hub - destination_hub ?trip_segment - trip_segment)
+    :precondition
+      (and
+        (destination_hub_allocated ?destination_hub)
+        (destination_hub_has_load ?destination_hub)
+        (trip_committed ?trip_segment)
+        (trip_loading_ready ?trip_segment)
+        (not
+          (ready_for_dispatch ?destination_hub)
+        )
+      )
+    :effect (ready_for_dispatch ?destination_hub)
+  )
+  (:action finalize_logistics_entity_binding_to_destination_record
+    :parameters (?shipment_order - logistics_entity ?consignment_destination_record - consignment_destination_record ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_dispatch ?shipment_order)
+        (assigned_time_window ?shipment_order ?time_window)
+        (destination_record_available ?consignment_destination_record)
+        (not
+          (logistics_committed ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (logistics_committed ?shipment_order)
+        (logistics_linked_to_destination_record ?shipment_order ?consignment_destination_record)
+        (not
+          (destination_record_available ?consignment_destination_record)
+        )
+      )
+  )
+  (:action finalize_origin_dispatch_and_release_asset
+    :parameters (?origin_hub - origin_hub ?tractor_or_trailer_asset - tractor_or_trailer_asset ?consignment_destination_record - consignment_destination_record)
+    :precondition
+      (and
+        (logistics_committed ?origin_hub)
+        (assigned_asset_to_logistics ?origin_hub ?tractor_or_trailer_asset)
+        (logistics_linked_to_destination_record ?origin_hub ?consignment_destination_record)
+        (not
+          (dispatch_finalized ?origin_hub)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?origin_hub)
+        (asset_available ?tractor_or_trailer_asset)
+        (destination_record_available ?consignment_destination_record)
+      )
+  )
+  (:action finalize_destination_dispatch_and_release_asset
+    :parameters (?destination_hub - destination_hub ?tractor_or_trailer_asset - tractor_or_trailer_asset ?consignment_destination_record - consignment_destination_record)
+    :precondition
+      (and
+        (logistics_committed ?destination_hub)
+        (assigned_asset_to_logistics ?destination_hub ?tractor_or_trailer_asset)
+        (logistics_linked_to_destination_record ?destination_hub ?consignment_destination_record)
+        (not
+          (dispatch_finalized ?destination_hub)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?destination_hub)
+        (asset_available ?tractor_or_trailer_asset)
+        (destination_record_available ?consignment_destination_record)
+      )
+  )
+  (:action finalize_vehicle_dispatch_and_release_asset
+    :parameters (?vehicle_unit - vehicle_unit ?tractor_or_trailer_asset - tractor_or_trailer_asset ?consignment_destination_record - consignment_destination_record)
+    :precondition
+      (and
+        (logistics_committed ?vehicle_unit)
+        (assigned_asset_to_logistics ?vehicle_unit ?tractor_or_trailer_asset)
+        (logistics_linked_to_destination_record ?vehicle_unit ?consignment_destination_record)
+        (not
+          (dispatch_finalized ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?vehicle_unit)
+        (asset_available ?tractor_or_trailer_asset)
+        (destination_record_available ?consignment_destination_record)
+      )
+  )
+)

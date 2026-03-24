@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain parallel_questline_conflict_resolution_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types game_object - object entity_category_primary - game_object entity_category_secondary - game_object entity_category_tertiary - game_object quest_template - game_object quest_case - quest_template resource_token - entity_category_primary objective_marker - entity_category_primary npc_actor - entity_category_primary optional_trigger - entity_category_primary secondary_reward - entity_category_primary resolution_token - entity_category_primary special_resource - entity_category_primary key_witness - entity_category_primary consumable_item - entity_category_secondary evidence_item - entity_category_secondary ally_marker - entity_category_secondary checkpoint_a - entity_category_tertiary checkpoint_b - entity_category_tertiary synchronization_point - entity_category_tertiary branch_type - quest_case branch_variant - quest_case branch_node_a - branch_type branch_node_b - branch_type reconciliation_unit - branch_variant)
+
+  (:predicates
+    (case_offered ?quest_case - quest_case)
+    (case_active ?quest_case - quest_case)
+    (case_resource_assigned ?quest_case - quest_case)
+    (case_finalization_flag ?quest_case - quest_case)
+    (case_finalization_awarded ?quest_case - quest_case)
+    (case_resolution_committed ?quest_case - quest_case)
+    (resource_available ?resource_token - resource_token)
+    (resource_assigned_to_case ?quest_case - quest_case ?resource_token - resource_token)
+    (objective_available ?objective_marker - objective_marker)
+    (objective_assigned ?quest_case - quest_case ?objective_marker - objective_marker)
+    (npc_available ?npc_actor - npc_actor)
+    (npc_assigned_to_case ?quest_case - quest_case ?npc_actor - npc_actor)
+    (item_available ?consumable_item - consumable_item)
+    (item_assigned_to_branch_a ?branch_node_a - branch_node_a ?consumable_item - consumable_item)
+    (item_assigned_to_branch_b ?branch_node_b - branch_node_b ?consumable_item - consumable_item)
+    (branch_a_checkpoint_link ?branch_node_a - branch_node_a ?checkpoint_a - checkpoint_a)
+    (checkpoint_a_primary_ready ?checkpoint_a - checkpoint_a)
+    (checkpoint_a_secondary_ready ?checkpoint_a - checkpoint_a)
+    (branch_a_completed_flag ?branch_node_a - branch_node_a)
+    (branch_b_checkpoint_link ?branch_node_b - branch_node_b ?checkpoint_b - checkpoint_b)
+    (checkpoint_b_primary_ready ?checkpoint_b - checkpoint_b)
+    (checkpoint_b_secondary_ready ?checkpoint_b - checkpoint_b)
+    (branch_b_completed_flag ?branch_node_b - branch_node_b)
+    (sync_point_available ?synchronization_point - synchronization_point)
+    (sync_point_created ?synchronization_point - synchronization_point)
+    (sync_attached_checkpoint_a ?synchronization_point - synchronization_point ?checkpoint_a - checkpoint_a)
+    (sync_attached_checkpoint_b ?synchronization_point - synchronization_point ?checkpoint_b - checkpoint_b)
+    (synchronization_variant_alpha ?synchronization_point - synchronization_point)
+    (synchronization_variant_beta ?synchronization_point - synchronization_point)
+    (synchronization_validated ?synchronization_point - synchronization_point)
+    (reconciliation_unit_bound_branch_a ?reconciliation_unit - reconciliation_unit ?branch_node_a - branch_node_a)
+    (reconciliation_unit_bound_branch_b ?reconciliation_unit - reconciliation_unit ?branch_node_b - branch_node_b)
+    (reconciliation_unit_attached_sync_point ?reconciliation_unit - reconciliation_unit ?synchronization_point - synchronization_point)
+    (evidence_available ?evidence_item - evidence_item)
+    (evidence_attached_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?evidence_item - evidence_item)
+    (evidence_used ?evidence_item - evidence_item)
+    (evidence_bound_to_sync_point ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    (reconciliation_unit_prepared ?reconciliation_unit - reconciliation_unit)
+    (reconciliation_unit_processing ?reconciliation_unit - reconciliation_unit)
+    (reconciliation_unit_witness_stage_complete ?reconciliation_unit - reconciliation_unit)
+    (optional_trigger_attached ?reconciliation_unit - reconciliation_unit)
+    (reconciliation_unit_bonus_flag ?reconciliation_unit - reconciliation_unit)
+    (ally_support_applied ?reconciliation_unit - reconciliation_unit)
+    (reconciliation_unit_finalization_staged ?reconciliation_unit - reconciliation_unit)
+    (ally_available ?ally_marker - ally_marker)
+    (ally_assigned_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?ally_marker - ally_marker)
+    (reconciliation_unit_allied_flag ?reconciliation_unit - reconciliation_unit)
+    (allied_support_stage1 ?reconciliation_unit - reconciliation_unit)
+    (allied_witness_complete ?reconciliation_unit - reconciliation_unit)
+    (optional_trigger_available ?optional_trigger - optional_trigger)
+    (optional_trigger_bound_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?optional_trigger - optional_trigger)
+    (secondary_reward_available ?secondary_reward - secondary_reward)
+    (secondary_reward_assigned_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?secondary_reward - secondary_reward)
+    (special_resource_available ?special_resource - special_resource)
+    (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?special_resource - special_resource)
+    (key_witness_available ?key_witness - key_witness)
+    (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit - reconciliation_unit ?key_witness - key_witness)
+    (resolution_token_available_case ?resolution_token - resolution_token)
+    (resolution_token_bound_to_case ?quest_case - quest_case ?resolution_token - resolution_token)
+    (branch_a_ready ?branch_node_a - branch_node_a)
+    (branch_b_ready ?branch_node_b - branch_node_b)
+    (reconciliation_unit_finalized ?reconciliation_unit - reconciliation_unit)
+  )
+  (:action offer_quest
+    :parameters (?quest_case - quest_case)
+    :precondition
+      (and
+        (not
+          (case_offered ?quest_case)
+        )
+        (not
+          (case_finalization_flag ?quest_case)
+        )
+      )
+    :effect (case_offered ?quest_case)
+  )
+  (:action assign_resource_to_quest
+    :parameters (?quest_case - quest_case ?resource_token - resource_token)
+    :precondition
+      (and
+        (case_offered ?quest_case)
+        (not
+          (case_resource_assigned ?quest_case)
+        )
+        (resource_available ?resource_token)
+      )
+    :effect
+      (and
+        (case_resource_assigned ?quest_case)
+        (resource_assigned_to_case ?quest_case ?resource_token)
+        (not
+          (resource_available ?resource_token)
+        )
+      )
+  )
+  (:action assign_objective_marker
+    :parameters (?quest_case - quest_case ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_offered ?quest_case)
+        (case_resource_assigned ?quest_case)
+        (objective_available ?objective_marker)
+      )
+    :effect
+      (and
+        (objective_assigned ?quest_case ?objective_marker)
+        (not
+          (objective_available ?objective_marker)
+        )
+      )
+  )
+  (:action accept_quest
+    :parameters (?quest_case - quest_case ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_offered ?quest_case)
+        (case_resource_assigned ?quest_case)
+        (objective_assigned ?quest_case ?objective_marker)
+        (not
+          (case_active ?quest_case)
+        )
+      )
+    :effect (case_active ?quest_case)
+  )
+  (:action release_objective_marker
+    :parameters (?quest_case - quest_case ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (objective_assigned ?quest_case ?objective_marker)
+      )
+    :effect
+      (and
+        (objective_available ?objective_marker)
+        (not
+          (objective_assigned ?quest_case ?objective_marker)
+        )
+      )
+  )
+  (:action assign_npc_to_case
+    :parameters (?quest_case - quest_case ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (case_active ?quest_case)
+        (npc_available ?npc_actor)
+      )
+    :effect
+      (and
+        (npc_assigned_to_case ?quest_case ?npc_actor)
+        (not
+          (npc_available ?npc_actor)
+        )
+      )
+  )
+  (:action release_npc_from_case
+    :parameters (?quest_case - quest_case ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (npc_assigned_to_case ?quest_case ?npc_actor)
+      )
+    :effect
+      (and
+        (npc_available ?npc_actor)
+        (not
+          (npc_assigned_to_case ?quest_case ?npc_actor)
+        )
+      )
+  )
+  (:action attach_special_resource_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?special_resource - special_resource)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (special_resource_available ?special_resource)
+      )
+    :effect
+      (and
+        (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit ?special_resource)
+        (not
+          (special_resource_available ?special_resource)
+        )
+      )
+  )
+  (:action detach_special_resource_from_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?special_resource - special_resource)
+    :precondition
+      (and
+        (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit ?special_resource)
+      )
+    :effect
+      (and
+        (special_resource_available ?special_resource)
+        (not
+          (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit ?special_resource)
+        )
+      )
+  )
+  (:action assign_key_witness_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (key_witness_available ?key_witness)
+      )
+    :effect
+      (and
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (not
+          (key_witness_available ?key_witness)
+        )
+      )
+  )
+  (:action release_key_witness_from_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness)
+    :precondition
+      (and
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+      )
+    :effect
+      (and
+        (key_witness_available ?key_witness)
+        (not
+          (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        )
+      )
+  )
+  (:action mark_branch_a_checkpoint_primary
+    :parameters (?branch_node_a - branch_node_a ?checkpoint_a - checkpoint_a ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_active ?branch_node_a)
+        (objective_assigned ?branch_node_a ?objective_marker)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (not
+          (checkpoint_a_primary_ready ?checkpoint_a)
+        )
+        (not
+          (checkpoint_a_secondary_ready ?checkpoint_a)
+        )
+      )
+    :effect (checkpoint_a_primary_ready ?checkpoint_a)
+  )
+  (:action finalize_branch_a_with_npc
+    :parameters (?branch_node_a - branch_node_a ?checkpoint_a - checkpoint_a ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (case_active ?branch_node_a)
+        (npc_assigned_to_case ?branch_node_a ?npc_actor)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (checkpoint_a_primary_ready ?checkpoint_a)
+        (not
+          (branch_a_ready ?branch_node_a)
+        )
+      )
+    :effect
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_a_completed_flag ?branch_node_a)
+      )
+  )
+  (:action use_item_on_branch_a
+    :parameters (?branch_node_a - branch_node_a ?checkpoint_a - checkpoint_a ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (case_active ?branch_node_a)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (item_available ?consumable_item)
+        (not
+          (branch_a_ready ?branch_node_a)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_a_secondary_ready ?checkpoint_a)
+        (branch_a_ready ?branch_node_a)
+        (item_assigned_to_branch_a ?branch_node_a ?consumable_item)
+        (not
+          (item_available ?consumable_item)
+        )
+      )
+  )
+  (:action process_branch_a_objective_and_item
+    :parameters (?branch_node_a - branch_node_a ?checkpoint_a - checkpoint_a ?objective_marker - objective_marker ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (case_active ?branch_node_a)
+        (objective_assigned ?branch_node_a ?objective_marker)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (checkpoint_a_secondary_ready ?checkpoint_a)
+        (item_assigned_to_branch_a ?branch_node_a ?consumable_item)
+        (not
+          (branch_a_completed_flag ?branch_node_a)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_a_primary_ready ?checkpoint_a)
+        (branch_a_completed_flag ?branch_node_a)
+        (item_available ?consumable_item)
+        (not
+          (item_assigned_to_branch_a ?branch_node_a ?consumable_item)
+        )
+      )
+  )
+  (:action mark_branch_b_checkpoint_primary
+    :parameters (?branch_node_b - branch_node_b ?checkpoint_b - checkpoint_b ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_active ?branch_node_b)
+        (objective_assigned ?branch_node_b ?objective_marker)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (not
+          (checkpoint_b_primary_ready ?checkpoint_b)
+        )
+        (not
+          (checkpoint_b_secondary_ready ?checkpoint_b)
+        )
+      )
+    :effect (checkpoint_b_primary_ready ?checkpoint_b)
+  )
+  (:action finalize_branch_b_with_npc
+    :parameters (?branch_node_b - branch_node_b ?checkpoint_b - checkpoint_b ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (case_active ?branch_node_b)
+        (npc_assigned_to_case ?branch_node_b ?npc_actor)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_b_primary_ready ?checkpoint_b)
+        (not
+          (branch_b_ready ?branch_node_b)
+        )
+      )
+    :effect
+      (and
+        (branch_b_ready ?branch_node_b)
+        (branch_b_completed_flag ?branch_node_b)
+      )
+  )
+  (:action use_item_on_branch_b
+    :parameters (?branch_node_b - branch_node_b ?checkpoint_b - checkpoint_b ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (case_active ?branch_node_b)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (item_available ?consumable_item)
+        (not
+          (branch_b_ready ?branch_node_b)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_b_secondary_ready ?checkpoint_b)
+        (branch_b_ready ?branch_node_b)
+        (item_assigned_to_branch_b ?branch_node_b ?consumable_item)
+        (not
+          (item_available ?consumable_item)
+        )
+      )
+  )
+  (:action process_branch_b_objective_and_item
+    :parameters (?branch_node_b - branch_node_b ?checkpoint_b - checkpoint_b ?objective_marker - objective_marker ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (case_active ?branch_node_b)
+        (objective_assigned ?branch_node_b ?objective_marker)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_b_secondary_ready ?checkpoint_b)
+        (item_assigned_to_branch_b ?branch_node_b ?consumable_item)
+        (not
+          (branch_b_completed_flag ?branch_node_b)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_b_primary_ready ?checkpoint_b)
+        (branch_b_completed_flag ?branch_node_b)
+        (item_available ?consumable_item)
+        (not
+          (item_assigned_to_branch_b ?branch_node_b ?consumable_item)
+        )
+      )
+  )
+  (:action create_synchronization_point_primary_primary
+    :parameters (?branch_node_a - branch_node_a ?branch_node_b - branch_node_b ?checkpoint_a - checkpoint_a ?checkpoint_b - checkpoint_b ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_b_ready ?branch_node_b)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_a_primary_ready ?checkpoint_a)
+        (checkpoint_b_primary_ready ?checkpoint_b)
+        (branch_a_completed_flag ?branch_node_a)
+        (branch_b_completed_flag ?branch_node_b)
+        (sync_point_available ?synchronization_point)
+      )
+    :effect
+      (and
+        (sync_point_created ?synchronization_point)
+        (sync_attached_checkpoint_a ?synchronization_point ?checkpoint_a)
+        (sync_attached_checkpoint_b ?synchronization_point ?checkpoint_b)
+        (not
+          (sync_point_available ?synchronization_point)
+        )
+      )
+  )
+  (:action create_synchronization_point_secondary_primary
+    :parameters (?branch_node_a - branch_node_a ?branch_node_b - branch_node_b ?checkpoint_a - checkpoint_a ?checkpoint_b - checkpoint_b ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_b_ready ?branch_node_b)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_a_secondary_ready ?checkpoint_a)
+        (checkpoint_b_primary_ready ?checkpoint_b)
+        (not
+          (branch_a_completed_flag ?branch_node_a)
+        )
+        (branch_b_completed_flag ?branch_node_b)
+        (sync_point_available ?synchronization_point)
+      )
+    :effect
+      (and
+        (sync_point_created ?synchronization_point)
+        (sync_attached_checkpoint_a ?synchronization_point ?checkpoint_a)
+        (sync_attached_checkpoint_b ?synchronization_point ?checkpoint_b)
+        (synchronization_variant_alpha ?synchronization_point)
+        (not
+          (sync_point_available ?synchronization_point)
+        )
+      )
+  )
+  (:action create_synchronization_point_primary_secondary
+    :parameters (?branch_node_a - branch_node_a ?branch_node_b - branch_node_b ?checkpoint_a - checkpoint_a ?checkpoint_b - checkpoint_b ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_b_ready ?branch_node_b)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_a_primary_ready ?checkpoint_a)
+        (checkpoint_b_secondary_ready ?checkpoint_b)
+        (branch_a_completed_flag ?branch_node_a)
+        (not
+          (branch_b_completed_flag ?branch_node_b)
+        )
+        (sync_point_available ?synchronization_point)
+      )
+    :effect
+      (and
+        (sync_point_created ?synchronization_point)
+        (sync_attached_checkpoint_a ?synchronization_point ?checkpoint_a)
+        (sync_attached_checkpoint_b ?synchronization_point ?checkpoint_b)
+        (synchronization_variant_beta ?synchronization_point)
+        (not
+          (sync_point_available ?synchronization_point)
+        )
+      )
+  )
+  (:action create_synchronization_point_secondary_secondary
+    :parameters (?branch_node_a - branch_node_a ?branch_node_b - branch_node_b ?checkpoint_a - checkpoint_a ?checkpoint_b - checkpoint_b ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_b_ready ?branch_node_b)
+        (branch_a_checkpoint_link ?branch_node_a ?checkpoint_a)
+        (branch_b_checkpoint_link ?branch_node_b ?checkpoint_b)
+        (checkpoint_a_secondary_ready ?checkpoint_a)
+        (checkpoint_b_secondary_ready ?checkpoint_b)
+        (not
+          (branch_a_completed_flag ?branch_node_a)
+        )
+        (not
+          (branch_b_completed_flag ?branch_node_b)
+        )
+        (sync_point_available ?synchronization_point)
+      )
+    :effect
+      (and
+        (sync_point_created ?synchronization_point)
+        (sync_attached_checkpoint_a ?synchronization_point ?checkpoint_a)
+        (sync_attached_checkpoint_b ?synchronization_point ?checkpoint_b)
+        (synchronization_variant_alpha ?synchronization_point)
+        (synchronization_variant_beta ?synchronization_point)
+        (not
+          (sync_point_available ?synchronization_point)
+        )
+      )
+  )
+  (:action validate_synchronization_point
+    :parameters (?synchronization_point - synchronization_point ?branch_node_a - branch_node_a ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (sync_point_created ?synchronization_point)
+        (branch_a_ready ?branch_node_a)
+        (objective_assigned ?branch_node_a ?objective_marker)
+        (not
+          (synchronization_validated ?synchronization_point)
+        )
+      )
+    :effect (synchronization_validated ?synchronization_point)
+  )
+  (:action apply_evidence_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (reconciliation_unit_attached_sync_point ?reconciliation_unit ?synchronization_point)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_available ?evidence_item)
+        (sync_point_created ?synchronization_point)
+        (synchronization_validated ?synchronization_point)
+        (not
+          (evidence_used ?evidence_item)
+        )
+      )
+    :effect
+      (and
+        (evidence_used ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action stage_evidence_validation_on_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?evidence_item - evidence_item ?synchronization_point - synchronization_point ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_used ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (objective_assigned ?reconciliation_unit ?objective_marker)
+        (not
+          (synchronization_variant_alpha ?synchronization_point)
+        )
+        (not
+          (reconciliation_unit_prepared ?reconciliation_unit)
+        )
+      )
+    :effect (reconciliation_unit_prepared ?reconciliation_unit)
+  )
+  (:action attach_optional_trigger_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?optional_trigger - optional_trigger)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (optional_trigger_available ?optional_trigger)
+        (not
+          (optional_trigger_attached ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (optional_trigger_attached ?reconciliation_unit)
+        (optional_trigger_bound_to_reconciliation_unit ?reconciliation_unit ?optional_trigger)
+        (not
+          (optional_trigger_available ?optional_trigger)
+        )
+      )
+  )
+  (:action apply_trigger_and_advance_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?evidence_item - evidence_item ?synchronization_point - synchronization_point ?objective_marker - objective_marker ?optional_trigger - optional_trigger)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_used ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (objective_assigned ?reconciliation_unit ?objective_marker)
+        (synchronization_variant_alpha ?synchronization_point)
+        (optional_trigger_attached ?reconciliation_unit)
+        (optional_trigger_bound_to_reconciliation_unit ?reconciliation_unit ?optional_trigger)
+        (not
+          (reconciliation_unit_prepared ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_prepared ?reconciliation_unit)
+        (reconciliation_unit_bonus_flag ?reconciliation_unit)
+      )
+  )
+  (:action begin_reconciliation_unit_processing_with_special_resource
+    :parameters (?reconciliation_unit - reconciliation_unit ?special_resource - special_resource ?npc_actor - npc_actor ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_prepared ?reconciliation_unit)
+        (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit ?special_resource)
+        (npc_assigned_to_case ?reconciliation_unit ?npc_actor)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (not
+          (synchronization_variant_beta ?synchronization_point)
+        )
+        (not
+          (reconciliation_unit_processing ?reconciliation_unit)
+        )
+      )
+    :effect (reconciliation_unit_processing ?reconciliation_unit)
+  )
+  (:action begin_reconciliation_unit_processing_with_special_resource_variant
+    :parameters (?reconciliation_unit - reconciliation_unit ?special_resource - special_resource ?npc_actor - npc_actor ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_prepared ?reconciliation_unit)
+        (special_resource_assigned_to_reconciliation_unit ?reconciliation_unit ?special_resource)
+        (npc_assigned_to_case ?reconciliation_unit ?npc_actor)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (synchronization_variant_beta ?synchronization_point)
+        (not
+          (reconciliation_unit_processing ?reconciliation_unit)
+        )
+      )
+    :effect (reconciliation_unit_processing ?reconciliation_unit)
+  )
+  (:action complete_reconciliation_unit_witness_stage
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_processing ?reconciliation_unit)
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (not
+          (synchronization_variant_alpha ?synchronization_point)
+        )
+        (not
+          (synchronization_variant_beta ?synchronization_point)
+        )
+        (not
+          (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        )
+      )
+    :effect (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+  )
+  (:action complete_reconciliation_unit_witness_stage_with_ally_support
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_processing ?reconciliation_unit)
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (synchronization_variant_alpha ?synchronization_point)
+        (not
+          (synchronization_variant_beta ?synchronization_point)
+        )
+        (not
+          (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (ally_support_applied ?reconciliation_unit)
+      )
+  )
+  (:action complete_reconciliation_unit_witness_stage_with_ally_support_variant
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_processing ?reconciliation_unit)
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (not
+          (synchronization_variant_alpha ?synchronization_point)
+        )
+        (synchronization_variant_beta ?synchronization_point)
+        (not
+          (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (ally_support_applied ?reconciliation_unit)
+      )
+  )
+  (:action complete_reconciliation_unit_witness_stage_with_ally_support_alt
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness ?evidence_item - evidence_item ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (reconciliation_unit_processing ?reconciliation_unit)
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (evidence_attached_to_reconciliation_unit ?reconciliation_unit ?evidence_item)
+        (evidence_bound_to_sync_point ?evidence_item ?synchronization_point)
+        (synchronization_variant_alpha ?synchronization_point)
+        (synchronization_variant_beta ?synchronization_point)
+        (not
+          (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (ally_support_applied ?reconciliation_unit)
+      )
+  )
+  (:action finalize_reconciliation_unit_no_ally
+    :parameters (?reconciliation_unit - reconciliation_unit)
+    :precondition
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (not
+          (ally_support_applied ?reconciliation_unit)
+        )
+        (not
+          (reconciliation_unit_finalized ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_finalized ?reconciliation_unit)
+        (case_finalization_awarded ?reconciliation_unit)
+      )
+  )
+  (:action assign_secondary_reward_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?secondary_reward - secondary_reward)
+    :precondition
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (ally_support_applied ?reconciliation_unit)
+        (secondary_reward_available ?secondary_reward)
+      )
+    :effect
+      (and
+        (secondary_reward_assigned_to_reconciliation_unit ?reconciliation_unit ?secondary_reward)
+        (not
+          (secondary_reward_available ?secondary_reward)
+        )
+      )
+  )
+  (:action finalize_reconciliation_unit_after_validation
+    :parameters (?reconciliation_unit - reconciliation_unit ?branch_node_a - branch_node_a ?branch_node_b - branch_node_b ?objective_marker - objective_marker ?secondary_reward - secondary_reward)
+    :precondition
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (ally_support_applied ?reconciliation_unit)
+        (secondary_reward_assigned_to_reconciliation_unit ?reconciliation_unit ?secondary_reward)
+        (reconciliation_unit_bound_branch_a ?reconciliation_unit ?branch_node_a)
+        (reconciliation_unit_bound_branch_b ?reconciliation_unit ?branch_node_b)
+        (branch_a_completed_flag ?branch_node_a)
+        (branch_b_completed_flag ?branch_node_b)
+        (objective_assigned ?reconciliation_unit ?objective_marker)
+        (not
+          (reconciliation_unit_finalization_staged ?reconciliation_unit)
+        )
+      )
+    :effect (reconciliation_unit_finalization_staged ?reconciliation_unit)
+  )
+  (:action finalize_reconciliation_unit_with_ally_support
+    :parameters (?reconciliation_unit - reconciliation_unit)
+    :precondition
+      (and
+        (reconciliation_unit_witness_stage_complete ?reconciliation_unit)
+        (reconciliation_unit_finalization_staged ?reconciliation_unit)
+        (not
+          (reconciliation_unit_finalized ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_finalized ?reconciliation_unit)
+        (case_finalization_awarded ?reconciliation_unit)
+      )
+  )
+  (:action attach_ally_marker_to_reconciliation_unit
+    :parameters (?reconciliation_unit - reconciliation_unit ?ally_marker - ally_marker ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_active ?reconciliation_unit)
+        (objective_assigned ?reconciliation_unit ?objective_marker)
+        (ally_available ?ally_marker)
+        (ally_assigned_to_reconciliation_unit ?reconciliation_unit ?ally_marker)
+        (not
+          (reconciliation_unit_allied_flag ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_allied_flag ?reconciliation_unit)
+        (not
+          (ally_available ?ally_marker)
+        )
+      )
+  )
+  (:action start_allied_finalization
+    :parameters (?reconciliation_unit - reconciliation_unit ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (reconciliation_unit_allied_flag ?reconciliation_unit)
+        (npc_assigned_to_case ?reconciliation_unit ?npc_actor)
+        (not
+          (allied_support_stage1 ?reconciliation_unit)
+        )
+      )
+    :effect (allied_support_stage1 ?reconciliation_unit)
+  )
+  (:action register_allied_witness
+    :parameters (?reconciliation_unit - reconciliation_unit ?key_witness - key_witness)
+    :precondition
+      (and
+        (allied_support_stage1 ?reconciliation_unit)
+        (key_witness_assigned_to_reconciliation_unit ?reconciliation_unit ?key_witness)
+        (not
+          (allied_witness_complete ?reconciliation_unit)
+        )
+      )
+    :effect (allied_witness_complete ?reconciliation_unit)
+  )
+  (:action finalize_reconciliation_unit_with_allied_support
+    :parameters (?reconciliation_unit - reconciliation_unit)
+    :precondition
+      (and
+        (allied_witness_complete ?reconciliation_unit)
+        (not
+          (reconciliation_unit_finalized ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_unit_finalized ?reconciliation_unit)
+        (case_finalization_awarded ?reconciliation_unit)
+      )
+  )
+  (:action finalize_branch_a
+    :parameters (?branch_node_a - branch_node_a ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_a_ready ?branch_node_a)
+        (branch_a_completed_flag ?branch_node_a)
+        (sync_point_created ?synchronization_point)
+        (synchronization_validated ?synchronization_point)
+        (not
+          (case_finalization_awarded ?branch_node_a)
+        )
+      )
+    :effect (case_finalization_awarded ?branch_node_a)
+  )
+  (:action finalize_branch_b
+    :parameters (?branch_node_b - branch_node_b ?synchronization_point - synchronization_point)
+    :precondition
+      (and
+        (branch_b_ready ?branch_node_b)
+        (branch_b_completed_flag ?branch_node_b)
+        (sync_point_created ?synchronization_point)
+        (synchronization_validated ?synchronization_point)
+        (not
+          (case_finalization_awarded ?branch_node_b)
+        )
+      )
+    :effect (case_finalization_awarded ?branch_node_b)
+  )
+  (:action apply_resolution_token_to_case
+    :parameters (?quest_case - quest_case ?resolution_token - resolution_token ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (case_finalization_awarded ?quest_case)
+        (objective_assigned ?quest_case ?objective_marker)
+        (resolution_token_available_case ?resolution_token)
+        (not
+          (case_resolution_committed ?quest_case)
+        )
+      )
+    :effect
+      (and
+        (case_resolution_committed ?quest_case)
+        (resolution_token_bound_to_case ?quest_case ?resolution_token)
+        (not
+          (resolution_token_available_case ?resolution_token)
+        )
+      )
+  )
+  (:action resolve_branch_a_and_reassign_resource
+    :parameters (?branch_node_a - branch_node_a ?resource_token - resource_token ?resolution_token - resolution_token)
+    :precondition
+      (and
+        (case_resolution_committed ?branch_node_a)
+        (resource_assigned_to_case ?branch_node_a ?resource_token)
+        (resolution_token_bound_to_case ?branch_node_a ?resolution_token)
+        (not
+          (case_finalization_flag ?branch_node_a)
+        )
+      )
+    :effect
+      (and
+        (case_finalization_flag ?branch_node_a)
+        (resource_available ?resource_token)
+        (resolution_token_available_case ?resolution_token)
+      )
+  )
+  (:action resolve_branch_b_and_reassign_resource
+    :parameters (?branch_node_b - branch_node_b ?resource_token - resource_token ?resolution_token - resolution_token)
+    :precondition
+      (and
+        (case_resolution_committed ?branch_node_b)
+        (resource_assigned_to_case ?branch_node_b ?resource_token)
+        (resolution_token_bound_to_case ?branch_node_b ?resolution_token)
+        (not
+          (case_finalization_flag ?branch_node_b)
+        )
+      )
+    :effect
+      (and
+        (case_finalization_flag ?branch_node_b)
+        (resource_available ?resource_token)
+        (resolution_token_available_case ?resolution_token)
+      )
+  )
+  (:action finalize_reconciliation_unit_and_reassign_resource
+    :parameters (?reconciliation_unit - reconciliation_unit ?resource_token - resource_token ?resolution_token - resolution_token)
+    :precondition
+      (and
+        (case_resolution_committed ?reconciliation_unit)
+        (resource_assigned_to_case ?reconciliation_unit ?resource_token)
+        (resolution_token_bound_to_case ?reconciliation_unit ?resolution_token)
+        (not
+          (case_finalization_flag ?reconciliation_unit)
+        )
+      )
+    :effect
+      (and
+        (case_finalization_flag ?reconciliation_unit)
+        (resource_available ?resource_token)
+        (resolution_token_available_case ?resolution_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem parallel_questline_conflict_resolution_problem)
+  (:domain parallel_questline_conflict_resolution_domain)
+  (:objects branch_a_node_1 - branch_node_a branch_b_node_1 - branch_node_b reconciliation_unit_1 - reconciliation_unit reconciliation_unit_2 - reconciliation_unit resource_token_1 - resource_token resource_token_2 - resource_token resource_token_3 - resource_token objective_marker_1 - objective_marker npc_actor_1 - npc_actor consumable_item_1 - consumable_item checkpoint_a_1 - checkpoint_a checkpoint_b_1 - checkpoint_b synchronization_point_1 - synchronization_point evidence_item_alpha - evidence_item evidence_item_beta - evidence_item optional_trigger_alpha - optional_trigger optional_trigger_beta - optional_trigger secondary_reward_alpha - secondary_reward secondary_reward_beta - secondary_reward resolution_token_1 - resolution_token special_resource_1 - special_resource ally_marker_1 - ally_marker ally_marker_2 - ally_marker key_witness_1 - key_witness)
+  (:init
+    (resource_available resource_token_1)
+    (resource_available resource_token_2)
+    (resource_available resource_token_3)
+    (objective_available objective_marker_1)
+    (npc_available npc_actor_1)
+    (item_available consumable_item_1)
+    (branch_a_checkpoint_link branch_a_node_1 checkpoint_a_1)
+    (branch_b_checkpoint_link branch_b_node_1 checkpoint_b_1)
+    (sync_point_available synchronization_point_1)
+    (evidence_available evidence_item_alpha)
+    (evidence_available evidence_item_beta)
+    (reconciliation_unit_bound_branch_a reconciliation_unit_1 branch_a_node_1)
+    (reconciliation_unit_bound_branch_a reconciliation_unit_2 branch_a_node_1)
+    (reconciliation_unit_bound_branch_b reconciliation_unit_1 branch_b_node_1)
+    (reconciliation_unit_bound_branch_b reconciliation_unit_2 branch_b_node_1)
+    (reconciliation_unit_attached_sync_point reconciliation_unit_1 synchronization_point_1)
+    (reconciliation_unit_attached_sync_point reconciliation_unit_2 synchronization_point_1)
+    (evidence_attached_to_reconciliation_unit reconciliation_unit_1 evidence_item_alpha)
+    (evidence_attached_to_reconciliation_unit reconciliation_unit_2 evidence_item_beta)
+    (optional_trigger_available optional_trigger_alpha)
+    (optional_trigger_available optional_trigger_beta)
+    (secondary_reward_available secondary_reward_alpha)
+    (secondary_reward_available secondary_reward_beta)
+    (resolution_token_available_case resolution_token_1)
+    (special_resource_available special_resource_1)
+    (ally_available ally_marker_1)
+    (ally_assigned_to_reconciliation_unit reconciliation_unit_1 ally_marker_1)
+    (ally_assigned_to_reconciliation_unit reconciliation_unit_2 ally_marker_2)
+    (key_witness_available key_witness_1)
+  )
+  (:goal
+    (and
+      (case_finalization_flag branch_a_node_1)
+      (case_finalization_flag branch_b_node_1)
+      (case_finalization_flag reconciliation_unit_1)
+      (case_finalization_flag reconciliation_unit_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(offer_quest branch_a_node_1)
+(assign_resource_to_quest branch_a_node_1 resource_token_1)
+(assign_objective_marker branch_a_node_1 objective_marker_1)
+(accept_quest branch_a_node_1 objective_marker_1)
+(assign_npc_to_case branch_a_node_1 npc_actor_1)
+(mark_branch_a_checkpoint_primary branch_a_node_1 checkpoint_a_1 objective_marker_1)
+(finalize_branch_a_with_npc branch_a_node_1 checkpoint_a_1 npc_actor_1)
+(release_npc_from_case branch_a_node_1 npc_actor_1)
+(offer_quest branch_b_node_1)
+(assign_resource_to_quest branch_b_node_1 resource_token_2)
+(release_objective_marker branch_a_node_1 objective_marker_1)
+(assign_objective_marker branch_b_node_1 objective_marker_1)
+(accept_quest branch_b_node_1 objective_marker_1)
+(assign_npc_to_case branch_b_node_1 npc_actor_1)
+(mark_branch_b_checkpoint_primary branch_b_node_1 checkpoint_b_1 objective_marker_1)
+(finalize_branch_b_with_npc branch_b_node_1 checkpoint_b_1 npc_actor_1)
+(release_npc_from_case branch_b_node_1 npc_actor_1)
+(release_objective_marker branch_b_node_1 objective_marker_1)
+(assign_objective_marker branch_a_node_1 objective_marker_1)
+(create_synchronization_point_primary_primary branch_a_node_1 branch_b_node_1 checkpoint_a_1 checkpoint_b_1 synchronization_point_1)
+(validate_synchronization_point synchronization_point_1 branch_a_node_1 objective_marker_1)
+(finalize_branch_a branch_a_node_1 synchronization_point_1)
+(finalize_branch_b branch_b_node_1 synchronization_point_1)
+(apply_resolution_token_to_case branch_a_node_1 resolution_token_1 objective_marker_1)
+(resolve_branch_a_and_reassign_resource branch_a_node_1 resource_token_1 resolution_token_1)
+(release_objective_marker branch_a_node_1 objective_marker_1)
+(assign_objective_marker branch_b_node_1 objective_marker_1)
+(apply_resolution_token_to_case branch_b_node_1 resolution_token_1 objective_marker_1)
+(resolve_branch_b_and_reassign_resource branch_b_node_1 resource_token_2 resolution_token_1)
+(release_objective_marker branch_b_node_1 objective_marker_1)
+(offer_quest reconciliation_unit_1)
+(assign_resource_to_quest reconciliation_unit_1 resource_token_1)
+(assign_objective_marker reconciliation_unit_1 objective_marker_1)
+(accept_quest reconciliation_unit_1 objective_marker_1)
+(apply_evidence_to_reconciliation_unit reconciliation_unit_1 evidence_item_alpha synchronization_point_1)
+(stage_evidence_validation_on_reconciliation_unit reconciliation_unit_1 evidence_item_alpha synchronization_point_1 objective_marker_1)
+(attach_special_resource_to_reconciliation_unit reconciliation_unit_1 special_resource_1)
+(assign_npc_to_case reconciliation_unit_1 npc_actor_1)
+(begin_reconciliation_unit_processing_with_special_resource reconciliation_unit_1 special_resource_1 npc_actor_1 evidence_item_alpha synchronization_point_1)
+(assign_key_witness_to_reconciliation_unit reconciliation_unit_1 key_witness_1)
+(complete_reconciliation_unit_witness_stage reconciliation_unit_1 key_witness_1 evidence_item_alpha synchronization_point_1)
+(finalize_reconciliation_unit_no_ally reconciliation_unit_1)
+(apply_resolution_token_to_case reconciliation_unit_1 resolution_token_1 objective_marker_1)
+(finalize_reconciliation_unit_and_reassign_resource reconciliation_unit_1 resource_token_1 resolution_token_1)
+(release_objective_marker reconciliation_unit_1 objective_marker_1)
+(release_npc_from_case reconciliation_unit_1 npc_actor_1)
+(release_key_witness_from_reconciliation_unit reconciliation_unit_1 key_witness_1)
+(detach_special_resource_from_reconciliation_unit reconciliation_unit_1 special_resource_1)
+(offer_quest reconciliation_unit_2)
+(assign_resource_to_quest reconciliation_unit_2 resource_token_2)
+(assign_objective_marker reconciliation_unit_2 objective_marker_1)
+(accept_quest reconciliation_unit_2 objective_marker_1)
+(apply_evidence_to_reconciliation_unit reconciliation_unit_2 evidence_item_beta synchronization_point_1)
+(stage_evidence_validation_on_reconciliation_unit reconciliation_unit_2 evidence_item_beta synchronization_point_1 objective_marker_1)
+(attach_special_resource_to_reconciliation_unit reconciliation_unit_2 special_resource_1)
+(assign_npc_to_case reconciliation_unit_2 npc_actor_1)
+(begin_reconciliation_unit_processing_with_special_resource reconciliation_unit_2 special_resource_1 npc_actor_1 evidence_item_beta synchronization_point_1)
+(assign_key_witness_to_reconciliation_unit reconciliation_unit_2 key_witness_1)
+(complete_reconciliation_unit_witness_stage reconciliation_unit_2 key_witness_1 evidence_item_beta synchronization_point_1)
+(finalize_reconciliation_unit_no_ally reconciliation_unit_2)
+(apply_resolution_token_to_case reconciliation_unit_2 resolution_token_1 objective_marker_1)
+(finalize_reconciliation_unit_and_reassign_resource reconciliation_unit_2 resource_token_2 resolution_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vm4091ch/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_vm4091ch/plan.pddl 62 
+
+
+
+--- stderr ---
+

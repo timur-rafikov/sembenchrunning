@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain finance_sleeve_capital_distribution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object instrument_taxonomy - object financial_instrument - object allocation_request - object allocation_unit - allocation_request execution_account - operational_resource security_candidate - operational_resource execution_desk - operational_resource execution_strategy - operational_resource routing_rule - operational_resource capital_instruction - operational_resource broker - operational_resource settlement_instruction - operational_resource adjustment_instrument - instrument_taxonomy trade_batch - instrument_taxonomy security_reference - instrument_taxonomy source_exec_leg - financial_instrument target_exec_leg - financial_instrument trade_order - financial_instrument sleeve_group - allocation_unit portfolio_group - allocation_unit source_sleeve - sleeve_group destination_sleeve - sleeve_group execution_portfolio - portfolio_group)
+  (:predicates
+    (allocation_unit_initiated ?allocation_unit - allocation_unit)
+    (allocation_unit_validated ?allocation_unit - allocation_unit)
+    (allocation_unit_account_assignment_recorded ?allocation_unit - allocation_unit)
+    (distribution_finalized ?allocation_unit - allocation_unit)
+    (ready_for_allocation ?allocation_unit - allocation_unit)
+    (allocation_unit_capital_instruction_assignment_recorded ?allocation_unit - allocation_unit)
+    (execution_account_available ?execution_account - execution_account)
+    (allocation_unit_assigned_account ?allocation_unit - allocation_unit ?execution_account - execution_account)
+    (security_candidate_available ?security_candidate - security_candidate)
+    (allocation_unit_selected_candidate ?allocation_unit - allocation_unit ?security_candidate - security_candidate)
+    (execution_desk_available ?execution_desk - execution_desk)
+    (allocation_unit_assigned_desk ?allocation_unit - allocation_unit ?execution_desk - execution_desk)
+    (adjustment_instrument_available ?adjustment_instrument - adjustment_instrument)
+    (source_sleeve_assigned_adjustment_instrument ?source_sleeve - source_sleeve ?adjustment_instrument - adjustment_instrument)
+    (destination_sleeve_assigned_adjustment_instrument ?destination_sleeve - destination_sleeve ?adjustment_instrument - adjustment_instrument)
+    (source_sleeve_assigned_source_leg ?source_sleeve - source_sleeve ?source_exec_leg - source_exec_leg)
+    (source_leg_ready ?source_exec_leg - source_exec_leg)
+    (source_leg_adjustment_applied ?source_exec_leg - source_exec_leg)
+    (source_sleeve_ready_for_order ?source_sleeve - source_sleeve)
+    (destination_sleeve_assigned_target_leg ?destination_sleeve - destination_sleeve ?target_exec_leg - target_exec_leg)
+    (target_leg_ready ?target_exec_leg - target_exec_leg)
+    (target_leg_adjustment_applied ?target_exec_leg - target_exec_leg)
+    (destination_sleeve_ready_for_order ?destination_sleeve - destination_sleeve)
+    (trade_order_placeholder_available ?trade_order - trade_order)
+    (trade_order_created ?trade_order - trade_order)
+    (trade_order_assigned_source_leg ?trade_order - trade_order ?source_exec_leg - source_exec_leg)
+    (trade_order_assigned_target_leg ?trade_order - trade_order ?target_exec_leg - target_exec_leg)
+    (order_includes_source_adjustment ?trade_order - trade_order)
+    (order_includes_target_adjustment ?trade_order - trade_order)
+    (order_validated_for_batch ?trade_order - trade_order)
+    (portfolio_assigned_source_sleeve ?execution_portfolio - execution_portfolio ?source_sleeve - source_sleeve)
+    (portfolio_assigned_destination_sleeve ?execution_portfolio - execution_portfolio ?destination_sleeve - destination_sleeve)
+    (portfolio_assigned_order ?execution_portfolio - execution_portfolio ?trade_order - trade_order)
+    (trade_batch_available ?trade_batch - trade_batch)
+    (portfolio_assigned_batch ?execution_portfolio - execution_portfolio ?trade_batch - trade_batch)
+    (trade_batch_active ?trade_batch - trade_batch)
+    (trade_batch_linked_order ?trade_batch - trade_batch ?trade_order - trade_order)
+    (portfolio_locked_for_execution ?execution_portfolio - execution_portfolio)
+    (portfolio_enrichment_applied ?execution_portfolio - execution_portfolio)
+    (portfolio_settlement_validated ?execution_portfolio - execution_portfolio)
+    (portfolio_strategy_attached ?execution_portfolio - execution_portfolio)
+    (portfolio_strategy_enriched ?execution_portfolio - execution_portfolio)
+    (portfolio_enrichment_complete ?execution_portfolio - execution_portfolio)
+    (portfolio_final_checks_completed ?execution_portfolio - execution_portfolio)
+    (security_reference_available ?security_reference - security_reference)
+    (portfolio_assigned_security_reference ?execution_portfolio - execution_portfolio ?security_reference - security_reference)
+    (portfolio_security_reference_binding_recorded ?execution_portfolio - execution_portfolio)
+    (portfolio_strategy_locked ?execution_portfolio - execution_portfolio)
+    (portfolio_settlement_assignment_recorded ?execution_portfolio - execution_portfolio)
+    (execution_strategy_available ?execution_strategy - execution_strategy)
+    (portfolio_execution_strategy_assigned ?execution_portfolio - execution_portfolio ?execution_strategy - execution_strategy)
+    (routing_rule_available ?routing_rule - routing_rule)
+    (portfolio_routing_rule_assigned ?execution_portfolio - execution_portfolio ?routing_rule - routing_rule)
+    (broker_available ?broker - broker)
+    (portfolio_assigned_broker ?execution_portfolio - execution_portfolio ?broker - broker)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (portfolio_settlement_instruction_assigned ?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction)
+    (capital_instruction_available ?capital_instruction - capital_instruction)
+    (allocation_unit_assigned_capital_instruction ?allocation_unit - allocation_unit ?capital_instruction - capital_instruction)
+    (source_sleeve_processed ?source_sleeve - source_sleeve)
+    (destination_sleeve_processed ?destination_sleeve - destination_sleeve)
+    (portfolio_marked_ready ?execution_portfolio - execution_portfolio)
+  )
+  (:action initiate_allocation_request
+    :parameters (?allocation_unit - allocation_unit)
+    :precondition
+      (and
+        (not
+          (allocation_unit_initiated ?allocation_unit)
+        )
+        (not
+          (distribution_finalized ?allocation_unit)
+        )
+      )
+    :effect (allocation_unit_initiated ?allocation_unit)
+  )
+  (:action attach_execution_account_to_allocation
+    :parameters (?allocation_unit - allocation_unit ?execution_account - execution_account)
+    :precondition
+      (and
+        (allocation_unit_initiated ?allocation_unit)
+        (not
+          (allocation_unit_account_assignment_recorded ?allocation_unit)
+        )
+        (execution_account_available ?execution_account)
+      )
+    :effect
+      (and
+        (allocation_unit_account_assignment_recorded ?allocation_unit)
+        (allocation_unit_assigned_account ?allocation_unit ?execution_account)
+        (not
+          (execution_account_available ?execution_account)
+        )
+      )
+  )
+  (:action assign_security_candidate_to_allocation
+    :parameters (?allocation_unit - allocation_unit ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_initiated ?allocation_unit)
+        (allocation_unit_account_assignment_recorded ?allocation_unit)
+        (security_candidate_available ?security_candidate)
+      )
+    :effect
+      (and
+        (allocation_unit_selected_candidate ?allocation_unit ?security_candidate)
+        (not
+          (security_candidate_available ?security_candidate)
+        )
+      )
+  )
+  (:action approve_allocation_candidate
+    :parameters (?allocation_unit - allocation_unit ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_initiated ?allocation_unit)
+        (allocation_unit_account_assignment_recorded ?allocation_unit)
+        (allocation_unit_selected_candidate ?allocation_unit ?security_candidate)
+        (not
+          (allocation_unit_validated ?allocation_unit)
+        )
+      )
+    :effect (allocation_unit_validated ?allocation_unit)
+  )
+  (:action release_security_candidate
+    :parameters (?allocation_unit - allocation_unit ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_selected_candidate ?allocation_unit ?security_candidate)
+      )
+    :effect
+      (and
+        (security_candidate_available ?security_candidate)
+        (not
+          (allocation_unit_selected_candidate ?allocation_unit ?security_candidate)
+        )
+      )
+  )
+  (:action assign_execution_desk_to_allocation
+    :parameters (?allocation_unit - allocation_unit ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (allocation_unit_validated ?allocation_unit)
+        (execution_desk_available ?execution_desk)
+      )
+    :effect
+      (and
+        (allocation_unit_assigned_desk ?allocation_unit ?execution_desk)
+        (not
+          (execution_desk_available ?execution_desk)
+        )
+      )
+  )
+  (:action unassign_execution_desk_from_allocation
+    :parameters (?allocation_unit - allocation_unit ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (allocation_unit_assigned_desk ?allocation_unit ?execution_desk)
+      )
+    :effect
+      (and
+        (execution_desk_available ?execution_desk)
+        (not
+          (allocation_unit_assigned_desk ?allocation_unit ?execution_desk)
+        )
+      )
+  )
+  (:action assign_broker_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?broker - broker)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (broker_available ?broker)
+      )
+    :effect
+      (and
+        (portfolio_assigned_broker ?execution_portfolio ?broker)
+        (not
+          (broker_available ?broker)
+        )
+      )
+  )
+  (:action unassign_broker_from_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?broker - broker)
+    :precondition
+      (and
+        (portfolio_assigned_broker ?execution_portfolio ?broker)
+      )
+    :effect
+      (and
+        (broker_available ?broker)
+        (not
+          (portfolio_assigned_broker ?execution_portfolio ?broker)
+        )
+      )
+  )
+  (:action assign_settlement_instruction_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action unassign_settlement_instruction_from_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+      )
+    :effect
+      (and
+        (settlement_instruction_available ?settlement_instruction)
+        (not
+          (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        )
+      )
+  )
+  (:action prepare_source_leg
+    :parameters (?source_sleeve - source_sleeve ?source_exec_leg - source_exec_leg ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_validated ?source_sleeve)
+        (allocation_unit_selected_candidate ?source_sleeve ?security_candidate)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (not
+          (source_leg_ready ?source_exec_leg)
+        )
+        (not
+          (source_leg_adjustment_applied ?source_exec_leg)
+        )
+      )
+    :effect (source_leg_ready ?source_exec_leg)
+  )
+  (:action finalize_source_leg_with_desk
+    :parameters (?source_sleeve - source_sleeve ?source_exec_leg - source_exec_leg ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (allocation_unit_validated ?source_sleeve)
+        (allocation_unit_assigned_desk ?source_sleeve ?execution_desk)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (source_leg_ready ?source_exec_leg)
+        (not
+          (source_sleeve_processed ?source_sleeve)
+        )
+      )
+    :effect
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (source_sleeve_ready_for_order ?source_sleeve)
+      )
+  )
+  (:action attach_adjustment_instrument_to_source_leg
+    :parameters (?source_sleeve - source_sleeve ?source_exec_leg - source_exec_leg ?adjustment_instrument - adjustment_instrument)
+    :precondition
+      (and
+        (allocation_unit_validated ?source_sleeve)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (adjustment_instrument_available ?adjustment_instrument)
+        (not
+          (source_sleeve_processed ?source_sleeve)
+        )
+      )
+    :effect
+      (and
+        (source_leg_adjustment_applied ?source_exec_leg)
+        (source_sleeve_processed ?source_sleeve)
+        (source_sleeve_assigned_adjustment_instrument ?source_sleeve ?adjustment_instrument)
+        (not
+          (adjustment_instrument_available ?adjustment_instrument)
+        )
+      )
+  )
+  (:action complete_source_leg_adjustment
+    :parameters (?source_sleeve - source_sleeve ?source_exec_leg - source_exec_leg ?security_candidate - security_candidate ?adjustment_instrument - adjustment_instrument)
+    :precondition
+      (and
+        (allocation_unit_validated ?source_sleeve)
+        (allocation_unit_selected_candidate ?source_sleeve ?security_candidate)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (source_leg_adjustment_applied ?source_exec_leg)
+        (source_sleeve_assigned_adjustment_instrument ?source_sleeve ?adjustment_instrument)
+        (not
+          (source_sleeve_ready_for_order ?source_sleeve)
+        )
+      )
+    :effect
+      (and
+        (source_leg_ready ?source_exec_leg)
+        (source_sleeve_ready_for_order ?source_sleeve)
+        (adjustment_instrument_available ?adjustment_instrument)
+        (not
+          (source_sleeve_assigned_adjustment_instrument ?source_sleeve ?adjustment_instrument)
+        )
+      )
+  )
+  (:action prepare_target_leg
+    :parameters (?destination_sleeve - destination_sleeve ?target_exec_leg - target_exec_leg ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_validated ?destination_sleeve)
+        (allocation_unit_selected_candidate ?destination_sleeve ?security_candidate)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (not
+          (target_leg_ready ?target_exec_leg)
+        )
+        (not
+          (target_leg_adjustment_applied ?target_exec_leg)
+        )
+      )
+    :effect (target_leg_ready ?target_exec_leg)
+  )
+  (:action finalize_target_leg_with_desk
+    :parameters (?destination_sleeve - destination_sleeve ?target_exec_leg - target_exec_leg ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (allocation_unit_validated ?destination_sleeve)
+        (allocation_unit_assigned_desk ?destination_sleeve ?execution_desk)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (target_leg_ready ?target_exec_leg)
+        (not
+          (destination_sleeve_processed ?destination_sleeve)
+        )
+      )
+    :effect
+      (and
+        (destination_sleeve_processed ?destination_sleeve)
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+      )
+  )
+  (:action attach_adjustment_instrument_to_target_leg
+    :parameters (?destination_sleeve - destination_sleeve ?target_exec_leg - target_exec_leg ?adjustment_instrument - adjustment_instrument)
+    :precondition
+      (and
+        (allocation_unit_validated ?destination_sleeve)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (adjustment_instrument_available ?adjustment_instrument)
+        (not
+          (destination_sleeve_processed ?destination_sleeve)
+        )
+      )
+    :effect
+      (and
+        (target_leg_adjustment_applied ?target_exec_leg)
+        (destination_sleeve_processed ?destination_sleeve)
+        (destination_sleeve_assigned_adjustment_instrument ?destination_sleeve ?adjustment_instrument)
+        (not
+          (adjustment_instrument_available ?adjustment_instrument)
+        )
+      )
+  )
+  (:action complete_target_leg_adjustment
+    :parameters (?destination_sleeve - destination_sleeve ?target_exec_leg - target_exec_leg ?security_candidate - security_candidate ?adjustment_instrument - adjustment_instrument)
+    :precondition
+      (and
+        (allocation_unit_validated ?destination_sleeve)
+        (allocation_unit_selected_candidate ?destination_sleeve ?security_candidate)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (target_leg_adjustment_applied ?target_exec_leg)
+        (destination_sleeve_assigned_adjustment_instrument ?destination_sleeve ?adjustment_instrument)
+        (not
+          (destination_sleeve_ready_for_order ?destination_sleeve)
+        )
+      )
+    :effect
+      (and
+        (target_leg_ready ?target_exec_leg)
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+        (adjustment_instrument_available ?adjustment_instrument)
+        (not
+          (destination_sleeve_assigned_adjustment_instrument ?destination_sleeve ?adjustment_instrument)
+        )
+      )
+  )
+  (:action construct_trade_order_without_adjustments
+    :parameters (?source_sleeve - source_sleeve ?destination_sleeve - destination_sleeve ?source_exec_leg - source_exec_leg ?target_exec_leg - target_exec_leg ?trade_order - trade_order)
+    :precondition
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (destination_sleeve_processed ?destination_sleeve)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (source_leg_ready ?source_exec_leg)
+        (target_leg_ready ?target_exec_leg)
+        (source_sleeve_ready_for_order ?source_sleeve)
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+        (trade_order_placeholder_available ?trade_order)
+      )
+    :effect
+      (and
+        (trade_order_created ?trade_order)
+        (trade_order_assigned_source_leg ?trade_order ?source_exec_leg)
+        (trade_order_assigned_target_leg ?trade_order ?target_exec_leg)
+        (not
+          (trade_order_placeholder_available ?trade_order)
+        )
+      )
+  )
+  (:action construct_trade_order_with_source_adjustment
+    :parameters (?source_sleeve - source_sleeve ?destination_sleeve - destination_sleeve ?source_exec_leg - source_exec_leg ?target_exec_leg - target_exec_leg ?trade_order - trade_order)
+    :precondition
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (destination_sleeve_processed ?destination_sleeve)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (source_leg_adjustment_applied ?source_exec_leg)
+        (target_leg_ready ?target_exec_leg)
+        (not
+          (source_sleeve_ready_for_order ?source_sleeve)
+        )
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+        (trade_order_placeholder_available ?trade_order)
+      )
+    :effect
+      (and
+        (trade_order_created ?trade_order)
+        (trade_order_assigned_source_leg ?trade_order ?source_exec_leg)
+        (trade_order_assigned_target_leg ?trade_order ?target_exec_leg)
+        (order_includes_source_adjustment ?trade_order)
+        (not
+          (trade_order_placeholder_available ?trade_order)
+        )
+      )
+  )
+  (:action construct_trade_order_with_target_adjustment
+    :parameters (?source_sleeve - source_sleeve ?destination_sleeve - destination_sleeve ?source_exec_leg - source_exec_leg ?target_exec_leg - target_exec_leg ?trade_order - trade_order)
+    :precondition
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (destination_sleeve_processed ?destination_sleeve)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (source_leg_ready ?source_exec_leg)
+        (target_leg_adjustment_applied ?target_exec_leg)
+        (source_sleeve_ready_for_order ?source_sleeve)
+        (not
+          (destination_sleeve_ready_for_order ?destination_sleeve)
+        )
+        (trade_order_placeholder_available ?trade_order)
+      )
+    :effect
+      (and
+        (trade_order_created ?trade_order)
+        (trade_order_assigned_source_leg ?trade_order ?source_exec_leg)
+        (trade_order_assigned_target_leg ?trade_order ?target_exec_leg)
+        (order_includes_target_adjustment ?trade_order)
+        (not
+          (trade_order_placeholder_available ?trade_order)
+        )
+      )
+  )
+  (:action construct_trade_order_with_both_adjustments
+    :parameters (?source_sleeve - source_sleeve ?destination_sleeve - destination_sleeve ?source_exec_leg - source_exec_leg ?target_exec_leg - target_exec_leg ?trade_order - trade_order)
+    :precondition
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (destination_sleeve_processed ?destination_sleeve)
+        (source_sleeve_assigned_source_leg ?source_sleeve ?source_exec_leg)
+        (destination_sleeve_assigned_target_leg ?destination_sleeve ?target_exec_leg)
+        (source_leg_adjustment_applied ?source_exec_leg)
+        (target_leg_adjustment_applied ?target_exec_leg)
+        (not
+          (source_sleeve_ready_for_order ?source_sleeve)
+        )
+        (not
+          (destination_sleeve_ready_for_order ?destination_sleeve)
+        )
+        (trade_order_placeholder_available ?trade_order)
+      )
+    :effect
+      (and
+        (trade_order_created ?trade_order)
+        (trade_order_assigned_source_leg ?trade_order ?source_exec_leg)
+        (trade_order_assigned_target_leg ?trade_order ?target_exec_leg)
+        (order_includes_source_adjustment ?trade_order)
+        (order_includes_target_adjustment ?trade_order)
+        (not
+          (trade_order_placeholder_available ?trade_order)
+        )
+      )
+  )
+  (:action validate_order_for_batch_assignment
+    :parameters (?trade_order - trade_order ?source_sleeve - source_sleeve ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (trade_order_created ?trade_order)
+        (source_sleeve_processed ?source_sleeve)
+        (allocation_unit_selected_candidate ?source_sleeve ?security_candidate)
+        (not
+          (order_validated_for_batch ?trade_order)
+        )
+      )
+    :effect (order_validated_for_batch ?trade_order)
+  )
+  (:action activate_trade_batch_and_link_to_order
+    :parameters (?execution_portfolio - execution_portfolio ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (portfolio_assigned_order ?execution_portfolio ?trade_order)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_available ?trade_batch)
+        (trade_order_created ?trade_order)
+        (order_validated_for_batch ?trade_order)
+        (not
+          (trade_batch_active ?trade_batch)
+        )
+      )
+    :effect
+      (and
+        (trade_batch_active ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (not
+          (trade_batch_available ?trade_batch)
+        )
+      )
+  )
+  (:action lock_portfolio_for_execution
+    :parameters (?execution_portfolio - execution_portfolio ?trade_batch - trade_batch ?trade_order - trade_order ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_active ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (allocation_unit_selected_candidate ?execution_portfolio ?security_candidate)
+        (not
+          (order_includes_source_adjustment ?trade_order)
+        )
+        (not
+          (portfolio_locked_for_execution ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_locked_for_execution ?execution_portfolio)
+  )
+  (:action assign_execution_strategy_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (execution_strategy_available ?execution_strategy)
+        (not
+          (portfolio_strategy_attached ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_strategy_attached ?execution_portfolio)
+        (portfolio_execution_strategy_assigned ?execution_portfolio ?execution_strategy)
+        (not
+          (execution_strategy_available ?execution_strategy)
+        )
+      )
+  )
+  (:action apply_execution_strategy_enrichment
+    :parameters (?execution_portfolio - execution_portfolio ?trade_batch - trade_batch ?trade_order - trade_order ?security_candidate - security_candidate ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_active ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (allocation_unit_selected_candidate ?execution_portfolio ?security_candidate)
+        (order_includes_source_adjustment ?trade_order)
+        (portfolio_strategy_attached ?execution_portfolio)
+        (portfolio_execution_strategy_assigned ?execution_portfolio ?execution_strategy)
+        (not
+          (portfolio_locked_for_execution ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_locked_for_execution ?execution_portfolio)
+        (portfolio_strategy_enriched ?execution_portfolio)
+      )
+  )
+  (:action enrich_portfolio_with_broker_pre_execution
+    :parameters (?execution_portfolio - execution_portfolio ?broker - broker ?execution_desk - execution_desk ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_locked_for_execution ?execution_portfolio)
+        (portfolio_assigned_broker ?execution_portfolio ?broker)
+        (allocation_unit_assigned_desk ?execution_portfolio ?execution_desk)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (not
+          (order_includes_target_adjustment ?trade_order)
+        )
+        (not
+          (portfolio_enrichment_applied ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_enrichment_applied ?execution_portfolio)
+  )
+  (:action enrich_portfolio_with_broker_for_execution
+    :parameters (?execution_portfolio - execution_portfolio ?broker - broker ?execution_desk - execution_desk ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_locked_for_execution ?execution_portfolio)
+        (portfolio_assigned_broker ?execution_portfolio ?broker)
+        (allocation_unit_assigned_desk ?execution_portfolio ?execution_desk)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (order_includes_target_adjustment ?trade_order)
+        (not
+          (portfolio_enrichment_applied ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_enrichment_applied ?execution_portfolio)
+  )
+  (:action assign_settlement_and_validate_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_enrichment_applied ?execution_portfolio)
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (not
+          (order_includes_source_adjustment ?trade_order)
+        )
+        (not
+          (order_includes_target_adjustment ?trade_order)
+        )
+        (not
+          (portfolio_settlement_validated ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_settlement_validated ?execution_portfolio)
+  )
+  (:action assign_settlement_enrich_and_mark_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_enrichment_applied ?execution_portfolio)
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (order_includes_source_adjustment ?trade_order)
+        (not
+          (order_includes_target_adjustment ?trade_order)
+        )
+        (not
+          (portfolio_settlement_validated ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_enrichment_complete ?execution_portfolio)
+      )
+  )
+  (:action assign_settlement_and_complete_enrichment_variant1
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_enrichment_applied ?execution_portfolio)
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (not
+          (order_includes_source_adjustment ?trade_order)
+        )
+        (order_includes_target_adjustment ?trade_order)
+        (not
+          (portfolio_settlement_validated ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_enrichment_complete ?execution_portfolio)
+      )
+  )
+  (:action assign_settlement_and_complete_enrichment_variant2
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction ?trade_batch - trade_batch ?trade_order - trade_order)
+    :precondition
+      (and
+        (portfolio_enrichment_applied ?execution_portfolio)
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (portfolio_assigned_batch ?execution_portfolio ?trade_batch)
+        (trade_batch_linked_order ?trade_batch ?trade_order)
+        (order_includes_source_adjustment ?trade_order)
+        (order_includes_target_adjustment ?trade_order)
+        (not
+          (portfolio_settlement_validated ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_enrichment_complete ?execution_portfolio)
+      )
+  )
+  (:action mark_portfolio_ready
+    :parameters (?execution_portfolio - execution_portfolio)
+    :precondition
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (not
+          (portfolio_enrichment_complete ?execution_portfolio)
+        )
+        (not
+          (portfolio_marked_ready ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_marked_ready ?execution_portfolio)
+        (ready_for_allocation ?execution_portfolio)
+      )
+  )
+  (:action assign_routing_rule_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?routing_rule - routing_rule)
+    :precondition
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_enrichment_complete ?execution_portfolio)
+        (routing_rule_available ?routing_rule)
+      )
+    :effect
+      (and
+        (portfolio_routing_rule_assigned ?execution_portfolio ?routing_rule)
+        (not
+          (routing_rule_available ?routing_rule)
+        )
+      )
+  )
+  (:action perform_pre_execution_portfolio_checks
+    :parameters (?execution_portfolio - execution_portfolio ?source_sleeve - source_sleeve ?destination_sleeve - destination_sleeve ?security_candidate - security_candidate ?routing_rule - routing_rule)
+    :precondition
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_enrichment_complete ?execution_portfolio)
+        (portfolio_routing_rule_assigned ?execution_portfolio ?routing_rule)
+        (portfolio_assigned_source_sleeve ?execution_portfolio ?source_sleeve)
+        (portfolio_assigned_destination_sleeve ?execution_portfolio ?destination_sleeve)
+        (source_sleeve_ready_for_order ?source_sleeve)
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+        (allocation_unit_selected_candidate ?execution_portfolio ?security_candidate)
+        (not
+          (portfolio_final_checks_completed ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_final_checks_completed ?execution_portfolio)
+  )
+  (:action finalize_portfolio_and_mark_ready
+    :parameters (?execution_portfolio - execution_portfolio)
+    :precondition
+      (and
+        (portfolio_settlement_validated ?execution_portfolio)
+        (portfolio_final_checks_completed ?execution_portfolio)
+        (not
+          (portfolio_marked_ready ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_marked_ready ?execution_portfolio)
+        (ready_for_allocation ?execution_portfolio)
+      )
+  )
+  (:action assign_security_reference_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?security_reference - security_reference ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (allocation_unit_validated ?execution_portfolio)
+        (allocation_unit_selected_candidate ?execution_portfolio ?security_candidate)
+        (security_reference_available ?security_reference)
+        (portfolio_assigned_security_reference ?execution_portfolio ?security_reference)
+        (not
+          (portfolio_security_reference_binding_recorded ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_security_reference_binding_recorded ?execution_portfolio)
+        (not
+          (security_reference_available ?security_reference)
+        )
+      )
+  )
+  (:action lock_portfolio_for_security_reference
+    :parameters (?execution_portfolio - execution_portfolio ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (portfolio_security_reference_binding_recorded ?execution_portfolio)
+        (allocation_unit_assigned_desk ?execution_portfolio ?execution_desk)
+        (not
+          (portfolio_strategy_locked ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_strategy_locked ?execution_portfolio)
+  )
+  (:action assign_settlement_after_security_binding
+    :parameters (?execution_portfolio - execution_portfolio ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (portfolio_strategy_locked ?execution_portfolio)
+        (portfolio_settlement_instruction_assigned ?execution_portfolio ?settlement_instruction)
+        (not
+          (portfolio_settlement_assignment_recorded ?execution_portfolio)
+        )
+      )
+    :effect (portfolio_settlement_assignment_recorded ?execution_portfolio)
+  )
+  (:action finalize_portfolio_settlement_and_mark_ready
+    :parameters (?execution_portfolio - execution_portfolio)
+    :precondition
+      (and
+        (portfolio_settlement_assignment_recorded ?execution_portfolio)
+        (not
+          (portfolio_marked_ready ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_marked_ready ?execution_portfolio)
+        (ready_for_allocation ?execution_portfolio)
+      )
+  )
+  (:action mark_source_sleeve_ready
+    :parameters (?source_sleeve - source_sleeve ?trade_order - trade_order)
+    :precondition
+      (and
+        (source_sleeve_processed ?source_sleeve)
+        (source_sleeve_ready_for_order ?source_sleeve)
+        (trade_order_created ?trade_order)
+        (order_validated_for_batch ?trade_order)
+        (not
+          (ready_for_allocation ?source_sleeve)
+        )
+      )
+    :effect (ready_for_allocation ?source_sleeve)
+  )
+  (:action mark_destination_sleeve_ready
+    :parameters (?destination_sleeve - destination_sleeve ?trade_order - trade_order)
+    :precondition
+      (and
+        (destination_sleeve_processed ?destination_sleeve)
+        (destination_sleeve_ready_for_order ?destination_sleeve)
+        (trade_order_created ?trade_order)
+        (order_validated_for_batch ?trade_order)
+        (not
+          (ready_for_allocation ?destination_sleeve)
+        )
+      )
+    :effect (ready_for_allocation ?destination_sleeve)
+  )
+  (:action ingest_capital_instruction_for_allocation
+    :parameters (?allocation_unit - allocation_unit ?capital_instruction - capital_instruction ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (ready_for_allocation ?allocation_unit)
+        (allocation_unit_selected_candidate ?allocation_unit ?security_candidate)
+        (capital_instruction_available ?capital_instruction)
+        (not
+          (allocation_unit_capital_instruction_assignment_recorded ?allocation_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_unit_capital_instruction_assignment_recorded ?allocation_unit)
+        (allocation_unit_assigned_capital_instruction ?allocation_unit ?capital_instruction)
+        (not
+          (capital_instruction_available ?capital_instruction)
+        )
+      )
+  )
+  (:action assign_capital_instruction_to_source_sleeve
+    :parameters (?source_sleeve - source_sleeve ?execution_account - execution_account ?capital_instruction - capital_instruction)
+    :precondition
+      (and
+        (allocation_unit_capital_instruction_assignment_recorded ?source_sleeve)
+        (allocation_unit_assigned_account ?source_sleeve ?execution_account)
+        (allocation_unit_assigned_capital_instruction ?source_sleeve ?capital_instruction)
+        (not
+          (distribution_finalized ?source_sleeve)
+        )
+      )
+    :effect
+      (and
+        (distribution_finalized ?source_sleeve)
+        (execution_account_available ?execution_account)
+        (capital_instruction_available ?capital_instruction)
+      )
+  )
+  (:action assign_capital_instruction_to_destination_sleeve
+    :parameters (?destination_sleeve - destination_sleeve ?execution_account - execution_account ?capital_instruction - capital_instruction)
+    :precondition
+      (and
+        (allocation_unit_capital_instruction_assignment_recorded ?destination_sleeve)
+        (allocation_unit_assigned_account ?destination_sleeve ?execution_account)
+        (allocation_unit_assigned_capital_instruction ?destination_sleeve ?capital_instruction)
+        (not
+          (distribution_finalized ?destination_sleeve)
+        )
+      )
+    :effect
+      (and
+        (distribution_finalized ?destination_sleeve)
+        (execution_account_available ?execution_account)
+        (capital_instruction_available ?capital_instruction)
+      )
+  )
+  (:action assign_capital_instruction_to_portfolio
+    :parameters (?execution_portfolio - execution_portfolio ?execution_account - execution_account ?capital_instruction - capital_instruction)
+    :precondition
+      (and
+        (allocation_unit_capital_instruction_assignment_recorded ?execution_portfolio)
+        (allocation_unit_assigned_account ?execution_portfolio ?execution_account)
+        (allocation_unit_assigned_capital_instruction ?execution_portfolio ?capital_instruction)
+        (not
+          (distribution_finalized ?execution_portfolio)
+        )
+      )
+    :effect
+      (and
+        (distribution_finalized ?execution_portfolio)
+        (execution_account_available ?execution_account)
+        (capital_instruction_available ?capital_instruction)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem sleeve_level_capital_distribution_problem)
+  (:domain finance_sleeve_capital_distribution)
+  (:objects source_sleeve_1 - source_sleeve destination_sleeve_1 - destination_sleeve execution_portfolio_alpha - execution_portfolio execution_portfolio_beta - execution_portfolio execution_account_1 - execution_account execution_account_2 - execution_account execution_account_3 - execution_account candidate_security_1 - security_candidate execution_desk_primary - execution_desk adjustment_instrument_cash - adjustment_instrument source_exec_leg_1 - source_exec_leg target_exec_leg_1 - target_exec_leg trade_order_placeholder_1 - trade_order trade_batch_1 - trade_batch trade_batch_2 - trade_batch execution_strategy_algo1 - execution_strategy execution_strategy_algo2 - execution_strategy routing_rule_compliance1 - routing_rule routing_rule_liquidity1 - routing_rule capital_instruction_funding1 - capital_instruction broker_primary - broker security_reference_issuer1 - security_reference security_reference_issuer2 - security_reference settlement_instruction_usd - settlement_instruction)
+  (:init
+    (execution_account_available execution_account_1)
+    (execution_account_available execution_account_2)
+    (execution_account_available execution_account_3)
+    (security_candidate_available candidate_security_1)
+    (execution_desk_available execution_desk_primary)
+    (adjustment_instrument_available adjustment_instrument_cash)
+    (source_sleeve_assigned_source_leg source_sleeve_1 source_exec_leg_1)
+    (destination_sleeve_assigned_target_leg destination_sleeve_1 target_exec_leg_1)
+    (trade_order_placeholder_available trade_order_placeholder_1)
+    (trade_batch_available trade_batch_1)
+    (trade_batch_available trade_batch_2)
+    (portfolio_assigned_source_sleeve execution_portfolio_alpha source_sleeve_1)
+    (portfolio_assigned_source_sleeve execution_portfolio_beta source_sleeve_1)
+    (portfolio_assigned_destination_sleeve execution_portfolio_alpha destination_sleeve_1)
+    (portfolio_assigned_destination_sleeve execution_portfolio_beta destination_sleeve_1)
+    (portfolio_assigned_order execution_portfolio_alpha trade_order_placeholder_1)
+    (portfolio_assigned_order execution_portfolio_beta trade_order_placeholder_1)
+    (portfolio_assigned_batch execution_portfolio_alpha trade_batch_1)
+    (portfolio_assigned_batch execution_portfolio_beta trade_batch_2)
+    (execution_strategy_available execution_strategy_algo1)
+    (execution_strategy_available execution_strategy_algo2)
+    (routing_rule_available routing_rule_compliance1)
+    (routing_rule_available routing_rule_liquidity1)
+    (capital_instruction_available capital_instruction_funding1)
+    (broker_available broker_primary)
+    (security_reference_available security_reference_issuer1)
+    (portfolio_assigned_security_reference execution_portfolio_alpha security_reference_issuer1)
+    (portfolio_assigned_security_reference execution_portfolio_beta security_reference_issuer2)
+    (settlement_instruction_available settlement_instruction_usd)
+  )
+  (:goal
+    (and
+      (distribution_finalized source_sleeve_1)
+      (distribution_finalized destination_sleeve_1)
+      (distribution_finalized execution_portfolio_alpha)
+      (distribution_finalized execution_portfolio_beta)
+    )
+  )
+)

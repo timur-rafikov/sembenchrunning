@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain logistics_fragile_standard_separation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object fulfillment_area - generic_object resource_grouping - generic_object logistics_asset_type - generic_object order_container_type - generic_object order - order_container_type supply_source_location - fulfillment_area picking_task - fulfillment_area handling_station - fulfillment_area label_template - fulfillment_area service_level_profile - fulfillment_area carrier - fulfillment_area special_packaging_spec - fulfillment_area special_handling_instruction - fulfillment_area inventory_item_unit - resource_grouping packaging_material - resource_grouping trade_document - resource_grouping fragile_consolidation_slot - logistics_asset_type standard_consolidation_slot - logistics_asset_type transport_unit_container - logistics_asset_type order_batch - order order_parcel - order fragile_handling_unit - order_batch standard_handling_unit - order_batch outbound_shipment_record - order_parcel)
+
+  (:predicates
+    (order_released ?order - order)
+    (entity_ready_for_processing ?order - order)
+    (order_sourced ?order - order)
+    (closed_for_dispatch ?order - order)
+    (entity_ready_for_carrier_assignment ?order - order)
+    (entity_has_assigned_carrier ?order - order)
+    (supply_source_available ?supply_source_location - supply_source_location)
+    (sourced_from_location ?order - order ?supply_source_location - supply_source_location)
+    (picking_task_available ?picking_task - picking_task)
+    (picking_task_assigned ?order - order ?picking_task - picking_task)
+    (handling_station_available ?handling_station - handling_station)
+    (assigned_handling_station ?order - order ?handling_station - handling_station)
+    (inventory_item_available ?inventory_item_unit - inventory_item_unit)
+    (fragile_handling_unit_contains_item ?fragile_handling_unit - fragile_handling_unit ?inventory_item_unit - inventory_item_unit)
+    (standard_handling_unit_contains_item ?standard_handling_unit - standard_handling_unit ?inventory_item_unit - inventory_item_unit)
+    (assigned_to_fragile_slot ?fragile_handling_unit - fragile_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot)
+    (fragile_slot_reserved ?fragile_consolidation_slot - fragile_consolidation_slot)
+    (fragile_slot_filled ?fragile_consolidation_slot - fragile_consolidation_slot)
+    (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit - fragile_handling_unit)
+    (assigned_to_standard_slot ?standard_handling_unit - standard_handling_unit ?standard_consolidation_slot - standard_consolidation_slot)
+    (standard_slot_reserved ?standard_consolidation_slot - standard_consolidation_slot)
+    (standard_slot_filled ?standard_consolidation_slot - standard_consolidation_slot)
+    (standard_handling_unit_ready_for_consolidation ?standard_handling_unit - standard_handling_unit)
+    (container_available ?transport_unit_container - transport_unit_container)
+    (container_reserved ?transport_unit_container - transport_unit_container)
+    (container_contains_fragile_slot ?transport_unit_container - transport_unit_container ?fragile_consolidation_slot - fragile_consolidation_slot)
+    (container_contains_standard_slot ?transport_unit_container - transport_unit_container ?standard_consolidation_slot - standard_consolidation_slot)
+    (container_has_fragile_content ?transport_unit_container - transport_unit_container)
+    (container_has_standard_content ?transport_unit_container - transport_unit_container)
+    (container_sealed ?transport_unit_container - transport_unit_container)
+    (shipment_includes_fragile_hu ?outbound_shipment_record - outbound_shipment_record ?fragile_handling_unit - fragile_handling_unit)
+    (shipment_includes_standard_hu ?outbound_shipment_record - outbound_shipment_record ?standard_handling_unit - standard_handling_unit)
+    (shipment_assigned_to_container ?outbound_shipment_record - outbound_shipment_record ?transport_unit_container - transport_unit_container)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (shipment_allocated_packaging_material ?outbound_shipment_record - outbound_shipment_record ?packaging_material - packaging_material)
+    (packaging_material_reserved ?packaging_material - packaging_material)
+    (packaging_material_assigned_to_container ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    (labeling_and_documentation_started ?outbound_shipment_record - outbound_shipment_record)
+    (labeling_and_documentation_completed ?outbound_shipment_record - outbound_shipment_record)
+    (final_checks_passed ?outbound_shipment_record - outbound_shipment_record)
+    (label_template_applied ?outbound_shipment_record - outbound_shipment_record)
+    (label_attachment_confirmed ?outbound_shipment_record - outbound_shipment_record)
+    (compliance_checks_complete ?outbound_shipment_record - outbound_shipment_record)
+    (final_approval_obtained ?outbound_shipment_record - outbound_shipment_record)
+    (trade_document_available ?trade_document - trade_document)
+    (shipment_attached_trade_document ?outbound_shipment_record - outbound_shipment_record ?trade_document - trade_document)
+    (trade_document_applied_to_shipment ?outbound_shipment_record - outbound_shipment_record)
+    (trade_document_verification_started ?outbound_shipment_record - outbound_shipment_record)
+    (trade_document_verification_completed ?outbound_shipment_record - outbound_shipment_record)
+    (label_template_available ?label_template - label_template)
+    (label_template_assigned ?outbound_shipment_record - outbound_shipment_record ?label_template - label_template)
+    (service_level_profile_available ?service_level_profile - service_level_profile)
+    (shipment_has_service_level_profile ?outbound_shipment_record - outbound_shipment_record ?service_level_profile - service_level_profile)
+    (special_packaging_spec_available ?special_packaging_spec - special_packaging_spec)
+    (shipment_assigned_special_packaging_spec ?outbound_shipment_record - outbound_shipment_record ?special_packaging_spec - special_packaging_spec)
+    (special_handling_instruction_available ?special_handling_instruction - special_handling_instruction)
+    (shipment_has_special_handling_instruction ?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction)
+    (carrier_available ?carrier - carrier)
+    (entity_assigned_carrier ?order - order ?carrier - carrier)
+    (fragile_handling_unit_packaging_applied ?fragile_handling_unit - fragile_handling_unit)
+    (standard_handling_unit_packaging_applied ?standard_handling_unit - standard_handling_unit)
+    (final_validation_complete ?outbound_shipment_record - outbound_shipment_record)
+  )
+  (:action release_order
+    :parameters (?order - order)
+    :precondition
+      (and
+        (not
+          (order_released ?order)
+        )
+        (not
+          (closed_for_dispatch ?order)
+        )
+      )
+    :effect (order_released ?order)
+  )
+  (:action assign_order_to_supply_source
+    :parameters (?order - order ?supply_source_location - supply_source_location)
+    :precondition
+      (and
+        (order_released ?order)
+        (not
+          (order_sourced ?order)
+        )
+        (supply_source_available ?supply_source_location)
+      )
+    :effect
+      (and
+        (order_sourced ?order)
+        (sourced_from_location ?order ?supply_source_location)
+        (not
+          (supply_source_available ?supply_source_location)
+        )
+      )
+  )
+  (:action assign_picking_task_to_order
+    :parameters (?order - order ?picking_task - picking_task)
+    :precondition
+      (and
+        (order_released ?order)
+        (order_sourced ?order)
+        (picking_task_available ?picking_task)
+      )
+    :effect
+      (and
+        (picking_task_assigned ?order ?picking_task)
+        (not
+          (picking_task_available ?picking_task)
+        )
+      )
+  )
+  (:action confirm_picking_assignment
+    :parameters (?order - order ?picking_task - picking_task)
+    :precondition
+      (and
+        (order_released ?order)
+        (order_sourced ?order)
+        (picking_task_assigned ?order ?picking_task)
+        (not
+          (entity_ready_for_processing ?order)
+        )
+      )
+    :effect (entity_ready_for_processing ?order)
+  )
+  (:action complete_picking_task
+    :parameters (?order - order ?picking_task - picking_task)
+    :precondition
+      (and
+        (picking_task_assigned ?order ?picking_task)
+      )
+    :effect
+      (and
+        (picking_task_available ?picking_task)
+        (not
+          (picking_task_assigned ?order ?picking_task)
+        )
+      )
+  )
+  (:action assign_handling_station_to_order
+    :parameters (?order - order ?handling_station - handling_station)
+    :precondition
+      (and
+        (entity_ready_for_processing ?order)
+        (handling_station_available ?handling_station)
+      )
+    :effect
+      (and
+        (assigned_handling_station ?order ?handling_station)
+        (not
+          (handling_station_available ?handling_station)
+        )
+      )
+  )
+  (:action release_handling_station_from_order
+    :parameters (?order - order ?handling_station - handling_station)
+    :precondition
+      (and
+        (assigned_handling_station ?order ?handling_station)
+      )
+    :effect
+      (and
+        (handling_station_available ?handling_station)
+        (not
+          (assigned_handling_station ?order ?handling_station)
+        )
+      )
+  )
+  (:action assign_special_packaging_spec_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_packaging_spec - special_packaging_spec)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (special_packaging_spec_available ?special_packaging_spec)
+      )
+    :effect
+      (and
+        (shipment_assigned_special_packaging_spec ?outbound_shipment_record ?special_packaging_spec)
+        (not
+          (special_packaging_spec_available ?special_packaging_spec)
+        )
+      )
+  )
+  (:action release_special_packaging_spec_from_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_packaging_spec - special_packaging_spec)
+    :precondition
+      (and
+        (shipment_assigned_special_packaging_spec ?outbound_shipment_record ?special_packaging_spec)
+      )
+    :effect
+      (and
+        (special_packaging_spec_available ?special_packaging_spec)
+        (not
+          (shipment_assigned_special_packaging_spec ?outbound_shipment_record ?special_packaging_spec)
+        )
+      )
+  )
+  (:action assign_special_handling_instruction_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (special_handling_instruction_available ?special_handling_instruction)
+      )
+    :effect
+      (and
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (not
+          (special_handling_instruction_available ?special_handling_instruction)
+        )
+      )
+  )
+  (:action release_special_handling_instruction_from_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction)
+    :precondition
+      (and
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+      )
+    :effect
+      (and
+        (special_handling_instruction_available ?special_handling_instruction)
+        (not
+          (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        )
+      )
+  )
+  (:action reserve_fragile_slot_for_picking
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?picking_task - picking_task)
+    :precondition
+      (and
+        (entity_ready_for_processing ?fragile_handling_unit)
+        (picking_task_assigned ?fragile_handling_unit ?picking_task)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (not
+          (fragile_slot_reserved ?fragile_consolidation_slot)
+        )
+        (not
+          (fragile_slot_filled ?fragile_consolidation_slot)
+        )
+      )
+    :effect (fragile_slot_reserved ?fragile_consolidation_slot)
+  )
+  (:action package_fragile_handling_unit
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?handling_station - handling_station)
+    :precondition
+      (and
+        (entity_ready_for_processing ?fragile_handling_unit)
+        (assigned_handling_station ?fragile_handling_unit ?handling_station)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (fragile_slot_reserved ?fragile_consolidation_slot)
+        (not
+          (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+      )
+  )
+  (:action load_inventory_item_into_fragile_slot
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?inventory_item_unit - inventory_item_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?fragile_handling_unit)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (inventory_item_available ?inventory_item_unit)
+        (not
+          (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (fragile_slot_filled ?fragile_consolidation_slot)
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (fragile_handling_unit_contains_item ?fragile_handling_unit ?inventory_item_unit)
+        (not
+          (inventory_item_available ?inventory_item_unit)
+        )
+      )
+  )
+  (:action finalize_fragile_item_assignment
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?picking_task - picking_task ?inventory_item_unit - inventory_item_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?fragile_handling_unit)
+        (picking_task_assigned ?fragile_handling_unit ?picking_task)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (fragile_slot_filled ?fragile_consolidation_slot)
+        (fragile_handling_unit_contains_item ?fragile_handling_unit ?inventory_item_unit)
+        (not
+          (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (fragile_slot_reserved ?fragile_consolidation_slot)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        (inventory_item_available ?inventory_item_unit)
+        (not
+          (fragile_handling_unit_contains_item ?fragile_handling_unit ?inventory_item_unit)
+        )
+      )
+  )
+  (:action reserve_standard_slot_for_picking
+    :parameters (?standard_handling_unit - standard_handling_unit ?standard_consolidation_slot - standard_consolidation_slot ?picking_task - picking_task)
+    :precondition
+      (and
+        (entity_ready_for_processing ?standard_handling_unit)
+        (picking_task_assigned ?standard_handling_unit ?picking_task)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (not
+          (standard_slot_reserved ?standard_consolidation_slot)
+        )
+        (not
+          (standard_slot_filled ?standard_consolidation_slot)
+        )
+      )
+    :effect (standard_slot_reserved ?standard_consolidation_slot)
+  )
+  (:action package_standard_handling_unit
+    :parameters (?standard_handling_unit - standard_handling_unit ?standard_consolidation_slot - standard_consolidation_slot ?handling_station - handling_station)
+    :precondition
+      (and
+        (entity_ready_for_processing ?standard_handling_unit)
+        (assigned_handling_station ?standard_handling_unit ?handling_station)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (standard_slot_reserved ?standard_consolidation_slot)
+        (not
+          (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+      )
+  )
+  (:action load_inventory_item_into_standard_slot
+    :parameters (?standard_handling_unit - standard_handling_unit ?standard_consolidation_slot - standard_consolidation_slot ?inventory_item_unit - inventory_item_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?standard_handling_unit)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (inventory_item_available ?inventory_item_unit)
+        (not
+          (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (standard_slot_filled ?standard_consolidation_slot)
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (standard_handling_unit_contains_item ?standard_handling_unit ?inventory_item_unit)
+        (not
+          (inventory_item_available ?inventory_item_unit)
+        )
+      )
+  )
+  (:action finalize_standard_item_assignment
+    :parameters (?standard_handling_unit - standard_handling_unit ?standard_consolidation_slot - standard_consolidation_slot ?picking_task - picking_task ?inventory_item_unit - inventory_item_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?standard_handling_unit)
+        (picking_task_assigned ?standard_handling_unit ?picking_task)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (standard_slot_filled ?standard_consolidation_slot)
+        (standard_handling_unit_contains_item ?standard_handling_unit ?inventory_item_unit)
+        (not
+          (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (standard_slot_reserved ?standard_consolidation_slot)
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        (inventory_item_available ?inventory_item_unit)
+        (not
+          (standard_handling_unit_contains_item ?standard_handling_unit ?inventory_item_unit)
+        )
+      )
+  )
+  (:action consolidate_slots_into_container
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?standard_handling_unit - standard_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?standard_consolidation_slot - standard_consolidation_slot ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (fragile_slot_reserved ?fragile_consolidation_slot)
+        (standard_slot_reserved ?standard_consolidation_slot)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        (container_available ?transport_unit_container)
+      )
+    :effect
+      (and
+        (container_reserved ?transport_unit_container)
+        (container_contains_fragile_slot ?transport_unit_container ?fragile_consolidation_slot)
+        (container_contains_standard_slot ?transport_unit_container ?standard_consolidation_slot)
+        (not
+          (container_available ?transport_unit_container)
+        )
+      )
+  )
+  (:action consolidate_filled_fragile_slot_into_container
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?standard_handling_unit - standard_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?standard_consolidation_slot - standard_consolidation_slot ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (fragile_slot_filled ?fragile_consolidation_slot)
+        (standard_slot_reserved ?standard_consolidation_slot)
+        (not
+          (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        )
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        (container_available ?transport_unit_container)
+      )
+    :effect
+      (and
+        (container_reserved ?transport_unit_container)
+        (container_contains_fragile_slot ?transport_unit_container ?fragile_consolidation_slot)
+        (container_contains_standard_slot ?transport_unit_container ?standard_consolidation_slot)
+        (container_has_fragile_content ?transport_unit_container)
+        (not
+          (container_available ?transport_unit_container)
+        )
+      )
+  )
+  (:action consolidate_filled_standard_slot_into_container
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?standard_handling_unit - standard_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?standard_consolidation_slot - standard_consolidation_slot ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (fragile_slot_reserved ?fragile_consolidation_slot)
+        (standard_slot_filled ?standard_consolidation_slot)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        (not
+          (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        )
+        (container_available ?transport_unit_container)
+      )
+    :effect
+      (and
+        (container_reserved ?transport_unit_container)
+        (container_contains_fragile_slot ?transport_unit_container ?fragile_consolidation_slot)
+        (container_contains_standard_slot ?transport_unit_container ?standard_consolidation_slot)
+        (container_has_standard_content ?transport_unit_container)
+        (not
+          (container_available ?transport_unit_container)
+        )
+      )
+  )
+  (:action consolidate_both_slots_into_container
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?standard_handling_unit - standard_handling_unit ?fragile_consolidation_slot - fragile_consolidation_slot ?standard_consolidation_slot - standard_consolidation_slot ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (assigned_to_fragile_slot ?fragile_handling_unit ?fragile_consolidation_slot)
+        (assigned_to_standard_slot ?standard_handling_unit ?standard_consolidation_slot)
+        (fragile_slot_filled ?fragile_consolidation_slot)
+        (standard_slot_filled ?standard_consolidation_slot)
+        (not
+          (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        )
+        (not
+          (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        )
+        (container_available ?transport_unit_container)
+      )
+    :effect
+      (and
+        (container_reserved ?transport_unit_container)
+        (container_contains_fragile_slot ?transport_unit_container ?fragile_consolidation_slot)
+        (container_contains_standard_slot ?transport_unit_container ?standard_consolidation_slot)
+        (container_has_fragile_content ?transport_unit_container)
+        (container_has_standard_content ?transport_unit_container)
+        (not
+          (container_available ?transport_unit_container)
+        )
+      )
+  )
+  (:action seal_container
+    :parameters (?transport_unit_container - transport_unit_container ?fragile_handling_unit - fragile_handling_unit ?picking_task - picking_task)
+    :precondition
+      (and
+        (container_reserved ?transport_unit_container)
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (picking_task_assigned ?fragile_handling_unit ?picking_task)
+        (not
+          (container_sealed ?transport_unit_container)
+        )
+      )
+    :effect (container_sealed ?transport_unit_container)
+  )
+  (:action reserve_and_assign_packaging_material_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (shipment_assigned_to_container ?outbound_shipment_record ?transport_unit_container)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_available ?packaging_material)
+        (container_reserved ?transport_unit_container)
+        (container_sealed ?transport_unit_container)
+        (not
+          (packaging_material_reserved ?packaging_material)
+        )
+      )
+    :effect
+      (and
+        (packaging_material_reserved ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action prepare_shipment_packaging
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container ?picking_task - picking_task)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_reserved ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (picking_task_assigned ?outbound_shipment_record ?picking_task)
+        (not
+          (container_has_fragile_content ?transport_unit_container)
+        )
+        (not
+          (labeling_and_documentation_started ?outbound_shipment_record)
+        )
+      )
+    :effect (labeling_and_documentation_started ?outbound_shipment_record)
+  )
+  (:action apply_label_template_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?label_template - label_template)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (label_template_available ?label_template)
+        (not
+          (label_template_applied ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (label_template_applied ?outbound_shipment_record)
+        (label_template_assigned ?outbound_shipment_record ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action attach_label_and_documents_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container ?picking_task - picking_task ?label_template - label_template)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_reserved ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (picking_task_assigned ?outbound_shipment_record ?picking_task)
+        (container_has_fragile_content ?transport_unit_container)
+        (label_template_applied ?outbound_shipment_record)
+        (label_template_assigned ?outbound_shipment_record ?label_template)
+        (not
+          (labeling_and_documentation_started ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (labeling_and_documentation_started ?outbound_shipment_record)
+        (label_attachment_confirmed ?outbound_shipment_record)
+      )
+  )
+  (:action apply_packaging_spec_and_complete_documentation
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_packaging_spec - special_packaging_spec ?handling_station - handling_station ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_started ?outbound_shipment_record)
+        (shipment_assigned_special_packaging_spec ?outbound_shipment_record ?special_packaging_spec)
+        (assigned_handling_station ?outbound_shipment_record ?handling_station)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (not
+          (container_has_standard_content ?transport_unit_container)
+        )
+        (not
+          (labeling_and_documentation_completed ?outbound_shipment_record)
+        )
+      )
+    :effect (labeling_and_documentation_completed ?outbound_shipment_record)
+  )
+  (:action apply_packaging_spec_and_complete_documentation_secondary
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_packaging_spec - special_packaging_spec ?handling_station - handling_station ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_started ?outbound_shipment_record)
+        (shipment_assigned_special_packaging_spec ?outbound_shipment_record ?special_packaging_spec)
+        (assigned_handling_station ?outbound_shipment_record ?handling_station)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (container_has_standard_content ?transport_unit_container)
+        (not
+          (labeling_and_documentation_completed ?outbound_shipment_record)
+        )
+      )
+    :effect (labeling_and_documentation_completed ?outbound_shipment_record)
+  )
+  (:action perform_special_handling_compliance_check
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_completed ?outbound_shipment_record)
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (not
+          (container_has_fragile_content ?transport_unit_container)
+        )
+        (not
+          (container_has_standard_content ?transport_unit_container)
+        )
+        (not
+          (final_checks_passed ?outbound_shipment_record)
+        )
+      )
+    :effect (final_checks_passed ?outbound_shipment_record)
+  )
+  (:action perform_special_handling_compliance_check_and_mark
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_completed ?outbound_shipment_record)
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (container_has_fragile_content ?transport_unit_container)
+        (not
+          (container_has_standard_content ?transport_unit_container)
+        )
+        (not
+          (final_checks_passed ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (compliance_checks_complete ?outbound_shipment_record)
+      )
+  )
+  (:action perform_special_handling_compliance_check_alt
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_completed ?outbound_shipment_record)
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (not
+          (container_has_fragile_content ?transport_unit_container)
+        )
+        (container_has_standard_content ?transport_unit_container)
+        (not
+          (final_checks_passed ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (compliance_checks_complete ?outbound_shipment_record)
+      )
+  )
+  (:action perform_special_handling_compliance_check_alt2
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction ?packaging_material - packaging_material ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (labeling_and_documentation_completed ?outbound_shipment_record)
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (shipment_allocated_packaging_material ?outbound_shipment_record ?packaging_material)
+        (packaging_material_assigned_to_container ?packaging_material ?transport_unit_container)
+        (container_has_fragile_content ?transport_unit_container)
+        (container_has_standard_content ?transport_unit_container)
+        (not
+          (final_checks_passed ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (compliance_checks_complete ?outbound_shipment_record)
+      )
+  )
+  (:action final_validation_and_mark_shipment_ready
+    :parameters (?outbound_shipment_record - outbound_shipment_record)
+    :precondition
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (not
+          (compliance_checks_complete ?outbound_shipment_record)
+        )
+        (not
+          (final_validation_complete ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_validation_complete ?outbound_shipment_record)
+        (entity_ready_for_carrier_assignment ?outbound_shipment_record)
+      )
+  )
+  (:action assign_service_level_profile_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (compliance_checks_complete ?outbound_shipment_record)
+        (service_level_profile_available ?service_level_profile)
+      )
+    :effect
+      (and
+        (shipment_has_service_level_profile ?outbound_shipment_record ?service_level_profile)
+        (not
+          (service_level_profile_available ?service_level_profile)
+        )
+      )
+  )
+  (:action obtain_final_shipment_approval
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?fragile_handling_unit - fragile_handling_unit ?standard_handling_unit - standard_handling_unit ?picking_task - picking_task ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (compliance_checks_complete ?outbound_shipment_record)
+        (shipment_has_service_level_profile ?outbound_shipment_record ?service_level_profile)
+        (shipment_includes_fragile_hu ?outbound_shipment_record ?fragile_handling_unit)
+        (shipment_includes_standard_hu ?outbound_shipment_record ?standard_handling_unit)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        (picking_task_assigned ?outbound_shipment_record ?picking_task)
+        (not
+          (final_approval_obtained ?outbound_shipment_record)
+        )
+      )
+    :effect (final_approval_obtained ?outbound_shipment_record)
+  )
+  (:action finalize_shipment_and_mark_ready
+    :parameters (?outbound_shipment_record - outbound_shipment_record)
+    :precondition
+      (and
+        (final_checks_passed ?outbound_shipment_record)
+        (final_approval_obtained ?outbound_shipment_record)
+        (not
+          (final_validation_complete ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_validation_complete ?outbound_shipment_record)
+        (entity_ready_for_carrier_assignment ?outbound_shipment_record)
+      )
+  )
+  (:action apply_trade_document_to_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?trade_document - trade_document ?picking_task - picking_task)
+    :precondition
+      (and
+        (entity_ready_for_processing ?outbound_shipment_record)
+        (picking_task_assigned ?outbound_shipment_record ?picking_task)
+        (trade_document_available ?trade_document)
+        (shipment_attached_trade_document ?outbound_shipment_record ?trade_document)
+        (not
+          (trade_document_applied_to_shipment ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (trade_document_applied_to_shipment ?outbound_shipment_record)
+        (not
+          (trade_document_available ?trade_document)
+        )
+      )
+  )
+  (:action start_trade_document_verification
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?handling_station - handling_station)
+    :precondition
+      (and
+        (trade_document_applied_to_shipment ?outbound_shipment_record)
+        (assigned_handling_station ?outbound_shipment_record ?handling_station)
+        (not
+          (trade_document_verification_started ?outbound_shipment_record)
+        )
+      )
+    :effect (trade_document_verification_started ?outbound_shipment_record)
+  )
+  (:action complete_trade_document_verification
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?special_handling_instruction - special_handling_instruction)
+    :precondition
+      (and
+        (trade_document_verification_started ?outbound_shipment_record)
+        (shipment_has_special_handling_instruction ?outbound_shipment_record ?special_handling_instruction)
+        (not
+          (trade_document_verification_completed ?outbound_shipment_record)
+        )
+      )
+    :effect (trade_document_verification_completed ?outbound_shipment_record)
+  )
+  (:action finalize_shipment_after_document_verification
+    :parameters (?outbound_shipment_record - outbound_shipment_record)
+    :precondition
+      (and
+        (trade_document_verification_completed ?outbound_shipment_record)
+        (not
+          (final_validation_complete ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (final_validation_complete ?outbound_shipment_record)
+        (entity_ready_for_carrier_assignment ?outbound_shipment_record)
+      )
+  )
+  (:action mark_fragile_hu_ready_for_carrier_assignment
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (fragile_handling_unit_packaging_applied ?fragile_handling_unit)
+        (fragile_handling_unit_ready_for_consolidation ?fragile_handling_unit)
+        (container_reserved ?transport_unit_container)
+        (container_sealed ?transport_unit_container)
+        (not
+          (entity_ready_for_carrier_assignment ?fragile_handling_unit)
+        )
+      )
+    :effect (entity_ready_for_carrier_assignment ?fragile_handling_unit)
+  )
+  (:action mark_standard_hu_ready_for_carrier_assignment
+    :parameters (?standard_handling_unit - standard_handling_unit ?transport_unit_container - transport_unit_container)
+    :precondition
+      (and
+        (standard_handling_unit_packaging_applied ?standard_handling_unit)
+        (standard_handling_unit_ready_for_consolidation ?standard_handling_unit)
+        (container_reserved ?transport_unit_container)
+        (container_sealed ?transport_unit_container)
+        (not
+          (entity_ready_for_carrier_assignment ?standard_handling_unit)
+        )
+      )
+    :effect (entity_ready_for_carrier_assignment ?standard_handling_unit)
+  )
+  (:action assign_carrier_to_order
+    :parameters (?order - order ?carrier - carrier ?picking_task - picking_task)
+    :precondition
+      (and
+        (entity_ready_for_carrier_assignment ?order)
+        (picking_task_assigned ?order ?picking_task)
+        (carrier_available ?carrier)
+        (not
+          (entity_has_assigned_carrier ?order)
+        )
+      )
+    :effect
+      (and
+        (entity_has_assigned_carrier ?order)
+        (entity_assigned_carrier ?order ?carrier)
+        (not
+          (carrier_available ?carrier)
+        )
+      )
+  )
+  (:action dispatch_fragile_handling_unit
+    :parameters (?fragile_handling_unit - fragile_handling_unit ?supply_source_location - supply_source_location ?carrier - carrier)
+    :precondition
+      (and
+        (entity_has_assigned_carrier ?fragile_handling_unit)
+        (sourced_from_location ?fragile_handling_unit ?supply_source_location)
+        (entity_assigned_carrier ?fragile_handling_unit ?carrier)
+        (not
+          (closed_for_dispatch ?fragile_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (closed_for_dispatch ?fragile_handling_unit)
+        (supply_source_available ?supply_source_location)
+        (carrier_available ?carrier)
+      )
+  )
+  (:action dispatch_standard_handling_unit
+    :parameters (?standard_handling_unit - standard_handling_unit ?supply_source_location - supply_source_location ?carrier - carrier)
+    :precondition
+      (and
+        (entity_has_assigned_carrier ?standard_handling_unit)
+        (sourced_from_location ?standard_handling_unit ?supply_source_location)
+        (entity_assigned_carrier ?standard_handling_unit ?carrier)
+        (not
+          (closed_for_dispatch ?standard_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (closed_for_dispatch ?standard_handling_unit)
+        (supply_source_available ?supply_source_location)
+        (carrier_available ?carrier)
+      )
+  )
+  (:action dispatch_outbound_shipment
+    :parameters (?outbound_shipment_record - outbound_shipment_record ?supply_source_location - supply_source_location ?carrier - carrier)
+    :precondition
+      (and
+        (entity_has_assigned_carrier ?outbound_shipment_record)
+        (sourced_from_location ?outbound_shipment_record ?supply_source_location)
+        (entity_assigned_carrier ?outbound_shipment_record ?carrier)
+        (not
+          (closed_for_dispatch ?outbound_shipment_record)
+        )
+      )
+    :effect
+      (and
+        (closed_for_dispatch ?outbound_shipment_record)
+        (supply_source_available ?supply_source_location)
+        (carrier_available ?carrier)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem fragile_standard_separation_instance)
+  (:domain logistics_fragile_standard_separation)
+  (:objects fragile_hu_1 - fragile_handling_unit standard_hu_1 - standard_handling_unit shipment_record_1 - outbound_shipment_record shipment_record_2 - outbound_shipment_record supply_source_a - supply_source_location supply_source_b - supply_source_location supply_source_c - supply_source_location picking_task_1 - picking_task handling_station_1 - handling_station inventory_item_1 - inventory_item_unit fragile_slot_1 - fragile_consolidation_slot standard_slot_1 - standard_consolidation_slot container_1 - transport_unit_container packaging_material_1 - packaging_material packaging_material_2 - packaging_material label_template_standard - label_template label_template_customs - label_template service_level_express - service_level_profile service_level_standard - service_level_profile carrier_express - carrier special_packaging_spec_fragile - special_packaging_spec trade_document_invoice - trade_document trade_document_customs - trade_document special_handling_instruction_fragile - special_handling_instruction)
+  (:init
+    (supply_source_available supply_source_a)
+    (supply_source_available supply_source_b)
+    (supply_source_available supply_source_c)
+    (picking_task_available picking_task_1)
+    (handling_station_available handling_station_1)
+    (inventory_item_available inventory_item_1)
+    (assigned_to_fragile_slot fragile_hu_1 fragile_slot_1)
+    (assigned_to_standard_slot standard_hu_1 standard_slot_1)
+    (container_available container_1)
+    (packaging_material_available packaging_material_1)
+    (packaging_material_available packaging_material_2)
+    (shipment_includes_fragile_hu shipment_record_1 fragile_hu_1)
+    (shipment_includes_fragile_hu shipment_record_2 fragile_hu_1)
+    (shipment_includes_standard_hu shipment_record_1 standard_hu_1)
+    (shipment_includes_standard_hu shipment_record_2 standard_hu_1)
+    (shipment_assigned_to_container shipment_record_1 container_1)
+    (shipment_assigned_to_container shipment_record_2 container_1)
+    (shipment_allocated_packaging_material shipment_record_1 packaging_material_1)
+    (shipment_allocated_packaging_material shipment_record_2 packaging_material_2)
+    (label_template_available label_template_standard)
+    (label_template_available label_template_customs)
+    (service_level_profile_available service_level_express)
+    (service_level_profile_available service_level_standard)
+    (carrier_available carrier_express)
+    (special_packaging_spec_available special_packaging_spec_fragile)
+    (trade_document_available trade_document_invoice)
+    (shipment_attached_trade_document shipment_record_1 trade_document_invoice)
+    (shipment_attached_trade_document shipment_record_2 trade_document_customs)
+    (special_handling_instruction_available special_handling_instruction_fragile)
+  )
+  (:goal
+    (and
+      (closed_for_dispatch fragile_hu_1)
+      (closed_for_dispatch standard_hu_1)
+      (closed_for_dispatch shipment_record_1)
+      (closed_for_dispatch shipment_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(release-order fragile_hu_1)
+(assign-order-to-supply-source fragile_hu_1 supply_source_a)
+(assign-picking-task-to-order fragile_hu_1 picking_task_1)
+(confirm-picking-assignment fragile_hu_1 picking_task_1)
+(assign-handling-station-to-order fragile_hu_1 handling_station_1)
+(reserve-fragile-slot-for-picking fragile_hu_1 fragile_slot_1 picking_task_1)
+(package-fragile-handling-unit fragile_hu_1 fragile_slot_1 handling_station_1)
+(complete-picking-task fragile_hu_1 picking_task_1)
+(release-handling-station-from-order fragile_hu_1 handling_station_1)
+(release-order standard_hu_1)
+(assign-order-to-supply-source standard_hu_1 supply_source_b)
+(assign-picking-task-to-order standard_hu_1 picking_task_1)
+(confirm-picking-assignment standard_hu_1 picking_task_1)
+(assign-handling-station-to-order standard_hu_1 handling_station_1)
+(reserve-standard-slot-for-picking standard_hu_1 standard_slot_1 picking_task_1)
+(package-standard-handling-unit standard_hu_1 standard_slot_1 handling_station_1)
+(complete-picking-task standard_hu_1 picking_task_1)
+(release-handling-station-from-order standard_hu_1 handling_station_1)
+(consolidate-slots-into-container fragile_hu_1 standard_hu_1 fragile_slot_1 standard_slot_1 container_1)
+(assign-picking-task-to-order fragile_hu_1 picking_task_1)
+(seal-container container_1 fragile_hu_1 picking_task_1)
+(complete-picking-task fragile_hu_1 picking_task_1)
+(mark-fragile-hu-ready-for-carrier-assignment fragile_hu_1 container_1)
+(mark-standard-hu-ready-for-carrier-assignment standard_hu_1 container_1)
+(release-order shipment_record_1)
+(assign-order-to-supply-source shipment_record_1 supply_source_c)
+(assign-picking-task-to-order shipment_record_1 picking_task_1)
+(confirm-picking-assignment shipment_record_1 picking_task_1)
+(reserve-and-assign-packaging-material-to-shipment shipment_record_1 packaging_material_1 container_1)
+(prepare-shipment-packaging shipment_record_1 packaging_material_1 container_1 picking_task_1)
+(assign-special-packaging-spec-to-shipment shipment_record_1 special_packaging_spec_fragile)
+(assign-special-handling-instruction-to-shipment shipment_record_1 special_handling_instruction_fragile)
+(assign-handling-station-to-order shipment_record_1 handling_station_1)
+(apply-packaging-spec-and-complete-documentation shipment_record_1 special_packaging_spec_fragile handling_station_1 packaging_material_1 container_1)
+(perform-special-handling-compliance-check shipment_record_1 special_handling_instruction_fragile packaging_material_1 container_1)
+(final-validation-and-mark-shipment-ready shipment_record_1)
+(assign-carrier-to-order shipment_record_1 carrier_express picking_task_1)
+(dispatch-outbound-shipment shipment_record_1 supply_source_c carrier_express)
+(complete-picking-task shipment_record_1 picking_task_1)
+(release-handling-station-from-order shipment_record_1 handling_station_1)
+(release-special-packaging-spec-from-shipment shipment_record_1 special_packaging_spec_fragile)
+(release-special-handling-instruction-from-shipment shipment_record_1 special_handling_instruction_fragile)
+(release-order shipment_record_2)
+(assign-order-to-supply-source shipment_record_2 supply_source_c)
+(assign-picking-task-to-order shipment_record_2 picking_task_1)
+(confirm-picking-assignment shipment_record_2 picking_task_1)
+(reserve-and-assign-packaging-material-to-shipment shipment_record_2 packaging_material_2 container_1)
+(prepare-shipment-packaging shipment_record_2 packaging_material_2 container_1 picking_task_1)
+(assign-special-packaging-spec-to-shipment shipment_record_2 special_packaging_spec_fragile)
+(assign-special-handling-instruction-to-shipment shipment_record_2 special_handling_instruction_fragile)
+(assign-handling-station-to-order shipment_record_2 handling_station_1)
+(apply-packaging-spec-and-complete-documentation shipment_record_2 special_packaging_spec_fragile handling_station_1 packaging_material_2 container_1)
+(perform-special-handling-compliance-check shipment_record_2 special_handling_instruction_fragile packaging_material_2 container_1)
+(final-validation-and-mark-shipment-ready shipment_record_2)
+(assign-carrier-to-order shipment_record_2 carrier_express picking_task_1)
+(dispatch-outbound-shipment shipment_record_2 supply_source_c carrier_express)
+(complete-picking-task shipment_record_2 picking_task_1)
+(release-handling-station-from-order shipment_record_2 handling_station_1)
+(release-special-packaging-spec-from-shipment shipment_record_2 special_packaging_spec_fragile)
+(release-special-handling-instruction-from-shipment shipment_record_2 special_handling_instruction_fragile)
+(assign-picking-task-to-order fragile_hu_1 picking_task_1)
+(assign-carrier-to-order fragile_hu_1 carrier_express picking_task_1)
+(dispatch-fragile-handling-unit fragile_hu_1 supply_source_a carrier_express)
+(complete-picking-task fragile_hu_1 picking_task_1)
+(assign-picking-task-to-order standard_hu_1 picking_task_1)
+(assign-carrier-to-order standard_hu_1 carrier_express picking_task_1)
+(dispatch-standard-handling-unit standard_hu_1 supply_source_b carrier_express)
+(complete-picking-task standard_hu_1 picking_task_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_92lxp4r0/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_92lxp4r0/plan.pddl 
+
+
+--- stderr ---
+

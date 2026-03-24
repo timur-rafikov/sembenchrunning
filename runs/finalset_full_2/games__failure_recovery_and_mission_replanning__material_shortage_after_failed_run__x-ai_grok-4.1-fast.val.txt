@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain material_shortage_recovery_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types asset_category - object cache_component_category - object category_support - object mission_container - object recoverable_unit - mission_container supply_pack - asset_category route_option - asset_category support_tool - asset_category optional_asset_a - asset_category consumable_type - asset_category resource_token - asset_category module_variant - asset_category key_component - asset_category material_unit - cache_component_category upgrade_module - cache_component_category blueprint_asset - cache_component_category scout_report - category_support support_report - category_support supply_cache - category_support member_slot_group_a - recoverable_unit member_slot_group_b - recoverable_unit scavenger_slot - member_slot_group_a responder_slot - member_slot_group_a squad_unit - member_slot_group_b)
+  (:predicates
+    (recoverable_marked_for_recovery ?mission_run - recoverable_unit)
+    (ready_for_recovery ?mission_run - recoverable_unit)
+    (recoverable_has_supply_pack ?mission_run - recoverable_unit)
+    (ready_for_redeploy ?mission_run - recoverable_unit)
+    (ready_for_restart ?mission_run - recoverable_unit)
+    (recoverable_reenabled ?mission_run - recoverable_unit)
+    (supply_pack_available ?supply_pack - supply_pack)
+    (assigned_supply_pack ?mission_run - recoverable_unit ?supply_pack - supply_pack)
+    (route_option_available ?route_option - route_option)
+    (claimed_route ?mission_run - recoverable_unit ?route_option - route_option)
+    (support_tool_available ?support_tool - support_tool)
+    (attached_support_tool ?mission_run - recoverable_unit ?support_tool - support_tool)
+    (material_unit_available ?material_unit - material_unit)
+    (scavenger_collected_material ?scavenger_slot - scavenger_slot ?material_unit - material_unit)
+    (responder_collected_material ?responder_slot - responder_slot ?material_unit - material_unit)
+    (slot_has_scout_report ?scavenger_slot - scavenger_slot ?scout_report - scout_report)
+    (scout_report_reserved ?scout_report - scout_report)
+    (scout_report_verified ?scout_report - scout_report)
+    (scavenger_collection_complete ?scavenger_slot - scavenger_slot)
+    (responder_assigned_support_report ?responder_slot - responder_slot ?support_report - support_report)
+    (support_report_reserved ?support_report - support_report)
+    (support_report_verified ?support_report - support_report)
+    (responder_collection_complete ?responder_slot - responder_slot)
+    (supply_cache_available ?supply_cache - supply_cache)
+    (supply_cache_active ?supply_cache - supply_cache)
+    (cache_has_scout_report ?supply_cache - supply_cache ?scout_report - scout_report)
+    (cache_has_support_report ?supply_cache - supply_cache ?support_report - support_report)
+    (cache_variant_alpha ?supply_cache - supply_cache)
+    (cache_variant_beta ?supply_cache - supply_cache)
+    (cache_activated ?supply_cache - supply_cache)
+    (squad_has_scavenger_slot ?squad_unit - squad_unit ?scavenger_slot - scavenger_slot)
+    (squad_has_responder_slot ?squad_unit - squad_unit ?responder_slot - responder_slot)
+    (squad_assigned_cache ?squad_unit - squad_unit ?supply_cache - supply_cache)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (squad_has_upgrade_module ?squad_unit - squad_unit ?upgrade_module - upgrade_module)
+    (upgrade_module_consumed ?upgrade_module - upgrade_module)
+    (module_attached_to_cache ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    (squad_module_slot_ready ?squad_unit - squad_unit)
+    (squad_has_variant_installed ?squad_unit - squad_unit)
+    (squad_ready_for_cache_activation ?squad_unit - squad_unit)
+    (squad_has_optional_asset ?squad_unit - squad_unit)
+    (squad_optional_asset_applied ?squad_unit - squad_unit)
+    (squad_confirmed_for_activation ?squad_unit - squad_unit)
+    (squad_ready_for_finalization ?squad_unit - squad_unit)
+    (blueprint_asset_available ?blueprint_asset - blueprint_asset)
+    (squad_has_blueprint_asset ?squad_unit - squad_unit ?blueprint_asset - blueprint_asset)
+    (squad_blueprint_applied ?squad_unit - squad_unit)
+    (squad_blueprint_ready ?squad_unit - squad_unit)
+    (squad_blueprint_unlocked ?squad_unit - squad_unit)
+    (optional_asset_available ?optional_asset_a - optional_asset_a)
+    (squad_assigned_optional_asset ?squad_unit - squad_unit ?optional_asset_a - optional_asset_a)
+    (consumable_available ?consumable_type - consumable_type)
+    (squad_has_consumable ?squad_unit - squad_unit ?consumable_type - consumable_type)
+    (module_variant_available ?module_variant - module_variant)
+    (squad_has_module_variant ?squad_unit - squad_unit ?module_variant - module_variant)
+    (key_component_available ?key_component - key_component)
+    (squad_has_key_component ?squad_unit - squad_unit ?key_component - key_component)
+    (resource_token_available ?resource_token - resource_token)
+    (recoverable_has_resource_token ?mission_run - recoverable_unit ?resource_token - resource_token)
+    (scavenger_slot_committed ?scavenger_slot - scavenger_slot)
+    (responder_slot_committed ?responder_slot - responder_slot)
+    (squad_ready_for_restart ?squad_unit - squad_unit)
+  )
+  (:action detect_and_mark_failed_recoverable
+    :parameters (?mission_run - recoverable_unit)
+    :precondition
+      (and
+        (not
+          (recoverable_marked_for_recovery ?mission_run)
+        )
+        (not
+          (ready_for_redeploy ?mission_run)
+        )
+      )
+    :effect (recoverable_marked_for_recovery ?mission_run)
+  )
+  (:action assign_supply_pack_to_recoverable
+    :parameters (?mission_run - recoverable_unit ?supply_pack - supply_pack)
+    :precondition
+      (and
+        (recoverable_marked_for_recovery ?mission_run)
+        (not
+          (recoverable_has_supply_pack ?mission_run)
+        )
+        (supply_pack_available ?supply_pack)
+      )
+    :effect
+      (and
+        (recoverable_has_supply_pack ?mission_run)
+        (assigned_supply_pack ?mission_run ?supply_pack)
+        (not
+          (supply_pack_available ?supply_pack)
+        )
+      )
+  )
+  (:action claim_route_for_recoverable
+    :parameters (?mission_run - recoverable_unit ?route_option - route_option)
+    :precondition
+      (and
+        (recoverable_marked_for_recovery ?mission_run)
+        (recoverable_has_supply_pack ?mission_run)
+        (route_option_available ?route_option)
+      )
+    :effect
+      (and
+        (claimed_route ?mission_run ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action finalize_route_claim
+    :parameters (?mission_run - recoverable_unit ?route_option - route_option)
+    :precondition
+      (and
+        (recoverable_marked_for_recovery ?mission_run)
+        (recoverable_has_supply_pack ?mission_run)
+        (claimed_route ?mission_run ?route_option)
+        (not
+          (ready_for_recovery ?mission_run)
+        )
+      )
+    :effect (ready_for_recovery ?mission_run)
+  )
+  (:action release_route_for_recoverable
+    :parameters (?mission_run - recoverable_unit ?route_option - route_option)
+    :precondition
+      (and
+        (claimed_route ?mission_run ?route_option)
+      )
+    :effect
+      (and
+        (route_option_available ?route_option)
+        (not
+          (claimed_route ?mission_run ?route_option)
+        )
+      )
+  )
+  (:action attach_support_tool_to_recoverable
+    :parameters (?mission_run - recoverable_unit ?support_tool - support_tool)
+    :precondition
+      (and
+        (ready_for_recovery ?mission_run)
+        (support_tool_available ?support_tool)
+      )
+    :effect
+      (and
+        (attached_support_tool ?mission_run ?support_tool)
+        (not
+          (support_tool_available ?support_tool)
+        )
+      )
+  )
+  (:action detach_support_tool_from_recoverable
+    :parameters (?mission_run - recoverable_unit ?support_tool - support_tool)
+    :precondition
+      (and
+        (attached_support_tool ?mission_run ?support_tool)
+      )
+    :effect
+      (and
+        (support_tool_available ?support_tool)
+        (not
+          (attached_support_tool ?mission_run ?support_tool)
+        )
+      )
+  )
+  (:action install_module_variant_to_squad
+    :parameters (?squad_unit - squad_unit ?module_variant - module_variant)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (module_variant_available ?module_variant)
+      )
+    :effect
+      (and
+        (squad_has_module_variant ?squad_unit ?module_variant)
+        (not
+          (module_variant_available ?module_variant)
+        )
+      )
+  )
+  (:action remove_module_variant_from_squad
+    :parameters (?squad_unit - squad_unit ?module_variant - module_variant)
+    :precondition
+      (and
+        (squad_has_module_variant ?squad_unit ?module_variant)
+      )
+    :effect
+      (and
+        (module_variant_available ?module_variant)
+        (not
+          (squad_has_module_variant ?squad_unit ?module_variant)
+        )
+      )
+  )
+  (:action install_key_component_to_squad
+    :parameters (?squad_unit - squad_unit ?key_component - key_component)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (key_component_available ?key_component)
+      )
+    :effect
+      (and
+        (squad_has_key_component ?squad_unit ?key_component)
+        (not
+          (key_component_available ?key_component)
+        )
+      )
+  )
+  (:action remove_key_component_from_squad
+    :parameters (?squad_unit - squad_unit ?key_component - key_component)
+    :precondition
+      (and
+        (squad_has_key_component ?squad_unit ?key_component)
+      )
+    :effect
+      (and
+        (key_component_available ?key_component)
+        (not
+          (squad_has_key_component ?squad_unit ?key_component)
+        )
+      )
+  )
+  (:action reserve_scout_report_for_scavenger
+    :parameters (?scavenger_slot - scavenger_slot ?scout_report - scout_report ?route_option - route_option)
+    :precondition
+      (and
+        (ready_for_recovery ?scavenger_slot)
+        (claimed_route ?scavenger_slot ?route_option)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (not
+          (scout_report_reserved ?scout_report)
+        )
+        (not
+          (scout_report_verified ?scout_report)
+        )
+      )
+    :effect (scout_report_reserved ?scout_report)
+  )
+  (:action scavenger_claim_collection_with_tool
+    :parameters (?scavenger_slot - scavenger_slot ?scout_report - scout_report ?support_tool - support_tool)
+    :precondition
+      (and
+        (ready_for_recovery ?scavenger_slot)
+        (attached_support_tool ?scavenger_slot ?support_tool)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (scout_report_reserved ?scout_report)
+        (not
+          (scavenger_slot_committed ?scavenger_slot)
+        )
+      )
+    :effect
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (scavenger_collection_complete ?scavenger_slot)
+      )
+  )
+  (:action scavenger_collect_material
+    :parameters (?scavenger_slot - scavenger_slot ?scout_report - scout_report ?material_unit - material_unit)
+    :precondition
+      (and
+        (ready_for_recovery ?scavenger_slot)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (material_unit_available ?material_unit)
+        (not
+          (scavenger_slot_committed ?scavenger_slot)
+        )
+      )
+    :effect
+      (and
+        (scout_report_verified ?scout_report)
+        (scavenger_slot_committed ?scavenger_slot)
+        (scavenger_collected_material ?scavenger_slot ?material_unit)
+        (not
+          (material_unit_available ?material_unit)
+        )
+      )
+  )
+  (:action scavenger_finalize_collection
+    :parameters (?scavenger_slot - scavenger_slot ?scout_report - scout_report ?route_option - route_option ?material_unit - material_unit)
+    :precondition
+      (and
+        (ready_for_recovery ?scavenger_slot)
+        (claimed_route ?scavenger_slot ?route_option)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (scout_report_verified ?scout_report)
+        (scavenger_collected_material ?scavenger_slot ?material_unit)
+        (not
+          (scavenger_collection_complete ?scavenger_slot)
+        )
+      )
+    :effect
+      (and
+        (scout_report_reserved ?scout_report)
+        (scavenger_collection_complete ?scavenger_slot)
+        (material_unit_available ?material_unit)
+        (not
+          (scavenger_collected_material ?scavenger_slot ?material_unit)
+        )
+      )
+  )
+  (:action reserve_support_report_for_responder
+    :parameters (?responder_slot - responder_slot ?support_report - support_report ?route_option - route_option)
+    :precondition
+      (and
+        (ready_for_recovery ?responder_slot)
+        (claimed_route ?responder_slot ?route_option)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (not
+          (support_report_reserved ?support_report)
+        )
+        (not
+          (support_report_verified ?support_report)
+        )
+      )
+    :effect (support_report_reserved ?support_report)
+  )
+  (:action responder_claim_collection_with_tool
+    :parameters (?responder_slot - responder_slot ?support_report - support_report ?support_tool - support_tool)
+    :precondition
+      (and
+        (ready_for_recovery ?responder_slot)
+        (attached_support_tool ?responder_slot ?support_tool)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (support_report_reserved ?support_report)
+        (not
+          (responder_slot_committed ?responder_slot)
+        )
+      )
+    :effect
+      (and
+        (responder_slot_committed ?responder_slot)
+        (responder_collection_complete ?responder_slot)
+      )
+  )
+  (:action responder_collect_material
+    :parameters (?responder_slot - responder_slot ?support_report - support_report ?material_unit - material_unit)
+    :precondition
+      (and
+        (ready_for_recovery ?responder_slot)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (material_unit_available ?material_unit)
+        (not
+          (responder_slot_committed ?responder_slot)
+        )
+      )
+    :effect
+      (and
+        (support_report_verified ?support_report)
+        (responder_slot_committed ?responder_slot)
+        (responder_collected_material ?responder_slot ?material_unit)
+        (not
+          (material_unit_available ?material_unit)
+        )
+      )
+  )
+  (:action responder_finalize_collection
+    :parameters (?responder_slot - responder_slot ?support_report - support_report ?route_option - route_option ?material_unit - material_unit)
+    :precondition
+      (and
+        (ready_for_recovery ?responder_slot)
+        (claimed_route ?responder_slot ?route_option)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (support_report_verified ?support_report)
+        (responder_collected_material ?responder_slot ?material_unit)
+        (not
+          (responder_collection_complete ?responder_slot)
+        )
+      )
+    :effect
+      (and
+        (support_report_reserved ?support_report)
+        (responder_collection_complete ?responder_slot)
+        (material_unit_available ?material_unit)
+        (not
+          (responder_collected_material ?responder_slot ?material_unit)
+        )
+      )
+  )
+  (:action assemble_supply_cache_from_reports
+    :parameters (?scavenger_slot - scavenger_slot ?responder_slot - responder_slot ?scout_report - scout_report ?support_report - support_report ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (responder_slot_committed ?responder_slot)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (scout_report_reserved ?scout_report)
+        (support_report_reserved ?support_report)
+        (scavenger_collection_complete ?scavenger_slot)
+        (responder_collection_complete ?responder_slot)
+        (supply_cache_available ?supply_cache)
+      )
+    :effect
+      (and
+        (supply_cache_active ?supply_cache)
+        (cache_has_scout_report ?supply_cache ?scout_report)
+        (cache_has_support_report ?supply_cache ?support_report)
+        (not
+          (supply_cache_available ?supply_cache)
+        )
+      )
+  )
+  (:action assemble_supply_cache_variant_alpha
+    :parameters (?scavenger_slot - scavenger_slot ?responder_slot - responder_slot ?scout_report - scout_report ?support_report - support_report ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (responder_slot_committed ?responder_slot)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (scout_report_verified ?scout_report)
+        (support_report_reserved ?support_report)
+        (not
+          (scavenger_collection_complete ?scavenger_slot)
+        )
+        (responder_collection_complete ?responder_slot)
+        (supply_cache_available ?supply_cache)
+      )
+    :effect
+      (and
+        (supply_cache_active ?supply_cache)
+        (cache_has_scout_report ?supply_cache ?scout_report)
+        (cache_has_support_report ?supply_cache ?support_report)
+        (cache_variant_alpha ?supply_cache)
+        (not
+          (supply_cache_available ?supply_cache)
+        )
+      )
+  )
+  (:action assemble_supply_cache_variant_beta
+    :parameters (?scavenger_slot - scavenger_slot ?responder_slot - responder_slot ?scout_report - scout_report ?support_report - support_report ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (responder_slot_committed ?responder_slot)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (scout_report_reserved ?scout_report)
+        (support_report_verified ?support_report)
+        (scavenger_collection_complete ?scavenger_slot)
+        (not
+          (responder_collection_complete ?responder_slot)
+        )
+        (supply_cache_available ?supply_cache)
+      )
+    :effect
+      (and
+        (supply_cache_active ?supply_cache)
+        (cache_has_scout_report ?supply_cache ?scout_report)
+        (cache_has_support_report ?supply_cache ?support_report)
+        (cache_variant_beta ?supply_cache)
+        (not
+          (supply_cache_available ?supply_cache)
+        )
+      )
+  )
+  (:action assemble_supply_cache_with_both_variants
+    :parameters (?scavenger_slot - scavenger_slot ?responder_slot - responder_slot ?scout_report - scout_report ?support_report - support_report ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (responder_slot_committed ?responder_slot)
+        (slot_has_scout_report ?scavenger_slot ?scout_report)
+        (responder_assigned_support_report ?responder_slot ?support_report)
+        (scout_report_verified ?scout_report)
+        (support_report_verified ?support_report)
+        (not
+          (scavenger_collection_complete ?scavenger_slot)
+        )
+        (not
+          (responder_collection_complete ?responder_slot)
+        )
+        (supply_cache_available ?supply_cache)
+      )
+    :effect
+      (and
+        (supply_cache_active ?supply_cache)
+        (cache_has_scout_report ?supply_cache ?scout_report)
+        (cache_has_support_report ?supply_cache ?support_report)
+        (cache_variant_alpha ?supply_cache)
+        (cache_variant_beta ?supply_cache)
+        (not
+          (supply_cache_available ?supply_cache)
+        )
+      )
+  )
+  (:action activate_supply_cache
+    :parameters (?supply_cache - supply_cache ?scavenger_slot - scavenger_slot ?route_option - route_option)
+    :precondition
+      (and
+        (supply_cache_active ?supply_cache)
+        (scavenger_slot_committed ?scavenger_slot)
+        (claimed_route ?scavenger_slot ?route_option)
+        (not
+          (cache_activated ?supply_cache)
+        )
+      )
+    :effect (cache_activated ?supply_cache)
+  )
+  (:action install_upgrade_module_into_cache
+    :parameters (?squad_unit - squad_unit ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (squad_assigned_cache ?squad_unit ?supply_cache)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (upgrade_module_available ?upgrade_module)
+        (supply_cache_active ?supply_cache)
+        (cache_activated ?supply_cache)
+        (not
+          (upgrade_module_consumed ?upgrade_module)
+        )
+      )
+    :effect
+      (and
+        (upgrade_module_consumed ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action prepare_squad_for_cache_transfer
+    :parameters (?squad_unit - squad_unit ?upgrade_module - upgrade_module ?supply_cache - supply_cache ?route_option - route_option)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (upgrade_module_consumed ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (claimed_route ?squad_unit ?route_option)
+        (not
+          (cache_variant_alpha ?supply_cache)
+        )
+        (not
+          (squad_module_slot_ready ?squad_unit)
+        )
+      )
+    :effect (squad_module_slot_ready ?squad_unit)
+  )
+  (:action assign_optional_asset_to_squad
+    :parameters (?squad_unit - squad_unit ?optional_asset_a - optional_asset_a)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (optional_asset_available ?optional_asset_a)
+        (not
+          (squad_has_optional_asset ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_has_optional_asset ?squad_unit)
+        (squad_assigned_optional_asset ?squad_unit ?optional_asset_a)
+        (not
+          (optional_asset_available ?optional_asset_a)
+        )
+      )
+  )
+  (:action apply_optional_asset_and_stage_squad
+    :parameters (?squad_unit - squad_unit ?upgrade_module - upgrade_module ?supply_cache - supply_cache ?route_option - route_option ?optional_asset_a - optional_asset_a)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (upgrade_module_consumed ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (claimed_route ?squad_unit ?route_option)
+        (cache_variant_alpha ?supply_cache)
+        (squad_has_optional_asset ?squad_unit)
+        (squad_assigned_optional_asset ?squad_unit ?optional_asset_a)
+        (not
+          (squad_module_slot_ready ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_module_slot_ready ?squad_unit)
+        (squad_optional_asset_applied ?squad_unit)
+      )
+  )
+  (:action install_variant_and_stage_squad_variant_alpha
+    :parameters (?squad_unit - squad_unit ?module_variant - module_variant ?support_tool - support_tool ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_module_slot_ready ?squad_unit)
+        (squad_has_module_variant ?squad_unit ?module_variant)
+        (attached_support_tool ?squad_unit ?support_tool)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (not
+          (cache_variant_beta ?supply_cache)
+        )
+        (not
+          (squad_has_variant_installed ?squad_unit)
+        )
+      )
+    :effect (squad_has_variant_installed ?squad_unit)
+  )
+  (:action install_variant_and_stage_squad_variant_beta
+    :parameters (?squad_unit - squad_unit ?module_variant - module_variant ?support_tool - support_tool ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_module_slot_ready ?squad_unit)
+        (squad_has_module_variant ?squad_unit ?module_variant)
+        (attached_support_tool ?squad_unit ?support_tool)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (cache_variant_beta ?supply_cache)
+        (not
+          (squad_has_variant_installed ?squad_unit)
+        )
+      )
+    :effect (squad_has_variant_installed ?squad_unit)
+  )
+  (:action stage_squad_for_key_component_activation
+    :parameters (?squad_unit - squad_unit ?key_component - key_component ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_has_variant_installed ?squad_unit)
+        (squad_has_key_component ?squad_unit ?key_component)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (not
+          (cache_variant_alpha ?supply_cache)
+        )
+        (not
+          (cache_variant_beta ?supply_cache)
+        )
+        (not
+          (squad_ready_for_cache_activation ?squad_unit)
+        )
+      )
+    :effect (squad_ready_for_cache_activation ?squad_unit)
+  )
+  (:action activate_key_component_and_confirm
+    :parameters (?squad_unit - squad_unit ?key_component - key_component ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_has_variant_installed ?squad_unit)
+        (squad_has_key_component ?squad_unit ?key_component)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (cache_variant_alpha ?supply_cache)
+        (not
+          (cache_variant_beta ?supply_cache)
+        )
+        (not
+          (squad_ready_for_cache_activation ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_confirmed_for_activation ?squad_unit)
+      )
+  )
+  (:action activate_key_component_and_confirm_variant
+    :parameters (?squad_unit - squad_unit ?key_component - key_component ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_has_variant_installed ?squad_unit)
+        (squad_has_key_component ?squad_unit ?key_component)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (not
+          (cache_variant_alpha ?supply_cache)
+        )
+        (cache_variant_beta ?supply_cache)
+        (not
+          (squad_ready_for_cache_activation ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_confirmed_for_activation ?squad_unit)
+      )
+  )
+  (:action activate_key_component_and_confirm_both
+    :parameters (?squad_unit - squad_unit ?key_component - key_component ?upgrade_module - upgrade_module ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (squad_has_variant_installed ?squad_unit)
+        (squad_has_key_component ?squad_unit ?key_component)
+        (squad_has_upgrade_module ?squad_unit ?upgrade_module)
+        (module_attached_to_cache ?upgrade_module ?supply_cache)
+        (cache_variant_alpha ?supply_cache)
+        (cache_variant_beta ?supply_cache)
+        (not
+          (squad_ready_for_cache_activation ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_confirmed_for_activation ?squad_unit)
+      )
+  )
+  (:action finalize_squad_activation
+    :parameters (?squad_unit - squad_unit)
+    :precondition
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (not
+          (squad_confirmed_for_activation ?squad_unit)
+        )
+        (not
+          (squad_ready_for_restart ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_restart ?squad_unit)
+        (ready_for_restart ?squad_unit)
+      )
+  )
+  (:action apply_consumable_to_squad
+    :parameters (?squad_unit - squad_unit ?consumable_type - consumable_type)
+    :precondition
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_confirmed_for_activation ?squad_unit)
+        (consumable_available ?consumable_type)
+      )
+    :effect
+      (and
+        (squad_has_consumable ?squad_unit ?consumable_type)
+        (not
+          (consumable_available ?consumable_type)
+        )
+      )
+  )
+  (:action finalize_squad_reconfiguration
+    :parameters (?squad_unit - squad_unit ?scavenger_slot - scavenger_slot ?responder_slot - responder_slot ?route_option - route_option ?consumable_type - consumable_type)
+    :precondition
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_confirmed_for_activation ?squad_unit)
+        (squad_has_consumable ?squad_unit ?consumable_type)
+        (squad_has_scavenger_slot ?squad_unit ?scavenger_slot)
+        (squad_has_responder_slot ?squad_unit ?responder_slot)
+        (scavenger_collection_complete ?scavenger_slot)
+        (responder_collection_complete ?responder_slot)
+        (claimed_route ?squad_unit ?route_option)
+        (not
+          (squad_ready_for_finalization ?squad_unit)
+        )
+      )
+    :effect (squad_ready_for_finalization ?squad_unit)
+  )
+  (:action finalize_squad_readiness
+    :parameters (?squad_unit - squad_unit)
+    :precondition
+      (and
+        (squad_ready_for_cache_activation ?squad_unit)
+        (squad_ready_for_finalization ?squad_unit)
+        (not
+          (squad_ready_for_restart ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_restart ?squad_unit)
+        (ready_for_restart ?squad_unit)
+      )
+  )
+  (:action apply_blueprint_to_squad
+    :parameters (?squad_unit - squad_unit ?blueprint_asset - blueprint_asset ?route_option - route_option)
+    :precondition
+      (and
+        (ready_for_recovery ?squad_unit)
+        (claimed_route ?squad_unit ?route_option)
+        (blueprint_asset_available ?blueprint_asset)
+        (squad_has_blueprint_asset ?squad_unit ?blueprint_asset)
+        (not
+          (squad_blueprint_applied ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_blueprint_applied ?squad_unit)
+        (not
+          (blueprint_asset_available ?blueprint_asset)
+        )
+      )
+  )
+  (:action prepare_blueprint_unlock
+    :parameters (?squad_unit - squad_unit ?support_tool - support_tool)
+    :precondition
+      (and
+        (squad_blueprint_applied ?squad_unit)
+        (attached_support_tool ?squad_unit ?support_tool)
+        (not
+          (squad_blueprint_ready ?squad_unit)
+        )
+      )
+    :effect (squad_blueprint_ready ?squad_unit)
+  )
+  (:action unlock_blueprint_with_key_component
+    :parameters (?squad_unit - squad_unit ?key_component - key_component)
+    :precondition
+      (and
+        (squad_blueprint_ready ?squad_unit)
+        (squad_has_key_component ?squad_unit ?key_component)
+        (not
+          (squad_blueprint_unlocked ?squad_unit)
+        )
+      )
+    :effect (squad_blueprint_unlocked ?squad_unit)
+  )
+  (:action finalize_blueprint_unlock
+    :parameters (?squad_unit - squad_unit)
+    :precondition
+      (and
+        (squad_blueprint_unlocked ?squad_unit)
+        (not
+          (squad_ready_for_restart ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (squad_ready_for_restart ?squad_unit)
+        (ready_for_restart ?squad_unit)
+      )
+  )
+  (:action finalize_scavenger_slot_ready
+    :parameters (?scavenger_slot - scavenger_slot ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (scavenger_slot_committed ?scavenger_slot)
+        (scavenger_collection_complete ?scavenger_slot)
+        (supply_cache_active ?supply_cache)
+        (cache_activated ?supply_cache)
+        (not
+          (ready_for_restart ?scavenger_slot)
+        )
+      )
+    :effect (ready_for_restart ?scavenger_slot)
+  )
+  (:action finalize_responder_slot_ready
+    :parameters (?responder_slot - responder_slot ?supply_cache - supply_cache)
+    :precondition
+      (and
+        (responder_slot_committed ?responder_slot)
+        (responder_collection_complete ?responder_slot)
+        (supply_cache_active ?supply_cache)
+        (cache_activated ?supply_cache)
+        (not
+          (ready_for_restart ?responder_slot)
+        )
+      )
+    :effect (ready_for_restart ?responder_slot)
+  )
+  (:action consume_resource_token_for_recoverable_restart
+    :parameters (?mission_run - recoverable_unit ?resource_token - resource_token ?route_option - route_option)
+    :precondition
+      (and
+        (ready_for_restart ?mission_run)
+        (claimed_route ?mission_run ?route_option)
+        (resource_token_available ?resource_token)
+        (not
+          (recoverable_reenabled ?mission_run)
+        )
+      )
+    :effect
+      (and
+        (recoverable_reenabled ?mission_run)
+        (recoverable_has_resource_token ?mission_run ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action reassign_supply_pack_and_enable_slot
+    :parameters (?scavenger_slot - scavenger_slot ?supply_pack - supply_pack ?resource_token - resource_token)
+    :precondition
+      (and
+        (recoverable_reenabled ?scavenger_slot)
+        (assigned_supply_pack ?scavenger_slot ?supply_pack)
+        (recoverable_has_resource_token ?scavenger_slot ?resource_token)
+        (not
+          (ready_for_redeploy ?scavenger_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_redeploy ?scavenger_slot)
+        (supply_pack_available ?supply_pack)
+        (resource_token_available ?resource_token)
+      )
+  )
+  (:action reassign_supply_pack_and_enable_responder
+    :parameters (?responder_slot - responder_slot ?supply_pack - supply_pack ?resource_token - resource_token)
+    :precondition
+      (and
+        (recoverable_reenabled ?responder_slot)
+        (assigned_supply_pack ?responder_slot ?supply_pack)
+        (recoverable_has_resource_token ?responder_slot ?resource_token)
+        (not
+          (ready_for_redeploy ?responder_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_redeploy ?responder_slot)
+        (supply_pack_available ?supply_pack)
+        (resource_token_available ?resource_token)
+      )
+  )
+  (:action reassign_supply_pack_and_enable_squad
+    :parameters (?squad_unit - squad_unit ?supply_pack - supply_pack ?resource_token - resource_token)
+    :precondition
+      (and
+        (recoverable_reenabled ?squad_unit)
+        (assigned_supply_pack ?squad_unit ?supply_pack)
+        (recoverable_has_resource_token ?squad_unit ?resource_token)
+        (not
+          (ready_for_redeploy ?squad_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_redeploy ?squad_unit)
+        (supply_pack_available ?supply_pack)
+        (resource_token_available ?resource_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem material_shortage_after_failed_run_scenario)
+  (:domain material_shortage_recovery_domain)
+  (:objects scavenger_slot_1 - scavenger_slot responder_slot_1 - responder_slot squad_alpha - squad_unit squad_bravo - squad_unit supply_pack_a - supply_pack supply_pack_b - supply_pack supply_pack_c - supply_pack route_option_north - route_option support_tool_drone - support_tool material_fragment - material_unit scout_report_alpha - scout_report support_report_alpha - support_report supply_cache_slot - supply_cache upgrade_module_mk1 - upgrade_module upgrade_module_mk2 - upgrade_module optional_asset_a1 - optional_asset_a optional_asset_a2 - optional_asset_a consumable_boost_a - consumable_type consumable_boost_b - consumable_type resource_token_1 - resource_token module_variant_red - module_variant blueprint_asset_alpha - blueprint_asset blueprint_asset_beta - blueprint_asset key_component_prime - key_component)
+  (:init
+    (supply_pack_available supply_pack_a)
+    (supply_pack_available supply_pack_b)
+    (supply_pack_available supply_pack_c)
+    (route_option_available route_option_north)
+    (support_tool_available support_tool_drone)
+    (material_unit_available material_fragment)
+    (slot_has_scout_report scavenger_slot_1 scout_report_alpha)
+    (responder_assigned_support_report responder_slot_1 support_report_alpha)
+    (supply_cache_available supply_cache_slot)
+    (upgrade_module_available upgrade_module_mk1)
+    (upgrade_module_available upgrade_module_mk2)
+    (squad_has_scavenger_slot squad_alpha scavenger_slot_1)
+    (squad_has_scavenger_slot squad_bravo scavenger_slot_1)
+    (squad_has_responder_slot squad_alpha responder_slot_1)
+    (squad_has_responder_slot squad_bravo responder_slot_1)
+    (squad_assigned_cache squad_alpha supply_cache_slot)
+    (squad_assigned_cache squad_bravo supply_cache_slot)
+    (squad_has_upgrade_module squad_alpha upgrade_module_mk1)
+    (squad_has_upgrade_module squad_bravo upgrade_module_mk2)
+    (optional_asset_available optional_asset_a1)
+    (optional_asset_available optional_asset_a2)
+    (consumable_available consumable_boost_a)
+    (consumable_available consumable_boost_b)
+    (resource_token_available resource_token_1)
+    (module_variant_available module_variant_red)
+    (blueprint_asset_available blueprint_asset_alpha)
+    (squad_has_blueprint_asset squad_alpha blueprint_asset_alpha)
+    (squad_has_blueprint_asset squad_bravo blueprint_asset_beta)
+    (key_component_available key_component_prime)
+  )
+  (:goal
+    (and
+      (ready_for_redeploy scavenger_slot_1)
+      (ready_for_redeploy responder_slot_1)
+      (ready_for_redeploy squad_alpha)
+      (ready_for_redeploy squad_bravo)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(detect_and_mark_failed_recoverable scavenger_slot_1)
+(assign_supply_pack_to_recoverable scavenger_slot_1 supply_pack_a)
+(claim_route_for_recoverable scavenger_slot_1 route_option_north)
+(finalize_route_claim scavenger_slot_1 route_option_north)
+(scavenger_collect_material scavenger_slot_1 scout_report_alpha material_fragment)
+(scavenger_finalize_collection scavenger_slot_1 scout_report_alpha route_option_north material_fragment)
+(release_route_for_recoverable scavenger_slot_1 route_option_north)
+(detect_and_mark_failed_recoverable responder_slot_1)
+(assign_supply_pack_to_recoverable responder_slot_1 supply_pack_b)
+(claim_route_for_recoverable responder_slot_1 route_option_north)
+(finalize_route_claim responder_slot_1 route_option_north)
+(responder_collect_material responder_slot_1 support_report_alpha material_fragment)
+(responder_finalize_collection responder_slot_1 support_report_alpha route_option_north material_fragment)
+(release_route_for_recoverable responder_slot_1 route_option_north)
+(assemble_supply_cache_from_reports scavenger_slot_1 responder_slot_1 scout_report_alpha support_report_alpha supply_cache_slot)
+(claim_route_for_recoverable scavenger_slot_1 route_option_north)
+(activate_supply_cache supply_cache_slot scavenger_slot_1 route_option_north)
+(finalize_scavenger_slot_ready scavenger_slot_1 supply_cache_slot)
+(finalize_responder_slot_ready responder_slot_1 supply_cache_slot)
+(consume_resource_token_for_recoverable_restart scavenger_slot_1 resource_token_1 route_option_north)
+(reassign_supply_pack_and_enable_slot scavenger_slot_1 supply_pack_a resource_token_1)
+(release_route_for_recoverable scavenger_slot_1 route_option_north)
+(claim_route_for_recoverable responder_slot_1 route_option_north)
+(consume_resource_token_for_recoverable_restart responder_slot_1 resource_token_1 route_option_north)
+(reassign_supply_pack_and_enable_responder responder_slot_1 supply_pack_b resource_token_1)
+(detect_and_mark_failed_recoverable squad_alpha)
+(assign_supply_pack_to_recoverable squad_alpha supply_pack_a)
+(claim_route_for_recoverable squad_alpha route_option_north)
+(finalize_route_claim squad_alpha route_option_north)
+(install_upgrade_module_into_cache squad_alpha upgrade_module_mk1 supply_cache_slot)
+(prepare_squad_for_cache_transfer squad_alpha upgrade_module_mk1 supply_cache_slot route_option_north)
+(install_module_variant_to_squad squad_alpha module_variant_red)
+(attach_support_tool_to_recoverable squad_alpha support_tool_drone)
+(install_variant_and_stage_squad_variant_alpha squad_alpha module_variant_red support_tool_drone upgrade_module_mk1 supply_cache_slot)
+(install_key_component_to_squad squad_alpha key_component_prime)
+(stage_squad_for_key_component_activation squad_alpha key_component_prime upgrade_module_mk1 supply_cache_slot)
+(remove_module_variant_from_squad squad_alpha module_variant_red)
+(detach_support_tool_from_recoverable squad_alpha support_tool_drone)
+(remove_key_component_from_squad squad_alpha key_component_prime)
+(finalize_squad_activation squad_alpha)
+(consume_resource_token_for_recoverable_restart squad_alpha resource_token_1 route_option_north)
+(reassign_supply_pack_and_enable_squad squad_alpha supply_pack_a resource_token_1)
+(release_route_for_recoverable squad_alpha route_option_north)
+(detect_and_mark_failed_recoverable squad_bravo)
+(assign_supply_pack_to_recoverable squad_bravo supply_pack_c)
+(claim_route_for_recoverable squad_bravo route_option_north)
+(finalize_route_claim squad_bravo route_option_north)
+(install_upgrade_module_into_cache squad_bravo upgrade_module_mk2 supply_cache_slot)
+(prepare_squad_for_cache_transfer squad_bravo upgrade_module_mk2 supply_cache_slot route_option_north)
+(install_module_variant_to_squad squad_bravo module_variant_red)
+(attach_support_tool_to_recoverable squad_bravo support_tool_drone)
+(install_variant_and_stage_squad_variant_alpha squad_bravo module_variant_red support_tool_drone upgrade_module_mk2 supply_cache_slot)
+(install_key_component_to_squad squad_bravo key_component_prime)
+(stage_squad_for_key_component_activation squad_bravo key_component_prime upgrade_module_mk2 supply_cache_slot)
+(remove_module_variant_from_squad squad_bravo module_variant_red)
+(detach_support_tool_from_recoverable squad_bravo support_tool_drone)
+(remove_key_component_from_squad squad_bravo key_component_prime)
+(finalize_squad_activation squad_bravo)
+(consume_resource_token_for_recoverable_restart squad_bravo resource_token_1 route_option_north)
+(reassign_supply_pack_and_enable_squad squad_bravo supply_pack_c resource_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ymtidl9e/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_ymtidl9e/plan.pddl 
+
+
+--- stderr ---
+

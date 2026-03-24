@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain ticket_reissuance_after_change_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource - entity component_resource - entity document_resource - entity booking_root - entity booking - booking_root ticket_stock - operational_resource fare_quote - operational_resource service_agent - operational_resource authorization_code - operational_resource ancillary_service - operational_resource exchange_receipt - operational_resource payment_transaction - operational_resource ticketing_office - operational_resource payment_instrument - component_resource ticket_coupon - component_resource supervisor_approval - component_resource original_fare_component - document_resource new_fare_component - document_resource ticket_document - document_resource itinerary_group - booking supplier_record_group - booking original_itinerary - itinerary_group changed_itinerary - itinerary_group airline_record - supplier_record_group)
+
+  (:predicates
+    (record_created ?booking - booking)
+    (record_committed ?booking - booking)
+    (record_ticket_stock_allocated ?booking - booking)
+    (reissue_finalized ?booking - booking)
+    (issuance_ready ?booking - booking)
+    (reissue_initiated ?booking - booking)
+    (ticket_stock_available ?ticket_stock - ticket_stock)
+    (record_ticket_stock_assigned ?booking - booking ?ticket_stock - ticket_stock)
+    (fare_quote_available ?fare_quote - fare_quote)
+    (record_has_fare_quote ?booking - booking ?fare_quote - fare_quote)
+    (service_agent_available ?service_agent - service_agent)
+    (record_assigned_service_agent ?booking - booking ?service_agent - service_agent)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (original_itinerary_payment_assigned ?original_itinerary - original_itinerary ?payment_instrument - payment_instrument)
+    (changed_itinerary_payment_assigned ?changed_itinerary - changed_itinerary ?payment_instrument - payment_instrument)
+    (itinerary_has_original_fare_component ?original_itinerary - original_itinerary ?original_fare_component - original_fare_component)
+    (fare_component_validated ?original_fare_component - original_fare_component)
+    (fare_component_reserved ?original_fare_component - original_fare_component)
+    (itinerary_validated ?original_itinerary - original_itinerary)
+    (changed_itinerary_has_new_fare_component ?changed_itinerary - changed_itinerary ?new_fare_component - new_fare_component)
+    (new_fare_component_validated ?new_fare_component - new_fare_component)
+    (new_fare_component_reserved ?new_fare_component - new_fare_component)
+    (changed_itinerary_validated ?changed_itinerary - changed_itinerary)
+    (ticket_document_available ?ticket_document - ticket_document)
+    (ticket_document_prepared ?ticket_document - ticket_document)
+    (ticket_document_includes_original_fare_component ?ticket_document - ticket_document ?original_fare_component - original_fare_component)
+    (ticket_document_includes_new_fare_component ?ticket_document - ticket_document ?new_fare_component - new_fare_component)
+    (ticket_doc_confirmed_original_provider ?ticket_document - ticket_document)
+    (ticket_doc_confirmed_new_provider ?ticket_document - ticket_document)
+    (ticket_document_finalized ?ticket_document - ticket_document)
+    (airline_record_for_itinerary ?airline_record - airline_record ?original_itinerary - original_itinerary)
+    (airline_record_for_changed_itinerary ?airline_record - airline_record ?changed_itinerary - changed_itinerary)
+    (airline_record_associated_ticket_document ?airline_record - airline_record ?ticket_document - ticket_document)
+    (ticket_coupon_available ?ticket_coupon - ticket_coupon)
+    (airline_record_has_coupon ?airline_record - airline_record ?ticket_coupon - ticket_coupon)
+    (ticket_coupon_assigned ?ticket_coupon - ticket_coupon)
+    (ticket_coupon_in_ticket_document ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    (airline_record_coupon_prepared ?airline_record - airline_record)
+    (airline_record_payment_applied ?airline_record - airline_record)
+    (airline_record_payment_confirmed ?airline_record - airline_record)
+    (airline_record_has_authorization ?airline_record - airline_record)
+    (airline_record_authorization_processed ?airline_record - airline_record)
+    (airline_record_ready_for_settlement ?airline_record - airline_record)
+    (airline_record_ready_for_issuance ?airline_record - airline_record)
+    (supervisor_approval_available ?supervisor_approval - supervisor_approval)
+    (airline_record_has_supervisor_approval ?airline_record - airline_record ?supervisor_approval - supervisor_approval)
+    (airline_record_override_requested ?airline_record - airline_record)
+    (airline_record_override_pending ?airline_record - airline_record)
+    (airline_record_override_confirmed ?airline_record - airline_record)
+    (authorization_code_available ?authorization_code - authorization_code)
+    (airline_record_has_authorization_code ?airline_record - airline_record ?authorization_code - authorization_code)
+    (ancillary_service_available ?ancillary_service - ancillary_service)
+    (airline_record_has_ancillary_service ?airline_record - airline_record ?ancillary_service - ancillary_service)
+    (payment_transaction_available ?payment_transaction - payment_transaction)
+    (airline_record_associated_payment_transaction ?airline_record - airline_record ?payment_transaction - payment_transaction)
+    (ticketing_office_available ?ticketing_office - ticketing_office)
+    (airline_record_associated_ticketing_office ?airline_record - airline_record ?ticketing_office - ticketing_office)
+    (exchange_receipt_available ?exchange_receipt - exchange_receipt)
+    (record_associated_exchange_receipt ?booking - booking ?exchange_receipt - exchange_receipt)
+    (itinerary_payment_recorded ?original_itinerary - original_itinerary)
+    (changed_itinerary_payment_recorded ?changed_itinerary - changed_itinerary)
+    (airline_record_finalized ?airline_record - airline_record)
+  )
+  (:action create_booking
+    :parameters (?booking - booking)
+    :precondition
+      (and
+        (not
+          (record_created ?booking)
+        )
+        (not
+          (reissue_finalized ?booking)
+        )
+      )
+    :effect (record_created ?booking)
+  )
+  (:action assign_ticket_stock_to_booking
+    :parameters (?booking - booking ?ticket_stock - ticket_stock)
+    :precondition
+      (and
+        (record_created ?booking)
+        (not
+          (record_ticket_stock_allocated ?booking)
+        )
+        (ticket_stock_available ?ticket_stock)
+      )
+    :effect
+      (and
+        (record_ticket_stock_allocated ?booking)
+        (record_ticket_stock_assigned ?booking ?ticket_stock)
+        (not
+          (ticket_stock_available ?ticket_stock)
+        )
+      )
+  )
+  (:action assign_fare_quote_to_booking
+    :parameters (?booking - booking ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_created ?booking)
+        (record_ticket_stock_allocated ?booking)
+        (fare_quote_available ?fare_quote)
+      )
+    :effect
+      (and
+        (record_has_fare_quote ?booking ?fare_quote)
+        (not
+          (fare_quote_available ?fare_quote)
+        )
+      )
+  )
+  (:action confirm_booking_fare_quote
+    :parameters (?booking - booking ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_created ?booking)
+        (record_ticket_stock_allocated ?booking)
+        (record_has_fare_quote ?booking ?fare_quote)
+        (not
+          (record_committed ?booking)
+        )
+      )
+    :effect (record_committed ?booking)
+  )
+  (:action dissociate_fare_quote_from_booking
+    :parameters (?booking - booking ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_has_fare_quote ?booking ?fare_quote)
+      )
+    :effect
+      (and
+        (fare_quote_available ?fare_quote)
+        (not
+          (record_has_fare_quote ?booking ?fare_quote)
+        )
+      )
+  )
+  (:action attach_service_agent_to_booking
+    :parameters (?booking - booking ?service_agent - service_agent)
+    :precondition
+      (and
+        (record_committed ?booking)
+        (service_agent_available ?service_agent)
+      )
+    :effect
+      (and
+        (record_assigned_service_agent ?booking ?service_agent)
+        (not
+          (service_agent_available ?service_agent)
+        )
+      )
+  )
+  (:action detach_service_agent_from_booking
+    :parameters (?booking - booking ?service_agent - service_agent)
+    :precondition
+      (and
+        (record_assigned_service_agent ?booking ?service_agent)
+      )
+    :effect
+      (and
+        (service_agent_available ?service_agent)
+        (not
+          (record_assigned_service_agent ?booking ?service_agent)
+        )
+      )
+  )
+  (:action assign_payment_transaction_to_airline_record
+    :parameters (?airline_record - airline_record ?payment_transaction - payment_transaction)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (payment_transaction_available ?payment_transaction)
+      )
+    :effect
+      (and
+        (airline_record_associated_payment_transaction ?airline_record ?payment_transaction)
+        (not
+          (payment_transaction_available ?payment_transaction)
+        )
+      )
+  )
+  (:action release_payment_transaction_from_airline_record
+    :parameters (?airline_record - airline_record ?payment_transaction - payment_transaction)
+    :precondition
+      (and
+        (airline_record_associated_payment_transaction ?airline_record ?payment_transaction)
+      )
+    :effect
+      (and
+        (payment_transaction_available ?payment_transaction)
+        (not
+          (airline_record_associated_payment_transaction ?airline_record ?payment_transaction)
+        )
+      )
+  )
+  (:action assign_ticketing_office_to_airline_record
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (ticketing_office_available ?ticketing_office)
+      )
+    :effect
+      (and
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (not
+          (ticketing_office_available ?ticketing_office)
+        )
+      )
+  )
+  (:action release_ticketing_office_from_airline_record
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office)
+    :precondition
+      (and
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+      )
+    :effect
+      (and
+        (ticketing_office_available ?ticketing_office)
+        (not
+          (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        )
+      )
+  )
+  (:action validate_original_fare_component
+    :parameters (?original_itinerary - original_itinerary ?original_fare_component - original_fare_component ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_committed ?original_itinerary)
+        (record_has_fare_quote ?original_itinerary ?fare_quote)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (not
+          (fare_component_validated ?original_fare_component)
+        )
+        (not
+          (fare_component_reserved ?original_fare_component)
+        )
+      )
+    :effect (fare_component_validated ?original_fare_component)
+  )
+  (:action confirm_original_itinerary_validation_by_agent
+    :parameters (?original_itinerary - original_itinerary ?original_fare_component - original_fare_component ?service_agent - service_agent)
+    :precondition
+      (and
+        (record_committed ?original_itinerary)
+        (record_assigned_service_agent ?original_itinerary ?service_agent)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (fare_component_validated ?original_fare_component)
+        (not
+          (itinerary_payment_recorded ?original_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (itinerary_validated ?original_itinerary)
+      )
+  )
+  (:action reserve_payment_instrument_for_original_itinerary
+    :parameters (?original_itinerary - original_itinerary ?original_fare_component - original_fare_component ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (record_committed ?original_itinerary)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (itinerary_payment_recorded ?original_itinerary)
+        )
+      )
+    :effect
+      (and
+        (fare_component_reserved ?original_fare_component)
+        (itinerary_payment_recorded ?original_itinerary)
+        (original_itinerary_payment_assigned ?original_itinerary ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action finalize_original_itinerary_payment
+    :parameters (?original_itinerary - original_itinerary ?original_fare_component - original_fare_component ?fare_quote - fare_quote ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (record_committed ?original_itinerary)
+        (record_has_fare_quote ?original_itinerary ?fare_quote)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (fare_component_reserved ?original_fare_component)
+        (original_itinerary_payment_assigned ?original_itinerary ?payment_instrument)
+        (not
+          (itinerary_validated ?original_itinerary)
+        )
+      )
+    :effect
+      (and
+        (fare_component_validated ?original_fare_component)
+        (itinerary_validated ?original_itinerary)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (original_itinerary_payment_assigned ?original_itinerary ?payment_instrument)
+        )
+      )
+  )
+  (:action validate_new_fare_component
+    :parameters (?changed_itinerary - changed_itinerary ?new_fare_component - new_fare_component ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_committed ?changed_itinerary)
+        (record_has_fare_quote ?changed_itinerary ?fare_quote)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (not
+          (new_fare_component_validated ?new_fare_component)
+        )
+        (not
+          (new_fare_component_reserved ?new_fare_component)
+        )
+      )
+    :effect (new_fare_component_validated ?new_fare_component)
+  )
+  (:action confirm_changed_itinerary_validation_by_agent
+    :parameters (?changed_itinerary - changed_itinerary ?new_fare_component - new_fare_component ?service_agent - service_agent)
+    :precondition
+      (and
+        (record_committed ?changed_itinerary)
+        (record_assigned_service_agent ?changed_itinerary ?service_agent)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (new_fare_component_validated ?new_fare_component)
+        (not
+          (changed_itinerary_payment_recorded ?changed_itinerary)
+        )
+      )
+    :effect
+      (and
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (changed_itinerary_validated ?changed_itinerary)
+      )
+  )
+  (:action reserve_payment_instrument_for_changed_itinerary
+    :parameters (?changed_itinerary - changed_itinerary ?new_fare_component - new_fare_component ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (record_committed ?changed_itinerary)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (changed_itinerary_payment_recorded ?changed_itinerary)
+        )
+      )
+    :effect
+      (and
+        (new_fare_component_reserved ?new_fare_component)
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (changed_itinerary_payment_assigned ?changed_itinerary ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action finalize_changed_itinerary_payment
+    :parameters (?changed_itinerary - changed_itinerary ?new_fare_component - new_fare_component ?fare_quote - fare_quote ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (record_committed ?changed_itinerary)
+        (record_has_fare_quote ?changed_itinerary ?fare_quote)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (new_fare_component_reserved ?new_fare_component)
+        (changed_itinerary_payment_assigned ?changed_itinerary ?payment_instrument)
+        (not
+          (changed_itinerary_validated ?changed_itinerary)
+        )
+      )
+    :effect
+      (and
+        (new_fare_component_validated ?new_fare_component)
+        (changed_itinerary_validated ?changed_itinerary)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (changed_itinerary_payment_assigned ?changed_itinerary ?payment_instrument)
+        )
+      )
+  )
+  (:action prepare_ticket_document
+    :parameters (?original_itinerary - original_itinerary ?changed_itinerary - changed_itinerary ?original_fare_component - original_fare_component ?new_fare_component - new_fare_component ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (fare_component_validated ?original_fare_component)
+        (new_fare_component_validated ?new_fare_component)
+        (itinerary_validated ?original_itinerary)
+        (changed_itinerary_validated ?changed_itinerary)
+        (ticket_document_available ?ticket_document)
+      )
+    :effect
+      (and
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_includes_original_fare_component ?ticket_document ?original_fare_component)
+        (ticket_document_includes_new_fare_component ?ticket_document ?new_fare_component)
+        (not
+          (ticket_document_available ?ticket_document)
+        )
+      )
+  )
+  (:action prepare_ticket_document_with_original_confirmation
+    :parameters (?original_itinerary - original_itinerary ?changed_itinerary - changed_itinerary ?original_fare_component - original_fare_component ?new_fare_component - new_fare_component ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (fare_component_reserved ?original_fare_component)
+        (new_fare_component_validated ?new_fare_component)
+        (not
+          (itinerary_validated ?original_itinerary)
+        )
+        (changed_itinerary_validated ?changed_itinerary)
+        (ticket_document_available ?ticket_document)
+      )
+    :effect
+      (and
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_includes_original_fare_component ?ticket_document ?original_fare_component)
+        (ticket_document_includes_new_fare_component ?ticket_document ?new_fare_component)
+        (ticket_doc_confirmed_original_provider ?ticket_document)
+        (not
+          (ticket_document_available ?ticket_document)
+        )
+      )
+  )
+  (:action prepare_ticket_document_with_new_confirmation
+    :parameters (?original_itinerary - original_itinerary ?changed_itinerary - changed_itinerary ?original_fare_component - original_fare_component ?new_fare_component - new_fare_component ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (fare_component_validated ?original_fare_component)
+        (new_fare_component_reserved ?new_fare_component)
+        (itinerary_validated ?original_itinerary)
+        (not
+          (changed_itinerary_validated ?changed_itinerary)
+        )
+        (ticket_document_available ?ticket_document)
+      )
+    :effect
+      (and
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_includes_original_fare_component ?ticket_document ?original_fare_component)
+        (ticket_document_includes_new_fare_component ?ticket_document ?new_fare_component)
+        (ticket_doc_confirmed_new_provider ?ticket_document)
+        (not
+          (ticket_document_available ?ticket_document)
+        )
+      )
+  )
+  (:action prepare_ticket_document_with_both_confirmations
+    :parameters (?original_itinerary - original_itinerary ?changed_itinerary - changed_itinerary ?original_fare_component - original_fare_component ?new_fare_component - new_fare_component ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (itinerary_has_original_fare_component ?original_itinerary ?original_fare_component)
+        (changed_itinerary_has_new_fare_component ?changed_itinerary ?new_fare_component)
+        (fare_component_reserved ?original_fare_component)
+        (new_fare_component_reserved ?new_fare_component)
+        (not
+          (itinerary_validated ?original_itinerary)
+        )
+        (not
+          (changed_itinerary_validated ?changed_itinerary)
+        )
+        (ticket_document_available ?ticket_document)
+      )
+    :effect
+      (and
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_includes_original_fare_component ?ticket_document ?original_fare_component)
+        (ticket_document_includes_new_fare_component ?ticket_document ?new_fare_component)
+        (ticket_doc_confirmed_original_provider ?ticket_document)
+        (ticket_doc_confirmed_new_provider ?ticket_document)
+        (not
+          (ticket_document_available ?ticket_document)
+        )
+      )
+  )
+  (:action finalize_ticket_document
+    :parameters (?ticket_document - ticket_document ?original_itinerary - original_itinerary ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (ticket_document_prepared ?ticket_document)
+        (itinerary_payment_recorded ?original_itinerary)
+        (record_has_fare_quote ?original_itinerary ?fare_quote)
+        (not
+          (ticket_document_finalized ?ticket_document)
+        )
+      )
+    :effect (ticket_document_finalized ?ticket_document)
+  )
+  (:action attach_coupon_to_airline_record
+    :parameters (?airline_record - airline_record ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (airline_record_associated_ticket_document ?airline_record ?ticket_document)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_available ?ticket_coupon)
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_finalized ?ticket_document)
+        (not
+          (ticket_coupon_assigned ?ticket_coupon)
+        )
+      )
+    :effect
+      (and
+        (ticket_coupon_assigned ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (not
+          (ticket_coupon_available ?ticket_coupon)
+        )
+      )
+  )
+  (:action prepare_airline_record_coupon
+    :parameters (?airline_record - airline_record ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_assigned ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (record_has_fare_quote ?airline_record ?fare_quote)
+        (not
+          (ticket_doc_confirmed_original_provider ?ticket_document)
+        )
+        (not
+          (airline_record_coupon_prepared ?airline_record)
+        )
+      )
+    :effect (airline_record_coupon_prepared ?airline_record)
+  )
+  (:action attach_authorization_code_to_airline_record
+    :parameters (?airline_record - airline_record ?authorization_code - authorization_code)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (authorization_code_available ?authorization_code)
+        (not
+          (airline_record_has_authorization ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_has_authorization ?airline_record)
+        (airline_record_has_authorization_code ?airline_record ?authorization_code)
+        (not
+          (authorization_code_available ?authorization_code)
+        )
+      )
+  )
+  (:action apply_authorization_and_prepare_airline_record
+    :parameters (?airline_record - airline_record ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document ?fare_quote - fare_quote ?authorization_code - authorization_code)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_assigned ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (record_has_fare_quote ?airline_record ?fare_quote)
+        (ticket_doc_confirmed_original_provider ?ticket_document)
+        (airline_record_has_authorization ?airline_record)
+        (airline_record_has_authorization_code ?airline_record ?authorization_code)
+        (not
+          (airline_record_coupon_prepared ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_coupon_prepared ?airline_record)
+        (airline_record_authorization_processed ?airline_record)
+      )
+  )
+  (:action apply_payment_transaction_to_airline_record
+    :parameters (?airline_record - airline_record ?payment_transaction - payment_transaction ?service_agent - service_agent ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_coupon_prepared ?airline_record)
+        (airline_record_associated_payment_transaction ?airline_record ?payment_transaction)
+        (record_assigned_service_agent ?airline_record ?service_agent)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (not
+          (ticket_doc_confirmed_new_provider ?ticket_document)
+        )
+        (not
+          (airline_record_payment_applied ?airline_record)
+        )
+      )
+    :effect (airline_record_payment_applied ?airline_record)
+  )
+  (:action apply_payment_transaction_to_airline_record_when_flagged
+    :parameters (?airline_record - airline_record ?payment_transaction - payment_transaction ?service_agent - service_agent ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_coupon_prepared ?airline_record)
+        (airline_record_associated_payment_transaction ?airline_record ?payment_transaction)
+        (record_assigned_service_agent ?airline_record ?service_agent)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (ticket_doc_confirmed_new_provider ?ticket_document)
+        (not
+          (airline_record_payment_applied ?airline_record)
+        )
+      )
+    :effect (airline_record_payment_applied ?airline_record)
+  )
+  (:action confirm_airline_record_payment_and_associate_office
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_payment_applied ?airline_record)
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (not
+          (ticket_doc_confirmed_original_provider ?ticket_document)
+        )
+        (not
+          (ticket_doc_confirmed_new_provider ?ticket_document)
+        )
+        (not
+          (airline_record_payment_confirmed ?airline_record)
+        )
+      )
+    :effect (airline_record_payment_confirmed ?airline_record)
+  )
+  (:action confirm_airline_record_payment_and_flag_settlement
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_payment_applied ?airline_record)
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (ticket_doc_confirmed_original_provider ?ticket_document)
+        (not
+          (ticket_doc_confirmed_new_provider ?ticket_document)
+        )
+        (not
+          (airline_record_payment_confirmed ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_settlement ?airline_record)
+      )
+  )
+  (:action confirm_airline_record_payment_and_flag_settlement_alt
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_payment_applied ?airline_record)
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (not
+          (ticket_doc_confirmed_original_provider ?ticket_document)
+        )
+        (ticket_doc_confirmed_new_provider ?ticket_document)
+        (not
+          (airline_record_payment_confirmed ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_settlement ?airline_record)
+      )
+  )
+  (:action confirm_airline_record_payment_and_flag_settlement_full
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office ?ticket_coupon - ticket_coupon ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (airline_record_payment_applied ?airline_record)
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (airline_record_has_coupon ?airline_record ?ticket_coupon)
+        (ticket_coupon_in_ticket_document ?ticket_coupon ?ticket_document)
+        (ticket_doc_confirmed_original_provider ?ticket_document)
+        (ticket_doc_confirmed_new_provider ?ticket_document)
+        (not
+          (airline_record_payment_confirmed ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_settlement ?airline_record)
+      )
+  )
+  (:action finalize_airline_record_minimal
+    :parameters (?airline_record - airline_record)
+    :precondition
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (not
+          (airline_record_ready_for_settlement ?airline_record)
+        )
+        (not
+          (airline_record_finalized ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_finalized ?airline_record)
+        (issuance_ready ?airline_record)
+      )
+  )
+  (:action attach_ancillary_service_to_airline_record
+    :parameters (?airline_record - airline_record ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_settlement ?airline_record)
+        (ancillary_service_available ?ancillary_service)
+      )
+    :effect
+      (and
+        (airline_record_has_ancillary_service ?airline_record ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action execute_airline_record_readiness_checks
+    :parameters (?airline_record - airline_record ?original_itinerary - original_itinerary ?changed_itinerary - changed_itinerary ?fare_quote - fare_quote ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_settlement ?airline_record)
+        (airline_record_has_ancillary_service ?airline_record ?ancillary_service)
+        (airline_record_for_itinerary ?airline_record ?original_itinerary)
+        (airline_record_for_changed_itinerary ?airline_record ?changed_itinerary)
+        (itinerary_validated ?original_itinerary)
+        (changed_itinerary_validated ?changed_itinerary)
+        (record_has_fare_quote ?airline_record ?fare_quote)
+        (not
+          (airline_record_ready_for_issuance ?airline_record)
+        )
+      )
+    :effect (airline_record_ready_for_issuance ?airline_record)
+  )
+  (:action finalize_airline_record_after_checks
+    :parameters (?airline_record - airline_record)
+    :precondition
+      (and
+        (airline_record_payment_confirmed ?airline_record)
+        (airline_record_ready_for_issuance ?airline_record)
+        (not
+          (airline_record_finalized ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_finalized ?airline_record)
+        (issuance_ready ?airline_record)
+      )
+  )
+  (:action request_override_for_airline_record
+    :parameters (?airline_record - airline_record ?supervisor_approval - supervisor_approval ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (record_committed ?airline_record)
+        (record_has_fare_quote ?airline_record ?fare_quote)
+        (supervisor_approval_available ?supervisor_approval)
+        (airline_record_has_supervisor_approval ?airline_record ?supervisor_approval)
+        (not
+          (airline_record_override_requested ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_override_requested ?airline_record)
+        (not
+          (supervisor_approval_available ?supervisor_approval)
+        )
+      )
+  )
+  (:action mark_airline_record_override_pending
+    :parameters (?airline_record - airline_record ?service_agent - service_agent)
+    :precondition
+      (and
+        (airline_record_override_requested ?airline_record)
+        (record_assigned_service_agent ?airline_record ?service_agent)
+        (not
+          (airline_record_override_pending ?airline_record)
+        )
+      )
+    :effect (airline_record_override_pending ?airline_record)
+  )
+  (:action confirm_override_with_ticketing_office
+    :parameters (?airline_record - airline_record ?ticketing_office - ticketing_office)
+    :precondition
+      (and
+        (airline_record_override_pending ?airline_record)
+        (airline_record_associated_ticketing_office ?airline_record ?ticketing_office)
+        (not
+          (airline_record_override_confirmed ?airline_record)
+        )
+      )
+    :effect (airline_record_override_confirmed ?airline_record)
+  )
+  (:action finalize_airline_record_override
+    :parameters (?airline_record - airline_record)
+    :precondition
+      (and
+        (airline_record_override_confirmed ?airline_record)
+        (not
+          (airline_record_finalized ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (airline_record_finalized ?airline_record)
+        (issuance_ready ?airline_record)
+      )
+  )
+  (:action finalize_original_itinerary_ticketing
+    :parameters (?original_itinerary - original_itinerary ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (itinerary_payment_recorded ?original_itinerary)
+        (itinerary_validated ?original_itinerary)
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_finalized ?ticket_document)
+        (not
+          (issuance_ready ?original_itinerary)
+        )
+      )
+    :effect (issuance_ready ?original_itinerary)
+  )
+  (:action finalize_changed_itinerary_ticketing
+    :parameters (?changed_itinerary - changed_itinerary ?ticket_document - ticket_document)
+    :precondition
+      (and
+        (changed_itinerary_payment_recorded ?changed_itinerary)
+        (changed_itinerary_validated ?changed_itinerary)
+        (ticket_document_prepared ?ticket_document)
+        (ticket_document_finalized ?ticket_document)
+        (not
+          (issuance_ready ?changed_itinerary)
+        )
+      )
+    :effect (issuance_ready ?changed_itinerary)
+  )
+  (:action create_exchange_receipt_for_booking
+    :parameters (?booking - booking ?exchange_receipt - exchange_receipt ?fare_quote - fare_quote)
+    :precondition
+      (and
+        (issuance_ready ?booking)
+        (record_has_fare_quote ?booking ?fare_quote)
+        (exchange_receipt_available ?exchange_receipt)
+        (not
+          (reissue_initiated ?booking)
+        )
+      )
+    :effect
+      (and
+        (reissue_initiated ?booking)
+        (record_associated_exchange_receipt ?booking ?exchange_receipt)
+        (not
+          (exchange_receipt_available ?exchange_receipt)
+        )
+      )
+  )
+  (:action apply_reissue_to_original_itinerary
+    :parameters (?original_itinerary - original_itinerary ?ticket_stock - ticket_stock ?exchange_receipt - exchange_receipt)
+    :precondition
+      (and
+        (reissue_initiated ?original_itinerary)
+        (record_ticket_stock_assigned ?original_itinerary ?ticket_stock)
+        (record_associated_exchange_receipt ?original_itinerary ?exchange_receipt)
+        (not
+          (reissue_finalized ?original_itinerary)
+        )
+      )
+    :effect
+      (and
+        (reissue_finalized ?original_itinerary)
+        (ticket_stock_available ?ticket_stock)
+        (exchange_receipt_available ?exchange_receipt)
+      )
+  )
+  (:action apply_reissue_to_changed_itinerary
+    :parameters (?changed_itinerary - changed_itinerary ?ticket_stock - ticket_stock ?exchange_receipt - exchange_receipt)
+    :precondition
+      (and
+        (reissue_initiated ?changed_itinerary)
+        (record_ticket_stock_assigned ?changed_itinerary ?ticket_stock)
+        (record_associated_exchange_receipt ?changed_itinerary ?exchange_receipt)
+        (not
+          (reissue_finalized ?changed_itinerary)
+        )
+      )
+    :effect
+      (and
+        (reissue_finalized ?changed_itinerary)
+        (ticket_stock_available ?ticket_stock)
+        (exchange_receipt_available ?exchange_receipt)
+      )
+  )
+  (:action apply_reissue_to_airline_record
+    :parameters (?airline_record - airline_record ?ticket_stock - ticket_stock ?exchange_receipt - exchange_receipt)
+    :precondition
+      (and
+        (reissue_initiated ?airline_record)
+        (record_ticket_stock_assigned ?airline_record ?ticket_stock)
+        (record_associated_exchange_receipt ?airline_record ?exchange_receipt)
+        (not
+          (reissue_finalized ?airline_record)
+        )
+      )
+    :effect
+      (and
+        (reissue_finalized ?airline_record)
+        (ticket_stock_available ?ticket_stock)
+        (exchange_receipt_available ?exchange_receipt)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem ticket_reissuance_after_change_scenario)
+  (:domain ticket_reissuance_after_change_domain)
+  (:objects orig_itinerary_1 - original_itinerary changed_itinerary_1 - changed_itinerary airline_record_supplier_a - airline_record airline_record_supplier_b - airline_record ticket_stock_a - ticket_stock ticket_stock_b - ticket_stock ticket_stock_c - ticket_stock fare_quote_1 - fare_quote service_agent_1 - service_agent payment_instrument_1 - payment_instrument original_fare_component_1 - original_fare_component new_fare_component_1 - new_fare_component ticket_document_1 - ticket_document ticket_coupon_1 - ticket_coupon ticket_coupon_2 - ticket_coupon authorization_code_1 - authorization_code authorization_code_2 - authorization_code ancillary_service_1 - ancillary_service ancillary_service_2 - ancillary_service exchange_receipt_1 - exchange_receipt payment_transaction_1 - payment_transaction supervisor_approval_1 - supervisor_approval supervisor_approval_2 - supervisor_approval ticketing_office_1 - ticketing_office)
+  (:init
+    (ticket_stock_available ticket_stock_a)
+    (ticket_stock_available ticket_stock_b)
+    (ticket_stock_available ticket_stock_c)
+    (fare_quote_available fare_quote_1)
+    (service_agent_available service_agent_1)
+    (payment_instrument_available payment_instrument_1)
+    (itinerary_has_original_fare_component orig_itinerary_1 original_fare_component_1)
+    (changed_itinerary_has_new_fare_component changed_itinerary_1 new_fare_component_1)
+    (ticket_document_available ticket_document_1)
+    (ticket_coupon_available ticket_coupon_1)
+    (ticket_coupon_available ticket_coupon_2)
+    (airline_record_for_itinerary airline_record_supplier_a orig_itinerary_1)
+    (airline_record_for_itinerary airline_record_supplier_b orig_itinerary_1)
+    (airline_record_for_changed_itinerary airline_record_supplier_a changed_itinerary_1)
+    (airline_record_for_changed_itinerary airline_record_supplier_b changed_itinerary_1)
+    (airline_record_associated_ticket_document airline_record_supplier_a ticket_document_1)
+    (airline_record_associated_ticket_document airline_record_supplier_b ticket_document_1)
+    (airline_record_has_coupon airline_record_supplier_a ticket_coupon_1)
+    (airline_record_has_coupon airline_record_supplier_b ticket_coupon_2)
+    (authorization_code_available authorization_code_1)
+    (authorization_code_available authorization_code_2)
+    (ancillary_service_available ancillary_service_1)
+    (ancillary_service_available ancillary_service_2)
+    (exchange_receipt_available exchange_receipt_1)
+    (payment_transaction_available payment_transaction_1)
+    (supervisor_approval_available supervisor_approval_1)
+    (airline_record_has_supervisor_approval airline_record_supplier_a supervisor_approval_1)
+    (airline_record_has_supervisor_approval airline_record_supplier_b supervisor_approval_2)
+    (ticketing_office_available ticketing_office_1)
+  )
+  (:goal
+    (and
+      (reissue_finalized orig_itinerary_1)
+      (reissue_finalized changed_itinerary_1)
+      (reissue_finalized airline_record_supplier_a)
+      (reissue_finalized airline_record_supplier_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_booking orig_itinerary_1)
+(assign_ticket_stock_to_booking orig_itinerary_1 ticket_stock_a)
+(assign_fare_quote_to_booking orig_itinerary_1 fare_quote_1)
+(confirm_booking_fare_quote orig_itinerary_1 fare_quote_1)
+(validate_original_fare_component orig_itinerary_1 original_fare_component_1 fare_quote_1)
+(attach_service_agent_to_booking orig_itinerary_1 service_agent_1)
+(confirm_original_itinerary_validation_by_agent orig_itinerary_1 original_fare_component_1 service_agent_1)
+(create_booking changed_itinerary_1)
+(assign_ticket_stock_to_booking changed_itinerary_1 ticket_stock_b)
+(dissociate_fare_quote_from_booking orig_itinerary_1 fare_quote_1)
+(assign_fare_quote_to_booking changed_itinerary_1 fare_quote_1)
+(confirm_booking_fare_quote changed_itinerary_1 fare_quote_1)
+(validate_new_fare_component changed_itinerary_1 new_fare_component_1 fare_quote_1)
+(detach_service_agent_from_booking orig_itinerary_1 service_agent_1)
+(attach_service_agent_to_booking changed_itinerary_1 service_agent_1)
+(confirm_changed_itinerary_validation_by_agent changed_itinerary_1 new_fare_component_1 service_agent_1)
+(prepare_ticket_document orig_itinerary_1 changed_itinerary_1 original_fare_component_1 new_fare_component_1 ticket_document_1)
+(dissociate_fare_quote_from_booking changed_itinerary_1 fare_quote_1)
+(assign_fare_quote_to_booking orig_itinerary_1 fare_quote_1)
+(finalize_ticket_document ticket_document_1 orig_itinerary_1 fare_quote_1)
+(finalize_original_itinerary_ticketing orig_itinerary_1 ticket_document_1)
+(finalize_changed_itinerary_ticketing changed_itinerary_1 ticket_document_1)
+(create_booking airline_record_supplier_a)
+(assign_ticket_stock_to_booking airline_record_supplier_a ticket_stock_c)
+(dissociate_fare_quote_from_booking orig_itinerary_1 fare_quote_1)
+(assign_fare_quote_to_booking airline_record_supplier_a fare_quote_1)
+(confirm_booking_fare_quote airline_record_supplier_a fare_quote_1)
+(detach_service_agent_from_booking changed_itinerary_1 service_agent_1)
+(attach_service_agent_to_booking airline_record_supplier_a service_agent_1)
+(assign_ticketing_office_to_airline_record airline_record_supplier_a ticketing_office_1)
+(request_override_for_airline_record airline_record_supplier_a supervisor_approval_1 fare_quote_1)
+(mark_airline_record_override_pending airline_record_supplier_a service_agent_1)
+(confirm_override_with_ticketing_office airline_record_supplier_a ticketing_office_1)
+(finalize_airline_record_override airline_record_supplier_a)
+(dissociate_fare_quote_from_booking airline_record_supplier_a fare_quote_1)
+(assign_fare_quote_to_booking orig_itinerary_1 fare_quote_1)
+(create_exchange_receipt_for_booking orig_itinerary_1 exchange_receipt_1 fare_quote_1)
+(apply_reissue_to_original_itinerary orig_itinerary_1 ticket_stock_a exchange_receipt_1)
+(dissociate_fare_quote_from_booking orig_itinerary_1 fare_quote_1)
+(assign_fare_quote_to_booking changed_itinerary_1 fare_quote_1)
+(create_exchange_receipt_for_booking changed_itinerary_1 exchange_receipt_1 fare_quote_1)
+(apply_reissue_to_changed_itinerary changed_itinerary_1 ticket_stock_b exchange_receipt_1)
+(dissociate_fare_quote_from_booking changed_itinerary_1 fare_quote_1)
+(assign_fare_quote_to_booking airline_record_supplier_a fare_quote_1)
+(create_exchange_receipt_for_booking airline_record_supplier_a exchange_receipt_1 fare_quote_1)
+(apply_reissue_to_airline_record airline_record_supplier_a ticket_stock_c exchange_receipt_1)
+(create_booking airline_record_supplier_b)
+(assign_ticket_stock_to_booking airline_record_supplier_b ticket_stock_a)
+(dissociate_fare_quote_from_booking airline_record_supplier_a fare_quote_1)
+(assign_fare_quote_to_booking airline_record_supplier_b fare_quote_1)
+(confirm_booking_fare_quote airline_record_supplier_b fare_quote_1)
+(detach_service_agent_from_booking airline_record_supplier_a service_agent_1)
+(attach_service_agent_to_booking airline_record_supplier_b service_agent_1)
+(release_ticketing_office_from_airline_record airline_record_supplier_a ticketing_office_1)
+(assign_ticketing_office_to_airline_record airline_record_supplier_b ticketing_office_1)
+(attach_coupon_to_airline_record airline_record_supplier_b ticket_coupon_2 ticket_document_1)
+(prepare_airline_record_coupon airline_record_supplier_b ticket_coupon_2 ticket_document_1 fare_quote_1)
+(assign_payment_transaction_to_airline_record airline_record_supplier_b payment_transaction_1)
+(apply_payment_transaction_to_airline_record airline_record_supplier_b payment_transaction_1 service_agent_1 ticket_coupon_2 ticket_document_1)
+(confirm_airline_record_payment_and_associate_office airline_record_supplier_b ticketing_office_1 ticket_coupon_2 ticket_document_1)
+(finalize_airline_record_minimal airline_record_supplier_b)
+(dissociate_fare_quote_from_booking airline_record_supplier_b fare_quote_1)
+(assign_fare_quote_to_booking airline_record_supplier_b fare_quote_1)
+(create_exchange_receipt_for_booking airline_record_supplier_b exchange_receipt_1 fare_quote_1)
+(apply_reissue_to_airline_record airline_record_supplier_b ticket_stock_a exchange_receipt_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_sw6w4ifa/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_sw6w4ifa/plan.pddl 65 
+
+
+
+--- stderr ---
+

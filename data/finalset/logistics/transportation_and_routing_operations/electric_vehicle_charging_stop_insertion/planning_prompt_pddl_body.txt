@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain electric_vehicle_charging_stop_insertion)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types infrastructure_component - object equipment_asset - object charger_location_entity - object route_element_base - object route_element - route_element_base charger_station - infrastructure_component connector_requirement - infrastructure_component charger_connector - infrastructure_component time_window_profile - infrastructure_component charging_profile - infrastructure_component time_slot - infrastructure_component charger_model - infrastructure_component session_token - infrastructure_component adapter_unit - equipment_asset access_permit - equipment_asset driver_preference - equipment_asset candidate_charger_departure - charger_location_entity candidate_charger_arrival - charger_location_entity charging_stop_candidate - charger_location_entity leg_base_type_a - route_element leg_base_type_b - route_element departure_leg - leg_base_type_a arrival_leg - leg_base_type_a vehicle_route - leg_base_type_b)
+  (:predicates
+    (route_element_initialized ?route_element - route_element)
+    (route_element_planned ?route_element - route_element)
+    (route_element_provisionally_bound ?route_element - route_element)
+    (route_element_inserted ?route_element - route_element)
+    (route_ready_for_insertion ?route_element - route_element)
+    (route_insertion_committed ?route_element - route_element)
+    (charger_station_available ?charger_station - charger_station)
+    (route_element_assigned_charger ?route_element - route_element ?charger_station - charger_station)
+    (connector_requirement_available ?connector_requirement - connector_requirement)
+    (route_element_has_connector_requirement ?route_element - route_element ?connector_requirement - connector_requirement)
+    (charger_connector_available ?charger_connector - charger_connector)
+    (route_element_reserved_charger_connector ?route_element - route_element ?charger_connector - charger_connector)
+    (adapter_unit_available ?adapter_unit - adapter_unit)
+    (adapter_allocated_to_departure_leg ?departure_leg - departure_leg ?adapter_unit - adapter_unit)
+    (adapter_allocated_to_arrival_leg ?arrival_leg - arrival_leg ?adapter_unit - adapter_unit)
+    (leg_mapped_to_candidate_departure_charger ?departure_leg - departure_leg ?candidate_charger_departure - candidate_charger_departure)
+    (candidate_departure_charger_active ?candidate_charger_departure - candidate_charger_departure)
+    (candidate_departure_charger_tentative ?candidate_charger_departure - candidate_charger_departure)
+    (departure_leg_feasible ?departure_leg - departure_leg)
+    (leg_mapped_to_candidate_arrival_charger ?arrival_leg - arrival_leg ?candidate_charger_arrival - candidate_charger_arrival)
+    (candidate_arrival_charger_active ?candidate_charger_arrival - candidate_charger_arrival)
+    (candidate_arrival_charger_tentative ?candidate_charger_arrival - candidate_charger_arrival)
+    (arrival_leg_feasible ?arrival_leg - arrival_leg)
+    (charging_stop_candidate_available ?charging_stop_candidate - charging_stop_candidate)
+    (charging_stop_candidate_composed ?charging_stop_candidate - charging_stop_candidate)
+    (stop_candidate_selected_departure_charger ?charging_stop_candidate - charging_stop_candidate ?candidate_charger_departure - candidate_charger_departure)
+    (stop_candidate_selected_arrival_charger ?charging_stop_candidate - charging_stop_candidate ?candidate_charger_arrival - candidate_charger_arrival)
+    (stop_candidate_option_a ?charging_stop_candidate - charging_stop_candidate)
+    (stop_candidate_option_b ?charging_stop_candidate - charging_stop_candidate)
+    (stop_candidate_scheduled ?charging_stop_candidate - charging_stop_candidate)
+    (vehicle_route_has_departure_leg ?vehicle_route - vehicle_route ?departure_leg - departure_leg)
+    (vehicle_route_has_arrival_leg ?vehicle_route - vehicle_route ?arrival_leg - arrival_leg)
+    (vehicle_route_assigned_stop_candidate ?vehicle_route - vehicle_route ?charging_stop_candidate - charging_stop_candidate)
+    (access_permit_available ?access_permit - access_permit)
+    (vehicle_route_holds_access_permit ?vehicle_route - vehicle_route ?access_permit - access_permit)
+    (access_permit_consumed ?access_permit - access_permit)
+    (access_permit_provisioned_for_stop_candidate ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    (vehicle_route_prebinding_ready ?vehicle_route - vehicle_route)
+    (vehicle_route_adapter_provisioning_complete ?vehicle_route - vehicle_route)
+    (vehicle_route_binding_stage ?vehicle_route - vehicle_route)
+    (vehicle_route_has_time_window_profile_binding ?vehicle_route - vehicle_route)
+    (driver_preference_applied_marker ?vehicle_route - vehicle_route)
+    (vehicle_route_readiness_completed ?vehicle_route - vehicle_route)
+    (vehicle_route_insertion_in_progress ?vehicle_route - vehicle_route)
+    (driver_preference_available ?driver_preference - driver_preference)
+    (vehicle_route_has_driver_preference_binding ?vehicle_route - vehicle_route ?driver_preference - driver_preference)
+    (driver_preference_applied_awaiting_connector ?vehicle_route - vehicle_route)
+    (connector_binding_established ?vehicle_route - vehicle_route)
+    (connector_binding_completed ?vehicle_route - vehicle_route)
+    (time_window_profile_available ?time_window_profile - time_window_profile)
+    (vehicle_route_has_time_window_profile ?vehicle_route - vehicle_route ?time_window_profile - time_window_profile)
+    (charging_profile_available ?charging_profile - charging_profile)
+    (vehicle_route_assigned_charging_profile ?vehicle_route - vehicle_route ?charging_profile - charging_profile)
+    (charger_model_available ?charger_model - charger_model)
+    (vehicle_route_allocated_charger_model ?vehicle_route - vehicle_route ?charger_model - charger_model)
+    (session_token_available ?session_token - session_token)
+    (session_token_bound_to_vehicle_route ?vehicle_route - vehicle_route ?session_token - session_token)
+    (time_slot_available ?time_slot - time_slot)
+    (route_element_assigned_time_slot ?route_element - route_element ?time_slot - time_slot)
+    (departure_leg_processed ?departure_leg - departure_leg)
+    (arrival_leg_processed ?arrival_leg - arrival_leg)
+    (vehicle_route_insertion_acknowledged ?vehicle_route - vehicle_route)
+  )
+  (:action initialize_route_element
+    :parameters (?route_element - route_element)
+    :precondition
+      (and
+        (not
+          (route_element_initialized ?route_element)
+        )
+        (not
+          (route_element_inserted ?route_element)
+        )
+      )
+    :effect (route_element_initialized ?route_element)
+  )
+  (:action provisionally_bind_route_element_to_station
+    :parameters (?route_element - route_element ?charger_station - charger_station)
+    :precondition
+      (and
+        (route_element_initialized ?route_element)
+        (not
+          (route_element_provisionally_bound ?route_element)
+        )
+        (charger_station_available ?charger_station)
+      )
+    :effect
+      (and
+        (route_element_provisionally_bound ?route_element)
+        (route_element_assigned_charger ?route_element ?charger_station)
+        (not
+          (charger_station_available ?charger_station)
+        )
+      )
+  )
+  (:action assign_connector_requirement_to_route_element
+    :parameters (?route_element - route_element ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_initialized ?route_element)
+        (route_element_provisionally_bound ?route_element)
+        (connector_requirement_available ?connector_requirement)
+      )
+    :effect
+      (and
+        (route_element_has_connector_requirement ?route_element ?connector_requirement)
+        (not
+          (connector_requirement_available ?connector_requirement)
+        )
+      )
+  )
+  (:action mark_route_element_planned
+    :parameters (?route_element - route_element ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_initialized ?route_element)
+        (route_element_provisionally_bound ?route_element)
+        (route_element_has_connector_requirement ?route_element ?connector_requirement)
+        (not
+          (route_element_planned ?route_element)
+        )
+      )
+    :effect (route_element_planned ?route_element)
+  )
+  (:action unassign_connector_requirement_from_route_element
+    :parameters (?route_element - route_element ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_has_connector_requirement ?route_element ?connector_requirement)
+      )
+    :effect
+      (and
+        (connector_requirement_available ?connector_requirement)
+        (not
+          (route_element_has_connector_requirement ?route_element ?connector_requirement)
+        )
+      )
+  )
+  (:action reserve_connector_for_route_element
+    :parameters (?route_element - route_element ?charger_connector - charger_connector)
+    :precondition
+      (and
+        (route_element_planned ?route_element)
+        (charger_connector_available ?charger_connector)
+      )
+    :effect
+      (and
+        (route_element_reserved_charger_connector ?route_element ?charger_connector)
+        (not
+          (charger_connector_available ?charger_connector)
+        )
+      )
+  )
+  (:action release_connector_reservation
+    :parameters (?route_element - route_element ?charger_connector - charger_connector)
+    :precondition
+      (and
+        (route_element_reserved_charger_connector ?route_element ?charger_connector)
+      )
+    :effect
+      (and
+        (charger_connector_available ?charger_connector)
+        (not
+          (route_element_reserved_charger_connector ?route_element ?charger_connector)
+        )
+      )
+  )
+  (:action allocate_charger_model_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?charger_model - charger_model)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (charger_model_available ?charger_model)
+      )
+    :effect
+      (and
+        (vehicle_route_allocated_charger_model ?vehicle_route ?charger_model)
+        (not
+          (charger_model_available ?charger_model)
+        )
+      )
+  )
+  (:action release_charger_model_from_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?charger_model - charger_model)
+    :precondition
+      (and
+        (vehicle_route_allocated_charger_model ?vehicle_route ?charger_model)
+      )
+    :effect
+      (and
+        (charger_model_available ?charger_model)
+        (not
+          (vehicle_route_allocated_charger_model ?vehicle_route ?charger_model)
+        )
+      )
+  )
+  (:action allocate_session_token_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (session_token_available ?session_token)
+      )
+    :effect
+      (and
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (not
+          (session_token_available ?session_token)
+        )
+      )
+  )
+  (:action release_session_token_from_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token)
+    :precondition
+      (and
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+      )
+    :effect
+      (and
+        (session_token_available ?session_token)
+        (not
+          (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        )
+      )
+  )
+  (:action activate_candidate_departure_charger
+    :parameters (?departure_leg - departure_leg ?candidate_charger_departure - candidate_charger_departure ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_planned ?departure_leg)
+        (route_element_has_connector_requirement ?departure_leg ?connector_requirement)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (not
+          (candidate_departure_charger_active ?candidate_charger_departure)
+        )
+        (not
+          (candidate_departure_charger_tentative ?candidate_charger_departure)
+        )
+      )
+    :effect (candidate_departure_charger_active ?candidate_charger_departure)
+  )
+  (:action confirm_departure_leg_feasibility_with_reserved_connector
+    :parameters (?departure_leg - departure_leg ?candidate_charger_departure - candidate_charger_departure ?charger_connector - charger_connector)
+    :precondition
+      (and
+        (route_element_planned ?departure_leg)
+        (route_element_reserved_charger_connector ?departure_leg ?charger_connector)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (candidate_departure_charger_active ?candidate_charger_departure)
+        (not
+          (departure_leg_processed ?departure_leg)
+        )
+      )
+    :effect
+      (and
+        (departure_leg_processed ?departure_leg)
+        (departure_leg_feasible ?departure_leg)
+      )
+  )
+  (:action allocate_adapter_to_departure_leg
+    :parameters (?departure_leg - departure_leg ?candidate_charger_departure - candidate_charger_departure ?adapter_unit - adapter_unit)
+    :precondition
+      (and
+        (route_element_planned ?departure_leg)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (adapter_unit_available ?adapter_unit)
+        (not
+          (departure_leg_processed ?departure_leg)
+        )
+      )
+    :effect
+      (and
+        (candidate_departure_charger_tentative ?candidate_charger_departure)
+        (departure_leg_processed ?departure_leg)
+        (adapter_allocated_to_departure_leg ?departure_leg ?adapter_unit)
+        (not
+          (adapter_unit_available ?adapter_unit)
+        )
+      )
+  )
+  (:action activate_departure_charger_from_tentative
+    :parameters (?departure_leg - departure_leg ?candidate_charger_departure - candidate_charger_departure ?connector_requirement - connector_requirement ?adapter_unit - adapter_unit)
+    :precondition
+      (and
+        (route_element_planned ?departure_leg)
+        (route_element_has_connector_requirement ?departure_leg ?connector_requirement)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (candidate_departure_charger_tentative ?candidate_charger_departure)
+        (adapter_allocated_to_departure_leg ?departure_leg ?adapter_unit)
+        (not
+          (departure_leg_feasible ?departure_leg)
+        )
+      )
+    :effect
+      (and
+        (candidate_departure_charger_active ?candidate_charger_departure)
+        (departure_leg_feasible ?departure_leg)
+        (adapter_unit_available ?adapter_unit)
+        (not
+          (adapter_allocated_to_departure_leg ?departure_leg ?adapter_unit)
+        )
+      )
+  )
+  (:action activate_candidate_arrival_charger
+    :parameters (?arrival_leg - arrival_leg ?candidate_charger_arrival - candidate_charger_arrival ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_planned ?arrival_leg)
+        (route_element_has_connector_requirement ?arrival_leg ?connector_requirement)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (not
+          (candidate_arrival_charger_active ?candidate_charger_arrival)
+        )
+        (not
+          (candidate_arrival_charger_tentative ?candidate_charger_arrival)
+        )
+      )
+    :effect (candidate_arrival_charger_active ?candidate_charger_arrival)
+  )
+  (:action confirm_arrival_leg_feasibility_with_reserved_connector
+    :parameters (?arrival_leg - arrival_leg ?candidate_charger_arrival - candidate_charger_arrival ?charger_connector - charger_connector)
+    :precondition
+      (and
+        (route_element_planned ?arrival_leg)
+        (route_element_reserved_charger_connector ?arrival_leg ?charger_connector)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_arrival_charger_active ?candidate_charger_arrival)
+        (not
+          (arrival_leg_processed ?arrival_leg)
+        )
+      )
+    :effect
+      (and
+        (arrival_leg_processed ?arrival_leg)
+        (arrival_leg_feasible ?arrival_leg)
+      )
+  )
+  (:action allocate_adapter_to_arrival_leg
+    :parameters (?arrival_leg - arrival_leg ?candidate_charger_arrival - candidate_charger_arrival ?adapter_unit - adapter_unit)
+    :precondition
+      (and
+        (route_element_planned ?arrival_leg)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (adapter_unit_available ?adapter_unit)
+        (not
+          (arrival_leg_processed ?arrival_leg)
+        )
+      )
+    :effect
+      (and
+        (candidate_arrival_charger_tentative ?candidate_charger_arrival)
+        (arrival_leg_processed ?arrival_leg)
+        (adapter_allocated_to_arrival_leg ?arrival_leg ?adapter_unit)
+        (not
+          (adapter_unit_available ?adapter_unit)
+        )
+      )
+  )
+  (:action activate_arrival_charger_from_tentative
+    :parameters (?arrival_leg - arrival_leg ?candidate_charger_arrival - candidate_charger_arrival ?connector_requirement - connector_requirement ?adapter_unit - adapter_unit)
+    :precondition
+      (and
+        (route_element_planned ?arrival_leg)
+        (route_element_has_connector_requirement ?arrival_leg ?connector_requirement)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_arrival_charger_tentative ?candidate_charger_arrival)
+        (adapter_allocated_to_arrival_leg ?arrival_leg ?adapter_unit)
+        (not
+          (arrival_leg_feasible ?arrival_leg)
+        )
+      )
+    :effect
+      (and
+        (candidate_arrival_charger_active ?candidate_charger_arrival)
+        (arrival_leg_feasible ?arrival_leg)
+        (adapter_unit_available ?adapter_unit)
+        (not
+          (adapter_allocated_to_arrival_leg ?arrival_leg ?adapter_unit)
+        )
+      )
+  )
+  (:action compose_charging_stop_candidate
+    :parameters (?departure_leg - departure_leg ?arrival_leg - arrival_leg ?candidate_charger_departure - candidate_charger_departure ?candidate_charger_arrival - candidate_charger_arrival ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (departure_leg_processed ?departure_leg)
+        (arrival_leg_processed ?arrival_leg)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_departure_charger_active ?candidate_charger_departure)
+        (candidate_arrival_charger_active ?candidate_charger_arrival)
+        (departure_leg_feasible ?departure_leg)
+        (arrival_leg_feasible ?arrival_leg)
+        (charging_stop_candidate_available ?charging_stop_candidate)
+      )
+    :effect
+      (and
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_selected_departure_charger ?charging_stop_candidate ?candidate_charger_departure)
+        (stop_candidate_selected_arrival_charger ?charging_stop_candidate ?candidate_charger_arrival)
+        (not
+          (charging_stop_candidate_available ?charging_stop_candidate)
+        )
+      )
+  )
+  (:action compose_charging_stop_candidate_option_a
+    :parameters (?departure_leg - departure_leg ?arrival_leg - arrival_leg ?candidate_charger_departure - candidate_charger_departure ?candidate_charger_arrival - candidate_charger_arrival ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (departure_leg_processed ?departure_leg)
+        (arrival_leg_processed ?arrival_leg)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_departure_charger_tentative ?candidate_charger_departure)
+        (candidate_arrival_charger_active ?candidate_charger_arrival)
+        (not
+          (departure_leg_feasible ?departure_leg)
+        )
+        (arrival_leg_feasible ?arrival_leg)
+        (charging_stop_candidate_available ?charging_stop_candidate)
+      )
+    :effect
+      (and
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_selected_departure_charger ?charging_stop_candidate ?candidate_charger_departure)
+        (stop_candidate_selected_arrival_charger ?charging_stop_candidate ?candidate_charger_arrival)
+        (stop_candidate_option_a ?charging_stop_candidate)
+        (not
+          (charging_stop_candidate_available ?charging_stop_candidate)
+        )
+      )
+  )
+  (:action compose_charging_stop_candidate_option_b
+    :parameters (?departure_leg - departure_leg ?arrival_leg - arrival_leg ?candidate_charger_departure - candidate_charger_departure ?candidate_charger_arrival - candidate_charger_arrival ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (departure_leg_processed ?departure_leg)
+        (arrival_leg_processed ?arrival_leg)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_departure_charger_active ?candidate_charger_departure)
+        (candidate_arrival_charger_tentative ?candidate_charger_arrival)
+        (departure_leg_feasible ?departure_leg)
+        (not
+          (arrival_leg_feasible ?arrival_leg)
+        )
+        (charging_stop_candidate_available ?charging_stop_candidate)
+      )
+    :effect
+      (and
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_selected_departure_charger ?charging_stop_candidate ?candidate_charger_departure)
+        (stop_candidate_selected_arrival_charger ?charging_stop_candidate ?candidate_charger_arrival)
+        (stop_candidate_option_b ?charging_stop_candidate)
+        (not
+          (charging_stop_candidate_available ?charging_stop_candidate)
+        )
+      )
+  )
+  (:action compose_charging_stop_candidate_both_options
+    :parameters (?departure_leg - departure_leg ?arrival_leg - arrival_leg ?candidate_charger_departure - candidate_charger_departure ?candidate_charger_arrival - candidate_charger_arrival ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (departure_leg_processed ?departure_leg)
+        (arrival_leg_processed ?arrival_leg)
+        (leg_mapped_to_candidate_departure_charger ?departure_leg ?candidate_charger_departure)
+        (leg_mapped_to_candidate_arrival_charger ?arrival_leg ?candidate_charger_arrival)
+        (candidate_departure_charger_tentative ?candidate_charger_departure)
+        (candidate_arrival_charger_tentative ?candidate_charger_arrival)
+        (not
+          (departure_leg_feasible ?departure_leg)
+        )
+        (not
+          (arrival_leg_feasible ?arrival_leg)
+        )
+        (charging_stop_candidate_available ?charging_stop_candidate)
+      )
+    :effect
+      (and
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_selected_departure_charger ?charging_stop_candidate ?candidate_charger_departure)
+        (stop_candidate_selected_arrival_charger ?charging_stop_candidate ?candidate_charger_arrival)
+        (stop_candidate_option_a ?charging_stop_candidate)
+        (stop_candidate_option_b ?charging_stop_candidate)
+        (not
+          (charging_stop_candidate_available ?charging_stop_candidate)
+        )
+      )
+  )
+  (:action schedule_stop_candidate_into_time_slot
+    :parameters (?charging_stop_candidate - charging_stop_candidate ?departure_leg - departure_leg ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (departure_leg_processed ?departure_leg)
+        (route_element_has_connector_requirement ?departure_leg ?connector_requirement)
+        (not
+          (stop_candidate_scheduled ?charging_stop_candidate)
+        )
+      )
+    :effect (stop_candidate_scheduled ?charging_stop_candidate)
+  )
+  (:action provision_access_permit_for_stop_candidate
+    :parameters (?vehicle_route - vehicle_route ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (vehicle_route_assigned_stop_candidate ?vehicle_route ?charging_stop_candidate)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_available ?access_permit)
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_scheduled ?charging_stop_candidate)
+        (not
+          (access_permit_consumed ?access_permit)
+        )
+      )
+    :effect
+      (and
+        (access_permit_consumed ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (not
+          (access_permit_available ?access_permit)
+        )
+      )
+  )
+  (:action pass_vehicle_route_prebinding_checks
+    :parameters (?vehicle_route - vehicle_route ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_consumed ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (route_element_has_connector_requirement ?vehicle_route ?connector_requirement)
+        (not
+          (stop_candidate_option_a ?charging_stop_candidate)
+        )
+        (not
+          (vehicle_route_prebinding_ready ?vehicle_route)
+        )
+      )
+    :effect (vehicle_route_prebinding_ready ?vehicle_route)
+  )
+  (:action bind_time_window_profile_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?time_window_profile - time_window_profile)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (time_window_profile_available ?time_window_profile)
+        (not
+          (vehicle_route_has_time_window_profile_binding ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_has_time_window_profile_binding ?vehicle_route)
+        (vehicle_route_has_time_window_profile ?vehicle_route ?time_window_profile)
+        (not
+          (time_window_profile_available ?time_window_profile)
+        )
+      )
+  )
+  (:action apply_time_window_and_prebinding
+    :parameters (?vehicle_route - vehicle_route ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate ?connector_requirement - connector_requirement ?time_window_profile - time_window_profile)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_consumed ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (route_element_has_connector_requirement ?vehicle_route ?connector_requirement)
+        (stop_candidate_option_a ?charging_stop_candidate)
+        (vehicle_route_has_time_window_profile_binding ?vehicle_route)
+        (vehicle_route_has_time_window_profile ?vehicle_route ?time_window_profile)
+        (not
+          (vehicle_route_prebinding_ready ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_prebinding_ready ?vehicle_route)
+        (driver_preference_applied_marker ?vehicle_route)
+      )
+  )
+  (:action complete_adapter_connector_provisioning_without_option_b
+    :parameters (?vehicle_route - vehicle_route ?charger_model - charger_model ?charger_connector - charger_connector ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_prebinding_ready ?vehicle_route)
+        (vehicle_route_allocated_charger_model ?vehicle_route ?charger_model)
+        (route_element_reserved_charger_connector ?vehicle_route ?charger_connector)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (not
+          (stop_candidate_option_b ?charging_stop_candidate)
+        )
+        (not
+          (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        )
+      )
+    :effect (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+  )
+  (:action complete_adapter_connector_provisioning_with_option_b
+    :parameters (?vehicle_route - vehicle_route ?charger_model - charger_model ?charger_connector - charger_connector ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_prebinding_ready ?vehicle_route)
+        (vehicle_route_allocated_charger_model ?vehicle_route ?charger_model)
+        (route_element_reserved_charger_connector ?vehicle_route ?charger_connector)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (stop_candidate_option_b ?charging_stop_candidate)
+        (not
+          (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        )
+      )
+    :effect (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+  )
+  (:action bind_driver_session_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (not
+          (stop_candidate_option_a ?charging_stop_candidate)
+        )
+        (not
+          (stop_candidate_option_b ?charging_stop_candidate)
+        )
+        (not
+          (vehicle_route_binding_stage ?vehicle_route)
+        )
+      )
+    :effect (vehicle_route_binding_stage ?vehicle_route)
+  )
+  (:action bind_driver_session_and_mark_readiness_option_a
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (stop_candidate_option_a ?charging_stop_candidate)
+        (not
+          (stop_candidate_option_b ?charging_stop_candidate)
+        )
+        (not
+          (vehicle_route_binding_stage ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_readiness_completed ?vehicle_route)
+      )
+  )
+  (:action bind_driver_session_and_mark_readiness_option_b
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (not
+          (stop_candidate_option_a ?charging_stop_candidate)
+        )
+        (stop_candidate_option_b ?charging_stop_candidate)
+        (not
+          (vehicle_route_binding_stage ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_readiness_completed ?vehicle_route)
+      )
+  )
+  (:action bind_driver_session_and_mark_readiness_both_options
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token ?access_permit - access_permit ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (vehicle_route_adapter_provisioning_complete ?vehicle_route)
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (vehicle_route_holds_access_permit ?vehicle_route ?access_permit)
+        (access_permit_provisioned_for_stop_candidate ?access_permit ?charging_stop_candidate)
+        (stop_candidate_option_a ?charging_stop_candidate)
+        (stop_candidate_option_b ?charging_stop_candidate)
+        (not
+          (vehicle_route_binding_stage ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_readiness_completed ?vehicle_route)
+      )
+  )
+  (:action acknowledge_route_and_mark_ready_for_insertion
+    :parameters (?vehicle_route - vehicle_route)
+    :precondition
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (not
+          (vehicle_route_readiness_completed ?vehicle_route)
+        )
+        (not
+          (vehicle_route_insertion_acknowledged ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_insertion_acknowledged ?vehicle_route)
+        (route_ready_for_insertion ?vehicle_route)
+      )
+  )
+  (:action assign_charging_profile_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?charging_profile - charging_profile)
+    :precondition
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_readiness_completed ?vehicle_route)
+        (charging_profile_available ?charging_profile)
+      )
+    :effect
+      (and
+        (vehicle_route_assigned_charging_profile ?vehicle_route ?charging_profile)
+        (not
+          (charging_profile_available ?charging_profile)
+        )
+      )
+  )
+  (:action commit_charging_stop_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?departure_leg - departure_leg ?arrival_leg - arrival_leg ?connector_requirement - connector_requirement ?charging_profile - charging_profile)
+    :precondition
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_readiness_completed ?vehicle_route)
+        (vehicle_route_assigned_charging_profile ?vehicle_route ?charging_profile)
+        (vehicle_route_has_departure_leg ?vehicle_route ?departure_leg)
+        (vehicle_route_has_arrival_leg ?vehicle_route ?arrival_leg)
+        (departure_leg_feasible ?departure_leg)
+        (arrival_leg_feasible ?arrival_leg)
+        (route_element_has_connector_requirement ?vehicle_route ?connector_requirement)
+        (not
+          (vehicle_route_insertion_in_progress ?vehicle_route)
+        )
+      )
+    :effect (vehicle_route_insertion_in_progress ?vehicle_route)
+  )
+  (:action finalize_route_insertion_and_acknowledge
+    :parameters (?vehicle_route - vehicle_route)
+    :precondition
+      (and
+        (vehicle_route_binding_stage ?vehicle_route)
+        (vehicle_route_insertion_in_progress ?vehicle_route)
+        (not
+          (vehicle_route_insertion_acknowledged ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_insertion_acknowledged ?vehicle_route)
+        (route_ready_for_insertion ?vehicle_route)
+      )
+  )
+  (:action apply_driver_preference_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?driver_preference - driver_preference ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_element_planned ?vehicle_route)
+        (route_element_has_connector_requirement ?vehicle_route ?connector_requirement)
+        (driver_preference_available ?driver_preference)
+        (vehicle_route_has_driver_preference_binding ?vehicle_route ?driver_preference)
+        (not
+          (driver_preference_applied_awaiting_connector ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (driver_preference_applied_awaiting_connector ?vehicle_route)
+        (not
+          (driver_preference_available ?driver_preference)
+        )
+      )
+  )
+  (:action establish_connector_binding_per_driver_preference
+    :parameters (?vehicle_route - vehicle_route ?charger_connector - charger_connector)
+    :precondition
+      (and
+        (driver_preference_applied_awaiting_connector ?vehicle_route)
+        (route_element_reserved_charger_connector ?vehicle_route ?charger_connector)
+        (not
+          (connector_binding_established ?vehicle_route)
+        )
+      )
+    :effect (connector_binding_established ?vehicle_route)
+  )
+  (:action complete_connector_binding_with_session_token
+    :parameters (?vehicle_route - vehicle_route ?session_token - session_token)
+    :precondition
+      (and
+        (connector_binding_established ?vehicle_route)
+        (session_token_bound_to_vehicle_route ?vehicle_route ?session_token)
+        (not
+          (connector_binding_completed ?vehicle_route)
+        )
+      )
+    :effect (connector_binding_completed ?vehicle_route)
+  )
+  (:action acknowledge_binding_and_mark_route_ready
+    :parameters (?vehicle_route - vehicle_route)
+    :precondition
+      (and
+        (connector_binding_completed ?vehicle_route)
+        (not
+          (vehicle_route_insertion_acknowledged ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (vehicle_route_insertion_acknowledged ?vehicle_route)
+        (route_ready_for_insertion ?vehicle_route)
+      )
+  )
+  (:action mark_departure_leg_ready_for_insertion
+    :parameters (?departure_leg - departure_leg ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (departure_leg_processed ?departure_leg)
+        (departure_leg_feasible ?departure_leg)
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_scheduled ?charging_stop_candidate)
+        (not
+          (route_ready_for_insertion ?departure_leg)
+        )
+      )
+    :effect (route_ready_for_insertion ?departure_leg)
+  )
+  (:action mark_arrival_leg_ready_for_insertion
+    :parameters (?arrival_leg - arrival_leg ?charging_stop_candidate - charging_stop_candidate)
+    :precondition
+      (and
+        (arrival_leg_processed ?arrival_leg)
+        (arrival_leg_feasible ?arrival_leg)
+        (charging_stop_candidate_composed ?charging_stop_candidate)
+        (stop_candidate_scheduled ?charging_stop_candidate)
+        (not
+          (route_ready_for_insertion ?arrival_leg)
+        )
+      )
+    :effect (route_ready_for_insertion ?arrival_leg)
+  )
+  (:action assign_time_slot_and_commit_route_element
+    :parameters (?route_element - route_element ?time_slot - time_slot ?connector_requirement - connector_requirement)
+    :precondition
+      (and
+        (route_ready_for_insertion ?route_element)
+        (route_element_has_connector_requirement ?route_element ?connector_requirement)
+        (time_slot_available ?time_slot)
+        (not
+          (route_insertion_committed ?route_element)
+        )
+      )
+    :effect
+      (and
+        (route_insertion_committed ?route_element)
+        (route_element_assigned_time_slot ?route_element ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action commit_insertion_to_departure_leg
+    :parameters (?departure_leg - departure_leg ?charger_station - charger_station ?time_slot - time_slot)
+    :precondition
+      (and
+        (route_insertion_committed ?departure_leg)
+        (route_element_assigned_charger ?departure_leg ?charger_station)
+        (route_element_assigned_time_slot ?departure_leg ?time_slot)
+        (not
+          (route_element_inserted ?departure_leg)
+        )
+      )
+    :effect
+      (and
+        (route_element_inserted ?departure_leg)
+        (charger_station_available ?charger_station)
+        (time_slot_available ?time_slot)
+      )
+  )
+  (:action commit_insertion_to_arrival_leg
+    :parameters (?arrival_leg - arrival_leg ?charger_station - charger_station ?time_slot - time_slot)
+    :precondition
+      (and
+        (route_insertion_committed ?arrival_leg)
+        (route_element_assigned_charger ?arrival_leg ?charger_station)
+        (route_element_assigned_time_slot ?arrival_leg ?time_slot)
+        (not
+          (route_element_inserted ?arrival_leg)
+        )
+      )
+    :effect
+      (and
+        (route_element_inserted ?arrival_leg)
+        (charger_station_available ?charger_station)
+        (time_slot_available ?time_slot)
+      )
+  )
+  (:action commit_insertion_to_vehicle_route
+    :parameters (?vehicle_route - vehicle_route ?charger_station - charger_station ?time_slot - time_slot)
+    :precondition
+      (and
+        (route_insertion_committed ?vehicle_route)
+        (route_element_assigned_charger ?vehicle_route ?charger_station)
+        (route_element_assigned_time_slot ?vehicle_route ?time_slot)
+        (not
+          (route_element_inserted ?vehicle_route)
+        )
+      )
+    :effect
+      (and
+        (route_element_inserted ?vehicle_route)
+        (charger_station_available ?charger_station)
+        (time_slot_available ?time_slot)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem ev_charging_stop_insertion_problem)
+  (:domain electric_vehicle_charging_stop_insertion)
+  (:objects departure_leg_1 - departure_leg arrival_leg_1 - arrival_leg vehicle_route_1 - vehicle_route vehicle_route_2 - vehicle_route charger_station_1 - charger_station charger_station_2 - charger_station charger_station_3 - charger_station connector_requirement_1 - connector_requirement charger_connector_1 - charger_connector adapter_unit_1 - adapter_unit candidate_departure_charger_1 - candidate_charger_departure candidate_arrival_charger_1 - candidate_charger_arrival charging_stop_candidate_1 - charging_stop_candidate access_permit_1 - access_permit access_permit_2 - access_permit time_window_profile_1 - time_window_profile time_window_profile_2 - time_window_profile charging_profile_1 - charging_profile charging_profile_2 - charging_profile time_slot_1 - time_slot charger_model_1 - charger_model driver_preference_1 - driver_preference driver_preference_2 - driver_preference session_token_1 - session_token)
+  (:init
+    (charger_station_available charger_station_1)
+    (charger_station_available charger_station_2)
+    (charger_station_available charger_station_3)
+    (connector_requirement_available connector_requirement_1)
+    (charger_connector_available charger_connector_1)
+    (adapter_unit_available adapter_unit_1)
+    (leg_mapped_to_candidate_departure_charger departure_leg_1 candidate_departure_charger_1)
+    (leg_mapped_to_candidate_arrival_charger arrival_leg_1 candidate_arrival_charger_1)
+    (charging_stop_candidate_available charging_stop_candidate_1)
+    (access_permit_available access_permit_1)
+    (access_permit_available access_permit_2)
+    (vehicle_route_has_departure_leg vehicle_route_1 departure_leg_1)
+    (vehicle_route_has_departure_leg vehicle_route_2 departure_leg_1)
+    (vehicle_route_has_arrival_leg vehicle_route_1 arrival_leg_1)
+    (vehicle_route_has_arrival_leg vehicle_route_2 arrival_leg_1)
+    (vehicle_route_assigned_stop_candidate vehicle_route_1 charging_stop_candidate_1)
+    (vehicle_route_assigned_stop_candidate vehicle_route_2 charging_stop_candidate_1)
+    (vehicle_route_holds_access_permit vehicle_route_1 access_permit_1)
+    (vehicle_route_holds_access_permit vehicle_route_2 access_permit_2)
+    (time_window_profile_available time_window_profile_1)
+    (time_window_profile_available time_window_profile_2)
+    (charging_profile_available charging_profile_1)
+    (charging_profile_available charging_profile_2)
+    (time_slot_available time_slot_1)
+    (charger_model_available charger_model_1)
+    (driver_preference_available driver_preference_1)
+    (vehicle_route_has_driver_preference_binding vehicle_route_1 driver_preference_1)
+    (vehicle_route_has_driver_preference_binding vehicle_route_2 driver_preference_2)
+    (session_token_available session_token_1)
+  )
+  (:goal
+    (and
+      (route_element_inserted departure_leg_1)
+      (route_element_inserted arrival_leg_1)
+      (route_element_inserted vehicle_route_1)
+      (route_element_inserted vehicle_route_2)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain prerequisite_chain_completion_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types academic_resource - object scheduling_resource - object administrative_resource - object abstract_course_type - object course - abstract_course_type instructor_resource - academic_resource section_offering - academic_resource assessment_event - academic_resource external_approval_document - academic_resource elective_option - academic_resource credit_unit - academic_resource grading_artifact - academic_resource capstone_advisor - academic_resource credit_token - scheduling_resource capstone_requirement - scheduling_resource recommendation_letter - scheduling_resource required_term_slot - administrative_resource elective_term_slot - administrative_resource program_milestone - administrative_resource course_category - course course_subcategory - course required_course_instance - course_category elective_course_instance - course_category student_record - course_subcategory)
+  (:predicates
+    (instance_initialized ?course - course)
+    (instance_confirmed ?course - course)
+    (instance_has_assigned_instructor ?course - course)
+    (instance_completed ?course - course)
+    (instance_ready_for_finalization ?course - course)
+    (instance_credit_assigned ?course - course)
+    (instructor_available ?instructor_resource - instructor_resource)
+    (instance_assigned_instructor ?course - course ?instructor_resource - instructor_resource)
+    (section_available ?section_offering - section_offering)
+    (instance_section_assignment ?course - course ?section_offering - section_offering)
+    (assessment_event_available ?assessment_event - assessment_event)
+    (assessment_assigned_to_instance ?course - course ?assessment_event - assessment_event)
+    (credit_token_available ?credit_token - credit_token)
+    (required_instance_credit_assigned ?required_course_instance - required_course_instance ?credit_token - credit_token)
+    (elective_instance_credit_assigned ?elective_course_instance - elective_course_instance ?credit_token - credit_token)
+    (required_instance_term_slot ?required_course_instance - required_course_instance ?required_term_slot - required_term_slot)
+    (required_term_slot_reserved ?required_term_slot - required_term_slot)
+    (required_term_slot_funded ?required_term_slot - required_term_slot)
+    (required_instance_contribution_ready ?required_course_instance - required_course_instance)
+    (elective_instance_term_slot ?elective_course_instance - elective_course_instance ?elective_term_slot - elective_term_slot)
+    (elective_term_slot_reserved ?elective_term_slot - elective_term_slot)
+    (elective_term_slot_funded ?elective_term_slot - elective_term_slot)
+    (elective_instance_contribution_ready ?elective_course_instance - elective_course_instance)
+    (program_milestone_available ?program_milestone - program_milestone)
+    (program_milestone_assembled ?program_milestone - program_milestone)
+    (milestone_includes_required_slot ?program_milestone - program_milestone ?required_term_slot - required_term_slot)
+    (milestone_includes_elective_slot ?program_milestone - program_milestone ?elective_term_slot - elective_term_slot)
+    (milestone_required_slot_funded ?program_milestone - program_milestone)
+    (milestone_elective_slot_funded ?program_milestone - program_milestone)
+    (milestone_validated ?program_milestone - program_milestone)
+    (student_has_required_instance ?student_record - student_record ?required_course_instance - required_course_instance)
+    (student_has_elective_instance ?student_record - student_record ?elective_course_instance - elective_course_instance)
+    (student_has_program_milestone ?student_record - student_record ?program_milestone - program_milestone)
+    (capstone_requirement_available ?capstone_requirement - capstone_requirement)
+    (student_has_capstone_requirement ?student_record - student_record ?capstone_requirement - capstone_requirement)
+    (capstone_requirement_claimed ?capstone_requirement - capstone_requirement)
+    (capstone_requirement_assigned_to_milestone ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    (student_capstone_requirement_verified ?student_record - student_record)
+    (student_capstone_resources_ready ?student_record - student_record)
+    (capstone_advisor_review_requested ?student_record - student_record)
+    (external_approval_attached ?student_record - student_record)
+    (external_approval_verified ?student_record - student_record)
+    (advisor_endorsement_recorded ?student_record - student_record)
+    (capstone_components_verified ?student_record - student_record)
+    (recommendation_letter_available ?recommendation_letter - recommendation_letter)
+    (student_recommendation_link ?student_record - student_record ?recommendation_letter - recommendation_letter)
+    (recommendation_claimed ?student_record - student_record)
+    (recommendation_review_in_progress ?student_record - student_record)
+    (recommendation_approved ?student_record - student_record)
+    (external_approval_available ?external_approval_document - external_approval_document)
+    (student_external_approval_link ?student_record - student_record ?external_approval_document - external_approval_document)
+    (elective_option_available ?elective_option - elective_option)
+    (student_elective_option_selected ?student_record - student_record ?elective_option - elective_option)
+    (grading_artifact_available ?grading_artifact - grading_artifact)
+    (grading_artifact_attached ?student_record - student_record ?grading_artifact - grading_artifact)
+    (capstone_advisor_available ?capstone_advisor - capstone_advisor)
+    (advisor_assigned_to_record ?student_record - student_record ?capstone_advisor - capstone_advisor)
+    (credit_unit_available ?credit_unit - credit_unit)
+    (instance_credit_allocation ?course - course ?credit_unit - credit_unit)
+    (required_instance_ready ?required_course_instance - required_course_instance)
+    (elective_instance_ready ?elective_course_instance - elective_course_instance)
+    (student_record_finalized ?student_record - student_record)
+  )
+  (:action initialize_instance
+    :parameters (?course - course)
+    :precondition
+      (and
+        (not
+          (instance_initialized ?course)
+        )
+        (not
+          (instance_completed ?course)
+        )
+      )
+    :effect (instance_initialized ?course)
+  )
+  (:action assign_instructor_to_instance
+    :parameters (?course - course ?instructor_resource - instructor_resource)
+    :precondition
+      (and
+        (instance_initialized ?course)
+        (not
+          (instance_has_assigned_instructor ?course)
+        )
+        (instructor_available ?instructor_resource)
+      )
+    :effect
+      (and
+        (instance_has_assigned_instructor ?course)
+        (instance_assigned_instructor ?course ?instructor_resource)
+        (not
+          (instructor_available ?instructor_resource)
+        )
+      )
+  )
+  (:action assign_section_to_instance
+    :parameters (?course - course ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_initialized ?course)
+        (instance_has_assigned_instructor ?course)
+        (section_available ?section_offering)
+      )
+    :effect
+      (and
+        (instance_section_assignment ?course ?section_offering)
+        (not
+          (section_available ?section_offering)
+        )
+      )
+  )
+  (:action confirm_instance
+    :parameters (?course - course ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_initialized ?course)
+        (instance_has_assigned_instructor ?course)
+        (instance_section_assignment ?course ?section_offering)
+        (not
+          (instance_confirmed ?course)
+        )
+      )
+    :effect (instance_confirmed ?course)
+  )
+  (:action release_instance_section_assignment
+    :parameters (?course - course ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_section_assignment ?course ?section_offering)
+      )
+    :effect
+      (and
+        (section_available ?section_offering)
+        (not
+          (instance_section_assignment ?course ?section_offering)
+        )
+      )
+  )
+  (:action assign_assessment_event_to_instance
+    :parameters (?course - course ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (instance_confirmed ?course)
+        (assessment_event_available ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_assigned_to_instance ?course ?assessment_event)
+        (not
+          (assessment_event_available ?assessment_event)
+        )
+      )
+  )
+  (:action release_assessment_from_instance
+    :parameters (?course - course ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (assessment_assigned_to_instance ?course ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_event_available ?assessment_event)
+        (not
+          (assessment_assigned_to_instance ?course ?assessment_event)
+        )
+      )
+  )
+  (:action attach_grading_artifact_to_record
+    :parameters (?student_record - student_record ?grading_artifact - grading_artifact)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (grading_artifact_available ?grading_artifact)
+      )
+    :effect
+      (and
+        (grading_artifact_attached ?student_record ?grading_artifact)
+        (not
+          (grading_artifact_available ?grading_artifact)
+        )
+      )
+  )
+  (:action detach_grading_artifact_from_record
+    :parameters (?student_record - student_record ?grading_artifact - grading_artifact)
+    :precondition
+      (and
+        (grading_artifact_attached ?student_record ?grading_artifact)
+      )
+    :effect
+      (and
+        (grading_artifact_available ?grading_artifact)
+        (not
+          (grading_artifact_attached ?student_record ?grading_artifact)
+        )
+      )
+  )
+  (:action assign_capstone_advisor_to_record
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (capstone_advisor_available ?capstone_advisor)
+      )
+    :effect
+      (and
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (not
+          (capstone_advisor_available ?capstone_advisor)
+        )
+      )
+  )
+  (:action release_capstone_advisor_from_record
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor)
+    :precondition
+      (and
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+      )
+    :effect
+      (and
+        (capstone_advisor_available ?capstone_advisor)
+        (not
+          (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        )
+      )
+  )
+  (:action reserve_required_term_slot_for_instance
+    :parameters (?required_course_instance - required_course_instance ?required_term_slot - required_term_slot ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_confirmed ?required_course_instance)
+        (instance_section_assignment ?required_course_instance ?section_offering)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (not
+          (required_term_slot_reserved ?required_term_slot)
+        )
+        (not
+          (required_term_slot_funded ?required_term_slot)
+        )
+      )
+    :effect (required_term_slot_reserved ?required_term_slot)
+  )
+  (:action verify_required_instance_prerequisites
+    :parameters (?required_course_instance - required_course_instance ?required_term_slot - required_term_slot ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (instance_confirmed ?required_course_instance)
+        (assessment_assigned_to_instance ?required_course_instance ?assessment_event)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (required_term_slot_reserved ?required_term_slot)
+        (not
+          (required_instance_ready ?required_course_instance)
+        )
+      )
+    :effect
+      (and
+        (required_instance_ready ?required_course_instance)
+        (required_instance_contribution_ready ?required_course_instance)
+      )
+  )
+  (:action allocate_credit_token_to_required_instance
+    :parameters (?required_course_instance - required_course_instance ?required_term_slot - required_term_slot ?credit_token - credit_token)
+    :precondition
+      (and
+        (instance_confirmed ?required_course_instance)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (credit_token_available ?credit_token)
+        (not
+          (required_instance_ready ?required_course_instance)
+        )
+      )
+    :effect
+      (and
+        (required_term_slot_funded ?required_term_slot)
+        (required_instance_ready ?required_course_instance)
+        (required_instance_credit_assigned ?required_course_instance ?credit_token)
+        (not
+          (credit_token_available ?credit_token)
+        )
+      )
+  )
+  (:action reconcile_credit_for_required_instance
+    :parameters (?required_course_instance - required_course_instance ?required_term_slot - required_term_slot ?section_offering - section_offering ?credit_token - credit_token)
+    :precondition
+      (and
+        (instance_confirmed ?required_course_instance)
+        (instance_section_assignment ?required_course_instance ?section_offering)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (required_term_slot_funded ?required_term_slot)
+        (required_instance_credit_assigned ?required_course_instance ?credit_token)
+        (not
+          (required_instance_contribution_ready ?required_course_instance)
+        )
+      )
+    :effect
+      (and
+        (required_term_slot_reserved ?required_term_slot)
+        (required_instance_contribution_ready ?required_course_instance)
+        (credit_token_available ?credit_token)
+        (not
+          (required_instance_credit_assigned ?required_course_instance ?credit_token)
+        )
+      )
+  )
+  (:action reserve_elective_term_slot_for_instance
+    :parameters (?elective_course_instance - elective_course_instance ?elective_term_slot - elective_term_slot ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_confirmed ?elective_course_instance)
+        (instance_section_assignment ?elective_course_instance ?section_offering)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (not
+          (elective_term_slot_reserved ?elective_term_slot)
+        )
+        (not
+          (elective_term_slot_funded ?elective_term_slot)
+        )
+      )
+    :effect (elective_term_slot_reserved ?elective_term_slot)
+  )
+  (:action verify_elective_instance_prerequisites
+    :parameters (?elective_course_instance - elective_course_instance ?elective_term_slot - elective_term_slot ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (instance_confirmed ?elective_course_instance)
+        (assessment_assigned_to_instance ?elective_course_instance ?assessment_event)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (elective_term_slot_reserved ?elective_term_slot)
+        (not
+          (elective_instance_ready ?elective_course_instance)
+        )
+      )
+    :effect
+      (and
+        (elective_instance_ready ?elective_course_instance)
+        (elective_instance_contribution_ready ?elective_course_instance)
+      )
+  )
+  (:action allocate_credit_token_to_elective_instance
+    :parameters (?elective_course_instance - elective_course_instance ?elective_term_slot - elective_term_slot ?credit_token - credit_token)
+    :precondition
+      (and
+        (instance_confirmed ?elective_course_instance)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (credit_token_available ?credit_token)
+        (not
+          (elective_instance_ready ?elective_course_instance)
+        )
+      )
+    :effect
+      (and
+        (elective_term_slot_funded ?elective_term_slot)
+        (elective_instance_ready ?elective_course_instance)
+        (elective_instance_credit_assigned ?elective_course_instance ?credit_token)
+        (not
+          (credit_token_available ?credit_token)
+        )
+      )
+  )
+  (:action reconcile_credit_for_elective_instance
+    :parameters (?elective_course_instance - elective_course_instance ?elective_term_slot - elective_term_slot ?section_offering - section_offering ?credit_token - credit_token)
+    :precondition
+      (and
+        (instance_confirmed ?elective_course_instance)
+        (instance_section_assignment ?elective_course_instance ?section_offering)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (elective_term_slot_funded ?elective_term_slot)
+        (elective_instance_credit_assigned ?elective_course_instance ?credit_token)
+        (not
+          (elective_instance_contribution_ready ?elective_course_instance)
+        )
+      )
+    :effect
+      (and
+        (elective_term_slot_reserved ?elective_term_slot)
+        (elective_instance_contribution_ready ?elective_course_instance)
+        (credit_token_available ?credit_token)
+        (not
+          (elective_instance_credit_assigned ?elective_course_instance ?credit_token)
+        )
+      )
+  )
+  (:action assemble_program_milestone
+    :parameters (?required_course_instance - required_course_instance ?elective_course_instance - elective_course_instance ?required_term_slot - required_term_slot ?elective_term_slot - elective_term_slot ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (required_instance_ready ?required_course_instance)
+        (elective_instance_ready ?elective_course_instance)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (required_term_slot_reserved ?required_term_slot)
+        (elective_term_slot_reserved ?elective_term_slot)
+        (required_instance_contribution_ready ?required_course_instance)
+        (elective_instance_contribution_ready ?elective_course_instance)
+        (program_milestone_available ?program_milestone)
+      )
+    :effect
+      (and
+        (program_milestone_assembled ?program_milestone)
+        (milestone_includes_required_slot ?program_milestone ?required_term_slot)
+        (milestone_includes_elective_slot ?program_milestone ?elective_term_slot)
+        (not
+          (program_milestone_available ?program_milestone)
+        )
+      )
+  )
+  (:action assemble_program_milestone_with_required_funding
+    :parameters (?required_course_instance - required_course_instance ?elective_course_instance - elective_course_instance ?required_term_slot - required_term_slot ?elective_term_slot - elective_term_slot ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (required_instance_ready ?required_course_instance)
+        (elective_instance_ready ?elective_course_instance)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (required_term_slot_funded ?required_term_slot)
+        (elective_term_slot_reserved ?elective_term_slot)
+        (not
+          (required_instance_contribution_ready ?required_course_instance)
+        )
+        (elective_instance_contribution_ready ?elective_course_instance)
+        (program_milestone_available ?program_milestone)
+      )
+    :effect
+      (and
+        (program_milestone_assembled ?program_milestone)
+        (milestone_includes_required_slot ?program_milestone ?required_term_slot)
+        (milestone_includes_elective_slot ?program_milestone ?elective_term_slot)
+        (milestone_required_slot_funded ?program_milestone)
+        (not
+          (program_milestone_available ?program_milestone)
+        )
+      )
+  )
+  (:action assemble_program_milestone_with_elective_funding
+    :parameters (?required_course_instance - required_course_instance ?elective_course_instance - elective_course_instance ?required_term_slot - required_term_slot ?elective_term_slot - elective_term_slot ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (required_instance_ready ?required_course_instance)
+        (elective_instance_ready ?elective_course_instance)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (required_term_slot_reserved ?required_term_slot)
+        (elective_term_slot_funded ?elective_term_slot)
+        (required_instance_contribution_ready ?required_course_instance)
+        (not
+          (elective_instance_contribution_ready ?elective_course_instance)
+        )
+        (program_milestone_available ?program_milestone)
+      )
+    :effect
+      (and
+        (program_milestone_assembled ?program_milestone)
+        (milestone_includes_required_slot ?program_milestone ?required_term_slot)
+        (milestone_includes_elective_slot ?program_milestone ?elective_term_slot)
+        (milestone_elective_slot_funded ?program_milestone)
+        (not
+          (program_milestone_available ?program_milestone)
+        )
+      )
+  )
+  (:action assemble_program_milestone_with_both_fundings
+    :parameters (?required_course_instance - required_course_instance ?elective_course_instance - elective_course_instance ?required_term_slot - required_term_slot ?elective_term_slot - elective_term_slot ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (required_instance_ready ?required_course_instance)
+        (elective_instance_ready ?elective_course_instance)
+        (required_instance_term_slot ?required_course_instance ?required_term_slot)
+        (elective_instance_term_slot ?elective_course_instance ?elective_term_slot)
+        (required_term_slot_funded ?required_term_slot)
+        (elective_term_slot_funded ?elective_term_slot)
+        (not
+          (required_instance_contribution_ready ?required_course_instance)
+        )
+        (not
+          (elective_instance_contribution_ready ?elective_course_instance)
+        )
+        (program_milestone_available ?program_milestone)
+      )
+    :effect
+      (and
+        (program_milestone_assembled ?program_milestone)
+        (milestone_includes_required_slot ?program_milestone ?required_term_slot)
+        (milestone_includes_elective_slot ?program_milestone ?elective_term_slot)
+        (milestone_required_slot_funded ?program_milestone)
+        (milestone_elective_slot_funded ?program_milestone)
+        (not
+          (program_milestone_available ?program_milestone)
+        )
+      )
+  )
+  (:action validate_program_milestone
+    :parameters (?program_milestone - program_milestone ?required_course_instance - required_course_instance ?section_offering - section_offering)
+    :precondition
+      (and
+        (program_milestone_assembled ?program_milestone)
+        (required_instance_ready ?required_course_instance)
+        (instance_section_assignment ?required_course_instance ?section_offering)
+        (not
+          (milestone_validated ?program_milestone)
+        )
+      )
+    :effect (milestone_validated ?program_milestone)
+  )
+  (:action claim_capstone_requirement_for_student
+    :parameters (?student_record - student_record ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (student_has_program_milestone ?student_record ?program_milestone)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_available ?capstone_requirement)
+        (program_milestone_assembled ?program_milestone)
+        (milestone_validated ?program_milestone)
+        (not
+          (capstone_requirement_claimed ?capstone_requirement)
+        )
+      )
+    :effect
+      (and
+        (capstone_requirement_claimed ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (not
+          (capstone_requirement_available ?capstone_requirement)
+        )
+      )
+  )
+  (:action stage_capstone_requirement_for_review
+    :parameters (?student_record - student_record ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_claimed ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (instance_section_assignment ?student_record ?section_offering)
+        (not
+          (milestone_required_slot_funded ?program_milestone)
+        )
+        (not
+          (student_capstone_requirement_verified ?student_record)
+        )
+      )
+    :effect (student_capstone_requirement_verified ?student_record)
+  )
+  (:action attach_external_approval_to_student_record
+    :parameters (?student_record - student_record ?external_approval_document - external_approval_document)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (external_approval_available ?external_approval_document)
+        (not
+          (external_approval_attached ?student_record)
+        )
+      )
+    :effect
+      (and
+        (external_approval_attached ?student_record)
+        (student_external_approval_link ?student_record ?external_approval_document)
+        (not
+          (external_approval_available ?external_approval_document)
+        )
+      )
+  )
+  (:action process_capstone_with_external_approval
+    :parameters (?student_record - student_record ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone ?section_offering - section_offering ?external_approval_document - external_approval_document)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_claimed ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (instance_section_assignment ?student_record ?section_offering)
+        (milestone_required_slot_funded ?program_milestone)
+        (external_approval_attached ?student_record)
+        (student_external_approval_link ?student_record ?external_approval_document)
+        (not
+          (student_capstone_requirement_verified ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_capstone_requirement_verified ?student_record)
+        (external_approval_verified ?student_record)
+      )
+  )
+  (:action attach_grading_artifact_and_mark_capstone_ready
+    :parameters (?student_record - student_record ?grading_artifact - grading_artifact ?assessment_event - assessment_event ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_requirement_verified ?student_record)
+        (grading_artifact_attached ?student_record ?grading_artifact)
+        (assessment_assigned_to_instance ?student_record ?assessment_event)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (not
+          (milestone_elective_slot_funded ?program_milestone)
+        )
+        (not
+          (student_capstone_resources_ready ?student_record)
+        )
+      )
+    :effect (student_capstone_resources_ready ?student_record)
+  )
+  (:action attach_grading_artifact_and_mark_capstone_ready_alt
+    :parameters (?student_record - student_record ?grading_artifact - grading_artifact ?assessment_event - assessment_event ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_requirement_verified ?student_record)
+        (grading_artifact_attached ?student_record ?grading_artifact)
+        (assessment_assigned_to_instance ?student_record ?assessment_event)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (milestone_elective_slot_funded ?program_milestone)
+        (not
+          (student_capstone_resources_ready ?student_record)
+        )
+      )
+    :effect (student_capstone_resources_ready ?student_record)
+  )
+  (:action request_capstone_advisor_review
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_resources_ready ?student_record)
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (not
+          (milestone_required_slot_funded ?program_milestone)
+        )
+        (not
+          (milestone_elective_slot_funded ?program_milestone)
+        )
+        (not
+          (capstone_advisor_review_requested ?student_record)
+        )
+      )
+    :effect (capstone_advisor_review_requested ?student_record)
+  )
+  (:action request_and_acknowledge_advisor_review
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_resources_ready ?student_record)
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (milestone_required_slot_funded ?program_milestone)
+        (not
+          (milestone_elective_slot_funded ?program_milestone)
+        )
+        (not
+          (capstone_advisor_review_requested ?student_record)
+        )
+      )
+    :effect
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (advisor_endorsement_recorded ?student_record)
+      )
+  )
+  (:action request_advisor_review_and_record_acknowledgement
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_resources_ready ?student_record)
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (not
+          (milestone_required_slot_funded ?program_milestone)
+        )
+        (milestone_elective_slot_funded ?program_milestone)
+        (not
+          (capstone_advisor_review_requested ?student_record)
+        )
+      )
+    :effect
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (advisor_endorsement_recorded ?student_record)
+      )
+  )
+  (:action request_advisor_review_with_additional_acknowledgement
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor ?capstone_requirement - capstone_requirement ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (student_capstone_resources_ready ?student_record)
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (student_has_capstone_requirement ?student_record ?capstone_requirement)
+        (capstone_requirement_assigned_to_milestone ?capstone_requirement ?program_milestone)
+        (milestone_required_slot_funded ?program_milestone)
+        (milestone_elective_slot_funded ?program_milestone)
+        (not
+          (capstone_advisor_review_requested ?student_record)
+        )
+      )
+    :effect
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (advisor_endorsement_recorded ?student_record)
+      )
+  )
+  (:action finalize_student_record_without_advisor_endorsement
+    :parameters (?student_record - student_record)
+    :precondition
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (not
+          (advisor_endorsement_recorded ?student_record)
+        )
+        (not
+          (student_record_finalized ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_record_finalized ?student_record)
+        (instance_ready_for_finalization ?student_record)
+      )
+  )
+  (:action attach_elective_option_to_record
+    :parameters (?student_record - student_record ?elective_option - elective_option)
+    :precondition
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (advisor_endorsement_recorded ?student_record)
+        (elective_option_available ?elective_option)
+      )
+    :effect
+      (and
+        (student_elective_option_selected ?student_record ?elective_option)
+        (not
+          (elective_option_available ?elective_option)
+        )
+      )
+  )
+  (:action prepare_student_record_for_certification
+    :parameters (?student_record - student_record ?required_course_instance - required_course_instance ?elective_course_instance - elective_course_instance ?section_offering - section_offering ?elective_option - elective_option)
+    :precondition
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (advisor_endorsement_recorded ?student_record)
+        (student_elective_option_selected ?student_record ?elective_option)
+        (student_has_required_instance ?student_record ?required_course_instance)
+        (student_has_elective_instance ?student_record ?elective_course_instance)
+        (required_instance_contribution_ready ?required_course_instance)
+        (elective_instance_contribution_ready ?elective_course_instance)
+        (instance_section_assignment ?student_record ?section_offering)
+        (not
+          (capstone_components_verified ?student_record)
+        )
+      )
+    :effect (capstone_components_verified ?student_record)
+  )
+  (:action finalize_student_record_with_verified_components
+    :parameters (?student_record - student_record)
+    :precondition
+      (and
+        (capstone_advisor_review_requested ?student_record)
+        (capstone_components_verified ?student_record)
+        (not
+          (student_record_finalized ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_record_finalized ?student_record)
+        (instance_ready_for_finalization ?student_record)
+      )
+  )
+  (:action claim_recommendation_letter_for_student
+    :parameters (?student_record - student_record ?recommendation_letter - recommendation_letter ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_confirmed ?student_record)
+        (instance_section_assignment ?student_record ?section_offering)
+        (recommendation_letter_available ?recommendation_letter)
+        (student_recommendation_link ?student_record ?recommendation_letter)
+        (not
+          (recommendation_claimed ?student_record)
+        )
+      )
+    :effect
+      (and
+        (recommendation_claimed ?student_record)
+        (not
+          (recommendation_letter_available ?recommendation_letter)
+        )
+      )
+  )
+  (:action start_recommendation_review
+    :parameters (?student_record - student_record ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (recommendation_claimed ?student_record)
+        (assessment_assigned_to_instance ?student_record ?assessment_event)
+        (not
+          (recommendation_review_in_progress ?student_record)
+        )
+      )
+    :effect (recommendation_review_in_progress ?student_record)
+  )
+  (:action approve_recommendation_letter
+    :parameters (?student_record - student_record ?capstone_advisor - capstone_advisor)
+    :precondition
+      (and
+        (recommendation_review_in_progress ?student_record)
+        (advisor_assigned_to_record ?student_record ?capstone_advisor)
+        (not
+          (recommendation_approved ?student_record)
+        )
+      )
+    :effect (recommendation_approved ?student_record)
+  )
+  (:action finalize_student_record_with_recommendation
+    :parameters (?student_record - student_record)
+    :precondition
+      (and
+        (recommendation_approved ?student_record)
+        (not
+          (student_record_finalized ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_record_finalized ?student_record)
+        (instance_ready_for_finalization ?student_record)
+      )
+  )
+  (:action award_credit_to_required_instance
+    :parameters (?required_course_instance - required_course_instance ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (required_instance_ready ?required_course_instance)
+        (required_instance_contribution_ready ?required_course_instance)
+        (program_milestone_assembled ?program_milestone)
+        (milestone_validated ?program_milestone)
+        (not
+          (instance_ready_for_finalization ?required_course_instance)
+        )
+      )
+    :effect (instance_ready_for_finalization ?required_course_instance)
+  )
+  (:action award_credit_to_elective_instance
+    :parameters (?elective_course_instance - elective_course_instance ?program_milestone - program_milestone)
+    :precondition
+      (and
+        (elective_instance_ready ?elective_course_instance)
+        (elective_instance_contribution_ready ?elective_course_instance)
+        (program_milestone_assembled ?program_milestone)
+        (milestone_validated ?program_milestone)
+        (not
+          (instance_ready_for_finalization ?elective_course_instance)
+        )
+      )
+    :effect (instance_ready_for_finalization ?elective_course_instance)
+  )
+  (:action assign_credit_unit_to_instance
+    :parameters (?course - course ?credit_unit - credit_unit ?section_offering - section_offering)
+    :precondition
+      (and
+        (instance_ready_for_finalization ?course)
+        (instance_section_assignment ?course ?section_offering)
+        (credit_unit_available ?credit_unit)
+        (not
+          (instance_credit_assigned ?course)
+        )
+      )
+    :effect
+      (and
+        (instance_credit_assigned ?course)
+        (instance_credit_allocation ?course ?credit_unit)
+        (not
+          (credit_unit_available ?credit_unit)
+        )
+      )
+  )
+  (:action complete_required_instance_and_release_resources
+    :parameters (?required_course_instance - required_course_instance ?instructor_resource - instructor_resource ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (instance_credit_assigned ?required_course_instance)
+        (instance_assigned_instructor ?required_course_instance ?instructor_resource)
+        (instance_credit_allocation ?required_course_instance ?credit_unit)
+        (not
+          (instance_completed ?required_course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_completed ?required_course_instance)
+        (instructor_available ?instructor_resource)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+  (:action complete_elective_instance_and_release_resources
+    :parameters (?elective_course_instance - elective_course_instance ?instructor_resource - instructor_resource ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (instance_credit_assigned ?elective_course_instance)
+        (instance_assigned_instructor ?elective_course_instance ?instructor_resource)
+        (instance_credit_allocation ?elective_course_instance ?credit_unit)
+        (not
+          (instance_completed ?elective_course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_completed ?elective_course_instance)
+        (instructor_available ?instructor_resource)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+  (:action complete_instance_and_release_resources
+    :parameters (?student_record - student_record ?instructor_resource - instructor_resource ?credit_unit - credit_unit)
+    :precondition
+      (and
+        (instance_credit_assigned ?student_record)
+        (instance_assigned_instructor ?student_record ?instructor_resource)
+        (instance_credit_allocation ?student_record ?credit_unit)
+        (not
+          (instance_completed ?student_record)
+        )
+      )
+    :effect
+      (and
+        (instance_completed ?student_record)
+        (instructor_available ?instructor_resource)
+        (credit_unit_available ?credit_unit)
+      )
+  )
+)

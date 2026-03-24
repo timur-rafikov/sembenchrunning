@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_batch_hold_point_decisioning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object resource_category_level2 - object resource_category_level3 - object batch_root_type - object batch_instance - batch_root_type production_line - resource_category operation_task - resource_category equipment_unit - resource_category technical_reviewer - resource_category qa_checklist - resource_category hold_reason_ticket - resource_category calibration_certificate - resource_category final_approval_document - resource_category material_lot - resource_category_level2 sample_or_test - resource_category_level2 release_document - resource_category_level2 upstream_hold_point - resource_category_level3 downstream_hold_point - resource_category_level3 batch_record - resource_category_level3 batch_subtype_a - batch_instance batch_subtype_b - batch_instance upstream_batch_unit - batch_subtype_a downstream_batch_unit - batch_subtype_a manufacturing_order - batch_subtype_b)
+  (:predicates
+    (unit_initiated ?batch - batch_instance)
+    (unit_operator_assignment_confirmed ?batch - batch_instance)
+    (unit_scheduled ?batch - batch_instance)
+    (release_authorized_for_item ?batch - batch_instance)
+    (release_candidate_for_item ?batch - batch_instance)
+    (release_requested_for_item ?batch - batch_instance)
+    (production_line_available ?production_line - production_line)
+    (unit_scheduled_on_production_line ?batch - batch_instance ?production_line - production_line)
+    (operation_task_available ?operation_task - operation_task)
+    (operation_task_assigned_to_unit ?batch - batch_instance ?operation_task - operation_task)
+    (equipment_available ?equipment - equipment_unit)
+    (equipment_reserved_for_unit ?batch - batch_instance ?equipment - equipment_unit)
+    (material_lot_available ?material_lot - material_lot)
+    (material_allocated_to_upstream_unit ?upstream_unit - upstream_batch_unit ?material_lot - material_lot)
+    (material_allocated_to_downstream_unit ?downstream_unit - downstream_batch_unit ?material_lot - material_lot)
+    (upstream_unit_assigned_to_hold_point ?upstream_unit - upstream_batch_unit ?upstream_hold_point - upstream_hold_point)
+    (upstream_hold_point_signalled ?upstream_hold_point - upstream_hold_point)
+    (upstream_hold_point_material_reserved ?upstream_hold_point - upstream_hold_point)
+    (upstream_unit_processing_complete ?upstream_unit - upstream_batch_unit)
+    (downstream_unit_assigned_to_hold_point ?downstream_unit - downstream_batch_unit ?downstream_hold_point - downstream_hold_point)
+    (downstream_hold_point_signalled ?downstream_hold_point - downstream_hold_point)
+    (downstream_hold_point_material_reserved ?downstream_hold_point - downstream_hold_point)
+    (downstream_unit_processing_complete ?downstream_unit - downstream_batch_unit)
+    (batch_record_draft_available ?batch_record - batch_record)
+    (batch_record_assembled ?batch_record - batch_record)
+    (batch_record_linked_to_upstream_hold_point ?batch_record - batch_record ?upstream_hold_point - upstream_hold_point)
+    (batch_record_linked_to_downstream_hold_point ?batch_record - batch_record ?downstream_hold_point - downstream_hold_point)
+    (batch_record_requires_technical_review ?batch_record - batch_record)
+    (batch_record_requires_final_signoff ?batch_record - batch_record)
+    (batch_record_validated ?batch_record - batch_record)
+    (manufacturing_order_linked_to_upstream_unit ?manufacturing_order - manufacturing_order ?upstream_unit - upstream_batch_unit)
+    (manufacturing_order_linked_to_downstream_unit ?manufacturing_order - manufacturing_order ?downstream_unit - downstream_batch_unit)
+    (manufacturing_order_linked_to_record ?manufacturing_order - manufacturing_order ?batch_record - batch_record)
+    (sample_available ?sample - sample_or_test)
+    (manufacturing_order_has_sample ?manufacturing_order - manufacturing_order ?sample - sample_or_test)
+    (sample_attached ?sample - sample_or_test)
+    (sample_linked_to_record ?sample - sample_or_test ?batch_record - batch_record)
+    (manufacturing_order_evidence_attached ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_tests_completed ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_ready_for_review ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_reviewer_assigned ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_documented_evidence_flag ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_qa_checklist_attached ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_qa_evaluation_complete ?manufacturing_order - manufacturing_order)
+    (release_document_available ?release_document - release_document)
+    (manufacturing_order_associated_with_release_document ?manufacturing_order - manufacturing_order ?release_document - release_document)
+    (manufacturing_order_release_document_attached ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_review_in_progress ?manufacturing_order - manufacturing_order)
+    (manufacturing_order_technical_review_completed ?manufacturing_order - manufacturing_order)
+    (technical_reviewer_available ?technical_reviewer - technical_reviewer)
+    (manufacturing_order_assigned_to_reviewer ?manufacturing_order - manufacturing_order ?technical_reviewer - technical_reviewer)
+    (qa_checklist_available ?qa_checklist - qa_checklist)
+    (qa_checklist_attached_to_manufacturing_order ?manufacturing_order - manufacturing_order ?qa_checklist - qa_checklist)
+    (calibration_certificate_available ?calibration_certificate - calibration_certificate)
+    (manufacturing_order_has_calibration_certificate ?manufacturing_order - manufacturing_order ?calibration_certificate - calibration_certificate)
+    (final_approval_document_available ?final_approval_document - final_approval_document)
+    (manufacturing_order_has_final_approval_document ?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document)
+    (hold_reason_ticket_available ?hold_reason_ticket - hold_reason_ticket)
+    (unit_linked_to_hold_reason_ticket ?batch - batch_instance ?hold_reason_ticket - hold_reason_ticket)
+    (upstream_unit_prepared_for_handover ?upstream_unit - upstream_batch_unit)
+    (downstream_unit_prepared_for_handover ?downstream_unit - downstream_batch_unit)
+    (manufacturing_order_release_flag_set ?manufacturing_order - manufacturing_order)
+  )
+  (:action initialize_unit_instance
+    :parameters (?batch - batch_instance)
+    :precondition
+      (and
+        (not
+          (unit_initiated ?batch)
+        )
+        (not
+          (release_authorized_for_item ?batch)
+        )
+      )
+    :effect (unit_initiated ?batch)
+  )
+  (:action schedule_unit_to_production_line
+    :parameters (?batch - batch_instance ?production_line - production_line)
+    :precondition
+      (and
+        (unit_initiated ?batch)
+        (not
+          (unit_scheduled ?batch)
+        )
+        (production_line_available ?production_line)
+      )
+    :effect
+      (and
+        (unit_scheduled ?batch)
+        (unit_scheduled_on_production_line ?batch ?production_line)
+        (not
+          (production_line_available ?production_line)
+        )
+      )
+  )
+  (:action assign_operation_task_to_unit
+    :parameters (?batch - batch_instance ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_initiated ?batch)
+        (unit_scheduled ?batch)
+        (operation_task_available ?operation_task)
+      )
+    :effect
+      (and
+        (operation_task_assigned_to_unit ?batch ?operation_task)
+        (not
+          (operation_task_available ?operation_task)
+        )
+      )
+  )
+  (:action confirm_operator_assignment
+    :parameters (?batch - batch_instance ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_initiated ?batch)
+        (unit_scheduled ?batch)
+        (operation_task_assigned_to_unit ?batch ?operation_task)
+        (not
+          (unit_operator_assignment_confirmed ?batch)
+        )
+      )
+    :effect (unit_operator_assignment_confirmed ?batch)
+  )
+  (:action unassign_operation_task_from_unit
+    :parameters (?batch - batch_instance ?operation_task - operation_task)
+    :precondition
+      (and
+        (operation_task_assigned_to_unit ?batch ?operation_task)
+      )
+    :effect
+      (and
+        (operation_task_available ?operation_task)
+        (not
+          (operation_task_assigned_to_unit ?batch ?operation_task)
+        )
+      )
+  )
+  (:action reserve_equipment_for_unit
+    :parameters (?batch - batch_instance ?equipment - equipment_unit)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?batch)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (equipment_reserved_for_unit ?batch ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_unit
+    :parameters (?batch - batch_instance ?equipment - equipment_unit)
+    :precondition
+      (and
+        (equipment_reserved_for_unit ?batch ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (equipment_reserved_for_unit ?batch ?equipment)
+        )
+      )
+  )
+  (:action attach_calibration_certificate_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (calibration_certificate_available ?calibration_certificate)
+      )
+    :effect
+      (and
+        (manufacturing_order_has_calibration_certificate ?manufacturing_order ?calibration_certificate)
+        (not
+          (calibration_certificate_available ?calibration_certificate)
+        )
+      )
+  )
+  (:action detach_calibration_certificate_from_order
+    :parameters (?manufacturing_order - manufacturing_order ?calibration_certificate - calibration_certificate)
+    :precondition
+      (and
+        (manufacturing_order_has_calibration_certificate ?manufacturing_order ?calibration_certificate)
+      )
+    :effect
+      (and
+        (calibration_certificate_available ?calibration_certificate)
+        (not
+          (manufacturing_order_has_calibration_certificate ?manufacturing_order ?calibration_certificate)
+        )
+      )
+  )
+  (:action attach_final_approval_document_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (final_approval_document_available ?final_approval_document)
+      )
+    :effect
+      (and
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (not
+          (final_approval_document_available ?final_approval_document)
+        )
+      )
+  )
+  (:action detach_final_approval_document_from_order
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document)
+    :precondition
+      (and
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+      )
+    :effect
+      (and
+        (final_approval_document_available ?final_approval_document)
+        (not
+          (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        )
+      )
+  )
+  (:action signal_upstream_hold_point
+    :parameters (?upstream_unit - upstream_batch_unit ?upstream_hold_point - upstream_hold_point ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?upstream_unit)
+        (operation_task_assigned_to_unit ?upstream_unit ?operation_task)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (not
+          (upstream_hold_point_signalled ?upstream_hold_point)
+        )
+        (not
+          (upstream_hold_point_material_reserved ?upstream_hold_point)
+        )
+      )
+    :effect (upstream_hold_point_signalled ?upstream_hold_point)
+  )
+  (:action start_upstream_equipment_operation
+    :parameters (?upstream_unit - upstream_batch_unit ?upstream_hold_point - upstream_hold_point ?equipment - equipment_unit)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?upstream_unit)
+        (equipment_reserved_for_unit ?upstream_unit ?equipment)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (upstream_hold_point_signalled ?upstream_hold_point)
+        (not
+          (upstream_unit_prepared_for_handover ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+      )
+  )
+  (:action allocate_material_to_upstream_unit
+    :parameters (?upstream_unit - upstream_batch_unit ?upstream_hold_point - upstream_hold_point ?material_lot - material_lot)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?upstream_unit)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (material_lot_available ?material_lot)
+        (not
+          (upstream_unit_prepared_for_handover ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_hold_point_material_reserved ?upstream_hold_point)
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (material_allocated_to_upstream_unit ?upstream_unit ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action process_upstream_material_and_release
+    :parameters (?upstream_unit - upstream_batch_unit ?upstream_hold_point - upstream_hold_point ?operation_task - operation_task ?material_lot - material_lot)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?upstream_unit)
+        (operation_task_assigned_to_unit ?upstream_unit ?operation_task)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (upstream_hold_point_material_reserved ?upstream_hold_point)
+        (material_allocated_to_upstream_unit ?upstream_unit ?material_lot)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_hold_point_signalled ?upstream_hold_point)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (material_lot_available ?material_lot)
+        (not
+          (material_allocated_to_upstream_unit ?upstream_unit ?material_lot)
+        )
+      )
+  )
+  (:action signal_downstream_hold_point
+    :parameters (?downstream_unit - downstream_batch_unit ?downstream_hold_point - downstream_hold_point ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?downstream_unit)
+        (operation_task_assigned_to_unit ?downstream_unit ?operation_task)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (not
+          (downstream_hold_point_signalled ?downstream_hold_point)
+        )
+        (not
+          (downstream_hold_point_material_reserved ?downstream_hold_point)
+        )
+      )
+    :effect (downstream_hold_point_signalled ?downstream_hold_point)
+  )
+  (:action start_downstream_equipment_operation
+    :parameters (?downstream_unit - downstream_batch_unit ?downstream_hold_point - downstream_hold_point ?equipment - equipment_unit)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?downstream_unit)
+        (equipment_reserved_for_unit ?downstream_unit ?equipment)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (downstream_hold_point_signalled ?downstream_hold_point)
+        (not
+          (downstream_unit_prepared_for_handover ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+      )
+  )
+  (:action allocate_material_to_downstream_unit
+    :parameters (?downstream_unit - downstream_batch_unit ?downstream_hold_point - downstream_hold_point ?material_lot - material_lot)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?downstream_unit)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (material_lot_available ?material_lot)
+        (not
+          (downstream_unit_prepared_for_handover ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_hold_point_material_reserved ?downstream_hold_point)
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (material_allocated_to_downstream_unit ?downstream_unit ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action process_downstream_material_and_release
+    :parameters (?downstream_unit - downstream_batch_unit ?downstream_hold_point - downstream_hold_point ?operation_task - operation_task ?material_lot - material_lot)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?downstream_unit)
+        (operation_task_assigned_to_unit ?downstream_unit ?operation_task)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (downstream_hold_point_material_reserved ?downstream_hold_point)
+        (material_allocated_to_downstream_unit ?downstream_unit ?material_lot)
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_hold_point_signalled ?downstream_hold_point)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (material_lot_available ?material_lot)
+        (not
+          (material_allocated_to_downstream_unit ?downstream_unit ?material_lot)
+        )
+      )
+  )
+  (:action assemble_batch_record_and_link_hold_points
+    :parameters (?upstream_unit - upstream_batch_unit ?downstream_unit - downstream_batch_unit ?upstream_hold_point - upstream_hold_point ?downstream_hold_point - downstream_hold_point ?batch_record - batch_record)
+    :precondition
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (upstream_hold_point_signalled ?upstream_hold_point)
+        (downstream_hold_point_signalled ?downstream_hold_point)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (batch_record_draft_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_assembled ?batch_record)
+        (batch_record_linked_to_upstream_hold_point ?batch_record ?upstream_hold_point)
+        (batch_record_linked_to_downstream_hold_point ?batch_record ?downstream_hold_point)
+        (not
+          (batch_record_draft_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_with_upstream_attachment
+    :parameters (?upstream_unit - upstream_batch_unit ?downstream_unit - downstream_batch_unit ?upstream_hold_point - upstream_hold_point ?downstream_hold_point - downstream_hold_point ?batch_record - batch_record)
+    :precondition
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (upstream_hold_point_material_reserved ?upstream_hold_point)
+        (downstream_hold_point_signalled ?downstream_hold_point)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+        (downstream_unit_processing_complete ?downstream_unit)
+        (batch_record_draft_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_assembled ?batch_record)
+        (batch_record_linked_to_upstream_hold_point ?batch_record ?upstream_hold_point)
+        (batch_record_linked_to_downstream_hold_point ?batch_record ?downstream_hold_point)
+        (batch_record_requires_technical_review ?batch_record)
+        (not
+          (batch_record_draft_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_with_downstream_attachment
+    :parameters (?upstream_unit - upstream_batch_unit ?downstream_unit - downstream_batch_unit ?upstream_hold_point - upstream_hold_point ?downstream_hold_point - downstream_hold_point ?batch_record - batch_record)
+    :precondition
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (upstream_hold_point_signalled ?upstream_hold_point)
+        (downstream_hold_point_material_reserved ?downstream_hold_point)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+        (batch_record_draft_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_assembled ?batch_record)
+        (batch_record_linked_to_upstream_hold_point ?batch_record ?upstream_hold_point)
+        (batch_record_linked_to_downstream_hold_point ?batch_record ?downstream_hold_point)
+        (batch_record_requires_final_signoff ?batch_record)
+        (not
+          (batch_record_draft_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_with_both_attachments
+    :parameters (?upstream_unit - upstream_batch_unit ?downstream_unit - downstream_batch_unit ?upstream_hold_point - upstream_hold_point ?downstream_hold_point - downstream_hold_point ?batch_record - batch_record)
+    :precondition
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (upstream_unit_assigned_to_hold_point ?upstream_unit ?upstream_hold_point)
+        (downstream_unit_assigned_to_hold_point ?downstream_unit ?downstream_hold_point)
+        (upstream_hold_point_material_reserved ?upstream_hold_point)
+        (downstream_hold_point_material_reserved ?downstream_hold_point)
+        (not
+          (upstream_unit_processing_complete ?upstream_unit)
+        )
+        (not
+          (downstream_unit_processing_complete ?downstream_unit)
+        )
+        (batch_record_draft_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_assembled ?batch_record)
+        (batch_record_linked_to_upstream_hold_point ?batch_record ?upstream_hold_point)
+        (batch_record_linked_to_downstream_hold_point ?batch_record ?downstream_hold_point)
+        (batch_record_requires_technical_review ?batch_record)
+        (batch_record_requires_final_signoff ?batch_record)
+        (not
+          (batch_record_draft_available ?batch_record)
+        )
+      )
+  )
+  (:action finalize_batch_record_validation
+    :parameters (?batch_record - batch_record ?upstream_unit - upstream_batch_unit ?operation_task - operation_task)
+    :precondition
+      (and
+        (batch_record_assembled ?batch_record)
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (operation_task_assigned_to_unit ?upstream_unit ?operation_task)
+        (not
+          (batch_record_validated ?batch_record)
+        )
+      )
+    :effect (batch_record_validated ?batch_record)
+  )
+  (:action attach_sample_to_record
+    :parameters (?manufacturing_order - manufacturing_order ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (manufacturing_order_linked_to_record ?manufacturing_order ?batch_record)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_available ?sample)
+        (batch_record_assembled ?batch_record)
+        (batch_record_validated ?batch_record)
+        (not
+          (sample_attached ?sample)
+        )
+      )
+    :effect
+      (and
+        (sample_attached ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (not
+          (sample_available ?sample)
+        )
+      )
+  )
+  (:action flag_order_for_sample_testing
+    :parameters (?manufacturing_order - manufacturing_order ?sample - sample_or_test ?batch_record - batch_record ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_attached ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (operation_task_assigned_to_unit ?manufacturing_order ?operation_task)
+        (not
+          (batch_record_requires_technical_review ?batch_record)
+        )
+        (not
+          (manufacturing_order_evidence_attached ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_evidence_attached ?manufacturing_order)
+  )
+  (:action assign_technical_reviewer_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (technical_reviewer_available ?technical_reviewer)
+        (not
+          (manufacturing_order_reviewer_assigned ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_reviewer_assigned ?manufacturing_order)
+        (manufacturing_order_assigned_to_reviewer ?manufacturing_order ?technical_reviewer)
+        (not
+          (technical_reviewer_available ?technical_reviewer)
+        )
+      )
+  )
+  (:action run_sample_analysis_and_mark_order
+    :parameters (?manufacturing_order - manufacturing_order ?sample - sample_or_test ?batch_record - batch_record ?operation_task - operation_task ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_attached ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (operation_task_assigned_to_unit ?manufacturing_order ?operation_task)
+        (batch_record_requires_technical_review ?batch_record)
+        (manufacturing_order_reviewer_assigned ?manufacturing_order)
+        (manufacturing_order_assigned_to_reviewer ?manufacturing_order ?technical_reviewer)
+        (not
+          (manufacturing_order_evidence_attached ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_evidence_attached ?manufacturing_order)
+        (manufacturing_order_documented_evidence_flag ?manufacturing_order)
+      )
+  )
+  (:action execute_qa_test_with_calibration
+    :parameters (?manufacturing_order - manufacturing_order ?calibration_certificate - calibration_certificate ?equipment - equipment_unit ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_evidence_attached ?manufacturing_order)
+        (manufacturing_order_has_calibration_certificate ?manufacturing_order ?calibration_certificate)
+        (equipment_reserved_for_unit ?manufacturing_order ?equipment)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (not
+          (batch_record_requires_final_signoff ?batch_record)
+        )
+        (not
+          (manufacturing_order_tests_completed ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_tests_completed ?manufacturing_order)
+  )
+  (:action execute_qa_test_for_final_signoff
+    :parameters (?manufacturing_order - manufacturing_order ?calibration_certificate - calibration_certificate ?equipment - equipment_unit ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_evidence_attached ?manufacturing_order)
+        (manufacturing_order_has_calibration_certificate ?manufacturing_order ?calibration_certificate)
+        (equipment_reserved_for_unit ?manufacturing_order ?equipment)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (batch_record_requires_final_signoff ?batch_record)
+        (not
+          (manufacturing_order_tests_completed ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_tests_completed ?manufacturing_order)
+  )
+  (:action record_final_approval_and_mark_ready
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_tests_completed ?manufacturing_order)
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (not
+          (batch_record_requires_technical_review ?batch_record)
+        )
+        (not
+          (batch_record_requires_final_signoff ?batch_record)
+        )
+        (not
+          (manufacturing_order_ready_for_review ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_ready_for_review ?manufacturing_order)
+  )
+  (:action apply_final_approval_and_attach_qa_checklist
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_tests_completed ?manufacturing_order)
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (batch_record_requires_technical_review ?batch_record)
+        (not
+          (batch_record_requires_final_signoff ?batch_record)
+        )
+        (not
+          (manufacturing_order_ready_for_review ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+      )
+  )
+  (:action apply_final_approval_and_attach_qa_checklist_variant
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_tests_completed ?manufacturing_order)
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (not
+          (batch_record_requires_technical_review ?batch_record)
+        )
+        (batch_record_requires_final_signoff ?batch_record)
+        (not
+          (manufacturing_order_ready_for_review ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+      )
+  )
+  (:action apply_final_approval_and_attach_qa_checklist_alt
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document ?sample - sample_or_test ?batch_record - batch_record)
+    :precondition
+      (and
+        (manufacturing_order_tests_completed ?manufacturing_order)
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (manufacturing_order_has_sample ?manufacturing_order ?sample)
+        (sample_linked_to_record ?sample ?batch_record)
+        (batch_record_requires_technical_review ?batch_record)
+        (batch_record_requires_final_signoff ?batch_record)
+        (not
+          (manufacturing_order_ready_for_review ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+      )
+  )
+  (:action flag_order_as_release_candidate
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (not
+          (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+        )
+        (not
+          (manufacturing_order_release_flag_set ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_release_flag_set ?manufacturing_order)
+        (release_candidate_for_item ?manufacturing_order)
+      )
+  )
+  (:action attach_qa_checklist_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?qa_checklist - qa_checklist)
+    :precondition
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+        (qa_checklist_available ?qa_checklist)
+      )
+    :effect
+      (and
+        (qa_checklist_attached_to_manufacturing_order ?manufacturing_order ?qa_checklist)
+        (not
+          (qa_checklist_available ?qa_checklist)
+        )
+      )
+  )
+  (:action perform_qa_evaluation_and_mark
+    :parameters (?manufacturing_order - manufacturing_order ?upstream_unit - upstream_batch_unit ?downstream_unit - downstream_batch_unit ?operation_task - operation_task ?qa_checklist - qa_checklist)
+    :precondition
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_checklist_attached ?manufacturing_order)
+        (qa_checklist_attached_to_manufacturing_order ?manufacturing_order ?qa_checklist)
+        (manufacturing_order_linked_to_upstream_unit ?manufacturing_order ?upstream_unit)
+        (manufacturing_order_linked_to_downstream_unit ?manufacturing_order ?downstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (operation_task_assigned_to_unit ?manufacturing_order ?operation_task)
+        (not
+          (manufacturing_order_qa_evaluation_complete ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_qa_evaluation_complete ?manufacturing_order)
+  )
+  (:action finalize_release_candidate
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (manufacturing_order_ready_for_review ?manufacturing_order)
+        (manufacturing_order_qa_evaluation_complete ?manufacturing_order)
+        (not
+          (manufacturing_order_release_flag_set ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_release_flag_set ?manufacturing_order)
+        (release_candidate_for_item ?manufacturing_order)
+      )
+  )
+  (:action attach_release_document_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?release_document - release_document ?operation_task - operation_task)
+    :precondition
+      (and
+        (unit_operator_assignment_confirmed ?manufacturing_order)
+        (operation_task_assigned_to_unit ?manufacturing_order ?operation_task)
+        (release_document_available ?release_document)
+        (manufacturing_order_associated_with_release_document ?manufacturing_order ?release_document)
+        (not
+          (manufacturing_order_release_document_attached ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_release_document_attached ?manufacturing_order)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action start_technical_review_on_order
+    :parameters (?manufacturing_order - manufacturing_order ?equipment - equipment_unit)
+    :precondition
+      (and
+        (manufacturing_order_release_document_attached ?manufacturing_order)
+        (equipment_reserved_for_unit ?manufacturing_order ?equipment)
+        (not
+          (manufacturing_order_review_in_progress ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_review_in_progress ?manufacturing_order)
+  )
+  (:action complete_technical_review
+    :parameters (?manufacturing_order - manufacturing_order ?final_approval_document - final_approval_document)
+    :precondition
+      (and
+        (manufacturing_order_review_in_progress ?manufacturing_order)
+        (manufacturing_order_has_final_approval_document ?manufacturing_order ?final_approval_document)
+        (not
+          (manufacturing_order_technical_review_completed ?manufacturing_order)
+        )
+      )
+    :effect (manufacturing_order_technical_review_completed ?manufacturing_order)
+  )
+  (:action finalize_order_release_after_review
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (manufacturing_order_technical_review_completed ?manufacturing_order)
+        (not
+          (manufacturing_order_release_flag_set ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_order_release_flag_set ?manufacturing_order)
+        (release_candidate_for_item ?manufacturing_order)
+      )
+  )
+  (:action mark_upstream_unit_as_release_candidate
+    :parameters (?upstream_unit - upstream_batch_unit ?batch_record - batch_record)
+    :precondition
+      (and
+        (upstream_unit_prepared_for_handover ?upstream_unit)
+        (upstream_unit_processing_complete ?upstream_unit)
+        (batch_record_assembled ?batch_record)
+        (batch_record_validated ?batch_record)
+        (not
+          (release_candidate_for_item ?upstream_unit)
+        )
+      )
+    :effect (release_candidate_for_item ?upstream_unit)
+  )
+  (:action mark_downstream_unit_as_release_candidate
+    :parameters (?downstream_unit - downstream_batch_unit ?batch_record - batch_record)
+    :precondition
+      (and
+        (downstream_unit_prepared_for_handover ?downstream_unit)
+        (downstream_unit_processing_complete ?downstream_unit)
+        (batch_record_assembled ?batch_record)
+        (batch_record_validated ?batch_record)
+        (not
+          (release_candidate_for_item ?downstream_unit)
+        )
+      )
+    :effect (release_candidate_for_item ?downstream_unit)
+  )
+  (:action request_unit_release_with_hold_reason
+    :parameters (?batch - batch_instance ?hold_reason_ticket - hold_reason_ticket ?operation_task - operation_task)
+    :precondition
+      (and
+        (release_candidate_for_item ?batch)
+        (operation_task_assigned_to_unit ?batch ?operation_task)
+        (hold_reason_ticket_available ?hold_reason_ticket)
+        (not
+          (release_requested_for_item ?batch)
+        )
+      )
+    :effect
+      (and
+        (release_requested_for_item ?batch)
+        (unit_linked_to_hold_reason_ticket ?batch ?hold_reason_ticket)
+        (not
+          (hold_reason_ticket_available ?hold_reason_ticket)
+        )
+      )
+  )
+  (:action authorize_upstream_unit_release_and_free_line
+    :parameters (?upstream_unit - upstream_batch_unit ?production_line - production_line ?hold_reason_ticket - hold_reason_ticket)
+    :precondition
+      (and
+        (release_requested_for_item ?upstream_unit)
+        (unit_scheduled_on_production_line ?upstream_unit ?production_line)
+        (unit_linked_to_hold_reason_ticket ?upstream_unit ?hold_reason_ticket)
+        (not
+          (release_authorized_for_item ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_for_item ?upstream_unit)
+        (production_line_available ?production_line)
+        (hold_reason_ticket_available ?hold_reason_ticket)
+      )
+  )
+  (:action authorize_downstream_unit_release_and_free_line
+    :parameters (?downstream_unit - downstream_batch_unit ?production_line - production_line ?hold_reason_ticket - hold_reason_ticket)
+    :precondition
+      (and
+        (release_requested_for_item ?downstream_unit)
+        (unit_scheduled_on_production_line ?downstream_unit ?production_line)
+        (unit_linked_to_hold_reason_ticket ?downstream_unit ?hold_reason_ticket)
+        (not
+          (release_authorized_for_item ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_for_item ?downstream_unit)
+        (production_line_available ?production_line)
+        (hold_reason_ticket_available ?hold_reason_ticket)
+      )
+  )
+  (:action authorize_order_release_and_free_line
+    :parameters (?manufacturing_order - manufacturing_order ?production_line - production_line ?hold_reason_ticket - hold_reason_ticket)
+    :precondition
+      (and
+        (release_requested_for_item ?manufacturing_order)
+        (unit_scheduled_on_production_line ?manufacturing_order ?production_line)
+        (unit_linked_to_hold_reason_ticket ?manufacturing_order ?hold_reason_ticket)
+        (not
+          (release_authorized_for_item ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (release_authorized_for_item ?manufacturing_order)
+        (production_line_available ?production_line)
+        (hold_reason_ticket_available ?hold_reason_ticket)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem batch_hold_point_decision_problem)
+  (:domain pharmaceutics_batch_hold_point_decisioning)
+  (:objects upstream_batch_unit_a - upstream_batch_unit downstream_batch_unit_a - downstream_batch_unit manufacturing_order_a - manufacturing_order manufacturing_order_b - manufacturing_order production_line_a - production_line production_line_b - production_line production_line_c - production_line operation_task_1 - operation_task equipment_reactor_1 - equipment_unit material_lot_1 - material_lot upstream_hold_point_1 - upstream_hold_point downstream_hold_point_1 - downstream_hold_point batch_record_a - batch_record sample_1 - sample_or_test sample_2 - sample_or_test technical_reviewer_1 - technical_reviewer technical_reviewer_2 - technical_reviewer qa_checklist_1 - qa_checklist qa_checklist_2 - qa_checklist hold_ticket_1 - hold_reason_ticket calibration_certificate_1 - calibration_certificate release_document_1 - release_document release_document_2 - release_document final_approval_document_1 - final_approval_document)
+  (:init
+    (production_line_available production_line_a)
+    (production_line_available production_line_b)
+    (production_line_available production_line_c)
+    (operation_task_available operation_task_1)
+    (equipment_available equipment_reactor_1)
+    (material_lot_available material_lot_1)
+    (upstream_unit_assigned_to_hold_point upstream_batch_unit_a upstream_hold_point_1)
+    (downstream_unit_assigned_to_hold_point downstream_batch_unit_a downstream_hold_point_1)
+    (batch_record_draft_available batch_record_a)
+    (sample_available sample_1)
+    (sample_available sample_2)
+    (manufacturing_order_linked_to_upstream_unit manufacturing_order_a upstream_batch_unit_a)
+    (manufacturing_order_linked_to_upstream_unit manufacturing_order_b upstream_batch_unit_a)
+    (manufacturing_order_linked_to_downstream_unit manufacturing_order_a downstream_batch_unit_a)
+    (manufacturing_order_linked_to_downstream_unit manufacturing_order_b downstream_batch_unit_a)
+    (manufacturing_order_linked_to_record manufacturing_order_a batch_record_a)
+    (manufacturing_order_linked_to_record manufacturing_order_b batch_record_a)
+    (manufacturing_order_has_sample manufacturing_order_a sample_1)
+    (manufacturing_order_has_sample manufacturing_order_b sample_2)
+    (technical_reviewer_available technical_reviewer_1)
+    (technical_reviewer_available technical_reviewer_2)
+    (qa_checklist_available qa_checklist_1)
+    (qa_checklist_available qa_checklist_2)
+    (hold_reason_ticket_available hold_ticket_1)
+    (calibration_certificate_available calibration_certificate_1)
+    (release_document_available release_document_1)
+    (manufacturing_order_associated_with_release_document manufacturing_order_a release_document_1)
+    (manufacturing_order_associated_with_release_document manufacturing_order_b release_document_2)
+    (final_approval_document_available final_approval_document_1)
+  )
+  (:goal
+    (and
+      (release_authorized_for_item upstream_batch_unit_a)
+      (release_authorized_for_item downstream_batch_unit_a)
+      (release_authorized_for_item manufacturing_order_a)
+      (release_authorized_for_item manufacturing_order_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_unit_instance upstream_batch_unit_a)
+(initialize_unit_instance downstream_batch_unit_a)
+(initialize_unit_instance manufacturing_order_a)
+(initialize_unit_instance manufacturing_order_b)
+(schedule_unit_to_production_line upstream_batch_unit_a production_line_a)
+(schedule_unit_to_production_line downstream_batch_unit_a production_line_b)
+(schedule_unit_to_production_line manufacturing_order_a production_line_c)
+(assign_operation_task_to_unit upstream_batch_unit_a operation_task_1)
+(confirm_operator_assignment upstream_batch_unit_a operation_task_1)
+(unassign_operation_task_from_unit upstream_batch_unit_a operation_task_1)
+(assign_operation_task_to_unit downstream_batch_unit_a operation_task_1)
+(confirm_operator_assignment downstream_batch_unit_a operation_task_1)
+(signal_downstream_hold_point downstream_batch_unit_a downstream_hold_point_1 operation_task_1)
+(allocate_material_to_downstream_unit downstream_batch_unit_a downstream_hold_point_1 material_lot_1)
+(process_downstream_material_and_release downstream_batch_unit_a downstream_hold_point_1 operation_task_1 material_lot_1)
+(assign_operation_task_to_unit upstream_batch_unit_a operation_task_1)
+(signal_upstream_hold_point upstream_batch_unit_a upstream_hold_point_1 operation_task_1)
+(allocate_material_to_upstream_unit upstream_batch_unit_a upstream_hold_point_1 material_lot_1)
+(process_upstream_material_and_release upstream_batch_unit_a upstream_hold_point_1 operation_task_1 material_lot_1)
+(unassign_operation_task_from_unit upstream_batch_unit_a operation_task_1)
+(assemble_batch_record_and_link_hold_points upstream_batch_unit_a downstream_batch_unit_a upstream_hold_point_1 downstream_hold_point_1 batch_record_a)
+(assign_operation_task_to_unit upstream_batch_unit_a operation_task_1)
+(finalize_batch_record_validation batch_record_a upstream_batch_unit_a operation_task_1)
+(unassign_operation_task_from_unit upstream_batch_unit_a operation_task_1)
+(assign_operation_task_to_unit manufacturing_order_a operation_task_1)
+(confirm_operator_assignment manufacturing_order_a operation_task_1)
+(attach_sample_to_record manufacturing_order_a sample_1 batch_record_a)
+(flag_order_for_sample_testing manufacturing_order_a sample_1 batch_record_a operation_task_1)
+(attach_calibration_certificate_to_order manufacturing_order_a calibration_certificate_1)
+(reserve_equipment_for_unit manufacturing_order_a equipment_reactor_1)
+(execute_qa_test_with_calibration manufacturing_order_a calibration_certificate_1 equipment_reactor_1 sample_1 batch_record_a)
+(attach_final_approval_document_to_order manufacturing_order_a final_approval_document_1)
+(record_final_approval_and_mark_ready manufacturing_order_a final_approval_document_1 sample_1 batch_record_a)
+(flag_order_as_release_candidate manufacturing_order_a)
+(request_unit_release_with_hold_reason manufacturing_order_a hold_ticket_1 operation_task_1)
+(authorize_order_release_and_free_line manufacturing_order_a production_line_c hold_ticket_1)
+(release_equipment_from_unit manufacturing_order_a equipment_reactor_1)
+(detach_calibration_certificate_from_order manufacturing_order_a calibration_certificate_1)
+(detach_final_approval_document_from_order manufacturing_order_a final_approval_document_1)
+(unassign_operation_task_from_unit manufacturing_order_a operation_task_1)
+(mark_upstream_unit_as_release_candidate upstream_batch_unit_a batch_record_a)
+(mark_downstream_unit_as_release_candidate downstream_batch_unit_a batch_record_a)
+(assign_operation_task_to_unit upstream_batch_unit_a operation_task_1)
+(request_unit_release_with_hold_reason upstream_batch_unit_a hold_ticket_1 operation_task_1)
+(authorize_upstream_unit_release_and_free_line upstream_batch_unit_a production_line_a hold_ticket_1)
+(assign_operation_task_to_unit downstream_batch_unit_a operation_task_1)
+(request_unit_release_with_hold_reason downstream_batch_unit_a hold_ticket_1 operation_task_1)
+(authorize_downstream_unit_release_and_free_line downstream_batch_unit_a production_line_b hold_ticket_1)
+(schedule_unit_to_production_line manufacturing_order_b production_line_a)
+(assign_operation_task_to_unit manufacturing_order_b operation_task_1)
+(confirm_operator_assignment manufacturing_order_b operation_task_1)
+(attach_sample_to_record manufacturing_order_b sample_2 batch_record_a)
+(flag_order_for_sample_testing manufacturing_order_b sample_2 batch_record_a operation_task_1)
+(attach_calibration_certificate_to_order manufacturing_order_b calibration_certificate_1)
+(reserve_equipment_for_unit manufacturing_order_b equipment_reactor_1)
+(execute_qa_test_with_calibration manufacturing_order_b calibration_certificate_1 equipment_reactor_1 sample_2 batch_record_a)
+(attach_final_approval_document_to_order manufacturing_order_b final_approval_document_1)
+(record_final_approval_and_mark_ready manufacturing_order_b final_approval_document_1 sample_2 batch_record_a)
+(flag_order_as_release_candidate manufacturing_order_b)
+(request_unit_release_with_hold_reason manufacturing_order_b hold_ticket_1 operation_task_1)
+(authorize_order_release_and_free_line manufacturing_order_b production_line_a hold_ticket_1)
+(release_equipment_from_unit manufacturing_order_b equipment_reactor_1)
+(unassign_operation_task_from_unit manufacturing_order_b operation_task_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_gvllmq09/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_gvllmq09/plan.pddl 
+
+
+--- stderr ---
+

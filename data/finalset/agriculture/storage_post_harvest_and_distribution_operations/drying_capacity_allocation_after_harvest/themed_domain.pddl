@@ -1,0 +1,937 @@
+(define (domain drying_capacity_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource - entity consumable_category - entity scheduling_category - entity harvest_product - entity workflow_subject - harvest_product drying_unit - operational_resource inspection_device - operational_resource conditioning_equipment - operational_resource packing_specification - operational_resource outbound_channel - operational_resource distribution_slot - operational_resource drying_profile - operational_resource regulatory_document - operational_resource treatment_material - consumable_category commodity_grade - consumable_category client_contract - consumable_category drying_channel - scheduling_category time_window - scheduling_category drying_unit_instance - scheduling_category product_batch - workflow_subject work_order_group - workflow_subject collection_batch - product_batch farm_batch - product_batch processing_order - work_order_group)
+
+  (:predicates
+    (intake_registered ?workflow_subject - workflow_subject)
+    (inspection_passed ?workflow_subject - workflow_subject)
+    (drying_reservation_active ?workflow_subject - workflow_subject)
+    (placed_in_drying_unit ?workflow_subject - workflow_subject)
+    (marked_for_release ?workflow_subject - workflow_subject)
+    (release_scheduled ?workflow_subject - workflow_subject)
+    (drying_unit_available ?dryer_unit - drying_unit)
+    (allocated_to_drying_unit ?workflow_subject - workflow_subject ?dryer_unit - drying_unit)
+    (inspection_device_available ?inspection_device - inspection_device)
+    (allocated_inspection_device ?workflow_subject - workflow_subject ?inspection_device - inspection_device)
+    (conditioning_equipment_available ?conditioning_equipment - conditioning_equipment)
+    (allocated_conditioning_equipment ?workflow_subject - workflow_subject ?conditioning_equipment - conditioning_equipment)
+    (treatment_material_available ?treatment_material - treatment_material)
+    (collection_batch_treatment_assigned ?collection_batch - collection_batch ?treatment_material - treatment_material)
+    (farm_batch_treatment_assigned ?farm_batch - farm_batch ?treatment_material - treatment_material)
+    (collection_batch_allocated_channel ?collection_batch - collection_batch ?drying_channel - drying_channel)
+    (drying_channel_reserved ?drying_channel - drying_channel)
+    (drying_channel_prepared_with_treatment ?drying_channel - drying_channel)
+    (collection_batch_ready ?collection_batch - collection_batch)
+    (farm_batch_allocated_time_window ?farm_batch - farm_batch ?time_window - time_window)
+    (time_window_reserved ?time_window - time_window)
+    (time_window_prepared_with_treatment ?time_window - time_window)
+    (farm_batch_ready ?farm_batch - farm_batch)
+    (drying_unit_instance_available ?drying_unit_instance - drying_unit_instance)
+    (drying_unit_instance_reserved ?drying_unit_instance - drying_unit_instance)
+    (drying_unit_instance_assigned_channel ?drying_unit_instance - drying_unit_instance ?drying_channel - drying_channel)
+    (drying_unit_instance_assigned_time_window ?drying_unit_instance - drying_unit_instance ?time_window - time_window)
+    (drying_unit_instance_requires_packing_spec ?drying_unit_instance - drying_unit_instance)
+    (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance - drying_unit_instance)
+    (drying_unit_instance_ready_for_configuration ?drying_unit_instance - drying_unit_instance)
+    (order_includes_collection_batch ?processing_order - processing_order ?collection_batch - collection_batch)
+    (order_includes_farm_batch ?processing_order - processing_order ?farm_batch - farm_batch)
+    (order_assigned_to_unit_instance ?processing_order - processing_order ?drying_unit_instance - drying_unit_instance)
+    (commodity_grade_available ?commodity_grade - commodity_grade)
+    (order_specifies_commodity_grade ?processing_order - processing_order ?commodity_grade - commodity_grade)
+    (commodity_grade_reserved ?commodity_grade - commodity_grade)
+    (commodity_grade_allocated_to_unit_instance ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    (processing_order_preconfigured ?processing_order - processing_order)
+    (processing_order_configuration_complete ?processing_order - processing_order)
+    (processing_order_cleared_for_execution ?processing_order - processing_order)
+    (order_packing_spec_reserved ?processing_order - processing_order)
+    (order_packing_confirmed ?processing_order - processing_order)
+    (processing_order_has_outbound_requirement ?processing_order - processing_order)
+    (processing_order_final_checks_passed ?processing_order - processing_order)
+    (client_contract_available ?client_contract - client_contract)
+    (order_linked_to_client_contract ?processing_order - processing_order ?client_contract - client_contract)
+    (processing_order_client_contract_linked ?processing_order - processing_order)
+    (processing_order_client_contract_reviewed ?processing_order - processing_order)
+    (processing_order_client_contract_authorized ?processing_order - processing_order)
+    (packing_spec_available ?packing_specification - packing_specification)
+    (order_assigned_packing_spec ?processing_order - processing_order ?packing_specification - packing_specification)
+    (outbound_channel_available ?outbound_channel - outbound_channel)
+    (order_assigned_outbound_channel ?processing_order - processing_order ?outbound_channel - outbound_channel)
+    (drying_profile_available ?drying_profile - drying_profile)
+    (order_assigned_drying_profile ?processing_order - processing_order ?drying_profile - drying_profile)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (order_linked_regulatory_document ?processing_order - processing_order ?regulatory_document - regulatory_document)
+    (distribution_slot_available ?distribution_slot - distribution_slot)
+    (subject_assigned_distribution_slot ?workflow_subject - workflow_subject ?distribution_slot - distribution_slot)
+    (collection_batch_allocation_confirmed ?collection_batch - collection_batch)
+    (farm_batch_allocation_confirmed ?farm_batch - farm_batch)
+    (processing_order_completed ?processing_order - processing_order)
+  )
+  (:action record_intake
+    :parameters (?workflow_subject - workflow_subject)
+    :precondition
+      (and
+        (not
+          (intake_registered ?workflow_subject)
+        )
+        (not
+          (placed_in_drying_unit ?workflow_subject)
+        )
+      )
+    :effect (intake_registered ?workflow_subject)
+  )
+  (:action reserve_drying_unit_for_subject
+    :parameters (?workflow_subject - workflow_subject ?dryer_unit - drying_unit)
+    :precondition
+      (and
+        (intake_registered ?workflow_subject)
+        (not
+          (drying_reservation_active ?workflow_subject)
+        )
+        (drying_unit_available ?dryer_unit)
+      )
+    :effect
+      (and
+        (drying_reservation_active ?workflow_subject)
+        (allocated_to_drying_unit ?workflow_subject ?dryer_unit)
+        (not
+          (drying_unit_available ?dryer_unit)
+        )
+      )
+  )
+  (:action allocate_inspection_device_to_subject
+    :parameters (?workflow_subject - workflow_subject ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (intake_registered ?workflow_subject)
+        (drying_reservation_active ?workflow_subject)
+        (inspection_device_available ?inspection_device)
+      )
+    :effect
+      (and
+        (allocated_inspection_device ?workflow_subject ?inspection_device)
+        (not
+          (inspection_device_available ?inspection_device)
+        )
+      )
+  )
+  (:action confirm_quality_inspection
+    :parameters (?workflow_subject - workflow_subject ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (intake_registered ?workflow_subject)
+        (drying_reservation_active ?workflow_subject)
+        (allocated_inspection_device ?workflow_subject ?inspection_device)
+        (not
+          (inspection_passed ?workflow_subject)
+        )
+      )
+    :effect (inspection_passed ?workflow_subject)
+  )
+  (:action release_inspection_device
+    :parameters (?workflow_subject - workflow_subject ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (allocated_inspection_device ?workflow_subject ?inspection_device)
+      )
+    :effect
+      (and
+        (inspection_device_available ?inspection_device)
+        (not
+          (allocated_inspection_device ?workflow_subject ?inspection_device)
+        )
+      )
+  )
+  (:action allocate_conditioning_equipment_to_subject
+    :parameters (?workflow_subject - workflow_subject ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (inspection_passed ?workflow_subject)
+        (conditioning_equipment_available ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (allocated_conditioning_equipment ?workflow_subject ?conditioning_equipment)
+        (not
+          (conditioning_equipment_available ?conditioning_equipment)
+        )
+      )
+  )
+  (:action release_conditioning_equipment
+    :parameters (?workflow_subject - workflow_subject ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (allocated_conditioning_equipment ?workflow_subject ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (conditioning_equipment_available ?conditioning_equipment)
+        (not
+          (allocated_conditioning_equipment ?workflow_subject ?conditioning_equipment)
+        )
+      )
+  )
+  (:action assign_drying_profile_to_order
+    :parameters (?processing_order - processing_order ?drying_profile - drying_profile)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (drying_profile_available ?drying_profile)
+      )
+    :effect
+      (and
+        (order_assigned_drying_profile ?processing_order ?drying_profile)
+        (not
+          (drying_profile_available ?drying_profile)
+        )
+      )
+  )
+  (:action release_drying_profile_from_order
+    :parameters (?processing_order - processing_order ?drying_profile - drying_profile)
+    :precondition
+      (and
+        (order_assigned_drying_profile ?processing_order ?drying_profile)
+      )
+    :effect
+      (and
+        (drying_profile_available ?drying_profile)
+        (not
+          (order_assigned_drying_profile ?processing_order ?drying_profile)
+        )
+      )
+  )
+  (:action attach_regulatory_document_to_order
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action detach_regulatory_document_from_order
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+      )
+    :effect
+      (and
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        )
+      )
+  )
+  (:action reserve_drying_channel_for_collection_batch
+    :parameters (?collection_batch - collection_batch ?drying_channel - drying_channel ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (inspection_passed ?collection_batch)
+        (allocated_inspection_device ?collection_batch ?inspection_device)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (not
+          (drying_channel_reserved ?drying_channel)
+        )
+        (not
+          (drying_channel_prepared_with_treatment ?drying_channel)
+        )
+      )
+    :effect (drying_channel_reserved ?drying_channel)
+  )
+  (:action mark_collection_batch_ready_for_allocation
+    :parameters (?collection_batch - collection_batch ?drying_channel - drying_channel ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (inspection_passed ?collection_batch)
+        (allocated_conditioning_equipment ?collection_batch ?conditioning_equipment)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (drying_channel_reserved ?drying_channel)
+        (not
+          (collection_batch_allocation_confirmed ?collection_batch)
+        )
+      )
+    :effect
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (collection_batch_ready ?collection_batch)
+      )
+  )
+  (:action prepare_channel_with_treatment_for_collection_batch
+    :parameters (?collection_batch - collection_batch ?drying_channel - drying_channel ?treatment_material - treatment_material)
+    :precondition
+      (and
+        (inspection_passed ?collection_batch)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (treatment_material_available ?treatment_material)
+        (not
+          (collection_batch_allocation_confirmed ?collection_batch)
+        )
+      )
+    :effect
+      (and
+        (drying_channel_prepared_with_treatment ?drying_channel)
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (collection_batch_treatment_assigned ?collection_batch ?treatment_material)
+        (not
+          (treatment_material_available ?treatment_material)
+        )
+      )
+  )
+  (:action finalize_collection_batch_channel_preparation
+    :parameters (?collection_batch - collection_batch ?drying_channel - drying_channel ?inspection_device - inspection_device ?treatment_material - treatment_material)
+    :precondition
+      (and
+        (inspection_passed ?collection_batch)
+        (allocated_inspection_device ?collection_batch ?inspection_device)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (drying_channel_prepared_with_treatment ?drying_channel)
+        (collection_batch_treatment_assigned ?collection_batch ?treatment_material)
+        (not
+          (collection_batch_ready ?collection_batch)
+        )
+      )
+    :effect
+      (and
+        (drying_channel_reserved ?drying_channel)
+        (collection_batch_ready ?collection_batch)
+        (treatment_material_available ?treatment_material)
+        (not
+          (collection_batch_treatment_assigned ?collection_batch ?treatment_material)
+        )
+      )
+  )
+  (:action reserve_time_window_for_farm_batch
+    :parameters (?farm_batch - farm_batch ?time_window - time_window ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (inspection_passed ?farm_batch)
+        (allocated_inspection_device ?farm_batch ?inspection_device)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (not
+          (time_window_reserved ?time_window)
+        )
+        (not
+          (time_window_prepared_with_treatment ?time_window)
+        )
+      )
+    :effect (time_window_reserved ?time_window)
+  )
+  (:action confirm_farm_batch_conditioning
+    :parameters (?farm_batch - farm_batch ?time_window - time_window ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (inspection_passed ?farm_batch)
+        (allocated_conditioning_equipment ?farm_batch ?conditioning_equipment)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (time_window_reserved ?time_window)
+        (not
+          (farm_batch_allocation_confirmed ?farm_batch)
+        )
+      )
+    :effect
+      (and
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (farm_batch_ready ?farm_batch)
+      )
+  )
+  (:action prepare_time_window_with_treatment_for_farm_batch
+    :parameters (?farm_batch - farm_batch ?time_window - time_window ?treatment_material - treatment_material)
+    :precondition
+      (and
+        (inspection_passed ?farm_batch)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (treatment_material_available ?treatment_material)
+        (not
+          (farm_batch_allocation_confirmed ?farm_batch)
+        )
+      )
+    :effect
+      (and
+        (time_window_prepared_with_treatment ?time_window)
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (farm_batch_treatment_assigned ?farm_batch ?treatment_material)
+        (not
+          (treatment_material_available ?treatment_material)
+        )
+      )
+  )
+  (:action finalize_farm_batch_time_window_reservation
+    :parameters (?farm_batch - farm_batch ?time_window - time_window ?inspection_device - inspection_device ?treatment_material - treatment_material)
+    :precondition
+      (and
+        (inspection_passed ?farm_batch)
+        (allocated_inspection_device ?farm_batch ?inspection_device)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (time_window_prepared_with_treatment ?time_window)
+        (farm_batch_treatment_assigned ?farm_batch ?treatment_material)
+        (not
+          (farm_batch_ready ?farm_batch)
+        )
+      )
+    :effect
+      (and
+        (time_window_reserved ?time_window)
+        (farm_batch_ready ?farm_batch)
+        (treatment_material_available ?treatment_material)
+        (not
+          (farm_batch_treatment_assigned ?farm_batch ?treatment_material)
+        )
+      )
+  )
+  (:action materialize_unit_instance_reservation
+    :parameters (?collection_batch - collection_batch ?farm_batch - farm_batch ?drying_channel - drying_channel ?time_window - time_window ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (drying_channel_reserved ?drying_channel)
+        (time_window_reserved ?time_window)
+        (collection_batch_ready ?collection_batch)
+        (farm_batch_ready ?farm_batch)
+        (drying_unit_instance_available ?drying_unit_instance)
+      )
+    :effect
+      (and
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_assigned_channel ?drying_unit_instance ?drying_channel)
+        (drying_unit_instance_assigned_time_window ?drying_unit_instance ?time_window)
+        (not
+          (drying_unit_instance_available ?drying_unit_instance)
+        )
+      )
+  )
+  (:action reserve_unit_instance_with_packing_requirement
+    :parameters (?collection_batch - collection_batch ?farm_batch - farm_batch ?drying_channel - drying_channel ?time_window - time_window ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (drying_channel_prepared_with_treatment ?drying_channel)
+        (time_window_reserved ?time_window)
+        (not
+          (collection_batch_ready ?collection_batch)
+        )
+        (farm_batch_ready ?farm_batch)
+        (drying_unit_instance_available ?drying_unit_instance)
+      )
+    :effect
+      (and
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_assigned_channel ?drying_unit_instance ?drying_channel)
+        (drying_unit_instance_assigned_time_window ?drying_unit_instance ?time_window)
+        (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        (not
+          (drying_unit_instance_available ?drying_unit_instance)
+        )
+      )
+  )
+  (:action reserve_unit_instance_with_profile_requirement
+    :parameters (?collection_batch - collection_batch ?farm_batch - farm_batch ?drying_channel - drying_channel ?time_window - time_window ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (drying_channel_reserved ?drying_channel)
+        (time_window_prepared_with_treatment ?time_window)
+        (collection_batch_ready ?collection_batch)
+        (not
+          (farm_batch_ready ?farm_batch)
+        )
+        (drying_unit_instance_available ?drying_unit_instance)
+      )
+    :effect
+      (and
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_assigned_channel ?drying_unit_instance ?drying_channel)
+        (drying_unit_instance_assigned_time_window ?drying_unit_instance ?time_window)
+        (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        (not
+          (drying_unit_instance_available ?drying_unit_instance)
+        )
+      )
+  )
+  (:action reserve_unit_instance_with_packing_and_profile_requirements
+    :parameters (?collection_batch - collection_batch ?farm_batch - farm_batch ?drying_channel - drying_channel ?time_window - time_window ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (collection_batch_allocated_channel ?collection_batch ?drying_channel)
+        (farm_batch_allocated_time_window ?farm_batch ?time_window)
+        (drying_channel_prepared_with_treatment ?drying_channel)
+        (time_window_prepared_with_treatment ?time_window)
+        (not
+          (collection_batch_ready ?collection_batch)
+        )
+        (not
+          (farm_batch_ready ?farm_batch)
+        )
+        (drying_unit_instance_available ?drying_unit_instance)
+      )
+    :effect
+      (and
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_assigned_channel ?drying_unit_instance ?drying_channel)
+        (drying_unit_instance_assigned_time_window ?drying_unit_instance ?time_window)
+        (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        (not
+          (drying_unit_instance_available ?drying_unit_instance)
+        )
+      )
+  )
+  (:action mark_unit_instance_ready_for_configuration
+    :parameters (?drying_unit_instance - drying_unit_instance ?collection_batch - collection_batch ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (allocated_inspection_device ?collection_batch ?inspection_device)
+        (not
+          (drying_unit_instance_ready_for_configuration ?drying_unit_instance)
+        )
+      )
+    :effect (drying_unit_instance_ready_for_configuration ?drying_unit_instance)
+  )
+  (:action reserve_commodity_grade_for_unit_instance
+    :parameters (?processing_order - processing_order ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (order_assigned_to_unit_instance ?processing_order ?drying_unit_instance)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_available ?commodity_grade)
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_ready_for_configuration ?drying_unit_instance)
+        (not
+          (commodity_grade_reserved ?commodity_grade)
+        )
+      )
+    :effect
+      (and
+        (commodity_grade_reserved ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (not
+          (commodity_grade_available ?commodity_grade)
+        )
+      )
+  )
+  (:action preconfigure_order_for_unit_instance
+    :parameters (?processing_order - processing_order ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_reserved ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (allocated_inspection_device ?processing_order ?inspection_device)
+        (not
+          (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        )
+        (not
+          (processing_order_preconfigured ?processing_order)
+        )
+      )
+    :effect (processing_order_preconfigured ?processing_order)
+  )
+  (:action assign_packing_spec_to_order
+    :parameters (?processing_order - processing_order ?packing_specification - packing_specification)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (packing_spec_available ?packing_specification)
+        (not
+          (order_packing_spec_reserved ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (order_packing_spec_reserved ?processing_order)
+        (order_assigned_packing_spec ?processing_order ?packing_specification)
+        (not
+          (packing_spec_available ?packing_specification)
+        )
+      )
+  )
+  (:action preconfigure_order_with_packing_spec
+    :parameters (?processing_order - processing_order ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance ?inspection_device - inspection_device ?packing_specification - packing_specification)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_reserved ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (allocated_inspection_device ?processing_order ?inspection_device)
+        (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        (order_packing_spec_reserved ?processing_order)
+        (order_assigned_packing_spec ?processing_order ?packing_specification)
+        (not
+          (processing_order_preconfigured ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_preconfigured ?processing_order)
+        (order_packing_confirmed ?processing_order)
+      )
+  )
+  (:action complete_order_configuration_without_profile_requirement
+    :parameters (?processing_order - processing_order ?drying_profile - drying_profile ?conditioning_equipment - conditioning_equipment ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_preconfigured ?processing_order)
+        (order_assigned_drying_profile ?processing_order ?drying_profile)
+        (allocated_conditioning_equipment ?processing_order ?conditioning_equipment)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (not
+          (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        )
+        (not
+          (processing_order_configuration_complete ?processing_order)
+        )
+      )
+    :effect (processing_order_configuration_complete ?processing_order)
+  )
+  (:action complete_order_configuration_with_profile_requirement
+    :parameters (?processing_order - processing_order ?drying_profile - drying_profile ?conditioning_equipment - conditioning_equipment ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_preconfigured ?processing_order)
+        (order_assigned_drying_profile ?processing_order ?drying_profile)
+        (allocated_conditioning_equipment ?processing_order ?conditioning_equipment)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        (not
+          (processing_order_configuration_complete ?processing_order)
+        )
+      )
+    :effect (processing_order_configuration_complete ?processing_order)
+  )
+  (:action authorize_order_without_packing_or_profile_requirements
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_configuration_complete ?processing_order)
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (not
+          (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        )
+        (not
+          (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        )
+        (not
+          (processing_order_cleared_for_execution ?processing_order)
+        )
+      )
+    :effect (processing_order_cleared_for_execution ?processing_order)
+  )
+  (:action authorize_order_with_packing_requirement
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_configuration_complete ?processing_order)
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        (not
+          (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        )
+        (not
+          (processing_order_cleared_for_execution ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_has_outbound_requirement ?processing_order)
+      )
+  )
+  (:action authorize_order_with_profile_requirement
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_configuration_complete ?processing_order)
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (not
+          (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        )
+        (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        (not
+          (processing_order_cleared_for_execution ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_has_outbound_requirement ?processing_order)
+      )
+  )
+  (:action authorize_order_with_packing_and_profile_requirements
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document ?commodity_grade - commodity_grade ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (processing_order_configuration_complete ?processing_order)
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (order_specifies_commodity_grade ?processing_order ?commodity_grade)
+        (commodity_grade_allocated_to_unit_instance ?commodity_grade ?drying_unit_instance)
+        (drying_unit_instance_requires_packing_spec ?drying_unit_instance)
+        (drying_unit_instance_requires_profile_confirmation ?drying_unit_instance)
+        (not
+          (processing_order_cleared_for_execution ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_has_outbound_requirement ?processing_order)
+      )
+  )
+  (:action finalize_order_execution_without_outbound_requirement
+    :parameters (?processing_order - processing_order)
+    :precondition
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (not
+          (processing_order_has_outbound_requirement ?processing_order)
+        )
+        (not
+          (processing_order_completed ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_completed ?processing_order)
+        (marked_for_release ?processing_order)
+      )
+  )
+  (:action assign_outbound_channel_to_order
+    :parameters (?processing_order - processing_order ?outbound_channel - outbound_channel)
+    :precondition
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_has_outbound_requirement ?processing_order)
+        (outbound_channel_available ?outbound_channel)
+      )
+    :effect
+      (and
+        (order_assigned_outbound_channel ?processing_order ?outbound_channel)
+        (not
+          (outbound_channel_available ?outbound_channel)
+        )
+      )
+  )
+  (:action perform_final_configuration_and_checks_for_order
+    :parameters (?processing_order - processing_order ?collection_batch - collection_batch ?farm_batch - farm_batch ?inspection_device - inspection_device ?outbound_channel - outbound_channel)
+    :precondition
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_has_outbound_requirement ?processing_order)
+        (order_assigned_outbound_channel ?processing_order ?outbound_channel)
+        (order_includes_collection_batch ?processing_order ?collection_batch)
+        (order_includes_farm_batch ?processing_order ?farm_batch)
+        (collection_batch_ready ?collection_batch)
+        (farm_batch_ready ?farm_batch)
+        (allocated_inspection_device ?processing_order ?inspection_device)
+        (not
+          (processing_order_final_checks_passed ?processing_order)
+        )
+      )
+    :effect (processing_order_final_checks_passed ?processing_order)
+  )
+  (:action finalize_order_execution_after_final_checks
+    :parameters (?processing_order - processing_order)
+    :precondition
+      (and
+        (processing_order_cleared_for_execution ?processing_order)
+        (processing_order_final_checks_passed ?processing_order)
+        (not
+          (processing_order_completed ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_completed ?processing_order)
+        (marked_for_release ?processing_order)
+      )
+  )
+  (:action assign_client_contract_to_order
+    :parameters (?processing_order - processing_order ?client_contract - client_contract ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (inspection_passed ?processing_order)
+        (allocated_inspection_device ?processing_order ?inspection_device)
+        (client_contract_available ?client_contract)
+        (order_linked_to_client_contract ?processing_order ?client_contract)
+        (not
+          (processing_order_client_contract_linked ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_client_contract_linked ?processing_order)
+        (not
+          (client_contract_available ?client_contract)
+        )
+      )
+  )
+  (:action review_assigned_client_contract
+    :parameters (?processing_order - processing_order ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (processing_order_client_contract_linked ?processing_order)
+        (allocated_conditioning_equipment ?processing_order ?conditioning_equipment)
+        (not
+          (processing_order_client_contract_reviewed ?processing_order)
+        )
+      )
+    :effect (processing_order_client_contract_reviewed ?processing_order)
+  )
+  (:action authorize_client_contract_for_order
+    :parameters (?processing_order - processing_order ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (processing_order_client_contract_reviewed ?processing_order)
+        (order_linked_regulatory_document ?processing_order ?regulatory_document)
+        (not
+          (processing_order_client_contract_authorized ?processing_order)
+        )
+      )
+    :effect (processing_order_client_contract_authorized ?processing_order)
+  )
+  (:action finalize_order_execution_via_contract_authorization
+    :parameters (?processing_order - processing_order)
+    :precondition
+      (and
+        (processing_order_client_contract_authorized ?processing_order)
+        (not
+          (processing_order_completed ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (processing_order_completed ?processing_order)
+        (marked_for_release ?processing_order)
+      )
+  )
+  (:action release_collection_batch_for_distribution
+    :parameters (?collection_batch - collection_batch ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (collection_batch_allocation_confirmed ?collection_batch)
+        (collection_batch_ready ?collection_batch)
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_ready_for_configuration ?drying_unit_instance)
+        (not
+          (marked_for_release ?collection_batch)
+        )
+      )
+    :effect (marked_for_release ?collection_batch)
+  )
+  (:action release_farm_batch_for_distribution
+    :parameters (?farm_batch - farm_batch ?drying_unit_instance - drying_unit_instance)
+    :precondition
+      (and
+        (farm_batch_allocation_confirmed ?farm_batch)
+        (farm_batch_ready ?farm_batch)
+        (drying_unit_instance_reserved ?drying_unit_instance)
+        (drying_unit_instance_ready_for_configuration ?drying_unit_instance)
+        (not
+          (marked_for_release ?farm_batch)
+        )
+      )
+    :effect (marked_for_release ?farm_batch)
+  )
+  (:action assign_distribution_slot_to_subject
+    :parameters (?workflow_subject - workflow_subject ?distribution_slot - distribution_slot ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (marked_for_release ?workflow_subject)
+        (allocated_inspection_device ?workflow_subject ?inspection_device)
+        (distribution_slot_available ?distribution_slot)
+        (not
+          (release_scheduled ?workflow_subject)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?workflow_subject)
+        (subject_assigned_distribution_slot ?workflow_subject ?distribution_slot)
+        (not
+          (distribution_slot_available ?distribution_slot)
+        )
+      )
+  )
+  (:action place_collection_batch_into_drying_unit
+    :parameters (?collection_batch - collection_batch ?dryer_unit - drying_unit ?distribution_slot - distribution_slot)
+    :precondition
+      (and
+        (release_scheduled ?collection_batch)
+        (allocated_to_drying_unit ?collection_batch ?dryer_unit)
+        (subject_assigned_distribution_slot ?collection_batch ?distribution_slot)
+        (not
+          (placed_in_drying_unit ?collection_batch)
+        )
+      )
+    :effect
+      (and
+        (placed_in_drying_unit ?collection_batch)
+        (drying_unit_available ?dryer_unit)
+        (distribution_slot_available ?distribution_slot)
+      )
+  )
+  (:action place_farm_batch_into_drying_unit
+    :parameters (?farm_batch - farm_batch ?dryer_unit - drying_unit ?distribution_slot - distribution_slot)
+    :precondition
+      (and
+        (release_scheduled ?farm_batch)
+        (allocated_to_drying_unit ?farm_batch ?dryer_unit)
+        (subject_assigned_distribution_slot ?farm_batch ?distribution_slot)
+        (not
+          (placed_in_drying_unit ?farm_batch)
+        )
+      )
+    :effect
+      (and
+        (placed_in_drying_unit ?farm_batch)
+        (drying_unit_available ?dryer_unit)
+        (distribution_slot_available ?distribution_slot)
+      )
+  )
+  (:action place_processing_order_into_drying_unit
+    :parameters (?processing_order - processing_order ?dryer_unit - drying_unit ?distribution_slot - distribution_slot)
+    :precondition
+      (and
+        (release_scheduled ?processing_order)
+        (allocated_to_drying_unit ?processing_order ?dryer_unit)
+        (subject_assigned_distribution_slot ?processing_order ?distribution_slot)
+        (not
+          (placed_in_drying_unit ?processing_order)
+        )
+      )
+    :effect
+      (and
+        (placed_in_drying_unit ?processing_order)
+        (drying_unit_available ?dryer_unit)
+        (distribution_slot_available ?distribution_slot)
+      )
+  )
+)

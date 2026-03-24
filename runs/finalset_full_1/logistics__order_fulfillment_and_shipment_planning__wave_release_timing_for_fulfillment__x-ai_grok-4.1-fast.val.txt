@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain wave_release_timing_for_fulfillment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types fulfillment_resource - object logistics_unit - object consolidation_group - object fulfillment_entity - object fulfillment_unit - fulfillment_entity inventory_location - fulfillment_resource item_sku - fulfillment_resource work_station - fulfillment_resource carrier_option - fulfillment_resource handling_instruction - fulfillment_resource delivery_window - fulfillment_resource packing_station - fulfillment_resource carrier_service - fulfillment_resource inventory_unit - logistics_unit package - logistics_unit routing_profile - logistics_unit pick_zone - consolidation_group ship_zone - consolidation_group shipment - consolidation_group sales_order_root - fulfillment_unit wave_root - fulfillment_unit sales_order - sales_order_root sales_order_segment - sales_order_root wave - wave_root)
+  (:predicates
+    (release_candidate ?fulfillment_unit - fulfillment_unit)
+    (entity_sourcing_confirmed ?fulfillment_unit - fulfillment_unit)
+    (inventory_sourced ?fulfillment_unit - fulfillment_unit)
+    (released_for_dispatch ?fulfillment_unit - fulfillment_unit)
+    (entity_ready_for_delivery_assignment ?fulfillment_unit - fulfillment_unit)
+    (entity_delivery_window_assigned ?fulfillment_unit - fulfillment_unit)
+    (location_available ?inventory_location - inventory_location)
+    (entity_sourced_from_location ?fulfillment_unit - fulfillment_unit ?inventory_location - inventory_location)
+    (sku_available ?item_sku - item_sku)
+    (entity_assigned_sku ?fulfillment_unit - fulfillment_unit ?item_sku - item_sku)
+    (workstation_available ?work_station - work_station)
+    (entity_assigned_workstation ?fulfillment_unit - fulfillment_unit ?work_station - work_station)
+    (inventory_unit_available ?inventory_unit - inventory_unit)
+    (inventory_unit_assigned_to_order ?sales_order - sales_order ?inventory_unit - inventory_unit)
+    (inventory_unit_assigned_to_segment ?sales_order_segment - sales_order_segment ?inventory_unit - inventory_unit)
+    (order_assigned_pick_zone ?sales_order - sales_order ?pick_zone - pick_zone)
+    (pick_zone_staged ?pick_zone - pick_zone)
+    (pick_zone_inventory_reserved ?pick_zone - pick_zone)
+    (picking_completed ?sales_order - sales_order)
+    (assigned_ship_zone ?sales_order_segment - sales_order_segment ?ship_zone - ship_zone)
+    (ship_zone_staged ?ship_zone - ship_zone)
+    (ship_zone_inventory_reserved ?ship_zone - ship_zone)
+    (segment_ready_for_shipment ?sales_order_segment - sales_order_segment)
+    (shipment_available ?shipment - shipment)
+    (shipment_staged ?shipment - shipment)
+    (shipment_assigned_pick_zone ?shipment - shipment ?pick_zone - pick_zone)
+    (shipment_assigned_ship_zone ?shipment - shipment ?ship_zone - ship_zone)
+    (requires_packaging_stage_1 ?shipment - shipment)
+    (requires_packaging_stage_2 ?shipment - shipment)
+    (packaging_completed ?shipment - shipment)
+    (wave_contains_order ?wave - wave ?sales_order - sales_order)
+    (wave_contains_order_segment ?wave - wave ?sales_order_segment - sales_order_segment)
+    (wave_contains_shipment ?wave - wave ?shipment - shipment)
+    (package_available ?package - package)
+    (wave_assigned_package ?wave - wave ?package - package)
+    (package_allocated ?package - package)
+    (package_assigned_to_shipment ?package - package ?shipment - shipment)
+    (wave_package_ready ?wave - wave)
+    (wave_packing_in_progress ?wave - wave)
+    (wave_packing_completed ?wave - wave)
+    (carrier_option_attached ?wave - wave)
+    (carrier_option_confirmed ?wave - wave)
+    (wave_ready_for_package_assignment ?wave - wave)
+    (wave_packing_finalized ?wave - wave)
+    (routing_profile_available ?routing_profile - routing_profile)
+    (wave_assigned_routing_profile ?wave - wave ?routing_profile - routing_profile)
+    (wave_routing_confirmed ?wave - wave)
+    (wave_ready_for_carrier_assignment ?wave - wave)
+    (carrier_service_attached ?wave - wave)
+    (carrier_option_available ?carrier_option - carrier_option)
+    (wave_assigned_carrier_option ?wave - wave ?carrier_option - carrier_option)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (wave_assigned_handling_instruction ?wave - wave ?handling_instruction - handling_instruction)
+    (packing_station_available ?packing_station - packing_station)
+    (wave_assigned_packing_station ?wave - wave ?packing_station - packing_station)
+    (carrier_service_available ?carrier_service - carrier_service)
+    (wave_assigned_carrier_service ?wave - wave ?carrier_service - carrier_service)
+    (delivery_window_available ?delivery_window - delivery_window)
+    (entity_assigned_delivery_window ?fulfillment_unit - fulfillment_unit ?delivery_window - delivery_window)
+    (order_ready_for_consolidation ?sales_order - sales_order)
+    (segment_ready_for_consolidation ?sales_order_segment - sales_order_segment)
+    (wave_finalized ?wave - wave)
+  )
+  (:action mark_fulfillment_unit_as_release_candidate
+    :parameters (?fulfillment_unit - fulfillment_unit)
+    :precondition
+      (and
+        (not
+          (release_candidate ?fulfillment_unit)
+        )
+        (not
+          (released_for_dispatch ?fulfillment_unit)
+        )
+      )
+    :effect (release_candidate ?fulfillment_unit)
+  )
+  (:action assign_inventory_location_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?inventory_location - inventory_location)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_unit)
+        (not
+          (inventory_sourced ?fulfillment_unit)
+        )
+        (location_available ?inventory_location)
+      )
+    :effect
+      (and
+        (inventory_sourced ?fulfillment_unit)
+        (entity_sourced_from_location ?fulfillment_unit ?inventory_location)
+        (not
+          (location_available ?inventory_location)
+        )
+      )
+  )
+  (:action allocate_sku_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?item_sku - item_sku)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_unit)
+        (inventory_sourced ?fulfillment_unit)
+        (sku_available ?item_sku)
+      )
+    :effect
+      (and
+        (entity_assigned_sku ?fulfillment_unit ?item_sku)
+        (not
+          (sku_available ?item_sku)
+        )
+      )
+  )
+  (:action finalize_sourcing_for_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?item_sku - item_sku)
+    :precondition
+      (and
+        (release_candidate ?fulfillment_unit)
+        (inventory_sourced ?fulfillment_unit)
+        (entity_assigned_sku ?fulfillment_unit ?item_sku)
+        (not
+          (entity_sourcing_confirmed ?fulfillment_unit)
+        )
+      )
+    :effect (entity_sourcing_confirmed ?fulfillment_unit)
+  )
+  (:action release_sku_from_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_assigned_sku ?fulfillment_unit ?item_sku)
+      )
+    :effect
+      (and
+        (sku_available ?item_sku)
+        (not
+          (entity_assigned_sku ?fulfillment_unit ?item_sku)
+        )
+      )
+  )
+  (:action assign_workstation_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?work_station - work_station)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?fulfillment_unit)
+        (workstation_available ?work_station)
+      )
+    :effect
+      (and
+        (entity_assigned_workstation ?fulfillment_unit ?work_station)
+        (not
+          (workstation_available ?work_station)
+        )
+      )
+  )
+  (:action release_workstation_from_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?work_station - work_station)
+    :precondition
+      (and
+        (entity_assigned_workstation ?fulfillment_unit ?work_station)
+      )
+    :effect
+      (and
+        (workstation_available ?work_station)
+        (not
+          (entity_assigned_workstation ?fulfillment_unit ?work_station)
+        )
+      )
+  )
+  (:action assign_packing_station_to_wave
+    :parameters (?wave - wave ?packing_station - packing_station)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (packing_station_available ?packing_station)
+      )
+    :effect
+      (and
+        (wave_assigned_packing_station ?wave ?packing_station)
+        (not
+          (packing_station_available ?packing_station)
+        )
+      )
+  )
+  (:action release_packing_station_from_wave
+    :parameters (?wave - wave ?packing_station - packing_station)
+    :precondition
+      (and
+        (wave_assigned_packing_station ?wave ?packing_station)
+      )
+    :effect
+      (and
+        (packing_station_available ?packing_station)
+        (not
+          (wave_assigned_packing_station ?wave ?packing_station)
+        )
+      )
+  )
+  (:action assign_carrier_service_to_wave
+    :parameters (?wave - wave ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (carrier_service_available ?carrier_service)
+      )
+    :effect
+      (and
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (not
+          (carrier_service_available ?carrier_service)
+        )
+      )
+  )
+  (:action release_carrier_service_from_wave
+    :parameters (?wave - wave ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+      )
+    :effect
+      (and
+        (carrier_service_available ?carrier_service)
+        (not
+          (wave_assigned_carrier_service ?wave ?carrier_service)
+        )
+      )
+  )
+  (:action stage_pick_zone_for_order
+    :parameters (?sales_order - sales_order ?pick_zone - pick_zone ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order)
+        (entity_assigned_sku ?sales_order ?item_sku)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (not
+          (pick_zone_staged ?pick_zone)
+        )
+        (not
+          (pick_zone_inventory_reserved ?pick_zone)
+        )
+      )
+    :effect (pick_zone_staged ?pick_zone)
+  )
+  (:action confirm_pick_assignment_for_order
+    :parameters (?sales_order - sales_order ?pick_zone - pick_zone ?work_station - work_station)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order)
+        (entity_assigned_workstation ?sales_order ?work_station)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (pick_zone_staged ?pick_zone)
+        (not
+          (order_ready_for_consolidation ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (picking_completed ?sales_order)
+      )
+  )
+  (:action reserve_inventory_unit_for_order
+    :parameters (?sales_order - sales_order ?pick_zone - pick_zone ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (order_ready_for_consolidation ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_inventory_reserved ?pick_zone)
+        (order_ready_for_consolidation ?sales_order)
+        (inventory_unit_assigned_to_order ?sales_order ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action finalize_pick_allocation
+    :parameters (?sales_order - sales_order ?pick_zone - pick_zone ?item_sku - item_sku ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order)
+        (entity_assigned_sku ?sales_order ?item_sku)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (pick_zone_inventory_reserved ?pick_zone)
+        (inventory_unit_assigned_to_order ?sales_order ?inventory_unit)
+        (not
+          (picking_completed ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_staged ?pick_zone)
+        (picking_completed ?sales_order)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (inventory_unit_assigned_to_order ?sales_order ?inventory_unit)
+        )
+      )
+  )
+  (:action stage_ship_zone_for_segment
+    :parameters (?sales_order_segment - sales_order_segment ?ship_zone - ship_zone ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order_segment)
+        (entity_assigned_sku ?sales_order_segment ?item_sku)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (not
+          (ship_zone_staged ?ship_zone)
+        )
+        (not
+          (ship_zone_inventory_reserved ?ship_zone)
+        )
+      )
+    :effect (ship_zone_staged ?ship_zone)
+  )
+  (:action confirm_ship_assignment_for_segment
+    :parameters (?sales_order_segment - sales_order_segment ?ship_zone - ship_zone ?work_station - work_station)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order_segment)
+        (entity_assigned_workstation ?sales_order_segment ?work_station)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (ship_zone_staged ?ship_zone)
+        (not
+          (segment_ready_for_consolidation ?sales_order_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (segment_ready_for_shipment ?sales_order_segment)
+      )
+  )
+  (:action reserve_inventory_unit_for_segment
+    :parameters (?sales_order_segment - sales_order_segment ?ship_zone - ship_zone ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order_segment)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (segment_ready_for_consolidation ?sales_order_segment)
+        )
+      )
+    :effect
+      (and
+        (ship_zone_inventory_reserved ?ship_zone)
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (inventory_unit_assigned_to_segment ?sales_order_segment ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action finalize_ship_allocation_for_segment
+    :parameters (?sales_order_segment - sales_order_segment ?ship_zone - ship_zone ?item_sku - item_sku ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?sales_order_segment)
+        (entity_assigned_sku ?sales_order_segment ?item_sku)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (ship_zone_inventory_reserved ?ship_zone)
+        (inventory_unit_assigned_to_segment ?sales_order_segment ?inventory_unit)
+        (not
+          (segment_ready_for_shipment ?sales_order_segment)
+        )
+      )
+    :effect
+      (and
+        (ship_zone_staged ?ship_zone)
+        (segment_ready_for_shipment ?sales_order_segment)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (inventory_unit_assigned_to_segment ?sales_order_segment ?inventory_unit)
+        )
+      )
+  )
+  (:action form_shipment_from_zones
+    :parameters (?sales_order - sales_order ?sales_order_segment - sales_order_segment ?pick_zone - pick_zone ?ship_zone - ship_zone ?shipment - shipment)
+    :precondition
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (pick_zone_staged ?pick_zone)
+        (ship_zone_staged ?ship_zone)
+        (picking_completed ?sales_order)
+        (segment_ready_for_shipment ?sales_order_segment)
+        (shipment_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?shipment)
+        (shipment_assigned_pick_zone ?shipment ?pick_zone)
+        (shipment_assigned_ship_zone ?shipment ?ship_zone)
+        (not
+          (shipment_available ?shipment)
+        )
+      )
+  )
+  (:action form_shipment_with_pack_stage_1
+    :parameters (?sales_order - sales_order ?sales_order_segment - sales_order_segment ?pick_zone - pick_zone ?ship_zone - ship_zone ?shipment - shipment)
+    :precondition
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (pick_zone_inventory_reserved ?pick_zone)
+        (ship_zone_staged ?ship_zone)
+        (not
+          (picking_completed ?sales_order)
+        )
+        (segment_ready_for_shipment ?sales_order_segment)
+        (shipment_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?shipment)
+        (shipment_assigned_pick_zone ?shipment ?pick_zone)
+        (shipment_assigned_ship_zone ?shipment ?ship_zone)
+        (requires_packaging_stage_1 ?shipment)
+        (not
+          (shipment_available ?shipment)
+        )
+      )
+  )
+  (:action form_shipment_with_pack_stage_2
+    :parameters (?sales_order - sales_order ?sales_order_segment - sales_order_segment ?pick_zone - pick_zone ?ship_zone - ship_zone ?shipment - shipment)
+    :precondition
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (pick_zone_staged ?pick_zone)
+        (ship_zone_inventory_reserved ?ship_zone)
+        (picking_completed ?sales_order)
+        (not
+          (segment_ready_for_shipment ?sales_order_segment)
+        )
+        (shipment_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?shipment)
+        (shipment_assigned_pick_zone ?shipment ?pick_zone)
+        (shipment_assigned_ship_zone ?shipment ?ship_zone)
+        (requires_packaging_stage_2 ?shipment)
+        (not
+          (shipment_available ?shipment)
+        )
+      )
+  )
+  (:action form_shipment_with_both_pack_stages
+    :parameters (?sales_order - sales_order ?sales_order_segment - sales_order_segment ?pick_zone - pick_zone ?ship_zone - ship_zone ?shipment - shipment)
+    :precondition
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (order_assigned_pick_zone ?sales_order ?pick_zone)
+        (assigned_ship_zone ?sales_order_segment ?ship_zone)
+        (pick_zone_inventory_reserved ?pick_zone)
+        (ship_zone_inventory_reserved ?ship_zone)
+        (not
+          (picking_completed ?sales_order)
+        )
+        (not
+          (segment_ready_for_shipment ?sales_order_segment)
+        )
+        (shipment_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_staged ?shipment)
+        (shipment_assigned_pick_zone ?shipment ?pick_zone)
+        (shipment_assigned_ship_zone ?shipment ?ship_zone)
+        (requires_packaging_stage_1 ?shipment)
+        (requires_packaging_stage_2 ?shipment)
+        (not
+          (shipment_available ?shipment)
+        )
+      )
+  )
+  (:action mark_shipment_as_packed
+    :parameters (?shipment - shipment ?sales_order - sales_order ?item_sku - item_sku)
+    :precondition
+      (and
+        (shipment_staged ?shipment)
+        (order_ready_for_consolidation ?sales_order)
+        (entity_assigned_sku ?sales_order ?item_sku)
+        (not
+          (packaging_completed ?shipment)
+        )
+      )
+    :effect (packaging_completed ?shipment)
+  )
+  (:action allocate_package_to_shipment
+    :parameters (?wave - wave ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (wave_contains_shipment ?wave ?shipment)
+        (wave_assigned_package ?wave ?package)
+        (package_available ?package)
+        (shipment_staged ?shipment)
+        (packaging_completed ?shipment)
+        (not
+          (package_allocated ?package)
+        )
+      )
+    :effect
+      (and
+        (package_allocated ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action prepare_wave_for_packaging
+    :parameters (?wave - wave ?package - package ?shipment - shipment ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (wave_assigned_package ?wave ?package)
+        (package_allocated ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (entity_assigned_sku ?wave ?item_sku)
+        (not
+          (requires_packaging_stage_1 ?shipment)
+        )
+        (not
+          (wave_package_ready ?wave)
+        )
+      )
+    :effect (wave_package_ready ?wave)
+  )
+  (:action assign_carrier_option_to_wave
+    :parameters (?wave - wave ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (carrier_option_available ?carrier_option)
+        (not
+          (carrier_option_attached ?wave)
+        )
+      )
+    :effect
+      (and
+        (carrier_option_attached ?wave)
+        (wave_assigned_carrier_option ?wave ?carrier_option)
+        (not
+          (carrier_option_available ?carrier_option)
+        )
+      )
+  )
+  (:action confirm_carrier_option_and_prepare_wave
+    :parameters (?wave - wave ?package - package ?shipment - shipment ?item_sku - item_sku ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (wave_assigned_package ?wave ?package)
+        (package_allocated ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (entity_assigned_sku ?wave ?item_sku)
+        (requires_packaging_stage_1 ?shipment)
+        (carrier_option_attached ?wave)
+        (wave_assigned_carrier_option ?wave ?carrier_option)
+        (not
+          (wave_package_ready ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_package_ready ?wave)
+        (carrier_option_confirmed ?wave)
+      )
+  )
+  (:action initiate_wave_packing_variant_a
+    :parameters (?wave - wave ?packing_station - packing_station ?work_station - work_station ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_package_ready ?wave)
+        (wave_assigned_packing_station ?wave ?packing_station)
+        (entity_assigned_workstation ?wave ?work_station)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (not
+          (requires_packaging_stage_2 ?shipment)
+        )
+        (not
+          (wave_packing_in_progress ?wave)
+        )
+      )
+    :effect (wave_packing_in_progress ?wave)
+  )
+  (:action initiate_wave_packing_variant_b
+    :parameters (?wave - wave ?packing_station - packing_station ?work_station - work_station ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_package_ready ?wave)
+        (wave_assigned_packing_station ?wave ?packing_station)
+        (entity_assigned_workstation ?wave ?work_station)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (requires_packaging_stage_2 ?shipment)
+        (not
+          (wave_packing_in_progress ?wave)
+        )
+      )
+    :effect (wave_packing_in_progress ?wave)
+  )
+  (:action complete_wave_packing_stage
+    :parameters (?wave - wave ?carrier_service - carrier_service ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_packing_in_progress ?wave)
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (not
+          (requires_packaging_stage_1 ?shipment)
+        )
+        (not
+          (requires_packaging_stage_2 ?shipment)
+        )
+        (not
+          (wave_packing_completed ?wave)
+        )
+      )
+    :effect (wave_packing_completed ?wave)
+  )
+  (:action complete_wave_packing_and_mark_ready
+    :parameters (?wave - wave ?carrier_service - carrier_service ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_packing_in_progress ?wave)
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (requires_packaging_stage_1 ?shipment)
+        (not
+          (requires_packaging_stage_2 ?shipment)
+        )
+        (not
+          (wave_packing_completed ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_packing_completed ?wave)
+        (wave_ready_for_package_assignment ?wave)
+      )
+  )
+  (:action finalize_packaging_variant_one
+    :parameters (?wave - wave ?carrier_service - carrier_service ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_packing_in_progress ?wave)
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (not
+          (requires_packaging_stage_1 ?shipment)
+        )
+        (requires_packaging_stage_2 ?shipment)
+        (not
+          (wave_packing_completed ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_packing_completed ?wave)
+        (wave_ready_for_package_assignment ?wave)
+      )
+  )
+  (:action finalize_packaging_variant_two
+    :parameters (?wave - wave ?carrier_service - carrier_service ?package - package ?shipment - shipment)
+    :precondition
+      (and
+        (wave_packing_in_progress ?wave)
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (wave_assigned_package ?wave ?package)
+        (package_assigned_to_shipment ?package ?shipment)
+        (requires_packaging_stage_1 ?shipment)
+        (requires_packaging_stage_2 ?shipment)
+        (not
+          (wave_packing_completed ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_packing_completed ?wave)
+        (wave_ready_for_package_assignment ?wave)
+      )
+  )
+  (:action finalize_wave_and_mark_ready
+    :parameters (?wave - wave)
+    :precondition
+      (and
+        (wave_packing_completed ?wave)
+        (not
+          (wave_ready_for_package_assignment ?wave)
+        )
+        (not
+          (wave_finalized ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_finalized ?wave)
+        (entity_ready_for_delivery_assignment ?wave)
+      )
+  )
+  (:action assign_handling_instruction_to_wave
+    :parameters (?wave - wave ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (wave_packing_completed ?wave)
+        (wave_ready_for_package_assignment ?wave)
+        (handling_instruction_available ?handling_instruction)
+      )
+    :effect
+      (and
+        (wave_assigned_handling_instruction ?wave ?handling_instruction)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action confirm_wave_packaging
+    :parameters (?wave - wave ?sales_order - sales_order ?sales_order_segment - sales_order_segment ?item_sku - item_sku ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (wave_packing_completed ?wave)
+        (wave_ready_for_package_assignment ?wave)
+        (wave_assigned_handling_instruction ?wave ?handling_instruction)
+        (wave_contains_order ?wave ?sales_order)
+        (wave_contains_order_segment ?wave ?sales_order_segment)
+        (picking_completed ?sales_order)
+        (segment_ready_for_shipment ?sales_order_segment)
+        (entity_assigned_sku ?wave ?item_sku)
+        (not
+          (wave_packing_finalized ?wave)
+        )
+      )
+    :effect (wave_packing_finalized ?wave)
+  )
+  (:action finalize_wave_and_mark_ready_alternate
+    :parameters (?wave - wave)
+    :precondition
+      (and
+        (wave_packing_completed ?wave)
+        (wave_packing_finalized ?wave)
+        (not
+          (wave_finalized ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_finalized ?wave)
+        (entity_ready_for_delivery_assignment ?wave)
+      )
+  )
+  (:action assign_routing_profile_to_wave
+    :parameters (?wave - wave ?routing_profile - routing_profile ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_sourcing_confirmed ?wave)
+        (entity_assigned_sku ?wave ?item_sku)
+        (routing_profile_available ?routing_profile)
+        (wave_assigned_routing_profile ?wave ?routing_profile)
+        (not
+          (wave_routing_confirmed ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_routing_confirmed ?wave)
+        (not
+          (routing_profile_available ?routing_profile)
+        )
+      )
+  )
+  (:action mark_wave_ready_for_carrier_assignment
+    :parameters (?wave - wave ?work_station - work_station)
+    :precondition
+      (and
+        (wave_routing_confirmed ?wave)
+        (entity_assigned_workstation ?wave ?work_station)
+        (not
+          (wave_ready_for_carrier_assignment ?wave)
+        )
+      )
+    :effect (wave_ready_for_carrier_assignment ?wave)
+  )
+  (:action attach_carrier_service_to_wave
+    :parameters (?wave - wave ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (wave_ready_for_carrier_assignment ?wave)
+        (wave_assigned_carrier_service ?wave ?carrier_service)
+        (not
+          (carrier_service_attached ?wave)
+        )
+      )
+    :effect (carrier_service_attached ?wave)
+  )
+  (:action mark_wave_ready_for_release
+    :parameters (?wave - wave)
+    :precondition
+      (and
+        (carrier_service_attached ?wave)
+        (not
+          (wave_finalized ?wave)
+        )
+      )
+    :effect
+      (and
+        (wave_finalized ?wave)
+        (entity_ready_for_delivery_assignment ?wave)
+      )
+  )
+  (:action flag_order_ready_for_delivery_assignment
+    :parameters (?sales_order - sales_order ?shipment - shipment)
+    :precondition
+      (and
+        (order_ready_for_consolidation ?sales_order)
+        (picking_completed ?sales_order)
+        (shipment_staged ?shipment)
+        (packaging_completed ?shipment)
+        (not
+          (entity_ready_for_delivery_assignment ?sales_order)
+        )
+      )
+    :effect (entity_ready_for_delivery_assignment ?sales_order)
+  )
+  (:action flag_segment_ready_for_delivery_assignment
+    :parameters (?sales_order_segment - sales_order_segment ?shipment - shipment)
+    :precondition
+      (and
+        (segment_ready_for_consolidation ?sales_order_segment)
+        (segment_ready_for_shipment ?sales_order_segment)
+        (shipment_staged ?shipment)
+        (packaging_completed ?shipment)
+        (not
+          (entity_ready_for_delivery_assignment ?sales_order_segment)
+        )
+      )
+    :effect (entity_ready_for_delivery_assignment ?sales_order_segment)
+  )
+  (:action assign_delivery_window_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?delivery_window - delivery_window ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_ready_for_delivery_assignment ?fulfillment_unit)
+        (entity_assigned_sku ?fulfillment_unit ?item_sku)
+        (delivery_window_available ?delivery_window)
+        (not
+          (entity_delivery_window_assigned ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_delivery_window_assigned ?fulfillment_unit)
+        (entity_assigned_delivery_window ?fulfillment_unit ?delivery_window)
+        (not
+          (delivery_window_available ?delivery_window)
+        )
+      )
+  )
+  (:action release_order_for_dispatch
+    :parameters (?sales_order - sales_order ?inventory_location - inventory_location ?delivery_window - delivery_window)
+    :precondition
+      (and
+        (entity_delivery_window_assigned ?sales_order)
+        (entity_sourced_from_location ?sales_order ?inventory_location)
+        (entity_assigned_delivery_window ?sales_order ?delivery_window)
+        (not
+          (released_for_dispatch ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?sales_order)
+        (location_available ?inventory_location)
+        (delivery_window_available ?delivery_window)
+      )
+  )
+  (:action release_segment_for_dispatch
+    :parameters (?sales_order_segment - sales_order_segment ?inventory_location - inventory_location ?delivery_window - delivery_window)
+    :precondition
+      (and
+        (entity_delivery_window_assigned ?sales_order_segment)
+        (entity_sourced_from_location ?sales_order_segment ?inventory_location)
+        (entity_assigned_delivery_window ?sales_order_segment ?delivery_window)
+        (not
+          (released_for_dispatch ?sales_order_segment)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?sales_order_segment)
+        (location_available ?inventory_location)
+        (delivery_window_available ?delivery_window)
+      )
+  )
+  (:action release_wave_for_dispatch
+    :parameters (?wave - wave ?inventory_location - inventory_location ?delivery_window - delivery_window)
+    :precondition
+      (and
+        (entity_delivery_window_assigned ?wave)
+        (entity_sourced_from_location ?wave ?inventory_location)
+        (entity_assigned_delivery_window ?wave ?delivery_window)
+        (not
+          (released_for_dispatch ?wave)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?wave)
+        (location_available ?inventory_location)
+        (delivery_window_available ?delivery_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem wave_release_plan_instance)
+  (:domain wave_release_timing_for_fulfillment)
+  (:objects sales_order_1 - sales_order order_segment_1 - sales_order_segment wave_1 - wave wave_2 - wave inventory_location_1 - inventory_location inventory_location_2 - inventory_location inventory_location_3 - inventory_location item_sku_1 - item_sku work_station_1 - work_station inventory_unit_1 - inventory_unit pick_zone_1 - pick_zone ship_zone_1 - ship_zone shipment_1 - shipment package_small - package package_medium - package carrier_option_express - carrier_option carrier_option_standard - carrier_option handling_instruction_fragile - handling_instruction handling_instruction_standard - handling_instruction delivery_window_1 - delivery_window packing_station_1 - packing_station routing_profile_primary - routing_profile routing_profile_secondary - routing_profile carrier_service_express - carrier_service)
+  (:init
+    (location_available inventory_location_1)
+    (location_available inventory_location_2)
+    (location_available inventory_location_3)
+    (sku_available item_sku_1)
+    (workstation_available work_station_1)
+    (inventory_unit_available inventory_unit_1)
+    (order_assigned_pick_zone sales_order_1 pick_zone_1)
+    (assigned_ship_zone order_segment_1 ship_zone_1)
+    (shipment_available shipment_1)
+    (package_available package_small)
+    (package_available package_medium)
+    (wave_contains_order wave_1 sales_order_1)
+    (wave_contains_order wave_2 sales_order_1)
+    (wave_contains_order_segment wave_1 order_segment_1)
+    (wave_contains_order_segment wave_2 order_segment_1)
+    (wave_contains_shipment wave_1 shipment_1)
+    (wave_contains_shipment wave_2 shipment_1)
+    (wave_assigned_package wave_1 package_small)
+    (wave_assigned_package wave_2 package_medium)
+    (carrier_option_available carrier_option_express)
+    (carrier_option_available carrier_option_standard)
+    (handling_instruction_available handling_instruction_fragile)
+    (handling_instruction_available handling_instruction_standard)
+    (delivery_window_available delivery_window_1)
+    (packing_station_available packing_station_1)
+    (routing_profile_available routing_profile_primary)
+    (wave_assigned_routing_profile wave_1 routing_profile_primary)
+    (wave_assigned_routing_profile wave_2 routing_profile_secondary)
+    (carrier_service_available carrier_service_express)
+  )
+  (:goal
+    (and
+      (released_for_dispatch sales_order_1)
+      (released_for_dispatch order_segment_1)
+      (released_for_dispatch wave_1)
+      (released_for_dispatch wave_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(mark_fulfillment_unit_as_release_candidate sales_order_1)
+(assign_inventory_location_to_fulfillment_unit sales_order_1 inventory_location_1)
+(allocate_sku_to_fulfillment_unit sales_order_1 item_sku_1)
+(finalize_sourcing_for_fulfillment_unit sales_order_1 item_sku_1)
+(assign_workstation_to_fulfillment_unit sales_order_1 work_station_1)
+(stage_pick_zone_for_order sales_order_1 pick_zone_1 item_sku_1)
+(confirm_pick_assignment_for_order sales_order_1 pick_zone_1 work_station_1)
+(release_workstation_from_fulfillment_unit sales_order_1 work_station_1)
+(release_sku_from_fulfillment_unit sales_order_1 item_sku_1)
+(mark_fulfillment_unit_as_release_candidate order_segment_1)
+(assign_inventory_location_to_fulfillment_unit order_segment_1 inventory_location_2)
+(allocate_sku_to_fulfillment_unit order_segment_1 item_sku_1)
+(finalize_sourcing_for_fulfillment_unit order_segment_1 item_sku_1)
+(assign_workstation_to_fulfillment_unit order_segment_1 work_station_1)
+(stage_ship_zone_for_segment order_segment_1 ship_zone_1 item_sku_1)
+(confirm_ship_assignment_for_segment order_segment_1 ship_zone_1 work_station_1)
+(release_workstation_from_fulfillment_unit order_segment_1 work_station_1)
+(release_sku_from_fulfillment_unit order_segment_1 item_sku_1)
+(form_shipment_from_zones sales_order_1 order_segment_1 pick_zone_1 ship_zone_1 shipment_1)
+(allocate_sku_to_fulfillment_unit sales_order_1 item_sku_1)
+(mark_shipment_as_packed shipment_1 sales_order_1 item_sku_1)
+(release_sku_from_fulfillment_unit sales_order_1 item_sku_1)
+(flag_order_ready_for_delivery_assignment sales_order_1 shipment_1)
+(flag_segment_ready_for_delivery_assignment order_segment_1 shipment_1)
+(allocate_sku_to_fulfillment_unit sales_order_1 item_sku_1)
+(assign_delivery_window_to_fulfillment_unit sales_order_1 delivery_window_1 item_sku_1)
+(release_order_for_dispatch sales_order_1 inventory_location_1 delivery_window_1)
+(release_sku_from_fulfillment_unit sales_order_1 item_sku_1)
+(allocate_sku_to_fulfillment_unit order_segment_1 item_sku_1)
+(assign_delivery_window_to_fulfillment_unit order_segment_1 delivery_window_1 item_sku_1)
+(release_segment_for_dispatch order_segment_1 inventory_location_2 delivery_window_1)
+(release_sku_from_fulfillment_unit order_segment_1 item_sku_1)
+(mark_fulfillment_unit_as_release_candidate wave_1)
+(assign_inventory_location_to_fulfillment_unit wave_1 inventory_location_1)
+(allocate_sku_to_fulfillment_unit wave_1 item_sku_1)
+(finalize_sourcing_for_fulfillment_unit wave_1 item_sku_1)
+(assign_workstation_to_fulfillment_unit wave_1 work_station_1)
+(assign_packing_station_to_wave wave_1 packing_station_1)
+(assign_carrier_service_to_wave wave_1 carrier_service_express)
+(allocate_package_to_shipment wave_1 package_small shipment_1)
+(prepare_wave_for_packaging wave_1 package_small shipment_1 item_sku_1)
+(initiate_wave_packing_variant_a wave_1 packing_station_1 work_station_1 package_small shipment_1)
+(complete_wave_packing_stage wave_1 carrier_service_express package_small shipment_1)
+(finalize_wave_and_mark_ready wave_1)
+(assign_delivery_window_to_fulfillment_unit wave_1 delivery_window_1 item_sku_1)
+(release_wave_for_dispatch wave_1 inventory_location_1 delivery_window_1)
+(release_sku_from_fulfillment_unit wave_1 item_sku_1)
+(release_workstation_from_fulfillment_unit wave_1 work_station_1)
+(release_packing_station_from_wave wave_1 packing_station_1)
+(release_carrier_service_from_wave wave_1 carrier_service_express)
+(mark_fulfillment_unit_as_release_candidate wave_2)
+(assign_inventory_location_to_fulfillment_unit wave_2 inventory_location_2)
+(allocate_sku_to_fulfillment_unit wave_2 item_sku_1)
+(finalize_sourcing_for_fulfillment_unit wave_2 item_sku_1)
+(assign_workstation_to_fulfillment_unit wave_2 work_station_1)
+(assign_packing_station_to_wave wave_2 packing_station_1)
+(assign_carrier_service_to_wave wave_2 carrier_service_express)
+(allocate_package_to_shipment wave_2 package_medium shipment_1)
+(prepare_wave_for_packaging wave_2 package_medium shipment_1 item_sku_1)
+(initiate_wave_packing_variant_a wave_2 packing_station_1 work_station_1 package_medium shipment_1)
+(complete_wave_packing_stage wave_2 carrier_service_express package_medium shipment_1)
+(finalize_wave_and_mark_ready wave_2)
+(assign_delivery_window_to_fulfillment_unit wave_2 delivery_window_1 item_sku_1)
+(release_wave_for_dispatch wave_2 inventory_location_2 delivery_window_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__zyj2i_o/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val__zyj2i_o/plan.pddl 64 
+
+
+
+--- stderr ---
+

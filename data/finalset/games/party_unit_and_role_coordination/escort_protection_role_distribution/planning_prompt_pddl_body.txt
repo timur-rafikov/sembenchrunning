@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain escort_protection_role_distribution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types assignable_resource - object static_resource - object tactical_element - object unit_base - object participant - unit_base role_slot - assignable_resource specialization - assignable_resource support_agent - assignable_resource modifier_token - assignable_resource behavior_profile - assignable_resource escort_protocol - assignable_resource upgrade_module - assignable_resource comm_marker - assignable_resource equipment_token - static_resource support_point - static_resource mission_objective - static_resource coverage_zone - tactical_element encounter - tactical_element maneuver_token - tactical_element escort_entity - participant team_entity - participant escort_target - escort_entity rover - escort_entity mission_team - team_entity)
+  (:predicates
+    (enlisted ?participant - participant)
+    (participant_confirmed ?participant - participant)
+    (has_role_slot ?participant - participant)
+    (activated ?participant - participant)
+    (ready ?participant - participant)
+    (participant_protocol_assigned_flag ?participant - participant)
+    (slot_free ?role_slot - role_slot)
+    (has_slot ?participant - participant ?role_slot - role_slot)
+    (specialization_available ?specialization - specialization)
+    (assigned_specialization ?participant - participant ?specialization - specialization)
+    (support_available ?support_agent - support_agent)
+    (assigned_support ?participant - participant ?support_agent - support_agent)
+    (equipment_available ?equipment_token - equipment_token)
+    (equipment_assigned_to_target ?escort_target - escort_target ?equipment_token - equipment_token)
+    (equipment_assigned_to_rover ?roving_escort - rover ?equipment_token - equipment_token)
+    (assigned_zone ?escort_target - escort_target ?coverage_zone - coverage_zone)
+    (zone_primary_claimed ?coverage_zone - coverage_zone)
+    (zone_secondary_claimed ?coverage_zone - coverage_zone)
+    (target_secured ?escort_target - escort_target)
+    (rover_assigned_encounter ?roving_escort - rover ?encounter - encounter)
+    (encounter_primary_claimed ?encounter - encounter)
+    (encounter_secondary_claimed ?encounter - encounter)
+    (rover_committed ?roving_escort - rover)
+    (maneuver_available ?maneuver_token - maneuver_token)
+    (maneuver_committed ?maneuver_token - maneuver_token)
+    (maneuver_zone_assignment ?maneuver_token - maneuver_token ?coverage_zone - coverage_zone)
+    (maneuver_encounter_assignment ?maneuver_token - maneuver_token ?encounter - encounter)
+    (maneuver_zone_secondary ?maneuver_token - maneuver_token)
+    (maneuver_encounter_secondary ?maneuver_token - maneuver_token)
+    (maneuver_support_point_reserved ?maneuver_token - maneuver_token)
+    (team_assigned_target ?mission_team - mission_team ?escort_target - escort_target)
+    (team_assigned_rover ?mission_team - mission_team ?roving_escort - rover)
+    (team_has_maneuver ?mission_team - mission_team ?maneuver_token - maneuver_token)
+    (support_point_available ?support_point - support_point)
+    (team_has_support_point ?mission_team - mission_team ?support_point - support_point)
+    (support_point_reserved ?support_point - support_point)
+    (support_point_assigned_maneuver ?support_point - support_point ?maneuver_token - maneuver_token)
+    (team_maneuver_locked ?mission_team - mission_team)
+    (team_upgrade_staged ?mission_team - mission_team)
+    (team_modifier_stage_ready ?mission_team - mission_team)
+    (team_modifier_attached ?mission_team - mission_team)
+    (team_modifier_committed ?mission_team - mission_team)
+    (team_behavior_stage_ready ?mission_team - mission_team)
+    (team_final_stage ?mission_team - mission_team)
+    (objective_available ?mission_objective - mission_objective)
+    (team_assigned_objective ?mission_team - mission_team ?mission_objective - mission_objective)
+    (team_objective_claimed ?mission_team - mission_team)
+    (team_objective_acknowledged ?mission_team - mission_team)
+    (team_objective_confirmed ?mission_team - mission_team)
+    (modifier_available ?modifier_token - modifier_token)
+    (team_has_modifier ?mission_team - mission_team ?modifier_token - modifier_token)
+    (behavior_profile_available ?behavior_profile - behavior_profile)
+    (team_has_behavior_profile ?mission_team - mission_team ?behavior_profile - behavior_profile)
+    (upgrade_available ?upgrade_module - upgrade_module)
+    (team_has_upgrade ?mission_team - mission_team ?upgrade_module - upgrade_module)
+    (comm_marker_available ?comm_marker - comm_marker)
+    (team_has_comm_marker ?mission_team - mission_team ?comm_marker - comm_marker)
+    (protocol_available ?escort_protocol - escort_protocol)
+    (participant_assigned_protocol ?participant - participant ?escort_protocol - escort_protocol)
+    (target_prepared ?escort_target - escort_target)
+    (rover_prepared ?roving_escort - rover)
+    (team_staged ?mission_team - mission_team)
+  )
+  (:action enlist_participant
+    :parameters (?participant - participant)
+    :precondition
+      (and
+        (not
+          (enlisted ?participant)
+        )
+        (not
+          (activated ?participant)
+        )
+      )
+    :effect (enlisted ?participant)
+  )
+  (:action claim_role_slot
+    :parameters (?participant - participant ?role_slot - role_slot)
+    :precondition
+      (and
+        (enlisted ?participant)
+        (not
+          (has_role_slot ?participant)
+        )
+        (slot_free ?role_slot)
+      )
+    :effect
+      (and
+        (has_role_slot ?participant)
+        (has_slot ?participant ?role_slot)
+        (not
+          (slot_free ?role_slot)
+        )
+      )
+  )
+  (:action assign_specialization_to_participant
+    :parameters (?participant - participant ?specialization - specialization)
+    :precondition
+      (and
+        (enlisted ?participant)
+        (has_role_slot ?participant)
+        (specialization_available ?specialization)
+      )
+    :effect
+      (and
+        (assigned_specialization ?participant ?specialization)
+        (not
+          (specialization_available ?specialization)
+        )
+      )
+  )
+  (:action confirm_enlistment
+    :parameters (?participant - participant ?specialization - specialization)
+    :precondition
+      (and
+        (enlisted ?participant)
+        (has_role_slot ?participant)
+        (assigned_specialization ?participant ?specialization)
+        (not
+          (participant_confirmed ?participant)
+        )
+      )
+    :effect (participant_confirmed ?participant)
+  )
+  (:action release_specialization
+    :parameters (?participant - participant ?specialization - specialization)
+    :precondition
+      (and
+        (assigned_specialization ?participant ?specialization)
+      )
+    :effect
+      (and
+        (specialization_available ?specialization)
+        (not
+          (assigned_specialization ?participant ?specialization)
+        )
+      )
+  )
+  (:action assign_support_agent_to_participant
+    :parameters (?participant - participant ?support_agent - support_agent)
+    :precondition
+      (and
+        (participant_confirmed ?participant)
+        (support_available ?support_agent)
+      )
+    :effect
+      (and
+        (assigned_support ?participant ?support_agent)
+        (not
+          (support_available ?support_agent)
+        )
+      )
+  )
+  (:action release_support_agent_from_participant
+    :parameters (?participant - participant ?support_agent - support_agent)
+    :precondition
+      (and
+        (assigned_support ?participant ?support_agent)
+      )
+    :effect
+      (and
+        (support_available ?support_agent)
+        (not
+          (assigned_support ?participant ?support_agent)
+        )
+      )
+  )
+  (:action attach_upgrade_module_to_team
+    :parameters (?mission_team - mission_team ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (upgrade_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (team_has_upgrade ?mission_team ?upgrade_module)
+        (not
+          (upgrade_available ?upgrade_module)
+        )
+      )
+  )
+  (:action detach_upgrade_module_from_team
+    :parameters (?mission_team - mission_team ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (team_has_upgrade ?mission_team ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_available ?upgrade_module)
+        (not
+          (team_has_upgrade ?mission_team ?upgrade_module)
+        )
+      )
+  )
+  (:action attach_comm_marker_to_team
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (comm_marker_available ?comm_marker)
+      )
+    :effect
+      (and
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (not
+          (comm_marker_available ?comm_marker)
+        )
+      )
+  )
+  (:action detach_comm_marker_from_team
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker)
+    :precondition
+      (and
+        (team_has_comm_marker ?mission_team ?comm_marker)
+      )
+    :effect
+      (and
+        (comm_marker_available ?comm_marker)
+        (not
+          (team_has_comm_marker ?mission_team ?comm_marker)
+        )
+      )
+  )
+  (:action mark_zone_primary_coverage
+    :parameters (?escort_target - escort_target ?coverage_zone - coverage_zone ?specialization - specialization)
+    :precondition
+      (and
+        (participant_confirmed ?escort_target)
+        (assigned_specialization ?escort_target ?specialization)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (not
+          (zone_primary_claimed ?coverage_zone)
+        )
+        (not
+          (zone_secondary_claimed ?coverage_zone)
+        )
+      )
+    :effect (zone_primary_claimed ?coverage_zone)
+  )
+  (:action secure_target_with_support
+    :parameters (?escort_target - escort_target ?coverage_zone - coverage_zone ?support_agent - support_agent)
+    :precondition
+      (and
+        (participant_confirmed ?escort_target)
+        (assigned_support ?escort_target ?support_agent)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (zone_primary_claimed ?coverage_zone)
+        (not
+          (target_prepared ?escort_target)
+        )
+      )
+    :effect
+      (and
+        (target_prepared ?escort_target)
+        (target_secured ?escort_target)
+      )
+  )
+  (:action equip_target
+    :parameters (?escort_target - escort_target ?coverage_zone - coverage_zone ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (participant_confirmed ?escort_target)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (equipment_available ?equipment_token)
+        (not
+          (target_prepared ?escort_target)
+        )
+      )
+    :effect
+      (and
+        (zone_secondary_claimed ?coverage_zone)
+        (target_prepared ?escort_target)
+        (equipment_assigned_to_target ?escort_target ?equipment_token)
+        (not
+          (equipment_available ?equipment_token)
+        )
+      )
+  )
+  (:action commit_equipment_to_target
+    :parameters (?escort_target - escort_target ?coverage_zone - coverage_zone ?specialization - specialization ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (participant_confirmed ?escort_target)
+        (assigned_specialization ?escort_target ?specialization)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (zone_secondary_claimed ?coverage_zone)
+        (equipment_assigned_to_target ?escort_target ?equipment_token)
+        (not
+          (target_secured ?escort_target)
+        )
+      )
+    :effect
+      (and
+        (zone_primary_claimed ?coverage_zone)
+        (target_secured ?escort_target)
+        (equipment_available ?equipment_token)
+        (not
+          (equipment_assigned_to_target ?escort_target ?equipment_token)
+        )
+      )
+  )
+  (:action claim_encounter_primary_for_rover
+    :parameters (?roving_escort - rover ?encounter - encounter ?specialization - specialization)
+    :precondition
+      (and
+        (participant_confirmed ?roving_escort)
+        (assigned_specialization ?roving_escort ?specialization)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (not
+          (encounter_primary_claimed ?encounter)
+        )
+        (not
+          (encounter_secondary_claimed ?encounter)
+        )
+      )
+    :effect (encounter_primary_claimed ?encounter)
+  )
+  (:action assign_support_to_rover
+    :parameters (?roving_escort - rover ?encounter - encounter ?support_agent - support_agent)
+    :precondition
+      (and
+        (participant_confirmed ?roving_escort)
+        (assigned_support ?roving_escort ?support_agent)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (encounter_primary_claimed ?encounter)
+        (not
+          (rover_prepared ?roving_escort)
+        )
+      )
+    :effect
+      (and
+        (rover_prepared ?roving_escort)
+        (rover_committed ?roving_escort)
+      )
+  )
+  (:action assign_equipment_to_rover
+    :parameters (?roving_escort - rover ?encounter - encounter ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (participant_confirmed ?roving_escort)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (equipment_available ?equipment_token)
+        (not
+          (rover_prepared ?roving_escort)
+        )
+      )
+    :effect
+      (and
+        (encounter_secondary_claimed ?encounter)
+        (rover_prepared ?roving_escort)
+        (equipment_assigned_to_rover ?roving_escort ?equipment_token)
+        (not
+          (equipment_available ?equipment_token)
+        )
+      )
+  )
+  (:action finalize_rover_equipment_assignment
+    :parameters (?roving_escort - rover ?encounter - encounter ?specialization - specialization ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (participant_confirmed ?roving_escort)
+        (assigned_specialization ?roving_escort ?specialization)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (encounter_secondary_claimed ?encounter)
+        (equipment_assigned_to_rover ?roving_escort ?equipment_token)
+        (not
+          (rover_committed ?roving_escort)
+        )
+      )
+    :effect
+      (and
+        (encounter_primary_claimed ?encounter)
+        (rover_committed ?roving_escort)
+        (equipment_available ?equipment_token)
+        (not
+          (equipment_assigned_to_rover ?roving_escort ?equipment_token)
+        )
+      )
+  )
+  (:action commit_maneuver_zone_primary_encounter_primary
+    :parameters (?escort_target - escort_target ?roving_escort - rover ?coverage_zone - coverage_zone ?encounter - encounter ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (target_prepared ?escort_target)
+        (rover_prepared ?roving_escort)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (zone_primary_claimed ?coverage_zone)
+        (encounter_primary_claimed ?encounter)
+        (target_secured ?escort_target)
+        (rover_committed ?roving_escort)
+        (maneuver_available ?maneuver_token)
+      )
+    :effect
+      (and
+        (maneuver_committed ?maneuver_token)
+        (maneuver_zone_assignment ?maneuver_token ?coverage_zone)
+        (maneuver_encounter_assignment ?maneuver_token ?encounter)
+        (not
+          (maneuver_available ?maneuver_token)
+        )
+      )
+  )
+  (:action commit_maneuver_zone_secondary_encounter_primary
+    :parameters (?escort_target - escort_target ?roving_escort - rover ?coverage_zone - coverage_zone ?encounter - encounter ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (target_prepared ?escort_target)
+        (rover_prepared ?roving_escort)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (zone_secondary_claimed ?coverage_zone)
+        (encounter_primary_claimed ?encounter)
+        (not
+          (target_secured ?escort_target)
+        )
+        (rover_committed ?roving_escort)
+        (maneuver_available ?maneuver_token)
+      )
+    :effect
+      (and
+        (maneuver_committed ?maneuver_token)
+        (maneuver_zone_assignment ?maneuver_token ?coverage_zone)
+        (maneuver_encounter_assignment ?maneuver_token ?encounter)
+        (maneuver_zone_secondary ?maneuver_token)
+        (not
+          (maneuver_available ?maneuver_token)
+        )
+      )
+  )
+  (:action commit_maneuver_zone_primary_encounter_secondary
+    :parameters (?escort_target - escort_target ?roving_escort - rover ?coverage_zone - coverage_zone ?encounter - encounter ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (target_prepared ?escort_target)
+        (rover_prepared ?roving_escort)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (zone_primary_claimed ?coverage_zone)
+        (encounter_secondary_claimed ?encounter)
+        (target_secured ?escort_target)
+        (not
+          (rover_committed ?roving_escort)
+        )
+        (maneuver_available ?maneuver_token)
+      )
+    :effect
+      (and
+        (maneuver_committed ?maneuver_token)
+        (maneuver_zone_assignment ?maneuver_token ?coverage_zone)
+        (maneuver_encounter_assignment ?maneuver_token ?encounter)
+        (maneuver_encounter_secondary ?maneuver_token)
+        (not
+          (maneuver_available ?maneuver_token)
+        )
+      )
+  )
+  (:action commit_maneuver_zone_secondary_encounter_secondary
+    :parameters (?escort_target - escort_target ?roving_escort - rover ?coverage_zone - coverage_zone ?encounter - encounter ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (target_prepared ?escort_target)
+        (rover_prepared ?roving_escort)
+        (assigned_zone ?escort_target ?coverage_zone)
+        (rover_assigned_encounter ?roving_escort ?encounter)
+        (zone_secondary_claimed ?coverage_zone)
+        (encounter_secondary_claimed ?encounter)
+        (not
+          (target_secured ?escort_target)
+        )
+        (not
+          (rover_committed ?roving_escort)
+        )
+        (maneuver_available ?maneuver_token)
+      )
+    :effect
+      (and
+        (maneuver_committed ?maneuver_token)
+        (maneuver_zone_assignment ?maneuver_token ?coverage_zone)
+        (maneuver_encounter_assignment ?maneuver_token ?encounter)
+        (maneuver_zone_secondary ?maneuver_token)
+        (maneuver_encounter_secondary ?maneuver_token)
+        (not
+          (maneuver_available ?maneuver_token)
+        )
+      )
+  )
+  (:action reserve_maneuver_support_point
+    :parameters (?maneuver_token - maneuver_token ?escort_target - escort_target ?specialization - specialization)
+    :precondition
+      (and
+        (maneuver_committed ?maneuver_token)
+        (target_prepared ?escort_target)
+        (assigned_specialization ?escort_target ?specialization)
+        (not
+          (maneuver_support_point_reserved ?maneuver_token)
+        )
+      )
+    :effect (maneuver_support_point_reserved ?maneuver_token)
+  )
+  (:action assign_support_point_to_maneuver
+    :parameters (?mission_team - mission_team ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (team_has_maneuver ?mission_team ?maneuver_token)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_available ?support_point)
+        (maneuver_committed ?maneuver_token)
+        (maneuver_support_point_reserved ?maneuver_token)
+        (not
+          (support_point_reserved ?support_point)
+        )
+      )
+    :effect
+      (and
+        (support_point_reserved ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (not
+          (support_point_available ?support_point)
+        )
+      )
+  )
+  (:action prepare_team_for_maneuver
+    :parameters (?mission_team - mission_team ?support_point - support_point ?maneuver_token - maneuver_token ?specialization - specialization)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_reserved ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (assigned_specialization ?mission_team ?specialization)
+        (not
+          (maneuver_zone_secondary ?maneuver_token)
+        )
+        (not
+          (team_maneuver_locked ?mission_team)
+        )
+      )
+    :effect (team_maneuver_locked ?mission_team)
+  )
+  (:action attach_modifier_to_team
+    :parameters (?mission_team - mission_team ?modifier_token - modifier_token)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (modifier_available ?modifier_token)
+        (not
+          (team_modifier_attached ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_modifier_attached ?mission_team)
+        (team_has_modifier ?mission_team ?modifier_token)
+        (not
+          (modifier_available ?modifier_token)
+        )
+      )
+  )
+  (:action prepare_team_with_modifier
+    :parameters (?mission_team - mission_team ?support_point - support_point ?maneuver_token - maneuver_token ?specialization - specialization ?modifier_token - modifier_token)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_reserved ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (assigned_specialization ?mission_team ?specialization)
+        (maneuver_zone_secondary ?maneuver_token)
+        (team_modifier_attached ?mission_team)
+        (team_has_modifier ?mission_team ?modifier_token)
+        (not
+          (team_maneuver_locked ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_maneuver_locked ?mission_team)
+        (team_modifier_committed ?mission_team)
+      )
+  )
+  (:action stage_team_with_upgrade_no_encounter_secondary
+    :parameters (?mission_team - mission_team ?upgrade_module - upgrade_module ?support_agent - support_agent ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_maneuver_locked ?mission_team)
+        (team_has_upgrade ?mission_team ?upgrade_module)
+        (assigned_support ?mission_team ?support_agent)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (not
+          (maneuver_encounter_secondary ?maneuver_token)
+        )
+        (not
+          (team_upgrade_staged ?mission_team)
+        )
+      )
+    :effect (team_upgrade_staged ?mission_team)
+  )
+  (:action stage_team_with_upgrade_with_encounter_secondary
+    :parameters (?mission_team - mission_team ?upgrade_module - upgrade_module ?support_agent - support_agent ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_maneuver_locked ?mission_team)
+        (team_has_upgrade ?mission_team ?upgrade_module)
+        (assigned_support ?mission_team ?support_agent)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (maneuver_encounter_secondary ?maneuver_token)
+        (not
+          (team_upgrade_staged ?mission_team)
+        )
+      )
+    :effect (team_upgrade_staged ?mission_team)
+  )
+  (:action commit_comm_marker_variant1
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_upgrade_staged ?mission_team)
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (not
+          (maneuver_zone_secondary ?maneuver_token)
+        )
+        (not
+          (maneuver_encounter_secondary ?maneuver_token)
+        )
+        (not
+          (team_modifier_stage_ready ?mission_team)
+        )
+      )
+    :effect (team_modifier_stage_ready ?mission_team)
+  )
+  (:action commit_comm_marker_variant2
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_upgrade_staged ?mission_team)
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (maneuver_zone_secondary ?maneuver_token)
+        (not
+          (maneuver_encounter_secondary ?maneuver_token)
+        )
+        (not
+          (team_modifier_stage_ready ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_behavior_stage_ready ?mission_team)
+      )
+  )
+  (:action commit_comm_marker_variant3
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_upgrade_staged ?mission_team)
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (not
+          (maneuver_zone_secondary ?maneuver_token)
+        )
+        (maneuver_encounter_secondary ?maneuver_token)
+        (not
+          (team_modifier_stage_ready ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_behavior_stage_ready ?mission_team)
+      )
+  )
+  (:action commit_comm_marker_variant4
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker ?support_point - support_point ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (team_upgrade_staged ?mission_team)
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (team_has_support_point ?mission_team ?support_point)
+        (support_point_assigned_maneuver ?support_point ?maneuver_token)
+        (maneuver_zone_secondary ?maneuver_token)
+        (maneuver_encounter_secondary ?maneuver_token)
+        (not
+          (team_modifier_stage_ready ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_behavior_stage_ready ?mission_team)
+      )
+  )
+  (:action stage_team_for_activation
+    :parameters (?mission_team - mission_team)
+    :precondition
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (not
+          (team_behavior_stage_ready ?mission_team)
+        )
+        (not
+          (team_staged ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_staged ?mission_team)
+        (ready ?mission_team)
+      )
+  )
+  (:action assign_behavior_profile_to_team
+    :parameters (?mission_team - mission_team ?behavior_profile - behavior_profile)
+    :precondition
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_behavior_stage_ready ?mission_team)
+        (behavior_profile_available ?behavior_profile)
+      )
+    :effect
+      (and
+        (team_has_behavior_profile ?mission_team ?behavior_profile)
+        (not
+          (behavior_profile_available ?behavior_profile)
+        )
+      )
+  )
+  (:action finalize_team_preparation
+    :parameters (?mission_team - mission_team ?escort_target - escort_target ?roving_escort - rover ?specialization - specialization ?behavior_profile - behavior_profile)
+    :precondition
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_behavior_stage_ready ?mission_team)
+        (team_has_behavior_profile ?mission_team ?behavior_profile)
+        (team_assigned_target ?mission_team ?escort_target)
+        (team_assigned_rover ?mission_team ?roving_escort)
+        (target_secured ?escort_target)
+        (rover_committed ?roving_escort)
+        (assigned_specialization ?mission_team ?specialization)
+        (not
+          (team_final_stage ?mission_team)
+        )
+      )
+    :effect (team_final_stage ?mission_team)
+  )
+  (:action stage_team_for_activation_with_final_stage
+    :parameters (?mission_team - mission_team)
+    :precondition
+      (and
+        (team_modifier_stage_ready ?mission_team)
+        (team_final_stage ?mission_team)
+        (not
+          (team_staged ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_staged ?mission_team)
+        (ready ?mission_team)
+      )
+  )
+  (:action claim_objective_for_team
+    :parameters (?mission_team - mission_team ?mission_objective - mission_objective ?specialization - specialization)
+    :precondition
+      (and
+        (participant_confirmed ?mission_team)
+        (assigned_specialization ?mission_team ?specialization)
+        (objective_available ?mission_objective)
+        (team_assigned_objective ?mission_team ?mission_objective)
+        (not
+          (team_objective_claimed ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_objective_claimed ?mission_team)
+        (not
+          (objective_available ?mission_objective)
+        )
+      )
+  )
+  (:action acknowledge_objective
+    :parameters (?mission_team - mission_team ?support_agent - support_agent)
+    :precondition
+      (and
+        (team_objective_claimed ?mission_team)
+        (assigned_support ?mission_team ?support_agent)
+        (not
+          (team_objective_acknowledged ?mission_team)
+        )
+      )
+    :effect (team_objective_acknowledged ?mission_team)
+  )
+  (:action confirm_objective_comm_marker
+    :parameters (?mission_team - mission_team ?comm_marker - comm_marker)
+    :precondition
+      (and
+        (team_objective_acknowledged ?mission_team)
+        (team_has_comm_marker ?mission_team ?comm_marker)
+        (not
+          (team_objective_confirmed ?mission_team)
+        )
+      )
+    :effect (team_objective_confirmed ?mission_team)
+  )
+  (:action stage_team_activation_from_objective_confirm
+    :parameters (?mission_team - mission_team)
+    :precondition
+      (and
+        (team_objective_confirmed ?mission_team)
+        (not
+          (team_staged ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (team_staged ?mission_team)
+        (ready ?mission_team)
+      )
+  )
+  (:action activate_target_post_maneuver
+    :parameters (?escort_target - escort_target ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (target_prepared ?escort_target)
+        (target_secured ?escort_target)
+        (maneuver_committed ?maneuver_token)
+        (maneuver_support_point_reserved ?maneuver_token)
+        (not
+          (ready ?escort_target)
+        )
+      )
+    :effect (ready ?escort_target)
+  )
+  (:action activate_rover_post_maneuver
+    :parameters (?roving_escort - rover ?maneuver_token - maneuver_token)
+    :precondition
+      (and
+        (rover_prepared ?roving_escort)
+        (rover_committed ?roving_escort)
+        (maneuver_committed ?maneuver_token)
+        (maneuver_support_point_reserved ?maneuver_token)
+        (not
+          (ready ?roving_escort)
+        )
+      )
+    :effect (ready ?roving_escort)
+  )
+  (:action apply_escort_protocol_to_participant
+    :parameters (?participant - participant ?escort_protocol - escort_protocol ?specialization - specialization)
+    :precondition
+      (and
+        (ready ?participant)
+        (assigned_specialization ?participant ?specialization)
+        (protocol_available ?escort_protocol)
+        (not
+          (participant_protocol_assigned_flag ?participant)
+        )
+      )
+    :effect
+      (and
+        (participant_protocol_assigned_flag ?participant)
+        (participant_assigned_protocol ?participant ?escort_protocol)
+        (not
+          (protocol_available ?escort_protocol)
+        )
+      )
+  )
+  (:action activate_target
+    :parameters (?escort_target - escort_target ?role_slot - role_slot ?escort_protocol - escort_protocol)
+    :precondition
+      (and
+        (participant_protocol_assigned_flag ?escort_target)
+        (has_slot ?escort_target ?role_slot)
+        (participant_assigned_protocol ?escort_target ?escort_protocol)
+        (not
+          (activated ?escort_target)
+        )
+      )
+    :effect
+      (and
+        (activated ?escort_target)
+        (slot_free ?role_slot)
+        (protocol_available ?escort_protocol)
+      )
+  )
+  (:action activate_rover
+    :parameters (?roving_escort - rover ?role_slot - role_slot ?escort_protocol - escort_protocol)
+    :precondition
+      (and
+        (participant_protocol_assigned_flag ?roving_escort)
+        (has_slot ?roving_escort ?role_slot)
+        (participant_assigned_protocol ?roving_escort ?escort_protocol)
+        (not
+          (activated ?roving_escort)
+        )
+      )
+    :effect
+      (and
+        (activated ?roving_escort)
+        (slot_free ?role_slot)
+        (protocol_available ?escort_protocol)
+      )
+  )
+  (:action activate_team
+    :parameters (?mission_team - mission_team ?role_slot - role_slot ?escort_protocol - escort_protocol)
+    :precondition
+      (and
+        (participant_protocol_assigned_flag ?mission_team)
+        (has_slot ?mission_team ?role_slot)
+        (participant_assigned_protocol ?mission_team ?escort_protocol)
+        (not
+          (activated ?mission_team)
+        )
+      )
+    :effect
+      (and
+        (activated ?mission_team)
+        (slot_free ?role_slot)
+        (protocol_available ?escort_protocol)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem escort_protection_scenario)
+  (:domain escort_protection_role_distribution)
+  (:objects escort_target_convoy - escort_target roving_escort_scout - rover team_alpha - mission_team team_bravo - mission_team role_slot_tank - role_slot role_slot_healer - role_slot role_slot_support - role_slot specialization_healer - specialization support_agent_drone_1 - support_agent equipment_kit_1 - equipment_token coverage_zone_alpha - coverage_zone encounter_alpha - encounter maneuver_flank_alpha - maneuver_token support_point_outpost_a - support_point support_point_outpost_b - support_point modifier_attack_boost - modifier_token modifier_defense_boost - modifier_token behavior_aggressive - behavior_profile behavior_defensive - behavior_profile escort_protocol_standard - escort_protocol upgrade_module_reinforcement - upgrade_module mission_objective_secure_bridge - mission_objective mission_objective_establish_perimeter - mission_objective comm_marker_channel_1 - comm_marker)
+  (:init
+    (slot_free role_slot_tank)
+    (slot_free role_slot_healer)
+    (slot_free role_slot_support)
+    (specialization_available specialization_healer)
+    (support_available support_agent_drone_1)
+    (equipment_available equipment_kit_1)
+    (assigned_zone escort_target_convoy coverage_zone_alpha)
+    (rover_assigned_encounter roving_escort_scout encounter_alpha)
+    (maneuver_available maneuver_flank_alpha)
+    (support_point_available support_point_outpost_a)
+    (support_point_available support_point_outpost_b)
+    (team_assigned_target team_alpha escort_target_convoy)
+    (team_assigned_target team_bravo escort_target_convoy)
+    (team_assigned_rover team_alpha roving_escort_scout)
+    (team_assigned_rover team_bravo roving_escort_scout)
+    (team_has_maneuver team_alpha maneuver_flank_alpha)
+    (team_has_maneuver team_bravo maneuver_flank_alpha)
+    (team_has_support_point team_alpha support_point_outpost_a)
+    (team_has_support_point team_bravo support_point_outpost_b)
+    (modifier_available modifier_attack_boost)
+    (modifier_available modifier_defense_boost)
+    (behavior_profile_available behavior_aggressive)
+    (behavior_profile_available behavior_defensive)
+    (protocol_available escort_protocol_standard)
+    (upgrade_available upgrade_module_reinforcement)
+    (objective_available mission_objective_secure_bridge)
+    (team_assigned_objective team_alpha mission_objective_secure_bridge)
+    (team_assigned_objective team_bravo mission_objective_establish_perimeter)
+    (comm_marker_available comm_marker_channel_1)
+  )
+  (:goal
+    (and
+      (activated escort_target_convoy)
+      (activated roving_escort_scout)
+      (activated team_alpha)
+      (activated team_bravo)
+    )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain boss_failure_loadout_adjustment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types asset_category - object item_category - object bundle_category - object encounter_root - object encounter_entity - encounter_root loadout_template - asset_category weapon_option - asset_category support_unit - asset_category tactic_module - asset_category consumable_buff - asset_category recovery_resource - asset_category special_equipment - asset_category synergy_modifier - asset_category inventory_item - item_category attachment_module - item_category tactical_trait - item_category primary_equipment_slot - bundle_category secondary_equipment_slot - bundle_category loadout_bundle - bundle_category player_role_group - encounter_entity plan_group - encounter_entity attacker_slot - player_role_group support_slot - player_role_group operator - plan_group)
+  (:predicates
+    (encounter_active ?encounter_entity - encounter_entity)
+    (entity_validated ?encounter_entity - encounter_entity)
+    (loadout_template_selected ?encounter_entity - encounter_entity)
+    (recovery_allocated ?encounter_entity - encounter_entity)
+    (ready_for_redeployment ?encounter_entity - encounter_entity)
+    (recovery_consumed ?encounter_entity - encounter_entity)
+    (loadout_template_available ?loadout_template - loadout_template)
+    (assigned_loadout_template ?encounter_entity - encounter_entity ?loadout_template - loadout_template)
+    (weapon_available ?weapon_option - weapon_option)
+    (bound_weapon ?encounter_entity - encounter_entity ?weapon_option - weapon_option)
+    (support_unit_available ?support_unit - support_unit)
+    (assigned_support_unit ?encounter_entity - encounter_entity ?support_unit - support_unit)
+    (inventory_item_available ?inventory_item - inventory_item)
+    (attacker_slot_item_assigned ?attacker_slot - attacker_slot ?inventory_item - inventory_item)
+    (support_slot_item_assigned ?support_slot - support_slot ?inventory_item - inventory_item)
+    (has_primary_slot ?attacker_slot - attacker_slot ?primary_equipment_slot - primary_equipment_slot)
+    (primary_slot_staged ?primary_equipment_slot - primary_equipment_slot)
+    (primary_slot_equipped ?primary_equipment_slot - primary_equipment_slot)
+    (attacker_slot_committed ?attacker_slot - attacker_slot)
+    (has_secondary_slot ?support_slot - support_slot ?secondary_equipment_slot - secondary_equipment_slot)
+    (secondary_slot_staged ?secondary_equipment_slot - secondary_equipment_slot)
+    (secondary_slot_equipped ?secondary_equipment_slot - secondary_equipment_slot)
+    (support_slot_committed ?support_slot - support_slot)
+    (bundle_template_available ?loadout_bundle - loadout_bundle)
+    (bundle_committed ?loadout_bundle - loadout_bundle)
+    (bundle_primary_assignment ?loadout_bundle - loadout_bundle ?primary_equipment_slot - primary_equipment_slot)
+    (bundle_secondary_assignment ?loadout_bundle - loadout_bundle ?secondary_equipment_slot - secondary_equipment_slot)
+    (bundle_primary_ready ?loadout_bundle - loadout_bundle)
+    (bundle_secondary_ready ?loadout_bundle - loadout_bundle)
+    (bundle_finalized ?loadout_bundle - loadout_bundle)
+    (operator_has_attacker_slot ?mission_coordinator - operator ?attacker_slot - attacker_slot)
+    (operator_has_support_slot ?mission_coordinator - operator ?support_slot - support_slot)
+    (operator_has_bundle ?mission_coordinator - operator ?loadout_bundle - loadout_bundle)
+    (attachment_module_available ?attachment_module - attachment_module)
+    (operator_attachment_slot ?mission_coordinator - operator ?attachment_module - attachment_module)
+    (module_committed ?attachment_module - attachment_module)
+    (module_attached_to_bundle ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    (operator_module_applied ?mission_coordinator - operator)
+    (operator_attachment_confirmed ?mission_coordinator - operator)
+    (operator_synergy_validated ?mission_coordinator - operator)
+    (operator_tactic_assigned ?mission_coordinator - operator)
+    (operator_tactic_staged ?mission_coordinator - operator)
+    (operator_trait_applied ?mission_coordinator - operator)
+    (operator_activation_ready ?mission_coordinator - operator)
+    (tactical_trait_available ?tactical_trait - tactical_trait)
+    (operator_tactical_trait_assigned ?mission_coordinator - operator ?tactical_trait - tactical_trait)
+    (operator_trait_active ?mission_coordinator - operator)
+    (operator_trait_confirmed ?mission_coordinator - operator)
+    (operator_trait_finalized ?mission_coordinator - operator)
+    (tactic_module_available ?tactic_module - tactic_module)
+    (operator_tactic_module_assigned ?mission_coordinator - operator ?tactic_module - tactic_module)
+    (consumable_buff_available ?consumable_buff - consumable_buff)
+    (operator_consumable_assigned ?mission_coordinator - operator ?consumable_buff - consumable_buff)
+    (special_equipment_available ?special_equipment - special_equipment)
+    (operator_special_equipment_assigned ?mission_coordinator - operator ?special_equipment - special_equipment)
+    (synergy_modifier_available ?synergy_modifier - synergy_modifier)
+    (operator_synergy_modifier_assigned ?mission_coordinator - operator ?synergy_modifier - synergy_modifier)
+    (recovery_resource_available ?recovery_resource - recovery_resource)
+    (entity_recovery_allocated ?encounter_entity - encounter_entity ?recovery_resource - recovery_resource)
+    (attacker_slot_staged ?attacker_slot - attacker_slot)
+    (support_slot_staged ?support_slot - support_slot)
+    (operator_locked ?mission_coordinator - operator)
+  )
+  (:action activate_encounter
+    :parameters (?encounter_entity - encounter_entity)
+    :precondition
+      (and
+        (not
+          (encounter_active ?encounter_entity)
+        )
+        (not
+          (recovery_allocated ?encounter_entity)
+        )
+      )
+    :effect (encounter_active ?encounter_entity)
+  )
+  (:action select_loadout_template
+    :parameters (?encounter_entity - encounter_entity ?loadout_template - loadout_template)
+    :precondition
+      (and
+        (encounter_active ?encounter_entity)
+        (not
+          (loadout_template_selected ?encounter_entity)
+        )
+        (loadout_template_available ?loadout_template)
+      )
+    :effect
+      (and
+        (loadout_template_selected ?encounter_entity)
+        (assigned_loadout_template ?encounter_entity ?loadout_template)
+        (not
+          (loadout_template_available ?loadout_template)
+        )
+      )
+  )
+  (:action bind_weapon_to_entity
+    :parameters (?encounter_entity - encounter_entity ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (encounter_active ?encounter_entity)
+        (loadout_template_selected ?encounter_entity)
+        (weapon_available ?weapon_option)
+      )
+    :effect
+      (and
+        (bound_weapon ?encounter_entity ?weapon_option)
+        (not
+          (weapon_available ?weapon_option)
+        )
+      )
+  )
+  (:action validate_weapon_binding
+    :parameters (?encounter_entity - encounter_entity ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (encounter_active ?encounter_entity)
+        (loadout_template_selected ?encounter_entity)
+        (bound_weapon ?encounter_entity ?weapon_option)
+        (not
+          (entity_validated ?encounter_entity)
+        )
+      )
+    :effect (entity_validated ?encounter_entity)
+  )
+  (:action release_weapon_binding
+    :parameters (?encounter_entity - encounter_entity ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (bound_weapon ?encounter_entity ?weapon_option)
+      )
+    :effect
+      (and
+        (weapon_available ?weapon_option)
+        (not
+          (bound_weapon ?encounter_entity ?weapon_option)
+        )
+      )
+  )
+  (:action assign_support_unit_to_entity
+    :parameters (?encounter_entity - encounter_entity ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_validated ?encounter_entity)
+        (support_unit_available ?support_unit)
+      )
+    :effect
+      (and
+        (assigned_support_unit ?encounter_entity ?support_unit)
+        (not
+          (support_unit_available ?support_unit)
+        )
+      )
+  )
+  (:action release_support_unit_from_entity
+    :parameters (?encounter_entity - encounter_entity ?support_unit - support_unit)
+    :precondition
+      (and
+        (assigned_support_unit ?encounter_entity ?support_unit)
+      )
+    :effect
+      (and
+        (support_unit_available ?support_unit)
+        (not
+          (assigned_support_unit ?encounter_entity ?support_unit)
+        )
+      )
+  )
+  (:action assign_special_equipment
+    :parameters (?mission_coordinator - operator ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (special_equipment_available ?special_equipment)
+      )
+    :effect
+      (and
+        (operator_special_equipment_assigned ?mission_coordinator ?special_equipment)
+        (not
+          (special_equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action unassign_special_equipment
+    :parameters (?mission_coordinator - operator ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (operator_special_equipment_assigned ?mission_coordinator ?special_equipment)
+      )
+    :effect
+      (and
+        (special_equipment_available ?special_equipment)
+        (not
+          (operator_special_equipment_assigned ?mission_coordinator ?special_equipment)
+        )
+      )
+  )
+  (:action assign_synergy_modifier
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (synergy_modifier_available ?synergy_modifier)
+      )
+    :effect
+      (and
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (not
+          (synergy_modifier_available ?synergy_modifier)
+        )
+      )
+  )
+  (:action unassign_synergy_modifier
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier)
+    :precondition
+      (and
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+      )
+    :effect
+      (and
+        (synergy_modifier_available ?synergy_modifier)
+        (not
+          (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        )
+      )
+  )
+  (:action stage_primary_equipment_slot
+    :parameters (?attacker_slot - attacker_slot ?primary_equipment_slot - primary_equipment_slot ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (entity_validated ?attacker_slot)
+        (bound_weapon ?attacker_slot ?weapon_option)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (not
+          (primary_slot_staged ?primary_equipment_slot)
+        )
+        (not
+          (primary_slot_equipped ?primary_equipment_slot)
+        )
+      )
+    :effect (primary_slot_staged ?primary_equipment_slot)
+  )
+  (:action confirm_attacker_slot
+    :parameters (?attacker_slot - attacker_slot ?primary_equipment_slot - primary_equipment_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_validated ?attacker_slot)
+        (assigned_support_unit ?attacker_slot ?support_unit)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (primary_slot_staged ?primary_equipment_slot)
+        (not
+          (attacker_slot_staged ?attacker_slot)
+        )
+      )
+    :effect
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (attacker_slot_committed ?attacker_slot)
+      )
+  )
+  (:action attach_item_to_attacker_slot
+    :parameters (?attacker_slot - attacker_slot ?primary_equipment_slot - primary_equipment_slot ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (entity_validated ?attacker_slot)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (inventory_item_available ?inventory_item)
+        (not
+          (attacker_slot_staged ?attacker_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_equipped ?primary_equipment_slot)
+        (attacker_slot_staged ?attacker_slot)
+        (attacker_slot_item_assigned ?attacker_slot ?inventory_item)
+        (not
+          (inventory_item_available ?inventory_item)
+        )
+      )
+  )
+  (:action commit_attacker_primary_setup
+    :parameters (?attacker_slot - attacker_slot ?primary_equipment_slot - primary_equipment_slot ?weapon_option - weapon_option ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (entity_validated ?attacker_slot)
+        (bound_weapon ?attacker_slot ?weapon_option)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (primary_slot_equipped ?primary_equipment_slot)
+        (attacker_slot_item_assigned ?attacker_slot ?inventory_item)
+        (not
+          (attacker_slot_committed ?attacker_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_staged ?primary_equipment_slot)
+        (attacker_slot_committed ?attacker_slot)
+        (inventory_item_available ?inventory_item)
+        (not
+          (attacker_slot_item_assigned ?attacker_slot ?inventory_item)
+        )
+      )
+  )
+  (:action stage_secondary_equipment_slot
+    :parameters (?support_slot - support_slot ?secondary_equipment_slot - secondary_equipment_slot ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (entity_validated ?support_slot)
+        (bound_weapon ?support_slot ?weapon_option)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (not
+          (secondary_slot_staged ?secondary_equipment_slot)
+        )
+        (not
+          (secondary_slot_equipped ?secondary_equipment_slot)
+        )
+      )
+    :effect (secondary_slot_staged ?secondary_equipment_slot)
+  )
+  (:action confirm_support_slot
+    :parameters (?support_slot - support_slot ?secondary_equipment_slot - secondary_equipment_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_validated ?support_slot)
+        (assigned_support_unit ?support_slot ?support_unit)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (secondary_slot_staged ?secondary_equipment_slot)
+        (not
+          (support_slot_staged ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (support_slot_staged ?support_slot)
+        (support_slot_committed ?support_slot)
+      )
+  )
+  (:action attach_item_to_support_slot
+    :parameters (?support_slot - support_slot ?secondary_equipment_slot - secondary_equipment_slot ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (entity_validated ?support_slot)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (inventory_item_available ?inventory_item)
+        (not
+          (support_slot_staged ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_equipped ?secondary_equipment_slot)
+        (support_slot_staged ?support_slot)
+        (support_slot_item_assigned ?support_slot ?inventory_item)
+        (not
+          (inventory_item_available ?inventory_item)
+        )
+      )
+  )
+  (:action commit_support_secondary_setup
+    :parameters (?support_slot - support_slot ?secondary_equipment_slot - secondary_equipment_slot ?weapon_option - weapon_option ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (entity_validated ?support_slot)
+        (bound_weapon ?support_slot ?weapon_option)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (secondary_slot_equipped ?secondary_equipment_slot)
+        (support_slot_item_assigned ?support_slot ?inventory_item)
+        (not
+          (support_slot_committed ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_staged ?secondary_equipment_slot)
+        (support_slot_committed ?support_slot)
+        (inventory_item_available ?inventory_item)
+        (not
+          (support_slot_item_assigned ?support_slot ?inventory_item)
+        )
+      )
+  )
+  (:action commit_loadout_bundle_basic
+    :parameters (?attacker_slot - attacker_slot ?support_slot - support_slot ?primary_equipment_slot - primary_equipment_slot ?secondary_equipment_slot - secondary_equipment_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (support_slot_staged ?support_slot)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (primary_slot_staged ?primary_equipment_slot)
+        (secondary_slot_staged ?secondary_equipment_slot)
+        (attacker_slot_committed ?attacker_slot)
+        (support_slot_committed ?support_slot)
+        (bundle_template_available ?loadout_bundle)
+      )
+    :effect
+      (and
+        (bundle_committed ?loadout_bundle)
+        (bundle_primary_assignment ?loadout_bundle ?primary_equipment_slot)
+        (bundle_secondary_assignment ?loadout_bundle ?secondary_equipment_slot)
+        (not
+          (bundle_template_available ?loadout_bundle)
+        )
+      )
+  )
+  (:action commit_loadout_bundle_primary_ready
+    :parameters (?attacker_slot - attacker_slot ?support_slot - support_slot ?primary_equipment_slot - primary_equipment_slot ?secondary_equipment_slot - secondary_equipment_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (support_slot_staged ?support_slot)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (primary_slot_equipped ?primary_equipment_slot)
+        (secondary_slot_staged ?secondary_equipment_slot)
+        (not
+          (attacker_slot_committed ?attacker_slot)
+        )
+        (support_slot_committed ?support_slot)
+        (bundle_template_available ?loadout_bundle)
+      )
+    :effect
+      (and
+        (bundle_committed ?loadout_bundle)
+        (bundle_primary_assignment ?loadout_bundle ?primary_equipment_slot)
+        (bundle_secondary_assignment ?loadout_bundle ?secondary_equipment_slot)
+        (bundle_primary_ready ?loadout_bundle)
+        (not
+          (bundle_template_available ?loadout_bundle)
+        )
+      )
+  )
+  (:action commit_loadout_bundle_secondary_ready
+    :parameters (?attacker_slot - attacker_slot ?support_slot - support_slot ?primary_equipment_slot - primary_equipment_slot ?secondary_equipment_slot - secondary_equipment_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (support_slot_staged ?support_slot)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (primary_slot_staged ?primary_equipment_slot)
+        (secondary_slot_equipped ?secondary_equipment_slot)
+        (attacker_slot_committed ?attacker_slot)
+        (not
+          (support_slot_committed ?support_slot)
+        )
+        (bundle_template_available ?loadout_bundle)
+      )
+    :effect
+      (and
+        (bundle_committed ?loadout_bundle)
+        (bundle_primary_assignment ?loadout_bundle ?primary_equipment_slot)
+        (bundle_secondary_assignment ?loadout_bundle ?secondary_equipment_slot)
+        (bundle_secondary_ready ?loadout_bundle)
+        (not
+          (bundle_template_available ?loadout_bundle)
+        )
+      )
+  )
+  (:action commit_loadout_bundle_fully_ready
+    :parameters (?attacker_slot - attacker_slot ?support_slot - support_slot ?primary_equipment_slot - primary_equipment_slot ?secondary_equipment_slot - secondary_equipment_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (support_slot_staged ?support_slot)
+        (has_primary_slot ?attacker_slot ?primary_equipment_slot)
+        (has_secondary_slot ?support_slot ?secondary_equipment_slot)
+        (primary_slot_equipped ?primary_equipment_slot)
+        (secondary_slot_equipped ?secondary_equipment_slot)
+        (not
+          (attacker_slot_committed ?attacker_slot)
+        )
+        (not
+          (support_slot_committed ?support_slot)
+        )
+        (bundle_template_available ?loadout_bundle)
+      )
+    :effect
+      (and
+        (bundle_committed ?loadout_bundle)
+        (bundle_primary_assignment ?loadout_bundle ?primary_equipment_slot)
+        (bundle_secondary_assignment ?loadout_bundle ?secondary_equipment_slot)
+        (bundle_primary_ready ?loadout_bundle)
+        (bundle_secondary_ready ?loadout_bundle)
+        (not
+          (bundle_template_available ?loadout_bundle)
+        )
+      )
+  )
+  (:action finalize_committed_bundle
+    :parameters (?loadout_bundle - loadout_bundle ?attacker_slot - attacker_slot ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (bundle_committed ?loadout_bundle)
+        (attacker_slot_staged ?attacker_slot)
+        (bound_weapon ?attacker_slot ?weapon_option)
+        (not
+          (bundle_finalized ?loadout_bundle)
+        )
+      )
+    :effect (bundle_finalized ?loadout_bundle)
+  )
+  (:action attach_module_to_bundle
+    :parameters (?mission_coordinator - operator ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (operator_has_bundle ?mission_coordinator ?loadout_bundle)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (attachment_module_available ?attachment_module)
+        (bundle_committed ?loadout_bundle)
+        (bundle_finalized ?loadout_bundle)
+        (not
+          (module_committed ?attachment_module)
+        )
+      )
+    :effect
+      (and
+        (module_committed ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (not
+          (attachment_module_available ?attachment_module)
+        )
+      )
+  )
+  (:action apply_module_to_operator
+    :parameters (?mission_coordinator - operator ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_committed ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (bound_weapon ?mission_coordinator ?weapon_option)
+        (not
+          (bundle_primary_ready ?loadout_bundle)
+        )
+        (not
+          (operator_module_applied ?mission_coordinator)
+        )
+      )
+    :effect (operator_module_applied ?mission_coordinator)
+  )
+  (:action assign_tactic_module_to_operator
+    :parameters (?mission_coordinator - operator ?tactic_module - tactic_module)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (tactic_module_available ?tactic_module)
+        (not
+          (operator_tactic_assigned ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_tactic_assigned ?mission_coordinator)
+        (operator_tactic_module_assigned ?mission_coordinator ?tactic_module)
+        (not
+          (tactic_module_available ?tactic_module)
+        )
+      )
+  )
+  (:action attach_tactic_module_to_operator
+    :parameters (?mission_coordinator - operator ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle ?weapon_option - weapon_option ?tactic_module - tactic_module)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_committed ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (bound_weapon ?mission_coordinator ?weapon_option)
+        (bundle_primary_ready ?loadout_bundle)
+        (operator_tactic_assigned ?mission_coordinator)
+        (operator_tactic_module_assigned ?mission_coordinator ?tactic_module)
+        (not
+          (operator_module_applied ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_module_applied ?mission_coordinator)
+        (operator_tactic_staged ?mission_coordinator)
+      )
+  )
+  (:action prepare_special_equipment
+    :parameters (?mission_coordinator - operator ?special_equipment - special_equipment ?support_unit - support_unit ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_module_applied ?mission_coordinator)
+        (operator_special_equipment_assigned ?mission_coordinator ?special_equipment)
+        (assigned_support_unit ?mission_coordinator ?support_unit)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (not
+          (bundle_secondary_ready ?loadout_bundle)
+        )
+        (not
+          (operator_attachment_confirmed ?mission_coordinator)
+        )
+      )
+    :effect (operator_attachment_confirmed ?mission_coordinator)
+  )
+  (:action prepare_special_equipment_variant
+    :parameters (?mission_coordinator - operator ?special_equipment - special_equipment ?support_unit - support_unit ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_module_applied ?mission_coordinator)
+        (operator_special_equipment_assigned ?mission_coordinator ?special_equipment)
+        (assigned_support_unit ?mission_coordinator ?support_unit)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (bundle_secondary_ready ?loadout_bundle)
+        (not
+          (operator_attachment_confirmed ?mission_coordinator)
+        )
+      )
+    :effect (operator_attachment_confirmed ?mission_coordinator)
+  )
+  (:action activate_synergy_modifier
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_attachment_confirmed ?mission_coordinator)
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (not
+          (bundle_primary_ready ?loadout_bundle)
+        )
+        (not
+          (bundle_secondary_ready ?loadout_bundle)
+        )
+        (not
+          (operator_synergy_validated ?mission_coordinator)
+        )
+      )
+    :effect (operator_synergy_validated ?mission_coordinator)
+  )
+  (:action activate_synergy_with_trait_and_mark
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_attachment_confirmed ?mission_coordinator)
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (bundle_primary_ready ?loadout_bundle)
+        (not
+          (bundle_secondary_ready ?loadout_bundle)
+        )
+        (not
+          (operator_synergy_validated ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_trait_applied ?mission_coordinator)
+      )
+  )
+  (:action activate_synergy_with_trait_alt
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_attachment_confirmed ?mission_coordinator)
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (not
+          (bundle_primary_ready ?loadout_bundle)
+        )
+        (bundle_secondary_ready ?loadout_bundle)
+        (not
+          (operator_synergy_validated ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_trait_applied ?mission_coordinator)
+      )
+  )
+  (:action activate_synergy_with_trait_full
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier ?attachment_module - attachment_module ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (operator_attachment_confirmed ?mission_coordinator)
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (operator_attachment_slot ?mission_coordinator ?attachment_module)
+        (module_attached_to_bundle ?attachment_module ?loadout_bundle)
+        (bundle_primary_ready ?loadout_bundle)
+        (bundle_secondary_ready ?loadout_bundle)
+        (not
+          (operator_synergy_validated ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_trait_applied ?mission_coordinator)
+      )
+  )
+  (:action finalize_operator_ready
+    :parameters (?mission_coordinator - operator)
+    :precondition
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (not
+          (operator_trait_applied ?mission_coordinator)
+        )
+        (not
+          (operator_locked ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_locked ?mission_coordinator)
+        (ready_for_redeployment ?mission_coordinator)
+      )
+  )
+  (:action assign_consumable_buff
+    :parameters (?mission_coordinator - operator ?consumable_buff - consumable_buff)
+    :precondition
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_trait_applied ?mission_coordinator)
+        (consumable_buff_available ?consumable_buff)
+      )
+    :effect
+      (and
+        (operator_consumable_assigned ?mission_coordinator ?consumable_buff)
+        (not
+          (consumable_buff_available ?consumable_buff)
+        )
+      )
+  )
+  (:action validate_plan_and_finalize
+    :parameters (?mission_coordinator - operator ?attacker_slot - attacker_slot ?support_slot - support_slot ?weapon_option - weapon_option ?consumable_buff - consumable_buff)
+    :precondition
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_trait_applied ?mission_coordinator)
+        (operator_consumable_assigned ?mission_coordinator ?consumable_buff)
+        (operator_has_attacker_slot ?mission_coordinator ?attacker_slot)
+        (operator_has_support_slot ?mission_coordinator ?support_slot)
+        (attacker_slot_committed ?attacker_slot)
+        (support_slot_committed ?support_slot)
+        (bound_weapon ?mission_coordinator ?weapon_option)
+        (not
+          (operator_activation_ready ?mission_coordinator)
+        )
+      )
+    :effect (operator_activation_ready ?mission_coordinator)
+  )
+  (:action finalize_operator_activation
+    :parameters (?mission_coordinator - operator)
+    :precondition
+      (and
+        (operator_synergy_validated ?mission_coordinator)
+        (operator_activation_ready ?mission_coordinator)
+        (not
+          (operator_locked ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_locked ?mission_coordinator)
+        (ready_for_redeployment ?mission_coordinator)
+      )
+  )
+  (:action activate_tactical_trait_on_operator
+    :parameters (?mission_coordinator - operator ?tactical_trait - tactical_trait ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (entity_validated ?mission_coordinator)
+        (bound_weapon ?mission_coordinator ?weapon_option)
+        (tactical_trait_available ?tactical_trait)
+        (operator_tactical_trait_assigned ?mission_coordinator ?tactical_trait)
+        (not
+          (operator_trait_active ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_trait_active ?mission_coordinator)
+        (not
+          (tactical_trait_available ?tactical_trait)
+        )
+      )
+  )
+  (:action confirm_tactical_trait_assignment
+    :parameters (?mission_coordinator - operator ?support_unit - support_unit)
+    :precondition
+      (and
+        (operator_trait_active ?mission_coordinator)
+        (assigned_support_unit ?mission_coordinator ?support_unit)
+        (not
+          (operator_trait_confirmed ?mission_coordinator)
+        )
+      )
+    :effect (operator_trait_confirmed ?mission_coordinator)
+  )
+  (:action finalize_tactical_trait_activation
+    :parameters (?mission_coordinator - operator ?synergy_modifier - synergy_modifier)
+    :precondition
+      (and
+        (operator_trait_confirmed ?mission_coordinator)
+        (operator_synergy_modifier_assigned ?mission_coordinator ?synergy_modifier)
+        (not
+          (operator_trait_finalized ?mission_coordinator)
+        )
+      )
+    :effect (operator_trait_finalized ?mission_coordinator)
+  )
+  (:action activate_plan_with_trait
+    :parameters (?mission_coordinator - operator)
+    :precondition
+      (and
+        (operator_trait_finalized ?mission_coordinator)
+        (not
+          (operator_locked ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operator_locked ?mission_coordinator)
+        (ready_for_redeployment ?mission_coordinator)
+      )
+  )
+  (:action activate_attacker_slot
+    :parameters (?attacker_slot - attacker_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (attacker_slot_staged ?attacker_slot)
+        (attacker_slot_committed ?attacker_slot)
+        (bundle_committed ?loadout_bundle)
+        (bundle_finalized ?loadout_bundle)
+        (not
+          (ready_for_redeployment ?attacker_slot)
+        )
+      )
+    :effect (ready_for_redeployment ?attacker_slot)
+  )
+  (:action activate_support_slot
+    :parameters (?support_slot - support_slot ?loadout_bundle - loadout_bundle)
+    :precondition
+      (and
+        (support_slot_staged ?support_slot)
+        (support_slot_committed ?support_slot)
+        (bundle_committed ?loadout_bundle)
+        (bundle_finalized ?loadout_bundle)
+        (not
+          (ready_for_redeployment ?support_slot)
+        )
+      )
+    :effect (ready_for_redeployment ?support_slot)
+  )
+  (:action apply_recovery_resource_to_entity
+    :parameters (?encounter_entity - encounter_entity ?recovery_resource - recovery_resource ?weapon_option - weapon_option)
+    :precondition
+      (and
+        (ready_for_redeployment ?encounter_entity)
+        (bound_weapon ?encounter_entity ?weapon_option)
+        (recovery_resource_available ?recovery_resource)
+        (not
+          (recovery_consumed ?encounter_entity)
+        )
+      )
+    :effect
+      (and
+        (recovery_consumed ?encounter_entity)
+        (entity_recovery_allocated ?encounter_entity ?recovery_resource)
+        (not
+          (recovery_resource_available ?recovery_resource)
+        )
+      )
+  )
+  (:action recover_and_assign_template_to_attacker_slot
+    :parameters (?attacker_slot - attacker_slot ?loadout_template - loadout_template ?recovery_resource - recovery_resource)
+    :precondition
+      (and
+        (recovery_consumed ?attacker_slot)
+        (assigned_loadout_template ?attacker_slot ?loadout_template)
+        (entity_recovery_allocated ?attacker_slot ?recovery_resource)
+        (not
+          (recovery_allocated ?attacker_slot)
+        )
+      )
+    :effect
+      (and
+        (recovery_allocated ?attacker_slot)
+        (loadout_template_available ?loadout_template)
+        (recovery_resource_available ?recovery_resource)
+      )
+  )
+  (:action recover_and_assign_template_to_support_slot
+    :parameters (?support_slot - support_slot ?loadout_template - loadout_template ?recovery_resource - recovery_resource)
+    :precondition
+      (and
+        (recovery_consumed ?support_slot)
+        (assigned_loadout_template ?support_slot ?loadout_template)
+        (entity_recovery_allocated ?support_slot ?recovery_resource)
+        (not
+          (recovery_allocated ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (recovery_allocated ?support_slot)
+        (loadout_template_available ?loadout_template)
+        (recovery_resource_available ?recovery_resource)
+      )
+  )
+  (:action recover_and_assign_template_to_operator
+    :parameters (?mission_coordinator - operator ?loadout_template - loadout_template ?recovery_resource - recovery_resource)
+    :precondition
+      (and
+        (recovery_consumed ?mission_coordinator)
+        (assigned_loadout_template ?mission_coordinator ?loadout_template)
+        (entity_recovery_allocated ?mission_coordinator ?recovery_resource)
+        (not
+          (recovery_allocated ?mission_coordinator)
+        )
+      )
+    :effect
+      (and
+        (recovery_allocated ?mission_coordinator)
+        (loadout_template_available ?loadout_template)
+        (recovery_resource_available ?recovery_resource)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem boss_failure_recovery_scenario)
+  (:domain boss_failure_loadout_adjustment)
+  (:objects attacker_slot_1 - attacker_slot support_slot_1 - support_slot mission_coordinator_1 - operator mission_coordinator_2 - operator loadout_template_a - loadout_template loadout_template_b - loadout_template loadout_template_c - loadout_template weapon_option_1 - weapon_option support_unit_alpha - support_unit inventory_item_frag - inventory_item primary_equipment_slot_1 - primary_equipment_slot secondary_equipment_slot_1 - secondary_equipment_slot loadout_bundle_template - loadout_bundle attachment_module_1 - attachment_module attachment_module_2 - attachment_module tactic_module_a - tactic_module tactic_module_b - tactic_module consumable_buff_a - consumable_buff consumable_buff_b - consumable_buff recovery_token_1 - recovery_resource special_equipment_1 - special_equipment tactical_trait_a - tactical_trait tactical_trait_b - tactical_trait synergy_modifier_a - synergy_modifier)
+  (:init
+    (loadout_template_available loadout_template_a)
+    (loadout_template_available loadout_template_b)
+    (loadout_template_available loadout_template_c)
+    (weapon_available weapon_option_1)
+    (support_unit_available support_unit_alpha)
+    (inventory_item_available inventory_item_frag)
+    (has_primary_slot attacker_slot_1 primary_equipment_slot_1)
+    (has_secondary_slot support_slot_1 secondary_equipment_slot_1)
+    (bundle_template_available loadout_bundle_template)
+    (attachment_module_available attachment_module_1)
+    (attachment_module_available attachment_module_2)
+    (operator_has_attacker_slot mission_coordinator_1 attacker_slot_1)
+    (operator_has_attacker_slot mission_coordinator_2 attacker_slot_1)
+    (operator_has_support_slot mission_coordinator_1 support_slot_1)
+    (operator_has_support_slot mission_coordinator_2 support_slot_1)
+    (operator_has_bundle mission_coordinator_1 loadout_bundle_template)
+    (operator_has_bundle mission_coordinator_2 loadout_bundle_template)
+    (operator_attachment_slot mission_coordinator_1 attachment_module_1)
+    (operator_attachment_slot mission_coordinator_2 attachment_module_2)
+    (tactic_module_available tactic_module_a)
+    (tactic_module_available tactic_module_b)
+    (consumable_buff_available consumable_buff_a)
+    (consumable_buff_available consumable_buff_b)
+    (recovery_resource_available recovery_token_1)
+    (special_equipment_available special_equipment_1)
+    (tactical_trait_available tactical_trait_a)
+    (operator_tactical_trait_assigned mission_coordinator_1 tactical_trait_a)
+    (operator_tactical_trait_assigned mission_coordinator_2 tactical_trait_b)
+    (synergy_modifier_available synergy_modifier_a)
+  )
+  (:goal
+    (and
+      (recovery_allocated attacker_slot_1)
+      (recovery_allocated support_slot_1)
+      (recovery_allocated mission_coordinator_1)
+      (recovery_allocated mission_coordinator_2)
+    )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain top_k_selection_by_scoring_function_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types candidate_group - object worker_group - object score_dimension - object input_set - object candidate - input_set resource_token - candidate_group score_function - candidate_group feature_extractor - candidate_group preference_label - candidate_group tie_breaker - candidate_group metadata - candidate_group attribute_primary - candidate_group attribute_secondary - candidate_group temporary_score - worker_group priority_tag - worker_group provenance - worker_group score_key_primary - score_dimension score_key_secondary - score_dimension aggregated_slot - score_dimension candidate_subgroup - candidate candidate_bucket - candidate partition_primary - candidate_subgroup partition_secondary - candidate_subgroup result_container - candidate_bucket)
+  (:predicates
+    (entity_registered ?candidate - candidate)
+    (entity_scored ?candidate - candidate)
+    (entity_has_token ?candidate - candidate)
+    (published ?candidate - candidate)
+    (adjudicated ?candidate - candidate)
+    (commit_ready ?candidate - candidate)
+    (token_available ?resource_token - resource_token)
+    (assigned_token ?candidate - candidate ?resource_token - resource_token)
+    (score_function_available ?score_function - score_function)
+    (assigned_score_function ?candidate - candidate ?score_function - score_function)
+    (feature_extractor_available ?feature_extractor - feature_extractor)
+    (bound_feature_extractor ?candidate - candidate ?feature_extractor - feature_extractor)
+    (temporary_score_available ?temporary_score - temporary_score)
+    (assigned_temp_score_primary ?partition_a - partition_primary ?temporary_score - temporary_score)
+    (assigned_temp_score_secondary ?partition_b - partition_secondary ?temporary_score - temporary_score)
+    (partition_has_score_key_primary ?partition_a - partition_primary ?score_key_a - score_key_primary)
+    (score_key_primary_flag_primary ?score_key_a - score_key_primary)
+    (score_key_primary_flag_secondary ?score_key_a - score_key_primary)
+    (partition_primary_ready ?partition_a - partition_primary)
+    (partition_has_score_key_secondary ?partition_b - partition_secondary ?score_key_b - score_key_secondary)
+    (score_key_secondary_flag_primary ?score_key_b - score_key_secondary)
+    (score_key_secondary_flag_secondary ?score_key_b - score_key_secondary)
+    (partition_secondary_ready ?partition_b - partition_secondary)
+    (slot_available ?aggregated_slot - aggregated_slot)
+    (slot_reserved ?aggregated_slot - aggregated_slot)
+    (slot_has_score_key_primary ?aggregated_slot - aggregated_slot ?score_key_a - score_key_primary)
+    (slot_has_score_key_secondary ?aggregated_slot - aggregated_slot ?score_key_b - score_key_secondary)
+    (slot_mark_primary ?aggregated_slot - aggregated_slot)
+    (slot_mark_secondary ?aggregated_slot - aggregated_slot)
+    (slot_validated ?aggregated_slot - aggregated_slot)
+    (container_associated_with_partition_primary ?result_container - result_container ?partition_a - partition_primary)
+    (container_associated_with_partition_secondary ?result_container - result_container ?partition_b - partition_secondary)
+    (container_has_aggregated_slot ?result_container - result_container ?aggregated_slot - aggregated_slot)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (container_has_priority_tag ?result_container - result_container ?priority_tag - priority_tag)
+    (priority_tag_consumed ?priority_tag - priority_tag)
+    (priority_tag_assigned_to_slot ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    (container_stage1_locked ?result_container - result_container)
+    (container_stage2_locked ?result_container - result_container)
+    (container_adjudication_candidate ?result_container - result_container)
+    (preference_label_attached ?result_container - result_container)
+    (preference_label_confirmed ?result_container - result_container)
+    (adjudication_marker_set ?result_container - result_container)
+    (adjudication_lock_acquired ?result_container - result_container)
+    (provenance_available ?provenance - provenance)
+    (container_has_provenance ?result_container - result_container ?provenance - provenance)
+    (provenance_bound ?result_container - result_container)
+    (provenance_acknowledged ?result_container - result_container)
+    (provenance_validated ?result_container - result_container)
+    (preference_label_available ?preference_label - preference_label)
+    (container_has_preference_label ?result_container - result_container ?preference_label - preference_label)
+    (tie_breaker_available ?tie_breaker - tie_breaker)
+    (container_has_tie_breaker ?result_container - result_container ?tie_breaker - tie_breaker)
+    (attribute_primary_available ?attribute_a - attribute_primary)
+    (container_has_attribute_primary ?result_container - result_container ?attribute_a - attribute_primary)
+    (attribute_secondary_available ?attribute_b - attribute_secondary)
+    (container_has_attribute_secondary ?result_container - result_container ?attribute_b - attribute_secondary)
+    (metadata_available ?metadata - metadata)
+    (entity_has_metadata ?candidate - candidate ?metadata - metadata)
+    (partition_primary_processed ?partition_a - partition_primary)
+    (partition_secondary_processed ?partition_b - partition_secondary)
+    (container_committed ?result_container - result_container)
+  )
+  (:action register_candidate
+    :parameters (?candidate - candidate)
+    :precondition
+      (and
+        (not
+          (entity_registered ?candidate)
+        )
+        (not
+          (published ?candidate)
+        )
+      )
+    :effect (entity_registered ?candidate)
+  )
+  (:action allocate_resource_token
+    :parameters (?candidate - candidate ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_registered ?candidate)
+        (not
+          (entity_has_token ?candidate)
+        )
+        (token_available ?resource_token)
+      )
+    :effect
+      (and
+        (entity_has_token ?candidate)
+        (assigned_token ?candidate ?resource_token)
+        (not
+          (token_available ?resource_token)
+        )
+      )
+  )
+  (:action assign_score_function
+    :parameters (?candidate - candidate ?score_function - score_function)
+    :precondition
+      (and
+        (entity_registered ?candidate)
+        (entity_has_token ?candidate)
+        (score_function_available ?score_function)
+      )
+    :effect
+      (and
+        (assigned_score_function ?candidate ?score_function)
+        (not
+          (score_function_available ?score_function)
+        )
+      )
+  )
+  (:action confirm_score
+    :parameters (?candidate - candidate ?score_function - score_function)
+    :precondition
+      (and
+        (entity_registered ?candidate)
+        (entity_has_token ?candidate)
+        (assigned_score_function ?candidate ?score_function)
+        (not
+          (entity_scored ?candidate)
+        )
+      )
+    :effect (entity_scored ?candidate)
+  )
+  (:action release_score_function
+    :parameters (?candidate - candidate ?score_function - score_function)
+    :precondition
+      (and
+        (assigned_score_function ?candidate ?score_function)
+      )
+    :effect
+      (and
+        (score_function_available ?score_function)
+        (not
+          (assigned_score_function ?candidate ?score_function)
+        )
+      )
+  )
+  (:action bind_feature_extractor
+    :parameters (?candidate - candidate ?feature_extractor - feature_extractor)
+    :precondition
+      (and
+        (entity_scored ?candidate)
+        (feature_extractor_available ?feature_extractor)
+      )
+    :effect
+      (and
+        (bound_feature_extractor ?candidate ?feature_extractor)
+        (not
+          (feature_extractor_available ?feature_extractor)
+        )
+      )
+  )
+  (:action unbind_feature_extractor
+    :parameters (?candidate - candidate ?feature_extractor - feature_extractor)
+    :precondition
+      (and
+        (bound_feature_extractor ?candidate ?feature_extractor)
+      )
+    :effect
+      (and
+        (feature_extractor_available ?feature_extractor)
+        (not
+          (bound_feature_extractor ?candidate ?feature_extractor)
+        )
+      )
+  )
+  (:action reserve_attribute_a
+    :parameters (?result_container - result_container ?attribute_a - attribute_primary)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (attribute_primary_available ?attribute_a)
+      )
+    :effect
+      (and
+        (container_has_attribute_primary ?result_container ?attribute_a)
+        (not
+          (attribute_primary_available ?attribute_a)
+        )
+      )
+  )
+  (:action release_attribute_a
+    :parameters (?result_container - result_container ?attribute_a - attribute_primary)
+    :precondition
+      (and
+        (container_has_attribute_primary ?result_container ?attribute_a)
+      )
+    :effect
+      (and
+        (attribute_primary_available ?attribute_a)
+        (not
+          (container_has_attribute_primary ?result_container ?attribute_a)
+        )
+      )
+  )
+  (:action reserve_attribute_b
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (attribute_secondary_available ?attribute_b)
+      )
+    :effect
+      (and
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (not
+          (attribute_secondary_available ?attribute_b)
+        )
+      )
+  )
+  (:action release_attribute_b
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary)
+    :precondition
+      (and
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+      )
+    :effect
+      (and
+        (attribute_secondary_available ?attribute_b)
+        (not
+          (container_has_attribute_secondary ?result_container ?attribute_b)
+        )
+      )
+  )
+  (:action claim_score_key_primary
+    :parameters (?partition_a - partition_primary ?score_key_a - score_key_primary ?score_function - score_function)
+    :precondition
+      (and
+        (entity_scored ?partition_a)
+        (assigned_score_function ?partition_a ?score_function)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (not
+          (score_key_primary_flag_primary ?score_key_a)
+        )
+        (not
+          (score_key_primary_flag_secondary ?score_key_a)
+        )
+      )
+    :effect (score_key_primary_flag_primary ?score_key_a)
+  )
+  (:action confirm_partition_primary_readiness
+    :parameters (?partition_a - partition_primary ?score_key_a - score_key_primary ?feature_extractor - feature_extractor)
+    :precondition
+      (and
+        (entity_scored ?partition_a)
+        (bound_feature_extractor ?partition_a ?feature_extractor)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (score_key_primary_flag_primary ?score_key_a)
+        (not
+          (partition_primary_processed ?partition_a)
+        )
+      )
+    :effect
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_primary_ready ?partition_a)
+      )
+  )
+  (:action apply_temp_score_to_partition_primary
+    :parameters (?partition_a - partition_primary ?score_key_a - score_key_primary ?temporary_score - temporary_score)
+    :precondition
+      (and
+        (entity_scored ?partition_a)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (temporary_score_available ?temporary_score)
+        (not
+          (partition_primary_processed ?partition_a)
+        )
+      )
+    :effect
+      (and
+        (score_key_primary_flag_secondary ?score_key_a)
+        (partition_primary_processed ?partition_a)
+        (assigned_temp_score_primary ?partition_a ?temporary_score)
+        (not
+          (temporary_score_available ?temporary_score)
+        )
+      )
+  )
+  (:action integrate_temp_score_partition_primary
+    :parameters (?partition_a - partition_primary ?score_key_a - score_key_primary ?score_function - score_function ?temporary_score - temporary_score)
+    :precondition
+      (and
+        (entity_scored ?partition_a)
+        (assigned_score_function ?partition_a ?score_function)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (score_key_primary_flag_secondary ?score_key_a)
+        (assigned_temp_score_primary ?partition_a ?temporary_score)
+        (not
+          (partition_primary_ready ?partition_a)
+        )
+      )
+    :effect
+      (and
+        (score_key_primary_flag_primary ?score_key_a)
+        (partition_primary_ready ?partition_a)
+        (temporary_score_available ?temporary_score)
+        (not
+          (assigned_temp_score_primary ?partition_a ?temporary_score)
+        )
+      )
+  )
+  (:action claim_score_key_secondary
+    :parameters (?partition_b - partition_secondary ?score_key_b - score_key_secondary ?score_function - score_function)
+    :precondition
+      (and
+        (entity_scored ?partition_b)
+        (assigned_score_function ?partition_b ?score_function)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (not
+          (score_key_secondary_flag_primary ?score_key_b)
+        )
+        (not
+          (score_key_secondary_flag_secondary ?score_key_b)
+        )
+      )
+    :effect (score_key_secondary_flag_primary ?score_key_b)
+  )
+  (:action confirm_partition_secondary_readiness
+    :parameters (?partition_b - partition_secondary ?score_key_b - score_key_secondary ?feature_extractor - feature_extractor)
+    :precondition
+      (and
+        (entity_scored ?partition_b)
+        (bound_feature_extractor ?partition_b ?feature_extractor)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_secondary_flag_primary ?score_key_b)
+        (not
+          (partition_secondary_processed ?partition_b)
+        )
+      )
+    :effect
+      (and
+        (partition_secondary_processed ?partition_b)
+        (partition_secondary_ready ?partition_b)
+      )
+  )
+  (:action apply_temp_score_to_partition_secondary
+    :parameters (?partition_b - partition_secondary ?score_key_b - score_key_secondary ?temporary_score - temporary_score)
+    :precondition
+      (and
+        (entity_scored ?partition_b)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (temporary_score_available ?temporary_score)
+        (not
+          (partition_secondary_processed ?partition_b)
+        )
+      )
+    :effect
+      (and
+        (score_key_secondary_flag_secondary ?score_key_b)
+        (partition_secondary_processed ?partition_b)
+        (assigned_temp_score_secondary ?partition_b ?temporary_score)
+        (not
+          (temporary_score_available ?temporary_score)
+        )
+      )
+  )
+  (:action integrate_temp_score_partition_secondary
+    :parameters (?partition_b - partition_secondary ?score_key_b - score_key_secondary ?score_function - score_function ?temporary_score - temporary_score)
+    :precondition
+      (and
+        (entity_scored ?partition_b)
+        (assigned_score_function ?partition_b ?score_function)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_secondary_flag_secondary ?score_key_b)
+        (assigned_temp_score_secondary ?partition_b ?temporary_score)
+        (not
+          (partition_secondary_ready ?partition_b)
+        )
+      )
+    :effect
+      (and
+        (score_key_secondary_flag_primary ?score_key_b)
+        (partition_secondary_ready ?partition_b)
+        (temporary_score_available ?temporary_score)
+        (not
+          (assigned_temp_score_secondary ?partition_b ?temporary_score)
+        )
+      )
+  )
+  (:action allocate_aggregated_slot
+    :parameters (?partition_a - partition_primary ?partition_b - partition_secondary ?score_key_a - score_key_primary ?score_key_b - score_key_secondary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_secondary_processed ?partition_b)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_primary_flag_primary ?score_key_a)
+        (score_key_secondary_flag_primary ?score_key_b)
+        (partition_primary_ready ?partition_a)
+        (partition_secondary_ready ?partition_b)
+        (slot_available ?aggregated_slot)
+      )
+    :effect
+      (and
+        (slot_reserved ?aggregated_slot)
+        (slot_has_score_key_primary ?aggregated_slot ?score_key_a)
+        (slot_has_score_key_secondary ?aggregated_slot ?score_key_b)
+        (not
+          (slot_available ?aggregated_slot)
+        )
+      )
+  )
+  (:action allocate_aggregated_slot_with_mark_primary
+    :parameters (?partition_a - partition_primary ?partition_b - partition_secondary ?score_key_a - score_key_primary ?score_key_b - score_key_secondary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_secondary_processed ?partition_b)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_primary_flag_secondary ?score_key_a)
+        (score_key_secondary_flag_primary ?score_key_b)
+        (not
+          (partition_primary_ready ?partition_a)
+        )
+        (partition_secondary_ready ?partition_b)
+        (slot_available ?aggregated_slot)
+      )
+    :effect
+      (and
+        (slot_reserved ?aggregated_slot)
+        (slot_has_score_key_primary ?aggregated_slot ?score_key_a)
+        (slot_has_score_key_secondary ?aggregated_slot ?score_key_b)
+        (slot_mark_primary ?aggregated_slot)
+        (not
+          (slot_available ?aggregated_slot)
+        )
+      )
+  )
+  (:action allocate_aggregated_slot_with_mark_secondary
+    :parameters (?partition_a - partition_primary ?partition_b - partition_secondary ?score_key_a - score_key_primary ?score_key_b - score_key_secondary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_secondary_processed ?partition_b)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_primary_flag_primary ?score_key_a)
+        (score_key_secondary_flag_secondary ?score_key_b)
+        (partition_primary_ready ?partition_a)
+        (not
+          (partition_secondary_ready ?partition_b)
+        )
+        (slot_available ?aggregated_slot)
+      )
+    :effect
+      (and
+        (slot_reserved ?aggregated_slot)
+        (slot_has_score_key_primary ?aggregated_slot ?score_key_a)
+        (slot_has_score_key_secondary ?aggregated_slot ?score_key_b)
+        (slot_mark_secondary ?aggregated_slot)
+        (not
+          (slot_available ?aggregated_slot)
+        )
+      )
+  )
+  (:action allocate_aggregated_slot_with_marks_primary_secondary
+    :parameters (?partition_a - partition_primary ?partition_b - partition_secondary ?score_key_a - score_key_primary ?score_key_b - score_key_secondary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_secondary_processed ?partition_b)
+        (partition_has_score_key_primary ?partition_a ?score_key_a)
+        (partition_has_score_key_secondary ?partition_b ?score_key_b)
+        (score_key_primary_flag_secondary ?score_key_a)
+        (score_key_secondary_flag_secondary ?score_key_b)
+        (not
+          (partition_primary_ready ?partition_a)
+        )
+        (not
+          (partition_secondary_ready ?partition_b)
+        )
+        (slot_available ?aggregated_slot)
+      )
+    :effect
+      (and
+        (slot_reserved ?aggregated_slot)
+        (slot_has_score_key_primary ?aggregated_slot ?score_key_a)
+        (slot_has_score_key_secondary ?aggregated_slot ?score_key_b)
+        (slot_mark_primary ?aggregated_slot)
+        (slot_mark_secondary ?aggregated_slot)
+        (not
+          (slot_available ?aggregated_slot)
+        )
+      )
+  )
+  (:action validate_slot_with_partition_primary
+    :parameters (?aggregated_slot - aggregated_slot ?partition_a - partition_primary ?score_function - score_function)
+    :precondition
+      (and
+        (slot_reserved ?aggregated_slot)
+        (partition_primary_processed ?partition_a)
+        (assigned_score_function ?partition_a ?score_function)
+        (not
+          (slot_validated ?aggregated_slot)
+        )
+      )
+    :effect (slot_validated ?aggregated_slot)
+  )
+  (:action assign_priority_tag_to_slot
+    :parameters (?result_container - result_container ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (container_has_aggregated_slot ?result_container ?aggregated_slot)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_available ?priority_tag)
+        (slot_reserved ?aggregated_slot)
+        (slot_validated ?aggregated_slot)
+        (not
+          (priority_tag_consumed ?priority_tag)
+        )
+      )
+    :effect
+      (and
+        (priority_tag_consumed ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action lock_container_stage1
+    :parameters (?result_container - result_container ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot ?score_function - score_function)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_consumed ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (assigned_score_function ?result_container ?score_function)
+        (not
+          (slot_mark_primary ?aggregated_slot)
+        )
+        (not
+          (container_stage1_locked ?result_container)
+        )
+      )
+    :effect (container_stage1_locked ?result_container)
+  )
+  (:action attach_preference_label
+    :parameters (?result_container - result_container ?preference_label - preference_label)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (preference_label_available ?preference_label)
+        (not
+          (preference_label_attached ?result_container)
+        )
+      )
+    :effect
+      (and
+        (preference_label_attached ?result_container)
+        (container_has_preference_label ?result_container ?preference_label)
+        (not
+          (preference_label_available ?preference_label)
+        )
+      )
+  )
+  (:action attach_preference_label_with_validation
+    :parameters (?result_container - result_container ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot ?score_function - score_function ?preference_label - preference_label)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_consumed ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (assigned_score_function ?result_container ?score_function)
+        (slot_mark_primary ?aggregated_slot)
+        (preference_label_attached ?result_container)
+        (container_has_preference_label ?result_container ?preference_label)
+        (not
+          (container_stage1_locked ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_stage1_locked ?result_container)
+        (preference_label_confirmed ?result_container)
+      )
+  )
+  (:action acquire_stage2_lock_primary
+    :parameters (?result_container - result_container ?attribute_a - attribute_primary ?feature_extractor - feature_extractor ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage1_locked ?result_container)
+        (container_has_attribute_primary ?result_container ?attribute_a)
+        (bound_feature_extractor ?result_container ?feature_extractor)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (not
+          (slot_mark_secondary ?aggregated_slot)
+        )
+        (not
+          (container_stage2_locked ?result_container)
+        )
+      )
+    :effect (container_stage2_locked ?result_container)
+  )
+  (:action acquire_stage2_lock_secondary
+    :parameters (?result_container - result_container ?attribute_a - attribute_primary ?feature_extractor - feature_extractor ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage1_locked ?result_container)
+        (container_has_attribute_primary ?result_container ?attribute_a)
+        (bound_feature_extractor ?result_container ?feature_extractor)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (slot_mark_secondary ?aggregated_slot)
+        (not
+          (container_stage2_locked ?result_container)
+        )
+      )
+    :effect (container_stage2_locked ?result_container)
+  )
+  (:action mark_container_adjudication_candidate
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage2_locked ?result_container)
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (not
+          (slot_mark_primary ?aggregated_slot)
+        )
+        (not
+          (slot_mark_secondary ?aggregated_slot)
+        )
+        (not
+          (container_adjudication_candidate ?result_container)
+        )
+      )
+    :effect (container_adjudication_candidate ?result_container)
+  )
+  (:action mark_adjudication_candidate_and_set_tag
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage2_locked ?result_container)
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (slot_mark_primary ?aggregated_slot)
+        (not
+          (slot_mark_secondary ?aggregated_slot)
+        )
+        (not
+          (container_adjudication_candidate ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_marker_set ?result_container)
+      )
+  )
+  (:action mark_adjudication_candidate_and_set_tag_alt
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage2_locked ?result_container)
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (not
+          (slot_mark_primary ?aggregated_slot)
+        )
+        (slot_mark_secondary ?aggregated_slot)
+        (not
+          (container_adjudication_candidate ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_marker_set ?result_container)
+      )
+  )
+  (:action mark_adjudication_candidate_and_set_tag_both
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary ?priority_tag - priority_tag ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (container_stage2_locked ?result_container)
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (container_has_priority_tag ?result_container ?priority_tag)
+        (priority_tag_assigned_to_slot ?priority_tag ?aggregated_slot)
+        (slot_mark_primary ?aggregated_slot)
+        (slot_mark_secondary ?aggregated_slot)
+        (not
+          (container_adjudication_candidate ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_marker_set ?result_container)
+      )
+  )
+  (:action finalize_container_adjudication
+    :parameters (?result_container - result_container)
+    :precondition
+      (and
+        (container_adjudication_candidate ?result_container)
+        (not
+          (adjudication_marker_set ?result_container)
+        )
+        (not
+          (container_committed ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_committed ?result_container)
+        (adjudicated ?result_container)
+      )
+  )
+  (:action attach_tie_breaker_to_container
+    :parameters (?result_container - result_container ?tie_breaker - tie_breaker)
+    :precondition
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_marker_set ?result_container)
+        (tie_breaker_available ?tie_breaker)
+      )
+    :effect
+      (and
+        (container_has_tie_breaker ?result_container ?tie_breaker)
+        (not
+          (tie_breaker_available ?tie_breaker)
+        )
+      )
+  )
+  (:action acquire_adjudication_lock
+    :parameters (?result_container - result_container ?partition_a - partition_primary ?partition_b - partition_secondary ?score_function - score_function ?tie_breaker - tie_breaker)
+    :precondition
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_marker_set ?result_container)
+        (container_has_tie_breaker ?result_container ?tie_breaker)
+        (container_associated_with_partition_primary ?result_container ?partition_a)
+        (container_associated_with_partition_secondary ?result_container ?partition_b)
+        (partition_primary_ready ?partition_a)
+        (partition_secondary_ready ?partition_b)
+        (assigned_score_function ?result_container ?score_function)
+        (not
+          (adjudication_lock_acquired ?result_container)
+        )
+      )
+    :effect (adjudication_lock_acquired ?result_container)
+  )
+  (:action finalize_container_adjudication_with_lock
+    :parameters (?result_container - result_container)
+    :precondition
+      (and
+        (container_adjudication_candidate ?result_container)
+        (adjudication_lock_acquired ?result_container)
+        (not
+          (container_committed ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_committed ?result_container)
+        (adjudicated ?result_container)
+      )
+  )
+  (:action bind_provenance_to_container
+    :parameters (?result_container - result_container ?provenance - provenance ?score_function - score_function)
+    :precondition
+      (and
+        (entity_scored ?result_container)
+        (assigned_score_function ?result_container ?score_function)
+        (provenance_available ?provenance)
+        (container_has_provenance ?result_container ?provenance)
+        (not
+          (provenance_bound ?result_container)
+        )
+      )
+    :effect
+      (and
+        (provenance_bound ?result_container)
+        (not
+          (provenance_available ?provenance)
+        )
+      )
+  )
+  (:action acknowledge_provenance_for_container
+    :parameters (?result_container - result_container ?feature_extractor - feature_extractor)
+    :precondition
+      (and
+        (provenance_bound ?result_container)
+        (bound_feature_extractor ?result_container ?feature_extractor)
+        (not
+          (provenance_acknowledged ?result_container)
+        )
+      )
+    :effect (provenance_acknowledged ?result_container)
+  )
+  (:action validate_provenance_for_container
+    :parameters (?result_container - result_container ?attribute_b - attribute_secondary)
+    :precondition
+      (and
+        (provenance_acknowledged ?result_container)
+        (container_has_attribute_secondary ?result_container ?attribute_b)
+        (not
+          (provenance_validated ?result_container)
+        )
+      )
+    :effect (provenance_validated ?result_container)
+  )
+  (:action finalize_container_after_provenance_validation
+    :parameters (?result_container - result_container)
+    :precondition
+      (and
+        (provenance_validated ?result_container)
+        (not
+          (container_committed ?result_container)
+        )
+      )
+    :effect
+      (and
+        (container_committed ?result_container)
+        (adjudicated ?result_container)
+      )
+  )
+  (:action finalize_partition_primary_adjudication
+    :parameters (?partition_a - partition_primary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_primary_processed ?partition_a)
+        (partition_primary_ready ?partition_a)
+        (slot_reserved ?aggregated_slot)
+        (slot_validated ?aggregated_slot)
+        (not
+          (adjudicated ?partition_a)
+        )
+      )
+    :effect (adjudicated ?partition_a)
+  )
+  (:action finalize_partition_secondary_adjudication
+    :parameters (?partition_b - partition_secondary ?aggregated_slot - aggregated_slot)
+    :precondition
+      (and
+        (partition_secondary_processed ?partition_b)
+        (partition_secondary_ready ?partition_b)
+        (slot_reserved ?aggregated_slot)
+        (slot_validated ?aggregated_slot)
+        (not
+          (adjudicated ?partition_b)
+        )
+      )
+    :effect (adjudicated ?partition_b)
+  )
+  (:action commit_candidate_with_metadata
+    :parameters (?candidate - candidate ?metadata - metadata ?score_function - score_function)
+    :precondition
+      (and
+        (adjudicated ?candidate)
+        (assigned_score_function ?candidate ?score_function)
+        (metadata_available ?metadata)
+        (not
+          (commit_ready ?candidate)
+        )
+      )
+    :effect
+      (and
+        (commit_ready ?candidate)
+        (entity_has_metadata ?candidate ?metadata)
+        (not
+          (metadata_available ?metadata)
+        )
+      )
+  )
+  (:action publish_and_release_partition_primary
+    :parameters (?partition_a - partition_primary ?resource_token - resource_token ?metadata - metadata)
+    :precondition
+      (and
+        (commit_ready ?partition_a)
+        (assigned_token ?partition_a ?resource_token)
+        (entity_has_metadata ?partition_a ?metadata)
+        (not
+          (published ?partition_a)
+        )
+      )
+    :effect
+      (and
+        (published ?partition_a)
+        (token_available ?resource_token)
+        (metadata_available ?metadata)
+      )
+  )
+  (:action publish_and_release_partition_secondary
+    :parameters (?partition_b - partition_secondary ?resource_token - resource_token ?metadata - metadata)
+    :precondition
+      (and
+        (commit_ready ?partition_b)
+        (assigned_token ?partition_b ?resource_token)
+        (entity_has_metadata ?partition_b ?metadata)
+        (not
+          (published ?partition_b)
+        )
+      )
+    :effect
+      (and
+        (published ?partition_b)
+        (token_available ?resource_token)
+        (metadata_available ?metadata)
+      )
+  )
+  (:action publish_and_release_container
+    :parameters (?result_container - result_container ?resource_token - resource_token ?metadata - metadata)
+    :precondition
+      (and
+        (commit_ready ?result_container)
+        (assigned_token ?result_container ?resource_token)
+        (entity_has_metadata ?result_container ?metadata)
+        (not
+          (published ?result_container)
+        )
+      )
+    :effect
+      (and
+        (published ?result_container)
+        (token_available ?resource_token)
+        (metadata_available ?metadata)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem top_k_selection_instance)
+  (:domain top_k_selection_by_scoring_function_domain)
+  (:objects partition_primary_1 - partition_primary partition_secondary_1 - partition_secondary result_container_1 - result_container result_container_2 - result_container resource_token_1 - resource_token resource_token_2 - resource_token resource_token_3 - resource_token score_function_1 - score_function feature_extractor_1 - feature_extractor temporary_score_1 - temporary_score score_key_primary_1 - score_key_primary score_key_secondary_1 - score_key_secondary aggregated_slot_1 - aggregated_slot priority_tag_1 - priority_tag priority_tag_2 - priority_tag preference_label_1 - preference_label preference_label_2 - preference_label tie_breaker_1 - tie_breaker tie_breaker_2 - tie_breaker metadata_1 - metadata attribute_primary_1 - attribute_primary provenance_1 - provenance provenance_2 - provenance attribute_secondary_1 - attribute_secondary)
+  (:init
+    (token_available resource_token_1)
+    (token_available resource_token_2)
+    (token_available resource_token_3)
+    (score_function_available score_function_1)
+    (feature_extractor_available feature_extractor_1)
+    (temporary_score_available temporary_score_1)
+    (partition_has_score_key_primary partition_primary_1 score_key_primary_1)
+    (partition_has_score_key_secondary partition_secondary_1 score_key_secondary_1)
+    (slot_available aggregated_slot_1)
+    (priority_tag_available priority_tag_1)
+    (priority_tag_available priority_tag_2)
+    (container_associated_with_partition_primary result_container_1 partition_primary_1)
+    (container_associated_with_partition_primary result_container_2 partition_primary_1)
+    (container_associated_with_partition_secondary result_container_1 partition_secondary_1)
+    (container_associated_with_partition_secondary result_container_2 partition_secondary_1)
+    (container_has_aggregated_slot result_container_1 aggregated_slot_1)
+    (container_has_aggregated_slot result_container_2 aggregated_slot_1)
+    (container_has_priority_tag result_container_1 priority_tag_1)
+    (container_has_priority_tag result_container_2 priority_tag_2)
+    (preference_label_available preference_label_1)
+    (preference_label_available preference_label_2)
+    (tie_breaker_available tie_breaker_1)
+    (tie_breaker_available tie_breaker_2)
+    (metadata_available metadata_1)
+    (attribute_primary_available attribute_primary_1)
+    (provenance_available provenance_1)
+    (container_has_provenance result_container_1 provenance_1)
+    (container_has_provenance result_container_2 provenance_2)
+    (attribute_secondary_available attribute_secondary_1)
+  )
+  (:goal
+    (and
+      (published partition_primary_1)
+      (published partition_secondary_1)
+      (published result_container_1)
+      (published result_container_2)
+    )
+  )
+)

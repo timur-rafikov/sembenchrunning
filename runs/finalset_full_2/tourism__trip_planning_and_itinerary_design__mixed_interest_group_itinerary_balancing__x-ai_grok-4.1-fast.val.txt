@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain mixed_interest_group_itinerary_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_category - object resource_category - object place_category - object trip_category - object group_trip - trip_category vendor_option - entity_category activity_proposal - entity_category service_provider - entity_category amenity - entity_category participant_role - entity_category temporal_constraint - entity_category special_service - entity_category regulatory_requirement - entity_category shared_preference_option - resource_category package_option - resource_category policy_option - resource_category location_type_a - place_category location_type_b - place_category schedule_slot - place_category day_slot_group - group_trip alternate_day_slot_group - group_trip primary_day_slot - day_slot_group secondary_day_slot - day_slot_group itinerary_segment - alternate_day_slot_group)
+  (:predicates
+    (trip_proposal_created ?trip - group_trip)
+    (assignment_ready ?trip - group_trip)
+    (vendor_option_allocated ?trip - group_trip)
+    (reservation_confirmed ?trip - group_trip)
+    (entity_validated ?trip - group_trip)
+    (constraints_bound_on_item ?trip - group_trip)
+    (vendor_option_available ?vendor_option - vendor_option)
+    (assigned_vendor_option ?trip - group_trip ?vendor_option - vendor_option)
+    (activity_proposal_available ?activity - activity_proposal)
+    (activity_assigned ?trip - group_trip ?activity - activity_proposal)
+    (service_provider_available ?service_provider - service_provider)
+    (assigned_service_provider ?trip - group_trip ?service_provider - service_provider)
+    (preference_option_available ?preference_option - shared_preference_option)
+    (primary_slot_preference_assigned ?primary_slot - primary_day_slot ?preference_option - shared_preference_option)
+    (secondary_slot_preference_assigned ?secondary_slot - secondary_day_slot ?preference_option - shared_preference_option)
+    (primary_slot_at_location_a ?primary_slot - primary_day_slot ?location_a - location_type_a)
+    (location_a_reserved_primary ?location_a - location_type_a)
+    (location_a_reserved_shared ?location_a - location_type_a)
+    (primary_slot_provider_confirmed ?primary_slot - primary_day_slot)
+    (secondary_slot_at_location_b ?secondary_slot - secondary_day_slot ?location_b - location_type_b)
+    (location_b_reserved_primary ?location_b - location_type_b)
+    (location_b_reserved_shared ?location_b - location_type_b)
+    (secondary_slot_provider_confirmed ?secondary_slot - secondary_day_slot)
+    (schedule_slot_open ?schedule_slot - schedule_slot)
+    (schedule_slot_prepared ?schedule_slot - schedule_slot)
+    (schedule_slot_location_a_link ?schedule_slot - schedule_slot ?location_a - location_type_a)
+    (schedule_slot_location_b_link ?schedule_slot - schedule_slot ?location_b - location_type_b)
+    (schedule_slot_primary_flag ?schedule_slot - schedule_slot)
+    (schedule_slot_secondary_flag ?schedule_slot - schedule_slot)
+    (schedule_slot_occupied ?schedule_slot - schedule_slot)
+    (segment_primary_slot_link ?segment - itinerary_segment ?primary_slot - primary_day_slot)
+    (segment_secondary_slot_link ?segment - itinerary_segment ?secondary_slot - secondary_day_slot)
+    (segment_schedule_slot_link ?segment - itinerary_segment ?schedule_slot - schedule_slot)
+    (package_option_available ?package_option - package_option)
+    (segment_package_link ?segment - itinerary_segment ?package_option - package_option)
+    (package_option_reserved ?package_option - package_option)
+    (package_attached_to_slot ?package_option - package_option ?schedule_slot - schedule_slot)
+    (segment_resources_locked ?segment - itinerary_segment)
+    (segment_service_reservation_ready ?segment - itinerary_segment)
+    (segment_requirements_verified ?segment - itinerary_segment)
+    (segment_amenity_registered ?segment - itinerary_segment)
+    (segment_amenity_locked ?segment - itinerary_segment)
+    (segment_additional_requirements_registered ?segment - itinerary_segment)
+    (segment_final_checks_passed ?segment - itinerary_segment)
+    (policy_option_available ?policy_option - policy_option)
+    (segment_policy_link ?segment - itinerary_segment ?policy_option - policy_option)
+    (segment_policy_applied ?segment - itinerary_segment)
+    (segment_amenity_applied ?segment - itinerary_segment)
+    (segment_regulatory_review_ready ?segment - itinerary_segment)
+    (amenity_available ?amenity - amenity)
+    (segment_has_amenity ?segment - itinerary_segment ?amenity - amenity)
+    (participant_role_available ?participant_role - participant_role)
+    (segment_participant_role_assigned ?segment - itinerary_segment ?participant_role - participant_role)
+    (special_service_available ?special_service - special_service)
+    (segment_special_service_assigned ?segment - itinerary_segment ?special_service - special_service)
+    (regulatory_requirement_available ?regulatory_requirement - regulatory_requirement)
+    (segment_regulatory_requirement_assigned ?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement)
+    (temporal_constraint_available ?temporal_constraint - temporal_constraint)
+    (temporal_constraint_assigned ?trip - group_trip ?temporal_constraint - temporal_constraint)
+    (primary_slot_ready_for_scheduling ?primary_slot - primary_day_slot)
+    (secondary_slot_ready_for_scheduling ?secondary_slot - secondary_day_slot)
+    (segment_confirmation_locked ?segment - itinerary_segment)
+  )
+  (:action create_trip_proposal
+    :parameters (?trip - group_trip)
+    :precondition
+      (and
+        (not
+          (trip_proposal_created ?trip)
+        )
+        (not
+          (reservation_confirmed ?trip)
+        )
+      )
+    :effect (trip_proposal_created ?trip)
+  )
+  (:action attach_vendor_option_to_proposal
+    :parameters (?trip - group_trip ?vendor_option - vendor_option)
+    :precondition
+      (and
+        (trip_proposal_created ?trip)
+        (not
+          (vendor_option_allocated ?trip)
+        )
+        (vendor_option_available ?vendor_option)
+      )
+    :effect
+      (and
+        (vendor_option_allocated ?trip)
+        (assigned_vendor_option ?trip ?vendor_option)
+        (not
+          (vendor_option_available ?vendor_option)
+        )
+      )
+  )
+  (:action assign_activity_proposal_to_trip
+    :parameters (?trip - group_trip ?activity - activity_proposal)
+    :precondition
+      (and
+        (trip_proposal_created ?trip)
+        (vendor_option_allocated ?trip)
+        (activity_proposal_available ?activity)
+      )
+    :effect
+      (and
+        (activity_assigned ?trip ?activity)
+        (not
+          (activity_proposal_available ?activity)
+        )
+      )
+  )
+  (:action confirm_activity_on_trip
+    :parameters (?trip - group_trip ?activity - activity_proposal)
+    :precondition
+      (and
+        (trip_proposal_created ?trip)
+        (vendor_option_allocated ?trip)
+        (activity_assigned ?trip ?activity)
+        (not
+          (assignment_ready ?trip)
+        )
+      )
+    :effect (assignment_ready ?trip)
+  )
+  (:action revoke_activity_assignment_from_trip
+    :parameters (?trip - group_trip ?activity - activity_proposal)
+    :precondition
+      (and
+        (activity_assigned ?trip ?activity)
+      )
+    :effect
+      (and
+        (activity_proposal_available ?activity)
+        (not
+          (activity_assigned ?trip ?activity)
+        )
+      )
+  )
+  (:action assign_service_provider_to_trip
+    :parameters (?trip - group_trip ?service_provider - service_provider)
+    :precondition
+      (and
+        (assignment_ready ?trip)
+        (service_provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (assigned_service_provider ?trip ?service_provider)
+        (not
+          (service_provider_available ?service_provider)
+        )
+      )
+  )
+  (:action release_service_provider_from_trip
+    :parameters (?trip - group_trip ?service_provider - service_provider)
+    :precondition
+      (and
+        (assigned_service_provider ?trip ?service_provider)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider)
+        (not
+          (assigned_service_provider ?trip ?service_provider)
+        )
+      )
+  )
+  (:action assign_special_service_to_segment
+    :parameters (?segment - itinerary_segment ?special_service - special_service)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (special_service_available ?special_service)
+      )
+    :effect
+      (and
+        (segment_special_service_assigned ?segment ?special_service)
+        (not
+          (special_service_available ?special_service)
+        )
+      )
+  )
+  (:action release_special_service_from_segment
+    :parameters (?segment - itinerary_segment ?special_service - special_service)
+    :precondition
+      (and
+        (segment_special_service_assigned ?segment ?special_service)
+      )
+    :effect
+      (and
+        (special_service_available ?special_service)
+        (not
+          (segment_special_service_assigned ?segment ?special_service)
+        )
+      )
+  )
+  (:action assign_regulatory_requirement_to_segment
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (regulatory_requirement_available ?regulatory_requirement)
+      )
+    :effect
+      (and
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (not
+          (regulatory_requirement_available ?regulatory_requirement)
+        )
+      )
+  )
+  (:action release_regulatory_requirement_from_segment
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement)
+    :precondition
+      (and
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+      )
+    :effect
+      (and
+        (regulatory_requirement_available ?regulatory_requirement)
+        (not
+          (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        )
+      )
+  )
+  (:action reserve_location_a_for_primary_slot
+    :parameters (?primary_slot - primary_day_slot ?location_a - location_type_a ?activity - activity_proposal)
+    :precondition
+      (and
+        (assignment_ready ?primary_slot)
+        (activity_assigned ?primary_slot ?activity)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (not
+          (location_a_reserved_primary ?location_a)
+        )
+        (not
+          (location_a_reserved_shared ?location_a)
+        )
+      )
+    :effect (location_a_reserved_primary ?location_a)
+  )
+  (:action confirm_primary_slot_provider_assignment
+    :parameters (?primary_slot - primary_day_slot ?location_a - location_type_a ?service_provider - service_provider)
+    :precondition
+      (and
+        (assignment_ready ?primary_slot)
+        (assigned_service_provider ?primary_slot ?service_provider)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (location_a_reserved_primary ?location_a)
+        (not
+          (primary_slot_ready_for_scheduling ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (primary_slot_provider_confirmed ?primary_slot)
+      )
+  )
+  (:action apply_shared_preference_to_primary_slot
+    :parameters (?primary_slot - primary_day_slot ?location_a - location_type_a ?preference_option - shared_preference_option)
+    :precondition
+      (and
+        (assignment_ready ?primary_slot)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (preference_option_available ?preference_option)
+        (not
+          (primary_slot_ready_for_scheduling ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (location_a_reserved_shared ?location_a)
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (primary_slot_preference_assigned ?primary_slot ?preference_option)
+        (not
+          (preference_option_available ?preference_option)
+        )
+      )
+  )
+  (:action finalize_primary_slot_reservation
+    :parameters (?primary_slot - primary_day_slot ?location_a - location_type_a ?activity - activity_proposal ?preference_option - shared_preference_option)
+    :precondition
+      (and
+        (assignment_ready ?primary_slot)
+        (activity_assigned ?primary_slot ?activity)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (location_a_reserved_shared ?location_a)
+        (primary_slot_preference_assigned ?primary_slot ?preference_option)
+        (not
+          (primary_slot_provider_confirmed ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (location_a_reserved_primary ?location_a)
+        (primary_slot_provider_confirmed ?primary_slot)
+        (preference_option_available ?preference_option)
+        (not
+          (primary_slot_preference_assigned ?primary_slot ?preference_option)
+        )
+      )
+  )
+  (:action reserve_location_b_for_secondary_slot
+    :parameters (?secondary_slot - secondary_day_slot ?location_b - location_type_b ?activity - activity_proposal)
+    :precondition
+      (and
+        (assignment_ready ?secondary_slot)
+        (activity_assigned ?secondary_slot ?activity)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (not
+          (location_b_reserved_primary ?location_b)
+        )
+        (not
+          (location_b_reserved_shared ?location_b)
+        )
+      )
+    :effect (location_b_reserved_primary ?location_b)
+  )
+  (:action confirm_secondary_slot_provider_assignment
+    :parameters (?secondary_slot - secondary_day_slot ?location_b - location_type_b ?service_provider - service_provider)
+    :precondition
+      (and
+        (assignment_ready ?secondary_slot)
+        (assigned_service_provider ?secondary_slot ?service_provider)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_b_reserved_primary ?location_b)
+        (not
+          (secondary_slot_ready_for_scheduling ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (secondary_slot_provider_confirmed ?secondary_slot)
+      )
+  )
+  (:action apply_shared_preference_to_secondary_slot
+    :parameters (?secondary_slot - secondary_day_slot ?location_b - location_type_b ?preference_option - shared_preference_option)
+    :precondition
+      (and
+        (assignment_ready ?secondary_slot)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (preference_option_available ?preference_option)
+        (not
+          (secondary_slot_ready_for_scheduling ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (location_b_reserved_shared ?location_b)
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (secondary_slot_preference_assigned ?secondary_slot ?preference_option)
+        (not
+          (preference_option_available ?preference_option)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_reservation
+    :parameters (?secondary_slot - secondary_day_slot ?location_b - location_type_b ?activity - activity_proposal ?preference_option - shared_preference_option)
+    :precondition
+      (and
+        (assignment_ready ?secondary_slot)
+        (activity_assigned ?secondary_slot ?activity)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_b_reserved_shared ?location_b)
+        (secondary_slot_preference_assigned ?secondary_slot ?preference_option)
+        (not
+          (secondary_slot_provider_confirmed ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (location_b_reserved_primary ?location_b)
+        (secondary_slot_provider_confirmed ?secondary_slot)
+        (preference_option_available ?preference_option)
+        (not
+          (secondary_slot_preference_assigned ?secondary_slot ?preference_option)
+        )
+      )
+  )
+  (:action assemble_schedule_slot_when_both_slots_ready
+    :parameters (?primary_slot - primary_day_slot ?secondary_slot - secondary_day_slot ?location_a - location_type_a ?location_b - location_type_b ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_a_reserved_primary ?location_a)
+        (location_b_reserved_primary ?location_b)
+        (primary_slot_provider_confirmed ?primary_slot)
+        (secondary_slot_provider_confirmed ?secondary_slot)
+        (schedule_slot_open ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_location_a_link ?schedule_slot ?location_a)
+        (schedule_slot_location_b_link ?schedule_slot ?location_b)
+        (not
+          (schedule_slot_open ?schedule_slot)
+        )
+      )
+  )
+  (:action assemble_schedule_slot_primary_shared_secondary_primary
+    :parameters (?primary_slot - primary_day_slot ?secondary_slot - secondary_day_slot ?location_a - location_type_a ?location_b - location_type_b ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_a_reserved_shared ?location_a)
+        (location_b_reserved_primary ?location_b)
+        (not
+          (primary_slot_provider_confirmed ?primary_slot)
+        )
+        (secondary_slot_provider_confirmed ?secondary_slot)
+        (schedule_slot_open ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_location_a_link ?schedule_slot ?location_a)
+        (schedule_slot_location_b_link ?schedule_slot ?location_b)
+        (schedule_slot_primary_flag ?schedule_slot)
+        (not
+          (schedule_slot_open ?schedule_slot)
+        )
+      )
+  )
+  (:action assemble_schedule_slot_primary_primary_secondary_shared
+    :parameters (?primary_slot - primary_day_slot ?secondary_slot - secondary_day_slot ?location_a - location_type_a ?location_b - location_type_b ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_a_reserved_primary ?location_a)
+        (location_b_reserved_shared ?location_b)
+        (primary_slot_provider_confirmed ?primary_slot)
+        (not
+          (secondary_slot_provider_confirmed ?secondary_slot)
+        )
+        (schedule_slot_open ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_location_a_link ?schedule_slot ?location_a)
+        (schedule_slot_location_b_link ?schedule_slot ?location_b)
+        (schedule_slot_secondary_flag ?schedule_slot)
+        (not
+          (schedule_slot_open ?schedule_slot)
+        )
+      )
+  )
+  (:action assemble_schedule_slot_both_shared
+    :parameters (?primary_slot - primary_day_slot ?secondary_slot - secondary_day_slot ?location_a - location_type_a ?location_b - location_type_b ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (primary_slot_at_location_a ?primary_slot ?location_a)
+        (secondary_slot_at_location_b ?secondary_slot ?location_b)
+        (location_a_reserved_shared ?location_a)
+        (location_b_reserved_shared ?location_b)
+        (not
+          (primary_slot_provider_confirmed ?primary_slot)
+        )
+        (not
+          (secondary_slot_provider_confirmed ?secondary_slot)
+        )
+        (schedule_slot_open ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_location_a_link ?schedule_slot ?location_a)
+        (schedule_slot_location_b_link ?schedule_slot ?location_b)
+        (schedule_slot_primary_flag ?schedule_slot)
+        (schedule_slot_secondary_flag ?schedule_slot)
+        (not
+          (schedule_slot_open ?schedule_slot)
+        )
+      )
+  )
+  (:action occupy_schedule_slot
+    :parameters (?schedule_slot - schedule_slot ?primary_slot - primary_day_slot ?activity - activity_proposal)
+    :precondition
+      (and
+        (schedule_slot_prepared ?schedule_slot)
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (activity_assigned ?primary_slot ?activity)
+        (not
+          (schedule_slot_occupied ?schedule_slot)
+        )
+      )
+    :effect (schedule_slot_occupied ?schedule_slot)
+  )
+  (:action reserve_package_for_segment
+    :parameters (?segment - itinerary_segment ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (segment_schedule_slot_link ?segment ?schedule_slot)
+        (segment_package_link ?segment ?package_option)
+        (package_option_available ?package_option)
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_occupied ?schedule_slot)
+        (not
+          (package_option_reserved ?package_option)
+        )
+      )
+    :effect
+      (and
+        (package_option_reserved ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (not
+          (package_option_available ?package_option)
+        )
+      )
+  )
+  (:action lock_segment_resources_after_package_reservation
+    :parameters (?segment - itinerary_segment ?package_option - package_option ?schedule_slot - schedule_slot ?activity - activity_proposal)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (segment_package_link ?segment ?package_option)
+        (package_option_reserved ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (activity_assigned ?segment ?activity)
+        (not
+          (schedule_slot_primary_flag ?schedule_slot)
+        )
+        (not
+          (segment_resources_locked ?segment)
+        )
+      )
+    :effect (segment_resources_locked ?segment)
+  )
+  (:action assign_amenity_to_segment
+    :parameters (?segment - itinerary_segment ?amenity - amenity)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (amenity_available ?amenity)
+        (not
+          (segment_amenity_registered ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_amenity_registered ?segment)
+        (segment_has_amenity ?segment ?amenity)
+        (not
+          (amenity_available ?amenity)
+        )
+      )
+  )
+  (:action attach_and_lock_amenity_for_segment
+    :parameters (?segment - itinerary_segment ?package_option - package_option ?schedule_slot - schedule_slot ?activity - activity_proposal ?amenity - amenity)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (segment_package_link ?segment ?package_option)
+        (package_option_reserved ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (activity_assigned ?segment ?activity)
+        (schedule_slot_primary_flag ?schedule_slot)
+        (segment_amenity_registered ?segment)
+        (segment_has_amenity ?segment ?amenity)
+        (not
+          (segment_resources_locked ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_resources_locked ?segment)
+        (segment_amenity_locked ?segment)
+      )
+  )
+  (:action reserve_segment_service_resources_no_secondary_flag
+    :parameters (?segment - itinerary_segment ?special_service - special_service ?service_provider - service_provider ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_resources_locked ?segment)
+        (segment_special_service_assigned ?segment ?special_service)
+        (assigned_service_provider ?segment ?service_provider)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (not
+          (schedule_slot_secondary_flag ?schedule_slot)
+        )
+        (not
+          (segment_service_reservation_ready ?segment)
+        )
+      )
+    :effect (segment_service_reservation_ready ?segment)
+  )
+  (:action reserve_segment_service_resources_with_secondary_flag
+    :parameters (?segment - itinerary_segment ?special_service - special_service ?service_provider - service_provider ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_resources_locked ?segment)
+        (segment_special_service_assigned ?segment ?special_service)
+        (assigned_service_provider ?segment ?service_provider)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (schedule_slot_secondary_flag ?schedule_slot)
+        (not
+          (segment_service_reservation_ready ?segment)
+        )
+      )
+    :effect (segment_service_reservation_ready ?segment)
+  )
+  (:action verify_segment_regulatory_requirements_and_prepare
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_service_reservation_ready ?segment)
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (not
+          (schedule_slot_primary_flag ?schedule_slot)
+        )
+        (not
+          (schedule_slot_secondary_flag ?schedule_slot)
+        )
+        (not
+          (segment_requirements_verified ?segment)
+        )
+      )
+    :effect (segment_requirements_verified ?segment)
+  )
+  (:action verify_and_register_segment_requirements_with_amenity_flag
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_service_reservation_ready ?segment)
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (schedule_slot_primary_flag ?schedule_slot)
+        (not
+          (schedule_slot_secondary_flag ?schedule_slot)
+        )
+        (not
+          (segment_requirements_verified ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_additional_requirements_registered ?segment)
+      )
+  )
+  (:action verify_and_register_segment_requirements_with_secondary_flag
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_service_reservation_ready ?segment)
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (not
+          (schedule_slot_primary_flag ?schedule_slot)
+        )
+        (schedule_slot_secondary_flag ?schedule_slot)
+        (not
+          (segment_requirements_verified ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_additional_requirements_registered ?segment)
+      )
+  )
+  (:action verify_and_register_segment_requirements_with_both_flags
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement ?package_option - package_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (segment_service_reservation_ready ?segment)
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (segment_package_link ?segment ?package_option)
+        (package_attached_to_slot ?package_option ?schedule_slot)
+        (schedule_slot_primary_flag ?schedule_slot)
+        (schedule_slot_secondary_flag ?schedule_slot)
+        (not
+          (segment_requirements_verified ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_additional_requirements_registered ?segment)
+      )
+  )
+  (:action finalize_segment_validation
+    :parameters (?segment - itinerary_segment)
+    :precondition
+      (and
+        (segment_requirements_verified ?segment)
+        (not
+          (segment_additional_requirements_registered ?segment)
+        )
+        (not
+          (segment_confirmation_locked ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_confirmation_locked ?segment)
+        (entity_validated ?segment)
+      )
+  )
+  (:action assign_participant_role_to_segment
+    :parameters (?segment - itinerary_segment ?participant_role - participant_role)
+    :precondition
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_additional_requirements_registered ?segment)
+        (participant_role_available ?participant_role)
+      )
+    :effect
+      (and
+        (segment_participant_role_assigned ?segment ?participant_role)
+        (not
+          (participant_role_available ?participant_role)
+        )
+      )
+  )
+  (:action approve_segment_finalization
+    :parameters (?segment - itinerary_segment ?primary_slot - primary_day_slot ?secondary_slot - secondary_day_slot ?activity - activity_proposal ?participant_role - participant_role)
+    :precondition
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_additional_requirements_registered ?segment)
+        (segment_participant_role_assigned ?segment ?participant_role)
+        (segment_primary_slot_link ?segment ?primary_slot)
+        (segment_secondary_slot_link ?segment ?secondary_slot)
+        (primary_slot_provider_confirmed ?primary_slot)
+        (secondary_slot_provider_confirmed ?secondary_slot)
+        (activity_assigned ?segment ?activity)
+        (not
+          (segment_final_checks_passed ?segment)
+        )
+      )
+    :effect (segment_final_checks_passed ?segment)
+  )
+  (:action lock_segment_for_confirmation
+    :parameters (?segment - itinerary_segment)
+    :precondition
+      (and
+        (segment_requirements_verified ?segment)
+        (segment_final_checks_passed ?segment)
+        (not
+          (segment_confirmation_locked ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_confirmation_locked ?segment)
+        (entity_validated ?segment)
+      )
+  )
+  (:action apply_policy_option_to_segment
+    :parameters (?segment - itinerary_segment ?policy_option - policy_option ?activity - activity_proposal)
+    :precondition
+      (and
+        (assignment_ready ?segment)
+        (activity_assigned ?segment ?activity)
+        (policy_option_available ?policy_option)
+        (segment_policy_link ?segment ?policy_option)
+        (not
+          (segment_policy_applied ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_policy_applied ?segment)
+        (not
+          (policy_option_available ?policy_option)
+        )
+      )
+  )
+  (:action confirm_segment_amenity_application
+    :parameters (?segment - itinerary_segment ?service_provider - service_provider)
+    :precondition
+      (and
+        (segment_policy_applied ?segment)
+        (assigned_service_provider ?segment ?service_provider)
+        (not
+          (segment_amenity_applied ?segment)
+        )
+      )
+    :effect (segment_amenity_applied ?segment)
+  )
+  (:action mark_segment_regulatory_review_ready
+    :parameters (?segment - itinerary_segment ?regulatory_requirement - regulatory_requirement)
+    :precondition
+      (and
+        (segment_amenity_applied ?segment)
+        (segment_regulatory_requirement_assigned ?segment ?regulatory_requirement)
+        (not
+          (segment_regulatory_review_ready ?segment)
+        )
+      )
+    :effect (segment_regulatory_review_ready ?segment)
+  )
+  (:action confirm_segment_post_regulatory_review
+    :parameters (?segment - itinerary_segment)
+    :precondition
+      (and
+        (segment_regulatory_review_ready ?segment)
+        (not
+          (segment_confirmation_locked ?segment)
+        )
+      )
+    :effect
+      (and
+        (segment_confirmation_locked ?segment)
+        (entity_validated ?segment)
+      )
+  )
+  (:action confirm_primary_slot_from_schedule_slot
+    :parameters (?primary_slot - primary_day_slot ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (primary_slot_ready_for_scheduling ?primary_slot)
+        (primary_slot_provider_confirmed ?primary_slot)
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_occupied ?schedule_slot)
+        (not
+          (entity_validated ?primary_slot)
+        )
+      )
+    :effect (entity_validated ?primary_slot)
+  )
+  (:action confirm_secondary_slot_from_schedule_slot
+    :parameters (?secondary_slot - secondary_day_slot ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (secondary_slot_ready_for_scheduling ?secondary_slot)
+        (secondary_slot_provider_confirmed ?secondary_slot)
+        (schedule_slot_prepared ?schedule_slot)
+        (schedule_slot_occupied ?schedule_slot)
+        (not
+          (entity_validated ?secondary_slot)
+        )
+      )
+    :effect (entity_validated ?secondary_slot)
+  )
+  (:action bind_temporal_constraint_to_trip
+    :parameters (?trip - group_trip ?temporal_constraint - temporal_constraint ?activity - activity_proposal)
+    :precondition
+      (and
+        (entity_validated ?trip)
+        (activity_assigned ?trip ?activity)
+        (temporal_constraint_available ?temporal_constraint)
+        (not
+          (constraints_bound_on_item ?trip)
+        )
+      )
+    :effect
+      (and
+        (constraints_bound_on_item ?trip)
+        (temporal_constraint_assigned ?trip ?temporal_constraint)
+        (not
+          (temporal_constraint_available ?temporal_constraint)
+        )
+      )
+  )
+  (:action confirm_primary_slot_with_vendor_and_constraint
+    :parameters (?primary_slot - primary_day_slot ?vendor_option - vendor_option ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (constraints_bound_on_item ?primary_slot)
+        (assigned_vendor_option ?primary_slot ?vendor_option)
+        (temporal_constraint_assigned ?primary_slot ?temporal_constraint)
+        (not
+          (reservation_confirmed ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?primary_slot)
+        (vendor_option_available ?vendor_option)
+        (temporal_constraint_available ?temporal_constraint)
+      )
+  )
+  (:action confirm_secondary_slot_with_vendor_and_constraint
+    :parameters (?secondary_slot - secondary_day_slot ?vendor_option - vendor_option ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (constraints_bound_on_item ?secondary_slot)
+        (assigned_vendor_option ?secondary_slot ?vendor_option)
+        (temporal_constraint_assigned ?secondary_slot ?temporal_constraint)
+        (not
+          (reservation_confirmed ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?secondary_slot)
+        (vendor_option_available ?vendor_option)
+        (temporal_constraint_available ?temporal_constraint)
+      )
+  )
+  (:action confirm_segment_with_vendor_and_constraint
+    :parameters (?segment - itinerary_segment ?vendor_option - vendor_option ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (constraints_bound_on_item ?segment)
+        (assigned_vendor_option ?segment ?vendor_option)
+        (temporal_constraint_assigned ?segment ?temporal_constraint)
+        (not
+          (reservation_confirmed ?segment)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?segment)
+        (vendor_option_available ?vendor_option)
+        (temporal_constraint_available ?temporal_constraint)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem mixed_interest_trip_instance)
+  (:domain mixed_interest_group_itinerary_planning)
+  (:objects day_slot_primary_1 - primary_day_slot day_slot_secondary_1 - secondary_day_slot itinerary_segment_morning - itinerary_segment itinerary_segment_afternoon - itinerary_segment vendor_option_transport - vendor_option vendor_option_accommodation - vendor_option vendor_option_tour_operator - vendor_option activity_proposal_museum_visit - activity_proposal service_provider_museum_guide - service_provider preference_group_dining - shared_preference_option location_a_city_center - location_type_a location_b_national_park - location_type_b schedule_slot_day1_morning - schedule_slot package_option_combined_ticket - package_option package_option_meal_addon - package_option amenity_wifi - amenity amenity_parking - amenity role_leader - participant_role role_participant - participant_role temporal_constraint_morning_only - temporal_constraint special_service_private_guide - special_service policy_option_group_discount - policy_option policy_option_special_waiver - policy_option regulatory_requirement_permit - regulatory_requirement)
+  (:init
+    (vendor_option_available vendor_option_transport)
+    (vendor_option_available vendor_option_accommodation)
+    (vendor_option_available vendor_option_tour_operator)
+    (activity_proposal_available activity_proposal_museum_visit)
+    (service_provider_available service_provider_museum_guide)
+    (preference_option_available preference_group_dining)
+    (primary_slot_at_location_a day_slot_primary_1 location_a_city_center)
+    (secondary_slot_at_location_b day_slot_secondary_1 location_b_national_park)
+    (schedule_slot_open schedule_slot_day1_morning)
+    (package_option_available package_option_combined_ticket)
+    (package_option_available package_option_meal_addon)
+    (segment_primary_slot_link itinerary_segment_morning day_slot_primary_1)
+    (segment_primary_slot_link itinerary_segment_afternoon day_slot_primary_1)
+    (segment_secondary_slot_link itinerary_segment_morning day_slot_secondary_1)
+    (segment_secondary_slot_link itinerary_segment_afternoon day_slot_secondary_1)
+    (segment_schedule_slot_link itinerary_segment_morning schedule_slot_day1_morning)
+    (segment_schedule_slot_link itinerary_segment_afternoon schedule_slot_day1_morning)
+    (segment_package_link itinerary_segment_morning package_option_combined_ticket)
+    (segment_package_link itinerary_segment_afternoon package_option_meal_addon)
+    (amenity_available amenity_wifi)
+    (amenity_available amenity_parking)
+    (participant_role_available role_leader)
+    (participant_role_available role_participant)
+    (temporal_constraint_available temporal_constraint_morning_only)
+    (special_service_available special_service_private_guide)
+    (policy_option_available policy_option_group_discount)
+    (segment_policy_link itinerary_segment_morning policy_option_group_discount)
+    (segment_policy_link itinerary_segment_afternoon policy_option_special_waiver)
+    (regulatory_requirement_available regulatory_requirement_permit)
+  )
+  (:goal
+    (and
+      (reservation_confirmed day_slot_primary_1)
+      (reservation_confirmed day_slot_secondary_1)
+      (reservation_confirmed itinerary_segment_morning)
+      (reservation_confirmed itinerary_segment_afternoon)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_trip_proposal day_slot_primary_1)
+(attach_vendor_option_to_proposal day_slot_primary_1 vendor_option_transport)
+(assign_activity_proposal_to_trip day_slot_primary_1 activity_proposal_museum_visit)
+(confirm_activity_on_trip day_slot_primary_1 activity_proposal_museum_visit)
+(apply_shared_preference_to_primary_slot day_slot_primary_1 location_a_city_center preference_group_dining)
+(finalize_primary_slot_reservation day_slot_primary_1 location_a_city_center activity_proposal_museum_visit preference_group_dining)
+(revoke_activity_assignment_from_trip day_slot_primary_1 activity_proposal_museum_visit)
+(create_trip_proposal day_slot_secondary_1)
+(attach_vendor_option_to_proposal day_slot_secondary_1 vendor_option_accommodation)
+(assign_activity_proposal_to_trip day_slot_secondary_1 activity_proposal_museum_visit)
+(confirm_activity_on_trip day_slot_secondary_1 activity_proposal_museum_visit)
+(apply_shared_preference_to_secondary_slot day_slot_secondary_1 location_b_national_park preference_group_dining)
+(finalize_secondary_slot_reservation day_slot_secondary_1 location_b_national_park activity_proposal_museum_visit preference_group_dining)
+(revoke_activity_assignment_from_trip day_slot_secondary_1 activity_proposal_museum_visit)
+(assign_activity_proposal_to_trip day_slot_primary_1 activity_proposal_museum_visit)
+(assemble_schedule_slot_when_both_slots_ready day_slot_primary_1 day_slot_secondary_1 location_a_city_center location_b_national_park schedule_slot_day1_morning)
+(occupy_schedule_slot schedule_slot_day1_morning day_slot_primary_1 activity_proposal_museum_visit)
+(confirm_primary_slot_from_schedule_slot day_slot_primary_1 schedule_slot_day1_morning)
+(confirm_secondary_slot_from_schedule_slot day_slot_secondary_1 schedule_slot_day1_morning)
+(bind_temporal_constraint_to_trip day_slot_primary_1 temporal_constraint_morning_only activity_proposal_museum_visit)
+(confirm_primary_slot_with_vendor_and_constraint day_slot_primary_1 vendor_option_transport temporal_constraint_morning_only)
+(revoke_activity_assignment_from_trip day_slot_primary_1 activity_proposal_museum_visit)
+(assign_activity_proposal_to_trip day_slot_secondary_1 activity_proposal_museum_visit)
+(bind_temporal_constraint_to_trip day_slot_secondary_1 temporal_constraint_morning_only activity_proposal_museum_visit)
+(confirm_secondary_slot_with_vendor_and_constraint day_slot_secondary_1 vendor_option_accommodation temporal_constraint_morning_only)
+(revoke_activity_assignment_from_trip day_slot_secondary_1 activity_proposal_museum_visit)
+(create_trip_proposal itinerary_segment_morning)
+(attach_vendor_option_to_proposal itinerary_segment_morning vendor_option_transport)
+(assign_activity_proposal_to_trip itinerary_segment_morning activity_proposal_museum_visit)
+(confirm_activity_on_trip itinerary_segment_morning activity_proposal_museum_visit)
+(reserve_package_for_segment itinerary_segment_morning package_option_combined_ticket schedule_slot_day1_morning)
+(lock_segment_resources_after_package_reservation itinerary_segment_morning package_option_combined_ticket schedule_slot_day1_morning activity_proposal_museum_visit)
+(assign_special_service_to_segment itinerary_segment_morning special_service_private_guide)
+(assign_service_provider_to_trip itinerary_segment_morning service_provider_museum_guide)
+(reserve_segment_service_resources_no_secondary_flag itinerary_segment_morning special_service_private_guide service_provider_museum_guide package_option_combined_ticket schedule_slot_day1_morning)
+(assign_regulatory_requirement_to_segment itinerary_segment_morning regulatory_requirement_permit)
+(verify_segment_regulatory_requirements_and_prepare itinerary_segment_morning regulatory_requirement_permit package_option_combined_ticket schedule_slot_day1_morning)
+(finalize_segment_validation itinerary_segment_morning)
+(release_regulatory_requirement_from_segment itinerary_segment_morning regulatory_requirement_permit)
+(release_special_service_from_segment itinerary_segment_morning special_service_private_guide)
+(release_service_provider_from_trip itinerary_segment_morning service_provider_museum_guide)
+(bind_temporal_constraint_to_trip itinerary_segment_morning temporal_constraint_morning_only activity_proposal_museum_visit)
+(confirm_segment_with_vendor_and_constraint itinerary_segment_morning vendor_option_transport temporal_constraint_morning_only)
+(revoke_activity_assignment_from_trip itinerary_segment_morning activity_proposal_museum_visit)
+(create_trip_proposal itinerary_segment_afternoon)
+(attach_vendor_option_to_proposal itinerary_segment_afternoon vendor_option_accommodation)
+(assign_activity_proposal_to_trip itinerary_segment_afternoon activity_proposal_museum_visit)
+(confirm_activity_on_trip itinerary_segment_afternoon activity_proposal_museum_visit)
+(reserve_package_for_segment itinerary_segment_afternoon package_option_meal_addon schedule_slot_day1_morning)
+(lock_segment_resources_after_package_reservation itinerary_segment_afternoon package_option_meal_addon schedule_slot_day1_morning activity_proposal_museum_visit)
+(assign_special_service_to_segment itinerary_segment_afternoon special_service_private_guide)
+(assign_service_provider_to_trip itinerary_segment_afternoon service_provider_museum_guide)
+(reserve_segment_service_resources_no_secondary_flag itinerary_segment_afternoon special_service_private_guide service_provider_museum_guide package_option_meal_addon schedule_slot_day1_morning)
+(assign_regulatory_requirement_to_segment itinerary_segment_afternoon regulatory_requirement_permit)
+(verify_segment_regulatory_requirements_and_prepare itinerary_segment_afternoon regulatory_requirement_permit package_option_meal_addon schedule_slot_day1_morning)
+(finalize_segment_validation itinerary_segment_afternoon)
+(release_regulatory_requirement_from_segment itinerary_segment_afternoon regulatory_requirement_permit)
+(release_special_service_from_segment itinerary_segment_afternoon special_service_private_guide)
+(release_service_provider_from_trip itinerary_segment_afternoon service_provider_museum_guide)
+(bind_temporal_constraint_to_trip itinerary_segment_afternoon temporal_constraint_morning_only activity_proposal_museum_visit)
+(confirm_segment_with_vendor_and_constraint itinerary_segment_afternoon vendor_option_accommodation temporal_constraint_morning_only)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_9z7dv91h/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 61 
+
+Successful plans:
+Value: 61
+ /tmp/val_9z7dv91h/plan.pddl 61 
+
+
+
+--- stderr ---
+

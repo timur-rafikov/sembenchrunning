@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain agriculture_weather_aware_reordering_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category_1 - object domain_auxiliary_20 - object domain_auxiliary_21 - object domain_root - object work_item - domain_root equipment_unit - resource_category_1 weather_window - resource_category_1 crew_unit - resource_category_1 compliance_certificate - resource_category_1 logistical_resource - resource_category_1 forecast_block - resource_category_1 treatment_type - resource_category_1 regulatory_approval - resource_category_1 agro_input_unit - domain_auxiliary_20 material_batch - domain_auxiliary_20 quality_check - domain_auxiliary_20 field_time_slot_primary - domain_auxiliary_21 field_time_slot_secondary - domain_auxiliary_21 work_order - domain_auxiliary_21 task_slot_role - work_item task_slot_role_alt - work_item field_task_primary - task_slot_role field_task_secondary - task_slot_role field_operation_plan - task_slot_role_alt)
+  (:predicates
+    (work_entity_created ?work_item - work_item)
+    (work_entity_planned ?work_item - work_item)
+    (work_entity_has_equipment ?work_item - work_item)
+    (work_entity_closed ?work_item - work_item)
+    (completion_signal ?work_item - work_item)
+    (ready_for_resource_return ?work_item - work_item)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (work_entity_assigned_equipment ?work_item - work_item ?equipment_unit - equipment_unit)
+    (weather_window_available ?weather_window - weather_window)
+    (work_entity_assigned_weather_window ?work_item - work_item ?weather_window - weather_window)
+    (crew_available ?crew_unit - crew_unit)
+    (work_entity_assigned_crew ?work_item - work_item ?crew_unit - crew_unit)
+    (agro_input_available ?agro_input_unit - agro_input_unit)
+    (task_reserved_input ?field_task_primary - field_task_primary ?agro_input_unit - agro_input_unit)
+    (secondary_task_reserved_input ?field_task_secondary - field_task_secondary ?agro_input_unit - agro_input_unit)
+    (task_has_primary_slot ?field_task_primary - field_task_primary ?field_time_slot_primary - field_time_slot_primary)
+    (slot_primary_ready ?field_time_slot_primary - field_time_slot_primary)
+    (slot_primary_reserved ?field_time_slot_primary - field_time_slot_primary)
+    (task_primary_ready_for_order ?field_task_primary - field_task_primary)
+    (task_has_secondary_slot ?field_task_secondary - field_task_secondary ?field_time_slot_secondary - field_time_slot_secondary)
+    (slot_secondary_ready ?field_time_slot_secondary - field_time_slot_secondary)
+    (slot_secondary_reserved ?field_time_slot_secondary - field_time_slot_secondary)
+    (task_secondary_ready_for_order ?field_task_secondary - field_task_secondary)
+    (work_order_available ?work_order - work_order)
+    (work_order_assembled ?work_order - work_order)
+    (work_order_assigned_primary_slot ?work_order - work_order ?field_time_slot_primary - field_time_slot_primary)
+    (work_order_assigned_secondary_slot ?work_order - work_order ?field_time_slot_secondary - field_time_slot_secondary)
+    (work_order_requires_certificate ?work_order - work_order)
+    (work_order_requires_additional_inspection ?work_order - work_order)
+    (work_order_activated ?work_order - work_order)
+    (plan_has_primary_task ?field_operation_plan - field_operation_plan ?field_task_primary - field_task_primary)
+    (plan_has_secondary_task ?field_operation_plan - field_operation_plan ?field_task_secondary - field_task_secondary)
+    (plan_linked_work_order ?field_operation_plan - field_operation_plan ?work_order - work_order)
+    (material_batch_available ?material_batch - material_batch)
+    (plan_has_material_batch ?field_operation_plan - field_operation_plan ?material_batch - material_batch)
+    (material_reserved ?material_batch - material_batch)
+    (material_allocated_to_work_order ?material_batch - material_batch ?work_order - work_order)
+    (plan_material_confirmed ?field_operation_plan - field_operation_plan)
+    (plan_prepped_for_treatment ?field_operation_plan - field_operation_plan)
+    (plan_validated ?field_operation_plan - field_operation_plan)
+    (plan_certificate_attached ?field_operation_plan - field_operation_plan)
+    (plan_certificate_attachment_confirmed ?field_operation_plan - field_operation_plan)
+    (plan_logistics_allocated ?field_operation_plan - field_operation_plan)
+    (plan_execution_staged ?field_operation_plan - field_operation_plan)
+    (quality_check_available ?quality_check - quality_check)
+    (plan_linked_quality_check ?field_operation_plan - field_operation_plan ?quality_check - quality_check)
+    (plan_inspection_recorded ?field_operation_plan - field_operation_plan)
+    (plan_inspection_subtask_triggered ?field_operation_plan - field_operation_plan)
+    (plan_inspection_subtask_completed ?field_operation_plan - field_operation_plan)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (plan_attached_certificate ?field_operation_plan - field_operation_plan ?compliance_certificate - compliance_certificate)
+    (logistical_resource_available ?logistical_resource - logistical_resource)
+    (plan_assigned_logistics ?field_operation_plan - field_operation_plan ?logistical_resource - logistical_resource)
+    (treatment_type_available ?treatment_type - treatment_type)
+    (plan_assigned_treatment ?field_operation_plan - field_operation_plan ?treatment_type - treatment_type)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (plan_has_regulatory_approval ?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval)
+    (forecast_block_available ?forecast_block - forecast_block)
+    (work_entity_assigned_forecast_block ?work_item - work_item ?forecast_block - forecast_block)
+    (primary_task_ready_flag ?field_task_primary - field_task_primary)
+    (secondary_task_ready_flag ?field_task_secondary - field_task_secondary)
+    (plan_finalized ?field_operation_plan - field_operation_plan)
+  )
+  (:action create_work_item
+    :parameters (?work_item - work_item)
+    :precondition
+      (and
+        (not
+          (work_entity_created ?work_item)
+        )
+        (not
+          (work_entity_closed ?work_item)
+        )
+      )
+    :effect (work_entity_created ?work_item)
+  )
+  (:action allocate_equipment_to_work_item
+    :parameters (?work_item - work_item ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (work_entity_created ?work_item)
+        (not
+          (work_entity_has_equipment ?work_item)
+        )
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (work_entity_has_equipment ?work_item)
+        (work_entity_assigned_equipment ?work_item ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_weather_window_to_work_item
+    :parameters (?work_item - work_item ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_created ?work_item)
+        (work_entity_has_equipment ?work_item)
+        (weather_window_available ?weather_window)
+      )
+    :effect
+      (and
+        (work_entity_assigned_weather_window ?work_item ?weather_window)
+        (not
+          (weather_window_available ?weather_window)
+        )
+      )
+  )
+  (:action confirm_work_item_schedule
+    :parameters (?work_item - work_item ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_created ?work_item)
+        (work_entity_has_equipment ?work_item)
+        (work_entity_assigned_weather_window ?work_item ?weather_window)
+        (not
+          (work_entity_planned ?work_item)
+        )
+      )
+    :effect (work_entity_planned ?work_item)
+  )
+  (:action release_weather_window_from_work_item
+    :parameters (?work_item - work_item ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_assigned_weather_window ?work_item ?weather_window)
+      )
+    :effect
+      (and
+        (weather_window_available ?weather_window)
+        (not
+          (work_entity_assigned_weather_window ?work_item ?weather_window)
+        )
+      )
+  )
+  (:action assign_crew_to_work_item
+    :parameters (?work_item - work_item ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (work_entity_planned ?work_item)
+        (crew_available ?crew_unit)
+      )
+    :effect
+      (and
+        (work_entity_assigned_crew ?work_item ?crew_unit)
+        (not
+          (crew_available ?crew_unit)
+        )
+      )
+  )
+  (:action release_crew_from_work_item
+    :parameters (?work_item - work_item ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (work_entity_assigned_crew ?work_item ?crew_unit)
+      )
+    :effect
+      (and
+        (crew_available ?crew_unit)
+        (not
+          (work_entity_assigned_crew ?work_item ?crew_unit)
+        )
+      )
+  )
+  (:action attach_treatment_to_plan
+    :parameters (?field_operation_plan - field_operation_plan ?treatment_type - treatment_type)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (treatment_type_available ?treatment_type)
+      )
+    :effect
+      (and
+        (plan_assigned_treatment ?field_operation_plan ?treatment_type)
+        (not
+          (treatment_type_available ?treatment_type)
+        )
+      )
+  )
+  (:action detach_treatment_from_plan
+    :parameters (?field_operation_plan - field_operation_plan ?treatment_type - treatment_type)
+    :precondition
+      (and
+        (plan_assigned_treatment ?field_operation_plan ?treatment_type)
+      )
+    :effect
+      (and
+        (treatment_type_available ?treatment_type)
+        (not
+          (plan_assigned_treatment ?field_operation_plan ?treatment_type)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_plan
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action detach_regulatory_approval_from_plan
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        )
+      )
+  )
+  (:action mark_time_slot_primary_ready_for_task
+    :parameters (?field_task_primary - field_task_primary ?field_time_slot_primary - field_time_slot_primary ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_primary)
+        (work_entity_assigned_weather_window ?field_task_primary ?weather_window)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (not
+          (slot_primary_ready ?field_time_slot_primary)
+        )
+        (not
+          (slot_primary_reserved ?field_time_slot_primary)
+        )
+      )
+    :effect (slot_primary_ready ?field_time_slot_primary)
+  )
+  (:action assign_crew_and_flag_primary_task_for_order
+    :parameters (?field_task_primary - field_task_primary ?field_time_slot_primary - field_time_slot_primary ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_primary)
+        (work_entity_assigned_crew ?field_task_primary ?crew_unit)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (slot_primary_ready ?field_time_slot_primary)
+        (not
+          (primary_task_ready_flag ?field_task_primary)
+        )
+      )
+    :effect
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (task_primary_ready_for_order ?field_task_primary)
+      )
+  )
+  (:action allocate_input_and_reserve_slot_primary
+    :parameters (?field_task_primary - field_task_primary ?field_time_slot_primary - field_time_slot_primary ?agro_input_unit - agro_input_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_primary)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (agro_input_available ?agro_input_unit)
+        (not
+          (primary_task_ready_flag ?field_task_primary)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_reserved ?field_time_slot_primary)
+        (primary_task_ready_flag ?field_task_primary)
+        (task_reserved_input ?field_task_primary ?agro_input_unit)
+        (not
+          (agro_input_available ?agro_input_unit)
+        )
+      )
+  )
+  (:action finalize_input_allocation_and_toggle_slot_primary
+    :parameters (?field_task_primary - field_task_primary ?field_time_slot_primary - field_time_slot_primary ?weather_window - weather_window ?agro_input_unit - agro_input_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_primary)
+        (work_entity_assigned_weather_window ?field_task_primary ?weather_window)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (slot_primary_reserved ?field_time_slot_primary)
+        (task_reserved_input ?field_task_primary ?agro_input_unit)
+        (not
+          (task_primary_ready_for_order ?field_task_primary)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_ready ?field_time_slot_primary)
+        (task_primary_ready_for_order ?field_task_primary)
+        (agro_input_available ?agro_input_unit)
+        (not
+          (task_reserved_input ?field_task_primary ?agro_input_unit)
+        )
+      )
+  )
+  (:action mark_time_slot_secondary_ready_for_task
+    :parameters (?field_task_secondary - field_task_secondary ?field_time_slot_secondary - field_time_slot_secondary ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_secondary)
+        (work_entity_assigned_weather_window ?field_task_secondary ?weather_window)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (not
+          (slot_secondary_ready ?field_time_slot_secondary)
+        )
+        (not
+          (slot_secondary_reserved ?field_time_slot_secondary)
+        )
+      )
+    :effect (slot_secondary_ready ?field_time_slot_secondary)
+  )
+  (:action assign_crew_and_flag_secondary_task_for_order
+    :parameters (?field_task_secondary - field_task_secondary ?field_time_slot_secondary - field_time_slot_secondary ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_secondary)
+        (work_entity_assigned_crew ?field_task_secondary ?crew_unit)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_secondary_ready ?field_time_slot_secondary)
+        (not
+          (secondary_task_ready_flag ?field_task_secondary)
+        )
+      )
+    :effect
+      (and
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_secondary_ready_for_order ?field_task_secondary)
+      )
+  )
+  (:action allocate_input_and_reserve_slot_secondary
+    :parameters (?field_task_secondary - field_task_secondary ?field_time_slot_secondary - field_time_slot_secondary ?agro_input_unit - agro_input_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_secondary)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (agro_input_available ?agro_input_unit)
+        (not
+          (secondary_task_ready_flag ?field_task_secondary)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_reserved ?field_time_slot_secondary)
+        (secondary_task_ready_flag ?field_task_secondary)
+        (secondary_task_reserved_input ?field_task_secondary ?agro_input_unit)
+        (not
+          (agro_input_available ?agro_input_unit)
+        )
+      )
+  )
+  (:action finalize_input_allocation_and_toggle_slot_secondary
+    :parameters (?field_task_secondary - field_task_secondary ?field_time_slot_secondary - field_time_slot_secondary ?weather_window - weather_window ?agro_input_unit - agro_input_unit)
+    :precondition
+      (and
+        (work_entity_planned ?field_task_secondary)
+        (work_entity_assigned_weather_window ?field_task_secondary ?weather_window)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_secondary_reserved ?field_time_slot_secondary)
+        (secondary_task_reserved_input ?field_task_secondary ?agro_input_unit)
+        (not
+          (task_secondary_ready_for_order ?field_task_secondary)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_ready ?field_time_slot_secondary)
+        (task_secondary_ready_for_order ?field_task_secondary)
+        (agro_input_available ?agro_input_unit)
+        (not
+          (secondary_task_reserved_input ?field_task_secondary ?agro_input_unit)
+        )
+      )
+  )
+  (:action assemble_work_order_from_ready_slots
+    :parameters (?field_task_primary - field_task_primary ?field_task_secondary - field_task_secondary ?field_time_slot_primary - field_time_slot_primary ?field_time_slot_secondary - field_time_slot_secondary ?work_order - work_order)
+    :precondition
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_primary_ready ?field_time_slot_primary)
+        (slot_secondary_ready ?field_time_slot_secondary)
+        (task_primary_ready_for_order ?field_task_primary)
+        (task_secondary_ready_for_order ?field_task_secondary)
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_assigned_primary_slot ?work_order ?field_time_slot_primary)
+        (work_order_assigned_secondary_slot ?work_order ?field_time_slot_secondary)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_reserved_primary_slot
+    :parameters (?field_task_primary - field_task_primary ?field_task_secondary - field_task_secondary ?field_time_slot_primary - field_time_slot_primary ?field_time_slot_secondary - field_time_slot_secondary ?work_order - work_order)
+    :precondition
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_primary_reserved ?field_time_slot_primary)
+        (slot_secondary_ready ?field_time_slot_secondary)
+        (not
+          (task_primary_ready_for_order ?field_task_primary)
+        )
+        (task_secondary_ready_for_order ?field_task_secondary)
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_assigned_primary_slot ?work_order ?field_time_slot_primary)
+        (work_order_assigned_secondary_slot ?work_order ?field_time_slot_secondary)
+        (work_order_requires_certificate ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_reserved_secondary_slot
+    :parameters (?field_task_primary - field_task_primary ?field_task_secondary - field_task_secondary ?field_time_slot_primary - field_time_slot_primary ?field_time_slot_secondary - field_time_slot_secondary ?work_order - work_order)
+    :precondition
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_primary_ready ?field_time_slot_primary)
+        (slot_secondary_reserved ?field_time_slot_secondary)
+        (task_primary_ready_for_order ?field_task_primary)
+        (not
+          (task_secondary_ready_for_order ?field_task_secondary)
+        )
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_assigned_primary_slot ?work_order ?field_time_slot_primary)
+        (work_order_assigned_secondary_slot ?work_order ?field_time_slot_secondary)
+        (work_order_requires_additional_inspection ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_both_reserved_slots
+    :parameters (?field_task_primary - field_task_primary ?field_task_secondary - field_task_secondary ?field_time_slot_primary - field_time_slot_primary ?field_time_slot_secondary - field_time_slot_secondary ?work_order - work_order)
+    :precondition
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_has_primary_slot ?field_task_primary ?field_time_slot_primary)
+        (task_has_secondary_slot ?field_task_secondary ?field_time_slot_secondary)
+        (slot_primary_reserved ?field_time_slot_primary)
+        (slot_secondary_reserved ?field_time_slot_secondary)
+        (not
+          (task_primary_ready_for_order ?field_task_primary)
+        )
+        (not
+          (task_secondary_ready_for_order ?field_task_secondary)
+        )
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_assembled ?work_order)
+        (work_order_assigned_primary_slot ?work_order ?field_time_slot_primary)
+        (work_order_assigned_secondary_slot ?work_order ?field_time_slot_secondary)
+        (work_order_requires_certificate ?work_order)
+        (work_order_requires_additional_inspection ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action activate_work_order_for_execution
+    :parameters (?work_order - work_order ?field_task_primary - field_task_primary ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_order_assembled ?work_order)
+        (primary_task_ready_flag ?field_task_primary)
+        (work_entity_assigned_weather_window ?field_task_primary ?weather_window)
+        (not
+          (work_order_activated ?work_order)
+        )
+      )
+    :effect (work_order_activated ?work_order)
+  )
+  (:action reserve_material_batch_and_allocate_to_work_order
+    :parameters (?field_operation_plan - field_operation_plan ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (plan_linked_work_order ?field_operation_plan ?work_order)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_batch_available ?material_batch)
+        (work_order_assembled ?work_order)
+        (work_order_activated ?work_order)
+        (not
+          (material_reserved ?material_batch)
+        )
+      )
+    :effect
+      (and
+        (material_reserved ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (not
+          (material_batch_available ?material_batch)
+        )
+      )
+  )
+  (:action confirm_material_allocation_for_plan
+    :parameters (?field_operation_plan - field_operation_plan ?material_batch - material_batch ?work_order - work_order ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_reserved ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (work_entity_assigned_weather_window ?field_operation_plan ?weather_window)
+        (not
+          (work_order_requires_certificate ?work_order)
+        )
+        (not
+          (plan_material_confirmed ?field_operation_plan)
+        )
+      )
+    :effect (plan_material_confirmed ?field_operation_plan)
+  )
+  (:action attach_compliance_certificate_to_plan
+    :parameters (?field_operation_plan - field_operation_plan ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (compliance_certificate_available ?compliance_certificate)
+        (not
+          (plan_certificate_attached ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_certificate_attached ?field_operation_plan)
+        (plan_attached_certificate ?field_operation_plan ?compliance_certificate)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action bind_certificate_and_stage_plan
+    :parameters (?field_operation_plan - field_operation_plan ?material_batch - material_batch ?work_order - work_order ?weather_window - weather_window ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_reserved ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (work_entity_assigned_weather_window ?field_operation_plan ?weather_window)
+        (work_order_requires_certificate ?work_order)
+        (plan_certificate_attached ?field_operation_plan)
+        (plan_attached_certificate ?field_operation_plan ?compliance_certificate)
+        (not
+          (plan_material_confirmed ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_material_confirmed ?field_operation_plan)
+        (plan_certificate_attachment_confirmed ?field_operation_plan)
+      )
+  )
+  (:action prepare_plan_for_treatment_variant_1
+    :parameters (?field_operation_plan - field_operation_plan ?treatment_type - treatment_type ?crew_unit - crew_unit ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_material_confirmed ?field_operation_plan)
+        (plan_assigned_treatment ?field_operation_plan ?treatment_type)
+        (work_entity_assigned_crew ?field_operation_plan ?crew_unit)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (not
+          (work_order_requires_additional_inspection ?work_order)
+        )
+        (not
+          (plan_prepped_for_treatment ?field_operation_plan)
+        )
+      )
+    :effect (plan_prepped_for_treatment ?field_operation_plan)
+  )
+  (:action prepare_plan_for_treatment_variant_2
+    :parameters (?field_operation_plan - field_operation_plan ?treatment_type - treatment_type ?crew_unit - crew_unit ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_material_confirmed ?field_operation_plan)
+        (plan_assigned_treatment ?field_operation_plan ?treatment_type)
+        (work_entity_assigned_crew ?field_operation_plan ?crew_unit)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (work_order_requires_additional_inspection ?work_order)
+        (not
+          (plan_prepped_for_treatment ?field_operation_plan)
+        )
+      )
+    :effect (plan_prepped_for_treatment ?field_operation_plan)
+  )
+  (:action authorize_plan_with_regulatory_step_1
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_prepped_for_treatment ?field_operation_plan)
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (not
+          (work_order_requires_certificate ?work_order)
+        )
+        (not
+          (work_order_requires_additional_inspection ?work_order)
+        )
+        (not
+          (plan_validated ?field_operation_plan)
+        )
+      )
+    :effect (plan_validated ?field_operation_plan)
+  )
+  (:action authorize_plan_with_regulatory_step_2
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_prepped_for_treatment ?field_operation_plan)
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (work_order_requires_certificate ?work_order)
+        (not
+          (work_order_requires_additional_inspection ?work_order)
+        )
+        (not
+          (plan_validated ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_logistics_allocated ?field_operation_plan)
+      )
+  )
+  (:action authorize_plan_with_regulatory_step_3
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_prepped_for_treatment ?field_operation_plan)
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (not
+          (work_order_requires_certificate ?work_order)
+        )
+        (work_order_requires_additional_inspection ?work_order)
+        (not
+          (plan_validated ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_logistics_allocated ?field_operation_plan)
+      )
+  )
+  (:action authorize_plan_with_regulatory_step_4
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval ?material_batch - material_batch ?work_order - work_order)
+    :precondition
+      (and
+        (plan_prepped_for_treatment ?field_operation_plan)
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (plan_has_material_batch ?field_operation_plan ?material_batch)
+        (material_allocated_to_work_order ?material_batch ?work_order)
+        (work_order_requires_certificate ?work_order)
+        (work_order_requires_additional_inspection ?work_order)
+        (not
+          (plan_validated ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_logistics_allocated ?field_operation_plan)
+      )
+  )
+  (:action finalize_operation_plan_and_emit_readiness
+    :parameters (?field_operation_plan - field_operation_plan)
+    :precondition
+      (and
+        (plan_validated ?field_operation_plan)
+        (not
+          (plan_logistics_allocated ?field_operation_plan)
+        )
+        (not
+          (plan_finalized ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_operation_plan)
+        (completion_signal ?field_operation_plan)
+      )
+  )
+  (:action assign_logistics_to_plan
+    :parameters (?field_operation_plan - field_operation_plan ?logistical_resource - logistical_resource)
+    :precondition
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_logistics_allocated ?field_operation_plan)
+        (logistical_resource_available ?logistical_resource)
+      )
+    :effect
+      (and
+        (plan_assigned_logistics ?field_operation_plan ?logistical_resource)
+        (not
+          (logistical_resource_available ?logistical_resource)
+        )
+      )
+  )
+  (:action commit_plan_execution_resources
+    :parameters (?field_operation_plan - field_operation_plan ?field_task_primary - field_task_primary ?field_task_secondary - field_task_secondary ?weather_window - weather_window ?logistical_resource - logistical_resource)
+    :precondition
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_logistics_allocated ?field_operation_plan)
+        (plan_assigned_logistics ?field_operation_plan ?logistical_resource)
+        (plan_has_primary_task ?field_operation_plan ?field_task_primary)
+        (plan_has_secondary_task ?field_operation_plan ?field_task_secondary)
+        (task_primary_ready_for_order ?field_task_primary)
+        (task_secondary_ready_for_order ?field_task_secondary)
+        (work_entity_assigned_weather_window ?field_operation_plan ?weather_window)
+        (not
+          (plan_execution_staged ?field_operation_plan)
+        )
+      )
+    :effect (plan_execution_staged ?field_operation_plan)
+  )
+  (:action finalize_plan_and_emit_completion
+    :parameters (?field_operation_plan - field_operation_plan)
+    :precondition
+      (and
+        (plan_validated ?field_operation_plan)
+        (plan_execution_staged ?field_operation_plan)
+        (not
+          (plan_finalized ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_operation_plan)
+        (completion_signal ?field_operation_plan)
+      )
+  )
+  (:action record_quality_check_for_plan
+    :parameters (?field_operation_plan - field_operation_plan ?quality_check - quality_check ?weather_window - weather_window)
+    :precondition
+      (and
+        (work_entity_planned ?field_operation_plan)
+        (work_entity_assigned_weather_window ?field_operation_plan ?weather_window)
+        (quality_check_available ?quality_check)
+        (plan_linked_quality_check ?field_operation_plan ?quality_check)
+        (not
+          (plan_inspection_recorded ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_inspection_recorded ?field_operation_plan)
+        (not
+          (quality_check_available ?quality_check)
+        )
+      )
+  )
+  (:action trigger_inspection_subtask
+    :parameters (?field_operation_plan - field_operation_plan ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (plan_inspection_recorded ?field_operation_plan)
+        (work_entity_assigned_crew ?field_operation_plan ?crew_unit)
+        (not
+          (plan_inspection_subtask_triggered ?field_operation_plan)
+        )
+      )
+    :effect (plan_inspection_subtask_triggered ?field_operation_plan)
+  )
+  (:action complete_inspection_with_approval
+    :parameters (?field_operation_plan - field_operation_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (plan_inspection_subtask_triggered ?field_operation_plan)
+        (plan_has_regulatory_approval ?field_operation_plan ?regulatory_approval)
+        (not
+          (plan_inspection_subtask_completed ?field_operation_plan)
+        )
+      )
+    :effect (plan_inspection_subtask_completed ?field_operation_plan)
+  )
+  (:action finalize_inspection_and_emit_completion
+    :parameters (?field_operation_plan - field_operation_plan)
+    :precondition
+      (and
+        (plan_inspection_subtask_completed ?field_operation_plan)
+        (not
+          (plan_finalized ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_operation_plan)
+        (completion_signal ?field_operation_plan)
+      )
+  )
+  (:action emit_field_task_completion_primary
+    :parameters (?field_task_primary - field_task_primary ?work_order - work_order)
+    :precondition
+      (and
+        (primary_task_ready_flag ?field_task_primary)
+        (task_primary_ready_for_order ?field_task_primary)
+        (work_order_assembled ?work_order)
+        (work_order_activated ?work_order)
+        (not
+          (completion_signal ?field_task_primary)
+        )
+      )
+    :effect (completion_signal ?field_task_primary)
+  )
+  (:action emit_field_task_completion_secondary
+    :parameters (?field_task_secondary - field_task_secondary ?work_order - work_order)
+    :precondition
+      (and
+        (secondary_task_ready_flag ?field_task_secondary)
+        (task_secondary_ready_for_order ?field_task_secondary)
+        (work_order_assembled ?work_order)
+        (work_order_activated ?work_order)
+        (not
+          (completion_signal ?field_task_secondary)
+        )
+      )
+    :effect (completion_signal ?field_task_secondary)
+  )
+  (:action assign_forecast_block_and_mark_for_reallocation
+    :parameters (?work_item - work_item ?forecast_block - forecast_block ?weather_window - weather_window)
+    :precondition
+      (and
+        (completion_signal ?work_item)
+        (work_entity_assigned_weather_window ?work_item ?weather_window)
+        (forecast_block_available ?forecast_block)
+        (not
+          (ready_for_resource_return ?work_item)
+        )
+      )
+    :effect
+      (and
+        (ready_for_resource_return ?work_item)
+        (work_entity_assigned_forecast_block ?work_item ?forecast_block)
+        (not
+          (forecast_block_available ?forecast_block)
+        )
+      )
+  )
+  (:action return_equipment_and_close_primary_task
+    :parameters (?field_task_primary - field_task_primary ?equipment_unit - equipment_unit ?forecast_block - forecast_block)
+    :precondition
+      (and
+        (ready_for_resource_return ?field_task_primary)
+        (work_entity_assigned_equipment ?field_task_primary ?equipment_unit)
+        (work_entity_assigned_forecast_block ?field_task_primary ?forecast_block)
+        (not
+          (work_entity_closed ?field_task_primary)
+        )
+      )
+    :effect
+      (and
+        (work_entity_closed ?field_task_primary)
+        (equipment_available ?equipment_unit)
+        (forecast_block_available ?forecast_block)
+      )
+  )
+  (:action return_equipment_and_close_secondary_task
+    :parameters (?field_task_secondary - field_task_secondary ?equipment_unit - equipment_unit ?forecast_block - forecast_block)
+    :precondition
+      (and
+        (ready_for_resource_return ?field_task_secondary)
+        (work_entity_assigned_equipment ?field_task_secondary ?equipment_unit)
+        (work_entity_assigned_forecast_block ?field_task_secondary ?forecast_block)
+        (not
+          (work_entity_closed ?field_task_secondary)
+        )
+      )
+    :effect
+      (and
+        (work_entity_closed ?field_task_secondary)
+        (equipment_available ?equipment_unit)
+        (forecast_block_available ?forecast_block)
+      )
+  )
+  (:action return_equipment_and_close_plan
+    :parameters (?field_operation_plan - field_operation_plan ?equipment_unit - equipment_unit ?forecast_block - forecast_block)
+    :precondition
+      (and
+        (ready_for_resource_return ?field_operation_plan)
+        (work_entity_assigned_equipment ?field_operation_plan ?equipment_unit)
+        (work_entity_assigned_forecast_block ?field_operation_plan ?forecast_block)
+        (not
+          (work_entity_closed ?field_operation_plan)
+        )
+      )
+    :effect
+      (and
+        (work_entity_closed ?field_operation_plan)
+        (equipment_available ?equipment_unit)
+        (forecast_block_available ?forecast_block)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem weather_aware_field_task_reordering_problem)
+  (:domain agriculture_weather_aware_reordering_domain)
+  (:objects field_task_primary_1 - field_task_primary field_task_secondary_1 - field_task_secondary operation_plan_1 - field_operation_plan operation_plan_2 - field_operation_plan equipment_tractor_1 - equipment_unit equipment_sprayer_1 - equipment_unit equipment_planter_1 - equipment_unit weather_window_1 - weather_window crew_alpha - crew_unit seed_lot_a - agro_input_unit time_slot_primary_1 - field_time_slot_primary time_slot_secondary_1 - field_time_slot_secondary work_order_1 - work_order material_batch_1 - material_batch material_batch_2 - material_batch compliance_certificate_1 - compliance_certificate compliance_certificate_2 - compliance_certificate logistics_truck_1 - logistical_resource logistics_truck_2 - logistical_resource forecast_block_72h - forecast_block treatment_type_npk - treatment_type quality_check_soil_sample_1 - quality_check quality_check_visual_inspection_1 - quality_check regulatory_approval_pesticide - regulatory_approval)
+  (:init
+    (equipment_available equipment_tractor_1)
+    (equipment_available equipment_sprayer_1)
+    (equipment_available equipment_planter_1)
+    (weather_window_available weather_window_1)
+    (crew_available crew_alpha)
+    (agro_input_available seed_lot_a)
+    (task_has_primary_slot field_task_primary_1 time_slot_primary_1)
+    (task_has_secondary_slot field_task_secondary_1 time_slot_secondary_1)
+    (work_order_available work_order_1)
+    (material_batch_available material_batch_1)
+    (material_batch_available material_batch_2)
+    (plan_has_primary_task operation_plan_1 field_task_primary_1)
+    (plan_has_primary_task operation_plan_2 field_task_primary_1)
+    (plan_has_secondary_task operation_plan_1 field_task_secondary_1)
+    (plan_has_secondary_task operation_plan_2 field_task_secondary_1)
+    (plan_linked_work_order operation_plan_1 work_order_1)
+    (plan_linked_work_order operation_plan_2 work_order_1)
+    (plan_has_material_batch operation_plan_1 material_batch_1)
+    (plan_has_material_batch operation_plan_2 material_batch_2)
+    (compliance_certificate_available compliance_certificate_1)
+    (compliance_certificate_available compliance_certificate_2)
+    (logistical_resource_available logistics_truck_1)
+    (logistical_resource_available logistics_truck_2)
+    (forecast_block_available forecast_block_72h)
+    (treatment_type_available treatment_type_npk)
+    (quality_check_available quality_check_soil_sample_1)
+    (plan_linked_quality_check operation_plan_1 quality_check_soil_sample_1)
+    (plan_linked_quality_check operation_plan_2 quality_check_visual_inspection_1)
+    (regulatory_approval_available regulatory_approval_pesticide)
+  )
+  (:goal
+    (and
+      (work_entity_closed field_task_primary_1)
+      (work_entity_closed field_task_secondary_1)
+      (work_entity_closed operation_plan_1)
+      (work_entity_closed operation_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_work_item field_task_primary_1)
+(create_work_item field_task_secondary_1)
+(create_work_item operation_plan_1)
+(create_work_item operation_plan_2)
+(allocate_equipment_to_work_item field_task_primary_1 equipment_tractor_1)
+(assign_weather_window_to_work_item field_task_primary_1 weather_window_1)
+(confirm_work_item_schedule field_task_primary_1 weather_window_1)
+(mark_time_slot_primary_ready_for_task field_task_primary_1 time_slot_primary_1 weather_window_1)
+(release_weather_window_from_work_item field_task_primary_1 weather_window_1)
+(allocate_equipment_to_work_item field_task_secondary_1 equipment_sprayer_1)
+(assign_weather_window_to_work_item field_task_secondary_1 weather_window_1)
+(confirm_work_item_schedule field_task_secondary_1 weather_window_1)
+(mark_time_slot_secondary_ready_for_task field_task_secondary_1 time_slot_secondary_1 weather_window_1)
+(release_weather_window_from_work_item field_task_secondary_1 weather_window_1)
+(assign_crew_to_work_item field_task_primary_1 crew_alpha)
+(assign_crew_and_flag_primary_task_for_order field_task_primary_1 time_slot_primary_1 crew_alpha)
+(release_crew_from_work_item field_task_primary_1 crew_alpha)
+(assign_crew_to_work_item field_task_secondary_1 crew_alpha)
+(assign_crew_and_flag_secondary_task_for_order field_task_secondary_1 time_slot_secondary_1 crew_alpha)
+(release_crew_from_work_item field_task_secondary_1 crew_alpha)
+(assemble_work_order_from_ready_slots field_task_primary_1 field_task_secondary_1 time_slot_primary_1 time_slot_secondary_1 work_order_1)
+(assign_weather_window_to_work_item field_task_primary_1 weather_window_1)
+(activate_work_order_for_execution work_order_1 field_task_primary_1 weather_window_1)
+(emit_field_task_completion_primary field_task_primary_1 work_order_1)
+(emit_field_task_completion_secondary field_task_secondary_1 work_order_1)
+(assign_forecast_block_and_mark_for_reallocation field_task_primary_1 forecast_block_72h weather_window_1)
+(release_weather_window_from_work_item field_task_primary_1 weather_window_1)
+(return_equipment_and_close_primary_task field_task_primary_1 equipment_tractor_1 forecast_block_72h)
+(assign_weather_window_to_work_item field_task_secondary_1 weather_window_1)
+(assign_forecast_block_and_mark_for_reallocation field_task_secondary_1 forecast_block_72h weather_window_1)
+(release_weather_window_from_work_item field_task_secondary_1 weather_window_1)
+(return_equipment_and_close_secondary_task field_task_secondary_1 equipment_sprayer_1 forecast_block_72h)
+(allocate_equipment_to_work_item operation_plan_1 equipment_planter_1)
+(assign_weather_window_to_work_item operation_plan_1 weather_window_1)
+(confirm_work_item_schedule operation_plan_1 weather_window_1)
+(attach_treatment_to_plan operation_plan_1 treatment_type_npk)
+(attach_regulatory_approval_to_plan operation_plan_1 regulatory_approval_pesticide)
+(assign_crew_to_work_item operation_plan_1 crew_alpha)
+(reserve_material_batch_and_allocate_to_work_order operation_plan_1 material_batch_1 work_order_1)
+(confirm_material_allocation_for_plan operation_plan_1 material_batch_1 work_order_1 weather_window_1)
+(prepare_plan_for_treatment_variant_1 operation_plan_1 treatment_type_npk crew_alpha material_batch_1 work_order_1)
+(authorize_plan_with_regulatory_step_1 operation_plan_1 regulatory_approval_pesticide material_batch_1 work_order_1)
+(finalize_operation_plan_and_emit_readiness operation_plan_1)
+(assign_forecast_block_and_mark_for_reallocation operation_plan_1 forecast_block_72h weather_window_1)
+(release_weather_window_from_work_item operation_plan_1 weather_window_1)
+(release_crew_from_work_item operation_plan_1 crew_alpha)
+(detach_treatment_from_plan operation_plan_1 treatment_type_npk)
+(detach_regulatory_approval_from_plan operation_plan_1 regulatory_approval_pesticide)
+(return_equipment_and_close_plan operation_plan_1 equipment_planter_1 forecast_block_72h)
+(allocate_equipment_to_work_item operation_plan_2 equipment_planter_1)
+(assign_weather_window_to_work_item operation_plan_2 weather_window_1)
+(confirm_work_item_schedule operation_plan_2 weather_window_1)
+(attach_treatment_to_plan operation_plan_2 treatment_type_npk)
+(attach_regulatory_approval_to_plan operation_plan_2 regulatory_approval_pesticide)
+(assign_crew_to_work_item operation_plan_2 crew_alpha)
+(reserve_material_batch_and_allocate_to_work_order operation_plan_2 material_batch_2 work_order_1)
+(confirm_material_allocation_for_plan operation_plan_2 material_batch_2 work_order_1 weather_window_1)
+(prepare_plan_for_treatment_variant_1 operation_plan_2 treatment_type_npk crew_alpha material_batch_2 work_order_1)
+(authorize_plan_with_regulatory_step_1 operation_plan_2 regulatory_approval_pesticide material_batch_2 work_order_1)
+(finalize_operation_plan_and_emit_readiness operation_plan_2)
+(assign_forecast_block_and_mark_for_reallocation operation_plan_2 forecast_block_72h weather_window_1)
+(release_weather_window_from_work_item operation_plan_2 weather_window_1)
+(release_crew_from_work_item operation_plan_2 crew_alpha)
+(detach_treatment_from_plan operation_plan_2 treatment_type_npk)
+(detach_regulatory_approval_from_plan operation_plan_2 regulatory_approval_pesticide)
+(return_equipment_and_close_plan operation_plan_2 equipment_planter_1 forecast_block_72h)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_f_r79uxe/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 66 
+
+Successful plans:
+Value: 66
+ /tmp/val_f_r79uxe/plan.pddl 66 
+
+
+
+--- stderr ---
+

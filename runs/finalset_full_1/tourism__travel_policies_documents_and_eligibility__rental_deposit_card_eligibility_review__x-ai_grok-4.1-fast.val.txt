@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain rental_deposit_card_eligibility_review_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_resource_category - object policy_category_group - object evidence_category_group - object case_container - object rental_case - case_container deposit_card_type - domain_resource_category document - domain_resource_category policy_rule - domain_resource_category manual_override_condition - domain_resource_category benefit_or_discount_profile - domain_resource_category eligibility_factor - domain_resource_category payment_or_hold_method - domain_resource_category temporal_constraint - domain_resource_category supporting_evidence - policy_category_group verification_package - policy_category_group third_party_verification - policy_category_group applicant_jurisdiction - evidence_category_group card_issuer_jurisdiction - evidence_category_group deposit_card_record - evidence_category_group applicant_profile_group - rental_case secondary_profile_group - rental_case primary_applicant_profile - applicant_profile_group co_applicant_profile - applicant_profile_group eligibility_processor - secondary_profile_group)
+  (:predicates
+    (entity_created ?rental_case - rental_case)
+    (entity_active ?rental_case - rental_case)
+    (card_selected ?rental_case - rental_case)
+    (eligibility_assigned ?rental_case - rental_case)
+    (final_decision_recorded ?rental_case - rental_case)
+    (eligibility_determined ?rental_case - rental_case)
+    (deposit_card_type_available ?deposit_card_type - deposit_card_type)
+    (entity_reserved_card ?rental_case - rental_case ?deposit_card_type - deposit_card_type)
+    (document_available ?document - document)
+    (document_attached_to_entity ?rental_case - rental_case ?document - document)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (rule_linked_to_entity ?rental_case - rental_case ?policy_rule - policy_rule)
+    (evidence_available ?supporting_evidence - supporting_evidence)
+    (primary_profile_attached_evidence ?primary_applicant_profile - primary_applicant_profile ?supporting_evidence - supporting_evidence)
+    (coapplicant_attached_evidence ?co_applicant_profile - co_applicant_profile ?supporting_evidence - supporting_evidence)
+    (primary_profile_jurisdiction ?primary_applicant_profile - primary_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction)
+    (jurisdiction_marked ?applicant_jurisdiction - applicant_jurisdiction)
+    (jurisdiction_evidence_flag ?applicant_jurisdiction - applicant_jurisdiction)
+    (primary_profile_verification_complete ?primary_applicant_profile - primary_applicant_profile)
+    (coapplicant_profile_jurisdiction ?co_applicant_profile - co_applicant_profile ?card_issuer_jurisdiction - card_issuer_jurisdiction)
+    (issuer_jurisdiction_marked ?card_issuer_jurisdiction - card_issuer_jurisdiction)
+    (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction - card_issuer_jurisdiction)
+    (coapplicant_profile_verification_complete ?co_applicant_profile - co_applicant_profile)
+    (deposit_card_record_pending ?deposit_card_record - deposit_card_record)
+    (deposit_card_record_created ?deposit_card_record - deposit_card_record)
+    (deposit_card_record_applicant_jurisdiction ?deposit_card_record - deposit_card_record ?applicant_jurisdiction - applicant_jurisdiction)
+    (deposit_card_record_issuer_jurisdiction ?deposit_card_record - deposit_card_record ?card_issuer_jurisdiction - card_issuer_jurisdiction)
+    (deposit_card_record_applicant_match_flag ?deposit_card_record - deposit_card_record)
+    (deposit_card_record_issuer_match_flag ?deposit_card_record - deposit_card_record)
+    (deposit_card_record_finalization_ready ?deposit_card_record - deposit_card_record)
+    (processor_linked_primary_profile ?eligibility_processor - eligibility_processor ?primary_applicant_profile - primary_applicant_profile)
+    (processor_linked_coapplicant_profile ?eligibility_processor - eligibility_processor ?co_applicant_profile - co_applicant_profile)
+    (processor_linked_deposit_card_record ?eligibility_processor - eligibility_processor ?deposit_card_record - deposit_card_record)
+    (verification_package_available ?verification_package - verification_package)
+    (processor_linked_verification_package ?eligibility_processor - eligibility_processor ?verification_package - verification_package)
+    (verification_package_consumed ?verification_package - verification_package)
+    (verification_package_linked_card_record ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    (processor_verification_flag ?eligibility_processor - eligibility_processor)
+    (processor_package_validated ?eligibility_processor - eligibility_processor)
+    (processor_ready_for_decision ?eligibility_processor - eligibility_processor)
+    (manual_override_engaged ?eligibility_processor - eligibility_processor)
+    (processor_override_logged ?eligibility_processor - eligibility_processor)
+    (processor_authorized ?eligibility_processor - eligibility_processor)
+    (processor_final_approval ?eligibility_processor - eligibility_processor)
+    (third_party_verification_available ?third_party_verification - third_party_verification)
+    (processor_linked_third_party_verification ?eligibility_processor - eligibility_processor ?third_party_verification - third_party_verification)
+    (processor_third_party_verified ?eligibility_processor - eligibility_processor)
+    (processor_third_party_check_linked ?eligibility_processor - eligibility_processor)
+    (processor_third_party_clearance ?eligibility_processor - eligibility_processor)
+    (manual_override_condition_available ?manual_override_condition - manual_override_condition)
+    (processor_linked_manual_override ?eligibility_processor - eligibility_processor ?manual_override_condition - manual_override_condition)
+    (benefit_profile_available ?benefit_or_discount_profile - benefit_or_discount_profile)
+    (processor_linked_benefit_profile ?eligibility_processor - eligibility_processor ?benefit_or_discount_profile - benefit_or_discount_profile)
+    (payment_method_available ?payment_or_hold_method - payment_or_hold_method)
+    (processor_linked_payment_method ?eligibility_processor - eligibility_processor ?payment_or_hold_method - payment_or_hold_method)
+    (temporal_constraint_available ?temporal_constraint - temporal_constraint)
+    (processor_linked_temporal_constraint ?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint)
+    (eligibility_factor_available ?eligibility_factor - eligibility_factor)
+    (entity_linked_eligibility_factor ?rental_case - rental_case ?eligibility_factor - eligibility_factor)
+    (primary_profile_ready ?primary_applicant_profile - primary_applicant_profile)
+    (coapplicant_profile_ready ?co_applicant_profile - co_applicant_profile)
+    (processor_decision_logged ?eligibility_processor - eligibility_processor)
+  )
+  (:action initialize_rental_case
+    :parameters (?rental_case - rental_case)
+    :precondition
+      (and
+        (not
+          (entity_created ?rental_case)
+        )
+        (not
+          (eligibility_assigned ?rental_case)
+        )
+      )
+    :effect (entity_created ?rental_case)
+  )
+  (:action select_and_reserve_deposit_card
+    :parameters (?rental_case - rental_case ?deposit_card_type - deposit_card_type)
+    :precondition
+      (and
+        (entity_created ?rental_case)
+        (not
+          (card_selected ?rental_case)
+        )
+        (deposit_card_type_available ?deposit_card_type)
+      )
+    :effect
+      (and
+        (card_selected ?rental_case)
+        (entity_reserved_card ?rental_case ?deposit_card_type)
+        (not
+          (deposit_card_type_available ?deposit_card_type)
+        )
+      )
+  )
+  (:action attach_document_to_case
+    :parameters (?rental_case - rental_case ?document - document)
+    :precondition
+      (and
+        (entity_created ?rental_case)
+        (card_selected ?rental_case)
+        (document_available ?document)
+      )
+    :effect
+      (and
+        (document_attached_to_entity ?rental_case ?document)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action validate_attached_document
+    :parameters (?rental_case - rental_case ?document - document)
+    :precondition
+      (and
+        (entity_created ?rental_case)
+        (card_selected ?rental_case)
+        (document_attached_to_entity ?rental_case ?document)
+        (not
+          (entity_active ?rental_case)
+        )
+      )
+    :effect (entity_active ?rental_case)
+  )
+  (:action detach_document_from_case
+    :parameters (?rental_case - rental_case ?document - document)
+    :precondition
+      (and
+        (document_attached_to_entity ?rental_case ?document)
+      )
+    :effect
+      (and
+        (document_available ?document)
+        (not
+          (document_attached_to_entity ?rental_case ?document)
+        )
+      )
+  )
+  (:action link_policy_rule_to_case
+    :parameters (?rental_case - rental_case ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_active ?rental_case)
+        (policy_rule_available ?policy_rule)
+      )
+    :effect
+      (and
+        (rule_linked_to_entity ?rental_case ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action unlink_policy_rule_from_case
+    :parameters (?rental_case - rental_case ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (rule_linked_to_entity ?rental_case ?policy_rule)
+      )
+    :effect
+      (and
+        (policy_rule_available ?policy_rule)
+        (not
+          (rule_linked_to_entity ?rental_case ?policy_rule)
+        )
+      )
+  )
+  (:action assign_payment_method_to_processor
+    :parameters (?eligibility_processor - eligibility_processor ?payment_or_hold_method - payment_or_hold_method)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (payment_method_available ?payment_or_hold_method)
+      )
+    :effect
+      (and
+        (processor_linked_payment_method ?eligibility_processor ?payment_or_hold_method)
+        (not
+          (payment_method_available ?payment_or_hold_method)
+        )
+      )
+  )
+  (:action release_payment_method_from_processor
+    :parameters (?eligibility_processor - eligibility_processor ?payment_or_hold_method - payment_or_hold_method)
+    :precondition
+      (and
+        (processor_linked_payment_method ?eligibility_processor ?payment_or_hold_method)
+      )
+    :effect
+      (and
+        (payment_method_available ?payment_or_hold_method)
+        (not
+          (processor_linked_payment_method ?eligibility_processor ?payment_or_hold_method)
+        )
+      )
+  )
+  (:action assign_temporal_constraint_to_processor
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (temporal_constraint_available ?temporal_constraint)
+      )
+    :effect
+      (and
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (not
+          (temporal_constraint_available ?temporal_constraint)
+        )
+      )
+  )
+  (:action release_temporal_constraint_from_processor
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+      )
+    :effect
+      (and
+        (temporal_constraint_available ?temporal_constraint)
+        (not
+          (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        )
+      )
+  )
+  (:action mark_applicant_jurisdiction
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?document - document)
+    :precondition
+      (and
+        (entity_active ?primary_applicant_profile)
+        (document_attached_to_entity ?primary_applicant_profile ?document)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (not
+          (jurisdiction_marked ?applicant_jurisdiction)
+        )
+        (not
+          (jurisdiction_evidence_flag ?applicant_jurisdiction)
+        )
+      )
+    :effect (jurisdiction_marked ?applicant_jurisdiction)
+  )
+  (:action complete_primary_profile_verification
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_active ?primary_applicant_profile)
+        (rule_linked_to_entity ?primary_applicant_profile ?policy_rule)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (jurisdiction_marked ?applicant_jurisdiction)
+        (not
+          (primary_profile_ready ?primary_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+      )
+  )
+  (:action attach_evidence_to_primary_profile
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_active ?primary_applicant_profile)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (evidence_available ?supporting_evidence)
+        (not
+          (primary_profile_ready ?primary_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_evidence_flag ?applicant_jurisdiction)
+        (primary_profile_ready ?primary_applicant_profile)
+        (primary_profile_attached_evidence ?primary_applicant_profile ?supporting_evidence)
+        (not
+          (evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action reconcile_primary_profile_evidence
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?document - document ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_active ?primary_applicant_profile)
+        (document_attached_to_entity ?primary_applicant_profile ?document)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (jurisdiction_evidence_flag ?applicant_jurisdiction)
+        (primary_profile_attached_evidence ?primary_applicant_profile ?supporting_evidence)
+        (not
+          (primary_profile_verification_complete ?primary_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_marked ?applicant_jurisdiction)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+        (evidence_available ?supporting_evidence)
+        (not
+          (primary_profile_attached_evidence ?primary_applicant_profile ?supporting_evidence)
+        )
+      )
+  )
+  (:action mark_card_issuer_jurisdiction
+    :parameters (?co_applicant_profile - co_applicant_profile ?card_issuer_jurisdiction - card_issuer_jurisdiction ?document - document)
+    :precondition
+      (and
+        (entity_active ?co_applicant_profile)
+        (document_attached_to_entity ?co_applicant_profile ?document)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (not
+          (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+        )
+        (not
+          (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction)
+        )
+      )
+    :effect (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+  )
+  (:action verify_coapp_profile_jurisdiction
+    :parameters (?co_applicant_profile - co_applicant_profile ?card_issuer_jurisdiction - card_issuer_jurisdiction ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_active ?co_applicant_profile)
+        (rule_linked_to_entity ?co_applicant_profile ?policy_rule)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+        (not
+          (coapplicant_profile_ready ?co_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+      )
+  )
+  (:action attach_evidence_to_coapp_profile
+    :parameters (?co_applicant_profile - co_applicant_profile ?card_issuer_jurisdiction - card_issuer_jurisdiction ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_active ?co_applicant_profile)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (evidence_available ?supporting_evidence)
+        (not
+          (coapplicant_profile_ready ?co_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction)
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (coapplicant_attached_evidence ?co_applicant_profile ?supporting_evidence)
+        (not
+          (evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action reconcile_coapp_profile_evidence
+    :parameters (?co_applicant_profile - co_applicant_profile ?card_issuer_jurisdiction - card_issuer_jurisdiction ?document - document ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (entity_active ?co_applicant_profile)
+        (document_attached_to_entity ?co_applicant_profile ?document)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction)
+        (coapplicant_attached_evidence ?co_applicant_profile ?supporting_evidence)
+        (not
+          (coapplicant_profile_verification_complete ?co_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+        (evidence_available ?supporting_evidence)
+        (not
+          (coapplicant_attached_evidence ?co_applicant_profile ?supporting_evidence)
+        )
+      )
+  )
+  (:action create_deposit_card_candidate_record
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?co_applicant_profile - co_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?card_issuer_jurisdiction - card_issuer_jurisdiction ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (jurisdiction_marked ?applicant_jurisdiction)
+        (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+        (deposit_card_record_pending ?deposit_card_record)
+      )
+    :effect
+      (and
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_applicant_jurisdiction ?deposit_card_record ?applicant_jurisdiction)
+        (deposit_card_record_issuer_jurisdiction ?deposit_card_record ?card_issuer_jurisdiction)
+        (not
+          (deposit_card_record_pending ?deposit_card_record)
+        )
+      )
+  )
+  (:action create_deposit_card_candidate_with_applicant_match
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?co_applicant_profile - co_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?card_issuer_jurisdiction - card_issuer_jurisdiction ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (jurisdiction_evidence_flag ?applicant_jurisdiction)
+        (issuer_jurisdiction_marked ?card_issuer_jurisdiction)
+        (not
+          (primary_profile_verification_complete ?primary_applicant_profile)
+        )
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+        (deposit_card_record_pending ?deposit_card_record)
+      )
+    :effect
+      (and
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_applicant_jurisdiction ?deposit_card_record ?applicant_jurisdiction)
+        (deposit_card_record_issuer_jurisdiction ?deposit_card_record ?card_issuer_jurisdiction)
+        (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        (not
+          (deposit_card_record_pending ?deposit_card_record)
+        )
+      )
+  )
+  (:action create_deposit_card_candidate_with_issuer_match
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?co_applicant_profile - co_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?card_issuer_jurisdiction - card_issuer_jurisdiction ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (jurisdiction_marked ?applicant_jurisdiction)
+        (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+        (not
+          (coapplicant_profile_verification_complete ?co_applicant_profile)
+        )
+        (deposit_card_record_pending ?deposit_card_record)
+      )
+    :effect
+      (and
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_applicant_jurisdiction ?deposit_card_record ?applicant_jurisdiction)
+        (deposit_card_record_issuer_jurisdiction ?deposit_card_record ?card_issuer_jurisdiction)
+        (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        (not
+          (deposit_card_record_pending ?deposit_card_record)
+        )
+      )
+  )
+  (:action create_deposit_card_candidate_full_match
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?co_applicant_profile - co_applicant_profile ?applicant_jurisdiction - applicant_jurisdiction ?card_issuer_jurisdiction - card_issuer_jurisdiction ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (primary_profile_jurisdiction ?primary_applicant_profile ?applicant_jurisdiction)
+        (coapplicant_profile_jurisdiction ?co_applicant_profile ?card_issuer_jurisdiction)
+        (jurisdiction_evidence_flag ?applicant_jurisdiction)
+        (issuer_jurisdiction_evidence_flag ?card_issuer_jurisdiction)
+        (not
+          (primary_profile_verification_complete ?primary_applicant_profile)
+        )
+        (not
+          (coapplicant_profile_verification_complete ?co_applicant_profile)
+        )
+        (deposit_card_record_pending ?deposit_card_record)
+      )
+    :effect
+      (and
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_applicant_jurisdiction ?deposit_card_record ?applicant_jurisdiction)
+        (deposit_card_record_issuer_jurisdiction ?deposit_card_record ?card_issuer_jurisdiction)
+        (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        (not
+          (deposit_card_record_pending ?deposit_card_record)
+        )
+      )
+  )
+  (:action mark_deposit_card_record_ready_for_finalization
+    :parameters (?deposit_card_record - deposit_card_record ?primary_applicant_profile - primary_applicant_profile ?document - document)
+    :precondition
+      (and
+        (deposit_card_record_created ?deposit_card_record)
+        (primary_profile_ready ?primary_applicant_profile)
+        (document_attached_to_entity ?primary_applicant_profile ?document)
+        (not
+          (deposit_card_record_finalization_ready ?deposit_card_record)
+        )
+      )
+    :effect (deposit_card_record_finalization_ready ?deposit_card_record)
+  )
+  (:action apply_verification_package_to_card_record
+    :parameters (?eligibility_processor - eligibility_processor ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (processor_linked_deposit_card_record ?eligibility_processor ?deposit_card_record)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_available ?verification_package)
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_finalization_ready ?deposit_card_record)
+        (not
+          (verification_package_consumed ?verification_package)
+        )
+      )
+    :effect
+      (and
+        (verification_package_consumed ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (not
+          (verification_package_available ?verification_package)
+        )
+      )
+  )
+  (:action confirm_verification_package_by_processor
+    :parameters (?eligibility_processor - eligibility_processor ?verification_package - verification_package ?deposit_card_record - deposit_card_record ?document - document)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_consumed ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (document_attached_to_entity ?eligibility_processor ?document)
+        (not
+          (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        )
+        (not
+          (processor_verification_flag ?eligibility_processor)
+        )
+      )
+    :effect (processor_verification_flag ?eligibility_processor)
+  )
+  (:action engage_manual_override
+    :parameters (?eligibility_processor - eligibility_processor ?manual_override_condition - manual_override_condition)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (manual_override_condition_available ?manual_override_condition)
+        (not
+          (manual_override_engaged ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (manual_override_engaged ?eligibility_processor)
+        (processor_linked_manual_override ?eligibility_processor ?manual_override_condition)
+        (not
+          (manual_override_condition_available ?manual_override_condition)
+        )
+      )
+  )
+  (:action apply_override_with_verification_package
+    :parameters (?eligibility_processor - eligibility_processor ?verification_package - verification_package ?deposit_card_record - deposit_card_record ?document - document ?manual_override_condition - manual_override_condition)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_consumed ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (document_attached_to_entity ?eligibility_processor ?document)
+        (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        (manual_override_engaged ?eligibility_processor)
+        (processor_linked_manual_override ?eligibility_processor ?manual_override_condition)
+        (not
+          (processor_verification_flag ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_verification_flag ?eligibility_processor)
+        (processor_override_logged ?eligibility_processor)
+      )
+  )
+  (:action processor_validate_package_primary_path
+    :parameters (?eligibility_processor - eligibility_processor ?payment_or_hold_method - payment_or_hold_method ?policy_rule - policy_rule ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_verification_flag ?eligibility_processor)
+        (processor_linked_payment_method ?eligibility_processor ?payment_or_hold_method)
+        (rule_linked_to_entity ?eligibility_processor ?policy_rule)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (not
+          (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        )
+        (not
+          (processor_package_validated ?eligibility_processor)
+        )
+      )
+    :effect (processor_package_validated ?eligibility_processor)
+  )
+  (:action processor_validate_package_secondary_path
+    :parameters (?eligibility_processor - eligibility_processor ?payment_or_hold_method - payment_or_hold_method ?policy_rule - policy_rule ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_verification_flag ?eligibility_processor)
+        (processor_linked_payment_method ?eligibility_processor ?payment_or_hold_method)
+        (rule_linked_to_entity ?eligibility_processor ?policy_rule)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        (not
+          (processor_package_validated ?eligibility_processor)
+        )
+      )
+    :effect (processor_package_validated ?eligibility_processor)
+  )
+  (:action prepare_processor_for_final_decision
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_package_validated ?eligibility_processor)
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (not
+          (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        )
+        (not
+          (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        )
+        (not
+          (processor_ready_for_decision ?eligibility_processor)
+        )
+      )
+    :effect (processor_ready_for_decision ?eligibility_processor)
+  )
+  (:action authorize_processor_for_benefit_path
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_package_validated ?eligibility_processor)
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        (not
+          (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        )
+        (not
+          (processor_ready_for_decision ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_authorized ?eligibility_processor)
+      )
+  )
+  (:action authorize_processor_for_alternate_benefit_path
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_package_validated ?eligibility_processor)
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (not
+          (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        )
+        (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        (not
+          (processor_ready_for_decision ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_authorized ?eligibility_processor)
+      )
+  )
+  (:action authorize_processor_for_combined_benefit_path
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint ?verification_package - verification_package ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (processor_package_validated ?eligibility_processor)
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (processor_linked_verification_package ?eligibility_processor ?verification_package)
+        (verification_package_linked_card_record ?verification_package ?deposit_card_record)
+        (deposit_card_record_applicant_match_flag ?deposit_card_record)
+        (deposit_card_record_issuer_match_flag ?deposit_card_record)
+        (not
+          (processor_ready_for_decision ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_authorized ?eligibility_processor)
+      )
+  )
+  (:action finalize_processor_decision
+    :parameters (?eligibility_processor - eligibility_processor)
+    :precondition
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (not
+          (processor_authorized ?eligibility_processor)
+        )
+        (not
+          (processor_decision_logged ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_decision_logged ?eligibility_processor)
+        (final_decision_recorded ?eligibility_processor)
+      )
+  )
+  (:action assign_benefit_profile_to_processor
+    :parameters (?eligibility_processor - eligibility_processor ?benefit_or_discount_profile - benefit_or_discount_profile)
+    :precondition
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_authorized ?eligibility_processor)
+        (benefit_profile_available ?benefit_or_discount_profile)
+      )
+    :effect
+      (and
+        (processor_linked_benefit_profile ?eligibility_processor ?benefit_or_discount_profile)
+        (not
+          (benefit_profile_available ?benefit_or_discount_profile)
+        )
+      )
+  )
+  (:action grant_processor_final_approval
+    :parameters (?eligibility_processor - eligibility_processor ?primary_applicant_profile - primary_applicant_profile ?co_applicant_profile - co_applicant_profile ?document - document ?benefit_or_discount_profile - benefit_or_discount_profile)
+    :precondition
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_authorized ?eligibility_processor)
+        (processor_linked_benefit_profile ?eligibility_processor ?benefit_or_discount_profile)
+        (processor_linked_primary_profile ?eligibility_processor ?primary_applicant_profile)
+        (processor_linked_coapplicant_profile ?eligibility_processor ?co_applicant_profile)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+        (document_attached_to_entity ?eligibility_processor ?document)
+        (not
+          (processor_final_approval ?eligibility_processor)
+        )
+      )
+    :effect (processor_final_approval ?eligibility_processor)
+  )
+  (:action record_processor_final_decision
+    :parameters (?eligibility_processor - eligibility_processor)
+    :precondition
+      (and
+        (processor_ready_for_decision ?eligibility_processor)
+        (processor_final_approval ?eligibility_processor)
+        (not
+          (processor_decision_logged ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_decision_logged ?eligibility_processor)
+        (final_decision_recorded ?eligibility_processor)
+      )
+  )
+  (:action attach_third_party_verification
+    :parameters (?eligibility_processor - eligibility_processor ?third_party_verification - third_party_verification ?document - document)
+    :precondition
+      (and
+        (entity_active ?eligibility_processor)
+        (document_attached_to_entity ?eligibility_processor ?document)
+        (third_party_verification_available ?third_party_verification)
+        (processor_linked_third_party_verification ?eligibility_processor ?third_party_verification)
+        (not
+          (processor_third_party_verified ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_third_party_verified ?eligibility_processor)
+        (not
+          (third_party_verification_available ?third_party_verification)
+        )
+      )
+  )
+  (:action link_third_party_verification_to_case
+    :parameters (?eligibility_processor - eligibility_processor ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (processor_third_party_verified ?eligibility_processor)
+        (rule_linked_to_entity ?eligibility_processor ?policy_rule)
+        (not
+          (processor_third_party_check_linked ?eligibility_processor)
+        )
+      )
+    :effect (processor_third_party_check_linked ?eligibility_processor)
+  )
+  (:action confirm_third_party_verification
+    :parameters (?eligibility_processor - eligibility_processor ?temporal_constraint - temporal_constraint)
+    :precondition
+      (and
+        (processor_third_party_check_linked ?eligibility_processor)
+        (processor_linked_temporal_constraint ?eligibility_processor ?temporal_constraint)
+        (not
+          (processor_third_party_clearance ?eligibility_processor)
+        )
+      )
+    :effect (processor_third_party_clearance ?eligibility_processor)
+  )
+  (:action finalize_processor_decision_from_third_party
+    :parameters (?eligibility_processor - eligibility_processor)
+    :precondition
+      (and
+        (processor_third_party_clearance ?eligibility_processor)
+        (not
+          (processor_decision_logged ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_decision_logged ?eligibility_processor)
+        (final_decision_recorded ?eligibility_processor)
+      )
+  )
+  (:action grant_primary_profile_eligibility
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (primary_profile_ready ?primary_applicant_profile)
+        (primary_profile_verification_complete ?primary_applicant_profile)
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_finalization_ready ?deposit_card_record)
+        (not
+          (final_decision_recorded ?primary_applicant_profile)
+        )
+      )
+    :effect (final_decision_recorded ?primary_applicant_profile)
+  )
+  (:action grant_coapplicant_profile_eligibility
+    :parameters (?co_applicant_profile - co_applicant_profile ?deposit_card_record - deposit_card_record)
+    :precondition
+      (and
+        (coapplicant_profile_ready ?co_applicant_profile)
+        (coapplicant_profile_verification_complete ?co_applicant_profile)
+        (deposit_card_record_created ?deposit_card_record)
+        (deposit_card_record_finalization_ready ?deposit_card_record)
+        (not
+          (final_decision_recorded ?co_applicant_profile)
+        )
+      )
+    :effect (final_decision_recorded ?co_applicant_profile)
+  )
+  (:action assign_eligibility_factor_to_case
+    :parameters (?rental_case - rental_case ?eligibility_factor - eligibility_factor ?document - document)
+    :precondition
+      (and
+        (final_decision_recorded ?rental_case)
+        (document_attached_to_entity ?rental_case ?document)
+        (eligibility_factor_available ?eligibility_factor)
+        (not
+          (eligibility_determined ?rental_case)
+        )
+      )
+    :effect
+      (and
+        (eligibility_determined ?rental_case)
+        (entity_linked_eligibility_factor ?rental_case ?eligibility_factor)
+        (not
+          (eligibility_factor_available ?eligibility_factor)
+        )
+      )
+  )
+  (:action assign_eligibility_and_reserve_card_to_primary_profile
+    :parameters (?primary_applicant_profile - primary_applicant_profile ?deposit_card_type - deposit_card_type ?eligibility_factor - eligibility_factor)
+    :precondition
+      (and
+        (eligibility_determined ?primary_applicant_profile)
+        (entity_reserved_card ?primary_applicant_profile ?deposit_card_type)
+        (entity_linked_eligibility_factor ?primary_applicant_profile ?eligibility_factor)
+        (not
+          (eligibility_assigned ?primary_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assigned ?primary_applicant_profile)
+        (deposit_card_type_available ?deposit_card_type)
+        (eligibility_factor_available ?eligibility_factor)
+      )
+  )
+  (:action assign_eligibility_and_reserve_card_to_coapplicant
+    :parameters (?co_applicant_profile - co_applicant_profile ?deposit_card_type - deposit_card_type ?eligibility_factor - eligibility_factor)
+    :precondition
+      (and
+        (eligibility_determined ?co_applicant_profile)
+        (entity_reserved_card ?co_applicant_profile ?deposit_card_type)
+        (entity_linked_eligibility_factor ?co_applicant_profile ?eligibility_factor)
+        (not
+          (eligibility_assigned ?co_applicant_profile)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assigned ?co_applicant_profile)
+        (deposit_card_type_available ?deposit_card_type)
+        (eligibility_factor_available ?eligibility_factor)
+      )
+  )
+  (:action record_eligibility_and_reserve_card_on_processor
+    :parameters (?eligibility_processor - eligibility_processor ?deposit_card_type - deposit_card_type ?eligibility_factor - eligibility_factor)
+    :precondition
+      (and
+        (eligibility_determined ?eligibility_processor)
+        (entity_reserved_card ?eligibility_processor ?deposit_card_type)
+        (entity_linked_eligibility_factor ?eligibility_processor ?eligibility_factor)
+        (not
+          (eligibility_assigned ?eligibility_processor)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assigned ?eligibility_processor)
+        (deposit_card_type_available ?deposit_card_type)
+        (eligibility_factor_available ?eligibility_factor)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem rental_deposit_card_eligibility_review_problem)
+  (:domain rental_deposit_card_eligibility_review_domain)
+  (:objects primary_applicant_profile_1 - primary_applicant_profile co_applicant_profile_1 - co_applicant_profile eligibility_processor_1 - eligibility_processor eligibility_processor_2 - eligibility_processor deposit_card_type_economy - deposit_card_type deposit_card_type_premium - deposit_card_type deposit_card_type_flexible - deposit_card_type document_passport_1 - document policy_rule_identity_verification - policy_rule supporting_evidence_payment_receipt - supporting_evidence applicant_jurisdiction_us - applicant_jurisdiction issuer_jurisdiction_uk - card_issuer_jurisdiction deposit_card_record_candidate_1 - deposit_card_record verification_package_identity_1 - verification_package verification_package_payment_1 - verification_package manual_override_emergency_policy - manual_override_condition manual_override_agent_discretion - manual_override_condition benefit_profile_loyalty - benefit_or_discount_profile benefit_profile_promotional - benefit_or_discount_profile eligibility_factor_sanctions_check - eligibility_factor payment_hold_method_authorization - payment_or_hold_method third_party_verification_identity_service - third_party_verification third_party_verification_payment_gateway - third_party_verification temporal_constraint_24h_hold - temporal_constraint)
+  (:init
+    (deposit_card_type_available deposit_card_type_economy)
+    (deposit_card_type_available deposit_card_type_premium)
+    (deposit_card_type_available deposit_card_type_flexible)
+    (document_available document_passport_1)
+    (policy_rule_available policy_rule_identity_verification)
+    (evidence_available supporting_evidence_payment_receipt)
+    (primary_profile_jurisdiction primary_applicant_profile_1 applicant_jurisdiction_us)
+    (coapplicant_profile_jurisdiction co_applicant_profile_1 issuer_jurisdiction_uk)
+    (deposit_card_record_pending deposit_card_record_candidate_1)
+    (verification_package_available verification_package_identity_1)
+    (verification_package_available verification_package_payment_1)
+    (processor_linked_primary_profile eligibility_processor_1 primary_applicant_profile_1)
+    (processor_linked_primary_profile eligibility_processor_2 primary_applicant_profile_1)
+    (processor_linked_coapplicant_profile eligibility_processor_1 co_applicant_profile_1)
+    (processor_linked_coapplicant_profile eligibility_processor_2 co_applicant_profile_1)
+    (processor_linked_deposit_card_record eligibility_processor_1 deposit_card_record_candidate_1)
+    (processor_linked_deposit_card_record eligibility_processor_2 deposit_card_record_candidate_1)
+    (processor_linked_verification_package eligibility_processor_1 verification_package_identity_1)
+    (processor_linked_verification_package eligibility_processor_2 verification_package_payment_1)
+    (manual_override_condition_available manual_override_emergency_policy)
+    (manual_override_condition_available manual_override_agent_discretion)
+    (benefit_profile_available benefit_profile_loyalty)
+    (benefit_profile_available benefit_profile_promotional)
+    (eligibility_factor_available eligibility_factor_sanctions_check)
+    (payment_method_available payment_hold_method_authorization)
+    (third_party_verification_available third_party_verification_identity_service)
+    (processor_linked_third_party_verification eligibility_processor_1 third_party_verification_identity_service)
+    (processor_linked_third_party_verification eligibility_processor_2 third_party_verification_payment_gateway)
+    (temporal_constraint_available temporal_constraint_24h_hold)
+  )
+  (:goal
+    (and
+      (eligibility_assigned primary_applicant_profile_1)
+      (eligibility_assigned co_applicant_profile_1)
+      (eligibility_assigned eligibility_processor_1)
+      (eligibility_assigned eligibility_processor_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_rental_case primary_applicant_profile_1)
+(initialize_rental_case co_applicant_profile_1)
+(initialize_rental_case eligibility_processor_1)
+(initialize_rental_case eligibility_processor_2)
+(select_and_reserve_deposit_card primary_applicant_profile_1 deposit_card_type_economy)
+(select_and_reserve_deposit_card co_applicant_profile_1 deposit_card_type_premium)
+(attach_document_to_case primary_applicant_profile_1 document_passport_1)
+(validate_attached_document primary_applicant_profile_1 document_passport_1)
+(link_policy_rule_to_case primary_applicant_profile_1 policy_rule_identity_verification)
+(mark_applicant_jurisdiction primary_applicant_profile_1 applicant_jurisdiction_us document_passport_1)
+(complete_primary_profile_verification primary_applicant_profile_1 applicant_jurisdiction_us policy_rule_identity_verification)
+(detach_document_from_case primary_applicant_profile_1 document_passport_1)
+(unlink_policy_rule_from_case primary_applicant_profile_1 policy_rule_identity_verification)
+(attach_document_to_case co_applicant_profile_1 document_passport_1)
+(validate_attached_document co_applicant_profile_1 document_passport_1)
+(link_policy_rule_to_case co_applicant_profile_1 policy_rule_identity_verification)
+(mark_card_issuer_jurisdiction co_applicant_profile_1 issuer_jurisdiction_uk document_passport_1)
+(verify_coapp_profile_jurisdiction co_applicant_profile_1 issuer_jurisdiction_uk policy_rule_identity_verification)
+(create_deposit_card_candidate_record primary_applicant_profile_1 co_applicant_profile_1 applicant_jurisdiction_us issuer_jurisdiction_uk deposit_card_record_candidate_1)
+(detach_document_from_case co_applicant_profile_1 document_passport_1)
+(attach_document_to_case primary_applicant_profile_1 document_passport_1)
+(mark_deposit_card_record_ready_for_finalization deposit_card_record_candidate_1 primary_applicant_profile_1 document_passport_1)
+(detach_document_from_case primary_applicant_profile_1 document_passport_1)
+(unlink_policy_rule_from_case co_applicant_profile_1 policy_rule_identity_verification)
+(select_and_reserve_deposit_card eligibility_processor_1 deposit_card_type_flexible)
+(attach_document_to_case eligibility_processor_1 document_passport_1)
+(validate_attached_document eligibility_processor_1 document_passport_1)
+(link_policy_rule_to_case eligibility_processor_1 policy_rule_identity_verification)
+(assign_payment_method_to_processor eligibility_processor_1 payment_hold_method_authorization)
+(assign_temporal_constraint_to_processor eligibility_processor_1 temporal_constraint_24h_hold)
+(apply_verification_package_to_card_record eligibility_processor_1 verification_package_identity_1 deposit_card_record_candidate_1)
+(confirm_verification_package_by_processor eligibility_processor_1 verification_package_identity_1 deposit_card_record_candidate_1 document_passport_1)
+(processor_validate_package_primary_path eligibility_processor_1 payment_hold_method_authorization policy_rule_identity_verification verification_package_identity_1 deposit_card_record_candidate_1)
+(prepare_processor_for_final_decision eligibility_processor_1 temporal_constraint_24h_hold verification_package_identity_1 deposit_card_record_candidate_1)
+(finalize_processor_decision eligibility_processor_1)
+(assign_eligibility_factor_to_case eligibility_processor_1 eligibility_factor_sanctions_check document_passport_1)
+(record_eligibility_and_reserve_card_on_processor eligibility_processor_1 deposit_card_type_flexible eligibility_factor_sanctions_check)
+(detach_document_from_case eligibility_processor_1 document_passport_1)
+(release_payment_method_from_processor eligibility_processor_1 payment_hold_method_authorization)
+(release_temporal_constraint_from_processor eligibility_processor_1 temporal_constraint_24h_hold)
+(unlink_policy_rule_from_case eligibility_processor_1 policy_rule_identity_verification)
+(select_and_reserve_deposit_card eligibility_processor_2 deposit_card_type_flexible)
+(attach_document_to_case eligibility_processor_2 document_passport_1)
+(validate_attached_document eligibility_processor_2 document_passport_1)
+(link_policy_rule_to_case eligibility_processor_2 policy_rule_identity_verification)
+(assign_payment_method_to_processor eligibility_processor_2 payment_hold_method_authorization)
+(assign_temporal_constraint_to_processor eligibility_processor_2 temporal_constraint_24h_hold)
+(apply_verification_package_to_card_record eligibility_processor_2 verification_package_payment_1 deposit_card_record_candidate_1)
+(confirm_verification_package_by_processor eligibility_processor_2 verification_package_payment_1 deposit_card_record_candidate_1 document_passport_1)
+(processor_validate_package_primary_path eligibility_processor_2 payment_hold_method_authorization policy_rule_identity_verification verification_package_payment_1 deposit_card_record_candidate_1)
+(prepare_processor_for_final_decision eligibility_processor_2 temporal_constraint_24h_hold verification_package_payment_1 deposit_card_record_candidate_1)
+(finalize_processor_decision eligibility_processor_2)
+(assign_eligibility_factor_to_case eligibility_processor_2 eligibility_factor_sanctions_check document_passport_1)
+(record_eligibility_and_reserve_card_on_processor eligibility_processor_2 deposit_card_type_flexible eligibility_factor_sanctions_check)
+(detach_document_from_case eligibility_processor_2 document_passport_1)
+(grant_primary_profile_eligibility primary_applicant_profile_1 deposit_card_record_candidate_1)
+(grant_coapplicant_profile_eligibility co_applicant_profile_1 deposit_card_record_candidate_1)
+(attach_document_to_case primary_applicant_profile_1 document_passport_1)
+(assign_eligibility_factor_to_case primary_applicant_profile_1 eligibility_factor_sanctions_check document_passport_1)
+(assign_eligibility_and_reserve_card_to_primary_profile primary_applicant_profile_1 deposit_card_type_economy eligibility_factor_sanctions_check)
+(detach_document_from_case primary_applicant_profile_1 document_passport_1)
+(attach_document_to_case co_applicant_profile_1 document_passport_1)
+(assign_eligibility_factor_to_case co_applicant_profile_1 eligibility_factor_sanctions_check document_passport_1)
+(assign_eligibility_and_reserve_card_to_coapplicant co_applicant_profile_1 deposit_card_type_premium eligibility_factor_sanctions_check)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_q2jsm2i9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_q2jsm2i9/plan.pddl 64 
+
+
+
+--- stderr ---
+

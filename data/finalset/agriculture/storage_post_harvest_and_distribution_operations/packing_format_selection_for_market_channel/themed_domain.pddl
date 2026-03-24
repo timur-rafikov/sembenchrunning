@@ -1,0 +1,936 @@
+(define (domain postharvest_packing_format_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_or_attribute_category - object labeling_and_traceability_category - object market_channel_category - object lot_root_category - object harvest_lot - lot_root_category packing_resource - resource_or_attribute_category quality_test - resource_or_attribute_category conditioning_equipment - resource_or_attribute_category brand_mark - resource_or_attribute_category order_specification - resource_or_attribute_category dispatch_time_slot - resource_or_attribute_category temperature_profile - resource_or_attribute_category compliance_certificate - resource_or_attribute_category packaging_material - labeling_and_traceability_category label_template - labeling_and_traceability_category traceability_code - labeling_and_traceability_category channel_profile_type1 - market_channel_category channel_profile_type2 - market_channel_category packing_format - market_channel_category lot_subcategory_group1 - harvest_lot lot_subcategory_group2 - harvest_lot lot_variant_a - lot_subcategory_group1 lot_variant_b - lot_subcategory_group1 packing_unit - lot_subcategory_group2)
+  (:predicates
+    (lot_registered ?harvest_lot - harvest_lot)
+    (quality_confirmed ?harvest_lot - harvest_lot)
+    (lot_resource_allocated ?harvest_lot - harvest_lot)
+    (released_for_dispatch ?harvest_lot - harvest_lot)
+    (ready_for_dispatch ?harvest_lot - harvest_lot)
+    (scheduled_for_dispatch ?harvest_lot - harvest_lot)
+    (packing_resource_available ?packing_resource - packing_resource)
+    (allocated_packing_resource ?harvest_lot - harvest_lot ?packing_resource - packing_resource)
+    (quality_test_available ?quality_test - quality_test)
+    (applied_quality_test ?harvest_lot - harvest_lot ?quality_test - quality_test)
+    (conditioning_equipment_available ?conditioning_equipment - conditioning_equipment)
+    (assigned_conditioning_equipment ?harvest_lot - harvest_lot ?conditioning_equipment - conditioning_equipment)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (packaging_material_allocated_to_variant_a ?lot_variant_a - lot_variant_a ?packaging_material - packaging_material)
+    (packaging_material_allocated_to_variant_b ?lot_variant_b - lot_variant_b ?packaging_material - packaging_material)
+    (lot_variant_a_channel_profile_type1_match ?lot_variant_a - lot_variant_a ?channel_profile_type1 - channel_profile_type1)
+    (channel_profile_type1_reserved ?channel_profile_type1 - channel_profile_type1)
+    (channel_profile_type1_secondary_flag ?channel_profile_type1 - channel_profile_type1)
+    (variant_a_marked_for_allocation ?lot_variant_a - lot_variant_a)
+    (lot_variant_b_channel_profile_type2_match ?lot_variant_b - lot_variant_b ?channel_profile_type2 - channel_profile_type2)
+    (channel_profile_type2_reserved ?channel_profile_type2 - channel_profile_type2)
+    (channel_profile_type2_secondary_flag ?channel_profile_type2 - channel_profile_type2)
+    (variant_b_marked_for_allocation ?lot_variant_b - lot_variant_b)
+    (packing_format_available ?packing_format - packing_format)
+    (packing_format_reserved ?packing_format - packing_format)
+    (packing_format_supports_channel_profile_type1 ?packing_format - packing_format ?channel_profile_type1 - channel_profile_type1)
+    (packing_format_supports_channel_profile_type2 ?packing_format - packing_format ?channel_profile_type2 - channel_profile_type2)
+    (packing_format_requires_temperature_profile ?packing_format - packing_format)
+    (packing_format_requires_compliance_certificate ?packing_format - packing_format)
+    (packing_format_validated ?packing_format - packing_format)
+    (packing_unit_contains_variant_a ?packing_unit - packing_unit ?lot_variant_a - lot_variant_a)
+    (packing_unit_contains_variant_b ?packing_unit - packing_unit ?lot_variant_b - lot_variant_b)
+    (packing_unit_assigned_packing_format ?packing_unit - packing_unit ?packing_format - packing_format)
+    (label_template_available ?label_template - label_template)
+    (packing_unit_assigned_label_template ?packing_unit - packing_unit ?label_template - label_template)
+    (label_template_in_use ?label_template - label_template)
+    (label_template_compatible_with_packing_format ?label_template - label_template ?packing_format - packing_format)
+    (packing_unit_label_attached ?packing_unit - packing_unit)
+    (packing_unit_format_validation_passed ?packing_unit - packing_unit)
+    (packing_unit_validated ?packing_unit - packing_unit)
+    (packing_unit_brand_reserved ?packing_unit - packing_unit)
+    (packing_unit_brand_applied ?packing_unit - packing_unit)
+    (packing_unit_additional_validation_passed ?packing_unit - packing_unit)
+    (packing_unit_final_checks_completed ?packing_unit - packing_unit)
+    (traceability_code_available ?traceability_code - traceability_code)
+    (packing_unit_assigned_traceability_code ?packing_unit - packing_unit ?traceability_code - traceability_code)
+    (packing_unit_traceability_assigned ?packing_unit - packing_unit)
+    (packing_unit_traceability_applied ?packing_unit - packing_unit)
+    (packing_unit_traceability_verified ?packing_unit - packing_unit)
+    (brand_mark_available ?brand_mark - brand_mark)
+    (packing_unit_assigned_brand_mark ?packing_unit - packing_unit ?brand_mark - brand_mark)
+    (order_specification_available ?order_specification - order_specification)
+    (packing_unit_assigned_order_specification ?packing_unit - packing_unit ?order_specification - order_specification)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (packing_unit_assigned_temperature_profile ?packing_unit - packing_unit ?temperature_profile - temperature_profile)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (packing_unit_assigned_compliance_certificate ?packing_unit - packing_unit ?compliance_certificate - compliance_certificate)
+    (dispatch_time_slot_available ?dispatch_time_slot - dispatch_time_slot)
+    (assigned_dispatch_time_slot ?harvest_lot - harvest_lot ?dispatch_time_slot - dispatch_time_slot)
+    (lot_variant_a_conditioning_complete ?lot_variant_a - lot_variant_a)
+    (lot_variant_b_conditioning_complete ?lot_variant_b - lot_variant_b)
+    (packing_unit_finalized ?packing_unit - packing_unit)
+  )
+  (:action receive_and_register_lot
+    :parameters (?harvest_lot - harvest_lot)
+    :precondition
+      (and
+        (not
+          (lot_registered ?harvest_lot)
+        )
+        (not
+          (released_for_dispatch ?harvest_lot)
+        )
+      )
+    :effect (lot_registered ?harvest_lot)
+  )
+  (:action assign_packing_resource_to_lot
+    :parameters (?harvest_lot - harvest_lot ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (lot_registered ?harvest_lot)
+        (not
+          (lot_resource_allocated ?harvest_lot)
+        )
+        (packing_resource_available ?packing_resource)
+      )
+    :effect
+      (and
+        (lot_resource_allocated ?harvest_lot)
+        (allocated_packing_resource ?harvest_lot ?packing_resource)
+        (not
+          (packing_resource_available ?packing_resource)
+        )
+      )
+  )
+  (:action start_quality_test_for_lot
+    :parameters (?harvest_lot - harvest_lot ?quality_test - quality_test)
+    :precondition
+      (and
+        (lot_registered ?harvest_lot)
+        (lot_resource_allocated ?harvest_lot)
+        (quality_test_available ?quality_test)
+      )
+    :effect
+      (and
+        (applied_quality_test ?harvest_lot ?quality_test)
+        (not
+          (quality_test_available ?quality_test)
+        )
+      )
+  )
+  (:action confirm_quality_test_for_lot
+    :parameters (?harvest_lot - harvest_lot ?quality_test - quality_test)
+    :precondition
+      (and
+        (lot_registered ?harvest_lot)
+        (lot_resource_allocated ?harvest_lot)
+        (applied_quality_test ?harvest_lot ?quality_test)
+        (not
+          (quality_confirmed ?harvest_lot)
+        )
+      )
+    :effect (quality_confirmed ?harvest_lot)
+  )
+  (:action release_quality_test
+    :parameters (?harvest_lot - harvest_lot ?quality_test - quality_test)
+    :precondition
+      (and
+        (applied_quality_test ?harvest_lot ?quality_test)
+      )
+    :effect
+      (and
+        (quality_test_available ?quality_test)
+        (not
+          (applied_quality_test ?harvest_lot ?quality_test)
+        )
+      )
+  )
+  (:action reserve_conditioning_equipment_for_lot
+    :parameters (?harvest_lot - harvest_lot ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (quality_confirmed ?harvest_lot)
+        (conditioning_equipment_available ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (assigned_conditioning_equipment ?harvest_lot ?conditioning_equipment)
+        (not
+          (conditioning_equipment_available ?conditioning_equipment)
+        )
+      )
+  )
+  (:action release_conditioning_equipment_from_lot
+    :parameters (?harvest_lot - harvest_lot ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (assigned_conditioning_equipment ?harvest_lot ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (conditioning_equipment_available ?conditioning_equipment)
+        (not
+          (assigned_conditioning_equipment ?harvest_lot ?conditioning_equipment)
+        )
+      )
+  )
+  (:action assign_temperature_profile_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (packing_unit_assigned_temperature_profile ?packing_unit ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action remove_temperature_profile_from_packing_unit
+    :parameters (?packing_unit - packing_unit ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (packing_unit_assigned_temperature_profile ?packing_unit ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (packing_unit_assigned_temperature_profile ?packing_unit ?temperature_profile)
+        )
+      )
+  )
+  (:action assign_compliance_certificate_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (compliance_certificate_available ?compliance_certificate)
+      )
+    :effect
+      (and
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action remove_compliance_certificate_from_packing_unit
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+      )
+    :effect
+      (and
+        (compliance_certificate_available ?compliance_certificate)
+        (not
+          (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        )
+      )
+  )
+  (:action propose_channel_profile_type1_for_variant_a
+    :parameters (?lot_variant_a - lot_variant_a ?channel_profile_type1 - channel_profile_type1 ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_a)
+        (applied_quality_test ?lot_variant_a ?quality_test)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (not
+          (channel_profile_type1_reserved ?channel_profile_type1)
+        )
+        (not
+          (channel_profile_type1_secondary_flag ?channel_profile_type1)
+        )
+      )
+    :effect (channel_profile_type1_reserved ?channel_profile_type1)
+  )
+  (:action complete_conditioning_for_variant_a
+    :parameters (?lot_variant_a - lot_variant_a ?channel_profile_type1 - channel_profile_type1 ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_a)
+        (assigned_conditioning_equipment ?lot_variant_a ?conditioning_equipment)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (channel_profile_type1_reserved ?channel_profile_type1)
+        (not
+          (lot_variant_a_conditioning_complete ?lot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+      )
+  )
+  (:action allocate_packaging_material_to_variant_a
+    :parameters (?lot_variant_a - lot_variant_a ?channel_profile_type1 - channel_profile_type1 ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_a)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (packaging_material_available ?packaging_material)
+        (not
+          (lot_variant_a_conditioning_complete ?lot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_type1_secondary_flag ?channel_profile_type1)
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (packaging_material_allocated_to_variant_a ?lot_variant_a ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action finalize_packaging_material_allocation_variant_a
+    :parameters (?lot_variant_a - lot_variant_a ?channel_profile_type1 - channel_profile_type1 ?quality_test - quality_test ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_a)
+        (applied_quality_test ?lot_variant_a ?quality_test)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (channel_profile_type1_secondary_flag ?channel_profile_type1)
+        (packaging_material_allocated_to_variant_a ?lot_variant_a ?packaging_material)
+        (not
+          (variant_a_marked_for_allocation ?lot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_type1_reserved ?channel_profile_type1)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+        (packaging_material_available ?packaging_material)
+        (not
+          (packaging_material_allocated_to_variant_a ?lot_variant_a ?packaging_material)
+        )
+      )
+  )
+  (:action propose_channel_profile_type2_for_variant_b
+    :parameters (?lot_variant_b - lot_variant_b ?channel_profile_type2 - channel_profile_type2 ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_b)
+        (applied_quality_test ?lot_variant_b ?quality_test)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (not
+          (channel_profile_type2_reserved ?channel_profile_type2)
+        )
+        (not
+          (channel_profile_type2_secondary_flag ?channel_profile_type2)
+        )
+      )
+    :effect (channel_profile_type2_reserved ?channel_profile_type2)
+  )
+  (:action complete_conditioning_for_variant_b
+    :parameters (?lot_variant_b - lot_variant_b ?channel_profile_type2 - channel_profile_type2 ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_b)
+        (assigned_conditioning_equipment ?lot_variant_b ?conditioning_equipment)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type2_reserved ?channel_profile_type2)
+        (not
+          (lot_variant_b_conditioning_complete ?lot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (variant_b_marked_for_allocation ?lot_variant_b)
+      )
+  )
+  (:action allocate_packaging_material_to_variant_b
+    :parameters (?lot_variant_b - lot_variant_b ?channel_profile_type2 - channel_profile_type2 ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_b)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (packaging_material_available ?packaging_material)
+        (not
+          (lot_variant_b_conditioning_complete ?lot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_type2_secondary_flag ?channel_profile_type2)
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (packaging_material_allocated_to_variant_b ?lot_variant_b ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action finalize_packaging_material_allocation_variant_b
+    :parameters (?lot_variant_b - lot_variant_b ?channel_profile_type2 - channel_profile_type2 ?quality_test - quality_test ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_confirmed ?lot_variant_b)
+        (applied_quality_test ?lot_variant_b ?quality_test)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type2_secondary_flag ?channel_profile_type2)
+        (packaging_material_allocated_to_variant_b ?lot_variant_b ?packaging_material)
+        (not
+          (variant_b_marked_for_allocation ?lot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (channel_profile_type2_reserved ?channel_profile_type2)
+        (variant_b_marked_for_allocation ?lot_variant_b)
+        (packaging_material_available ?packaging_material)
+        (not
+          (packaging_material_allocated_to_variant_b ?lot_variant_b ?packaging_material)
+        )
+      )
+  )
+  (:action initialize_packing_unit_with_packing_format
+    :parameters (?lot_variant_a - lot_variant_a ?lot_variant_b - lot_variant_b ?channel_profile_type1 - channel_profile_type1 ?channel_profile_type2 - channel_profile_type2 ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type1_reserved ?channel_profile_type1)
+        (channel_profile_type2_reserved ?channel_profile_type2)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+        (variant_b_marked_for_allocation ?lot_variant_b)
+        (packing_format_available ?packing_format)
+      )
+    :effect
+      (and
+        (packing_format_reserved ?packing_format)
+        (packing_format_supports_channel_profile_type1 ?packing_format ?channel_profile_type1)
+        (packing_format_supports_channel_profile_type2 ?packing_format ?channel_profile_type2)
+        (not
+          (packing_format_available ?packing_format)
+        )
+      )
+  )
+  (:action initialize_packing_unit_with_format_temp_required
+    :parameters (?lot_variant_a - lot_variant_a ?lot_variant_b - lot_variant_b ?channel_profile_type1 - channel_profile_type1 ?channel_profile_type2 - channel_profile_type2 ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type1_secondary_flag ?channel_profile_type1)
+        (channel_profile_type2_reserved ?channel_profile_type2)
+        (not
+          (variant_a_marked_for_allocation ?lot_variant_a)
+        )
+        (variant_b_marked_for_allocation ?lot_variant_b)
+        (packing_format_available ?packing_format)
+      )
+    :effect
+      (and
+        (packing_format_reserved ?packing_format)
+        (packing_format_supports_channel_profile_type1 ?packing_format ?channel_profile_type1)
+        (packing_format_supports_channel_profile_type2 ?packing_format ?channel_profile_type2)
+        (packing_format_requires_temperature_profile ?packing_format)
+        (not
+          (packing_format_available ?packing_format)
+        )
+      )
+  )
+  (:action initialize_packing_unit_with_format_certificate_required
+    :parameters (?lot_variant_a - lot_variant_a ?lot_variant_b - lot_variant_b ?channel_profile_type1 - channel_profile_type1 ?channel_profile_type2 - channel_profile_type2 ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type1_reserved ?channel_profile_type1)
+        (channel_profile_type2_secondary_flag ?channel_profile_type2)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+        (not
+          (variant_b_marked_for_allocation ?lot_variant_b)
+        )
+        (packing_format_available ?packing_format)
+      )
+    :effect
+      (and
+        (packing_format_reserved ?packing_format)
+        (packing_format_supports_channel_profile_type1 ?packing_format ?channel_profile_type1)
+        (packing_format_supports_channel_profile_type2 ?packing_format ?channel_profile_type2)
+        (packing_format_requires_compliance_certificate ?packing_format)
+        (not
+          (packing_format_available ?packing_format)
+        )
+      )
+  )
+  (:action initialize_packing_unit_with_format_temp_and_certificate_required
+    :parameters (?lot_variant_a - lot_variant_a ?lot_variant_b - lot_variant_b ?channel_profile_type1 - channel_profile_type1 ?channel_profile_type2 - channel_profile_type2 ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (lot_variant_a_channel_profile_type1_match ?lot_variant_a ?channel_profile_type1)
+        (lot_variant_b_channel_profile_type2_match ?lot_variant_b ?channel_profile_type2)
+        (channel_profile_type1_secondary_flag ?channel_profile_type1)
+        (channel_profile_type2_secondary_flag ?channel_profile_type2)
+        (not
+          (variant_a_marked_for_allocation ?lot_variant_a)
+        )
+        (not
+          (variant_b_marked_for_allocation ?lot_variant_b)
+        )
+        (packing_format_available ?packing_format)
+      )
+    :effect
+      (and
+        (packing_format_reserved ?packing_format)
+        (packing_format_supports_channel_profile_type1 ?packing_format ?channel_profile_type1)
+        (packing_format_supports_channel_profile_type2 ?packing_format ?channel_profile_type2)
+        (packing_format_requires_temperature_profile ?packing_format)
+        (packing_format_requires_compliance_certificate ?packing_format)
+        (not
+          (packing_format_available ?packing_format)
+        )
+      )
+  )
+  (:action validate_packing_format_for_variant
+    :parameters (?packing_format - packing_format ?lot_variant_a - lot_variant_a ?quality_test - quality_test)
+    :precondition
+      (and
+        (packing_format_reserved ?packing_format)
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (applied_quality_test ?lot_variant_a ?quality_test)
+        (not
+          (packing_format_validated ?packing_format)
+        )
+      )
+    :effect (packing_format_validated ?packing_format)
+  )
+  (:action bind_label_template_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (packing_unit_assigned_packing_format ?packing_unit ?packing_format)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_available ?label_template)
+        (packing_format_reserved ?packing_format)
+        (packing_format_validated ?packing_format)
+        (not
+          (label_template_in_use ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_in_use ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action attach_label_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?label_template - label_template ?packing_format - packing_format ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_in_use ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (applied_quality_test ?packing_unit ?quality_test)
+        (not
+          (packing_format_requires_temperature_profile ?packing_format)
+        )
+        (not
+          (packing_unit_label_attached ?packing_unit)
+        )
+      )
+    :effect (packing_unit_label_attached ?packing_unit)
+  )
+  (:action reserve_brand_mark_for_packing_unit
+    :parameters (?packing_unit - packing_unit ?brand_mark - brand_mark)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (brand_mark_available ?brand_mark)
+        (not
+          (packing_unit_brand_reserved ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_brand_reserved ?packing_unit)
+        (packing_unit_assigned_brand_mark ?packing_unit ?brand_mark)
+        (not
+          (brand_mark_available ?brand_mark)
+        )
+      )
+  )
+  (:action apply_brand_and_label_for_temp_required_format
+    :parameters (?packing_unit - packing_unit ?label_template - label_template ?packing_format - packing_format ?quality_test - quality_test ?brand_mark - brand_mark)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_in_use ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (applied_quality_test ?packing_unit ?quality_test)
+        (packing_format_requires_temperature_profile ?packing_format)
+        (packing_unit_brand_reserved ?packing_unit)
+        (packing_unit_assigned_brand_mark ?packing_unit ?brand_mark)
+        (not
+          (packing_unit_label_attached ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_label_attached ?packing_unit)
+        (packing_unit_brand_applied ?packing_unit)
+      )
+  )
+  (:action perform_temperature_validation_without_certificate
+    :parameters (?packing_unit - packing_unit ?temperature_profile - temperature_profile ?conditioning_equipment - conditioning_equipment ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_label_attached ?packing_unit)
+        (packing_unit_assigned_temperature_profile ?packing_unit ?temperature_profile)
+        (assigned_conditioning_equipment ?packing_unit ?conditioning_equipment)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (not
+          (packing_format_requires_compliance_certificate ?packing_format)
+        )
+        (not
+          (packing_unit_format_validation_passed ?packing_unit)
+        )
+      )
+    :effect (packing_unit_format_validation_passed ?packing_unit)
+  )
+  (:action perform_temperature_validation_with_certificate
+    :parameters (?packing_unit - packing_unit ?temperature_profile - temperature_profile ?conditioning_equipment - conditioning_equipment ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_label_attached ?packing_unit)
+        (packing_unit_assigned_temperature_profile ?packing_unit ?temperature_profile)
+        (assigned_conditioning_equipment ?packing_unit ?conditioning_equipment)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (packing_format_requires_compliance_certificate ?packing_format)
+        (not
+          (packing_unit_format_validation_passed ?packing_unit)
+        )
+      )
+    :effect (packing_unit_format_validation_passed ?packing_unit)
+  )
+  (:action apply_compliance_certificate_and_mark_validated
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_format_validation_passed ?packing_unit)
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (not
+          (packing_format_requires_temperature_profile ?packing_format)
+        )
+        (not
+          (packing_format_requires_compliance_certificate ?packing_format)
+        )
+        (not
+          (packing_unit_validated ?packing_unit)
+        )
+      )
+    :effect (packing_unit_validated ?packing_unit)
+  )
+  (:action apply_compliance_certificate_and_mark_validated_with_additional_flag
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_format_validation_passed ?packing_unit)
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (packing_format_requires_temperature_profile ?packing_format)
+        (not
+          (packing_format_requires_compliance_certificate ?packing_format)
+        )
+        (not
+          (packing_unit_validated ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_additional_validation_passed ?packing_unit)
+      )
+  )
+  (:action apply_compliance_certificate_and_mark_validated_variant3
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_format_validation_passed ?packing_unit)
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (not
+          (packing_format_requires_temperature_profile ?packing_format)
+        )
+        (packing_format_requires_compliance_certificate ?packing_format)
+        (not
+          (packing_unit_validated ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_additional_validation_passed ?packing_unit)
+      )
+  )
+  (:action apply_compliance_certificate_and_mark_validated_variant4
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate ?label_template - label_template ?packing_format - packing_format)
+    :precondition
+      (and
+        (packing_unit_format_validation_passed ?packing_unit)
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (packing_unit_assigned_label_template ?packing_unit ?label_template)
+        (label_template_compatible_with_packing_format ?label_template ?packing_format)
+        (packing_format_requires_temperature_profile ?packing_format)
+        (packing_format_requires_compliance_certificate ?packing_format)
+        (not
+          (packing_unit_validated ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_additional_validation_passed ?packing_unit)
+      )
+  )
+  (:action finalize_packing_unit_minimal
+    :parameters (?packing_unit - packing_unit)
+    :precondition
+      (and
+        (packing_unit_validated ?packing_unit)
+        (not
+          (packing_unit_additional_validation_passed ?packing_unit)
+        )
+        (not
+          (packing_unit_finalized ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_finalized ?packing_unit)
+        (ready_for_dispatch ?packing_unit)
+      )
+  )
+  (:action bind_order_specification_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?order_specification - order_specification)
+    :precondition
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_additional_validation_passed ?packing_unit)
+        (order_specification_available ?order_specification)
+      )
+    :effect
+      (and
+        (packing_unit_assigned_order_specification ?packing_unit ?order_specification)
+        (not
+          (order_specification_available ?order_specification)
+        )
+      )
+  )
+  (:action perform_final_checks_and_mark_ready
+    :parameters (?packing_unit - packing_unit ?lot_variant_a - lot_variant_a ?lot_variant_b - lot_variant_b ?quality_test - quality_test ?order_specification - order_specification)
+    :precondition
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_additional_validation_passed ?packing_unit)
+        (packing_unit_assigned_order_specification ?packing_unit ?order_specification)
+        (packing_unit_contains_variant_a ?packing_unit ?lot_variant_a)
+        (packing_unit_contains_variant_b ?packing_unit ?lot_variant_b)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+        (variant_b_marked_for_allocation ?lot_variant_b)
+        (applied_quality_test ?packing_unit ?quality_test)
+        (not
+          (packing_unit_final_checks_completed ?packing_unit)
+        )
+      )
+    :effect (packing_unit_final_checks_completed ?packing_unit)
+  )
+  (:action finalize_packing_unit_after_checks
+    :parameters (?packing_unit - packing_unit)
+    :precondition
+      (and
+        (packing_unit_validated ?packing_unit)
+        (packing_unit_final_checks_completed ?packing_unit)
+        (not
+          (packing_unit_finalized ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_finalized ?packing_unit)
+        (ready_for_dispatch ?packing_unit)
+      )
+  )
+  (:action reserve_traceability_code_for_packing_unit
+    :parameters (?packing_unit - packing_unit ?traceability_code - traceability_code ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_confirmed ?packing_unit)
+        (applied_quality_test ?packing_unit ?quality_test)
+        (traceability_code_available ?traceability_code)
+        (packing_unit_assigned_traceability_code ?packing_unit ?traceability_code)
+        (not
+          (packing_unit_traceability_assigned ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_traceability_assigned ?packing_unit)
+        (not
+          (traceability_code_available ?traceability_code)
+        )
+      )
+  )
+  (:action apply_traceability_label_to_packing_unit
+    :parameters (?packing_unit - packing_unit ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (packing_unit_traceability_assigned ?packing_unit)
+        (assigned_conditioning_equipment ?packing_unit ?conditioning_equipment)
+        (not
+          (packing_unit_traceability_applied ?packing_unit)
+        )
+      )
+    :effect (packing_unit_traceability_applied ?packing_unit)
+  )
+  (:action attach_certificate_post_traceability
+    :parameters (?packing_unit - packing_unit ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (packing_unit_traceability_applied ?packing_unit)
+        (packing_unit_assigned_compliance_certificate ?packing_unit ?compliance_certificate)
+        (not
+          (packing_unit_traceability_verified ?packing_unit)
+        )
+      )
+    :effect (packing_unit_traceability_verified ?packing_unit)
+  )
+  (:action finalize_packing_unit_traceability
+    :parameters (?packing_unit - packing_unit)
+    :precondition
+      (and
+        (packing_unit_traceability_verified ?packing_unit)
+        (not
+          (packing_unit_finalized ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_finalized ?packing_unit)
+        (ready_for_dispatch ?packing_unit)
+      )
+  )
+  (:action allocate_variant_a_to_packing_format_and_mark_ready
+    :parameters (?lot_variant_a - lot_variant_a ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_a_conditioning_complete ?lot_variant_a)
+        (variant_a_marked_for_allocation ?lot_variant_a)
+        (packing_format_reserved ?packing_format)
+        (packing_format_validated ?packing_format)
+        (not
+          (ready_for_dispatch ?lot_variant_a)
+        )
+      )
+    :effect (ready_for_dispatch ?lot_variant_a)
+  )
+  (:action allocate_variant_b_to_packing_format_and_mark_ready
+    :parameters (?lot_variant_b - lot_variant_b ?packing_format - packing_format)
+    :precondition
+      (and
+        (lot_variant_b_conditioning_complete ?lot_variant_b)
+        (variant_b_marked_for_allocation ?lot_variant_b)
+        (packing_format_reserved ?packing_format)
+        (packing_format_validated ?packing_format)
+        (not
+          (ready_for_dispatch ?lot_variant_b)
+        )
+      )
+    :effect (ready_for_dispatch ?lot_variant_b)
+  )
+  (:action assign_dispatch_time_slot_to_lot
+    :parameters (?harvest_lot - harvest_lot ?dispatch_time_slot - dispatch_time_slot ?quality_test - quality_test)
+    :precondition
+      (and
+        (ready_for_dispatch ?harvest_lot)
+        (applied_quality_test ?harvest_lot ?quality_test)
+        (dispatch_time_slot_available ?dispatch_time_slot)
+        (not
+          (scheduled_for_dispatch ?harvest_lot)
+        )
+      )
+    :effect
+      (and
+        (scheduled_for_dispatch ?harvest_lot)
+        (assigned_dispatch_time_slot ?harvest_lot ?dispatch_time_slot)
+        (not
+          (dispatch_time_slot_available ?dispatch_time_slot)
+        )
+      )
+  )
+  (:action release_variant_a_for_dispatch
+    :parameters (?lot_variant_a - lot_variant_a ?packing_resource - packing_resource ?dispatch_time_slot - dispatch_time_slot)
+    :precondition
+      (and
+        (scheduled_for_dispatch ?lot_variant_a)
+        (allocated_packing_resource ?lot_variant_a ?packing_resource)
+        (assigned_dispatch_time_slot ?lot_variant_a ?dispatch_time_slot)
+        (not
+          (released_for_dispatch ?lot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?lot_variant_a)
+        (packing_resource_available ?packing_resource)
+        (dispatch_time_slot_available ?dispatch_time_slot)
+      )
+  )
+  (:action release_variant_b_for_dispatch
+    :parameters (?lot_variant_b - lot_variant_b ?packing_resource - packing_resource ?dispatch_time_slot - dispatch_time_slot)
+    :precondition
+      (and
+        (scheduled_for_dispatch ?lot_variant_b)
+        (allocated_packing_resource ?lot_variant_b ?packing_resource)
+        (assigned_dispatch_time_slot ?lot_variant_b ?dispatch_time_slot)
+        (not
+          (released_for_dispatch ?lot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?lot_variant_b)
+        (packing_resource_available ?packing_resource)
+        (dispatch_time_slot_available ?dispatch_time_slot)
+      )
+  )
+  (:action release_packing_unit_for_dispatch
+    :parameters (?packing_unit - packing_unit ?packing_resource - packing_resource ?dispatch_time_slot - dispatch_time_slot)
+    :precondition
+      (and
+        (scheduled_for_dispatch ?packing_unit)
+        (allocated_packing_resource ?packing_unit ?packing_resource)
+        (assigned_dispatch_time_slot ?packing_unit ?dispatch_time_slot)
+        (not
+          (released_for_dispatch ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?packing_unit)
+        (packing_resource_available ?packing_resource)
+        (dispatch_time_slot_available ?dispatch_time_slot)
+      )
+  )
+)

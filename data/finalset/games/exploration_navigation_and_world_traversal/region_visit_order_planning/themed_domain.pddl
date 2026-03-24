@@ -1,0 +1,936 @@
+(define (domain region_visit_order_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types traversal_resource - object aux_item_category - object route_component_category - object world_space_root - object region - world_space_root traversal_gate - traversal_resource recon_report - traversal_resource escort_unit - traversal_resource feature_key - traversal_resource upgrade_token - traversal_resource hazard_marker - traversal_resource special_tool - traversal_resource region_slot - traversal_resource consumable_supply - aux_item_category map_fragment - aux_item_category region_feature - aux_item_category route_anchor_a - route_component_category route_anchor_b - route_component_category traversal_task - route_component_category controllable_region - region sector_region - region entry_node - controllable_region exit_node - controllable_region hub - sector_region)
+  (:predicates
+    (region_discovered ?region - region)
+    (region_accessible ?region - region)
+    (region_gate_assigned_flag ?region - region)
+    (region_completed ?region - region)
+    (region_covered ?region - region)
+    (region_hazard_registered ?region - region)
+    (traversal_gate_available ?traversal_gate - traversal_gate)
+    (region_assigned_traversal_gate ?region - region ?traversal_gate - traversal_gate)
+    (recon_report_available ?recon_report - recon_report)
+    (region_recon_attached ?region - region ?recon_report - recon_report)
+    (escort_available ?escort_unit - escort_unit)
+    (region_escort_assigned ?region - region ?escort_unit - escort_unit)
+    (supply_available ?consumable_supply - consumable_supply)
+    (entry_node_supply_assigned ?entry_node - entry_node ?consumable_supply - consumable_supply)
+    (exit_node_supply_assigned ?exit_node - exit_node ?consumable_supply - consumable_supply)
+    (entry_anchor_a_link ?entry_node - entry_node ?route_anchor_a - route_anchor_a)
+    (anchor_a_ready ?route_anchor_a - route_anchor_a)
+    (anchor_a_supplied ?route_anchor_a - route_anchor_a)
+    (entry_node_finalized ?entry_node - entry_node)
+    (exit_anchor_b_link ?exit_node - exit_node ?route_anchor_b - route_anchor_b)
+    (anchor_b_ready ?route_anchor_b - route_anchor_b)
+    (anchor_b_supplied ?route_anchor_b - route_anchor_b)
+    (exit_node_finalized ?exit_node - exit_node)
+    (traversal_task_available ?traversal_task - traversal_task)
+    (traversal_task_packaged ?traversal_task - traversal_task)
+    (traversal_task_anchor_a_link ?traversal_task - traversal_task ?route_anchor_a - route_anchor_a)
+    (traversal_task_anchor_b_link ?traversal_task - traversal_task ?route_anchor_b - route_anchor_b)
+    (traversal_task_ready_variant_a ?traversal_task - traversal_task)
+    (traversal_task_ready_variant_b ?traversal_task - traversal_task)
+    (traversal_task_ready_to_execute ?traversal_task - traversal_task)
+    (hub_has_entry_node ?area_hub - hub ?entry_node - entry_node)
+    (hub_has_exit_node ?area_hub - hub ?exit_node - exit_node)
+    (hub_has_traversal_task ?area_hub - hub ?traversal_task - traversal_task)
+    (map_fragment_available ?map_fragment - map_fragment)
+    (hub_has_map_fragment ?area_hub - hub ?map_fragment - map_fragment)
+    (map_fragment_integrated ?map_fragment - map_fragment)
+    (map_fragment_attached_to_task ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    (hub_map_validated ?area_hub - hub)
+    (hub_tool_processed ?area_hub - hub)
+    (hub_ready_for_execution ?area_hub - hub)
+    (hub_feature_key_reserved ?area_hub - hub)
+    (hub_feature_stage_two ?area_hub - hub)
+    (hub_feature_confirmed ?area_hub - hub)
+    (hub_fully_configured ?area_hub - hub)
+    (region_feature_available ?region_feature - region_feature)
+    (hub_has_region_feature ?area_hub - hub ?region_feature - region_feature)
+    (hub_feature_enabled ?area_hub - hub)
+    (hub_feature_stage_activated ?area_hub - hub)
+    (hub_feature_ready_for_finalization ?area_hub - hub)
+    (feature_key_available ?feature_key - feature_key)
+    (hub_has_feature_key ?area_hub - hub ?feature_key - feature_key)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (hub_has_upgrade_token ?area_hub - hub ?upgrade_token - upgrade_token)
+    (special_tool_available ?special_tool - special_tool)
+    (hub_has_special_tool ?area_hub - hub ?special_tool - special_tool)
+    (region_slot_available ?region_slot - region_slot)
+    (hub_has_region_slot ?area_hub - hub ?region_slot - region_slot)
+    (hazard_marker_available ?hazard_marker - hazard_marker)
+    (region_hazard_link ?region - region ?hazard_marker - hazard_marker)
+    (entry_node_ready ?entry_node - entry_node)
+    (exit_node_ready ?exit_node - exit_node)
+    (hub_coverage_marked ?area_hub - hub)
+  )
+  (:action discover_region
+    :parameters (?region - region)
+    :precondition
+      (and
+        (not
+          (region_discovered ?region)
+        )
+        (not
+          (region_completed ?region)
+        )
+      )
+    :effect (region_discovered ?region)
+  )
+  (:action assign_traversal_gate
+    :parameters (?region - region ?traversal_gate - traversal_gate)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (not
+          (region_gate_assigned_flag ?region)
+        )
+        (traversal_gate_available ?traversal_gate)
+      )
+    :effect
+      (and
+        (region_gate_assigned_flag ?region)
+        (region_assigned_traversal_gate ?region ?traversal_gate)
+        (not
+          (traversal_gate_available ?traversal_gate)
+        )
+      )
+  )
+  (:action attach_recon_report_to_region
+    :parameters (?region - region ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (region_gate_assigned_flag ?region)
+        (recon_report_available ?recon_report)
+      )
+    :effect
+      (and
+        (region_recon_attached ?region ?recon_report)
+        (not
+          (recon_report_available ?recon_report)
+        )
+      )
+  )
+  (:action confirm_region_access
+    :parameters (?region - region ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (region_gate_assigned_flag ?region)
+        (region_recon_attached ?region ?recon_report)
+        (not
+          (region_accessible ?region)
+        )
+      )
+    :effect (region_accessible ?region)
+  )
+  (:action reclaim_recon_report
+    :parameters (?region - region ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_recon_attached ?region ?recon_report)
+      )
+    :effect
+      (and
+        (recon_report_available ?recon_report)
+        (not
+          (region_recon_attached ?region ?recon_report)
+        )
+      )
+  )
+  (:action assign_escort_to_region
+    :parameters (?region - region ?escort_unit - escort_unit)
+    :precondition
+      (and
+        (region_accessible ?region)
+        (escort_available ?escort_unit)
+      )
+    :effect
+      (and
+        (region_escort_assigned ?region ?escort_unit)
+        (not
+          (escort_available ?escort_unit)
+        )
+      )
+  )
+  (:action release_escort_from_region
+    :parameters (?region - region ?escort_unit - escort_unit)
+    :precondition
+      (and
+        (region_escort_assigned ?region ?escort_unit)
+      )
+    :effect
+      (and
+        (escort_available ?escort_unit)
+        (not
+          (region_escort_assigned ?region ?escort_unit)
+        )
+      )
+  )
+  (:action attach_special_tool_to_hub
+    :parameters (?area_hub - hub ?special_tool - special_tool)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (special_tool_available ?special_tool)
+      )
+    :effect
+      (and
+        (hub_has_special_tool ?area_hub ?special_tool)
+        (not
+          (special_tool_available ?special_tool)
+        )
+      )
+  )
+  (:action detach_special_tool_from_hub
+    :parameters (?area_hub - hub ?special_tool - special_tool)
+    :precondition
+      (and
+        (hub_has_special_tool ?area_hub ?special_tool)
+      )
+    :effect
+      (and
+        (special_tool_available ?special_tool)
+        (not
+          (hub_has_special_tool ?area_hub ?special_tool)
+        )
+      )
+  )
+  (:action assign_region_slot_to_hub
+    :parameters (?area_hub - hub ?region_slot - region_slot)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (region_slot_available ?region_slot)
+      )
+    :effect
+      (and
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (not
+          (region_slot_available ?region_slot)
+        )
+      )
+  )
+  (:action unassign_region_slot_from_hub
+    :parameters (?area_hub - hub ?region_slot - region_slot)
+    :precondition
+      (and
+        (hub_has_region_slot ?area_hub ?region_slot)
+      )
+    :effect
+      (and
+        (region_slot_available ?region_slot)
+        (not
+          (hub_has_region_slot ?area_hub ?region_slot)
+        )
+      )
+  )
+  (:action claim_anchor_a_with_recon
+    :parameters (?entry_node - entry_node ?route_anchor_a - route_anchor_a ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_accessible ?entry_node)
+        (region_recon_attached ?entry_node ?recon_report)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (not
+          (anchor_a_ready ?route_anchor_a)
+        )
+        (not
+          (anchor_a_supplied ?route_anchor_a)
+        )
+      )
+    :effect (anchor_a_ready ?route_anchor_a)
+  )
+  (:action finalize_entry_node_with_escort
+    :parameters (?entry_node - entry_node ?route_anchor_a - route_anchor_a ?escort_unit - escort_unit)
+    :precondition
+      (and
+        (region_accessible ?entry_node)
+        (region_escort_assigned ?entry_node ?escort_unit)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (anchor_a_ready ?route_anchor_a)
+        (not
+          (entry_node_ready ?entry_node)
+        )
+      )
+    :effect
+      (and
+        (entry_node_ready ?entry_node)
+        (entry_node_finalized ?entry_node)
+      )
+  )
+  (:action supply_anchor_a
+    :parameters (?entry_node - entry_node ?route_anchor_a - route_anchor_a ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (region_accessible ?entry_node)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (supply_available ?consumable_supply)
+        (not
+          (entry_node_ready ?entry_node)
+        )
+      )
+    :effect
+      (and
+        (anchor_a_supplied ?route_anchor_a)
+        (entry_node_ready ?entry_node)
+        (entry_node_supply_assigned ?entry_node ?consumable_supply)
+        (not
+          (supply_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_entry_anchor_with_recon_and_supply
+    :parameters (?entry_node - entry_node ?route_anchor_a - route_anchor_a ?recon_report - recon_report ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (region_accessible ?entry_node)
+        (region_recon_attached ?entry_node ?recon_report)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (anchor_a_supplied ?route_anchor_a)
+        (entry_node_supply_assigned ?entry_node ?consumable_supply)
+        (not
+          (entry_node_finalized ?entry_node)
+        )
+      )
+    :effect
+      (and
+        (anchor_a_ready ?route_anchor_a)
+        (entry_node_finalized ?entry_node)
+        (supply_available ?consumable_supply)
+        (not
+          (entry_node_supply_assigned ?entry_node ?consumable_supply)
+        )
+      )
+  )
+  (:action claim_anchor_b_with_recon
+    :parameters (?exit_node - exit_node ?route_anchor_b - route_anchor_b ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_accessible ?exit_node)
+        (region_recon_attached ?exit_node ?recon_report)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (not
+          (anchor_b_ready ?route_anchor_b)
+        )
+        (not
+          (anchor_b_supplied ?route_anchor_b)
+        )
+      )
+    :effect (anchor_b_ready ?route_anchor_b)
+  )
+  (:action finalize_exit_node_with_escort
+    :parameters (?exit_node - exit_node ?route_anchor_b - route_anchor_b ?escort_unit - escort_unit)
+    :precondition
+      (and
+        (region_accessible ?exit_node)
+        (region_escort_assigned ?exit_node ?escort_unit)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_b_ready ?route_anchor_b)
+        (not
+          (exit_node_ready ?exit_node)
+        )
+      )
+    :effect
+      (and
+        (exit_node_ready ?exit_node)
+        (exit_node_finalized ?exit_node)
+      )
+  )
+  (:action supply_anchor_b
+    :parameters (?exit_node - exit_node ?route_anchor_b - route_anchor_b ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (region_accessible ?exit_node)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (supply_available ?consumable_supply)
+        (not
+          (exit_node_ready ?exit_node)
+        )
+      )
+    :effect
+      (and
+        (anchor_b_supplied ?route_anchor_b)
+        (exit_node_ready ?exit_node)
+        (exit_node_supply_assigned ?exit_node ?consumable_supply)
+        (not
+          (supply_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_exit_anchor_with_recon_and_supply
+    :parameters (?exit_node - exit_node ?route_anchor_b - route_anchor_b ?recon_report - recon_report ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (region_accessible ?exit_node)
+        (region_recon_attached ?exit_node ?recon_report)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_b_supplied ?route_anchor_b)
+        (exit_node_supply_assigned ?exit_node ?consumable_supply)
+        (not
+          (exit_node_finalized ?exit_node)
+        )
+      )
+    :effect
+      (and
+        (anchor_b_ready ?route_anchor_b)
+        (exit_node_finalized ?exit_node)
+        (supply_available ?consumable_supply)
+        (not
+          (exit_node_supply_assigned ?exit_node ?consumable_supply)
+        )
+      )
+  )
+  (:action package_traversal_task_no_variant
+    :parameters (?entry_node - entry_node ?exit_node - exit_node ?route_anchor_a - route_anchor_a ?route_anchor_b - route_anchor_b ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (entry_node_ready ?entry_node)
+        (exit_node_ready ?exit_node)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_a_ready ?route_anchor_a)
+        (anchor_b_ready ?route_anchor_b)
+        (entry_node_finalized ?entry_node)
+        (exit_node_finalized ?exit_node)
+        (traversal_task_available ?traversal_task)
+      )
+    :effect
+      (and
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_anchor_a_link ?traversal_task ?route_anchor_a)
+        (traversal_task_anchor_b_link ?traversal_task ?route_anchor_b)
+        (not
+          (traversal_task_available ?traversal_task)
+        )
+      )
+  )
+  (:action package_traversal_task_sets_variant_a
+    :parameters (?entry_node - entry_node ?exit_node - exit_node ?route_anchor_a - route_anchor_a ?route_anchor_b - route_anchor_b ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (entry_node_ready ?entry_node)
+        (exit_node_ready ?exit_node)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_a_supplied ?route_anchor_a)
+        (anchor_b_ready ?route_anchor_b)
+        (not
+          (entry_node_finalized ?entry_node)
+        )
+        (exit_node_finalized ?exit_node)
+        (traversal_task_available ?traversal_task)
+      )
+    :effect
+      (and
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_anchor_a_link ?traversal_task ?route_anchor_a)
+        (traversal_task_anchor_b_link ?traversal_task ?route_anchor_b)
+        (traversal_task_ready_variant_a ?traversal_task)
+        (not
+          (traversal_task_available ?traversal_task)
+        )
+      )
+  )
+  (:action package_traversal_task_sets_variant_b
+    :parameters (?entry_node - entry_node ?exit_node - exit_node ?route_anchor_a - route_anchor_a ?route_anchor_b - route_anchor_b ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (entry_node_ready ?entry_node)
+        (exit_node_ready ?exit_node)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_a_ready ?route_anchor_a)
+        (anchor_b_supplied ?route_anchor_b)
+        (entry_node_finalized ?entry_node)
+        (not
+          (exit_node_finalized ?exit_node)
+        )
+        (traversal_task_available ?traversal_task)
+      )
+    :effect
+      (and
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_anchor_a_link ?traversal_task ?route_anchor_a)
+        (traversal_task_anchor_b_link ?traversal_task ?route_anchor_b)
+        (traversal_task_ready_variant_b ?traversal_task)
+        (not
+          (traversal_task_available ?traversal_task)
+        )
+      )
+  )
+  (:action package_traversal_task_sets_variants_ab
+    :parameters (?entry_node - entry_node ?exit_node - exit_node ?route_anchor_a - route_anchor_a ?route_anchor_b - route_anchor_b ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (entry_node_ready ?entry_node)
+        (exit_node_ready ?exit_node)
+        (entry_anchor_a_link ?entry_node ?route_anchor_a)
+        (exit_anchor_b_link ?exit_node ?route_anchor_b)
+        (anchor_a_supplied ?route_anchor_a)
+        (anchor_b_supplied ?route_anchor_b)
+        (not
+          (entry_node_finalized ?entry_node)
+        )
+        (not
+          (exit_node_finalized ?exit_node)
+        )
+        (traversal_task_available ?traversal_task)
+      )
+    :effect
+      (and
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_anchor_a_link ?traversal_task ?route_anchor_a)
+        (traversal_task_anchor_b_link ?traversal_task ?route_anchor_b)
+        (traversal_task_ready_variant_a ?traversal_task)
+        (traversal_task_ready_variant_b ?traversal_task)
+        (not
+          (traversal_task_available ?traversal_task)
+        )
+      )
+  )
+  (:action finalize_traversal_task
+    :parameters (?traversal_task - traversal_task ?entry_node - entry_node ?recon_report - recon_report)
+    :precondition
+      (and
+        (traversal_task_packaged ?traversal_task)
+        (entry_node_ready ?entry_node)
+        (region_recon_attached ?entry_node ?recon_report)
+        (not
+          (traversal_task_ready_to_execute ?traversal_task)
+        )
+      )
+    :effect (traversal_task_ready_to_execute ?traversal_task)
+  )
+  (:action attach_map_fragment_to_task
+    :parameters (?area_hub - hub ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (hub_has_traversal_task ?area_hub ?traversal_task)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_available ?map_fragment)
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_ready_to_execute ?traversal_task)
+        (not
+          (map_fragment_integrated ?map_fragment)
+        )
+      )
+    :effect
+      (and
+        (map_fragment_integrated ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (not
+          (map_fragment_available ?map_fragment)
+        )
+      )
+  )
+  (:action validate_hub_for_task_execution
+    :parameters (?area_hub - hub ?map_fragment - map_fragment ?traversal_task - traversal_task ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_integrated ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (region_recon_attached ?area_hub ?recon_report)
+        (not
+          (traversal_task_ready_variant_a ?traversal_task)
+        )
+        (not
+          (hub_map_validated ?area_hub)
+        )
+      )
+    :effect (hub_map_validated ?area_hub)
+  )
+  (:action attach_feature_key_to_hub
+    :parameters (?area_hub - hub ?feature_key - feature_key)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (feature_key_available ?feature_key)
+        (not
+          (hub_feature_key_reserved ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_feature_key_reserved ?area_hub)
+        (hub_has_feature_key ?area_hub ?feature_key)
+        (not
+          (feature_key_available ?feature_key)
+        )
+      )
+  )
+  (:action progress_hub_feature_with_key
+    :parameters (?area_hub - hub ?map_fragment - map_fragment ?traversal_task - traversal_task ?recon_report - recon_report ?feature_key - feature_key)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_integrated ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (region_recon_attached ?area_hub ?recon_report)
+        (traversal_task_ready_variant_a ?traversal_task)
+        (hub_feature_key_reserved ?area_hub)
+        (hub_has_feature_key ?area_hub ?feature_key)
+        (not
+          (hub_map_validated ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_map_validated ?area_hub)
+        (hub_feature_stage_two ?area_hub)
+      )
+  )
+  (:action apply_tool_integration_stage_1
+    :parameters (?area_hub - hub ?special_tool - special_tool ?escort_unit - escort_unit ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_map_validated ?area_hub)
+        (hub_has_special_tool ?area_hub ?special_tool)
+        (region_escort_assigned ?area_hub ?escort_unit)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (not
+          (traversal_task_ready_variant_b ?traversal_task)
+        )
+        (not
+          (hub_tool_processed ?area_hub)
+        )
+      )
+    :effect (hub_tool_processed ?area_hub)
+  )
+  (:action apply_tool_integration_stage_2
+    :parameters (?area_hub - hub ?special_tool - special_tool ?escort_unit - escort_unit ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_map_validated ?area_hub)
+        (hub_has_special_tool ?area_hub ?special_tool)
+        (region_escort_assigned ?area_hub ?escort_unit)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (traversal_task_ready_variant_b ?traversal_task)
+        (not
+          (hub_tool_processed ?area_hub)
+        )
+      )
+    :effect (hub_tool_processed ?area_hub)
+  )
+  (:action activate_hub_execution_preparation
+    :parameters (?area_hub - hub ?region_slot - region_slot ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_tool_processed ?area_hub)
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (not
+          (traversal_task_ready_variant_a ?traversal_task)
+        )
+        (not
+          (traversal_task_ready_variant_b ?traversal_task)
+        )
+        (not
+          (hub_ready_for_execution ?area_hub)
+        )
+      )
+    :effect (hub_ready_for_execution ?area_hub)
+  )
+  (:action activate_hub_execution_with_variant_a
+    :parameters (?area_hub - hub ?region_slot - region_slot ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_tool_processed ?area_hub)
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (traversal_task_ready_variant_a ?traversal_task)
+        (not
+          (traversal_task_ready_variant_b ?traversal_task)
+        )
+        (not
+          (hub_ready_for_execution ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_feature_confirmed ?area_hub)
+      )
+  )
+  (:action activate_hub_execution_with_variant_b
+    :parameters (?area_hub - hub ?region_slot - region_slot ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_tool_processed ?area_hub)
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (not
+          (traversal_task_ready_variant_a ?traversal_task)
+        )
+        (traversal_task_ready_variant_b ?traversal_task)
+        (not
+          (hub_ready_for_execution ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_feature_confirmed ?area_hub)
+      )
+  )
+  (:action activate_hub_execution_with_variant_c
+    :parameters (?area_hub - hub ?region_slot - region_slot ?map_fragment - map_fragment ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (hub_tool_processed ?area_hub)
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (hub_has_map_fragment ?area_hub ?map_fragment)
+        (map_fragment_attached_to_task ?map_fragment ?traversal_task)
+        (traversal_task_ready_variant_a ?traversal_task)
+        (traversal_task_ready_variant_b ?traversal_task)
+        (not
+          (hub_ready_for_execution ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_feature_confirmed ?area_hub)
+      )
+  )
+  (:action finalize_hub_coverage
+    :parameters (?area_hub - hub)
+    :precondition
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (not
+          (hub_feature_confirmed ?area_hub)
+        )
+        (not
+          (hub_coverage_marked ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_coverage_marked ?area_hub)
+        (region_covered ?area_hub)
+      )
+  )
+  (:action attach_upgrade_token_to_hub
+    :parameters (?area_hub - hub ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_feature_confirmed ?area_hub)
+        (upgrade_token_available ?upgrade_token)
+      )
+    :effect
+      (and
+        (hub_has_upgrade_token ?area_hub ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action configure_hub_for_coverage
+    :parameters (?area_hub - hub ?entry_node - entry_node ?exit_node - exit_node ?recon_report - recon_report ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_feature_confirmed ?area_hub)
+        (hub_has_upgrade_token ?area_hub ?upgrade_token)
+        (hub_has_entry_node ?area_hub ?entry_node)
+        (hub_has_exit_node ?area_hub ?exit_node)
+        (entry_node_finalized ?entry_node)
+        (exit_node_finalized ?exit_node)
+        (region_recon_attached ?area_hub ?recon_report)
+        (not
+          (hub_fully_configured ?area_hub)
+        )
+      )
+    :effect (hub_fully_configured ?area_hub)
+  )
+  (:action finalize_configured_hub_coverage
+    :parameters (?area_hub - hub)
+    :precondition
+      (and
+        (hub_ready_for_execution ?area_hub)
+        (hub_fully_configured ?area_hub)
+        (not
+          (hub_coverage_marked ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_coverage_marked ?area_hub)
+        (region_covered ?area_hub)
+      )
+  )
+  (:action enable_hub_feature
+    :parameters (?area_hub - hub ?region_feature - region_feature ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_accessible ?area_hub)
+        (region_recon_attached ?area_hub ?recon_report)
+        (region_feature_available ?region_feature)
+        (hub_has_region_feature ?area_hub ?region_feature)
+        (not
+          (hub_feature_enabled ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_feature_enabled ?area_hub)
+        (not
+          (region_feature_available ?region_feature)
+        )
+      )
+  )
+  (:action activate_hub_feature_stage_one
+    :parameters (?area_hub - hub ?escort_unit - escort_unit)
+    :precondition
+      (and
+        (hub_feature_enabled ?area_hub)
+        (region_escort_assigned ?area_hub ?escort_unit)
+        (not
+          (hub_feature_stage_activated ?area_hub)
+        )
+      )
+    :effect (hub_feature_stage_activated ?area_hub)
+  )
+  (:action prepare_hub_feature_slot
+    :parameters (?area_hub - hub ?region_slot - region_slot)
+    :precondition
+      (and
+        (hub_feature_stage_activated ?area_hub)
+        (hub_has_region_slot ?area_hub ?region_slot)
+        (not
+          (hub_feature_ready_for_finalization ?area_hub)
+        )
+      )
+    :effect (hub_feature_ready_for_finalization ?area_hub)
+  )
+  (:action finalize_feature_coverage
+    :parameters (?area_hub - hub)
+    :precondition
+      (and
+        (hub_feature_ready_for_finalization ?area_hub)
+        (not
+          (hub_coverage_marked ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (hub_coverage_marked ?area_hub)
+        (region_covered ?area_hub)
+      )
+  )
+  (:action mark_entry_node_covered
+    :parameters (?entry_node - entry_node ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (entry_node_ready ?entry_node)
+        (entry_node_finalized ?entry_node)
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_ready_to_execute ?traversal_task)
+        (not
+          (region_covered ?entry_node)
+        )
+      )
+    :effect (region_covered ?entry_node)
+  )
+  (:action mark_exit_node_covered
+    :parameters (?exit_node - exit_node ?traversal_task - traversal_task)
+    :precondition
+      (and
+        (exit_node_ready ?exit_node)
+        (exit_node_finalized ?exit_node)
+        (traversal_task_packaged ?traversal_task)
+        (traversal_task_ready_to_execute ?traversal_task)
+        (not
+          (region_covered ?exit_node)
+        )
+      )
+    :effect (region_covered ?exit_node)
+  )
+  (:action register_region_hazard
+    :parameters (?region - region ?hazard_marker - hazard_marker ?recon_report - recon_report)
+    :precondition
+      (and
+        (region_covered ?region)
+        (region_recon_attached ?region ?recon_report)
+        (hazard_marker_available ?hazard_marker)
+        (not
+          (region_hazard_registered ?region)
+        )
+      )
+    :effect
+      (and
+        (region_hazard_registered ?region)
+        (region_hazard_link ?region ?hazard_marker)
+        (not
+          (hazard_marker_available ?hazard_marker)
+        )
+      )
+  )
+  (:action finalize_region_completion_from_hazard_entry
+    :parameters (?entry_node - entry_node ?traversal_gate - traversal_gate ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (region_hazard_registered ?entry_node)
+        (region_assigned_traversal_gate ?entry_node ?traversal_gate)
+        (region_hazard_link ?entry_node ?hazard_marker)
+        (not
+          (region_completed ?entry_node)
+        )
+      )
+    :effect
+      (and
+        (region_completed ?entry_node)
+        (traversal_gate_available ?traversal_gate)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action finalize_region_completion_from_hazard_exit
+    :parameters (?exit_node - exit_node ?traversal_gate - traversal_gate ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (region_hazard_registered ?exit_node)
+        (region_assigned_traversal_gate ?exit_node ?traversal_gate)
+        (region_hazard_link ?exit_node ?hazard_marker)
+        (not
+          (region_completed ?exit_node)
+        )
+      )
+    :effect
+      (and
+        (region_completed ?exit_node)
+        (traversal_gate_available ?traversal_gate)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action finalize_region_completion_from_hazard_hub
+    :parameters (?area_hub - hub ?traversal_gate - traversal_gate ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (region_hazard_registered ?area_hub)
+        (region_assigned_traversal_gate ?area_hub ?traversal_gate)
+        (region_hazard_link ?area_hub ?hazard_marker)
+        (not
+          (region_completed ?area_hub)
+        )
+      )
+    :effect
+      (and
+        (region_completed ?area_hub)
+        (traversal_gate_available ?traversal_gate)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+)

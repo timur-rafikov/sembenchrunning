@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain water_stress_response_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource_type - entity asset_type - entity temporal_task_type - entity spatial_entity_type - entity field_zone - spatial_entity_type irrigation_resource - operational_resource_type sensor_device - operational_resource_type crew - operational_resource_type irrigation_equipment - operational_resource_type deployment_slot - operational_resource_type water_source - operational_resource_type irrigation_mode - operational_resource_type weather_window - operational_resource_type irrigation_preset - asset_type supply_batch - asset_type contractor - asset_type irrigation_window - temporal_task_type crop_window - temporal_task_type irrigation_task - temporal_task_type field_subdivision - field_zone management_subdivision - field_zone irrigation_block - field_subdivision crop_block - field_subdivision management_unit - management_subdivision)
+
+  (:predicates
+    (field_plan_created ?field_zone - field_zone)
+    (field_plan_committed ?field_zone - field_zone)
+    (zone_resource_reserved ?field_zone - field_zone)
+    (operation_closed ?field_zone - field_zone)
+    (execution_completed ?field_zone - field_zone)
+    (ready_for_resource_release ?field_zone - field_zone)
+    (irrigation_resource_available ?irrigation_resource - irrigation_resource)
+    (resource_assigned_to_zone ?field_zone - field_zone ?irrigation_resource - irrigation_resource)
+    (sensor_available ?sensor_device_var - sensor_device)
+    (sensor_bound_to_zone ?field_zone - field_zone ?sensor_device_var - sensor_device)
+    (crew_available ?crew - crew)
+    (crew_assigned_to_zone ?field_zone - field_zone ?crew - crew)
+    (preset_available ?irrigation_preset - irrigation_preset)
+    (preset_assigned_to_block ?irrigation_block_var - irrigation_block ?irrigation_preset - irrigation_preset)
+    (preset_assigned_to_crop_block ?crop_block_var - crop_block ?irrigation_preset - irrigation_preset)
+    (block_has_irrigation_window ?irrigation_block_var - irrigation_block ?irrigation_window - irrigation_window)
+    (irrigation_window_selected ?irrigation_window - irrigation_window)
+    (irrigation_window_alternate_selected ?irrigation_window - irrigation_window)
+    (irrigation_block_ready ?irrigation_block_var - irrigation_block)
+    (crop_block_has_crop_window ?crop_block_var - crop_block ?crop_window - crop_window)
+    (crop_window_selected ?crop_window - crop_window)
+    (crop_window_alternate_selected ?crop_window - crop_window)
+    (crop_block_ready ?crop_block_var - crop_block)
+    (irrigation_task_slot_available ?irrigation_task - irrigation_task)
+    (irrigation_task_created ?irrigation_task - irrigation_task)
+    (task_assigned_irrigation_window ?irrigation_task - irrigation_task ?irrigation_window - irrigation_window)
+    (task_assigned_crop_window ?irrigation_task - irrigation_task ?crop_window - crop_window)
+    (irrigation_task_needs_equipment ?irrigation_task - irrigation_task)
+    (irrigation_task_needs_deployment_slot ?irrigation_task - irrigation_task)
+    (irrigation_task_scheduled ?irrigation_task - irrigation_task)
+    (management_unit_has_block ?management_unit - management_unit ?irrigation_block_var - irrigation_block)
+    (management_unit_has_crop_block ?management_unit - management_unit ?crop_block_var - crop_block)
+    (management_unit_assigned_task ?management_unit - management_unit ?irrigation_task - irrigation_task)
+    (supply_batch_available ?supply_batch - supply_batch)
+    (management_unit_has_supply_batch ?management_unit - management_unit ?supply_batch - supply_batch)
+    (supply_batch_allocated ?supply_batch - supply_batch)
+    (supply_batch_assigned_to_task ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    (management_unit_validated ?management_unit - management_unit)
+    (management_unit_deployment_confirmed ?management_unit - management_unit)
+    (management_unit_mode_ready ?management_unit - management_unit)
+    (management_unit_equipment_reserved ?management_unit - management_unit)
+    (management_unit_equipment_confirmed ?management_unit - management_unit)
+    (management_unit_execution_mode_set ?management_unit - management_unit)
+    (management_unit_deployment_ready ?management_unit - management_unit)
+    (contractor_available ?contractor - contractor)
+    (management_unit_assigned_contractor ?management_unit - management_unit ?contractor - contractor)
+    (management_unit_contractor_assigned ?management_unit - management_unit)
+    (management_unit_contractor_prepared ?management_unit - management_unit)
+    (management_unit_contractor_ready_for_execution ?management_unit - management_unit)
+    (equipment_available ?irrigation_equipment - irrigation_equipment)
+    (management_unit_assigned_equipment ?management_unit - management_unit ?irrigation_equipment - irrigation_equipment)
+    (deployment_slot_available ?deployment_slot_var - deployment_slot)
+    (management_unit_assigned_deployment_slot ?management_unit - management_unit ?deployment_slot_var - deployment_slot)
+    (irrigation_mode_available ?irrigation_mode - irrigation_mode)
+    (management_unit_assigned_mode ?management_unit - management_unit ?irrigation_mode - irrigation_mode)
+    (weather_window_available ?weather_window - weather_window)
+    (management_unit_assigned_weather_window ?management_unit - management_unit ?weather_window - weather_window)
+    (water_source_available ?water_source - water_source)
+    (zone_assigned_water_source ?field_zone - field_zone ?water_source - water_source)
+    (irrigation_block_prepared ?irrigation_block_var - irrigation_block)
+    (crop_block_prepared ?crop_block_var - crop_block)
+    (management_unit_execution_marked ?management_unit - management_unit)
+  )
+  (:action create_field_response_plan
+    :parameters (?field_zone - field_zone)
+    :precondition
+      (and
+        (not
+          (field_plan_created ?field_zone)
+        )
+        (not
+          (operation_closed ?field_zone)
+        )
+      )
+    :effect (field_plan_created ?field_zone)
+  )
+  (:action reserve_irrigation_resource_for_zone
+    :parameters (?field_zone - field_zone ?irrigation_resource - irrigation_resource)
+    :precondition
+      (and
+        (field_plan_created ?field_zone)
+        (not
+          (zone_resource_reserved ?field_zone)
+        )
+        (irrigation_resource_available ?irrigation_resource)
+      )
+    :effect
+      (and
+        (zone_resource_reserved ?field_zone)
+        (resource_assigned_to_zone ?field_zone ?irrigation_resource)
+        (not
+          (irrigation_resource_available ?irrigation_resource)
+        )
+      )
+  )
+  (:action bind_sensor_to_field_plan
+    :parameters (?field_zone - field_zone ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_created ?field_zone)
+        (zone_resource_reserved ?field_zone)
+        (sensor_available ?sensor_device_var)
+      )
+    :effect
+      (and
+        (sensor_bound_to_zone ?field_zone ?sensor_device_var)
+        (not
+          (sensor_available ?sensor_device_var)
+        )
+      )
+  )
+  (:action activate_field_plan
+    :parameters (?field_zone - field_zone ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_created ?field_zone)
+        (zone_resource_reserved ?field_zone)
+        (sensor_bound_to_zone ?field_zone ?sensor_device_var)
+        (not
+          (field_plan_committed ?field_zone)
+        )
+      )
+    :effect (field_plan_committed ?field_zone)
+  )
+  (:action release_sensor_from_field_plan
+    :parameters (?field_zone - field_zone ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (sensor_bound_to_zone ?field_zone ?sensor_device_var)
+      )
+    :effect
+      (and
+        (sensor_available ?sensor_device_var)
+        (not
+          (sensor_bound_to_zone ?field_zone ?sensor_device_var)
+        )
+      )
+  )
+  (:action assign_crew_to_field_plan
+    :parameters (?field_zone - field_zone ?crew - crew)
+    :precondition
+      (and
+        (field_plan_committed ?field_zone)
+        (crew_available ?crew)
+      )
+    :effect
+      (and
+        (crew_assigned_to_zone ?field_zone ?crew)
+        (not
+          (crew_available ?crew)
+        )
+      )
+  )
+  (:action release_crew_from_field_plan
+    :parameters (?field_zone - field_zone ?crew - crew)
+    :precondition
+      (and
+        (crew_assigned_to_zone ?field_zone ?crew)
+      )
+    :effect
+      (and
+        (crew_available ?crew)
+        (not
+          (crew_assigned_to_zone ?field_zone ?crew)
+        )
+      )
+  )
+  (:action assign_irrigation_mode_to_unit
+    :parameters (?management_unit - management_unit ?irrigation_mode - irrigation_mode)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (irrigation_mode_available ?irrigation_mode)
+      )
+    :effect
+      (and
+        (management_unit_assigned_mode ?management_unit ?irrigation_mode)
+        (not
+          (irrigation_mode_available ?irrigation_mode)
+        )
+      )
+  )
+  (:action unassign_irrigation_mode_from_unit
+    :parameters (?management_unit - management_unit ?irrigation_mode - irrigation_mode)
+    :precondition
+      (and
+        (management_unit_assigned_mode ?management_unit ?irrigation_mode)
+      )
+    :effect
+      (and
+        (irrigation_mode_available ?irrigation_mode)
+        (not
+          (management_unit_assigned_mode ?management_unit ?irrigation_mode)
+        )
+      )
+  )
+  (:action assign_weather_window_to_unit
+    :parameters (?management_unit - management_unit ?weather_window - weather_window)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (weather_window_available ?weather_window)
+      )
+    :effect
+      (and
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (not
+          (weather_window_available ?weather_window)
+        )
+      )
+  )
+  (:action unassign_weather_window_from_unit
+    :parameters (?management_unit - management_unit ?weather_window - weather_window)
+    :precondition
+      (and
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+      )
+    :effect
+      (and
+        (weather_window_available ?weather_window)
+        (not
+          (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        )
+      )
+  )
+  (:action select_irrigation_window_for_block
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_window - irrigation_window ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_committed ?irrigation_block_var)
+        (sensor_bound_to_zone ?irrigation_block_var ?sensor_device_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (not
+          (irrigation_window_selected ?irrigation_window)
+        )
+        (not
+          (irrigation_window_alternate_selected ?irrigation_window)
+        )
+      )
+    :effect (irrigation_window_selected ?irrigation_window)
+  )
+  (:action prepare_irrigation_block_with_crew
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_window - irrigation_window ?crew - crew)
+    :precondition
+      (and
+        (field_plan_committed ?irrigation_block_var)
+        (crew_assigned_to_zone ?irrigation_block_var ?crew)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (irrigation_window_selected ?irrigation_window)
+        (not
+          (irrigation_block_prepared ?irrigation_block_var)
+        )
+      )
+    :effect
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (irrigation_block_ready ?irrigation_block_var)
+      )
+  )
+  (:action assign_preset_to_irrigation_block
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_window - irrigation_window ?irrigation_preset - irrigation_preset)
+    :precondition
+      (and
+        (field_plan_committed ?irrigation_block_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (preset_available ?irrigation_preset)
+        (not
+          (irrigation_block_prepared ?irrigation_block_var)
+        )
+      )
+    :effect
+      (and
+        (irrigation_window_alternate_selected ?irrigation_window)
+        (irrigation_block_prepared ?irrigation_block_var)
+        (preset_assigned_to_block ?irrigation_block_var ?irrigation_preset)
+        (not
+          (preset_available ?irrigation_preset)
+        )
+      )
+  )
+  (:action apply_preset_and_mark_block_ready
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_window - irrigation_window ?sensor_device_var - sensor_device ?irrigation_preset - irrigation_preset)
+    :precondition
+      (and
+        (field_plan_committed ?irrigation_block_var)
+        (sensor_bound_to_zone ?irrigation_block_var ?sensor_device_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (irrigation_window_alternate_selected ?irrigation_window)
+        (preset_assigned_to_block ?irrigation_block_var ?irrigation_preset)
+        (not
+          (irrigation_block_ready ?irrigation_block_var)
+        )
+      )
+    :effect
+      (and
+        (irrigation_window_selected ?irrigation_window)
+        (irrigation_block_ready ?irrigation_block_var)
+        (preset_available ?irrigation_preset)
+        (not
+          (preset_assigned_to_block ?irrigation_block_var ?irrigation_preset)
+        )
+      )
+  )
+  (:action select_crop_window_for_block
+    :parameters (?crop_block_var - crop_block ?crop_window - crop_window ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_committed ?crop_block_var)
+        (sensor_bound_to_zone ?crop_block_var ?sensor_device_var)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (not
+          (crop_window_selected ?crop_window)
+        )
+        (not
+          (crop_window_alternate_selected ?crop_window)
+        )
+      )
+    :effect (crop_window_selected ?crop_window)
+  )
+  (:action prepare_crop_block_with_crew
+    :parameters (?crop_block_var - crop_block ?crop_window - crop_window ?crew - crew)
+    :precondition
+      (and
+        (field_plan_committed ?crop_block_var)
+        (crew_assigned_to_zone ?crop_block_var ?crew)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (crop_window_selected ?crop_window)
+        (not
+          (crop_block_prepared ?crop_block_var)
+        )
+      )
+    :effect
+      (and
+        (crop_block_prepared ?crop_block_var)
+        (crop_block_ready ?crop_block_var)
+      )
+  )
+  (:action assign_preset_to_crop_block
+    :parameters (?crop_block_var - crop_block ?crop_window - crop_window ?irrigation_preset - irrigation_preset)
+    :precondition
+      (and
+        (field_plan_committed ?crop_block_var)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (preset_available ?irrigation_preset)
+        (not
+          (crop_block_prepared ?crop_block_var)
+        )
+      )
+    :effect
+      (and
+        (crop_window_alternate_selected ?crop_window)
+        (crop_block_prepared ?crop_block_var)
+        (preset_assigned_to_crop_block ?crop_block_var ?irrigation_preset)
+        (not
+          (preset_available ?irrigation_preset)
+        )
+      )
+  )
+  (:action apply_preset_and_mark_crop_block_ready
+    :parameters (?crop_block_var - crop_block ?crop_window - crop_window ?sensor_device_var - sensor_device ?irrigation_preset - irrigation_preset)
+    :precondition
+      (and
+        (field_plan_committed ?crop_block_var)
+        (sensor_bound_to_zone ?crop_block_var ?sensor_device_var)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (crop_window_alternate_selected ?crop_window)
+        (preset_assigned_to_crop_block ?crop_block_var ?irrigation_preset)
+        (not
+          (crop_block_ready ?crop_block_var)
+        )
+      )
+    :effect
+      (and
+        (crop_window_selected ?crop_window)
+        (crop_block_ready ?crop_block_var)
+        (preset_available ?irrigation_preset)
+        (not
+          (preset_assigned_to_crop_block ?crop_block_var ?irrigation_preset)
+        )
+      )
+  )
+  (:action assemble_irrigation_task_from_blocks
+    :parameters (?irrigation_block_var - irrigation_block ?crop_block_var - crop_block ?irrigation_window - irrigation_window ?crop_window - crop_window ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (crop_block_prepared ?crop_block_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (irrigation_window_selected ?irrigation_window)
+        (crop_window_selected ?crop_window)
+        (irrigation_block_ready ?irrigation_block_var)
+        (crop_block_ready ?crop_block_var)
+        (irrigation_task_slot_available ?irrigation_task)
+      )
+    :effect
+      (and
+        (irrigation_task_created ?irrigation_task)
+        (task_assigned_irrigation_window ?irrigation_task ?irrigation_window)
+        (task_assigned_crop_window ?irrigation_task ?crop_window)
+        (not
+          (irrigation_task_slot_available ?irrigation_task)
+        )
+      )
+  )
+  (:action assemble_irrigation_task_with_secondary_irrigation_window
+    :parameters (?irrigation_block_var - irrigation_block ?crop_block_var - crop_block ?irrigation_window - irrigation_window ?crop_window - crop_window ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (crop_block_prepared ?crop_block_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (irrigation_window_alternate_selected ?irrigation_window)
+        (crop_window_selected ?crop_window)
+        (not
+          (irrigation_block_ready ?irrigation_block_var)
+        )
+        (crop_block_ready ?crop_block_var)
+        (irrigation_task_slot_available ?irrigation_task)
+      )
+    :effect
+      (and
+        (irrigation_task_created ?irrigation_task)
+        (task_assigned_irrigation_window ?irrigation_task ?irrigation_window)
+        (task_assigned_crop_window ?irrigation_task ?crop_window)
+        (irrigation_task_needs_equipment ?irrigation_task)
+        (not
+          (irrigation_task_slot_available ?irrigation_task)
+        )
+      )
+  )
+  (:action assemble_irrigation_task_with_alternate_crop_window
+    :parameters (?irrigation_block_var - irrigation_block ?crop_block_var - crop_block ?irrigation_window - irrigation_window ?crop_window - crop_window ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (crop_block_prepared ?crop_block_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (irrigation_window_selected ?irrigation_window)
+        (crop_window_alternate_selected ?crop_window)
+        (irrigation_block_ready ?irrigation_block_var)
+        (not
+          (crop_block_ready ?crop_block_var)
+        )
+        (irrigation_task_slot_available ?irrigation_task)
+      )
+    :effect
+      (and
+        (irrigation_task_created ?irrigation_task)
+        (task_assigned_irrigation_window ?irrigation_task ?irrigation_window)
+        (task_assigned_crop_window ?irrigation_task ?crop_window)
+        (irrigation_task_needs_deployment_slot ?irrigation_task)
+        (not
+          (irrigation_task_slot_available ?irrigation_task)
+        )
+      )
+  )
+  (:action assemble_irrigation_task_with_both_alternates
+    :parameters (?irrigation_block_var - irrigation_block ?crop_block_var - crop_block ?irrigation_window - irrigation_window ?crop_window - crop_window ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (crop_block_prepared ?crop_block_var)
+        (block_has_irrigation_window ?irrigation_block_var ?irrigation_window)
+        (crop_block_has_crop_window ?crop_block_var ?crop_window)
+        (irrigation_window_alternate_selected ?irrigation_window)
+        (crop_window_alternate_selected ?crop_window)
+        (not
+          (irrigation_block_ready ?irrigation_block_var)
+        )
+        (not
+          (crop_block_ready ?crop_block_var)
+        )
+        (irrigation_task_slot_available ?irrigation_task)
+      )
+    :effect
+      (and
+        (irrigation_task_created ?irrigation_task)
+        (task_assigned_irrigation_window ?irrigation_task ?irrigation_window)
+        (task_assigned_crop_window ?irrigation_task ?crop_window)
+        (irrigation_task_needs_equipment ?irrigation_task)
+        (irrigation_task_needs_deployment_slot ?irrigation_task)
+        (not
+          (irrigation_task_slot_available ?irrigation_task)
+        )
+      )
+  )
+  (:action schedule_irrigation_task
+    :parameters (?irrigation_task - irrigation_task ?irrigation_block_var - irrigation_block ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (irrigation_task_created ?irrigation_task)
+        (irrigation_block_prepared ?irrigation_block_var)
+        (sensor_bound_to_zone ?irrigation_block_var ?sensor_device_var)
+        (not
+          (irrigation_task_scheduled ?irrigation_task)
+        )
+      )
+    :effect (irrigation_task_scheduled ?irrigation_task)
+  )
+  (:action allocate_supply_batch_to_task
+    :parameters (?management_unit - management_unit ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (management_unit_assigned_task ?management_unit ?irrigation_task)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_available ?supply_batch)
+        (irrigation_task_created ?irrigation_task)
+        (irrigation_task_scheduled ?irrigation_task)
+        (not
+          (supply_batch_allocated ?supply_batch)
+        )
+      )
+    :effect
+      (and
+        (supply_batch_allocated ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (not
+          (supply_batch_available ?supply_batch)
+        )
+      )
+  )
+  (:action validate_management_unit_for_execution
+    :parameters (?management_unit - management_unit ?supply_batch - supply_batch ?irrigation_task - irrigation_task ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_allocated ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (sensor_bound_to_zone ?management_unit ?sensor_device_var)
+        (not
+          (irrigation_task_needs_equipment ?irrigation_task)
+        )
+        (not
+          (management_unit_validated ?management_unit)
+        )
+      )
+    :effect (management_unit_validated ?management_unit)
+  )
+  (:action assign_equipment_to_management_unit
+    :parameters (?management_unit - management_unit ?irrigation_equipment - irrigation_equipment)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (equipment_available ?irrigation_equipment)
+        (not
+          (management_unit_equipment_reserved ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_equipment_reserved ?management_unit)
+        (management_unit_assigned_equipment ?management_unit ?irrigation_equipment)
+        (not
+          (equipment_available ?irrigation_equipment)
+        )
+      )
+  )
+  (:action assign_equipment_and_validate_unit
+    :parameters (?management_unit - management_unit ?supply_batch - supply_batch ?irrigation_task - irrigation_task ?sensor_device_var - sensor_device ?irrigation_equipment - irrigation_equipment)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_allocated ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (sensor_bound_to_zone ?management_unit ?sensor_device_var)
+        (irrigation_task_needs_equipment ?irrigation_task)
+        (management_unit_equipment_reserved ?management_unit)
+        (management_unit_assigned_equipment ?management_unit ?irrigation_equipment)
+        (not
+          (management_unit_validated ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_validated ?management_unit)
+        (management_unit_equipment_confirmed ?management_unit)
+      )
+  )
+  (:action confirm_management_unit_equipment_provision
+    :parameters (?management_unit - management_unit ?irrigation_mode - irrigation_mode ?crew - crew ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_validated ?management_unit)
+        (management_unit_assigned_mode ?management_unit ?irrigation_mode)
+        (crew_assigned_to_zone ?management_unit ?crew)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (not
+          (irrigation_task_needs_deployment_slot ?irrigation_task)
+        )
+        (not
+          (management_unit_deployment_confirmed ?management_unit)
+        )
+      )
+    :effect (management_unit_deployment_confirmed ?management_unit)
+  )
+  (:action confirm_management_unit_equipment_provision_variant
+    :parameters (?management_unit - management_unit ?irrigation_mode - irrigation_mode ?crew - crew ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_validated ?management_unit)
+        (management_unit_assigned_mode ?management_unit ?irrigation_mode)
+        (crew_assigned_to_zone ?management_unit ?crew)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (irrigation_task_needs_deployment_slot ?irrigation_task)
+        (not
+          (management_unit_deployment_confirmed ?management_unit)
+        )
+      )
+    :effect (management_unit_deployment_confirmed ?management_unit)
+  )
+  (:action mark_management_unit_mode_ready
+    :parameters (?management_unit - management_unit ?weather_window - weather_window ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_deployment_confirmed ?management_unit)
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (not
+          (irrigation_task_needs_equipment ?irrigation_task)
+        )
+        (not
+          (irrigation_task_needs_deployment_slot ?irrigation_task)
+        )
+        (not
+          (management_unit_mode_ready ?management_unit)
+        )
+      )
+    :effect (management_unit_mode_ready ?management_unit)
+  )
+  (:action mark_management_unit_mode_and_set_execution_mode
+    :parameters (?management_unit - management_unit ?weather_window - weather_window ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_deployment_confirmed ?management_unit)
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (irrigation_task_needs_equipment ?irrigation_task)
+        (not
+          (irrigation_task_needs_deployment_slot ?irrigation_task)
+        )
+        (not
+          (management_unit_mode_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_execution_mode_set ?management_unit)
+      )
+  )
+  (:action mark_management_unit_mode_and_set_execution_mode_variant
+    :parameters (?management_unit - management_unit ?weather_window - weather_window ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_deployment_confirmed ?management_unit)
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (not
+          (irrigation_task_needs_equipment ?irrigation_task)
+        )
+        (irrigation_task_needs_deployment_slot ?irrigation_task)
+        (not
+          (management_unit_mode_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_execution_mode_set ?management_unit)
+      )
+  )
+  (:action mark_management_unit_mode_and_set_execution_mode_variant_two
+    :parameters (?management_unit - management_unit ?weather_window - weather_window ?supply_batch - supply_batch ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (management_unit_deployment_confirmed ?management_unit)
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (management_unit_has_supply_batch ?management_unit ?supply_batch)
+        (supply_batch_assigned_to_task ?supply_batch ?irrigation_task)
+        (irrigation_task_needs_equipment ?irrigation_task)
+        (irrigation_task_needs_deployment_slot ?irrigation_task)
+        (not
+          (management_unit_mode_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_execution_mode_set ?management_unit)
+      )
+  )
+  (:action finalize_management_unit_execution
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (not
+          (management_unit_execution_mode_set ?management_unit)
+        )
+        (not
+          (management_unit_execution_marked ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_execution_marked ?management_unit)
+        (execution_completed ?management_unit)
+      )
+  )
+  (:action assign_deployment_slot_to_management_unit
+    :parameters (?management_unit - management_unit ?deployment_slot_var - deployment_slot)
+    :precondition
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_execution_mode_set ?management_unit)
+        (deployment_slot_available ?deployment_slot_var)
+      )
+    :effect
+      (and
+        (management_unit_assigned_deployment_slot ?management_unit ?deployment_slot_var)
+        (not
+          (deployment_slot_available ?deployment_slot_var)
+        )
+      )
+  )
+  (:action prepare_management_unit_for_execution
+    :parameters (?management_unit - management_unit ?irrigation_block_var - irrigation_block ?crop_block_var - crop_block ?sensor_device_var - sensor_device ?deployment_slot_var - deployment_slot)
+    :precondition
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_execution_mode_set ?management_unit)
+        (management_unit_assigned_deployment_slot ?management_unit ?deployment_slot_var)
+        (management_unit_has_block ?management_unit ?irrigation_block_var)
+        (management_unit_has_crop_block ?management_unit ?crop_block_var)
+        (irrigation_block_ready ?irrigation_block_var)
+        (crop_block_ready ?crop_block_var)
+        (sensor_bound_to_zone ?management_unit ?sensor_device_var)
+        (not
+          (management_unit_deployment_ready ?management_unit)
+        )
+      )
+    :effect (management_unit_deployment_ready ?management_unit)
+  )
+  (:action confirm_and_mark_unit_executing
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_mode_ready ?management_unit)
+        (management_unit_deployment_ready ?management_unit)
+        (not
+          (management_unit_execution_marked ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_execution_marked ?management_unit)
+        (execution_completed ?management_unit)
+      )
+  )
+  (:action assign_contractor_to_management_unit
+    :parameters (?management_unit - management_unit ?contractor - contractor ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (field_plan_committed ?management_unit)
+        (sensor_bound_to_zone ?management_unit ?sensor_device_var)
+        (contractor_available ?contractor)
+        (management_unit_assigned_contractor ?management_unit ?contractor)
+        (not
+          (management_unit_contractor_assigned ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_contractor_assigned ?management_unit)
+        (not
+          (contractor_available ?contractor)
+        )
+      )
+  )
+  (:action prepare_contractor_assignment
+    :parameters (?management_unit - management_unit ?crew - crew)
+    :precondition
+      (and
+        (management_unit_contractor_assigned ?management_unit)
+        (crew_assigned_to_zone ?management_unit ?crew)
+        (not
+          (management_unit_contractor_prepared ?management_unit)
+        )
+      )
+    :effect (management_unit_contractor_prepared ?management_unit)
+  )
+  (:action assign_weather_for_contractor
+    :parameters (?management_unit - management_unit ?weather_window - weather_window)
+    :precondition
+      (and
+        (management_unit_contractor_prepared ?management_unit)
+        (management_unit_assigned_weather_window ?management_unit ?weather_window)
+        (not
+          (management_unit_contractor_ready_for_execution ?management_unit)
+        )
+      )
+    :effect (management_unit_contractor_ready_for_execution ?management_unit)
+  )
+  (:action finalize_contractor_assignment
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (management_unit_contractor_ready_for_execution ?management_unit)
+        (not
+          (management_unit_execution_marked ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (management_unit_execution_marked ?management_unit)
+        (execution_completed ?management_unit)
+      )
+  )
+  (:action finalize_irrigation_block_operation
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (irrigation_block_prepared ?irrigation_block_var)
+        (irrigation_block_ready ?irrigation_block_var)
+        (irrigation_task_created ?irrigation_task)
+        (irrigation_task_scheduled ?irrigation_task)
+        (not
+          (execution_completed ?irrigation_block_var)
+        )
+      )
+    :effect (execution_completed ?irrigation_block_var)
+  )
+  (:action finalize_crop_block_operation
+    :parameters (?crop_block_var - crop_block ?irrigation_task - irrigation_task)
+    :precondition
+      (and
+        (crop_block_prepared ?crop_block_var)
+        (crop_block_ready ?crop_block_var)
+        (irrigation_task_created ?irrigation_task)
+        (irrigation_task_scheduled ?irrigation_task)
+        (not
+          (execution_completed ?crop_block_var)
+        )
+      )
+    :effect (execution_completed ?crop_block_var)
+  )
+  (:action assign_water_source_to_zone_post_execution
+    :parameters (?field_zone - field_zone ?water_source - water_source ?sensor_device_var - sensor_device)
+    :precondition
+      (and
+        (execution_completed ?field_zone)
+        (sensor_bound_to_zone ?field_zone ?sensor_device_var)
+        (water_source_available ?water_source)
+        (not
+          (ready_for_resource_release ?field_zone)
+        )
+      )
+    :effect
+      (and
+        (ready_for_resource_release ?field_zone)
+        (zone_assigned_water_source ?field_zone ?water_source)
+        (not
+          (water_source_available ?water_source)
+        )
+      )
+  )
+  (:action release_resources_and_close_irrigation_block
+    :parameters (?irrigation_block_var - irrigation_block ?irrigation_resource - irrigation_resource ?water_source - water_source)
+    :precondition
+      (and
+        (ready_for_resource_release ?irrigation_block_var)
+        (resource_assigned_to_zone ?irrigation_block_var ?irrigation_resource)
+        (zone_assigned_water_source ?irrigation_block_var ?water_source)
+        (not
+          (operation_closed ?irrigation_block_var)
+        )
+      )
+    :effect
+      (and
+        (operation_closed ?irrigation_block_var)
+        (irrigation_resource_available ?irrigation_resource)
+        (water_source_available ?water_source)
+      )
+  )
+  (:action release_resources_and_close_crop_block
+    :parameters (?crop_block_var - crop_block ?irrigation_resource - irrigation_resource ?water_source - water_source)
+    :precondition
+      (and
+        (ready_for_resource_release ?crop_block_var)
+        (resource_assigned_to_zone ?crop_block_var ?irrigation_resource)
+        (zone_assigned_water_source ?crop_block_var ?water_source)
+        (not
+          (operation_closed ?crop_block_var)
+        )
+      )
+    :effect
+      (and
+        (operation_closed ?crop_block_var)
+        (irrigation_resource_available ?irrigation_resource)
+        (water_source_available ?water_source)
+      )
+  )
+  (:action release_resources_and_close_management_unit
+    :parameters (?management_unit - management_unit ?irrigation_resource - irrigation_resource ?water_source - water_source)
+    :precondition
+      (and
+        (ready_for_resource_release ?management_unit)
+        (resource_assigned_to_zone ?management_unit ?irrigation_resource)
+        (zone_assigned_water_source ?management_unit ?water_source)
+        (not
+          (operation_closed ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (operation_closed ?management_unit)
+        (irrigation_resource_available ?irrigation_resource)
+        (water_source_available ?water_source)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem water_stress_response_problem)
+  (:domain water_stress_response_domain)
+  (:objects irrigation_block_1 - irrigation_block crop_block_1 - crop_block management_unit_1 - management_unit management_unit_2 - management_unit irrigation_resource_pump_1 - irrigation_resource irrigation_resource_pump_2 - irrigation_resource irrigation_resource_crew_unit_1 - irrigation_resource soil_moisture_sensor_1 - sensor_device irrigation_crew_alpha - crew irrigation_preset_supplemental_1 - irrigation_preset morning_irrigation_window_1 - irrigation_window critical_crop_window_1 - crop_window irrigation_task_slot_1 - irrigation_task supply_batch_water_1 - supply_batch supply_batch_nutrient_1 - supply_batch pump_trailer_1 - irrigation_equipment mobile_irrigation_unit_1 - irrigation_equipment deployment_slot_1 - deployment_slot deployment_slot_2 - deployment_slot water_source_well_1 - water_source irrigation_mode_low_volume - irrigation_mode contractor_acme_irrigation - contractor contractor_field_services - contractor weather_window_no_rain - weather_window)
+  (:init
+    (irrigation_resource_available irrigation_resource_pump_1)
+    (irrigation_resource_available irrigation_resource_pump_2)
+    (irrigation_resource_available irrigation_resource_crew_unit_1)
+    (sensor_available soil_moisture_sensor_1)
+    (crew_available irrigation_crew_alpha)
+    (preset_available irrigation_preset_supplemental_1)
+    (block_has_irrigation_window irrigation_block_1 morning_irrigation_window_1)
+    (crop_block_has_crop_window crop_block_1 critical_crop_window_1)
+    (irrigation_task_slot_available irrigation_task_slot_1)
+    (supply_batch_available supply_batch_water_1)
+    (supply_batch_available supply_batch_nutrient_1)
+    (management_unit_has_block management_unit_1 irrigation_block_1)
+    (management_unit_has_block management_unit_2 irrigation_block_1)
+    (management_unit_has_crop_block management_unit_1 crop_block_1)
+    (management_unit_has_crop_block management_unit_2 crop_block_1)
+    (management_unit_assigned_task management_unit_1 irrigation_task_slot_1)
+    (management_unit_assigned_task management_unit_2 irrigation_task_slot_1)
+    (management_unit_has_supply_batch management_unit_1 supply_batch_water_1)
+    (management_unit_has_supply_batch management_unit_2 supply_batch_nutrient_1)
+    (equipment_available pump_trailer_1)
+    (equipment_available mobile_irrigation_unit_1)
+    (deployment_slot_available deployment_slot_1)
+    (deployment_slot_available deployment_slot_2)
+    (water_source_available water_source_well_1)
+    (irrigation_mode_available irrigation_mode_low_volume)
+    (contractor_available contractor_acme_irrigation)
+    (management_unit_assigned_contractor management_unit_1 contractor_acme_irrigation)
+    (management_unit_assigned_contractor management_unit_2 contractor_field_services)
+    (weather_window_available weather_window_no_rain)
+  )
+  (:goal
+    (and
+      (operation_closed irrigation_block_1)
+      (operation_closed crop_block_1)
+      (operation_closed management_unit_1)
+      (operation_closed management_unit_2)
+    )
+  )
+)

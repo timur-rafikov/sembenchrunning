@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain warehouse_to_market_allocation_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object service_resource_type - object logistics_resource_type - object allocation_entity_parent - object product_batch - allocation_entity_parent transport_unit - operational_resource_type grading_station - operational_resource_type conditioning_unit - operational_resource_type route_option - operational_resource_type delivery_window - operational_resource_type waybill - operational_resource_type quality_certificate - operational_resource_type regulatory_approval - operational_resource_type packaging_kit - service_resource_type container - service_resource_type buyer_contract - service_resource_type storage_slot - logistics_resource_type market_channel - logistics_resource_type shipment - logistics_resource_type batch_subclass_parent - product_batch allocation_record_parent - product_batch storage_batch - batch_subclass_parent market_batch - batch_subclass_parent allocation_record - allocation_record_parent)
+  (:predicates
+    (registered_receipt ?product_batch - product_batch)
+    (grading_completed_entity ?product_batch - product_batch)
+    (transport_reserved_at_intake ?product_batch - product_batch)
+    (released_for_dispatch ?product_batch - product_batch)
+    (staged_for_release_entity ?product_batch - product_batch)
+    (documented_for_release_entity ?product_batch - product_batch)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (assigned_to_transport_unit ?product_batch - product_batch ?transport_unit - transport_unit)
+    (grading_station_available ?grading_station - grading_station)
+    (grading_station_assigned ?product_batch - product_batch ?grading_station - grading_station)
+    (conditioning_unit_available ?conditioning_unit - conditioning_unit)
+    (conditioning_unit_assigned ?product_batch - product_batch ?conditioning_unit - conditioning_unit)
+    (packaging_kit_available ?packaging_kit - packaging_kit)
+    (packaging_kit_assigned_to_storage ?storage_batch - storage_batch ?packaging_kit - packaging_kit)
+    (packaging_kit_assigned_to_market ?market_batch - market_batch ?packaging_kit - packaging_kit)
+    (storage_slot_link ?storage_batch - storage_batch ?storage_slot - storage_slot)
+    (storage_slot_ready ?storage_slot - storage_slot)
+    (storage_slot_needs_handling ?storage_slot - storage_slot)
+    (storage_batch_ready_for_assembly ?storage_batch - storage_batch)
+    (market_channel_link ?market_batch - market_batch ?market_channel - market_channel)
+    (market_channel_ready ?market_channel - market_channel)
+    (market_channel_holding ?market_channel - market_channel)
+    (market_batch_ready_for_assembly ?market_batch - market_batch)
+    (shipment_slot_available ?shipment - shipment)
+    (shipment_reserved ?shipment - shipment)
+    (shipment_assigned_storage_slot ?shipment - shipment ?storage_slot - storage_slot)
+    (shipment_assigned_market_channel ?shipment - shipment ?market_channel - market_channel)
+    (shipment_temp_required ?shipment - shipment)
+    (shipment_priority_flag ?shipment - shipment)
+    (shipment_finalized ?shipment - shipment)
+    (allocation_assigned_storage_batch ?allocation_record - allocation_record ?storage_batch - storage_batch)
+    (allocation_assigned_market_batch ?allocation_record - allocation_record ?market_batch - market_batch)
+    (allocation_assigned_shipment ?allocation_record - allocation_record ?shipment - shipment)
+    (container_available ?container - container)
+    (allocation_has_container ?allocation_record - allocation_record ?container - container)
+    (container_in_use ?container - container)
+    (container_assigned_to_shipment ?container - container ?shipment - shipment)
+    (allocation_prepared ?allocation_record - allocation_record)
+    (allocation_certified ?allocation_record - allocation_record)
+    (allocation_staged ?allocation_record - allocation_record)
+    (route_option_attached_to_allocation ?allocation_record - allocation_record)
+    (route_option_confirmed ?allocation_record - allocation_record)
+    (allocation_ready_for_delivery_assignment ?allocation_record - allocation_record)
+    (allocation_final_checks_passed ?allocation_record - allocation_record)
+    (buyer_contract_available ?buyer_contract - buyer_contract)
+    (buyer_contract_assigned_to_allocation ?allocation_record - allocation_record ?buyer_contract - buyer_contract)
+    (allocation_constrained_by_contract ?allocation_record - allocation_record)
+    (contract_conditions_initiated_for_allocation ?allocation_record - allocation_record)
+    (regulatory_approval_recorded_for_allocation ?allocation_record - allocation_record)
+    (route_option_available ?route_option - route_option)
+    (allocation_assigned_route_option ?allocation_record - allocation_record ?route_option - route_option)
+    (delivery_window_available ?delivery_window - delivery_window)
+    (delivery_window_assigned_to_allocation ?allocation_record - allocation_record ?delivery_window - delivery_window)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (quality_certificate_assigned_to_allocation ?allocation_record - allocation_record ?quality_certificate - quality_certificate)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (regulatory_approval_assigned_to_allocation ?allocation_record - allocation_record ?regulatory_approval - regulatory_approval)
+    (waybill_available ?waybill - waybill)
+    (waybill_assigned ?product_batch - product_batch ?waybill - waybill)
+    (storage_batch_preparation_flag ?storage_batch - storage_batch)
+    (market_batch_preparation_flag ?market_batch - market_batch)
+    (allocation_finalized ?allocation_record - allocation_record)
+  )
+  (:action register_batch_arrival
+    :parameters (?product_batch - product_batch)
+    :precondition
+      (and
+        (not
+          (registered_receipt ?product_batch)
+        )
+        (not
+          (released_for_dispatch ?product_batch)
+        )
+      )
+    :effect (registered_receipt ?product_batch)
+  )
+  (:action reserve_transport_for_batch
+    :parameters (?product_batch - product_batch ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (registered_receipt ?product_batch)
+        (not
+          (transport_reserved_at_intake ?product_batch)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_reserved_at_intake ?product_batch)
+        (assigned_to_transport_unit ?product_batch ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action assign_batch_to_grading_station
+    :parameters (?product_batch - product_batch ?grading_station - grading_station)
+    :precondition
+      (and
+        (registered_receipt ?product_batch)
+        (transport_reserved_at_intake ?product_batch)
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (grading_station_assigned ?product_batch ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action record_grading_completion
+    :parameters (?product_batch - product_batch ?grading_station - grading_station)
+    :precondition
+      (and
+        (registered_receipt ?product_batch)
+        (transport_reserved_at_intake ?product_batch)
+        (grading_station_assigned ?product_batch ?grading_station)
+        (not
+          (grading_completed_entity ?product_batch)
+        )
+      )
+    :effect (grading_completed_entity ?product_batch)
+  )
+  (:action release_grading_station
+    :parameters (?product_batch - product_batch ?grading_station - grading_station)
+    :precondition
+      (and
+        (grading_station_assigned ?product_batch ?grading_station)
+      )
+    :effect
+      (and
+        (grading_station_available ?grading_station)
+        (not
+          (grading_station_assigned ?product_batch ?grading_station)
+        )
+      )
+  )
+  (:action assign_conditioning_unit_to_batch
+    :parameters (?product_batch - product_batch ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (grading_completed_entity ?product_batch)
+        (conditioning_unit_available ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_assigned ?product_batch ?conditioning_unit)
+        (not
+          (conditioning_unit_available ?conditioning_unit)
+        )
+      )
+  )
+  (:action release_conditioning_unit
+    :parameters (?product_batch - product_batch ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (conditioning_unit_assigned ?product_batch ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_available ?conditioning_unit)
+        (not
+          (conditioning_unit_assigned ?product_batch ?conditioning_unit)
+        )
+      )
+  )
+  (:action attach_quality_certificate
+    :parameters (?allocation_record - allocation_record ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (quality_certificate_available ?quality_certificate)
+      )
+    :effect
+      (and
+        (quality_certificate_assigned_to_allocation ?allocation_record ?quality_certificate)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action release_quality_certificate
+    :parameters (?allocation_record - allocation_record ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (quality_certificate_assigned_to_allocation ?allocation_record ?quality_certificate)
+      )
+    :effect
+      (and
+        (quality_certificate_available ?quality_certificate)
+        (not
+          (quality_certificate_assigned_to_allocation ?allocation_record ?quality_certificate)
+        )
+      )
+  )
+  (:action attach_regulatory_approval
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action release_regulatory_approval
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        )
+      )
+  )
+  (:action mark_storage_slot_ready
+    :parameters (?storage_batch - storage_batch ?storage_slot - storage_slot ?grading_station - grading_station)
+    :precondition
+      (and
+        (grading_completed_entity ?storage_batch)
+        (grading_station_assigned ?storage_batch ?grading_station)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (not
+          (storage_slot_ready ?storage_slot)
+        )
+        (not
+          (storage_slot_needs_handling ?storage_slot)
+        )
+      )
+    :effect (storage_slot_ready ?storage_slot)
+  )
+  (:action reserve_conditioning_and_prepare_storage_batch
+    :parameters (?storage_batch - storage_batch ?storage_slot - storage_slot ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (grading_completed_entity ?storage_batch)
+        (conditioning_unit_assigned ?storage_batch ?conditioning_unit)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (storage_slot_ready ?storage_slot)
+        (not
+          (storage_batch_preparation_flag ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (storage_batch_ready_for_assembly ?storage_batch)
+      )
+  )
+  (:action assign_packaging_kit_to_storage_batch
+    :parameters (?storage_batch - storage_batch ?storage_slot - storage_slot ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (grading_completed_entity ?storage_batch)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (storage_batch_preparation_flag ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_slot_needs_handling ?storage_slot)
+        (storage_batch_preparation_flag ?storage_batch)
+        (packaging_kit_assigned_to_storage ?storage_batch ?packaging_kit)
+        (not
+          (packaging_kit_available ?packaging_kit)
+        )
+      )
+  )
+  (:action finalize_storage_batch_preparation
+    :parameters (?storage_batch - storage_batch ?storage_slot - storage_slot ?grading_station - grading_station ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (grading_completed_entity ?storage_batch)
+        (grading_station_assigned ?storage_batch ?grading_station)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (storage_slot_needs_handling ?storage_slot)
+        (packaging_kit_assigned_to_storage ?storage_batch ?packaging_kit)
+        (not
+          (storage_batch_ready_for_assembly ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_slot_ready ?storage_slot)
+        (storage_batch_ready_for_assembly ?storage_batch)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (packaging_kit_assigned_to_storage ?storage_batch ?packaging_kit)
+        )
+      )
+  )
+  (:action mark_market_channel_ready
+    :parameters (?market_batch - market_batch ?market_channel - market_channel ?grading_station - grading_station)
+    :precondition
+      (and
+        (grading_completed_entity ?market_batch)
+        (grading_station_assigned ?market_batch ?grading_station)
+        (market_channel_link ?market_batch ?market_channel)
+        (not
+          (market_channel_ready ?market_channel)
+        )
+        (not
+          (market_channel_holding ?market_channel)
+        )
+      )
+    :effect (market_channel_ready ?market_channel)
+  )
+  (:action assign_conditioning_and_mark_market_ready
+    :parameters (?market_batch - market_batch ?market_channel - market_channel ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (grading_completed_entity ?market_batch)
+        (conditioning_unit_assigned ?market_batch ?conditioning_unit)
+        (market_channel_link ?market_batch ?market_channel)
+        (market_channel_ready ?market_channel)
+        (not
+          (market_batch_preparation_flag ?market_batch)
+        )
+      )
+    :effect
+      (and
+        (market_batch_preparation_flag ?market_batch)
+        (market_batch_ready_for_assembly ?market_batch)
+      )
+  )
+  (:action assign_packaging_kit_to_market_batch
+    :parameters (?market_batch - market_batch ?market_channel - market_channel ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (grading_completed_entity ?market_batch)
+        (market_channel_link ?market_batch ?market_channel)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (market_batch_preparation_flag ?market_batch)
+        )
+      )
+    :effect
+      (and
+        (market_channel_holding ?market_channel)
+        (market_batch_preparation_flag ?market_batch)
+        (packaging_kit_assigned_to_market ?market_batch ?packaging_kit)
+        (not
+          (packaging_kit_available ?packaging_kit)
+        )
+      )
+  )
+  (:action finalize_market_batch_preparation
+    :parameters (?market_batch - market_batch ?market_channel - market_channel ?grading_station - grading_station ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (grading_completed_entity ?market_batch)
+        (grading_station_assigned ?market_batch ?grading_station)
+        (market_channel_link ?market_batch ?market_channel)
+        (market_channel_holding ?market_channel)
+        (packaging_kit_assigned_to_market ?market_batch ?packaging_kit)
+        (not
+          (market_batch_ready_for_assembly ?market_batch)
+        )
+      )
+    :effect
+      (and
+        (market_channel_ready ?market_channel)
+        (market_batch_ready_for_assembly ?market_batch)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (packaging_kit_assigned_to_market ?market_batch ?packaging_kit)
+        )
+      )
+  )
+  (:action assemble_shipment
+    :parameters (?storage_batch - storage_batch ?market_batch - market_batch ?storage_slot - storage_slot ?market_channel - market_channel ?shipment - shipment)
+    :precondition
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (market_batch_preparation_flag ?market_batch)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (market_channel_link ?market_batch ?market_channel)
+        (storage_slot_ready ?storage_slot)
+        (market_channel_ready ?market_channel)
+        (storage_batch_ready_for_assembly ?storage_batch)
+        (market_batch_ready_for_assembly ?market_batch)
+        (shipment_slot_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_assigned_storage_slot ?shipment ?storage_slot)
+        (shipment_assigned_market_channel ?shipment ?market_channel)
+        (not
+          (shipment_slot_available ?shipment)
+        )
+      )
+  )
+  (:action assemble_shipment_with_temperature_requirement
+    :parameters (?storage_batch - storage_batch ?market_batch - market_batch ?storage_slot - storage_slot ?market_channel - market_channel ?shipment - shipment)
+    :precondition
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (market_batch_preparation_flag ?market_batch)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (market_channel_link ?market_batch ?market_channel)
+        (storage_slot_needs_handling ?storage_slot)
+        (market_channel_ready ?market_channel)
+        (not
+          (storage_batch_ready_for_assembly ?storage_batch)
+        )
+        (market_batch_ready_for_assembly ?market_batch)
+        (shipment_slot_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_assigned_storage_slot ?shipment ?storage_slot)
+        (shipment_assigned_market_channel ?shipment ?market_channel)
+        (shipment_temp_required ?shipment)
+        (not
+          (shipment_slot_available ?shipment)
+        )
+      )
+  )
+  (:action assemble_shipment_with_priority_flag
+    :parameters (?storage_batch - storage_batch ?market_batch - market_batch ?storage_slot - storage_slot ?market_channel - market_channel ?shipment - shipment)
+    :precondition
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (market_batch_preparation_flag ?market_batch)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (market_channel_link ?market_batch ?market_channel)
+        (storage_slot_ready ?storage_slot)
+        (market_channel_holding ?market_channel)
+        (storage_batch_ready_for_assembly ?storage_batch)
+        (not
+          (market_batch_ready_for_assembly ?market_batch)
+        )
+        (shipment_slot_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_assigned_storage_slot ?shipment ?storage_slot)
+        (shipment_assigned_market_channel ?shipment ?market_channel)
+        (shipment_priority_flag ?shipment)
+        (not
+          (shipment_slot_available ?shipment)
+        )
+      )
+  )
+  (:action assemble_shipment_with_multiple_qualifiers
+    :parameters (?storage_batch - storage_batch ?market_batch - market_batch ?storage_slot - storage_slot ?market_channel - market_channel ?shipment - shipment)
+    :precondition
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (market_batch_preparation_flag ?market_batch)
+        (storage_slot_link ?storage_batch ?storage_slot)
+        (market_channel_link ?market_batch ?market_channel)
+        (storage_slot_needs_handling ?storage_slot)
+        (market_channel_holding ?market_channel)
+        (not
+          (storage_batch_ready_for_assembly ?storage_batch)
+        )
+        (not
+          (market_batch_ready_for_assembly ?market_batch)
+        )
+        (shipment_slot_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_assigned_storage_slot ?shipment ?storage_slot)
+        (shipment_assigned_market_channel ?shipment ?market_channel)
+        (shipment_temp_required ?shipment)
+        (shipment_priority_flag ?shipment)
+        (not
+          (shipment_slot_available ?shipment)
+        )
+      )
+  )
+  (:action finalize_shipment
+    :parameters (?shipment - shipment ?storage_batch - storage_batch ?grading_station - grading_station)
+    :precondition
+      (and
+        (shipment_reserved ?shipment)
+        (storage_batch_preparation_flag ?storage_batch)
+        (grading_station_assigned ?storage_batch ?grading_station)
+        (not
+          (shipment_finalized ?shipment)
+        )
+      )
+    :effect (shipment_finalized ?shipment)
+  )
+  (:action assign_container_to_shipment
+    :parameters (?allocation_record - allocation_record ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (allocation_assigned_shipment ?allocation_record ?shipment)
+        (allocation_has_container ?allocation_record ?container)
+        (container_available ?container)
+        (shipment_reserved ?shipment)
+        (shipment_finalized ?shipment)
+        (not
+          (container_in_use ?container)
+        )
+      )
+    :effect
+      (and
+        (container_in_use ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action prepare_allocation_for_certification
+    :parameters (?allocation_record - allocation_record ?container - container ?shipment - shipment ?grading_station - grading_station)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (allocation_has_container ?allocation_record ?container)
+        (container_in_use ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (grading_station_assigned ?allocation_record ?grading_station)
+        (not
+          (shipment_temp_required ?shipment)
+        )
+        (not
+          (allocation_prepared ?allocation_record)
+        )
+      )
+    :effect (allocation_prepared ?allocation_record)
+  )
+  (:action assign_route_option_to_allocation
+    :parameters (?allocation_record - allocation_record ?route_option - route_option)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (route_option_available ?route_option)
+        (not
+          (route_option_attached_to_allocation ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (route_option_attached_to_allocation ?allocation_record)
+        (allocation_assigned_route_option ?allocation_record ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action apply_route_and_prepare_allocation
+    :parameters (?allocation_record - allocation_record ?container - container ?shipment - shipment ?grading_station - grading_station ?route_option - route_option)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (allocation_has_container ?allocation_record ?container)
+        (container_in_use ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (grading_station_assigned ?allocation_record ?grading_station)
+        (shipment_temp_required ?shipment)
+        (route_option_attached_to_allocation ?allocation_record)
+        (allocation_assigned_route_option ?allocation_record ?route_option)
+        (not
+          (allocation_prepared ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_prepared ?allocation_record)
+        (route_option_confirmed ?allocation_record)
+      )
+  )
+  (:action certify_allocation_standard
+    :parameters (?allocation_record - allocation_record ?quality_certificate - quality_certificate ?conditioning_unit - conditioning_unit ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_prepared ?allocation_record)
+        (quality_certificate_assigned_to_allocation ?allocation_record ?quality_certificate)
+        (conditioning_unit_assigned ?allocation_record ?conditioning_unit)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (not
+          (shipment_priority_flag ?shipment)
+        )
+        (not
+          (allocation_certified ?allocation_record)
+        )
+      )
+    :effect (allocation_certified ?allocation_record)
+  )
+  (:action certify_allocation_priority
+    :parameters (?allocation_record - allocation_record ?quality_certificate - quality_certificate ?conditioning_unit - conditioning_unit ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_prepared ?allocation_record)
+        (quality_certificate_assigned_to_allocation ?allocation_record ?quality_certificate)
+        (conditioning_unit_assigned ?allocation_record ?conditioning_unit)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (shipment_priority_flag ?shipment)
+        (not
+          (allocation_certified ?allocation_record)
+        )
+      )
+    :effect (allocation_certified ?allocation_record)
+  )
+  (:action advance_allocation_to_staging
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_certified ?allocation_record)
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (not
+          (shipment_temp_required ?shipment)
+        )
+        (not
+          (shipment_priority_flag ?shipment)
+        )
+        (not
+          (allocation_staged ?allocation_record)
+        )
+      )
+    :effect (allocation_staged ?allocation_record)
+  )
+  (:action stage_allocation_with_temperature_qualifier
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_certified ?allocation_record)
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (shipment_temp_required ?shipment)
+        (not
+          (shipment_priority_flag ?shipment)
+        )
+        (not
+          (allocation_staged ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_ready_for_delivery_assignment ?allocation_record)
+      )
+  )
+  (:action stage_allocation_with_priority_qualifier
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_certified ?allocation_record)
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (not
+          (shipment_temp_required ?shipment)
+        )
+        (shipment_priority_flag ?shipment)
+        (not
+          (allocation_staged ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_ready_for_delivery_assignment ?allocation_record)
+      )
+  )
+  (:action stage_allocation_with_temperature_and_priority_qualifiers
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval ?container - container ?shipment - shipment)
+    :precondition
+      (and
+        (allocation_certified ?allocation_record)
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (allocation_has_container ?allocation_record ?container)
+        (container_assigned_to_shipment ?container ?shipment)
+        (shipment_temp_required ?shipment)
+        (shipment_priority_flag ?shipment)
+        (not
+          (allocation_staged ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_ready_for_delivery_assignment ?allocation_record)
+      )
+  )
+  (:action finalize_allocation_for_release
+    :parameters (?allocation_record - allocation_record)
+    :precondition
+      (and
+        (allocation_staged ?allocation_record)
+        (not
+          (allocation_ready_for_delivery_assignment ?allocation_record)
+        )
+        (not
+          (allocation_finalized ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?allocation_record)
+        (staged_for_release_entity ?allocation_record)
+      )
+  )
+  (:action assign_delivery_window_to_allocation
+    :parameters (?allocation_record - allocation_record ?delivery_window - delivery_window)
+    :precondition
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_ready_for_delivery_assignment ?allocation_record)
+        (delivery_window_available ?delivery_window)
+      )
+    :effect
+      (and
+        (delivery_window_assigned_to_allocation ?allocation_record ?delivery_window)
+        (not
+          (delivery_window_available ?delivery_window)
+        )
+      )
+  )
+  (:action perform_final_staging_checks
+    :parameters (?allocation_record - allocation_record ?storage_batch - storage_batch ?market_batch - market_batch ?grading_station - grading_station ?delivery_window - delivery_window)
+    :precondition
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_ready_for_delivery_assignment ?allocation_record)
+        (delivery_window_assigned_to_allocation ?allocation_record ?delivery_window)
+        (allocation_assigned_storage_batch ?allocation_record ?storage_batch)
+        (allocation_assigned_market_batch ?allocation_record ?market_batch)
+        (storage_batch_ready_for_assembly ?storage_batch)
+        (market_batch_ready_for_assembly ?market_batch)
+        (grading_station_assigned ?allocation_record ?grading_station)
+        (not
+          (allocation_final_checks_passed ?allocation_record)
+        )
+      )
+    :effect (allocation_final_checks_passed ?allocation_record)
+  )
+  (:action finalize_allocation_after_checks
+    :parameters (?allocation_record - allocation_record)
+    :precondition
+      (and
+        (allocation_staged ?allocation_record)
+        (allocation_final_checks_passed ?allocation_record)
+        (not
+          (allocation_finalized ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?allocation_record)
+        (staged_for_release_entity ?allocation_record)
+      )
+  )
+  (:action apply_buyer_contract_to_allocation
+    :parameters (?allocation_record - allocation_record ?buyer_contract - buyer_contract ?grading_station - grading_station)
+    :precondition
+      (and
+        (grading_completed_entity ?allocation_record)
+        (grading_station_assigned ?allocation_record ?grading_station)
+        (buyer_contract_available ?buyer_contract)
+        (buyer_contract_assigned_to_allocation ?allocation_record ?buyer_contract)
+        (not
+          (allocation_constrained_by_contract ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_constrained_by_contract ?allocation_record)
+        (not
+          (buyer_contract_available ?buyer_contract)
+        )
+      )
+  )
+  (:action acknowledge_buyer_contract_for_allocation
+    :parameters (?allocation_record - allocation_record ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (allocation_constrained_by_contract ?allocation_record)
+        (conditioning_unit_assigned ?allocation_record ?conditioning_unit)
+        (not
+          (contract_conditions_initiated_for_allocation ?allocation_record)
+        )
+      )
+    :effect (contract_conditions_initiated_for_allocation ?allocation_record)
+  )
+  (:action apply_regulatory_approval_to_allocation
+    :parameters (?allocation_record - allocation_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (contract_conditions_initiated_for_allocation ?allocation_record)
+        (regulatory_approval_assigned_to_allocation ?allocation_record ?regulatory_approval)
+        (not
+          (regulatory_approval_recorded_for_allocation ?allocation_record)
+        )
+      )
+    :effect (regulatory_approval_recorded_for_allocation ?allocation_record)
+  )
+  (:action finalize_allocation_with_contract
+    :parameters (?allocation_record - allocation_record)
+    :precondition
+      (and
+        (regulatory_approval_recorded_for_allocation ?allocation_record)
+        (not
+          (allocation_finalized ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?allocation_record)
+        (staged_for_release_entity ?allocation_record)
+      )
+  )
+  (:action release_storage_batch_for_dispatch
+    :parameters (?storage_batch - storage_batch ?shipment - shipment)
+    :precondition
+      (and
+        (storage_batch_preparation_flag ?storage_batch)
+        (storage_batch_ready_for_assembly ?storage_batch)
+        (shipment_reserved ?shipment)
+        (shipment_finalized ?shipment)
+        (not
+          (staged_for_release_entity ?storage_batch)
+        )
+      )
+    :effect (staged_for_release_entity ?storage_batch)
+  )
+  (:action release_market_batch_for_dispatch
+    :parameters (?market_batch - market_batch ?shipment - shipment)
+    :precondition
+      (and
+        (market_batch_preparation_flag ?market_batch)
+        (market_batch_ready_for_assembly ?market_batch)
+        (shipment_reserved ?shipment)
+        (shipment_finalized ?shipment)
+        (not
+          (staged_for_release_entity ?market_batch)
+        )
+      )
+    :effect (staged_for_release_entity ?market_batch)
+  )
+  (:action assign_waybill_to_batch
+    :parameters (?product_batch - product_batch ?waybill - waybill ?grading_station - grading_station)
+    :precondition
+      (and
+        (staged_for_release_entity ?product_batch)
+        (grading_station_assigned ?product_batch ?grading_station)
+        (waybill_available ?waybill)
+        (not
+          (documented_for_release_entity ?product_batch)
+        )
+      )
+    :effect
+      (and
+        (documented_for_release_entity ?product_batch)
+        (waybill_assigned ?product_batch ?waybill)
+        (not
+          (waybill_available ?waybill)
+        )
+      )
+  )
+  (:action execute_storage_batch_dispatch
+    :parameters (?storage_batch - storage_batch ?transport_unit - transport_unit ?waybill - waybill)
+    :precondition
+      (and
+        (documented_for_release_entity ?storage_batch)
+        (assigned_to_transport_unit ?storage_batch ?transport_unit)
+        (waybill_assigned ?storage_batch ?waybill)
+        (not
+          (released_for_dispatch ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?storage_batch)
+        (transport_unit_available ?transport_unit)
+        (waybill_available ?waybill)
+      )
+  )
+  (:action execute_market_batch_dispatch
+    :parameters (?market_batch - market_batch ?transport_unit - transport_unit ?waybill - waybill)
+    :precondition
+      (and
+        (documented_for_release_entity ?market_batch)
+        (assigned_to_transport_unit ?market_batch ?transport_unit)
+        (waybill_assigned ?market_batch ?waybill)
+        (not
+          (released_for_dispatch ?market_batch)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?market_batch)
+        (transport_unit_available ?transport_unit)
+        (waybill_available ?waybill)
+      )
+  )
+  (:action execute_allocation_dispatch
+    :parameters (?allocation_record - allocation_record ?transport_unit - transport_unit ?waybill - waybill)
+    :precondition
+      (and
+        (documented_for_release_entity ?allocation_record)
+        (assigned_to_transport_unit ?allocation_record ?transport_unit)
+        (waybill_assigned ?allocation_record ?waybill)
+        (not
+          (released_for_dispatch ?allocation_record)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?allocation_record)
+        (transport_unit_available ?transport_unit)
+        (waybill_available ?waybill)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem warehouse_to_market_allocation_scenario)
+  (:domain warehouse_to_market_allocation_planning)
+  (:objects storage_batch_1 - storage_batch market_batch_1 - market_batch allocation_record_1 - allocation_record allocation_record_2 - allocation_record transport_unit_1 - transport_unit transport_unit_2 - transport_unit transport_unit_3 - transport_unit grading_station_1 - grading_station conditioning_unit_1 - conditioning_unit packaging_kit_1 - packaging_kit storage_slot_1 - storage_slot market_channel_1 - market_channel shipment_1 - shipment container_1 - container container_2 - container route_option_1 - route_option route_option_2 - route_option delivery_window_1 - delivery_window delivery_window_2 - delivery_window waybill_1 - waybill quality_certificate_1 - quality_certificate buyer_contract_1 - buyer_contract buyer_contract_2 - buyer_contract regulatory_approval_1 - regulatory_approval)
+  (:init
+    (transport_unit_available transport_unit_1)
+    (transport_unit_available transport_unit_2)
+    (transport_unit_available transport_unit_3)
+    (grading_station_available grading_station_1)
+    (conditioning_unit_available conditioning_unit_1)
+    (packaging_kit_available packaging_kit_1)
+    (storage_slot_link storage_batch_1 storage_slot_1)
+    (market_channel_link market_batch_1 market_channel_1)
+    (shipment_slot_available shipment_1)
+    (container_available container_1)
+    (container_available container_2)
+    (allocation_assigned_storage_batch allocation_record_1 storage_batch_1)
+    (allocation_assigned_storage_batch allocation_record_2 storage_batch_1)
+    (allocation_assigned_market_batch allocation_record_1 market_batch_1)
+    (allocation_assigned_market_batch allocation_record_2 market_batch_1)
+    (allocation_assigned_shipment allocation_record_1 shipment_1)
+    (allocation_assigned_shipment allocation_record_2 shipment_1)
+    (allocation_has_container allocation_record_1 container_1)
+    (allocation_has_container allocation_record_2 container_2)
+    (route_option_available route_option_1)
+    (route_option_available route_option_2)
+    (delivery_window_available delivery_window_1)
+    (delivery_window_available delivery_window_2)
+    (waybill_available waybill_1)
+    (quality_certificate_available quality_certificate_1)
+    (buyer_contract_available buyer_contract_1)
+    (buyer_contract_assigned_to_allocation allocation_record_1 buyer_contract_1)
+    (buyer_contract_assigned_to_allocation allocation_record_2 buyer_contract_2)
+    (regulatory_approval_available regulatory_approval_1)
+  )
+  (:goal
+    (and
+      (released_for_dispatch storage_batch_1)
+      (released_for_dispatch market_batch_1)
+      (released_for_dispatch allocation_record_1)
+      (released_for_dispatch allocation_record_2)
+    )
+  )
+)

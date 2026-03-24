@@ -1,0 +1,936 @@
+(define (domain return_replacement_outbound_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types location_type - object resource_type - object node_type - object order_type - object order - order_type fulfillment_source - location_type handling_profile - location_type warehouse_resource - location_type label_profile - location_type service_level - location_type route_slot - location_type handling_equipment - location_type time_window - location_type inventory_unit - resource_type packaging_unit - resource_type return_authorization - resource_type return_node - node_type replacement_node - node_type transport_unit - node_type order_line_group - order fulfillment_plan_container - order return_line - order_line_group replacement_line - order_line_group shipment_plan - fulfillment_plan_container)
+  (:predicates
+    (fulfillment_item_released ?order - order)
+    (fulfillment_item_sourced ?order - order)
+    (fulfillment_item_assigned_to_source_flag ?order - order)
+    (fulfillment_item_ready_for_shipment ?order - order)
+    (assigned_for_execution ?order - order)
+    (fulfillment_item_dispatch_confirmed ?order - order)
+    (fulfillment_source_available ?fulfillment_source - fulfillment_source)
+    (fulfillment_item_assigned_to_fulfillment_source ?order - order ?fulfillment_source - fulfillment_source)
+    (handling_profile_available ?handling_profile - handling_profile)
+    (fulfillment_item_assigned_handling_profile ?order - order ?handling_profile - handling_profile)
+    (warehouse_resource_available ?warehouse_resource - warehouse_resource)
+    (fulfillment_item_assigned_warehouse_resource ?order - order ?warehouse_resource - warehouse_resource)
+    (inventory_unit_available ?inventory_unit - inventory_unit)
+    (inventory_allocated_to_return_line ?return_line - return_line ?inventory_unit - inventory_unit)
+    (inventory_allocated_to_replacement_line ?replacement_line - replacement_line ?inventory_unit - inventory_unit)
+    (return_line_eligible_for_return_node ?return_line - return_line ?return_node - return_node)
+    (return_node_locked ?return_node - return_node)
+    (return_node_has_inventory ?return_node - return_node)
+    (return_line_picked ?return_line - return_line)
+    (replacement_line_eligible_for_replacement_node ?replacement_line - replacement_line ?replacement_node - replacement_node)
+    (replacement_node_locked ?replacement_node - replacement_node)
+    (replacement_node_has_inventory ?replacement_node - replacement_node)
+    (replacement_line_picked ?replacement_line - replacement_line)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_reserved ?transport_unit - transport_unit)
+    (transport_unit_assigned_to_return_node ?transport_unit - transport_unit ?return_node - return_node)
+    (transport_unit_assigned_to_replacement_node ?transport_unit - transport_unit ?replacement_node - replacement_node)
+    (transport_unit_readiness_a ?transport_unit - transport_unit)
+    (transport_unit_readiness_b ?transport_unit - transport_unit)
+    (transport_unit_validated_for_order ?transport_unit - transport_unit)
+    (shipment_plan_links_return_line ?shipment_plan - shipment_plan ?return_line - return_line)
+    (shipment_plan_links_replacement_line ?shipment_plan - shipment_plan ?replacement_line - replacement_line)
+    (shipment_plan_linked_transport_unit ?shipment_plan - shipment_plan ?transport_unit - transport_unit)
+    (packaging_unit_available ?packaging_unit - packaging_unit)
+    (shipment_plan_requires_packaging_unit ?shipment_plan - shipment_plan ?packaging_unit - packaging_unit)
+    (packaging_unit_allocated_to_shipment_plan ?packaging_unit - packaging_unit)
+    (packaging_unit_assigned_to_transport_unit ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    (shipment_plan_packaging_applied ?shipment_plan - shipment_plan)
+    (shipment_plan_equipment_allocated ?shipment_plan - shipment_plan)
+    (shipment_plan_service_time_window_validated ?shipment_plan - shipment_plan)
+    (shipment_plan_label_profile_available ?shipment_plan - shipment_plan)
+    (label_profile_applied_to_shipment_plan ?shipment_plan - shipment_plan)
+    (shipment_plan_annotated_service_level ?shipment_plan - shipment_plan)
+    (shipment_plan_scheduled_for_execution ?shipment_plan - shipment_plan)
+    (return_authorization_available ?return_authorization - return_authorization)
+    (shipment_plan_linked_return_authorization ?shipment_plan - shipment_plan ?return_authorization - return_authorization)
+    (shipment_plan_validated_against_authorization ?shipment_plan - shipment_plan)
+    (shipment_plan_qualified_for_special_handling ?shipment_plan - shipment_plan)
+    (shipment_plan_cleared_high_priority_dispatch ?shipment_plan - shipment_plan)
+    (label_profile_available ?label_profile - label_profile)
+    (shipment_plan_assigned_label_profile ?shipment_plan - shipment_plan ?label_profile - label_profile)
+    (service_level_resource_available ?service_level - service_level)
+    (shipment_plan_assigned_service_level ?shipment_plan - shipment_plan ?service_level - service_level)
+    (handling_equipment_available ?handling_equipment - handling_equipment)
+    (shipment_plan_assigned_handling_equipment ?shipment_plan - shipment_plan ?handling_equipment - handling_equipment)
+    (time_window_available ?time_window - time_window)
+    (shipment_plan_assigned_time_window ?shipment_plan - shipment_plan ?time_window - time_window)
+    (route_slot_available ?route_slot - route_slot)
+    (fulfillment_item_linked_route_slot ?order - order ?route_slot - route_slot)
+    (return_line_ready_for_consolidation ?return_line - return_line)
+    (replacement_line_ready_for_consolidation ?replacement_line - replacement_line)
+    (shipment_plan_finalized_recorded ?shipment_plan - shipment_plan)
+  )
+  (:action release_order_into_planning
+    :parameters (?order - order)
+    :precondition
+      (and
+        (not
+          (fulfillment_item_released ?order)
+        )
+        (not
+          (fulfillment_item_ready_for_shipment ?order)
+        )
+      )
+    :effect (fulfillment_item_released ?order)
+  )
+  (:action assign_fulfillment_source_to_order
+    :parameters (?order - order ?fulfillment_source - fulfillment_source)
+    :precondition
+      (and
+        (fulfillment_item_released ?order)
+        (not
+          (fulfillment_item_assigned_to_source_flag ?order)
+        )
+        (fulfillment_source_available ?fulfillment_source)
+      )
+    :effect
+      (and
+        (fulfillment_item_assigned_to_source_flag ?order)
+        (fulfillment_item_assigned_to_fulfillment_source ?order ?fulfillment_source)
+        (not
+          (fulfillment_source_available ?fulfillment_source)
+        )
+      )
+  )
+  (:action assign_handling_profile_to_order
+    :parameters (?order - order ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_released ?order)
+        (fulfillment_item_assigned_to_source_flag ?order)
+        (handling_profile_available ?handling_profile)
+      )
+    :effect
+      (and
+        (fulfillment_item_assigned_handling_profile ?order ?handling_profile)
+        (not
+          (handling_profile_available ?handling_profile)
+        )
+      )
+  )
+  (:action mark_order_as_sourced
+    :parameters (?order - order ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_released ?order)
+        (fulfillment_item_assigned_to_source_flag ?order)
+        (fulfillment_item_assigned_handling_profile ?order ?handling_profile)
+        (not
+          (fulfillment_item_sourced ?order)
+        )
+      )
+    :effect (fulfillment_item_sourced ?order)
+  )
+  (:action release_handling_profile_from_order
+    :parameters (?order - order ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_assigned_handling_profile ?order ?handling_profile)
+      )
+    :effect
+      (and
+        (handling_profile_available ?handling_profile)
+        (not
+          (fulfillment_item_assigned_handling_profile ?order ?handling_profile)
+        )
+      )
+  )
+  (:action assign_warehouse_resource_to_order
+    :parameters (?order - order ?warehouse_resource - warehouse_resource)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?order)
+        (warehouse_resource_available ?warehouse_resource)
+      )
+    :effect
+      (and
+        (fulfillment_item_assigned_warehouse_resource ?order ?warehouse_resource)
+        (not
+          (warehouse_resource_available ?warehouse_resource)
+        )
+      )
+  )
+  (:action release_warehouse_resource_from_order
+    :parameters (?order - order ?warehouse_resource - warehouse_resource)
+    :precondition
+      (and
+        (fulfillment_item_assigned_warehouse_resource ?order ?warehouse_resource)
+      )
+    :effect
+      (and
+        (warehouse_resource_available ?warehouse_resource)
+        (not
+          (fulfillment_item_assigned_warehouse_resource ?order ?warehouse_resource)
+        )
+      )
+  )
+  (:action assign_handling_equipment_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (handling_equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (shipment_plan_assigned_handling_equipment ?shipment_plan ?handling_equipment)
+        (not
+          (handling_equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action release_handling_equipment_from_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (shipment_plan_assigned_handling_equipment ?shipment_plan ?handling_equipment)
+      )
+    :effect
+      (and
+        (handling_equipment_available ?handling_equipment)
+        (not
+          (shipment_plan_assigned_handling_equipment ?shipment_plan ?handling_equipment)
+        )
+      )
+  )
+  (:action assign_time_window_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action release_time_window_from_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window)
+    :precondition
+      (and
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        )
+      )
+  )
+  (:action lock_return_node_for_line
+    :parameters (?return_line - return_line ?return_node - return_node ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?return_line)
+        (fulfillment_item_assigned_handling_profile ?return_line ?handling_profile)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (not
+          (return_node_locked ?return_node)
+        )
+        (not
+          (return_node_has_inventory ?return_node)
+        )
+      )
+    :effect (return_node_locked ?return_node)
+  )
+  (:action confirm_return_line_pick
+    :parameters (?return_line - return_line ?return_node - return_node ?warehouse_resource - warehouse_resource)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?return_line)
+        (fulfillment_item_assigned_warehouse_resource ?return_line ?warehouse_resource)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (return_node_locked ?return_node)
+        (not
+          (return_line_ready_for_consolidation ?return_line)
+        )
+      )
+    :effect
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (return_line_picked ?return_line)
+      )
+  )
+  (:action allocate_inventory_to_return_line
+    :parameters (?return_line - return_line ?return_node - return_node ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?return_line)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (return_line_ready_for_consolidation ?return_line)
+        )
+      )
+    :effect
+      (and
+        (return_node_has_inventory ?return_node)
+        (return_line_ready_for_consolidation ?return_line)
+        (inventory_allocated_to_return_line ?return_line ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action confirm_return_pick_and_release_inventory
+    :parameters (?return_line - return_line ?return_node - return_node ?handling_profile - handling_profile ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?return_line)
+        (fulfillment_item_assigned_handling_profile ?return_line ?handling_profile)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (return_node_has_inventory ?return_node)
+        (inventory_allocated_to_return_line ?return_line ?inventory_unit)
+        (not
+          (return_line_picked ?return_line)
+        )
+      )
+    :effect
+      (and
+        (return_node_locked ?return_node)
+        (return_line_picked ?return_line)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (inventory_allocated_to_return_line ?return_line ?inventory_unit)
+        )
+      )
+  )
+  (:action lock_replacement_node_for_line
+    :parameters (?replacement_line - replacement_line ?replacement_node - replacement_node ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?replacement_line)
+        (fulfillment_item_assigned_handling_profile ?replacement_line ?handling_profile)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (not
+          (replacement_node_locked ?replacement_node)
+        )
+        (not
+          (replacement_node_has_inventory ?replacement_node)
+        )
+      )
+    :effect (replacement_node_locked ?replacement_node)
+  )
+  (:action confirm_replacement_line_pick
+    :parameters (?replacement_line - replacement_line ?replacement_node - replacement_node ?warehouse_resource - warehouse_resource)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?replacement_line)
+        (fulfillment_item_assigned_warehouse_resource ?replacement_line ?warehouse_resource)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (replacement_node_locked ?replacement_node)
+        (not
+          (replacement_line_ready_for_consolidation ?replacement_line)
+        )
+      )
+    :effect
+      (and
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (replacement_line_picked ?replacement_line)
+      )
+  )
+  (:action allocate_inventory_to_replacement_line
+    :parameters (?replacement_line - replacement_line ?replacement_node - replacement_node ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?replacement_line)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (replacement_line_ready_for_consolidation ?replacement_line)
+        )
+      )
+    :effect
+      (and
+        (replacement_node_has_inventory ?replacement_node)
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (inventory_allocated_to_replacement_line ?replacement_line ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action confirm_replacement_pick_and_release_inventory
+    :parameters (?replacement_line - replacement_line ?replacement_node - replacement_node ?handling_profile - handling_profile ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?replacement_line)
+        (fulfillment_item_assigned_handling_profile ?replacement_line ?handling_profile)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (replacement_node_has_inventory ?replacement_node)
+        (inventory_allocated_to_replacement_line ?replacement_line ?inventory_unit)
+        (not
+          (replacement_line_picked ?replacement_line)
+        )
+      )
+    :effect
+      (and
+        (replacement_node_locked ?replacement_node)
+        (replacement_line_picked ?replacement_line)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (inventory_allocated_to_replacement_line ?replacement_line ?inventory_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_for_shipment
+    :parameters (?return_line - return_line ?replacement_line - replacement_line ?return_node - return_node ?replacement_node - replacement_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (return_node_locked ?return_node)
+        (replacement_node_locked ?replacement_node)
+        (return_line_picked ?return_line)
+        (replacement_line_picked ?replacement_line)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_to_return_node ?transport_unit ?return_node)
+        (transport_unit_assigned_to_replacement_node ?transport_unit ?replacement_node)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_with_readiness_a
+    :parameters (?return_line - return_line ?replacement_line - replacement_line ?return_node - return_node ?replacement_node - replacement_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (return_node_has_inventory ?return_node)
+        (replacement_node_locked ?replacement_node)
+        (not
+          (return_line_picked ?return_line)
+        )
+        (replacement_line_picked ?replacement_line)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_to_return_node ?transport_unit ?return_node)
+        (transport_unit_assigned_to_replacement_node ?transport_unit ?replacement_node)
+        (transport_unit_readiness_a ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_with_readiness_b
+    :parameters (?return_line - return_line ?replacement_line - replacement_line ?return_node - return_node ?replacement_node - replacement_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (return_node_locked ?return_node)
+        (replacement_node_has_inventory ?replacement_node)
+        (return_line_picked ?return_line)
+        (not
+          (replacement_line_picked ?replacement_line)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_to_return_node ?transport_unit ?return_node)
+        (transport_unit_assigned_to_replacement_node ?transport_unit ?replacement_node)
+        (transport_unit_readiness_b ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_transport_unit_with_both_readiness
+    :parameters (?return_line - return_line ?replacement_line - replacement_line ?return_node - return_node ?replacement_node - replacement_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (return_line_eligible_for_return_node ?return_line ?return_node)
+        (replacement_line_eligible_for_replacement_node ?replacement_line ?replacement_node)
+        (return_node_has_inventory ?return_node)
+        (replacement_node_has_inventory ?replacement_node)
+        (not
+          (return_line_picked ?return_line)
+        )
+        (not
+          (replacement_line_picked ?replacement_line)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_to_return_node ?transport_unit ?return_node)
+        (transport_unit_assigned_to_replacement_node ?transport_unit ?replacement_node)
+        (transport_unit_readiness_a ?transport_unit)
+        (transport_unit_readiness_b ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action validate_transport_unit_for_order
+    :parameters (?transport_unit - transport_unit ?return_line - return_line ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (return_line_ready_for_consolidation ?return_line)
+        (fulfillment_item_assigned_handling_profile ?return_line ?handling_profile)
+        (not
+          (transport_unit_validated_for_order ?transport_unit)
+        )
+      )
+    :effect (transport_unit_validated_for_order ?transport_unit)
+  )
+  (:action allocate_packaging_unit_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (shipment_plan_linked_transport_unit ?shipment_plan ?transport_unit)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_available ?packaging_unit)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_validated_for_order ?transport_unit)
+        (not
+          (packaging_unit_allocated_to_shipment_plan ?packaging_unit)
+        )
+      )
+    :effect
+      (and
+        (packaging_unit_allocated_to_shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (not
+          (packaging_unit_available ?packaging_unit)
+        )
+      )
+  )
+  (:action apply_packaging_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?packaging_unit - packaging_unit ?transport_unit - transport_unit ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_allocated_to_shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (fulfillment_item_assigned_handling_profile ?shipment_plan ?handling_profile)
+        (not
+          (transport_unit_readiness_a ?transport_unit)
+        )
+        (not
+          (shipment_plan_packaging_applied ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_packaging_applied ?shipment_plan)
+  )
+  (:action apply_label_profile_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?label_profile - label_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (label_profile_available ?label_profile)
+        (not
+          (shipment_plan_label_profile_available ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_label_profile_available ?shipment_plan)
+        (shipment_plan_assigned_label_profile ?shipment_plan ?label_profile)
+        (not
+          (label_profile_available ?label_profile)
+        )
+      )
+  )
+  (:action apply_label_and_mark_label_applied
+    :parameters (?shipment_plan - shipment_plan ?packaging_unit - packaging_unit ?transport_unit - transport_unit ?handling_profile - handling_profile ?label_profile - label_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_allocated_to_shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (fulfillment_item_assigned_handling_profile ?shipment_plan ?handling_profile)
+        (transport_unit_readiness_a ?transport_unit)
+        (shipment_plan_label_profile_available ?shipment_plan)
+        (shipment_plan_assigned_label_profile ?shipment_plan ?label_profile)
+        (not
+          (shipment_plan_packaging_applied ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_packaging_applied ?shipment_plan)
+        (label_profile_applied_to_shipment_plan ?shipment_plan)
+      )
+  )
+  (:action allocate_equipment_before_readiness_b
+    :parameters (?shipment_plan - shipment_plan ?handling_equipment - handling_equipment ?warehouse_resource - warehouse_resource ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_packaging_applied ?shipment_plan)
+        (shipment_plan_assigned_handling_equipment ?shipment_plan ?handling_equipment)
+        (fulfillment_item_assigned_warehouse_resource ?shipment_plan ?warehouse_resource)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (not
+          (transport_unit_readiness_b ?transport_unit)
+        )
+        (not
+          (shipment_plan_equipment_allocated ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_equipment_allocated ?shipment_plan)
+  )
+  (:action allocate_equipment_after_readiness_b
+    :parameters (?shipment_plan - shipment_plan ?handling_equipment - handling_equipment ?warehouse_resource - warehouse_resource ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_packaging_applied ?shipment_plan)
+        (shipment_plan_assigned_handling_equipment ?shipment_plan ?handling_equipment)
+        (fulfillment_item_assigned_warehouse_resource ?shipment_plan ?warehouse_resource)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (transport_unit_readiness_b ?transport_unit)
+        (not
+          (shipment_plan_equipment_allocated ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_equipment_allocated ?shipment_plan)
+  )
+  (:action validate_time_window_and_mark_service_ready_no_readiness
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_equipment_allocated ?shipment_plan)
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (not
+          (transport_unit_readiness_a ?transport_unit)
+        )
+        (not
+          (transport_unit_readiness_b ?transport_unit)
+        )
+        (not
+          (shipment_plan_service_time_window_validated ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_service_time_window_validated ?shipment_plan)
+  )
+  (:action validate_time_window_and_annotate_service_level_readiness_a
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_equipment_allocated ?shipment_plan)
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (transport_unit_readiness_a ?transport_unit)
+        (not
+          (transport_unit_readiness_b ?transport_unit)
+        )
+        (not
+          (shipment_plan_service_time_window_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_annotated_service_level ?shipment_plan)
+      )
+  )
+  (:action validate_time_window_and_annotate_service_level_readiness_b
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_equipment_allocated ?shipment_plan)
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (not
+          (transport_unit_readiness_a ?transport_unit)
+        )
+        (transport_unit_readiness_b ?transport_unit)
+        (not
+          (shipment_plan_service_time_window_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_annotated_service_level ?shipment_plan)
+      )
+  )
+  (:action validate_time_window_and_annotate_service_level_readiness_both
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window ?packaging_unit - packaging_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_plan_equipment_allocated ?shipment_plan)
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (shipment_plan_requires_packaging_unit ?shipment_plan ?packaging_unit)
+        (packaging_unit_assigned_to_transport_unit ?packaging_unit ?transport_unit)
+        (transport_unit_readiness_a ?transport_unit)
+        (transport_unit_readiness_b ?transport_unit)
+        (not
+          (shipment_plan_service_time_window_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_annotated_service_level ?shipment_plan)
+      )
+  )
+  (:action finalize_shipment_plan_for_execution
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (not
+          (shipment_plan_annotated_service_level ?shipment_plan)
+        )
+        (not
+          (shipment_plan_finalized_recorded ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized_recorded ?shipment_plan)
+        (assigned_for_execution ?shipment_plan)
+      )
+  )
+  (:action assign_service_level_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?service_level - service_level)
+    :precondition
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_annotated_service_level ?shipment_plan)
+        (service_level_resource_available ?service_level)
+      )
+    :effect
+      (and
+        (shipment_plan_assigned_service_level ?shipment_plan ?service_level)
+        (not
+          (service_level_resource_available ?service_level)
+        )
+      )
+  )
+  (:action schedule_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?return_line - return_line ?replacement_line - replacement_line ?handling_profile - handling_profile ?service_level - service_level)
+    :precondition
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_annotated_service_level ?shipment_plan)
+        (shipment_plan_assigned_service_level ?shipment_plan ?service_level)
+        (shipment_plan_links_return_line ?shipment_plan ?return_line)
+        (shipment_plan_links_replacement_line ?shipment_plan ?replacement_line)
+        (return_line_picked ?return_line)
+        (replacement_line_picked ?replacement_line)
+        (fulfillment_item_assigned_handling_profile ?shipment_plan ?handling_profile)
+        (not
+          (shipment_plan_scheduled_for_execution ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_scheduled_for_execution ?shipment_plan)
+  )
+  (:action finalize_and_record_shipment_plan
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_plan_service_time_window_validated ?shipment_plan)
+        (shipment_plan_scheduled_for_execution ?shipment_plan)
+        (not
+          (shipment_plan_finalized_recorded ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized_recorded ?shipment_plan)
+        (assigned_for_execution ?shipment_plan)
+      )
+  )
+  (:action validate_shipment_against_return_authorization
+    :parameters (?shipment_plan - shipment_plan ?return_authorization - return_authorization ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (fulfillment_item_sourced ?shipment_plan)
+        (fulfillment_item_assigned_handling_profile ?shipment_plan ?handling_profile)
+        (return_authorization_available ?return_authorization)
+        (shipment_plan_linked_return_authorization ?shipment_plan ?return_authorization)
+        (not
+          (shipment_plan_validated_against_authorization ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_validated_against_authorization ?shipment_plan)
+        (not
+          (return_authorization_available ?return_authorization)
+        )
+      )
+  )
+  (:action qualify_shipment_for_special_handling
+    :parameters (?shipment_plan - shipment_plan ?warehouse_resource - warehouse_resource)
+    :precondition
+      (and
+        (shipment_plan_validated_against_authorization ?shipment_plan)
+        (fulfillment_item_assigned_warehouse_resource ?shipment_plan ?warehouse_resource)
+        (not
+          (shipment_plan_qualified_for_special_handling ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_qualified_for_special_handling ?shipment_plan)
+  )
+  (:action clear_shipment_for_high_priority_dispatch
+    :parameters (?shipment_plan - shipment_plan ?time_window - time_window)
+    :precondition
+      (and
+        (shipment_plan_qualified_for_special_handling ?shipment_plan)
+        (shipment_plan_assigned_time_window ?shipment_plan ?time_window)
+        (not
+          (shipment_plan_cleared_high_priority_dispatch ?shipment_plan)
+        )
+      )
+    :effect (shipment_plan_cleared_high_priority_dispatch ?shipment_plan)
+  )
+  (:action record_shipment_after_priority_clearance
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_plan_cleared_high_priority_dispatch ?shipment_plan)
+        (not
+          (shipment_plan_finalized_recorded ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized_recorded ?shipment_plan)
+        (assigned_for_execution ?shipment_plan)
+      )
+  )
+  (:action confirm_return_line_dispatch
+    :parameters (?return_line - return_line ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (return_line_ready_for_consolidation ?return_line)
+        (return_line_picked ?return_line)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_validated_for_order ?transport_unit)
+        (not
+          (assigned_for_execution ?return_line)
+        )
+      )
+    :effect (assigned_for_execution ?return_line)
+  )
+  (:action confirm_replacement_line_dispatch
+    :parameters (?replacement_line - replacement_line ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (replacement_line_ready_for_consolidation ?replacement_line)
+        (replacement_line_picked ?replacement_line)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_validated_for_order ?transport_unit)
+        (not
+          (assigned_for_execution ?replacement_line)
+        )
+      )
+    :effect (assigned_for_execution ?replacement_line)
+  )
+  (:action confirm_order_dispatch_and_link_route
+    :parameters (?order - order ?route_slot - route_slot ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (assigned_for_execution ?order)
+        (fulfillment_item_assigned_handling_profile ?order ?handling_profile)
+        (route_slot_available ?route_slot)
+        (not
+          (fulfillment_item_dispatch_confirmed ?order)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_item_dispatch_confirmed ?order)
+        (fulfillment_item_linked_route_slot ?order ?route_slot)
+        (not
+          (route_slot_available ?route_slot)
+        )
+      )
+  )
+  (:action link_return_line_to_transport_and_mark_ready
+    :parameters (?return_line - return_line ?fulfillment_source - fulfillment_source ?route_slot - route_slot)
+    :precondition
+      (and
+        (fulfillment_item_dispatch_confirmed ?return_line)
+        (fulfillment_item_assigned_to_fulfillment_source ?return_line ?fulfillment_source)
+        (fulfillment_item_linked_route_slot ?return_line ?route_slot)
+        (not
+          (fulfillment_item_ready_for_shipment ?return_line)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_item_ready_for_shipment ?return_line)
+        (fulfillment_source_available ?fulfillment_source)
+        (route_slot_available ?route_slot)
+      )
+  )
+  (:action link_replacement_line_to_transport_and_mark_ready
+    :parameters (?replacement_line - replacement_line ?fulfillment_source - fulfillment_source ?route_slot - route_slot)
+    :precondition
+      (and
+        (fulfillment_item_dispatch_confirmed ?replacement_line)
+        (fulfillment_item_assigned_to_fulfillment_source ?replacement_line ?fulfillment_source)
+        (fulfillment_item_linked_route_slot ?replacement_line ?route_slot)
+        (not
+          (fulfillment_item_ready_for_shipment ?replacement_line)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_item_ready_for_shipment ?replacement_line)
+        (fulfillment_source_available ?fulfillment_source)
+        (route_slot_available ?route_slot)
+      )
+  )
+  (:action link_shipment_plan_to_transport_and_mark_ready
+    :parameters (?shipment_plan - shipment_plan ?fulfillment_source - fulfillment_source ?route_slot - route_slot)
+    :precondition
+      (and
+        (fulfillment_item_dispatch_confirmed ?shipment_plan)
+        (fulfillment_item_assigned_to_fulfillment_source ?shipment_plan ?fulfillment_source)
+        (fulfillment_item_linked_route_slot ?shipment_plan ?route_slot)
+        (not
+          (fulfillment_item_ready_for_shipment ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_item_ready_for_shipment ?shipment_plan)
+        (fulfillment_source_available ?fulfillment_source)
+        (route_slot_available ?route_slot)
+      )
+  )
+)

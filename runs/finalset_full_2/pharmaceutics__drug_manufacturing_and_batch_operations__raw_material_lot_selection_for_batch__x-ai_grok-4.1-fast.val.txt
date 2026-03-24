@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_raw_material_lot_selection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types pharm_asset - object domain_entity_alt - object domain_entity_alt2 - object domain_root - object batch_header - domain_root material_lot - pharm_asset material_identity - pharm_asset operator - pharm_asset analytical_method - pharm_asset quality_credential - pharm_asset certificate_document - pharm_asset material_certificate - pharm_asset audit_trail_entry - pharm_asset container_unit - domain_entity_alt qc_sample - domain_entity_alt regulatory_reference - domain_entity_alt material_source - domain_entity_alt2 supplier_shipment - domain_entity_alt2 lot_selection_record - domain_entity_alt2 batch_subtype_a - batch_header batch_subtype_b - batch_header primary_material_requirement_slot - batch_subtype_a secondary_material_requirement_slot - batch_subtype_a batch_detail - batch_subtype_b)
+  (:predicates
+    (entity_initialized ?production_batch - batch_header)
+    (record_open_flag ?production_batch - batch_header)
+    (entity_has_candidate_lot ?production_batch - batch_header)
+    (entity_allocation_finalized ?production_batch - batch_header)
+    (entity_ready_for_release ?production_batch - batch_header)
+    (entity_certificate_attached ?production_batch - batch_header)
+    (lot_available ?material_lot - material_lot)
+    (entity_candidate_lot_link ?production_batch - batch_header ?material_lot - material_lot)
+    (material_identity_available ?material_identity - material_identity)
+    (batch_material_identity_link ?production_batch - batch_header ?material_identity - material_identity)
+    (operator_available ?operator - operator)
+    (operator_assigned_to_entity ?production_batch - batch_header ?operator - operator)
+    (container_available ?container_unit - container_unit)
+    (primary_slot_container_link ?primary_material_requirement_slot - primary_material_requirement_slot ?container_unit - container_unit)
+    (secondary_slot_container_link ?secondary_material_requirement_slot - secondary_material_requirement_slot ?container_unit - container_unit)
+    (primary_slot_material_source_link ?primary_material_requirement_slot - primary_material_requirement_slot ?material_source - material_source)
+    (source_staged ?material_source - material_source)
+    (source_container_loaded ?material_source - material_source)
+    (primary_slot_ready ?primary_material_requirement_slot - primary_material_requirement_slot)
+    (secondary_slot_shipment_link ?secondary_material_requirement_slot - secondary_material_requirement_slot ?supplier_shipment - supplier_shipment)
+    (shipment_staged ?supplier_shipment - supplier_shipment)
+    (shipment_container_loaded ?supplier_shipment - supplier_shipment)
+    (secondary_slot_ready ?secondary_material_requirement_slot - secondary_material_requirement_slot)
+    (selection_record_available ?lot_selection_record - lot_selection_record)
+    (selection_record_created ?lot_selection_record - lot_selection_record)
+    (selection_record_source_link ?lot_selection_record - lot_selection_record ?material_source - material_source)
+    (selection_record_shipment_link ?lot_selection_record - lot_selection_record ?supplier_shipment - supplier_shipment)
+    (selection_record_primary_confirmed ?lot_selection_record - lot_selection_record)
+    (selection_record_secondary_confirmed ?lot_selection_record - lot_selection_record)
+    (selection_record_sample_collected ?lot_selection_record - lot_selection_record)
+    (batch_record_primary_slot_link ?batch_record - batch_detail ?primary_material_requirement_slot - primary_material_requirement_slot)
+    (batch_record_secondary_slot_link ?batch_record - batch_detail ?secondary_material_requirement_slot - secondary_material_requirement_slot)
+    (batch_record_selection_record_link ?batch_record - batch_detail ?lot_selection_record - lot_selection_record)
+    (qc_sample_available ?qc_sample - qc_sample)
+    (batch_record_qc_sample_link ?batch_record - batch_detail ?qc_sample - qc_sample)
+    (qc_sample_reserved ?qc_sample - qc_sample)
+    (qc_sample_linked_to_selection_record ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    (qc_test_requested ?batch_record - batch_detail)
+    (qc_test_completed ?batch_record - batch_detail)
+    (qc_review_completed ?batch_record - batch_detail)
+    (analytical_method_assigned ?batch_record - batch_detail)
+    (analytical_method_executed ?batch_record - batch_detail)
+    (credential_requested ?batch_record - batch_detail)
+    (qc_checks_all_passed ?batch_record - batch_detail)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (batch_record_regulatory_reference_link ?batch_record - batch_detail ?regulatory_reference - regulatory_reference)
+    (regulatory_reference_applied ?batch_record - batch_detail)
+    (operator_authorized ?batch_record - batch_detail)
+    (operator_authorization_audited ?batch_record - batch_detail)
+    (analytical_method_available ?analytical_method - analytical_method)
+    (batch_record_method_link ?batch_record - batch_detail ?analytical_method - analytical_method)
+    (quality_credential_available ?quality_credential - quality_credential)
+    (batch_record_credential_link ?batch_record - batch_detail ?quality_credential - quality_credential)
+    (material_certificate_available ?material_certificate - material_certificate)
+    (batch_record_material_certificate_link ?batch_record - batch_detail ?material_certificate - material_certificate)
+    (audit_trail_entry_available ?audit_trail_entry - audit_trail_entry)
+    (batch_record_audit_link ?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry)
+    (certificate_document_available ?certificate_document - certificate_document)
+    (entity_certificate_document_link ?production_batch - batch_header ?certificate_document - certificate_document)
+    (primary_slot_staged ?primary_material_requirement_slot - primary_material_requirement_slot)
+    (secondary_slot_staged ?secondary_material_requirement_slot - secondary_material_requirement_slot)
+    (batch_record_marked_for_release ?batch_record - batch_detail)
+  )
+  (:action initialize_production_batch
+    :parameters (?production_batch - batch_header)
+    :precondition
+      (and
+        (not
+          (entity_initialized ?production_batch)
+        )
+        (not
+          (entity_allocation_finalized ?production_batch)
+        )
+      )
+    :effect (entity_initialized ?production_batch)
+  )
+  (:action propose_material_lot
+    :parameters (?production_batch - batch_header ?material_lot - material_lot)
+    :precondition
+      (and
+        (entity_initialized ?production_batch)
+        (not
+          (entity_has_candidate_lot ?production_batch)
+        )
+        (lot_available ?material_lot)
+      )
+    :effect
+      (and
+        (entity_has_candidate_lot ?production_batch)
+        (entity_candidate_lot_link ?production_batch ?material_lot)
+        (not
+          (lot_available ?material_lot)
+        )
+      )
+  )
+  (:action assign_material_identity_to_batch
+    :parameters (?production_batch - batch_header ?material_identity - material_identity)
+    :precondition
+      (and
+        (entity_initialized ?production_batch)
+        (entity_has_candidate_lot ?production_batch)
+        (material_identity_available ?material_identity)
+      )
+    :effect
+      (and
+        (batch_material_identity_link ?production_batch ?material_identity)
+        (not
+          (material_identity_available ?material_identity)
+        )
+      )
+  )
+  (:action finalize_batch_identity
+    :parameters (?production_batch - batch_header ?material_identity - material_identity)
+    :precondition
+      (and
+        (entity_initialized ?production_batch)
+        (entity_has_candidate_lot ?production_batch)
+        (batch_material_identity_link ?production_batch ?material_identity)
+        (not
+          (record_open_flag ?production_batch)
+        )
+      )
+    :effect (record_open_flag ?production_batch)
+  )
+  (:action unassign_material_identity_from_batch
+    :parameters (?production_batch - batch_header ?material_identity - material_identity)
+    :precondition
+      (and
+        (batch_material_identity_link ?production_batch ?material_identity)
+      )
+    :effect
+      (and
+        (material_identity_available ?material_identity)
+        (not
+          (batch_material_identity_link ?production_batch ?material_identity)
+        )
+      )
+  )
+  (:action assign_operator_to_record
+    :parameters (?production_batch - batch_header ?operator - operator)
+    :precondition
+      (and
+        (record_open_flag ?production_batch)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_entity ?production_batch ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action unassign_operator_from_record
+    :parameters (?production_batch - batch_header ?operator - operator)
+    :precondition
+      (and
+        (operator_assigned_to_entity ?production_batch ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned_to_entity ?production_batch ?operator)
+        )
+      )
+  )
+  (:action attach_material_certificate_to_record
+    :parameters (?batch_record - batch_detail ?material_certificate - material_certificate)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (material_certificate_available ?material_certificate)
+      )
+    :effect
+      (and
+        (batch_record_material_certificate_link ?batch_record ?material_certificate)
+        (not
+          (material_certificate_available ?material_certificate)
+        )
+      )
+  )
+  (:action detach_material_certificate_from_record
+    :parameters (?batch_record - batch_detail ?material_certificate - material_certificate)
+    :precondition
+      (and
+        (batch_record_material_certificate_link ?batch_record ?material_certificate)
+      )
+    :effect
+      (and
+        (material_certificate_available ?material_certificate)
+        (not
+          (batch_record_material_certificate_link ?batch_record ?material_certificate)
+        )
+      )
+  )
+  (:action attach_audit_trail_entry_to_record
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (audit_trail_entry_available ?audit_trail_entry)
+      )
+    :effect
+      (and
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (not
+          (audit_trail_entry_available ?audit_trail_entry)
+        )
+      )
+  )
+  (:action detach_audit_trail_entry_from_record
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry)
+    :precondition
+      (and
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+      )
+    :effect
+      (and
+        (audit_trail_entry_available ?audit_trail_entry)
+        (not
+          (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        )
+      )
+  )
+  (:action stage_material_source
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?material_source - material_source ?material_identity - material_identity)
+    :precondition
+      (and
+        (record_open_flag ?primary_material_requirement_slot)
+        (batch_material_identity_link ?primary_material_requirement_slot ?material_identity)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (not
+          (source_staged ?material_source)
+        )
+        (not
+          (source_container_loaded ?material_source)
+        )
+      )
+    :effect (source_staged ?material_source)
+  )
+  (:action confirm_source_staging
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?material_source - material_source ?operator - operator)
+    :precondition
+      (and
+        (record_open_flag ?primary_material_requirement_slot)
+        (operator_assigned_to_entity ?primary_material_requirement_slot ?operator)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (source_staged ?material_source)
+        (not
+          (primary_slot_staged ?primary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (primary_slot_ready ?primary_material_requirement_slot)
+      )
+  )
+  (:action assign_container_to_primary_slot
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?material_source - material_source ?container_unit - container_unit)
+    :precondition
+      (and
+        (record_open_flag ?primary_material_requirement_slot)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (container_available ?container_unit)
+        (not
+          (primary_slot_staged ?primary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (source_container_loaded ?material_source)
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (primary_slot_container_link ?primary_material_requirement_slot ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action load_container_into_primary_slot
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?material_source - material_source ?material_identity - material_identity ?container_unit - container_unit)
+    :precondition
+      (and
+        (record_open_flag ?primary_material_requirement_slot)
+        (batch_material_identity_link ?primary_material_requirement_slot ?material_identity)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (source_container_loaded ?material_source)
+        (primary_slot_container_link ?primary_material_requirement_slot ?container_unit)
+        (not
+          (primary_slot_ready ?primary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (source_staged ?material_source)
+        (primary_slot_ready ?primary_material_requirement_slot)
+        (container_available ?container_unit)
+        (not
+          (primary_slot_container_link ?primary_material_requirement_slot ?container_unit)
+        )
+      )
+  )
+  (:action stage_shipment_for_secondary_slot
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?supplier_shipment - supplier_shipment ?material_identity - material_identity)
+    :precondition
+      (and
+        (record_open_flag ?secondary_material_requirement_slot)
+        (batch_material_identity_link ?secondary_material_requirement_slot ?material_identity)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (not
+          (shipment_staged ?supplier_shipment)
+        )
+        (not
+          (shipment_container_loaded ?supplier_shipment)
+        )
+      )
+    :effect (shipment_staged ?supplier_shipment)
+  )
+  (:action confirm_shipment_staging
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?supplier_shipment - supplier_shipment ?operator - operator)
+    :precondition
+      (and
+        (record_open_flag ?secondary_material_requirement_slot)
+        (operator_assigned_to_entity ?secondary_material_requirement_slot ?operator)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (shipment_staged ?supplier_shipment)
+        (not
+          (secondary_slot_staged ?secondary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+      )
+  )
+  (:action assign_container_to_secondary_slot
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?supplier_shipment - supplier_shipment ?container_unit - container_unit)
+    :precondition
+      (and
+        (record_open_flag ?secondary_material_requirement_slot)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (container_available ?container_unit)
+        (not
+          (secondary_slot_staged ?secondary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (shipment_container_loaded ?supplier_shipment)
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (secondary_slot_container_link ?secondary_material_requirement_slot ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action load_container_into_secondary_slot
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?supplier_shipment - supplier_shipment ?material_identity - material_identity ?container_unit - container_unit)
+    :precondition
+      (and
+        (record_open_flag ?secondary_material_requirement_slot)
+        (batch_material_identity_link ?secondary_material_requirement_slot ?material_identity)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (shipment_container_loaded ?supplier_shipment)
+        (secondary_slot_container_link ?secondary_material_requirement_slot ?container_unit)
+        (not
+          (secondary_slot_ready ?secondary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (shipment_staged ?supplier_shipment)
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+        (container_available ?container_unit)
+        (not
+          (secondary_slot_container_link ?secondary_material_requirement_slot ?container_unit)
+        )
+      )
+  )
+  (:action create_lot_selection_record
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_source - material_source ?supplier_shipment - supplier_shipment ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (source_staged ?material_source)
+        (shipment_staged ?supplier_shipment)
+        (primary_slot_ready ?primary_material_requirement_slot)
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+        (selection_record_available ?lot_selection_record)
+      )
+    :effect
+      (and
+        (selection_record_created ?lot_selection_record)
+        (selection_record_source_link ?lot_selection_record ?material_source)
+        (selection_record_shipment_link ?lot_selection_record ?supplier_shipment)
+        (not
+          (selection_record_available ?lot_selection_record)
+        )
+      )
+  )
+  (:action create_lot_selection_record_confirm_primary
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_source - material_source ?supplier_shipment - supplier_shipment ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (source_container_loaded ?material_source)
+        (shipment_staged ?supplier_shipment)
+        (not
+          (primary_slot_ready ?primary_material_requirement_slot)
+        )
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+        (selection_record_available ?lot_selection_record)
+      )
+    :effect
+      (and
+        (selection_record_created ?lot_selection_record)
+        (selection_record_source_link ?lot_selection_record ?material_source)
+        (selection_record_shipment_link ?lot_selection_record ?supplier_shipment)
+        (selection_record_primary_confirmed ?lot_selection_record)
+        (not
+          (selection_record_available ?lot_selection_record)
+        )
+      )
+  )
+  (:action create_lot_selection_record_confirm_secondary
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_source - material_source ?supplier_shipment - supplier_shipment ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (source_staged ?material_source)
+        (shipment_container_loaded ?supplier_shipment)
+        (primary_slot_ready ?primary_material_requirement_slot)
+        (not
+          (secondary_slot_ready ?secondary_material_requirement_slot)
+        )
+        (selection_record_available ?lot_selection_record)
+      )
+    :effect
+      (and
+        (selection_record_created ?lot_selection_record)
+        (selection_record_source_link ?lot_selection_record ?material_source)
+        (selection_record_shipment_link ?lot_selection_record ?supplier_shipment)
+        (selection_record_secondary_confirmed ?lot_selection_record)
+        (not
+          (selection_record_available ?lot_selection_record)
+        )
+      )
+  )
+  (:action create_lot_selection_record_confirm_both_sources
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_source - material_source ?supplier_shipment - supplier_shipment ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (primary_slot_material_source_link ?primary_material_requirement_slot ?material_source)
+        (secondary_slot_shipment_link ?secondary_material_requirement_slot ?supplier_shipment)
+        (source_container_loaded ?material_source)
+        (shipment_container_loaded ?supplier_shipment)
+        (not
+          (primary_slot_ready ?primary_material_requirement_slot)
+        )
+        (not
+          (secondary_slot_ready ?secondary_material_requirement_slot)
+        )
+        (selection_record_available ?lot_selection_record)
+      )
+    :effect
+      (and
+        (selection_record_created ?lot_selection_record)
+        (selection_record_source_link ?lot_selection_record ?material_source)
+        (selection_record_shipment_link ?lot_selection_record ?supplier_shipment)
+        (selection_record_primary_confirmed ?lot_selection_record)
+        (selection_record_secondary_confirmed ?lot_selection_record)
+        (not
+          (selection_record_available ?lot_selection_record)
+        )
+      )
+  )
+  (:action prepare_selection_record_for_sampling
+    :parameters (?lot_selection_record - lot_selection_record ?primary_material_requirement_slot - primary_material_requirement_slot ?material_identity - material_identity)
+    :precondition
+      (and
+        (selection_record_created ?lot_selection_record)
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (batch_material_identity_link ?primary_material_requirement_slot ?material_identity)
+        (not
+          (selection_record_sample_collected ?lot_selection_record)
+        )
+      )
+    :effect (selection_record_sample_collected ?lot_selection_record)
+  )
+  (:action collect_qc_sample
+    :parameters (?batch_record - batch_detail ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (batch_record_selection_record_link ?batch_record ?lot_selection_record)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_available ?qc_sample)
+        (selection_record_created ?lot_selection_record)
+        (selection_record_sample_collected ?lot_selection_record)
+        (not
+          (qc_sample_reserved ?qc_sample)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_reserved ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (not
+          (qc_sample_available ?qc_sample)
+        )
+      )
+  )
+  (:action request_qc_test
+    :parameters (?batch_record - batch_detail ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record ?material_identity - material_identity)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_reserved ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (batch_material_identity_link ?batch_record ?material_identity)
+        (not
+          (selection_record_primary_confirmed ?lot_selection_record)
+        )
+        (not
+          (qc_test_requested ?batch_record)
+        )
+      )
+    :effect (qc_test_requested ?batch_record)
+  )
+  (:action assign_analytical_method
+    :parameters (?batch_record - batch_detail ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (analytical_method_available ?analytical_method)
+        (not
+          (analytical_method_assigned ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (analytical_method_assigned ?batch_record)
+        (batch_record_method_link ?batch_record ?analytical_method)
+        (not
+          (analytical_method_available ?analytical_method)
+        )
+      )
+  )
+  (:action perform_analytical_method
+    :parameters (?batch_record - batch_detail ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record ?material_identity - material_identity ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_reserved ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (batch_material_identity_link ?batch_record ?material_identity)
+        (selection_record_primary_confirmed ?lot_selection_record)
+        (analytical_method_assigned ?batch_record)
+        (batch_record_method_link ?batch_record ?analytical_method)
+        (not
+          (qc_test_requested ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qc_test_requested ?batch_record)
+        (analytical_method_executed ?batch_record)
+      )
+  )
+  (:action record_qc_test_result
+    :parameters (?batch_record - batch_detail ?material_certificate - material_certificate ?operator - operator ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_requested ?batch_record)
+        (batch_record_material_certificate_link ?batch_record ?material_certificate)
+        (operator_assigned_to_entity ?batch_record ?operator)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (not
+          (selection_record_secondary_confirmed ?lot_selection_record)
+        )
+        (not
+          (qc_test_completed ?batch_record)
+        )
+      )
+    :effect (qc_test_completed ?batch_record)
+  )
+  (:action record_qc_test_result_secondary
+    :parameters (?batch_record - batch_detail ?material_certificate - material_certificate ?operator - operator ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_requested ?batch_record)
+        (batch_record_material_certificate_link ?batch_record ?material_certificate)
+        (operator_assigned_to_entity ?batch_record ?operator)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (selection_record_secondary_confirmed ?lot_selection_record)
+        (not
+          (qc_test_completed ?batch_record)
+        )
+      )
+    :effect (qc_test_completed ?batch_record)
+  )
+  (:action complete_qc_review
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_completed ?batch_record)
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (not
+          (selection_record_primary_confirmed ?lot_selection_record)
+        )
+        (not
+          (selection_record_secondary_confirmed ?lot_selection_record)
+        )
+        (not
+          (qc_review_completed ?batch_record)
+        )
+      )
+    :effect (qc_review_completed ?batch_record)
+  )
+  (:action complete_qc_review_with_credential_request
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_completed ?batch_record)
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (selection_record_primary_confirmed ?lot_selection_record)
+        (not
+          (selection_record_secondary_confirmed ?lot_selection_record)
+        )
+        (not
+          (qc_review_completed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qc_review_completed ?batch_record)
+        (credential_requested ?batch_record)
+      )
+  )
+  (:action complete_qc_review_secondary_with_credential_request
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_completed ?batch_record)
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (not
+          (selection_record_primary_confirmed ?lot_selection_record)
+        )
+        (selection_record_secondary_confirmed ?lot_selection_record)
+        (not
+          (qc_review_completed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qc_review_completed ?batch_record)
+        (credential_requested ?batch_record)
+      )
+  )
+  (:action complete_qc_review_both_sources
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry ?qc_sample - qc_sample ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (qc_test_completed ?batch_record)
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (batch_record_qc_sample_link ?batch_record ?qc_sample)
+        (qc_sample_linked_to_selection_record ?qc_sample ?lot_selection_record)
+        (selection_record_primary_confirmed ?lot_selection_record)
+        (selection_record_secondary_confirmed ?lot_selection_record)
+        (not
+          (qc_review_completed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qc_review_completed ?batch_record)
+        (credential_requested ?batch_record)
+      )
+  )
+  (:action mark_record_ready_for_release
+    :parameters (?batch_record - batch_detail)
+    :precondition
+      (and
+        (qc_review_completed ?batch_record)
+        (not
+          (credential_requested ?batch_record)
+        )
+        (not
+          (batch_record_marked_for_release ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (batch_record_marked_for_release ?batch_record)
+        (entity_ready_for_release ?batch_record)
+      )
+  )
+  (:action apply_quality_credential
+    :parameters (?batch_record - batch_detail ?quality_credential - quality_credential)
+    :precondition
+      (and
+        (qc_review_completed ?batch_record)
+        (credential_requested ?batch_record)
+        (quality_credential_available ?quality_credential)
+      )
+    :effect
+      (and
+        (batch_record_credential_link ?batch_record ?quality_credential)
+        (not
+          (quality_credential_available ?quality_credential)
+        )
+      )
+  )
+  (:action verify_qc_and_operational_checks
+    :parameters (?batch_record - batch_detail ?primary_material_requirement_slot - primary_material_requirement_slot ?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_identity - material_identity ?quality_credential - quality_credential)
+    :precondition
+      (and
+        (qc_review_completed ?batch_record)
+        (credential_requested ?batch_record)
+        (batch_record_credential_link ?batch_record ?quality_credential)
+        (batch_record_primary_slot_link ?batch_record ?primary_material_requirement_slot)
+        (batch_record_secondary_slot_link ?batch_record ?secondary_material_requirement_slot)
+        (primary_slot_ready ?primary_material_requirement_slot)
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+        (batch_material_identity_link ?batch_record ?material_identity)
+        (not
+          (qc_checks_all_passed ?batch_record)
+        )
+      )
+    :effect (qc_checks_all_passed ?batch_record)
+  )
+  (:action finalize_record_ready_for_release
+    :parameters (?batch_record - batch_detail)
+    :precondition
+      (and
+        (qc_review_completed ?batch_record)
+        (qc_checks_all_passed ?batch_record)
+        (not
+          (batch_record_marked_for_release ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (batch_record_marked_for_release ?batch_record)
+        (entity_ready_for_release ?batch_record)
+      )
+  )
+  (:action apply_regulatory_reference
+    :parameters (?batch_record - batch_detail ?regulatory_reference - regulatory_reference ?material_identity - material_identity)
+    :precondition
+      (and
+        (record_open_flag ?batch_record)
+        (batch_material_identity_link ?batch_record ?material_identity)
+        (regulatory_reference_available ?regulatory_reference)
+        (batch_record_regulatory_reference_link ?batch_record ?regulatory_reference)
+        (not
+          (regulatory_reference_applied ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (regulatory_reference_applied ?batch_record)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action authorize_operator_for_record
+    :parameters (?batch_record - batch_detail ?operator - operator)
+    :precondition
+      (and
+        (regulatory_reference_applied ?batch_record)
+        (operator_assigned_to_entity ?batch_record ?operator)
+        (not
+          (operator_authorized ?batch_record)
+        )
+      )
+    :effect (operator_authorized ?batch_record)
+  )
+  (:action audit_operator_authorization
+    :parameters (?batch_record - batch_detail ?audit_trail_entry - audit_trail_entry)
+    :precondition
+      (and
+        (operator_authorized ?batch_record)
+        (batch_record_audit_link ?batch_record ?audit_trail_entry)
+        (not
+          (operator_authorization_audited ?batch_record)
+        )
+      )
+    :effect (operator_authorization_audited ?batch_record)
+  )
+  (:action finalize_record_release_after_audit
+    :parameters (?batch_record - batch_detail)
+    :precondition
+      (and
+        (operator_authorization_audited ?batch_record)
+        (not
+          (batch_record_marked_for_release ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (batch_record_marked_for_release ?batch_record)
+        (entity_ready_for_release ?batch_record)
+      )
+  )
+  (:action mark_primary_slot_ready_for_release
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_material_requirement_slot)
+        (primary_slot_ready ?primary_material_requirement_slot)
+        (selection_record_created ?lot_selection_record)
+        (selection_record_sample_collected ?lot_selection_record)
+        (not
+          (entity_ready_for_release ?primary_material_requirement_slot)
+        )
+      )
+    :effect (entity_ready_for_release ?primary_material_requirement_slot)
+  )
+  (:action mark_secondary_slot_ready_for_release
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?lot_selection_record - lot_selection_record)
+    :precondition
+      (and
+        (secondary_slot_staged ?secondary_material_requirement_slot)
+        (secondary_slot_ready ?secondary_material_requirement_slot)
+        (selection_record_created ?lot_selection_record)
+        (selection_record_sample_collected ?lot_selection_record)
+        (not
+          (entity_ready_for_release ?secondary_material_requirement_slot)
+        )
+      )
+    :effect (entity_ready_for_release ?secondary_material_requirement_slot)
+  )
+  (:action attach_certificate_document_to_batch
+    :parameters (?production_batch - batch_header ?certificate_document - certificate_document ?material_identity - material_identity)
+    :precondition
+      (and
+        (entity_ready_for_release ?production_batch)
+        (batch_material_identity_link ?production_batch ?material_identity)
+        (certificate_document_available ?certificate_document)
+        (not
+          (entity_certificate_attached ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (entity_certificate_attached ?production_batch)
+        (entity_certificate_document_link ?production_batch ?certificate_document)
+        (not
+          (certificate_document_available ?certificate_document)
+        )
+      )
+  )
+  (:action finalize_primary_slot_allocation
+    :parameters (?primary_material_requirement_slot - primary_material_requirement_slot ?material_lot - material_lot ?certificate_document - certificate_document)
+    :precondition
+      (and
+        (entity_certificate_attached ?primary_material_requirement_slot)
+        (entity_candidate_lot_link ?primary_material_requirement_slot ?material_lot)
+        (entity_certificate_document_link ?primary_material_requirement_slot ?certificate_document)
+        (not
+          (entity_allocation_finalized ?primary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_finalized ?primary_material_requirement_slot)
+        (lot_available ?material_lot)
+        (certificate_document_available ?certificate_document)
+      )
+  )
+  (:action finalize_secondary_slot_allocation
+    :parameters (?secondary_material_requirement_slot - secondary_material_requirement_slot ?material_lot - material_lot ?certificate_document - certificate_document)
+    :precondition
+      (and
+        (entity_certificate_attached ?secondary_material_requirement_slot)
+        (entity_candidate_lot_link ?secondary_material_requirement_slot ?material_lot)
+        (entity_certificate_document_link ?secondary_material_requirement_slot ?certificate_document)
+        (not
+          (entity_allocation_finalized ?secondary_material_requirement_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_finalized ?secondary_material_requirement_slot)
+        (lot_available ?material_lot)
+        (certificate_document_available ?certificate_document)
+      )
+  )
+  (:action finalize_batch_record_allocation
+    :parameters (?batch_record - batch_detail ?material_lot - material_lot ?certificate_document - certificate_document)
+    :precondition
+      (and
+        (entity_certificate_attached ?batch_record)
+        (entity_candidate_lot_link ?batch_record ?material_lot)
+        (entity_certificate_document_link ?batch_record ?certificate_document)
+        (not
+          (entity_allocation_finalized ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_finalized ?batch_record)
+        (lot_available ?material_lot)
+        (certificate_document_available ?certificate_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem batch_lot_selection_scenario)
+  (:domain pharmaceutics_raw_material_lot_selection)
+  (:objects primary_material_requirement_slot_1 - primary_material_requirement_slot secondary_material_requirement_slot_1 - secondary_material_requirement_slot batch_record_1 - batch_detail batch_record_2 - batch_detail material_lot_1 - material_lot material_lot_2 - material_lot material_lot_3 - material_lot material_identity_1 - material_identity operator_1 - operator container_unit_1 - container_unit material_source_1 - material_source supplier_shipment_1 - supplier_shipment lot_selection_record_1 - lot_selection_record qc_sample_1 - qc_sample qc_sample_2 - qc_sample analytical_method_1 - analytical_method analytical_method_2 - analytical_method quality_credential_1 - quality_credential quality_credential_2 - quality_credential certificate_document_1 - certificate_document material_certificate_1 - material_certificate regulatory_reference_1 - regulatory_reference regulatory_reference_2 - regulatory_reference audit_trail_entry_1 - audit_trail_entry)
+  (:init
+    (lot_available material_lot_1)
+    (lot_available material_lot_2)
+    (lot_available material_lot_3)
+    (material_identity_available material_identity_1)
+    (operator_available operator_1)
+    (container_available container_unit_1)
+    (primary_slot_material_source_link primary_material_requirement_slot_1 material_source_1)
+    (secondary_slot_shipment_link secondary_material_requirement_slot_1 supplier_shipment_1)
+    (selection_record_available lot_selection_record_1)
+    (qc_sample_available qc_sample_1)
+    (qc_sample_available qc_sample_2)
+    (batch_record_primary_slot_link batch_record_1 primary_material_requirement_slot_1)
+    (batch_record_primary_slot_link batch_record_2 primary_material_requirement_slot_1)
+    (batch_record_secondary_slot_link batch_record_1 secondary_material_requirement_slot_1)
+    (batch_record_secondary_slot_link batch_record_2 secondary_material_requirement_slot_1)
+    (batch_record_selection_record_link batch_record_1 lot_selection_record_1)
+    (batch_record_selection_record_link batch_record_2 lot_selection_record_1)
+    (batch_record_qc_sample_link batch_record_1 qc_sample_1)
+    (batch_record_qc_sample_link batch_record_2 qc_sample_2)
+    (analytical_method_available analytical_method_1)
+    (analytical_method_available analytical_method_2)
+    (quality_credential_available quality_credential_1)
+    (quality_credential_available quality_credential_2)
+    (certificate_document_available certificate_document_1)
+    (material_certificate_available material_certificate_1)
+    (regulatory_reference_available regulatory_reference_1)
+    (batch_record_regulatory_reference_link batch_record_1 regulatory_reference_1)
+    (batch_record_regulatory_reference_link batch_record_2 regulatory_reference_2)
+    (audit_trail_entry_available audit_trail_entry_1)
+  )
+  (:goal
+    (and
+      (entity_allocation_finalized primary_material_requirement_slot_1)
+      (entity_allocation_finalized secondary_material_requirement_slot_1)
+      (entity_allocation_finalized batch_record_1)
+      (entity_allocation_finalized batch_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_production_batch primary_material_requirement_slot_1)
+(propose_material_lot primary_material_requirement_slot_1 material_lot_1)
+(assign_material_identity_to_batch primary_material_requirement_slot_1 material_identity_1)
+(finalize_batch_identity primary_material_requirement_slot_1 material_identity_1)
+(assign_container_to_primary_slot primary_material_requirement_slot_1 material_source_1 container_unit_1)
+(load_container_into_primary_slot primary_material_requirement_slot_1 material_source_1 material_identity_1 container_unit_1)
+(initialize_production_batch secondary_material_requirement_slot_1)
+(propose_material_lot secondary_material_requirement_slot_1 material_lot_2)
+(unassign_material_identity_from_batch primary_material_requirement_slot_1 material_identity_1)
+(assign_material_identity_to_batch secondary_material_requirement_slot_1 material_identity_1)
+(finalize_batch_identity secondary_material_requirement_slot_1 material_identity_1)
+(assign_container_to_secondary_slot secondary_material_requirement_slot_1 supplier_shipment_1 container_unit_1)
+(load_container_into_secondary_slot secondary_material_requirement_slot_1 supplier_shipment_1 material_identity_1 container_unit_1)
+(create_lot_selection_record primary_material_requirement_slot_1 secondary_material_requirement_slot_1 material_source_1 supplier_shipment_1 lot_selection_record_1)
+(unassign_material_identity_from_batch secondary_material_requirement_slot_1 material_identity_1)
+(assign_material_identity_to_batch primary_material_requirement_slot_1 material_identity_1)
+(prepare_selection_record_for_sampling lot_selection_record_1 primary_material_requirement_slot_1 material_identity_1)
+(mark_primary_slot_ready_for_release primary_material_requirement_slot_1 lot_selection_record_1)
+(mark_secondary_slot_ready_for_release secondary_material_requirement_slot_1 lot_selection_record_1)
+(attach_certificate_document_to_batch primary_material_requirement_slot_1 certificate_document_1 material_identity_1)
+(finalize_primary_slot_allocation primary_material_requirement_slot_1 material_lot_1 certificate_document_1)
+(unassign_material_identity_from_batch primary_material_requirement_slot_1 material_identity_1)
+(assign_material_identity_to_batch secondary_material_requirement_slot_1 material_identity_1)
+(attach_certificate_document_to_batch secondary_material_requirement_slot_1 certificate_document_1 material_identity_1)
+(finalize_secondary_slot_allocation secondary_material_requirement_slot_1 material_lot_2 certificate_document_1)
+(unassign_material_identity_from_batch secondary_material_requirement_slot_1 material_identity_1)
+(initialize_production_batch batch_record_1)
+(propose_material_lot batch_record_1 material_lot_1)
+(assign_material_identity_to_batch batch_record_1 material_identity_1)
+(finalize_batch_identity batch_record_1 material_identity_1)
+(collect_qc_sample batch_record_1 qc_sample_1 lot_selection_record_1)
+(request_qc_test batch_record_1 qc_sample_1 lot_selection_record_1 material_identity_1)
+(assign_operator_to_record batch_record_1 operator_1)
+(attach_material_certificate_to_record batch_record_1 material_certificate_1)
+(record_qc_test_result batch_record_1 material_certificate_1 operator_1 qc_sample_1 lot_selection_record_1)
+(attach_audit_trail_entry_to_record batch_record_1 audit_trail_entry_1)
+(complete_qc_review batch_record_1 audit_trail_entry_1 qc_sample_1 lot_selection_record_1)
+(mark_record_ready_for_release batch_record_1)
+(attach_certificate_document_to_batch batch_record_1 certificate_document_1 material_identity_1)
+(finalize_batch_record_allocation batch_record_1 material_lot_1 certificate_document_1)
+(unassign_material_identity_from_batch batch_record_1 material_identity_1)
+(detach_material_certificate_from_record batch_record_1 material_certificate_1)
+(detach_audit_trail_entry_from_record batch_record_1 audit_trail_entry_1)
+(unassign_operator_from_record batch_record_1 operator_1)
+(initialize_production_batch batch_record_2)
+(propose_material_lot batch_record_2 material_lot_2)
+(assign_material_identity_to_batch batch_record_2 material_identity_1)
+(finalize_batch_identity batch_record_2 material_identity_1)
+(collect_qc_sample batch_record_2 qc_sample_2 lot_selection_record_1)
+(request_qc_test batch_record_2 qc_sample_2 lot_selection_record_1 material_identity_1)
+(assign_operator_to_record batch_record_2 operator_1)
+(attach_material_certificate_to_record batch_record_2 material_certificate_1)
+(record_qc_test_result batch_record_2 material_certificate_1 operator_1 qc_sample_2 lot_selection_record_1)
+(attach_audit_trail_entry_to_record batch_record_2 audit_trail_entry_1)
+(complete_qc_review batch_record_2 audit_trail_entry_1 qc_sample_2 lot_selection_record_1)
+(mark_record_ready_for_release batch_record_2)
+(attach_certificate_document_to_batch batch_record_2 certificate_document_1 material_identity_1)
+(finalize_batch_record_allocation batch_record_2 material_lot_2 certificate_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vnltdv6s/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_vnltdv6s/plan.pddl 58 
+
+
+
+--- stderr ---
+

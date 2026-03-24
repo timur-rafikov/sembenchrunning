@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain logistics_partial_fulfillment_split_decision)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object handling_category - object transport_entity_category - object order_record - object order_entity - order_record fulfillment_center - resource_category service_level_profile - resource_category packing_resource - resource_category equipment_type - resource_category transport_requirement - resource_category split_decision_token - resource_category special_handling_requirement - resource_category carrier_option - resource_category inventory_unit - handling_category handling_unit_type - handling_category customer_delivery_slot - handling_category origin_node - transport_entity_category destination_node - transport_entity_category transport_unit - transport_entity_category order_component_group - order_entity order_component_group_alt - order_entity source_allocation - order_component_group consolidation_group - order_component_group shipment_plan - order_component_group_alt)
+  (:predicates
+    (order_released ?order_entity - order_entity)
+    (entity_validated ?order_entity - order_entity)
+    (sourcing_assigned ?order_entity - order_entity)
+    (fulfilled ?order_entity - order_entity)
+    (ready_for_finalization ?order_entity - order_entity)
+    (split_decision_applied ?order_entity - order_entity)
+    (fulfillment_center_available ?fulfillment_center - fulfillment_center)
+    (assigned_fulfillment_center ?order_entity - order_entity ?fulfillment_center - fulfillment_center)
+    (service_level_available ?service_level_profile - service_level_profile)
+    (has_service_level_profile ?order_entity - order_entity ?service_level_profile - service_level_profile)
+    (packing_resource_available ?packing_resource - packing_resource)
+    (allocated_packing_resource ?order_entity - order_entity ?packing_resource - packing_resource)
+    (inventory_unit_available ?inventory_unit - inventory_unit)
+    (allocated_inventory_unit ?source_allocation - source_allocation ?inventory_unit - inventory_unit)
+    (consolidation_allocated_inventory ?consolidation_group - consolidation_group ?inventory_unit - inventory_unit)
+    (allocation_origin_node ?source_allocation - source_allocation ?origin_node - origin_node)
+    (origin_node_selected ?origin_node - origin_node)
+    (origin_node_inventory_committed ?origin_node - origin_node)
+    (allocation_inventory_confirmed ?source_allocation - source_allocation)
+    (consolidation_destination_node ?consolidation_group - consolidation_group ?destination_node - destination_node)
+    (destination_node_selected ?destination_node - destination_node)
+    (destination_node_inventory_committed ?destination_node - destination_node)
+    (consolidation_ready ?consolidation_group - consolidation_group)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_allocated ?transport_unit - transport_unit)
+    (transport_unit_origin_assigned ?transport_unit - transport_unit ?origin_node - origin_node)
+    (transport_unit_destination_assigned ?transport_unit - transport_unit ?destination_node - destination_node)
+    (transport_unit_origin_verified ?transport_unit - transport_unit)
+    (transport_unit_destination_verified ?transport_unit - transport_unit)
+    (transport_unit_load_ready ?transport_unit - transport_unit)
+    (shipment_includes_allocation ?shipment_plan - shipment_plan ?source_allocation - source_allocation)
+    (shipment_includes_consolidation ?shipment_plan - shipment_plan ?consolidation_group - consolidation_group)
+    (shipment_assigned_transport_unit ?shipment_plan - shipment_plan ?transport_unit - transport_unit)
+    (handling_unit_type_available ?handling_unit_type - handling_unit_type)
+    (shipment_requested_handling_unit_type ?shipment_plan - shipment_plan ?handling_unit_type - handling_unit_type)
+    (handling_unit_type_reserved ?handling_unit_type - handling_unit_type)
+    (handling_unit_type_assigned_to_transport_unit ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    (shipment_processing_ready ?shipment_plan - shipment_plan)
+    (shipment_hu_allocated ?shipment_plan - shipment_plan)
+    (shipment_carrier_verified ?shipment_plan - shipment_plan)
+    (shipment_equipment_bound ?shipment_plan - shipment_plan)
+    (shipment_equipment_confirmed ?shipment_plan - shipment_plan)
+    (shipment_transport_requirements_assigned ?shipment_plan - shipment_plan)
+    (shipment_load_verified ?shipment_plan - shipment_plan)
+    (customer_delivery_slot_available ?customer_delivery_slot - customer_delivery_slot)
+    (shipment_assigned_customer_slot ?shipment_plan - shipment_plan ?customer_delivery_slot - customer_delivery_slot)
+    (shipment_customer_slot_bound ?shipment_plan - shipment_plan)
+    (shipment_slot_equipment_ready ?shipment_plan - shipment_plan)
+    (shipment_carrier_selected ?shipment_plan - shipment_plan)
+    (equipment_type_available ?equipment_type - equipment_type)
+    (shipment_assigned_equipment_type ?shipment_plan - shipment_plan ?equipment_type - equipment_type)
+    (transport_requirement_available ?transport_requirement - transport_requirement)
+    (shipment_has_transport_requirement ?shipment_plan - shipment_plan ?transport_requirement - transport_requirement)
+    (special_handling_available ?special_handling_requirement - special_handling_requirement)
+    (shipment_has_special_handling ?shipment_plan - shipment_plan ?special_handling_requirement - special_handling_requirement)
+    (carrier_option_available ?carrier_option - carrier_option)
+    (shipment_has_carrier_option ?shipment_plan - shipment_plan ?carrier_option - carrier_option)
+    (split_token_available ?split_token - split_decision_token)
+    (assigned_split_token ?order_entity - order_entity ?split_token - split_decision_token)
+    (allocation_prepared ?source_allocation - source_allocation)
+    (consolidation_prepared ?consolidation_group - consolidation_group)
+    (shipment_plan_finalized ?shipment_plan - shipment_plan)
+  )
+  (:action release_order
+    :parameters (?order_entity - order_entity)
+    :precondition
+      (and
+        (not
+          (order_released ?order_entity)
+        )
+        (not
+          (fulfilled ?order_entity)
+        )
+      )
+    :effect (order_released ?order_entity)
+  )
+  (:action assign_sourcing_candidate
+    :parameters (?order_entity - order_entity ?fulfillment_center - fulfillment_center)
+    :precondition
+      (and
+        (order_released ?order_entity)
+        (not
+          (sourcing_assigned ?order_entity)
+        )
+        (fulfillment_center_available ?fulfillment_center)
+      )
+    :effect
+      (and
+        (sourcing_assigned ?order_entity)
+        (assigned_fulfillment_center ?order_entity ?fulfillment_center)
+        (not
+          (fulfillment_center_available ?fulfillment_center)
+        )
+      )
+  )
+  (:action attach_service_level_profile
+    :parameters (?order_entity - order_entity ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (order_released ?order_entity)
+        (sourcing_assigned ?order_entity)
+        (service_level_available ?service_level_profile)
+      )
+    :effect
+      (and
+        (has_service_level_profile ?order_entity ?service_level_profile)
+        (not
+          (service_level_available ?service_level_profile)
+        )
+      )
+  )
+  (:action confirm_service_level_assignment
+    :parameters (?order_entity - order_entity ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (order_released ?order_entity)
+        (sourcing_assigned ?order_entity)
+        (has_service_level_profile ?order_entity ?service_level_profile)
+        (not
+          (entity_validated ?order_entity)
+        )
+      )
+    :effect (entity_validated ?order_entity)
+  )
+  (:action revoke_service_level_assignment
+    :parameters (?order_entity - order_entity ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (has_service_level_profile ?order_entity ?service_level_profile)
+      )
+    :effect
+      (and
+        (service_level_available ?service_level_profile)
+        (not
+          (has_service_level_profile ?order_entity ?service_level_profile)
+        )
+      )
+  )
+  (:action reserve_packing_resource
+    :parameters (?order_entity - order_entity ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (entity_validated ?order_entity)
+        (packing_resource_available ?packing_resource)
+      )
+    :effect
+      (and
+        (allocated_packing_resource ?order_entity ?packing_resource)
+        (not
+          (packing_resource_available ?packing_resource)
+        )
+      )
+  )
+  (:action release_packing_resource
+    :parameters (?order_entity - order_entity ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (allocated_packing_resource ?order_entity ?packing_resource)
+      )
+    :effect
+      (and
+        (packing_resource_available ?packing_resource)
+        (not
+          (allocated_packing_resource ?order_entity ?packing_resource)
+        )
+      )
+  )
+  (:action attach_special_handling_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (special_handling_available ?special_handling_requirement)
+      )
+    :effect
+      (and
+        (shipment_has_special_handling ?shipment_plan ?special_handling_requirement)
+        (not
+          (special_handling_available ?special_handling_requirement)
+        )
+      )
+  )
+  (:action remove_special_handling_from_shipment
+    :parameters (?shipment_plan - shipment_plan ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (shipment_has_special_handling ?shipment_plan ?special_handling_requirement)
+      )
+    :effect
+      (and
+        (special_handling_available ?special_handling_requirement)
+        (not
+          (shipment_has_special_handling ?shipment_plan ?special_handling_requirement)
+        )
+      )
+  )
+  (:action attach_carrier_option_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (carrier_option_available ?carrier_option)
+      )
+    :effect
+      (and
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (not
+          (carrier_option_available ?carrier_option)
+        )
+      )
+  )
+  (:action remove_carrier_option_from_shipment
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+      )
+    :effect
+      (and
+        (carrier_option_available ?carrier_option)
+        (not
+          (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        )
+      )
+  )
+  (:action claim_origin_node_for_allocation
+    :parameters (?source_allocation - source_allocation ?origin_node - origin_node ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (entity_validated ?source_allocation)
+        (has_service_level_profile ?source_allocation ?service_level_profile)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (not
+          (origin_node_selected ?origin_node)
+        )
+        (not
+          (origin_node_inventory_committed ?origin_node)
+        )
+      )
+    :effect (origin_node_selected ?origin_node)
+  )
+  (:action reserve_allocation_for_packing
+    :parameters (?source_allocation - source_allocation ?origin_node - origin_node ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (entity_validated ?source_allocation)
+        (allocated_packing_resource ?source_allocation ?packing_resource)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (origin_node_selected ?origin_node)
+        (not
+          (allocation_prepared ?source_allocation)
+        )
+      )
+    :effect
+      (and
+        (allocation_prepared ?source_allocation)
+        (allocation_inventory_confirmed ?source_allocation)
+      )
+  )
+  (:action allocate_inventory_to_source
+    :parameters (?source_allocation - source_allocation ?origin_node - origin_node ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_validated ?source_allocation)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (allocation_prepared ?source_allocation)
+        )
+      )
+    :effect
+      (and
+        (origin_node_inventory_committed ?origin_node)
+        (allocation_prepared ?source_allocation)
+        (allocated_inventory_unit ?source_allocation ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action finalize_inventory_allocation
+    :parameters (?source_allocation - source_allocation ?origin_node - origin_node ?service_level_profile - service_level_profile ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_validated ?source_allocation)
+        (has_service_level_profile ?source_allocation ?service_level_profile)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (origin_node_inventory_committed ?origin_node)
+        (allocated_inventory_unit ?source_allocation ?inventory_unit)
+        (not
+          (allocation_inventory_confirmed ?source_allocation)
+        )
+      )
+    :effect
+      (and
+        (origin_node_selected ?origin_node)
+        (allocation_inventory_confirmed ?source_allocation)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (allocated_inventory_unit ?source_allocation ?inventory_unit)
+        )
+      )
+  )
+  (:action claim_destination_node_for_consolidation
+    :parameters (?consolidation_group - consolidation_group ?destination_node - destination_node ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (entity_validated ?consolidation_group)
+        (has_service_level_profile ?consolidation_group ?service_level_profile)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (not
+          (destination_node_selected ?destination_node)
+        )
+        (not
+          (destination_node_inventory_committed ?destination_node)
+        )
+      )
+    :effect (destination_node_selected ?destination_node)
+  )
+  (:action reserve_consolidation_for_packing
+    :parameters (?consolidation_group - consolidation_group ?destination_node - destination_node ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (entity_validated ?consolidation_group)
+        (allocated_packing_resource ?consolidation_group ?packing_resource)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (destination_node_selected ?destination_node)
+        (not
+          (consolidation_prepared ?consolidation_group)
+        )
+      )
+    :effect
+      (and
+        (consolidation_prepared ?consolidation_group)
+        (consolidation_ready ?consolidation_group)
+      )
+  )
+  (:action allocate_inventory_to_consolidation
+    :parameters (?consolidation_group - consolidation_group ?destination_node - destination_node ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_validated ?consolidation_group)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (consolidation_prepared ?consolidation_group)
+        )
+      )
+    :effect
+      (and
+        (destination_node_inventory_committed ?destination_node)
+        (consolidation_prepared ?consolidation_group)
+        (consolidation_allocated_inventory ?consolidation_group ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action finalize_consolidation_inventory_allocation
+    :parameters (?consolidation_group - consolidation_group ?destination_node - destination_node ?service_level_profile - service_level_profile ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_validated ?consolidation_group)
+        (has_service_level_profile ?consolidation_group ?service_level_profile)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (destination_node_inventory_committed ?destination_node)
+        (consolidation_allocated_inventory ?consolidation_group ?inventory_unit)
+        (not
+          (consolidation_ready ?consolidation_group)
+        )
+      )
+    :effect
+      (and
+        (destination_node_selected ?destination_node)
+        (consolidation_ready ?consolidation_group)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (consolidation_allocated_inventory ?consolidation_group ?inventory_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_standard
+    :parameters (?source_allocation - source_allocation ?consolidation_group - consolidation_group ?origin_node - origin_node ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_prepared ?source_allocation)
+        (consolidation_prepared ?consolidation_group)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (origin_node_selected ?origin_node)
+        (destination_node_selected ?destination_node)
+        (allocation_inventory_confirmed ?source_allocation)
+        (consolidation_ready ?consolidation_group)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_origin_assigned ?transport_unit ?origin_node)
+        (transport_unit_destination_assigned ?transport_unit ?destination_node)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_origin_committed
+    :parameters (?source_allocation - source_allocation ?consolidation_group - consolidation_group ?origin_node - origin_node ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_prepared ?source_allocation)
+        (consolidation_prepared ?consolidation_group)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (origin_node_inventory_committed ?origin_node)
+        (destination_node_selected ?destination_node)
+        (not
+          (allocation_inventory_confirmed ?source_allocation)
+        )
+        (consolidation_ready ?consolidation_group)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_origin_assigned ?transport_unit ?origin_node)
+        (transport_unit_destination_assigned ?transport_unit ?destination_node)
+        (transport_unit_origin_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_destination_committed
+    :parameters (?source_allocation - source_allocation ?consolidation_group - consolidation_group ?origin_node - origin_node ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_prepared ?source_allocation)
+        (consolidation_prepared ?consolidation_group)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (origin_node_selected ?origin_node)
+        (destination_node_inventory_committed ?destination_node)
+        (allocation_inventory_confirmed ?source_allocation)
+        (not
+          (consolidation_ready ?consolidation_group)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_origin_assigned ?transport_unit ?origin_node)
+        (transport_unit_destination_assigned ?transport_unit ?destination_node)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_both_committed
+    :parameters (?source_allocation - source_allocation ?consolidation_group - consolidation_group ?origin_node - origin_node ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_prepared ?source_allocation)
+        (consolidation_prepared ?consolidation_group)
+        (allocation_origin_node ?source_allocation ?origin_node)
+        (consolidation_destination_node ?consolidation_group ?destination_node)
+        (origin_node_inventory_committed ?origin_node)
+        (destination_node_inventory_committed ?destination_node)
+        (not
+          (allocation_inventory_confirmed ?source_allocation)
+        )
+        (not
+          (consolidation_ready ?consolidation_group)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_origin_assigned ?transport_unit ?origin_node)
+        (transport_unit_destination_assigned ?transport_unit ?destination_node)
+        (transport_unit_origin_verified ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action mark_transport_unit_load_ready
+    :parameters (?transport_unit - transport_unit ?source_allocation - source_allocation ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (allocation_prepared ?source_allocation)
+        (has_service_level_profile ?source_allocation ?service_level_profile)
+        (not
+          (transport_unit_load_ready ?transport_unit)
+        )
+      )
+    :effect (transport_unit_load_ready ?transport_unit)
+  )
+  (:action assign_handling_unit_type_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (shipment_assigned_transport_unit ?shipment_plan ?transport_unit)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_available ?handling_unit_type)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_load_ready ?transport_unit)
+        (not
+          (handling_unit_type_reserved ?handling_unit_type)
+        )
+      )
+    :effect
+      (and
+        (handling_unit_type_reserved ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (not
+          (handling_unit_type_available ?handling_unit_type)
+        )
+      )
+  )
+  (:action confirm_handling_unit_type_assignment
+    :parameters (?shipment_plan - shipment_plan ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_reserved ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (has_service_level_profile ?shipment_plan ?service_level_profile)
+        (not
+          (transport_unit_origin_verified ?transport_unit)
+        )
+        (not
+          (shipment_processing_ready ?shipment_plan)
+        )
+      )
+    :effect (shipment_processing_ready ?shipment_plan)
+  )
+  (:action bind_equipment_type_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (equipment_type_available ?equipment_type)
+        (not
+          (shipment_equipment_bound ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_equipment_bound ?shipment_plan)
+        (shipment_assigned_equipment_type ?shipment_plan ?equipment_type)
+        (not
+          (equipment_type_available ?equipment_type)
+        )
+      )
+  )
+  (:action apply_handling_sequence_and_equipment
+    :parameters (?shipment_plan - shipment_plan ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit ?service_level_profile - service_level_profile ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_reserved ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (has_service_level_profile ?shipment_plan ?service_level_profile)
+        (transport_unit_origin_verified ?transport_unit)
+        (shipment_equipment_bound ?shipment_plan)
+        (shipment_assigned_equipment_type ?shipment_plan ?equipment_type)
+        (not
+          (shipment_processing_ready ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_processing_ready ?shipment_plan)
+        (shipment_equipment_confirmed ?shipment_plan)
+      )
+  )
+  (:action prepare_shipment_with_special_handling
+    :parameters (?shipment_plan - shipment_plan ?special_handling_requirement - special_handling_requirement ?packing_resource - packing_resource ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_processing_ready ?shipment_plan)
+        (shipment_has_special_handling ?shipment_plan ?special_handling_requirement)
+        (allocated_packing_resource ?shipment_plan ?packing_resource)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_hu_allocated ?shipment_plan)
+        )
+      )
+    :effect (shipment_hu_allocated ?shipment_plan)
+  )
+  (:action prepare_shipment_with_special_handling_variant2
+    :parameters (?shipment_plan - shipment_plan ?special_handling_requirement - special_handling_requirement ?packing_resource - packing_resource ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_processing_ready ?shipment_plan)
+        (shipment_has_special_handling ?shipment_plan ?special_handling_requirement)
+        (allocated_packing_resource ?shipment_plan ?packing_resource)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_hu_allocated ?shipment_plan)
+        )
+      )
+    :effect (shipment_hu_allocated ?shipment_plan)
+  )
+  (:action apply_carrier_option_and_verify_load
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_hu_allocated ?shipment_plan)
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (not
+          (transport_unit_origin_verified ?transport_unit)
+        )
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_carrier_verified ?shipment_plan)
+        )
+      )
+    :effect (shipment_carrier_verified ?shipment_plan)
+  )
+  (:action apply_carrier_option_and_confirm_equipment
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_hu_allocated ?shipment_plan)
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (transport_unit_origin_verified ?transport_unit)
+        (not
+          (transport_unit_destination_verified ?transport_unit)
+        )
+        (not
+          (shipment_carrier_verified ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_transport_requirements_assigned ?shipment_plan)
+      )
+  )
+  (:action apply_carrier_option_and_confirm_hu_assignment
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_hu_allocated ?shipment_plan)
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (not
+          (transport_unit_origin_verified ?transport_unit)
+        )
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_carrier_verified ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_transport_requirements_assigned ?shipment_plan)
+      )
+  )
+  (:action apply_carrier_option_and_finalize_preparation
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option ?handling_unit_type - handling_unit_type ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_hu_allocated ?shipment_plan)
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (shipment_requested_handling_unit_type ?shipment_plan ?handling_unit_type)
+        (handling_unit_type_assigned_to_transport_unit ?handling_unit_type ?transport_unit)
+        (transport_unit_origin_verified ?transport_unit)
+        (transport_unit_destination_verified ?transport_unit)
+        (not
+          (shipment_carrier_verified ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_transport_requirements_assigned ?shipment_plan)
+      )
+  )
+  (:action mark_shipment_ready_for_finalization
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (not
+          (shipment_transport_requirements_assigned ?shipment_plan)
+        )
+        (not
+          (shipment_plan_finalized ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized ?shipment_plan)
+        (ready_for_finalization ?shipment_plan)
+      )
+  )
+  (:action assign_transport_requirement_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?transport_requirement - transport_requirement)
+    :precondition
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_transport_requirements_assigned ?shipment_plan)
+        (transport_requirement_available ?transport_requirement)
+      )
+    :effect
+      (and
+        (shipment_has_transport_requirement ?shipment_plan ?transport_requirement)
+        (not
+          (transport_requirement_available ?transport_requirement)
+        )
+      )
+  )
+  (:action qualify_shipment_for_dispatch
+    :parameters (?shipment_plan - shipment_plan ?source_allocation - source_allocation ?consolidation_group - consolidation_group ?service_level_profile - service_level_profile ?transport_requirement - transport_requirement)
+    :precondition
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_transport_requirements_assigned ?shipment_plan)
+        (shipment_has_transport_requirement ?shipment_plan ?transport_requirement)
+        (shipment_includes_allocation ?shipment_plan ?source_allocation)
+        (shipment_includes_consolidation ?shipment_plan ?consolidation_group)
+        (allocation_inventory_confirmed ?source_allocation)
+        (consolidation_ready ?consolidation_group)
+        (has_service_level_profile ?shipment_plan ?service_level_profile)
+        (not
+          (shipment_load_verified ?shipment_plan)
+        )
+      )
+    :effect (shipment_load_verified ?shipment_plan)
+  )
+  (:action finalize_shipment_and_mark_ready
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_carrier_verified ?shipment_plan)
+        (shipment_load_verified ?shipment_plan)
+        (not
+          (shipment_plan_finalized ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized ?shipment_plan)
+        (ready_for_finalization ?shipment_plan)
+      )
+  )
+  (:action assign_customer_delivery_slot_to_shipment
+    :parameters (?shipment_plan - shipment_plan ?customer_delivery_slot - customer_delivery_slot ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (entity_validated ?shipment_plan)
+        (has_service_level_profile ?shipment_plan ?service_level_profile)
+        (customer_delivery_slot_available ?customer_delivery_slot)
+        (shipment_assigned_customer_slot ?shipment_plan ?customer_delivery_slot)
+        (not
+          (shipment_customer_slot_bound ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_customer_slot_bound ?shipment_plan)
+        (not
+          (customer_delivery_slot_available ?customer_delivery_slot)
+        )
+      )
+  )
+  (:action confirm_slot_packing_resource
+    :parameters (?shipment_plan - shipment_plan ?packing_resource - packing_resource)
+    :precondition
+      (and
+        (shipment_customer_slot_bound ?shipment_plan)
+        (allocated_packing_resource ?shipment_plan ?packing_resource)
+        (not
+          (shipment_slot_equipment_ready ?shipment_plan)
+        )
+      )
+    :effect (shipment_slot_equipment_ready ?shipment_plan)
+  )
+  (:action bind_carrier_option_to_shipment_preparation
+    :parameters (?shipment_plan - shipment_plan ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (shipment_slot_equipment_ready ?shipment_plan)
+        (shipment_has_carrier_option ?shipment_plan ?carrier_option)
+        (not
+          (shipment_carrier_selected ?shipment_plan)
+        )
+      )
+    :effect (shipment_carrier_selected ?shipment_plan)
+  )
+  (:action finalize_carrier_binding_and_mark_ready
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (shipment_carrier_selected ?shipment_plan)
+        (not
+          (shipment_plan_finalized ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_finalized ?shipment_plan)
+        (ready_for_finalization ?shipment_plan)
+      )
+  )
+  (:action finalize_allocation_for_dispatch
+    :parameters (?source_allocation - source_allocation ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_prepared ?source_allocation)
+        (allocation_inventory_confirmed ?source_allocation)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_load_ready ?transport_unit)
+        (not
+          (ready_for_finalization ?source_allocation)
+        )
+      )
+    :effect (ready_for_finalization ?source_allocation)
+  )
+  (:action finalize_consolidation_for_dispatch
+    :parameters (?consolidation_group - consolidation_group ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (consolidation_prepared ?consolidation_group)
+        (consolidation_ready ?consolidation_group)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_load_ready ?transport_unit)
+        (not
+          (ready_for_finalization ?consolidation_group)
+        )
+      )
+    :effect (ready_for_finalization ?consolidation_group)
+  )
+  (:action apply_split_decision_to_order
+    :parameters (?order_entity - order_entity ?split_token - split_decision_token ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (ready_for_finalization ?order_entity)
+        (has_service_level_profile ?order_entity ?service_level_profile)
+        (split_token_available ?split_token)
+        (not
+          (split_decision_applied ?order_entity)
+        )
+      )
+    :effect
+      (and
+        (split_decision_applied ?order_entity)
+        (assigned_split_token ?order_entity ?split_token)
+        (not
+          (split_token_available ?split_token)
+        )
+      )
+  )
+  (:action apply_split_to_source_allocation
+    :parameters (?source_allocation - source_allocation ?fulfillment_center - fulfillment_center ?split_token - split_decision_token)
+    :precondition
+      (and
+        (split_decision_applied ?source_allocation)
+        (assigned_fulfillment_center ?source_allocation ?fulfillment_center)
+        (assigned_split_token ?source_allocation ?split_token)
+        (not
+          (fulfilled ?source_allocation)
+        )
+      )
+    :effect
+      (and
+        (fulfilled ?source_allocation)
+        (fulfillment_center_available ?fulfillment_center)
+        (split_token_available ?split_token)
+      )
+  )
+  (:action apply_split_to_consolidation_group
+    :parameters (?consolidation_group - consolidation_group ?fulfillment_center - fulfillment_center ?split_token - split_decision_token)
+    :precondition
+      (and
+        (split_decision_applied ?consolidation_group)
+        (assigned_fulfillment_center ?consolidation_group ?fulfillment_center)
+        (assigned_split_token ?consolidation_group ?split_token)
+        (not
+          (fulfilled ?consolidation_group)
+        )
+      )
+    :effect
+      (and
+        (fulfilled ?consolidation_group)
+        (fulfillment_center_available ?fulfillment_center)
+        (split_token_available ?split_token)
+      )
+  )
+  (:action apply_split_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?fulfillment_center - fulfillment_center ?split_token - split_decision_token)
+    :precondition
+      (and
+        (split_decision_applied ?shipment_plan)
+        (assigned_fulfillment_center ?shipment_plan ?fulfillment_center)
+        (assigned_split_token ?shipment_plan ?split_token)
+        (not
+          (fulfilled ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (fulfilled ?shipment_plan)
+        (fulfillment_center_available ?fulfillment_center)
+        (split_token_available ?split_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem partial_fulfillment_split_decision_scenario)
+  (:domain logistics_partial_fulfillment_split_decision)
+  (:objects source_allocation_1 - source_allocation consolidation_group_1 - consolidation_group shipment_plan_a - shipment_plan shipment_plan_b - shipment_plan fulfillment_center_north - fulfillment_center fulfillment_center_south - fulfillment_center fulfillment_center_central - fulfillment_center service_level_standard - service_level_profile packing_station_1 - packing_resource inventory_unit_pallet_1 - inventory_unit origin_node_dock_1 - origin_node destination_node_zone_1 - destination_node transport_unit_container_1 - transport_unit hu_type_box - handling_unit_type hu_type_pallet - handling_unit_type equipment_type_forklift - equipment_type equipment_type_trailer - equipment_type transport_requirement_capacity_small - transport_requirement transport_requirement_capacity_large - transport_requirement split_token_1 - split_decision_token special_handling_temperature_control - special_handling_requirement customer_slot_morning - customer_delivery_slot customer_slot_evening - customer_delivery_slot carrier_option_standard - carrier_option)
+  (:init
+    (fulfillment_center_available fulfillment_center_north)
+    (fulfillment_center_available fulfillment_center_south)
+    (fulfillment_center_available fulfillment_center_central)
+    (service_level_available service_level_standard)
+    (packing_resource_available packing_station_1)
+    (inventory_unit_available inventory_unit_pallet_1)
+    (allocation_origin_node source_allocation_1 origin_node_dock_1)
+    (consolidation_destination_node consolidation_group_1 destination_node_zone_1)
+    (transport_unit_available transport_unit_container_1)
+    (handling_unit_type_available hu_type_box)
+    (handling_unit_type_available hu_type_pallet)
+    (shipment_includes_allocation shipment_plan_a source_allocation_1)
+    (shipment_includes_allocation shipment_plan_b source_allocation_1)
+    (shipment_includes_consolidation shipment_plan_a consolidation_group_1)
+    (shipment_includes_consolidation shipment_plan_b consolidation_group_1)
+    (shipment_assigned_transport_unit shipment_plan_a transport_unit_container_1)
+    (shipment_assigned_transport_unit shipment_plan_b transport_unit_container_1)
+    (shipment_requested_handling_unit_type shipment_plan_a hu_type_box)
+    (shipment_requested_handling_unit_type shipment_plan_b hu_type_pallet)
+    (equipment_type_available equipment_type_forklift)
+    (equipment_type_available equipment_type_trailer)
+    (transport_requirement_available transport_requirement_capacity_small)
+    (transport_requirement_available transport_requirement_capacity_large)
+    (split_token_available split_token_1)
+    (special_handling_available special_handling_temperature_control)
+    (customer_delivery_slot_available customer_slot_morning)
+    (shipment_assigned_customer_slot shipment_plan_a customer_slot_morning)
+    (shipment_assigned_customer_slot shipment_plan_b customer_slot_evening)
+    (carrier_option_available carrier_option_standard)
+  )
+  (:goal
+    (and
+      (fulfilled source_allocation_1)
+      (fulfilled consolidation_group_1)
+      (fulfilled shipment_plan_a)
+      (fulfilled shipment_plan_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(release_order source_allocation_1)
+(assign_sourcing_candidate source_allocation_1 fulfillment_center_north)
+(attach_service_level_profile source_allocation_1 service_level_standard)
+(confirm_service_level_assignment source_allocation_1 service_level_standard)
+(allocate_inventory_to_source source_allocation_1 origin_node_dock_1 inventory_unit_pallet_1)
+(finalize_inventory_allocation source_allocation_1 origin_node_dock_1 service_level_standard inventory_unit_pallet_1)
+(revoke_service_level_assignment source_allocation_1 service_level_standard)
+(release_order consolidation_group_1)
+(assign_sourcing_candidate consolidation_group_1 fulfillment_center_south)
+(attach_service_level_profile consolidation_group_1 service_level_standard)
+(confirm_service_level_assignment consolidation_group_1 service_level_standard)
+(allocate_inventory_to_consolidation consolidation_group_1 destination_node_zone_1 inventory_unit_pallet_1)
+(finalize_consolidation_inventory_allocation consolidation_group_1 destination_node_zone_1 service_level_standard inventory_unit_pallet_1)
+(revoke_service_level_assignment consolidation_group_1 service_level_standard)
+(attach_service_level_profile source_allocation_1 service_level_standard)
+(allocate_transport_unit_standard source_allocation_1 consolidation_group_1 origin_node_dock_1 destination_node_zone_1 transport_unit_container_1)
+(mark_transport_unit_load_ready transport_unit_container_1 source_allocation_1 service_level_standard)
+(finalize_allocation_for_dispatch source_allocation_1 transport_unit_container_1)
+(finalize_consolidation_for_dispatch consolidation_group_1 transport_unit_container_1)
+(apply_split_decision_to_order source_allocation_1 split_token_1 service_level_standard)
+(apply_split_to_source_allocation source_allocation_1 fulfillment_center_north split_token_1)
+(revoke_service_level_assignment source_allocation_1 service_level_standard)
+(attach_service_level_profile consolidation_group_1 service_level_standard)
+(apply_split_decision_to_order consolidation_group_1 split_token_1 service_level_standard)
+(apply_split_to_consolidation_group consolidation_group_1 fulfillment_center_south split_token_1)
+(release_order shipment_plan_a)
+(assign_sourcing_candidate shipment_plan_a fulfillment_center_central)
+(attach_service_level_profile shipment_plan_a service_level_standard)
+(confirm_service_level_assignment shipment_plan_a service_level_standard)
+(reserve_packing_resource shipment_plan_a packing_station_1)
+(attach_special_handling_to_shipment shipment_plan_a special_handling_temperature_control)
+(attach_carrier_option_to_shipment shipment_plan_a carrier_option_standard)
+(assign_handling_unit_type_to_shipment shipment_plan_a hu_type_box transport_unit_container_1)
+(confirm_handling_unit_type_assignment shipment_plan_a hu_type_box transport_unit_container_1 service_level_standard)
+(prepare_shipment_with_special_handling shipment_plan_a special_handling_temperature_control packing_station_1 hu_type_box transport_unit_container_1)
+(apply_carrier_option_and_verify_load shipment_plan_a carrier_option_standard hu_type_box transport_unit_container_1)
+(mark_shipment_ready_for_finalization shipment_plan_a)
+(apply_split_decision_to_order shipment_plan_a split_token_1 service_level_standard)
+(apply_split_to_shipment_plan shipment_plan_a fulfillment_center_central split_token_1)
+(release_packing_resource shipment_plan_a packing_station_1)
+(remove_special_handling_from_shipment shipment_plan_a special_handling_temperature_control)
+(remove_carrier_option_from_shipment shipment_plan_a carrier_option_standard)
+(revoke_service_level_assignment shipment_plan_a service_level_standard)
+(release_order shipment_plan_b)
+(assign_sourcing_candidate shipment_plan_b fulfillment_center_north)
+(attach_service_level_profile shipment_plan_b service_level_standard)
+(confirm_service_level_assignment shipment_plan_b service_level_standard)
+(reserve_packing_resource shipment_plan_b packing_station_1)
+(attach_special_handling_to_shipment shipment_plan_b special_handling_temperature_control)
+(attach_carrier_option_to_shipment shipment_plan_b carrier_option_standard)
+(assign_handling_unit_type_to_shipment shipment_plan_b hu_type_pallet transport_unit_container_1)
+(confirm_handling_unit_type_assignment shipment_plan_b hu_type_pallet transport_unit_container_1 service_level_standard)
+(prepare_shipment_with_special_handling shipment_plan_b special_handling_temperature_control packing_station_1 hu_type_pallet transport_unit_container_1)
+(apply_carrier_option_and_verify_load shipment_plan_b carrier_option_standard hu_type_pallet transport_unit_container_1)
+(mark_shipment_ready_for_finalization shipment_plan_b)
+(apply_split_decision_to_order shipment_plan_b split_token_1 service_level_standard)
+(apply_split_to_shipment_plan shipment_plan_b fulfillment_center_north split_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_pfgi3omo/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_pfgi3omo/plan.pddl 
+
+
+--- stderr ---
+

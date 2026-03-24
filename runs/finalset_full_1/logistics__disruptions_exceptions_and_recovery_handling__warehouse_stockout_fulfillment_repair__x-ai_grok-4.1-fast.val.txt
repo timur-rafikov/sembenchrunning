@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain warehouse_stockout_fulfillment_repair_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object logistics_asset - object logistics_element - object stockout_case_root - object fulfillment_case - stockout_case_root transport_resource - operational_resource item_sku - operational_resource warehouse_staff - operational_resource expedite_option - operational_resource service_level_option - operational_resource claim_document - operational_resource repair_toolkit - operational_resource external_approval - operational_resource replacement_lot - logistics_asset packing_unit - logistics_asset claim_evidence - logistics_asset origin_route_leg - logistics_element destination_route_leg - logistics_element shipment_proposal - logistics_element warehouse_case_type - fulfillment_case actor_case_type - fulfillment_case origin_warehouse - warehouse_case_type alternative_warehouse - warehouse_case_type fulfillment_agent - actor_case_type)
+  (:predicates
+    (entity_recorded ?fulfillment_case - fulfillment_case)
+    (entity_validated ?fulfillment_case - fulfillment_case)
+    (transport_allocated ?fulfillment_case - fulfillment_case)
+    (operation_restored ?fulfillment_case - fulfillment_case)
+    (ready_for_execution ?fulfillment_case - fulfillment_case)
+    (entity_release_authorized ?fulfillment_case - fulfillment_case)
+    (transport_available ?transport_resource - transport_resource)
+    (entity_transport_candidate ?fulfillment_case - fulfillment_case ?transport_resource - transport_resource)
+    (sku_available ?item_sku - item_sku)
+    (entity_has_sku ?fulfillment_case - fulfillment_case ?item_sku - item_sku)
+    (staff_available ?warehouse_staff - warehouse_staff)
+    (entity_has_assigned_staff ?fulfillment_case - fulfillment_case ?warehouse_staff - warehouse_staff)
+    (replacement_lot_available ?replacement_lot - replacement_lot)
+    (origin_has_replacement_lot ?origin_warehouse - origin_warehouse ?replacement_lot - replacement_lot)
+    (alternative_has_replacement_lot ?alternative_warehouse - alternative_warehouse ?replacement_lot - replacement_lot)
+    (origin_has_route_leg ?origin_warehouse - origin_warehouse ?origin_route_leg - origin_route_leg)
+    (origin_leg_confirmed ?origin_route_leg - origin_route_leg)
+    (origin_leg_reserved ?origin_route_leg - origin_route_leg)
+    (origin_warehouse_ready ?origin_warehouse - origin_warehouse)
+    (alternative_has_route_leg ?alternative_warehouse - alternative_warehouse ?destination_route_leg - destination_route_leg)
+    (destination_leg_confirmed ?destination_route_leg - destination_route_leg)
+    (destination_leg_reserved ?destination_route_leg - destination_route_leg)
+    (alternative_warehouse_ready ?alternative_warehouse - alternative_warehouse)
+    (shipment_proposal_created ?shipment_proposal - shipment_proposal)
+    (shipment_proposal_locked ?shipment_proposal - shipment_proposal)
+    (proposal_has_origin_leg ?shipment_proposal - shipment_proposal ?origin_route_leg - origin_route_leg)
+    (proposal_has_destination_leg ?shipment_proposal - shipment_proposal ?destination_route_leg - destination_route_leg)
+    (proposal_origin_confirmed ?shipment_proposal - shipment_proposal)
+    (proposal_destination_confirmed ?shipment_proposal - shipment_proposal)
+    (proposal_packaging_validated ?shipment_proposal - shipment_proposal)
+    (agent_operates_at_origin ?fulfillment_agent - fulfillment_agent ?origin_warehouse - origin_warehouse)
+    (agent_operates_at_alternative ?fulfillment_agent - fulfillment_agent ?alternative_warehouse - alternative_warehouse)
+    (agent_linked_to_proposal ?fulfillment_agent - fulfillment_agent ?shipment_proposal - shipment_proposal)
+    (packing_unit_available ?packing_unit - packing_unit)
+    (agent_has_packing_unit ?fulfillment_agent - fulfillment_agent ?packing_unit - packing_unit)
+    (packing_unit_reserved ?packing_unit - packing_unit)
+    (packing_unit_assigned_to_proposal ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    (agent_ready_for_tooling ?fulfillment_agent - fulfillment_agent)
+    (agent_tooling_allocated ?fulfillment_agent - fulfillment_agent)
+    (agent_approval_stage ?fulfillment_agent - fulfillment_agent)
+    (agent_expedite_flag ?fulfillment_agent - fulfillment_agent)
+    (agent_expedite_confirmed ?fulfillment_agent - fulfillment_agent)
+    (agent_service_level_attached ?fulfillment_agent - fulfillment_agent)
+    (agent_execution_authorized ?fulfillment_agent - fulfillment_agent)
+    (claim_evidence_available ?claim_evidence - claim_evidence)
+    (agent_has_claim_evidence ?fulfillment_agent - fulfillment_agent ?claim_evidence - claim_evidence)
+    (evidence_attached_to_agent ?fulfillment_agent - fulfillment_agent)
+    (evidence_validated ?fulfillment_agent - fulfillment_agent)
+    (evidence_approved ?fulfillment_agent - fulfillment_agent)
+    (expedite_option_available ?expedite_option - expedite_option)
+    (agent_expedite_assignment ?fulfillment_agent - fulfillment_agent ?expedite_option - expedite_option)
+    (service_level_available ?service_level_option - service_level_option)
+    (agent_service_level_assignment ?fulfillment_agent - fulfillment_agent ?service_level_option - service_level_option)
+    (repair_toolkit_available ?repair_toolkit - repair_toolkit)
+    (agent_has_repair_toolkit ?fulfillment_agent - fulfillment_agent ?repair_toolkit - repair_toolkit)
+    (external_approval_available ?external_approval - external_approval)
+    (agent_has_external_approval ?fulfillment_agent - fulfillment_agent ?external_approval - external_approval)
+    (claim_document_available ?claim_document - claim_document)
+    (entity_has_claim_document ?fulfillment_case - fulfillment_case ?claim_document - claim_document)
+    (origin_ready_flag ?origin_warehouse - origin_warehouse)
+    (alternative_ready_flag ?alternative_warehouse - alternative_warehouse)
+    (agent_finalized ?fulfillment_agent - fulfillment_agent)
+  )
+  (:action record_fulfillment_case
+    :parameters (?fulfillment_case - fulfillment_case)
+    :precondition
+      (and
+        (not
+          (entity_recorded ?fulfillment_case)
+        )
+        (not
+          (operation_restored ?fulfillment_case)
+        )
+      )
+    :effect (entity_recorded ?fulfillment_case)
+  )
+  (:action allocate_transport_resource_to_case
+    :parameters (?fulfillment_case - fulfillment_case ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (entity_recorded ?fulfillment_case)
+        (not
+          (transport_allocated ?fulfillment_case)
+        )
+        (transport_available ?transport_resource)
+      )
+    :effect
+      (and
+        (transport_allocated ?fulfillment_case)
+        (entity_transport_candidate ?fulfillment_case ?transport_resource)
+        (not
+          (transport_available ?transport_resource)
+        )
+      )
+  )
+  (:action associate_sku_with_case
+    :parameters (?fulfillment_case - fulfillment_case ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_recorded ?fulfillment_case)
+        (transport_allocated ?fulfillment_case)
+        (sku_available ?item_sku)
+      )
+    :effect
+      (and
+        (entity_has_sku ?fulfillment_case ?item_sku)
+        (not
+          (sku_available ?item_sku)
+        )
+      )
+  )
+  (:action validate_case_item_association
+    :parameters (?fulfillment_case - fulfillment_case ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_recorded ?fulfillment_case)
+        (transport_allocated ?fulfillment_case)
+        (entity_has_sku ?fulfillment_case ?item_sku)
+        (not
+          (entity_validated ?fulfillment_case)
+        )
+      )
+    :effect (entity_validated ?fulfillment_case)
+  )
+  (:action release_sku_assignment
+    :parameters (?fulfillment_case - fulfillment_case ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_has_sku ?fulfillment_case ?item_sku)
+      )
+    :effect
+      (and
+        (sku_available ?item_sku)
+        (not
+          (entity_has_sku ?fulfillment_case ?item_sku)
+        )
+      )
+  )
+  (:action assign_staff_to_case
+    :parameters (?fulfillment_case - fulfillment_case ?warehouse_staff - warehouse_staff)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_case)
+        (staff_available ?warehouse_staff)
+      )
+    :effect
+      (and
+        (entity_has_assigned_staff ?fulfillment_case ?warehouse_staff)
+        (not
+          (staff_available ?warehouse_staff)
+        )
+      )
+  )
+  (:action release_staff_assignment
+    :parameters (?fulfillment_case - fulfillment_case ?warehouse_staff - warehouse_staff)
+    :precondition
+      (and
+        (entity_has_assigned_staff ?fulfillment_case ?warehouse_staff)
+      )
+    :effect
+      (and
+        (staff_available ?warehouse_staff)
+        (not
+          (entity_has_assigned_staff ?fulfillment_case ?warehouse_staff)
+        )
+      )
+  )
+  (:action reserve_repair_toolkit_for_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?repair_toolkit - repair_toolkit)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (repair_toolkit_available ?repair_toolkit)
+      )
+    :effect
+      (and
+        (agent_has_repair_toolkit ?fulfillment_agent ?repair_toolkit)
+        (not
+          (repair_toolkit_available ?repair_toolkit)
+        )
+      )
+  )
+  (:action release_repair_toolkit_from_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?repair_toolkit - repair_toolkit)
+    :precondition
+      (and
+        (agent_has_repair_toolkit ?fulfillment_agent ?repair_toolkit)
+      )
+    :effect
+      (and
+        (repair_toolkit_available ?repair_toolkit)
+        (not
+          (agent_has_repair_toolkit ?fulfillment_agent ?repair_toolkit)
+        )
+      )
+  )
+  (:action assign_external_approval_to_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (external_approval_available ?external_approval)
+      )
+    :effect
+      (and
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action release_external_approval_from_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval)
+    :precondition
+      (and
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+      )
+    :effect
+      (and
+        (external_approval_available ?external_approval)
+        (not
+          (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        )
+      )
+  )
+  (:action evaluate_origin_leg_for_sourcing
+    :parameters (?origin_warehouse - origin_warehouse ?origin_route_leg - origin_route_leg ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_validated ?origin_warehouse)
+        (entity_has_sku ?origin_warehouse ?item_sku)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (not
+          (origin_leg_confirmed ?origin_route_leg)
+        )
+        (not
+          (origin_leg_reserved ?origin_route_leg)
+        )
+      )
+    :effect (origin_leg_confirmed ?origin_route_leg)
+  )
+  (:action mark_origin_warehouse_ready
+    :parameters (?origin_warehouse - origin_warehouse ?origin_route_leg - origin_route_leg ?warehouse_staff - warehouse_staff)
+    :precondition
+      (and
+        (entity_validated ?origin_warehouse)
+        (entity_has_assigned_staff ?origin_warehouse ?warehouse_staff)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (origin_leg_confirmed ?origin_route_leg)
+        (not
+          (origin_ready_flag ?origin_warehouse)
+        )
+      )
+    :effect
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (origin_warehouse_ready ?origin_warehouse)
+      )
+  )
+  (:action reserve_replacement_lot_for_origin
+    :parameters (?origin_warehouse - origin_warehouse ?origin_route_leg - origin_route_leg ?replacement_lot - replacement_lot)
+    :precondition
+      (and
+        (entity_validated ?origin_warehouse)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (replacement_lot_available ?replacement_lot)
+        (not
+          (origin_ready_flag ?origin_warehouse)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_reserved ?origin_route_leg)
+        (origin_ready_flag ?origin_warehouse)
+        (origin_has_replacement_lot ?origin_warehouse ?replacement_lot)
+        (not
+          (replacement_lot_available ?replacement_lot)
+        )
+      )
+  )
+  (:action fulfill_origin_restock_from_replacement
+    :parameters (?origin_warehouse - origin_warehouse ?origin_route_leg - origin_route_leg ?item_sku - item_sku ?replacement_lot - replacement_lot)
+    :precondition
+      (and
+        (entity_validated ?origin_warehouse)
+        (entity_has_sku ?origin_warehouse ?item_sku)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (origin_leg_reserved ?origin_route_leg)
+        (origin_has_replacement_lot ?origin_warehouse ?replacement_lot)
+        (not
+          (origin_warehouse_ready ?origin_warehouse)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_confirmed ?origin_route_leg)
+        (origin_warehouse_ready ?origin_warehouse)
+        (replacement_lot_available ?replacement_lot)
+        (not
+          (origin_has_replacement_lot ?origin_warehouse ?replacement_lot)
+        )
+      )
+  )
+  (:action evaluate_alternative_leg_for_sourcing
+    :parameters (?alternative_warehouse - alternative_warehouse ?destination_route_leg - destination_route_leg ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_validated ?alternative_warehouse)
+        (entity_has_sku ?alternative_warehouse ?item_sku)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (not
+          (destination_leg_confirmed ?destination_route_leg)
+        )
+        (not
+          (destination_leg_reserved ?destination_route_leg)
+        )
+      )
+    :effect (destination_leg_confirmed ?destination_route_leg)
+  )
+  (:action mark_alternative_warehouse_ready
+    :parameters (?alternative_warehouse - alternative_warehouse ?destination_route_leg - destination_route_leg ?warehouse_staff - warehouse_staff)
+    :precondition
+      (and
+        (entity_validated ?alternative_warehouse)
+        (entity_has_assigned_staff ?alternative_warehouse ?warehouse_staff)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (destination_leg_confirmed ?destination_route_leg)
+        (not
+          (alternative_ready_flag ?alternative_warehouse)
+        )
+      )
+    :effect
+      (and
+        (alternative_ready_flag ?alternative_warehouse)
+        (alternative_warehouse_ready ?alternative_warehouse)
+      )
+  )
+  (:action reserve_replacement_lot_for_alternative
+    :parameters (?alternative_warehouse - alternative_warehouse ?destination_route_leg - destination_route_leg ?replacement_lot - replacement_lot)
+    :precondition
+      (and
+        (entity_validated ?alternative_warehouse)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (replacement_lot_available ?replacement_lot)
+        (not
+          (alternative_ready_flag ?alternative_warehouse)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_reserved ?destination_route_leg)
+        (alternative_ready_flag ?alternative_warehouse)
+        (alternative_has_replacement_lot ?alternative_warehouse ?replacement_lot)
+        (not
+          (replacement_lot_available ?replacement_lot)
+        )
+      )
+  )
+  (:action fulfill_alternative_restock_from_replacement
+    :parameters (?alternative_warehouse - alternative_warehouse ?destination_route_leg - destination_route_leg ?item_sku - item_sku ?replacement_lot - replacement_lot)
+    :precondition
+      (and
+        (entity_validated ?alternative_warehouse)
+        (entity_has_sku ?alternative_warehouse ?item_sku)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (destination_leg_reserved ?destination_route_leg)
+        (alternative_has_replacement_lot ?alternative_warehouse ?replacement_lot)
+        (not
+          (alternative_warehouse_ready ?alternative_warehouse)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_confirmed ?destination_route_leg)
+        (alternative_warehouse_ready ?alternative_warehouse)
+        (replacement_lot_available ?replacement_lot)
+        (not
+          (alternative_has_replacement_lot ?alternative_warehouse ?replacement_lot)
+        )
+      )
+  )
+  (:action create_shipment_proposal
+    :parameters (?origin_warehouse - origin_warehouse ?alternative_warehouse - alternative_warehouse ?origin_route_leg - origin_route_leg ?destination_route_leg - destination_route_leg ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (alternative_ready_flag ?alternative_warehouse)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (origin_leg_confirmed ?origin_route_leg)
+        (destination_leg_confirmed ?destination_route_leg)
+        (origin_warehouse_ready ?origin_warehouse)
+        (alternative_warehouse_ready ?alternative_warehouse)
+        (shipment_proposal_created ?shipment_proposal)
+      )
+    :effect
+      (and
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_has_origin_leg ?shipment_proposal ?origin_route_leg)
+        (proposal_has_destination_leg ?shipment_proposal ?destination_route_leg)
+        (not
+          (shipment_proposal_created ?shipment_proposal)
+        )
+      )
+  )
+  (:action create_shipment_proposal_with_origin_confirmation
+    :parameters (?origin_warehouse - origin_warehouse ?alternative_warehouse - alternative_warehouse ?origin_route_leg - origin_route_leg ?destination_route_leg - destination_route_leg ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (alternative_ready_flag ?alternative_warehouse)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (origin_leg_reserved ?origin_route_leg)
+        (destination_leg_confirmed ?destination_route_leg)
+        (not
+          (origin_warehouse_ready ?origin_warehouse)
+        )
+        (alternative_warehouse_ready ?alternative_warehouse)
+        (shipment_proposal_created ?shipment_proposal)
+      )
+    :effect
+      (and
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_has_origin_leg ?shipment_proposal ?origin_route_leg)
+        (proposal_has_destination_leg ?shipment_proposal ?destination_route_leg)
+        (proposal_origin_confirmed ?shipment_proposal)
+        (not
+          (shipment_proposal_created ?shipment_proposal)
+        )
+      )
+  )
+  (:action create_shipment_proposal_with_destination_confirmation
+    :parameters (?origin_warehouse - origin_warehouse ?alternative_warehouse - alternative_warehouse ?origin_route_leg - origin_route_leg ?destination_route_leg - destination_route_leg ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (alternative_ready_flag ?alternative_warehouse)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (origin_leg_confirmed ?origin_route_leg)
+        (destination_leg_reserved ?destination_route_leg)
+        (origin_warehouse_ready ?origin_warehouse)
+        (not
+          (alternative_warehouse_ready ?alternative_warehouse)
+        )
+        (shipment_proposal_created ?shipment_proposal)
+      )
+    :effect
+      (and
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_has_origin_leg ?shipment_proposal ?origin_route_leg)
+        (proposal_has_destination_leg ?shipment_proposal ?destination_route_leg)
+        (proposal_destination_confirmed ?shipment_proposal)
+        (not
+          (shipment_proposal_created ?shipment_proposal)
+        )
+      )
+  )
+  (:action create_shipment_proposal_with_full_confirmation
+    :parameters (?origin_warehouse - origin_warehouse ?alternative_warehouse - alternative_warehouse ?origin_route_leg - origin_route_leg ?destination_route_leg - destination_route_leg ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (alternative_ready_flag ?alternative_warehouse)
+        (origin_has_route_leg ?origin_warehouse ?origin_route_leg)
+        (alternative_has_route_leg ?alternative_warehouse ?destination_route_leg)
+        (origin_leg_reserved ?origin_route_leg)
+        (destination_leg_reserved ?destination_route_leg)
+        (not
+          (origin_warehouse_ready ?origin_warehouse)
+        )
+        (not
+          (alternative_warehouse_ready ?alternative_warehouse)
+        )
+        (shipment_proposal_created ?shipment_proposal)
+      )
+    :effect
+      (and
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_has_origin_leg ?shipment_proposal ?origin_route_leg)
+        (proposal_has_destination_leg ?shipment_proposal ?destination_route_leg)
+        (proposal_origin_confirmed ?shipment_proposal)
+        (proposal_destination_confirmed ?shipment_proposal)
+        (not
+          (shipment_proposal_created ?shipment_proposal)
+        )
+      )
+  )
+  (:action validate_proposal_for_packaging
+    :parameters (?shipment_proposal - shipment_proposal ?origin_warehouse - origin_warehouse ?item_sku - item_sku)
+    :precondition
+      (and
+        (shipment_proposal_locked ?shipment_proposal)
+        (origin_ready_flag ?origin_warehouse)
+        (entity_has_sku ?origin_warehouse ?item_sku)
+        (not
+          (proposal_packaging_validated ?shipment_proposal)
+        )
+      )
+    :effect (proposal_packaging_validated ?shipment_proposal)
+  )
+  (:action reserve_packing_unit_for_proposal
+    :parameters (?fulfillment_agent - fulfillment_agent ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (agent_linked_to_proposal ?fulfillment_agent ?shipment_proposal)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_available ?packing_unit)
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_packaging_validated ?shipment_proposal)
+        (not
+          (packing_unit_reserved ?packing_unit)
+        )
+      )
+    :effect
+      (and
+        (packing_unit_reserved ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (not
+          (packing_unit_available ?packing_unit)
+        )
+      )
+  )
+  (:action prepare_agent_for_shipment_execution
+    :parameters (?fulfillment_agent - fulfillment_agent ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_reserved ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (entity_has_sku ?fulfillment_agent ?item_sku)
+        (not
+          (proposal_origin_confirmed ?shipment_proposal)
+        )
+        (not
+          (agent_ready_for_tooling ?fulfillment_agent)
+        )
+      )
+    :effect (agent_ready_for_tooling ?fulfillment_agent)
+  )
+  (:action assign_expedite_option_to_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?expedite_option - expedite_option)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (expedite_option_available ?expedite_option)
+        (not
+          (agent_expedite_flag ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_expedite_flag ?fulfillment_agent)
+        (agent_expedite_assignment ?fulfillment_agent ?expedite_option)
+        (not
+          (expedite_option_available ?expedite_option)
+        )
+      )
+  )
+  (:action confirm_expedite_and_prepare_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal ?item_sku - item_sku ?expedite_option - expedite_option)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_reserved ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (entity_has_sku ?fulfillment_agent ?item_sku)
+        (proposal_origin_confirmed ?shipment_proposal)
+        (agent_expedite_flag ?fulfillment_agent)
+        (agent_expedite_assignment ?fulfillment_agent ?expedite_option)
+        (not
+          (agent_ready_for_tooling ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_ready_for_tooling ?fulfillment_agent)
+        (agent_expedite_confirmed ?fulfillment_agent)
+      )
+  )
+  (:action allocate_toolkit_and_staff_pre_destination_confirmation
+    :parameters (?fulfillment_agent - fulfillment_agent ?repair_toolkit - repair_toolkit ?warehouse_staff - warehouse_staff ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_ready_for_tooling ?fulfillment_agent)
+        (agent_has_repair_toolkit ?fulfillment_agent ?repair_toolkit)
+        (entity_has_assigned_staff ?fulfillment_agent ?warehouse_staff)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (not
+          (proposal_destination_confirmed ?shipment_proposal)
+        )
+        (not
+          (agent_tooling_allocated ?fulfillment_agent)
+        )
+      )
+    :effect (agent_tooling_allocated ?fulfillment_agent)
+  )
+  (:action allocate_toolkit_and_staff_post_destination_confirmation
+    :parameters (?fulfillment_agent - fulfillment_agent ?repair_toolkit - repair_toolkit ?warehouse_staff - warehouse_staff ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_ready_for_tooling ?fulfillment_agent)
+        (agent_has_repair_toolkit ?fulfillment_agent ?repair_toolkit)
+        (entity_has_assigned_staff ?fulfillment_agent ?warehouse_staff)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (proposal_destination_confirmed ?shipment_proposal)
+        (not
+          (agent_tooling_allocated ?fulfillment_agent)
+        )
+      )
+    :effect (agent_tooling_allocated ?fulfillment_agent)
+  )
+  (:action collect_evidence_and_prepare_agent_for_approval
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_tooling_allocated ?fulfillment_agent)
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (not
+          (proposal_origin_confirmed ?shipment_proposal)
+        )
+        (not
+          (proposal_destination_confirmed ?shipment_proposal)
+        )
+        (not
+          (agent_approval_stage ?fulfillment_agent)
+        )
+      )
+    :effect (agent_approval_stage ?fulfillment_agent)
+  )
+  (:action collect_evidence_with_origin_confirmation_and_attach_service_level
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_tooling_allocated ?fulfillment_agent)
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (proposal_origin_confirmed ?shipment_proposal)
+        (not
+          (proposal_destination_confirmed ?shipment_proposal)
+        )
+        (not
+          (agent_approval_stage ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_service_level_attached ?fulfillment_agent)
+      )
+  )
+  (:action collect_evidence_with_destination_confirmation_and_attach_service_level
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_tooling_allocated ?fulfillment_agent)
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (not
+          (proposal_origin_confirmed ?shipment_proposal)
+        )
+        (proposal_destination_confirmed ?shipment_proposal)
+        (not
+          (agent_approval_stage ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_service_level_attached ?fulfillment_agent)
+      )
+  )
+  (:action collect_evidence_with_full_confirmation_and_attach_service_level
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval ?packing_unit - packing_unit ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (agent_tooling_allocated ?fulfillment_agent)
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (agent_has_packing_unit ?fulfillment_agent ?packing_unit)
+        (packing_unit_assigned_to_proposal ?packing_unit ?shipment_proposal)
+        (proposal_origin_confirmed ?shipment_proposal)
+        (proposal_destination_confirmed ?shipment_proposal)
+        (not
+          (agent_approval_stage ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_service_level_attached ?fulfillment_agent)
+      )
+  )
+  (:action finalize_agent_qc_and_mark_ready
+    :parameters (?fulfillment_agent - fulfillment_agent)
+    :precondition
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (not
+          (agent_service_level_attached ?fulfillment_agent)
+        )
+        (not
+          (agent_finalized ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?fulfillment_agent)
+        (ready_for_execution ?fulfillment_agent)
+      )
+  )
+  (:action assign_service_level_to_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_service_level_attached ?fulfillment_agent)
+        (service_level_available ?service_level_option)
+      )
+    :effect
+      (and
+        (agent_service_level_assignment ?fulfillment_agent ?service_level_option)
+        (not
+          (service_level_available ?service_level_option)
+        )
+      )
+  )
+  (:action authorize_agent_execution
+    :parameters (?fulfillment_agent - fulfillment_agent ?origin_warehouse - origin_warehouse ?alternative_warehouse - alternative_warehouse ?item_sku - item_sku ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_service_level_attached ?fulfillment_agent)
+        (agent_service_level_assignment ?fulfillment_agent ?service_level_option)
+        (agent_operates_at_origin ?fulfillment_agent ?origin_warehouse)
+        (agent_operates_at_alternative ?fulfillment_agent ?alternative_warehouse)
+        (origin_warehouse_ready ?origin_warehouse)
+        (alternative_warehouse_ready ?alternative_warehouse)
+        (entity_has_sku ?fulfillment_agent ?item_sku)
+        (not
+          (agent_execution_authorized ?fulfillment_agent)
+        )
+      )
+    :effect (agent_execution_authorized ?fulfillment_agent)
+  )
+  (:action approve_agent_and_mark_ready
+    :parameters (?fulfillment_agent - fulfillment_agent)
+    :precondition
+      (and
+        (agent_approval_stage ?fulfillment_agent)
+        (agent_execution_authorized ?fulfillment_agent)
+        (not
+          (agent_finalized ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?fulfillment_agent)
+        (ready_for_execution ?fulfillment_agent)
+      )
+  )
+  (:action attach_claim_evidence_to_agent
+    :parameters (?fulfillment_agent - fulfillment_agent ?claim_evidence - claim_evidence ?item_sku - item_sku)
+    :precondition
+      (and
+        (entity_validated ?fulfillment_agent)
+        (entity_has_sku ?fulfillment_agent ?item_sku)
+        (claim_evidence_available ?claim_evidence)
+        (agent_has_claim_evidence ?fulfillment_agent ?claim_evidence)
+        (not
+          (evidence_attached_to_agent ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (evidence_attached_to_agent ?fulfillment_agent)
+        (not
+          (claim_evidence_available ?claim_evidence)
+        )
+      )
+  )
+  (:action validate_attached_evidence
+    :parameters (?fulfillment_agent - fulfillment_agent ?warehouse_staff - warehouse_staff)
+    :precondition
+      (and
+        (evidence_attached_to_agent ?fulfillment_agent)
+        (entity_has_assigned_staff ?fulfillment_agent ?warehouse_staff)
+        (not
+          (evidence_validated ?fulfillment_agent)
+        )
+      )
+    :effect (evidence_validated ?fulfillment_agent)
+  )
+  (:action approve_evidence_with_external_approval
+    :parameters (?fulfillment_agent - fulfillment_agent ?external_approval - external_approval)
+    :precondition
+      (and
+        (evidence_validated ?fulfillment_agent)
+        (agent_has_external_approval ?fulfillment_agent ?external_approval)
+        (not
+          (evidence_approved ?fulfillment_agent)
+        )
+      )
+    :effect (evidence_approved ?fulfillment_agent)
+  )
+  (:action finalize_evidence_approval_and_release_agent
+    :parameters (?fulfillment_agent - fulfillment_agent)
+    :precondition
+      (and
+        (evidence_approved ?fulfillment_agent)
+        (not
+          (agent_finalized ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_finalized ?fulfillment_agent)
+        (ready_for_execution ?fulfillment_agent)
+      )
+  )
+  (:action finalize_origin_warehouse_and_mark_ready
+    :parameters (?origin_warehouse - origin_warehouse ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (origin_ready_flag ?origin_warehouse)
+        (origin_warehouse_ready ?origin_warehouse)
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_packaging_validated ?shipment_proposal)
+        (not
+          (ready_for_execution ?origin_warehouse)
+        )
+      )
+    :effect (ready_for_execution ?origin_warehouse)
+  )
+  (:action finalize_alternative_warehouse_and_mark_ready
+    :parameters (?alternative_warehouse - alternative_warehouse ?shipment_proposal - shipment_proposal)
+    :precondition
+      (and
+        (alternative_ready_flag ?alternative_warehouse)
+        (alternative_warehouse_ready ?alternative_warehouse)
+        (shipment_proposal_locked ?shipment_proposal)
+        (proposal_packaging_validated ?shipment_proposal)
+        (not
+          (ready_for_execution ?alternative_warehouse)
+        )
+      )
+    :effect (ready_for_execution ?alternative_warehouse)
+  )
+  (:action apply_claim_document_to_case
+    :parameters (?fulfillment_case - fulfillment_case ?claim_document - claim_document ?item_sku - item_sku)
+    :precondition
+      (and
+        (ready_for_execution ?fulfillment_case)
+        (entity_has_sku ?fulfillment_case ?item_sku)
+        (claim_document_available ?claim_document)
+        (not
+          (entity_release_authorized ?fulfillment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_release_authorized ?fulfillment_case)
+        (entity_has_claim_document ?fulfillment_case ?claim_document)
+        (not
+          (claim_document_available ?claim_document)
+        )
+      )
+  )
+  (:action restore_origin_warehouse_and_release_transport
+    :parameters (?origin_warehouse - origin_warehouse ?transport_resource - transport_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (entity_release_authorized ?origin_warehouse)
+        (entity_transport_candidate ?origin_warehouse ?transport_resource)
+        (entity_has_claim_document ?origin_warehouse ?claim_document)
+        (not
+          (operation_restored ?origin_warehouse)
+        )
+      )
+    :effect
+      (and
+        (operation_restored ?origin_warehouse)
+        (transport_available ?transport_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action restore_alternative_warehouse_and_release_transport
+    :parameters (?alternative_warehouse - alternative_warehouse ?transport_resource - transport_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (entity_release_authorized ?alternative_warehouse)
+        (entity_transport_candidate ?alternative_warehouse ?transport_resource)
+        (entity_has_claim_document ?alternative_warehouse ?claim_document)
+        (not
+          (operation_restored ?alternative_warehouse)
+        )
+      )
+    :effect
+      (and
+        (operation_restored ?alternative_warehouse)
+        (transport_available ?transport_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action restore_agent_and_release_transport
+    :parameters (?fulfillment_agent - fulfillment_agent ?transport_resource - transport_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (entity_release_authorized ?fulfillment_agent)
+        (entity_transport_candidate ?fulfillment_agent ?transport_resource)
+        (entity_has_claim_document ?fulfillment_agent ?claim_document)
+        (not
+          (operation_restored ?fulfillment_agent)
+        )
+      )
+    :effect
+      (and
+        (operation_restored ?fulfillment_agent)
+        (transport_available ?transport_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem warehouse_stockout_repair_scenario)
+  (:domain warehouse_stockout_fulfillment_repair_domain)
+  (:objects warehouse_origin_1 - origin_warehouse warehouse_alternative_1 - alternative_warehouse fulfillment_agent_1 - fulfillment_agent fulfillment_agent_2 - fulfillment_agent carrier_truck_1 - transport_resource carrier_truck_2 - transport_resource carrier_truck_3 - transport_resource sku_missing_1 - item_sku warehouse_staff_1 - warehouse_staff replacement_lot_1 - replacement_lot origin_leg_1 - origin_route_leg destination_leg_1 - destination_route_leg shipment_proposal_alpha - shipment_proposal packing_unit_box_a - packing_unit packing_unit_box_b - packing_unit expedite_option_express - expedite_option expedite_option_priority - expedite_option service_level_standard - service_level_option service_level_expedited - service_level_option claim_document_1 - claim_document repair_toolkit_basic - repair_toolkit claim_evidence_photo_1 - claim_evidence claim_evidence_log_1 - claim_evidence external_approval_token_1 - external_approval)
+  (:init
+    (transport_available carrier_truck_1)
+    (transport_available carrier_truck_2)
+    (transport_available carrier_truck_3)
+    (sku_available sku_missing_1)
+    (staff_available warehouse_staff_1)
+    (replacement_lot_available replacement_lot_1)
+    (origin_has_route_leg warehouse_origin_1 origin_leg_1)
+    (alternative_has_route_leg warehouse_alternative_1 destination_leg_1)
+    (shipment_proposal_created shipment_proposal_alpha)
+    (packing_unit_available packing_unit_box_a)
+    (packing_unit_available packing_unit_box_b)
+    (agent_operates_at_origin fulfillment_agent_1 warehouse_origin_1)
+    (agent_operates_at_origin fulfillment_agent_2 warehouse_origin_1)
+    (agent_operates_at_alternative fulfillment_agent_1 warehouse_alternative_1)
+    (agent_operates_at_alternative fulfillment_agent_2 warehouse_alternative_1)
+    (agent_linked_to_proposal fulfillment_agent_1 shipment_proposal_alpha)
+    (agent_linked_to_proposal fulfillment_agent_2 shipment_proposal_alpha)
+    (agent_has_packing_unit fulfillment_agent_1 packing_unit_box_a)
+    (agent_has_packing_unit fulfillment_agent_2 packing_unit_box_b)
+    (expedite_option_available expedite_option_express)
+    (expedite_option_available expedite_option_priority)
+    (service_level_available service_level_standard)
+    (service_level_available service_level_expedited)
+    (claim_document_available claim_document_1)
+    (repair_toolkit_available repair_toolkit_basic)
+    (claim_evidence_available claim_evidence_photo_1)
+    (agent_has_claim_evidence fulfillment_agent_1 claim_evidence_photo_1)
+    (agent_has_claim_evidence fulfillment_agent_2 claim_evidence_log_1)
+    (external_approval_available external_approval_token_1)
+  )
+  (:goal
+    (and
+      (operation_restored warehouse_origin_1)
+      (operation_restored warehouse_alternative_1)
+      (operation_restored fulfillment_agent_1)
+      (operation_restored fulfillment_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(record_fulfillment_case warehouse_origin_1)
+(record_fulfillment_case warehouse_alternative_1)
+(record_fulfillment_case fulfillment_agent_1)
+(record_fulfillment_case fulfillment_agent_2)
+(allocate_transport_resource_to_case warehouse_origin_1 carrier_truck_1)
+(associate_sku_with_case warehouse_origin_1 sku_missing_1)
+(validate_case_item_association warehouse_origin_1 sku_missing_1)
+(evaluate_origin_leg_for_sourcing warehouse_origin_1 origin_leg_1 sku_missing_1)
+(assign_staff_to_case warehouse_origin_1 warehouse_staff_1)
+(mark_origin_warehouse_ready warehouse_origin_1 origin_leg_1 warehouse_staff_1)
+(release_staff_assignment warehouse_origin_1 warehouse_staff_1)
+(release_sku_assignment warehouse_origin_1 sku_missing_1)
+(allocate_transport_resource_to_case warehouse_alternative_1 carrier_truck_2)
+(associate_sku_with_case warehouse_alternative_1 sku_missing_1)
+(validate_case_item_association warehouse_alternative_1 sku_missing_1)
+(evaluate_alternative_leg_for_sourcing warehouse_alternative_1 destination_leg_1 sku_missing_1)
+(assign_staff_to_case warehouse_alternative_1 warehouse_staff_1)
+(mark_alternative_warehouse_ready warehouse_alternative_1 destination_leg_1 warehouse_staff_1)
+(release_staff_assignment warehouse_alternative_1 warehouse_staff_1)
+(release_sku_assignment warehouse_alternative_1 sku_missing_1)
+(create_shipment_proposal warehouse_origin_1 warehouse_alternative_1 origin_leg_1 destination_leg_1 shipment_proposal_alpha)
+(associate_sku_with_case warehouse_origin_1 sku_missing_1)
+(validate_proposal_for_packaging shipment_proposal_alpha warehouse_origin_1 sku_missing_1)
+(finalize_origin_warehouse_and_mark_ready warehouse_origin_1 shipment_proposal_alpha)
+(finalize_alternative_warehouse_and_mark_ready warehouse_alternative_1 shipment_proposal_alpha)
+(release_sku_assignment warehouse_origin_1 sku_missing_1)
+(allocate_transport_resource_to_case fulfillment_agent_1 carrier_truck_3)
+(associate_sku_with_case fulfillment_agent_1 sku_missing_1)
+(validate_case_item_association fulfillment_agent_1 sku_missing_1)
+(reserve_packing_unit_for_proposal fulfillment_agent_1 packing_unit_box_a shipment_proposal_alpha)
+(prepare_agent_for_shipment_execution fulfillment_agent_1 packing_unit_box_a shipment_proposal_alpha sku_missing_1)
+(reserve_repair_toolkit_for_agent fulfillment_agent_1 repair_toolkit_basic)
+(assign_staff_to_case fulfillment_agent_1 warehouse_staff_1)
+(assign_external_approval_to_agent fulfillment_agent_1 external_approval_token_1)
+(allocate_toolkit_and_staff_pre_destination_confirmation fulfillment_agent_1 repair_toolkit_basic warehouse_staff_1 packing_unit_box_a shipment_proposal_alpha)
+(collect_evidence_and_prepare_agent_for_approval fulfillment_agent_1 external_approval_token_1 packing_unit_box_a shipment_proposal_alpha)
+(finalize_agent_qc_and_mark_ready fulfillment_agent_1)
+(apply_claim_document_to_case fulfillment_agent_1 claim_document_1 sku_missing_1)
+(restore_agent_and_release_transport fulfillment_agent_1 carrier_truck_3 claim_document_1)
+(release_sku_assignment fulfillment_agent_1 sku_missing_1)
+(release_repair_toolkit_from_agent fulfillment_agent_1 repair_toolkit_basic)
+(release_staff_assignment fulfillment_agent_1 warehouse_staff_1)
+(release_external_approval_from_agent fulfillment_agent_1 external_approval_token_1)
+(allocate_transport_resource_to_case fulfillment_agent_2 carrier_truck_3)
+(associate_sku_with_case fulfillment_agent_2 sku_missing_1)
+(validate_case_item_association fulfillment_agent_2 sku_missing_1)
+(reserve_packing_unit_for_proposal fulfillment_agent_2 packing_unit_box_b shipment_proposal_alpha)
+(prepare_agent_for_shipment_execution fulfillment_agent_2 packing_unit_box_b shipment_proposal_alpha sku_missing_1)
+(reserve_repair_toolkit_for_agent fulfillment_agent_2 repair_toolkit_basic)
+(assign_staff_to_case fulfillment_agent_2 warehouse_staff_1)
+(assign_external_approval_to_agent fulfillment_agent_2 external_approval_token_1)
+(allocate_toolkit_and_staff_pre_destination_confirmation fulfillment_agent_2 repair_toolkit_basic warehouse_staff_1 packing_unit_box_b shipment_proposal_alpha)
+(collect_evidence_and_prepare_agent_for_approval fulfillment_agent_2 external_approval_token_1 packing_unit_box_b shipment_proposal_alpha)
+(finalize_agent_qc_and_mark_ready fulfillment_agent_2)
+(apply_claim_document_to_case fulfillment_agent_2 claim_document_1 sku_missing_1)
+(restore_agent_and_release_transport fulfillment_agent_2 carrier_truck_3 claim_document_1)
+(release_sku_assignment fulfillment_agent_2 sku_missing_1)
+(associate_sku_with_case warehouse_origin_1 sku_missing_1)
+(apply_claim_document_to_case warehouse_origin_1 claim_document_1 sku_missing_1)
+(restore_origin_warehouse_and_release_transport warehouse_origin_1 carrier_truck_1 claim_document_1)
+(release_sku_assignment warehouse_origin_1 sku_missing_1)
+(associate_sku_with_case warehouse_alternative_1 sku_missing_1)
+(apply_claim_document_to_case warehouse_alternative_1 claim_document_1 sku_missing_1)
+(restore_alternative_warehouse_and_release_transport warehouse_alternative_1 carrier_truck_2 claim_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2i8mli27/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_2i8mli27/plan.pddl 64 
+
+
+
+--- stderr ---
+

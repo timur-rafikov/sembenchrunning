@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain multimodal_transport_mode_selection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object logistics_asset_group - object network_entity_group - object shipment_order - object leg - shipment_order mode_slot - resource_category route_option - resource_category facility_terminal - resource_category handling_code - resource_category equipment_type - resource_category time_window - resource_category crew_or_driver - resource_category insurance_document - resource_category cargo_item - logistics_asset_group package_batch - logistics_asset_group consignor_clearance - logistics_asset_group transfer_node_a - network_entity_group transfer_node_b - network_entity_group intermodal_unit - network_entity_group leg_group - leg itinerary_group - leg origin_leg - leg_group feeder_or_destination_leg - leg_group itinerary_unit - itinerary_group)
+  (:predicates
+    (registered ?transport_leg - leg)
+    (route_confirmed ?transport_leg - leg)
+    (mode_reserved ?transport_leg - leg)
+    (completed ?transport_leg - leg)
+    (eligible_for_scheduling ?transport_leg - leg)
+    (scheduled ?transport_leg - leg)
+    (mode_slot_available ?mode_slot - mode_slot)
+    (assigned_mode_slot ?transport_leg - leg ?mode_slot - mode_slot)
+    (route_option_available ?route_option - route_option)
+    (assigned_route_option ?transport_leg - leg ?route_option - route_option)
+    (terminal_slot_available ?facility_terminal - facility_terminal)
+    (leg_assigned_terminal ?transport_leg - leg ?facility_terminal - facility_terminal)
+    (cargo_item_available ?cargo_item - cargo_item)
+    (origin_leg_assigned_cargo ?origin_leg - origin_leg ?cargo_item - cargo_item)
+    (feeder_leg_assigned_cargo ?feeder_or_destination_leg - feeder_or_destination_leg ?cargo_item - cargo_item)
+    (origin_leg_assigned_node_a ?origin_leg - origin_leg ?transfer_node_a - transfer_node_a)
+    (transfer_node_a_reserved ?transfer_node_a - transfer_node_a)
+    (transfer_node_a_staged ?transfer_node_a - transfer_node_a)
+    (origin_leg_ready ?origin_leg - origin_leg)
+    (feeder_leg_assigned_node_b ?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_b - transfer_node_b)
+    (transfer_node_b_reserved ?transfer_node_b - transfer_node_b)
+    (transfer_node_b_staged ?transfer_node_b - transfer_node_b)
+    (feeder_leg_ready ?feeder_or_destination_leg - feeder_or_destination_leg)
+    (intermodal_unit_available ?intermodal_unit - intermodal_unit)
+    (intermodal_unit_allocated ?intermodal_unit - intermodal_unit)
+    (intermodal_unit_paired_node_a ?intermodal_unit - intermodal_unit ?transfer_node_a - transfer_node_a)
+    (intermodal_unit_paired_node_b ?intermodal_unit - intermodal_unit ?transfer_node_b - transfer_node_b)
+    (intermodal_unit_requires_export_handling ?intermodal_unit - intermodal_unit)
+    (intermodal_unit_requires_import_handling ?intermodal_unit - intermodal_unit)
+    (intermodal_unit_ready_for_loading ?intermodal_unit - intermodal_unit)
+    (itinerary_has_origin_leg ?itinerary_unit - itinerary_unit ?origin_leg - origin_leg)
+    (itinerary_has_feeder_leg ?itinerary_unit - itinerary_unit ?feeder_or_destination_leg - feeder_or_destination_leg)
+    (itinerary_assigned_intermodal_unit ?itinerary_unit - itinerary_unit ?intermodal_unit - intermodal_unit)
+    (package_batch_available ?package_batch - package_batch)
+    (itinerary_assigned_package_batch ?itinerary_unit - itinerary_unit ?package_batch - package_batch)
+    (package_batch_allocated ?package_batch - package_batch)
+    (package_batch_loaded_into_unit ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    (itinerary_package_unit_validated ?itinerary_unit - itinerary_unit)
+    (itinerary_equipment_validated ?itinerary_unit - itinerary_unit)
+    (itinerary_documents_validated ?itinerary_unit - itinerary_unit)
+    (handling_code_applied ?itinerary_unit - itinerary_unit)
+    (handling_code_validated ?itinerary_unit - itinerary_unit)
+    (equipment_compatibility_validated ?itinerary_unit - itinerary_unit)
+    (itinerary_ready_for_execution ?itinerary_unit - itinerary_unit)
+    (consignor_clearance_available ?consignor_clearance - consignor_clearance)
+    (itinerary_has_consignor_clearance ?itinerary_unit - itinerary_unit ?consignor_clearance - consignor_clearance)
+    (itinerary_consignor_clearance_bound ?itinerary_unit - itinerary_unit)
+    (itinerary_clearance_verified ?itinerary_unit - itinerary_unit)
+    (itinerary_preexecution_validated ?itinerary_unit - itinerary_unit)
+    (handling_code_available ?handling_code - handling_code)
+    (itinerary_has_handling_code ?itinerary_unit - itinerary_unit ?handling_code - handling_code)
+    (equipment_type_available ?equipment_type - equipment_type)
+    (itinerary_assigned_equipment_type ?itinerary_unit - itinerary_unit ?equipment_type - equipment_type)
+    (crew_available ?crew_or_driver - crew_or_driver)
+    (itinerary_assigned_crew ?itinerary_unit - itinerary_unit ?crew_or_driver - crew_or_driver)
+    (insurance_document_available ?insurance_document - insurance_document)
+    (itinerary_assigned_insurance ?itinerary_unit - itinerary_unit ?insurance_document - insurance_document)
+    (time_window_available ?time_window - time_window)
+    (assigned_time_window ?transport_leg - leg ?time_window - time_window)
+    (origin_leg_staged_flag ?origin_leg - origin_leg)
+    (feeder_leg_staged_flag ?feeder_or_destination_leg - feeder_or_destination_leg)
+    (itinerary_finalized_flag ?itinerary_unit - itinerary_unit)
+  )
+  (:action create_leg
+    :parameters (?transport_leg - leg)
+    :precondition
+      (and
+        (not
+          (registered ?transport_leg)
+        )
+        (not
+          (completed ?transport_leg)
+        )
+      )
+    :effect (registered ?transport_leg)
+  )
+  (:action assign_mode_slot_to_leg
+    :parameters (?transport_leg - leg ?mode_slot - mode_slot)
+    :precondition
+      (and
+        (registered ?transport_leg)
+        (not
+          (mode_reserved ?transport_leg)
+        )
+        (mode_slot_available ?mode_slot)
+      )
+    :effect
+      (and
+        (mode_reserved ?transport_leg)
+        (assigned_mode_slot ?transport_leg ?mode_slot)
+        (not
+          (mode_slot_available ?mode_slot)
+        )
+      )
+  )
+  (:action reserve_route_option_for_leg
+    :parameters (?transport_leg - leg ?route_option - route_option)
+    :precondition
+      (and
+        (registered ?transport_leg)
+        (mode_reserved ?transport_leg)
+        (route_option_available ?route_option)
+      )
+    :effect
+      (and
+        (assigned_route_option ?transport_leg ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action confirm_leg_routing
+    :parameters (?transport_leg - leg ?route_option - route_option)
+    :precondition
+      (and
+        (registered ?transport_leg)
+        (mode_reserved ?transport_leg)
+        (assigned_route_option ?transport_leg ?route_option)
+        (not
+          (route_confirmed ?transport_leg)
+        )
+      )
+    :effect (route_confirmed ?transport_leg)
+  )
+  (:action release_route_reservation
+    :parameters (?transport_leg - leg ?route_option - route_option)
+    :precondition
+      (and
+        (assigned_route_option ?transport_leg ?route_option)
+      )
+    :effect
+      (and
+        (route_option_available ?route_option)
+        (not
+          (assigned_route_option ?transport_leg ?route_option)
+        )
+      )
+  )
+  (:action reserve_terminal_slot_for_leg
+    :parameters (?transport_leg - leg ?facility_terminal - facility_terminal)
+    :precondition
+      (and
+        (route_confirmed ?transport_leg)
+        (terminal_slot_available ?facility_terminal)
+      )
+    :effect
+      (and
+        (leg_assigned_terminal ?transport_leg ?facility_terminal)
+        (not
+          (terminal_slot_available ?facility_terminal)
+        )
+      )
+  )
+  (:action release_terminal_slot_from_leg
+    :parameters (?transport_leg - leg ?facility_terminal - facility_terminal)
+    :precondition
+      (and
+        (leg_assigned_terminal ?transport_leg ?facility_terminal)
+      )
+    :effect
+      (and
+        (terminal_slot_available ?facility_terminal)
+        (not
+          (leg_assigned_terminal ?transport_leg ?facility_terminal)
+        )
+      )
+  )
+  (:action assign_crew_to_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?crew_or_driver - crew_or_driver)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (crew_available ?crew_or_driver)
+      )
+    :effect
+      (and
+        (itinerary_assigned_crew ?itinerary_unit ?crew_or_driver)
+        (not
+          (crew_available ?crew_or_driver)
+        )
+      )
+  )
+  (:action release_crew_from_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?crew_or_driver - crew_or_driver)
+    :precondition
+      (and
+        (itinerary_assigned_crew ?itinerary_unit ?crew_or_driver)
+      )
+    :effect
+      (and
+        (crew_available ?crew_or_driver)
+        (not
+          (itinerary_assigned_crew ?itinerary_unit ?crew_or_driver)
+        )
+      )
+  )
+  (:action assign_insurance_to_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (insurance_document_available ?insurance_document)
+      )
+    :effect
+      (and
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (not
+          (insurance_document_available ?insurance_document)
+        )
+      )
+  )
+  (:action release_insurance_from_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document)
+    :precondition
+      (and
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+      )
+    :effect
+      (and
+        (insurance_document_available ?insurance_document)
+        (not
+          (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        )
+      )
+  )
+  (:action reserve_transfer_node_a_for_origin_leg
+    :parameters (?origin_leg - origin_leg ?transfer_node_a - transfer_node_a ?route_option - route_option)
+    :precondition
+      (and
+        (route_confirmed ?origin_leg)
+        (assigned_route_option ?origin_leg ?route_option)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (not
+          (transfer_node_a_reserved ?transfer_node_a)
+        )
+        (not
+          (transfer_node_a_staged ?transfer_node_a)
+        )
+      )
+    :effect (transfer_node_a_reserved ?transfer_node_a)
+  )
+  (:action stage_origin_leg_at_node
+    :parameters (?origin_leg - origin_leg ?transfer_node_a - transfer_node_a ?facility_terminal - facility_terminal)
+    :precondition
+      (and
+        (route_confirmed ?origin_leg)
+        (leg_assigned_terminal ?origin_leg ?facility_terminal)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (transfer_node_a_reserved ?transfer_node_a)
+        (not
+          (origin_leg_staged_flag ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+      )
+  )
+  (:action stage_cargo_on_origin_leg
+    :parameters (?origin_leg - origin_leg ?transfer_node_a - transfer_node_a ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (route_confirmed ?origin_leg)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (cargo_item_available ?cargo_item)
+        (not
+          (origin_leg_staged_flag ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_a_staged ?transfer_node_a)
+        (origin_leg_staged_flag ?origin_leg)
+        (origin_leg_assigned_cargo ?origin_leg ?cargo_item)
+        (not
+          (cargo_item_available ?cargo_item)
+        )
+      )
+  )
+  (:action finalize_origin_leg_cargo_staging
+    :parameters (?origin_leg - origin_leg ?transfer_node_a - transfer_node_a ?route_option - route_option ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (route_confirmed ?origin_leg)
+        (assigned_route_option ?origin_leg ?route_option)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (transfer_node_a_staged ?transfer_node_a)
+        (origin_leg_assigned_cargo ?origin_leg ?cargo_item)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_a_reserved ?transfer_node_a)
+        (origin_leg_ready ?origin_leg)
+        (cargo_item_available ?cargo_item)
+        (not
+          (origin_leg_assigned_cargo ?origin_leg ?cargo_item)
+        )
+      )
+  )
+  (:action reserve_transfer_node_b_for_feeder_leg
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_b - transfer_node_b ?route_option - route_option)
+    :precondition
+      (and
+        (route_confirmed ?feeder_or_destination_leg)
+        (assigned_route_option ?feeder_or_destination_leg ?route_option)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (not
+          (transfer_node_b_reserved ?transfer_node_b)
+        )
+        (not
+          (transfer_node_b_staged ?transfer_node_b)
+        )
+      )
+    :effect (transfer_node_b_reserved ?transfer_node_b)
+  )
+  (:action stage_feeder_leg_at_node
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_b - transfer_node_b ?facility_terminal - facility_terminal)
+    :precondition
+      (and
+        (route_confirmed ?feeder_or_destination_leg)
+        (leg_assigned_terminal ?feeder_or_destination_leg ?facility_terminal)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_b_reserved ?transfer_node_b)
+        (not
+          (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        )
+      )
+    :effect
+      (and
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (feeder_leg_ready ?feeder_or_destination_leg)
+      )
+  )
+  (:action stage_cargo_on_feeder_leg
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_b - transfer_node_b ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (route_confirmed ?feeder_or_destination_leg)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (cargo_item_available ?cargo_item)
+        (not
+          (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_b_staged ?transfer_node_b)
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (feeder_leg_assigned_cargo ?feeder_or_destination_leg ?cargo_item)
+        (not
+          (cargo_item_available ?cargo_item)
+        )
+      )
+  )
+  (:action finalize_feeder_leg_cargo_staging
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_b - transfer_node_b ?route_option - route_option ?cargo_item - cargo_item)
+    :precondition
+      (and
+        (route_confirmed ?feeder_or_destination_leg)
+        (assigned_route_option ?feeder_or_destination_leg ?route_option)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_b_staged ?transfer_node_b)
+        (feeder_leg_assigned_cargo ?feeder_or_destination_leg ?cargo_item)
+        (not
+          (feeder_leg_ready ?feeder_or_destination_leg)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_b_reserved ?transfer_node_b)
+        (feeder_leg_ready ?feeder_or_destination_leg)
+        (cargo_item_available ?cargo_item)
+        (not
+          (feeder_leg_assigned_cargo ?feeder_or_destination_leg ?cargo_item)
+        )
+      )
+  )
+  (:action allocate_intermodal_unit_between_nodes
+    :parameters (?origin_leg - origin_leg ?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_a - transfer_node_a ?transfer_node_b - transfer_node_b ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_a_reserved ?transfer_node_a)
+        (transfer_node_b_reserved ?transfer_node_b)
+        (origin_leg_ready ?origin_leg)
+        (feeder_leg_ready ?feeder_or_destination_leg)
+        (intermodal_unit_available ?intermodal_unit)
+      )
+    :effect
+      (and
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_paired_node_a ?intermodal_unit ?transfer_node_a)
+        (intermodal_unit_paired_node_b ?intermodal_unit ?transfer_node_b)
+        (not
+          (intermodal_unit_available ?intermodal_unit)
+        )
+      )
+  )
+  (:action allocate_intermodal_unit_with_export_flag
+    :parameters (?origin_leg - origin_leg ?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_a - transfer_node_a ?transfer_node_b - transfer_node_b ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_a_staged ?transfer_node_a)
+        (transfer_node_b_reserved ?transfer_node_b)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (feeder_leg_ready ?feeder_or_destination_leg)
+        (intermodal_unit_available ?intermodal_unit)
+      )
+    :effect
+      (and
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_paired_node_a ?intermodal_unit ?transfer_node_a)
+        (intermodal_unit_paired_node_b ?intermodal_unit ?transfer_node_b)
+        (intermodal_unit_requires_export_handling ?intermodal_unit)
+        (not
+          (intermodal_unit_available ?intermodal_unit)
+        )
+      )
+  )
+  (:action allocate_intermodal_unit_with_import_flag
+    :parameters (?origin_leg - origin_leg ?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_a - transfer_node_a ?transfer_node_b - transfer_node_b ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_a_reserved ?transfer_node_a)
+        (transfer_node_b_staged ?transfer_node_b)
+        (origin_leg_ready ?origin_leg)
+        (not
+          (feeder_leg_ready ?feeder_or_destination_leg)
+        )
+        (intermodal_unit_available ?intermodal_unit)
+      )
+    :effect
+      (and
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_paired_node_a ?intermodal_unit ?transfer_node_a)
+        (intermodal_unit_paired_node_b ?intermodal_unit ?transfer_node_b)
+        (intermodal_unit_requires_import_handling ?intermodal_unit)
+        (not
+          (intermodal_unit_available ?intermodal_unit)
+        )
+      )
+  )
+  (:action allocate_intermodal_unit_with_both_flags
+    :parameters (?origin_leg - origin_leg ?feeder_or_destination_leg - feeder_or_destination_leg ?transfer_node_a - transfer_node_a ?transfer_node_b - transfer_node_b ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (origin_leg_assigned_node_a ?origin_leg ?transfer_node_a)
+        (feeder_leg_assigned_node_b ?feeder_or_destination_leg ?transfer_node_b)
+        (transfer_node_a_staged ?transfer_node_a)
+        (transfer_node_b_staged ?transfer_node_b)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (not
+          (feeder_leg_ready ?feeder_or_destination_leg)
+        )
+        (intermodal_unit_available ?intermodal_unit)
+      )
+    :effect
+      (and
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_paired_node_a ?intermodal_unit ?transfer_node_a)
+        (intermodal_unit_paired_node_b ?intermodal_unit ?transfer_node_b)
+        (intermodal_unit_requires_export_handling ?intermodal_unit)
+        (intermodal_unit_requires_import_handling ?intermodal_unit)
+        (not
+          (intermodal_unit_available ?intermodal_unit)
+        )
+      )
+  )
+  (:action mark_intermodal_unit_ready_for_loading
+    :parameters (?intermodal_unit - intermodal_unit ?origin_leg - origin_leg ?route_option - route_option)
+    :precondition
+      (and
+        (intermodal_unit_allocated ?intermodal_unit)
+        (origin_leg_staged_flag ?origin_leg)
+        (assigned_route_option ?origin_leg ?route_option)
+        (not
+          (intermodal_unit_ready_for_loading ?intermodal_unit)
+        )
+      )
+    :effect (intermodal_unit_ready_for_loading ?intermodal_unit)
+  )
+  (:action bind_package_batch_to_intermodal_unit
+    :parameters (?itinerary_unit - itinerary_unit ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (itinerary_assigned_intermodal_unit ?itinerary_unit ?intermodal_unit)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_available ?package_batch)
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_ready_for_loading ?intermodal_unit)
+        (not
+          (package_batch_allocated ?package_batch)
+        )
+      )
+    :effect
+      (and
+        (package_batch_allocated ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (not
+          (package_batch_available ?package_batch)
+        )
+      )
+  )
+  (:action verify_package_unit_binding_for_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?package_batch - package_batch ?intermodal_unit - intermodal_unit ?route_option - route_option)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_allocated ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (assigned_route_option ?itinerary_unit ?route_option)
+        (not
+          (intermodal_unit_requires_export_handling ?intermodal_unit)
+        )
+        (not
+          (itinerary_package_unit_validated ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_package_unit_validated ?itinerary_unit)
+  )
+  (:action apply_handling_code_to_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?handling_code - handling_code)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (handling_code_available ?handling_code)
+        (not
+          (handling_code_applied ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (handling_code_applied ?itinerary_unit)
+        (itinerary_has_handling_code ?itinerary_unit ?handling_code)
+        (not
+          (handling_code_available ?handling_code)
+        )
+      )
+  )
+  (:action validate_handling_code_and_equipment_for_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?package_batch - package_batch ?intermodal_unit - intermodal_unit ?route_option - route_option ?handling_code - handling_code)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_allocated ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (assigned_route_option ?itinerary_unit ?route_option)
+        (intermodal_unit_requires_export_handling ?intermodal_unit)
+        (handling_code_applied ?itinerary_unit)
+        (itinerary_has_handling_code ?itinerary_unit ?handling_code)
+        (not
+          (itinerary_package_unit_validated ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_package_unit_validated ?itinerary_unit)
+        (handling_code_validated ?itinerary_unit)
+      )
+  )
+  (:action perform_equipment_validation_step_1
+    :parameters (?itinerary_unit - itinerary_unit ?crew_or_driver - crew_or_driver ?facility_terminal - facility_terminal ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_package_unit_validated ?itinerary_unit)
+        (itinerary_assigned_crew ?itinerary_unit ?crew_or_driver)
+        (leg_assigned_terminal ?itinerary_unit ?facility_terminal)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (not
+          (intermodal_unit_requires_import_handling ?intermodal_unit)
+        )
+        (not
+          (itinerary_equipment_validated ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_equipment_validated ?itinerary_unit)
+  )
+  (:action perform_equipment_validation_step_2
+    :parameters (?itinerary_unit - itinerary_unit ?crew_or_driver - crew_or_driver ?facility_terminal - facility_terminal ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_package_unit_validated ?itinerary_unit)
+        (itinerary_assigned_crew ?itinerary_unit ?crew_or_driver)
+        (leg_assigned_terminal ?itinerary_unit ?facility_terminal)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (intermodal_unit_requires_import_handling ?intermodal_unit)
+        (not
+          (itinerary_equipment_validated ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_equipment_validated ?itinerary_unit)
+  )
+  (:action validate_insurance_and_packages_for_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_equipment_validated ?itinerary_unit)
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (not
+          (intermodal_unit_requires_export_handling ?intermodal_unit)
+        )
+        (not
+          (intermodal_unit_requires_import_handling ?intermodal_unit)
+        )
+        (not
+          (itinerary_documents_validated ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_documents_validated ?itinerary_unit)
+  )
+  (:action confirm_insurance_validation_with_unit_flag
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_equipment_validated ?itinerary_unit)
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (intermodal_unit_requires_export_handling ?intermodal_unit)
+        (not
+          (intermodal_unit_requires_import_handling ?intermodal_unit)
+        )
+        (not
+          (itinerary_documents_validated ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (equipment_compatibility_validated ?itinerary_unit)
+      )
+  )
+  (:action confirm_insurance_validation_with_alternate_flags
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_equipment_validated ?itinerary_unit)
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (not
+          (intermodal_unit_requires_export_handling ?intermodal_unit)
+        )
+        (intermodal_unit_requires_import_handling ?intermodal_unit)
+        (not
+          (itinerary_documents_validated ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (equipment_compatibility_validated ?itinerary_unit)
+      )
+  )
+  (:action confirm_insurance_validation_full
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document ?package_batch - package_batch ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (itinerary_equipment_validated ?itinerary_unit)
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (itinerary_assigned_package_batch ?itinerary_unit ?package_batch)
+        (package_batch_loaded_into_unit ?package_batch ?intermodal_unit)
+        (intermodal_unit_requires_export_handling ?intermodal_unit)
+        (intermodal_unit_requires_import_handling ?intermodal_unit)
+        (not
+          (itinerary_documents_validated ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (equipment_compatibility_validated ?itinerary_unit)
+      )
+  )
+  (:action finalize_itinerary_checks
+    :parameters (?itinerary_unit - itinerary_unit)
+    :precondition
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (not
+          (equipment_compatibility_validated ?itinerary_unit)
+        )
+        (not
+          (itinerary_finalized_flag ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized_flag ?itinerary_unit)
+        (eligible_for_scheduling ?itinerary_unit)
+      )
+  )
+  (:action assign_equipment_type_to_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (equipment_compatibility_validated ?itinerary_unit)
+        (equipment_type_available ?equipment_type)
+      )
+    :effect
+      (and
+        (itinerary_assigned_equipment_type ?itinerary_unit ?equipment_type)
+        (not
+          (equipment_type_available ?equipment_type)
+        )
+      )
+  )
+  (:action finalize_itinerary_readiness
+    :parameters (?itinerary_unit - itinerary_unit ?origin_leg - origin_leg ?feeder_or_destination_leg - feeder_or_destination_leg ?route_option - route_option ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (equipment_compatibility_validated ?itinerary_unit)
+        (itinerary_assigned_equipment_type ?itinerary_unit ?equipment_type)
+        (itinerary_has_origin_leg ?itinerary_unit ?origin_leg)
+        (itinerary_has_feeder_leg ?itinerary_unit ?feeder_or_destination_leg)
+        (origin_leg_ready ?origin_leg)
+        (feeder_leg_ready ?feeder_or_destination_leg)
+        (assigned_route_option ?itinerary_unit ?route_option)
+        (not
+          (itinerary_ready_for_execution ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_ready_for_execution ?itinerary_unit)
+  )
+  (:action finalize_itinerary_post_checks
+    :parameters (?itinerary_unit - itinerary_unit)
+    :precondition
+      (and
+        (itinerary_documents_validated ?itinerary_unit)
+        (itinerary_ready_for_execution ?itinerary_unit)
+        (not
+          (itinerary_finalized_flag ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized_flag ?itinerary_unit)
+        (eligible_for_scheduling ?itinerary_unit)
+      )
+  )
+  (:action bind_consignor_clearance_to_itinerary
+    :parameters (?itinerary_unit - itinerary_unit ?consignor_clearance - consignor_clearance ?route_option - route_option)
+    :precondition
+      (and
+        (route_confirmed ?itinerary_unit)
+        (assigned_route_option ?itinerary_unit ?route_option)
+        (consignor_clearance_available ?consignor_clearance)
+        (itinerary_has_consignor_clearance ?itinerary_unit ?consignor_clearance)
+        (not
+          (itinerary_consignor_clearance_bound ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_consignor_clearance_bound ?itinerary_unit)
+        (not
+          (consignor_clearance_available ?consignor_clearance)
+        )
+      )
+  )
+  (:action verify_itinerary_clearance_at_terminal
+    :parameters (?itinerary_unit - itinerary_unit ?facility_terminal - facility_terminal)
+    :precondition
+      (and
+        (itinerary_consignor_clearance_bound ?itinerary_unit)
+        (leg_assigned_terminal ?itinerary_unit ?facility_terminal)
+        (not
+          (itinerary_clearance_verified ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_clearance_verified ?itinerary_unit)
+  )
+  (:action confirm_clearance_and_insurance
+    :parameters (?itinerary_unit - itinerary_unit ?insurance_document - insurance_document)
+    :precondition
+      (and
+        (itinerary_clearance_verified ?itinerary_unit)
+        (itinerary_assigned_insurance ?itinerary_unit ?insurance_document)
+        (not
+          (itinerary_preexecution_validated ?itinerary_unit)
+        )
+      )
+    :effect (itinerary_preexecution_validated ?itinerary_unit)
+  )
+  (:action finalize_itinerary_after_clearance
+    :parameters (?itinerary_unit - itinerary_unit)
+    :precondition
+      (and
+        (itinerary_preexecution_validated ?itinerary_unit)
+        (not
+          (itinerary_finalized_flag ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized_flag ?itinerary_unit)
+        (eligible_for_scheduling ?itinerary_unit)
+      )
+  )
+  (:action mark_origin_leg_completed
+    :parameters (?origin_leg - origin_leg ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (origin_leg_staged_flag ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_ready_for_loading ?intermodal_unit)
+        (not
+          (eligible_for_scheduling ?origin_leg)
+        )
+      )
+    :effect (eligible_for_scheduling ?origin_leg)
+  )
+  (:action mark_feeder_leg_completed
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?intermodal_unit - intermodal_unit)
+    :precondition
+      (and
+        (feeder_leg_staged_flag ?feeder_or_destination_leg)
+        (feeder_leg_ready ?feeder_or_destination_leg)
+        (intermodal_unit_allocated ?intermodal_unit)
+        (intermodal_unit_ready_for_loading ?intermodal_unit)
+        (not
+          (eligible_for_scheduling ?feeder_or_destination_leg)
+        )
+      )
+    :effect (eligible_for_scheduling ?feeder_or_destination_leg)
+  )
+  (:action assign_time_window_to_leg
+    :parameters (?transport_leg - leg ?time_window - time_window ?route_option - route_option)
+    :precondition
+      (and
+        (eligible_for_scheduling ?transport_leg)
+        (assigned_route_option ?transport_leg ?route_option)
+        (time_window_available ?time_window)
+        (not
+          (scheduled ?transport_leg)
+        )
+      )
+    :effect
+      (and
+        (scheduled ?transport_leg)
+        (assigned_time_window ?transport_leg ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action complete_origin_leg_and_release_resources
+    :parameters (?origin_leg - origin_leg ?mode_slot - mode_slot ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?origin_leg)
+        (assigned_mode_slot ?origin_leg ?mode_slot)
+        (assigned_time_window ?origin_leg ?time_window)
+        (not
+          (completed ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (completed ?origin_leg)
+        (mode_slot_available ?mode_slot)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action complete_feeder_leg_and_release_resources
+    :parameters (?feeder_or_destination_leg - feeder_or_destination_leg ?mode_slot - mode_slot ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?feeder_or_destination_leg)
+        (assigned_mode_slot ?feeder_or_destination_leg ?mode_slot)
+        (assigned_time_window ?feeder_or_destination_leg ?time_window)
+        (not
+          (completed ?feeder_or_destination_leg)
+        )
+      )
+    :effect
+      (and
+        (completed ?feeder_or_destination_leg)
+        (mode_slot_available ?mode_slot)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action complete_itinerary_and_release_resources
+    :parameters (?itinerary_unit - itinerary_unit ?mode_slot - mode_slot ?time_window - time_window)
+    :precondition
+      (and
+        (scheduled ?itinerary_unit)
+        (assigned_mode_slot ?itinerary_unit ?mode_slot)
+        (assigned_time_window ?itinerary_unit ?time_window)
+        (not
+          (completed ?itinerary_unit)
+        )
+      )
+    :effect
+      (and
+        (completed ?itinerary_unit)
+        (mode_slot_available ?mode_slot)
+        (time_window_available ?time_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem shipment_plan_scenario_1)
+  (:domain multimodal_transport_mode_selection)
+  (:objects origin_leg_1 - origin_leg feeder_leg_1 - feeder_or_destination_leg itinerary_1 - itinerary_unit itinerary_2 - itinerary_unit mode_slot_1 - mode_slot mode_slot_2 - mode_slot mode_slot_3 - mode_slot route_option_1 - route_option terminal_a - facility_terminal cargo_item_1 - cargo_item transfer_node_a_1 - transfer_node_a transfer_node_b_1 - transfer_node_b intermodal_unit_1 - intermodal_unit package_batch_1 - package_batch package_batch_2 - package_batch handling_code_1 - handling_code handling_code_2 - handling_code equipment_type_1 - equipment_type equipment_type_2 - equipment_type time_window_1 - time_window crew_1 - crew_or_driver consignor_clearance_1 - consignor_clearance consignor_clearance_2 - consignor_clearance insurance_document_1 - insurance_document)
+  (:init
+    (mode_slot_available mode_slot_1)
+    (mode_slot_available mode_slot_2)
+    (mode_slot_available mode_slot_3)
+    (route_option_available route_option_1)
+    (terminal_slot_available terminal_a)
+    (cargo_item_available cargo_item_1)
+    (origin_leg_assigned_node_a origin_leg_1 transfer_node_a_1)
+    (feeder_leg_assigned_node_b feeder_leg_1 transfer_node_b_1)
+    (intermodal_unit_available intermodal_unit_1)
+    (package_batch_available package_batch_1)
+    (package_batch_available package_batch_2)
+    (itinerary_has_origin_leg itinerary_1 origin_leg_1)
+    (itinerary_has_origin_leg itinerary_2 origin_leg_1)
+    (itinerary_has_feeder_leg itinerary_1 feeder_leg_1)
+    (itinerary_has_feeder_leg itinerary_2 feeder_leg_1)
+    (itinerary_assigned_intermodal_unit itinerary_1 intermodal_unit_1)
+    (itinerary_assigned_intermodal_unit itinerary_2 intermodal_unit_1)
+    (itinerary_assigned_package_batch itinerary_1 package_batch_1)
+    (itinerary_assigned_package_batch itinerary_2 package_batch_2)
+    (handling_code_available handling_code_1)
+    (handling_code_available handling_code_2)
+    (equipment_type_available equipment_type_1)
+    (equipment_type_available equipment_type_2)
+    (time_window_available time_window_1)
+    (crew_available crew_1)
+    (consignor_clearance_available consignor_clearance_1)
+    (itinerary_has_consignor_clearance itinerary_1 consignor_clearance_1)
+    (itinerary_has_consignor_clearance itinerary_2 consignor_clearance_2)
+    (insurance_document_available insurance_document_1)
+  )
+  (:goal
+    (and
+      (completed origin_leg_1)
+      (completed feeder_leg_1)
+      (completed itinerary_1)
+      (completed itinerary_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_leg origin_leg_1)
+(assign_mode_slot_to_leg origin_leg_1 mode_slot_1)
+(reserve_route_option_for_leg origin_leg_1 route_option_1)
+(confirm_leg_routing origin_leg_1 route_option_1)
+(reserve_terminal_slot_for_leg origin_leg_1 terminal_a)
+(reserve_transfer_node_a_for_origin_leg origin_leg_1 transfer_node_a_1 route_option_1)
+(release_route_reservation origin_leg_1 route_option_1)
+(stage_origin_leg_at_node origin_leg_1 transfer_node_a_1 terminal_a)
+(release_terminal_slot_from_leg origin_leg_1 terminal_a)
+(create_leg feeder_leg_1)
+(assign_mode_slot_to_leg feeder_leg_1 mode_slot_2)
+(reserve_route_option_for_leg feeder_leg_1 route_option_1)
+(confirm_leg_routing feeder_leg_1 route_option_1)
+(reserve_terminal_slot_for_leg feeder_leg_1 terminal_a)
+(reserve_transfer_node_b_for_feeder_leg feeder_leg_1 transfer_node_b_1 route_option_1)
+(release_route_reservation feeder_leg_1 route_option_1)
+(stage_feeder_leg_at_node feeder_leg_1 transfer_node_b_1 terminal_a)
+(release_terminal_slot_from_leg feeder_leg_1 terminal_a)
+(allocate_intermodal_unit_between_nodes origin_leg_1 feeder_leg_1 transfer_node_a_1 transfer_node_b_1 intermodal_unit_1)
+(reserve_route_option_for_leg origin_leg_1 route_option_1)
+(mark_intermodal_unit_ready_for_loading intermodal_unit_1 origin_leg_1 route_option_1)
+(mark_origin_leg_completed origin_leg_1 intermodal_unit_1)
+(mark_feeder_leg_completed feeder_leg_1 intermodal_unit_1)
+(reserve_route_option_for_leg origin_leg_1 route_option_1)
+(assign_time_window_to_leg origin_leg_1 time_window_1 route_option_1)
+(complete_origin_leg_and_release_resources origin_leg_1 mode_slot_1 time_window_1)
+(reserve_route_option_for_leg feeder_leg_1 route_option_1)
+(assign_time_window_to_leg feeder_leg_1 time_window_1 route_option_1)
+(complete_feeder_leg_and_release_resources feeder_leg_1 mode_slot_2 time_window_1)
+(create_leg itinerary_1)
+(assign_mode_slot_to_leg itinerary_1 mode_slot_1)
+(reserve_route_option_for_leg itinerary_1 route_option_1)
+(confirm_leg_routing itinerary_1 route_option_1)
+(bind_package_batch_to_intermodal_unit itinerary_1 package_batch_1 intermodal_unit_1)
+(verify_package_unit_binding_for_itinerary itinerary_1 package_batch_1 intermodal_unit_1 route_option_1)
+(assign_crew_to_itinerary itinerary_1 crew_1)
+(reserve_terminal_slot_for_leg itinerary_1 terminal_a)
+(perform_equipment_validation_step_1 itinerary_1 crew_1 terminal_a package_batch_1 intermodal_unit_1)
+(release_terminal_slot_from_leg itinerary_1 terminal_a)
+(assign_insurance_to_itinerary itinerary_1 insurance_document_1)
+(validate_insurance_and_packages_for_itinerary itinerary_1 insurance_document_1 package_batch_1 intermodal_unit_1)
+(finalize_itinerary_checks itinerary_1)
+(release_crew_from_itinerary itinerary_1 crew_1)
+(release_insurance_from_itinerary itinerary_1 insurance_document_1)
+(assign_time_window_to_leg itinerary_1 time_window_1 route_option_1)
+(complete_itinerary_and_release_resources itinerary_1 mode_slot_1 time_window_1)
+(release_route_reservation itinerary_1 route_option_1)
+(create_leg itinerary_2)
+(assign_mode_slot_to_leg itinerary_2 mode_slot_2)
+(reserve_route_option_for_leg itinerary_2 route_option_1)
+(confirm_leg_routing itinerary_2 route_option_1)
+(bind_package_batch_to_intermodal_unit itinerary_2 package_batch_2 intermodal_unit_1)
+(verify_package_unit_binding_for_itinerary itinerary_2 package_batch_2 intermodal_unit_1 route_option_1)
+(assign_crew_to_itinerary itinerary_2 crew_1)
+(reserve_terminal_slot_for_leg itinerary_2 terminal_a)
+(perform_equipment_validation_step_1 itinerary_2 crew_1 terminal_a package_batch_2 intermodal_unit_1)
+(release_terminal_slot_from_leg itinerary_2 terminal_a)
+(assign_insurance_to_itinerary itinerary_2 insurance_document_1)
+(validate_insurance_and_packages_for_itinerary itinerary_2 insurance_document_1 package_batch_2 intermodal_unit_1)
+(finalize_itinerary_checks itinerary_2)
+(release_crew_from_itinerary itinerary_2 crew_1)
+(release_insurance_from_itinerary itinerary_2 insurance_document_1)
+(assign_time_window_to_leg itinerary_2 time_window_1 route_option_1)
+(complete_itinerary_and_release_resources itinerary_2 mode_slot_2 time_window_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_dfvu1n9s/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_dfvu1n9s/plan.pddl 
+
+
+--- stderr ---
+

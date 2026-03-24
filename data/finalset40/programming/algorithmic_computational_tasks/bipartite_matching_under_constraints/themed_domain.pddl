@@ -1,0 +1,936 @@
+(define (domain bipartite_matching_under_constraints)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types attribute_class - object resource_category - object slot_category - object entity_category - object participant - entity_category partner_token - attribute_class proposal_option - attribute_class intermediary - attribute_class static_attribute_a - attribute_class static_attribute_b - attribute_class external_constraint_token - attribute_class optional_qualifier - attribute_class priority_flag - attribute_class consumable_resource - resource_category constraint_marker - resource_category slot_type - resource_category resource_dimension_a - slot_category resource_dimension_b - slot_category assignment_record - slot_category proposer_group_type - participant target_group_type - participant proposer_group_a - proposer_group_type proposer_group_b - proposer_group_type target_position - target_group_type)
+  (:predicates
+    (participant_active ?participant - participant)
+    (entity_confirmed ?participant - participant)
+    (participant_proposed ?participant - participant)
+    (match_committed ?participant - participant)
+    (eligible_for_finalization ?participant - participant)
+    (external_constraint_applied ?participant - participant)
+    (partner_token_available ?partner_token - partner_token)
+    (partner_link ?participant - participant ?partner_token - partner_token)
+    (proposal_option_available ?proposal_option - proposal_option)
+    (proposal_link ?participant - participant ?proposal_option - proposal_option)
+    (intermediary_available ?intermediary - intermediary)
+    (intermediary_link ?participant - participant ?intermediary - intermediary)
+    (consumable_resource_available ?consumable_resource - consumable_resource)
+    (allocated_consumable_a ?proposer_group_a - proposer_group_a ?consumable_resource - consumable_resource)
+    (allocated_consumable_b ?proposer_group_b - proposer_group_b ?consumable_resource - consumable_resource)
+    (groupa_resource_dimension_link ?proposer_group_a - proposer_group_a ?resource_dimension_a - resource_dimension_a)
+    (resource_dimension_a_reserved ?resource_dimension_a - resource_dimension_a)
+    (resource_dimension_a_consumed ?resource_dimension_a - resource_dimension_a)
+    (group_a_resource_confirmed ?proposer_group_a - proposer_group_a)
+    (groupb_resource_dimension_link ?proposer_group_b - proposer_group_b ?resource_dimension_b - resource_dimension_b)
+    (resource_dimension_b_reserved ?resource_dimension_b - resource_dimension_b)
+    (resource_dimension_b_consumed ?resource_dimension_b - resource_dimension_b)
+    (group_b_resource_confirmed ?proposer_group_b - proposer_group_b)
+    (assignment_record_available ?assignment_record - assignment_record)
+    (assignment_record_active ?assignment_record - assignment_record)
+    (record_resource_a_link ?assignment_record - assignment_record ?resource_dimension_a - resource_dimension_a)
+    (record_resource_b_link ?assignment_record - assignment_record ?resource_dimension_b - resource_dimension_b)
+    (record_variant_x ?assignment_record - assignment_record)
+    (record_variant_y ?assignment_record - assignment_record)
+    (record_locked ?assignment_record - assignment_record)
+    (position_associated_with_group_a ?target_position - target_position ?proposer_group_a - proposer_group_a)
+    (position_associated_with_group_b ?target_position - target_position ?proposer_group_b - proposer_group_b)
+    (position_assignment_record_link ?target_position - target_position ?assignment_record - assignment_record)
+    (constraint_marker_available ?constraint_marker - constraint_marker)
+    (position_constraint_link ?target_position - target_position ?constraint_marker - constraint_marker)
+    (constraint_marker_bound ?constraint_marker - constraint_marker)
+    (constraint_marker_record_link ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    (attribute_binding_phase1 ?target_position - target_position)
+    (attribute_binding_phase2 ?target_position - target_position)
+    (attribute_selection_complete ?target_position - target_position)
+    (static_attribute_a_bound ?target_position - target_position)
+    (attribute_selection_variant ?target_position - target_position)
+    (attribute_selection_secondary ?target_position - target_position)
+    (composite_checks_passed ?target_position - target_position)
+    (slot_type_available ?slot_type - slot_type)
+    (position_slot_link ?target_position - target_position ?slot_type - slot_type)
+    (slot_binding_active ?target_position - target_position)
+    (slot_binding_confirmed ?target_position - target_position)
+    (slot_binding_finalized ?target_position - target_position)
+    (static_attribute_a_available ?static_attribute_a - static_attribute_a)
+    (position_static_attribute_link ?target_position - target_position ?static_attribute_a - static_attribute_a)
+    (static_attribute_b_available ?static_attribute_b - static_attribute_b)
+    (position_static_attribute_b_link ?target_position - target_position ?static_attribute_b - static_attribute_b)
+    (optional_qualifier_available ?optional_qualifier - optional_qualifier)
+    (position_optional_qualifier_link ?target_position - target_position ?optional_qualifier - optional_qualifier)
+    (priority_flag_available ?priority_flag - priority_flag)
+    (position_priority_flag_link ?target_position - target_position ?priority_flag - priority_flag)
+    (external_constraint_token_available ?external_constraint_token - external_constraint_token)
+    (external_constraint_link ?participant - participant ?external_constraint_token - external_constraint_token)
+    (group_a_ready ?proposer_group_a - proposer_group_a)
+    (group_b_ready ?proposer_group_b - proposer_group_b)
+    (position_finalized_flag ?target_position - target_position)
+  )
+  (:action activate_participant
+    :parameters (?participant - participant)
+    :precondition
+      (and
+        (not
+          (participant_active ?participant)
+        )
+        (not
+          (match_committed ?participant)
+        )
+      )
+    :effect (participant_active ?participant)
+  )
+  (:action create_proposal_with_partner_token
+    :parameters (?participant - participant ?partner_token - partner_token)
+    :precondition
+      (and
+        (participant_active ?participant)
+        (not
+          (participant_proposed ?participant)
+        )
+        (partner_token_available ?partner_token)
+      )
+    :effect
+      (and
+        (participant_proposed ?participant)
+        (partner_link ?participant ?partner_token)
+        (not
+          (partner_token_available ?partner_token)
+        )
+      )
+  )
+  (:action record_proposal_option
+    :parameters (?participant - participant ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (participant_active ?participant)
+        (participant_proposed ?participant)
+        (proposal_option_available ?proposal_option)
+      )
+    :effect
+      (and
+        (proposal_link ?participant ?proposal_option)
+        (not
+          (proposal_option_available ?proposal_option)
+        )
+      )
+  )
+  (:action confirm_proposal_acceptance
+    :parameters (?participant - participant ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (participant_active ?participant)
+        (participant_proposed ?participant)
+        (proposal_link ?participant ?proposal_option)
+        (not
+          (entity_confirmed ?participant)
+        )
+      )
+    :effect (entity_confirmed ?participant)
+  )
+  (:action retract_proposal_option
+    :parameters (?participant - participant ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (proposal_link ?participant ?proposal_option)
+      )
+    :effect
+      (and
+        (proposal_option_available ?proposal_option)
+        (not
+          (proposal_link ?participant ?proposal_option)
+        )
+      )
+  )
+  (:action bind_intermediary_to_participant
+    :parameters (?participant - participant ?intermediary - intermediary)
+    :precondition
+      (and
+        (entity_confirmed ?participant)
+        (intermediary_available ?intermediary)
+      )
+    :effect
+      (and
+        (intermediary_link ?participant ?intermediary)
+        (not
+          (intermediary_available ?intermediary)
+        )
+      )
+  )
+  (:action unbind_intermediary_from_participant
+    :parameters (?participant - participant ?intermediary - intermediary)
+    :precondition
+      (and
+        (intermediary_link ?participant ?intermediary)
+      )
+    :effect
+      (and
+        (intermediary_available ?intermediary)
+        (not
+          (intermediary_link ?participant ?intermediary)
+        )
+      )
+  )
+  (:action reserve_optional_qualifier_for_position
+    :parameters (?target_position - target_position ?optional_qualifier - optional_qualifier)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (optional_qualifier_available ?optional_qualifier)
+      )
+    :effect
+      (and
+        (position_optional_qualifier_link ?target_position ?optional_qualifier)
+        (not
+          (optional_qualifier_available ?optional_qualifier)
+        )
+      )
+  )
+  (:action release_optional_qualifier_from_position
+    :parameters (?target_position - target_position ?optional_qualifier - optional_qualifier)
+    :precondition
+      (and
+        (position_optional_qualifier_link ?target_position ?optional_qualifier)
+      )
+    :effect
+      (and
+        (optional_qualifier_available ?optional_qualifier)
+        (not
+          (position_optional_qualifier_link ?target_position ?optional_qualifier)
+        )
+      )
+  )
+  (:action reserve_priority_flag_for_position
+    :parameters (?target_position - target_position ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (priority_flag_available ?priority_flag)
+      )
+    :effect
+      (and
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (not
+          (priority_flag_available ?priority_flag)
+        )
+      )
+  )
+  (:action release_priority_flag_from_position
+    :parameters (?target_position - target_position ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (position_priority_flag_link ?target_position ?priority_flag)
+      )
+    :effect
+      (and
+        (priority_flag_available ?priority_flag)
+        (not
+          (position_priority_flag_link ?target_position ?priority_flag)
+        )
+      )
+  )
+  (:action reserve_resource_dimension_a_for_group
+    :parameters (?proposer_group_a - proposer_group_a ?resource_dimension_a - resource_dimension_a ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_a)
+        (proposal_link ?proposer_group_a ?proposal_option)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (not
+          (resource_dimension_a_reserved ?resource_dimension_a)
+        )
+        (not
+          (resource_dimension_a_consumed ?resource_dimension_a)
+        )
+      )
+    :effect (resource_dimension_a_reserved ?resource_dimension_a)
+  )
+  (:action confirm_group_a_reservation_with_intermediary
+    :parameters (?proposer_group_a - proposer_group_a ?resource_dimension_a - resource_dimension_a ?intermediary - intermediary)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_a)
+        (intermediary_link ?proposer_group_a ?intermediary)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (resource_dimension_a_reserved ?resource_dimension_a)
+        (not
+          (group_a_ready ?proposer_group_a)
+        )
+      )
+    :effect
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_a_resource_confirmed ?proposer_group_a)
+      )
+  )
+  (:action allocate_consumable_for_group_a
+    :parameters (?proposer_group_a - proposer_group_a ?resource_dimension_a - resource_dimension_a ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_a)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (group_a_ready ?proposer_group_a)
+        )
+      )
+    :effect
+      (and
+        (resource_dimension_a_consumed ?resource_dimension_a)
+        (group_a_ready ?proposer_group_a)
+        (allocated_consumable_a ?proposer_group_a ?consumable_resource)
+        (not
+          (consumable_resource_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_consumable_allocation_group_a
+    :parameters (?proposer_group_a - proposer_group_a ?resource_dimension_a - resource_dimension_a ?proposal_option - proposal_option ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_a)
+        (proposal_link ?proposer_group_a ?proposal_option)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (resource_dimension_a_consumed ?resource_dimension_a)
+        (allocated_consumable_a ?proposer_group_a ?consumable_resource)
+        (not
+          (group_a_resource_confirmed ?proposer_group_a)
+        )
+      )
+    :effect
+      (and
+        (resource_dimension_a_reserved ?resource_dimension_a)
+        (group_a_resource_confirmed ?proposer_group_a)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (allocated_consumable_a ?proposer_group_a ?consumable_resource)
+        )
+      )
+  )
+  (:action reserve_resource_dimension_b_for_group
+    :parameters (?proposer_group_b - proposer_group_b ?resource_dimension_b - resource_dimension_b ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_b)
+        (proposal_link ?proposer_group_b ?proposal_option)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (not
+          (resource_dimension_b_reserved ?resource_dimension_b)
+        )
+        (not
+          (resource_dimension_b_consumed ?resource_dimension_b)
+        )
+      )
+    :effect (resource_dimension_b_reserved ?resource_dimension_b)
+  )
+  (:action confirm_group_b_reservation_with_intermediary
+    :parameters (?proposer_group_b - proposer_group_b ?resource_dimension_b - resource_dimension_b ?intermediary - intermediary)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_b)
+        (intermediary_link ?proposer_group_b ?intermediary)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_b_reserved ?resource_dimension_b)
+        (not
+          (group_b_ready ?proposer_group_b)
+        )
+      )
+    :effect
+      (and
+        (group_b_ready ?proposer_group_b)
+        (group_b_resource_confirmed ?proposer_group_b)
+      )
+  )
+  (:action allocate_consumable_for_group_b
+    :parameters (?proposer_group_b - proposer_group_b ?resource_dimension_b - resource_dimension_b ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_b)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (group_b_ready ?proposer_group_b)
+        )
+      )
+    :effect
+      (and
+        (resource_dimension_b_consumed ?resource_dimension_b)
+        (group_b_ready ?proposer_group_b)
+        (allocated_consumable_b ?proposer_group_b ?consumable_resource)
+        (not
+          (consumable_resource_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_consumable_allocation_group_b
+    :parameters (?proposer_group_b - proposer_group_b ?resource_dimension_b - resource_dimension_b ?proposal_option - proposal_option ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_confirmed ?proposer_group_b)
+        (proposal_link ?proposer_group_b ?proposal_option)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_b_consumed ?resource_dimension_b)
+        (allocated_consumable_b ?proposer_group_b ?consumable_resource)
+        (not
+          (group_b_resource_confirmed ?proposer_group_b)
+        )
+      )
+    :effect
+      (and
+        (resource_dimension_b_reserved ?resource_dimension_b)
+        (group_b_resource_confirmed ?proposer_group_b)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (allocated_consumable_b ?proposer_group_b ?consumable_resource)
+        )
+      )
+  )
+  (:action instantiate_assignment_record
+    :parameters (?proposer_group_a - proposer_group_a ?proposer_group_b - proposer_group_b ?resource_dimension_a - resource_dimension_a ?resource_dimension_b - resource_dimension_b ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_b_ready ?proposer_group_b)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_a_reserved ?resource_dimension_a)
+        (resource_dimension_b_reserved ?resource_dimension_b)
+        (group_a_resource_confirmed ?proposer_group_a)
+        (group_b_resource_confirmed ?proposer_group_b)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_active ?assignment_record)
+        (record_resource_a_link ?assignment_record ?resource_dimension_a)
+        (record_resource_b_link ?assignment_record ?resource_dimension_b)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_record_variant_x
+    :parameters (?proposer_group_a - proposer_group_a ?proposer_group_b - proposer_group_b ?resource_dimension_a - resource_dimension_a ?resource_dimension_b - resource_dimension_b ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_b_ready ?proposer_group_b)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_a_consumed ?resource_dimension_a)
+        (resource_dimension_b_reserved ?resource_dimension_b)
+        (not
+          (group_a_resource_confirmed ?proposer_group_a)
+        )
+        (group_b_resource_confirmed ?proposer_group_b)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_active ?assignment_record)
+        (record_resource_a_link ?assignment_record ?resource_dimension_a)
+        (record_resource_b_link ?assignment_record ?resource_dimension_b)
+        (record_variant_x ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_record_variant_y
+    :parameters (?proposer_group_a - proposer_group_a ?proposer_group_b - proposer_group_b ?resource_dimension_a - resource_dimension_a ?resource_dimension_b - resource_dimension_b ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_b_ready ?proposer_group_b)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_a_reserved ?resource_dimension_a)
+        (resource_dimension_b_consumed ?resource_dimension_b)
+        (group_a_resource_confirmed ?proposer_group_a)
+        (not
+          (group_b_resource_confirmed ?proposer_group_b)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_active ?assignment_record)
+        (record_resource_a_link ?assignment_record ?resource_dimension_a)
+        (record_resource_b_link ?assignment_record ?resource_dimension_b)
+        (record_variant_y ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_record_variants_xy
+    :parameters (?proposer_group_a - proposer_group_a ?proposer_group_b - proposer_group_b ?resource_dimension_a - resource_dimension_a ?resource_dimension_b - resource_dimension_b ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_b_ready ?proposer_group_b)
+        (groupa_resource_dimension_link ?proposer_group_a ?resource_dimension_a)
+        (groupb_resource_dimension_link ?proposer_group_b ?resource_dimension_b)
+        (resource_dimension_a_consumed ?resource_dimension_a)
+        (resource_dimension_b_consumed ?resource_dimension_b)
+        (not
+          (group_a_resource_confirmed ?proposer_group_a)
+        )
+        (not
+          (group_b_resource_confirmed ?proposer_group_b)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_active ?assignment_record)
+        (record_resource_a_link ?assignment_record ?resource_dimension_a)
+        (record_resource_b_link ?assignment_record ?resource_dimension_b)
+        (record_variant_x ?assignment_record)
+        (record_variant_y ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action lock_assignment_record_for_proposer
+    :parameters (?assignment_record - assignment_record ?proposer_group_a - proposer_group_a ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (assignment_record_active ?assignment_record)
+        (group_a_ready ?proposer_group_a)
+        (proposal_link ?proposer_group_a ?proposal_option)
+        (not
+          (record_locked ?assignment_record)
+        )
+      )
+    :effect (record_locked ?assignment_record)
+  )
+  (:action attach_constraint_marker_to_record
+    :parameters (?target_position - target_position ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (position_assignment_record_link ?target_position ?assignment_record)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_available ?constraint_marker)
+        (assignment_record_active ?assignment_record)
+        (record_locked ?assignment_record)
+        (not
+          (constraint_marker_bound ?constraint_marker)
+        )
+      )
+    :effect
+      (and
+        (constraint_marker_bound ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (not
+          (constraint_marker_available ?constraint_marker)
+        )
+      )
+  )
+  (:action bind_constraint_marker_and_mark_position
+    :parameters (?target_position - target_position ?constraint_marker - constraint_marker ?assignment_record - assignment_record ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_bound ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (proposal_link ?target_position ?proposal_option)
+        (not
+          (record_variant_x ?assignment_record)
+        )
+        (not
+          (attribute_binding_phase1 ?target_position)
+        )
+      )
+    :effect (attribute_binding_phase1 ?target_position)
+  )
+  (:action bind_static_attribute_a_to_position
+    :parameters (?target_position - target_position ?static_attribute_a - static_attribute_a)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (static_attribute_a_available ?static_attribute_a)
+        (not
+          (static_attribute_a_bound ?target_position)
+        )
+      )
+    :effect
+      (and
+        (static_attribute_a_bound ?target_position)
+        (position_static_attribute_link ?target_position ?static_attribute_a)
+        (not
+          (static_attribute_a_available ?static_attribute_a)
+        )
+      )
+  )
+  (:action bind_static_attribute_and_mark_variant
+    :parameters (?target_position - target_position ?constraint_marker - constraint_marker ?assignment_record - assignment_record ?proposal_option - proposal_option ?static_attribute_a - static_attribute_a)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_bound ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (proposal_link ?target_position ?proposal_option)
+        (record_variant_x ?assignment_record)
+        (static_attribute_a_bound ?target_position)
+        (position_static_attribute_link ?target_position ?static_attribute_a)
+        (not
+          (attribute_binding_phase1 ?target_position)
+        )
+      )
+    :effect
+      (and
+        (attribute_binding_phase1 ?target_position)
+        (attribute_selection_variant ?target_position)
+      )
+  )
+  (:action activate_attribute_branch_path1
+    :parameters (?target_position - target_position ?optional_qualifier - optional_qualifier ?intermediary - intermediary ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase1 ?target_position)
+        (position_optional_qualifier_link ?target_position ?optional_qualifier)
+        (intermediary_link ?target_position ?intermediary)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (not
+          (record_variant_y ?assignment_record)
+        )
+        (not
+          (attribute_binding_phase2 ?target_position)
+        )
+      )
+    :effect (attribute_binding_phase2 ?target_position)
+  )
+  (:action activate_attribute_branch_path2
+    :parameters (?target_position - target_position ?optional_qualifier - optional_qualifier ?intermediary - intermediary ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase1 ?target_position)
+        (position_optional_qualifier_link ?target_position ?optional_qualifier)
+        (intermediary_link ?target_position ?intermediary)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (record_variant_y ?assignment_record)
+        (not
+          (attribute_binding_phase2 ?target_position)
+        )
+      )
+    :effect (attribute_binding_phase2 ?target_position)
+  )
+  (:action finalize_attribute_selection_path1
+    :parameters (?target_position - target_position ?priority_flag - priority_flag ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase2 ?target_position)
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (not
+          (record_variant_x ?assignment_record)
+        )
+        (not
+          (record_variant_y ?assignment_record)
+        )
+        (not
+          (attribute_selection_complete ?target_position)
+        )
+      )
+    :effect (attribute_selection_complete ?target_position)
+  )
+  (:action finalize_attribute_selection_path1_with_secondary
+    :parameters (?target_position - target_position ?priority_flag - priority_flag ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase2 ?target_position)
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (record_variant_x ?assignment_record)
+        (not
+          (record_variant_y ?assignment_record)
+        )
+        (not
+          (attribute_selection_complete ?target_position)
+        )
+      )
+    :effect
+      (and
+        (attribute_selection_complete ?target_position)
+        (attribute_selection_secondary ?target_position)
+      )
+  )
+  (:action finalize_attribute_selection_path2
+    :parameters (?target_position - target_position ?priority_flag - priority_flag ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase2 ?target_position)
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (not
+          (record_variant_x ?assignment_record)
+        )
+        (record_variant_y ?assignment_record)
+        (not
+          (attribute_selection_complete ?target_position)
+        )
+      )
+    :effect
+      (and
+        (attribute_selection_complete ?target_position)
+        (attribute_selection_secondary ?target_position)
+      )
+  )
+  (:action finalize_attribute_selection_path2_with_secondary
+    :parameters (?target_position - target_position ?priority_flag - priority_flag ?constraint_marker - constraint_marker ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (attribute_binding_phase2 ?target_position)
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (position_constraint_link ?target_position ?constraint_marker)
+        (constraint_marker_record_link ?constraint_marker ?assignment_record)
+        (record_variant_x ?assignment_record)
+        (record_variant_y ?assignment_record)
+        (not
+          (attribute_selection_complete ?target_position)
+        )
+      )
+    :effect
+      (and
+        (attribute_selection_complete ?target_position)
+        (attribute_selection_secondary ?target_position)
+      )
+  )
+  (:action mark_position_ready_for_finalization
+    :parameters (?target_position - target_position)
+    :precondition
+      (and
+        (attribute_selection_complete ?target_position)
+        (not
+          (attribute_selection_secondary ?target_position)
+        )
+        (not
+          (position_finalized_flag ?target_position)
+        )
+      )
+    :effect
+      (and
+        (position_finalized_flag ?target_position)
+        (eligible_for_finalization ?target_position)
+      )
+  )
+  (:action bind_static_attribute_b_to_position
+    :parameters (?target_position - target_position ?static_attribute_b - static_attribute_b)
+    :precondition
+      (and
+        (attribute_selection_complete ?target_position)
+        (attribute_selection_secondary ?target_position)
+        (static_attribute_b_available ?static_attribute_b)
+      )
+    :effect
+      (and
+        (position_static_attribute_b_link ?target_position ?static_attribute_b)
+        (not
+          (static_attribute_b_available ?static_attribute_b)
+        )
+      )
+  )
+  (:action perform_composite_prechecks_and_mark
+    :parameters (?target_position - target_position ?proposer_group_a - proposer_group_a ?proposer_group_b - proposer_group_b ?proposal_option - proposal_option ?static_attribute_b - static_attribute_b)
+    :precondition
+      (and
+        (attribute_selection_complete ?target_position)
+        (attribute_selection_secondary ?target_position)
+        (position_static_attribute_b_link ?target_position ?static_attribute_b)
+        (position_associated_with_group_a ?target_position ?proposer_group_a)
+        (position_associated_with_group_b ?target_position ?proposer_group_b)
+        (group_a_resource_confirmed ?proposer_group_a)
+        (group_b_resource_confirmed ?proposer_group_b)
+        (proposal_link ?target_position ?proposal_option)
+        (not
+          (composite_checks_passed ?target_position)
+        )
+      )
+    :effect (composite_checks_passed ?target_position)
+  )
+  (:action finalize_position_after_composite_checks
+    :parameters (?target_position - target_position)
+    :precondition
+      (and
+        (attribute_selection_complete ?target_position)
+        (composite_checks_passed ?target_position)
+        (not
+          (position_finalized_flag ?target_position)
+        )
+      )
+    :effect
+      (and
+        (position_finalized_flag ?target_position)
+        (eligible_for_finalization ?target_position)
+      )
+  )
+  (:action reserve_slot_type_for_position
+    :parameters (?target_position - target_position ?slot_type - slot_type ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (entity_confirmed ?target_position)
+        (proposal_link ?target_position ?proposal_option)
+        (slot_type_available ?slot_type)
+        (position_slot_link ?target_position ?slot_type)
+        (not
+          (slot_binding_active ?target_position)
+        )
+      )
+    :effect
+      (and
+        (slot_binding_active ?target_position)
+        (not
+          (slot_type_available ?slot_type)
+        )
+      )
+  )
+  (:action confirm_slot_binding_to_position
+    :parameters (?target_position - target_position ?intermediary - intermediary)
+    :precondition
+      (and
+        (slot_binding_active ?target_position)
+        (intermediary_link ?target_position ?intermediary)
+        (not
+          (slot_binding_confirmed ?target_position)
+        )
+      )
+    :effect (slot_binding_confirmed ?target_position)
+  )
+  (:action bind_priority_flag_to_slot_binding
+    :parameters (?target_position - target_position ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (slot_binding_confirmed ?target_position)
+        (position_priority_flag_link ?target_position ?priority_flag)
+        (not
+          (slot_binding_finalized ?target_position)
+        )
+      )
+    :effect (slot_binding_finalized ?target_position)
+  )
+  (:action finalize_slot_binding_and_mark_for_finalization
+    :parameters (?target_position - target_position)
+    :precondition
+      (and
+        (slot_binding_finalized ?target_position)
+        (not
+          (position_finalized_flag ?target_position)
+        )
+      )
+    :effect
+      (and
+        (position_finalized_flag ?target_position)
+        (eligible_for_finalization ?target_position)
+      )
+  )
+  (:action finalize_proposer_availability_group_a
+    :parameters (?proposer_group_a - proposer_group_a ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_a_ready ?proposer_group_a)
+        (group_a_resource_confirmed ?proposer_group_a)
+        (assignment_record_active ?assignment_record)
+        (record_locked ?assignment_record)
+        (not
+          (eligible_for_finalization ?proposer_group_a)
+        )
+      )
+    :effect (eligible_for_finalization ?proposer_group_a)
+  )
+  (:action finalize_proposer_availability_group_b
+    :parameters (?proposer_group_b - proposer_group_b ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (group_b_ready ?proposer_group_b)
+        (group_b_resource_confirmed ?proposer_group_b)
+        (assignment_record_active ?assignment_record)
+        (record_locked ?assignment_record)
+        (not
+          (eligible_for_finalization ?proposer_group_b)
+        )
+      )
+    :effect (eligible_for_finalization ?proposer_group_b)
+  )
+  (:action consume_external_constraint_for_participant
+    :parameters (?participant - participant ?external_constraint_token - external_constraint_token ?proposal_option - proposal_option)
+    :precondition
+      (and
+        (eligible_for_finalization ?participant)
+        (proposal_link ?participant ?proposal_option)
+        (external_constraint_token_available ?external_constraint_token)
+        (not
+          (external_constraint_applied ?participant)
+        )
+      )
+    :effect
+      (and
+        (external_constraint_applied ?participant)
+        (external_constraint_link ?participant ?external_constraint_token)
+        (not
+          (external_constraint_token_available ?external_constraint_token)
+        )
+      )
+  )
+  (:action commit_match_with_partner_for_group_a
+    :parameters (?proposer_group_a - proposer_group_a ?partner_token - partner_token ?external_constraint_token - external_constraint_token)
+    :precondition
+      (and
+        (external_constraint_applied ?proposer_group_a)
+        (partner_link ?proposer_group_a ?partner_token)
+        (external_constraint_link ?proposer_group_a ?external_constraint_token)
+        (not
+          (match_committed ?proposer_group_a)
+        )
+      )
+    :effect
+      (and
+        (match_committed ?proposer_group_a)
+        (partner_token_available ?partner_token)
+        (external_constraint_token_available ?external_constraint_token)
+      )
+  )
+  (:action commit_match_with_partner_for_group_b
+    :parameters (?proposer_group_b - proposer_group_b ?partner_token - partner_token ?external_constraint_token - external_constraint_token)
+    :precondition
+      (and
+        (external_constraint_applied ?proposer_group_b)
+        (partner_link ?proposer_group_b ?partner_token)
+        (external_constraint_link ?proposer_group_b ?external_constraint_token)
+        (not
+          (match_committed ?proposer_group_b)
+        )
+      )
+    :effect
+      (and
+        (match_committed ?proposer_group_b)
+        (partner_token_available ?partner_token)
+        (external_constraint_token_available ?external_constraint_token)
+      )
+  )
+  (:action commit_match_with_partner_for_position
+    :parameters (?target_position - target_position ?partner_token - partner_token ?external_constraint_token - external_constraint_token)
+    :precondition
+      (and
+        (external_constraint_applied ?target_position)
+        (partner_link ?target_position ?partner_token)
+        (external_constraint_link ?target_position ?external_constraint_token)
+        (not
+          (match_committed ?target_position)
+        )
+      )
+    :effect
+      (and
+        (match_committed ?target_position)
+        (partner_token_available ?partner_token)
+        (external_constraint_token_available ?external_constraint_token)
+      )
+  )
+)

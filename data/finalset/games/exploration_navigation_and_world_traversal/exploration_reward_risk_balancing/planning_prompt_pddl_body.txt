@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain exploration_reward_risk_balancing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_supertype - object device_supertype - object object_supertype - object agent_supertype - object mission_entity - agent_supertype route_token - resource_supertype scout_probe - resource_supertype tool_module - resource_supertype special_objective - resource_supertype upgrade_module - resource_supertype consumable_resource - resource_supertype upgrade_key - resource_supertype upgrade_condition - resource_supertype collectible_item - device_supertype map_fragment - device_supertype objective_marker - device_supertype path_hazard_a - object_supertype path_hazard_b - object_supertype expedition_asset - object_supertype node_subtype_a - mission_entity node_subtype_b - mission_entity region_node_primary - node_subtype_a region_node_secondary - node_subtype_a site_entity - node_subtype_b)
+  (:predicates
+    (discovered ?explorer - mission_entity)
+    (validated_entity ?explorer - mission_entity)
+    (has_route_token ?explorer - mission_entity)
+    (traversal_unlocked ?explorer - mission_entity)
+    (service_operational ?explorer - mission_entity)
+    (reward_claimed_entity ?explorer - mission_entity)
+    (token_available ?route_token - route_token)
+    (route_token_linked ?explorer - mission_entity ?route_token - route_token)
+    (probe_available ?scout_probe - scout_probe)
+    (probe_deployed ?explorer - mission_entity ?scout_probe - scout_probe)
+    (tool_available ?tool_module - tool_module)
+    (tool_installed ?explorer - mission_entity ?tool_module - tool_module)
+    (collectible_available ?collectible_item - collectible_item)
+    (primary_node_has_collectible ?primary_node - region_node_primary ?collectible_item - collectible_item)
+    (secondary_node_has_collectible ?secondary_node - region_node_secondary ?collectible_item - collectible_item)
+    (primary_node_hazard_link ?primary_node - region_node_primary ?path_hazard_a - path_hazard_a)
+    (hazard_a_cleared ?path_hazard_a - path_hazard_a)
+    (hazard_a_triggered ?path_hazard_a - path_hazard_a)
+    (primary_node_ready ?primary_node - region_node_primary)
+    (secondary_node_hazard_link ?secondary_node - region_node_secondary ?path_hazard_b - path_hazard_b)
+    (hazard_b_cleared ?path_hazard_b - path_hazard_b)
+    (hazard_b_triggered ?path_hazard_b - path_hazard_b)
+    (secondary_node_ready ?secondary_node - region_node_secondary)
+    (asset_available ?expedition_asset - expedition_asset)
+    (asset_loaded ?expedition_asset - expedition_asset)
+    (asset_hazard_a_link ?expedition_asset - expedition_asset ?path_hazard_a - path_hazard_a)
+    (asset_hazard_b_link ?expedition_asset - expedition_asset ?path_hazard_b - path_hazard_b)
+    (asset_mode_a ?expedition_asset - expedition_asset)
+    (asset_mode_b ?expedition_asset - expedition_asset)
+    (asset_deployed ?expedition_asset - expedition_asset)
+    (site_connected_primary ?site - site_entity ?primary_node - region_node_primary)
+    (site_connected_secondary ?site - site_entity ?secondary_node - region_node_secondary)
+    (site_asset_link ?site - site_entity ?expedition_asset - expedition_asset)
+    (fragment_available ?map_fragment - map_fragment)
+    (site_has_fragment ?site - site_entity ?map_fragment - map_fragment)
+    (fragment_integrated ?map_fragment - map_fragment)
+    (fragment_asset_link ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    (site_prepared ?site - site_entity)
+    (upgrade_key_committed ?site - site_entity)
+    (site_final_ready ?site - site_entity)
+    (site_has_objective ?site - site_entity)
+    (site_objective_engaged ?site - site_entity)
+    (site_modules_attached ?site - site_entity)
+    (site_services_configured ?site - site_entity)
+    (objective_marker_available ?objective_marker - objective_marker)
+    (site_has_objective_marker ?site - site_entity ?objective_marker - objective_marker)
+    (objective_assigned ?site - site_entity)
+    (objective_tool_engaged ?site - site_entity)
+    (objective_condition_met ?site - site_entity)
+    (special_objective_available ?special_objective - special_objective)
+    (site_has_special_objective ?site - site_entity ?special_objective - special_objective)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (site_has_upgrade_module ?site - site_entity ?upgrade_module - upgrade_module)
+    (upgrade_key_available ?upgrade_key - upgrade_key)
+    (site_has_upgrade_key ?site - site_entity ?upgrade_key - upgrade_key)
+    (upgrade_condition_available ?upgrade_condition - upgrade_condition)
+    (site_has_upgrade_condition ?site - site_entity ?upgrade_condition - upgrade_condition)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (consumable_allocated ?explorer - mission_entity ?consumable_resource - consumable_resource)
+    (primary_node_prepared ?primary_node - region_node_primary)
+    (secondary_node_prepared ?secondary_node - region_node_secondary)
+    (site_activated ?site - site_entity)
+  )
+  (:action discover_location
+    :parameters (?explorer - mission_entity)
+    :precondition
+      (and
+        (not
+          (discovered ?explorer)
+        )
+        (not
+          (traversal_unlocked ?explorer)
+        )
+      )
+    :effect (discovered ?explorer)
+  )
+  (:action assign_route_token
+    :parameters (?explorer - mission_entity ?route_token - route_token)
+    :precondition
+      (and
+        (discovered ?explorer)
+        (not
+          (has_route_token ?explorer)
+        )
+        (token_available ?route_token)
+      )
+    :effect
+      (and
+        (has_route_token ?explorer)
+        (route_token_linked ?explorer ?route_token)
+        (not
+          (token_available ?route_token)
+        )
+      )
+  )
+  (:action deploy_scout_probe
+    :parameters (?explorer - mission_entity ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (discovered ?explorer)
+        (has_route_token ?explorer)
+        (probe_available ?scout_probe)
+      )
+    :effect
+      (and
+        (probe_deployed ?explorer ?scout_probe)
+        (not
+          (probe_available ?scout_probe)
+        )
+      )
+  )
+  (:action confirm_scan
+    :parameters (?explorer - mission_entity ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (discovered ?explorer)
+        (has_route_token ?explorer)
+        (probe_deployed ?explorer ?scout_probe)
+        (not
+          (validated_entity ?explorer)
+        )
+      )
+    :effect (validated_entity ?explorer)
+  )
+  (:action recover_scout_probe
+    :parameters (?explorer - mission_entity ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (probe_deployed ?explorer ?scout_probe)
+      )
+    :effect
+      (and
+        (probe_available ?scout_probe)
+        (not
+          (probe_deployed ?explorer ?scout_probe)
+        )
+      )
+  )
+  (:action attach_tool_module
+    :parameters (?explorer - mission_entity ?tool_module - tool_module)
+    :precondition
+      (and
+        (validated_entity ?explorer)
+        (tool_available ?tool_module)
+      )
+    :effect
+      (and
+        (tool_installed ?explorer ?tool_module)
+        (not
+          (tool_available ?tool_module)
+        )
+      )
+  )
+  (:action detach_tool_module
+    :parameters (?explorer - mission_entity ?tool_module - tool_module)
+    :precondition
+      (and
+        (tool_installed ?explorer ?tool_module)
+      )
+    :effect
+      (and
+        (tool_available ?tool_module)
+        (not
+          (tool_installed ?explorer ?tool_module)
+        )
+      )
+  )
+  (:action attach_upgrade_key
+    :parameters (?site - site_entity ?upgrade_key - upgrade_key)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (upgrade_key_available ?upgrade_key)
+      )
+    :effect
+      (and
+        (site_has_upgrade_key ?site ?upgrade_key)
+        (not
+          (upgrade_key_available ?upgrade_key)
+        )
+      )
+  )
+  (:action detach_upgrade_key
+    :parameters (?site - site_entity ?upgrade_key - upgrade_key)
+    :precondition
+      (and
+        (site_has_upgrade_key ?site ?upgrade_key)
+      )
+    :effect
+      (and
+        (upgrade_key_available ?upgrade_key)
+        (not
+          (site_has_upgrade_key ?site ?upgrade_key)
+        )
+      )
+  )
+  (:action attach_upgrade_condition
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (upgrade_condition_available ?upgrade_condition)
+      )
+    :effect
+      (and
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (not
+          (upgrade_condition_available ?upgrade_condition)
+        )
+      )
+  )
+  (:action detach_upgrade_condition
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition)
+    :precondition
+      (and
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+      )
+    :effect
+      (and
+        (upgrade_condition_available ?upgrade_condition)
+        (not
+          (site_has_upgrade_condition ?site ?upgrade_condition)
+        )
+      )
+  )
+  (:action clear_hazard_a
+    :parameters (?primary_node - region_node_primary ?path_hazard_a - path_hazard_a ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (validated_entity ?primary_node)
+        (probe_deployed ?primary_node ?scout_probe)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (not
+          (hazard_a_cleared ?path_hazard_a)
+        )
+        (not
+          (hazard_a_triggered ?path_hazard_a)
+        )
+      )
+    :effect (hazard_a_cleared ?path_hazard_a)
+  )
+  (:action prepare_primary_node
+    :parameters (?primary_node - region_node_primary ?path_hazard_a - path_hazard_a ?tool_module - tool_module)
+    :precondition
+      (and
+        (validated_entity ?primary_node)
+        (tool_installed ?primary_node ?tool_module)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (hazard_a_cleared ?path_hazard_a)
+        (not
+          (primary_node_prepared ?primary_node)
+        )
+      )
+    :effect
+      (and
+        (primary_node_prepared ?primary_node)
+        (primary_node_ready ?primary_node)
+      )
+  )
+  (:action deposit_collectible_primary_node
+    :parameters (?primary_node - region_node_primary ?path_hazard_a - path_hazard_a ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (validated_entity ?primary_node)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (collectible_available ?collectible_item)
+        (not
+          (primary_node_prepared ?primary_node)
+        )
+      )
+    :effect
+      (and
+        (hazard_a_triggered ?path_hazard_a)
+        (primary_node_prepared ?primary_node)
+        (primary_node_has_collectible ?primary_node ?collectible_item)
+        (not
+          (collectible_available ?collectible_item)
+        )
+      )
+  )
+  (:action clear_hazard_with_collectible_primary
+    :parameters (?primary_node - region_node_primary ?path_hazard_a - path_hazard_a ?scout_probe - scout_probe ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (validated_entity ?primary_node)
+        (probe_deployed ?primary_node ?scout_probe)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (hazard_a_triggered ?path_hazard_a)
+        (primary_node_has_collectible ?primary_node ?collectible_item)
+        (not
+          (primary_node_ready ?primary_node)
+        )
+      )
+    :effect
+      (and
+        (hazard_a_cleared ?path_hazard_a)
+        (primary_node_ready ?primary_node)
+        (collectible_available ?collectible_item)
+        (not
+          (primary_node_has_collectible ?primary_node ?collectible_item)
+        )
+      )
+  )
+  (:action clear_hazard_b
+    :parameters (?secondary_node - region_node_secondary ?path_hazard_b - path_hazard_b ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (validated_entity ?secondary_node)
+        (probe_deployed ?secondary_node ?scout_probe)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (not
+          (hazard_b_cleared ?path_hazard_b)
+        )
+        (not
+          (hazard_b_triggered ?path_hazard_b)
+        )
+      )
+    :effect (hazard_b_cleared ?path_hazard_b)
+  )
+  (:action prepare_secondary_node
+    :parameters (?secondary_node - region_node_secondary ?path_hazard_b - path_hazard_b ?tool_module - tool_module)
+    :precondition
+      (and
+        (validated_entity ?secondary_node)
+        (tool_installed ?secondary_node ?tool_module)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_b_cleared ?path_hazard_b)
+        (not
+          (secondary_node_prepared ?secondary_node)
+        )
+      )
+    :effect
+      (and
+        (secondary_node_prepared ?secondary_node)
+        (secondary_node_ready ?secondary_node)
+      )
+  )
+  (:action deposit_collectible_secondary_node
+    :parameters (?secondary_node - region_node_secondary ?path_hazard_b - path_hazard_b ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (validated_entity ?secondary_node)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (collectible_available ?collectible_item)
+        (not
+          (secondary_node_prepared ?secondary_node)
+        )
+      )
+    :effect
+      (and
+        (hazard_b_triggered ?path_hazard_b)
+        (secondary_node_prepared ?secondary_node)
+        (secondary_node_has_collectible ?secondary_node ?collectible_item)
+        (not
+          (collectible_available ?collectible_item)
+        )
+      )
+  )
+  (:action clear_hazard_with_collectible_secondary
+    :parameters (?secondary_node - region_node_secondary ?path_hazard_b - path_hazard_b ?scout_probe - scout_probe ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (validated_entity ?secondary_node)
+        (probe_deployed ?secondary_node ?scout_probe)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_b_triggered ?path_hazard_b)
+        (secondary_node_has_collectible ?secondary_node ?collectible_item)
+        (not
+          (secondary_node_ready ?secondary_node)
+        )
+      )
+    :effect
+      (and
+        (hazard_b_cleared ?path_hazard_b)
+        (secondary_node_ready ?secondary_node)
+        (collectible_available ?collectible_item)
+        (not
+          (secondary_node_has_collectible ?secondary_node ?collectible_item)
+        )
+      )
+  )
+  (:action assemble_expedition_asset
+    :parameters (?primary_node - region_node_primary ?secondary_node - region_node_secondary ?path_hazard_a - path_hazard_a ?path_hazard_b - path_hazard_b ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (primary_node_prepared ?primary_node)
+        (secondary_node_prepared ?secondary_node)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_a_cleared ?path_hazard_a)
+        (hazard_b_cleared ?path_hazard_b)
+        (primary_node_ready ?primary_node)
+        (secondary_node_ready ?secondary_node)
+        (asset_available ?expedition_asset)
+      )
+    :effect
+      (and
+        (asset_loaded ?expedition_asset)
+        (asset_hazard_a_link ?expedition_asset ?path_hazard_a)
+        (asset_hazard_b_link ?expedition_asset ?path_hazard_b)
+        (not
+          (asset_available ?expedition_asset)
+        )
+      )
+  )
+  (:action assemble_expedition_asset_mode_a
+    :parameters (?primary_node - region_node_primary ?secondary_node - region_node_secondary ?path_hazard_a - path_hazard_a ?path_hazard_b - path_hazard_b ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (primary_node_prepared ?primary_node)
+        (secondary_node_prepared ?secondary_node)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_a_triggered ?path_hazard_a)
+        (hazard_b_cleared ?path_hazard_b)
+        (not
+          (primary_node_ready ?primary_node)
+        )
+        (secondary_node_ready ?secondary_node)
+        (asset_available ?expedition_asset)
+      )
+    :effect
+      (and
+        (asset_loaded ?expedition_asset)
+        (asset_hazard_a_link ?expedition_asset ?path_hazard_a)
+        (asset_hazard_b_link ?expedition_asset ?path_hazard_b)
+        (asset_mode_a ?expedition_asset)
+        (not
+          (asset_available ?expedition_asset)
+        )
+      )
+  )
+  (:action assemble_expedition_asset_mode_b
+    :parameters (?primary_node - region_node_primary ?secondary_node - region_node_secondary ?path_hazard_a - path_hazard_a ?path_hazard_b - path_hazard_b ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (primary_node_prepared ?primary_node)
+        (secondary_node_prepared ?secondary_node)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_a_cleared ?path_hazard_a)
+        (hazard_b_triggered ?path_hazard_b)
+        (primary_node_ready ?primary_node)
+        (not
+          (secondary_node_ready ?secondary_node)
+        )
+        (asset_available ?expedition_asset)
+      )
+    :effect
+      (and
+        (asset_loaded ?expedition_asset)
+        (asset_hazard_a_link ?expedition_asset ?path_hazard_a)
+        (asset_hazard_b_link ?expedition_asset ?path_hazard_b)
+        (asset_mode_b ?expedition_asset)
+        (not
+          (asset_available ?expedition_asset)
+        )
+      )
+  )
+  (:action assemble_expedition_asset_mode_both
+    :parameters (?primary_node - region_node_primary ?secondary_node - region_node_secondary ?path_hazard_a - path_hazard_a ?path_hazard_b - path_hazard_b ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (primary_node_prepared ?primary_node)
+        (secondary_node_prepared ?secondary_node)
+        (primary_node_hazard_link ?primary_node ?path_hazard_a)
+        (secondary_node_hazard_link ?secondary_node ?path_hazard_b)
+        (hazard_a_triggered ?path_hazard_a)
+        (hazard_b_triggered ?path_hazard_b)
+        (not
+          (primary_node_ready ?primary_node)
+        )
+        (not
+          (secondary_node_ready ?secondary_node)
+        )
+        (asset_available ?expedition_asset)
+      )
+    :effect
+      (and
+        (asset_loaded ?expedition_asset)
+        (asset_hazard_a_link ?expedition_asset ?path_hazard_a)
+        (asset_hazard_b_link ?expedition_asset ?path_hazard_b)
+        (asset_mode_a ?expedition_asset)
+        (asset_mode_b ?expedition_asset)
+        (not
+          (asset_available ?expedition_asset)
+        )
+      )
+  )
+  (:action prime_expedition_asset
+    :parameters (?expedition_asset - expedition_asset ?primary_node - region_node_primary ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (asset_loaded ?expedition_asset)
+        (primary_node_prepared ?primary_node)
+        (probe_deployed ?primary_node ?scout_probe)
+        (not
+          (asset_deployed ?expedition_asset)
+        )
+      )
+    :effect (asset_deployed ?expedition_asset)
+  )
+  (:action integrate_map_fragment
+    :parameters (?site - site_entity ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (site_asset_link ?site ?expedition_asset)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_available ?map_fragment)
+        (asset_loaded ?expedition_asset)
+        (asset_deployed ?expedition_asset)
+        (not
+          (fragment_integrated ?map_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_integrated ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (not
+          (fragment_available ?map_fragment)
+        )
+      )
+  )
+  (:action process_fragment_enable_site
+    :parameters (?site - site_entity ?map_fragment - map_fragment ?expedition_asset - expedition_asset ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_integrated ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (probe_deployed ?site ?scout_probe)
+        (not
+          (asset_mode_a ?expedition_asset)
+        )
+        (not
+          (site_prepared ?site)
+        )
+      )
+    :effect (site_prepared ?site)
+  )
+  (:action attach_special_objective
+    :parameters (?site - site_entity ?special_objective - special_objective)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (special_objective_available ?special_objective)
+        (not
+          (site_has_objective ?site)
+        )
+      )
+    :effect
+      (and
+        (site_has_objective ?site)
+        (site_has_special_objective ?site ?special_objective)
+        (not
+          (special_objective_available ?special_objective)
+        )
+      )
+  )
+  (:action apply_fragment_and_objective
+    :parameters (?site - site_entity ?map_fragment - map_fragment ?expedition_asset - expedition_asset ?scout_probe - scout_probe ?special_objective - special_objective)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_integrated ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (probe_deployed ?site ?scout_probe)
+        (asset_mode_a ?expedition_asset)
+        (site_has_objective ?site)
+        (site_has_special_objective ?site ?special_objective)
+        (not
+          (site_prepared ?site)
+        )
+      )
+    :effect
+      (and
+        (site_prepared ?site)
+        (site_objective_engaged ?site)
+      )
+  )
+  (:action commit_upgrade_key
+    :parameters (?site - site_entity ?upgrade_key - upgrade_key ?tool_module - tool_module ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (site_prepared ?site)
+        (site_has_upgrade_key ?site ?upgrade_key)
+        (tool_installed ?site ?tool_module)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (not
+          (asset_mode_b ?expedition_asset)
+        )
+        (not
+          (upgrade_key_committed ?site)
+        )
+      )
+    :effect (upgrade_key_committed ?site)
+  )
+  (:action commit_upgrade_key_alternate
+    :parameters (?site - site_entity ?upgrade_key - upgrade_key ?tool_module - tool_module ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (site_prepared ?site)
+        (site_has_upgrade_key ?site ?upgrade_key)
+        (tool_installed ?site ?tool_module)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (asset_mode_b ?expedition_asset)
+        (not
+          (upgrade_key_committed ?site)
+        )
+      )
+    :effect (upgrade_key_committed ?site)
+  )
+  (:action activate_upgrade_condition
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (upgrade_key_committed ?site)
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (not
+          (asset_mode_a ?expedition_asset)
+        )
+        (not
+          (asset_mode_b ?expedition_asset)
+        )
+        (not
+          (site_final_ready ?site)
+        )
+      )
+    :effect (site_final_ready ?site)
+  )
+  (:action activate_upgrade_condition_mode_a
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (upgrade_key_committed ?site)
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (asset_mode_a ?expedition_asset)
+        (not
+          (asset_mode_b ?expedition_asset)
+        )
+        (not
+          (site_final_ready ?site)
+        )
+      )
+    :effect
+      (and
+        (site_final_ready ?site)
+        (site_modules_attached ?site)
+      )
+  )
+  (:action activate_upgrade_condition_mode_b
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (upgrade_key_committed ?site)
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (not
+          (asset_mode_a ?expedition_asset)
+        )
+        (asset_mode_b ?expedition_asset)
+        (not
+          (site_final_ready ?site)
+        )
+      )
+    :effect
+      (and
+        (site_final_ready ?site)
+        (site_modules_attached ?site)
+      )
+  )
+  (:action activate_upgrade_condition_mode_both
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition ?map_fragment - map_fragment ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (upgrade_key_committed ?site)
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (site_has_fragment ?site ?map_fragment)
+        (fragment_asset_link ?map_fragment ?expedition_asset)
+        (asset_mode_a ?expedition_asset)
+        (asset_mode_b ?expedition_asset)
+        (not
+          (site_final_ready ?site)
+        )
+      )
+    :effect
+      (and
+        (site_final_ready ?site)
+        (site_modules_attached ?site)
+      )
+  )
+  (:action finalize_site_activation
+    :parameters (?site - site_entity)
+    :precondition
+      (and
+        (site_final_ready ?site)
+        (not
+          (site_modules_attached ?site)
+        )
+        (not
+          (site_activated ?site)
+        )
+      )
+    :effect
+      (and
+        (site_activated ?site)
+        (service_operational ?site)
+      )
+  )
+  (:action install_upgrade_module
+    :parameters (?site - site_entity ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (site_final_ready ?site)
+        (site_modules_attached ?site)
+        (upgrade_module_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (site_has_upgrade_module ?site ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action execute_site_finalization
+    :parameters (?site - site_entity ?primary_node - region_node_primary ?secondary_node - region_node_secondary ?scout_probe - scout_probe ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (site_final_ready ?site)
+        (site_modules_attached ?site)
+        (site_has_upgrade_module ?site ?upgrade_module)
+        (site_connected_primary ?site ?primary_node)
+        (site_connected_secondary ?site ?secondary_node)
+        (primary_node_ready ?primary_node)
+        (secondary_node_ready ?secondary_node)
+        (probe_deployed ?site ?scout_probe)
+        (not
+          (site_services_configured ?site)
+        )
+      )
+    :effect (site_services_configured ?site)
+  )
+  (:action finalize_site_activation_with_services
+    :parameters (?site - site_entity)
+    :precondition
+      (and
+        (site_final_ready ?site)
+        (site_services_configured ?site)
+        (not
+          (site_activated ?site)
+        )
+      )
+    :effect
+      (and
+        (site_activated ?site)
+        (service_operational ?site)
+      )
+  )
+  (:action bind_objective_marker
+    :parameters (?site - site_entity ?objective_marker - objective_marker ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (validated_entity ?site)
+        (probe_deployed ?site ?scout_probe)
+        (objective_marker_available ?objective_marker)
+        (site_has_objective_marker ?site ?objective_marker)
+        (not
+          (objective_assigned ?site)
+        )
+      )
+    :effect
+      (and
+        (objective_assigned ?site)
+        (not
+          (objective_marker_available ?objective_marker)
+        )
+      )
+  )
+  (:action engage_objective_with_tool
+    :parameters (?site - site_entity ?tool_module - tool_module)
+    :precondition
+      (and
+        (objective_assigned ?site)
+        (tool_installed ?site ?tool_module)
+        (not
+          (objective_tool_engaged ?site)
+        )
+      )
+    :effect (objective_tool_engaged ?site)
+  )
+  (:action satisfy_objective_condition
+    :parameters (?site - site_entity ?upgrade_condition - upgrade_condition)
+    :precondition
+      (and
+        (objective_tool_engaged ?site)
+        (site_has_upgrade_condition ?site ?upgrade_condition)
+        (not
+          (objective_condition_met ?site)
+        )
+      )
+    :effect (objective_condition_met ?site)
+  )
+  (:action finalize_objective
+    :parameters (?site - site_entity)
+    :precondition
+      (and
+        (objective_condition_met ?site)
+        (not
+          (site_activated ?site)
+        )
+      )
+    :effect
+      (and
+        (site_activated ?site)
+        (service_operational ?site)
+      )
+  )
+  (:action claim_primary_node_reward
+    :parameters (?primary_node - region_node_primary ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (primary_node_prepared ?primary_node)
+        (primary_node_ready ?primary_node)
+        (asset_loaded ?expedition_asset)
+        (asset_deployed ?expedition_asset)
+        (not
+          (service_operational ?primary_node)
+        )
+      )
+    :effect (service_operational ?primary_node)
+  )
+  (:action claim_secondary_node_reward
+    :parameters (?secondary_node - region_node_secondary ?expedition_asset - expedition_asset)
+    :precondition
+      (and
+        (secondary_node_prepared ?secondary_node)
+        (secondary_node_ready ?secondary_node)
+        (asset_loaded ?expedition_asset)
+        (asset_deployed ?expedition_asset)
+        (not
+          (service_operational ?secondary_node)
+        )
+      )
+    :effect (service_operational ?secondary_node)
+  )
+  (:action claim_and_convert_reward
+    :parameters (?explorer - mission_entity ?consumable_resource - consumable_resource ?scout_probe - scout_probe)
+    :precondition
+      (and
+        (service_operational ?explorer)
+        (probe_deployed ?explorer ?scout_probe)
+        (consumable_available ?consumable_resource)
+        (not
+          (reward_claimed_entity ?explorer)
+        )
+      )
+    :effect
+      (and
+        (reward_claimed_entity ?explorer)
+        (consumable_allocated ?explorer ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action unlock_traversal_primary_node
+    :parameters (?primary_node - region_node_primary ?route_token - route_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (reward_claimed_entity ?primary_node)
+        (route_token_linked ?primary_node ?route_token)
+        (consumable_allocated ?primary_node ?consumable_resource)
+        (not
+          (traversal_unlocked ?primary_node)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?primary_node)
+        (token_available ?route_token)
+        (consumable_available ?consumable_resource)
+      )
+  )
+  (:action unlock_traversal_secondary_node
+    :parameters (?secondary_node - region_node_secondary ?route_token - route_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (reward_claimed_entity ?secondary_node)
+        (route_token_linked ?secondary_node ?route_token)
+        (consumable_allocated ?secondary_node ?consumable_resource)
+        (not
+          (traversal_unlocked ?secondary_node)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?secondary_node)
+        (token_available ?route_token)
+        (consumable_available ?consumable_resource)
+      )
+  )
+  (:action unlock_traversal_site
+    :parameters (?site - site_entity ?route_token - route_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (reward_claimed_entity ?site)
+        (route_token_linked ?site ?route_token)
+        (consumable_allocated ?site ?consumable_resource)
+        (not
+          (traversal_unlocked ?site)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?site)
+        (token_available ?route_token)
+        (consumable_available ?consumable_resource)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem exploration_scenario_1)
+  (:domain exploration_reward_risk_balancing_domain)
+  (:objects primary_node_1 - region_node_primary secondary_node_1 - region_node_secondary site_1 - site_entity site_2 - site_entity route_token_a - route_token route_token_b - route_token route_token_c - route_token scout_probe_1 - scout_probe tool_module_1 - tool_module collectible_item_1 - collectible_item path_hazard_a_1 - path_hazard_a path_hazard_b_1 - path_hazard_b expedition_asset_1 - expedition_asset map_fragment_1 - map_fragment map_fragment_2 - map_fragment special_objective_1 - special_objective special_objective_2 - special_objective upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module consumable_resource_1 - consumable_resource upgrade_key_1 - upgrade_key objective_marker_1 - objective_marker objective_marker_2 - objective_marker upgrade_condition_1 - upgrade_condition)
+  (:init
+    (token_available route_token_a)
+    (token_available route_token_b)
+    (token_available route_token_c)
+    (probe_available scout_probe_1)
+    (tool_available tool_module_1)
+    (collectible_available collectible_item_1)
+    (primary_node_hazard_link primary_node_1 path_hazard_a_1)
+    (secondary_node_hazard_link secondary_node_1 path_hazard_b_1)
+    (asset_available expedition_asset_1)
+    (fragment_available map_fragment_1)
+    (fragment_available map_fragment_2)
+    (site_connected_primary site_1 primary_node_1)
+    (site_connected_primary site_2 primary_node_1)
+    (site_connected_secondary site_1 secondary_node_1)
+    (site_connected_secondary site_2 secondary_node_1)
+    (site_asset_link site_1 expedition_asset_1)
+    (site_asset_link site_2 expedition_asset_1)
+    (site_has_fragment site_1 map_fragment_1)
+    (site_has_fragment site_2 map_fragment_2)
+    (special_objective_available special_objective_1)
+    (special_objective_available special_objective_2)
+    (upgrade_module_available upgrade_module_1)
+    (upgrade_module_available upgrade_module_2)
+    (consumable_available consumable_resource_1)
+    (upgrade_key_available upgrade_key_1)
+    (objective_marker_available objective_marker_1)
+    (site_has_objective_marker site_1 objective_marker_1)
+    (site_has_objective_marker site_2 objective_marker_2)
+    (upgrade_condition_available upgrade_condition_1)
+  )
+  (:goal
+    (and
+      (traversal_unlocked primary_node_1)
+      (traversal_unlocked secondary_node_1)
+      (traversal_unlocked site_1)
+      (traversal_unlocked site_2)
+    )
+  )
+)

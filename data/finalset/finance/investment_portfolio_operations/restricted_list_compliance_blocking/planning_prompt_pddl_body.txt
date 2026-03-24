@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain restricted_list_compliance_blocking_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object domain_entity - object identifier - object top_level_entity - object investment_entity - top_level_entity restricted_list_entry - operational_resource screening_resource - operational_resource approver_resource - operational_resource external_approval_token - operational_resource execution_venue_option - operational_resource restriction_record - operational_resource portfolio_manager - operational_resource policy_document - operational_resource asset - domain_entity instrument_record - domain_entity regulatory_document - domain_entity exposure_bucket - identifier market_venue - identifier trade_candidate - identifier portfolio_grouping - investment_entity execution_grouping - investment_entity portfolio - portfolio_grouping strategy - portfolio_grouping execution_agent - execution_grouping)
+  (:predicates
+    (entity_registered ?investment_entity - investment_entity)
+    (screening_cleared_entity ?investment_entity - investment_entity)
+    (has_restriction ?investment_entity - investment_entity)
+    (block_propagated ?investment_entity - investment_entity)
+    (assignment_completed ?investment_entity - investment_entity)
+    (block_initiated ?investment_entity - investment_entity)
+    (restricted_entry_available ?restricted_list_entry - restricted_list_entry)
+    (restricted_entry_assigned ?investment_entity - investment_entity ?restricted_list_entry - restricted_list_entry)
+    (screening_resource_available ?screening_resource - screening_resource)
+    (screened_with_resource ?investment_entity - investment_entity ?screening_resource - screening_resource)
+    (approver_available ?approver_resource - approver_resource)
+    (approver_assigned ?investment_entity - investment_entity ?approver_resource - approver_resource)
+    (asset_available ?asset - asset)
+    (portfolio_asset_reserved ?portfolio - portfolio ?asset - asset)
+    (strategy_asset_reserved ?strategy - strategy ?asset - asset)
+    (exposure_linked_to_portfolio ?portfolio - portfolio ?exposure_bucket - exposure_bucket)
+    (exposure_flag_primary ?exposure_bucket - exposure_bucket)
+    (exposure_flag_secondary ?exposure_bucket - exposure_bucket)
+    (portfolio_exposure_confirmed ?portfolio - portfolio)
+    (strategy_has_market ?strategy - strategy ?market_venue - market_venue)
+    (market_flag_primary ?market_venue - market_venue)
+    (market_flag_secondary ?market_venue - market_venue)
+    (strategy_market_confirmed ?strategy - strategy)
+    (trade_candidate_available ?trade_candidate - trade_candidate)
+    (trade_candidate_constructed ?trade_candidate - trade_candidate)
+    (trade_candidate_has_exposure ?trade_candidate - trade_candidate ?exposure_bucket - exposure_bucket)
+    (trade_candidate_has_market ?trade_candidate - trade_candidate ?market_venue - market_venue)
+    (trade_candidate_requires_approval_a ?trade_candidate - trade_candidate)
+    (trade_candidate_requires_approval_b ?trade_candidate - trade_candidate)
+    (trade_candidate_instrument_locked ?trade_candidate - trade_candidate)
+    (execution_agent_assigned_portfolio ?execution_agent - execution_agent ?portfolio - portfolio)
+    (execution_agent_assigned_strategy ?execution_agent - execution_agent ?strategy - strategy)
+    (execution_agent_assigned_tradecandidate ?execution_agent - execution_agent ?trade_candidate - trade_candidate)
+    (instrument_record_available ?instrument_record - instrument_record)
+    (execution_agent_has_instrument_record ?execution_agent - execution_agent ?instrument_record - instrument_record)
+    (instrument_record_locked ?instrument_record - instrument_record)
+    (instrument_record_bound_to_tradecandidate ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    (execution_agent_instrument_validated ?execution_agent - execution_agent)
+    (execution_agent_endorsement_stage1 ?execution_agent - execution_agent)
+    (execution_agent_endorsement_stage2 ?execution_agent - execution_agent)
+    (execution_agent_external_token_attached ?execution_agent - execution_agent)
+    (execution_agent_external_token_applied ?execution_agent - execution_agent)
+    (policy_confirmation_obtained ?execution_agent - execution_agent)
+    (execution_agent_ready_for_assignment ?execution_agent - execution_agent)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (execution_agent_has_regulatory_document ?execution_agent - execution_agent ?regulatory_document - regulatory_document)
+    (regulatory_acknowledged ?execution_agent - execution_agent)
+    (regulatory_review_started ?execution_agent - execution_agent)
+    (regulatory_review_completed ?execution_agent - execution_agent)
+    (external_approval_token_available ?external_approval_token - external_approval_token)
+    (execution_agent_external_token_assigned ?execution_agent - execution_agent ?external_approval_token - external_approval_token)
+    (execution_venue_option_available ?execution_venue_option - execution_venue_option)
+    (execution_agent_execution_venue_selected ?execution_agent - execution_agent ?execution_venue_option - execution_venue_option)
+    (portfolio_manager_available ?portfolio_manager - portfolio_manager)
+    (execution_agent_has_portfolio_manager ?execution_agent - execution_agent ?portfolio_manager - portfolio_manager)
+    (policy_document_available ?policy_document - policy_document)
+    (execution_agent_has_policy_document ?execution_agent - execution_agent ?policy_document - policy_document)
+    (restriction_record_available ?restriction_record - restriction_record)
+    (entity_has_restriction_record ?investment_entity - investment_entity ?restriction_record - restriction_record)
+    (portfolio_ready_for_execution ?portfolio - portfolio)
+    (strategy_ready_for_execution ?strategy - strategy)
+    (execution_agent_finalized ?execution_agent - execution_agent)
+  )
+  (:action register_investment_entity
+    :parameters (?investment_entity - investment_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?investment_entity)
+        )
+        (not
+          (block_propagated ?investment_entity)
+        )
+      )
+    :effect (entity_registered ?investment_entity)
+  )
+  (:action assign_restriction_entry
+    :parameters (?investment_entity - investment_entity ?restricted_list_entry - restricted_list_entry)
+    :precondition
+      (and
+        (entity_registered ?investment_entity)
+        (not
+          (has_restriction ?investment_entity)
+        )
+        (restricted_entry_available ?restricted_list_entry)
+      )
+    :effect
+      (and
+        (has_restriction ?investment_entity)
+        (restricted_entry_assigned ?investment_entity ?restricted_list_entry)
+        (not
+          (restricted_entry_available ?restricted_list_entry)
+        )
+      )
+  )
+  (:action assign_screening_resource
+    :parameters (?investment_entity - investment_entity ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (entity_registered ?investment_entity)
+        (has_restriction ?investment_entity)
+        (screening_resource_available ?screening_resource)
+      )
+    :effect
+      (and
+        (screened_with_resource ?investment_entity ?screening_resource)
+        (not
+          (screening_resource_available ?screening_resource)
+        )
+      )
+  )
+  (:action confirm_screening_clearance
+    :parameters (?investment_entity - investment_entity ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (entity_registered ?investment_entity)
+        (has_restriction ?investment_entity)
+        (screened_with_resource ?investment_entity ?screening_resource)
+        (not
+          (screening_cleared_entity ?investment_entity)
+        )
+      )
+    :effect (screening_cleared_entity ?investment_entity)
+  )
+  (:action release_screening_resource
+    :parameters (?investment_entity - investment_entity ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (screened_with_resource ?investment_entity ?screening_resource)
+      )
+    :effect
+      (and
+        (screening_resource_available ?screening_resource)
+        (not
+          (screened_with_resource ?investment_entity ?screening_resource)
+        )
+      )
+  )
+  (:action assign_approver_to_entity
+    :parameters (?investment_entity - investment_entity ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?investment_entity)
+        (approver_available ?approver_resource)
+      )
+    :effect
+      (and
+        (approver_assigned ?investment_entity ?approver_resource)
+        (not
+          (approver_available ?approver_resource)
+        )
+      )
+  )
+  (:action release_approver_from_entity
+    :parameters (?investment_entity - investment_entity ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (approver_assigned ?investment_entity ?approver_resource)
+      )
+    :effect
+      (and
+        (approver_available ?approver_resource)
+        (not
+          (approver_assigned ?investment_entity ?approver_resource)
+        )
+      )
+  )
+  (:action assign_portfolio_manager_to_agent
+    :parameters (?execution_agent - execution_agent ?portfolio_manager - portfolio_manager)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (portfolio_manager_available ?portfolio_manager)
+      )
+    :effect
+      (and
+        (execution_agent_has_portfolio_manager ?execution_agent ?portfolio_manager)
+        (not
+          (portfolio_manager_available ?portfolio_manager)
+        )
+      )
+  )
+  (:action release_portfolio_manager_from_agent
+    :parameters (?execution_agent - execution_agent ?portfolio_manager - portfolio_manager)
+    :precondition
+      (and
+        (execution_agent_has_portfolio_manager ?execution_agent ?portfolio_manager)
+      )
+    :effect
+      (and
+        (portfolio_manager_available ?portfolio_manager)
+        (not
+          (execution_agent_has_portfolio_manager ?execution_agent ?portfolio_manager)
+        )
+      )
+  )
+  (:action assign_policy_document_to_agent
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (policy_document_available ?policy_document)
+      )
+    :effect
+      (and
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action release_policy_document_from_agent
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document)
+    :precondition
+      (and
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+      )
+    :effect
+      (and
+        (policy_document_available ?policy_document)
+        (not
+          (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        )
+      )
+  )
+  (:action annotate_exposure_for_portfolio
+    :parameters (?portfolio - portfolio ?exposure_bucket - exposure_bucket ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?portfolio)
+        (screened_with_resource ?portfolio ?screening_resource)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (not
+          (exposure_flag_primary ?exposure_bucket)
+        )
+        (not
+          (exposure_flag_secondary ?exposure_bucket)
+        )
+      )
+    :effect (exposure_flag_primary ?exposure_bucket)
+  )
+  (:action approve_portfolio_exposure
+    :parameters (?portfolio - portfolio ?exposure_bucket - exposure_bucket ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?portfolio)
+        (approver_assigned ?portfolio ?approver_resource)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (exposure_flag_primary ?exposure_bucket)
+        (not
+          (portfolio_ready_for_execution ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (portfolio_exposure_confirmed ?portfolio)
+      )
+  )
+  (:action reserve_asset_for_portfolio
+    :parameters (?portfolio - portfolio ?exposure_bucket - exposure_bucket ?asset - asset)
+    :precondition
+      (and
+        (screening_cleared_entity ?portfolio)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (asset_available ?asset)
+        (not
+          (portfolio_ready_for_execution ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (exposure_flag_secondary ?exposure_bucket)
+        (portfolio_ready_for_execution ?portfolio)
+        (portfolio_asset_reserved ?portfolio ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action finalize_asset_reservation
+    :parameters (?portfolio - portfolio ?exposure_bucket - exposure_bucket ?screening_resource - screening_resource ?asset - asset)
+    :precondition
+      (and
+        (screening_cleared_entity ?portfolio)
+        (screened_with_resource ?portfolio ?screening_resource)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (exposure_flag_secondary ?exposure_bucket)
+        (portfolio_asset_reserved ?portfolio ?asset)
+        (not
+          (portfolio_exposure_confirmed ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (exposure_flag_primary ?exposure_bucket)
+        (portfolio_exposure_confirmed ?portfolio)
+        (asset_available ?asset)
+        (not
+          (portfolio_asset_reserved ?portfolio ?asset)
+        )
+      )
+  )
+  (:action select_market_for_strategy
+    :parameters (?strategy - strategy ?market_venue - market_venue ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?strategy)
+        (screened_with_resource ?strategy ?screening_resource)
+        (strategy_has_market ?strategy ?market_venue)
+        (not
+          (market_flag_primary ?market_venue)
+        )
+        (not
+          (market_flag_secondary ?market_venue)
+        )
+      )
+    :effect (market_flag_primary ?market_venue)
+  )
+  (:action approve_strategy_market
+    :parameters (?strategy - strategy ?market_venue - market_venue ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?strategy)
+        (approver_assigned ?strategy ?approver_resource)
+        (strategy_has_market ?strategy ?market_venue)
+        (market_flag_primary ?market_venue)
+        (not
+          (strategy_ready_for_execution ?strategy)
+        )
+      )
+    :effect
+      (and
+        (strategy_ready_for_execution ?strategy)
+        (strategy_market_confirmed ?strategy)
+      )
+  )
+  (:action reserve_asset_for_strategy
+    :parameters (?strategy - strategy ?market_venue - market_venue ?asset - asset)
+    :precondition
+      (and
+        (screening_cleared_entity ?strategy)
+        (strategy_has_market ?strategy ?market_venue)
+        (asset_available ?asset)
+        (not
+          (strategy_ready_for_execution ?strategy)
+        )
+      )
+    :effect
+      (and
+        (market_flag_secondary ?market_venue)
+        (strategy_ready_for_execution ?strategy)
+        (strategy_asset_reserved ?strategy ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action finalize_strategy_asset_reservation
+    :parameters (?strategy - strategy ?market_venue - market_venue ?screening_resource - screening_resource ?asset - asset)
+    :precondition
+      (and
+        (screening_cleared_entity ?strategy)
+        (screened_with_resource ?strategy ?screening_resource)
+        (strategy_has_market ?strategy ?market_venue)
+        (market_flag_secondary ?market_venue)
+        (strategy_asset_reserved ?strategy ?asset)
+        (not
+          (strategy_market_confirmed ?strategy)
+        )
+      )
+    :effect
+      (and
+        (market_flag_primary ?market_venue)
+        (strategy_market_confirmed ?strategy)
+        (asset_available ?asset)
+        (not
+          (strategy_asset_reserved ?strategy ?asset)
+        )
+      )
+  )
+  (:action construct_trade_candidate
+    :parameters (?portfolio - portfolio ?strategy - strategy ?exposure_bucket - exposure_bucket ?market_venue - market_venue ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (strategy_ready_for_execution ?strategy)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (strategy_has_market ?strategy ?market_venue)
+        (exposure_flag_primary ?exposure_bucket)
+        (market_flag_primary ?market_venue)
+        (portfolio_exposure_confirmed ?portfolio)
+        (strategy_market_confirmed ?strategy)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_has_exposure ?trade_candidate ?exposure_bucket)
+        (trade_candidate_has_market ?trade_candidate ?market_venue)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action construct_trade_candidate_with_flag_a
+    :parameters (?portfolio - portfolio ?strategy - strategy ?exposure_bucket - exposure_bucket ?market_venue - market_venue ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (strategy_ready_for_execution ?strategy)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (strategy_has_market ?strategy ?market_venue)
+        (exposure_flag_secondary ?exposure_bucket)
+        (market_flag_primary ?market_venue)
+        (not
+          (portfolio_exposure_confirmed ?portfolio)
+        )
+        (strategy_market_confirmed ?strategy)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_has_exposure ?trade_candidate ?exposure_bucket)
+        (trade_candidate_has_market ?trade_candidate ?market_venue)
+        (trade_candidate_requires_approval_a ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action construct_trade_candidate_with_flag_b
+    :parameters (?portfolio - portfolio ?strategy - strategy ?exposure_bucket - exposure_bucket ?market_venue - market_venue ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (strategy_ready_for_execution ?strategy)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (strategy_has_market ?strategy ?market_venue)
+        (exposure_flag_primary ?exposure_bucket)
+        (market_flag_secondary ?market_venue)
+        (portfolio_exposure_confirmed ?portfolio)
+        (not
+          (strategy_market_confirmed ?strategy)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_has_exposure ?trade_candidate ?exposure_bucket)
+        (trade_candidate_has_market ?trade_candidate ?market_venue)
+        (trade_candidate_requires_approval_b ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action construct_trade_candidate_with_flags_ab
+    :parameters (?portfolio - portfolio ?strategy - strategy ?exposure_bucket - exposure_bucket ?market_venue - market_venue ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (strategy_ready_for_execution ?strategy)
+        (exposure_linked_to_portfolio ?portfolio ?exposure_bucket)
+        (strategy_has_market ?strategy ?market_venue)
+        (exposure_flag_secondary ?exposure_bucket)
+        (market_flag_secondary ?market_venue)
+        (not
+          (portfolio_exposure_confirmed ?portfolio)
+        )
+        (not
+          (strategy_market_confirmed ?strategy)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_has_exposure ?trade_candidate ?exposure_bucket)
+        (trade_candidate_has_market ?trade_candidate ?market_venue)
+        (trade_candidate_requires_approval_a ?trade_candidate)
+        (trade_candidate_requires_approval_b ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action lock_instrument_for_trade_candidate
+    :parameters (?trade_candidate - trade_candidate ?portfolio - portfolio ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (trade_candidate_constructed ?trade_candidate)
+        (portfolio_ready_for_execution ?portfolio)
+        (screened_with_resource ?portfolio ?screening_resource)
+        (not
+          (trade_candidate_instrument_locked ?trade_candidate)
+        )
+      )
+    :effect (trade_candidate_instrument_locked ?trade_candidate)
+  )
+  (:action reserve_instrument_record_for_agent_and_trade
+    :parameters (?execution_agent - execution_agent ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (execution_agent_assigned_tradecandidate ?execution_agent ?trade_candidate)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_available ?instrument_record)
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_instrument_locked ?trade_candidate)
+        (not
+          (instrument_record_locked ?instrument_record)
+        )
+      )
+    :effect
+      (and
+        (instrument_record_locked ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (not
+          (instrument_record_available ?instrument_record)
+        )
+      )
+  )
+  (:action validate_instrument_for_agent
+    :parameters (?execution_agent - execution_agent ?instrument_record - instrument_record ?trade_candidate - trade_candidate ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_locked ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (screened_with_resource ?execution_agent ?screening_resource)
+        (not
+          (trade_candidate_requires_approval_a ?trade_candidate)
+        )
+        (not
+          (execution_agent_instrument_validated ?execution_agent)
+        )
+      )
+    :effect (execution_agent_instrument_validated ?execution_agent)
+  )
+  (:action attach_external_approval_token_to_agent
+    :parameters (?execution_agent - execution_agent ?external_approval_token - external_approval_token)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (external_approval_token_available ?external_approval_token)
+        (not
+          (execution_agent_external_token_attached ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_external_token_attached ?execution_agent)
+        (execution_agent_external_token_assigned ?execution_agent ?external_approval_token)
+        (not
+          (external_approval_token_available ?external_approval_token)
+        )
+      )
+  )
+  (:action apply_external_token_and_validate_instrument_for_agent
+    :parameters (?execution_agent - execution_agent ?instrument_record - instrument_record ?trade_candidate - trade_candidate ?screening_resource - screening_resource ?external_approval_token - external_approval_token)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_locked ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (screened_with_resource ?execution_agent ?screening_resource)
+        (trade_candidate_requires_approval_a ?trade_candidate)
+        (execution_agent_external_token_attached ?execution_agent)
+        (execution_agent_external_token_assigned ?execution_agent ?external_approval_token)
+        (not
+          (execution_agent_instrument_validated ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_instrument_validated ?execution_agent)
+        (execution_agent_external_token_applied ?execution_agent)
+      )
+  )
+  (:action request_manager_endorsement
+    :parameters (?execution_agent - execution_agent ?portfolio_manager - portfolio_manager ?approver_resource - approver_resource ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_instrument_validated ?execution_agent)
+        (execution_agent_has_portfolio_manager ?execution_agent ?portfolio_manager)
+        (approver_assigned ?execution_agent ?approver_resource)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (not
+          (trade_candidate_requires_approval_b ?trade_candidate)
+        )
+        (not
+          (execution_agent_endorsement_stage1 ?execution_agent)
+        )
+      )
+    :effect (execution_agent_endorsement_stage1 ?execution_agent)
+  )
+  (:action request_manager_endorsement_secondary
+    :parameters (?execution_agent - execution_agent ?portfolio_manager - portfolio_manager ?approver_resource - approver_resource ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_instrument_validated ?execution_agent)
+        (execution_agent_has_portfolio_manager ?execution_agent ?portfolio_manager)
+        (approver_assigned ?execution_agent ?approver_resource)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (trade_candidate_requires_approval_b ?trade_candidate)
+        (not
+          (execution_agent_endorsement_stage1 ?execution_agent)
+        )
+      )
+    :effect (execution_agent_endorsement_stage1 ?execution_agent)
+  )
+  (:action advance_agent_endorsement_stage2
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage1 ?execution_agent)
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (not
+          (trade_candidate_requires_approval_a ?trade_candidate)
+        )
+        (not
+          (trade_candidate_requires_approval_b ?trade_candidate)
+        )
+        (not
+          (execution_agent_endorsement_stage2 ?execution_agent)
+        )
+      )
+    :effect (execution_agent_endorsement_stage2 ?execution_agent)
+  )
+  (:action advance_agent_endorsement_and_confirm_policy
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage1 ?execution_agent)
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (trade_candidate_requires_approval_a ?trade_candidate)
+        (not
+          (trade_candidate_requires_approval_b ?trade_candidate)
+        )
+        (not
+          (execution_agent_endorsement_stage2 ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (policy_confirmation_obtained ?execution_agent)
+      )
+  )
+  (:action advance_agent_endorsement_confirm_policy_variant_1
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage1 ?execution_agent)
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (not
+          (trade_candidate_requires_approval_a ?trade_candidate)
+        )
+        (trade_candidate_requires_approval_b ?trade_candidate)
+        (not
+          (execution_agent_endorsement_stage2 ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (policy_confirmation_obtained ?execution_agent)
+      )
+  )
+  (:action advance_agent_endorsement_confirm_policy_variant_2
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document ?instrument_record - instrument_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage1 ?execution_agent)
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (execution_agent_has_instrument_record ?execution_agent ?instrument_record)
+        (instrument_record_bound_to_tradecandidate ?instrument_record ?trade_candidate)
+        (trade_candidate_requires_approval_a ?trade_candidate)
+        (trade_candidate_requires_approval_b ?trade_candidate)
+        (not
+          (execution_agent_endorsement_stage2 ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (policy_confirmation_obtained ?execution_agent)
+      )
+  )
+  (:action finalize_trade_and_mark_agent_assigned
+    :parameters (?execution_agent - execution_agent)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (not
+          (policy_confirmation_obtained ?execution_agent)
+        )
+        (not
+          (execution_agent_finalized ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_finalized ?execution_agent)
+        (assignment_completed ?execution_agent)
+      )
+  )
+  (:action assign_execution_venue_option_to_agent
+    :parameters (?execution_agent - execution_agent ?execution_venue_option - execution_venue_option)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (policy_confirmation_obtained ?execution_agent)
+        (execution_venue_option_available ?execution_venue_option)
+      )
+    :effect
+      (and
+        (execution_agent_execution_venue_selected ?execution_agent ?execution_venue_option)
+        (not
+          (execution_venue_option_available ?execution_venue_option)
+        )
+      )
+  )
+  (:action finalize_agent_allocation
+    :parameters (?execution_agent - execution_agent ?portfolio - portfolio ?strategy - strategy ?screening_resource - screening_resource ?execution_venue_option - execution_venue_option)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (policy_confirmation_obtained ?execution_agent)
+        (execution_agent_execution_venue_selected ?execution_agent ?execution_venue_option)
+        (execution_agent_assigned_portfolio ?execution_agent ?portfolio)
+        (execution_agent_assigned_strategy ?execution_agent ?strategy)
+        (portfolio_exposure_confirmed ?portfolio)
+        (strategy_market_confirmed ?strategy)
+        (screened_with_resource ?execution_agent ?screening_resource)
+        (not
+          (execution_agent_ready_for_assignment ?execution_agent)
+        )
+      )
+    :effect (execution_agent_ready_for_assignment ?execution_agent)
+  )
+  (:action finalize_agent_assignment_with_all_checks
+    :parameters (?execution_agent - execution_agent)
+    :precondition
+      (and
+        (execution_agent_endorsement_stage2 ?execution_agent)
+        (execution_agent_ready_for_assignment ?execution_agent)
+        (not
+          (execution_agent_finalized ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_finalized ?execution_agent)
+        (assignment_completed ?execution_agent)
+      )
+  )
+  (:action assign_regulatory_document_to_agent
+    :parameters (?execution_agent - execution_agent ?regulatory_document - regulatory_document ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (screening_cleared_entity ?execution_agent)
+        (screened_with_resource ?execution_agent ?screening_resource)
+        (regulatory_document_available ?regulatory_document)
+        (execution_agent_has_regulatory_document ?execution_agent ?regulatory_document)
+        (not
+          (regulatory_acknowledged ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (regulatory_acknowledged ?execution_agent)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action start_regulatory_review
+    :parameters (?execution_agent - execution_agent ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (regulatory_acknowledged ?execution_agent)
+        (approver_assigned ?execution_agent ?approver_resource)
+        (not
+          (regulatory_review_started ?execution_agent)
+        )
+      )
+    :effect (regulatory_review_started ?execution_agent)
+  )
+  (:action complete_regulatory_review
+    :parameters (?execution_agent - execution_agent ?policy_document - policy_document)
+    :precondition
+      (and
+        (regulatory_review_started ?execution_agent)
+        (execution_agent_has_policy_document ?execution_agent ?policy_document)
+        (not
+          (regulatory_review_completed ?execution_agent)
+        )
+      )
+    :effect (regulatory_review_completed ?execution_agent)
+  )
+  (:action finalize_agent_assignment_after_regulatory
+    :parameters (?execution_agent - execution_agent)
+    :precondition
+      (and
+        (regulatory_review_completed ?execution_agent)
+        (not
+          (execution_agent_finalized ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (execution_agent_finalized ?execution_agent)
+        (assignment_completed ?execution_agent)
+      )
+  )
+  (:action complete_portfolio_assignment
+    :parameters (?portfolio - portfolio ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (portfolio_ready_for_execution ?portfolio)
+        (portfolio_exposure_confirmed ?portfolio)
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_instrument_locked ?trade_candidate)
+        (not
+          (assignment_completed ?portfolio)
+        )
+      )
+    :effect (assignment_completed ?portfolio)
+  )
+  (:action complete_strategy_assignment
+    :parameters (?strategy - strategy ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (strategy_ready_for_execution ?strategy)
+        (strategy_market_confirmed ?strategy)
+        (trade_candidate_constructed ?trade_candidate)
+        (trade_candidate_instrument_locked ?trade_candidate)
+        (not
+          (assignment_completed ?strategy)
+        )
+      )
+    :effect (assignment_completed ?strategy)
+  )
+  (:action flag_entity_block_and_create_restriction_record
+    :parameters (?investment_entity - investment_entity ?restriction_record - restriction_record ?screening_resource - screening_resource)
+    :precondition
+      (and
+        (assignment_completed ?investment_entity)
+        (screened_with_resource ?investment_entity ?screening_resource)
+        (restriction_record_available ?restriction_record)
+        (not
+          (block_initiated ?investment_entity)
+        )
+      )
+    :effect
+      (and
+        (block_initiated ?investment_entity)
+        (entity_has_restriction_record ?investment_entity ?restriction_record)
+        (not
+          (restriction_record_available ?restriction_record)
+        )
+      )
+  )
+  (:action propagate_block_to_portfolio
+    :parameters (?portfolio - portfolio ?restricted_list_entry - restricted_list_entry ?restriction_record - restriction_record)
+    :precondition
+      (and
+        (block_initiated ?portfolio)
+        (restricted_entry_assigned ?portfolio ?restricted_list_entry)
+        (entity_has_restriction_record ?portfolio ?restriction_record)
+        (not
+          (block_propagated ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (block_propagated ?portfolio)
+        (restricted_entry_available ?restricted_list_entry)
+        (restriction_record_available ?restriction_record)
+      )
+  )
+  (:action propagate_block_to_strategy
+    :parameters (?strategy - strategy ?restricted_list_entry - restricted_list_entry ?restriction_record - restriction_record)
+    :precondition
+      (and
+        (block_initiated ?strategy)
+        (restricted_entry_assigned ?strategy ?restricted_list_entry)
+        (entity_has_restriction_record ?strategy ?restriction_record)
+        (not
+          (block_propagated ?strategy)
+        )
+      )
+    :effect
+      (and
+        (block_propagated ?strategy)
+        (restricted_entry_available ?restricted_list_entry)
+        (restriction_record_available ?restriction_record)
+      )
+  )
+  (:action propagate_block_to_execution_agent
+    :parameters (?execution_agent - execution_agent ?restricted_list_entry - restricted_list_entry ?restriction_record - restriction_record)
+    :precondition
+      (and
+        (block_initiated ?execution_agent)
+        (restricted_entry_assigned ?execution_agent ?restricted_list_entry)
+        (entity_has_restriction_record ?execution_agent ?restriction_record)
+        (not
+          (block_propagated ?execution_agent)
+        )
+      )
+    :effect
+      (and
+        (block_propagated ?execution_agent)
+        (restricted_entry_available ?restricted_list_entry)
+        (restriction_record_available ?restriction_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem restricted_list_compliance_blocking_problem)
+  (:domain restricted_list_compliance_blocking_domain)
+  (:objects portfolio_alpha - portfolio strategy_equity_sleeve - strategy execution_agent_alpha - execution_agent execution_agent_beta - execution_agent restricted_entry_a - restricted_list_entry restricted_entry_b - restricted_list_entry restricted_entry_c - restricted_list_entry screening_engine_rule_1 - screening_resource approver_slot_1 - approver_resource asset_abc - asset exposure_bucket_core - exposure_bucket market_venue_primary - market_venue trade_candidate_1 - trade_candidate instrument_record_1 - instrument_record instrument_record_2 - instrument_record external_approval_token_1 - external_approval_token external_approval_token_2 - external_approval_token execution_venue_option_a - execution_venue_option execution_venue_option_b - execution_venue_option restriction_record_1 - restriction_record portfolio_manager_1 - portfolio_manager regulatory_document_1 - regulatory_document regulatory_document_2 - regulatory_document policy_document_1 - policy_document)
+  (:init
+    (restricted_entry_available restricted_entry_a)
+    (restricted_entry_available restricted_entry_b)
+    (restricted_entry_available restricted_entry_c)
+    (screening_resource_available screening_engine_rule_1)
+    (approver_available approver_slot_1)
+    (asset_available asset_abc)
+    (exposure_linked_to_portfolio portfolio_alpha exposure_bucket_core)
+    (strategy_has_market strategy_equity_sleeve market_venue_primary)
+    (trade_candidate_available trade_candidate_1)
+    (instrument_record_available instrument_record_1)
+    (instrument_record_available instrument_record_2)
+    (execution_agent_assigned_portfolio execution_agent_alpha portfolio_alpha)
+    (execution_agent_assigned_portfolio execution_agent_beta portfolio_alpha)
+    (execution_agent_assigned_strategy execution_agent_alpha strategy_equity_sleeve)
+    (execution_agent_assigned_strategy execution_agent_beta strategy_equity_sleeve)
+    (execution_agent_assigned_tradecandidate execution_agent_alpha trade_candidate_1)
+    (execution_agent_assigned_tradecandidate execution_agent_beta trade_candidate_1)
+    (execution_agent_has_instrument_record execution_agent_alpha instrument_record_1)
+    (execution_agent_has_instrument_record execution_agent_beta instrument_record_2)
+    (external_approval_token_available external_approval_token_1)
+    (external_approval_token_available external_approval_token_2)
+    (execution_venue_option_available execution_venue_option_a)
+    (execution_venue_option_available execution_venue_option_b)
+    (restriction_record_available restriction_record_1)
+    (portfolio_manager_available portfolio_manager_1)
+    (regulatory_document_available regulatory_document_1)
+    (execution_agent_has_regulatory_document execution_agent_alpha regulatory_document_1)
+    (execution_agent_has_regulatory_document execution_agent_beta regulatory_document_2)
+    (policy_document_available policy_document_1)
+  )
+  (:goal
+    (and
+      (block_propagated portfolio_alpha)
+      (block_propagated strategy_equity_sleeve)
+      (block_propagated execution_agent_alpha)
+      (block_propagated execution_agent_beta)
+    )
+  )
+)

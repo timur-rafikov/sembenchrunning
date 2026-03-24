@@ -1,0 +1,1009 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain inventory_allocation_by_storage_condition_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types location_family - object product_family - object condition_family - object inventory_record_group - object inventory_record - inventory_record_group handling_equipment - location_family putaway_task - location_family operator - location_family storage_constraint - location_family access_constraint - location_family condition_requirement - location_family inspection_resource - location_family regulatory_document - location_family product_sku - product_family shelf_bin_template - product_family special_handling_label - product_family bulk_condition_profile - condition_family pick_face_condition_profile - condition_family pallet_container - condition_family location_subtype_group - inventory_record slot_subtype_group - inventory_record bulk_storage_location - location_subtype_group pick_face_location - location_subtype_group storage_slot_record - slot_subtype_group)
+  (:predicates
+    (allocatable_received ?inventory_record - inventory_record)
+    (allocatable_ready ?inventory_record - inventory_record)
+    (equipment_assigned ?inventory_record - inventory_record)
+    (allocated ?inventory_record - inventory_record)
+    (available_for_assignment ?inventory_record - inventory_record)
+    (condition_assigned ?inventory_record - inventory_record)
+    (equipment_available ?handling_equipment - handling_equipment)
+    (assigned_to_equipment ?inventory_record - inventory_record ?handling_equipment - handling_equipment)
+    (putaway_task_available ?putaway_task - putaway_task)
+    (assigned_to_putaway ?inventory_record - inventory_record ?putaway_task - putaway_task)
+    (operator_available ?operator - operator)
+    (assigned_to_operator ?inventory_record - inventory_record ?operator - operator)
+    (sku_available ?product_sku - product_sku)
+    (bulk_location_reserved_for_sku ?bulk_storage_location - bulk_storage_location ?product_sku - product_sku)
+    (pick_face_reserved_for_sku ?pick_face_location - pick_face_location ?product_sku - product_sku)
+    (bulk_location_condition_profile ?bulk_storage_location - bulk_storage_location ?bulk_condition_profile - bulk_condition_profile)
+    (bulk_profile_ready ?bulk_condition_profile - bulk_condition_profile)
+    (bulk_profile_reserved ?bulk_condition_profile - bulk_condition_profile)
+    (bulk_location_stocked ?bulk_storage_location - bulk_storage_location)
+    (pick_face_location_condition_profile ?pick_face_location - pick_face_location ?pick_face_condition_profile - pick_face_condition_profile)
+    (pick_face_profile_ready ?pick_face_condition_profile - pick_face_condition_profile)
+    (pick_face_profile_reserved ?pick_face_condition_profile - pick_face_condition_profile)
+    (pick_face_location_stocked ?pick_face_location - pick_face_location)
+    (container_available ?pallet_container - pallet_container)
+    (container_assembled ?pallet_container - pallet_container)
+    (container_has_bulk_profile ?pallet_container - pallet_container ?bulk_condition_profile - bulk_condition_profile)
+    (container_has_pickface_profile ?pallet_container - pallet_container ?pick_face_condition_profile - pick_face_condition_profile)
+    (container_requires_inspection_a ?pallet_container - pallet_container)
+    (container_requires_inspection_b ?pallet_container - pallet_container)
+    (container_inspection_complete ?pallet_container - pallet_container)
+    (slot_in_bulk_location ?storage_slot_record - storage_slot_record ?bulk_storage_location - bulk_storage_location)
+    (slot_in_pickface_location ?storage_slot_record - storage_slot_record ?pick_face_location - pick_face_location)
+    (slot_contains_container ?storage_slot_record - storage_slot_record ?pallet_container - pallet_container)
+    (shelf_template_available ?shelf_bin_template - shelf_bin_template)
+    (slot_assigned_template ?storage_slot_record - storage_slot_record ?shelf_bin_template - shelf_bin_template)
+    (shelf_template_installed ?shelf_bin_template - shelf_bin_template)
+    (template_assigned_to_container ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    (slot_prepared_for_assignment ?storage_slot_record - storage_slot_record)
+    (slot_inspection_assigned ?storage_slot_record - storage_slot_record)
+    (slot_verified ?storage_slot_record - storage_slot_record)
+    (slot_has_storage_constraint_flag ?storage_slot_record - storage_slot_record)
+    (slot_storage_constraint_confirmed ?storage_slot_record - storage_slot_record)
+    (slot_ready_for_access_constraint ?storage_slot_record - storage_slot_record)
+    (slot_reconciled ?storage_slot_record - storage_slot_record)
+    (label_available ?special_handling_label - special_handling_label)
+    (slot_assigned_label ?storage_slot_record - storage_slot_record ?special_handling_label - special_handling_label)
+    (slot_label_attached ?storage_slot_record - storage_slot_record)
+    (slot_label_verified_step1 ?storage_slot_record - storage_slot_record)
+    (slot_label_verified ?storage_slot_record - storage_slot_record)
+    (storage_constraint_available ?storage_constraint - storage_constraint)
+    (slot_has_storage_constraint ?storage_slot_record - storage_slot_record ?storage_constraint - storage_constraint)
+    (access_constraint_available ?access_constraint - access_constraint)
+    (slot_assigned_access_constraint ?storage_slot_record - storage_slot_record ?access_constraint - access_constraint)
+    (inspection_resource_available ?inspection_resource - inspection_resource)
+    (slot_assigned_inspection_resource ?storage_slot_record - storage_slot_record ?inspection_resource - inspection_resource)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (slot_assigned_regulatory_document ?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document)
+    (condition_requirement_available ?condition_requirement - condition_requirement)
+    (assigned_condition_requirement ?inventory_record - inventory_record ?condition_requirement - condition_requirement)
+    (bulk_location_ready ?bulk_storage_location - bulk_storage_location)
+    (pickface_location_ready ?pick_face_location - pick_face_location)
+    (slot_finalized ?storage_slot_record - storage_slot_record)
+  )
+  (:action register_inventory_arrival
+    :parameters (?inventory_record - inventory_record)
+    :precondition
+      (and
+        (not
+          (allocatable_received ?inventory_record)
+        )
+        (not
+          (allocated ?inventory_record)
+        )
+      )
+    :effect (allocatable_received ?inventory_record)
+  )
+  (:action assign_and_reserve_handling_equipment
+    :parameters (?inventory_record - inventory_record ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (allocatable_received ?inventory_record)
+        (not
+          (equipment_assigned ?inventory_record)
+        )
+        (equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (equipment_assigned ?inventory_record)
+        (assigned_to_equipment ?inventory_record ?handling_equipment)
+        (not
+          (equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action create_putaway_task
+    :parameters (?inventory_record - inventory_record ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_received ?inventory_record)
+        (equipment_assigned ?inventory_record)
+        (putaway_task_available ?putaway_task)
+      )
+    :effect
+      (and
+        (assigned_to_putaway ?inventory_record ?putaway_task)
+        (not
+          (putaway_task_available ?putaway_task)
+        )
+      )
+  )
+  (:action acknowledge_putaway_task
+    :parameters (?inventory_record - inventory_record ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_received ?inventory_record)
+        (equipment_assigned ?inventory_record)
+        (assigned_to_putaway ?inventory_record ?putaway_task)
+        (not
+          (allocatable_ready ?inventory_record)
+        )
+      )
+    :effect (allocatable_ready ?inventory_record)
+  )
+  (:action release_putaway_task
+    :parameters (?inventory_record - inventory_record ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (assigned_to_putaway ?inventory_record ?putaway_task)
+      )
+    :effect
+      (and
+        (putaway_task_available ?putaway_task)
+        (not
+          (assigned_to_putaway ?inventory_record ?putaway_task)
+        )
+      )
+  )
+  (:action assign_operator_to_inventory
+    :parameters (?inventory_record - inventory_record ?operator - operator)
+    :precondition
+      (and
+        (allocatable_ready ?inventory_record)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (assigned_to_operator ?inventory_record ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_inventory
+    :parameters (?inventory_record - inventory_record ?operator - operator)
+    :precondition
+      (and
+        (assigned_to_operator ?inventory_record ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (assigned_to_operator ?inventory_record ?operator)
+        )
+      )
+  )
+  (:action assign_inspection_resource_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?inspection_resource - inspection_resource)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (inspection_resource_available ?inspection_resource)
+      )
+    :effect
+      (and
+        (slot_assigned_inspection_resource ?storage_slot_record ?inspection_resource)
+        (not
+          (inspection_resource_available ?inspection_resource)
+        )
+      )
+  )
+  (:action release_inspection_resource_from_slot
+    :parameters (?storage_slot_record - storage_slot_record ?inspection_resource - inspection_resource)
+    :precondition
+      (and
+        (slot_assigned_inspection_resource ?storage_slot_record ?inspection_resource)
+      )
+    :effect
+      (and
+        (inspection_resource_available ?inspection_resource)
+        (not
+          (slot_assigned_inspection_resource ?storage_slot_record ?inspection_resource)
+        )
+      )
+  )
+  (:action attach_regulatory_document_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action release_regulatory_document_from_slot
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+      )
+    :effect
+      (and
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        )
+      )
+  )
+  (:action reserve_bulk_condition_profile
+    :parameters (?bulk_storage_location - bulk_storage_location ?bulk_condition_profile - bulk_condition_profile ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_ready ?bulk_storage_location)
+        (assigned_to_putaway ?bulk_storage_location ?putaway_task)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (not
+          (bulk_profile_ready ?bulk_condition_profile)
+        )
+        (not
+          (bulk_profile_reserved ?bulk_condition_profile)
+        )
+      )
+    :effect (bulk_profile_ready ?bulk_condition_profile)
+  )
+  (:action prepare_bulk_location_with_operator
+    :parameters (?bulk_storage_location - bulk_storage_location ?bulk_condition_profile - bulk_condition_profile ?operator - operator)
+    :precondition
+      (and
+        (allocatable_ready ?bulk_storage_location)
+        (assigned_to_operator ?bulk_storage_location ?operator)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (bulk_profile_ready ?bulk_condition_profile)
+        (not
+          (bulk_location_ready ?bulk_storage_location)
+        )
+      )
+    :effect
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (bulk_location_stocked ?bulk_storage_location)
+      )
+  )
+  (:action assign_sku_to_bulk_location
+    :parameters (?bulk_storage_location - bulk_storage_location ?bulk_condition_profile - bulk_condition_profile ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocatable_ready ?bulk_storage_location)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (sku_available ?product_sku)
+        (not
+          (bulk_location_ready ?bulk_storage_location)
+        )
+      )
+    :effect
+      (and
+        (bulk_profile_reserved ?bulk_condition_profile)
+        (bulk_location_ready ?bulk_storage_location)
+        (bulk_location_reserved_for_sku ?bulk_storage_location ?product_sku)
+        (not
+          (sku_available ?product_sku)
+        )
+      )
+  )
+  (:action finalize_bulk_allocation
+    :parameters (?bulk_storage_location - bulk_storage_location ?bulk_condition_profile - bulk_condition_profile ?putaway_task - putaway_task ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocatable_ready ?bulk_storage_location)
+        (assigned_to_putaway ?bulk_storage_location ?putaway_task)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (bulk_profile_reserved ?bulk_condition_profile)
+        (bulk_location_reserved_for_sku ?bulk_storage_location ?product_sku)
+        (not
+          (bulk_location_stocked ?bulk_storage_location)
+        )
+      )
+    :effect
+      (and
+        (bulk_profile_ready ?bulk_condition_profile)
+        (bulk_location_stocked ?bulk_storage_location)
+        (sku_available ?product_sku)
+        (not
+          (bulk_location_reserved_for_sku ?bulk_storage_location ?product_sku)
+        )
+      )
+  )
+  (:action reserve_pickface_condition_profile
+    :parameters (?pick_face_location - pick_face_location ?pick_face_condition_profile - pick_face_condition_profile ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_ready ?pick_face_location)
+        (assigned_to_putaway ?pick_face_location ?putaway_task)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (not
+          (pick_face_profile_ready ?pick_face_condition_profile)
+        )
+        (not
+          (pick_face_profile_reserved ?pick_face_condition_profile)
+        )
+      )
+    :effect (pick_face_profile_ready ?pick_face_condition_profile)
+  )
+  (:action assign_operator_to_pickface
+    :parameters (?pick_face_location - pick_face_location ?pick_face_condition_profile - pick_face_condition_profile ?operator - operator)
+    :precondition
+      (and
+        (allocatable_ready ?pick_face_location)
+        (assigned_to_operator ?pick_face_location ?operator)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (pick_face_profile_ready ?pick_face_condition_profile)
+        (not
+          (pickface_location_ready ?pick_face_location)
+        )
+      )
+    :effect
+      (and
+        (pickface_location_ready ?pick_face_location)
+        (pick_face_location_stocked ?pick_face_location)
+      )
+  )
+  (:action assign_sku_to_pickface
+    :parameters (?pick_face_location - pick_face_location ?pick_face_condition_profile - pick_face_condition_profile ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocatable_ready ?pick_face_location)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (sku_available ?product_sku)
+        (not
+          (pickface_location_ready ?pick_face_location)
+        )
+      )
+    :effect
+      (and
+        (pick_face_profile_reserved ?pick_face_condition_profile)
+        (pickface_location_ready ?pick_face_location)
+        (pick_face_reserved_for_sku ?pick_face_location ?product_sku)
+        (not
+          (sku_available ?product_sku)
+        )
+      )
+  )
+  (:action finalize_pickface_allocation
+    :parameters (?pick_face_location - pick_face_location ?pick_face_condition_profile - pick_face_condition_profile ?putaway_task - putaway_task ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocatable_ready ?pick_face_location)
+        (assigned_to_putaway ?pick_face_location ?putaway_task)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (pick_face_profile_reserved ?pick_face_condition_profile)
+        (pick_face_reserved_for_sku ?pick_face_location ?product_sku)
+        (not
+          (pick_face_location_stocked ?pick_face_location)
+        )
+      )
+    :effect
+      (and
+        (pick_face_profile_ready ?pick_face_condition_profile)
+        (pick_face_location_stocked ?pick_face_location)
+        (sku_available ?product_sku)
+        (not
+          (pick_face_reserved_for_sku ?pick_face_location ?product_sku)
+        )
+      )
+  )
+  (:action assemble_container_standard
+    :parameters (?bulk_storage_location - bulk_storage_location ?pick_face_location - pick_face_location ?bulk_condition_profile - bulk_condition_profile ?pick_face_condition_profile - pick_face_condition_profile ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (pickface_location_ready ?pick_face_location)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (bulk_profile_ready ?bulk_condition_profile)
+        (pick_face_profile_ready ?pick_face_condition_profile)
+        (bulk_location_stocked ?bulk_storage_location)
+        (pick_face_location_stocked ?pick_face_location)
+        (container_available ?pallet_container)
+      )
+    :effect
+      (and
+        (container_assembled ?pallet_container)
+        (container_has_bulk_profile ?pallet_container ?bulk_condition_profile)
+        (container_has_pickface_profile ?pallet_container ?pick_face_condition_profile)
+        (not
+          (container_available ?pallet_container)
+        )
+      )
+  )
+  (:action assemble_container_bulk_reserved
+    :parameters (?bulk_storage_location - bulk_storage_location ?pick_face_location - pick_face_location ?bulk_condition_profile - bulk_condition_profile ?pick_face_condition_profile - pick_face_condition_profile ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (pickface_location_ready ?pick_face_location)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (bulk_profile_reserved ?bulk_condition_profile)
+        (pick_face_profile_ready ?pick_face_condition_profile)
+        (not
+          (bulk_location_stocked ?bulk_storage_location)
+        )
+        (pick_face_location_stocked ?pick_face_location)
+        (container_available ?pallet_container)
+      )
+    :effect
+      (and
+        (container_assembled ?pallet_container)
+        (container_has_bulk_profile ?pallet_container ?bulk_condition_profile)
+        (container_has_pickface_profile ?pallet_container ?pick_face_condition_profile)
+        (container_requires_inspection_a ?pallet_container)
+        (not
+          (container_available ?pallet_container)
+        )
+      )
+  )
+  (:action assemble_container_pickface_reserved
+    :parameters (?bulk_storage_location - bulk_storage_location ?pick_face_location - pick_face_location ?bulk_condition_profile - bulk_condition_profile ?pick_face_condition_profile - pick_face_condition_profile ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (pickface_location_ready ?pick_face_location)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (bulk_profile_ready ?bulk_condition_profile)
+        (pick_face_profile_reserved ?pick_face_condition_profile)
+        (bulk_location_stocked ?bulk_storage_location)
+        (not
+          (pick_face_location_stocked ?pick_face_location)
+        )
+        (container_available ?pallet_container)
+      )
+    :effect
+      (and
+        (container_assembled ?pallet_container)
+        (container_has_bulk_profile ?pallet_container ?bulk_condition_profile)
+        (container_has_pickface_profile ?pallet_container ?pick_face_condition_profile)
+        (container_requires_inspection_b ?pallet_container)
+        (not
+          (container_available ?pallet_container)
+        )
+      )
+  )
+  (:action assemble_container_both_reserved
+    :parameters (?bulk_storage_location - bulk_storage_location ?pick_face_location - pick_face_location ?bulk_condition_profile - bulk_condition_profile ?pick_face_condition_profile - pick_face_condition_profile ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (pickface_location_ready ?pick_face_location)
+        (bulk_location_condition_profile ?bulk_storage_location ?bulk_condition_profile)
+        (pick_face_location_condition_profile ?pick_face_location ?pick_face_condition_profile)
+        (bulk_profile_reserved ?bulk_condition_profile)
+        (pick_face_profile_reserved ?pick_face_condition_profile)
+        (not
+          (bulk_location_stocked ?bulk_storage_location)
+        )
+        (not
+          (pick_face_location_stocked ?pick_face_location)
+        )
+        (container_available ?pallet_container)
+      )
+    :effect
+      (and
+        (container_assembled ?pallet_container)
+        (container_has_bulk_profile ?pallet_container ?bulk_condition_profile)
+        (container_has_pickface_profile ?pallet_container ?pick_face_condition_profile)
+        (container_requires_inspection_a ?pallet_container)
+        (container_requires_inspection_b ?pallet_container)
+        (not
+          (container_available ?pallet_container)
+        )
+      )
+  )
+  (:action mark_container_inspection_complete
+    :parameters (?pallet_container - pallet_container ?bulk_storage_location - bulk_storage_location ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (container_assembled ?pallet_container)
+        (bulk_location_ready ?bulk_storage_location)
+        (assigned_to_putaway ?bulk_storage_location ?putaway_task)
+        (not
+          (container_inspection_complete ?pallet_container)
+        )
+      )
+    :effect (container_inspection_complete ?pallet_container)
+  )
+  (:action install_shelf_template_on_slot
+    :parameters (?storage_slot_record - storage_slot_record ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (slot_contains_container ?storage_slot_record ?pallet_container)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (shelf_template_available ?shelf_bin_template)
+        (container_assembled ?pallet_container)
+        (container_inspection_complete ?pallet_container)
+        (not
+          (shelf_template_installed ?shelf_bin_template)
+        )
+      )
+    :effect
+      (and
+        (shelf_template_installed ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (not
+          (shelf_template_available ?shelf_bin_template)
+        )
+      )
+  )
+  (:action prepare_slot_after_template_installation
+    :parameters (?storage_slot_record - storage_slot_record ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (shelf_template_installed ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (assigned_to_putaway ?storage_slot_record ?putaway_task)
+        (not
+          (container_requires_inspection_a ?pallet_container)
+        )
+        (not
+          (slot_prepared_for_assignment ?storage_slot_record)
+        )
+      )
+    :effect (slot_prepared_for_assignment ?storage_slot_record)
+  )
+  (:action apply_storage_constraint_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?storage_constraint - storage_constraint)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (storage_constraint_available ?storage_constraint)
+        (not
+          (slot_has_storage_constraint_flag ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_has_storage_constraint_flag ?storage_slot_record)
+        (slot_has_storage_constraint ?storage_slot_record ?storage_constraint)
+        (not
+          (storage_constraint_available ?storage_constraint)
+        )
+      )
+  )
+  (:action apply_storage_constraint_with_template_and_container
+    :parameters (?storage_slot_record - storage_slot_record ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container ?putaway_task - putaway_task ?storage_constraint - storage_constraint)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (shelf_template_installed ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (assigned_to_putaway ?storage_slot_record ?putaway_task)
+        (container_requires_inspection_a ?pallet_container)
+        (slot_has_storage_constraint_flag ?storage_slot_record)
+        (slot_has_storage_constraint ?storage_slot_record ?storage_constraint)
+        (not
+          (slot_prepared_for_assignment ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_prepared_for_assignment ?storage_slot_record)
+        (slot_storage_constraint_confirmed ?storage_slot_record)
+      )
+  )
+  (:action attach_inspection_and_label_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?inspection_resource - inspection_resource ?operator - operator ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_prepared_for_assignment ?storage_slot_record)
+        (slot_assigned_inspection_resource ?storage_slot_record ?inspection_resource)
+        (assigned_to_operator ?storage_slot_record ?operator)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (not
+          (container_requires_inspection_b ?pallet_container)
+        )
+        (not
+          (slot_inspection_assigned ?storage_slot_record)
+        )
+      )
+    :effect (slot_inspection_assigned ?storage_slot_record)
+  )
+  (:action attach_inspection_and_label_to_slot_alternate
+    :parameters (?storage_slot_record - storage_slot_record ?inspection_resource - inspection_resource ?operator - operator ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_prepared_for_assignment ?storage_slot_record)
+        (slot_assigned_inspection_resource ?storage_slot_record ?inspection_resource)
+        (assigned_to_operator ?storage_slot_record ?operator)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (container_requires_inspection_b ?pallet_container)
+        (not
+          (slot_inspection_assigned ?storage_slot_record)
+        )
+      )
+    :effect (slot_inspection_assigned ?storage_slot_record)
+  )
+  (:action attach_regulatory_document_and_verify_slot
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_inspection_assigned ?storage_slot_record)
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (not
+          (container_requires_inspection_a ?pallet_container)
+        )
+        (not
+          (container_requires_inspection_b ?pallet_container)
+        )
+        (not
+          (slot_verified ?storage_slot_record)
+        )
+      )
+    :effect (slot_verified ?storage_slot_record)
+  )
+  (:action attach_regulatory_document_and_verify_slot_variant
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_inspection_assigned ?storage_slot_record)
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (container_requires_inspection_a ?pallet_container)
+        (not
+          (container_requires_inspection_b ?pallet_container)
+        )
+        (not
+          (slot_verified ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_ready_for_access_constraint ?storage_slot_record)
+      )
+  )
+  (:action attach_regulatory_document_and_verify_slot_alternate
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_inspection_assigned ?storage_slot_record)
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (not
+          (container_requires_inspection_a ?pallet_container)
+        )
+        (container_requires_inspection_b ?pallet_container)
+        (not
+          (slot_verified ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_ready_for_access_constraint ?storage_slot_record)
+      )
+  )
+  (:action attach_regulatory_document_and_verify_slot_combined
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document ?shelf_bin_template - shelf_bin_template ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (slot_inspection_assigned ?storage_slot_record)
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (slot_assigned_template ?storage_slot_record ?shelf_bin_template)
+        (template_assigned_to_container ?shelf_bin_template ?pallet_container)
+        (container_requires_inspection_a ?pallet_container)
+        (container_requires_inspection_b ?pallet_container)
+        (not
+          (slot_verified ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_ready_for_access_constraint ?storage_slot_record)
+      )
+  )
+  (:action finalize_slot_configuration
+    :parameters (?storage_slot_record - storage_slot_record)
+    :precondition
+      (and
+        (slot_verified ?storage_slot_record)
+        (not
+          (slot_ready_for_access_constraint ?storage_slot_record)
+        )
+        (not
+          (slot_finalized ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot_record)
+        (available_for_assignment ?storage_slot_record)
+      )
+  )
+  (:action attach_access_constraint_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?access_constraint - access_constraint)
+    :precondition
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_ready_for_access_constraint ?storage_slot_record)
+        (access_constraint_available ?access_constraint)
+      )
+    :effect
+      (and
+        (slot_assigned_access_constraint ?storage_slot_record ?access_constraint)
+        (not
+          (access_constraint_available ?access_constraint)
+        )
+      )
+  )
+  (:action execute_slot_reconciliation
+    :parameters (?storage_slot_record - storage_slot_record ?bulk_storage_location - bulk_storage_location ?pick_face_location - pick_face_location ?putaway_task - putaway_task ?access_constraint - access_constraint)
+    :precondition
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_ready_for_access_constraint ?storage_slot_record)
+        (slot_assigned_access_constraint ?storage_slot_record ?access_constraint)
+        (slot_in_bulk_location ?storage_slot_record ?bulk_storage_location)
+        (slot_in_pickface_location ?storage_slot_record ?pick_face_location)
+        (bulk_location_stocked ?bulk_storage_location)
+        (pick_face_location_stocked ?pick_face_location)
+        (assigned_to_putaway ?storage_slot_record ?putaway_task)
+        (not
+          (slot_reconciled ?storage_slot_record)
+        )
+      )
+    :effect (slot_reconciled ?storage_slot_record)
+  )
+  (:action finalize_slot
+    :parameters (?storage_slot_record - storage_slot_record)
+    :precondition
+      (and
+        (slot_verified ?storage_slot_record)
+        (slot_reconciled ?storage_slot_record)
+        (not
+          (slot_finalized ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot_record)
+        (available_for_assignment ?storage_slot_record)
+      )
+  )
+  (:action attach_special_handling_label_to_slot
+    :parameters (?storage_slot_record - storage_slot_record ?special_handling_label - special_handling_label ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (allocatable_ready ?storage_slot_record)
+        (assigned_to_putaway ?storage_slot_record ?putaway_task)
+        (label_available ?special_handling_label)
+        (slot_assigned_label ?storage_slot_record ?special_handling_label)
+        (not
+          (slot_label_attached ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_label_attached ?storage_slot_record)
+        (not
+          (label_available ?special_handling_label)
+        )
+      )
+  )
+  (:action update_slot_after_label_attachment
+    :parameters (?storage_slot_record - storage_slot_record ?operator - operator)
+    :precondition
+      (and
+        (slot_label_attached ?storage_slot_record)
+        (assigned_to_operator ?storage_slot_record ?operator)
+        (not
+          (slot_label_verified_step1 ?storage_slot_record)
+        )
+      )
+    :effect (slot_label_verified_step1 ?storage_slot_record)
+  )
+  (:action attach_regulatory_document_to_labeled_slot
+    :parameters (?storage_slot_record - storage_slot_record ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (slot_label_verified_step1 ?storage_slot_record)
+        (slot_assigned_regulatory_document ?storage_slot_record ?regulatory_document)
+        (not
+          (slot_label_verified ?storage_slot_record)
+        )
+      )
+    :effect (slot_label_verified ?storage_slot_record)
+  )
+  (:action finalize_slot_label_verification
+    :parameters (?storage_slot_record - storage_slot_record)
+    :precondition
+      (and
+        (slot_label_verified ?storage_slot_record)
+        (not
+          (slot_finalized ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_finalized ?storage_slot_record)
+        (available_for_assignment ?storage_slot_record)
+      )
+  )
+  (:action activate_bulk_location_for_picking
+    :parameters (?bulk_storage_location - bulk_storage_location ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (bulk_location_ready ?bulk_storage_location)
+        (bulk_location_stocked ?bulk_storage_location)
+        (container_assembled ?pallet_container)
+        (container_inspection_complete ?pallet_container)
+        (not
+          (available_for_assignment ?bulk_storage_location)
+        )
+      )
+    :effect (available_for_assignment ?bulk_storage_location)
+  )
+  (:action activate_pickface_location_for_picking
+    :parameters (?pick_face_location - pick_face_location ?pallet_container - pallet_container)
+    :precondition
+      (and
+        (pickface_location_ready ?pick_face_location)
+        (pick_face_location_stocked ?pick_face_location)
+        (container_assembled ?pallet_container)
+        (container_inspection_complete ?pallet_container)
+        (not
+          (available_for_assignment ?pick_face_location)
+        )
+      )
+    :effect (available_for_assignment ?pick_face_location)
+  )
+  (:action assign_condition_requirement_to_inventory
+    :parameters (?inventory_record - inventory_record ?condition_requirement - condition_requirement ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (available_for_assignment ?inventory_record)
+        (assigned_to_putaway ?inventory_record ?putaway_task)
+        (condition_requirement_available ?condition_requirement)
+        (not
+          (condition_assigned ?inventory_record)
+        )
+      )
+    :effect
+      (and
+        (condition_assigned ?inventory_record)
+        (assigned_condition_requirement ?inventory_record ?condition_requirement)
+        (not
+          (condition_requirement_available ?condition_requirement)
+        )
+      )
+  )
+  (:action allocate_bulk_location
+    :parameters (?bulk_storage_location - bulk_storage_location ?handling_equipment - handling_equipment ?condition_requirement - condition_requirement)
+    :precondition
+      (and
+        (condition_assigned ?bulk_storage_location)
+        (assigned_to_equipment ?bulk_storage_location ?handling_equipment)
+        (assigned_condition_requirement ?bulk_storage_location ?condition_requirement)
+        (not
+          (allocated ?bulk_storage_location)
+        )
+      )
+    :effect
+      (and
+        (allocated ?bulk_storage_location)
+        (equipment_available ?handling_equipment)
+        (condition_requirement_available ?condition_requirement)
+      )
+  )
+  (:action allocate_pick_face_location
+    :parameters (?pick_face_location - pick_face_location ?handling_equipment - handling_equipment ?condition_requirement - condition_requirement)
+    :precondition
+      (and
+        (condition_assigned ?pick_face_location)
+        (assigned_to_equipment ?pick_face_location ?handling_equipment)
+        (assigned_condition_requirement ?pick_face_location ?condition_requirement)
+        (not
+          (allocated ?pick_face_location)
+        )
+      )
+    :effect
+      (and
+        (allocated ?pick_face_location)
+        (equipment_available ?handling_equipment)
+        (condition_requirement_available ?condition_requirement)
+      )
+  )
+  (:action allocate_storage_slot
+    :parameters (?storage_slot_record - storage_slot_record ?handling_equipment - handling_equipment ?condition_requirement - condition_requirement)
+    :precondition
+      (and
+        (condition_assigned ?storage_slot_record)
+        (assigned_to_equipment ?storage_slot_record ?handling_equipment)
+        (assigned_condition_requirement ?storage_slot_record ?condition_requirement)
+        (not
+          (allocated ?storage_slot_record)
+        )
+      )
+    :effect
+      (and
+        (allocated ?storage_slot_record)
+        (equipment_available ?handling_equipment)
+        (condition_requirement_available ?condition_requirement)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem inventory_allocation_case)
+  (:domain inventory_allocation_by_storage_condition_domain)
+  (:objects bulk_location_1 - bulk_storage_location pick_face_location_1 - pick_face_location storage_slot_1 - storage_slot_record storage_slot_2 - storage_slot_record forklift_1 - handling_equipment forklift_2 - handling_equipment pallet_jack_1 - handling_equipment putaway_task_1 - putaway_task operator_1 - operator sku_1 - product_sku bulk_profile_cold - bulk_condition_profile pickface_profile_ambient - pick_face_condition_profile pallet_1 - pallet_container shelf_template_1 - shelf_bin_template shelf_template_2 - shelf_bin_template storage_constraint_stackable - storage_constraint storage_constraint_segregation - storage_constraint access_constraint_forklift_required - access_constraint access_constraint_restricted - access_constraint condition_requirement_refrigerated - condition_requirement inspection_resource_qc - inspection_resource special_handling_label_fragile - special_handling_label special_handling_label_hazardous - special_handling_label regulatory_document_sds - regulatory_document)
+  (:init
+    (equipment_available forklift_1)
+    (equipment_available forklift_2)
+    (equipment_available pallet_jack_1)
+    (putaway_task_available putaway_task_1)
+    (operator_available operator_1)
+    (sku_available sku_1)
+    (bulk_location_condition_profile bulk_location_1 bulk_profile_cold)
+    (pick_face_location_condition_profile pick_face_location_1 pickface_profile_ambient)
+    (container_available pallet_1)
+    (shelf_template_available shelf_template_1)
+    (shelf_template_available shelf_template_2)
+    (slot_in_bulk_location storage_slot_1 bulk_location_1)
+    (slot_in_bulk_location storage_slot_2 bulk_location_1)
+    (slot_in_pickface_location storage_slot_1 pick_face_location_1)
+    (slot_in_pickface_location storage_slot_2 pick_face_location_1)
+    (slot_contains_container storage_slot_1 pallet_1)
+    (slot_contains_container storage_slot_2 pallet_1)
+    (slot_assigned_template storage_slot_1 shelf_template_1)
+    (slot_assigned_template storage_slot_2 shelf_template_2)
+    (storage_constraint_available storage_constraint_stackable)
+    (storage_constraint_available storage_constraint_segregation)
+    (access_constraint_available access_constraint_forklift_required)
+    (access_constraint_available access_constraint_restricted)
+    (condition_requirement_available condition_requirement_refrigerated)
+    (inspection_resource_available inspection_resource_qc)
+    (label_available special_handling_label_fragile)
+    (slot_assigned_label storage_slot_1 special_handling_label_fragile)
+    (slot_assigned_label storage_slot_2 special_handling_label_hazardous)
+    (regulatory_document_available regulatory_document_sds)
+  )
+  (:goal
+    (and
+      (allocated bulk_location_1)
+      (allocated pick_face_location_1)
+      (allocated storage_slot_1)
+      (allocated storage_slot_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_inventory_arrival bulk_location_1)
+(assign_and_reserve_handling_equipment bulk_location_1 forklift_1)
+(create_putaway_task bulk_location_1 putaway_task_1)
+(acknowledge_putaway_task bulk_location_1 putaway_task_1)
+(reserve_bulk_condition_profile bulk_location_1 bulk_profile_cold putaway_task_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_7brhfbj3/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_7brhfbj3/plan.pddl 
+
+
+--- stderr ---
+

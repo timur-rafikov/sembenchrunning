@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_last_mile_transport_selection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object location_umbrella - object asset_umbrella - object segment_root - object trip_segment - segment_root provider_option - operational_resource time_window - operational_resource operator_resource - operational_resource fare_option - operational_resource passenger_preference - operational_resource timing_buffer - operational_resource vehicle_attribute - operational_resource service_option - operational_resource transfer_point - location_umbrella route_variant - location_umbrella operator_credential - location_umbrella pickup_point - asset_umbrella dropoff_point - asset_umbrella vehicle_unit - asset_umbrella boarding_segment_group - trip_segment alighting_segment_group - trip_segment origin_segment - boarding_segment_group destination_segment - boarding_segment_group itinerary_candidate - alighting_segment_group)
+  (:predicates
+    (segment_discovered ?trip_segment - trip_segment)
+    (segment_ready ?trip_segment - trip_segment)
+    (segment_provider_reserved ?trip_segment - trip_segment)
+    (segment_committed ?trip_segment - trip_segment)
+    (segment_dispatch_eligible ?trip_segment - trip_segment)
+    (segment_buffer_reserved ?trip_segment - trip_segment)
+    (provider_option_available ?provider_option - provider_option)
+    (segment_assigned_provider ?trip_segment - trip_segment ?provider_option - provider_option)
+    (time_window_available ?time_window - time_window)
+    (segment_time_window_binding ?trip_segment - trip_segment ?time_window - time_window)
+    (operator_resource_available ?operator_resource - operator_resource)
+    (trip_segment_assigned_operator ?trip_segment - trip_segment ?operator_resource - operator_resource)
+    (transfer_point_available ?transfer_point - transfer_point)
+    (origin_segment_reserved_transfer_point ?origin_segment - origin_segment ?transfer_point - transfer_point)
+    (destination_segment_reserved_transfer_point ?destination_segment - destination_segment ?transfer_point - transfer_point)
+    (origin_segment_pickup_point_binding ?origin_segment - origin_segment ?pickup_point - pickup_point)
+    (pickup_point_ready ?pickup_point - pickup_point)
+    (pickup_point_reserved ?pickup_point - pickup_point)
+    (origin_segment_pickup_confirmed ?origin_segment - origin_segment)
+    (destination_segment_dropoff_point_binding ?destination_segment - destination_segment ?dropoff_point - dropoff_point)
+    (dropoff_point_ready ?dropoff_point - dropoff_point)
+    (dropoff_point_reserved ?dropoff_point - dropoff_point)
+    (destination_segment_dropoff_confirmed ?destination_segment - destination_segment)
+    (vehicle_unit_available ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_reserved ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_assigned_to_pickup ?vehicle_unit - vehicle_unit ?pickup_point - pickup_point)
+    (vehicle_unit_assigned_to_dropoff ?vehicle_unit - vehicle_unit ?dropoff_point - dropoff_point)
+    (vehicle_pickup_compatible ?vehicle_unit - vehicle_unit)
+    (vehicle_dropoff_compatible ?vehicle_unit - vehicle_unit)
+    (vehicle_confirmed ?vehicle_unit - vehicle_unit)
+    (itinerary_origin_segment_association ?itinerary_candidate - itinerary_candidate ?origin_segment - origin_segment)
+    (itinerary_destination_segment_association ?itinerary_candidate - itinerary_candidate ?destination_segment - destination_segment)
+    (itinerary_candidate_vehicle_binding ?itinerary_candidate - itinerary_candidate ?vehicle_unit - vehicle_unit)
+    (route_variant_available ?route_variant - route_variant)
+    (itinerary_candidate_route_variant_binding ?itinerary_candidate - itinerary_candidate ?route_variant - route_variant)
+    (route_variant_reserved ?route_variant - route_variant)
+    (route_variant_assigned_to_vehicle ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    (itinerary_candidate_validated ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_attribute_applied ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_finalized_checks ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_fare_selected ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_validated_with_fare ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_preferences_applied ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_operational_checks_passed ?itinerary_candidate - itinerary_candidate)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (itinerary_candidate_operator_credential_binding ?itinerary_candidate - itinerary_candidate ?operator_credential - operator_credential)
+    (itinerary_candidate_operator_credential_confirmed ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_operator_validated ?itinerary_candidate - itinerary_candidate)
+    (itinerary_candidate_operator_ready ?itinerary_candidate - itinerary_candidate)
+    (fare_option_available ?fare_option - fare_option)
+    (itinerary_candidate_fare_binding ?itinerary_candidate - itinerary_candidate ?fare_option - fare_option)
+    (passenger_preference_available ?passenger_preference - passenger_preference)
+    (itinerary_candidate_preference_binding ?itinerary_candidate - itinerary_candidate ?passenger_preference - passenger_preference)
+    (vehicle_attribute_available ?vehicle_attribute - vehicle_attribute)
+    (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate - itinerary_candidate ?vehicle_attribute - vehicle_attribute)
+    (service_option_available ?service_option - service_option)
+    (itinerary_candidate_service_option_binding ?itinerary_candidate - itinerary_candidate ?service_option - service_option)
+    (timing_buffer_available ?timing_buffer - timing_buffer)
+    (segment_timing_buffer_binding ?trip_segment - trip_segment ?timing_buffer - timing_buffer)
+    (origin_segment_pickup_registered ?origin_segment - origin_segment)
+    (destination_segment_dropoff_registered ?destination_segment - destination_segment)
+    (itinerary_candidate_committed ?itinerary_candidate - itinerary_candidate)
+  )
+  (:action discover_trip_segment
+    :parameters (?trip_segment - trip_segment)
+    :precondition
+      (and
+        (not
+          (segment_discovered ?trip_segment)
+        )
+        (not
+          (segment_committed ?trip_segment)
+        )
+      )
+    :effect (segment_discovered ?trip_segment)
+  )
+  (:action reserve_provider_option_for_segment
+    :parameters (?trip_segment - trip_segment ?provider_option - provider_option)
+    :precondition
+      (and
+        (segment_discovered ?trip_segment)
+        (not
+          (segment_provider_reserved ?trip_segment)
+        )
+        (provider_option_available ?provider_option)
+      )
+    :effect
+      (and
+        (segment_provider_reserved ?trip_segment)
+        (segment_assigned_provider ?trip_segment ?provider_option)
+        (not
+          (provider_option_available ?provider_option)
+        )
+      )
+  )
+  (:action reserve_time_window_for_segment
+    :parameters (?trip_segment - trip_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_discovered ?trip_segment)
+        (segment_provider_reserved ?trip_segment)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (segment_time_window_binding ?trip_segment ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_trip_segment_ready
+    :parameters (?trip_segment - trip_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_discovered ?trip_segment)
+        (segment_provider_reserved ?trip_segment)
+        (segment_time_window_binding ?trip_segment ?time_window)
+        (not
+          (segment_ready ?trip_segment)
+        )
+      )
+    :effect (segment_ready ?trip_segment)
+  )
+  (:action release_time_window_from_segment
+    :parameters (?trip_segment - trip_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_time_window_binding ?trip_segment ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (segment_time_window_binding ?trip_segment ?time_window)
+        )
+      )
+  )
+  (:action reserve_operator_for_segment
+    :parameters (?trip_segment - trip_segment ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (segment_ready ?trip_segment)
+        (operator_resource_available ?operator_resource)
+      )
+    :effect
+      (and
+        (trip_segment_assigned_operator ?trip_segment ?operator_resource)
+        (not
+          (operator_resource_available ?operator_resource)
+        )
+      )
+  )
+  (:action release_operator_from_segment
+    :parameters (?trip_segment - trip_segment ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (trip_segment_assigned_operator ?trip_segment ?operator_resource)
+      )
+    :effect
+      (and
+        (operator_resource_available ?operator_resource)
+        (not
+          (trip_segment_assigned_operator ?trip_segment ?operator_resource)
+        )
+      )
+  )
+  (:action apply_vehicle_attribute_to_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?vehicle_attribute - vehicle_attribute)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (vehicle_attribute_available ?vehicle_attribute)
+      )
+    :effect
+      (and
+        (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate ?vehicle_attribute)
+        (not
+          (vehicle_attribute_available ?vehicle_attribute)
+        )
+      )
+  )
+  (:action release_vehicle_attribute_from_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?vehicle_attribute - vehicle_attribute)
+    :precondition
+      (and
+        (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate ?vehicle_attribute)
+      )
+    :effect
+      (and
+        (vehicle_attribute_available ?vehicle_attribute)
+        (not
+          (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate ?vehicle_attribute)
+        )
+      )
+  )
+  (:action apply_service_option_to_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action release_service_option_from_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+      )
+    :effect
+      (and
+        (service_option_available ?service_option)
+        (not
+          (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        )
+      )
+  )
+  (:action prepare_pickup_point_for_origin_segment
+    :parameters (?origin_segment - origin_segment ?pickup_point - pickup_point ?time_window - time_window)
+    :precondition
+      (and
+        (segment_ready ?origin_segment)
+        (segment_time_window_binding ?origin_segment ?time_window)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (not
+          (pickup_point_ready ?pickup_point)
+        )
+        (not
+          (pickup_point_reserved ?pickup_point)
+        )
+      )
+    :effect (pickup_point_ready ?pickup_point)
+  )
+  (:action confirm_origin_pickup_and_mark_segment
+    :parameters (?origin_segment - origin_segment ?pickup_point - pickup_point ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (segment_ready ?origin_segment)
+        (trip_segment_assigned_operator ?origin_segment ?operator_resource)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (pickup_point_ready ?pickup_point)
+        (not
+          (origin_segment_pickup_registered ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (origin_segment_pickup_confirmed ?origin_segment)
+      )
+  )
+  (:action reserve_transfer_point_for_origin
+    :parameters (?origin_segment - origin_segment ?pickup_point - pickup_point ?transfer_point - transfer_point)
+    :precondition
+      (and
+        (segment_ready ?origin_segment)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (transfer_point_available ?transfer_point)
+        (not
+          (origin_segment_pickup_registered ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_point_reserved ?pickup_point)
+        (origin_segment_pickup_registered ?origin_segment)
+        (origin_segment_reserved_transfer_point ?origin_segment ?transfer_point)
+        (not
+          (transfer_point_available ?transfer_point)
+        )
+      )
+  )
+  (:action finalize_origin_pickup_and_confirm
+    :parameters (?origin_segment - origin_segment ?pickup_point - pickup_point ?time_window - time_window ?transfer_point - transfer_point)
+    :precondition
+      (and
+        (segment_ready ?origin_segment)
+        (segment_time_window_binding ?origin_segment ?time_window)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (pickup_point_reserved ?pickup_point)
+        (origin_segment_reserved_transfer_point ?origin_segment ?transfer_point)
+        (not
+          (origin_segment_pickup_confirmed ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_point_ready ?pickup_point)
+        (origin_segment_pickup_confirmed ?origin_segment)
+        (transfer_point_available ?transfer_point)
+        (not
+          (origin_segment_reserved_transfer_point ?origin_segment ?transfer_point)
+        )
+      )
+  )
+  (:action prepare_dropoff_point_for_destination_segment
+    :parameters (?destination_segment - destination_segment ?dropoff_point - dropoff_point ?time_window - time_window)
+    :precondition
+      (and
+        (segment_ready ?destination_segment)
+        (segment_time_window_binding ?destination_segment ?time_window)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (not
+          (dropoff_point_ready ?dropoff_point)
+        )
+        (not
+          (dropoff_point_reserved ?dropoff_point)
+        )
+      )
+    :effect (dropoff_point_ready ?dropoff_point)
+  )
+  (:action confirm_dropoff_and_mark_destination_segment
+    :parameters (?destination_segment - destination_segment ?dropoff_point - dropoff_point ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (segment_ready ?destination_segment)
+        (trip_segment_assigned_operator ?destination_segment ?operator_resource)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (dropoff_point_ready ?dropoff_point)
+        (not
+          (destination_segment_dropoff_registered ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_dropoff_registered ?destination_segment)
+        (destination_segment_dropoff_confirmed ?destination_segment)
+      )
+  )
+  (:action reserve_transfer_point_for_destination
+    :parameters (?destination_segment - destination_segment ?dropoff_point - dropoff_point ?transfer_point - transfer_point)
+    :precondition
+      (and
+        (segment_ready ?destination_segment)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (transfer_point_available ?transfer_point)
+        (not
+          (destination_segment_dropoff_registered ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_point_reserved ?dropoff_point)
+        (destination_segment_dropoff_registered ?destination_segment)
+        (destination_segment_reserved_transfer_point ?destination_segment ?transfer_point)
+        (not
+          (transfer_point_available ?transfer_point)
+        )
+      )
+  )
+  (:action finalize_destination_dropoff_and_confirm
+    :parameters (?destination_segment - destination_segment ?dropoff_point - dropoff_point ?time_window - time_window ?transfer_point - transfer_point)
+    :precondition
+      (and
+        (segment_ready ?destination_segment)
+        (segment_time_window_binding ?destination_segment ?time_window)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (dropoff_point_reserved ?dropoff_point)
+        (destination_segment_reserved_transfer_point ?destination_segment ?transfer_point)
+        (not
+          (destination_segment_dropoff_confirmed ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_point_ready ?dropoff_point)
+        (destination_segment_dropoff_confirmed ?destination_segment)
+        (transfer_point_available ?transfer_point)
+        (not
+          (destination_segment_reserved_transfer_point ?destination_segment ?transfer_point)
+        )
+      )
+  )
+  (:action assemble_vehicle_candidate
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?pickup_point - pickup_point ?dropoff_point - dropoff_point ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (destination_segment_dropoff_registered ?destination_segment)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (pickup_point_ready ?pickup_point)
+        (dropoff_point_ready ?dropoff_point)
+        (origin_segment_pickup_confirmed ?origin_segment)
+        (destination_segment_dropoff_confirmed ?destination_segment)
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_point)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_point)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action assemble_vehicle_candidate_pickup_locked
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?pickup_point - pickup_point ?dropoff_point - dropoff_point ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (destination_segment_dropoff_registered ?destination_segment)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (pickup_point_reserved ?pickup_point)
+        (dropoff_point_ready ?dropoff_point)
+        (not
+          (origin_segment_pickup_confirmed ?origin_segment)
+        )
+        (destination_segment_dropoff_confirmed ?destination_segment)
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_point)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_point)
+        (vehicle_pickup_compatible ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action assemble_vehicle_candidate_dropoff_locked
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?pickup_point - pickup_point ?dropoff_point - dropoff_point ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (destination_segment_dropoff_registered ?destination_segment)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (pickup_point_ready ?pickup_point)
+        (dropoff_point_reserved ?dropoff_point)
+        (origin_segment_pickup_confirmed ?origin_segment)
+        (not
+          (destination_segment_dropoff_confirmed ?destination_segment)
+        )
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_point)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_point)
+        (vehicle_dropoff_compatible ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action assemble_vehicle_candidate_both_locked
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?pickup_point - pickup_point ?dropoff_point - dropoff_point ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (destination_segment_dropoff_registered ?destination_segment)
+        (origin_segment_pickup_point_binding ?origin_segment ?pickup_point)
+        (destination_segment_dropoff_point_binding ?destination_segment ?dropoff_point)
+        (pickup_point_reserved ?pickup_point)
+        (dropoff_point_reserved ?dropoff_point)
+        (not
+          (origin_segment_pickup_confirmed ?origin_segment)
+        )
+        (not
+          (destination_segment_dropoff_confirmed ?destination_segment)
+        )
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_point)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_point)
+        (vehicle_pickup_compatible ?vehicle_unit)
+        (vehicle_dropoff_compatible ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action confirm_vehicle_for_time_window
+    :parameters (?vehicle_unit - vehicle_unit ?origin_segment - origin_segment ?time_window - time_window)
+    :precondition
+      (and
+        (vehicle_unit_reserved ?vehicle_unit)
+        (origin_segment_pickup_registered ?origin_segment)
+        (segment_time_window_binding ?origin_segment ?time_window)
+        (not
+          (vehicle_confirmed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_confirmed ?vehicle_unit)
+  )
+  (:action select_route_variant_for_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (itinerary_candidate_vehicle_binding ?itinerary_candidate ?vehicle_unit)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_available ?route_variant)
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_confirmed ?vehicle_unit)
+        (not
+          (route_variant_reserved ?route_variant)
+        )
+      )
+    :effect
+      (and
+        (route_variant_reserved ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (not
+          (route_variant_available ?route_variant)
+        )
+      )
+  )
+  (:action validate_itinerary_candidate
+    :parameters (?itinerary_candidate - itinerary_candidate ?route_variant - route_variant ?vehicle_unit - vehicle_unit ?time_window - time_window)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_reserved ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (segment_time_window_binding ?itinerary_candidate ?time_window)
+        (not
+          (vehicle_pickup_compatible ?vehicle_unit)
+        )
+        (not
+          (itinerary_candidate_validated ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_validated ?itinerary_candidate)
+  )
+  (:action select_fare_option_for_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?fare_option - fare_option)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (fare_option_available ?fare_option)
+        (not
+          (itinerary_candidate_fare_selected ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_fare_selected ?itinerary_candidate)
+        (itinerary_candidate_fare_binding ?itinerary_candidate ?fare_option)
+        (not
+          (fare_option_available ?fare_option)
+        )
+      )
+  )
+  (:action apply_route_and_fare_validations_to_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?route_variant - route_variant ?vehicle_unit - vehicle_unit ?time_window - time_window ?fare_option - fare_option)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_reserved ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (segment_time_window_binding ?itinerary_candidate ?time_window)
+        (vehicle_pickup_compatible ?vehicle_unit)
+        (itinerary_candidate_fare_selected ?itinerary_candidate)
+        (itinerary_candidate_fare_binding ?itinerary_candidate ?fare_option)
+        (not
+          (itinerary_candidate_validated ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_validated ?itinerary_candidate)
+        (itinerary_candidate_validated_with_fare ?itinerary_candidate)
+      )
+  )
+  (:action apply_vehicle_attribute_checks_to_itinerary_without_dropoff_compatibility
+    :parameters (?itinerary_candidate - itinerary_candidate ?vehicle_attribute - vehicle_attribute ?operator_resource - operator_resource ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_validated ?itinerary_candidate)
+        (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate ?vehicle_attribute)
+        (trip_segment_assigned_operator ?itinerary_candidate ?operator_resource)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (not
+          (vehicle_dropoff_compatible ?vehicle_unit)
+        )
+        (not
+          (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_attribute_applied ?itinerary_candidate)
+  )
+  (:action apply_vehicle_attribute_checks_to_itinerary_with_dropoff_compatibility
+    :parameters (?itinerary_candidate - itinerary_candidate ?vehicle_attribute - vehicle_attribute ?operator_resource - operator_resource ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_validated ?itinerary_candidate)
+        (itinerary_candidate_vehicle_attribute_binding ?itinerary_candidate ?vehicle_attribute)
+        (trip_segment_assigned_operator ?itinerary_candidate ?operator_resource)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (vehicle_dropoff_compatible ?vehicle_unit)
+        (not
+          (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_attribute_applied ?itinerary_candidate)
+  )
+  (:action validate_service_option_for_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (not
+          (vehicle_pickup_compatible ?vehicle_unit)
+        )
+        (not
+          (vehicle_dropoff_compatible ?vehicle_unit)
+        )
+        (not
+          (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_finalized_checks ?itinerary_candidate)
+  )
+  (:action validate_service_option_and_apply_preference_marker
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (vehicle_pickup_compatible ?vehicle_unit)
+        (not
+          (vehicle_dropoff_compatible ?vehicle_unit)
+        )
+        (not
+          (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_preferences_applied ?itinerary_candidate)
+      )
+  )
+  (:action validate_service_option_and_mark_preferences
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (not
+          (vehicle_pickup_compatible ?vehicle_unit)
+        )
+        (vehicle_dropoff_compatible ?vehicle_unit)
+        (not
+          (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_preferences_applied ?itinerary_candidate)
+      )
+  )
+  (:action validate_service_option_and_mark_preferences_full
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option ?route_variant - route_variant ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (itinerary_candidate_attribute_applied ?itinerary_candidate)
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (itinerary_candidate_route_variant_binding ?itinerary_candidate ?route_variant)
+        (route_variant_assigned_to_vehicle ?route_variant ?vehicle_unit)
+        (vehicle_pickup_compatible ?vehicle_unit)
+        (vehicle_dropoff_compatible ?vehicle_unit)
+        (not
+          (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_preferences_applied ?itinerary_candidate)
+      )
+  )
+  (:action finalize_itinerary_candidate
+    :parameters (?itinerary_candidate - itinerary_candidate)
+    :precondition
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (not
+          (itinerary_candidate_preferences_applied ?itinerary_candidate)
+        )
+        (not
+          (itinerary_candidate_committed ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_committed ?itinerary_candidate)
+        (segment_dispatch_eligible ?itinerary_candidate)
+      )
+  )
+  (:action bind_passenger_preference_to_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_preferences_applied ?itinerary_candidate)
+        (passenger_preference_available ?passenger_preference)
+      )
+    :effect
+      (and
+        (itinerary_candidate_preference_binding ?itinerary_candidate ?passenger_preference)
+        (not
+          (passenger_preference_available ?passenger_preference)
+        )
+      )
+  )
+  (:action perform_operational_checks_for_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?origin_segment - origin_segment ?destination_segment - destination_segment ?time_window - time_window ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_preferences_applied ?itinerary_candidate)
+        (itinerary_candidate_preference_binding ?itinerary_candidate ?passenger_preference)
+        (itinerary_origin_segment_association ?itinerary_candidate ?origin_segment)
+        (itinerary_destination_segment_association ?itinerary_candidate ?destination_segment)
+        (origin_segment_pickup_confirmed ?origin_segment)
+        (destination_segment_dropoff_confirmed ?destination_segment)
+        (segment_time_window_binding ?itinerary_candidate ?time_window)
+        (not
+          (itinerary_candidate_operational_checks_passed ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_operational_checks_passed ?itinerary_candidate)
+  )
+  (:action finalize_itinerary_after_operational_checks
+    :parameters (?itinerary_candidate - itinerary_candidate)
+    :precondition
+      (and
+        (itinerary_candidate_finalized_checks ?itinerary_candidate)
+        (itinerary_candidate_operational_checks_passed ?itinerary_candidate)
+        (not
+          (itinerary_candidate_committed ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_committed ?itinerary_candidate)
+        (segment_dispatch_eligible ?itinerary_candidate)
+      )
+  )
+  (:action bind_operator_credential_to_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?operator_credential - operator_credential ?time_window - time_window)
+    :precondition
+      (and
+        (segment_ready ?itinerary_candidate)
+        (segment_time_window_binding ?itinerary_candidate ?time_window)
+        (operator_credential_available ?operator_credential)
+        (itinerary_candidate_operator_credential_binding ?itinerary_candidate ?operator_credential)
+        (not
+          (itinerary_candidate_operator_credential_confirmed ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_operator_credential_confirmed ?itinerary_candidate)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action confirm_operator_for_itinerary
+    :parameters (?itinerary_candidate - itinerary_candidate ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (itinerary_candidate_operator_credential_confirmed ?itinerary_candidate)
+        (trip_segment_assigned_operator ?itinerary_candidate ?operator_resource)
+        (not
+          (itinerary_candidate_operator_validated ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_operator_validated ?itinerary_candidate)
+  )
+  (:action confirm_service_option_compliance_with_operator
+    :parameters (?itinerary_candidate - itinerary_candidate ?service_option - service_option)
+    :precondition
+      (and
+        (itinerary_candidate_operator_validated ?itinerary_candidate)
+        (itinerary_candidate_service_option_binding ?itinerary_candidate ?service_option)
+        (not
+          (itinerary_candidate_operator_ready ?itinerary_candidate)
+        )
+      )
+    :effect (itinerary_candidate_operator_ready ?itinerary_candidate)
+  )
+  (:action finalize_itinerary_after_operator_confirmation
+    :parameters (?itinerary_candidate - itinerary_candidate)
+    :precondition
+      (and
+        (itinerary_candidate_operator_ready ?itinerary_candidate)
+        (not
+          (itinerary_candidate_committed ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (itinerary_candidate_committed ?itinerary_candidate)
+        (segment_dispatch_eligible ?itinerary_candidate)
+      )
+  )
+  (:action mark_origin_segment_dispatch_eligible
+    :parameters (?origin_segment - origin_segment ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (origin_segment_pickup_registered ?origin_segment)
+        (origin_segment_pickup_confirmed ?origin_segment)
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_confirmed ?vehicle_unit)
+        (not
+          (segment_dispatch_eligible ?origin_segment)
+        )
+      )
+    :effect (segment_dispatch_eligible ?origin_segment)
+  )
+  (:action mark_destination_segment_dispatch_eligible
+    :parameters (?destination_segment - destination_segment ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (destination_segment_dropoff_registered ?destination_segment)
+        (destination_segment_dropoff_confirmed ?destination_segment)
+        (vehicle_unit_reserved ?vehicle_unit)
+        (vehicle_confirmed ?vehicle_unit)
+        (not
+          (segment_dispatch_eligible ?destination_segment)
+        )
+      )
+    :effect (segment_dispatch_eligible ?destination_segment)
+  )
+  (:action reserve_timing_buffer_for_segment
+    :parameters (?trip_segment - trip_segment ?timing_buffer - timing_buffer ?time_window - time_window)
+    :precondition
+      (and
+        (segment_dispatch_eligible ?trip_segment)
+        (segment_time_window_binding ?trip_segment ?time_window)
+        (timing_buffer_available ?timing_buffer)
+        (not
+          (segment_buffer_reserved ?trip_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_buffer_reserved ?trip_segment)
+        (segment_timing_buffer_binding ?trip_segment ?timing_buffer)
+        (not
+          (timing_buffer_available ?timing_buffer)
+        )
+      )
+  )
+  (:action commit_provider_and_finalize_origin_segment
+    :parameters (?origin_segment - origin_segment ?provider_option - provider_option ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (segment_buffer_reserved ?origin_segment)
+        (segment_assigned_provider ?origin_segment ?provider_option)
+        (segment_timing_buffer_binding ?origin_segment ?timing_buffer)
+        (not
+          (segment_committed ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_committed ?origin_segment)
+        (provider_option_available ?provider_option)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action commit_provider_and_finalize_destination_segment
+    :parameters (?destination_segment - destination_segment ?provider_option - provider_option ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (segment_buffer_reserved ?destination_segment)
+        (segment_assigned_provider ?destination_segment ?provider_option)
+        (segment_timing_buffer_binding ?destination_segment ?timing_buffer)
+        (not
+          (segment_committed ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_committed ?destination_segment)
+        (provider_option_available ?provider_option)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action commit_provider_and_finalize_itinerary_candidate
+    :parameters (?itinerary_candidate - itinerary_candidate ?provider_option - provider_option ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (segment_buffer_reserved ?itinerary_candidate)
+        (segment_assigned_provider ?itinerary_candidate ?provider_option)
+        (segment_timing_buffer_binding ?itinerary_candidate ?timing_buffer)
+        (not
+          (segment_committed ?itinerary_candidate)
+        )
+      )
+    :effect
+      (and
+        (segment_committed ?itinerary_candidate)
+        (provider_option_available ?provider_option)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem tourism_last_mile_transport_selection_instance)
+  (:domain tourism_last_mile_transport_selection)
+  (:objects origin_segment_1 - origin_segment destination_segment_1 - destination_segment itinerary_candidate_1 - itinerary_candidate itinerary_candidate_2 - itinerary_candidate provider_option_1 - provider_option provider_option_2 - provider_option provider_option_3 - provider_option time_window_1 - time_window operator_resource_1 - operator_resource transfer_point_1 - transfer_point pickup_point_1 - pickup_point dropoff_point_1 - dropoff_point vehicle_unit_1 - vehicle_unit route_variant_1 - route_variant route_variant_2 - route_variant fare_option_1 - fare_option fare_option_2 - fare_option passenger_preference_1 - passenger_preference passenger_preference_2 - passenger_preference timing_buffer_1 - timing_buffer vehicle_attribute_1 - vehicle_attribute operator_credential_1 - operator_credential operator_credential_2 - operator_credential service_option_1 - service_option)
+  (:init
+    (provider_option_available provider_option_1)
+    (provider_option_available provider_option_2)
+    (provider_option_available provider_option_3)
+    (time_window_available time_window_1)
+    (operator_resource_available operator_resource_1)
+    (transfer_point_available transfer_point_1)
+    (origin_segment_pickup_point_binding origin_segment_1 pickup_point_1)
+    (destination_segment_dropoff_point_binding destination_segment_1 dropoff_point_1)
+    (vehicle_unit_available vehicle_unit_1)
+    (route_variant_available route_variant_1)
+    (route_variant_available route_variant_2)
+    (itinerary_origin_segment_association itinerary_candidate_1 origin_segment_1)
+    (itinerary_origin_segment_association itinerary_candidate_2 origin_segment_1)
+    (itinerary_destination_segment_association itinerary_candidate_1 destination_segment_1)
+    (itinerary_destination_segment_association itinerary_candidate_2 destination_segment_1)
+    (itinerary_candidate_vehicle_binding itinerary_candidate_1 vehicle_unit_1)
+    (itinerary_candidate_vehicle_binding itinerary_candidate_2 vehicle_unit_1)
+    (itinerary_candidate_route_variant_binding itinerary_candidate_1 route_variant_1)
+    (itinerary_candidate_route_variant_binding itinerary_candidate_2 route_variant_2)
+    (fare_option_available fare_option_1)
+    (fare_option_available fare_option_2)
+    (passenger_preference_available passenger_preference_1)
+    (passenger_preference_available passenger_preference_2)
+    (timing_buffer_available timing_buffer_1)
+    (vehicle_attribute_available vehicle_attribute_1)
+    (operator_credential_available operator_credential_1)
+    (itinerary_candidate_operator_credential_binding itinerary_candidate_1 operator_credential_1)
+    (itinerary_candidate_operator_credential_binding itinerary_candidate_2 operator_credential_2)
+    (service_option_available service_option_1)
+  )
+  (:goal
+    (and
+      (segment_committed origin_segment_1)
+      (segment_committed destination_segment_1)
+      (segment_committed itinerary_candidate_1)
+      (segment_committed itinerary_candidate_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_trip_segment origin_segment_1)
+(reserve_provider_option_for_segment origin_segment_1 provider_option_1)
+(reserve_time_window_for_segment origin_segment_1 time_window_1)
+(confirm_trip_segment_ready origin_segment_1 time_window_1)
+(reserve_operator_for_segment origin_segment_1 operator_resource_1)
+(prepare_pickup_point_for_origin_segment origin_segment_1 pickup_point_1 time_window_1)
+(confirm_origin_pickup_and_mark_segment origin_segment_1 pickup_point_1 operator_resource_1)
+(release_operator_from_segment origin_segment_1 operator_resource_1)
+(discover_trip_segment destination_segment_1)
+(reserve_provider_option_for_segment destination_segment_1 provider_option_2)
+(release_time_window_from_segment origin_segment_1 time_window_1)
+(reserve_time_window_for_segment destination_segment_1 time_window_1)
+(confirm_trip_segment_ready destination_segment_1 time_window_1)
+(reserve_operator_for_segment destination_segment_1 operator_resource_1)
+(prepare_dropoff_point_for_destination_segment destination_segment_1 dropoff_point_1 time_window_1)
+(confirm_dropoff_and_mark_destination_segment destination_segment_1 dropoff_point_1 operator_resource_1)
+(release_operator_from_segment destination_segment_1 operator_resource_1)
+(release_time_window_from_segment destination_segment_1 time_window_1)
+(assemble_vehicle_candidate origin_segment_1 destination_segment_1 pickup_point_1 dropoff_point_1 vehicle_unit_1)
+(reserve_time_window_for_segment origin_segment_1 time_window_1)
+(confirm_vehicle_for_time_window vehicle_unit_1 origin_segment_1 time_window_1)
+(mark_origin_segment_dispatch_eligible origin_segment_1 vehicle_unit_1)
+(mark_destination_segment_dispatch_eligible destination_segment_1 vehicle_unit_1)
+(reserve_timing_buffer_for_segment origin_segment_1 timing_buffer_1 time_window_1)
+(commit_provider_and_finalize_origin_segment origin_segment_1 provider_option_1 timing_buffer_1)
+(release_time_window_from_segment origin_segment_1 time_window_1)
+(reserve_time_window_for_segment destination_segment_1 time_window_1)
+(reserve_timing_buffer_for_segment destination_segment_1 timing_buffer_1 time_window_1)
+(commit_provider_and_finalize_destination_segment destination_segment_1 provider_option_2 timing_buffer_1)
+(release_time_window_from_segment destination_segment_1 time_window_1)
+(discover_trip_segment itinerary_candidate_1)
+(reserve_provider_option_for_segment itinerary_candidate_1 provider_option_3)
+(reserve_time_window_for_segment itinerary_candidate_1 time_window_1)
+(confirm_trip_segment_ready itinerary_candidate_1 time_window_1)
+(reserve_operator_for_segment itinerary_candidate_1 operator_resource_1)
+(select_fare_option_for_itinerary itinerary_candidate_1 fare_option_1)
+(select_route_variant_for_itinerary itinerary_candidate_1 route_variant_1 vehicle_unit_1)
+(validate_itinerary_candidate itinerary_candidate_1 route_variant_1 vehicle_unit_1 time_window_1)
+(apply_vehicle_attribute_to_itinerary itinerary_candidate_1 vehicle_attribute_1)
+(apply_vehicle_attribute_checks_to_itinerary_without_dropoff_compatibility itinerary_candidate_1 vehicle_attribute_1 operator_resource_1 route_variant_1 vehicle_unit_1)
+(apply_service_option_to_itinerary itinerary_candidate_1 service_option_1)
+(validate_service_option_for_itinerary itinerary_candidate_1 service_option_1 route_variant_1 vehicle_unit_1)
+(finalize_itinerary_candidate itinerary_candidate_1)
+(reserve_timing_buffer_for_segment itinerary_candidate_1 timing_buffer_1 time_window_1)
+(commit_provider_and_finalize_itinerary_candidate itinerary_candidate_1 provider_option_3 timing_buffer_1)
+(release_time_window_from_segment itinerary_candidate_1 time_window_1)
+(release_vehicle_attribute_from_itinerary itinerary_candidate_1 vehicle_attribute_1)
+(release_service_option_from_itinerary itinerary_candidate_1 service_option_1)
+(release_operator_from_segment itinerary_candidate_1 operator_resource_1)
+(discover_trip_segment itinerary_candidate_2)
+(reserve_provider_option_for_segment itinerary_candidate_2 provider_option_1)
+(reserve_time_window_for_segment itinerary_candidate_2 time_window_1)
+(confirm_trip_segment_ready itinerary_candidate_2 time_window_1)
+(reserve_operator_for_segment itinerary_candidate_2 operator_resource_1)
+(select_fare_option_for_itinerary itinerary_candidate_2 fare_option_2)
+(select_route_variant_for_itinerary itinerary_candidate_2 route_variant_2 vehicle_unit_1)
+(validate_itinerary_candidate itinerary_candidate_2 route_variant_2 vehicle_unit_1 time_window_1)
+(apply_vehicle_attribute_to_itinerary itinerary_candidate_2 vehicle_attribute_1)
+(apply_vehicle_attribute_checks_to_itinerary_without_dropoff_compatibility itinerary_candidate_2 vehicle_attribute_1 operator_resource_1 route_variant_2 vehicle_unit_1)
+(apply_service_option_to_itinerary itinerary_candidate_2 service_option_1)
+(validate_service_option_for_itinerary itinerary_candidate_2 service_option_1 route_variant_2 vehicle_unit_1)
+(finalize_itinerary_candidate itinerary_candidate_2)
+(reserve_timing_buffer_for_segment itinerary_candidate_2 timing_buffer_1 time_window_1)
+(commit_provider_and_finalize_itinerary_candidate itinerary_candidate_2 provider_option_1 timing_buffer_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ap3rulm3/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_ap3rulm3/plan.pddl 64 
+
+
+
+--- stderr ---
+

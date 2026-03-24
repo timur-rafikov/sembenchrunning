@@ -1,0 +1,936 @@
+(define (domain outflow_funding_from_positions)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types financial_resource_type - object trade_artifact_type - object asset_identifier - object portfolio_level_entity - object order_position - portfolio_level_entity funding_bucket - financial_resource_type outflow_request - financial_resource_type trading_desk - financial_resource_type approval_token - financial_resource_type execution_method - financial_resource_type cash_account - financial_resource_type execution_algorithm - financial_resource_type settlement_instruction - financial_resource_type available_lot - trade_artifact_type allocation_ticket - trade_artifact_type client_directive - trade_artifact_type from_instrument - asset_identifier to_instrument - asset_identifier trade_plan - asset_identifier position_subtype_a - order_position position_subtype_b - order_position liquidation_candidate - position_subtype_a replacement_candidate - position_subtype_a trade_order - position_subtype_b)
+  (:predicates
+    (order_registered ?position - order_position)
+    (order_validated ?position - order_position)
+    (order_bucket_linked ?position - order_position)
+    (order_funded ?position - order_position)
+    (order_completed ?position - order_position)
+    (order_cash_assigned ?position - order_position)
+    (funding_bucket_available ?funding_bucket - funding_bucket)
+    (order_assigned_to_funding_bucket ?position - order_position ?funding_bucket - funding_bucket)
+    (outflow_request_unassigned ?outflow_request - outflow_request)
+    (position_linked_to_outflow_request ?position - order_position ?outflow_request - outflow_request)
+    (trading_desk_available ?trading_desk - trading_desk)
+    (order_assigned_to_trading_desk ?position - order_position ?trading_desk - trading_desk)
+    (available_lot_available ?available_lot - available_lot)
+    (liquidation_candidate_allocated_lot ?liquidation_candidate - liquidation_candidate ?available_lot - available_lot)
+    (replacement_candidate_allocated_lot ?replacement_candidate - replacement_candidate ?available_lot - available_lot)
+    (liquidation_candidate_from_instrument ?liquidation_candidate - liquidation_candidate ?from_instrument - from_instrument)
+    (from_instrument_primary_ready ?from_instrument - from_instrument)
+    (from_instrument_secondary_ready ?from_instrument - from_instrument)
+    (liquidation_candidate_ready ?liquidation_candidate - liquidation_candidate)
+    (replacement_candidate_to_instrument ?replacement_candidate - replacement_candidate ?to_instrument - to_instrument)
+    (to_instrument_primary_ready ?to_instrument - to_instrument)
+    (to_instrument_secondary_ready ?to_instrument - to_instrument)
+    (replacement_candidate_ready ?replacement_candidate - replacement_candidate)
+    (trade_plan_available ?trade_plan - trade_plan)
+    (trade_plan_created ?trade_plan - trade_plan)
+    (trade_plan_leg_from_instrument ?trade_plan - trade_plan ?from_instrument - from_instrument)
+    (trade_plan_leg_to_instrument ?trade_plan - trade_plan ?to_instrument - to_instrument)
+    (trade_plan_requires_approval_token ?trade_plan - trade_plan)
+    (trade_plan_requires_execution_algorithm ?trade_plan - trade_plan)
+    (trade_plan_validated ?trade_plan - trade_plan)
+    (order_sources_liquidation_candidate ?trade_order - trade_order ?liquidation_candidate - liquidation_candidate)
+    (order_sources_replacement_candidate ?trade_order - trade_order ?replacement_candidate - replacement_candidate)
+    (order_bound_to_trade_plan ?trade_order - trade_order ?trade_plan - trade_plan)
+    (allocation_ticket_available ?allocation_ticket - allocation_ticket)
+    (order_bound_to_allocation_ticket ?trade_order - trade_order ?allocation_ticket - allocation_ticket)
+    (allocation_ticket_committed ?allocation_ticket - allocation_ticket)
+    (allocation_ticket_bound_to_trade_plan ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    (order_eligible_for_execution_setup ?trade_order - trade_order)
+    (order_execution_algorithm_bound ?trade_order - trade_order)
+    (order_qualification_completed ?trade_order - trade_order)
+    (order_approval_attached ?trade_order - trade_order)
+    (order_approval_verified ?trade_order - trade_order)
+    (order_ready_for_execution_method_assignment ?trade_order - trade_order)
+    (order_allocations_confirmed ?trade_order - trade_order)
+    (client_directive_pending ?client_directive - client_directive)
+    (order_bound_to_client_directive ?trade_order - trade_order ?client_directive - client_directive)
+    (order_client_directive_attached ?trade_order - trade_order)
+    (order_client_directive_processed ?trade_order - trade_order)
+    (order_client_directive_finalized ?trade_order - trade_order)
+    (approval_token_available ?approval_token - approval_token)
+    (order_approval_token_attached ?trade_order - trade_order ?approval_token - approval_token)
+    (execution_method_available ?execution_method - execution_method)
+    (order_execution_method_assigned ?trade_order - trade_order ?execution_method - execution_method)
+    (execution_algorithm_available ?execution_algorithm - execution_algorithm)
+    (order_execution_algorithm_assigned ?trade_order - trade_order ?execution_algorithm - execution_algorithm)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (order_settlement_instruction_attached ?trade_order - trade_order ?settlement_instruction - settlement_instruction)
+    (cash_account_available ?cash_account - cash_account)
+    (order_assigned_to_cash_account ?position - order_position ?cash_account - cash_account)
+    (liquidation_candidate_qualified ?liquidation_candidate - liquidation_candidate)
+    (replacement_candidate_qualified ?replacement_candidate - replacement_candidate)
+    (order_finalized ?trade_order - trade_order)
+  )
+  (:action register_order
+    :parameters (?position - order_position)
+    :precondition
+      (and
+        (not
+          (order_registered ?position)
+        )
+        (not
+          (order_funded ?position)
+        )
+      )
+    :effect (order_registered ?position)
+  )
+  (:action assign_funding_bucket_to_order
+    :parameters (?position - order_position ?funding_bucket - funding_bucket)
+    :precondition
+      (and
+        (order_registered ?position)
+        (not
+          (order_bucket_linked ?position)
+        )
+        (funding_bucket_available ?funding_bucket)
+      )
+    :effect
+      (and
+        (order_bucket_linked ?position)
+        (order_assigned_to_funding_bucket ?position ?funding_bucket)
+        (not
+          (funding_bucket_available ?funding_bucket)
+        )
+      )
+  )
+  (:action link_outflow_request_to_order
+    :parameters (?position - order_position ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_registered ?position)
+        (order_bucket_linked ?position)
+        (outflow_request_unassigned ?outflow_request)
+      )
+    :effect
+      (and
+        (position_linked_to_outflow_request ?position ?outflow_request)
+        (not
+          (outflow_request_unassigned ?outflow_request)
+        )
+      )
+  )
+  (:action validate_order_for_funding
+    :parameters (?position - order_position ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_registered ?position)
+        (order_bucket_linked ?position)
+        (position_linked_to_outflow_request ?position ?outflow_request)
+        (not
+          (order_validated ?position)
+        )
+      )
+    :effect (order_validated ?position)
+  )
+  (:action unlink_outflow_request
+    :parameters (?position - order_position ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (position_linked_to_outflow_request ?position ?outflow_request)
+      )
+    :effect
+      (and
+        (outflow_request_unassigned ?outflow_request)
+        (not
+          (position_linked_to_outflow_request ?position ?outflow_request)
+        )
+      )
+  )
+  (:action assign_trading_desk_to_order
+    :parameters (?position - order_position ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (order_validated ?position)
+        (trading_desk_available ?trading_desk)
+      )
+    :effect
+      (and
+        (order_assigned_to_trading_desk ?position ?trading_desk)
+        (not
+          (trading_desk_available ?trading_desk)
+        )
+      )
+  )
+  (:action release_trading_desk_from_order
+    :parameters (?position - order_position ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (order_assigned_to_trading_desk ?position ?trading_desk)
+      )
+    :effect
+      (and
+        (trading_desk_available ?trading_desk)
+        (not
+          (order_assigned_to_trading_desk ?position ?trading_desk)
+        )
+      )
+  )
+  (:action bind_execution_algorithm_to_order
+    :parameters (?trade_order - trade_order ?execution_algorithm - execution_algorithm)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (execution_algorithm_available ?execution_algorithm)
+      )
+    :effect
+      (and
+        (order_execution_algorithm_assigned ?trade_order ?execution_algorithm)
+        (not
+          (execution_algorithm_available ?execution_algorithm)
+        )
+      )
+  )
+  (:action unbind_execution_algorithm_from_order
+    :parameters (?trade_order - trade_order ?execution_algorithm - execution_algorithm)
+    :precondition
+      (and
+        (order_execution_algorithm_assigned ?trade_order ?execution_algorithm)
+      )
+    :effect
+      (and
+        (execution_algorithm_available ?execution_algorithm)
+        (not
+          (order_execution_algorithm_assigned ?trade_order ?execution_algorithm)
+        )
+      )
+  )
+  (:action attach_settlement_instruction_to_order
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action detach_settlement_instruction_from_order
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+      )
+    :effect
+      (and
+        (settlement_instruction_available ?settlement_instruction)
+        (not
+          (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        )
+      )
+  )
+  (:action mark_from_instrument_primary_ready
+    :parameters (?liquidation_candidate - liquidation_candidate ?from_instrument - from_instrument ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_validated ?liquidation_candidate)
+        (position_linked_to_outflow_request ?liquidation_candidate ?outflow_request)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (not
+          (from_instrument_primary_ready ?from_instrument)
+        )
+        (not
+          (from_instrument_secondary_ready ?from_instrument)
+        )
+      )
+    :effect (from_instrument_primary_ready ?from_instrument)
+  )
+  (:action reserve_liquidation_candidate_with_trading_desk
+    :parameters (?liquidation_candidate - liquidation_candidate ?from_instrument - from_instrument ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (order_validated ?liquidation_candidate)
+        (order_assigned_to_trading_desk ?liquidation_candidate ?trading_desk)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (from_instrument_primary_ready ?from_instrument)
+        (not
+          (liquidation_candidate_qualified ?liquidation_candidate)
+        )
+      )
+    :effect
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (liquidation_candidate_ready ?liquidation_candidate)
+      )
+  )
+  (:action allocate_lot_to_liquidation_candidate
+    :parameters (?liquidation_candidate - liquidation_candidate ?from_instrument - from_instrument ?available_lot - available_lot)
+    :precondition
+      (and
+        (order_validated ?liquidation_candidate)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (available_lot_available ?available_lot)
+        (not
+          (liquidation_candidate_qualified ?liquidation_candidate)
+        )
+      )
+    :effect
+      (and
+        (from_instrument_secondary_ready ?from_instrument)
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (liquidation_candidate_allocated_lot ?liquidation_candidate ?available_lot)
+        (not
+          (available_lot_available ?available_lot)
+        )
+      )
+  )
+  (:action confirm_lot_allocation_for_candidate
+    :parameters (?liquidation_candidate - liquidation_candidate ?from_instrument - from_instrument ?outflow_request - outflow_request ?available_lot - available_lot)
+    :precondition
+      (and
+        (order_validated ?liquidation_candidate)
+        (position_linked_to_outflow_request ?liquidation_candidate ?outflow_request)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (from_instrument_secondary_ready ?from_instrument)
+        (liquidation_candidate_allocated_lot ?liquidation_candidate ?available_lot)
+        (not
+          (liquidation_candidate_ready ?liquidation_candidate)
+        )
+      )
+    :effect
+      (and
+        (from_instrument_primary_ready ?from_instrument)
+        (liquidation_candidate_ready ?liquidation_candidate)
+        (available_lot_available ?available_lot)
+        (not
+          (liquidation_candidate_allocated_lot ?liquidation_candidate ?available_lot)
+        )
+      )
+  )
+  (:action mark_to_instrument_primary_ready
+    :parameters (?replacement_candidate - replacement_candidate ?to_instrument - to_instrument ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_validated ?replacement_candidate)
+        (position_linked_to_outflow_request ?replacement_candidate ?outflow_request)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (not
+          (to_instrument_primary_ready ?to_instrument)
+        )
+        (not
+          (to_instrument_secondary_ready ?to_instrument)
+        )
+      )
+    :effect (to_instrument_primary_ready ?to_instrument)
+  )
+  (:action reserve_replacement_candidate_with_trading_desk
+    :parameters (?replacement_candidate - replacement_candidate ?to_instrument - to_instrument ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (order_validated ?replacement_candidate)
+        (order_assigned_to_trading_desk ?replacement_candidate ?trading_desk)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (to_instrument_primary_ready ?to_instrument)
+        (not
+          (replacement_candidate_qualified ?replacement_candidate)
+        )
+      )
+    :effect
+      (and
+        (replacement_candidate_qualified ?replacement_candidate)
+        (replacement_candidate_ready ?replacement_candidate)
+      )
+  )
+  (:action allocate_lot_to_replacement_candidate
+    :parameters (?replacement_candidate - replacement_candidate ?to_instrument - to_instrument ?available_lot - available_lot)
+    :precondition
+      (and
+        (order_validated ?replacement_candidate)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (available_lot_available ?available_lot)
+        (not
+          (replacement_candidate_qualified ?replacement_candidate)
+        )
+      )
+    :effect
+      (and
+        (to_instrument_secondary_ready ?to_instrument)
+        (replacement_candidate_qualified ?replacement_candidate)
+        (replacement_candidate_allocated_lot ?replacement_candidate ?available_lot)
+        (not
+          (available_lot_available ?available_lot)
+        )
+      )
+  )
+  (:action confirm_lot_allocation_for_replacement_candidate
+    :parameters (?replacement_candidate - replacement_candidate ?to_instrument - to_instrument ?outflow_request - outflow_request ?available_lot - available_lot)
+    :precondition
+      (and
+        (order_validated ?replacement_candidate)
+        (position_linked_to_outflow_request ?replacement_candidate ?outflow_request)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (to_instrument_secondary_ready ?to_instrument)
+        (replacement_candidate_allocated_lot ?replacement_candidate ?available_lot)
+        (not
+          (replacement_candidate_ready ?replacement_candidate)
+        )
+      )
+    :effect
+      (and
+        (to_instrument_primary_ready ?to_instrument)
+        (replacement_candidate_ready ?replacement_candidate)
+        (available_lot_available ?available_lot)
+        (not
+          (replacement_candidate_allocated_lot ?replacement_candidate ?available_lot)
+        )
+      )
+  )
+  (:action construct_trade_plan_basic
+    :parameters (?liquidation_candidate - liquidation_candidate ?replacement_candidate - replacement_candidate ?from_instrument - from_instrument ?to_instrument - to_instrument ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (replacement_candidate_qualified ?replacement_candidate)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (from_instrument_primary_ready ?from_instrument)
+        (to_instrument_primary_ready ?to_instrument)
+        (liquidation_candidate_ready ?liquidation_candidate)
+        (replacement_candidate_ready ?replacement_candidate)
+        (trade_plan_available ?trade_plan)
+      )
+    :effect
+      (and
+        (trade_plan_created ?trade_plan)
+        (trade_plan_leg_from_instrument ?trade_plan ?from_instrument)
+        (trade_plan_leg_to_instrument ?trade_plan ?to_instrument)
+        (not
+          (trade_plan_available ?trade_plan)
+        )
+      )
+  )
+  (:action construct_trade_plan_requires_approval
+    :parameters (?liquidation_candidate - liquidation_candidate ?replacement_candidate - replacement_candidate ?from_instrument - from_instrument ?to_instrument - to_instrument ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (replacement_candidate_qualified ?replacement_candidate)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (from_instrument_secondary_ready ?from_instrument)
+        (to_instrument_primary_ready ?to_instrument)
+        (not
+          (liquidation_candidate_ready ?liquidation_candidate)
+        )
+        (replacement_candidate_ready ?replacement_candidate)
+        (trade_plan_available ?trade_plan)
+      )
+    :effect
+      (and
+        (trade_plan_created ?trade_plan)
+        (trade_plan_leg_from_instrument ?trade_plan ?from_instrument)
+        (trade_plan_leg_to_instrument ?trade_plan ?to_instrument)
+        (trade_plan_requires_approval_token ?trade_plan)
+        (not
+          (trade_plan_available ?trade_plan)
+        )
+      )
+  )
+  (:action construct_trade_plan_requires_execution_algorithm
+    :parameters (?liquidation_candidate - liquidation_candidate ?replacement_candidate - replacement_candidate ?from_instrument - from_instrument ?to_instrument - to_instrument ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (replacement_candidate_qualified ?replacement_candidate)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (from_instrument_primary_ready ?from_instrument)
+        (to_instrument_secondary_ready ?to_instrument)
+        (liquidation_candidate_ready ?liquidation_candidate)
+        (not
+          (replacement_candidate_ready ?replacement_candidate)
+        )
+        (trade_plan_available ?trade_plan)
+      )
+    :effect
+      (and
+        (trade_plan_created ?trade_plan)
+        (trade_plan_leg_from_instrument ?trade_plan ?from_instrument)
+        (trade_plan_leg_to_instrument ?trade_plan ?to_instrument)
+        (trade_plan_requires_execution_algorithm ?trade_plan)
+        (not
+          (trade_plan_available ?trade_plan)
+        )
+      )
+  )
+  (:action construct_trade_plan_requires_approval_and_execution_algorithm
+    :parameters (?liquidation_candidate - liquidation_candidate ?replacement_candidate - replacement_candidate ?from_instrument - from_instrument ?to_instrument - to_instrument ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (replacement_candidate_qualified ?replacement_candidate)
+        (liquidation_candidate_from_instrument ?liquidation_candidate ?from_instrument)
+        (replacement_candidate_to_instrument ?replacement_candidate ?to_instrument)
+        (from_instrument_secondary_ready ?from_instrument)
+        (to_instrument_secondary_ready ?to_instrument)
+        (not
+          (liquidation_candidate_ready ?liquidation_candidate)
+        )
+        (not
+          (replacement_candidate_ready ?replacement_candidate)
+        )
+        (trade_plan_available ?trade_plan)
+      )
+    :effect
+      (and
+        (trade_plan_created ?trade_plan)
+        (trade_plan_leg_from_instrument ?trade_plan ?from_instrument)
+        (trade_plan_leg_to_instrument ?trade_plan ?to_instrument)
+        (trade_plan_requires_approval_token ?trade_plan)
+        (trade_plan_requires_execution_algorithm ?trade_plan)
+        (not
+          (trade_plan_available ?trade_plan)
+        )
+      )
+  )
+  (:action validate_trade_plan_for_candidate
+    :parameters (?trade_plan - trade_plan ?liquidation_candidate - liquidation_candidate ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (trade_plan_created ?trade_plan)
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (position_linked_to_outflow_request ?liquidation_candidate ?outflow_request)
+        (not
+          (trade_plan_validated ?trade_plan)
+        )
+      )
+    :effect (trade_plan_validated ?trade_plan)
+  )
+  (:action attach_allocation_ticket_to_order
+    :parameters (?trade_order - trade_order ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (order_bound_to_trade_plan ?trade_order ?trade_plan)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_available ?allocation_ticket)
+        (trade_plan_created ?trade_plan)
+        (trade_plan_validated ?trade_plan)
+        (not
+          (allocation_ticket_committed ?allocation_ticket)
+        )
+      )
+    :effect
+      (and
+        (allocation_ticket_committed ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action activate_order_for_execution_setup
+    :parameters (?trade_order - trade_order ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_committed ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (position_linked_to_outflow_request ?trade_order ?outflow_request)
+        (not
+          (trade_plan_requires_approval_token ?trade_plan)
+        )
+        (not
+          (order_eligible_for_execution_setup ?trade_order)
+        )
+      )
+    :effect (order_eligible_for_execution_setup ?trade_order)
+  )
+  (:action attach_approval_token_to_order
+    :parameters (?trade_order - trade_order ?approval_token - approval_token)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (approval_token_available ?approval_token)
+        (not
+          (order_approval_attached ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_approval_attached ?trade_order)
+        (order_approval_token_attached ?trade_order ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action apply_approval_and_enable_order
+    :parameters (?trade_order - trade_order ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan ?outflow_request - outflow_request ?approval_token - approval_token)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_committed ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (position_linked_to_outflow_request ?trade_order ?outflow_request)
+        (trade_plan_requires_approval_token ?trade_plan)
+        (order_approval_attached ?trade_order)
+        (order_approval_token_attached ?trade_order ?approval_token)
+        (not
+          (order_eligible_for_execution_setup ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_eligible_for_execution_setup ?trade_order)
+        (order_approval_verified ?trade_order)
+      )
+  )
+  (:action assign_execution_algorithm_to_order_when_not_flagged
+    :parameters (?trade_order - trade_order ?execution_algorithm - execution_algorithm ?trading_desk - trading_desk ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_eligible_for_execution_setup ?trade_order)
+        (order_execution_algorithm_assigned ?trade_order ?execution_algorithm)
+        (order_assigned_to_trading_desk ?trade_order ?trading_desk)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (not
+          (trade_plan_requires_execution_algorithm ?trade_plan)
+        )
+        (not
+          (order_execution_algorithm_bound ?trade_order)
+        )
+      )
+    :effect (order_execution_algorithm_bound ?trade_order)
+  )
+  (:action assign_execution_algorithm_to_order_when_flagged
+    :parameters (?trade_order - trade_order ?execution_algorithm - execution_algorithm ?trading_desk - trading_desk ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_eligible_for_execution_setup ?trade_order)
+        (order_execution_algorithm_assigned ?trade_order ?execution_algorithm)
+        (order_assigned_to_trading_desk ?trade_order ?trading_desk)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (trade_plan_requires_execution_algorithm ?trade_plan)
+        (not
+          (order_execution_algorithm_bound ?trade_order)
+        )
+      )
+    :effect (order_execution_algorithm_bound ?trade_order)
+  )
+  (:action finalize_order_settlement_baseline
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_execution_algorithm_bound ?trade_order)
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (not
+          (trade_plan_requires_approval_token ?trade_plan)
+        )
+        (not
+          (trade_plan_requires_execution_algorithm ?trade_plan)
+        )
+        (not
+          (order_qualification_completed ?trade_order)
+        )
+      )
+    :effect (order_qualification_completed ?trade_order)
+  )
+  (:action finalize_order_settlement_with_approval
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_execution_algorithm_bound ?trade_order)
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (trade_plan_requires_approval_token ?trade_plan)
+        (not
+          (trade_plan_requires_execution_algorithm ?trade_plan)
+        )
+        (not
+          (order_qualification_completed ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_ready_for_execution_method_assignment ?trade_order)
+      )
+  )
+  (:action finalize_order_settlement_with_execution_algo
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_execution_algorithm_bound ?trade_order)
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (not
+          (trade_plan_requires_approval_token ?trade_plan)
+        )
+        (trade_plan_requires_execution_algorithm ?trade_plan)
+        (not
+          (order_qualification_completed ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_ready_for_execution_method_assignment ?trade_order)
+      )
+  )
+  (:action finalize_order_settlement_with_approval_and_execution_algo
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction ?allocation_ticket - allocation_ticket ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (order_execution_algorithm_bound ?trade_order)
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (order_bound_to_allocation_ticket ?trade_order ?allocation_ticket)
+        (allocation_ticket_bound_to_trade_plan ?allocation_ticket ?trade_plan)
+        (trade_plan_requires_approval_token ?trade_plan)
+        (trade_plan_requires_execution_algorithm ?trade_plan)
+        (not
+          (order_qualification_completed ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_ready_for_execution_method_assignment ?trade_order)
+      )
+  )
+  (:action finalize_order
+    :parameters (?trade_order - trade_order)
+    :precondition
+      (and
+        (order_qualification_completed ?trade_order)
+        (not
+          (order_ready_for_execution_method_assignment ?trade_order)
+        )
+        (not
+          (order_finalized ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?trade_order)
+        (order_completed ?trade_order)
+      )
+  )
+  (:action assign_execution_method_to_order
+    :parameters (?trade_order - trade_order ?execution_method - execution_method)
+    :precondition
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_ready_for_execution_method_assignment ?trade_order)
+        (execution_method_available ?execution_method)
+      )
+    :effect
+      (and
+        (order_execution_method_assigned ?trade_order ?execution_method)
+        (not
+          (execution_method_available ?execution_method)
+        )
+      )
+  )
+  (:action confirm_order_allocations
+    :parameters (?trade_order - trade_order ?liquidation_candidate - liquidation_candidate ?replacement_candidate - replacement_candidate ?outflow_request - outflow_request ?execution_method - execution_method)
+    :precondition
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_ready_for_execution_method_assignment ?trade_order)
+        (order_execution_method_assigned ?trade_order ?execution_method)
+        (order_sources_liquidation_candidate ?trade_order ?liquidation_candidate)
+        (order_sources_replacement_candidate ?trade_order ?replacement_candidate)
+        (liquidation_candidate_ready ?liquidation_candidate)
+        (replacement_candidate_ready ?replacement_candidate)
+        (position_linked_to_outflow_request ?trade_order ?outflow_request)
+        (not
+          (order_allocations_confirmed ?trade_order)
+        )
+      )
+    :effect (order_allocations_confirmed ?trade_order)
+  )
+  (:action finalize_order_after_allocations
+    :parameters (?trade_order - trade_order)
+    :precondition
+      (and
+        (order_qualification_completed ?trade_order)
+        (order_allocations_confirmed ?trade_order)
+        (not
+          (order_finalized ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?trade_order)
+        (order_completed ?trade_order)
+      )
+  )
+  (:action apply_client_directive_to_order
+    :parameters (?trade_order - trade_order ?client_directive - client_directive ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_validated ?trade_order)
+        (position_linked_to_outflow_request ?trade_order ?outflow_request)
+        (client_directive_pending ?client_directive)
+        (order_bound_to_client_directive ?trade_order ?client_directive)
+        (not
+          (order_client_directive_attached ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_client_directive_attached ?trade_order)
+        (not
+          (client_directive_pending ?client_directive)
+        )
+      )
+  )
+  (:action process_client_directive_with_trading_desk
+    :parameters (?trade_order - trade_order ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (order_client_directive_attached ?trade_order)
+        (order_assigned_to_trading_desk ?trade_order ?trading_desk)
+        (not
+          (order_client_directive_processed ?trade_order)
+        )
+      )
+    :effect (order_client_directive_processed ?trade_order)
+  )
+  (:action attach_settlement_instruction_after_directive
+    :parameters (?trade_order - trade_order ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (order_client_directive_processed ?trade_order)
+        (order_settlement_instruction_attached ?trade_order ?settlement_instruction)
+        (not
+          (order_client_directive_finalized ?trade_order)
+        )
+      )
+    :effect (order_client_directive_finalized ?trade_order)
+  )
+  (:action finalize_order_after_directive
+    :parameters (?trade_order - trade_order)
+    :precondition
+      (and
+        (order_client_directive_finalized ?trade_order)
+        (not
+          (order_finalized ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?trade_order)
+        (order_completed ?trade_order)
+      )
+  )
+  (:action mark_liquidation_candidate_completed
+    :parameters (?liquidation_candidate - liquidation_candidate ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (liquidation_candidate_qualified ?liquidation_candidate)
+        (liquidation_candidate_ready ?liquidation_candidate)
+        (trade_plan_created ?trade_plan)
+        (trade_plan_validated ?trade_plan)
+        (not
+          (order_completed ?liquidation_candidate)
+        )
+      )
+    :effect (order_completed ?liquidation_candidate)
+  )
+  (:action mark_replacement_candidate_completed
+    :parameters (?replacement_candidate - replacement_candidate ?trade_plan - trade_plan)
+    :precondition
+      (and
+        (replacement_candidate_qualified ?replacement_candidate)
+        (replacement_candidate_ready ?replacement_candidate)
+        (trade_plan_created ?trade_plan)
+        (trade_plan_validated ?trade_plan)
+        (not
+          (order_completed ?replacement_candidate)
+        )
+      )
+    :effect (order_completed ?replacement_candidate)
+  )
+  (:action assign_cash_account_to_order
+    :parameters (?position - order_position ?cash_account - cash_account ?outflow_request - outflow_request)
+    :precondition
+      (and
+        (order_completed ?position)
+        (position_linked_to_outflow_request ?position ?outflow_request)
+        (cash_account_available ?cash_account)
+        (not
+          (order_cash_assigned ?position)
+        )
+      )
+    :effect
+      (and
+        (order_cash_assigned ?position)
+        (order_assigned_to_cash_account ?position ?cash_account)
+        (not
+          (cash_account_available ?cash_account)
+        )
+      )
+  )
+  (:action finalize_funding_from_candidate
+    :parameters (?liquidation_candidate - liquidation_candidate ?funding_bucket - funding_bucket ?cash_account - cash_account)
+    :precondition
+      (and
+        (order_cash_assigned ?liquidation_candidate)
+        (order_assigned_to_funding_bucket ?liquidation_candidate ?funding_bucket)
+        (order_assigned_to_cash_account ?liquidation_candidate ?cash_account)
+        (not
+          (order_funded ?liquidation_candidate)
+        )
+      )
+    :effect
+      (and
+        (order_funded ?liquidation_candidate)
+        (funding_bucket_available ?funding_bucket)
+        (cash_account_available ?cash_account)
+      )
+  )
+  (:action finalize_funding_from_replacement_candidate
+    :parameters (?replacement_candidate - replacement_candidate ?funding_bucket - funding_bucket ?cash_account - cash_account)
+    :precondition
+      (and
+        (order_cash_assigned ?replacement_candidate)
+        (order_assigned_to_funding_bucket ?replacement_candidate ?funding_bucket)
+        (order_assigned_to_cash_account ?replacement_candidate ?cash_account)
+        (not
+          (order_funded ?replacement_candidate)
+        )
+      )
+    :effect
+      (and
+        (order_funded ?replacement_candidate)
+        (funding_bucket_available ?funding_bucket)
+        (cash_account_available ?cash_account)
+      )
+  )
+  (:action assign_funding_bucket_and_cash_account_to_order
+    :parameters (?trade_order - trade_order ?funding_bucket - funding_bucket ?cash_account - cash_account)
+    :precondition
+      (and
+        (order_cash_assigned ?trade_order)
+        (order_assigned_to_funding_bucket ?trade_order ?funding_bucket)
+        (order_assigned_to_cash_account ?trade_order ?cash_account)
+        (not
+          (order_funded ?trade_order)
+        )
+      )
+    :effect
+      (and
+        (order_funded ?trade_order)
+        (funding_bucket_available ?funding_bucket)
+        (cash_account_available ?cash_account)
+      )
+  )
+)

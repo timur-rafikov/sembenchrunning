@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain packaging_type_selection_for_order_mix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types packaging_resource_class - object packaging_component_class - object packaging_group_class - object order_root - object customer_order - order_root packaging_type - packaging_resource_class item_sku - packaging_resource_class packing_station - packaging_resource_class label_type - packaging_resource_class carrier_option - packaging_resource_class service_level_option - packaging_resource_class handling_attribute - packaging_resource_class regulatory_code - packaging_resource_class package_component - packaging_component_class container_size - packaging_component_class customer_preference - packaging_component_class pack_template - packaging_group_class template_variant - packaging_group_class handling_unit - packaging_group_class order_unit_class - customer_order packing_unit_class - customer_order pick_unit - order_unit_class consolidation_unit - order_unit_class package_configuration - packing_unit_class)
+  (:predicates
+    (entity_released ?order - customer_order)
+    (entity_ready_for_packing ?order - customer_order)
+    (entity_allocated ?order - customer_order)
+    (packaging_finalized ?order - customer_order)
+    (ready_for_service_assignment ?order - customer_order)
+    (service_assigned ?order - customer_order)
+    (packaging_type_available ?packaging_type - packaging_type)
+    (entity_assigned_packaging_type ?order - customer_order ?packaging_type - packaging_type)
+    (sku_available ?sku - item_sku)
+    (entity_has_sku_reserved ?order - customer_order ?sku - item_sku)
+    (packing_station_available ?packing_station - packing_station)
+    (entity_assigned_packing_station ?order - customer_order ?packing_station - packing_station)
+    (component_available ?component - package_component)
+    (pick_unit_assigned_component ?pick_unit - pick_unit ?component - package_component)
+    (consolidation_unit_assigned_component ?consolidation_unit - consolidation_unit ?component - package_component)
+    (pick_unit_assigned_template ?pick_unit - pick_unit ?pack_template - pack_template)
+    (template_reserved ?pack_template - pack_template)
+    (template_populated ?pack_template - pack_template)
+    (pick_unit_slot_confirmed ?pick_unit - pick_unit)
+    (consolidation_unit_assigned_variant ?consolidation_unit - consolidation_unit ?template_variant - template_variant)
+    (variant_reserved ?template_variant - template_variant)
+    (variant_populated ?template_variant - template_variant)
+    (consolidation_unit_slot_confirmed ?consolidation_unit - consolidation_unit)
+    (handling_unit_available ?handling_unit - handling_unit)
+    (handling_unit_created ?handling_unit - handling_unit)
+    (handling_unit_assigned_template ?handling_unit - handling_unit ?pack_template - pack_template)
+    (handling_unit_assigned_variant ?handling_unit - handling_unit ?template_variant - template_variant)
+    (handling_unit_requires_labeling ?handling_unit - handling_unit)
+    (handling_unit_requires_carrier_selection ?handling_unit - handling_unit)
+    (handling_unit_items_verified ?handling_unit - handling_unit)
+    (config_assigned_to_pick_unit ?package_config - package_configuration ?pick_unit - pick_unit)
+    (config_assigned_to_consolidation_unit ?package_config - package_configuration ?consolidation_unit - consolidation_unit)
+    (config_assigned_to_handling_unit ?package_config - package_configuration ?handling_unit - handling_unit)
+    (container_size_available ?container_size - container_size)
+    (config_supports_container_size ?package_config - package_configuration ?container_size - container_size)
+    (container_size_assigned ?container_size - container_size)
+    (container_size_assigned_to_handling_unit ?container_size - container_size ?handling_unit - handling_unit)
+    (config_validated ?package_config - package_configuration)
+    (handling_attribute_applied ?package_config - package_configuration)
+    (config_ready_for_finalization ?package_config - package_configuration)
+    (label_assigned_to_config ?package_config - package_configuration)
+    (config_label_applied ?package_config - package_configuration)
+    (config_ready_for_carrier_assignment ?package_config - package_configuration)
+    (config_consolidation_validated ?package_config - package_configuration)
+    (customer_preference_available ?customer_preference - customer_preference)
+    (config_associated_with_customer_preference ?package_config - package_configuration ?customer_preference - customer_preference)
+    (preference_applied ?package_config - package_configuration)
+    (preference_label_applied ?package_config - package_configuration)
+    (preference_validated ?package_config - package_configuration)
+    (label_type_available ?label_type - label_type)
+    (config_assigned_label_type ?package_config - package_configuration ?label_type - label_type)
+    (carrier_option_available ?carrier_option - carrier_option)
+    (config_assigned_carrier_option ?package_config - package_configuration ?carrier_option - carrier_option)
+    (handling_attribute_available ?handling_attribute - handling_attribute)
+    (config_assigned_handling_attribute ?package_config - package_configuration ?handling_attribute - handling_attribute)
+    (regulatory_code_available ?regulatory_code - regulatory_code)
+    (config_assigned_regulatory_code ?package_config - package_configuration ?regulatory_code - regulatory_code)
+    (service_level_option_available ?service_level - service_level_option)
+    (entity_assigned_service_level ?order - customer_order ?service_level - service_level_option)
+    (pick_unit_ready ?pick_unit - pick_unit)
+    (consolidation_unit_ready ?consolidation_unit - consolidation_unit)
+    (config_finalized ?package_config - package_configuration)
+  )
+  (:action release_order
+    :parameters (?order - customer_order)
+    :precondition
+      (and
+        (not
+          (entity_released ?order)
+        )
+        (not
+          (packaging_finalized ?order)
+        )
+      )
+    :effect (entity_released ?order)
+  )
+  (:action allocate_packaging_type_to_order
+    :parameters (?order - customer_order ?packaging_type - packaging_type)
+    :precondition
+      (and
+        (entity_released ?order)
+        (not
+          (entity_allocated ?order)
+        )
+        (packaging_type_available ?packaging_type)
+      )
+    :effect
+      (and
+        (entity_allocated ?order)
+        (entity_assigned_packaging_type ?order ?packaging_type)
+        (not
+          (packaging_type_available ?packaging_type)
+        )
+      )
+  )
+  (:action reserve_sku_for_order
+    :parameters (?order - customer_order ?sku - item_sku)
+    :precondition
+      (and
+        (entity_released ?order)
+        (entity_allocated ?order)
+        (sku_available ?sku)
+      )
+    :effect
+      (and
+        (entity_has_sku_reserved ?order ?sku)
+        (not
+          (sku_available ?sku)
+        )
+      )
+  )
+  (:action confirm_sku_allocation_for_order
+    :parameters (?order - customer_order ?sku - item_sku)
+    :precondition
+      (and
+        (entity_released ?order)
+        (entity_allocated ?order)
+        (entity_has_sku_reserved ?order ?sku)
+        (not
+          (entity_ready_for_packing ?order)
+        )
+      )
+    :effect (entity_ready_for_packing ?order)
+  )
+  (:action release_sku_reservation_from_order
+    :parameters (?order - customer_order ?sku - item_sku)
+    :precondition
+      (and
+        (entity_has_sku_reserved ?order ?sku)
+      )
+    :effect
+      (and
+        (sku_available ?sku)
+        (not
+          (entity_has_sku_reserved ?order ?sku)
+        )
+      )
+  )
+  (:action assign_packing_station_to_order
+    :parameters (?order - customer_order ?packing_station - packing_station)
+    :precondition
+      (and
+        (entity_ready_for_packing ?order)
+        (packing_station_available ?packing_station)
+      )
+    :effect
+      (and
+        (entity_assigned_packing_station ?order ?packing_station)
+        (not
+          (packing_station_available ?packing_station)
+        )
+      )
+  )
+  (:action release_packing_station_from_order
+    :parameters (?order - customer_order ?packing_station - packing_station)
+    :precondition
+      (and
+        (entity_assigned_packing_station ?order ?packing_station)
+      )
+    :effect
+      (and
+        (packing_station_available ?packing_station)
+        (not
+          (entity_assigned_packing_station ?order ?packing_station)
+        )
+      )
+  )
+  (:action assign_handling_attribute_to_config
+    :parameters (?package_config - package_configuration ?handling_attribute - handling_attribute)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (handling_attribute_available ?handling_attribute)
+      )
+    :effect
+      (and
+        (config_assigned_handling_attribute ?package_config ?handling_attribute)
+        (not
+          (handling_attribute_available ?handling_attribute)
+        )
+      )
+  )
+  (:action unassign_handling_attribute_from_config
+    :parameters (?package_config - package_configuration ?handling_attribute - handling_attribute)
+    :precondition
+      (and
+        (config_assigned_handling_attribute ?package_config ?handling_attribute)
+      )
+    :effect
+      (and
+        (handling_attribute_available ?handling_attribute)
+        (not
+          (config_assigned_handling_attribute ?package_config ?handling_attribute)
+        )
+      )
+  )
+  (:action assign_regulatory_code_to_config
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (regulatory_code_available ?regulatory_code)
+      )
+    :effect
+      (and
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (not
+          (regulatory_code_available ?regulatory_code)
+        )
+      )
+  )
+  (:action unassign_regulatory_code_from_config
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code)
+    :precondition
+      (and
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+      )
+    :effect
+      (and
+        (regulatory_code_available ?regulatory_code)
+        (not
+          (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        )
+      )
+  )
+  (:action reserve_pack_template_for_pick_unit
+    :parameters (?pick_unit - pick_unit ?pack_template - pack_template ?sku - item_sku)
+    :precondition
+      (and
+        (entity_ready_for_packing ?pick_unit)
+        (entity_has_sku_reserved ?pick_unit ?sku)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (not
+          (template_reserved ?pack_template)
+        )
+        (not
+          (template_populated ?pack_template)
+        )
+      )
+    :effect (template_reserved ?pack_template)
+  )
+  (:action confirm_pick_unit_slot
+    :parameters (?pick_unit - pick_unit ?pack_template - pack_template ?packing_station - packing_station)
+    :precondition
+      (and
+        (entity_ready_for_packing ?pick_unit)
+        (entity_assigned_packing_station ?pick_unit ?packing_station)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (template_reserved ?pack_template)
+        (not
+          (pick_unit_ready ?pick_unit)
+        )
+      )
+    :effect
+      (and
+        (pick_unit_ready ?pick_unit)
+        (pick_unit_slot_confirmed ?pick_unit)
+      )
+  )
+  (:action assign_component_to_pick_unit
+    :parameters (?pick_unit - pick_unit ?pack_template - pack_template ?component - package_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?pick_unit)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (component_available ?component)
+        (not
+          (pick_unit_ready ?pick_unit)
+        )
+      )
+    :effect
+      (and
+        (template_populated ?pack_template)
+        (pick_unit_ready ?pick_unit)
+        (pick_unit_assigned_component ?pick_unit ?component)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action finalize_pick_unit_template
+    :parameters (?pick_unit - pick_unit ?pack_template - pack_template ?sku - item_sku ?component - package_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?pick_unit)
+        (entity_has_sku_reserved ?pick_unit ?sku)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (template_populated ?pack_template)
+        (pick_unit_assigned_component ?pick_unit ?component)
+        (not
+          (pick_unit_slot_confirmed ?pick_unit)
+        )
+      )
+    :effect
+      (and
+        (template_reserved ?pack_template)
+        (pick_unit_slot_confirmed ?pick_unit)
+        (component_available ?component)
+        (not
+          (pick_unit_assigned_component ?pick_unit ?component)
+        )
+      )
+  )
+  (:action reserve_variant_for_consolidation_unit
+    :parameters (?consolidation_unit - consolidation_unit ?template_variant - template_variant ?sku - item_sku)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_unit)
+        (entity_has_sku_reserved ?consolidation_unit ?sku)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (not
+          (variant_reserved ?template_variant)
+        )
+        (not
+          (variant_populated ?template_variant)
+        )
+      )
+    :effect (variant_reserved ?template_variant)
+  )
+  (:action confirm_consolidation_unit_slot
+    :parameters (?consolidation_unit - consolidation_unit ?template_variant - template_variant ?packing_station - packing_station)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_unit)
+        (entity_assigned_packing_station ?consolidation_unit ?packing_station)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (variant_reserved ?template_variant)
+        (not
+          (consolidation_unit_ready ?consolidation_unit)
+        )
+      )
+    :effect
+      (and
+        (consolidation_unit_ready ?consolidation_unit)
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+      )
+  )
+  (:action assign_component_to_consolidation_unit
+    :parameters (?consolidation_unit - consolidation_unit ?template_variant - template_variant ?component - package_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_unit)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (component_available ?component)
+        (not
+          (consolidation_unit_ready ?consolidation_unit)
+        )
+      )
+    :effect
+      (and
+        (variant_populated ?template_variant)
+        (consolidation_unit_ready ?consolidation_unit)
+        (consolidation_unit_assigned_component ?consolidation_unit ?component)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action finalize_consolidation_unit_variant
+    :parameters (?consolidation_unit - consolidation_unit ?template_variant - template_variant ?sku - item_sku ?component - package_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_unit)
+        (entity_has_sku_reserved ?consolidation_unit ?sku)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (variant_populated ?template_variant)
+        (consolidation_unit_assigned_component ?consolidation_unit ?component)
+        (not
+          (consolidation_unit_slot_confirmed ?consolidation_unit)
+        )
+      )
+    :effect
+      (and
+        (variant_reserved ?template_variant)
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+        (component_available ?component)
+        (not
+          (consolidation_unit_assigned_component ?consolidation_unit ?component)
+        )
+      )
+  )
+  (:action form_handling_unit
+    :parameters (?pick_unit - pick_unit ?consolidation_unit - consolidation_unit ?pack_template - pack_template ?template_variant - template_variant ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (pick_unit_ready ?pick_unit)
+        (consolidation_unit_ready ?consolidation_unit)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (template_reserved ?pack_template)
+        (variant_reserved ?template_variant)
+        (pick_unit_slot_confirmed ?pick_unit)
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+        (handling_unit_available ?handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_created ?handling_unit)
+        (handling_unit_assigned_template ?handling_unit ?pack_template)
+        (handling_unit_assigned_variant ?handling_unit ?template_variant)
+        (not
+          (handling_unit_available ?handling_unit)
+        )
+      )
+  )
+  (:action form_handling_unit_with_label_requirement
+    :parameters (?pick_unit - pick_unit ?consolidation_unit - consolidation_unit ?pack_template - pack_template ?template_variant - template_variant ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (pick_unit_ready ?pick_unit)
+        (consolidation_unit_ready ?consolidation_unit)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (template_populated ?pack_template)
+        (variant_reserved ?template_variant)
+        (not
+          (pick_unit_slot_confirmed ?pick_unit)
+        )
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+        (handling_unit_available ?handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_created ?handling_unit)
+        (handling_unit_assigned_template ?handling_unit ?pack_template)
+        (handling_unit_assigned_variant ?handling_unit ?template_variant)
+        (handling_unit_requires_labeling ?handling_unit)
+        (not
+          (handling_unit_available ?handling_unit)
+        )
+      )
+  )
+  (:action form_handling_unit_with_carrier_requirement
+    :parameters (?pick_unit - pick_unit ?consolidation_unit - consolidation_unit ?pack_template - pack_template ?template_variant - template_variant ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (pick_unit_ready ?pick_unit)
+        (consolidation_unit_ready ?consolidation_unit)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (template_reserved ?pack_template)
+        (variant_populated ?template_variant)
+        (pick_unit_slot_confirmed ?pick_unit)
+        (not
+          (consolidation_unit_slot_confirmed ?consolidation_unit)
+        )
+        (handling_unit_available ?handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_created ?handling_unit)
+        (handling_unit_assigned_template ?handling_unit ?pack_template)
+        (handling_unit_assigned_variant ?handling_unit ?template_variant)
+        (handling_unit_requires_carrier_selection ?handling_unit)
+        (not
+          (handling_unit_available ?handling_unit)
+        )
+      )
+  )
+  (:action form_handling_unit_with_label_and_carrier_requirement
+    :parameters (?pick_unit - pick_unit ?consolidation_unit - consolidation_unit ?pack_template - pack_template ?template_variant - template_variant ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (pick_unit_ready ?pick_unit)
+        (consolidation_unit_ready ?consolidation_unit)
+        (pick_unit_assigned_template ?pick_unit ?pack_template)
+        (consolidation_unit_assigned_variant ?consolidation_unit ?template_variant)
+        (template_populated ?pack_template)
+        (variant_populated ?template_variant)
+        (not
+          (pick_unit_slot_confirmed ?pick_unit)
+        )
+        (not
+          (consolidation_unit_slot_confirmed ?consolidation_unit)
+        )
+        (handling_unit_available ?handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_created ?handling_unit)
+        (handling_unit_assigned_template ?handling_unit ?pack_template)
+        (handling_unit_assigned_variant ?handling_unit ?template_variant)
+        (handling_unit_requires_labeling ?handling_unit)
+        (handling_unit_requires_carrier_selection ?handling_unit)
+        (not
+          (handling_unit_available ?handling_unit)
+        )
+      )
+  )
+  (:action verify_handling_unit_contents
+    :parameters (?handling_unit - handling_unit ?pick_unit - pick_unit ?sku - item_sku)
+    :precondition
+      (and
+        (handling_unit_created ?handling_unit)
+        (pick_unit_ready ?pick_unit)
+        (entity_has_sku_reserved ?pick_unit ?sku)
+        (not
+          (handling_unit_items_verified ?handling_unit)
+        )
+      )
+    :effect (handling_unit_items_verified ?handling_unit)
+  )
+  (:action assign_container_size_to_config
+    :parameters (?package_config - package_configuration ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (config_assigned_to_handling_unit ?package_config ?handling_unit)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_available ?container_size)
+        (handling_unit_created ?handling_unit)
+        (handling_unit_items_verified ?handling_unit)
+        (not
+          (container_size_assigned ?container_size)
+        )
+      )
+    :effect
+      (and
+        (container_size_assigned ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (not
+          (container_size_available ?container_size)
+        )
+      )
+  )
+  (:action validate_config_against_items
+    :parameters (?package_config - package_configuration ?container_size - container_size ?handling_unit - handling_unit ?sku - item_sku)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (entity_has_sku_reserved ?package_config ?sku)
+        (not
+          (handling_unit_requires_labeling ?handling_unit)
+        )
+        (not
+          (config_validated ?package_config)
+        )
+      )
+    :effect (config_validated ?package_config)
+  )
+  (:action assign_label_type_to_config
+    :parameters (?package_config - package_configuration ?label_type - label_type)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (label_type_available ?label_type)
+        (not
+          (label_assigned_to_config ?package_config)
+        )
+      )
+    :effect
+      (and
+        (label_assigned_to_config ?package_config)
+        (config_assigned_label_type ?package_config ?label_type)
+        (not
+          (label_type_available ?label_type)
+        )
+      )
+  )
+  (:action apply_label_and_validate_config
+    :parameters (?package_config - package_configuration ?container_size - container_size ?handling_unit - handling_unit ?sku - item_sku ?label_type - label_type)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (entity_has_sku_reserved ?package_config ?sku)
+        (handling_unit_requires_labeling ?handling_unit)
+        (label_assigned_to_config ?package_config)
+        (config_assigned_label_type ?package_config ?label_type)
+        (not
+          (config_validated ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_validated ?package_config)
+        (config_label_applied ?package_config)
+      )
+  )
+  (:action apply_handling_attribute_branch_1
+    :parameters (?package_config - package_configuration ?handling_attribute - handling_attribute ?packing_station - packing_station ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (config_validated ?package_config)
+        (config_assigned_handling_attribute ?package_config ?handling_attribute)
+        (entity_assigned_packing_station ?package_config ?packing_station)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (not
+          (handling_unit_requires_carrier_selection ?handling_unit)
+        )
+        (not
+          (handling_attribute_applied ?package_config)
+        )
+      )
+    :effect (handling_attribute_applied ?package_config)
+  )
+  (:action apply_handling_attribute_branch_2
+    :parameters (?package_config - package_configuration ?handling_attribute - handling_attribute ?packing_station - packing_station ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (config_validated ?package_config)
+        (config_assigned_handling_attribute ?package_config ?handling_attribute)
+        (entity_assigned_packing_station ?package_config ?packing_station)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (handling_unit_requires_carrier_selection ?handling_unit)
+        (not
+          (handling_attribute_applied ?package_config)
+        )
+      )
+    :effect (handling_attribute_applied ?package_config)
+  )
+  (:action apply_regulatory_code_route_1
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (handling_attribute_applied ?package_config)
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (not
+          (handling_unit_requires_labeling ?handling_unit)
+        )
+        (not
+          (handling_unit_requires_carrier_selection ?handling_unit)
+        )
+        (not
+          (config_ready_for_finalization ?package_config)
+        )
+      )
+    :effect (config_ready_for_finalization ?package_config)
+  )
+  (:action apply_regulatory_code_route_2
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (handling_attribute_applied ?package_config)
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (handling_unit_requires_labeling ?handling_unit)
+        (not
+          (handling_unit_requires_carrier_selection ?handling_unit)
+        )
+        (not
+          (config_ready_for_finalization ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_ready_for_carrier_assignment ?package_config)
+      )
+  )
+  (:action apply_regulatory_code_route_3
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (handling_attribute_applied ?package_config)
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (not
+          (handling_unit_requires_labeling ?handling_unit)
+        )
+        (handling_unit_requires_carrier_selection ?handling_unit)
+        (not
+          (config_ready_for_finalization ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_ready_for_carrier_assignment ?package_config)
+      )
+  )
+  (:action apply_regulatory_code_route_4
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code ?container_size - container_size ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (handling_attribute_applied ?package_config)
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (config_supports_container_size ?package_config ?container_size)
+        (container_size_assigned_to_handling_unit ?container_size ?handling_unit)
+        (handling_unit_requires_labeling ?handling_unit)
+        (handling_unit_requires_carrier_selection ?handling_unit)
+        (not
+          (config_ready_for_finalization ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_ready_for_carrier_assignment ?package_config)
+      )
+  )
+  (:action prepare_config_for_finalization
+    :parameters (?package_config - package_configuration)
+    :precondition
+      (and
+        (config_ready_for_finalization ?package_config)
+        (not
+          (config_ready_for_carrier_assignment ?package_config)
+        )
+        (not
+          (config_finalized ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_finalized ?package_config)
+        (ready_for_service_assignment ?package_config)
+      )
+  )
+  (:action assign_carrier_option_to_config
+    :parameters (?package_config - package_configuration ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_ready_for_carrier_assignment ?package_config)
+        (carrier_option_available ?carrier_option)
+      )
+    :effect
+      (and
+        (config_assigned_carrier_option ?package_config ?carrier_option)
+        (not
+          (carrier_option_available ?carrier_option)
+        )
+      )
+  )
+  (:action validate_config_against_units
+    :parameters (?package_config - package_configuration ?pick_unit - pick_unit ?consolidation_unit - consolidation_unit ?sku - item_sku ?carrier_option - carrier_option)
+    :precondition
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_ready_for_carrier_assignment ?package_config)
+        (config_assigned_carrier_option ?package_config ?carrier_option)
+        (config_assigned_to_pick_unit ?package_config ?pick_unit)
+        (config_assigned_to_consolidation_unit ?package_config ?consolidation_unit)
+        (pick_unit_slot_confirmed ?pick_unit)
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+        (entity_has_sku_reserved ?package_config ?sku)
+        (not
+          (config_consolidation_validated ?package_config)
+        )
+      )
+    :effect (config_consolidation_validated ?package_config)
+  )
+  (:action finalize_config_and_mark_ready
+    :parameters (?package_config - package_configuration)
+    :precondition
+      (and
+        (config_ready_for_finalization ?package_config)
+        (config_consolidation_validated ?package_config)
+        (not
+          (config_finalized ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_finalized ?package_config)
+        (ready_for_service_assignment ?package_config)
+      )
+  )
+  (:action apply_customer_preference_to_config
+    :parameters (?package_config - package_configuration ?customer_preference - customer_preference ?sku - item_sku)
+    :precondition
+      (and
+        (entity_ready_for_packing ?package_config)
+        (entity_has_sku_reserved ?package_config ?sku)
+        (customer_preference_available ?customer_preference)
+        (config_associated_with_customer_preference ?package_config ?customer_preference)
+        (not
+          (preference_applied ?package_config)
+        )
+      )
+    :effect
+      (and
+        (preference_applied ?package_config)
+        (not
+          (customer_preference_available ?customer_preference)
+        )
+      )
+  )
+  (:action apply_preference_label_step
+    :parameters (?package_config - package_configuration ?packing_station - packing_station)
+    :precondition
+      (and
+        (preference_applied ?package_config)
+        (entity_assigned_packing_station ?package_config ?packing_station)
+        (not
+          (preference_label_applied ?package_config)
+        )
+      )
+    :effect (preference_label_applied ?package_config)
+  )
+  (:action apply_preference_regulatory_step
+    :parameters (?package_config - package_configuration ?regulatory_code - regulatory_code)
+    :precondition
+      (and
+        (preference_label_applied ?package_config)
+        (config_assigned_regulatory_code ?package_config ?regulatory_code)
+        (not
+          (preference_validated ?package_config)
+        )
+      )
+    :effect (preference_validated ?package_config)
+  )
+  (:action finalize_preference_and_mark_ready
+    :parameters (?package_config - package_configuration)
+    :precondition
+      (and
+        (preference_validated ?package_config)
+        (not
+          (config_finalized ?package_config)
+        )
+      )
+    :effect
+      (and
+        (config_finalized ?package_config)
+        (ready_for_service_assignment ?package_config)
+      )
+  )
+  (:action finalize_pick_unit_for_packing
+    :parameters (?pick_unit - pick_unit ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (pick_unit_ready ?pick_unit)
+        (pick_unit_slot_confirmed ?pick_unit)
+        (handling_unit_created ?handling_unit)
+        (handling_unit_items_verified ?handling_unit)
+        (not
+          (ready_for_service_assignment ?pick_unit)
+        )
+      )
+    :effect (ready_for_service_assignment ?pick_unit)
+  )
+  (:action finalize_consolidation_unit_for_packing
+    :parameters (?consolidation_unit - consolidation_unit ?handling_unit - handling_unit)
+    :precondition
+      (and
+        (consolidation_unit_ready ?consolidation_unit)
+        (consolidation_unit_slot_confirmed ?consolidation_unit)
+        (handling_unit_created ?handling_unit)
+        (handling_unit_items_verified ?handling_unit)
+        (not
+          (ready_for_service_assignment ?consolidation_unit)
+        )
+      )
+    :effect (ready_for_service_assignment ?consolidation_unit)
+  )
+  (:action assign_service_level_to_order
+    :parameters (?order - customer_order ?service_level - service_level_option ?sku - item_sku)
+    :precondition
+      (and
+        (ready_for_service_assignment ?order)
+        (entity_has_sku_reserved ?order ?sku)
+        (service_level_option_available ?service_level)
+        (not
+          (service_assigned ?order)
+        )
+      )
+    :effect
+      (and
+        (service_assigned ?order)
+        (entity_assigned_service_level ?order ?service_level)
+        (not
+          (service_level_option_available ?service_level)
+        )
+      )
+  )
+  (:action propagate_service_and_finalize_pick_unit
+    :parameters (?pick_unit - pick_unit ?packaging_type - packaging_type ?service_level - service_level_option)
+    :precondition
+      (and
+        (service_assigned ?pick_unit)
+        (entity_assigned_packaging_type ?pick_unit ?packaging_type)
+        (entity_assigned_service_level ?pick_unit ?service_level)
+        (not
+          (packaging_finalized ?pick_unit)
+        )
+      )
+    :effect
+      (and
+        (packaging_finalized ?pick_unit)
+        (packaging_type_available ?packaging_type)
+        (service_level_option_available ?service_level)
+      )
+  )
+  (:action propagate_service_and_finalize_consolidation_unit
+    :parameters (?consolidation_unit - consolidation_unit ?packaging_type - packaging_type ?service_level - service_level_option)
+    :precondition
+      (and
+        (service_assigned ?consolidation_unit)
+        (entity_assigned_packaging_type ?consolidation_unit ?packaging_type)
+        (entity_assigned_service_level ?consolidation_unit ?service_level)
+        (not
+          (packaging_finalized ?consolidation_unit)
+        )
+      )
+    :effect
+      (and
+        (packaging_finalized ?consolidation_unit)
+        (packaging_type_available ?packaging_type)
+        (service_level_option_available ?service_level)
+      )
+  )
+  (:action propagate_service_and_finalize_package_config
+    :parameters (?package_config - package_configuration ?packaging_type - packaging_type ?service_level - service_level_option)
+    :precondition
+      (and
+        (service_assigned ?package_config)
+        (entity_assigned_packaging_type ?package_config ?packaging_type)
+        (entity_assigned_service_level ?package_config ?service_level)
+        (not
+          (packaging_finalized ?package_config)
+        )
+      )
+    :effect
+      (and
+        (packaging_finalized ?package_config)
+        (packaging_type_available ?packaging_type)
+        (service_level_option_available ?service_level)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem order_mix_instance)
+  (:domain packaging_type_selection_for_order_mix)
+  (:objects pick_unit_1 - pick_unit consolidation_unit_1 - consolidation_unit package_config_1 - package_configuration package_config_2 - package_configuration carton_small - packaging_type box_medium - packaging_type polybag_small - packaging_type sku_1001 - item_sku packing_station_a - packing_station bubble_wrap - package_component template_slot_a - pack_template variant_a - template_variant handling_unit_slot_1 - handling_unit container_size_small - container_size container_size_medium - container_size shipping_label - label_type compliance_label - label_type carrier_fedex - carrier_option carrier_dhl - carrier_option service_standard - service_level_option attribute_fragile - handling_attribute pref_no_signature - customer_preference pref_leave_at_door - customer_preference regulatory_code_1 - regulatory_code)
+  (:init
+    (packaging_type_available carton_small)
+    (packaging_type_available box_medium)
+    (packaging_type_available polybag_small)
+    (sku_available sku_1001)
+    (packing_station_available packing_station_a)
+    (component_available bubble_wrap)
+    (pick_unit_assigned_template pick_unit_1 template_slot_a)
+    (consolidation_unit_assigned_variant consolidation_unit_1 variant_a)
+    (handling_unit_available handling_unit_slot_1)
+    (container_size_available container_size_small)
+    (container_size_available container_size_medium)
+    (config_assigned_to_pick_unit package_config_1 pick_unit_1)
+    (config_assigned_to_pick_unit package_config_2 pick_unit_1)
+    (config_assigned_to_consolidation_unit package_config_1 consolidation_unit_1)
+    (config_assigned_to_consolidation_unit package_config_2 consolidation_unit_1)
+    (config_assigned_to_handling_unit package_config_1 handling_unit_slot_1)
+    (config_assigned_to_handling_unit package_config_2 handling_unit_slot_1)
+    (config_supports_container_size package_config_1 container_size_small)
+    (config_supports_container_size package_config_2 container_size_medium)
+    (label_type_available shipping_label)
+    (label_type_available compliance_label)
+    (carrier_option_available carrier_fedex)
+    (carrier_option_available carrier_dhl)
+    (service_level_option_available service_standard)
+    (handling_attribute_available attribute_fragile)
+    (customer_preference_available pref_no_signature)
+    (config_associated_with_customer_preference package_config_1 pref_no_signature)
+    (config_associated_with_customer_preference package_config_2 pref_leave_at_door)
+    (regulatory_code_available regulatory_code_1)
+  )
+  (:goal
+    (and
+      (packaging_finalized pick_unit_1)
+      (packaging_finalized consolidation_unit_1)
+      (packaging_finalized package_config_1)
+      (packaging_finalized package_config_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(release_order pick_unit_1)
+(allocate_packaging_type_to_order pick_unit_1 carton_small)
+(reserve_sku_for_order pick_unit_1 sku_1001)
+(confirm_sku_allocation_for_order pick_unit_1 sku_1001)
+(assign_component_to_pick_unit pick_unit_1 template_slot_a bubble_wrap)
+(finalize_pick_unit_template pick_unit_1 template_slot_a sku_1001 bubble_wrap)
+(release_sku_reservation_from_order pick_unit_1 sku_1001)
+(release_order consolidation_unit_1)
+(allocate_packaging_type_to_order consolidation_unit_1 box_medium)
+(reserve_sku_for_order consolidation_unit_1 sku_1001)
+(confirm_sku_allocation_for_order consolidation_unit_1 sku_1001)
+(assign_component_to_consolidation_unit consolidation_unit_1 variant_a bubble_wrap)
+(finalize_consolidation_unit_variant consolidation_unit_1 variant_a sku_1001 bubble_wrap)
+(form_handling_unit pick_unit_1 consolidation_unit_1 template_slot_a variant_a handling_unit_slot_1)
+(release_sku_reservation_from_order consolidation_unit_1 sku_1001)
+(reserve_sku_for_order pick_unit_1 sku_1001)
+(verify_handling_unit_contents handling_unit_slot_1 pick_unit_1 sku_1001)
+(finalize_pick_unit_for_packing pick_unit_1 handling_unit_slot_1)
+(finalize_consolidation_unit_for_packing consolidation_unit_1 handling_unit_slot_1)
+(release_sku_reservation_from_order pick_unit_1 sku_1001)
+(release_order package_config_1)
+(allocate_packaging_type_to_order package_config_1 polybag_small)
+(reserve_sku_for_order package_config_1 sku_1001)
+(confirm_sku_allocation_for_order package_config_1 sku_1001)
+(apply_customer_preference_to_config package_config_1 pref_no_signature sku_1001)
+(assign_packing_station_to_order package_config_1 packing_station_a)
+(apply_preference_label_step package_config_1 packing_station_a)
+(assign_regulatory_code_to_config package_config_1 regulatory_code_1)
+(apply_preference_regulatory_step package_config_1 regulatory_code_1)
+(finalize_preference_and_mark_ready package_config_1)
+(assign_service_level_to_order package_config_1 service_standard sku_1001)
+(propagate_service_and_finalize_package_config package_config_1 polybag_small service_standard)
+(release_packing_station_from_order package_config_1 packing_station_a)
+(unassign_regulatory_code_from_config package_config_1 regulatory_code_1)
+(release_sku_reservation_from_order package_config_1 sku_1001)
+(release_order package_config_2)
+(allocate_packaging_type_to_order package_config_2 polybag_small)
+(reserve_sku_for_order package_config_2 sku_1001)
+(confirm_sku_allocation_for_order package_config_2 sku_1001)
+(assign_container_size_to_config package_config_2 container_size_medium handling_unit_slot_1)
+(validate_config_against_items package_config_2 container_size_medium handling_unit_slot_1 sku_1001)
+(assign_handling_attribute_to_config package_config_2 attribute_fragile)
+(assign_packing_station_to_order package_config_2 packing_station_a)
+(apply_handling_attribute_branch_1 package_config_2 attribute_fragile packing_station_a container_size_medium handling_unit_slot_1)
+(assign_regulatory_code_to_config package_config_2 regulatory_code_1)
+(apply_regulatory_code_route_1 package_config_2 regulatory_code_1 container_size_medium handling_unit_slot_1)
+(prepare_config_for_finalization package_config_2)
+(assign_service_level_to_order package_config_2 service_standard sku_1001)
+(propagate_service_and_finalize_package_config package_config_2 polybag_small service_standard)
+(release_packing_station_from_order package_config_2 packing_station_a)
+(release_sku_reservation_from_order package_config_2 sku_1001)
+(reserve_sku_for_order pick_unit_1 sku_1001)
+(assign_service_level_to_order pick_unit_1 service_standard sku_1001)
+(propagate_service_and_finalize_pick_unit pick_unit_1 carton_small service_standard)
+(release_sku_reservation_from_order pick_unit_1 sku_1001)
+(reserve_sku_for_order consolidation_unit_1 sku_1001)
+(assign_service_level_to_order consolidation_unit_1 service_standard sku_1001)
+(propagate_service_and_finalize_consolidation_unit consolidation_unit_1 box_medium service_standard)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2tqtss13/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_2tqtss13/plan.pddl 58 
+
+
+
+--- stderr ---
+

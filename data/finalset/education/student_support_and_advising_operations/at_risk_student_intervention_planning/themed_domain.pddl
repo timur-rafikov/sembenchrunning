@@ -1,0 +1,937 @@
+(define (domain at_risk_student_intervention_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object personnel_supertype - entity resource_supertype - entity need_supertype - entity case_root - entity case_participant - case_root support_staff_member - personnel_supertype service_provider - personnel_supertype department_liaison - personnel_supertype approval_token - personnel_supertype service_option - personnel_supertype accommodation - personnel_supertype external_partner - personnel_supertype specialist_availability - personnel_supertype service_resource - resource_supertype assessment_form - resource_supertype specialist_consultant - resource_supertype academic_need - need_supertype nonacademic_need - need_supertype intervention_plan_document - need_supertype case_participant_subtype - case_participant coordinator_staff_subtype - case_participant faculty_advisor_staff - case_participant_subtype case_manager_staff - case_participant_subtype intervention_coordinator_staff - coordinator_staff_subtype)
+
+  (:predicates
+    (case_intake_open ?case_participant - case_participant)
+    (participant_confirmed ?case_participant - case_participant)
+    (case_assigned ?case_participant - case_participant)
+    (responsibility_assigned ?case_participant - case_participant)
+    (entity_finalized ?case_participant - case_participant)
+    (accommodation_recorded ?case_participant - case_participant)
+    (support_staff_available ?support_staff_member - support_staff_member)
+    (case_assigned_to_support_staff ?case_participant - case_participant ?support_staff_member - support_staff_member)
+    (service_provider_available ?service_provider_var - service_provider)
+    (case_referred_to_service_provider ?case_participant - case_participant ?service_provider_var - service_provider)
+    (department_liaison_available ?department_liaison - department_liaison)
+    (case_assigned_to_liaison ?case_participant - case_participant ?department_liaison - department_liaison)
+    (service_resource_available ?service_resource - service_resource)
+    (faculty_resource_assigned ?faculty_advisor_staff_var - faculty_advisor_staff ?service_resource - service_resource)
+    (case_manager_resource_assigned ?case_manager_staff_var - case_manager_staff ?service_resource - service_resource)
+    (advisor_reports_academic_need ?faculty_advisor_staff_var - faculty_advisor_staff ?academic_need - academic_need)
+    (academic_need_marked ?academic_need - academic_need)
+    (academic_need_resource_allocated ?academic_need - academic_need)
+    (advisor_assessment_recorded ?faculty_advisor_staff_var - faculty_advisor_staff)
+    (case_manager_reports_nonacademic_need ?case_manager_staff_var - case_manager_staff ?nonacademic_need - nonacademic_need)
+    (nonacademic_need_marked ?nonacademic_need - nonacademic_need)
+    (nonacademic_need_resource_allocated ?nonacademic_need - nonacademic_need)
+    (case_manager_assessment_recorded ?case_manager_staff_var - case_manager_staff)
+    (plan_document_slot_available ?intervention_plan_document - intervention_plan_document)
+    (plan_document_created ?intervention_plan_document - intervention_plan_document)
+    (plan_linked_to_academic_need ?intervention_plan_document - intervention_plan_document ?academic_need - academic_need)
+    (plan_linked_to_nonacademic_need ?intervention_plan_document - intervention_plan_document ?nonacademic_need - nonacademic_need)
+    (plan_includes_academic_actions ?intervention_plan_document - intervention_plan_document)
+    (plan_includes_nonacademic_actions ?intervention_plan_document - intervention_plan_document)
+    (plan_ready_for_documentation ?intervention_plan_document - intervention_plan_document)
+    (coordinator_linked_to_faculty_advisor ?intervention_coordinator_staff_var - intervention_coordinator_staff ?faculty_advisor_staff_var - faculty_advisor_staff)
+    (coordinator_linked_to_case_manager ?intervention_coordinator_staff_var - intervention_coordinator_staff ?case_manager_staff_var - case_manager_staff)
+    (coordinator_responsible_for_plan ?intervention_coordinator_staff_var - intervention_coordinator_staff ?intervention_plan_document - intervention_plan_document)
+    (assessment_form_available ?assessment_form - assessment_form)
+    (coordinator_has_assessment_form ?intervention_coordinator_staff_var - intervention_coordinator_staff ?assessment_form - assessment_form)
+    (assessment_form_attached ?assessment_form - assessment_form)
+    (assessment_form_linked_to_plan ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_specialist_engaged ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_ready_for_finalization ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_requested_approval ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_approval_recorded ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_has_partner_response ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (coordinator_documentation_locked ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (specialist_consultant_available ?specialist_consultant - specialist_consultant)
+    (coordinator_linked_to_specialist ?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_consultant - specialist_consultant)
+    (specialist_engagement_recorded ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (liaison_contact_requested ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (specialist_confirmation_received ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    (approval_token_available ?approval_token - approval_token)
+    (coordinator_has_approval_token ?intervention_coordinator_staff_var - intervention_coordinator_staff ?approval_token - approval_token)
+    (service_option_available ?service_option_var - service_option)
+    (coordinator_selected_service_option ?intervention_coordinator_staff_var - intervention_coordinator_staff ?service_option_var - service_option)
+    (external_partner_available ?external_partner - external_partner)
+    (coordinator_engaged_external_partner ?intervention_coordinator_staff_var - intervention_coordinator_staff ?external_partner - external_partner)
+    (specialist_availability_flag ?specialist_availability - specialist_availability)
+    (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability)
+    (accommodation_available ?accommodation - accommodation)
+    (case_linked_to_accommodation ?case_participant - case_participant ?accommodation - accommodation)
+    (advisor_action_recorded ?faculty_advisor_staff_var - faculty_advisor_staff)
+    (case_manager_action_recorded ?case_manager_staff_var - case_manager_staff)
+    (coordinator_completion_flag ?intervention_coordinator_staff_var - intervention_coordinator_staff)
+  )
+  (:action open_case_intake
+    :parameters (?case_participant - case_participant)
+    :precondition
+      (and
+        (not
+          (case_intake_open ?case_participant)
+        )
+        (not
+          (responsibility_assigned ?case_participant)
+        )
+      )
+    :effect (case_intake_open ?case_participant)
+  )
+  (:action assign_support_staff_to_case
+    :parameters (?case_participant - case_participant ?support_staff_member - support_staff_member)
+    :precondition
+      (and
+        (case_intake_open ?case_participant)
+        (not
+          (case_assigned ?case_participant)
+        )
+        (support_staff_available ?support_staff_member)
+      )
+    :effect
+      (and
+        (case_assigned ?case_participant)
+        (case_assigned_to_support_staff ?case_participant ?support_staff_member)
+        (not
+          (support_staff_available ?support_staff_member)
+        )
+      )
+  )
+  (:action refer_case_to_service_provider
+    :parameters (?case_participant - case_participant ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (case_intake_open ?case_participant)
+        (case_assigned ?case_participant)
+        (service_provider_available ?service_provider_var)
+      )
+    :effect
+      (and
+        (case_referred_to_service_provider ?case_participant ?service_provider_var)
+        (not
+          (service_provider_available ?service_provider_var)
+        )
+      )
+  )
+  (:action confirm_service_referral
+    :parameters (?case_participant - case_participant ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (case_intake_open ?case_participant)
+        (case_assigned ?case_participant)
+        (case_referred_to_service_provider ?case_participant ?service_provider_var)
+        (not
+          (participant_confirmed ?case_participant)
+        )
+      )
+    :effect (participant_confirmed ?case_participant)
+  )
+  (:action retract_service_referral
+    :parameters (?case_participant - case_participant ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (case_referred_to_service_provider ?case_participant ?service_provider_var)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider_var)
+        (not
+          (case_referred_to_service_provider ?case_participant ?service_provider_var)
+        )
+      )
+  )
+  (:action assign_department_liaison
+    :parameters (?case_participant - case_participant ?department_liaison - department_liaison)
+    :precondition
+      (and
+        (participant_confirmed ?case_participant)
+        (department_liaison_available ?department_liaison)
+      )
+    :effect
+      (and
+        (case_assigned_to_liaison ?case_participant ?department_liaison)
+        (not
+          (department_liaison_available ?department_liaison)
+        )
+      )
+  )
+  (:action retract_liaison_assignment
+    :parameters (?case_participant - case_participant ?department_liaison - department_liaison)
+    :precondition
+      (and
+        (case_assigned_to_liaison ?case_participant ?department_liaison)
+      )
+    :effect
+      (and
+        (department_liaison_available ?department_liaison)
+        (not
+          (case_assigned_to_liaison ?case_participant ?department_liaison)
+        )
+      )
+  )
+  (:action refer_to_external_partner
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?external_partner - external_partner)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (external_partner_available ?external_partner)
+      )
+    :effect
+      (and
+        (coordinator_engaged_external_partner ?intervention_coordinator_staff_var ?external_partner)
+        (not
+          (external_partner_available ?external_partner)
+        )
+      )
+  )
+  (:action retract_external_partner_referral
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?external_partner - external_partner)
+    :precondition
+      (and
+        (coordinator_engaged_external_partner ?intervention_coordinator_staff_var ?external_partner)
+      )
+    :effect
+      (and
+        (external_partner_available ?external_partner)
+        (not
+          (coordinator_engaged_external_partner ?intervention_coordinator_staff_var ?external_partner)
+        )
+      )
+  )
+  (:action assign_specialist_availability_to_coordinator
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (specialist_availability_flag ?specialist_availability)
+      )
+    :effect
+      (and
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (not
+          (specialist_availability_flag ?specialist_availability)
+        )
+      )
+  )
+  (:action unassign_specialist_availability
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability)
+    :precondition
+      (and
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+      )
+    :effect
+      (and
+        (specialist_availability_flag ?specialist_availability)
+        (not
+          (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        )
+      )
+  )
+  (:action faculty_flag_academic_need
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?academic_need - academic_need ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (participant_confirmed ?faculty_advisor_staff_var)
+        (case_referred_to_service_provider ?faculty_advisor_staff_var ?service_provider_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (not
+          (academic_need_marked ?academic_need)
+        )
+        (not
+          (academic_need_resource_allocated ?academic_need)
+        )
+      )
+    :effect (academic_need_marked ?academic_need)
+  )
+  (:action faculty_notify_liaison_about_need
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?academic_need - academic_need ?department_liaison - department_liaison)
+    :precondition
+      (and
+        (participant_confirmed ?faculty_advisor_staff_var)
+        (case_assigned_to_liaison ?faculty_advisor_staff_var ?department_liaison)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (academic_need_marked ?academic_need)
+        (not
+          (advisor_action_recorded ?faculty_advisor_staff_var)
+        )
+      )
+    :effect
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+      )
+  )
+  (:action faculty_allocate_service_resource
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?academic_need - academic_need ?service_resource - service_resource)
+    :precondition
+      (and
+        (participant_confirmed ?faculty_advisor_staff_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (service_resource_available ?service_resource)
+        (not
+          (advisor_action_recorded ?faculty_advisor_staff_var)
+        )
+      )
+    :effect
+      (and
+        (academic_need_resource_allocated ?academic_need)
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (faculty_resource_assigned ?faculty_advisor_staff_var ?service_resource)
+        (not
+          (service_resource_available ?service_resource)
+        )
+      )
+  )
+  (:action faculty_finalize_resource_allocation
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?academic_need - academic_need ?service_provider_var - service_provider ?service_resource - service_resource)
+    :precondition
+      (and
+        (participant_confirmed ?faculty_advisor_staff_var)
+        (case_referred_to_service_provider ?faculty_advisor_staff_var ?service_provider_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (academic_need_resource_allocated ?academic_need)
+        (faculty_resource_assigned ?faculty_advisor_staff_var ?service_resource)
+        (not
+          (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        )
+      )
+    :effect
+      (and
+        (academic_need_marked ?academic_need)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        (service_resource_available ?service_resource)
+        (not
+          (faculty_resource_assigned ?faculty_advisor_staff_var ?service_resource)
+        )
+      )
+  )
+  (:action case_manager_flag_nonacademic_need
+    :parameters (?case_manager_staff_var - case_manager_staff ?nonacademic_need - nonacademic_need ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (participant_confirmed ?case_manager_staff_var)
+        (case_referred_to_service_provider ?case_manager_staff_var ?service_provider_var)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (not
+          (nonacademic_need_marked ?nonacademic_need)
+        )
+        (not
+          (nonacademic_need_resource_allocated ?nonacademic_need)
+        )
+      )
+    :effect (nonacademic_need_marked ?nonacademic_need)
+  )
+  (:action case_manager_notify_liaison_about_need
+    :parameters (?case_manager_staff_var - case_manager_staff ?nonacademic_need - nonacademic_need ?department_liaison - department_liaison)
+    :precondition
+      (and
+        (participant_confirmed ?case_manager_staff_var)
+        (case_assigned_to_liaison ?case_manager_staff_var ?department_liaison)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (nonacademic_need_marked ?nonacademic_need)
+        (not
+          (case_manager_action_recorded ?case_manager_staff_var)
+        )
+      )
+    :effect
+      (and
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+      )
+  )
+  (:action case_manager_allocate_service_resource
+    :parameters (?case_manager_staff_var - case_manager_staff ?nonacademic_need - nonacademic_need ?service_resource - service_resource)
+    :precondition
+      (and
+        (participant_confirmed ?case_manager_staff_var)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (service_resource_available ?service_resource)
+        (not
+          (case_manager_action_recorded ?case_manager_staff_var)
+        )
+      )
+    :effect
+      (and
+        (nonacademic_need_resource_allocated ?nonacademic_need)
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (case_manager_resource_assigned ?case_manager_staff_var ?service_resource)
+        (not
+          (service_resource_available ?service_resource)
+        )
+      )
+  )
+  (:action case_manager_finalize_resource_allocation
+    :parameters (?case_manager_staff_var - case_manager_staff ?nonacademic_need - nonacademic_need ?service_provider_var - service_provider ?service_resource - service_resource)
+    :precondition
+      (and
+        (participant_confirmed ?case_manager_staff_var)
+        (case_referred_to_service_provider ?case_manager_staff_var ?service_provider_var)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (nonacademic_need_resource_allocated ?nonacademic_need)
+        (case_manager_resource_assigned ?case_manager_staff_var ?service_resource)
+        (not
+          (case_manager_assessment_recorded ?case_manager_staff_var)
+        )
+      )
+    :effect
+      (and
+        (nonacademic_need_marked ?nonacademic_need)
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+        (service_resource_available ?service_resource)
+        (not
+          (case_manager_resource_assigned ?case_manager_staff_var ?service_resource)
+        )
+      )
+  )
+  (:action create_intervention_plan_from_assessments
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?case_manager_staff_var - case_manager_staff ?academic_need - academic_need ?nonacademic_need - nonacademic_need ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (academic_need_marked ?academic_need)
+        (nonacademic_need_marked ?nonacademic_need)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+        (plan_document_slot_available ?intervention_plan_document)
+      )
+    :effect
+      (and
+        (plan_document_created ?intervention_plan_document)
+        (plan_linked_to_academic_need ?intervention_plan_document ?academic_need)
+        (plan_linked_to_nonacademic_need ?intervention_plan_document ?nonacademic_need)
+        (not
+          (plan_document_slot_available ?intervention_plan_document)
+        )
+      )
+  )
+  (:action assemble_intervention_plan_academic_priority
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?case_manager_staff_var - case_manager_staff ?academic_need - academic_need ?nonacademic_need - nonacademic_need ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (academic_need_resource_allocated ?academic_need)
+        (nonacademic_need_marked ?nonacademic_need)
+        (not
+          (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        )
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+        (plan_document_slot_available ?intervention_plan_document)
+      )
+    :effect
+      (and
+        (plan_document_created ?intervention_plan_document)
+        (plan_linked_to_academic_need ?intervention_plan_document ?academic_need)
+        (plan_linked_to_nonacademic_need ?intervention_plan_document ?nonacademic_need)
+        (plan_includes_academic_actions ?intervention_plan_document)
+        (not
+          (plan_document_slot_available ?intervention_plan_document)
+        )
+      )
+  )
+  (:action assemble_intervention_plan_nonacademic_priority
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?case_manager_staff_var - case_manager_staff ?academic_need - academic_need ?nonacademic_need - nonacademic_need ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (academic_need_marked ?academic_need)
+        (nonacademic_need_resource_allocated ?nonacademic_need)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        (not
+          (case_manager_assessment_recorded ?case_manager_staff_var)
+        )
+        (plan_document_slot_available ?intervention_plan_document)
+      )
+    :effect
+      (and
+        (plan_document_created ?intervention_plan_document)
+        (plan_linked_to_academic_need ?intervention_plan_document ?academic_need)
+        (plan_linked_to_nonacademic_need ?intervention_plan_document ?nonacademic_need)
+        (plan_includes_nonacademic_actions ?intervention_plan_document)
+        (not
+          (plan_document_slot_available ?intervention_plan_document)
+        )
+      )
+  )
+  (:action assemble_intervention_plan_full
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?case_manager_staff_var - case_manager_staff ?academic_need - academic_need ?nonacademic_need - nonacademic_need ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (advisor_reports_academic_need ?faculty_advisor_staff_var ?academic_need)
+        (case_manager_reports_nonacademic_need ?case_manager_staff_var ?nonacademic_need)
+        (academic_need_resource_allocated ?academic_need)
+        (nonacademic_need_resource_allocated ?nonacademic_need)
+        (not
+          (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        )
+        (not
+          (case_manager_assessment_recorded ?case_manager_staff_var)
+        )
+        (plan_document_slot_available ?intervention_plan_document)
+      )
+    :effect
+      (and
+        (plan_document_created ?intervention_plan_document)
+        (plan_linked_to_academic_need ?intervention_plan_document ?academic_need)
+        (plan_linked_to_nonacademic_need ?intervention_plan_document ?nonacademic_need)
+        (plan_includes_academic_actions ?intervention_plan_document)
+        (plan_includes_nonacademic_actions ?intervention_plan_document)
+        (not
+          (plan_document_slot_available ?intervention_plan_document)
+        )
+      )
+  )
+  (:action submit_plan_for_provider_review
+    :parameters (?intervention_plan_document - intervention_plan_document ?faculty_advisor_staff_var - faculty_advisor_staff ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (plan_document_created ?intervention_plan_document)
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (case_referred_to_service_provider ?faculty_advisor_staff_var ?service_provider_var)
+        (not
+          (plan_ready_for_documentation ?intervention_plan_document)
+        )
+      )
+    :effect (plan_ready_for_documentation ?intervention_plan_document)
+  )
+  (:action attach_assessment_form_to_plan
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (coordinator_responsible_for_plan ?intervention_coordinator_staff_var ?intervention_plan_document)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_available ?assessment_form)
+        (plan_document_created ?intervention_plan_document)
+        (plan_ready_for_documentation ?intervention_plan_document)
+        (not
+          (assessment_form_attached ?assessment_form)
+        )
+      )
+    :effect
+      (and
+        (assessment_form_attached ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (not
+          (assessment_form_available ?assessment_form)
+        )
+      )
+  )
+  (:action coordinator_prepare_specialist_referral
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_attached ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (case_referred_to_service_provider ?intervention_coordinator_staff_var ?service_provider_var)
+        (not
+          (plan_includes_academic_actions ?intervention_plan_document)
+        )
+        (not
+          (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+  )
+  (:action request_approval_token
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?approval_token - approval_token)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (approval_token_available ?approval_token)
+        (not
+          (coordinator_requested_approval ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_requested_approval ?intervention_coordinator_staff_var)
+        (coordinator_has_approval_token ?intervention_coordinator_staff_var ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action coordinator_initiate_specialist_referral
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document ?service_provider_var - service_provider ?approval_token - approval_token)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_attached ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (case_referred_to_service_provider ?intervention_coordinator_staff_var ?service_provider_var)
+        (plan_includes_academic_actions ?intervention_plan_document)
+        (coordinator_requested_approval ?intervention_coordinator_staff_var)
+        (coordinator_has_approval_token ?intervention_coordinator_staff_var ?approval_token)
+        (not
+          (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+        (coordinator_approval_recorded ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action initiate_specialist_integration
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?external_partner - external_partner ?department_liaison - department_liaison ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+        (coordinator_engaged_external_partner ?intervention_coordinator_staff_var ?external_partner)
+        (case_assigned_to_liaison ?intervention_coordinator_staff_var ?department_liaison)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (not
+          (plan_includes_nonacademic_actions ?intervention_plan_document)
+        )
+        (not
+          (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+  )
+  (:action confirm_specialist_integration
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?external_partner - external_partner ?department_liaison - department_liaison ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_ready_for_specialist_referral ?intervention_coordinator_staff_var)
+        (coordinator_engaged_external_partner ?intervention_coordinator_staff_var ?external_partner)
+        (case_assigned_to_liaison ?intervention_coordinator_staff_var ?department_liaison)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (plan_includes_nonacademic_actions ?intervention_plan_document)
+        (not
+          (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+  )
+  (:action coordinator_finalize_partner_integration_stage_a
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (not
+          (plan_includes_academic_actions ?intervention_plan_document)
+        )
+        (not
+          (plan_includes_nonacademic_actions ?intervention_plan_document)
+        )
+        (not
+          (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+  )
+  (:action coordinator_finalize_partner_integration_stage_b
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (plan_includes_academic_actions ?intervention_plan_document)
+        (not
+          (plan_includes_nonacademic_actions ?intervention_plan_document)
+        )
+        (not
+          (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action coordinator_finalize_partner_integration_stage_c
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (not
+          (plan_includes_academic_actions ?intervention_plan_document)
+        )
+        (plan_includes_nonacademic_actions ?intervention_plan_document)
+        (not
+          (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action coordinator_finalize_partner_integration_stage_d
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability ?assessment_form - assessment_form ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (coordinator_specialist_engaged ?intervention_coordinator_staff_var)
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (coordinator_has_assessment_form ?intervention_coordinator_staff_var ?assessment_form)
+        (assessment_form_linked_to_plan ?assessment_form ?intervention_plan_document)
+        (plan_includes_academic_actions ?intervention_plan_document)
+        (plan_includes_nonacademic_actions ?intervention_plan_document)
+        (not
+          (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action coordinator_sign_off_final_review
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (not
+          (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+        )
+        (not
+          (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        (entity_finalized ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action coordinator_select_service_option
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?service_option_var - service_option)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+        (service_option_available ?service_option_var)
+      )
+    :effect
+      (and
+        (coordinator_selected_service_option ?intervention_coordinator_staff_var ?service_option_var)
+        (not
+          (service_option_available ?service_option_var)
+        )
+      )
+  )
+  (:action coordinator_initiate_finalization
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?faculty_advisor_staff_var - faculty_advisor_staff ?case_manager_staff_var - case_manager_staff ?service_provider_var - service_provider ?service_option_var - service_option)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_has_partner_response ?intervention_coordinator_staff_var)
+        (coordinator_selected_service_option ?intervention_coordinator_staff_var ?service_option_var)
+        (coordinator_linked_to_faculty_advisor ?intervention_coordinator_staff_var ?faculty_advisor_staff_var)
+        (coordinator_linked_to_case_manager ?intervention_coordinator_staff_var ?case_manager_staff_var)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+        (case_referred_to_service_provider ?intervention_coordinator_staff_var ?service_provider_var)
+        (not
+          (coordinator_documentation_locked ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (coordinator_documentation_locked ?intervention_coordinator_staff_var)
+  )
+  (:action complete_coordinator_finalization
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?intervention_coordinator_staff_var)
+        (coordinator_documentation_locked ?intervention_coordinator_staff_var)
+        (not
+          (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        (entity_finalized ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action engage_specialist_consultant
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_consultant - specialist_consultant ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (participant_confirmed ?intervention_coordinator_staff_var)
+        (case_referred_to_service_provider ?intervention_coordinator_staff_var ?service_provider_var)
+        (specialist_consultant_available ?specialist_consultant)
+        (coordinator_linked_to_specialist ?intervention_coordinator_staff_var ?specialist_consultant)
+        (not
+          (specialist_engagement_recorded ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (specialist_engagement_recorded ?intervention_coordinator_staff_var)
+        (not
+          (specialist_consultant_available ?specialist_consultant)
+        )
+      )
+  )
+  (:action request_liaison_contact
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?department_liaison - department_liaison)
+    :precondition
+      (and
+        (specialist_engagement_recorded ?intervention_coordinator_staff_var)
+        (case_assigned_to_liaison ?intervention_coordinator_staff_var ?department_liaison)
+        (not
+          (liaison_contact_requested ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (liaison_contact_requested ?intervention_coordinator_staff_var)
+  )
+  (:action confirm_specialist_availability
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?specialist_availability - specialist_availability)
+    :precondition
+      (and
+        (liaison_contact_requested ?intervention_coordinator_staff_var)
+        (coordinator_linked_to_specialist_availability ?intervention_coordinator_staff_var ?specialist_availability)
+        (not
+          (specialist_confirmation_received ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect (specialist_confirmation_received ?intervention_coordinator_staff_var)
+  )
+  (:action complete_liaison_contact
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff)
+    :precondition
+      (and
+        (specialist_confirmation_received ?intervention_coordinator_staff_var)
+        (not
+          (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (coordinator_completion_flag ?intervention_coordinator_staff_var)
+        (entity_finalized ?intervention_coordinator_staff_var)
+      )
+  )
+  (:action record_faculty_completion
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (advisor_action_recorded ?faculty_advisor_staff_var)
+        (advisor_assessment_recorded ?faculty_advisor_staff_var)
+        (plan_document_created ?intervention_plan_document)
+        (plan_ready_for_documentation ?intervention_plan_document)
+        (not
+          (entity_finalized ?faculty_advisor_staff_var)
+        )
+      )
+    :effect (entity_finalized ?faculty_advisor_staff_var)
+  )
+  (:action record_case_manager_completion
+    :parameters (?case_manager_staff_var - case_manager_staff ?intervention_plan_document - intervention_plan_document)
+    :precondition
+      (and
+        (case_manager_action_recorded ?case_manager_staff_var)
+        (case_manager_assessment_recorded ?case_manager_staff_var)
+        (plan_document_created ?intervention_plan_document)
+        (plan_ready_for_documentation ?intervention_plan_document)
+        (not
+          (entity_finalized ?case_manager_staff_var)
+        )
+      )
+    :effect (entity_finalized ?case_manager_staff_var)
+  )
+  (:action record_accommodation_for_case
+    :parameters (?case_participant - case_participant ?accommodation - accommodation ?service_provider_var - service_provider)
+    :precondition
+      (and
+        (entity_finalized ?case_participant)
+        (case_referred_to_service_provider ?case_participant ?service_provider_var)
+        (accommodation_available ?accommodation)
+        (not
+          (accommodation_recorded ?case_participant)
+        )
+      )
+    :effect
+      (and
+        (accommodation_recorded ?case_participant)
+        (case_linked_to_accommodation ?case_participant ?accommodation)
+        (not
+          (accommodation_available ?accommodation)
+        )
+      )
+  )
+  (:action assign_accommodation_task_to_faculty
+    :parameters (?faculty_advisor_staff_var - faculty_advisor_staff ?support_staff_member - support_staff_member ?accommodation - accommodation)
+    :precondition
+      (and
+        (accommodation_recorded ?faculty_advisor_staff_var)
+        (case_assigned_to_support_staff ?faculty_advisor_staff_var ?support_staff_member)
+        (case_linked_to_accommodation ?faculty_advisor_staff_var ?accommodation)
+        (not
+          (responsibility_assigned ?faculty_advisor_staff_var)
+        )
+      )
+    :effect
+      (and
+        (responsibility_assigned ?faculty_advisor_staff_var)
+        (support_staff_available ?support_staff_member)
+        (accommodation_available ?accommodation)
+      )
+  )
+  (:action assign_accommodation_task_to_case_manager
+    :parameters (?case_manager_staff_var - case_manager_staff ?support_staff_member - support_staff_member ?accommodation - accommodation)
+    :precondition
+      (and
+        (accommodation_recorded ?case_manager_staff_var)
+        (case_assigned_to_support_staff ?case_manager_staff_var ?support_staff_member)
+        (case_linked_to_accommodation ?case_manager_staff_var ?accommodation)
+        (not
+          (responsibility_assigned ?case_manager_staff_var)
+        )
+      )
+    :effect
+      (and
+        (responsibility_assigned ?case_manager_staff_var)
+        (support_staff_available ?support_staff_member)
+        (accommodation_available ?accommodation)
+      )
+  )
+  (:action assign_accommodation_task_to_coordinator
+    :parameters (?intervention_coordinator_staff_var - intervention_coordinator_staff ?support_staff_member - support_staff_member ?accommodation - accommodation)
+    :precondition
+      (and
+        (accommodation_recorded ?intervention_coordinator_staff_var)
+        (case_assigned_to_support_staff ?intervention_coordinator_staff_var ?support_staff_member)
+        (case_linked_to_accommodation ?intervention_coordinator_staff_var ?accommodation)
+        (not
+          (responsibility_assigned ?intervention_coordinator_staff_var)
+        )
+      )
+    :effect
+      (and
+        (responsibility_assigned ?intervention_coordinator_staff_var)
+        (support_staff_available ?support_staff_member)
+        (accommodation_available ?accommodation)
+      )
+  )
+)

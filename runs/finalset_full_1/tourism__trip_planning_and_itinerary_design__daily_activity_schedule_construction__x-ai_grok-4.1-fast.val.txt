@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain daily_activity_schedule_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_entity - object supply_entity - object scheduling_entity - object itinerary_container - object trip_day - itinerary_container transport_choice - service_entity activity_type - service_entity service_provider - service_entity user_preference - service_entity traveler_profile - service_entity personal_requirement - service_entity facility_booking - service_entity guide_option - service_entity resource_item - supply_entity venue - supply_entity promotional_offer - supply_entity morning_time_window - scheduling_entity afternoon_time_window - scheduling_entity activity_offer - scheduling_entity day_segment_group - trip_day day_plan_group - trip_day morning_block - day_segment_group afternoon_block - day_segment_group day_plan - day_plan_group)
+  (:predicates
+    (trip_day_initialized ?day - trip_day)
+    (schedule_element_validated ?day - trip_day)
+    (schedule_element_has_transport ?day - trip_day)
+    (schedule_element_confirmed ?day - trip_day)
+    (itinerary_element_active ?day - trip_day)
+    (personal_requirements_attached ?day - trip_day)
+    (transport_available ?transport - transport_choice)
+    (schedule_element_transport_association ?day - trip_day ?transport - transport_choice)
+    (activity_available ?activity - activity_type)
+    (schedule_element_activity_candidate_association ?day - trip_day ?activity - activity_type)
+    (service_provider_available ?service_provider - service_provider)
+    (day_service_provider_assigned ?day - trip_day ?service_provider - service_provider)
+    (resource_item_available ?resource_item - resource_item)
+    (morning_block_resource_reserved ?morning_block - morning_block ?resource_item - resource_item)
+    (afternoon_block_resource_reserved ?afternoon_block - afternoon_block ?resource_item - resource_item)
+    (morning_block_time_window_association ?morning_block - morning_block ?morning_time_window - morning_time_window)
+    (morning_time_window_occupied ?morning_time_window - morning_time_window)
+    (morning_time_window_reserved_for_resource ?morning_time_window - morning_time_window)
+    (morning_block_ready ?morning_block - morning_block)
+    (afternoon_block_time_window_association ?afternoon_block - afternoon_block ?afternoon_time_window - afternoon_time_window)
+    (afternoon_time_window_occupied ?afternoon_time_window - afternoon_time_window)
+    (afternoon_time_window_reserved_for_resource ?afternoon_time_window - afternoon_time_window)
+    (afternoon_block_ready ?afternoon_block - afternoon_block)
+    (activity_offer_available ?activity_offer - activity_offer)
+    (activity_offer_proposed ?activity_offer - activity_offer)
+    (activity_offer_assigned_morning_window ?activity_offer - activity_offer ?morning_time_window - morning_time_window)
+    (activity_offer_assigned_afternoon_window ?activity_offer - activity_offer ?afternoon_time_window - afternoon_time_window)
+    (activity_offer_flag_stage_1 ?activity_offer - activity_offer)
+    (activity_offer_flag_stage_2 ?activity_offer - activity_offer)
+    (activity_offer_time_confirmed ?activity_offer - activity_offer)
+    (plan_has_morning_block ?day_plan - day_plan ?morning_block - morning_block)
+    (plan_has_afternoon_block ?day_plan - day_plan ?afternoon_block - afternoon_block)
+    (plan_includes_activity_offer ?day_plan - day_plan ?activity_offer - activity_offer)
+    (venue_available ?venue - venue)
+    (plan_has_venue ?day_plan - day_plan ?venue - venue)
+    (venue_reserved ?venue - venue)
+    (venue_assigned_to_offer ?venue - venue ?activity_offer - activity_offer)
+    (plan_prepared_for_booking ?day_plan - day_plan)
+    (plan_booking_ready ?day_plan - day_plan)
+    (plan_booking_initiated ?day_plan - day_plan)
+    (plan_has_user_preference ?day_plan - day_plan)
+    (plan_preference_applied ?day_plan - day_plan)
+    (plan_preferences_attached ?day_plan - day_plan)
+    (plan_resources_finalized ?day_plan - day_plan)
+    (promotional_offer_available ?promotional_offer - promotional_offer)
+    (plan_has_promotional_offer ?day_plan - day_plan ?promotional_offer - promotional_offer)
+    (promotional_offer_applied_to_plan ?day_plan - day_plan)
+    (plan_ready_for_guide_assignment ?day_plan - day_plan)
+    (guide_assigned_to_plan ?day_plan - day_plan)
+    (user_preference_available ?user_preference - user_preference)
+    (plan_has_user_preference_association ?day_plan - day_plan ?user_preference - user_preference)
+    (traveler_profile_available ?traveler_profile - traveler_profile)
+    (plan_has_traveler_profile ?day_plan - day_plan ?traveler_profile - traveler_profile)
+    (facility_booking_available ?facility_booking - facility_booking)
+    (plan_has_facility_booking ?day_plan - day_plan ?facility_booking - facility_booking)
+    (guide_option_available ?guide_option - guide_option)
+    (plan_has_guide_option ?day_plan - day_plan ?guide_option - guide_option)
+    (personal_requirement_available ?personal_requirement - personal_requirement)
+    (day_has_personal_requirement ?day - trip_day ?personal_requirement - personal_requirement)
+    (morning_block_allocated ?morning_block - morning_block)
+    (afternoon_block_allocated ?afternoon_block - afternoon_block)
+    (plan_finalized ?day_plan - day_plan)
+  )
+  (:action initialize_trip_day
+    :parameters (?day - trip_day)
+    :precondition
+      (and
+        (not
+          (trip_day_initialized ?day)
+        )
+        (not
+          (schedule_element_confirmed ?day)
+        )
+      )
+    :effect (trip_day_initialized ?day)
+  )
+  (:action assign_transport_to_day
+    :parameters (?day - trip_day ?transport - transport_choice)
+    :precondition
+      (and
+        (trip_day_initialized ?day)
+        (not
+          (schedule_element_has_transport ?day)
+        )
+        (transport_available ?transport)
+      )
+    :effect
+      (and
+        (schedule_element_has_transport ?day)
+        (schedule_element_transport_association ?day ?transport)
+        (not
+          (transport_available ?transport)
+        )
+      )
+  )
+  (:action propose_activity_for_day
+    :parameters (?day - trip_day ?activity - activity_type)
+    :precondition
+      (and
+        (trip_day_initialized ?day)
+        (schedule_element_has_transport ?day)
+        (activity_available ?activity)
+      )
+    :effect
+      (and
+        (schedule_element_activity_candidate_association ?day ?activity)
+        (not
+          (activity_available ?activity)
+        )
+      )
+  )
+  (:action validate_day_for_booking
+    :parameters (?day - trip_day ?activity - activity_type)
+    :precondition
+      (and
+        (trip_day_initialized ?day)
+        (schedule_element_has_transport ?day)
+        (schedule_element_activity_candidate_association ?day ?activity)
+        (not
+          (schedule_element_validated ?day)
+        )
+      )
+    :effect (schedule_element_validated ?day)
+  )
+  (:action release_activity_candidate
+    :parameters (?day - trip_day ?activity - activity_type)
+    :precondition
+      (and
+        (schedule_element_activity_candidate_association ?day ?activity)
+      )
+    :effect
+      (and
+        (activity_available ?activity)
+        (not
+          (schedule_element_activity_candidate_association ?day ?activity)
+        )
+      )
+  )
+  (:action attach_service_provider_to_day
+    :parameters (?day - trip_day ?service_provider - service_provider)
+    :precondition
+      (and
+        (schedule_element_validated ?day)
+        (service_provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (day_service_provider_assigned ?day ?service_provider)
+        (not
+          (service_provider_available ?service_provider)
+        )
+      )
+  )
+  (:action detach_service_provider_from_day
+    :parameters (?day - trip_day ?service_provider - service_provider)
+    :precondition
+      (and
+        (day_service_provider_assigned ?day ?service_provider)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider)
+        (not
+          (day_service_provider_assigned ?day ?service_provider)
+        )
+      )
+  )
+  (:action reserve_facility_booking_for_plan
+    :parameters (?day_plan - day_plan ?facility_booking - facility_booking)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (facility_booking_available ?facility_booking)
+      )
+    :effect
+      (and
+        (plan_has_facility_booking ?day_plan ?facility_booking)
+        (not
+          (facility_booking_available ?facility_booking)
+        )
+      )
+  )
+  (:action release_facility_booking_from_plan
+    :parameters (?day_plan - day_plan ?facility_booking - facility_booking)
+    :precondition
+      (and
+        (plan_has_facility_booking ?day_plan ?facility_booking)
+      )
+    :effect
+      (and
+        (facility_booking_available ?facility_booking)
+        (not
+          (plan_has_facility_booking ?day_plan ?facility_booking)
+        )
+      )
+  )
+  (:action attach_guide_option_to_plan
+    :parameters (?day_plan - day_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (guide_option_available ?guide_option)
+      )
+    :effect
+      (and
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (not
+          (guide_option_available ?guide_option)
+        )
+      )
+  )
+  (:action detach_guide_option_from_plan
+    :parameters (?day_plan - day_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (plan_has_guide_option ?day_plan ?guide_option)
+      )
+    :effect
+      (and
+        (guide_option_available ?guide_option)
+        (not
+          (plan_has_guide_option ?day_plan ?guide_option)
+        )
+      )
+  )
+  (:action allocate_morning_time_window
+    :parameters (?morning_block - morning_block ?morning_time_window - morning_time_window ?activity - activity_type)
+    :precondition
+      (and
+        (schedule_element_validated ?morning_block)
+        (schedule_element_activity_candidate_association ?morning_block ?activity)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (not
+          (morning_time_window_occupied ?morning_time_window)
+        )
+        (not
+          (morning_time_window_reserved_for_resource ?morning_time_window)
+        )
+      )
+    :effect (morning_time_window_occupied ?morning_time_window)
+  )
+  (:action confirm_morning_block_service
+    :parameters (?morning_block - morning_block ?morning_time_window - morning_time_window ?service_provider - service_provider)
+    :precondition
+      (and
+        (schedule_element_validated ?morning_block)
+        (day_service_provider_assigned ?morning_block ?service_provider)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (morning_time_window_occupied ?morning_time_window)
+        (not
+          (morning_block_allocated ?morning_block)
+        )
+      )
+    :effect
+      (and
+        (morning_block_allocated ?morning_block)
+        (morning_block_ready ?morning_block)
+      )
+  )
+  (:action reserve_resource_for_morning_block
+    :parameters (?morning_block - morning_block ?morning_time_window - morning_time_window ?resource_item - resource_item)
+    :precondition
+      (and
+        (schedule_element_validated ?morning_block)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (resource_item_available ?resource_item)
+        (not
+          (morning_block_allocated ?morning_block)
+        )
+      )
+    :effect
+      (and
+        (morning_time_window_reserved_for_resource ?morning_time_window)
+        (morning_block_allocated ?morning_block)
+        (morning_block_resource_reserved ?morning_block ?resource_item)
+        (not
+          (resource_item_available ?resource_item)
+        )
+      )
+  )
+  (:action finalize_morning_activity_with_resource
+    :parameters (?morning_block - morning_block ?morning_time_window - morning_time_window ?activity - activity_type ?resource_item - resource_item)
+    :precondition
+      (and
+        (schedule_element_validated ?morning_block)
+        (schedule_element_activity_candidate_association ?morning_block ?activity)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (morning_time_window_reserved_for_resource ?morning_time_window)
+        (morning_block_resource_reserved ?morning_block ?resource_item)
+        (not
+          (morning_block_ready ?morning_block)
+        )
+      )
+    :effect
+      (and
+        (morning_time_window_occupied ?morning_time_window)
+        (morning_block_ready ?morning_block)
+        (resource_item_available ?resource_item)
+        (not
+          (morning_block_resource_reserved ?morning_block ?resource_item)
+        )
+      )
+  )
+  (:action allocate_afternoon_time_window
+    :parameters (?afternoon_block - afternoon_block ?afternoon_time_window - afternoon_time_window ?activity - activity_type)
+    :precondition
+      (and
+        (schedule_element_validated ?afternoon_block)
+        (schedule_element_activity_candidate_association ?afternoon_block ?activity)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (not
+          (afternoon_time_window_occupied ?afternoon_time_window)
+        )
+        (not
+          (afternoon_time_window_reserved_for_resource ?afternoon_time_window)
+        )
+      )
+    :effect (afternoon_time_window_occupied ?afternoon_time_window)
+  )
+  (:action confirm_afternoon_block_service
+    :parameters (?afternoon_block - afternoon_block ?afternoon_time_window - afternoon_time_window ?service_provider - service_provider)
+    :precondition
+      (and
+        (schedule_element_validated ?afternoon_block)
+        (day_service_provider_assigned ?afternoon_block ?service_provider)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (afternoon_time_window_occupied ?afternoon_time_window)
+        (not
+          (afternoon_block_allocated ?afternoon_block)
+        )
+      )
+    :effect
+      (and
+        (afternoon_block_allocated ?afternoon_block)
+        (afternoon_block_ready ?afternoon_block)
+      )
+  )
+  (:action reserve_resource_for_afternoon_block
+    :parameters (?afternoon_block - afternoon_block ?afternoon_time_window - afternoon_time_window ?resource_item - resource_item)
+    :precondition
+      (and
+        (schedule_element_validated ?afternoon_block)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (resource_item_available ?resource_item)
+        (not
+          (afternoon_block_allocated ?afternoon_block)
+        )
+      )
+    :effect
+      (and
+        (afternoon_time_window_reserved_for_resource ?afternoon_time_window)
+        (afternoon_block_allocated ?afternoon_block)
+        (afternoon_block_resource_reserved ?afternoon_block ?resource_item)
+        (not
+          (resource_item_available ?resource_item)
+        )
+      )
+  )
+  (:action finalize_afternoon_activity_with_resource
+    :parameters (?afternoon_block - afternoon_block ?afternoon_time_window - afternoon_time_window ?activity - activity_type ?resource_item - resource_item)
+    :precondition
+      (and
+        (schedule_element_validated ?afternoon_block)
+        (schedule_element_activity_candidate_association ?afternoon_block ?activity)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (afternoon_time_window_reserved_for_resource ?afternoon_time_window)
+        (afternoon_block_resource_reserved ?afternoon_block ?resource_item)
+        (not
+          (afternoon_block_ready ?afternoon_block)
+        )
+      )
+    :effect
+      (and
+        (afternoon_time_window_occupied ?afternoon_time_window)
+        (afternoon_block_ready ?afternoon_block)
+        (resource_item_available ?resource_item)
+        (not
+          (afternoon_block_resource_reserved ?afternoon_block ?resource_item)
+        )
+      )
+  )
+  (:action compose_activity_offer_from_segments
+    :parameters (?morning_block - morning_block ?afternoon_block - afternoon_block ?morning_time_window - morning_time_window ?afternoon_time_window - afternoon_time_window ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (morning_block_allocated ?morning_block)
+        (afternoon_block_allocated ?afternoon_block)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (morning_time_window_occupied ?morning_time_window)
+        (afternoon_time_window_occupied ?afternoon_time_window)
+        (morning_block_ready ?morning_block)
+        (afternoon_block_ready ?afternoon_block)
+        (activity_offer_available ?activity_offer)
+      )
+    :effect
+      (and
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_assigned_morning_window ?activity_offer ?morning_time_window)
+        (activity_offer_assigned_afternoon_window ?activity_offer ?afternoon_time_window)
+        (not
+          (activity_offer_available ?activity_offer)
+        )
+      )
+  )
+  (:action compose_activity_offer_morning_resource
+    :parameters (?morning_block - morning_block ?afternoon_block - afternoon_block ?morning_time_window - morning_time_window ?afternoon_time_window - afternoon_time_window ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (morning_block_allocated ?morning_block)
+        (afternoon_block_allocated ?afternoon_block)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (morning_time_window_reserved_for_resource ?morning_time_window)
+        (afternoon_time_window_occupied ?afternoon_time_window)
+        (not
+          (morning_block_ready ?morning_block)
+        )
+        (afternoon_block_ready ?afternoon_block)
+        (activity_offer_available ?activity_offer)
+      )
+    :effect
+      (and
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_assigned_morning_window ?activity_offer ?morning_time_window)
+        (activity_offer_assigned_afternoon_window ?activity_offer ?afternoon_time_window)
+        (activity_offer_flag_stage_1 ?activity_offer)
+        (not
+          (activity_offer_available ?activity_offer)
+        )
+      )
+  )
+  (:action compose_activity_offer_afternoon_resource
+    :parameters (?morning_block - morning_block ?afternoon_block - afternoon_block ?morning_time_window - morning_time_window ?afternoon_time_window - afternoon_time_window ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (morning_block_allocated ?morning_block)
+        (afternoon_block_allocated ?afternoon_block)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (morning_time_window_occupied ?morning_time_window)
+        (afternoon_time_window_reserved_for_resource ?afternoon_time_window)
+        (morning_block_ready ?morning_block)
+        (not
+          (afternoon_block_ready ?afternoon_block)
+        )
+        (activity_offer_available ?activity_offer)
+      )
+    :effect
+      (and
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_assigned_morning_window ?activity_offer ?morning_time_window)
+        (activity_offer_assigned_afternoon_window ?activity_offer ?afternoon_time_window)
+        (activity_offer_flag_stage_2 ?activity_offer)
+        (not
+          (activity_offer_available ?activity_offer)
+        )
+      )
+  )
+  (:action compose_activity_offer_with_both_resources
+    :parameters (?morning_block - morning_block ?afternoon_block - afternoon_block ?morning_time_window - morning_time_window ?afternoon_time_window - afternoon_time_window ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (morning_block_allocated ?morning_block)
+        (afternoon_block_allocated ?afternoon_block)
+        (morning_block_time_window_association ?morning_block ?morning_time_window)
+        (afternoon_block_time_window_association ?afternoon_block ?afternoon_time_window)
+        (morning_time_window_reserved_for_resource ?morning_time_window)
+        (afternoon_time_window_reserved_for_resource ?afternoon_time_window)
+        (not
+          (morning_block_ready ?morning_block)
+        )
+        (not
+          (afternoon_block_ready ?afternoon_block)
+        )
+        (activity_offer_available ?activity_offer)
+      )
+    :effect
+      (and
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_assigned_morning_window ?activity_offer ?morning_time_window)
+        (activity_offer_assigned_afternoon_window ?activity_offer ?afternoon_time_window)
+        (activity_offer_flag_stage_1 ?activity_offer)
+        (activity_offer_flag_stage_2 ?activity_offer)
+        (not
+          (activity_offer_available ?activity_offer)
+        )
+      )
+  )
+  (:action confirm_activity_offer_time_slot
+    :parameters (?activity_offer - activity_offer ?morning_block - morning_block ?activity - activity_type)
+    :precondition
+      (and
+        (activity_offer_proposed ?activity_offer)
+        (morning_block_allocated ?morning_block)
+        (schedule_element_activity_candidate_association ?morning_block ?activity)
+        (not
+          (activity_offer_time_confirmed ?activity_offer)
+        )
+      )
+    :effect (activity_offer_time_confirmed ?activity_offer)
+  )
+  (:action reserve_venue_for_offer
+    :parameters (?day_plan - day_plan ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (plan_includes_activity_offer ?day_plan ?activity_offer)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_available ?venue)
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_time_confirmed ?activity_offer)
+        (not
+          (venue_reserved ?venue)
+        )
+      )
+    :effect
+      (and
+        (venue_reserved ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (not
+          (venue_available ?venue)
+        )
+      )
+  )
+  (:action confirm_venue_allocation_for_plan
+    :parameters (?day_plan - day_plan ?venue - venue ?activity_offer - activity_offer ?activity - activity_type)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_reserved ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (schedule_element_activity_candidate_association ?day_plan ?activity)
+        (not
+          (activity_offer_flag_stage_1 ?activity_offer)
+        )
+        (not
+          (plan_prepared_for_booking ?day_plan)
+        )
+      )
+    :effect (plan_prepared_for_booking ?day_plan)
+  )
+  (:action attach_user_preference_to_plan
+    :parameters (?day_plan - day_plan ?user_preference - user_preference)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (user_preference_available ?user_preference)
+        (not
+          (plan_has_user_preference ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_user_preference ?day_plan)
+        (plan_has_user_preference_association ?day_plan ?user_preference)
+        (not
+          (user_preference_available ?user_preference)
+        )
+      )
+  )
+  (:action apply_user_preference_and_prepare_plan
+    :parameters (?day_plan - day_plan ?venue - venue ?activity_offer - activity_offer ?activity - activity_type ?user_preference - user_preference)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_reserved ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (schedule_element_activity_candidate_association ?day_plan ?activity)
+        (activity_offer_flag_stage_1 ?activity_offer)
+        (plan_has_user_preference ?day_plan)
+        (plan_has_user_preference_association ?day_plan ?user_preference)
+        (not
+          (plan_prepared_for_booking ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_prepared_for_booking ?day_plan)
+        (plan_preference_applied ?day_plan)
+      )
+  )
+  (:action stage_offer_booking
+    :parameters (?day_plan - day_plan ?facility_booking - facility_booking ?service_provider - service_provider ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_prepared_for_booking ?day_plan)
+        (plan_has_facility_booking ?day_plan ?facility_booking)
+        (day_service_provider_assigned ?day_plan ?service_provider)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (not
+          (activity_offer_flag_stage_2 ?activity_offer)
+        )
+        (not
+          (plan_booking_ready ?day_plan)
+        )
+      )
+    :effect (plan_booking_ready ?day_plan)
+  )
+  (:action stage_offer_booking_alternate
+    :parameters (?day_plan - day_plan ?facility_booking - facility_booking ?service_provider - service_provider ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_prepared_for_booking ?day_plan)
+        (plan_has_facility_booking ?day_plan ?facility_booking)
+        (day_service_provider_assigned ?day_plan ?service_provider)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (activity_offer_flag_stage_2 ?activity_offer)
+        (not
+          (plan_booking_ready ?day_plan)
+        )
+      )
+    :effect (plan_booking_ready ?day_plan)
+  )
+  (:action initiate_offer_booking_stage
+    :parameters (?day_plan - day_plan ?guide_option - guide_option ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_booking_ready ?day_plan)
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (not
+          (activity_offer_flag_stage_1 ?activity_offer)
+        )
+        (not
+          (activity_offer_flag_stage_2 ?activity_offer)
+        )
+        (not
+          (plan_booking_initiated ?day_plan)
+        )
+      )
+    :effect (plan_booking_initiated ?day_plan)
+  )
+  (:action advance_offer_booking_with_additional_confirmation
+    :parameters (?day_plan - day_plan ?guide_option - guide_option ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_booking_ready ?day_plan)
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (activity_offer_flag_stage_1 ?activity_offer)
+        (not
+          (activity_offer_flag_stage_2 ?activity_offer)
+        )
+        (not
+          (plan_booking_initiated ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_preferences_attached ?day_plan)
+      )
+  )
+  (:action advance_offer_booking_with_alternate_confirmation
+    :parameters (?day_plan - day_plan ?guide_option - guide_option ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_booking_ready ?day_plan)
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (not
+          (activity_offer_flag_stage_1 ?activity_offer)
+        )
+        (activity_offer_flag_stage_2 ?activity_offer)
+        (not
+          (plan_booking_initiated ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_preferences_attached ?day_plan)
+      )
+  )
+  (:action advance_offer_booking_with_full_confirmation
+    :parameters (?day_plan - day_plan ?guide_option - guide_option ?venue - venue ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (plan_booking_ready ?day_plan)
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (plan_has_venue ?day_plan ?venue)
+        (venue_assigned_to_offer ?venue ?activity_offer)
+        (activity_offer_flag_stage_1 ?activity_offer)
+        (activity_offer_flag_stage_2 ?activity_offer)
+        (not
+          (plan_booking_initiated ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_preferences_attached ?day_plan)
+      )
+  )
+  (:action activate_day_plan_for_confirmation
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (plan_booking_initiated ?day_plan)
+        (not
+          (plan_preferences_attached ?day_plan)
+        )
+        (not
+          (plan_finalized ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?day_plan)
+        (itinerary_element_active ?day_plan)
+      )
+  )
+  (:action attach_traveler_profile_to_plan
+    :parameters (?day_plan - day_plan ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_preferences_attached ?day_plan)
+        (traveler_profile_available ?traveler_profile)
+      )
+    :effect
+      (and
+        (plan_has_traveler_profile ?day_plan ?traveler_profile)
+        (not
+          (traveler_profile_available ?traveler_profile)
+        )
+      )
+  )
+  (:action validate_plan_with_profile_and_segments
+    :parameters (?day_plan - day_plan ?morning_block - morning_block ?afternoon_block - afternoon_block ?activity - activity_type ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_preferences_attached ?day_plan)
+        (plan_has_traveler_profile ?day_plan ?traveler_profile)
+        (plan_has_morning_block ?day_plan ?morning_block)
+        (plan_has_afternoon_block ?day_plan ?afternoon_block)
+        (morning_block_ready ?morning_block)
+        (afternoon_block_ready ?afternoon_block)
+        (schedule_element_activity_candidate_association ?day_plan ?activity)
+        (not
+          (plan_resources_finalized ?day_plan)
+        )
+      )
+    :effect (plan_resources_finalized ?day_plan)
+  )
+  (:action finalize_plan_post_validation
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (plan_booking_initiated ?day_plan)
+        (plan_resources_finalized ?day_plan)
+        (not
+          (plan_finalized ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?day_plan)
+        (itinerary_element_active ?day_plan)
+      )
+  )
+  (:action apply_promotional_offer_to_plan
+    :parameters (?day_plan - day_plan ?promotional_offer - promotional_offer ?activity - activity_type)
+    :precondition
+      (and
+        (schedule_element_validated ?day_plan)
+        (schedule_element_activity_candidate_association ?day_plan ?activity)
+        (promotional_offer_available ?promotional_offer)
+        (plan_has_promotional_offer ?day_plan ?promotional_offer)
+        (not
+          (promotional_offer_applied_to_plan ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (promotional_offer_applied_to_plan ?day_plan)
+        (not
+          (promotional_offer_available ?promotional_offer)
+        )
+      )
+  )
+  (:action flag_plan_for_provider_assignment
+    :parameters (?day_plan - day_plan ?service_provider - service_provider)
+    :precondition
+      (and
+        (promotional_offer_applied_to_plan ?day_plan)
+        (day_service_provider_assigned ?day_plan ?service_provider)
+        (not
+          (plan_ready_for_guide_assignment ?day_plan)
+        )
+      )
+    :effect (plan_ready_for_guide_assignment ?day_plan)
+  )
+  (:action assign_guide_option_to_plan
+    :parameters (?day_plan - day_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (plan_ready_for_guide_assignment ?day_plan)
+        (plan_has_guide_option ?day_plan ?guide_option)
+        (not
+          (guide_assigned_to_plan ?day_plan)
+        )
+      )
+    :effect (guide_assigned_to_plan ?day_plan)
+  )
+  (:action finalize_plan_with_guide
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (guide_assigned_to_plan ?day_plan)
+        (not
+          (plan_finalized ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?day_plan)
+        (itinerary_element_active ?day_plan)
+      )
+  )
+  (:action activate_morning_block
+    :parameters (?morning_block - morning_block ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (morning_block_allocated ?morning_block)
+        (morning_block_ready ?morning_block)
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_time_confirmed ?activity_offer)
+        (not
+          (itinerary_element_active ?morning_block)
+        )
+      )
+    :effect (itinerary_element_active ?morning_block)
+  )
+  (:action activate_afternoon_block
+    :parameters (?afternoon_block - afternoon_block ?activity_offer - activity_offer)
+    :precondition
+      (and
+        (afternoon_block_allocated ?afternoon_block)
+        (afternoon_block_ready ?afternoon_block)
+        (activity_offer_proposed ?activity_offer)
+        (activity_offer_time_confirmed ?activity_offer)
+        (not
+          (itinerary_element_active ?afternoon_block)
+        )
+      )
+    :effect (itinerary_element_active ?afternoon_block)
+  )
+  (:action apply_personal_requirement_to_day
+    :parameters (?day - trip_day ?personal_requirement - personal_requirement ?activity - activity_type)
+    :precondition
+      (and
+        (itinerary_element_active ?day)
+        (schedule_element_activity_candidate_association ?day ?activity)
+        (personal_requirement_available ?personal_requirement)
+        (not
+          (personal_requirements_attached ?day)
+        )
+      )
+    :effect
+      (and
+        (personal_requirements_attached ?day)
+        (day_has_personal_requirement ?day ?personal_requirement)
+        (not
+          (personal_requirement_available ?personal_requirement)
+        )
+      )
+  )
+  (:action propagate_personal_requirement_to_morning_block
+    :parameters (?morning_block - morning_block ?transport - transport_choice ?personal_requirement - personal_requirement)
+    :precondition
+      (and
+        (personal_requirements_attached ?morning_block)
+        (schedule_element_transport_association ?morning_block ?transport)
+        (day_has_personal_requirement ?morning_block ?personal_requirement)
+        (not
+          (schedule_element_confirmed ?morning_block)
+        )
+      )
+    :effect
+      (and
+        (schedule_element_confirmed ?morning_block)
+        (transport_available ?transport)
+        (personal_requirement_available ?personal_requirement)
+      )
+  )
+  (:action propagate_personal_requirement_to_afternoon_block
+    :parameters (?afternoon_block - afternoon_block ?transport - transport_choice ?personal_requirement - personal_requirement)
+    :precondition
+      (and
+        (personal_requirements_attached ?afternoon_block)
+        (schedule_element_transport_association ?afternoon_block ?transport)
+        (day_has_personal_requirement ?afternoon_block ?personal_requirement)
+        (not
+          (schedule_element_confirmed ?afternoon_block)
+        )
+      )
+    :effect
+      (and
+        (schedule_element_confirmed ?afternoon_block)
+        (transport_available ?transport)
+        (personal_requirement_available ?personal_requirement)
+      )
+  )
+  (:action propagate_personal_requirement_to_day_plan
+    :parameters (?day_plan - day_plan ?transport - transport_choice ?personal_requirement - personal_requirement)
+    :precondition
+      (and
+        (personal_requirements_attached ?day_plan)
+        (schedule_element_transport_association ?day_plan ?transport)
+        (day_has_personal_requirement ?day_plan ?personal_requirement)
+        (not
+          (schedule_element_confirmed ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (schedule_element_confirmed ?day_plan)
+        (transport_available ?transport)
+        (personal_requirement_available ?personal_requirement)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem trip_day_schedule_problem)
+  (:domain daily_activity_schedule_domain)
+  (:objects morning_block_1 - morning_block afternoon_block_1 - afternoon_block day_plan_1 - day_plan day_plan_2 - day_plan transport_option_1 - transport_choice transport_option_2 - transport_choice transport_option_3 - transport_choice activity_type_1 - activity_type service_provider_1 - service_provider resource_item_1 - resource_item morning_time_window_1 - morning_time_window afternoon_time_window_1 - afternoon_time_window activity_offer_1 - activity_offer venue_1 - venue venue_2 - venue user_preference_1 - user_preference user_preference_2 - user_preference traveler_profile_1 - traveler_profile traveler_profile_2 - traveler_profile personal_requirement_1 - personal_requirement facility_booking_1 - facility_booking promotional_offer_1 - promotional_offer promotional_offer_2 - promotional_offer guide_option_1 - guide_option)
+  (:init
+    (transport_available transport_option_1)
+    (transport_available transport_option_2)
+    (transport_available transport_option_3)
+    (activity_available activity_type_1)
+    (service_provider_available service_provider_1)
+    (resource_item_available resource_item_1)
+    (morning_block_time_window_association morning_block_1 morning_time_window_1)
+    (afternoon_block_time_window_association afternoon_block_1 afternoon_time_window_1)
+    (activity_offer_available activity_offer_1)
+    (venue_available venue_1)
+    (venue_available venue_2)
+    (plan_has_morning_block day_plan_1 morning_block_1)
+    (plan_has_morning_block day_plan_2 morning_block_1)
+    (plan_has_afternoon_block day_plan_1 afternoon_block_1)
+    (plan_has_afternoon_block day_plan_2 afternoon_block_1)
+    (plan_includes_activity_offer day_plan_1 activity_offer_1)
+    (plan_includes_activity_offer day_plan_2 activity_offer_1)
+    (plan_has_venue day_plan_1 venue_1)
+    (plan_has_venue day_plan_2 venue_2)
+    (user_preference_available user_preference_1)
+    (user_preference_available user_preference_2)
+    (traveler_profile_available traveler_profile_1)
+    (traveler_profile_available traveler_profile_2)
+    (personal_requirement_available personal_requirement_1)
+    (facility_booking_available facility_booking_1)
+    (promotional_offer_available promotional_offer_1)
+    (plan_has_promotional_offer day_plan_1 promotional_offer_1)
+    (plan_has_promotional_offer day_plan_2 promotional_offer_2)
+    (guide_option_available guide_option_1)
+  )
+  (:goal
+    (and
+      (schedule_element_confirmed morning_block_1)
+      (schedule_element_confirmed afternoon_block_1)
+      (schedule_element_confirmed day_plan_1)
+      (schedule_element_confirmed day_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_trip_day morning_block_1)
+(assign_transport_to_day morning_block_1 transport_option_1)
+(propose_activity_for_day morning_block_1 activity_type_1)
+(validate_day_for_booking morning_block_1 activity_type_1)
+(reserve_resource_for_morning_block morning_block_1 morning_time_window_1 resource_item_1)
+(finalize_morning_activity_with_resource morning_block_1 morning_time_window_1 activity_type_1 resource_item_1)
+(release_activity_candidate morning_block_1 activity_type_1)
+(initialize_trip_day afternoon_block_1)
+(assign_transport_to_day afternoon_block_1 transport_option_2)
+(propose_activity_for_day afternoon_block_1 activity_type_1)
+(validate_day_for_booking afternoon_block_1 activity_type_1)
+(reserve_resource_for_afternoon_block afternoon_block_1 afternoon_time_window_1 resource_item_1)
+(finalize_afternoon_activity_with_resource afternoon_block_1 afternoon_time_window_1 activity_type_1 resource_item_1)
+(release_activity_candidate afternoon_block_1 activity_type_1)
+(propose_activity_for_day morning_block_1 activity_type_1)
+(compose_activity_offer_from_segments morning_block_1 afternoon_block_1 morning_time_window_1 afternoon_time_window_1 activity_offer_1)
+(confirm_activity_offer_time_slot activity_offer_1 morning_block_1 activity_type_1)
+(activate_morning_block morning_block_1 activity_offer_1)
+(activate_afternoon_block afternoon_block_1 activity_offer_1)
+(apply_personal_requirement_to_day morning_block_1 personal_requirement_1 activity_type_1)
+(propagate_personal_requirement_to_morning_block morning_block_1 transport_option_1 personal_requirement_1)
+(release_activity_candidate morning_block_1 activity_type_1)
+(propose_activity_for_day afternoon_block_1 activity_type_1)
+(apply_personal_requirement_to_day afternoon_block_1 personal_requirement_1 activity_type_1)
+(propagate_personal_requirement_to_afternoon_block afternoon_block_1 transport_option_2 personal_requirement_1)
+(initialize_trip_day day_plan_1)
+(assign_transport_to_day day_plan_1 transport_option_1)
+(propose_activity_for_day day_plan_1 activity_type_1)
+(validate_day_for_booking day_plan_1 activity_type_1)
+(reserve_venue_for_offer day_plan_1 venue_1 activity_offer_1)
+(confirm_venue_allocation_for_plan day_plan_1 venue_1 activity_offer_1 activity_type_1)
+(reserve_facility_booking_for_plan day_plan_1 facility_booking_1)
+(attach_service_provider_to_day day_plan_1 service_provider_1)
+(stage_offer_booking day_plan_1 facility_booking_1 service_provider_1 venue_1 activity_offer_1)
+(attach_guide_option_to_plan day_plan_1 guide_option_1)
+(initiate_offer_booking_stage day_plan_1 guide_option_1 venue_1 activity_offer_1)
+(activate_day_plan_for_confirmation day_plan_1)
+(apply_personal_requirement_to_day day_plan_1 personal_requirement_1 activity_type_1)
+(propagate_personal_requirement_to_day_plan day_plan_1 transport_option_1 personal_requirement_1)
+(release_activity_candidate day_plan_1 activity_type_1)
+(release_facility_booking_from_plan day_plan_1 facility_booking_1)
+(detach_service_provider_from_day day_plan_1 service_provider_1)
+(detach_guide_option_from_plan day_plan_1 guide_option_1)
+(initialize_trip_day day_plan_2)
+(assign_transport_to_day day_plan_2 transport_option_2)
+(propose_activity_for_day day_plan_2 activity_type_1)
+(validate_day_for_booking day_plan_2 activity_type_1)
+(reserve_venue_for_offer day_plan_2 venue_2 activity_offer_1)
+(confirm_venue_allocation_for_plan day_plan_2 venue_2 activity_offer_1 activity_type_1)
+(reserve_facility_booking_for_plan day_plan_2 facility_booking_1)
+(attach_service_provider_to_day day_plan_2 service_provider_1)
+(stage_offer_booking day_plan_2 facility_booking_1 service_provider_1 venue_2 activity_offer_1)
+(attach_guide_option_to_plan day_plan_2 guide_option_1)
+(initiate_offer_booking_stage day_plan_2 guide_option_1 venue_2 activity_offer_1)
+(activate_day_plan_for_confirmation day_plan_2)
+(apply_personal_requirement_to_day day_plan_2 personal_requirement_1 activity_type_1)
+(propagate_personal_requirement_to_day_plan day_plan_2 transport_option_2 personal_requirement_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ph84vmtb/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_ph84vmtb/plan.pddl 
+
+
+--- stderr ---
+

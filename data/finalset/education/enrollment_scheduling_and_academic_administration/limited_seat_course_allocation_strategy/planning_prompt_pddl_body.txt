@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain limited_seat_course_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object infrastructure_group - object policy_group - object enrollment_category - object enrollment_entity - enrollment_category seat_token - resource_group time_slot - resource_group administrator - resource_group department_unit - resource_group allocation_profile - resource_group deadline_token - resource_group equipment - resource_group approval_token - resource_group override_authorization_token - infrastructure_group auxiliary_resource - infrastructure_group sponsor - infrastructure_group room - policy_group instructor - policy_group section_candidate - policy_group student_category - enrollment_entity offering_category - enrollment_entity student_primary - student_category student_secondary - student_category course_offering - offering_category)
+  (:predicates
+    (enrollment_request_registered ?enrollment_entity - enrollment_entity)
+    (request_validated ?enrollment_entity - enrollment_entity)
+    (seat_reservation_active ?enrollment_entity - enrollment_entity)
+    (enrollment_confirmed ?enrollment_entity - enrollment_entity)
+    (eligible_for_enrollment ?enrollment_entity - enrollment_entity)
+    (provisional_enrollment ?enrollment_entity - enrollment_entity)
+    (seat_available ?seat_token - seat_token)
+    (seat_token_assigned_to ?enrollment_entity - enrollment_entity ?seat_token - seat_token)
+    (time_slot_available ?time_slot - time_slot)
+    (assigned_time_slot ?enrollment_entity - enrollment_entity ?time_slot - time_slot)
+    (administrator_available ?administrator - administrator)
+    (assigned_administrator ?enrollment_entity - enrollment_entity ?administrator - administrator)
+    (override_authorization_token_available ?override_token - override_authorization_token)
+    (override_authorization_assigned_primary ?student_primary - student_primary ?override_token - override_authorization_token)
+    (override_authorization_assigned_secondary ?student_secondary - student_secondary ?override_token - override_authorization_token)
+    (student_room_candidate ?student_primary - student_primary ?room - room)
+    (room_primary_reserved ?room - room)
+    (room_secondary_reserved ?room - room)
+    (student_primary_confirmed ?student_primary - student_primary)
+    (student_instructor_candidate ?student_secondary - student_secondary ?instructor - instructor)
+    (instructor_primary_reserved ?instructor - instructor)
+    (instructor_secondary_reserved ?instructor - instructor)
+    (student_secondary_confirmed ?student_secondary - student_secondary)
+    (section_candidate_available ?section_candidate - section_candidate)
+    (section_candidate_reserved ?section_candidate - section_candidate)
+    (section_room_assigned ?section_candidate - section_candidate ?room - room)
+    (section_instructor_assigned ?section_candidate - section_candidate ?instructor - instructor)
+    (section_room_constraint ?section_candidate - section_candidate)
+    (section_instructor_constraint ?section_candidate - section_candidate)
+    (section_timeslot_confirmed ?section_candidate - section_candidate)
+    (offering_has_primary_student ?course_offering - course_offering ?student_primary - student_primary)
+    (offering_has_secondary_student ?course_offering - course_offering ?student_secondary - student_secondary)
+    (offering_section_candidate_link ?course_offering - course_offering ?section_candidate - section_candidate)
+    (auxiliary_resource_available ?aux_resource - auxiliary_resource)
+    (offering_auxiliary_resource_assigned ?course_offering - course_offering ?aux_resource - auxiliary_resource)
+    (auxiliary_resource_consumed ?aux_resource - auxiliary_resource)
+    (auxiliary_resource_bound_to_section ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    (offering_resources_validated ?course_offering - course_offering)
+    (offering_equipment_reserved ?course_offering - course_offering)
+    (offering_approvals_ready ?course_offering - course_offering)
+    (offering_department_assigned ?course_offering - course_offering)
+    (offering_department_approved ?course_offering - course_offering)
+    (allocation_profile_attached ?course_offering - course_offering)
+    (offering_ready_for_finalization ?course_offering - course_offering)
+    (sponsor_available ?sponsor - sponsor)
+    (offering_sponsor_assigned ?course_offering - course_offering ?sponsor - sponsor)
+    (sponsor_confirmed ?course_offering - course_offering)
+    (sponsor_acknowledged ?course_offering - course_offering)
+    (sponsor_approval_recorded ?course_offering - course_offering)
+    (department_unit_available ?department_unit - department_unit)
+    (offering_department_binding ?course_offering - course_offering ?department_unit - department_unit)
+    (allocation_profile_available ?allocation_profile - allocation_profile)
+    (allocation_profile_attached_to_offering ?course_offering - course_offering ?allocation_profile - allocation_profile)
+    (equipment_available ?equipment - equipment)
+    (offering_equipment_assigned ?course_offering - course_offering ?equipment - equipment)
+    (approval_token_available ?approval_token - approval_token)
+    (offering_approval_assigned ?course_offering - course_offering ?approval_token - approval_token)
+    (deadline_token_available ?deadline_token - deadline_token)
+    (deadline_assigned_to_entity ?enrollment_entity - enrollment_entity ?deadline_token - deadline_token)
+    (student_primary_ready ?student_primary - student_primary)
+    (student_secondary_ready ?student_secondary - student_secondary)
+    (offering_approved_for_enrollment ?course_offering - course_offering)
+  )
+  (:action submit_enrollment_request
+    :parameters (?enrollment_entity - enrollment_entity)
+    :precondition
+      (and
+        (not
+          (enrollment_request_registered ?enrollment_entity)
+        )
+        (not
+          (enrollment_confirmed ?enrollment_entity)
+        )
+      )
+    :effect (enrollment_request_registered ?enrollment_entity)
+  )
+  (:action provisionally_reserve_seat
+    :parameters (?enrollment_entity - enrollment_entity ?seat_token - seat_token)
+    :precondition
+      (and
+        (enrollment_request_registered ?enrollment_entity)
+        (not
+          (seat_reservation_active ?enrollment_entity)
+        )
+        (seat_available ?seat_token)
+      )
+    :effect
+      (and
+        (seat_reservation_active ?enrollment_entity)
+        (seat_token_assigned_to ?enrollment_entity ?seat_token)
+        (not
+          (seat_available ?seat_token)
+        )
+      )
+  )
+  (:action assign_time_slot
+    :parameters (?enrollment_entity - enrollment_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (enrollment_request_registered ?enrollment_entity)
+        (seat_reservation_active ?enrollment_entity)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (assigned_time_slot ?enrollment_entity ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_request_validation
+    :parameters (?enrollment_entity - enrollment_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (enrollment_request_registered ?enrollment_entity)
+        (seat_reservation_active ?enrollment_entity)
+        (assigned_time_slot ?enrollment_entity ?time_slot)
+        (not
+          (request_validated ?enrollment_entity)
+        )
+      )
+    :effect (request_validated ?enrollment_entity)
+  )
+  (:action release_time_slot
+    :parameters (?enrollment_entity - enrollment_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (assigned_time_slot ?enrollment_entity ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (assigned_time_slot ?enrollment_entity ?time_slot)
+        )
+      )
+  )
+  (:action assign_administrator_to_request
+    :parameters (?enrollment_entity - enrollment_entity ?administrator - administrator)
+    :precondition
+      (and
+        (request_validated ?enrollment_entity)
+        (administrator_available ?administrator)
+      )
+    :effect
+      (and
+        (assigned_administrator ?enrollment_entity ?administrator)
+        (not
+          (administrator_available ?administrator)
+        )
+      )
+  )
+  (:action release_administrator_from_request
+    :parameters (?enrollment_entity - enrollment_entity ?administrator - administrator)
+    :precondition
+      (and
+        (assigned_administrator ?enrollment_entity ?administrator)
+      )
+    :effect
+      (and
+        (administrator_available ?administrator)
+        (not
+          (assigned_administrator ?enrollment_entity ?administrator)
+        )
+      )
+  )
+  (:action assign_equipment_to_offering
+    :parameters (?course_offering - course_offering ?equipment - equipment)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (offering_equipment_assigned ?course_offering ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_offering
+    :parameters (?course_offering - course_offering ?equipment - equipment)
+    :precondition
+      (and
+        (offering_equipment_assigned ?course_offering ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (offering_equipment_assigned ?course_offering ?equipment)
+        )
+      )
+  )
+  (:action assign_approval_token_to_offering
+    :parameters (?course_offering - course_offering ?approval_token - approval_token)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action release_approval_token_from_offering
+    :parameters (?course_offering - course_offering ?approval_token - approval_token)
+    :precondition
+      (and
+        (offering_approval_assigned ?course_offering ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (offering_approval_assigned ?course_offering ?approval_token)
+        )
+      )
+  )
+  (:action provisionally_claim_room
+    :parameters (?student_primary - student_primary ?room - room ?time_slot - time_slot)
+    :precondition
+      (and
+        (request_validated ?student_primary)
+        (assigned_time_slot ?student_primary ?time_slot)
+        (student_room_candidate ?student_primary ?room)
+        (not
+          (room_primary_reserved ?room)
+        )
+        (not
+          (room_secondary_reserved ?room)
+        )
+      )
+    :effect (room_primary_reserved ?room)
+  )
+  (:action confirm_room_for_primary
+    :parameters (?student_primary - student_primary ?room - room ?administrator - administrator)
+    :precondition
+      (and
+        (request_validated ?student_primary)
+        (assigned_administrator ?student_primary ?administrator)
+        (student_room_candidate ?student_primary ?room)
+        (room_primary_reserved ?room)
+        (not
+          (student_primary_ready ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (student_primary_ready ?student_primary)
+        (student_primary_confirmed ?student_primary)
+      )
+  )
+  (:action assign_auxiliary_resource_to_primary
+    :parameters (?student_primary - student_primary ?room - room ?aux_resource - override_authorization_token)
+    :precondition
+      (and
+        (request_validated ?student_primary)
+        (student_room_candidate ?student_primary ?room)
+        (override_authorization_token_available ?aux_resource)
+        (not
+          (student_primary_ready ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (room_secondary_reserved ?room)
+        (student_primary_ready ?student_primary)
+        (override_authorization_assigned_primary ?student_primary ?aux_resource)
+        (not
+          (override_authorization_token_available ?aux_resource)
+        )
+      )
+  )
+  (:action finalize_room_resources_for_primary
+    :parameters (?student_primary - student_primary ?room - room ?time_slot - time_slot ?aux_resource - override_authorization_token)
+    :precondition
+      (and
+        (request_validated ?student_primary)
+        (assigned_time_slot ?student_primary ?time_slot)
+        (student_room_candidate ?student_primary ?room)
+        (room_secondary_reserved ?room)
+        (override_authorization_assigned_primary ?student_primary ?aux_resource)
+        (not
+          (student_primary_confirmed ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (room_primary_reserved ?room)
+        (student_primary_confirmed ?student_primary)
+        (override_authorization_token_available ?aux_resource)
+        (not
+          (override_authorization_assigned_primary ?student_primary ?aux_resource)
+        )
+      )
+  )
+  (:action provisionally_claim_instructor
+    :parameters (?student_secondary - student_secondary ?instructor - instructor ?time_slot - time_slot)
+    :precondition
+      (and
+        (request_validated ?student_secondary)
+        (assigned_time_slot ?student_secondary ?time_slot)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (not
+          (instructor_primary_reserved ?instructor)
+        )
+        (not
+          (instructor_secondary_reserved ?instructor)
+        )
+      )
+    :effect (instructor_primary_reserved ?instructor)
+  )
+  (:action confirm_instructor_for_secondary
+    :parameters (?student_secondary - student_secondary ?instructor - instructor ?administrator - administrator)
+    :precondition
+      (and
+        (request_validated ?student_secondary)
+        (assigned_administrator ?student_secondary ?administrator)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (instructor_primary_reserved ?instructor)
+        (not
+          (student_secondary_ready ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (student_secondary_ready ?student_secondary)
+        (student_secondary_confirmed ?student_secondary)
+      )
+  )
+  (:action assign_auxiliary_resource_to_secondary
+    :parameters (?student_secondary - student_secondary ?instructor - instructor ?aux_resource - override_authorization_token)
+    :precondition
+      (and
+        (request_validated ?student_secondary)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (override_authorization_token_available ?aux_resource)
+        (not
+          (student_secondary_ready ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (instructor_secondary_reserved ?instructor)
+        (student_secondary_ready ?student_secondary)
+        (override_authorization_assigned_secondary ?student_secondary ?aux_resource)
+        (not
+          (override_authorization_token_available ?aux_resource)
+        )
+      )
+  )
+  (:action finalize_instructor_resources_for_secondary
+    :parameters (?student_secondary - student_secondary ?instructor - instructor ?time_slot - time_slot ?aux_resource - override_authorization_token)
+    :precondition
+      (and
+        (request_validated ?student_secondary)
+        (assigned_time_slot ?student_secondary ?time_slot)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (instructor_secondary_reserved ?instructor)
+        (override_authorization_assigned_secondary ?student_secondary ?aux_resource)
+        (not
+          (student_secondary_confirmed ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (instructor_primary_reserved ?instructor)
+        (student_secondary_confirmed ?student_secondary)
+        (override_authorization_token_available ?aux_resource)
+        (not
+          (override_authorization_assigned_secondary ?student_secondary ?aux_resource)
+        )
+      )
+  )
+  (:action compose_section_candidate
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?room - room ?instructor - instructor ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_primary_ready ?student_primary)
+        (student_secondary_ready ?student_secondary)
+        (student_room_candidate ?student_primary ?room)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (room_primary_reserved ?room)
+        (instructor_primary_reserved ?instructor)
+        (student_primary_confirmed ?student_primary)
+        (student_secondary_confirmed ?student_secondary)
+        (section_candidate_available ?section_candidate)
+      )
+    :effect
+      (and
+        (section_candidate_reserved ?section_candidate)
+        (section_room_assigned ?section_candidate ?room)
+        (section_instructor_assigned ?section_candidate ?instructor)
+        (not
+          (section_candidate_available ?section_candidate)
+        )
+      )
+  )
+  (:action compose_section_candidate_with_room_primary_constraint
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?room - room ?instructor - instructor ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_primary_ready ?student_primary)
+        (student_secondary_ready ?student_secondary)
+        (student_room_candidate ?student_primary ?room)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (room_secondary_reserved ?room)
+        (instructor_primary_reserved ?instructor)
+        (not
+          (student_primary_confirmed ?student_primary)
+        )
+        (student_secondary_confirmed ?student_secondary)
+        (section_candidate_available ?section_candidate)
+      )
+    :effect
+      (and
+        (section_candidate_reserved ?section_candidate)
+        (section_room_assigned ?section_candidate ?room)
+        (section_instructor_assigned ?section_candidate ?instructor)
+        (section_room_constraint ?section_candidate)
+        (not
+          (section_candidate_available ?section_candidate)
+        )
+      )
+  )
+  (:action compose_section_candidate_with_instructor_primary_constraint
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?room - room ?instructor - instructor ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_primary_ready ?student_primary)
+        (student_secondary_ready ?student_secondary)
+        (student_room_candidate ?student_primary ?room)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (room_primary_reserved ?room)
+        (instructor_secondary_reserved ?instructor)
+        (student_primary_confirmed ?student_primary)
+        (not
+          (student_secondary_confirmed ?student_secondary)
+        )
+        (section_candidate_available ?section_candidate)
+      )
+    :effect
+      (and
+        (section_candidate_reserved ?section_candidate)
+        (section_room_assigned ?section_candidate ?room)
+        (section_instructor_assigned ?section_candidate ?instructor)
+        (section_instructor_constraint ?section_candidate)
+        (not
+          (section_candidate_available ?section_candidate)
+        )
+      )
+  )
+  (:action compose_section_candidate_with_both_constraints
+    :parameters (?student_primary - student_primary ?student_secondary - student_secondary ?room - room ?instructor - instructor ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_primary_ready ?student_primary)
+        (student_secondary_ready ?student_secondary)
+        (student_room_candidate ?student_primary ?room)
+        (student_instructor_candidate ?student_secondary ?instructor)
+        (room_secondary_reserved ?room)
+        (instructor_secondary_reserved ?instructor)
+        (not
+          (student_primary_confirmed ?student_primary)
+        )
+        (not
+          (student_secondary_confirmed ?student_secondary)
+        )
+        (section_candidate_available ?section_candidate)
+      )
+    :effect
+      (and
+        (section_candidate_reserved ?section_candidate)
+        (section_room_assigned ?section_candidate ?room)
+        (section_instructor_assigned ?section_candidate ?instructor)
+        (section_room_constraint ?section_candidate)
+        (section_instructor_constraint ?section_candidate)
+        (not
+          (section_candidate_available ?section_candidate)
+        )
+      )
+  )
+  (:action confirm_section_timeslot
+    :parameters (?section_candidate - section_candidate ?student_primary - student_primary ?time_slot - time_slot)
+    :precondition
+      (and
+        (section_candidate_reserved ?section_candidate)
+        (student_primary_ready ?student_primary)
+        (assigned_time_slot ?student_primary ?time_slot)
+        (not
+          (section_timeslot_confirmed ?section_candidate)
+        )
+      )
+    :effect (section_timeslot_confirmed ?section_candidate)
+  )
+  (:action consume_auxiliary_resource_for_section
+    :parameters (?course_offering - course_offering ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (offering_section_candidate_link ?course_offering ?section_candidate)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_available ?aux_resource)
+        (section_candidate_reserved ?section_candidate)
+        (section_timeslot_confirmed ?section_candidate)
+        (not
+          (auxiliary_resource_consumed ?aux_resource)
+        )
+      )
+    :effect
+      (and
+        (auxiliary_resource_consumed ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (not
+          (auxiliary_resource_available ?aux_resource)
+        )
+      )
+  )
+  (:action validate_offering_after_resource_binding
+    :parameters (?course_offering - course_offering ?aux_resource - auxiliary_resource ?section_candidate - section_candidate ?time_slot - time_slot)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_consumed ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (assigned_time_slot ?course_offering ?time_slot)
+        (not
+          (section_room_constraint ?section_candidate)
+        )
+        (not
+          (offering_resources_validated ?course_offering)
+        )
+      )
+    :effect (offering_resources_validated ?course_offering)
+  )
+  (:action assign_department_to_offering
+    :parameters (?course_offering - course_offering ?department_unit - department_unit)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (department_unit_available ?department_unit)
+        (not
+          (offering_department_assigned ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_department_assigned ?course_offering)
+        (offering_department_binding ?course_offering ?department_unit)
+        (not
+          (department_unit_available ?department_unit)
+        )
+      )
+  )
+  (:action validate_offering_with_department
+    :parameters (?course_offering - course_offering ?aux_resource - auxiliary_resource ?section_candidate - section_candidate ?time_slot - time_slot ?department_unit - department_unit)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_consumed ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (assigned_time_slot ?course_offering ?time_slot)
+        (section_room_constraint ?section_candidate)
+        (offering_department_assigned ?course_offering)
+        (offering_department_binding ?course_offering ?department_unit)
+        (not
+          (offering_resources_validated ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_resources_validated ?course_offering)
+        (offering_department_approved ?course_offering)
+      )
+  )
+  (:action reserve_equipment_for_offering_step1
+    :parameters (?course_offering - course_offering ?equipment - equipment ?administrator - administrator ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_resources_validated ?course_offering)
+        (offering_equipment_assigned ?course_offering ?equipment)
+        (assigned_administrator ?course_offering ?administrator)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (not
+          (section_instructor_constraint ?section_candidate)
+        )
+        (not
+          (offering_equipment_reserved ?course_offering)
+        )
+      )
+    :effect (offering_equipment_reserved ?course_offering)
+  )
+  (:action reserve_equipment_for_offering_step2
+    :parameters (?course_offering - course_offering ?equipment - equipment ?administrator - administrator ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_resources_validated ?course_offering)
+        (offering_equipment_assigned ?course_offering ?equipment)
+        (assigned_administrator ?course_offering ?administrator)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (section_instructor_constraint ?section_candidate)
+        (not
+          (offering_equipment_reserved ?course_offering)
+        )
+      )
+    :effect (offering_equipment_reserved ?course_offering)
+  )
+  (:action record_approval_for_offering_stage1
+    :parameters (?course_offering - course_offering ?approval_token - approval_token ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_equipment_reserved ?course_offering)
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (not
+          (section_room_constraint ?section_candidate)
+        )
+        (not
+          (section_instructor_constraint ?section_candidate)
+        )
+        (not
+          (offering_approvals_ready ?course_offering)
+        )
+      )
+    :effect (offering_approvals_ready ?course_offering)
+  )
+  (:action record_approval_for_offering_stage2
+    :parameters (?course_offering - course_offering ?approval_token - approval_token ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_equipment_reserved ?course_offering)
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (section_room_constraint ?section_candidate)
+        (not
+          (section_instructor_constraint ?section_candidate)
+        )
+        (not
+          (offering_approvals_ready ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approvals_ready ?course_offering)
+        (allocation_profile_attached ?course_offering)
+      )
+  )
+  (:action record_approval_for_offering_stage3
+    :parameters (?course_offering - course_offering ?approval_token - approval_token ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_equipment_reserved ?course_offering)
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (not
+          (section_room_constraint ?section_candidate)
+        )
+        (section_instructor_constraint ?section_candidate)
+        (not
+          (offering_approvals_ready ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approvals_ready ?course_offering)
+        (allocation_profile_attached ?course_offering)
+      )
+  )
+  (:action record_approval_for_offering_stage4
+    :parameters (?course_offering - course_offering ?approval_token - approval_token ?aux_resource - auxiliary_resource ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (offering_equipment_reserved ?course_offering)
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (offering_auxiliary_resource_assigned ?course_offering ?aux_resource)
+        (auxiliary_resource_bound_to_section ?aux_resource ?section_candidate)
+        (section_room_constraint ?section_candidate)
+        (section_instructor_constraint ?section_candidate)
+        (not
+          (offering_approvals_ready ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approvals_ready ?course_offering)
+        (allocation_profile_attached ?course_offering)
+      )
+  )
+  (:action mark_offering_eligible_for_enrollment
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_approvals_ready ?course_offering)
+        (not
+          (allocation_profile_attached ?course_offering)
+        )
+        (not
+          (offering_approved_for_enrollment ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approved_for_enrollment ?course_offering)
+        (eligible_for_enrollment ?course_offering)
+      )
+  )
+  (:action attach_allocation_profile_to_offering
+    :parameters (?course_offering - course_offering ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (offering_approvals_ready ?course_offering)
+        (allocation_profile_attached ?course_offering)
+        (allocation_profile_available ?allocation_profile)
+      )
+    :effect
+      (and
+        (allocation_profile_attached_to_offering ?course_offering ?allocation_profile)
+        (not
+          (allocation_profile_available ?allocation_profile)
+        )
+      )
+  )
+  (:action finalize_offering_readiness
+    :parameters (?course_offering - course_offering ?student_primary - student_primary ?student_secondary - student_secondary ?time_slot - time_slot ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (offering_approvals_ready ?course_offering)
+        (allocation_profile_attached ?course_offering)
+        (allocation_profile_attached_to_offering ?course_offering ?allocation_profile)
+        (offering_has_primary_student ?course_offering ?student_primary)
+        (offering_has_secondary_student ?course_offering ?student_secondary)
+        (student_primary_confirmed ?student_primary)
+        (student_secondary_confirmed ?student_secondary)
+        (assigned_time_slot ?course_offering ?time_slot)
+        (not
+          (offering_ready_for_finalization ?course_offering)
+        )
+      )
+    :effect (offering_ready_for_finalization ?course_offering)
+  )
+  (:action promote_offering_to_eligible_for_enrollment
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_approvals_ready ?course_offering)
+        (offering_ready_for_finalization ?course_offering)
+        (not
+          (offering_approved_for_enrollment ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approved_for_enrollment ?course_offering)
+        (eligible_for_enrollment ?course_offering)
+      )
+  )
+  (:action request_sponsor_commitment
+    :parameters (?course_offering - course_offering ?sponsor - sponsor ?time_slot - time_slot)
+    :precondition
+      (and
+        (request_validated ?course_offering)
+        (assigned_time_slot ?course_offering ?time_slot)
+        (sponsor_available ?sponsor)
+        (offering_sponsor_assigned ?course_offering ?sponsor)
+        (not
+          (sponsor_confirmed ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (sponsor_confirmed ?course_offering)
+        (not
+          (sponsor_available ?sponsor)
+        )
+      )
+  )
+  (:action acknowledge_sponsor_commitment
+    :parameters (?course_offering - course_offering ?administrator - administrator)
+    :precondition
+      (and
+        (sponsor_confirmed ?course_offering)
+        (assigned_administrator ?course_offering ?administrator)
+        (not
+          (sponsor_acknowledged ?course_offering)
+        )
+      )
+    :effect (sponsor_acknowledged ?course_offering)
+  )
+  (:action record_sponsor_final_approval
+    :parameters (?course_offering - course_offering ?approval_token - approval_token)
+    :precondition
+      (and
+        (sponsor_acknowledged ?course_offering)
+        (offering_approval_assigned ?course_offering ?approval_token)
+        (not
+          (sponsor_approval_recorded ?course_offering)
+        )
+      )
+    :effect (sponsor_approval_recorded ?course_offering)
+  )
+  (:action finalize_offering_via_sponsor_approval
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (sponsor_approval_recorded ?course_offering)
+        (not
+          (offering_approved_for_enrollment ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approved_for_enrollment ?course_offering)
+        (eligible_for_enrollment ?course_offering)
+      )
+  )
+  (:action mark_student_primary_eligible_for_enrollment
+    :parameters (?student_primary - student_primary ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_primary_ready ?student_primary)
+        (student_primary_confirmed ?student_primary)
+        (section_candidate_reserved ?section_candidate)
+        (section_timeslot_confirmed ?section_candidate)
+        (not
+          (eligible_for_enrollment ?student_primary)
+        )
+      )
+    :effect (eligible_for_enrollment ?student_primary)
+  )
+  (:action mark_student_secondary_eligible_for_enrollment
+    :parameters (?student_secondary - student_secondary ?section_candidate - section_candidate)
+    :precondition
+      (and
+        (student_secondary_ready ?student_secondary)
+        (student_secondary_confirmed ?student_secondary)
+        (section_candidate_reserved ?section_candidate)
+        (section_timeslot_confirmed ?section_candidate)
+        (not
+          (eligible_for_enrollment ?student_secondary)
+        )
+      )
+    :effect (eligible_for_enrollment ?student_secondary)
+  )
+  (:action record_provisional_enrollment_with_deadline
+    :parameters (?enrollment_entity - enrollment_entity ?deadline_token - deadline_token ?time_slot - time_slot)
+    :precondition
+      (and
+        (eligible_for_enrollment ?enrollment_entity)
+        (assigned_time_slot ?enrollment_entity ?time_slot)
+        (deadline_token_available ?deadline_token)
+        (not
+          (provisional_enrollment ?enrollment_entity)
+        )
+      )
+    :effect
+      (and
+        (provisional_enrollment ?enrollment_entity)
+        (deadline_assigned_to_entity ?enrollment_entity ?deadline_token)
+        (not
+          (deadline_token_available ?deadline_token)
+        )
+      )
+  )
+  (:action finalize_enrollment_primary_with_seat
+    :parameters (?student_primary - student_primary ?seat_token - seat_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (provisional_enrollment ?student_primary)
+        (seat_token_assigned_to ?student_primary ?seat_token)
+        (deadline_assigned_to_entity ?student_primary ?deadline_token)
+        (not
+          (enrollment_confirmed ?student_primary)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?student_primary)
+        (seat_available ?seat_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+  (:action finalize_enrollment_secondary_with_seat
+    :parameters (?student_secondary - student_secondary ?seat_token - seat_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (provisional_enrollment ?student_secondary)
+        (seat_token_assigned_to ?student_secondary ?seat_token)
+        (deadline_assigned_to_entity ?student_secondary ?deadline_token)
+        (not
+          (enrollment_confirmed ?student_secondary)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?student_secondary)
+        (seat_available ?seat_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+  (:action finalize_offering_enrollment_with_seat
+    :parameters (?course_offering - course_offering ?seat_token - seat_token ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (provisional_enrollment ?course_offering)
+        (seat_token_assigned_to ?course_offering ?seat_token)
+        (deadline_assigned_to_entity ?course_offering ?deadline_token)
+        (not
+          (enrollment_confirmed ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (enrollment_confirmed ?course_offering)
+        (seat_available ?seat_token)
+        (deadline_token_available ?deadline_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem limited_seat_allocation_problem)
+  (:domain limited_seat_course_allocation)
+  (:objects student_primary_1 - student_primary student_secondary_1 - student_secondary course_offering_1 - course_offering course_offering_2 - course_offering seat_token_1 - seat_token seat_token_2 - seat_token seat_token_3 - seat_token time_slot_1 - time_slot administrator_registrar - administrator override_token_1 - override_authorization_token room_101 - room instructor_1 - instructor section_candidate_1 - section_candidate aux_resource_1 - auxiliary_resource aux_resource_2 - auxiliary_resource department_1 - department_unit department_2 - department_unit allocation_profile_a - allocation_profile allocation_profile_b - allocation_profile deadline_1 - deadline_token equipment_av_kit - equipment sponsor_1 - sponsor sponsor_2 - sponsor approval_token_1 - approval_token)
+  (:init
+    (seat_available seat_token_1)
+    (seat_available seat_token_2)
+    (seat_available seat_token_3)
+    (time_slot_available time_slot_1)
+    (administrator_available administrator_registrar)
+    (override_authorization_token_available override_token_1)
+    (student_room_candidate student_primary_1 room_101)
+    (student_instructor_candidate student_secondary_1 instructor_1)
+    (section_candidate_available section_candidate_1)
+    (auxiliary_resource_available aux_resource_1)
+    (auxiliary_resource_available aux_resource_2)
+    (offering_has_primary_student course_offering_1 student_primary_1)
+    (offering_has_primary_student course_offering_2 student_primary_1)
+    (offering_has_secondary_student course_offering_1 student_secondary_1)
+    (offering_has_secondary_student course_offering_2 student_secondary_1)
+    (offering_section_candidate_link course_offering_1 section_candidate_1)
+    (offering_section_candidate_link course_offering_2 section_candidate_1)
+    (offering_auxiliary_resource_assigned course_offering_1 aux_resource_1)
+    (offering_auxiliary_resource_assigned course_offering_2 aux_resource_2)
+    (department_unit_available department_1)
+    (department_unit_available department_2)
+    (allocation_profile_available allocation_profile_a)
+    (allocation_profile_available allocation_profile_b)
+    (deadline_token_available deadline_1)
+    (equipment_available equipment_av_kit)
+    (sponsor_available sponsor_1)
+    (offering_sponsor_assigned course_offering_1 sponsor_1)
+    (offering_sponsor_assigned course_offering_2 sponsor_2)
+    (approval_token_available approval_token_1)
+  )
+  (:goal
+    (and
+      (enrollment_confirmed student_primary_1)
+      (enrollment_confirmed student_secondary_1)
+      (enrollment_confirmed course_offering_1)
+      (enrollment_confirmed course_offering_2)
+    )
+  )
+)

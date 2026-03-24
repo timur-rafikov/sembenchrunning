@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain unit_assignment_across_multiple_objectives)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object unit_class - entity token_class - entity node_class - entity unit_pool - entity unit_candidate - unit_pool role_token - unit_class specialization - unit_class operator - unit_class tag_token - unit_class consumable - unit_class phase_marker - unit_class module_type - unit_class tactic_token - unit_class equipment - token_class module - token_class strategy_tag - token_class subnode_primary - node_class subnode_secondary - node_class asset_platform - node_class slot_class_primary - unit_candidate slot_class_secondary - unit_candidate objective_slot_primary - slot_class_primary objective_slot_secondary - slot_class_primary team - slot_class_secondary)
+
+  (:predicates
+    (deployment_unit_registered ?unit_candidate - unit_candidate)
+    (deployment_unit_prepared ?unit_candidate - unit_candidate)
+    (deployment_unit_role_claimed ?unit_candidate - unit_candidate)
+    (deployment_unit_recycled ?unit_candidate - unit_candidate)
+    (deployment_unit_activated ?unit_candidate - unit_candidate)
+    (deployment_unit_completed_phase ?unit_candidate - unit_candidate)
+    (role_token_available ?role_token - role_token)
+    (deployment_unit_role_token_assigned ?unit_candidate - unit_candidate ?role_token - role_token)
+    (specialization_available ?specialization - specialization)
+    (deployment_unit_has_specialization ?unit_candidate - unit_candidate ?specialization - specialization)
+    (operator_available ?operator - operator)
+    (deployment_unit_bound_operator ?unit_candidate - unit_candidate ?operator - operator)
+    (equipment_available ?equipment - equipment)
+    (slot_has_equipment ?objective_slot_primary - objective_slot_primary ?equipment - equipment)
+    (slot_secondary_has_equipment ?objective_slot_secondary - objective_slot_secondary ?equipment - equipment)
+    (slot_has_subnode_primary ?objective_slot_primary - objective_slot_primary ?subnode_a - subnode_primary)
+    (subnode_primary_covered ?subnode_a - subnode_primary)
+    (subnode_primary_equipment_reserved ?subnode_a - subnode_primary)
+    (slot_primary_ready ?objective_slot_primary - objective_slot_primary)
+    (slot_has_subnode_secondary ?objective_slot_secondary - objective_slot_secondary ?subnode_b - subnode_secondary)
+    (subnode_secondary_covered ?subnode_b - subnode_secondary)
+    (subnode_secondary_equipment_reserved ?subnode_b - subnode_secondary)
+    (slot_secondary_ready ?objective_slot_secondary - objective_slot_secondary)
+    (asset_available ?asset_platform - asset_platform)
+    (asset_ready ?asset_platform - asset_platform)
+    (asset_covers_subnode_primary ?asset_platform - asset_platform ?subnode_a - subnode_primary)
+    (asset_covers_subnode_secondary ?asset_platform - asset_platform ?subnode_b - subnode_secondary)
+    (asset_marker_primary ?asset_platform - asset_platform)
+    (asset_marker_secondary ?asset_platform - asset_platform)
+    (asset_commissioned ?asset_platform - asset_platform)
+    (team_assigned_primary_slot ?team - team ?objective_slot_primary - objective_slot_primary)
+    (team_assigned_secondary_slot ?team - team ?objective_slot_secondary - objective_slot_secondary)
+    (team_assigned_asset ?team - team ?asset_platform - asset_platform)
+    (module_available ?module - module)
+    (team_has_module ?team - team ?module - module)
+    (module_installed ?module - module)
+    (module_installed_on_asset ?module - module ?asset_platform - asset_platform)
+    (team_integration_started ?team - team)
+    (team_integration_stage_two ?team - team)
+    (team_pre_activation_ready ?team - team)
+    (team_tag_attached ?team - team)
+    (team_tag_upgrade_applied ?team - team)
+    (team_metadata_attached ?team - team)
+    (team_final_checks_passed ?team - team)
+    (strategy_tag_available ?strategy_tag - strategy_tag)
+    (team_has_strategy_tag ?team - team ?strategy_tag - strategy_tag)
+    (team_strategy_tag_activated ?team - team)
+    (team_tag_ready_for_tactics ?team - team)
+    (team_tactic_applied ?team - team)
+    (tag_token_available ?tag_token - tag_token)
+    (team_tag_assigned ?team - team ?tag_token - tag_token)
+    (consumable_available ?consumable - consumable)
+    (team_consumable_assigned ?team - team ?consumable - consumable)
+    (module_type_available ?module_type - module_type)
+    (team_module_type_assigned ?team - team ?module_type - module_type)
+    (tactic_token_available ?tactic_token - tactic_token)
+    (team_tactic_assigned ?team - team ?tactic_token - tactic_token)
+    (phase_marker_available ?phase_marker - phase_marker)
+    (deployment_unit_phase_marker_assigned ?unit_candidate - unit_candidate ?phase_marker - phase_marker)
+    (slot_primary_initialized ?objective_slot_primary - objective_slot_primary)
+    (slot_secondary_initialized ?objective_slot_secondary - objective_slot_secondary)
+    (team_certified ?team - team)
+  )
+  (:action register_unit_candidate
+    :parameters (?unit_candidate - unit_candidate)
+    :precondition
+      (and
+        (not
+          (deployment_unit_registered ?unit_candidate)
+        )
+        (not
+          (deployment_unit_recycled ?unit_candidate)
+        )
+      )
+    :effect (deployment_unit_registered ?unit_candidate)
+  )
+  (:action claim_role_token
+    :parameters (?unit_candidate - unit_candidate ?role_token - role_token)
+    :precondition
+      (and
+        (deployment_unit_registered ?unit_candidate)
+        (not
+          (deployment_unit_role_claimed ?unit_candidate)
+        )
+        (role_token_available ?role_token)
+      )
+    :effect
+      (and
+        (deployment_unit_role_claimed ?unit_candidate)
+        (deployment_unit_role_token_assigned ?unit_candidate ?role_token)
+        (not
+          (role_token_available ?role_token)
+        )
+      )
+  )
+  (:action assign_specialization_to_unit
+    :parameters (?unit_candidate - unit_candidate ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_registered ?unit_candidate)
+        (deployment_unit_role_claimed ?unit_candidate)
+        (specialization_available ?specialization)
+      )
+    :effect
+      (and
+        (deployment_unit_has_specialization ?unit_candidate ?specialization)
+        (not
+          (specialization_available ?specialization)
+        )
+      )
+  )
+  (:action confirm_specialization_assignment
+    :parameters (?unit_candidate - unit_candidate ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_registered ?unit_candidate)
+        (deployment_unit_role_claimed ?unit_candidate)
+        (deployment_unit_has_specialization ?unit_candidate ?specialization)
+        (not
+          (deployment_unit_prepared ?unit_candidate)
+        )
+      )
+    :effect (deployment_unit_prepared ?unit_candidate)
+  )
+  (:action unassign_specialization_from_unit
+    :parameters (?unit_candidate - unit_candidate ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_has_specialization ?unit_candidate ?specialization)
+      )
+    :effect
+      (and
+        (specialization_available ?specialization)
+        (not
+          (deployment_unit_has_specialization ?unit_candidate ?specialization)
+        )
+      )
+  )
+  (:action bind_operator_to_unit
+    :parameters (?unit_candidate - unit_candidate ?operator - operator)
+    :precondition
+      (and
+        (deployment_unit_prepared ?unit_candidate)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (deployment_unit_bound_operator ?unit_candidate ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action unbind_operator_from_unit
+    :parameters (?unit_candidate - unit_candidate ?operator - operator)
+    :precondition
+      (and
+        (deployment_unit_bound_operator ?unit_candidate ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (deployment_unit_bound_operator ?unit_candidate ?operator)
+        )
+      )
+  )
+  (:action install_module_type_on_team
+    :parameters (?team - team ?module_type - module_type)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (module_type_available ?module_type)
+      )
+    :effect
+      (and
+        (team_module_type_assigned ?team ?module_type)
+        (not
+          (module_type_available ?module_type)
+        )
+      )
+  )
+  (:action uninstall_module_type_from_team
+    :parameters (?team - team ?module_type - module_type)
+    :precondition
+      (and
+        (team_module_type_assigned ?team ?module_type)
+      )
+    :effect
+      (and
+        (module_type_available ?module_type)
+        (not
+          (team_module_type_assigned ?team ?module_type)
+        )
+      )
+  )
+  (:action assign_tactic_to_team
+    :parameters (?team - team ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (tactic_token_available ?tactic_token)
+      )
+    :effect
+      (and
+        (team_tactic_assigned ?team ?tactic_token)
+        (not
+          (tactic_token_available ?tactic_token)
+        )
+      )
+  )
+  (:action remove_tactic_from_team
+    :parameters (?team - team ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (team_tactic_assigned ?team ?tactic_token)
+      )
+    :effect
+      (and
+        (tactic_token_available ?tactic_token)
+        (not
+          (team_tactic_assigned ?team ?tactic_token)
+        )
+      )
+  )
+  (:action cover_subnode_primary_with_specialization
+    :parameters (?objective_slot_primary - objective_slot_primary ?subnode_a - subnode_primary ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_primary)
+        (deployment_unit_has_specialization ?objective_slot_primary ?specialization)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (not
+          (subnode_primary_covered ?subnode_a)
+        )
+        (not
+          (subnode_primary_equipment_reserved ?subnode_a)
+        )
+      )
+    :effect (subnode_primary_covered ?subnode_a)
+  )
+  (:action confirm_primary_slot_with_operator
+    :parameters (?objective_slot_primary - objective_slot_primary ?subnode_a - subnode_primary ?operator - operator)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_primary)
+        (deployment_unit_bound_operator ?objective_slot_primary ?operator)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (subnode_primary_covered ?subnode_a)
+        (not
+          (slot_primary_initialized ?objective_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_primary_ready ?objective_slot_primary)
+      )
+  )
+  (:action attach_equipment_to_primary_slot
+    :parameters (?objective_slot_primary - objective_slot_primary ?subnode_a - subnode_primary ?equipment - equipment)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_primary)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (equipment_available ?equipment)
+        (not
+          (slot_primary_initialized ?objective_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (subnode_primary_equipment_reserved ?subnode_a)
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_has_equipment ?objective_slot_primary ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action finalize_primary_slot_coverage
+    :parameters (?objective_slot_primary - objective_slot_primary ?subnode_a - subnode_primary ?specialization - specialization ?equipment - equipment)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_primary)
+        (deployment_unit_has_specialization ?objective_slot_primary ?specialization)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (subnode_primary_equipment_reserved ?subnode_a)
+        (slot_has_equipment ?objective_slot_primary ?equipment)
+        (not
+          (slot_primary_ready ?objective_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (subnode_primary_covered ?subnode_a)
+        (slot_primary_ready ?objective_slot_primary)
+        (equipment_available ?equipment)
+        (not
+          (slot_has_equipment ?objective_slot_primary ?equipment)
+        )
+      )
+  )
+  (:action cover_subnode_secondary_with_specialization
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?subnode_b - subnode_secondary ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_secondary)
+        (deployment_unit_has_specialization ?objective_slot_secondary ?specialization)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (not
+          (subnode_secondary_covered ?subnode_b)
+        )
+        (not
+          (subnode_secondary_equipment_reserved ?subnode_b)
+        )
+      )
+    :effect (subnode_secondary_covered ?subnode_b)
+  )
+  (:action confirm_secondary_slot_with_operator
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?subnode_b - subnode_secondary ?operator - operator)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_secondary)
+        (deployment_unit_bound_operator ?objective_slot_secondary ?operator)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_secondary_covered ?subnode_b)
+        (not
+          (slot_secondary_initialized ?objective_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_secondary_ready ?objective_slot_secondary)
+      )
+  )
+  (:action attach_equipment_to_secondary_slot
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?subnode_b - subnode_secondary ?equipment - equipment)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_secondary)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (equipment_available ?equipment)
+        (not
+          (slot_secondary_initialized ?objective_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (subnode_secondary_equipment_reserved ?subnode_b)
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_secondary_has_equipment ?objective_slot_secondary ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_coverage
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?subnode_b - subnode_secondary ?specialization - specialization ?equipment - equipment)
+    :precondition
+      (and
+        (deployment_unit_prepared ?objective_slot_secondary)
+        (deployment_unit_has_specialization ?objective_slot_secondary ?specialization)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_secondary_equipment_reserved ?subnode_b)
+        (slot_secondary_has_equipment ?objective_slot_secondary ?equipment)
+        (not
+          (slot_secondary_ready ?objective_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (subnode_secondary_covered ?subnode_b)
+        (slot_secondary_ready ?objective_slot_secondary)
+        (equipment_available ?equipment)
+        (not
+          (slot_secondary_has_equipment ?objective_slot_secondary ?equipment)
+        )
+      )
+  )
+  (:action assemble_asset
+    :parameters (?objective_slot_primary - objective_slot_primary ?objective_slot_secondary - objective_slot_secondary ?subnode_a - subnode_primary ?subnode_b - subnode_secondary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_primary_covered ?subnode_a)
+        (subnode_secondary_covered ?subnode_b)
+        (slot_primary_ready ?objective_slot_primary)
+        (slot_secondary_ready ?objective_slot_secondary)
+        (asset_available ?asset_platform)
+      )
+    :effect
+      (and
+        (asset_ready ?asset_platform)
+        (asset_covers_subnode_primary ?asset_platform ?subnode_a)
+        (asset_covers_subnode_secondary ?asset_platform ?subnode_b)
+        (not
+          (asset_available ?asset_platform)
+        )
+      )
+  )
+  (:action assemble_asset_set_marker_primary
+    :parameters (?objective_slot_primary - objective_slot_primary ?objective_slot_secondary - objective_slot_secondary ?subnode_a - subnode_primary ?subnode_b - subnode_secondary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_primary_equipment_reserved ?subnode_a)
+        (subnode_secondary_covered ?subnode_b)
+        (not
+          (slot_primary_ready ?objective_slot_primary)
+        )
+        (slot_secondary_ready ?objective_slot_secondary)
+        (asset_available ?asset_platform)
+      )
+    :effect
+      (and
+        (asset_ready ?asset_platform)
+        (asset_covers_subnode_primary ?asset_platform ?subnode_a)
+        (asset_covers_subnode_secondary ?asset_platform ?subnode_b)
+        (asset_marker_primary ?asset_platform)
+        (not
+          (asset_available ?asset_platform)
+        )
+      )
+  )
+  (:action assemble_asset_set_marker_secondary
+    :parameters (?objective_slot_primary - objective_slot_primary ?objective_slot_secondary - objective_slot_secondary ?subnode_a - subnode_primary ?subnode_b - subnode_secondary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_primary_covered ?subnode_a)
+        (subnode_secondary_equipment_reserved ?subnode_b)
+        (slot_primary_ready ?objective_slot_primary)
+        (not
+          (slot_secondary_ready ?objective_slot_secondary)
+        )
+        (asset_available ?asset_platform)
+      )
+    :effect
+      (and
+        (asset_ready ?asset_platform)
+        (asset_covers_subnode_primary ?asset_platform ?subnode_a)
+        (asset_covers_subnode_secondary ?asset_platform ?subnode_b)
+        (asset_marker_secondary ?asset_platform)
+        (not
+          (asset_available ?asset_platform)
+        )
+      )
+  )
+  (:action assemble_asset_with_both_markers
+    :parameters (?objective_slot_primary - objective_slot_primary ?objective_slot_secondary - objective_slot_secondary ?subnode_a - subnode_primary ?subnode_b - subnode_secondary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_has_subnode_primary ?objective_slot_primary ?subnode_a)
+        (slot_has_subnode_secondary ?objective_slot_secondary ?subnode_b)
+        (subnode_primary_equipment_reserved ?subnode_a)
+        (subnode_secondary_equipment_reserved ?subnode_b)
+        (not
+          (slot_primary_ready ?objective_slot_primary)
+        )
+        (not
+          (slot_secondary_ready ?objective_slot_secondary)
+        )
+        (asset_available ?asset_platform)
+      )
+    :effect
+      (and
+        (asset_ready ?asset_platform)
+        (asset_covers_subnode_primary ?asset_platform ?subnode_a)
+        (asset_covers_subnode_secondary ?asset_platform ?subnode_b)
+        (asset_marker_primary ?asset_platform)
+        (asset_marker_secondary ?asset_platform)
+        (not
+          (asset_available ?asset_platform)
+        )
+      )
+  )
+  (:action commission_asset
+    :parameters (?asset_platform - asset_platform ?objective_slot_primary - objective_slot_primary ?specialization - specialization)
+    :precondition
+      (and
+        (asset_ready ?asset_platform)
+        (slot_primary_initialized ?objective_slot_primary)
+        (deployment_unit_has_specialization ?objective_slot_primary ?specialization)
+        (not
+          (asset_commissioned ?asset_platform)
+        )
+      )
+    :effect (asset_commissioned ?asset_platform)
+  )
+  (:action integrate_module_into_asset
+    :parameters (?team - team ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (team_assigned_asset ?team ?asset_platform)
+        (team_has_module ?team ?module)
+        (module_available ?module)
+        (asset_ready ?asset_platform)
+        (asset_commissioned ?asset_platform)
+        (not
+          (module_installed ?module)
+        )
+      )
+    :effect
+      (and
+        (module_installed ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (not
+          (module_available ?module)
+        )
+      )
+  )
+  (:action finalize_module_integration
+    :parameters (?team - team ?module - module ?asset_platform - asset_platform ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (team_has_module ?team ?module)
+        (module_installed ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (deployment_unit_has_specialization ?team ?specialization)
+        (not
+          (asset_marker_primary ?asset_platform)
+        )
+        (not
+          (team_integration_started ?team)
+        )
+      )
+    :effect (team_integration_started ?team)
+  )
+  (:action apply_tag_token_to_team
+    :parameters (?team - team ?tag_token - tag_token)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (tag_token_available ?tag_token)
+        (not
+          (team_tag_attached ?team)
+        )
+      )
+    :effect
+      (and
+        (team_tag_attached ?team)
+        (team_tag_assigned ?team ?tag_token)
+        (not
+          (tag_token_available ?tag_token)
+        )
+      )
+  )
+  (:action apply_tag_upgrade_to_team
+    :parameters (?team - team ?module - module ?asset_platform - asset_platform ?specialization - specialization ?tag_token - tag_token)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (team_has_module ?team ?module)
+        (module_installed ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (deployment_unit_has_specialization ?team ?specialization)
+        (asset_marker_primary ?asset_platform)
+        (team_tag_attached ?team)
+        (team_tag_assigned ?team ?tag_token)
+        (not
+          (team_integration_started ?team)
+        )
+      )
+    :effect
+      (and
+        (team_integration_started ?team)
+        (team_tag_upgrade_applied ?team)
+      )
+  )
+  (:action apply_module_integration_to_team
+    :parameters (?team - team ?module_type - module_type ?operator - operator ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_started ?team)
+        (team_module_type_assigned ?team ?module_type)
+        (deployment_unit_bound_operator ?team ?operator)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (not
+          (asset_marker_secondary ?asset_platform)
+        )
+        (not
+          (team_integration_stage_two ?team)
+        )
+      )
+    :effect (team_integration_stage_two ?team)
+  )
+  (:action complete_team_module_integration
+    :parameters (?team - team ?module_type - module_type ?operator - operator ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_started ?team)
+        (team_module_type_assigned ?team ?module_type)
+        (deployment_unit_bound_operator ?team ?operator)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (asset_marker_secondary ?asset_platform)
+        (not
+          (team_integration_stage_two ?team)
+        )
+      )
+    :effect (team_integration_stage_two ?team)
+  )
+  (:action advance_team_to_pre_activation
+    :parameters (?team - team ?tactic_token - tactic_token ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_stage_two ?team)
+        (team_tactic_assigned ?team ?tactic_token)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (not
+          (asset_marker_primary ?asset_platform)
+        )
+        (not
+          (asset_marker_secondary ?asset_platform)
+        )
+        (not
+          (team_pre_activation_ready ?team)
+        )
+      )
+    :effect (team_pre_activation_ready ?team)
+  )
+  (:action advance_team_and_attach_metadata
+    :parameters (?team - team ?tactic_token - tactic_token ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_stage_two ?team)
+        (team_tactic_assigned ?team ?tactic_token)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (asset_marker_primary ?asset_platform)
+        (not
+          (asset_marker_secondary ?asset_platform)
+        )
+        (not
+          (team_pre_activation_ready ?team)
+        )
+      )
+    :effect
+      (and
+        (team_pre_activation_ready ?team)
+        (team_metadata_attached ?team)
+      )
+  )
+  (:action apply_metadata_and_advance_team
+    :parameters (?team - team ?tactic_token - tactic_token ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_stage_two ?team)
+        (team_tactic_assigned ?team ?tactic_token)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (not
+          (asset_marker_primary ?asset_platform)
+        )
+        (asset_marker_secondary ?asset_platform)
+        (not
+          (team_pre_activation_ready ?team)
+        )
+      )
+    :effect
+      (and
+        (team_pre_activation_ready ?team)
+        (team_metadata_attached ?team)
+      )
+  )
+  (:action finalize_team_metadata
+    :parameters (?team - team ?tactic_token - tactic_token ?module - module ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (team_integration_stage_two ?team)
+        (team_tactic_assigned ?team ?tactic_token)
+        (team_has_module ?team ?module)
+        (module_installed_on_asset ?module ?asset_platform)
+        (asset_marker_primary ?asset_platform)
+        (asset_marker_secondary ?asset_platform)
+        (not
+          (team_pre_activation_ready ?team)
+        )
+      )
+    :effect
+      (and
+        (team_pre_activation_ready ?team)
+        (team_metadata_attached ?team)
+      )
+  )
+  (:action certify_team_for_deployment
+    :parameters (?team - team)
+    :precondition
+      (and
+        (team_pre_activation_ready ?team)
+        (not
+          (team_metadata_attached ?team)
+        )
+        (not
+          (team_certified ?team)
+        )
+      )
+    :effect
+      (and
+        (team_certified ?team)
+        (deployment_unit_activated ?team)
+      )
+  )
+  (:action assign_consumable_to_team
+    :parameters (?team - team ?consumable - consumable)
+    :precondition
+      (and
+        (team_pre_activation_ready ?team)
+        (team_metadata_attached ?team)
+        (consumable_available ?consumable)
+      )
+    :effect
+      (and
+        (team_consumable_assigned ?team ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_team_configuration
+    :parameters (?team - team ?objective_slot_primary - objective_slot_primary ?objective_slot_secondary - objective_slot_secondary ?specialization - specialization ?consumable - consumable)
+    :precondition
+      (and
+        (team_pre_activation_ready ?team)
+        (team_metadata_attached ?team)
+        (team_consumable_assigned ?team ?consumable)
+        (team_assigned_primary_slot ?team ?objective_slot_primary)
+        (team_assigned_secondary_slot ?team ?objective_slot_secondary)
+        (slot_primary_ready ?objective_slot_primary)
+        (slot_secondary_ready ?objective_slot_secondary)
+        (deployment_unit_has_specialization ?team ?specialization)
+        (not
+          (team_final_checks_passed ?team)
+        )
+      )
+    :effect (team_final_checks_passed ?team)
+  )
+  (:action finalize_and_activate_team
+    :parameters (?team - team)
+    :precondition
+      (and
+        (team_pre_activation_ready ?team)
+        (team_final_checks_passed ?team)
+        (not
+          (team_certified ?team)
+        )
+      )
+    :effect
+      (and
+        (team_certified ?team)
+        (deployment_unit_activated ?team)
+      )
+  )
+  (:action claim_strategy_tag_for_team
+    :parameters (?team - team ?strategy_tag - strategy_tag ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_prepared ?team)
+        (deployment_unit_has_specialization ?team ?specialization)
+        (strategy_tag_available ?strategy_tag)
+        (team_has_strategy_tag ?team ?strategy_tag)
+        (not
+          (team_strategy_tag_activated ?team)
+        )
+      )
+    :effect
+      (and
+        (team_strategy_tag_activated ?team)
+        (not
+          (strategy_tag_available ?strategy_tag)
+        )
+      )
+  )
+  (:action prepare_team_tag_for_tactics
+    :parameters (?team - team ?operator - operator)
+    :precondition
+      (and
+        (team_strategy_tag_activated ?team)
+        (deployment_unit_bound_operator ?team ?operator)
+        (not
+          (team_tag_ready_for_tactics ?team)
+        )
+      )
+    :effect (team_tag_ready_for_tactics ?team)
+  )
+  (:action apply_tactic_to_team
+    :parameters (?team - team ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (team_tag_ready_for_tactics ?team)
+        (team_tactic_assigned ?team ?tactic_token)
+        (not
+          (team_tactic_applied ?team)
+        )
+      )
+    :effect (team_tactic_applied ?team)
+  )
+  (:action finalize_tactic_and_activate_team
+    :parameters (?team - team)
+    :precondition
+      (and
+        (team_tactic_applied ?team)
+        (not
+          (team_certified ?team)
+        )
+      )
+    :effect
+      (and
+        (team_certified ?team)
+        (deployment_unit_activated ?team)
+      )
+  )
+  (:action activate_primary_slot_unit
+    :parameters (?objective_slot_primary - objective_slot_primary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_primary_initialized ?objective_slot_primary)
+        (slot_primary_ready ?objective_slot_primary)
+        (asset_ready ?asset_platform)
+        (asset_commissioned ?asset_platform)
+        (not
+          (deployment_unit_activated ?objective_slot_primary)
+        )
+      )
+    :effect (deployment_unit_activated ?objective_slot_primary)
+  )
+  (:action activate_secondary_slot_unit
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?asset_platform - asset_platform)
+    :precondition
+      (and
+        (slot_secondary_initialized ?objective_slot_secondary)
+        (slot_secondary_ready ?objective_slot_secondary)
+        (asset_ready ?asset_platform)
+        (asset_commissioned ?asset_platform)
+        (not
+          (deployment_unit_activated ?objective_slot_secondary)
+        )
+      )
+    :effect (deployment_unit_activated ?objective_slot_secondary)
+  )
+  (:action complete_objective_phase_for_unit
+    :parameters (?unit_candidate - unit_candidate ?phase_marker - phase_marker ?specialization - specialization)
+    :precondition
+      (and
+        (deployment_unit_activated ?unit_candidate)
+        (deployment_unit_has_specialization ?unit_candidate ?specialization)
+        (phase_marker_available ?phase_marker)
+        (not
+          (deployment_unit_completed_phase ?unit_candidate)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_completed_phase ?unit_candidate)
+        (deployment_unit_phase_marker_assigned ?unit_candidate ?phase_marker)
+        (not
+          (phase_marker_available ?phase_marker)
+        )
+      )
+  )
+  (:action recycle_unit_and_release_role_token
+    :parameters (?objective_slot_primary - objective_slot_primary ?role_token - role_token ?phase_marker - phase_marker)
+    :precondition
+      (and
+        (deployment_unit_completed_phase ?objective_slot_primary)
+        (deployment_unit_role_token_assigned ?objective_slot_primary ?role_token)
+        (deployment_unit_phase_marker_assigned ?objective_slot_primary ?phase_marker)
+        (not
+          (deployment_unit_recycled ?objective_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_recycled ?objective_slot_primary)
+        (role_token_available ?role_token)
+        (phase_marker_available ?phase_marker)
+      )
+  )
+  (:action recycle_secondary_unit_and_release_role_token
+    :parameters (?objective_slot_secondary - objective_slot_secondary ?role_token - role_token ?phase_marker - phase_marker)
+    :precondition
+      (and
+        (deployment_unit_completed_phase ?objective_slot_secondary)
+        (deployment_unit_role_token_assigned ?objective_slot_secondary ?role_token)
+        (deployment_unit_phase_marker_assigned ?objective_slot_secondary ?phase_marker)
+        (not
+          (deployment_unit_recycled ?objective_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_recycled ?objective_slot_secondary)
+        (role_token_available ?role_token)
+        (phase_marker_available ?phase_marker)
+      )
+  )
+  (:action recycle_team_and_release_role_token
+    :parameters (?team - team ?role_token - role_token ?phase_marker - phase_marker)
+    :precondition
+      (and
+        (deployment_unit_completed_phase ?team)
+        (deployment_unit_role_token_assigned ?team ?role_token)
+        (deployment_unit_phase_marker_assigned ?team ?phase_marker)
+        (not
+          (deployment_unit_recycled ?team)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_recycled ?team)
+        (role_token_available ?role_token)
+        (phase_marker_available ?phase_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem unit_assignment_multi_objectives_scenario)
+  (:domain unit_assignment_across_multiple_objectives)
+  (:objects primary_slot_1 - objective_slot_primary secondary_slot_1 - objective_slot_secondary team_1 - team team_2 - team role_token_1 - role_token role_token_2 - role_token role_token_3 - role_token specialization_1 - specialization operator_1 - operator equipment_1 - equipment subnode_primary_1 - subnode_primary subnode_secondary_1 - subnode_secondary asset_platform_1 - asset_platform module_1 - module module_2 - module tag_token_1 - tag_token tag_token_2 - tag_token consumable_1 - consumable consumable_2 - consumable phase_marker_1 - phase_marker module_type_1 - module_type strategy_tag_1 - strategy_tag strategy_tag_2 - strategy_tag tactic_token_1 - tactic_token)
+  (:init
+    (role_token_available role_token_1)
+    (role_token_available role_token_2)
+    (role_token_available role_token_3)
+    (specialization_available specialization_1)
+    (operator_available operator_1)
+    (equipment_available equipment_1)
+    (slot_has_subnode_primary primary_slot_1 subnode_primary_1)
+    (slot_has_subnode_secondary secondary_slot_1 subnode_secondary_1)
+    (asset_available asset_platform_1)
+    (module_available module_1)
+    (module_available module_2)
+    (team_assigned_primary_slot team_1 primary_slot_1)
+    (team_assigned_primary_slot team_2 primary_slot_1)
+    (team_assigned_secondary_slot team_1 secondary_slot_1)
+    (team_assigned_secondary_slot team_2 secondary_slot_1)
+    (team_assigned_asset team_1 asset_platform_1)
+    (team_assigned_asset team_2 asset_platform_1)
+    (team_has_module team_1 module_1)
+    (team_has_module team_2 module_2)
+    (tag_token_available tag_token_1)
+    (tag_token_available tag_token_2)
+    (consumable_available consumable_1)
+    (consumable_available consumable_2)
+    (phase_marker_available phase_marker_1)
+    (module_type_available module_type_1)
+    (strategy_tag_available strategy_tag_1)
+    (team_has_strategy_tag team_1 strategy_tag_1)
+    (team_has_strategy_tag team_2 strategy_tag_2)
+    (tactic_token_available tactic_token_1)
+  )
+  (:goal
+    (and
+      (deployment_unit_recycled primary_slot_1)
+      (deployment_unit_recycled secondary_slot_1)
+      (deployment_unit_recycled team_1)
+      (deployment_unit_recycled team_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register-unit_candidate primary_slot_1)
+(claim_role_token primary_slot_1 role_token_1)
+(assign_specialization_to_unit primary_slot_1 specialization_1)
+(confirm_specialization_assignment primary_slot_1 specialization_1)
+(bind_operator_to_unit primary_slot_1 operator_1)
+(cover_subnode_primary_with_specialization primary_slot_1 subnode_primary_1 specialization_1)
+(confirm_primary_slot_with_operator primary_slot_1 subnode_primary_1 operator_1)
+(unbind_operator_from_unit primary_slot_1 operator_1)
+(unassign_specialization_from_unit primary_slot_1 specialization_1)
+(register-unit_candidate secondary_slot_1)
+(claim_role_token secondary_slot_1 role_token_2)
+(assign_specialization_to_unit secondary_slot_1 specialization_1)
+(confirm_specialization_assignment secondary_slot_1 specialization_1)
+(bind_operator_to_unit secondary_slot_1 operator_1)
+(cover_subnode_secondary_with_specialization secondary_slot_1 subnode_secondary_1 specialization_1)
+(confirm_secondary_slot_with_operator secondary_slot_1 subnode_secondary_1 operator_1)
+(unbind_operator_from_unit secondary_slot_1 operator_1)
+(unassign_specialization_from_unit secondary_slot_1 specialization_1)
+(assign_specialization_to_unit primary_slot_1 specialization_1)
+(assemble_asset primary_slot_1 secondary_slot_1 subnode_primary_1 subnode_secondary_1 asset_platform_1)
+(commission_asset asset_platform_1 primary_slot_1 specialization_1)
+(activate_primary_slot_unit primary_slot_1 asset_platform_1)
+(activate_secondary_slot_unit secondary_slot_1 asset_platform_1)
+(complete_objective_phase_for_unit primary_slot_1 phase_marker_1 specialization_1)
+(unassign_specialization_from_unit primary_slot_1 specialization_1)
+(recycle_unit_and_release_role_token primary_slot_1 role_token_1 phase_marker_1)
+(assign_specialization_to_unit secondary_slot_1 specialization_1)
+(complete_objective_phase_for_unit secondary_slot_1 phase_marker_1 specialization_1)
+(unassign_specialization_from_unit secondary_slot_1 specialization_1)
+(recycle_secondary_unit_and_release_role_token secondary_slot_1 role_token_2 phase_marker_1)
+(register-unit_candidate team_1)
+(claim_role_token team_1 role_token_3)
+(assign_specialization_to_unit team_1 specialization_1)
+(confirm_specialization_assignment team_1 specialization_1)
+(assign_tactic_to_team team_1 tactic_token_1)
+(install_module_type_on_team team_1 module_type_1)
+(integrate_module_into_asset team_1 module_1 asset_platform_1)
+(finalize_module_integration team_1 module_1 asset_platform_1 specialization_1)
+(bind_operator_to_unit team_1 operator_1)
+(apply_module_integration_to_team team_1 module_type_1 operator_1 module_1 asset_platform_1)
+(advance_team_to_pre_activation team_1 tactic_token_1 module_1 asset_platform_1)
+(certify_team_for_deployment team_1)
+(complete_objective_phase_for_unit team_1 phase_marker_1 specialization_1)
+(unassign_specialization_from_unit team_1 specialization_1)
+(unbind_operator_from_unit team_1 operator_1)
+(uninstall_module_type_from_team team_1 module_type_1)
+(remove_tactic_from_team team_1 tactic_token_1)
+(recycle_team_and_release_role_token team_1 role_token_3 phase_marker_1)
+(register-unit_candidate team_2)
+(claim_role_token team_2 role_token_1)
+(assign_specialization_to_unit team_2 specialization_1)
+(confirm_specialization_assignment team_2 specialization_1)
+(assign_tactic_to_team team_2 tactic_token_1)
+(install_module_type_on_team team_2 module_type_1)
+(integrate_module_into_asset team_2 module_2 asset_platform_1)
+(finalize_module_integration team_2 module_2 asset_platform_1 specialization_1)
+(bind_operator_to_unit team_2 operator_1)
+(apply_module_integration_to_team team_2 module_type_1 operator_1 module_2 asset_platform_1)
+(advance_team_to_pre_activation team_2 tactic_token_1 module_2 asset_platform_1)
+(certify_team_for_deployment team_2)
+(complete_objective_phase_for_unit team_2 phase_marker_1 specialization_1)
+(unassign_specialization_from_unit team_2 specialization_1)
+(unbind_operator_from_unit team_2 operator_1)
+(uninstall_module_type_from_team team_2 module_type_1)
+(remove_tactic_from_team team_2 tactic_token_1)
+(recycle_team_and_release_role_token team_2 role_token_1 phase_marker_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_rmj806na/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_rmj806na/plan.pddl 
+
+
+--- stderr ---
+

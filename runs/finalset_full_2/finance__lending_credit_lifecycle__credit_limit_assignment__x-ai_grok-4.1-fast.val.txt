@@ -1,0 +1,1012 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain credit_limit_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object resource_artifact - domain_object asset_document - domain_object assessment_component - domain_object primary_subject_group - domain_object borrower_entity - primary_subject_group underwriter_resource - resource_artifact scoring_model - resource_artifact reviewer_role - resource_artifact legal_document_template - resource_artifact pricing_scheme - resource_artifact authorization_token - resource_artifact pricing_parameter - resource_artifact portfolio_segment - resource_artifact collateral_package - asset_document security_document - asset_document risk_classification - asset_document borrower_risk_factor - assessment_component facility_pricing_factor - assessment_component limit_proposal - assessment_component borrower_profile_group - borrower_entity facility_profile_group - borrower_entity borrower_exposure_profile - borrower_profile_group facility_exposure_profile - borrower_profile_group credit_limit_case - facility_profile_group)
+
+  (:predicates
+    (borrower_intake_created ?borrower - borrower_entity)
+    (subject_initialized ?borrower - borrower_entity)
+    (underwriter_assignment_flag ?borrower - borrower_entity)
+    (limit_assigned_for_subject ?borrower - borrower_entity)
+    (decision_recorded_for_subject ?borrower - borrower_entity)
+    (authorization_issued_for_subject ?borrower - borrower_entity)
+    (underwriter_available ?underwriter - underwriter_resource)
+    (assigned_underwriter_for_subject ?borrower - borrower_entity ?underwriter - underwriter_resource)
+    (scoring_model_available ?scoring_model - scoring_model)
+    (assigned_scoring_model_for_subject ?borrower - borrower_entity ?scoring_model - scoring_model)
+    (reviewer_available ?reviewer - reviewer_role)
+    (assigned_reviewer_for_subject ?borrower - borrower_entity ?reviewer - reviewer_role)
+    (collateral_package_available ?collateral_package - collateral_package)
+    (borrower_exposure_has_collateral ?borrower_exposure_profile - borrower_exposure_profile ?collateral_package - collateral_package)
+    (facility_exposure_has_collateral ?facility_exposure_profile - facility_exposure_profile ?collateral_package - collateral_package)
+    (exposure_profile_has_risk_factor ?borrower_exposure_profile - borrower_exposure_profile ?borrower_risk_factor - borrower_risk_factor)
+    (risk_factor_tagged ?borrower_risk_factor - borrower_risk_factor)
+    (risk_factor_collateral_tag ?borrower_risk_factor - borrower_risk_factor)
+    (borrower_exposure_verified ?borrower_exposure_profile - borrower_exposure_profile)
+    (facility_exposure_has_pricing_factor ?facility_exposure_profile - facility_exposure_profile ?facility_pricing_factor - facility_pricing_factor)
+    (facility_pricing_factor_tagged ?facility_pricing_factor - facility_pricing_factor)
+    (facility_pricing_factor_collateral_tag ?facility_pricing_factor - facility_pricing_factor)
+    (facility_exposure_verified ?facility_exposure_profile - facility_exposure_profile)
+    (proposal_draft ?limit_proposal - limit_proposal)
+    (proposal_staged ?limit_proposal - limit_proposal)
+    (proposal_has_borrower_risk_factor ?limit_proposal - limit_proposal ?borrower_risk_factor - borrower_risk_factor)
+    (proposal_has_facility_pricing_factor ?limit_proposal - limit_proposal ?facility_pricing_factor - facility_pricing_factor)
+    (proposal_flag_borrower_risk ?limit_proposal - limit_proposal)
+    (proposal_flag_facility_pricing ?limit_proposal - limit_proposal)
+    (proposal_locked ?limit_proposal - limit_proposal)
+    (case_includes_borrower_profile ?credit_limit_case - credit_limit_case ?borrower_exposure_profile - borrower_exposure_profile)
+    (case_includes_facility_profile ?credit_limit_case - credit_limit_case ?facility_exposure_profile - facility_exposure_profile)
+    (case_associated_proposal ?credit_limit_case - credit_limit_case ?limit_proposal - limit_proposal)
+    (security_document_available ?security_document - security_document)
+    (case_has_security_document ?credit_limit_case - credit_limit_case ?security_document - security_document)
+    (security_document_registered ?security_document - security_document)
+    (security_document_linked_to_proposal ?security_document - security_document ?limit_proposal - limit_proposal)
+    (case_collateral_verified ?credit_limit_case - credit_limit_case)
+    (case_pricing_verified ?credit_limit_case - credit_limit_case)
+    (case_validation_complete ?credit_limit_case - credit_limit_case)
+    (legal_template_attached ?credit_limit_case - credit_limit_case)
+    (case_legal_attachment_completed ?credit_limit_case - credit_limit_case)
+    (case_pricing_scheme_ready ?credit_limit_case - credit_limit_case)
+    (case_approval_aggregated ?credit_limit_case - credit_limit_case)
+    (risk_classification_available ?risk_classification - risk_classification)
+    (case_has_risk_classification ?credit_limit_case - credit_limit_case ?risk_classification - risk_classification)
+    (case_risk_classification_locked ?credit_limit_case - credit_limit_case)
+    (case_legal_review_completed ?credit_limit_case - credit_limit_case)
+    (case_portfolio_segment_attached ?credit_limit_case - credit_limit_case)
+    (legal_template_available ?legal_document_template - legal_document_template)
+    (case_attached_legal_template ?credit_limit_case - credit_limit_case ?legal_document_template - legal_document_template)
+    (pricing_scheme_available ?pricing_scheme - pricing_scheme)
+    (case_pricing_scheme_linked ?credit_limit_case - credit_limit_case ?pricing_scheme - pricing_scheme)
+    (pricing_parameter_available ?pricing_parameter - pricing_parameter)
+    (case_pricing_parameter_attached ?credit_limit_case - credit_limit_case ?pricing_parameter - pricing_parameter)
+    (portfolio_segment_available ?portfolio_segment - portfolio_segment)
+    (case_portfolio_segment_linked ?credit_limit_case - credit_limit_case ?portfolio_segment - portfolio_segment)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (authorization_token_assigned_for_subject ?borrower - borrower_entity ?authorization_token - authorization_token)
+    (borrower_exposure_ready ?borrower_exposure_profile - borrower_exposure_profile)
+    (facility_exposure_ready ?facility_exposure_profile - facility_exposure_profile)
+    (decision_marked ?credit_limit_case - credit_limit_case)
+  )
+  (:action register_borrower_intake
+    :parameters (?borrower - borrower_entity)
+    :precondition
+      (and
+        (not
+          (borrower_intake_created ?borrower)
+        )
+        (not
+          (limit_assigned_for_subject ?borrower)
+        )
+      )
+    :effect (borrower_intake_created ?borrower)
+  )
+  (:action assign_underwriter_to_borrower
+    :parameters (?borrower - borrower_entity ?underwriter - underwriter_resource)
+    :precondition
+      (and
+        (borrower_intake_created ?borrower)
+        (not
+          (underwriter_assignment_flag ?borrower)
+        )
+        (underwriter_available ?underwriter)
+      )
+    :effect
+      (and
+        (underwriter_assignment_flag ?borrower)
+        (assigned_underwriter_for_subject ?borrower ?underwriter)
+        (not
+          (underwriter_available ?underwriter)
+        )
+      )
+  )
+  (:action apply_scoring_model_to_borrower
+    :parameters (?borrower - borrower_entity ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (borrower_intake_created ?borrower)
+        (underwriter_assignment_flag ?borrower)
+        (scoring_model_available ?scoring_model)
+      )
+    :effect
+      (and
+        (assigned_scoring_model_for_subject ?borrower ?scoring_model)
+        (not
+          (scoring_model_available ?scoring_model)
+        )
+      )
+  )
+  (:action finalize_scoring_for_borrower
+    :parameters (?borrower - borrower_entity ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (borrower_intake_created ?borrower)
+        (underwriter_assignment_flag ?borrower)
+        (assigned_scoring_model_for_subject ?borrower ?scoring_model)
+        (not
+          (subject_initialized ?borrower)
+        )
+      )
+    :effect (subject_initialized ?borrower)
+  )
+  (:action release_scoring_model_from_borrower
+    :parameters (?borrower - borrower_entity ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (assigned_scoring_model_for_subject ?borrower ?scoring_model)
+      )
+    :effect
+      (and
+        (scoring_model_available ?scoring_model)
+        (not
+          (assigned_scoring_model_for_subject ?borrower ?scoring_model)
+        )
+      )
+  )
+  (:action assign_reviewer_to_borrower
+    :parameters (?borrower - borrower_entity ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (subject_initialized ?borrower)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (assigned_reviewer_for_subject ?borrower ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_borrower
+    :parameters (?borrower - borrower_entity ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (assigned_reviewer_for_subject ?borrower ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (assigned_reviewer_for_subject ?borrower ?reviewer)
+        )
+      )
+  )
+  (:action attach_pricing_parameter_to_case
+    :parameters (?limit_case - credit_limit_case ?pricing_parameter - pricing_parameter)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (pricing_parameter_available ?pricing_parameter)
+      )
+    :effect
+      (and
+        (case_pricing_parameter_attached ?limit_case ?pricing_parameter)
+        (not
+          (pricing_parameter_available ?pricing_parameter)
+        )
+      )
+  )
+  (:action detach_pricing_parameter_from_case
+    :parameters (?limit_case - credit_limit_case ?pricing_parameter - pricing_parameter)
+    :precondition
+      (and
+        (case_pricing_parameter_attached ?limit_case ?pricing_parameter)
+      )
+    :effect
+      (and
+        (pricing_parameter_available ?pricing_parameter)
+        (not
+          (case_pricing_parameter_attached ?limit_case ?pricing_parameter)
+        )
+      )
+  )
+  (:action attach_portfolio_segment_to_case
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (portfolio_segment_available ?portfolio_segment)
+      )
+    :effect
+      (and
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (not
+          (portfolio_segment_available ?portfolio_segment)
+        )
+      )
+  )
+  (:action detach_portfolio_segment_from_case
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment)
+    :precondition
+      (and
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+      )
+    :effect
+      (and
+        (portfolio_segment_available ?portfolio_segment)
+        (not
+          (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        )
+      )
+  )
+  (:action flag_risk_factor_for_borrower_exposure
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (subject_initialized ?borrower_exposure_profile)
+        (assigned_scoring_model_for_subject ?borrower_exposure_profile ?scoring_model)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (not
+          (risk_factor_tagged ?borrower_risk_factor)
+        )
+        (not
+          (risk_factor_collateral_tag ?borrower_risk_factor)
+        )
+      )
+    :effect (risk_factor_tagged ?borrower_risk_factor)
+  )
+  (:action verify_borrower_exposure
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (subject_initialized ?borrower_exposure_profile)
+        (assigned_reviewer_for_subject ?borrower_exposure_profile ?reviewer)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (risk_factor_tagged ?borrower_risk_factor)
+        (not
+          (borrower_exposure_ready ?borrower_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+      )
+  )
+  (:action attach_collateral_to_borrower_exposure
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?collateral_package - collateral_package)
+    :precondition
+      (and
+        (subject_initialized ?borrower_exposure_profile)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (collateral_package_available ?collateral_package)
+        (not
+          (borrower_exposure_ready ?borrower_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (risk_factor_collateral_tag ?borrower_risk_factor)
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (borrower_exposure_has_collateral ?borrower_exposure_profile ?collateral_package)
+        (not
+          (collateral_package_available ?collateral_package)
+        )
+      )
+  )
+  (:action finalize_borrower_exposure_collateral_assignment
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?scoring_model - scoring_model ?collateral_package - collateral_package)
+    :precondition
+      (and
+        (subject_initialized ?borrower_exposure_profile)
+        (assigned_scoring_model_for_subject ?borrower_exposure_profile ?scoring_model)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (risk_factor_collateral_tag ?borrower_risk_factor)
+        (borrower_exposure_has_collateral ?borrower_exposure_profile ?collateral_package)
+        (not
+          (borrower_exposure_verified ?borrower_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (risk_factor_tagged ?borrower_risk_factor)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+        (collateral_package_available ?collateral_package)
+        (not
+          (borrower_exposure_has_collateral ?borrower_exposure_profile ?collateral_package)
+        )
+      )
+  )
+  (:action flag_pricing_factor_for_facility_exposure
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?facility_pricing_factor - facility_pricing_factor ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (subject_initialized ?facility_exposure_profile)
+        (assigned_scoring_model_for_subject ?facility_exposure_profile ?scoring_model)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (not
+          (facility_pricing_factor_tagged ?facility_pricing_factor)
+        )
+        (not
+          (facility_pricing_factor_collateral_tag ?facility_pricing_factor)
+        )
+      )
+    :effect (facility_pricing_factor_tagged ?facility_pricing_factor)
+  )
+  (:action verify_facility_exposure
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?facility_pricing_factor - facility_pricing_factor ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (subject_initialized ?facility_exposure_profile)
+        (assigned_reviewer_for_subject ?facility_exposure_profile ?reviewer)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (facility_pricing_factor_tagged ?facility_pricing_factor)
+        (not
+          (facility_exposure_ready ?facility_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (facility_exposure_ready ?facility_exposure_profile)
+        (facility_exposure_verified ?facility_exposure_profile)
+      )
+  )
+  (:action attach_collateral_to_facility_exposure
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?facility_pricing_factor - facility_pricing_factor ?collateral_package - collateral_package)
+    :precondition
+      (and
+        (subject_initialized ?facility_exposure_profile)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (collateral_package_available ?collateral_package)
+        (not
+          (facility_exposure_ready ?facility_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (facility_pricing_factor_collateral_tag ?facility_pricing_factor)
+        (facility_exposure_ready ?facility_exposure_profile)
+        (facility_exposure_has_collateral ?facility_exposure_profile ?collateral_package)
+        (not
+          (collateral_package_available ?collateral_package)
+        )
+      )
+  )
+  (:action finalize_facility_exposure_collateral_assignment
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?facility_pricing_factor - facility_pricing_factor ?scoring_model - scoring_model ?collateral_package - collateral_package)
+    :precondition
+      (and
+        (subject_initialized ?facility_exposure_profile)
+        (assigned_scoring_model_for_subject ?facility_exposure_profile ?scoring_model)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (facility_pricing_factor_collateral_tag ?facility_pricing_factor)
+        (facility_exposure_has_collateral ?facility_exposure_profile ?collateral_package)
+        (not
+          (facility_exposure_verified ?facility_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (facility_pricing_factor_tagged ?facility_pricing_factor)
+        (facility_exposure_verified ?facility_exposure_profile)
+        (collateral_package_available ?collateral_package)
+        (not
+          (facility_exposure_has_collateral ?facility_exposure_profile ?collateral_package)
+        )
+      )
+  )
+  (:action consolidate_exposure_and_risk_into_proposal
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?facility_exposure_profile - facility_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?facility_pricing_factor - facility_pricing_factor ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (facility_exposure_ready ?facility_exposure_profile)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (risk_factor_tagged ?borrower_risk_factor)
+        (facility_pricing_factor_tagged ?facility_pricing_factor)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+        (facility_exposure_verified ?facility_exposure_profile)
+        (proposal_draft ?limit_proposal)
+      )
+    :effect
+      (and
+        (proposal_staged ?limit_proposal)
+        (proposal_has_borrower_risk_factor ?limit_proposal ?borrower_risk_factor)
+        (proposal_has_facility_pricing_factor ?limit_proposal ?facility_pricing_factor)
+        (not
+          (proposal_draft ?limit_proposal)
+        )
+      )
+  )
+  (:action consolidate_exposure_and_pricing_into_proposal_variant_a
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?facility_exposure_profile - facility_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?facility_pricing_factor - facility_pricing_factor ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (facility_exposure_ready ?facility_exposure_profile)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (risk_factor_collateral_tag ?borrower_risk_factor)
+        (facility_pricing_factor_tagged ?facility_pricing_factor)
+        (not
+          (borrower_exposure_verified ?borrower_exposure_profile)
+        )
+        (facility_exposure_verified ?facility_exposure_profile)
+        (proposal_draft ?limit_proposal)
+      )
+    :effect
+      (and
+        (proposal_staged ?limit_proposal)
+        (proposal_has_borrower_risk_factor ?limit_proposal ?borrower_risk_factor)
+        (proposal_has_facility_pricing_factor ?limit_proposal ?facility_pricing_factor)
+        (proposal_flag_borrower_risk ?limit_proposal)
+        (not
+          (proposal_draft ?limit_proposal)
+        )
+      )
+  )
+  (:action consolidate_exposure_and_pricing_into_proposal_variant_b
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?facility_exposure_profile - facility_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?facility_pricing_factor - facility_pricing_factor ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (facility_exposure_ready ?facility_exposure_profile)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (risk_factor_tagged ?borrower_risk_factor)
+        (facility_pricing_factor_collateral_tag ?facility_pricing_factor)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+        (not
+          (facility_exposure_verified ?facility_exposure_profile)
+        )
+        (proposal_draft ?limit_proposal)
+      )
+    :effect
+      (and
+        (proposal_staged ?limit_proposal)
+        (proposal_has_borrower_risk_factor ?limit_proposal ?borrower_risk_factor)
+        (proposal_has_facility_pricing_factor ?limit_proposal ?facility_pricing_factor)
+        (proposal_flag_facility_pricing ?limit_proposal)
+        (not
+          (proposal_draft ?limit_proposal)
+        )
+      )
+  )
+  (:action consolidate_exposure_and_pricing_into_proposal_comprehensive
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?facility_exposure_profile - facility_exposure_profile ?borrower_risk_factor - borrower_risk_factor ?facility_pricing_factor - facility_pricing_factor ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (facility_exposure_ready ?facility_exposure_profile)
+        (exposure_profile_has_risk_factor ?borrower_exposure_profile ?borrower_risk_factor)
+        (facility_exposure_has_pricing_factor ?facility_exposure_profile ?facility_pricing_factor)
+        (risk_factor_collateral_tag ?borrower_risk_factor)
+        (facility_pricing_factor_collateral_tag ?facility_pricing_factor)
+        (not
+          (borrower_exposure_verified ?borrower_exposure_profile)
+        )
+        (not
+          (facility_exposure_verified ?facility_exposure_profile)
+        )
+        (proposal_draft ?limit_proposal)
+      )
+    :effect
+      (and
+        (proposal_staged ?limit_proposal)
+        (proposal_has_borrower_risk_factor ?limit_proposal ?borrower_risk_factor)
+        (proposal_has_facility_pricing_factor ?limit_proposal ?facility_pricing_factor)
+        (proposal_flag_borrower_risk ?limit_proposal)
+        (proposal_flag_facility_pricing ?limit_proposal)
+        (not
+          (proposal_draft ?limit_proposal)
+        )
+      )
+  )
+  (:action lock_proposal_for_collateral_verification
+    :parameters (?limit_proposal - limit_proposal ?borrower_exposure_profile - borrower_exposure_profile ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (proposal_staged ?limit_proposal)
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (assigned_scoring_model_for_subject ?borrower_exposure_profile ?scoring_model)
+        (not
+          (proposal_locked ?limit_proposal)
+        )
+      )
+    :effect (proposal_locked ?limit_proposal)
+  )
+  (:action register_security_document_for_case
+    :parameters (?limit_case - credit_limit_case ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (case_associated_proposal ?limit_case ?limit_proposal)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_available ?security_document)
+        (proposal_staged ?limit_proposal)
+        (proposal_locked ?limit_proposal)
+        (not
+          (security_document_registered ?security_document)
+        )
+      )
+    :effect
+      (and
+        (security_document_registered ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (not
+          (security_document_available ?security_document)
+        )
+      )
+  )
+  (:action verify_and_attach_security_document_to_case
+    :parameters (?limit_case - credit_limit_case ?security_document - security_document ?limit_proposal - limit_proposal ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_registered ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (assigned_scoring_model_for_subject ?limit_case ?scoring_model)
+        (not
+          (proposal_flag_borrower_risk ?limit_proposal)
+        )
+        (not
+          (case_collateral_verified ?limit_case)
+        )
+      )
+    :effect (case_collateral_verified ?limit_case)
+  )
+  (:action attach_legal_template_to_case
+    :parameters (?limit_case - credit_limit_case ?legal_document_template - legal_document_template)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (legal_template_available ?legal_document_template)
+        (not
+          (legal_template_attached ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (legal_template_attached ?limit_case)
+        (case_attached_legal_template ?limit_case ?legal_document_template)
+        (not
+          (legal_template_available ?legal_document_template)
+        )
+      )
+  )
+  (:action process_legal_attachment_and_verification
+    :parameters (?limit_case - credit_limit_case ?security_document - security_document ?limit_proposal - limit_proposal ?scoring_model - scoring_model ?legal_document_template - legal_document_template)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_registered ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (assigned_scoring_model_for_subject ?limit_case ?scoring_model)
+        (proposal_flag_borrower_risk ?limit_proposal)
+        (legal_template_attached ?limit_case)
+        (case_attached_legal_template ?limit_case ?legal_document_template)
+        (not
+          (case_collateral_verified ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (case_collateral_verified ?limit_case)
+        (case_legal_attachment_completed ?limit_case)
+      )
+  )
+  (:action stage_case_for_pricing_verification
+    :parameters (?limit_case - credit_limit_case ?pricing_parameter - pricing_parameter ?reviewer - reviewer_role ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_collateral_verified ?limit_case)
+        (case_pricing_parameter_attached ?limit_case ?pricing_parameter)
+        (assigned_reviewer_for_subject ?limit_case ?reviewer)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (not
+          (proposal_flag_facility_pricing ?limit_proposal)
+        )
+        (not
+          (case_pricing_verified ?limit_case)
+        )
+      )
+    :effect (case_pricing_verified ?limit_case)
+  )
+  (:action confirm_pricing_verification_for_case
+    :parameters (?limit_case - credit_limit_case ?pricing_parameter - pricing_parameter ?reviewer - reviewer_role ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_collateral_verified ?limit_case)
+        (case_pricing_parameter_attached ?limit_case ?pricing_parameter)
+        (assigned_reviewer_for_subject ?limit_case ?reviewer)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (proposal_flag_facility_pricing ?limit_proposal)
+        (not
+          (case_pricing_verified ?limit_case)
+        )
+      )
+    :effect (case_pricing_verified ?limit_case)
+  )
+  (:action complete_case_validation_before_decision
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_pricing_verified ?limit_case)
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (not
+          (proposal_flag_borrower_risk ?limit_proposal)
+        )
+        (not
+          (proposal_flag_facility_pricing ?limit_proposal)
+        )
+        (not
+          (case_validation_complete ?limit_case)
+        )
+      )
+    :effect (case_validation_complete ?limit_case)
+  )
+  (:action complete_case_validation_and_set_pricing_ready_variant_a
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_pricing_verified ?limit_case)
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (proposal_flag_borrower_risk ?limit_proposal)
+        (not
+          (proposal_flag_facility_pricing ?limit_proposal)
+        )
+        (not
+          (case_validation_complete ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (case_validation_complete ?limit_case)
+        (case_pricing_scheme_ready ?limit_case)
+      )
+  )
+  (:action complete_case_validation_and_set_pricing_ready_variant_b
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_pricing_verified ?limit_case)
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (not
+          (proposal_flag_borrower_risk ?limit_proposal)
+        )
+        (proposal_flag_facility_pricing ?limit_proposal)
+        (not
+          (case_validation_complete ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (case_validation_complete ?limit_case)
+        (case_pricing_scheme_ready ?limit_case)
+      )
+  )
+  (:action complete_case_validation_and_set_pricing_ready_variant_c
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment ?security_document - security_document ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (case_pricing_verified ?limit_case)
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (case_has_security_document ?limit_case ?security_document)
+        (security_document_linked_to_proposal ?security_document ?limit_proposal)
+        (proposal_flag_borrower_risk ?limit_proposal)
+        (proposal_flag_facility_pricing ?limit_proposal)
+        (not
+          (case_validation_complete ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (case_validation_complete ?limit_case)
+        (case_pricing_scheme_ready ?limit_case)
+      )
+  )
+  (:action record_case_decision_without_pricing_scheme
+    :parameters (?limit_case - credit_limit_case)
+    :precondition
+      (and
+        (case_validation_complete ?limit_case)
+        (not
+          (case_pricing_scheme_ready ?limit_case)
+        )
+        (not
+          (decision_marked ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (decision_marked ?limit_case)
+        (decision_recorded_for_subject ?limit_case)
+      )
+  )
+  (:action attach_pricing_scheme_to_case
+    :parameters (?limit_case - credit_limit_case ?pricing_scheme - pricing_scheme)
+    :precondition
+      (and
+        (case_validation_complete ?limit_case)
+        (case_pricing_scheme_ready ?limit_case)
+        (pricing_scheme_available ?pricing_scheme)
+      )
+    :effect
+      (and
+        (case_pricing_scheme_linked ?limit_case ?pricing_scheme)
+        (not
+          (pricing_scheme_available ?pricing_scheme)
+        )
+      )
+  )
+  (:action execute_final_approval_sequence
+    :parameters (?limit_case - credit_limit_case ?borrower_exposure_profile - borrower_exposure_profile ?facility_exposure_profile - facility_exposure_profile ?scoring_model - scoring_model ?pricing_scheme - pricing_scheme)
+    :precondition
+      (and
+        (case_validation_complete ?limit_case)
+        (case_pricing_scheme_ready ?limit_case)
+        (case_pricing_scheme_linked ?limit_case ?pricing_scheme)
+        (case_includes_borrower_profile ?limit_case ?borrower_exposure_profile)
+        (case_includes_facility_profile ?limit_case ?facility_exposure_profile)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+        (facility_exposure_verified ?facility_exposure_profile)
+        (assigned_scoring_model_for_subject ?limit_case ?scoring_model)
+        (not
+          (case_approval_aggregated ?limit_case)
+        )
+      )
+    :effect (case_approval_aggregated ?limit_case)
+  )
+  (:action finalize_case_and_record_decision
+    :parameters (?limit_case - credit_limit_case)
+    :precondition
+      (and
+        (case_validation_complete ?limit_case)
+        (case_approval_aggregated ?limit_case)
+        (not
+          (decision_marked ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (decision_marked ?limit_case)
+        (decision_recorded_for_subject ?limit_case)
+      )
+  )
+  (:action assign_risk_classification_to_case
+    :parameters (?limit_case - credit_limit_case ?risk_classification - risk_classification ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (subject_initialized ?limit_case)
+        (assigned_scoring_model_for_subject ?limit_case ?scoring_model)
+        (risk_classification_available ?risk_classification)
+        (case_has_risk_classification ?limit_case ?risk_classification)
+        (not
+          (case_risk_classification_locked ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (case_risk_classification_locked ?limit_case)
+        (not
+          (risk_classification_available ?risk_classification)
+        )
+      )
+  )
+  (:action complete_case_legal_review
+    :parameters (?limit_case - credit_limit_case ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (case_risk_classification_locked ?limit_case)
+        (assigned_reviewer_for_subject ?limit_case ?reviewer)
+        (not
+          (case_legal_review_completed ?limit_case)
+        )
+      )
+    :effect (case_legal_review_completed ?limit_case)
+  )
+  (:action attach_portfolio_segment_for_legal_review
+    :parameters (?limit_case - credit_limit_case ?portfolio_segment - portfolio_segment)
+    :precondition
+      (and
+        (case_legal_review_completed ?limit_case)
+        (case_portfolio_segment_linked ?limit_case ?portfolio_segment)
+        (not
+          (case_portfolio_segment_attached ?limit_case)
+        )
+      )
+    :effect (case_portfolio_segment_attached ?limit_case)
+  )
+  (:action finalize_decision_and_mark_case
+    :parameters (?limit_case - credit_limit_case)
+    :precondition
+      (and
+        (case_portfolio_segment_attached ?limit_case)
+        (not
+          (decision_marked ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (decision_marked ?limit_case)
+        (decision_recorded_for_subject ?limit_case)
+      )
+  )
+  (:action activate_limit_on_borrower_exposure
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (borrower_exposure_ready ?borrower_exposure_profile)
+        (borrower_exposure_verified ?borrower_exposure_profile)
+        (proposal_staged ?limit_proposal)
+        (proposal_locked ?limit_proposal)
+        (not
+          (decision_recorded_for_subject ?borrower_exposure_profile)
+        )
+      )
+    :effect (decision_recorded_for_subject ?borrower_exposure_profile)
+  )
+  (:action activate_limit_on_facility_exposure
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?limit_proposal - limit_proposal)
+    :precondition
+      (and
+        (facility_exposure_ready ?facility_exposure_profile)
+        (facility_exposure_verified ?facility_exposure_profile)
+        (proposal_staged ?limit_proposal)
+        (proposal_locked ?limit_proposal)
+        (not
+          (decision_recorded_for_subject ?facility_exposure_profile)
+        )
+      )
+    :effect (decision_recorded_for_subject ?facility_exposure_profile)
+  )
+  (:action issue_authorization_token_for_borrower
+    :parameters (?borrower - borrower_entity ?authorization_token - authorization_token ?scoring_model - scoring_model)
+    :precondition
+      (and
+        (decision_recorded_for_subject ?borrower)
+        (assigned_scoring_model_for_subject ?borrower ?scoring_model)
+        (authorization_token_available ?authorization_token)
+        (not
+          (authorization_issued_for_subject ?borrower)
+        )
+      )
+    :effect
+      (and
+        (authorization_issued_for_subject ?borrower)
+        (authorization_token_assigned_for_subject ?borrower ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action apply_authorization_and_assign_limit_to_borrower_exposure
+    :parameters (?borrower_exposure_profile - borrower_exposure_profile ?underwriter - underwriter_resource ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (authorization_issued_for_subject ?borrower_exposure_profile)
+        (assigned_underwriter_for_subject ?borrower_exposure_profile ?underwriter)
+        (authorization_token_assigned_for_subject ?borrower_exposure_profile ?authorization_token)
+        (not
+          (limit_assigned_for_subject ?borrower_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (limit_assigned_for_subject ?borrower_exposure_profile)
+        (underwriter_available ?underwriter)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action apply_authorization_and_assign_limit_to_facility_exposure
+    :parameters (?facility_exposure_profile - facility_exposure_profile ?underwriter - underwriter_resource ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (authorization_issued_for_subject ?facility_exposure_profile)
+        (assigned_underwriter_for_subject ?facility_exposure_profile ?underwriter)
+        (authorization_token_assigned_for_subject ?facility_exposure_profile ?authorization_token)
+        (not
+          (limit_assigned_for_subject ?facility_exposure_profile)
+        )
+      )
+    :effect
+      (and
+        (limit_assigned_for_subject ?facility_exposure_profile)
+        (underwriter_available ?underwriter)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action apply_authorization_and_assign_limit_to_case
+    :parameters (?limit_case - credit_limit_case ?underwriter - underwriter_resource ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (authorization_issued_for_subject ?limit_case)
+        (assigned_underwriter_for_subject ?limit_case ?underwriter)
+        (authorization_token_assigned_for_subject ?limit_case ?authorization_token)
+        (not
+          (limit_assigned_for_subject ?limit_case)
+        )
+      )
+    :effect
+      (and
+        (limit_assigned_for_subject ?limit_case)
+        (underwriter_available ?underwriter)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem credit_limit_assignment_problem)
+  (:domain credit_limit_assignment_domain)
+  (:objects borrower_exposure_profile_1 - borrower_exposure_profile facility_exposure_profile_1 - facility_exposure_profile credit_limit_case_1 - credit_limit_case credit_limit_case_2 - credit_limit_case underwriter_resource_1 - underwriter_resource underwriter_resource_2 - underwriter_resource underwriter_resource_3 - underwriter_resource scoring_model_1 - scoring_model reviewer_role_1 - reviewer_role collateral_package_1 - collateral_package borrower_risk_factor_1 - borrower_risk_factor facility_pricing_factor_1 - facility_pricing_factor limit_proposal_1 - limit_proposal security_document_1 - security_document security_document_2 - security_document legal_document_template_1 - legal_document_template legal_document_template_2 - legal_document_template pricing_scheme_1 - pricing_scheme pricing_scheme_2 - pricing_scheme authorization_token_1 - authorization_token pricing_parameter_1 - pricing_parameter risk_classification_1 - risk_classification risk_classification_2 - risk_classification portfolio_segment_1 - portfolio_segment)
+  (:init
+    (underwriter_available underwriter_resource_1)
+    (underwriter_available underwriter_resource_2)
+    (underwriter_available underwriter_resource_3)
+    (scoring_model_available scoring_model_1)
+    (reviewer_available reviewer_role_1)
+    (collateral_package_available collateral_package_1)
+    (exposure_profile_has_risk_factor borrower_exposure_profile_1 borrower_risk_factor_1)
+    (facility_exposure_has_pricing_factor facility_exposure_profile_1 facility_pricing_factor_1)
+    (proposal_draft limit_proposal_1)
+    (security_document_available security_document_1)
+    (security_document_available security_document_2)
+    (case_includes_borrower_profile credit_limit_case_1 borrower_exposure_profile_1)
+    (case_includes_borrower_profile credit_limit_case_2 borrower_exposure_profile_1)
+    (case_includes_facility_profile credit_limit_case_1 facility_exposure_profile_1)
+    (case_includes_facility_profile credit_limit_case_2 facility_exposure_profile_1)
+    (case_associated_proposal credit_limit_case_1 limit_proposal_1)
+    (case_associated_proposal credit_limit_case_2 limit_proposal_1)
+    (case_has_security_document credit_limit_case_1 security_document_1)
+    (case_has_security_document credit_limit_case_2 security_document_2)
+    (legal_template_available legal_document_template_1)
+    (legal_template_available legal_document_template_2)
+    (pricing_scheme_available pricing_scheme_1)
+    (pricing_scheme_available pricing_scheme_2)
+    (authorization_token_available authorization_token_1)
+    (pricing_parameter_available pricing_parameter_1)
+    (risk_classification_available risk_classification_1)
+    (case_has_risk_classification credit_limit_case_1 risk_classification_1)
+    (case_has_risk_classification credit_limit_case_2 risk_classification_2)
+    (portfolio_segment_available portfolio_segment_1)
+  )
+  (:goal
+    (and
+      (limit_assigned_for_subject borrower_exposure_profile_1)
+      (limit_assigned_for_subject facility_exposure_profile_1)
+      (limit_assigned_for_subject credit_limit_case_1)
+      (limit_assigned_for_subject credit_limit_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_borrower_intake borrower_exposure_profile_1)
+(register_borrower_intake facility_exposure_profile_1)
+(register_borrower_intake credit_limit_case_1)
+(register_borrower_intake credit_limit_case_2)
+(assign_underwriter_to_borrower borrower_exposure_profile_1 underwriter_resource_1)
+(assign_underwriter_to_borrower facility_exposure_profile_1 underwriter_resource_2)
+(assign_underwriter_to_borrower credit_limit_case_1 underwriter_resource_3)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_3b5xp5gf/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_3b5xp5gf/plan.pddl 
+
+
+--- stderr ---
+

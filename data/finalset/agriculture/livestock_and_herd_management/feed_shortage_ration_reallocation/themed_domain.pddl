@@ -1,0 +1,936 @@
+(define (domain feed_shortage_ration_reallocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types husbandry_resource - object regulated_item - object transfer_asset - object herd_entity - object herd_unit - herd_entity feed_point - husbandry_resource feed_batch - husbandry_resource handler - husbandry_resource biosecurity_protocol - husbandry_resource equipment_item - husbandry_resource allocation_voucher - husbandry_resource treatment_additive - husbandry_resource inspection_token - husbandry_resource supplement_pack - regulated_item quality_sample - regulated_item regulatory_permit - regulated_item ration_request_slot - transfer_asset distribution_slot - transfer_asset transfer_container - transfer_asset herd_segment - herd_unit site_unit - herd_unit donor_herd - herd_segment recipient_herd - herd_segment operational_unit - site_unit)
+  (:predicates
+    (herd_unit_registered ?herd_unit - herd_unit)
+    (unit_processing_ready ?herd_unit - herd_unit)
+    (herd_feed_point_reserved ?herd_unit - herd_unit)
+    (unit_allocation_finalized ?herd_unit - herd_unit)
+    (unit_allocation_authorized ?herd_unit - herd_unit)
+    (unit_allocation_recorded ?herd_unit - herd_unit)
+    (feed_point_available ?feed_point - feed_point)
+    (unit_staged_at_feed_point ?herd_unit - herd_unit ?feed_point - feed_point)
+    (feed_batch_available ?feed_batch - feed_batch)
+    (unit_feed_batch_assigned ?herd_unit - herd_unit ?feed_batch - feed_batch)
+    (handler_available ?handler - handler)
+    (handler_assigned_to_unit ?herd_unit - herd_unit ?handler - handler)
+    (supplement_pack_available ?supplement_pack - supplement_pack)
+    (donor_supplement_assigned ?donor_herd - donor_herd ?supplement_pack - supplement_pack)
+    (recipient_supplement_assigned ?recipient_herd - recipient_herd ?supplement_pack - supplement_pack)
+    (donor_ration_slot_linked ?donor_herd - donor_herd ?ration_request_slot - ration_request_slot)
+    (ration_request_slot_prepared ?ration_request_slot - ration_request_slot)
+    (ration_request_slot_confirmed ?ration_request_slot - ration_request_slot)
+    (donor_ready_for_transfer ?donor_herd - donor_herd)
+    (recipient_distribution_slot_linked ?recipient_herd - recipient_herd ?distribution_slot - distribution_slot)
+    (distribution_slot_prepared ?distribution_slot - distribution_slot)
+    (distribution_slot_confirmed ?distribution_slot - distribution_slot)
+    (recipient_ready_for_transfer ?recipient_herd - recipient_herd)
+    (transfer_container_available ?transfer_container - transfer_container)
+    (transfer_container_prepared ?transfer_container - transfer_container)
+    (container_linked_to_donor_slot ?transfer_container - transfer_container ?ration_request_slot - ration_request_slot)
+    (container_linked_to_recipient_slot ?transfer_container - transfer_container ?distribution_slot - distribution_slot)
+    (donor_slot_committed ?transfer_container - transfer_container)
+    (recipient_slot_committed ?transfer_container - transfer_container)
+    (transfer_container_sealed ?transfer_container - transfer_container)
+    (unit_linked_to_donor_herd ?operational_unit - operational_unit ?donor_herd - donor_herd)
+    (unit_linked_to_recipient_herd ?operational_unit - operational_unit ?recipient_herd - recipient_herd)
+    (unit_linked_to_transfer_container ?operational_unit - operational_unit ?transfer_container - transfer_container)
+    (quality_sample_available ?quality_sample - quality_sample)
+    (sample_assigned_to_unit ?operational_unit - operational_unit ?quality_sample - quality_sample)
+    (sample_processed ?quality_sample - quality_sample)
+    (sample_linked_to_container ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    (quality_check_passed ?operational_unit - operational_unit)
+    (operational_checks_complete ?operational_unit - operational_unit)
+    (inspection_passed ?operational_unit - operational_unit)
+    (biosecurity_protocol_linked ?operational_unit - operational_unit)
+    (biosecurity_protocol_confirmed ?operational_unit - operational_unit)
+    (compliance_verified ?operational_unit - operational_unit)
+    (compliance_signoff_complete ?operational_unit - operational_unit)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (permit_assigned ?operational_unit - operational_unit ?regulatory_permit - regulatory_permit)
+    (permit_acknowledged ?operational_unit - operational_unit)
+    (dispatch_prepared ?operational_unit - operational_unit)
+    (final_dispatch_ready ?operational_unit - operational_unit)
+    (biosecurity_protocol_available ?biosecurity_protocol - biosecurity_protocol)
+    (biosecurity_protocol_assigned ?operational_unit - operational_unit ?biosecurity_protocol - biosecurity_protocol)
+    (equipment_item_available ?equipment_item - equipment_item)
+    (equipment_item_assigned ?operational_unit - operational_unit ?equipment_item - equipment_item)
+    (treatment_additive_available ?treatment_additive - treatment_additive)
+    (treatment_additive_applied ?operational_unit - operational_unit ?treatment_additive - treatment_additive)
+    (inspection_token_available ?inspection_token - inspection_token)
+    (inspection_assigned ?operational_unit - operational_unit ?inspection_token - inspection_token)
+    (allocation_voucher_available ?allocation_voucher - allocation_voucher)
+    (allocation_voucher_assigned ?herd_unit - herd_unit ?allocation_voucher - allocation_voucher)
+    (donor_preparation_finalized ?donor_herd - donor_herd)
+    (recipient_preparation_finalized ?recipient_herd - recipient_herd)
+    (unit_cleared_for_dispatch ?operational_unit - operational_unit)
+  )
+  (:action register_herd_unit
+    :parameters (?herd_unit - herd_unit)
+    :precondition
+      (and
+        (not
+          (herd_unit_registered ?herd_unit)
+        )
+        (not
+          (unit_allocation_finalized ?herd_unit)
+        )
+      )
+    :effect (herd_unit_registered ?herd_unit)
+  )
+  (:action reserve_feed_point
+    :parameters (?herd_unit - herd_unit ?feed_point - feed_point)
+    :precondition
+      (and
+        (herd_unit_registered ?herd_unit)
+        (not
+          (herd_feed_point_reserved ?herd_unit)
+        )
+        (feed_point_available ?feed_point)
+      )
+    :effect
+      (and
+        (herd_feed_point_reserved ?herd_unit)
+        (unit_staged_at_feed_point ?herd_unit ?feed_point)
+        (not
+          (feed_point_available ?feed_point)
+        )
+      )
+  )
+  (:action assign_feed_batch
+    :parameters (?herd_unit - herd_unit ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (herd_unit_registered ?herd_unit)
+        (herd_feed_point_reserved ?herd_unit)
+        (feed_batch_available ?feed_batch)
+      )
+    :effect
+      (and
+        (unit_feed_batch_assigned ?herd_unit ?feed_batch)
+        (not
+          (feed_batch_available ?feed_batch)
+        )
+      )
+  )
+  (:action confirm_feed_batch_assignment
+    :parameters (?herd_unit - herd_unit ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (herd_unit_registered ?herd_unit)
+        (herd_feed_point_reserved ?herd_unit)
+        (unit_feed_batch_assigned ?herd_unit ?feed_batch)
+        (not
+          (unit_processing_ready ?herd_unit)
+        )
+      )
+    :effect (unit_processing_ready ?herd_unit)
+  )
+  (:action release_feed_batch
+    :parameters (?herd_unit - herd_unit ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_feed_batch_assigned ?herd_unit ?feed_batch)
+      )
+    :effect
+      (and
+        (feed_batch_available ?feed_batch)
+        (not
+          (unit_feed_batch_assigned ?herd_unit ?feed_batch)
+        )
+      )
+  )
+  (:action assign_handler
+    :parameters (?herd_unit - herd_unit ?handler - handler)
+    :precondition
+      (and
+        (unit_processing_ready ?herd_unit)
+        (handler_available ?handler)
+      )
+    :effect
+      (and
+        (handler_assigned_to_unit ?herd_unit ?handler)
+        (not
+          (handler_available ?handler)
+        )
+      )
+  )
+  (:action release_handler
+    :parameters (?herd_unit - herd_unit ?handler - handler)
+    :precondition
+      (and
+        (handler_assigned_to_unit ?herd_unit ?handler)
+      )
+    :effect
+      (and
+        (handler_available ?handler)
+        (not
+          (handler_assigned_to_unit ?herd_unit ?handler)
+        )
+      )
+  )
+  (:action assign_treatment_additive
+    :parameters (?operational_unit - operational_unit ?treatment_additive - treatment_additive)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (treatment_additive_available ?treatment_additive)
+      )
+    :effect
+      (and
+        (treatment_additive_applied ?operational_unit ?treatment_additive)
+        (not
+          (treatment_additive_available ?treatment_additive)
+        )
+      )
+  )
+  (:action release_treatment_additive
+    :parameters (?operational_unit - operational_unit ?treatment_additive - treatment_additive)
+    :precondition
+      (and
+        (treatment_additive_applied ?operational_unit ?treatment_additive)
+      )
+    :effect
+      (and
+        (treatment_additive_available ?treatment_additive)
+        (not
+          (treatment_additive_applied ?operational_unit ?treatment_additive)
+        )
+      )
+  )
+  (:action assign_inspection_token
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (inspection_token_available ?inspection_token)
+      )
+    :effect
+      (and
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (not
+          (inspection_token_available ?inspection_token)
+        )
+      )
+  )
+  (:action release_inspection_token
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token)
+    :precondition
+      (and
+        (inspection_assigned ?operational_unit ?inspection_token)
+      )
+    :effect
+      (and
+        (inspection_token_available ?inspection_token)
+        (not
+          (inspection_assigned ?operational_unit ?inspection_token)
+        )
+      )
+  )
+  (:action prepare_donor_ration_slot
+    :parameters (?donor_herd - donor_herd ?ration_request_slot - ration_request_slot ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_processing_ready ?donor_herd)
+        (unit_feed_batch_assigned ?donor_herd ?feed_batch)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (not
+          (ration_request_slot_prepared ?ration_request_slot)
+        )
+        (not
+          (ration_request_slot_confirmed ?ration_request_slot)
+        )
+      )
+    :effect (ration_request_slot_prepared ?ration_request_slot)
+  )
+  (:action stage_donor_herd
+    :parameters (?donor_herd - donor_herd ?ration_request_slot - ration_request_slot ?handler - handler)
+    :precondition
+      (and
+        (unit_processing_ready ?donor_herd)
+        (handler_assigned_to_unit ?donor_herd ?handler)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (ration_request_slot_prepared ?ration_request_slot)
+        (not
+          (donor_preparation_finalized ?donor_herd)
+        )
+      )
+    :effect
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (donor_ready_for_transfer ?donor_herd)
+      )
+  )
+  (:action confirm_donor_supplement
+    :parameters (?donor_herd - donor_herd ?ration_request_slot - ration_request_slot ?supplement_pack - supplement_pack)
+    :precondition
+      (and
+        (unit_processing_ready ?donor_herd)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (supplement_pack_available ?supplement_pack)
+        (not
+          (donor_preparation_finalized ?donor_herd)
+        )
+      )
+    :effect
+      (and
+        (ration_request_slot_confirmed ?ration_request_slot)
+        (donor_preparation_finalized ?donor_herd)
+        (donor_supplement_assigned ?donor_herd ?supplement_pack)
+        (not
+          (supplement_pack_available ?supplement_pack)
+        )
+      )
+  )
+  (:action restore_donor_supplement
+    :parameters (?donor_herd - donor_herd ?ration_request_slot - ration_request_slot ?feed_batch - feed_batch ?supplement_pack - supplement_pack)
+    :precondition
+      (and
+        (unit_processing_ready ?donor_herd)
+        (unit_feed_batch_assigned ?donor_herd ?feed_batch)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (ration_request_slot_confirmed ?ration_request_slot)
+        (donor_supplement_assigned ?donor_herd ?supplement_pack)
+        (not
+          (donor_ready_for_transfer ?donor_herd)
+        )
+      )
+    :effect
+      (and
+        (ration_request_slot_prepared ?ration_request_slot)
+        (donor_ready_for_transfer ?donor_herd)
+        (supplement_pack_available ?supplement_pack)
+        (not
+          (donor_supplement_assigned ?donor_herd ?supplement_pack)
+        )
+      )
+  )
+  (:action prepare_recipient_distribution_slot
+    :parameters (?recipient_herd - recipient_herd ?distribution_slot - distribution_slot ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_processing_ready ?recipient_herd)
+        (unit_feed_batch_assigned ?recipient_herd ?feed_batch)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (not
+          (distribution_slot_prepared ?distribution_slot)
+        )
+        (not
+          (distribution_slot_confirmed ?distribution_slot)
+        )
+      )
+    :effect (distribution_slot_prepared ?distribution_slot)
+  )
+  (:action stage_recipient_herd
+    :parameters (?recipient_herd - recipient_herd ?distribution_slot - distribution_slot ?handler - handler)
+    :precondition
+      (and
+        (unit_processing_ready ?recipient_herd)
+        (handler_assigned_to_unit ?recipient_herd ?handler)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (distribution_slot_prepared ?distribution_slot)
+        (not
+          (recipient_preparation_finalized ?recipient_herd)
+        )
+      )
+    :effect
+      (and
+        (recipient_preparation_finalized ?recipient_herd)
+        (recipient_ready_for_transfer ?recipient_herd)
+      )
+  )
+  (:action confirm_recipient_supplement
+    :parameters (?recipient_herd - recipient_herd ?distribution_slot - distribution_slot ?supplement_pack - supplement_pack)
+    :precondition
+      (and
+        (unit_processing_ready ?recipient_herd)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (supplement_pack_available ?supplement_pack)
+        (not
+          (recipient_preparation_finalized ?recipient_herd)
+        )
+      )
+    :effect
+      (and
+        (distribution_slot_confirmed ?distribution_slot)
+        (recipient_preparation_finalized ?recipient_herd)
+        (recipient_supplement_assigned ?recipient_herd ?supplement_pack)
+        (not
+          (supplement_pack_available ?supplement_pack)
+        )
+      )
+  )
+  (:action restore_recipient_supplement
+    :parameters (?recipient_herd - recipient_herd ?distribution_slot - distribution_slot ?feed_batch - feed_batch ?supplement_pack - supplement_pack)
+    :precondition
+      (and
+        (unit_processing_ready ?recipient_herd)
+        (unit_feed_batch_assigned ?recipient_herd ?feed_batch)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (distribution_slot_confirmed ?distribution_slot)
+        (recipient_supplement_assigned ?recipient_herd ?supplement_pack)
+        (not
+          (recipient_ready_for_transfer ?recipient_herd)
+        )
+      )
+    :effect
+      (and
+        (distribution_slot_prepared ?distribution_slot)
+        (recipient_ready_for_transfer ?recipient_herd)
+        (supplement_pack_available ?supplement_pack)
+        (not
+          (recipient_supplement_assigned ?recipient_herd ?supplement_pack)
+        )
+      )
+  )
+  (:action assemble_transfer_container
+    :parameters (?donor_herd - donor_herd ?recipient_herd - recipient_herd ?ration_request_slot - ration_request_slot ?distribution_slot - distribution_slot ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (recipient_preparation_finalized ?recipient_herd)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (ration_request_slot_prepared ?ration_request_slot)
+        (distribution_slot_prepared ?distribution_slot)
+        (donor_ready_for_transfer ?donor_herd)
+        (recipient_ready_for_transfer ?recipient_herd)
+        (transfer_container_available ?transfer_container)
+      )
+    :effect
+      (and
+        (transfer_container_prepared ?transfer_container)
+        (container_linked_to_donor_slot ?transfer_container ?ration_request_slot)
+        (container_linked_to_recipient_slot ?transfer_container ?distribution_slot)
+        (not
+          (transfer_container_available ?transfer_container)
+        )
+      )
+  )
+  (:action commit_donor_slot_to_container
+    :parameters (?donor_herd - donor_herd ?recipient_herd - recipient_herd ?ration_request_slot - ration_request_slot ?distribution_slot - distribution_slot ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (recipient_preparation_finalized ?recipient_herd)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (ration_request_slot_confirmed ?ration_request_slot)
+        (distribution_slot_prepared ?distribution_slot)
+        (not
+          (donor_ready_for_transfer ?donor_herd)
+        )
+        (recipient_ready_for_transfer ?recipient_herd)
+        (transfer_container_available ?transfer_container)
+      )
+    :effect
+      (and
+        (transfer_container_prepared ?transfer_container)
+        (container_linked_to_donor_slot ?transfer_container ?ration_request_slot)
+        (container_linked_to_recipient_slot ?transfer_container ?distribution_slot)
+        (donor_slot_committed ?transfer_container)
+        (not
+          (transfer_container_available ?transfer_container)
+        )
+      )
+  )
+  (:action commit_recipient_slot_to_container
+    :parameters (?donor_herd - donor_herd ?recipient_herd - recipient_herd ?ration_request_slot - ration_request_slot ?distribution_slot - distribution_slot ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (recipient_preparation_finalized ?recipient_herd)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (ration_request_slot_prepared ?ration_request_slot)
+        (distribution_slot_confirmed ?distribution_slot)
+        (donor_ready_for_transfer ?donor_herd)
+        (not
+          (recipient_ready_for_transfer ?recipient_herd)
+        )
+        (transfer_container_available ?transfer_container)
+      )
+    :effect
+      (and
+        (transfer_container_prepared ?transfer_container)
+        (container_linked_to_donor_slot ?transfer_container ?ration_request_slot)
+        (container_linked_to_recipient_slot ?transfer_container ?distribution_slot)
+        (recipient_slot_committed ?transfer_container)
+        (not
+          (transfer_container_available ?transfer_container)
+        )
+      )
+  )
+  (:action commit_full_container_links
+    :parameters (?donor_herd - donor_herd ?recipient_herd - recipient_herd ?ration_request_slot - ration_request_slot ?distribution_slot - distribution_slot ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (recipient_preparation_finalized ?recipient_herd)
+        (donor_ration_slot_linked ?donor_herd ?ration_request_slot)
+        (recipient_distribution_slot_linked ?recipient_herd ?distribution_slot)
+        (ration_request_slot_confirmed ?ration_request_slot)
+        (distribution_slot_confirmed ?distribution_slot)
+        (not
+          (donor_ready_for_transfer ?donor_herd)
+        )
+        (not
+          (recipient_ready_for_transfer ?recipient_herd)
+        )
+        (transfer_container_available ?transfer_container)
+      )
+    :effect
+      (and
+        (transfer_container_prepared ?transfer_container)
+        (container_linked_to_donor_slot ?transfer_container ?ration_request_slot)
+        (container_linked_to_recipient_slot ?transfer_container ?distribution_slot)
+        (donor_slot_committed ?transfer_container)
+        (recipient_slot_committed ?transfer_container)
+        (not
+          (transfer_container_available ?transfer_container)
+        )
+      )
+  )
+  (:action seal_transfer_container
+    :parameters (?transfer_container - transfer_container ?donor_herd - donor_herd ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (transfer_container_prepared ?transfer_container)
+        (donor_preparation_finalized ?donor_herd)
+        (unit_feed_batch_assigned ?donor_herd ?feed_batch)
+        (not
+          (transfer_container_sealed ?transfer_container)
+        )
+      )
+    :effect (transfer_container_sealed ?transfer_container)
+  )
+  (:action register_quality_sample
+    :parameters (?operational_unit - operational_unit ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (unit_linked_to_transfer_container ?operational_unit ?transfer_container)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (quality_sample_available ?quality_sample)
+        (transfer_container_prepared ?transfer_container)
+        (transfer_container_sealed ?transfer_container)
+        (not
+          (sample_processed ?quality_sample)
+        )
+      )
+    :effect
+      (and
+        (sample_processed ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (not
+          (quality_sample_available ?quality_sample)
+        )
+      )
+  )
+  (:action validate_quality_sample
+    :parameters (?operational_unit - operational_unit ?quality_sample - quality_sample ?transfer_container - transfer_container ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_processed ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (unit_feed_batch_assigned ?operational_unit ?feed_batch)
+        (not
+          (donor_slot_committed ?transfer_container)
+        )
+        (not
+          (quality_check_passed ?operational_unit)
+        )
+      )
+    :effect (quality_check_passed ?operational_unit)
+  )
+  (:action assign_biosecurity_protocol
+    :parameters (?operational_unit - operational_unit ?biosecurity_protocol - biosecurity_protocol)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (biosecurity_protocol_available ?biosecurity_protocol)
+        (not
+          (biosecurity_protocol_linked ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (biosecurity_protocol_linked ?operational_unit)
+        (biosecurity_protocol_assigned ?operational_unit ?biosecurity_protocol)
+        (not
+          (biosecurity_protocol_available ?biosecurity_protocol)
+        )
+      )
+  )
+  (:action confirm_biosecurity_protocol
+    :parameters (?operational_unit - operational_unit ?quality_sample - quality_sample ?transfer_container - transfer_container ?feed_batch - feed_batch ?biosecurity_protocol - biosecurity_protocol)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_processed ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (unit_feed_batch_assigned ?operational_unit ?feed_batch)
+        (donor_slot_committed ?transfer_container)
+        (biosecurity_protocol_linked ?operational_unit)
+        (biosecurity_protocol_assigned ?operational_unit ?biosecurity_protocol)
+        (not
+          (quality_check_passed ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (quality_check_passed ?operational_unit)
+        (biosecurity_protocol_confirmed ?operational_unit)
+      )
+  )
+  (:action verify_operational_readiness
+    :parameters (?operational_unit - operational_unit ?treatment_additive - treatment_additive ?handler - handler ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (quality_check_passed ?operational_unit)
+        (treatment_additive_applied ?operational_unit ?treatment_additive)
+        (handler_assigned_to_unit ?operational_unit ?handler)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (not
+          (recipient_slot_committed ?transfer_container)
+        )
+        (not
+          (operational_checks_complete ?operational_unit)
+        )
+      )
+    :effect (operational_checks_complete ?operational_unit)
+  )
+  (:action verify_operational_readiness_with_confirmation
+    :parameters (?operational_unit - operational_unit ?treatment_additive - treatment_additive ?handler - handler ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (quality_check_passed ?operational_unit)
+        (treatment_additive_applied ?operational_unit ?treatment_additive)
+        (handler_assigned_to_unit ?operational_unit ?handler)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (recipient_slot_committed ?transfer_container)
+        (not
+          (operational_checks_complete ?operational_unit)
+        )
+      )
+    :effect (operational_checks_complete ?operational_unit)
+  )
+  (:action begin_compliance_review
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (operational_checks_complete ?operational_unit)
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (not
+          (donor_slot_committed ?transfer_container)
+        )
+        (not
+          (recipient_slot_committed ?transfer_container)
+        )
+        (not
+          (inspection_passed ?operational_unit)
+        )
+      )
+    :effect (inspection_passed ?operational_unit)
+  )
+  (:action complete_compliance_review_with_prepared_slot
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (operational_checks_complete ?operational_unit)
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (donor_slot_committed ?transfer_container)
+        (not
+          (recipient_slot_committed ?transfer_container)
+        )
+        (not
+          (inspection_passed ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_verified ?operational_unit)
+      )
+  )
+  (:action complete_compliance_review_with_confirmed_slot
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (operational_checks_complete ?operational_unit)
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (not
+          (donor_slot_committed ?transfer_container)
+        )
+        (recipient_slot_committed ?transfer_container)
+        (not
+          (inspection_passed ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_verified ?operational_unit)
+      )
+  )
+  (:action complete_compliance_review_with_both_slots
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token ?quality_sample - quality_sample ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (operational_checks_complete ?operational_unit)
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (sample_assigned_to_unit ?operational_unit ?quality_sample)
+        (sample_linked_to_container ?quality_sample ?transfer_container)
+        (donor_slot_committed ?transfer_container)
+        (recipient_slot_committed ?transfer_container)
+        (not
+          (inspection_passed ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_verified ?operational_unit)
+      )
+  )
+  (:action clear_operational_unit
+    :parameters (?operational_unit - operational_unit)
+    :precondition
+      (and
+        (inspection_passed ?operational_unit)
+        (not
+          (compliance_verified ?operational_unit)
+        )
+        (not
+          (unit_cleared_for_dispatch ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_cleared_for_dispatch ?operational_unit)
+        (unit_allocation_authorized ?operational_unit)
+      )
+  )
+  (:action assign_equipment_item
+    :parameters (?operational_unit - operational_unit ?equipment_item - equipment_item)
+    :precondition
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_verified ?operational_unit)
+        (equipment_item_available ?equipment_item)
+      )
+    :effect
+      (and
+        (equipment_item_assigned ?operational_unit ?equipment_item)
+        (not
+          (equipment_item_available ?equipment_item)
+        )
+      )
+  )
+  (:action complete_operational_alignment
+    :parameters (?operational_unit - operational_unit ?donor_herd - donor_herd ?recipient_herd - recipient_herd ?feed_batch - feed_batch ?equipment_item - equipment_item)
+    :precondition
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_verified ?operational_unit)
+        (equipment_item_assigned ?operational_unit ?equipment_item)
+        (unit_linked_to_donor_herd ?operational_unit ?donor_herd)
+        (unit_linked_to_recipient_herd ?operational_unit ?recipient_herd)
+        (donor_ready_for_transfer ?donor_herd)
+        (recipient_ready_for_transfer ?recipient_herd)
+        (unit_feed_batch_assigned ?operational_unit ?feed_batch)
+        (not
+          (compliance_signoff_complete ?operational_unit)
+        )
+      )
+    :effect (compliance_signoff_complete ?operational_unit)
+  )
+  (:action clear_operational_unit_after_alignment
+    :parameters (?operational_unit - operational_unit)
+    :precondition
+      (and
+        (inspection_passed ?operational_unit)
+        (compliance_signoff_complete ?operational_unit)
+        (not
+          (unit_cleared_for_dispatch ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_cleared_for_dispatch ?operational_unit)
+        (unit_allocation_authorized ?operational_unit)
+      )
+  )
+  (:action acknowledge_regulatory_permit
+    :parameters (?operational_unit - operational_unit ?regulatory_permit - regulatory_permit ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_processing_ready ?operational_unit)
+        (unit_feed_batch_assigned ?operational_unit ?feed_batch)
+        (regulatory_permit_available ?regulatory_permit)
+        (permit_assigned ?operational_unit ?regulatory_permit)
+        (not
+          (permit_acknowledged ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (permit_acknowledged ?operational_unit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action prepare_dispatch_after_permit
+    :parameters (?operational_unit - operational_unit ?handler - handler)
+    :precondition
+      (and
+        (permit_acknowledged ?operational_unit)
+        (handler_assigned_to_unit ?operational_unit ?handler)
+        (not
+          (dispatch_prepared ?operational_unit)
+        )
+      )
+    :effect (dispatch_prepared ?operational_unit)
+  )
+  (:action record_inspection_token
+    :parameters (?operational_unit - operational_unit ?inspection_token - inspection_token)
+    :precondition
+      (and
+        (dispatch_prepared ?operational_unit)
+        (inspection_assigned ?operational_unit ?inspection_token)
+        (not
+          (final_dispatch_ready ?operational_unit)
+        )
+      )
+    :effect (final_dispatch_ready ?operational_unit)
+  )
+  (:action clear_operational_unit_after_token_check
+    :parameters (?operational_unit - operational_unit)
+    :precondition
+      (and
+        (final_dispatch_ready ?operational_unit)
+        (not
+          (unit_cleared_for_dispatch ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_cleared_for_dispatch ?operational_unit)
+        (unit_allocation_authorized ?operational_unit)
+      )
+  )
+  (:action authorize_donor_herd
+    :parameters (?donor_herd - donor_herd ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (donor_preparation_finalized ?donor_herd)
+        (donor_ready_for_transfer ?donor_herd)
+        (transfer_container_prepared ?transfer_container)
+        (transfer_container_sealed ?transfer_container)
+        (not
+          (unit_allocation_authorized ?donor_herd)
+        )
+      )
+    :effect (unit_allocation_authorized ?donor_herd)
+  )
+  (:action authorize_recipient_herd
+    :parameters (?recipient_herd - recipient_herd ?transfer_container - transfer_container)
+    :precondition
+      (and
+        (recipient_preparation_finalized ?recipient_herd)
+        (recipient_ready_for_transfer ?recipient_herd)
+        (transfer_container_prepared ?transfer_container)
+        (transfer_container_sealed ?transfer_container)
+        (not
+          (unit_allocation_authorized ?recipient_herd)
+        )
+      )
+    :effect (unit_allocation_authorized ?recipient_herd)
+  )
+  (:action assign_allocation_voucher
+    :parameters (?herd_unit - herd_unit ?allocation_voucher - allocation_voucher ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (unit_allocation_authorized ?herd_unit)
+        (unit_feed_batch_assigned ?herd_unit ?feed_batch)
+        (allocation_voucher_available ?allocation_voucher)
+        (not
+          (unit_allocation_recorded ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_recorded ?herd_unit)
+        (allocation_voucher_assigned ?herd_unit ?allocation_voucher)
+        (not
+          (allocation_voucher_available ?allocation_voucher)
+        )
+      )
+  )
+  (:action release_donor_feed_point
+    :parameters (?donor_herd - donor_herd ?feed_point - feed_point ?allocation_voucher - allocation_voucher)
+    :precondition
+      (and
+        (unit_allocation_recorded ?donor_herd)
+        (unit_staged_at_feed_point ?donor_herd ?feed_point)
+        (allocation_voucher_assigned ?donor_herd ?allocation_voucher)
+        (not
+          (unit_allocation_finalized ?donor_herd)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_finalized ?donor_herd)
+        (feed_point_available ?feed_point)
+        (allocation_voucher_available ?allocation_voucher)
+      )
+  )
+  (:action release_recipient_feed_point
+    :parameters (?recipient_herd - recipient_herd ?feed_point - feed_point ?allocation_voucher - allocation_voucher)
+    :precondition
+      (and
+        (unit_allocation_recorded ?recipient_herd)
+        (unit_staged_at_feed_point ?recipient_herd ?feed_point)
+        (allocation_voucher_assigned ?recipient_herd ?allocation_voucher)
+        (not
+          (unit_allocation_finalized ?recipient_herd)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_finalized ?recipient_herd)
+        (feed_point_available ?feed_point)
+        (allocation_voucher_available ?allocation_voucher)
+      )
+  )
+  (:action release_operational_feed_point
+    :parameters (?operational_unit - operational_unit ?feed_point - feed_point ?allocation_voucher - allocation_voucher)
+    :precondition
+      (and
+        (unit_allocation_recorded ?operational_unit)
+        (unit_staged_at_feed_point ?operational_unit ?feed_point)
+        (allocation_voucher_assigned ?operational_unit ?allocation_voucher)
+        (not
+          (unit_allocation_finalized ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_finalized ?operational_unit)
+        (feed_point_available ?feed_point)
+        (allocation_voucher_available ?allocation_voucher)
+      )
+  )
+)

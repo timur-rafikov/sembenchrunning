@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain pharm_post_incident_recovery_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types asset_category - object supply_element - object operational_unit - object node_supertype - object supply_chain_node - node_supertype logistics_asset - asset_category sample_test - asset_category site_agent - asset_category communication_channel - asset_category technical_auditor - asset_category regulatory_document - asset_category remediation_method - asset_category independent_lab_result - asset_category alternative_supplier - supply_element inspection_protocol - supply_element surveillance_feed - supply_element supply_batch - operational_unit distribution_route - operational_unit recovery_plan - operational_unit production_node - supply_chain_node distribution_node - supply_chain_node manufacturing_site - production_node distribution_center - production_node response_team - distribution_node)
+  (:predicates
+    (incident_identified ?supply_chain_node - supply_chain_node)
+    (entity_triage_completed ?supply_chain_node - supply_chain_node)
+    (asset_allocated ?supply_chain_node - supply_chain_node)
+    (node_operational ?supply_chain_node - supply_chain_node)
+    (entity_release_ready ?supply_chain_node - supply_chain_node)
+    (regulatory_submitted ?supply_chain_node - supply_chain_node)
+    (asset_available ?logistics_asset - logistics_asset)
+    (asset_assigned_to_entity ?supply_chain_node - supply_chain_node ?logistics_asset - logistics_asset)
+    (sample_available ?sample_test - sample_test)
+    (sample_linked_to_entity ?supply_chain_node - supply_chain_node ?sample_test - sample_test)
+    (agent_available ?site_agent - site_agent)
+    (agent_assigned_to_entity ?supply_chain_node - supply_chain_node ?site_agent - site_agent)
+    (alternate_supplier_available ?alternative_supplier - alternative_supplier)
+    (manufacturing_site_has_alternate_supplier ?manufacturing_site - manufacturing_site ?alternative_supplier - alternative_supplier)
+    (distribution_center_has_alternate_supplier ?distribution_center - distribution_center ?alternative_supplier - alternative_supplier)
+    (manufacturing_site_contains_batch ?manufacturing_site - manufacturing_site ?supply_batch - supply_batch)
+    (batch_quarantined ?supply_batch - supply_batch)
+    (batch_marked_for_alternate_supply ?supply_batch - supply_batch)
+    (site_quarantine_confirmed ?manufacturing_site - manufacturing_site)
+    (distribution_center_has_route ?distribution_center - distribution_center ?distribution_route - distribution_route)
+    (route_quarantined ?distribution_route - distribution_route)
+    (route_marked_for_alternate_supply ?distribution_route - distribution_route)
+    (distribution_quarantine_confirmed ?distribution_center - distribution_center)
+    (recovery_plan_available ?recovery_plan - recovery_plan)
+    (recovery_plan_instantiated ?recovery_plan - recovery_plan)
+    (recovery_plan_covers_batch ?recovery_plan - recovery_plan ?supply_batch - supply_batch)
+    (recovery_plan_covers_route ?recovery_plan - recovery_plan ?distribution_route - distribution_route)
+    (recovery_plan_flag_stage_one ?recovery_plan - recovery_plan)
+    (recovery_plan_flag_stage_two ?recovery_plan - recovery_plan)
+    (recovery_plan_testing_scheduled ?recovery_plan - recovery_plan)
+    (team_assigned_to_manufacturing_site ?response_team - response_team ?manufacturing_site - manufacturing_site)
+    (team_assigned_to_distribution_center ?response_team - response_team ?distribution_center - distribution_center)
+    (team_assigned_to_recovery_plan ?response_team - response_team ?recovery_plan - recovery_plan)
+    (inspection_protocol_available ?inspection_protocol - inspection_protocol)
+    (team_uses_inspection_protocol ?response_team - response_team ?inspection_protocol - inspection_protocol)
+    (inspection_protocol_in_use ?inspection_protocol - inspection_protocol)
+    (protocol_applied_to_recovery_plan ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    (team_validation_ready ?response_team - response_team)
+    (team_testing_completed ?response_team - response_team)
+    (team_verification_complete ?response_team - response_team)
+    (team_has_comm_channel ?response_team - response_team)
+    (team_comm_ready ?response_team - response_team)
+    (team_audit_cleared ?response_team - response_team)
+    (team_internal_approval ?response_team - response_team)
+    (surveillance_feed_available ?surveillance_feed - surveillance_feed)
+    (team_monitors_surveillance_feed ?response_team - response_team ?surveillance_feed - surveillance_feed)
+    (team_received_surveillance_alert ?response_team - response_team)
+    (team_in_field_deployment ?response_team - response_team)
+    (team_field_action_verified ?response_team - response_team)
+    (comm_channel_available ?communication_channel - communication_channel)
+    (team_assigned_comm_channel ?response_team - response_team ?communication_channel - communication_channel)
+    (auditor_available ?technical_auditor - technical_auditor)
+    (team_engaged_technical_auditor ?response_team - response_team ?technical_auditor - technical_auditor)
+    (remediation_method_available ?remediation_method - remediation_method)
+    (remediation_method_assigned_to_team ?response_team - response_team ?remediation_method - remediation_method)
+    (independent_lab_result_available ?independent_lab_result - independent_lab_result)
+    (team_has_independent_lab_result ?response_team - response_team ?independent_lab_result - independent_lab_result)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (regulatory_document_linked_to_entity ?supply_chain_node - supply_chain_node ?regulatory_document - regulatory_document)
+    (site_quarantine_active ?manufacturing_site - manufacturing_site)
+    (distribution_center_quarantine_active ?distribution_center - distribution_center)
+    (final_approval_documented ?response_team - response_team)
+  )
+  (:action identify_incident_node
+    :parameters (?supply_chain_node - supply_chain_node)
+    :precondition
+      (and
+        (not
+          (incident_identified ?supply_chain_node)
+        )
+        (not
+          (node_operational ?supply_chain_node)
+        )
+      )
+    :effect (incident_identified ?supply_chain_node)
+  )
+  (:action allocate_logistics_asset_to_node
+    :parameters (?supply_chain_node - supply_chain_node ?logistics_asset - logistics_asset)
+    :precondition
+      (and
+        (incident_identified ?supply_chain_node)
+        (not
+          (asset_allocated ?supply_chain_node)
+        )
+        (asset_available ?logistics_asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?supply_chain_node)
+        (asset_assigned_to_entity ?supply_chain_node ?logistics_asset)
+        (not
+          (asset_available ?logistics_asset)
+        )
+      )
+  )
+  (:action collect_sample_from_node
+    :parameters (?supply_chain_node - supply_chain_node ?sample_test - sample_test)
+    :precondition
+      (and
+        (incident_identified ?supply_chain_node)
+        (asset_allocated ?supply_chain_node)
+        (sample_available ?sample_test)
+      )
+    :effect
+      (and
+        (sample_linked_to_entity ?supply_chain_node ?sample_test)
+        (not
+          (sample_available ?sample_test)
+        )
+      )
+  )
+  (:action complete_initial_triage
+    :parameters (?supply_chain_node - supply_chain_node ?sample_test - sample_test)
+    :precondition
+      (and
+        (incident_identified ?supply_chain_node)
+        (asset_allocated ?supply_chain_node)
+        (sample_linked_to_entity ?supply_chain_node ?sample_test)
+        (not
+          (entity_triage_completed ?supply_chain_node)
+        )
+      )
+    :effect (entity_triage_completed ?supply_chain_node)
+  )
+  (:action release_sample_to_pool
+    :parameters (?supply_chain_node - supply_chain_node ?sample_test - sample_test)
+    :precondition
+      (and
+        (sample_linked_to_entity ?supply_chain_node ?sample_test)
+      )
+    :effect
+      (and
+        (sample_available ?sample_test)
+        (not
+          (sample_linked_to_entity ?supply_chain_node ?sample_test)
+        )
+      )
+  )
+  (:action deploy_site_agent_to_node
+    :parameters (?supply_chain_node - supply_chain_node ?site_agent - site_agent)
+    :precondition
+      (and
+        (entity_triage_completed ?supply_chain_node)
+        (agent_available ?site_agent)
+      )
+    :effect
+      (and
+        (agent_assigned_to_entity ?supply_chain_node ?site_agent)
+        (not
+          (agent_available ?site_agent)
+        )
+      )
+  )
+  (:action withdraw_site_agent_from_node
+    :parameters (?supply_chain_node - supply_chain_node ?site_agent - site_agent)
+    :precondition
+      (and
+        (agent_assigned_to_entity ?supply_chain_node ?site_agent)
+      )
+    :effect
+      (and
+        (agent_available ?site_agent)
+        (not
+          (agent_assigned_to_entity ?supply_chain_node ?site_agent)
+        )
+      )
+  )
+  (:action assign_remediation_method_to_team
+    :parameters (?response_team - response_team ?remediation_method - remediation_method)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (remediation_method_available ?remediation_method)
+      )
+    :effect
+      (and
+        (remediation_method_assigned_to_team ?response_team ?remediation_method)
+        (not
+          (remediation_method_available ?remediation_method)
+        )
+      )
+  )
+  (:action unassign_remediation_method_from_team
+    :parameters (?response_team - response_team ?remediation_method - remediation_method)
+    :precondition
+      (and
+        (remediation_method_assigned_to_team ?response_team ?remediation_method)
+      )
+    :effect
+      (and
+        (remediation_method_available ?remediation_method)
+        (not
+          (remediation_method_assigned_to_team ?response_team ?remediation_method)
+        )
+      )
+  )
+  (:action assign_independent_lab_result_to_team
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (independent_lab_result_available ?independent_lab_result)
+      )
+    :effect
+      (and
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (not
+          (independent_lab_result_available ?independent_lab_result)
+        )
+      )
+  )
+  (:action unassign_independent_lab_result_from_team
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result)
+    :precondition
+      (and
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+      )
+    :effect
+      (and
+        (independent_lab_result_available ?independent_lab_result)
+        (not
+          (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        )
+      )
+  )
+  (:action quarantine_batch_at_site
+    :parameters (?manufacturing_site - manufacturing_site ?supply_batch - supply_batch ?sample_test - sample_test)
+    :precondition
+      (and
+        (entity_triage_completed ?manufacturing_site)
+        (sample_linked_to_entity ?manufacturing_site ?sample_test)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (not
+          (batch_quarantined ?supply_batch)
+        )
+        (not
+          (batch_marked_for_alternate_supply ?supply_batch)
+        )
+      )
+    :effect (batch_quarantined ?supply_batch)
+  )
+  (:action confirm_site_quarantine_with_agent
+    :parameters (?manufacturing_site - manufacturing_site ?supply_batch - supply_batch ?site_agent - site_agent)
+    :precondition
+      (and
+        (entity_triage_completed ?manufacturing_site)
+        (agent_assigned_to_entity ?manufacturing_site ?site_agent)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (batch_quarantined ?supply_batch)
+        (not
+          (site_quarantine_active ?manufacturing_site)
+        )
+      )
+    :effect
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (site_quarantine_confirmed ?manufacturing_site)
+      )
+  )
+  (:action assign_alternate_supplier_for_batch
+    :parameters (?manufacturing_site - manufacturing_site ?supply_batch - supply_batch ?alternative_supplier - alternative_supplier)
+    :precondition
+      (and
+        (entity_triage_completed ?manufacturing_site)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (alternate_supplier_available ?alternative_supplier)
+        (not
+          (site_quarantine_active ?manufacturing_site)
+        )
+      )
+    :effect
+      (and
+        (batch_marked_for_alternate_supply ?supply_batch)
+        (site_quarantine_active ?manufacturing_site)
+        (manufacturing_site_has_alternate_supplier ?manufacturing_site ?alternative_supplier)
+        (not
+          (alternate_supplier_available ?alternative_supplier)
+        )
+      )
+  )
+  (:action process_batch_test_outcome
+    :parameters (?manufacturing_site - manufacturing_site ?supply_batch - supply_batch ?sample_test - sample_test ?alternative_supplier - alternative_supplier)
+    :precondition
+      (and
+        (entity_triage_completed ?manufacturing_site)
+        (sample_linked_to_entity ?manufacturing_site ?sample_test)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (batch_marked_for_alternate_supply ?supply_batch)
+        (manufacturing_site_has_alternate_supplier ?manufacturing_site ?alternative_supplier)
+        (not
+          (site_quarantine_confirmed ?manufacturing_site)
+        )
+      )
+    :effect
+      (and
+        (batch_quarantined ?supply_batch)
+        (site_quarantine_confirmed ?manufacturing_site)
+        (alternate_supplier_available ?alternative_supplier)
+        (not
+          (manufacturing_site_has_alternate_supplier ?manufacturing_site ?alternative_supplier)
+        )
+      )
+  )
+  (:action quarantine_distribution_route
+    :parameters (?distribution_center - distribution_center ?distribution_route - distribution_route ?sample_test - sample_test)
+    :precondition
+      (and
+        (entity_triage_completed ?distribution_center)
+        (sample_linked_to_entity ?distribution_center ?sample_test)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (not
+          (route_quarantined ?distribution_route)
+        )
+        (not
+          (route_marked_for_alternate_supply ?distribution_route)
+        )
+      )
+    :effect (route_quarantined ?distribution_route)
+  )
+  (:action confirm_route_quarantine_with_agent
+    :parameters (?distribution_center - distribution_center ?distribution_route - distribution_route ?site_agent - site_agent)
+    :precondition
+      (and
+        (entity_triage_completed ?distribution_center)
+        (agent_assigned_to_entity ?distribution_center ?site_agent)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (route_quarantined ?distribution_route)
+        (not
+          (distribution_center_quarantine_active ?distribution_center)
+        )
+      )
+    :effect
+      (and
+        (distribution_center_quarantine_active ?distribution_center)
+        (distribution_quarantine_confirmed ?distribution_center)
+      )
+  )
+  (:action assign_alternate_supplier_for_route
+    :parameters (?distribution_center - distribution_center ?distribution_route - distribution_route ?alternative_supplier - alternative_supplier)
+    :precondition
+      (and
+        (entity_triage_completed ?distribution_center)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (alternate_supplier_available ?alternative_supplier)
+        (not
+          (distribution_center_quarantine_active ?distribution_center)
+        )
+      )
+    :effect
+      (and
+        (route_marked_for_alternate_supply ?distribution_route)
+        (distribution_center_quarantine_active ?distribution_center)
+        (distribution_center_has_alternate_supplier ?distribution_center ?alternative_supplier)
+        (not
+          (alternate_supplier_available ?alternative_supplier)
+        )
+      )
+  )
+  (:action process_route_test_outcome
+    :parameters (?distribution_center - distribution_center ?distribution_route - distribution_route ?sample_test - sample_test ?alternative_supplier - alternative_supplier)
+    :precondition
+      (and
+        (entity_triage_completed ?distribution_center)
+        (sample_linked_to_entity ?distribution_center ?sample_test)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (route_marked_for_alternate_supply ?distribution_route)
+        (distribution_center_has_alternate_supplier ?distribution_center ?alternative_supplier)
+        (not
+          (distribution_quarantine_confirmed ?distribution_center)
+        )
+      )
+    :effect
+      (and
+        (route_quarantined ?distribution_route)
+        (distribution_quarantine_confirmed ?distribution_center)
+        (alternate_supplier_available ?alternative_supplier)
+        (not
+          (distribution_center_has_alternate_supplier ?distribution_center ?alternative_supplier)
+        )
+      )
+  )
+  (:action instantiate_recovery_plan
+    :parameters (?manufacturing_site - manufacturing_site ?distribution_center - distribution_center ?supply_batch - supply_batch ?distribution_route - distribution_route ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (distribution_center_quarantine_active ?distribution_center)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (batch_quarantined ?supply_batch)
+        (route_quarantined ?distribution_route)
+        (site_quarantine_confirmed ?manufacturing_site)
+        (distribution_quarantine_confirmed ?distribution_center)
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_covers_batch ?recovery_plan ?supply_batch)
+        (recovery_plan_covers_route ?recovery_plan ?distribution_route)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action instantiate_recovery_plan_stage_one
+    :parameters (?manufacturing_site - manufacturing_site ?distribution_center - distribution_center ?supply_batch - supply_batch ?distribution_route - distribution_route ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (distribution_center_quarantine_active ?distribution_center)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (batch_marked_for_alternate_supply ?supply_batch)
+        (route_quarantined ?distribution_route)
+        (not
+          (site_quarantine_confirmed ?manufacturing_site)
+        )
+        (distribution_quarantine_confirmed ?distribution_center)
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_covers_batch ?recovery_plan ?supply_batch)
+        (recovery_plan_covers_route ?recovery_plan ?distribution_route)
+        (recovery_plan_flag_stage_one ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action instantiate_recovery_plan_stage_two
+    :parameters (?manufacturing_site - manufacturing_site ?distribution_center - distribution_center ?supply_batch - supply_batch ?distribution_route - distribution_route ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (distribution_center_quarantine_active ?distribution_center)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (batch_quarantined ?supply_batch)
+        (route_marked_for_alternate_supply ?distribution_route)
+        (site_quarantine_confirmed ?manufacturing_site)
+        (not
+          (distribution_quarantine_confirmed ?distribution_center)
+        )
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_covers_batch ?recovery_plan ?supply_batch)
+        (recovery_plan_covers_route ?recovery_plan ?distribution_route)
+        (recovery_plan_flag_stage_two ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action instantiate_recovery_plan_full_stage
+    :parameters (?manufacturing_site - manufacturing_site ?distribution_center - distribution_center ?supply_batch - supply_batch ?distribution_route - distribution_route ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (distribution_center_quarantine_active ?distribution_center)
+        (manufacturing_site_contains_batch ?manufacturing_site ?supply_batch)
+        (distribution_center_has_route ?distribution_center ?distribution_route)
+        (batch_marked_for_alternate_supply ?supply_batch)
+        (route_marked_for_alternate_supply ?distribution_route)
+        (not
+          (site_quarantine_confirmed ?manufacturing_site)
+        )
+        (not
+          (distribution_quarantine_confirmed ?distribution_center)
+        )
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_covers_batch ?recovery_plan ?supply_batch)
+        (recovery_plan_covers_route ?recovery_plan ?distribution_route)
+        (recovery_plan_flag_stage_one ?recovery_plan)
+        (recovery_plan_flag_stage_two ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action schedule_plan_testing
+    :parameters (?recovery_plan - recovery_plan ?manufacturing_site - manufacturing_site ?sample_test - sample_test)
+    :precondition
+      (and
+        (recovery_plan_instantiated ?recovery_plan)
+        (site_quarantine_active ?manufacturing_site)
+        (sample_linked_to_entity ?manufacturing_site ?sample_test)
+        (not
+          (recovery_plan_testing_scheduled ?recovery_plan)
+        )
+      )
+    :effect (recovery_plan_testing_scheduled ?recovery_plan)
+  )
+  (:action engage_inspection_protocol
+    :parameters (?response_team - response_team ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (team_assigned_to_recovery_plan ?response_team ?recovery_plan)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (inspection_protocol_available ?inspection_protocol)
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_testing_scheduled ?recovery_plan)
+        (not
+          (inspection_protocol_in_use ?inspection_protocol)
+        )
+      )
+    :effect
+      (and
+        (inspection_protocol_in_use ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (not
+          (inspection_protocol_available ?inspection_protocol)
+        )
+      )
+  )
+  (:action complete_inspection_protocol_validation
+    :parameters (?response_team - response_team ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan ?sample_test - sample_test)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (inspection_protocol_in_use ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (sample_linked_to_entity ?response_team ?sample_test)
+        (not
+          (recovery_plan_flag_stage_one ?recovery_plan)
+        )
+        (not
+          (team_validation_ready ?response_team)
+        )
+      )
+    :effect (team_validation_ready ?response_team)
+  )
+  (:action assign_communication_channel_to_team
+    :parameters (?response_team - response_team ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (comm_channel_available ?communication_channel)
+        (not
+          (team_has_comm_channel ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_has_comm_channel ?response_team)
+        (team_assigned_comm_channel ?response_team ?communication_channel)
+        (not
+          (comm_channel_available ?communication_channel)
+        )
+      )
+  )
+  (:action prepare_team_for_communication_and_validation
+    :parameters (?response_team - response_team ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan ?sample_test - sample_test ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (inspection_protocol_in_use ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (sample_linked_to_entity ?response_team ?sample_test)
+        (recovery_plan_flag_stage_one ?recovery_plan)
+        (team_has_comm_channel ?response_team)
+        (team_assigned_comm_channel ?response_team ?communication_channel)
+        (not
+          (team_validation_ready ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_validation_ready ?response_team)
+        (team_comm_ready ?response_team)
+      )
+  )
+  (:action perform_remediation_and_initiate_team_testing
+    :parameters (?response_team - response_team ?remediation_method - remediation_method ?site_agent - site_agent ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_validation_ready ?response_team)
+        (remediation_method_assigned_to_team ?response_team ?remediation_method)
+        (agent_assigned_to_entity ?response_team ?site_agent)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (not
+          (recovery_plan_flag_stage_two ?recovery_plan)
+        )
+        (not
+          (team_testing_completed ?response_team)
+        )
+      )
+    :effect (team_testing_completed ?response_team)
+  )
+  (:action perform_remediation_and_initiate_team_testing_stage_two
+    :parameters (?response_team - response_team ?remediation_method - remediation_method ?site_agent - site_agent ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_validation_ready ?response_team)
+        (remediation_method_assigned_to_team ?response_team ?remediation_method)
+        (agent_assigned_to_entity ?response_team ?site_agent)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (recovery_plan_flag_stage_two ?recovery_plan)
+        (not
+          (team_testing_completed ?response_team)
+        )
+      )
+    :effect (team_testing_completed ?response_team)
+  )
+  (:action verify_team_with_independent_lab_result
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_testing_completed ?response_team)
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (not
+          (recovery_plan_flag_stage_one ?recovery_plan)
+        )
+        (not
+          (recovery_plan_flag_stage_two ?recovery_plan)
+        )
+        (not
+          (team_verification_complete ?response_team)
+        )
+      )
+    :effect (team_verification_complete ?response_team)
+  )
+  (:action verify_team_with_independent_lab_and_stage_one
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_testing_completed ?response_team)
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (recovery_plan_flag_stage_one ?recovery_plan)
+        (not
+          (recovery_plan_flag_stage_two ?recovery_plan)
+        )
+        (not
+          (team_verification_complete ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_verification_complete ?response_team)
+        (team_audit_cleared ?response_team)
+      )
+  )
+  (:action verify_team_with_independent_lab_and_stage_two
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_testing_completed ?response_team)
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (not
+          (recovery_plan_flag_stage_one ?recovery_plan)
+        )
+        (recovery_plan_flag_stage_two ?recovery_plan)
+        (not
+          (team_verification_complete ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_verification_complete ?response_team)
+        (team_audit_cleared ?response_team)
+      )
+  )
+  (:action verify_team_with_independent_lab_and_full_stage
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result ?inspection_protocol - inspection_protocol ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (team_testing_completed ?response_team)
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (team_uses_inspection_protocol ?response_team ?inspection_protocol)
+        (protocol_applied_to_recovery_plan ?inspection_protocol ?recovery_plan)
+        (recovery_plan_flag_stage_one ?recovery_plan)
+        (recovery_plan_flag_stage_two ?recovery_plan)
+        (not
+          (team_verification_complete ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_verification_complete ?response_team)
+        (team_audit_cleared ?response_team)
+      )
+  )
+  (:action finalize_team_approval_for_release
+    :parameters (?response_team - response_team)
+    :precondition
+      (and
+        (team_verification_complete ?response_team)
+        (not
+          (team_audit_cleared ?response_team)
+        )
+        (not
+          (final_approval_documented ?response_team)
+        )
+      )
+    :effect
+      (and
+        (final_approval_documented ?response_team)
+        (entity_release_ready ?response_team)
+      )
+  )
+  (:action engage_technical_auditor
+    :parameters (?response_team - response_team ?technical_auditor - technical_auditor)
+    :precondition
+      (and
+        (team_verification_complete ?response_team)
+        (team_audit_cleared ?response_team)
+        (auditor_available ?technical_auditor)
+      )
+    :effect
+      (and
+        (team_engaged_technical_auditor ?response_team ?technical_auditor)
+        (not
+          (auditor_available ?technical_auditor)
+        )
+      )
+  )
+  (:action obtain_internal_approval
+    :parameters (?response_team - response_team ?manufacturing_site - manufacturing_site ?distribution_center - distribution_center ?sample_test - sample_test ?technical_auditor - technical_auditor)
+    :precondition
+      (and
+        (team_verification_complete ?response_team)
+        (team_audit_cleared ?response_team)
+        (team_engaged_technical_auditor ?response_team ?technical_auditor)
+        (team_assigned_to_manufacturing_site ?response_team ?manufacturing_site)
+        (team_assigned_to_distribution_center ?response_team ?distribution_center)
+        (site_quarantine_confirmed ?manufacturing_site)
+        (distribution_quarantine_confirmed ?distribution_center)
+        (sample_linked_to_entity ?response_team ?sample_test)
+        (not
+          (team_internal_approval ?response_team)
+        )
+      )
+    :effect (team_internal_approval ?response_team)
+  )
+  (:action document_final_approval
+    :parameters (?response_team - response_team)
+    :precondition
+      (and
+        (team_verification_complete ?response_team)
+        (team_internal_approval ?response_team)
+        (not
+          (final_approval_documented ?response_team)
+        )
+      )
+    :effect
+      (and
+        (final_approval_documented ?response_team)
+        (entity_release_ready ?response_team)
+      )
+  )
+  (:action ingest_surveillance_alert
+    :parameters (?response_team - response_team ?surveillance_feed - surveillance_feed ?sample_test - sample_test)
+    :precondition
+      (and
+        (entity_triage_completed ?response_team)
+        (sample_linked_to_entity ?response_team ?sample_test)
+        (surveillance_feed_available ?surveillance_feed)
+        (team_monitors_surveillance_feed ?response_team ?surveillance_feed)
+        (not
+          (team_received_surveillance_alert ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_received_surveillance_alert ?response_team)
+        (not
+          (surveillance_feed_available ?surveillance_feed)
+        )
+      )
+  )
+  (:action dispatch_team_field_deployment
+    :parameters (?response_team - response_team ?site_agent - site_agent)
+    :precondition
+      (and
+        (team_received_surveillance_alert ?response_team)
+        (agent_assigned_to_entity ?response_team ?site_agent)
+        (not
+          (team_in_field_deployment ?response_team)
+        )
+      )
+    :effect (team_in_field_deployment ?response_team)
+  )
+  (:action verify_field_action_with_lab_result
+    :parameters (?response_team - response_team ?independent_lab_result - independent_lab_result)
+    :precondition
+      (and
+        (team_in_field_deployment ?response_team)
+        (team_has_independent_lab_result ?response_team ?independent_lab_result)
+        (not
+          (team_field_action_verified ?response_team)
+        )
+      )
+    :effect (team_field_action_verified ?response_team)
+  )
+  (:action finalize_field_verification
+    :parameters (?response_team - response_team)
+    :precondition
+      (and
+        (team_field_action_verified ?response_team)
+        (not
+          (final_approval_documented ?response_team)
+        )
+      )
+    :effect
+      (and
+        (final_approval_documented ?response_team)
+        (entity_release_ready ?response_team)
+      )
+  )
+  (:action authorize_node_for_regulatory_submission
+    :parameters (?manufacturing_site - manufacturing_site ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (site_quarantine_active ?manufacturing_site)
+        (site_quarantine_confirmed ?manufacturing_site)
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_testing_scheduled ?recovery_plan)
+        (not
+          (entity_release_ready ?manufacturing_site)
+        )
+      )
+    :effect (entity_release_ready ?manufacturing_site)
+  )
+  (:action authorize_distribution_center_for_regulatory_submission
+    :parameters (?distribution_center - distribution_center ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (distribution_center_quarantine_active ?distribution_center)
+        (distribution_quarantine_confirmed ?distribution_center)
+        (recovery_plan_instantiated ?recovery_plan)
+        (recovery_plan_testing_scheduled ?recovery_plan)
+        (not
+          (entity_release_ready ?distribution_center)
+        )
+      )
+    :effect (entity_release_ready ?distribution_center)
+  )
+  (:action submit_regulatory_document
+    :parameters (?supply_chain_node - supply_chain_node ?regulatory_document - regulatory_document ?sample_test - sample_test)
+    :precondition
+      (and
+        (entity_release_ready ?supply_chain_node)
+        (sample_linked_to_entity ?supply_chain_node ?sample_test)
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (regulatory_submitted ?supply_chain_node)
+        )
+      )
+    :effect
+      (and
+        (regulatory_submitted ?supply_chain_node)
+        (regulatory_document_linked_to_entity ?supply_chain_node ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action reinstate_site_with_asset_return
+    :parameters (?manufacturing_site - manufacturing_site ?logistics_asset - logistics_asset ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (regulatory_submitted ?manufacturing_site)
+        (asset_assigned_to_entity ?manufacturing_site ?logistics_asset)
+        (regulatory_document_linked_to_entity ?manufacturing_site ?regulatory_document)
+        (not
+          (node_operational ?manufacturing_site)
+        )
+      )
+    :effect
+      (and
+        (node_operational ?manufacturing_site)
+        (asset_available ?logistics_asset)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+  (:action reinstate_distribution_center_with_asset_return
+    :parameters (?distribution_center - distribution_center ?logistics_asset - logistics_asset ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (regulatory_submitted ?distribution_center)
+        (asset_assigned_to_entity ?distribution_center ?logistics_asset)
+        (regulatory_document_linked_to_entity ?distribution_center ?regulatory_document)
+        (not
+          (node_operational ?distribution_center)
+        )
+      )
+    :effect
+      (and
+        (node_operational ?distribution_center)
+        (asset_available ?logistics_asset)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+  (:action reinstate_team_with_asset_return
+    :parameters (?response_team - response_team ?logistics_asset - logistics_asset ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (regulatory_submitted ?response_team)
+        (asset_assigned_to_entity ?response_team ?logistics_asset)
+        (regulatory_document_linked_to_entity ?response_team ?regulatory_document)
+        (not
+          (node_operational ?response_team)
+        )
+      )
+    :effect
+      (and
+        (node_operational ?response_team)
+        (asset_available ?logistics_asset)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem post_incident_recovery_scenario)
+  (:domain pharm_post_incident_recovery_domain)
+  (:objects manufacturing_site_alpha - manufacturing_site distribution_center_central - distribution_center response_team_alpha - response_team response_team_bravo - response_team logistics_asset_truck_1 - logistics_asset logistics_asset_truck_2 - logistics_asset logistics_asset_container_1 - logistics_asset sample_test_001 - sample_test site_agent_field_1 - site_agent alternate_supplier_partner_a - alternative_supplier supply_batch_001 - supply_batch distribution_route_north - distribution_route recovery_plan_rp1 - recovery_plan inspection_protocol_ip1 - inspection_protocol inspection_protocol_ip2 - inspection_protocol communication_channel_email - communication_channel communication_channel_phone - communication_channel technical_auditor_ext_1 - technical_auditor technical_auditor_ext_2 - technical_auditor regulatory_document_initial - regulatory_document remediation_method_decontamination - remediation_method surveillance_feed_complaints - surveillance_feed surveillance_feed_quality_monitoring - surveillance_feed independent_lab_result_certified - independent_lab_result)
+  (:init
+    (asset_available logistics_asset_truck_1)
+    (asset_available logistics_asset_truck_2)
+    (asset_available logistics_asset_container_1)
+    (sample_available sample_test_001)
+    (agent_available site_agent_field_1)
+    (alternate_supplier_available alternate_supplier_partner_a)
+    (manufacturing_site_contains_batch manufacturing_site_alpha supply_batch_001)
+    (distribution_center_has_route distribution_center_central distribution_route_north)
+    (recovery_plan_available recovery_plan_rp1)
+    (inspection_protocol_available inspection_protocol_ip1)
+    (inspection_protocol_available inspection_protocol_ip2)
+    (team_assigned_to_manufacturing_site response_team_alpha manufacturing_site_alpha)
+    (team_assigned_to_manufacturing_site response_team_bravo manufacturing_site_alpha)
+    (team_assigned_to_distribution_center response_team_alpha distribution_center_central)
+    (team_assigned_to_distribution_center response_team_bravo distribution_center_central)
+    (team_assigned_to_recovery_plan response_team_alpha recovery_plan_rp1)
+    (team_assigned_to_recovery_plan response_team_bravo recovery_plan_rp1)
+    (team_uses_inspection_protocol response_team_alpha inspection_protocol_ip1)
+    (team_uses_inspection_protocol response_team_bravo inspection_protocol_ip2)
+    (comm_channel_available communication_channel_email)
+    (comm_channel_available communication_channel_phone)
+    (auditor_available technical_auditor_ext_1)
+    (auditor_available technical_auditor_ext_2)
+    (regulatory_document_available regulatory_document_initial)
+    (remediation_method_available remediation_method_decontamination)
+    (surveillance_feed_available surveillance_feed_complaints)
+    (team_monitors_surveillance_feed response_team_alpha surveillance_feed_complaints)
+    (team_monitors_surveillance_feed response_team_bravo surveillance_feed_quality_monitoring)
+    (independent_lab_result_available independent_lab_result_certified)
+  )
+  (:goal
+    (and
+      (node_operational manufacturing_site_alpha)
+      (node_operational distribution_center_central)
+      (node_operational response_team_alpha)
+      (node_operational response_team_bravo)
+    )
+  )
+)

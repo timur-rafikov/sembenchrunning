@@ -1,0 +1,936 @@
+(define (domain youngstock_care_schedule_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_asset_category - object supply_item_category - object schedule_category - object animal_base - object care_subject - animal_base allocation_slot - resource_asset_category care_protocol - resource_asset_category attendant_role - resource_asset_category diagnostic_resource - resource_asset_category equipment_set - resource_asset_category vaccine_dose - resource_asset_category treatment_product - resource_asset_category lab_sample - resource_asset_category feed_batch - supply_item_category medication_batch - supply_item_category inspection_certificate - supply_item_category feeding_slot_a - schedule_category feeding_slot_b - schedule_category work_order - schedule_category age_class - care_subject group_class - care_subject neonate - age_class weaner - age_class youngstock_batch - group_class)
+  (:predicates
+    (care_subject_admitted ?care_subject - care_subject)
+    (intake_confirmed ?care_subject - care_subject)
+    (allocation_assigned ?care_subject - care_subject)
+    (care_subject_discharged ?care_subject - care_subject)
+    (ready_for_treatment ?care_subject - care_subject)
+    (treatment_administered ?care_subject - care_subject)
+    (allocation_slot_available ?allocation_slot - allocation_slot)
+    (assigned_to_allocation_slot ?care_subject - care_subject ?allocation_slot - allocation_slot)
+    (care_protocol_available ?care_protocol - care_protocol)
+    (enrolled_in_care_protocol ?care_subject - care_subject ?care_protocol - care_protocol)
+    (attendant_available ?attendant_role - attendant_role)
+    (attendant_assigned ?care_subject - care_subject ?attendant_role - attendant_role)
+    (feed_batch_available ?feed_batch - feed_batch)
+    (feed_batch_assigned_to_neonate ?neonate - neonate ?feed_batch - feed_batch)
+    (feed_batch_assigned_to_weaner ?weaner - weaner ?feed_batch - feed_batch)
+    (assigned_feeding_slot_a ?neonate - neonate ?feeding_slot_a - feeding_slot_a)
+    (feeding_slot_a_prepared ?feeding_slot_a - feeding_slot_a)
+    (feeding_slot_a_loaded ?feeding_slot_a - feeding_slot_a)
+    (neonate_feed_recorded ?neonate - neonate)
+    (assigned_feeding_slot_b ?weaner - weaner ?feeding_slot_b - feeding_slot_b)
+    (feeding_slot_b_prepared ?feeding_slot_b - feeding_slot_b)
+    (feeding_slot_b_loaded ?feeding_slot_b - feeding_slot_b)
+    (weaner_feed_recorded ?weaner - weaner)
+    (work_order_available ?work_order - work_order)
+    (work_order_reserved ?work_order - work_order)
+    (work_order_assigned_slot_a ?work_order - work_order ?feeding_slot_a - feeding_slot_a)
+    (work_order_assigned_slot_b ?work_order - work_order ?feeding_slot_b - feeding_slot_b)
+    (work_order_requires_inspection ?work_order - work_order)
+    (work_order_requires_treatment ?work_order - work_order)
+    (work_order_execution_ready ?work_order - work_order)
+    (batch_contains_neonate ?youngstock_batch - youngstock_batch ?neonate - neonate)
+    (batch_contains_weaner ?youngstock_batch - youngstock_batch ?weaner - weaner)
+    (batch_linked_to_work_order ?youngstock_batch - youngstock_batch ?work_order - work_order)
+    (medication_batch_available ?medication_batch - medication_batch)
+    (batch_has_medication_batch ?youngstock_batch - youngstock_batch ?medication_batch - medication_batch)
+    (medication_batch_reserved ?medication_batch - medication_batch)
+    (medication_batch_assigned_to_work_order ?medication_batch - medication_batch ?work_order - work_order)
+    (batch_medication_verified ?youngstock_batch - youngstock_batch)
+    (batch_treatment_product_staged ?youngstock_batch - youngstock_batch)
+    (batch_pre_execution_checks_completed ?youngstock_batch - youngstock_batch)
+    (diagnostic_resource_assigned ?youngstock_batch - youngstock_batch)
+    (inspection_reservation_confirmed ?youngstock_batch - youngstock_batch)
+    (requires_equipment_allocation ?youngstock_batch - youngstock_batch)
+    (batch_execution_ready ?youngstock_batch - youngstock_batch)
+    (inspection_certificate_available ?inspection_certificate - inspection_certificate)
+    (batch_linked_to_inspection_certificate ?youngstock_batch - youngstock_batch ?inspection_certificate - inspection_certificate)
+    (inspection_authorized ?youngstock_batch - youngstock_batch)
+    (inspection_performed ?youngstock_batch - youngstock_batch)
+    (inspection_result_recorded ?youngstock_batch - youngstock_batch)
+    (diagnostic_resource_available ?diagnostic_resource - diagnostic_resource)
+    (batch_linked_to_diagnostic_resource ?youngstock_batch - youngstock_batch ?diagnostic_resource - diagnostic_resource)
+    (equipment_set_available ?equipment_set - equipment_set)
+    (equipment_assigned_to_batch ?youngstock_batch - youngstock_batch ?equipment_set - equipment_set)
+    (treatment_product_available ?treatment_product - treatment_product)
+    (treatment_product_assigned_to_batch ?youngstock_batch - youngstock_batch ?treatment_product - treatment_product)
+    (lab_sample_available ?lab_sample - lab_sample)
+    (batch_has_lab_sample ?youngstock_batch - youngstock_batch ?lab_sample - lab_sample)
+    (vaccine_dose_available ?vaccine_dose - vaccine_dose)
+    (vaccine_dose_assigned_to_care_subject ?care_subject - care_subject ?vaccine_dose - vaccine_dose)
+    (neonate_staged_for_feeding ?neonate - neonate)
+    (weaner_staged_for_feeding ?weaner - weaner)
+    (batch_execution_logged ?youngstock_batch - youngstock_batch)
+  )
+  (:action admit_care_subject
+    :parameters (?care_subject - care_subject)
+    :precondition
+      (and
+        (not
+          (care_subject_admitted ?care_subject)
+        )
+        (not
+          (care_subject_discharged ?care_subject)
+        )
+      )
+    :effect (care_subject_admitted ?care_subject)
+  )
+  (:action assign_allocation_slot_to_care_subject
+    :parameters (?care_subject - care_subject ?allocation_slot - allocation_slot)
+    :precondition
+      (and
+        (care_subject_admitted ?care_subject)
+        (not
+          (allocation_assigned ?care_subject)
+        )
+        (allocation_slot_available ?allocation_slot)
+      )
+    :effect
+      (and
+        (allocation_assigned ?care_subject)
+        (assigned_to_allocation_slot ?care_subject ?allocation_slot)
+        (not
+          (allocation_slot_available ?allocation_slot)
+        )
+      )
+  )
+  (:action enroll_care_subject_in_care_protocol
+    :parameters (?care_subject - care_subject ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (care_subject_admitted ?care_subject)
+        (allocation_assigned ?care_subject)
+        (care_protocol_available ?care_protocol)
+      )
+    :effect
+      (and
+        (enrolled_in_care_protocol ?care_subject ?care_protocol)
+        (not
+          (care_protocol_available ?care_protocol)
+        )
+      )
+  )
+  (:action confirm_admission
+    :parameters (?care_subject - care_subject ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (care_subject_admitted ?care_subject)
+        (allocation_assigned ?care_subject)
+        (enrolled_in_care_protocol ?care_subject ?care_protocol)
+        (not
+          (intake_confirmed ?care_subject)
+        )
+      )
+    :effect (intake_confirmed ?care_subject)
+  )
+  (:action unenroll_animal_from_care_protocol
+    :parameters (?care_subject - care_subject ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (enrolled_in_care_protocol ?care_subject ?care_protocol)
+      )
+    :effect
+      (and
+        (care_protocol_available ?care_protocol)
+        (not
+          (enrolled_in_care_protocol ?care_subject ?care_protocol)
+        )
+      )
+  )
+  (:action assign_attendant_to_care_subject
+    :parameters (?care_subject - care_subject ?attendant_role - attendant_role)
+    :precondition
+      (and
+        (intake_confirmed ?care_subject)
+        (attendant_available ?attendant_role)
+      )
+    :effect
+      (and
+        (attendant_assigned ?care_subject ?attendant_role)
+        (not
+          (attendant_available ?attendant_role)
+        )
+      )
+  )
+  (:action unassign_attendant_from_care_subject
+    :parameters (?care_subject - care_subject ?attendant_role - attendant_role)
+    :precondition
+      (and
+        (attendant_assigned ?care_subject ?attendant_role)
+      )
+    :effect
+      (and
+        (attendant_available ?attendant_role)
+        (not
+          (attendant_assigned ?care_subject ?attendant_role)
+        )
+      )
+  )
+  (:action assign_treatment_product_to_batch
+    :parameters (?youngstock_batch - youngstock_batch ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (treatment_product_available ?treatment_product)
+      )
+    :effect
+      (and
+        (treatment_product_assigned_to_batch ?youngstock_batch ?treatment_product)
+        (not
+          (treatment_product_available ?treatment_product)
+        )
+      )
+  )
+  (:action release_treatment_product_from_batch
+    :parameters (?youngstock_batch - youngstock_batch ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (treatment_product_assigned_to_batch ?youngstock_batch ?treatment_product)
+      )
+    :effect
+      (and
+        (treatment_product_available ?treatment_product)
+        (not
+          (treatment_product_assigned_to_batch ?youngstock_batch ?treatment_product)
+        )
+      )
+  )
+  (:action assign_lab_sample_to_batch
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (lab_sample_available ?lab_sample)
+      )
+    :effect
+      (and
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (not
+          (lab_sample_available ?lab_sample)
+        )
+      )
+  )
+  (:action release_lab_sample_from_batch
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample)
+    :precondition
+      (and
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+      )
+    :effect
+      (and
+        (lab_sample_available ?lab_sample)
+        (not
+          (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        )
+      )
+  )
+  (:action prepare_feeding_slot_a
+    :parameters (?neonate - neonate ?feeding_slot_a - feeding_slot_a ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (intake_confirmed ?neonate)
+        (enrolled_in_care_protocol ?neonate ?care_protocol)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (not
+          (feeding_slot_a_prepared ?feeding_slot_a)
+        )
+        (not
+          (feeding_slot_a_loaded ?feeding_slot_a)
+        )
+      )
+    :effect (feeding_slot_a_prepared ?feeding_slot_a)
+  )
+  (:action stage_neonate_with_attendant
+    :parameters (?neonate - neonate ?feeding_slot_a - feeding_slot_a ?attendant_role - attendant_role)
+    :precondition
+      (and
+        (intake_confirmed ?neonate)
+        (attendant_assigned ?neonate ?attendant_role)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (feeding_slot_a_prepared ?feeding_slot_a)
+        (not
+          (neonate_staged_for_feeding ?neonate)
+        )
+      )
+    :effect
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (neonate_feed_recorded ?neonate)
+      )
+  )
+  (:action load_feed_to_feeding_slot_a
+    :parameters (?neonate - neonate ?feeding_slot_a - feeding_slot_a ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (intake_confirmed ?neonate)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (feed_batch_available ?feed_batch)
+        (not
+          (neonate_staged_for_feeding ?neonate)
+        )
+      )
+    :effect
+      (and
+        (feeding_slot_a_loaded ?feeding_slot_a)
+        (neonate_staged_for_feeding ?neonate)
+        (feed_batch_assigned_to_neonate ?neonate ?feed_batch)
+        (not
+          (feed_batch_available ?feed_batch)
+        )
+      )
+  )
+  (:action finalize_neonate_feeding_preparation
+    :parameters (?neonate - neonate ?feeding_slot_a - feeding_slot_a ?care_protocol - care_protocol ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (intake_confirmed ?neonate)
+        (enrolled_in_care_protocol ?neonate ?care_protocol)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (feeding_slot_a_loaded ?feeding_slot_a)
+        (feed_batch_assigned_to_neonate ?neonate ?feed_batch)
+        (not
+          (neonate_feed_recorded ?neonate)
+        )
+      )
+    :effect
+      (and
+        (feeding_slot_a_prepared ?feeding_slot_a)
+        (neonate_feed_recorded ?neonate)
+        (feed_batch_available ?feed_batch)
+        (not
+          (feed_batch_assigned_to_neonate ?neonate ?feed_batch)
+        )
+      )
+  )
+  (:action prepare_feeding_slot_b
+    :parameters (?weaner - weaner ?feeding_slot_b - feeding_slot_b ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (intake_confirmed ?weaner)
+        (enrolled_in_care_protocol ?weaner ?care_protocol)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (not
+          (feeding_slot_b_prepared ?feeding_slot_b)
+        )
+        (not
+          (feeding_slot_b_loaded ?feeding_slot_b)
+        )
+      )
+    :effect (feeding_slot_b_prepared ?feeding_slot_b)
+  )
+  (:action assign_attendant_for_weaner_staging
+    :parameters (?weaner - weaner ?feeding_slot_b - feeding_slot_b ?attendant_role - attendant_role)
+    :precondition
+      (and
+        (intake_confirmed ?weaner)
+        (attendant_assigned ?weaner ?attendant_role)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_b_prepared ?feeding_slot_b)
+        (not
+          (weaner_staged_for_feeding ?weaner)
+        )
+      )
+    :effect
+      (and
+        (weaner_staged_for_feeding ?weaner)
+        (weaner_feed_recorded ?weaner)
+      )
+  )
+  (:action load_feed_to_feeding_slot_b
+    :parameters (?weaner - weaner ?feeding_slot_b - feeding_slot_b ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (intake_confirmed ?weaner)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feed_batch_available ?feed_batch)
+        (not
+          (weaner_staged_for_feeding ?weaner)
+        )
+      )
+    :effect
+      (and
+        (feeding_slot_b_loaded ?feeding_slot_b)
+        (weaner_staged_for_feeding ?weaner)
+        (feed_batch_assigned_to_weaner ?weaner ?feed_batch)
+        (not
+          (feed_batch_available ?feed_batch)
+        )
+      )
+  )
+  (:action finalize_weaner_feeding_preparation
+    :parameters (?weaner - weaner ?feeding_slot_b - feeding_slot_b ?care_protocol - care_protocol ?feed_batch - feed_batch)
+    :precondition
+      (and
+        (intake_confirmed ?weaner)
+        (enrolled_in_care_protocol ?weaner ?care_protocol)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_b_loaded ?feeding_slot_b)
+        (feed_batch_assigned_to_weaner ?weaner ?feed_batch)
+        (not
+          (weaner_feed_recorded ?weaner)
+        )
+      )
+    :effect
+      (and
+        (feeding_slot_b_prepared ?feeding_slot_b)
+        (weaner_feed_recorded ?weaner)
+        (feed_batch_available ?feed_batch)
+        (not
+          (feed_batch_assigned_to_weaner ?weaner ?feed_batch)
+        )
+      )
+  )
+  (:action create_and_reserve_work_order
+    :parameters (?neonate - neonate ?weaner - weaner ?feeding_slot_a - feeding_slot_a ?feeding_slot_b - feeding_slot_b ?work_order - work_order)
+    :precondition
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (weaner_staged_for_feeding ?weaner)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_a_prepared ?feeding_slot_a)
+        (feeding_slot_b_prepared ?feeding_slot_b)
+        (neonate_feed_recorded ?neonate)
+        (weaner_feed_recorded ?weaner)
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_reserved ?work_order)
+        (work_order_assigned_slot_a ?work_order ?feeding_slot_a)
+        (work_order_assigned_slot_b ?work_order ?feeding_slot_b)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action create_and_reserve_work_order_with_inspection
+    :parameters (?neonate - neonate ?weaner - weaner ?feeding_slot_a - feeding_slot_a ?feeding_slot_b - feeding_slot_b ?work_order - work_order)
+    :precondition
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (weaner_staged_for_feeding ?weaner)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_a_loaded ?feeding_slot_a)
+        (feeding_slot_b_prepared ?feeding_slot_b)
+        (not
+          (neonate_feed_recorded ?neonate)
+        )
+        (weaner_feed_recorded ?weaner)
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_reserved ?work_order)
+        (work_order_assigned_slot_a ?work_order ?feeding_slot_a)
+        (work_order_assigned_slot_b ?work_order ?feeding_slot_b)
+        (work_order_requires_inspection ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action create_and_reserve_work_order_with_treatment
+    :parameters (?neonate - neonate ?weaner - weaner ?feeding_slot_a - feeding_slot_a ?feeding_slot_b - feeding_slot_b ?work_order - work_order)
+    :precondition
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (weaner_staged_for_feeding ?weaner)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_a_prepared ?feeding_slot_a)
+        (feeding_slot_b_loaded ?feeding_slot_b)
+        (neonate_feed_recorded ?neonate)
+        (not
+          (weaner_feed_recorded ?weaner)
+        )
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_reserved ?work_order)
+        (work_order_assigned_slot_a ?work_order ?feeding_slot_a)
+        (work_order_assigned_slot_b ?work_order ?feeding_slot_b)
+        (work_order_requires_treatment ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action create_and_reserve_work_order_with_inspection_and_treatment
+    :parameters (?neonate - neonate ?weaner - weaner ?feeding_slot_a - feeding_slot_a ?feeding_slot_b - feeding_slot_b ?work_order - work_order)
+    :precondition
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (weaner_staged_for_feeding ?weaner)
+        (assigned_feeding_slot_a ?neonate ?feeding_slot_a)
+        (assigned_feeding_slot_b ?weaner ?feeding_slot_b)
+        (feeding_slot_a_loaded ?feeding_slot_a)
+        (feeding_slot_b_loaded ?feeding_slot_b)
+        (not
+          (neonate_feed_recorded ?neonate)
+        )
+        (not
+          (weaner_feed_recorded ?weaner)
+        )
+        (work_order_available ?work_order)
+      )
+    :effect
+      (and
+        (work_order_reserved ?work_order)
+        (work_order_assigned_slot_a ?work_order ?feeding_slot_a)
+        (work_order_assigned_slot_b ?work_order ?feeding_slot_b)
+        (work_order_requires_inspection ?work_order)
+        (work_order_requires_treatment ?work_order)
+        (not
+          (work_order_available ?work_order)
+        )
+      )
+  )
+  (:action confirm_work_order_execution_ready
+    :parameters (?work_order - work_order ?neonate - neonate ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (work_order_reserved ?work_order)
+        (neonate_staged_for_feeding ?neonate)
+        (enrolled_in_care_protocol ?neonate ?care_protocol)
+        (not
+          (work_order_execution_ready ?work_order)
+        )
+      )
+    :effect (work_order_execution_ready ?work_order)
+  )
+  (:action reserve_medication_batch_for_work_order
+    :parameters (?youngstock_batch - youngstock_batch ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (batch_linked_to_work_order ?youngstock_batch ?work_order)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_available ?medication_batch)
+        (work_order_reserved ?work_order)
+        (work_order_execution_ready ?work_order)
+        (not
+          (medication_batch_reserved ?medication_batch)
+        )
+      )
+    :effect
+      (and
+        (medication_batch_reserved ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (not
+          (medication_batch_available ?medication_batch)
+        )
+      )
+  )
+  (:action verify_medication_for_batch
+    :parameters (?youngstock_batch - youngstock_batch ?medication_batch - medication_batch ?work_order - work_order ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_reserved ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (enrolled_in_care_protocol ?youngstock_batch ?care_protocol)
+        (not
+          (work_order_requires_inspection ?work_order)
+        )
+        (not
+          (batch_medication_verified ?youngstock_batch)
+        )
+      )
+    :effect (batch_medication_verified ?youngstock_batch)
+  )
+  (:action assign_diagnostic_resource_to_batch
+    :parameters (?youngstock_batch - youngstock_batch ?diagnostic_resource - diagnostic_resource)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (diagnostic_resource_available ?diagnostic_resource)
+        (not
+          (diagnostic_resource_assigned ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (diagnostic_resource_assigned ?youngstock_batch)
+        (batch_linked_to_diagnostic_resource ?youngstock_batch ?diagnostic_resource)
+        (not
+          (diagnostic_resource_available ?diagnostic_resource)
+        )
+      )
+  )
+  (:action verify_inspection_and_stage_for_batch
+    :parameters (?youngstock_batch - youngstock_batch ?medication_batch - medication_batch ?work_order - work_order ?care_protocol - care_protocol ?diagnostic_resource - diagnostic_resource)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_reserved ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (enrolled_in_care_protocol ?youngstock_batch ?care_protocol)
+        (work_order_requires_inspection ?work_order)
+        (diagnostic_resource_assigned ?youngstock_batch)
+        (batch_linked_to_diagnostic_resource ?youngstock_batch ?diagnostic_resource)
+        (not
+          (batch_medication_verified ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_medication_verified ?youngstock_batch)
+        (inspection_reservation_confirmed ?youngstock_batch)
+      )
+  )
+  (:action stage_treatment_product_for_batch_variant_a
+    :parameters (?youngstock_batch - youngstock_batch ?treatment_product - treatment_product ?attendant_role - attendant_role ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_medication_verified ?youngstock_batch)
+        (treatment_product_assigned_to_batch ?youngstock_batch ?treatment_product)
+        (attendant_assigned ?youngstock_batch ?attendant_role)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (not
+          (work_order_requires_treatment ?work_order)
+        )
+        (not
+          (batch_treatment_product_staged ?youngstock_batch)
+        )
+      )
+    :effect (batch_treatment_product_staged ?youngstock_batch)
+  )
+  (:action stage_treatment_product_for_batch_variant_b
+    :parameters (?youngstock_batch - youngstock_batch ?treatment_product - treatment_product ?attendant_role - attendant_role ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_medication_verified ?youngstock_batch)
+        (treatment_product_assigned_to_batch ?youngstock_batch ?treatment_product)
+        (attendant_assigned ?youngstock_batch ?attendant_role)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (work_order_requires_treatment ?work_order)
+        (not
+          (batch_treatment_product_staged ?youngstock_batch)
+        )
+      )
+    :effect (batch_treatment_product_staged ?youngstock_batch)
+  )
+  (:action complete_pre_execution_checks_variant_none
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_treatment_product_staged ?youngstock_batch)
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (not
+          (work_order_requires_inspection ?work_order)
+        )
+        (not
+          (work_order_requires_treatment ?work_order)
+        )
+        (not
+          (batch_pre_execution_checks_completed ?youngstock_batch)
+        )
+      )
+    :effect (batch_pre_execution_checks_completed ?youngstock_batch)
+  )
+  (:action complete_pre_execution_checks_and_flag_equipment
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_treatment_product_staged ?youngstock_batch)
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (work_order_requires_inspection ?work_order)
+        (not
+          (work_order_requires_treatment ?work_order)
+        )
+        (not
+          (batch_pre_execution_checks_completed ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (requires_equipment_allocation ?youngstock_batch)
+      )
+  )
+  (:action complete_pre_execution_checks_and_flag_equipment_variant_b
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_treatment_product_staged ?youngstock_batch)
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (not
+          (work_order_requires_inspection ?work_order)
+        )
+        (work_order_requires_treatment ?work_order)
+        (not
+          (batch_pre_execution_checks_completed ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (requires_equipment_allocation ?youngstock_batch)
+      )
+  )
+  (:action complete_pre_execution_checks_and_flag_equipment_variant_c
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample ?medication_batch - medication_batch ?work_order - work_order)
+    :precondition
+      (and
+        (batch_treatment_product_staged ?youngstock_batch)
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (batch_has_medication_batch ?youngstock_batch ?medication_batch)
+        (medication_batch_assigned_to_work_order ?medication_batch ?work_order)
+        (work_order_requires_inspection ?work_order)
+        (work_order_requires_treatment ?work_order)
+        (not
+          (batch_pre_execution_checks_completed ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (requires_equipment_allocation ?youngstock_batch)
+      )
+  )
+  (:action finalize_batch_preparation
+    :parameters (?youngstock_batch - youngstock_batch)
+    :precondition
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (not
+          (requires_equipment_allocation ?youngstock_batch)
+        )
+        (not
+          (batch_execution_logged ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_execution_logged ?youngstock_batch)
+        (ready_for_treatment ?youngstock_batch)
+      )
+  )
+  (:action assign_equipment_to_batch
+    :parameters (?youngstock_batch - youngstock_batch ?equipment_set - equipment_set)
+    :precondition
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (requires_equipment_allocation ?youngstock_batch)
+        (equipment_set_available ?equipment_set)
+      )
+    :effect
+      (and
+        (equipment_assigned_to_batch ?youngstock_batch ?equipment_set)
+        (not
+          (equipment_set_available ?equipment_set)
+        )
+      )
+  )
+  (:action confirm_batch_execution_readiness
+    :parameters (?youngstock_batch - youngstock_batch ?neonate - neonate ?weaner - weaner ?care_protocol - care_protocol ?equipment_set - equipment_set)
+    :precondition
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (requires_equipment_allocation ?youngstock_batch)
+        (equipment_assigned_to_batch ?youngstock_batch ?equipment_set)
+        (batch_contains_neonate ?youngstock_batch ?neonate)
+        (batch_contains_weaner ?youngstock_batch ?weaner)
+        (neonate_feed_recorded ?neonate)
+        (weaner_feed_recorded ?weaner)
+        (enrolled_in_care_protocol ?youngstock_batch ?care_protocol)
+        (not
+          (batch_execution_ready ?youngstock_batch)
+        )
+      )
+    :effect (batch_execution_ready ?youngstock_batch)
+  )
+  (:action record_batch_execution_and_mark_ready
+    :parameters (?youngstock_batch - youngstock_batch)
+    :precondition
+      (and
+        (batch_pre_execution_checks_completed ?youngstock_batch)
+        (batch_execution_ready ?youngstock_batch)
+        (not
+          (batch_execution_logged ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_execution_logged ?youngstock_batch)
+        (ready_for_treatment ?youngstock_batch)
+      )
+  )
+  (:action authorize_inspection_for_batch
+    :parameters (?youngstock_batch - youngstock_batch ?inspection_certificate - inspection_certificate ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (intake_confirmed ?youngstock_batch)
+        (enrolled_in_care_protocol ?youngstock_batch ?care_protocol)
+        (inspection_certificate_available ?inspection_certificate)
+        (batch_linked_to_inspection_certificate ?youngstock_batch ?inspection_certificate)
+        (not
+          (inspection_authorized ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (inspection_authorized ?youngstock_batch)
+        (not
+          (inspection_certificate_available ?inspection_certificate)
+        )
+      )
+  )
+  (:action perform_inspection_by_attendant
+    :parameters (?youngstock_batch - youngstock_batch ?attendant_role - attendant_role)
+    :precondition
+      (and
+        (inspection_authorized ?youngstock_batch)
+        (attendant_assigned ?youngstock_batch ?attendant_role)
+        (not
+          (inspection_performed ?youngstock_batch)
+        )
+      )
+    :effect (inspection_performed ?youngstock_batch)
+  )
+  (:action record_inspection_result
+    :parameters (?youngstock_batch - youngstock_batch ?lab_sample - lab_sample)
+    :precondition
+      (and
+        (inspection_performed ?youngstock_batch)
+        (batch_has_lab_sample ?youngstock_batch ?lab_sample)
+        (not
+          (inspection_result_recorded ?youngstock_batch)
+        )
+      )
+    :effect (inspection_result_recorded ?youngstock_batch)
+  )
+  (:action finalize_inspection_and_mark_ready
+    :parameters (?youngstock_batch - youngstock_batch)
+    :precondition
+      (and
+        (inspection_result_recorded ?youngstock_batch)
+        (not
+          (batch_execution_logged ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_execution_logged ?youngstock_batch)
+        (ready_for_treatment ?youngstock_batch)
+      )
+  )
+  (:action record_neonate_execution_completion
+    :parameters (?neonate - neonate ?work_order - work_order)
+    :precondition
+      (and
+        (neonate_staged_for_feeding ?neonate)
+        (neonate_feed_recorded ?neonate)
+        (work_order_reserved ?work_order)
+        (work_order_execution_ready ?work_order)
+        (not
+          (ready_for_treatment ?neonate)
+        )
+      )
+    :effect (ready_for_treatment ?neonate)
+  )
+  (:action record_weaner_execution_completion
+    :parameters (?weaner - weaner ?work_order - work_order)
+    :precondition
+      (and
+        (weaner_staged_for_feeding ?weaner)
+        (weaner_feed_recorded ?weaner)
+        (work_order_reserved ?work_order)
+        (work_order_execution_ready ?work_order)
+        (not
+          (ready_for_treatment ?weaner)
+        )
+      )
+    :effect (ready_for_treatment ?weaner)
+  )
+  (:action administer_treatment_to_care_subject
+    :parameters (?care_subject - care_subject ?vaccine_dose - vaccine_dose ?care_protocol - care_protocol)
+    :precondition
+      (and
+        (ready_for_treatment ?care_subject)
+        (enrolled_in_care_protocol ?care_subject ?care_protocol)
+        (vaccine_dose_available ?vaccine_dose)
+        (not
+          (treatment_administered ?care_subject)
+        )
+      )
+    :effect
+      (and
+        (treatment_administered ?care_subject)
+        (vaccine_dose_assigned_to_care_subject ?care_subject ?vaccine_dose)
+        (not
+          (vaccine_dose_available ?vaccine_dose)
+        )
+      )
+  )
+  (:action finalize_treatment_and_release_neonate
+    :parameters (?neonate - neonate ?allocation_slot - allocation_slot ?vaccine_dose - vaccine_dose)
+    :precondition
+      (and
+        (treatment_administered ?neonate)
+        (assigned_to_allocation_slot ?neonate ?allocation_slot)
+        (vaccine_dose_assigned_to_care_subject ?neonate ?vaccine_dose)
+        (not
+          (care_subject_discharged ?neonate)
+        )
+      )
+    :effect
+      (and
+        (care_subject_discharged ?neonate)
+        (allocation_slot_available ?allocation_slot)
+        (vaccine_dose_available ?vaccine_dose)
+      )
+  )
+  (:action finalize_treatment_and_release_weaner
+    :parameters (?weaner - weaner ?allocation_slot - allocation_slot ?vaccine_dose - vaccine_dose)
+    :precondition
+      (and
+        (treatment_administered ?weaner)
+        (assigned_to_allocation_slot ?weaner ?allocation_slot)
+        (vaccine_dose_assigned_to_care_subject ?weaner ?vaccine_dose)
+        (not
+          (care_subject_discharged ?weaner)
+        )
+      )
+    :effect
+      (and
+        (care_subject_discharged ?weaner)
+        (allocation_slot_available ?allocation_slot)
+        (vaccine_dose_available ?vaccine_dose)
+      )
+  )
+  (:action finalize_treatment_and_release_batch
+    :parameters (?youngstock_batch - youngstock_batch ?allocation_slot - allocation_slot ?vaccine_dose - vaccine_dose)
+    :precondition
+      (and
+        (treatment_administered ?youngstock_batch)
+        (assigned_to_allocation_slot ?youngstock_batch ?allocation_slot)
+        (vaccine_dose_assigned_to_care_subject ?youngstock_batch ?vaccine_dose)
+        (not
+          (care_subject_discharged ?youngstock_batch)
+        )
+      )
+    :effect
+      (and
+        (care_subject_discharged ?youngstock_batch)
+        (allocation_slot_available ?allocation_slot)
+        (vaccine_dose_available ?vaccine_dose)
+      )
+  )
+)

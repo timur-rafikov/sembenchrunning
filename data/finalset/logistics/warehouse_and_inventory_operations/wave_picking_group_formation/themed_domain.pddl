@@ -1,0 +1,936 @@
+(define (domain wave_picking_group_formation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types warehouse_resource - object warehouse_asset - object operational_node - object wave_entity - object wave - wave_entity picker_resource - warehouse_resource order - warehouse_resource workstation - warehouse_resource equipment_profile - warehouse_resource station_token - warehouse_resource priority_token - warehouse_resource configuration_profile - warehouse_resource shift_slot - warehouse_resource tote_container - warehouse_asset pick_batch - warehouse_asset supervisor_token - warehouse_asset pick_zone - operational_node pack_zone - operational_node picking_cart - operational_node wave_picker_branch - wave wave_grouping - wave picker_role_a - wave_picker_branch picker_role_b - wave_picker_branch wave_group_unit - wave_grouping)
+  (:predicates
+    (wave_entity_initialized ?wave - wave)
+    (wave_entity_confirmed ?wave - wave)
+    (wave_entity_has_assignment ?wave - wave)
+    (released_for_execution ?wave - wave)
+    (ready_for_dispatch ?wave - wave)
+    (priority_assigned ?wave - wave)
+    (picker_available ?picker_resource - picker_resource)
+    (wave_entity_assigned_picker ?wave - wave ?picker_resource - picker_resource)
+    (order_available ?order - order)
+    (order_assigned_to_wave_entity ?wave - wave ?order - order)
+    (workstation_available ?workstation - workstation)
+    (wave_entity_bound_workstation ?wave - wave ?workstation - workstation)
+    (tote_available ?tote_container - tote_container)
+    (picker_a_assigned_tote ?picker_role_a - picker_role_a ?tote_container - tote_container)
+    (picker_b_assigned_tote ?picker_role_b - picker_role_b ?tote_container - tote_container)
+    (picker_a_assigned_pick_zone ?picker_role_a - picker_role_a ?pick_zone - pick_zone)
+    (pick_zone_ready ?pick_zone - pick_zone)
+    (pick_zone_tote_allocated ?pick_zone - pick_zone)
+    (picker_a_ready_for_cart ?picker_role_a - picker_role_a)
+    (picker_b_assigned_pack_zone ?picker_role_b - picker_role_b ?pack_zone - pack_zone)
+    (pack_zone_ready ?pack_zone - pack_zone)
+    (pack_zone_tote_allocated ?pack_zone - pack_zone)
+    (picker_b_ready_for_cart ?picker_role_b - picker_role_b)
+    (cart_available ?picking_cart - picking_cart)
+    (cart_reserved ?picking_cart - picking_cart)
+    (cart_assigned_to_pick_zone ?picking_cart - picking_cart ?pick_zone - pick_zone)
+    (cart_assigned_to_pack_zone ?picking_cart - picking_cart ?pack_zone - pack_zone)
+    (cart_pick_zone_marker ?picking_cart - picking_cart)
+    (cart_pack_zone_marker ?picking_cart - picking_cart)
+    (cart_ready ?picking_cart - picking_cart)
+    (group_has_picker_a ?wave_group_unit - wave_group_unit ?picker_role_a - picker_role_a)
+    (group_has_picker_b ?wave_group_unit - wave_group_unit ?picker_role_b - picker_role_b)
+    (group_assigned_cart ?wave_group_unit - wave_group_unit ?picking_cart - picking_cart)
+    (pick_batch_available ?pick_batch - pick_batch)
+    (group_has_pick_batch ?wave_group_unit - wave_group_unit ?pick_batch - pick_batch)
+    (pick_batch_materialized ?pick_batch - pick_batch)
+    (pick_batch_on_cart ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    (group_batch_materialized ?wave_group_unit - wave_group_unit)
+    (group_configuration_applied ?wave_group_unit - wave_group_unit)
+    (supervisor_authorization_started ?wave_group_unit - wave_group_unit)
+    (equipment_reserved_for_group ?wave_group_unit - wave_group_unit)
+    (equipment_commissioned ?wave_group_unit - wave_group_unit)
+    (supervisor_approved ?wave_group_unit - wave_group_unit)
+    (final_station_assignment_done ?wave_group_unit - wave_group_unit)
+    (supervisor_token_available ?supervisor_token - supervisor_token)
+    (group_bound_supervisor ?wave_group_unit - wave_group_unit ?supervisor_token - supervisor_token)
+    (supervisor_assigned_to_group ?wave_group_unit - wave_group_unit)
+    (station_commissioning_in_progress ?wave_group_unit - wave_group_unit)
+    (station_commissioned ?wave_group_unit - wave_group_unit)
+    (equipment_profile_available ?equipment_profile - equipment_profile)
+    (group_has_equipment_profile ?wave_group_unit - wave_group_unit ?equipment_profile - equipment_profile)
+    (station_token_available ?station_token - station_token)
+    (group_bound_station_token ?wave_group_unit - wave_group_unit ?station_token - station_token)
+    (configuration_profile_available ?configuration_profile - configuration_profile)
+    (group_has_configuration_profile ?wave_group_unit - wave_group_unit ?configuration_profile - configuration_profile)
+    (shift_slot_available ?shift_slot - shift_slot)
+    (group_assigned_shift_slot ?wave_group_unit - wave_group_unit ?shift_slot - shift_slot)
+    (priority_token_available ?priority_token - priority_token)
+    (wave_entity_has_priority_token ?wave - wave ?priority_token - priority_token)
+    (picker_a_queued ?picker_role_a - picker_role_a)
+    (picker_b_queued ?picker_role_b - picker_role_b)
+    (group_finalized ?wave_group_unit - wave_group_unit)
+  )
+  (:action initialize_wave
+    :parameters (?wave - wave)
+    :precondition
+      (and
+        (not
+          (wave_entity_initialized ?wave)
+        )
+        (not
+          (released_for_execution ?wave)
+        )
+      )
+    :effect (wave_entity_initialized ?wave)
+  )
+  (:action assign_picker_resource_to_wave
+    :parameters (?wave - wave ?picker_resource - picker_resource)
+    :precondition
+      (and
+        (wave_entity_initialized ?wave)
+        (not
+          (wave_entity_has_assignment ?wave)
+        )
+        (picker_available ?picker_resource)
+      )
+    :effect
+      (and
+        (wave_entity_has_assignment ?wave)
+        (wave_entity_assigned_picker ?wave ?picker_resource)
+        (not
+          (picker_available ?picker_resource)
+        )
+      )
+  )
+  (:action attach_order_to_wave
+    :parameters (?wave - wave ?order - order)
+    :precondition
+      (and
+        (wave_entity_initialized ?wave)
+        (wave_entity_has_assignment ?wave)
+        (order_available ?order)
+      )
+    :effect
+      (and
+        (order_assigned_to_wave_entity ?wave ?order)
+        (not
+          (order_available ?order)
+        )
+      )
+  )
+  (:action confirm_wave
+    :parameters (?wave - wave ?order - order)
+    :precondition
+      (and
+        (wave_entity_initialized ?wave)
+        (wave_entity_has_assignment ?wave)
+        (order_assigned_to_wave_entity ?wave ?order)
+        (not
+          (wave_entity_confirmed ?wave)
+        )
+      )
+    :effect (wave_entity_confirmed ?wave)
+  )
+  (:action release_order_from_wave
+    :parameters (?wave - wave ?order - order)
+    :precondition
+      (and
+        (order_assigned_to_wave_entity ?wave ?order)
+      )
+    :effect
+      (and
+        (order_available ?order)
+        (not
+          (order_assigned_to_wave_entity ?wave ?order)
+        )
+      )
+  )
+  (:action assign_workstation_to_wave
+    :parameters (?wave - wave ?workstation - workstation)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave)
+        (workstation_available ?workstation)
+      )
+    :effect
+      (and
+        (wave_entity_bound_workstation ?wave ?workstation)
+        (not
+          (workstation_available ?workstation)
+        )
+      )
+  )
+  (:action release_workstation_from_wave
+    :parameters (?wave - wave ?workstation - workstation)
+    :precondition
+      (and
+        (wave_entity_bound_workstation ?wave ?workstation)
+      )
+    :effect
+      (and
+        (workstation_available ?workstation)
+        (not
+          (wave_entity_bound_workstation ?wave ?workstation)
+        )
+      )
+  )
+  (:action assign_configuration_profile_to_group
+    :parameters (?wave_group_unit - wave_group_unit ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (configuration_profile_available ?configuration_profile)
+      )
+    :effect
+      (and
+        (group_has_configuration_profile ?wave_group_unit ?configuration_profile)
+        (not
+          (configuration_profile_available ?configuration_profile)
+        )
+      )
+  )
+  (:action release_configuration_profile_from_group
+    :parameters (?wave_group_unit - wave_group_unit ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (group_has_configuration_profile ?wave_group_unit ?configuration_profile)
+      )
+    :effect
+      (and
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (group_has_configuration_profile ?wave_group_unit ?configuration_profile)
+        )
+      )
+  )
+  (:action assign_shift_slot_to_group
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (shift_slot_available ?shift_slot)
+      )
+    :effect
+      (and
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (not
+          (shift_slot_available ?shift_slot)
+        )
+      )
+  )
+  (:action release_shift_slot_from_group
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot)
+    :precondition
+      (and
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+      )
+    :effect
+      (and
+        (shift_slot_available ?shift_slot)
+        (not
+          (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        )
+      )
+  )
+  (:action activate_pick_zone_for_picker_a
+    :parameters (?picker_role_a - picker_role_a ?pick_zone - pick_zone ?order - order)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_a)
+        (order_assigned_to_wave_entity ?picker_role_a ?order)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (not
+          (pick_zone_ready ?pick_zone)
+        )
+        (not
+          (pick_zone_tote_allocated ?pick_zone)
+        )
+      )
+    :effect (pick_zone_ready ?pick_zone)
+  )
+  (:action confirm_picker_a_staging
+    :parameters (?picker_role_a - picker_role_a ?pick_zone - pick_zone ?workstation - workstation)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_a)
+        (wave_entity_bound_workstation ?picker_role_a ?workstation)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (pick_zone_ready ?pick_zone)
+        (not
+          (picker_a_queued ?picker_role_a)
+        )
+      )
+    :effect
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_a_ready_for_cart ?picker_role_a)
+      )
+  )
+  (:action assign_tote_to_picker_a
+    :parameters (?picker_role_a - picker_role_a ?pick_zone - pick_zone ?tote_container - tote_container)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_a)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (tote_available ?tote_container)
+        (not
+          (picker_a_queued ?picker_role_a)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_tote_allocated ?pick_zone)
+        (picker_a_queued ?picker_role_a)
+        (picker_a_assigned_tote ?picker_role_a ?tote_container)
+        (not
+          (tote_available ?tote_container)
+        )
+      )
+  )
+  (:action finalize_tote_allocation_picker_a
+    :parameters (?picker_role_a - picker_role_a ?pick_zone - pick_zone ?order - order ?tote_container - tote_container)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_a)
+        (order_assigned_to_wave_entity ?picker_role_a ?order)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (pick_zone_tote_allocated ?pick_zone)
+        (picker_a_assigned_tote ?picker_role_a ?tote_container)
+        (not
+          (picker_a_ready_for_cart ?picker_role_a)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_ready ?pick_zone)
+        (picker_a_ready_for_cart ?picker_role_a)
+        (tote_available ?tote_container)
+        (not
+          (picker_a_assigned_tote ?picker_role_a ?tote_container)
+        )
+      )
+  )
+  (:action activate_pack_zone_for_picker_b
+    :parameters (?picker_role_b - picker_role_b ?pack_zone - pack_zone ?order - order)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_b)
+        (order_assigned_to_wave_entity ?picker_role_b ?order)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (not
+          (pack_zone_ready ?pack_zone)
+        )
+        (not
+          (pack_zone_tote_allocated ?pack_zone)
+        )
+      )
+    :effect (pack_zone_ready ?pack_zone)
+  )
+  (:action confirm_picker_b_staging
+    :parameters (?picker_role_b - picker_role_b ?pack_zone - pack_zone ?workstation - workstation)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_b)
+        (wave_entity_bound_workstation ?picker_role_b ?workstation)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pack_zone_ready ?pack_zone)
+        (not
+          (picker_b_queued ?picker_role_b)
+        )
+      )
+    :effect
+      (and
+        (picker_b_queued ?picker_role_b)
+        (picker_b_ready_for_cart ?picker_role_b)
+      )
+  )
+  (:action assign_tote_to_picker_b
+    :parameters (?picker_role_b - picker_role_b ?pack_zone - pack_zone ?tote_container - tote_container)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_b)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (tote_available ?tote_container)
+        (not
+          (picker_b_queued ?picker_role_b)
+        )
+      )
+    :effect
+      (and
+        (pack_zone_tote_allocated ?pack_zone)
+        (picker_b_queued ?picker_role_b)
+        (picker_b_assigned_tote ?picker_role_b ?tote_container)
+        (not
+          (tote_available ?tote_container)
+        )
+      )
+  )
+  (:action finalize_tote_allocation_picker_b
+    :parameters (?picker_role_b - picker_role_b ?pack_zone - pack_zone ?order - order ?tote_container - tote_container)
+    :precondition
+      (and
+        (wave_entity_confirmed ?picker_role_b)
+        (order_assigned_to_wave_entity ?picker_role_b ?order)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pack_zone_tote_allocated ?pack_zone)
+        (picker_b_assigned_tote ?picker_role_b ?tote_container)
+        (not
+          (picker_b_ready_for_cart ?picker_role_b)
+        )
+      )
+    :effect
+      (and
+        (pack_zone_ready ?pack_zone)
+        (picker_b_ready_for_cart ?picker_role_b)
+        (tote_available ?tote_container)
+        (not
+          (picker_b_assigned_tote ?picker_role_b ?tote_container)
+        )
+      )
+  )
+  (:action prepare_picking_cart
+    :parameters (?picker_role_a - picker_role_a ?picker_role_b - picker_role_b ?pick_zone - pick_zone ?pack_zone - pack_zone ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_b_queued ?picker_role_b)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pick_zone_ready ?pick_zone)
+        (pack_zone_ready ?pack_zone)
+        (picker_a_ready_for_cart ?picker_role_a)
+        (picker_b_ready_for_cart ?picker_role_b)
+        (cart_available ?picking_cart)
+      )
+    :effect
+      (and
+        (cart_reserved ?picking_cart)
+        (cart_assigned_to_pick_zone ?picking_cart ?pick_zone)
+        (cart_assigned_to_pack_zone ?picking_cart ?pack_zone)
+        (not
+          (cart_available ?picking_cart)
+        )
+      )
+  )
+  (:action prepare_picking_cart_with_pick_zone_flag
+    :parameters (?picker_role_a - picker_role_a ?picker_role_b - picker_role_b ?pick_zone - pick_zone ?pack_zone - pack_zone ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_b_queued ?picker_role_b)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pick_zone_tote_allocated ?pick_zone)
+        (pack_zone_ready ?pack_zone)
+        (not
+          (picker_a_ready_for_cart ?picker_role_a)
+        )
+        (picker_b_ready_for_cart ?picker_role_b)
+        (cart_available ?picking_cart)
+      )
+    :effect
+      (and
+        (cart_reserved ?picking_cart)
+        (cart_assigned_to_pick_zone ?picking_cart ?pick_zone)
+        (cart_assigned_to_pack_zone ?picking_cart ?pack_zone)
+        (cart_pick_zone_marker ?picking_cart)
+        (not
+          (cart_available ?picking_cart)
+        )
+      )
+  )
+  (:action prepare_picking_cart_with_pack_zone_flag
+    :parameters (?picker_role_a - picker_role_a ?picker_role_b - picker_role_b ?pick_zone - pick_zone ?pack_zone - pack_zone ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_b_queued ?picker_role_b)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pick_zone_ready ?pick_zone)
+        (pack_zone_tote_allocated ?pack_zone)
+        (picker_a_ready_for_cart ?picker_role_a)
+        (not
+          (picker_b_ready_for_cart ?picker_role_b)
+        )
+        (cart_available ?picking_cart)
+      )
+    :effect
+      (and
+        (cart_reserved ?picking_cart)
+        (cart_assigned_to_pick_zone ?picking_cart ?pick_zone)
+        (cart_assigned_to_pack_zone ?picking_cart ?pack_zone)
+        (cart_pack_zone_marker ?picking_cart)
+        (not
+          (cart_available ?picking_cart)
+        )
+      )
+  )
+  (:action prepare_picking_cart_with_both_zone_flags
+    :parameters (?picker_role_a - picker_role_a ?picker_role_b - picker_role_b ?pick_zone - pick_zone ?pack_zone - pack_zone ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_b_queued ?picker_role_b)
+        (picker_a_assigned_pick_zone ?picker_role_a ?pick_zone)
+        (picker_b_assigned_pack_zone ?picker_role_b ?pack_zone)
+        (pick_zone_tote_allocated ?pick_zone)
+        (pack_zone_tote_allocated ?pack_zone)
+        (not
+          (picker_a_ready_for_cart ?picker_role_a)
+        )
+        (not
+          (picker_b_ready_for_cart ?picker_role_b)
+        )
+        (cart_available ?picking_cart)
+      )
+    :effect
+      (and
+        (cart_reserved ?picking_cart)
+        (cart_assigned_to_pick_zone ?picking_cart ?pick_zone)
+        (cart_assigned_to_pack_zone ?picking_cart ?pack_zone)
+        (cart_pick_zone_marker ?picking_cart)
+        (cart_pack_zone_marker ?picking_cart)
+        (not
+          (cart_available ?picking_cart)
+        )
+      )
+  )
+  (:action mark_cart_ready_for_order_batch
+    :parameters (?picking_cart - picking_cart ?picker_role_a - picker_role_a ?order - order)
+    :precondition
+      (and
+        (cart_reserved ?picking_cart)
+        (picker_a_queued ?picker_role_a)
+        (order_assigned_to_wave_entity ?picker_role_a ?order)
+        (not
+          (cart_ready ?picking_cart)
+        )
+      )
+    :effect (cart_ready ?picking_cart)
+  )
+  (:action materialize_pick_batch_onto_cart
+    :parameters (?wave_group_unit - wave_group_unit ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (group_assigned_cart ?wave_group_unit ?picking_cart)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_available ?pick_batch)
+        (cart_reserved ?picking_cart)
+        (cart_ready ?picking_cart)
+        (not
+          (pick_batch_materialized ?pick_batch)
+        )
+      )
+    :effect
+      (and
+        (pick_batch_materialized ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (not
+          (pick_batch_available ?pick_batch)
+        )
+      )
+  )
+  (:action confirm_group_batch_materialization
+    :parameters (?wave_group_unit - wave_group_unit ?pick_batch - pick_batch ?picking_cart - picking_cart ?order - order)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_materialized ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (order_assigned_to_wave_entity ?wave_group_unit ?order)
+        (not
+          (cart_pick_zone_marker ?picking_cart)
+        )
+        (not
+          (group_batch_materialized ?wave_group_unit)
+        )
+      )
+    :effect (group_batch_materialized ?wave_group_unit)
+  )
+  (:action reserve_equipment_profile_for_group
+    :parameters (?wave_group_unit - wave_group_unit ?equipment_profile - equipment_profile)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (equipment_profile_available ?equipment_profile)
+        (not
+          (equipment_reserved_for_group ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (equipment_reserved_for_group ?wave_group_unit)
+        (group_has_equipment_profile ?wave_group_unit ?equipment_profile)
+        (not
+          (equipment_profile_available ?equipment_profile)
+        )
+      )
+  )
+  (:action commission_equipment_and_mark_group
+    :parameters (?wave_group_unit - wave_group_unit ?pick_batch - pick_batch ?picking_cart - picking_cart ?order - order ?equipment_profile - equipment_profile)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_materialized ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (order_assigned_to_wave_entity ?wave_group_unit ?order)
+        (cart_pick_zone_marker ?picking_cart)
+        (equipment_reserved_for_group ?wave_group_unit)
+        (group_has_equipment_profile ?wave_group_unit ?equipment_profile)
+        (not
+          (group_batch_materialized ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (group_batch_materialized ?wave_group_unit)
+        (equipment_commissioned ?wave_group_unit)
+      )
+  )
+  (:action apply_configuration_profile_to_group_no_pack_flag
+    :parameters (?wave_group_unit - wave_group_unit ?configuration_profile - configuration_profile ?workstation - workstation ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_batch_materialized ?wave_group_unit)
+        (group_has_configuration_profile ?wave_group_unit ?configuration_profile)
+        (wave_entity_bound_workstation ?wave_group_unit ?workstation)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (not
+          (cart_pack_zone_marker ?picking_cart)
+        )
+        (not
+          (group_configuration_applied ?wave_group_unit)
+        )
+      )
+    :effect (group_configuration_applied ?wave_group_unit)
+  )
+  (:action apply_configuration_profile_to_group_with_pack_flag
+    :parameters (?wave_group_unit - wave_group_unit ?configuration_profile - configuration_profile ?workstation - workstation ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_batch_materialized ?wave_group_unit)
+        (group_has_configuration_profile ?wave_group_unit ?configuration_profile)
+        (wave_entity_bound_workstation ?wave_group_unit ?workstation)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (cart_pack_zone_marker ?picking_cart)
+        (not
+          (group_configuration_applied ?wave_group_unit)
+        )
+      )
+    :effect (group_configuration_applied ?wave_group_unit)
+  )
+  (:action begin_supervisor_authorization
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_configuration_applied ?wave_group_unit)
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (not
+          (cart_pick_zone_marker ?picking_cart)
+        )
+        (not
+          (cart_pack_zone_marker ?picking_cart)
+        )
+        (not
+          (supervisor_authorization_started ?wave_group_unit)
+        )
+      )
+    :effect (supervisor_authorization_started ?wave_group_unit)
+  )
+  (:action authorize_group_with_supervisor_and_mark
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_configuration_applied ?wave_group_unit)
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (cart_pick_zone_marker ?picking_cart)
+        (not
+          (cart_pack_zone_marker ?picking_cart)
+        )
+        (not
+          (supervisor_authorization_started ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (supervisor_approved ?wave_group_unit)
+      )
+  )
+  (:action authorize_group_with_supervisor_alt
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_configuration_applied ?wave_group_unit)
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (not
+          (cart_pick_zone_marker ?picking_cart)
+        )
+        (cart_pack_zone_marker ?picking_cart)
+        (not
+          (supervisor_authorization_started ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (supervisor_approved ?wave_group_unit)
+      )
+  )
+  (:action authorize_group_with_supervisor_finalize
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot ?pick_batch - pick_batch ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (group_configuration_applied ?wave_group_unit)
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (group_has_pick_batch ?wave_group_unit ?pick_batch)
+        (pick_batch_on_cart ?pick_batch ?picking_cart)
+        (cart_pick_zone_marker ?picking_cart)
+        (cart_pack_zone_marker ?picking_cart)
+        (not
+          (supervisor_authorization_started ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (supervisor_approved ?wave_group_unit)
+      )
+  )
+  (:action finalize_group_and_set_ready
+    :parameters (?wave_group_unit - wave_group_unit)
+    :precondition
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (not
+          (supervisor_approved ?wave_group_unit)
+        )
+        (not
+          (group_finalized ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (group_finalized ?wave_group_unit)
+        (ready_for_dispatch ?wave_group_unit)
+      )
+  )
+  (:action bind_station_token_to_group
+    :parameters (?wave_group_unit - wave_group_unit ?station_token - station_token)
+    :precondition
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (supervisor_approved ?wave_group_unit)
+        (station_token_available ?station_token)
+      )
+    :effect
+      (and
+        (group_bound_station_token ?wave_group_unit ?station_token)
+        (not
+          (station_token_available ?station_token)
+        )
+      )
+  )
+  (:action set_group_start_conditions
+    :parameters (?wave_group_unit - wave_group_unit ?picker_role_a - picker_role_a ?picker_role_b - picker_role_b ?order - order ?station_token - station_token)
+    :precondition
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (supervisor_approved ?wave_group_unit)
+        (group_bound_station_token ?wave_group_unit ?station_token)
+        (group_has_picker_a ?wave_group_unit ?picker_role_a)
+        (group_has_picker_b ?wave_group_unit ?picker_role_b)
+        (picker_a_ready_for_cart ?picker_role_a)
+        (picker_b_ready_for_cart ?picker_role_b)
+        (order_assigned_to_wave_entity ?wave_group_unit ?order)
+        (not
+          (final_station_assignment_done ?wave_group_unit)
+        )
+      )
+    :effect (final_station_assignment_done ?wave_group_unit)
+  )
+  (:action finalize_group_and_set_ready_alternate
+    :parameters (?wave_group_unit - wave_group_unit)
+    :precondition
+      (and
+        (supervisor_authorization_started ?wave_group_unit)
+        (final_station_assignment_done ?wave_group_unit)
+        (not
+          (group_finalized ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (group_finalized ?wave_group_unit)
+        (ready_for_dispatch ?wave_group_unit)
+      )
+  )
+  (:action bind_supervisor_to_group
+    :parameters (?wave_group_unit - wave_group_unit ?supervisor_token - supervisor_token ?order - order)
+    :precondition
+      (and
+        (wave_entity_confirmed ?wave_group_unit)
+        (order_assigned_to_wave_entity ?wave_group_unit ?order)
+        (supervisor_token_available ?supervisor_token)
+        (group_bound_supervisor ?wave_group_unit ?supervisor_token)
+        (not
+          (supervisor_assigned_to_group ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (supervisor_assigned_to_group ?wave_group_unit)
+        (not
+          (supervisor_token_available ?supervisor_token)
+        )
+      )
+  )
+  (:action start_station_commissioning
+    :parameters (?wave_group_unit - wave_group_unit ?workstation - workstation)
+    :precondition
+      (and
+        (supervisor_assigned_to_group ?wave_group_unit)
+        (wave_entity_bound_workstation ?wave_group_unit ?workstation)
+        (not
+          (station_commissioning_in_progress ?wave_group_unit)
+        )
+      )
+    :effect (station_commissioning_in_progress ?wave_group_unit)
+  )
+  (:action complete_station_commissioning_with_shift
+    :parameters (?wave_group_unit - wave_group_unit ?shift_slot - shift_slot)
+    :precondition
+      (and
+        (station_commissioning_in_progress ?wave_group_unit)
+        (group_assigned_shift_slot ?wave_group_unit ?shift_slot)
+        (not
+          (station_commissioned ?wave_group_unit)
+        )
+      )
+    :effect (station_commissioned ?wave_group_unit)
+  )
+  (:action finalize_group_post_station_commissioning
+    :parameters (?wave_group_unit - wave_group_unit)
+    :precondition
+      (and
+        (station_commissioned ?wave_group_unit)
+        (not
+          (group_finalized ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (group_finalized ?wave_group_unit)
+        (ready_for_dispatch ?wave_group_unit)
+      )
+  )
+  (:action release_picker_a_to_start
+    :parameters (?picker_role_a - picker_role_a ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_a_queued ?picker_role_a)
+        (picker_a_ready_for_cart ?picker_role_a)
+        (cart_reserved ?picking_cart)
+        (cart_ready ?picking_cart)
+        (not
+          (ready_for_dispatch ?picker_role_a)
+        )
+      )
+    :effect (ready_for_dispatch ?picker_role_a)
+  )
+  (:action release_picker_b_to_start
+    :parameters (?picker_role_b - picker_role_b ?picking_cart - picking_cart)
+    :precondition
+      (and
+        (picker_b_queued ?picker_role_b)
+        (picker_b_ready_for_cart ?picker_role_b)
+        (cart_reserved ?picking_cart)
+        (cart_ready ?picking_cart)
+        (not
+          (ready_for_dispatch ?picker_role_b)
+        )
+      )
+    :effect (ready_for_dispatch ?picker_role_b)
+  )
+  (:action assign_priority_to_wave
+    :parameters (?wave - wave ?priority_token - priority_token ?order - order)
+    :precondition
+      (and
+        (ready_for_dispatch ?wave)
+        (order_assigned_to_wave_entity ?wave ?order)
+        (priority_token_available ?priority_token)
+        (not
+          (priority_assigned ?wave)
+        )
+      )
+    :effect
+      (and
+        (priority_assigned ?wave)
+        (wave_entity_has_priority_token ?wave ?priority_token)
+        (not
+          (priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action split_and_release_picker_a_based_on_priority
+    :parameters (?picker_role_a - picker_role_a ?picker_resource - picker_resource ?priority_token - priority_token)
+    :precondition
+      (and
+        (priority_assigned ?picker_role_a)
+        (wave_entity_assigned_picker ?picker_role_a ?picker_resource)
+        (wave_entity_has_priority_token ?picker_role_a ?priority_token)
+        (not
+          (released_for_execution ?picker_role_a)
+        )
+      )
+    :effect
+      (and
+        (released_for_execution ?picker_role_a)
+        (picker_available ?picker_resource)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action split_and_release_picker_b_based_on_priority
+    :parameters (?picker_role_b - picker_role_b ?picker_resource - picker_resource ?priority_token - priority_token)
+    :precondition
+      (and
+        (priority_assigned ?picker_role_b)
+        (wave_entity_assigned_picker ?picker_role_b ?picker_resource)
+        (wave_entity_has_priority_token ?picker_role_b ?priority_token)
+        (not
+          (released_for_execution ?picker_role_b)
+        )
+      )
+    :effect
+      (and
+        (released_for_execution ?picker_role_b)
+        (picker_available ?picker_resource)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action split_and_release_group_based_on_priority
+    :parameters (?wave_group_unit - wave_group_unit ?picker_resource - picker_resource ?priority_token - priority_token)
+    :precondition
+      (and
+        (priority_assigned ?wave_group_unit)
+        (wave_entity_assigned_picker ?wave_group_unit ?picker_resource)
+        (wave_entity_has_priority_token ?wave_group_unit ?priority_token)
+        (not
+          (released_for_execution ?wave_group_unit)
+        )
+      )
+    :effect
+      (and
+        (released_for_execution ?wave_group_unit)
+        (picker_available ?picker_resource)
+        (priority_token_available ?priority_token)
+      )
+  )
+)

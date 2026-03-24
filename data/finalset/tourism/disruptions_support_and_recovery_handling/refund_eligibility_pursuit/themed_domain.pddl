@@ -1,0 +1,937 @@
+(define (domain tourism_refund_eligibility_pursuit)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object actor_root - entity resource_root - entity document_root - entity root_entity - entity affected_service - root_entity support_channel - actor_root policy_check_resource - actor_root service_agent - actor_root third_party_authorization - actor_root compensation_option - actor_root claim_form - actor_root monetary_adjustment_proposal - actor_root escalation_approval - actor_root document_resource - resource_root verification_package - resource_root cancellation_reason - resource_root customer_segment - document_root supplier_segment - document_root refund_submission - document_root booking_group - affected_service case_group - affected_service customer_booking - booking_group supplier_booking - booking_group refund_case - case_group)
+
+  (:predicates
+    (intake_registered ?affected_service - affected_service)
+    (policy_verified ?affected_service - affected_service)
+    (support_channel_assigned_flag ?affected_service - affected_service)
+    (refund_eligibility_registered ?affected_service - affected_service)
+    (eligibility_adjudicated ?affected_service - affected_service)
+    (registration_prepared ?affected_service - affected_service)
+    (support_channel_available ?support_channel - support_channel)
+    (support_channel_assigned_to ?affected_service - affected_service ?support_channel - support_channel)
+    (policy_resource_available ?policy_check_resource - policy_check_resource)
+    (policy_check_allocated ?affected_service - affected_service ?policy_check_resource - policy_check_resource)
+    (agent_available ?service_agent - service_agent)
+    (assigned_agent_to_service ?affected_service - affected_service ?service_agent - service_agent)
+    (document_available ?document_resource - document_resource)
+    (booking_attached_document ?customer_booking - customer_booking ?document_resource - document_resource)
+    (supplier_attached_document ?supplier_booking - supplier_booking ?document_resource - document_resource)
+    (booking_mapped_to_customer_segment ?customer_booking - customer_booking ?customer_segment - customer_segment)
+    (customer_segment_selected ?customer_segment - customer_segment)
+    (customer_segment_document_attached ?customer_segment - customer_segment)
+    (customer_booking_segment_ready ?customer_booking - customer_booking)
+    (supplier_booking_mapped_to_supplier_segment ?supplier_booking - supplier_booking ?supplier_segment - supplier_segment)
+    (supplier_segment_selected ?supplier_segment - supplier_segment)
+    (supplier_segment_document_attached ?supplier_segment - supplier_segment)
+    (supplier_booking_segment_ready ?supplier_booking - supplier_booking)
+    (refund_submission_unit_available ?refund_submission - refund_submission)
+    (refund_submission_created ?refund_submission - refund_submission)
+    (submission_includes_customer_segment ?refund_submission - refund_submission ?customer_segment - customer_segment)
+    (submission_includes_supplier_segment ?refund_submission - refund_submission ?supplier_segment - supplier_segment)
+    (submission_has_customer_documents ?refund_submission - refund_submission)
+    (submission_has_supplier_documents ?refund_submission - refund_submission)
+    (submission_ready_for_verification ?refund_submission - refund_submission)
+    (case_links_to_customer_booking ?refund_case - refund_case ?customer_booking - customer_booking)
+    (case_links_to_supplier_booking ?refund_case - refund_case ?supplier_booking - supplier_booking)
+    (case_includes_submission ?refund_case - refund_case ?refund_submission - refund_submission)
+    (verification_package_available ?verification_package - verification_package)
+    (case_has_verification_package ?refund_case - refund_case ?verification_package - verification_package)
+    (verification_package_attached ?verification_package - verification_package)
+    (verification_package_assigned_to_submission ?verification_package - verification_package ?refund_submission - refund_submission)
+    (case_ready_for_enrichment ?refund_case - refund_case)
+    (case_has_monetary_proposal ?refund_case - refund_case)
+    (case_ready_for_adjudication ?refund_case - refund_case)
+    (case_has_third_party_authorization ?refund_case - refund_case)
+    (case_authorization_recorded ?refund_case - refund_case)
+    (case_has_compensation_options ?refund_case - refund_case)
+    (case_ready_for_finalization ?refund_case - refund_case)
+    (cancellation_reason_available ?cancellation_reason - cancellation_reason)
+    (case_has_cancellation_reason ?refund_case - refund_case ?cancellation_reason - cancellation_reason)
+    (case_cancellation_flag ?refund_case - refund_case)
+    (case_cancellation_processing_started ?refund_case - refund_case)
+    (case_cancellation_approval_granted ?refund_case - refund_case)
+    (third_party_authorization_available ?third_party_authorization - third_party_authorization)
+    (case_linked_to_third_party_authorization ?refund_case - refund_case ?third_party_authorization - third_party_authorization)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (case_attached_compensation_option ?refund_case - refund_case ?compensation_option - compensation_option)
+    (monetary_proposal_available ?monetary_adjustment_proposal - monetary_adjustment_proposal)
+    (case_has_monetary_proposal_link ?refund_case - refund_case ?monetary_adjustment_proposal - monetary_adjustment_proposal)
+    (escalation_approval_available ?escalation_approval - escalation_approval)
+    (case_has_escalation_approval ?refund_case - refund_case ?escalation_approval - escalation_approval)
+    (claim_form_available ?claim_form - claim_form)
+    (service_linked_claim_form ?affected_service - affected_service ?claim_form - claim_form)
+    (customer_booking_segment_processed ?customer_booking - customer_booking)
+    (supplier_booking_segment_processed ?supplier_booking - supplier_booking)
+    (case_registration_completed ?refund_case - refund_case)
+  )
+  (:action create_service_intake
+    :parameters (?affected_service - affected_service)
+    :precondition
+      (and
+        (not
+          (intake_registered ?affected_service)
+        )
+        (not
+          (refund_eligibility_registered ?affected_service)
+        )
+      )
+    :effect (intake_registered ?affected_service)
+  )
+  (:action assign_support_channel
+    :parameters (?affected_service - affected_service ?support_channel - support_channel)
+    :precondition
+      (and
+        (intake_registered ?affected_service)
+        (not
+          (support_channel_assigned_flag ?affected_service)
+        )
+        (support_channel_available ?support_channel)
+      )
+    :effect
+      (and
+        (support_channel_assigned_flag ?affected_service)
+        (support_channel_assigned_to ?affected_service ?support_channel)
+        (not
+          (support_channel_available ?support_channel)
+        )
+      )
+  )
+  (:action allocate_policy_check_resource
+    :parameters (?affected_service - affected_service ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (intake_registered ?affected_service)
+        (support_channel_assigned_flag ?affected_service)
+        (policy_resource_available ?policy_check_resource)
+      )
+    :effect
+      (and
+        (policy_check_allocated ?affected_service ?policy_check_resource)
+        (not
+          (policy_resource_available ?policy_check_resource)
+        )
+      )
+  )
+  (:action complete_policy_verification
+    :parameters (?affected_service - affected_service ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (intake_registered ?affected_service)
+        (support_channel_assigned_flag ?affected_service)
+        (policy_check_allocated ?affected_service ?policy_check_resource)
+        (not
+          (policy_verified ?affected_service)
+        )
+      )
+    :effect (policy_verified ?affected_service)
+  )
+  (:action release_policy_check_resource
+    :parameters (?affected_service - affected_service ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (policy_check_allocated ?affected_service ?policy_check_resource)
+      )
+    :effect
+      (and
+        (policy_resource_available ?policy_check_resource)
+        (not
+          (policy_check_allocated ?affected_service ?policy_check_resource)
+        )
+      )
+  )
+  (:action assign_service_agent
+    :parameters (?affected_service - affected_service ?service_agent - service_agent)
+    :precondition
+      (and
+        (policy_verified ?affected_service)
+        (agent_available ?service_agent)
+      )
+    :effect
+      (and
+        (assigned_agent_to_service ?affected_service ?service_agent)
+        (not
+          (agent_available ?service_agent)
+        )
+      )
+  )
+  (:action release_service_agent
+    :parameters (?affected_service - affected_service ?service_agent - service_agent)
+    :precondition
+      (and
+        (assigned_agent_to_service ?affected_service ?service_agent)
+      )
+    :effect
+      (and
+        (agent_available ?service_agent)
+        (not
+          (assigned_agent_to_service ?affected_service ?service_agent)
+        )
+      )
+  )
+  (:action attach_monetary_proposal_to_case
+    :parameters (?refund_case - refund_case ?monetary_adjustment_proposal - monetary_adjustment_proposal)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (monetary_proposal_available ?monetary_adjustment_proposal)
+      )
+    :effect
+      (and
+        (case_has_monetary_proposal_link ?refund_case ?monetary_adjustment_proposal)
+        (not
+          (monetary_proposal_available ?monetary_adjustment_proposal)
+        )
+      )
+  )
+  (:action remove_monetary_proposal_from_case
+    :parameters (?refund_case - refund_case ?monetary_adjustment_proposal - monetary_adjustment_proposal)
+    :precondition
+      (and
+        (case_has_monetary_proposal_link ?refund_case ?monetary_adjustment_proposal)
+      )
+    :effect
+      (and
+        (monetary_proposal_available ?monetary_adjustment_proposal)
+        (not
+          (case_has_monetary_proposal_link ?refund_case ?monetary_adjustment_proposal)
+        )
+      )
+  )
+  (:action attach_escalation_approval_to_case
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (escalation_approval_available ?escalation_approval)
+      )
+    :effect
+      (and
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (not
+          (escalation_approval_available ?escalation_approval)
+        )
+      )
+  )
+  (:action remove_escalation_approval_from_case
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+      )
+    :effect
+      (and
+        (escalation_approval_available ?escalation_approval)
+        (not
+          (case_has_escalation_approval ?refund_case ?escalation_approval)
+        )
+      )
+  )
+  (:action select_customer_segment_for_booking
+    :parameters (?customer_booking - customer_booking ?customer_segment - customer_segment ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (policy_verified ?customer_booking)
+        (policy_check_allocated ?customer_booking ?policy_check_resource)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (not
+          (customer_segment_selected ?customer_segment)
+        )
+        (not
+          (customer_segment_document_attached ?customer_segment)
+        )
+      )
+    :effect (customer_segment_selected ?customer_segment)
+  )
+  (:action confirm_customer_segment_for_booking
+    :parameters (?customer_booking - customer_booking ?customer_segment - customer_segment ?service_agent - service_agent)
+    :precondition
+      (and
+        (policy_verified ?customer_booking)
+        (assigned_agent_to_service ?customer_booking ?service_agent)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (customer_segment_selected ?customer_segment)
+        (not
+          (customer_booking_segment_processed ?customer_booking)
+        )
+      )
+    :effect
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (customer_booking_segment_ready ?customer_booking)
+      )
+  )
+  (:action attach_document_to_customer_segment
+    :parameters (?customer_booking - customer_booking ?customer_segment - customer_segment ?document_resource - document_resource)
+    :precondition
+      (and
+        (policy_verified ?customer_booking)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (document_available ?document_resource)
+        (not
+          (customer_booking_segment_processed ?customer_booking)
+        )
+      )
+    :effect
+      (and
+        (customer_segment_document_attached ?customer_segment)
+        (customer_booking_segment_processed ?customer_booking)
+        (booking_attached_document ?customer_booking ?document_resource)
+        (not
+          (document_available ?document_resource)
+        )
+      )
+  )
+  (:action finalize_customer_segment_with_document
+    :parameters (?customer_booking - customer_booking ?customer_segment - customer_segment ?policy_check_resource - policy_check_resource ?document_resource - document_resource)
+    :precondition
+      (and
+        (policy_verified ?customer_booking)
+        (policy_check_allocated ?customer_booking ?policy_check_resource)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (customer_segment_document_attached ?customer_segment)
+        (booking_attached_document ?customer_booking ?document_resource)
+        (not
+          (customer_booking_segment_ready ?customer_booking)
+        )
+      )
+    :effect
+      (and
+        (customer_segment_selected ?customer_segment)
+        (customer_booking_segment_ready ?customer_booking)
+        (document_available ?document_resource)
+        (not
+          (booking_attached_document ?customer_booking ?document_resource)
+        )
+      )
+  )
+  (:action select_supplier_segment_for_booking
+    :parameters (?supplier_booking - supplier_booking ?supplier_segment - supplier_segment ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (policy_verified ?supplier_booking)
+        (policy_check_allocated ?supplier_booking ?policy_check_resource)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (not
+          (supplier_segment_selected ?supplier_segment)
+        )
+        (not
+          (supplier_segment_document_attached ?supplier_segment)
+        )
+      )
+    :effect (supplier_segment_selected ?supplier_segment)
+  )
+  (:action confirm_supplier_segment_for_booking
+    :parameters (?supplier_booking - supplier_booking ?supplier_segment - supplier_segment ?service_agent - service_agent)
+    :precondition
+      (and
+        (policy_verified ?supplier_booking)
+        (assigned_agent_to_service ?supplier_booking ?service_agent)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (supplier_segment_selected ?supplier_segment)
+        (not
+          (supplier_booking_segment_processed ?supplier_booking)
+        )
+      )
+    :effect
+      (and
+        (supplier_booking_segment_processed ?supplier_booking)
+        (supplier_booking_segment_ready ?supplier_booking)
+      )
+  )
+  (:action attach_document_to_supplier_segment
+    :parameters (?supplier_booking - supplier_booking ?supplier_segment - supplier_segment ?document_resource - document_resource)
+    :precondition
+      (and
+        (policy_verified ?supplier_booking)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (document_available ?document_resource)
+        (not
+          (supplier_booking_segment_processed ?supplier_booking)
+        )
+      )
+    :effect
+      (and
+        (supplier_segment_document_attached ?supplier_segment)
+        (supplier_booking_segment_processed ?supplier_booking)
+        (supplier_attached_document ?supplier_booking ?document_resource)
+        (not
+          (document_available ?document_resource)
+        )
+      )
+  )
+  (:action finalize_supplier_segment_with_document
+    :parameters (?supplier_booking - supplier_booking ?supplier_segment - supplier_segment ?policy_check_resource - policy_check_resource ?document_resource - document_resource)
+    :precondition
+      (and
+        (policy_verified ?supplier_booking)
+        (policy_check_allocated ?supplier_booking ?policy_check_resource)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (supplier_segment_document_attached ?supplier_segment)
+        (supplier_attached_document ?supplier_booking ?document_resource)
+        (not
+          (supplier_booking_segment_ready ?supplier_booking)
+        )
+      )
+    :effect
+      (and
+        (supplier_segment_selected ?supplier_segment)
+        (supplier_booking_segment_ready ?supplier_booking)
+        (document_available ?document_resource)
+        (not
+          (supplier_attached_document ?supplier_booking ?document_resource)
+        )
+      )
+  )
+  (:action assemble_refund_submission
+    :parameters (?customer_booking - customer_booking ?supplier_booking - supplier_booking ?customer_segment - customer_segment ?supplier_segment - supplier_segment ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (supplier_booking_segment_processed ?supplier_booking)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (customer_segment_selected ?customer_segment)
+        (supplier_segment_selected ?supplier_segment)
+        (customer_booking_segment_ready ?customer_booking)
+        (supplier_booking_segment_ready ?supplier_booking)
+        (refund_submission_unit_available ?refund_submission)
+      )
+    :effect
+      (and
+        (refund_submission_created ?refund_submission)
+        (submission_includes_customer_segment ?refund_submission ?customer_segment)
+        (submission_includes_supplier_segment ?refund_submission ?supplier_segment)
+        (not
+          (refund_submission_unit_available ?refund_submission)
+        )
+      )
+  )
+  (:action assemble_refund_submission_with_customer_docs
+    :parameters (?customer_booking - customer_booking ?supplier_booking - supplier_booking ?customer_segment - customer_segment ?supplier_segment - supplier_segment ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (supplier_booking_segment_processed ?supplier_booking)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (customer_segment_document_attached ?customer_segment)
+        (supplier_segment_selected ?supplier_segment)
+        (not
+          (customer_booking_segment_ready ?customer_booking)
+        )
+        (supplier_booking_segment_ready ?supplier_booking)
+        (refund_submission_unit_available ?refund_submission)
+      )
+    :effect
+      (and
+        (refund_submission_created ?refund_submission)
+        (submission_includes_customer_segment ?refund_submission ?customer_segment)
+        (submission_includes_supplier_segment ?refund_submission ?supplier_segment)
+        (submission_has_customer_documents ?refund_submission)
+        (not
+          (refund_submission_unit_available ?refund_submission)
+        )
+      )
+  )
+  (:action assemble_refund_submission_with_supplier_docs
+    :parameters (?customer_booking - customer_booking ?supplier_booking - supplier_booking ?customer_segment - customer_segment ?supplier_segment - supplier_segment ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (supplier_booking_segment_processed ?supplier_booking)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (customer_segment_selected ?customer_segment)
+        (supplier_segment_document_attached ?supplier_segment)
+        (customer_booking_segment_ready ?customer_booking)
+        (not
+          (supplier_booking_segment_ready ?supplier_booking)
+        )
+        (refund_submission_unit_available ?refund_submission)
+      )
+    :effect
+      (and
+        (refund_submission_created ?refund_submission)
+        (submission_includes_customer_segment ?refund_submission ?customer_segment)
+        (submission_includes_supplier_segment ?refund_submission ?supplier_segment)
+        (submission_has_supplier_documents ?refund_submission)
+        (not
+          (refund_submission_unit_available ?refund_submission)
+        )
+      )
+  )
+  (:action assemble_refund_submission_with_both_docs
+    :parameters (?customer_booking - customer_booking ?supplier_booking - supplier_booking ?customer_segment - customer_segment ?supplier_segment - supplier_segment ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (supplier_booking_segment_processed ?supplier_booking)
+        (booking_mapped_to_customer_segment ?customer_booking ?customer_segment)
+        (supplier_booking_mapped_to_supplier_segment ?supplier_booking ?supplier_segment)
+        (customer_segment_document_attached ?customer_segment)
+        (supplier_segment_document_attached ?supplier_segment)
+        (not
+          (customer_booking_segment_ready ?customer_booking)
+        )
+        (not
+          (supplier_booking_segment_ready ?supplier_booking)
+        )
+        (refund_submission_unit_available ?refund_submission)
+      )
+    :effect
+      (and
+        (refund_submission_created ?refund_submission)
+        (submission_includes_customer_segment ?refund_submission ?customer_segment)
+        (submission_includes_supplier_segment ?refund_submission ?supplier_segment)
+        (submission_has_customer_documents ?refund_submission)
+        (submission_has_supplier_documents ?refund_submission)
+        (not
+          (refund_submission_unit_available ?refund_submission)
+        )
+      )
+  )
+  (:action mark_submission_ready_for_verification
+    :parameters (?refund_submission - refund_submission ?customer_booking - customer_booking ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (refund_submission_created ?refund_submission)
+        (customer_booking_segment_processed ?customer_booking)
+        (policy_check_allocated ?customer_booking ?policy_check_resource)
+        (not
+          (submission_ready_for_verification ?refund_submission)
+        )
+      )
+    :effect (submission_ready_for_verification ?refund_submission)
+  )
+  (:action create_verification_package_for_case
+    :parameters (?refund_case - refund_case ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (case_includes_submission ?refund_case ?refund_submission)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_available ?verification_package)
+        (refund_submission_created ?refund_submission)
+        (submission_ready_for_verification ?refund_submission)
+        (not
+          (verification_package_attached ?verification_package)
+        )
+      )
+    :effect
+      (and
+        (verification_package_attached ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (not
+          (verification_package_available ?verification_package)
+        )
+      )
+  )
+  (:action prepare_case_for_enrichment
+    :parameters (?refund_case - refund_case ?verification_package - verification_package ?refund_submission - refund_submission ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_attached ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (policy_check_allocated ?refund_case ?policy_check_resource)
+        (not
+          (submission_has_customer_documents ?refund_submission)
+        )
+        (not
+          (case_ready_for_enrichment ?refund_case)
+        )
+      )
+    :effect (case_ready_for_enrichment ?refund_case)
+  )
+  (:action attach_third_party_authorization_to_case
+    :parameters (?refund_case - refund_case ?third_party_authorization - third_party_authorization)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (third_party_authorization_available ?third_party_authorization)
+        (not
+          (case_has_third_party_authorization ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_third_party_authorization ?refund_case)
+        (case_linked_to_third_party_authorization ?refund_case ?third_party_authorization)
+        (not
+          (third_party_authorization_available ?third_party_authorization)
+        )
+      )
+  )
+  (:action enrich_case_with_third_party_authorization
+    :parameters (?refund_case - refund_case ?verification_package - verification_package ?refund_submission - refund_submission ?policy_check_resource - policy_check_resource ?third_party_authorization - third_party_authorization)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_attached ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (policy_check_allocated ?refund_case ?policy_check_resource)
+        (submission_has_customer_documents ?refund_submission)
+        (case_has_third_party_authorization ?refund_case)
+        (case_linked_to_third_party_authorization ?refund_case ?third_party_authorization)
+        (not
+          (case_ready_for_enrichment ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_enrichment ?refund_case)
+        (case_authorization_recorded ?refund_case)
+      )
+  )
+  (:action attach_monetary_proposal_from_customer_segment
+    :parameters (?refund_case - refund_case ?monetary_adjustment_proposal - monetary_adjustment_proposal ?service_agent - service_agent ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_ready_for_enrichment ?refund_case)
+        (case_has_monetary_proposal_link ?refund_case ?monetary_adjustment_proposal)
+        (assigned_agent_to_service ?refund_case ?service_agent)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (not
+          (submission_has_supplier_documents ?refund_submission)
+        )
+        (not
+          (case_has_monetary_proposal ?refund_case)
+        )
+      )
+    :effect (case_has_monetary_proposal ?refund_case)
+  )
+  (:action attach_monetary_proposal_from_supplier_segment
+    :parameters (?refund_case - refund_case ?monetary_adjustment_proposal - monetary_adjustment_proposal ?service_agent - service_agent ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_ready_for_enrichment ?refund_case)
+        (case_has_monetary_proposal_link ?refund_case ?monetary_adjustment_proposal)
+        (assigned_agent_to_service ?refund_case ?service_agent)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (submission_has_supplier_documents ?refund_submission)
+        (not
+          (case_has_monetary_proposal ?refund_case)
+        )
+      )
+    :effect (case_has_monetary_proposal ?refund_case)
+  )
+  (:action apply_escalation_and_mark_ready_for_adjudication
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_has_monetary_proposal ?refund_case)
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (not
+          (submission_has_customer_documents ?refund_submission)
+        )
+        (not
+          (submission_has_supplier_documents ?refund_submission)
+        )
+        (not
+          (case_ready_for_adjudication ?refund_case)
+        )
+      )
+    :effect (case_ready_for_adjudication ?refund_case)
+  )
+  (:action apply_escalation_and_mark_with_compensation_options
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_has_monetary_proposal ?refund_case)
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (submission_has_customer_documents ?refund_submission)
+        (not
+          (submission_has_supplier_documents ?refund_submission)
+        )
+        (not
+          (case_ready_for_adjudication ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_has_compensation_options ?refund_case)
+      )
+  )
+  (:action apply_escalation_and_mark_with_compensation_options_variant
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_has_monetary_proposal ?refund_case)
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (not
+          (submission_has_customer_documents ?refund_submission)
+        )
+        (submission_has_supplier_documents ?refund_submission)
+        (not
+          (case_ready_for_adjudication ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_has_compensation_options ?refund_case)
+      )
+  )
+  (:action apply_escalation_and_mark_with_compensation_options_alternate
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval ?verification_package - verification_package ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (case_has_monetary_proposal ?refund_case)
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (case_has_verification_package ?refund_case ?verification_package)
+        (verification_package_assigned_to_submission ?verification_package ?refund_submission)
+        (submission_has_customer_documents ?refund_submission)
+        (submission_has_supplier_documents ?refund_submission)
+        (not
+          (case_ready_for_adjudication ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_has_compensation_options ?refund_case)
+      )
+  )
+  (:action finalize_adjudication_without_compensation
+    :parameters (?refund_case - refund_case)
+    :precondition
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (not
+          (case_has_compensation_options ?refund_case)
+        )
+        (not
+          (case_registration_completed ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_registration_completed ?refund_case)
+        (eligibility_adjudicated ?refund_case)
+      )
+  )
+  (:action attach_compensation_option_to_case
+    :parameters (?refund_case - refund_case ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_has_compensation_options ?refund_case)
+        (compensation_option_available ?compensation_option)
+      )
+    :effect
+      (and
+        (case_attached_compensation_option ?refund_case ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action apply_compensation_option_and_mark_finalizable
+    :parameters (?refund_case - refund_case ?customer_booking - customer_booking ?supplier_booking - supplier_booking ?policy_check_resource - policy_check_resource ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_has_compensation_options ?refund_case)
+        (case_attached_compensation_option ?refund_case ?compensation_option)
+        (case_links_to_customer_booking ?refund_case ?customer_booking)
+        (case_links_to_supplier_booking ?refund_case ?supplier_booking)
+        (customer_booking_segment_ready ?customer_booking)
+        (supplier_booking_segment_ready ?supplier_booking)
+        (policy_check_allocated ?refund_case ?policy_check_resource)
+        (not
+          (case_ready_for_finalization ?refund_case)
+        )
+      )
+    :effect (case_ready_for_finalization ?refund_case)
+  )
+  (:action finalize_adjudication_with_compensation
+    :parameters (?refund_case - refund_case)
+    :precondition
+      (and
+        (case_ready_for_adjudication ?refund_case)
+        (case_ready_for_finalization ?refund_case)
+        (not
+          (case_registration_completed ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_registration_completed ?refund_case)
+        (eligibility_adjudicated ?refund_case)
+      )
+  )
+  (:action flag_case_for_cancellation_review
+    :parameters (?refund_case - refund_case ?cancellation_reason - cancellation_reason ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (policy_verified ?refund_case)
+        (policy_check_allocated ?refund_case ?policy_check_resource)
+        (cancellation_reason_available ?cancellation_reason)
+        (case_has_cancellation_reason ?refund_case ?cancellation_reason)
+        (not
+          (case_cancellation_flag ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_cancellation_flag ?refund_case)
+        (not
+          (cancellation_reason_available ?cancellation_reason)
+        )
+      )
+  )
+  (:action start_cancellation_processing
+    :parameters (?refund_case - refund_case ?service_agent - service_agent)
+    :precondition
+      (and
+        (case_cancellation_flag ?refund_case)
+        (assigned_agent_to_service ?refund_case ?service_agent)
+        (not
+          (case_cancellation_processing_started ?refund_case)
+        )
+      )
+    :effect (case_cancellation_processing_started ?refund_case)
+  )
+  (:action confirm_cancellation_approval
+    :parameters (?refund_case - refund_case ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (case_cancellation_processing_started ?refund_case)
+        (case_has_escalation_approval ?refund_case ?escalation_approval)
+        (not
+          (case_cancellation_approval_granted ?refund_case)
+        )
+      )
+    :effect (case_cancellation_approval_granted ?refund_case)
+  )
+  (:action finalize_cancellation_and_register_adjudication
+    :parameters (?refund_case - refund_case)
+    :precondition
+      (and
+        (case_cancellation_approval_granted ?refund_case)
+        (not
+          (case_registration_completed ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (case_registration_completed ?refund_case)
+        (eligibility_adjudicated ?refund_case)
+      )
+  )
+  (:action register_booking_outcome_from_submission
+    :parameters (?customer_booking - customer_booking ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (customer_booking_segment_processed ?customer_booking)
+        (customer_booking_segment_ready ?customer_booking)
+        (refund_submission_created ?refund_submission)
+        (submission_ready_for_verification ?refund_submission)
+        (not
+          (eligibility_adjudicated ?customer_booking)
+        )
+      )
+    :effect (eligibility_adjudicated ?customer_booking)
+  )
+  (:action register_supplier_booking_outcome_from_submission
+    :parameters (?supplier_booking - supplier_booking ?refund_submission - refund_submission)
+    :precondition
+      (and
+        (supplier_booking_segment_processed ?supplier_booking)
+        (supplier_booking_segment_ready ?supplier_booking)
+        (refund_submission_created ?refund_submission)
+        (submission_ready_for_verification ?refund_submission)
+        (not
+          (eligibility_adjudicated ?supplier_booking)
+        )
+      )
+    :effect (eligibility_adjudicated ?supplier_booking)
+  )
+  (:action prepare_registration_and_attach_claim_form
+    :parameters (?affected_service - affected_service ?claim_form - claim_form ?policy_check_resource - policy_check_resource)
+    :precondition
+      (and
+        (eligibility_adjudicated ?affected_service)
+        (policy_check_allocated ?affected_service ?policy_check_resource)
+        (claim_form_available ?claim_form)
+        (not
+          (registration_prepared ?affected_service)
+        )
+      )
+    :effect
+      (and
+        (registration_prepared ?affected_service)
+        (service_linked_claim_form ?affected_service ?claim_form)
+        (not
+          (claim_form_available ?claim_form)
+        )
+      )
+  )
+  (:action finalize_booking_registration_and_release_resources
+    :parameters (?customer_booking - customer_booking ?support_channel - support_channel ?claim_form - claim_form)
+    :precondition
+      (and
+        (registration_prepared ?customer_booking)
+        (support_channel_assigned_to ?customer_booking ?support_channel)
+        (service_linked_claim_form ?customer_booking ?claim_form)
+        (not
+          (refund_eligibility_registered ?customer_booking)
+        )
+      )
+    :effect
+      (and
+        (refund_eligibility_registered ?customer_booking)
+        (support_channel_available ?support_channel)
+        (claim_form_available ?claim_form)
+      )
+  )
+  (:action finalize_supplier_registration_and_release_resources
+    :parameters (?supplier_booking - supplier_booking ?support_channel - support_channel ?claim_form - claim_form)
+    :precondition
+      (and
+        (registration_prepared ?supplier_booking)
+        (support_channel_assigned_to ?supplier_booking ?support_channel)
+        (service_linked_claim_form ?supplier_booking ?claim_form)
+        (not
+          (refund_eligibility_registered ?supplier_booking)
+        )
+      )
+    :effect
+      (and
+        (refund_eligibility_registered ?supplier_booking)
+        (support_channel_available ?support_channel)
+        (claim_form_available ?claim_form)
+      )
+  )
+  (:action complete_case_registration_and_release_resources
+    :parameters (?refund_case - refund_case ?support_channel - support_channel ?claim_form - claim_form)
+    :precondition
+      (and
+        (registration_prepared ?refund_case)
+        (support_channel_assigned_to ?refund_case ?support_channel)
+        (service_linked_claim_form ?refund_case ?claim_form)
+        (not
+          (refund_eligibility_registered ?refund_case)
+        )
+      )
+    :effect
+      (and
+        (refund_eligibility_registered ?refund_case)
+        (support_channel_available ?support_channel)
+        (claim_form_available ?claim_form)
+      )
+  )
+)

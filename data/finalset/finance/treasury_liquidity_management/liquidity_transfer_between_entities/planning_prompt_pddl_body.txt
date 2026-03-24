@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain finance_treasury_liquidity_transfer)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object supporting_resource - object liquidity_structure - object organization_entity_base - object domain_entity - organization_entity_base payment_channel - operational_resource liquidity_request - operational_resource treasury_approver - operational_resource compliance_rule - operational_resource execution_window - operational_resource transaction_token - operational_resource approval_credential - operational_resource execution_signature - operational_resource funding_instrument - supporting_resource payment_file - supporting_resource compliance_certificate - supporting_resource liquidity_buffer - liquidity_structure target_buffer - liquidity_structure settlement_batch - liquidity_structure account_type - domain_entity instruction_subtype - domain_entity source_account - account_type destination_account - account_type transfer_instruction - instruction_subtype)
+  (:predicates
+    (entity_liquidity_context_created ?legal_entity - domain_entity)
+    (entity_request_validated ?legal_entity - domain_entity)
+    (entity_request_registered ?legal_entity - domain_entity)
+    (entity_settlement_marked ?legal_entity - domain_entity)
+    (entity_execution_ready ?legal_entity - domain_entity)
+    (entity_final_authorization_applied ?legal_entity - domain_entity)
+    (payment_channel_available ?payment_channel - payment_channel)
+    (entity_payment_channel_assigned ?legal_entity - domain_entity ?payment_channel - payment_channel)
+    (liquidity_request_available ?liquidity_request - liquidity_request)
+    (entity_request_association ?legal_entity - domain_entity ?liquidity_request - liquidity_request)
+    (treasury_approver_available ?treasury_approver - treasury_approver)
+    (entity_treasury_approver_assigned ?legal_entity - domain_entity ?treasury_approver - treasury_approver)
+    (funding_instrument_available ?funding_instrument - funding_instrument)
+    (source_assigned_instrument ?source_account - source_account ?funding_instrument - funding_instrument)
+    (destination_assigned_instrument ?destination_account - destination_account ?funding_instrument - funding_instrument)
+    (source_buffer_linked ?source_account - source_account ?liquidity_buffer - liquidity_buffer)
+    (liquidity_buffer_reserved ?liquidity_buffer - liquidity_buffer)
+    (liquidity_buffer_committed ?liquidity_buffer - liquidity_buffer)
+    (source_account_ready ?source_account - source_account)
+    (destination_buffer_linked ?destination_account - destination_account ?target_buffer - target_buffer)
+    (target_buffer_reserved ?target_buffer - target_buffer)
+    (target_buffer_committed ?target_buffer - target_buffer)
+    (destination_account_ready ?destination_account - destination_account)
+    (settlement_batch_available ?settlement_batch - settlement_batch)
+    (settlement_batch_active ?settlement_batch - settlement_batch)
+    (batch_includes_source_buffer ?settlement_batch - settlement_batch ?liquidity_buffer - liquidity_buffer)
+    (batch_includes_target_buffer ?settlement_batch - settlement_batch ?target_buffer - target_buffer)
+    (batch_processing_flag_a ?settlement_batch - settlement_batch)
+    (batch_processing_flag_b ?settlement_batch - settlement_batch)
+    (batch_confirmed ?settlement_batch - settlement_batch)
+    (instruction_source_account_link ?transfer_instruction - transfer_instruction ?source_account - source_account)
+    (instruction_destination_account_link ?transfer_instruction - transfer_instruction ?destination_account - destination_account)
+    (instruction_in_settlement_batch ?transfer_instruction - transfer_instruction ?settlement_batch - settlement_batch)
+    (payment_file_available ?payment_file - payment_file)
+    (instruction_has_payment_file ?transfer_instruction - transfer_instruction ?payment_file - payment_file)
+    (payment_file_locked ?payment_file - payment_file)
+    (payment_file_assigned_to_batch ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    (instruction_file_validated ?transfer_instruction - transfer_instruction)
+    (instruction_approval_attached ?transfer_instruction - transfer_instruction)
+    (instruction_signature_attached ?transfer_instruction - transfer_instruction)
+    (compliance_rule_assigned ?transfer_instruction - transfer_instruction)
+    (compliance_rule_check_passed ?transfer_instruction - transfer_instruction)
+    (execution_checks_satisfied ?transfer_instruction - transfer_instruction)
+    (instruction_ready_for_execution ?transfer_instruction - transfer_instruction)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (instruction_compliance_certificate_link ?transfer_instruction - transfer_instruction ?compliance_certificate - compliance_certificate)
+    (compliance_certificate_attached ?transfer_instruction - transfer_instruction)
+    (compliance_verification_marked ?transfer_instruction - transfer_instruction)
+    (compliance_signature_attached ?transfer_instruction - transfer_instruction)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (instruction_compliance_rule_link ?transfer_instruction - transfer_instruction ?compliance_rule - compliance_rule)
+    (execution_window_available ?execution_window - execution_window)
+    (instruction_execution_window_link ?transfer_instruction - transfer_instruction ?execution_window - execution_window)
+    (approval_credential_available ?approval_credential - approval_credential)
+    (instruction_has_approval_credential ?transfer_instruction - transfer_instruction ?approval_credential - approval_credential)
+    (execution_signature_available ?execution_signature - execution_signature)
+    (instruction_has_execution_signature ?transfer_instruction - transfer_instruction ?execution_signature - execution_signature)
+    (transaction_token_available ?transaction_token - transaction_token)
+    (entity_transaction_token_bound ?legal_entity - domain_entity ?transaction_token - transaction_token)
+    (source_account_marked ?source_account - source_account)
+    (destination_account_marked ?destination_account - destination_account)
+    (instruction_execution_locked ?transfer_instruction - transfer_instruction)
+  )
+  (:action create_liquidity_request_context
+    :parameters (?legal_entity - domain_entity)
+    :precondition
+      (and
+        (not
+          (entity_liquidity_context_created ?legal_entity)
+        )
+        (not
+          (entity_settlement_marked ?legal_entity)
+        )
+      )
+    :effect (entity_liquidity_context_created ?legal_entity)
+  )
+  (:action assign_payment_channel_to_entity
+    :parameters (?legal_entity - domain_entity ?payment_channel - payment_channel)
+    :precondition
+      (and
+        (entity_liquidity_context_created ?legal_entity)
+        (not
+          (entity_request_registered ?legal_entity)
+        )
+        (payment_channel_available ?payment_channel)
+      )
+    :effect
+      (and
+        (entity_request_registered ?legal_entity)
+        (entity_payment_channel_assigned ?legal_entity ?payment_channel)
+        (not
+          (payment_channel_available ?payment_channel)
+        )
+      )
+  )
+  (:action associate_liquidity_request_with_entity
+    :parameters (?legal_entity - domain_entity ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_liquidity_context_created ?legal_entity)
+        (entity_request_registered ?legal_entity)
+        (liquidity_request_available ?liquidity_request)
+      )
+    :effect
+      (and
+        (entity_request_association ?legal_entity ?liquidity_request)
+        (not
+          (liquidity_request_available ?liquidity_request)
+        )
+      )
+  )
+  (:action validate_liquidity_request
+    :parameters (?legal_entity - domain_entity ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_liquidity_context_created ?legal_entity)
+        (entity_request_registered ?legal_entity)
+        (entity_request_association ?legal_entity ?liquidity_request)
+        (not
+          (entity_request_validated ?legal_entity)
+        )
+      )
+    :effect (entity_request_validated ?legal_entity)
+  )
+  (:action deregister_liquidity_request
+    :parameters (?legal_entity - domain_entity ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_request_association ?legal_entity ?liquidity_request)
+      )
+    :effect
+      (and
+        (liquidity_request_available ?liquidity_request)
+        (not
+          (entity_request_association ?legal_entity ?liquidity_request)
+        )
+      )
+  )
+  (:action assign_treasury_approver
+    :parameters (?legal_entity - domain_entity ?treasury_approver - treasury_approver)
+    :precondition
+      (and
+        (entity_request_validated ?legal_entity)
+        (treasury_approver_available ?treasury_approver)
+      )
+    :effect
+      (and
+        (entity_treasury_approver_assigned ?legal_entity ?treasury_approver)
+        (not
+          (treasury_approver_available ?treasury_approver)
+        )
+      )
+  )
+  (:action unassign_treasury_approver
+    :parameters (?legal_entity - domain_entity ?treasury_approver - treasury_approver)
+    :precondition
+      (and
+        (entity_treasury_approver_assigned ?legal_entity ?treasury_approver)
+      )
+    :effect
+      (and
+        (treasury_approver_available ?treasury_approver)
+        (not
+          (entity_treasury_approver_assigned ?legal_entity ?treasury_approver)
+        )
+      )
+  )
+  (:action attach_approval_credential
+    :parameters (?transfer_instruction - transfer_instruction ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (approval_credential_available ?approval_credential)
+      )
+    :effect
+      (and
+        (instruction_has_approval_credential ?transfer_instruction ?approval_credential)
+        (not
+          (approval_credential_available ?approval_credential)
+        )
+      )
+  )
+  (:action detach_approval_credential
+    :parameters (?transfer_instruction - transfer_instruction ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (instruction_has_approval_credential ?transfer_instruction ?approval_credential)
+      )
+    :effect
+      (and
+        (approval_credential_available ?approval_credential)
+        (not
+          (instruction_has_approval_credential ?transfer_instruction ?approval_credential)
+        )
+      )
+  )
+  (:action attach_execution_signature
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (execution_signature_available ?execution_signature)
+      )
+    :effect
+      (and
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (not
+          (execution_signature_available ?execution_signature)
+        )
+      )
+  )
+  (:action detach_execution_signature
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature)
+    :precondition
+      (and
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+      )
+    :effect
+      (and
+        (execution_signature_available ?execution_signature)
+        (not
+          (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        )
+      )
+  )
+  (:action reserve_source_buffer
+    :parameters (?source_account - source_account ?liquidity_buffer - liquidity_buffer ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_request_validated ?source_account)
+        (entity_request_association ?source_account ?liquidity_request)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (not
+          (liquidity_buffer_reserved ?liquidity_buffer)
+        )
+        (not
+          (liquidity_buffer_committed ?liquidity_buffer)
+        )
+      )
+    :effect (liquidity_buffer_reserved ?liquidity_buffer)
+  )
+  (:action confirm_source_account_readiness
+    :parameters (?source_account - source_account ?liquidity_buffer - liquidity_buffer ?treasury_approver - treasury_approver)
+    :precondition
+      (and
+        (entity_request_validated ?source_account)
+        (entity_treasury_approver_assigned ?source_account ?treasury_approver)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (not
+          (source_account_marked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_account_marked ?source_account)
+        (source_account_ready ?source_account)
+      )
+  )
+  (:action allocate_funding_instrument_to_source
+    :parameters (?source_account - source_account ?liquidity_buffer - liquidity_buffer ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (entity_request_validated ?source_account)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (funding_instrument_available ?funding_instrument)
+        (not
+          (source_account_marked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (liquidity_buffer_committed ?liquidity_buffer)
+        (source_account_marked ?source_account)
+        (source_assigned_instrument ?source_account ?funding_instrument)
+        (not
+          (funding_instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action finalize_source_instrument_allocation
+    :parameters (?source_account - source_account ?liquidity_buffer - liquidity_buffer ?liquidity_request - liquidity_request ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (entity_request_validated ?source_account)
+        (entity_request_association ?source_account ?liquidity_request)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (liquidity_buffer_committed ?liquidity_buffer)
+        (source_assigned_instrument ?source_account ?funding_instrument)
+        (not
+          (source_account_ready ?source_account)
+        )
+      )
+    :effect
+      (and
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (source_account_ready ?source_account)
+        (funding_instrument_available ?funding_instrument)
+        (not
+          (source_assigned_instrument ?source_account ?funding_instrument)
+        )
+      )
+  )
+  (:action reserve_target_buffer
+    :parameters (?destination_account - destination_account ?target_buffer - target_buffer ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_request_validated ?destination_account)
+        (entity_request_association ?destination_account ?liquidity_request)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (not
+          (target_buffer_reserved ?target_buffer)
+        )
+        (not
+          (target_buffer_committed ?target_buffer)
+        )
+      )
+    :effect (target_buffer_reserved ?target_buffer)
+  )
+  (:action confirm_destination_account_readiness
+    :parameters (?destination_account - destination_account ?target_buffer - target_buffer ?treasury_approver - treasury_approver)
+    :precondition
+      (and
+        (entity_request_validated ?destination_account)
+        (entity_treasury_approver_assigned ?destination_account ?treasury_approver)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (target_buffer_reserved ?target_buffer)
+        (not
+          (destination_account_marked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (destination_account_marked ?destination_account)
+        (destination_account_ready ?destination_account)
+      )
+  )
+  (:action allocate_funding_instrument_to_destination
+    :parameters (?destination_account - destination_account ?target_buffer - target_buffer ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (entity_request_validated ?destination_account)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (funding_instrument_available ?funding_instrument)
+        (not
+          (destination_account_marked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (target_buffer_committed ?target_buffer)
+        (destination_account_marked ?destination_account)
+        (destination_assigned_instrument ?destination_account ?funding_instrument)
+        (not
+          (funding_instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action finalize_destination_instrument_allocation
+    :parameters (?destination_account - destination_account ?target_buffer - target_buffer ?liquidity_request - liquidity_request ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (entity_request_validated ?destination_account)
+        (entity_request_association ?destination_account ?liquidity_request)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (target_buffer_committed ?target_buffer)
+        (destination_assigned_instrument ?destination_account ?funding_instrument)
+        (not
+          (destination_account_ready ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (target_buffer_reserved ?target_buffer)
+        (destination_account_ready ?destination_account)
+        (funding_instrument_available ?funding_instrument)
+        (not
+          (destination_assigned_instrument ?destination_account ?funding_instrument)
+        )
+      )
+  )
+  (:action assemble_settlement_batch_standard
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_buffer - liquidity_buffer ?target_buffer - target_buffer ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (source_account_marked ?source_account)
+        (destination_account_marked ?destination_account)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (target_buffer_reserved ?target_buffer)
+        (source_account_ready ?source_account)
+        (destination_account_ready ?destination_account)
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_includes_source_buffer ?settlement_batch ?liquidity_buffer)
+        (batch_includes_target_buffer ?settlement_batch ?target_buffer)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action assemble_settlement_batch_with_confirmation_a
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_buffer - liquidity_buffer ?target_buffer - target_buffer ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (source_account_marked ?source_account)
+        (destination_account_marked ?destination_account)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (liquidity_buffer_committed ?liquidity_buffer)
+        (target_buffer_reserved ?target_buffer)
+        (not
+          (source_account_ready ?source_account)
+        )
+        (destination_account_ready ?destination_account)
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_includes_source_buffer ?settlement_batch ?liquidity_buffer)
+        (batch_includes_target_buffer ?settlement_batch ?target_buffer)
+        (batch_processing_flag_a ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action assemble_settlement_batch_with_confirmation_b
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_buffer - liquidity_buffer ?target_buffer - target_buffer ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (source_account_marked ?source_account)
+        (destination_account_marked ?destination_account)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (target_buffer_committed ?target_buffer)
+        (source_account_ready ?source_account)
+        (not
+          (destination_account_ready ?destination_account)
+        )
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_includes_source_buffer ?settlement_batch ?liquidity_buffer)
+        (batch_includes_target_buffer ?settlement_batch ?target_buffer)
+        (batch_processing_flag_b ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action assemble_settlement_batch_with_confirmation_a_and_b
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_buffer - liquidity_buffer ?target_buffer - target_buffer ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (source_account_marked ?source_account)
+        (destination_account_marked ?destination_account)
+        (source_buffer_linked ?source_account ?liquidity_buffer)
+        (destination_buffer_linked ?destination_account ?target_buffer)
+        (liquidity_buffer_committed ?liquidity_buffer)
+        (target_buffer_committed ?target_buffer)
+        (not
+          (source_account_ready ?source_account)
+        )
+        (not
+          (destination_account_ready ?destination_account)
+        )
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_includes_source_buffer ?settlement_batch ?liquidity_buffer)
+        (batch_includes_target_buffer ?settlement_batch ?target_buffer)
+        (batch_processing_flag_a ?settlement_batch)
+        (batch_processing_flag_b ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action confirm_settlement_batch
+    :parameters (?settlement_batch - settlement_batch ?source_account - source_account ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (source_account_marked ?source_account)
+        (entity_request_association ?source_account ?liquidity_request)
+        (not
+          (batch_confirmed ?settlement_batch)
+        )
+      )
+    :effect (batch_confirmed ?settlement_batch)
+  )
+  (:action ingest_payment_file_for_instruction
+    :parameters (?transfer_instruction - transfer_instruction ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (instruction_in_settlement_batch ?transfer_instruction ?settlement_batch)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_available ?payment_file)
+        (settlement_batch_active ?settlement_batch)
+        (batch_confirmed ?settlement_batch)
+        (not
+          (payment_file_locked ?payment_file)
+        )
+      )
+    :effect
+      (and
+        (payment_file_locked ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (not
+          (payment_file_available ?payment_file)
+        )
+      )
+  )
+  (:action validate_instruction_file
+    :parameters (?transfer_instruction - transfer_instruction ?payment_file - payment_file ?settlement_batch - settlement_batch ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_locked ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (entity_request_association ?transfer_instruction ?liquidity_request)
+        (not
+          (batch_processing_flag_a ?settlement_batch)
+        )
+        (not
+          (instruction_file_validated ?transfer_instruction)
+        )
+      )
+    :effect (instruction_file_validated ?transfer_instruction)
+  )
+  (:action assign_compliance_rule_to_instruction
+    :parameters (?transfer_instruction - transfer_instruction ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (compliance_rule_available ?compliance_rule)
+        (not
+          (compliance_rule_assigned ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (compliance_rule_assigned ?transfer_instruction)
+        (instruction_compliance_rule_link ?transfer_instruction ?compliance_rule)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action evaluate_compliance_rule_for_instruction
+    :parameters (?transfer_instruction - transfer_instruction ?payment_file - payment_file ?settlement_batch - settlement_batch ?liquidity_request - liquidity_request ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_locked ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (entity_request_association ?transfer_instruction ?liquidity_request)
+        (batch_processing_flag_a ?settlement_batch)
+        (compliance_rule_assigned ?transfer_instruction)
+        (instruction_compliance_rule_link ?transfer_instruction ?compliance_rule)
+        (not
+          (instruction_file_validated ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_file_validated ?transfer_instruction)
+        (compliance_rule_check_passed ?transfer_instruction)
+      )
+  )
+  (:action apply_approval_credential_and_mark
+    :parameters (?transfer_instruction - transfer_instruction ?approval_credential - approval_credential ?treasury_approver - treasury_approver ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_file_validated ?transfer_instruction)
+        (instruction_has_approval_credential ?transfer_instruction ?approval_credential)
+        (entity_treasury_approver_assigned ?transfer_instruction ?treasury_approver)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (not
+          (batch_processing_flag_b ?settlement_batch)
+        )
+        (not
+          (instruction_approval_attached ?transfer_instruction)
+        )
+      )
+    :effect (instruction_approval_attached ?transfer_instruction)
+  )
+  (:action apply_approval_credential_for_flagged_batch
+    :parameters (?transfer_instruction - transfer_instruction ?approval_credential - approval_credential ?treasury_approver - treasury_approver ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_file_validated ?transfer_instruction)
+        (instruction_has_approval_credential ?transfer_instruction ?approval_credential)
+        (entity_treasury_approver_assigned ?transfer_instruction ?treasury_approver)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (batch_processing_flag_b ?settlement_batch)
+        (not
+          (instruction_approval_attached ?transfer_instruction)
+        )
+      )
+    :effect (instruction_approval_attached ?transfer_instruction)
+  )
+  (:action apply_execution_signature_standard
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_approval_attached ?transfer_instruction)
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (not
+          (batch_processing_flag_a ?settlement_batch)
+        )
+        (not
+          (batch_processing_flag_b ?settlement_batch)
+        )
+        (not
+          (instruction_signature_attached ?transfer_instruction)
+        )
+      )
+    :effect (instruction_signature_attached ?transfer_instruction)
+  )
+  (:action apply_execution_signature_with_flag_a
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_approval_attached ?transfer_instruction)
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (batch_processing_flag_a ?settlement_batch)
+        (not
+          (batch_processing_flag_b ?settlement_batch)
+        )
+        (not
+          (instruction_signature_attached ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (execution_checks_satisfied ?transfer_instruction)
+      )
+  )
+  (:action apply_execution_signature_with_flag_b
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_approval_attached ?transfer_instruction)
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (not
+          (batch_processing_flag_a ?settlement_batch)
+        )
+        (batch_processing_flag_b ?settlement_batch)
+        (not
+          (instruction_signature_attached ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (execution_checks_satisfied ?transfer_instruction)
+      )
+  )
+  (:action apply_execution_signature_with_both_flags
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature ?payment_file - payment_file ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (instruction_approval_attached ?transfer_instruction)
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (instruction_has_payment_file ?transfer_instruction ?payment_file)
+        (payment_file_assigned_to_batch ?payment_file ?settlement_batch)
+        (batch_processing_flag_a ?settlement_batch)
+        (batch_processing_flag_b ?settlement_batch)
+        (not
+          (instruction_signature_attached ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (execution_checks_satisfied ?transfer_instruction)
+      )
+  )
+  (:action grant_execution_clearance_without_additional_checks
+    :parameters (?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (not
+          (execution_checks_satisfied ?transfer_instruction)
+        )
+        (not
+          (instruction_execution_locked ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_execution_locked ?transfer_instruction)
+        (entity_execution_ready ?transfer_instruction)
+      )
+  )
+  (:action bind_execution_window_to_instruction
+    :parameters (?transfer_instruction - transfer_instruction ?execution_window - execution_window)
+    :precondition
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (execution_checks_satisfied ?transfer_instruction)
+        (execution_window_available ?execution_window)
+      )
+    :effect
+      (and
+        (instruction_execution_window_link ?transfer_instruction ?execution_window)
+        (not
+          (execution_window_available ?execution_window)
+        )
+      )
+  )
+  (:action finalize_instruction_pre_execution
+    :parameters (?transfer_instruction - transfer_instruction ?source_account - source_account ?destination_account - destination_account ?liquidity_request - liquidity_request ?execution_window - execution_window)
+    :precondition
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (execution_checks_satisfied ?transfer_instruction)
+        (instruction_execution_window_link ?transfer_instruction ?execution_window)
+        (instruction_source_account_link ?transfer_instruction ?source_account)
+        (instruction_destination_account_link ?transfer_instruction ?destination_account)
+        (source_account_ready ?source_account)
+        (destination_account_ready ?destination_account)
+        (entity_request_association ?transfer_instruction ?liquidity_request)
+        (not
+          (instruction_ready_for_execution ?transfer_instruction)
+        )
+      )
+    :effect (instruction_ready_for_execution ?transfer_instruction)
+  )
+  (:action grant_execution_clearance_after_checks
+    :parameters (?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (instruction_signature_attached ?transfer_instruction)
+        (instruction_ready_for_execution ?transfer_instruction)
+        (not
+          (instruction_execution_locked ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_execution_locked ?transfer_instruction)
+        (entity_execution_ready ?transfer_instruction)
+      )
+  )
+  (:action attach_compliance_certificate
+    :parameters (?transfer_instruction - transfer_instruction ?compliance_certificate - compliance_certificate ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_request_validated ?transfer_instruction)
+        (entity_request_association ?transfer_instruction ?liquidity_request)
+        (compliance_certificate_available ?compliance_certificate)
+        (instruction_compliance_certificate_link ?transfer_instruction ?compliance_certificate)
+        (not
+          (compliance_certificate_attached ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (compliance_certificate_attached ?transfer_instruction)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action mark_compliance_verified
+    :parameters (?transfer_instruction - transfer_instruction ?treasury_approver - treasury_approver)
+    :precondition
+      (and
+        (compliance_certificate_attached ?transfer_instruction)
+        (entity_treasury_approver_assigned ?transfer_instruction ?treasury_approver)
+        (not
+          (compliance_verification_marked ?transfer_instruction)
+        )
+      )
+    :effect (compliance_verification_marked ?transfer_instruction)
+  )
+  (:action apply_execution_signature_for_compliance
+    :parameters (?transfer_instruction - transfer_instruction ?execution_signature - execution_signature)
+    :precondition
+      (and
+        (compliance_verification_marked ?transfer_instruction)
+        (instruction_has_execution_signature ?transfer_instruction ?execution_signature)
+        (not
+          (compliance_signature_attached ?transfer_instruction)
+        )
+      )
+    :effect (compliance_signature_attached ?transfer_instruction)
+  )
+  (:action grant_execution_clearance_from_compliance
+    :parameters (?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (compliance_signature_attached ?transfer_instruction)
+        (not
+          (instruction_execution_locked ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_execution_locked ?transfer_instruction)
+        (entity_execution_ready ?transfer_instruction)
+      )
+  )
+  (:action mark_source_ready_for_settlement
+    :parameters (?source_account - source_account ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (source_account_marked ?source_account)
+        (source_account_ready ?source_account)
+        (settlement_batch_active ?settlement_batch)
+        (batch_confirmed ?settlement_batch)
+        (not
+          (entity_execution_ready ?source_account)
+        )
+      )
+    :effect (entity_execution_ready ?source_account)
+  )
+  (:action mark_destination_ready_for_settlement
+    :parameters (?destination_account - destination_account ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (destination_account_marked ?destination_account)
+        (destination_account_ready ?destination_account)
+        (settlement_batch_active ?settlement_batch)
+        (batch_confirmed ?settlement_batch)
+        (not
+          (entity_execution_ready ?destination_account)
+        )
+      )
+    :effect (entity_execution_ready ?destination_account)
+  )
+  (:action apply_transaction_token_to_entity
+    :parameters (?legal_entity - domain_entity ?transaction_token - transaction_token ?liquidity_request - liquidity_request)
+    :precondition
+      (and
+        (entity_execution_ready ?legal_entity)
+        (entity_request_association ?legal_entity ?liquidity_request)
+        (transaction_token_available ?transaction_token)
+        (not
+          (entity_final_authorization_applied ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_final_authorization_applied ?legal_entity)
+        (entity_transaction_token_bound ?legal_entity ?transaction_token)
+        (not
+          (transaction_token_available ?transaction_token)
+        )
+      )
+  )
+  (:action finalize_settlement_source_and_release_channel
+    :parameters (?source_account - source_account ?payment_channel - payment_channel ?transaction_token - transaction_token)
+    :precondition
+      (and
+        (entity_final_authorization_applied ?source_account)
+        (entity_payment_channel_assigned ?source_account ?payment_channel)
+        (entity_transaction_token_bound ?source_account ?transaction_token)
+        (not
+          (entity_settlement_marked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_marked ?source_account)
+        (payment_channel_available ?payment_channel)
+        (transaction_token_available ?transaction_token)
+      )
+  )
+  (:action finalize_settlement_destination_and_release_channel
+    :parameters (?destination_account - destination_account ?payment_channel - payment_channel ?transaction_token - transaction_token)
+    :precondition
+      (and
+        (entity_final_authorization_applied ?destination_account)
+        (entity_payment_channel_assigned ?destination_account ?payment_channel)
+        (entity_transaction_token_bound ?destination_account ?transaction_token)
+        (not
+          (entity_settlement_marked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_marked ?destination_account)
+        (payment_channel_available ?payment_channel)
+        (transaction_token_available ?transaction_token)
+      )
+  )
+  (:action finalize_settlement_instruction_and_release_channel
+    :parameters (?transfer_instruction - transfer_instruction ?payment_channel - payment_channel ?transaction_token - transaction_token)
+    :precondition
+      (and
+        (entity_final_authorization_applied ?transfer_instruction)
+        (entity_payment_channel_assigned ?transfer_instruction ?payment_channel)
+        (entity_transaction_token_bound ?transfer_instruction ?transaction_token)
+        (not
+          (entity_settlement_marked ?transfer_instruction)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_marked ?transfer_instruction)
+        (payment_channel_available ?payment_channel)
+        (transaction_token_available ?transaction_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem liquidity_transfer_between_entities)
+  (:domain finance_treasury_liquidity_transfer)
+  (:objects source_account_obj - source_account destination_account_obj - destination_account transfer_instruction_obj_1 - transfer_instruction transfer_instruction_obj_2 - transfer_instruction payment_channel_obj_1 - payment_channel payment_channel_obj_2 - payment_channel payment_channel_obj_3 - payment_channel liquidity_request_obj - liquidity_request treasury_approver_obj - treasury_approver funding_instrument_obj - funding_instrument liquidity_buffer_obj - liquidity_buffer target_buffer_obj - target_buffer settlement_batch_obj - settlement_batch payment_file_obj_1 - payment_file payment_file_obj_2 - payment_file compliance_rule_obj_1 - compliance_rule compliance_rule_obj_2 - compliance_rule execution_window_obj_1 - execution_window execution_window_obj_2 - execution_window transaction_token_obj - transaction_token approval_credential_obj - approval_credential compliance_certificate_obj_1 - compliance_certificate compliance_certificate_obj_2 - compliance_certificate execution_signature_obj - execution_signature)
+  (:init
+    (payment_channel_available payment_channel_obj_1)
+    (payment_channel_available payment_channel_obj_2)
+    (payment_channel_available payment_channel_obj_3)
+    (liquidity_request_available liquidity_request_obj)
+    (treasury_approver_available treasury_approver_obj)
+    (funding_instrument_available funding_instrument_obj)
+    (source_buffer_linked source_account_obj liquidity_buffer_obj)
+    (destination_buffer_linked destination_account_obj target_buffer_obj)
+    (settlement_batch_available settlement_batch_obj)
+    (payment_file_available payment_file_obj_1)
+    (payment_file_available payment_file_obj_2)
+    (instruction_source_account_link transfer_instruction_obj_1 source_account_obj)
+    (instruction_source_account_link transfer_instruction_obj_2 source_account_obj)
+    (instruction_destination_account_link transfer_instruction_obj_1 destination_account_obj)
+    (instruction_destination_account_link transfer_instruction_obj_2 destination_account_obj)
+    (instruction_in_settlement_batch transfer_instruction_obj_1 settlement_batch_obj)
+    (instruction_in_settlement_batch transfer_instruction_obj_2 settlement_batch_obj)
+    (instruction_has_payment_file transfer_instruction_obj_1 payment_file_obj_1)
+    (instruction_has_payment_file transfer_instruction_obj_2 payment_file_obj_2)
+    (compliance_rule_available compliance_rule_obj_1)
+    (compliance_rule_available compliance_rule_obj_2)
+    (execution_window_available execution_window_obj_1)
+    (execution_window_available execution_window_obj_2)
+    (transaction_token_available transaction_token_obj)
+    (approval_credential_available approval_credential_obj)
+    (compliance_certificate_available compliance_certificate_obj_1)
+    (instruction_compliance_certificate_link transfer_instruction_obj_1 compliance_certificate_obj_1)
+    (instruction_compliance_certificate_link transfer_instruction_obj_2 compliance_certificate_obj_2)
+    (execution_signature_available execution_signature_obj)
+  )
+  (:goal
+    (and
+      (entity_settlement_marked source_account_obj)
+      (entity_settlement_marked destination_account_obj)
+      (entity_settlement_marked transfer_instruction_obj_1)
+      (entity_settlement_marked transfer_instruction_obj_2)
+    )
+  )
+)

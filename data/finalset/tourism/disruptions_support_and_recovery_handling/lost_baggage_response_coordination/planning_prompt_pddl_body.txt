@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain lost_baggage_response_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object evidence_and_item_type - object location_and_request_type - object case_supertype - object lost_baggage_case - case_supertype baggage_reference - operational_resource_type communication_channel - operational_resource_type staff_resource - operational_resource_type photographic_evidence - operational_resource_type compensation_option - operational_resource_type refund_instrument - operational_resource_type logistics_resource - operational_resource_type external_authorization - operational_resource_type emergency_provision_kit - evidence_and_item_type found_item_record - evidence_and_item_type third_party_contact - evidence_and_item_type airline_location_record - location_and_request_type handler_location_record - location_and_request_type recovery_request - location_and_request_type carrier_case_group - lost_baggage_case service_provider_case_group - lost_baggage_case airline_case_record - carrier_case_group ground_handler_record - carrier_case_group case_manager_unit - service_provider_case_group)
+  (:predicates
+    (record_registered ?lost_baggage_case - lost_baggage_case)
+    (record_triaged ?lost_baggage_case - lost_baggage_case)
+    (record_has_baggage_reference ?lost_baggage_case - lost_baggage_case)
+    (record_reconciled ?lost_baggage_case - lost_baggage_case)
+    (record_marked_for_resolution ?lost_baggage_case - lost_baggage_case)
+    (record_refund_issued ?lost_baggage_case - lost_baggage_case)
+    (baggage_reference_available ?baggage_reference - baggage_reference)
+    (record_baggage_assignment ?lost_baggage_case - lost_baggage_case ?baggage_reference - baggage_reference)
+    (communication_channel_available ?communication_channel - communication_channel)
+    (record_communication_link ?lost_baggage_case - lost_baggage_case ?communication_channel - communication_channel)
+    (staff_available ?staff_resource - staff_resource)
+    (record_assigned_staff ?lost_baggage_case - lost_baggage_case ?staff_resource - staff_resource)
+    (emergency_kit_available ?emergency_provision_kit - emergency_provision_kit)
+    (airline_issued_kit ?airline_case_record - airline_case_record ?emergency_provision_kit - emergency_provision_kit)
+    (handler_issued_kit ?ground_handler_record - ground_handler_record ?emergency_provision_kit - emergency_provision_kit)
+    (airline_record_search_location ?airline_case_record - airline_case_record ?airline_location_record - airline_location_record)
+    (airline_location_search_requested ?airline_location_record - airline_location_record)
+    (airline_location_search_confirmed ?airline_location_record - airline_location_record)
+    (airline_ready_for_recovery ?airline_case_record - airline_case_record)
+    (handler_record_location_assignment ?ground_handler_record - ground_handler_record ?handler_location_record - handler_location_record)
+    (handler_location_search_requested ?handler_location_record - handler_location_record)
+    (handler_location_search_confirmed ?handler_location_record - handler_location_record)
+    (handler_ready_for_recovery ?ground_handler_record - ground_handler_record)
+    (recovery_request_ready ?recovery_request - recovery_request)
+    (recovery_request_submitted ?recovery_request - recovery_request)
+    (recovery_request_target_airline_location ?recovery_request - recovery_request ?airline_location_record - airline_location_record)
+    (recovery_request_target_handler_location ?recovery_request - recovery_request ?handler_location_record - handler_location_record)
+    (recovery_request_includes_logistics ?recovery_request - recovery_request)
+    (recovery_request_includes_third_party ?recovery_request - recovery_request)
+    (recovery_request_tracking_started ?recovery_request - recovery_request)
+    (manager_linked_carrier_record ?case_manager_unit - case_manager_unit ?airline_case_record - airline_case_record)
+    (manager_linked_handler_record ?case_manager_unit - case_manager_unit ?ground_handler_record - ground_handler_record)
+    (manager_assigned_recovery_request ?case_manager_unit - case_manager_unit ?recovery_request - recovery_request)
+    (found_item_record_available ?found_item_record - found_item_record)
+    (manager_has_found_item_record ?case_manager_unit - case_manager_unit ?found_item_record - found_item_record)
+    (found_item_validated ?found_item_record - found_item_record)
+    (found_item_linked_to_recovery_request ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    (manager_initiates_collection ?case_manager_unit - case_manager_unit)
+    (manager_collection_scheduled ?case_manager_unit - case_manager_unit)
+    (manager_authorization_obtained ?case_manager_unit - case_manager_unit)
+    (manager_photographic_evidence_present ?case_manager_unit - case_manager_unit)
+    (manager_photographic_evidence_logged ?case_manager_unit - case_manager_unit)
+    (manager_external_authorization_confirmed ?case_manager_unit - case_manager_unit)
+    (manager_collection_executed ?case_manager_unit - case_manager_unit)
+    (third_party_contact_available ?third_party_contact - third_party_contact)
+    (manager_linked_third_party_contact ?case_manager_unit - case_manager_unit ?third_party_contact - third_party_contact)
+    (manager_third_party_contact_engaged ?case_manager_unit - case_manager_unit)
+    (manager_third_party_request_sent ?case_manager_unit - case_manager_unit)
+    (manager_external_authorization_requested ?case_manager_unit - case_manager_unit)
+    (photographic_evidence_available ?photographic_evidence - photographic_evidence)
+    (manager_photographic_evidence_link ?case_manager_unit - case_manager_unit ?photographic_evidence - photographic_evidence)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (manager_assigned_compensation_option ?case_manager_unit - case_manager_unit ?compensation_option - compensation_option)
+    (logistics_resource_available ?logistics_resource - logistics_resource)
+    (manager_allocated_logistics_resource ?case_manager_unit - case_manager_unit ?logistics_resource - logistics_resource)
+    (external_authorization_available ?external_authorization - external_authorization)
+    (manager_assigned_external_authorization ?case_manager_unit - case_manager_unit ?external_authorization - external_authorization)
+    (refund_instrument_available ?refund_instrument - refund_instrument)
+    (record_assigned_refund_instrument ?lost_baggage_case - lost_baggage_case ?refund_instrument - refund_instrument)
+    (airline_search_team_allocated ?airline_case_record - airline_case_record)
+    (handler_search_team_allocated ?ground_handler_record - ground_handler_record)
+    (manager_unit_finalized ?case_manager_unit - case_manager_unit)
+  )
+  (:action register_lost_baggage_case
+    :parameters (?lost_baggage_case - lost_baggage_case)
+    :precondition
+      (and
+        (not
+          (record_registered ?lost_baggage_case)
+        )
+        (not
+          (record_reconciled ?lost_baggage_case)
+        )
+      )
+    :effect (record_registered ?lost_baggage_case)
+  )
+  (:action allocate_baggage_reference_to_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?baggage_reference - baggage_reference)
+    :precondition
+      (and
+        (record_registered ?lost_baggage_case)
+        (not
+          (record_has_baggage_reference ?lost_baggage_case)
+        )
+        (baggage_reference_available ?baggage_reference)
+      )
+    :effect
+      (and
+        (record_has_baggage_reference ?lost_baggage_case)
+        (record_baggage_assignment ?lost_baggage_case ?baggage_reference)
+        (not
+          (baggage_reference_available ?baggage_reference)
+        )
+      )
+  )
+  (:action link_communication_channel_to_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_registered ?lost_baggage_case)
+        (record_has_baggage_reference ?lost_baggage_case)
+        (communication_channel_available ?communication_channel)
+      )
+    :effect
+      (and
+        (record_communication_link ?lost_baggage_case ?communication_channel)
+        (not
+          (communication_channel_available ?communication_channel)
+        )
+      )
+  )
+  (:action confirm_communication_and_triage_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_registered ?lost_baggage_case)
+        (record_has_baggage_reference ?lost_baggage_case)
+        (record_communication_link ?lost_baggage_case ?communication_channel)
+        (not
+          (record_triaged ?lost_baggage_case)
+        )
+      )
+    :effect (record_triaged ?lost_baggage_case)
+  )
+  (:action release_communication_channel_from_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_communication_link ?lost_baggage_case ?communication_channel)
+      )
+    :effect
+      (and
+        (communication_channel_available ?communication_channel)
+        (not
+          (record_communication_link ?lost_baggage_case ?communication_channel)
+        )
+      )
+  )
+  (:action assign_staff_to_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (record_triaged ?lost_baggage_case)
+        (staff_available ?staff_resource)
+      )
+    :effect
+      (and
+        (record_assigned_staff ?lost_baggage_case ?staff_resource)
+        (not
+          (staff_available ?staff_resource)
+        )
+      )
+  )
+  (:action unassign_staff_from_case
+    :parameters (?lost_baggage_case - lost_baggage_case ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (record_assigned_staff ?lost_baggage_case ?staff_resource)
+      )
+    :effect
+      (and
+        (staff_available ?staff_resource)
+        (not
+          (record_assigned_staff ?lost_baggage_case ?staff_resource)
+        )
+      )
+  )
+  (:action assign_logistics_to_manager_unit
+    :parameters (?case_manager_unit - case_manager_unit ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (logistics_resource_available ?logistics_resource)
+      )
+    :effect
+      (and
+        (manager_allocated_logistics_resource ?case_manager_unit ?logistics_resource)
+        (not
+          (logistics_resource_available ?logistics_resource)
+        )
+      )
+  )
+  (:action release_logistics_from_manager_unit
+    :parameters (?case_manager_unit - case_manager_unit ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (manager_allocated_logistics_resource ?case_manager_unit ?logistics_resource)
+      )
+    :effect
+      (and
+        (logistics_resource_available ?logistics_resource)
+        (not
+          (manager_allocated_logistics_resource ?case_manager_unit ?logistics_resource)
+        )
+      )
+  )
+  (:action assign_external_authorization_to_manager
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (external_authorization_available ?external_authorization)
+      )
+    :effect
+      (and
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (not
+          (external_authorization_available ?external_authorization)
+        )
+      )
+  )
+  (:action release_external_authorization_from_manager
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+      )
+    :effect
+      (and
+        (external_authorization_available ?external_authorization)
+        (not
+          (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        )
+      )
+  )
+  (:action request_airline_location_search
+    :parameters (?airline_case_record - airline_case_record ?airline_location_record - airline_location_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_triaged ?airline_case_record)
+        (record_communication_link ?airline_case_record ?communication_channel)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (not
+          (airline_location_search_requested ?airline_location_record)
+        )
+        (not
+          (airline_location_search_confirmed ?airline_location_record)
+        )
+      )
+    :effect (airline_location_search_requested ?airline_location_record)
+  )
+  (:action assign_airline_search_team_and_mark_ready
+    :parameters (?airline_case_record - airline_case_record ?airline_location_record - airline_location_record ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (record_triaged ?airline_case_record)
+        (record_assigned_staff ?airline_case_record ?staff_resource)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (airline_location_search_requested ?airline_location_record)
+        (not
+          (airline_search_team_allocated ?airline_case_record)
+        )
+      )
+    :effect
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (airline_ready_for_recovery ?airline_case_record)
+      )
+  )
+  (:action issue_emergency_kit_and_mark_airline_search
+    :parameters (?airline_case_record - airline_case_record ?airline_location_record - airline_location_record ?emergency_provision_kit - emergency_provision_kit)
+    :precondition
+      (and
+        (record_triaged ?airline_case_record)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (emergency_kit_available ?emergency_provision_kit)
+        (not
+          (airline_search_team_allocated ?airline_case_record)
+        )
+      )
+    :effect
+      (and
+        (airline_location_search_confirmed ?airline_location_record)
+        (airline_search_team_allocated ?airline_case_record)
+        (airline_issued_kit ?airline_case_record ?emergency_provision_kit)
+        (not
+          (emergency_kit_available ?emergency_provision_kit)
+        )
+      )
+  )
+  (:action finalize_airline_search_update
+    :parameters (?airline_case_record - airline_case_record ?airline_location_record - airline_location_record ?communication_channel - communication_channel ?emergency_provision_kit - emergency_provision_kit)
+    :precondition
+      (and
+        (record_triaged ?airline_case_record)
+        (record_communication_link ?airline_case_record ?communication_channel)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (airline_location_search_confirmed ?airline_location_record)
+        (airline_issued_kit ?airline_case_record ?emergency_provision_kit)
+        (not
+          (airline_ready_for_recovery ?airline_case_record)
+        )
+      )
+    :effect
+      (and
+        (airline_location_search_requested ?airline_location_record)
+        (airline_ready_for_recovery ?airline_case_record)
+        (emergency_kit_available ?emergency_provision_kit)
+        (not
+          (airline_issued_kit ?airline_case_record ?emergency_provision_kit)
+        )
+      )
+  )
+  (:action request_handler_location_search
+    :parameters (?ground_handler_record - ground_handler_record ?handler_location_record - handler_location_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_triaged ?ground_handler_record)
+        (record_communication_link ?ground_handler_record ?communication_channel)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (not
+          (handler_location_search_requested ?handler_location_record)
+        )
+        (not
+          (handler_location_search_confirmed ?handler_location_record)
+        )
+      )
+    :effect (handler_location_search_requested ?handler_location_record)
+  )
+  (:action assign_handler_staff_and_mark_ready
+    :parameters (?ground_handler_record - ground_handler_record ?handler_location_record - handler_location_record ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (record_triaged ?ground_handler_record)
+        (record_assigned_staff ?ground_handler_record ?staff_resource)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (handler_location_search_requested ?handler_location_record)
+        (not
+          (handler_search_team_allocated ?ground_handler_record)
+        )
+      )
+    :effect
+      (and
+        (handler_search_team_allocated ?ground_handler_record)
+        (handler_ready_for_recovery ?ground_handler_record)
+      )
+  )
+  (:action issue_emergency_kit_for_handler_search
+    :parameters (?ground_handler_record - ground_handler_record ?handler_location_record - handler_location_record ?emergency_provision_kit - emergency_provision_kit)
+    :precondition
+      (and
+        (record_triaged ?ground_handler_record)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (emergency_kit_available ?emergency_provision_kit)
+        (not
+          (handler_search_team_allocated ?ground_handler_record)
+        )
+      )
+    :effect
+      (and
+        (handler_location_search_confirmed ?handler_location_record)
+        (handler_search_team_allocated ?ground_handler_record)
+        (handler_issued_kit ?ground_handler_record ?emergency_provision_kit)
+        (not
+          (emergency_kit_available ?emergency_provision_kit)
+        )
+      )
+  )
+  (:action finalize_handler_search_update
+    :parameters (?ground_handler_record - ground_handler_record ?handler_location_record - handler_location_record ?communication_channel - communication_channel ?emergency_provision_kit - emergency_provision_kit)
+    :precondition
+      (and
+        (record_triaged ?ground_handler_record)
+        (record_communication_link ?ground_handler_record ?communication_channel)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (handler_location_search_confirmed ?handler_location_record)
+        (handler_issued_kit ?ground_handler_record ?emergency_provision_kit)
+        (not
+          (handler_ready_for_recovery ?ground_handler_record)
+        )
+      )
+    :effect
+      (and
+        (handler_location_search_requested ?handler_location_record)
+        (handler_ready_for_recovery ?ground_handler_record)
+        (emergency_kit_available ?emergency_provision_kit)
+        (not
+          (handler_issued_kit ?ground_handler_record ?emergency_provision_kit)
+        )
+      )
+  )
+  (:action submit_recovery_request_standard
+    :parameters (?airline_case_record - airline_case_record ?ground_handler_record - ground_handler_record ?airline_location_record - airline_location_record ?handler_location_record - handler_location_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (handler_search_team_allocated ?ground_handler_record)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (airline_location_search_requested ?airline_location_record)
+        (handler_location_search_requested ?handler_location_record)
+        (airline_ready_for_recovery ?airline_case_record)
+        (handler_ready_for_recovery ?ground_handler_record)
+        (recovery_request_ready ?recovery_request)
+      )
+    :effect
+      (and
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_target_airline_location ?recovery_request ?airline_location_record)
+        (recovery_request_target_handler_location ?recovery_request ?handler_location_record)
+        (not
+          (recovery_request_ready ?recovery_request)
+        )
+      )
+  )
+  (:action submit_recovery_request_with_logistics
+    :parameters (?airline_case_record - airline_case_record ?ground_handler_record - ground_handler_record ?airline_location_record - airline_location_record ?handler_location_record - handler_location_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (handler_search_team_allocated ?ground_handler_record)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (airline_location_search_confirmed ?airline_location_record)
+        (handler_location_search_requested ?handler_location_record)
+        (not
+          (airline_ready_for_recovery ?airline_case_record)
+        )
+        (handler_ready_for_recovery ?ground_handler_record)
+        (recovery_request_ready ?recovery_request)
+      )
+    :effect
+      (and
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_target_airline_location ?recovery_request ?airline_location_record)
+        (recovery_request_target_handler_location ?recovery_request ?handler_location_record)
+        (recovery_request_includes_logistics ?recovery_request)
+        (not
+          (recovery_request_ready ?recovery_request)
+        )
+      )
+  )
+  (:action submit_recovery_request_with_third_party
+    :parameters (?airline_case_record - airline_case_record ?ground_handler_record - ground_handler_record ?airline_location_record - airline_location_record ?handler_location_record - handler_location_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (handler_search_team_allocated ?ground_handler_record)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (airline_location_search_requested ?airline_location_record)
+        (handler_location_search_confirmed ?handler_location_record)
+        (airline_ready_for_recovery ?airline_case_record)
+        (not
+          (handler_ready_for_recovery ?ground_handler_record)
+        )
+        (recovery_request_ready ?recovery_request)
+      )
+    :effect
+      (and
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_target_airline_location ?recovery_request ?airline_location_record)
+        (recovery_request_target_handler_location ?recovery_request ?handler_location_record)
+        (recovery_request_includes_third_party ?recovery_request)
+        (not
+          (recovery_request_ready ?recovery_request)
+        )
+      )
+  )
+  (:action submit_recovery_request_with_logistics_and_third_party
+    :parameters (?airline_case_record - airline_case_record ?ground_handler_record - ground_handler_record ?airline_location_record - airline_location_record ?handler_location_record - handler_location_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (handler_search_team_allocated ?ground_handler_record)
+        (airline_record_search_location ?airline_case_record ?airline_location_record)
+        (handler_record_location_assignment ?ground_handler_record ?handler_location_record)
+        (airline_location_search_confirmed ?airline_location_record)
+        (handler_location_search_confirmed ?handler_location_record)
+        (not
+          (airline_ready_for_recovery ?airline_case_record)
+        )
+        (not
+          (handler_ready_for_recovery ?ground_handler_record)
+        )
+        (recovery_request_ready ?recovery_request)
+      )
+    :effect
+      (and
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_target_airline_location ?recovery_request ?airline_location_record)
+        (recovery_request_target_handler_location ?recovery_request ?handler_location_record)
+        (recovery_request_includes_logistics ?recovery_request)
+        (recovery_request_includes_third_party ?recovery_request)
+        (not
+          (recovery_request_ready ?recovery_request)
+        )
+      )
+  )
+  (:action start_recovery_request_tracking
+    :parameters (?recovery_request - recovery_request ?airline_case_record - airline_case_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (recovery_request_submitted ?recovery_request)
+        (airline_search_team_allocated ?airline_case_record)
+        (record_communication_link ?airline_case_record ?communication_channel)
+        (not
+          (recovery_request_tracking_started ?recovery_request)
+        )
+      )
+    :effect (recovery_request_tracking_started ?recovery_request)
+  )
+  (:action associate_found_item_with_manager_and_request
+    :parameters (?case_manager_unit - case_manager_unit ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (manager_assigned_recovery_request ?case_manager_unit ?recovery_request)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_record_available ?found_item_record)
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_tracking_started ?recovery_request)
+        (not
+          (found_item_validated ?found_item_record)
+        )
+      )
+    :effect
+      (and
+        (found_item_validated ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (not
+          (found_item_record_available ?found_item_record)
+        )
+      )
+  )
+  (:action initiate_manager_collection
+    :parameters (?case_manager_unit - case_manager_unit ?found_item_record - found_item_record ?recovery_request - recovery_request ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_validated ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (record_communication_link ?case_manager_unit ?communication_channel)
+        (not
+          (recovery_request_includes_logistics ?recovery_request)
+        )
+        (not
+          (manager_initiates_collection ?case_manager_unit)
+        )
+      )
+    :effect (manager_initiates_collection ?case_manager_unit)
+  )
+  (:action assign_photographic_evidence_to_manager
+    :parameters (?case_manager_unit - case_manager_unit ?photographic_evidence - photographic_evidence)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (photographic_evidence_available ?photographic_evidence)
+        (not
+          (manager_photographic_evidence_present ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_photographic_evidence_present ?case_manager_unit)
+        (manager_photographic_evidence_link ?case_manager_unit ?photographic_evidence)
+        (not
+          (photographic_evidence_available ?photographic_evidence)
+        )
+      )
+  )
+  (:action process_photographic_evidence_and_initiate_collection
+    :parameters (?case_manager_unit - case_manager_unit ?found_item_record - found_item_record ?recovery_request - recovery_request ?communication_channel - communication_channel ?photographic_evidence - photographic_evidence)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_validated ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (record_communication_link ?case_manager_unit ?communication_channel)
+        (recovery_request_includes_logistics ?recovery_request)
+        (manager_photographic_evidence_present ?case_manager_unit)
+        (manager_photographic_evidence_link ?case_manager_unit ?photographic_evidence)
+        (not
+          (manager_initiates_collection ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_initiates_collection ?case_manager_unit)
+        (manager_photographic_evidence_logged ?case_manager_unit)
+      )
+  )
+  (:action schedule_manager_collection_without_third_party
+    :parameters (?case_manager_unit - case_manager_unit ?logistics_resource - logistics_resource ?staff_resource - staff_resource ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_initiates_collection ?case_manager_unit)
+        (manager_allocated_logistics_resource ?case_manager_unit ?logistics_resource)
+        (record_assigned_staff ?case_manager_unit ?staff_resource)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (not
+          (recovery_request_includes_third_party ?recovery_request)
+        )
+        (not
+          (manager_collection_scheduled ?case_manager_unit)
+        )
+      )
+    :effect (manager_collection_scheduled ?case_manager_unit)
+  )
+  (:action schedule_manager_collection_with_third_party
+    :parameters (?case_manager_unit - case_manager_unit ?logistics_resource - logistics_resource ?staff_resource - staff_resource ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_initiates_collection ?case_manager_unit)
+        (manager_allocated_logistics_resource ?case_manager_unit ?logistics_resource)
+        (record_assigned_staff ?case_manager_unit ?staff_resource)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (recovery_request_includes_third_party ?recovery_request)
+        (not
+          (manager_collection_scheduled ?case_manager_unit)
+        )
+      )
+    :effect (manager_collection_scheduled ?case_manager_unit)
+  )
+  (:action request_external_authorization_standard
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_collection_scheduled ?case_manager_unit)
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (not
+          (recovery_request_includes_logistics ?recovery_request)
+        )
+        (not
+          (recovery_request_includes_third_party ?recovery_request)
+        )
+        (not
+          (manager_authorization_obtained ?case_manager_unit)
+        )
+      )
+    :effect (manager_authorization_obtained ?case_manager_unit)
+  )
+  (:action request_external_authorization_with_logistics
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_collection_scheduled ?case_manager_unit)
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (recovery_request_includes_logistics ?recovery_request)
+        (not
+          (recovery_request_includes_third_party ?recovery_request)
+        )
+        (not
+          (manager_authorization_obtained ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_external_authorization_confirmed ?case_manager_unit)
+      )
+  )
+  (:action request_external_authorization_with_third_party
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_collection_scheduled ?case_manager_unit)
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (not
+          (recovery_request_includes_logistics ?recovery_request)
+        )
+        (recovery_request_includes_third_party ?recovery_request)
+        (not
+          (manager_authorization_obtained ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_external_authorization_confirmed ?case_manager_unit)
+      )
+  )
+  (:action request_external_authorization_with_logistics_and_third_party
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization ?found_item_record - found_item_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (manager_collection_scheduled ?case_manager_unit)
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (manager_has_found_item_record ?case_manager_unit ?found_item_record)
+        (found_item_linked_to_recovery_request ?found_item_record ?recovery_request)
+        (recovery_request_includes_logistics ?recovery_request)
+        (recovery_request_includes_third_party ?recovery_request)
+        (not
+          (manager_authorization_obtained ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_external_authorization_confirmed ?case_manager_unit)
+      )
+  )
+  (:action finalize_manager_disposition
+    :parameters (?case_manager_unit - case_manager_unit)
+    :precondition
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (not
+          (manager_external_authorization_confirmed ?case_manager_unit)
+        )
+        (not
+          (manager_unit_finalized ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_finalized ?case_manager_unit)
+        (record_marked_for_resolution ?case_manager_unit)
+      )
+  )
+  (:action apply_compensation_option_to_manager_case
+    :parameters (?case_manager_unit - case_manager_unit ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_external_authorization_confirmed ?case_manager_unit)
+        (compensation_option_available ?compensation_option)
+      )
+    :effect
+      (and
+        (manager_assigned_compensation_option ?case_manager_unit ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action perform_collection_and_update_manager_status
+    :parameters (?case_manager_unit - case_manager_unit ?airline_case_record - airline_case_record ?ground_handler_record - ground_handler_record ?communication_channel - communication_channel ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_external_authorization_confirmed ?case_manager_unit)
+        (manager_assigned_compensation_option ?case_manager_unit ?compensation_option)
+        (manager_linked_carrier_record ?case_manager_unit ?airline_case_record)
+        (manager_linked_handler_record ?case_manager_unit ?ground_handler_record)
+        (airline_ready_for_recovery ?airline_case_record)
+        (handler_ready_for_recovery ?ground_handler_record)
+        (record_communication_link ?case_manager_unit ?communication_channel)
+        (not
+          (manager_collection_executed ?case_manager_unit)
+        )
+      )
+    :effect (manager_collection_executed ?case_manager_unit)
+  )
+  (:action finalize_manager_disposition_post_collection
+    :parameters (?case_manager_unit - case_manager_unit)
+    :precondition
+      (and
+        (manager_authorization_obtained ?case_manager_unit)
+        (manager_collection_executed ?case_manager_unit)
+        (not
+          (manager_unit_finalized ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_finalized ?case_manager_unit)
+        (record_marked_for_resolution ?case_manager_unit)
+      )
+  )
+  (:action engage_third_party_contact
+    :parameters (?case_manager_unit - case_manager_unit ?third_party_contact - third_party_contact ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_triaged ?case_manager_unit)
+        (record_communication_link ?case_manager_unit ?communication_channel)
+        (third_party_contact_available ?third_party_contact)
+        (manager_linked_third_party_contact ?case_manager_unit ?third_party_contact)
+        (not
+          (manager_third_party_contact_engaged ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_third_party_contact_engaged ?case_manager_unit)
+        (not
+          (third_party_contact_available ?third_party_contact)
+        )
+      )
+  )
+  (:action send_third_party_service_request
+    :parameters (?case_manager_unit - case_manager_unit ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (manager_third_party_contact_engaged ?case_manager_unit)
+        (record_assigned_staff ?case_manager_unit ?staff_resource)
+        (not
+          (manager_third_party_request_sent ?case_manager_unit)
+        )
+      )
+    :effect (manager_third_party_request_sent ?case_manager_unit)
+  )
+  (:action request_external_authorization_from_third_party
+    :parameters (?case_manager_unit - case_manager_unit ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (manager_third_party_request_sent ?case_manager_unit)
+        (manager_assigned_external_authorization ?case_manager_unit ?external_authorization)
+        (not
+          (manager_external_authorization_requested ?case_manager_unit)
+        )
+      )
+    :effect (manager_external_authorization_requested ?case_manager_unit)
+  )
+  (:action finalize_manager_disposition_from_third_party
+    :parameters (?case_manager_unit - case_manager_unit)
+    :precondition
+      (and
+        (manager_external_authorization_requested ?case_manager_unit)
+        (not
+          (manager_unit_finalized ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_finalized ?case_manager_unit)
+        (record_marked_for_resolution ?case_manager_unit)
+      )
+  )
+  (:action finalize_airline_record_reconciliation
+    :parameters (?airline_case_record - airline_case_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (airline_search_team_allocated ?airline_case_record)
+        (airline_ready_for_recovery ?airline_case_record)
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_tracking_started ?recovery_request)
+        (not
+          (record_marked_for_resolution ?airline_case_record)
+        )
+      )
+    :effect (record_marked_for_resolution ?airline_case_record)
+  )
+  (:action finalize_handler_record_reconciliation
+    :parameters (?ground_handler_record - ground_handler_record ?recovery_request - recovery_request)
+    :precondition
+      (and
+        (handler_search_team_allocated ?ground_handler_record)
+        (handler_ready_for_recovery ?ground_handler_record)
+        (recovery_request_submitted ?recovery_request)
+        (recovery_request_tracking_started ?recovery_request)
+        (not
+          (record_marked_for_resolution ?ground_handler_record)
+        )
+      )
+    :effect (record_marked_for_resolution ?ground_handler_record)
+  )
+  (:action issue_refund_instrument
+    :parameters (?lost_baggage_case - lost_baggage_case ?refund_instrument - refund_instrument ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (record_marked_for_resolution ?lost_baggage_case)
+        (record_communication_link ?lost_baggage_case ?communication_channel)
+        (refund_instrument_available ?refund_instrument)
+        (not
+          (record_refund_issued ?lost_baggage_case)
+        )
+      )
+    :effect
+      (and
+        (record_refund_issued ?lost_baggage_case)
+        (record_assigned_refund_instrument ?lost_baggage_case ?refund_instrument)
+        (not
+          (refund_instrument_available ?refund_instrument)
+        )
+      )
+  )
+  (:action reconcile_airline_record_and_release_resources
+    :parameters (?airline_case_record - airline_case_record ?baggage_reference - baggage_reference ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (record_refund_issued ?airline_case_record)
+        (record_baggage_assignment ?airline_case_record ?baggage_reference)
+        (record_assigned_refund_instrument ?airline_case_record ?refund_instrument)
+        (not
+          (record_reconciled ?airline_case_record)
+        )
+      )
+    :effect
+      (and
+        (record_reconciled ?airline_case_record)
+        (baggage_reference_available ?baggage_reference)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+  (:action reconcile_handler_record_and_release_resources
+    :parameters (?ground_handler_record - ground_handler_record ?baggage_reference - baggage_reference ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (record_refund_issued ?ground_handler_record)
+        (record_baggage_assignment ?ground_handler_record ?baggage_reference)
+        (record_assigned_refund_instrument ?ground_handler_record ?refund_instrument)
+        (not
+          (record_reconciled ?ground_handler_record)
+        )
+      )
+    :effect
+      (and
+        (record_reconciled ?ground_handler_record)
+        (baggage_reference_available ?baggage_reference)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+  (:action reconcile_manager_unit_and_release_resources
+    :parameters (?case_manager_unit - case_manager_unit ?baggage_reference - baggage_reference ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (record_refund_issued ?case_manager_unit)
+        (record_baggage_assignment ?case_manager_unit ?baggage_reference)
+        (record_assigned_refund_instrument ?case_manager_unit ?refund_instrument)
+        (not
+          (record_reconciled ?case_manager_unit)
+        )
+      )
+    :effect
+      (and
+        (record_reconciled ?case_manager_unit)
+        (baggage_reference_available ?baggage_reference)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem lost_baggage_response_scenario)
+  (:domain lost_baggage_response_coordination)
+  (:objects airline_case_record_1 - airline_case_record handler_case_record_1 - ground_handler_record case_manager_unit_alpha - case_manager_unit case_manager_unit_beta - case_manager_unit baggage_ref_001 - baggage_reference baggage_ref_002 - baggage_reference baggage_ref_003 - baggage_reference comm_channel_phone_1 - communication_channel staff_agent_1 - staff_resource emergency_kit_standard - emergency_provision_kit airline_location_zone_1 - airline_location_record handler_location_depot_1 - handler_location_record recovery_request_1 - recovery_request found_item_1 - found_item_record found_item_2 - found_item_record photo_evidence_1 - photographic_evidence photo_evidence_2 - photographic_evidence compensation_option_standard - compensation_option compensation_option_premium - compensation_option refund_voucher_1 - refund_instrument logistics_vehicle_1 - logistics_resource third_party_contact_hotel_1 - third_party_contact third_party_contact_transfer_1 - third_party_contact external_authorization_approval_1 - external_authorization)
+  (:init
+    (baggage_reference_available baggage_ref_001)
+    (baggage_reference_available baggage_ref_002)
+    (baggage_reference_available baggage_ref_003)
+    (communication_channel_available comm_channel_phone_1)
+    (staff_available staff_agent_1)
+    (emergency_kit_available emergency_kit_standard)
+    (airline_record_search_location airline_case_record_1 airline_location_zone_1)
+    (handler_record_location_assignment handler_case_record_1 handler_location_depot_1)
+    (recovery_request_ready recovery_request_1)
+    (found_item_record_available found_item_1)
+    (found_item_record_available found_item_2)
+    (manager_linked_carrier_record case_manager_unit_alpha airline_case_record_1)
+    (manager_linked_carrier_record case_manager_unit_beta airline_case_record_1)
+    (manager_linked_handler_record case_manager_unit_alpha handler_case_record_1)
+    (manager_linked_handler_record case_manager_unit_beta handler_case_record_1)
+    (manager_assigned_recovery_request case_manager_unit_alpha recovery_request_1)
+    (manager_assigned_recovery_request case_manager_unit_beta recovery_request_1)
+    (manager_has_found_item_record case_manager_unit_alpha found_item_1)
+    (manager_has_found_item_record case_manager_unit_beta found_item_2)
+    (photographic_evidence_available photo_evidence_1)
+    (photographic_evidence_available photo_evidence_2)
+    (compensation_option_available compensation_option_standard)
+    (compensation_option_available compensation_option_premium)
+    (refund_instrument_available refund_voucher_1)
+    (logistics_resource_available logistics_vehicle_1)
+    (third_party_contact_available third_party_contact_hotel_1)
+    (manager_linked_third_party_contact case_manager_unit_alpha third_party_contact_hotel_1)
+    (manager_linked_third_party_contact case_manager_unit_beta third_party_contact_transfer_1)
+    (external_authorization_available external_authorization_approval_1)
+  )
+  (:goal
+    (and
+      (record_reconciled airline_case_record_1)
+      (record_reconciled handler_case_record_1)
+      (record_reconciled case_manager_unit_alpha)
+      (record_reconciled case_manager_unit_beta)
+    )
+  )
+)

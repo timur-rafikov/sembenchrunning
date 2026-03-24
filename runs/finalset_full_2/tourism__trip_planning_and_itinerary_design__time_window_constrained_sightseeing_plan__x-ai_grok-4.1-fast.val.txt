@@ -1,0 +1,1059 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain time_window_constrained_sightseeing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object infrastructure_asset - entity resource_family - entity scheduling_family - entity itinerary_component_supertype - entity itinerary_item - itinerary_component_supertype transport_option - infrastructure_asset activity - infrastructure_asset onsite_service_slot - infrastructure_asset premium_option - infrastructure_asset auxiliary_service - infrastructure_asset temporal_marker - infrastructure_asset preference_token - infrastructure_asset location_attribute - infrastructure_asset consumable_resource - resource_family resource_option - resource_family constraint_token - resource_family time_window_morning_type - scheduling_family time_window_afternoon_type - scheduling_family visit_candidate - scheduling_family day_slot_supertype - itinerary_item itinerary_supertype - itinerary_item day_slot_morning - day_slot_supertype day_slot_afternoon - day_slot_supertype itinerary_instance - itinerary_supertype)
+
+  (:predicates
+    (itinerary_item_selected ?itinerary_component - itinerary_item)
+    (itinerary_item_activity_confirmed ?itinerary_component - itinerary_item)
+    (itinerary_item_transport_reserved ?itinerary_component - itinerary_item)
+    (itinerary_item_finalized ?itinerary_component - itinerary_item)
+    (itinerary_item_validated ?itinerary_component - itinerary_item)
+    (itinerary_item_time_anchored ?itinerary_component - itinerary_item)
+    (transport_option_available ?transport_option - transport_option)
+    (itinerary_item_assigned_transport ?itinerary_component - itinerary_item ?transport_option - transport_option)
+    (activity_available ?activity - activity)
+    (activity_assigned_to_itinerary_item ?itinerary_component - itinerary_item ?activity - activity)
+    (service_slot_available ?onsite_service_slot - onsite_service_slot)
+    (service_slot_assigned_to_itinerary_item ?itinerary_component - itinerary_item ?onsite_service_slot - onsite_service_slot)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (day_slot_morning_consumable_assigned ?day_slot_a - day_slot_morning ?consumable_resource - consumable_resource)
+    (day_slot_afternoon_consumable_assigned ?day_slot_b - day_slot_afternoon ?consumable_resource - consumable_resource)
+    (day_slot_morning_time_window_link ?day_slot_a - day_slot_morning ?time_window_a - time_window_morning_type)
+    (time_window_morning_booked ?time_window_a - time_window_morning_type)
+    (time_window_morning_pending ?time_window_a - time_window_morning_type)
+    (day_slot_morning_completed ?day_slot_a - day_slot_morning)
+    (day_slot_afternoon_time_window_link ?day_slot_b - day_slot_afternoon ?time_window_b - time_window_afternoon_type)
+    (time_window_afternoon_booked ?time_window_b - time_window_afternoon_type)
+    (time_window_afternoon_pending ?time_window_b - time_window_afternoon_type)
+    (day_slot_afternoon_completed ?day_slot_b - day_slot_afternoon)
+    (visit_candidate_available ?visit_candidate - visit_candidate)
+    (visit_candidate_reserved ?visit_candidate - visit_candidate)
+    (visit_candidate_has_time_window_morning ?visit_candidate - visit_candidate ?time_window_a - time_window_morning_type)
+    (visit_candidate_has_time_window_afternoon ?visit_candidate - visit_candidate ?time_window_b - time_window_afternoon_type)
+    (visit_candidate_flag_option_a ?visit_candidate - visit_candidate)
+    (visit_candidate_flag_option_b ?visit_candidate - visit_candidate)
+    (visit_candidate_timing_confirmed ?visit_candidate - visit_candidate)
+    (itinerary_includes_day_slot_morning ?itinerary_instance - itinerary_instance ?day_slot_a - day_slot_morning)
+    (itinerary_includes_day_slot_afternoon ?itinerary_instance - itinerary_instance ?day_slot_b - day_slot_afternoon)
+    (itinerary_includes_visit_candidate ?itinerary_instance - itinerary_instance ?visit_candidate - visit_candidate)
+    (resource_option_available ?resource_option - resource_option)
+    (itinerary_has_resource_option ?itinerary_instance - itinerary_instance ?resource_option - resource_option)
+    (resource_option_locked ?resource_option - resource_option)
+    (resource_option_attached_to_visit_candidate ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    (itinerary_option_applied ?itinerary_instance - itinerary_instance)
+    (itinerary_option_stage2_applied ?itinerary_instance - itinerary_instance)
+    (itinerary_option_stage3_applied ?itinerary_instance - itinerary_instance)
+    (premium_option_selected ?itinerary_instance - itinerary_instance)
+    (itinerary_option_augmented ?itinerary_instance - itinerary_instance)
+    (itinerary_auxiliary_flag ?itinerary_instance - itinerary_instance)
+    (itinerary_ready_for_finalization ?itinerary_instance - itinerary_instance)
+    (constraint_token_available ?constraint_token - constraint_token)
+    (itinerary_has_constraint_token ?itinerary_instance - itinerary_instance ?constraint_token - constraint_token)
+    (constraint_applied_to_itinerary ?itinerary_instance - itinerary_instance)
+    (itinerary_constraint_service_prepared ?itinerary_instance - itinerary_instance)
+    (itinerary_constraint_service_confirmed ?itinerary_instance - itinerary_instance)
+    (premium_option_available ?premium_option - premium_option)
+    (itinerary_has_premium_option ?itinerary_instance - itinerary_instance ?premium_option - premium_option)
+    (auxiliary_service_available ?auxiliary_service - auxiliary_service)
+    (itinerary_has_auxiliary_service ?itinerary_instance - itinerary_instance ?auxiliary_service - auxiliary_service)
+    (preference_token_available ?preference_token - preference_token)
+    (itinerary_has_preference_token ?itinerary_instance - itinerary_instance ?preference_token - preference_token)
+    (location_attribute_available ?location_attribute - location_attribute)
+    (itinerary_has_location_attribute ?itinerary_instance - itinerary_instance ?location_attribute - location_attribute)
+    (temporal_marker_available ?temporal_marker - temporal_marker)
+    (itinerary_item_has_temporal_marker ?itinerary_component - itinerary_item ?temporal_marker - temporal_marker)
+    (day_slot_morning_ready ?day_slot_a - day_slot_morning)
+    (day_slot_afternoon_ready ?day_slot_b - day_slot_afternoon)
+    (itinerary_finalized ?itinerary_instance - itinerary_instance)
+  )
+  (:action select_itinerary_component
+    :parameters (?itinerary_component - itinerary_item)
+    :precondition
+      (and
+        (not
+          (itinerary_item_selected ?itinerary_component)
+        )
+        (not
+          (itinerary_item_finalized ?itinerary_component)
+        )
+      )
+    :effect (itinerary_item_selected ?itinerary_component)
+  )
+  (:action assign_transport_to_component
+    :parameters (?itinerary_component - itinerary_item ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_item_selected ?itinerary_component)
+        (not
+          (itinerary_item_transport_reserved ?itinerary_component)
+        )
+        (transport_option_available ?transport_option)
+      )
+    :effect
+      (and
+        (itinerary_item_transport_reserved ?itinerary_component)
+        (itinerary_item_assigned_transport ?itinerary_component ?transport_option)
+        (not
+          (transport_option_available ?transport_option)
+        )
+      )
+  )
+  (:action propose_activity_for_component
+    :parameters (?itinerary_component - itinerary_item ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_selected ?itinerary_component)
+        (itinerary_item_transport_reserved ?itinerary_component)
+        (activity_available ?activity)
+      )
+    :effect
+      (and
+        (activity_assigned_to_itinerary_item ?itinerary_component ?activity)
+        (not
+          (activity_available ?activity)
+        )
+      )
+  )
+  (:action confirm_activity_for_component
+    :parameters (?itinerary_component - itinerary_item ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_selected ?itinerary_component)
+        (itinerary_item_transport_reserved ?itinerary_component)
+        (activity_assigned_to_itinerary_item ?itinerary_component ?activity)
+        (not
+          (itinerary_item_activity_confirmed ?itinerary_component)
+        )
+      )
+    :effect (itinerary_item_activity_confirmed ?itinerary_component)
+  )
+  (:action rollback_activity_assignment
+    :parameters (?itinerary_component - itinerary_item ?activity - activity)
+    :precondition
+      (and
+        (activity_assigned_to_itinerary_item ?itinerary_component ?activity)
+      )
+    :effect
+      (and
+        (activity_available ?activity)
+        (not
+          (activity_assigned_to_itinerary_item ?itinerary_component ?activity)
+        )
+      )
+  )
+  (:action book_onsite_service_for_component
+    :parameters (?itinerary_component - itinerary_item ?onsite_service_slot - onsite_service_slot)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_component)
+        (service_slot_available ?onsite_service_slot)
+      )
+    :effect
+      (and
+        (service_slot_assigned_to_itinerary_item ?itinerary_component ?onsite_service_slot)
+        (not
+          (service_slot_available ?onsite_service_slot)
+        )
+      )
+  )
+  (:action release_onsite_service_from_component
+    :parameters (?itinerary_component - itinerary_item ?onsite_service_slot - onsite_service_slot)
+    :precondition
+      (and
+        (service_slot_assigned_to_itinerary_item ?itinerary_component ?onsite_service_slot)
+      )
+    :effect
+      (and
+        (service_slot_available ?onsite_service_slot)
+        (not
+          (service_slot_assigned_to_itinerary_item ?itinerary_component ?onsite_service_slot)
+        )
+      )
+  )
+  (:action attach_preference_token_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?preference_token - preference_token)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (preference_token_available ?preference_token)
+      )
+    :effect
+      (and
+        (itinerary_has_preference_token ?itinerary_instance ?preference_token)
+        (not
+          (preference_token_available ?preference_token)
+        )
+      )
+  )
+  (:action detach_preference_token_from_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?preference_token - preference_token)
+    :precondition
+      (and
+        (itinerary_has_preference_token ?itinerary_instance ?preference_token)
+      )
+    :effect
+      (and
+        (preference_token_available ?preference_token)
+        (not
+          (itinerary_has_preference_token ?itinerary_instance ?preference_token)
+        )
+      )
+  )
+  (:action attach_location_attribute_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (location_attribute_available ?location_attribute)
+      )
+    :effect
+      (and
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (not
+          (location_attribute_available ?location_attribute)
+        )
+      )
+  )
+  (:action detach_location_attribute_from_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute)
+    :precondition
+      (and
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+      )
+    :effect
+      (and
+        (location_attribute_available ?location_attribute)
+        (not
+          (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        )
+      )
+  )
+  (:action claim_time_window_for_day_slot_morning
+    :parameters (?day_slot_a - day_slot_morning ?time_window_a - time_window_morning_type ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_a)
+        (activity_assigned_to_itinerary_item ?day_slot_a ?activity)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (not
+          (time_window_morning_booked ?time_window_a)
+        )
+        (not
+          (time_window_morning_pending ?time_window_a)
+        )
+      )
+    :effect (time_window_morning_booked ?time_window_a)
+  )
+  (:action confirm_day_slot_morning_service
+    :parameters (?day_slot_a - day_slot_morning ?time_window_a - time_window_morning_type ?onsite_service_slot - onsite_service_slot)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_a)
+        (service_slot_assigned_to_itinerary_item ?day_slot_a ?onsite_service_slot)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (time_window_morning_booked ?time_window_a)
+        (not
+          (day_slot_morning_ready ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_morning_completed ?day_slot_a)
+      )
+  )
+  (:action attach_consumable_to_day_slot_morning
+    :parameters (?day_slot_a - day_slot_morning ?time_window_a - time_window_morning_type ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_a)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (consumable_available ?consumable_resource)
+        (not
+          (day_slot_morning_ready ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (time_window_morning_pending ?time_window_a)
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_morning_consumable_assigned ?day_slot_a ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_day_slot_morning_consumable
+    :parameters (?day_slot_a - day_slot_morning ?time_window_a - time_window_morning_type ?activity - activity ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_a)
+        (activity_assigned_to_itinerary_item ?day_slot_a ?activity)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (time_window_morning_pending ?time_window_a)
+        (day_slot_morning_consumable_assigned ?day_slot_a ?consumable_resource)
+        (not
+          (day_slot_morning_completed ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (time_window_morning_booked ?time_window_a)
+        (day_slot_morning_completed ?day_slot_a)
+        (consumable_available ?consumable_resource)
+        (not
+          (day_slot_morning_consumable_assigned ?day_slot_a ?consumable_resource)
+        )
+      )
+  )
+  (:action claim_time_window_for_day_slot_afternoon
+    :parameters (?day_slot_b - day_slot_afternoon ?time_window_b - time_window_afternoon_type ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_b)
+        (activity_assigned_to_itinerary_item ?day_slot_b ?activity)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (not
+          (time_window_afternoon_booked ?time_window_b)
+        )
+        (not
+          (time_window_afternoon_pending ?time_window_b)
+        )
+      )
+    :effect (time_window_afternoon_booked ?time_window_b)
+  )
+  (:action confirm_day_slot_afternoon_service
+    :parameters (?day_slot_b - day_slot_afternoon ?time_window_b - time_window_afternoon_type ?onsite_service_slot - onsite_service_slot)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_b)
+        (service_slot_assigned_to_itinerary_item ?day_slot_b ?onsite_service_slot)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_afternoon_booked ?time_window_b)
+        (not
+          (day_slot_afternoon_ready ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_afternoon_completed ?day_slot_b)
+      )
+  )
+  (:action attach_consumable_to_day_slot_afternoon
+    :parameters (?day_slot_b - day_slot_afternoon ?time_window_b - time_window_afternoon_type ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_b)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (consumable_available ?consumable_resource)
+        (not
+          (day_slot_afternoon_ready ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (time_window_afternoon_pending ?time_window_b)
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_afternoon_consumable_assigned ?day_slot_b ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_day_slot_afternoon_consumable
+    :parameters (?day_slot_b - day_slot_afternoon ?time_window_b - time_window_afternoon_type ?activity - activity ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?day_slot_b)
+        (activity_assigned_to_itinerary_item ?day_slot_b ?activity)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_afternoon_pending ?time_window_b)
+        (day_slot_afternoon_consumable_assigned ?day_slot_b ?consumable_resource)
+        (not
+          (day_slot_afternoon_completed ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (time_window_afternoon_booked ?time_window_b)
+        (day_slot_afternoon_completed ?day_slot_b)
+        (consumable_available ?consumable_resource)
+        (not
+          (day_slot_afternoon_consumable_assigned ?day_slot_b ?consumable_resource)
+        )
+      )
+  )
+  (:action compose_visit_candidate
+    :parameters (?day_slot_a - day_slot_morning ?day_slot_b - day_slot_afternoon ?time_window_a - time_window_morning_type ?time_window_b - time_window_afternoon_type ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_morning_booked ?time_window_a)
+        (time_window_afternoon_booked ?time_window_b)
+        (day_slot_morning_completed ?day_slot_a)
+        (day_slot_afternoon_completed ?day_slot_b)
+        (visit_candidate_available ?visit_candidate)
+      )
+    :effect
+      (and
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_has_time_window_morning ?visit_candidate ?time_window_a)
+        (visit_candidate_has_time_window_afternoon ?visit_candidate ?time_window_b)
+        (not
+          (visit_candidate_available ?visit_candidate)
+        )
+      )
+  )
+  (:action compose_visit_candidate_with_window_morning_pending
+    :parameters (?day_slot_a - day_slot_morning ?day_slot_b - day_slot_afternoon ?time_window_a - time_window_morning_type ?time_window_b - time_window_afternoon_type ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_morning_pending ?time_window_a)
+        (time_window_afternoon_booked ?time_window_b)
+        (not
+          (day_slot_morning_completed ?day_slot_a)
+        )
+        (day_slot_afternoon_completed ?day_slot_b)
+        (visit_candidate_available ?visit_candidate)
+      )
+    :effect
+      (and
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_has_time_window_morning ?visit_candidate ?time_window_a)
+        (visit_candidate_has_time_window_afternoon ?visit_candidate ?time_window_b)
+        (visit_candidate_flag_option_a ?visit_candidate)
+        (not
+          (visit_candidate_available ?visit_candidate)
+        )
+      )
+  )
+  (:action compose_visit_candidate_with_window_afternoon_pending
+    :parameters (?day_slot_a - day_slot_morning ?day_slot_b - day_slot_afternoon ?time_window_a - time_window_morning_type ?time_window_b - time_window_afternoon_type ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_morning_booked ?time_window_a)
+        (time_window_afternoon_pending ?time_window_b)
+        (day_slot_morning_completed ?day_slot_a)
+        (not
+          (day_slot_afternoon_completed ?day_slot_b)
+        )
+        (visit_candidate_available ?visit_candidate)
+      )
+    :effect
+      (and
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_has_time_window_morning ?visit_candidate ?time_window_a)
+        (visit_candidate_has_time_window_afternoon ?visit_candidate ?time_window_b)
+        (visit_candidate_flag_option_b ?visit_candidate)
+        (not
+          (visit_candidate_available ?visit_candidate)
+        )
+      )
+  )
+  (:action compose_visit_candidate_with_both_windows_pending
+    :parameters (?day_slot_a - day_slot_morning ?day_slot_b - day_slot_afternoon ?time_window_a - time_window_morning_type ?time_window_b - time_window_afternoon_type ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_morning_time_window_link ?day_slot_a ?time_window_a)
+        (day_slot_afternoon_time_window_link ?day_slot_b ?time_window_b)
+        (time_window_morning_pending ?time_window_a)
+        (time_window_afternoon_pending ?time_window_b)
+        (not
+          (day_slot_morning_completed ?day_slot_a)
+        )
+        (not
+          (day_slot_afternoon_completed ?day_slot_b)
+        )
+        (visit_candidate_available ?visit_candidate)
+      )
+    :effect
+      (and
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_has_time_window_morning ?visit_candidate ?time_window_a)
+        (visit_candidate_has_time_window_afternoon ?visit_candidate ?time_window_b)
+        (visit_candidate_flag_option_a ?visit_candidate)
+        (visit_candidate_flag_option_b ?visit_candidate)
+        (not
+          (visit_candidate_available ?visit_candidate)
+        )
+      )
+  )
+  (:action confirm_visit_candidate_timing
+    :parameters (?visit_candidate - visit_candidate ?day_slot_a - day_slot_morning ?activity - activity)
+    :precondition
+      (and
+        (visit_candidate_reserved ?visit_candidate)
+        (day_slot_morning_ready ?day_slot_a)
+        (activity_assigned_to_itinerary_item ?day_slot_a ?activity)
+        (not
+          (visit_candidate_timing_confirmed ?visit_candidate)
+        )
+      )
+    :effect (visit_candidate_timing_confirmed ?visit_candidate)
+  )
+  (:action allocate_resource_option_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (itinerary_includes_visit_candidate ?itinerary_instance ?visit_candidate)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_available ?resource_option)
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_timing_confirmed ?visit_candidate)
+        (not
+          (resource_option_locked ?resource_option)
+        )
+      )
+    :effect
+      (and
+        (resource_option_locked ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (not
+          (resource_option_available ?resource_option)
+        )
+      )
+  )
+  (:action confirm_resource_option_allocation
+    :parameters (?itinerary_instance - itinerary_instance ?resource_option - resource_option ?visit_candidate - visit_candidate ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_locked ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (activity_assigned_to_itinerary_item ?itinerary_instance ?activity)
+        (not
+          (visit_candidate_flag_option_a ?visit_candidate)
+        )
+        (not
+          (itinerary_option_applied ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_option_applied ?itinerary_instance)
+  )
+  (:action select_premium_option_for_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?premium_option - premium_option)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (premium_option_available ?premium_option)
+        (not
+          (premium_option_selected ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (premium_option_selected ?itinerary_instance)
+        (itinerary_has_premium_option ?itinerary_instance ?premium_option)
+        (not
+          (premium_option_available ?premium_option)
+        )
+      )
+  )
+  (:action augment_itinerary_with_premium_and_resource
+    :parameters (?itinerary_instance - itinerary_instance ?resource_option - resource_option ?visit_candidate - visit_candidate ?activity - activity ?premium_option - premium_option)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_locked ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (activity_assigned_to_itinerary_item ?itinerary_instance ?activity)
+        (visit_candidate_flag_option_a ?visit_candidate)
+        (premium_option_selected ?itinerary_instance)
+        (itinerary_has_premium_option ?itinerary_instance ?premium_option)
+        (not
+          (itinerary_option_applied ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_option_applied ?itinerary_instance)
+        (itinerary_option_augmented ?itinerary_instance)
+      )
+  )
+  (:action attach_auxiliary_service_and_resources_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?preference_token - preference_token ?onsite_service_slot - onsite_service_slot ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_applied ?itinerary_instance)
+        (itinerary_has_preference_token ?itinerary_instance ?preference_token)
+        (service_slot_assigned_to_itinerary_item ?itinerary_instance ?onsite_service_slot)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (not
+          (visit_candidate_flag_option_b ?visit_candidate)
+        )
+        (not
+          (itinerary_option_stage2_applied ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_option_stage2_applied ?itinerary_instance)
+  )
+  (:action attach_auxiliary_service_and_resources_to_itinerary_alternate
+    :parameters (?itinerary_instance - itinerary_instance ?preference_token - preference_token ?onsite_service_slot - onsite_service_slot ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_applied ?itinerary_instance)
+        (itinerary_has_preference_token ?itinerary_instance ?preference_token)
+        (service_slot_assigned_to_itinerary_item ?itinerary_instance ?onsite_service_slot)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (visit_candidate_flag_option_b ?visit_candidate)
+        (not
+          (itinerary_option_stage2_applied ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_option_stage2_applied ?itinerary_instance)
+  )
+  (:action apply_location_attribute_with_resources_stage1
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_stage2_applied ?itinerary_instance)
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (not
+          (visit_candidate_flag_option_a ?visit_candidate)
+        )
+        (not
+          (visit_candidate_flag_option_b ?visit_candidate)
+        )
+        (not
+          (itinerary_option_stage3_applied ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_option_stage3_applied ?itinerary_instance)
+  )
+  (:action apply_location_attribute_with_resources_stage2
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_stage2_applied ?itinerary_instance)
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (visit_candidate_flag_option_a ?visit_candidate)
+        (not
+          (visit_candidate_flag_option_b ?visit_candidate)
+        )
+        (not
+          (itinerary_option_stage3_applied ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_auxiliary_flag ?itinerary_instance)
+      )
+  )
+  (:action apply_location_attribute_with_resources_stage3
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_stage2_applied ?itinerary_instance)
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (not
+          (visit_candidate_flag_option_a ?visit_candidate)
+        )
+        (visit_candidate_flag_option_b ?visit_candidate)
+        (not
+          (itinerary_option_stage3_applied ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_auxiliary_flag ?itinerary_instance)
+      )
+  )
+  (:action apply_location_attribute_with_resources_comprehensive
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute ?resource_option - resource_option ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (itinerary_option_stage2_applied ?itinerary_instance)
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (itinerary_has_resource_option ?itinerary_instance ?resource_option)
+        (resource_option_attached_to_visit_candidate ?resource_option ?visit_candidate)
+        (visit_candidate_flag_option_a ?visit_candidate)
+        (visit_candidate_flag_option_b ?visit_candidate)
+        (not
+          (itinerary_option_stage3_applied ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_auxiliary_flag ?itinerary_instance)
+      )
+  )
+  (:action finalize_itinerary_instance
+    :parameters (?itinerary_instance - itinerary_instance)
+    :precondition
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (not
+          (itinerary_auxiliary_flag ?itinerary_instance)
+        )
+        (not
+          (itinerary_finalized ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?itinerary_instance)
+        (itinerary_item_validated ?itinerary_instance)
+      )
+  )
+  (:action attach_optional_auxiliary_service_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_auxiliary_flag ?itinerary_instance)
+        (auxiliary_service_available ?auxiliary_service)
+      )
+    :effect
+      (and
+        (itinerary_has_auxiliary_service ?itinerary_instance ?auxiliary_service)
+        (not
+          (auxiliary_service_available ?auxiliary_service)
+        )
+      )
+  )
+  (:action apply_preferences_and_confirm_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?day_slot_a - day_slot_morning ?day_slot_b - day_slot_afternoon ?activity - activity ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_auxiliary_flag ?itinerary_instance)
+        (itinerary_has_auxiliary_service ?itinerary_instance ?auxiliary_service)
+        (itinerary_includes_day_slot_morning ?itinerary_instance ?day_slot_a)
+        (itinerary_includes_day_slot_afternoon ?itinerary_instance ?day_slot_b)
+        (day_slot_morning_completed ?day_slot_a)
+        (day_slot_afternoon_completed ?day_slot_b)
+        (activity_assigned_to_itinerary_item ?itinerary_instance ?activity)
+        (not
+          (itinerary_ready_for_finalization ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_ready_for_finalization ?itinerary_instance)
+  )
+  (:action lock_and_finalize_itinerary
+    :parameters (?itinerary_instance - itinerary_instance)
+    :precondition
+      (and
+        (itinerary_option_stage3_applied ?itinerary_instance)
+        (itinerary_ready_for_finalization ?itinerary_instance)
+        (not
+          (itinerary_finalized ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?itinerary_instance)
+        (itinerary_item_validated ?itinerary_instance)
+      )
+  )
+  (:action apply_constraint_token_to_itinerary
+    :parameters (?itinerary_instance - itinerary_instance ?constraint_token - constraint_token ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_activity_confirmed ?itinerary_instance)
+        (activity_assigned_to_itinerary_item ?itinerary_instance ?activity)
+        (constraint_token_available ?constraint_token)
+        (itinerary_has_constraint_token ?itinerary_instance ?constraint_token)
+        (not
+          (constraint_applied_to_itinerary ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (constraint_applied_to_itinerary ?itinerary_instance)
+        (not
+          (constraint_token_available ?constraint_token)
+        )
+      )
+  )
+  (:action prepare_itinerary_service_for_constraint
+    :parameters (?itinerary_instance - itinerary_instance ?onsite_service_slot - onsite_service_slot)
+    :precondition
+      (and
+        (constraint_applied_to_itinerary ?itinerary_instance)
+        (service_slot_assigned_to_itinerary_item ?itinerary_instance ?onsite_service_slot)
+        (not
+          (itinerary_constraint_service_prepared ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_constraint_service_prepared ?itinerary_instance)
+  )
+  (:action confirm_itinerary_constraint_service
+    :parameters (?itinerary_instance - itinerary_instance ?location_attribute - location_attribute)
+    :precondition
+      (and
+        (itinerary_constraint_service_prepared ?itinerary_instance)
+        (itinerary_has_location_attribute ?itinerary_instance ?location_attribute)
+        (not
+          (itinerary_constraint_service_confirmed ?itinerary_instance)
+        )
+      )
+    :effect (itinerary_constraint_service_confirmed ?itinerary_instance)
+  )
+  (:action finalize_itinerary_with_constraint
+    :parameters (?itinerary_instance - itinerary_instance)
+    :precondition
+      (and
+        (itinerary_constraint_service_confirmed ?itinerary_instance)
+        (not
+          (itinerary_finalized ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?itinerary_instance)
+        (itinerary_item_validated ?itinerary_instance)
+      )
+  )
+  (:action mark_day_slot_morning_completed
+    :parameters (?day_slot_a - day_slot_morning ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_morning_ready ?day_slot_a)
+        (day_slot_morning_completed ?day_slot_a)
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_timing_confirmed ?visit_candidate)
+        (not
+          (itinerary_item_validated ?day_slot_a)
+        )
+      )
+    :effect (itinerary_item_validated ?day_slot_a)
+  )
+  (:action mark_day_slot_afternoon_completed
+    :parameters (?day_slot_b - day_slot_afternoon ?visit_candidate - visit_candidate)
+    :precondition
+      (and
+        (day_slot_afternoon_ready ?day_slot_b)
+        (day_slot_afternoon_completed ?day_slot_b)
+        (visit_candidate_reserved ?visit_candidate)
+        (visit_candidate_timing_confirmed ?visit_candidate)
+        (not
+          (itinerary_item_validated ?day_slot_b)
+        )
+      )
+    :effect (itinerary_item_validated ?day_slot_b)
+  )
+  (:action anchor_temporal_marker_to_component
+    :parameters (?itinerary_component - itinerary_item ?temporal_marker - temporal_marker ?activity - activity)
+    :precondition
+      (and
+        (itinerary_item_validated ?itinerary_component)
+        (activity_assigned_to_itinerary_item ?itinerary_component ?activity)
+        (temporal_marker_available ?temporal_marker)
+        (not
+          (itinerary_item_time_anchored ?itinerary_component)
+        )
+      )
+    :effect
+      (and
+        (itinerary_item_time_anchored ?itinerary_component)
+        (itinerary_item_has_temporal_marker ?itinerary_component ?temporal_marker)
+        (not
+          (temporal_marker_available ?temporal_marker)
+        )
+      )
+  )
+  (:action assign_transport_to_day_slot_morning_and_finalize
+    :parameters (?day_slot_a - day_slot_morning ?transport_option - transport_option ?temporal_marker - temporal_marker)
+    :precondition
+      (and
+        (itinerary_item_time_anchored ?day_slot_a)
+        (itinerary_item_assigned_transport ?day_slot_a ?transport_option)
+        (itinerary_item_has_temporal_marker ?day_slot_a ?temporal_marker)
+        (not
+          (itinerary_item_finalized ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (itinerary_item_finalized ?day_slot_a)
+        (transport_option_available ?transport_option)
+        (temporal_marker_available ?temporal_marker)
+      )
+  )
+  (:action assign_transport_to_day_slot_afternoon_and_finalize
+    :parameters (?day_slot_b - day_slot_afternoon ?transport_option - transport_option ?temporal_marker - temporal_marker)
+    :precondition
+      (and
+        (itinerary_item_time_anchored ?day_slot_b)
+        (itinerary_item_assigned_transport ?day_slot_b ?transport_option)
+        (itinerary_item_has_temporal_marker ?day_slot_b ?temporal_marker)
+        (not
+          (itinerary_item_finalized ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (itinerary_item_finalized ?day_slot_b)
+        (transport_option_available ?transport_option)
+        (temporal_marker_available ?temporal_marker)
+      )
+  )
+  (:action assign_transport_to_itinerary_and_finalize
+    :parameters (?itinerary_instance - itinerary_instance ?transport_option - transport_option ?temporal_marker - temporal_marker)
+    :precondition
+      (and
+        (itinerary_item_time_anchored ?itinerary_instance)
+        (itinerary_item_assigned_transport ?itinerary_instance ?transport_option)
+        (itinerary_item_has_temporal_marker ?itinerary_instance ?temporal_marker)
+        (not
+          (itinerary_item_finalized ?itinerary_instance)
+        )
+      )
+    :effect
+      (and
+        (itinerary_item_finalized ?itinerary_instance)
+        (transport_option_available ?transport_option)
+        (temporal_marker_available ?temporal_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem sightseeing_plan_problem_1)
+  (:domain time_window_constrained_sightseeing_domain)
+  (:objects day_slot_morning_1 - day_slot_morning day_slot_afternoon_1 - day_slot_afternoon itinerary_instance_1 - itinerary_instance itinerary_instance_2 - itinerary_instance transport_option_bus - transport_option transport_option_shuttle - transport_option transport_option_taxi - transport_option activity_museum - activity onsite_service_slot_guided_tour - onsite_service_slot consumable_standard_ticket - consumable_resource time_window_morning_1 - time_window_morning_type time_window_afternoon_1 - time_window_afternoon_type visit_candidate_1 - visit_candidate resource_option_audio_guide - resource_option resource_option_camera_rental - resource_option premium_option_priority_entry - premium_option premium_option_vip_tour - premium_option auxiliary_service_private_guide - auxiliary_service auxiliary_service_transport_supplement - auxiliary_service temporal_marker_1 - temporal_marker preference_accessibility - preference_token constraint_token_pass1 - constraint_token constraint_token_pass2 - constraint_token location_attribute_wheelchair_access - location_attribute)
+  (:init
+    (transport_option_available transport_option_bus)
+    (transport_option_available transport_option_shuttle)
+    (transport_option_available transport_option_taxi)
+    (activity_available activity_museum)
+    (service_slot_available onsite_service_slot_guided_tour)
+    (consumable_available consumable_standard_ticket)
+    (day_slot_morning_time_window_link day_slot_morning_1 time_window_morning_1)
+    (day_slot_afternoon_time_window_link day_slot_afternoon_1 time_window_afternoon_1)
+    (visit_candidate_available visit_candidate_1)
+    (resource_option_available resource_option_audio_guide)
+    (resource_option_available resource_option_camera_rental)
+    (itinerary_includes_day_slot_morning itinerary_instance_1 day_slot_morning_1)
+    (itinerary_includes_day_slot_morning itinerary_instance_2 day_slot_morning_1)
+    (itinerary_includes_day_slot_afternoon itinerary_instance_1 day_slot_afternoon_1)
+    (itinerary_includes_day_slot_afternoon itinerary_instance_2 day_slot_afternoon_1)
+    (itinerary_includes_visit_candidate itinerary_instance_1 visit_candidate_1)
+    (itinerary_includes_visit_candidate itinerary_instance_2 visit_candidate_1)
+    (itinerary_has_resource_option itinerary_instance_1 resource_option_audio_guide)
+    (itinerary_has_resource_option itinerary_instance_2 resource_option_camera_rental)
+    (premium_option_available premium_option_priority_entry)
+    (premium_option_available premium_option_vip_tour)
+    (auxiliary_service_available auxiliary_service_private_guide)
+    (auxiliary_service_available auxiliary_service_transport_supplement)
+    (temporal_marker_available temporal_marker_1)
+    (preference_token_available preference_accessibility)
+    (constraint_token_available constraint_token_pass1)
+    (itinerary_has_constraint_token itinerary_instance_1 constraint_token_pass1)
+    (itinerary_has_constraint_token itinerary_instance_2 constraint_token_pass2)
+    (location_attribute_available location_attribute_wheelchair_access)
+  )
+  (:goal
+    (and
+      (itinerary_item_finalized day_slot_morning_1)
+      (itinerary_item_finalized day_slot_afternoon_1)
+      (itinerary_item_finalized itinerary_instance_1)
+      (itinerary_item_finalized itinerary_instance_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(select_itinerary_component day_slot_morning_1)
+(assign_transport_to_component day_slot_morning_1 transport_option_bus)
+(propose_activity_for_component day_slot_morning_1 activity_museum)
+(confirm_activity_for_component day_slot_morning_1 activity_museum)
+(book_onsite_service_for_component day_slot_morning_1 onsite_service_slot_guided_tour)
+(claim_time_window_for_day_slot_morning day_slot_morning_1 time_window_morning_1 activity_museum)
+(confirm_day_slot_morning_service day_slot_morning_1 time_window_morning_1 onsite_service_slot_guided_tour)
+(release_onsite_service_from_component day_slot_morning_1 onsite_service_slot_guided_tour)
+(select_itinerary_component day_slot_afternoon_1)
+(assign_transport_to_component day_slot_afternoon_1 transport_option_shuttle)
+(propose_activity_for_component day_slot_afternoon_1 activity_museum)
+(confirm_activity_for_component day_slot_afternoon_1 activity_museum)
+(attach_consumable_to_day_slot_afternoon day_slot_afternoon_1 time_window_afternoon_1 consumable_standard_ticket)
+(finalize_day_slot_afternoon_consumable day_slot_afternoon_1 time_window_afternoon_1 activity_museum consumable_standard_ticket)
+(compose_visit_candidate day_slot_morning_1 day_slot_afternoon_1 time_window_morning_1 time_window_afternoon_1 visit_candidate_1)
+(rollback_activity_assignment day_slot_afternoon_1 activity_museum)
+(propose_activity_for_component day_slot_morning_1 activity_museum)
+(confirm_visit_candidate_timing visit_candidate_1 day_slot_morning_1 activity_museum)
+(mark_day_slot_morning_completed day_slot_morning_1 visit_candidate_1)
+(mark_day_slot_afternoon_completed day_slot_afternoon_1 visit_candidate_1)
+(anchor_temporal_marker_to_component day_slot_morning_1 temporal_marker_1 activity_museum)
+(assign_transport_to_day_slot_morning_and_finalize day_slot_morning_1 transport_option_bus temporal_marker_1)
+(rollback_activity_assignment day_slot_morning_1 activity_museum)
+(propose_activity_for_component day_slot_afternoon_1 activity_museum)
+(anchor_temporal_marker_to_component day_slot_afternoon_1 temporal_marker_1 activity_museum)
+(assign_transport_to_day_slot_afternoon_and_finalize day_slot_afternoon_1 transport_option_shuttle temporal_marker_1)
+(rollback_activity_assignment day_slot_afternoon_1 activity_museum)
+(select_itinerary_component itinerary_instance_1)
+(assign_transport_to_component itinerary_instance_1 transport_option_taxi)
+(propose_activity_for_component itinerary_instance_1 activity_museum)
+(confirm_activity_for_component itinerary_instance_1 activity_museum)
+(allocate_resource_option_to_itinerary itinerary_instance_1 resource_option_audio_guide visit_candidate_1)
+(confirm_resource_option_allocation itinerary_instance_1 resource_option_audio_guide visit_candidate_1 activity_museum)
+(attach_preference_token_to_itinerary itinerary_instance_1 preference_accessibility)
+(book_onsite_service_for_component itinerary_instance_1 onsite_service_slot_guided_tour)
+(attach_auxiliary_service_and_resources_to_itinerary itinerary_instance_1 preference_accessibility onsite_service_slot_guided_tour resource_option_audio_guide visit_candidate_1)
+(attach_location_attribute_to_itinerary itinerary_instance_1 location_attribute_wheelchair_access)
+(apply_location_attribute_with_resources_stage1 itinerary_instance_1 location_attribute_wheelchair_access resource_option_audio_guide visit_candidate_1)
+(finalize_itinerary_instance itinerary_instance_1)
+(rollback_activity_assignment itinerary_instance_1 activity_museum)
+(detach_preference_token_from_itinerary itinerary_instance_1 preference_accessibility)
+(release_onsite_service_from_component itinerary_instance_1 onsite_service_slot_guided_tour)
+(detach_location_attribute_from_itinerary itinerary_instance_1 location_attribute_wheelchair_access)
+(select_itinerary_component itinerary_instance_2)
+(assign_transport_to_component itinerary_instance_2 transport_option_bus)
+(propose_activity_for_component itinerary_instance_2 activity_museum)
+(confirm_activity_for_component itinerary_instance_2 activity_museum)
+(allocate_resource_option_to_itinerary itinerary_instance_2 resource_option_camera_rental visit_candidate_1)
+(confirm_resource_option_allocation itinerary_instance_2 resource_option_camera_rental visit_candidate_1 activity_museum)
+(attach_preference_token_to_itinerary itinerary_instance_2 preference_accessibility)
+(book_onsite_service_for_component itinerary_instance_2 onsite_service_slot_guided_tour)
+(attach_auxiliary_service_and_resources_to_itinerary itinerary_instance_2 preference_accessibility onsite_service_slot_guided_tour resource_option_camera_rental visit_candidate_1)
+(attach_location_attribute_to_itinerary itinerary_instance_2 location_attribute_wheelchair_access)
+(apply_location_attribute_with_resources_stage1 itinerary_instance_2 location_attribute_wheelchair_access resource_option_camera_rental visit_candidate_1)
+(finalize_itinerary_instance itinerary_instance_2)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_hh1elyk6/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_hh1elyk6/plan.pddl 
+
+
+--- stderr ---
+

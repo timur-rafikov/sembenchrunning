@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain container_cloud_environment_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types integration_resource - object deployment_artifact_root - object infra_root - object application_entity - object application_component - application_entity credential_reference - integration_resource credential_descriptor - integration_resource operator_agent - integration_resource policy_rule - integration_resource feature_flag - integration_resource secret_material - integration_resource monitoring_integration - integration_resource quota_profile - integration_resource artifact - deployment_artifact_root configuration_bundle - deployment_artifact_root plugin_extension - deployment_artifact_root runtime_target - infra_root location_zone - infra_root deployment_target - infra_root component_environment - application_component component_orchestrator_role - application_component environment_instance - component_environment alternate_environment_instance - component_environment orchestrator - component_orchestrator_role)
+  (:predicates
+    (managed_entity_registered ?application_component - application_component)
+    (managed_entity_ready ?application_component - application_component)
+    (managed_entity_bound ?application_component - application_component)
+    (integration_committed ?application_component - application_component)
+    (operational ?application_component - application_component)
+    (secret_bound ?application_component - application_component)
+    (credential_available ?credential_reference - credential_reference)
+    (bound_to_credential ?application_component - application_component ?credential_reference - credential_reference)
+    (credential_descriptor_available ?credential_descriptor - credential_descriptor)
+    (managed_entity_has_credential_descriptor ?application_component - application_component ?credential_descriptor - credential_descriptor)
+    (operator_available ?operator_agent - operator_agent)
+    (operator_assigned ?application_component - application_component ?operator_agent - operator_agent)
+    (artifact_available ?artifact - artifact)
+    (environment_associated_artifact ?environment_instance - environment_instance ?artifact - artifact)
+    (alternate_env_artifact_binding ?alternate_environment_instance - alternate_environment_instance ?artifact - artifact)
+    (environment_runtime_target_binding ?environment_instance - environment_instance ?runtime_target - runtime_target)
+    (runtime_target_discovered ?runtime_target - runtime_target)
+    (runtime_target_associated ?runtime_target - runtime_target)
+    (environment_prepared ?environment_instance - environment_instance)
+    (alternate_env_location_binding ?alternate_environment_instance - alternate_environment_instance ?location_zone - location_zone)
+    (location_discovered ?location_zone - location_zone)
+    (location_associated ?location_zone - location_zone)
+    (alternate_environment_prepared ?alternate_environment_instance - alternate_environment_instance)
+    (deployment_target_pending ?deployment_target - deployment_target)
+    (deployment_target_provisioned ?deployment_target - deployment_target)
+    (deployment_target_runtime_binding ?deployment_target - deployment_target ?runtime_target - runtime_target)
+    (deployment_target_location_binding ?deployment_target - deployment_target ?location_zone - location_zone)
+    (deployment_target_option_alpha ?deployment_target - deployment_target)
+    (deployment_target_option_beta ?deployment_target - deployment_target)
+    (deployment_target_initialized ?deployment_target - deployment_target)
+    (orchestrator_environment_binding ?orchestrator - orchestrator ?environment_instance - environment_instance)
+    (orchestrator_alternate_environment_binding ?orchestrator - orchestrator ?alternate_environment_instance - alternate_environment_instance)
+    (orchestrator_deployment_target_binding ?orchestrator - orchestrator ?deployment_target - deployment_target)
+    (config_bundle_available ?configuration_bundle - configuration_bundle)
+    (orchestrator_has_config_bundle ?orchestrator - orchestrator ?configuration_bundle - configuration_bundle)
+    (config_bundle_applied ?configuration_bundle - configuration_bundle)
+    (config_bundle_bound_to_deployment_target ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    (orchestrator_validated ?orchestrator - orchestrator)
+    (orchestrator_policy_engaged ?orchestrator - orchestrator)
+    (orchestrator_policy_approval_reached ?orchestrator - orchestrator)
+    (orchestrator_policy_configured ?orchestrator - orchestrator)
+    (orchestrator_policy_acknowledged ?orchestrator - orchestrator)
+    (orchestrator_plugins_enabled ?orchestrator - orchestrator)
+    (orchestrator_finalization_prereq ?orchestrator - orchestrator)
+    (plugin_available ?plugin_extension - plugin_extension)
+    (orchestrator_plugin_binding ?orchestrator - orchestrator ?plugin_extension - plugin_extension)
+    (orchestrator_plugin_applied ?orchestrator - orchestrator)
+    (policy_approval_started ?orchestrator - orchestrator)
+    (policy_approval_completed ?orchestrator - orchestrator)
+    (policy_available ?policy_rule - policy_rule)
+    (orchestrator_policy_bound ?orchestrator - orchestrator ?policy_rule - policy_rule)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (orchestrator_feature_flag_bound ?orchestrator - orchestrator ?feature_flag - feature_flag)
+    (monitoring_integration_available ?monitoring_integration - monitoring_integration)
+    (orchestrator_monitoring_bound ?orchestrator - orchestrator ?monitoring_integration - monitoring_integration)
+    (quota_profile_available ?quota_profile - quota_profile)
+    (orchestrator_quota_bound ?orchestrator - orchestrator ?quota_profile - quota_profile)
+    (secret_material_available ?secret_material - secret_material)
+    (managed_entity_secret_material_binding ?application_component - application_component ?secret_material - secret_material)
+    (environment_initialized ?environment_instance - environment_instance)
+    (alternate_environment_initialized ?alternate_environment_instance - alternate_environment_instance)
+    (orchestrator_finalized ?orchestrator - orchestrator)
+  )
+  (:action register_managed_entity
+    :parameters (?application_component - application_component)
+    :precondition
+      (and
+        (not
+          (managed_entity_registered ?application_component)
+        )
+        (not
+          (integration_committed ?application_component)
+        )
+      )
+    :effect (managed_entity_registered ?application_component)
+  )
+  (:action bind_credential_to_managed_entity
+    :parameters (?application_component - application_component ?credential_reference - credential_reference)
+    :precondition
+      (and
+        (managed_entity_registered ?application_component)
+        (not
+          (managed_entity_bound ?application_component)
+        )
+        (credential_available ?credential_reference)
+      )
+    :effect
+      (and
+        (managed_entity_bound ?application_component)
+        (bound_to_credential ?application_component ?credential_reference)
+        (not
+          (credential_available ?credential_reference)
+        )
+      )
+  )
+  (:action attach_credential_descriptor_to_managed_entity
+    :parameters (?application_component - application_component ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_registered ?application_component)
+        (managed_entity_bound ?application_component)
+        (credential_descriptor_available ?credential_descriptor)
+      )
+    :effect
+      (and
+        (managed_entity_has_credential_descriptor ?application_component ?credential_descriptor)
+        (not
+          (credential_descriptor_available ?credential_descriptor)
+        )
+      )
+  )
+  (:action mark_managed_entity_ready
+    :parameters (?application_component - application_component ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_registered ?application_component)
+        (managed_entity_bound ?application_component)
+        (managed_entity_has_credential_descriptor ?application_component ?credential_descriptor)
+        (not
+          (managed_entity_ready ?application_component)
+        )
+      )
+    :effect (managed_entity_ready ?application_component)
+  )
+  (:action release_credential_descriptor_from_managed_entity
+    :parameters (?application_component - application_component ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_has_credential_descriptor ?application_component ?credential_descriptor)
+      )
+    :effect
+      (and
+        (credential_descriptor_available ?credential_descriptor)
+        (not
+          (managed_entity_has_credential_descriptor ?application_component ?credential_descriptor)
+        )
+      )
+  )
+  (:action assign_operator_to_managed_entity
+    :parameters (?application_component - application_component ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (managed_entity_ready ?application_component)
+        (operator_available ?operator_agent)
+      )
+    :effect
+      (and
+        (operator_assigned ?application_component ?operator_agent)
+        (not
+          (operator_available ?operator_agent)
+        )
+      )
+  )
+  (:action unassign_operator_from_managed_entity
+    :parameters (?application_component - application_component ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (operator_assigned ?application_component ?operator_agent)
+      )
+    :effect
+      (and
+        (operator_available ?operator_agent)
+        (not
+          (operator_assigned ?application_component ?operator_agent)
+        )
+      )
+  )
+  (:action attach_monitoring_integration_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?monitoring_integration - monitoring_integration)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (monitoring_integration_available ?monitoring_integration)
+      )
+    :effect
+      (and
+        (orchestrator_monitoring_bound ?orchestrator ?monitoring_integration)
+        (not
+          (monitoring_integration_available ?monitoring_integration)
+        )
+      )
+  )
+  (:action detach_monitoring_integration_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?monitoring_integration - monitoring_integration)
+    :precondition
+      (and
+        (orchestrator_monitoring_bound ?orchestrator ?monitoring_integration)
+      )
+    :effect
+      (and
+        (monitoring_integration_available ?monitoring_integration)
+        (not
+          (orchestrator_monitoring_bound ?orchestrator ?monitoring_integration)
+        )
+      )
+  )
+  (:action attach_quota_profile_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (quota_profile_available ?quota_profile)
+      )
+    :effect
+      (and
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (not
+          (quota_profile_available ?quota_profile)
+        )
+      )
+  )
+  (:action detach_quota_profile_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile)
+    :precondition
+      (and
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+      )
+    :effect
+      (and
+        (quota_profile_available ?quota_profile)
+        (not
+          (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        )
+      )
+  )
+  (:action discover_runtime_target_for_environment
+    :parameters (?environment_instance - environment_instance ?runtime_target - runtime_target ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_ready ?environment_instance)
+        (managed_entity_has_credential_descriptor ?environment_instance ?credential_descriptor)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (not
+          (runtime_target_discovered ?runtime_target)
+        )
+        (not
+          (runtime_target_associated ?runtime_target)
+        )
+      )
+    :effect (runtime_target_discovered ?runtime_target)
+  )
+  (:action apply_operator_to_environment
+    :parameters (?environment_instance - environment_instance ?runtime_target - runtime_target ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (managed_entity_ready ?environment_instance)
+        (operator_assigned ?environment_instance ?operator_agent)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (runtime_target_discovered ?runtime_target)
+        (not
+          (environment_initialized ?environment_instance)
+        )
+      )
+    :effect
+      (and
+        (environment_initialized ?environment_instance)
+        (environment_prepared ?environment_instance)
+      )
+  )
+  (:action associate_artifact_with_environment_runtime
+    :parameters (?environment_instance - environment_instance ?runtime_target - runtime_target ?artifact - artifact)
+    :precondition
+      (and
+        (managed_entity_ready ?environment_instance)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (artifact_available ?artifact)
+        (not
+          (environment_initialized ?environment_instance)
+        )
+      )
+    :effect
+      (and
+        (runtime_target_associated ?runtime_target)
+        (environment_initialized ?environment_instance)
+        (environment_associated_artifact ?environment_instance ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action deploy_artifact_on_environment_runtime
+    :parameters (?environment_instance - environment_instance ?runtime_target - runtime_target ?credential_descriptor - credential_descriptor ?artifact - artifact)
+    :precondition
+      (and
+        (managed_entity_ready ?environment_instance)
+        (managed_entity_has_credential_descriptor ?environment_instance ?credential_descriptor)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (runtime_target_associated ?runtime_target)
+        (environment_associated_artifact ?environment_instance ?artifact)
+        (not
+          (environment_prepared ?environment_instance)
+        )
+      )
+    :effect
+      (and
+        (runtime_target_discovered ?runtime_target)
+        (environment_prepared ?environment_instance)
+        (artifact_available ?artifact)
+        (not
+          (environment_associated_artifact ?environment_instance ?artifact)
+        )
+      )
+  )
+  (:action discover_location_for_alternate_environment
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?location_zone - location_zone ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_ready ?alternate_environment_instance)
+        (managed_entity_has_credential_descriptor ?alternate_environment_instance ?credential_descriptor)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (not
+          (location_discovered ?location_zone)
+        )
+        (not
+          (location_associated ?location_zone)
+        )
+      )
+    :effect (location_discovered ?location_zone)
+  )
+  (:action apply_operator_to_alternate_environment
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?location_zone - location_zone ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (managed_entity_ready ?alternate_environment_instance)
+        (operator_assigned ?alternate_environment_instance ?operator_agent)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (location_discovered ?location_zone)
+        (not
+          (alternate_environment_initialized ?alternate_environment_instance)
+        )
+      )
+    :effect
+      (and
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (alternate_environment_prepared ?alternate_environment_instance)
+      )
+  )
+  (:action associate_artifact_with_alternate_environment
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?location_zone - location_zone ?artifact - artifact)
+    :precondition
+      (and
+        (managed_entity_ready ?alternate_environment_instance)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (artifact_available ?artifact)
+        (not
+          (alternate_environment_initialized ?alternate_environment_instance)
+        )
+      )
+    :effect
+      (and
+        (location_associated ?location_zone)
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (alternate_env_artifact_binding ?alternate_environment_instance ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action deploy_artifact_on_alternate_environment
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?location_zone - location_zone ?credential_descriptor - credential_descriptor ?artifact - artifact)
+    :precondition
+      (and
+        (managed_entity_ready ?alternate_environment_instance)
+        (managed_entity_has_credential_descriptor ?alternate_environment_instance ?credential_descriptor)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (location_associated ?location_zone)
+        (alternate_env_artifact_binding ?alternate_environment_instance ?artifact)
+        (not
+          (alternate_environment_prepared ?alternate_environment_instance)
+        )
+      )
+    :effect
+      (and
+        (location_discovered ?location_zone)
+        (alternate_environment_prepared ?alternate_environment_instance)
+        (artifact_available ?artifact)
+        (not
+          (alternate_env_artifact_binding ?alternate_environment_instance ?artifact)
+        )
+      )
+  )
+  (:action create_deployment_target
+    :parameters (?environment_instance - environment_instance ?alternate_environment_instance - alternate_environment_instance ?runtime_target - runtime_target ?location_zone - location_zone ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (environment_initialized ?environment_instance)
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (runtime_target_discovered ?runtime_target)
+        (location_discovered ?location_zone)
+        (environment_prepared ?environment_instance)
+        (alternate_environment_prepared ?alternate_environment_instance)
+        (deployment_target_pending ?deployment_target)
+      )
+    :effect
+      (and
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_runtime_binding ?deployment_target ?runtime_target)
+        (deployment_target_location_binding ?deployment_target ?location_zone)
+        (not
+          (deployment_target_pending ?deployment_target)
+        )
+      )
+  )
+  (:action provision_deployment_target_with_option_alpha
+    :parameters (?environment_instance - environment_instance ?alternate_environment_instance - alternate_environment_instance ?runtime_target - runtime_target ?location_zone - location_zone ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (environment_initialized ?environment_instance)
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (runtime_target_associated ?runtime_target)
+        (location_discovered ?location_zone)
+        (not
+          (environment_prepared ?environment_instance)
+        )
+        (alternate_environment_prepared ?alternate_environment_instance)
+        (deployment_target_pending ?deployment_target)
+      )
+    :effect
+      (and
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_runtime_binding ?deployment_target ?runtime_target)
+        (deployment_target_location_binding ?deployment_target ?location_zone)
+        (deployment_target_option_alpha ?deployment_target)
+        (not
+          (deployment_target_pending ?deployment_target)
+        )
+      )
+  )
+  (:action provision_deployment_target_with_option_beta
+    :parameters (?environment_instance - environment_instance ?alternate_environment_instance - alternate_environment_instance ?runtime_target - runtime_target ?location_zone - location_zone ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (environment_initialized ?environment_instance)
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (runtime_target_discovered ?runtime_target)
+        (location_associated ?location_zone)
+        (environment_prepared ?environment_instance)
+        (not
+          (alternate_environment_prepared ?alternate_environment_instance)
+        )
+        (deployment_target_pending ?deployment_target)
+      )
+    :effect
+      (and
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_runtime_binding ?deployment_target ?runtime_target)
+        (deployment_target_location_binding ?deployment_target ?location_zone)
+        (deployment_target_option_beta ?deployment_target)
+        (not
+          (deployment_target_pending ?deployment_target)
+        )
+      )
+  )
+  (:action provision_deployment_target_with_options_alpha_and_beta
+    :parameters (?environment_instance - environment_instance ?alternate_environment_instance - alternate_environment_instance ?runtime_target - runtime_target ?location_zone - location_zone ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (environment_initialized ?environment_instance)
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (environment_runtime_target_binding ?environment_instance ?runtime_target)
+        (alternate_env_location_binding ?alternate_environment_instance ?location_zone)
+        (runtime_target_associated ?runtime_target)
+        (location_associated ?location_zone)
+        (not
+          (environment_prepared ?environment_instance)
+        )
+        (not
+          (alternate_environment_prepared ?alternate_environment_instance)
+        )
+        (deployment_target_pending ?deployment_target)
+      )
+    :effect
+      (and
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_runtime_binding ?deployment_target ?runtime_target)
+        (deployment_target_location_binding ?deployment_target ?location_zone)
+        (deployment_target_option_alpha ?deployment_target)
+        (deployment_target_option_beta ?deployment_target)
+        (not
+          (deployment_target_pending ?deployment_target)
+        )
+      )
+  )
+  (:action initialize_deployment_target
+    :parameters (?deployment_target - deployment_target ?environment_instance - environment_instance ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (deployment_target_provisioned ?deployment_target)
+        (environment_initialized ?environment_instance)
+        (managed_entity_has_credential_descriptor ?environment_instance ?credential_descriptor)
+        (not
+          (deployment_target_initialized ?deployment_target)
+        )
+      )
+    :effect (deployment_target_initialized ?deployment_target)
+  )
+  (:action bind_configuration_to_orchestrator_and_target
+    :parameters (?orchestrator - orchestrator ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (orchestrator_deployment_target_binding ?orchestrator ?deployment_target)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_available ?configuration_bundle)
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_initialized ?deployment_target)
+        (not
+          (config_bundle_applied ?configuration_bundle)
+        )
+      )
+    :effect
+      (and
+        (config_bundle_applied ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (not
+          (config_bundle_available ?configuration_bundle)
+        )
+      )
+  )
+  (:action validate_orchestrator_configuration
+    :parameters (?orchestrator - orchestrator ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_applied ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (managed_entity_has_credential_descriptor ?orchestrator ?credential_descriptor)
+        (not
+          (deployment_target_option_alpha ?deployment_target)
+        )
+        (not
+          (orchestrator_validated ?orchestrator)
+        )
+      )
+    :effect (orchestrator_validated ?orchestrator)
+  )
+  (:action attach_policy_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (policy_available ?policy_rule)
+        (not
+          (orchestrator_policy_configured ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_policy_configured ?orchestrator)
+        (orchestrator_policy_bound ?orchestrator ?policy_rule)
+        (not
+          (policy_available ?policy_rule)
+        )
+      )
+  )
+  (:action apply_policy_and_flag_orchestrator
+    :parameters (?orchestrator - orchestrator ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target ?credential_descriptor - credential_descriptor ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_applied ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (managed_entity_has_credential_descriptor ?orchestrator ?credential_descriptor)
+        (deployment_target_option_alpha ?deployment_target)
+        (orchestrator_policy_configured ?orchestrator)
+        (orchestrator_policy_bound ?orchestrator ?policy_rule)
+        (not
+          (orchestrator_validated ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_validated ?orchestrator)
+        (orchestrator_policy_acknowledged ?orchestrator)
+      )
+  )
+  (:action initiate_policy_approval_with_monitoring_and_operator
+    :parameters (?orchestrator - orchestrator ?monitoring_integration - monitoring_integration ?operator_agent - operator_agent ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_validated ?orchestrator)
+        (orchestrator_monitoring_bound ?orchestrator ?monitoring_integration)
+        (operator_assigned ?orchestrator ?operator_agent)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (not
+          (deployment_target_option_beta ?deployment_target)
+        )
+        (not
+          (orchestrator_policy_engaged ?orchestrator)
+        )
+      )
+    :effect (orchestrator_policy_engaged ?orchestrator)
+  )
+  (:action initiate_policy_approval_with_monitoring_and_operator_variant
+    :parameters (?orchestrator - orchestrator ?monitoring_integration - monitoring_integration ?operator_agent - operator_agent ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_validated ?orchestrator)
+        (orchestrator_monitoring_bound ?orchestrator ?monitoring_integration)
+        (operator_assigned ?orchestrator ?operator_agent)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (deployment_target_option_beta ?deployment_target)
+        (not
+          (orchestrator_policy_engaged ?orchestrator)
+        )
+      )
+    :effect (orchestrator_policy_engaged ?orchestrator)
+  )
+  (:action advance_policy_approval
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_policy_engaged ?orchestrator)
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (not
+          (deployment_target_option_alpha ?deployment_target)
+        )
+        (not
+          (deployment_target_option_beta ?deployment_target)
+        )
+        (not
+          (orchestrator_policy_approval_reached ?orchestrator)
+        )
+      )
+    :effect (orchestrator_policy_approval_reached ?orchestrator)
+  )
+  (:action advance_policy_approval_and_register_plugin
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_policy_engaged ?orchestrator)
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (deployment_target_option_alpha ?deployment_target)
+        (not
+          (deployment_target_option_beta ?deployment_target)
+        )
+        (not
+          (orchestrator_policy_approval_reached ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_plugins_enabled ?orchestrator)
+      )
+  )
+  (:action advance_policy_approval_variant
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_policy_engaged ?orchestrator)
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (not
+          (deployment_target_option_alpha ?deployment_target)
+        )
+        (deployment_target_option_beta ?deployment_target)
+        (not
+          (orchestrator_policy_approval_reached ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_plugins_enabled ?orchestrator)
+      )
+  )
+  (:action advance_policy_approval_variant_two
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile ?configuration_bundle - configuration_bundle ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (orchestrator_policy_engaged ?orchestrator)
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (orchestrator_has_config_bundle ?orchestrator ?configuration_bundle)
+        (config_bundle_bound_to_deployment_target ?configuration_bundle ?deployment_target)
+        (deployment_target_option_alpha ?deployment_target)
+        (deployment_target_option_beta ?deployment_target)
+        (not
+          (orchestrator_policy_approval_reached ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_plugins_enabled ?orchestrator)
+      )
+  )
+  (:action finalize_orchestrator_activation
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (not
+          (orchestrator_plugins_enabled ?orchestrator)
+        )
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (operational ?orchestrator)
+      )
+  )
+  (:action enable_feature_flag_on_orchestrator
+    :parameters (?orchestrator - orchestrator ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_plugins_enabled ?orchestrator)
+        (feature_flag_available ?feature_flag)
+      )
+    :effect
+      (and
+        (orchestrator_feature_flag_bound ?orchestrator ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action complete_orchestrator_finalization_prechecks
+    :parameters (?orchestrator - orchestrator ?environment_instance - environment_instance ?alternate_environment_instance - alternate_environment_instance ?credential_descriptor - credential_descriptor ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_plugins_enabled ?orchestrator)
+        (orchestrator_feature_flag_bound ?orchestrator ?feature_flag)
+        (orchestrator_environment_binding ?orchestrator ?environment_instance)
+        (orchestrator_alternate_environment_binding ?orchestrator ?alternate_environment_instance)
+        (environment_prepared ?environment_instance)
+        (alternate_environment_prepared ?alternate_environment_instance)
+        (managed_entity_has_credential_descriptor ?orchestrator ?credential_descriptor)
+        (not
+          (orchestrator_finalization_prereq ?orchestrator)
+        )
+      )
+    :effect (orchestrator_finalization_prereq ?orchestrator)
+  )
+  (:action finalize_orchestrator_postchecks
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_policy_approval_reached ?orchestrator)
+        (orchestrator_finalization_prereq ?orchestrator)
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (operational ?orchestrator)
+      )
+  )
+  (:action attach_plugin_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?plugin_extension - plugin_extension ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (managed_entity_ready ?orchestrator)
+        (managed_entity_has_credential_descriptor ?orchestrator ?credential_descriptor)
+        (plugin_available ?plugin_extension)
+        (orchestrator_plugin_binding ?orchestrator ?plugin_extension)
+        (not
+          (orchestrator_plugin_applied ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_plugin_applied ?orchestrator)
+        (not
+          (plugin_available ?plugin_extension)
+        )
+      )
+  )
+  (:action start_policy_approval_phase
+    :parameters (?orchestrator - orchestrator ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (orchestrator_plugin_applied ?orchestrator)
+        (operator_assigned ?orchestrator ?operator_agent)
+        (not
+          (policy_approval_started ?orchestrator)
+        )
+      )
+    :effect (policy_approval_started ?orchestrator)
+  )
+  (:action complete_policy_approval_with_quota
+    :parameters (?orchestrator - orchestrator ?quota_profile - quota_profile)
+    :precondition
+      (and
+        (policy_approval_started ?orchestrator)
+        (orchestrator_quota_bound ?orchestrator ?quota_profile)
+        (not
+          (policy_approval_completed ?orchestrator)
+        )
+      )
+    :effect (policy_approval_completed ?orchestrator)
+  )
+  (:action finalize_orchestrator_after_policy_approval
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (policy_approval_completed ?orchestrator)
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (operational ?orchestrator)
+      )
+  )
+  (:action finalize_environment_activation
+    :parameters (?environment_instance - environment_instance ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (environment_initialized ?environment_instance)
+        (environment_prepared ?environment_instance)
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_initialized ?deployment_target)
+        (not
+          (operational ?environment_instance)
+        )
+      )
+    :effect (operational ?environment_instance)
+  )
+  (:action finalize_alternate_environment_activation
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?deployment_target - deployment_target)
+    :precondition
+      (and
+        (alternate_environment_initialized ?alternate_environment_instance)
+        (alternate_environment_prepared ?alternate_environment_instance)
+        (deployment_target_provisioned ?deployment_target)
+        (deployment_target_initialized ?deployment_target)
+        (not
+          (operational ?alternate_environment_instance)
+        )
+      )
+    :effect (operational ?alternate_environment_instance)
+  )
+  (:action consume_secret_and_bind_to_managed_entity
+    :parameters (?application_component - application_component ?secret_material - secret_material ?credential_descriptor - credential_descriptor)
+    :precondition
+      (and
+        (operational ?application_component)
+        (managed_entity_has_credential_descriptor ?application_component ?credential_descriptor)
+        (secret_material_available ?secret_material)
+        (not
+          (secret_bound ?application_component)
+        )
+      )
+    :effect
+      (and
+        (secret_bound ?application_component)
+        (managed_entity_secret_material_binding ?application_component ?secret_material)
+        (not
+          (secret_material_available ?secret_material)
+        )
+      )
+  )
+  (:action propagate_secret_and_commit_environment_integration
+    :parameters (?environment_instance - environment_instance ?credential_reference - credential_reference ?secret_material - secret_material)
+    :precondition
+      (and
+        (secret_bound ?environment_instance)
+        (bound_to_credential ?environment_instance ?credential_reference)
+        (managed_entity_secret_material_binding ?environment_instance ?secret_material)
+        (not
+          (integration_committed ?environment_instance)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?environment_instance)
+        (credential_available ?credential_reference)
+        (secret_material_available ?secret_material)
+      )
+  )
+  (:action propagate_secret_and_commit_alternate_environment_integration
+    :parameters (?alternate_environment_instance - alternate_environment_instance ?credential_reference - credential_reference ?secret_material - secret_material)
+    :precondition
+      (and
+        (secret_bound ?alternate_environment_instance)
+        (bound_to_credential ?alternate_environment_instance ?credential_reference)
+        (managed_entity_secret_material_binding ?alternate_environment_instance ?secret_material)
+        (not
+          (integration_committed ?alternate_environment_instance)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?alternate_environment_instance)
+        (credential_available ?credential_reference)
+        (secret_material_available ?secret_material)
+      )
+  )
+  (:action propagate_secret_and_commit_orchestrator_integration
+    :parameters (?orchestrator - orchestrator ?credential_reference - credential_reference ?secret_material - secret_material)
+    :precondition
+      (and
+        (secret_bound ?orchestrator)
+        (bound_to_credential ?orchestrator ?credential_reference)
+        (managed_entity_secret_material_binding ?orchestrator ?secret_material)
+        (not
+          (integration_committed ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?orchestrator)
+        (credential_available ?credential_reference)
+        (secret_material_available ?secret_material)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem integration_deployment_case)
+  (:domain container_cloud_environment_integration)
+  (:objects namespace_alpha - environment_instance namespace_beta - alternate_environment_instance orchestrator_primary - orchestrator orchestrator_secondary - orchestrator registry_credential_1 - credential_reference registry_credential_2 - credential_reference registry_credential_3 - credential_reference credential_descriptor_1 - credential_descriptor operator_agent_1 - operator_agent artifact_image_1 - artifact runtime_host_1 - runtime_target zone_us_east_1 - location_zone deployment_cluster_1 - deployment_target config_bundle_v1 - configuration_bundle config_bundle_v2 - configuration_bundle policy_rule_1 - policy_rule policy_rule_2 - policy_rule feature_flag_experimental - feature_flag feature_flag_beta - feature_flag secret_key_1 - secret_material monitoring_connector_datadog - monitoring_integration plugin_extension_logging - plugin_extension plugin_extension_tracing - plugin_extension quota_profile_basic - quota_profile)
+  (:init
+    (credential_available registry_credential_1)
+    (credential_available registry_credential_2)
+    (credential_available registry_credential_3)
+    (credential_descriptor_available credential_descriptor_1)
+    (operator_available operator_agent_1)
+    (artifact_available artifact_image_1)
+    (environment_runtime_target_binding namespace_alpha runtime_host_1)
+    (alternate_env_location_binding namespace_beta zone_us_east_1)
+    (deployment_target_pending deployment_cluster_1)
+    (config_bundle_available config_bundle_v1)
+    (config_bundle_available config_bundle_v2)
+    (orchestrator_environment_binding orchestrator_primary namespace_alpha)
+    (orchestrator_environment_binding orchestrator_secondary namespace_alpha)
+    (orchestrator_alternate_environment_binding orchestrator_primary namespace_beta)
+    (orchestrator_alternate_environment_binding orchestrator_secondary namespace_beta)
+    (orchestrator_deployment_target_binding orchestrator_primary deployment_cluster_1)
+    (orchestrator_deployment_target_binding orchestrator_secondary deployment_cluster_1)
+    (orchestrator_has_config_bundle orchestrator_primary config_bundle_v1)
+    (orchestrator_has_config_bundle orchestrator_secondary config_bundle_v2)
+    (policy_available policy_rule_1)
+    (policy_available policy_rule_2)
+    (feature_flag_available feature_flag_experimental)
+    (feature_flag_available feature_flag_beta)
+    (secret_material_available secret_key_1)
+    (monitoring_integration_available monitoring_connector_datadog)
+    (plugin_available plugin_extension_logging)
+    (orchestrator_plugin_binding orchestrator_primary plugin_extension_logging)
+    (orchestrator_plugin_binding orchestrator_secondary plugin_extension_tracing)
+    (quota_profile_available quota_profile_basic)
+  )
+  (:goal
+    (and
+      (integration_committed namespace_alpha)
+      (integration_committed namespace_beta)
+      (integration_committed orchestrator_primary)
+      (integration_committed orchestrator_secondary)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain pharmacy_split_dispense_pickup_staging)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object supply_or_material_category - object location_or_container_category - object case_category - object prescription_order - case_category inventory_item - resource_category formulary_check_task - resource_category pharmacy_staff_member - resource_category special_handling_requirement - resource_category auxiliary_label - resource_category patient_instruction_material - resource_category equipment_or_device_check - resource_category regulatory_authorization_token - resource_category packaging_component - supply_or_material_category label_template - supply_or_material_category authorization_document - supply_or_material_category staging_slot_primary - location_or_container_category staging_slot_secondary - location_or_container_category dispense_package - location_or_container_category dispense_segment_category - prescription_order workorder_subcategory - prescription_order primary_dispense_segment - dispense_segment_category secondary_dispense_segment - dispense_segment_category dispensing_workorder - workorder_subcategory)
+  (:predicates
+    (prescription_registered ?prescription - prescription_order)
+    (review_completed ?prescription - prescription_order)
+    (inventory_allocated ?prescription - prescription_order)
+    (released_for_pickup ?prescription - prescription_order)
+    (final_verification_completed ?prescription - prescription_order)
+    (instructions_attached ?prescription - prescription_order)
+    (inventory_available ?inventory_item - inventory_item)
+    (inventory_reserved ?prescription - prescription_order ?inventory_item - inventory_item)
+    (formulary_task_available ?formulary_task - formulary_check_task)
+    (formulary_check_assigned ?prescription - prescription_order ?formulary_task - formulary_check_task)
+    (staff_available ?staff_member - pharmacy_staff_member)
+    (staff_assigned ?prescription - prescription_order ?staff_member - pharmacy_staff_member)
+    (packaging_available ?packaging_component - packaging_component)
+    (primary_packaging_allocated ?primary_segment - primary_dispense_segment ?packaging_component - packaging_component)
+    (secondary_packaging_allocated ?secondary_segment - secondary_dispense_segment ?packaging_component - packaging_component)
+    (primary_segment_staged_in_slot ?primary_segment - primary_dispense_segment ?primary_slot - staging_slot_primary)
+    (primary_slot_ready ?primary_slot - staging_slot_primary)
+    (primary_slot_packaging_assigned ?primary_slot - staging_slot_primary)
+    (primary_segment_prepared ?primary_segment - primary_dispense_segment)
+    (secondary_segment_staged_in_slot ?secondary_segment - secondary_dispense_segment ?secondary_slot - staging_slot_secondary)
+    (secondary_slot_ready ?secondary_slot - staging_slot_secondary)
+    (secondary_slot_packaging_assigned ?secondary_slot - staging_slot_secondary)
+    (secondary_segment_prepared ?secondary_segment - secondary_dispense_segment)
+    (dispense_package_available ?dispense_package - dispense_package)
+    (dispense_package_allocated ?dispense_package - dispense_package)
+    (package_linked_primary_slot ?dispense_package - dispense_package ?primary_slot - staging_slot_primary)
+    (package_linked_secondary_slot ?dispense_package - dispense_package ?secondary_slot - staging_slot_secondary)
+    (package_flag_primary_route ?dispense_package - dispense_package)
+    (package_flag_secondary_route ?dispense_package - dispense_package)
+    (package_sealed ?dispense_package - dispense_package)
+    (workorder_includes_primary_segment ?workorder - dispensing_workorder ?primary_segment - primary_dispense_segment)
+    (workorder_includes_secondary_segment ?workorder - dispensing_workorder ?secondary_segment - secondary_dispense_segment)
+    (workorder_associated_with_package ?workorder - dispensing_workorder ?dispense_package - dispense_package)
+    (label_template_available ?label_template - label_template)
+    (workorder_label_template_bound ?workorder - dispensing_workorder ?label_template - label_template)
+    (label_template_consumed ?label_template - label_template)
+    (label_template_assigned_to_package ?label_template - label_template ?dispense_package - dispense_package)
+    (workorder_labeling_ready ?workorder - dispensing_workorder)
+    (workorder_labeling_in_progress ?workorder - dispensing_workorder)
+    (workorder_authorization_verified ?workorder - dispensing_workorder)
+    (workorder_has_special_handling ?workorder - dispensing_workorder)
+    (workorder_special_handling_ready ?workorder - dispensing_workorder)
+    (workorder_labeling_completed ?workorder - dispensing_workorder)
+    (workorder_qc_passed ?workorder - dispensing_workorder)
+    (authorization_document_available ?authorization_doc - authorization_document)
+    (workorder_authorization_document_bound ?workorder - dispensing_workorder ?authorization_doc - authorization_document)
+    (workorder_authorization_processed ?workorder - dispensing_workorder)
+    (workorder_authorization_under_review ?workorder - dispensing_workorder)
+    (workorder_regulatory_check_passed ?workorder - dispensing_workorder)
+    (special_handling_available ?special_handling - special_handling_requirement)
+    (workorder_special_handling_link ?workorder - dispensing_workorder ?special_handling - special_handling_requirement)
+    (auxiliary_label_available ?auxiliary_label - auxiliary_label)
+    (workorder_aux_label_bound ?workorder - dispensing_workorder ?auxiliary_label - auxiliary_label)
+    (equipment_check_available ?equipment_check - equipment_or_device_check)
+    (workorder_equipment_check_assigned ?workorder - dispensing_workorder ?equipment_check - equipment_or_device_check)
+    (auth_token_available ?auth_token - regulatory_authorization_token)
+    (workorder_auth_token_assigned ?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token)
+    (patient_instruction_available ?patient_instruction - patient_instruction_material)
+    (patient_instruction_linked ?prescription - prescription_order ?patient_instruction - patient_instruction_material)
+    (primary_segment_packaging_confirmed ?primary_segment - primary_dispense_segment)
+    (secondary_segment_packaging_confirmed ?secondary_segment - secondary_dispense_segment)
+    (workorder_final_release_marked ?workorder - dispensing_workorder)
+  )
+  (:action register_prescription
+    :parameters (?prescription - prescription_order)
+    :precondition
+      (and
+        (not
+          (prescription_registered ?prescription)
+        )
+        (not
+          (released_for_pickup ?prescription)
+        )
+      )
+    :effect (prescription_registered ?prescription)
+  )
+  (:action reserve_inventory_for_prescription
+    :parameters (?prescription - prescription_order ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (prescription_registered ?prescription)
+        (not
+          (inventory_allocated ?prescription)
+        )
+        (inventory_available ?inventory_item)
+      )
+    :effect
+      (and
+        (inventory_allocated ?prescription)
+        (inventory_reserved ?prescription ?inventory_item)
+        (not
+          (inventory_available ?inventory_item)
+        )
+      )
+  )
+  (:action assign_formulary_task
+    :parameters (?prescription - prescription_order ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (prescription_registered ?prescription)
+        (inventory_allocated ?prescription)
+        (formulary_task_available ?formulary_task)
+      )
+    :effect
+      (and
+        (formulary_check_assigned ?prescription ?formulary_task)
+        (not
+          (formulary_task_available ?formulary_task)
+        )
+      )
+  )
+  (:action finalize_formulary_review
+    :parameters (?prescription - prescription_order ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (prescription_registered ?prescription)
+        (inventory_allocated ?prescription)
+        (formulary_check_assigned ?prescription ?formulary_task)
+        (not
+          (review_completed ?prescription)
+        )
+      )
+    :effect (review_completed ?prescription)
+  )
+  (:action release_formulary_task
+    :parameters (?prescription - prescription_order ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (formulary_check_assigned ?prescription ?formulary_task)
+      )
+    :effect
+      (and
+        (formulary_task_available ?formulary_task)
+        (not
+          (formulary_check_assigned ?prescription ?formulary_task)
+        )
+      )
+  )
+  (:action assign_staff_member
+    :parameters (?prescription - prescription_order ?staff_member - pharmacy_staff_member)
+    :precondition
+      (and
+        (review_completed ?prescription)
+        (staff_available ?staff_member)
+      )
+    :effect
+      (and
+        (staff_assigned ?prescription ?staff_member)
+        (not
+          (staff_available ?staff_member)
+        )
+      )
+  )
+  (:action unassign_staff_member
+    :parameters (?prescription - prescription_order ?staff_member - pharmacy_staff_member)
+    :precondition
+      (and
+        (staff_assigned ?prescription ?staff_member)
+      )
+    :effect
+      (and
+        (staff_available ?staff_member)
+        (not
+          (staff_assigned ?prescription ?staff_member)
+        )
+      )
+  )
+  (:action assign_equipment_check
+    :parameters (?workorder - dispensing_workorder ?equipment_check - equipment_or_device_check)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (equipment_check_available ?equipment_check)
+      )
+    :effect
+      (and
+        (workorder_equipment_check_assigned ?workorder ?equipment_check)
+        (not
+          (equipment_check_available ?equipment_check)
+        )
+      )
+  )
+  (:action release_equipment_check
+    :parameters (?workorder - dispensing_workorder ?equipment_check - equipment_or_device_check)
+    :precondition
+      (and
+        (workorder_equipment_check_assigned ?workorder ?equipment_check)
+      )
+    :effect
+      (and
+        (equipment_check_available ?equipment_check)
+        (not
+          (workorder_equipment_check_assigned ?workorder ?equipment_check)
+        )
+      )
+  )
+  (:action assign_regulatory_token
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (auth_token_available ?auth_token)
+      )
+    :effect
+      (and
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (not
+          (auth_token_available ?auth_token)
+        )
+      )
+  )
+  (:action release_regulatory_token
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token)
+    :precondition
+      (and
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+      )
+    :effect
+      (and
+        (auth_token_available ?auth_token)
+        (not
+          (workorder_auth_token_assigned ?workorder ?auth_token)
+        )
+      )
+  )
+  (:action stage_primary_segment_in_slot
+    :parameters (?primary_segment - primary_dispense_segment ?primary_slot - staging_slot_primary ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (review_completed ?primary_segment)
+        (formulary_check_assigned ?primary_segment ?formulary_task)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (not
+          (primary_slot_ready ?primary_slot)
+        )
+        (not
+          (primary_slot_packaging_assigned ?primary_slot)
+        )
+      )
+    :effect (primary_slot_ready ?primary_slot)
+  )
+  (:action confirm_primary_packaging
+    :parameters (?primary_segment - primary_dispense_segment ?primary_slot - staging_slot_primary ?staff_member - pharmacy_staff_member)
+    :precondition
+      (and
+        (review_completed ?primary_segment)
+        (staff_assigned ?primary_segment ?staff_member)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (primary_slot_ready ?primary_slot)
+        (not
+          (primary_segment_packaging_confirmed ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (primary_segment_prepared ?primary_segment)
+      )
+  )
+  (:action allocate_packaging_to_primary_segment
+    :parameters (?primary_segment - primary_dispense_segment ?primary_slot - staging_slot_primary ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (review_completed ?primary_segment)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (packaging_available ?packaging_component)
+        (not
+          (primary_segment_packaging_confirmed ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_packaging_assigned ?primary_slot)
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (primary_packaging_allocated ?primary_segment ?packaging_component)
+        (not
+          (packaging_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_primary_segment_packaging
+    :parameters (?primary_segment - primary_dispense_segment ?primary_slot - staging_slot_primary ?formulary_task - formulary_check_task ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (review_completed ?primary_segment)
+        (formulary_check_assigned ?primary_segment ?formulary_task)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (primary_slot_packaging_assigned ?primary_slot)
+        (primary_packaging_allocated ?primary_segment ?packaging_component)
+        (not
+          (primary_segment_prepared ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_ready ?primary_slot)
+        (primary_segment_prepared ?primary_segment)
+        (packaging_available ?packaging_component)
+        (not
+          (primary_packaging_allocated ?primary_segment ?packaging_component)
+        )
+      )
+  )
+  (:action stage_secondary_segment_in_slot
+    :parameters (?secondary_segment - secondary_dispense_segment ?secondary_slot - staging_slot_secondary ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (review_completed ?secondary_segment)
+        (formulary_check_assigned ?secondary_segment ?formulary_task)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (not
+          (secondary_slot_ready ?secondary_slot)
+        )
+        (not
+          (secondary_slot_packaging_assigned ?secondary_slot)
+        )
+      )
+    :effect (secondary_slot_ready ?secondary_slot)
+  )
+  (:action confirm_secondary_packaging
+    :parameters (?secondary_segment - secondary_dispense_segment ?secondary_slot - staging_slot_secondary ?staff_member - pharmacy_staff_member)
+    :precondition
+      (and
+        (review_completed ?secondary_segment)
+        (staff_assigned ?secondary_segment ?staff_member)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (not
+          (secondary_segment_packaging_confirmed ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (secondary_segment_prepared ?secondary_segment)
+      )
+  )
+  (:action allocate_packaging_to_secondary_segment
+    :parameters (?secondary_segment - secondary_dispense_segment ?secondary_slot - staging_slot_secondary ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (review_completed ?secondary_segment)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (packaging_available ?packaging_component)
+        (not
+          (secondary_segment_packaging_confirmed ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_packaging_assigned ?secondary_slot)
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (secondary_packaging_allocated ?secondary_segment ?packaging_component)
+        (not
+          (packaging_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_secondary_segment_packaging
+    :parameters (?secondary_segment - secondary_dispense_segment ?secondary_slot - staging_slot_secondary ?formulary_task - formulary_check_task ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (review_completed ?secondary_segment)
+        (formulary_check_assigned ?secondary_segment ?formulary_task)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (secondary_slot_packaging_assigned ?secondary_slot)
+        (secondary_packaging_allocated ?secondary_segment ?packaging_component)
+        (not
+          (secondary_segment_prepared ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_ready ?secondary_slot)
+        (secondary_segment_prepared ?secondary_segment)
+        (packaging_available ?packaging_component)
+        (not
+          (secondary_packaging_allocated ?secondary_segment ?packaging_component)
+        )
+      )
+  )
+  (:action assemble_dispense_package_from_slots
+    :parameters (?primary_segment - primary_dispense_segment ?secondary_segment - secondary_dispense_segment ?primary_slot - staging_slot_primary ?secondary_slot - staging_slot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (primary_slot_ready ?primary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (primary_segment_prepared ?primary_segment)
+        (secondary_segment_prepared ?secondary_segment)
+        (dispense_package_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_allocated ?dispense_package)
+        (package_linked_primary_slot ?dispense_package ?primary_slot)
+        (package_linked_secondary_slot ?dispense_package ?secondary_slot)
+        (not
+          (dispense_package_available ?dispense_package)
+        )
+      )
+  )
+  (:action assemble_dispense_package_primary_packaging_assigned
+    :parameters (?primary_segment - primary_dispense_segment ?secondary_segment - secondary_dispense_segment ?primary_slot - staging_slot_primary ?secondary_slot - staging_slot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (primary_slot_packaging_assigned ?primary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (not
+          (primary_segment_prepared ?primary_segment)
+        )
+        (secondary_segment_prepared ?secondary_segment)
+        (dispense_package_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_allocated ?dispense_package)
+        (package_linked_primary_slot ?dispense_package ?primary_slot)
+        (package_linked_secondary_slot ?dispense_package ?secondary_slot)
+        (package_flag_primary_route ?dispense_package)
+        (not
+          (dispense_package_available ?dispense_package)
+        )
+      )
+  )
+  (:action assemble_dispense_package_secondary_packaging_assigned
+    :parameters (?primary_segment - primary_dispense_segment ?secondary_segment - secondary_dispense_segment ?primary_slot - staging_slot_primary ?secondary_slot - staging_slot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (primary_slot_ready ?primary_slot)
+        (secondary_slot_packaging_assigned ?secondary_slot)
+        (primary_segment_prepared ?primary_segment)
+        (not
+          (secondary_segment_prepared ?secondary_segment)
+        )
+        (dispense_package_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_allocated ?dispense_package)
+        (package_linked_primary_slot ?dispense_package ?primary_slot)
+        (package_linked_secondary_slot ?dispense_package ?secondary_slot)
+        (package_flag_secondary_route ?dispense_package)
+        (not
+          (dispense_package_available ?dispense_package)
+        )
+      )
+  )
+  (:action assemble_dispense_package_both_packaging_assigned
+    :parameters (?primary_segment - primary_dispense_segment ?secondary_segment - secondary_dispense_segment ?primary_slot - staging_slot_primary ?secondary_slot - staging_slot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (primary_segment_staged_in_slot ?primary_segment ?primary_slot)
+        (secondary_segment_staged_in_slot ?secondary_segment ?secondary_slot)
+        (primary_slot_packaging_assigned ?primary_slot)
+        (secondary_slot_packaging_assigned ?secondary_slot)
+        (not
+          (primary_segment_prepared ?primary_segment)
+        )
+        (not
+          (secondary_segment_prepared ?secondary_segment)
+        )
+        (dispense_package_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_allocated ?dispense_package)
+        (package_linked_primary_slot ?dispense_package ?primary_slot)
+        (package_linked_secondary_slot ?dispense_package ?secondary_slot)
+        (package_flag_primary_route ?dispense_package)
+        (package_flag_secondary_route ?dispense_package)
+        (not
+          (dispense_package_available ?dispense_package)
+        )
+      )
+  )
+  (:action seal_dispense_package
+    :parameters (?dispense_package - dispense_package ?primary_segment - primary_dispense_segment ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (dispense_package_allocated ?dispense_package)
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (formulary_check_assigned ?primary_segment ?formulary_task)
+        (not
+          (package_sealed ?dispense_package)
+        )
+      )
+    :effect (package_sealed ?dispense_package)
+  )
+  (:action apply_label_template_to_package
+    :parameters (?workorder - dispensing_workorder ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (workorder_associated_with_package ?workorder ?dispense_package)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_available ?label_template)
+        (dispense_package_allocated ?dispense_package)
+        (package_sealed ?dispense_package)
+        (not
+          (label_template_consumed ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_consumed ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action initiate_labeling_process
+    :parameters (?workorder - dispensing_workorder ?label_template - label_template ?dispense_package - dispense_package ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_consumed ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (formulary_check_assigned ?workorder ?formulary_task)
+        (not
+          (package_flag_primary_route ?dispense_package)
+        )
+        (not
+          (workorder_labeling_ready ?workorder)
+        )
+      )
+    :effect (workorder_labeling_ready ?workorder)
+  )
+  (:action attach_special_handling_requirement
+    :parameters (?workorder - dispensing_workorder ?special_handling - special_handling_requirement)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (special_handling_available ?special_handling)
+        (not
+          (workorder_has_special_handling ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_has_special_handling ?workorder)
+        (workorder_special_handling_link ?workorder ?special_handling)
+        (not
+          (special_handling_available ?special_handling)
+        )
+      )
+  )
+  (:action apply_special_handling_and_labeling
+    :parameters (?workorder - dispensing_workorder ?label_template - label_template ?dispense_package - dispense_package ?formulary_task - formulary_check_task ?special_handling - special_handling_requirement)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_consumed ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (formulary_check_assigned ?workorder ?formulary_task)
+        (package_flag_primary_route ?dispense_package)
+        (workorder_has_special_handling ?workorder)
+        (workorder_special_handling_link ?workorder ?special_handling)
+        (not
+          (workorder_labeling_ready ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_labeling_ready ?workorder)
+        (workorder_special_handling_ready ?workorder)
+      )
+  )
+  (:action perform_equipment_check_start_labeling_variant_a
+    :parameters (?workorder - dispensing_workorder ?equipment_check - equipment_or_device_check ?staff_member - pharmacy_staff_member ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_ready ?workorder)
+        (workorder_equipment_check_assigned ?workorder ?equipment_check)
+        (staff_assigned ?workorder ?staff_member)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (not
+          (package_flag_secondary_route ?dispense_package)
+        )
+        (not
+          (workorder_labeling_in_progress ?workorder)
+        )
+      )
+    :effect (workorder_labeling_in_progress ?workorder)
+  )
+  (:action perform_equipment_check_start_labeling_variant_b
+    :parameters (?workorder - dispensing_workorder ?equipment_check - equipment_or_device_check ?staff_member - pharmacy_staff_member ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_ready ?workorder)
+        (workorder_equipment_check_assigned ?workorder ?equipment_check)
+        (staff_assigned ?workorder ?staff_member)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (package_flag_secondary_route ?dispense_package)
+        (not
+          (workorder_labeling_in_progress ?workorder)
+        )
+      )
+    :effect (workorder_labeling_in_progress ?workorder)
+  )
+  (:action verify_regulatory_authorization_variant_a
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_in_progress ?workorder)
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (not
+          (package_flag_primary_route ?dispense_package)
+        )
+        (not
+          (package_flag_secondary_route ?dispense_package)
+        )
+        (not
+          (workorder_authorization_verified ?workorder)
+        )
+      )
+    :effect (workorder_authorization_verified ?workorder)
+  )
+  (:action verify_regulatory_authorization_variant_b
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_in_progress ?workorder)
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (package_flag_primary_route ?dispense_package)
+        (not
+          (package_flag_secondary_route ?dispense_package)
+        )
+        (not
+          (workorder_authorization_verified ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_labeling_completed ?workorder)
+      )
+  )
+  (:action verify_regulatory_authorization_variant_c
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_in_progress ?workorder)
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (not
+          (package_flag_primary_route ?dispense_package)
+        )
+        (package_flag_secondary_route ?dispense_package)
+        (not
+          (workorder_authorization_verified ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_labeling_completed ?workorder)
+      )
+  )
+  (:action verify_regulatory_authorization_variant_d
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token ?label_template - label_template ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (workorder_labeling_in_progress ?workorder)
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (workorder_label_template_bound ?workorder ?label_template)
+        (label_template_assigned_to_package ?label_template ?dispense_package)
+        (package_flag_primary_route ?dispense_package)
+        (package_flag_secondary_route ?dispense_package)
+        (not
+          (workorder_authorization_verified ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_labeling_completed ?workorder)
+      )
+  )
+  (:action mark_workorder_ready_for_finalization
+    :parameters (?workorder - dispensing_workorder)
+    :precondition
+      (and
+        (workorder_authorization_verified ?workorder)
+        (not
+          (workorder_labeling_completed ?workorder)
+        )
+        (not
+          (workorder_final_release_marked ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_final_release_marked ?workorder)
+        (final_verification_completed ?workorder)
+      )
+  )
+  (:action bind_auxiliary_label_to_workorder
+    :parameters (?workorder - dispensing_workorder ?auxiliary_label - auxiliary_label)
+    :precondition
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_labeling_completed ?workorder)
+        (auxiliary_label_available ?auxiliary_label)
+      )
+    :effect
+      (and
+        (workorder_aux_label_bound ?workorder ?auxiliary_label)
+        (not
+          (auxiliary_label_available ?auxiliary_label)
+        )
+      )
+  )
+  (:action perform_workorder_qc_verification
+    :parameters (?workorder - dispensing_workorder ?primary_segment - primary_dispense_segment ?secondary_segment - secondary_dispense_segment ?formulary_task - formulary_check_task ?auxiliary_label - auxiliary_label)
+    :precondition
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_labeling_completed ?workorder)
+        (workorder_aux_label_bound ?workorder ?auxiliary_label)
+        (workorder_includes_primary_segment ?workorder ?primary_segment)
+        (workorder_includes_secondary_segment ?workorder ?secondary_segment)
+        (primary_segment_prepared ?primary_segment)
+        (secondary_segment_prepared ?secondary_segment)
+        (formulary_check_assigned ?workorder ?formulary_task)
+        (not
+          (workorder_qc_passed ?workorder)
+        )
+      )
+    :effect (workorder_qc_passed ?workorder)
+  )
+  (:action finalize_workorder_post_qc
+    :parameters (?workorder - dispensing_workorder)
+    :precondition
+      (and
+        (workorder_authorization_verified ?workorder)
+        (workorder_qc_passed ?workorder)
+        (not
+          (workorder_final_release_marked ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_final_release_marked ?workorder)
+        (final_verification_completed ?workorder)
+      )
+  )
+  (:action bind_authorization_document_to_workorder
+    :parameters (?workorder - dispensing_workorder ?authorization_doc - authorization_document ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (review_completed ?workorder)
+        (formulary_check_assigned ?workorder ?formulary_task)
+        (authorization_document_available ?authorization_doc)
+        (workorder_authorization_document_bound ?workorder ?authorization_doc)
+        (not
+          (workorder_authorization_processed ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_authorization_processed ?workorder)
+        (not
+          (authorization_document_available ?authorization_doc)
+        )
+      )
+  )
+  (:action start_authorization_review
+    :parameters (?workorder - dispensing_workorder ?staff_member - pharmacy_staff_member)
+    :precondition
+      (and
+        (workorder_authorization_processed ?workorder)
+        (staff_assigned ?workorder ?staff_member)
+        (not
+          (workorder_authorization_under_review ?workorder)
+        )
+      )
+    :effect (workorder_authorization_under_review ?workorder)
+  )
+  (:action verify_auth_token_for_workorder
+    :parameters (?workorder - dispensing_workorder ?auth_token - regulatory_authorization_token)
+    :precondition
+      (and
+        (workorder_authorization_under_review ?workorder)
+        (workorder_auth_token_assigned ?workorder ?auth_token)
+        (not
+          (workorder_regulatory_check_passed ?workorder)
+        )
+      )
+    :effect (workorder_regulatory_check_passed ?workorder)
+  )
+  (:action finalize_workorder_after_authorization
+    :parameters (?workorder - dispensing_workorder)
+    :precondition
+      (and
+        (workorder_regulatory_check_passed ?workorder)
+        (not
+          (workorder_final_release_marked ?workorder)
+        )
+      )
+    :effect
+      (and
+        (workorder_final_release_marked ?workorder)
+        (final_verification_completed ?workorder)
+      )
+  )
+  (:action finalize_primary_segment_for_release
+    :parameters (?primary_segment - primary_dispense_segment ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (primary_segment_packaging_confirmed ?primary_segment)
+        (primary_segment_prepared ?primary_segment)
+        (dispense_package_allocated ?dispense_package)
+        (package_sealed ?dispense_package)
+        (not
+          (final_verification_completed ?primary_segment)
+        )
+      )
+    :effect (final_verification_completed ?primary_segment)
+  )
+  (:action finalize_secondary_segment_for_release
+    :parameters (?secondary_segment - secondary_dispense_segment ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (secondary_segment_packaging_confirmed ?secondary_segment)
+        (secondary_segment_prepared ?secondary_segment)
+        (dispense_package_allocated ?dispense_package)
+        (package_sealed ?dispense_package)
+        (not
+          (final_verification_completed ?secondary_segment)
+        )
+      )
+    :effect (final_verification_completed ?secondary_segment)
+  )
+  (:action generate_and_attach_patient_instructions
+    :parameters (?prescription - prescription_order ?patient_instruction - patient_instruction_material ?formulary_task - formulary_check_task)
+    :precondition
+      (and
+        (final_verification_completed ?prescription)
+        (formulary_check_assigned ?prescription ?formulary_task)
+        (patient_instruction_available ?patient_instruction)
+        (not
+          (instructions_attached ?prescription)
+        )
+      )
+    :effect
+      (and
+        (instructions_attached ?prescription)
+        (patient_instruction_linked ?prescription ?patient_instruction)
+        (not
+          (patient_instruction_available ?patient_instruction)
+        )
+      )
+  )
+  (:action release_primary_segment_for_pickup
+    :parameters (?primary_segment - primary_dispense_segment ?inventory_item - inventory_item ?patient_instruction - patient_instruction_material)
+    :precondition
+      (and
+        (instructions_attached ?primary_segment)
+        (inventory_reserved ?primary_segment ?inventory_item)
+        (patient_instruction_linked ?primary_segment ?patient_instruction)
+        (not
+          (released_for_pickup ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (released_for_pickup ?primary_segment)
+        (inventory_available ?inventory_item)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+  (:action release_secondary_segment_for_pickup
+    :parameters (?secondary_segment - secondary_dispense_segment ?inventory_item - inventory_item ?patient_instruction - patient_instruction_material)
+    :precondition
+      (and
+        (instructions_attached ?secondary_segment)
+        (inventory_reserved ?secondary_segment ?inventory_item)
+        (patient_instruction_linked ?secondary_segment ?patient_instruction)
+        (not
+          (released_for_pickup ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (released_for_pickup ?secondary_segment)
+        (inventory_available ?inventory_item)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+  (:action release_workorder_for_pickup
+    :parameters (?workorder - dispensing_workorder ?inventory_item - inventory_item ?patient_instruction - patient_instruction_material)
+    :precondition
+      (and
+        (instructions_attached ?workorder)
+        (inventory_reserved ?workorder ?inventory_item)
+        (patient_instruction_linked ?workorder ?patient_instruction)
+        (not
+          (released_for_pickup ?workorder)
+        )
+      )
+    :effect
+      (and
+        (released_for_pickup ?workorder)
+        (inventory_available ?inventory_item)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+)

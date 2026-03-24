@@ -1,0 +1,936 @@
+(define (domain sterility_sensitive_operation_scheduling_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object record_category - object equipment_category - object batch_group - object batch - batch_group line_resource - resource_category process_operation - resource_category operator - resource_category label - resource_category test_equipment - resource_category quarantine_area - resource_category sterility_test_kit - resource_category validation_document - resource_category material_lot - record_category document - record_category monitoring_event - record_category cleanroom_zone - equipment_category transfer_port - equipment_category batch_record_document - equipment_category stage_group - batch unit_group - batch primary_stage - stage_group secondary_stage - stage_group production_unit - unit_group)
+  (:predicates
+    (batch_queued ?batch - batch)
+    (operation_confirmed ?batch - batch)
+    (batch_resource_allocated ?batch - batch)
+    (released ?batch - batch)
+    (processing_complete ?batch - batch)
+    (in_quarantine ?batch - batch)
+    (line_resource_available ?line_resource - line_resource)
+    (assigned_to_line ?batch - batch ?line_resource - line_resource)
+    (operation_available ?process_operation - process_operation)
+    (assigned_operation ?batch - batch ?process_operation - process_operation)
+    (operator_available ?operator - operator)
+    (assigned_operator ?batch - batch ?operator - operator)
+    (material_lot_available ?material_lot - material_lot)
+    (primary_stage_staged_material ?primary_stage - primary_stage ?material_lot - material_lot)
+    (secondary_stage_staged_material ?secondary_stage - secondary_stage ?material_lot - material_lot)
+    (stage_assigned_zone ?primary_stage - primary_stage ?cleanroom_zone - cleanroom_zone)
+    (zone_ready ?cleanroom_zone - cleanroom_zone)
+    (zone_materials_staged ?cleanroom_zone - cleanroom_zone)
+    (primary_stage_prepared ?primary_stage - primary_stage)
+    (stage_assigned_transfer_port ?secondary_stage - secondary_stage ?transfer_port - transfer_port)
+    (transfer_port_ready ?transfer_port - transfer_port)
+    (transfer_port_material_staged ?transfer_port - transfer_port)
+    (secondary_stage_prepared ?secondary_stage - secondary_stage)
+    (batch_record_available ?batch_record - batch_record_document)
+    (batch_record_initiated ?batch_record - batch_record_document)
+    (record_linked_to_zone ?batch_record - batch_record_document ?cleanroom_zone - cleanroom_zone)
+    (record_linked_to_port ?batch_record - batch_record_document ?transfer_port - transfer_port)
+    (record_confirmed_for_zone_transfer ?batch_record - batch_record_document)
+    (record_confirmed_for_port_transfer ?batch_record - batch_record_document)
+    (record_transfer_completed ?batch_record - batch_record_document)
+    (unit_assigned_primary_stage ?production_unit - production_unit ?primary_stage - primary_stage)
+    (unit_assigned_secondary_stage ?production_unit - production_unit ?secondary_stage - secondary_stage)
+    (unit_linked_to_batch_record ?production_unit - production_unit ?batch_record - batch_record_document)
+    (document_available ?document - document)
+    (unit_document_associated ?production_unit - production_unit ?document - document)
+    (document_linked ?document - document)
+    (document_associated_with_batch_record ?document - document ?batch_record - batch_record_document)
+    (unit_documentation_finalized ?production_unit - production_unit)
+    (unit_qa_initiated ?production_unit - production_unit)
+    (unit_validation_checks_completed ?production_unit - production_unit)
+    (label_applied ?production_unit - production_unit)
+    (label_verified ?production_unit - production_unit)
+    (unit_requires_equipment_test ?production_unit - production_unit)
+    (unit_final_checks_passed ?production_unit - production_unit)
+    (monitoring_event_available ?monitoring_event - monitoring_event)
+    (unit_associated_monitoring_event ?production_unit - production_unit ?monitoring_event - monitoring_event)
+    (unit_monitoring_event_attached ?production_unit - production_unit)
+    (unit_monitoring_verified ?production_unit - production_unit)
+    (unit_monitoring_accepted ?production_unit - production_unit)
+    (label_available ?label - label)
+    (unit_assigned_label ?production_unit - production_unit ?label - label)
+    (test_equipment_available ?test_equipment - test_equipment)
+    (unit_assigned_test_equipment ?production_unit - production_unit ?test_equipment - test_equipment)
+    (sterility_test_kit_available ?sterility_test_kit - sterility_test_kit)
+    (unit_assigned_test_kit ?production_unit - production_unit ?sterility_test_kit - sterility_test_kit)
+    (validation_document_available ?validation_document - validation_document)
+    (unit_assigned_validation_document ?production_unit - production_unit ?validation_document - validation_document)
+    (quarantine_area_available ?quarantine_area - quarantine_area)
+    (assigned_quarantine_area ?batch - batch ?quarantine_area - quarantine_area)
+    (primary_stage_locked ?primary_stage - primary_stage)
+    (secondary_stage_locked ?secondary_stage - secondary_stage)
+    (unit_finalized ?production_unit - production_unit)
+  )
+  (:action enqueue_batch
+    :parameters (?batch - batch)
+    :precondition
+      (and
+        (not
+          (batch_queued ?batch)
+        )
+        (not
+          (released ?batch)
+        )
+      )
+    :effect (batch_queued ?batch)
+  )
+  (:action reserve_line_for_batch
+    :parameters (?batch - batch ?line_resource - line_resource)
+    :precondition
+      (and
+        (batch_queued ?batch)
+        (not
+          (batch_resource_allocated ?batch)
+        )
+        (line_resource_available ?line_resource)
+      )
+    :effect
+      (and
+        (batch_resource_allocated ?batch)
+        (assigned_to_line ?batch ?line_resource)
+        (not
+          (line_resource_available ?line_resource)
+        )
+      )
+  )
+  (:action assign_operation_to_batch
+    :parameters (?batch - batch ?process_operation - process_operation)
+    :precondition
+      (and
+        (batch_queued ?batch)
+        (batch_resource_allocated ?batch)
+        (operation_available ?process_operation)
+      )
+    :effect
+      (and
+        (assigned_operation ?batch ?process_operation)
+        (not
+          (operation_available ?process_operation)
+        )
+      )
+  )
+  (:action confirm_operation_assignment
+    :parameters (?batch - batch ?process_operation - process_operation)
+    :precondition
+      (and
+        (batch_queued ?batch)
+        (batch_resource_allocated ?batch)
+        (assigned_operation ?batch ?process_operation)
+        (not
+          (operation_confirmed ?batch)
+        )
+      )
+    :effect (operation_confirmed ?batch)
+  )
+  (:action unassign_operation_from_batch
+    :parameters (?batch - batch ?process_operation - process_operation)
+    :precondition
+      (and
+        (assigned_operation ?batch ?process_operation)
+      )
+    :effect
+      (and
+        (operation_available ?process_operation)
+        (not
+          (assigned_operation ?batch ?process_operation)
+        )
+      )
+  )
+  (:action assign_operator_to_batch
+    :parameters (?batch - batch ?operator - operator)
+    :precondition
+      (and
+        (operation_confirmed ?batch)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (assigned_operator ?batch ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action unassign_operator_from_batch
+    :parameters (?batch - batch ?operator - operator)
+    :precondition
+      (and
+        (assigned_operator ?batch ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (assigned_operator ?batch ?operator)
+        )
+      )
+  )
+  (:action assign_sterility_test_kit_to_unit
+    :parameters (?production_unit - production_unit ?sterility_test_kit - sterility_test_kit)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (sterility_test_kit_available ?sterility_test_kit)
+      )
+    :effect
+      (and
+        (unit_assigned_test_kit ?production_unit ?sterility_test_kit)
+        (not
+          (sterility_test_kit_available ?sterility_test_kit)
+        )
+      )
+  )
+  (:action release_sterility_test_kit_from_unit
+    :parameters (?production_unit - production_unit ?sterility_test_kit - sterility_test_kit)
+    :precondition
+      (and
+        (unit_assigned_test_kit ?production_unit ?sterility_test_kit)
+      )
+    :effect
+      (and
+        (sterility_test_kit_available ?sterility_test_kit)
+        (not
+          (unit_assigned_test_kit ?production_unit ?sterility_test_kit)
+        )
+      )
+  )
+  (:action assign_validation_document_to_unit
+    :parameters (?production_unit - production_unit ?validation_document - validation_document)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (validation_document_available ?validation_document)
+      )
+    :effect
+      (and
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (not
+          (validation_document_available ?validation_document)
+        )
+      )
+  )
+  (:action unassign_validation_document_from_unit
+    :parameters (?production_unit - production_unit ?validation_document - validation_document)
+    :precondition
+      (and
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+      )
+    :effect
+      (and
+        (validation_document_available ?validation_document)
+        (not
+          (unit_assigned_validation_document ?production_unit ?validation_document)
+        )
+      )
+  )
+  (:action condition_cleanroom_zone
+    :parameters (?primary_stage - primary_stage ?cleanroom_zone - cleanroom_zone ?process_operation - process_operation)
+    :precondition
+      (and
+        (operation_confirmed ?primary_stage)
+        (assigned_operation ?primary_stage ?process_operation)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (not
+          (zone_ready ?cleanroom_zone)
+        )
+        (not
+          (zone_materials_staged ?cleanroom_zone)
+        )
+      )
+    :effect (zone_ready ?cleanroom_zone)
+  )
+  (:action engage_primary_stage_with_operator
+    :parameters (?primary_stage - primary_stage ?cleanroom_zone - cleanroom_zone ?operator - operator)
+    :precondition
+      (and
+        (operation_confirmed ?primary_stage)
+        (assigned_operator ?primary_stage ?operator)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (zone_ready ?cleanroom_zone)
+        (not
+          (primary_stage_locked ?primary_stage)
+        )
+      )
+    :effect
+      (and
+        (primary_stage_locked ?primary_stage)
+        (primary_stage_prepared ?primary_stage)
+      )
+  )
+  (:action stage_material_for_primary_stage
+    :parameters (?primary_stage - primary_stage ?cleanroom_zone - cleanroom_zone ?material_lot - material_lot)
+    :precondition
+      (and
+        (operation_confirmed ?primary_stage)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (material_lot_available ?material_lot)
+        (not
+          (primary_stage_locked ?primary_stage)
+        )
+      )
+    :effect
+      (and
+        (zone_materials_staged ?cleanroom_zone)
+        (primary_stage_locked ?primary_stage)
+        (primary_stage_staged_material ?primary_stage ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action process_primary_stage_materials
+    :parameters (?primary_stage - primary_stage ?cleanroom_zone - cleanroom_zone ?process_operation - process_operation ?material_lot - material_lot)
+    :precondition
+      (and
+        (operation_confirmed ?primary_stage)
+        (assigned_operation ?primary_stage ?process_operation)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (zone_materials_staged ?cleanroom_zone)
+        (primary_stage_staged_material ?primary_stage ?material_lot)
+        (not
+          (primary_stage_prepared ?primary_stage)
+        )
+      )
+    :effect
+      (and
+        (zone_ready ?cleanroom_zone)
+        (primary_stage_prepared ?primary_stage)
+        (material_lot_available ?material_lot)
+        (not
+          (primary_stage_staged_material ?primary_stage ?material_lot)
+        )
+      )
+  )
+  (:action prepare_transfer_port_for_secondary_stage
+    :parameters (?secondary_stage - secondary_stage ?transfer_port - transfer_port ?process_operation - process_operation)
+    :precondition
+      (and
+        (operation_confirmed ?secondary_stage)
+        (assigned_operation ?secondary_stage ?process_operation)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (not
+          (transfer_port_ready ?transfer_port)
+        )
+        (not
+          (transfer_port_material_staged ?transfer_port)
+        )
+      )
+    :effect (transfer_port_ready ?transfer_port)
+  )
+  (:action engage_secondary_stage_with_operator
+    :parameters (?secondary_stage - secondary_stage ?transfer_port - transfer_port ?operator - operator)
+    :precondition
+      (and
+        (operation_confirmed ?secondary_stage)
+        (assigned_operator ?secondary_stage ?operator)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (transfer_port_ready ?transfer_port)
+        (not
+          (secondary_stage_locked ?secondary_stage)
+        )
+      )
+    :effect
+      (and
+        (secondary_stage_locked ?secondary_stage)
+        (secondary_stage_prepared ?secondary_stage)
+      )
+  )
+  (:action stage_material_for_secondary_stage
+    :parameters (?secondary_stage - secondary_stage ?transfer_port - transfer_port ?material_lot - material_lot)
+    :precondition
+      (and
+        (operation_confirmed ?secondary_stage)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (material_lot_available ?material_lot)
+        (not
+          (secondary_stage_locked ?secondary_stage)
+        )
+      )
+    :effect
+      (and
+        (transfer_port_material_staged ?transfer_port)
+        (secondary_stage_locked ?secondary_stage)
+        (secondary_stage_staged_material ?secondary_stage ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action process_secondary_stage_materials
+    :parameters (?secondary_stage - secondary_stage ?transfer_port - transfer_port ?process_operation - process_operation ?material_lot - material_lot)
+    :precondition
+      (and
+        (operation_confirmed ?secondary_stage)
+        (assigned_operation ?secondary_stage ?process_operation)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (transfer_port_material_staged ?transfer_port)
+        (secondary_stage_staged_material ?secondary_stage ?material_lot)
+        (not
+          (secondary_stage_prepared ?secondary_stage)
+        )
+      )
+    :effect
+      (and
+        (transfer_port_ready ?transfer_port)
+        (secondary_stage_prepared ?secondary_stage)
+        (material_lot_available ?material_lot)
+        (not
+          (secondary_stage_staged_material ?secondary_stage ?material_lot)
+        )
+      )
+  )
+  (:action execute_synchronized_transfer_and_initiate_batch_record
+    :parameters (?primary_stage - primary_stage ?secondary_stage - secondary_stage ?cleanroom_zone - cleanroom_zone ?transfer_port - transfer_port ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (primary_stage_locked ?primary_stage)
+        (secondary_stage_locked ?secondary_stage)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (zone_ready ?cleanroom_zone)
+        (transfer_port_ready ?transfer_port)
+        (primary_stage_prepared ?primary_stage)
+        (secondary_stage_prepared ?secondary_stage)
+        (batch_record_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_initiated ?batch_record)
+        (record_linked_to_zone ?batch_record ?cleanroom_zone)
+        (record_linked_to_port ?batch_record ?transfer_port)
+        (not
+          (batch_record_available ?batch_record)
+        )
+      )
+  )
+  (:action initiate_synchronized_transfer_with_zone_confirmation
+    :parameters (?primary_stage - primary_stage ?secondary_stage - secondary_stage ?cleanroom_zone - cleanroom_zone ?transfer_port - transfer_port ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (primary_stage_locked ?primary_stage)
+        (secondary_stage_locked ?secondary_stage)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (zone_materials_staged ?cleanroom_zone)
+        (transfer_port_ready ?transfer_port)
+        (not
+          (primary_stage_prepared ?primary_stage)
+        )
+        (secondary_stage_prepared ?secondary_stage)
+        (batch_record_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_initiated ?batch_record)
+        (record_linked_to_zone ?batch_record ?cleanroom_zone)
+        (record_linked_to_port ?batch_record ?transfer_port)
+        (record_confirmed_for_zone_transfer ?batch_record)
+        (not
+          (batch_record_available ?batch_record)
+        )
+      )
+  )
+  (:action initiate_synchronized_transfer_with_port_confirmation
+    :parameters (?primary_stage - primary_stage ?secondary_stage - secondary_stage ?cleanroom_zone - cleanroom_zone ?transfer_port - transfer_port ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (primary_stage_locked ?primary_stage)
+        (secondary_stage_locked ?secondary_stage)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (zone_ready ?cleanroom_zone)
+        (transfer_port_material_staged ?transfer_port)
+        (primary_stage_prepared ?primary_stage)
+        (not
+          (secondary_stage_prepared ?secondary_stage)
+        )
+        (batch_record_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_initiated ?batch_record)
+        (record_linked_to_zone ?batch_record ?cleanroom_zone)
+        (record_linked_to_port ?batch_record ?transfer_port)
+        (record_confirmed_for_port_transfer ?batch_record)
+        (not
+          (batch_record_available ?batch_record)
+        )
+      )
+  )
+  (:action initiate_synchronized_transfer_with_full_confirmation
+    :parameters (?primary_stage - primary_stage ?secondary_stage - secondary_stage ?cleanroom_zone - cleanroom_zone ?transfer_port - transfer_port ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (primary_stage_locked ?primary_stage)
+        (secondary_stage_locked ?secondary_stage)
+        (stage_assigned_zone ?primary_stage ?cleanroom_zone)
+        (stage_assigned_transfer_port ?secondary_stage ?transfer_port)
+        (zone_materials_staged ?cleanroom_zone)
+        (transfer_port_material_staged ?transfer_port)
+        (not
+          (primary_stage_prepared ?primary_stage)
+        )
+        (not
+          (secondary_stage_prepared ?secondary_stage)
+        )
+        (batch_record_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_initiated ?batch_record)
+        (record_linked_to_zone ?batch_record ?cleanroom_zone)
+        (record_linked_to_port ?batch_record ?transfer_port)
+        (record_confirmed_for_zone_transfer ?batch_record)
+        (record_confirmed_for_port_transfer ?batch_record)
+        (not
+          (batch_record_available ?batch_record)
+        )
+      )
+  )
+  (:action complete_batch_record_transfer
+    :parameters (?batch_record - batch_record_document ?primary_stage - primary_stage ?process_operation - process_operation)
+    :precondition
+      (and
+        (batch_record_initiated ?batch_record)
+        (primary_stage_locked ?primary_stage)
+        (assigned_operation ?primary_stage ?process_operation)
+        (not
+          (record_transfer_completed ?batch_record)
+        )
+      )
+    :effect (record_transfer_completed ?batch_record)
+  )
+  (:action associate_document_with_unit_and_record
+    :parameters (?production_unit - production_unit ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (unit_linked_to_batch_record ?production_unit ?batch_record)
+        (unit_document_associated ?production_unit ?document)
+        (document_available ?document)
+        (batch_record_initiated ?batch_record)
+        (record_transfer_completed ?batch_record)
+        (not
+          (document_linked ?document)
+        )
+      )
+    :effect
+      (and
+        (document_linked ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action finalize_document_association_on_unit
+    :parameters (?production_unit - production_unit ?document - document ?batch_record - batch_record_document ?process_operation - process_operation)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (unit_document_associated ?production_unit ?document)
+        (document_linked ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (assigned_operation ?production_unit ?process_operation)
+        (not
+          (record_confirmed_for_zone_transfer ?batch_record)
+        )
+        (not
+          (unit_documentation_finalized ?production_unit)
+        )
+      )
+    :effect (unit_documentation_finalized ?production_unit)
+  )
+  (:action assign_label_to_unit
+    :parameters (?production_unit - production_unit ?label - label)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (label_available ?label)
+        (not
+          (label_applied ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (label_applied ?production_unit)
+        (unit_assigned_label ?production_unit ?label)
+        (not
+          (label_available ?label)
+        )
+      )
+  )
+  (:action verify_label_and_documentation_for_unit
+    :parameters (?production_unit - production_unit ?document - document ?batch_record - batch_record_document ?process_operation - process_operation ?label - label)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (unit_document_associated ?production_unit ?document)
+        (document_linked ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (assigned_operation ?production_unit ?process_operation)
+        (record_confirmed_for_zone_transfer ?batch_record)
+        (label_applied ?production_unit)
+        (unit_assigned_label ?production_unit ?label)
+        (not
+          (unit_documentation_finalized ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_documentation_finalized ?production_unit)
+        (label_verified ?production_unit)
+      )
+  )
+  (:action initiate_unit_qc_with_test_kit_and_operator
+    :parameters (?production_unit - production_unit ?sterility_test_kit - sterility_test_kit ?operator - operator ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_documentation_finalized ?production_unit)
+        (unit_assigned_test_kit ?production_unit ?sterility_test_kit)
+        (assigned_operator ?production_unit ?operator)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (not
+          (record_confirmed_for_port_transfer ?batch_record)
+        )
+        (not
+          (unit_qa_initiated ?production_unit)
+        )
+      )
+    :effect (unit_qa_initiated ?production_unit)
+  )
+  (:action initiate_unit_qc_post_port_confirmation
+    :parameters (?production_unit - production_unit ?sterility_test_kit - sterility_test_kit ?operator - operator ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_documentation_finalized ?production_unit)
+        (unit_assigned_test_kit ?production_unit ?sterility_test_kit)
+        (assigned_operator ?production_unit ?operator)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (record_confirmed_for_port_transfer ?batch_record)
+        (not
+          (unit_qa_initiated ?production_unit)
+        )
+      )
+    :effect (unit_qa_initiated ?production_unit)
+  )
+  (:action perform_validation_checks_on_unit
+    :parameters (?production_unit - production_unit ?validation_document - validation_document ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_qa_initiated ?production_unit)
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (not
+          (record_confirmed_for_zone_transfer ?batch_record)
+        )
+        (not
+          (record_confirmed_for_port_transfer ?batch_record)
+        )
+        (not
+          (unit_validation_checks_completed ?production_unit)
+        )
+      )
+    :effect (unit_validation_checks_completed ?production_unit)
+  )
+  (:action perform_validation_and_equipment_checks_on_unit
+    :parameters (?production_unit - production_unit ?validation_document - validation_document ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_qa_initiated ?production_unit)
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (record_confirmed_for_zone_transfer ?batch_record)
+        (not
+          (record_confirmed_for_port_transfer ?batch_record)
+        )
+        (not
+          (unit_validation_checks_completed ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_requires_equipment_test ?production_unit)
+      )
+  )
+  (:action perform_validation_and_equipment_checks_on_unit_alternate
+    :parameters (?production_unit - production_unit ?validation_document - validation_document ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_qa_initiated ?production_unit)
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (not
+          (record_confirmed_for_zone_transfer ?batch_record)
+        )
+        (record_confirmed_for_port_transfer ?batch_record)
+        (not
+          (unit_validation_checks_completed ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_requires_equipment_test ?production_unit)
+      )
+  )
+  (:action perform_validation_and_equipment_checks_on_unit_all_confirmations
+    :parameters (?production_unit - production_unit ?validation_document - validation_document ?document - document ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (unit_qa_initiated ?production_unit)
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (unit_document_associated ?production_unit ?document)
+        (document_associated_with_batch_record ?document ?batch_record)
+        (record_confirmed_for_zone_transfer ?batch_record)
+        (record_confirmed_for_port_transfer ?batch_record)
+        (not
+          (unit_validation_checks_completed ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_requires_equipment_test ?production_unit)
+      )
+  )
+  (:action finalize_unit_for_release
+    :parameters (?production_unit - production_unit)
+    :precondition
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (not
+          (unit_requires_equipment_test ?production_unit)
+        )
+        (not
+          (unit_finalized ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_finalized ?production_unit)
+        (processing_complete ?production_unit)
+      )
+  )
+  (:action assign_test_equipment_to_unit
+    :parameters (?production_unit - production_unit ?test_equipment - test_equipment)
+    :precondition
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_requires_equipment_test ?production_unit)
+        (test_equipment_available ?test_equipment)
+      )
+    :effect
+      (and
+        (unit_assigned_test_equipment ?production_unit ?test_equipment)
+        (not
+          (test_equipment_available ?test_equipment)
+        )
+      )
+  )
+  (:action perform_final_release_checks_on_unit
+    :parameters (?production_unit - production_unit ?primary_stage - primary_stage ?secondary_stage - secondary_stage ?process_operation - process_operation ?test_equipment - test_equipment)
+    :precondition
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_requires_equipment_test ?production_unit)
+        (unit_assigned_test_equipment ?production_unit ?test_equipment)
+        (unit_assigned_primary_stage ?production_unit ?primary_stage)
+        (unit_assigned_secondary_stage ?production_unit ?secondary_stage)
+        (primary_stage_prepared ?primary_stage)
+        (secondary_stage_prepared ?secondary_stage)
+        (assigned_operation ?production_unit ?process_operation)
+        (not
+          (unit_final_checks_passed ?production_unit)
+        )
+      )
+    :effect (unit_final_checks_passed ?production_unit)
+  )
+  (:action finalize_unit_after_final_checks
+    :parameters (?production_unit - production_unit)
+    :precondition
+      (and
+        (unit_validation_checks_completed ?production_unit)
+        (unit_final_checks_passed ?production_unit)
+        (not
+          (unit_finalized ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_finalized ?production_unit)
+        (processing_complete ?production_unit)
+      )
+  )
+  (:action attach_monitoring_event_to_unit
+    :parameters (?production_unit - production_unit ?monitoring_event - monitoring_event ?process_operation - process_operation)
+    :precondition
+      (and
+        (operation_confirmed ?production_unit)
+        (assigned_operation ?production_unit ?process_operation)
+        (monitoring_event_available ?monitoring_event)
+        (unit_associated_monitoring_event ?production_unit ?monitoring_event)
+        (not
+          (unit_monitoring_event_attached ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_monitoring_event_attached ?production_unit)
+        (not
+          (monitoring_event_available ?monitoring_event)
+        )
+      )
+  )
+  (:action verify_monitoring_and_lock_unit
+    :parameters (?production_unit - production_unit ?operator - operator)
+    :precondition
+      (and
+        (unit_monitoring_event_attached ?production_unit)
+        (assigned_operator ?production_unit ?operator)
+        (not
+          (unit_monitoring_verified ?production_unit)
+        )
+      )
+    :effect (unit_monitoring_verified ?production_unit)
+  )
+  (:action accept_validation_for_unit
+    :parameters (?production_unit - production_unit ?validation_document - validation_document)
+    :precondition
+      (and
+        (unit_monitoring_verified ?production_unit)
+        (unit_assigned_validation_document ?production_unit ?validation_document)
+        (not
+          (unit_monitoring_accepted ?production_unit)
+        )
+      )
+    :effect (unit_monitoring_accepted ?production_unit)
+  )
+  (:action finalize_unit_after_validation
+    :parameters (?production_unit - production_unit)
+    :precondition
+      (and
+        (unit_monitoring_accepted ?production_unit)
+        (not
+          (unit_finalized ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_finalized ?production_unit)
+        (processing_complete ?production_unit)
+      )
+  )
+  (:action finalize_primary_stage
+    :parameters (?primary_stage - primary_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (primary_stage_locked ?primary_stage)
+        (primary_stage_prepared ?primary_stage)
+        (batch_record_initiated ?batch_record)
+        (record_transfer_completed ?batch_record)
+        (not
+          (processing_complete ?primary_stage)
+        )
+      )
+    :effect (processing_complete ?primary_stage)
+  )
+  (:action finalize_secondary_stage
+    :parameters (?secondary_stage - secondary_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (secondary_stage_locked ?secondary_stage)
+        (secondary_stage_prepared ?secondary_stage)
+        (batch_record_initiated ?batch_record)
+        (record_transfer_completed ?batch_record)
+        (not
+          (processing_complete ?secondary_stage)
+        )
+      )
+    :effect (processing_complete ?secondary_stage)
+  )
+  (:action place_batch_in_quarantine
+    :parameters (?batch - batch ?quarantine_area - quarantine_area ?process_operation - process_operation)
+    :precondition
+      (and
+        (processing_complete ?batch)
+        (assigned_operation ?batch ?process_operation)
+        (quarantine_area_available ?quarantine_area)
+        (not
+          (in_quarantine ?batch)
+        )
+      )
+    :effect
+      (and
+        (in_quarantine ?batch)
+        (assigned_quarantine_area ?batch ?quarantine_area)
+        (not
+          (quarantine_area_available ?quarantine_area)
+        )
+      )
+  )
+  (:action release_primary_stage_and_free_resource
+    :parameters (?primary_stage - primary_stage ?line_resource - line_resource ?quarantine_area - quarantine_area)
+    :precondition
+      (and
+        (in_quarantine ?primary_stage)
+        (assigned_to_line ?primary_stage ?line_resource)
+        (assigned_quarantine_area ?primary_stage ?quarantine_area)
+        (not
+          (released ?primary_stage)
+        )
+      )
+    :effect
+      (and
+        (released ?primary_stage)
+        (line_resource_available ?line_resource)
+        (quarantine_area_available ?quarantine_area)
+      )
+  )
+  (:action release_secondary_stage_and_free_resource
+    :parameters (?secondary_stage - secondary_stage ?line_resource - line_resource ?quarantine_area - quarantine_area)
+    :precondition
+      (and
+        (in_quarantine ?secondary_stage)
+        (assigned_to_line ?secondary_stage ?line_resource)
+        (assigned_quarantine_area ?secondary_stage ?quarantine_area)
+        (not
+          (released ?secondary_stage)
+        )
+      )
+    :effect
+      (and
+        (released ?secondary_stage)
+        (line_resource_available ?line_resource)
+        (quarantine_area_available ?quarantine_area)
+      )
+  )
+  (:action release_production_unit_and_free_resource
+    :parameters (?production_unit - production_unit ?line_resource - line_resource ?quarantine_area - quarantine_area)
+    :precondition
+      (and
+        (in_quarantine ?production_unit)
+        (assigned_to_line ?production_unit ?line_resource)
+        (assigned_quarantine_area ?production_unit ?quarantine_area)
+        (not
+          (released ?production_unit)
+        )
+      )
+    :effect
+      (and
+        (released ?production_unit)
+        (line_resource_available ?line_resource)
+        (quarantine_area_available ?quarantine_area)
+      )
+  )
+)

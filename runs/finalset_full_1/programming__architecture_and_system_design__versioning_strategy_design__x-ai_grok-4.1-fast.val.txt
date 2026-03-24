@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain versioning_strategy_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types supporting_artifact - object operational_artifact - object release_context - object registered_artifact - object software_artifact - registered_artifact release_channel - supporting_artifact compatibility_test_suite - supporting_artifact design_reviewer - supporting_artifact policy_checklist - supporting_artifact benchmark_suite - supporting_artifact approval_token - supporting_artifact security_report - supporting_artifact audit_record - supporting_artifact migration_script - operational_artifact deployment_plan - operational_artifact acceptance_criterion - operational_artifact source_environment_variant - release_context target_environment_variant - release_context release_candidate - release_context module_variant - software_artifact integrator_variant - software_artifact core_module_instance - module_variant dependent_module_instance - module_variant system_integrator - integrator_variant)
+  (:predicates
+    (component_registered ?artifact - software_artifact)
+    (component_validated ?artifact - software_artifact)
+    (component_has_channel ?artifact - software_artifact)
+    (component_published ?artifact - software_artifact)
+    (component_ready_for_publication ?artifact - software_artifact)
+    (component_approval_granted ?artifact - software_artifact)
+    (channel_available ?release_channel - release_channel)
+    (component_assigned_to_channel ?artifact - software_artifact ?release_channel - release_channel)
+    (test_suite_available ?compatibility_test_suite - compatibility_test_suite)
+    (component_attached_test_suite ?artifact - software_artifact ?compatibility_test_suite - compatibility_test_suite)
+    (reviewer_available ?design_reviewer - design_reviewer)
+    (component_assigned_reviewer ?artifact - software_artifact ?design_reviewer - design_reviewer)
+    (migration_script_available ?migration_script - migration_script)
+    (core_assigned_migration_script ?core_module - core_module_instance ?migration_script - migration_script)
+    (dependent_assigned_migration_script ?dependent_module - dependent_module_instance ?migration_script - migration_script)
+    (core_assigned_source_variant ?core_module - core_module_instance ?source_variant - source_environment_variant)
+    (source_variant_selected ?source_variant - source_environment_variant)
+    (source_variant_migration_attached ?source_variant - source_environment_variant)
+    (core_validated_for_candidate ?core_module - core_module_instance)
+    (dependent_assigned_target_variant ?dependent_module - dependent_module_instance ?target_variant - target_environment_variant)
+    (target_variant_selected ?target_variant - target_environment_variant)
+    (target_variant_migration_attached ?target_variant - target_environment_variant)
+    (dependent_validated_for_candidate ?dependent_module - dependent_module_instance)
+    (candidate_available ?release_candidate - release_candidate)
+    (candidate_created ?release_candidate - release_candidate)
+    (candidate_has_source_variant ?release_candidate - release_candidate ?source_variant - source_environment_variant)
+    (candidate_has_target_variant ?release_candidate - release_candidate ?target_variant - target_environment_variant)
+    (candidate_policy_included ?release_candidate - release_candidate)
+    (candidate_benchmark_included ?release_candidate - release_candidate)
+    (candidate_deployment_ready ?release_candidate - release_candidate)
+    (integrator_includes_core ?integrator - system_integrator ?core_module - core_module_instance)
+    (integrator_includes_dependent ?integrator - system_integrator ?dependent_module - dependent_module_instance)
+    (integrator_has_candidate ?integrator - system_integrator ?release_candidate - release_candidate)
+    (deployment_plan_available ?deployment_plan - deployment_plan)
+    (integrator_has_deployment_plan ?integrator - system_integrator ?deployment_plan - deployment_plan)
+    (deployment_plan_consumed ?deployment_plan - deployment_plan)
+    (deployment_plan_bound_to_candidate ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    (integrator_packaging_prepared ?integrator - system_integrator)
+    (integrator_security_reviewed ?integrator - system_integrator)
+    (integrator_integration_verified ?integrator - system_integrator)
+    (integrator_policy_attached ?integrator - system_integrator)
+    (integrator_policy_validated ?integrator - system_integrator)
+    (integrator_benchmark_attached ?integrator - system_integrator)
+    (integrator_ready_for_finalization ?integrator - system_integrator)
+    (acceptance_criterion_available ?acceptance_criterion - acceptance_criterion)
+    (integrator_has_acceptance_criterion ?integrator - system_integrator ?acceptance_criterion - acceptance_criterion)
+    (integrator_acceptance_attached ?integrator - system_integrator)
+    (integrator_acceptance_reviewed ?integrator - system_integrator)
+    (integrator_acceptance_finalized ?integrator - system_integrator)
+    (policy_checklist_available ?policy_checklist - policy_checklist)
+    (integrator_has_policy_checklist ?integrator - system_integrator ?policy_checklist - policy_checklist)
+    (benchmark_suite_available ?benchmark_suite - benchmark_suite)
+    (integrator_has_benchmark_suite ?integrator - system_integrator ?benchmark_suite - benchmark_suite)
+    (security_report_available ?security_report - security_report)
+    (integrator_has_security_report ?integrator - system_integrator ?security_report - security_report)
+    (audit_record_available ?audit_record - audit_record)
+    (integrator_has_audit_record ?integrator - system_integrator ?audit_record - audit_record)
+    (approval_token_available ?approval_token - approval_token)
+    (component_linked_approval_token ?artifact - software_artifact ?approval_token - approval_token)
+    (core_prepared_for_candidate ?core_module - core_module_instance)
+    (dependent_prepared_for_candidate ?dependent_module - dependent_module_instance)
+    (integrator_finalization_mark ?integrator - system_integrator)
+  )
+  (:action register_artifact
+    :parameters (?artifact - software_artifact)
+    :precondition
+      (and
+        (not
+          (component_registered ?artifact)
+        )
+        (not
+          (component_published ?artifact)
+        )
+      )
+    :effect (component_registered ?artifact)
+  )
+  (:action assign_release_channel
+    :parameters (?artifact - software_artifact ?release_channel - release_channel)
+    :precondition
+      (and
+        (component_registered ?artifact)
+        (not
+          (component_has_channel ?artifact)
+        )
+        (channel_available ?release_channel)
+      )
+    :effect
+      (and
+        (component_has_channel ?artifact)
+        (component_assigned_to_channel ?artifact ?release_channel)
+        (not
+          (channel_available ?release_channel)
+        )
+      )
+  )
+  (:action allocate_compatibility_test_suite
+    :parameters (?artifact - software_artifact ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_registered ?artifact)
+        (component_has_channel ?artifact)
+        (test_suite_available ?compatibility_test_suite)
+      )
+    :effect
+      (and
+        (component_attached_test_suite ?artifact ?compatibility_test_suite)
+        (not
+          (test_suite_available ?compatibility_test_suite)
+        )
+      )
+  )
+  (:action mark_artifact_validated
+    :parameters (?artifact - software_artifact ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_registered ?artifact)
+        (component_has_channel ?artifact)
+        (component_attached_test_suite ?artifact ?compatibility_test_suite)
+        (not
+          (component_validated ?artifact)
+        )
+      )
+    :effect (component_validated ?artifact)
+  )
+  (:action release_compatibility_test_suite
+    :parameters (?artifact - software_artifact ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_attached_test_suite ?artifact ?compatibility_test_suite)
+      )
+    :effect
+      (and
+        (test_suite_available ?compatibility_test_suite)
+        (not
+          (component_attached_test_suite ?artifact ?compatibility_test_suite)
+        )
+      )
+  )
+  (:action assign_design_reviewer
+    :parameters (?artifact - software_artifact ?design_reviewer - design_reviewer)
+    :precondition
+      (and
+        (component_validated ?artifact)
+        (reviewer_available ?design_reviewer)
+      )
+    :effect
+      (and
+        (component_assigned_reviewer ?artifact ?design_reviewer)
+        (not
+          (reviewer_available ?design_reviewer)
+        )
+      )
+  )
+  (:action release_design_reviewer
+    :parameters (?artifact - software_artifact ?design_reviewer - design_reviewer)
+    :precondition
+      (and
+        (component_assigned_reviewer ?artifact ?design_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?design_reviewer)
+        (not
+          (component_assigned_reviewer ?artifact ?design_reviewer)
+        )
+      )
+  )
+  (:action attach_security_report
+    :parameters (?integrator - system_integrator ?security_report - security_report)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (security_report_available ?security_report)
+      )
+    :effect
+      (and
+        (integrator_has_security_report ?integrator ?security_report)
+        (not
+          (security_report_available ?security_report)
+        )
+      )
+  )
+  (:action detach_security_report
+    :parameters (?integrator - system_integrator ?security_report - security_report)
+    :precondition
+      (and
+        (integrator_has_security_report ?integrator ?security_report)
+      )
+    :effect
+      (and
+        (security_report_available ?security_report)
+        (not
+          (integrator_has_security_report ?integrator ?security_report)
+        )
+      )
+  )
+  (:action attach_audit_record
+    :parameters (?integrator - system_integrator ?audit_record - audit_record)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (audit_record_available ?audit_record)
+      )
+    :effect
+      (and
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (not
+          (audit_record_available ?audit_record)
+        )
+      )
+  )
+  (:action detach_audit_record
+    :parameters (?integrator - system_integrator ?audit_record - audit_record)
+    :precondition
+      (and
+        (integrator_has_audit_record ?integrator ?audit_record)
+      )
+    :effect
+      (and
+        (audit_record_available ?audit_record)
+        (not
+          (integrator_has_audit_record ?integrator ?audit_record)
+        )
+      )
+  )
+  (:action select_source_variant_for_core
+    :parameters (?core_module - core_module_instance ?source_variant - source_environment_variant ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_validated ?core_module)
+        (component_attached_test_suite ?core_module ?compatibility_test_suite)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (not
+          (source_variant_selected ?source_variant)
+        )
+        (not
+          (source_variant_migration_attached ?source_variant)
+        )
+      )
+    :effect (source_variant_selected ?source_variant)
+  )
+  (:action approve_core_with_reviewer
+    :parameters (?core_module - core_module_instance ?source_variant - source_environment_variant ?design_reviewer - design_reviewer)
+    :precondition
+      (and
+        (component_validated ?core_module)
+        (component_assigned_reviewer ?core_module ?design_reviewer)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (source_variant_selected ?source_variant)
+        (not
+          (core_prepared_for_candidate ?core_module)
+        )
+      )
+    :effect
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (core_validated_for_candidate ?core_module)
+      )
+  )
+  (:action attach_migration_script_to_core
+    :parameters (?core_module - core_module_instance ?source_variant - source_environment_variant ?migration_script - migration_script)
+    :precondition
+      (and
+        (component_validated ?core_module)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (migration_script_available ?migration_script)
+        (not
+          (core_prepared_for_candidate ?core_module)
+        )
+      )
+    :effect
+      (and
+        (source_variant_migration_attached ?source_variant)
+        (core_prepared_for_candidate ?core_module)
+        (core_assigned_migration_script ?core_module ?migration_script)
+        (not
+          (migration_script_available ?migration_script)
+        )
+      )
+  )
+  (:action finalize_core_migration_path
+    :parameters (?core_module - core_module_instance ?source_variant - source_environment_variant ?compatibility_test_suite - compatibility_test_suite ?migration_script - migration_script)
+    :precondition
+      (and
+        (component_validated ?core_module)
+        (component_attached_test_suite ?core_module ?compatibility_test_suite)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (source_variant_migration_attached ?source_variant)
+        (core_assigned_migration_script ?core_module ?migration_script)
+        (not
+          (core_validated_for_candidate ?core_module)
+        )
+      )
+    :effect
+      (and
+        (source_variant_selected ?source_variant)
+        (core_validated_for_candidate ?core_module)
+        (migration_script_available ?migration_script)
+        (not
+          (core_assigned_migration_script ?core_module ?migration_script)
+        )
+      )
+  )
+  (:action select_target_variant_for_dependent
+    :parameters (?dependent_module - dependent_module_instance ?target_variant - target_environment_variant ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_validated ?dependent_module)
+        (component_attached_test_suite ?dependent_module ?compatibility_test_suite)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (not
+          (target_variant_selected ?target_variant)
+        )
+        (not
+          (target_variant_migration_attached ?target_variant)
+        )
+      )
+    :effect (target_variant_selected ?target_variant)
+  )
+  (:action approve_dependent_with_reviewer
+    :parameters (?dependent_module - dependent_module_instance ?target_variant - target_environment_variant ?design_reviewer - design_reviewer)
+    :precondition
+      (and
+        (component_validated ?dependent_module)
+        (component_assigned_reviewer ?dependent_module ?design_reviewer)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (target_variant_selected ?target_variant)
+        (not
+          (dependent_prepared_for_candidate ?dependent_module)
+        )
+      )
+    :effect
+      (and
+        (dependent_prepared_for_candidate ?dependent_module)
+        (dependent_validated_for_candidate ?dependent_module)
+      )
+  )
+  (:action attach_migration_script_to_dependent
+    :parameters (?dependent_module - dependent_module_instance ?target_variant - target_environment_variant ?migration_script - migration_script)
+    :precondition
+      (and
+        (component_validated ?dependent_module)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (migration_script_available ?migration_script)
+        (not
+          (dependent_prepared_for_candidate ?dependent_module)
+        )
+      )
+    :effect
+      (and
+        (target_variant_migration_attached ?target_variant)
+        (dependent_prepared_for_candidate ?dependent_module)
+        (dependent_assigned_migration_script ?dependent_module ?migration_script)
+        (not
+          (migration_script_available ?migration_script)
+        )
+      )
+  )
+  (:action finalize_dependent_migration_path
+    :parameters (?dependent_module - dependent_module_instance ?target_variant - target_environment_variant ?compatibility_test_suite - compatibility_test_suite ?migration_script - migration_script)
+    :precondition
+      (and
+        (component_validated ?dependent_module)
+        (component_attached_test_suite ?dependent_module ?compatibility_test_suite)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (target_variant_migration_attached ?target_variant)
+        (dependent_assigned_migration_script ?dependent_module ?migration_script)
+        (not
+          (dependent_validated_for_candidate ?dependent_module)
+        )
+      )
+    :effect
+      (and
+        (target_variant_selected ?target_variant)
+        (dependent_validated_for_candidate ?dependent_module)
+        (migration_script_available ?migration_script)
+        (not
+          (dependent_assigned_migration_script ?dependent_module ?migration_script)
+        )
+      )
+  )
+  (:action compose_release_candidate
+    :parameters (?core_module - core_module_instance ?dependent_module - dependent_module_instance ?source_variant - source_environment_variant ?target_variant - target_environment_variant ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (dependent_prepared_for_candidate ?dependent_module)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (source_variant_selected ?source_variant)
+        (target_variant_selected ?target_variant)
+        (core_validated_for_candidate ?core_module)
+        (dependent_validated_for_candidate ?dependent_module)
+        (candidate_available ?release_candidate)
+      )
+    :effect
+      (and
+        (candidate_created ?release_candidate)
+        (candidate_has_source_variant ?release_candidate ?source_variant)
+        (candidate_has_target_variant ?release_candidate ?target_variant)
+        (not
+          (candidate_available ?release_candidate)
+        )
+      )
+  )
+  (:action compose_release_candidate_with_policy
+    :parameters (?core_module - core_module_instance ?dependent_module - dependent_module_instance ?source_variant - source_environment_variant ?target_variant - target_environment_variant ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (dependent_prepared_for_candidate ?dependent_module)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (source_variant_migration_attached ?source_variant)
+        (target_variant_selected ?target_variant)
+        (not
+          (core_validated_for_candidate ?core_module)
+        )
+        (dependent_validated_for_candidate ?dependent_module)
+        (candidate_available ?release_candidate)
+      )
+    :effect
+      (and
+        (candidate_created ?release_candidate)
+        (candidate_has_source_variant ?release_candidate ?source_variant)
+        (candidate_has_target_variant ?release_candidate ?target_variant)
+        (candidate_policy_included ?release_candidate)
+        (not
+          (candidate_available ?release_candidate)
+        )
+      )
+  )
+  (:action compose_release_candidate_with_benchmark
+    :parameters (?core_module - core_module_instance ?dependent_module - dependent_module_instance ?source_variant - source_environment_variant ?target_variant - target_environment_variant ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (dependent_prepared_for_candidate ?dependent_module)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (source_variant_selected ?source_variant)
+        (target_variant_migration_attached ?target_variant)
+        (core_validated_for_candidate ?core_module)
+        (not
+          (dependent_validated_for_candidate ?dependent_module)
+        )
+        (candidate_available ?release_candidate)
+      )
+    :effect
+      (and
+        (candidate_created ?release_candidate)
+        (candidate_has_source_variant ?release_candidate ?source_variant)
+        (candidate_has_target_variant ?release_candidate ?target_variant)
+        (candidate_benchmark_included ?release_candidate)
+        (not
+          (candidate_available ?release_candidate)
+        )
+      )
+  )
+  (:action compose_release_candidate_full
+    :parameters (?core_module - core_module_instance ?dependent_module - dependent_module_instance ?source_variant - source_environment_variant ?target_variant - target_environment_variant ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (dependent_prepared_for_candidate ?dependent_module)
+        (core_assigned_source_variant ?core_module ?source_variant)
+        (dependent_assigned_target_variant ?dependent_module ?target_variant)
+        (source_variant_migration_attached ?source_variant)
+        (target_variant_migration_attached ?target_variant)
+        (not
+          (core_validated_for_candidate ?core_module)
+        )
+        (not
+          (dependent_validated_for_candidate ?dependent_module)
+        )
+        (candidate_available ?release_candidate)
+      )
+    :effect
+      (and
+        (candidate_created ?release_candidate)
+        (candidate_has_source_variant ?release_candidate ?source_variant)
+        (candidate_has_target_variant ?release_candidate ?target_variant)
+        (candidate_policy_included ?release_candidate)
+        (candidate_benchmark_included ?release_candidate)
+        (not
+          (candidate_available ?release_candidate)
+        )
+      )
+  )
+  (:action validate_release_candidate_for_deployment
+    :parameters (?release_candidate - release_candidate ?core_module - core_module_instance ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (candidate_created ?release_candidate)
+        (core_prepared_for_candidate ?core_module)
+        (component_attached_test_suite ?core_module ?compatibility_test_suite)
+        (not
+          (candidate_deployment_ready ?release_candidate)
+        )
+      )
+    :effect (candidate_deployment_ready ?release_candidate)
+  )
+  (:action bind_deployment_plan_to_candidate
+    :parameters (?integrator - system_integrator ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (integrator_has_candidate ?integrator ?release_candidate)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_available ?deployment_plan)
+        (candidate_created ?release_candidate)
+        (candidate_deployment_ready ?release_candidate)
+        (not
+          (deployment_plan_consumed ?deployment_plan)
+        )
+      )
+    :effect
+      (and
+        (deployment_plan_consumed ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (not
+          (deployment_plan_available ?deployment_plan)
+        )
+      )
+  )
+  (:action prepare_integrator_package_stage1
+    :parameters (?integrator - system_integrator ?deployment_plan - deployment_plan ?release_candidate - release_candidate ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_consumed ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (component_attached_test_suite ?integrator ?compatibility_test_suite)
+        (not
+          (candidate_policy_included ?release_candidate)
+        )
+        (not
+          (integrator_packaging_prepared ?integrator)
+        )
+      )
+    :effect (integrator_packaging_prepared ?integrator)
+  )
+  (:action attach_policy_checklist_to_integrator
+    :parameters (?integrator - system_integrator ?policy_checklist - policy_checklist)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (policy_checklist_available ?policy_checklist)
+        (not
+          (integrator_policy_attached ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_policy_attached ?integrator)
+        (integrator_has_policy_checklist ?integrator ?policy_checklist)
+        (not
+          (policy_checklist_available ?policy_checklist)
+        )
+      )
+  )
+  (:action apply_policy_and_prepare_package
+    :parameters (?integrator - system_integrator ?deployment_plan - deployment_plan ?release_candidate - release_candidate ?compatibility_test_suite - compatibility_test_suite ?policy_checklist - policy_checklist)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_consumed ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (component_attached_test_suite ?integrator ?compatibility_test_suite)
+        (candidate_policy_included ?release_candidate)
+        (integrator_policy_attached ?integrator)
+        (integrator_has_policy_checklist ?integrator ?policy_checklist)
+        (not
+          (integrator_packaging_prepared ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_packaging_prepared ?integrator)
+        (integrator_policy_validated ?integrator)
+      )
+  )
+  (:action apply_security_and_review
+    :parameters (?integrator - system_integrator ?security_report - security_report ?design_reviewer - design_reviewer ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_packaging_prepared ?integrator)
+        (integrator_has_security_report ?integrator ?security_report)
+        (component_assigned_reviewer ?integrator ?design_reviewer)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (not
+          (candidate_benchmark_included ?release_candidate)
+        )
+        (not
+          (integrator_security_reviewed ?integrator)
+        )
+      )
+    :effect (integrator_security_reviewed ?integrator)
+  )
+  (:action apply_security_and_review_alt
+    :parameters (?integrator - system_integrator ?security_report - security_report ?design_reviewer - design_reviewer ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_packaging_prepared ?integrator)
+        (integrator_has_security_report ?integrator ?security_report)
+        (component_assigned_reviewer ?integrator ?design_reviewer)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (candidate_benchmark_included ?release_candidate)
+        (not
+          (integrator_security_reviewed ?integrator)
+        )
+      )
+    :effect (integrator_security_reviewed ?integrator)
+  )
+  (:action candidate_attach_audit_mark_verified_basic
+    :parameters (?integrator - system_integrator ?audit_record - audit_record ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_security_reviewed ?integrator)
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (not
+          (candidate_policy_included ?release_candidate)
+        )
+        (not
+          (candidate_benchmark_included ?release_candidate)
+        )
+        (not
+          (integrator_integration_verified ?integrator)
+        )
+      )
+    :effect (integrator_integration_verified ?integrator)
+  )
+  (:action candidate_attach_audit_mark_verified_policy_only
+    :parameters (?integrator - system_integrator ?audit_record - audit_record ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_security_reviewed ?integrator)
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (candidate_policy_included ?release_candidate)
+        (not
+          (candidate_benchmark_included ?release_candidate)
+        )
+        (not
+          (integrator_integration_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_benchmark_attached ?integrator)
+      )
+  )
+  (:action candidate_attach_audit_mark_verified_with_benchmark_only
+    :parameters (?integrator - system_integrator ?audit_record - audit_record ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_security_reviewed ?integrator)
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (not
+          (candidate_policy_included ?release_candidate)
+        )
+        (candidate_benchmark_included ?release_candidate)
+        (not
+          (integrator_integration_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_benchmark_attached ?integrator)
+      )
+  )
+  (:action candidate_attach_audit_mark_verified_full
+    :parameters (?integrator - system_integrator ?audit_record - audit_record ?deployment_plan - deployment_plan ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (integrator_security_reviewed ?integrator)
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (integrator_has_deployment_plan ?integrator ?deployment_plan)
+        (deployment_plan_bound_to_candidate ?deployment_plan ?release_candidate)
+        (candidate_policy_included ?release_candidate)
+        (candidate_benchmark_included ?release_candidate)
+        (not
+          (integrator_integration_verified ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_benchmark_attached ?integrator)
+      )
+  )
+  (:action finalize_integrator_no_benchmarks
+    :parameters (?integrator - system_integrator)
+    :precondition
+      (and
+        (integrator_integration_verified ?integrator)
+        (not
+          (integrator_benchmark_attached ?integrator)
+        )
+        (not
+          (integrator_finalization_mark ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_finalization_mark ?integrator)
+        (component_ready_for_publication ?integrator)
+      )
+  )
+  (:action attach_benchmark_suite
+    :parameters (?integrator - system_integrator ?benchmark_suite - benchmark_suite)
+    :precondition
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_benchmark_attached ?integrator)
+        (benchmark_suite_available ?benchmark_suite)
+      )
+    :effect
+      (and
+        (integrator_has_benchmark_suite ?integrator ?benchmark_suite)
+        (not
+          (benchmark_suite_available ?benchmark_suite)
+        )
+      )
+  )
+  (:action integrator_finalize_with_benchmarks
+    :parameters (?integrator - system_integrator ?core_module - core_module_instance ?dependent_module - dependent_module_instance ?compatibility_test_suite - compatibility_test_suite ?benchmark_suite - benchmark_suite)
+    :precondition
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_benchmark_attached ?integrator)
+        (integrator_has_benchmark_suite ?integrator ?benchmark_suite)
+        (integrator_includes_core ?integrator ?core_module)
+        (integrator_includes_dependent ?integrator ?dependent_module)
+        (core_validated_for_candidate ?core_module)
+        (dependent_validated_for_candidate ?dependent_module)
+        (component_attached_test_suite ?integrator ?compatibility_test_suite)
+        (not
+          (integrator_ready_for_finalization ?integrator)
+        )
+      )
+    :effect (integrator_ready_for_finalization ?integrator)
+  )
+  (:action finalize_integrator_with_staged_checks
+    :parameters (?integrator - system_integrator)
+    :precondition
+      (and
+        (integrator_integration_verified ?integrator)
+        (integrator_ready_for_finalization ?integrator)
+        (not
+          (integrator_finalization_mark ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_finalization_mark ?integrator)
+        (component_ready_for_publication ?integrator)
+      )
+  )
+  (:action attach_acceptance_criterion
+    :parameters (?integrator - system_integrator ?acceptance_criterion - acceptance_criterion ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_validated ?integrator)
+        (component_attached_test_suite ?integrator ?compatibility_test_suite)
+        (acceptance_criterion_available ?acceptance_criterion)
+        (integrator_has_acceptance_criterion ?integrator ?acceptance_criterion)
+        (not
+          (integrator_acceptance_attached ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_acceptance_attached ?integrator)
+        (not
+          (acceptance_criterion_available ?acceptance_criterion)
+        )
+      )
+  )
+  (:action mark_acceptance_review_passed
+    :parameters (?integrator - system_integrator ?design_reviewer - design_reviewer)
+    :precondition
+      (and
+        (integrator_acceptance_attached ?integrator)
+        (component_assigned_reviewer ?integrator ?design_reviewer)
+        (not
+          (integrator_acceptance_reviewed ?integrator)
+        )
+      )
+    :effect (integrator_acceptance_reviewed ?integrator)
+  )
+  (:action apply_audit_to_acceptance
+    :parameters (?integrator - system_integrator ?audit_record - audit_record)
+    :precondition
+      (and
+        (integrator_acceptance_reviewed ?integrator)
+        (integrator_has_audit_record ?integrator ?audit_record)
+        (not
+          (integrator_acceptance_finalized ?integrator)
+        )
+      )
+    :effect (integrator_acceptance_finalized ?integrator)
+  )
+  (:action finalize_acceptance
+    :parameters (?integrator - system_integrator)
+    :precondition
+      (and
+        (integrator_acceptance_finalized ?integrator)
+        (not
+          (integrator_finalization_mark ?integrator)
+        )
+      )
+    :effect
+      (and
+        (integrator_finalization_mark ?integrator)
+        (component_ready_for_publication ?integrator)
+      )
+  )
+  (:action activate_core_for_publication
+    :parameters (?core_module - core_module_instance ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (core_prepared_for_candidate ?core_module)
+        (core_validated_for_candidate ?core_module)
+        (candidate_created ?release_candidate)
+        (candidate_deployment_ready ?release_candidate)
+        (not
+          (component_ready_for_publication ?core_module)
+        )
+      )
+    :effect (component_ready_for_publication ?core_module)
+  )
+  (:action activate_dependent_for_publication
+    :parameters (?dependent_module - dependent_module_instance ?release_candidate - release_candidate)
+    :precondition
+      (and
+        (dependent_prepared_for_candidate ?dependent_module)
+        (dependent_validated_for_candidate ?dependent_module)
+        (candidate_created ?release_candidate)
+        (candidate_deployment_ready ?release_candidate)
+        (not
+          (component_ready_for_publication ?dependent_module)
+        )
+      )
+    :effect (component_ready_for_publication ?dependent_module)
+  )
+  (:action grant_artifact_approval
+    :parameters (?artifact - software_artifact ?approval_token - approval_token ?compatibility_test_suite - compatibility_test_suite)
+    :precondition
+      (and
+        (component_ready_for_publication ?artifact)
+        (component_attached_test_suite ?artifact ?compatibility_test_suite)
+        (approval_token_available ?approval_token)
+        (not
+          (component_approval_granted ?artifact)
+        )
+      )
+    :effect
+      (and
+        (component_approval_granted ?artifact)
+        (component_linked_approval_token ?artifact ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action activate_core_in_channel
+    :parameters (?core_module - core_module_instance ?release_channel - release_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_approval_granted ?core_module)
+        (component_assigned_to_channel ?core_module ?release_channel)
+        (component_linked_approval_token ?core_module ?approval_token)
+        (not
+          (component_published ?core_module)
+        )
+      )
+    :effect
+      (and
+        (component_published ?core_module)
+        (channel_available ?release_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+  (:action activate_dependent_in_channel
+    :parameters (?dependent_module - dependent_module_instance ?release_channel - release_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_approval_granted ?dependent_module)
+        (component_assigned_to_channel ?dependent_module ?release_channel)
+        (component_linked_approval_token ?dependent_module ?approval_token)
+        (not
+          (component_published ?dependent_module)
+        )
+      )
+    :effect
+      (and
+        (component_published ?dependent_module)
+        (channel_available ?release_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+  (:action activate_integrator_in_channel
+    :parameters (?integrator - system_integrator ?release_channel - release_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_approval_granted ?integrator)
+        (component_assigned_to_channel ?integrator ?release_channel)
+        (component_linked_approval_token ?integrator ?approval_token)
+        (not
+          (component_published ?integrator)
+        )
+      )
+    :effect
+      (and
+        (component_published ?integrator)
+        (channel_available ?release_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem versioning_strategy_scenario)
+  (:domain versioning_strategy_design)
+  (:objects core_instance_a - core_module_instance dependent_instance_a - dependent_module_instance integrator_alpha - system_integrator integrator_beta - system_integrator channel_stable - release_channel channel_main - release_channel channel_experimental - release_channel compat_test_suite_v1 - compatibility_test_suite reviewer_alice - design_reviewer migration_script_v1 - migration_script source_env_v1 - source_environment_variant target_env_v1 - target_environment_variant release_candidate_1 - release_candidate deployment_plan_blueprint_a - deployment_plan deployment_plan_blueprint_b - deployment_plan policy_checklist_compliance_a - policy_checklist policy_checklist_compliance_b - policy_checklist benchmark_suite_perf - benchmark_suite benchmark_suite_stress - benchmark_suite approval_token_stakeholder - approval_token security_report_scan1 - security_report acceptance_criterion_1 - acceptance_criterion acceptance_criterion_2 - acceptance_criterion audit_record_2026_03 - audit_record)
+  (:init
+    (channel_available channel_stable)
+    (channel_available channel_main)
+    (channel_available channel_experimental)
+    (test_suite_available compat_test_suite_v1)
+    (reviewer_available reviewer_alice)
+    (migration_script_available migration_script_v1)
+    (core_assigned_source_variant core_instance_a source_env_v1)
+    (dependent_assigned_target_variant dependent_instance_a target_env_v1)
+    (candidate_available release_candidate_1)
+    (deployment_plan_available deployment_plan_blueprint_a)
+    (deployment_plan_available deployment_plan_blueprint_b)
+    (integrator_includes_core integrator_alpha core_instance_a)
+    (integrator_includes_core integrator_beta core_instance_a)
+    (integrator_includes_dependent integrator_alpha dependent_instance_a)
+    (integrator_includes_dependent integrator_beta dependent_instance_a)
+    (integrator_has_candidate integrator_alpha release_candidate_1)
+    (integrator_has_candidate integrator_beta release_candidate_1)
+    (integrator_has_deployment_plan integrator_alpha deployment_plan_blueprint_a)
+    (integrator_has_deployment_plan integrator_beta deployment_plan_blueprint_b)
+    (policy_checklist_available policy_checklist_compliance_a)
+    (policy_checklist_available policy_checklist_compliance_b)
+    (benchmark_suite_available benchmark_suite_perf)
+    (benchmark_suite_available benchmark_suite_stress)
+    (approval_token_available approval_token_stakeholder)
+    (security_report_available security_report_scan1)
+    (acceptance_criterion_available acceptance_criterion_1)
+    (integrator_has_acceptance_criterion integrator_alpha acceptance_criterion_1)
+    (integrator_has_acceptance_criterion integrator_beta acceptance_criterion_2)
+    (audit_record_available audit_record_2026_03)
+  )
+  (:goal
+    (and
+      (component_published core_instance_a)
+      (component_published dependent_instance_a)
+      (component_published integrator_alpha)
+      (component_published integrator_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_artifact core_instance_a)
+(assign_release_channel core_instance_a channel_experimental)
+(allocate_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(mark_artifact_validated core_instance_a compat_test_suite_v1)
+(attach_migration_script_to_core core_instance_a source_env_v1 migration_script_v1)
+(finalize_core_migration_path core_instance_a source_env_v1 compat_test_suite_v1 migration_script_v1)
+(release_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(register_artifact dependent_instance_a)
+(assign_release_channel dependent_instance_a channel_main)
+(allocate_compatibility_test_suite dependent_instance_a compat_test_suite_v1)
+(mark_artifact_validated dependent_instance_a compat_test_suite_v1)
+(attach_migration_script_to_dependent dependent_instance_a target_env_v1 migration_script_v1)
+(finalize_dependent_migration_path dependent_instance_a target_env_v1 compat_test_suite_v1 migration_script_v1)
+(release_compatibility_test_suite dependent_instance_a compat_test_suite_v1)
+(allocate_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(compose_release_candidate core_instance_a dependent_instance_a source_env_v1 target_env_v1 release_candidate_1)
+(validate_release_candidate_for_deployment release_candidate_1 core_instance_a compat_test_suite_v1)
+(release_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(register_artifact integrator_alpha)
+(assign_release_channel integrator_alpha channel_stable)
+(allocate_compatibility_test_suite integrator_alpha compat_test_suite_v1)
+(mark_artifact_validated integrator_alpha compat_test_suite_v1)
+(bind_deployment_plan_to_candidate integrator_alpha deployment_plan_blueprint_a release_candidate_1)
+(prepare_integrator_package_stage1 integrator_alpha deployment_plan_blueprint_a release_candidate_1 compat_test_suite_v1)
+(attach_security_report integrator_alpha security_report_scan1)
+(assign_design_reviewer integrator_alpha reviewer_alice)
+(apply_security_and_review integrator_alpha security_report_scan1 reviewer_alice deployment_plan_blueprint_a release_candidate_1)
+(attach_audit_record integrator_alpha audit_record_2026_03)
+(candidate_attach_audit_mark_verified_basic integrator_alpha audit_record_2026_03 deployment_plan_blueprint_a release_candidate_1)
+(finalize_integrator_no_benchmarks integrator_alpha)
+(grant_artifact_approval integrator_alpha approval_token_stakeholder compat_test_suite_v1)
+(activate_integrator_in_channel integrator_alpha channel_stable approval_token_stakeholder)
+(release_compatibility_test_suite integrator_alpha compat_test_suite_v1)
+(release_design_reviewer integrator_alpha reviewer_alice)
+(detach_security_report integrator_alpha security_report_scan1)
+(detach_audit_record integrator_alpha audit_record_2026_03)
+(register_artifact integrator_beta)
+(assign_release_channel integrator_beta channel_stable)
+(allocate_compatibility_test_suite integrator_beta compat_test_suite_v1)
+(mark_artifact_validated integrator_beta compat_test_suite_v1)
+(bind_deployment_plan_to_candidate integrator_beta deployment_plan_blueprint_b release_candidate_1)
+(prepare_integrator_package_stage1 integrator_beta deployment_plan_blueprint_b release_candidate_1 compat_test_suite_v1)
+(attach_security_report integrator_beta security_report_scan1)
+(assign_design_reviewer integrator_beta reviewer_alice)
+(apply_security_and_review integrator_beta security_report_scan1 reviewer_alice deployment_plan_blueprint_b release_candidate_1)
+(attach_audit_record integrator_beta audit_record_2026_03)
+(candidate_attach_audit_mark_verified_basic integrator_beta audit_record_2026_03 deployment_plan_blueprint_b release_candidate_1)
+(finalize_integrator_no_benchmarks integrator_beta)
+(grant_artifact_approval integrator_beta approval_token_stakeholder compat_test_suite_v1)
+(activate_integrator_in_channel integrator_beta channel_stable approval_token_stakeholder)
+(release_compatibility_test_suite integrator_beta compat_test_suite_v1)
+(activate_core_for_publication core_instance_a release_candidate_1)
+(activate_dependent_for_publication dependent_instance_a release_candidate_1)
+(allocate_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(grant_artifact_approval core_instance_a approval_token_stakeholder compat_test_suite_v1)
+(activate_core_in_channel core_instance_a channel_experimental approval_token_stakeholder)
+(release_compatibility_test_suite core_instance_a compat_test_suite_v1)
+(allocate_compatibility_test_suite dependent_instance_a compat_test_suite_v1)
+(grant_artifact_approval dependent_instance_a approval_token_stakeholder compat_test_suite_v1)
+(activate_dependent_in_channel dependent_instance_a channel_main approval_token_stakeholder)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1n2_iml9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 60 
+
+Successful plans:
+Value: 60
+ /tmp/val_1n2_iml9/plan.pddl 60 
+
+
+
+--- stderr ---
+

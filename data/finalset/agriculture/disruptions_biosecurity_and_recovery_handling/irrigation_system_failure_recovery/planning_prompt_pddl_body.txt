@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain irrigation_system_failure_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object asset_or_vendor_subcategory - object logistics_category - object site_category - object incident_site - site_category contingency_resource - resource_category diagnostic_tool - resource_category specialist_team - resource_category regulatory_permit - resource_category funding_allocation - resource_category salvage_strategy - resource_category equipment - resource_category certification - resource_category consumable_kit - asset_or_vendor_subcategory replacement_part - asset_or_vendor_subcategory external_contractor - asset_or_vendor_subcategory repair_location - logistics_category temporary_system_option - logistics_category deployment_package - logistics_category component_subtype - incident_site subsystem_subtype - incident_site infrastructure_component - component_subtype irrigation_sector - component_subtype work_order - subsystem_subtype)
+  (:predicates
+    (incident_reported ?incident_site - incident_site)
+    (diagnosis_confirmed_for_target ?incident_site - incident_site)
+    (triage_assigned ?incident_site - incident_site)
+    (restoration_completed_for_target ?incident_site - incident_site)
+    (repair_completed_for_target ?incident_site - incident_site)
+    (restoration_authorized_for_target ?incident_site - incident_site)
+    (contingency_resource_available ?contingency_resource - contingency_resource)
+    (contingency_resource_allocated_to_target ?incident_site - incident_site ?contingency_resource - contingency_resource)
+    (diagnostic_tool_available ?diagnostic_tool - diagnostic_tool)
+    (diagnostic_tool_assigned_to_target ?incident_site - incident_site ?diagnostic_tool - diagnostic_tool)
+    (specialist_team_available ?specialist_team - specialist_team)
+    (specialist_team_assigned_to_target ?incident_site - incident_site ?specialist_team - specialist_team)
+    (consumable_kit_available ?consumable_kit - consumable_kit)
+    (consumable_allocated_to_component ?infrastructure_component - infrastructure_component ?consumable_kit - consumable_kit)
+    (consumable_allocated_to_sector ?irrigation_sector - irrigation_sector ?consumable_kit - consumable_kit)
+    (component_repair_location_assoc ?infrastructure_component - infrastructure_component ?repair_location - repair_location)
+    (repair_location_staged ?repair_location - repair_location)
+    (consumable_allocated_to_repair_location ?repair_location - repair_location)
+    (component_ready_for_repair ?infrastructure_component - infrastructure_component)
+    (sector_temporary_option_assoc ?irrigation_sector - irrigation_sector ?temporary_system_option - temporary_system_option)
+    (temporary_system_option_staged ?temporary_system_option - temporary_system_option)
+    (temporary_system_option_engaged ?temporary_system_option - temporary_system_option)
+    (sector_ready_for_repair ?irrigation_sector - irrigation_sector)
+    (deployment_package_available ?deployment_package - deployment_package)
+    (deployment_package_staged ?deployment_package - deployment_package)
+    (deployment_package_assigned_repair_location ?deployment_package - deployment_package ?repair_location - repair_location)
+    (deployment_package_assigned_temporary_option ?deployment_package - deployment_package ?temporary_system_option - temporary_system_option)
+    (deployment_package_mobilized ?deployment_package - deployment_package)
+    (deployment_package_mobilized_additional ?deployment_package - deployment_package)
+    (deployment_package_crew_mobilized ?deployment_package - deployment_package)
+    (work_order_targets_component ?work_order - work_order ?infrastructure_component - infrastructure_component)
+    (work_order_targets_sector ?work_order - work_order ?irrigation_sector - irrigation_sector)
+    (work_order_assigned_to_deployment ?work_order - work_order ?deployment_package - deployment_package)
+    (replacement_part_available ?replacement_part - replacement_part)
+    (work_order_requires_replacement_part ?work_order - work_order ?replacement_part - replacement_part)
+    (replacement_part_reserved ?replacement_part - replacement_part)
+    (replacement_part_allocated_to_deployment ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    (work_order_equipment_assigned_validated ?work_order - work_order)
+    (work_order_equipment_initial_check_complete ?work_order - work_order)
+    (work_order_validated_high_level ?work_order - work_order)
+    (work_order_permit_attached ?work_order - work_order)
+    (work_order_permit_verified ?work_order - work_order)
+    (work_order_cleared_for_execution ?work_order - work_order)
+    (work_order_in_progress ?work_order - work_order)
+    (external_contractor_available ?external_contractor - external_contractor)
+    (work_order_contractor_assigned ?work_order - work_order ?external_contractor - external_contractor)
+    (work_order_contractor_authorized ?work_order - work_order)
+    (work_order_contractor_onboarded ?work_order - work_order)
+    (work_order_contractor_validated ?work_order - work_order)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (work_order_permit_associated ?work_order - work_order ?regulatory_permit - regulatory_permit)
+    (funding_allocation_available ?funding_allocation - funding_allocation)
+    (work_order_funding_assigned ?work_order - work_order ?funding_allocation - funding_allocation)
+    (equipment_available ?equipment - equipment)
+    (work_order_equipment_allocated ?work_order - work_order ?equipment - equipment)
+    (certification_available ?certification - certification)
+    (work_order_certification_attached ?work_order - work_order ?certification - certification)
+    (salvage_strategy_available ?salvage_strategy - salvage_strategy)
+    (salvage_strategy_assigned_to_target ?incident_site - incident_site ?salvage_strategy - salvage_strategy)
+    (component_contained ?infrastructure_component - infrastructure_component)
+    (sector_contained ?irrigation_sector - irrigation_sector)
+    (work_order_closed ?work_order - work_order)
+  )
+  (:action report_incident
+    :parameters (?incident_site - incident_site)
+    :precondition
+      (and
+        (not
+          (incident_reported ?incident_site)
+        )
+        (not
+          (restoration_completed_for_target ?incident_site)
+        )
+      )
+    :effect (incident_reported ?incident_site)
+  )
+  (:action allocate_contingency_resource_to_site
+    :parameters (?incident_site - incident_site ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (incident_reported ?incident_site)
+        (not
+          (triage_assigned ?incident_site)
+        )
+        (contingency_resource_available ?contingency_resource)
+      )
+    :effect
+      (and
+        (triage_assigned ?incident_site)
+        (contingency_resource_allocated_to_target ?incident_site ?contingency_resource)
+        (not
+          (contingency_resource_available ?contingency_resource)
+        )
+      )
+  )
+  (:action assign_diagnostic_tool_to_site
+    :parameters (?incident_site - incident_site ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (incident_reported ?incident_site)
+        (triage_assigned ?incident_site)
+        (diagnostic_tool_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_tool_assigned_to_target ?incident_site ?diagnostic_tool)
+        (not
+          (diagnostic_tool_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action confirm_diagnosis_for_site
+    :parameters (?incident_site - incident_site ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (incident_reported ?incident_site)
+        (triage_assigned ?incident_site)
+        (diagnostic_tool_assigned_to_target ?incident_site ?diagnostic_tool)
+        (not
+          (diagnosis_confirmed_for_target ?incident_site)
+        )
+      )
+    :effect (diagnosis_confirmed_for_target ?incident_site)
+  )
+  (:action return_diagnostic_tool_to_inventory
+    :parameters (?incident_site - incident_site ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnostic_tool_assigned_to_target ?incident_site ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_tool_available ?diagnostic_tool)
+        (not
+          (diagnostic_tool_assigned_to_target ?incident_site ?diagnostic_tool)
+        )
+      )
+  )
+  (:action assign_specialist_team_to_site
+    :parameters (?incident_site - incident_site ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?incident_site)
+        (specialist_team_available ?specialist_team)
+      )
+    :effect
+      (and
+        (specialist_team_assigned_to_target ?incident_site ?specialist_team)
+        (not
+          (specialist_team_available ?specialist_team)
+        )
+      )
+  )
+  (:action release_specialist_team_from_site
+    :parameters (?incident_site - incident_site ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (specialist_team_assigned_to_target ?incident_site ?specialist_team)
+      )
+    :effect
+      (and
+        (specialist_team_available ?specialist_team)
+        (not
+          (specialist_team_assigned_to_target ?incident_site ?specialist_team)
+        )
+      )
+  )
+  (:action assign_equipment_to_work_order
+    :parameters (?work_order - work_order ?equipment - equipment)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (work_order_equipment_allocated ?work_order ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_work_order
+    :parameters (?work_order - work_order ?equipment - equipment)
+    :precondition
+      (and
+        (work_order_equipment_allocated ?work_order ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (work_order_equipment_allocated ?work_order ?equipment)
+        )
+      )
+  )
+  (:action assign_certification_to_work_order
+    :parameters (?work_order - work_order ?certification - certification)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (certification_available ?certification)
+      )
+    :effect
+      (and
+        (work_order_certification_attached ?work_order ?certification)
+        (not
+          (certification_available ?certification)
+        )
+      )
+  )
+  (:action release_certification_from_work_order
+    :parameters (?work_order - work_order ?certification - certification)
+    :precondition
+      (and
+        (work_order_certification_attached ?work_order ?certification)
+      )
+    :effect
+      (and
+        (certification_available ?certification)
+        (not
+          (work_order_certification_attached ?work_order ?certification)
+        )
+      )
+  )
+  (:action stage_repair_location
+    :parameters (?infrastructure_component - infrastructure_component ?repair_location - repair_location ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?infrastructure_component)
+        (diagnostic_tool_assigned_to_target ?infrastructure_component ?diagnostic_tool)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (not
+          (repair_location_staged ?repair_location)
+        )
+        (not
+          (consumable_allocated_to_repair_location ?repair_location)
+        )
+      )
+    :effect (repair_location_staged ?repair_location)
+  )
+  (:action deploy_specialist_team_for_containment
+    :parameters (?infrastructure_component - infrastructure_component ?repair_location - repair_location ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?infrastructure_component)
+        (specialist_team_assigned_to_target ?infrastructure_component ?specialist_team)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (repair_location_staged ?repair_location)
+        (not
+          (component_contained ?infrastructure_component)
+        )
+      )
+    :effect
+      (and
+        (component_contained ?infrastructure_component)
+        (component_ready_for_repair ?infrastructure_component)
+      )
+  )
+  (:action allocate_consumable_kit_to_component
+    :parameters (?infrastructure_component - infrastructure_component ?repair_location - repair_location ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?infrastructure_component)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (component_contained ?infrastructure_component)
+        )
+      )
+    :effect
+      (and
+        (consumable_allocated_to_repair_location ?repair_location)
+        (component_contained ?infrastructure_component)
+        (consumable_allocated_to_component ?infrastructure_component ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action finalize_containment_and_restock_consumable
+    :parameters (?infrastructure_component - infrastructure_component ?repair_location - repair_location ?diagnostic_tool - diagnostic_tool ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?infrastructure_component)
+        (diagnostic_tool_assigned_to_target ?infrastructure_component ?diagnostic_tool)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (consumable_allocated_to_repair_location ?repair_location)
+        (consumable_allocated_to_component ?infrastructure_component ?consumable_kit)
+        (not
+          (component_ready_for_repair ?infrastructure_component)
+        )
+      )
+    :effect
+      (and
+        (repair_location_staged ?repair_location)
+        (component_ready_for_repair ?infrastructure_component)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (consumable_allocated_to_component ?infrastructure_component ?consumable_kit)
+        )
+      )
+  )
+  (:action stage_temporary_system_for_sector
+    :parameters (?irrigation_sector - irrigation_sector ?temporary_system_option - temporary_system_option ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?irrigation_sector)
+        (diagnostic_tool_assigned_to_target ?irrigation_sector ?diagnostic_tool)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (not
+          (temporary_system_option_staged ?temporary_system_option)
+        )
+        (not
+          (temporary_system_option_engaged ?temporary_system_option)
+        )
+      )
+    :effect (temporary_system_option_staged ?temporary_system_option)
+  )
+  (:action assign_specialist_team_to_sector
+    :parameters (?irrigation_sector - irrigation_sector ?temporary_system_option - temporary_system_option ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?irrigation_sector)
+        (specialist_team_assigned_to_target ?irrigation_sector ?specialist_team)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (temporary_system_option_staged ?temporary_system_option)
+        (not
+          (sector_contained ?irrigation_sector)
+        )
+      )
+    :effect
+      (and
+        (sector_contained ?irrigation_sector)
+        (sector_ready_for_repair ?irrigation_sector)
+      )
+  )
+  (:action allocate_consumable_kit_to_sector
+    :parameters (?irrigation_sector - irrigation_sector ?temporary_system_option - temporary_system_option ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?irrigation_sector)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (sector_contained ?irrigation_sector)
+        )
+      )
+    :effect
+      (and
+        (temporary_system_option_engaged ?temporary_system_option)
+        (sector_contained ?irrigation_sector)
+        (consumable_allocated_to_sector ?irrigation_sector ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action finalize_temporary_system_for_sector
+    :parameters (?irrigation_sector - irrigation_sector ?temporary_system_option - temporary_system_option ?diagnostic_tool - diagnostic_tool ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?irrigation_sector)
+        (diagnostic_tool_assigned_to_target ?irrigation_sector ?diagnostic_tool)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (temporary_system_option_engaged ?temporary_system_option)
+        (consumable_allocated_to_sector ?irrigation_sector ?consumable_kit)
+        (not
+          (sector_ready_for_repair ?irrigation_sector)
+        )
+      )
+    :effect
+      (and
+        (temporary_system_option_staged ?temporary_system_option)
+        (sector_ready_for_repair ?irrigation_sector)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (consumable_allocated_to_sector ?irrigation_sector ?consumable_kit)
+        )
+      )
+  )
+  (:action assemble_deployment_package
+    :parameters (?infrastructure_component - infrastructure_component ?irrigation_sector - irrigation_sector ?repair_location - repair_location ?temporary_system_option - temporary_system_option ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (component_contained ?infrastructure_component)
+        (sector_contained ?irrigation_sector)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (repair_location_staged ?repair_location)
+        (temporary_system_option_staged ?temporary_system_option)
+        (component_ready_for_repair ?infrastructure_component)
+        (sector_ready_for_repair ?irrigation_sector)
+        (deployment_package_available ?deployment_package)
+      )
+    :effect
+      (and
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_assigned_repair_location ?deployment_package ?repair_location)
+        (deployment_package_assigned_temporary_option ?deployment_package ?temporary_system_option)
+        (not
+          (deployment_package_available ?deployment_package)
+        )
+      )
+  )
+  (:action assemble_and_issue_deployment_package
+    :parameters (?infrastructure_component - infrastructure_component ?irrigation_sector - irrigation_sector ?repair_location - repair_location ?temporary_system_option - temporary_system_option ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (component_contained ?infrastructure_component)
+        (sector_contained ?irrigation_sector)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (consumable_allocated_to_repair_location ?repair_location)
+        (temporary_system_option_staged ?temporary_system_option)
+        (not
+          (component_ready_for_repair ?infrastructure_component)
+        )
+        (sector_ready_for_repair ?irrigation_sector)
+        (deployment_package_available ?deployment_package)
+      )
+    :effect
+      (and
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_assigned_repair_location ?deployment_package ?repair_location)
+        (deployment_package_assigned_temporary_option ?deployment_package ?temporary_system_option)
+        (deployment_package_mobilized ?deployment_package)
+        (not
+          (deployment_package_available ?deployment_package)
+        )
+      )
+  )
+  (:action assemble_and_issue_deployment_package_secondary
+    :parameters (?infrastructure_component - infrastructure_component ?irrigation_sector - irrigation_sector ?repair_location - repair_location ?temporary_system_option - temporary_system_option ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (component_contained ?infrastructure_component)
+        (sector_contained ?irrigation_sector)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (repair_location_staged ?repair_location)
+        (temporary_system_option_engaged ?temporary_system_option)
+        (component_ready_for_repair ?infrastructure_component)
+        (not
+          (sector_ready_for_repair ?irrigation_sector)
+        )
+        (deployment_package_available ?deployment_package)
+      )
+    :effect
+      (and
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_assigned_repair_location ?deployment_package ?repair_location)
+        (deployment_package_assigned_temporary_option ?deployment_package ?temporary_system_option)
+        (deployment_package_mobilized_additional ?deployment_package)
+        (not
+          (deployment_package_available ?deployment_package)
+        )
+      )
+  )
+  (:action assemble_and_issue_deployment_package_full
+    :parameters (?infrastructure_component - infrastructure_component ?irrigation_sector - irrigation_sector ?repair_location - repair_location ?temporary_system_option - temporary_system_option ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (component_contained ?infrastructure_component)
+        (sector_contained ?irrigation_sector)
+        (component_repair_location_assoc ?infrastructure_component ?repair_location)
+        (sector_temporary_option_assoc ?irrigation_sector ?temporary_system_option)
+        (consumable_allocated_to_repair_location ?repair_location)
+        (temporary_system_option_engaged ?temporary_system_option)
+        (not
+          (component_ready_for_repair ?infrastructure_component)
+        )
+        (not
+          (sector_ready_for_repair ?irrigation_sector)
+        )
+        (deployment_package_available ?deployment_package)
+      )
+    :effect
+      (and
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_assigned_repair_location ?deployment_package ?repair_location)
+        (deployment_package_assigned_temporary_option ?deployment_package ?temporary_system_option)
+        (deployment_package_mobilized ?deployment_package)
+        (deployment_package_mobilized_additional ?deployment_package)
+        (not
+          (deployment_package_available ?deployment_package)
+        )
+      )
+  )
+  (:action mobilize_deployment_package_crew
+    :parameters (?deployment_package - deployment_package ?infrastructure_component - infrastructure_component ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (deployment_package_staged ?deployment_package)
+        (component_contained ?infrastructure_component)
+        (diagnostic_tool_assigned_to_target ?infrastructure_component ?diagnostic_tool)
+        (not
+          (deployment_package_crew_mobilized ?deployment_package)
+        )
+      )
+    :effect (deployment_package_crew_mobilized ?deployment_package)
+  )
+  (:action reserve_and_allocate_replacement_part
+    :parameters (?work_order - work_order ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (work_order_assigned_to_deployment ?work_order ?deployment_package)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_available ?replacement_part)
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_crew_mobilized ?deployment_package)
+        (not
+          (replacement_part_reserved ?replacement_part)
+        )
+      )
+    :effect
+      (and
+        (replacement_part_reserved ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (not
+          (replacement_part_available ?replacement_part)
+        )
+      )
+  )
+  (:action validate_and_assign_equipment_to_work_order
+    :parameters (?work_order - work_order ?replacement_part - replacement_part ?deployment_package - deployment_package ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_reserved ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (diagnostic_tool_assigned_to_target ?work_order ?diagnostic_tool)
+        (not
+          (deployment_package_mobilized ?deployment_package)
+        )
+        (not
+          (work_order_equipment_assigned_validated ?work_order)
+        )
+      )
+    :effect (work_order_equipment_assigned_validated ?work_order)
+  )
+  (:action attach_permit_to_work_order
+    :parameters (?work_order - work_order ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (regulatory_permit_available ?regulatory_permit)
+        (not
+          (work_order_permit_attached ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_permit_attached ?work_order)
+        (work_order_permit_associated ?work_order ?regulatory_permit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action validate_permit_and_authorize_work_order
+    :parameters (?work_order - work_order ?replacement_part - replacement_part ?deployment_package - deployment_package ?diagnostic_tool - diagnostic_tool ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_reserved ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (diagnostic_tool_assigned_to_target ?work_order ?diagnostic_tool)
+        (deployment_package_mobilized ?deployment_package)
+        (work_order_permit_attached ?work_order)
+        (work_order_permit_associated ?work_order ?regulatory_permit)
+        (not
+          (work_order_equipment_assigned_validated ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_equipment_assigned_validated ?work_order)
+        (work_order_permit_verified ?work_order)
+      )
+  )
+  (:action perform_initial_equipment_validation
+    :parameters (?work_order - work_order ?equipment - equipment ?specialist_team - specialist_team ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_assigned_validated ?work_order)
+        (work_order_equipment_allocated ?work_order ?equipment)
+        (specialist_team_assigned_to_target ?work_order ?specialist_team)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (not
+          (deployment_package_mobilized_additional ?deployment_package)
+        )
+        (not
+          (work_order_equipment_initial_check_complete ?work_order)
+        )
+      )
+    :effect (work_order_equipment_initial_check_complete ?work_order)
+  )
+  (:action perform_secondary_equipment_validation
+    :parameters (?work_order - work_order ?equipment - equipment ?specialist_team - specialist_team ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_assigned_validated ?work_order)
+        (work_order_equipment_allocated ?work_order ?equipment)
+        (specialist_team_assigned_to_target ?work_order ?specialist_team)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (deployment_package_mobilized_additional ?deployment_package)
+        (not
+          (work_order_equipment_initial_check_complete ?work_order)
+        )
+      )
+    :effect (work_order_equipment_initial_check_complete ?work_order)
+  )
+  (:action perform_higher_level_validation
+    :parameters (?work_order - work_order ?certification - certification ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_initial_check_complete ?work_order)
+        (work_order_certification_attached ?work_order ?certification)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (not
+          (deployment_package_mobilized ?deployment_package)
+        )
+        (not
+          (deployment_package_mobilized_additional ?deployment_package)
+        )
+        (not
+          (work_order_validated_high_level ?work_order)
+        )
+      )
+    :effect (work_order_validated_high_level ?work_order)
+  )
+  (:action perform_higher_level_validation_and_prepare_execution
+    :parameters (?work_order - work_order ?certification - certification ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_initial_check_complete ?work_order)
+        (work_order_certification_attached ?work_order ?certification)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (deployment_package_mobilized ?deployment_package)
+        (not
+          (deployment_package_mobilized_additional ?deployment_package)
+        )
+        (not
+          (work_order_validated_high_level ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_cleared_for_execution ?work_order)
+      )
+  )
+  (:action perform_higher_level_validation_and_prepare_execution_secondary
+    :parameters (?work_order - work_order ?certification - certification ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_initial_check_complete ?work_order)
+        (work_order_certification_attached ?work_order ?certification)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (not
+          (deployment_package_mobilized ?deployment_package)
+        )
+        (deployment_package_mobilized_additional ?deployment_package)
+        (not
+          (work_order_validated_high_level ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_cleared_for_execution ?work_order)
+      )
+  )
+  (:action perform_final_higher_level_validation_and_prepare_execution
+    :parameters (?work_order - work_order ?certification - certification ?replacement_part - replacement_part ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (work_order_equipment_initial_check_complete ?work_order)
+        (work_order_certification_attached ?work_order ?certification)
+        (work_order_requires_replacement_part ?work_order ?replacement_part)
+        (replacement_part_allocated_to_deployment ?replacement_part ?deployment_package)
+        (deployment_package_mobilized ?deployment_package)
+        (deployment_package_mobilized_additional ?deployment_package)
+        (not
+          (work_order_validated_high_level ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_cleared_for_execution ?work_order)
+      )
+  )
+  (:action close_work_order_and_record_completion
+    :parameters (?work_order - work_order)
+    :precondition
+      (and
+        (work_order_validated_high_level ?work_order)
+        (not
+          (work_order_cleared_for_execution ?work_order)
+        )
+        (not
+          (work_order_closed ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_closed ?work_order)
+        (repair_completed_for_target ?work_order)
+      )
+  )
+  (:action assign_funding_to_work_order
+    :parameters (?work_order - work_order ?funding_allocation - funding_allocation)
+    :precondition
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_cleared_for_execution ?work_order)
+        (funding_allocation_available ?funding_allocation)
+      )
+    :effect
+      (and
+        (work_order_funding_assigned ?work_order ?funding_allocation)
+        (not
+          (funding_allocation_available ?funding_allocation)
+        )
+      )
+  )
+  (:action start_work_order_execution
+    :parameters (?work_order - work_order ?infrastructure_component - infrastructure_component ?irrigation_sector - irrigation_sector ?diagnostic_tool - diagnostic_tool ?funding_allocation - funding_allocation)
+    :precondition
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_cleared_for_execution ?work_order)
+        (work_order_funding_assigned ?work_order ?funding_allocation)
+        (work_order_targets_component ?work_order ?infrastructure_component)
+        (work_order_targets_sector ?work_order ?irrigation_sector)
+        (component_ready_for_repair ?infrastructure_component)
+        (sector_ready_for_repair ?irrigation_sector)
+        (diagnostic_tool_assigned_to_target ?work_order ?diagnostic_tool)
+        (not
+          (work_order_in_progress ?work_order)
+        )
+      )
+    :effect (work_order_in_progress ?work_order)
+  )
+  (:action finalize_and_close_work_order
+    :parameters (?work_order - work_order)
+    :precondition
+      (and
+        (work_order_validated_high_level ?work_order)
+        (work_order_in_progress ?work_order)
+        (not
+          (work_order_closed ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_closed ?work_order)
+        (repair_completed_for_target ?work_order)
+      )
+  )
+  (:action authorize_contractor_for_work_order
+    :parameters (?work_order - work_order ?external_contractor - external_contractor ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_confirmed_for_target ?work_order)
+        (diagnostic_tool_assigned_to_target ?work_order ?diagnostic_tool)
+        (external_contractor_available ?external_contractor)
+        (work_order_contractor_assigned ?work_order ?external_contractor)
+        (not
+          (work_order_contractor_authorized ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_contractor_authorized ?work_order)
+        (not
+          (external_contractor_available ?external_contractor)
+        )
+      )
+  )
+  (:action perform_contractor_onboarding_checks
+    :parameters (?work_order - work_order ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (work_order_contractor_authorized ?work_order)
+        (specialist_team_assigned_to_target ?work_order ?specialist_team)
+        (not
+          (work_order_contractor_onboarded ?work_order)
+        )
+      )
+    :effect (work_order_contractor_onboarded ?work_order)
+  )
+  (:action validate_contractor_certification
+    :parameters (?work_order - work_order ?certification - certification)
+    :precondition
+      (and
+        (work_order_contractor_onboarded ?work_order)
+        (work_order_certification_attached ?work_order ?certification)
+        (not
+          (work_order_contractor_validated ?work_order)
+        )
+      )
+    :effect (work_order_contractor_validated ?work_order)
+  )
+  (:action close_work_order_after_contractor_validation
+    :parameters (?work_order - work_order)
+    :precondition
+      (and
+        (work_order_contractor_validated ?work_order)
+        (not
+          (work_order_closed ?work_order)
+        )
+      )
+    :effect
+      (and
+        (work_order_closed ?work_order)
+        (repair_completed_for_target ?work_order)
+      )
+  )
+  (:action mark_component_repaired
+    :parameters (?infrastructure_component - infrastructure_component ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (component_contained ?infrastructure_component)
+        (component_ready_for_repair ?infrastructure_component)
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_crew_mobilized ?deployment_package)
+        (not
+          (repair_completed_for_target ?infrastructure_component)
+        )
+      )
+    :effect (repair_completed_for_target ?infrastructure_component)
+  )
+  (:action mark_sector_repaired
+    :parameters (?irrigation_sector - irrigation_sector ?deployment_package - deployment_package)
+    :precondition
+      (and
+        (sector_contained ?irrigation_sector)
+        (sector_ready_for_repair ?irrigation_sector)
+        (deployment_package_staged ?deployment_package)
+        (deployment_package_crew_mobilized ?deployment_package)
+        (not
+          (repair_completed_for_target ?irrigation_sector)
+        )
+      )
+    :effect (repair_completed_for_target ?irrigation_sector)
+  )
+  (:action authorize_restoration_and_assign_salvage
+    :parameters (?incident_site - incident_site ?salvage_strategy - salvage_strategy ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (repair_completed_for_target ?incident_site)
+        (diagnostic_tool_assigned_to_target ?incident_site ?diagnostic_tool)
+        (salvage_strategy_available ?salvage_strategy)
+        (not
+          (restoration_authorized_for_target ?incident_site)
+        )
+      )
+    :effect
+      (and
+        (restoration_authorized_for_target ?incident_site)
+        (salvage_strategy_assigned_to_target ?incident_site ?salvage_strategy)
+        (not
+          (salvage_strategy_available ?salvage_strategy)
+        )
+      )
+  )
+  (:action complete_restoration_and_return_resource
+    :parameters (?infrastructure_component - infrastructure_component ?contingency_resource - contingency_resource ?salvage_strategy - salvage_strategy)
+    :precondition
+      (and
+        (restoration_authorized_for_target ?infrastructure_component)
+        (contingency_resource_allocated_to_target ?infrastructure_component ?contingency_resource)
+        (salvage_strategy_assigned_to_target ?infrastructure_component ?salvage_strategy)
+        (not
+          (restoration_completed_for_target ?infrastructure_component)
+        )
+      )
+    :effect
+      (and
+        (restoration_completed_for_target ?infrastructure_component)
+        (contingency_resource_available ?contingency_resource)
+        (salvage_strategy_available ?salvage_strategy)
+      )
+  )
+  (:action complete_restoration_on_sector_and_return_resource
+    :parameters (?irrigation_sector - irrigation_sector ?contingency_resource - contingency_resource ?salvage_strategy - salvage_strategy)
+    :precondition
+      (and
+        (restoration_authorized_for_target ?irrigation_sector)
+        (contingency_resource_allocated_to_target ?irrigation_sector ?contingency_resource)
+        (salvage_strategy_assigned_to_target ?irrigation_sector ?salvage_strategy)
+        (not
+          (restoration_completed_for_target ?irrigation_sector)
+        )
+      )
+    :effect
+      (and
+        (restoration_completed_for_target ?irrigation_sector)
+        (contingency_resource_available ?contingency_resource)
+        (salvage_strategy_available ?salvage_strategy)
+      )
+  )
+  (:action complete_restoration_on_work_order_and_return_resource
+    :parameters (?work_order - work_order ?contingency_resource - contingency_resource ?salvage_strategy - salvage_strategy)
+    :precondition
+      (and
+        (restoration_authorized_for_target ?work_order)
+        (contingency_resource_allocated_to_target ?work_order ?contingency_resource)
+        (salvage_strategy_assigned_to_target ?work_order ?salvage_strategy)
+        (not
+          (restoration_completed_for_target ?work_order)
+        )
+      )
+    :effect
+      (and
+        (restoration_completed_for_target ?work_order)
+        (contingency_resource_available ?contingency_resource)
+        (salvage_strategy_available ?salvage_strategy)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem irrigation_failure_recovery_scenario_1)
+  (:domain irrigation_system_failure_recovery)
+  (:objects pump_1 - infrastructure_component sector_1 - irrigation_sector work_order_1 - work_order work_order_2 - work_order contingency_pump_1 - contingency_resource contingency_pump_2 - contingency_resource contingency_valve_1 - contingency_resource flow_meter_1 - diagnostic_tool electrical_repair_team - specialist_team gasket_seal_kit_1 - consumable_kit pump_discharge_port_1 - repair_location temporary_bypass_pump_1 - temporary_system_option deployment_package_alpha - deployment_package pump_motor_assembly - replacement_part control_panel_module - replacement_part water_usage_permit_1 - regulatory_permit environmental_permit_1 - regulatory_permit funding_line_1 - funding_allocation funding_line_2 - funding_allocation reduced_flow_salvage_plan_1 - salvage_strategy rental_generator_1 - equipment contractor_excavation_1 - external_contractor contractor_electrical_2 - external_contractor safety_certification_level_1 - certification)
+  (:init
+    (contingency_resource_available contingency_pump_1)
+    (contingency_resource_available contingency_pump_2)
+    (contingency_resource_available contingency_valve_1)
+    (diagnostic_tool_available flow_meter_1)
+    (specialist_team_available electrical_repair_team)
+    (consumable_kit_available gasket_seal_kit_1)
+    (component_repair_location_assoc pump_1 pump_discharge_port_1)
+    (sector_temporary_option_assoc sector_1 temporary_bypass_pump_1)
+    (deployment_package_available deployment_package_alpha)
+    (replacement_part_available pump_motor_assembly)
+    (replacement_part_available control_panel_module)
+    (work_order_targets_component work_order_1 pump_1)
+    (work_order_targets_component work_order_2 pump_1)
+    (work_order_targets_sector work_order_1 sector_1)
+    (work_order_targets_sector work_order_2 sector_1)
+    (work_order_assigned_to_deployment work_order_1 deployment_package_alpha)
+    (work_order_assigned_to_deployment work_order_2 deployment_package_alpha)
+    (work_order_requires_replacement_part work_order_1 pump_motor_assembly)
+    (work_order_requires_replacement_part work_order_2 control_panel_module)
+    (regulatory_permit_available water_usage_permit_1)
+    (regulatory_permit_available environmental_permit_1)
+    (funding_allocation_available funding_line_1)
+    (funding_allocation_available funding_line_2)
+    (salvage_strategy_available reduced_flow_salvage_plan_1)
+    (equipment_available rental_generator_1)
+    (external_contractor_available contractor_excavation_1)
+    (work_order_contractor_assigned work_order_1 contractor_excavation_1)
+    (work_order_contractor_assigned work_order_2 contractor_electrical_2)
+    (certification_available safety_certification_level_1)
+  )
+  (:goal
+    (and
+      (restoration_completed_for_target pump_1)
+      (restoration_completed_for_target sector_1)
+      (restoration_completed_for_target work_order_1)
+      (restoration_completed_for_target work_order_2)
+    )
+  )
+)

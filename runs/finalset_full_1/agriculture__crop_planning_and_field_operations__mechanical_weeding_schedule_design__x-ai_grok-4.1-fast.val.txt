@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain mechanical_weeding_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object auxiliary_resource_type - object operational_resource_type - object plan_container - object plan_item - plan_container weeding_method - resource_type growth_stage - resource_type operator_role - resource_type soil_condition - resource_type operator_shift - resource_type calendar_window - resource_type attachment_setting - resource_type sensor_payload - resource_type tool_module - auxiliary_resource_type field_zone - auxiliary_resource_type certification - auxiliary_resource_type field_condition_profile - operational_resource_type operational_route - operational_resource_type machine_unit - operational_resource_type field_category - plan_item operational_category - plan_item field_plot - field_category field_block - field_category weeding_plan - operational_category)
+  (:predicates
+    (plan_initialized ?plan_element - plan_item)
+    (plan_confirmed ?plan_element - plan_item)
+    (method_reserved ?plan_element - plan_item)
+    (weeding_completed ?plan_element - plan_item)
+    (execution_recorded ?plan_element - plan_item)
+    (execution_finalized ?plan_element - plan_item)
+    (method_available ?weeding_method - weeding_method)
+    (method_assigned_to_element ?plan_element - plan_item ?weeding_method - weeding_method)
+    (growth_stage_available ?growth_stage - growth_stage)
+    (growth_stage_assigned ?plan_element - plan_item ?growth_stage - growth_stage)
+    (operator_available ?operator_role - operator_role)
+    (operator_assigned_to_element ?plan_element - plan_item ?operator_role - operator_role)
+    (tool_module_available ?tool_module - tool_module)
+    (plot_tool_assigned ?field_plot - field_plot ?tool_module - tool_module)
+    (block_tool_assigned ?field_block - field_block ?tool_module - tool_module)
+    (plot_has_condition_profile ?field_plot - field_plot ?condition_profile - field_condition_profile)
+    (condition_profile_tagged ?condition_profile - field_condition_profile)
+    (condition_profile_flagged ?condition_profile - field_condition_profile)
+    (plot_ready ?field_plot - field_plot)
+    (block_route_assigned ?field_block - field_block ?operational_route - operational_route)
+    (route_tagged ?operational_route - operational_route)
+    (route_flagged ?operational_route - operational_route)
+    (block_ready ?field_block - field_block)
+    (machine_available ?machine_unit - machine_unit)
+    (machine_assigned ?machine_unit - machine_unit)
+    (machine_has_condition_profile ?machine_unit - machine_unit ?condition_profile - field_condition_profile)
+    (machine_assigned_route ?machine_unit - machine_unit ?operational_route - operational_route)
+    (machine_requires_soil_check ?machine_unit - machine_unit)
+    (machine_requires_attachment_config ?machine_unit - machine_unit)
+    (machine_configured ?machine_unit - machine_unit)
+    (plan_covers_plot ?weeding_plan - weeding_plan ?field_plot - field_plot)
+    (plan_covers_block ?weeding_plan - weeding_plan ?field_block - field_block)
+    (plan_assigned_machine ?weeding_plan - weeding_plan ?machine_unit - machine_unit)
+    (zone_available ?field_zone - field_zone)
+    (plan_zone_assigned ?weeding_plan - weeding_plan ?field_zone - field_zone)
+    (zone_assigned ?field_zone - field_zone)
+    (zone_machine_link ?field_zone - field_zone ?machine_unit - machine_unit)
+    (plan_precheck_passed ?weeding_plan - weeding_plan)
+    (plan_configuration_confirmed ?weeding_plan - weeding_plan)
+    (plan_sensor_payload_verified ?weeding_plan - weeding_plan)
+    (plan_has_soil_condition ?weeding_plan - weeding_plan)
+    (plan_soil_compatibility_verified ?weeding_plan - weeding_plan)
+    (plan_requires_shift ?weeding_plan - weeding_plan)
+    (plan_deployment_ready ?weeding_plan - weeding_plan)
+    (certification_available ?certification - certification)
+    (plan_certification_assigned ?weeding_plan - weeding_plan ?certification - certification)
+    (plan_certification_verified ?weeding_plan - weeding_plan)
+    (plan_operator_authorized ?weeding_plan - weeding_plan)
+    (plan_sensor_payload_validation_passed ?weeding_plan - weeding_plan)
+    (soil_condition_available ?soil_condition - soil_condition)
+    (plan_soil_condition_assigned ?weeding_plan - weeding_plan ?soil_condition - soil_condition)
+    (operator_shift_available ?operator_shift - operator_shift)
+    (plan_shift_assigned ?weeding_plan - weeding_plan ?operator_shift - operator_shift)
+    (attachment_setting_available ?attachment_setting - attachment_setting)
+    (plan_attachment_assigned ?weeding_plan - weeding_plan ?attachment_setting - attachment_setting)
+    (sensor_payload_available ?sensor_payload - sensor_payload)
+    (plan_sensor_payload_assigned ?weeding_plan - weeding_plan ?sensor_payload - sensor_payload)
+    (calendar_window_available ?calendar_window - calendar_window)
+    (plan_calendar_assigned ?plan_element - plan_item ?calendar_window - calendar_window)
+    (plot_prepared ?field_plot - field_plot)
+    (block_prepared ?field_block - field_block)
+    (plan_closed ?weeding_plan - weeding_plan)
+  )
+  (:action create_weeding_plan_element
+    :parameters (?plan_element - plan_item)
+    :precondition
+      (and
+        (not
+          (plan_initialized ?plan_element)
+        )
+        (not
+          (weeding_completed ?plan_element)
+        )
+      )
+    :effect (plan_initialized ?plan_element)
+  )
+  (:action assign_weeding_method
+    :parameters (?plan_element - plan_item ?weeding_method - weeding_method)
+    :precondition
+      (and
+        (plan_initialized ?plan_element)
+        (not
+          (method_reserved ?plan_element)
+        )
+        (method_available ?weeding_method)
+      )
+    :effect
+      (and
+        (method_reserved ?plan_element)
+        (method_assigned_to_element ?plan_element ?weeding_method)
+        (not
+          (method_available ?weeding_method)
+        )
+      )
+  )
+  (:action reserve_growth_stage_for_element
+    :parameters (?plan_element - plan_item ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_initialized ?plan_element)
+        (method_reserved ?plan_element)
+        (growth_stage_available ?growth_stage)
+      )
+    :effect
+      (and
+        (growth_stage_assigned ?plan_element ?growth_stage)
+        (not
+          (growth_stage_available ?growth_stage)
+        )
+      )
+  )
+  (:action confirm_growth_stage_assignment
+    :parameters (?plan_element - plan_item ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_initialized ?plan_element)
+        (method_reserved ?plan_element)
+        (growth_stage_assigned ?plan_element ?growth_stage)
+        (not
+          (plan_confirmed ?plan_element)
+        )
+      )
+    :effect (plan_confirmed ?plan_element)
+  )
+  (:action release_growth_stage_reservation
+    :parameters (?plan_element - plan_item ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (growth_stage_assigned ?plan_element ?growth_stage)
+      )
+    :effect
+      (and
+        (growth_stage_available ?growth_stage)
+        (not
+          (growth_stage_assigned ?plan_element ?growth_stage)
+        )
+      )
+  )
+  (:action assign_operator_role_to_element
+    :parameters (?plan_element - plan_item ?operator_role - operator_role)
+    :precondition
+      (and
+        (plan_confirmed ?plan_element)
+        (operator_available ?operator_role)
+      )
+    :effect
+      (and
+        (operator_assigned_to_element ?plan_element ?operator_role)
+        (not
+          (operator_available ?operator_role)
+        )
+      )
+  )
+  (:action release_operator_role_from_element
+    :parameters (?plan_element - plan_item ?operator_role - operator_role)
+    :precondition
+      (and
+        (operator_assigned_to_element ?plan_element ?operator_role)
+      )
+    :effect
+      (and
+        (operator_available ?operator_role)
+        (not
+          (operator_assigned_to_element ?plan_element ?operator_role)
+        )
+      )
+  )
+  (:action bind_attachment_setting_to_plan
+    :parameters (?weeding_plan - weeding_plan ?attachment_setting - attachment_setting)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (attachment_setting_available ?attachment_setting)
+      )
+    :effect
+      (and
+        (plan_attachment_assigned ?weeding_plan ?attachment_setting)
+        (not
+          (attachment_setting_available ?attachment_setting)
+        )
+      )
+  )
+  (:action release_attachment_setting_from_plan
+    :parameters (?weeding_plan - weeding_plan ?attachment_setting - attachment_setting)
+    :precondition
+      (and
+        (plan_attachment_assigned ?weeding_plan ?attachment_setting)
+      )
+    :effect
+      (and
+        (attachment_setting_available ?attachment_setting)
+        (not
+          (plan_attachment_assigned ?weeding_plan ?attachment_setting)
+        )
+      )
+  )
+  (:action assign_sensor_payload_to_plan
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (sensor_payload_available ?sensor_payload)
+      )
+    :effect
+      (and
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (not
+          (sensor_payload_available ?sensor_payload)
+        )
+      )
+  )
+  (:action release_sensor_payload_from_plan
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload)
+    :precondition
+      (and
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+      )
+    :effect
+      (and
+        (sensor_payload_available ?sensor_payload)
+        (not
+          (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        )
+      )
+  )
+  (:action tag_condition_profile_for_plot
+    :parameters (?field_plot - field_plot ?condition_profile - field_condition_profile ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_confirmed ?field_plot)
+        (growth_stage_assigned ?field_plot ?growth_stage)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (not
+          (condition_profile_tagged ?condition_profile)
+        )
+        (not
+          (condition_profile_flagged ?condition_profile)
+        )
+      )
+    :effect (condition_profile_tagged ?condition_profile)
+  )
+  (:action assign_operator_and_mark_plot_ready
+    :parameters (?field_plot - field_plot ?condition_profile - field_condition_profile ?operator_role - operator_role)
+    :precondition
+      (and
+        (plan_confirmed ?field_plot)
+        (operator_assigned_to_element ?field_plot ?operator_role)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (condition_profile_tagged ?condition_profile)
+        (not
+          (plot_prepared ?field_plot)
+        )
+      )
+    :effect
+      (and
+        (plot_prepared ?field_plot)
+        (plot_ready ?field_plot)
+      )
+  )
+  (:action assign_tool_module_to_plot
+    :parameters (?field_plot - field_plot ?condition_profile - field_condition_profile ?tool_module - tool_module)
+    :precondition
+      (and
+        (plan_confirmed ?field_plot)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (tool_module_available ?tool_module)
+        (not
+          (plot_prepared ?field_plot)
+        )
+      )
+    :effect
+      (and
+        (condition_profile_flagged ?condition_profile)
+        (plot_prepared ?field_plot)
+        (plot_tool_assigned ?field_plot ?tool_module)
+        (not
+          (tool_module_available ?tool_module)
+        )
+      )
+  )
+  (:action finalize_plot_condition_and_release_module
+    :parameters (?field_plot - field_plot ?condition_profile - field_condition_profile ?growth_stage - growth_stage ?tool_module - tool_module)
+    :precondition
+      (and
+        (plan_confirmed ?field_plot)
+        (growth_stage_assigned ?field_plot ?growth_stage)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (condition_profile_flagged ?condition_profile)
+        (plot_tool_assigned ?field_plot ?tool_module)
+        (not
+          (plot_ready ?field_plot)
+        )
+      )
+    :effect
+      (and
+        (condition_profile_tagged ?condition_profile)
+        (plot_ready ?field_plot)
+        (tool_module_available ?tool_module)
+        (not
+          (plot_tool_assigned ?field_plot ?tool_module)
+        )
+      )
+  )
+  (:action tag_operational_route
+    :parameters (?field_block - field_block ?operational_route - operational_route ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_confirmed ?field_block)
+        (growth_stage_assigned ?field_block ?growth_stage)
+        (block_route_assigned ?field_block ?operational_route)
+        (not
+          (route_tagged ?operational_route)
+        )
+        (not
+          (route_flagged ?operational_route)
+        )
+      )
+    :effect (route_tagged ?operational_route)
+  )
+  (:action assign_operator_and_mark_block_ready
+    :parameters (?field_block - field_block ?operational_route - operational_route ?operator_role - operator_role)
+    :precondition
+      (and
+        (plan_confirmed ?field_block)
+        (operator_assigned_to_element ?field_block ?operator_role)
+        (block_route_assigned ?field_block ?operational_route)
+        (route_tagged ?operational_route)
+        (not
+          (block_prepared ?field_block)
+        )
+      )
+    :effect
+      (and
+        (block_prepared ?field_block)
+        (block_ready ?field_block)
+      )
+  )
+  (:action assign_tool_module_to_block
+    :parameters (?field_block - field_block ?operational_route - operational_route ?tool_module - tool_module)
+    :precondition
+      (and
+        (plan_confirmed ?field_block)
+        (block_route_assigned ?field_block ?operational_route)
+        (tool_module_available ?tool_module)
+        (not
+          (block_prepared ?field_block)
+        )
+      )
+    :effect
+      (and
+        (route_flagged ?operational_route)
+        (block_prepared ?field_block)
+        (block_tool_assigned ?field_block ?tool_module)
+        (not
+          (tool_module_available ?tool_module)
+        )
+      )
+  )
+  (:action finalize_block_route_and_release_module
+    :parameters (?field_block - field_block ?operational_route - operational_route ?growth_stage - growth_stage ?tool_module - tool_module)
+    :precondition
+      (and
+        (plan_confirmed ?field_block)
+        (growth_stage_assigned ?field_block ?growth_stage)
+        (block_route_assigned ?field_block ?operational_route)
+        (route_flagged ?operational_route)
+        (block_tool_assigned ?field_block ?tool_module)
+        (not
+          (block_ready ?field_block)
+        )
+      )
+    :effect
+      (and
+        (route_tagged ?operational_route)
+        (block_ready ?field_block)
+        (tool_module_available ?tool_module)
+        (not
+          (block_tool_assigned ?field_block ?tool_module)
+        )
+      )
+  )
+  (:action allocate_machine_unit
+    :parameters (?field_plot - field_plot ?field_block - field_block ?condition_profile - field_condition_profile ?operational_route - operational_route ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plot_prepared ?field_plot)
+        (block_prepared ?field_block)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (block_route_assigned ?field_block ?operational_route)
+        (condition_profile_tagged ?condition_profile)
+        (route_tagged ?operational_route)
+        (plot_ready ?field_plot)
+        (block_ready ?field_block)
+        (machine_available ?machine_unit)
+      )
+    :effect
+      (and
+        (machine_assigned ?machine_unit)
+        (machine_has_condition_profile ?machine_unit ?condition_profile)
+        (machine_assigned_route ?machine_unit ?operational_route)
+        (not
+          (machine_available ?machine_unit)
+        )
+      )
+  )
+  (:action allocate_machine_with_profile_flag
+    :parameters (?field_plot - field_plot ?field_block - field_block ?condition_profile - field_condition_profile ?operational_route - operational_route ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plot_prepared ?field_plot)
+        (block_prepared ?field_block)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (block_route_assigned ?field_block ?operational_route)
+        (condition_profile_flagged ?condition_profile)
+        (route_tagged ?operational_route)
+        (not
+          (plot_ready ?field_plot)
+        )
+        (block_ready ?field_block)
+        (machine_available ?machine_unit)
+      )
+    :effect
+      (and
+        (machine_assigned ?machine_unit)
+        (machine_has_condition_profile ?machine_unit ?condition_profile)
+        (machine_assigned_route ?machine_unit ?operational_route)
+        (machine_requires_soil_check ?machine_unit)
+        (not
+          (machine_available ?machine_unit)
+        )
+      )
+  )
+  (:action allocate_machine_with_route_flag
+    :parameters (?field_plot - field_plot ?field_block - field_block ?condition_profile - field_condition_profile ?operational_route - operational_route ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plot_prepared ?field_plot)
+        (block_prepared ?field_block)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (block_route_assigned ?field_block ?operational_route)
+        (condition_profile_tagged ?condition_profile)
+        (route_flagged ?operational_route)
+        (plot_ready ?field_plot)
+        (not
+          (block_ready ?field_block)
+        )
+        (machine_available ?machine_unit)
+      )
+    :effect
+      (and
+        (machine_assigned ?machine_unit)
+        (machine_has_condition_profile ?machine_unit ?condition_profile)
+        (machine_assigned_route ?machine_unit ?operational_route)
+        (machine_requires_attachment_config ?machine_unit)
+        (not
+          (machine_available ?machine_unit)
+        )
+      )
+  )
+  (:action allocate_machine_with_full_flags
+    :parameters (?field_plot - field_plot ?field_block - field_block ?condition_profile - field_condition_profile ?operational_route - operational_route ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plot_prepared ?field_plot)
+        (block_prepared ?field_block)
+        (plot_has_condition_profile ?field_plot ?condition_profile)
+        (block_route_assigned ?field_block ?operational_route)
+        (condition_profile_flagged ?condition_profile)
+        (route_flagged ?operational_route)
+        (not
+          (plot_ready ?field_plot)
+        )
+        (not
+          (block_ready ?field_block)
+        )
+        (machine_available ?machine_unit)
+      )
+    :effect
+      (and
+        (machine_assigned ?machine_unit)
+        (machine_has_condition_profile ?machine_unit ?condition_profile)
+        (machine_assigned_route ?machine_unit ?operational_route)
+        (machine_requires_soil_check ?machine_unit)
+        (machine_requires_attachment_config ?machine_unit)
+        (not
+          (machine_available ?machine_unit)
+        )
+      )
+  )
+  (:action configure_machine_unit
+    :parameters (?machine_unit - machine_unit ?field_plot - field_plot ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (machine_assigned ?machine_unit)
+        (plot_prepared ?field_plot)
+        (growth_stage_assigned ?field_plot ?growth_stage)
+        (not
+          (machine_configured ?machine_unit)
+        )
+      )
+    :effect (machine_configured ?machine_unit)
+  )
+  (:action link_field_zone_to_machine
+    :parameters (?weeding_plan - weeding_plan ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (plan_assigned_machine ?weeding_plan ?machine_unit)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_available ?field_zone)
+        (machine_assigned ?machine_unit)
+        (machine_configured ?machine_unit)
+        (not
+          (zone_assigned ?field_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_assigned ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (not
+          (zone_available ?field_zone)
+        )
+      )
+  )
+  (:action perform_plan_precheck_no_soil_check
+    :parameters (?weeding_plan - weeding_plan ?field_zone - field_zone ?machine_unit - machine_unit ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_assigned ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (growth_stage_assigned ?weeding_plan ?growth_stage)
+        (not
+          (machine_requires_soil_check ?machine_unit)
+        )
+        (not
+          (plan_precheck_passed ?weeding_plan)
+        )
+      )
+    :effect (plan_precheck_passed ?weeding_plan)
+  )
+  (:action assign_soil_condition_to_plan
+    :parameters (?weeding_plan - weeding_plan ?soil_condition - soil_condition)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (soil_condition_available ?soil_condition)
+        (not
+          (plan_has_soil_condition ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_soil_condition ?weeding_plan)
+        (plan_soil_condition_assigned ?weeding_plan ?soil_condition)
+        (not
+          (soil_condition_available ?soil_condition)
+        )
+      )
+  )
+  (:action perform_plan_precheck_with_soil_check
+    :parameters (?weeding_plan - weeding_plan ?field_zone - field_zone ?machine_unit - machine_unit ?growth_stage - growth_stage ?soil_condition - soil_condition)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_assigned ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (growth_stage_assigned ?weeding_plan ?growth_stage)
+        (machine_requires_soil_check ?machine_unit)
+        (plan_has_soil_condition ?weeding_plan)
+        (plan_soil_condition_assigned ?weeding_plan ?soil_condition)
+        (not
+          (plan_precheck_passed ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_precheck_passed ?weeding_plan)
+        (plan_soil_compatibility_verified ?weeding_plan)
+      )
+  )
+  (:action verify_plan_configuration_standard
+    :parameters (?weeding_plan - weeding_plan ?attachment_setting - attachment_setting ?operator_role - operator_role ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_precheck_passed ?weeding_plan)
+        (plan_attachment_assigned ?weeding_plan ?attachment_setting)
+        (operator_assigned_to_element ?weeding_plan ?operator_role)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (not
+          (machine_requires_attachment_config ?machine_unit)
+        )
+        (not
+          (plan_configuration_confirmed ?weeding_plan)
+        )
+      )
+    :effect (plan_configuration_confirmed ?weeding_plan)
+  )
+  (:action verify_plan_configuration_attachment_required
+    :parameters (?weeding_plan - weeding_plan ?attachment_setting - attachment_setting ?operator_role - operator_role ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_precheck_passed ?weeding_plan)
+        (plan_attachment_assigned ?weeding_plan ?attachment_setting)
+        (operator_assigned_to_element ?weeding_plan ?operator_role)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (machine_requires_attachment_config ?machine_unit)
+        (not
+          (plan_configuration_confirmed ?weeding_plan)
+        )
+      )
+    :effect (plan_configuration_confirmed ?weeding_plan)
+  )
+  (:action apply_sensor_validation_standard
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_configuration_confirmed ?weeding_plan)
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (not
+          (machine_requires_soil_check ?machine_unit)
+        )
+        (not
+          (machine_requires_attachment_config ?machine_unit)
+        )
+        (not
+          (plan_sensor_payload_verified ?weeding_plan)
+        )
+      )
+    :effect (plan_sensor_payload_verified ?weeding_plan)
+  )
+  (:action apply_sensor_validation_with_soil_check
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_configuration_confirmed ?weeding_plan)
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (machine_requires_soil_check ?machine_unit)
+        (not
+          (machine_requires_attachment_config ?machine_unit)
+        )
+        (not
+          (plan_sensor_payload_verified ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_requires_shift ?weeding_plan)
+      )
+  )
+  (:action apply_sensor_validation_with_attachment_check
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_configuration_confirmed ?weeding_plan)
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (not
+          (machine_requires_soil_check ?machine_unit)
+        )
+        (machine_requires_attachment_config ?machine_unit)
+        (not
+          (plan_sensor_payload_verified ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_requires_shift ?weeding_plan)
+      )
+  )
+  (:action apply_sensor_validation_with_soil_and_attachment
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload ?field_zone - field_zone ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plan_configuration_confirmed ?weeding_plan)
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (plan_zone_assigned ?weeding_plan ?field_zone)
+        (zone_machine_link ?field_zone ?machine_unit)
+        (machine_requires_soil_check ?machine_unit)
+        (machine_requires_attachment_config ?machine_unit)
+        (not
+          (plan_sensor_payload_verified ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_requires_shift ?weeding_plan)
+      )
+  )
+  (:action finalize_plan_without_shift
+    :parameters (?weeding_plan - weeding_plan)
+    :precondition
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (not
+          (plan_requires_shift ?weeding_plan)
+        )
+        (not
+          (plan_closed ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_closed ?weeding_plan)
+        (execution_recorded ?weeding_plan)
+      )
+  )
+  (:action assign_shift_to_plan
+    :parameters (?weeding_plan - weeding_plan ?operator_shift - operator_shift)
+    :precondition
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_requires_shift ?weeding_plan)
+        (operator_shift_available ?operator_shift)
+      )
+    :effect
+      (and
+        (plan_shift_assigned ?weeding_plan ?operator_shift)
+        (not
+          (operator_shift_available ?operator_shift)
+        )
+      )
+  )
+  (:action prepare_plan_for_deployment
+    :parameters (?weeding_plan - weeding_plan ?field_plot - field_plot ?field_block - field_block ?growth_stage - growth_stage ?operator_shift - operator_shift)
+    :precondition
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_requires_shift ?weeding_plan)
+        (plan_shift_assigned ?weeding_plan ?operator_shift)
+        (plan_covers_plot ?weeding_plan ?field_plot)
+        (plan_covers_block ?weeding_plan ?field_block)
+        (plot_ready ?field_plot)
+        (block_ready ?field_block)
+        (growth_stage_assigned ?weeding_plan ?growth_stage)
+        (not
+          (plan_deployment_ready ?weeding_plan)
+        )
+      )
+    :effect (plan_deployment_ready ?weeding_plan)
+  )
+  (:action finalize_plan_with_shift
+    :parameters (?weeding_plan - weeding_plan)
+    :precondition
+      (and
+        (plan_sensor_payload_verified ?weeding_plan)
+        (plan_deployment_ready ?weeding_plan)
+        (not
+          (plan_closed ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_closed ?weeding_plan)
+        (execution_recorded ?weeding_plan)
+      )
+  )
+  (:action confirm_certification_assignment
+    :parameters (?weeding_plan - weeding_plan ?certification - certification ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (plan_confirmed ?weeding_plan)
+        (growth_stage_assigned ?weeding_plan ?growth_stage)
+        (certification_available ?certification)
+        (plan_certification_assigned ?weeding_plan ?certification)
+        (not
+          (plan_certification_verified ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_certification_verified ?weeding_plan)
+        (not
+          (certification_available ?certification)
+        )
+      )
+  )
+  (:action authorize_operator_for_plan
+    :parameters (?weeding_plan - weeding_plan ?operator_role - operator_role)
+    :precondition
+      (and
+        (plan_certification_verified ?weeding_plan)
+        (operator_assigned_to_element ?weeding_plan ?operator_role)
+        (not
+          (plan_operator_authorized ?weeding_plan)
+        )
+      )
+    :effect (plan_operator_authorized ?weeding_plan)
+  )
+  (:action validate_operator_and_sensor_payload
+    :parameters (?weeding_plan - weeding_plan ?sensor_payload - sensor_payload)
+    :precondition
+      (and
+        (plan_operator_authorized ?weeding_plan)
+        (plan_sensor_payload_assigned ?weeding_plan ?sensor_payload)
+        (not
+          (plan_sensor_payload_validation_passed ?weeding_plan)
+        )
+      )
+    :effect (plan_sensor_payload_validation_passed ?weeding_plan)
+  )
+  (:action finalize_plan_after_certification
+    :parameters (?weeding_plan - weeding_plan)
+    :precondition
+      (and
+        (plan_sensor_payload_validation_passed ?weeding_plan)
+        (not
+          (plan_closed ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_closed ?weeding_plan)
+        (execution_recorded ?weeding_plan)
+      )
+  )
+  (:action record_plot_execution
+    :parameters (?field_plot - field_plot ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (plot_prepared ?field_plot)
+        (plot_ready ?field_plot)
+        (machine_assigned ?machine_unit)
+        (machine_configured ?machine_unit)
+        (not
+          (execution_recorded ?field_plot)
+        )
+      )
+    :effect (execution_recorded ?field_plot)
+  )
+  (:action record_block_execution
+    :parameters (?field_block - field_block ?machine_unit - machine_unit)
+    :precondition
+      (and
+        (block_prepared ?field_block)
+        (block_ready ?field_block)
+        (machine_assigned ?machine_unit)
+        (machine_configured ?machine_unit)
+        (not
+          (execution_recorded ?field_block)
+        )
+      )
+    :effect (execution_recorded ?field_block)
+  )
+  (:action record_execution_and_assign_calendar
+    :parameters (?plan_element - plan_item ?calendar_window - calendar_window ?growth_stage - growth_stage)
+    :precondition
+      (and
+        (execution_recorded ?plan_element)
+        (growth_stage_assigned ?plan_element ?growth_stage)
+        (calendar_window_available ?calendar_window)
+        (not
+          (execution_finalized ?plan_element)
+        )
+      )
+    :effect
+      (and
+        (execution_finalized ?plan_element)
+        (plan_calendar_assigned ?plan_element ?calendar_window)
+        (not
+          (calendar_window_available ?calendar_window)
+        )
+      )
+  )
+  (:action reset_plot_and_release_resources
+    :parameters (?field_plot - field_plot ?weeding_method - weeding_method ?calendar_window - calendar_window)
+    :precondition
+      (and
+        (execution_finalized ?field_plot)
+        (method_assigned_to_element ?field_plot ?weeding_method)
+        (plan_calendar_assigned ?field_plot ?calendar_window)
+        (not
+          (weeding_completed ?field_plot)
+        )
+      )
+    :effect
+      (and
+        (weeding_completed ?field_plot)
+        (method_available ?weeding_method)
+        (calendar_window_available ?calendar_window)
+      )
+  )
+  (:action reset_block_and_release_resources
+    :parameters (?field_block - field_block ?weeding_method - weeding_method ?calendar_window - calendar_window)
+    :precondition
+      (and
+        (execution_finalized ?field_block)
+        (method_assigned_to_element ?field_block ?weeding_method)
+        (plan_calendar_assigned ?field_block ?calendar_window)
+        (not
+          (weeding_completed ?field_block)
+        )
+      )
+    :effect
+      (and
+        (weeding_completed ?field_block)
+        (method_available ?weeding_method)
+        (calendar_window_available ?calendar_window)
+      )
+  )
+  (:action reset_plan_and_release_resources
+    :parameters (?weeding_plan - weeding_plan ?weeding_method - weeding_method ?calendar_window - calendar_window)
+    :precondition
+      (and
+        (execution_finalized ?weeding_plan)
+        (method_assigned_to_element ?weeding_plan ?weeding_method)
+        (plan_calendar_assigned ?weeding_plan ?calendar_window)
+        (not
+          (weeding_completed ?weeding_plan)
+        )
+      )
+    :effect
+      (and
+        (weeding_completed ?weeding_plan)
+        (method_available ?weeding_method)
+        (calendar_window_available ?calendar_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem weeding_schedule_scenario)
+  (:domain mechanical_weeding_domain)
+  (:objects field_plot_1 - field_plot field_block_1 - field_block weeding_plan_1 - weeding_plan weeding_plan_2 - weeding_plan method_tine_weeder - weeding_method method_finger_weeder - weeding_method method_interrow_hoe - weeding_method growth_stage_1 - growth_stage operator_role_primary - operator_role tool_module_blade - tool_module condition_profile_high_weeds - field_condition_profile route_1 - operational_route machine_unit_tractor_1 - machine_unit field_zone_1 - field_zone field_zone_2 - field_zone soil_condition_loamy - soil_condition soil_condition_clay - soil_condition shift_morning - operator_shift shift_afternoon - operator_shift calendar_window_spring - calendar_window attachment_setting_default - attachment_setting certification_level_1 - certification certification_level_2 - certification sensor_payload_ndvi - sensor_payload)
+  (:init
+    (method_available method_tine_weeder)
+    (method_available method_finger_weeder)
+    (method_available method_interrow_hoe)
+    (growth_stage_available growth_stage_1)
+    (operator_available operator_role_primary)
+    (tool_module_available tool_module_blade)
+    (plot_has_condition_profile field_plot_1 condition_profile_high_weeds)
+    (block_route_assigned field_block_1 route_1)
+    (machine_available machine_unit_tractor_1)
+    (zone_available field_zone_1)
+    (zone_available field_zone_2)
+    (plan_covers_plot weeding_plan_1 field_plot_1)
+    (plan_covers_plot weeding_plan_2 field_plot_1)
+    (plan_covers_block weeding_plan_1 field_block_1)
+    (plan_covers_block weeding_plan_2 field_block_1)
+    (plan_assigned_machine weeding_plan_1 machine_unit_tractor_1)
+    (plan_assigned_machine weeding_plan_2 machine_unit_tractor_1)
+    (plan_zone_assigned weeding_plan_1 field_zone_1)
+    (plan_zone_assigned weeding_plan_2 field_zone_2)
+    (soil_condition_available soil_condition_loamy)
+    (soil_condition_available soil_condition_clay)
+    (operator_shift_available shift_morning)
+    (operator_shift_available shift_afternoon)
+    (calendar_window_available calendar_window_spring)
+    (attachment_setting_available attachment_setting_default)
+    (certification_available certification_level_1)
+    (plan_certification_assigned weeding_plan_1 certification_level_1)
+    (plan_certification_assigned weeding_plan_2 certification_level_2)
+    (sensor_payload_available sensor_payload_ndvi)
+  )
+  (:goal
+    (and
+      (weeding_completed field_plot_1)
+      (weeding_completed field_block_1)
+      (weeding_completed weeding_plan_1)
+      (weeding_completed weeding_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_weeding_plan_element field_plot_1)
+(assign_weeding_method field_plot_1 method_tine_weeder)
+(reserve_growth_stage_for_element field_plot_1 growth_stage_1)
+(confirm_growth_stage_assignment field_plot_1 growth_stage_1)
+(assign_operator_role_to_element field_plot_1 operator_role_primary)
+(tag_condition_profile_for_plot field_plot_1 condition_profile_high_weeds growth_stage_1)
+(assign_operator_and_mark_plot_ready field_plot_1 condition_profile_high_weeds operator_role_primary)
+(release_operator_role_from_element field_plot_1 operator_role_primary)
+(release_growth_stage_reservation field_plot_1 growth_stage_1)
+(create_weeding_plan_element field_block_1)
+(assign_weeding_method field_block_1 method_finger_weeder)
+(reserve_growth_stage_for_element field_block_1 growth_stage_1)
+(confirm_growth_stage_assignment field_block_1 growth_stage_1)
+(assign_operator_role_to_element field_block_1 operator_role_primary)
+(tag_operational_route field_block_1 route_1 growth_stage_1)
+(assign_operator_and_mark_block_ready field_block_1 route_1 operator_role_primary)
+(allocate_machine field_plot_1 field_block_1 condition_profile_high_weeds route_1 machine_unit_tractor_1)
+(release_growth_stage_reservation field_block_1 growth_stage_1)
+(reserve_growth_stage_for_element field_plot_1 growth_stage_1)
+(configure_machine machine_unit_tractor_1 field_plot_1 growth_stage_1)
+(record_plot_execution field_plot_1 machine_unit_tractor_1)
+(record_block_execution field_block_1 machine_unit_tractor_1)
+(record_execution_and_assign_calendar field_plot_1 calendar_window_spring growth_stage_1)
+(reset_plot_and_release_resources field_plot_1 method_tine_weeder calendar_window_spring)
+(release_growth_stage_reservation field_plot_1 growth_stage_1)
+(reserve_growth_stage_for_element field_block_1 growth_stage_1)
+(record_execution_and_assign_calendar field_block_1 calendar_window_spring growth_stage_1)
+(reset_block_and_release_resources field_block_1 method_finger_weeder calendar_window_spring)
+(release_growth_stage_reservation field_block_1 growth_stage_1)
+(release_operator_role_from_element field_block_1 operator_role_primary)
+(create_weeding_plan_element weeding_plan_1)
+(assign_weeding_method weeding_plan_1 method_tine_weeder)
+(reserve_growth_stage_for_element weeding_plan_1 growth_stage_1)
+(confirm_growth_stage_assignment weeding_plan_1 growth_stage_1)
+(link_field_zone_to_machine weeding_plan_1 field_zone_1 machine_unit_tractor_1)
+(perform_plan_precheck_no_soil_check weeding_plan_1 field_zone_1 machine_unit_tractor_1 growth_stage_1)
+(bind_attachment_setting_to_plan weeding_plan_1 attachment_setting_default)
+(assign_operator_role_to_element weeding_plan_1 operator_role_primary)
+(verify_plan_configuration_standard weeding_plan_1 attachment_setting_default operator_role_primary field_zone_1 machine_unit_tractor_1)
+(assign_sensor_payload_to_plan weeding_plan_1 sensor_payload_ndvi)
+(apply_sensor_validation_standard weeding_plan_1 sensor_payload_ndvi field_zone_1 machine_unit_tractor_1)
+(finalize_plan_without_shift weeding_plan_1)
+(record_execution_and_assign_calendar weeding_plan_1 calendar_window_spring growth_stage_1)
+(reset_plan_and_release_resources weeding_plan_1 method_tine_weeder calendar_window_spring)
+(release_operator_role_from_element weeding_plan_1 operator_role_primary)
+(release_growth_stage_reservation weeding_plan_1 growth_stage_1)
+(release_attachment_setting_from_plan weeding_plan_1 attachment_setting_default)
+(release_sensor_payload_from_plan weeding_plan_1 sensor_payload_ndvi)
+(create_weeding_plan_element weeding_plan_2)
+(assign_weeding_method weeding_plan_2 method_interrow_hoe)
+(reserve_growth_stage_for_element weeding_plan_2 growth_stage_1)
+(confirm_growth_stage_assignment weeding_plan_2 growth_stage_1)
+(link_field_zone_to_machine weeding_plan_2 field_zone_2 machine_unit_tractor_1)
+(perform_plan_precheck_no_soil_check weeding_plan_2 field_zone_2 machine_unit_tractor_1 growth_stage_1)
+(bind_attachment_setting_to_plan weeding_plan_2 attachment_setting_default)
+(assign_operator_role_to_element weeding_plan_2 operator_role_primary)
+(verify_plan_configuration_standard weeding_plan_2 attachment_setting_default operator_role_primary field_zone_2 machine_unit_tractor_1)
+(assign_sensor_payload_to_plan weeding_plan_2 sensor_payload_ndvi)
+(apply_sensor_validation_standard weeding_plan_2 sensor_payload_ndvi field_zone_2 machine_unit_tractor_1)
+(finalize_plan_without_shift weeding_plan_2)
+(record_execution_and_assign_calendar weeding_plan_2 calendar_window_spring growth_stage_1)
+(reset_plan_and_release_resources weeding_plan_2 method_interrow_hoe calendar_window_spring)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_jccn4rbd/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_jccn4rbd/plan.pddl 
+
+
+--- stderr ---
+

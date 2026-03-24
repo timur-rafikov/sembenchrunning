@@ -1,0 +1,936 @@
+(define (domain credit_reassessment_workflow)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_category - object document_artifact - object classification - object record_container - object reassessment_record - record_container faculty_reviewer - entity_category submitted_document - entity_category administrative_officer - entity_category policy_reference - entity_category support_service - entity_category evidence_attachment - entity_category approval_token - entity_category escalation_marker - entity_category alternative_credit_option - document_artifact course_equivalency_record - document_artifact exception_justification - document_artifact credit_deficit_type - classification program_requirement_gap - classification recovery_plan - classification transcript_role - reassessment_record profile_role - reassessment_record origin_transcript - transcript_role destination_program_record - transcript_role student_profile - profile_role)
+  (:predicates
+    (record_initiated ?reassessment_case - reassessment_record)
+    (record_validated ?reassessment_case - reassessment_record)
+    (record_reviewer_assigned ?reassessment_case - reassessment_record)
+    (record_updated ?reassessment_case - reassessment_record)
+    (restoration_applied ?reassessment_case - reassessment_record)
+    (record_finalized ?reassessment_case - reassessment_record)
+    (reviewer_available ?faculty_reviewer - faculty_reviewer)
+    (assigned_reviewer ?reassessment_case - reassessment_record ?faculty_reviewer - faculty_reviewer)
+    (document_available ?submitted_document - submitted_document)
+    (document_linked ?reassessment_case - reassessment_record ?submitted_document - submitted_document)
+    (officer_available ?administrative_officer - administrative_officer)
+    (assigned_administrative_officer ?reassessment_case - reassessment_record ?administrative_officer - administrative_officer)
+    (alternative_option_available ?alternative_credit_option - alternative_credit_option)
+    (proposed_alternative_for_transcript ?origin_transcript - origin_transcript ?alternative_credit_option - alternative_credit_option)
+    (proposed_alternative_for_program ?destination_program_record - destination_program_record ?alternative_credit_option - alternative_credit_option)
+    (transcript_has_deficit ?origin_transcript - origin_transcript ?credit_deficit_type - credit_deficit_type)
+    (deficit_flagged ?credit_deficit_type - credit_deficit_type)
+    (mitigation_option_recorded ?credit_deficit_type - credit_deficit_type)
+    (origin_mitigation_confirmed ?origin_transcript - origin_transcript)
+    (program_has_requirement_gap ?destination_program_record - destination_program_record ?program_requirement_gap - program_requirement_gap)
+    (gap_flagged ?program_requirement_gap - program_requirement_gap)
+    (gap_mitigation_proposed ?program_requirement_gap - program_requirement_gap)
+    (destination_mitigation_confirmed ?destination_program_record - destination_program_record)
+    (recovery_plan_draft ?recovery_plan - recovery_plan)
+    (recovery_plan_finalized ?recovery_plan - recovery_plan)
+    (recovery_plan_addresses_deficit ?recovery_plan - recovery_plan ?credit_deficit_type - credit_deficit_type)
+    (recovery_plan_addresses_requirement_gap ?recovery_plan - recovery_plan ?program_requirement_gap - program_requirement_gap)
+    (recovery_plan_requires_department_approval ?recovery_plan - recovery_plan)
+    (recovery_plan_requires_committee_approval ?recovery_plan - recovery_plan)
+    (recovery_plan_registered ?recovery_plan - recovery_plan)
+    (profile_linked_origin_transcript ?student_profile - student_profile ?origin_transcript - origin_transcript)
+    (profile_linked_destination_program ?student_profile - student_profile ?destination_program_record - destination_program_record)
+    (profile_linked_recovery_plan ?student_profile - student_profile ?recovery_plan - recovery_plan)
+    (equivalency_record_available ?course_equivalency_record - course_equivalency_record)
+    (profile_has_equivalency_record ?student_profile - student_profile ?course_equivalency_record - course_equivalency_record)
+    (equivalency_record_finalized ?course_equivalency_record - course_equivalency_record)
+    (equivalency_linked_to_plan ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    (profile_specialist_approved ?student_profile - student_profile)
+    (supplemental_authorization_applied ?student_profile - student_profile)
+    (profile_ready_for_finalization ?student_profile - student_profile)
+    (policy_reference_flagged ?student_profile - student_profile)
+    (policy_validation_recorded ?student_profile - student_profile)
+    (support_service_requested ?student_profile - student_profile)
+    (support_service_attached ?student_profile - student_profile)
+    (exception_justification_available ?exception_justification - exception_justification)
+    (profile_has_exception_justification ?student_profile - student_profile ?exception_justification - exception_justification)
+    (exception_granted ?student_profile - student_profile)
+    (exception_processing_complete ?student_profile - student_profile)
+    (exception_authorized ?student_profile - student_profile)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (policy_attached_to_profile ?student_profile - student_profile ?policy_reference - policy_reference)
+    (support_service_available ?support_service - support_service)
+    (support_service_assigned_to_profile ?student_profile - student_profile ?support_service - support_service)
+    (approval_token_available ?approval_token - approval_token)
+    (approval_token_allocated_to_profile ?student_profile - student_profile ?approval_token - approval_token)
+    (escalation_marker_available ?escalation_marker - escalation_marker)
+    (escalation_marker_allocated_to_profile ?student_profile - student_profile ?escalation_marker - escalation_marker)
+    (evidence_attachment_available ?evidence_attachment - evidence_attachment)
+    (record_has_evidence_attachment ?reassessment_case - reassessment_record ?evidence_attachment - evidence_attachment)
+    (origin_transcript_ready ?origin_transcript - origin_transcript)
+    (destination_program_ready ?destination_program_record - destination_program_record)
+    (profile_finalized ?student_profile - student_profile)
+  )
+  (:action open_reassessment_record
+    :parameters (?reassessment_case - reassessment_record)
+    :precondition
+      (and
+        (not
+          (record_initiated ?reassessment_case)
+        )
+        (not
+          (record_updated ?reassessment_case)
+        )
+      )
+    :effect (record_initiated ?reassessment_case)
+  )
+  (:action assign_faculty_reviewer
+    :parameters (?reassessment_case - reassessment_record ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (record_initiated ?reassessment_case)
+        (not
+          (record_reviewer_assigned ?reassessment_case)
+        )
+        (reviewer_available ?faculty_reviewer)
+      )
+    :effect
+      (and
+        (record_reviewer_assigned ?reassessment_case)
+        (assigned_reviewer ?reassessment_case ?faculty_reviewer)
+        (not
+          (reviewer_available ?faculty_reviewer)
+        )
+      )
+  )
+  (:action attach_document_to_record
+    :parameters (?reassessment_case - reassessment_record ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_initiated ?reassessment_case)
+        (record_reviewer_assigned ?reassessment_case)
+        (document_available ?submitted_document)
+      )
+    :effect
+      (and
+        (document_linked ?reassessment_case ?submitted_document)
+        (not
+          (document_available ?submitted_document)
+        )
+      )
+  )
+  (:action validate_record
+    :parameters (?reassessment_case - reassessment_record ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_initiated ?reassessment_case)
+        (record_reviewer_assigned ?reassessment_case)
+        (document_linked ?reassessment_case ?submitted_document)
+        (not
+          (record_validated ?reassessment_case)
+        )
+      )
+    :effect (record_validated ?reassessment_case)
+  )
+  (:action detach_document_from_record
+    :parameters (?reassessment_case - reassessment_record ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (document_linked ?reassessment_case ?submitted_document)
+      )
+    :effect
+      (and
+        (document_available ?submitted_document)
+        (not
+          (document_linked ?reassessment_case ?submitted_document)
+        )
+      )
+  )
+  (:action assign_administrative_officer
+    :parameters (?reassessment_case - reassessment_record ?administrative_officer - administrative_officer)
+    :precondition
+      (and
+        (record_validated ?reassessment_case)
+        (officer_available ?administrative_officer)
+      )
+    :effect
+      (and
+        (assigned_administrative_officer ?reassessment_case ?administrative_officer)
+        (not
+          (officer_available ?administrative_officer)
+        )
+      )
+  )
+  (:action unassign_administrative_officer
+    :parameters (?reassessment_case - reassessment_record ?administrative_officer - administrative_officer)
+    :precondition
+      (and
+        (assigned_administrative_officer ?reassessment_case ?administrative_officer)
+      )
+    :effect
+      (and
+        (officer_available ?administrative_officer)
+        (not
+          (assigned_administrative_officer ?reassessment_case ?administrative_officer)
+        )
+      )
+  )
+  (:action issue_approval_token_to_profile
+    :parameters (?student_profile - student_profile ?approval_token - approval_token)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_allocated_to_profile ?student_profile ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action revoke_approval_token_from_profile
+    :parameters (?student_profile - student_profile ?approval_token - approval_token)
+    :precondition
+      (and
+        (approval_token_allocated_to_profile ?student_profile ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (approval_token_allocated_to_profile ?student_profile ?approval_token)
+        )
+      )
+  )
+  (:action issue_escalation_marker_to_profile
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (escalation_marker_available ?escalation_marker)
+      )
+    :effect
+      (and
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (not
+          (escalation_marker_available ?escalation_marker)
+        )
+      )
+  )
+  (:action revoke_escalation_marker_from_profile
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker)
+    :precondition
+      (and
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+      )
+    :effect
+      (and
+        (escalation_marker_available ?escalation_marker)
+        (not
+          (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        )
+      )
+  )
+  (:action flag_credit_deficit
+    :parameters (?origin_transcript - origin_transcript ?credit_deficit_type - credit_deficit_type ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_validated ?origin_transcript)
+        (document_linked ?origin_transcript ?submitted_document)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (not
+          (deficit_flagged ?credit_deficit_type)
+        )
+        (not
+          (mitigation_option_recorded ?credit_deficit_type)
+        )
+      )
+    :effect (deficit_flagged ?credit_deficit_type)
+  )
+  (:action confirm_origin_mitigation
+    :parameters (?origin_transcript - origin_transcript ?credit_deficit_type - credit_deficit_type ?administrative_officer - administrative_officer)
+    :precondition
+      (and
+        (record_validated ?origin_transcript)
+        (assigned_administrative_officer ?origin_transcript ?administrative_officer)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (deficit_flagged ?credit_deficit_type)
+        (not
+          (origin_transcript_ready ?origin_transcript)
+        )
+      )
+    :effect
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (origin_mitigation_confirmed ?origin_transcript)
+      )
+  )
+  (:action propose_alternative_for_origin_transcript
+    :parameters (?origin_transcript - origin_transcript ?credit_deficit_type - credit_deficit_type ?alternative_credit_option - alternative_credit_option)
+    :precondition
+      (and
+        (record_validated ?origin_transcript)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (alternative_option_available ?alternative_credit_option)
+        (not
+          (origin_transcript_ready ?origin_transcript)
+        )
+      )
+    :effect
+      (and
+        (mitigation_option_recorded ?credit_deficit_type)
+        (origin_transcript_ready ?origin_transcript)
+        (proposed_alternative_for_transcript ?origin_transcript ?alternative_credit_option)
+        (not
+          (alternative_option_available ?alternative_credit_option)
+        )
+      )
+  )
+  (:action finalize_origin_alternative
+    :parameters (?origin_transcript - origin_transcript ?credit_deficit_type - credit_deficit_type ?submitted_document - submitted_document ?alternative_credit_option - alternative_credit_option)
+    :precondition
+      (and
+        (record_validated ?origin_transcript)
+        (document_linked ?origin_transcript ?submitted_document)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (mitigation_option_recorded ?credit_deficit_type)
+        (proposed_alternative_for_transcript ?origin_transcript ?alternative_credit_option)
+        (not
+          (origin_mitigation_confirmed ?origin_transcript)
+        )
+      )
+    :effect
+      (and
+        (deficit_flagged ?credit_deficit_type)
+        (origin_mitigation_confirmed ?origin_transcript)
+        (alternative_option_available ?alternative_credit_option)
+        (not
+          (proposed_alternative_for_transcript ?origin_transcript ?alternative_credit_option)
+        )
+      )
+  )
+  (:action flag_requirement_gap
+    :parameters (?destination_program_record - destination_program_record ?program_requirement_gap - program_requirement_gap ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_validated ?destination_program_record)
+        (document_linked ?destination_program_record ?submitted_document)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (not
+          (gap_flagged ?program_requirement_gap)
+        )
+        (not
+          (gap_mitigation_proposed ?program_requirement_gap)
+        )
+      )
+    :effect (gap_flagged ?program_requirement_gap)
+  )
+  (:action confirm_destination_mitigation
+    :parameters (?destination_program_record - destination_program_record ?program_requirement_gap - program_requirement_gap ?administrative_officer - administrative_officer)
+    :precondition
+      (and
+        (record_validated ?destination_program_record)
+        (assigned_administrative_officer ?destination_program_record ?administrative_officer)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (gap_flagged ?program_requirement_gap)
+        (not
+          (destination_program_ready ?destination_program_record)
+        )
+      )
+    :effect
+      (and
+        (destination_program_ready ?destination_program_record)
+        (destination_mitigation_confirmed ?destination_program_record)
+      )
+  )
+  (:action propose_alternative_for_program
+    :parameters (?destination_program_record - destination_program_record ?program_requirement_gap - program_requirement_gap ?alternative_credit_option - alternative_credit_option)
+    :precondition
+      (and
+        (record_validated ?destination_program_record)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (alternative_option_available ?alternative_credit_option)
+        (not
+          (destination_program_ready ?destination_program_record)
+        )
+      )
+    :effect
+      (and
+        (gap_mitigation_proposed ?program_requirement_gap)
+        (destination_program_ready ?destination_program_record)
+        (proposed_alternative_for_program ?destination_program_record ?alternative_credit_option)
+        (not
+          (alternative_option_available ?alternative_credit_option)
+        )
+      )
+  )
+  (:action finalize_program_alternative
+    :parameters (?destination_program_record - destination_program_record ?program_requirement_gap - program_requirement_gap ?submitted_document - submitted_document ?alternative_credit_option - alternative_credit_option)
+    :precondition
+      (and
+        (record_validated ?destination_program_record)
+        (document_linked ?destination_program_record ?submitted_document)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (gap_mitigation_proposed ?program_requirement_gap)
+        (proposed_alternative_for_program ?destination_program_record ?alternative_credit_option)
+        (not
+          (destination_mitigation_confirmed ?destination_program_record)
+        )
+      )
+    :effect
+      (and
+        (gap_flagged ?program_requirement_gap)
+        (destination_mitigation_confirmed ?destination_program_record)
+        (alternative_option_available ?alternative_credit_option)
+        (not
+          (proposed_alternative_for_program ?destination_program_record ?alternative_credit_option)
+        )
+      )
+  )
+  (:action assemble_recovery_plan
+    :parameters (?origin_transcript - origin_transcript ?destination_program_record - destination_program_record ?credit_deficit_type - credit_deficit_type ?program_requirement_gap - program_requirement_gap ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (destination_program_ready ?destination_program_record)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (deficit_flagged ?credit_deficit_type)
+        (gap_flagged ?program_requirement_gap)
+        (origin_mitigation_confirmed ?origin_transcript)
+        (destination_mitigation_confirmed ?destination_program_record)
+        (recovery_plan_draft ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_addresses_deficit ?recovery_plan ?credit_deficit_type)
+        (recovery_plan_addresses_requirement_gap ?recovery_plan ?program_requirement_gap)
+        (not
+          (recovery_plan_draft ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_department_approval
+    :parameters (?origin_transcript - origin_transcript ?destination_program_record - destination_program_record ?credit_deficit_type - credit_deficit_type ?program_requirement_gap - program_requirement_gap ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (destination_program_ready ?destination_program_record)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (mitigation_option_recorded ?credit_deficit_type)
+        (gap_flagged ?program_requirement_gap)
+        (not
+          (origin_mitigation_confirmed ?origin_transcript)
+        )
+        (destination_mitigation_confirmed ?destination_program_record)
+        (recovery_plan_draft ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_addresses_deficit ?recovery_plan ?credit_deficit_type)
+        (recovery_plan_addresses_requirement_gap ?recovery_plan ?program_requirement_gap)
+        (recovery_plan_requires_department_approval ?recovery_plan)
+        (not
+          (recovery_plan_draft ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_committee_approval
+    :parameters (?origin_transcript - origin_transcript ?destination_program_record - destination_program_record ?credit_deficit_type - credit_deficit_type ?program_requirement_gap - program_requirement_gap ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (destination_program_ready ?destination_program_record)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (deficit_flagged ?credit_deficit_type)
+        (gap_mitigation_proposed ?program_requirement_gap)
+        (origin_mitigation_confirmed ?origin_transcript)
+        (not
+          (destination_mitigation_confirmed ?destination_program_record)
+        )
+        (recovery_plan_draft ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_addresses_deficit ?recovery_plan ?credit_deficit_type)
+        (recovery_plan_addresses_requirement_gap ?recovery_plan ?program_requirement_gap)
+        (recovery_plan_requires_committee_approval ?recovery_plan)
+        (not
+          (recovery_plan_draft ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_multiple_approvals
+    :parameters (?origin_transcript - origin_transcript ?destination_program_record - destination_program_record ?credit_deficit_type - credit_deficit_type ?program_requirement_gap - program_requirement_gap ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (destination_program_ready ?destination_program_record)
+        (transcript_has_deficit ?origin_transcript ?credit_deficit_type)
+        (program_has_requirement_gap ?destination_program_record ?program_requirement_gap)
+        (mitigation_option_recorded ?credit_deficit_type)
+        (gap_mitigation_proposed ?program_requirement_gap)
+        (not
+          (origin_mitigation_confirmed ?origin_transcript)
+        )
+        (not
+          (destination_mitigation_confirmed ?destination_program_record)
+        )
+        (recovery_plan_draft ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_addresses_deficit ?recovery_plan ?credit_deficit_type)
+        (recovery_plan_addresses_requirement_gap ?recovery_plan ?program_requirement_gap)
+        (recovery_plan_requires_department_approval ?recovery_plan)
+        (recovery_plan_requires_committee_approval ?recovery_plan)
+        (not
+          (recovery_plan_draft ?recovery_plan)
+        )
+      )
+  )
+  (:action register_recovery_plan
+    :parameters (?recovery_plan - recovery_plan ?origin_transcript - origin_transcript ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (recovery_plan_finalized ?recovery_plan)
+        (origin_transcript_ready ?origin_transcript)
+        (document_linked ?origin_transcript ?submitted_document)
+        (not
+          (recovery_plan_registered ?recovery_plan)
+        )
+      )
+    :effect (recovery_plan_registered ?recovery_plan)
+  )
+  (:action create_course_equivalency_record
+    :parameters (?student_profile - student_profile ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (profile_linked_recovery_plan ?student_profile ?recovery_plan)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_record_available ?course_equivalency_record)
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_registered ?recovery_plan)
+        (not
+          (equivalency_record_finalized ?course_equivalency_record)
+        )
+      )
+    :effect
+      (and
+        (equivalency_record_finalized ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (not
+          (equivalency_record_available ?course_equivalency_record)
+        )
+      )
+  )
+  (:action validate_equivalency_for_profile
+    :parameters (?student_profile - student_profile ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_record_finalized ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (document_linked ?student_profile ?submitted_document)
+        (not
+          (recovery_plan_requires_department_approval ?recovery_plan)
+        )
+        (not
+          (profile_specialist_approved ?student_profile)
+        )
+      )
+    :effect (profile_specialist_approved ?student_profile)
+  )
+  (:action attach_policy_reference_to_profile
+    :parameters (?student_profile - student_profile ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (policy_reference_available ?policy_reference)
+        (not
+          (policy_reference_flagged ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (policy_reference_flagged ?student_profile)
+        (policy_attached_to_profile ?student_profile ?policy_reference)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action apply_policy_reference_and_validate_profile
+    :parameters (?student_profile - student_profile ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan ?submitted_document - submitted_document ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_record_finalized ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (document_linked ?student_profile ?submitted_document)
+        (recovery_plan_requires_department_approval ?recovery_plan)
+        (policy_reference_flagged ?student_profile)
+        (policy_attached_to_profile ?student_profile ?policy_reference)
+        (not
+          (profile_specialist_approved ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_specialist_approved ?student_profile)
+        (policy_validation_recorded ?student_profile)
+      )
+  )
+  (:action apply_supplemental_authorization_to_profile
+    :parameters (?student_profile - student_profile ?approval_token - approval_token ?administrative_officer - administrative_officer ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (profile_specialist_approved ?student_profile)
+        (approval_token_allocated_to_profile ?student_profile ?approval_token)
+        (assigned_administrative_officer ?student_profile ?administrative_officer)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (not
+          (recovery_plan_requires_committee_approval ?recovery_plan)
+        )
+        (not
+          (supplemental_authorization_applied ?student_profile)
+        )
+      )
+    :effect (supplemental_authorization_applied ?student_profile)
+  )
+  (:action apply_supplemental_authorization_with_plan_flag
+    :parameters (?student_profile - student_profile ?approval_token - approval_token ?administrative_officer - administrative_officer ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (profile_specialist_approved ?student_profile)
+        (approval_token_allocated_to_profile ?student_profile ?approval_token)
+        (assigned_administrative_officer ?student_profile ?administrative_officer)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (recovery_plan_requires_committee_approval ?recovery_plan)
+        (not
+          (supplemental_authorization_applied ?student_profile)
+        )
+      )
+    :effect (supplemental_authorization_applied ?student_profile)
+  )
+  (:action escalate_profile_for_approval
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (supplemental_authorization_applied ?student_profile)
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (not
+          (recovery_plan_requires_department_approval ?recovery_plan)
+        )
+        (not
+          (recovery_plan_requires_committee_approval ?recovery_plan)
+        )
+        (not
+          (profile_ready_for_finalization ?student_profile)
+        )
+      )
+    :effect (profile_ready_for_finalization ?student_profile)
+  )
+  (:action escalate_profile_and_mark_for_support
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (supplemental_authorization_applied ?student_profile)
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (recovery_plan_requires_department_approval ?recovery_plan)
+        (not
+          (recovery_plan_requires_committee_approval ?recovery_plan)
+        )
+        (not
+          (profile_ready_for_finalization ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_requested ?student_profile)
+      )
+  )
+  (:action escalate_profile_and_record_full_approval
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (supplemental_authorization_applied ?student_profile)
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (not
+          (recovery_plan_requires_department_approval ?recovery_plan)
+        )
+        (recovery_plan_requires_committee_approval ?recovery_plan)
+        (not
+          (profile_ready_for_finalization ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_requested ?student_profile)
+      )
+  )
+  (:action escalate_profile_and_record_approval_set
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker ?course_equivalency_record - course_equivalency_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (supplemental_authorization_applied ?student_profile)
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (profile_has_equivalency_record ?student_profile ?course_equivalency_record)
+        (equivalency_linked_to_plan ?course_equivalency_record ?recovery_plan)
+        (recovery_plan_requires_department_approval ?recovery_plan)
+        (recovery_plan_requires_committee_approval ?recovery_plan)
+        (not
+          (profile_ready_for_finalization ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_requested ?student_profile)
+      )
+  )
+  (:action finalize_profile
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (not
+          (support_service_requested ?student_profile)
+        )
+        (not
+          (profile_finalized ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalized ?student_profile)
+        (restoration_applied ?student_profile)
+      )
+  )
+  (:action assign_support_service_to_profile
+    :parameters (?student_profile - student_profile ?support_service - support_service)
+    :precondition
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_requested ?student_profile)
+        (support_service_available ?support_service)
+      )
+    :effect
+      (and
+        (support_service_assigned_to_profile ?student_profile ?support_service)
+        (not
+          (support_service_available ?support_service)
+        )
+      )
+  )
+  (:action confirm_support_service_provision
+    :parameters (?student_profile - student_profile ?origin_transcript - origin_transcript ?destination_program_record - destination_program_record ?submitted_document - submitted_document ?support_service - support_service)
+    :precondition
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_requested ?student_profile)
+        (support_service_assigned_to_profile ?student_profile ?support_service)
+        (profile_linked_origin_transcript ?student_profile ?origin_transcript)
+        (profile_linked_destination_program ?student_profile ?destination_program_record)
+        (origin_mitigation_confirmed ?origin_transcript)
+        (destination_mitigation_confirmed ?destination_program_record)
+        (document_linked ?student_profile ?submitted_document)
+        (not
+          (support_service_attached ?student_profile)
+        )
+      )
+    :effect (support_service_attached ?student_profile)
+  )
+  (:action finalize_profile_after_support
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (profile_ready_for_finalization ?student_profile)
+        (support_service_attached ?student_profile)
+        (not
+          (profile_finalized ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalized ?student_profile)
+        (restoration_applied ?student_profile)
+      )
+  )
+  (:action apply_exception_justification_to_profile
+    :parameters (?student_profile - student_profile ?exception_justification - exception_justification ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (record_validated ?student_profile)
+        (document_linked ?student_profile ?submitted_document)
+        (exception_justification_available ?exception_justification)
+        (profile_has_exception_justification ?student_profile ?exception_justification)
+        (not
+          (exception_granted ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (exception_granted ?student_profile)
+        (not
+          (exception_justification_available ?exception_justification)
+        )
+      )
+  )
+  (:action record_exception_processing
+    :parameters (?student_profile - student_profile ?administrative_officer - administrative_officer)
+    :precondition
+      (and
+        (exception_granted ?student_profile)
+        (assigned_administrative_officer ?student_profile ?administrative_officer)
+        (not
+          (exception_processing_complete ?student_profile)
+        )
+      )
+    :effect (exception_processing_complete ?student_profile)
+  )
+  (:action authorize_exception_for_profile
+    :parameters (?student_profile - student_profile ?escalation_marker - escalation_marker)
+    :precondition
+      (and
+        (exception_processing_complete ?student_profile)
+        (escalation_marker_allocated_to_profile ?student_profile ?escalation_marker)
+        (not
+          (exception_authorized ?student_profile)
+        )
+      )
+    :effect (exception_authorized ?student_profile)
+  )
+  (:action finalize_exception_authorization
+    :parameters (?student_profile - student_profile)
+    :precondition
+      (and
+        (exception_authorized ?student_profile)
+        (not
+          (profile_finalized ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalized ?student_profile)
+        (restoration_applied ?student_profile)
+      )
+  )
+  (:action apply_restoration_to_origin_transcript
+    :parameters (?origin_transcript - origin_transcript ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (origin_transcript_ready ?origin_transcript)
+        (origin_mitigation_confirmed ?origin_transcript)
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_registered ?recovery_plan)
+        (not
+          (restoration_applied ?origin_transcript)
+        )
+      )
+    :effect (restoration_applied ?origin_transcript)
+  )
+  (:action apply_restoration_to_program_record
+    :parameters (?destination_program_record - destination_program_record ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (destination_program_ready ?destination_program_record)
+        (destination_mitigation_confirmed ?destination_program_record)
+        (recovery_plan_finalized ?recovery_plan)
+        (recovery_plan_registered ?recovery_plan)
+        (not
+          (restoration_applied ?destination_program_record)
+        )
+      )
+    :effect (restoration_applied ?destination_program_record)
+  )
+  (:action commit_credit_restoration_to_record
+    :parameters (?reassessment_case - reassessment_record ?evidence_attachment - evidence_attachment ?submitted_document - submitted_document)
+    :precondition
+      (and
+        (restoration_applied ?reassessment_case)
+        (document_linked ?reassessment_case ?submitted_document)
+        (evidence_attachment_available ?evidence_attachment)
+        (not
+          (record_finalized ?reassessment_case)
+        )
+      )
+    :effect
+      (and
+        (record_finalized ?reassessment_case)
+        (record_has_evidence_attachment ?reassessment_case ?evidence_attachment)
+        (not
+          (evidence_attachment_available ?evidence_attachment)
+        )
+      )
+  )
+  (:action apply_record_update_and_release_reviewer
+    :parameters (?origin_transcript - origin_transcript ?faculty_reviewer - faculty_reviewer ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (record_finalized ?origin_transcript)
+        (assigned_reviewer ?origin_transcript ?faculty_reviewer)
+        (record_has_evidence_attachment ?origin_transcript ?evidence_attachment)
+        (not
+          (record_updated ?origin_transcript)
+        )
+      )
+    :effect
+      (and
+        (record_updated ?origin_transcript)
+        (reviewer_available ?faculty_reviewer)
+        (evidence_attachment_available ?evidence_attachment)
+      )
+  )
+  (:action apply_program_record_update_and_release_reviewer
+    :parameters (?destination_program_record - destination_program_record ?faculty_reviewer - faculty_reviewer ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (record_finalized ?destination_program_record)
+        (assigned_reviewer ?destination_program_record ?faculty_reviewer)
+        (record_has_evidence_attachment ?destination_program_record ?evidence_attachment)
+        (not
+          (record_updated ?destination_program_record)
+        )
+      )
+    :effect
+      (and
+        (record_updated ?destination_program_record)
+        (reviewer_available ?faculty_reviewer)
+        (evidence_attachment_available ?evidence_attachment)
+      )
+  )
+  (:action apply_profile_record_update_and_release_reviewer
+    :parameters (?student_profile - student_profile ?faculty_reviewer - faculty_reviewer ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (record_finalized ?student_profile)
+        (assigned_reviewer ?student_profile ?faculty_reviewer)
+        (record_has_evidence_attachment ?student_profile ?evidence_attachment)
+        (not
+          (record_updated ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (record_updated ?student_profile)
+        (reviewer_available ?faculty_reviewer)
+        (evidence_attachment_available ?evidence_attachment)
+      )
+  )
+)

@@ -1,0 +1,1044 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain audit_evidence_collection_routing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types audit_resource - object artifact_pool - object system_pool - object case_cluster - object audit_case - case_cluster evidence_collector - audit_resource evidence_type - audit_resource reviewer - audit_resource compliance_check - audit_resource approval_template - audit_resource routing_token - audit_resource signatory_record - audit_resource external_reviewer - audit_resource temporary_attachment - artifact_pool workpaper - artifact_pool third_party_confirmation - artifact_pool source_system - system_pool data_extract - system_pool audit_package - system_pool account_cluster - audit_case owner_cluster - audit_case ledger_account - account_cluster process_owner - account_cluster audit_workitem - owner_cluster)
+  (:predicates
+    (evidence_request_issued ?evidence_request - audit_case)
+    (eligible_for_processing ?evidence_request - audit_case)
+    (collector_claimed ?evidence_request - audit_case)
+    (routing_completed ?evidence_request - audit_case)
+    (finalized ?evidence_request - audit_case)
+    (entity_finalized_for_routing ?evidence_request - audit_case)
+    (collector_available ?evidence_collector - evidence_collector)
+    (assigned_to_collector ?evidence_request - audit_case ?evidence_collector - evidence_collector)
+    (evidence_type_available ?evidence_type - evidence_type)
+    (entity_has_evidence_type ?evidence_request - audit_case ?evidence_type - evidence_type)
+    (reviewer_available ?reviewer - reviewer)
+    (entity_has_assigned_reviewer ?evidence_request - audit_case ?reviewer - reviewer)
+    (temporary_attachment_available ?temporary_attachment - temporary_attachment)
+    (account_has_temp_attachment ?ledger_account - ledger_account ?temporary_attachment - temporary_attachment)
+    (owner_has_temp_attachment ?process_owner - process_owner ?temporary_attachment - temporary_attachment)
+    (ledger_account_source_system ?ledger_account - ledger_account ?source_system - source_system)
+    (source_ready_for_packaging ?source_system - source_system)
+    (source_ready_for_owner_routing ?source_system - source_system)
+    (account_ready_for_packaging ?ledger_account - ledger_account)
+    (owner_has_data_extract ?process_owner - process_owner ?data_extract - data_extract)
+    (data_extract_ready ?data_extract - data_extract)
+    (data_extract_ready_for_owner ?data_extract - data_extract)
+    (owner_ready_for_packaging ?process_owner - process_owner)
+    (audit_package_available ?audit_package - audit_package)
+    (audit_package_prepared ?audit_package - audit_package)
+    (package_source_system_association ?audit_package - audit_package ?source_system - source_system)
+    (package_has_data_extract ?audit_package - audit_package ?data_extract - data_extract)
+    (package_flag_source_ready ?audit_package - audit_package)
+    (package_flag_owner_ready ?audit_package - audit_package)
+    (package_ready_for_workpaper_attachment ?audit_package - audit_package)
+    (workitem_associated_with_account ?audit_workitem - audit_workitem ?ledger_account - ledger_account)
+    (workitem_associated_with_owner ?audit_workitem - audit_workitem ?process_owner - process_owner)
+    (workitem_in_audit_package ?audit_workitem - audit_workitem ?audit_package - audit_package)
+    (workpaper_available ?workpaper - workpaper)
+    (workitem_has_workpaper ?audit_workitem - audit_workitem ?workpaper - workpaper)
+    (workpaper_indexed ?workpaper - workpaper)
+    (workpaper_attached_to_package ?workpaper - workpaper ?audit_package - audit_package)
+    (workitem_indexed ?audit_workitem - audit_workitem)
+    (signatory_record_registered ?audit_workitem - audit_workitem)
+    (signoff_initiated ?audit_workitem - audit_workitem)
+    (compliance_check_applied ?audit_workitem - audit_workitem)
+    (workitem_compliance_template_applied ?audit_workitem - audit_workitem)
+    (approval_template_applied ?audit_workitem - audit_workitem)
+    (final_signoff_achieved ?audit_workitem - audit_workitem)
+    (third_party_confirmation_available ?third_party_confirmation - third_party_confirmation)
+    (workitem_has_third_party_confirmation ?audit_workitem - audit_workitem ?third_party_confirmation - third_party_confirmation)
+    (targeted_review_initiated ?audit_workitem - audit_workitem)
+    (targeted_review_stage1_completed ?audit_workitem - audit_workitem)
+    (targeted_review_approved ?audit_workitem - audit_workitem)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (workitem_has_compliance_check ?audit_workitem - audit_workitem ?compliance_check - compliance_check)
+    (approval_template_available ?approval_template - approval_template)
+    (workitem_has_approval_template ?audit_workitem - audit_workitem ?approval_template - approval_template)
+    (signatory_record_available ?signatory_record - signatory_record)
+    (workitem_has_signatory_record ?audit_workitem - audit_workitem ?signatory_record - signatory_record)
+    (external_reviewer_available ?external_reviewer - external_reviewer)
+    (workitem_has_external_reviewer ?audit_workitem - audit_workitem ?external_reviewer - external_reviewer)
+    (routing_token_available ?routing_token - routing_token)
+    (entity_has_routing_token ?evidence_request - audit_case ?routing_token - routing_token)
+    (account_staged_for_packaging ?ledger_account - ledger_account)
+    (owner_staged_for_packaging ?process_owner - process_owner)
+    (workitem_marked_complete ?audit_workitem - audit_workitem)
+  )
+  (:action create_evidence_request
+    :parameters (?evidence_request - audit_case)
+    :precondition
+      (and
+        (not
+          (evidence_request_issued ?evidence_request)
+        )
+        (not
+          (routing_completed ?evidence_request)
+        )
+      )
+    :effect (evidence_request_issued ?evidence_request)
+  )
+  (:action assign_request_to_collector
+    :parameters (?evidence_request - audit_case ?evidence_collector - evidence_collector)
+    :precondition
+      (and
+        (evidence_request_issued ?evidence_request)
+        (not
+          (collector_claimed ?evidence_request)
+        )
+        (collector_available ?evidence_collector)
+      )
+    :effect
+      (and
+        (collector_claimed ?evidence_request)
+        (assigned_to_collector ?evidence_request ?evidence_collector)
+        (not
+          (collector_available ?evidence_collector)
+        )
+      )
+  )
+  (:action collector_claims_evidence_type
+    :parameters (?evidence_request - audit_case ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (evidence_request_issued ?evidence_request)
+        (collector_claimed ?evidence_request)
+        (evidence_type_available ?evidence_type)
+      )
+    :effect
+      (and
+        (entity_has_evidence_type ?evidence_request ?evidence_type)
+        (not
+          (evidence_type_available ?evidence_type)
+        )
+      )
+  )
+  (:action validate_evidence_type
+    :parameters (?evidence_request - audit_case ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (evidence_request_issued ?evidence_request)
+        (collector_claimed ?evidence_request)
+        (entity_has_evidence_type ?evidence_request ?evidence_type)
+        (not
+          (eligible_for_processing ?evidence_request)
+        )
+      )
+    :effect (eligible_for_processing ?evidence_request)
+  )
+  (:action release_evidence_type_claim
+    :parameters (?evidence_request - audit_case ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (entity_has_evidence_type ?evidence_request ?evidence_type)
+      )
+    :effect
+      (and
+        (evidence_type_available ?evidence_type)
+        (not
+          (entity_has_evidence_type ?evidence_request ?evidence_type)
+        )
+      )
+  )
+  (:action assign_reviewer_to_request
+    :parameters (?evidence_request - audit_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (eligible_for_processing ?evidence_request)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (entity_has_assigned_reviewer ?evidence_request ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_request
+    :parameters (?evidence_request - audit_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_has_assigned_reviewer ?evidence_request ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (entity_has_assigned_reviewer ?evidence_request ?reviewer)
+        )
+      )
+  )
+  (:action assign_signatory_record_to_workitem
+    :parameters (?audit_workitem - audit_workitem ?signatory_record - signatory_record)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (signatory_record_available ?signatory_record)
+      )
+    :effect
+      (and
+        (workitem_has_signatory_record ?audit_workitem ?signatory_record)
+        (not
+          (signatory_record_available ?signatory_record)
+        )
+      )
+  )
+  (:action release_signatory_record_from_workitem
+    :parameters (?audit_workitem - audit_workitem ?signatory_record - signatory_record)
+    :precondition
+      (and
+        (workitem_has_signatory_record ?audit_workitem ?signatory_record)
+      )
+    :effect
+      (and
+        (signatory_record_available ?signatory_record)
+        (not
+          (workitem_has_signatory_record ?audit_workitem ?signatory_record)
+        )
+      )
+  )
+  (:action assign_external_reviewer_to_workitem
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (external_reviewer_available ?external_reviewer)
+      )
+    :effect
+      (and
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (not
+          (external_reviewer_available ?external_reviewer)
+        )
+      )
+  )
+  (:action release_external_reviewer_from_workitem
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+      )
+    :effect
+      (and
+        (external_reviewer_available ?external_reviewer)
+        (not
+          (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        )
+      )
+  )
+  (:action mark_source_system_ready_for_packaging
+    :parameters (?ledger_account - ledger_account ?source_system - source_system ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (eligible_for_processing ?ledger_account)
+        (entity_has_evidence_type ?ledger_account ?evidence_type)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (not
+          (source_ready_for_packaging ?source_system)
+        )
+        (not
+          (source_ready_for_owner_routing ?source_system)
+        )
+      )
+    :effect (source_ready_for_packaging ?source_system)
+  )
+  (:action stage_account_with_reviewer_for_packaging
+    :parameters (?ledger_account - ledger_account ?source_system - source_system ?reviewer - reviewer)
+    :precondition
+      (and
+        (eligible_for_processing ?ledger_account)
+        (entity_has_assigned_reviewer ?ledger_account ?reviewer)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (source_ready_for_packaging ?source_system)
+        (not
+          (account_staged_for_packaging ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (account_ready_for_packaging ?ledger_account)
+      )
+  )
+  (:action attach_temporary_attachment_to_account
+    :parameters (?ledger_account - ledger_account ?source_system - source_system ?temporary_attachment - temporary_attachment)
+    :precondition
+      (and
+        (eligible_for_processing ?ledger_account)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (temporary_attachment_available ?temporary_attachment)
+        (not
+          (account_staged_for_packaging ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (source_ready_for_owner_routing ?source_system)
+        (account_staged_for_packaging ?ledger_account)
+        (account_has_temp_attachment ?ledger_account ?temporary_attachment)
+        (not
+          (temporary_attachment_available ?temporary_attachment)
+        )
+      )
+  )
+  (:action process_temp_attachment_and_mark_account_ready
+    :parameters (?ledger_account - ledger_account ?source_system - source_system ?evidence_type - evidence_type ?temporary_attachment - temporary_attachment)
+    :precondition
+      (and
+        (eligible_for_processing ?ledger_account)
+        (entity_has_evidence_type ?ledger_account ?evidence_type)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (source_ready_for_owner_routing ?source_system)
+        (account_has_temp_attachment ?ledger_account ?temporary_attachment)
+        (not
+          (account_ready_for_packaging ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (source_ready_for_packaging ?source_system)
+        (account_ready_for_packaging ?ledger_account)
+        (temporary_attachment_available ?temporary_attachment)
+        (not
+          (account_has_temp_attachment ?ledger_account ?temporary_attachment)
+        )
+      )
+  )
+  (:action mark_owner_data_extract_ready
+    :parameters (?process_owner - process_owner ?data_extract - data_extract ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (eligible_for_processing ?process_owner)
+        (entity_has_evidence_type ?process_owner ?evidence_type)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (not
+          (data_extract_ready ?data_extract)
+        )
+        (not
+          (data_extract_ready_for_owner ?data_extract)
+        )
+      )
+    :effect (data_extract_ready ?data_extract)
+  )
+  (:action stage_owner_with_reviewer_for_packaging
+    :parameters (?process_owner - process_owner ?data_extract - data_extract ?reviewer - reviewer)
+    :precondition
+      (and
+        (eligible_for_processing ?process_owner)
+        (entity_has_assigned_reviewer ?process_owner ?reviewer)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (data_extract_ready ?data_extract)
+        (not
+          (owner_staged_for_packaging ?process_owner)
+        )
+      )
+    :effect
+      (and
+        (owner_staged_for_packaging ?process_owner)
+        (owner_ready_for_packaging ?process_owner)
+      )
+  )
+  (:action attach_temporary_attachment_to_owner
+    :parameters (?process_owner - process_owner ?data_extract - data_extract ?temporary_attachment - temporary_attachment)
+    :precondition
+      (and
+        (eligible_for_processing ?process_owner)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (temporary_attachment_available ?temporary_attachment)
+        (not
+          (owner_staged_for_packaging ?process_owner)
+        )
+      )
+    :effect
+      (and
+        (data_extract_ready_for_owner ?data_extract)
+        (owner_staged_for_packaging ?process_owner)
+        (owner_has_temp_attachment ?process_owner ?temporary_attachment)
+        (not
+          (temporary_attachment_available ?temporary_attachment)
+        )
+      )
+  )
+  (:action process_owner_attachment_and_mark_ready
+    :parameters (?process_owner - process_owner ?data_extract - data_extract ?evidence_type - evidence_type ?temporary_attachment - temporary_attachment)
+    :precondition
+      (and
+        (eligible_for_processing ?process_owner)
+        (entity_has_evidence_type ?process_owner ?evidence_type)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (data_extract_ready_for_owner ?data_extract)
+        (owner_has_temp_attachment ?process_owner ?temporary_attachment)
+        (not
+          (owner_ready_for_packaging ?process_owner)
+        )
+      )
+    :effect
+      (and
+        (data_extract_ready ?data_extract)
+        (owner_ready_for_packaging ?process_owner)
+        (temporary_attachment_available ?temporary_attachment)
+        (not
+          (owner_has_temp_attachment ?process_owner ?temporary_attachment)
+        )
+      )
+  )
+  (:action assemble_audit_package
+    :parameters (?ledger_account - ledger_account ?process_owner - process_owner ?source_system - source_system ?data_extract - data_extract ?audit_package - audit_package)
+    :precondition
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (owner_staged_for_packaging ?process_owner)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (source_ready_for_packaging ?source_system)
+        (data_extract_ready ?data_extract)
+        (account_ready_for_packaging ?ledger_account)
+        (owner_ready_for_packaging ?process_owner)
+        (audit_package_available ?audit_package)
+      )
+    :effect
+      (and
+        (audit_package_prepared ?audit_package)
+        (package_source_system_association ?audit_package ?source_system)
+        (package_has_data_extract ?audit_package ?data_extract)
+        (not
+          (audit_package_available ?audit_package)
+        )
+      )
+  )
+  (:action assemble_audit_package_with_source_ready_flag
+    :parameters (?ledger_account - ledger_account ?process_owner - process_owner ?source_system - source_system ?data_extract - data_extract ?audit_package - audit_package)
+    :precondition
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (owner_staged_for_packaging ?process_owner)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (source_ready_for_owner_routing ?source_system)
+        (data_extract_ready ?data_extract)
+        (not
+          (account_ready_for_packaging ?ledger_account)
+        )
+        (owner_ready_for_packaging ?process_owner)
+        (audit_package_available ?audit_package)
+      )
+    :effect
+      (and
+        (audit_package_prepared ?audit_package)
+        (package_source_system_association ?audit_package ?source_system)
+        (package_has_data_extract ?audit_package ?data_extract)
+        (package_flag_source_ready ?audit_package)
+        (not
+          (audit_package_available ?audit_package)
+        )
+      )
+  )
+  (:action assemble_audit_package_with_owner_ready_flag
+    :parameters (?ledger_account - ledger_account ?process_owner - process_owner ?source_system - source_system ?data_extract - data_extract ?audit_package - audit_package)
+    :precondition
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (owner_staged_for_packaging ?process_owner)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (source_ready_for_packaging ?source_system)
+        (data_extract_ready_for_owner ?data_extract)
+        (account_ready_for_packaging ?ledger_account)
+        (not
+          (owner_ready_for_packaging ?process_owner)
+        )
+        (audit_package_available ?audit_package)
+      )
+    :effect
+      (and
+        (audit_package_prepared ?audit_package)
+        (package_source_system_association ?audit_package ?source_system)
+        (package_has_data_extract ?audit_package ?data_extract)
+        (package_flag_owner_ready ?audit_package)
+        (not
+          (audit_package_available ?audit_package)
+        )
+      )
+  )
+  (:action assemble_audit_package_with_both_ready_flags
+    :parameters (?ledger_account - ledger_account ?process_owner - process_owner ?source_system - source_system ?data_extract - data_extract ?audit_package - audit_package)
+    :precondition
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (owner_staged_for_packaging ?process_owner)
+        (ledger_account_source_system ?ledger_account ?source_system)
+        (owner_has_data_extract ?process_owner ?data_extract)
+        (source_ready_for_owner_routing ?source_system)
+        (data_extract_ready_for_owner ?data_extract)
+        (not
+          (account_ready_for_packaging ?ledger_account)
+        )
+        (not
+          (owner_ready_for_packaging ?process_owner)
+        )
+        (audit_package_available ?audit_package)
+      )
+    :effect
+      (and
+        (audit_package_prepared ?audit_package)
+        (package_source_system_association ?audit_package ?source_system)
+        (package_has_data_extract ?audit_package ?data_extract)
+        (package_flag_source_ready ?audit_package)
+        (package_flag_owner_ready ?audit_package)
+        (not
+          (audit_package_available ?audit_package)
+        )
+      )
+  )
+  (:action mark_package_ready_for_workpaper_attachment
+    :parameters (?audit_package - audit_package ?ledger_account - ledger_account ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (audit_package_prepared ?audit_package)
+        (account_staged_for_packaging ?ledger_account)
+        (entity_has_evidence_type ?ledger_account ?evidence_type)
+        (not
+          (package_ready_for_workpaper_attachment ?audit_package)
+        )
+      )
+    :effect (package_ready_for_workpaper_attachment ?audit_package)
+  )
+  (:action attach_and_index_workpaper
+    :parameters (?audit_workitem - audit_workitem ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (workitem_in_audit_package ?audit_workitem ?audit_package)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_available ?workpaper)
+        (audit_package_prepared ?audit_package)
+        (package_ready_for_workpaper_attachment ?audit_package)
+        (not
+          (workpaper_indexed ?workpaper)
+        )
+      )
+    :effect
+      (and
+        (workpaper_indexed ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (not
+          (workpaper_available ?workpaper)
+        )
+      )
+  )
+  (:action confirm_workpaper_indexing_for_workitem
+    :parameters (?audit_workitem - audit_workitem ?workpaper - workpaper ?audit_package - audit_package ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_indexed ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (entity_has_evidence_type ?audit_workitem ?evidence_type)
+        (not
+          (package_flag_source_ready ?audit_package)
+        )
+        (not
+          (workitem_indexed ?audit_workitem)
+        )
+      )
+    :effect (workitem_indexed ?audit_workitem)
+  )
+  (:action apply_compliance_check_to_workitem
+    :parameters (?audit_workitem - audit_workitem ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (compliance_check_available ?compliance_check)
+        (not
+          (compliance_check_applied ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (compliance_check_applied ?audit_workitem)
+        (workitem_has_compliance_check ?audit_workitem ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action apply_compliance_check_and_mark_workpaper
+    :parameters (?audit_workitem - audit_workitem ?workpaper - workpaper ?audit_package - audit_package ?evidence_type - evidence_type ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_indexed ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (entity_has_evidence_type ?audit_workitem ?evidence_type)
+        (package_flag_source_ready ?audit_package)
+        (compliance_check_applied ?audit_workitem)
+        (workitem_has_compliance_check ?audit_workitem ?compliance_check)
+        (not
+          (workitem_indexed ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_indexed ?audit_workitem)
+        (workitem_compliance_template_applied ?audit_workitem)
+      )
+  )
+  (:action initiate_individual_signoff
+    :parameters (?audit_workitem - audit_workitem ?signatory_record - signatory_record ?reviewer - reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (workitem_indexed ?audit_workitem)
+        (workitem_has_signatory_record ?audit_workitem ?signatory_record)
+        (entity_has_assigned_reviewer ?audit_workitem ?reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (not
+          (package_flag_owner_ready ?audit_package)
+        )
+        (not
+          (signatory_record_registered ?audit_workitem)
+        )
+      )
+    :effect (signatory_record_registered ?audit_workitem)
+  )
+  (:action confirm_individual_signoff_assignment
+    :parameters (?audit_workitem - audit_workitem ?signatory_record - signatory_record ?reviewer - reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (workitem_indexed ?audit_workitem)
+        (workitem_has_signatory_record ?audit_workitem ?signatory_record)
+        (entity_has_assigned_reviewer ?audit_workitem ?reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (package_flag_owner_ready ?audit_package)
+        (not
+          (signatory_record_registered ?audit_workitem)
+        )
+      )
+    :effect (signatory_record_registered ?audit_workitem)
+  )
+  (:action record_external_reviewer_signoff_no_package_flags
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (signatory_record_registered ?audit_workitem)
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (not
+          (package_flag_source_ready ?audit_package)
+        )
+        (not
+          (package_flag_owner_ready ?audit_package)
+        )
+        (not
+          (signoff_initiated ?audit_workitem)
+        )
+      )
+    :effect (signoff_initiated ?audit_workitem)
+  )
+  (:action record_external_reviewer_signoff_with_source_flag
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (signatory_record_registered ?audit_workitem)
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (package_flag_source_ready ?audit_package)
+        (not
+          (package_flag_owner_ready ?audit_package)
+        )
+        (not
+          (signoff_initiated ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (signoff_initiated ?audit_workitem)
+        (approval_template_applied ?audit_workitem)
+      )
+  )
+  (:action record_external_reviewer_signoff_with_owner_flag
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (signatory_record_registered ?audit_workitem)
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (not
+          (package_flag_source_ready ?audit_package)
+        )
+        (package_flag_owner_ready ?audit_package)
+        (not
+          (signoff_initiated ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (signoff_initiated ?audit_workitem)
+        (approval_template_applied ?audit_workitem)
+      )
+  )
+  (:action record_external_reviewer_signoff_with_both_flags
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer ?workpaper - workpaper ?audit_package - audit_package)
+    :precondition
+      (and
+        (signatory_record_registered ?audit_workitem)
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (workitem_has_workpaper ?audit_workitem ?workpaper)
+        (workpaper_attached_to_package ?workpaper ?audit_package)
+        (package_flag_source_ready ?audit_package)
+        (package_flag_owner_ready ?audit_package)
+        (not
+          (signoff_initiated ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (signoff_initiated ?audit_workitem)
+        (approval_template_applied ?audit_workitem)
+      )
+  )
+  (:action finalize_workitem
+    :parameters (?audit_workitem - audit_workitem)
+    :precondition
+      (and
+        (signoff_initiated ?audit_workitem)
+        (not
+          (approval_template_applied ?audit_workitem)
+        )
+        (not
+          (workitem_marked_complete ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_marked_complete ?audit_workitem)
+        (finalized ?audit_workitem)
+      )
+  )
+  (:action apply_approval_template_to_workitem
+    :parameters (?audit_workitem - audit_workitem ?approval_template - approval_template)
+    :precondition
+      (and
+        (signoff_initiated ?audit_workitem)
+        (approval_template_applied ?audit_workitem)
+        (approval_template_available ?approval_template)
+      )
+    :effect
+      (and
+        (workitem_has_approval_template ?audit_workitem ?approval_template)
+        (not
+          (approval_template_available ?approval_template)
+        )
+      )
+  )
+  (:action apply_signatories_and_mark_final_signoff
+    :parameters (?audit_workitem - audit_workitem ?ledger_account - ledger_account ?process_owner - process_owner ?evidence_type - evidence_type ?approval_template - approval_template)
+    :precondition
+      (and
+        (signoff_initiated ?audit_workitem)
+        (approval_template_applied ?audit_workitem)
+        (workitem_has_approval_template ?audit_workitem ?approval_template)
+        (workitem_associated_with_account ?audit_workitem ?ledger_account)
+        (workitem_associated_with_owner ?audit_workitem ?process_owner)
+        (account_ready_for_packaging ?ledger_account)
+        (owner_ready_for_packaging ?process_owner)
+        (entity_has_evidence_type ?audit_workitem ?evidence_type)
+        (not
+          (final_signoff_achieved ?audit_workitem)
+        )
+      )
+    :effect (final_signoff_achieved ?audit_workitem)
+  )
+  (:action finalize_workitem_after_signoffs
+    :parameters (?audit_workitem - audit_workitem)
+    :precondition
+      (and
+        (signoff_initiated ?audit_workitem)
+        (final_signoff_achieved ?audit_workitem)
+        (not
+          (workitem_marked_complete ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_marked_complete ?audit_workitem)
+        (finalized ?audit_workitem)
+      )
+  )
+  (:action initiate_targeted_third_party_review
+    :parameters (?audit_workitem - audit_workitem ?third_party_confirmation - third_party_confirmation ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (eligible_for_processing ?audit_workitem)
+        (entity_has_evidence_type ?audit_workitem ?evidence_type)
+        (third_party_confirmation_available ?third_party_confirmation)
+        (workitem_has_third_party_confirmation ?audit_workitem ?third_party_confirmation)
+        (not
+          (targeted_review_initiated ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (targeted_review_initiated ?audit_workitem)
+        (not
+          (third_party_confirmation_available ?third_party_confirmation)
+        )
+      )
+  )
+  (:action assign_reviewer_for_targeted_review
+    :parameters (?audit_workitem - audit_workitem ?reviewer - reviewer)
+    :precondition
+      (and
+        (targeted_review_initiated ?audit_workitem)
+        (entity_has_assigned_reviewer ?audit_workitem ?reviewer)
+        (not
+          (targeted_review_stage1_completed ?audit_workitem)
+        )
+      )
+    :effect (targeted_review_stage1_completed ?audit_workitem)
+  )
+  (:action record_targeted_review_external_signoff
+    :parameters (?audit_workitem - audit_workitem ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (targeted_review_stage1_completed ?audit_workitem)
+        (workitem_has_external_reviewer ?audit_workitem ?external_reviewer)
+        (not
+          (targeted_review_approved ?audit_workitem)
+        )
+      )
+    :effect (targeted_review_approved ?audit_workitem)
+  )
+  (:action finalize_targeted_review
+    :parameters (?audit_workitem - audit_workitem)
+    :precondition
+      (and
+        (targeted_review_approved ?audit_workitem)
+        (not
+          (workitem_marked_complete ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_marked_complete ?audit_workitem)
+        (finalized ?audit_workitem)
+      )
+  )
+  (:action apply_package_to_account
+    :parameters (?ledger_account - ledger_account ?audit_package - audit_package)
+    :precondition
+      (and
+        (account_staged_for_packaging ?ledger_account)
+        (account_ready_for_packaging ?ledger_account)
+        (audit_package_prepared ?audit_package)
+        (package_ready_for_workpaper_attachment ?audit_package)
+        (not
+          (finalized ?ledger_account)
+        )
+      )
+    :effect (finalized ?ledger_account)
+  )
+  (:action apply_package_to_owner
+    :parameters (?process_owner - process_owner ?audit_package - audit_package)
+    :precondition
+      (and
+        (owner_staged_for_packaging ?process_owner)
+        (owner_ready_for_packaging ?process_owner)
+        (audit_package_prepared ?audit_package)
+        (package_ready_for_workpaper_attachment ?audit_package)
+        (not
+          (finalized ?process_owner)
+        )
+      )
+    :effect (finalized ?process_owner)
+  )
+  (:action finalize_evidence_with_routing_token
+    :parameters (?evidence_request - audit_case ?routing_token - routing_token ?evidence_type - evidence_type)
+    :precondition
+      (and
+        (finalized ?evidence_request)
+        (entity_has_evidence_type ?evidence_request ?evidence_type)
+        (routing_token_available ?routing_token)
+        (not
+          (entity_finalized_for_routing ?evidence_request)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_routing ?evidence_request)
+        (entity_has_routing_token ?evidence_request ?routing_token)
+        (not
+          (routing_token_available ?routing_token)
+        )
+      )
+  )
+  (:action propagate_routing_token_to_collector_and_mark_account
+    :parameters (?ledger_account - ledger_account ?evidence_collector - evidence_collector ?routing_token - routing_token)
+    :precondition
+      (and
+        (entity_finalized_for_routing ?ledger_account)
+        (assigned_to_collector ?ledger_account ?evidence_collector)
+        (entity_has_routing_token ?ledger_account ?routing_token)
+        (not
+          (routing_completed ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (routing_completed ?ledger_account)
+        (collector_available ?evidence_collector)
+        (routing_token_available ?routing_token)
+      )
+  )
+  (:action propagate_routing_token_to_collector_and_mark_owner
+    :parameters (?process_owner - process_owner ?evidence_collector - evidence_collector ?routing_token - routing_token)
+    :precondition
+      (and
+        (entity_finalized_for_routing ?process_owner)
+        (assigned_to_collector ?process_owner ?evidence_collector)
+        (entity_has_routing_token ?process_owner ?routing_token)
+        (not
+          (routing_completed ?process_owner)
+        )
+      )
+    :effect
+      (and
+        (routing_completed ?process_owner)
+        (collector_available ?evidence_collector)
+        (routing_token_available ?routing_token)
+      )
+  )
+  (:action propagate_routing_token_to_collector_and_mark_workitem
+    :parameters (?audit_workitem - audit_workitem ?evidence_collector - evidence_collector ?routing_token - routing_token)
+    :precondition
+      (and
+        (entity_finalized_for_routing ?audit_workitem)
+        (assigned_to_collector ?audit_workitem ?evidence_collector)
+        (entity_has_routing_token ?audit_workitem ?routing_token)
+        (not
+          (routing_completed ?audit_workitem)
+        )
+      )
+    :effect
+      (and
+        (routing_completed ?audit_workitem)
+        (collector_available ?evidence_collector)
+        (routing_token_available ?routing_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem audit_evidence_collection_routing_case)
+  (:domain audit_evidence_collection_routing_domain)
+  (:objects ledger_account_payables_4000 - ledger_account process_owner_ap_manager - process_owner audit_workitem_ap_reconciliation_2024_01 - audit_workitem audit_workitem_cash_reconciliation_2024_01 - audit_workitem evidence_collector_team_a - evidence_collector evidence_collector_external_service - evidence_collector evidence_collector_internal_queue - evidence_collector evidence_type_invoice - evidence_type reviewer_senior_manager - reviewer temp_attachment_invoice_pdf - temporary_attachment source_system_erp_system - source_system data_extract_ap_aging - data_extract audit_package_ap_january_2024 - audit_package workpaper_ap_transactions - workpaper workpaper_cash_bank_statement - workpaper compliance_check_sarbanes_oxley - compliance_check compliance_check_internal_control - compliance_check approval_template_standard_signoff - approval_template approval_template_escalation - approval_template routing_token_rt_001 - routing_token signatory_record_sig_jane_doe - signatory_record third_party_confirmation_bank_conf_123 - third_party_confirmation third_party_confirmation_supplier_conf_456 - third_party_confirmation external_reviewer_firm_partner - external_reviewer)
+  (:init
+    (collector_available evidence_collector_team_a)
+    (collector_available evidence_collector_external_service)
+    (collector_available evidence_collector_internal_queue)
+    (evidence_type_available evidence_type_invoice)
+    (reviewer_available reviewer_senior_manager)
+    (temporary_attachment_available temp_attachment_invoice_pdf)
+    (ledger_account_source_system ledger_account_payables_4000 source_system_erp_system)
+    (owner_has_data_extract process_owner_ap_manager data_extract_ap_aging)
+    (audit_package_available audit_package_ap_january_2024)
+    (workpaper_available workpaper_ap_transactions)
+    (workpaper_available workpaper_cash_bank_statement)
+    (workitem_associated_with_account audit_workitem_ap_reconciliation_2024_01 ledger_account_payables_4000)
+    (workitem_associated_with_account audit_workitem_cash_reconciliation_2024_01 ledger_account_payables_4000)
+    (workitem_associated_with_owner audit_workitem_ap_reconciliation_2024_01 process_owner_ap_manager)
+    (workitem_associated_with_owner audit_workitem_cash_reconciliation_2024_01 process_owner_ap_manager)
+    (workitem_in_audit_package audit_workitem_ap_reconciliation_2024_01 audit_package_ap_january_2024)
+    (workitem_in_audit_package audit_workitem_cash_reconciliation_2024_01 audit_package_ap_january_2024)
+    (workitem_has_workpaper audit_workitem_ap_reconciliation_2024_01 workpaper_ap_transactions)
+    (workitem_has_workpaper audit_workitem_cash_reconciliation_2024_01 workpaper_cash_bank_statement)
+    (compliance_check_available compliance_check_sarbanes_oxley)
+    (compliance_check_available compliance_check_internal_control)
+    (approval_template_available approval_template_standard_signoff)
+    (approval_template_available approval_template_escalation)
+    (routing_token_available routing_token_rt_001)
+    (signatory_record_available signatory_record_sig_jane_doe)
+    (third_party_confirmation_available third_party_confirmation_bank_conf_123)
+    (workitem_has_third_party_confirmation audit_workitem_ap_reconciliation_2024_01 third_party_confirmation_bank_conf_123)
+    (workitem_has_third_party_confirmation audit_workitem_cash_reconciliation_2024_01 third_party_confirmation_supplier_conf_456)
+    (external_reviewer_available external_reviewer_firm_partner)
+  )
+  (:goal
+    (and
+      (routing_completed ledger_account_payables_4000)
+      (routing_completed process_owner_ap_manager)
+      (routing_completed audit_workitem_ap_reconciliation_2024_01)
+      (routing_completed audit_workitem_cash_reconciliation_2024_01)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_evidence_request ledger_account_payables_4000)
+(assign_request_to_collector ledger_account_payables_4000 evidence_collector_team_a)
+(collector_claims_evidence_type ledger_account_payables_4000 evidence_type_invoice)
+(validate_evidence_type ledger_account_payables_4000 evidence_type_invoice)
+(assign_reviewer_to_request ledger_account_payables_4000 reviewer_senior_manager)
+(mark_source_system_ready_for_packaging ledger_account_payables_4000 source_system_erp_system evidence_type_invoice)
+(stage_account_with_reviewer_for_packaging ledger_account_payables_4000 source_system_erp_system reviewer_senior_manager)
+(attach_temporary_attachment_to_account ledger_account_payables_4000 source_system_erp_system temp_attachment_invoice_pdf)
+(process_temp_attachment_and_mark_account_ready ledger_account_payables_4000 source_system_erp_system evidence_type_invoice temp_attachment_invoice_pdf)
+(mark_owner_data_extract_ready process_owner_ap_manager data_extract_ap_aging evidence_type_invoice)
+(stage_owner_with_reviewer_for_packaging process_owner_ap_manager data_extract_ap_aging reviewer_senior_manager)
+(attach_temporary_attachment_to_owner process_owner_ap_manager data_extract_ap_aging temp_attachment_invoice_pdf)
+(process_owner_attachment_and_mark_ready process_owner_ap_manager data_extract_ap_aging evidence_type_invoice temp_attachment_invoice_pdf)
+(assemble_audit_package ledger_account_payables_4000 process_owner_ap_manager source_system_erp_system data_extract_ap_aging audit_package_ap_january_2024)
+(mark_package_ready_for_workpaper_attachment audit_package_ap_january_2024 ledger_account_payables_4000 evidence_type_invoice)
+(attach_and_index_workpaper audit_workitem_ap_reconciliation_2024_01 workpaper_ap_transactions audit_package_ap_january_2024)
+(attach_and_index_workpaper audit_workitem_cash_reconciliation_2024_01 workpaper_cash_bank_statement audit_package_ap_january_2024)
+(apply_compliance_check_to_workitem audit_workitem_ap_reconciliation_2024_01 compliance_check_sarbanes_oxley)
+(apply_compliance_check_to_workitem audit_workitem_cash_reconciliation_2024_01 compliance_check_internal_control)
+(apply_compliance_check_and_mark_workpaper audit_workitem_ap_reconciliation_2024_01 workpaper_ap_transactions audit_package_ap_january_2024 evidence_type_invoice compliance_check_sarbanes_oxley)
+(apply_compliance_check_and_mark_workpaper audit_workitem_cash_reconciliation_2024_01 workpaper_cash_bank_statement audit_package_ap_january_2024 evidence_type_invoice compliance_check_internal_control)
+(assign_signatory_record_to_workitem audit_workitem_ap_reconciliation_2024_01 signatory_record_sig_jane_doe)
+(assign_signatory_record_to_workitem audit_workitem_cash_reconciliation_2024_01 signatory_record_sig_jane_doe)
+(initiate_individual_signoff audit_workitem_ap_reconciliation_2024_01 signatory_record_sig_jane_doe reviewer_senior_manager workpaper_ap_transactions audit_package_ap_january_2024)
+(initiate_individual_signoff audit_workitem_cash_reconciliation_2024_01 signatory_record_sig_jane_doe reviewer_senior_manager workpaper_cash_bank_statement audit_package_ap_january_2024)
+(apply_approval_template_to_workitem audit_workitem_ap_reconciliation_2024_01 approval_template_standard_signoff)
+(apply_approval_template_to_workitem audit_workitem_cash_reconciliation_2024_01 approval_template_standard_signoff)
+(apply_signatories_and_mark_final_signoff audit_workitem_ap_reconciliation_2024_01 ledger_account_payables_4000 process_owner_ap_manager evidence_type_invoice approval_template_standard_signoff)
+(apply_signatories_and_mark_final_signoff audit_workitem_cash_reconciliation_2024_01 ledger_account_payables_4000 process_owner_ap_manager evidence_type_invoice approval_template_standard_signoff)
+(finalize_workitem_after_signoffs audit_workitem_ap_reconciliation_2024_01)
+(finalize_workitem_after_signoffs audit_workitem_cash_reconciliation_2024_01)
+(apply_package_to_account ledger_account_payables_4000 audit_package_ap_january_2024)
+(apply_package_to_owner process_owner_ap_manager audit_package_ap_january_2024)
+(finalize_evidence_with_routing_token ledger_account_payables_4000 routing_token_rt_001 evidence_type_invoice)
+(finalize_evidence_with_routing_token process_owner_ap_manager routing_token_rt_001 evidence_type_invoice)
+(finalize_evidence_with_routing_token audit_workitem_ap_reconciliation_2024_01 routing_token_rt_001 evidence_type_invoice)
+(finalize_evidence_with_routing_token audit_workitem_cash_reconciliation_2024_01 routing_token_rt_001 evidence_type_invoice)
+(propagate_routing_token_to_collector_and_mark_account ledger_account_payables_4000 evidence_collector_team_a routing_token_rt_001)
+(propagate_routing_token_to_collector_and_mark_owner process_owner_ap_manager evidence_collector_team_a routing_token_rt_001)
+(propagate_routing_token_to_collector_and_mark_workitem audit_workitem_ap_reconciliation_2024_01 evidence_collector_team_a routing_token_rt_001)
+(propagate_routing_token_to_collector_and_mark_workitem audit_workitem_cash_reconciliation_2024_01 evidence_collector_team_a routing_token_rt_001)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_zo3axz5r/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_zo3axz5r/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,937 @@
+(define (domain quest_progression_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object metadata_group_1 - base_object metadata_group_2 - base_object metadata_group_3 - base_object category_root - base_object quest_node - category_root unlock_token - metadata_group_1 interaction_method - metadata_group_1 quest_agent - metadata_group_1 optional_modifier_tag - metadata_group_1 challenge_modifier - metadata_group_1 narrative_tag - metadata_group_1 special_resource - metadata_group_1 time_limited_event_tag - metadata_group_1 side_content_item - metadata_group_2 reward_component - metadata_group_2 companion_tag - metadata_group_2 encounter_instance - metadata_group_3 encounter_variant - metadata_group_3 mission_composite - metadata_group_3 mainline_node_type - quest_node milestone_node_type - quest_node mainline_quest_node - mainline_node_type side_quest_node - mainline_node_type milestone_node - milestone_node_type)
+
+  (:predicates
+    (quest_available ?quest_node - quest_node)
+    (quest_active ?quest_node - quest_node)
+    (quest_token_bound ?quest_node - quest_node)
+    (quest_completed ?quest_node - quest_node)
+    (quest_finalized ?quest_node - quest_node)
+    (quest_ready_to_complete ?quest_node - quest_node)
+    (unlock_token_available ?unlock_token - unlock_token)
+    (token_bound_to_node ?quest_node - quest_node ?unlock_token - unlock_token)
+    (interaction_available ?interaction_method - interaction_method)
+    (interaction_attached_to_quest ?quest_node - quest_node ?interaction_method - interaction_method)
+    (agent_available ?agent_requirement - quest_agent)
+    (agent_assigned_to_node ?quest_node - quest_node ?agent_requirement - quest_agent)
+    (side_item_available ?side_content_item - side_content_item)
+    (mainline_has_side_item ?mainline_quest_node - mainline_quest_node ?side_content_item - side_content_item)
+    (side_has_item ?side_quest_node - side_quest_node ?side_content_item - side_content_item)
+    (mainline_has_encounter ?mainline_quest_node - mainline_quest_node ?encounter_instance - encounter_instance)
+    (encounter_instance_state_primary ?encounter_instance - encounter_instance)
+    (encounter_instance_state_alternate ?encounter_instance - encounter_instance)
+    (mainline_progress_flag ?mainline_quest_node - mainline_quest_node)
+    (side_has_encounter_variant ?side_quest_node - side_quest_node ?encounter_variant - encounter_variant)
+    (encounter_variant_state_primary ?encounter_variant - encounter_variant)
+    (encounter_variant_state_alternate ?encounter_variant - encounter_variant)
+    (side_progress_flag ?side_quest_node - side_quest_node)
+    (composite_unassembled ?mission_composite - mission_composite)
+    (composite_ready ?mission_composite - mission_composite)
+    (composite_has_encounter_instance ?mission_composite - mission_composite ?encounter_instance - encounter_instance)
+    (composite_has_encounter_variant ?mission_composite - mission_composite ?encounter_variant - encounter_variant)
+    (composite_flag_instance_primary ?mission_composite - mission_composite)
+    (composite_flag_variant_primary ?mission_composite - mission_composite)
+    (composite_deployed ?mission_composite - mission_composite)
+    (milestone_requires_mainline ?milestone_node - milestone_node ?mainline_quest_node - mainline_quest_node)
+    (milestone_requires_side ?milestone_node - milestone_node ?side_quest_node - side_quest_node)
+    (milestone_requires_composite ?milestone_node - milestone_node ?mission_composite - mission_composite)
+    (reward_component_available ?reward_component - reward_component)
+    (milestone_has_reward_component ?milestone_node - milestone_node ?reward_component - reward_component)
+    (reward_component_attached ?reward_component - reward_component)
+    (reward_component_attached_to_composite ?reward_component - reward_component ?mission_composite - mission_composite)
+    (milestone_component_verified ?milestone_node - milestone_node)
+    (milestone_attachment_sequence_started ?milestone_node - milestone_node)
+    (milestone_ready_for_finalization ?milestone_node - milestone_node)
+    (optional_modifier_flag_present_on_milestone ?milestone_node - milestone_node)
+    (optional_modifier_confirmed ?milestone_node - milestone_node)
+    (milestone_modifier_flag_present ?milestone_node - milestone_node)
+    (milestone_integration_complete ?milestone_node - milestone_node)
+    (companion_tag_available ?companion_tag - companion_tag)
+    (companion_attached_to_milestone ?milestone_node - milestone_node ?companion_tag - companion_tag)
+    (companion_engaged_on_milestone ?milestone_node - milestone_node)
+    (companion_ready_state ?milestone_node - milestone_node)
+    (companion_finalized_state ?milestone_node - milestone_node)
+    (optional_modifier_tag_available ?optional_modifier_tag - optional_modifier_tag)
+    (optional_modifier_attached_to_milestone ?milestone_node - milestone_node ?optional_modifier_tag - optional_modifier_tag)
+    (challenge_modifier_available ?challenge_modifier - challenge_modifier)
+    (challenge_modifier_attached ?milestone_node - milestone_node ?challenge_modifier - challenge_modifier)
+    (special_resource_available ?special_resource - special_resource)
+    (special_resource_attached ?milestone_node - milestone_node ?special_resource - special_resource)
+    (event_token_available ?time_limited_event_tag - time_limited_event_tag)
+    (event_token_attached ?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag)
+    (narrative_tag_available ?narrative_tag - narrative_tag)
+    (narrative_tag_attached_to_node ?quest_node - quest_node ?narrative_tag - narrative_tag)
+    (mainline_encounter_ready ?mainline_quest_node - mainline_quest_node)
+    (side_encounter_ready ?side_quest_node - side_quest_node)
+    (milestone_completion_marked ?milestone_node - milestone_node)
+  )
+  (:action make_quest_available
+    :parameters (?quest_node - quest_node)
+    :precondition
+      (and
+        (not
+          (quest_available ?quest_node)
+        )
+        (not
+          (quest_completed ?quest_node)
+        )
+      )
+    :effect (quest_available ?quest_node)
+  )
+  (:action assign_unlock_token
+    :parameters (?quest_node - quest_node ?unlock_token - unlock_token)
+    :precondition
+      (and
+        (quest_available ?quest_node)
+        (not
+          (quest_token_bound ?quest_node)
+        )
+        (unlock_token_available ?unlock_token)
+      )
+    :effect
+      (and
+        (quest_token_bound ?quest_node)
+        (token_bound_to_node ?quest_node ?unlock_token)
+        (not
+          (unlock_token_available ?unlock_token)
+        )
+      )
+  )
+  (:action attach_interaction_to_quest
+    :parameters (?quest_node - quest_node ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_available ?quest_node)
+        (quest_token_bound ?quest_node)
+        (interaction_available ?interaction_method)
+      )
+    :effect
+      (and
+        (interaction_attached_to_quest ?quest_node ?interaction_method)
+        (not
+          (interaction_available ?interaction_method)
+        )
+      )
+  )
+  (:action confirm_quest_activation
+    :parameters (?quest_node - quest_node ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_available ?quest_node)
+        (quest_token_bound ?quest_node)
+        (interaction_attached_to_quest ?quest_node ?interaction_method)
+        (not
+          (quest_active ?quest_node)
+        )
+      )
+    :effect (quest_active ?quest_node)
+  )
+  (:action detach_interaction_from_quest
+    :parameters (?quest_node - quest_node ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (interaction_attached_to_quest ?quest_node ?interaction_method)
+      )
+    :effect
+      (and
+        (interaction_available ?interaction_method)
+        (not
+          (interaction_attached_to_quest ?quest_node ?interaction_method)
+        )
+      )
+  )
+  (:action assign_agent_to_quest
+    :parameters (?quest_node - quest_node ?agent_requirement - quest_agent)
+    :precondition
+      (and
+        (quest_active ?quest_node)
+        (agent_available ?agent_requirement)
+      )
+    :effect
+      (and
+        (agent_assigned_to_node ?quest_node ?agent_requirement)
+        (not
+          (agent_available ?agent_requirement)
+        )
+      )
+  )
+  (:action unassign_agent_from_quest
+    :parameters (?quest_node - quest_node ?agent_requirement - quest_agent)
+    :precondition
+      (and
+        (agent_assigned_to_node ?quest_node ?agent_requirement)
+      )
+    :effect
+      (and
+        (agent_available ?agent_requirement)
+        (not
+          (agent_assigned_to_node ?quest_node ?agent_requirement)
+        )
+      )
+  )
+  (:action attach_special_resource_to_milestone
+    :parameters (?milestone_node - milestone_node ?special_resource - special_resource)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (special_resource_available ?special_resource)
+      )
+    :effect
+      (and
+        (special_resource_attached ?milestone_node ?special_resource)
+        (not
+          (special_resource_available ?special_resource)
+        )
+      )
+  )
+  (:action detach_special_resource_from_milestone
+    :parameters (?milestone_node - milestone_node ?special_resource - special_resource)
+    :precondition
+      (and
+        (special_resource_attached ?milestone_node ?special_resource)
+      )
+    :effect
+      (and
+        (special_resource_available ?special_resource)
+        (not
+          (special_resource_attached ?milestone_node ?special_resource)
+        )
+      )
+  )
+  (:action attach_time_limited_event_to_milestone
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (event_token_available ?time_limited_event_tag)
+      )
+    :effect
+      (and
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (not
+          (event_token_available ?time_limited_event_tag)
+        )
+      )
+  )
+  (:action detach_time_limited_event_from_milestone
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag)
+    :precondition
+      (and
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+      )
+    :effect
+      (and
+        (event_token_available ?time_limited_event_tag)
+        (not
+          (event_token_attached ?milestone_node ?time_limited_event_tag)
+        )
+      )
+  )
+  (:action activate_encounter_instance_primary
+    :parameters (?mainline_quest_node - mainline_quest_node ?encounter_instance - encounter_instance ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_active ?mainline_quest_node)
+        (interaction_attached_to_quest ?mainline_quest_node ?interaction_method)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (not
+          (encounter_instance_state_primary ?encounter_instance)
+        )
+        (not
+          (encounter_instance_state_alternate ?encounter_instance)
+        )
+      )
+    :effect (encounter_instance_state_primary ?encounter_instance)
+  )
+  (:action confirm_mainline_encounter_with_agent
+    :parameters (?mainline_quest_node - mainline_quest_node ?encounter_instance - encounter_instance ?agent_requirement - quest_agent)
+    :precondition
+      (and
+        (quest_active ?mainline_quest_node)
+        (agent_assigned_to_node ?mainline_quest_node ?agent_requirement)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (encounter_instance_state_primary ?encounter_instance)
+        (not
+          (mainline_encounter_ready ?mainline_quest_node)
+        )
+      )
+    :effect
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (mainline_progress_flag ?mainline_quest_node)
+      )
+  )
+  (:action apply_side_item_to_mainline_encounter
+    :parameters (?mainline_quest_node - mainline_quest_node ?encounter_instance - encounter_instance ?side_content_item - side_content_item)
+    :precondition
+      (and
+        (quest_active ?mainline_quest_node)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (side_item_available ?side_content_item)
+        (not
+          (mainline_encounter_ready ?mainline_quest_node)
+        )
+      )
+    :effect
+      (and
+        (encounter_instance_state_alternate ?encounter_instance)
+        (mainline_encounter_ready ?mainline_quest_node)
+        (mainline_has_side_item ?mainline_quest_node ?side_content_item)
+        (not
+          (side_item_available ?side_content_item)
+        )
+      )
+  )
+  (:action resolve_mainline_encounter_item
+    :parameters (?mainline_quest_node - mainline_quest_node ?encounter_instance - encounter_instance ?interaction_method - interaction_method ?side_content_item - side_content_item)
+    :precondition
+      (and
+        (quest_active ?mainline_quest_node)
+        (interaction_attached_to_quest ?mainline_quest_node ?interaction_method)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (encounter_instance_state_alternate ?encounter_instance)
+        (mainline_has_side_item ?mainline_quest_node ?side_content_item)
+        (not
+          (mainline_progress_flag ?mainline_quest_node)
+        )
+      )
+    :effect
+      (and
+        (encounter_instance_state_primary ?encounter_instance)
+        (mainline_progress_flag ?mainline_quest_node)
+        (side_item_available ?side_content_item)
+        (not
+          (mainline_has_side_item ?mainline_quest_node ?side_content_item)
+        )
+      )
+  )
+  (:action activate_side_encounter_variant_primary
+    :parameters (?side_quest_node - side_quest_node ?encounter_variant - encounter_variant ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_active ?side_quest_node)
+        (interaction_attached_to_quest ?side_quest_node ?interaction_method)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (not
+          (encounter_variant_state_primary ?encounter_variant)
+        )
+        (not
+          (encounter_variant_state_alternate ?encounter_variant)
+        )
+      )
+    :effect (encounter_variant_state_primary ?encounter_variant)
+  )
+  (:action confirm_side_encounter_with_agent
+    :parameters (?side_quest_node - side_quest_node ?encounter_variant - encounter_variant ?agent_requirement - quest_agent)
+    :precondition
+      (and
+        (quest_active ?side_quest_node)
+        (agent_assigned_to_node ?side_quest_node ?agent_requirement)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_variant_state_primary ?encounter_variant)
+        (not
+          (side_encounter_ready ?side_quest_node)
+        )
+      )
+    :effect
+      (and
+        (side_encounter_ready ?side_quest_node)
+        (side_progress_flag ?side_quest_node)
+      )
+  )
+  (:action apply_side_item_to_side_encounter
+    :parameters (?side_quest_node - side_quest_node ?encounter_variant - encounter_variant ?side_content_item - side_content_item)
+    :precondition
+      (and
+        (quest_active ?side_quest_node)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (side_item_available ?side_content_item)
+        (not
+          (side_encounter_ready ?side_quest_node)
+        )
+      )
+    :effect
+      (and
+        (encounter_variant_state_alternate ?encounter_variant)
+        (side_encounter_ready ?side_quest_node)
+        (side_has_item ?side_quest_node ?side_content_item)
+        (not
+          (side_item_available ?side_content_item)
+        )
+      )
+  )
+  (:action resolve_side_encounter_item
+    :parameters (?side_quest_node - side_quest_node ?encounter_variant - encounter_variant ?interaction_method - interaction_method ?side_content_item - side_content_item)
+    :precondition
+      (and
+        (quest_active ?side_quest_node)
+        (interaction_attached_to_quest ?side_quest_node ?interaction_method)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_variant_state_alternate ?encounter_variant)
+        (side_has_item ?side_quest_node ?side_content_item)
+        (not
+          (side_progress_flag ?side_quest_node)
+        )
+      )
+    :effect
+      (and
+        (encounter_variant_state_primary ?encounter_variant)
+        (side_progress_flag ?side_quest_node)
+        (side_item_available ?side_content_item)
+        (not
+          (side_has_item ?side_quest_node ?side_content_item)
+        )
+      )
+  )
+  (:action compose_mission_composite_primary_primary
+    :parameters (?mainline_quest_node - mainline_quest_node ?side_quest_node - side_quest_node ?encounter_instance - encounter_instance ?encounter_variant - encounter_variant ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (side_encounter_ready ?side_quest_node)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_instance_state_primary ?encounter_instance)
+        (encounter_variant_state_primary ?encounter_variant)
+        (mainline_progress_flag ?mainline_quest_node)
+        (side_progress_flag ?side_quest_node)
+        (composite_unassembled ?mission_composite)
+      )
+    :effect
+      (and
+        (composite_ready ?mission_composite)
+        (composite_has_encounter_instance ?mission_composite ?encounter_instance)
+        (composite_has_encounter_variant ?mission_composite ?encounter_variant)
+        (not
+          (composite_unassembled ?mission_composite)
+        )
+      )
+  )
+  (:action compose_mission_composite_alternate_primary
+    :parameters (?mainline_quest_node - mainline_quest_node ?side_quest_node - side_quest_node ?encounter_instance - encounter_instance ?encounter_variant - encounter_variant ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (side_encounter_ready ?side_quest_node)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_instance_state_alternate ?encounter_instance)
+        (encounter_variant_state_primary ?encounter_variant)
+        (not
+          (mainline_progress_flag ?mainline_quest_node)
+        )
+        (side_progress_flag ?side_quest_node)
+        (composite_unassembled ?mission_composite)
+      )
+    :effect
+      (and
+        (composite_ready ?mission_composite)
+        (composite_has_encounter_instance ?mission_composite ?encounter_instance)
+        (composite_has_encounter_variant ?mission_composite ?encounter_variant)
+        (composite_flag_instance_primary ?mission_composite)
+        (not
+          (composite_unassembled ?mission_composite)
+        )
+      )
+  )
+  (:action compose_mission_composite_primary_alternate
+    :parameters (?mainline_quest_node - mainline_quest_node ?side_quest_node - side_quest_node ?encounter_instance - encounter_instance ?encounter_variant - encounter_variant ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (side_encounter_ready ?side_quest_node)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_instance_state_primary ?encounter_instance)
+        (encounter_variant_state_alternate ?encounter_variant)
+        (mainline_progress_flag ?mainline_quest_node)
+        (not
+          (side_progress_flag ?side_quest_node)
+        )
+        (composite_unassembled ?mission_composite)
+      )
+    :effect
+      (and
+        (composite_ready ?mission_composite)
+        (composite_has_encounter_instance ?mission_composite ?encounter_instance)
+        (composite_has_encounter_variant ?mission_composite ?encounter_variant)
+        (composite_flag_variant_primary ?mission_composite)
+        (not
+          (composite_unassembled ?mission_composite)
+        )
+      )
+  )
+  (:action compose_mission_composite_alternate_alternate
+    :parameters (?mainline_quest_node - mainline_quest_node ?side_quest_node - side_quest_node ?encounter_instance - encounter_instance ?encounter_variant - encounter_variant ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (side_encounter_ready ?side_quest_node)
+        (mainline_has_encounter ?mainline_quest_node ?encounter_instance)
+        (side_has_encounter_variant ?side_quest_node ?encounter_variant)
+        (encounter_instance_state_alternate ?encounter_instance)
+        (encounter_variant_state_alternate ?encounter_variant)
+        (not
+          (mainline_progress_flag ?mainline_quest_node)
+        )
+        (not
+          (side_progress_flag ?side_quest_node)
+        )
+        (composite_unassembled ?mission_composite)
+      )
+    :effect
+      (and
+        (composite_ready ?mission_composite)
+        (composite_has_encounter_instance ?mission_composite ?encounter_instance)
+        (composite_has_encounter_variant ?mission_composite ?encounter_variant)
+        (composite_flag_instance_primary ?mission_composite)
+        (composite_flag_variant_primary ?mission_composite)
+        (not
+          (composite_unassembled ?mission_composite)
+        )
+      )
+  )
+  (:action deploy_mission_composite
+    :parameters (?mission_composite - mission_composite ?mainline_quest_node - mainline_quest_node ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (composite_ready ?mission_composite)
+        (mainline_encounter_ready ?mainline_quest_node)
+        (interaction_attached_to_quest ?mainline_quest_node ?interaction_method)
+        (not
+          (composite_deployed ?mission_composite)
+        )
+      )
+    :effect (composite_deployed ?mission_composite)
+  )
+  (:action attach_reward_component_to_milestone
+    :parameters (?milestone_node - milestone_node ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (milestone_requires_composite ?milestone_node ?mission_composite)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_available ?reward_component)
+        (composite_ready ?mission_composite)
+        (composite_deployed ?mission_composite)
+        (not
+          (reward_component_attached ?reward_component)
+        )
+      )
+    :effect
+      (and
+        (reward_component_attached ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (not
+          (reward_component_available ?reward_component)
+        )
+      )
+  )
+  (:action validate_reward_component_attachment
+    :parameters (?milestone_node - milestone_node ?reward_component - reward_component ?mission_composite - mission_composite ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (interaction_attached_to_quest ?milestone_node ?interaction_method)
+        (not
+          (composite_flag_instance_primary ?mission_composite)
+        )
+        (not
+          (milestone_component_verified ?milestone_node)
+        )
+      )
+    :effect (milestone_component_verified ?milestone_node)
+  )
+  (:action apply_optional_modifier_tag_to_milestone
+    :parameters (?milestone_node - milestone_node ?optional_modifier_tag - optional_modifier_tag)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (optional_modifier_tag_available ?optional_modifier_tag)
+        (not
+          (optional_modifier_flag_present_on_milestone ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (optional_modifier_flag_present_on_milestone ?milestone_node)
+        (optional_modifier_attached_to_milestone ?milestone_node ?optional_modifier_tag)
+        (not
+          (optional_modifier_tag_available ?optional_modifier_tag)
+        )
+      )
+  )
+  (:action integrate_optional_modifier_and_components
+    :parameters (?milestone_node - milestone_node ?reward_component - reward_component ?mission_composite - mission_composite ?interaction_method - interaction_method ?optional_modifier_tag - optional_modifier_tag)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (interaction_attached_to_quest ?milestone_node ?interaction_method)
+        (composite_flag_instance_primary ?mission_composite)
+        (optional_modifier_flag_present_on_milestone ?milestone_node)
+        (optional_modifier_attached_to_milestone ?milestone_node ?optional_modifier_tag)
+        (not
+          (milestone_component_verified ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_component_verified ?milestone_node)
+        (optional_modifier_confirmed ?milestone_node)
+      )
+  )
+  (:action attach_special_resource_and_start_modifier_sequence
+    :parameters (?milestone_node - milestone_node ?special_resource - special_resource ?agent_requirement - quest_agent ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_component_verified ?milestone_node)
+        (special_resource_attached ?milestone_node ?special_resource)
+        (agent_assigned_to_node ?milestone_node ?agent_requirement)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (not
+          (composite_flag_variant_primary ?mission_composite)
+        )
+        (not
+          (milestone_attachment_sequence_started ?milestone_node)
+        )
+      )
+    :effect (milestone_attachment_sequence_started ?milestone_node)
+  )
+  (:action apply_special_resource_and_continue_modifier_sequence
+    :parameters (?milestone_node - milestone_node ?special_resource - special_resource ?agent_requirement - quest_agent ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_component_verified ?milestone_node)
+        (special_resource_attached ?milestone_node ?special_resource)
+        (agent_assigned_to_node ?milestone_node ?agent_requirement)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (composite_flag_variant_primary ?mission_composite)
+        (not
+          (milestone_attachment_sequence_started ?milestone_node)
+        )
+      )
+    :effect (milestone_attachment_sequence_started ?milestone_node)
+  )
+  (:action attach_event_token_and_mark_milestone_ready
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_attachment_sequence_started ?milestone_node)
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (not
+          (composite_flag_instance_primary ?mission_composite)
+        )
+        (not
+          (composite_flag_variant_primary ?mission_composite)
+        )
+        (not
+          (milestone_ready_for_finalization ?milestone_node)
+        )
+      )
+    :effect (milestone_ready_for_finalization ?milestone_node)
+  )
+  (:action confirm_modifier_stack_variant_a
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_attachment_sequence_started ?milestone_node)
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (composite_flag_instance_primary ?mission_composite)
+        (not
+          (composite_flag_variant_primary ?mission_composite)
+        )
+        (not
+          (milestone_ready_for_finalization ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_modifier_flag_present ?milestone_node)
+      )
+  )
+  (:action confirm_modifier_stack_variant_b
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_attachment_sequence_started ?milestone_node)
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (not
+          (composite_flag_instance_primary ?mission_composite)
+        )
+        (composite_flag_variant_primary ?mission_composite)
+        (not
+          (milestone_ready_for_finalization ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_modifier_flag_present ?milestone_node)
+      )
+  )
+  (:action confirm_modifier_stack_variant_c
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag ?reward_component - reward_component ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (milestone_attachment_sequence_started ?milestone_node)
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (milestone_has_reward_component ?milestone_node ?reward_component)
+        (reward_component_attached_to_composite ?reward_component ?mission_composite)
+        (composite_flag_instance_primary ?mission_composite)
+        (composite_flag_variant_primary ?mission_composite)
+        (not
+          (milestone_ready_for_finalization ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_modifier_flag_present ?milestone_node)
+      )
+  )
+  (:action finalize_milestone
+    :parameters (?milestone_node - milestone_node)
+    :precondition
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (not
+          (milestone_modifier_flag_present ?milestone_node)
+        )
+        (not
+          (milestone_completion_marked ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_completion_marked ?milestone_node)
+        (quest_finalized ?milestone_node)
+      )
+  )
+  (:action attach_challenge_modifier_to_milestone
+    :parameters (?milestone_node - milestone_node ?challenge_modifier - challenge_modifier)
+    :precondition
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_modifier_flag_present ?milestone_node)
+        (challenge_modifier_available ?challenge_modifier)
+      )
+    :effect
+      (and
+        (challenge_modifier_attached ?milestone_node ?challenge_modifier)
+        (not
+          (challenge_modifier_available ?challenge_modifier)
+        )
+      )
+  )
+  (:action integrate_milestone_inputs
+    :parameters (?milestone_node - milestone_node ?mainline_quest_node - mainline_quest_node ?side_quest_node - side_quest_node ?interaction_method - interaction_method ?challenge_modifier - challenge_modifier)
+    :precondition
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_modifier_flag_present ?milestone_node)
+        (challenge_modifier_attached ?milestone_node ?challenge_modifier)
+        (milestone_requires_mainline ?milestone_node ?mainline_quest_node)
+        (milestone_requires_side ?milestone_node ?side_quest_node)
+        (mainline_progress_flag ?mainline_quest_node)
+        (side_progress_flag ?side_quest_node)
+        (interaction_attached_to_quest ?milestone_node ?interaction_method)
+        (not
+          (milestone_integration_complete ?milestone_node)
+        )
+      )
+    :effect (milestone_integration_complete ?milestone_node)
+  )
+  (:action finalize_milestone_after_integration
+    :parameters (?milestone_node - milestone_node)
+    :precondition
+      (and
+        (milestone_ready_for_finalization ?milestone_node)
+        (milestone_integration_complete ?milestone_node)
+        (not
+          (milestone_completion_marked ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_completion_marked ?milestone_node)
+        (quest_finalized ?milestone_node)
+      )
+  )
+  (:action engage_companion_on_milestone
+    :parameters (?milestone_node - milestone_node ?companion_tag - companion_tag ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_active ?milestone_node)
+        (interaction_attached_to_quest ?milestone_node ?interaction_method)
+        (companion_tag_available ?companion_tag)
+        (companion_attached_to_milestone ?milestone_node ?companion_tag)
+        (not
+          (companion_engaged_on_milestone ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (companion_engaged_on_milestone ?milestone_node)
+        (not
+          (companion_tag_available ?companion_tag)
+        )
+      )
+  )
+  (:action prepare_companion_for_milestone
+    :parameters (?milestone_node - milestone_node ?agent_requirement - quest_agent)
+    :precondition
+      (and
+        (companion_engaged_on_milestone ?milestone_node)
+        (agent_assigned_to_node ?milestone_node ?agent_requirement)
+        (not
+          (companion_ready_state ?milestone_node)
+        )
+      )
+    :effect (companion_ready_state ?milestone_node)
+  )
+  (:action finalize_companion_for_milestone
+    :parameters (?milestone_node - milestone_node ?time_limited_event_tag - time_limited_event_tag)
+    :precondition
+      (and
+        (companion_ready_state ?milestone_node)
+        (event_token_attached ?milestone_node ?time_limited_event_tag)
+        (not
+          (companion_finalized_state ?milestone_node)
+        )
+      )
+    :effect (companion_finalized_state ?milestone_node)
+  )
+  (:action finalize_milestone_with_companion
+    :parameters (?milestone_node - milestone_node)
+    :precondition
+      (and
+        (companion_finalized_state ?milestone_node)
+        (not
+          (milestone_completion_marked ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (milestone_completion_marked ?milestone_node)
+        (quest_finalized ?milestone_node)
+      )
+  )
+  (:action propagate_milestone_completion_to_mainline
+    :parameters (?mainline_quest_node - mainline_quest_node ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (mainline_encounter_ready ?mainline_quest_node)
+        (mainline_progress_flag ?mainline_quest_node)
+        (composite_ready ?mission_composite)
+        (composite_deployed ?mission_composite)
+        (not
+          (quest_finalized ?mainline_quest_node)
+        )
+      )
+    :effect (quest_finalized ?mainline_quest_node)
+  )
+  (:action propagate_milestone_completion_to_side_node
+    :parameters (?side_quest_node - side_quest_node ?mission_composite - mission_composite)
+    :precondition
+      (and
+        (side_encounter_ready ?side_quest_node)
+        (side_progress_flag ?side_quest_node)
+        (composite_ready ?mission_composite)
+        (composite_deployed ?mission_composite)
+        (not
+          (quest_finalized ?side_quest_node)
+        )
+      )
+    :effect (quest_finalized ?side_quest_node)
+  )
+  (:action propagate_completion_and_bind_narrative_tag
+    :parameters (?quest_node - quest_node ?narrative_tag - narrative_tag ?interaction_method - interaction_method)
+    :precondition
+      (and
+        (quest_finalized ?quest_node)
+        (interaction_attached_to_quest ?quest_node ?interaction_method)
+        (narrative_tag_available ?narrative_tag)
+        (not
+          (quest_ready_to_complete ?quest_node)
+        )
+      )
+    :effect
+      (and
+        (quest_ready_to_complete ?quest_node)
+        (narrative_tag_attached_to_node ?quest_node ?narrative_tag)
+        (not
+          (narrative_tag_available ?narrative_tag)
+        )
+      )
+  )
+  (:action complete_mainline_node_and_restore_unlock_token
+    :parameters (?mainline_quest_node - mainline_quest_node ?unlock_token - unlock_token ?narrative_tag - narrative_tag)
+    :precondition
+      (and
+        (quest_ready_to_complete ?mainline_quest_node)
+        (token_bound_to_node ?mainline_quest_node ?unlock_token)
+        (narrative_tag_attached_to_node ?mainline_quest_node ?narrative_tag)
+        (not
+          (quest_completed ?mainline_quest_node)
+        )
+      )
+    :effect
+      (and
+        (quest_completed ?mainline_quest_node)
+        (unlock_token_available ?unlock_token)
+        (narrative_tag_available ?narrative_tag)
+      )
+  )
+  (:action complete_side_node_and_restore_unlock_token
+    :parameters (?side_quest_node - side_quest_node ?unlock_token - unlock_token ?narrative_tag - narrative_tag)
+    :precondition
+      (and
+        (quest_ready_to_complete ?side_quest_node)
+        (token_bound_to_node ?side_quest_node ?unlock_token)
+        (narrative_tag_attached_to_node ?side_quest_node ?narrative_tag)
+        (not
+          (quest_completed ?side_quest_node)
+        )
+      )
+    :effect
+      (and
+        (quest_completed ?side_quest_node)
+        (unlock_token_available ?unlock_token)
+        (narrative_tag_available ?narrative_tag)
+      )
+  )
+  (:action complete_milestone_and_restore_unlock_token
+    :parameters (?milestone_node - milestone_node ?unlock_token - unlock_token ?narrative_tag - narrative_tag)
+    :precondition
+      (and
+        (quest_ready_to_complete ?milestone_node)
+        (token_bound_to_node ?milestone_node ?unlock_token)
+        (narrative_tag_attached_to_node ?milestone_node ?narrative_tag)
+        (not
+          (quest_completed ?milestone_node)
+        )
+      )
+    :effect
+      (and
+        (quest_completed ?milestone_node)
+        (unlock_token_available ?unlock_token)
+        (narrative_tag_available ?narrative_tag)
+      )
+  )
+)

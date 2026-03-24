@@ -1,0 +1,937 @@
+(define (domain pharmaceutics_audit_readiness_evidence_assembly)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category - entity artifact_category - entity activity_category - entity case_category - entity quality_case - case_category approver_role - resource_category subject_matter_reviewer - resource_category functional_owner - resource_category index_tag - resource_category approval_credential - resource_category archive_token - resource_category validation_protocol - resource_category inspection_reference - resource_category evidence_artifact - artifact_category supporting_checklist - artifact_category regulatory_citation - artifact_category validation_activity - activity_category verification_activity - activity_category evidence_package - activity_category investigation_category - quality_case action_plan_category - quality_case investigation - investigation_category corrective_action_plan - investigation_category evidence_record - action_plan_category)
+
+  (:predicates
+    (quality_case_initiated ?quality_case - quality_case)
+    (technical_review_completed_on_item ?quality_case - quality_case)
+    (item_triaged ?quality_case - quality_case)
+    (item_closed ?quality_case - quality_case)
+    (inspection_readiness_asserted ?quality_case - quality_case)
+    (item_archive_token_assigned ?quality_case - quality_case)
+    (approver_available ?approver_role - approver_role)
+    (item_assigned_approver ?quality_case - quality_case ?approver_role - approver_role)
+    (subject_matter_reviewer_available ?subject_matter_reviewer - subject_matter_reviewer)
+    (item_assigned_reviewer ?quality_case - quality_case ?subject_matter_reviewer - subject_matter_reviewer)
+    (functional_owner_available ?functional_owner - functional_owner)
+    (item_assigned_owner ?quality_case - quality_case ?functional_owner - functional_owner)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (investigation_has_artifact ?investigation - investigation ?evidence_artifact - evidence_artifact)
+    (action_plan_has_artifact ?corrective_action_plan - corrective_action_plan ?evidence_artifact - evidence_artifact)
+    (investigation_linked_validation_activity ?investigation - investigation ?validation_activity - validation_activity)
+    (validation_activity_requested ?validation_activity - validation_activity)
+    (validation_activity_evidence_attached ?validation_activity - validation_activity)
+    (investigation_evidence_reconciled ?investigation - investigation)
+    (action_plan_linked_verification_activity ?corrective_action_plan - corrective_action_plan ?verification_activity - verification_activity)
+    (verification_activity_requested ?verification_activity - verification_activity)
+    (verification_activity_evidence_attached ?verification_activity - verification_activity)
+    (action_plan_evidence_reconciled ?corrective_action_plan - corrective_action_plan)
+    (evidence_package_pending ?evidence_package - evidence_package)
+    (evidence_package_compiled ?evidence_package - evidence_package)
+    (evidence_package_includes_validation_activity ?evidence_package - evidence_package ?validation_activity - validation_activity)
+    (evidence_package_includes_verification_activity ?evidence_package - evidence_package ?verification_activity - verification_activity)
+    (evidence_package_has_validation_evidence ?evidence_package - evidence_package)
+    (evidence_package_has_verification_evidence ?evidence_package - evidence_package)
+    (evidence_package_finalized ?evidence_package - evidence_package)
+    (evidence_record_indexed_to_investigation ?evidence_record - evidence_record ?investigation - investigation)
+    (evidence_record_indexed_to_action_plan ?evidence_record - evidence_record ?corrective_action_plan - corrective_action_plan)
+    (evidence_record_belongs_to_package ?evidence_record - evidence_record ?evidence_package - evidence_package)
+    (supporting_checklist_available ?supporting_checklist - supporting_checklist)
+    (evidence_record_has_supporting_checklist ?evidence_record - evidence_record ?supporting_checklist - supporting_checklist)
+    (supporting_checklist_indexed ?supporting_checklist - supporting_checklist)
+    (supporting_checklist_indexed_into_package ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    (evidence_record_owner_attested ?evidence_record - evidence_record)
+    (dossier_gating_tag_applied ?evidence_record - evidence_record)
+    (inspection_reference_integrated ?evidence_record - evidence_record)
+    (index_tag_allocated ?evidence_record - evidence_record)
+    (evidence_record_index_verified ?evidence_record - evidence_record)
+    (evidence_record_regulatory_citation_linked ?evidence_record - evidence_record)
+    (owner_final_verification ?evidence_record - evidence_record)
+    (evidence_record_regulatory_citation_available ?regulatory_citation - regulatory_citation)
+    (evidence_record_has_regulatory_citation ?evidence_record - evidence_record ?regulatory_citation - regulatory_citation)
+    (evidence_record_regulatory_citation_attached ?evidence_record - evidence_record)
+    (evidence_record_regulatory_citation_owner_acknowledged ?evidence_record - evidence_record)
+    (evidence_record_regulatory_citation_verified ?evidence_record - evidence_record)
+    (index_tag_available ?index_tag - index_tag)
+    (evidence_record_has_index_tag ?evidence_record - evidence_record ?index_tag - index_tag)
+    (approval_credential_available ?approval_credential - approval_credential)
+    (evidence_record_has_approval_credential ?evidence_record - evidence_record ?approval_credential - approval_credential)
+    (validation_protocol_available ?validation_protocol - validation_protocol)
+    (evidence_record_has_validation_protocol ?evidence_record - evidence_record ?validation_protocol - validation_protocol)
+    (inspection_reference_available ?inspection_reference - inspection_reference)
+    (evidence_record_has_inspection_reference ?evidence_record - evidence_record ?inspection_reference - inspection_reference)
+    (archive_token_available ?archive_token - archive_token)
+    (item_bound_to_archive_token ?quality_case - quality_case ?archive_token - archive_token)
+    (investigation_owner_acknowledged ?investigation - investigation)
+    (action_plan_owner_acknowledged ?corrective_action_plan - corrective_action_plan)
+    (record_approval_gate_reached ?evidence_record - evidence_record)
+  )
+  (:action register_quality_case
+    :parameters (?quality_case - quality_case)
+    :precondition
+      (and
+        (not
+          (quality_case_initiated ?quality_case)
+        )
+        (not
+          (item_closed ?quality_case)
+        )
+      )
+    :effect (quality_case_initiated ?quality_case)
+  )
+  (:action assign_approver_to_case
+    :parameters (?quality_case - quality_case ?approver_role - approver_role)
+    :precondition
+      (and
+        (quality_case_initiated ?quality_case)
+        (not
+          (item_triaged ?quality_case)
+        )
+        (approver_available ?approver_role)
+      )
+    :effect
+      (and
+        (item_triaged ?quality_case)
+        (item_assigned_approver ?quality_case ?approver_role)
+        (not
+          (approver_available ?approver_role)
+        )
+      )
+  )
+  (:action assign_subject_matter_reviewer
+    :parameters (?quality_case - quality_case ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (quality_case_initiated ?quality_case)
+        (item_triaged ?quality_case)
+        (subject_matter_reviewer_available ?subject_matter_reviewer)
+      )
+    :effect
+      (and
+        (item_assigned_reviewer ?quality_case ?subject_matter_reviewer)
+        (not
+          (subject_matter_reviewer_available ?subject_matter_reviewer)
+        )
+      )
+  )
+  (:action finalize_technical_review
+    :parameters (?quality_case - quality_case ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (quality_case_initiated ?quality_case)
+        (item_triaged ?quality_case)
+        (item_assigned_reviewer ?quality_case ?subject_matter_reviewer)
+        (not
+          (technical_review_completed_on_item ?quality_case)
+        )
+      )
+    :effect (technical_review_completed_on_item ?quality_case)
+  )
+  (:action release_subject_matter_reviewer
+    :parameters (?quality_case - quality_case ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (item_assigned_reviewer ?quality_case ?subject_matter_reviewer)
+      )
+    :effect
+      (and
+        (subject_matter_reviewer_available ?subject_matter_reviewer)
+        (not
+          (item_assigned_reviewer ?quality_case ?subject_matter_reviewer)
+        )
+      )
+  )
+  (:action assign_functional_owner
+    :parameters (?quality_case - quality_case ?functional_owner - functional_owner)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?quality_case)
+        (functional_owner_available ?functional_owner)
+      )
+    :effect
+      (and
+        (item_assigned_owner ?quality_case ?functional_owner)
+        (not
+          (functional_owner_available ?functional_owner)
+        )
+      )
+  )
+  (:action release_functional_owner
+    :parameters (?quality_case - quality_case ?functional_owner - functional_owner)
+    :precondition
+      (and
+        (item_assigned_owner ?quality_case ?functional_owner)
+      )
+    :effect
+      (and
+        (functional_owner_available ?functional_owner)
+        (not
+          (item_assigned_owner ?quality_case ?functional_owner)
+        )
+      )
+  )
+  (:action attach_validation_protocol_to_record
+    :parameters (?evidence_record - evidence_record ?validation_protocol - validation_protocol)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (validation_protocol_available ?validation_protocol)
+      )
+    :effect
+      (and
+        (evidence_record_has_validation_protocol ?evidence_record ?validation_protocol)
+        (not
+          (validation_protocol_available ?validation_protocol)
+        )
+      )
+  )
+  (:action detach_validation_protocol_from_record
+    :parameters (?evidence_record - evidence_record ?validation_protocol - validation_protocol)
+    :precondition
+      (and
+        (evidence_record_has_validation_protocol ?evidence_record ?validation_protocol)
+      )
+    :effect
+      (and
+        (validation_protocol_available ?validation_protocol)
+        (not
+          (evidence_record_has_validation_protocol ?evidence_record ?validation_protocol)
+        )
+      )
+  )
+  (:action attach_inspection_reference_to_record
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (inspection_reference_available ?inspection_reference)
+      )
+    :effect
+      (and
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (not
+          (inspection_reference_available ?inspection_reference)
+        )
+      )
+  )
+  (:action detach_inspection_reference_from_record
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference)
+    :precondition
+      (and
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+      )
+    :effect
+      (and
+        (inspection_reference_available ?inspection_reference)
+        (not
+          (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        )
+      )
+  )
+  (:action request_validation_activity_for_investigation
+    :parameters (?investigation - investigation ?validation_activity - validation_activity ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?investigation)
+        (item_assigned_reviewer ?investigation ?subject_matter_reviewer)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (not
+          (validation_activity_requested ?validation_activity)
+        )
+        (not
+          (validation_activity_evidence_attached ?validation_activity)
+        )
+      )
+    :effect (validation_activity_requested ?validation_activity)
+  )
+  (:action owner_acknowledge_validation_request
+    :parameters (?investigation - investigation ?validation_activity - validation_activity ?functional_owner - functional_owner)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?investigation)
+        (item_assigned_owner ?investigation ?functional_owner)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (validation_activity_requested ?validation_activity)
+        (not
+          (investigation_owner_acknowledged ?investigation)
+        )
+      )
+    :effect
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (investigation_evidence_reconciled ?investigation)
+      )
+  )
+  (:action attach_artifact_to_investigation
+    :parameters (?investigation - investigation ?validation_activity - validation_activity ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?investigation)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (investigation_owner_acknowledged ?investigation)
+        )
+      )
+    :effect
+      (and
+        (validation_activity_evidence_attached ?validation_activity)
+        (investigation_owner_acknowledged ?investigation)
+        (investigation_has_artifact ?investigation ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action reconcile_investigation_evidence
+    :parameters (?investigation - investigation ?validation_activity - validation_activity ?subject_matter_reviewer - subject_matter_reviewer ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?investigation)
+        (item_assigned_reviewer ?investigation ?subject_matter_reviewer)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (validation_activity_evidence_attached ?validation_activity)
+        (investigation_has_artifact ?investigation ?evidence_artifact)
+        (not
+          (investigation_evidence_reconciled ?investigation)
+        )
+      )
+    :effect
+      (and
+        (validation_activity_requested ?validation_activity)
+        (investigation_evidence_reconciled ?investigation)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (investigation_has_artifact ?investigation ?evidence_artifact)
+        )
+      )
+  )
+  (:action request_verification_activity_for_action_plan
+    :parameters (?corrective_action_plan - corrective_action_plan ?verification_activity - verification_activity ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?corrective_action_plan)
+        (item_assigned_reviewer ?corrective_action_plan ?subject_matter_reviewer)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (not
+          (verification_activity_requested ?verification_activity)
+        )
+        (not
+          (verification_activity_evidence_attached ?verification_activity)
+        )
+      )
+    :effect (verification_activity_requested ?verification_activity)
+  )
+  (:action owner_acknowledge_verification_request
+    :parameters (?corrective_action_plan - corrective_action_plan ?verification_activity - verification_activity ?functional_owner - functional_owner)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?corrective_action_plan)
+        (item_assigned_owner ?corrective_action_plan ?functional_owner)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (verification_activity_requested ?verification_activity)
+        (not
+          (action_plan_owner_acknowledged ?corrective_action_plan)
+        )
+      )
+    :effect
+      (and
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+      )
+  )
+  (:action attach_artifact_to_action_plan
+    :parameters (?corrective_action_plan - corrective_action_plan ?verification_activity - verification_activity ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?corrective_action_plan)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (action_plan_owner_acknowledged ?corrective_action_plan)
+        )
+      )
+    :effect
+      (and
+        (verification_activity_evidence_attached ?verification_activity)
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (action_plan_has_artifact ?corrective_action_plan ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action reconcile_action_plan_evidence
+    :parameters (?corrective_action_plan - corrective_action_plan ?verification_activity - verification_activity ?subject_matter_reviewer - subject_matter_reviewer ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?corrective_action_plan)
+        (item_assigned_reviewer ?corrective_action_plan ?subject_matter_reviewer)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (verification_activity_evidence_attached ?verification_activity)
+        (action_plan_has_artifact ?corrective_action_plan ?evidence_artifact)
+        (not
+          (action_plan_evidence_reconciled ?corrective_action_plan)
+        )
+      )
+    :effect
+      (and
+        (verification_activity_requested ?verification_activity)
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (action_plan_has_artifact ?corrective_action_plan ?evidence_artifact)
+        )
+      )
+  )
+  (:action assemble_evidence_package_variant_1
+    :parameters (?investigation - investigation ?corrective_action_plan - corrective_action_plan ?validation_activity - validation_activity ?verification_activity - verification_activity ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (validation_activity_requested ?validation_activity)
+        (verification_activity_requested ?verification_activity)
+        (investigation_evidence_reconciled ?investigation)
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+        (evidence_package_pending ?evidence_package)
+      )
+    :effect
+      (and
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_includes_validation_activity ?evidence_package ?validation_activity)
+        (evidence_package_includes_verification_activity ?evidence_package ?verification_activity)
+        (not
+          (evidence_package_pending ?evidence_package)
+        )
+      )
+  )
+  (:action assemble_evidence_package_variant_2
+    :parameters (?investigation - investigation ?corrective_action_plan - corrective_action_plan ?validation_activity - validation_activity ?verification_activity - verification_activity ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (validation_activity_evidence_attached ?validation_activity)
+        (verification_activity_requested ?verification_activity)
+        (not
+          (investigation_evidence_reconciled ?investigation)
+        )
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+        (evidence_package_pending ?evidence_package)
+      )
+    :effect
+      (and
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_includes_validation_activity ?evidence_package ?validation_activity)
+        (evidence_package_includes_verification_activity ?evidence_package ?verification_activity)
+        (evidence_package_has_validation_evidence ?evidence_package)
+        (not
+          (evidence_package_pending ?evidence_package)
+        )
+      )
+  )
+  (:action assemble_evidence_package_variant_3
+    :parameters (?investigation - investigation ?corrective_action_plan - corrective_action_plan ?validation_activity - validation_activity ?verification_activity - verification_activity ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (validation_activity_requested ?validation_activity)
+        (verification_activity_evidence_attached ?verification_activity)
+        (investigation_evidence_reconciled ?investigation)
+        (not
+          (action_plan_evidence_reconciled ?corrective_action_plan)
+        )
+        (evidence_package_pending ?evidence_package)
+      )
+    :effect
+      (and
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_includes_validation_activity ?evidence_package ?validation_activity)
+        (evidence_package_includes_verification_activity ?evidence_package ?verification_activity)
+        (evidence_package_has_verification_evidence ?evidence_package)
+        (not
+          (evidence_package_pending ?evidence_package)
+        )
+      )
+  )
+  (:action assemble_evidence_package_variant_4
+    :parameters (?investigation - investigation ?corrective_action_plan - corrective_action_plan ?validation_activity - validation_activity ?verification_activity - verification_activity ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (investigation_linked_validation_activity ?investigation ?validation_activity)
+        (action_plan_linked_verification_activity ?corrective_action_plan ?verification_activity)
+        (validation_activity_evidence_attached ?validation_activity)
+        (verification_activity_evidence_attached ?verification_activity)
+        (not
+          (investigation_evidence_reconciled ?investigation)
+        )
+        (not
+          (action_plan_evidence_reconciled ?corrective_action_plan)
+        )
+        (evidence_package_pending ?evidence_package)
+      )
+    :effect
+      (and
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_includes_validation_activity ?evidence_package ?validation_activity)
+        (evidence_package_includes_verification_activity ?evidence_package ?verification_activity)
+        (evidence_package_has_validation_evidence ?evidence_package)
+        (evidence_package_has_verification_evidence ?evidence_package)
+        (not
+          (evidence_package_pending ?evidence_package)
+        )
+      )
+  )
+  (:action finalize_evidence_package
+    :parameters (?evidence_package - evidence_package ?investigation - investigation ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (evidence_package_compiled ?evidence_package)
+        (investigation_owner_acknowledged ?investigation)
+        (item_assigned_reviewer ?investigation ?subject_matter_reviewer)
+        (not
+          (evidence_package_finalized ?evidence_package)
+        )
+      )
+    :effect (evidence_package_finalized ?evidence_package)
+  )
+  (:action index_supporting_checklist_into_package
+    :parameters (?evidence_record - evidence_record ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (evidence_record_belongs_to_package ?evidence_record ?evidence_package)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_available ?supporting_checklist)
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_finalized ?evidence_package)
+        (not
+          (supporting_checklist_indexed ?supporting_checklist)
+        )
+      )
+    :effect
+      (and
+        (supporting_checklist_indexed ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (not
+          (supporting_checklist_available ?supporting_checklist)
+        )
+      )
+  )
+  (:action advance_record_review_gate
+    :parameters (?evidence_record - evidence_record ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (item_assigned_reviewer ?evidence_record ?subject_matter_reviewer)
+        (not
+          (evidence_package_has_validation_evidence ?evidence_package)
+        )
+        (not
+          (evidence_record_owner_attested ?evidence_record)
+        )
+      )
+    :effect (evidence_record_owner_attested ?evidence_record)
+  )
+  (:action assign_index_tag_to_record
+    :parameters (?evidence_record - evidence_record ?index_tag - index_tag)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (index_tag_available ?index_tag)
+        (not
+          (index_tag_allocated ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (index_tag_allocated ?evidence_record)
+        (evidence_record_has_index_tag ?evidence_record ?index_tag)
+        (not
+          (index_tag_available ?index_tag)
+        )
+      )
+  )
+  (:action apply_index_tag_and_verify
+    :parameters (?evidence_record - evidence_record ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package ?subject_matter_reviewer - subject_matter_reviewer ?index_tag - index_tag)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (item_assigned_reviewer ?evidence_record ?subject_matter_reviewer)
+        (evidence_package_has_validation_evidence ?evidence_package)
+        (index_tag_allocated ?evidence_record)
+        (evidence_record_has_index_tag ?evidence_record ?index_tag)
+        (not
+          (evidence_record_owner_attested ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (evidence_record_owner_attested ?evidence_record)
+        (evidence_record_index_verified ?evidence_record)
+      )
+  )
+  (:action apply_owner_index_and_checks_variant_1
+    :parameters (?evidence_record - evidence_record ?validation_protocol - validation_protocol ?functional_owner - functional_owner ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (evidence_record_owner_attested ?evidence_record)
+        (evidence_record_has_validation_protocol ?evidence_record ?validation_protocol)
+        (item_assigned_owner ?evidence_record ?functional_owner)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (not
+          (evidence_package_has_verification_evidence ?evidence_package)
+        )
+        (not
+          (dossier_gating_tag_applied ?evidence_record)
+        )
+      )
+    :effect (dossier_gating_tag_applied ?evidence_record)
+  )
+  (:action apply_owner_index_and_checks_variant_2
+    :parameters (?evidence_record - evidence_record ?validation_protocol - validation_protocol ?functional_owner - functional_owner ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (evidence_record_owner_attested ?evidence_record)
+        (evidence_record_has_validation_protocol ?evidence_record ?validation_protocol)
+        (item_assigned_owner ?evidence_record ?functional_owner)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (evidence_package_has_verification_evidence ?evidence_package)
+        (not
+          (dossier_gating_tag_applied ?evidence_record)
+        )
+      )
+    :effect (dossier_gating_tag_applied ?evidence_record)
+  )
+  (:action integrate_inspection_reference
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (dossier_gating_tag_applied ?evidence_record)
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (not
+          (evidence_package_has_validation_evidence ?evidence_package)
+        )
+        (not
+          (evidence_package_has_verification_evidence ?evidence_package)
+        )
+        (not
+          (inspection_reference_integrated ?evidence_record)
+        )
+      )
+    :effect (inspection_reference_integrated ?evidence_record)
+  )
+  (:action integrate_inspection_reference_and_confirm
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (dossier_gating_tag_applied ?evidence_record)
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (evidence_package_has_validation_evidence ?evidence_package)
+        (not
+          (evidence_package_has_verification_evidence ?evidence_package)
+        )
+        (not
+          (inspection_reference_integrated ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (evidence_record_regulatory_citation_linked ?evidence_record)
+      )
+  )
+  (:action integrate_inspection_reference_and_confirm_alt1
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (dossier_gating_tag_applied ?evidence_record)
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (not
+          (evidence_package_has_validation_evidence ?evidence_package)
+        )
+        (evidence_package_has_verification_evidence ?evidence_package)
+        (not
+          (inspection_reference_integrated ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (evidence_record_regulatory_citation_linked ?evidence_record)
+      )
+  )
+  (:action integrate_inspection_reference_and_confirm_alt2
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference ?supporting_checklist - supporting_checklist ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (dossier_gating_tag_applied ?evidence_record)
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (evidence_record_has_supporting_checklist ?evidence_record ?supporting_checklist)
+        (supporting_checklist_indexed_into_package ?supporting_checklist ?evidence_package)
+        (evidence_package_has_validation_evidence ?evidence_package)
+        (evidence_package_has_verification_evidence ?evidence_package)
+        (not
+          (inspection_reference_integrated ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (evidence_record_regulatory_citation_linked ?evidence_record)
+      )
+  )
+  (:action assert_record_inspection_readiness
+    :parameters (?evidence_record - evidence_record)
+    :precondition
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (not
+          (evidence_record_regulatory_citation_linked ?evidence_record)
+        )
+        (not
+          (record_approval_gate_reached ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (record_approval_gate_reached ?evidence_record)
+        (inspection_readiness_asserted ?evidence_record)
+      )
+  )
+  (:action attach_approval_credential_to_record
+    :parameters (?evidence_record - evidence_record ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (evidence_record_regulatory_citation_linked ?evidence_record)
+        (approval_credential_available ?approval_credential)
+      )
+    :effect
+      (and
+        (evidence_record_has_approval_credential ?evidence_record ?approval_credential)
+        (not
+          (approval_credential_available ?approval_credential)
+        )
+      )
+  )
+  (:action perform_record_final_verification_by_owner
+    :parameters (?evidence_record - evidence_record ?investigation - investigation ?corrective_action_plan - corrective_action_plan ?subject_matter_reviewer - subject_matter_reviewer ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (evidence_record_regulatory_citation_linked ?evidence_record)
+        (evidence_record_has_approval_credential ?evidence_record ?approval_credential)
+        (evidence_record_indexed_to_investigation ?evidence_record ?investigation)
+        (evidence_record_indexed_to_action_plan ?evidence_record ?corrective_action_plan)
+        (investigation_evidence_reconciled ?investigation)
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+        (item_assigned_reviewer ?evidence_record ?subject_matter_reviewer)
+        (not
+          (owner_final_verification ?evidence_record)
+        )
+      )
+    :effect (owner_final_verification ?evidence_record)
+  )
+  (:action finalize_record_approval_from_owner
+    :parameters (?evidence_record - evidence_record)
+    :precondition
+      (and
+        (inspection_reference_integrated ?evidence_record)
+        (owner_final_verification ?evidence_record)
+        (not
+          (record_approval_gate_reached ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (record_approval_gate_reached ?evidence_record)
+        (inspection_readiness_asserted ?evidence_record)
+      )
+  )
+  (:action attach_regulatory_citation_to_record
+    :parameters (?evidence_record - evidence_record ?regulatory_citation - regulatory_citation ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (technical_review_completed_on_item ?evidence_record)
+        (item_assigned_reviewer ?evidence_record ?subject_matter_reviewer)
+        (evidence_record_regulatory_citation_available ?regulatory_citation)
+        (evidence_record_has_regulatory_citation ?evidence_record ?regulatory_citation)
+        (not
+          (evidence_record_regulatory_citation_attached ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (evidence_record_regulatory_citation_attached ?evidence_record)
+        (not
+          (evidence_record_regulatory_citation_available ?regulatory_citation)
+        )
+      )
+  )
+  (:action owner_acknowledge_regulatory_citation
+    :parameters (?evidence_record - evidence_record ?functional_owner - functional_owner)
+    :precondition
+      (and
+        (evidence_record_regulatory_citation_attached ?evidence_record)
+        (item_assigned_owner ?evidence_record ?functional_owner)
+        (not
+          (evidence_record_regulatory_citation_owner_acknowledged ?evidence_record)
+        )
+      )
+    :effect (evidence_record_regulatory_citation_owner_acknowledged ?evidence_record)
+  )
+  (:action verify_regulatory_citation_with_inspection_reference
+    :parameters (?evidence_record - evidence_record ?inspection_reference - inspection_reference)
+    :precondition
+      (and
+        (evidence_record_regulatory_citation_owner_acknowledged ?evidence_record)
+        (evidence_record_has_inspection_reference ?evidence_record ?inspection_reference)
+        (not
+          (evidence_record_regulatory_citation_verified ?evidence_record)
+        )
+      )
+    :effect (evidence_record_regulatory_citation_verified ?evidence_record)
+  )
+  (:action finalize_regulatory_citation_reconciliation
+    :parameters (?evidence_record - evidence_record)
+    :precondition
+      (and
+        (evidence_record_regulatory_citation_verified ?evidence_record)
+        (not
+          (record_approval_gate_reached ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (record_approval_gate_reached ?evidence_record)
+        (inspection_readiness_asserted ?evidence_record)
+      )
+  )
+  (:action propagate_readiness_to_investigation
+    :parameters (?investigation - investigation ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (investigation_owner_acknowledged ?investigation)
+        (investigation_evidence_reconciled ?investigation)
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_finalized ?evidence_package)
+        (not
+          (inspection_readiness_asserted ?investigation)
+        )
+      )
+    :effect (inspection_readiness_asserted ?investigation)
+  )
+  (:action propagate_readiness_to_action_plan
+    :parameters (?corrective_action_plan - corrective_action_plan ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (action_plan_owner_acknowledged ?corrective_action_plan)
+        (action_plan_evidence_reconciled ?corrective_action_plan)
+        (evidence_package_compiled ?evidence_package)
+        (evidence_package_finalized ?evidence_package)
+        (not
+          (inspection_readiness_asserted ?corrective_action_plan)
+        )
+      )
+    :effect (inspection_readiness_asserted ?corrective_action_plan)
+  )
+  (:action capture_archive_token_for_case
+    :parameters (?quality_case - quality_case ?archive_token - archive_token ?subject_matter_reviewer - subject_matter_reviewer)
+    :precondition
+      (and
+        (inspection_readiness_asserted ?quality_case)
+        (item_assigned_reviewer ?quality_case ?subject_matter_reviewer)
+        (archive_token_available ?archive_token)
+        (not
+          (item_archive_token_assigned ?quality_case)
+        )
+      )
+    :effect
+      (and
+        (item_archive_token_assigned ?quality_case)
+        (item_bound_to_archive_token ?quality_case ?archive_token)
+        (not
+          (archive_token_available ?archive_token)
+        )
+      )
+  )
+  (:action finalize_case_and_release_approver
+    :parameters (?investigation - investigation ?approver_role - approver_role ?archive_token - archive_token)
+    :precondition
+      (and
+        (item_archive_token_assigned ?investigation)
+        (item_assigned_approver ?investigation ?approver_role)
+        (item_bound_to_archive_token ?investigation ?archive_token)
+        (not
+          (item_closed ?investigation)
+        )
+      )
+    :effect
+      (and
+        (item_closed ?investigation)
+        (approver_available ?approver_role)
+        (archive_token_available ?archive_token)
+      )
+  )
+  (:action finalize_action_plan_and_release_approver
+    :parameters (?corrective_action_plan - corrective_action_plan ?approver_role - approver_role ?archive_token - archive_token)
+    :precondition
+      (and
+        (item_archive_token_assigned ?corrective_action_plan)
+        (item_assigned_approver ?corrective_action_plan ?approver_role)
+        (item_bound_to_archive_token ?corrective_action_plan ?archive_token)
+        (not
+          (item_closed ?corrective_action_plan)
+        )
+      )
+    :effect
+      (and
+        (item_closed ?corrective_action_plan)
+        (approver_available ?approver_role)
+        (archive_token_available ?archive_token)
+      )
+  )
+  (:action finalize_record_and_release_approver
+    :parameters (?evidence_record - evidence_record ?approver_role - approver_role ?archive_token - archive_token)
+    :precondition
+      (and
+        (item_archive_token_assigned ?evidence_record)
+        (item_assigned_approver ?evidence_record ?approver_role)
+        (item_bound_to_archive_token ?evidence_record ?archive_token)
+        (not
+          (item_closed ?evidence_record)
+        )
+      )
+    :effect
+      (and
+        (item_closed ?evidence_record)
+        (approver_available ?approver_role)
+        (archive_token_available ?archive_token)
+      )
+  )
+)

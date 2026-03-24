@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain beneficiary_account_change_control)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_group - object reference_data_group - object settlement_instrument_group - object case_root - object beneficiary_change_case - case_root operator_endpoint - operational_resource_group validator_service - operational_resource_group authorizer_service - operational_resource_group compliance_rule - operational_resource_group approval_profile - operational_resource_group audit_record - operational_resource_group signature_credential - operational_resource_group regulatory_token - operational_resource_group document - reference_data_group attachment_bundle - reference_data_group external_reference - reference_data_group clearing_channel - settlement_instrument_group routing_path - settlement_instrument_group settlement_message - settlement_instrument_group case_subtype_origin - beneficiary_change_case case_subtype_receiving - beneficiary_change_case originating_case - case_subtype_origin receiving_case - case_subtype_origin work_item - case_subtype_receiving)
+  (:predicates
+    (case_registered ?beneficiary_change_case - beneficiary_change_case)
+    (validated ?beneficiary_change_case - beneficiary_change_case)
+    (case_operator_assigned ?beneficiary_change_case - beneficiary_change_case)
+    (change_executed ?beneficiary_change_case - beneficiary_change_case)
+    (released_to_settlement ?beneficiary_change_case - beneficiary_change_case)
+    (change_committed ?beneficiary_change_case - beneficiary_change_case)
+    (endpoint_available ?operator_endpoint - operator_endpoint)
+    (assigned_endpoint ?beneficiary_change_case - beneficiary_change_case ?operator_endpoint - operator_endpoint)
+    (validator_available ?validator_service - validator_service)
+    (assigned_validator ?beneficiary_change_case - beneficiary_change_case ?validator_service - validator_service)
+    (authorizer_available ?authorizer_service - authorizer_service)
+    (assigned_authorizer ?beneficiary_change_case - beneficiary_change_case ?authorizer_service - authorizer_service)
+    (document_available ?document - document)
+    (originating_case_document_bound ?originating_case - originating_case ?document - document)
+    (receiving_case_document_bound ?receiving_case - receiving_case ?document - document)
+    (originating_case_channel_binding ?originating_case - originating_case ?clearing_channel - clearing_channel)
+    (clearing_channel_primary_ready ?clearing_channel - clearing_channel)
+    (clearing_channel_requires_attachment ?clearing_channel - clearing_channel)
+    (originating_case_ready ?originating_case - originating_case)
+    (receiving_case_routing_binding ?receiving_case - receiving_case ?routing_path - routing_path)
+    (routing_path_ready ?routing_path - routing_path)
+    (routing_path_requires_attachment ?routing_path - routing_path)
+    (receiving_case_ready ?receiving_case - receiving_case)
+    (settlement_message_pending ?settlement_message - settlement_message)
+    (message_composed ?settlement_message - settlement_message)
+    (message_bound_channel ?settlement_message - settlement_message ?clearing_channel - clearing_channel)
+    (message_bound_routing_path ?settlement_message - settlement_message ?routing_path - routing_path)
+    (message_flag_originating_attachment ?settlement_message - settlement_message)
+    (message_flag_receiving_attachment ?settlement_message - settlement_message)
+    (message_locked ?settlement_message - settlement_message)
+    (workitem_originating_case_link ?work_item - work_item ?originating_case - originating_case)
+    (workitem_receiving_case_link ?work_item - work_item ?receiving_case - receiving_case)
+    (workitem_bound_message ?work_item - work_item ?settlement_message - settlement_message)
+    (attachment_bundle_available ?attachment_bundle - attachment_bundle)
+    (workitem_has_attachment ?work_item - work_item ?attachment_bundle - attachment_bundle)
+    (attachment_bundle_sealed ?attachment_bundle - attachment_bundle)
+    (attachment_bound_message ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    (workitem_authorization_ready ?work_item - work_item)
+    (workitem_authorization_engaged ?work_item - work_item)
+    (workitem_authorized ?work_item - work_item)
+    (workitem_has_compliance_rule ?work_item - work_item)
+    (workitem_compliance_flag ?work_item - work_item)
+    (workitem_ready_for_approval_profile ?work_item - work_item)
+    (workitem_final_checks_passed ?work_item - work_item)
+    (external_reference_available ?external_reference - external_reference)
+    (workitem_bound_external_reference ?work_item - work_item ?external_reference - external_reference)
+    (workitem_exception_approval_initiated ?work_item - work_item)
+    (workitem_exception_authorizer_engaged ?work_item - work_item)
+    (workitem_exception_authorized ?work_item - work_item)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (workitem_assigned_compliance_rule ?work_item - work_item ?compliance_rule - compliance_rule)
+    (approval_profile_available ?approval_profile - approval_profile)
+    (workitem_assigned_approval_profile ?work_item - work_item ?approval_profile - approval_profile)
+    (signature_credential_available ?signature_credential - signature_credential)
+    (workitem_bound_signature_credential ?work_item - work_item ?signature_credential - signature_credential)
+    (regulatory_token_available ?regulatory_token - regulatory_token)
+    (workitem_bound_regulatory_token ?work_item - work_item ?regulatory_token - regulatory_token)
+    (audit_record_available ?audit_record - audit_record)
+    (bound_audit_record ?beneficiary_change_case - beneficiary_change_case ?audit_record - audit_record)
+    (originating_case_composition_ready ?originating_case - originating_case)
+    (receiving_case_composition_ready ?receiving_case - receiving_case)
+    (workitem_completion_recorded ?work_item - work_item)
+  )
+  (:action register_beneficiary_change_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?beneficiary_change_case)
+        )
+        (not
+          (change_executed ?beneficiary_change_case)
+        )
+      )
+    :effect (case_registered ?beneficiary_change_case)
+  )
+  (:action assign_operator_endpoint_to_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?operator_endpoint - operator_endpoint)
+    :precondition
+      (and
+        (case_registered ?beneficiary_change_case)
+        (not
+          (case_operator_assigned ?beneficiary_change_case)
+        )
+        (endpoint_available ?operator_endpoint)
+      )
+    :effect
+      (and
+        (case_operator_assigned ?beneficiary_change_case)
+        (assigned_endpoint ?beneficiary_change_case ?operator_endpoint)
+        (not
+          (endpoint_available ?operator_endpoint)
+        )
+      )
+  )
+  (:action assign_validator_to_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?validator_service - validator_service)
+    :precondition
+      (and
+        (case_registered ?beneficiary_change_case)
+        (case_operator_assigned ?beneficiary_change_case)
+        (validator_available ?validator_service)
+      )
+    :effect
+      (and
+        (assigned_validator ?beneficiary_change_case ?validator_service)
+        (not
+          (validator_available ?validator_service)
+        )
+      )
+  )
+  (:action confirm_case_validation
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?validator_service - validator_service)
+    :precondition
+      (and
+        (case_registered ?beneficiary_change_case)
+        (case_operator_assigned ?beneficiary_change_case)
+        (assigned_validator ?beneficiary_change_case ?validator_service)
+        (not
+          (validated ?beneficiary_change_case)
+        )
+      )
+    :effect (validated ?beneficiary_change_case)
+  )
+  (:action release_validator_from_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?validator_service - validator_service)
+    :precondition
+      (and
+        (assigned_validator ?beneficiary_change_case ?validator_service)
+      )
+    :effect
+      (and
+        (validator_available ?validator_service)
+        (not
+          (assigned_validator ?beneficiary_change_case ?validator_service)
+        )
+      )
+  )
+  (:action assign_authorizer_to_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?authorizer_service - authorizer_service)
+    :precondition
+      (and
+        (validated ?beneficiary_change_case)
+        (authorizer_available ?authorizer_service)
+      )
+    :effect
+      (and
+        (assigned_authorizer ?beneficiary_change_case ?authorizer_service)
+        (not
+          (authorizer_available ?authorizer_service)
+        )
+      )
+  )
+  (:action release_authorizer_from_case
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?authorizer_service - authorizer_service)
+    :precondition
+      (and
+        (assigned_authorizer ?beneficiary_change_case ?authorizer_service)
+      )
+    :effect
+      (and
+        (authorizer_available ?authorizer_service)
+        (not
+          (assigned_authorizer ?beneficiary_change_case ?authorizer_service)
+        )
+      )
+  )
+  (:action bind_signature_credential_to_work_item
+    :parameters (?work_item - work_item ?signature_credential - signature_credential)
+    :precondition
+      (and
+        (validated ?work_item)
+        (signature_credential_available ?signature_credential)
+      )
+    :effect
+      (and
+        (workitem_bound_signature_credential ?work_item ?signature_credential)
+        (not
+          (signature_credential_available ?signature_credential)
+        )
+      )
+  )
+  (:action unbind_signature_credential_from_work_item
+    :parameters (?work_item - work_item ?signature_credential - signature_credential)
+    :precondition
+      (and
+        (workitem_bound_signature_credential ?work_item ?signature_credential)
+      )
+    :effect
+      (and
+        (signature_credential_available ?signature_credential)
+        (not
+          (workitem_bound_signature_credential ?work_item ?signature_credential)
+        )
+      )
+  )
+  (:action bind_regulatory_token_to_work_item
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token)
+    :precondition
+      (and
+        (validated ?work_item)
+        (regulatory_token_available ?regulatory_token)
+      )
+    :effect
+      (and
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (not
+          (regulatory_token_available ?regulatory_token)
+        )
+      )
+  )
+  (:action unbind_regulatory_token_from_work_item
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token)
+    :precondition
+      (and
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+      )
+    :effect
+      (and
+        (regulatory_token_available ?regulatory_token)
+        (not
+          (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        )
+      )
+  )
+  (:action collect_originating_evidence
+    :parameters (?originating_case - originating_case ?clearing_channel - clearing_channel ?validator_service - validator_service)
+    :precondition
+      (and
+        (validated ?originating_case)
+        (assigned_validator ?originating_case ?validator_service)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (not
+          (clearing_channel_primary_ready ?clearing_channel)
+        )
+        (not
+          (clearing_channel_requires_attachment ?clearing_channel)
+        )
+      )
+    :effect (clearing_channel_primary_ready ?clearing_channel)
+  )
+  (:action apply_originating_authorization
+    :parameters (?originating_case - originating_case ?clearing_channel - clearing_channel ?authorizer_service - authorizer_service)
+    :precondition
+      (and
+        (validated ?originating_case)
+        (assigned_authorizer ?originating_case ?authorizer_service)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (clearing_channel_primary_ready ?clearing_channel)
+        (not
+          (originating_case_composition_ready ?originating_case)
+        )
+      )
+    :effect
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (originating_case_ready ?originating_case)
+      )
+  )
+  (:action bind_document_to_originating_case
+    :parameters (?originating_case - originating_case ?clearing_channel - clearing_channel ?document - document)
+    :precondition
+      (and
+        (validated ?originating_case)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (document_available ?document)
+        (not
+          (originating_case_composition_ready ?originating_case)
+        )
+      )
+    :effect
+      (and
+        (clearing_channel_requires_attachment ?clearing_channel)
+        (originating_case_composition_ready ?originating_case)
+        (originating_case_document_bound ?originating_case ?document)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action finalize_originating_evidence_collection
+    :parameters (?originating_case - originating_case ?clearing_channel - clearing_channel ?validator_service - validator_service ?document - document)
+    :precondition
+      (and
+        (validated ?originating_case)
+        (assigned_validator ?originating_case ?validator_service)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (clearing_channel_requires_attachment ?clearing_channel)
+        (originating_case_document_bound ?originating_case ?document)
+        (not
+          (originating_case_ready ?originating_case)
+        )
+      )
+    :effect
+      (and
+        (clearing_channel_primary_ready ?clearing_channel)
+        (originating_case_ready ?originating_case)
+        (document_available ?document)
+        (not
+          (originating_case_document_bound ?originating_case ?document)
+        )
+      )
+  )
+  (:action collect_receiving_evidence
+    :parameters (?receiving_case - receiving_case ?routing_path - routing_path ?validator_service - validator_service)
+    :precondition
+      (and
+        (validated ?receiving_case)
+        (assigned_validator ?receiving_case ?validator_service)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (not
+          (routing_path_ready ?routing_path)
+        )
+        (not
+          (routing_path_requires_attachment ?routing_path)
+        )
+      )
+    :effect (routing_path_ready ?routing_path)
+  )
+  (:action apply_receiving_authorization
+    :parameters (?receiving_case - receiving_case ?routing_path - routing_path ?authorizer_service - authorizer_service)
+    :precondition
+      (and
+        (validated ?receiving_case)
+        (assigned_authorizer ?receiving_case ?authorizer_service)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (routing_path_ready ?routing_path)
+        (not
+          (receiving_case_composition_ready ?receiving_case)
+        )
+      )
+    :effect
+      (and
+        (receiving_case_composition_ready ?receiving_case)
+        (receiving_case_ready ?receiving_case)
+      )
+  )
+  (:action bind_document_to_receiving_case
+    :parameters (?receiving_case - receiving_case ?routing_path - routing_path ?document - document)
+    :precondition
+      (and
+        (validated ?receiving_case)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (document_available ?document)
+        (not
+          (receiving_case_composition_ready ?receiving_case)
+        )
+      )
+    :effect
+      (and
+        (routing_path_requires_attachment ?routing_path)
+        (receiving_case_composition_ready ?receiving_case)
+        (receiving_case_document_bound ?receiving_case ?document)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action finalize_receiving_evidence_collection
+    :parameters (?receiving_case - receiving_case ?routing_path - routing_path ?validator_service - validator_service ?document - document)
+    :precondition
+      (and
+        (validated ?receiving_case)
+        (assigned_validator ?receiving_case ?validator_service)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (routing_path_requires_attachment ?routing_path)
+        (receiving_case_document_bound ?receiving_case ?document)
+        (not
+          (receiving_case_ready ?receiving_case)
+        )
+      )
+    :effect
+      (and
+        (routing_path_ready ?routing_path)
+        (receiving_case_ready ?receiving_case)
+        (document_available ?document)
+        (not
+          (receiving_case_document_bound ?receiving_case ?document)
+        )
+      )
+  )
+  (:action compose_and_bind_settlement_message
+    :parameters (?originating_case - originating_case ?receiving_case - receiving_case ?clearing_channel - clearing_channel ?routing_path - routing_path ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (receiving_case_composition_ready ?receiving_case)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (clearing_channel_primary_ready ?clearing_channel)
+        (routing_path_ready ?routing_path)
+        (originating_case_ready ?originating_case)
+        (receiving_case_ready ?receiving_case)
+        (settlement_message_pending ?settlement_message)
+      )
+    :effect
+      (and
+        (message_composed ?settlement_message)
+        (message_bound_channel ?settlement_message ?clearing_channel)
+        (message_bound_routing_path ?settlement_message ?routing_path)
+        (not
+          (settlement_message_pending ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_originating_attachment
+    :parameters (?originating_case - originating_case ?receiving_case - receiving_case ?clearing_channel - clearing_channel ?routing_path - routing_path ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (receiving_case_composition_ready ?receiving_case)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (clearing_channel_requires_attachment ?clearing_channel)
+        (routing_path_ready ?routing_path)
+        (not
+          (originating_case_ready ?originating_case)
+        )
+        (receiving_case_ready ?receiving_case)
+        (settlement_message_pending ?settlement_message)
+      )
+    :effect
+      (and
+        (message_composed ?settlement_message)
+        (message_bound_channel ?settlement_message ?clearing_channel)
+        (message_bound_routing_path ?settlement_message ?routing_path)
+        (message_flag_originating_attachment ?settlement_message)
+        (not
+          (settlement_message_pending ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_receiving_attachment
+    :parameters (?originating_case - originating_case ?receiving_case - receiving_case ?clearing_channel - clearing_channel ?routing_path - routing_path ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (receiving_case_composition_ready ?receiving_case)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (clearing_channel_primary_ready ?clearing_channel)
+        (routing_path_requires_attachment ?routing_path)
+        (originating_case_ready ?originating_case)
+        (not
+          (receiving_case_ready ?receiving_case)
+        )
+        (settlement_message_pending ?settlement_message)
+      )
+    :effect
+      (and
+        (message_composed ?settlement_message)
+        (message_bound_channel ?settlement_message ?clearing_channel)
+        (message_bound_routing_path ?settlement_message ?routing_path)
+        (message_flag_receiving_attachment ?settlement_message)
+        (not
+          (settlement_message_pending ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_both_attachments
+    :parameters (?originating_case - originating_case ?receiving_case - receiving_case ?clearing_channel - clearing_channel ?routing_path - routing_path ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (receiving_case_composition_ready ?receiving_case)
+        (originating_case_channel_binding ?originating_case ?clearing_channel)
+        (receiving_case_routing_binding ?receiving_case ?routing_path)
+        (clearing_channel_requires_attachment ?clearing_channel)
+        (routing_path_requires_attachment ?routing_path)
+        (not
+          (originating_case_ready ?originating_case)
+        )
+        (not
+          (receiving_case_ready ?receiving_case)
+        )
+        (settlement_message_pending ?settlement_message)
+      )
+    :effect
+      (and
+        (message_composed ?settlement_message)
+        (message_bound_channel ?settlement_message ?clearing_channel)
+        (message_bound_routing_path ?settlement_message ?routing_path)
+        (message_flag_originating_attachment ?settlement_message)
+        (message_flag_receiving_attachment ?settlement_message)
+        (not
+          (settlement_message_pending ?settlement_message)
+        )
+      )
+  )
+  (:action lock_settlement_message
+    :parameters (?settlement_message - settlement_message ?originating_case - originating_case ?validator_service - validator_service)
+    :precondition
+      (and
+        (message_composed ?settlement_message)
+        (originating_case_composition_ready ?originating_case)
+        (assigned_validator ?originating_case ?validator_service)
+        (not
+          (message_locked ?settlement_message)
+        )
+      )
+    :effect (message_locked ?settlement_message)
+  )
+  (:action seal_and_attach_bundle_to_message
+    :parameters (?work_item - work_item ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (validated ?work_item)
+        (workitem_bound_message ?work_item ?settlement_message)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bundle_available ?attachment_bundle)
+        (message_composed ?settlement_message)
+        (message_locked ?settlement_message)
+        (not
+          (attachment_bundle_sealed ?attachment_bundle)
+        )
+      )
+    :effect
+      (and
+        (attachment_bundle_sealed ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (not
+          (attachment_bundle_available ?attachment_bundle)
+        )
+      )
+  )
+  (:action prepare_workitem_for_authorization
+    :parameters (?work_item - work_item ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message ?validator_service - validator_service)
+    :precondition
+      (and
+        (validated ?work_item)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bundle_sealed ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (assigned_validator ?work_item ?validator_service)
+        (not
+          (message_flag_originating_attachment ?settlement_message)
+        )
+        (not
+          (workitem_authorization_ready ?work_item)
+        )
+      )
+    :effect (workitem_authorization_ready ?work_item)
+  )
+  (:action assign_compliance_rule_to_workitem
+    :parameters (?work_item - work_item ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (validated ?work_item)
+        (compliance_rule_available ?compliance_rule)
+        (not
+          (workitem_has_compliance_rule ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_has_compliance_rule ?work_item)
+        (workitem_assigned_compliance_rule ?work_item ?compliance_rule)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action initiate_authorization_with_compliance_and_attachment
+    :parameters (?work_item - work_item ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message ?validator_service - validator_service ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (validated ?work_item)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bundle_sealed ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (assigned_validator ?work_item ?validator_service)
+        (message_flag_originating_attachment ?settlement_message)
+        (workitem_has_compliance_rule ?work_item)
+        (workitem_assigned_compliance_rule ?work_item ?compliance_rule)
+        (not
+          (workitem_authorization_ready ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_authorization_ready ?work_item)
+        (workitem_compliance_flag ?work_item)
+      )
+  )
+  (:action request_primary_authorizer_signature
+    :parameters (?work_item - work_item ?signature_credential - signature_credential ?authorizer_service - authorizer_service ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_ready ?work_item)
+        (workitem_bound_signature_credential ?work_item ?signature_credential)
+        (assigned_authorizer ?work_item ?authorizer_service)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (not
+          (message_flag_receiving_attachment ?settlement_message)
+        )
+        (not
+          (workitem_authorization_engaged ?work_item)
+        )
+      )
+    :effect (workitem_authorization_engaged ?work_item)
+  )
+  (:action request_secondary_authorizer_signature
+    :parameters (?work_item - work_item ?signature_credential - signature_credential ?authorizer_service - authorizer_service ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_ready ?work_item)
+        (workitem_bound_signature_credential ?work_item ?signature_credential)
+        (assigned_authorizer ?work_item ?authorizer_service)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (message_flag_receiving_attachment ?settlement_message)
+        (not
+          (workitem_authorization_engaged ?work_item)
+        )
+      )
+    :effect (workitem_authorization_engaged ?work_item)
+  )
+  (:action execute_regulatory_authorization
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_engaged ?work_item)
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (not
+          (message_flag_originating_attachment ?settlement_message)
+        )
+        (not
+          (message_flag_receiving_attachment ?settlement_message)
+        )
+        (not
+          (workitem_authorized ?work_item)
+        )
+      )
+    :effect (workitem_authorized ?work_item)
+  )
+  (:action execute_regulatory_authorization_and_attach_profile
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_engaged ?work_item)
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (message_flag_originating_attachment ?settlement_message)
+        (not
+          (message_flag_receiving_attachment ?settlement_message)
+        )
+        (not
+          (workitem_authorized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_ready_for_approval_profile ?work_item)
+      )
+  )
+  (:action execute_regulatory_authorization_and_attach_profile_alt
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_engaged ?work_item)
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (not
+          (message_flag_originating_attachment ?settlement_message)
+        )
+        (message_flag_receiving_attachment ?settlement_message)
+        (not
+          (workitem_authorized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_ready_for_approval_profile ?work_item)
+      )
+  )
+  (:action execute_regulatory_authorization_and_attach_profile_final
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token ?attachment_bundle - attachment_bundle ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (workitem_authorization_engaged ?work_item)
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (workitem_has_attachment ?work_item ?attachment_bundle)
+        (attachment_bound_message ?attachment_bundle ?settlement_message)
+        (message_flag_originating_attachment ?settlement_message)
+        (message_flag_receiving_attachment ?settlement_message)
+        (not
+          (workitem_authorized ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_ready_for_approval_profile ?work_item)
+      )
+  )
+  (:action finalize_workitem_without_approval_profile
+    :parameters (?work_item - work_item)
+    :precondition
+      (and
+        (workitem_authorized ?work_item)
+        (not
+          (workitem_ready_for_approval_profile ?work_item)
+        )
+        (not
+          (workitem_completion_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_completion_recorded ?work_item)
+        (released_to_settlement ?work_item)
+      )
+  )
+  (:action attach_approval_profile_to_workitem
+    :parameters (?work_item - work_item ?approval_profile - approval_profile)
+    :precondition
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_ready_for_approval_profile ?work_item)
+        (approval_profile_available ?approval_profile)
+      )
+    :effect
+      (and
+        (workitem_assigned_approval_profile ?work_item ?approval_profile)
+        (not
+          (approval_profile_available ?approval_profile)
+        )
+      )
+  )
+  (:action perform_pre_handover_checks
+    :parameters (?work_item - work_item ?originating_case - originating_case ?receiving_case - receiving_case ?validator_service - validator_service ?approval_profile - approval_profile)
+    :precondition
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_ready_for_approval_profile ?work_item)
+        (workitem_assigned_approval_profile ?work_item ?approval_profile)
+        (workitem_originating_case_link ?work_item ?originating_case)
+        (workitem_receiving_case_link ?work_item ?receiving_case)
+        (originating_case_ready ?originating_case)
+        (receiving_case_ready ?receiving_case)
+        (assigned_validator ?work_item ?validator_service)
+        (not
+          (workitem_final_checks_passed ?work_item)
+        )
+      )
+    :effect (workitem_final_checks_passed ?work_item)
+  )
+  (:action complete_and_handover_workitem
+    :parameters (?work_item - work_item)
+    :precondition
+      (and
+        (workitem_authorized ?work_item)
+        (workitem_final_checks_passed ?work_item)
+        (not
+          (workitem_completion_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_completion_recorded ?work_item)
+        (released_to_settlement ?work_item)
+      )
+  )
+  (:action initiate_exception_approval_via_external_reference
+    :parameters (?work_item - work_item ?external_reference - external_reference ?validator_service - validator_service)
+    :precondition
+      (and
+        (validated ?work_item)
+        (assigned_validator ?work_item ?validator_service)
+        (external_reference_available ?external_reference)
+        (workitem_bound_external_reference ?work_item ?external_reference)
+        (not
+          (workitem_exception_approval_initiated ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_exception_approval_initiated ?work_item)
+        (not
+          (external_reference_available ?external_reference)
+        )
+      )
+  )
+  (:action assign_authorizer_for_exception_approval
+    :parameters (?work_item - work_item ?authorizer_service - authorizer_service)
+    :precondition
+      (and
+        (workitem_exception_approval_initiated ?work_item)
+        (assigned_authorizer ?work_item ?authorizer_service)
+        (not
+          (workitem_exception_authorizer_engaged ?work_item)
+        )
+      )
+    :effect (workitem_exception_authorizer_engaged ?work_item)
+  )
+  (:action apply_regulatory_token_for_exception_approval
+    :parameters (?work_item - work_item ?regulatory_token - regulatory_token)
+    :precondition
+      (and
+        (workitem_exception_authorizer_engaged ?work_item)
+        (workitem_bound_regulatory_token ?work_item ?regulatory_token)
+        (not
+          (workitem_exception_authorized ?work_item)
+        )
+      )
+    :effect (workitem_exception_authorized ?work_item)
+  )
+  (:action finalize_exception_approval_and_handover
+    :parameters (?work_item - work_item)
+    :precondition
+      (and
+        (workitem_exception_authorized ?work_item)
+        (not
+          (workitem_completion_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (workitem_completion_recorded ?work_item)
+        (released_to_settlement ?work_item)
+      )
+  )
+  (:action release_settlement_from_originating_case
+    :parameters (?originating_case - originating_case ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_case_composition_ready ?originating_case)
+        (originating_case_ready ?originating_case)
+        (message_composed ?settlement_message)
+        (message_locked ?settlement_message)
+        (not
+          (released_to_settlement ?originating_case)
+        )
+      )
+    :effect (released_to_settlement ?originating_case)
+  )
+  (:action release_settlement_from_receiving_case
+    :parameters (?receiving_case - receiving_case ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (receiving_case_composition_ready ?receiving_case)
+        (receiving_case_ready ?receiving_case)
+        (message_composed ?settlement_message)
+        (message_locked ?settlement_message)
+        (not
+          (released_to_settlement ?receiving_case)
+        )
+      )
+    :effect (released_to_settlement ?receiving_case)
+  )
+  (:action execute_case_change_and_bind_audit_record
+    :parameters (?beneficiary_change_case - beneficiary_change_case ?audit_record - audit_record ?validator_service - validator_service)
+    :precondition
+      (and
+        (released_to_settlement ?beneficiary_change_case)
+        (assigned_validator ?beneficiary_change_case ?validator_service)
+        (audit_record_available ?audit_record)
+        (not
+          (change_committed ?beneficiary_change_case)
+        )
+      )
+    :effect
+      (and
+        (change_committed ?beneficiary_change_case)
+        (bound_audit_record ?beneficiary_change_case ?audit_record)
+        (not
+          (audit_record_available ?audit_record)
+        )
+      )
+  )
+  (:action propagate_change_to_originating_case_and_release_endpoint
+    :parameters (?originating_case - originating_case ?operator_endpoint - operator_endpoint ?audit_record - audit_record)
+    :precondition
+      (and
+        (change_committed ?originating_case)
+        (assigned_endpoint ?originating_case ?operator_endpoint)
+        (bound_audit_record ?originating_case ?audit_record)
+        (not
+          (change_executed ?originating_case)
+        )
+      )
+    :effect
+      (and
+        (change_executed ?originating_case)
+        (endpoint_available ?operator_endpoint)
+        (audit_record_available ?audit_record)
+      )
+  )
+  (:action propagate_change_to_receiving_case_and_release_endpoint
+    :parameters (?receiving_case - receiving_case ?operator_endpoint - operator_endpoint ?audit_record - audit_record)
+    :precondition
+      (and
+        (change_committed ?receiving_case)
+        (assigned_endpoint ?receiving_case ?operator_endpoint)
+        (bound_audit_record ?receiving_case ?audit_record)
+        (not
+          (change_executed ?receiving_case)
+        )
+      )
+    :effect
+      (and
+        (change_executed ?receiving_case)
+        (endpoint_available ?operator_endpoint)
+        (audit_record_available ?audit_record)
+      )
+  )
+  (:action propagate_change_to_workitem_and_release_endpoint
+    :parameters (?work_item - work_item ?operator_endpoint - operator_endpoint ?audit_record - audit_record)
+    :precondition
+      (and
+        (change_committed ?work_item)
+        (assigned_endpoint ?work_item ?operator_endpoint)
+        (bound_audit_record ?work_item ?audit_record)
+        (not
+          (change_executed ?work_item)
+        )
+      )
+    :effect
+      (and
+        (change_executed ?work_item)
+        (endpoint_available ?operator_endpoint)
+        (audit_record_available ?audit_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem beneficiary_account_change_scenario)
+  (:domain beneficiary_account_change_control)
+  (:objects originating_case_1 - originating_case receiving_case_1 - receiving_case work_item_1 - work_item work_item_2 - work_item operator_endpoint_1 - operator_endpoint operator_endpoint_2 - operator_endpoint operator_endpoint_3 - operator_endpoint validator_service_1 - validator_service authorizer_service_1 - authorizer_service document_1 - document clearing_channel_1 - clearing_channel routing_path_1 - routing_path settlement_message_1 - settlement_message attachment_bundle_1 - attachment_bundle attachment_bundle_2 - attachment_bundle compliance_rule_1 - compliance_rule compliance_rule_2 - compliance_rule approval_profile_1 - approval_profile approval_profile_2 - approval_profile audit_record_1 - audit_record signature_credential_1 - signature_credential external_reference_1 - external_reference external_reference_2 - external_reference regulatory_token_1 - regulatory_token)
+  (:init
+    (endpoint_available operator_endpoint_1)
+    (endpoint_available operator_endpoint_2)
+    (endpoint_available operator_endpoint_3)
+    (validator_available validator_service_1)
+    (authorizer_available authorizer_service_1)
+    (document_available document_1)
+    (originating_case_channel_binding originating_case_1 clearing_channel_1)
+    (receiving_case_routing_binding receiving_case_1 routing_path_1)
+    (settlement_message_pending settlement_message_1)
+    (attachment_bundle_available attachment_bundle_1)
+    (attachment_bundle_available attachment_bundle_2)
+    (workitem_originating_case_link work_item_1 originating_case_1)
+    (workitem_originating_case_link work_item_2 originating_case_1)
+    (workitem_receiving_case_link work_item_1 receiving_case_1)
+    (workitem_receiving_case_link work_item_2 receiving_case_1)
+    (workitem_bound_message work_item_1 settlement_message_1)
+    (workitem_bound_message work_item_2 settlement_message_1)
+    (workitem_has_attachment work_item_1 attachment_bundle_1)
+    (workitem_has_attachment work_item_2 attachment_bundle_2)
+    (compliance_rule_available compliance_rule_1)
+    (compliance_rule_available compliance_rule_2)
+    (approval_profile_available approval_profile_1)
+    (approval_profile_available approval_profile_2)
+    (audit_record_available audit_record_1)
+    (signature_credential_available signature_credential_1)
+    (external_reference_available external_reference_1)
+    (workitem_bound_external_reference work_item_1 external_reference_1)
+    (workitem_bound_external_reference work_item_2 external_reference_2)
+    (regulatory_token_available regulatory_token_1)
+  )
+  (:goal
+    (and
+      (change_executed originating_case_1)
+      (change_executed receiving_case_1)
+      (change_executed work_item_1)
+      (change_executed work_item_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_beneficiary_change_case originating_case_1)
+(register_beneficiary_change_case receiving_case_1)
+(register_beneficiary_change_case work_item_1)
+(register_beneficiary_change_case work_item_2)
+(assign_operator_endpoint_to_case originating_case_1 operator_endpoint_1)
+(assign_operator_endpoint_to_case receiving_case_1 operator_endpoint_2)
+(assign_operator_endpoint_to_case work_item_1 operator_endpoint_3)
+(assign_validator_to_case originating_case_1 validator_service_1)
+(confirm_case_validation originating_case_1 validator_service_1)
+(collect_originating_evidence originating_case_1 clearing_channel_1 validator_service_1)
+(assign_authorizer_to_case originating_case_1 authorizer_service_1)
+(apply_originating_authorization originating_case_1 clearing_channel_1 authorizer_service_1)
+(release_authorizer_from_case originating_case_1 authorizer_service_1)
+(release_validator_from_case originating_case_1 validator_service_1)
+(assign_validator_to_case receiving_case_1 validator_service_1)
+(confirm_case_validation receiving_case_1 validator_service_1)
+(collect_receiving_evidence receiving_case_1 routing_path_1 validator_service_1)
+(assign_authorizer_to_case receiving_case_1 authorizer_service_1)
+(apply_receiving_authorization receiving_case_1 routing_path_1 authorizer_service_1)
+(release_authorizer_from_case receiving_case_1 authorizer_service_1)
+(release_validator_from_case receiving_case_1 validator_service_1)
+(compose_and_bind_settlement_message originating_case_1 receiving_case_1 clearing_channel_1 routing_path_1 settlement_message_1)
+(assign_validator_to_case originating_case_1 validator_service_1)
+(lock_settlement_message settlement_message_1 originating_case_1 validator_service_1)
+(release_settlement_from_originating_case originating_case_1 settlement_message_1)
+(release_settlement_from_receiving_case receiving_case_1 settlement_message_1)
+(release_validator_from_case originating_case_1 validator_service_1)
+(assign_validator_to_case work_item_1 validator_service_1)
+(confirm_case_validation work_item_1 validator_service_1)
+(seal_and_attach_bundle_to_message work_item_1 attachment_bundle_1 settlement_message_1)
+(prepare_workitem_for_authorization work_item_1 attachment_bundle_1 settlement_message_1 validator_service_1)
+(bind_signature_credential_to_work_item work_item_1 signature_credential_1)
+(bind_regulatory_token_to_work_item work_item_1 regulatory_token_1)
+(assign_authorizer_to_case work_item_1 authorizer_service_1)
+(request_primary_authorizer_signature work_item_1 signature_credential_1 authorizer_service_1 attachment_bundle_1 settlement_message_1)
+(execute_regulatory_authorization work_item_1 regulatory_token_1 attachment_bundle_1 settlement_message_1)
+(finalize_workitem_without_approval_profile work_item_1)
+(execute_case_change_and_bind_audit_record work_item_1 audit_record_1 validator_service_1)
+(propagate_change_to_workitem_and_release_endpoint work_item_1 operator_endpoint_3 audit_record_1)
+(release_validator_from_case work_item_1 validator_service_1)
+(assign_operator_endpoint_to_case work_item_2 operator_endpoint_3)
+(assign_validator_to_case work_item_2 validator_service_1)
+(confirm_case_validation work_item_2 validator_service_1)
+(seal_and_attach_bundle_to_message work_item_2 attachment_bundle_2 settlement_message_1)
+(prepare_workitem_for_authorization work_item_2 attachment_bundle_2 settlement_message_1 validator_service_1)
+(unbind_signature_credential_from_work_item work_item_1 signature_credential_1)
+(bind_signature_credential_to_work_item work_item_2 signature_credential_1)
+(unbind_regulatory_token_from_work_item work_item_1 regulatory_token_1)
+(bind_regulatory_token_to_work_item work_item_2 regulatory_token_1)
+(release_authorizer_from_case work_item_1 authorizer_service_1)
+(assign_authorizer_to_case work_item_2 authorizer_service_1)
+(request_primary_authorizer_signature work_item_2 signature_credential_1 authorizer_service_1 attachment_bundle_2 settlement_message_1)
+(execute_regulatory_authorization work_item_2 regulatory_token_1 attachment_bundle_2 settlement_message_1)
+(finalize_workitem_without_approval_profile work_item_2)
+(execute_case_change_and_bind_audit_record work_item_2 audit_record_1 validator_service_1)
+(propagate_change_to_workitem_and_release_endpoint work_item_2 operator_endpoint_3 audit_record_1)
+(release_validator_from_case work_item_2 validator_service_1)
+(assign_validator_to_case originating_case_1 validator_service_1)
+(execute_case_change_and_bind_audit_record originating_case_1 audit_record_1 validator_service_1)
+(propagate_change_to_originating_case_and_release_endpoint originating_case_1 operator_endpoint_1 audit_record_1)
+(release_validator_from_case originating_case_1 validator_service_1)
+(assign_validator_to_case receiving_case_1 validator_service_1)
+(execute_case_change_and_bind_audit_record receiving_case_1 audit_record_1 validator_service_1)
+(propagate_change_to_receiving_case_and_release_endpoint receiving_case_1 operator_endpoint_2 audit_record_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_lio5v20c/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_lio5v20c/plan.pddl 64 
+
+
+
+--- stderr ---
+

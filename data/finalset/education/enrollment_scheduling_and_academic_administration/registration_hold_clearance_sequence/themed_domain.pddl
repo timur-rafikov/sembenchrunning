@@ -1,0 +1,937 @@
+(define (domain registration_hold_clearance_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_group - entity facility_document_group - entity scheduling_group - entity root_case_type - entity registration_case - root_case_type clearance_token - resource_group academic_term - resource_group instructor_availability - resource_group consent_form_type - resource_group scheduling_preference - resource_group clearance_document - resource_group room_allocation - resource_group external_approval_document - resource_group auxiliary_document - facility_document_group room_location - facility_document_group special_approval_type - facility_document_group time_slot - scheduling_group meeting_pattern - scheduling_group section_proposal - scheduling_group personnel_or_student_group - registration_case administrative_unit_group - registration_case student_profile - personnel_or_student_group enrollment_profile - personnel_or_student_group administrative_actor - administrative_unit_group)
+
+  (:predicates
+    (hold_initiated ?registration_case - registration_case)
+    (entity_assignment_requested ?registration_case - registration_case)
+    (clearance_claimed ?registration_case - registration_case)
+    (is_cleared ?registration_case - registration_case)
+    (entity_signoff_completed ?registration_case - registration_case)
+    (clearance_authorized ?registration_case - registration_case)
+    (clearance_token_available ?clearance_token - clearance_token)
+    (allocated_clearance_token ?registration_case - registration_case ?clearance_token - clearance_token)
+    (academic_term_available ?academic_term - academic_term)
+    (assigned_academic_term ?registration_case - registration_case ?academic_term - academic_term)
+    (instructor_available ?instructor_availability - instructor_availability)
+    (assigned_instructor ?registration_case - registration_case ?instructor_availability - instructor_availability)
+    (auxiliary_document_available ?auxiliary_document - auxiliary_document)
+    (profile_has_auxiliary_document ?student_profile - student_profile ?auxiliary_document - auxiliary_document)
+    (enrollment_has_auxiliary_document ?enrollment_profile - enrollment_profile ?auxiliary_document - auxiliary_document)
+    (profile_time_slot_compatible ?student_profile - student_profile ?time_slot - time_slot)
+    (time_slot_reserved ?time_slot - time_slot)
+    (time_slot_flagged ?time_slot - time_slot)
+    (profile_time_slot_assigned ?student_profile - student_profile)
+    (enrollment_meeting_pattern_compatible ?enrollment_profile - enrollment_profile ?meeting_pattern - meeting_pattern)
+    (meeting_pattern_reserved ?meeting_pattern - meeting_pattern)
+    (meeting_pattern_flagged ?meeting_pattern - meeting_pattern)
+    (enrollment_meeting_assigned ?enrollment_profile - enrollment_profile)
+    (section_proposal_available ?section_proposal - section_proposal)
+    (section_proposal_selected ?section_proposal - section_proposal)
+    (proposal_has_time_slot ?section_proposal - section_proposal ?time_slot - time_slot)
+    (proposal_has_meeting_pattern ?section_proposal - section_proposal ?meeting_pattern - meeting_pattern)
+    (proposal_needs_room_booking ?section_proposal - section_proposal)
+    (proposal_needs_capacity_authorization ?section_proposal - section_proposal)
+    (proposal_room_booked ?section_proposal - section_proposal)
+    (actor_oversees_student ?administrative_actor - administrative_actor ?student_profile - student_profile)
+    (actor_oversees_enrollment ?administrative_actor - administrative_actor ?enrollment_profile - enrollment_profile)
+    (actor_assigned_proposal ?administrative_actor - administrative_actor ?section_proposal - section_proposal)
+    (room_available ?room_location - room_location)
+    (actor_has_room ?administrative_actor - administrative_actor ?room_location - room_location)
+    (room_reserved ?room_location - room_location)
+    (room_allocated_to_proposal ?room_location - room_location ?section_proposal - section_proposal)
+    (actor_room_validation ?administrative_actor - administrative_actor)
+    (actor_consent_obtained ?administrative_actor - administrative_actor)
+    (actor_primary_authorization ?administrative_actor - administrative_actor)
+    (actor_has_consent_form ?administrative_actor - administrative_actor)
+    (actor_room_assignment_confirmed ?administrative_actor - administrative_actor)
+    (actor_secondary_authorization ?administrative_actor - administrative_actor)
+    (actor_final_authorization ?administrative_actor - administrative_actor)
+    (special_approval_available ?special_approval_type - special_approval_type)
+    (actor_has_special_approval ?administrative_actor - administrative_actor ?special_approval_type - special_approval_type)
+    (actor_special_approval_recorded ?administrative_actor - administrative_actor)
+    (instructor_confirmation_recorded ?administrative_actor - administrative_actor)
+    (instructor_external_approval_recorded ?administrative_actor - administrative_actor)
+    (consent_form_available ?consent_form_type - consent_form_type)
+    (actor_attached_consent_form ?administrative_actor - administrative_actor ?consent_form_type - consent_form_type)
+    (scheduling_preference_available ?scheduling_preference - scheduling_preference)
+    (actor_attached_scheduling_preference ?administrative_actor - administrative_actor ?scheduling_preference - scheduling_preference)
+    (room_allocation_available ?room_allocation - room_allocation)
+    (actor_room_allocation_assigned ?administrative_actor - administrative_actor ?room_allocation - room_allocation)
+    (external_approval_available ?external_approval - external_approval_document)
+    (actor_external_approval_attached ?administrative_actor - administrative_actor ?external_approval - external_approval_document)
+    (clearance_document_available ?clearance_document - clearance_document)
+    (attached_clearance_document ?registration_case - registration_case ?clearance_document - clearance_document)
+    (student_slot_verified ?student_profile - student_profile)
+    (enrollment_slot_verified ?enrollment_profile - enrollment_profile)
+    (actor_signoff_recorded ?administrative_actor - administrative_actor)
+  )
+  (:action initiate_registration_hold
+    :parameters (?registration_case - registration_case)
+    :precondition
+      (and
+        (not
+          (hold_initiated ?registration_case)
+        )
+        (not
+          (is_cleared ?registration_case)
+        )
+      )
+    :effect (hold_initiated ?registration_case)
+  )
+  (:action claim_clearance_token
+    :parameters (?registration_case - registration_case ?clearance_token - clearance_token)
+    :precondition
+      (and
+        (hold_initiated ?registration_case)
+        (not
+          (clearance_claimed ?registration_case)
+        )
+        (clearance_token_available ?clearance_token)
+      )
+    :effect
+      (and
+        (clearance_claimed ?registration_case)
+        (allocated_clearance_token ?registration_case ?clearance_token)
+        (not
+          (clearance_token_available ?clearance_token)
+        )
+      )
+  )
+  (:action request_term_assignment
+    :parameters (?registration_case - registration_case ?academic_term - academic_term)
+    :precondition
+      (and
+        (hold_initiated ?registration_case)
+        (clearance_claimed ?registration_case)
+        (academic_term_available ?academic_term)
+      )
+    :effect
+      (and
+        (assigned_academic_term ?registration_case ?academic_term)
+        (not
+          (academic_term_available ?academic_term)
+        )
+      )
+  )
+  (:action activate_assignment_request
+    :parameters (?registration_case - registration_case ?academic_term - academic_term)
+    :precondition
+      (and
+        (hold_initiated ?registration_case)
+        (clearance_claimed ?registration_case)
+        (assigned_academic_term ?registration_case ?academic_term)
+        (not
+          (entity_assignment_requested ?registration_case)
+        )
+      )
+    :effect (entity_assignment_requested ?registration_case)
+  )
+  (:action release_term_assignment
+    :parameters (?registration_case - registration_case ?academic_term - academic_term)
+    :precondition
+      (and
+        (assigned_academic_term ?registration_case ?academic_term)
+      )
+    :effect
+      (and
+        (academic_term_available ?academic_term)
+        (not
+          (assigned_academic_term ?registration_case ?academic_term)
+        )
+      )
+  )
+  (:action assign_instructor_to_registration
+    :parameters (?registration_case - registration_case ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (entity_assignment_requested ?registration_case)
+        (instructor_available ?instructor_availability)
+      )
+    :effect
+      (and
+        (assigned_instructor ?registration_case ?instructor_availability)
+        (not
+          (instructor_available ?instructor_availability)
+        )
+      )
+  )
+  (:action release_instructor_assignment
+    :parameters (?registration_case - registration_case ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (assigned_instructor ?registration_case ?instructor_availability)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor_availability)
+        (not
+          (assigned_instructor ?registration_case ?instructor_availability)
+        )
+      )
+  )
+  (:action assign_room_allocation_to_actor
+    :parameters (?administrative_actor - administrative_actor ?room_allocation - room_allocation)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (room_allocation_available ?room_allocation)
+      )
+    :effect
+      (and
+        (actor_room_allocation_assigned ?administrative_actor ?room_allocation)
+        (not
+          (room_allocation_available ?room_allocation)
+        )
+      )
+  )
+  (:action release_room_allocation_from_actor
+    :parameters (?administrative_actor - administrative_actor ?room_allocation - room_allocation)
+    :precondition
+      (and
+        (actor_room_allocation_assigned ?administrative_actor ?room_allocation)
+      )
+    :effect
+      (and
+        (room_allocation_available ?room_allocation)
+        (not
+          (actor_room_allocation_assigned ?administrative_actor ?room_allocation)
+        )
+      )
+  )
+  (:action attach_external_approval
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (external_approval_available ?external_approval)
+      )
+    :effect
+      (and
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action detach_external_approval
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document)
+    :precondition
+      (and
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+      )
+    :effect
+      (and
+        (external_approval_available ?external_approval)
+        (not
+          (actor_external_approval_attached ?administrative_actor ?external_approval)
+        )
+      )
+  )
+  (:action reserve_time_slot_for_profile
+    :parameters (?student_profile - student_profile ?time_slot - time_slot ?academic_term - academic_term)
+    :precondition
+      (and
+        (entity_assignment_requested ?student_profile)
+        (assigned_academic_term ?student_profile ?academic_term)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (not
+          (time_slot_reserved ?time_slot)
+        )
+        (not
+          (time_slot_flagged ?time_slot)
+        )
+      )
+    :effect (time_slot_reserved ?time_slot)
+  )
+  (:action confirm_time_slot_assignment_with_instructor
+    :parameters (?student_profile - student_profile ?time_slot - time_slot ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (entity_assignment_requested ?student_profile)
+        (assigned_instructor ?student_profile ?instructor_availability)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (time_slot_reserved ?time_slot)
+        (not
+          (student_slot_verified ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (student_slot_verified ?student_profile)
+        (profile_time_slot_assigned ?student_profile)
+      )
+  )
+  (:action attach_aux_doc_and_flag_time_slot
+    :parameters (?student_profile - student_profile ?time_slot - time_slot ?auxiliary_document - auxiliary_document)
+    :precondition
+      (and
+        (entity_assignment_requested ?student_profile)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (auxiliary_document_available ?auxiliary_document)
+        (not
+          (student_slot_verified ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (time_slot_flagged ?time_slot)
+        (student_slot_verified ?student_profile)
+        (profile_has_auxiliary_document ?student_profile ?auxiliary_document)
+        (not
+          (auxiliary_document_available ?auxiliary_document)
+        )
+      )
+  )
+  (:action finalize_time_slot_assignment_using_aux_doc
+    :parameters (?student_profile - student_profile ?time_slot - time_slot ?academic_term - academic_term ?auxiliary_document - auxiliary_document)
+    :precondition
+      (and
+        (entity_assignment_requested ?student_profile)
+        (assigned_academic_term ?student_profile ?academic_term)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (time_slot_flagged ?time_slot)
+        (profile_has_auxiliary_document ?student_profile ?auxiliary_document)
+        (not
+          (profile_time_slot_assigned ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (time_slot_reserved ?time_slot)
+        (profile_time_slot_assigned ?student_profile)
+        (auxiliary_document_available ?auxiliary_document)
+        (not
+          (profile_has_auxiliary_document ?student_profile ?auxiliary_document)
+        )
+      )
+  )
+  (:action reserve_meeting_pattern_for_enrollment
+    :parameters (?enrollment_profile - enrollment_profile ?meeting_pattern - meeting_pattern ?academic_term - academic_term)
+    :precondition
+      (and
+        (entity_assignment_requested ?enrollment_profile)
+        (assigned_academic_term ?enrollment_profile ?academic_term)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (not
+          (meeting_pattern_reserved ?meeting_pattern)
+        )
+        (not
+          (meeting_pattern_flagged ?meeting_pattern)
+        )
+      )
+    :effect (meeting_pattern_reserved ?meeting_pattern)
+  )
+  (:action confirm_meeting_assignment_with_instructor
+    :parameters (?enrollment_profile - enrollment_profile ?meeting_pattern - meeting_pattern ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (entity_assignment_requested ?enrollment_profile)
+        (assigned_instructor ?enrollment_profile ?instructor_availability)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (meeting_pattern_reserved ?meeting_pattern)
+        (not
+          (enrollment_slot_verified ?enrollment_profile)
+        )
+      )
+    :effect
+      (and
+        (enrollment_slot_verified ?enrollment_profile)
+        (enrollment_meeting_assigned ?enrollment_profile)
+      )
+  )
+  (:action attach_aux_doc_and_flag_meeting_pattern
+    :parameters (?enrollment_profile - enrollment_profile ?meeting_pattern - meeting_pattern ?auxiliary_document - auxiliary_document)
+    :precondition
+      (and
+        (entity_assignment_requested ?enrollment_profile)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (auxiliary_document_available ?auxiliary_document)
+        (not
+          (enrollment_slot_verified ?enrollment_profile)
+        )
+      )
+    :effect
+      (and
+        (meeting_pattern_flagged ?meeting_pattern)
+        (enrollment_slot_verified ?enrollment_profile)
+        (enrollment_has_auxiliary_document ?enrollment_profile ?auxiliary_document)
+        (not
+          (auxiliary_document_available ?auxiliary_document)
+        )
+      )
+  )
+  (:action finalize_meeting_assignment_using_aux_doc
+    :parameters (?enrollment_profile - enrollment_profile ?meeting_pattern - meeting_pattern ?academic_term - academic_term ?auxiliary_document - auxiliary_document)
+    :precondition
+      (and
+        (entity_assignment_requested ?enrollment_profile)
+        (assigned_academic_term ?enrollment_profile ?academic_term)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (meeting_pattern_flagged ?meeting_pattern)
+        (enrollment_has_auxiliary_document ?enrollment_profile ?auxiliary_document)
+        (not
+          (enrollment_meeting_assigned ?enrollment_profile)
+        )
+      )
+    :effect
+      (and
+        (meeting_pattern_reserved ?meeting_pattern)
+        (enrollment_meeting_assigned ?enrollment_profile)
+        (auxiliary_document_available ?auxiliary_document)
+        (not
+          (enrollment_has_auxiliary_document ?enrollment_profile ?auxiliary_document)
+        )
+      )
+  )
+  (:action compose_section_proposal
+    :parameters (?student_profile - student_profile ?enrollment_profile - enrollment_profile ?time_slot - time_slot ?meeting_pattern - meeting_pattern ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_slot_verified ?student_profile)
+        (enrollment_slot_verified ?enrollment_profile)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (time_slot_reserved ?time_slot)
+        (meeting_pattern_reserved ?meeting_pattern)
+        (profile_time_slot_assigned ?student_profile)
+        (enrollment_meeting_assigned ?enrollment_profile)
+        (section_proposal_available ?section_proposal)
+      )
+    :effect
+      (and
+        (section_proposal_selected ?section_proposal)
+        (proposal_has_time_slot ?section_proposal ?time_slot)
+        (proposal_has_meeting_pattern ?section_proposal ?meeting_pattern)
+        (not
+          (section_proposal_available ?section_proposal)
+        )
+      )
+  )
+  (:action compose_section_proposal_with_facility_flag
+    :parameters (?student_profile - student_profile ?enrollment_profile - enrollment_profile ?time_slot - time_slot ?meeting_pattern - meeting_pattern ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_slot_verified ?student_profile)
+        (enrollment_slot_verified ?enrollment_profile)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (time_slot_flagged ?time_slot)
+        (meeting_pattern_reserved ?meeting_pattern)
+        (not
+          (profile_time_slot_assigned ?student_profile)
+        )
+        (enrollment_meeting_assigned ?enrollment_profile)
+        (section_proposal_available ?section_proposal)
+      )
+    :effect
+      (and
+        (section_proposal_selected ?section_proposal)
+        (proposal_has_time_slot ?section_proposal ?time_slot)
+        (proposal_has_meeting_pattern ?section_proposal ?meeting_pattern)
+        (proposal_needs_room_booking ?section_proposal)
+        (not
+          (section_proposal_available ?section_proposal)
+        )
+      )
+  )
+  (:action compose_section_proposal_with_capacity_flag
+    :parameters (?student_profile - student_profile ?enrollment_profile - enrollment_profile ?time_slot - time_slot ?meeting_pattern - meeting_pattern ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_slot_verified ?student_profile)
+        (enrollment_slot_verified ?enrollment_profile)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (time_slot_reserved ?time_slot)
+        (meeting_pattern_flagged ?meeting_pattern)
+        (profile_time_slot_assigned ?student_profile)
+        (not
+          (enrollment_meeting_assigned ?enrollment_profile)
+        )
+        (section_proposal_available ?section_proposal)
+      )
+    :effect
+      (and
+        (section_proposal_selected ?section_proposal)
+        (proposal_has_time_slot ?section_proposal ?time_slot)
+        (proposal_has_meeting_pattern ?section_proposal ?meeting_pattern)
+        (proposal_needs_capacity_authorization ?section_proposal)
+        (not
+          (section_proposal_available ?section_proposal)
+        )
+      )
+  )
+  (:action compose_section_proposal_with_facility_and_capacity_flags
+    :parameters (?student_profile - student_profile ?enrollment_profile - enrollment_profile ?time_slot - time_slot ?meeting_pattern - meeting_pattern ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_slot_verified ?student_profile)
+        (enrollment_slot_verified ?enrollment_profile)
+        (profile_time_slot_compatible ?student_profile ?time_slot)
+        (enrollment_meeting_pattern_compatible ?enrollment_profile ?meeting_pattern)
+        (time_slot_flagged ?time_slot)
+        (meeting_pattern_flagged ?meeting_pattern)
+        (not
+          (profile_time_slot_assigned ?student_profile)
+        )
+        (not
+          (enrollment_meeting_assigned ?enrollment_profile)
+        )
+        (section_proposal_available ?section_proposal)
+      )
+    :effect
+      (and
+        (section_proposal_selected ?section_proposal)
+        (proposal_has_time_slot ?section_proposal ?time_slot)
+        (proposal_has_meeting_pattern ?section_proposal ?meeting_pattern)
+        (proposal_needs_room_booking ?section_proposal)
+        (proposal_needs_capacity_authorization ?section_proposal)
+        (not
+          (section_proposal_available ?section_proposal)
+        )
+      )
+  )
+  (:action confirm_proposal_room_booking
+    :parameters (?section_proposal - section_proposal ?student_profile - student_profile ?academic_term - academic_term)
+    :precondition
+      (and
+        (section_proposal_selected ?section_proposal)
+        (student_slot_verified ?student_profile)
+        (assigned_academic_term ?student_profile ?academic_term)
+        (not
+          (proposal_room_booked ?section_proposal)
+        )
+      )
+    :effect (proposal_room_booked ?section_proposal)
+  )
+  (:action reserve_room_for_proposal
+    :parameters (?administrative_actor - administrative_actor ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (actor_assigned_proposal ?administrative_actor ?section_proposal)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_available ?room_location)
+        (section_proposal_selected ?section_proposal)
+        (proposal_room_booked ?section_proposal)
+        (not
+          (room_reserved ?room_location)
+        )
+      )
+    :effect
+      (and
+        (room_reserved ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (not
+          (room_available ?room_location)
+        )
+      )
+  )
+  (:action validate_actor_room_assignment
+    :parameters (?administrative_actor - administrative_actor ?room_location - room_location ?section_proposal - section_proposal ?academic_term - academic_term)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_reserved ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (assigned_academic_term ?administrative_actor ?academic_term)
+        (not
+          (proposal_needs_room_booking ?section_proposal)
+        )
+        (not
+          (actor_room_validation ?administrative_actor)
+        )
+      )
+    :effect (actor_room_validation ?administrative_actor)
+  )
+  (:action attach_consent_form_to_actor
+    :parameters (?administrative_actor - administrative_actor ?consent_form_type - consent_form_type)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (consent_form_available ?consent_form_type)
+        (not
+          (actor_has_consent_form ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_has_consent_form ?administrative_actor)
+        (actor_attached_consent_form ?administrative_actor ?consent_form_type)
+        (not
+          (consent_form_available ?consent_form_type)
+        )
+      )
+  )
+  (:action confirm_actor_room_and_consent
+    :parameters (?administrative_actor - administrative_actor ?room_location - room_location ?section_proposal - section_proposal ?academic_term - academic_term ?consent_form_type - consent_form_type)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_reserved ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (assigned_academic_term ?administrative_actor ?academic_term)
+        (proposal_needs_room_booking ?section_proposal)
+        (actor_has_consent_form ?administrative_actor)
+        (actor_attached_consent_form ?administrative_actor ?consent_form_type)
+        (not
+          (actor_room_validation ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_room_validation ?administrative_actor)
+        (actor_room_assignment_confirmed ?administrative_actor)
+      )
+  )
+  (:action record_instructor_consent
+    :parameters (?administrative_actor - administrative_actor ?room_allocation - room_allocation ?instructor_availability - instructor_availability ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_room_validation ?administrative_actor)
+        (actor_room_allocation_assigned ?administrative_actor ?room_allocation)
+        (assigned_instructor ?administrative_actor ?instructor_availability)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (not
+          (proposal_needs_capacity_authorization ?section_proposal)
+        )
+        (not
+          (actor_consent_obtained ?administrative_actor)
+        )
+      )
+    :effect (actor_consent_obtained ?administrative_actor)
+  )
+  (:action record_instructor_consent_for_proposal
+    :parameters (?administrative_actor - administrative_actor ?room_allocation - room_allocation ?instructor_availability - instructor_availability ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_room_validation ?administrative_actor)
+        (actor_room_allocation_assigned ?administrative_actor ?room_allocation)
+        (assigned_instructor ?administrative_actor ?instructor_availability)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (proposal_needs_capacity_authorization ?section_proposal)
+        (not
+          (actor_consent_obtained ?administrative_actor)
+        )
+      )
+    :effect (actor_consent_obtained ?administrative_actor)
+  )
+  (:action apply_external_authorization_primary
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_consent_obtained ?administrative_actor)
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (not
+          (proposal_needs_room_booking ?section_proposal)
+        )
+        (not
+          (proposal_needs_capacity_authorization ?section_proposal)
+        )
+        (not
+          (actor_primary_authorization ?administrative_actor)
+        )
+      )
+    :effect (actor_primary_authorization ?administrative_actor)
+  )
+  (:action apply_external_authorization_primary_with_secondary_flag
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_consent_obtained ?administrative_actor)
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (proposal_needs_room_booking ?section_proposal)
+        (not
+          (proposal_needs_capacity_authorization ?section_proposal)
+        )
+        (not
+          (actor_primary_authorization ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_secondary_authorization ?administrative_actor)
+      )
+  )
+  (:action apply_external_authorization_primary_with_secondary_flag_alt1
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_consent_obtained ?administrative_actor)
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (not
+          (proposal_needs_room_booking ?section_proposal)
+        )
+        (proposal_needs_capacity_authorization ?section_proposal)
+        (not
+          (actor_primary_authorization ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_secondary_authorization ?administrative_actor)
+      )
+  )
+  (:action apply_external_authorization_primary_with_secondary_flag_alt2
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document ?room_location - room_location ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (actor_consent_obtained ?administrative_actor)
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (actor_has_room ?administrative_actor ?room_location)
+        (room_allocated_to_proposal ?room_location ?section_proposal)
+        (proposal_needs_room_booking ?section_proposal)
+        (proposal_needs_capacity_authorization ?section_proposal)
+        (not
+          (actor_primary_authorization ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_secondary_authorization ?administrative_actor)
+      )
+  )
+  (:action finalize_actor_signoff
+    :parameters (?administrative_actor - administrative_actor)
+    :precondition
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (not
+          (actor_secondary_authorization ?administrative_actor)
+        )
+        (not
+          (actor_signoff_recorded ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_signoff_recorded ?administrative_actor)
+        (entity_signoff_completed ?administrative_actor)
+      )
+  )
+  (:action attach_scheduling_preference_to_actor
+    :parameters (?administrative_actor - administrative_actor ?scheduling_preference - scheduling_preference)
+    :precondition
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_secondary_authorization ?administrative_actor)
+        (scheduling_preference_available ?scheduling_preference)
+      )
+    :effect
+      (and
+        (actor_attached_scheduling_preference ?administrative_actor ?scheduling_preference)
+        (not
+          (scheduling_preference_available ?scheduling_preference)
+        )
+      )
+  )
+  (:action authorize_actor_for_final_assignment
+    :parameters (?administrative_actor - administrative_actor ?student_profile - student_profile ?enrollment_profile - enrollment_profile ?academic_term - academic_term ?scheduling_preference - scheduling_preference)
+    :precondition
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_secondary_authorization ?administrative_actor)
+        (actor_attached_scheduling_preference ?administrative_actor ?scheduling_preference)
+        (actor_oversees_student ?administrative_actor ?student_profile)
+        (actor_oversees_enrollment ?administrative_actor ?enrollment_profile)
+        (profile_time_slot_assigned ?student_profile)
+        (enrollment_meeting_assigned ?enrollment_profile)
+        (assigned_academic_term ?administrative_actor ?academic_term)
+        (not
+          (actor_final_authorization ?administrative_actor)
+        )
+      )
+    :effect (actor_final_authorization ?administrative_actor)
+  )
+  (:action record_actor_final_signoff
+    :parameters (?administrative_actor - administrative_actor)
+    :precondition
+      (and
+        (actor_primary_authorization ?administrative_actor)
+        (actor_final_authorization ?administrative_actor)
+        (not
+          (actor_signoff_recorded ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_signoff_recorded ?administrative_actor)
+        (entity_signoff_completed ?administrative_actor)
+      )
+  )
+  (:action request_special_approval_for_actor
+    :parameters (?administrative_actor - administrative_actor ?special_approval_type - special_approval_type ?academic_term - academic_term)
+    :precondition
+      (and
+        (entity_assignment_requested ?administrative_actor)
+        (assigned_academic_term ?administrative_actor ?academic_term)
+        (special_approval_available ?special_approval_type)
+        (actor_has_special_approval ?administrative_actor ?special_approval_type)
+        (not
+          (actor_special_approval_recorded ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_special_approval_recorded ?administrative_actor)
+        (not
+          (special_approval_available ?special_approval_type)
+        )
+      )
+  )
+  (:action record_instructor_confirmation
+    :parameters (?administrative_actor - administrative_actor ?instructor_availability - instructor_availability)
+    :precondition
+      (and
+        (actor_special_approval_recorded ?administrative_actor)
+        (assigned_instructor ?administrative_actor ?instructor_availability)
+        (not
+          (instructor_confirmation_recorded ?administrative_actor)
+        )
+      )
+    :effect (instructor_confirmation_recorded ?administrative_actor)
+  )
+  (:action apply_external_approval_to_instructor
+    :parameters (?administrative_actor - administrative_actor ?external_approval - external_approval_document)
+    :precondition
+      (and
+        (instructor_confirmation_recorded ?administrative_actor)
+        (actor_external_approval_attached ?administrative_actor ?external_approval)
+        (not
+          (instructor_external_approval_recorded ?administrative_actor)
+        )
+      )
+    :effect (instructor_external_approval_recorded ?administrative_actor)
+  )
+  (:action record_instructor_signoff
+    :parameters (?administrative_actor - administrative_actor)
+    :precondition
+      (and
+        (instructor_external_approval_recorded ?administrative_actor)
+        (not
+          (actor_signoff_recorded ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_signoff_recorded ?administrative_actor)
+        (entity_signoff_completed ?administrative_actor)
+      )
+  )
+  (:action apply_final_assignment_to_student
+    :parameters (?student_profile - student_profile ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_slot_verified ?student_profile)
+        (profile_time_slot_assigned ?student_profile)
+        (section_proposal_selected ?section_proposal)
+        (proposal_room_booked ?section_proposal)
+        (not
+          (entity_signoff_completed ?student_profile)
+        )
+      )
+    :effect (entity_signoff_completed ?student_profile)
+  )
+  (:action apply_final_assignment_to_enrollment_profile
+    :parameters (?enrollment_profile - enrollment_profile ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (enrollment_slot_verified ?enrollment_profile)
+        (enrollment_meeting_assigned ?enrollment_profile)
+        (section_proposal_selected ?section_proposal)
+        (proposal_room_booked ?section_proposal)
+        (not
+          (entity_signoff_completed ?enrollment_profile)
+        )
+      )
+    :effect (entity_signoff_completed ?enrollment_profile)
+  )
+  (:action authorize_clearance_and_attach_document
+    :parameters (?registration_case - registration_case ?clearance_document - clearance_document ?academic_term - academic_term)
+    :precondition
+      (and
+        (entity_signoff_completed ?registration_case)
+        (assigned_academic_term ?registration_case ?academic_term)
+        (clearance_document_available ?clearance_document)
+        (not
+          (clearance_authorized ?registration_case)
+        )
+      )
+    :effect
+      (and
+        (clearance_authorized ?registration_case)
+        (attached_clearance_document ?registration_case ?clearance_document)
+        (not
+          (clearance_document_available ?clearance_document)
+        )
+      )
+  )
+  (:action apply_clearance_and_release_token_for_student
+    :parameters (?student_profile - student_profile ?clearance_token - clearance_token ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (clearance_authorized ?student_profile)
+        (allocated_clearance_token ?student_profile ?clearance_token)
+        (attached_clearance_document ?student_profile ?clearance_document)
+        (not
+          (is_cleared ?student_profile)
+        )
+      )
+    :effect
+      (and
+        (is_cleared ?student_profile)
+        (clearance_token_available ?clearance_token)
+        (clearance_document_available ?clearance_document)
+      )
+  )
+  (:action apply_clearance_and_release_token_for_enrollment
+    :parameters (?enrollment_profile - enrollment_profile ?clearance_token - clearance_token ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (clearance_authorized ?enrollment_profile)
+        (allocated_clearance_token ?enrollment_profile ?clearance_token)
+        (attached_clearance_document ?enrollment_profile ?clearance_document)
+        (not
+          (is_cleared ?enrollment_profile)
+        )
+      )
+    :effect
+      (and
+        (is_cleared ?enrollment_profile)
+        (clearance_token_available ?clearance_token)
+        (clearance_document_available ?clearance_document)
+      )
+  )
+  (:action apply_clearance_and_release_token_for_actor
+    :parameters (?administrative_actor - administrative_actor ?clearance_token - clearance_token ?clearance_document - clearance_document)
+    :precondition
+      (and
+        (clearance_authorized ?administrative_actor)
+        (allocated_clearance_token ?administrative_actor ?clearance_token)
+        (attached_clearance_document ?administrative_actor ?clearance_document)
+        (not
+          (is_cleared ?administrative_actor)
+        )
+      )
+    :effect
+      (and
+        (is_cleared ?administrative_actor)
+        (clearance_token_available ?clearance_token)
+        (clearance_document_available ?clearance_document)
+      )
+  )
+)

@@ -1,0 +1,937 @@
+(define (domain final_year_requirement_consolidation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object meta_case_type - domain_object meta_resource_type - domain_object meta_schedule_type - domain_object case_supertype - domain_object final_year_case - case_supertype advisor_slot - meta_case_type course_option - meta_case_type faculty_approver - meta_case_type special_condition - meta_case_type endorsement_token - meta_case_type assessment_slot - meta_case_type competency_evidence - meta_case_type accreditation_flag - meta_case_type elective_token - meta_resource_type supporting_document - meta_resource_type external_certificate - meta_resource_type milestone - meta_schedule_type schedule_window - meta_schedule_type graduation_requirement_record - meta_schedule_type student_record_type - final_year_case student_group_type - final_year_case student_record - student_record_type student_peer_group - student_record_type program_consolidation_plan - student_group_type)
+
+  (:predicates
+    (consolidation_subject_registered ?final_year_case - final_year_case)
+    (consolidation_subject_initiated ?final_year_case - final_year_case)
+    (advisor_assignment_confirmed ?final_year_case - final_year_case)
+    (consolidation_subject_finalized ?final_year_case - final_year_case)
+    (consolidation_subject_ready_for_certification ?final_year_case - final_year_case)
+    (consolidation_subject_certification_applied ?final_year_case - final_year_case)
+    (advisor_slot_available ?advisor_slot - advisor_slot)
+    (consolidation_subject_has_advisor_slot ?final_year_case - final_year_case ?advisor_slot - advisor_slot)
+    (course_option_available ?course_option - course_option)
+    (consolidation_subject_has_course_option ?final_year_case - final_year_case ?course_option - course_option)
+    (faculty_approver_available ?faculty_approver - faculty_approver)
+    (consolidation_subject_has_faculty_approver ?final_year_case - final_year_case ?faculty_approver - faculty_approver)
+    (elective_token_available ?elective_token - elective_token)
+    (student_assigned_elective_token ?student_record - student_record ?elective_token - elective_token)
+    (peer_group_assigned_elective_token ?student_peer_group - student_peer_group ?elective_token - elective_token)
+    (student_linked_milestone ?student_record - student_record ?milestone - milestone)
+    (milestone_signaled ?milestone - milestone)
+    (milestone_reserved ?milestone - milestone)
+    (student_milestone_completed ?student_record - student_record)
+    (peer_group_has_schedule_window ?student_peer_group - student_peer_group ?schedule_window - schedule_window)
+    (schedule_window_signaled ?schedule_window - schedule_window)
+    (schedule_window_reserved ?schedule_window - schedule_window)
+    (peer_group_milestone_completed ?student_peer_group - student_peer_group)
+    (requirement_record_available ?graduation_requirement_record - graduation_requirement_record)
+    (requirement_record_created ?graduation_requirement_record - graduation_requirement_record)
+    (requirement_record_includes_milestone ?graduation_requirement_record - graduation_requirement_record ?milestone - milestone)
+    (requirement_record_includes_schedule_window ?graduation_requirement_record - graduation_requirement_record ?schedule_window - schedule_window)
+    (requirement_has_primary_endorsement ?graduation_requirement_record - graduation_requirement_record)
+    (requirement_has_secondary_endorsement ?graduation_requirement_record - graduation_requirement_record)
+    (requirement_student_validated ?graduation_requirement_record - graduation_requirement_record)
+    (plan_includes_student_record ?program_consolidation_plan - program_consolidation_plan ?student_record - student_record)
+    (plan_includes_peer_group ?program_consolidation_plan - program_consolidation_plan ?student_peer_group - student_peer_group)
+    (plan_includes_requirement_record ?program_consolidation_plan - program_consolidation_plan ?graduation_requirement_record - graduation_requirement_record)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (plan_has_supporting_document ?program_consolidation_plan - program_consolidation_plan ?supporting_document - supporting_document)
+    (supporting_document_attached ?supporting_document - supporting_document)
+    (supporting_document_validates_requirement ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    (plan_documents_verified ?program_consolidation_plan - program_consolidation_plan)
+    (plan_competency_evidence_attached ?program_consolidation_plan - program_consolidation_plan)
+    (plan_accreditation_stage1_complete ?program_consolidation_plan - program_consolidation_plan)
+    (plan_special_condition_flag ?program_consolidation_plan - program_consolidation_plan)
+    (plan_special_condition_attached ?program_consolidation_plan - program_consolidation_plan)
+    (plan_accreditation_stage2_complete ?program_consolidation_plan - program_consolidation_plan)
+    (plan_final_checks_passed ?program_consolidation_plan - program_consolidation_plan)
+    (external_certificate_available ?external_certificate - external_certificate)
+    (plan_has_external_certificate ?program_consolidation_plan - program_consolidation_plan ?external_certificate - external_certificate)
+    (plan_external_certificate_applied ?program_consolidation_plan - program_consolidation_plan)
+    (plan_external_certificate_stage1 ?program_consolidation_plan - program_consolidation_plan)
+    (plan_external_certificate_validated ?program_consolidation_plan - program_consolidation_plan)
+    (special_condition_available ?special_condition - special_condition)
+    (plan_linked_special_condition ?program_consolidation_plan - program_consolidation_plan ?special_condition - special_condition)
+    (endorsement_token_available ?endorsement_token - endorsement_token)
+    (plan_has_endorsement_token ?program_consolidation_plan - program_consolidation_plan ?endorsement_token - endorsement_token)
+    (competency_evidence_available ?competency_evidence - competency_evidence)
+    (plan_has_competency_evidence ?program_consolidation_plan - program_consolidation_plan ?competency_evidence - competency_evidence)
+    (accreditation_flag_available ?accreditation_flag - accreditation_flag)
+    (plan_has_accreditation_flag ?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag)
+    (assessment_slot_available ?assessment_slot - assessment_slot)
+    (consolidation_subject_has_assessment_slot ?final_year_case - final_year_case ?assessment_slot - assessment_slot)
+    (student_milestone_in_progress ?student_record - student_record)
+    (peer_group_milestone_in_progress ?student_peer_group - student_peer_group)
+    (plan_finalized_flag ?program_consolidation_plan - program_consolidation_plan)
+  )
+  (:action register_final_year_case
+    :parameters (?final_year_case - final_year_case)
+    :precondition
+      (and
+        (not
+          (consolidation_subject_registered ?final_year_case)
+        )
+        (not
+          (consolidation_subject_finalized ?final_year_case)
+        )
+      )
+    :effect (consolidation_subject_registered ?final_year_case)
+  )
+  (:action assign_advisor_slot_to_case
+    :parameters (?final_year_case - final_year_case ?advisor_slot - advisor_slot)
+    :precondition
+      (and
+        (consolidation_subject_registered ?final_year_case)
+        (not
+          (advisor_assignment_confirmed ?final_year_case)
+        )
+        (advisor_slot_available ?advisor_slot)
+      )
+    :effect
+      (and
+        (advisor_assignment_confirmed ?final_year_case)
+        (consolidation_subject_has_advisor_slot ?final_year_case ?advisor_slot)
+        (not
+          (advisor_slot_available ?advisor_slot)
+        )
+      )
+  )
+  (:action reserve_course_option_for_case
+    :parameters (?final_year_case - final_year_case ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_registered ?final_year_case)
+        (advisor_assignment_confirmed ?final_year_case)
+        (course_option_available ?course_option)
+      )
+    :effect
+      (and
+        (consolidation_subject_has_course_option ?final_year_case ?course_option)
+        (not
+          (course_option_available ?course_option)
+        )
+      )
+  )
+  (:action confirm_course_option_for_case
+    :parameters (?final_year_case - final_year_case ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_registered ?final_year_case)
+        (advisor_assignment_confirmed ?final_year_case)
+        (consolidation_subject_has_course_option ?final_year_case ?course_option)
+        (not
+          (consolidation_subject_initiated ?final_year_case)
+        )
+      )
+    :effect (consolidation_subject_initiated ?final_year_case)
+  )
+  (:action release_course_option_reservation
+    :parameters (?final_year_case - final_year_case ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_has_course_option ?final_year_case ?course_option)
+      )
+    :effect
+      (and
+        (course_option_available ?course_option)
+        (not
+          (consolidation_subject_has_course_option ?final_year_case ?course_option)
+        )
+      )
+  )
+  (:action attach_faculty_approver_to_case
+    :parameters (?final_year_case - final_year_case ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?final_year_case)
+        (faculty_approver_available ?faculty_approver)
+      )
+    :effect
+      (and
+        (consolidation_subject_has_faculty_approver ?final_year_case ?faculty_approver)
+        (not
+          (faculty_approver_available ?faculty_approver)
+        )
+      )
+  )
+  (:action release_faculty_approver_from_case
+    :parameters (?final_year_case - final_year_case ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (consolidation_subject_has_faculty_approver ?final_year_case ?faculty_approver)
+      )
+    :effect
+      (and
+        (faculty_approver_available ?faculty_approver)
+        (not
+          (consolidation_subject_has_faculty_approver ?final_year_case ?faculty_approver)
+        )
+      )
+  )
+  (:action attach_competency_evidence_to_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?competency_evidence - competency_evidence)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (competency_evidence_available ?competency_evidence)
+      )
+    :effect
+      (and
+        (plan_has_competency_evidence ?program_consolidation_plan ?competency_evidence)
+        (not
+          (competency_evidence_available ?competency_evidence)
+        )
+      )
+  )
+  (:action detach_competency_evidence_from_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?competency_evidence - competency_evidence)
+    :precondition
+      (and
+        (plan_has_competency_evidence ?program_consolidation_plan ?competency_evidence)
+      )
+    :effect
+      (and
+        (competency_evidence_available ?competency_evidence)
+        (not
+          (plan_has_competency_evidence ?program_consolidation_plan ?competency_evidence)
+        )
+      )
+  )
+  (:action attach_accreditation_flag_to_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (accreditation_flag_available ?accreditation_flag)
+      )
+    :effect
+      (and
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (not
+          (accreditation_flag_available ?accreditation_flag)
+        )
+      )
+  )
+  (:action detach_accreditation_flag_from_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag)
+    :precondition
+      (and
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+      )
+    :effect
+      (and
+        (accreditation_flag_available ?accreditation_flag)
+        (not
+          (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        )
+      )
+  )
+  (:action signal_milestone_for_student_record
+    :parameters (?student_record - student_record ?milestone - milestone ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_record)
+        (consolidation_subject_has_course_option ?student_record ?course_option)
+        (student_linked_milestone ?student_record ?milestone)
+        (not
+          (milestone_signaled ?milestone)
+        )
+        (not
+          (milestone_reserved ?milestone)
+        )
+      )
+    :effect (milestone_signaled ?milestone)
+  )
+  (:action record_student_milestone_progress
+    :parameters (?student_record - student_record ?milestone - milestone ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_record)
+        (consolidation_subject_has_faculty_approver ?student_record ?faculty_approver)
+        (student_linked_milestone ?student_record ?milestone)
+        (milestone_signaled ?milestone)
+        (not
+          (student_milestone_in_progress ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_milestone_in_progress ?student_record)
+        (student_milestone_completed ?student_record)
+      )
+  )
+  (:action apply_elective_token_to_student_milestone
+    :parameters (?student_record - student_record ?milestone - milestone ?elective_token - elective_token)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_record)
+        (student_linked_milestone ?student_record ?milestone)
+        (elective_token_available ?elective_token)
+        (not
+          (student_milestone_in_progress ?student_record)
+        )
+      )
+    :effect
+      (and
+        (milestone_reserved ?milestone)
+        (student_milestone_in_progress ?student_record)
+        (student_assigned_elective_token ?student_record ?elective_token)
+        (not
+          (elective_token_available ?elective_token)
+        )
+      )
+  )
+  (:action finalize_student_milestone_and_release_elective_token
+    :parameters (?student_record - student_record ?milestone - milestone ?course_option - course_option ?elective_token - elective_token)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_record)
+        (consolidation_subject_has_course_option ?student_record ?course_option)
+        (student_linked_milestone ?student_record ?milestone)
+        (milestone_reserved ?milestone)
+        (student_assigned_elective_token ?student_record ?elective_token)
+        (not
+          (student_milestone_completed ?student_record)
+        )
+      )
+    :effect
+      (and
+        (milestone_signaled ?milestone)
+        (student_milestone_completed ?student_record)
+        (elective_token_available ?elective_token)
+        (not
+          (student_assigned_elective_token ?student_record ?elective_token)
+        )
+      )
+  )
+  (:action signal_milestone_for_peer_group
+    :parameters (?student_peer_group - student_peer_group ?schedule_window - schedule_window ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_peer_group)
+        (consolidation_subject_has_course_option ?student_peer_group ?course_option)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (not
+          (schedule_window_signaled ?schedule_window)
+        )
+        (not
+          (schedule_window_reserved ?schedule_window)
+        )
+      )
+    :effect (schedule_window_signaled ?schedule_window)
+  )
+  (:action record_peer_group_milestone_progress
+    :parameters (?student_peer_group - student_peer_group ?schedule_window - schedule_window ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_peer_group)
+        (consolidation_subject_has_faculty_approver ?student_peer_group ?faculty_approver)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (schedule_window_signaled ?schedule_window)
+        (not
+          (peer_group_milestone_in_progress ?student_peer_group)
+        )
+      )
+    :effect
+      (and
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (peer_group_milestone_completed ?student_peer_group)
+      )
+  )
+  (:action apply_elective_token_to_peer_group_milestone
+    :parameters (?student_peer_group - student_peer_group ?schedule_window - schedule_window ?elective_token - elective_token)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_peer_group)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (elective_token_available ?elective_token)
+        (not
+          (peer_group_milestone_in_progress ?student_peer_group)
+        )
+      )
+    :effect
+      (and
+        (schedule_window_reserved ?schedule_window)
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (peer_group_assigned_elective_token ?student_peer_group ?elective_token)
+        (not
+          (elective_token_available ?elective_token)
+        )
+      )
+  )
+  (:action finalize_peer_group_milestone_and_release_elective_token
+    :parameters (?student_peer_group - student_peer_group ?schedule_window - schedule_window ?course_option - course_option ?elective_token - elective_token)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?student_peer_group)
+        (consolidation_subject_has_course_option ?student_peer_group ?course_option)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (schedule_window_reserved ?schedule_window)
+        (peer_group_assigned_elective_token ?student_peer_group ?elective_token)
+        (not
+          (peer_group_milestone_completed ?student_peer_group)
+        )
+      )
+    :effect
+      (and
+        (schedule_window_signaled ?schedule_window)
+        (peer_group_milestone_completed ?student_peer_group)
+        (elective_token_available ?elective_token)
+        (not
+          (peer_group_assigned_elective_token ?student_peer_group ?elective_token)
+        )
+      )
+  )
+  (:action assemble_requirement_record
+    :parameters (?student_record - student_record ?student_peer_group - student_peer_group ?milestone - milestone ?schedule_window - schedule_window ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (student_milestone_in_progress ?student_record)
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (student_linked_milestone ?student_record ?milestone)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (milestone_signaled ?milestone)
+        (schedule_window_signaled ?schedule_window)
+        (student_milestone_completed ?student_record)
+        (peer_group_milestone_completed ?student_peer_group)
+        (requirement_record_available ?graduation_requirement_record)
+      )
+    :effect
+      (and
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_record_includes_milestone ?graduation_requirement_record ?milestone)
+        (requirement_record_includes_schedule_window ?graduation_requirement_record ?schedule_window)
+        (not
+          (requirement_record_available ?graduation_requirement_record)
+        )
+      )
+  )
+  (:action assemble_requirement_record_with_primary_endorsement
+    :parameters (?student_record - student_record ?student_peer_group - student_peer_group ?milestone - milestone ?schedule_window - schedule_window ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (student_milestone_in_progress ?student_record)
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (student_linked_milestone ?student_record ?milestone)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (milestone_reserved ?milestone)
+        (schedule_window_signaled ?schedule_window)
+        (not
+          (student_milestone_completed ?student_record)
+        )
+        (peer_group_milestone_completed ?student_peer_group)
+        (requirement_record_available ?graduation_requirement_record)
+      )
+    :effect
+      (and
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_record_includes_milestone ?graduation_requirement_record ?milestone)
+        (requirement_record_includes_schedule_window ?graduation_requirement_record ?schedule_window)
+        (requirement_has_primary_endorsement ?graduation_requirement_record)
+        (not
+          (requirement_record_available ?graduation_requirement_record)
+        )
+      )
+  )
+  (:action assemble_requirement_record_with_secondary_endorsement
+    :parameters (?student_record - student_record ?student_peer_group - student_peer_group ?milestone - milestone ?schedule_window - schedule_window ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (student_milestone_in_progress ?student_record)
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (student_linked_milestone ?student_record ?milestone)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (milestone_signaled ?milestone)
+        (schedule_window_reserved ?schedule_window)
+        (student_milestone_completed ?student_record)
+        (not
+          (peer_group_milestone_completed ?student_peer_group)
+        )
+        (requirement_record_available ?graduation_requirement_record)
+      )
+    :effect
+      (and
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_record_includes_milestone ?graduation_requirement_record ?milestone)
+        (requirement_record_includes_schedule_window ?graduation_requirement_record ?schedule_window)
+        (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        (not
+          (requirement_record_available ?graduation_requirement_record)
+        )
+      )
+  )
+  (:action assemble_requirement_record_with_both_endorsements
+    :parameters (?student_record - student_record ?student_peer_group - student_peer_group ?milestone - milestone ?schedule_window - schedule_window ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (student_milestone_in_progress ?student_record)
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (student_linked_milestone ?student_record ?milestone)
+        (peer_group_has_schedule_window ?student_peer_group ?schedule_window)
+        (milestone_reserved ?milestone)
+        (schedule_window_reserved ?schedule_window)
+        (not
+          (student_milestone_completed ?student_record)
+        )
+        (not
+          (peer_group_milestone_completed ?student_peer_group)
+        )
+        (requirement_record_available ?graduation_requirement_record)
+      )
+    :effect
+      (and
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_record_includes_milestone ?graduation_requirement_record ?milestone)
+        (requirement_record_includes_schedule_window ?graduation_requirement_record ?schedule_window)
+        (requirement_has_primary_endorsement ?graduation_requirement_record)
+        (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        (not
+          (requirement_record_available ?graduation_requirement_record)
+        )
+      )
+  )
+  (:action validate_requirement_record_by_student_milestone
+    :parameters (?graduation_requirement_record - graduation_requirement_record ?student_record - student_record ?course_option - course_option)
+    :precondition
+      (and
+        (requirement_record_created ?graduation_requirement_record)
+        (student_milestone_in_progress ?student_record)
+        (consolidation_subject_has_course_option ?student_record ?course_option)
+        (not
+          (requirement_student_validated ?graduation_requirement_record)
+        )
+      )
+    :effect (requirement_student_validated ?graduation_requirement_record)
+  )
+  (:action attach_supporting_document_to_plan_and_requirement
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (plan_includes_requirement_record ?program_consolidation_plan ?graduation_requirement_record)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_student_validated ?graduation_requirement_record)
+        (not
+          (supporting_document_attached ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action verify_plan_documents
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (consolidation_subject_has_course_option ?program_consolidation_plan ?course_option)
+        (not
+          (requirement_has_primary_endorsement ?graduation_requirement_record)
+        )
+        (not
+          (plan_documents_verified ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_documents_verified ?program_consolidation_plan)
+  )
+  (:action apply_special_condition_to_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?special_condition - special_condition)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (special_condition_available ?special_condition)
+        (not
+          (plan_special_condition_flag ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_special_condition_flag ?program_consolidation_plan)
+        (plan_linked_special_condition ?program_consolidation_plan ?special_condition)
+        (not
+          (special_condition_available ?special_condition)
+        )
+      )
+  )
+  (:action confirm_special_condition_with_documentation
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record ?course_option - course_option ?special_condition - special_condition)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (consolidation_subject_has_course_option ?program_consolidation_plan ?course_option)
+        (requirement_has_primary_endorsement ?graduation_requirement_record)
+        (plan_special_condition_flag ?program_consolidation_plan)
+        (plan_linked_special_condition ?program_consolidation_plan ?special_condition)
+        (not
+          (plan_documents_verified ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_documents_verified ?program_consolidation_plan)
+        (plan_special_condition_attached ?program_consolidation_plan)
+      )
+  )
+  (:action prepare_plan_with_competency_evidence
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?competency_evidence - competency_evidence ?faculty_approver - faculty_approver ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_documents_verified ?program_consolidation_plan)
+        (plan_has_competency_evidence ?program_consolidation_plan ?competency_evidence)
+        (consolidation_subject_has_faculty_approver ?program_consolidation_plan ?faculty_approver)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (not
+          (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        )
+        (not
+          (plan_competency_evidence_attached ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_competency_evidence_attached ?program_consolidation_plan)
+  )
+  (:action advance_plan_with_competency_evidence
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?competency_evidence - competency_evidence ?faculty_approver - faculty_approver ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_documents_verified ?program_consolidation_plan)
+        (plan_has_competency_evidence ?program_consolidation_plan ?competency_evidence)
+        (consolidation_subject_has_faculty_approver ?program_consolidation_plan ?faculty_approver)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        (not
+          (plan_competency_evidence_attached ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_competency_evidence_attached ?program_consolidation_plan)
+  )
+  (:action advance_plan_accreditation_stage1
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_competency_evidence_attached ?program_consolidation_plan)
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (not
+          (requirement_has_primary_endorsement ?graduation_requirement_record)
+        )
+        (not
+          (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        )
+        (not
+          (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_accreditation_stage1_complete ?program_consolidation_plan)
+  )
+  (:action advance_plan_accreditation_stage2
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_competency_evidence_attached ?program_consolidation_plan)
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (requirement_has_primary_endorsement ?graduation_requirement_record)
+        (not
+          (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        )
+        (not
+          (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_accreditation_stage2_complete ?program_consolidation_plan)
+      )
+  )
+  (:action advance_plan_accreditation_stage3
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_competency_evidence_attached ?program_consolidation_plan)
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (not
+          (requirement_has_primary_endorsement ?graduation_requirement_record)
+        )
+        (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        (not
+          (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_accreditation_stage2_complete ?program_consolidation_plan)
+      )
+  )
+  (:action advance_plan_accreditation_stage4
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag ?supporting_document - supporting_document ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (plan_competency_evidence_attached ?program_consolidation_plan)
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (plan_has_supporting_document ?program_consolidation_plan ?supporting_document)
+        (supporting_document_validates_requirement ?supporting_document ?graduation_requirement_record)
+        (requirement_has_primary_endorsement ?graduation_requirement_record)
+        (requirement_has_secondary_endorsement ?graduation_requirement_record)
+        (not
+          (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_accreditation_stage2_complete ?program_consolidation_plan)
+      )
+  )
+  (:action finalize_plan_and_mark_ready_for_certification
+    :parameters (?program_consolidation_plan - program_consolidation_plan)
+    :precondition
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (not
+          (plan_accreditation_stage2_complete ?program_consolidation_plan)
+        )
+        (not
+          (plan_finalized_flag ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_flag ?program_consolidation_plan)
+        (consolidation_subject_ready_for_certification ?program_consolidation_plan)
+      )
+  )
+  (:action attach_endorsement_token_to_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?endorsement_token - endorsement_token)
+    :precondition
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_accreditation_stage2_complete ?program_consolidation_plan)
+        (endorsement_token_available ?endorsement_token)
+      )
+    :effect
+      (and
+        (plan_has_endorsement_token ?program_consolidation_plan ?endorsement_token)
+        (not
+          (endorsement_token_available ?endorsement_token)
+        )
+      )
+  )
+  (:action pass_plan_final_checks
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?student_record - student_record ?student_peer_group - student_peer_group ?course_option - course_option ?endorsement_token - endorsement_token)
+    :precondition
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_accreditation_stage2_complete ?program_consolidation_plan)
+        (plan_has_endorsement_token ?program_consolidation_plan ?endorsement_token)
+        (plan_includes_student_record ?program_consolidation_plan ?student_record)
+        (plan_includes_peer_group ?program_consolidation_plan ?student_peer_group)
+        (student_milestone_completed ?student_record)
+        (peer_group_milestone_completed ?student_peer_group)
+        (consolidation_subject_has_course_option ?program_consolidation_plan ?course_option)
+        (not
+          (plan_final_checks_passed ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_final_checks_passed ?program_consolidation_plan)
+  )
+  (:action finalize_plan_certification
+    :parameters (?program_consolidation_plan - program_consolidation_plan)
+    :precondition
+      (and
+        (plan_accreditation_stage1_complete ?program_consolidation_plan)
+        (plan_final_checks_passed ?program_consolidation_plan)
+        (not
+          (plan_finalized_flag ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_flag ?program_consolidation_plan)
+        (consolidation_subject_ready_for_certification ?program_consolidation_plan)
+      )
+  )
+  (:action apply_external_certificate_to_plan
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?external_certificate - external_certificate ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_initiated ?program_consolidation_plan)
+        (consolidation_subject_has_course_option ?program_consolidation_plan ?course_option)
+        (external_certificate_available ?external_certificate)
+        (plan_has_external_certificate ?program_consolidation_plan ?external_certificate)
+        (not
+          (plan_external_certificate_applied ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_external_certificate_applied ?program_consolidation_plan)
+        (not
+          (external_certificate_available ?external_certificate)
+        )
+      )
+  )
+  (:action start_conditional_approver_sequence
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (plan_external_certificate_applied ?program_consolidation_plan)
+        (consolidation_subject_has_faculty_approver ?program_consolidation_plan ?faculty_approver)
+        (not
+          (plan_external_certificate_stage1 ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_external_certificate_stage1 ?program_consolidation_plan)
+  )
+  (:action complete_conditional_approver_sequence
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?accreditation_flag - accreditation_flag)
+    :precondition
+      (and
+        (plan_external_certificate_stage1 ?program_consolidation_plan)
+        (plan_has_accreditation_flag ?program_consolidation_plan ?accreditation_flag)
+        (not
+          (plan_external_certificate_validated ?program_consolidation_plan)
+        )
+      )
+    :effect (plan_external_certificate_validated ?program_consolidation_plan)
+  )
+  (:action finalize_plan_via_conditional_approval
+    :parameters (?program_consolidation_plan - program_consolidation_plan)
+    :precondition
+      (and
+        (plan_external_certificate_validated ?program_consolidation_plan)
+        (not
+          (plan_finalized_flag ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized_flag ?program_consolidation_plan)
+        (consolidation_subject_ready_for_certification ?program_consolidation_plan)
+      )
+  )
+  (:action certify_student_record
+    :parameters (?student_record - student_record ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (student_milestone_in_progress ?student_record)
+        (student_milestone_completed ?student_record)
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_student_validated ?graduation_requirement_record)
+        (not
+          (consolidation_subject_ready_for_certification ?student_record)
+        )
+      )
+    :effect (consolidation_subject_ready_for_certification ?student_record)
+  )
+  (:action certify_peer_group_record
+    :parameters (?student_peer_group - student_peer_group ?graduation_requirement_record - graduation_requirement_record)
+    :precondition
+      (and
+        (peer_group_milestone_in_progress ?student_peer_group)
+        (peer_group_milestone_completed ?student_peer_group)
+        (requirement_record_created ?graduation_requirement_record)
+        (requirement_student_validated ?graduation_requirement_record)
+        (not
+          (consolidation_subject_ready_for_certification ?student_peer_group)
+        )
+      )
+    :effect (consolidation_subject_ready_for_certification ?student_peer_group)
+  )
+  (:action attach_assessment_slot_to_case
+    :parameters (?final_year_case - final_year_case ?assessment_slot - assessment_slot ?course_option - course_option)
+    :precondition
+      (and
+        (consolidation_subject_ready_for_certification ?final_year_case)
+        (consolidation_subject_has_course_option ?final_year_case ?course_option)
+        (assessment_slot_available ?assessment_slot)
+        (not
+          (consolidation_subject_certification_applied ?final_year_case)
+        )
+      )
+    :effect
+      (and
+        (consolidation_subject_certification_applied ?final_year_case)
+        (consolidation_subject_has_assessment_slot ?final_year_case ?assessment_slot)
+        (not
+          (assessment_slot_available ?assessment_slot)
+        )
+      )
+  )
+  (:action finalize_student_consolidation_and_release_advisor
+    :parameters (?student_record - student_record ?advisor_slot - advisor_slot ?assessment_slot - assessment_slot)
+    :precondition
+      (and
+        (consolidation_subject_certification_applied ?student_record)
+        (consolidation_subject_has_advisor_slot ?student_record ?advisor_slot)
+        (consolidation_subject_has_assessment_slot ?student_record ?assessment_slot)
+        (not
+          (consolidation_subject_finalized ?student_record)
+        )
+      )
+    :effect
+      (and
+        (consolidation_subject_finalized ?student_record)
+        (advisor_slot_available ?advisor_slot)
+        (assessment_slot_available ?assessment_slot)
+      )
+  )
+  (:action finalize_peer_group_consolidation_and_release_advisor
+    :parameters (?student_peer_group - student_peer_group ?advisor_slot - advisor_slot ?assessment_slot - assessment_slot)
+    :precondition
+      (and
+        (consolidation_subject_certification_applied ?student_peer_group)
+        (consolidation_subject_has_advisor_slot ?student_peer_group ?advisor_slot)
+        (consolidation_subject_has_assessment_slot ?student_peer_group ?assessment_slot)
+        (not
+          (consolidation_subject_finalized ?student_peer_group)
+        )
+      )
+    :effect
+      (and
+        (consolidation_subject_finalized ?student_peer_group)
+        (advisor_slot_available ?advisor_slot)
+        (assessment_slot_available ?assessment_slot)
+      )
+  )
+  (:action finalize_plan_consolidation_and_release_advisor
+    :parameters (?program_consolidation_plan - program_consolidation_plan ?advisor_slot - advisor_slot ?assessment_slot - assessment_slot)
+    :precondition
+      (and
+        (consolidation_subject_certification_applied ?program_consolidation_plan)
+        (consolidation_subject_has_advisor_slot ?program_consolidation_plan ?advisor_slot)
+        (consolidation_subject_has_assessment_slot ?program_consolidation_plan ?assessment_slot)
+        (not
+          (consolidation_subject_finalized ?program_consolidation_plan)
+        )
+      )
+    :effect
+      (and
+        (consolidation_subject_finalized ?program_consolidation_plan)
+        (advisor_slot_available ?advisor_slot)
+        (assessment_slot_available ?assessment_slot)
+      )
+  )
+)

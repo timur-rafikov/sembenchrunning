@@ -1,0 +1,936 @@
+(define (domain pharm_manufacturing_scale_up_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object material_type - object equipment_type - object manufacturing_entity_type - object manufacturing_entity - manufacturing_entity_type production_line - resource_type process_stage - resource_type qualified_personnel - resource_type quality_document_type - resource_type qa_checklist - resource_type release_document - resource_type validation_certificate - resource_type regulatory_approval - resource_type material_batch - material_type analytical_sample - material_type protocol_version - material_type upstream_vessel - equipment_type downstream_vessel - equipment_type product_unit - equipment_type operational_unit_group - manufacturing_entity record_group - manufacturing_entity upstream_unit - operational_unit_group downstream_unit - operational_unit_group production_record - record_group)
+  (:predicates
+    (entity_initialized ?manufacturing_entity - manufacturing_entity)
+    (entity_ready ?manufacturing_entity - manufacturing_entity)
+    (entity_line_reserved ?manufacturing_entity - manufacturing_entity)
+    (ready_for_release ?manufacturing_entity - manufacturing_entity)
+    (final_signoff_recorded ?manufacturing_entity - manufacturing_entity)
+    (approval_recorded ?manufacturing_entity - manufacturing_entity)
+    (production_line_available ?production_line - production_line)
+    (entity_assigned_to_line ?manufacturing_entity - manufacturing_entity ?production_line - production_line)
+    (process_stage_available ?process_stage - process_stage)
+    (entity_assigned_to_stage ?manufacturing_entity - manufacturing_entity ?process_stage - process_stage)
+    (qualified_personnel_available ?qualified_personnel - qualified_personnel)
+    (entity_assigned_personnel ?manufacturing_entity - manufacturing_entity ?qualified_personnel - qualified_personnel)
+    (material_batch_available ?material_batch - material_batch)
+    (upstream_unit_has_material ?upstream_unit - upstream_unit ?material_batch - material_batch)
+    (downstream_unit_has_material ?downstream_unit - downstream_unit ?material_batch - material_batch)
+    (upstream_unit_assigned_vessel ?upstream_unit - upstream_unit ?upstream_vessel - upstream_vessel)
+    (upstream_vessel_primary_staged ?upstream_vessel - upstream_vessel)
+    (upstream_vessel_secondary_staged ?upstream_vessel - upstream_vessel)
+    (upstream_unit_processed ?upstream_unit - upstream_unit)
+    (downstream_unit_assigned_vessel ?downstream_unit - downstream_unit ?downstream_vessel - downstream_vessel)
+    (downstream_vessel_primary_staged ?downstream_vessel - downstream_vessel)
+    (downstream_vessel_secondary_staged ?downstream_vessel - downstream_vessel)
+    (downstream_unit_processed ?downstream_unit - downstream_unit)
+    (product_unit_available ?product_unit - product_unit)
+    (product_unit_allocated ?product_unit - product_unit)
+    (product_unit_associated_upstream_vessel ?product_unit - product_unit ?upstream_vessel - upstream_vessel)
+    (product_unit_associated_downstream_vessel ?product_unit - product_unit ?downstream_vessel - downstream_vessel)
+    (product_unit_upstream_ready ?product_unit - product_unit)
+    (product_unit_downstream_ready ?product_unit - product_unit)
+    (product_unit_processing_complete ?product_unit - product_unit)
+    (production_record_assigned_upstream_unit ?production_record - production_record ?upstream_unit - upstream_unit)
+    (production_record_assigned_downstream_unit ?production_record - production_record ?downstream_unit - downstream_unit)
+    (production_record_includes_product_unit ?production_record - production_record ?product_unit - product_unit)
+    (analytical_sample_available ?analytical_sample - analytical_sample)
+    (production_record_has_analytical_sample ?production_record - production_record ?analytical_sample - analytical_sample)
+    (analytical_sample_marked_for_testing ?analytical_sample - analytical_sample)
+    (analytical_sample_from_product_unit ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    (production_record_sample_attached ?production_record - production_record)
+    (production_record_validation_started ?production_record - production_record)
+    (production_record_checks_complete ?production_record - production_record)
+    (quality_document_flag_set ?production_record - production_record)
+    (production_record_quality_document_verified ?production_record - production_record)
+    (production_record_additional_checks_done ?production_record - production_record)
+    (production_record_processing_completed ?production_record - production_record)
+    (protocol_version_available ?protocol_version - protocol_version)
+    (production_record_has_protocol_version ?production_record - production_record ?protocol_version - protocol_version)
+    (production_record_protocol_applied ?production_record - production_record)
+    (production_record_execution_confirmed ?production_record - production_record)
+    (production_record_approval_step_completed ?production_record - production_record)
+    (quality_document_type_available ?quality_document_type - quality_document_type)
+    (production_record_has_quality_document ?production_record - production_record ?quality_document_type - quality_document_type)
+    (qa_checklist_available ?qa_checklist - qa_checklist)
+    (production_record_has_qa_checklist ?production_record - production_record ?qa_checklist - qa_checklist)
+    (validation_certificate_available ?validation_certificate - validation_certificate)
+    (production_record_has_validation_certificate ?production_record - production_record ?validation_certificate - validation_certificate)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (production_record_has_regulatory_approval ?production_record - production_record ?regulatory_approval - regulatory_approval)
+    (release_document_available ?release_document - release_document)
+    (entity_has_release_document ?manufacturing_entity - manufacturing_entity ?release_document - release_document)
+    (upstream_unit_ready ?upstream_unit - upstream_unit)
+    (downstream_unit_ready ?downstream_unit - downstream_unit)
+    (production_record_finalized ?production_record - production_record)
+  )
+  (:action initiate_production_record
+    :parameters (?manufacturing_entity - manufacturing_entity)
+    :precondition
+      (and
+        (not
+          (entity_initialized ?manufacturing_entity)
+        )
+        (not
+          (ready_for_release ?manufacturing_entity)
+        )
+      )
+    :effect (entity_initialized ?manufacturing_entity)
+  )
+  (:action assign_production_line_to_entity
+    :parameters (?manufacturing_entity - manufacturing_entity ?production_line - production_line)
+    :precondition
+      (and
+        (entity_initialized ?manufacturing_entity)
+        (not
+          (entity_line_reserved ?manufacturing_entity)
+        )
+        (production_line_available ?production_line)
+      )
+    :effect
+      (and
+        (entity_line_reserved ?manufacturing_entity)
+        (entity_assigned_to_line ?manufacturing_entity ?production_line)
+        (not
+          (production_line_available ?production_line)
+        )
+      )
+  )
+  (:action assign_process_stage_to_entity
+    :parameters (?manufacturing_entity - manufacturing_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_initialized ?manufacturing_entity)
+        (entity_line_reserved ?manufacturing_entity)
+        (process_stage_available ?process_stage)
+      )
+    :effect
+      (and
+        (entity_assigned_to_stage ?manufacturing_entity ?process_stage)
+        (not
+          (process_stage_available ?process_stage)
+        )
+      )
+  )
+  (:action confirm_production_record_ready
+    :parameters (?manufacturing_entity - manufacturing_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_initialized ?manufacturing_entity)
+        (entity_line_reserved ?manufacturing_entity)
+        (entity_assigned_to_stage ?manufacturing_entity ?process_stage)
+        (not
+          (entity_ready ?manufacturing_entity)
+        )
+      )
+    :effect (entity_ready ?manufacturing_entity)
+  )
+  (:action unassign_process_stage_from_entity
+    :parameters (?manufacturing_entity - manufacturing_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_assigned_to_stage ?manufacturing_entity ?process_stage)
+      )
+    :effect
+      (and
+        (process_stage_available ?process_stage)
+        (not
+          (entity_assigned_to_stage ?manufacturing_entity ?process_stage)
+        )
+      )
+  )
+  (:action assign_personnel_to_record
+    :parameters (?manufacturing_entity - manufacturing_entity ?qualified_personnel - qualified_personnel)
+    :precondition
+      (and
+        (entity_ready ?manufacturing_entity)
+        (qualified_personnel_available ?qualified_personnel)
+      )
+    :effect
+      (and
+        (entity_assigned_personnel ?manufacturing_entity ?qualified_personnel)
+        (not
+          (qualified_personnel_available ?qualified_personnel)
+        )
+      )
+  )
+  (:action unassign_personnel_from_record
+    :parameters (?manufacturing_entity - manufacturing_entity ?qualified_personnel - qualified_personnel)
+    :precondition
+      (and
+        (entity_assigned_personnel ?manufacturing_entity ?qualified_personnel)
+      )
+    :effect
+      (and
+        (qualified_personnel_available ?qualified_personnel)
+        (not
+          (entity_assigned_personnel ?manufacturing_entity ?qualified_personnel)
+        )
+      )
+  )
+  (:action attach_validation_certificate_to_record
+    :parameters (?production_record - production_record ?validation_certificate - validation_certificate)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (validation_certificate_available ?validation_certificate)
+      )
+    :effect
+      (and
+        (production_record_has_validation_certificate ?production_record ?validation_certificate)
+        (not
+          (validation_certificate_available ?validation_certificate)
+        )
+      )
+  )
+  (:action detach_validation_certificate_from_record
+    :parameters (?production_record - production_record ?validation_certificate - validation_certificate)
+    :precondition
+      (and
+        (production_record_has_validation_certificate ?production_record ?validation_certificate)
+      )
+    :effect
+      (and
+        (validation_certificate_available ?validation_certificate)
+        (not
+          (production_record_has_validation_certificate ?production_record ?validation_certificate)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_record
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action detach_regulatory_approval_from_record
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        )
+      )
+  )
+  (:action stage_upstream_vessel_primary
+    :parameters (?upstream_unit - upstream_unit ?upstream_vessel - upstream_vessel ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_ready ?upstream_unit)
+        (entity_assigned_to_stage ?upstream_unit ?process_stage)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (not
+          (upstream_vessel_primary_staged ?upstream_vessel)
+        )
+        (not
+          (upstream_vessel_secondary_staged ?upstream_vessel)
+        )
+      )
+    :effect (upstream_vessel_primary_staged ?upstream_vessel)
+  )
+  (:action complete_upstream_primary_stage
+    :parameters (?upstream_unit - upstream_unit ?upstream_vessel - upstream_vessel ?qualified_personnel - qualified_personnel)
+    :precondition
+      (and
+        (entity_ready ?upstream_unit)
+        (entity_assigned_personnel ?upstream_unit ?qualified_personnel)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (upstream_vessel_primary_staged ?upstream_vessel)
+        (not
+          (upstream_unit_ready ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_processed ?upstream_unit)
+      )
+  )
+  (:action allocate_material_to_upstream_unit
+    :parameters (?upstream_unit - upstream_unit ?upstream_vessel - upstream_vessel ?material_batch - material_batch)
+    :precondition
+      (and
+        (entity_ready ?upstream_unit)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (material_batch_available ?material_batch)
+        (not
+          (upstream_unit_ready ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_vessel_secondary_staged ?upstream_vessel)
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_has_material ?upstream_unit ?material_batch)
+        (not
+          (material_batch_available ?material_batch)
+        )
+      )
+  )
+  (:action finalize_upstream_material_processing
+    :parameters (?upstream_unit - upstream_unit ?upstream_vessel - upstream_vessel ?process_stage - process_stage ?material_batch - material_batch)
+    :precondition
+      (and
+        (entity_ready ?upstream_unit)
+        (entity_assigned_to_stage ?upstream_unit ?process_stage)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (upstream_vessel_secondary_staged ?upstream_vessel)
+        (upstream_unit_has_material ?upstream_unit ?material_batch)
+        (not
+          (upstream_unit_processed ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (upstream_vessel_primary_staged ?upstream_vessel)
+        (upstream_unit_processed ?upstream_unit)
+        (material_batch_available ?material_batch)
+        (not
+          (upstream_unit_has_material ?upstream_unit ?material_batch)
+        )
+      )
+  )
+  (:action stage_downstream_vessel_primary
+    :parameters (?downstream_unit - downstream_unit ?downstream_vessel - downstream_vessel ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_ready ?downstream_unit)
+        (entity_assigned_to_stage ?downstream_unit ?process_stage)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (not
+          (downstream_vessel_primary_staged ?downstream_vessel)
+        )
+        (not
+          (downstream_vessel_secondary_staged ?downstream_vessel)
+        )
+      )
+    :effect (downstream_vessel_primary_staged ?downstream_vessel)
+  )
+  (:action complete_downstream_primary_stage
+    :parameters (?downstream_unit - downstream_unit ?downstream_vessel - downstream_vessel ?qualified_personnel - qualified_personnel)
+    :precondition
+      (and
+        (entity_ready ?downstream_unit)
+        (entity_assigned_personnel ?downstream_unit ?qualified_personnel)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (downstream_vessel_primary_staged ?downstream_vessel)
+        (not
+          (downstream_unit_ready ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_processed ?downstream_unit)
+      )
+  )
+  (:action allocate_material_to_downstream_unit
+    :parameters (?downstream_unit - downstream_unit ?downstream_vessel - downstream_vessel ?material_batch - material_batch)
+    :precondition
+      (and
+        (entity_ready ?downstream_unit)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (material_batch_available ?material_batch)
+        (not
+          (downstream_unit_ready ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_vessel_secondary_staged ?downstream_vessel)
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_has_material ?downstream_unit ?material_batch)
+        (not
+          (material_batch_available ?material_batch)
+        )
+      )
+  )
+  (:action finalize_downstream_material_processing
+    :parameters (?downstream_unit - downstream_unit ?downstream_vessel - downstream_vessel ?process_stage - process_stage ?material_batch - material_batch)
+    :precondition
+      (and
+        (entity_ready ?downstream_unit)
+        (entity_assigned_to_stage ?downstream_unit ?process_stage)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (downstream_vessel_secondary_staged ?downstream_vessel)
+        (downstream_unit_has_material ?downstream_unit ?material_batch)
+        (not
+          (downstream_unit_processed ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (downstream_vessel_primary_staged ?downstream_vessel)
+        (downstream_unit_processed ?downstream_unit)
+        (material_batch_available ?material_batch)
+        (not
+          (downstream_unit_has_material ?downstream_unit ?material_batch)
+        )
+      )
+  )
+  (:action allocate_product_unit_with_primary_staging
+    :parameters (?upstream_unit - upstream_unit ?downstream_unit - downstream_unit ?upstream_vessel - upstream_vessel ?downstream_vessel - downstream_vessel ?product_unit - product_unit)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (upstream_vessel_primary_staged ?upstream_vessel)
+        (downstream_vessel_primary_staged ?downstream_vessel)
+        (upstream_unit_processed ?upstream_unit)
+        (downstream_unit_processed ?downstream_unit)
+        (product_unit_available ?product_unit)
+      )
+    :effect
+      (and
+        (product_unit_allocated ?product_unit)
+        (product_unit_associated_upstream_vessel ?product_unit ?upstream_vessel)
+        (product_unit_associated_downstream_vessel ?product_unit ?downstream_vessel)
+        (not
+          (product_unit_available ?product_unit)
+        )
+      )
+  )
+  (:action allocate_product_unit_with_upstream_secondary
+    :parameters (?upstream_unit - upstream_unit ?downstream_unit - downstream_unit ?upstream_vessel - upstream_vessel ?downstream_vessel - downstream_vessel ?product_unit - product_unit)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (upstream_vessel_secondary_staged ?upstream_vessel)
+        (downstream_vessel_primary_staged ?downstream_vessel)
+        (not
+          (upstream_unit_processed ?upstream_unit)
+        )
+        (downstream_unit_processed ?downstream_unit)
+        (product_unit_available ?product_unit)
+      )
+    :effect
+      (and
+        (product_unit_allocated ?product_unit)
+        (product_unit_associated_upstream_vessel ?product_unit ?upstream_vessel)
+        (product_unit_associated_downstream_vessel ?product_unit ?downstream_vessel)
+        (product_unit_upstream_ready ?product_unit)
+        (not
+          (product_unit_available ?product_unit)
+        )
+      )
+  )
+  (:action allocate_product_unit_with_downstream_secondary
+    :parameters (?upstream_unit - upstream_unit ?downstream_unit - downstream_unit ?upstream_vessel - upstream_vessel ?downstream_vessel - downstream_vessel ?product_unit - product_unit)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (upstream_vessel_primary_staged ?upstream_vessel)
+        (downstream_vessel_secondary_staged ?downstream_vessel)
+        (upstream_unit_processed ?upstream_unit)
+        (not
+          (downstream_unit_processed ?downstream_unit)
+        )
+        (product_unit_available ?product_unit)
+      )
+    :effect
+      (and
+        (product_unit_allocated ?product_unit)
+        (product_unit_associated_upstream_vessel ?product_unit ?upstream_vessel)
+        (product_unit_associated_downstream_vessel ?product_unit ?downstream_vessel)
+        (product_unit_downstream_ready ?product_unit)
+        (not
+          (product_unit_available ?product_unit)
+        )
+      )
+  )
+  (:action allocate_product_unit_with_both_secondary
+    :parameters (?upstream_unit - upstream_unit ?downstream_unit - downstream_unit ?upstream_vessel - upstream_vessel ?downstream_vessel - downstream_vessel ?product_unit - product_unit)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (downstream_unit_ready ?downstream_unit)
+        (upstream_unit_assigned_vessel ?upstream_unit ?upstream_vessel)
+        (downstream_unit_assigned_vessel ?downstream_unit ?downstream_vessel)
+        (upstream_vessel_secondary_staged ?upstream_vessel)
+        (downstream_vessel_secondary_staged ?downstream_vessel)
+        (not
+          (upstream_unit_processed ?upstream_unit)
+        )
+        (not
+          (downstream_unit_processed ?downstream_unit)
+        )
+        (product_unit_available ?product_unit)
+      )
+    :effect
+      (and
+        (product_unit_allocated ?product_unit)
+        (product_unit_associated_upstream_vessel ?product_unit ?upstream_vessel)
+        (product_unit_associated_downstream_vessel ?product_unit ?downstream_vessel)
+        (product_unit_upstream_ready ?product_unit)
+        (product_unit_downstream_ready ?product_unit)
+        (not
+          (product_unit_available ?product_unit)
+        )
+      )
+  )
+  (:action mark_product_unit_processing_complete
+    :parameters (?product_unit - product_unit ?upstream_unit - upstream_unit ?process_stage - process_stage)
+    :precondition
+      (and
+        (product_unit_allocated ?product_unit)
+        (upstream_unit_ready ?upstream_unit)
+        (entity_assigned_to_stage ?upstream_unit ?process_stage)
+        (not
+          (product_unit_processing_complete ?product_unit)
+        )
+      )
+    :effect (product_unit_processing_complete ?product_unit)
+  )
+  (:action create_and_attach_analytical_sample
+    :parameters (?production_record - production_record ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (production_record_includes_product_unit ?production_record ?product_unit)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_available ?analytical_sample)
+        (product_unit_allocated ?product_unit)
+        (product_unit_processing_complete ?product_unit)
+        (not
+          (analytical_sample_marked_for_testing ?analytical_sample)
+        )
+      )
+    :effect
+      (and
+        (analytical_sample_marked_for_testing ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (not
+          (analytical_sample_available ?analytical_sample)
+        )
+      )
+  )
+  (:action confirm_analytical_sample_and_mark_record
+    :parameters (?production_record - production_record ?analytical_sample - analytical_sample ?product_unit - product_unit ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_marked_for_testing ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (entity_assigned_to_stage ?production_record ?process_stage)
+        (not
+          (product_unit_upstream_ready ?product_unit)
+        )
+        (not
+          (production_record_sample_attached ?production_record)
+        )
+      )
+    :effect (production_record_sample_attached ?production_record)
+  )
+  (:action assign_quality_document_to_record
+    :parameters (?production_record - production_record ?quality_document_type - quality_document_type)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (quality_document_type_available ?quality_document_type)
+        (not
+          (quality_document_flag_set ?production_record)
+        )
+      )
+    :effect
+      (and
+        (quality_document_flag_set ?production_record)
+        (production_record_has_quality_document ?production_record ?quality_document_type)
+        (not
+          (quality_document_type_available ?quality_document_type)
+        )
+      )
+  )
+  (:action verify_quality_document_and_mark_record
+    :parameters (?production_record - production_record ?analytical_sample - analytical_sample ?product_unit - product_unit ?process_stage - process_stage ?quality_document_type - quality_document_type)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_marked_for_testing ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (entity_assigned_to_stage ?production_record ?process_stage)
+        (product_unit_upstream_ready ?product_unit)
+        (quality_document_flag_set ?production_record)
+        (production_record_has_quality_document ?production_record ?quality_document_type)
+        (not
+          (production_record_sample_attached ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_sample_attached ?production_record)
+        (production_record_quality_document_verified ?production_record)
+      )
+  )
+  (:action start_validation_and_sample_verification
+    :parameters (?production_record - production_record ?validation_certificate - validation_certificate ?qualified_personnel - qualified_personnel ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_sample_attached ?production_record)
+        (production_record_has_validation_certificate ?production_record ?validation_certificate)
+        (entity_assigned_personnel ?production_record ?qualified_personnel)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (not
+          (product_unit_downstream_ready ?product_unit)
+        )
+        (not
+          (production_record_validation_started ?production_record)
+        )
+      )
+    :effect (production_record_validation_started ?production_record)
+  )
+  (:action continue_validation_and_sample_verification
+    :parameters (?production_record - production_record ?validation_certificate - validation_certificate ?qualified_personnel - qualified_personnel ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_sample_attached ?production_record)
+        (production_record_has_validation_certificate ?production_record ?validation_certificate)
+        (entity_assigned_personnel ?production_record ?qualified_personnel)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (product_unit_downstream_ready ?product_unit)
+        (not
+          (production_record_validation_started ?production_record)
+        )
+      )
+    :effect (production_record_validation_started ?production_record)
+  )
+  (:action initiate_regulatory_validation_check
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_validation_started ?production_record)
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (not
+          (product_unit_upstream_ready ?product_unit)
+        )
+        (not
+          (product_unit_downstream_ready ?product_unit)
+        )
+        (not
+          (production_record_checks_complete ?production_record)
+        )
+      )
+    :effect (production_record_checks_complete ?production_record)
+  )
+  (:action complete_regulatory_validation_with_secondary
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_validation_started ?production_record)
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (product_unit_upstream_ready ?product_unit)
+        (not
+          (product_unit_downstream_ready ?product_unit)
+        )
+        (not
+          (production_record_checks_complete ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_additional_checks_done ?production_record)
+      )
+  )
+  (:action complete_regulatory_validation_alternate
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_validation_started ?production_record)
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (not
+          (product_unit_upstream_ready ?product_unit)
+        )
+        (product_unit_downstream_ready ?product_unit)
+        (not
+          (production_record_checks_complete ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_additional_checks_done ?production_record)
+      )
+  )
+  (:action complete_regulatory_validation_final
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval ?analytical_sample - analytical_sample ?product_unit - product_unit)
+    :precondition
+      (and
+        (production_record_validation_started ?production_record)
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (production_record_has_analytical_sample ?production_record ?analytical_sample)
+        (analytical_sample_from_product_unit ?analytical_sample ?product_unit)
+        (product_unit_upstream_ready ?product_unit)
+        (product_unit_downstream_ready ?product_unit)
+        (not
+          (production_record_checks_complete ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_additional_checks_done ?production_record)
+      )
+  )
+  (:action finalize_record_and_capture_signoff
+    :parameters (?production_record - production_record)
+    :precondition
+      (and
+        (production_record_checks_complete ?production_record)
+        (not
+          (production_record_additional_checks_done ?production_record)
+        )
+        (not
+          (production_record_finalized ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_finalized ?production_record)
+        (final_signoff_recorded ?production_record)
+      )
+  )
+  (:action attach_qa_checklist_to_record
+    :parameters (?production_record - production_record ?qa_checklist - qa_checklist)
+    :precondition
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_additional_checks_done ?production_record)
+        (qa_checklist_available ?qa_checklist)
+      )
+    :effect
+      (and
+        (production_record_has_qa_checklist ?production_record ?qa_checklist)
+        (not
+          (qa_checklist_available ?qa_checklist)
+        )
+      )
+  )
+  (:action execute_qa_checks_and_mark_record
+    :parameters (?production_record - production_record ?upstream_unit - upstream_unit ?downstream_unit - downstream_unit ?process_stage - process_stage ?qa_checklist - qa_checklist)
+    :precondition
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_additional_checks_done ?production_record)
+        (production_record_has_qa_checklist ?production_record ?qa_checklist)
+        (production_record_assigned_upstream_unit ?production_record ?upstream_unit)
+        (production_record_assigned_downstream_unit ?production_record ?downstream_unit)
+        (upstream_unit_processed ?upstream_unit)
+        (downstream_unit_processed ?downstream_unit)
+        (entity_assigned_to_stage ?production_record ?process_stage)
+        (not
+          (production_record_processing_completed ?production_record)
+        )
+      )
+    :effect (production_record_processing_completed ?production_record)
+  )
+  (:action finalize_record_post_qa_checks
+    :parameters (?production_record - production_record)
+    :precondition
+      (and
+        (production_record_checks_complete ?production_record)
+        (production_record_processing_completed ?production_record)
+        (not
+          (production_record_finalized ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_finalized ?production_record)
+        (final_signoff_recorded ?production_record)
+      )
+  )
+  (:action apply_protocol_version_to_record
+    :parameters (?production_record - production_record ?protocol_version - protocol_version ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_ready ?production_record)
+        (entity_assigned_to_stage ?production_record ?process_stage)
+        (protocol_version_available ?protocol_version)
+        (production_record_has_protocol_version ?production_record ?protocol_version)
+        (not
+          (production_record_protocol_applied ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_protocol_applied ?production_record)
+        (not
+          (protocol_version_available ?protocol_version)
+        )
+      )
+  )
+  (:action confirm_execution_against_protocol
+    :parameters (?production_record - production_record ?qualified_personnel - qualified_personnel)
+    :precondition
+      (and
+        (production_record_protocol_applied ?production_record)
+        (entity_assigned_personnel ?production_record ?qualified_personnel)
+        (not
+          (production_record_execution_confirmed ?production_record)
+        )
+      )
+    :effect (production_record_execution_confirmed ?production_record)
+  )
+  (:action record_apply_regulatory_approval
+    :parameters (?production_record - production_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (production_record_execution_confirmed ?production_record)
+        (production_record_has_regulatory_approval ?production_record ?regulatory_approval)
+        (not
+          (production_record_approval_step_completed ?production_record)
+        )
+      )
+    :effect (production_record_approval_step_completed ?production_record)
+  )
+  (:action finalize_record_after_approvals
+    :parameters (?production_record - production_record)
+    :precondition
+      (and
+        (production_record_approval_step_completed ?production_record)
+        (not
+          (production_record_finalized ?production_record)
+        )
+      )
+    :effect
+      (and
+        (production_record_finalized ?production_record)
+        (final_signoff_recorded ?production_record)
+      )
+  )
+  (:action finalize_upstream_unit_signoff
+    :parameters (?upstream_unit - upstream_unit ?product_unit - product_unit)
+    :precondition
+      (and
+        (upstream_unit_ready ?upstream_unit)
+        (upstream_unit_processed ?upstream_unit)
+        (product_unit_allocated ?product_unit)
+        (product_unit_processing_complete ?product_unit)
+        (not
+          (final_signoff_recorded ?upstream_unit)
+        )
+      )
+    :effect (final_signoff_recorded ?upstream_unit)
+  )
+  (:action finalize_downstream_unit_signoff
+    :parameters (?downstream_unit - downstream_unit ?product_unit - product_unit)
+    :precondition
+      (and
+        (downstream_unit_ready ?downstream_unit)
+        (downstream_unit_processed ?downstream_unit)
+        (product_unit_allocated ?product_unit)
+        (product_unit_processing_complete ?product_unit)
+        (not
+          (final_signoff_recorded ?downstream_unit)
+        )
+      )
+    :effect (final_signoff_recorded ?downstream_unit)
+  )
+  (:action attach_release_document_and_authorize_record
+    :parameters (?manufacturing_entity - manufacturing_entity ?release_document - release_document ?process_stage - process_stage)
+    :precondition
+      (and
+        (final_signoff_recorded ?manufacturing_entity)
+        (entity_assigned_to_stage ?manufacturing_entity ?process_stage)
+        (release_document_available ?release_document)
+        (not
+          (approval_recorded ?manufacturing_entity)
+        )
+      )
+    :effect
+      (and
+        (approval_recorded ?manufacturing_entity)
+        (entity_has_release_document ?manufacturing_entity ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action authorize_upstream_unit_for_release
+    :parameters (?upstream_unit - upstream_unit ?production_line - production_line ?release_document - release_document)
+    :precondition
+      (and
+        (approval_recorded ?upstream_unit)
+        (entity_assigned_to_line ?upstream_unit ?production_line)
+        (entity_has_release_document ?upstream_unit ?release_document)
+        (not
+          (ready_for_release ?upstream_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_release ?upstream_unit)
+        (production_line_available ?production_line)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action authorize_downstream_unit_for_release
+    :parameters (?downstream_unit - downstream_unit ?production_line - production_line ?release_document - release_document)
+    :precondition
+      (and
+        (approval_recorded ?downstream_unit)
+        (entity_assigned_to_line ?downstream_unit ?production_line)
+        (entity_has_release_document ?downstream_unit ?release_document)
+        (not
+          (ready_for_release ?downstream_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_release ?downstream_unit)
+        (production_line_available ?production_line)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action authorize_record_for_release
+    :parameters (?production_record - production_record ?production_line - production_line ?release_document - release_document)
+    :precondition
+      (and
+        (approval_recorded ?production_record)
+        (entity_assigned_to_line ?production_record ?production_line)
+        (entity_has_release_document ?production_record ?release_document)
+        (not
+          (ready_for_release ?production_record)
+        )
+      )
+    :effect
+      (and
+        (ready_for_release ?production_record)
+        (production_line_available ?production_line)
+        (release_document_available ?release_document)
+      )
+  )
+)

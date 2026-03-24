@@ -1,0 +1,936 @@
+(define (domain warehouse_replenishment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types catalogue_category - object location_type - object resource_type - object domain_root - object domain_entity - domain_root staging_slot - catalogue_category sku - catalogue_category operator - catalogue_category storage_profile - catalogue_category material_handling_vehicle - catalogue_category inventory_document - catalogue_category lift_equipment - catalogue_category quality_check - catalogue_category case_unit - location_type case_label - location_type order_batch - location_type source_slot - resource_type destination_slot - resource_type transfer_tote - resource_type storage_location_supertype - domain_entity job_supertype - domain_entity storage_location - storage_location_supertype pick_location - storage_location_supertype replenishment_job - job_supertype)
+  (:predicates
+    (receipt_registered ?receipt - domain_entity)
+    (ready_for_processing_entity ?receipt - domain_entity)
+    (receipt_staged ?receipt - domain_entity)
+    (reconciled ?receipt - domain_entity)
+    (processing_complete_entity ?receipt - domain_entity)
+    (finalized ?receipt - domain_entity)
+    (staging_slot_available ?staging_slot - staging_slot)
+    (assigned_to_staging ?receipt - domain_entity ?staging_slot - staging_slot)
+    (sku_available ?sku - sku)
+    (sku_confirmed ?receipt - domain_entity ?sku - sku)
+    (operator_available ?operator - operator)
+    (assigned_operator ?receipt - domain_entity ?operator - operator)
+    (case_available ?case_unit - case_unit)
+    (storage_location_case_allocated ?storage_location - storage_location ?case_unit - case_unit)
+    (pick_location_case_allocated ?pick_location - pick_location ?case_unit - case_unit)
+    (storage_has_source_slot ?storage_location - storage_location ?source_slot - source_slot)
+    (source_slot_reserved ?source_slot - source_slot)
+    (source_slot_loaded ?source_slot - source_slot)
+    (source_ready_for_pick ?storage_location - storage_location)
+    (pick_location_destination_link ?pick_location - pick_location ?destination_slot - destination_slot)
+    (destination_slot_reserved ?destination_slot - destination_slot)
+    (destination_slot_loaded ?destination_slot - destination_slot)
+    (pick_location_ready ?pick_location - pick_location)
+    (tote_available ?tote - transfer_tote)
+    (tote_assigned ?tote - transfer_tote)
+    (tote_source_slot_link ?tote - transfer_tote ?source_slot - source_slot)
+    (tote_destination_slot_link ?tote - transfer_tote ?destination_slot - destination_slot)
+    (tote_source_ready ?tote - transfer_tote)
+    (tote_destination_ready ?tote - transfer_tote)
+    (tote_ready ?tote - transfer_tote)
+    (job_source_location ?job - replenishment_job ?storage_location - storage_location)
+    (job_pick_location ?job - replenishment_job ?pick_location - pick_location)
+    (job_tote ?job - replenishment_job ?tote - transfer_tote)
+    (label_available ?case_label - case_label)
+    (job_label_assigned ?job - replenishment_job ?case_label - case_label)
+    (label_applied ?case_label - case_label)
+    (label_tote_link ?case_label - case_label ?tote - transfer_tote)
+    (job_containerized ?job - replenishment_job)
+    (job_zone_confirmed ?job - replenishment_job)
+    (qc_gate_passed ?job - replenishment_job)
+    (profile_attached ?job - replenishment_job)
+    (job_profile_validated ?job - replenishment_job)
+    (job_ready_for_vehicle_assignment ?job - replenishment_job)
+    (job_execution_ready ?job - replenishment_job)
+    (order_batch_available ?order_batch - order_batch)
+    (job_order_link ?job - replenishment_job ?order_batch - order_batch)
+    (job_order_confirmed ?job - replenishment_job)
+    (operator_engaged ?job - replenishment_job)
+    (job_operator_qc_passed ?job - replenishment_job)
+    (storage_profile_available ?storage_profile - storage_profile)
+    (job_storage_profile ?job - replenishment_job ?storage_profile - storage_profile)
+    (vehicle_available ?vehicle - material_handling_vehicle)
+    (job_vehicle_assigned ?job - replenishment_job ?vehicle - material_handling_vehicle)
+    (lift_equipment_available ?lift_equipment - lift_equipment)
+    (job_lift_equipment_assigned ?job - replenishment_job ?lift_equipment - lift_equipment)
+    (quality_check_available ?quality_check - quality_check)
+    (job_quality_check_assigned ?job - replenishment_job ?quality_check - quality_check)
+    (inventory_document_available ?inventory_document - inventory_document)
+    (receipt_inventory_document_link ?receipt - domain_entity ?inventory_document - inventory_document)
+    (storage_location_locked ?storage_location - storage_location)
+    (pick_location_locked ?pick_location - pick_location)
+    (job_finalized ?job - replenishment_job)
+  )
+  (:action register_inbound_receipt
+    :parameters (?receipt - domain_entity)
+    :precondition
+      (and
+        (not
+          (receipt_registered ?receipt)
+        )
+        (not
+          (reconciled ?receipt)
+        )
+      )
+    :effect (receipt_registered ?receipt)
+  )
+  (:action assign_staging_slot
+    :parameters (?receipt - domain_entity ?staging_slot - staging_slot)
+    :precondition
+      (and
+        (receipt_registered ?receipt)
+        (not
+          (receipt_staged ?receipt)
+        )
+        (staging_slot_available ?staging_slot)
+      )
+    :effect
+      (and
+        (receipt_staged ?receipt)
+        (assigned_to_staging ?receipt ?staging_slot)
+        (not
+          (staging_slot_available ?staging_slot)
+        )
+      )
+  )
+  (:action associate_sku_with_receipt
+    :parameters (?receipt - domain_entity ?sku - sku)
+    :precondition
+      (and
+        (receipt_registered ?receipt)
+        (receipt_staged ?receipt)
+        (sku_available ?sku)
+      )
+    :effect
+      (and
+        (sku_confirmed ?receipt ?sku)
+        (not
+          (sku_available ?sku)
+        )
+      )
+  )
+  (:action confirm_receipt_inspection
+    :parameters (?receipt - domain_entity ?sku - sku)
+    :precondition
+      (and
+        (receipt_registered ?receipt)
+        (receipt_staged ?receipt)
+        (sku_confirmed ?receipt ?sku)
+        (not
+          (ready_for_processing_entity ?receipt)
+        )
+      )
+    :effect (ready_for_processing_entity ?receipt)
+  )
+  (:action rollback_sku_assignment
+    :parameters (?receipt - domain_entity ?sku - sku)
+    :precondition
+      (and
+        (sku_confirmed ?receipt ?sku)
+      )
+    :effect
+      (and
+        (sku_available ?sku)
+        (not
+          (sku_confirmed ?receipt ?sku)
+        )
+      )
+  )
+  (:action assign_operator_to_receipt
+    :parameters (?receipt - domain_entity ?operator - operator)
+    :precondition
+      (and
+        (ready_for_processing_entity ?receipt)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (assigned_operator ?receipt ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_receipt
+    :parameters (?receipt - domain_entity ?operator - operator)
+    :precondition
+      (and
+        (assigned_operator ?receipt ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (assigned_operator ?receipt ?operator)
+        )
+      )
+  )
+  (:action reserve_lift_equipment_for_job
+    :parameters (?job - replenishment_job ?lift_equipment - lift_equipment)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (lift_equipment_available ?lift_equipment)
+      )
+    :effect
+      (and
+        (job_lift_equipment_assigned ?job ?lift_equipment)
+        (not
+          (lift_equipment_available ?lift_equipment)
+        )
+      )
+  )
+  (:action release_lift_equipment_from_job
+    :parameters (?job - replenishment_job ?lift_equipment - lift_equipment)
+    :precondition
+      (and
+        (job_lift_equipment_assigned ?job ?lift_equipment)
+      )
+    :effect
+      (and
+        (lift_equipment_available ?lift_equipment)
+        (not
+          (job_lift_equipment_assigned ?job ?lift_equipment)
+        )
+      )
+  )
+  (:action reserve_quality_check_for_job
+    :parameters (?job - replenishment_job ?quality_check - quality_check)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (quality_check_available ?quality_check)
+      )
+    :effect
+      (and
+        (job_quality_check_assigned ?job ?quality_check)
+        (not
+          (quality_check_available ?quality_check)
+        )
+      )
+  )
+  (:action release_quality_check_from_job
+    :parameters (?job - replenishment_job ?quality_check - quality_check)
+    :precondition
+      (and
+        (job_quality_check_assigned ?job ?quality_check)
+      )
+    :effect
+      (and
+        (quality_check_available ?quality_check)
+        (not
+          (job_quality_check_assigned ?job ?quality_check)
+        )
+      )
+  )
+  (:action reserve_source_slot_for_sku
+    :parameters (?storage_location - storage_location ?source_slot - source_slot ?sku - sku)
+    :precondition
+      (and
+        (ready_for_processing_entity ?storage_location)
+        (sku_confirmed ?storage_location ?sku)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (not
+          (source_slot_reserved ?source_slot)
+        )
+        (not
+          (source_slot_loaded ?source_slot)
+        )
+      )
+    :effect (source_slot_reserved ?source_slot)
+  )
+  (:action assign_operator_and_lock_location
+    :parameters (?storage_location - storage_location ?source_slot - source_slot ?operator - operator)
+    :precondition
+      (and
+        (ready_for_processing_entity ?storage_location)
+        (assigned_operator ?storage_location ?operator)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (source_slot_reserved ?source_slot)
+        (not
+          (storage_location_locked ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_locked ?storage_location)
+        (source_ready_for_pick ?storage_location)
+      )
+  )
+  (:action allocate_case_unit_to_source_slot
+    :parameters (?storage_location - storage_location ?source_slot - source_slot ?case_unit - case_unit)
+    :precondition
+      (and
+        (ready_for_processing_entity ?storage_location)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (case_available ?case_unit)
+        (not
+          (storage_location_locked ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (source_slot_loaded ?source_slot)
+        (storage_location_locked ?storage_location)
+        (storage_location_case_allocated ?storage_location ?case_unit)
+        (not
+          (case_available ?case_unit)
+        )
+      )
+  )
+  (:action commit_case_allocation
+    :parameters (?storage_location - storage_location ?source_slot - source_slot ?sku - sku ?case_unit - case_unit)
+    :precondition
+      (and
+        (ready_for_processing_entity ?storage_location)
+        (sku_confirmed ?storage_location ?sku)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (source_slot_loaded ?source_slot)
+        (storage_location_case_allocated ?storage_location ?case_unit)
+        (not
+          (source_ready_for_pick ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (source_slot_reserved ?source_slot)
+        (source_ready_for_pick ?storage_location)
+        (case_available ?case_unit)
+        (not
+          (storage_location_case_allocated ?storage_location ?case_unit)
+        )
+      )
+  )
+  (:action reserve_destination_slot_for_sku
+    :parameters (?pick_location - pick_location ?destination_slot - destination_slot ?sku - sku)
+    :precondition
+      (and
+        (ready_for_processing_entity ?pick_location)
+        (sku_confirmed ?pick_location ?sku)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (not
+          (destination_slot_reserved ?destination_slot)
+        )
+        (not
+          (destination_slot_loaded ?destination_slot)
+        )
+      )
+    :effect (destination_slot_reserved ?destination_slot)
+  )
+  (:action assign_operator_to_pick_location
+    :parameters (?pick_location - pick_location ?destination_slot - destination_slot ?operator - operator)
+    :precondition
+      (and
+        (ready_for_processing_entity ?pick_location)
+        (assigned_operator ?pick_location ?operator)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (destination_slot_reserved ?destination_slot)
+        (not
+          (pick_location_locked ?pick_location)
+        )
+      )
+    :effect
+      (and
+        (pick_location_locked ?pick_location)
+        (pick_location_ready ?pick_location)
+      )
+  )
+  (:action allocate_case_unit_to_pick_location
+    :parameters (?pick_location - pick_location ?destination_slot - destination_slot ?case_unit - case_unit)
+    :precondition
+      (and
+        (ready_for_processing_entity ?pick_location)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (case_available ?case_unit)
+        (not
+          (pick_location_locked ?pick_location)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_loaded ?destination_slot)
+        (pick_location_locked ?pick_location)
+        (pick_location_case_allocated ?pick_location ?case_unit)
+        (not
+          (case_available ?case_unit)
+        )
+      )
+  )
+  (:action commit_pick_location_case_allocation
+    :parameters (?pick_location - pick_location ?destination_slot - destination_slot ?sku - sku ?case_unit - case_unit)
+    :precondition
+      (and
+        (ready_for_processing_entity ?pick_location)
+        (sku_confirmed ?pick_location ?sku)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (destination_slot_loaded ?destination_slot)
+        (pick_location_case_allocated ?pick_location ?case_unit)
+        (not
+          (pick_location_ready ?pick_location)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_reserved ?destination_slot)
+        (pick_location_ready ?pick_location)
+        (case_available ?case_unit)
+        (not
+          (pick_location_case_allocated ?pick_location ?case_unit)
+        )
+      )
+  )
+  (:action assign_tote_and_bind_slots
+    :parameters (?storage_location - storage_location ?pick_location - pick_location ?source_slot - source_slot ?destination_slot - destination_slot ?tote - transfer_tote)
+    :precondition
+      (and
+        (storage_location_locked ?storage_location)
+        (pick_location_locked ?pick_location)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (source_slot_reserved ?source_slot)
+        (destination_slot_reserved ?destination_slot)
+        (source_ready_for_pick ?storage_location)
+        (pick_location_ready ?pick_location)
+        (tote_available ?tote)
+      )
+    :effect
+      (and
+        (tote_assigned ?tote)
+        (tote_source_slot_link ?tote ?source_slot)
+        (tote_destination_slot_link ?tote ?destination_slot)
+        (not
+          (tote_available ?tote)
+        )
+      )
+  )
+  (:action assign_tote_and_mark_source_ready
+    :parameters (?storage_location - storage_location ?pick_location - pick_location ?source_slot - source_slot ?destination_slot - destination_slot ?tote - transfer_tote)
+    :precondition
+      (and
+        (storage_location_locked ?storage_location)
+        (pick_location_locked ?pick_location)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (source_slot_loaded ?source_slot)
+        (destination_slot_reserved ?destination_slot)
+        (not
+          (source_ready_for_pick ?storage_location)
+        )
+        (pick_location_ready ?pick_location)
+        (tote_available ?tote)
+      )
+    :effect
+      (and
+        (tote_assigned ?tote)
+        (tote_source_slot_link ?tote ?source_slot)
+        (tote_destination_slot_link ?tote ?destination_slot)
+        (tote_source_ready ?tote)
+        (not
+          (tote_available ?tote)
+        )
+      )
+  )
+  (:action assign_tote_and_mark_destination_ready
+    :parameters (?storage_location - storage_location ?pick_location - pick_location ?source_slot - source_slot ?destination_slot - destination_slot ?tote - transfer_tote)
+    :precondition
+      (and
+        (storage_location_locked ?storage_location)
+        (pick_location_locked ?pick_location)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (source_slot_reserved ?source_slot)
+        (destination_slot_loaded ?destination_slot)
+        (source_ready_for_pick ?storage_location)
+        (not
+          (pick_location_ready ?pick_location)
+        )
+        (tote_available ?tote)
+      )
+    :effect
+      (and
+        (tote_assigned ?tote)
+        (tote_source_slot_link ?tote ?source_slot)
+        (tote_destination_slot_link ?tote ?destination_slot)
+        (tote_destination_ready ?tote)
+        (not
+          (tote_available ?tote)
+        )
+      )
+  )
+  (:action assign_tote_and_mark_both_ready
+    :parameters (?storage_location - storage_location ?pick_location - pick_location ?source_slot - source_slot ?destination_slot - destination_slot ?tote - transfer_tote)
+    :precondition
+      (and
+        (storage_location_locked ?storage_location)
+        (pick_location_locked ?pick_location)
+        (storage_has_source_slot ?storage_location ?source_slot)
+        (pick_location_destination_link ?pick_location ?destination_slot)
+        (source_slot_loaded ?source_slot)
+        (destination_slot_loaded ?destination_slot)
+        (not
+          (source_ready_for_pick ?storage_location)
+        )
+        (not
+          (pick_location_ready ?pick_location)
+        )
+        (tote_available ?tote)
+      )
+    :effect
+      (and
+        (tote_assigned ?tote)
+        (tote_source_slot_link ?tote ?source_slot)
+        (tote_destination_slot_link ?tote ?destination_slot)
+        (tote_source_ready ?tote)
+        (tote_destination_ready ?tote)
+        (not
+          (tote_available ?tote)
+        )
+      )
+  )
+  (:action mark_tote_ready_for_transfer
+    :parameters (?tote - transfer_tote ?storage_location - storage_location ?sku - sku)
+    :precondition
+      (and
+        (tote_assigned ?tote)
+        (storage_location_locked ?storage_location)
+        (sku_confirmed ?storage_location ?sku)
+        (not
+          (tote_ready ?tote)
+        )
+      )
+    :effect (tote_ready ?tote)
+  )
+  (:action apply_case_label_and_attach_to_tote
+    :parameters (?job - replenishment_job ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (job_tote ?job ?tote)
+        (job_label_assigned ?job ?case_label)
+        (label_available ?case_label)
+        (tote_assigned ?tote)
+        (tote_ready ?tote)
+        (not
+          (label_applied ?case_label)
+        )
+      )
+    :effect
+      (and
+        (label_applied ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (not
+          (label_available ?case_label)
+        )
+      )
+  )
+  (:action containerize_job_for_tote
+    :parameters (?job - replenishment_job ?case_label - case_label ?tote - transfer_tote ?sku - sku)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (job_label_assigned ?job ?case_label)
+        (label_applied ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (sku_confirmed ?job ?sku)
+        (not
+          (tote_source_ready ?tote)
+        )
+        (not
+          (job_containerized ?job)
+        )
+      )
+    :effect (job_containerized ?job)
+  )
+  (:action attach_storage_profile_to_job
+    :parameters (?job - replenishment_job ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (storage_profile_available ?storage_profile)
+        (not
+          (profile_attached ?job)
+        )
+      )
+    :effect
+      (and
+        (profile_attached ?job)
+        (job_storage_profile ?job ?storage_profile)
+        (not
+          (storage_profile_available ?storage_profile)
+        )
+      )
+  )
+  (:action finalize_labeling_and_profile_for_job
+    :parameters (?job - replenishment_job ?case_label - case_label ?tote - transfer_tote ?sku - sku ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (job_label_assigned ?job ?case_label)
+        (label_applied ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (sku_confirmed ?job ?sku)
+        (tote_source_ready ?tote)
+        (profile_attached ?job)
+        (job_storage_profile ?job ?storage_profile)
+        (not
+          (job_containerized ?job)
+        )
+      )
+    :effect
+      (and
+        (job_containerized ?job)
+        (job_profile_validated ?job)
+      )
+  )
+  (:action confirm_zone_and_lock_resources_variant_1
+    :parameters (?job - replenishment_job ?lift_equipment - lift_equipment ?operator - operator ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_containerized ?job)
+        (job_lift_equipment_assigned ?job ?lift_equipment)
+        (assigned_operator ?job ?operator)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (not
+          (tote_destination_ready ?tote)
+        )
+        (not
+          (job_zone_confirmed ?job)
+        )
+      )
+    :effect (job_zone_confirmed ?job)
+  )
+  (:action confirm_zone_and_lock_resources_variant_2
+    :parameters (?job - replenishment_job ?lift_equipment - lift_equipment ?operator - operator ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_containerized ?job)
+        (job_lift_equipment_assigned ?job ?lift_equipment)
+        (assigned_operator ?job ?operator)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (tote_destination_ready ?tote)
+        (not
+          (job_zone_confirmed ?job)
+        )
+      )
+    :effect (job_zone_confirmed ?job)
+  )
+  (:action assign_quality_check_to_job
+    :parameters (?job - replenishment_job ?quality_check - quality_check ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_zone_confirmed ?job)
+        (job_quality_check_assigned ?job ?quality_check)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (not
+          (tote_source_ready ?tote)
+        )
+        (not
+          (tote_destination_ready ?tote)
+        )
+        (not
+          (qc_gate_passed ?job)
+        )
+      )
+    :effect (qc_gate_passed ?job)
+  )
+  (:action assign_quality_check_and_mark_vehicle_ready
+    :parameters (?job - replenishment_job ?quality_check - quality_check ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_zone_confirmed ?job)
+        (job_quality_check_assigned ?job ?quality_check)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (tote_source_ready ?tote)
+        (not
+          (tote_destination_ready ?tote)
+        )
+        (not
+          (qc_gate_passed ?job)
+        )
+      )
+    :effect
+      (and
+        (qc_gate_passed ?job)
+        (job_ready_for_vehicle_assignment ?job)
+      )
+  )
+  (:action assign_quality_check_and_mark_vehicle_ready_variant_2
+    :parameters (?job - replenishment_job ?quality_check - quality_check ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_zone_confirmed ?job)
+        (job_quality_check_assigned ?job ?quality_check)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (not
+          (tote_source_ready ?tote)
+        )
+        (tote_destination_ready ?tote)
+        (not
+          (qc_gate_passed ?job)
+        )
+      )
+    :effect
+      (and
+        (qc_gate_passed ?job)
+        (job_ready_for_vehicle_assignment ?job)
+      )
+  )
+  (:action assign_quality_check_and_mark_vehicle_ready_variant_3
+    :parameters (?job - replenishment_job ?quality_check - quality_check ?case_label - case_label ?tote - transfer_tote)
+    :precondition
+      (and
+        (job_zone_confirmed ?job)
+        (job_quality_check_assigned ?job ?quality_check)
+        (job_label_assigned ?job ?case_label)
+        (label_tote_link ?case_label ?tote)
+        (tote_source_ready ?tote)
+        (tote_destination_ready ?tote)
+        (not
+          (qc_gate_passed ?job)
+        )
+      )
+    :effect
+      (and
+        (qc_gate_passed ?job)
+        (job_ready_for_vehicle_assignment ?job)
+      )
+  )
+  (:action finalize_job_post_qc
+    :parameters (?job - replenishment_job)
+    :precondition
+      (and
+        (qc_gate_passed ?job)
+        (not
+          (job_ready_for_vehicle_assignment ?job)
+        )
+        (not
+          (job_finalized ?job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?job)
+        (processing_complete_entity ?job)
+      )
+  )
+  (:action assign_vehicle_to_job
+    :parameters (?job - replenishment_job ?vehicle - material_handling_vehicle)
+    :precondition
+      (and
+        (qc_gate_passed ?job)
+        (job_ready_for_vehicle_assignment ?job)
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (job_vehicle_assigned ?job ?vehicle)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action start_job_execution
+    :parameters (?job - replenishment_job ?storage_location - storage_location ?pick_location - pick_location ?sku - sku ?vehicle - material_handling_vehicle)
+    :precondition
+      (and
+        (qc_gate_passed ?job)
+        (job_ready_for_vehicle_assignment ?job)
+        (job_vehicle_assigned ?job ?vehicle)
+        (job_source_location ?job ?storage_location)
+        (job_pick_location ?job ?pick_location)
+        (source_ready_for_pick ?storage_location)
+        (pick_location_ready ?pick_location)
+        (sku_confirmed ?job ?sku)
+        (not
+          (job_execution_ready ?job)
+        )
+      )
+    :effect (job_execution_ready ?job)
+  )
+  (:action complete_job_and_release_resources
+    :parameters (?job - replenishment_job)
+    :precondition
+      (and
+        (qc_gate_passed ?job)
+        (job_execution_ready ?job)
+        (not
+          (job_finalized ?job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?job)
+        (processing_complete_entity ?job)
+      )
+  )
+  (:action confirm_order_and_bind_to_job
+    :parameters (?job - replenishment_job ?order_batch - order_batch ?sku - sku)
+    :precondition
+      (and
+        (ready_for_processing_entity ?job)
+        (sku_confirmed ?job ?sku)
+        (order_batch_available ?order_batch)
+        (job_order_link ?job ?order_batch)
+        (not
+          (job_order_confirmed ?job)
+        )
+      )
+    :effect
+      (and
+        (job_order_confirmed ?job)
+        (not
+          (order_batch_available ?order_batch)
+        )
+      )
+  )
+  (:action operator_acknowledge_job
+    :parameters (?job - replenishment_job ?operator - operator)
+    :precondition
+      (and
+        (job_order_confirmed ?job)
+        (assigned_operator ?job ?operator)
+        (not
+          (operator_engaged ?job)
+        )
+      )
+    :effect (operator_engaged ?job)
+  )
+  (:action record_qc_pass_for_job
+    :parameters (?job - replenishment_job ?quality_check - quality_check)
+    :precondition
+      (and
+        (operator_engaged ?job)
+        (job_quality_check_assigned ?job ?quality_check)
+        (not
+          (job_operator_qc_passed ?job)
+        )
+      )
+    :effect (job_operator_qc_passed ?job)
+  )
+  (:action finalize_job_after_operator_qc
+    :parameters (?job - replenishment_job)
+    :precondition
+      (and
+        (job_operator_qc_passed ?job)
+        (not
+          (job_finalized ?job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?job)
+        (processing_complete_entity ?job)
+      )
+  )
+  (:action finalize_storage_location_reconciliation
+    :parameters (?storage_location - storage_location ?tote - transfer_tote)
+    :precondition
+      (and
+        (storage_location_locked ?storage_location)
+        (source_ready_for_pick ?storage_location)
+        (tote_assigned ?tote)
+        (tote_ready ?tote)
+        (not
+          (processing_complete_entity ?storage_location)
+        )
+      )
+    :effect (processing_complete_entity ?storage_location)
+  )
+  (:action finalize_pick_location_reconciliation
+    :parameters (?pick_location - pick_location ?tote - transfer_tote)
+    :precondition
+      (and
+        (pick_location_locked ?pick_location)
+        (pick_location_ready ?pick_location)
+        (tote_assigned ?tote)
+        (tote_ready ?tote)
+        (not
+          (processing_complete_entity ?pick_location)
+        )
+      )
+    :effect (processing_complete_entity ?pick_location)
+  )
+  (:action issue_inventory_document_for_receipt
+    :parameters (?receipt - domain_entity ?inventory_document - inventory_document ?sku - sku)
+    :precondition
+      (and
+        (processing_complete_entity ?receipt)
+        (sku_confirmed ?receipt ?sku)
+        (inventory_document_available ?inventory_document)
+        (not
+          (finalized ?receipt)
+        )
+      )
+    :effect
+      (and
+        (finalized ?receipt)
+        (receipt_inventory_document_link ?receipt ?inventory_document)
+        (not
+          (inventory_document_available ?inventory_document)
+        )
+      )
+  )
+  (:action close_storage_location_and_release_staging
+    :parameters (?storage_location - storage_location ?staging_slot - staging_slot ?inventory_document - inventory_document)
+    :precondition
+      (and
+        (finalized ?storage_location)
+        (assigned_to_staging ?storage_location ?staging_slot)
+        (receipt_inventory_document_link ?storage_location ?inventory_document)
+        (not
+          (reconciled ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (reconciled ?storage_location)
+        (staging_slot_available ?staging_slot)
+        (inventory_document_available ?inventory_document)
+      )
+  )
+  (:action close_pick_location_and_release_staging
+    :parameters (?pick_location - pick_location ?staging_slot - staging_slot ?inventory_document - inventory_document)
+    :precondition
+      (and
+        (finalized ?pick_location)
+        (assigned_to_staging ?pick_location ?staging_slot)
+        (receipt_inventory_document_link ?pick_location ?inventory_document)
+        (not
+          (reconciled ?pick_location)
+        )
+      )
+    :effect
+      (and
+        (reconciled ?pick_location)
+        (staging_slot_available ?staging_slot)
+        (inventory_document_available ?inventory_document)
+      )
+  )
+  (:action close_job_and_release_staging
+    :parameters (?job - replenishment_job ?staging_slot - staging_slot ?inventory_document - inventory_document)
+    :precondition
+      (and
+        (finalized ?job)
+        (assigned_to_staging ?job ?staging_slot)
+        (receipt_inventory_document_link ?job ?inventory_document)
+        (not
+          (reconciled ?job)
+        )
+      )
+    :effect
+      (and
+        (reconciled ?job)
+        (staging_slot_available ?staging_slot)
+        (inventory_document_available ?inventory_document)
+      )
+  )
+)

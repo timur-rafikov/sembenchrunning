@@ -1,0 +1,1080 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_payments_settlement_batch_splitting)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_root_type_1 - object entity_root_type_2 - object entity_root_type_3 - object payment_entity_root - object payment_entity - payment_entity_root settlement_channel - entity_root_type_1 validation_slot - entity_root_type_1 processing_queue - entity_root_type_1 priority_marker - entity_root_type_1 settlement_window - entity_root_type_1 assignment_evidence - entity_root_type_1 external_resource_token - entity_root_type_1 third_party_ack - entity_root_type_1 split_token - entity_root_type_2 instruction_file - entity_root_type_2 compliance_approval - entity_root_type_2 rail_capacity_unit_source - entity_root_type_3 rail_capacity_unit_destination - entity_root_type_3 split_batch - entity_root_type_3 payment_entity_group_type_a - payment_entity payment_entity_group_type_b - payment_entity payer_batch - payment_entity_group_type_a payee_batch - payment_entity_group_type_a processing_job - payment_entity_group_type_b)
+  (:predicates
+    (entity_registered ?payment_entity - payment_entity)
+    (entity_released ?payment_entity - payment_entity)
+    (channel_allocated ?payment_entity - payment_entity)
+    (settled ?payment_entity - payment_entity)
+    (ready_for_settlement ?payment_entity - payment_entity)
+    (assignment_evidence_recorded ?payment_entity - payment_entity)
+    (channel_available ?settlement_channel - settlement_channel)
+    (allocated_to_settlement_channel ?payment_entity - payment_entity ?settlement_channel - settlement_channel)
+    (validation_slot_available ?validation_slot - validation_slot)
+    (assigned_validation_slot ?payment_entity - payment_entity ?validation_slot - validation_slot)
+    (processing_queue_available ?processing_queue - processing_queue)
+    (assigned_processing_queue ?payment_entity - payment_entity ?processing_queue - processing_queue)
+    (split_token_available ?split_token - split_token)
+    (split_token_assigned_to_payer ?payer_batch - payer_batch ?split_token - split_token)
+    (split_token_assigned_to_payee ?payee_batch - payee_batch ?split_token - split_token)
+    (payer_capacity_unit_mapping ?payer_batch - payer_batch ?rail_capacity_unit_source - rail_capacity_unit_source)
+    (source_capacity_reserved ?rail_capacity_unit_source - rail_capacity_unit_source)
+    (source_capacity_on_hold ?rail_capacity_unit_source - rail_capacity_unit_source)
+    (payer_batch_ready ?payer_batch - payer_batch)
+    (payee_capacity_unit_mapping ?payee_batch - payee_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination)
+    (destination_capacity_reserved ?rail_capacity_unit_destination - rail_capacity_unit_destination)
+    (destination_capacity_on_hold ?rail_capacity_unit_destination - rail_capacity_unit_destination)
+    (payee_batch_ready ?payee_batch - payee_batch)
+    (split_batch_slot_available ?split_batch - split_batch)
+    (split_batch_created ?split_batch - split_batch)
+    (split_batch_assigned_source_capacity_unit ?split_batch - split_batch ?rail_capacity_unit_source - rail_capacity_unit_source)
+    (split_batch_assigned_destination_capacity_unit ?split_batch - split_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination)
+    (split_batch_source_ready ?split_batch - split_batch)
+    (split_batch_destination_ready ?split_batch - split_batch)
+    (split_batch_staged ?split_batch - split_batch)
+    (processing_job_includes_payer_batch ?processing_job - processing_job ?payer_batch - payer_batch)
+    (processing_job_includes_payee_batch ?processing_job - processing_job ?payee_batch - payee_batch)
+    (processing_job_associated_split_batch ?processing_job - processing_job ?split_batch - split_batch)
+    (instruction_file_available ?instruction_file - instruction_file)
+    (processing_job_has_instruction_file ?processing_job - processing_job ?instruction_file - instruction_file)
+    (instruction_file_consumed ?instruction_file - instruction_file)
+    (instruction_file_attached_to_split_batch ?instruction_file - instruction_file ?split_batch - split_batch)
+    (processing_job_ready_for_transmission ?processing_job - processing_job)
+    (processing_job_transmitted ?processing_job - processing_job)
+    (third_party_confirmed ?processing_job - processing_job)
+    (priority_attached ?processing_job - processing_job)
+    (priority_applied_to_job ?processing_job - processing_job)
+    (has_optional_enhancements ?processing_job - processing_job)
+    (enhancements_processed ?processing_job - processing_job)
+    (compliance_approval_available ?compliance_approval - compliance_approval)
+    (processing_job_has_compliance_approval ?processing_job - processing_job ?compliance_approval - compliance_approval)
+    (compliance_applied_to_job ?processing_job - processing_job)
+    (operator_review_completed ?processing_job - processing_job)
+    (operator_acknowledged ?processing_job - processing_job)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (processing_job_has_priority_marker ?processing_job - processing_job ?priority_marker - priority_marker)
+    (settlement_window_available ?settlement_window - settlement_window)
+    (processing_job_assigned_settlement_window ?processing_job - processing_job ?settlement_window - settlement_window)
+    (external_resource_token_available ?external_resource_token - external_resource_token)
+    (processing_job_has_external_resource_token ?processing_job - processing_job ?external_resource_token - external_resource_token)
+    (third_party_ack_available ?third_party_ack - third_party_ack)
+    (processing_job_third_party_acknowledged ?processing_job - processing_job ?third_party_ack - third_party_ack)
+    (assignment_evidence_available ?assignment_evidence - assignment_evidence)
+    (assignment_evidence_attached ?payment_entity - payment_entity ?assignment_evidence - assignment_evidence)
+    (payer_capacity_allocated_flag ?payer_batch - payer_batch)
+    (payee_capacity_allocated_flag ?payee_batch - payee_batch)
+    (completion_marker_emitted ?processing_job - processing_job)
+  )
+  (:action register_payment
+    :parameters (?payment_entity - payment_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?payment_entity)
+        )
+        (not
+          (settled ?payment_entity)
+        )
+      )
+    :effect (entity_registered ?payment_entity)
+  )
+  (:action assign_settlement_channel_to_payment
+    :parameters (?payment_entity - payment_entity ?settlement_channel - settlement_channel)
+    :precondition
+      (and
+        (entity_registered ?payment_entity)
+        (not
+          (channel_allocated ?payment_entity)
+        )
+        (channel_available ?settlement_channel)
+      )
+    :effect
+      (and
+        (channel_allocated ?payment_entity)
+        (allocated_to_settlement_channel ?payment_entity ?settlement_channel)
+        (not
+          (channel_available ?settlement_channel)
+        )
+      )
+  )
+  (:action assign_validation_slot_to_payment
+    :parameters (?payment_entity - payment_entity ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_registered ?payment_entity)
+        (channel_allocated ?payment_entity)
+        (validation_slot_available ?validation_slot)
+      )
+    :effect
+      (and
+        (assigned_validation_slot ?payment_entity ?validation_slot)
+        (not
+          (validation_slot_available ?validation_slot)
+        )
+      )
+  )
+  (:action mark_payment_released
+    :parameters (?payment_entity - payment_entity ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_registered ?payment_entity)
+        (channel_allocated ?payment_entity)
+        (assigned_validation_slot ?payment_entity ?validation_slot)
+        (not
+          (entity_released ?payment_entity)
+        )
+      )
+    :effect (entity_released ?payment_entity)
+  )
+  (:action release_validation_slot
+    :parameters (?payment_entity - payment_entity ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (assigned_validation_slot ?payment_entity ?validation_slot)
+      )
+    :effect
+      (and
+        (validation_slot_available ?validation_slot)
+        (not
+          (assigned_validation_slot ?payment_entity ?validation_slot)
+        )
+      )
+  )
+  (:action assign_processing_queue_to_payment
+    :parameters (?payment_entity - payment_entity ?processing_queue - processing_queue)
+    :precondition
+      (and
+        (entity_released ?payment_entity)
+        (processing_queue_available ?processing_queue)
+      )
+    :effect
+      (and
+        (assigned_processing_queue ?payment_entity ?processing_queue)
+        (not
+          (processing_queue_available ?processing_queue)
+        )
+      )
+  )
+  (:action release_processing_queue_from_payment
+    :parameters (?payment_entity - payment_entity ?processing_queue - processing_queue)
+    :precondition
+      (and
+        (assigned_processing_queue ?payment_entity ?processing_queue)
+      )
+    :effect
+      (and
+        (processing_queue_available ?processing_queue)
+        (not
+          (assigned_processing_queue ?payment_entity ?processing_queue)
+        )
+      )
+  )
+  (:action allocate_external_resource_to_job
+    :parameters (?processing_job - processing_job ?external_resource_token - external_resource_token)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (external_resource_token_available ?external_resource_token)
+      )
+    :effect
+      (and
+        (processing_job_has_external_resource_token ?processing_job ?external_resource_token)
+        (not
+          (external_resource_token_available ?external_resource_token)
+        )
+      )
+  )
+  (:action release_external_resource_from_job
+    :parameters (?processing_job - processing_job ?external_resource_token - external_resource_token)
+    :precondition
+      (and
+        (processing_job_has_external_resource_token ?processing_job ?external_resource_token)
+      )
+    :effect
+      (and
+        (external_resource_token_available ?external_resource_token)
+        (not
+          (processing_job_has_external_resource_token ?processing_job ?external_resource_token)
+        )
+      )
+  )
+  (:action attach_third_party_ack_to_job
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (third_party_ack_available ?third_party_ack)
+      )
+    :effect
+      (and
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (not
+          (third_party_ack_available ?third_party_ack)
+        )
+      )
+  )
+  (:action release_third_party_ack_from_job
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack)
+    :precondition
+      (and
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+      )
+    :effect
+      (and
+        (third_party_ack_available ?third_party_ack)
+        (not
+          (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        )
+      )
+  )
+  (:action reserve_payer_capacity_unit
+    :parameters (?payer_batch - payer_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_released ?payer_batch)
+        (assigned_validation_slot ?payer_batch ?validation_slot)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (not
+          (source_capacity_reserved ?rail_capacity_unit_source)
+        )
+        (not
+          (source_capacity_on_hold ?rail_capacity_unit_source)
+        )
+      )
+    :effect (source_capacity_reserved ?rail_capacity_unit_source)
+  )
+  (:action confirm_payer_capacity_reservation
+    :parameters (?payer_batch - payer_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?processing_queue - processing_queue)
+    :precondition
+      (and
+        (entity_released ?payer_batch)
+        (assigned_processing_queue ?payer_batch ?processing_queue)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (source_capacity_reserved ?rail_capacity_unit_source)
+        (not
+          (payer_capacity_allocated_flag ?payer_batch)
+        )
+      )
+    :effect
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payer_batch_ready ?payer_batch)
+      )
+  )
+  (:action reserve_payer_split_token
+    :parameters (?payer_batch - payer_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?split_token - split_token)
+    :precondition
+      (and
+        (entity_released ?payer_batch)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (split_token_available ?split_token)
+        (not
+          (payer_capacity_allocated_flag ?payer_batch)
+        )
+      )
+    :effect
+      (and
+        (source_capacity_on_hold ?rail_capacity_unit_source)
+        (payer_capacity_allocated_flag ?payer_batch)
+        (split_token_assigned_to_payer ?payer_batch ?split_token)
+        (not
+          (split_token_available ?split_token)
+        )
+      )
+  )
+  (:action finalize_payer_capacity_allocation
+    :parameters (?payer_batch - payer_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?validation_slot - validation_slot ?split_token - split_token)
+    :precondition
+      (and
+        (entity_released ?payer_batch)
+        (assigned_validation_slot ?payer_batch ?validation_slot)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (source_capacity_on_hold ?rail_capacity_unit_source)
+        (split_token_assigned_to_payer ?payer_batch ?split_token)
+        (not
+          (payer_batch_ready ?payer_batch)
+        )
+      )
+    :effect
+      (and
+        (source_capacity_reserved ?rail_capacity_unit_source)
+        (payer_batch_ready ?payer_batch)
+        (split_token_available ?split_token)
+        (not
+          (split_token_assigned_to_payer ?payer_batch ?split_token)
+        )
+      )
+  )
+  (:action reserve_payee_capacity_unit
+    :parameters (?payee_batch - payee_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_released ?payee_batch)
+        (assigned_validation_slot ?payee_batch ?validation_slot)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (not
+          (destination_capacity_reserved ?rail_capacity_unit_destination)
+        )
+        (not
+          (destination_capacity_on_hold ?rail_capacity_unit_destination)
+        )
+      )
+    :effect (destination_capacity_reserved ?rail_capacity_unit_destination)
+  )
+  (:action confirm_payee_capacity_reservation
+    :parameters (?payee_batch - payee_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination ?processing_queue - processing_queue)
+    :precondition
+      (and
+        (entity_released ?payee_batch)
+        (assigned_processing_queue ?payee_batch ?processing_queue)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (destination_capacity_reserved ?rail_capacity_unit_destination)
+        (not
+          (payee_capacity_allocated_flag ?payee_batch)
+        )
+      )
+    :effect
+      (and
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payee_batch_ready ?payee_batch)
+      )
+  )
+  (:action reserve_payee_split_token
+    :parameters (?payee_batch - payee_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination ?split_token - split_token)
+    :precondition
+      (and
+        (entity_released ?payee_batch)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (split_token_available ?split_token)
+        (not
+          (payee_capacity_allocated_flag ?payee_batch)
+        )
+      )
+    :effect
+      (and
+        (destination_capacity_on_hold ?rail_capacity_unit_destination)
+        (payee_capacity_allocated_flag ?payee_batch)
+        (split_token_assigned_to_payee ?payee_batch ?split_token)
+        (not
+          (split_token_available ?split_token)
+        )
+      )
+  )
+  (:action finalize_payee_capacity_allocation
+    :parameters (?payee_batch - payee_batch ?rail_capacity_unit_destination - rail_capacity_unit_destination ?validation_slot - validation_slot ?split_token - split_token)
+    :precondition
+      (and
+        (entity_released ?payee_batch)
+        (assigned_validation_slot ?payee_batch ?validation_slot)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (destination_capacity_on_hold ?rail_capacity_unit_destination)
+        (split_token_assigned_to_payee ?payee_batch ?split_token)
+        (not
+          (payee_batch_ready ?payee_batch)
+        )
+      )
+    :effect
+      (and
+        (destination_capacity_reserved ?rail_capacity_unit_destination)
+        (payee_batch_ready ?payee_batch)
+        (split_token_available ?split_token)
+        (not
+          (split_token_assigned_to_payee ?payee_batch ?split_token)
+        )
+      )
+  )
+  (:action create_split_batch
+    :parameters (?payer_batch - payer_batch ?payee_batch - payee_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?rail_capacity_unit_destination - rail_capacity_unit_destination ?split_batch - split_batch)
+    :precondition
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (source_capacity_reserved ?rail_capacity_unit_source)
+        (destination_capacity_reserved ?rail_capacity_unit_destination)
+        (payer_batch_ready ?payer_batch)
+        (payee_batch_ready ?payee_batch)
+        (split_batch_slot_available ?split_batch)
+      )
+    :effect
+      (and
+        (split_batch_created ?split_batch)
+        (split_batch_assigned_source_capacity_unit ?split_batch ?rail_capacity_unit_source)
+        (split_batch_assigned_destination_capacity_unit ?split_batch ?rail_capacity_unit_destination)
+        (not
+          (split_batch_slot_available ?split_batch)
+        )
+      )
+  )
+  (:action create_split_batch_with_source_hold
+    :parameters (?payer_batch - payer_batch ?payee_batch - payee_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?rail_capacity_unit_destination - rail_capacity_unit_destination ?split_batch - split_batch)
+    :precondition
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (source_capacity_on_hold ?rail_capacity_unit_source)
+        (destination_capacity_reserved ?rail_capacity_unit_destination)
+        (not
+          (payer_batch_ready ?payer_batch)
+        )
+        (payee_batch_ready ?payee_batch)
+        (split_batch_slot_available ?split_batch)
+      )
+    :effect
+      (and
+        (split_batch_created ?split_batch)
+        (split_batch_assigned_source_capacity_unit ?split_batch ?rail_capacity_unit_source)
+        (split_batch_assigned_destination_capacity_unit ?split_batch ?rail_capacity_unit_destination)
+        (split_batch_source_ready ?split_batch)
+        (not
+          (split_batch_slot_available ?split_batch)
+        )
+      )
+  )
+  (:action create_split_batch_with_destination_hold
+    :parameters (?payer_batch - payer_batch ?payee_batch - payee_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?rail_capacity_unit_destination - rail_capacity_unit_destination ?split_batch - split_batch)
+    :precondition
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (source_capacity_reserved ?rail_capacity_unit_source)
+        (destination_capacity_on_hold ?rail_capacity_unit_destination)
+        (payer_batch_ready ?payer_batch)
+        (not
+          (payee_batch_ready ?payee_batch)
+        )
+        (split_batch_slot_available ?split_batch)
+      )
+    :effect
+      (and
+        (split_batch_created ?split_batch)
+        (split_batch_assigned_source_capacity_unit ?split_batch ?rail_capacity_unit_source)
+        (split_batch_assigned_destination_capacity_unit ?split_batch ?rail_capacity_unit_destination)
+        (split_batch_destination_ready ?split_batch)
+        (not
+          (split_batch_slot_available ?split_batch)
+        )
+      )
+  )
+  (:action create_split_batch_with_both_holds
+    :parameters (?payer_batch - payer_batch ?payee_batch - payee_batch ?rail_capacity_unit_source - rail_capacity_unit_source ?rail_capacity_unit_destination - rail_capacity_unit_destination ?split_batch - split_batch)
+    :precondition
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payer_capacity_unit_mapping ?payer_batch ?rail_capacity_unit_source)
+        (payee_capacity_unit_mapping ?payee_batch ?rail_capacity_unit_destination)
+        (source_capacity_on_hold ?rail_capacity_unit_source)
+        (destination_capacity_on_hold ?rail_capacity_unit_destination)
+        (not
+          (payer_batch_ready ?payer_batch)
+        )
+        (not
+          (payee_batch_ready ?payee_batch)
+        )
+        (split_batch_slot_available ?split_batch)
+      )
+    :effect
+      (and
+        (split_batch_created ?split_batch)
+        (split_batch_assigned_source_capacity_unit ?split_batch ?rail_capacity_unit_source)
+        (split_batch_assigned_destination_capacity_unit ?split_batch ?rail_capacity_unit_destination)
+        (split_batch_source_ready ?split_batch)
+        (split_batch_destination_ready ?split_batch)
+        (not
+          (split_batch_slot_available ?split_batch)
+        )
+      )
+  )
+  (:action stage_split_batch_for_transmission
+    :parameters (?split_batch - split_batch ?payer_batch - payer_batch ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (split_batch_created ?split_batch)
+        (payer_capacity_allocated_flag ?payer_batch)
+        (assigned_validation_slot ?payer_batch ?validation_slot)
+        (not
+          (split_batch_staged ?split_batch)
+        )
+      )
+    :effect (split_batch_staged ?split_batch)
+  )
+  (:action attach_instruction_file_to_split_batch
+    :parameters (?processing_job - processing_job ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (processing_job_associated_split_batch ?processing_job ?split_batch)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_available ?instruction_file)
+        (split_batch_created ?split_batch)
+        (split_batch_staged ?split_batch)
+        (not
+          (instruction_file_consumed ?instruction_file)
+        )
+      )
+    :effect
+      (and
+        (instruction_file_consumed ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (not
+          (instruction_file_available ?instruction_file)
+        )
+      )
+  )
+  (:action prepare_processing_job_for_transmission
+    :parameters (?processing_job - processing_job ?instruction_file - instruction_file ?split_batch - split_batch ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_consumed ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (assigned_validation_slot ?processing_job ?validation_slot)
+        (not
+          (split_batch_source_ready ?split_batch)
+        )
+        (not
+          (processing_job_ready_for_transmission ?processing_job)
+        )
+      )
+    :effect (processing_job_ready_for_transmission ?processing_job)
+  )
+  (:action attach_priority_marker_to_job
+    :parameters (?processing_job - processing_job ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (priority_marker_available ?priority_marker)
+        (not
+          (priority_attached ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (priority_attached ?processing_job)
+        (processing_job_has_priority_marker ?processing_job ?priority_marker)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action apply_priority_and_prepare_job
+    :parameters (?processing_job - processing_job ?instruction_file - instruction_file ?split_batch - split_batch ?validation_slot - validation_slot ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_consumed ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (assigned_validation_slot ?processing_job ?validation_slot)
+        (split_batch_source_ready ?split_batch)
+        (priority_attached ?processing_job)
+        (processing_job_has_priority_marker ?processing_job ?priority_marker)
+        (not
+          (processing_job_ready_for_transmission ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (processing_job_ready_for_transmission ?processing_job)
+        (priority_applied_to_job ?processing_job)
+      )
+  )
+  (:action submit_job_to_third_party_primary
+    :parameters (?processing_job - processing_job ?external_resource_token - external_resource_token ?processing_queue - processing_queue ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_ready_for_transmission ?processing_job)
+        (processing_job_has_external_resource_token ?processing_job ?external_resource_token)
+        (assigned_processing_queue ?processing_job ?processing_queue)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (not
+          (split_batch_destination_ready ?split_batch)
+        )
+        (not
+          (processing_job_transmitted ?processing_job)
+        )
+      )
+    :effect (processing_job_transmitted ?processing_job)
+  )
+  (:action submit_job_to_third_party_secondary
+    :parameters (?processing_job - processing_job ?external_resource_token - external_resource_token ?processing_queue - processing_queue ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_ready_for_transmission ?processing_job)
+        (processing_job_has_external_resource_token ?processing_job ?external_resource_token)
+        (assigned_processing_queue ?processing_job ?processing_queue)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (split_batch_destination_ready ?split_batch)
+        (not
+          (processing_job_transmitted ?processing_job)
+        )
+      )
+    :effect (processing_job_transmitted ?processing_job)
+  )
+  (:action process_third_party_ack_unflagged
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_transmitted ?processing_job)
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (not
+          (split_batch_source_ready ?split_batch)
+        )
+        (not
+          (split_batch_destination_ready ?split_batch)
+        )
+        (not
+          (third_party_confirmed ?processing_job)
+        )
+      )
+    :effect (third_party_confirmed ?processing_job)
+  )
+  (:action process_third_party_ack_source_flagged
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_transmitted ?processing_job)
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (split_batch_source_ready ?split_batch)
+        (not
+          (split_batch_destination_ready ?split_batch)
+        )
+        (not
+          (third_party_confirmed ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (third_party_confirmed ?processing_job)
+        (has_optional_enhancements ?processing_job)
+      )
+  )
+  (:action process_third_party_ack_destination_flagged
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_transmitted ?processing_job)
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (not
+          (split_batch_source_ready ?split_batch)
+        )
+        (split_batch_destination_ready ?split_batch)
+        (not
+          (third_party_confirmed ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (third_party_confirmed ?processing_job)
+        (has_optional_enhancements ?processing_job)
+      )
+  )
+  (:action process_third_party_ack_both_flagged
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack ?instruction_file - instruction_file ?split_batch - split_batch)
+    :precondition
+      (and
+        (processing_job_transmitted ?processing_job)
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (processing_job_has_instruction_file ?processing_job ?instruction_file)
+        (instruction_file_attached_to_split_batch ?instruction_file ?split_batch)
+        (split_batch_source_ready ?split_batch)
+        (split_batch_destination_ready ?split_batch)
+        (not
+          (third_party_confirmed ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (third_party_confirmed ?processing_job)
+        (has_optional_enhancements ?processing_job)
+      )
+  )
+  (:action finalize_job_basic
+    :parameters (?processing_job - processing_job)
+    :precondition
+      (and
+        (third_party_confirmed ?processing_job)
+        (not
+          (has_optional_enhancements ?processing_job)
+        )
+        (not
+          (completion_marker_emitted ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (completion_marker_emitted ?processing_job)
+        (ready_for_settlement ?processing_job)
+      )
+  )
+  (:action attach_settlement_window_to_job
+    :parameters (?processing_job - processing_job ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (third_party_confirmed ?processing_job)
+        (has_optional_enhancements ?processing_job)
+        (settlement_window_available ?settlement_window)
+      )
+    :effect
+      (and
+        (processing_job_assigned_settlement_window ?processing_job ?settlement_window)
+        (not
+          (settlement_window_available ?settlement_window)
+        )
+      )
+  )
+  (:action process_enhancements_before_finalization
+    :parameters (?processing_job - processing_job ?payer_batch - payer_batch ?payee_batch - payee_batch ?validation_slot - validation_slot ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (third_party_confirmed ?processing_job)
+        (has_optional_enhancements ?processing_job)
+        (processing_job_assigned_settlement_window ?processing_job ?settlement_window)
+        (processing_job_includes_payer_batch ?processing_job ?payer_batch)
+        (processing_job_includes_payee_batch ?processing_job ?payee_batch)
+        (payer_batch_ready ?payer_batch)
+        (payee_batch_ready ?payee_batch)
+        (assigned_validation_slot ?processing_job ?validation_slot)
+        (not
+          (enhancements_processed ?processing_job)
+        )
+      )
+    :effect (enhancements_processed ?processing_job)
+  )
+  (:action finalize_job_with_enhancements
+    :parameters (?processing_job - processing_job)
+    :precondition
+      (and
+        (third_party_confirmed ?processing_job)
+        (enhancements_processed ?processing_job)
+        (not
+          (completion_marker_emitted ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (completion_marker_emitted ?processing_job)
+        (ready_for_settlement ?processing_job)
+      )
+  )
+  (:action apply_compliance_approval_to_job
+    :parameters (?processing_job - processing_job ?compliance_approval - compliance_approval ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (entity_released ?processing_job)
+        (assigned_validation_slot ?processing_job ?validation_slot)
+        (compliance_approval_available ?compliance_approval)
+        (processing_job_has_compliance_approval ?processing_job ?compliance_approval)
+        (not
+          (compliance_applied_to_job ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (compliance_applied_to_job ?processing_job)
+        (not
+          (compliance_approval_available ?compliance_approval)
+        )
+      )
+  )
+  (:action complete_operator_review_assignment
+    :parameters (?processing_job - processing_job ?processing_queue - processing_queue)
+    :precondition
+      (and
+        (compliance_applied_to_job ?processing_job)
+        (assigned_processing_queue ?processing_job ?processing_queue)
+        (not
+          (operator_review_completed ?processing_job)
+        )
+      )
+    :effect (operator_review_completed ?processing_job)
+  )
+  (:action operator_acknowledge_job
+    :parameters (?processing_job - processing_job ?third_party_ack - third_party_ack)
+    :precondition
+      (and
+        (operator_review_completed ?processing_job)
+        (processing_job_third_party_acknowledged ?processing_job ?third_party_ack)
+        (not
+          (operator_acknowledged ?processing_job)
+        )
+      )
+    :effect (operator_acknowledged ?processing_job)
+  )
+  (:action finalize_job_with_operator_acknowledgement
+    :parameters (?processing_job - processing_job)
+    :precondition
+      (and
+        (operator_acknowledged ?processing_job)
+        (not
+          (completion_marker_emitted ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (completion_marker_emitted ?processing_job)
+        (ready_for_settlement ?processing_job)
+      )
+  )
+  (:action finalize_payer_batch
+    :parameters (?payer_batch - payer_batch ?split_batch - split_batch)
+    :precondition
+      (and
+        (payer_capacity_allocated_flag ?payer_batch)
+        (payer_batch_ready ?payer_batch)
+        (split_batch_created ?split_batch)
+        (split_batch_staged ?split_batch)
+        (not
+          (ready_for_settlement ?payer_batch)
+        )
+      )
+    :effect (ready_for_settlement ?payer_batch)
+  )
+  (:action finalize_payee_batch
+    :parameters (?payee_batch - payee_batch ?split_batch - split_batch)
+    :precondition
+      (and
+        (payee_capacity_allocated_flag ?payee_batch)
+        (payee_batch_ready ?payee_batch)
+        (split_batch_created ?split_batch)
+        (split_batch_staged ?split_batch)
+        (not
+          (ready_for_settlement ?payee_batch)
+        )
+      )
+    :effect (ready_for_settlement ?payee_batch)
+  )
+  (:action attach_assignment_evidence_to_entity
+    :parameters (?payment_entity - payment_entity ?assignment_evidence - assignment_evidence ?validation_slot - validation_slot)
+    :precondition
+      (and
+        (ready_for_settlement ?payment_entity)
+        (assigned_validation_slot ?payment_entity ?validation_slot)
+        (assignment_evidence_available ?assignment_evidence)
+        (not
+          (assignment_evidence_recorded ?payment_entity)
+        )
+      )
+    :effect
+      (and
+        (assignment_evidence_recorded ?payment_entity)
+        (assignment_evidence_attached ?payment_entity ?assignment_evidence)
+        (not
+          (assignment_evidence_available ?assignment_evidence)
+        )
+      )
+  )
+  (:action finalize_payer_batch_and_release_channel
+    :parameters (?payer_batch - payer_batch ?settlement_channel - settlement_channel ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_evidence_recorded ?payer_batch)
+        (allocated_to_settlement_channel ?payer_batch ?settlement_channel)
+        (assignment_evidence_attached ?payer_batch ?assignment_evidence)
+        (not
+          (settled ?payer_batch)
+        )
+      )
+    :effect
+      (and
+        (settled ?payer_batch)
+        (channel_available ?settlement_channel)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+  (:action finalize_payee_batch_and_release_channel
+    :parameters (?payee_batch - payee_batch ?settlement_channel - settlement_channel ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_evidence_recorded ?payee_batch)
+        (allocated_to_settlement_channel ?payee_batch ?settlement_channel)
+        (assignment_evidence_attached ?payee_batch ?assignment_evidence)
+        (not
+          (settled ?payee_batch)
+        )
+      )
+    :effect
+      (and
+        (settled ?payee_batch)
+        (channel_available ?settlement_channel)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+  (:action finalize_processing_job_and_release_channel
+    :parameters (?processing_job - processing_job ?settlement_channel - settlement_channel ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_evidence_recorded ?processing_job)
+        (allocated_to_settlement_channel ?processing_job ?settlement_channel)
+        (assignment_evidence_attached ?processing_job ?assignment_evidence)
+        (not
+          (settled ?processing_job)
+        )
+      )
+    :effect
+      (and
+        (settled ?processing_job)
+        (channel_available ?settlement_channel)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem payment_batch_splitting_under_rail_limits)
+  (:domain finance_payments_settlement_batch_splitting)
+  (:objects payer_batch_obj - payer_batch payee_batch_obj - payee_batch processing_job_obj_1 - processing_job processing_job_obj_2 - processing_job settlement_channel_obj_1 - settlement_channel settlement_channel_obj_2 - settlement_channel settlement_channel_obj_3 - settlement_channel validation_slot_obj - validation_slot processing_queue_obj - processing_queue split_token_obj - split_token rail_capacity_unit_source_obj - rail_capacity_unit_source rail_capacity_unit_destination_obj - rail_capacity_unit_destination split_batch_obj - split_batch instruction_file_obj_1 - instruction_file instruction_file_obj_2 - instruction_file priority_marker_obj_1 - priority_marker priority_marker_obj_2 - priority_marker settlement_window_obj_1 - settlement_window settlement_window_obj_2 - settlement_window assignment_evidence_obj - assignment_evidence external_resource_token_obj - external_resource_token compliance_approval_obj_1 - compliance_approval compliance_approval_obj_2 - compliance_approval third_party_ack_obj - third_party_ack)
+  (:init
+    (channel_available settlement_channel_obj_1)
+    (channel_available settlement_channel_obj_2)
+    (channel_available settlement_channel_obj_3)
+    (validation_slot_available validation_slot_obj)
+    (processing_queue_available processing_queue_obj)
+    (split_token_available split_token_obj)
+    (payer_capacity_unit_mapping payer_batch_obj rail_capacity_unit_source_obj)
+    (payee_capacity_unit_mapping payee_batch_obj rail_capacity_unit_destination_obj)
+    (split_batch_slot_available split_batch_obj)
+    (instruction_file_available instruction_file_obj_1)
+    (instruction_file_available instruction_file_obj_2)
+    (processing_job_includes_payer_batch processing_job_obj_1 payer_batch_obj)
+    (processing_job_includes_payer_batch processing_job_obj_2 payer_batch_obj)
+    (processing_job_includes_payee_batch processing_job_obj_1 payee_batch_obj)
+    (processing_job_includes_payee_batch processing_job_obj_2 payee_batch_obj)
+    (processing_job_associated_split_batch processing_job_obj_1 split_batch_obj)
+    (processing_job_associated_split_batch processing_job_obj_2 split_batch_obj)
+    (processing_job_has_instruction_file processing_job_obj_1 instruction_file_obj_1)
+    (processing_job_has_instruction_file processing_job_obj_2 instruction_file_obj_2)
+    (priority_marker_available priority_marker_obj_1)
+    (priority_marker_available priority_marker_obj_2)
+    (settlement_window_available settlement_window_obj_1)
+    (settlement_window_available settlement_window_obj_2)
+    (assignment_evidence_available assignment_evidence_obj)
+    (external_resource_token_available external_resource_token_obj)
+    (compliance_approval_available compliance_approval_obj_1)
+    (processing_job_has_compliance_approval processing_job_obj_1 compliance_approval_obj_1)
+    (processing_job_has_compliance_approval processing_job_obj_2 compliance_approval_obj_2)
+    (third_party_ack_available third_party_ack_obj)
+  )
+  (:goal
+    (and
+      (settled payer_batch_obj)
+      (settled payee_batch_obj)
+      (settled processing_job_obj_1)
+      (settled processing_job_obj_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_payment payer_batch_obj)
+(assign_settlement_channel_to_payment payer_batch_obj settlement_channel_obj_1)
+(assign_validation_slot_to_payment payer_batch_obj validation_slot_obj)
+(mark_payment_released payer_batch_obj validation_slot_obj)
+(reserve_payer_capacity_unit payer_batch_obj rail_capacity_unit_source_obj validation_slot_obj)
+(release_validation_slot payer_batch_obj validation_slot_obj)
+(assign_processing_queue_to_payment payer_batch_obj processing_queue_obj)
+(confirm_payer_capacity_reservation payer_batch_obj rail_capacity_unit_source_obj processing_queue_obj)
+(register_payment payee_batch_obj)
+(assign_settlement_channel_to_payment payee_batch_obj settlement_channel_obj_2)
+(assign_validation_slot_to_payment payee_batch_obj validation_slot_obj)
+(mark_payment_released payee_batch_obj validation_slot_obj)
+(reserve_payee_capacity_unit payee_batch_obj rail_capacity_unit_destination_obj validation_slot_obj)
+(release_validation_slot payee_batch_obj validation_slot_obj)
+(release_processing_queue_from_payment payer_batch_obj processing_queue_obj)
+(assign_processing_queue_to_payment payee_batch_obj processing_queue_obj)
+(confirm_payee_capacity_reservation payee_batch_obj rail_capacity_unit_destination_obj processing_queue_obj)
+(release_processing_queue_from_payment payee_batch_obj processing_queue_obj)
+(create_split_batch payer_batch_obj payee_batch_obj rail_capacity_unit_source_obj rail_capacity_unit_destination_obj split_batch_obj)
+(assign_validation_slot_to_payment payer_batch_obj validation_slot_obj)
+(stage_split_batch_for_transmission split_batch_obj payer_batch_obj validation_slot_obj)
+(finalize_payer_batch payer_batch_obj split_batch_obj)
+(finalize_payee_batch payee_batch_obj split_batch_obj)
+(release_validation_slot payer_batch_obj validation_slot_obj)
+(register_payment processing_job_obj_1)
+(assign_settlement_channel_to_payment processing_job_obj_1 settlement_channel_obj_3)
+(assign_validation_slot_to_payment processing_job_obj_1 validation_slot_obj)
+(mark_payment_released processing_job_obj_1 validation_slot_obj)
+(apply_compliance_approval_to_job processing_job_obj_1 compliance_approval_obj_1 validation_slot_obj)
+(allocate_external_resource_to_job processing_job_obj_1 external_resource_token_obj)
+(attach_third_party_ack_to_job processing_job_obj_1 third_party_ack_obj)
+(attach_instruction_file_to_split_batch processing_job_obj_1 instruction_file_obj_1 split_batch_obj)
+(prepare_processing_job_for_transmission processing_job_obj_1 instruction_file_obj_1 split_batch_obj validation_slot_obj)
+(assign_processing_queue_to_payment processing_job_obj_1 processing_queue_obj)
+(submit_job_to_third_party_primary processing_job_obj_1 external_resource_token_obj processing_queue_obj instruction_file_obj_1 split_batch_obj)
+(process_third_party_ack_unflagged processing_job_obj_1 third_party_ack_obj instruction_file_obj_1 split_batch_obj)
+(complete_operator_review_assignment processing_job_obj_1 processing_queue_obj)
+(operator_acknowledge_job processing_job_obj_1 third_party_ack_obj)
+(finalize_job_with_operator_acknowledgement processing_job_obj_1)
+(release_external_resource_from_job processing_job_obj_1 external_resource_token_obj)
+(release_third_party_ack_from_job processing_job_obj_1 third_party_ack_obj)
+(release_processing_queue_from_payment processing_job_obj_1 processing_queue_obj)
+(release_validation_slot processing_job_obj_1 validation_slot_obj)
+(assign_validation_slot_to_payment payer_batch_obj validation_slot_obj)
+(attach_assignment_evidence_to_entity payer_batch_obj assignment_evidence_obj validation_slot_obj)
+(finalize_payer_batch_and_release_channel payer_batch_obj settlement_channel_obj_1 assignment_evidence_obj)
+(release_validation_slot payer_batch_obj validation_slot_obj)
+(register_payment processing_job_obj_2)
+(assign_settlement_channel_to_payment processing_job_obj_2 settlement_channel_obj_1)
+(assign_validation_slot_to_payment processing_job_obj_2 validation_slot_obj)
+(mark_payment_released processing_job_obj_2 validation_slot_obj)
+(apply_compliance_approval_to_job processing_job_obj_2 compliance_approval_obj_2 validation_slot_obj)
+(allocate_external_resource_to_job processing_job_obj_2 external_resource_token_obj)
+(attach_third_party_ack_to_job processing_job_obj_2 third_party_ack_obj)
+(attach_instruction_file_to_split_batch processing_job_obj_2 instruction_file_obj_2 split_batch_obj)
+(prepare_processing_job_for_transmission processing_job_obj_2 instruction_file_obj_2 split_batch_obj validation_slot_obj)
+(assign_processing_queue_to_payment processing_job_obj_2 processing_queue_obj)
+(submit_job_to_third_party_primary processing_job_obj_2 external_resource_token_obj processing_queue_obj instruction_file_obj_2 split_batch_obj)
+(process_third_party_ack_unflagged processing_job_obj_2 third_party_ack_obj instruction_file_obj_2 split_batch_obj)
+(complete_operator_review_assignment processing_job_obj_2 processing_queue_obj)
+(operator_acknowledge_job processing_job_obj_2 third_party_ack_obj)
+(finalize_job_with_operator_acknowledgement processing_job_obj_2)
+(release_external_resource_from_job processing_job_obj_2 external_resource_token_obj)
+(release_third_party_ack_from_job processing_job_obj_2 third_party_ack_obj)
+(release_processing_queue_from_payment processing_job_obj_2 processing_queue_obj)
+(release_validation_slot processing_job_obj_2 validation_slot_obj)
+(assign_validation_slot_to_payment payee_batch_obj validation_slot_obj)
+(attach_assignment_evidence_to_entity payee_batch_obj assignment_evidence_obj validation_slot_obj)
+(finalize_payee_batch_and_release_channel payee_batch_obj settlement_channel_obj_2 assignment_evidence_obj)
+(release_validation_slot payee_batch_obj validation_slot_obj)
+(assign_validation_slot_to_payment processing_job_obj_1 validation_slot_obj)
+(attach_assignment_evidence_to_entity processing_job_obj_1 assignment_evidence_obj validation_slot_obj)
+(finalize_processing_job_and_release_channel processing_job_obj_1 settlement_channel_obj_3 assignment_evidence_obj)
+(release_validation_slot processing_job_obj_1 validation_slot_obj)
+(assign_validation_slot_to_payment processing_job_obj_2 validation_slot_obj)
+(attach_assignment_evidence_to_entity processing_job_obj_2 assignment_evidence_obj validation_slot_obj)
+(finalize_processing_job_and_release_channel processing_job_obj_2 settlement_channel_obj_1 assignment_evidence_obj)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_8twv7n4s/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_8twv7n4s/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain rebalance_trade_generation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_holder - object directive_holder - object instrument_holder - object portfolio_root - object portfolio - portfolio_root execution_venue - domain_holder security - domain_holder execution_strategy - domain_holder allocation_policy - domain_holder transaction_cost_model - domain_holder settlement_account - domain_holder liquidity_bucket - domain_holder execution_window - domain_holder adjustment_directive - directive_holder account_allocation_slot - directive_holder client_instruction - directive_holder sell_opportunity - instrument_holder buy_opportunity - instrument_holder trade_candidate - instrument_holder portfolio_group - portfolio portfolio_task - portfolio sell_bucket - portfolio_group buy_bucket - portfolio_group rebalance_job - portfolio_task)
+  (:predicates
+    (portfolio_registered ?portfolio - portfolio)
+    (rebalance_ready ?portfolio - portfolio)
+    (sell_bucket_bound ?portfolio - portfolio)
+    (settled ?portfolio - portfolio)
+    (finalized ?portfolio - portfolio)
+    (settlement_linked ?portfolio - portfolio)
+    (execution_venue_available ?execution_venue - execution_venue)
+    (entity_execution_venue_linked ?portfolio - portfolio ?execution_venue - execution_venue)
+    (security_available ?security - security)
+    (entity_security_linked ?portfolio - portfolio ?security - security)
+    (execution_strategy_available ?execution_strategy - execution_strategy)
+    (entity_execution_strategy_linked ?portfolio - portfolio ?execution_strategy - execution_strategy)
+    (adjustment_directive_available ?adjustment_directive - adjustment_directive)
+    (sell_bucket_directive_linked ?sell_bucket - sell_bucket ?adjustment_directive - adjustment_directive)
+    (buy_bucket_directive_linked ?buy_bucket - buy_bucket ?adjustment_directive - adjustment_directive)
+    (sell_bucket_opportunity_linked ?sell_bucket - sell_bucket ?sell_opportunity - sell_opportunity)
+    (sell_opportunity_provisional ?sell_opportunity - sell_opportunity)
+    (sell_opportunity_confirmed ?sell_opportunity - sell_opportunity)
+    (sell_bucket_closed ?sell_bucket - sell_bucket)
+    (buy_bucket_opportunity_linked ?buy_bucket - buy_bucket ?buy_opportunity - buy_opportunity)
+    (buy_opportunity_provisional ?buy_opportunity - buy_opportunity)
+    (buy_opportunity_confirmed ?buy_opportunity - buy_opportunity)
+    (buy_bucket_closed ?buy_bucket - buy_bucket)
+    (trade_candidate_available ?trade_candidate - trade_candidate)
+    (trade_candidate_formed ?trade_candidate - trade_candidate)
+    (trade_candidate_sell_opportunity_linked ?trade_candidate - trade_candidate ?sell_opportunity - sell_opportunity)
+    (trade_candidate_buy_opportunity_linked ?trade_candidate - trade_candidate ?buy_opportunity - buy_opportunity)
+    (sell_leg_ready ?trade_candidate - trade_candidate)
+    (buy_leg_ready ?trade_candidate - trade_candidate)
+    (trade_candidate_validated ?trade_candidate - trade_candidate)
+    (rebalance_job_sell_bucket_linked ?rebalance_job - rebalance_job ?sell_bucket - sell_bucket)
+    (rebalance_job_buy_bucket_linked ?rebalance_job - rebalance_job ?buy_bucket - buy_bucket)
+    (rebalance_job_trade_candidate_linked ?rebalance_job - rebalance_job ?trade_candidate - trade_candidate)
+    (allocation_slot_available ?allocation_slot - account_allocation_slot)
+    (rebalance_job_allocation_slot_linked ?rebalance_job - rebalance_job ?allocation_slot - account_allocation_slot)
+    (allocation_slot_reserved ?allocation_slot - account_allocation_slot)
+    (allocation_slot_trade_candidate_linked ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    (allocation_verified ?rebalance_job - rebalance_job)
+    (routing_reviewed ?rebalance_job - rebalance_job)
+    (execution_prepared ?rebalance_job - rebalance_job)
+    (allocation_policy_applied ?rebalance_job - rebalance_job)
+    (allocation_approved ?rebalance_job - rebalance_job)
+    (execution_authorized ?rebalance_job - rebalance_job)
+    (reconciliation_complete ?rebalance_job - rebalance_job)
+    (client_instruction_available ?client_instruction - client_instruction)
+    (rebalance_job_client_instruction_linked ?rebalance_job - rebalance_job ?client_instruction - client_instruction)
+    (client_instruction_applied ?rebalance_job - rebalance_job)
+    (execution_strategy_confirmed ?rebalance_job - rebalance_job)
+    (execution_window_confirmed ?rebalance_job - rebalance_job)
+    (allocation_policy_available ?allocation_policy - allocation_policy)
+    (rebalance_job_allocation_policy_linked ?rebalance_job - rebalance_job ?allocation_policy - allocation_policy)
+    (transaction_cost_model_available ?transaction_cost_model_param - transaction_cost_model)
+    (rebalance_job_transaction_cost_model_linked ?rebalance_job - rebalance_job ?transaction_cost_model_param - transaction_cost_model)
+    (liquidity_bucket_available ?liquidity_bucket - liquidity_bucket)
+    (rebalance_job_liquidity_bucket_linked ?rebalance_job - rebalance_job ?liquidity_bucket - liquidity_bucket)
+    (execution_window_available ?execution_window - execution_window)
+    (rebalance_job_execution_window_linked ?rebalance_job - rebalance_job ?execution_window - execution_window)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (entity_settlement_account_linked ?portfolio - portfolio ?settlement_account - settlement_account)
+    (sell_bucket_ready ?sell_bucket - sell_bucket)
+    (buy_bucket_ready ?buy_bucket - buy_bucket)
+    (package_complete ?rebalance_job - rebalance_job)
+  )
+  (:action register_portfolio
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (not
+          (portfolio_registered ?portfolio)
+        )
+        (not
+          (settled ?portfolio)
+        )
+      )
+    :effect (portfolio_registered ?portfolio)
+  )
+  (:action bind_sell_bucket
+    :parameters (?portfolio - portfolio ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (portfolio_registered ?portfolio)
+        (not
+          (sell_bucket_bound ?portfolio)
+        )
+        (execution_venue_available ?execution_venue)
+      )
+    :effect
+      (and
+        (sell_bucket_bound ?portfolio)
+        (entity_execution_venue_linked ?portfolio ?execution_venue)
+        (not
+          (execution_venue_available ?execution_venue)
+        )
+      )
+  )
+  (:action reserve_security_for_rebalance
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (portfolio_registered ?portfolio)
+        (sell_bucket_bound ?portfolio)
+        (security_available ?security)
+      )
+    :effect
+      (and
+        (entity_security_linked ?portfolio ?security)
+        (not
+          (security_available ?security)
+        )
+      )
+  )
+  (:action mark_rebalance_ready
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (portfolio_registered ?portfolio)
+        (sell_bucket_bound ?portfolio)
+        (entity_security_linked ?portfolio ?security)
+        (not
+          (rebalance_ready ?portfolio)
+        )
+      )
+    :effect (rebalance_ready ?portfolio)
+  )
+  (:action release_security_reservation
+    :parameters (?portfolio - portfolio ?security - security)
+    :precondition
+      (and
+        (entity_security_linked ?portfolio ?security)
+      )
+    :effect
+      (and
+        (security_available ?security)
+        (not
+          (entity_security_linked ?portfolio ?security)
+        )
+      )
+  )
+  (:action bind_execution_strategy
+    :parameters (?portfolio - portfolio ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (rebalance_ready ?portfolio)
+        (execution_strategy_available ?execution_strategy)
+      )
+    :effect
+      (and
+        (entity_execution_strategy_linked ?portfolio ?execution_strategy)
+        (not
+          (execution_strategy_available ?execution_strategy)
+        )
+      )
+  )
+  (:action release_execution_strategy
+    :parameters (?portfolio - portfolio ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (entity_execution_strategy_linked ?portfolio ?execution_strategy)
+      )
+    :effect
+      (and
+        (execution_strategy_available ?execution_strategy)
+        (not
+          (entity_execution_strategy_linked ?portfolio ?execution_strategy)
+        )
+      )
+  )
+  (:action bind_liquidity_bucket
+    :parameters (?rebalance_job - rebalance_job ?liquidity_bucket - liquidity_bucket)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (liquidity_bucket_available ?liquidity_bucket)
+      )
+    :effect
+      (and
+        (rebalance_job_liquidity_bucket_linked ?rebalance_job ?liquidity_bucket)
+        (not
+          (liquidity_bucket_available ?liquidity_bucket)
+        )
+      )
+  )
+  (:action release_liquidity_bucket
+    :parameters (?rebalance_job - rebalance_job ?liquidity_bucket - liquidity_bucket)
+    :precondition
+      (and
+        (rebalance_job_liquidity_bucket_linked ?rebalance_job ?liquidity_bucket)
+      )
+    :effect
+      (and
+        (liquidity_bucket_available ?liquidity_bucket)
+        (not
+          (rebalance_job_liquidity_bucket_linked ?rebalance_job ?liquidity_bucket)
+        )
+      )
+  )
+  (:action bind_execution_window
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (execution_window_available ?execution_window)
+      )
+    :effect
+      (and
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (not
+          (execution_window_available ?execution_window)
+        )
+      )
+  )
+  (:action release_execution_window
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window)
+    :precondition
+      (and
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+      )
+    :effect
+      (and
+        (execution_window_available ?execution_window)
+        (not
+          (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        )
+      )
+  )
+  (:action generate_sell_opportunity
+    :parameters (?sell_bucket - sell_bucket ?sell_opportunity - sell_opportunity ?security - security)
+    :precondition
+      (and
+        (rebalance_ready ?sell_bucket)
+        (entity_security_linked ?sell_bucket ?security)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (not
+          (sell_opportunity_provisional ?sell_opportunity)
+        )
+        (not
+          (sell_opportunity_confirmed ?sell_opportunity)
+        )
+      )
+    :effect (sell_opportunity_provisional ?sell_opportunity)
+  )
+  (:action qualify_sell_opportunity
+    :parameters (?sell_bucket - sell_bucket ?sell_opportunity - sell_opportunity ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (rebalance_ready ?sell_bucket)
+        (entity_execution_strategy_linked ?sell_bucket ?execution_strategy)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (sell_opportunity_provisional ?sell_opportunity)
+        (not
+          (sell_bucket_ready ?sell_bucket)
+        )
+      )
+    :effect
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (sell_bucket_closed ?sell_bucket)
+      )
+  )
+  (:action stage_sell_opportunity
+    :parameters (?sell_bucket - sell_bucket ?sell_opportunity - sell_opportunity ?adjustment_directive - adjustment_directive)
+    :precondition
+      (and
+        (rebalance_ready ?sell_bucket)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (adjustment_directive_available ?adjustment_directive)
+        (not
+          (sell_bucket_ready ?sell_bucket)
+        )
+      )
+    :effect
+      (and
+        (sell_opportunity_confirmed ?sell_opportunity)
+        (sell_bucket_ready ?sell_bucket)
+        (sell_bucket_directive_linked ?sell_bucket ?adjustment_directive)
+        (not
+          (adjustment_directive_available ?adjustment_directive)
+        )
+      )
+  )
+  (:action finalize_sell_opportunity
+    :parameters (?sell_bucket - sell_bucket ?sell_opportunity - sell_opportunity ?security - security ?adjustment_directive - adjustment_directive)
+    :precondition
+      (and
+        (rebalance_ready ?sell_bucket)
+        (entity_security_linked ?sell_bucket ?security)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (sell_opportunity_confirmed ?sell_opportunity)
+        (sell_bucket_directive_linked ?sell_bucket ?adjustment_directive)
+        (not
+          (sell_bucket_closed ?sell_bucket)
+        )
+      )
+    :effect
+      (and
+        (sell_opportunity_provisional ?sell_opportunity)
+        (sell_bucket_closed ?sell_bucket)
+        (adjustment_directive_available ?adjustment_directive)
+        (not
+          (sell_bucket_directive_linked ?sell_bucket ?adjustment_directive)
+        )
+      )
+  )
+  (:action generate_buy_opportunity
+    :parameters (?buy_bucket - buy_bucket ?buy_opportunity - buy_opportunity ?security - security)
+    :precondition
+      (and
+        (rebalance_ready ?buy_bucket)
+        (entity_security_linked ?buy_bucket ?security)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (not
+          (buy_opportunity_provisional ?buy_opportunity)
+        )
+        (not
+          (buy_opportunity_confirmed ?buy_opportunity)
+        )
+      )
+    :effect (buy_opportunity_provisional ?buy_opportunity)
+  )
+  (:action qualify_buy_opportunity
+    :parameters (?buy_bucket - buy_bucket ?buy_opportunity - buy_opportunity ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (rebalance_ready ?buy_bucket)
+        (entity_execution_strategy_linked ?buy_bucket ?execution_strategy)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (buy_opportunity_provisional ?buy_opportunity)
+        (not
+          (buy_bucket_ready ?buy_bucket)
+        )
+      )
+    :effect
+      (and
+        (buy_bucket_ready ?buy_bucket)
+        (buy_bucket_closed ?buy_bucket)
+      )
+  )
+  (:action stage_buy_opportunity
+    :parameters (?buy_bucket - buy_bucket ?buy_opportunity - buy_opportunity ?adjustment_directive - adjustment_directive)
+    :precondition
+      (and
+        (rebalance_ready ?buy_bucket)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (adjustment_directive_available ?adjustment_directive)
+        (not
+          (buy_bucket_ready ?buy_bucket)
+        )
+      )
+    :effect
+      (and
+        (buy_opportunity_confirmed ?buy_opportunity)
+        (buy_bucket_ready ?buy_bucket)
+        (buy_bucket_directive_linked ?buy_bucket ?adjustment_directive)
+        (not
+          (adjustment_directive_available ?adjustment_directive)
+        )
+      )
+  )
+  (:action finalize_buy_opportunity
+    :parameters (?buy_bucket - buy_bucket ?buy_opportunity - buy_opportunity ?security - security ?adjustment_directive - adjustment_directive)
+    :precondition
+      (and
+        (rebalance_ready ?buy_bucket)
+        (entity_security_linked ?buy_bucket ?security)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (buy_opportunity_confirmed ?buy_opportunity)
+        (buy_bucket_directive_linked ?buy_bucket ?adjustment_directive)
+        (not
+          (buy_bucket_closed ?buy_bucket)
+        )
+      )
+    :effect
+      (and
+        (buy_opportunity_provisional ?buy_opportunity)
+        (buy_bucket_closed ?buy_bucket)
+        (adjustment_directive_available ?adjustment_directive)
+        (not
+          (buy_bucket_directive_linked ?buy_bucket ?adjustment_directive)
+        )
+      )
+  )
+  (:action assemble_trade_candidate
+    :parameters (?sell_bucket - sell_bucket ?buy_bucket - buy_bucket ?sell_opportunity - sell_opportunity ?buy_opportunity - buy_opportunity ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (buy_bucket_ready ?buy_bucket)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (sell_opportunity_provisional ?sell_opportunity)
+        (buy_opportunity_provisional ?buy_opportunity)
+        (sell_bucket_closed ?sell_bucket)
+        (buy_bucket_closed ?buy_bucket)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_sell_opportunity_linked ?trade_candidate ?sell_opportunity)
+        (trade_candidate_buy_opportunity_linked ?trade_candidate ?buy_opportunity)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_sell_ready
+    :parameters (?sell_bucket - sell_bucket ?buy_bucket - buy_bucket ?sell_opportunity - sell_opportunity ?buy_opportunity - buy_opportunity ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (buy_bucket_ready ?buy_bucket)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (sell_opportunity_confirmed ?sell_opportunity)
+        (buy_opportunity_provisional ?buy_opportunity)
+        (not
+          (sell_bucket_closed ?sell_bucket)
+        )
+        (buy_bucket_closed ?buy_bucket)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_sell_opportunity_linked ?trade_candidate ?sell_opportunity)
+        (trade_candidate_buy_opportunity_linked ?trade_candidate ?buy_opportunity)
+        (sell_leg_ready ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_buy_ready
+    :parameters (?sell_bucket - sell_bucket ?buy_bucket - buy_bucket ?sell_opportunity - sell_opportunity ?buy_opportunity - buy_opportunity ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (buy_bucket_ready ?buy_bucket)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (sell_opportunity_provisional ?sell_opportunity)
+        (buy_opportunity_confirmed ?buy_opportunity)
+        (sell_bucket_closed ?sell_bucket)
+        (not
+          (buy_bucket_closed ?buy_bucket)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_sell_opportunity_linked ?trade_candidate ?sell_opportunity)
+        (trade_candidate_buy_opportunity_linked ?trade_candidate ?buy_opportunity)
+        (buy_leg_ready ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_fully_ready
+    :parameters (?sell_bucket - sell_bucket ?buy_bucket - buy_bucket ?sell_opportunity - sell_opportunity ?buy_opportunity - buy_opportunity ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (buy_bucket_ready ?buy_bucket)
+        (sell_bucket_opportunity_linked ?sell_bucket ?sell_opportunity)
+        (buy_bucket_opportunity_linked ?buy_bucket ?buy_opportunity)
+        (sell_opportunity_confirmed ?sell_opportunity)
+        (buy_opportunity_confirmed ?buy_opportunity)
+        (not
+          (sell_bucket_closed ?sell_bucket)
+        )
+        (not
+          (buy_bucket_closed ?buy_bucket)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_sell_opportunity_linked ?trade_candidate ?sell_opportunity)
+        (trade_candidate_buy_opportunity_linked ?trade_candidate ?buy_opportunity)
+        (sell_leg_ready ?trade_candidate)
+        (buy_leg_ready ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action validate_trade_candidate
+    :parameters (?trade_candidate - trade_candidate ?sell_bucket - sell_bucket ?security - security)
+    :precondition
+      (and
+        (trade_candidate_formed ?trade_candidate)
+        (sell_bucket_ready ?sell_bucket)
+        (entity_security_linked ?sell_bucket ?security)
+        (not
+          (trade_candidate_validated ?trade_candidate)
+        )
+      )
+    :effect (trade_candidate_validated ?trade_candidate)
+  )
+  (:action reserve_allocation_slot
+    :parameters (?rebalance_job - rebalance_job ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (rebalance_job_trade_candidate_linked ?rebalance_job ?trade_candidate)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_available ?allocation_slot)
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_validated ?trade_candidate)
+        (not
+          (allocation_slot_reserved ?allocation_slot)
+        )
+      )
+    :effect
+      (and
+        (allocation_slot_reserved ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (not
+          (allocation_slot_available ?allocation_slot)
+        )
+      )
+  )
+  (:action confirm_allocation_slot
+    :parameters (?rebalance_job - rebalance_job ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate ?security - security)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_reserved ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (entity_security_linked ?rebalance_job ?security)
+        (not
+          (sell_leg_ready ?trade_candidate)
+        )
+        (not
+          (allocation_verified ?rebalance_job)
+        )
+      )
+    :effect (allocation_verified ?rebalance_job)
+  )
+  (:action apply_allocation_policy
+    :parameters (?rebalance_job - rebalance_job ?allocation_policy - allocation_policy)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (allocation_policy_available ?allocation_policy)
+        (not
+          (allocation_policy_applied ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_policy_applied ?rebalance_job)
+        (rebalance_job_allocation_policy_linked ?rebalance_job ?allocation_policy)
+        (not
+          (allocation_policy_available ?allocation_policy)
+        )
+      )
+  )
+  (:action approve_allocation_binding
+    :parameters (?rebalance_job - rebalance_job ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate ?security - security ?allocation_policy - allocation_policy)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_reserved ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (entity_security_linked ?rebalance_job ?security)
+        (sell_leg_ready ?trade_candidate)
+        (allocation_policy_applied ?rebalance_job)
+        (rebalance_job_allocation_policy_linked ?rebalance_job ?allocation_policy)
+        (not
+          (allocation_verified ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_verified ?rebalance_job)
+        (allocation_approved ?rebalance_job)
+      )
+  )
+  (:action review_execution_route_primary
+    :parameters (?rebalance_job - rebalance_job ?liquidity_bucket - liquidity_bucket ?execution_strategy - execution_strategy ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (allocation_verified ?rebalance_job)
+        (rebalance_job_liquidity_bucket_linked ?rebalance_job ?liquidity_bucket)
+        (entity_execution_strategy_linked ?rebalance_job ?execution_strategy)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (not
+          (buy_leg_ready ?trade_candidate)
+        )
+        (not
+          (routing_reviewed ?rebalance_job)
+        )
+      )
+    :effect (routing_reviewed ?rebalance_job)
+  )
+  (:action review_execution_route_secondary
+    :parameters (?rebalance_job - rebalance_job ?liquidity_bucket - liquidity_bucket ?execution_strategy - execution_strategy ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (allocation_verified ?rebalance_job)
+        (rebalance_job_liquidity_bucket_linked ?rebalance_job ?liquidity_bucket)
+        (entity_execution_strategy_linked ?rebalance_job ?execution_strategy)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (buy_leg_ready ?trade_candidate)
+        (not
+          (routing_reviewed ?rebalance_job)
+        )
+      )
+    :effect (routing_reviewed ?rebalance_job)
+  )
+  (:action authorize_execution_route_primary
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (routing_reviewed ?rebalance_job)
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (not
+          (sell_leg_ready ?trade_candidate)
+        )
+        (not
+          (buy_leg_ready ?trade_candidate)
+        )
+        (not
+          (execution_prepared ?rebalance_job)
+        )
+      )
+    :effect (execution_prepared ?rebalance_job)
+  )
+  (:action authorize_execution_route_secondary
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (routing_reviewed ?rebalance_job)
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (sell_leg_ready ?trade_candidate)
+        (not
+          (buy_leg_ready ?trade_candidate)
+        )
+        (not
+          (execution_prepared ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (execution_prepared ?rebalance_job)
+        (execution_authorized ?rebalance_job)
+      )
+  )
+  (:action authorize_execution_route_tertiary
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (routing_reviewed ?rebalance_job)
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (not
+          (sell_leg_ready ?trade_candidate)
+        )
+        (buy_leg_ready ?trade_candidate)
+        (not
+          (execution_prepared ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (execution_prepared ?rebalance_job)
+        (execution_authorized ?rebalance_job)
+      )
+  )
+  (:action authorize_execution_route_quaternary
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window ?allocation_slot - account_allocation_slot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (routing_reviewed ?rebalance_job)
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (rebalance_job_allocation_slot_linked ?rebalance_job ?allocation_slot)
+        (allocation_slot_trade_candidate_linked ?allocation_slot ?trade_candidate)
+        (sell_leg_ready ?trade_candidate)
+        (buy_leg_ready ?trade_candidate)
+        (not
+          (execution_prepared ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (execution_prepared ?rebalance_job)
+        (execution_authorized ?rebalance_job)
+      )
+  )
+  (:action seal_trade_package
+    :parameters (?rebalance_job - rebalance_job)
+    :precondition
+      (and
+        (execution_prepared ?rebalance_job)
+        (not
+          (execution_authorized ?rebalance_job)
+        )
+        (not
+          (package_complete ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (package_complete ?rebalance_job)
+        (finalized ?rebalance_job)
+      )
+  )
+  (:action attach_transaction_cost_model
+    :parameters (?rebalance_job - rebalance_job ?transaction_cost_model_param - transaction_cost_model)
+    :precondition
+      (and
+        (execution_prepared ?rebalance_job)
+        (execution_authorized ?rebalance_job)
+        (transaction_cost_model_available ?transaction_cost_model_param)
+      )
+    :effect
+      (and
+        (rebalance_job_transaction_cost_model_linked ?rebalance_job ?transaction_cost_model_param)
+        (not
+          (transaction_cost_model_available ?transaction_cost_model_param)
+        )
+      )
+  )
+  (:action reconcile_trade_package
+    :parameters (?rebalance_job - rebalance_job ?sell_bucket - sell_bucket ?buy_bucket - buy_bucket ?security - security ?transaction_cost_model_param - transaction_cost_model)
+    :precondition
+      (and
+        (execution_prepared ?rebalance_job)
+        (execution_authorized ?rebalance_job)
+        (rebalance_job_transaction_cost_model_linked ?rebalance_job ?transaction_cost_model_param)
+        (rebalance_job_sell_bucket_linked ?rebalance_job ?sell_bucket)
+        (rebalance_job_buy_bucket_linked ?rebalance_job ?buy_bucket)
+        (sell_bucket_closed ?sell_bucket)
+        (buy_bucket_closed ?buy_bucket)
+        (entity_security_linked ?rebalance_job ?security)
+        (not
+          (reconciliation_complete ?rebalance_job)
+        )
+      )
+    :effect (reconciliation_complete ?rebalance_job)
+  )
+  (:action authorize_trade_package
+    :parameters (?rebalance_job - rebalance_job)
+    :precondition
+      (and
+        (execution_prepared ?rebalance_job)
+        (reconciliation_complete ?rebalance_job)
+        (not
+          (package_complete ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (package_complete ?rebalance_job)
+        (finalized ?rebalance_job)
+      )
+  )
+  (:action apply_client_instruction
+    :parameters (?rebalance_job - rebalance_job ?client_instruction - client_instruction ?security - security)
+    :precondition
+      (and
+        (rebalance_ready ?rebalance_job)
+        (entity_security_linked ?rebalance_job ?security)
+        (client_instruction_available ?client_instruction)
+        (rebalance_job_client_instruction_linked ?rebalance_job ?client_instruction)
+        (not
+          (client_instruction_applied ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (client_instruction_applied ?rebalance_job)
+        (not
+          (client_instruction_available ?client_instruction)
+        )
+      )
+  )
+  (:action confirm_strategy_alignment
+    :parameters (?rebalance_job - rebalance_job ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (client_instruction_applied ?rebalance_job)
+        (entity_execution_strategy_linked ?rebalance_job ?execution_strategy)
+        (not
+          (execution_strategy_confirmed ?rebalance_job)
+        )
+      )
+    :effect (execution_strategy_confirmed ?rebalance_job)
+  )
+  (:action confirm_execution_window
+    :parameters (?rebalance_job - rebalance_job ?execution_window - execution_window)
+    :precondition
+      (and
+        (execution_strategy_confirmed ?rebalance_job)
+        (rebalance_job_execution_window_linked ?rebalance_job ?execution_window)
+        (not
+          (execution_window_confirmed ?rebalance_job)
+        )
+      )
+    :effect (execution_window_confirmed ?rebalance_job)
+  )
+  (:action release_trade_package
+    :parameters (?rebalance_job - rebalance_job)
+    :precondition
+      (and
+        (execution_window_confirmed ?rebalance_job)
+        (not
+          (package_complete ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (package_complete ?rebalance_job)
+        (finalized ?rebalance_job)
+      )
+  )
+  (:action close_sell_bucket
+    :parameters (?sell_bucket - sell_bucket ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (sell_bucket_ready ?sell_bucket)
+        (sell_bucket_closed ?sell_bucket)
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_validated ?trade_candidate)
+        (not
+          (finalized ?sell_bucket)
+        )
+      )
+    :effect (finalized ?sell_bucket)
+  )
+  (:action close_buy_bucket
+    :parameters (?buy_bucket - buy_bucket ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (buy_bucket_ready ?buy_bucket)
+        (buy_bucket_closed ?buy_bucket)
+        (trade_candidate_formed ?trade_candidate)
+        (trade_candidate_validated ?trade_candidate)
+        (not
+          (finalized ?buy_bucket)
+        )
+      )
+    :effect (finalized ?buy_bucket)
+  )
+  (:action assign_settlement_account
+    :parameters (?portfolio - portfolio ?settlement_account - settlement_account ?security - security)
+    :precondition
+      (and
+        (finalized ?portfolio)
+        (entity_security_linked ?portfolio ?security)
+        (settlement_account_available ?settlement_account)
+        (not
+          (settlement_linked ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (settlement_linked ?portfolio)
+        (entity_settlement_account_linked ?portfolio ?settlement_account)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action settle_sell_bucket
+    :parameters (?sell_bucket - sell_bucket ?execution_venue - execution_venue ?settlement_account - settlement_account)
+    :precondition
+      (and
+        (settlement_linked ?sell_bucket)
+        (entity_execution_venue_linked ?sell_bucket ?execution_venue)
+        (entity_settlement_account_linked ?sell_bucket ?settlement_account)
+        (not
+          (settled ?sell_bucket)
+        )
+      )
+    :effect
+      (and
+        (settled ?sell_bucket)
+        (execution_venue_available ?execution_venue)
+        (settlement_account_available ?settlement_account)
+      )
+  )
+  (:action settle_buy_bucket
+    :parameters (?buy_bucket - buy_bucket ?execution_venue - execution_venue ?settlement_account - settlement_account)
+    :precondition
+      (and
+        (settlement_linked ?buy_bucket)
+        (entity_execution_venue_linked ?buy_bucket ?execution_venue)
+        (entity_settlement_account_linked ?buy_bucket ?settlement_account)
+        (not
+          (settled ?buy_bucket)
+        )
+      )
+    :effect
+      (and
+        (settled ?buy_bucket)
+        (execution_venue_available ?execution_venue)
+        (settlement_account_available ?settlement_account)
+      )
+  )
+  (:action settle_rebalance_job
+    :parameters (?rebalance_job - rebalance_job ?execution_venue - execution_venue ?settlement_account - settlement_account)
+    :precondition
+      (and
+        (settlement_linked ?rebalance_job)
+        (entity_execution_venue_linked ?rebalance_job ?execution_venue)
+        (entity_settlement_account_linked ?rebalance_job ?settlement_account)
+        (not
+          (settled ?rebalance_job)
+        )
+      )
+    :effect
+      (and
+        (settled ?rebalance_job)
+        (execution_venue_available ?execution_venue)
+        (settlement_account_available ?settlement_account)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem rebalance_trade_generation_case)
+  (:domain rebalance_trade_generation)
+  (:objects sell_bucket_primary - sell_bucket buy_bucket_primary - buy_bucket rebalance_job_primary - rebalance_job rebalance_job_secondary - rebalance_job execution_venue_primary - execution_venue execution_venue_secondary - execution_venue execution_venue_tertiary - execution_venue security_alpha - security execution_strategy_primary - execution_strategy adjustment_directive_primary - adjustment_directive sell_opportunity_primary - sell_opportunity buy_opportunity_primary - buy_opportunity trade_candidate_primary - trade_candidate allocation_slot_primary - account_allocation_slot allocation_slot_secondary - account_allocation_slot allocation_policy_primary - allocation_policy allocation_policy_secondary - allocation_policy transaction_cost_model_primary - transaction_cost_model transaction_cost_model_secondary - transaction_cost_model settlement_account_primary - settlement_account liquidity_bucket_primary - liquidity_bucket client_instruction_primary - client_instruction client_instruction_secondary - client_instruction execution_window_primary - execution_window)
+  (:init
+    (execution_venue_available execution_venue_primary)
+    (execution_venue_available execution_venue_secondary)
+    (execution_venue_available execution_venue_tertiary)
+    (security_available security_alpha)
+    (execution_strategy_available execution_strategy_primary)
+    (adjustment_directive_available adjustment_directive_primary)
+    (sell_bucket_opportunity_linked sell_bucket_primary sell_opportunity_primary)
+    (buy_bucket_opportunity_linked buy_bucket_primary buy_opportunity_primary)
+    (trade_candidate_available trade_candidate_primary)
+    (allocation_slot_available allocation_slot_primary)
+    (allocation_slot_available allocation_slot_secondary)
+    (rebalance_job_sell_bucket_linked rebalance_job_primary sell_bucket_primary)
+    (rebalance_job_sell_bucket_linked rebalance_job_secondary sell_bucket_primary)
+    (rebalance_job_buy_bucket_linked rebalance_job_primary buy_bucket_primary)
+    (rebalance_job_buy_bucket_linked rebalance_job_secondary buy_bucket_primary)
+    (rebalance_job_trade_candidate_linked rebalance_job_primary trade_candidate_primary)
+    (rebalance_job_trade_candidate_linked rebalance_job_secondary trade_candidate_primary)
+    (rebalance_job_allocation_slot_linked rebalance_job_primary allocation_slot_primary)
+    (rebalance_job_allocation_slot_linked rebalance_job_secondary allocation_slot_secondary)
+    (allocation_policy_available allocation_policy_primary)
+    (allocation_policy_available allocation_policy_secondary)
+    (transaction_cost_model_available transaction_cost_model_primary)
+    (transaction_cost_model_available transaction_cost_model_secondary)
+    (settlement_account_available settlement_account_primary)
+    (liquidity_bucket_available liquidity_bucket_primary)
+    (client_instruction_available client_instruction_primary)
+    (rebalance_job_client_instruction_linked rebalance_job_primary client_instruction_primary)
+    (rebalance_job_client_instruction_linked rebalance_job_secondary client_instruction_secondary)
+    (execution_window_available execution_window_primary)
+  )
+  (:goal
+    (and
+      (settled sell_bucket_primary)
+      (settled buy_bucket_primary)
+      (settled rebalance_job_primary)
+      (settled rebalance_job_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_portfolio sell_bucket_primary)
+(bind_sell_bucket sell_bucket_primary execution_venue_primary)
+(reserve_security_for_rebalance sell_bucket_primary security_alpha)
+(mark_rebalance_ready sell_bucket_primary security_alpha)
+(generate_sell_opportunity sell_bucket_primary sell_opportunity_primary security_alpha)
+(release_security_reservation sell_bucket_primary security_alpha)
+(register_portfolio buy_bucket_primary)
+(bind_sell_bucket buy_bucket_primary execution_venue_secondary)
+(reserve_security_for_rebalance buy_bucket_primary security_alpha)
+(mark_rebalance_ready buy_bucket_primary security_alpha)
+(generate_buy_opportunity buy_bucket_primary buy_opportunity_primary security_alpha)
+(release_security_reservation buy_bucket_primary security_alpha)
+(bind_execution_strategy sell_bucket_primary execution_strategy_primary)
+(qualify_sell_opportunity sell_bucket_primary sell_opportunity_primary execution_strategy_primary)
+(release_execution_strategy sell_bucket_primary execution_strategy_primary)
+(bind_execution_strategy buy_bucket_primary execution_strategy_primary)
+(qualify_buy_opportunity buy_bucket_primary buy_opportunity_primary execution_strategy_primary)
+(release_execution_strategy buy_bucket_primary execution_strategy_primary)
+(assemble_trade_candidate sell_bucket_primary buy_bucket_primary sell_opportunity_primary buy_opportunity_primary trade_candidate_primary)
+(reserve_security_for_rebalance sell_bucket_primary security_alpha)
+(validate_trade_candidate trade_candidate_primary sell_bucket_primary security_alpha)
+(close_sell_bucket sell_bucket_primary trade_candidate_primary)
+(close_buy_bucket buy_bucket_primary trade_candidate_primary)
+(assign_settlement_account sell_bucket_primary settlement_account_primary security_alpha)
+(settle_sell_bucket sell_bucket_primary execution_venue_primary settlement_account_primary)
+(release_security_reservation sell_bucket_primary security_alpha)
+(reserve_security_for_rebalance buy_bucket_primary security_alpha)
+(assign_settlement_account buy_bucket_primary settlement_account_primary security_alpha)
+(settle_buy_bucket buy_bucket_primary execution_venue_secondary settlement_account_primary)
+(release_security_reservation buy_bucket_primary security_alpha)
+(register_portfolio rebalance_job_primary)
+(bind_sell_bucket rebalance_job_primary execution_venue_tertiary)
+(reserve_security_for_rebalance rebalance_job_primary security_alpha)
+(mark_rebalance_ready rebalance_job_primary security_alpha)
+(reserve_allocation_slot rebalance_job_primary allocation_slot_primary trade_candidate_primary)
+(confirm_allocation_slot rebalance_job_primary allocation_slot_primary trade_candidate_primary security_alpha)
+(bind_liquidity_bucket rebalance_job_primary liquidity_bucket_primary)
+(bind_execution_strategy rebalance_job_primary execution_strategy_primary)
+(review_execution_route_primary rebalance_job_primary liquidity_bucket_primary execution_strategy_primary allocation_slot_primary trade_candidate_primary)
+(bind_execution_window rebalance_job_primary execution_window_primary)
+(authorize_execution_route_primary rebalance_job_primary execution_window_primary allocation_slot_primary trade_candidate_primary)
+(seal_trade_package rebalance_job_primary)
+(assign_settlement_account rebalance_job_primary settlement_account_primary security_alpha)
+(settle_rebalance_job rebalance_job_primary execution_venue_tertiary settlement_account_primary)
+(release_security_reservation rebalance_job_primary security_alpha)
+(release_liquidity_bucket rebalance_job_primary liquidity_bucket_primary)
+(release_execution_strategy rebalance_job_primary execution_strategy_primary)
+(release_execution_window rebalance_job_primary execution_window_primary)
+(register_portfolio rebalance_job_secondary)
+(bind_sell_bucket rebalance_job_secondary execution_venue_tertiary)
+(reserve_security_for_rebalance rebalance_job_secondary security_alpha)
+(mark_rebalance_ready rebalance_job_secondary security_alpha)
+(reserve_allocation_slot rebalance_job_secondary allocation_slot_secondary trade_candidate_primary)
+(confirm_allocation_slot rebalance_job_secondary allocation_slot_secondary trade_candidate_primary security_alpha)
+(bind_liquidity_bucket rebalance_job_secondary liquidity_bucket_primary)
+(bind_execution_strategy rebalance_job_secondary execution_strategy_primary)
+(review_execution_route_primary rebalance_job_secondary liquidity_bucket_primary execution_strategy_primary allocation_slot_secondary trade_candidate_primary)
+(bind_execution_window rebalance_job_secondary execution_window_primary)
+(authorize_execution_route_primary rebalance_job_secondary execution_window_primary allocation_slot_secondary trade_candidate_primary)
+(seal_trade_package rebalance_job_secondary)
+(assign_settlement_account rebalance_job_secondary settlement_account_primary security_alpha)
+(settle_rebalance_job rebalance_job_secondary execution_venue_tertiary settlement_account_primary)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_azjredhm/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_azjredhm/plan.pddl 62 
+
+
+
+--- stderr ---
+

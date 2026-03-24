@@ -1,5 +1,6 @@
 """Aggregate primary benchmark metrics over multiple runs and compute statistical significance."""
 
+import warnings
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Union
 
@@ -16,12 +17,12 @@ class RunRecord:
     model: str
     executability: float
     reachability: float
-    optimality_ratio: float
-    first_error_step: int
+    optimality_ratio: float  # opt_len / pred_len when goal reached; -1.0 otherwise
     first_val_failure_step: int = -1
     first_ref_deviation_step: int = -1
     section: Optional[str] = None   # e.g. "blocks_world", "logistics"
     subsection: Optional[str] = None  # e.g. "clean", "problem_01"
+    status: str = "metrics_computed"
 
 
 @dataclass
@@ -100,6 +101,12 @@ def aggregate_runs(
                 t = scipy_stats.t.ppf((1 + confidence) / 2, n - 1)
                 ci_low = mean - t * se
                 ci_high = mean + t * se
+                if name in ("executability", "reachability"):
+                    ci_low = max(0.0, ci_low)
+                    ci_high = min(1.0, ci_high)
+                elif name == "optimality_ratio":
+                    # Ratio is non-negative when defined; t-interval can dip below 0 on small n.
+                    ci_low = max(0.0, ci_low)
             out[k][name] = AggregateStats(
                 mean=mean, std=std, count=n, ci_low=ci_low, ci_high=ci_high
             )
@@ -146,7 +153,15 @@ def compare_models(
         if r.model not in (model_a, model_b):
             continue
         key = (r.example_id, r.run_id)
-        by_pair.setdefault(key, {})[r.model] = r
+        bucket = by_pair.setdefault(key, {})
+        if r.model in bucket:
+            warnings.warn(
+                f"compare_models: duplicate record for model={r.model!r} "
+                f"example_id={r.example_id!r} run_id={r.run_id!r}; keeping the last occurrence.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        bucket[r.model] = r
 
     # Only keep pairs that have both models
     pairs: List[tuple] = [k for k, v in by_pair.items() if model_a in v and model_b in v]
@@ -172,17 +187,29 @@ def compare_models(
         mean_diff = mean_b - mean_a
 
         if use_wilcoxon:
-            try:
-                stat, p_val = scipy_stats.wilcoxon(arr_a, arr_b, alternative="two-sided")
-            except Exception:
+            diff = arr_a - arr_b
+            if np.allclose(diff, 0.0):
                 p_val = 1.0
-            test_used = "wilcoxon"
+                test_used = "wilcoxon_skipped_identical"
+            else:
+                try:
+                    stat, p_val = scipy_stats.wilcoxon(arr_a, arr_b, alternative="two-sided")
+                    test_used = "wilcoxon"
+                except Exception:
+                    p_val = 1.0
+                    test_used = "wilcoxon_failed"
         else:
-            try:
-                stat, p_val = scipy_stats.ttest_rel(arr_a, arr_b)
-            except Exception:
+            diff = arr_a - arr_b
+            if np.allclose(diff, 0.0):
                 p_val = 1.0
-            test_used = "paired_ttest"
+                test_used = "paired_ttest_skipped_identical"
+            else:
+                try:
+                    stat, p_val = scipy_stats.ttest_rel(arr_a, arr_b)
+                    test_used = "paired_ttest"
+                except Exception:
+                    p_val = 1.0
+                    test_used = "paired_ttest_failed"
 
         results.append(
             ComparisonResult(

@@ -1,0 +1,936 @@
+(define (domain tourism_attraction_closure_substitution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types case_resource - object offer_entity - object event_entity - object itinerary_component - object itinerary_element - itinerary_component substitute_option - case_resource availability_check - case_resource supplier_contact - case_resource escalation_tag - case_resource compensation_package - case_resource refund_instrument - case_resource logistics_resource - case_resource manager_approval - case_resource remediation_offer - offer_entity ancillary_item - offer_entity partner_approval - offer_entity closure_notice - event_entity customer_preference - event_entity replacement_booking - event_entity visit_subtype - itinerary_element case_subtype - itinerary_element scheduled_attraction - visit_subtype scheduled_addon - visit_subtype support_case - case_subtype)
+  (:predicates
+    (issue_registered ?itinerary_element - itinerary_element)
+    (proposal_accepted ?itinerary_element - itinerary_element)
+    (proposal_made ?itinerary_element - itinerary_element)
+    (itinerary_element_resolved ?itinerary_element - itinerary_element)
+    (operationally_closed ?itinerary_element - itinerary_element)
+    (compensation_recorded ?itinerary_element - itinerary_element)
+    (substitute_available ?substitute_option - substitute_option)
+    (proposed_substitute ?itinerary_element - itinerary_element ?substitute_option - substitute_option)
+    (availability_check_pending ?availability_check - availability_check)
+    (availability_check_record ?itinerary_element - itinerary_element ?availability_check - availability_check)
+    (supplier_contact_available ?supplier_contact - supplier_contact)
+    (supplier_contact_assigned ?itinerary_element - itinerary_element ?supplier_contact - supplier_contact)
+    (remediation_offer_available ?remediation_offer - remediation_offer)
+    (offer_allocated_to_attraction ?scheduled_attraction - scheduled_attraction ?remediation_offer - remediation_offer)
+    (offer_allocated_to_addon ?scheduled_addon - scheduled_addon ?remediation_offer - remediation_offer)
+    (closure_notice_for_attraction ?scheduled_attraction - scheduled_attraction ?closure_notice - closure_notice)
+    (closure_notice_validated ?closure_notice - closure_notice)
+    (closure_notice_selected ?closure_notice - closure_notice)
+    (attraction_candidate_selected ?scheduled_attraction - scheduled_attraction)
+    (addon_preference_link ?scheduled_addon - scheduled_addon ?customer_preference - customer_preference)
+    (preference_confirmed ?customer_preference - customer_preference)
+    (preference_alternative_confirmed ?customer_preference - customer_preference)
+    (addon_candidate_selected ?scheduled_addon - scheduled_addon)
+    (replacement_booking_draft ?replacement_booking - replacement_booking)
+    (replacement_booking_reserved ?replacement_booking - replacement_booking)
+    (booking_references_closure_notice ?replacement_booking - replacement_booking ?closure_notice - closure_notice)
+    (booking_references_customer_preference ?replacement_booking - replacement_booking ?customer_preference - customer_preference)
+    (booking_needs_partner_approval ?replacement_booking - replacement_booking)
+    (booking_needs_manager_approval ?replacement_booking - replacement_booking)
+    (booking_ready_for_fulfilment ?replacement_booking - replacement_booking)
+    (case_involves_attraction ?support_case - support_case ?scheduled_attraction - scheduled_attraction)
+    (case_involves_addon ?support_case - support_case ?scheduled_addon - scheduled_addon)
+    (case_links_booking ?support_case - support_case ?replacement_booking - replacement_booking)
+    (ancillary_item_available ?ancillary_item - ancillary_item)
+    (case_has_ancillary ?support_case - support_case ?ancillary_item - ancillary_item)
+    (ancillary_item_allocated ?ancillary_item - ancillary_item)
+    (ancillary_linked_to_booking ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    (case_logistics_allocated ?support_case - support_case)
+    (partner_approval_obtained ?support_case - support_case)
+    (approvals_collected ?support_case - support_case)
+    (case_escalated ?support_case - support_case)
+    (escalation_processed ?support_case - support_case)
+    (case_fulfilment_ready ?support_case - support_case)
+    (case_fulfilment_confirmed ?support_case - support_case)
+    (partner_approval_available ?partner_approval - partner_approval)
+    (case_has_partner_approval ?support_case - support_case ?partner_approval - partner_approval)
+    (partner_approval_registered ?support_case - support_case)
+    (partner_approval_request_sent ?support_case - support_case)
+    (partner_approval_confirmed ?support_case - support_case)
+    (escalation_tag_available ?escalation_tag - escalation_tag)
+    (case_escalation_tag_assigned ?support_case - support_case ?escalation_tag - escalation_tag)
+    (compensation_package_available ?compensation_package - compensation_package)
+    (case_compensation_assigned ?support_case - support_case ?compensation_package - compensation_package)
+    (logistics_resource_available ?logistics_resource - logistics_resource)
+    (case_allocated_logistics_resource ?support_case - support_case ?logistics_resource - logistics_resource)
+    (manager_approval_available ?manager_approval - manager_approval)
+    (case_allocated_manager_approval ?support_case - support_case ?manager_approval - manager_approval)
+    (refund_instrument_available ?refund_instrument - refund_instrument)
+    (refund_instrument_assigned ?itinerary_element - itinerary_element ?refund_instrument - refund_instrument)
+    (attraction_evaluated ?scheduled_attraction - scheduled_attraction)
+    (addon_evaluated ?scheduled_addon - scheduled_addon)
+    (case_closed ?support_case - support_case)
+  )
+  (:action register_closure_incident
+    :parameters (?itinerary_element - itinerary_element)
+    :precondition
+      (and
+        (not
+          (issue_registered ?itinerary_element)
+        )
+        (not
+          (itinerary_element_resolved ?itinerary_element)
+        )
+      )
+    :effect (issue_registered ?itinerary_element)
+  )
+  (:action propose_substitute_option
+    :parameters (?itinerary_element - itinerary_element ?substitute_option - substitute_option)
+    :precondition
+      (and
+        (issue_registered ?itinerary_element)
+        (not
+          (proposal_made ?itinerary_element)
+        )
+        (substitute_available ?substitute_option)
+      )
+    :effect
+      (and
+        (proposal_made ?itinerary_element)
+        (proposed_substitute ?itinerary_element ?substitute_option)
+        (not
+          (substitute_available ?substitute_option)
+        )
+      )
+  )
+  (:action perform_availability_check
+    :parameters (?itinerary_element - itinerary_element ?availability_check - availability_check)
+    :precondition
+      (and
+        (issue_registered ?itinerary_element)
+        (proposal_made ?itinerary_element)
+        (availability_check_pending ?availability_check)
+      )
+    :effect
+      (and
+        (availability_check_record ?itinerary_element ?availability_check)
+        (not
+          (availability_check_pending ?availability_check)
+        )
+      )
+  )
+  (:action record_proposal_acceptance
+    :parameters (?itinerary_element - itinerary_element ?availability_check - availability_check)
+    :precondition
+      (and
+        (issue_registered ?itinerary_element)
+        (proposal_made ?itinerary_element)
+        (availability_check_record ?itinerary_element ?availability_check)
+        (not
+          (proposal_accepted ?itinerary_element)
+        )
+      )
+    :effect (proposal_accepted ?itinerary_element)
+  )
+  (:action revert_availability_check
+    :parameters (?itinerary_element - itinerary_element ?availability_check - availability_check)
+    :precondition
+      (and
+        (availability_check_record ?itinerary_element ?availability_check)
+      )
+    :effect
+      (and
+        (availability_check_pending ?availability_check)
+        (not
+          (availability_check_record ?itinerary_element ?availability_check)
+        )
+      )
+  )
+  (:action assign_supplier_contact
+    :parameters (?itinerary_element - itinerary_element ?supplier_contact - supplier_contact)
+    :precondition
+      (and
+        (proposal_accepted ?itinerary_element)
+        (supplier_contact_available ?supplier_contact)
+      )
+    :effect
+      (and
+        (supplier_contact_assigned ?itinerary_element ?supplier_contact)
+        (not
+          (supplier_contact_available ?supplier_contact)
+        )
+      )
+  )
+  (:action unassign_supplier_contact
+    :parameters (?itinerary_element - itinerary_element ?supplier_contact - supplier_contact)
+    :precondition
+      (and
+        (supplier_contact_assigned ?itinerary_element ?supplier_contact)
+      )
+    :effect
+      (and
+        (supplier_contact_available ?supplier_contact)
+        (not
+          (supplier_contact_assigned ?itinerary_element ?supplier_contact)
+        )
+      )
+  )
+  (:action allocate_logistics_resource
+    :parameters (?support_case - support_case ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (logistics_resource_available ?logistics_resource)
+      )
+    :effect
+      (and
+        (case_allocated_logistics_resource ?support_case ?logistics_resource)
+        (not
+          (logistics_resource_available ?logistics_resource)
+        )
+      )
+  )
+  (:action release_logistics_resource
+    :parameters (?support_case - support_case ?logistics_resource - logistics_resource)
+    :precondition
+      (and
+        (case_allocated_logistics_resource ?support_case ?logistics_resource)
+      )
+    :effect
+      (and
+        (logistics_resource_available ?logistics_resource)
+        (not
+          (case_allocated_logistics_resource ?support_case ?logistics_resource)
+        )
+      )
+  )
+  (:action request_manager_approval
+    :parameters (?support_case - support_case ?manager_approval - manager_approval)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (manager_approval_available ?manager_approval)
+      )
+    :effect
+      (and
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (not
+          (manager_approval_available ?manager_approval)
+        )
+      )
+  )
+  (:action revoke_manager_approval
+    :parameters (?support_case - support_case ?manager_approval - manager_approval)
+    :precondition
+      (and
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+      )
+    :effect
+      (and
+        (manager_approval_available ?manager_approval)
+        (not
+          (case_allocated_manager_approval ?support_case ?manager_approval)
+        )
+      )
+  )
+  (:action validate_closure_notice
+    :parameters (?scheduled_attraction - scheduled_attraction ?closure_notice - closure_notice ?availability_check - availability_check)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_attraction)
+        (availability_check_record ?scheduled_attraction ?availability_check)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (not
+          (closure_notice_validated ?closure_notice)
+        )
+        (not
+          (closure_notice_selected ?closure_notice)
+        )
+      )
+    :effect (closure_notice_validated ?closure_notice)
+  )
+  (:action confirm_attraction_candidate
+    :parameters (?scheduled_attraction - scheduled_attraction ?closure_notice - closure_notice ?supplier_contact - supplier_contact)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_attraction)
+        (supplier_contact_assigned ?scheduled_attraction ?supplier_contact)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (closure_notice_validated ?closure_notice)
+        (not
+          (attraction_evaluated ?scheduled_attraction)
+        )
+      )
+    :effect
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (attraction_candidate_selected ?scheduled_attraction)
+      )
+  )
+  (:action allocate_remediation_offer
+    :parameters (?scheduled_attraction - scheduled_attraction ?closure_notice - closure_notice ?remediation_offer - remediation_offer)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_attraction)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (remediation_offer_available ?remediation_offer)
+        (not
+          (attraction_evaluated ?scheduled_attraction)
+        )
+      )
+    :effect
+      (and
+        (closure_notice_selected ?closure_notice)
+        (attraction_evaluated ?scheduled_attraction)
+        (offer_allocated_to_attraction ?scheduled_attraction ?remediation_offer)
+        (not
+          (remediation_offer_available ?remediation_offer)
+        )
+      )
+  )
+  (:action finalize_attraction_candidate
+    :parameters (?scheduled_attraction - scheduled_attraction ?closure_notice - closure_notice ?availability_check - availability_check ?remediation_offer - remediation_offer)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_attraction)
+        (availability_check_record ?scheduled_attraction ?availability_check)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (closure_notice_selected ?closure_notice)
+        (offer_allocated_to_attraction ?scheduled_attraction ?remediation_offer)
+        (not
+          (attraction_candidate_selected ?scheduled_attraction)
+        )
+      )
+    :effect
+      (and
+        (closure_notice_validated ?closure_notice)
+        (attraction_candidate_selected ?scheduled_attraction)
+        (remediation_offer_available ?remediation_offer)
+        (not
+          (offer_allocated_to_attraction ?scheduled_attraction ?remediation_offer)
+        )
+      )
+  )
+  (:action validate_addon_candidate
+    :parameters (?scheduled_addon - scheduled_addon ?customer_preference - customer_preference ?availability_check - availability_check)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_addon)
+        (availability_check_record ?scheduled_addon ?availability_check)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (not
+          (preference_confirmed ?customer_preference)
+        )
+        (not
+          (preference_alternative_confirmed ?customer_preference)
+        )
+      )
+    :effect (preference_confirmed ?customer_preference)
+  )
+  (:action assign_supplier_contact_to_addon
+    :parameters (?scheduled_addon - scheduled_addon ?customer_preference - customer_preference ?supplier_contact - supplier_contact)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_addon)
+        (supplier_contact_assigned ?scheduled_addon ?supplier_contact)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (preference_confirmed ?customer_preference)
+        (not
+          (addon_evaluated ?scheduled_addon)
+        )
+      )
+    :effect
+      (and
+        (addon_evaluated ?scheduled_addon)
+        (addon_candidate_selected ?scheduled_addon)
+      )
+  )
+  (:action allocate_remediation_offer_for_addon
+    :parameters (?scheduled_addon - scheduled_addon ?customer_preference - customer_preference ?remediation_offer - remediation_offer)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_addon)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (remediation_offer_available ?remediation_offer)
+        (not
+          (addon_evaluated ?scheduled_addon)
+        )
+      )
+    :effect
+      (and
+        (preference_alternative_confirmed ?customer_preference)
+        (addon_evaluated ?scheduled_addon)
+        (offer_allocated_to_addon ?scheduled_addon ?remediation_offer)
+        (not
+          (remediation_offer_available ?remediation_offer)
+        )
+      )
+  )
+  (:action finalize_addon_candidate
+    :parameters (?scheduled_addon - scheduled_addon ?customer_preference - customer_preference ?availability_check - availability_check ?remediation_offer - remediation_offer)
+    :precondition
+      (and
+        (proposal_accepted ?scheduled_addon)
+        (availability_check_record ?scheduled_addon ?availability_check)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (preference_alternative_confirmed ?customer_preference)
+        (offer_allocated_to_addon ?scheduled_addon ?remediation_offer)
+        (not
+          (addon_candidate_selected ?scheduled_addon)
+        )
+      )
+    :effect
+      (and
+        (preference_confirmed ?customer_preference)
+        (addon_candidate_selected ?scheduled_addon)
+        (remediation_offer_available ?remediation_offer)
+        (not
+          (offer_allocated_to_addon ?scheduled_addon ?remediation_offer)
+        )
+      )
+  )
+  (:action create_replacement_booking
+    :parameters (?scheduled_attraction - scheduled_attraction ?scheduled_addon - scheduled_addon ?closure_notice - closure_notice ?customer_preference - customer_preference ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (addon_evaluated ?scheduled_addon)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (closure_notice_validated ?closure_notice)
+        (preference_confirmed ?customer_preference)
+        (attraction_candidate_selected ?scheduled_attraction)
+        (addon_candidate_selected ?scheduled_addon)
+        (replacement_booking_draft ?replacement_booking)
+      )
+    :effect
+      (and
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_references_closure_notice ?replacement_booking ?closure_notice)
+        (booking_references_customer_preference ?replacement_booking ?customer_preference)
+        (not
+          (replacement_booking_draft ?replacement_booking)
+        )
+      )
+  )
+  (:action create_replacement_booking_with_partner_approval
+    :parameters (?scheduled_attraction - scheduled_attraction ?scheduled_addon - scheduled_addon ?closure_notice - closure_notice ?customer_preference - customer_preference ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (addon_evaluated ?scheduled_addon)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (closure_notice_selected ?closure_notice)
+        (preference_confirmed ?customer_preference)
+        (not
+          (attraction_candidate_selected ?scheduled_attraction)
+        )
+        (addon_candidate_selected ?scheduled_addon)
+        (replacement_booking_draft ?replacement_booking)
+      )
+    :effect
+      (and
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_references_closure_notice ?replacement_booking ?closure_notice)
+        (booking_references_customer_preference ?replacement_booking ?customer_preference)
+        (booking_needs_partner_approval ?replacement_booking)
+        (not
+          (replacement_booking_draft ?replacement_booking)
+        )
+      )
+  )
+  (:action create_replacement_booking_with_alternative_preference
+    :parameters (?scheduled_attraction - scheduled_attraction ?scheduled_addon - scheduled_addon ?closure_notice - closure_notice ?customer_preference - customer_preference ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (addon_evaluated ?scheduled_addon)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (closure_notice_validated ?closure_notice)
+        (preference_alternative_confirmed ?customer_preference)
+        (attraction_candidate_selected ?scheduled_attraction)
+        (not
+          (addon_candidate_selected ?scheduled_addon)
+        )
+        (replacement_booking_draft ?replacement_booking)
+      )
+    :effect
+      (and
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_references_closure_notice ?replacement_booking ?closure_notice)
+        (booking_references_customer_preference ?replacement_booking ?customer_preference)
+        (booking_needs_manager_approval ?replacement_booking)
+        (not
+          (replacement_booking_draft ?replacement_booking)
+        )
+      )
+  )
+  (:action create_replacement_booking_full
+    :parameters (?scheduled_attraction - scheduled_attraction ?scheduled_addon - scheduled_addon ?closure_notice - closure_notice ?customer_preference - customer_preference ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (addon_evaluated ?scheduled_addon)
+        (closure_notice_for_attraction ?scheduled_attraction ?closure_notice)
+        (addon_preference_link ?scheduled_addon ?customer_preference)
+        (closure_notice_selected ?closure_notice)
+        (preference_alternative_confirmed ?customer_preference)
+        (not
+          (attraction_candidate_selected ?scheduled_attraction)
+        )
+        (not
+          (addon_candidate_selected ?scheduled_addon)
+        )
+        (replacement_booking_draft ?replacement_booking)
+      )
+    :effect
+      (and
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_references_closure_notice ?replacement_booking ?closure_notice)
+        (booking_references_customer_preference ?replacement_booking ?customer_preference)
+        (booking_needs_partner_approval ?replacement_booking)
+        (booking_needs_manager_approval ?replacement_booking)
+        (not
+          (replacement_booking_draft ?replacement_booking)
+        )
+      )
+  )
+  (:action mark_booking_ready_for_fulfilment
+    :parameters (?replacement_booking - replacement_booking ?scheduled_attraction - scheduled_attraction ?availability_check - availability_check)
+    :precondition
+      (and
+        (replacement_booking_reserved ?replacement_booking)
+        (attraction_evaluated ?scheduled_attraction)
+        (availability_check_record ?scheduled_attraction ?availability_check)
+        (not
+          (booking_ready_for_fulfilment ?replacement_booking)
+        )
+      )
+    :effect (booking_ready_for_fulfilment ?replacement_booking)
+  )
+  (:action attach_ancillary_item_to_case
+    :parameters (?support_case - support_case ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (case_links_booking ?support_case ?replacement_booking)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_item_available ?ancillary_item)
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_ready_for_fulfilment ?replacement_booking)
+        (not
+          (ancillary_item_allocated ?ancillary_item)
+        )
+      )
+    :effect
+      (and
+        (ancillary_item_allocated ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (not
+          (ancillary_item_available ?ancillary_item)
+        )
+      )
+  )
+  (:action confirm_ancillary_allocation
+    :parameters (?support_case - support_case ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking ?availability_check - availability_check)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_item_allocated ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (availability_check_record ?support_case ?availability_check)
+        (not
+          (booking_needs_partner_approval ?replacement_booking)
+        )
+        (not
+          (case_logistics_allocated ?support_case)
+        )
+      )
+    :effect (case_logistics_allocated ?support_case)
+  )
+  (:action assign_escalation_tag
+    :parameters (?support_case - support_case ?escalation_tag - escalation_tag)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (escalation_tag_available ?escalation_tag)
+        (not
+          (case_escalated ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_escalated ?support_case)
+        (case_escalation_tag_assigned ?support_case ?escalation_tag)
+        (not
+          (escalation_tag_available ?escalation_tag)
+        )
+      )
+  )
+  (:action allocate_ancillary_on_escalation
+    :parameters (?support_case - support_case ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking ?availability_check - availability_check ?escalation_tag - escalation_tag)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_item_allocated ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (availability_check_record ?support_case ?availability_check)
+        (booking_needs_partner_approval ?replacement_booking)
+        (case_escalated ?support_case)
+        (case_escalation_tag_assigned ?support_case ?escalation_tag)
+        (not
+          (case_logistics_allocated ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_logistics_allocated ?support_case)
+        (escalation_processed ?support_case)
+      )
+  )
+  (:action request_partner_approval
+    :parameters (?support_case - support_case ?logistics_resource - logistics_resource ?supplier_contact - supplier_contact ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (case_logistics_allocated ?support_case)
+        (case_allocated_logistics_resource ?support_case ?logistics_resource)
+        (supplier_contact_assigned ?support_case ?supplier_contact)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (not
+          (booking_needs_manager_approval ?replacement_booking)
+        )
+        (not
+          (partner_approval_obtained ?support_case)
+        )
+      )
+    :effect (partner_approval_obtained ?support_case)
+  )
+  (:action request_partner_approval_confirm
+    :parameters (?support_case - support_case ?logistics_resource - logistics_resource ?supplier_contact - supplier_contact ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (case_logistics_allocated ?support_case)
+        (case_allocated_logistics_resource ?support_case ?logistics_resource)
+        (supplier_contact_assigned ?support_case ?supplier_contact)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (booking_needs_manager_approval ?replacement_booking)
+        (not
+          (partner_approval_obtained ?support_case)
+        )
+      )
+    :effect (partner_approval_obtained ?support_case)
+  )
+  (:action collect_partner_manager_approvals
+    :parameters (?support_case - support_case ?manager_approval - manager_approval ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (partner_approval_obtained ?support_case)
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (not
+          (booking_needs_partner_approval ?replacement_booking)
+        )
+        (not
+          (booking_needs_manager_approval ?replacement_booking)
+        )
+        (not
+          (approvals_collected ?support_case)
+        )
+      )
+    :effect (approvals_collected ?support_case)
+  )
+  (:action collect_approvals_and_prepare_fulfilment
+    :parameters (?support_case - support_case ?manager_approval - manager_approval ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (partner_approval_obtained ?support_case)
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (booking_needs_partner_approval ?replacement_booking)
+        (not
+          (booking_needs_manager_approval ?replacement_booking)
+        )
+        (not
+          (approvals_collected ?support_case)
+        )
+      )
+    :effect
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_ready ?support_case)
+      )
+  )
+  (:action collect_approvals_and_prepare_fulfilment_variant
+    :parameters (?support_case - support_case ?manager_approval - manager_approval ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (partner_approval_obtained ?support_case)
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (not
+          (booking_needs_partner_approval ?replacement_booking)
+        )
+        (booking_needs_manager_approval ?replacement_booking)
+        (not
+          (approvals_collected ?support_case)
+        )
+      )
+    :effect
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_ready ?support_case)
+      )
+  )
+  (:action collect_approvals_and_prepare_fulfilment_combined
+    :parameters (?support_case - support_case ?manager_approval - manager_approval ?ancillary_item - ancillary_item ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (partner_approval_obtained ?support_case)
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (case_has_ancillary ?support_case ?ancillary_item)
+        (ancillary_linked_to_booking ?ancillary_item ?replacement_booking)
+        (booking_needs_partner_approval ?replacement_booking)
+        (booking_needs_manager_approval ?replacement_booking)
+        (not
+          (approvals_collected ?support_case)
+        )
+      )
+    :effect
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_ready ?support_case)
+      )
+  )
+  (:action initiate_case_closure
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (approvals_collected ?support_case)
+        (not
+          (case_fulfilment_ready ?support_case)
+        )
+        (not
+          (case_closed ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?support_case)
+        (operationally_closed ?support_case)
+      )
+  )
+  (:action assign_compensation_package
+    :parameters (?support_case - support_case ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_ready ?support_case)
+        (compensation_package_available ?compensation_package)
+      )
+    :effect
+      (and
+        (case_compensation_assigned ?support_case ?compensation_package)
+        (not
+          (compensation_package_available ?compensation_package)
+        )
+      )
+  )
+  (:action finalize_fulfilment
+    :parameters (?support_case - support_case ?scheduled_attraction - scheduled_attraction ?scheduled_addon - scheduled_addon ?availability_check - availability_check ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_ready ?support_case)
+        (case_compensation_assigned ?support_case ?compensation_package)
+        (case_involves_attraction ?support_case ?scheduled_attraction)
+        (case_involves_addon ?support_case ?scheduled_addon)
+        (attraction_candidate_selected ?scheduled_attraction)
+        (addon_candidate_selected ?scheduled_addon)
+        (availability_check_record ?support_case ?availability_check)
+        (not
+          (case_fulfilment_confirmed ?support_case)
+        )
+      )
+    :effect (case_fulfilment_confirmed ?support_case)
+  )
+  (:action close_case_after_fulfilment
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (approvals_collected ?support_case)
+        (case_fulfilment_confirmed ?support_case)
+        (not
+          (case_closed ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?support_case)
+        (operationally_closed ?support_case)
+      )
+  )
+  (:action assign_partner_approval_to_case
+    :parameters (?support_case - support_case ?partner_approval - partner_approval ?availability_check - availability_check)
+    :precondition
+      (and
+        (proposal_accepted ?support_case)
+        (availability_check_record ?support_case ?availability_check)
+        (partner_approval_available ?partner_approval)
+        (case_has_partner_approval ?support_case ?partner_approval)
+        (not
+          (partner_approval_registered ?support_case)
+        )
+      )
+    :effect
+      (and
+        (partner_approval_registered ?support_case)
+        (not
+          (partner_approval_available ?partner_approval)
+        )
+      )
+  )
+  (:action initiate_partner_approval_request
+    :parameters (?support_case - support_case ?supplier_contact - supplier_contact)
+    :precondition
+      (and
+        (partner_approval_registered ?support_case)
+        (supplier_contact_assigned ?support_case ?supplier_contact)
+        (not
+          (partner_approval_request_sent ?support_case)
+        )
+      )
+    :effect (partner_approval_request_sent ?support_case)
+  )
+  (:action confirm_partner_approval
+    :parameters (?support_case - support_case ?manager_approval - manager_approval)
+    :precondition
+      (and
+        (partner_approval_request_sent ?support_case)
+        (case_allocated_manager_approval ?support_case ?manager_approval)
+        (not
+          (partner_approval_confirmed ?support_case)
+        )
+      )
+    :effect (partner_approval_confirmed ?support_case)
+  )
+  (:action close_case_on_partner_confirmation
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (partner_approval_confirmed ?support_case)
+        (not
+          (case_closed ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?support_case)
+        (operationally_closed ?support_case)
+      )
+  )
+  (:action finalize_attraction_resolution
+    :parameters (?scheduled_attraction - scheduled_attraction ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (attraction_evaluated ?scheduled_attraction)
+        (attraction_candidate_selected ?scheduled_attraction)
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_ready_for_fulfilment ?replacement_booking)
+        (not
+          (operationally_closed ?scheduled_attraction)
+        )
+      )
+    :effect (operationally_closed ?scheduled_attraction)
+  )
+  (:action finalize_addon_resolution
+    :parameters (?scheduled_addon - scheduled_addon ?replacement_booking - replacement_booking)
+    :precondition
+      (and
+        (addon_evaluated ?scheduled_addon)
+        (addon_candidate_selected ?scheduled_addon)
+        (replacement_booking_reserved ?replacement_booking)
+        (booking_ready_for_fulfilment ?replacement_booking)
+        (not
+          (operationally_closed ?scheduled_addon)
+        )
+      )
+    :effect (operationally_closed ?scheduled_addon)
+  )
+  (:action assign_refund_instrument
+    :parameters (?itinerary_element - itinerary_element ?refund_instrument - refund_instrument ?availability_check - availability_check)
+    :precondition
+      (and
+        (operationally_closed ?itinerary_element)
+        (availability_check_record ?itinerary_element ?availability_check)
+        (refund_instrument_available ?refund_instrument)
+        (not
+          (compensation_recorded ?itinerary_element)
+        )
+      )
+    :effect
+      (and
+        (compensation_recorded ?itinerary_element)
+        (refund_instrument_assigned ?itinerary_element ?refund_instrument)
+        (not
+          (refund_instrument_available ?refund_instrument)
+        )
+      )
+  )
+  (:action execute_refund_and_finalize_substitution
+    :parameters (?scheduled_attraction - scheduled_attraction ?substitute_option - substitute_option ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (compensation_recorded ?scheduled_attraction)
+        (proposed_substitute ?scheduled_attraction ?substitute_option)
+        (refund_instrument_assigned ?scheduled_attraction ?refund_instrument)
+        (not
+          (itinerary_element_resolved ?scheduled_attraction)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_resolved ?scheduled_attraction)
+        (substitute_available ?substitute_option)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+  (:action execute_refund_and_finalize_addon
+    :parameters (?scheduled_addon - scheduled_addon ?substitute_option - substitute_option ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (compensation_recorded ?scheduled_addon)
+        (proposed_substitute ?scheduled_addon ?substitute_option)
+        (refund_instrument_assigned ?scheduled_addon ?refund_instrument)
+        (not
+          (itinerary_element_resolved ?scheduled_addon)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_resolved ?scheduled_addon)
+        (substitute_available ?substitute_option)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+  (:action execute_refund_and_finalize_case
+    :parameters (?support_case - support_case ?substitute_option - substitute_option ?refund_instrument - refund_instrument)
+    :precondition
+      (and
+        (compensation_recorded ?support_case)
+        (proposed_substitute ?support_case ?substitute_option)
+        (refund_instrument_assigned ?support_case ?refund_instrument)
+        (not
+          (itinerary_element_resolved ?support_case)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_resolved ?support_case)
+        (substitute_available ?substitute_option)
+        (refund_instrument_available ?refund_instrument)
+      )
+  )
+)

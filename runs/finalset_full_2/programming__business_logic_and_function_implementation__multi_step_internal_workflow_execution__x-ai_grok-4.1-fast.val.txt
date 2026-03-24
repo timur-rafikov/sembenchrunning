@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain multi_step_internal_workflow_execution_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object_entity - object workflow_component - object_entity resource_category - object_entity asset_category - object_entity aggregate_root - object_entity workflow_instance - aggregate_root resource_token - workflow_component operation_type - workflow_component capability - workflow_component policy_rule - workflow_component metadata_record - workflow_component audit_token - workflow_component execution_parameter - workflow_component notification_template - workflow_component artifact - resource_category attachment_record - resource_category approval_reference - resource_category signal_channel_a - asset_category signal_channel_b - asset_category output_bundle - asset_category participant_group_a - workflow_instance participant_group_b - workflow_instance primary_participant - participant_group_a secondary_participant - participant_group_a orchestrator - participant_group_b)
+
+  (:predicates
+    (workflow_instance_open ?workflow_instance - workflow_instance)
+    (context_enabled ?workflow_instance - workflow_instance)
+    (resource_allocated ?workflow_instance - workflow_instance)
+    (finalized ?workflow_instance - workflow_instance)
+    (completion_signaled ?workflow_instance - workflow_instance)
+    (audit_stage_open ?workflow_instance - workflow_instance)
+    (resource_available ?resource_token - resource_token)
+    (workflow_resource_binding ?workflow_instance - workflow_instance ?resource_token - resource_token)
+    (operation_type_available ?operation_type - operation_type)
+    (workflow_operation_binding ?workflow_instance - workflow_instance ?operation_type - operation_type)
+    (capability_available ?capability - capability)
+    (workflow_capability_binding ?workflow_instance - workflow_instance ?capability - capability)
+    (artifact_available ?artifact - artifact)
+    (primary_artifact_binding ?primary_participant - primary_participant ?artifact - artifact)
+    (secondary_artifact_binding ?secondary_participant - secondary_participant ?artifact - artifact)
+    (primary_channel_binding ?primary_participant - primary_participant ?signal_channel_a - signal_channel_a)
+    (signal_a_emitted ?signal_channel_a - signal_channel_a)
+    (signal_a_buffered ?signal_channel_a - signal_channel_a)
+    (primary_participant_committed ?primary_participant - primary_participant)
+    (secondary_channel_binding ?secondary_participant - secondary_participant ?signal_channel_b - signal_channel_b)
+    (signal_b_emitted ?signal_channel_b - signal_channel_b)
+    (signal_b_buffered ?signal_channel_b - signal_channel_b)
+    (secondary_participant_committed ?secondary_participant - secondary_participant)
+    (output_bundle_available ?output_bundle - output_bundle)
+    (output_bundle_prepared ?output_bundle - output_bundle)
+    (bundle_signal_a_link ?output_bundle - output_bundle ?signal_channel_a - signal_channel_a)
+    (bundle_signal_b_link ?output_bundle - output_bundle ?signal_channel_b - signal_channel_b)
+    (bundle_marker_a ?output_bundle - output_bundle)
+    (bundle_marker_b ?output_bundle - output_bundle)
+    (bundle_verified ?output_bundle - output_bundle)
+    (orchestrator_primary_link ?orchestrator - orchestrator ?primary_participant - primary_participant)
+    (orchestrator_secondary_link ?orchestrator - orchestrator ?secondary_participant - secondary_participant)
+    (orchestrator_output_link ?orchestrator - orchestrator ?output_bundle - output_bundle)
+    (attachment_available ?attachment_record - attachment_record)
+    (orchestrator_attachment_link ?orchestrator - orchestrator ?attachment_record - attachment_record)
+    (attachment_bound ?attachment_record - attachment_record)
+    (attachment_bundle_link ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    (orchestrator_review_stage_a ?orchestrator - orchestrator)
+    (orchestrator_review_stage_b ?orchestrator - orchestrator)
+    (orchestrator_review_stage_c ?orchestrator - orchestrator)
+    (policy_bound ?orchestrator - orchestrator)
+    (orchestrator_approval_ready ?orchestrator - orchestrator)
+    (orchestrator_enrichment_ready ?orchestrator - orchestrator)
+    (orchestrator_validation_passed ?orchestrator - orchestrator)
+    (approval_reference_available ?approval_reference - approval_reference)
+    (orchestrator_approval_reference_link ?orchestrator - orchestrator ?approval_reference - approval_reference)
+    (orchestrator_review_started ?orchestrator - orchestrator)
+    (orchestrator_review_confirmed ?orchestrator - orchestrator)
+    (orchestrator_review_closed ?orchestrator - orchestrator)
+    (policy_available ?policy_rule - policy_rule)
+    (orchestrator_policy_link ?orchestrator - orchestrator ?policy_rule - policy_rule)
+    (metadata_available ?metadata_record - metadata_record)
+    (orchestrator_metadata_link ?orchestrator - orchestrator ?metadata_record - metadata_record)
+    (execution_parameter_available ?execution_parameter - execution_parameter)
+    (orchestrator_parameter_link ?orchestrator - orchestrator ?execution_parameter - execution_parameter)
+    (notification_template_available ?notification_template - notification_template)
+    (orchestrator_notification_link ?orchestrator - orchestrator ?notification_template - notification_template)
+    (audit_token_available ?audit_token - audit_token)
+    (workflow_audit_link ?workflow_instance - workflow_instance ?audit_token - audit_token)
+    (primary_participant_primed ?primary_participant - primary_participant)
+    (secondary_participant_primed ?secondary_participant - secondary_participant)
+    (orchestrator_finalized ?orchestrator - orchestrator)
+  )
+  (:action initialize_workflow_instance
+    :parameters (?workflow_instance - workflow_instance)
+    :precondition
+      (and
+        (not
+          (workflow_instance_open ?workflow_instance)
+        )
+        (not
+          (finalized ?workflow_instance)
+        )
+      )
+    :effect (workflow_instance_open ?workflow_instance)
+  )
+  (:action allocate_workflow_resource
+    :parameters (?workflow_instance - workflow_instance ?resource_token - resource_token)
+    :precondition
+      (and
+        (workflow_instance_open ?workflow_instance)
+        (not
+          (resource_allocated ?workflow_instance)
+        )
+        (resource_available ?resource_token)
+      )
+    :effect
+      (and
+        (resource_allocated ?workflow_instance)
+        (workflow_resource_binding ?workflow_instance ?resource_token)
+        (not
+          (resource_available ?resource_token)
+        )
+      )
+  )
+  (:action bind_operation_type_to_workflow
+    :parameters (?workflow_instance - workflow_instance ?operation_type - operation_type)
+    :precondition
+      (and
+        (workflow_instance_open ?workflow_instance)
+        (resource_allocated ?workflow_instance)
+        (operation_type_available ?operation_type)
+      )
+    :effect
+      (and
+        (workflow_operation_binding ?workflow_instance ?operation_type)
+        (not
+          (operation_type_available ?operation_type)
+        )
+      )
+  )
+  (:action confirm_workflow_operation_binding
+    :parameters (?workflow_instance - workflow_instance ?operation_type - operation_type)
+    :precondition
+      (and
+        (workflow_instance_open ?workflow_instance)
+        (resource_allocated ?workflow_instance)
+        (workflow_operation_binding ?workflow_instance ?operation_type)
+        (not
+          (context_enabled ?workflow_instance)
+        )
+      )
+    :effect (context_enabled ?workflow_instance)
+  )
+  (:action release_operation_type_binding
+    :parameters (?workflow_instance - workflow_instance ?operation_type - operation_type)
+    :precondition
+      (and
+        (workflow_operation_binding ?workflow_instance ?operation_type)
+      )
+    :effect
+      (and
+        (operation_type_available ?operation_type)
+        (not
+          (workflow_operation_binding ?workflow_instance ?operation_type)
+        )
+      )
+  )
+  (:action bind_capability_to_workflow
+    :parameters (?workflow_instance - workflow_instance ?capability - capability)
+    :precondition
+      (and
+        (context_enabled ?workflow_instance)
+        (capability_available ?capability)
+      )
+    :effect
+      (and
+        (workflow_capability_binding ?workflow_instance ?capability)
+        (not
+          (capability_available ?capability)
+        )
+      )
+  )
+  (:action release_capability_binding
+    :parameters (?workflow_instance - workflow_instance ?capability - capability)
+    :precondition
+      (and
+        (workflow_capability_binding ?workflow_instance ?capability)
+      )
+    :effect
+      (and
+        (capability_available ?capability)
+        (not
+          (workflow_capability_binding ?workflow_instance ?capability)
+        )
+      )
+  )
+  (:action bind_execution_parameter_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (execution_parameter_available ?execution_parameter)
+      )
+    :effect
+      (and
+        (orchestrator_parameter_link ?orchestrator ?execution_parameter)
+        (not
+          (execution_parameter_available ?execution_parameter)
+        )
+      )
+  )
+  (:action unbind_execution_parameter_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (orchestrator_parameter_link ?orchestrator ?execution_parameter)
+      )
+    :effect
+      (and
+        (execution_parameter_available ?execution_parameter)
+        (not
+          (orchestrator_parameter_link ?orchestrator ?execution_parameter)
+        )
+      )
+  )
+  (:action bind_notification_template_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (notification_template_available ?notification_template)
+      )
+    :effect
+      (and
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (not
+          (notification_template_available ?notification_template)
+        )
+      )
+  )
+  (:action unbind_notification_template_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template)
+    :precondition
+      (and
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+      )
+    :effect
+      (and
+        (notification_template_available ?notification_template)
+        (not
+          (orchestrator_notification_link ?orchestrator ?notification_template)
+        )
+      )
+  )
+  (:action emit_primary_signal_a
+    :parameters (?primary_participant - primary_participant ?signal_channel_a - signal_channel_a ?operation_type - operation_type)
+    :precondition
+      (and
+        (context_enabled ?primary_participant)
+        (workflow_operation_binding ?primary_participant ?operation_type)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (not
+          (signal_a_emitted ?signal_channel_a)
+        )
+        (not
+          (signal_a_buffered ?signal_channel_a)
+        )
+      )
+    :effect (signal_a_emitted ?signal_channel_a)
+  )
+  (:action prime_primary_participant
+    :parameters (?primary_participant - primary_participant ?signal_channel_a - signal_channel_a ?capability - capability)
+    :precondition
+      (and
+        (context_enabled ?primary_participant)
+        (workflow_capability_binding ?primary_participant ?capability)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (signal_a_emitted ?signal_channel_a)
+        (not
+          (primary_participant_primed ?primary_participant)
+        )
+      )
+    :effect
+      (and
+        (primary_participant_primed ?primary_participant)
+        (primary_participant_committed ?primary_participant)
+      )
+  )
+  (:action attach_primary_artifact
+    :parameters (?primary_participant - primary_participant ?signal_channel_a - signal_channel_a ?artifact - artifact)
+    :precondition
+      (and
+        (context_enabled ?primary_participant)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (artifact_available ?artifact)
+        (not
+          (primary_participant_primed ?primary_participant)
+        )
+      )
+    :effect
+      (and
+        (signal_a_buffered ?signal_channel_a)
+        (primary_participant_primed ?primary_participant)
+        (primary_artifact_binding ?primary_participant ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action restore_primary_artifact
+    :parameters (?primary_participant - primary_participant ?signal_channel_a - signal_channel_a ?operation_type - operation_type ?artifact - artifact)
+    :precondition
+      (and
+        (context_enabled ?primary_participant)
+        (workflow_operation_binding ?primary_participant ?operation_type)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (signal_a_buffered ?signal_channel_a)
+        (primary_artifact_binding ?primary_participant ?artifact)
+        (not
+          (primary_participant_committed ?primary_participant)
+        )
+      )
+    :effect
+      (and
+        (signal_a_emitted ?signal_channel_a)
+        (primary_participant_committed ?primary_participant)
+        (artifact_available ?artifact)
+        (not
+          (primary_artifact_binding ?primary_participant ?artifact)
+        )
+      )
+  )
+  (:action emit_secondary_signal_b
+    :parameters (?secondary_participant - secondary_participant ?signal_channel_b - signal_channel_b ?operation_type - operation_type)
+    :precondition
+      (and
+        (context_enabled ?secondary_participant)
+        (workflow_operation_binding ?secondary_participant ?operation_type)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (not
+          (signal_b_emitted ?signal_channel_b)
+        )
+        (not
+          (signal_b_buffered ?signal_channel_b)
+        )
+      )
+    :effect (signal_b_emitted ?signal_channel_b)
+  )
+  (:action prime_secondary_participant
+    :parameters (?secondary_participant - secondary_participant ?signal_channel_b - signal_channel_b ?capability - capability)
+    :precondition
+      (and
+        (context_enabled ?secondary_participant)
+        (workflow_capability_binding ?secondary_participant ?capability)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_b_emitted ?signal_channel_b)
+        (not
+          (secondary_participant_primed ?secondary_participant)
+        )
+      )
+    :effect
+      (and
+        (secondary_participant_primed ?secondary_participant)
+        (secondary_participant_committed ?secondary_participant)
+      )
+  )
+  (:action attach_secondary_artifact
+    :parameters (?secondary_participant - secondary_participant ?signal_channel_b - signal_channel_b ?artifact - artifact)
+    :precondition
+      (and
+        (context_enabled ?secondary_participant)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (artifact_available ?artifact)
+        (not
+          (secondary_participant_primed ?secondary_participant)
+        )
+      )
+    :effect
+      (and
+        (signal_b_buffered ?signal_channel_b)
+        (secondary_participant_primed ?secondary_participant)
+        (secondary_artifact_binding ?secondary_participant ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action restore_secondary_artifact
+    :parameters (?secondary_participant - secondary_participant ?signal_channel_b - signal_channel_b ?operation_type - operation_type ?artifact - artifact)
+    :precondition
+      (and
+        (context_enabled ?secondary_participant)
+        (workflow_operation_binding ?secondary_participant ?operation_type)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_b_buffered ?signal_channel_b)
+        (secondary_artifact_binding ?secondary_participant ?artifact)
+        (not
+          (secondary_participant_committed ?secondary_participant)
+        )
+      )
+    :effect
+      (and
+        (signal_b_emitted ?signal_channel_b)
+        (secondary_participant_committed ?secondary_participant)
+        (artifact_available ?artifact)
+        (not
+          (secondary_artifact_binding ?secondary_participant ?artifact)
+        )
+      )
+  )
+  (:action consolidate_output_bundle_variant_a
+    :parameters (?primary_participant - primary_participant ?secondary_participant - secondary_participant ?signal_channel_a - signal_channel_a ?signal_channel_b - signal_channel_b ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (primary_participant_primed ?primary_participant)
+        (secondary_participant_primed ?secondary_participant)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_a_emitted ?signal_channel_a)
+        (signal_b_emitted ?signal_channel_b)
+        (primary_participant_committed ?primary_participant)
+        (secondary_participant_committed ?secondary_participant)
+        (output_bundle_available ?output_bundle)
+      )
+    :effect
+      (and
+        (output_bundle_prepared ?output_bundle)
+        (bundle_signal_a_link ?output_bundle ?signal_channel_a)
+        (bundle_signal_b_link ?output_bundle ?signal_channel_b)
+        (not
+          (output_bundle_available ?output_bundle)
+        )
+      )
+  )
+  (:action consolidate_output_bundle_variant_b
+    :parameters (?primary_participant - primary_participant ?secondary_participant - secondary_participant ?signal_channel_a - signal_channel_a ?signal_channel_b - signal_channel_b ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (primary_participant_primed ?primary_participant)
+        (secondary_participant_primed ?secondary_participant)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_a_buffered ?signal_channel_a)
+        (signal_b_emitted ?signal_channel_b)
+        (not
+          (primary_participant_committed ?primary_participant)
+        )
+        (secondary_participant_committed ?secondary_participant)
+        (output_bundle_available ?output_bundle)
+      )
+    :effect
+      (and
+        (output_bundle_prepared ?output_bundle)
+        (bundle_signal_a_link ?output_bundle ?signal_channel_a)
+        (bundle_signal_b_link ?output_bundle ?signal_channel_b)
+        (bundle_marker_a ?output_bundle)
+        (not
+          (output_bundle_available ?output_bundle)
+        )
+      )
+  )
+  (:action consolidate_output_bundle_variant_c
+    :parameters (?primary_participant - primary_participant ?secondary_participant - secondary_participant ?signal_channel_a - signal_channel_a ?signal_channel_b - signal_channel_b ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (primary_participant_primed ?primary_participant)
+        (secondary_participant_primed ?secondary_participant)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_a_emitted ?signal_channel_a)
+        (signal_b_buffered ?signal_channel_b)
+        (primary_participant_committed ?primary_participant)
+        (not
+          (secondary_participant_committed ?secondary_participant)
+        )
+        (output_bundle_available ?output_bundle)
+      )
+    :effect
+      (and
+        (output_bundle_prepared ?output_bundle)
+        (bundle_signal_a_link ?output_bundle ?signal_channel_a)
+        (bundle_signal_b_link ?output_bundle ?signal_channel_b)
+        (bundle_marker_b ?output_bundle)
+        (not
+          (output_bundle_available ?output_bundle)
+        )
+      )
+  )
+  (:action consolidate_output_bundle_variant_d
+    :parameters (?primary_participant - primary_participant ?secondary_participant - secondary_participant ?signal_channel_a - signal_channel_a ?signal_channel_b - signal_channel_b ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (primary_participant_primed ?primary_participant)
+        (secondary_participant_primed ?secondary_participant)
+        (primary_channel_binding ?primary_participant ?signal_channel_a)
+        (secondary_channel_binding ?secondary_participant ?signal_channel_b)
+        (signal_a_buffered ?signal_channel_a)
+        (signal_b_buffered ?signal_channel_b)
+        (not
+          (primary_participant_committed ?primary_participant)
+        )
+        (not
+          (secondary_participant_committed ?secondary_participant)
+        )
+        (output_bundle_available ?output_bundle)
+      )
+    :effect
+      (and
+        (output_bundle_prepared ?output_bundle)
+        (bundle_signal_a_link ?output_bundle ?signal_channel_a)
+        (bundle_signal_b_link ?output_bundle ?signal_channel_b)
+        (bundle_marker_a ?output_bundle)
+        (bundle_marker_b ?output_bundle)
+        (not
+          (output_bundle_available ?output_bundle)
+        )
+      )
+  )
+  (:action verify_output_bundle
+    :parameters (?output_bundle - output_bundle ?primary_participant - primary_participant ?operation_type - operation_type)
+    :precondition
+      (and
+        (output_bundle_prepared ?output_bundle)
+        (primary_participant_primed ?primary_participant)
+        (workflow_operation_binding ?primary_participant ?operation_type)
+        (not
+          (bundle_verified ?output_bundle)
+        )
+      )
+    :effect (bundle_verified ?output_bundle)
+  )
+  (:action bind_attachment_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (orchestrator_output_link ?orchestrator ?output_bundle)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_available ?attachment_record)
+        (output_bundle_prepared ?output_bundle)
+        (bundle_verified ?output_bundle)
+        (not
+          (attachment_bound ?attachment_record)
+        )
+      )
+    :effect
+      (and
+        (attachment_bound ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (not
+          (attachment_available ?attachment_record)
+        )
+      )
+  )
+  (:action certify_attachment_binding
+    :parameters (?orchestrator - orchestrator ?attachment_record - attachment_record ?output_bundle - output_bundle ?operation_type - operation_type)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bound ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (workflow_operation_binding ?orchestrator ?operation_type)
+        (not
+          (bundle_marker_a ?output_bundle)
+        )
+        (not
+          (orchestrator_review_stage_a ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_stage_a ?orchestrator)
+  )
+  (:action bind_policy_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (policy_available ?policy_rule)
+        (not
+          (policy_bound ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (policy_bound ?orchestrator)
+        (orchestrator_policy_link ?orchestrator ?policy_rule)
+        (not
+          (policy_available ?policy_rule)
+        )
+      )
+  )
+  (:action certify_policy_binding
+    :parameters (?orchestrator - orchestrator ?attachment_record - attachment_record ?output_bundle - output_bundle ?operation_type - operation_type ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bound ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (workflow_operation_binding ?orchestrator ?operation_type)
+        (bundle_marker_a ?output_bundle)
+        (policy_bound ?orchestrator)
+        (orchestrator_policy_link ?orchestrator ?policy_rule)
+        (not
+          (orchestrator_review_stage_a ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_review_stage_a ?orchestrator)
+        (orchestrator_approval_ready ?orchestrator)
+      )
+  )
+  (:action promote_orchestrator_checkpoint_a
+    :parameters (?orchestrator - orchestrator ?execution_parameter - execution_parameter ?capability - capability ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_a ?orchestrator)
+        (orchestrator_parameter_link ?orchestrator ?execution_parameter)
+        (workflow_capability_binding ?orchestrator ?capability)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (not
+          (bundle_marker_b ?output_bundle)
+        )
+        (not
+          (orchestrator_review_stage_b ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_stage_b ?orchestrator)
+  )
+  (:action promote_orchestrator_checkpoint_b
+    :parameters (?orchestrator - orchestrator ?execution_parameter - execution_parameter ?capability - capability ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_a ?orchestrator)
+        (orchestrator_parameter_link ?orchestrator ?execution_parameter)
+        (workflow_capability_binding ?orchestrator ?capability)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (bundle_marker_b ?output_bundle)
+        (not
+          (orchestrator_review_stage_b ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_stage_b ?orchestrator)
+  )
+  (:action promote_orchestrator_checkpoint_c
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_b ?orchestrator)
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (not
+          (bundle_marker_a ?output_bundle)
+        )
+        (not
+          (bundle_marker_b ?output_bundle)
+        )
+        (not
+          (orchestrator_review_stage_c ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_stage_c ?orchestrator)
+  )
+  (:action promote_orchestrator_checkpoint_d
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_b ?orchestrator)
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (bundle_marker_a ?output_bundle)
+        (not
+          (bundle_marker_b ?output_bundle)
+        )
+        (not
+          (orchestrator_review_stage_c ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_enrichment_ready ?orchestrator)
+      )
+  )
+  (:action promote_orchestrator_checkpoint_e
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_b ?orchestrator)
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (not
+          (bundle_marker_a ?output_bundle)
+        )
+        (bundle_marker_b ?output_bundle)
+        (not
+          (orchestrator_review_stage_c ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_enrichment_ready ?orchestrator)
+      )
+  )
+  (:action promote_orchestrator_checkpoint_f
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template ?attachment_record - attachment_record ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (orchestrator_review_stage_b ?orchestrator)
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (orchestrator_attachment_link ?orchestrator ?attachment_record)
+        (attachment_bundle_link ?attachment_record ?output_bundle)
+        (bundle_marker_a ?output_bundle)
+        (bundle_marker_b ?output_bundle)
+        (not
+          (orchestrator_review_stage_c ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_enrichment_ready ?orchestrator)
+      )
+  )
+  (:action seal_orchestrator_finalization
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (not
+          (orchestrator_enrichment_ready ?orchestrator)
+        )
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (completion_signaled ?orchestrator)
+      )
+  )
+  (:action attach_metadata_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?metadata_record - metadata_record)
+    :precondition
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_enrichment_ready ?orchestrator)
+        (metadata_available ?metadata_record)
+      )
+    :effect
+      (and
+        (orchestrator_metadata_link ?orchestrator ?metadata_record)
+        (not
+          (metadata_available ?metadata_record)
+        )
+      )
+  )
+  (:action validate_orchestrator_enrichment
+    :parameters (?orchestrator - orchestrator ?primary_participant - primary_participant ?secondary_participant - secondary_participant ?operation_type - operation_type ?metadata_record - metadata_record)
+    :precondition
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_enrichment_ready ?orchestrator)
+        (orchestrator_metadata_link ?orchestrator ?metadata_record)
+        (orchestrator_primary_link ?orchestrator ?primary_participant)
+        (orchestrator_secondary_link ?orchestrator ?secondary_participant)
+        (primary_participant_committed ?primary_participant)
+        (secondary_participant_committed ?secondary_participant)
+        (workflow_operation_binding ?orchestrator ?operation_type)
+        (not
+          (orchestrator_validation_passed ?orchestrator)
+        )
+      )
+    :effect (orchestrator_validation_passed ?orchestrator)
+  )
+  (:action certify_orchestrator_finalization
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_review_stage_c ?orchestrator)
+        (orchestrator_validation_passed ?orchestrator)
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (completion_signaled ?orchestrator)
+      )
+  )
+  (:action start_orchestrator_review
+    :parameters (?orchestrator - orchestrator ?approval_reference - approval_reference ?operation_type - operation_type)
+    :precondition
+      (and
+        (context_enabled ?orchestrator)
+        (workflow_operation_binding ?orchestrator ?operation_type)
+        (approval_reference_available ?approval_reference)
+        (orchestrator_approval_reference_link ?orchestrator ?approval_reference)
+        (not
+          (orchestrator_review_started ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_review_started ?orchestrator)
+        (not
+          (approval_reference_available ?approval_reference)
+        )
+      )
+  )
+  (:action authorize_orchestrator_capability
+    :parameters (?orchestrator - orchestrator ?capability - capability)
+    :precondition
+      (and
+        (orchestrator_review_started ?orchestrator)
+        (workflow_capability_binding ?orchestrator ?capability)
+        (not
+          (orchestrator_review_confirmed ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_confirmed ?orchestrator)
+  )
+  (:action confirm_orchestrator_review
+    :parameters (?orchestrator - orchestrator ?notification_template - notification_template)
+    :precondition
+      (and
+        (orchestrator_review_confirmed ?orchestrator)
+        (orchestrator_notification_link ?orchestrator ?notification_template)
+        (not
+          (orchestrator_review_closed ?orchestrator)
+        )
+      )
+    :effect (orchestrator_review_closed ?orchestrator)
+  )
+  (:action complete_orchestrator_finalization
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_review_closed ?orchestrator)
+        (not
+          (orchestrator_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_finalized ?orchestrator)
+        (completion_signaled ?orchestrator)
+      )
+  )
+  (:action mark_primary_participant_complete
+    :parameters (?primary_participant - primary_participant ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (primary_participant_primed ?primary_participant)
+        (primary_participant_committed ?primary_participant)
+        (output_bundle_prepared ?output_bundle)
+        (bundle_verified ?output_bundle)
+        (not
+          (completion_signaled ?primary_participant)
+        )
+      )
+    :effect (completion_signaled ?primary_participant)
+  )
+  (:action mark_secondary_participant_complete
+    :parameters (?secondary_participant - secondary_participant ?output_bundle - output_bundle)
+    :precondition
+      (and
+        (secondary_participant_primed ?secondary_participant)
+        (secondary_participant_committed ?secondary_participant)
+        (output_bundle_prepared ?output_bundle)
+        (bundle_verified ?output_bundle)
+        (not
+          (completion_signaled ?secondary_participant)
+        )
+      )
+    :effect (completion_signaled ?secondary_participant)
+  )
+  (:action bind_audit_token_to_workflow_instance
+    :parameters (?workflow_instance - workflow_instance ?audit_token - audit_token ?operation_type - operation_type)
+    :precondition
+      (and
+        (completion_signaled ?workflow_instance)
+        (workflow_operation_binding ?workflow_instance ?operation_type)
+        (audit_token_available ?audit_token)
+        (not
+          (audit_stage_open ?workflow_instance)
+        )
+      )
+    :effect
+      (and
+        (audit_stage_open ?workflow_instance)
+        (workflow_audit_link ?workflow_instance ?audit_token)
+        (not
+          (audit_token_available ?audit_token)
+        )
+      )
+  )
+  (:action finalize_primary_participant
+    :parameters (?primary_participant - primary_participant ?resource_token - resource_token ?audit_token - audit_token)
+    :precondition
+      (and
+        (audit_stage_open ?primary_participant)
+        (workflow_resource_binding ?primary_participant ?resource_token)
+        (workflow_audit_link ?primary_participant ?audit_token)
+        (not
+          (finalized ?primary_participant)
+        )
+      )
+    :effect
+      (and
+        (finalized ?primary_participant)
+        (resource_available ?resource_token)
+        (audit_token_available ?audit_token)
+      )
+  )
+  (:action finalize_secondary_participant
+    :parameters (?secondary_participant - secondary_participant ?resource_token - resource_token ?audit_token - audit_token)
+    :precondition
+      (and
+        (audit_stage_open ?secondary_participant)
+        (workflow_resource_binding ?secondary_participant ?resource_token)
+        (workflow_audit_link ?secondary_participant ?audit_token)
+        (not
+          (finalized ?secondary_participant)
+        )
+      )
+    :effect
+      (and
+        (finalized ?secondary_participant)
+        (resource_available ?resource_token)
+        (audit_token_available ?audit_token)
+      )
+  )
+  (:action finalize_orchestrator
+    :parameters (?orchestrator - orchestrator ?resource_token - resource_token ?audit_token - audit_token)
+    :precondition
+      (and
+        (audit_stage_open ?orchestrator)
+        (workflow_resource_binding ?orchestrator ?resource_token)
+        (workflow_audit_link ?orchestrator ?audit_token)
+        (not
+          (finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (finalized ?orchestrator)
+        (resource_available ?resource_token)
+        (audit_token_available ?audit_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem multi_step_internal_workflow_execution_problem)
+  (:domain multi_step_internal_workflow_execution_domain)
+  (:objects primary_participant_instance - primary_participant secondary_participant_instance - secondary_participant lead_orchestrator - orchestrator support_orchestrator - orchestrator resource_token_a - resource_token resource_token_b - resource_token resource_token_c - resource_token standard_operation_type - operation_type processing_capability - capability supporting_artifact - artifact signal_channel_alpha - signal_channel_a signal_channel_beta - signal_channel_b consolidated_output_bundle - output_bundle attachment_a - attachment_record attachment_b - attachment_record policy_a - policy_rule policy_b - policy_rule metadata_a - metadata_record metadata_b - metadata_record audit_token_main - audit_token execution_parameter_main - execution_parameter approval_reference_a - approval_reference approval_reference_b - approval_reference notification_template_main - notification_template)
+  (:init
+    (resource_available resource_token_a)
+    (resource_available resource_token_b)
+    (resource_available resource_token_c)
+    (operation_type_available standard_operation_type)
+    (capability_available processing_capability)
+    (artifact_available supporting_artifact)
+    (primary_channel_binding primary_participant_instance signal_channel_alpha)
+    (secondary_channel_binding secondary_participant_instance signal_channel_beta)
+    (output_bundle_available consolidated_output_bundle)
+    (attachment_available attachment_a)
+    (attachment_available attachment_b)
+    (orchestrator_primary_link lead_orchestrator primary_participant_instance)
+    (orchestrator_primary_link support_orchestrator primary_participant_instance)
+    (orchestrator_secondary_link lead_orchestrator secondary_participant_instance)
+    (orchestrator_secondary_link support_orchestrator secondary_participant_instance)
+    (orchestrator_output_link lead_orchestrator consolidated_output_bundle)
+    (orchestrator_output_link support_orchestrator consolidated_output_bundle)
+    (orchestrator_attachment_link lead_orchestrator attachment_a)
+    (orchestrator_attachment_link support_orchestrator attachment_b)
+    (policy_available policy_a)
+    (policy_available policy_b)
+    (metadata_available metadata_a)
+    (metadata_available metadata_b)
+    (audit_token_available audit_token_main)
+    (execution_parameter_available execution_parameter_main)
+    (approval_reference_available approval_reference_a)
+    (orchestrator_approval_reference_link lead_orchestrator approval_reference_a)
+    (orchestrator_approval_reference_link support_orchestrator approval_reference_b)
+    (notification_template_available notification_template_main)
+  )
+  (:goal
+    (and
+      (finalized primary_participant_instance)
+      (finalized secondary_participant_instance)
+      (finalized lead_orchestrator)
+      (finalized support_orchestrator)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_workflow_instance primary_participant_instance)
+(allocate_workflow_resource primary_participant_instance resource_token_a)
+(bind_operation_type_to_workflow primary_participant_instance standard_operation_type)
+(confirm_workflow_operation_binding primary_participant_instance standard_operation_type)
+(attach_primary_artifact primary_participant_instance signal_channel_alpha supporting_artifact)
+(restore_primary_artifact primary_participant_instance signal_channel_alpha standard_operation_type supporting_artifact)
+(release_operation_type_binding primary_participant_instance standard_operation_type)
+(initialize_workflow_instance secondary_participant_instance)
+(allocate_workflow_resource secondary_participant_instance resource_token_b)
+(bind_operation_type_to_workflow secondary_participant_instance standard_operation_type)
+(confirm_workflow_operation_binding secondary_participant_instance standard_operation_type)
+(attach_secondary_artifact secondary_participant_instance signal_channel_beta supporting_artifact)
+(restore_secondary_artifact secondary_participant_instance signal_channel_beta standard_operation_type supporting_artifact)
+(release_operation_type_binding secondary_participant_instance standard_operation_type)
+(consolidate_output_bundle_variant_a primary_participant_instance secondary_participant_instance signal_channel_alpha signal_channel_beta consolidated_output_bundle)
+(bind_operation_type_to_workflow primary_participant_instance standard_operation_type)
+(verify_output_bundle consolidated_output_bundle primary_participant_instance standard_operation_type)
+(mark_primary_participant_complete primary_participant_instance consolidated_output_bundle)
+(mark_secondary_participant_complete secondary_participant_instance consolidated_output_bundle)
+(release_operation_type_binding primary_participant_instance standard_operation_type)
+(initialize_workflow_instance lead_orchestrator)
+(allocate_workflow_resource lead_orchestrator resource_token_c)
+(bind_operation_type_to_workflow lead_orchestrator standard_operation_type)
+(confirm_workflow_operation_binding lead_orchestrator standard_operation_type)
+(bind_execution_parameter_to_orchestrator lead_orchestrator execution_parameter_main)
+(bind_notification_template_to_orchestrator lead_orchestrator notification_template_main)
+(bind_capability_to_workflow lead_orchestrator processing_capability)
+(bind_attachment_to_orchestrator lead_orchestrator attachment_a consolidated_output_bundle)
+(certify_attachment_binding lead_orchestrator attachment_a consolidated_output_bundle standard_operation_type)
+(promote_orchestrator_checkpoint_a lead_orchestrator execution_parameter_main processing_capability attachment_a consolidated_output_bundle)
+(promote_orchestrator_checkpoint_c lead_orchestrator notification_template_main attachment_a consolidated_output_bundle)
+(seal_orchestrator_finalization lead_orchestrator)
+(bind_audit_token_to_workflow_instance lead_orchestrator audit_token_main standard_operation_type)
+(finalize_orchestrator lead_orchestrator resource_token_c audit_token_main)
+(release_operation_type_binding lead_orchestrator standard_operation_type)
+(release_capability_binding lead_orchestrator processing_capability)
+(unbind_execution_parameter_from_orchestrator lead_orchestrator execution_parameter_main)
+(unbind_notification_template_from_orchestrator lead_orchestrator notification_template_main)
+(initialize_workflow_instance support_orchestrator)
+(allocate_workflow_resource support_orchestrator resource_token_c)
+(bind_operation_type_to_workflow support_orchestrator standard_operation_type)
+(confirm_workflow_operation_binding support_orchestrator standard_operation_type)
+(bind_execution_parameter_to_orchestrator support_orchestrator execution_parameter_main)
+(bind_notification_template_to_orchestrator support_orchestrator notification_template_main)
+(bind_capability_to_workflow support_orchestrator processing_capability)
+(bind_attachment_to_orchestrator support_orchestrator attachment_b consolidated_output_bundle)
+(certify_attachment_binding support_orchestrator attachment_b consolidated_output_bundle standard_operation_type)
+(promote_orchestrator_checkpoint_a support_orchestrator execution_parameter_main processing_capability attachment_b consolidated_output_bundle)
+(promote_orchestrator_checkpoint_c support_orchestrator notification_template_main attachment_b consolidated_output_bundle)
+(seal_orchestrator_finalization support_orchestrator)
+(bind_audit_token_to_workflow_instance support_orchestrator audit_token_main standard_operation_type)
+(finalize_orchestrator support_orchestrator resource_token_c audit_token_main)
+(release_operation_type_binding support_orchestrator standard_operation_type)
+(release_capability_binding support_orchestrator processing_capability)
+(unbind_execution_parameter_from_orchestrator support_orchestrator execution_parameter_main)
+(unbind_notification_template_from_orchestrator support_orchestrator notification_template_main)
+(bind_operation_type_to_workflow primary_participant_instance standard_operation_type)
+(bind_audit_token_to_workflow_instance primary_participant_instance audit_token_main standard_operation_type)
+(finalize_primary_participant primary_participant_instance resource_token_a audit_token_main)
+(release_operation_type_binding primary_participant_instance standard_operation_type)
+(bind_operation_type_to_workflow secondary_participant_instance standard_operation_type)
+(bind_audit_token_to_workflow_instance secondary_participant_instance audit_token_main standard_operation_type)
+(finalize_secondary_participant secondary_participant_instance resource_token_b audit_token_main)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_xiyw8y5d/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_xiyw8y5d/plan.pddl 63 
+
+
+
+--- stderr ---
+

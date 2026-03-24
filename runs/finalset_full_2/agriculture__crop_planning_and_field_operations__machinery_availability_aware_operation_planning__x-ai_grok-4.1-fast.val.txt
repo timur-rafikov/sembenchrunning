@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain machinery_availability_aware_operation_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_entity - entity supply_entity - entity slot_entity - entity operation_planning_domain - entity work_record - operation_planning_domain tractor_unit - resource_entity time_slot - resource_entity operator_crew - resource_entity seasonal_label - resource_entity priority_tag - resource_entity logistic_resource - resource_entity attachment_spec - resource_entity certification - resource_entity consumable_item - supply_entity material_batch - supply_entity policy_tag - supply_entity slot_type_a - slot_entity slot_type_b - slot_entity implement_unit - slot_entity field_unit - work_record machine_group - work_record field_parcel - field_unit field_subparcel - field_unit machine_unit - machine_group)
+
+  (:predicates
+    (operation_planned ?work - work_record)
+    (operation_ready_for_execution ?work - work_record)
+    (operation_has_assigned_tractor ?work - work_record)
+    (operation_completed ?work - work_record)
+    (operation_active_for_execution ?work - work_record)
+    (operation_execution_reported ?work - work_record)
+    (tractor_available ?tractor - tractor_unit)
+    (operation_assigned_to_tractor ?work - work_record ?tractor - tractor_unit)
+    (time_slot_available ?time_slot - time_slot)
+    (operation_scheduled_in_time_slot ?work - work_record ?time_slot - time_slot)
+    (operator_available ?crew - operator_crew)
+    (operation_assigned_to_operator ?work - work_record ?crew - operator_crew)
+    (consumable_available ?consumable - consumable_item)
+    (consumable_allocated_to_parcel ?parcel - field_parcel ?consumable - consumable_item)
+    (consumable_allocated_to_subparcel ?subparcel - field_subparcel ?consumable - consumable_item)
+    (parcel_has_slot_type_a ?parcel - field_parcel ?slot_a - slot_type_a)
+    (slot_a_reserved ?slot_a - slot_type_a)
+    (slot_a_reserved_for_material ?slot_a - slot_type_a)
+    (parcel_ready_for_bundling ?parcel - field_parcel)
+    (subparcel_has_slot_type_b ?subparcel - field_subparcel ?slot_b - slot_type_b)
+    (slot_b_reserved ?slot_b - slot_type_b)
+    (slot_b_reserved_for_material ?slot_b - slot_type_b)
+    (subparcel_ready_for_bundling ?subparcel - field_subparcel)
+    (implement_available ?implement - implement_unit)
+    (implement_allocated ?implement - implement_unit)
+    (implement_assigned_to_slot_a ?implement - implement_unit ?slot_a - slot_type_a)
+    (implement_assigned_to_slot_b ?implement - implement_unit ?slot_b - slot_type_b)
+    (implement_needs_batch_loading ?implement - implement_unit)
+    (implement_needs_secondary_loading ?implement - implement_unit)
+    (implement_verified_for_operation ?implement - implement_unit)
+    (machine_linked_to_parcel ?machine - machine_unit ?parcel - field_parcel)
+    (machine_linked_to_subparcel ?machine - machine_unit ?subparcel - field_subparcel)
+    (machine_mounted_with_implement ?machine - machine_unit ?implement - implement_unit)
+    (batch_available ?batch - material_batch)
+    (machine_assigned_batch ?machine - machine_unit ?batch - material_batch)
+    (batch_prepared ?batch - material_batch)
+    (batch_assigned_to_implement ?batch - material_batch ?implement - implement_unit)
+    (machine_prepared_with_batch ?machine - machine_unit)
+    (machine_ready_for_activation ?machine - machine_unit)
+    (pre_activation_checks_completed ?machine - machine_unit)
+    (seasonal_label_attached ?machine - machine_unit)
+    (seasonal_label_confirmed ?machine - machine_unit)
+    (priority_assignment_required ?machine - machine_unit)
+    (assigned_to_execution_bundle ?machine - machine_unit)
+    (policy_tag_available ?policy - policy_tag)
+    (machine_has_policy_tag ?machine - machine_unit ?policy - policy_tag)
+    (policy_applied ?machine - machine_unit)
+    (policy_checks_passed ?machine - machine_unit)
+    (policy_activation_ready ?machine - machine_unit)
+    (seasonal_label_available ?season - seasonal_label)
+    (machine_has_seasonal_label ?machine - machine_unit ?season - seasonal_label)
+    (priority_tag_available ?priority - priority_tag)
+    (machine_has_priority_tag ?machine - machine_unit ?priority - priority_tag)
+    (attachment_spec_available ?attachment - attachment_spec)
+    (machine_assigned_attachment ?machine - machine_unit ?attachment - attachment_spec)
+    (certification_available ?certification - certification)
+    (machine_has_certification ?machine - machine_unit ?certification - certification)
+    (logistic_resource_available ?logistic - logistic_resource)
+    (operation_allocated_logistic_resource ?work - work_record ?logistic - logistic_resource)
+    (operator_allocated_to_parcel ?parcel - field_parcel)
+    (operator_allocated_to_subparcel ?subparcel - field_subparcel)
+    (activation_confirmed ?machine - machine_unit)
+  )
+  (:action create_work_record
+    :parameters (?work - work_record)
+    :precondition
+      (and
+        (not
+          (operation_planned ?work)
+        )
+        (not
+          (operation_completed ?work)
+        )
+      )
+    :effect (operation_planned ?work)
+  )
+  (:action assign_tractor_to_work
+    :parameters (?work - work_record ?tractor - tractor_unit)
+    :precondition
+      (and
+        (operation_planned ?work)
+        (not
+          (operation_has_assigned_tractor ?work)
+        )
+        (tractor_available ?tractor)
+      )
+    :effect
+      (and
+        (operation_has_assigned_tractor ?work)
+        (operation_assigned_to_tractor ?work ?tractor)
+        (not
+          (tractor_available ?tractor)
+        )
+      )
+  )
+  (:action reserve_time_slot_for_work
+    :parameters (?work - work_record ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_planned ?work)
+        (operation_has_assigned_tractor ?work)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (operation_scheduled_in_time_slot ?work ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_work_readiness
+    :parameters (?work - work_record ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_planned ?work)
+        (operation_has_assigned_tractor ?work)
+        (operation_scheduled_in_time_slot ?work ?time_slot)
+        (not
+          (operation_ready_for_execution ?work)
+        )
+      )
+    :effect (operation_ready_for_execution ?work)
+  )
+  (:action unreserve_time_slot
+    :parameters (?work - work_record ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_scheduled_in_time_slot ?work ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (operation_scheduled_in_time_slot ?work ?time_slot)
+        )
+      )
+  )
+  (:action assign_operator_to_work
+    :parameters (?work - work_record ?crew - operator_crew)
+    :precondition
+      (and
+        (operation_ready_for_execution ?work)
+        (operator_available ?crew)
+      )
+    :effect
+      (and
+        (operation_assigned_to_operator ?work ?crew)
+        (not
+          (operator_available ?crew)
+        )
+      )
+  )
+  (:action release_operator_from_work
+    :parameters (?work - work_record ?crew - operator_crew)
+    :precondition
+      (and
+        (operation_assigned_to_operator ?work ?crew)
+      )
+    :effect
+      (and
+        (operator_available ?crew)
+        (not
+          (operation_assigned_to_operator ?work ?crew)
+        )
+      )
+  )
+  (:action assign_attachment_spec_to_machine
+    :parameters (?machine - machine_unit ?attachment - attachment_spec)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (attachment_spec_available ?attachment)
+      )
+    :effect
+      (and
+        (machine_assigned_attachment ?machine ?attachment)
+        (not
+          (attachment_spec_available ?attachment)
+        )
+      )
+  )
+  (:action unassign_attachment_spec_from_machine
+    :parameters (?machine - machine_unit ?attachment - attachment_spec)
+    :precondition
+      (and
+        (machine_assigned_attachment ?machine ?attachment)
+      )
+    :effect
+      (and
+        (attachment_spec_available ?attachment)
+        (not
+          (machine_assigned_attachment ?machine ?attachment)
+        )
+      )
+  )
+  (:action assign_certification_to_machine
+    :parameters (?machine - machine_unit ?certification - certification)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (certification_available ?certification)
+      )
+    :effect
+      (and
+        (machine_has_certification ?machine ?certification)
+        (not
+          (certification_available ?certification)
+        )
+      )
+  )
+  (:action unassign_certification_from_machine
+    :parameters (?machine - machine_unit ?certification - certification)
+    :precondition
+      (and
+        (machine_has_certification ?machine ?certification)
+      )
+    :effect
+      (and
+        (certification_available ?certification)
+        (not
+          (machine_has_certification ?machine ?certification)
+        )
+      )
+  )
+  (:action reserve_slot_type_a_for_parcel
+    :parameters (?parcel - field_parcel ?slot_a - slot_type_a ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_ready_for_execution ?parcel)
+        (operation_scheduled_in_time_slot ?parcel ?time_slot)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (not
+          (slot_a_reserved ?slot_a)
+        )
+        (not
+          (slot_a_reserved_for_material ?slot_a)
+        )
+      )
+    :effect (slot_a_reserved ?slot_a)
+  )
+  (:action allocate_operator_to_parcel_and_mark_ready
+    :parameters (?parcel - field_parcel ?slot_a - slot_type_a ?crew - operator_crew)
+    :precondition
+      (and
+        (operation_ready_for_execution ?parcel)
+        (operation_assigned_to_operator ?parcel ?crew)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (slot_a_reserved ?slot_a)
+        (not
+          (operator_allocated_to_parcel ?parcel)
+        )
+      )
+    :effect
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (parcel_ready_for_bundling ?parcel)
+      )
+  )
+  (:action allocate_consumable_to_parcel
+    :parameters (?parcel - field_parcel ?slot_a - slot_type_a ?consumable - consumable_item)
+    :precondition
+      (and
+        (operation_ready_for_execution ?parcel)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (consumable_available ?consumable)
+        (not
+          (operator_allocated_to_parcel ?parcel)
+        )
+      )
+    :effect
+      (and
+        (slot_a_reserved_for_material ?slot_a)
+        (operator_allocated_to_parcel ?parcel)
+        (consumable_allocated_to_parcel ?parcel ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action apply_consumable_to_parcel
+    :parameters (?parcel - field_parcel ?slot_a - slot_type_a ?time_slot - time_slot ?consumable - consumable_item)
+    :precondition
+      (and
+        (operation_ready_for_execution ?parcel)
+        (operation_scheduled_in_time_slot ?parcel ?time_slot)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (slot_a_reserved_for_material ?slot_a)
+        (consumable_allocated_to_parcel ?parcel ?consumable)
+        (not
+          (parcel_ready_for_bundling ?parcel)
+        )
+      )
+    :effect
+      (and
+        (slot_a_reserved ?slot_a)
+        (parcel_ready_for_bundling ?parcel)
+        (consumable_available ?consumable)
+        (not
+          (consumable_allocated_to_parcel ?parcel ?consumable)
+        )
+      )
+  )
+  (:action reserve_slot_type_b_for_subparcel
+    :parameters (?subparcel - field_subparcel ?slot_b - slot_type_b ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_ready_for_execution ?subparcel)
+        (operation_scheduled_in_time_slot ?subparcel ?time_slot)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (not
+          (slot_b_reserved ?slot_b)
+        )
+        (not
+          (slot_b_reserved_for_material ?slot_b)
+        )
+      )
+    :effect (slot_b_reserved ?slot_b)
+  )
+  (:action allocate_operator_to_subparcel
+    :parameters (?subparcel - field_subparcel ?slot_b - slot_type_b ?crew - operator_crew)
+    :precondition
+      (and
+        (operation_ready_for_execution ?subparcel)
+        (operation_assigned_to_operator ?subparcel ?crew)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_b_reserved ?slot_b)
+        (not
+          (operator_allocated_to_subparcel ?subparcel)
+        )
+      )
+    :effect
+      (and
+        (operator_allocated_to_subparcel ?subparcel)
+        (subparcel_ready_for_bundling ?subparcel)
+      )
+  )
+  (:action allocate_consumable_to_subparcel
+    :parameters (?subparcel - field_subparcel ?slot_b - slot_type_b ?consumable - consumable_item)
+    :precondition
+      (and
+        (operation_ready_for_execution ?subparcel)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (consumable_available ?consumable)
+        (not
+          (operator_allocated_to_subparcel ?subparcel)
+        )
+      )
+    :effect
+      (and
+        (slot_b_reserved_for_material ?slot_b)
+        (operator_allocated_to_subparcel ?subparcel)
+        (consumable_allocated_to_subparcel ?subparcel ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action apply_consumable_to_subparcel
+    :parameters (?subparcel - field_subparcel ?slot_b - slot_type_b ?time_slot - time_slot ?consumable - consumable_item)
+    :precondition
+      (and
+        (operation_ready_for_execution ?subparcel)
+        (operation_scheduled_in_time_slot ?subparcel ?time_slot)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_b_reserved_for_material ?slot_b)
+        (consumable_allocated_to_subparcel ?subparcel ?consumable)
+        (not
+          (subparcel_ready_for_bundling ?subparcel)
+        )
+      )
+    :effect
+      (and
+        (slot_b_reserved ?slot_b)
+        (subparcel_ready_for_bundling ?subparcel)
+        (consumable_available ?consumable)
+        (not
+          (consumable_allocated_to_subparcel ?subparcel ?consumable)
+        )
+      )
+  )
+  (:action create_execution_bundle_standard
+    :parameters (?parcel - field_parcel ?subparcel - field_subparcel ?slot_a - slot_type_a ?slot_b - slot_type_b ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (operator_allocated_to_subparcel ?subparcel)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_a_reserved ?slot_a)
+        (slot_b_reserved ?slot_b)
+        (parcel_ready_for_bundling ?parcel)
+        (subparcel_ready_for_bundling ?subparcel)
+        (implement_available ?implement)
+      )
+    :effect
+      (and
+        (implement_allocated ?implement)
+        (implement_assigned_to_slot_a ?implement ?slot_a)
+        (implement_assigned_to_slot_b ?implement ?slot_b)
+        (not
+          (implement_available ?implement)
+        )
+      )
+  )
+  (:action create_execution_bundle_with_material_for_slot_a
+    :parameters (?parcel - field_parcel ?subparcel - field_subparcel ?slot_a - slot_type_a ?slot_b - slot_type_b ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (operator_allocated_to_subparcel ?subparcel)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_a_reserved_for_material ?slot_a)
+        (slot_b_reserved ?slot_b)
+        (not
+          (parcel_ready_for_bundling ?parcel)
+        )
+        (subparcel_ready_for_bundling ?subparcel)
+        (implement_available ?implement)
+      )
+    :effect
+      (and
+        (implement_allocated ?implement)
+        (implement_assigned_to_slot_a ?implement ?slot_a)
+        (implement_assigned_to_slot_b ?implement ?slot_b)
+        (implement_needs_batch_loading ?implement)
+        (not
+          (implement_available ?implement)
+        )
+      )
+  )
+  (:action create_execution_bundle_with_material_for_slot_b
+    :parameters (?parcel - field_parcel ?subparcel - field_subparcel ?slot_a - slot_type_a ?slot_b - slot_type_b ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (operator_allocated_to_subparcel ?subparcel)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_a_reserved ?slot_a)
+        (slot_b_reserved_for_material ?slot_b)
+        (parcel_ready_for_bundling ?parcel)
+        (not
+          (subparcel_ready_for_bundling ?subparcel)
+        )
+        (implement_available ?implement)
+      )
+    :effect
+      (and
+        (implement_allocated ?implement)
+        (implement_assigned_to_slot_a ?implement ?slot_a)
+        (implement_assigned_to_slot_b ?implement ?slot_b)
+        (implement_needs_secondary_loading ?implement)
+        (not
+          (implement_available ?implement)
+        )
+      )
+  )
+  (:action create_execution_bundle_with_materials_for_both_slots
+    :parameters (?parcel - field_parcel ?subparcel - field_subparcel ?slot_a - slot_type_a ?slot_b - slot_type_b ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (operator_allocated_to_subparcel ?subparcel)
+        (parcel_has_slot_type_a ?parcel ?slot_a)
+        (subparcel_has_slot_type_b ?subparcel ?slot_b)
+        (slot_a_reserved_for_material ?slot_a)
+        (slot_b_reserved_for_material ?slot_b)
+        (not
+          (parcel_ready_for_bundling ?parcel)
+        )
+        (not
+          (subparcel_ready_for_bundling ?subparcel)
+        )
+        (implement_available ?implement)
+      )
+    :effect
+      (and
+        (implement_allocated ?implement)
+        (implement_assigned_to_slot_a ?implement ?slot_a)
+        (implement_assigned_to_slot_b ?implement ?slot_b)
+        (implement_needs_batch_loading ?implement)
+        (implement_needs_secondary_loading ?implement)
+        (not
+          (implement_available ?implement)
+        )
+      )
+  )
+  (:action verify_implement_for_operation
+    :parameters (?implement - implement_unit ?parcel - field_parcel ?time_slot - time_slot)
+    :precondition
+      (and
+        (implement_allocated ?implement)
+        (operator_allocated_to_parcel ?parcel)
+        (operation_scheduled_in_time_slot ?parcel ?time_slot)
+        (not
+          (implement_verified_for_operation ?implement)
+        )
+      )
+    :effect (implement_verified_for_operation ?implement)
+  )
+  (:action prepare_batch_and_assign_to_implement
+    :parameters (?machine - machine_unit ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (machine_mounted_with_implement ?machine ?implement)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_available ?batch)
+        (implement_allocated ?implement)
+        (implement_verified_for_operation ?implement)
+        (not
+          (batch_prepared ?batch)
+        )
+      )
+    :effect
+      (and
+        (batch_prepared ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (not
+          (batch_available ?batch)
+        )
+      )
+  )
+  (:action load_batch_into_machine
+    :parameters (?machine - machine_unit ?batch - material_batch ?implement - implement_unit ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_prepared ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (operation_scheduled_in_time_slot ?machine ?time_slot)
+        (not
+          (implement_needs_batch_loading ?implement)
+        )
+        (not
+          (machine_prepared_with_batch ?machine)
+        )
+      )
+    :effect (machine_prepared_with_batch ?machine)
+  )
+  (:action attach_seasonal_label_to_machine
+    :parameters (?machine - machine_unit ?season - seasonal_label)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (seasonal_label_available ?season)
+        (not
+          (seasonal_label_attached ?machine)
+        )
+      )
+    :effect
+      (and
+        (seasonal_label_attached ?machine)
+        (machine_has_seasonal_label ?machine ?season)
+        (not
+          (seasonal_label_available ?season)
+        )
+      )
+  )
+  (:action finalize_seasonal_prep_for_machine
+    :parameters (?machine - machine_unit ?batch - material_batch ?implement - implement_unit ?time_slot - time_slot ?season - seasonal_label)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_prepared ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (operation_scheduled_in_time_slot ?machine ?time_slot)
+        (implement_needs_batch_loading ?implement)
+        (seasonal_label_attached ?machine)
+        (machine_has_seasonal_label ?machine ?season)
+        (not
+          (machine_prepared_with_batch ?machine)
+        )
+      )
+    :effect
+      (and
+        (machine_prepared_with_batch ?machine)
+        (seasonal_label_confirmed ?machine)
+      )
+  )
+  (:action prepare_machine_for_activation_variant_1
+    :parameters (?machine - machine_unit ?attachment - attachment_spec ?crew - operator_crew ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_prepared_with_batch ?machine)
+        (machine_assigned_attachment ?machine ?attachment)
+        (operation_assigned_to_operator ?machine ?crew)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (not
+          (implement_needs_secondary_loading ?implement)
+        )
+        (not
+          (machine_ready_for_activation ?machine)
+        )
+      )
+    :effect (machine_ready_for_activation ?machine)
+  )
+  (:action prepare_machine_for_activation_variant_2
+    :parameters (?machine - machine_unit ?attachment - attachment_spec ?crew - operator_crew ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_prepared_with_batch ?machine)
+        (machine_assigned_attachment ?machine ?attachment)
+        (operation_assigned_to_operator ?machine ?crew)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (implement_needs_secondary_loading ?implement)
+        (not
+          (machine_ready_for_activation ?machine)
+        )
+      )
+    :effect (machine_ready_for_activation ?machine)
+  )
+  (:action perform_certification_prechecks_variant_1
+    :parameters (?machine - machine_unit ?certification - certification ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_ready_for_activation ?machine)
+        (machine_has_certification ?machine ?certification)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (not
+          (implement_needs_batch_loading ?implement)
+        )
+        (not
+          (implement_needs_secondary_loading ?implement)
+        )
+        (not
+          (pre_activation_checks_completed ?machine)
+        )
+      )
+    :effect (pre_activation_checks_completed ?machine)
+  )
+  (:action perform_certification_prechecks_variant_2
+    :parameters (?machine - machine_unit ?certification - certification ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_ready_for_activation ?machine)
+        (machine_has_certification ?machine ?certification)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (implement_needs_batch_loading ?implement)
+        (not
+          (implement_needs_secondary_loading ?implement)
+        )
+        (not
+          (pre_activation_checks_completed ?machine)
+        )
+      )
+    :effect
+      (and
+        (pre_activation_checks_completed ?machine)
+        (priority_assignment_required ?machine)
+      )
+  )
+  (:action perform_certification_prechecks_variant_3
+    :parameters (?machine - machine_unit ?certification - certification ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_ready_for_activation ?machine)
+        (machine_has_certification ?machine ?certification)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (not
+          (implement_needs_batch_loading ?implement)
+        )
+        (implement_needs_secondary_loading ?implement)
+        (not
+          (pre_activation_checks_completed ?machine)
+        )
+      )
+    :effect
+      (and
+        (pre_activation_checks_completed ?machine)
+        (priority_assignment_required ?machine)
+      )
+  )
+  (:action perform_certification_prechecks_variant_4
+    :parameters (?machine - machine_unit ?certification - certification ?batch - material_batch ?implement - implement_unit)
+    :precondition
+      (and
+        (machine_ready_for_activation ?machine)
+        (machine_has_certification ?machine ?certification)
+        (machine_assigned_batch ?machine ?batch)
+        (batch_assigned_to_implement ?batch ?implement)
+        (implement_needs_batch_loading ?implement)
+        (implement_needs_secondary_loading ?implement)
+        (not
+          (pre_activation_checks_completed ?machine)
+        )
+      )
+    :effect
+      (and
+        (pre_activation_checks_completed ?machine)
+        (priority_assignment_required ?machine)
+      )
+  )
+  (:action activate_machine_for_execution
+    :parameters (?machine - machine_unit)
+    :precondition
+      (and
+        (pre_activation_checks_completed ?machine)
+        (not
+          (priority_assignment_required ?machine)
+        )
+        (not
+          (activation_confirmed ?machine)
+        )
+      )
+    :effect
+      (and
+        (activation_confirmed ?machine)
+        (operation_active_for_execution ?machine)
+      )
+  )
+  (:action assign_priority_tag_to_machine
+    :parameters (?machine - machine_unit ?priority - priority_tag)
+    :precondition
+      (and
+        (pre_activation_checks_completed ?machine)
+        (priority_assignment_required ?machine)
+        (priority_tag_available ?priority)
+      )
+    :effect
+      (and
+        (machine_has_priority_tag ?machine ?priority)
+        (not
+          (priority_tag_available ?priority)
+        )
+      )
+  )
+  (:action assign_machine_to_execution_bundle
+    :parameters (?machine - machine_unit ?parcel - field_parcel ?subparcel - field_subparcel ?time_slot - time_slot ?priority - priority_tag)
+    :precondition
+      (and
+        (pre_activation_checks_completed ?machine)
+        (priority_assignment_required ?machine)
+        (machine_has_priority_tag ?machine ?priority)
+        (machine_linked_to_parcel ?machine ?parcel)
+        (machine_linked_to_subparcel ?machine ?subparcel)
+        (parcel_ready_for_bundling ?parcel)
+        (subparcel_ready_for_bundling ?subparcel)
+        (operation_scheduled_in_time_slot ?machine ?time_slot)
+        (not
+          (assigned_to_execution_bundle ?machine)
+        )
+      )
+    :effect (assigned_to_execution_bundle ?machine)
+  )
+  (:action activate_machine_after_bundle_assignment
+    :parameters (?machine - machine_unit)
+    :precondition
+      (and
+        (pre_activation_checks_completed ?machine)
+        (assigned_to_execution_bundle ?machine)
+        (not
+          (activation_confirmed ?machine)
+        )
+      )
+    :effect
+      (and
+        (activation_confirmed ?machine)
+        (operation_active_for_execution ?machine)
+      )
+  )
+  (:action apply_policy_tag_to_machine
+    :parameters (?machine - machine_unit ?policy - policy_tag ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_ready_for_execution ?machine)
+        (operation_scheduled_in_time_slot ?machine ?time_slot)
+        (policy_tag_available ?policy)
+        (machine_has_policy_tag ?machine ?policy)
+        (not
+          (policy_applied ?machine)
+        )
+      )
+    :effect
+      (and
+        (policy_applied ?machine)
+        (not
+          (policy_tag_available ?policy)
+        )
+      )
+  )
+  (:action finalize_policy_checks
+    :parameters (?machine - machine_unit ?crew - operator_crew)
+    :precondition
+      (and
+        (policy_applied ?machine)
+        (operation_assigned_to_operator ?machine ?crew)
+        (not
+          (policy_checks_passed ?machine)
+        )
+      )
+    :effect (policy_checks_passed ?machine)
+  )
+  (:action approve_certification_activation
+    :parameters (?machine - machine_unit ?certification - certification)
+    :precondition
+      (and
+        (policy_checks_passed ?machine)
+        (machine_has_certification ?machine ?certification)
+        (not
+          (policy_activation_ready ?machine)
+        )
+      )
+    :effect (policy_activation_ready ?machine)
+  )
+  (:action activate_machine_after_policy_checks
+    :parameters (?machine - machine_unit)
+    :precondition
+      (and
+        (policy_activation_ready ?machine)
+        (not
+          (activation_confirmed ?machine)
+        )
+      )
+    :effect
+      (and
+        (activation_confirmed ?machine)
+        (operation_active_for_execution ?machine)
+      )
+  )
+  (:action perform_operation_on_parcel
+    :parameters (?parcel - field_parcel ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_parcel ?parcel)
+        (parcel_ready_for_bundling ?parcel)
+        (implement_allocated ?implement)
+        (implement_verified_for_operation ?implement)
+        (not
+          (operation_active_for_execution ?parcel)
+        )
+      )
+    :effect (operation_active_for_execution ?parcel)
+  )
+  (:action perform_operation_on_subparcel
+    :parameters (?subparcel - field_subparcel ?implement - implement_unit)
+    :precondition
+      (and
+        (operator_allocated_to_subparcel ?subparcel)
+        (subparcel_ready_for_bundling ?subparcel)
+        (implement_allocated ?implement)
+        (implement_verified_for_operation ?implement)
+        (not
+          (operation_active_for_execution ?subparcel)
+        )
+      )
+    :effect (operation_active_for_execution ?subparcel)
+  )
+  (:action consume_logistic_resource_for_work
+    :parameters (?work - work_record ?logistic - logistic_resource ?time_slot - time_slot)
+    :precondition
+      (and
+        (operation_active_for_execution ?work)
+        (operation_scheduled_in_time_slot ?work ?time_slot)
+        (logistic_resource_available ?logistic)
+        (not
+          (operation_execution_reported ?work)
+        )
+      )
+    :effect
+      (and
+        (operation_execution_reported ?work)
+        (operation_allocated_logistic_resource ?work ?logistic)
+        (not
+          (logistic_resource_available ?logistic)
+        )
+      )
+  )
+  (:action finalize_operation_and_release_resources
+    :parameters (?parcel - field_parcel ?tractor - tractor_unit ?logistic - logistic_resource)
+    :precondition
+      (and
+        (operation_execution_reported ?parcel)
+        (operation_assigned_to_tractor ?parcel ?tractor)
+        (operation_allocated_logistic_resource ?parcel ?logistic)
+        (not
+          (operation_completed ?parcel)
+        )
+      )
+    :effect
+      (and
+        (operation_completed ?parcel)
+        (tractor_available ?tractor)
+        (logistic_resource_available ?logistic)
+      )
+  )
+  (:action finalize_subparcel_operation_and_release_resources
+    :parameters (?subparcel - field_subparcel ?tractor - tractor_unit ?logistic - logistic_resource)
+    :precondition
+      (and
+        (operation_execution_reported ?subparcel)
+        (operation_assigned_to_tractor ?subparcel ?tractor)
+        (operation_allocated_logistic_resource ?subparcel ?logistic)
+        (not
+          (operation_completed ?subparcel)
+        )
+      )
+    :effect
+      (and
+        (operation_completed ?subparcel)
+        (tractor_available ?tractor)
+        (logistic_resource_available ?logistic)
+      )
+  )
+  (:action finalize_machine_operation_and_release_resources
+    :parameters (?machine - machine_unit ?tractor - tractor_unit ?logistic - logistic_resource)
+    :precondition
+      (and
+        (operation_execution_reported ?machine)
+        (operation_assigned_to_tractor ?machine ?tractor)
+        (operation_allocated_logistic_resource ?machine ?logistic)
+        (not
+          (operation_completed ?machine)
+        )
+      )
+    :effect
+      (and
+        (operation_completed ?machine)
+        (tractor_available ?tractor)
+        (logistic_resource_available ?logistic)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem farm_operation_schedule_problem)
+  (:domain machinery_availability_aware_operation_planning)
+  (:objects field_parcel_1 - field_parcel field_subparcel_1 - field_subparcel machine_unit_1 - machine_unit machine_unit_2 - machine_unit tractor_1 - tractor_unit tractor_2 - tractor_unit tractor_3 - tractor_unit time_slot_1 - time_slot crew_1 - operator_crew consumable_seed_1 - consumable_item slot_type_a_1 - slot_type_a slot_type_b_1 - slot_type_b implement_sprayer_1 - implement_unit material_batch_1 - material_batch material_batch_2 - material_batch season_spring - seasonal_label season_autumn - seasonal_label priority_high - priority_tag priority_low - priority_tag logistic_trailer_1 - logistic_resource attachment_spec_standard - attachment_spec policy_safety - policy_tag policy_environmental - policy_tag operator_certification_1 - certification)
+  (:init
+    (tractor_available tractor_1)
+    (tractor_available tractor_2)
+    (tractor_available tractor_3)
+    (time_slot_available time_slot_1)
+    (operator_available crew_1)
+    (consumable_available consumable_seed_1)
+    (parcel_has_slot_type_a field_parcel_1 slot_type_a_1)
+    (subparcel_has_slot_type_b field_subparcel_1 slot_type_b_1)
+    (implement_available implement_sprayer_1)
+    (batch_available material_batch_1)
+    (batch_available material_batch_2)
+    (machine_linked_to_parcel machine_unit_1 field_parcel_1)
+    (machine_linked_to_parcel machine_unit_2 field_parcel_1)
+    (machine_linked_to_subparcel machine_unit_1 field_subparcel_1)
+    (machine_linked_to_subparcel machine_unit_2 field_subparcel_1)
+    (machine_mounted_with_implement machine_unit_1 implement_sprayer_1)
+    (machine_mounted_with_implement machine_unit_2 implement_sprayer_1)
+    (machine_assigned_batch machine_unit_1 material_batch_1)
+    (machine_assigned_batch machine_unit_2 material_batch_2)
+    (seasonal_label_available season_spring)
+    (seasonal_label_available season_autumn)
+    (priority_tag_available priority_high)
+    (priority_tag_available priority_low)
+    (logistic_resource_available logistic_trailer_1)
+    (attachment_spec_available attachment_spec_standard)
+    (policy_tag_available policy_safety)
+    (machine_has_policy_tag machine_unit_1 policy_safety)
+    (machine_has_policy_tag machine_unit_2 policy_environmental)
+    (certification_available operator_certification_1)
+  )
+  (:goal
+    (and
+      (operation_completed field_parcel_1)
+      (operation_completed field_subparcel_1)
+      (operation_completed machine_unit_1)
+      (operation_completed machine_unit_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_work_record field_parcel_1)
+(create_work_record field_subparcel_1)
+(assign_tractor_to_work field_parcel_1 tractor_1)
+(assign_tractor_to_work field_subparcel_1 tractor_2)
+(reserve_time_slot_for_work field_parcel_1 time_slot_1)
+(confirm_work_readiness field_parcel_1 time_slot_1)
+(allocate_consumable_to_parcel field_parcel_1 slot_type_a_1 consumable_seed_1)
+(apply_consumable_to_parcel field_parcel_1 slot_type_a_1 time_slot_1 consumable_seed_1)
+(unreserve_time_slot field_parcel_1 time_slot_1)
+(reserve_time_slot_for_work field_subparcel_1 time_slot_1)
+(confirm_work_readiness field_subparcel_1 time_slot_1)
+(allocate_consumable_to_subparcel field_subparcel_1 slot_type_b_1 consumable_seed_1)
+(apply_consumable_to_subparcel field_subparcel_1 slot_type_b_1 time_slot_1 consumable_seed_1)
+(create_execution_bundle_standard field_parcel_1 field_subparcel_1 slot_type_a_1 slot_type_b_1 implement_sprayer_1)
+(unreserve_time_slot field_subparcel_1 time_slot_1)
+(reserve_time_slot_for_work field_parcel_1 time_slot_1)
+(verify_implement_for_operation implement_sprayer_1 field_parcel_1 time_slot_1)
+(perform_operation_on_parcel field_parcel_1 implement_sprayer_1)
+(consume_logistic_resource_for_work field_parcel_1 logistic_trailer_1 time_slot_1)
+(finalize_operation_and_release_resources field_parcel_1 tractor_1 logistic_trailer_1)
+(perform_operation_on_subparcel field_subparcel_1 implement_sprayer_1)
+(unreserve_time_slot field_parcel_1 time_slot_1)
+(reserve_time_slot_for_work field_subparcel_1 time_slot_1)
+(consume_logistic_resource_for_work field_subparcel_1 logistic_trailer_1 time_slot_1)
+(finalize_subparcel_operation_and_release_resources field_subparcel_1 tractor_2 logistic_trailer_1)
+(unreserve_time_slot field_subparcel_1 time_slot_1)
+(create_work_record machine_unit_1)
+(assign_tractor_to_work machine_unit_1 tractor_1)
+(reserve_time_slot_for_work machine_unit_1 time_slot_1)
+(confirm_work_readiness machine_unit_1 time_slot_1)
+(assign_operator_to_work machine_unit_1 crew_1)
+(assign_attachment_spec_to_machine machine_unit_1 attachment_spec_standard)
+(assign_certification_to_machine machine_unit_1 operator_certification_1)
+(prepare_batch_and_assign_to_implement machine_unit_1 material_batch_1 implement_sprayer_1)
+(load_batch_into_machine machine_unit_1 material_batch_1 implement_sprayer_1 time_slot_1)
+(prepare_machine_for_activation_variant_1 machine_unit_1 attachment_spec_standard crew_1 material_batch_1 implement_sprayer_1)
+(perform_certification_prechecks_variant_1 machine_unit_1 operator_certification_1 material_batch_1 implement_sprayer_1)
+(activate_machine_for_execution machine_unit_1)
+(consume_logistic_resource_for_work machine_unit_1 logistic_trailer_1 time_slot_1)
+(finalize_machine_operation_and_release_resources machine_unit_1 tractor_1 logistic_trailer_1)
+(unreserve_time_slot machine_unit_1 time_slot_1)
+(release_operator_from_work machine_unit_1 crew_1)
+(unassign_attachment_spec_from_machine machine_unit_1 attachment_spec_standard)
+(unassign_certification_from_machine machine_unit_1 operator_certification_1)
+(create_work_record machine_unit_2)
+(assign_tractor_to_work machine_unit_2 tractor_3)
+(reserve_time_slot_for_work machine_unit_2 time_slot_1)
+(confirm_work_readiness machine_unit_2 time_slot_1)
+(assign_operator_to_work machine_unit_2 crew_1)
+(assign_attachment_spec_to_machine machine_unit_2 attachment_spec_standard)
+(assign_certification_to_machine machine_unit_2 operator_certification_1)
+(prepare_batch_and_assign_to_implement machine_unit_2 material_batch_2 implement_sprayer_1)
+(load_batch_into_machine machine_unit_2 material_batch_2 implement_sprayer_1 time_slot_1)
+(prepare_machine_for_activation_variant_1 machine_unit_2 attachment_spec_standard crew_1 material_batch_2 implement_sprayer_1)
+(perform_certification_prechecks_variant_1 machine_unit_2 operator_certification_1 material_batch_2 implement_sprayer_1)
+(activate_machine_for_execution machine_unit_2)
+(consume_logistic_resource_for_work machine_unit_2 logistic_trailer_1 time_slot_1)
+(finalize_machine_operation_and_release_resources machine_unit_2 tractor_3 logistic_trailer_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_10vwib4w/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_10vwib4w/plan.pddl 58 
+
+
+
+--- stderr ---
+

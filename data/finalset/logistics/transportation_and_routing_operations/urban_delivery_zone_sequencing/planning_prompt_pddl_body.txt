@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain urban_delivery_zone_sequencing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity_category - object cargo_aux_category - object spatial_movement_category - object primary_domain_entity_category - object operational_entity - primary_domain_entity_category transport_mode - resource_entity_category dispatch_window - resource_entity_category handling_agent - resource_entity_category access_permit - resource_entity_category service_requirement - resource_entity_category delivery_slot - resource_entity_category vehicle_equipment - resource_entity_category regulatory_clearance - resource_entity_category cargo_unit - cargo_aux_category container_unit - cargo_aux_category priority_tag - cargo_aux_category origin_zone - spatial_movement_category destination_zone - spatial_movement_category transport_leg - spatial_movement_category vehicle_role_subtype - operational_entity route_role_subtype - operational_entity vehicle_unit - vehicle_role_subtype driver_operator - vehicle_role_subtype route_plan - route_role_subtype)
+  (:predicates
+    (entity_initialized ?operational_entity - operational_entity)
+    (entity_active ?operational_entity - operational_entity)
+    (mode_selected ?operational_entity - operational_entity)
+    (deployed_integrated ?operational_entity - operational_entity)
+    (entity_ready_for_finalization ?operational_entity - operational_entity)
+    (entity_allocated_for_delivery ?operational_entity - operational_entity)
+    (mode_available ?transport_mode - transport_mode)
+    (entity_mode_assignment ?operational_entity - operational_entity ?transport_mode - transport_mode)
+    (time_window_available ?dispatch_window - dispatch_window)
+    (entity_time_assignment ?operational_entity - operational_entity ?dispatch_window - dispatch_window)
+    (handling_agent_available ?handling_agent - handling_agent)
+    (handling_agent_assignment ?operational_entity - operational_entity ?handling_agent - handling_agent)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (vehicle_cargo_assignment ?vehicle - vehicle_unit ?cargo_unit - cargo_unit)
+    (driver_cargo_assignment ?driver - driver_operator ?cargo_unit - cargo_unit)
+    (vehicle_zone_assignment ?vehicle - vehicle_unit ?origin_zone - origin_zone)
+    (origin_zone_ready ?origin_zone - origin_zone)
+    (origin_zone_staged ?origin_zone - origin_zone)
+    (vehicle_ready_flag ?vehicle - vehicle_unit)
+    (driver_zone_assignment ?driver - driver_operator ?destination_zone - destination_zone)
+    (destination_zone_ready ?destination_zone - destination_zone)
+    (destination_zone_staged ?destination_zone - destination_zone)
+    (driver_ready_flag ?driver - driver_operator)
+    (transport_leg_available ?transport_leg - transport_leg)
+    (transport_leg_reserved ?transport_leg - transport_leg)
+    (leg_origin_binding ?transport_leg - transport_leg ?origin_zone - origin_zone)
+    (leg_destination_binding ?transport_leg - transport_leg ?destination_zone - destination_zone)
+    (leg_has_midpoint_flag ?transport_leg - transport_leg)
+    (leg_has_alternate_flag ?transport_leg - transport_leg)
+    (leg_activated_for_loading ?transport_leg - transport_leg)
+    (route_vehicle_relation ?route_plan - route_plan ?vehicle - vehicle_unit)
+    (route_driver_relation ?route_plan - route_plan ?driver - driver_operator)
+    (route_leg_relation ?route_plan - route_plan ?transport_leg - transport_leg)
+    (container_available ?container - container_unit)
+    (route_container_relation ?route_plan - route_plan ?container - container_unit)
+    (container_materialized ?container - container_unit)
+    (container_leg_binding ?container - container_unit ?transport_leg - transport_leg)
+    (route_container_ready_flag ?route_plan - route_plan)
+    (route_prepared_for_compliance ?route_plan - route_plan)
+    (compliance_passed_flag ?route_plan - route_plan)
+    (permit_assigned_flag ?route_plan - route_plan)
+    (permit_consumed_flag ?route_plan - route_plan)
+    (service_requirements_satisfied ?route_plan - route_plan)
+    (route_sequenced_flag ?route_plan - route_plan)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (route_priority_binding ?route_plan - route_plan ?priority_tag - priority_tag)
+    (priority_applied_flag ?route_plan - route_plan)
+    (priority_ready_for_clearance ?route_plan - route_plan)
+    (priority_clearance_flag ?route_plan - route_plan)
+    (access_permit_available ?access_permit - access_permit)
+    (route_permit_binding ?route_plan - route_plan ?access_permit - access_permit)
+    (service_requirement_available ?service_requirement - service_requirement)
+    (route_service_binding ?route_plan - route_plan ?service_requirement - service_requirement)
+    (equipment_available ?vehicle_equipment - vehicle_equipment)
+    (route_equipment_binding ?route_plan - route_plan ?vehicle_equipment - vehicle_equipment)
+    (clearance_available ?regulatory_clearance - regulatory_clearance)
+    (route_clearance_binding ?route_plan - route_plan ?regulatory_clearance - regulatory_clearance)
+    (delivery_slot_available ?delivery_slot - delivery_slot)
+    (entity_slot_binding ?operational_entity - operational_entity ?delivery_slot - delivery_slot)
+    (vehicle_zone_stage_flag ?vehicle - vehicle_unit)
+    (driver_zone_stage_flag ?driver - driver_operator)
+    (finalized_dispatch_flag ?route_plan - route_plan)
+  )
+  (:action initialize_task
+    :parameters (?operational_entity - operational_entity)
+    :precondition
+      (and
+        (not
+          (entity_initialized ?operational_entity)
+        )
+        (not
+          (deployed_integrated ?operational_entity)
+        )
+      )
+    :effect (entity_initialized ?operational_entity)
+  )
+  (:action assign_transport_mode
+    :parameters (?operational_entity - operational_entity ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (entity_initialized ?operational_entity)
+        (not
+          (mode_selected ?operational_entity)
+        )
+        (mode_available ?transport_mode)
+      )
+    :effect
+      (and
+        (mode_selected ?operational_entity)
+        (entity_mode_assignment ?operational_entity ?transport_mode)
+        (not
+          (mode_available ?transport_mode)
+        )
+      )
+  )
+  (:action assign_dispatch_window
+    :parameters (?operational_entity - operational_entity ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_initialized ?operational_entity)
+        (mode_selected ?operational_entity)
+        (time_window_available ?dispatch_window)
+      )
+    :effect
+      (and
+        (entity_time_assignment ?operational_entity ?dispatch_window)
+        (not
+          (time_window_available ?dispatch_window)
+        )
+      )
+  )
+  (:action activate_entity
+    :parameters (?operational_entity - operational_entity ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_initialized ?operational_entity)
+        (mode_selected ?operational_entity)
+        (entity_time_assignment ?operational_entity ?dispatch_window)
+        (not
+          (entity_active ?operational_entity)
+        )
+      )
+    :effect (entity_active ?operational_entity)
+  )
+  (:action release_dispatch_window
+    :parameters (?operational_entity - operational_entity ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_time_assignment ?operational_entity ?dispatch_window)
+      )
+    :effect
+      (and
+        (time_window_available ?dispatch_window)
+        (not
+          (entity_time_assignment ?operational_entity ?dispatch_window)
+        )
+      )
+  )
+  (:action assign_handling_agent
+    :parameters (?operational_entity - operational_entity ?handling_agent - handling_agent)
+    :precondition
+      (and
+        (entity_active ?operational_entity)
+        (handling_agent_available ?handling_agent)
+      )
+    :effect
+      (and
+        (handling_agent_assignment ?operational_entity ?handling_agent)
+        (not
+          (handling_agent_available ?handling_agent)
+        )
+      )
+  )
+  (:action release_handling_agent
+    :parameters (?operational_entity - operational_entity ?handling_agent - handling_agent)
+    :precondition
+      (and
+        (handling_agent_assignment ?operational_entity ?handling_agent)
+      )
+    :effect
+      (and
+        (handling_agent_available ?handling_agent)
+        (not
+          (handling_agent_assignment ?operational_entity ?handling_agent)
+        )
+      )
+  )
+  (:action assign_vehicle_equipment_to_route
+    :parameters (?route_plan - route_plan ?vehicle_equipment - vehicle_equipment)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (equipment_available ?vehicle_equipment)
+      )
+    :effect
+      (and
+        (route_equipment_binding ?route_plan ?vehicle_equipment)
+        (not
+          (equipment_available ?vehicle_equipment)
+        )
+      )
+  )
+  (:action release_vehicle_equipment_from_route
+    :parameters (?route_plan - route_plan ?vehicle_equipment - vehicle_equipment)
+    :precondition
+      (and
+        (route_equipment_binding ?route_plan ?vehicle_equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?vehicle_equipment)
+        (not
+          (route_equipment_binding ?route_plan ?vehicle_equipment)
+        )
+      )
+  )
+  (:action assign_regulatory_clearance_to_route
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (clearance_available ?regulatory_clearance)
+      )
+    :effect
+      (and
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (not
+          (clearance_available ?regulatory_clearance)
+        )
+      )
+  )
+  (:action release_route_clearance
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+      )
+    :effect
+      (and
+        (clearance_available ?regulatory_clearance)
+        (not
+          (route_clearance_binding ?route_plan ?regulatory_clearance)
+        )
+      )
+  )
+  (:action signal_origin_zone_ready
+    :parameters (?vehicle - vehicle_unit ?origin_zone - origin_zone ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_active ?vehicle)
+        (entity_time_assignment ?vehicle ?dispatch_window)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (not
+          (origin_zone_ready ?origin_zone)
+        )
+        (not
+          (origin_zone_staged ?origin_zone)
+        )
+      )
+    :effect (origin_zone_ready ?origin_zone)
+  )
+  (:action stage_vehicle_at_origin
+    :parameters (?vehicle - vehicle_unit ?origin_zone - origin_zone ?handling_agent - handling_agent)
+    :precondition
+      (and
+        (entity_active ?vehicle)
+        (handling_agent_assignment ?vehicle ?handling_agent)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (origin_zone_ready ?origin_zone)
+        (not
+          (vehicle_zone_stage_flag ?vehicle)
+        )
+      )
+    :effect
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (vehicle_ready_flag ?vehicle)
+      )
+  )
+  (:action stage_origin_cargo
+    :parameters (?vehicle - vehicle_unit ?origin_zone - origin_zone ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_active ?vehicle)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (vehicle_zone_stage_flag ?vehicle)
+        )
+      )
+    :effect
+      (and
+        (origin_zone_staged ?origin_zone)
+        (vehicle_zone_stage_flag ?vehicle)
+        (vehicle_cargo_assignment ?vehicle ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_vehicle_staging
+    :parameters (?vehicle - vehicle_unit ?origin_zone - origin_zone ?dispatch_window - dispatch_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_active ?vehicle)
+        (entity_time_assignment ?vehicle ?dispatch_window)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (origin_zone_staged ?origin_zone)
+        (vehicle_cargo_assignment ?vehicle ?cargo_unit)
+        (not
+          (vehicle_ready_flag ?vehicle)
+        )
+      )
+    :effect
+      (and
+        (origin_zone_ready ?origin_zone)
+        (vehicle_ready_flag ?vehicle)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (vehicle_cargo_assignment ?vehicle ?cargo_unit)
+        )
+      )
+  )
+  (:action signal_destination_zone_ready
+    :parameters (?driver - driver_operator ?destination_zone - destination_zone ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_active ?driver)
+        (entity_time_assignment ?driver ?dispatch_window)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (not
+          (destination_zone_ready ?destination_zone)
+        )
+        (not
+          (destination_zone_staged ?destination_zone)
+        )
+      )
+    :effect (destination_zone_ready ?destination_zone)
+  )
+  (:action stage_driver_at_destination
+    :parameters (?driver - driver_operator ?destination_zone - destination_zone ?handling_agent - handling_agent)
+    :precondition
+      (and
+        (entity_active ?driver)
+        (handling_agent_assignment ?driver ?handling_agent)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (destination_zone_ready ?destination_zone)
+        (not
+          (driver_zone_stage_flag ?driver)
+        )
+      )
+    :effect
+      (and
+        (driver_zone_stage_flag ?driver)
+        (driver_ready_flag ?driver)
+      )
+  )
+  (:action stage_destination_cargo
+    :parameters (?driver - driver_operator ?destination_zone - destination_zone ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_active ?driver)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (driver_zone_stage_flag ?driver)
+        )
+      )
+    :effect
+      (and
+        (destination_zone_staged ?destination_zone)
+        (driver_zone_stage_flag ?driver)
+        (driver_cargo_assignment ?driver ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_driver_staging
+    :parameters (?driver - driver_operator ?destination_zone - destination_zone ?dispatch_window - dispatch_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (entity_active ?driver)
+        (entity_time_assignment ?driver ?dispatch_window)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (destination_zone_staged ?destination_zone)
+        (driver_cargo_assignment ?driver ?cargo_unit)
+        (not
+          (driver_ready_flag ?driver)
+        )
+      )
+    :effect
+      (and
+        (destination_zone_ready ?destination_zone)
+        (driver_ready_flag ?driver)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (driver_cargo_assignment ?driver ?cargo_unit)
+        )
+      )
+  )
+  (:action reserve_transport_leg
+    :parameters (?vehicle - vehicle_unit ?driver - driver_operator ?origin_zone - origin_zone ?destination_zone - destination_zone ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (driver_zone_stage_flag ?driver)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (origin_zone_ready ?origin_zone)
+        (destination_zone_ready ?destination_zone)
+        (vehicle_ready_flag ?vehicle)
+        (driver_ready_flag ?driver)
+        (transport_leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_reserved ?transport_leg)
+        (leg_origin_binding ?transport_leg ?origin_zone)
+        (leg_destination_binding ?transport_leg ?destination_zone)
+        (not
+          (transport_leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action reserve_transport_leg_with_midpoint
+    :parameters (?vehicle - vehicle_unit ?driver - driver_operator ?origin_zone - origin_zone ?destination_zone - destination_zone ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (driver_zone_stage_flag ?driver)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (origin_zone_staged ?origin_zone)
+        (destination_zone_ready ?destination_zone)
+        (not
+          (vehicle_ready_flag ?vehicle)
+        )
+        (driver_ready_flag ?driver)
+        (transport_leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_reserved ?transport_leg)
+        (leg_origin_binding ?transport_leg ?origin_zone)
+        (leg_destination_binding ?transport_leg ?destination_zone)
+        (leg_has_midpoint_flag ?transport_leg)
+        (not
+          (transport_leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action reserve_transport_leg_with_alternate
+    :parameters (?vehicle - vehicle_unit ?driver - driver_operator ?origin_zone - origin_zone ?destination_zone - destination_zone ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (driver_zone_stage_flag ?driver)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (origin_zone_ready ?origin_zone)
+        (destination_zone_staged ?destination_zone)
+        (vehicle_ready_flag ?vehicle)
+        (not
+          (driver_ready_flag ?driver)
+        )
+        (transport_leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_reserved ?transport_leg)
+        (leg_origin_binding ?transport_leg ?origin_zone)
+        (leg_destination_binding ?transport_leg ?destination_zone)
+        (leg_has_alternate_flag ?transport_leg)
+        (not
+          (transport_leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action reserve_transport_leg_with_midpoint_and_alternate
+    :parameters (?vehicle - vehicle_unit ?driver - driver_operator ?origin_zone - origin_zone ?destination_zone - destination_zone ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (driver_zone_stage_flag ?driver)
+        (vehicle_zone_assignment ?vehicle ?origin_zone)
+        (driver_zone_assignment ?driver ?destination_zone)
+        (origin_zone_staged ?origin_zone)
+        (destination_zone_staged ?destination_zone)
+        (not
+          (vehicle_ready_flag ?vehicle)
+        )
+        (not
+          (driver_ready_flag ?driver)
+        )
+        (transport_leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_reserved ?transport_leg)
+        (leg_origin_binding ?transport_leg ?origin_zone)
+        (leg_destination_binding ?transport_leg ?destination_zone)
+        (leg_has_midpoint_flag ?transport_leg)
+        (leg_has_alternate_flag ?transport_leg)
+        (not
+          (transport_leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action activate_leg_for_loading
+    :parameters (?transport_leg - transport_leg ?vehicle - vehicle_unit ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (transport_leg_reserved ?transport_leg)
+        (vehicle_zone_stage_flag ?vehicle)
+        (entity_time_assignment ?vehicle ?dispatch_window)
+        (not
+          (leg_activated_for_loading ?transport_leg)
+        )
+      )
+    :effect (leg_activated_for_loading ?transport_leg)
+  )
+  (:action assign_and_materialize_container
+    :parameters (?route_plan - route_plan ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (route_leg_relation ?route_plan ?transport_leg)
+        (route_container_relation ?route_plan ?container)
+        (container_available ?container)
+        (transport_leg_reserved ?transport_leg)
+        (leg_activated_for_loading ?transport_leg)
+        (not
+          (container_materialized ?container)
+        )
+      )
+    :effect
+      (and
+        (container_materialized ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action mark_route_container_ready
+    :parameters (?route_plan - route_plan ?container - container_unit ?transport_leg - transport_leg ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (route_container_relation ?route_plan ?container)
+        (container_materialized ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (entity_time_assignment ?route_plan ?dispatch_window)
+        (not
+          (leg_has_midpoint_flag ?transport_leg)
+        )
+        (not
+          (route_container_ready_flag ?route_plan)
+        )
+      )
+    :effect (route_container_ready_flag ?route_plan)
+  )
+  (:action assign_access_permit_to_route
+    :parameters (?route_plan - route_plan ?access_permit - access_permit)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (access_permit_available ?access_permit)
+        (not
+          (permit_assigned_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (permit_assigned_flag ?route_plan)
+        (route_permit_binding ?route_plan ?access_permit)
+        (not
+          (access_permit_available ?access_permit)
+        )
+      )
+  )
+  (:action consume_access_permit_and_prepare_route
+    :parameters (?route_plan - route_plan ?container - container_unit ?transport_leg - transport_leg ?dispatch_window - dispatch_window ?access_permit - access_permit)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (route_container_relation ?route_plan ?container)
+        (container_materialized ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (entity_time_assignment ?route_plan ?dispatch_window)
+        (leg_has_midpoint_flag ?transport_leg)
+        (permit_assigned_flag ?route_plan)
+        (route_permit_binding ?route_plan ?access_permit)
+        (not
+          (route_container_ready_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_container_ready_flag ?route_plan)
+        (permit_consumed_flag ?route_plan)
+      )
+  )
+  (:action prepare_route_for_compliance_without_alternate
+    :parameters (?route_plan - route_plan ?vehicle_equipment - vehicle_equipment ?handling_agent - handling_agent ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_container_ready_flag ?route_plan)
+        (route_equipment_binding ?route_plan ?vehicle_equipment)
+        (handling_agent_assignment ?route_plan ?handling_agent)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (not
+          (leg_has_alternate_flag ?transport_leg)
+        )
+        (not
+          (route_prepared_for_compliance ?route_plan)
+        )
+      )
+    :effect (route_prepared_for_compliance ?route_plan)
+  )
+  (:action prepare_route_for_compliance_with_alternate
+    :parameters (?route_plan - route_plan ?vehicle_equipment - vehicle_equipment ?handling_agent - handling_agent ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_container_ready_flag ?route_plan)
+        (route_equipment_binding ?route_plan ?vehicle_equipment)
+        (handling_agent_assignment ?route_plan ?handling_agent)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (leg_has_alternate_flag ?transport_leg)
+        (not
+          (route_prepared_for_compliance ?route_plan)
+        )
+      )
+    :effect (route_prepared_for_compliance ?route_plan)
+  )
+  (:action apply_route_clearance
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_prepared_for_compliance ?route_plan)
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (not
+          (leg_has_midpoint_flag ?transport_leg)
+        )
+        (not
+          (leg_has_alternate_flag ?transport_leg)
+        )
+        (not
+          (compliance_passed_flag ?route_plan)
+        )
+      )
+    :effect (compliance_passed_flag ?route_plan)
+  )
+  (:action apply_route_clearance_and_satisfy_service_midpoint
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_prepared_for_compliance ?route_plan)
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (leg_has_midpoint_flag ?transport_leg)
+        (not
+          (leg_has_alternate_flag ?transport_leg)
+        )
+        (not
+          (compliance_passed_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (compliance_passed_flag ?route_plan)
+        (service_requirements_satisfied ?route_plan)
+      )
+  )
+  (:action apply_route_clearance_and_satisfy_service_alternate
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_prepared_for_compliance ?route_plan)
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (not
+          (leg_has_midpoint_flag ?transport_leg)
+        )
+        (leg_has_alternate_flag ?transport_leg)
+        (not
+          (compliance_passed_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (compliance_passed_flag ?route_plan)
+        (service_requirements_satisfied ?route_plan)
+      )
+  )
+  (:action apply_route_clearance_and_satisfy_service_both
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance ?container - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (route_prepared_for_compliance ?route_plan)
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (route_container_relation ?route_plan ?container)
+        (container_leg_binding ?container ?transport_leg)
+        (leg_has_midpoint_flag ?transport_leg)
+        (leg_has_alternate_flag ?transport_leg)
+        (not
+          (compliance_passed_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (compliance_passed_flag ?route_plan)
+        (service_requirements_satisfied ?route_plan)
+      )
+  )
+  (:action finalize_route_without_service_requirements
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (compliance_passed_flag ?route_plan)
+        (not
+          (service_requirements_satisfied ?route_plan)
+        )
+        (not
+          (finalized_dispatch_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (finalized_dispatch_flag ?route_plan)
+        (entity_ready_for_finalization ?route_plan)
+      )
+  )
+  (:action assign_service_requirement_to_route
+    :parameters (?route_plan - route_plan ?service_requirement - service_requirement)
+    :precondition
+      (and
+        (compliance_passed_flag ?route_plan)
+        (service_requirements_satisfied ?route_plan)
+        (service_requirement_available ?service_requirement)
+      )
+    :effect
+      (and
+        (route_service_binding ?route_plan ?service_requirement)
+        (not
+          (service_requirement_available ?service_requirement)
+        )
+      )
+  )
+  (:action sequence_route_plan
+    :parameters (?route_plan - route_plan ?vehicle - vehicle_unit ?driver - driver_operator ?dispatch_window - dispatch_window ?service_requirement - service_requirement)
+    :precondition
+      (and
+        (compliance_passed_flag ?route_plan)
+        (service_requirements_satisfied ?route_plan)
+        (route_service_binding ?route_plan ?service_requirement)
+        (route_vehicle_relation ?route_plan ?vehicle)
+        (route_driver_relation ?route_plan ?driver)
+        (vehicle_ready_flag ?vehicle)
+        (driver_ready_flag ?driver)
+        (entity_time_assignment ?route_plan ?dispatch_window)
+        (not
+          (route_sequenced_flag ?route_plan)
+        )
+      )
+    :effect (route_sequenced_flag ?route_plan)
+  )
+  (:action finalize_sequenced_route
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (compliance_passed_flag ?route_plan)
+        (route_sequenced_flag ?route_plan)
+        (not
+          (finalized_dispatch_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (finalized_dispatch_flag ?route_plan)
+        (entity_ready_for_finalization ?route_plan)
+      )
+  )
+  (:action apply_priority_tag_to_route
+    :parameters (?route_plan - route_plan ?priority_tag - priority_tag ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_active ?route_plan)
+        (entity_time_assignment ?route_plan ?dispatch_window)
+        (priority_tag_available ?priority_tag)
+        (route_priority_binding ?route_plan ?priority_tag)
+        (not
+          (priority_applied_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (priority_applied_flag ?route_plan)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action mark_priority_ready_for_clearance
+    :parameters (?route_plan - route_plan ?handling_agent - handling_agent)
+    :precondition
+      (and
+        (priority_applied_flag ?route_plan)
+        (handling_agent_assignment ?route_plan ?handling_agent)
+        (not
+          (priority_ready_for_clearance ?route_plan)
+        )
+      )
+    :effect (priority_ready_for_clearance ?route_plan)
+  )
+  (:action clear_priority_for_route
+    :parameters (?route_plan - route_plan ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (priority_ready_for_clearance ?route_plan)
+        (route_clearance_binding ?route_plan ?regulatory_clearance)
+        (not
+          (priority_clearance_flag ?route_plan)
+        )
+      )
+    :effect (priority_clearance_flag ?route_plan)
+  )
+  (:action finalize_route_with_priority
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (priority_clearance_flag ?route_plan)
+        (not
+          (finalized_dispatch_flag ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (finalized_dispatch_flag ?route_plan)
+        (entity_ready_for_finalization ?route_plan)
+      )
+  )
+  (:action confirm_vehicle_deployment
+    :parameters (?vehicle - vehicle_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_zone_stage_flag ?vehicle)
+        (vehicle_ready_flag ?vehicle)
+        (transport_leg_reserved ?transport_leg)
+        (leg_activated_for_loading ?transport_leg)
+        (not
+          (entity_ready_for_finalization ?vehicle)
+        )
+      )
+    :effect (entity_ready_for_finalization ?vehicle)
+  )
+  (:action confirm_driver_deployment
+    :parameters (?driver - driver_operator ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (driver_zone_stage_flag ?driver)
+        (driver_ready_flag ?driver)
+        (transport_leg_reserved ?transport_leg)
+        (leg_activated_for_loading ?transport_leg)
+        (not
+          (entity_ready_for_finalization ?driver)
+        )
+      )
+    :effect (entity_ready_for_finalization ?driver)
+  )
+  (:action assign_entity_to_delivery_slot
+    :parameters (?operational_entity - operational_entity ?delivery_slot - delivery_slot ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (entity_ready_for_finalization ?operational_entity)
+        (entity_time_assignment ?operational_entity ?dispatch_window)
+        (delivery_slot_available ?delivery_slot)
+        (not
+          (entity_allocated_for_delivery ?operational_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocated_for_delivery ?operational_entity)
+        (entity_slot_binding ?operational_entity ?delivery_slot)
+        (not
+          (delivery_slot_available ?delivery_slot)
+        )
+      )
+  )
+  (:action deploy_vehicle_and_release_resources
+    :parameters (?vehicle - vehicle_unit ?transport_mode - transport_mode ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (entity_allocated_for_delivery ?vehicle)
+        (entity_mode_assignment ?vehicle ?transport_mode)
+        (entity_slot_binding ?vehicle ?delivery_slot)
+        (not
+          (deployed_integrated ?vehicle)
+        )
+      )
+    :effect
+      (and
+        (deployed_integrated ?vehicle)
+        (mode_available ?transport_mode)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action deploy_driver_and_release_resources
+    :parameters (?driver - driver_operator ?transport_mode - transport_mode ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (entity_allocated_for_delivery ?driver)
+        (entity_mode_assignment ?driver ?transport_mode)
+        (entity_slot_binding ?driver ?delivery_slot)
+        (not
+          (deployed_integrated ?driver)
+        )
+      )
+    :effect
+      (and
+        (deployed_integrated ?driver)
+        (mode_available ?transport_mode)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action deploy_route_and_release_resources
+    :parameters (?route_plan - route_plan ?transport_mode - transport_mode ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (entity_allocated_for_delivery ?route_plan)
+        (entity_mode_assignment ?route_plan ?transport_mode)
+        (entity_slot_binding ?route_plan ?delivery_slot)
+        (not
+          (deployed_integrated ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (deployed_integrated ?route_plan)
+        (mode_available ?transport_mode)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem urban_delivery_zone_sequencing_problem)
+  (:domain urban_delivery_zone_sequencing_domain)
+  (:objects vehicle_1 - vehicle_unit driver_1 - driver_operator route_plan_1 - route_plan route_plan_2 - route_plan mode_van - transport_mode mode_bike - transport_mode mode_e_cargo - transport_mode dispatch_window_1 - dispatch_window handling_agent_1 - handling_agent cargo_unit_1 - cargo_unit origin_zone_1 - origin_zone destination_zone_1 - destination_zone transport_leg_1 - transport_leg container_1 - container_unit container_2 - container_unit access_permit_1 - access_permit access_permit_2 - access_permit service_requirement_1 - service_requirement service_requirement_2 - service_requirement delivery_slot_1 - delivery_slot equipment_1 - vehicle_equipment priority_tag_1 - priority_tag priority_tag_2 - priority_tag clearance_1 - regulatory_clearance)
+  (:init
+    (mode_available mode_van)
+    (mode_available mode_bike)
+    (mode_available mode_e_cargo)
+    (time_window_available dispatch_window_1)
+    (handling_agent_available handling_agent_1)
+    (cargo_unit_available cargo_unit_1)
+    (vehicle_zone_assignment vehicle_1 origin_zone_1)
+    (driver_zone_assignment driver_1 destination_zone_1)
+    (transport_leg_available transport_leg_1)
+    (container_available container_1)
+    (container_available container_2)
+    (route_vehicle_relation route_plan_1 vehicle_1)
+    (route_vehicle_relation route_plan_2 vehicle_1)
+    (route_driver_relation route_plan_1 driver_1)
+    (route_driver_relation route_plan_2 driver_1)
+    (route_leg_relation route_plan_1 transport_leg_1)
+    (route_leg_relation route_plan_2 transport_leg_1)
+    (route_container_relation route_plan_1 container_1)
+    (route_container_relation route_plan_2 container_2)
+    (access_permit_available access_permit_1)
+    (access_permit_available access_permit_2)
+    (service_requirement_available service_requirement_1)
+    (service_requirement_available service_requirement_2)
+    (delivery_slot_available delivery_slot_1)
+    (equipment_available equipment_1)
+    (priority_tag_available priority_tag_1)
+    (route_priority_binding route_plan_1 priority_tag_1)
+    (route_priority_binding route_plan_2 priority_tag_2)
+    (clearance_available clearance_1)
+  )
+  (:goal
+    (and
+      (deployed_integrated vehicle_1)
+      (deployed_integrated driver_1)
+      (deployed_integrated route_plan_1)
+      (deployed_integrated route_plan_2)
+    )
+  )
+)

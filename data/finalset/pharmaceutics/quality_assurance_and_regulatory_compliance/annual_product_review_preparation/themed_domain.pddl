@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_apr_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types apr_entity - object artifact - object document_type - object product_concept - object product - product_concept reviewer - apr_entity supporting_document - apr_entity approver - apr_entity regulatory_metadata - apr_entity stakeholder_input - apr_entity review_cycle - apr_entity validation_task - apr_entity compliance_evidence - apr_entity checklist_item - artifact validation_record - artifact inspection_finding - artifact process_procedure - document_type analytical_method - document_type apr_document - document_type product_component_group - product product_review_group - product manufacturing_site - product_component_group manufacturing_line - product_component_group preparer_team - product_review_group)
+  (:predicates
+    (apr_initiated ?product - product)
+    (ready_for_approval ?product - product)
+    (review_assignment_recorded ?product - product)
+    (apr_finalized_entity ?product - product)
+    (signoff_recorded_entity ?product - product)
+    (approval_recorded_entity ?product - product)
+    (reviewer_available ?reviewer - reviewer)
+    (reviewer_assigned ?product - product ?reviewer - reviewer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (supporting_doc_linked_to_entity ?product - product ?supporting_document - supporting_document)
+    (approver_available ?approver - approver)
+    (approver_assigned ?product - product ?approver - approver)
+    (checklist_item_available ?checklist_item - checklist_item)
+    (checklist_assigned_to_site ?site - manufacturing_site ?checklist_item - checklist_item)
+    (checklist_assigned_to_line ?line - manufacturing_line ?checklist_item - checklist_item)
+    (procedure_applicable_to_site ?site - manufacturing_site ?procedure - process_procedure)
+    (procedure_ready ?procedure - process_procedure)
+    (procedure_pending_checklist ?procedure - process_procedure)
+    (site_input_complete ?site - manufacturing_site)
+    (method_linked_to_line ?line - manufacturing_line ?method_spec - analytical_method)
+    (method_ready ?method_spec - analytical_method)
+    (method_pending_checklist ?method_spec - analytical_method)
+    (line_input_complete ?line - manufacturing_line)
+    (apr_draft_available ?apr_document - apr_document)
+    (apr_draft_created ?apr_document - apr_document)
+    (apr_linked_to_procedure ?apr_document - apr_document ?procedure - process_procedure)
+    (apr_linked_to_method ?apr_document - apr_document ?method_spec - analytical_method)
+    (apr_flag_procedure_ready ?apr_document - apr_document)
+    (apr_flag_method_ready ?apr_document - apr_document)
+    (apr_flag_validation_ready ?apr_document - apr_document)
+    (preparer_assigned_to_site ?preparer - preparer_team ?site - manufacturing_site)
+    (preparer_assigned_to_line ?preparer - preparer_team ?line - manufacturing_line)
+    (preparer_linked_to_apr ?preparer - preparer_team ?apr_document - apr_document)
+    (validation_record_available ?validation_record - validation_record)
+    (preparer_has_validation_record ?preparer - preparer_team ?validation_record - validation_record)
+    (validation_record_marked_included ?validation_record - validation_record)
+    (validation_record_linked_to_apr ?validation_record - validation_record ?apr_document - apr_document)
+    (preparer_validation_confirmed ?preparer - preparer_team)
+    (preparer_ready_for_sme_review ?preparer - preparer_team)
+    (sme_review_completed ?preparer - preparer_team)
+    (regulatory_metadata_assigned ?preparer - preparer_team)
+    (sme_stage_active_for_preparer ?preparer - preparer_team)
+    (sme_review_acknowledged ?preparer - preparer_team)
+    (team_signoff_ready ?preparer - preparer_team)
+    (inspection_finding_available ?inspection_finding - inspection_finding)
+    (preparer_considered_inspection_finding ?preparer - preparer_team ?inspection_finding - inspection_finding)
+    (inspection_finding_acknowledged ?preparer - preparer_team)
+    (inspection_evidence_assignment_recorded ?preparer - preparer_team)
+    (inspection_evidence_review_completed ?preparer - preparer_team)
+    (regulatory_metadata_available ?regulatory_metadata - regulatory_metadata)
+    (preparer_has_regulatory_metadata ?preparer - preparer_team ?regulatory_metadata - regulatory_metadata)
+    (stakeholder_input_available ?stakeholder_input - stakeholder_input)
+    (preparer_has_stakeholder_input ?preparer - preparer_team ?stakeholder_input - stakeholder_input)
+    (validation_task_available ?validation_task - validation_task)
+    (preparer_has_validation_task ?preparer - preparer_team ?validation_task - validation_task)
+    (compliance_evidence_available ?compliance_evidence - compliance_evidence)
+    (preparer_has_compliance_evidence ?preparer - preparer_team ?compliance_evidence - compliance_evidence)
+    (review_cycle_available ?review_cycle - review_cycle)
+    (entity_has_review_cycle ?product - product ?review_cycle - review_cycle)
+    (site_check_complete ?site - manufacturing_site)
+    (line_check_complete ?line - manufacturing_line)
+    (preparer_finalized ?preparer - preparer_team)
+  )
+  (:action initiate_apr_for_product
+    :parameters (?product - product)
+    :precondition
+      (and
+        (not
+          (apr_initiated ?product)
+        )
+        (not
+          (apr_finalized_entity ?product)
+        )
+      )
+    :effect (apr_initiated ?product)
+  )
+  (:action assign_reviewer_to_product
+    :parameters (?product - product ?reviewer - reviewer)
+    :precondition
+      (and
+        (apr_initiated ?product)
+        (not
+          (review_assignment_recorded ?product)
+        )
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (review_assignment_recorded ?product)
+        (reviewer_assigned ?product ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action attach_supporting_document_to_product
+    :parameters (?product - product ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (apr_initiated ?product)
+        (review_assignment_recorded ?product)
+        (supporting_document_available ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_doc_linked_to_entity ?product ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action verify_supporting_document_link
+    :parameters (?product - product ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (apr_initiated ?product)
+        (review_assignment_recorded ?product)
+        (supporting_doc_linked_to_entity ?product ?supporting_document)
+        (not
+          (ready_for_approval ?product)
+        )
+      )
+    :effect (ready_for_approval ?product)
+  )
+  (:action detach_supporting_document_from_product
+    :parameters (?product - product ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (supporting_doc_linked_to_entity ?product ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_document_available ?supporting_document)
+        (not
+          (supporting_doc_linked_to_entity ?product ?supporting_document)
+        )
+      )
+  )
+  (:action assign_approver_to_product
+    :parameters (?product - product ?approver - approver)
+    :precondition
+      (and
+        (ready_for_approval ?product)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (approver_assigned ?product ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action retract_approver_from_product
+    :parameters (?product - product ?approver - approver)
+    :precondition
+      (and
+        (approver_assigned ?product ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (approver_assigned ?product ?approver)
+        )
+      )
+  )
+  (:action assign_validation_task_to_preparer
+    :parameters (?preparer - preparer_team ?validation_task - validation_task)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (validation_task_available ?validation_task)
+      )
+    :effect
+      (and
+        (preparer_has_validation_task ?preparer ?validation_task)
+        (not
+          (validation_task_available ?validation_task)
+        )
+      )
+  )
+  (:action retract_validation_task_from_preparer
+    :parameters (?preparer - preparer_team ?validation_task - validation_task)
+    :precondition
+      (and
+        (preparer_has_validation_task ?preparer ?validation_task)
+      )
+    :effect
+      (and
+        (validation_task_available ?validation_task)
+        (not
+          (preparer_has_validation_task ?preparer ?validation_task)
+        )
+      )
+  )
+  (:action assign_compliance_evidence_to_preparer
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (compliance_evidence_available ?compliance_evidence)
+      )
+    :effect
+      (and
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (not
+          (compliance_evidence_available ?compliance_evidence)
+        )
+      )
+  )
+  (:action retract_compliance_evidence_from_preparer
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+      )
+    :effect
+      (and
+        (compliance_evidence_available ?compliance_evidence)
+        (not
+          (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        )
+      )
+  )
+  (:action confirm_procedure_for_site
+    :parameters (?site - manufacturing_site ?procedure - process_procedure ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (ready_for_approval ?site)
+        (supporting_doc_linked_to_entity ?site ?supporting_document)
+        (procedure_applicable_to_site ?site ?procedure)
+        (not
+          (procedure_ready ?procedure)
+        )
+        (not
+          (procedure_pending_checklist ?procedure)
+        )
+      )
+    :effect (procedure_ready ?procedure)
+  )
+  (:action approver_confirm_site_procedure
+    :parameters (?site - manufacturing_site ?procedure - process_procedure ?approver - approver)
+    :precondition
+      (and
+        (ready_for_approval ?site)
+        (approver_assigned ?site ?approver)
+        (procedure_applicable_to_site ?site ?procedure)
+        (procedure_ready ?procedure)
+        (not
+          (site_check_complete ?site)
+        )
+      )
+    :effect
+      (and
+        (site_check_complete ?site)
+        (site_input_complete ?site)
+      )
+  )
+  (:action assign_checklist_item_to_site
+    :parameters (?site - manufacturing_site ?procedure - process_procedure ?checklist_item - checklist_item)
+    :precondition
+      (and
+        (ready_for_approval ?site)
+        (procedure_applicable_to_site ?site ?procedure)
+        (checklist_item_available ?checklist_item)
+        (not
+          (site_check_complete ?site)
+        )
+      )
+    :effect
+      (and
+        (procedure_pending_checklist ?procedure)
+        (site_check_complete ?site)
+        (checklist_assigned_to_site ?site ?checklist_item)
+        (not
+          (checklist_item_available ?checklist_item)
+        )
+      )
+  )
+  (:action complete_site_checklist_item
+    :parameters (?site - manufacturing_site ?procedure - process_procedure ?supporting_document - supporting_document ?checklist_item - checklist_item)
+    :precondition
+      (and
+        (ready_for_approval ?site)
+        (supporting_doc_linked_to_entity ?site ?supporting_document)
+        (procedure_applicable_to_site ?site ?procedure)
+        (procedure_pending_checklist ?procedure)
+        (checklist_assigned_to_site ?site ?checklist_item)
+        (not
+          (site_input_complete ?site)
+        )
+      )
+    :effect
+      (and
+        (procedure_ready ?procedure)
+        (site_input_complete ?site)
+        (checklist_item_available ?checklist_item)
+        (not
+          (checklist_assigned_to_site ?site ?checklist_item)
+        )
+      )
+  )
+  (:action confirm_method_for_line
+    :parameters (?line - manufacturing_line ?method_spec - analytical_method ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (ready_for_approval ?line)
+        (supporting_doc_linked_to_entity ?line ?supporting_document)
+        (method_linked_to_line ?line ?method_spec)
+        (not
+          (method_ready ?method_spec)
+        )
+        (not
+          (method_pending_checklist ?method_spec)
+        )
+      )
+    :effect (method_ready ?method_spec)
+  )
+  (:action approver_confirm_line_method
+    :parameters (?line - manufacturing_line ?method_spec - analytical_method ?approver - approver)
+    :precondition
+      (and
+        (ready_for_approval ?line)
+        (approver_assigned ?line ?approver)
+        (method_linked_to_line ?line ?method_spec)
+        (method_ready ?method_spec)
+        (not
+          (line_check_complete ?line)
+        )
+      )
+    :effect
+      (and
+        (line_check_complete ?line)
+        (line_input_complete ?line)
+      )
+  )
+  (:action assign_checklist_item_to_line
+    :parameters (?line - manufacturing_line ?method_spec - analytical_method ?checklist_item - checklist_item)
+    :precondition
+      (and
+        (ready_for_approval ?line)
+        (method_linked_to_line ?line ?method_spec)
+        (checklist_item_available ?checklist_item)
+        (not
+          (line_check_complete ?line)
+        )
+      )
+    :effect
+      (and
+        (method_pending_checklist ?method_spec)
+        (line_check_complete ?line)
+        (checklist_assigned_to_line ?line ?checklist_item)
+        (not
+          (checklist_item_available ?checklist_item)
+        )
+      )
+  )
+  (:action complete_line_checklist_item
+    :parameters (?line - manufacturing_line ?method_spec - analytical_method ?supporting_document - supporting_document ?checklist_item - checklist_item)
+    :precondition
+      (and
+        (ready_for_approval ?line)
+        (supporting_doc_linked_to_entity ?line ?supporting_document)
+        (method_linked_to_line ?line ?method_spec)
+        (method_pending_checklist ?method_spec)
+        (checklist_assigned_to_line ?line ?checklist_item)
+        (not
+          (line_input_complete ?line)
+        )
+      )
+    :effect
+      (and
+        (method_ready ?method_spec)
+        (line_input_complete ?line)
+        (checklist_item_available ?checklist_item)
+        (not
+          (checklist_assigned_to_line ?line ?checklist_item)
+        )
+      )
+  )
+  (:action assemble_apr_document_from_inputs
+    :parameters (?site - manufacturing_site ?line - manufacturing_line ?procedure - process_procedure ?method_spec - analytical_method ?apr_document - apr_document)
+    :precondition
+      (and
+        (site_check_complete ?site)
+        (line_check_complete ?line)
+        (procedure_applicable_to_site ?site ?procedure)
+        (method_linked_to_line ?line ?method_spec)
+        (procedure_ready ?procedure)
+        (method_ready ?method_spec)
+        (site_input_complete ?site)
+        (line_input_complete ?line)
+        (apr_draft_available ?apr_document)
+      )
+    :effect
+      (and
+        (apr_draft_created ?apr_document)
+        (apr_linked_to_procedure ?apr_document ?procedure)
+        (apr_linked_to_method ?apr_document ?method_spec)
+        (not
+          (apr_draft_available ?apr_document)
+        )
+      )
+  )
+  (:action assemble_apr_document_with_procedure_confirmation
+    :parameters (?site - manufacturing_site ?line - manufacturing_line ?procedure - process_procedure ?method_spec - analytical_method ?apr_document - apr_document)
+    :precondition
+      (and
+        (site_check_complete ?site)
+        (line_check_complete ?line)
+        (procedure_applicable_to_site ?site ?procedure)
+        (method_linked_to_line ?line ?method_spec)
+        (procedure_pending_checklist ?procedure)
+        (method_ready ?method_spec)
+        (not
+          (site_input_complete ?site)
+        )
+        (line_input_complete ?line)
+        (apr_draft_available ?apr_document)
+      )
+    :effect
+      (and
+        (apr_draft_created ?apr_document)
+        (apr_linked_to_procedure ?apr_document ?procedure)
+        (apr_linked_to_method ?apr_document ?method_spec)
+        (apr_flag_procedure_ready ?apr_document)
+        (not
+          (apr_draft_available ?apr_document)
+        )
+      )
+  )
+  (:action assemble_apr_document_with_method_confirmation
+    :parameters (?site - manufacturing_site ?line - manufacturing_line ?procedure - process_procedure ?method_spec - analytical_method ?apr_document - apr_document)
+    :precondition
+      (and
+        (site_check_complete ?site)
+        (line_check_complete ?line)
+        (procedure_applicable_to_site ?site ?procedure)
+        (method_linked_to_line ?line ?method_spec)
+        (procedure_ready ?procedure)
+        (method_pending_checklist ?method_spec)
+        (site_input_complete ?site)
+        (not
+          (line_input_complete ?line)
+        )
+        (apr_draft_available ?apr_document)
+      )
+    :effect
+      (and
+        (apr_draft_created ?apr_document)
+        (apr_linked_to_procedure ?apr_document ?procedure)
+        (apr_linked_to_method ?apr_document ?method_spec)
+        (apr_flag_method_ready ?apr_document)
+        (not
+          (apr_draft_available ?apr_document)
+        )
+      )
+  )
+  (:action assemble_apr_document_with_both_confirmations
+    :parameters (?site - manufacturing_site ?line - manufacturing_line ?procedure - process_procedure ?method_spec - analytical_method ?apr_document - apr_document)
+    :precondition
+      (and
+        (site_check_complete ?site)
+        (line_check_complete ?line)
+        (procedure_applicable_to_site ?site ?procedure)
+        (method_linked_to_line ?line ?method_spec)
+        (procedure_pending_checklist ?procedure)
+        (method_pending_checklist ?method_spec)
+        (not
+          (site_input_complete ?site)
+        )
+        (not
+          (line_input_complete ?line)
+        )
+        (apr_draft_available ?apr_document)
+      )
+    :effect
+      (and
+        (apr_draft_created ?apr_document)
+        (apr_linked_to_procedure ?apr_document ?procedure)
+        (apr_linked_to_method ?apr_document ?method_spec)
+        (apr_flag_procedure_ready ?apr_document)
+        (apr_flag_method_ready ?apr_document)
+        (not
+          (apr_draft_available ?apr_document)
+        )
+      )
+  )
+  (:action mark_apr_ready_for_validation_linkage
+    :parameters (?apr_document - apr_document ?site - manufacturing_site ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (apr_draft_created ?apr_document)
+        (site_check_complete ?site)
+        (supporting_doc_linked_to_entity ?site ?supporting_document)
+        (not
+          (apr_flag_validation_ready ?apr_document)
+        )
+      )
+    :effect (apr_flag_validation_ready ?apr_document)
+  )
+  (:action include_validation_record_in_apr
+    :parameters (?preparer - preparer_team ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (preparer_linked_to_apr ?preparer ?apr_document)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_available ?validation_record)
+        (apr_draft_created ?apr_document)
+        (apr_flag_validation_ready ?apr_document)
+        (not
+          (validation_record_marked_included ?validation_record)
+        )
+      )
+    :effect
+      (and
+        (validation_record_marked_included ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (not
+          (validation_record_available ?validation_record)
+        )
+      )
+  )
+  (:action finalize_preparer_validation_inclusion
+    :parameters (?preparer - preparer_team ?validation_record - validation_record ?apr_document - apr_document ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_marked_included ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (supporting_doc_linked_to_entity ?preparer ?supporting_document)
+        (not
+          (apr_flag_procedure_ready ?apr_document)
+        )
+        (not
+          (preparer_validation_confirmed ?preparer)
+        )
+      )
+    :effect (preparer_validation_confirmed ?preparer)
+  )
+  (:action assign_regulatory_metadata_to_preparer
+    :parameters (?preparer - preparer_team ?regulatory_metadata - regulatory_metadata)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (regulatory_metadata_available ?regulatory_metadata)
+        (not
+          (regulatory_metadata_assigned ?preparer)
+        )
+      )
+    :effect
+      (and
+        (regulatory_metadata_assigned ?preparer)
+        (preparer_has_regulatory_metadata ?preparer ?regulatory_metadata)
+        (not
+          (regulatory_metadata_available ?regulatory_metadata)
+        )
+      )
+  )
+  (:action advance_preparer_sme_workflow_stage
+    :parameters (?preparer - preparer_team ?validation_record - validation_record ?apr_document - apr_document ?supporting_document - supporting_document ?regulatory_metadata - regulatory_metadata)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_marked_included ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (supporting_doc_linked_to_entity ?preparer ?supporting_document)
+        (apr_flag_procedure_ready ?apr_document)
+        (regulatory_metadata_assigned ?preparer)
+        (preparer_has_regulatory_metadata ?preparer ?regulatory_metadata)
+        (not
+          (preparer_validation_confirmed ?preparer)
+        )
+      )
+    :effect
+      (and
+        (preparer_validation_confirmed ?preparer)
+        (sme_stage_active_for_preparer ?preparer)
+      )
+  )
+  (:action submit_preparer_for_sme_review
+    :parameters (?preparer - preparer_team ?validation_task - validation_task ?approver - approver ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_validation_confirmed ?preparer)
+        (preparer_has_validation_task ?preparer ?validation_task)
+        (approver_assigned ?preparer ?approver)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (not
+          (apr_flag_method_ready ?apr_document)
+        )
+        (not
+          (preparer_ready_for_sme_review ?preparer)
+        )
+      )
+    :effect (preparer_ready_for_sme_review ?preparer)
+  )
+  (:action submit_preparer_for_sme_review_after_method_flag
+    :parameters (?preparer - preparer_team ?validation_task - validation_task ?approver - approver ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_validation_confirmed ?preparer)
+        (preparer_has_validation_task ?preparer ?validation_task)
+        (approver_assigned ?preparer ?approver)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (apr_flag_method_ready ?apr_document)
+        (not
+          (preparer_ready_for_sme_review ?preparer)
+        )
+      )
+    :effect (preparer_ready_for_sme_review ?preparer)
+  )
+  (:action complete_sme_review_for_preparer
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_ready_for_sme_review ?preparer)
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (not
+          (apr_flag_procedure_ready ?apr_document)
+        )
+        (not
+          (apr_flag_method_ready ?apr_document)
+        )
+        (not
+          (sme_review_completed ?preparer)
+        )
+      )
+    :effect (sme_review_completed ?preparer)
+  )
+  (:action complete_sme_review_and_record_alignment
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_ready_for_sme_review ?preparer)
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (apr_flag_procedure_ready ?apr_document)
+        (not
+          (apr_flag_method_ready ?apr_document)
+        )
+        (not
+          (sme_review_completed ?preparer)
+        )
+      )
+    :effect
+      (and
+        (sme_review_completed ?preparer)
+        (sme_review_acknowledged ?preparer)
+      )
+  )
+  (:action complete_sme_review_and_establish_alignment
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_ready_for_sme_review ?preparer)
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (not
+          (apr_flag_procedure_ready ?apr_document)
+        )
+        (apr_flag_method_ready ?apr_document)
+        (not
+          (sme_review_completed ?preparer)
+        )
+      )
+    :effect
+      (and
+        (sme_review_completed ?preparer)
+        (sme_review_acknowledged ?preparer)
+      )
+  )
+  (:action complete_sme_review_and_finalize_alignment
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence ?validation_record - validation_record ?apr_document - apr_document)
+    :precondition
+      (and
+        (preparer_ready_for_sme_review ?preparer)
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (preparer_has_validation_record ?preparer ?validation_record)
+        (validation_record_linked_to_apr ?validation_record ?apr_document)
+        (apr_flag_procedure_ready ?apr_document)
+        (apr_flag_method_ready ?apr_document)
+        (not
+          (sme_review_completed ?preparer)
+        )
+      )
+    :effect
+      (and
+        (sme_review_completed ?preparer)
+        (sme_review_acknowledged ?preparer)
+      )
+  )
+  (:action record_preparer_signoff
+    :parameters (?preparer - preparer_team)
+    :precondition
+      (and
+        (sme_review_completed ?preparer)
+        (not
+          (sme_review_acknowledged ?preparer)
+        )
+        (not
+          (preparer_finalized ?preparer)
+        )
+      )
+    :effect
+      (and
+        (preparer_finalized ?preparer)
+        (signoff_recorded_entity ?preparer)
+      )
+  )
+  (:action attach_stakeholder_input_to_preparer
+    :parameters (?preparer - preparer_team ?stakeholder_input - stakeholder_input)
+    :precondition
+      (and
+        (sme_review_completed ?preparer)
+        (sme_review_acknowledged ?preparer)
+        (stakeholder_input_available ?stakeholder_input)
+      )
+    :effect
+      (and
+        (preparer_has_stakeholder_input ?preparer ?stakeholder_input)
+        (not
+          (stakeholder_input_available ?stakeholder_input)
+        )
+      )
+  )
+  (:action submit_preparer_for_team_signoff
+    :parameters (?preparer - preparer_team ?site - manufacturing_site ?line - manufacturing_line ?supporting_document - supporting_document ?stakeholder_input - stakeholder_input)
+    :precondition
+      (and
+        (sme_review_completed ?preparer)
+        (sme_review_acknowledged ?preparer)
+        (preparer_has_stakeholder_input ?preparer ?stakeholder_input)
+        (preparer_assigned_to_site ?preparer ?site)
+        (preparer_assigned_to_line ?preparer ?line)
+        (site_input_complete ?site)
+        (line_input_complete ?line)
+        (supporting_doc_linked_to_entity ?preparer ?supporting_document)
+        (not
+          (team_signoff_ready ?preparer)
+        )
+      )
+    :effect (team_signoff_ready ?preparer)
+  )
+  (:action finalize_team_signoff
+    :parameters (?preparer - preparer_team)
+    :precondition
+      (and
+        (sme_review_completed ?preparer)
+        (team_signoff_ready ?preparer)
+        (not
+          (preparer_finalized ?preparer)
+        )
+      )
+    :effect
+      (and
+        (preparer_finalized ?preparer)
+        (signoff_recorded_entity ?preparer)
+      )
+  )
+  (:action associate_inspection_finding_with_preparer
+    :parameters (?preparer - preparer_team ?inspection_finding - inspection_finding ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (ready_for_approval ?preparer)
+        (supporting_doc_linked_to_entity ?preparer ?supporting_document)
+        (inspection_finding_available ?inspection_finding)
+        (preparer_considered_inspection_finding ?preparer ?inspection_finding)
+        (not
+          (inspection_finding_acknowledged ?preparer)
+        )
+      )
+    :effect
+      (and
+        (inspection_finding_acknowledged ?preparer)
+        (not
+          (inspection_finding_available ?inspection_finding)
+        )
+      )
+  )
+  (:action acknowledge_inspection_finding_assignment
+    :parameters (?preparer - preparer_team ?approver - approver)
+    :precondition
+      (and
+        (inspection_finding_acknowledged ?preparer)
+        (approver_assigned ?preparer ?approver)
+        (not
+          (inspection_evidence_assignment_recorded ?preparer)
+        )
+      )
+    :effect (inspection_evidence_assignment_recorded ?preparer)
+  )
+  (:action record_compliance_evidence_review_completion
+    :parameters (?preparer - preparer_team ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (inspection_evidence_assignment_recorded ?preparer)
+        (preparer_has_compliance_evidence ?preparer ?compliance_evidence)
+        (not
+          (inspection_evidence_review_completed ?preparer)
+        )
+      )
+    :effect (inspection_evidence_review_completed ?preparer)
+  )
+  (:action finalize_inspection_finding_signoff
+    :parameters (?preparer - preparer_team)
+    :precondition
+      (and
+        (inspection_evidence_review_completed ?preparer)
+        (not
+          (preparer_finalized ?preparer)
+        )
+      )
+    :effect
+      (and
+        (preparer_finalized ?preparer)
+        (signoff_recorded_entity ?preparer)
+      )
+  )
+  (:action record_site_final_signoff
+    :parameters (?site - manufacturing_site ?apr_document - apr_document)
+    :precondition
+      (and
+        (site_check_complete ?site)
+        (site_input_complete ?site)
+        (apr_draft_created ?apr_document)
+        (apr_flag_validation_ready ?apr_document)
+        (not
+          (signoff_recorded_entity ?site)
+        )
+      )
+    :effect (signoff_recorded_entity ?site)
+  )
+  (:action record_line_final_signoff
+    :parameters (?line - manufacturing_line ?apr_document - apr_document)
+    :precondition
+      (and
+        (line_check_complete ?line)
+        (line_input_complete ?line)
+        (apr_draft_created ?apr_document)
+        (apr_flag_validation_ready ?apr_document)
+        (not
+          (signoff_recorded_entity ?line)
+        )
+      )
+    :effect (signoff_recorded_entity ?line)
+  )
+  (:action record_product_approval_and_review_cycle
+    :parameters (?product - product ?review_cycle - review_cycle ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (signoff_recorded_entity ?product)
+        (supporting_doc_linked_to_entity ?product ?supporting_document)
+        (review_cycle_available ?review_cycle)
+        (not
+          (approval_recorded_entity ?product)
+        )
+      )
+    :effect
+      (and
+        (approval_recorded_entity ?product)
+        (entity_has_review_cycle ?product ?review_cycle)
+        (not
+          (review_cycle_available ?review_cycle)
+        )
+      )
+  )
+  (:action finalize_site_and_release_reviewer
+    :parameters (?site - manufacturing_site ?reviewer - reviewer ?review_cycle - review_cycle)
+    :precondition
+      (and
+        (approval_recorded_entity ?site)
+        (reviewer_assigned ?site ?reviewer)
+        (entity_has_review_cycle ?site ?review_cycle)
+        (not
+          (apr_finalized_entity ?site)
+        )
+      )
+    :effect
+      (and
+        (apr_finalized_entity ?site)
+        (reviewer_available ?reviewer)
+        (review_cycle_available ?review_cycle)
+      )
+  )
+  (:action finalize_line_and_release_reviewer
+    :parameters (?line - manufacturing_line ?reviewer - reviewer ?review_cycle - review_cycle)
+    :precondition
+      (and
+        (approval_recorded_entity ?line)
+        (reviewer_assigned ?line ?reviewer)
+        (entity_has_review_cycle ?line ?review_cycle)
+        (not
+          (apr_finalized_entity ?line)
+        )
+      )
+    :effect
+      (and
+        (apr_finalized_entity ?line)
+        (reviewer_available ?reviewer)
+        (review_cycle_available ?review_cycle)
+      )
+  )
+  (:action finalize_preparer_and_release_reviewer
+    :parameters (?preparer - preparer_team ?reviewer - reviewer ?review_cycle - review_cycle)
+    :precondition
+      (and
+        (approval_recorded_entity ?preparer)
+        (reviewer_assigned ?preparer ?reviewer)
+        (entity_has_review_cycle ?preparer ?review_cycle)
+        (not
+          (apr_finalized_entity ?preparer)
+        )
+      )
+    :effect
+      (and
+        (apr_finalized_entity ?preparer)
+        (reviewer_available ?reviewer)
+        (review_cycle_available ?review_cycle)
+      )
+  )
+)

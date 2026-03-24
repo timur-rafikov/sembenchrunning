@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain task_queue_worker_model)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types worker_resource - object queue_resource - object message_resource - object task_queue_system - object task - task_queue_system worker_slot - worker_resource handler_type - worker_resource executor_capability - worker_resource priority_flag - worker_resource execution_profile - worker_resource result_sink - worker_resource worker_label - worker_resource deadline_token - worker_resource artifact - queue_resource payload_blob - queue_resource affinity_tag - queue_resource input_partition - message_resource output_partition - message_resource dispatch_message - message_resource task_shard - task orchestrated_task - task producer_shard - task_shard consumer_shard - task_shard orchestrator - orchestrated_task)
+  (:predicates
+    (task_registered ?task - task)
+    (task_ready ?task - task)
+    (task_assigned ?task - task)
+    (component_finalized ?task - task)
+    (acknowledged ?task - task)
+    (execution_completed ?task - task)
+    (worker_slot_available ?worker_slot - worker_slot)
+    (task_assigned_to_slot ?task - task ?worker_slot - worker_slot)
+    (handler_available ?handler_type - handler_type)
+    (task_bound_to_handler ?task - task ?handler_type - handler_type)
+    (executor_capability_available ?executor_capability - executor_capability)
+    (task_bound_to_executor ?task - task ?executor_capability - executor_capability)
+    (artifact_available ?artifact - artifact)
+    (producer_shard_has_artifact ?producer_shard - producer_shard ?artifact - artifact)
+    (consumer_shard_has_artifact ?consumer_shard - consumer_shard ?artifact - artifact)
+    (producer_shard_input_partition ?producer_shard - producer_shard ?input_partition - input_partition)
+    (input_partition_reserved ?input_partition - input_partition)
+    (input_partition_staged ?input_partition - input_partition)
+    (producer_shard_ready ?producer_shard - producer_shard)
+    (consumer_shard_output_partition ?consumer_shard - consumer_shard ?output_partition - output_partition)
+    (output_partition_reserved ?output_partition - output_partition)
+    (output_partition_staged ?output_partition - output_partition)
+    (consumer_shard_ready ?consumer_shard - consumer_shard)
+    (dispatch_message_slot_available ?dispatch_message - dispatch_message)
+    (dispatch_message_ready ?dispatch_message - dispatch_message)
+    (dispatch_message_targets_input ?dispatch_message - dispatch_message ?input_partition - input_partition)
+    (dispatch_message_targets_output ?dispatch_message - dispatch_message ?output_partition - output_partition)
+    (dispatch_message_flag_a ?dispatch_message - dispatch_message)
+    (dispatch_message_flag_b ?dispatch_message - dispatch_message)
+    (dispatch_message_payload_open ?dispatch_message - dispatch_message)
+    (orchestrator_maps_producer_shard ?orchestrator - orchestrator ?producer_shard - producer_shard)
+    (orchestrator_maps_consumer_shard ?orchestrator - orchestrator ?consumer_shard - consumer_shard)
+    (orchestrator_maps_dispatch_message ?orchestrator - orchestrator ?dispatch_message - dispatch_message)
+    (payload_blob_available ?payload_blob - payload_blob)
+    (orchestrator_has_payload_blob ?orchestrator - orchestrator ?payload_blob - payload_blob)
+    (payload_blob_transferred ?payload_blob - payload_blob)
+    (payload_blob_linked_to_message ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    (orchestrator_payload_attached ?orchestrator - orchestrator)
+    (orchestrator_payload_verified ?orchestrator - orchestrator)
+    (orchestrator_feature_gate_passed ?orchestrator - orchestrator)
+    (orchestrator_priority_stage ?orchestrator - orchestrator)
+    (orchestrator_priority_activated ?orchestrator - orchestrator)
+    (orchestrator_profile_bound ?orchestrator - orchestrator)
+    (orchestrator_ready_to_execute ?orchestrator - orchestrator)
+    (affinity_tag_available ?affinity_tag - affinity_tag)
+    (orchestrator_bound_affinity ?orchestrator - orchestrator ?affinity_tag - affinity_tag)
+    (orchestrator_stage_one_enabled ?orchestrator - orchestrator)
+    (orchestrator_stage_two_enabled ?orchestrator - orchestrator)
+    (orchestrator_stage_three_enabled ?orchestrator - orchestrator)
+    (priority_flag_available ?priority_flag - priority_flag)
+    (orchestrator_bound_priority_flag ?orchestrator - orchestrator ?priority_flag - priority_flag)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (orchestrator_bound_execution_profile ?orchestrator - orchestrator ?execution_profile - execution_profile)
+    (worker_label_available ?worker_label - worker_label)
+    (orchestrator_bound_worker_label ?orchestrator - orchestrator ?worker_label - worker_label)
+    (deadline_token_available ?deadline_token - deadline_token)
+    (orchestrator_bound_deadline ?orchestrator - orchestrator ?deadline_token - deadline_token)
+    (result_sink_available ?result_sink - result_sink)
+    (task_target_result_sink ?task - task ?result_sink - result_sink)
+    (producer_shard_reserved ?producer_shard - producer_shard)
+    (consumer_shard_reserved ?consumer_shard - consumer_shard)
+    (orchestrator_acknowledged ?orchestrator - orchestrator)
+  )
+  (:action create_task
+    :parameters (?task - task)
+    :precondition
+      (and
+        (not
+          (task_registered ?task)
+        )
+        (not
+          (component_finalized ?task)
+        )
+      )
+    :effect (task_registered ?task)
+  )
+  (:action assign_worker_slot_to_task
+    :parameters (?task - task ?worker_slot - worker_slot)
+    :precondition
+      (and
+        (task_registered ?task)
+        (not
+          (task_assigned ?task)
+        )
+        (worker_slot_available ?worker_slot)
+      )
+    :effect
+      (and
+        (task_assigned ?task)
+        (task_assigned_to_slot ?task ?worker_slot)
+        (not
+          (worker_slot_available ?worker_slot)
+        )
+      )
+  )
+  (:action bind_handler_to_task
+    :parameters (?task - task ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_registered ?task)
+        (task_assigned ?task)
+        (handler_available ?handler_type)
+      )
+    :effect
+      (and
+        (task_bound_to_handler ?task ?handler_type)
+        (not
+          (handler_available ?handler_type)
+        )
+      )
+  )
+  (:action mark_task_ready
+    :parameters (?task - task ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_registered ?task)
+        (task_assigned ?task)
+        (task_bound_to_handler ?task ?handler_type)
+        (not
+          (task_ready ?task)
+        )
+      )
+    :effect (task_ready ?task)
+  )
+  (:action release_handler_from_task
+    :parameters (?task - task ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_bound_to_handler ?task ?handler_type)
+      )
+    :effect
+      (and
+        (handler_available ?handler_type)
+        (not
+          (task_bound_to_handler ?task ?handler_type)
+        )
+      )
+  )
+  (:action claim_executor_capability_for_task
+    :parameters (?task - task ?executor_capability - executor_capability)
+    :precondition
+      (and
+        (task_ready ?task)
+        (executor_capability_available ?executor_capability)
+      )
+    :effect
+      (and
+        (task_bound_to_executor ?task ?executor_capability)
+        (not
+          (executor_capability_available ?executor_capability)
+        )
+      )
+  )
+  (:action release_executor_from_task
+    :parameters (?task - task ?executor_capability - executor_capability)
+    :precondition
+      (and
+        (task_bound_to_executor ?task ?executor_capability)
+      )
+    :effect
+      (and
+        (executor_capability_available ?executor_capability)
+        (not
+          (task_bound_to_executor ?task ?executor_capability)
+        )
+      )
+  )
+  (:action claim_worker_label_for_orchestrator
+    :parameters (?orchestrator - orchestrator ?worker_label - worker_label)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (worker_label_available ?worker_label)
+      )
+    :effect
+      (and
+        (orchestrator_bound_worker_label ?orchestrator ?worker_label)
+        (not
+          (worker_label_available ?worker_label)
+        )
+      )
+  )
+  (:action release_worker_label_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?worker_label - worker_label)
+    :precondition
+      (and
+        (orchestrator_bound_worker_label ?orchestrator ?worker_label)
+      )
+    :effect
+      (and
+        (worker_label_available ?worker_label)
+        (not
+          (orchestrator_bound_worker_label ?orchestrator ?worker_label)
+        )
+      )
+  )
+  (:action bind_deadline_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (deadline_token_available ?deadline_token)
+      )
+    :effect
+      (and
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (not
+          (deadline_token_available ?deadline_token)
+        )
+      )
+  )
+  (:action release_deadline_from_orchestrator
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+      )
+    :effect
+      (and
+        (deadline_token_available ?deadline_token)
+        (not
+          (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        )
+      )
+  )
+  (:action reserve_input_partition_for_producer
+    :parameters (?producer_shard - producer_shard ?input_partition - input_partition ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_ready ?producer_shard)
+        (task_bound_to_handler ?producer_shard ?handler_type)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (not
+          (input_partition_reserved ?input_partition)
+        )
+        (not
+          (input_partition_staged ?input_partition)
+        )
+      )
+    :effect (input_partition_reserved ?input_partition)
+  )
+  (:action reserve_producer_shard_with_executor
+    :parameters (?producer_shard - producer_shard ?input_partition - input_partition ?executor_capability - executor_capability)
+    :precondition
+      (and
+        (task_ready ?producer_shard)
+        (task_bound_to_executor ?producer_shard ?executor_capability)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (input_partition_reserved ?input_partition)
+        (not
+          (producer_shard_reserved ?producer_shard)
+        )
+      )
+    :effect
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (producer_shard_ready ?producer_shard)
+      )
+  )
+  (:action stage_artifact_for_producer_shard
+    :parameters (?producer_shard - producer_shard ?input_partition - input_partition ?artifact - artifact)
+    :precondition
+      (and
+        (task_ready ?producer_shard)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (artifact_available ?artifact)
+        (not
+          (producer_shard_reserved ?producer_shard)
+        )
+      )
+    :effect
+      (and
+        (input_partition_staged ?input_partition)
+        (producer_shard_reserved ?producer_shard)
+        (producer_shard_has_artifact ?producer_shard ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action commit_producer_partition_payload
+    :parameters (?producer_shard - producer_shard ?input_partition - input_partition ?handler_type - handler_type ?artifact - artifact)
+    :precondition
+      (and
+        (task_ready ?producer_shard)
+        (task_bound_to_handler ?producer_shard ?handler_type)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (input_partition_staged ?input_partition)
+        (producer_shard_has_artifact ?producer_shard ?artifact)
+        (not
+          (producer_shard_ready ?producer_shard)
+        )
+      )
+    :effect
+      (and
+        (input_partition_reserved ?input_partition)
+        (producer_shard_ready ?producer_shard)
+        (artifact_available ?artifact)
+        (not
+          (producer_shard_has_artifact ?producer_shard ?artifact)
+        )
+      )
+  )
+  (:action reserve_output_partition_for_consumer
+    :parameters (?consumer_shard - consumer_shard ?output_partition - output_partition ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_ready ?consumer_shard)
+        (task_bound_to_handler ?consumer_shard ?handler_type)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (not
+          (output_partition_reserved ?output_partition)
+        )
+        (not
+          (output_partition_staged ?output_partition)
+        )
+      )
+    :effect (output_partition_reserved ?output_partition)
+  )
+  (:action reserve_consumer_shard_with_executor
+    :parameters (?consumer_shard - consumer_shard ?output_partition - output_partition ?executor_capability - executor_capability)
+    :precondition
+      (and
+        (task_ready ?consumer_shard)
+        (task_bound_to_executor ?consumer_shard ?executor_capability)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (output_partition_reserved ?output_partition)
+        (not
+          (consumer_shard_reserved ?consumer_shard)
+        )
+      )
+    :effect
+      (and
+        (consumer_shard_reserved ?consumer_shard)
+        (consumer_shard_ready ?consumer_shard)
+      )
+  )
+  (:action stage_artifact_for_consumer_shard
+    :parameters (?consumer_shard - consumer_shard ?output_partition - output_partition ?artifact - artifact)
+    :precondition
+      (and
+        (task_ready ?consumer_shard)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (artifact_available ?artifact)
+        (not
+          (consumer_shard_reserved ?consumer_shard)
+        )
+      )
+    :effect
+      (and
+        (output_partition_staged ?output_partition)
+        (consumer_shard_reserved ?consumer_shard)
+        (consumer_shard_has_artifact ?consumer_shard ?artifact)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action commit_consumer_partition_payload
+    :parameters (?consumer_shard - consumer_shard ?output_partition - output_partition ?handler_type - handler_type ?artifact - artifact)
+    :precondition
+      (and
+        (task_ready ?consumer_shard)
+        (task_bound_to_handler ?consumer_shard ?handler_type)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (output_partition_staged ?output_partition)
+        (consumer_shard_has_artifact ?consumer_shard ?artifact)
+        (not
+          (consumer_shard_ready ?consumer_shard)
+        )
+      )
+    :effect
+      (and
+        (output_partition_reserved ?output_partition)
+        (consumer_shard_ready ?consumer_shard)
+        (artifact_available ?artifact)
+        (not
+          (consumer_shard_has_artifact ?consumer_shard ?artifact)
+        )
+      )
+  )
+  (:action assemble_dispatch_message
+    :parameters (?producer_shard - producer_shard ?consumer_shard - consumer_shard ?input_partition - input_partition ?output_partition - output_partition ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (consumer_shard_reserved ?consumer_shard)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (input_partition_reserved ?input_partition)
+        (output_partition_reserved ?output_partition)
+        (producer_shard_ready ?producer_shard)
+        (consumer_shard_ready ?consumer_shard)
+        (dispatch_message_slot_available ?dispatch_message)
+      )
+    :effect
+      (and
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_targets_input ?dispatch_message ?input_partition)
+        (dispatch_message_targets_output ?dispatch_message ?output_partition)
+        (not
+          (dispatch_message_slot_available ?dispatch_message)
+        )
+      )
+  )
+  (:action assemble_dispatch_message_with_input_payload
+    :parameters (?producer_shard - producer_shard ?consumer_shard - consumer_shard ?input_partition - input_partition ?output_partition - output_partition ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (consumer_shard_reserved ?consumer_shard)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (input_partition_staged ?input_partition)
+        (output_partition_reserved ?output_partition)
+        (not
+          (producer_shard_ready ?producer_shard)
+        )
+        (consumer_shard_ready ?consumer_shard)
+        (dispatch_message_slot_available ?dispatch_message)
+      )
+    :effect
+      (and
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_targets_input ?dispatch_message ?input_partition)
+        (dispatch_message_targets_output ?dispatch_message ?output_partition)
+        (dispatch_message_flag_a ?dispatch_message)
+        (not
+          (dispatch_message_slot_available ?dispatch_message)
+        )
+      )
+  )
+  (:action assemble_dispatch_message_with_output_payload
+    :parameters (?producer_shard - producer_shard ?consumer_shard - consumer_shard ?input_partition - input_partition ?output_partition - output_partition ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (consumer_shard_reserved ?consumer_shard)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (input_partition_reserved ?input_partition)
+        (output_partition_staged ?output_partition)
+        (producer_shard_ready ?producer_shard)
+        (not
+          (consumer_shard_ready ?consumer_shard)
+        )
+        (dispatch_message_slot_available ?dispatch_message)
+      )
+    :effect
+      (and
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_targets_input ?dispatch_message ?input_partition)
+        (dispatch_message_targets_output ?dispatch_message ?output_partition)
+        (dispatch_message_flag_b ?dispatch_message)
+        (not
+          (dispatch_message_slot_available ?dispatch_message)
+        )
+      )
+  )
+  (:action assemble_dispatch_message_with_input_and_output_payload
+    :parameters (?producer_shard - producer_shard ?consumer_shard - consumer_shard ?input_partition - input_partition ?output_partition - output_partition ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (consumer_shard_reserved ?consumer_shard)
+        (producer_shard_input_partition ?producer_shard ?input_partition)
+        (consumer_shard_output_partition ?consumer_shard ?output_partition)
+        (input_partition_staged ?input_partition)
+        (output_partition_staged ?output_partition)
+        (not
+          (producer_shard_ready ?producer_shard)
+        )
+        (not
+          (consumer_shard_ready ?consumer_shard)
+        )
+        (dispatch_message_slot_available ?dispatch_message)
+      )
+    :effect
+      (and
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_targets_input ?dispatch_message ?input_partition)
+        (dispatch_message_targets_output ?dispatch_message ?output_partition)
+        (dispatch_message_flag_a ?dispatch_message)
+        (dispatch_message_flag_b ?dispatch_message)
+        (not
+          (dispatch_message_slot_available ?dispatch_message)
+        )
+      )
+  )
+  (:action finalize_dispatch_message_assembly
+    :parameters (?dispatch_message - dispatch_message ?producer_shard - producer_shard ?handler_type - handler_type)
+    :precondition
+      (and
+        (dispatch_message_ready ?dispatch_message)
+        (producer_shard_reserved ?producer_shard)
+        (task_bound_to_handler ?producer_shard ?handler_type)
+        (not
+          (dispatch_message_payload_open ?dispatch_message)
+        )
+      )
+    :effect (dispatch_message_payload_open ?dispatch_message)
+  )
+  (:action attach_payload_blob_to_dispatch_message
+    :parameters (?orchestrator - orchestrator ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (orchestrator_maps_dispatch_message ?orchestrator ?dispatch_message)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_available ?payload_blob)
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_payload_open ?dispatch_message)
+        (not
+          (payload_blob_transferred ?payload_blob)
+        )
+      )
+    :effect
+      (and
+        (payload_blob_transferred ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (not
+          (payload_blob_available ?payload_blob)
+        )
+      )
+  )
+  (:action acknowledge_payload_transfer
+    :parameters (?orchestrator - orchestrator ?payload_blob - payload_blob ?dispatch_message - dispatch_message ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_transferred ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (task_bound_to_handler ?orchestrator ?handler_type)
+        (not
+          (dispatch_message_flag_a ?dispatch_message)
+        )
+        (not
+          (orchestrator_payload_attached ?orchestrator)
+        )
+      )
+    :effect (orchestrator_payload_attached ?orchestrator)
+  )
+  (:action bind_priority_flag_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (priority_flag_available ?priority_flag)
+        (not
+          (orchestrator_priority_stage ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_priority_stage ?orchestrator)
+        (orchestrator_bound_priority_flag ?orchestrator ?priority_flag)
+        (not
+          (priority_flag_available ?priority_flag)
+        )
+      )
+  )
+  (:action activate_orchestrator_priority_stage_with_payload
+    :parameters (?orchestrator - orchestrator ?payload_blob - payload_blob ?dispatch_message - dispatch_message ?handler_type - handler_type ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_transferred ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (task_bound_to_handler ?orchestrator ?handler_type)
+        (dispatch_message_flag_a ?dispatch_message)
+        (orchestrator_priority_stage ?orchestrator)
+        (orchestrator_bound_priority_flag ?orchestrator ?priority_flag)
+        (not
+          (orchestrator_payload_attached ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_payload_attached ?orchestrator)
+        (orchestrator_priority_activated ?orchestrator)
+      )
+  )
+  (:action orchestrator_process_payload_phase_1
+    :parameters (?orchestrator - orchestrator ?worker_label - worker_label ?executor_capability - executor_capability ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_attached ?orchestrator)
+        (orchestrator_bound_worker_label ?orchestrator ?worker_label)
+        (task_bound_to_executor ?orchestrator ?executor_capability)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (not
+          (dispatch_message_flag_b ?dispatch_message)
+        )
+        (not
+          (orchestrator_payload_verified ?orchestrator)
+        )
+      )
+    :effect (orchestrator_payload_verified ?orchestrator)
+  )
+  (:action orchestrator_process_payload_phase_2
+    :parameters (?orchestrator - orchestrator ?worker_label - worker_label ?executor_capability - executor_capability ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_attached ?orchestrator)
+        (orchestrator_bound_worker_label ?orchestrator ?worker_label)
+        (task_bound_to_executor ?orchestrator ?executor_capability)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (dispatch_message_flag_b ?dispatch_message)
+        (not
+          (orchestrator_payload_verified ?orchestrator)
+        )
+      )
+    :effect (orchestrator_payload_verified ?orchestrator)
+  )
+  (:action open_orchestrator_feature_gate
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_verified ?orchestrator)
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (not
+          (dispatch_message_flag_a ?dispatch_message)
+        )
+        (not
+          (dispatch_message_flag_b ?dispatch_message)
+        )
+        (not
+          (orchestrator_feature_gate_passed ?orchestrator)
+        )
+      )
+    :effect (orchestrator_feature_gate_passed ?orchestrator)
+  )
+  (:action open_feature_gate_and_bind_profile
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_verified ?orchestrator)
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (dispatch_message_flag_a ?dispatch_message)
+        (not
+          (dispatch_message_flag_b ?dispatch_message)
+        )
+        (not
+          (orchestrator_feature_gate_passed ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_profile_bound ?orchestrator)
+      )
+  )
+  (:action open_feature_gate_and_bind_profile_alt
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_verified ?orchestrator)
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (not
+          (dispatch_message_flag_a ?dispatch_message)
+        )
+        (dispatch_message_flag_b ?dispatch_message)
+        (not
+          (orchestrator_feature_gate_passed ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_profile_bound ?orchestrator)
+      )
+  )
+  (:action open_feature_gate_and_bind_profile_final
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token ?payload_blob - payload_blob ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (orchestrator_payload_verified ?orchestrator)
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (orchestrator_has_payload_blob ?orchestrator ?payload_blob)
+        (payload_blob_linked_to_message ?payload_blob ?dispatch_message)
+        (dispatch_message_flag_a ?dispatch_message)
+        (dispatch_message_flag_b ?dispatch_message)
+        (not
+          (orchestrator_feature_gate_passed ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_profile_bound ?orchestrator)
+      )
+  )
+  (:action promote_orchestrator_and_acknowledge
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (not
+          (orchestrator_profile_bound ?orchestrator)
+        )
+        (not
+          (orchestrator_acknowledged ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_acknowledged ?orchestrator)
+        (acknowledged ?orchestrator)
+      )
+  )
+  (:action bind_execution_profile_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_profile_bound ?orchestrator)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (orchestrator_bound_execution_profile ?orchestrator ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action authorize_orchestrator_execution
+    :parameters (?orchestrator - orchestrator ?producer_shard - producer_shard ?consumer_shard - consumer_shard ?handler_type - handler_type ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_profile_bound ?orchestrator)
+        (orchestrator_bound_execution_profile ?orchestrator ?execution_profile)
+        (orchestrator_maps_producer_shard ?orchestrator ?producer_shard)
+        (orchestrator_maps_consumer_shard ?orchestrator ?consumer_shard)
+        (producer_shard_ready ?producer_shard)
+        (consumer_shard_ready ?consumer_shard)
+        (task_bound_to_handler ?orchestrator ?handler_type)
+        (not
+          (orchestrator_ready_to_execute ?orchestrator)
+        )
+      )
+    :effect (orchestrator_ready_to_execute ?orchestrator)
+  )
+  (:action acknowledge_orchestrator_completion
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_feature_gate_passed ?orchestrator)
+        (orchestrator_ready_to_execute ?orchestrator)
+        (not
+          (orchestrator_acknowledged ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_acknowledged ?orchestrator)
+        (acknowledged ?orchestrator)
+      )
+  )
+  (:action bind_affinity_tag_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?affinity_tag - affinity_tag ?handler_type - handler_type)
+    :precondition
+      (and
+        (task_ready ?orchestrator)
+        (task_bound_to_handler ?orchestrator ?handler_type)
+        (affinity_tag_available ?affinity_tag)
+        (orchestrator_bound_affinity ?orchestrator ?affinity_tag)
+        (not
+          (orchestrator_stage_one_enabled ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_stage_one_enabled ?orchestrator)
+        (not
+          (affinity_tag_available ?affinity_tag)
+        )
+      )
+  )
+  (:action enable_orchestrator_stage_two
+    :parameters (?orchestrator - orchestrator ?executor_capability - executor_capability)
+    :precondition
+      (and
+        (orchestrator_stage_one_enabled ?orchestrator)
+        (task_bound_to_executor ?orchestrator ?executor_capability)
+        (not
+          (orchestrator_stage_two_enabled ?orchestrator)
+        )
+      )
+    :effect (orchestrator_stage_two_enabled ?orchestrator)
+  )
+  (:action apply_deadline_to_orchestrator
+    :parameters (?orchestrator - orchestrator ?deadline_token - deadline_token)
+    :precondition
+      (and
+        (orchestrator_stage_two_enabled ?orchestrator)
+        (orchestrator_bound_deadline ?orchestrator ?deadline_token)
+        (not
+          (orchestrator_stage_three_enabled ?orchestrator)
+        )
+      )
+    :effect (orchestrator_stage_three_enabled ?orchestrator)
+  )
+  (:action acknowledge_orchestrator_and_release
+    :parameters (?orchestrator - orchestrator)
+    :precondition
+      (and
+        (orchestrator_stage_three_enabled ?orchestrator)
+        (not
+          (orchestrator_acknowledged ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_acknowledged ?orchestrator)
+        (acknowledged ?orchestrator)
+      )
+  )
+  (:action acknowledge_producer_shard_completion
+    :parameters (?producer_shard - producer_shard ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (producer_shard_reserved ?producer_shard)
+        (producer_shard_ready ?producer_shard)
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_payload_open ?dispatch_message)
+        (not
+          (acknowledged ?producer_shard)
+        )
+      )
+    :effect (acknowledged ?producer_shard)
+  )
+  (:action acknowledge_consumer_shard_completion
+    :parameters (?consumer_shard - consumer_shard ?dispatch_message - dispatch_message)
+    :precondition
+      (and
+        (consumer_shard_reserved ?consumer_shard)
+        (consumer_shard_ready ?consumer_shard)
+        (dispatch_message_ready ?dispatch_message)
+        (dispatch_message_payload_open ?dispatch_message)
+        (not
+          (acknowledged ?consumer_shard)
+        )
+      )
+    :effect (acknowledged ?consumer_shard)
+  )
+  (:action complete_task_and_bind_result_sink
+    :parameters (?task - task ?result_sink - result_sink ?handler_type - handler_type)
+    :precondition
+      (and
+        (acknowledged ?task)
+        (task_bound_to_handler ?task ?handler_type)
+        (result_sink_available ?result_sink)
+        (not
+          (execution_completed ?task)
+        )
+      )
+    :effect
+      (and
+        (execution_completed ?task)
+        (task_target_result_sink ?task ?result_sink)
+        (not
+          (result_sink_available ?result_sink)
+        )
+      )
+  )
+  (:action finalize_producer_shard_and_release_slot
+    :parameters (?producer_shard - producer_shard ?worker_slot - worker_slot ?result_sink - result_sink)
+    :precondition
+      (and
+        (execution_completed ?producer_shard)
+        (task_assigned_to_slot ?producer_shard ?worker_slot)
+        (task_target_result_sink ?producer_shard ?result_sink)
+        (not
+          (component_finalized ?producer_shard)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?producer_shard)
+        (worker_slot_available ?worker_slot)
+        (result_sink_available ?result_sink)
+      )
+  )
+  (:action finalize_consumer_shard_and_release_slot
+    :parameters (?consumer_shard - consumer_shard ?worker_slot - worker_slot ?result_sink - result_sink)
+    :precondition
+      (and
+        (execution_completed ?consumer_shard)
+        (task_assigned_to_slot ?consumer_shard ?worker_slot)
+        (task_target_result_sink ?consumer_shard ?result_sink)
+        (not
+          (component_finalized ?consumer_shard)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?consumer_shard)
+        (worker_slot_available ?worker_slot)
+        (result_sink_available ?result_sink)
+      )
+  )
+  (:action finalize_orchestrator_and_release_slot
+    :parameters (?orchestrator - orchestrator ?worker_slot - worker_slot ?result_sink - result_sink)
+    :precondition
+      (and
+        (execution_completed ?orchestrator)
+        (task_assigned_to_slot ?orchestrator ?worker_slot)
+        (task_target_result_sink ?orchestrator ?result_sink)
+        (not
+          (component_finalized ?orchestrator)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?orchestrator)
+        (worker_slot_available ?worker_slot)
+        (result_sink_available ?result_sink)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem task_queue_worker_scenario)
+  (:domain task_queue_worker_model)
+  (:objects producer_shard_1 - producer_shard consumer_shard_1 - consumer_shard orchestrator_1 - orchestrator orchestrator_2 - orchestrator worker_slot_1 - worker_slot worker_slot_2 - worker_slot worker_slot_3 - worker_slot handler_type_1 - handler_type executor_capability_1 - executor_capability artifact_1 - artifact input_partition_1 - input_partition output_partition_1 - output_partition dispatch_message_1 - dispatch_message payload_blob_1 - payload_blob payload_blob_2 - payload_blob priority_flag_high - priority_flag priority_flag_low - priority_flag execution_profile_1 - execution_profile execution_profile_2 - execution_profile result_sink_1 - result_sink worker_label_1 - worker_label affinity_tag_1 - affinity_tag affinity_tag_2 - affinity_tag deadline_token_1 - deadline_token)
+  (:init
+    (worker_slot_available worker_slot_1)
+    (worker_slot_available worker_slot_2)
+    (worker_slot_available worker_slot_3)
+    (handler_available handler_type_1)
+    (executor_capability_available executor_capability_1)
+    (artifact_available artifact_1)
+    (producer_shard_input_partition producer_shard_1 input_partition_1)
+    (consumer_shard_output_partition consumer_shard_1 output_partition_1)
+    (dispatch_message_slot_available dispatch_message_1)
+    (payload_blob_available payload_blob_1)
+    (payload_blob_available payload_blob_2)
+    (orchestrator_maps_producer_shard orchestrator_1 producer_shard_1)
+    (orchestrator_maps_producer_shard orchestrator_2 producer_shard_1)
+    (orchestrator_maps_consumer_shard orchestrator_1 consumer_shard_1)
+    (orchestrator_maps_consumer_shard orchestrator_2 consumer_shard_1)
+    (orchestrator_maps_dispatch_message orchestrator_1 dispatch_message_1)
+    (orchestrator_maps_dispatch_message orchestrator_2 dispatch_message_1)
+    (orchestrator_has_payload_blob orchestrator_1 payload_blob_1)
+    (orchestrator_has_payload_blob orchestrator_2 payload_blob_2)
+    (priority_flag_available priority_flag_high)
+    (priority_flag_available priority_flag_low)
+    (execution_profile_available execution_profile_1)
+    (execution_profile_available execution_profile_2)
+    (result_sink_available result_sink_1)
+    (worker_label_available worker_label_1)
+    (affinity_tag_available affinity_tag_1)
+    (orchestrator_bound_affinity orchestrator_1 affinity_tag_1)
+    (orchestrator_bound_affinity orchestrator_2 affinity_tag_2)
+    (deadline_token_available deadline_token_1)
+  )
+  (:goal
+    (and
+      (component_finalized producer_shard_1)
+      (component_finalized consumer_shard_1)
+      (component_finalized orchestrator_1)
+      (component_finalized orchestrator_2)
+    )
+  )
+)

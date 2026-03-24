@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain hotel_room_type_reservation_choice_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types accommodation_resource_category - object service_option_category - object transaction_element_category - object reservation_abstraction - object reservation_choice - reservation_abstraction rate_plan - accommodation_resource_category room_type_option - accommodation_resource_category room_unit - accommodation_resource_category special_request_type - accommodation_resource_category rate_modifier - accommodation_resource_category cancellation_option - accommodation_resource_category corporate_rate_option - accommodation_resource_category identity_document - accommodation_resource_category ancillary_service - service_option_category room_assignment_token - service_option_category promotional_code - service_option_category primary_inventory_bucket - transaction_element_category secondary_inventory_bucket - transaction_element_category booking_record - transaction_element_category guest_context_supertype - reservation_choice supplier_context_supertype - reservation_choice lead_guest_context - guest_context_supertype secondary_guest_context - guest_context_supertype hotel_supplier_context - supplier_context_supertype)
+  (:predicates
+    (reservation_context_open ?reservation_choice - reservation_choice)
+    (reservation_context_ready ?reservation_choice - reservation_choice)
+    (reservation_context_rate_attached ?reservation_choice - reservation_choice)
+    (reservation_context_committed ?reservation_choice - reservation_choice)
+    (confirmation_recorded ?reservation_choice - reservation_choice)
+    (booking_association_created ?reservation_choice - reservation_choice)
+    (rate_plan_available ?rate_plan - rate_plan)
+    (reservation_has_rate_plan ?reservation_choice - reservation_choice ?rate_plan - rate_plan)
+    (room_type_option_available ?room_type_option - room_type_option)
+    (reservation_has_room_type ?reservation_choice - reservation_choice ?room_type_option - room_type_option)
+    (room_unit_available ?room_unit - room_unit)
+    (unit_assigned_to_reservation ?reservation_choice - reservation_choice ?room_unit - room_unit)
+    (ancillary_service_available ?ancillary_service - ancillary_service)
+    (lead_guest_ancillary_attached ?lead_guest_context - lead_guest_context ?ancillary_service - ancillary_service)
+    (secondary_guest_ancillary_attached ?secondary_guest_context - secondary_guest_context ?ancillary_service - ancillary_service)
+    (guest_primary_bucket_association ?lead_guest_context - lead_guest_context ?primary_inventory_bucket - primary_inventory_bucket)
+    (primary_bucket_hold_marked ?primary_inventory_bucket - primary_inventory_bucket)
+    (primary_bucket_ancillary_marked ?primary_inventory_bucket - primary_inventory_bucket)
+    (lead_guest_hold_confirmed ?lead_guest_context - lead_guest_context)
+    (guest_secondary_bucket_association ?secondary_guest_context - secondary_guest_context ?secondary_inventory_bucket - secondary_inventory_bucket)
+    (secondary_bucket_hold_marked ?secondary_inventory_bucket - secondary_inventory_bucket)
+    (secondary_bucket_ancillary_marked ?secondary_inventory_bucket - secondary_inventory_bucket)
+    (secondary_guest_hold_confirmed ?secondary_guest_context - secondary_guest_context)
+    (booking_record_slot_available ?booking_record - booking_record)
+    (booking_record_created ?booking_record - booking_record)
+    (booking_record_primary_bucket_link ?booking_record - booking_record ?primary_inventory_bucket - primary_inventory_bucket)
+    (booking_record_secondary_bucket_link ?booking_record - booking_record ?secondary_inventory_bucket - secondary_inventory_bucket)
+    (booking_record_variant_guarantee ?booking_record - booking_record)
+    (booking_record_variant_fee ?booking_record - booking_record)
+    (booking_record_assignment_ready ?booking_record - booking_record)
+    (supplier_link_lead_guest ?hotel_supplier_context - hotel_supplier_context ?lead_guest_context - lead_guest_context)
+    (supplier_link_secondary_guest ?hotel_supplier_context - hotel_supplier_context ?secondary_guest_context - secondary_guest_context)
+    (supplier_has_booking_record ?hotel_supplier_context - hotel_supplier_context ?booking_record - booking_record)
+    (room_assignment_token_available ?room_assignment_token - room_assignment_token)
+    (supplier_has_room_assignment_token ?hotel_supplier_context - hotel_supplier_context ?room_assignment_token - room_assignment_token)
+    (room_assignment_token_consumed ?room_assignment_token - room_assignment_token)
+    (room_assignment_token_link_booking ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    (supplier_allocation_step1_completed ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_allocation_step2_completed ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_room_assignment_requested ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_special_request_applied ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_special_request_validated ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_ready_for_rate_modifier ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_allocation_validated_for_assignment ?hotel_supplier_context - hotel_supplier_context)
+    (promotional_code_available ?promotional_code - promotional_code)
+    (supplier_has_promotional_code ?hotel_supplier_context - hotel_supplier_context ?promotional_code - promotional_code)
+    (supplier_promotion_applied ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_promotion_validated ?hotel_supplier_context - hotel_supplier_context)
+    (supplier_promotion_confirmed ?hotel_supplier_context - hotel_supplier_context)
+    (special_request_type_available ?special_request_type - special_request_type)
+    (supplier_has_special_request_type ?hotel_supplier_context - hotel_supplier_context ?special_request_type - special_request_type)
+    (rate_modifier_available ?rate_modifier - rate_modifier)
+    (supplier_has_rate_modifier ?hotel_supplier_context - hotel_supplier_context ?rate_modifier - rate_modifier)
+    (corporate_rate_available ?corporate_rate_option - corporate_rate_option)
+    (supplier_has_corporate_rate ?hotel_supplier_context - hotel_supplier_context ?corporate_rate_option - corporate_rate_option)
+    (identity_document_available ?identity_document - identity_document)
+    (supplier_has_identity_document ?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document)
+    (cancellation_option_available ?cancellation_option - cancellation_option)
+    (reservation_has_cancellation_option ?reservation_choice - reservation_choice ?cancellation_option - cancellation_option)
+    (primary_guest_hold_active ?lead_guest_context - lead_guest_context)
+    (secondary_guest_hold_active ?secondary_guest_context - secondary_guest_context)
+    (supplier_final_confirmation_recorded ?hotel_supplier_context - hotel_supplier_context)
+  )
+  (:action initialize_reservation_choice
+    :parameters (?reservation_choice - reservation_choice)
+    :precondition
+      (and
+        (not
+          (reservation_context_open ?reservation_choice)
+        )
+        (not
+          (reservation_context_committed ?reservation_choice)
+        )
+      )
+    :effect (reservation_context_open ?reservation_choice)
+  )
+  (:action attach_rate_plan_to_reservation
+    :parameters (?reservation_choice - reservation_choice ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (reservation_context_open ?reservation_choice)
+        (not
+          (reservation_context_rate_attached ?reservation_choice)
+        )
+        (rate_plan_available ?rate_plan)
+      )
+    :effect
+      (and
+        (reservation_context_rate_attached ?reservation_choice)
+        (reservation_has_rate_plan ?reservation_choice ?rate_plan)
+        (not
+          (rate_plan_available ?rate_plan)
+        )
+      )
+  )
+  (:action attach_room_type_option_to_reservation
+    :parameters (?reservation_choice - reservation_choice ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_open ?reservation_choice)
+        (reservation_context_rate_attached ?reservation_choice)
+        (room_type_option_available ?room_type_option)
+      )
+    :effect
+      (and
+        (reservation_has_room_type ?reservation_choice ?room_type_option)
+        (not
+          (room_type_option_available ?room_type_option)
+        )
+      )
+  )
+  (:action confirm_room_type_selection
+    :parameters (?reservation_choice - reservation_choice ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_open ?reservation_choice)
+        (reservation_context_rate_attached ?reservation_choice)
+        (reservation_has_room_type ?reservation_choice ?room_type_option)
+        (not
+          (reservation_context_ready ?reservation_choice)
+        )
+      )
+    :effect (reservation_context_ready ?reservation_choice)
+  )
+  (:action release_room_type_selection
+    :parameters (?reservation_choice - reservation_choice ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_has_room_type ?reservation_choice ?room_type_option)
+      )
+    :effect
+      (and
+        (room_type_option_available ?room_type_option)
+        (not
+          (reservation_has_room_type ?reservation_choice ?room_type_option)
+        )
+      )
+  )
+  (:action assign_room_unit_to_reservation
+    :parameters (?reservation_choice - reservation_choice ?room_unit - room_unit)
+    :precondition
+      (and
+        (reservation_context_ready ?reservation_choice)
+        (room_unit_available ?room_unit)
+      )
+    :effect
+      (and
+        (unit_assigned_to_reservation ?reservation_choice ?room_unit)
+        (not
+          (room_unit_available ?room_unit)
+        )
+      )
+  )
+  (:action release_room_unit_from_reservation
+    :parameters (?reservation_choice - reservation_choice ?room_unit - room_unit)
+    :precondition
+      (and
+        (unit_assigned_to_reservation ?reservation_choice ?room_unit)
+      )
+    :effect
+      (and
+        (room_unit_available ?room_unit)
+        (not
+          (unit_assigned_to_reservation ?reservation_choice ?room_unit)
+        )
+      )
+  )
+  (:action apply_corporate_rate_to_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?corporate_rate_option - corporate_rate_option)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (corporate_rate_available ?corporate_rate_option)
+      )
+    :effect
+      (and
+        (supplier_has_corporate_rate ?hotel_supplier_context ?corporate_rate_option)
+        (not
+          (corporate_rate_available ?corporate_rate_option)
+        )
+      )
+  )
+  (:action remove_corporate_rate_from_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?corporate_rate_option - corporate_rate_option)
+    :precondition
+      (and
+        (supplier_has_corporate_rate ?hotel_supplier_context ?corporate_rate_option)
+      )
+    :effect
+      (and
+        (corporate_rate_available ?corporate_rate_option)
+        (not
+          (supplier_has_corporate_rate ?hotel_supplier_context ?corporate_rate_option)
+        )
+      )
+  )
+  (:action attach_identity_document_to_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (identity_document_available ?identity_document)
+      )
+    :effect
+      (and
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (not
+          (identity_document_available ?identity_document)
+        )
+      )
+  )
+  (:action detach_identity_document_from_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document)
+    :precondition
+      (and
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+      )
+    :effect
+      (and
+        (identity_document_available ?identity_document)
+        (not
+          (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        )
+      )
+  )
+  (:action mark_primary_inventory_bucket_for_hold
+    :parameters (?lead_guest_context - lead_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_ready ?lead_guest_context)
+        (reservation_has_room_type ?lead_guest_context ?room_type_option)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (not
+          (primary_bucket_hold_marked ?primary_inventory_bucket)
+        )
+        (not
+          (primary_bucket_ancillary_marked ?primary_inventory_bucket)
+        )
+      )
+    :effect (primary_bucket_hold_marked ?primary_inventory_bucket)
+  )
+  (:action confirm_primary_hold_with_unit_assignment
+    :parameters (?lead_guest_context - lead_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?room_unit - room_unit)
+    :precondition
+      (and
+        (reservation_context_ready ?lead_guest_context)
+        (unit_assigned_to_reservation ?lead_guest_context ?room_unit)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (primary_bucket_hold_marked ?primary_inventory_bucket)
+        (not
+          (primary_guest_hold_active ?lead_guest_context)
+        )
+      )
+    :effect
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+      )
+  )
+  (:action attach_ancillary_to_primary_hold
+    :parameters (?lead_guest_context - lead_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (reservation_context_ready ?lead_guest_context)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (primary_guest_hold_active ?lead_guest_context)
+        )
+      )
+    :effect
+      (and
+        (primary_bucket_ancillary_marked ?primary_inventory_bucket)
+        (primary_guest_hold_active ?lead_guest_context)
+        (lead_guest_ancillary_attached ?lead_guest_context ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_primary_hold_after_ancillary
+    :parameters (?lead_guest_context - lead_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?room_type_option - room_type_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (reservation_context_ready ?lead_guest_context)
+        (reservation_has_room_type ?lead_guest_context ?room_type_option)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (primary_bucket_ancillary_marked ?primary_inventory_bucket)
+        (lead_guest_ancillary_attached ?lead_guest_context ?ancillary_service)
+        (not
+          (lead_guest_hold_confirmed ?lead_guest_context)
+        )
+      )
+    :effect
+      (and
+        (primary_bucket_hold_marked ?primary_inventory_bucket)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (lead_guest_ancillary_attached ?lead_guest_context ?ancillary_service)
+        )
+      )
+  )
+  (:action mark_secondary_inventory_bucket_for_hold
+    :parameters (?secondary_guest_context - secondary_guest_context ?secondary_inventory_bucket - secondary_inventory_bucket ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_ready ?secondary_guest_context)
+        (reservation_has_room_type ?secondary_guest_context ?room_type_option)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (not
+          (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+        )
+        (not
+          (secondary_bucket_ancillary_marked ?secondary_inventory_bucket)
+        )
+      )
+    :effect (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+  )
+  (:action confirm_secondary_hold_with_unit_assignment
+    :parameters (?secondary_guest_context - secondary_guest_context ?secondary_inventory_bucket - secondary_inventory_bucket ?room_unit - room_unit)
+    :precondition
+      (and
+        (reservation_context_ready ?secondary_guest_context)
+        (unit_assigned_to_reservation ?secondary_guest_context ?room_unit)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+        (not
+          (secondary_guest_hold_active ?secondary_guest_context)
+        )
+      )
+    :effect
+      (and
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+      )
+  )
+  (:action attach_ancillary_to_secondary_hold
+    :parameters (?secondary_guest_context - secondary_guest_context ?secondary_inventory_bucket - secondary_inventory_bucket ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (reservation_context_ready ?secondary_guest_context)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (secondary_guest_hold_active ?secondary_guest_context)
+        )
+      )
+    :effect
+      (and
+        (secondary_bucket_ancillary_marked ?secondary_inventory_bucket)
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (secondary_guest_ancillary_attached ?secondary_guest_context ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_secondary_hold_after_ancillary
+    :parameters (?secondary_guest_context - secondary_guest_context ?secondary_inventory_bucket - secondary_inventory_bucket ?room_type_option - room_type_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (reservation_context_ready ?secondary_guest_context)
+        (reservation_has_room_type ?secondary_guest_context ?room_type_option)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (secondary_bucket_ancillary_marked ?secondary_inventory_bucket)
+        (secondary_guest_ancillary_attached ?secondary_guest_context ?ancillary_service)
+        (not
+          (secondary_guest_hold_confirmed ?secondary_guest_context)
+        )
+      )
+    :effect
+      (and
+        (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (secondary_guest_ancillary_attached ?secondary_guest_context ?ancillary_service)
+        )
+      )
+  )
+  (:action create_booking_record_standard
+    :parameters (?lead_guest_context - lead_guest_context ?secondary_guest_context - secondary_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?secondary_inventory_bucket - secondary_inventory_bucket ?booking_record - booking_record)
+    :precondition
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (primary_bucket_hold_marked ?primary_inventory_bucket)
+        (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+        (booking_record_slot_available ?booking_record)
+      )
+    :effect
+      (and
+        (booking_record_created ?booking_record)
+        (booking_record_primary_bucket_link ?booking_record ?primary_inventory_bucket)
+        (booking_record_secondary_bucket_link ?booking_record ?secondary_inventory_bucket)
+        (not
+          (booking_record_slot_available ?booking_record)
+        )
+      )
+  )
+  (:action create_booking_record_with_guarantee
+    :parameters (?lead_guest_context - lead_guest_context ?secondary_guest_context - secondary_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?secondary_inventory_bucket - secondary_inventory_bucket ?booking_record - booking_record)
+    :precondition
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (primary_bucket_ancillary_marked ?primary_inventory_bucket)
+        (secondary_bucket_hold_marked ?secondary_inventory_bucket)
+        (not
+          (lead_guest_hold_confirmed ?lead_guest_context)
+        )
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+        (booking_record_slot_available ?booking_record)
+      )
+    :effect
+      (and
+        (booking_record_created ?booking_record)
+        (booking_record_primary_bucket_link ?booking_record ?primary_inventory_bucket)
+        (booking_record_secondary_bucket_link ?booking_record ?secondary_inventory_bucket)
+        (booking_record_variant_guarantee ?booking_record)
+        (not
+          (booking_record_slot_available ?booking_record)
+        )
+      )
+  )
+  (:action create_booking_record_with_fee
+    :parameters (?lead_guest_context - lead_guest_context ?secondary_guest_context - secondary_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?secondary_inventory_bucket - secondary_inventory_bucket ?booking_record - booking_record)
+    :precondition
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (primary_bucket_hold_marked ?primary_inventory_bucket)
+        (secondary_bucket_ancillary_marked ?secondary_inventory_bucket)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+        (not
+          (secondary_guest_hold_confirmed ?secondary_guest_context)
+        )
+        (booking_record_slot_available ?booking_record)
+      )
+    :effect
+      (and
+        (booking_record_created ?booking_record)
+        (booking_record_primary_bucket_link ?booking_record ?primary_inventory_bucket)
+        (booking_record_secondary_bucket_link ?booking_record ?secondary_inventory_bucket)
+        (booking_record_variant_fee ?booking_record)
+        (not
+          (booking_record_slot_available ?booking_record)
+        )
+      )
+  )
+  (:action create_booking_record_with_guarantee_and_fee
+    :parameters (?lead_guest_context - lead_guest_context ?secondary_guest_context - secondary_guest_context ?primary_inventory_bucket - primary_inventory_bucket ?secondary_inventory_bucket - secondary_inventory_bucket ?booking_record - booking_record)
+    :precondition
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (guest_primary_bucket_association ?lead_guest_context ?primary_inventory_bucket)
+        (guest_secondary_bucket_association ?secondary_guest_context ?secondary_inventory_bucket)
+        (primary_bucket_ancillary_marked ?primary_inventory_bucket)
+        (secondary_bucket_ancillary_marked ?secondary_inventory_bucket)
+        (not
+          (lead_guest_hold_confirmed ?lead_guest_context)
+        )
+        (not
+          (secondary_guest_hold_confirmed ?secondary_guest_context)
+        )
+        (booking_record_slot_available ?booking_record)
+      )
+    :effect
+      (and
+        (booking_record_created ?booking_record)
+        (booking_record_primary_bucket_link ?booking_record ?primary_inventory_bucket)
+        (booking_record_secondary_bucket_link ?booking_record ?secondary_inventory_bucket)
+        (booking_record_variant_guarantee ?booking_record)
+        (booking_record_variant_fee ?booking_record)
+        (not
+          (booking_record_slot_available ?booking_record)
+        )
+      )
+  )
+  (:action prepare_booking_record_for_assignment
+    :parameters (?booking_record - booking_record ?lead_guest_context - lead_guest_context ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (booking_record_created ?booking_record)
+        (primary_guest_hold_active ?lead_guest_context)
+        (reservation_has_room_type ?lead_guest_context ?room_type_option)
+        (not
+          (booking_record_assignment_ready ?booking_record)
+        )
+      )
+    :effect (booking_record_assignment_ready ?booking_record)
+  )
+  (:action issue_room_assignment_token
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (supplier_has_booking_record ?hotel_supplier_context ?booking_record)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_available ?room_assignment_token)
+        (booking_record_created ?booking_record)
+        (booking_record_assignment_ready ?booking_record)
+        (not
+          (room_assignment_token_consumed ?room_assignment_token)
+        )
+      )
+    :effect
+      (and
+        (room_assignment_token_consumed ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (not
+          (room_assignment_token_available ?room_assignment_token)
+        )
+      )
+  )
+  (:action confirm_room_assignment_with_supplier
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?room_assignment_token - room_assignment_token ?booking_record - booking_record ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_consumed ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (reservation_has_room_type ?hotel_supplier_context ?room_type_option)
+        (not
+          (booking_record_variant_guarantee ?booking_record)
+        )
+        (not
+          (supplier_allocation_step1_completed ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_allocation_step1_completed ?hotel_supplier_context)
+  )
+  (:action apply_special_request_to_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?special_request_type - special_request_type)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (special_request_type_available ?special_request_type)
+        (not
+          (supplier_special_request_applied ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_special_request_applied ?hotel_supplier_context)
+        (supplier_has_special_request_type ?hotel_supplier_context ?special_request_type)
+        (not
+          (special_request_type_available ?special_request_type)
+        )
+      )
+  )
+  (:action process_assignment_with_special_request
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?room_assignment_token - room_assignment_token ?booking_record - booking_record ?room_type_option - room_type_option ?special_request_type - special_request_type)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_consumed ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (reservation_has_room_type ?hotel_supplier_context ?room_type_option)
+        (booking_record_variant_guarantee ?booking_record)
+        (supplier_special_request_applied ?hotel_supplier_context)
+        (supplier_has_special_request_type ?hotel_supplier_context ?special_request_type)
+        (not
+          (supplier_allocation_step1_completed ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_allocation_step1_completed ?hotel_supplier_context)
+        (supplier_special_request_validated ?hotel_supplier_context)
+      )
+  )
+  (:action supplier_allocate_with_corporate_rate_variant_a
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?corporate_rate_option - corporate_rate_option ?room_unit - room_unit ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step1_completed ?hotel_supplier_context)
+        (supplier_has_corporate_rate ?hotel_supplier_context ?corporate_rate_option)
+        (unit_assigned_to_reservation ?hotel_supplier_context ?room_unit)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (not
+          (booking_record_variant_fee ?booking_record)
+        )
+        (not
+          (supplier_allocation_step2_completed ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_allocation_step2_completed ?hotel_supplier_context)
+  )
+  (:action supplier_allocate_with_corporate_rate_variant_b
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?corporate_rate_option - corporate_rate_option ?room_unit - room_unit ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step1_completed ?hotel_supplier_context)
+        (supplier_has_corporate_rate ?hotel_supplier_context ?corporate_rate_option)
+        (unit_assigned_to_reservation ?hotel_supplier_context ?room_unit)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (booking_record_variant_fee ?booking_record)
+        (not
+          (supplier_allocation_step2_completed ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_allocation_step2_completed ?hotel_supplier_context)
+  )
+  (:action request_room_assignment_from_supplier
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step2_completed ?hotel_supplier_context)
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (not
+          (booking_record_variant_guarantee ?booking_record)
+        )
+        (not
+          (booking_record_variant_fee ?booking_record)
+        )
+        (not
+          (supplier_room_assignment_requested ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_room_assignment_requested ?hotel_supplier_context)
+  )
+  (:action request_room_assignment_and_mark_ready_for_modifier
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step2_completed ?hotel_supplier_context)
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (booking_record_variant_guarantee ?booking_record)
+        (not
+          (booking_record_variant_fee ?booking_record)
+        )
+        (not
+          (supplier_room_assignment_requested ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+      )
+  )
+  (:action request_room_assignment_and_mark_ready_for_modifier_variant
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step2_completed ?hotel_supplier_context)
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (not
+          (booking_record_variant_guarantee ?booking_record)
+        )
+        (booking_record_variant_fee ?booking_record)
+        (not
+          (supplier_room_assignment_requested ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+      )
+  )
+  (:action request_room_assignment_and_mark_ready_for_modifier_full
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document ?room_assignment_token - room_assignment_token ?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_allocation_step2_completed ?hotel_supplier_context)
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (supplier_has_room_assignment_token ?hotel_supplier_context ?room_assignment_token)
+        (room_assignment_token_link_booking ?room_assignment_token ?booking_record)
+        (booking_record_variant_guarantee ?booking_record)
+        (booking_record_variant_fee ?booking_record)
+        (not
+          (supplier_room_assignment_requested ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+      )
+  )
+  (:action finalize_room_assignment_and_record_confirmation
+    :parameters (?hotel_supplier_context - hotel_supplier_context)
+    :precondition
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (not
+          (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+        )
+        (not
+          (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        (confirmation_recorded ?hotel_supplier_context)
+      )
+  )
+  (:action attach_rate_modifier_to_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?rate_modifier - rate_modifier)
+    :precondition
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+        (rate_modifier_available ?rate_modifier)
+      )
+    :effect
+      (and
+        (supplier_has_rate_modifier ?hotel_supplier_context ?rate_modifier)
+        (not
+          (rate_modifier_available ?rate_modifier)
+        )
+      )
+  )
+  (:action finalize_supplier_allocation
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?lead_guest_context - lead_guest_context ?secondary_guest_context - secondary_guest_context ?room_type_option - room_type_option ?rate_modifier - rate_modifier)
+    :precondition
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_ready_for_rate_modifier ?hotel_supplier_context)
+        (supplier_has_rate_modifier ?hotel_supplier_context ?rate_modifier)
+        (supplier_link_lead_guest ?hotel_supplier_context ?lead_guest_context)
+        (supplier_link_secondary_guest ?hotel_supplier_context ?secondary_guest_context)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+        (reservation_has_room_type ?hotel_supplier_context ?room_type_option)
+        (not
+          (supplier_allocation_validated_for_assignment ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_allocation_validated_for_assignment ?hotel_supplier_context)
+  )
+  (:action record_supplier_confirmation_and_confirm_reservation
+    :parameters (?hotel_supplier_context - hotel_supplier_context)
+    :precondition
+      (and
+        (supplier_room_assignment_requested ?hotel_supplier_context)
+        (supplier_allocation_validated_for_assignment ?hotel_supplier_context)
+        (not
+          (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        (confirmation_recorded ?hotel_supplier_context)
+      )
+  )
+  (:action apply_promotional_code_to_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?promotional_code - promotional_code ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (reservation_context_ready ?hotel_supplier_context)
+        (reservation_has_room_type ?hotel_supplier_context ?room_type_option)
+        (promotional_code_available ?promotional_code)
+        (supplier_has_promotional_code ?hotel_supplier_context ?promotional_code)
+        (not
+          (supplier_promotion_applied ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_promotion_applied ?hotel_supplier_context)
+        (not
+          (promotional_code_available ?promotional_code)
+        )
+      )
+  )
+  (:action validate_promotional_code_with_assigned_unit
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?room_unit - room_unit)
+    :precondition
+      (and
+        (supplier_promotion_applied ?hotel_supplier_context)
+        (unit_assigned_to_reservation ?hotel_supplier_context ?room_unit)
+        (not
+          (supplier_promotion_validated ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_promotion_validated ?hotel_supplier_context)
+  )
+  (:action confirm_identity_for_promotion
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?identity_document - identity_document)
+    :precondition
+      (and
+        (supplier_promotion_validated ?hotel_supplier_context)
+        (supplier_has_identity_document ?hotel_supplier_context ?identity_document)
+        (not
+          (supplier_promotion_confirmed ?hotel_supplier_context)
+        )
+      )
+    :effect (supplier_promotion_confirmed ?hotel_supplier_context)
+  )
+  (:action record_promotion_confirmation_and_confirm_reservation
+    :parameters (?hotel_supplier_context - hotel_supplier_context)
+    :precondition
+      (and
+        (supplier_promotion_confirmed ?hotel_supplier_context)
+        (not
+          (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (supplier_final_confirmation_recorded ?hotel_supplier_context)
+        (confirmation_recorded ?hotel_supplier_context)
+      )
+  )
+  (:action record_primary_guest_confirmation
+    :parameters (?lead_guest_context - lead_guest_context ?booking_record - booking_record)
+    :precondition
+      (and
+        (primary_guest_hold_active ?lead_guest_context)
+        (lead_guest_hold_confirmed ?lead_guest_context)
+        (booking_record_created ?booking_record)
+        (booking_record_assignment_ready ?booking_record)
+        (not
+          (confirmation_recorded ?lead_guest_context)
+        )
+      )
+    :effect (confirmation_recorded ?lead_guest_context)
+  )
+  (:action record_secondary_guest_confirmation
+    :parameters (?secondary_guest_context - secondary_guest_context ?booking_record - booking_record)
+    :precondition
+      (and
+        (secondary_guest_hold_active ?secondary_guest_context)
+        (secondary_guest_hold_confirmed ?secondary_guest_context)
+        (booking_record_created ?booking_record)
+        (booking_record_assignment_ready ?booking_record)
+        (not
+          (confirmation_recorded ?secondary_guest_context)
+        )
+      )
+    :effect (confirmation_recorded ?secondary_guest_context)
+  )
+  (:action commit_reservation_choice_with_cancellation_option
+    :parameters (?reservation_choice - reservation_choice ?cancellation_option - cancellation_option ?room_type_option - room_type_option)
+    :precondition
+      (and
+        (confirmation_recorded ?reservation_choice)
+        (reservation_has_room_type ?reservation_choice ?room_type_option)
+        (cancellation_option_available ?cancellation_option)
+        (not
+          (booking_association_created ?reservation_choice)
+        )
+      )
+    :effect
+      (and
+        (booking_association_created ?reservation_choice)
+        (reservation_has_cancellation_option ?reservation_choice ?cancellation_option)
+        (not
+          (cancellation_option_available ?cancellation_option)
+        )
+      )
+  )
+  (:action persist_booking_for_lead_guest
+    :parameters (?lead_guest_context - lead_guest_context ?rate_plan - rate_plan ?cancellation_option - cancellation_option)
+    :precondition
+      (and
+        (booking_association_created ?lead_guest_context)
+        (reservation_has_rate_plan ?lead_guest_context ?rate_plan)
+        (reservation_has_cancellation_option ?lead_guest_context ?cancellation_option)
+        (not
+          (reservation_context_committed ?lead_guest_context)
+        )
+      )
+    :effect
+      (and
+        (reservation_context_committed ?lead_guest_context)
+        (rate_plan_available ?rate_plan)
+        (cancellation_option_available ?cancellation_option)
+      )
+  )
+  (:action persist_booking_for_secondary_guest
+    :parameters (?secondary_guest_context - secondary_guest_context ?rate_plan - rate_plan ?cancellation_option - cancellation_option)
+    :precondition
+      (and
+        (booking_association_created ?secondary_guest_context)
+        (reservation_has_rate_plan ?secondary_guest_context ?rate_plan)
+        (reservation_has_cancellation_option ?secondary_guest_context ?cancellation_option)
+        (not
+          (reservation_context_committed ?secondary_guest_context)
+        )
+      )
+    :effect
+      (and
+        (reservation_context_committed ?secondary_guest_context)
+        (rate_plan_available ?rate_plan)
+        (cancellation_option_available ?cancellation_option)
+      )
+  )
+  (:action persist_booking_for_supplier_context
+    :parameters (?hotel_supplier_context - hotel_supplier_context ?rate_plan - rate_plan ?cancellation_option - cancellation_option)
+    :precondition
+      (and
+        (booking_association_created ?hotel_supplier_context)
+        (reservation_has_rate_plan ?hotel_supplier_context ?rate_plan)
+        (reservation_has_cancellation_option ?hotel_supplier_context ?cancellation_option)
+        (not
+          (reservation_context_committed ?hotel_supplier_context)
+        )
+      )
+    :effect
+      (and
+        (reservation_context_committed ?hotel_supplier_context)
+        (rate_plan_available ?rate_plan)
+        (cancellation_option_available ?cancellation_option)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem hotel_room_type_reservation_choice_problem)
+  (:domain hotel_room_type_reservation_choice_domain)
+  (:objects lead_guest_context_1 - lead_guest_context secondary_guest_context_1 - secondary_guest_context hotel_supplier_session_1 - hotel_supplier_context hotel_supplier_session_2 - hotel_supplier_context rate_plan_refundable - rate_plan rate_plan_non_refundable - rate_plan rate_plan_member - rate_plan room_type_deluxe_king - room_type_option room_101 - room_unit ancillary_breakfast - ancillary_service primary_bucket_a - primary_inventory_bucket secondary_bucket_a - secondary_inventory_bucket booking_record_slot_1 - booking_record assignment_token_alpha - room_assignment_token assignment_token_beta - room_assignment_token special_request_high_floor - special_request_type special_request_accessible - special_request_type rate_modifier_membership_discount - rate_modifier rate_modifier_last_minute - rate_modifier cancellation_policy_standard - cancellation_option corporate_rate_option_1 - corporate_rate_option promo_code_summer20 - promotional_code promo_code_member50 - promotional_code id_passport_example - identity_document)
+  (:init
+    (rate_plan_available rate_plan_refundable)
+    (rate_plan_available rate_plan_non_refundable)
+    (rate_plan_available rate_plan_member)
+    (room_type_option_available room_type_deluxe_king)
+    (room_unit_available room_101)
+    (ancillary_service_available ancillary_breakfast)
+    (guest_primary_bucket_association lead_guest_context_1 primary_bucket_a)
+    (guest_secondary_bucket_association secondary_guest_context_1 secondary_bucket_a)
+    (booking_record_slot_available booking_record_slot_1)
+    (room_assignment_token_available assignment_token_alpha)
+    (room_assignment_token_available assignment_token_beta)
+    (supplier_link_lead_guest hotel_supplier_session_1 lead_guest_context_1)
+    (supplier_link_lead_guest hotel_supplier_session_2 lead_guest_context_1)
+    (supplier_link_secondary_guest hotel_supplier_session_1 secondary_guest_context_1)
+    (supplier_link_secondary_guest hotel_supplier_session_2 secondary_guest_context_1)
+    (supplier_has_booking_record hotel_supplier_session_1 booking_record_slot_1)
+    (supplier_has_booking_record hotel_supplier_session_2 booking_record_slot_1)
+    (supplier_has_room_assignment_token hotel_supplier_session_1 assignment_token_alpha)
+    (supplier_has_room_assignment_token hotel_supplier_session_2 assignment_token_beta)
+    (special_request_type_available special_request_high_floor)
+    (special_request_type_available special_request_accessible)
+    (rate_modifier_available rate_modifier_membership_discount)
+    (rate_modifier_available rate_modifier_last_minute)
+    (cancellation_option_available cancellation_policy_standard)
+    (corporate_rate_available corporate_rate_option_1)
+    (promotional_code_available promo_code_summer20)
+    (supplier_has_promotional_code hotel_supplier_session_1 promo_code_summer20)
+    (supplier_has_promotional_code hotel_supplier_session_2 promo_code_member50)
+    (identity_document_available id_passport_example)
+  )
+  (:goal
+    (and
+      (reservation_context_committed lead_guest_context_1)
+      (reservation_context_committed secondary_guest_context_1)
+      (reservation_context_committed hotel_supplier_session_1)
+      (reservation_context_committed hotel_supplier_session_2)
+    )
+  )
+)

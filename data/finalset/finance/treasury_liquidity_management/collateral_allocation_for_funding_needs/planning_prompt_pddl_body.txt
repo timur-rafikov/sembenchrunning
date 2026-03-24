@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain treasury_collateral_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object asset_metadata_group - object bucket_group - object account_base - object account - account_base collateral_pool - resource_group eligibility_check - resource_group custodian - resource_group allocation_rule - resource_group valuation_profile - resource_group settlement_type - resource_group buffer_profile - resource_group counterparty_approval - resource_group collateral_asset - asset_metadata_group settlement_lot - asset_metadata_group regulatory_constraint - asset_metadata_group funding_bucket - bucket_group liquidity_bucket - bucket_group allocation_candidate - bucket_group account_role_group - account portfolio_group - account funding_account - account_role_group receiving_account - account_role_group portfolio - portfolio_group)
+  (:predicates
+    (entity_funding_need_registered ?account - account)
+    (entity_eligibility_validated ?account - account)
+    (entity_collateral_pool_attached ?account - account)
+    (entity_funding_need_fulfilled ?account - account)
+    (entity_ready_for_posting ?account - account)
+    (entity_posting_committed ?account - account)
+    (collateral_pool_available ?collateral_pool - collateral_pool)
+    (entity_assigned_collateral_pool ?account - account ?collateral_pool - collateral_pool)
+    (eligibility_snapshot_available ?eligibility_snapshot - eligibility_check)
+    (entity_has_eligibility_snapshot ?account - account ?eligibility_snapshot - eligibility_check)
+    (custodian_available ?custodian - custodian)
+    (entity_custodian_hold ?account - account ?custodian - custodian)
+    (collateral_asset_available ?collateral_asset - collateral_asset)
+    (funding_account_reserved_asset ?funding_account - funding_account ?collateral_asset - collateral_asset)
+    (receiving_account_reserved_asset ?receiving_account - receiving_account ?collateral_asset - collateral_asset)
+    (funding_account_bucket ?funding_account - funding_account ?funding_bucket - funding_bucket)
+    (funding_bucket_tagged_source ?funding_bucket - funding_bucket)
+    (funding_bucket_tagged_candidate ?funding_bucket - funding_bucket)
+    (funding_account_marked_source ?funding_account - funding_account)
+    (receiving_account_liquidity_bucket ?receiving_account - receiving_account ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_tagged_source ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_tagged_candidate ?liquidity_bucket - liquidity_bucket)
+    (receiving_account_marked_destination ?receiving_account - receiving_account)
+    (allocation_candidate_available ?allocation_candidate - allocation_candidate)
+    (allocation_candidate_locked ?allocation_candidate - allocation_candidate)
+    (candidate_funding_bucket_link ?allocation_candidate - allocation_candidate ?funding_bucket - funding_bucket)
+    (candidate_liquidity_bucket_link ?allocation_candidate - allocation_candidate ?liquidity_bucket - liquidity_bucket)
+    (candidate_funding_matched ?allocation_candidate - allocation_candidate)
+    (candidate_liquidity_matched ?allocation_candidate - allocation_candidate)
+    (candidate_ready_for_settlement ?allocation_candidate - allocation_candidate)
+    (portfolio_funding_account_link ?portfolio - portfolio ?funding_account - funding_account)
+    (portfolio_receiving_account_link ?portfolio - portfolio ?receiving_account - receiving_account)
+    (portfolio_candidate_link ?portfolio - portfolio ?allocation_candidate - allocation_candidate)
+    (settlement_lot_available ?settlement_lot - settlement_lot)
+    (portfolio_settlement_lot_link ?portfolio - portfolio ?settlement_lot - settlement_lot)
+    (settlement_lot_reserved ?settlement_lot - settlement_lot)
+    (settlement_lot_assigned_to_candidate ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    (portfolio_reservation_marked ?portfolio - portfolio)
+    (portfolio_reservation_confirmed ?portfolio - portfolio)
+    (portfolio_ready_for_allocation ?portfolio - portfolio)
+    (portfolio_has_allocation_rule ?portfolio - portfolio)
+    (portfolio_allocation_rule_confirmed ?portfolio - portfolio)
+    (portfolio_valuation_applied ?portfolio - portfolio)
+    (portfolio_checks_passed ?portfolio - portfolio)
+    (regulatory_constraint_available ?regulatory_constraint - regulatory_constraint)
+    (portfolio_regulatory_constraint_link ?portfolio - portfolio ?regulatory_constraint - regulatory_constraint)
+    (portfolio_regulatory_check_applied ?portfolio - portfolio)
+    (portfolio_regulatory_rule_passed ?portfolio - portfolio)
+    (portfolio_regulatory_approval_done ?portfolio - portfolio)
+    (allocation_rule_available ?allocation_rule - allocation_rule)
+    (portfolio_allocation_rule_link ?portfolio - portfolio ?allocation_rule - allocation_rule)
+    (valuation_profile_available ?valuation_profile - valuation_profile)
+    (portfolio_valuation_profile_link ?portfolio - portfolio ?valuation_profile - valuation_profile)
+    (buffer_profile_available ?buffer_profile - buffer_profile)
+    (portfolio_buffer_profile_link ?portfolio - portfolio ?buffer_profile - buffer_profile)
+    (counterparty_approval_available ?counterparty_approval - counterparty_approval)
+    (portfolio_counterparty_approval_link ?portfolio - portfolio ?counterparty_approval - counterparty_approval)
+    (settlement_type_available ?settlement_type - settlement_type)
+    (entity_settlement_type_selected ?account - account ?settlement_type - settlement_type)
+    (funding_account_ready ?funding_account - funding_account)
+    (receiving_account_ready ?receiving_account - receiving_account)
+    (portfolio_finalized ?portfolio - portfolio)
+  )
+  (:action register_funding_need
+    :parameters (?account - account)
+    :precondition
+      (and
+        (not
+          (entity_funding_need_registered ?account)
+        )
+        (not
+          (entity_funding_need_fulfilled ?account)
+        )
+      )
+    :effect (entity_funding_need_registered ?account)
+  )
+  (:action assign_collateral_pool_to_account
+    :parameters (?account - account ?collateral_pool - collateral_pool)
+    :precondition
+      (and
+        (entity_funding_need_registered ?account)
+        (not
+          (entity_collateral_pool_attached ?account)
+        )
+        (collateral_pool_available ?collateral_pool)
+      )
+    :effect
+      (and
+        (entity_collateral_pool_attached ?account)
+        (entity_assigned_collateral_pool ?account ?collateral_pool)
+        (not
+          (collateral_pool_available ?collateral_pool)
+        )
+      )
+  )
+  (:action attach_eligibility_snapshot_to_account
+    :parameters (?account - account ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_funding_need_registered ?account)
+        (entity_collateral_pool_attached ?account)
+        (eligibility_snapshot_available ?eligibility_snapshot)
+      )
+    :effect
+      (and
+        (entity_has_eligibility_snapshot ?account ?eligibility_snapshot)
+        (not
+          (eligibility_snapshot_available ?eligibility_snapshot)
+        )
+      )
+  )
+  (:action confirm_account_eligibility
+    :parameters (?account - account ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_funding_need_registered ?account)
+        (entity_collateral_pool_attached ?account)
+        (entity_has_eligibility_snapshot ?account ?eligibility_snapshot)
+        (not
+          (entity_eligibility_validated ?account)
+        )
+      )
+    :effect (entity_eligibility_validated ?account)
+  )
+  (:action release_eligibility_snapshot_from_account
+    :parameters (?account - account ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_has_eligibility_snapshot ?account ?eligibility_snapshot)
+      )
+    :effect
+      (and
+        (eligibility_snapshot_available ?eligibility_snapshot)
+        (not
+          (entity_has_eligibility_snapshot ?account ?eligibility_snapshot)
+        )
+      )
+  )
+  (:action request_custodian_hold_for_account
+    :parameters (?account - account ?custodian - custodian)
+    :precondition
+      (and
+        (entity_eligibility_validated ?account)
+        (custodian_available ?custodian)
+      )
+    :effect
+      (and
+        (entity_custodian_hold ?account ?custodian)
+        (not
+          (custodian_available ?custodian)
+        )
+      )
+  )
+  (:action release_custodian_hold_for_account
+    :parameters (?account - account ?custodian - custodian)
+    :precondition
+      (and
+        (entity_custodian_hold ?account ?custodian)
+      )
+    :effect
+      (and
+        (custodian_available ?custodian)
+        (not
+          (entity_custodian_hold ?account ?custodian)
+        )
+      )
+  )
+  (:action assign_buffer_profile_to_portfolio
+    :parameters (?portfolio - portfolio ?buffer_profile - buffer_profile)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (buffer_profile_available ?buffer_profile)
+      )
+    :effect
+      (and
+        (portfolio_buffer_profile_link ?portfolio ?buffer_profile)
+        (not
+          (buffer_profile_available ?buffer_profile)
+        )
+      )
+  )
+  (:action remove_buffer_profile_from_portfolio
+    :parameters (?portfolio - portfolio ?buffer_profile - buffer_profile)
+    :precondition
+      (and
+        (portfolio_buffer_profile_link ?portfolio ?buffer_profile)
+      )
+    :effect
+      (and
+        (buffer_profile_available ?buffer_profile)
+        (not
+          (portfolio_buffer_profile_link ?portfolio ?buffer_profile)
+        )
+      )
+  )
+  (:action assign_counterparty_approval_to_portfolio
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (counterparty_approval_available ?counterparty_approval)
+      )
+    :effect
+      (and
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (not
+          (counterparty_approval_available ?counterparty_approval)
+        )
+      )
+  )
+  (:action remove_counterparty_approval_from_portfolio
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval)
+    :precondition
+      (and
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+      )
+    :effect
+      (and
+        (counterparty_approval_available ?counterparty_approval)
+        (not
+          (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        )
+      )
+  )
+  (:action tag_funding_bucket_for_source
+    :parameters (?funding_account - funding_account ?funding_bucket - funding_bucket ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_eligibility_validated ?funding_account)
+        (entity_has_eligibility_snapshot ?funding_account ?eligibility_snapshot)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (not
+          (funding_bucket_tagged_source ?funding_bucket)
+        )
+        (not
+          (funding_bucket_tagged_candidate ?funding_bucket)
+        )
+      )
+    :effect (funding_bucket_tagged_source ?funding_bucket)
+  )
+  (:action confirm_funding_source_with_custodian
+    :parameters (?funding_account - funding_account ?funding_bucket - funding_bucket ?custodian - custodian)
+    :precondition
+      (and
+        (entity_eligibility_validated ?funding_account)
+        (entity_custodian_hold ?funding_account ?custodian)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (funding_bucket_tagged_source ?funding_bucket)
+        (not
+          (funding_account_ready ?funding_account)
+        )
+      )
+    :effect
+      (and
+        (funding_account_ready ?funding_account)
+        (funding_account_marked_source ?funding_account)
+      )
+  )
+  (:action reserve_asset_for_funding_account
+    :parameters (?funding_account - funding_account ?funding_bucket - funding_bucket ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (entity_eligibility_validated ?funding_account)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (funding_account_ready ?funding_account)
+        )
+      )
+    :effect
+      (and
+        (funding_bucket_tagged_candidate ?funding_bucket)
+        (funding_account_ready ?funding_account)
+        (funding_account_reserved_asset ?funding_account ?collateral_asset)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action finalize_funding_asset_selection
+    :parameters (?funding_account - funding_account ?funding_bucket - funding_bucket ?eligibility_snapshot - eligibility_check ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (entity_eligibility_validated ?funding_account)
+        (entity_has_eligibility_snapshot ?funding_account ?eligibility_snapshot)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (funding_bucket_tagged_candidate ?funding_bucket)
+        (funding_account_reserved_asset ?funding_account ?collateral_asset)
+        (not
+          (funding_account_marked_source ?funding_account)
+        )
+      )
+    :effect
+      (and
+        (funding_bucket_tagged_source ?funding_bucket)
+        (funding_account_marked_source ?funding_account)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (funding_account_reserved_asset ?funding_account ?collateral_asset)
+        )
+      )
+  )
+  (:action tag_liquidity_bucket_for_destination
+    :parameters (?receiving_account - receiving_account ?liquidity_bucket - liquidity_bucket ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_eligibility_validated ?receiving_account)
+        (entity_has_eligibility_snapshot ?receiving_account ?eligibility_snapshot)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (not
+          (liquidity_bucket_tagged_source ?liquidity_bucket)
+        )
+        (not
+          (liquidity_bucket_tagged_candidate ?liquidity_bucket)
+        )
+      )
+    :effect (liquidity_bucket_tagged_source ?liquidity_bucket)
+  )
+  (:action confirm_receiving_source_with_custodian
+    :parameters (?receiving_account - receiving_account ?liquidity_bucket - liquidity_bucket ?custodian - custodian)
+    :precondition
+      (and
+        (entity_eligibility_validated ?receiving_account)
+        (entity_custodian_hold ?receiving_account ?custodian)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (liquidity_bucket_tagged_source ?liquidity_bucket)
+        (not
+          (receiving_account_ready ?receiving_account)
+        )
+      )
+    :effect
+      (and
+        (receiving_account_ready ?receiving_account)
+        (receiving_account_marked_destination ?receiving_account)
+      )
+  )
+  (:action reserve_asset_for_receiving_account
+    :parameters (?receiving_account - receiving_account ?liquidity_bucket - liquidity_bucket ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (entity_eligibility_validated ?receiving_account)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (receiving_account_ready ?receiving_account)
+        )
+      )
+    :effect
+      (and
+        (liquidity_bucket_tagged_candidate ?liquidity_bucket)
+        (receiving_account_ready ?receiving_account)
+        (receiving_account_reserved_asset ?receiving_account ?collateral_asset)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action finalize_receiving_asset_selection
+    :parameters (?receiving_account - receiving_account ?liquidity_bucket - liquidity_bucket ?eligibility_snapshot - eligibility_check ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (entity_eligibility_validated ?receiving_account)
+        (entity_has_eligibility_snapshot ?receiving_account ?eligibility_snapshot)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (liquidity_bucket_tagged_candidate ?liquidity_bucket)
+        (receiving_account_reserved_asset ?receiving_account ?collateral_asset)
+        (not
+          (receiving_account_marked_destination ?receiving_account)
+        )
+      )
+    :effect
+      (and
+        (liquidity_bucket_tagged_source ?liquidity_bucket)
+        (receiving_account_marked_destination ?receiving_account)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (receiving_account_reserved_asset ?receiving_account ?collateral_asset)
+        )
+      )
+  )
+  (:action create_allocation_candidate_standard
+    :parameters (?funding_account - funding_account ?receiving_account - receiving_account ?funding_bucket - funding_bucket ?liquidity_bucket - liquidity_bucket ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (funding_account_ready ?funding_account)
+        (receiving_account_ready ?receiving_account)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (funding_bucket_tagged_source ?funding_bucket)
+        (liquidity_bucket_tagged_source ?liquidity_bucket)
+        (funding_account_marked_source ?funding_account)
+        (receiving_account_marked_destination ?receiving_account)
+        (allocation_candidate_available ?allocation_candidate)
+      )
+    :effect
+      (and
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_funding_bucket_link ?allocation_candidate ?funding_bucket)
+        (candidate_liquidity_bucket_link ?allocation_candidate ?liquidity_bucket)
+        (not
+          (allocation_candidate_available ?allocation_candidate)
+        )
+      )
+  )
+  (:action create_allocation_candidate_with_funding_tag
+    :parameters (?funding_account - funding_account ?receiving_account - receiving_account ?funding_bucket - funding_bucket ?liquidity_bucket - liquidity_bucket ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (funding_account_ready ?funding_account)
+        (receiving_account_ready ?receiving_account)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (funding_bucket_tagged_candidate ?funding_bucket)
+        (liquidity_bucket_tagged_source ?liquidity_bucket)
+        (not
+          (funding_account_marked_source ?funding_account)
+        )
+        (receiving_account_marked_destination ?receiving_account)
+        (allocation_candidate_available ?allocation_candidate)
+      )
+    :effect
+      (and
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_funding_bucket_link ?allocation_candidate ?funding_bucket)
+        (candidate_liquidity_bucket_link ?allocation_candidate ?liquidity_bucket)
+        (candidate_funding_matched ?allocation_candidate)
+        (not
+          (allocation_candidate_available ?allocation_candidate)
+        )
+      )
+  )
+  (:action create_allocation_candidate_with_liquidity_tag
+    :parameters (?funding_account - funding_account ?receiving_account - receiving_account ?funding_bucket - funding_bucket ?liquidity_bucket - liquidity_bucket ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (funding_account_ready ?funding_account)
+        (receiving_account_ready ?receiving_account)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (funding_bucket_tagged_source ?funding_bucket)
+        (liquidity_bucket_tagged_candidate ?liquidity_bucket)
+        (funding_account_marked_source ?funding_account)
+        (not
+          (receiving_account_marked_destination ?receiving_account)
+        )
+        (allocation_candidate_available ?allocation_candidate)
+      )
+    :effect
+      (and
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_funding_bucket_link ?allocation_candidate ?funding_bucket)
+        (candidate_liquidity_bucket_link ?allocation_candidate ?liquidity_bucket)
+        (candidate_liquidity_matched ?allocation_candidate)
+        (not
+          (allocation_candidate_available ?allocation_candidate)
+        )
+      )
+  )
+  (:action create_allocation_candidate_full_match
+    :parameters (?funding_account - funding_account ?receiving_account - receiving_account ?funding_bucket - funding_bucket ?liquidity_bucket - liquidity_bucket ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (funding_account_ready ?funding_account)
+        (receiving_account_ready ?receiving_account)
+        (funding_account_bucket ?funding_account ?funding_bucket)
+        (receiving_account_liquidity_bucket ?receiving_account ?liquidity_bucket)
+        (funding_bucket_tagged_candidate ?funding_bucket)
+        (liquidity_bucket_tagged_candidate ?liquidity_bucket)
+        (not
+          (funding_account_marked_source ?funding_account)
+        )
+        (not
+          (receiving_account_marked_destination ?receiving_account)
+        )
+        (allocation_candidate_available ?allocation_candidate)
+      )
+    :effect
+      (and
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_funding_bucket_link ?allocation_candidate ?funding_bucket)
+        (candidate_liquidity_bucket_link ?allocation_candidate ?liquidity_bucket)
+        (candidate_funding_matched ?allocation_candidate)
+        (candidate_liquidity_matched ?allocation_candidate)
+        (not
+          (allocation_candidate_available ?allocation_candidate)
+        )
+      )
+  )
+  (:action mark_candidate_ready_for_settlement
+    :parameters (?allocation_candidate - allocation_candidate ?funding_account - funding_account ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (allocation_candidate_locked ?allocation_candidate)
+        (funding_account_ready ?funding_account)
+        (entity_has_eligibility_snapshot ?funding_account ?eligibility_snapshot)
+        (not
+          (candidate_ready_for_settlement ?allocation_candidate)
+        )
+      )
+    :effect (candidate_ready_for_settlement ?allocation_candidate)
+  )
+  (:action reserve_settlement_lot_for_candidate
+    :parameters (?portfolio - portfolio ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (portfolio_candidate_link ?portfolio ?allocation_candidate)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_available ?settlement_lot)
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_ready_for_settlement ?allocation_candidate)
+        (not
+          (settlement_lot_reserved ?settlement_lot)
+        )
+      )
+    :effect
+      (and
+        (settlement_lot_reserved ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (not
+          (settlement_lot_available ?settlement_lot)
+        )
+      )
+  )
+  (:action lock_portfolio_assets_for_candidate
+    :parameters (?portfolio - portfolio ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_reserved ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (entity_has_eligibility_snapshot ?portfolio ?eligibility_snapshot)
+        (not
+          (candidate_funding_matched ?allocation_candidate)
+        )
+        (not
+          (portfolio_reservation_marked ?portfolio)
+        )
+      )
+    :effect (portfolio_reservation_marked ?portfolio)
+  )
+  (:action apply_allocation_rule_to_portfolio
+    :parameters (?portfolio - portfolio ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (allocation_rule_available ?allocation_rule)
+        (not
+          (portfolio_has_allocation_rule ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_has_allocation_rule ?portfolio)
+        (portfolio_allocation_rule_link ?portfolio ?allocation_rule)
+        (not
+          (allocation_rule_available ?allocation_rule)
+        )
+      )
+  )
+  (:action assign_allocation_rule_and_reserve_assets
+    :parameters (?portfolio - portfolio ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate ?eligibility_snapshot - eligibility_check ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_reserved ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (entity_has_eligibility_snapshot ?portfolio ?eligibility_snapshot)
+        (candidate_funding_matched ?allocation_candidate)
+        (portfolio_has_allocation_rule ?portfolio)
+        (portfolio_allocation_rule_link ?portfolio ?allocation_rule)
+        (not
+          (portfolio_reservation_marked ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_reservation_marked ?portfolio)
+        (portfolio_allocation_rule_confirmed ?portfolio)
+      )
+  )
+  (:action apply_buffer_profile_and_confirm_reservation
+    :parameters (?portfolio - portfolio ?buffer_profile - buffer_profile ?custodian - custodian ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_marked ?portfolio)
+        (portfolio_buffer_profile_link ?portfolio ?buffer_profile)
+        (entity_custodian_hold ?portfolio ?custodian)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (not
+          (candidate_liquidity_matched ?allocation_candidate)
+        )
+        (not
+          (portfolio_reservation_confirmed ?portfolio)
+        )
+      )
+    :effect (portfolio_reservation_confirmed ?portfolio)
+  )
+  (:action apply_buffer_profile_and_confirm_reservation_secondary
+    :parameters (?portfolio - portfolio ?buffer_profile - buffer_profile ?custodian - custodian ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_marked ?portfolio)
+        (portfolio_buffer_profile_link ?portfolio ?buffer_profile)
+        (entity_custodian_hold ?portfolio ?custodian)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (candidate_liquidity_matched ?allocation_candidate)
+        (not
+          (portfolio_reservation_confirmed ?portfolio)
+        )
+      )
+    :effect (portfolio_reservation_confirmed ?portfolio)
+  )
+  (:action apply_counterparty_approval_and_mark_ready
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_confirmed ?portfolio)
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (not
+          (candidate_funding_matched ?allocation_candidate)
+        )
+        (not
+          (candidate_liquidity_matched ?allocation_candidate)
+        )
+        (not
+          (portfolio_ready_for_allocation ?portfolio)
+        )
+      )
+    :effect (portfolio_ready_for_allocation ?portfolio)
+  )
+  (:action apply_counterparty_approval_and_mark_ready_with_valuation
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_confirmed ?portfolio)
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (candidate_funding_matched ?allocation_candidate)
+        (not
+          (candidate_liquidity_matched ?allocation_candidate)
+        )
+        (not
+          (portfolio_ready_for_allocation ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_valuation_applied ?portfolio)
+      )
+  )
+  (:action apply_counterparty_approval_with_valuation_variant
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_confirmed ?portfolio)
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (not
+          (candidate_funding_matched ?allocation_candidate)
+        )
+        (candidate_liquidity_matched ?allocation_candidate)
+        (not
+          (portfolio_ready_for_allocation ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_valuation_applied ?portfolio)
+      )
+  )
+  (:action apply_counterparty_approval_with_valuation_full
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval ?settlement_lot - settlement_lot ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (portfolio_reservation_confirmed ?portfolio)
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (portfolio_settlement_lot_link ?portfolio ?settlement_lot)
+        (settlement_lot_assigned_to_candidate ?settlement_lot ?allocation_candidate)
+        (candidate_funding_matched ?allocation_candidate)
+        (candidate_liquidity_matched ?allocation_candidate)
+        (not
+          (portfolio_ready_for_allocation ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_valuation_applied ?portfolio)
+      )
+  )
+  (:action finalize_portfolio_without_valuation
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (not
+          (portfolio_valuation_applied ?portfolio)
+        )
+        (not
+          (portfolio_finalized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_finalized ?portfolio)
+        (entity_ready_for_posting ?portfolio)
+      )
+  )
+  (:action assign_valuation_profile_to_portfolio
+    :parameters (?portfolio - portfolio ?valuation_profile - valuation_profile)
+    :precondition
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_valuation_applied ?portfolio)
+        (valuation_profile_available ?valuation_profile)
+      )
+    :effect
+      (and
+        (portfolio_valuation_profile_link ?portfolio ?valuation_profile)
+        (not
+          (valuation_profile_available ?valuation_profile)
+        )
+      )
+  )
+  (:action perform_portfolio_allocation_checks
+    :parameters (?portfolio - portfolio ?funding_account - funding_account ?receiving_account - receiving_account ?eligibility_snapshot - eligibility_check ?valuation_profile - valuation_profile)
+    :precondition
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_valuation_applied ?portfolio)
+        (portfolio_valuation_profile_link ?portfolio ?valuation_profile)
+        (portfolio_funding_account_link ?portfolio ?funding_account)
+        (portfolio_receiving_account_link ?portfolio ?receiving_account)
+        (funding_account_marked_source ?funding_account)
+        (receiving_account_marked_destination ?receiving_account)
+        (entity_has_eligibility_snapshot ?portfolio ?eligibility_snapshot)
+        (not
+          (portfolio_checks_passed ?portfolio)
+        )
+      )
+    :effect (portfolio_checks_passed ?portfolio)
+  )
+  (:action finalize_portfolio_allocation
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (portfolio_ready_for_allocation ?portfolio)
+        (portfolio_checks_passed ?portfolio)
+        (not
+          (portfolio_finalized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_finalized ?portfolio)
+        (entity_ready_for_posting ?portfolio)
+      )
+  )
+  (:action apply_regulatory_constraint_to_portfolio
+    :parameters (?portfolio - portfolio ?regulatory_constraint - regulatory_constraint ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_eligibility_validated ?portfolio)
+        (entity_has_eligibility_snapshot ?portfolio ?eligibility_snapshot)
+        (regulatory_constraint_available ?regulatory_constraint)
+        (portfolio_regulatory_constraint_link ?portfolio ?regulatory_constraint)
+        (not
+          (portfolio_regulatory_check_applied ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_regulatory_check_applied ?portfolio)
+        (not
+          (regulatory_constraint_available ?regulatory_constraint)
+        )
+      )
+  )
+  (:action mark_portfolio_regulatory_rule_passed
+    :parameters (?portfolio - portfolio ?custodian - custodian)
+    :precondition
+      (and
+        (portfolio_regulatory_check_applied ?portfolio)
+        (entity_custodian_hold ?portfolio ?custodian)
+        (not
+          (portfolio_regulatory_rule_passed ?portfolio)
+        )
+      )
+    :effect (portfolio_regulatory_rule_passed ?portfolio)
+  )
+  (:action apply_regulatory_approval
+    :parameters (?portfolio - portfolio ?counterparty_approval - counterparty_approval)
+    :precondition
+      (and
+        (portfolio_regulatory_rule_passed ?portfolio)
+        (portfolio_counterparty_approval_link ?portfolio ?counterparty_approval)
+        (not
+          (portfolio_regulatory_approval_done ?portfolio)
+        )
+      )
+    :effect (portfolio_regulatory_approval_done ?portfolio)
+  )
+  (:action finalize_portfolio_after_regulatory_approval
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (portfolio_regulatory_approval_done ?portfolio)
+        (not
+          (portfolio_finalized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_finalized ?portfolio)
+        (entity_ready_for_posting ?portfolio)
+      )
+  )
+  (:action post_settlement_to_funding_account
+    :parameters (?funding_account - funding_account ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (funding_account_ready ?funding_account)
+        (funding_account_marked_source ?funding_account)
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_ready_for_settlement ?allocation_candidate)
+        (not
+          (entity_ready_for_posting ?funding_account)
+        )
+      )
+    :effect (entity_ready_for_posting ?funding_account)
+  )
+  (:action post_settlement_to_receiving_account
+    :parameters (?receiving_account - receiving_account ?allocation_candidate - allocation_candidate)
+    :precondition
+      (and
+        (receiving_account_ready ?receiving_account)
+        (receiving_account_marked_destination ?receiving_account)
+        (allocation_candidate_locked ?allocation_candidate)
+        (candidate_ready_for_settlement ?allocation_candidate)
+        (not
+          (entity_ready_for_posting ?receiving_account)
+        )
+      )
+    :effect (entity_ready_for_posting ?receiving_account)
+  )
+  (:action commit_posting_and_select_settlement_type
+    :parameters (?account - account ?settlement_type - settlement_type ?eligibility_snapshot - eligibility_check)
+    :precondition
+      (and
+        (entity_ready_for_posting ?account)
+        (entity_has_eligibility_snapshot ?account ?eligibility_snapshot)
+        (settlement_type_available ?settlement_type)
+        (not
+          (entity_posting_committed ?account)
+        )
+      )
+    :effect
+      (and
+        (entity_posting_committed ?account)
+        (entity_settlement_type_selected ?account ?settlement_type)
+        (not
+          (settlement_type_available ?settlement_type)
+        )
+      )
+  )
+  (:action execute_settlement_for_funding_account
+    :parameters (?funding_account - funding_account ?collateral_pool - collateral_pool ?settlement_type - settlement_type)
+    :precondition
+      (and
+        (entity_posting_committed ?funding_account)
+        (entity_assigned_collateral_pool ?funding_account ?collateral_pool)
+        (entity_settlement_type_selected ?funding_account ?settlement_type)
+        (not
+          (entity_funding_need_fulfilled ?funding_account)
+        )
+      )
+    :effect
+      (and
+        (entity_funding_need_fulfilled ?funding_account)
+        (collateral_pool_available ?collateral_pool)
+        (settlement_type_available ?settlement_type)
+      )
+  )
+  (:action execute_settlement_for_receiving_account
+    :parameters (?receiving_account - receiving_account ?collateral_pool - collateral_pool ?settlement_type - settlement_type)
+    :precondition
+      (and
+        (entity_posting_committed ?receiving_account)
+        (entity_assigned_collateral_pool ?receiving_account ?collateral_pool)
+        (entity_settlement_type_selected ?receiving_account ?settlement_type)
+        (not
+          (entity_funding_need_fulfilled ?receiving_account)
+        )
+      )
+    :effect
+      (and
+        (entity_funding_need_fulfilled ?receiving_account)
+        (collateral_pool_available ?collateral_pool)
+        (settlement_type_available ?settlement_type)
+      )
+  )
+  (:action execute_settlement_for_portfolio
+    :parameters (?portfolio - portfolio ?collateral_pool - collateral_pool ?settlement_type - settlement_type)
+    :precondition
+      (and
+        (entity_posting_committed ?portfolio)
+        (entity_assigned_collateral_pool ?portfolio ?collateral_pool)
+        (entity_settlement_type_selected ?portfolio ?settlement_type)
+        (not
+          (entity_funding_need_fulfilled ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (entity_funding_need_fulfilled ?portfolio)
+        (collateral_pool_available ?collateral_pool)
+        (settlement_type_available ?settlement_type)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem collateral_allocation_for_funding_needs_problem)
+  (:domain treasury_collateral_allocation)
+  (:objects funding_account_1 - funding_account receiving_account_1 - receiving_account portfolio_alpha - portfolio portfolio_beta - portfolio collateral_pool_a - collateral_pool collateral_pool_b - collateral_pool collateral_pool_c - collateral_pool eligibility_snapshot_1 - eligibility_check custodian_1 - custodian collateral_asset_1 - collateral_asset funding_bucket_1 - funding_bucket liquidity_bucket_1 - liquidity_bucket allocation_candidate_1 - allocation_candidate settlement_lot_a - settlement_lot settlement_lot_b - settlement_lot allocation_rule_1 - allocation_rule allocation_rule_2 - allocation_rule valuation_profile_1 - valuation_profile valuation_profile_2 - valuation_profile settlement_type_cash - settlement_type buffer_profile_standard - buffer_profile regulatory_constraint_1 - regulatory_constraint regulatory_constraint_2 - regulatory_constraint counterparty_approval_1 - counterparty_approval)
+  (:init
+    (collateral_pool_available collateral_pool_a)
+    (collateral_pool_available collateral_pool_b)
+    (collateral_pool_available collateral_pool_c)
+    (eligibility_snapshot_available eligibility_snapshot_1)
+    (custodian_available custodian_1)
+    (collateral_asset_available collateral_asset_1)
+    (funding_account_bucket funding_account_1 funding_bucket_1)
+    (receiving_account_liquidity_bucket receiving_account_1 liquidity_bucket_1)
+    (allocation_candidate_available allocation_candidate_1)
+    (settlement_lot_available settlement_lot_a)
+    (settlement_lot_available settlement_lot_b)
+    (portfolio_funding_account_link portfolio_alpha funding_account_1)
+    (portfolio_funding_account_link portfolio_beta funding_account_1)
+    (portfolio_receiving_account_link portfolio_alpha receiving_account_1)
+    (portfolio_receiving_account_link portfolio_beta receiving_account_1)
+    (portfolio_candidate_link portfolio_alpha allocation_candidate_1)
+    (portfolio_candidate_link portfolio_beta allocation_candidate_1)
+    (portfolio_settlement_lot_link portfolio_alpha settlement_lot_a)
+    (portfolio_settlement_lot_link portfolio_beta settlement_lot_b)
+    (allocation_rule_available allocation_rule_1)
+    (allocation_rule_available allocation_rule_2)
+    (valuation_profile_available valuation_profile_1)
+    (valuation_profile_available valuation_profile_2)
+    (settlement_type_available settlement_type_cash)
+    (buffer_profile_available buffer_profile_standard)
+    (regulatory_constraint_available regulatory_constraint_1)
+    (portfolio_regulatory_constraint_link portfolio_alpha regulatory_constraint_1)
+    (portfolio_regulatory_constraint_link portfolio_beta regulatory_constraint_2)
+    (counterparty_approval_available counterparty_approval_1)
+  )
+  (:goal
+    (and
+      (entity_funding_need_fulfilled funding_account_1)
+      (entity_funding_need_fulfilled receiving_account_1)
+      (entity_funding_need_fulfilled portfolio_alpha)
+      (entity_funding_need_fulfilled portfolio_beta)
+    )
+  )
+)

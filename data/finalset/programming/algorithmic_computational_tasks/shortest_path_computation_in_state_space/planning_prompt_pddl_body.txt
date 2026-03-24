@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain bidirectional_shortest_path_search_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types control_token_parent - object attribute_token_parent - object frontier_parent - object state_parent - object state - state_parent worker_token - control_token_parent operation_token - control_token_parent processing_unit - control_token_parent metadata_tag - control_token_parent policy_tag - control_token_parent solution_tag - control_token_parent resource_type_token - control_token_parent preference_token - control_token_parent cost_token - attribute_token_parent materialization_token - attribute_token_parent constraint_token - attribute_token_parent forward_frontier_entry - frontier_parent backward_frontier_entry - frontier_parent candidate_entry - frontier_parent node_role_parent - state task_role_parent - state forward_node - node_role_parent backward_node - node_role_parent search_task - task_role_parent)
+  (:predicates
+    (entity_discovered ?state - state)
+    (entity_activated ?state - state)
+    (entity_scheduled ?state - state)
+    (entity_solution_integrated ?state - state)
+    (entity_settled ?state - state)
+    (entity_solution_tagged ?state - state)
+    (worker_available ?worker_token - worker_token)
+    (assigned_worker ?state - state ?worker_token - worker_token)
+    (operation_token_available ?operation_token - operation_token)
+    (entity_operation_assigned ?state - state ?operation_token - operation_token)
+    (processing_unit_available ?processing_unit - processing_unit)
+    (entity_processing_unit_assigned ?state - state ?processing_unit - processing_unit)
+    (cost_token_available ?cost_token - cost_token)
+    (forward_node_cost ?forward_node - forward_node ?cost_token - cost_token)
+    (backward_node_cost ?backward_node - backward_node ?cost_token - cost_token)
+    (forward_frontier_link ?forward_node - forward_node ?forward_frontier_entry - forward_frontier_entry)
+    (forward_entry_active ?forward_frontier_entry - forward_frontier_entry)
+    (forward_entry_consumed ?forward_frontier_entry - forward_frontier_entry)
+    (forward_node_expanded ?forward_node - forward_node)
+    (backward_frontier_link ?backward_node - backward_node ?backward_frontier_entry - backward_frontier_entry)
+    (backward_entry_active ?backward_frontier_entry - backward_frontier_entry)
+    (backward_entry_consumed ?backward_frontier_entry - backward_frontier_entry)
+    (backward_node_expanded ?backward_node - backward_node)
+    (candidate_slot_available ?candidate_entry - candidate_entry)
+    (candidate_active ?candidate_entry - candidate_entry)
+    (candidate_forward_link ?candidate_entry - candidate_entry ?forward_frontier_entry - forward_frontier_entry)
+    (candidate_backward_link ?candidate_entry - candidate_entry ?backward_frontier_entry - backward_frontier_entry)
+    (candidate_forward_ready ?candidate_entry - candidate_entry)
+    (candidate_backward_ready ?candidate_entry - candidate_entry)
+    (candidate_activated ?candidate_entry - candidate_entry)
+    (task_bind_forward_node ?search_task - search_task ?forward_node - forward_node)
+    (task_bind_backward_node ?search_task - search_task ?backward_node - backward_node)
+    (task_has_candidate ?search_task - search_task ?candidate_entry - candidate_entry)
+    (materialization_token_available ?materialization_token - materialization_token)
+    (task_has_materialization_token ?search_task - search_task ?materialization_token - materialization_token)
+    (materialization_token_claimed ?materialization_token - materialization_token)
+    (materialization_for_candidate ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    (task_materialized ?search_task - search_task)
+    (task_prepared ?search_task - search_task)
+    (task_finalization_ready ?search_task - search_task)
+    (task_metadata_applied ?search_task - search_task)
+    (task_metadata_propagated ?search_task - search_task)
+    (task_policy_attached ?search_task - search_task)
+    (task_final_checks_passed ?search_task - search_task)
+    (constraint_token_available ?constraint_token - constraint_token)
+    (task_constraint_requested ?search_task - search_task ?constraint_token - constraint_token)
+    (task_constraint_satisfied ?search_task - search_task)
+    (task_constraint_configured ?search_task - search_task)
+    (task_preference_applied ?search_task - search_task)
+    (metadata_tag_available ?metadata_tag - metadata_tag)
+    (task_metadata_link ?search_task - search_task ?metadata_tag - metadata_tag)
+    (policy_tag_available ?policy_tag - policy_tag)
+    (task_policy_link ?search_task - search_task ?policy_tag - policy_tag)
+    (resource_type_available ?resource_type_token - resource_type_token)
+    (task_resource_type_link ?search_task - search_task ?resource_type_token - resource_type_token)
+    (preference_token_available ?preference_token - preference_token)
+    (task_preference_link ?search_task - search_task ?preference_token - preference_token)
+    (solution_tag_available ?solution_tag - solution_tag)
+    (entity_solution_tag ?state - state ?solution_tag - solution_tag)
+    (forward_node_pending ?forward_node - forward_node)
+    (backward_node_pending ?backward_node - backward_node)
+    (task_finalized ?search_task - search_task)
+  )
+  (:action mark_state_discovered
+    :parameters (?state - state)
+    :precondition
+      (and
+        (not
+          (entity_discovered ?state)
+        )
+        (not
+          (entity_solution_integrated ?state)
+        )
+      )
+    :effect (entity_discovered ?state)
+  )
+  (:action assign_worker_token_to_state
+    :parameters (?state - state ?worker_token - worker_token)
+    :precondition
+      (and
+        (entity_discovered ?state)
+        (not
+          (entity_scheduled ?state)
+        )
+        (worker_available ?worker_token)
+      )
+    :effect
+      (and
+        (entity_scheduled ?state)
+        (assigned_worker ?state ?worker_token)
+        (not
+          (worker_available ?worker_token)
+        )
+      )
+  )
+  (:action assign_operation_token_to_state
+    :parameters (?state - state ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_discovered ?state)
+        (entity_scheduled ?state)
+        (operation_token_available ?operation_token)
+      )
+    :effect
+      (and
+        (entity_operation_assigned ?state ?operation_token)
+        (not
+          (operation_token_available ?operation_token)
+        )
+      )
+  )
+  (:action activate_state_for_processing
+    :parameters (?state - state ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_discovered ?state)
+        (entity_scheduled ?state)
+        (entity_operation_assigned ?state ?operation_token)
+        (not
+          (entity_activated ?state)
+        )
+      )
+    :effect (entity_activated ?state)
+  )
+  (:action release_operation_token_from_state
+    :parameters (?state - state ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_operation_assigned ?state ?operation_token)
+      )
+    :effect
+      (and
+        (operation_token_available ?operation_token)
+        (not
+          (entity_operation_assigned ?state ?operation_token)
+        )
+      )
+  )
+  (:action assign_processing_unit_to_state
+    :parameters (?state - state ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (entity_activated ?state)
+        (processing_unit_available ?processing_unit)
+      )
+    :effect
+      (and
+        (entity_processing_unit_assigned ?state ?processing_unit)
+        (not
+          (processing_unit_available ?processing_unit)
+        )
+      )
+  )
+  (:action release_processing_unit_from_state
+    :parameters (?state - state ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (entity_processing_unit_assigned ?state ?processing_unit)
+      )
+    :effect
+      (and
+        (processing_unit_available ?processing_unit)
+        (not
+          (entity_processing_unit_assigned ?state ?processing_unit)
+        )
+      )
+  )
+  (:action bind_resource_type_to_task
+    :parameters (?search_task - search_task ?resource_type_token - resource_type_token)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (resource_type_available ?resource_type_token)
+      )
+    :effect
+      (and
+        (task_resource_type_link ?search_task ?resource_type_token)
+        (not
+          (resource_type_available ?resource_type_token)
+        )
+      )
+  )
+  (:action release_resource_type_from_task
+    :parameters (?search_task - search_task ?resource_type_token - resource_type_token)
+    :precondition
+      (and
+        (task_resource_type_link ?search_task ?resource_type_token)
+      )
+    :effect
+      (and
+        (resource_type_available ?resource_type_token)
+        (not
+          (task_resource_type_link ?search_task ?resource_type_token)
+        )
+      )
+  )
+  (:action bind_preference_to_task
+    :parameters (?search_task - search_task ?preference_token - preference_token)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (preference_token_available ?preference_token)
+      )
+    :effect
+      (and
+        (task_preference_link ?search_task ?preference_token)
+        (not
+          (preference_token_available ?preference_token)
+        )
+      )
+  )
+  (:action release_preference_from_task
+    :parameters (?search_task - search_task ?preference_token - preference_token)
+    :precondition
+      (and
+        (task_preference_link ?search_task ?preference_token)
+      )
+    :effect
+      (and
+        (preference_token_available ?preference_token)
+        (not
+          (task_preference_link ?search_task ?preference_token)
+        )
+      )
+  )
+  (:action generate_forward_frontier_entry
+    :parameters (?forward_node - forward_node ?forward_frontier_entry - forward_frontier_entry ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_activated ?forward_node)
+        (entity_operation_assigned ?forward_node ?operation_token)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (not
+          (forward_entry_active ?forward_frontier_entry)
+        )
+        (not
+          (forward_entry_consumed ?forward_frontier_entry)
+        )
+      )
+    :effect (forward_entry_active ?forward_frontier_entry)
+  )
+  (:action process_forward_frontier_entry
+    :parameters (?forward_node - forward_node ?forward_frontier_entry - forward_frontier_entry ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (entity_activated ?forward_node)
+        (entity_processing_unit_assigned ?forward_node ?processing_unit)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (forward_entry_active ?forward_frontier_entry)
+        (not
+          (forward_node_pending ?forward_node)
+        )
+      )
+    :effect
+      (and
+        (forward_node_pending ?forward_node)
+        (forward_node_expanded ?forward_node)
+      )
+  )
+  (:action annotate_forward_node_with_cost
+    :parameters (?forward_node - forward_node ?forward_frontier_entry - forward_frontier_entry ?cost_token - cost_token)
+    :precondition
+      (and
+        (entity_activated ?forward_node)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (cost_token_available ?cost_token)
+        (not
+          (forward_node_pending ?forward_node)
+        )
+      )
+    :effect
+      (and
+        (forward_entry_consumed ?forward_frontier_entry)
+        (forward_node_pending ?forward_node)
+        (forward_node_cost ?forward_node ?cost_token)
+        (not
+          (cost_token_available ?cost_token)
+        )
+      )
+  )
+  (:action finalize_forward_node_cost_update
+    :parameters (?forward_node - forward_node ?forward_frontier_entry - forward_frontier_entry ?operation_token - operation_token ?cost_token - cost_token)
+    :precondition
+      (and
+        (entity_activated ?forward_node)
+        (entity_operation_assigned ?forward_node ?operation_token)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (forward_entry_consumed ?forward_frontier_entry)
+        (forward_node_cost ?forward_node ?cost_token)
+        (not
+          (forward_node_expanded ?forward_node)
+        )
+      )
+    :effect
+      (and
+        (forward_entry_active ?forward_frontier_entry)
+        (forward_node_expanded ?forward_node)
+        (cost_token_available ?cost_token)
+        (not
+          (forward_node_cost ?forward_node ?cost_token)
+        )
+      )
+  )
+  (:action generate_backward_frontier_entry
+    :parameters (?backward_node - backward_node ?backward_frontier_entry - backward_frontier_entry ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_activated ?backward_node)
+        (entity_operation_assigned ?backward_node ?operation_token)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (not
+          (backward_entry_active ?backward_frontier_entry)
+        )
+        (not
+          (backward_entry_consumed ?backward_frontier_entry)
+        )
+      )
+    :effect (backward_entry_active ?backward_frontier_entry)
+  )
+  (:action process_backward_frontier_entry
+    :parameters (?backward_node - backward_node ?backward_frontier_entry - backward_frontier_entry ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (entity_activated ?backward_node)
+        (entity_processing_unit_assigned ?backward_node ?processing_unit)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (backward_entry_active ?backward_frontier_entry)
+        (not
+          (backward_node_pending ?backward_node)
+        )
+      )
+    :effect
+      (and
+        (backward_node_pending ?backward_node)
+        (backward_node_expanded ?backward_node)
+      )
+  )
+  (:action annotate_backward_node_with_cost
+    :parameters (?backward_node - backward_node ?backward_frontier_entry - backward_frontier_entry ?cost_token - cost_token)
+    :precondition
+      (and
+        (entity_activated ?backward_node)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (cost_token_available ?cost_token)
+        (not
+          (backward_node_pending ?backward_node)
+        )
+      )
+    :effect
+      (and
+        (backward_entry_consumed ?backward_frontier_entry)
+        (backward_node_pending ?backward_node)
+        (backward_node_cost ?backward_node ?cost_token)
+        (not
+          (cost_token_available ?cost_token)
+        )
+      )
+  )
+  (:action finalize_backward_node_cost_update
+    :parameters (?backward_node - backward_node ?backward_frontier_entry - backward_frontier_entry ?operation_token - operation_token ?cost_token - cost_token)
+    :precondition
+      (and
+        (entity_activated ?backward_node)
+        (entity_operation_assigned ?backward_node ?operation_token)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (backward_entry_consumed ?backward_frontier_entry)
+        (backward_node_cost ?backward_node ?cost_token)
+        (not
+          (backward_node_expanded ?backward_node)
+        )
+      )
+    :effect
+      (and
+        (backward_entry_active ?backward_frontier_entry)
+        (backward_node_expanded ?backward_node)
+        (cost_token_available ?cost_token)
+        (not
+          (backward_node_cost ?backward_node ?cost_token)
+        )
+      )
+  )
+  (:action assemble_candidate_from_frontiers
+    :parameters (?forward_node - forward_node ?backward_node - backward_node ?forward_frontier_entry - forward_frontier_entry ?backward_frontier_entry - backward_frontier_entry ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (forward_node_pending ?forward_node)
+        (backward_node_pending ?backward_node)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (forward_entry_active ?forward_frontier_entry)
+        (backward_entry_active ?backward_frontier_entry)
+        (forward_node_expanded ?forward_node)
+        (backward_node_expanded ?backward_node)
+        (candidate_slot_available ?candidate_entry)
+      )
+    :effect
+      (and
+        (candidate_active ?candidate_entry)
+        (candidate_forward_link ?candidate_entry ?forward_frontier_entry)
+        (candidate_backward_link ?candidate_entry ?backward_frontier_entry)
+        (not
+          (candidate_slot_available ?candidate_entry)
+        )
+      )
+  )
+  (:action assemble_candidate_set_forward_ready
+    :parameters (?forward_node - forward_node ?backward_node - backward_node ?forward_frontier_entry - forward_frontier_entry ?backward_frontier_entry - backward_frontier_entry ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (forward_node_pending ?forward_node)
+        (backward_node_pending ?backward_node)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (forward_entry_consumed ?forward_frontier_entry)
+        (backward_entry_active ?backward_frontier_entry)
+        (not
+          (forward_node_expanded ?forward_node)
+        )
+        (backward_node_expanded ?backward_node)
+        (candidate_slot_available ?candidate_entry)
+      )
+    :effect
+      (and
+        (candidate_active ?candidate_entry)
+        (candidate_forward_link ?candidate_entry ?forward_frontier_entry)
+        (candidate_backward_link ?candidate_entry ?backward_frontier_entry)
+        (candidate_forward_ready ?candidate_entry)
+        (not
+          (candidate_slot_available ?candidate_entry)
+        )
+      )
+  )
+  (:action assemble_candidate_set_backward_ready
+    :parameters (?forward_node - forward_node ?backward_node - backward_node ?forward_frontier_entry - forward_frontier_entry ?backward_frontier_entry - backward_frontier_entry ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (forward_node_pending ?forward_node)
+        (backward_node_pending ?backward_node)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (forward_entry_active ?forward_frontier_entry)
+        (backward_entry_consumed ?backward_frontier_entry)
+        (forward_node_expanded ?forward_node)
+        (not
+          (backward_node_expanded ?backward_node)
+        )
+        (candidate_slot_available ?candidate_entry)
+      )
+    :effect
+      (and
+        (candidate_active ?candidate_entry)
+        (candidate_forward_link ?candidate_entry ?forward_frontier_entry)
+        (candidate_backward_link ?candidate_entry ?backward_frontier_entry)
+        (candidate_backward_ready ?candidate_entry)
+        (not
+          (candidate_slot_available ?candidate_entry)
+        )
+      )
+  )
+  (:action assemble_candidate_set_both_ready
+    :parameters (?forward_node - forward_node ?backward_node - backward_node ?forward_frontier_entry - forward_frontier_entry ?backward_frontier_entry - backward_frontier_entry ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (forward_node_pending ?forward_node)
+        (backward_node_pending ?backward_node)
+        (forward_frontier_link ?forward_node ?forward_frontier_entry)
+        (backward_frontier_link ?backward_node ?backward_frontier_entry)
+        (forward_entry_consumed ?forward_frontier_entry)
+        (backward_entry_consumed ?backward_frontier_entry)
+        (not
+          (forward_node_expanded ?forward_node)
+        )
+        (not
+          (backward_node_expanded ?backward_node)
+        )
+        (candidate_slot_available ?candidate_entry)
+      )
+    :effect
+      (and
+        (candidate_active ?candidate_entry)
+        (candidate_forward_link ?candidate_entry ?forward_frontier_entry)
+        (candidate_backward_link ?candidate_entry ?backward_frontier_entry)
+        (candidate_forward_ready ?candidate_entry)
+        (candidate_backward_ready ?candidate_entry)
+        (not
+          (candidate_slot_available ?candidate_entry)
+        )
+      )
+  )
+  (:action activate_candidate_entry
+    :parameters (?candidate_entry - candidate_entry ?forward_node - forward_node ?operation_token - operation_token)
+    :precondition
+      (and
+        (candidate_active ?candidate_entry)
+        (forward_node_pending ?forward_node)
+        (entity_operation_assigned ?forward_node ?operation_token)
+        (not
+          (candidate_activated ?candidate_entry)
+        )
+      )
+    :effect (candidate_activated ?candidate_entry)
+  )
+  (:action claim_materialization_token_for_task
+    :parameters (?search_task - search_task ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (task_has_candidate ?search_task ?candidate_entry)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_token_available ?materialization_token)
+        (candidate_active ?candidate_entry)
+        (candidate_activated ?candidate_entry)
+        (not
+          (materialization_token_claimed ?materialization_token)
+        )
+      )
+    :effect
+      (and
+        (materialization_token_claimed ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (not
+          (materialization_token_available ?materialization_token)
+        )
+      )
+  )
+  (:action begin_candidate_materialization
+    :parameters (?search_task - search_task ?materialization_token - materialization_token ?candidate_entry - candidate_entry ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_token_claimed ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (entity_operation_assigned ?search_task ?operation_token)
+        (not
+          (candidate_forward_ready ?candidate_entry)
+        )
+        (not
+          (task_materialized ?search_task)
+        )
+      )
+    :effect (task_materialized ?search_task)
+  )
+  (:action apply_metadata_tag_to_task
+    :parameters (?search_task - search_task ?metadata_tag - metadata_tag)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (metadata_tag_available ?metadata_tag)
+        (not
+          (task_metadata_applied ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_metadata_applied ?search_task)
+        (task_metadata_link ?search_task ?metadata_tag)
+        (not
+          (metadata_tag_available ?metadata_tag)
+        )
+      )
+  )
+  (:action process_candidate_with_metadata
+    :parameters (?search_task - search_task ?materialization_token - materialization_token ?candidate_entry - candidate_entry ?operation_token - operation_token ?metadata_tag - metadata_tag)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_token_claimed ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (entity_operation_assigned ?search_task ?operation_token)
+        (candidate_forward_ready ?candidate_entry)
+        (task_metadata_applied ?search_task)
+        (task_metadata_link ?search_task ?metadata_tag)
+        (not
+          (task_materialized ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_materialized ?search_task)
+        (task_metadata_propagated ?search_task)
+      )
+  )
+  (:action prepare_task_for_finalization_no_backward_flag
+    :parameters (?search_task - search_task ?resource_type_token - resource_type_token ?processing_unit - processing_unit ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_materialized ?search_task)
+        (task_resource_type_link ?search_task ?resource_type_token)
+        (entity_processing_unit_assigned ?search_task ?processing_unit)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (not
+          (candidate_backward_ready ?candidate_entry)
+        )
+        (not
+          (task_prepared ?search_task)
+        )
+      )
+    :effect (task_prepared ?search_task)
+  )
+  (:action prepare_task_for_finalization_with_backward_flag
+    :parameters (?search_task - search_task ?resource_type_token - resource_type_token ?processing_unit - processing_unit ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_materialized ?search_task)
+        (task_resource_type_link ?search_task ?resource_type_token)
+        (entity_processing_unit_assigned ?search_task ?processing_unit)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (candidate_backward_ready ?candidate_entry)
+        (not
+          (task_prepared ?search_task)
+        )
+      )
+    :effect (task_prepared ?search_task)
+  )
+  (:action mark_task_ready_for_finalization
+    :parameters (?search_task - search_task ?preference_token - preference_token ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_prepared ?search_task)
+        (task_preference_link ?search_task ?preference_token)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (not
+          (candidate_forward_ready ?candidate_entry)
+        )
+        (not
+          (candidate_backward_ready ?candidate_entry)
+        )
+        (not
+          (task_finalization_ready ?search_task)
+        )
+      )
+    :effect (task_finalization_ready ?search_task)
+  )
+  (:action mark_task_ready_and_attach_policy_option_a
+    :parameters (?search_task - search_task ?preference_token - preference_token ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_prepared ?search_task)
+        (task_preference_link ?search_task ?preference_token)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (candidate_forward_ready ?candidate_entry)
+        (not
+          (candidate_backward_ready ?candidate_entry)
+        )
+        (not
+          (task_finalization_ready ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalization_ready ?search_task)
+        (task_policy_attached ?search_task)
+      )
+  )
+  (:action mark_task_ready_and_attach_policy_option_b
+    :parameters (?search_task - search_task ?preference_token - preference_token ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_prepared ?search_task)
+        (task_preference_link ?search_task ?preference_token)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (not
+          (candidate_forward_ready ?candidate_entry)
+        )
+        (candidate_backward_ready ?candidate_entry)
+        (not
+          (task_finalization_ready ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalization_ready ?search_task)
+        (task_policy_attached ?search_task)
+      )
+  )
+  (:action mark_task_ready_and_attach_policy_option_c
+    :parameters (?search_task - search_task ?preference_token - preference_token ?materialization_token - materialization_token ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (task_prepared ?search_task)
+        (task_preference_link ?search_task ?preference_token)
+        (task_has_materialization_token ?search_task ?materialization_token)
+        (materialization_for_candidate ?materialization_token ?candidate_entry)
+        (candidate_forward_ready ?candidate_entry)
+        (candidate_backward_ready ?candidate_entry)
+        (not
+          (task_finalization_ready ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalization_ready ?search_task)
+        (task_policy_attached ?search_task)
+      )
+  )
+  (:action finalize_task_without_policy
+    :parameters (?search_task - search_task)
+    :precondition
+      (and
+        (task_finalization_ready ?search_task)
+        (not
+          (task_policy_attached ?search_task)
+        )
+        (not
+          (task_finalized ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?search_task)
+        (entity_settled ?search_task)
+      )
+  )
+  (:action attach_policy_tag_to_task
+    :parameters (?search_task - search_task ?policy_tag - policy_tag)
+    :precondition
+      (and
+        (task_finalization_ready ?search_task)
+        (task_policy_attached ?search_task)
+        (policy_tag_available ?policy_tag)
+      )
+    :effect
+      (and
+        (task_policy_link ?search_task ?policy_tag)
+        (not
+          (policy_tag_available ?policy_tag)
+        )
+      )
+  )
+  (:action perform_task_finalization_checks
+    :parameters (?search_task - search_task ?forward_node - forward_node ?backward_node - backward_node ?operation_token - operation_token ?policy_tag - policy_tag)
+    :precondition
+      (and
+        (task_finalization_ready ?search_task)
+        (task_policy_attached ?search_task)
+        (task_policy_link ?search_task ?policy_tag)
+        (task_bind_forward_node ?search_task ?forward_node)
+        (task_bind_backward_node ?search_task ?backward_node)
+        (forward_node_expanded ?forward_node)
+        (backward_node_expanded ?backward_node)
+        (entity_operation_assigned ?search_task ?operation_token)
+        (not
+          (task_final_checks_passed ?search_task)
+        )
+      )
+    :effect (task_final_checks_passed ?search_task)
+  )
+  (:action finalize_task_with_checks
+    :parameters (?search_task - search_task)
+    :precondition
+      (and
+        (task_finalization_ready ?search_task)
+        (task_final_checks_passed ?search_task)
+        (not
+          (task_finalized ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?search_task)
+        (entity_settled ?search_task)
+      )
+  )
+  (:action apply_constraint_to_task
+    :parameters (?search_task - search_task ?constraint_token - constraint_token ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_activated ?search_task)
+        (entity_operation_assigned ?search_task ?operation_token)
+        (constraint_token_available ?constraint_token)
+        (task_constraint_requested ?search_task ?constraint_token)
+        (not
+          (task_constraint_satisfied ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_constraint_satisfied ?search_task)
+        (not
+          (constraint_token_available ?constraint_token)
+        )
+      )
+  )
+  (:action configure_task_constraint
+    :parameters (?search_task - search_task ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (task_constraint_satisfied ?search_task)
+        (entity_processing_unit_assigned ?search_task ?processing_unit)
+        (not
+          (task_constraint_configured ?search_task)
+        )
+      )
+    :effect (task_constraint_configured ?search_task)
+  )
+  (:action apply_task_preference_config
+    :parameters (?search_task - search_task ?preference_token - preference_token)
+    :precondition
+      (and
+        (task_constraint_configured ?search_task)
+        (task_preference_link ?search_task ?preference_token)
+        (not
+          (task_preference_applied ?search_task)
+        )
+      )
+    :effect (task_preference_applied ?search_task)
+  )
+  (:action finalize_task_after_preference
+    :parameters (?search_task - search_task)
+    :precondition
+      (and
+        (task_preference_applied ?search_task)
+        (not
+          (task_finalized ?search_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized ?search_task)
+        (entity_settled ?search_task)
+      )
+  )
+  (:action settle_forward_node
+    :parameters (?forward_node - forward_node ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (forward_node_pending ?forward_node)
+        (forward_node_expanded ?forward_node)
+        (candidate_active ?candidate_entry)
+        (candidate_activated ?candidate_entry)
+        (not
+          (entity_settled ?forward_node)
+        )
+      )
+    :effect (entity_settled ?forward_node)
+  )
+  (:action settle_backward_node
+    :parameters (?backward_node - backward_node ?candidate_entry - candidate_entry)
+    :precondition
+      (and
+        (backward_node_pending ?backward_node)
+        (backward_node_expanded ?backward_node)
+        (candidate_active ?candidate_entry)
+        (candidate_activated ?candidate_entry)
+        (not
+          (entity_settled ?backward_node)
+        )
+      )
+    :effect (entity_settled ?backward_node)
+  )
+  (:action label_state_with_solution
+    :parameters (?state - state ?solution_tag - solution_tag ?operation_token - operation_token)
+    :precondition
+      (and
+        (entity_settled ?state)
+        (entity_operation_assigned ?state ?operation_token)
+        (solution_tag_available ?solution_tag)
+        (not
+          (entity_solution_tagged ?state)
+        )
+      )
+    :effect
+      (and
+        (entity_solution_tagged ?state)
+        (entity_solution_tag ?state ?solution_tag)
+        (not
+          (solution_tag_available ?solution_tag)
+        )
+      )
+  )
+  (:action integrate_solution_into_forward_node
+    :parameters (?forward_node - forward_node ?worker_token - worker_token ?solution_tag - solution_tag)
+    :precondition
+      (and
+        (entity_solution_tagged ?forward_node)
+        (assigned_worker ?forward_node ?worker_token)
+        (entity_solution_tag ?forward_node ?solution_tag)
+        (not
+          (entity_solution_integrated ?forward_node)
+        )
+      )
+    :effect
+      (and
+        (entity_solution_integrated ?forward_node)
+        (worker_available ?worker_token)
+        (solution_tag_available ?solution_tag)
+      )
+  )
+  (:action integrate_solution_into_backward_node
+    :parameters (?backward_node - backward_node ?worker_token - worker_token ?solution_tag - solution_tag)
+    :precondition
+      (and
+        (entity_solution_tagged ?backward_node)
+        (assigned_worker ?backward_node ?worker_token)
+        (entity_solution_tag ?backward_node ?solution_tag)
+        (not
+          (entity_solution_integrated ?backward_node)
+        )
+      )
+    :effect
+      (and
+        (entity_solution_integrated ?backward_node)
+        (worker_available ?worker_token)
+        (solution_tag_available ?solution_tag)
+      )
+  )
+  (:action integrate_solution_into_task
+    :parameters (?search_task - search_task ?worker_token - worker_token ?solution_tag - solution_tag)
+    :precondition
+      (and
+        (entity_solution_tagged ?search_task)
+        (assigned_worker ?search_task ?worker_token)
+        (entity_solution_tag ?search_task ?solution_tag)
+        (not
+          (entity_solution_integrated ?search_task)
+        )
+      )
+    :effect
+      (and
+        (entity_solution_integrated ?search_task)
+        (worker_available ?worker_token)
+        (solution_tag_available ?solution_tag)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem shortest_path_search_instance)
+  (:domain bidirectional_shortest_path_search_domain)
+  (:objects forward_node_1 - forward_node backward_node_1 - backward_node search_task_1 - search_task search_task_2 - search_task worker_token_1 - worker_token worker_token_2 - worker_token worker_token_3 - worker_token operation_token_1 - operation_token processing_unit_1 - processing_unit cost_token_1 - cost_token forward_frontier_entry_1 - forward_frontier_entry backward_frontier_entry_1 - backward_frontier_entry candidate_entry_1 - candidate_entry materialization_token_1 - materialization_token materialization_token_2 - materialization_token metadata_tag_1 - metadata_tag metadata_tag_2 - metadata_tag policy_tag_1 - policy_tag policy_tag_2 - policy_tag solution_tag_1 - solution_tag resource_type_token_1 - resource_type_token constraint_token_1 - constraint_token constraint_token_2 - constraint_token preference_token_1 - preference_token)
+  (:init
+    (worker_available worker_token_1)
+    (worker_available worker_token_2)
+    (worker_available worker_token_3)
+    (operation_token_available operation_token_1)
+    (processing_unit_available processing_unit_1)
+    (cost_token_available cost_token_1)
+    (forward_frontier_link forward_node_1 forward_frontier_entry_1)
+    (backward_frontier_link backward_node_1 backward_frontier_entry_1)
+    (candidate_slot_available candidate_entry_1)
+    (materialization_token_available materialization_token_1)
+    (materialization_token_available materialization_token_2)
+    (task_bind_forward_node search_task_1 forward_node_1)
+    (task_bind_forward_node search_task_2 forward_node_1)
+    (task_bind_backward_node search_task_1 backward_node_1)
+    (task_bind_backward_node search_task_2 backward_node_1)
+    (task_has_candidate search_task_1 candidate_entry_1)
+    (task_has_candidate search_task_2 candidate_entry_1)
+    (task_has_materialization_token search_task_1 materialization_token_1)
+    (task_has_materialization_token search_task_2 materialization_token_2)
+    (metadata_tag_available metadata_tag_1)
+    (metadata_tag_available metadata_tag_2)
+    (policy_tag_available policy_tag_1)
+    (policy_tag_available policy_tag_2)
+    (solution_tag_available solution_tag_1)
+    (resource_type_available resource_type_token_1)
+    (constraint_token_available constraint_token_1)
+    (task_constraint_requested search_task_1 constraint_token_1)
+    (task_constraint_requested search_task_2 constraint_token_2)
+    (preference_token_available preference_token_1)
+  )
+  (:goal
+    (and
+      (entity_solution_integrated forward_node_1)
+      (entity_solution_integrated backward_node_1)
+      (entity_solution_integrated search_task_1)
+      (entity_solution_integrated search_task_2)
+    )
+  )
+)

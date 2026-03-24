@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain final_exam_window_preserving_course_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object academic_entity - entity allocatable_resource - entity scheduling_entity - entity person - entity student - person section - academic_entity meeting_time_slot - academic_entity instructor - academic_entity special_equipment - academic_entity assessment_mode - academic_entity student_accommodation_token - academic_entity assessment_resource - academic_entity exam_board_approval - academic_entity exam_resource_candidate - allocatable_resource invigilator - allocatable_resource departmental_override - allocatable_resource exam_time_slot - scheduling_entity room - scheduling_entity exam_session - scheduling_entity course_element - student course_entry - student course_offering - course_element course_component - course_element course_instance - course_entry)
+
+  (:predicates
+    (student_selection_initiated ?student - student)
+    (exam_allocation_eligible ?student - student)
+    (has_section_selection ?student - student)
+    (entity_finalized_for_exam ?student - student)
+    (entity_administratively_cleared ?student - student)
+    (entity_accommodation_assigned ?student - student)
+    (section_available ?section - section)
+    (entity_assigned_to_section ?student - student ?section - section)
+    (meeting_slot_available ?meeting_time_slot - meeting_time_slot)
+    (reserved_meeting_slot ?student - student ?meeting_time_slot - meeting_time_slot)
+    (instructor_available ?instructor - instructor)
+    (assigned_instructor_to_entity ?student - student ?instructor - instructor)
+    (exam_resource_candidate_available ?exam_resource_candidate - exam_resource_candidate)
+    (offering_allocated_resource_candidate ?course_offering - course_offering ?exam_resource_candidate - exam_resource_candidate)
+    (component_allocated_resource_candidate ?course_component - course_component ?exam_resource_candidate - exam_resource_candidate)
+    (offering_candidate_exam_slot ?course_offering - course_offering ?exam_time_slot - exam_time_slot)
+    (exam_slot_marked_by_component ?exam_time_slot - exam_time_slot)
+    (exam_slot_marked_by_resource ?exam_time_slot - exam_time_slot)
+    (offering_confirmed ?course_offering - course_offering)
+    (component_candidate_room ?course_component - course_component ?room - room)
+    (room_marked_by_component ?room - room)
+    (room_marked_by_resource ?room - room)
+    (component_confirmed ?course_component - course_component)
+    (session_slot_available ?exam_session - exam_session)
+    (session_allocated ?exam_session - exam_session)
+    (session_assigned_time_slot ?exam_session - exam_session ?exam_time_slot - exam_time_slot)
+    (session_assigned_room ?exam_session - exam_session ?room - room)
+    (session_requires_special_equipment ?exam_session - exam_session)
+    (session_requires_invigilator ?exam_session - exam_session)
+    (session_time_locked ?exam_session - exam_session)
+    (instance_includes_offering ?course_instance - course_instance ?course_offering - course_offering)
+    (instance_includes_component ?course_instance - course_instance ?course_component - course_component)
+    (instance_assigned_session ?course_instance - course_instance ?exam_session - exam_session)
+    (invigilator_available ?invigilator - invigilator)
+    (instance_allocated_invigilator_candidate ?course_instance - course_instance ?invigilator - invigilator)
+    (invigilator_assigned ?invigilator - invigilator)
+    (invigilator_assigned_to_session ?invigilator - invigilator ?exam_session - exam_session)
+    (instance_resources_pack_ready ?course_instance - course_instance)
+    (instance_resources_locked ?course_instance - course_instance)
+    (instance_admin_approved ?course_instance - course_instance)
+    (equipment_requested ?course_instance - course_instance)
+    (equipment_confirmed_for_instance ?course_instance - course_instance)
+    (instance_ready_for_assessment_mode_assignment ?course_instance - course_instance)
+    (instance_resources_confirmed ?course_instance - course_instance)
+    (departmental_override_available ?departmental_override - departmental_override)
+    (instance_has_departmental_override ?course_instance - course_instance ?departmental_override - departmental_override)
+    (instance_override_requested ?course_instance - course_instance)
+    (instructor_override_approved ?course_instance - course_instance)
+    (exam_board_approval_recorded ?course_instance - course_instance)
+    (special_equipment_available ?special_equipment - special_equipment)
+    (instance_allocated_special_equipment ?course_instance - course_instance ?special_equipment - special_equipment)
+    (assessment_mode_available ?assessment_mode - assessment_mode)
+    (instance_assessment_mode_assigned ?course_instance - course_instance ?assessment_mode - assessment_mode)
+    (assessment_resource_available ?assessment_resource - assessment_resource)
+    (instance_assessment_resource_assigned ?course_instance - course_instance ?assessment_resource - assessment_resource)
+    (exam_board_approval_available ?exam_board_approval - exam_board_approval)
+    (instance_exam_board_approval_assigned ?course_instance - course_instance ?exam_board_approval - exam_board_approval)
+    (accommodation_token_available ?student_accommodation_token - student_accommodation_token)
+    (entity_accommodation_token_assigned ?student - student ?student_accommodation_token - student_accommodation_token)
+    (offering_ready ?course_offering - course_offering)
+    (component_ready ?course_component - course_component)
+    (instance_finalization_locked ?course_instance - course_instance)
+  )
+  (:action initiate_course_selection
+    :parameters (?student - student)
+    :precondition
+      (and
+        (not
+          (student_selection_initiated ?student)
+        )
+        (not
+          (entity_finalized_for_exam ?student)
+        )
+      )
+    :effect (student_selection_initiated ?student)
+  )
+  (:action select_section
+    :parameters (?student - student ?section - section)
+    :precondition
+      (and
+        (student_selection_initiated ?student)
+        (not
+          (has_section_selection ?student)
+        )
+        (section_available ?section)
+      )
+    :effect
+      (and
+        (has_section_selection ?student)
+        (entity_assigned_to_section ?student ?section)
+        (not
+          (section_available ?section)
+        )
+      )
+  )
+  (:action reserve_meeting_time_slot
+    :parameters (?student - student ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (student_selection_initiated ?student)
+        (has_section_selection ?student)
+        (meeting_slot_available ?meeting_time_slot)
+      )
+    :effect
+      (and
+        (reserved_meeting_slot ?student ?meeting_time_slot)
+        (not
+          (meeting_slot_available ?meeting_time_slot)
+        )
+      )
+  )
+  (:action confirm_meeting_time_selection
+    :parameters (?student - student ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (student_selection_initiated ?student)
+        (has_section_selection ?student)
+        (reserved_meeting_slot ?student ?meeting_time_slot)
+        (not
+          (exam_allocation_eligible ?student)
+        )
+      )
+    :effect (exam_allocation_eligible ?student)
+  )
+  (:action release_meeting_time_slot
+    :parameters (?student - student ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (reserved_meeting_slot ?student ?meeting_time_slot)
+      )
+    :effect
+      (and
+        (meeting_slot_available ?meeting_time_slot)
+        (not
+          (reserved_meeting_slot ?student ?meeting_time_slot)
+        )
+      )
+  )
+  (:action assign_instructor_to_student
+    :parameters (?student - student ?instructor - instructor)
+    :precondition
+      (and
+        (exam_allocation_eligible ?student)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (assigned_instructor_to_entity ?student ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action unassign_instructor_from_student
+    :parameters (?student - student ?instructor - instructor)
+    :precondition
+      (and
+        (assigned_instructor_to_entity ?student ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (assigned_instructor_to_entity ?student ?instructor)
+        )
+      )
+  )
+  (:action assign_assessment_resource_to_instance
+    :parameters (?course_instance - course_instance ?assessment_resource - assessment_resource)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (assessment_resource_available ?assessment_resource)
+      )
+    :effect
+      (and
+        (instance_assessment_resource_assigned ?course_instance ?assessment_resource)
+        (not
+          (assessment_resource_available ?assessment_resource)
+        )
+      )
+  )
+  (:action unassign_assessment_resource_from_instance
+    :parameters (?course_instance - course_instance ?assessment_resource - assessment_resource)
+    :precondition
+      (and
+        (instance_assessment_resource_assigned ?course_instance ?assessment_resource)
+      )
+    :effect
+      (and
+        (assessment_resource_available ?assessment_resource)
+        (not
+          (instance_assessment_resource_assigned ?course_instance ?assessment_resource)
+        )
+      )
+  )
+  (:action assign_exam_board_approval_to_instance
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (exam_board_approval_available ?exam_board_approval)
+      )
+    :effect
+      (and
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (not
+          (exam_board_approval_available ?exam_board_approval)
+        )
+      )
+  )
+  (:action revoke_exam_board_approval_from_instance
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval)
+    :precondition
+      (and
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+      )
+    :effect
+      (and
+        (exam_board_approval_available ?exam_board_approval)
+        (not
+          (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        )
+      )
+  )
+  (:action propagate_exam_slot_candidate
+    :parameters (?course_offering - course_offering ?exam_time_slot - exam_time_slot ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_offering)
+        (reserved_meeting_slot ?course_offering ?meeting_time_slot)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (not
+          (exam_slot_marked_by_component ?exam_time_slot)
+        )
+        (not
+          (exam_slot_marked_by_resource ?exam_time_slot)
+        )
+      )
+    :effect (exam_slot_marked_by_component ?exam_time_slot)
+  )
+  (:action confirm_exam_slot_for_offering_by_instructor
+    :parameters (?course_offering - course_offering ?exam_time_slot - exam_time_slot ?instructor - instructor)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_offering)
+        (assigned_instructor_to_entity ?course_offering ?instructor)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (exam_slot_marked_by_component ?exam_time_slot)
+        (not
+          (offering_ready ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_ready ?course_offering)
+        (offering_confirmed ?course_offering)
+      )
+  )
+  (:action allocate_resource_candidate_to_offering
+    :parameters (?course_offering - course_offering ?exam_time_slot - exam_time_slot ?exam_resource_candidate - exam_resource_candidate)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_offering)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (exam_resource_candidate_available ?exam_resource_candidate)
+        (not
+          (offering_ready ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (exam_slot_marked_by_resource ?exam_time_slot)
+        (offering_ready ?course_offering)
+        (offering_allocated_resource_candidate ?course_offering ?exam_resource_candidate)
+        (not
+          (exam_resource_candidate_available ?exam_resource_candidate)
+        )
+      )
+  )
+  (:action finalize_resource_and_confirm_offering
+    :parameters (?course_offering - course_offering ?exam_time_slot - exam_time_slot ?meeting_time_slot - meeting_time_slot ?exam_resource_candidate - exam_resource_candidate)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_offering)
+        (reserved_meeting_slot ?course_offering ?meeting_time_slot)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (exam_slot_marked_by_resource ?exam_time_slot)
+        (offering_allocated_resource_candidate ?course_offering ?exam_resource_candidate)
+        (not
+          (offering_confirmed ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (exam_slot_marked_by_component ?exam_time_slot)
+        (offering_confirmed ?course_offering)
+        (exam_resource_candidate_available ?exam_resource_candidate)
+        (not
+          (offering_allocated_resource_candidate ?course_offering ?exam_resource_candidate)
+        )
+      )
+  )
+  (:action propagate_room_slot_candidate
+    :parameters (?course_component - course_component ?room - room ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_component)
+        (reserved_meeting_slot ?course_component ?meeting_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (not
+          (room_marked_by_component ?room)
+        )
+        (not
+          (room_marked_by_resource ?room)
+        )
+      )
+    :effect (room_marked_by_component ?room)
+  )
+  (:action confirm_component_room_by_instructor
+    :parameters (?course_component - course_component ?room - room ?instructor - instructor)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_component)
+        (assigned_instructor_to_entity ?course_component ?instructor)
+        (component_candidate_room ?course_component ?room)
+        (room_marked_by_component ?room)
+        (not
+          (component_ready ?course_component)
+        )
+      )
+    :effect
+      (and
+        (component_ready ?course_component)
+        (component_confirmed ?course_component)
+      )
+  )
+  (:action allocate_resource_candidate_to_component
+    :parameters (?course_component - course_component ?room - room ?exam_resource_candidate - exam_resource_candidate)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_component)
+        (component_candidate_room ?course_component ?room)
+        (exam_resource_candidate_available ?exam_resource_candidate)
+        (not
+          (component_ready ?course_component)
+        )
+      )
+    :effect
+      (and
+        (room_marked_by_resource ?room)
+        (component_ready ?course_component)
+        (component_allocated_resource_candidate ?course_component ?exam_resource_candidate)
+        (not
+          (exam_resource_candidate_available ?exam_resource_candidate)
+        )
+      )
+  )
+  (:action finalize_resource_and_confirm_component
+    :parameters (?course_component - course_component ?room - room ?meeting_time_slot - meeting_time_slot ?exam_resource_candidate - exam_resource_candidate)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_component)
+        (reserved_meeting_slot ?course_component ?meeting_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (room_marked_by_resource ?room)
+        (component_allocated_resource_candidate ?course_component ?exam_resource_candidate)
+        (not
+          (component_confirmed ?course_component)
+        )
+      )
+    :effect
+      (and
+        (room_marked_by_component ?room)
+        (component_confirmed ?course_component)
+        (exam_resource_candidate_available ?exam_resource_candidate)
+        (not
+          (component_allocated_resource_candidate ?course_component ?exam_resource_candidate)
+        )
+      )
+  )
+  (:action propose_exam_session
+    :parameters (?course_offering - course_offering ?course_component - course_component ?exam_time_slot - exam_time_slot ?room - room ?exam_session - exam_session)
+    :precondition
+      (and
+        (offering_ready ?course_offering)
+        (component_ready ?course_component)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (exam_slot_marked_by_component ?exam_time_slot)
+        (room_marked_by_component ?room)
+        (offering_confirmed ?course_offering)
+        (component_confirmed ?course_component)
+        (session_slot_available ?exam_session)
+      )
+    :effect
+      (and
+        (session_allocated ?exam_session)
+        (session_assigned_time_slot ?exam_session ?exam_time_slot)
+        (session_assigned_room ?exam_session ?room)
+        (not
+          (session_slot_available ?exam_session)
+        )
+      )
+  )
+  (:action propose_exam_session_requires_equipment
+    :parameters (?course_offering - course_offering ?course_component - course_component ?exam_time_slot - exam_time_slot ?room - room ?exam_session - exam_session)
+    :precondition
+      (and
+        (offering_ready ?course_offering)
+        (component_ready ?course_component)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (exam_slot_marked_by_resource ?exam_time_slot)
+        (room_marked_by_component ?room)
+        (not
+          (offering_confirmed ?course_offering)
+        )
+        (component_confirmed ?course_component)
+        (session_slot_available ?exam_session)
+      )
+    :effect
+      (and
+        (session_allocated ?exam_session)
+        (session_assigned_time_slot ?exam_session ?exam_time_slot)
+        (session_assigned_room ?exam_session ?room)
+        (session_requires_special_equipment ?exam_session)
+        (not
+          (session_slot_available ?exam_session)
+        )
+      )
+  )
+  (:action propose_exam_session_requires_invigilator
+    :parameters (?course_offering - course_offering ?course_component - course_component ?exam_time_slot - exam_time_slot ?room - room ?exam_session - exam_session)
+    :precondition
+      (and
+        (offering_ready ?course_offering)
+        (component_ready ?course_component)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (exam_slot_marked_by_component ?exam_time_slot)
+        (room_marked_by_resource ?room)
+        (offering_confirmed ?course_offering)
+        (not
+          (component_confirmed ?course_component)
+        )
+        (session_slot_available ?exam_session)
+      )
+    :effect
+      (and
+        (session_allocated ?exam_session)
+        (session_assigned_time_slot ?exam_session ?exam_time_slot)
+        (session_assigned_room ?exam_session ?room)
+        (session_requires_invigilator ?exam_session)
+        (not
+          (session_slot_available ?exam_session)
+        )
+      )
+  )
+  (:action propose_exam_session_requires_equipment_and_invigilator
+    :parameters (?course_offering - course_offering ?course_component - course_component ?exam_time_slot - exam_time_slot ?room - room ?exam_session - exam_session)
+    :precondition
+      (and
+        (offering_ready ?course_offering)
+        (component_ready ?course_component)
+        (offering_candidate_exam_slot ?course_offering ?exam_time_slot)
+        (component_candidate_room ?course_component ?room)
+        (exam_slot_marked_by_resource ?exam_time_slot)
+        (room_marked_by_resource ?room)
+        (not
+          (offering_confirmed ?course_offering)
+        )
+        (not
+          (component_confirmed ?course_component)
+        )
+        (session_slot_available ?exam_session)
+      )
+    :effect
+      (and
+        (session_allocated ?exam_session)
+        (session_assigned_time_slot ?exam_session ?exam_time_slot)
+        (session_assigned_room ?exam_session ?room)
+        (session_requires_special_equipment ?exam_session)
+        (session_requires_invigilator ?exam_session)
+        (not
+          (session_slot_available ?exam_session)
+        )
+      )
+  )
+  (:action lock_exam_session_time
+    :parameters (?exam_session - exam_session ?course_offering - course_offering ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (session_allocated ?exam_session)
+        (offering_ready ?course_offering)
+        (reserved_meeting_slot ?course_offering ?meeting_time_slot)
+        (not
+          (session_time_locked ?exam_session)
+        )
+      )
+    :effect (session_time_locked ?exam_session)
+  )
+  (:action assign_invigilator_to_instance_session
+    :parameters (?course_instance - course_instance ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (instance_assigned_session ?course_instance ?exam_session)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_available ?invigilator)
+        (session_allocated ?exam_session)
+        (session_time_locked ?exam_session)
+        (not
+          (invigilator_assigned ?invigilator)
+        )
+      )
+    :effect
+      (and
+        (invigilator_assigned ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (not
+          (invigilator_available ?invigilator)
+        )
+      )
+  )
+  (:action prepare_instance_resource_pack
+    :parameters (?course_instance - course_instance ?invigilator - invigilator ?exam_session - exam_session ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (reserved_meeting_slot ?course_instance ?meeting_time_slot)
+        (not
+          (session_requires_special_equipment ?exam_session)
+        )
+        (not
+          (instance_resources_pack_ready ?course_instance)
+        )
+      )
+    :effect (instance_resources_pack_ready ?course_instance)
+  )
+  (:action request_special_equipment_for_instance
+    :parameters (?course_instance - course_instance ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (special_equipment_available ?special_equipment)
+        (not
+          (equipment_requested ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (equipment_requested ?course_instance)
+        (instance_allocated_special_equipment ?course_instance ?special_equipment)
+        (not
+          (special_equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action confirm_equipment_and_prepare_instance_resources
+    :parameters (?course_instance - course_instance ?invigilator - invigilator ?exam_session - exam_session ?meeting_time_slot - meeting_time_slot ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (reserved_meeting_slot ?course_instance ?meeting_time_slot)
+        (session_requires_special_equipment ?exam_session)
+        (equipment_requested ?course_instance)
+        (instance_allocated_special_equipment ?course_instance ?special_equipment)
+        (not
+          (instance_resources_pack_ready ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_resources_pack_ready ?course_instance)
+        (equipment_confirmed_for_instance ?course_instance)
+      )
+  )
+  (:action assign_assessment_resource_and_lock_instance_primary
+    :parameters (?course_instance - course_instance ?assessment_resource - assessment_resource ?instructor - instructor ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_pack_ready ?course_instance)
+        (instance_assessment_resource_assigned ?course_instance ?assessment_resource)
+        (assigned_instructor_to_entity ?course_instance ?instructor)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (not
+          (session_requires_invigilator ?exam_session)
+        )
+        (not
+          (instance_resources_locked ?course_instance)
+        )
+      )
+    :effect (instance_resources_locked ?course_instance)
+  )
+  (:action assign_assessment_resource_and_lock_instance_secondary
+    :parameters (?course_instance - course_instance ?assessment_resource - assessment_resource ?instructor - instructor ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_pack_ready ?course_instance)
+        (instance_assessment_resource_assigned ?course_instance ?assessment_resource)
+        (assigned_instructor_to_entity ?course_instance ?instructor)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (session_requires_invigilator ?exam_session)
+        (not
+          (instance_resources_locked ?course_instance)
+        )
+      )
+    :effect (instance_resources_locked ?course_instance)
+  )
+  (:action apply_exam_board_approval_and_mark_instance
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_locked ?course_instance)
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (not
+          (session_requires_special_equipment ?exam_session)
+        )
+        (not
+          (session_requires_invigilator ?exam_session)
+        )
+        (not
+          (instance_admin_approved ?course_instance)
+        )
+      )
+    :effect (instance_admin_approved ?course_instance)
+  )
+  (:action apply_exam_board_approval_and_mark_instance_with_confirmation
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_locked ?course_instance)
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (session_requires_special_equipment ?exam_session)
+        (not
+          (session_requires_invigilator ?exam_session)
+        )
+        (not
+          (instance_admin_approved ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_ready_for_assessment_mode_assignment ?course_instance)
+      )
+  )
+  (:action apply_exam_board_approval_and_mark_instance_variant
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_locked ?course_instance)
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (not
+          (session_requires_special_equipment ?exam_session)
+        )
+        (session_requires_invigilator ?exam_session)
+        (not
+          (instance_admin_approved ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_ready_for_assessment_mode_assignment ?course_instance)
+      )
+  )
+  (:action apply_exam_board_approval_and_mark_instance_alternate
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval ?invigilator - invigilator ?exam_session - exam_session)
+    :precondition
+      (and
+        (instance_resources_locked ?course_instance)
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (instance_allocated_invigilator_candidate ?course_instance ?invigilator)
+        (invigilator_assigned_to_session ?invigilator ?exam_session)
+        (session_requires_special_equipment ?exam_session)
+        (session_requires_invigilator ?exam_session)
+        (not
+          (instance_admin_approved ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_ready_for_assessment_mode_assignment ?course_instance)
+      )
+  )
+  (:action finalize_instance_administratively
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (instance_admin_approved ?course_instance)
+        (not
+          (instance_ready_for_assessment_mode_assignment ?course_instance)
+        )
+        (not
+          (instance_finalization_locked ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_locked ?course_instance)
+        (entity_administratively_cleared ?course_instance)
+      )
+  )
+  (:action assign_assessment_mode_to_instance
+    :parameters (?course_instance - course_instance ?assessment_mode - assessment_mode)
+    :precondition
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_ready_for_assessment_mode_assignment ?course_instance)
+        (assessment_mode_available ?assessment_mode)
+      )
+    :effect
+      (and
+        (instance_assessment_mode_assigned ?course_instance ?assessment_mode)
+        (not
+          (assessment_mode_available ?assessment_mode)
+        )
+      )
+  )
+  (:action obtain_administrative_compliance_for_instance
+    :parameters (?course_instance - course_instance ?course_offering - course_offering ?course_component - course_component ?meeting_time_slot - meeting_time_slot ?assessment_mode - assessment_mode)
+    :precondition
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_ready_for_assessment_mode_assignment ?course_instance)
+        (instance_assessment_mode_assigned ?course_instance ?assessment_mode)
+        (instance_includes_offering ?course_instance ?course_offering)
+        (instance_includes_component ?course_instance ?course_component)
+        (offering_confirmed ?course_offering)
+        (component_confirmed ?course_component)
+        (reserved_meeting_slot ?course_instance ?meeting_time_slot)
+        (not
+          (instance_resources_confirmed ?course_instance)
+        )
+      )
+    :effect (instance_resources_confirmed ?course_instance)
+  )
+  (:action finalize_instance_after_compliance
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (instance_admin_approved ?course_instance)
+        (instance_resources_confirmed ?course_instance)
+        (not
+          (instance_finalization_locked ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_locked ?course_instance)
+        (entity_administratively_cleared ?course_instance)
+      )
+  )
+  (:action request_departmental_override_for_instance
+    :parameters (?course_instance - course_instance ?departmental_override - departmental_override ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (exam_allocation_eligible ?course_instance)
+        (reserved_meeting_slot ?course_instance ?meeting_time_slot)
+        (departmental_override_available ?departmental_override)
+        (instance_has_departmental_override ?course_instance ?departmental_override)
+        (not
+          (instance_override_requested ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_override_requested ?course_instance)
+        (not
+          (departmental_override_available ?departmental_override)
+        )
+      )
+  )
+  (:action instructor_approve_override_for_instance
+    :parameters (?course_instance - course_instance ?instructor - instructor)
+    :precondition
+      (and
+        (instance_override_requested ?course_instance)
+        (assigned_instructor_to_entity ?course_instance ?instructor)
+        (not
+          (instructor_override_approved ?course_instance)
+        )
+      )
+    :effect (instructor_override_approved ?course_instance)
+  )
+  (:action record_exam_board_approval_for_instance
+    :parameters (?course_instance - course_instance ?exam_board_approval - exam_board_approval)
+    :precondition
+      (and
+        (instructor_override_approved ?course_instance)
+        (instance_exam_board_approval_assigned ?course_instance ?exam_board_approval)
+        (not
+          (exam_board_approval_recorded ?course_instance)
+        )
+      )
+    :effect (exam_board_approval_recorded ?course_instance)
+  )
+  (:action finalize_instance_post_exam_board
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (exam_board_approval_recorded ?course_instance)
+        (not
+          (instance_finalization_locked ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_locked ?course_instance)
+        (entity_administratively_cleared ?course_instance)
+      )
+  )
+  (:action finalize_offering_enrollment
+    :parameters (?course_offering - course_offering ?exam_session - exam_session)
+    :precondition
+      (and
+        (offering_ready ?course_offering)
+        (offering_confirmed ?course_offering)
+        (session_allocated ?exam_session)
+        (session_time_locked ?exam_session)
+        (not
+          (entity_administratively_cleared ?course_offering)
+        )
+      )
+    :effect (entity_administratively_cleared ?course_offering)
+  )
+  (:action finalize_component_enrollment
+    :parameters (?course_component - course_component ?exam_session - exam_session)
+    :precondition
+      (and
+        (component_ready ?course_component)
+        (component_confirmed ?course_component)
+        (session_allocated ?exam_session)
+        (session_time_locked ?exam_session)
+        (not
+          (entity_administratively_cleared ?course_component)
+        )
+      )
+    :effect (entity_administratively_cleared ?course_component)
+  )
+  (:action request_student_accommodation
+    :parameters (?student - student ?student_accommodation_token - student_accommodation_token ?meeting_time_slot - meeting_time_slot)
+    :precondition
+      (and
+        (entity_administratively_cleared ?student)
+        (reserved_meeting_slot ?student ?meeting_time_slot)
+        (accommodation_token_available ?student_accommodation_token)
+        (not
+          (entity_accommodation_assigned ?student)
+        )
+      )
+    :effect
+      (and
+        (entity_accommodation_assigned ?student)
+        (entity_accommodation_token_assigned ?student ?student_accommodation_token)
+        (not
+          (accommodation_token_available ?student_accommodation_token)
+        )
+      )
+  )
+  (:action commit_offering_assignment_and_release_section
+    :parameters (?course_offering - course_offering ?section - section ?student_accommodation_token - student_accommodation_token)
+    :precondition
+      (and
+        (entity_accommodation_assigned ?course_offering)
+        (entity_assigned_to_section ?course_offering ?section)
+        (entity_accommodation_token_assigned ?course_offering ?student_accommodation_token)
+        (not
+          (entity_finalized_for_exam ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_exam ?course_offering)
+        (section_available ?section)
+        (accommodation_token_available ?student_accommodation_token)
+      )
+  )
+  (:action commit_component_assignment_and_release_section
+    :parameters (?course_component - course_component ?section - section ?student_accommodation_token - student_accommodation_token)
+    :precondition
+      (and
+        (entity_accommodation_assigned ?course_component)
+        (entity_assigned_to_section ?course_component ?section)
+        (entity_accommodation_token_assigned ?course_component ?student_accommodation_token)
+        (not
+          (entity_finalized_for_exam ?course_component)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_exam ?course_component)
+        (section_available ?section)
+        (accommodation_token_available ?student_accommodation_token)
+      )
+  )
+  (:action commit_instance_assignment_and_release_section
+    :parameters (?course_instance - course_instance ?section - section ?student_accommodation_token - student_accommodation_token)
+    :precondition
+      (and
+        (entity_accommodation_assigned ?course_instance)
+        (entity_assigned_to_section ?course_instance ?section)
+        (entity_accommodation_token_assigned ?course_instance ?student_accommodation_token)
+        (not
+          (entity_finalized_for_exam ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_exam ?course_instance)
+        (section_available ?section)
+        (accommodation_token_available ?student_accommodation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem final_exam_preserving_course_selection_problem)
+  (:domain final_exam_window_preserving_course_selection_domain)
+  (:objects course_offering_1 - course_offering course_component_1 - course_component course_instance_1 - course_instance course_instance_2 - course_instance section_101 - section section_102 - section section_103 - section meeting_time_slot_1 - meeting_time_slot instructor_1 - instructor exam_resource_candidate_1 - exam_resource_candidate exam_time_slot_1 - exam_time_slot room_101 - room exam_session_1 - exam_session invigilator_1 - invigilator invigilator_2 - invigilator special_equipment_1 - special_equipment special_equipment_2 - special_equipment assessment_mode_in_person - assessment_mode assessment_mode_remote - assessment_mode accommodation_token_1 - student_accommodation_token assessment_resource_1 - assessment_resource dept_override_1 - departmental_override dept_override_2 - departmental_override exam_board_approval_1 - exam_board_approval)
+  (:init
+    (section_available section_101)
+    (section_available section_102)
+    (section_available section_103)
+    (meeting_slot_available meeting_time_slot_1)
+    (instructor_available instructor_1)
+    (exam_resource_candidate_available exam_resource_candidate_1)
+    (offering_candidate_exam_slot course_offering_1 exam_time_slot_1)
+    (component_candidate_room course_component_1 room_101)
+    (session_slot_available exam_session_1)
+    (invigilator_available invigilator_1)
+    (invigilator_available invigilator_2)
+    (instance_includes_offering course_instance_1 course_offering_1)
+    (instance_includes_offering course_instance_2 course_offering_1)
+    (instance_includes_component course_instance_1 course_component_1)
+    (instance_includes_component course_instance_2 course_component_1)
+    (instance_assigned_session course_instance_1 exam_session_1)
+    (instance_assigned_session course_instance_2 exam_session_1)
+    (instance_allocated_invigilator_candidate course_instance_1 invigilator_1)
+    (instance_allocated_invigilator_candidate course_instance_2 invigilator_2)
+    (special_equipment_available special_equipment_1)
+    (special_equipment_available special_equipment_2)
+    (assessment_mode_available assessment_mode_in_person)
+    (assessment_mode_available assessment_mode_remote)
+    (accommodation_token_available accommodation_token_1)
+    (assessment_resource_available assessment_resource_1)
+    (departmental_override_available dept_override_1)
+    (instance_has_departmental_override course_instance_1 dept_override_1)
+    (instance_has_departmental_override course_instance_2 dept_override_2)
+    (exam_board_approval_available exam_board_approval_1)
+  )
+  (:goal
+    (and
+      (entity_finalized_for_exam course_offering_1)
+      (entity_finalized_for_exam course_component_1)
+      (entity_finalized_for_exam course_instance_1)
+      (entity_finalized_for_exam course_instance_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_course_selection course_offering_1)
+(select_section course_offering_1 section_101)
+(reserve_meeting_time_slot course_offering_1 meeting_time_slot_1)
+(confirm_meeting_time_selection course_offering_1 meeting_time_slot_1)
+(allocate_resource_candidate_to_offering course_offering_1 exam_time_slot_1 exam_resource_candidate_1)
+(finalize_resource_and_confirm_offering course_offering_1 exam_time_slot_1 meeting_time_slot_1 exam_resource_candidate_1)
+(release_meeting_time_slot course_offering_1 meeting_time_slot_1)
+(initiate_course_selection course_component_1)
+(select_section course_component_1 section_102)
+(reserve_meeting_time_slot course_component_1 meeting_time_slot_1)
+(confirm_meeting_time_selection course_component_1 meeting_time_slot_1)
+(allocate_resource_candidate_to_component course_component_1 room_101 exam_resource_candidate_1)
+(finalize_resource_and_confirm_component course_component_1 room_101 meeting_time_slot_1 exam_resource_candidate_1)
+(propose_exam_session course_offering_1 course_component_1 exam_time_slot_1 room_101 exam_session_1)
+(release_meeting_time_slot course_component_1 meeting_time_slot_1)
+(reserve_meeting_time_slot course_offering_1 meeting_time_slot_1)
+(lock_exam_session_time exam_session_1 course_offering_1 meeting_time_slot_1)
+(finalize_offering_enrollment course_offering_1 exam_session_1)
+(request_student_accommodation course_offering_1 accommodation_token_1 meeting_time_slot_1)
+(commit_offering_assignment_and_release_section course_offering_1 section_101 accommodation_token_1)
+(release_meeting_time_slot course_offering_1 meeting_time_slot_1)
+(finalize_component_enrollment course_component_1 exam_session_1)
+(reserve_meeting_time_slot course_component_1 meeting_time_slot_1)
+(request_student_accommodation course_component_1 accommodation_token_1 meeting_time_slot_1)
+(commit_component_assignment_and_release_section course_component_1 section_102 accommodation_token_1)
+(release_meeting_time_slot course_component_1 meeting_time_slot_1)
+(initiate_course_selection course_instance_1)
+(select_section course_instance_1 section_101)
+(reserve_meeting_time_slot course_instance_1 meeting_time_slot_1)
+(confirm_meeting_time_selection course_instance_1 meeting_time_slot_1)
+(assign_invigilator_to_instance_session course_instance_1 invigilator_1 exam_session_1)
+(prepare_instance_resource_pack course_instance_1 invigilator_1 exam_session_1 meeting_time_slot_1)
+(assign_instructor_to_student course_instance_1 instructor_1)
+(assign_assessment_resource_to_instance course_instance_1 assessment_resource_1)
+(assign_assessment_resource_and_lock_instance_primary course_instance_1 assessment_resource_1 instructor_1 invigilator_1 exam_session_1)
+(assign_exam_board_approval_to_instance course_instance_1 exam_board_approval_1)
+(apply_exam_board_approval_and_mark_instance course_instance_1 exam_board_approval_1 invigilator_1 exam_session_1)
+(finalize_instance_administratively course_instance_1)
+(request_student_accommodation course_instance_1 accommodation_token_1 meeting_time_slot_1)
+(commit_instance_assignment_and_release_section course_instance_1 section_101 accommodation_token_1)
+(release_meeting_time_slot course_instance_1 meeting_time_slot_1)
+(initiate_course_selection course_instance_2)
+(select_section course_instance_2 section_102)
+(reserve_meeting_time_slot course_instance_2 meeting_time_slot_1)
+(confirm_meeting_time_selection course_instance_2 meeting_time_slot_1)
+(assign_invigilator_to_instance_session course_instance_2 invigilator_2 exam_session_1)
+(prepare_instance_resource_pack course_instance_2 invigilator_2 exam_session_1 meeting_time_slot_1)
+(unassign_instructor_from_student course_instance_1 instructor_1)
+(assign_instructor_to_student course_instance_2 instructor_1)
+(unassign_assessment_resource_from_instance course_instance_1 assessment_resource_1)
+(assign_assessment_resource_to_instance course_instance_2 assessment_resource_1)
+(assign_assessment_resource_and_lock_instance_primary course_instance_2 assessment_resource_1 instructor_1 invigilator_2 exam_session_1)
+(revoke_exam_board_approval_from_instance course_instance_1 exam_board_approval_1)
+(assign_exam_board_approval_to_instance course_instance_2 exam_board_approval_1)
+(apply_exam_board_approval_and_mark_instance course_instance_2 exam_board_approval_1 invigilator_2 exam_session_1)
+(finalize_instance_administratively course_instance_2)
+(request_student_accommodation course_instance_2 accommodation_token_1 meeting_time_slot_1)
+(commit_instance_assignment_and_release_section course_instance_2 section_102 accommodation_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_rdbtjpvm/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_rdbtjpvm/plan.pddl 58 
+
+
+
+--- stderr ---
+

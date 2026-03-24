@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain loan_offer_structuring_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object document_type - object exposure_type - object case_root - object loan_case - case_root approval_resource - resource_type pricing_model - resource_type product_term_template - resource_type consent_document - resource_type execution_method - resource_type funding_profile - resource_type pricing_adjustment - resource_type external_approval_token - resource_type collateral_asset_template - document_type security_document_template - document_type internal_approval_token - document_type exposure_profile_primary - exposure_type exposure_profile_secondary - exposure_type loan_offer_package - exposure_type borrower_role_group - loan_case offer_role_group - loan_case primary_party - borrower_role_group secondary_party - borrower_role_group offer_structuring_instance - offer_role_group)
+  (:predicates
+    (loan_case_registered ?loan_case - loan_case)
+    (structuring_initiated_for_entity ?loan_case - loan_case)
+    (approval_allocated ?loan_case - loan_case)
+    (offer_activated ?loan_case - loan_case)
+    (ready_for_execution_flag_for_entity ?loan_case - loan_case)
+    (activation_authorized_for_entity ?loan_case - loan_case)
+    (approval_resource_available ?approval_resource - approval_resource)
+    (assigned_approval_resource_to_entity ?loan_case - loan_case ?approval_resource - approval_resource)
+    (pricing_model_available ?pricing_model - pricing_model)
+    (pricing_attached_to_entity ?loan_case - loan_case ?pricing_model - pricing_model)
+    (product_term_template_available ?product_term_template - product_term_template)
+    (product_term_attached_to_entity ?loan_case - loan_case ?product_term_template - product_term_template)
+    (collateral_template_available ?collateral_asset_template - collateral_asset_template)
+    (collateral_attached_to_primary ?primary_party - primary_party ?collateral_asset_template - collateral_asset_template)
+    (collateral_attached_to_secondary ?secondary_party - secondary_party ?collateral_asset_template - collateral_asset_template)
+    (primary_exposure_profile_assigned ?primary_party - primary_party ?exposure_profile_primary - exposure_profile_primary)
+    (exposure_provisional_primary ?exposure_profile_primary - exposure_profile_primary)
+    (exposure_committed_primary ?exposure_profile_primary - exposure_profile_primary)
+    (primary_exposure_committed ?primary_party - primary_party)
+    (secondary_exposure_profile_assigned ?secondary_party - secondary_party ?exposure_profile_secondary - exposure_profile_secondary)
+    (exposure_provisional_secondary ?exposure_profile_secondary - exposure_profile_secondary)
+    (exposure_committed_secondary ?exposure_profile_secondary - exposure_profile_secondary)
+    (secondary_exposure_committed ?secondary_party - secondary_party)
+    (loan_offer_package_available ?loan_offer_package - loan_offer_package)
+    (loan_offer_package_allocated ?loan_offer_package - loan_offer_package)
+    (loan_offer_package_linked_to_primary_exposure ?loan_offer_package - loan_offer_package ?exposure_profile_primary - exposure_profile_primary)
+    (loan_offer_package_linked_to_secondary_exposure ?loan_offer_package - loan_offer_package ?exposure_profile_secondary - exposure_profile_secondary)
+    (loan_offer_package_primary_tranche_flag ?loan_offer_package - loan_offer_package)
+    (loan_offer_package_secondary_tranche_flag ?loan_offer_package - loan_offer_package)
+    (loan_offer_package_finalized ?loan_offer_package - loan_offer_package)
+    (structuring_instance_has_primary ?offer_structuring_instance - offer_structuring_instance ?primary_party - primary_party)
+    (structuring_instance_has_secondary ?offer_structuring_instance - offer_structuring_instance ?secondary_party - secondary_party)
+    (structuring_instance_linked_package ?offer_structuring_instance - offer_structuring_instance ?loan_offer_package - loan_offer_package)
+    (security_doc_template_available ?security_document_template - security_document_template)
+    (structuring_instance_has_security_template ?offer_structuring_instance - offer_structuring_instance ?security_document_template - security_document_template)
+    (security_document_instantiated ?security_document_template - security_document_template)
+    (document_bound_to_package ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    (documents_bound_to_structuring_instance ?offer_structuring_instance - offer_structuring_instance)
+    (pricing_adjustment_committed ?offer_structuring_instance - offer_structuring_instance)
+    (structuring_instance_ready_for_final_checks ?offer_structuring_instance - offer_structuring_instance)
+    (consent_document_attached ?offer_structuring_instance - offer_structuring_instance)
+    (consent_document_acknowledged ?offer_structuring_instance - offer_structuring_instance)
+    (execution_method_required ?offer_structuring_instance - offer_structuring_instance)
+    (execution_method_attachment_confirmed ?offer_structuring_instance - offer_structuring_instance)
+    (internal_approval_token_available ?internal_approval_token - internal_approval_token)
+    (internal_approval_staged_for_binding ?offer_structuring_instance - offer_structuring_instance ?internal_approval_token - internal_approval_token)
+    (internal_approval_bound ?offer_structuring_instance - offer_structuring_instance)
+    (internal_approval_recorded ?offer_structuring_instance - offer_structuring_instance)
+    (external_approval_recorded ?offer_structuring_instance - offer_structuring_instance)
+    (consent_document_template_available ?consent_document - consent_document)
+    (structuring_instance_has_consent_document ?offer_structuring_instance - offer_structuring_instance ?consent_document - consent_document)
+    (execution_method_available ?execution_method - execution_method)
+    (execution_method_attached_to_structuring_instance ?offer_structuring_instance - offer_structuring_instance ?execution_method - execution_method)
+    (pricing_adjustment_available ?pricing_adjustment - pricing_adjustment)
+    (pricing_adjustment_attached ?offer_structuring_instance - offer_structuring_instance ?pricing_adjustment - pricing_adjustment)
+    (external_approval_token_available ?external_approval_token - external_approval_token)
+    (external_approval_attached ?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token)
+    (funding_profile_available ?funding_profile - funding_profile)
+    (funding_profile_assigned_to_entity ?loan_case - loan_case ?funding_profile - funding_profile)
+    (primary_ready_for_offer_assembly ?primary_party - primary_party)
+    (secondary_ready_for_offer_assembly ?secondary_party - secondary_party)
+    (structuring_instance_finalized ?offer_structuring_instance - offer_structuring_instance)
+  )
+  (:action register_loan_case
+    :parameters (?loan_case - loan_case)
+    :precondition
+      (and
+        (not
+          (loan_case_registered ?loan_case)
+        )
+        (not
+          (offer_activated ?loan_case)
+        )
+      )
+    :effect (loan_case_registered ?loan_case)
+  )
+  (:action assign_approval_resource_to_case
+    :parameters (?loan_case - loan_case ?approval_resource - approval_resource)
+    :precondition
+      (and
+        (loan_case_registered ?loan_case)
+        (not
+          (approval_allocated ?loan_case)
+        )
+        (approval_resource_available ?approval_resource)
+      )
+    :effect
+      (and
+        (approval_allocated ?loan_case)
+        (assigned_approval_resource_to_entity ?loan_case ?approval_resource)
+        (not
+          (approval_resource_available ?approval_resource)
+        )
+      )
+  )
+  (:action attach_pricing_model_to_case
+    :parameters (?loan_case - loan_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (loan_case_registered ?loan_case)
+        (approval_allocated ?loan_case)
+        (pricing_model_available ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_attached_to_entity ?loan_case ?pricing_model)
+        (not
+          (pricing_model_available ?pricing_model)
+        )
+      )
+  )
+  (:action confirm_pricing_and_initiate_structuring
+    :parameters (?loan_case - loan_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (loan_case_registered ?loan_case)
+        (approval_allocated ?loan_case)
+        (pricing_attached_to_entity ?loan_case ?pricing_model)
+        (not
+          (structuring_initiated_for_entity ?loan_case)
+        )
+      )
+    :effect (structuring_initiated_for_entity ?loan_case)
+  )
+  (:action release_pricing_model_from_case
+    :parameters (?loan_case - loan_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (pricing_attached_to_entity ?loan_case ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_available ?pricing_model)
+        (not
+          (pricing_attached_to_entity ?loan_case ?pricing_model)
+        )
+      )
+  )
+  (:action bind_product_term_to_case
+    :parameters (?loan_case - loan_case ?product_term_template - product_term_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?loan_case)
+        (product_term_template_available ?product_term_template)
+      )
+    :effect
+      (and
+        (product_term_attached_to_entity ?loan_case ?product_term_template)
+        (not
+          (product_term_template_available ?product_term_template)
+        )
+      )
+  )
+  (:action release_product_term_from_case
+    :parameters (?loan_case - loan_case ?product_term_template - product_term_template)
+    :precondition
+      (and
+        (product_term_attached_to_entity ?loan_case ?product_term_template)
+      )
+    :effect
+      (and
+        (product_term_template_available ?product_term_template)
+        (not
+          (product_term_attached_to_entity ?loan_case ?product_term_template)
+        )
+      )
+  )
+  (:action attach_pricing_adjustment_to_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?pricing_adjustment - pricing_adjustment)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (pricing_adjustment_available ?pricing_adjustment)
+      )
+    :effect
+      (and
+        (pricing_adjustment_attached ?offer_structuring_instance ?pricing_adjustment)
+        (not
+          (pricing_adjustment_available ?pricing_adjustment)
+        )
+      )
+  )
+  (:action release_pricing_adjustment_from_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?pricing_adjustment - pricing_adjustment)
+    :precondition
+      (and
+        (pricing_adjustment_attached ?offer_structuring_instance ?pricing_adjustment)
+      )
+    :effect
+      (and
+        (pricing_adjustment_available ?pricing_adjustment)
+        (not
+          (pricing_adjustment_attached ?offer_structuring_instance ?pricing_adjustment)
+        )
+      )
+  )
+  (:action attach_external_approval_token
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (external_approval_token_available ?external_approval_token)
+      )
+    :effect
+      (and
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (not
+          (external_approval_token_available ?external_approval_token)
+        )
+      )
+  )
+  (:action release_external_approval_token
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token)
+    :precondition
+      (and
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+      )
+    :effect
+      (and
+        (external_approval_token_available ?external_approval_token)
+        (not
+          (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        )
+      )
+  )
+  (:action provisionally_assign_primary_exposure_profile
+    :parameters (?primary_party - primary_party ?exposure_profile_primary - exposure_profile_primary ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?primary_party)
+        (pricing_attached_to_entity ?primary_party ?pricing_model)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (not
+          (exposure_provisional_primary ?exposure_profile_primary)
+        )
+        (not
+          (exposure_committed_primary ?exposure_profile_primary)
+        )
+      )
+    :effect (exposure_provisional_primary ?exposure_profile_primary)
+  )
+  (:action confirm_primary_exposure_profile
+    :parameters (?primary_party - primary_party ?exposure_profile_primary - exposure_profile_primary ?product_term_template - product_term_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?primary_party)
+        (product_term_attached_to_entity ?primary_party ?product_term_template)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (exposure_provisional_primary ?exposure_profile_primary)
+        (not
+          (primary_ready_for_offer_assembly ?primary_party)
+        )
+      )
+    :effect
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (primary_exposure_committed ?primary_party)
+      )
+  )
+  (:action attach_collateral_to_primary
+    :parameters (?primary_party - primary_party ?exposure_profile_primary - exposure_profile_primary ?collateral_asset_template - collateral_asset_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?primary_party)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (collateral_template_available ?collateral_asset_template)
+        (not
+          (primary_ready_for_offer_assembly ?primary_party)
+        )
+      )
+    :effect
+      (and
+        (exposure_committed_primary ?exposure_profile_primary)
+        (primary_ready_for_offer_assembly ?primary_party)
+        (collateral_attached_to_primary ?primary_party ?collateral_asset_template)
+        (not
+          (collateral_template_available ?collateral_asset_template)
+        )
+      )
+  )
+  (:action finalize_primary_exposure_and_collateral
+    :parameters (?primary_party - primary_party ?exposure_profile_primary - exposure_profile_primary ?pricing_model - pricing_model ?collateral_asset_template - collateral_asset_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?primary_party)
+        (pricing_attached_to_entity ?primary_party ?pricing_model)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (exposure_committed_primary ?exposure_profile_primary)
+        (collateral_attached_to_primary ?primary_party ?collateral_asset_template)
+        (not
+          (primary_exposure_committed ?primary_party)
+        )
+      )
+    :effect
+      (and
+        (exposure_provisional_primary ?exposure_profile_primary)
+        (primary_exposure_committed ?primary_party)
+        (collateral_template_available ?collateral_asset_template)
+        (not
+          (collateral_attached_to_primary ?primary_party ?collateral_asset_template)
+        )
+      )
+  )
+  (:action provisionally_assign_secondary_exposure_profile
+    :parameters (?secondary_party - secondary_party ?exposure_profile_secondary - exposure_profile_secondary ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?secondary_party)
+        (pricing_attached_to_entity ?secondary_party ?pricing_model)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (not
+          (exposure_provisional_secondary ?exposure_profile_secondary)
+        )
+        (not
+          (exposure_committed_secondary ?exposure_profile_secondary)
+        )
+      )
+    :effect (exposure_provisional_secondary ?exposure_profile_secondary)
+  )
+  (:action confirm_secondary_exposure_profile
+    :parameters (?secondary_party - secondary_party ?exposure_profile_secondary - exposure_profile_secondary ?product_term_template - product_term_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?secondary_party)
+        (product_term_attached_to_entity ?secondary_party ?product_term_template)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_provisional_secondary ?exposure_profile_secondary)
+        (not
+          (secondary_ready_for_offer_assembly ?secondary_party)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (secondary_exposure_committed ?secondary_party)
+      )
+  )
+  (:action attach_collateral_to_secondary
+    :parameters (?secondary_party - secondary_party ?exposure_profile_secondary - exposure_profile_secondary ?collateral_asset_template - collateral_asset_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?secondary_party)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (collateral_template_available ?collateral_asset_template)
+        (not
+          (secondary_ready_for_offer_assembly ?secondary_party)
+        )
+      )
+    :effect
+      (and
+        (exposure_committed_secondary ?exposure_profile_secondary)
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (collateral_attached_to_secondary ?secondary_party ?collateral_asset_template)
+        (not
+          (collateral_template_available ?collateral_asset_template)
+        )
+      )
+  )
+  (:action finalize_secondary_exposure_and_collateral
+    :parameters (?secondary_party - secondary_party ?exposure_profile_secondary - exposure_profile_secondary ?pricing_model - pricing_model ?collateral_asset_template - collateral_asset_template)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?secondary_party)
+        (pricing_attached_to_entity ?secondary_party ?pricing_model)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_committed_secondary ?exposure_profile_secondary)
+        (collateral_attached_to_secondary ?secondary_party ?collateral_asset_template)
+        (not
+          (secondary_exposure_committed ?secondary_party)
+        )
+      )
+    :effect
+      (and
+        (exposure_provisional_secondary ?exposure_profile_secondary)
+        (secondary_exposure_committed ?secondary_party)
+        (collateral_template_available ?collateral_asset_template)
+        (not
+          (collateral_attached_to_secondary ?secondary_party ?collateral_asset_template)
+        )
+      )
+  )
+  (:action assemble_loan_offer_package
+    :parameters (?primary_party - primary_party ?secondary_party - secondary_party ?exposure_profile_primary - exposure_profile_primary ?exposure_profile_secondary - exposure_profile_secondary ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_provisional_primary ?exposure_profile_primary)
+        (exposure_provisional_secondary ?exposure_profile_secondary)
+        (primary_exposure_committed ?primary_party)
+        (secondary_exposure_committed ?secondary_party)
+        (loan_offer_package_available ?loan_offer_package)
+      )
+    :effect
+      (and
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_linked_to_primary_exposure ?loan_offer_package ?exposure_profile_primary)
+        (loan_offer_package_linked_to_secondary_exposure ?loan_offer_package ?exposure_profile_secondary)
+        (not
+          (loan_offer_package_available ?loan_offer_package)
+        )
+      )
+  )
+  (:action assemble_loan_offer_package_mark_primary_tranche
+    :parameters (?primary_party - primary_party ?secondary_party - secondary_party ?exposure_profile_primary - exposure_profile_primary ?exposure_profile_secondary - exposure_profile_secondary ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_committed_primary ?exposure_profile_primary)
+        (exposure_provisional_secondary ?exposure_profile_secondary)
+        (not
+          (primary_exposure_committed ?primary_party)
+        )
+        (secondary_exposure_committed ?secondary_party)
+        (loan_offer_package_available ?loan_offer_package)
+      )
+    :effect
+      (and
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_linked_to_primary_exposure ?loan_offer_package ?exposure_profile_primary)
+        (loan_offer_package_linked_to_secondary_exposure ?loan_offer_package ?exposure_profile_secondary)
+        (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        (not
+          (loan_offer_package_available ?loan_offer_package)
+        )
+      )
+  )
+  (:action assemble_loan_offer_package_mark_secondary_tranche
+    :parameters (?primary_party - primary_party ?secondary_party - secondary_party ?exposure_profile_primary - exposure_profile_primary ?exposure_profile_secondary - exposure_profile_secondary ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_provisional_primary ?exposure_profile_primary)
+        (exposure_committed_secondary ?exposure_profile_secondary)
+        (primary_exposure_committed ?primary_party)
+        (not
+          (secondary_exposure_committed ?secondary_party)
+        )
+        (loan_offer_package_available ?loan_offer_package)
+      )
+    :effect
+      (and
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_linked_to_primary_exposure ?loan_offer_package ?exposure_profile_primary)
+        (loan_offer_package_linked_to_secondary_exposure ?loan_offer_package ?exposure_profile_secondary)
+        (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        (not
+          (loan_offer_package_available ?loan_offer_package)
+        )
+      )
+  )
+  (:action assemble_loan_offer_package_mark_both_tranches
+    :parameters (?primary_party - primary_party ?secondary_party - secondary_party ?exposure_profile_primary - exposure_profile_primary ?exposure_profile_secondary - exposure_profile_secondary ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (primary_exposure_profile_assigned ?primary_party ?exposure_profile_primary)
+        (secondary_exposure_profile_assigned ?secondary_party ?exposure_profile_secondary)
+        (exposure_committed_primary ?exposure_profile_primary)
+        (exposure_committed_secondary ?exposure_profile_secondary)
+        (not
+          (primary_exposure_committed ?primary_party)
+        )
+        (not
+          (secondary_exposure_committed ?secondary_party)
+        )
+        (loan_offer_package_available ?loan_offer_package)
+      )
+    :effect
+      (and
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_linked_to_primary_exposure ?loan_offer_package ?exposure_profile_primary)
+        (loan_offer_package_linked_to_secondary_exposure ?loan_offer_package ?exposure_profile_secondary)
+        (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        (not
+          (loan_offer_package_available ?loan_offer_package)
+        )
+      )
+  )
+  (:action finalize_loan_offer_package
+    :parameters (?loan_offer_package - loan_offer_package ?primary_party - primary_party ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (loan_offer_package_allocated ?loan_offer_package)
+        (primary_ready_for_offer_assembly ?primary_party)
+        (pricing_attached_to_entity ?primary_party ?pricing_model)
+        (not
+          (loan_offer_package_finalized ?loan_offer_package)
+        )
+      )
+    :effect (loan_offer_package_finalized ?loan_offer_package)
+  )
+  (:action instantiate_and_bind_security_document
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (structuring_instance_linked_package ?offer_structuring_instance ?loan_offer_package)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (security_doc_template_available ?security_document_template)
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_finalized ?loan_offer_package)
+        (not
+          (security_document_instantiated ?security_document_template)
+        )
+      )
+    :effect
+      (and
+        (security_document_instantiated ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (not
+          (security_doc_template_available ?security_document_template)
+        )
+      )
+  )
+  (:action validate_documents_and_mark_bound
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (security_document_instantiated ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (pricing_attached_to_entity ?offer_structuring_instance ?pricing_model)
+        (not
+          (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        )
+        (not
+          (documents_bound_to_structuring_instance ?offer_structuring_instance)
+        )
+      )
+    :effect (documents_bound_to_structuring_instance ?offer_structuring_instance)
+  )
+  (:action attach_consent_document_to_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?consent_document - consent_document)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (consent_document_template_available ?consent_document)
+        (not
+          (consent_document_attached ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (consent_document_attached ?offer_structuring_instance)
+        (structuring_instance_has_consent_document ?offer_structuring_instance ?consent_document)
+        (not
+          (consent_document_template_available ?consent_document)
+        )
+      )
+  )
+  (:action acknowledge_consent_and_bind_documents
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package ?pricing_model - pricing_model ?consent_document - consent_document)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (security_document_instantiated ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (pricing_attached_to_entity ?offer_structuring_instance ?pricing_model)
+        (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        (consent_document_attached ?offer_structuring_instance)
+        (structuring_instance_has_consent_document ?offer_structuring_instance ?consent_document)
+        (not
+          (documents_bound_to_structuring_instance ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (documents_bound_to_structuring_instance ?offer_structuring_instance)
+        (consent_document_acknowledged ?offer_structuring_instance)
+      )
+  )
+  (:action apply_pricing_adjustment_primary_path
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?pricing_adjustment - pricing_adjustment ?product_term_template - product_term_template ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (documents_bound_to_structuring_instance ?offer_structuring_instance)
+        (pricing_adjustment_attached ?offer_structuring_instance ?pricing_adjustment)
+        (product_term_attached_to_entity ?offer_structuring_instance ?product_term_template)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (not
+          (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        )
+        (not
+          (pricing_adjustment_committed ?offer_structuring_instance)
+        )
+      )
+    :effect (pricing_adjustment_committed ?offer_structuring_instance)
+  )
+  (:action apply_pricing_adjustment_secondary_path
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?pricing_adjustment - pricing_adjustment ?product_term_template - product_term_template ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (documents_bound_to_structuring_instance ?offer_structuring_instance)
+        (pricing_adjustment_attached ?offer_structuring_instance ?pricing_adjustment)
+        (product_term_attached_to_entity ?offer_structuring_instance ?product_term_template)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        (not
+          (pricing_adjustment_committed ?offer_structuring_instance)
+        )
+      )
+    :effect (pricing_adjustment_committed ?offer_structuring_instance)
+  )
+  (:action external_approval_without_tranche_flags
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (pricing_adjustment_committed ?offer_structuring_instance)
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (not
+          (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        )
+        (not
+          (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        )
+        (not
+          (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        )
+      )
+    :effect (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+  )
+  (:action external_approval_with_primary_tranche
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (pricing_adjustment_committed ?offer_structuring_instance)
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        (not
+          (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        )
+        (not
+          (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_required ?offer_structuring_instance)
+      )
+  )
+  (:action external_approval_with_secondary_tranche
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (pricing_adjustment_committed ?offer_structuring_instance)
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (not
+          (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        )
+        (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        (not
+          (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_required ?offer_structuring_instance)
+      )
+  )
+  (:action external_approval_with_both_tranches
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token ?security_document_template - security_document_template ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (pricing_adjustment_committed ?offer_structuring_instance)
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (structuring_instance_has_security_template ?offer_structuring_instance ?security_document_template)
+        (document_bound_to_package ?security_document_template ?loan_offer_package)
+        (loan_offer_package_primary_tranche_flag ?loan_offer_package)
+        (loan_offer_package_secondary_tranche_flag ?loan_offer_package)
+        (not
+          (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_required ?offer_structuring_instance)
+      )
+  )
+  (:action finalize_structuring_instance_without_execution_method
+    :parameters (?offer_structuring_instance - offer_structuring_instance)
+    :precondition
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (not
+          (execution_method_required ?offer_structuring_instance)
+        )
+        (not
+          (structuring_instance_finalized ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_finalized ?offer_structuring_instance)
+        (ready_for_execution_flag_for_entity ?offer_structuring_instance)
+      )
+  )
+  (:action attach_execution_method_to_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?execution_method - execution_method)
+    :precondition
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_required ?offer_structuring_instance)
+        (execution_method_available ?execution_method)
+      )
+    :effect
+      (and
+        (execution_method_attached_to_structuring_instance ?offer_structuring_instance ?execution_method)
+        (not
+          (execution_method_available ?execution_method)
+        )
+      )
+  )
+  (:action confirm_execution_method_attachment
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?primary_party - primary_party ?secondary_party - secondary_party ?pricing_model - pricing_model ?execution_method - execution_method)
+    :precondition
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_required ?offer_structuring_instance)
+        (execution_method_attached_to_structuring_instance ?offer_structuring_instance ?execution_method)
+        (structuring_instance_has_primary ?offer_structuring_instance ?primary_party)
+        (structuring_instance_has_secondary ?offer_structuring_instance ?secondary_party)
+        (primary_exposure_committed ?primary_party)
+        (secondary_exposure_committed ?secondary_party)
+        (pricing_attached_to_entity ?offer_structuring_instance ?pricing_model)
+        (not
+          (execution_method_attachment_confirmed ?offer_structuring_instance)
+        )
+      )
+    :effect (execution_method_attachment_confirmed ?offer_structuring_instance)
+  )
+  (:action finalize_structuring_instance_with_execution_method
+    :parameters (?offer_structuring_instance - offer_structuring_instance)
+    :precondition
+      (and
+        (structuring_instance_ready_for_final_checks ?offer_structuring_instance)
+        (execution_method_attachment_confirmed ?offer_structuring_instance)
+        (not
+          (structuring_instance_finalized ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_finalized ?offer_structuring_instance)
+        (ready_for_execution_flag_for_entity ?offer_structuring_instance)
+      )
+  )
+  (:action attach_internal_approval_token_to_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?internal_approval_token - internal_approval_token ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (structuring_initiated_for_entity ?offer_structuring_instance)
+        (pricing_attached_to_entity ?offer_structuring_instance ?pricing_model)
+        (internal_approval_token_available ?internal_approval_token)
+        (internal_approval_staged_for_binding ?offer_structuring_instance ?internal_approval_token)
+        (not
+          (internal_approval_bound ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (internal_approval_bound ?offer_structuring_instance)
+        (not
+          (internal_approval_token_available ?internal_approval_token)
+        )
+      )
+  )
+  (:action acknowledge_internal_approval
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?product_term_template - product_term_template)
+    :precondition
+      (and
+        (internal_approval_bound ?offer_structuring_instance)
+        (product_term_attached_to_entity ?offer_structuring_instance ?product_term_template)
+        (not
+          (internal_approval_recorded ?offer_structuring_instance)
+        )
+      )
+    :effect (internal_approval_recorded ?offer_structuring_instance)
+  )
+  (:action record_external_approval
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?external_approval_token - external_approval_token)
+    :precondition
+      (and
+        (internal_approval_recorded ?offer_structuring_instance)
+        (external_approval_attached ?offer_structuring_instance ?external_approval_token)
+        (not
+          (external_approval_recorded ?offer_structuring_instance)
+        )
+      )
+    :effect (external_approval_recorded ?offer_structuring_instance)
+  )
+  (:action finalize_structuring_instance_after_external_approval
+    :parameters (?offer_structuring_instance - offer_structuring_instance)
+    :precondition
+      (and
+        (external_approval_recorded ?offer_structuring_instance)
+        (not
+          (structuring_instance_finalized ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (structuring_instance_finalized ?offer_structuring_instance)
+        (ready_for_execution_flag_for_entity ?offer_structuring_instance)
+      )
+  )
+  (:action approve_primary_party_for_execution
+    :parameters (?primary_party - primary_party ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (primary_ready_for_offer_assembly ?primary_party)
+        (primary_exposure_committed ?primary_party)
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_finalized ?loan_offer_package)
+        (not
+          (ready_for_execution_flag_for_entity ?primary_party)
+        )
+      )
+    :effect (ready_for_execution_flag_for_entity ?primary_party)
+  )
+  (:action approve_secondary_party_for_execution
+    :parameters (?secondary_party - secondary_party ?loan_offer_package - loan_offer_package)
+    :precondition
+      (and
+        (secondary_ready_for_offer_assembly ?secondary_party)
+        (secondary_exposure_committed ?secondary_party)
+        (loan_offer_package_allocated ?loan_offer_package)
+        (loan_offer_package_finalized ?loan_offer_package)
+        (not
+          (ready_for_execution_flag_for_entity ?secondary_party)
+        )
+      )
+    :effect (ready_for_execution_flag_for_entity ?secondary_party)
+  )
+  (:action authorize_activation_and_assign_funding
+    :parameters (?loan_case - loan_case ?funding_profile - funding_profile ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (ready_for_execution_flag_for_entity ?loan_case)
+        (pricing_attached_to_entity ?loan_case ?pricing_model)
+        (funding_profile_available ?funding_profile)
+        (not
+          (activation_authorized_for_entity ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (activation_authorized_for_entity ?loan_case)
+        (funding_profile_assigned_to_entity ?loan_case ?funding_profile)
+        (not
+          (funding_profile_available ?funding_profile)
+        )
+      )
+  )
+  (:action activate_offer_for_primary_party
+    :parameters (?primary_party - primary_party ?approval_resource - approval_resource ?funding_profile - funding_profile)
+    :precondition
+      (and
+        (activation_authorized_for_entity ?primary_party)
+        (assigned_approval_resource_to_entity ?primary_party ?approval_resource)
+        (funding_profile_assigned_to_entity ?primary_party ?funding_profile)
+        (not
+          (offer_activated ?primary_party)
+        )
+      )
+    :effect
+      (and
+        (offer_activated ?primary_party)
+        (approval_resource_available ?approval_resource)
+        (funding_profile_available ?funding_profile)
+      )
+  )
+  (:action activate_offer_for_secondary_party
+    :parameters (?secondary_party - secondary_party ?approval_resource - approval_resource ?funding_profile - funding_profile)
+    :precondition
+      (and
+        (activation_authorized_for_entity ?secondary_party)
+        (assigned_approval_resource_to_entity ?secondary_party ?approval_resource)
+        (funding_profile_assigned_to_entity ?secondary_party ?funding_profile)
+        (not
+          (offer_activated ?secondary_party)
+        )
+      )
+    :effect
+      (and
+        (offer_activated ?secondary_party)
+        (approval_resource_available ?approval_resource)
+        (funding_profile_available ?funding_profile)
+      )
+  )
+  (:action activate_offer_structuring_instance
+    :parameters (?offer_structuring_instance - offer_structuring_instance ?approval_resource - approval_resource ?funding_profile - funding_profile)
+    :precondition
+      (and
+        (activation_authorized_for_entity ?offer_structuring_instance)
+        (assigned_approval_resource_to_entity ?offer_structuring_instance ?approval_resource)
+        (funding_profile_assigned_to_entity ?offer_structuring_instance ?funding_profile)
+        (not
+          (offer_activated ?offer_structuring_instance)
+        )
+      )
+    :effect
+      (and
+        (offer_activated ?offer_structuring_instance)
+        (approval_resource_available ?approval_resource)
+        (funding_profile_available ?funding_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem loan_offer_structuring_problem)
+  (:domain loan_offer_structuring_domain)
+  (:objects primary_party_1 - primary_party secondary_party_1 - secondary_party structuring_instance_1 - offer_structuring_instance structuring_instance_2 - offer_structuring_instance approval_resource_slot_1 - approval_resource approval_resource_slot_2 - approval_resource approval_resource_slot_3 - approval_resource pricing_model_standard_index - pricing_model product_term_template_standard_amortization - product_term_template collateral_template_mortgage - collateral_asset_template exposure_profile_primary_standard - exposure_profile_primary exposure_profile_secondary_standard - exposure_profile_secondary loan_offer_package_slot_1 - loan_offer_package security_doc_template_mortgage_deed - security_document_template security_doc_template_guarantee - security_document_template consent_document_customer - consent_document consent_document_third_party - consent_document execution_method_esign - execution_method execution_method_wet_signature - execution_method funding_profile_standard - funding_profile pricing_adjustment_override_1 - pricing_adjustment internal_approval_record_1 - internal_approval_token internal_approval_record_2 - internal_approval_token external_approval_record_1 - external_approval_token)
+  (:init
+    (approval_resource_available approval_resource_slot_1)
+    (approval_resource_available approval_resource_slot_2)
+    (approval_resource_available approval_resource_slot_3)
+    (pricing_model_available pricing_model_standard_index)
+    (product_term_template_available product_term_template_standard_amortization)
+    (collateral_template_available collateral_template_mortgage)
+    (primary_exposure_profile_assigned primary_party_1 exposure_profile_primary_standard)
+    (secondary_exposure_profile_assigned secondary_party_1 exposure_profile_secondary_standard)
+    (loan_offer_package_available loan_offer_package_slot_1)
+    (security_doc_template_available security_doc_template_mortgage_deed)
+    (security_doc_template_available security_doc_template_guarantee)
+    (structuring_instance_has_primary structuring_instance_1 primary_party_1)
+    (structuring_instance_has_primary structuring_instance_2 primary_party_1)
+    (structuring_instance_has_secondary structuring_instance_1 secondary_party_1)
+    (structuring_instance_has_secondary structuring_instance_2 secondary_party_1)
+    (structuring_instance_linked_package structuring_instance_1 loan_offer_package_slot_1)
+    (structuring_instance_linked_package structuring_instance_2 loan_offer_package_slot_1)
+    (structuring_instance_has_security_template structuring_instance_1 security_doc_template_mortgage_deed)
+    (structuring_instance_has_security_template structuring_instance_2 security_doc_template_guarantee)
+    (consent_document_template_available consent_document_customer)
+    (consent_document_template_available consent_document_third_party)
+    (execution_method_available execution_method_esign)
+    (execution_method_available execution_method_wet_signature)
+    (funding_profile_available funding_profile_standard)
+    (pricing_adjustment_available pricing_adjustment_override_1)
+    (internal_approval_token_available internal_approval_record_1)
+    (internal_approval_staged_for_binding structuring_instance_1 internal_approval_record_1)
+    (internal_approval_staged_for_binding structuring_instance_2 internal_approval_record_2)
+    (external_approval_token_available external_approval_record_1)
+  )
+  (:goal
+    (and
+      (offer_activated primary_party_1)
+      (offer_activated secondary_party_1)
+      (offer_activated structuring_instance_1)
+      (offer_activated structuring_instance_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_loan_case primary_party_1)
+(assign_approval_resource_to_case primary_party_1 approval_resource_slot_1)
+(attach_pricing_model_to_case primary_party_1 pricing_model_standard_index)
+(confirm_pricing_and_initiate_structuring primary_party_1 pricing_model_standard_index)
+(release_pricing_model_from_case primary_party_1 pricing_model_standard_index)
+(attach_pricing_model_to_case primary_party_1 pricing_model_standard_index)
+(provisionally_assign_primary_exposure_profile primary_party_1 exposure_profile_primary_standard pricing_model_standard_index)
+(release_pricing_model_from_case primary_party_1 pricing_model_standard_index)
+(bind_product_term_to_case primary_party_1 product_term_template_standard_amortization)
+(confirm_primary_exposure_profile primary_party_1 exposure_profile_primary_standard product_term_template_standard_amortization)
+(release_product_term_from_case primary_party_1 product_term_template_standard_amortization)
+(register_loan_case secondary_party_1)
+(assign_approval_resource_to_case secondary_party_1 approval_resource_slot_2)
+(attach_pricing_model_to_case secondary_party_1 pricing_model_standard_index)
+(confirm_pricing_and_initiate_structuring secondary_party_1 pricing_model_standard_index)
+(release_pricing_model_from_case secondary_party_1 pricing_model_standard_index)
+(attach_pricing_model_to_case secondary_party_1 pricing_model_standard_index)
+(provisionally_assign_secondary_exposure_profile secondary_party_1 exposure_profile_secondary_standard pricing_model_standard_index)
+(release_pricing_model_from_case secondary_party_1 pricing_model_standard_index)
+(bind_product_term_to_case secondary_party_1 product_term_template_standard_amortization)
+(confirm_secondary_exposure_profile secondary_party_1 exposure_profile_secondary_standard product_term_template_standard_amortization)
+(release_product_term_from_case secondary_party_1 product_term_template_standard_amortization)
+(assemble_loan_offer_package primary_party_1 secondary_party_1 exposure_profile_primary_standard exposure_profile_secondary_standard loan_offer_package_slot_1)
+(attach_pricing_model_to_case primary_party_1 pricing_model_standard_index)
+(finalize_loan_offer_package loan_offer_package_slot_1 primary_party_1 pricing_model_standard_index)
+(approve_primary_party_for_execution primary_party_1 loan_offer_package_slot_1)
+(approve_secondary_party_for_execution secondary_party_1 loan_offer_package_slot_1)
+(authorize_activation_and_assign_funding primary_party_1 funding_profile_standard pricing_model_standard_index)
+(activate_offer_for_primary_party primary_party_1 approval_resource_slot_1 funding_profile_standard)
+(release_pricing_model_from_case primary_party_1 pricing_model_standard_index)
+(attach_pricing_model_to_case secondary_party_1 pricing_model_standard_index)
+(authorize_activation_and_assign_funding secondary_party_1 funding_profile_standard pricing_model_standard_index)
+(activate_offer_for_secondary_party secondary_party_1 approval_resource_slot_2 funding_profile_standard)
+(release_pricing_model_from_case secondary_party_1 pricing_model_standard_index)
+(register_loan_case structuring_instance_1)
+(assign_approval_resource_to_case structuring_instance_1 approval_resource_slot_1)
+(attach_pricing_model_to_case structuring_instance_1 pricing_model_standard_index)
+(confirm_pricing_and_initiate_structuring structuring_instance_1 pricing_model_standard_index)
+(release_pricing_model_from_case structuring_instance_1 pricing_model_standard_index)
+(instantiate_and_bind_security_document structuring_instance_1 security_doc_template_mortgage_deed loan_offer_package_slot_1)
+(attach_pricing_model_to_case structuring_instance_1 pricing_model_standard_index)
+(validate_documents_and_mark_bound structuring_instance_1 security_doc_template_mortgage_deed loan_offer_package_slot_1 pricing_model_standard_index)
+(attach_pricing_adjustment_to_structuring_instance structuring_instance_1 pricing_adjustment_override_1)
+(bind_product_term_to_case structuring_instance_1 product_term_template_standard_amortization)
+(apply_pricing_adjustment_primary_path structuring_instance_1 pricing_adjustment_override_1 product_term_template_standard_amortization security_doc_template_mortgage_deed loan_offer_package_slot_1)
+(attach_external_approval_token structuring_instance_1 external_approval_record_1)
+(external_approval_without_tranche_flags structuring_instance_1 external_approval_record_1 security_doc_template_mortgage_deed loan_offer_package_slot_1)
+(finalize_structuring_instance_without_execution_method structuring_instance_1)
+(authorize_activation_and_assign_funding structuring_instance_1 funding_profile_standard pricing_model_standard_index)
+(activate_offer_structuring_instance structuring_instance_1 approval_resource_slot_1 funding_profile_standard)
+(release_pricing_model_from_case structuring_instance_1 pricing_model_standard_index)
+(release_product_term_from_case structuring_instance_1 product_term_template_standard_amortization)
+(release_pricing_adjustment_from_structuring_instance structuring_instance_1 pricing_adjustment_override_1)
+(release_external_approval_token structuring_instance_1 external_approval_record_1)
+(register_loan_case structuring_instance_2)
+(assign_approval_resource_to_case structuring_instance_2 approval_resource_slot_1)
+(attach_pricing_model_to_case structuring_instance_2 pricing_model_standard_index)
+(confirm_pricing_and_initiate_structuring structuring_instance_2 pricing_model_standard_index)
+(release_pricing_model_from_case structuring_instance_2 pricing_model_standard_index)
+(instantiate_and_bind_security_document structuring_instance_2 security_doc_template_guarantee loan_offer_package_slot_1)
+(attach_pricing_model_to_case structuring_instance_2 pricing_model_standard_index)
+(validate_documents_and_mark_bound structuring_instance_2 security_doc_template_guarantee loan_offer_package_slot_1 pricing_model_standard_index)
+(attach_pricing_adjustment_to_structuring_instance structuring_instance_2 pricing_adjustment_override_1)
+(bind_product_term_to_case structuring_instance_2 product_term_template_standard_amortization)
+(apply_pricing_adjustment_primary_path structuring_instance_2 pricing_adjustment_override_1 product_term_template_standard_amortization security_doc_template_guarantee loan_offer_package_slot_1)
+(attach_external_approval_token structuring_instance_2 external_approval_record_1)
+(external_approval_without_tranche_flags structuring_instance_2 external_approval_record_1 security_doc_template_guarantee loan_offer_package_slot_1)
+(finalize_structuring_instance_without_execution_method structuring_instance_2)
+(authorize_activation_and_assign_funding structuring_instance_2 funding_profile_standard pricing_model_standard_index)
+(activate_offer_structuring_instance structuring_instance_2 approval_resource_slot_1 funding_profile_standard)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_hqu9aijj/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 70 
+
+Successful plans:
+Value: 70
+ /tmp/val_hqu9aijj/plan.pddl 70 
+
+
+
+--- stderr ---
+

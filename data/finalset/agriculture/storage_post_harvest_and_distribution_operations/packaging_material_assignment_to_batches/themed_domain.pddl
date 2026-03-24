@@ -1,0 +1,936 @@
+(define (domain packaging_material_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_resource - object component_type - object channel_type - object batch_category - object batch - batch_category packaging_material_unit - physical_resource quality_test_kit - physical_resource conditioning_resource - physical_resource label_variant - physical_resource palletising_option - physical_resource release_time_slot - physical_resource seal_or_tamper_tag - physical_resource traceability_tag - physical_resource packaging_component - component_type container_unit - component_type certification_mark - component_type primary_packaging_spec - channel_type distribution_channel - channel_type outbound_container - channel_type stored_batch_subtype - batch packing_batch_subtype - batch stored_batch_slot - stored_batch_subtype consolidation_batch_slot - stored_batch_subtype packing_task - packing_batch_subtype)
+  (:predicates
+    (entity_registered ?batch - batch)
+    (entity_ready_for_packing ?batch - batch)
+    (packaging_reserved_flag_on_batch ?batch - batch)
+    (packaging_assignment_completed_flag ?batch - batch)
+    (entity_finalized_flag ?batch - batch)
+    (entity_release_authorized ?batch - batch)
+    (packaging_material_available ?packaging_material_unit - packaging_material_unit)
+    (packaging_material_reserved_for_batch ?batch - batch ?packaging_material_unit - packaging_material_unit)
+    (quality_test_kit_available ?quality_test_kit - quality_test_kit)
+    (entity_assigned_quality_test_kit ?batch - batch ?quality_test_kit - quality_test_kit)
+    (conditioning_resource_available ?conditioning_resource - conditioning_resource)
+    (entity_assigned_conditioning_resource ?batch - batch ?conditioning_resource - conditioning_resource)
+    (packaging_component_available ?packaging_component - packaging_component)
+    (stored_slot_assigned_component ?stored_batch_slot - stored_batch_slot ?packaging_component - packaging_component)
+    (consolidation_slot_assigned_component ?consolidation_batch_slot - consolidation_batch_slot ?packaging_component - packaging_component)
+    (stored_slot_link_primary_packaging_spec ?stored_batch_slot - stored_batch_slot ?primary_packaging_spec - primary_packaging_spec)
+    (primary_packaging_spec_selected_flag ?primary_packaging_spec - primary_packaging_spec)
+    (alternative_primary_packaging_selected_flag ?primary_packaging_spec - primary_packaging_spec)
+    (stored_slot_mark_ready_for_assignment ?stored_batch_slot - stored_batch_slot)
+    (consolidation_slot_link_distribution_channel ?consolidation_batch_slot - consolidation_batch_slot ?distribution_channel - distribution_channel)
+    (distribution_channel_selected_flag ?distribution_channel - distribution_channel)
+    (alternative_distribution_channel_selected_flag ?distribution_channel - distribution_channel)
+    (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot - consolidation_batch_slot)
+    (outbound_container_available ?outbound_container - outbound_container)
+    (outbound_container_reserved_flag ?outbound_container - outbound_container)
+    (container_assigned_primary_packaging_spec ?outbound_container - outbound_container ?primary_packaging_spec - primary_packaging_spec)
+    (container_assigned_distribution_channel ?outbound_container - outbound_container ?distribution_channel - distribution_channel)
+    (container_option_a_flag ?outbound_container - outbound_container)
+    (container_option_b_flag ?outbound_container - outbound_container)
+    (container_marked_sealed_flag ?outbound_container - outbound_container)
+    (task_links_stored_batch_slot ?packing_task - packing_task ?stored_batch_slot - stored_batch_slot)
+    (task_links_consolidation_batch_slot ?packing_task - packing_task ?consolidation_batch_slot - consolidation_batch_slot)
+    (task_links_outbound_container ?packing_task - packing_task ?outbound_container - outbound_container)
+    (container_unit_available ?container_unit - container_unit)
+    (task_links_container_unit ?packing_task - packing_task ?container_unit - container_unit)
+    (container_unit_prepared_flag ?container_unit - container_unit)
+    (container_unit_attached_to_outbound_container ?container_unit - container_unit ?outbound_container - outbound_container)
+    (task_stage_bound_materials_flag ?packing_task - packing_task)
+    (task_stage_verified_flag ?packing_task - packing_task)
+    (task_stage_quality_checked_flag ?packing_task - packing_task)
+    (task_has_label_variant_flag ?packing_task - packing_task)
+    (task_label_applied_flag ?packing_task - packing_task)
+    (task_has_palletising_option_flag ?packing_task - packing_task)
+    (task_palletised_flag ?packing_task - packing_task)
+    (certification_mark_available ?certification_mark - certification_mark)
+    (task_has_certification_mark ?packing_task - packing_task ?certification_mark - certification_mark)
+    (task_certification_applied_flag ?packing_task - packing_task)
+    (task_labeling_in_progress_flag ?packing_task - packing_task)
+    (task_labeling_completed_flag ?packing_task - packing_task)
+    (label_variant_available ?label_variant - label_variant)
+    (task_assigned_label_variant ?packing_task - packing_task ?label_variant - label_variant)
+    (palletising_option_available ?palletising_option - palletising_option)
+    (task_assigned_palletising_option ?packing_task - packing_task ?palletising_option - palletising_option)
+    (seal_available ?seal_or_tamper_tag - seal_or_tamper_tag)
+    (task_assigned_seal ?packing_task - packing_task ?seal_or_tamper_tag - seal_or_tamper_tag)
+    (trace_tag_available ?traceability_tag - traceability_tag)
+    (task_assigned_trace_tag ?packing_task - packing_task ?traceability_tag - traceability_tag)
+    (release_time_slot_available ?release_time_slot - release_time_slot)
+    (entity_assigned_release_time ?batch - batch ?release_time_slot - release_time_slot)
+    (stored_slot_ready_flag ?stored_batch_slot - stored_batch_slot)
+    (consolidation_slot_ready_flag ?consolidation_batch_slot - consolidation_batch_slot)
+    (task_finalized_flag ?packing_task - packing_task)
+  )
+  (:action record_batch_intake
+    :parameters (?batch - batch)
+    :precondition
+      (and
+        (not
+          (entity_registered ?batch)
+        )
+        (not
+          (packaging_assignment_completed_flag ?batch)
+        )
+      )
+    :effect (entity_registered ?batch)
+  )
+  (:action reserve_packaging_material_for_batch
+    :parameters (?batch - batch ?packaging_material_unit - packaging_material_unit)
+    :precondition
+      (and
+        (entity_registered ?batch)
+        (not
+          (packaging_reserved_flag_on_batch ?batch)
+        )
+        (packaging_material_available ?packaging_material_unit)
+      )
+    :effect
+      (and
+        (packaging_reserved_flag_on_batch ?batch)
+        (packaging_material_reserved_for_batch ?batch ?packaging_material_unit)
+        (not
+          (packaging_material_available ?packaging_material_unit)
+        )
+      )
+  )
+  (:action assign_quality_test_kit_to_batch
+    :parameters (?batch - batch ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_registered ?batch)
+        (packaging_reserved_flag_on_batch ?batch)
+        (quality_test_kit_available ?quality_test_kit)
+      )
+    :effect
+      (and
+        (entity_assigned_quality_test_kit ?batch ?quality_test_kit)
+        (not
+          (quality_test_kit_available ?quality_test_kit)
+        )
+      )
+  )
+  (:action mark_batch_ready_for_packing_after_grading
+    :parameters (?batch - batch ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_registered ?batch)
+        (packaging_reserved_flag_on_batch ?batch)
+        (entity_assigned_quality_test_kit ?batch ?quality_test_kit)
+        (not
+          (entity_ready_for_packing ?batch)
+        )
+      )
+    :effect (entity_ready_for_packing ?batch)
+  )
+  (:action release_quality_test_kit
+    :parameters (?batch - batch ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_assigned_quality_test_kit ?batch ?quality_test_kit)
+      )
+    :effect
+      (and
+        (quality_test_kit_available ?quality_test_kit)
+        (not
+          (entity_assigned_quality_test_kit ?batch ?quality_test_kit)
+        )
+      )
+  )
+  (:action assign_conditioning_resource_to_batch
+    :parameters (?batch - batch ?conditioning_resource - conditioning_resource)
+    :precondition
+      (and
+        (entity_ready_for_packing ?batch)
+        (conditioning_resource_available ?conditioning_resource)
+      )
+    :effect
+      (and
+        (entity_assigned_conditioning_resource ?batch ?conditioning_resource)
+        (not
+          (conditioning_resource_available ?conditioning_resource)
+        )
+      )
+  )
+  (:action release_conditioning_resource_from_batch
+    :parameters (?batch - batch ?conditioning_resource - conditioning_resource)
+    :precondition
+      (and
+        (entity_assigned_conditioning_resource ?batch ?conditioning_resource)
+      )
+    :effect
+      (and
+        (conditioning_resource_available ?conditioning_resource)
+        (not
+          (entity_assigned_conditioning_resource ?batch ?conditioning_resource)
+        )
+      )
+  )
+  (:action assign_seal_to_task
+    :parameters (?packing_task - packing_task ?seal_or_tamper_tag - seal_or_tamper_tag)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (seal_available ?seal_or_tamper_tag)
+      )
+    :effect
+      (and
+        (task_assigned_seal ?packing_task ?seal_or_tamper_tag)
+        (not
+          (seal_available ?seal_or_tamper_tag)
+        )
+      )
+  )
+  (:action release_seal_from_task
+    :parameters (?packing_task - packing_task ?seal_or_tamper_tag - seal_or_tamper_tag)
+    :precondition
+      (and
+        (task_assigned_seal ?packing_task ?seal_or_tamper_tag)
+      )
+    :effect
+      (and
+        (seal_available ?seal_or_tamper_tag)
+        (not
+          (task_assigned_seal ?packing_task ?seal_or_tamper_tag)
+        )
+      )
+  )
+  (:action assign_traceability_tag_to_task
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (trace_tag_available ?traceability_tag)
+      )
+    :effect
+      (and
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (not
+          (trace_tag_available ?traceability_tag)
+        )
+      )
+  )
+  (:action release_traceability_tag_from_task
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+      )
+    :effect
+      (and
+        (trace_tag_available ?traceability_tag)
+        (not
+          (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        )
+      )
+  )
+  (:action select_primary_packaging_spec_for_stored_slot
+    :parameters (?stored_batch_slot - stored_batch_slot ?primary_packaging_spec - primary_packaging_spec ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_ready_for_packing ?stored_batch_slot)
+        (entity_assigned_quality_test_kit ?stored_batch_slot ?quality_test_kit)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (not
+          (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+        )
+        (not
+          (alternative_primary_packaging_selected_flag ?primary_packaging_spec)
+        )
+      )
+    :effect (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+  )
+  (:action prepare_stored_slot_for_assignment
+    :parameters (?stored_batch_slot - stored_batch_slot ?primary_packaging_spec - primary_packaging_spec ?conditioning_resource - conditioning_resource)
+    :precondition
+      (and
+        (entity_ready_for_packing ?stored_batch_slot)
+        (entity_assigned_conditioning_resource ?stored_batch_slot ?conditioning_resource)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+        (not
+          (stored_slot_ready_flag ?stored_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+      )
+  )
+  (:action assign_packaging_component_to_stored_slot
+    :parameters (?stored_batch_slot - stored_batch_slot ?primary_packaging_spec - primary_packaging_spec ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?stored_batch_slot)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (packaging_component_available ?packaging_component)
+        (not
+          (stored_slot_ready_flag ?stored_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (alternative_primary_packaging_selected_flag ?primary_packaging_spec)
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (stored_slot_assigned_component ?stored_batch_slot ?packaging_component)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_primary_packaging_selection_for_stored_slot
+    :parameters (?stored_batch_slot - stored_batch_slot ?primary_packaging_spec - primary_packaging_spec ?quality_test_kit - quality_test_kit ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?stored_batch_slot)
+        (entity_assigned_quality_test_kit ?stored_batch_slot ?quality_test_kit)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (alternative_primary_packaging_selected_flag ?primary_packaging_spec)
+        (stored_slot_assigned_component ?stored_batch_slot ?packaging_component)
+        (not
+          (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        (packaging_component_available ?packaging_component)
+        (not
+          (stored_slot_assigned_component ?stored_batch_slot ?packaging_component)
+        )
+      )
+  )
+  (:action select_distribution_channel_for_consolidation_slot
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?distribution_channel - distribution_channel ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_batch_slot)
+        (entity_assigned_quality_test_kit ?consolidation_batch_slot ?quality_test_kit)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (not
+          (distribution_channel_selected_flag ?distribution_channel)
+        )
+        (not
+          (alternative_distribution_channel_selected_flag ?distribution_channel)
+        )
+      )
+    :effect (distribution_channel_selected_flag ?distribution_channel)
+  )
+  (:action prepare_consolidation_slot_for_assignment
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?distribution_channel - distribution_channel ?conditioning_resource - conditioning_resource)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_batch_slot)
+        (entity_assigned_conditioning_resource ?consolidation_batch_slot ?conditioning_resource)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (distribution_channel_selected_flag ?distribution_channel)
+        (not
+          (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+      )
+  )
+  (:action assign_packaging_component_to_consolidation_slot
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?distribution_channel - distribution_channel ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_batch_slot)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (packaging_component_available ?packaging_component)
+        (not
+          (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (alternative_distribution_channel_selected_flag ?distribution_channel)
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (consolidation_slot_assigned_component ?consolidation_batch_slot ?packaging_component)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_distribution_channel_selection_for_consolidation_slot
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?distribution_channel - distribution_channel ?quality_test_kit - quality_test_kit ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (entity_ready_for_packing ?consolidation_batch_slot)
+        (entity_assigned_quality_test_kit ?consolidation_batch_slot ?quality_test_kit)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (alternative_distribution_channel_selected_flag ?distribution_channel)
+        (consolidation_slot_assigned_component ?consolidation_batch_slot ?packaging_component)
+        (not
+          (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (distribution_channel_selected_flag ?distribution_channel)
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        (packaging_component_available ?packaging_component)
+        (not
+          (consolidation_slot_assigned_component ?consolidation_batch_slot ?packaging_component)
+        )
+      )
+  )
+  (:action reserve_and_bind_outbound_container
+    :parameters (?stored_batch_slot - stored_batch_slot ?consolidation_batch_slot - consolidation_batch_slot ?primary_packaging_spec - primary_packaging_spec ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+        (distribution_channel_selected_flag ?distribution_channel)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_assigned_primary_packaging_spec ?outbound_container ?primary_packaging_spec)
+        (container_assigned_distribution_channel ?outbound_container ?distribution_channel)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action reserve_and_bind_outbound_container_with_option_a
+    :parameters (?stored_batch_slot - stored_batch_slot ?consolidation_batch_slot - consolidation_batch_slot ?primary_packaging_spec - primary_packaging_spec ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (alternative_primary_packaging_selected_flag ?primary_packaging_spec)
+        (distribution_channel_selected_flag ?distribution_channel)
+        (not
+          (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        )
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_assigned_primary_packaging_spec ?outbound_container ?primary_packaging_spec)
+        (container_assigned_distribution_channel ?outbound_container ?distribution_channel)
+        (container_option_a_flag ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action reserve_and_bind_outbound_container_with_option_b
+    :parameters (?stored_batch_slot - stored_batch_slot ?consolidation_batch_slot - consolidation_batch_slot ?primary_packaging_spec - primary_packaging_spec ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (primary_packaging_spec_selected_flag ?primary_packaging_spec)
+        (alternative_distribution_channel_selected_flag ?distribution_channel)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        (not
+          (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        )
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_assigned_primary_packaging_spec ?outbound_container ?primary_packaging_spec)
+        (container_assigned_distribution_channel ?outbound_container ?distribution_channel)
+        (container_option_b_flag ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action reserve_and_bind_outbound_container_with_options_a_and_b
+    :parameters (?stored_batch_slot - stored_batch_slot ?consolidation_batch_slot - consolidation_batch_slot ?primary_packaging_spec - primary_packaging_spec ?distribution_channel - distribution_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (stored_slot_link_primary_packaging_spec ?stored_batch_slot ?primary_packaging_spec)
+        (consolidation_slot_link_distribution_channel ?consolidation_batch_slot ?distribution_channel)
+        (alternative_primary_packaging_selected_flag ?primary_packaging_spec)
+        (alternative_distribution_channel_selected_flag ?distribution_channel)
+        (not
+          (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        )
+        (not
+          (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        )
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_assigned_primary_packaging_spec ?outbound_container ?primary_packaging_spec)
+        (container_assigned_distribution_channel ?outbound_container ?distribution_channel)
+        (container_option_a_flag ?outbound_container)
+        (container_option_b_flag ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action mark_outbound_container_sealed
+    :parameters (?outbound_container - outbound_container ?stored_batch_slot - stored_batch_slot ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (outbound_container_reserved_flag ?outbound_container)
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (entity_assigned_quality_test_kit ?stored_batch_slot ?quality_test_kit)
+        (not
+          (container_marked_sealed_flag ?outbound_container)
+        )
+      )
+    :effect (container_marked_sealed_flag ?outbound_container)
+  )
+  (:action prepare_container_unit_and_attach_to_outbound
+    :parameters (?packing_task - packing_task ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (task_links_outbound_container ?packing_task ?outbound_container)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_available ?container_unit)
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_marked_sealed_flag ?outbound_container)
+        (not
+          (container_unit_prepared_flag ?container_unit)
+        )
+      )
+    :effect
+      (and
+        (container_unit_prepared_flag ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (not
+          (container_unit_available ?container_unit)
+        )
+      )
+  )
+  (:action attach_container_unit_to_task
+    :parameters (?packing_task - packing_task ?container_unit - container_unit ?outbound_container - outbound_container ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_prepared_flag ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (entity_assigned_quality_test_kit ?packing_task ?quality_test_kit)
+        (not
+          (container_option_a_flag ?outbound_container)
+        )
+        (not
+          (task_stage_bound_materials_flag ?packing_task)
+        )
+      )
+    :effect (task_stage_bound_materials_flag ?packing_task)
+  )
+  (:action assign_label_variant_to_task
+    :parameters (?packing_task - packing_task ?label_variant - label_variant)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (label_variant_available ?label_variant)
+        (not
+          (task_has_label_variant_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_has_label_variant_flag ?packing_task)
+        (task_assigned_label_variant ?packing_task ?label_variant)
+        (not
+          (label_variant_available ?label_variant)
+        )
+      )
+  )
+  (:action apply_label_variant_and_mark_label_applied
+    :parameters (?packing_task - packing_task ?container_unit - container_unit ?outbound_container - outbound_container ?quality_test_kit - quality_test_kit ?label_variant - label_variant)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_prepared_flag ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (entity_assigned_quality_test_kit ?packing_task ?quality_test_kit)
+        (container_option_a_flag ?outbound_container)
+        (task_has_label_variant_flag ?packing_task)
+        (task_assigned_label_variant ?packing_task ?label_variant)
+        (not
+          (task_stage_bound_materials_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_stage_bound_materials_flag ?packing_task)
+        (task_label_applied_flag ?packing_task)
+      )
+  )
+  (:action verify_bound_materials_for_task
+    :parameters (?packing_task - packing_task ?seal_or_tamper_tag - seal_or_tamper_tag ?conditioning_resource - conditioning_resource ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_bound_materials_flag ?packing_task)
+        (task_assigned_seal ?packing_task ?seal_or_tamper_tag)
+        (entity_assigned_conditioning_resource ?packing_task ?conditioning_resource)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (not
+          (container_option_b_flag ?outbound_container)
+        )
+        (not
+          (task_stage_verified_flag ?packing_task)
+        )
+      )
+    :effect (task_stage_verified_flag ?packing_task)
+  )
+  (:action verify_bound_materials_for_task_alternate
+    :parameters (?packing_task - packing_task ?seal_or_tamper_tag - seal_or_tamper_tag ?conditioning_resource - conditioning_resource ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_bound_materials_flag ?packing_task)
+        (task_assigned_seal ?packing_task ?seal_or_tamper_tag)
+        (entity_assigned_conditioning_resource ?packing_task ?conditioning_resource)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (container_option_b_flag ?outbound_container)
+        (not
+          (task_stage_verified_flag ?packing_task)
+        )
+      )
+    :effect (task_stage_verified_flag ?packing_task)
+  )
+  (:action perform_quality_check_for_task_standard
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_verified_flag ?packing_task)
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (not
+          (container_option_a_flag ?outbound_container)
+        )
+        (not
+          (container_option_b_flag ?outbound_container)
+        )
+        (not
+          (task_stage_quality_checked_flag ?packing_task)
+        )
+      )
+    :effect (task_stage_quality_checked_flag ?packing_task)
+  )
+  (:action perform_quality_check_for_task_option_a
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_verified_flag ?packing_task)
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (container_option_a_flag ?outbound_container)
+        (not
+          (container_option_b_flag ?outbound_container)
+        )
+        (not
+          (task_stage_quality_checked_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_has_palletising_option_flag ?packing_task)
+      )
+  )
+  (:action perform_quality_check_for_task_option_b
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_verified_flag ?packing_task)
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (not
+          (container_option_a_flag ?outbound_container)
+        )
+        (container_option_b_flag ?outbound_container)
+        (not
+          (task_stage_quality_checked_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_has_palletising_option_flag ?packing_task)
+      )
+  )
+  (:action perform_quality_check_for_task_options_a_and_b
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag ?container_unit - container_unit ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (task_stage_verified_flag ?packing_task)
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (task_links_container_unit ?packing_task ?container_unit)
+        (container_unit_attached_to_outbound_container ?container_unit ?outbound_container)
+        (container_option_a_flag ?outbound_container)
+        (container_option_b_flag ?outbound_container)
+        (not
+          (task_stage_quality_checked_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_has_palletising_option_flag ?packing_task)
+      )
+  )
+  (:action finalize_packing_task
+    :parameters (?packing_task - packing_task)
+    :precondition
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (not
+          (task_has_palletising_option_flag ?packing_task)
+        )
+        (not
+          (task_finalized_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized_flag ?packing_task)
+        (entity_finalized_flag ?packing_task)
+      )
+  )
+  (:action assign_palletising_option_to_task
+    :parameters (?packing_task - packing_task ?palletising_option - palletising_option)
+    :precondition
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_has_palletising_option_flag ?packing_task)
+        (palletising_option_available ?palletising_option)
+      )
+    :effect
+      (and
+        (task_assigned_palletising_option ?packing_task ?palletising_option)
+        (not
+          (palletising_option_available ?palletising_option)
+        )
+      )
+  )
+  (:action perform_palletising_and_mark_task
+    :parameters (?packing_task - packing_task ?stored_batch_slot - stored_batch_slot ?consolidation_batch_slot - consolidation_batch_slot ?quality_test_kit - quality_test_kit ?palletising_option - palletising_option)
+    :precondition
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_has_palletising_option_flag ?packing_task)
+        (task_assigned_palletising_option ?packing_task ?palletising_option)
+        (task_links_stored_batch_slot ?packing_task ?stored_batch_slot)
+        (task_links_consolidation_batch_slot ?packing_task ?consolidation_batch_slot)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        (entity_assigned_quality_test_kit ?packing_task ?quality_test_kit)
+        (not
+          (task_palletised_flag ?packing_task)
+        )
+      )
+    :effect (task_palletised_flag ?packing_task)
+  )
+  (:action finalize_palletising_and_lock_task
+    :parameters (?packing_task - packing_task)
+    :precondition
+      (and
+        (task_stage_quality_checked_flag ?packing_task)
+        (task_palletised_flag ?packing_task)
+        (not
+          (task_finalized_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized_flag ?packing_task)
+        (entity_finalized_flag ?packing_task)
+      )
+  )
+  (:action assign_certification_mark_to_task
+    :parameters (?packing_task - packing_task ?certification_mark - certification_mark ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_ready_for_packing ?packing_task)
+        (entity_assigned_quality_test_kit ?packing_task ?quality_test_kit)
+        (certification_mark_available ?certification_mark)
+        (task_has_certification_mark ?packing_task ?certification_mark)
+        (not
+          (task_certification_applied_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_certification_applied_flag ?packing_task)
+        (not
+          (certification_mark_available ?certification_mark)
+        )
+      )
+  )
+  (:action start_task_labeling
+    :parameters (?packing_task - packing_task ?conditioning_resource - conditioning_resource)
+    :precondition
+      (and
+        (task_certification_applied_flag ?packing_task)
+        (entity_assigned_conditioning_resource ?packing_task ?conditioning_resource)
+        (not
+          (task_labeling_in_progress_flag ?packing_task)
+        )
+      )
+    :effect (task_labeling_in_progress_flag ?packing_task)
+  )
+  (:action complete_task_labeling
+    :parameters (?packing_task - packing_task ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (task_labeling_in_progress_flag ?packing_task)
+        (task_assigned_trace_tag ?packing_task ?traceability_tag)
+        (not
+          (task_labeling_completed_flag ?packing_task)
+        )
+      )
+    :effect (task_labeling_completed_flag ?packing_task)
+  )
+  (:action finalize_labeling_and_mark_task_finalized
+    :parameters (?packing_task - packing_task)
+    :precondition
+      (and
+        (task_labeling_completed_flag ?packing_task)
+        (not
+          (task_finalized_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (task_finalized_flag ?packing_task)
+        (entity_finalized_flag ?packing_task)
+      )
+  )
+  (:action mark_stored_slot_dispatch_ready
+    :parameters (?stored_batch_slot - stored_batch_slot ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (stored_slot_ready_flag ?stored_batch_slot)
+        (stored_slot_mark_ready_for_assignment ?stored_batch_slot)
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_marked_sealed_flag ?outbound_container)
+        (not
+          (entity_finalized_flag ?stored_batch_slot)
+        )
+      )
+    :effect (entity_finalized_flag ?stored_batch_slot)
+  )
+  (:action mark_consolidation_slot_dispatch_ready
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (consolidation_slot_ready_flag ?consolidation_batch_slot)
+        (consolidation_slot_mark_ready_for_assignment ?consolidation_batch_slot)
+        (outbound_container_reserved_flag ?outbound_container)
+        (container_marked_sealed_flag ?outbound_container)
+        (not
+          (entity_finalized_flag ?consolidation_batch_slot)
+        )
+      )
+    :effect (entity_finalized_flag ?consolidation_batch_slot)
+  )
+  (:action authorize_batch_release_and_assign_release_slot
+    :parameters (?batch - batch ?release_time_slot - release_time_slot ?quality_test_kit - quality_test_kit)
+    :precondition
+      (and
+        (entity_finalized_flag ?batch)
+        (entity_assigned_quality_test_kit ?batch ?quality_test_kit)
+        (release_time_slot_available ?release_time_slot)
+        (not
+          (entity_release_authorized ?batch)
+        )
+      )
+    :effect
+      (and
+        (entity_release_authorized ?batch)
+        (entity_assigned_release_time ?batch ?release_time_slot)
+        (not
+          (release_time_slot_available ?release_time_slot)
+        )
+      )
+  )
+  (:action assign_packaging_material_to_stored_slot_and_mark_assigned
+    :parameters (?stored_batch_slot - stored_batch_slot ?packaging_material_unit - packaging_material_unit ?release_time_slot - release_time_slot)
+    :precondition
+      (and
+        (entity_release_authorized ?stored_batch_slot)
+        (packaging_material_reserved_for_batch ?stored_batch_slot ?packaging_material_unit)
+        (entity_assigned_release_time ?stored_batch_slot ?release_time_slot)
+        (not
+          (packaging_assignment_completed_flag ?stored_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (packaging_assignment_completed_flag ?stored_batch_slot)
+        (packaging_material_available ?packaging_material_unit)
+        (release_time_slot_available ?release_time_slot)
+      )
+  )
+  (:action assign_packaging_material_to_consolidation_slot_and_mark_assigned
+    :parameters (?consolidation_batch_slot - consolidation_batch_slot ?packaging_material_unit - packaging_material_unit ?release_time_slot - release_time_slot)
+    :precondition
+      (and
+        (entity_release_authorized ?consolidation_batch_slot)
+        (packaging_material_reserved_for_batch ?consolidation_batch_slot ?packaging_material_unit)
+        (entity_assigned_release_time ?consolidation_batch_slot ?release_time_slot)
+        (not
+          (packaging_assignment_completed_flag ?consolidation_batch_slot)
+        )
+      )
+    :effect
+      (and
+        (packaging_assignment_completed_flag ?consolidation_batch_slot)
+        (packaging_material_available ?packaging_material_unit)
+        (release_time_slot_available ?release_time_slot)
+      )
+  )
+  (:action assign_packaging_material_to_packing_task_and_mark_assigned
+    :parameters (?packing_task - packing_task ?packaging_material_unit - packaging_material_unit ?release_time_slot - release_time_slot)
+    :precondition
+      (and
+        (entity_release_authorized ?packing_task)
+        (packaging_material_reserved_for_batch ?packing_task ?packaging_material_unit)
+        (entity_assigned_release_time ?packing_task ?release_time_slot)
+        (not
+          (packaging_assignment_completed_flag ?packing_task)
+        )
+      )
+    :effect
+      (and
+        (packaging_assignment_completed_flag ?packing_task)
+        (packaging_material_available ?packaging_material_unit)
+        (release_time_slot_available ?release_time_slot)
+      )
+  )
+)

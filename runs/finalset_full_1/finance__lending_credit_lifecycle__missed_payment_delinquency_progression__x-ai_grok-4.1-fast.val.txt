@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain missed_payment_delinquency_progression_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types party_role_group - object resource_group - object bucket_package_group - object case_container - object credit_account_case - case_container collection_agent - party_role_group notice_template - party_role_group remediation_action - party_role_group external_notice_provider - party_role_group settlement_strategy - party_role_group escalation_reason - party_role_group restructure_template - party_role_group legal_action_type - party_role_group assistance_option - resource_group supporting_document - resource_group legal_notice_type - resource_group primary_delinquency_bucket - bucket_package_group secondary_delinquency_bucket - bucket_package_group collection_package - bucket_package_group obligor_group - credit_account_case work_item_group - credit_account_case primary_obligor - obligor_group secondary_obligor - obligor_group servicer_work_item - work_item_group)
+  (:predicates
+    (delinquency_initiated ?credit_account_case - credit_account_case)
+    (entity_collection_eligible ?credit_account_case - credit_account_case)
+    (agent_assigned ?credit_account_case - credit_account_case)
+    (entity_returned_to_pool ?credit_account_case - credit_account_case)
+    (entity_resolved ?credit_account_case - credit_account_case)
+    (entity_outcome_recorded ?credit_account_case - credit_account_case)
+    (agent_available ?collection_agent - collection_agent)
+    (entity_collection_assignment ?credit_account_case - credit_account_case ?collection_agent - collection_agent)
+    (notice_template_available ?notice_template - notice_template)
+    (entity_notice_attached ?credit_account_case - credit_account_case ?notice_template - notice_template)
+    (remediation_action_available ?remediation_action - remediation_action)
+    (remediation_attached ?credit_account_case - credit_account_case ?remediation_action - remediation_action)
+    (assistance_option_available ?assistance_option - assistance_option)
+    (assistance_attached_to_primary_obligor ?primary_obligor - primary_obligor ?assistance_option - assistance_option)
+    (assistance_attached_to_secondary_obligor ?secondary_obligor - secondary_obligor ?assistance_option - assistance_option)
+    (primary_obligor_bucket_assigned ?primary_obligor - primary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket)
+    (primary_bucket_flagged ?primary_delinquency_bucket - primary_delinquency_bucket)
+    (primary_bucket_assistance_flag ?primary_delinquency_bucket - primary_delinquency_bucket)
+    (primary_obligor_bucket_ready ?primary_obligor - primary_obligor)
+    (secondary_obligor_bucket_assigned ?secondary_obligor - secondary_obligor ?secondary_delinquency_bucket - secondary_delinquency_bucket)
+    (secondary_bucket_flagged ?secondary_delinquency_bucket - secondary_delinquency_bucket)
+    (secondary_bucket_assistance_flag ?secondary_delinquency_bucket - secondary_delinquency_bucket)
+    (secondary_obligor_bucket_ready ?secondary_obligor - secondary_obligor)
+    (collection_package_available ?collection_package - collection_package)
+    (collection_package_assembled ?collection_package - collection_package)
+    (package_attached_primary_bucket ?collection_package - collection_package ?primary_delinquency_bucket - primary_delinquency_bucket)
+    (package_attached_secondary_bucket ?collection_package - collection_package ?secondary_delinquency_bucket - secondary_delinquency_bucket)
+    (package_includes_primary_assistance ?collection_package - collection_package)
+    (package_includes_secondary_assistance ?collection_package - collection_package)
+    (package_routed ?collection_package - collection_package)
+    (work_item_link_primary_obligor ?servicer_work_item - servicer_work_item ?primary_obligor - primary_obligor)
+    (work_item_link_secondary_obligor ?servicer_work_item - servicer_work_item ?secondary_obligor - secondary_obligor)
+    (work_item_link_collection_package ?servicer_work_item - servicer_work_item ?collection_package - collection_package)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (work_item_has_document ?servicer_work_item - servicer_work_item ?supporting_document - supporting_document)
+    (document_attached ?supporting_document - supporting_document)
+    (document_linked_to_package ?supporting_document - supporting_document ?collection_package - collection_package)
+    (work_item_validated ?servicer_work_item - servicer_work_item)
+    (collection_activity_executed ?servicer_work_item - servicer_work_item)
+    (work_item_ready_for_resolution ?servicer_work_item - servicer_work_item)
+    (external_provider_bound ?servicer_work_item - servicer_work_item)
+    (external_provider_package_steps_enabled ?servicer_work_item - servicer_work_item)
+    (work_item_settlement_eligible ?servicer_work_item - servicer_work_item)
+    (work_item_finalized_for_resolution ?servicer_work_item - servicer_work_item)
+    (legal_notice_type_available ?legal_notice_type - legal_notice_type)
+    (legal_notice_attached_to_work_item ?servicer_work_item - servicer_work_item ?legal_notice_type - legal_notice_type)
+    (legal_escalation_initiated ?servicer_work_item - servicer_work_item)
+    (legal_notice_prepared ?servicer_work_item - servicer_work_item)
+    (legal_action_executed ?servicer_work_item - servicer_work_item)
+    (external_notice_provider_available ?external_notice_provider - external_notice_provider)
+    (work_item_external_provider_assigned ?servicer_work_item - servicer_work_item ?external_notice_provider - external_notice_provider)
+    (settlement_strategy_available ?settlement_strategy - settlement_strategy)
+    (work_item_settlement_strategy_attached ?servicer_work_item - servicer_work_item ?settlement_strategy - settlement_strategy)
+    (restructure_template_available ?restructure_template - restructure_template)
+    (work_item_restructure_template_attached ?servicer_work_item - servicer_work_item ?restructure_template - restructure_template)
+    (legal_action_type_available ?legal_action_type - legal_action_type)
+    (work_item_legal_action_attached ?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type)
+    (escalation_reason_available ?escalation_reason - escalation_reason)
+    (outcome_reason_attached ?credit_account_case - credit_account_case ?escalation_reason - escalation_reason)
+    (obligor_package_ready ?primary_obligor - primary_obligor)
+    (coobligor_package_ready ?secondary_obligor - secondary_obligor)
+    (final_resolution_logged ?servicer_work_item - servicer_work_item)
+  )
+  (:action open_delinquency_case
+    :parameters (?credit_account_case - credit_account_case)
+    :precondition
+      (and
+        (not
+          (delinquency_initiated ?credit_account_case)
+        )
+        (not
+          (entity_returned_to_pool ?credit_account_case)
+        )
+      )
+    :effect (delinquency_initiated ?credit_account_case)
+  )
+  (:action assign_collection_agent
+    :parameters (?credit_account_case - credit_account_case ?collection_agent - collection_agent)
+    :precondition
+      (and
+        (delinquency_initiated ?credit_account_case)
+        (not
+          (agent_assigned ?credit_account_case)
+        )
+        (agent_available ?collection_agent)
+      )
+    :effect
+      (and
+        (agent_assigned ?credit_account_case)
+        (entity_collection_assignment ?credit_account_case ?collection_agent)
+        (not
+          (agent_available ?collection_agent)
+        )
+      )
+  )
+  (:action attach_notice_template
+    :parameters (?credit_account_case - credit_account_case ?notice_template - notice_template)
+    :precondition
+      (and
+        (delinquency_initiated ?credit_account_case)
+        (agent_assigned ?credit_account_case)
+        (notice_template_available ?notice_template)
+      )
+    :effect
+      (and
+        (entity_notice_attached ?credit_account_case ?notice_template)
+        (not
+          (notice_template_available ?notice_template)
+        )
+      )
+  )
+  (:action mark_notice_sent
+    :parameters (?credit_account_case - credit_account_case ?notice_template - notice_template)
+    :precondition
+      (and
+        (delinquency_initiated ?credit_account_case)
+        (agent_assigned ?credit_account_case)
+        (entity_notice_attached ?credit_account_case ?notice_template)
+        (not
+          (entity_collection_eligible ?credit_account_case)
+        )
+      )
+    :effect (entity_collection_eligible ?credit_account_case)
+  )
+  (:action retract_notice_template
+    :parameters (?credit_account_case - credit_account_case ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_notice_attached ?credit_account_case ?notice_template)
+      )
+    :effect
+      (and
+        (notice_template_available ?notice_template)
+        (not
+          (entity_notice_attached ?credit_account_case ?notice_template)
+        )
+      )
+  )
+  (:action attach_remediation_action
+    :parameters (?credit_account_case - credit_account_case ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (entity_collection_eligible ?credit_account_case)
+        (remediation_action_available ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_attached ?credit_account_case ?remediation_action)
+        (not
+          (remediation_action_available ?remediation_action)
+        )
+      )
+  )
+  (:action detach_remediation_action
+    :parameters (?credit_account_case - credit_account_case ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (remediation_attached ?credit_account_case ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_action_available ?remediation_action)
+        (not
+          (remediation_attached ?credit_account_case ?remediation_action)
+        )
+      )
+  )
+  (:action attach_restructure_template_to_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?restructure_template - restructure_template)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (restructure_template_available ?restructure_template)
+      )
+    :effect
+      (and
+        (work_item_restructure_template_attached ?servicer_work_item ?restructure_template)
+        (not
+          (restructure_template_available ?restructure_template)
+        )
+      )
+  )
+  (:action detach_restructure_template_from_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?restructure_template - restructure_template)
+    :precondition
+      (and
+        (work_item_restructure_template_attached ?servicer_work_item ?restructure_template)
+      )
+    :effect
+      (and
+        (restructure_template_available ?restructure_template)
+        (not
+          (work_item_restructure_template_attached ?servicer_work_item ?restructure_template)
+        )
+      )
+  )
+  (:action attach_legal_action_type_to_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (legal_action_type_available ?legal_action_type)
+      )
+    :effect
+      (and
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (not
+          (legal_action_type_available ?legal_action_type)
+        )
+      )
+  )
+  (:action detach_legal_action_type_from_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type)
+    :precondition
+      (and
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+      )
+    :effect
+      (and
+        (legal_action_type_available ?legal_action_type)
+        (not
+          (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        )
+      )
+  )
+  (:action evaluate_primary_bucket
+    :parameters (?primary_obligor - primary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_collection_eligible ?primary_obligor)
+        (entity_notice_attached ?primary_obligor ?notice_template)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (not
+          (primary_bucket_flagged ?primary_delinquency_bucket)
+        )
+        (not
+          (primary_bucket_assistance_flag ?primary_delinquency_bucket)
+        )
+      )
+    :effect (primary_bucket_flagged ?primary_delinquency_bucket)
+  )
+  (:action process_primary_bucket_with_remediation
+    :parameters (?primary_obligor - primary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (entity_collection_eligible ?primary_obligor)
+        (remediation_attached ?primary_obligor ?remediation_action)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (primary_bucket_flagged ?primary_delinquency_bucket)
+        (not
+          (obligor_package_ready ?primary_obligor)
+        )
+      )
+    :effect
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (primary_obligor_bucket_ready ?primary_obligor)
+      )
+  )
+  (:action offer_assistance_to_primary_obligor
+    :parameters (?primary_obligor - primary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?assistance_option - assistance_option)
+    :precondition
+      (and
+        (entity_collection_eligible ?primary_obligor)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (assistance_option_available ?assistance_option)
+        (not
+          (obligor_package_ready ?primary_obligor)
+        )
+      )
+    :effect
+      (and
+        (primary_bucket_assistance_flag ?primary_delinquency_bucket)
+        (obligor_package_ready ?primary_obligor)
+        (assistance_attached_to_primary_obligor ?primary_obligor ?assistance_option)
+        (not
+          (assistance_option_available ?assistance_option)
+        )
+      )
+  )
+  (:action apply_assistance_and_mark_primary_bucket_ready
+    :parameters (?primary_obligor - primary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?notice_template - notice_template ?assistance_option - assistance_option)
+    :precondition
+      (and
+        (entity_collection_eligible ?primary_obligor)
+        (entity_notice_attached ?primary_obligor ?notice_template)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (primary_bucket_assistance_flag ?primary_delinquency_bucket)
+        (assistance_attached_to_primary_obligor ?primary_obligor ?assistance_option)
+        (not
+          (primary_obligor_bucket_ready ?primary_obligor)
+        )
+      )
+    :effect
+      (and
+        (primary_bucket_flagged ?primary_delinquency_bucket)
+        (primary_obligor_bucket_ready ?primary_obligor)
+        (assistance_option_available ?assistance_option)
+        (not
+          (assistance_attached_to_primary_obligor ?primary_obligor ?assistance_option)
+        )
+      )
+  )
+  (:action evaluate_secondary_bucket
+    :parameters (?secondary_obligor - secondary_obligor ?secondary_delinquency_bucket - secondary_delinquency_bucket ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_collection_eligible ?secondary_obligor)
+        (entity_notice_attached ?secondary_obligor ?notice_template)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (not
+          (secondary_bucket_flagged ?secondary_delinquency_bucket)
+        )
+        (not
+          (secondary_bucket_assistance_flag ?secondary_delinquency_bucket)
+        )
+      )
+    :effect (secondary_bucket_flagged ?secondary_delinquency_bucket)
+  )
+  (:action process_secondary_bucket_with_remediation
+    :parameters (?secondary_obligor - secondary_obligor ?secondary_delinquency_bucket - secondary_delinquency_bucket ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (entity_collection_eligible ?secondary_obligor)
+        (remediation_attached ?secondary_obligor ?remediation_action)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (secondary_bucket_flagged ?secondary_delinquency_bucket)
+        (not
+          (coobligor_package_ready ?secondary_obligor)
+        )
+      )
+    :effect
+      (and
+        (coobligor_package_ready ?secondary_obligor)
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+      )
+  )
+  (:action offer_assistance_to_secondary_obligor
+    :parameters (?secondary_obligor - secondary_obligor ?secondary_delinquency_bucket - secondary_delinquency_bucket ?assistance_option - assistance_option)
+    :precondition
+      (and
+        (entity_collection_eligible ?secondary_obligor)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (assistance_option_available ?assistance_option)
+        (not
+          (coobligor_package_ready ?secondary_obligor)
+        )
+      )
+    :effect
+      (and
+        (secondary_bucket_assistance_flag ?secondary_delinquency_bucket)
+        (coobligor_package_ready ?secondary_obligor)
+        (assistance_attached_to_secondary_obligor ?secondary_obligor ?assistance_option)
+        (not
+          (assistance_option_available ?assistance_option)
+        )
+      )
+  )
+  (:action apply_assistance_and_mark_secondary_bucket_ready
+    :parameters (?secondary_obligor - secondary_obligor ?secondary_delinquency_bucket - secondary_delinquency_bucket ?notice_template - notice_template ?assistance_option - assistance_option)
+    :precondition
+      (and
+        (entity_collection_eligible ?secondary_obligor)
+        (entity_notice_attached ?secondary_obligor ?notice_template)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (secondary_bucket_assistance_flag ?secondary_delinquency_bucket)
+        (assistance_attached_to_secondary_obligor ?secondary_obligor ?assistance_option)
+        (not
+          (secondary_obligor_bucket_ready ?secondary_obligor)
+        )
+      )
+    :effect
+      (and
+        (secondary_bucket_flagged ?secondary_delinquency_bucket)
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+        (assistance_option_available ?assistance_option)
+        (not
+          (assistance_attached_to_secondary_obligor ?secondary_obligor ?assistance_option)
+        )
+      )
+  )
+  (:action assemble_collection_package
+    :parameters (?primary_obligor - primary_obligor ?secondary_obligor - secondary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?secondary_delinquency_bucket - secondary_delinquency_bucket ?collection_package - collection_package)
+    :precondition
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (coobligor_package_ready ?secondary_obligor)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (primary_bucket_flagged ?primary_delinquency_bucket)
+        (secondary_bucket_flagged ?secondary_delinquency_bucket)
+        (primary_obligor_bucket_ready ?primary_obligor)
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+        (collection_package_available ?collection_package)
+      )
+    :effect
+      (and
+        (collection_package_assembled ?collection_package)
+        (package_attached_primary_bucket ?collection_package ?primary_delinquency_bucket)
+        (package_attached_secondary_bucket ?collection_package ?secondary_delinquency_bucket)
+        (not
+          (collection_package_available ?collection_package)
+        )
+      )
+  )
+  (:action assemble_collection_package_with_primary_assistance
+    :parameters (?primary_obligor - primary_obligor ?secondary_obligor - secondary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?secondary_delinquency_bucket - secondary_delinquency_bucket ?collection_package - collection_package)
+    :precondition
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (coobligor_package_ready ?secondary_obligor)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (primary_bucket_assistance_flag ?primary_delinquency_bucket)
+        (secondary_bucket_flagged ?secondary_delinquency_bucket)
+        (not
+          (primary_obligor_bucket_ready ?primary_obligor)
+        )
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+        (collection_package_available ?collection_package)
+      )
+    :effect
+      (and
+        (collection_package_assembled ?collection_package)
+        (package_attached_primary_bucket ?collection_package ?primary_delinquency_bucket)
+        (package_attached_secondary_bucket ?collection_package ?secondary_delinquency_bucket)
+        (package_includes_primary_assistance ?collection_package)
+        (not
+          (collection_package_available ?collection_package)
+        )
+      )
+  )
+  (:action assemble_collection_package_with_secondary_assistance
+    :parameters (?primary_obligor - primary_obligor ?secondary_obligor - secondary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?secondary_delinquency_bucket - secondary_delinquency_bucket ?collection_package - collection_package)
+    :precondition
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (coobligor_package_ready ?secondary_obligor)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (primary_bucket_flagged ?primary_delinquency_bucket)
+        (secondary_bucket_assistance_flag ?secondary_delinquency_bucket)
+        (primary_obligor_bucket_ready ?primary_obligor)
+        (not
+          (secondary_obligor_bucket_ready ?secondary_obligor)
+        )
+        (collection_package_available ?collection_package)
+      )
+    :effect
+      (and
+        (collection_package_assembled ?collection_package)
+        (package_attached_primary_bucket ?collection_package ?primary_delinquency_bucket)
+        (package_attached_secondary_bucket ?collection_package ?secondary_delinquency_bucket)
+        (package_includes_secondary_assistance ?collection_package)
+        (not
+          (collection_package_available ?collection_package)
+        )
+      )
+  )
+  (:action assemble_collection_package_with_both_assistances
+    :parameters (?primary_obligor - primary_obligor ?secondary_obligor - secondary_obligor ?primary_delinquency_bucket - primary_delinquency_bucket ?secondary_delinquency_bucket - secondary_delinquency_bucket ?collection_package - collection_package)
+    :precondition
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (coobligor_package_ready ?secondary_obligor)
+        (primary_obligor_bucket_assigned ?primary_obligor ?primary_delinquency_bucket)
+        (secondary_obligor_bucket_assigned ?secondary_obligor ?secondary_delinquency_bucket)
+        (primary_bucket_assistance_flag ?primary_delinquency_bucket)
+        (secondary_bucket_assistance_flag ?secondary_delinquency_bucket)
+        (not
+          (primary_obligor_bucket_ready ?primary_obligor)
+        )
+        (not
+          (secondary_obligor_bucket_ready ?secondary_obligor)
+        )
+        (collection_package_available ?collection_package)
+      )
+    :effect
+      (and
+        (collection_package_assembled ?collection_package)
+        (package_attached_primary_bucket ?collection_package ?primary_delinquency_bucket)
+        (package_attached_secondary_bucket ?collection_package ?secondary_delinquency_bucket)
+        (package_includes_primary_assistance ?collection_package)
+        (package_includes_secondary_assistance ?collection_package)
+        (not
+          (collection_package_available ?collection_package)
+        )
+      )
+  )
+  (:action mark_package_routed
+    :parameters (?collection_package - collection_package ?primary_obligor - primary_obligor ?notice_template - notice_template)
+    :precondition
+      (and
+        (collection_package_assembled ?collection_package)
+        (obligor_package_ready ?primary_obligor)
+        (entity_notice_attached ?primary_obligor ?notice_template)
+        (not
+          (package_routed ?collection_package)
+        )
+      )
+    :effect (package_routed ?collection_package)
+  )
+  (:action attach_supporting_document_to_package
+    :parameters (?servicer_work_item - servicer_work_item ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (work_item_link_collection_package ?servicer_work_item ?collection_package)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (collection_package_assembled ?collection_package)
+        (package_routed ?collection_package)
+        (not
+          (document_attached ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (document_attached ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action validate_package_and_release_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?supporting_document - supporting_document ?collection_package - collection_package ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_attached ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (entity_notice_attached ?servicer_work_item ?notice_template)
+        (not
+          (package_includes_primary_assistance ?collection_package)
+        )
+        (not
+          (work_item_validated ?servicer_work_item)
+        )
+      )
+    :effect (work_item_validated ?servicer_work_item)
+  )
+  (:action attach_external_notice_provider
+    :parameters (?servicer_work_item - servicer_work_item ?external_notice_provider - external_notice_provider)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (external_notice_provider_available ?external_notice_provider)
+        (not
+          (external_provider_bound ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (external_provider_bound ?servicer_work_item)
+        (work_item_external_provider_assigned ?servicer_work_item ?external_notice_provider)
+        (not
+          (external_notice_provider_available ?external_notice_provider)
+        )
+      )
+  )
+  (:action enable_external_provider_package_steps
+    :parameters (?servicer_work_item - servicer_work_item ?supporting_document - supporting_document ?collection_package - collection_package ?notice_template - notice_template ?external_notice_provider - external_notice_provider)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_attached ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (entity_notice_attached ?servicer_work_item ?notice_template)
+        (package_includes_primary_assistance ?collection_package)
+        (external_provider_bound ?servicer_work_item)
+        (work_item_external_provider_assigned ?servicer_work_item ?external_notice_provider)
+        (not
+          (work_item_validated ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_validated ?servicer_work_item)
+        (external_provider_package_steps_enabled ?servicer_work_item)
+      )
+  )
+  (:action execute_collection_activity_primary_path
+    :parameters (?servicer_work_item - servicer_work_item ?restructure_template - restructure_template ?remediation_action - remediation_action ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (work_item_validated ?servicer_work_item)
+        (work_item_restructure_template_attached ?servicer_work_item ?restructure_template)
+        (remediation_attached ?servicer_work_item ?remediation_action)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (not
+          (package_includes_secondary_assistance ?collection_package)
+        )
+        (not
+          (collection_activity_executed ?servicer_work_item)
+        )
+      )
+    :effect (collection_activity_executed ?servicer_work_item)
+  )
+  (:action execute_collection_activity_secondary_path
+    :parameters (?servicer_work_item - servicer_work_item ?restructure_template - restructure_template ?remediation_action - remediation_action ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (work_item_validated ?servicer_work_item)
+        (work_item_restructure_template_attached ?servicer_work_item ?restructure_template)
+        (remediation_attached ?servicer_work_item ?remediation_action)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (package_includes_secondary_assistance ?collection_package)
+        (not
+          (collection_activity_executed ?servicer_work_item)
+        )
+      )
+    :effect (collection_activity_executed ?servicer_work_item)
+  )
+  (:action escalate_work_item_for_legal_action
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (collection_activity_executed ?servicer_work_item)
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (not
+          (package_includes_primary_assistance ?collection_package)
+        )
+        (not
+          (package_includes_secondary_assistance ?collection_package)
+        )
+        (not
+          (work_item_ready_for_resolution ?servicer_work_item)
+        )
+      )
+    :effect (work_item_ready_for_resolution ?servicer_work_item)
+  )
+  (:action escalate_and_mark_settlement_eligible_primary_only
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (collection_activity_executed ?servicer_work_item)
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (package_includes_primary_assistance ?collection_package)
+        (not
+          (package_includes_secondary_assistance ?collection_package)
+        )
+        (not
+          (work_item_ready_for_resolution ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_settlement_eligible ?servicer_work_item)
+      )
+  )
+  (:action escalate_and_mark_settlement_eligible_secondary_only
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (collection_activity_executed ?servicer_work_item)
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (not
+          (package_includes_primary_assistance ?collection_package)
+        )
+        (package_includes_secondary_assistance ?collection_package)
+        (not
+          (work_item_ready_for_resolution ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_settlement_eligible ?servicer_work_item)
+      )
+  )
+  (:action escalate_and_mark_settlement_eligible_both
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type ?supporting_document - supporting_document ?collection_package - collection_package)
+    :precondition
+      (and
+        (collection_activity_executed ?servicer_work_item)
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (work_item_has_document ?servicer_work_item ?supporting_document)
+        (document_linked_to_package ?supporting_document ?collection_package)
+        (package_includes_primary_assistance ?collection_package)
+        (package_includes_secondary_assistance ?collection_package)
+        (not
+          (work_item_ready_for_resolution ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_settlement_eligible ?servicer_work_item)
+      )
+  )
+  (:action finalize_work_item_without_settlement
+    :parameters (?servicer_work_item - servicer_work_item)
+    :precondition
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (not
+          (work_item_settlement_eligible ?servicer_work_item)
+        )
+        (not
+          (final_resolution_logged ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (final_resolution_logged ?servicer_work_item)
+        (entity_resolved ?servicer_work_item)
+      )
+  )
+  (:action attach_settlement_strategy_to_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?settlement_strategy - settlement_strategy)
+    :precondition
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_settlement_eligible ?servicer_work_item)
+        (settlement_strategy_available ?settlement_strategy)
+      )
+    :effect
+      (and
+        (work_item_settlement_strategy_attached ?servicer_work_item ?settlement_strategy)
+        (not
+          (settlement_strategy_available ?settlement_strategy)
+        )
+      )
+  )
+  (:action apply_settlement_strategy_and_finalize_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?primary_obligor - primary_obligor ?secondary_obligor - secondary_obligor ?notice_template - notice_template ?settlement_strategy - settlement_strategy)
+    :precondition
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_settlement_eligible ?servicer_work_item)
+        (work_item_settlement_strategy_attached ?servicer_work_item ?settlement_strategy)
+        (work_item_link_primary_obligor ?servicer_work_item ?primary_obligor)
+        (work_item_link_secondary_obligor ?servicer_work_item ?secondary_obligor)
+        (primary_obligor_bucket_ready ?primary_obligor)
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+        (entity_notice_attached ?servicer_work_item ?notice_template)
+        (not
+          (work_item_finalized_for_resolution ?servicer_work_item)
+        )
+      )
+    :effect (work_item_finalized_for_resolution ?servicer_work_item)
+  )
+  (:action finalize_work_item
+    :parameters (?servicer_work_item - servicer_work_item)
+    :precondition
+      (and
+        (work_item_ready_for_resolution ?servicer_work_item)
+        (work_item_finalized_for_resolution ?servicer_work_item)
+        (not
+          (final_resolution_logged ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (final_resolution_logged ?servicer_work_item)
+        (entity_resolved ?servicer_work_item)
+      )
+  )
+  (:action initiate_legal_escalation
+    :parameters (?servicer_work_item - servicer_work_item ?legal_notice_type - legal_notice_type ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_collection_eligible ?servicer_work_item)
+        (entity_notice_attached ?servicer_work_item ?notice_template)
+        (legal_notice_type_available ?legal_notice_type)
+        (legal_notice_attached_to_work_item ?servicer_work_item ?legal_notice_type)
+        (not
+          (legal_escalation_initiated ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (legal_escalation_initiated ?servicer_work_item)
+        (not
+          (legal_notice_type_available ?legal_notice_type)
+        )
+      )
+  )
+  (:action prepare_legal_notice_for_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (legal_escalation_initiated ?servicer_work_item)
+        (remediation_attached ?servicer_work_item ?remediation_action)
+        (not
+          (legal_notice_prepared ?servicer_work_item)
+        )
+      )
+    :effect (legal_notice_prepared ?servicer_work_item)
+  )
+  (:action apply_legal_action_to_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?legal_action_type - legal_action_type)
+    :precondition
+      (and
+        (legal_notice_prepared ?servicer_work_item)
+        (work_item_legal_action_attached ?servicer_work_item ?legal_action_type)
+        (not
+          (legal_action_executed ?servicer_work_item)
+        )
+      )
+    :effect (legal_action_executed ?servicer_work_item)
+  )
+  (:action finalize_work_item_after_legal_action
+    :parameters (?servicer_work_item - servicer_work_item)
+    :precondition
+      (and
+        (legal_action_executed ?servicer_work_item)
+        (not
+          (final_resolution_logged ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (final_resolution_logged ?servicer_work_item)
+        (entity_resolved ?servicer_work_item)
+      )
+  )
+  (:action record_recovery_for_primary_obligor
+    :parameters (?primary_obligor - primary_obligor ?collection_package - collection_package)
+    :precondition
+      (and
+        (obligor_package_ready ?primary_obligor)
+        (primary_obligor_bucket_ready ?primary_obligor)
+        (collection_package_assembled ?collection_package)
+        (package_routed ?collection_package)
+        (not
+          (entity_resolved ?primary_obligor)
+        )
+      )
+    :effect (entity_resolved ?primary_obligor)
+  )
+  (:action record_recovery_for_secondary_obligor
+    :parameters (?secondary_obligor - secondary_obligor ?collection_package - collection_package)
+    :precondition
+      (and
+        (coobligor_package_ready ?secondary_obligor)
+        (secondary_obligor_bucket_ready ?secondary_obligor)
+        (collection_package_assembled ?collection_package)
+        (package_routed ?collection_package)
+        (not
+          (entity_resolved ?secondary_obligor)
+        )
+      )
+    :effect (entity_resolved ?secondary_obligor)
+  )
+  (:action promote_case_outcome_and_record_reason
+    :parameters (?credit_account_case - credit_account_case ?escalation_reason - escalation_reason ?notice_template - notice_template)
+    :precondition
+      (and
+        (entity_resolved ?credit_account_case)
+        (entity_notice_attached ?credit_account_case ?notice_template)
+        (escalation_reason_available ?escalation_reason)
+        (not
+          (entity_outcome_recorded ?credit_account_case)
+        )
+      )
+    :effect
+      (and
+        (entity_outcome_recorded ?credit_account_case)
+        (outcome_reason_attached ?credit_account_case ?escalation_reason)
+        (not
+          (escalation_reason_available ?escalation_reason)
+        )
+      )
+  )
+  (:action release_resources_for_primary_obligor
+    :parameters (?primary_obligor - primary_obligor ?collection_agent - collection_agent ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (entity_outcome_recorded ?primary_obligor)
+        (entity_collection_assignment ?primary_obligor ?collection_agent)
+        (outcome_reason_attached ?primary_obligor ?escalation_reason)
+        (not
+          (entity_returned_to_pool ?primary_obligor)
+        )
+      )
+    :effect
+      (and
+        (entity_returned_to_pool ?primary_obligor)
+        (agent_available ?collection_agent)
+        (escalation_reason_available ?escalation_reason)
+      )
+  )
+  (:action release_resources_for_secondary_obligor
+    :parameters (?secondary_obligor - secondary_obligor ?collection_agent - collection_agent ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (entity_outcome_recorded ?secondary_obligor)
+        (entity_collection_assignment ?secondary_obligor ?collection_agent)
+        (outcome_reason_attached ?secondary_obligor ?escalation_reason)
+        (not
+          (entity_returned_to_pool ?secondary_obligor)
+        )
+      )
+    :effect
+      (and
+        (entity_returned_to_pool ?secondary_obligor)
+        (agent_available ?collection_agent)
+        (escalation_reason_available ?escalation_reason)
+      )
+  )
+  (:action release_resources_for_work_item
+    :parameters (?servicer_work_item - servicer_work_item ?collection_agent - collection_agent ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (entity_outcome_recorded ?servicer_work_item)
+        (entity_collection_assignment ?servicer_work_item ?collection_agent)
+        (outcome_reason_attached ?servicer_work_item ?escalation_reason)
+        (not
+          (entity_returned_to_pool ?servicer_work_item)
+        )
+      )
+    :effect
+      (and
+        (entity_returned_to_pool ?servicer_work_item)
+        (agent_available ?collection_agent)
+        (escalation_reason_available ?escalation_reason)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem missed_payment_case_scenario)
+  (:domain missed_payment_delinquency_progression_domain)
+  (:objects primary_obligor_1 - primary_obligor secondary_obligor_1 - secondary_obligor servicer_work_item_1 - servicer_work_item servicer_work_item_2 - servicer_work_item collection_agent_1 - collection_agent collection_agent_2 - collection_agent collection_agent_3 - collection_agent notice_template_1 - notice_template remediation_action_1 - remediation_action assistance_option_1 - assistance_option primary_delinquency_bucket_1 - primary_delinquency_bucket secondary_delinquency_bucket_1 - secondary_delinquency_bucket collection_package_1 - collection_package supporting_document_1 - supporting_document supporting_document_2 - supporting_document external_notice_provider_1 - external_notice_provider external_notice_provider_2 - external_notice_provider settlement_strategy_1 - settlement_strategy settlement_strategy_2 - settlement_strategy escalation_reason_1 - escalation_reason restructure_template_1 - restructure_template legal_notice_type_1 - legal_notice_type legal_notice_type_2 - legal_notice_type legal_action_type_1 - legal_action_type)
+  (:init
+    (agent_available collection_agent_1)
+    (agent_available collection_agent_2)
+    (agent_available collection_agent_3)
+    (notice_template_available notice_template_1)
+    (remediation_action_available remediation_action_1)
+    (assistance_option_available assistance_option_1)
+    (primary_obligor_bucket_assigned primary_obligor_1 primary_delinquency_bucket_1)
+    (secondary_obligor_bucket_assigned secondary_obligor_1 secondary_delinquency_bucket_1)
+    (collection_package_available collection_package_1)
+    (supporting_document_available supporting_document_1)
+    (supporting_document_available supporting_document_2)
+    (work_item_link_primary_obligor servicer_work_item_1 primary_obligor_1)
+    (work_item_link_primary_obligor servicer_work_item_2 primary_obligor_1)
+    (work_item_link_secondary_obligor servicer_work_item_1 secondary_obligor_1)
+    (work_item_link_secondary_obligor servicer_work_item_2 secondary_obligor_1)
+    (work_item_link_collection_package servicer_work_item_1 collection_package_1)
+    (work_item_link_collection_package servicer_work_item_2 collection_package_1)
+    (work_item_has_document servicer_work_item_1 supporting_document_1)
+    (work_item_has_document servicer_work_item_2 supporting_document_2)
+    (external_notice_provider_available external_notice_provider_1)
+    (external_notice_provider_available external_notice_provider_2)
+    (settlement_strategy_available settlement_strategy_1)
+    (settlement_strategy_available settlement_strategy_2)
+    (escalation_reason_available escalation_reason_1)
+    (restructure_template_available restructure_template_1)
+    (legal_notice_type_available legal_notice_type_1)
+    (legal_notice_attached_to_work_item servicer_work_item_1 legal_notice_type_1)
+    (legal_notice_attached_to_work_item servicer_work_item_2 legal_notice_type_2)
+    (legal_action_type_available legal_action_type_1)
+  )
+  (:goal
+    (and
+      (entity_returned_to_pool primary_obligor_1)
+      (entity_returned_to_pool secondary_obligor_1)
+      (entity_returned_to_pool servicer_work_item_1)
+      (entity_returned_to_pool servicer_work_item_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_delinquency_case primary_obligor_1)
+(assign_collection_agent primary_obligor_1 collection_agent_1)
+(attach_notice_template primary_obligor_1 notice_template_1)
+(mark_notice_sent primary_obligor_1 notice_template_1)
+(attach_remediation_action primary_obligor_1 remediation_action_1)
+(evaluate_primary_bucket primary_obligor_1 primary_delinquency_bucket_1 notice_template_1)
+(process_primary_bucket_with_remediation primary_obligor_1 primary_delinquency_bucket_1 remediation_action_1)
+(detach_remediation_action primary_obligor_1 remediation_action_1)
+(open_delinquency_case secondary_obligor_1)
+(assign_collection_agent secondary_obligor_1 collection_agent_2)
+(retract_notice_template primary_obligor_1 notice_template_1)
+(attach_notice_template secondary_obligor_1 notice_template_1)
+(mark_notice_sent secondary_obligor_1 notice_template_1)
+(attach_remediation_action secondary_obligor_1 remediation_action_1)
+(evaluate_secondary_bucket secondary_obligor_1 secondary_delinquency_bucket_1 notice_template_1)
+(process_secondary_bucket_with_remediation secondary_obligor_1 secondary_delinquency_bucket_1 remediation_action_1)
+(retract_notice_template secondary_obligor_1 notice_template_1)
+(attach_notice_template primary_obligor_1 notice_template_1)
+(assemble_collection_package primary_obligor_1 secondary_obligor_1 primary_delinquency_bucket_1 secondary_delinquency_bucket_1 collection_package_1)
+(mark_package_routed collection_package_1 primary_obligor_1 notice_template_1)
+(record_recovery_for_primary_obligor primary_obligor_1 collection_package_1)
+(record_recovery_for_secondary_obligor secondary_obligor_1 collection_package_1)
+(detach_remediation_action secondary_obligor_1 remediation_action_1)
+(open_delinquency_case servicer_work_item_1)
+(assign_collection_agent servicer_work_item_1 collection_agent_3)
+(retract_notice_template primary_obligor_1 notice_template_1)
+(attach_notice_template servicer_work_item_1 notice_template_1)
+(mark_notice_sent servicer_work_item_1 notice_template_1)
+(attach_restructure_template_to_work_item servicer_work_item_1 restructure_template_1)
+(attach_remediation_action servicer_work_item_1 remediation_action_1)
+(attach_legal_action_type_to_work_item servicer_work_item_1 legal_action_type_1)
+(attach_supporting_document_to_package servicer_work_item_1 supporting_document_1 collection_package_1)
+(validate_package_and_release_work_item servicer_work_item_1 supporting_document_1 collection_package_1 notice_template_1)
+(execute_collection_activity_primary_path servicer_work_item_1 restructure_template_1 remediation_action_1 supporting_document_1 collection_package_1)
+(escalate_work_item_for_legal_action servicer_work_item_1 legal_action_type_1 supporting_document_1 collection_package_1)
+(finalize_work_item_without_settlement servicer_work_item_1)
+(promote_case_outcome_and_record_reason servicer_work_item_1 escalation_reason_1 notice_template_1)
+(release_resources_for_work_item servicer_work_item_1 collection_agent_3 escalation_reason_1)
+(open_delinquency_case servicer_work_item_2)
+(assign_collection_agent servicer_work_item_2 collection_agent_3)
+(retract_notice_template servicer_work_item_1 notice_template_1)
+(attach_notice_template servicer_work_item_2 notice_template_1)
+(mark_notice_sent servicer_work_item_2 notice_template_1)
+(detach_restructure_template_from_work_item servicer_work_item_1 restructure_template_1)
+(attach_restructure_template_to_work_item servicer_work_item_2 restructure_template_1)
+(detach_remediation_action servicer_work_item_1 remediation_action_1)
+(attach_remediation_action servicer_work_item_2 remediation_action_1)
+(detach_legal_action_type_from_work_item servicer_work_item_1 legal_action_type_1)
+(attach_legal_action_type_to_work_item servicer_work_item_2 legal_action_type_1)
+(attach_supporting_document_to_package servicer_work_item_2 supporting_document_2 collection_package_1)
+(validate_package_and_release_work_item servicer_work_item_2 supporting_document_2 collection_package_1 notice_template_1)
+(execute_collection_activity_primary_path servicer_work_item_2 restructure_template_1 remediation_action_1 supporting_document_2 collection_package_1)
+(escalate_work_item_for_legal_action servicer_work_item_2 legal_action_type_1 supporting_document_2 collection_package_1)
+(finalize_work_item_without_settlement servicer_work_item_2)
+(promote_case_outcome_and_record_reason servicer_work_item_2 escalation_reason_1 notice_template_1)
+(release_resources_for_work_item servicer_work_item_2 collection_agent_3 escalation_reason_1)
+(retract_notice_template servicer_work_item_2 notice_template_1)
+(attach_notice_template primary_obligor_1 notice_template_1)
+(promote_case_outcome_and_record_reason primary_obligor_1 escalation_reason_1 notice_template_1)
+(release_resources_for_primary_obligor primary_obligor_1 collection_agent_1 escalation_reason_1)
+(retract_notice_template primary_obligor_1 notice_template_1)
+(attach_notice_template secondary_obligor_1 notice_template_1)
+(promote_case_outcome_and_record_reason secondary_obligor_1 escalation_reason_1 notice_template_1)
+(release_resources_for_secondary_obligor secondary_obligor_1 collection_agent_2 escalation_reason_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_6x7i5lds/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_6x7i5lds/plan.pddl 64 
+
+
+
+--- stderr ---
+

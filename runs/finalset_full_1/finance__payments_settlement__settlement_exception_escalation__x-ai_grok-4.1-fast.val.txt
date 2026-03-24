@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_payments_settlement_exception_escalation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object channel_category - object document_category - object instruction_container - object payment_instruction - instruction_container settlement_channel - resource_category message_endpoint - resource_category approver - resource_category escalation_policy - resource_category priority_profile - resource_category escalation_reason_token - resource_category execution_mode_token - resource_category escalation_level - resource_category supporting_channel - channel_category compliance_reference - channel_category authorization_profile - channel_category origin_execution_document - document_category beneficiary_execution_document - document_category settlement_work_record - document_category leg_container_type - payment_instruction work_unit_container_type - payment_instruction origin_leg - leg_container_type beneficiary_leg - leg_container_type processing_work_unit - work_unit_container_type)
+  (:predicates
+    (intake_registered ?payment_instruction - payment_instruction)
+    (released_for_processing ?payment_instruction - payment_instruction)
+    (channel_selected ?payment_instruction - payment_instruction)
+    (settled ?payment_instruction - payment_instruction)
+    (ready_for_finalization ?payment_instruction - payment_instruction)
+    (finalization_in_progress ?payment_instruction - payment_instruction)
+    (channel_available ?settlement_channel - settlement_channel)
+    (assigned_channel ?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    (endpoint_available ?message_endpoint - message_endpoint)
+    (assigned_endpoint ?payment_instruction - payment_instruction ?message_endpoint - message_endpoint)
+    (approver_available ?approver - approver)
+    (assigned_approver ?payment_instruction - payment_instruction ?approver - approver)
+    (supporting_channel_available ?supporting_document - supporting_channel)
+    (origin_leg_channel_attached ?origin_leg - origin_leg ?supporting_document - supporting_channel)
+    (beneficiary_leg_channel_attached ?beneficiary_leg - beneficiary_leg ?supporting_document - supporting_channel)
+    (origin_leg_execution_document_link ?origin_leg - origin_leg ?origin_execution_channel - origin_execution_document)
+    (origin_execution_document_ready ?origin_execution_channel - origin_execution_document)
+    (origin_execution_document_required ?origin_execution_channel - origin_execution_document)
+    (origin_leg_ready ?origin_leg - origin_leg)
+    (beneficiary_leg_execution_document_link ?beneficiary_leg - beneficiary_leg ?beneficiary_execution_channel - beneficiary_execution_document)
+    (beneficiary_execution_document_ready ?beneficiary_execution_channel - beneficiary_execution_document)
+    (beneficiary_execution_document_required ?beneficiary_execution_channel - beneficiary_execution_document)
+    (beneficiary_leg_ready ?beneficiary_leg - beneficiary_leg)
+    (work_record_available ?settlement_work_record - settlement_work_record)
+    (work_record_created ?settlement_work_record - settlement_work_record)
+    (work_record_origin_document_link ?settlement_work_record - settlement_work_record ?origin_execution_channel - origin_execution_document)
+    (work_record_beneficiary_document_link ?settlement_work_record - settlement_work_record ?beneficiary_execution_channel - beneficiary_execution_document)
+    (work_record_requires_origin_document ?settlement_work_record - settlement_work_record)
+    (work_record_requires_beneficiary_document ?settlement_work_record - settlement_work_record)
+    (work_record_ready_for_document_check ?settlement_work_record - settlement_work_record)
+    (work_unit_has_origin_leg ?processing_work_unit - processing_work_unit ?origin_leg - origin_leg)
+    (work_unit_has_beneficiary_leg ?processing_work_unit - processing_work_unit ?beneficiary_leg - beneficiary_leg)
+    (work_unit_linked_work_record ?processing_work_unit - processing_work_unit ?settlement_work_record - settlement_work_record)
+    (compliance_reference_available ?compliance_reference - compliance_reference)
+    (work_unit_has_compliance_reference ?processing_work_unit - processing_work_unit ?compliance_reference - compliance_reference)
+    (compliance_reference_attached ?compliance_reference - compliance_reference)
+    (compliance_reference_linked_work_record ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    (work_unit_ready_for_claim ?processing_work_unit - processing_work_unit)
+    (work_unit_claimed_by_operator ?processing_work_unit - processing_work_unit)
+    (operator_processed_work_unit ?processing_work_unit - processing_work_unit)
+    (work_unit_policy_assigned ?processing_work_unit - processing_work_unit)
+    (work_unit_policy_evaluated ?processing_work_unit - processing_work_unit)
+    (ready_for_priority_assignment ?processing_work_unit - processing_work_unit)
+    (operator_executed_work_unit ?processing_work_unit - processing_work_unit)
+    (authorization_profile_available ?authorization_profile - authorization_profile)
+    (work_unit_has_authorization_profile ?processing_work_unit - processing_work_unit ?authorization_profile - authorization_profile)
+    (work_unit_special_handling_flag ?processing_work_unit - processing_work_unit)
+    (special_handling_step_completed ?processing_work_unit - processing_work_unit)
+    (special_handling_escalation_completed ?processing_work_unit - processing_work_unit)
+    (escalation_policy_available ?escalation_policy - escalation_policy)
+    (work_unit_has_escalation_policy ?processing_work_unit - processing_work_unit ?escalation_policy - escalation_policy)
+    (priority_profile_available ?priority_profile - priority_profile)
+    (work_unit_priority_assigned ?processing_work_unit - processing_work_unit ?priority_profile - priority_profile)
+    (execution_mode_token_available ?execution_mode_token - execution_mode_token)
+    (work_unit_execution_mode_assigned ?processing_work_unit - processing_work_unit ?execution_mode_token - execution_mode_token)
+    (escalation_level_available ?escalation_level - escalation_level)
+    (work_unit_escalation_level_assigned ?processing_work_unit - processing_work_unit ?escalation_level - escalation_level)
+    (escalation_reason_token_available ?escalation_reason_token - escalation_reason_token)
+    (escalation_reason_assigned_for_finalization ?payment_instruction - payment_instruction ?escalation_reason_token - escalation_reason_token)
+    (origin_leg_assessed ?origin_leg - origin_leg)
+    (beneficiary_leg_assessed ?beneficiary_leg - beneficiary_leg)
+    (work_unit_completion_mark ?processing_work_unit - processing_work_unit)
+  )
+  (:action register_payment_instruction
+    :parameters (?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (intake_registered ?payment_instruction)
+        )
+        (not
+          (settled ?payment_instruction)
+        )
+      )
+    :effect (intake_registered ?payment_instruction)
+  )
+  (:action assign_settlement_channel_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    :precondition
+      (and
+        (intake_registered ?payment_instruction)
+        (not
+          (channel_selected ?payment_instruction)
+        )
+        (channel_available ?settlement_channel)
+      )
+    :effect
+      (and
+        (channel_selected ?payment_instruction)
+        (assigned_channel ?payment_instruction ?settlement_channel)
+        (not
+          (channel_available ?settlement_channel)
+        )
+      )
+  )
+  (:action assign_message_endpoint_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (intake_registered ?payment_instruction)
+        (channel_selected ?payment_instruction)
+        (endpoint_available ?message_endpoint)
+      )
+    :effect
+      (and
+        (assigned_endpoint ?payment_instruction ?message_endpoint)
+        (not
+          (endpoint_available ?message_endpoint)
+        )
+      )
+  )
+  (:action release_payment_instruction
+    :parameters (?payment_instruction - payment_instruction ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (intake_registered ?payment_instruction)
+        (channel_selected ?payment_instruction)
+        (assigned_endpoint ?payment_instruction ?message_endpoint)
+        (not
+          (released_for_processing ?payment_instruction)
+        )
+      )
+    :effect (released_for_processing ?payment_instruction)
+  )
+  (:action unassign_message_endpoint_from_instruction
+    :parameters (?payment_instruction - payment_instruction ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (assigned_endpoint ?payment_instruction ?message_endpoint)
+      )
+    :effect
+      (and
+        (endpoint_available ?message_endpoint)
+        (not
+          (assigned_endpoint ?payment_instruction ?message_endpoint)
+        )
+      )
+  )
+  (:action assign_approver_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?approver - approver)
+    :precondition
+      (and
+        (released_for_processing ?payment_instruction)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (assigned_approver ?payment_instruction ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_assignment
+    :parameters (?payment_instruction - payment_instruction ?approver - approver)
+    :precondition
+      (and
+        (assigned_approver ?payment_instruction ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (assigned_approver ?payment_instruction ?approver)
+        )
+      )
+  )
+  (:action assign_execution_mode_to_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?execution_mode_token - execution_mode_token)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (execution_mode_token_available ?execution_mode_token)
+      )
+    :effect
+      (and
+        (work_unit_execution_mode_assigned ?processing_work_unit ?execution_mode_token)
+        (not
+          (execution_mode_token_available ?execution_mode_token)
+        )
+      )
+  )
+  (:action revoke_execution_mode_from_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?execution_mode_token - execution_mode_token)
+    :precondition
+      (and
+        (work_unit_execution_mode_assigned ?processing_work_unit ?execution_mode_token)
+      )
+    :effect
+      (and
+        (execution_mode_token_available ?execution_mode_token)
+        (not
+          (work_unit_execution_mode_assigned ?processing_work_unit ?execution_mode_token)
+        )
+      )
+  )
+  (:action assign_escalation_level_to_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (escalation_level_available ?escalation_level)
+      )
+    :effect
+      (and
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (not
+          (escalation_level_available ?escalation_level)
+        )
+      )
+  )
+  (:action revoke_escalation_level_from_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level)
+    :precondition
+      (and
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+      )
+    :effect
+      (and
+        (escalation_level_available ?escalation_level)
+        (not
+          (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        )
+      )
+  )
+  (:action evaluate_origin_leg_channel
+    :parameters (?origin_leg - origin_leg ?origin_execution_channel - origin_execution_document ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (released_for_processing ?origin_leg)
+        (assigned_endpoint ?origin_leg ?message_endpoint)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (not
+          (origin_execution_document_ready ?origin_execution_channel)
+        )
+        (not
+          (origin_execution_document_required ?origin_execution_channel)
+        )
+      )
+    :effect (origin_execution_document_ready ?origin_execution_channel)
+  )
+  (:action authorize_origin_leg_for_routing
+    :parameters (?origin_leg - origin_leg ?origin_execution_channel - origin_execution_document ?approver - approver)
+    :precondition
+      (and
+        (released_for_processing ?origin_leg)
+        (assigned_approver ?origin_leg ?approver)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (origin_execution_document_ready ?origin_execution_channel)
+        (not
+          (origin_leg_assessed ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+      )
+  )
+  (:action attach_supporting_channel_to_origin_leg
+    :parameters (?origin_leg - origin_leg ?origin_execution_channel - origin_execution_document ?supporting_document - supporting_channel)
+    :precondition
+      (and
+        (released_for_processing ?origin_leg)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (supporting_channel_available ?supporting_document)
+        (not
+          (origin_leg_assessed ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_execution_document_required ?origin_execution_channel)
+        (origin_leg_assessed ?origin_leg)
+        (origin_leg_channel_attached ?origin_leg ?supporting_document)
+        (not
+          (supporting_channel_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_origin_leg_supporting_channel_and_mark_ready
+    :parameters (?origin_leg - origin_leg ?origin_execution_channel - origin_execution_document ?message_endpoint - message_endpoint ?supporting_document - supporting_channel)
+    :precondition
+      (and
+        (released_for_processing ?origin_leg)
+        (assigned_endpoint ?origin_leg ?message_endpoint)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (origin_execution_document_required ?origin_execution_channel)
+        (origin_leg_channel_attached ?origin_leg ?supporting_document)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_execution_document_ready ?origin_execution_channel)
+        (origin_leg_ready ?origin_leg)
+        (supporting_channel_available ?supporting_document)
+        (not
+          (origin_leg_channel_attached ?origin_leg ?supporting_document)
+        )
+      )
+  )
+  (:action evaluate_beneficiary_leg_channel
+    :parameters (?beneficiary_leg - beneficiary_leg ?beneficiary_execution_channel - beneficiary_execution_document ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_leg)
+        (assigned_endpoint ?beneficiary_leg ?message_endpoint)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (not
+          (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+        )
+        (not
+          (beneficiary_execution_document_required ?beneficiary_execution_channel)
+        )
+      )
+    :effect (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+  )
+  (:action authorize_beneficiary_leg_for_routing
+    :parameters (?beneficiary_leg - beneficiary_leg ?beneficiary_execution_channel - beneficiary_execution_document ?approver - approver)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_leg)
+        (assigned_approver ?beneficiary_leg ?approver)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+        (not
+          (beneficiary_leg_assessed ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+      )
+  )
+  (:action attach_supporting_channel_to_beneficiary_leg
+    :parameters (?beneficiary_leg - beneficiary_leg ?beneficiary_execution_channel - beneficiary_execution_document ?supporting_document - supporting_channel)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_leg)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (supporting_channel_available ?supporting_document)
+        (not
+          (beneficiary_leg_assessed ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_execution_document_required ?beneficiary_execution_channel)
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (beneficiary_leg_channel_attached ?beneficiary_leg ?supporting_document)
+        (not
+          (supporting_channel_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_beneficiary_leg_supporting_channel_and_mark_ready
+    :parameters (?beneficiary_leg - beneficiary_leg ?beneficiary_execution_channel - beneficiary_execution_document ?message_endpoint - message_endpoint ?supporting_document - supporting_channel)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_leg)
+        (assigned_endpoint ?beneficiary_leg ?message_endpoint)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (beneficiary_execution_document_required ?beneficiary_execution_channel)
+        (beneficiary_leg_channel_attached ?beneficiary_leg ?supporting_document)
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (supporting_channel_available ?supporting_document)
+        (not
+          (beneficiary_leg_channel_attached ?beneficiary_leg ?supporting_document)
+        )
+      )
+  )
+  (:action create_settlement_work_record
+    :parameters (?origin_leg - origin_leg ?beneficiary_leg - beneficiary_leg ?origin_execution_channel - origin_execution_document ?beneficiary_execution_channel - beneficiary_execution_document ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (origin_execution_document_ready ?origin_execution_channel)
+        (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+        (origin_leg_ready ?origin_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (work_record_available ?settlement_work_record)
+      )
+    :effect
+      (and
+        (work_record_created ?settlement_work_record)
+        (work_record_origin_document_link ?settlement_work_record ?origin_execution_channel)
+        (work_record_beneficiary_document_link ?settlement_work_record ?beneficiary_execution_channel)
+        (not
+          (work_record_available ?settlement_work_record)
+        )
+      )
+  )
+  (:action create_work_record_with_origin_doc_requirement
+    :parameters (?origin_leg - origin_leg ?beneficiary_leg - beneficiary_leg ?origin_execution_channel - origin_execution_document ?beneficiary_execution_channel - beneficiary_execution_document ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (origin_execution_document_required ?origin_execution_channel)
+        (beneficiary_execution_document_ready ?beneficiary_execution_channel)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (work_record_available ?settlement_work_record)
+      )
+    :effect
+      (and
+        (work_record_created ?settlement_work_record)
+        (work_record_origin_document_link ?settlement_work_record ?origin_execution_channel)
+        (work_record_beneficiary_document_link ?settlement_work_record ?beneficiary_execution_channel)
+        (work_record_requires_origin_document ?settlement_work_record)
+        (not
+          (work_record_available ?settlement_work_record)
+        )
+      )
+  )
+  (:action create_work_record_with_beneficiary_doc_requirement
+    :parameters (?origin_leg - origin_leg ?beneficiary_leg - beneficiary_leg ?origin_execution_channel - origin_execution_document ?beneficiary_execution_channel - beneficiary_execution_document ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (origin_execution_document_ready ?origin_execution_channel)
+        (beneficiary_execution_document_required ?beneficiary_execution_channel)
+        (origin_leg_ready ?origin_leg)
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+        (work_record_available ?settlement_work_record)
+      )
+    :effect
+      (and
+        (work_record_created ?settlement_work_record)
+        (work_record_origin_document_link ?settlement_work_record ?origin_execution_channel)
+        (work_record_beneficiary_document_link ?settlement_work_record ?beneficiary_execution_channel)
+        (work_record_requires_beneficiary_document ?settlement_work_record)
+        (not
+          (work_record_available ?settlement_work_record)
+        )
+      )
+  )
+  (:action create_work_record_with_both_doc_requirements
+    :parameters (?origin_leg - origin_leg ?beneficiary_leg - beneficiary_leg ?origin_execution_channel - origin_execution_document ?beneficiary_execution_channel - beneficiary_execution_document ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (origin_leg_execution_document_link ?origin_leg ?origin_execution_channel)
+        (beneficiary_leg_execution_document_link ?beneficiary_leg ?beneficiary_execution_channel)
+        (origin_execution_document_required ?origin_execution_channel)
+        (beneficiary_execution_document_required ?beneficiary_execution_channel)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+        (work_record_available ?settlement_work_record)
+      )
+    :effect
+      (and
+        (work_record_created ?settlement_work_record)
+        (work_record_origin_document_link ?settlement_work_record ?origin_execution_channel)
+        (work_record_beneficiary_document_link ?settlement_work_record ?beneficiary_execution_channel)
+        (work_record_requires_origin_document ?settlement_work_record)
+        (work_record_requires_beneficiary_document ?settlement_work_record)
+        (not
+          (work_record_available ?settlement_work_record)
+        )
+      )
+  )
+  (:action confirm_work_record_ready_for_document_check
+    :parameters (?settlement_work_record - settlement_work_record ?origin_leg - origin_leg ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (work_record_created ?settlement_work_record)
+        (origin_leg_assessed ?origin_leg)
+        (assigned_endpoint ?origin_leg ?message_endpoint)
+        (not
+          (work_record_ready_for_document_check ?settlement_work_record)
+        )
+      )
+    :effect (work_record_ready_for_document_check ?settlement_work_record)
+  )
+  (:action attach_compliance_reference_to_work_record
+    :parameters (?processing_work_unit - processing_work_unit ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (work_unit_linked_work_record ?processing_work_unit ?settlement_work_record)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_available ?compliance_reference)
+        (work_record_created ?settlement_work_record)
+        (work_record_ready_for_document_check ?settlement_work_record)
+        (not
+          (compliance_reference_attached ?compliance_reference)
+        )
+      )
+    :effect
+      (and
+        (compliance_reference_attached ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (not
+          (compliance_reference_available ?compliance_reference)
+        )
+      )
+  )
+  (:action claim_work_unit_for_operator_handling
+    :parameters (?processing_work_unit - processing_work_unit ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_attached ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (assigned_endpoint ?processing_work_unit ?message_endpoint)
+        (not
+          (work_record_requires_origin_document ?settlement_work_record)
+        )
+        (not
+          (work_unit_ready_for_claim ?processing_work_unit)
+        )
+      )
+    :effect (work_unit_ready_for_claim ?processing_work_unit)
+  )
+  (:action assign_escalation_policy_to_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_policy - escalation_policy)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (escalation_policy_available ?escalation_policy)
+        (not
+          (work_unit_policy_assigned ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_policy_assigned ?processing_work_unit)
+        (work_unit_has_escalation_policy ?processing_work_unit ?escalation_policy)
+        (not
+          (escalation_policy_available ?escalation_policy)
+        )
+      )
+  )
+  (:action apply_policy_and_mark_work_unit_ready_for_operator
+    :parameters (?processing_work_unit - processing_work_unit ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record ?message_endpoint - message_endpoint ?escalation_policy - escalation_policy)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_attached ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (assigned_endpoint ?processing_work_unit ?message_endpoint)
+        (work_record_requires_origin_document ?settlement_work_record)
+        (work_unit_policy_assigned ?processing_work_unit)
+        (work_unit_has_escalation_policy ?processing_work_unit ?escalation_policy)
+        (not
+          (work_unit_ready_for_claim ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_ready_for_claim ?processing_work_unit)
+        (work_unit_policy_evaluated ?processing_work_unit)
+      )
+  )
+  (:action operator_claim_work_unit_for_execution
+    :parameters (?processing_work_unit - processing_work_unit ?execution_mode_token - execution_mode_token ?approver - approver ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_ready_for_claim ?processing_work_unit)
+        (work_unit_execution_mode_assigned ?processing_work_unit ?execution_mode_token)
+        (assigned_approver ?processing_work_unit ?approver)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (not
+          (work_record_requires_beneficiary_document ?settlement_work_record)
+        )
+        (not
+          (work_unit_claimed_by_operator ?processing_work_unit)
+        )
+      )
+    :effect (work_unit_claimed_by_operator ?processing_work_unit)
+  )
+  (:action operator_claim_work_unit_with_mode
+    :parameters (?processing_work_unit - processing_work_unit ?execution_mode_token - execution_mode_token ?approver - approver ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_ready_for_claim ?processing_work_unit)
+        (work_unit_execution_mode_assigned ?processing_work_unit ?execution_mode_token)
+        (assigned_approver ?processing_work_unit ?approver)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (work_record_requires_beneficiary_document ?settlement_work_record)
+        (not
+          (work_unit_claimed_by_operator ?processing_work_unit)
+        )
+      )
+    :effect (work_unit_claimed_by_operator ?processing_work_unit)
+  )
+  (:action operator_apply_escalation_level
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_claimed_by_operator ?processing_work_unit)
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (not
+          (work_record_requires_origin_document ?settlement_work_record)
+        )
+        (not
+          (work_record_requires_beneficiary_document ?settlement_work_record)
+        )
+        (not
+          (operator_processed_work_unit ?processing_work_unit)
+        )
+      )
+    :effect (operator_processed_work_unit ?processing_work_unit)
+  )
+  (:action operator_confirm_and_assign_priority
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_claimed_by_operator ?processing_work_unit)
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (work_record_requires_origin_document ?settlement_work_record)
+        (not
+          (work_record_requires_beneficiary_document ?settlement_work_record)
+        )
+        (not
+          (operator_processed_work_unit ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (ready_for_priority_assignment ?processing_work_unit)
+      )
+  )
+  (:action operator_confirm_and_assign_priority_variant
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_claimed_by_operator ?processing_work_unit)
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (not
+          (work_record_requires_origin_document ?settlement_work_record)
+        )
+        (work_record_requires_beneficiary_document ?settlement_work_record)
+        (not
+          (operator_processed_work_unit ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (ready_for_priority_assignment ?processing_work_unit)
+      )
+  )
+  (:action operator_confirm_and_assign_priority_both_flags
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level ?compliance_reference - compliance_reference ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (work_unit_claimed_by_operator ?processing_work_unit)
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (work_unit_has_compliance_reference ?processing_work_unit ?compliance_reference)
+        (compliance_reference_linked_work_record ?compliance_reference ?settlement_work_record)
+        (work_record_requires_origin_document ?settlement_work_record)
+        (work_record_requires_beneficiary_document ?settlement_work_record)
+        (not
+          (operator_processed_work_unit ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (ready_for_priority_assignment ?processing_work_unit)
+      )
+  )
+  (:action mark_work_unit_ready_for_finalization
+    :parameters (?processing_work_unit - processing_work_unit)
+    :precondition
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (not
+          (ready_for_priority_assignment ?processing_work_unit)
+        )
+        (not
+          (work_unit_completion_mark ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_completion_mark ?processing_work_unit)
+        (ready_for_finalization ?processing_work_unit)
+      )
+  )
+  (:action assign_priority_profile_to_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?priority_profile - priority_profile)
+    :precondition
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (ready_for_priority_assignment ?processing_work_unit)
+        (priority_profile_available ?priority_profile)
+      )
+    :effect
+      (and
+        (work_unit_priority_assigned ?processing_work_unit ?priority_profile)
+        (not
+          (priority_profile_available ?priority_profile)
+        )
+      )
+  )
+  (:action operator_execute_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?origin_leg - origin_leg ?beneficiary_leg - beneficiary_leg ?message_endpoint - message_endpoint ?priority_profile - priority_profile)
+    :precondition
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (ready_for_priority_assignment ?processing_work_unit)
+        (work_unit_priority_assigned ?processing_work_unit ?priority_profile)
+        (work_unit_has_origin_leg ?processing_work_unit ?origin_leg)
+        (work_unit_has_beneficiary_leg ?processing_work_unit ?beneficiary_leg)
+        (origin_leg_ready ?origin_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (assigned_endpoint ?processing_work_unit ?message_endpoint)
+        (not
+          (operator_executed_work_unit ?processing_work_unit)
+        )
+      )
+    :effect (operator_executed_work_unit ?processing_work_unit)
+  )
+  (:action complete_work_unit_execution
+    :parameters (?processing_work_unit - processing_work_unit)
+    :precondition
+      (and
+        (operator_processed_work_unit ?processing_work_unit)
+        (operator_executed_work_unit ?processing_work_unit)
+        (not
+          (work_unit_completion_mark ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_completion_mark ?processing_work_unit)
+        (ready_for_finalization ?processing_work_unit)
+      )
+  )
+  (:action apply_authorization_profile_to_work_unit
+    :parameters (?processing_work_unit - processing_work_unit ?authorization_profile - authorization_profile ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (released_for_processing ?processing_work_unit)
+        (assigned_endpoint ?processing_work_unit ?message_endpoint)
+        (authorization_profile_available ?authorization_profile)
+        (work_unit_has_authorization_profile ?processing_work_unit ?authorization_profile)
+        (not
+          (work_unit_special_handling_flag ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_special_handling_flag ?processing_work_unit)
+        (not
+          (authorization_profile_available ?authorization_profile)
+        )
+      )
+  )
+  (:action perform_policy_step_before_escalation
+    :parameters (?processing_work_unit - processing_work_unit ?approver - approver)
+    :precondition
+      (and
+        (work_unit_special_handling_flag ?processing_work_unit)
+        (assigned_approver ?processing_work_unit ?approver)
+        (not
+          (special_handling_step_completed ?processing_work_unit)
+        )
+      )
+    :effect (special_handling_step_completed ?processing_work_unit)
+  )
+  (:action apply_escalation_level_after_policy
+    :parameters (?processing_work_unit - processing_work_unit ?escalation_level - escalation_level)
+    :precondition
+      (and
+        (special_handling_step_completed ?processing_work_unit)
+        (work_unit_escalation_level_assigned ?processing_work_unit ?escalation_level)
+        (not
+          (special_handling_escalation_completed ?processing_work_unit)
+        )
+      )
+    :effect (special_handling_escalation_completed ?processing_work_unit)
+  )
+  (:action complete_special_handling_and_mark_ready
+    :parameters (?processing_work_unit - processing_work_unit)
+    :precondition
+      (and
+        (special_handling_escalation_completed ?processing_work_unit)
+        (not
+          (work_unit_completion_mark ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (work_unit_completion_mark ?processing_work_unit)
+        (ready_for_finalization ?processing_work_unit)
+      )
+  )
+  (:action finalize_origin_leg
+    :parameters (?origin_leg - origin_leg ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (origin_leg_assessed ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+        (work_record_created ?settlement_work_record)
+        (work_record_ready_for_document_check ?settlement_work_record)
+        (not
+          (ready_for_finalization ?origin_leg)
+        )
+      )
+    :effect (ready_for_finalization ?origin_leg)
+  )
+  (:action finalize_beneficiary_leg
+    :parameters (?beneficiary_leg - beneficiary_leg ?settlement_work_record - settlement_work_record)
+    :precondition
+      (and
+        (beneficiary_leg_assessed ?beneficiary_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (work_record_created ?settlement_work_record)
+        (work_record_ready_for_document_check ?settlement_work_record)
+        (not
+          (ready_for_finalization ?beneficiary_leg)
+        )
+      )
+    :effect (ready_for_finalization ?beneficiary_leg)
+  )
+  (:action initiate_instruction_finalization
+    :parameters (?payment_instruction - payment_instruction ?escalation_reason_token - escalation_reason_token ?message_endpoint - message_endpoint)
+    :precondition
+      (and
+        (ready_for_finalization ?payment_instruction)
+        (assigned_endpoint ?payment_instruction ?message_endpoint)
+        (escalation_reason_token_available ?escalation_reason_token)
+        (not
+          (finalization_in_progress ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (finalization_in_progress ?payment_instruction)
+        (escalation_reason_assigned_for_finalization ?payment_instruction ?escalation_reason_token)
+        (not
+          (escalation_reason_token_available ?escalation_reason_token)
+        )
+      )
+  )
+  (:action complete_origin_leg_settlement
+    :parameters (?origin_leg - origin_leg ?settlement_channel - settlement_channel ?escalation_reason_token - escalation_reason_token)
+    :precondition
+      (and
+        (finalization_in_progress ?origin_leg)
+        (assigned_channel ?origin_leg ?settlement_channel)
+        (escalation_reason_assigned_for_finalization ?origin_leg ?escalation_reason_token)
+        (not
+          (settled ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (settled ?origin_leg)
+        (channel_available ?settlement_channel)
+        (escalation_reason_token_available ?escalation_reason_token)
+      )
+  )
+  (:action complete_beneficiary_leg_settlement
+    :parameters (?beneficiary_leg - beneficiary_leg ?settlement_channel - settlement_channel ?escalation_reason_token - escalation_reason_token)
+    :precondition
+      (and
+        (finalization_in_progress ?beneficiary_leg)
+        (assigned_channel ?beneficiary_leg ?settlement_channel)
+        (escalation_reason_assigned_for_finalization ?beneficiary_leg ?escalation_reason_token)
+        (not
+          (settled ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (settled ?beneficiary_leg)
+        (channel_available ?settlement_channel)
+        (escalation_reason_token_available ?escalation_reason_token)
+      )
+  )
+  (:action complete_work_unit_settlement
+    :parameters (?processing_work_unit - processing_work_unit ?settlement_channel - settlement_channel ?escalation_reason_token - escalation_reason_token)
+    :precondition
+      (and
+        (finalization_in_progress ?processing_work_unit)
+        (assigned_channel ?processing_work_unit ?settlement_channel)
+        (escalation_reason_assigned_for_finalization ?processing_work_unit ?escalation_reason_token)
+        (not
+          (settled ?processing_work_unit)
+        )
+      )
+    :effect
+      (and
+        (settled ?processing_work_unit)
+        (channel_available ?settlement_channel)
+        (escalation_reason_token_available ?escalation_reason_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem settlement_exception_escalation_scenario)
+  (:domain finance_payments_settlement_exception_escalation)
+  (:objects origin_leg_1 - origin_leg beneficiary_leg_1 - beneficiary_leg processing_work_unit_1 - processing_work_unit processing_work_unit_2 - processing_work_unit settlement_channel_1 - settlement_channel settlement_channel_2 - settlement_channel settlement_channel_3 - settlement_channel message_endpoint_1 - message_endpoint approver_1 - approver supporting_document_1 - supporting_channel origin_execution_channel_1 - origin_execution_document beneficiary_execution_channel_1 - beneficiary_execution_document settlement_work_record_1 - settlement_work_record compliance_reference_1 - compliance_reference compliance_reference_2 - compliance_reference escalation_policy_1 - escalation_policy escalation_policy_2 - escalation_policy priority_profile_1 - priority_profile priority_profile_2 - priority_profile escalation_reason_token_1 - escalation_reason_token execution_mode_token_1 - execution_mode_token authorization_profile_1 - authorization_profile authorization_profile_2 - authorization_profile escalation_level_1 - escalation_level)
+  (:init
+    (channel_available settlement_channel_1)
+    (channel_available settlement_channel_2)
+    (channel_available settlement_channel_3)
+    (endpoint_available message_endpoint_1)
+    (approver_available approver_1)
+    (supporting_channel_available supporting_document_1)
+    (origin_leg_execution_document_link origin_leg_1 origin_execution_channel_1)
+    (beneficiary_leg_execution_document_link beneficiary_leg_1 beneficiary_execution_channel_1)
+    (work_record_available settlement_work_record_1)
+    (compliance_reference_available compliance_reference_1)
+    (compliance_reference_available compliance_reference_2)
+    (work_unit_has_origin_leg processing_work_unit_1 origin_leg_1)
+    (work_unit_has_origin_leg processing_work_unit_2 origin_leg_1)
+    (work_unit_has_beneficiary_leg processing_work_unit_1 beneficiary_leg_1)
+    (work_unit_has_beneficiary_leg processing_work_unit_2 beneficiary_leg_1)
+    (work_unit_linked_work_record processing_work_unit_1 settlement_work_record_1)
+    (work_unit_linked_work_record processing_work_unit_2 settlement_work_record_1)
+    (work_unit_has_compliance_reference processing_work_unit_1 compliance_reference_1)
+    (work_unit_has_compliance_reference processing_work_unit_2 compliance_reference_2)
+    (escalation_policy_available escalation_policy_1)
+    (escalation_policy_available escalation_policy_2)
+    (priority_profile_available priority_profile_1)
+    (priority_profile_available priority_profile_2)
+    (escalation_reason_token_available escalation_reason_token_1)
+    (execution_mode_token_available execution_mode_token_1)
+    (authorization_profile_available authorization_profile_1)
+    (work_unit_has_authorization_profile processing_work_unit_1 authorization_profile_1)
+    (work_unit_has_authorization_profile processing_work_unit_2 authorization_profile_2)
+    (escalation_level_available escalation_level_1)
+  )
+  (:goal
+    (and
+      (settled origin_leg_1)
+      (settled beneficiary_leg_1)
+      (settled processing_work_unit_1)
+      (settled processing_work_unit_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_payment_instruction origin_leg_1)
+(assign_settlement_channel_to_instruction origin_leg_1 settlement_channel_1)
+(assign_message_endpoint_to_instruction origin_leg_1 message_endpoint_1)
+(release_payment_instruction origin_leg_1 message_endpoint_1)
+(evaluate_origin_leg_channel origin_leg_1 origin_execution_channel_1 message_endpoint_1)
+(assign_approver_to_instruction origin_leg_1 approver_1)
+(authorize_origin_leg_for_routing origin_leg_1 origin_execution_channel_1 approver_1)
+(release_approver_assignment origin_leg_1 approver_1)
+(unassign_message_endpoint_from_instruction origin_leg_1 message_endpoint_1)
+(register_payment_instruction beneficiary_leg_1)
+(assign_settlement_channel_to_instruction beneficiary_leg_1 settlement_channel_2)
+(assign_message_endpoint_to_instruction beneficiary_leg_1 message_endpoint_1)
+(release_payment_instruction beneficiary_leg_1 message_endpoint_1)
+(evaluate_beneficiary_leg_channel beneficiary_leg_1 beneficiary_execution_channel_1 message_endpoint_1)
+(assign_approver_to_instruction beneficiary_leg_1 approver_1)
+(authorize_beneficiary_leg_for_routing beneficiary_leg_1 beneficiary_execution_channel_1 approver_1)
+(release_approver_assignment beneficiary_leg_1 approver_1)
+(unassign_message_endpoint_from_instruction beneficiary_leg_1 message_endpoint_1)
+(create_settlement_work_record origin_leg_1 beneficiary_leg_1 origin_execution_channel_1 beneficiary_execution_channel_1 settlement_work_record_1)
+(assign_message_endpoint_to_instruction origin_leg_1 message_endpoint_1)
+(confirm_work_record_ready_for_document_check settlement_work_record_1 origin_leg_1 message_endpoint_1)
+(unassign_message_endpoint_from_instruction origin_leg_1 message_endpoint_1)
+(finalize_origin_leg origin_leg_1 settlement_work_record_1)
+(finalize_beneficiary_leg beneficiary_leg_1 settlement_work_record_1)
+(register_payment_instruction processing_work_unit_1)
+(assign_settlement_channel_to_instruction processing_work_unit_1 settlement_channel_3)
+(assign_message_endpoint_to_instruction processing_work_unit_1 message_endpoint_1)
+(release_payment_instruction processing_work_unit_1 message_endpoint_1)
+(assign_escalation_level_to_work_unit processing_work_unit_1 escalation_level_1)
+(apply_authorization_profile_to_work_unit processing_work_unit_1 authorization_profile_1 message_endpoint_1)
+(assign_approver_to_instruction processing_work_unit_1 approver_1)
+(perform_policy_step_before_escalation processing_work_unit_1 approver_1)
+(apply_escalation_level_after_policy processing_work_unit_1 escalation_level_1)
+(complete_special_handling_and_mark_ready processing_work_unit_1)
+(initiate_instruction_finalization processing_work_unit_1 escalation_reason_token_1 message_endpoint_1)
+(unassign_message_endpoint_from_instruction processing_work_unit_1 message_endpoint_1)
+(complete_work_unit_settlement processing_work_unit_1 settlement_channel_3 escalation_reason_token_1)
+(release_approver_assignment processing_work_unit_1 approver_1)
+(revoke_escalation_level_from_work_unit processing_work_unit_1 escalation_level_1)
+(register_payment_instruction processing_work_unit_2)
+(assign_settlement_channel_to_instruction processing_work_unit_2 settlement_channel_3)
+(assign_message_endpoint_to_instruction processing_work_unit_2 message_endpoint_1)
+(release_payment_instruction processing_work_unit_2 message_endpoint_1)
+(attach_compliance_reference_to_work_record processing_work_unit_2 compliance_reference_2 settlement_work_record_1)
+(claim_work_unit_for_operator_handling processing_work_unit_2 compliance_reference_2 settlement_work_record_1 message_endpoint_1)
+(assign_execution_mode_to_work_unit processing_work_unit_2 execution_mode_token_1)
+(assign_escalation_level_to_work_unit processing_work_unit_2 escalation_level_1)
+(assign_approver_to_instruction processing_work_unit_2 approver_1)
+(operator_claim_work_unit_for_execution processing_work_unit_2 execution_mode_token_1 approver_1 compliance_reference_2 settlement_work_record_1)
+(operator_apply_escalation_level processing_work_unit_2 escalation_level_1 compliance_reference_2 settlement_work_record_1)
+(mark_work_unit_ready_for_finalization processing_work_unit_2)
+(initiate_instruction_finalization processing_work_unit_2 escalation_reason_token_1 message_endpoint_1)
+(unassign_message_endpoint_from_instruction processing_work_unit_2 message_endpoint_1)
+(complete_work_unit_settlement processing_work_unit_2 settlement_channel_3 escalation_reason_token_1)
+(release_approver_assignment processing_work_unit_2 approver_1)
+(assign_message_endpoint_to_instruction origin_leg_1 message_endpoint_1)
+(initiate_instruction_finalization origin_leg_1 escalation_reason_token_1 message_endpoint_1)
+(unassign_message_endpoint_from_instruction origin_leg_1 message_endpoint_1)
+(complete_origin_leg_settlement origin_leg_1 settlement_channel_1 escalation_reason_token_1)
+(assign_message_endpoint_to_instruction beneficiary_leg_1 message_endpoint_1)
+(initiate_instruction_finalization beneficiary_leg_1 escalation_reason_token_1 message_endpoint_1)
+(unassign_message_endpoint_from_instruction beneficiary_leg_1 message_endpoint_1)
+(complete_beneficiary_leg_settlement beneficiary_leg_1 settlement_channel_2 escalation_reason_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_3y08zmoz/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_3y08zmoz/plan.pddl 63 
+
+
+
+--- stderr ---
+

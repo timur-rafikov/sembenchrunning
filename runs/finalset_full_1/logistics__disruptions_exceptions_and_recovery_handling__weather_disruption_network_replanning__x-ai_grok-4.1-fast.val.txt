@@ -1,0 +1,1079 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain weather_disruption_network_replanning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_pool - object geography_group - object operational_group - object disruption_record - object case_component - disruption_record vehicle_resource - resource_pool time_window - resource_pool operator_team - resource_pool policy_option - resource_pool constraint_profile - resource_pool claim_document - resource_pool equipment - resource_pool authority_approval - resource_pool material_resource - geography_group depot_asset - geography_group service_option - geography_group affected_zone - operational_group alternate_zone - operational_group contingency_plan - operational_group route_segment_group - case_component agent_group - case_component origin_segment - route_segment_group destination_segment - route_segment_group replanning_agent - agent_group)
+  (:predicates
+    (component_disruption_registered ?case_component - case_component)
+    (component_schedule_confirmed ?case_component - case_component)
+    (component_vehicle_reserved ?case_component - case_component)
+    (component_recovery_complete ?case_component - case_component)
+    (component_restoration_scheduled ?case_component - case_component)
+    (component_claim_attached ?case_component - case_component)
+    (vehicle_available ?vehicle_resource - vehicle_resource)
+    (component_vehicle_assigned ?case_component - case_component ?vehicle_resource - vehicle_resource)
+    (time_window_available ?time_window - time_window)
+    (component_time_window_assigned ?case_component - case_component ?time_window - time_window)
+    (operator_available ?operator_team - operator_team)
+    (component_operator_assigned ?case_component - case_component ?operator_team - operator_team)
+    (material_available ?material_resource - material_resource)
+    (material_assigned_to_origin ?origin_segment - origin_segment ?material_resource - material_resource)
+    (material_assigned_to_destination ?destination_segment - destination_segment ?material_resource - material_resource)
+    (segment_in_affected_zone ?origin_segment - origin_segment ?affected_zone - affected_zone)
+    (affected_zone_flagged ?affected_zone - affected_zone)
+    (affected_zone_resources_deployed ?affected_zone - affected_zone)
+    (origin_segment_validated ?origin_segment - origin_segment)
+    (segment_in_alternate_zone ?destination_segment - destination_segment ?alternate_zone - alternate_zone)
+    (alternate_zone_flagged ?alternate_zone - alternate_zone)
+    (alternate_zone_resources_deployed ?alternate_zone - alternate_zone)
+    (destination_segment_validated ?destination_segment - destination_segment)
+    (contingency_plan_template_available ?contingency_plan - contingency_plan)
+    (contingency_plan_selected ?contingency_plan - contingency_plan)
+    (plan_linked_to_affected_zone ?contingency_plan - contingency_plan ?affected_zone - affected_zone)
+    (plan_linked_to_alternate_zone ?contingency_plan - contingency_plan ?alternate_zone - alternate_zone)
+    (plan_requires_policy_validation ?contingency_plan - contingency_plan)
+    (plan_requires_service_option ?contingency_plan - contingency_plan)
+    (plan_time_confirmed ?contingency_plan - contingency_plan)
+    (agent_assigned_origin_segment ?replanning_agent - replanning_agent ?origin_segment - origin_segment)
+    (agent_assigned_destination_segment ?replanning_agent - replanning_agent ?destination_segment - destination_segment)
+    (agent_linked_contingency_plan ?replanning_agent - replanning_agent ?contingency_plan - contingency_plan)
+    (depot_available ?depot_asset - depot_asset)
+    (agent_linked_depot ?replanning_agent - replanning_agent ?depot_asset - depot_asset)
+    (depot_allocated ?depot_asset - depot_asset)
+    (depot_assigned_to_plan ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    (agent_allocated_to_plan ?replanning_agent - replanning_agent)
+    (agent_equipped ?replanning_agent - replanning_agent)
+    (agent_approved ?replanning_agent - replanning_agent)
+    (agent_policy_applied ?replanning_agent - replanning_agent)
+    (agent_policy_validated ?replanning_agent - replanning_agent)
+    (agent_constraints_applied ?replanning_agent - replanning_agent)
+    (agent_final_checks_done ?replanning_agent - replanning_agent)
+    (service_option_available ?service_option - service_option)
+    (agent_service_option_assigned ?replanning_agent - replanning_agent ?service_option - service_option)
+    (agent_service_option_selected ?replanning_agent - replanning_agent)
+    (agent_service_option_confirmed ?replanning_agent - replanning_agent)
+    (agent_service_option_ready ?replanning_agent - replanning_agent)
+    (policy_option_available ?policy_option - policy_option)
+    (agent_policy_option_assigned ?replanning_agent - replanning_agent ?policy_option - policy_option)
+    (constraint_profile_available ?constraint_profile - constraint_profile)
+    (agent_constraint_profile_assigned ?replanning_agent - replanning_agent ?constraint_profile - constraint_profile)
+    (equipment_available ?equipment - equipment)
+    (agent_equipment_assigned ?replanning_agent - replanning_agent ?equipment - equipment)
+    (authority_approval_available ?authority_approval - authority_approval)
+    (agent_authority_approval_assigned ?replanning_agent - replanning_agent ?authority_approval - authority_approval)
+    (claim_document_available ?claim_document - claim_document)
+    (component_claim_attached_to_document ?case_component - case_component ?claim_document - claim_document)
+    (origin_segment_ready ?origin_segment - origin_segment)
+    (destination_segment_ready ?destination_segment - destination_segment)
+    (agent_activated ?replanning_agent - replanning_agent)
+  )
+  (:action register_disruption_record
+    :parameters (?case_component - case_component)
+    :precondition
+      (and
+        (not
+          (component_disruption_registered ?case_component)
+        )
+        (not
+          (component_recovery_complete ?case_component)
+        )
+      )
+    :effect (component_disruption_registered ?case_component)
+  )
+  (:action assign_vehicle_to_case
+    :parameters (?case_component - case_component ?vehicle_resource - vehicle_resource)
+    :precondition
+      (and
+        (component_disruption_registered ?case_component)
+        (not
+          (component_vehicle_reserved ?case_component)
+        )
+        (vehicle_available ?vehicle_resource)
+      )
+    :effect
+      (and
+        (component_vehicle_reserved ?case_component)
+        (component_vehicle_assigned ?case_component ?vehicle_resource)
+        (not
+          (vehicle_available ?vehicle_resource)
+        )
+      )
+  )
+  (:action assign_time_window_to_case
+    :parameters (?case_component - case_component ?time_window - time_window)
+    :precondition
+      (and
+        (component_disruption_registered ?case_component)
+        (component_vehicle_reserved ?case_component)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (component_time_window_assigned ?case_component ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_case_schedule
+    :parameters (?case_component - case_component ?time_window - time_window)
+    :precondition
+      (and
+        (component_disruption_registered ?case_component)
+        (component_vehicle_reserved ?case_component)
+        (component_time_window_assigned ?case_component ?time_window)
+        (not
+          (component_schedule_confirmed ?case_component)
+        )
+      )
+    :effect (component_schedule_confirmed ?case_component)
+  )
+  (:action release_time_window_from_case
+    :parameters (?case_component - case_component ?time_window - time_window)
+    :precondition
+      (and
+        (component_time_window_assigned ?case_component ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (component_time_window_assigned ?case_component ?time_window)
+        )
+      )
+  )
+  (:action assign_operator_team_to_case
+    :parameters (?case_component - case_component ?operator_team - operator_team)
+    :precondition
+      (and
+        (component_schedule_confirmed ?case_component)
+        (operator_available ?operator_team)
+      )
+    :effect
+      (and
+        (component_operator_assigned ?case_component ?operator_team)
+        (not
+          (operator_available ?operator_team)
+        )
+      )
+  )
+  (:action release_operator_team_from_case
+    :parameters (?case_component - case_component ?operator_team - operator_team)
+    :precondition
+      (and
+        (component_operator_assigned ?case_component ?operator_team)
+      )
+    :effect
+      (and
+        (operator_available ?operator_team)
+        (not
+          (component_operator_assigned ?case_component ?operator_team)
+        )
+      )
+  )
+  (:action assign_equipment_to_agent
+    :parameters (?replanning_agent - replanning_agent ?equipment - equipment)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (agent_equipment_assigned ?replanning_agent ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_agent
+    :parameters (?replanning_agent - replanning_agent ?equipment - equipment)
+    :precondition
+      (and
+        (agent_equipment_assigned ?replanning_agent ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (agent_equipment_assigned ?replanning_agent ?equipment)
+        )
+      )
+  )
+  (:action assign_authority_approval_to_agent
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (authority_approval_available ?authority_approval)
+      )
+    :effect
+      (and
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (not
+          (authority_approval_available ?authority_approval)
+        )
+      )
+  )
+  (:action release_authority_approval_from_agent
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval)
+    :precondition
+      (and
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+      )
+    :effect
+      (and
+        (authority_approval_available ?authority_approval)
+        (not
+          (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        )
+      )
+  )
+  (:action flag_affected_zone_for_segment
+    :parameters (?origin_segment - origin_segment ?affected_zone - affected_zone ?time_window - time_window)
+    :precondition
+      (and
+        (component_schedule_confirmed ?origin_segment)
+        (component_time_window_assigned ?origin_segment ?time_window)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (not
+          (affected_zone_flagged ?affected_zone)
+        )
+        (not
+          (affected_zone_resources_deployed ?affected_zone)
+        )
+      )
+    :effect (affected_zone_flagged ?affected_zone)
+  )
+  (:action assign_operator_and_mark_origin_segment
+    :parameters (?origin_segment - origin_segment ?affected_zone - affected_zone ?operator_team - operator_team)
+    :precondition
+      (and
+        (component_schedule_confirmed ?origin_segment)
+        (component_operator_assigned ?origin_segment ?operator_team)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (affected_zone_flagged ?affected_zone)
+        (not
+          (origin_segment_ready ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_ready ?origin_segment)
+        (origin_segment_validated ?origin_segment)
+      )
+  )
+  (:action allocate_material_to_origin_segment
+    :parameters (?origin_segment - origin_segment ?affected_zone - affected_zone ?material_resource - material_resource)
+    :precondition
+      (and
+        (component_schedule_confirmed ?origin_segment)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (material_available ?material_resource)
+        (not
+          (origin_segment_ready ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (affected_zone_resources_deployed ?affected_zone)
+        (origin_segment_ready ?origin_segment)
+        (material_assigned_to_origin ?origin_segment ?material_resource)
+        (not
+          (material_available ?material_resource)
+        )
+      )
+  )
+  (:action process_origin_material_deployment
+    :parameters (?origin_segment - origin_segment ?affected_zone - affected_zone ?time_window - time_window ?material_resource - material_resource)
+    :precondition
+      (and
+        (component_schedule_confirmed ?origin_segment)
+        (component_time_window_assigned ?origin_segment ?time_window)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (affected_zone_resources_deployed ?affected_zone)
+        (material_assigned_to_origin ?origin_segment ?material_resource)
+        (not
+          (origin_segment_validated ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (affected_zone_flagged ?affected_zone)
+        (origin_segment_validated ?origin_segment)
+        (material_available ?material_resource)
+        (not
+          (material_assigned_to_origin ?origin_segment ?material_resource)
+        )
+      )
+  )
+  (:action flag_alternate_zone_for_destination
+    :parameters (?destination_segment - destination_segment ?alternate_zone - alternate_zone ?time_window - time_window)
+    :precondition
+      (and
+        (component_schedule_confirmed ?destination_segment)
+        (component_time_window_assigned ?destination_segment ?time_window)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (not
+          (alternate_zone_flagged ?alternate_zone)
+        )
+        (not
+          (alternate_zone_resources_deployed ?alternate_zone)
+        )
+      )
+    :effect (alternate_zone_flagged ?alternate_zone)
+  )
+  (:action assign_operator_and_mark_destination_segment
+    :parameters (?destination_segment - destination_segment ?alternate_zone - alternate_zone ?operator_team - operator_team)
+    :precondition
+      (and
+        (component_schedule_confirmed ?destination_segment)
+        (component_operator_assigned ?destination_segment ?operator_team)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (alternate_zone_flagged ?alternate_zone)
+        (not
+          (destination_segment_ready ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_ready ?destination_segment)
+        (destination_segment_validated ?destination_segment)
+      )
+  )
+  (:action allocate_material_to_destination_segment
+    :parameters (?destination_segment - destination_segment ?alternate_zone - alternate_zone ?material_resource - material_resource)
+    :precondition
+      (and
+        (component_schedule_confirmed ?destination_segment)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (material_available ?material_resource)
+        (not
+          (destination_segment_ready ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_zone_resources_deployed ?alternate_zone)
+        (destination_segment_ready ?destination_segment)
+        (material_assigned_to_destination ?destination_segment ?material_resource)
+        (not
+          (material_available ?material_resource)
+        )
+      )
+  )
+  (:action process_destination_material_deployment
+    :parameters (?destination_segment - destination_segment ?alternate_zone - alternate_zone ?time_window - time_window ?material_resource - material_resource)
+    :precondition
+      (and
+        (component_schedule_confirmed ?destination_segment)
+        (component_time_window_assigned ?destination_segment ?time_window)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (alternate_zone_resources_deployed ?alternate_zone)
+        (material_assigned_to_destination ?destination_segment ?material_resource)
+        (not
+          (destination_segment_validated ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_zone_flagged ?alternate_zone)
+        (destination_segment_validated ?destination_segment)
+        (material_available ?material_resource)
+        (not
+          (material_assigned_to_destination ?destination_segment ?material_resource)
+        )
+      )
+  )
+  (:action instantiate_contingency_plan
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?affected_zone - affected_zone ?alternate_zone - alternate_zone ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (affected_zone_flagged ?affected_zone)
+        (alternate_zone_flagged ?alternate_zone)
+        (origin_segment_validated ?origin_segment)
+        (destination_segment_validated ?destination_segment)
+        (contingency_plan_template_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_linked_to_affected_zone ?contingency_plan ?affected_zone)
+        (plan_linked_to_alternate_zone ?contingency_plan ?alternate_zone)
+        (not
+          (contingency_plan_template_available ?contingency_plan)
+        )
+      )
+  )
+  (:action instantiate_contingency_plan_with_policy
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?affected_zone - affected_zone ?alternate_zone - alternate_zone ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (affected_zone_resources_deployed ?affected_zone)
+        (alternate_zone_flagged ?alternate_zone)
+        (not
+          (origin_segment_validated ?origin_segment)
+        )
+        (destination_segment_validated ?destination_segment)
+        (contingency_plan_template_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_linked_to_affected_zone ?contingency_plan ?affected_zone)
+        (plan_linked_to_alternate_zone ?contingency_plan ?alternate_zone)
+        (plan_requires_policy_validation ?contingency_plan)
+        (not
+          (contingency_plan_template_available ?contingency_plan)
+        )
+      )
+  )
+  (:action instantiate_contingency_plan_with_service
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?affected_zone - affected_zone ?alternate_zone - alternate_zone ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (affected_zone_flagged ?affected_zone)
+        (alternate_zone_resources_deployed ?alternate_zone)
+        (origin_segment_validated ?origin_segment)
+        (not
+          (destination_segment_validated ?destination_segment)
+        )
+        (contingency_plan_template_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_linked_to_affected_zone ?contingency_plan ?affected_zone)
+        (plan_linked_to_alternate_zone ?contingency_plan ?alternate_zone)
+        (plan_requires_service_option ?contingency_plan)
+        (not
+          (contingency_plan_template_available ?contingency_plan)
+        )
+      )
+  )
+  (:action instantiate_contingency_plan_with_policy_and_service
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?affected_zone - affected_zone ?alternate_zone - alternate_zone ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (segment_in_affected_zone ?origin_segment ?affected_zone)
+        (segment_in_alternate_zone ?destination_segment ?alternate_zone)
+        (affected_zone_resources_deployed ?affected_zone)
+        (alternate_zone_resources_deployed ?alternate_zone)
+        (not
+          (origin_segment_validated ?origin_segment)
+        )
+        (not
+          (destination_segment_validated ?destination_segment)
+        )
+        (contingency_plan_template_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_linked_to_affected_zone ?contingency_plan ?affected_zone)
+        (plan_linked_to_alternate_zone ?contingency_plan ?alternate_zone)
+        (plan_requires_policy_validation ?contingency_plan)
+        (plan_requires_service_option ?contingency_plan)
+        (not
+          (contingency_plan_template_available ?contingency_plan)
+        )
+      )
+  )
+  (:action confirm_plan_time_window
+    :parameters (?contingency_plan - contingency_plan ?origin_segment - origin_segment ?time_window - time_window)
+    :precondition
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (origin_segment_ready ?origin_segment)
+        (component_time_window_assigned ?origin_segment ?time_window)
+        (not
+          (plan_time_confirmed ?contingency_plan)
+        )
+      )
+    :effect (plan_time_confirmed ?contingency_plan)
+  )
+  (:action assign_depot_to_plan
+    :parameters (?replanning_agent - replanning_agent ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (agent_linked_contingency_plan ?replanning_agent ?contingency_plan)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_available ?depot_asset)
+        (contingency_plan_selected ?contingency_plan)
+        (plan_time_confirmed ?contingency_plan)
+        (not
+          (depot_allocated ?depot_asset)
+        )
+      )
+    :effect
+      (and
+        (depot_allocated ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (not
+          (depot_available ?depot_asset)
+        )
+      )
+  )
+  (:action authorize_agent_for_plan
+    :parameters (?replanning_agent - replanning_agent ?depot_asset - depot_asset ?contingency_plan - contingency_plan ?time_window - time_window)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_allocated ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (component_time_window_assigned ?replanning_agent ?time_window)
+        (not
+          (plan_requires_policy_validation ?contingency_plan)
+        )
+        (not
+          (agent_allocated_to_plan ?replanning_agent)
+        )
+      )
+    :effect (agent_allocated_to_plan ?replanning_agent)
+  )
+  (:action apply_policy_option_to_agent
+    :parameters (?replanning_agent - replanning_agent ?policy_option - policy_option)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (policy_option_available ?policy_option)
+        (not
+          (agent_policy_applied ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_policy_applied ?replanning_agent)
+        (agent_policy_option_assigned ?replanning_agent ?policy_option)
+        (not
+          (policy_option_available ?policy_option)
+        )
+      )
+  )
+  (:action authorize_agent_with_policy_validation
+    :parameters (?replanning_agent - replanning_agent ?depot_asset - depot_asset ?contingency_plan - contingency_plan ?time_window - time_window ?policy_option - policy_option)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_allocated ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (component_time_window_assigned ?replanning_agent ?time_window)
+        (plan_requires_policy_validation ?contingency_plan)
+        (agent_policy_applied ?replanning_agent)
+        (agent_policy_option_assigned ?replanning_agent ?policy_option)
+        (not
+          (agent_allocated_to_plan ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_allocated_to_plan ?replanning_agent)
+        (agent_policy_validated ?replanning_agent)
+      )
+  )
+  (:action equip_agent_for_plan_standard
+    :parameters (?replanning_agent - replanning_agent ?equipment - equipment ?operator_team - operator_team ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_allocated_to_plan ?replanning_agent)
+        (agent_equipment_assigned ?replanning_agent ?equipment)
+        (component_operator_assigned ?replanning_agent ?operator_team)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (not
+          (plan_requires_service_option ?contingency_plan)
+        )
+        (not
+          (agent_equipped ?replanning_agent)
+        )
+      )
+    :effect (agent_equipped ?replanning_agent)
+  )
+  (:action equip_agent_for_plan_with_service
+    :parameters (?replanning_agent - replanning_agent ?equipment - equipment ?operator_team - operator_team ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_allocated_to_plan ?replanning_agent)
+        (agent_equipment_assigned ?replanning_agent ?equipment)
+        (component_operator_assigned ?replanning_agent ?operator_team)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (plan_requires_service_option ?contingency_plan)
+        (not
+          (agent_equipped ?replanning_agent)
+        )
+      )
+    :effect (agent_equipped ?replanning_agent)
+  )
+  (:action process_agent_authority_approval
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_equipped ?replanning_agent)
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (not
+          (plan_requires_policy_validation ?contingency_plan)
+        )
+        (not
+          (plan_requires_service_option ?contingency_plan)
+        )
+        (not
+          (agent_approved ?replanning_agent)
+        )
+      )
+    :effect (agent_approved ?replanning_agent)
+  )
+  (:action confirm_approval_and_apply_constraints
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_equipped ?replanning_agent)
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (plan_requires_policy_validation ?contingency_plan)
+        (not
+          (plan_requires_service_option ?contingency_plan)
+        )
+        (not
+          (agent_approved ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_constraints_applied ?replanning_agent)
+      )
+  )
+  (:action approve_agent_with_constraints_variant
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_equipped ?replanning_agent)
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (not
+          (plan_requires_policy_validation ?contingency_plan)
+        )
+        (plan_requires_service_option ?contingency_plan)
+        (not
+          (agent_approved ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_constraints_applied ?replanning_agent)
+      )
+  )
+  (:action approve_agent_with_constraints_complete
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval ?depot_asset - depot_asset ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (agent_equipped ?replanning_agent)
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (agent_linked_depot ?replanning_agent ?depot_asset)
+        (depot_assigned_to_plan ?depot_asset ?contingency_plan)
+        (plan_requires_policy_validation ?contingency_plan)
+        (plan_requires_service_option ?contingency_plan)
+        (not
+          (agent_approved ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_constraints_applied ?replanning_agent)
+      )
+  )
+  (:action finalize_agent_activation
+    :parameters (?replanning_agent - replanning_agent)
+    :precondition
+      (and
+        (agent_approved ?replanning_agent)
+        (not
+          (agent_constraints_applied ?replanning_agent)
+        )
+        (not
+          (agent_activated ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_activated ?replanning_agent)
+        (component_restoration_scheduled ?replanning_agent)
+      )
+  )
+  (:action assign_constraint_profile_to_agent
+    :parameters (?replanning_agent - replanning_agent ?constraint_profile - constraint_profile)
+    :precondition
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_constraints_applied ?replanning_agent)
+        (constraint_profile_available ?constraint_profile)
+      )
+    :effect
+      (and
+        (agent_constraint_profile_assigned ?replanning_agent ?constraint_profile)
+        (not
+          (constraint_profile_available ?constraint_profile)
+        )
+      )
+  )
+  (:action perform_final_agent_checks
+    :parameters (?replanning_agent - replanning_agent ?origin_segment - origin_segment ?destination_segment - destination_segment ?time_window - time_window ?constraint_profile - constraint_profile)
+    :precondition
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_constraints_applied ?replanning_agent)
+        (agent_constraint_profile_assigned ?replanning_agent ?constraint_profile)
+        (agent_assigned_origin_segment ?replanning_agent ?origin_segment)
+        (agent_assigned_destination_segment ?replanning_agent ?destination_segment)
+        (origin_segment_validated ?origin_segment)
+        (destination_segment_validated ?destination_segment)
+        (component_time_window_assigned ?replanning_agent ?time_window)
+        (not
+          (agent_final_checks_done ?replanning_agent)
+        )
+      )
+    :effect (agent_final_checks_done ?replanning_agent)
+  )
+  (:action activate_agent_after_checks
+    :parameters (?replanning_agent - replanning_agent)
+    :precondition
+      (and
+        (agent_approved ?replanning_agent)
+        (agent_final_checks_done ?replanning_agent)
+        (not
+          (agent_activated ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_activated ?replanning_agent)
+        (component_restoration_scheduled ?replanning_agent)
+      )
+  )
+  (:action select_service_option_for_agent
+    :parameters (?replanning_agent - replanning_agent ?service_option - service_option ?time_window - time_window)
+    :precondition
+      (and
+        (component_schedule_confirmed ?replanning_agent)
+        (component_time_window_assigned ?replanning_agent ?time_window)
+        (service_option_available ?service_option)
+        (agent_service_option_assigned ?replanning_agent ?service_option)
+        (not
+          (agent_service_option_selected ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_service_option_selected ?replanning_agent)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action confirm_service_option_for_agent
+    :parameters (?replanning_agent - replanning_agent ?operator_team - operator_team)
+    :precondition
+      (and
+        (agent_service_option_selected ?replanning_agent)
+        (component_operator_assigned ?replanning_agent ?operator_team)
+        (not
+          (agent_service_option_confirmed ?replanning_agent)
+        )
+      )
+    :effect (agent_service_option_confirmed ?replanning_agent)
+  )
+  (:action finalize_service_option_confirmation
+    :parameters (?replanning_agent - replanning_agent ?authority_approval - authority_approval)
+    :precondition
+      (and
+        (agent_service_option_confirmed ?replanning_agent)
+        (agent_authority_approval_assigned ?replanning_agent ?authority_approval)
+        (not
+          (agent_service_option_ready ?replanning_agent)
+        )
+      )
+    :effect (agent_service_option_ready ?replanning_agent)
+  )
+  (:action activate_agent_with_service_option
+    :parameters (?replanning_agent - replanning_agent)
+    :precondition
+      (and
+        (agent_service_option_ready ?replanning_agent)
+        (not
+          (agent_activated ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_activated ?replanning_agent)
+        (component_restoration_scheduled ?replanning_agent)
+      )
+  )
+  (:action assign_restoration_to_origin_segment
+    :parameters (?origin_segment - origin_segment ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (origin_segment_ready ?origin_segment)
+        (origin_segment_validated ?origin_segment)
+        (contingency_plan_selected ?contingency_plan)
+        (plan_time_confirmed ?contingency_plan)
+        (not
+          (component_restoration_scheduled ?origin_segment)
+        )
+      )
+    :effect (component_restoration_scheduled ?origin_segment)
+  )
+  (:action assign_restoration_to_destination_segment
+    :parameters (?destination_segment - destination_segment ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (destination_segment_ready ?destination_segment)
+        (destination_segment_validated ?destination_segment)
+        (contingency_plan_selected ?contingency_plan)
+        (plan_time_confirmed ?contingency_plan)
+        (not
+          (component_restoration_scheduled ?destination_segment)
+        )
+      )
+    :effect (component_restoration_scheduled ?destination_segment)
+  )
+  (:action attach_claim_document_to_case
+    :parameters (?case_component - case_component ?claim_document - claim_document ?time_window - time_window)
+    :precondition
+      (and
+        (component_restoration_scheduled ?case_component)
+        (component_time_window_assigned ?case_component ?time_window)
+        (claim_document_available ?claim_document)
+        (not
+          (component_claim_attached ?case_component)
+        )
+      )
+    :effect
+      (and
+        (component_claim_attached ?case_component)
+        (component_claim_attached_to_document ?case_component ?claim_document)
+        (not
+          (claim_document_available ?claim_document)
+        )
+      )
+  )
+  (:action finalize_restoration_and_release_vehicle_for_origin
+    :parameters (?origin_segment - origin_segment ?vehicle_resource - vehicle_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (component_claim_attached ?origin_segment)
+        (component_vehicle_assigned ?origin_segment ?vehicle_resource)
+        (component_claim_attached_to_document ?origin_segment ?claim_document)
+        (not
+          (component_recovery_complete ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (component_recovery_complete ?origin_segment)
+        (vehicle_available ?vehicle_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action finalize_restoration_and_release_vehicle_for_destination
+    :parameters (?destination_segment - destination_segment ?vehicle_resource - vehicle_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (component_claim_attached ?destination_segment)
+        (component_vehicle_assigned ?destination_segment ?vehicle_resource)
+        (component_claim_attached_to_document ?destination_segment ?claim_document)
+        (not
+          (component_recovery_complete ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (component_recovery_complete ?destination_segment)
+        (vehicle_available ?vehicle_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action finalize_restoration_and_release_vehicle_for_agent
+    :parameters (?replanning_agent - replanning_agent ?vehicle_resource - vehicle_resource ?claim_document - claim_document)
+    :precondition
+      (and
+        (component_claim_attached ?replanning_agent)
+        (component_vehicle_assigned ?replanning_agent ?vehicle_resource)
+        (component_claim_attached_to_document ?replanning_agent ?claim_document)
+        (not
+          (component_recovery_complete ?replanning_agent)
+        )
+      )
+    :effect
+      (and
+        (component_recovery_complete ?replanning_agent)
+        (vehicle_available ?vehicle_resource)
+        (claim_document_available ?claim_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem disruption_response_case_1)
+  (:domain weather_disruption_network_replanning)
+  (:objects origin_segment_1 - origin_segment destination_segment_1 - destination_segment replanning_agent_1 - replanning_agent replanning_agent_2 - replanning_agent vehicle_unit_1 - vehicle_resource vehicle_unit_2 - vehicle_resource vehicle_unit_3 - vehicle_resource time_window_1 - time_window operator_team_1 - operator_team material_resource_1 - material_resource affected_zone_1 - affected_zone alternate_zone_1 - alternate_zone contingency_plan_template_1 - contingency_plan depot_asset_1 - depot_asset depot_asset_2 - depot_asset policy_option_1 - policy_option policy_option_2 - policy_option constraint_profile_1 - constraint_profile constraint_profile_2 - constraint_profile claim_document_1 - claim_document equipment_1 - equipment service_option_1 - service_option service_option_2 - service_option authority_approval_1 - authority_approval)
+  (:init
+    (vehicle_available vehicle_unit_1)
+    (vehicle_available vehicle_unit_2)
+    (vehicle_available vehicle_unit_3)
+    (time_window_available time_window_1)
+    (operator_available operator_team_1)
+    (material_available material_resource_1)
+    (segment_in_affected_zone origin_segment_1 affected_zone_1)
+    (segment_in_alternate_zone destination_segment_1 alternate_zone_1)
+    (contingency_plan_template_available contingency_plan_template_1)
+    (depot_available depot_asset_1)
+    (depot_available depot_asset_2)
+    (agent_assigned_origin_segment replanning_agent_1 origin_segment_1)
+    (agent_assigned_origin_segment replanning_agent_2 origin_segment_1)
+    (agent_assigned_destination_segment replanning_agent_1 destination_segment_1)
+    (agent_assigned_destination_segment replanning_agent_2 destination_segment_1)
+    (agent_linked_contingency_plan replanning_agent_1 contingency_plan_template_1)
+    (agent_linked_contingency_plan replanning_agent_2 contingency_plan_template_1)
+    (agent_linked_depot replanning_agent_1 depot_asset_1)
+    (agent_linked_depot replanning_agent_2 depot_asset_2)
+    (policy_option_available policy_option_1)
+    (policy_option_available policy_option_2)
+    (constraint_profile_available constraint_profile_1)
+    (constraint_profile_available constraint_profile_2)
+    (claim_document_available claim_document_1)
+    (equipment_available equipment_1)
+    (service_option_available service_option_1)
+    (agent_service_option_assigned replanning_agent_1 service_option_1)
+    (agent_service_option_assigned replanning_agent_2 service_option_2)
+    (authority_approval_available authority_approval_1)
+  )
+  (:goal
+    (and
+      (component_recovery_complete origin_segment_1)
+      (component_recovery_complete destination_segment_1)
+      (component_recovery_complete replanning_agent_1)
+      (component_recovery_complete replanning_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_disruption_record origin_segment_1)
+(assign_vehicle_to_case origin_segment_1 vehicle_unit_1)
+(assign_time_window_to_case origin_segment_1 time_window_1)
+(confirm_case_schedule origin_segment_1 time_window_1)
+(release_time_window_from_case origin_segment_1 time_window_1)
+(register_disruption_record destination_segment_1)
+(assign_vehicle_to_case destination_segment_1 vehicle_unit_2)
+(assign_time_window_to_case destination_segment_1 time_window_1)
+(confirm_case_schedule destination_segment_1 time_window_1)
+(release_time_window_from_case destination_segment_1 time_window_1)
+(assign_time_window_to_case origin_segment_1 time_window_1)
+(flag_affected_zone_for_segment origin_segment_1 affected_zone_1 time_window_1)
+(release_time_window_from_case origin_segment_1 time_window_1)
+(assign_time_window_to_case destination_segment_1 time_window_1)
+(flag_alternate_zone_for_destination destination_segment_1 alternate_zone_1 time_window_1)
+(release_time_window_from_case destination_segment_1 time_window_1)
+(assign_operator_team_to_case origin_segment_1 operator_team_1)
+(assign_operator_and_mark_origin_segment origin_segment_1 affected_zone_1 operator_team_1)
+(release_operator_team_from_case origin_segment_1 operator_team_1)
+(assign_operator_team_to_case destination_segment_1 operator_team_1)
+(assign_operator_and_mark_destination_segment destination_segment_1 alternate_zone_1 operator_team_1)
+(release_operator_team_from_case destination_segment_1 operator_team_1)
+(instantiate_contingency_plan origin_segment_1 destination_segment_1 affected_zone_1 alternate_zone_1 contingency_plan_template_1)
+(assign_time_window_to_case origin_segment_1 time_window_1)
+(confirm_plan_time contingency_plan_template_1 origin_segment_1 time_window_1)
+(release_time_window_from_case origin_segment_1 time_window_1)
+(assign_restoration_to_origin_segment origin_segment_1 contingency_plan_template_1)
+(assign_restoration_to_destination_segment destination_segment_1 contingency_plan_template_1)
+(assign_time_window_to_case origin_segment_1 time_window_1)
+(attach_claim_document_to_case origin_segment_1 claim_document_1 time_window_1)
+(finalize_restoration_and_release_vehicle_for_origin origin_segment_1 vehicle_unit_1 claim_document_1)
+(assign_time_window_to_case destination_segment_1 time_window_1)
+(attach_claim_document_to_case destination_segment_1 claim_document_1 time_window_1)
+(release_time_window_from_case destination_segment_1 time_window_1)
+(finalize_restoration_and_release_vehicle_for_destination destination_segment_1 vehicle_unit_2 claim_document_1)
+(register_disruption_record replanning_agent_1)
+(assign_vehicle_to_case replanning_agent_1 vehicle_unit_3)
+(assign_time_window_to_case replanning_agent_1 time_window_1)
+(confirm_case_schedule replanning_agent_1 time_window_1)
+(release_time_window_from_case replanning_agent_1 time_window_1)
+(register_disruption_record replanning_agent_2)
+(assign_vehicle_to_case replanning_agent_2 vehicle_unit_1)
+(assign_time_window_to_case replanning_agent_2 time_window_1)
+(confirm_case_schedule replanning_agent_2 time_window_1)
+(release_time_window_from_case replanning_agent_2 time_window_1)
+(assign_depot_to_plan replanning_agent_1 depot_asset_1 contingency_plan_template_1)
+(assign_depot_to_plan replanning_agent_2 depot_asset_2 contingency_plan_template_1)
+(assign_time_window_to_case replanning_agent_1 time_window_1)
+(authorize_agent_for_plan replanning_agent_1 depot_asset_1 contingency_plan_template_1 time_window_1)
+(release_time_window_from_case replanning_agent_1 time_window_1)
+(assign_time_window_to_case replanning_agent_2 time_window_1)
+(authorize_agent_for_plan replanning_agent_2 depot_asset_2 contingency_plan_template_1 time_window_1)
+(release_time_window_from_case replanning_agent_2 time_window_1)
+(assign_equipment_to_agent replanning_agent_1 equipment_1)
+(assign_operator_team_to_case replanning_agent_1 operator_team_1)
+(assign_authority_approval_to_agent replanning_agent_1 authority_approval_1)
+(equip_agent_for_plan_standard replanning_agent_1 equipment_1 operator_team_1 depot_asset_1 contingency_plan_template_1)
+(process_agent_authority_approval replanning_agent_1 authority_approval_1 depot_asset_1 contingency_plan_template_1)
+(release_operator_team_from_case replanning_agent_1 operator_team_1)
+(release_equipment_from_agent replanning_agent_1 equipment_1)
+(release_authority_approval_from_agent replanning_agent_1 authority_approval_1)
+(finalize_agent_activation replanning_agent_1)
+(assign_time_window_to_case replanning_agent_1 time_window_1)
+(attach_claim_document_to_case replanning_agent_1 claim_document_1 time_window_1)
+(finalize_restoration_and_release_vehicle_for_agent replanning_agent_1 vehicle_unit_3 claim_document_1)
+(assign_equipment_to_agent replanning_agent_2 equipment_1)
+(assign_operator_team_to_case replanning_agent_2 operator_team_1)
+(assign_authority_approval_to_agent replanning_agent_2 authority_approval_1)
+(equip_agent_for_plan_standard replanning_agent_2 equipment_1 operator_team_1 depot_asset_2 contingency_plan_template_1)
+(process_agent_authority_approval replanning_agent_2 authority_approval_1 depot_asset_2 contingency_plan_template_1)
+(release_operator_team_from_case replanning_agent_2 operator_team_1)
+(release_equipment_from_agent replanning_agent_2 equipment_1)
+(release_authority_approval_from_agent replanning_agent_2 authority_approval_1)
+(finalize_agent_activation replanning_agent_2)
+(assign_time_window_to_case replanning_agent_2 time_window_1)
+(attach_claim_document_to_case replanning_agent_2 claim_document_1 time_window_1)
+(finalize_restoration_and_release_vehicle_for_agent replanning_agent_2 vehicle_unit_1 claim_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_gvdsn69p/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_gvdsn69p/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain reusable_asset_rotation_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types provider_group - object commodity_group - object location_group - object rotation_category - object rotation_unit - rotation_category reusable_asset - provider_group commodity_batch - provider_group operator_unit - provider_group certification_document - provider_group quality_aid - provider_group contingency_reserve - provider_group consumable_unit - provider_group contingency_type - provider_group supply_item - commodity_group processing_station - commodity_group regulatory_permit - commodity_group loading_point - location_group delivery_point - location_group transport_unit - location_group rotation_origin_role - rotation_unit rotation_destination_role - rotation_unit origin_zone - rotation_origin_role destination_zone - rotation_origin_role logistics_node - rotation_destination_role)
+  (:predicates
+    (rotation_entity_initialized ?rotation_unit - rotation_unit)
+    (rotation_entity_ready ?rotation_unit - rotation_unit)
+    (rotation_entity_asset_allocated ?rotation_unit - rotation_unit)
+    (rotation_entity_completed ?rotation_unit - rotation_unit)
+    (rotation_entity_tasks_completed ?rotation_unit - rotation_unit)
+    (rotation_entity_commodity_assigned ?rotation_unit - rotation_unit)
+    (asset_available ?reusable_asset - reusable_asset)
+    (rotation_entity_asset_link ?rotation_unit - rotation_unit ?reusable_asset - reusable_asset)
+    (commodity_batch_available ?commodity_batch - commodity_batch)
+    (rotation_entity_commodity_loaded ?rotation_unit - rotation_unit ?commodity_batch - commodity_batch)
+    (operator_available ?operator_unit - operator_unit)
+    (rotation_entity_operator_assigned ?rotation_unit - rotation_unit ?operator_unit - operator_unit)
+    (supply_item_available ?supply_item - supply_item)
+    (rotation_entity_origin_supply_assigned ?origin_zone - origin_zone ?supply_item - supply_item)
+    (rotation_entity_destination_supply_assigned ?destination_zone - destination_zone ?supply_item - supply_item)
+    (origin_loading_point_assigned ?origin_zone - origin_zone ?loading_point - loading_point)
+    (loading_point_prepared ?loading_point - loading_point)
+    (loading_point_supplied ?loading_point - loading_point)
+    (origin_operator_staged ?origin_zone - origin_zone)
+    (destination_delivery_point_assigned ?destination_zone - destination_zone ?delivery_point - delivery_point)
+    (delivery_point_prepared ?delivery_point - delivery_point)
+    (delivery_point_supplied ?delivery_point - delivery_point)
+    (destination_operator_staged ?destination_zone - destination_zone)
+    (transport_available ?transport_unit - transport_unit)
+    (transport_assigned ?transport_unit - transport_unit)
+    (transport_loading_point_link ?transport_unit - transport_unit ?loading_point - loading_point)
+    (transport_delivery_point_link ?transport_unit - transport_unit ?delivery_point - delivery_point)
+    (transport_origin_supplied ?transport_unit - transport_unit)
+    (transport_destination_supplied ?transport_unit - transport_unit)
+    (transport_dispatched ?transport_unit - transport_unit)
+    (node_assigned_origin ?logistics_node - logistics_node ?origin_zone - origin_zone)
+    (node_assigned_destination ?logistics_node - logistics_node ?destination_zone - destination_zone)
+    (node_assigned_transport ?logistics_node - logistics_node ?transport_unit - transport_unit)
+    (processing_station_available ?processing_station - processing_station)
+    (node_processing_station_assigned ?logistics_node - logistics_node ?processing_station - processing_station)
+    (processing_station_activated ?processing_station - processing_station)
+    (processing_station_assigned_transport ?processing_station - processing_station ?transport_unit - transport_unit)
+    (node_processing_accepted ?logistics_node - logistics_node)
+    (node_inspection_started ?logistics_node - logistics_node)
+    (node_inspection_passed ?logistics_node - logistics_node)
+    (certification_attached ?logistics_node - logistics_node)
+    (certification_verified ?logistics_node - logistics_node)
+    (node_inspection_reported ?logistics_node - logistics_node)
+    (node_final_check_completed ?logistics_node - logistics_node)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (node_permit_link ?logistics_node - logistics_node ?regulatory_permit - regulatory_permit)
+    (node_permit_applied ?logistics_node - logistics_node)
+    (node_followup_assigned ?logistics_node - logistics_node)
+    (node_followup_completed ?logistics_node - logistics_node)
+    (certification_document_available ?certification_document - certification_document)
+    (node_certification_bound ?logistics_node - logistics_node ?certification_document - certification_document)
+    (quality_aid_available ?quality_aid - quality_aid)
+    (node_quality_aid_attached ?logistics_node - logistics_node ?quality_aid - quality_aid)
+    (consumable_unit_available ?consumable_unit - consumable_unit)
+    (node_consumable_assigned ?logistics_node - logistics_node ?consumable_unit - consumable_unit)
+    (contingency_type_available ?contingency_type - contingency_type)
+    (node_contingency_type_assigned ?logistics_node - logistics_node ?contingency_type - contingency_type)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (rotation_entity_contingency_assigned ?rotation_unit - rotation_unit ?contingency_reserve - contingency_reserve)
+    (origin_ready_for_transport ?origin_zone - origin_zone)
+    (destination_ready_for_transport ?destination_zone - destination_zone)
+    (node_finalized ?logistics_node - logistics_node)
+  )
+  (:action initialize_rotation_unit
+    :parameters (?rotation_unit - rotation_unit)
+    :precondition
+      (and
+        (not
+          (rotation_entity_initialized ?rotation_unit)
+        )
+        (not
+          (rotation_entity_completed ?rotation_unit)
+        )
+      )
+    :effect (rotation_entity_initialized ?rotation_unit)
+  )
+  (:action assign_asset_to_rotation
+    :parameters (?rotation_unit - rotation_unit ?reusable_asset - reusable_asset)
+    :precondition
+      (and
+        (rotation_entity_initialized ?rotation_unit)
+        (not
+          (rotation_entity_asset_allocated ?rotation_unit)
+        )
+        (asset_available ?reusable_asset)
+      )
+    :effect
+      (and
+        (rotation_entity_asset_allocated ?rotation_unit)
+        (rotation_entity_asset_link ?rotation_unit ?reusable_asset)
+        (not
+          (asset_available ?reusable_asset)
+        )
+      )
+  )
+  (:action load_commodity_into_asset
+    :parameters (?rotation_unit - rotation_unit ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_initialized ?rotation_unit)
+        (rotation_entity_asset_allocated ?rotation_unit)
+        (commodity_batch_available ?commodity_batch)
+      )
+    :effect
+      (and
+        (rotation_entity_commodity_loaded ?rotation_unit ?commodity_batch)
+        (not
+          (commodity_batch_available ?commodity_batch)
+        )
+      )
+  )
+  (:action mark_rotation_ready
+    :parameters (?rotation_unit - rotation_unit ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_initialized ?rotation_unit)
+        (rotation_entity_asset_allocated ?rotation_unit)
+        (rotation_entity_commodity_loaded ?rotation_unit ?commodity_batch)
+        (not
+          (rotation_entity_ready ?rotation_unit)
+        )
+      )
+    :effect (rotation_entity_ready ?rotation_unit)
+  )
+  (:action unload_commodity_from_asset
+    :parameters (?rotation_unit - rotation_unit ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_commodity_loaded ?rotation_unit ?commodity_batch)
+      )
+    :effect
+      (and
+        (commodity_batch_available ?commodity_batch)
+        (not
+          (rotation_entity_commodity_loaded ?rotation_unit ?commodity_batch)
+        )
+      )
+  )
+  (:action assign_operator_to_rotation
+    :parameters (?rotation_unit - rotation_unit ?operator_unit - operator_unit)
+    :precondition
+      (and
+        (rotation_entity_ready ?rotation_unit)
+        (operator_available ?operator_unit)
+      )
+    :effect
+      (and
+        (rotation_entity_operator_assigned ?rotation_unit ?operator_unit)
+        (not
+          (operator_available ?operator_unit)
+        )
+      )
+  )
+  (:action release_operator_from_rotation
+    :parameters (?rotation_unit - rotation_unit ?operator_unit - operator_unit)
+    :precondition
+      (and
+        (rotation_entity_operator_assigned ?rotation_unit ?operator_unit)
+      )
+    :effect
+      (and
+        (operator_available ?operator_unit)
+        (not
+          (rotation_entity_operator_assigned ?rotation_unit ?operator_unit)
+        )
+      )
+  )
+  (:action assign_consumable_to_node
+    :parameters (?logistics_node - logistics_node ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (consumable_unit_available ?consumable_unit)
+      )
+    :effect
+      (and
+        (node_consumable_assigned ?logistics_node ?consumable_unit)
+        (not
+          (consumable_unit_available ?consumable_unit)
+        )
+      )
+  )
+  (:action release_consumable_from_node
+    :parameters (?logistics_node - logistics_node ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (node_consumable_assigned ?logistics_node ?consumable_unit)
+      )
+    :effect
+      (and
+        (consumable_unit_available ?consumable_unit)
+        (not
+          (node_consumable_assigned ?logistics_node ?consumable_unit)
+        )
+      )
+  )
+  (:action assign_contingency_type_to_node
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (contingency_type_available ?contingency_type)
+      )
+    :effect
+      (and
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (not
+          (contingency_type_available ?contingency_type)
+        )
+      )
+  )
+  (:action release_contingency_type_from_node
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type)
+    :precondition
+      (and
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+      )
+    :effect
+      (and
+        (contingency_type_available ?contingency_type)
+        (not
+          (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        )
+      )
+  )
+  (:action prepare_origin_loading_point
+    :parameters (?origin_zone - origin_zone ?loading_point - loading_point ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_ready ?origin_zone)
+        (rotation_entity_commodity_loaded ?origin_zone ?commodity_batch)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (not
+          (loading_point_prepared ?loading_point)
+        )
+        (not
+          (loading_point_supplied ?loading_point)
+        )
+      )
+    :effect (loading_point_prepared ?loading_point)
+  )
+  (:action stage_origin_operator
+    :parameters (?origin_zone - origin_zone ?loading_point - loading_point ?operator_unit - operator_unit)
+    :precondition
+      (and
+        (rotation_entity_ready ?origin_zone)
+        (rotation_entity_operator_assigned ?origin_zone ?operator_unit)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (loading_point_prepared ?loading_point)
+        (not
+          (origin_ready_for_transport ?origin_zone)
+        )
+      )
+    :effect
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (origin_operator_staged ?origin_zone)
+      )
+  )
+  (:action assign_supply_to_origin
+    :parameters (?origin_zone - origin_zone ?loading_point - loading_point ?supply_item - supply_item)
+    :precondition
+      (and
+        (rotation_entity_ready ?origin_zone)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (supply_item_available ?supply_item)
+        (not
+          (origin_ready_for_transport ?origin_zone)
+        )
+      )
+    :effect
+      (and
+        (loading_point_supplied ?loading_point)
+        (origin_ready_for_transport ?origin_zone)
+        (rotation_entity_origin_supply_assigned ?origin_zone ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action execute_origin_supply_loading
+    :parameters (?origin_zone - origin_zone ?loading_point - loading_point ?commodity_batch - commodity_batch ?supply_item - supply_item)
+    :precondition
+      (and
+        (rotation_entity_ready ?origin_zone)
+        (rotation_entity_commodity_loaded ?origin_zone ?commodity_batch)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (loading_point_supplied ?loading_point)
+        (rotation_entity_origin_supply_assigned ?origin_zone ?supply_item)
+        (not
+          (origin_operator_staged ?origin_zone)
+        )
+      )
+    :effect
+      (and
+        (loading_point_prepared ?loading_point)
+        (origin_operator_staged ?origin_zone)
+        (supply_item_available ?supply_item)
+        (not
+          (rotation_entity_origin_supply_assigned ?origin_zone ?supply_item)
+        )
+      )
+  )
+  (:action prepare_destination_delivery_point
+    :parameters (?destination_zone - destination_zone ?delivery_point - delivery_point ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_ready ?destination_zone)
+        (rotation_entity_commodity_loaded ?destination_zone ?commodity_batch)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (not
+          (delivery_point_prepared ?delivery_point)
+        )
+        (not
+          (delivery_point_supplied ?delivery_point)
+        )
+      )
+    :effect (delivery_point_prepared ?delivery_point)
+  )
+  (:action stage_destination_operator
+    :parameters (?destination_zone - destination_zone ?delivery_point - delivery_point ?operator_unit - operator_unit)
+    :precondition
+      (and
+        (rotation_entity_ready ?destination_zone)
+        (rotation_entity_operator_assigned ?destination_zone ?operator_unit)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (delivery_point_prepared ?delivery_point)
+        (not
+          (destination_ready_for_transport ?destination_zone)
+        )
+      )
+    :effect
+      (and
+        (destination_ready_for_transport ?destination_zone)
+        (destination_operator_staged ?destination_zone)
+      )
+  )
+  (:action assign_supply_to_destination
+    :parameters (?destination_zone - destination_zone ?delivery_point - delivery_point ?supply_item - supply_item)
+    :precondition
+      (and
+        (rotation_entity_ready ?destination_zone)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (supply_item_available ?supply_item)
+        (not
+          (destination_ready_for_transport ?destination_zone)
+        )
+      )
+    :effect
+      (and
+        (delivery_point_supplied ?delivery_point)
+        (destination_ready_for_transport ?destination_zone)
+        (rotation_entity_destination_supply_assigned ?destination_zone ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action execute_destination_supply_unloading
+    :parameters (?destination_zone - destination_zone ?delivery_point - delivery_point ?commodity_batch - commodity_batch ?supply_item - supply_item)
+    :precondition
+      (and
+        (rotation_entity_ready ?destination_zone)
+        (rotation_entity_commodity_loaded ?destination_zone ?commodity_batch)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (delivery_point_supplied ?delivery_point)
+        (rotation_entity_destination_supply_assigned ?destination_zone ?supply_item)
+        (not
+          (destination_operator_staged ?destination_zone)
+        )
+      )
+    :effect
+      (and
+        (delivery_point_prepared ?delivery_point)
+        (destination_operator_staged ?destination_zone)
+        (supply_item_available ?supply_item)
+        (not
+          (rotation_entity_destination_supply_assigned ?destination_zone ?supply_item)
+        )
+      )
+  )
+  (:action stage_transport_both_slots_prepared
+    :parameters (?origin_zone - origin_zone ?destination_zone - destination_zone ?loading_point - loading_point ?delivery_point - delivery_point ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (destination_ready_for_transport ?destination_zone)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (loading_point_prepared ?loading_point)
+        (delivery_point_prepared ?delivery_point)
+        (origin_operator_staged ?origin_zone)
+        (destination_operator_staged ?destination_zone)
+        (transport_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_assigned ?transport_unit)
+        (transport_loading_point_link ?transport_unit ?loading_point)
+        (transport_delivery_point_link ?transport_unit ?delivery_point)
+        (not
+          (transport_available ?transport_unit)
+        )
+      )
+  )
+  (:action stage_transport_origin_supplied
+    :parameters (?origin_zone - origin_zone ?destination_zone - destination_zone ?loading_point - loading_point ?delivery_point - delivery_point ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (destination_ready_for_transport ?destination_zone)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (loading_point_supplied ?loading_point)
+        (delivery_point_prepared ?delivery_point)
+        (not
+          (origin_operator_staged ?origin_zone)
+        )
+        (destination_operator_staged ?destination_zone)
+        (transport_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_assigned ?transport_unit)
+        (transport_loading_point_link ?transport_unit ?loading_point)
+        (transport_delivery_point_link ?transport_unit ?delivery_point)
+        (transport_origin_supplied ?transport_unit)
+        (not
+          (transport_available ?transport_unit)
+        )
+      )
+  )
+  (:action stage_transport_destination_supplied
+    :parameters (?origin_zone - origin_zone ?destination_zone - destination_zone ?loading_point - loading_point ?delivery_point - delivery_point ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (destination_ready_for_transport ?destination_zone)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (loading_point_prepared ?loading_point)
+        (delivery_point_supplied ?delivery_point)
+        (origin_operator_staged ?origin_zone)
+        (not
+          (destination_operator_staged ?destination_zone)
+        )
+        (transport_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_assigned ?transport_unit)
+        (transport_loading_point_link ?transport_unit ?loading_point)
+        (transport_delivery_point_link ?transport_unit ?delivery_point)
+        (transport_destination_supplied ?transport_unit)
+        (not
+          (transport_available ?transport_unit)
+        )
+      )
+  )
+  (:action stage_transport_both_slots_supplied
+    :parameters (?origin_zone - origin_zone ?destination_zone - destination_zone ?loading_point - loading_point ?delivery_point - delivery_point ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (destination_ready_for_transport ?destination_zone)
+        (origin_loading_point_assigned ?origin_zone ?loading_point)
+        (destination_delivery_point_assigned ?destination_zone ?delivery_point)
+        (loading_point_supplied ?loading_point)
+        (delivery_point_supplied ?delivery_point)
+        (not
+          (origin_operator_staged ?origin_zone)
+        )
+        (not
+          (destination_operator_staged ?destination_zone)
+        )
+        (transport_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_assigned ?transport_unit)
+        (transport_loading_point_link ?transport_unit ?loading_point)
+        (transport_delivery_point_link ?transport_unit ?delivery_point)
+        (transport_origin_supplied ?transport_unit)
+        (transport_destination_supplied ?transport_unit)
+        (not
+          (transport_available ?transport_unit)
+        )
+      )
+  )
+  (:action dispatch_transport_unit
+    :parameters (?transport_unit - transport_unit ?origin_zone - origin_zone ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (transport_assigned ?transport_unit)
+        (origin_ready_for_transport ?origin_zone)
+        (rotation_entity_commodity_loaded ?origin_zone ?commodity_batch)
+        (not
+          (transport_dispatched ?transport_unit)
+        )
+      )
+    :effect (transport_dispatched ?transport_unit)
+  )
+  (:action activate_processing_station
+    :parameters (?logistics_node - logistics_node ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (node_assigned_transport ?logistics_node ?transport_unit)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_available ?processing_station)
+        (transport_assigned ?transport_unit)
+        (transport_dispatched ?transport_unit)
+        (not
+          (processing_station_activated ?processing_station)
+        )
+      )
+    :effect
+      (and
+        (processing_station_activated ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (not
+          (processing_station_available ?processing_station)
+        )
+      )
+  )
+  (:action accept_processing_station_assignment
+    :parameters (?logistics_node - logistics_node ?processing_station - processing_station ?transport_unit - transport_unit ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_activated ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (rotation_entity_commodity_loaded ?logistics_node ?commodity_batch)
+        (not
+          (transport_origin_supplied ?transport_unit)
+        )
+        (not
+          (node_processing_accepted ?logistics_node)
+        )
+      )
+    :effect (node_processing_accepted ?logistics_node)
+  )
+  (:action assign_certification_to_node
+    :parameters (?logistics_node - logistics_node ?certification_document - certification_document)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (certification_document_available ?certification_document)
+        (not
+          (certification_attached ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (certification_attached ?logistics_node)
+        (node_certification_bound ?logistics_node ?certification_document)
+        (not
+          (certification_document_available ?certification_document)
+        )
+      )
+  )
+  (:action verify_certification_for_node
+    :parameters (?logistics_node - logistics_node ?processing_station - processing_station ?transport_unit - transport_unit ?commodity_batch - commodity_batch ?certification_document - certification_document)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_activated ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (rotation_entity_commodity_loaded ?logistics_node ?commodity_batch)
+        (transport_origin_supplied ?transport_unit)
+        (certification_attached ?logistics_node)
+        (node_certification_bound ?logistics_node ?certification_document)
+        (not
+          (node_processing_accepted ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_processing_accepted ?logistics_node)
+        (certification_verified ?logistics_node)
+      )
+  )
+  (:action initiate_node_inspection_primary
+    :parameters (?logistics_node - logistics_node ?consumable_unit - consumable_unit ?operator_unit - operator_unit ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_processing_accepted ?logistics_node)
+        (node_consumable_assigned ?logistics_node ?consumable_unit)
+        (rotation_entity_operator_assigned ?logistics_node ?operator_unit)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (not
+          (transport_destination_supplied ?transport_unit)
+        )
+        (not
+          (node_inspection_started ?logistics_node)
+        )
+      )
+    :effect (node_inspection_started ?logistics_node)
+  )
+  (:action initiate_node_inspection_secondary
+    :parameters (?logistics_node - logistics_node ?consumable_unit - consumable_unit ?operator_unit - operator_unit ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_processing_accepted ?logistics_node)
+        (node_consumable_assigned ?logistics_node ?consumable_unit)
+        (rotation_entity_operator_assigned ?logistics_node ?operator_unit)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (transport_destination_supplied ?transport_unit)
+        (not
+          (node_inspection_started ?logistics_node)
+        )
+      )
+    :effect (node_inspection_started ?logistics_node)
+  )
+  (:action advance_node_inspection_stage1
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_inspection_started ?logistics_node)
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (not
+          (transport_origin_supplied ?transport_unit)
+        )
+        (not
+          (transport_destination_supplied ?transport_unit)
+        )
+        (not
+          (node_inspection_passed ?logistics_node)
+        )
+      )
+    :effect (node_inspection_passed ?logistics_node)
+  )
+  (:action advance_node_inspection_stage2
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_inspection_started ?logistics_node)
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (transport_origin_supplied ?transport_unit)
+        (not
+          (transport_destination_supplied ?transport_unit)
+        )
+        (not
+          (node_inspection_passed ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_inspection_reported ?logistics_node)
+      )
+  )
+  (:action advance_node_inspection_stage3
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_inspection_started ?logistics_node)
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (not
+          (transport_origin_supplied ?transport_unit)
+        )
+        (transport_destination_supplied ?transport_unit)
+        (not
+          (node_inspection_passed ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_inspection_reported ?logistics_node)
+      )
+  )
+  (:action advance_node_inspection_stage4
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type ?processing_station - processing_station ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (node_inspection_started ?logistics_node)
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (node_processing_station_assigned ?logistics_node ?processing_station)
+        (processing_station_assigned_transport ?processing_station ?transport_unit)
+        (transport_origin_supplied ?transport_unit)
+        (transport_destination_supplied ?transport_unit)
+        (not
+          (node_inspection_passed ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_inspection_reported ?logistics_node)
+      )
+  )
+  (:action finalize_rotation_node_checks
+    :parameters (?logistics_node - logistics_node)
+    :precondition
+      (and
+        (node_inspection_passed ?logistics_node)
+        (not
+          (node_inspection_reported ?logistics_node)
+        )
+        (not
+          (node_finalized ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?logistics_node)
+        (rotation_entity_tasks_completed ?logistics_node)
+      )
+  )
+  (:action attach_quality_aid_to_node
+    :parameters (?logistics_node - logistics_node ?quality_aid - quality_aid)
+    :precondition
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_inspection_reported ?logistics_node)
+        (quality_aid_available ?quality_aid)
+      )
+    :effect
+      (and
+        (node_quality_aid_attached ?logistics_node ?quality_aid)
+        (not
+          (quality_aid_available ?quality_aid)
+        )
+      )
+  )
+  (:action perform_final_checks
+    :parameters (?logistics_node - logistics_node ?origin_zone - origin_zone ?destination_zone - destination_zone ?commodity_batch - commodity_batch ?quality_aid - quality_aid)
+    :precondition
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_inspection_reported ?logistics_node)
+        (node_quality_aid_attached ?logistics_node ?quality_aid)
+        (node_assigned_origin ?logistics_node ?origin_zone)
+        (node_assigned_destination ?logistics_node ?destination_zone)
+        (origin_operator_staged ?origin_zone)
+        (destination_operator_staged ?destination_zone)
+        (rotation_entity_commodity_loaded ?logistics_node ?commodity_batch)
+        (not
+          (node_final_check_completed ?logistics_node)
+        )
+      )
+    :effect (node_final_check_completed ?logistics_node)
+  )
+  (:action finalize_node_after_checks
+    :parameters (?logistics_node - logistics_node)
+    :precondition
+      (and
+        (node_inspection_passed ?logistics_node)
+        (node_final_check_completed ?logistics_node)
+        (not
+          (node_finalized ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?logistics_node)
+        (rotation_entity_tasks_completed ?logistics_node)
+      )
+  )
+  (:action apply_permit_to_node
+    :parameters (?logistics_node - logistics_node ?regulatory_permit - regulatory_permit ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_ready ?logistics_node)
+        (rotation_entity_commodity_loaded ?logistics_node ?commodity_batch)
+        (regulatory_permit_available ?regulatory_permit)
+        (node_permit_link ?logistics_node ?regulatory_permit)
+        (not
+          (node_permit_applied ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_permit_applied ?logistics_node)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action assign_followup_operator
+    :parameters (?logistics_node - logistics_node ?operator_unit - operator_unit)
+    :precondition
+      (and
+        (node_permit_applied ?logistics_node)
+        (rotation_entity_operator_assigned ?logistics_node ?operator_unit)
+        (not
+          (node_followup_assigned ?logistics_node)
+        )
+      )
+    :effect (node_followup_assigned ?logistics_node)
+  )
+  (:action complete_followup_inspection
+    :parameters (?logistics_node - logistics_node ?contingency_type - contingency_type)
+    :precondition
+      (and
+        (node_followup_assigned ?logistics_node)
+        (node_contingency_type_assigned ?logistics_node ?contingency_type)
+        (not
+          (node_followup_completed ?logistics_node)
+        )
+      )
+    :effect (node_followup_completed ?logistics_node)
+  )
+  (:action finalize_followup
+    :parameters (?logistics_node - logistics_node)
+    :precondition
+      (and
+        (node_followup_completed ?logistics_node)
+        (not
+          (node_finalized ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?logistics_node)
+        (rotation_entity_tasks_completed ?logistics_node)
+      )
+  )
+  (:action complete_origin_personnel_task
+    :parameters (?origin_zone - origin_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_ready_for_transport ?origin_zone)
+        (origin_operator_staged ?origin_zone)
+        (transport_assigned ?transport_unit)
+        (transport_dispatched ?transport_unit)
+        (not
+          (rotation_entity_tasks_completed ?origin_zone)
+        )
+      )
+    :effect (rotation_entity_tasks_completed ?origin_zone)
+  )
+  (:action complete_destination_personnel_task
+    :parameters (?destination_zone - destination_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (destination_ready_for_transport ?destination_zone)
+        (destination_operator_staged ?destination_zone)
+        (transport_assigned ?transport_unit)
+        (transport_dispatched ?transport_unit)
+        (not
+          (rotation_entity_tasks_completed ?destination_zone)
+        )
+      )
+    :effect (rotation_entity_tasks_completed ?destination_zone)
+  )
+  (:action assign_commodity_and_contingency_to_rotation
+    :parameters (?rotation_unit - rotation_unit ?contingency_reserve - contingency_reserve ?commodity_batch - commodity_batch)
+    :precondition
+      (and
+        (rotation_entity_tasks_completed ?rotation_unit)
+        (rotation_entity_commodity_loaded ?rotation_unit ?commodity_batch)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (rotation_entity_commodity_assigned ?rotation_unit)
+        )
+      )
+    :effect
+      (and
+        (rotation_entity_commodity_assigned ?rotation_unit)
+        (rotation_entity_contingency_assigned ?rotation_unit ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action complete_rotation_origin_release_resources
+    :parameters (?origin_zone - origin_zone ?reusable_asset - reusable_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (rotation_entity_commodity_assigned ?origin_zone)
+        (rotation_entity_asset_link ?origin_zone ?reusable_asset)
+        (rotation_entity_contingency_assigned ?origin_zone ?contingency_reserve)
+        (not
+          (rotation_entity_completed ?origin_zone)
+        )
+      )
+    :effect
+      (and
+        (rotation_entity_completed ?origin_zone)
+        (asset_available ?reusable_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action complete_rotation_destination_release_resources
+    :parameters (?destination_zone - destination_zone ?reusable_asset - reusable_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (rotation_entity_commodity_assigned ?destination_zone)
+        (rotation_entity_asset_link ?destination_zone ?reusable_asset)
+        (rotation_entity_contingency_assigned ?destination_zone ?contingency_reserve)
+        (not
+          (rotation_entity_completed ?destination_zone)
+        )
+      )
+    :effect
+      (and
+        (rotation_entity_completed ?destination_zone)
+        (asset_available ?reusable_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action complete_rotation_node_release_resources
+    :parameters (?logistics_node - logistics_node ?reusable_asset - reusable_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (rotation_entity_commodity_assigned ?logistics_node)
+        (rotation_entity_asset_link ?logistics_node ?reusable_asset)
+        (rotation_entity_contingency_assigned ?logistics_node ?contingency_reserve)
+        (not
+          (rotation_entity_completed ?logistics_node)
+        )
+      )
+    :effect
+      (and
+        (rotation_entity_completed ?logistics_node)
+        (asset_available ?reusable_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)

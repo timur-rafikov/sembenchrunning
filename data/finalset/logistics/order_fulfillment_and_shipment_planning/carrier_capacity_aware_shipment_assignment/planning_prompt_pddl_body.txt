@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain carrier_capacity_shipment_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object item_type - object domain_location_type - object fulfillment_entity_root - object fulfillment_entity - fulfillment_entity_root carrier_resource - resource_type order_line_item - resource_type warehouse_terminal - resource_type routing_attribute - resource_type special_handling_requirement - resource_type service_option - resource_type equipment_type - resource_type operational_attribute - resource_type packaging_unit - item_type piece_package - item_type contract_offer - item_type origin_time_slot - domain_location_type destination_time_slot - domain_location_type formed_shipment - domain_location_type flow_unit_category - fulfillment_entity consolidation_category - fulfillment_entity origin_fulfillment_unit - flow_unit_category destination_fulfillment_unit - flow_unit_category consolidation_shipment - consolidation_category)
+  (:predicates
+    (released_for_planning ?fulfillment_entity - fulfillment_entity)
+    (validated_for_planning ?fulfillment_entity - fulfillment_entity)
+    (entity_carrier_reserved ?fulfillment_entity - fulfillment_entity)
+    (assignment_finalized ?fulfillment_entity - fulfillment_entity)
+    (operationally_confirmed ?fulfillment_entity - fulfillment_entity)
+    (assignment_token_consumed ?fulfillment_entity - fulfillment_entity)
+    (carrier_available ?carrier_resource - carrier_resource)
+    (assigned_to_carrier ?fulfillment_entity - fulfillment_entity ?carrier_resource - carrier_resource)
+    (item_available ?order_line_item - order_line_item)
+    (line_item_allocated ?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    (terminal_available ?warehouse_terminal - warehouse_terminal)
+    (assigned_terminal ?fulfillment_entity - fulfillment_entity ?warehouse_terminal - warehouse_terminal)
+    (packaging_available ?packaging_unit - packaging_unit)
+    (origin_has_packaging ?origin_fulfillment_unit - origin_fulfillment_unit ?packaging_unit - packaging_unit)
+    (destination_has_packaging ?destination_fulfillment_unit - destination_fulfillment_unit ?packaging_unit - packaging_unit)
+    (compatible_with_origin_slot ?origin_fulfillment_unit - origin_fulfillment_unit ?origin_time_slot - origin_time_slot)
+    (origin_slot_on_hold ?origin_time_slot - origin_time_slot)
+    (origin_slot_confirmed ?origin_time_slot - origin_time_slot)
+    (origin_slot_confirmed_for_unit ?origin_fulfillment_unit - origin_fulfillment_unit)
+    (compatible_with_destination_slot ?destination_fulfillment_unit - destination_fulfillment_unit ?destination_time_slot - destination_time_slot)
+    (destination_slot_on_hold ?destination_time_slot - destination_time_slot)
+    (destination_slot_confirmed ?destination_time_slot - destination_time_slot)
+    (destination_slot_confirmed_for_unit ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (formed_shipment_available ?formed_shipment - formed_shipment)
+    (formed_shipment_active ?formed_shipment - formed_shipment)
+    (shipment_has_origin_slot ?formed_shipment - formed_shipment ?origin_time_slot - origin_time_slot)
+    (shipment_has_destination_slot ?formed_shipment - formed_shipment ?destination_time_slot - destination_time_slot)
+    (formed_shipment_origin_confirmed ?formed_shipment - formed_shipment)
+    (formed_shipment_destination_confirmed ?formed_shipment - formed_shipment)
+    (formed_shipment_manifest_ready ?formed_shipment - formed_shipment)
+    (consolidation_contains_origin ?consolidation_shipment - consolidation_shipment ?origin_fulfillment_unit - origin_fulfillment_unit)
+    (consolidation_contains_destination ?consolidation_shipment - consolidation_shipment ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (consolidation_linked_to_formed_shipment ?consolidation_shipment - consolidation_shipment ?formed_shipment - formed_shipment)
+    (package_available ?piece_package - piece_package)
+    (consolidation_has_package ?consolidation_shipment - consolidation_shipment ?piece_package - piece_package)
+    (package_manifested ?piece_package - piece_package)
+    (package_assigned_to_shipment ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    (consolidation_prepared ?consolidation_shipment - consolidation_shipment)
+    (attributes_prepared ?consolidation_shipment - consolidation_shipment)
+    (attributes_confirmed ?consolidation_shipment - consolidation_shipment)
+    (routing_attribute_attached ?consolidation_shipment - consolidation_shipment)
+    (routing_attribute_enforced ?consolidation_shipment - consolidation_shipment)
+    (awaiting_special_handling_attachment ?consolidation_shipment - consolidation_shipment)
+    (final_readiness_verified ?consolidation_shipment - consolidation_shipment)
+    (contract_offer_available ?contract_offer - contract_offer)
+    (consolidation_has_contract_offer ?consolidation_shipment - consolidation_shipment ?contract_offer - contract_offer)
+    (contract_offer_applied ?consolidation_shipment - consolidation_shipment)
+    (contract_acknowledged ?consolidation_shipment - consolidation_shipment)
+    (contract_requirements_confirmed ?consolidation_shipment - consolidation_shipment)
+    (routing_attribute_available ?routing_attribute - routing_attribute)
+    (consolidation_has_routing_attribute ?consolidation_shipment - consolidation_shipment ?routing_attribute - routing_attribute)
+    (special_handling_available ?special_handling_requirement - special_handling_requirement)
+    (consolidation_has_special_handling ?consolidation_shipment - consolidation_shipment ?special_handling_requirement - special_handling_requirement)
+    (equipment_type_available ?equipment_type - equipment_type)
+    (equipment_assigned_to_consolidation ?consolidation_shipment - consolidation_shipment ?equipment_type - equipment_type)
+    (operational_attribute_available ?operational_attribute - operational_attribute)
+    (consolidation_has_operational_attribute ?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute)
+    (service_option_available ?service_option - service_option)
+    (entity_assigned_service_option ?fulfillment_entity - fulfillment_entity ?service_option - service_option)
+    (origin_unit_ready ?origin_fulfillment_unit - origin_fulfillment_unit)
+    (destination_unit_ready ?destination_fulfillment_unit - destination_fulfillment_unit)
+    (finalization_recorded ?consolidation_shipment - consolidation_shipment)
+  )
+  (:action release_fulfillment_entity
+    :parameters (?fulfillment_entity - fulfillment_entity)
+    :precondition
+      (and
+        (not
+          (released_for_planning ?fulfillment_entity)
+        )
+        (not
+          (assignment_finalized ?fulfillment_entity)
+        )
+      )
+    :effect (released_for_planning ?fulfillment_entity)
+  )
+  (:action reserve_carrier_for_entity
+    :parameters (?fulfillment_entity - fulfillment_entity ?carrier_resource - carrier_resource)
+    :precondition
+      (and
+        (released_for_planning ?fulfillment_entity)
+        (not
+          (entity_carrier_reserved ?fulfillment_entity)
+        )
+        (carrier_available ?carrier_resource)
+      )
+    :effect
+      (and
+        (entity_carrier_reserved ?fulfillment_entity)
+        (assigned_to_carrier ?fulfillment_entity ?carrier_resource)
+        (not
+          (carrier_available ?carrier_resource)
+        )
+      )
+  )
+  (:action allocate_line_item_to_entity
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (released_for_planning ?fulfillment_entity)
+        (entity_carrier_reserved ?fulfillment_entity)
+        (item_available ?order_line_item)
+      )
+    :effect
+      (and
+        (line_item_allocated ?fulfillment_entity ?order_line_item)
+        (not
+          (item_available ?order_line_item)
+        )
+      )
+  )
+  (:action confirm_item_allocation
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (released_for_planning ?fulfillment_entity)
+        (entity_carrier_reserved ?fulfillment_entity)
+        (line_item_allocated ?fulfillment_entity ?order_line_item)
+        (not
+          (validated_for_planning ?fulfillment_entity)
+        )
+      )
+    :effect (validated_for_planning ?fulfillment_entity)
+  )
+  (:action rollback_item_allocation
+    :parameters (?fulfillment_entity - fulfillment_entity ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (line_item_allocated ?fulfillment_entity ?order_line_item)
+      )
+    :effect
+      (and
+        (item_available ?order_line_item)
+        (not
+          (line_item_allocated ?fulfillment_entity ?order_line_item)
+        )
+      )
+  )
+  (:action assign_terminal_to_entity
+    :parameters (?fulfillment_entity - fulfillment_entity ?warehouse_terminal - warehouse_terminal)
+    :precondition
+      (and
+        (validated_for_planning ?fulfillment_entity)
+        (terminal_available ?warehouse_terminal)
+      )
+    :effect
+      (and
+        (assigned_terminal ?fulfillment_entity ?warehouse_terminal)
+        (not
+          (terminal_available ?warehouse_terminal)
+        )
+      )
+  )
+  (:action release_terminal_assignment
+    :parameters (?fulfillment_entity - fulfillment_entity ?warehouse_terminal - warehouse_terminal)
+    :precondition
+      (and
+        (assigned_terminal ?fulfillment_entity ?warehouse_terminal)
+      )
+    :effect
+      (and
+        (terminal_available ?warehouse_terminal)
+        (not
+          (assigned_terminal ?fulfillment_entity ?warehouse_terminal)
+        )
+      )
+  )
+  (:action assign_equipment_to_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (equipment_type_available ?equipment_type)
+      )
+    :effect
+      (and
+        (equipment_assigned_to_consolidation ?consolidation_shipment ?equipment_type)
+        (not
+          (equipment_type_available ?equipment_type)
+        )
+      )
+  )
+  (:action release_equipment_from_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?equipment_type - equipment_type)
+    :precondition
+      (and
+        (equipment_assigned_to_consolidation ?consolidation_shipment ?equipment_type)
+      )
+    :effect
+      (and
+        (equipment_type_available ?equipment_type)
+        (not
+          (equipment_assigned_to_consolidation ?consolidation_shipment ?equipment_type)
+        )
+      )
+  )
+  (:action assign_operational_attribute_to_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (operational_attribute_available ?operational_attribute)
+      )
+    :effect
+      (and
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (not
+          (operational_attribute_available ?operational_attribute)
+        )
+      )
+  )
+  (:action release_operational_attribute_from_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute)
+    :precondition
+      (and
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+      )
+    :effect
+      (and
+        (operational_attribute_available ?operational_attribute)
+        (not
+          (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        )
+      )
+  )
+  (:action hold_origin_time_slot
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?origin_time_slot - origin_time_slot ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (validated_for_planning ?origin_fulfillment_unit)
+        (line_item_allocated ?origin_fulfillment_unit ?order_line_item)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (not
+          (origin_slot_on_hold ?origin_time_slot)
+        )
+        (not
+          (origin_slot_confirmed ?origin_time_slot)
+        )
+      )
+    :effect (origin_slot_on_hold ?origin_time_slot)
+  )
+  (:action confirm_origin_slot_for_unit
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?origin_time_slot - origin_time_slot ?warehouse_terminal - warehouse_terminal)
+    :precondition
+      (and
+        (validated_for_planning ?origin_fulfillment_unit)
+        (assigned_terminal ?origin_fulfillment_unit ?warehouse_terminal)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (origin_slot_on_hold ?origin_time_slot)
+        (not
+          (origin_unit_ready ?origin_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+      )
+  )
+  (:action reserve_origin_slot_and_assign_packaging
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?origin_time_slot - origin_time_slot ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (validated_for_planning ?origin_fulfillment_unit)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (packaging_available ?packaging_unit)
+        (not
+          (origin_unit_ready ?origin_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_slot_confirmed ?origin_time_slot)
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (origin_has_packaging ?origin_fulfillment_unit ?packaging_unit)
+        (not
+          (packaging_available ?packaging_unit)
+        )
+      )
+  )
+  (:action finalize_origin_slot_reservation
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?origin_time_slot - origin_time_slot ?order_line_item - order_line_item ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (validated_for_planning ?origin_fulfillment_unit)
+        (line_item_allocated ?origin_fulfillment_unit ?order_line_item)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (origin_slot_confirmed ?origin_time_slot)
+        (origin_has_packaging ?origin_fulfillment_unit ?packaging_unit)
+        (not
+          (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_slot_on_hold ?origin_time_slot)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        (packaging_available ?packaging_unit)
+        (not
+          (origin_has_packaging ?origin_fulfillment_unit ?packaging_unit)
+        )
+      )
+  )
+  (:action hold_destination_time_slot
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_time_slot - destination_time_slot ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (validated_for_planning ?destination_fulfillment_unit)
+        (line_item_allocated ?destination_fulfillment_unit ?order_line_item)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (not
+          (destination_slot_on_hold ?destination_time_slot)
+        )
+        (not
+          (destination_slot_confirmed ?destination_time_slot)
+        )
+      )
+    :effect (destination_slot_on_hold ?destination_time_slot)
+  )
+  (:action confirm_destination_slot_for_unit
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_time_slot - destination_time_slot ?warehouse_terminal - warehouse_terminal)
+    :precondition
+      (and
+        (validated_for_planning ?destination_fulfillment_unit)
+        (assigned_terminal ?destination_fulfillment_unit ?warehouse_terminal)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (destination_slot_on_hold ?destination_time_slot)
+        (not
+          (destination_unit_ready ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+      )
+  )
+  (:action reserve_destination_slot_and_assign_packaging
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_time_slot - destination_time_slot ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (validated_for_planning ?destination_fulfillment_unit)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (packaging_available ?packaging_unit)
+        (not
+          (destination_unit_ready ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_confirmed ?destination_time_slot)
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (destination_has_packaging ?destination_fulfillment_unit ?packaging_unit)
+        (not
+          (packaging_available ?packaging_unit)
+        )
+      )
+  )
+  (:action finalize_destination_slot_reservation
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?destination_time_slot - destination_time_slot ?order_line_item - order_line_item ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (validated_for_planning ?destination_fulfillment_unit)
+        (line_item_allocated ?destination_fulfillment_unit ?order_line_item)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (destination_slot_confirmed ?destination_time_slot)
+        (destination_has_packaging ?destination_fulfillment_unit ?packaging_unit)
+        (not
+          (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_on_hold ?destination_time_slot)
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        (packaging_available ?packaging_unit)
+        (not
+          (destination_has_packaging ?destination_fulfillment_unit ?packaging_unit)
+        )
+      )
+  )
+  (:action assemble_formed_shipment
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?origin_time_slot - origin_time_slot ?destination_time_slot - destination_time_slot ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (origin_slot_on_hold ?origin_time_slot)
+        (destination_slot_on_hold ?destination_time_slot)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        (formed_shipment_available ?formed_shipment)
+      )
+    :effect
+      (and
+        (formed_shipment_active ?formed_shipment)
+        (shipment_has_origin_slot ?formed_shipment ?origin_time_slot)
+        (shipment_has_destination_slot ?formed_shipment ?destination_time_slot)
+        (not
+          (formed_shipment_available ?formed_shipment)
+        )
+      )
+  )
+  (:action assemble_formed_shipment_origin_confirmed
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?origin_time_slot - origin_time_slot ?destination_time_slot - destination_time_slot ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (origin_slot_confirmed ?origin_time_slot)
+        (destination_slot_on_hold ?destination_time_slot)
+        (not
+          (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        )
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        (formed_shipment_available ?formed_shipment)
+      )
+    :effect
+      (and
+        (formed_shipment_active ?formed_shipment)
+        (shipment_has_origin_slot ?formed_shipment ?origin_time_slot)
+        (shipment_has_destination_slot ?formed_shipment ?destination_time_slot)
+        (formed_shipment_origin_confirmed ?formed_shipment)
+        (not
+          (formed_shipment_available ?formed_shipment)
+        )
+      )
+  )
+  (:action assemble_formed_shipment_destination_confirmed
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?origin_time_slot - origin_time_slot ?destination_time_slot - destination_time_slot ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (origin_slot_on_hold ?origin_time_slot)
+        (destination_slot_confirmed ?destination_time_slot)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        (not
+          (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        )
+        (formed_shipment_available ?formed_shipment)
+      )
+    :effect
+      (and
+        (formed_shipment_active ?formed_shipment)
+        (shipment_has_origin_slot ?formed_shipment ?origin_time_slot)
+        (shipment_has_destination_slot ?formed_shipment ?destination_time_slot)
+        (formed_shipment_destination_confirmed ?formed_shipment)
+        (not
+          (formed_shipment_available ?formed_shipment)
+        )
+      )
+  )
+  (:action assemble_formed_shipment_both_confirmed
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?origin_time_slot - origin_time_slot ?destination_time_slot - destination_time_slot ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (compatible_with_origin_slot ?origin_fulfillment_unit ?origin_time_slot)
+        (compatible_with_destination_slot ?destination_fulfillment_unit ?destination_time_slot)
+        (origin_slot_confirmed ?origin_time_slot)
+        (destination_slot_confirmed ?destination_time_slot)
+        (not
+          (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        )
+        (not
+          (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        )
+        (formed_shipment_available ?formed_shipment)
+      )
+    :effect
+      (and
+        (formed_shipment_active ?formed_shipment)
+        (shipment_has_origin_slot ?formed_shipment ?origin_time_slot)
+        (shipment_has_destination_slot ?formed_shipment ?destination_time_slot)
+        (formed_shipment_origin_confirmed ?formed_shipment)
+        (formed_shipment_destination_confirmed ?formed_shipment)
+        (not
+          (formed_shipment_available ?formed_shipment)
+        )
+      )
+  )
+  (:action mark_shipment_manifest_ready
+    :parameters (?formed_shipment - formed_shipment ?origin_fulfillment_unit - origin_fulfillment_unit ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (formed_shipment_active ?formed_shipment)
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (line_item_allocated ?origin_fulfillment_unit ?order_line_item)
+        (not
+          (formed_shipment_manifest_ready ?formed_shipment)
+        )
+      )
+    :effect (formed_shipment_manifest_ready ?formed_shipment)
+  )
+  (:action bind_package_to_shipment
+    :parameters (?consolidation_shipment - consolidation_shipment ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (consolidation_linked_to_formed_shipment ?consolidation_shipment ?formed_shipment)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_available ?piece_package)
+        (formed_shipment_active ?formed_shipment)
+        (formed_shipment_manifest_ready ?formed_shipment)
+        (not
+          (package_manifested ?piece_package)
+        )
+      )
+    :effect
+      (and
+        (package_manifested ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (not
+          (package_available ?piece_package)
+        )
+      )
+  )
+  (:action prepare_consolidation_for_manifesting
+    :parameters (?consolidation_shipment - consolidation_shipment ?piece_package - piece_package ?formed_shipment - formed_shipment ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_manifested ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (line_item_allocated ?consolidation_shipment ?order_line_item)
+        (not
+          (formed_shipment_origin_confirmed ?formed_shipment)
+        )
+        (not
+          (consolidation_prepared ?consolidation_shipment)
+        )
+      )
+    :effect (consolidation_prepared ?consolidation_shipment)
+  )
+  (:action attach_routing_attribute_to_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?routing_attribute - routing_attribute)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (routing_attribute_available ?routing_attribute)
+        (not
+          (routing_attribute_attached ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (routing_attribute_attached ?consolidation_shipment)
+        (consolidation_has_routing_attribute ?consolidation_shipment ?routing_attribute)
+        (not
+          (routing_attribute_available ?routing_attribute)
+        )
+      )
+  )
+  (:action apply_routing_attribute_and_prepare
+    :parameters (?consolidation_shipment - consolidation_shipment ?piece_package - piece_package ?formed_shipment - formed_shipment ?order_line_item - order_line_item ?routing_attribute - routing_attribute)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_manifested ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (line_item_allocated ?consolidation_shipment ?order_line_item)
+        (formed_shipment_origin_confirmed ?formed_shipment)
+        (routing_attribute_attached ?consolidation_shipment)
+        (consolidation_has_routing_attribute ?consolidation_shipment ?routing_attribute)
+        (not
+          (consolidation_prepared ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (consolidation_prepared ?consolidation_shipment)
+        (routing_attribute_enforced ?consolidation_shipment)
+      )
+  )
+  (:action assign_equipment_and_prepare_attributes
+    :parameters (?consolidation_shipment - consolidation_shipment ?equipment_type - equipment_type ?warehouse_terminal - warehouse_terminal ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (consolidation_prepared ?consolidation_shipment)
+        (equipment_assigned_to_consolidation ?consolidation_shipment ?equipment_type)
+        (assigned_terminal ?consolidation_shipment ?warehouse_terminal)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (not
+          (formed_shipment_destination_confirmed ?formed_shipment)
+        )
+        (not
+          (attributes_prepared ?consolidation_shipment)
+        )
+      )
+    :effect (attributes_prepared ?consolidation_shipment)
+  )
+  (:action assign_equipment_and_prepare_attributes_alt
+    :parameters (?consolidation_shipment - consolidation_shipment ?equipment_type - equipment_type ?warehouse_terminal - warehouse_terminal ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (consolidation_prepared ?consolidation_shipment)
+        (equipment_assigned_to_consolidation ?consolidation_shipment ?equipment_type)
+        (assigned_terminal ?consolidation_shipment ?warehouse_terminal)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (formed_shipment_destination_confirmed ?formed_shipment)
+        (not
+          (attributes_prepared ?consolidation_shipment)
+        )
+      )
+    :effect (attributes_prepared ?consolidation_shipment)
+  )
+  (:action attach_operational_attribute_and_prepare
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (attributes_prepared ?consolidation_shipment)
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (not
+          (formed_shipment_origin_confirmed ?formed_shipment)
+        )
+        (not
+          (formed_shipment_destination_confirmed ?formed_shipment)
+        )
+        (not
+          (attributes_confirmed ?consolidation_shipment)
+        )
+      )
+    :effect (attributes_confirmed ?consolidation_shipment)
+  )
+  (:action attach_operational_attribute_and_prepare_and_set_flags
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (attributes_prepared ?consolidation_shipment)
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (formed_shipment_origin_confirmed ?formed_shipment)
+        (not
+          (formed_shipment_destination_confirmed ?formed_shipment)
+        )
+        (not
+          (attributes_confirmed ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (awaiting_special_handling_attachment ?consolidation_shipment)
+      )
+  )
+  (:action attach_operational_attribute_and_prepare_with_flags
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (attributes_prepared ?consolidation_shipment)
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (not
+          (formed_shipment_origin_confirmed ?formed_shipment)
+        )
+        (formed_shipment_destination_confirmed ?formed_shipment)
+        (not
+          (attributes_confirmed ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (awaiting_special_handling_attachment ?consolidation_shipment)
+      )
+  )
+  (:action attach_operational_attribute_and_prepare_complete
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute ?piece_package - piece_package ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (attributes_prepared ?consolidation_shipment)
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (consolidation_has_package ?consolidation_shipment ?piece_package)
+        (package_assigned_to_shipment ?piece_package ?formed_shipment)
+        (formed_shipment_origin_confirmed ?formed_shipment)
+        (formed_shipment_destination_confirmed ?formed_shipment)
+        (not
+          (attributes_confirmed ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (awaiting_special_handling_attachment ?consolidation_shipment)
+      )
+  )
+  (:action finalize_consolidation_without_additional_attributes
+    :parameters (?consolidation_shipment - consolidation_shipment)
+    :precondition
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (not
+          (awaiting_special_handling_attachment ?consolidation_shipment)
+        )
+        (not
+          (finalization_recorded ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (finalization_recorded ?consolidation_shipment)
+        (operationally_confirmed ?consolidation_shipment)
+      )
+  )
+  (:action attach_special_handling_requirement_to_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (awaiting_special_handling_attachment ?consolidation_shipment)
+        (special_handling_available ?special_handling_requirement)
+      )
+    :effect
+      (and
+        (consolidation_has_special_handling ?consolidation_shipment ?special_handling_requirement)
+        (not
+          (special_handling_available ?special_handling_requirement)
+        )
+      )
+  )
+  (:action validate_consolidation_pre_dispatch
+    :parameters (?consolidation_shipment - consolidation_shipment ?origin_fulfillment_unit - origin_fulfillment_unit ?destination_fulfillment_unit - destination_fulfillment_unit ?order_line_item - order_line_item ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (awaiting_special_handling_attachment ?consolidation_shipment)
+        (consolidation_has_special_handling ?consolidation_shipment ?special_handling_requirement)
+        (consolidation_contains_origin ?consolidation_shipment ?origin_fulfillment_unit)
+        (consolidation_contains_destination ?consolidation_shipment ?destination_fulfillment_unit)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        (line_item_allocated ?consolidation_shipment ?order_line_item)
+        (not
+          (final_readiness_verified ?consolidation_shipment)
+        )
+      )
+    :effect (final_readiness_verified ?consolidation_shipment)
+  )
+  (:action finalize_consolidation_with_final_checks
+    :parameters (?consolidation_shipment - consolidation_shipment)
+    :precondition
+      (and
+        (attributes_confirmed ?consolidation_shipment)
+        (final_readiness_verified ?consolidation_shipment)
+        (not
+          (finalization_recorded ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (finalization_recorded ?consolidation_shipment)
+        (operationally_confirmed ?consolidation_shipment)
+      )
+  )
+  (:action apply_contract_offer_to_consolidation
+    :parameters (?consolidation_shipment - consolidation_shipment ?contract_offer - contract_offer ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (validated_for_planning ?consolidation_shipment)
+        (line_item_allocated ?consolidation_shipment ?order_line_item)
+        (contract_offer_available ?contract_offer)
+        (consolidation_has_contract_offer ?consolidation_shipment ?contract_offer)
+        (not
+          (contract_offer_applied ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (contract_offer_applied ?consolidation_shipment)
+        (not
+          (contract_offer_available ?contract_offer)
+        )
+      )
+  )
+  (:action acknowledge_contract_and_assign_terminal
+    :parameters (?consolidation_shipment - consolidation_shipment ?warehouse_terminal - warehouse_terminal)
+    :precondition
+      (and
+        (contract_offer_applied ?consolidation_shipment)
+        (assigned_terminal ?consolidation_shipment ?warehouse_terminal)
+        (not
+          (contract_acknowledged ?consolidation_shipment)
+        )
+      )
+    :effect (contract_acknowledged ?consolidation_shipment)
+  )
+  (:action confirm_operational_attribute_assignment
+    :parameters (?consolidation_shipment - consolidation_shipment ?operational_attribute - operational_attribute)
+    :precondition
+      (and
+        (contract_acknowledged ?consolidation_shipment)
+        (consolidation_has_operational_attribute ?consolidation_shipment ?operational_attribute)
+        (not
+          (contract_requirements_confirmed ?consolidation_shipment)
+        )
+      )
+    :effect (contract_requirements_confirmed ?consolidation_shipment)
+  )
+  (:action finalize_consolidation_after_contract
+    :parameters (?consolidation_shipment - consolidation_shipment)
+    :precondition
+      (and
+        (contract_requirements_confirmed ?consolidation_shipment)
+        (not
+          (finalization_recorded ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (finalization_recorded ?consolidation_shipment)
+        (operationally_confirmed ?consolidation_shipment)
+      )
+  )
+  (:action confirm_origin_operational_readiness
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_fulfillment_unit)
+        (origin_slot_confirmed_for_unit ?origin_fulfillment_unit)
+        (formed_shipment_active ?formed_shipment)
+        (formed_shipment_manifest_ready ?formed_shipment)
+        (not
+          (operationally_confirmed ?origin_fulfillment_unit)
+        )
+      )
+    :effect (operationally_confirmed ?origin_fulfillment_unit)
+  )
+  (:action confirm_destination_operational_readiness
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?formed_shipment - formed_shipment)
+    :precondition
+      (and
+        (destination_unit_ready ?destination_fulfillment_unit)
+        (destination_slot_confirmed_for_unit ?destination_fulfillment_unit)
+        (formed_shipment_active ?formed_shipment)
+        (formed_shipment_manifest_ready ?formed_shipment)
+        (not
+          (operationally_confirmed ?destination_fulfillment_unit)
+        )
+      )
+    :effect (operationally_confirmed ?destination_fulfillment_unit)
+  )
+  (:action apply_service_option_and_initiate_finalization
+    :parameters (?fulfillment_entity - fulfillment_entity ?service_option - service_option ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (operationally_confirmed ?fulfillment_entity)
+        (line_item_allocated ?fulfillment_entity ?order_line_item)
+        (service_option_available ?service_option)
+        (not
+          (assignment_token_consumed ?fulfillment_entity)
+        )
+      )
+    :effect
+      (and
+        (assignment_token_consumed ?fulfillment_entity)
+        (entity_assigned_service_option ?fulfillment_entity ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action finalize_assignment_for_origin_and_release_tokens
+    :parameters (?origin_fulfillment_unit - origin_fulfillment_unit ?carrier_resource - carrier_resource ?service_option - service_option)
+    :precondition
+      (and
+        (assignment_token_consumed ?origin_fulfillment_unit)
+        (assigned_to_carrier ?origin_fulfillment_unit ?carrier_resource)
+        (entity_assigned_service_option ?origin_fulfillment_unit ?service_option)
+        (not
+          (assignment_finalized ?origin_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?origin_fulfillment_unit)
+        (carrier_available ?carrier_resource)
+        (service_option_available ?service_option)
+      )
+  )
+  (:action finalize_assignment_for_destination_and_release_tokens
+    :parameters (?destination_fulfillment_unit - destination_fulfillment_unit ?carrier_resource - carrier_resource ?service_option - service_option)
+    :precondition
+      (and
+        (assignment_token_consumed ?destination_fulfillment_unit)
+        (assigned_to_carrier ?destination_fulfillment_unit ?carrier_resource)
+        (entity_assigned_service_option ?destination_fulfillment_unit ?service_option)
+        (not
+          (assignment_finalized ?destination_fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?destination_fulfillment_unit)
+        (carrier_available ?carrier_resource)
+        (service_option_available ?service_option)
+      )
+  )
+  (:action finalize_assignment_for_consolidation_and_release_tokens
+    :parameters (?consolidation_shipment - consolidation_shipment ?carrier_resource - carrier_resource ?service_option - service_option)
+    :precondition
+      (and
+        (assignment_token_consumed ?consolidation_shipment)
+        (assigned_to_carrier ?consolidation_shipment ?carrier_resource)
+        (entity_assigned_service_option ?consolidation_shipment ?service_option)
+        (not
+          (assignment_finalized ?consolidation_shipment)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?consolidation_shipment)
+        (carrier_available ?carrier_resource)
+        (service_option_available ?service_option)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem carrier_capacity_shipment_assignment_problem)
+  (:domain carrier_capacity_shipment_assignment_domain)
+  (:objects origin_unit_1 - origin_fulfillment_unit destination_unit_1 - destination_fulfillment_unit consolidation_candidate_a - consolidation_shipment consolidation_candidate_b - consolidation_shipment carrier_alpha - carrier_resource carrier_beta - carrier_resource carrier_gamma - carrier_resource order_line_item_1 - order_line_item warehouse_terminal_1 - warehouse_terminal packaging_unit_1 - packaging_unit origin_slot_1 - origin_time_slot destination_slot_1 - destination_time_slot formed_shipment_1 - formed_shipment package_1 - piece_package package_2 - piece_package routing_attribute_primary - routing_attribute routing_attribute_secondary - routing_attribute special_handling_fragile - special_handling_requirement special_handling_hazardous - special_handling_requirement service_option_standard - service_option equipment_type_reefer - equipment_type contract_offer_a - contract_offer contract_offer_b - contract_offer operational_attribute_1 - operational_attribute)
+  (:init
+    (carrier_available carrier_alpha)
+    (carrier_available carrier_beta)
+    (carrier_available carrier_gamma)
+    (item_available order_line_item_1)
+    (terminal_available warehouse_terminal_1)
+    (packaging_available packaging_unit_1)
+    (compatible_with_origin_slot origin_unit_1 origin_slot_1)
+    (compatible_with_destination_slot destination_unit_1 destination_slot_1)
+    (formed_shipment_available formed_shipment_1)
+    (package_available package_1)
+    (package_available package_2)
+    (consolidation_contains_origin consolidation_candidate_a origin_unit_1)
+    (consolidation_contains_origin consolidation_candidate_b origin_unit_1)
+    (consolidation_contains_destination consolidation_candidate_a destination_unit_1)
+    (consolidation_contains_destination consolidation_candidate_b destination_unit_1)
+    (consolidation_linked_to_formed_shipment consolidation_candidate_a formed_shipment_1)
+    (consolidation_linked_to_formed_shipment consolidation_candidate_b formed_shipment_1)
+    (consolidation_has_package consolidation_candidate_a package_1)
+    (consolidation_has_package consolidation_candidate_b package_2)
+    (routing_attribute_available routing_attribute_primary)
+    (routing_attribute_available routing_attribute_secondary)
+    (special_handling_available special_handling_fragile)
+    (special_handling_available special_handling_hazardous)
+    (service_option_available service_option_standard)
+    (equipment_type_available equipment_type_reefer)
+    (contract_offer_available contract_offer_a)
+    (consolidation_has_contract_offer consolidation_candidate_a contract_offer_a)
+    (consolidation_has_contract_offer consolidation_candidate_b contract_offer_b)
+    (operational_attribute_available operational_attribute_1)
+  )
+  (:goal
+    (and
+      (assignment_finalized origin_unit_1)
+      (assignment_finalized destination_unit_1)
+      (assignment_finalized consolidation_candidate_a)
+      (assignment_finalized consolidation_candidate_b)
+    )
+  )
+)

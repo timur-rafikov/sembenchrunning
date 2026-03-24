@@ -1,0 +1,936 @@
+(define (domain near_graduation_requirement_gap_repair_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource - object institutional_artifact - object deficit_class - object repair_process_root - object case_entity - repair_process_root resource_token - actor_or_resource evidence_document - actor_or_resource faculty_reviewer - actor_or_resource external_waiver_document - actor_or_resource scheduling_slot - actor_or_resource approval_artifact - actor_or_resource override_authorization - actor_or_resource escalation_record - actor_or_resource remediation_option - institutional_artifact transcript_entry - institutional_artifact exception_request_document - institutional_artifact requirement_deficit - deficit_class requirement_deficit_peer - deficit_class repair_proposal - deficit_class case_role_group - case_entity manager_role_group - case_entity student - case_role_group peer_student - case_role_group case_administrator - manager_role_group)
+  (:predicates
+    (repair_case_initiated ?case_entity - case_entity)
+    (evidence_verified ?case_entity - case_entity)
+    (case_resource_token_allocated ?case_entity - case_entity)
+    (administrative_correction_recorded ?case_entity - case_entity)
+    (ready_for_approval_workflow ?case_entity - case_entity)
+    (approval_recorded ?case_entity - case_entity)
+    (resource_token_available ?resource_token - resource_token)
+    (case_allocated_resource ?case_entity - case_entity ?resource_token - resource_token)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (case_evidence_attached ?case_entity - case_entity ?evidence_document - evidence_document)
+    (faculty_reviewer_available ?faculty_reviewer - faculty_reviewer)
+    (case_assigned_faculty_reviewer ?case_entity - case_entity ?faculty_reviewer - faculty_reviewer)
+    (remediation_option_available ?remediation_option - remediation_option)
+    (student_assigned_remediation_option ?student - student ?remediation_option - remediation_option)
+    (peer_assigned_remediation_option ?peer_student - peer_student ?remediation_option - remediation_option)
+    (student_has_deficit ?student - student ?requirement_deficit - requirement_deficit)
+    (deficit_flagged_for_review ?requirement_deficit - requirement_deficit)
+    (deficit_linked_to_option ?requirement_deficit - requirement_deficit)
+    (student_proposal_finalized ?student - student)
+    (peer_has_deficit ?peer_student - peer_student ?requirement_deficit_peer - requirement_deficit_peer)
+    (peer_deficit_flagged_for_review ?requirement_deficit_peer - requirement_deficit_peer)
+    (peer_deficit_linked_to_option ?requirement_deficit_peer - requirement_deficit_peer)
+    (peer_proposal_finalized ?peer_student - peer_student)
+    (proposal_resource_available ?repair_proposal - repair_proposal)
+    (proposal_registered ?repair_proposal - repair_proposal)
+    (proposal_addresses_deficit ?repair_proposal - repair_proposal ?requirement_deficit - requirement_deficit)
+    (proposal_addresses_peer_deficit ?repair_proposal - repair_proposal ?requirement_deficit_peer - requirement_deficit_peer)
+    (proposal_requires_override ?repair_proposal - repair_proposal)
+    (proposal_requires_escalation ?repair_proposal - repair_proposal)
+    (proposal_locked_for_documentation ?repair_proposal - repair_proposal)
+    (case_admin_assigned_student ?case_administrator - case_administrator ?student - student)
+    (case_admin_assigned_peer ?case_administrator - case_administrator ?peer_student - peer_student)
+    (case_admin_assigned_proposal ?case_administrator - case_administrator ?repair_proposal - repair_proposal)
+    (transcript_entry_available ?transcript_entry - transcript_entry)
+    (case_admin_has_transcript_entry ?case_administrator - case_administrator ?transcript_entry - transcript_entry)
+    (transcript_entry_attached ?transcript_entry - transcript_entry)
+    (transcript_entry_linked_to_proposal ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    (case_admin_documentation_completed ?case_administrator - case_administrator)
+    (case_admin_override_authorized ?case_administrator - case_administrator)
+    (case_admin_escalation_reviewed ?case_administrator - case_administrator)
+    (case_admin_waiver_ingested ?case_administrator - case_administrator)
+    (case_admin_documentation_signed ?case_administrator - case_administrator)
+    (case_admin_collected_endorsements ?case_administrator - case_administrator)
+    (case_admin_final_checks_completed ?case_administrator - case_administrator)
+    (exception_request_document_available ?exception_request_document - exception_request_document)
+    (case_admin_linked_exception_request ?case_administrator - case_administrator ?exception_request_document - exception_request_document)
+    (case_admin_exception_processed ?case_administrator - case_administrator)
+    (case_admin_exception_review_started ?case_administrator - case_administrator)
+    (case_admin_escalation_initiated ?case_administrator - case_administrator)
+    (external_waiver_document_available ?external_waiver_document - external_waiver_document)
+    (case_admin_linked_external_waiver ?case_administrator - case_administrator ?external_waiver_document - external_waiver_document)
+    (scheduling_slot_available ?scheduling_slot - scheduling_slot)
+    (case_admin_reserved_scheduling_slot ?case_administrator - case_administrator ?scheduling_slot - scheduling_slot)
+    (override_authorization_available ?override_authorization - override_authorization)
+    (case_admin_assigned_override_authorization ?case_administrator - case_administrator ?override_authorization - override_authorization)
+    (escalation_record_available ?escalation_record - escalation_record)
+    (case_admin_assigned_escalation_record ?case_administrator - case_administrator ?escalation_record - escalation_record)
+    (approval_artifact_available ?approval_artifact - approval_artifact)
+    (case_has_approval_artifact ?case_entity - case_entity ?approval_artifact - approval_artifact)
+    (student_proposal_prepared ?student - student)
+    (peer_proposal_prepared ?peer_student - peer_student)
+    (administrative_finalized ?case_administrator - case_administrator)
+  )
+  (:action open_repair_case
+    :parameters (?case_entity - case_entity)
+    :precondition
+      (and
+        (not
+          (repair_case_initiated ?case_entity)
+        )
+        (not
+          (administrative_correction_recorded ?case_entity)
+        )
+      )
+    :effect (repair_case_initiated ?case_entity)
+  )
+  (:action assign_resource_token_to_case
+    :parameters (?case_entity - case_entity ?resource_token - resource_token)
+    :precondition
+      (and
+        (repair_case_initiated ?case_entity)
+        (not
+          (case_resource_token_allocated ?case_entity)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (case_resource_token_allocated ?case_entity)
+        (case_allocated_resource ?case_entity ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action attach_evidence_to_case
+    :parameters (?case_entity - case_entity ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (repair_case_initiated ?case_entity)
+        (case_resource_token_allocated ?case_entity)
+        (evidence_document_available ?evidence_document)
+      )
+    :effect
+      (and
+        (case_evidence_attached ?case_entity ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action validate_attached_evidence
+    :parameters (?case_entity - case_entity ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (repair_case_initiated ?case_entity)
+        (case_resource_token_allocated ?case_entity)
+        (case_evidence_attached ?case_entity ?evidence_document)
+        (not
+          (evidence_verified ?case_entity)
+        )
+      )
+    :effect (evidence_verified ?case_entity)
+  )
+  (:action detach_evidence_from_case
+    :parameters (?case_entity - case_entity ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (case_evidence_attached ?case_entity ?evidence_document)
+      )
+    :effect
+      (and
+        (evidence_document_available ?evidence_document)
+        (not
+          (case_evidence_attached ?case_entity ?evidence_document)
+        )
+      )
+  )
+  (:action assign_faculty_reviewer
+    :parameters (?case_entity - case_entity ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (evidence_verified ?case_entity)
+        (faculty_reviewer_available ?faculty_reviewer)
+      )
+    :effect
+      (and
+        (case_assigned_faculty_reviewer ?case_entity ?faculty_reviewer)
+        (not
+          (faculty_reviewer_available ?faculty_reviewer)
+        )
+      )
+  )
+  (:action release_faculty_reviewer
+    :parameters (?case_entity - case_entity ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (case_assigned_faculty_reviewer ?case_entity ?faculty_reviewer)
+      )
+    :effect
+      (and
+        (faculty_reviewer_available ?faculty_reviewer)
+        (not
+          (case_assigned_faculty_reviewer ?case_entity ?faculty_reviewer)
+        )
+      )
+  )
+  (:action assign_override_authorization_to_case_admin
+    :parameters (?case_administrator - case_administrator ?override_authorization - override_authorization)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (override_authorization_available ?override_authorization)
+      )
+    :effect
+      (and
+        (case_admin_assigned_override_authorization ?case_administrator ?override_authorization)
+        (not
+          (override_authorization_available ?override_authorization)
+        )
+      )
+  )
+  (:action release_override_authorization_from_case_admin
+    :parameters (?case_administrator - case_administrator ?override_authorization - override_authorization)
+    :precondition
+      (and
+        (case_admin_assigned_override_authorization ?case_administrator ?override_authorization)
+      )
+    :effect
+      (and
+        (override_authorization_available ?override_authorization)
+        (not
+          (case_admin_assigned_override_authorization ?case_administrator ?override_authorization)
+        )
+      )
+  )
+  (:action assign_escalation_record_to_case_admin
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (escalation_record_available ?escalation_record)
+      )
+    :effect
+      (and
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (not
+          (escalation_record_available ?escalation_record)
+        )
+      )
+  )
+  (:action release_escalation_record_from_case_admin
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record)
+    :precondition
+      (and
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+      )
+    :effect
+      (and
+        (escalation_record_available ?escalation_record)
+        (not
+          (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        )
+      )
+  )
+  (:action flag_deficit_for_review
+    :parameters (?student - student ?requirement_deficit - requirement_deficit ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (evidence_verified ?student)
+        (case_evidence_attached ?student ?evidence_document)
+        (student_has_deficit ?student ?requirement_deficit)
+        (not
+          (deficit_flagged_for_review ?requirement_deficit)
+        )
+        (not
+          (deficit_linked_to_option ?requirement_deficit)
+        )
+      )
+    :effect (deficit_flagged_for_review ?requirement_deficit)
+  )
+  (:action reserve_deficit_for_admin_review
+    :parameters (?student - student ?requirement_deficit - requirement_deficit ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (evidence_verified ?student)
+        (case_assigned_faculty_reviewer ?student ?faculty_reviewer)
+        (student_has_deficit ?student ?requirement_deficit)
+        (deficit_flagged_for_review ?requirement_deficit)
+        (not
+          (student_proposal_prepared ?student)
+        )
+      )
+    :effect
+      (and
+        (student_proposal_prepared ?student)
+        (student_proposal_finalized ?student)
+      )
+  )
+  (:action reserve_remediation_option_for_student
+    :parameters (?student - student ?requirement_deficit - requirement_deficit ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (evidence_verified ?student)
+        (student_has_deficit ?student ?requirement_deficit)
+        (remediation_option_available ?remediation_option)
+        (not
+          (student_proposal_prepared ?student)
+        )
+      )
+    :effect
+      (and
+        (deficit_linked_to_option ?requirement_deficit)
+        (student_proposal_prepared ?student)
+        (student_assigned_remediation_option ?student ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action confirm_remediation_option_for_student
+    :parameters (?student - student ?requirement_deficit - requirement_deficit ?evidence_document - evidence_document ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (evidence_verified ?student)
+        (case_evidence_attached ?student ?evidence_document)
+        (student_has_deficit ?student ?requirement_deficit)
+        (deficit_linked_to_option ?requirement_deficit)
+        (student_assigned_remediation_option ?student ?remediation_option)
+        (not
+          (student_proposal_finalized ?student)
+        )
+      )
+    :effect
+      (and
+        (deficit_flagged_for_review ?requirement_deficit)
+        (student_proposal_finalized ?student)
+        (remediation_option_available ?remediation_option)
+        (not
+          (student_assigned_remediation_option ?student ?remediation_option)
+        )
+      )
+  )
+  (:action flag_peer_deficit_for_review
+    :parameters (?peer_student - peer_student ?requirement_deficit_peer - requirement_deficit_peer ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (evidence_verified ?peer_student)
+        (case_evidence_attached ?peer_student ?evidence_document)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (not
+          (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+        )
+        (not
+          (peer_deficit_linked_to_option ?requirement_deficit_peer)
+        )
+      )
+    :effect (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+  )
+  (:action reserve_peer_for_admin_review
+    :parameters (?peer_student - peer_student ?requirement_deficit_peer - requirement_deficit_peer ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (evidence_verified ?peer_student)
+        (case_assigned_faculty_reviewer ?peer_student ?faculty_reviewer)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+        (not
+          (peer_proposal_prepared ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (peer_proposal_prepared ?peer_student)
+        (peer_proposal_finalized ?peer_student)
+      )
+  )
+  (:action reserve_remediation_option_for_peer
+    :parameters (?peer_student - peer_student ?requirement_deficit_peer - requirement_deficit_peer ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (evidence_verified ?peer_student)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (remediation_option_available ?remediation_option)
+        (not
+          (peer_proposal_prepared ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (peer_deficit_linked_to_option ?requirement_deficit_peer)
+        (peer_proposal_prepared ?peer_student)
+        (peer_assigned_remediation_option ?peer_student ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action confirm_remediation_option_for_peer
+    :parameters (?peer_student - peer_student ?requirement_deficit_peer - requirement_deficit_peer ?evidence_document - evidence_document ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (evidence_verified ?peer_student)
+        (case_evidence_attached ?peer_student ?evidence_document)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (peer_deficit_linked_to_option ?requirement_deficit_peer)
+        (peer_assigned_remediation_option ?peer_student ?remediation_option)
+        (not
+          (peer_proposal_finalized ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+        (peer_proposal_finalized ?peer_student)
+        (remediation_option_available ?remediation_option)
+        (not
+          (peer_assigned_remediation_option ?peer_student ?remediation_option)
+        )
+      )
+  )
+  (:action generate_repair_proposal
+    :parameters (?student - student ?peer_student - peer_student ?requirement_deficit - requirement_deficit ?requirement_deficit_peer - requirement_deficit_peer ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (student_proposal_prepared ?student)
+        (peer_proposal_prepared ?peer_student)
+        (student_has_deficit ?student ?requirement_deficit)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (deficit_flagged_for_review ?requirement_deficit)
+        (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+        (student_proposal_finalized ?student)
+        (peer_proposal_finalized ?peer_student)
+        (proposal_resource_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (proposal_registered ?repair_proposal)
+        (proposal_addresses_deficit ?repair_proposal ?requirement_deficit)
+        (proposal_addresses_peer_deficit ?repair_proposal ?requirement_deficit_peer)
+        (not
+          (proposal_resource_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_with_override
+    :parameters (?student - student ?peer_student - peer_student ?requirement_deficit - requirement_deficit ?requirement_deficit_peer - requirement_deficit_peer ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (student_proposal_prepared ?student)
+        (peer_proposal_prepared ?peer_student)
+        (student_has_deficit ?student ?requirement_deficit)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (deficit_linked_to_option ?requirement_deficit)
+        (peer_deficit_flagged_for_review ?requirement_deficit_peer)
+        (not
+          (student_proposal_finalized ?student)
+        )
+        (peer_proposal_finalized ?peer_student)
+        (proposal_resource_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (proposal_registered ?repair_proposal)
+        (proposal_addresses_deficit ?repair_proposal ?requirement_deficit)
+        (proposal_addresses_peer_deficit ?repair_proposal ?requirement_deficit_peer)
+        (proposal_requires_override ?repair_proposal)
+        (not
+          (proposal_resource_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_with_escalation
+    :parameters (?student - student ?peer_student - peer_student ?requirement_deficit - requirement_deficit ?requirement_deficit_peer - requirement_deficit_peer ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (student_proposal_prepared ?student)
+        (peer_proposal_prepared ?peer_student)
+        (student_has_deficit ?student ?requirement_deficit)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (deficit_flagged_for_review ?requirement_deficit)
+        (peer_deficit_linked_to_option ?requirement_deficit_peer)
+        (student_proposal_finalized ?student)
+        (not
+          (peer_proposal_finalized ?peer_student)
+        )
+        (proposal_resource_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (proposal_registered ?repair_proposal)
+        (proposal_addresses_deficit ?repair_proposal ?requirement_deficit)
+        (proposal_addresses_peer_deficit ?repair_proposal ?requirement_deficit_peer)
+        (proposal_requires_escalation ?repair_proposal)
+        (not
+          (proposal_resource_available ?repair_proposal)
+        )
+      )
+  )
+  (:action generate_repair_proposal_with_override_and_escalation
+    :parameters (?student - student ?peer_student - peer_student ?requirement_deficit - requirement_deficit ?requirement_deficit_peer - requirement_deficit_peer ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (student_proposal_prepared ?student)
+        (peer_proposal_prepared ?peer_student)
+        (student_has_deficit ?student ?requirement_deficit)
+        (peer_has_deficit ?peer_student ?requirement_deficit_peer)
+        (deficit_linked_to_option ?requirement_deficit)
+        (peer_deficit_linked_to_option ?requirement_deficit_peer)
+        (not
+          (student_proposal_finalized ?student)
+        )
+        (not
+          (peer_proposal_finalized ?peer_student)
+        )
+        (proposal_resource_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (proposal_registered ?repair_proposal)
+        (proposal_addresses_deficit ?repair_proposal ?requirement_deficit)
+        (proposal_addresses_peer_deficit ?repair_proposal ?requirement_deficit_peer)
+        (proposal_requires_override ?repair_proposal)
+        (proposal_requires_escalation ?repair_proposal)
+        (not
+          (proposal_resource_available ?repair_proposal)
+        )
+      )
+  )
+  (:action finalize_proposal_for_documentation
+    :parameters (?repair_proposal - repair_proposal ?student - student ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (proposal_registered ?repair_proposal)
+        (student_proposal_prepared ?student)
+        (case_evidence_attached ?student ?evidence_document)
+        (not
+          (proposal_locked_for_documentation ?repair_proposal)
+        )
+      )
+    :effect (proposal_locked_for_documentation ?repair_proposal)
+  )
+  (:action attach_transcript_entry_to_proposal
+    :parameters (?case_administrator - case_administrator ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (case_admin_assigned_proposal ?case_administrator ?repair_proposal)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_available ?transcript_entry)
+        (proposal_registered ?repair_proposal)
+        (proposal_locked_for_documentation ?repair_proposal)
+        (not
+          (transcript_entry_attached ?transcript_entry)
+        )
+      )
+    :effect
+      (and
+        (transcript_entry_attached ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (not
+          (transcript_entry_available ?transcript_entry)
+        )
+      )
+  )
+  (:action complete_proposal_documentation
+    :parameters (?case_administrator - case_administrator ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_attached ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (case_evidence_attached ?case_administrator ?evidence_document)
+        (not
+          (proposal_requires_override ?repair_proposal)
+        )
+        (not
+          (case_admin_documentation_completed ?case_administrator)
+        )
+      )
+    :effect (case_admin_documentation_completed ?case_administrator)
+  )
+  (:action ingest_external_waiver_document
+    :parameters (?case_administrator - case_administrator ?external_waiver_document - external_waiver_document)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (external_waiver_document_available ?external_waiver_document)
+        (not
+          (case_admin_waiver_ingested ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_waiver_ingested ?case_administrator)
+        (case_admin_linked_external_waiver ?case_administrator ?external_waiver_document)
+        (not
+          (external_waiver_document_available ?external_waiver_document)
+        )
+      )
+  )
+  (:action finalize_proposal_with_waiver
+    :parameters (?case_administrator - case_administrator ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal ?evidence_document - evidence_document ?external_waiver_document - external_waiver_document)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_attached ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (case_evidence_attached ?case_administrator ?evidence_document)
+        (proposal_requires_override ?repair_proposal)
+        (case_admin_waiver_ingested ?case_administrator)
+        (case_admin_linked_external_waiver ?case_administrator ?external_waiver_document)
+        (not
+          (case_admin_documentation_completed ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_documentation_completed ?case_administrator)
+        (case_admin_documentation_signed ?case_administrator)
+      )
+  )
+  (:action authorize_proposal_override_by_case_admin
+    :parameters (?case_administrator - case_administrator ?override_authorization - override_authorization ?faculty_reviewer - faculty_reviewer ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_documentation_completed ?case_administrator)
+        (case_admin_assigned_override_authorization ?case_administrator ?override_authorization)
+        (case_assigned_faculty_reviewer ?case_administrator ?faculty_reviewer)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (not
+          (proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_admin_override_authorized ?case_administrator)
+        )
+      )
+    :effect (case_admin_override_authorized ?case_administrator)
+  )
+  (:action authorize_proposal_override_with_slot
+    :parameters (?case_administrator - case_administrator ?override_authorization - override_authorization ?faculty_reviewer - faculty_reviewer ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_documentation_completed ?case_administrator)
+        (case_admin_assigned_override_authorization ?case_administrator ?override_authorization)
+        (case_assigned_faculty_reviewer ?case_administrator ?faculty_reviewer)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_admin_override_authorized ?case_administrator)
+        )
+      )
+    :effect (case_admin_override_authorized ?case_administrator)
+  )
+  (:action process_escalation_review
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_override_authorized ?case_administrator)
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (not
+          (proposal_requires_override ?repair_proposal)
+        )
+        (not
+          (proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_admin_escalation_reviewed ?case_administrator)
+        )
+      )
+    :effect (case_admin_escalation_reviewed ?case_administrator)
+  )
+  (:action process_escalation_and_collect_endorsements
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_override_authorized ?case_administrator)
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (proposal_requires_override ?repair_proposal)
+        (not
+          (proposal_requires_escalation ?repair_proposal)
+        )
+        (not
+          (case_admin_escalation_reviewed ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_collected_endorsements ?case_administrator)
+      )
+  )
+  (:action complete_escalation_and_collect_endorsements_variant
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_override_authorized ?case_administrator)
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (not
+          (proposal_requires_override ?repair_proposal)
+        )
+        (proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_admin_escalation_reviewed ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_collected_endorsements ?case_administrator)
+      )
+  )
+  (:action complete_escalation_and_collect_endorsements_alt
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record ?transcript_entry - transcript_entry ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_admin_override_authorized ?case_administrator)
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (case_admin_has_transcript_entry ?case_administrator ?transcript_entry)
+        (transcript_entry_linked_to_proposal ?transcript_entry ?repair_proposal)
+        (proposal_requires_override ?repair_proposal)
+        (proposal_requires_escalation ?repair_proposal)
+        (not
+          (case_admin_escalation_reviewed ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_collected_endorsements ?case_administrator)
+      )
+  )
+  (:action finalize_case_admin_approval_preparation
+    :parameters (?case_administrator - case_administrator)
+    :precondition
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (not
+          (case_admin_collected_endorsements ?case_administrator)
+        )
+        (not
+          (administrative_finalized ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (administrative_finalized ?case_administrator)
+        (ready_for_approval_workflow ?case_administrator)
+      )
+  )
+  (:action reserve_scheduling_slot
+    :parameters (?case_administrator - case_administrator ?scheduling_slot - scheduling_slot)
+    :precondition
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_collected_endorsements ?case_administrator)
+        (scheduling_slot_available ?scheduling_slot)
+      )
+    :effect
+      (and
+        (case_admin_reserved_scheduling_slot ?case_administrator ?scheduling_slot)
+        (not
+          (scheduling_slot_available ?scheduling_slot)
+        )
+      )
+  )
+  (:action perform_final_administrative_checks
+    :parameters (?case_administrator - case_administrator ?student - student ?peer_student - peer_student ?evidence_document - evidence_document ?scheduling_slot - scheduling_slot)
+    :precondition
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_collected_endorsements ?case_administrator)
+        (case_admin_reserved_scheduling_slot ?case_administrator ?scheduling_slot)
+        (case_admin_assigned_student ?case_administrator ?student)
+        (case_admin_assigned_peer ?case_administrator ?peer_student)
+        (student_proposal_finalized ?student)
+        (peer_proposal_finalized ?peer_student)
+        (case_evidence_attached ?case_administrator ?evidence_document)
+        (not
+          (case_admin_final_checks_completed ?case_administrator)
+        )
+      )
+    :effect (case_admin_final_checks_completed ?case_administrator)
+  )
+  (:action certify_administrator_and_mark_case_ready
+    :parameters (?case_administrator - case_administrator)
+    :precondition
+      (and
+        (case_admin_escalation_reviewed ?case_administrator)
+        (case_admin_final_checks_completed ?case_administrator)
+        (not
+          (administrative_finalized ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (administrative_finalized ?case_administrator)
+        (ready_for_approval_workflow ?case_administrator)
+      )
+  )
+  (:action process_exception_request_document
+    :parameters (?case_administrator - case_administrator ?exception_request_document - exception_request_document ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (evidence_verified ?case_administrator)
+        (case_evidence_attached ?case_administrator ?evidence_document)
+        (exception_request_document_available ?exception_request_document)
+        (case_admin_linked_exception_request ?case_administrator ?exception_request_document)
+        (not
+          (case_admin_exception_processed ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (case_admin_exception_processed ?case_administrator)
+        (not
+          (exception_request_document_available ?exception_request_document)
+        )
+      )
+  )
+  (:action start_exception_review
+    :parameters (?case_administrator - case_administrator ?faculty_reviewer - faculty_reviewer)
+    :precondition
+      (and
+        (case_admin_exception_processed ?case_administrator)
+        (case_assigned_faculty_reviewer ?case_administrator ?faculty_reviewer)
+        (not
+          (case_admin_exception_review_started ?case_administrator)
+        )
+      )
+    :effect (case_admin_exception_review_started ?case_administrator)
+  )
+  (:action initiate_exception_escalation
+    :parameters (?case_administrator - case_administrator ?escalation_record - escalation_record)
+    :precondition
+      (and
+        (case_admin_exception_review_started ?case_administrator)
+        (case_admin_assigned_escalation_record ?case_administrator ?escalation_record)
+        (not
+          (case_admin_escalation_initiated ?case_administrator)
+        )
+      )
+    :effect (case_admin_escalation_initiated ?case_administrator)
+  )
+  (:action finalize_exception_approval
+    :parameters (?case_administrator - case_administrator)
+    :precondition
+      (and
+        (case_admin_escalation_initiated ?case_administrator)
+        (not
+          (administrative_finalized ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (administrative_finalized ?case_administrator)
+        (ready_for_approval_workflow ?case_administrator)
+      )
+  )
+  (:action certify_student_case
+    :parameters (?student - student ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (student_proposal_prepared ?student)
+        (student_proposal_finalized ?student)
+        (proposal_registered ?repair_proposal)
+        (proposal_locked_for_documentation ?repair_proposal)
+        (not
+          (ready_for_approval_workflow ?student)
+        )
+      )
+    :effect (ready_for_approval_workflow ?student)
+  )
+  (:action certify_peer_case
+    :parameters (?peer_student - peer_student ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (peer_proposal_prepared ?peer_student)
+        (peer_proposal_finalized ?peer_student)
+        (proposal_registered ?repair_proposal)
+        (proposal_locked_for_documentation ?repair_proposal)
+        (not
+          (ready_for_approval_workflow ?peer_student)
+        )
+      )
+    :effect (ready_for_approval_workflow ?peer_student)
+  )
+  (:action apply_approval_artifact_to_case
+    :parameters (?case_entity - case_entity ?approval_artifact - approval_artifact ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_approval_workflow ?case_entity)
+        (case_evidence_attached ?case_entity ?evidence_document)
+        (approval_artifact_available ?approval_artifact)
+        (not
+          (approval_recorded ?case_entity)
+        )
+      )
+    :effect
+      (and
+        (approval_recorded ?case_entity)
+        (case_has_approval_artifact ?case_entity ?approval_artifact)
+        (not
+          (approval_artifact_available ?approval_artifact)
+        )
+      )
+  )
+  (:action apply_administrative_correction_for_student
+    :parameters (?student - student ?resource_token - resource_token ?approval_artifact - approval_artifact)
+    :precondition
+      (and
+        (approval_recorded ?student)
+        (case_allocated_resource ?student ?resource_token)
+        (case_has_approval_artifact ?student ?approval_artifact)
+        (not
+          (administrative_correction_recorded ?student)
+        )
+      )
+    :effect
+      (and
+        (administrative_correction_recorded ?student)
+        (resource_token_available ?resource_token)
+        (approval_artifact_available ?approval_artifact)
+      )
+  )
+  (:action apply_administrative_correction_for_peer
+    :parameters (?peer_student - peer_student ?resource_token - resource_token ?approval_artifact - approval_artifact)
+    :precondition
+      (and
+        (approval_recorded ?peer_student)
+        (case_allocated_resource ?peer_student ?resource_token)
+        (case_has_approval_artifact ?peer_student ?approval_artifact)
+        (not
+          (administrative_correction_recorded ?peer_student)
+        )
+      )
+    :effect
+      (and
+        (administrative_correction_recorded ?peer_student)
+        (resource_token_available ?resource_token)
+        (approval_artifact_available ?approval_artifact)
+      )
+  )
+  (:action apply_administrative_correction_for_administrator
+    :parameters (?case_administrator - case_administrator ?resource_token - resource_token ?approval_artifact - approval_artifact)
+    :precondition
+      (and
+        (approval_recorded ?case_administrator)
+        (case_allocated_resource ?case_administrator ?resource_token)
+        (case_has_approval_artifact ?case_administrator ?approval_artifact)
+        (not
+          (administrative_correction_recorded ?case_administrator)
+        )
+      )
+    :effect
+      (and
+        (administrative_correction_recorded ?case_administrator)
+        (resource_token_available ?resource_token)
+        (approval_artifact_available ?approval_artifact)
+      )
+  )
+)

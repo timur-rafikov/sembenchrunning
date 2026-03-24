@@ -1,0 +1,936 @@
+(define (domain faction_lockout_alternative_progression_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types game_entity - object configuration_group - object resource_category - object plan_category - object mission_objective - plan_category faction_option - game_entity loadout_option - game_entity support_unit - game_entity asset_token - game_entity tactical_modifier - game_entity mission_token - game_entity equipment_attachment - game_entity leadership_trait - game_entity consumable_item - configuration_group upgrade_module - configuration_group faction_marker - configuration_group route_option_a - resource_category route_option_b - resource_category mission_instance - resource_category primary_role_group - mission_objective secondary_role_group - mission_objective primary_actor_slot - primary_role_group secondary_actor_slot - primary_role_group agent_profile - secondary_role_group)
+  (:predicates
+    (entity_active ?mission_objective - mission_objective)
+    (entity_committed ?mission_objective - mission_objective)
+    (entity_faction_selected ?mission_objective - mission_objective)
+    (ready_for_deployment ?mission_objective - mission_objective)
+    (entity_promotion_applied ?mission_objective - mission_objective)
+    (entity_salvaged ?mission_objective - mission_objective)
+    (faction_option_available ?faction_option - faction_option)
+    (entity_reserved_faction ?mission_objective - mission_objective ?faction_option - faction_option)
+    (loadout_available ?loadout_option - loadout_option)
+    (entity_reserved_loadout ?mission_objective - mission_objective ?loadout_option - loadout_option)
+    (support_unit_available ?support_unit - support_unit)
+    (entity_assigned_support ?mission_objective - mission_objective ?support_unit - support_unit)
+    (consumable_available ?consumable_item - consumable_item)
+    (primary_slot_has_consumable ?primary_actor_slot - primary_actor_slot ?consumable_item - consumable_item)
+    (secondary_slot_has_consumable ?secondary_actor_slot - secondary_actor_slot ?consumable_item - consumable_item)
+    (primary_slot_assigned_route ?primary_actor_slot - primary_actor_slot ?route_option_a - route_option_a)
+    (route_option_a_activated ?route_option_a - route_option_a)
+    (route_option_staged ?route_option_a - route_option_a)
+    (primary_slot_confirmed ?primary_actor_slot - primary_actor_slot)
+    (secondary_slot_assigned_route ?secondary_actor_slot - secondary_actor_slot ?route_option_b - route_option_b)
+    (route_option_b_activated ?route_option_b - route_option_b)
+    (route_option_b_staged ?route_option_b - route_option_b)
+    (secondary_slot_confirmed ?secondary_actor_slot - secondary_actor_slot)
+    (mission_seed_available ?mission_instance - mission_instance)
+    (mission_instance_ready ?mission_instance - mission_instance)
+    (mission_has_route_a ?mission_instance - mission_instance ?route_option_a - route_option_a)
+    (mission_has_route_b ?mission_instance - mission_instance ?route_option_b - route_option_b)
+    (mission_asset_required ?mission_instance - mission_instance)
+    (mission_modifier_required ?mission_instance - mission_instance)
+    (mission_node_processed ?mission_instance - mission_instance)
+    (agent_assigned_primary_slot ?agent_profile - agent_profile ?primary_actor_slot - primary_actor_slot)
+    (agent_assigned_secondary_slot ?agent_profile - agent_profile ?secondary_actor_slot - secondary_actor_slot)
+    (agent_assigned_to_mission ?agent_profile - agent_profile ?mission_instance - mission_instance)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (agent_has_upgrade ?agent_profile - agent_profile ?upgrade_module - upgrade_module)
+    (upgrade_installed ?upgrade_module - upgrade_module)
+    (upgrade_attached_to_mission ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    (agent_node_ready ?agent_profile - agent_profile)
+    (agent_promo_candidate ?agent_profile - agent_profile)
+    (agent_promotion_ready ?agent_profile - agent_profile)
+    (agent_asset_assigned ?agent_profile - agent_profile)
+    (agent_asset_processed ?agent_profile - agent_profile)
+    (agent_modifier_applied ?agent_profile - agent_profile)
+    (agent_promoted ?agent_profile - agent_profile)
+    (faction_marker_available ?faction_marker - faction_marker)
+    (agent_bound_faction_marker ?agent_profile - agent_profile ?faction_marker - faction_marker)
+    (agent_faction_committed ?agent_profile - agent_profile)
+    (agent_asset_staged ?agent_profile - agent_profile)
+    (agent_asset_confirmed ?agent_profile - agent_profile)
+    (asset_token_available ?asset_token - asset_token)
+    (agent_has_asset_token ?agent_profile - agent_profile ?asset_token - asset_token)
+    (tactical_modifier_available ?tactical_modifier - tactical_modifier)
+    (agent_assigned_modifier ?agent_profile - agent_profile ?tactical_modifier - tactical_modifier)
+    (equipment_attachment_available ?equipment_attachment - equipment_attachment)
+    (agent_has_attachment ?agent_profile - agent_profile ?equipment_attachment - equipment_attachment)
+    (leadership_trait_available ?leadership_trait - leadership_trait)
+    (agent_assigned_leadership_trait ?agent_profile - agent_profile ?leadership_trait - leadership_trait)
+    (salvage_token_available ?mission_token - mission_token)
+    (entity_bound_salvage_token ?mission_objective - mission_objective ?mission_token - mission_token)
+    (primary_slot_ready ?primary_actor_slot - primary_actor_slot)
+    (secondary_slot_ready ?secondary_actor_slot - secondary_actor_slot)
+    (agent_deployment_committed ?agent_profile - agent_profile)
+  )
+  (:action initialize_objective
+    :parameters (?mission_objective - mission_objective)
+    :precondition
+      (and
+        (not
+          (entity_active ?mission_objective)
+        )
+        (not
+          (ready_for_deployment ?mission_objective)
+        )
+      )
+    :effect (entity_active ?mission_objective)
+  )
+  (:action reserve_faction_option
+    :parameters (?mission_objective - mission_objective ?faction_option - faction_option)
+    :precondition
+      (and
+        (entity_active ?mission_objective)
+        (not
+          (entity_faction_selected ?mission_objective)
+        )
+        (faction_option_available ?faction_option)
+      )
+    :effect
+      (and
+        (entity_faction_selected ?mission_objective)
+        (entity_reserved_faction ?mission_objective ?faction_option)
+        (not
+          (faction_option_available ?faction_option)
+        )
+      )
+  )
+  (:action reserve_loadout_for_objective
+    :parameters (?mission_objective - mission_objective ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_active ?mission_objective)
+        (entity_faction_selected ?mission_objective)
+        (loadout_available ?loadout_option)
+      )
+    :effect
+      (and
+        (entity_reserved_loadout ?mission_objective ?loadout_option)
+        (not
+          (loadout_available ?loadout_option)
+        )
+      )
+  )
+  (:action commit_loadout_to_objective
+    :parameters (?mission_objective - mission_objective ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_active ?mission_objective)
+        (entity_faction_selected ?mission_objective)
+        (entity_reserved_loadout ?mission_objective ?loadout_option)
+        (not
+          (entity_committed ?mission_objective)
+        )
+      )
+    :effect (entity_committed ?mission_objective)
+  )
+  (:action release_loadout_from_objective
+    :parameters (?mission_objective - mission_objective ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_reserved_loadout ?mission_objective ?loadout_option)
+      )
+    :effect
+      (and
+        (loadout_available ?loadout_option)
+        (not
+          (entity_reserved_loadout ?mission_objective ?loadout_option)
+        )
+      )
+  )
+  (:action assign_support_to_objective
+    :parameters (?mission_objective - mission_objective ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_committed ?mission_objective)
+        (support_unit_available ?support_unit)
+      )
+    :effect
+      (and
+        (entity_assigned_support ?mission_objective ?support_unit)
+        (not
+          (support_unit_available ?support_unit)
+        )
+      )
+  )
+  (:action unassign_support_from_objective
+    :parameters (?mission_objective - mission_objective ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_assigned_support ?mission_objective ?support_unit)
+      )
+    :effect
+      (and
+        (support_unit_available ?support_unit)
+        (not
+          (entity_assigned_support ?mission_objective ?support_unit)
+        )
+      )
+  )
+  (:action attach_equipment_to_agent
+    :parameters (?agent_profile - agent_profile ?equipment_attachment - equipment_attachment)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (equipment_attachment_available ?equipment_attachment)
+      )
+    :effect
+      (and
+        (agent_has_attachment ?agent_profile ?equipment_attachment)
+        (not
+          (equipment_attachment_available ?equipment_attachment)
+        )
+      )
+  )
+  (:action detach_equipment_from_agent
+    :parameters (?agent_profile - agent_profile ?equipment_attachment - equipment_attachment)
+    :precondition
+      (and
+        (agent_has_attachment ?agent_profile ?equipment_attachment)
+      )
+    :effect
+      (and
+        (equipment_attachment_available ?equipment_attachment)
+        (not
+          (agent_has_attachment ?agent_profile ?equipment_attachment)
+        )
+      )
+  )
+  (:action assign_leadership_trait_to_agent
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (leadership_trait_available ?leadership_trait)
+      )
+    :effect
+      (and
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (not
+          (leadership_trait_available ?leadership_trait)
+        )
+      )
+  )
+  (:action remove_leadership_trait_from_agent
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait)
+    :precondition
+      (and
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+      )
+    :effect
+      (and
+        (leadership_trait_available ?leadership_trait)
+        (not
+          (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        )
+      )
+  )
+  (:action activate_route_for_primary_slot
+    :parameters (?primary_actor_slot - primary_actor_slot ?route_option_a - route_option_a ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_committed ?primary_actor_slot)
+        (entity_reserved_loadout ?primary_actor_slot ?loadout_option)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (not
+          (route_option_a_activated ?route_option_a)
+        )
+        (not
+          (route_option_staged ?route_option_a)
+        )
+      )
+    :effect (route_option_a_activated ?route_option_a)
+  )
+  (:action stage_primary_slot_with_support
+    :parameters (?primary_actor_slot - primary_actor_slot ?route_option_a - route_option_a ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_committed ?primary_actor_slot)
+        (entity_assigned_support ?primary_actor_slot ?support_unit)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (route_option_a_activated ?route_option_a)
+        (not
+          (primary_slot_ready ?primary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (primary_slot_confirmed ?primary_actor_slot)
+      )
+  )
+  (:action stage_primary_slot_with_consumable
+    :parameters (?primary_actor_slot - primary_actor_slot ?route_option_a - route_option_a ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_committed ?primary_actor_slot)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (consumable_available ?consumable_item)
+        (not
+          (primary_slot_ready ?primary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (route_option_staged ?route_option_a)
+        (primary_slot_ready ?primary_actor_slot)
+        (primary_slot_has_consumable ?primary_actor_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_primary_slot_preparation
+    :parameters (?primary_actor_slot - primary_actor_slot ?route_option_a - route_option_a ?loadout_option - loadout_option ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_committed ?primary_actor_slot)
+        (entity_reserved_loadout ?primary_actor_slot ?loadout_option)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (route_option_staged ?route_option_a)
+        (primary_slot_has_consumable ?primary_actor_slot ?consumable_item)
+        (not
+          (primary_slot_confirmed ?primary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (route_option_a_activated ?route_option_a)
+        (primary_slot_confirmed ?primary_actor_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (primary_slot_has_consumable ?primary_actor_slot ?consumable_item)
+        )
+      )
+  )
+  (:action activate_route_for_secondary_slot
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?route_option_b - route_option_b ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_committed ?secondary_actor_slot)
+        (entity_reserved_loadout ?secondary_actor_slot ?loadout_option)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (not
+          (route_option_b_activated ?route_option_b)
+        )
+        (not
+          (route_option_b_staged ?route_option_b)
+        )
+      )
+    :effect (route_option_b_activated ?route_option_b)
+  )
+  (:action stage_secondary_slot_with_support
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?route_option_b - route_option_b ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_committed ?secondary_actor_slot)
+        (entity_assigned_support ?secondary_actor_slot ?support_unit)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_b_activated ?route_option_b)
+        (not
+          (secondary_slot_ready ?secondary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_ready ?secondary_actor_slot)
+        (secondary_slot_confirmed ?secondary_actor_slot)
+      )
+  )
+  (:action stage_secondary_slot_with_consumable
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?route_option_b - route_option_b ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_committed ?secondary_actor_slot)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (consumable_available ?consumable_item)
+        (not
+          (secondary_slot_ready ?secondary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (route_option_b_staged ?route_option_b)
+        (secondary_slot_ready ?secondary_actor_slot)
+        (secondary_slot_has_consumable ?secondary_actor_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_preparation
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?route_option_b - route_option_b ?loadout_option - loadout_option ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_committed ?secondary_actor_slot)
+        (entity_reserved_loadout ?secondary_actor_slot ?loadout_option)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_b_staged ?route_option_b)
+        (secondary_slot_has_consumable ?secondary_actor_slot ?consumable_item)
+        (not
+          (secondary_slot_confirmed ?secondary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (route_option_b_activated ?route_option_b)
+        (secondary_slot_confirmed ?secondary_actor_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (secondary_slot_has_consumable ?secondary_actor_slot ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_mission_standard
+    :parameters (?primary_actor_slot - primary_actor_slot ?secondary_actor_slot - secondary_actor_slot ?route_option_a - route_option_a ?route_option_b - route_option_b ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (secondary_slot_ready ?secondary_actor_slot)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_a_activated ?route_option_a)
+        (route_option_b_activated ?route_option_b)
+        (primary_slot_confirmed ?primary_actor_slot)
+        (secondary_slot_confirmed ?secondary_actor_slot)
+        (mission_seed_available ?mission_instance)
+      )
+    :effect
+      (and
+        (mission_instance_ready ?mission_instance)
+        (mission_has_route_a ?mission_instance ?route_option_a)
+        (mission_has_route_b ?mission_instance ?route_option_b)
+        (not
+          (mission_seed_available ?mission_instance)
+        )
+      )
+  )
+  (:action assemble_mission_asset_path
+    :parameters (?primary_actor_slot - primary_actor_slot ?secondary_actor_slot - secondary_actor_slot ?route_option_a - route_option_a ?route_option_b - route_option_b ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (secondary_slot_ready ?secondary_actor_slot)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_staged ?route_option_a)
+        (route_option_b_activated ?route_option_b)
+        (not
+          (primary_slot_confirmed ?primary_actor_slot)
+        )
+        (secondary_slot_confirmed ?secondary_actor_slot)
+        (mission_seed_available ?mission_instance)
+      )
+    :effect
+      (and
+        (mission_instance_ready ?mission_instance)
+        (mission_has_route_a ?mission_instance ?route_option_a)
+        (mission_has_route_b ?mission_instance ?route_option_b)
+        (mission_asset_required ?mission_instance)
+        (not
+          (mission_seed_available ?mission_instance)
+        )
+      )
+  )
+  (:action assemble_mission_modifier_path
+    :parameters (?primary_actor_slot - primary_actor_slot ?secondary_actor_slot - secondary_actor_slot ?route_option_a - route_option_a ?route_option_b - route_option_b ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (secondary_slot_ready ?secondary_actor_slot)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_a_activated ?route_option_a)
+        (route_option_b_staged ?route_option_b)
+        (primary_slot_confirmed ?primary_actor_slot)
+        (not
+          (secondary_slot_confirmed ?secondary_actor_slot)
+        )
+        (mission_seed_available ?mission_instance)
+      )
+    :effect
+      (and
+        (mission_instance_ready ?mission_instance)
+        (mission_has_route_a ?mission_instance ?route_option_a)
+        (mission_has_route_b ?mission_instance ?route_option_b)
+        (mission_modifier_required ?mission_instance)
+        (not
+          (mission_seed_available ?mission_instance)
+        )
+      )
+  )
+  (:action assemble_mission_asset_and_modifier_path
+    :parameters (?primary_actor_slot - primary_actor_slot ?secondary_actor_slot - secondary_actor_slot ?route_option_a - route_option_a ?route_option_b - route_option_b ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (secondary_slot_ready ?secondary_actor_slot)
+        (primary_slot_assigned_route ?primary_actor_slot ?route_option_a)
+        (secondary_slot_assigned_route ?secondary_actor_slot ?route_option_b)
+        (route_option_staged ?route_option_a)
+        (route_option_b_staged ?route_option_b)
+        (not
+          (primary_slot_confirmed ?primary_actor_slot)
+        )
+        (not
+          (secondary_slot_confirmed ?secondary_actor_slot)
+        )
+        (mission_seed_available ?mission_instance)
+      )
+    :effect
+      (and
+        (mission_instance_ready ?mission_instance)
+        (mission_has_route_a ?mission_instance ?route_option_a)
+        (mission_has_route_b ?mission_instance ?route_option_b)
+        (mission_asset_required ?mission_instance)
+        (mission_modifier_required ?mission_instance)
+        (not
+          (mission_seed_available ?mission_instance)
+        )
+      )
+  )
+  (:action mark_mission_node_processed
+    :parameters (?mission_instance - mission_instance ?primary_actor_slot - primary_actor_slot ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (mission_instance_ready ?mission_instance)
+        (primary_slot_ready ?primary_actor_slot)
+        (entity_reserved_loadout ?primary_actor_slot ?loadout_option)
+        (not
+          (mission_node_processed ?mission_instance)
+        )
+      )
+    :effect (mission_node_processed ?mission_instance)
+  )
+  (:action install_upgrade_module_on_mission_node
+    :parameters (?agent_profile - agent_profile ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (agent_assigned_to_mission ?agent_profile ?mission_instance)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_module_available ?upgrade_module)
+        (mission_instance_ready ?mission_instance)
+        (mission_node_processed ?mission_instance)
+        (not
+          (upgrade_installed ?upgrade_module)
+        )
+      )
+    :effect
+      (and
+        (upgrade_installed ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action finalize_agent_node_upgrade
+    :parameters (?agent_profile - agent_profile ?upgrade_module - upgrade_module ?mission_instance - mission_instance ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_installed ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (entity_reserved_loadout ?agent_profile ?loadout_option)
+        (not
+          (mission_asset_required ?mission_instance)
+        )
+        (not
+          (agent_node_ready ?agent_profile)
+        )
+      )
+    :effect (agent_node_ready ?agent_profile)
+  )
+  (:action assign_asset_token_to_agent
+    :parameters (?agent_profile - agent_profile ?asset_token - asset_token)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (asset_token_available ?asset_token)
+        (not
+          (agent_asset_assigned ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_asset_assigned ?agent_profile)
+        (agent_has_asset_token ?agent_profile ?asset_token)
+        (not
+          (asset_token_available ?asset_token)
+        )
+      )
+  )
+  (:action process_agent_node_with_asset
+    :parameters (?agent_profile - agent_profile ?upgrade_module - upgrade_module ?mission_instance - mission_instance ?loadout_option - loadout_option ?asset_token - asset_token)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_installed ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (entity_reserved_loadout ?agent_profile ?loadout_option)
+        (mission_asset_required ?mission_instance)
+        (agent_asset_assigned ?agent_profile)
+        (agent_has_asset_token ?agent_profile ?asset_token)
+        (not
+          (agent_node_ready ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_node_ready ?agent_profile)
+        (agent_asset_processed ?agent_profile)
+      )
+  )
+  (:action flag_agent_for_promotion
+    :parameters (?agent_profile - agent_profile ?equipment_attachment - equipment_attachment ?support_unit - support_unit ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_node_ready ?agent_profile)
+        (agent_has_attachment ?agent_profile ?equipment_attachment)
+        (entity_assigned_support ?agent_profile ?support_unit)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (not
+          (mission_modifier_required ?mission_instance)
+        )
+        (not
+          (agent_promo_candidate ?agent_profile)
+        )
+      )
+    :effect (agent_promo_candidate ?agent_profile)
+  )
+  (:action flag_agent_for_promotion_variant
+    :parameters (?agent_profile - agent_profile ?equipment_attachment - equipment_attachment ?support_unit - support_unit ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_node_ready ?agent_profile)
+        (agent_has_attachment ?agent_profile ?equipment_attachment)
+        (entity_assigned_support ?agent_profile ?support_unit)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (mission_modifier_required ?mission_instance)
+        (not
+          (agent_promo_candidate ?agent_profile)
+        )
+      )
+    :effect (agent_promo_candidate ?agent_profile)
+  )
+  (:action prepare_agent_with_trait
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_promo_candidate ?agent_profile)
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (not
+          (mission_asset_required ?mission_instance)
+        )
+        (not
+          (mission_modifier_required ?mission_instance)
+        )
+        (not
+          (agent_promotion_ready ?agent_profile)
+        )
+      )
+    :effect (agent_promotion_ready ?agent_profile)
+  )
+  (:action prepare_agent_with_trait_and_asset
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_promo_candidate ?agent_profile)
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (mission_asset_required ?mission_instance)
+        (not
+          (mission_modifier_required ?mission_instance)
+        )
+        (not
+          (agent_promotion_ready ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_modifier_applied ?agent_profile)
+      )
+  )
+  (:action prepare_agent_with_trait_and_modifier
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_promo_candidate ?agent_profile)
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (not
+          (mission_asset_required ?mission_instance)
+        )
+        (mission_modifier_required ?mission_instance)
+        (not
+          (agent_promotion_ready ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_modifier_applied ?agent_profile)
+      )
+  )
+  (:action prepare_agent_with_trait_with_both_flags
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait ?upgrade_module - upgrade_module ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (agent_promo_candidate ?agent_profile)
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (agent_has_upgrade ?agent_profile ?upgrade_module)
+        (upgrade_attached_to_mission ?upgrade_module ?mission_instance)
+        (mission_asset_required ?mission_instance)
+        (mission_modifier_required ?mission_instance)
+        (not
+          (agent_promotion_ready ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_modifier_applied ?agent_profile)
+      )
+  )
+  (:action finalize_agent_promotion_no_modifier
+    :parameters (?agent_profile - agent_profile)
+    :precondition
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (not
+          (agent_modifier_applied ?agent_profile)
+        )
+        (not
+          (agent_deployment_committed ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_deployment_committed ?agent_profile)
+        (entity_promotion_applied ?agent_profile)
+      )
+  )
+  (:action assign_tactical_modifier_to_agent
+    :parameters (?agent_profile - agent_profile ?tactical_modifier - tactical_modifier)
+    :precondition
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_modifier_applied ?agent_profile)
+        (tactical_modifier_available ?tactical_modifier)
+      )
+    :effect
+      (and
+        (agent_assigned_modifier ?agent_profile ?tactical_modifier)
+        (not
+          (tactical_modifier_available ?tactical_modifier)
+        )
+      )
+  )
+  (:action promote_and_deploy_agent
+    :parameters (?agent_profile - agent_profile ?primary_actor_slot - primary_actor_slot ?secondary_actor_slot - secondary_actor_slot ?loadout_option - loadout_option ?tactical_modifier - tactical_modifier)
+    :precondition
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_modifier_applied ?agent_profile)
+        (agent_assigned_modifier ?agent_profile ?tactical_modifier)
+        (agent_assigned_primary_slot ?agent_profile ?primary_actor_slot)
+        (agent_assigned_secondary_slot ?agent_profile ?secondary_actor_slot)
+        (primary_slot_confirmed ?primary_actor_slot)
+        (secondary_slot_confirmed ?secondary_actor_slot)
+        (entity_reserved_loadout ?agent_profile ?loadout_option)
+        (not
+          (agent_promoted ?agent_profile)
+        )
+      )
+    :effect (agent_promoted ?agent_profile)
+  )
+  (:action finalize_agent_deployment
+    :parameters (?agent_profile - agent_profile)
+    :precondition
+      (and
+        (agent_promotion_ready ?agent_profile)
+        (agent_promoted ?agent_profile)
+        (not
+          (agent_deployment_committed ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_deployment_committed ?agent_profile)
+        (entity_promotion_applied ?agent_profile)
+      )
+  )
+  (:action commit_agent_faction_affiliation
+    :parameters (?agent_profile - agent_profile ?faction_marker - faction_marker ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_committed ?agent_profile)
+        (entity_reserved_loadout ?agent_profile ?loadout_option)
+        (faction_marker_available ?faction_marker)
+        (agent_bound_faction_marker ?agent_profile ?faction_marker)
+        (not
+          (agent_faction_committed ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_faction_committed ?agent_profile)
+        (not
+          (faction_marker_available ?faction_marker)
+        )
+      )
+  )
+  (:action stage_agent_asset
+    :parameters (?agent_profile - agent_profile ?support_unit - support_unit)
+    :precondition
+      (and
+        (agent_faction_committed ?agent_profile)
+        (entity_assigned_support ?agent_profile ?support_unit)
+        (not
+          (agent_asset_staged ?agent_profile)
+        )
+      )
+    :effect (agent_asset_staged ?agent_profile)
+  )
+  (:action finalize_agent_asset_stage
+    :parameters (?agent_profile - agent_profile ?leadership_trait - leadership_trait)
+    :precondition
+      (and
+        (agent_asset_staged ?agent_profile)
+        (agent_assigned_leadership_trait ?agent_profile ?leadership_trait)
+        (not
+          (agent_asset_confirmed ?agent_profile)
+        )
+      )
+    :effect (agent_asset_confirmed ?agent_profile)
+  )
+  (:action finalize_agent_asset_stage_commit
+    :parameters (?agent_profile - agent_profile)
+    :precondition
+      (and
+        (agent_asset_confirmed ?agent_profile)
+        (not
+          (agent_deployment_committed ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (agent_deployment_committed ?agent_profile)
+        (entity_promotion_applied ?agent_profile)
+      )
+  )
+  (:action propagate_deployment_to_primary_slot
+    :parameters (?primary_actor_slot - primary_actor_slot ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_actor_slot)
+        (primary_slot_confirmed ?primary_actor_slot)
+        (mission_instance_ready ?mission_instance)
+        (mission_node_processed ?mission_instance)
+        (not
+          (entity_promotion_applied ?primary_actor_slot)
+        )
+      )
+    :effect (entity_promotion_applied ?primary_actor_slot)
+  )
+  (:action propagate_deployment_to_secondary_slot
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?mission_instance - mission_instance)
+    :precondition
+      (and
+        (secondary_slot_ready ?secondary_actor_slot)
+        (secondary_slot_confirmed ?secondary_actor_slot)
+        (mission_instance_ready ?mission_instance)
+        (mission_node_processed ?mission_instance)
+        (not
+          (entity_promotion_applied ?secondary_actor_slot)
+        )
+      )
+    :effect (entity_promotion_applied ?secondary_actor_slot)
+  )
+  (:action apply_salvage_token_to_objective
+    :parameters (?mission_objective - mission_objective ?mission_token - mission_token ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (entity_promotion_applied ?mission_objective)
+        (entity_reserved_loadout ?mission_objective ?loadout_option)
+        (salvage_token_available ?mission_token)
+        (not
+          (entity_salvaged ?mission_objective)
+        )
+      )
+    :effect
+      (and
+        (entity_salvaged ?mission_objective)
+        (entity_bound_salvage_token ?mission_objective ?mission_token)
+        (not
+          (salvage_token_available ?mission_token)
+        )
+      )
+  )
+  (:action reintegrate_primary_slot_via_faction_option
+    :parameters (?primary_actor_slot - primary_actor_slot ?faction_option - faction_option ?mission_token - mission_token)
+    :precondition
+      (and
+        (entity_salvaged ?primary_actor_slot)
+        (entity_reserved_faction ?primary_actor_slot ?faction_option)
+        (entity_bound_salvage_token ?primary_actor_slot ?mission_token)
+        (not
+          (ready_for_deployment ?primary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_deployment ?primary_actor_slot)
+        (faction_option_available ?faction_option)
+        (salvage_token_available ?mission_token)
+      )
+  )
+  (:action reintegrate_secondary_slot_via_faction_option
+    :parameters (?secondary_actor_slot - secondary_actor_slot ?faction_option - faction_option ?mission_token - mission_token)
+    :precondition
+      (and
+        (entity_salvaged ?secondary_actor_slot)
+        (entity_reserved_faction ?secondary_actor_slot ?faction_option)
+        (entity_bound_salvage_token ?secondary_actor_slot ?mission_token)
+        (not
+          (ready_for_deployment ?secondary_actor_slot)
+        )
+      )
+    :effect
+      (and
+        (ready_for_deployment ?secondary_actor_slot)
+        (faction_option_available ?faction_option)
+        (salvage_token_available ?mission_token)
+      )
+  )
+  (:action reintegrate_agent_with_faction_option
+    :parameters (?agent_profile - agent_profile ?faction_option - faction_option ?mission_token - mission_token)
+    :precondition
+      (and
+        (entity_salvaged ?agent_profile)
+        (entity_reserved_faction ?agent_profile ?faction_option)
+        (entity_bound_salvage_token ?agent_profile ?mission_token)
+        (not
+          (ready_for_deployment ?agent_profile)
+        )
+      )
+    :effect
+      (and
+        (ready_for_deployment ?agent_profile)
+        (faction_option_available ?faction_option)
+        (salvage_token_available ?mission_token)
+      )
+  )
+)

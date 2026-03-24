@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain temporary_facility_outage_workaround)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object operational_resource_group - domain_object support_resource_group - domain_object routing_order_group - domain_object workaround_domain_root - domain_object affected_entity - workaround_domain_root alternate_facility_option - operational_resource_group shipment - operational_resource_group response_team - operational_resource_group escalation_contact - operational_resource_group compensation_option - operational_resource_group claim_document - operational_resource_group vendor - operational_resource_group regulatory_clearance - operational_resource_group supply_item - support_resource_group package_document - support_resource_group third_party_contact - support_resource_group origin_route_option - routing_order_group destination_route_option - routing_order_group recovery_task_order - routing_order_group facility_group - affected_entity recovery_case_group - affected_entity origin_facility - facility_group destination_facility - facility_group recovery_case - recovery_case_group)
+
+  (:predicates
+    (incident_reported ?affected_entity - affected_entity)
+    (workaround_planned_for_subject ?affected_entity - affected_entity)
+    (alternate_assigned ?affected_entity - affected_entity)
+    (incident_resolved ?affected_entity - affected_entity)
+    (eligible_for_claims ?affected_entity - affected_entity)
+    (claim_filed ?affected_entity - affected_entity)
+    (alternate_available ?alternate_facility_option - alternate_facility_option)
+    (assigned_alternate_facility_option ?affected_entity - affected_entity ?alternate_facility_option - alternate_facility_option)
+    (shipment_available ?shipment - shipment)
+    (assigned_shipment ?affected_entity - affected_entity ?shipment - shipment)
+    (team_available ?response_team - response_team)
+    (assigned_response_team ?affected_entity - affected_entity ?response_team - response_team)
+    (supply_available ?supply_item - supply_item)
+    (origin_supply_reserved ?origin_facility - origin_facility ?supply_item - supply_item)
+    (destination_supply_reserved ?destination_facility - destination_facility ?supply_item - supply_item)
+    (origin_has_route_option ?origin_facility - origin_facility ?origin_route_option - origin_route_option)
+    (origin_route_validated ?origin_route_option - origin_route_option)
+    (origin_supply_staged ?origin_route_option - origin_route_option)
+    (origin_ready ?origin_facility - origin_facility)
+    (destination_has_route_option ?destination_facility - destination_facility ?destination_route_option - destination_route_option)
+    (destination_route_validated ?destination_route_option - destination_route_option)
+    (destination_supply_staged ?destination_route_option - destination_route_option)
+    (destination_ready ?destination_facility - destination_facility)
+    (task_order_pending ?recovery_task_order - recovery_task_order)
+    (task_order_staged ?recovery_task_order - recovery_task_order)
+    (task_order_has_origin_route ?recovery_task_order - recovery_task_order ?origin_route_option - origin_route_option)
+    (task_order_has_destination_route ?recovery_task_order - recovery_task_order ?destination_route_option - destination_route_option)
+    (task_order_needs_origin_processing ?recovery_task_order - recovery_task_order)
+    (task_order_needs_destination_processing ?recovery_task_order - recovery_task_order)
+    (task_order_ready ?recovery_task_order - recovery_task_order)
+    (case_has_origin ?recovery_case - recovery_case ?origin_facility - origin_facility)
+    (case_has_destination ?recovery_case - recovery_case ?destination_facility - destination_facility)
+    (case_linked_task_order ?recovery_case - recovery_case ?recovery_task_order - recovery_task_order)
+    (package_document_available ?package_document - package_document)
+    (case_has_package_document ?recovery_case - recovery_case ?package_document - package_document)
+    (package_document_verified ?package_document - package_document)
+    (package_document_linked_to_order ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    (case_documentation_complete ?recovery_case - recovery_case)
+    (case_vendor_confirmed ?recovery_case - recovery_case)
+    (case_regulatory_cleared ?recovery_case - recovery_case)
+    (case_has_escalation_contact ?recovery_case - recovery_case)
+    (case_escalation_recorded ?recovery_case - recovery_case)
+    (case_approval_recorded ?recovery_case - recovery_case)
+    (case_execution_gate_open ?recovery_case - recovery_case)
+    (third_party_contact_available ?third_party_contact - third_party_contact)
+    (case_linked_third_party_contact ?recovery_case - recovery_case ?third_party_contact - third_party_contact)
+    (case_third_party_contact_initiated ?recovery_case - recovery_case)
+    (case_third_party_contact_acknowledged ?recovery_case - recovery_case)
+    (case_third_party_clearance_recorded ?recovery_case - recovery_case)
+    (escalation_contact_available ?escalation_contact - escalation_contact)
+    (case_linked_escalation_contact ?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (case_compensation_option_selected ?recovery_case - recovery_case ?compensation_option - compensation_option)
+    (vendor_available ?vendor - vendor)
+    (case_linked_vendor ?recovery_case - recovery_case ?vendor - vendor)
+    (regulatory_clearance_available ?regulatory_clearance - regulatory_clearance)
+    (case_linked_regulatory_clearance ?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance)
+    (claim_document_available ?claim_document - claim_document)
+    (entity_linked_claim_document ?affected_entity - affected_entity ?claim_document - claim_document)
+    (origin_resources_allocated ?origin_facility - origin_facility)
+    (destination_resources_allocated ?destination_facility - destination_facility)
+    (case_finalized ?recovery_case - recovery_case)
+  )
+  (:action register_outage_incident
+    :parameters (?affected_entity - affected_entity)
+    :precondition
+      (and
+        (not
+          (incident_reported ?affected_entity)
+        )
+        (not
+          (incident_resolved ?affected_entity)
+        )
+      )
+    :effect (incident_reported ?affected_entity)
+  )
+  (:action assign_alternate_facility_option
+    :parameters (?affected_entity - affected_entity ?alternate_facility_option - alternate_facility_option)
+    :precondition
+      (and
+        (incident_reported ?affected_entity)
+        (not
+          (alternate_assigned ?affected_entity)
+        )
+        (alternate_available ?alternate_facility_option)
+      )
+    :effect
+      (and
+        (alternate_assigned ?affected_entity)
+        (assigned_alternate_facility_option ?affected_entity ?alternate_facility_option)
+        (not
+          (alternate_available ?alternate_facility_option)
+        )
+      )
+  )
+  (:action link_shipment_to_entity
+    :parameters (?affected_entity - affected_entity ?shipment - shipment)
+    :precondition
+      (and
+        (incident_reported ?affected_entity)
+        (alternate_assigned ?affected_entity)
+        (shipment_available ?shipment)
+      )
+    :effect
+      (and
+        (assigned_shipment ?affected_entity ?shipment)
+        (not
+          (shipment_available ?shipment)
+        )
+      )
+  )
+  (:action create_mitigation_plan
+    :parameters (?affected_entity - affected_entity ?shipment - shipment)
+    :precondition
+      (and
+        (incident_reported ?affected_entity)
+        (alternate_assigned ?affected_entity)
+        (assigned_shipment ?affected_entity ?shipment)
+        (not
+          (workaround_planned_for_subject ?affected_entity)
+        )
+      )
+    :effect (workaround_planned_for_subject ?affected_entity)
+  )
+  (:action unassign_shipment_from_entity
+    :parameters (?affected_entity - affected_entity ?shipment - shipment)
+    :precondition
+      (and
+        (assigned_shipment ?affected_entity ?shipment)
+      )
+    :effect
+      (and
+        (shipment_available ?shipment)
+        (not
+          (assigned_shipment ?affected_entity ?shipment)
+        )
+      )
+  )
+  (:action assign_response_team_to_entity
+    :parameters (?affected_entity - affected_entity ?response_team - response_team)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?affected_entity)
+        (team_available ?response_team)
+      )
+    :effect
+      (and
+        (assigned_response_team ?affected_entity ?response_team)
+        (not
+          (team_available ?response_team)
+        )
+      )
+  )
+  (:action release_response_team_from_entity
+    :parameters (?affected_entity - affected_entity ?response_team - response_team)
+    :precondition
+      (and
+        (assigned_response_team ?affected_entity ?response_team)
+      )
+    :effect
+      (and
+        (team_available ?response_team)
+        (not
+          (assigned_response_team ?affected_entity ?response_team)
+        )
+      )
+  )
+  (:action assign_vendor_to_case
+    :parameters (?recovery_case - recovery_case ?vendor - vendor)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (vendor_available ?vendor)
+      )
+    :effect
+      (and
+        (case_linked_vendor ?recovery_case ?vendor)
+        (not
+          (vendor_available ?vendor)
+        )
+      )
+  )
+  (:action release_vendor_from_case
+    :parameters (?recovery_case - recovery_case ?vendor - vendor)
+    :precondition
+      (and
+        (case_linked_vendor ?recovery_case ?vendor)
+      )
+    :effect
+      (and
+        (vendor_available ?vendor)
+        (not
+          (case_linked_vendor ?recovery_case ?vendor)
+        )
+      )
+  )
+  (:action attach_regulatory_clearance_to_case
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (regulatory_clearance_available ?regulatory_clearance)
+      )
+    :effect
+      (and
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (not
+          (regulatory_clearance_available ?regulatory_clearance)
+        )
+      )
+  )
+  (:action remove_regulatory_clearance_from_case
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+      )
+    :effect
+      (and
+        (regulatory_clearance_available ?regulatory_clearance)
+        (not
+          (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        )
+      )
+  )
+  (:action validate_origin_route_option
+    :parameters (?origin_facility - origin_facility ?origin_route_option - origin_route_option ?shipment - shipment)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?origin_facility)
+        (assigned_shipment ?origin_facility ?shipment)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (not
+          (origin_route_validated ?origin_route_option)
+        )
+        (not
+          (origin_supply_staged ?origin_route_option)
+        )
+      )
+    :effect (origin_route_validated ?origin_route_option)
+  )
+  (:action reserve_origin_team_and_mark_ready
+    :parameters (?origin_facility - origin_facility ?origin_route_option - origin_route_option ?response_team - response_team)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?origin_facility)
+        (assigned_response_team ?origin_facility ?response_team)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (origin_route_validated ?origin_route_option)
+        (not
+          (origin_resources_allocated ?origin_facility)
+        )
+      )
+    :effect
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (origin_ready ?origin_facility)
+      )
+  )
+  (:action stage_origin_supply
+    :parameters (?origin_facility - origin_facility ?origin_route_option - origin_route_option ?supply_item - supply_item)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?origin_facility)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (supply_available ?supply_item)
+        (not
+          (origin_resources_allocated ?origin_facility)
+        )
+      )
+    :effect
+      (and
+        (origin_supply_staged ?origin_route_option)
+        (origin_resources_allocated ?origin_facility)
+        (origin_supply_reserved ?origin_facility ?supply_item)
+        (not
+          (supply_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_origin_route_preparation
+    :parameters (?origin_facility - origin_facility ?origin_route_option - origin_route_option ?shipment - shipment ?supply_item - supply_item)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?origin_facility)
+        (assigned_shipment ?origin_facility ?shipment)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (origin_supply_staged ?origin_route_option)
+        (origin_supply_reserved ?origin_facility ?supply_item)
+        (not
+          (origin_ready ?origin_facility)
+        )
+      )
+    :effect
+      (and
+        (origin_route_validated ?origin_route_option)
+        (origin_ready ?origin_facility)
+        (supply_available ?supply_item)
+        (not
+          (origin_supply_reserved ?origin_facility ?supply_item)
+        )
+      )
+  )
+  (:action validate_destination_route_option
+    :parameters (?destination_facility - destination_facility ?destination_route_option - destination_route_option ?shipment - shipment)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?destination_facility)
+        (assigned_shipment ?destination_facility ?shipment)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (not
+          (destination_route_validated ?destination_route_option)
+        )
+        (not
+          (destination_supply_staged ?destination_route_option)
+        )
+      )
+    :effect (destination_route_validated ?destination_route_option)
+  )
+  (:action reserve_destination_team_and_mark_ready
+    :parameters (?destination_facility - destination_facility ?destination_route_option - destination_route_option ?response_team - response_team)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?destination_facility)
+        (assigned_response_team ?destination_facility ?response_team)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (destination_route_validated ?destination_route_option)
+        (not
+          (destination_resources_allocated ?destination_facility)
+        )
+      )
+    :effect
+      (and
+        (destination_resources_allocated ?destination_facility)
+        (destination_ready ?destination_facility)
+      )
+  )
+  (:action stage_destination_supply
+    :parameters (?destination_facility - destination_facility ?destination_route_option - destination_route_option ?supply_item - supply_item)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?destination_facility)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (supply_available ?supply_item)
+        (not
+          (destination_resources_allocated ?destination_facility)
+        )
+      )
+    :effect
+      (and
+        (destination_supply_staged ?destination_route_option)
+        (destination_resources_allocated ?destination_facility)
+        (destination_supply_reserved ?destination_facility ?supply_item)
+        (not
+          (supply_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_destination_route_preparation
+    :parameters (?destination_facility - destination_facility ?destination_route_option - destination_route_option ?shipment - shipment ?supply_item - supply_item)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?destination_facility)
+        (assigned_shipment ?destination_facility ?shipment)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (destination_supply_staged ?destination_route_option)
+        (destination_supply_reserved ?destination_facility ?supply_item)
+        (not
+          (destination_ready ?destination_facility)
+        )
+      )
+    :effect
+      (and
+        (destination_route_validated ?destination_route_option)
+        (destination_ready ?destination_facility)
+        (supply_available ?supply_item)
+        (not
+          (destination_supply_reserved ?destination_facility ?supply_item)
+        )
+      )
+  )
+  (:action create_and_stage_task_order
+    :parameters (?origin_facility - origin_facility ?destination_facility - destination_facility ?origin_route_option - origin_route_option ?destination_route_option - destination_route_option ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (destination_resources_allocated ?destination_facility)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (origin_route_validated ?origin_route_option)
+        (destination_route_validated ?destination_route_option)
+        (origin_ready ?origin_facility)
+        (destination_ready ?destination_facility)
+        (task_order_pending ?recovery_task_order)
+      )
+    :effect
+      (and
+        (task_order_staged ?recovery_task_order)
+        (task_order_has_origin_route ?recovery_task_order ?origin_route_option)
+        (task_order_has_destination_route ?recovery_task_order ?destination_route_option)
+        (not
+          (task_order_pending ?recovery_task_order)
+        )
+      )
+  )
+  (:action create_and_stage_task_order_with_origin_supply
+    :parameters (?origin_facility - origin_facility ?destination_facility - destination_facility ?origin_route_option - origin_route_option ?destination_route_option - destination_route_option ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (destination_resources_allocated ?destination_facility)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (origin_supply_staged ?origin_route_option)
+        (destination_route_validated ?destination_route_option)
+        (not
+          (origin_ready ?origin_facility)
+        )
+        (destination_ready ?destination_facility)
+        (task_order_pending ?recovery_task_order)
+      )
+    :effect
+      (and
+        (task_order_staged ?recovery_task_order)
+        (task_order_has_origin_route ?recovery_task_order ?origin_route_option)
+        (task_order_has_destination_route ?recovery_task_order ?destination_route_option)
+        (task_order_needs_origin_processing ?recovery_task_order)
+        (not
+          (task_order_pending ?recovery_task_order)
+        )
+      )
+  )
+  (:action create_and_stage_task_order_with_destination_supply
+    :parameters (?origin_facility - origin_facility ?destination_facility - destination_facility ?origin_route_option - origin_route_option ?destination_route_option - destination_route_option ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (destination_resources_allocated ?destination_facility)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (origin_route_validated ?origin_route_option)
+        (destination_supply_staged ?destination_route_option)
+        (origin_ready ?origin_facility)
+        (not
+          (destination_ready ?destination_facility)
+        )
+        (task_order_pending ?recovery_task_order)
+      )
+    :effect
+      (and
+        (task_order_staged ?recovery_task_order)
+        (task_order_has_origin_route ?recovery_task_order ?origin_route_option)
+        (task_order_has_destination_route ?recovery_task_order ?destination_route_option)
+        (task_order_needs_destination_processing ?recovery_task_order)
+        (not
+          (task_order_pending ?recovery_task_order)
+        )
+      )
+  )
+  (:action create_and_stage_task_order_with_both_supplies
+    :parameters (?origin_facility - origin_facility ?destination_facility - destination_facility ?origin_route_option - origin_route_option ?destination_route_option - destination_route_option ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (destination_resources_allocated ?destination_facility)
+        (origin_has_route_option ?origin_facility ?origin_route_option)
+        (destination_has_route_option ?destination_facility ?destination_route_option)
+        (origin_supply_staged ?origin_route_option)
+        (destination_supply_staged ?destination_route_option)
+        (not
+          (origin_ready ?origin_facility)
+        )
+        (not
+          (destination_ready ?destination_facility)
+        )
+        (task_order_pending ?recovery_task_order)
+      )
+    :effect
+      (and
+        (task_order_staged ?recovery_task_order)
+        (task_order_has_origin_route ?recovery_task_order ?origin_route_option)
+        (task_order_has_destination_route ?recovery_task_order ?destination_route_option)
+        (task_order_needs_origin_processing ?recovery_task_order)
+        (task_order_needs_destination_processing ?recovery_task_order)
+        (not
+          (task_order_pending ?recovery_task_order)
+        )
+      )
+  )
+  (:action mark_task_order_ready_for_execution
+    :parameters (?recovery_task_order - recovery_task_order ?origin_facility - origin_facility ?shipment - shipment)
+    :precondition
+      (and
+        (task_order_staged ?recovery_task_order)
+        (origin_resources_allocated ?origin_facility)
+        (assigned_shipment ?origin_facility ?shipment)
+        (not
+          (task_order_ready ?recovery_task_order)
+        )
+      )
+    :effect (task_order_ready ?recovery_task_order)
+  )
+  (:action validate_and_attach_package_document_to_order
+    :parameters (?recovery_case - recovery_case ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (case_linked_task_order ?recovery_case ?recovery_task_order)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_available ?package_document)
+        (task_order_staged ?recovery_task_order)
+        (task_order_ready ?recovery_task_order)
+        (not
+          (package_document_verified ?package_document)
+        )
+      )
+    :effect
+      (and
+        (package_document_verified ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (not
+          (package_document_available ?package_document)
+        )
+      )
+  )
+  (:action finalize_package_documentation_for_case
+    :parameters (?recovery_case - recovery_case ?package_document - package_document ?recovery_task_order - recovery_task_order ?shipment - shipment)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_verified ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (assigned_shipment ?recovery_case ?shipment)
+        (not
+          (task_order_needs_origin_processing ?recovery_task_order)
+        )
+        (not
+          (case_documentation_complete ?recovery_case)
+        )
+      )
+    :effect (case_documentation_complete ?recovery_case)
+  )
+  (:action attach_escalation_contact_to_case
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (escalation_contact_available ?escalation_contact)
+        (not
+          (case_has_escalation_contact ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_escalation_contact ?recovery_case)
+        (case_linked_escalation_contact ?recovery_case ?escalation_contact)
+        (not
+          (escalation_contact_available ?escalation_contact)
+        )
+      )
+  )
+  (:action attach_escalation_contact_and_documents_to_case
+    :parameters (?recovery_case - recovery_case ?package_document - package_document ?recovery_task_order - recovery_task_order ?shipment - shipment ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_verified ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (assigned_shipment ?recovery_case ?shipment)
+        (task_order_needs_origin_processing ?recovery_task_order)
+        (case_has_escalation_contact ?recovery_case)
+        (case_linked_escalation_contact ?recovery_case ?escalation_contact)
+        (not
+          (case_documentation_complete ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_documentation_complete ?recovery_case)
+        (case_escalation_recorded ?recovery_case)
+      )
+  )
+  (:action confirm_vendor_preparation_for_case_origin_variant
+    :parameters (?recovery_case - recovery_case ?vendor - vendor ?response_team - response_team ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_documentation_complete ?recovery_case)
+        (case_linked_vendor ?recovery_case ?vendor)
+        (assigned_response_team ?recovery_case ?response_team)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (not
+          (task_order_needs_destination_processing ?recovery_task_order)
+        )
+        (not
+          (case_vendor_confirmed ?recovery_case)
+        )
+      )
+    :effect (case_vendor_confirmed ?recovery_case)
+  )
+  (:action confirm_vendor_preparation_for_case_destination_variant
+    :parameters (?recovery_case - recovery_case ?vendor - vendor ?response_team - response_team ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_documentation_complete ?recovery_case)
+        (case_linked_vendor ?recovery_case ?vendor)
+        (assigned_response_team ?recovery_case ?response_team)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (task_order_needs_destination_processing ?recovery_task_order)
+        (not
+          (case_vendor_confirmed ?recovery_case)
+        )
+      )
+    :effect (case_vendor_confirmed ?recovery_case)
+  )
+  (:action apply_regulatory_clearance_to_case
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_vendor_confirmed ?recovery_case)
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (not
+          (task_order_needs_origin_processing ?recovery_task_order)
+        )
+        (not
+          (task_order_needs_destination_processing ?recovery_task_order)
+        )
+        (not
+          (case_regulatory_cleared ?recovery_case)
+        )
+      )
+    :effect (case_regulatory_cleared ?recovery_case)
+  )
+  (:action apply_regulatory_clearance_and_record_approval_origin_processing
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_vendor_confirmed ?recovery_case)
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (task_order_needs_origin_processing ?recovery_task_order)
+        (not
+          (task_order_needs_destination_processing ?recovery_task_order)
+        )
+        (not
+          (case_regulatory_cleared ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_approval_recorded ?recovery_case)
+      )
+  )
+  (:action apply_regulatory_clearance_and_record_approval_destination_processing
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_vendor_confirmed ?recovery_case)
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (not
+          (task_order_needs_origin_processing ?recovery_task_order)
+        )
+        (task_order_needs_destination_processing ?recovery_task_order)
+        (not
+          (case_regulatory_cleared ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_approval_recorded ?recovery_case)
+      )
+  )
+  (:action apply_regulatory_clearance_and_record_approval_both_processing
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance ?package_document - package_document ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (case_vendor_confirmed ?recovery_case)
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (case_has_package_document ?recovery_case ?package_document)
+        (package_document_linked_to_order ?package_document ?recovery_task_order)
+        (task_order_needs_origin_processing ?recovery_task_order)
+        (task_order_needs_destination_processing ?recovery_task_order)
+        (not
+          (case_regulatory_cleared ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_approval_recorded ?recovery_case)
+      )
+  )
+  (:action mark_case_ready_for_execution
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (not
+          (case_approval_recorded ?recovery_case)
+        )
+        (not
+          (case_finalized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?recovery_case)
+        (eligible_for_claims ?recovery_case)
+      )
+  )
+  (:action attach_compensation_option_to_case
+    :parameters (?recovery_case - recovery_case ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_approval_recorded ?recovery_case)
+        (compensation_option_available ?compensation_option)
+      )
+    :effect
+      (and
+        (case_compensation_option_selected ?recovery_case ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action open_case_execution_gate
+    :parameters (?recovery_case - recovery_case ?origin_facility - origin_facility ?destination_facility - destination_facility ?shipment - shipment ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_approval_recorded ?recovery_case)
+        (case_compensation_option_selected ?recovery_case ?compensation_option)
+        (case_has_origin ?recovery_case ?origin_facility)
+        (case_has_destination ?recovery_case ?destination_facility)
+        (origin_ready ?origin_facility)
+        (destination_ready ?destination_facility)
+        (assigned_shipment ?recovery_case ?shipment)
+        (not
+          (case_execution_gate_open ?recovery_case)
+        )
+      )
+    :effect (case_execution_gate_open ?recovery_case)
+  )
+  (:action finalize_case_and_enable_claims
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_regulatory_cleared ?recovery_case)
+        (case_execution_gate_open ?recovery_case)
+        (not
+          (case_finalized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?recovery_case)
+        (eligible_for_claims ?recovery_case)
+      )
+  )
+  (:action initiate_third_party_contact_for_case
+    :parameters (?recovery_case - recovery_case ?third_party_contact - third_party_contact ?shipment - shipment)
+    :precondition
+      (and
+        (workaround_planned_for_subject ?recovery_case)
+        (assigned_shipment ?recovery_case ?shipment)
+        (third_party_contact_available ?third_party_contact)
+        (case_linked_third_party_contact ?recovery_case ?third_party_contact)
+        (not
+          (case_third_party_contact_initiated ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_third_party_contact_initiated ?recovery_case)
+        (not
+          (third_party_contact_available ?third_party_contact)
+        )
+      )
+  )
+  (:action acknowledge_third_party_contact_for_case
+    :parameters (?recovery_case - recovery_case ?response_team - response_team)
+    :precondition
+      (and
+        (case_third_party_contact_initiated ?recovery_case)
+        (assigned_response_team ?recovery_case ?response_team)
+        (not
+          (case_third_party_contact_acknowledged ?recovery_case)
+        )
+      )
+    :effect (case_third_party_contact_acknowledged ?recovery_case)
+  )
+  (:action record_third_party_clearance_acknowledgment
+    :parameters (?recovery_case - recovery_case ?regulatory_clearance - regulatory_clearance)
+    :precondition
+      (and
+        (case_third_party_contact_acknowledged ?recovery_case)
+        (case_linked_regulatory_clearance ?recovery_case ?regulatory_clearance)
+        (not
+          (case_third_party_clearance_recorded ?recovery_case)
+        )
+      )
+    :effect (case_third_party_clearance_recorded ?recovery_case)
+  )
+  (:action finalize_case_after_third_party_confirmation
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_third_party_clearance_recorded ?recovery_case)
+        (not
+          (case_finalized ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?recovery_case)
+        (eligible_for_claims ?recovery_case)
+      )
+  )
+  (:action mark_origin_facility_eligible_for_claims
+    :parameters (?origin_facility - origin_facility ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (origin_resources_allocated ?origin_facility)
+        (origin_ready ?origin_facility)
+        (task_order_staged ?recovery_task_order)
+        (task_order_ready ?recovery_task_order)
+        (not
+          (eligible_for_claims ?origin_facility)
+        )
+      )
+    :effect (eligible_for_claims ?origin_facility)
+  )
+  (:action mark_destination_facility_eligible_for_claims
+    :parameters (?destination_facility - destination_facility ?recovery_task_order - recovery_task_order)
+    :precondition
+      (and
+        (destination_resources_allocated ?destination_facility)
+        (destination_ready ?destination_facility)
+        (task_order_staged ?recovery_task_order)
+        (task_order_ready ?recovery_task_order)
+        (not
+          (eligible_for_claims ?destination_facility)
+        )
+      )
+    :effect (eligible_for_claims ?destination_facility)
+  )
+  (:action file_claim_for_entity
+    :parameters (?affected_entity - affected_entity ?claim_document - claim_document ?shipment - shipment)
+    :precondition
+      (and
+        (eligible_for_claims ?affected_entity)
+        (assigned_shipment ?affected_entity ?shipment)
+        (claim_document_available ?claim_document)
+        (not
+          (claim_filed ?affected_entity)
+        )
+      )
+    :effect
+      (and
+        (claim_filed ?affected_entity)
+        (entity_linked_claim_document ?affected_entity ?claim_document)
+        (not
+          (claim_document_available ?claim_document)
+        )
+      )
+  )
+  (:action commit_recovery_action_and_restore_origin
+    :parameters (?origin_facility - origin_facility ?alternate_facility_option - alternate_facility_option ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_filed ?origin_facility)
+        (assigned_alternate_facility_option ?origin_facility ?alternate_facility_option)
+        (entity_linked_claim_document ?origin_facility ?claim_document)
+        (not
+          (incident_resolved ?origin_facility)
+        )
+      )
+    :effect
+      (and
+        (incident_resolved ?origin_facility)
+        (alternate_available ?alternate_facility_option)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action commit_recovery_action_and_restore_destination
+    :parameters (?destination_facility - destination_facility ?alternate_facility_option - alternate_facility_option ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_filed ?destination_facility)
+        (assigned_alternate_facility_option ?destination_facility ?alternate_facility_option)
+        (entity_linked_claim_document ?destination_facility ?claim_document)
+        (not
+          (incident_resolved ?destination_facility)
+        )
+      )
+    :effect
+      (and
+        (incident_resolved ?destination_facility)
+        (alternate_available ?alternate_facility_option)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action commit_recovery_and_restore_case
+    :parameters (?recovery_case - recovery_case ?alternate_facility_option - alternate_facility_option ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_filed ?recovery_case)
+        (assigned_alternate_facility_option ?recovery_case ?alternate_facility_option)
+        (entity_linked_claim_document ?recovery_case ?claim_document)
+        (not
+          (incident_resolved ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (incident_resolved ?recovery_case)
+        (alternate_available ?alternate_facility_option)
+        (claim_document_available ?claim_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem temporary_facility_outage_scenario)
+  (:domain temporary_facility_outage_workaround)
+  (:objects origin_facility_main - origin_facility destination_facility_main - destination_facility recovery_case_01 - recovery_case recovery_case_02 - recovery_case alternate_facility_option_a - alternate_facility_option alternate_facility_option_b - alternate_facility_option alternate_facility_option_c - alternate_facility_option shipment_1001 - shipment response_team_alpha - response_team supply_item_spare_parts - supply_item origin_route_option_1 - origin_route_option destination_route_option_1 - destination_route_option recovery_task_order_001 - recovery_task_order package_document_manifest_1 - package_document package_document_manifest_2 - package_document escalation_contact_internal_ops - escalation_contact escalation_contact_customer_care - escalation_contact compensation_option_refund - compensation_option compensation_option_credit - compensation_option claim_document_0001 - claim_document vendor_preferred_supplier - vendor third_party_contact_carrier_1 - third_party_contact third_party_contact_carrier_2 - third_party_contact regulatory_clearance_type_a - regulatory_clearance)
+  (:init
+    (alternate_available alternate_facility_option_a)
+    (alternate_available alternate_facility_option_b)
+    (alternate_available alternate_facility_option_c)
+    (shipment_available shipment_1001)
+    (team_available response_team_alpha)
+    (supply_available supply_item_spare_parts)
+    (origin_has_route_option origin_facility_main origin_route_option_1)
+    (destination_has_route_option destination_facility_main destination_route_option_1)
+    (task_order_pending recovery_task_order_001)
+    (package_document_available package_document_manifest_1)
+    (package_document_available package_document_manifest_2)
+    (case_has_origin recovery_case_01 origin_facility_main)
+    (case_has_origin recovery_case_02 origin_facility_main)
+    (case_has_destination recovery_case_01 destination_facility_main)
+    (case_has_destination recovery_case_02 destination_facility_main)
+    (case_linked_task_order recovery_case_01 recovery_task_order_001)
+    (case_linked_task_order recovery_case_02 recovery_task_order_001)
+    (case_has_package_document recovery_case_01 package_document_manifest_1)
+    (case_has_package_document recovery_case_02 package_document_manifest_2)
+    (escalation_contact_available escalation_contact_internal_ops)
+    (escalation_contact_available escalation_contact_customer_care)
+    (compensation_option_available compensation_option_refund)
+    (compensation_option_available compensation_option_credit)
+    (claim_document_available claim_document_0001)
+    (vendor_available vendor_preferred_supplier)
+    (third_party_contact_available third_party_contact_carrier_1)
+    (case_linked_third_party_contact recovery_case_01 third_party_contact_carrier_1)
+    (case_linked_third_party_contact recovery_case_02 third_party_contact_carrier_2)
+    (regulatory_clearance_available regulatory_clearance_type_a)
+  )
+  (:goal
+    (and
+      (incident_resolved origin_facility_main)
+      (incident_resolved destination_facility_main)
+      (incident_resolved recovery_case_01)
+      (incident_resolved recovery_case_02)
+    )
+  )
+)

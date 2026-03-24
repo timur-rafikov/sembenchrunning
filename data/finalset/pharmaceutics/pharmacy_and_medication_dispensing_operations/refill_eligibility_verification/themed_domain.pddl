@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_refill_eligibility_verification)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_or_role - object artifact - object status_artifact - object prescription_entity - object prescription - prescription_entity prior_authorization_record - resource_or_role clinical_check_rule - resource_or_role pharmacist - resource_or_role override_token - resource_or_role packaging_profile - resource_or_role communication_channel - resource_or_role dispensing_equipment - resource_or_role regulatory_checklist - resource_or_role packaging_kit - artifact label_template - artifact prescriber_credential - artifact coverage_status - status_artifact alt_coverage_status - status_artifact dispensing_container - status_artifact prescription_component_refill_stream - prescription prescription_component_dispensing_work_order - prescription refill_stream_instore - prescription_component_refill_stream refill_stream_mail_order - prescription_component_refill_stream dispensing_work_order - prescription_component_dispensing_work_order)
+  (:predicates
+    (prescription_intake_recorded ?prescription - prescription)
+    (clinical_clearance_obtained ?prescription - prescription)
+    (prescriber_linked ?prescription - prescription)
+    (dispense_authorized ?prescription - prescription)
+    (final_verification_complete ?prescription - prescription)
+    (patient_instruction_generated ?prescription - prescription)
+    (prior_auth_record_available ?prior_authorization_record - prior_authorization_record)
+    (linked_to_prior_authorization ?prescription - prescription ?prior_authorization_record - prior_authorization_record)
+    (clinical_check_resource_available ?clinical_check_rule - clinical_check_rule)
+    (linked_to_clinical_check ?prescription - prescription ?clinical_check_rule - clinical_check_rule)
+    (pharmacist_available ?pharmacist - pharmacist)
+    (pharmacist_assigned_to_prescription ?prescription - prescription ?pharmacist - pharmacist)
+    (packaging_kit_available ?packaging_kit - packaging_kit)
+    (refill_instore_assigned_packaging_kit ?refill_stream_instore - refill_stream_instore ?packaging_kit - packaging_kit)
+    (refill_mail_order_assigned_packaging_kit ?refill_stream_mail_order - refill_stream_mail_order ?packaging_kit - packaging_kit)
+    (refill_instore_linked_to_coverage_status ?refill_stream_instore - refill_stream_instore ?coverage_status - coverage_status)
+    (coverage_allows_substitution ?coverage_status - coverage_status)
+    (coverage_requires_prior_auth ?coverage_status - coverage_status)
+    (refill_instore_eligibility_confirmed ?refill_stream_instore - refill_stream_instore)
+    (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order - refill_stream_mail_order ?alt_coverage_status - alt_coverage_status)
+    (alt_coverage_allows_substitution ?alt_coverage_status - alt_coverage_status)
+    (alt_coverage_requires_prior_auth ?alt_coverage_status - alt_coverage_status)
+    (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order - refill_stream_mail_order)
+    (container_offer_available ?dispensing_container - dispensing_container)
+    (container_reserved ?dispensing_container - dispensing_container)
+    (container_linked_to_coverage_instore ?dispensing_container - dispensing_container ?coverage_status - coverage_status)
+    (container_linked_to_alt_coverage ?dispensing_container - dispensing_container ?alt_coverage_status - alt_coverage_status)
+    (container_requires_special_handling_flag_a ?dispensing_container - dispensing_container)
+    (container_requires_special_handling_flag_b ?dispensing_container - dispensing_container)
+    (label_queued_for_container ?dispensing_container - dispensing_container)
+    (dispensing_work_order_links_to_refill_instore ?dispensing_work_order - dispensing_work_order ?refill_stream_instore - refill_stream_instore)
+    (dispensing_work_order_links_to_refill_mail_order ?dispensing_work_order - dispensing_work_order ?refill_stream_mail_order - refill_stream_mail_order)
+    (dispensing_work_order_links_to_container ?dispensing_work_order - dispensing_work_order ?dispensing_container - dispensing_container)
+    (label_template_available ?label_template - label_template)
+    (dispensing_work_order_assigned_label_template ?dispensing_work_order - dispensing_work_order ?label_template - label_template)
+    (label_template_locked ?label_template - label_template)
+    (label_template_bound_to_container ?label_template - label_template ?dispensing_container - dispensing_container)
+    (label_selected_for_workorder ?dispensing_work_order - dispensing_work_order)
+    (dispensing_work_order_has_clinical_assignments ?dispensing_work_order - dispensing_work_order)
+    (dispensing_work_order_authorization_staged ?dispensing_work_order - dispensing_work_order)
+    (override_token_claimed ?dispensing_work_order - dispensing_work_order)
+    (override_applied ?dispensing_work_order - dispensing_work_order)
+    (compliance_checks_completed ?dispensing_work_order - dispensing_work_order)
+    (packaging_confirmed_for_workorder ?dispensing_work_order - dispensing_work_order)
+    (prescriber_credential_available ?prescriber_credential - prescriber_credential)
+    (prescriber_credential_attached_to_workorder ?dispensing_work_order - dispensing_work_order ?prescriber_credential - prescriber_credential)
+    (override_requested_on_workorder ?dispensing_work_order - dispensing_work_order)
+    (override_approval_step_completed ?dispensing_work_order - dispensing_work_order)
+    (override_finalized ?dispensing_work_order - dispensing_work_order)
+    (override_token_available ?override_token - override_token)
+    (override_token_linked_to_workorder ?dispensing_work_order - dispensing_work_order ?override_token - override_token)
+    (packaging_profile_available ?packaging_profile - packaging_profile)
+    (packaging_profile_assigned_to_workorder ?dispensing_work_order - dispensing_work_order ?packaging_profile - packaging_profile)
+    (dispensing_equipment_available ?dispensing_equipment - dispensing_equipment)
+    (equipment_reserved_for_workorder ?dispensing_work_order - dispensing_work_order ?dispensing_equipment - dispensing_equipment)
+    (regulatory_checklist_available ?regulatory_checklist - regulatory_checklist)
+    (regulatory_checklist_attached_to_workorder ?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist)
+    (communication_channel_available ?communication_channel - communication_channel)
+    (linked_to_communication_channel ?prescription - prescription ?communication_channel - communication_channel)
+    (refill_instore_ready_for_packaging ?refill_stream_instore - refill_stream_instore)
+    (refill_mail_order_ready_for_packaging ?refill_stream_mail_order - refill_stream_mail_order)
+    (verification_logged ?dispensing_work_order - dispensing_work_order)
+  )
+  (:action record_prescription_intake
+    :parameters (?prescription - prescription)
+    :precondition
+      (and
+        (not
+          (prescription_intake_recorded ?prescription)
+        )
+        (not
+          (dispense_authorized ?prescription)
+        )
+      )
+    :effect (prescription_intake_recorded ?prescription)
+  )
+  (:action link_prescription_to_prior_auth
+    :parameters (?prescription - prescription ?prior_authorization_record - prior_authorization_record)
+    :precondition
+      (and
+        (prescription_intake_recorded ?prescription)
+        (not
+          (prescriber_linked ?prescription)
+        )
+        (prior_auth_record_available ?prior_authorization_record)
+      )
+    :effect
+      (and
+        (prescriber_linked ?prescription)
+        (linked_to_prior_authorization ?prescription ?prior_authorization_record)
+        (not
+          (prior_auth_record_available ?prior_authorization_record)
+        )
+      )
+  )
+  (:action assign_clinical_check_to_prescription
+    :parameters (?prescription - prescription ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (prescription_intake_recorded ?prescription)
+        (prescriber_linked ?prescription)
+        (clinical_check_resource_available ?clinical_check_rule)
+      )
+    :effect
+      (and
+        (linked_to_clinical_check ?prescription ?clinical_check_rule)
+        (not
+          (clinical_check_resource_available ?clinical_check_rule)
+        )
+      )
+  )
+  (:action obtain_clinical_clearance_for_prescription
+    :parameters (?prescription - prescription ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (prescription_intake_recorded ?prescription)
+        (prescriber_linked ?prescription)
+        (linked_to_clinical_check ?prescription ?clinical_check_rule)
+        (not
+          (clinical_clearance_obtained ?prescription)
+        )
+      )
+    :effect (clinical_clearance_obtained ?prescription)
+  )
+  (:action unassign_clinical_check_from_prescription
+    :parameters (?prescription - prescription ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (linked_to_clinical_check ?prescription ?clinical_check_rule)
+      )
+    :effect
+      (and
+        (clinical_check_resource_available ?clinical_check_rule)
+        (not
+          (linked_to_clinical_check ?prescription ?clinical_check_rule)
+        )
+      )
+  )
+  (:action assign_pharmacist_to_prescription
+    :parameters (?prescription - prescription ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?prescription)
+        (pharmacist_available ?pharmacist)
+      )
+    :effect
+      (and
+        (pharmacist_assigned_to_prescription ?prescription ?pharmacist)
+        (not
+          (pharmacist_available ?pharmacist)
+        )
+      )
+  )
+  (:action unassign_pharmacist_from_prescription
+    :parameters (?prescription - prescription ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (pharmacist_assigned_to_prescription ?prescription ?pharmacist)
+      )
+    :effect
+      (and
+        (pharmacist_available ?pharmacist)
+        (not
+          (pharmacist_assigned_to_prescription ?prescription ?pharmacist)
+        )
+      )
+  )
+  (:action reserve_dispensing_equipment_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?dispensing_equipment - dispensing_equipment)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (dispensing_equipment_available ?dispensing_equipment)
+      )
+    :effect
+      (and
+        (equipment_reserved_for_workorder ?dispensing_work_order ?dispensing_equipment)
+        (not
+          (dispensing_equipment_available ?dispensing_equipment)
+        )
+      )
+  )
+  (:action release_dispensing_equipment_from_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?dispensing_equipment - dispensing_equipment)
+    :precondition
+      (and
+        (equipment_reserved_for_workorder ?dispensing_work_order ?dispensing_equipment)
+      )
+    :effect
+      (and
+        (dispensing_equipment_available ?dispensing_equipment)
+        (not
+          (equipment_reserved_for_workorder ?dispensing_work_order ?dispensing_equipment)
+        )
+      )
+  )
+  (:action attach_regulatory_checklist_to_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (regulatory_checklist_available ?regulatory_checklist)
+      )
+    :effect
+      (and
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (not
+          (regulatory_checklist_available ?regulatory_checklist)
+        )
+      )
+  )
+  (:action detach_regulatory_checklist_from_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist)
+    :precondition
+      (and
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+      )
+    :effect
+      (and
+        (regulatory_checklist_available ?regulatory_checklist)
+        (not
+          (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        )
+      )
+  )
+  (:action set_coverage_allows_substitution
+    :parameters (?refill_stream_instore - refill_stream_instore ?coverage_status - coverage_status ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_instore)
+        (linked_to_clinical_check ?refill_stream_instore ?clinical_check_rule)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (not
+          (coverage_allows_substitution ?coverage_status)
+        )
+        (not
+          (coverage_requires_prior_auth ?coverage_status)
+        )
+      )
+    :effect (coverage_allows_substitution ?coverage_status)
+  )
+  (:action confirm_instore_refill_eligibility
+    :parameters (?refill_stream_instore - refill_stream_instore ?coverage_status - coverage_status ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_instore)
+        (pharmacist_assigned_to_prescription ?refill_stream_instore ?pharmacist)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (coverage_allows_substitution ?coverage_status)
+        (not
+          (refill_instore_ready_for_packaging ?refill_stream_instore)
+        )
+      )
+    :effect
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+      )
+  )
+  (:action assign_packaging_kit_and_flag_prior_auth
+    :parameters (?refill_stream_instore - refill_stream_instore ?coverage_status - coverage_status ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_instore)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (refill_instore_ready_for_packaging ?refill_stream_instore)
+        )
+      )
+    :effect
+      (and
+        (coverage_requires_prior_auth ?coverage_status)
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_instore_assigned_packaging_kit ?refill_stream_instore ?packaging_kit)
+        (not
+          (packaging_kit_available ?packaging_kit)
+        )
+      )
+  )
+  (:action process_substitution_and_confirm_instore_refill_eligibility
+    :parameters (?refill_stream_instore - refill_stream_instore ?coverage_status - coverage_status ?clinical_check_rule - clinical_check_rule ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_instore)
+        (linked_to_clinical_check ?refill_stream_instore ?clinical_check_rule)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (coverage_requires_prior_auth ?coverage_status)
+        (refill_instore_assigned_packaging_kit ?refill_stream_instore ?packaging_kit)
+        (not
+          (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        )
+      )
+    :effect
+      (and
+        (coverage_allows_substitution ?coverage_status)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (refill_instore_assigned_packaging_kit ?refill_stream_instore ?packaging_kit)
+        )
+      )
+  )
+  (:action set_alt_coverage_allows_substitution
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?alt_coverage_status - alt_coverage_status ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_mail_order)
+        (linked_to_clinical_check ?refill_stream_mail_order ?clinical_check_rule)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (not
+          (alt_coverage_allows_substitution ?alt_coverage_status)
+        )
+        (not
+          (alt_coverage_requires_prior_auth ?alt_coverage_status)
+        )
+      )
+    :effect (alt_coverage_allows_substitution ?alt_coverage_status)
+  )
+  (:action confirm_mailorder_refill_eligibility
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?alt_coverage_status - alt_coverage_status ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_mail_order)
+        (pharmacist_assigned_to_prescription ?refill_stream_mail_order ?pharmacist)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (alt_coverage_allows_substitution ?alt_coverage_status)
+        (not
+          (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        )
+      )
+    :effect
+      (and
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+      )
+  )
+  (:action assign_packaging_kit_and_flag_prior_auth_for_mailorder_refill
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?alt_coverage_status - alt_coverage_status ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_mail_order)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        )
+      )
+    :effect
+      (and
+        (alt_coverage_requires_prior_auth ?alt_coverage_status)
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_mail_order_assigned_packaging_kit ?refill_stream_mail_order ?packaging_kit)
+        (not
+          (packaging_kit_available ?packaging_kit)
+        )
+      )
+  )
+  (:action process_substitution_and_confirm_mailorder_refill_eligibility
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?alt_coverage_status - alt_coverage_status ?clinical_check_rule - clinical_check_rule ?packaging_kit - packaging_kit)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?refill_stream_mail_order)
+        (linked_to_clinical_check ?refill_stream_mail_order ?clinical_check_rule)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (alt_coverage_requires_prior_auth ?alt_coverage_status)
+        (refill_mail_order_assigned_packaging_kit ?refill_stream_mail_order ?packaging_kit)
+        (not
+          (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        )
+      )
+    :effect
+      (and
+        (alt_coverage_allows_substitution ?alt_coverage_status)
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        (packaging_kit_available ?packaging_kit)
+        (not
+          (refill_mail_order_assigned_packaging_kit ?refill_stream_mail_order ?packaging_kit)
+        )
+      )
+  )
+  (:action reserve_container_and_annotate_coverages
+    :parameters (?refill_stream_instore - refill_stream_instore ?refill_stream_mail_order - refill_stream_mail_order ?coverage_status - coverage_status ?alt_coverage_status - alt_coverage_status ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (coverage_allows_substitution ?coverage_status)
+        (alt_coverage_allows_substitution ?alt_coverage_status)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        (container_offer_available ?dispensing_container)
+      )
+    :effect
+      (and
+        (container_reserved ?dispensing_container)
+        (container_linked_to_coverage_instore ?dispensing_container ?coverage_status)
+        (container_linked_to_alt_coverage ?dispensing_container ?alt_coverage_status)
+        (not
+          (container_offer_available ?dispensing_container)
+        )
+      )
+  )
+  (:action reserve_container_annotate_and_set_handling_flag_a
+    :parameters (?refill_stream_instore - refill_stream_instore ?refill_stream_mail_order - refill_stream_mail_order ?coverage_status - coverage_status ?alt_coverage_status - alt_coverage_status ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (coverage_requires_prior_auth ?coverage_status)
+        (alt_coverage_allows_substitution ?alt_coverage_status)
+        (not
+          (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        )
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        (container_offer_available ?dispensing_container)
+      )
+    :effect
+      (and
+        (container_reserved ?dispensing_container)
+        (container_linked_to_coverage_instore ?dispensing_container ?coverage_status)
+        (container_linked_to_alt_coverage ?dispensing_container ?alt_coverage_status)
+        (container_requires_special_handling_flag_a ?dispensing_container)
+        (not
+          (container_offer_available ?dispensing_container)
+        )
+      )
+  )
+  (:action reserve_container_annotate_and_set_handling_flag_b
+    :parameters (?refill_stream_instore - refill_stream_instore ?refill_stream_mail_order - refill_stream_mail_order ?coverage_status - coverage_status ?alt_coverage_status - alt_coverage_status ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (coverage_allows_substitution ?coverage_status)
+        (alt_coverage_requires_prior_auth ?alt_coverage_status)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        (not
+          (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        )
+        (container_offer_available ?dispensing_container)
+      )
+    :effect
+      (and
+        (container_reserved ?dispensing_container)
+        (container_linked_to_coverage_instore ?dispensing_container ?coverage_status)
+        (container_linked_to_alt_coverage ?dispensing_container ?alt_coverage_status)
+        (container_requires_special_handling_flag_b ?dispensing_container)
+        (not
+          (container_offer_available ?dispensing_container)
+        )
+      )
+  )
+  (:action reserve_container_annotate_and_set_handling_flags_a_b
+    :parameters (?refill_stream_instore - refill_stream_instore ?refill_stream_mail_order - refill_stream_mail_order ?coverage_status - coverage_status ?alt_coverage_status - alt_coverage_status ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_instore_linked_to_coverage_status ?refill_stream_instore ?coverage_status)
+        (refill_mail_order_linked_to_alt_coverage ?refill_stream_mail_order ?alt_coverage_status)
+        (coverage_requires_prior_auth ?coverage_status)
+        (alt_coverage_requires_prior_auth ?alt_coverage_status)
+        (not
+          (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        )
+        (not
+          (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        )
+        (container_offer_available ?dispensing_container)
+      )
+    :effect
+      (and
+        (container_reserved ?dispensing_container)
+        (container_linked_to_coverage_instore ?dispensing_container ?coverage_status)
+        (container_linked_to_alt_coverage ?dispensing_container ?alt_coverage_status)
+        (container_requires_special_handling_flag_a ?dispensing_container)
+        (container_requires_special_handling_flag_b ?dispensing_container)
+        (not
+          (container_offer_available ?dispensing_container)
+        )
+      )
+  )
+  (:action queue_label_for_container
+    :parameters (?dispensing_container - dispensing_container ?refill_stream_instore - refill_stream_instore ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (container_reserved ?dispensing_container)
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (linked_to_clinical_check ?refill_stream_instore ?clinical_check_rule)
+        (not
+          (label_queued_for_container ?dispensing_container)
+        )
+      )
+    :effect (label_queued_for_container ?dispensing_container)
+  )
+  (:action claim_label_template_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (dispensing_work_order_links_to_container ?dispensing_work_order ?dispensing_container)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_available ?label_template)
+        (container_reserved ?dispensing_container)
+        (label_queued_for_container ?dispensing_container)
+        (not
+          (label_template_locked ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_locked ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action select_label_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?label_template - label_template ?dispensing_container - dispensing_container ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_locked ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (linked_to_clinical_check ?dispensing_work_order ?clinical_check_rule)
+        (not
+          (container_requires_special_handling_flag_a ?dispensing_container)
+        )
+        (not
+          (label_selected_for_workorder ?dispensing_work_order)
+        )
+      )
+    :effect (label_selected_for_workorder ?dispensing_work_order)
+  )
+  (:action claim_override_token_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?override_token - override_token)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (override_token_available ?override_token)
+        (not
+          (override_token_claimed ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (override_token_claimed ?dispensing_work_order)
+        (override_token_linked_to_workorder ?dispensing_work_order ?override_token)
+        (not
+          (override_token_available ?override_token)
+        )
+      )
+  )
+  (:action apply_override_and_select_label_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?label_template - label_template ?dispensing_container - dispensing_container ?clinical_check_rule - clinical_check_rule ?override_token - override_token)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_locked ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (linked_to_clinical_check ?dispensing_work_order ?clinical_check_rule)
+        (container_requires_special_handling_flag_a ?dispensing_container)
+        (override_token_claimed ?dispensing_work_order)
+        (override_token_linked_to_workorder ?dispensing_work_order ?override_token)
+        (not
+          (label_selected_for_workorder ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (label_selected_for_workorder ?dispensing_work_order)
+        (override_applied ?dispensing_work_order)
+      )
+  )
+  (:action assign_clinical_and_equipment_resources_standard_container
+    :parameters (?dispensing_work_order - dispensing_work_order ?dispensing_equipment - dispensing_equipment ?pharmacist - pharmacist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (label_selected_for_workorder ?dispensing_work_order)
+        (equipment_reserved_for_workorder ?dispensing_work_order ?dispensing_equipment)
+        (pharmacist_assigned_to_prescription ?dispensing_work_order ?pharmacist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (not
+          (container_requires_special_handling_flag_b ?dispensing_container)
+        )
+        (not
+          (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        )
+      )
+    :effect (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+  )
+  (:action assign_clinical_and_equipment_resources_flagged_container
+    :parameters (?dispensing_work_order - dispensing_work_order ?dispensing_equipment - dispensing_equipment ?pharmacist - pharmacist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (label_selected_for_workorder ?dispensing_work_order)
+        (equipment_reserved_for_workorder ?dispensing_work_order ?dispensing_equipment)
+        (pharmacist_assigned_to_prescription ?dispensing_work_order ?pharmacist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (container_requires_special_handling_flag_b ?dispensing_container)
+        (not
+          (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        )
+      )
+    :effect (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+  )
+  (:action stage_authorization_without_special_handling
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (not
+          (container_requires_special_handling_flag_a ?dispensing_container)
+        )
+        (not
+          (container_requires_special_handling_flag_b ?dispensing_container)
+        )
+        (not
+          (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        )
+      )
+    :effect (dispensing_work_order_authorization_staged ?dispensing_work_order)
+  )
+  (:action stage_authorization_with_flag_a_and_compliance
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (container_requires_special_handling_flag_a ?dispensing_container)
+        (not
+          (container_requires_special_handling_flag_b ?dispensing_container)
+        )
+        (not
+          (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (compliance_checks_completed ?dispensing_work_order)
+      )
+  )
+  (:action stage_authorization_with_flag_b_and_compliance
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (not
+          (container_requires_special_handling_flag_a ?dispensing_container)
+        )
+        (container_requires_special_handling_flag_b ?dispensing_container)
+        (not
+          (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (compliance_checks_completed ?dispensing_work_order)
+      )
+  )
+  (:action stage_authorization_with_flags_a_b_and_compliance
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist ?label_template - label_template ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (dispensing_work_order_has_clinical_assignments ?dispensing_work_order)
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (dispensing_work_order_assigned_label_template ?dispensing_work_order ?label_template)
+        (label_template_bound_to_container ?label_template ?dispensing_container)
+        (container_requires_special_handling_flag_a ?dispensing_container)
+        (container_requires_special_handling_flag_b ?dispensing_container)
+        (not
+          (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (compliance_checks_completed ?dispensing_work_order)
+      )
+  )
+  (:action complete_final_verification_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order)
+    :precondition
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (not
+          (compliance_checks_completed ?dispensing_work_order)
+        )
+        (not
+          (verification_logged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (verification_logged ?dispensing_work_order)
+        (final_verification_complete ?dispensing_work_order)
+      )
+  )
+  (:action assign_packaging_profile_to_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?packaging_profile - packaging_profile)
+    :precondition
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (compliance_checks_completed ?dispensing_work_order)
+        (packaging_profile_available ?packaging_profile)
+      )
+    :effect
+      (and
+        (packaging_profile_assigned_to_workorder ?dispensing_work_order ?packaging_profile)
+        (not
+          (packaging_profile_available ?packaging_profile)
+        )
+      )
+  )
+  (:action confirm_packaging_contents_for_workorder
+    :parameters (?dispensing_work_order - dispensing_work_order ?refill_stream_instore - refill_stream_instore ?refill_stream_mail_order - refill_stream_mail_order ?clinical_check_rule - clinical_check_rule ?packaging_profile - packaging_profile)
+    :precondition
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (compliance_checks_completed ?dispensing_work_order)
+        (packaging_profile_assigned_to_workorder ?dispensing_work_order ?packaging_profile)
+        (dispensing_work_order_links_to_refill_instore ?dispensing_work_order ?refill_stream_instore)
+        (dispensing_work_order_links_to_refill_mail_order ?dispensing_work_order ?refill_stream_mail_order)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        (linked_to_clinical_check ?dispensing_work_order ?clinical_check_rule)
+        (not
+          (packaging_confirmed_for_workorder ?dispensing_work_order)
+        )
+      )
+    :effect (packaging_confirmed_for_workorder ?dispensing_work_order)
+  )
+  (:action finalize_verification_and_record_audit
+    :parameters (?dispensing_work_order - dispensing_work_order)
+    :precondition
+      (and
+        (dispensing_work_order_authorization_staged ?dispensing_work_order)
+        (packaging_confirmed_for_workorder ?dispensing_work_order)
+        (not
+          (verification_logged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (verification_logged ?dispensing_work_order)
+        (final_verification_complete ?dispensing_work_order)
+      )
+  )
+  (:action request_override_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?prescriber_credential - prescriber_credential ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (clinical_clearance_obtained ?dispensing_work_order)
+        (linked_to_clinical_check ?dispensing_work_order ?clinical_check_rule)
+        (prescriber_credential_available ?prescriber_credential)
+        (prescriber_credential_attached_to_workorder ?dispensing_work_order ?prescriber_credential)
+        (not
+          (override_requested_on_workorder ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (override_requested_on_workorder ?dispensing_work_order)
+        (not
+          (prescriber_credential_available ?prescriber_credential)
+        )
+      )
+  )
+  (:action complete_override_approval_step_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (override_requested_on_workorder ?dispensing_work_order)
+        (pharmacist_assigned_to_prescription ?dispensing_work_order ?pharmacist)
+        (not
+          (override_approval_step_completed ?dispensing_work_order)
+        )
+      )
+    :effect (override_approval_step_completed ?dispensing_work_order)
+  )
+  (:action finalize_override_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?regulatory_checklist - regulatory_checklist)
+    :precondition
+      (and
+        (override_approval_step_completed ?dispensing_work_order)
+        (regulatory_checklist_attached_to_workorder ?dispensing_work_order ?regulatory_checklist)
+        (not
+          (override_finalized ?dispensing_work_order)
+        )
+      )
+    :effect (override_finalized ?dispensing_work_order)
+  )
+  (:action finalize_verification_post_override
+    :parameters (?dispensing_work_order - dispensing_work_order)
+    :precondition
+      (and
+        (override_finalized ?dispensing_work_order)
+        (not
+          (verification_logged ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (verification_logged ?dispensing_work_order)
+        (final_verification_complete ?dispensing_work_order)
+      )
+  )
+  (:action record_final_verification_for_instore_refill
+    :parameters (?refill_stream_instore - refill_stream_instore ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_instore_ready_for_packaging ?refill_stream_instore)
+        (refill_instore_eligibility_confirmed ?refill_stream_instore)
+        (container_reserved ?dispensing_container)
+        (label_queued_for_container ?dispensing_container)
+        (not
+          (final_verification_complete ?refill_stream_instore)
+        )
+      )
+    :effect (final_verification_complete ?refill_stream_instore)
+  )
+  (:action record_final_verification_for_mailorder_refill
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?dispensing_container - dispensing_container)
+    :precondition
+      (and
+        (refill_mail_order_ready_for_packaging ?refill_stream_mail_order)
+        (refill_mail_order_eligibility_confirmed ?refill_stream_mail_order)
+        (container_reserved ?dispensing_container)
+        (label_queued_for_container ?dispensing_container)
+        (not
+          (final_verification_complete ?refill_stream_mail_order)
+        )
+      )
+    :effect (final_verification_complete ?refill_stream_mail_order)
+  )
+  (:action generate_patient_instructions_and_link_communication_channel
+    :parameters (?prescription - prescription ?communication_channel - communication_channel ?clinical_check_rule - clinical_check_rule)
+    :precondition
+      (and
+        (final_verification_complete ?prescription)
+        (linked_to_clinical_check ?prescription ?clinical_check_rule)
+        (communication_channel_available ?communication_channel)
+        (not
+          (patient_instruction_generated ?prescription)
+        )
+      )
+    :effect
+      (and
+        (patient_instruction_generated ?prescription)
+        (linked_to_communication_channel ?prescription ?communication_channel)
+        (not
+          (communication_channel_available ?communication_channel)
+        )
+      )
+  )
+  (:action authorize_dispense_for_instore_refill
+    :parameters (?refill_stream_instore - refill_stream_instore ?prior_authorization_record - prior_authorization_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (patient_instruction_generated ?refill_stream_instore)
+        (linked_to_prior_authorization ?refill_stream_instore ?prior_authorization_record)
+        (linked_to_communication_channel ?refill_stream_instore ?communication_channel)
+        (not
+          (dispense_authorized ?refill_stream_instore)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?refill_stream_instore)
+        (prior_auth_record_available ?prior_authorization_record)
+        (communication_channel_available ?communication_channel)
+      )
+  )
+  (:action authorize_dispense_for_mailorder_refill
+    :parameters (?refill_stream_mail_order - refill_stream_mail_order ?prior_authorization_record - prior_authorization_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (patient_instruction_generated ?refill_stream_mail_order)
+        (linked_to_prior_authorization ?refill_stream_mail_order ?prior_authorization_record)
+        (linked_to_communication_channel ?refill_stream_mail_order ?communication_channel)
+        (not
+          (dispense_authorized ?refill_stream_mail_order)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?refill_stream_mail_order)
+        (prior_auth_record_available ?prior_authorization_record)
+        (communication_channel_available ?communication_channel)
+      )
+  )
+  (:action authorize_dispense_for_dispensing_work_order
+    :parameters (?dispensing_work_order - dispensing_work_order ?prior_authorization_record - prior_authorization_record ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (patient_instruction_generated ?dispensing_work_order)
+        (linked_to_prior_authorization ?dispensing_work_order ?prior_authorization_record)
+        (linked_to_communication_channel ?dispensing_work_order ?communication_channel)
+        (not
+          (dispense_authorized ?dispensing_work_order)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?dispensing_work_order)
+        (prior_auth_record_available ?prior_authorization_record)
+        (communication_channel_available ?communication_channel)
+      )
+  )
+)

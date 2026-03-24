@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain harvester_capacity_distribution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_token_parent - object equipment_token_parent - object support_token_parent - object plot_root_type - object plot - plot_root_type harvester_resource_token - resource_token_parent harvest_time_slot - resource_token_parent attachment_header - resource_token_parent header_model - resource_token_parent operator_crew - resource_token_parent contingency_reserve_unit - resource_token_parent fuel_reserve - resource_token_parent weather_window - resource_token_parent consumable_kit - equipment_token_parent storage_silo_bin - equipment_token_parent site_permission - equipment_token_parent transfer_route_a - support_token_parent transfer_route_b - support_token_parent harvest_job - support_token_parent plot_supertype_a - plot asset_supertype - plot plot_variant_a - plot_supertype_a plot_variant_b - plot_supertype_a harvester_asset - asset_supertype)
+  (:predicates
+    (entity_registered ?plot - plot)
+    (entity_scheduled ?plot - plot)
+    (entity_token_reserved ?plot - plot)
+    (entity_serviced ?plot - plot)
+    (entity_ready_for_execution ?plot - plot)
+    (execution_in_progress ?plot - plot)
+    (harvester_token_available ?harvester_resource_token - harvester_resource_token)
+    (has_reserved_token ?plot - plot ?harvester_resource_token - harvester_resource_token)
+    (time_slot_available ?harvest_time_slot - harvest_time_slot)
+    (assigned_time_slot ?plot - plot ?harvest_time_slot - harvest_time_slot)
+    (header_available ?attachment_header - attachment_header)
+    (entity_has_header_attachment ?plot - plot ?attachment_header - attachment_header)
+    (consumable_kit_available ?consumable_kit - consumable_kit)
+    (plot_variant_a_allocated_kit ?plot_variant_a - plot_variant_a ?consumable_kit - consumable_kit)
+    (plot_variant_b_allocated_kit ?plot_variant_b - plot_variant_b ?consumable_kit - consumable_kit)
+    (plot_variant_a_assigned_route ?plot_variant_a - plot_variant_a ?transfer_route_a - transfer_route_a)
+    (route_a_ready ?transfer_route_a - transfer_route_a)
+    (route_a_prepared ?transfer_route_a - transfer_route_a)
+    (plot_variant_a_confirmed ?plot_variant_a - plot_variant_a)
+    (plot_variant_b_assigned_route ?plot_variant_b - plot_variant_b ?transfer_route_b - transfer_route_b)
+    (route_b_ready ?transfer_route_b - transfer_route_b)
+    (route_b_prepared ?transfer_route_b - transfer_route_b)
+    (plot_variant_b_confirmed ?plot_variant_b - plot_variant_b)
+    (harvest_job_available ?harvest_job - harvest_job)
+    (harvest_job_staged ?harvest_job - harvest_job)
+    (harvest_job_assigned_route_a ?harvest_job - harvest_job ?transfer_route_a - transfer_route_a)
+    (harvest_job_assigned_route_b ?harvest_job - harvest_job ?transfer_route_b - transfer_route_b)
+    (harvest_job_route_a_flag ?harvest_job - harvest_job)
+    (harvest_job_route_b_flag ?harvest_job - harvest_job)
+    (harvest_job_ready_for_storage ?harvest_job - harvest_job)
+    (asset_compatible_with_variant_a ?harvester_asset - harvester_asset ?plot_variant_a - plot_variant_a)
+    (asset_compatible_with_variant_b ?harvester_asset - harvester_asset ?plot_variant_b - plot_variant_b)
+    (asset_assigned_to_job ?harvester_asset - harvester_asset ?harvest_job - harvest_job)
+    (silo_bin_available ?storage_silo_bin - storage_silo_bin)
+    (asset_assigned_to_silo_bin ?harvester_asset - harvester_asset ?storage_silo_bin - storage_silo_bin)
+    (silo_bin_prepared ?storage_silo_bin - storage_silo_bin)
+    (silo_bin_allocated_to_job ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    (asset_certified ?harvester_asset - harvester_asset)
+    (asset_inspection_completed ?harvester_asset - harvester_asset)
+    (asset_cleared_for_operation ?harvester_asset - harvester_asset)
+    (asset_has_header_model_assigned ?harvester_asset - harvester_asset)
+    (asset_header_verified ?harvester_asset - harvester_asset)
+    (asset_requires_crew_assignment ?harvester_asset - harvester_asset)
+    (asset_prepared_for_dispatch ?harvester_asset - harvester_asset)
+    (site_permission_available ?site_permission - site_permission)
+    (asset_has_site_permission ?harvester_asset - harvester_asset ?site_permission - site_permission)
+    (asset_permission_applied ?harvester_asset - harvester_asset)
+    (asset_permission_confirmed ?harvester_asset - harvester_asset)
+    (asset_permission_finalized ?harvester_asset - harvester_asset)
+    (header_model_available ?header_model - header_model)
+    (asset_assigned_header_model ?harvester_asset - harvester_asset ?header_model - header_model)
+    (operator_crew_available ?operator_crew - operator_crew)
+    (asset_assigned_operator_crew ?harvester_asset - harvester_asset ?operator_crew - operator_crew)
+    (fuel_reserve_available ?fuel_reserve - fuel_reserve)
+    (asset_fuel_reserved ?harvester_asset - harvester_asset ?fuel_reserve - fuel_reserve)
+    (weather_window_available ?weather_window - weather_window)
+    (asset_weather_window_reserved ?harvester_asset - harvester_asset ?weather_window - weather_window)
+    (contingency_reserve_available ?contingency_reserve_unit - contingency_reserve_unit)
+    (entity_assigned_contingency_unit ?plot - plot ?contingency_reserve_unit - contingency_reserve_unit)
+    (plot_variant_a_staged ?plot_variant_a - plot_variant_a)
+    (plot_variant_b_staged ?plot_variant_b - plot_variant_b)
+    (asset_commissioned ?harvester_asset - harvester_asset)
+  )
+  (:action register_plot
+    :parameters (?plot - plot)
+    :precondition
+      (and
+        (not
+          (entity_registered ?plot)
+        )
+        (not
+          (entity_serviced ?plot)
+        )
+      )
+    :effect (entity_registered ?plot)
+  )
+  (:action reserve_harvester_token_for_plot
+    :parameters (?plot - plot ?harvester_resource_token - harvester_resource_token)
+    :precondition
+      (and
+        (entity_registered ?plot)
+        (not
+          (entity_token_reserved ?plot)
+        )
+        (harvester_token_available ?harvester_resource_token)
+      )
+    :effect
+      (and
+        (entity_token_reserved ?plot)
+        (has_reserved_token ?plot ?harvester_resource_token)
+        (not
+          (harvester_token_available ?harvester_resource_token)
+        )
+      )
+  )
+  (:action assign_time_slot_to_plot
+    :parameters (?plot - plot ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_registered ?plot)
+        (entity_token_reserved ?plot)
+        (time_slot_available ?harvest_time_slot)
+      )
+    :effect
+      (and
+        (assigned_time_slot ?plot ?harvest_time_slot)
+        (not
+          (time_slot_available ?harvest_time_slot)
+        )
+      )
+  )
+  (:action finalize_plot_scheduling
+    :parameters (?plot - plot ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_registered ?plot)
+        (entity_token_reserved ?plot)
+        (assigned_time_slot ?plot ?harvest_time_slot)
+        (not
+          (entity_scheduled ?plot)
+        )
+      )
+    :effect (entity_scheduled ?plot)
+  )
+  (:action release_time_slot_from_plot
+    :parameters (?plot - plot ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (assigned_time_slot ?plot ?harvest_time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?harvest_time_slot)
+        (not
+          (assigned_time_slot ?plot ?harvest_time_slot)
+        )
+      )
+  )
+  (:action attach_header_to_plot
+    :parameters (?plot - plot ?attachment_header - attachment_header)
+    :precondition
+      (and
+        (entity_scheduled ?plot)
+        (header_available ?attachment_header)
+      )
+    :effect
+      (and
+        (entity_has_header_attachment ?plot ?attachment_header)
+        (not
+          (header_available ?attachment_header)
+        )
+      )
+  )
+  (:action detach_header_from_plot
+    :parameters (?plot - plot ?attachment_header - attachment_header)
+    :precondition
+      (and
+        (entity_has_header_attachment ?plot ?attachment_header)
+      )
+    :effect
+      (and
+        (header_available ?attachment_header)
+        (not
+          (entity_has_header_attachment ?plot ?attachment_header)
+        )
+      )
+  )
+  (:action allocate_fuel_reserve_to_asset
+    :parameters (?harvester_asset - harvester_asset ?fuel_reserve - fuel_reserve)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (fuel_reserve_available ?fuel_reserve)
+      )
+    :effect
+      (and
+        (asset_fuel_reserved ?harvester_asset ?fuel_reserve)
+        (not
+          (fuel_reserve_available ?fuel_reserve)
+        )
+      )
+  )
+  (:action release_fuel_reserve_from_asset
+    :parameters (?harvester_asset - harvester_asset ?fuel_reserve - fuel_reserve)
+    :precondition
+      (and
+        (asset_fuel_reserved ?harvester_asset ?fuel_reserve)
+      )
+    :effect
+      (and
+        (fuel_reserve_available ?fuel_reserve)
+        (not
+          (asset_fuel_reserved ?harvester_asset ?fuel_reserve)
+        )
+      )
+  )
+  (:action allocate_weather_window_to_asset
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (weather_window_available ?weather_window)
+      )
+    :effect
+      (and
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (not
+          (weather_window_available ?weather_window)
+        )
+      )
+  )
+  (:action release_weather_window_from_asset
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window)
+    :precondition
+      (and
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+      )
+    :effect
+      (and
+        (weather_window_available ?weather_window)
+        (not
+          (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        )
+      )
+  )
+  (:action mark_route_a_ready
+    :parameters (?plot_variant_a - plot_variant_a ?transfer_route_a - transfer_route_a ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_a)
+        (assigned_time_slot ?plot_variant_a ?harvest_time_slot)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (not
+          (route_a_ready ?transfer_route_a)
+        )
+        (not
+          (route_a_prepared ?transfer_route_a)
+        )
+      )
+    :effect (route_a_ready ?transfer_route_a)
+  )
+  (:action stage_plot_variant_a_with_header
+    :parameters (?plot_variant_a - plot_variant_a ?transfer_route_a - transfer_route_a ?attachment_header - attachment_header)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_a)
+        (entity_has_header_attachment ?plot_variant_a ?attachment_header)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (route_a_ready ?transfer_route_a)
+        (not
+          (plot_variant_a_staged ?plot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_a_confirmed ?plot_variant_a)
+      )
+  )
+  (:action stage_plot_variant_a_with_kit
+    :parameters (?plot_variant_a - plot_variant_a ?transfer_route_a - transfer_route_a ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_a)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (plot_variant_a_staged ?plot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (route_a_prepared ?transfer_route_a)
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_a_allocated_kit ?plot_variant_a ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action finalize_route_a_staging
+    :parameters (?plot_variant_a - plot_variant_a ?transfer_route_a - transfer_route_a ?harvest_time_slot - harvest_time_slot ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_a)
+        (assigned_time_slot ?plot_variant_a ?harvest_time_slot)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (route_a_prepared ?transfer_route_a)
+        (plot_variant_a_allocated_kit ?plot_variant_a ?consumable_kit)
+        (not
+          (plot_variant_a_confirmed ?plot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (route_a_ready ?transfer_route_a)
+        (plot_variant_a_confirmed ?plot_variant_a)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (plot_variant_a_allocated_kit ?plot_variant_a ?consumable_kit)
+        )
+      )
+  )
+  (:action mark_route_b_ready
+    :parameters (?plot_variant_b - plot_variant_b ?transfer_route_b - transfer_route_b ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_b)
+        (assigned_time_slot ?plot_variant_b ?harvest_time_slot)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (not
+          (route_b_ready ?transfer_route_b)
+        )
+        (not
+          (route_b_prepared ?transfer_route_b)
+        )
+      )
+    :effect (route_b_ready ?transfer_route_b)
+  )
+  (:action stage_plot_variant_b_with_header
+    :parameters (?plot_variant_b - plot_variant_b ?transfer_route_b - transfer_route_b ?attachment_header - attachment_header)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_b)
+        (entity_has_header_attachment ?plot_variant_b ?attachment_header)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_b_ready ?transfer_route_b)
+        (not
+          (plot_variant_b_staged ?plot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_b_confirmed ?plot_variant_b)
+      )
+  )
+  (:action stage_plot_variant_b_with_kit
+    :parameters (?plot_variant_b - plot_variant_b ?transfer_route_b - transfer_route_b ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_b)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (plot_variant_b_staged ?plot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (route_b_prepared ?transfer_route_b)
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_b_allocated_kit ?plot_variant_b ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action finalize_route_b_staging
+    :parameters (?plot_variant_b - plot_variant_b ?transfer_route_b - transfer_route_b ?harvest_time_slot - harvest_time_slot ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (entity_scheduled ?plot_variant_b)
+        (assigned_time_slot ?plot_variant_b ?harvest_time_slot)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_b_prepared ?transfer_route_b)
+        (plot_variant_b_allocated_kit ?plot_variant_b ?consumable_kit)
+        (not
+          (plot_variant_b_confirmed ?plot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (route_b_ready ?transfer_route_b)
+        (plot_variant_b_confirmed ?plot_variant_b)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (plot_variant_b_allocated_kit ?plot_variant_b ?consumable_kit)
+        )
+      )
+  )
+  (:action create_harvest_job_with_routes
+    :parameters (?plot_variant_a - plot_variant_a ?plot_variant_b - plot_variant_b ?transfer_route_a - transfer_route_a ?transfer_route_b - transfer_route_b ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_a_ready ?transfer_route_a)
+        (route_b_ready ?transfer_route_b)
+        (plot_variant_a_confirmed ?plot_variant_a)
+        (plot_variant_b_confirmed ?plot_variant_b)
+        (harvest_job_available ?harvest_job)
+      )
+    :effect
+      (and
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_assigned_route_a ?harvest_job ?transfer_route_a)
+        (harvest_job_assigned_route_b ?harvest_job ?transfer_route_b)
+        (not
+          (harvest_job_available ?harvest_job)
+        )
+      )
+  )
+  (:action create_harvest_job_route_a_secondary
+    :parameters (?plot_variant_a - plot_variant_a ?plot_variant_b - plot_variant_b ?transfer_route_a - transfer_route_a ?transfer_route_b - transfer_route_b ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_a_prepared ?transfer_route_a)
+        (route_b_ready ?transfer_route_b)
+        (not
+          (plot_variant_a_confirmed ?plot_variant_a)
+        )
+        (plot_variant_b_confirmed ?plot_variant_b)
+        (harvest_job_available ?harvest_job)
+      )
+    :effect
+      (and
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_assigned_route_a ?harvest_job ?transfer_route_a)
+        (harvest_job_assigned_route_b ?harvest_job ?transfer_route_b)
+        (harvest_job_route_a_flag ?harvest_job)
+        (not
+          (harvest_job_available ?harvest_job)
+        )
+      )
+  )
+  (:action create_harvest_job_route_b_secondary
+    :parameters (?plot_variant_a - plot_variant_a ?plot_variant_b - plot_variant_b ?transfer_route_a - transfer_route_a ?transfer_route_b - transfer_route_b ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_a_ready ?transfer_route_a)
+        (route_b_prepared ?transfer_route_b)
+        (plot_variant_a_confirmed ?plot_variant_a)
+        (not
+          (plot_variant_b_confirmed ?plot_variant_b)
+        )
+        (harvest_job_available ?harvest_job)
+      )
+    :effect
+      (and
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_assigned_route_a ?harvest_job ?transfer_route_a)
+        (harvest_job_assigned_route_b ?harvest_job ?transfer_route_b)
+        (harvest_job_route_b_flag ?harvest_job)
+        (not
+          (harvest_job_available ?harvest_job)
+        )
+      )
+  )
+  (:action create_harvest_job_with_both_secondary_routes
+    :parameters (?plot_variant_a - plot_variant_a ?plot_variant_b - plot_variant_b ?transfer_route_a - transfer_route_a ?transfer_route_b - transfer_route_b ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_a_assigned_route ?plot_variant_a ?transfer_route_a)
+        (plot_variant_b_assigned_route ?plot_variant_b ?transfer_route_b)
+        (route_a_prepared ?transfer_route_a)
+        (route_b_prepared ?transfer_route_b)
+        (not
+          (plot_variant_a_confirmed ?plot_variant_a)
+        )
+        (not
+          (plot_variant_b_confirmed ?plot_variant_b)
+        )
+        (harvest_job_available ?harvest_job)
+      )
+    :effect
+      (and
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_assigned_route_a ?harvest_job ?transfer_route_a)
+        (harvest_job_assigned_route_b ?harvest_job ?transfer_route_b)
+        (harvest_job_route_a_flag ?harvest_job)
+        (harvest_job_route_b_flag ?harvest_job)
+        (not
+          (harvest_job_available ?harvest_job)
+        )
+      )
+  )
+  (:action confirm_job_ready_for_storage
+    :parameters (?harvest_job - harvest_job ?plot_variant_a - plot_variant_a ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (harvest_job_staged ?harvest_job)
+        (plot_variant_a_staged ?plot_variant_a)
+        (assigned_time_slot ?plot_variant_a ?harvest_time_slot)
+        (not
+          (harvest_job_ready_for_storage ?harvest_job)
+        )
+      )
+    :effect (harvest_job_ready_for_storage ?harvest_job)
+  )
+  (:action prepare_silo_bin_for_job
+    :parameters (?harvester_asset - harvester_asset ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (asset_assigned_to_job ?harvester_asset ?harvest_job)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_available ?storage_silo_bin)
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_ready_for_storage ?harvest_job)
+        (not
+          (silo_bin_prepared ?storage_silo_bin)
+        )
+      )
+    :effect
+      (and
+        (silo_bin_prepared ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (not
+          (silo_bin_available ?storage_silo_bin)
+        )
+      )
+  )
+  (:action certify_asset_with_bin
+    :parameters (?harvester_asset - harvester_asset ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_prepared ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (assigned_time_slot ?harvester_asset ?harvest_time_slot)
+        (not
+          (harvest_job_route_a_flag ?harvest_job)
+        )
+        (not
+          (asset_certified ?harvester_asset)
+        )
+      )
+    :effect (asset_certified ?harvester_asset)
+  )
+  (:action assign_header_model_to_asset
+    :parameters (?harvester_asset - harvester_asset ?header_model - header_model)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (header_model_available ?header_model)
+        (not
+          (asset_has_header_model_assigned ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_has_header_model_assigned ?harvester_asset)
+        (asset_assigned_header_model ?harvester_asset ?header_model)
+        (not
+          (header_model_available ?header_model)
+        )
+      )
+  )
+  (:action finalize_asset_header_and_bin_preparation
+    :parameters (?harvester_asset - harvester_asset ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job ?harvest_time_slot - harvest_time_slot ?header_model - header_model)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_prepared ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (assigned_time_slot ?harvester_asset ?harvest_time_slot)
+        (harvest_job_route_a_flag ?harvest_job)
+        (asset_has_header_model_assigned ?harvester_asset)
+        (asset_assigned_header_model ?harvester_asset ?header_model)
+        (not
+          (asset_certified ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_certified ?harvester_asset)
+        (asset_header_verified ?harvester_asset)
+      )
+  )
+  (:action advance_asset_certification_with_fuel_and_header
+    :parameters (?harvester_asset - harvester_asset ?fuel_reserve - fuel_reserve ?attachment_header - attachment_header ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_certified ?harvester_asset)
+        (asset_fuel_reserved ?harvester_asset ?fuel_reserve)
+        (entity_has_header_attachment ?harvester_asset ?attachment_header)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (not
+          (harvest_job_route_b_flag ?harvest_job)
+        )
+        (not
+          (asset_inspection_completed ?harvester_asset)
+        )
+      )
+    :effect (asset_inspection_completed ?harvester_asset)
+  )
+  (:action advance_asset_certification_path_two
+    :parameters (?harvester_asset - harvester_asset ?fuel_reserve - fuel_reserve ?attachment_header - attachment_header ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_certified ?harvester_asset)
+        (asset_fuel_reserved ?harvester_asset ?fuel_reserve)
+        (entity_has_header_attachment ?harvester_asset ?attachment_header)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (harvest_job_route_b_flag ?harvest_job)
+        (not
+          (asset_inspection_completed ?harvester_asset)
+        )
+      )
+    :effect (asset_inspection_completed ?harvester_asset)
+  )
+  (:action approve_asset_for_operation
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_inspection_completed ?harvester_asset)
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (not
+          (harvest_job_route_a_flag ?harvest_job)
+        )
+        (not
+          (harvest_job_route_b_flag ?harvest_job)
+        )
+        (not
+          (asset_cleared_for_operation ?harvester_asset)
+        )
+      )
+    :effect (asset_cleared_for_operation ?harvester_asset)
+  )
+  (:action approve_and_flag_asset_for_crew_assignment
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_inspection_completed ?harvester_asset)
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (harvest_job_route_a_flag ?harvest_job)
+        (not
+          (harvest_job_route_b_flag ?harvest_job)
+        )
+        (not
+          (asset_cleared_for_operation ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_requires_crew_assignment ?harvester_asset)
+      )
+  )
+  (:action approve_and_flag_asset_for_crew_assignment_route_b
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_inspection_completed ?harvester_asset)
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (not
+          (harvest_job_route_a_flag ?harvest_job)
+        )
+        (harvest_job_route_b_flag ?harvest_job)
+        (not
+          (asset_cleared_for_operation ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_requires_crew_assignment ?harvester_asset)
+      )
+  )
+  (:action approve_and_flag_asset_for_crew_assignment_both_routes
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window ?storage_silo_bin - storage_silo_bin ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (asset_inspection_completed ?harvester_asset)
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (asset_assigned_to_silo_bin ?harvester_asset ?storage_silo_bin)
+        (silo_bin_allocated_to_job ?storage_silo_bin ?harvest_job)
+        (harvest_job_route_a_flag ?harvest_job)
+        (harvest_job_route_b_flag ?harvest_job)
+        (not
+          (asset_cleared_for_operation ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_requires_crew_assignment ?harvester_asset)
+      )
+  )
+  (:action commission_asset_without_crew
+    :parameters (?harvester_asset - harvester_asset)
+    :precondition
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (not
+          (asset_requires_crew_assignment ?harvester_asset)
+        )
+        (not
+          (asset_commissioned ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_commissioned ?harvester_asset)
+        (entity_ready_for_execution ?harvester_asset)
+      )
+  )
+  (:action assign_operator_crew_to_asset
+    :parameters (?harvester_asset - harvester_asset ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_requires_crew_assignment ?harvester_asset)
+        (operator_crew_available ?operator_crew)
+      )
+    :effect
+      (and
+        (asset_assigned_operator_crew ?harvester_asset ?operator_crew)
+        (not
+          (operator_crew_available ?operator_crew)
+        )
+      )
+  )
+  (:action prepare_asset_for_dispatch
+    :parameters (?harvester_asset - harvester_asset ?plot_variant_a - plot_variant_a ?plot_variant_b - plot_variant_b ?harvest_time_slot - harvest_time_slot ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_requires_crew_assignment ?harvester_asset)
+        (asset_assigned_operator_crew ?harvester_asset ?operator_crew)
+        (asset_compatible_with_variant_a ?harvester_asset ?plot_variant_a)
+        (asset_compatible_with_variant_b ?harvester_asset ?plot_variant_b)
+        (plot_variant_a_confirmed ?plot_variant_a)
+        (plot_variant_b_confirmed ?plot_variant_b)
+        (assigned_time_slot ?harvester_asset ?harvest_time_slot)
+        (not
+          (asset_prepared_for_dispatch ?harvester_asset)
+        )
+      )
+    :effect (asset_prepared_for_dispatch ?harvester_asset)
+  )
+  (:action commission_asset_after_preparation
+    :parameters (?harvester_asset - harvester_asset)
+    :precondition
+      (and
+        (asset_cleared_for_operation ?harvester_asset)
+        (asset_prepared_for_dispatch ?harvester_asset)
+        (not
+          (asset_commissioned ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_commissioned ?harvester_asset)
+        (entity_ready_for_execution ?harvester_asset)
+      )
+  )
+  (:action apply_site_permission_to_asset
+    :parameters (?harvester_asset - harvester_asset ?site_permission - site_permission ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_scheduled ?harvester_asset)
+        (assigned_time_slot ?harvester_asset ?harvest_time_slot)
+        (site_permission_available ?site_permission)
+        (asset_has_site_permission ?harvester_asset ?site_permission)
+        (not
+          (asset_permission_applied ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_permission_applied ?harvester_asset)
+        (not
+          (site_permission_available ?site_permission)
+        )
+      )
+  )
+  (:action confirm_asset_permission_and_header
+    :parameters (?harvester_asset - harvester_asset ?attachment_header - attachment_header)
+    :precondition
+      (and
+        (asset_permission_applied ?harvester_asset)
+        (entity_has_header_attachment ?harvester_asset ?attachment_header)
+        (not
+          (asset_permission_confirmed ?harvester_asset)
+        )
+      )
+    :effect (asset_permission_confirmed ?harvester_asset)
+  )
+  (:action finalize_asset_permission_with_weather_window
+    :parameters (?harvester_asset - harvester_asset ?weather_window - weather_window)
+    :precondition
+      (and
+        (asset_permission_confirmed ?harvester_asset)
+        (asset_weather_window_reserved ?harvester_asset ?weather_window)
+        (not
+          (asset_permission_finalized ?harvester_asset)
+        )
+      )
+    :effect (asset_permission_finalized ?harvester_asset)
+  )
+  (:action commission_asset_after_permission
+    :parameters (?harvester_asset - harvester_asset)
+    :precondition
+      (and
+        (asset_permission_finalized ?harvester_asset)
+        (not
+          (asset_commissioned ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (asset_commissioned ?harvester_asset)
+        (entity_ready_for_execution ?harvester_asset)
+      )
+  )
+  (:action complete_plot_variant_a_from_job
+    :parameters (?plot_variant_a - plot_variant_a ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_a_staged ?plot_variant_a)
+        (plot_variant_a_confirmed ?plot_variant_a)
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_ready_for_storage ?harvest_job)
+        (not
+          (entity_ready_for_execution ?plot_variant_a)
+        )
+      )
+    :effect (entity_ready_for_execution ?plot_variant_a)
+  )
+  (:action complete_plot_variant_b_from_job
+    :parameters (?plot_variant_b - plot_variant_b ?harvest_job - harvest_job)
+    :precondition
+      (and
+        (plot_variant_b_staged ?plot_variant_b)
+        (plot_variant_b_confirmed ?plot_variant_b)
+        (harvest_job_staged ?harvest_job)
+        (harvest_job_ready_for_storage ?harvest_job)
+        (not
+          (entity_ready_for_execution ?plot_variant_b)
+        )
+      )
+    :effect (entity_ready_for_execution ?plot_variant_b)
+  )
+  (:action execute_harvest_on_plot
+    :parameters (?plot - plot ?contingency_reserve_unit - contingency_reserve_unit ?harvest_time_slot - harvest_time_slot)
+    :precondition
+      (and
+        (entity_ready_for_execution ?plot)
+        (assigned_time_slot ?plot ?harvest_time_slot)
+        (contingency_reserve_available ?contingency_reserve_unit)
+        (not
+          (execution_in_progress ?plot)
+        )
+      )
+    :effect
+      (and
+        (execution_in_progress ?plot)
+        (entity_assigned_contingency_unit ?plot ?contingency_reserve_unit)
+        (not
+          (contingency_reserve_available ?contingency_reserve_unit)
+        )
+      )
+  )
+  (:action finalize_plot_variant_a_execution
+    :parameters (?plot_variant_a - plot_variant_a ?harvester_resource_token - harvester_resource_token ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (execution_in_progress ?plot_variant_a)
+        (has_reserved_token ?plot_variant_a ?harvester_resource_token)
+        (entity_assigned_contingency_unit ?plot_variant_a ?contingency_reserve_unit)
+        (not
+          (entity_serviced ?plot_variant_a)
+        )
+      )
+    :effect
+      (and
+        (entity_serviced ?plot_variant_a)
+        (harvester_token_available ?harvester_resource_token)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action finalize_plot_variant_b_execution
+    :parameters (?plot_variant_b - plot_variant_b ?harvester_resource_token - harvester_resource_token ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (execution_in_progress ?plot_variant_b)
+        (has_reserved_token ?plot_variant_b ?harvester_resource_token)
+        (entity_assigned_contingency_unit ?plot_variant_b ?contingency_reserve_unit)
+        (not
+          (entity_serviced ?plot_variant_b)
+        )
+      )
+    :effect
+      (and
+        (entity_serviced ?plot_variant_b)
+        (harvester_token_available ?harvester_resource_token)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action finalize_asset_execution_and_release_token
+    :parameters (?harvester_asset - harvester_asset ?harvester_resource_token - harvester_resource_token ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (execution_in_progress ?harvester_asset)
+        (has_reserved_token ?harvester_asset ?harvester_resource_token)
+        (entity_assigned_contingency_unit ?harvester_asset ?contingency_reserve_unit)
+        (not
+          (entity_serviced ?harvester_asset)
+        )
+      )
+    :effect
+      (and
+        (entity_serviced ?harvester_asset)
+        (harvester_token_available ?harvester_resource_token)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem harvest_scheduling_case_01)
+  (:domain harvester_capacity_distribution)
+  (:objects plot_variant_a_1 - plot_variant_a plot_variant_b_1 - plot_variant_b harvester_asset_alpha - harvester_asset harvester_asset_bravo - harvester_asset harvester_token_1 - harvester_resource_token harvester_token_2 - harvester_resource_token harvester_token_3 - harvester_resource_token time_slot_1 - harvest_time_slot attachment_header_1 - attachment_header consumable_kit_1 - consumable_kit route_a_1 - transfer_route_a route_b_1 - transfer_route_b harvest_job_1 - harvest_job silo_bin_1 - storage_silo_bin silo_bin_2 - storage_silo_bin header_model_a - header_model header_model_b - header_model operator_crew_alpha - operator_crew operator_crew_bravo - operator_crew contingency_unit_1 - contingency_reserve_unit fuel_reserve_1 - fuel_reserve site_permission_1 - site_permission site_permission_2 - site_permission weather_window_1 - weather_window)
+  (:init
+    (harvester_token_available harvester_token_1)
+    (harvester_token_available harvester_token_2)
+    (harvester_token_available harvester_token_3)
+    (time_slot_available time_slot_1)
+    (header_available attachment_header_1)
+    (consumable_kit_available consumable_kit_1)
+    (plot_variant_a_assigned_route plot_variant_a_1 route_a_1)
+    (plot_variant_b_assigned_route plot_variant_b_1 route_b_1)
+    (harvest_job_available harvest_job_1)
+    (silo_bin_available silo_bin_1)
+    (silo_bin_available silo_bin_2)
+    (asset_compatible_with_variant_a harvester_asset_alpha plot_variant_a_1)
+    (asset_compatible_with_variant_a harvester_asset_bravo plot_variant_a_1)
+    (asset_compatible_with_variant_b harvester_asset_alpha plot_variant_b_1)
+    (asset_compatible_with_variant_b harvester_asset_bravo plot_variant_b_1)
+    (asset_assigned_to_job harvester_asset_alpha harvest_job_1)
+    (asset_assigned_to_job harvester_asset_bravo harvest_job_1)
+    (asset_assigned_to_silo_bin harvester_asset_alpha silo_bin_1)
+    (asset_assigned_to_silo_bin harvester_asset_bravo silo_bin_2)
+    (header_model_available header_model_a)
+    (header_model_available header_model_b)
+    (operator_crew_available operator_crew_alpha)
+    (operator_crew_available operator_crew_bravo)
+    (contingency_reserve_available contingency_unit_1)
+    (fuel_reserve_available fuel_reserve_1)
+    (site_permission_available site_permission_1)
+    (asset_has_site_permission harvester_asset_alpha site_permission_1)
+    (asset_has_site_permission harvester_asset_bravo site_permission_2)
+    (weather_window_available weather_window_1)
+  )
+  (:goal
+    (and
+      (entity_serviced plot_variant_a_1)
+      (entity_serviced plot_variant_b_1)
+      (entity_serviced harvester_asset_alpha)
+      (entity_serviced harvester_asset_bravo)
+    )
+  )
+)

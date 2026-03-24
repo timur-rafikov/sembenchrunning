@@ -1,0 +1,937 @@
+(define (domain traveler_no_show_consequence_handling)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object travel_entity - generic_entity service_entity - generic_entity supplier_entity - generic_entity case_type - generic_entity no_show_case - case_type remedy_channel - travel_entity service_resource - travel_entity contact_point - travel_entity policy_clause - travel_entity fulfillment_option - travel_entity authorization_token - travel_entity staff_credential - travel_entity legal_approval - travel_entity compensation_item - service_entity document_template - service_entity third_party_approval - service_entity supplier_offer - supplier_entity alternative_offer - supplier_entity recovery_package - supplier_entity booking_type - no_show_case segment_type - no_show_case booking_segment - booking_type alternate_segment - booking_type case_handler - segment_type)
+
+  (:predicates
+    (entity_registered ?no_show_case - no_show_case)
+    (entity_validated ?no_show_case - no_show_case)
+    (entity_remedy_assigned ?no_show_case - no_show_case)
+    (entity_resolved ?no_show_case - no_show_case)
+    (entity_executed ?no_show_case - no_show_case)
+    (entity_settlement_authorized ?no_show_case - no_show_case)
+    (remedy_channel_available ?remedy_channel - remedy_channel)
+    (entity_remedy_link ?no_show_case - no_show_case ?remedy_channel - remedy_channel)
+    (resource_available ?service_resource - service_resource)
+    (entity_resource_assignment ?no_show_case - no_show_case ?service_resource - service_resource)
+    (contact_available ?contact_point - contact_point)
+    (entity_contact_assignment ?no_show_case - no_show_case ?contact_point - contact_point)
+    (compensation_item_available ?compensation_item - compensation_item)
+    (segment_compensation_assigned ?booking_segment - booking_segment ?compensation_item - compensation_item)
+    (alternate_segment_compensation_assigned ?alternate_segment - alternate_segment ?compensation_item - compensation_item)
+    (segment_offer_link ?booking_segment - booking_segment ?supplier_offer - supplier_offer)
+    (supplier_offer_marked ?supplier_offer - supplier_offer)
+    (supplier_offer_flagged_for_compensation ?supplier_offer - supplier_offer)
+    (segment_confirmed ?booking_segment - booking_segment)
+    (alternate_segment_offer_link ?alternate_segment - alternate_segment ?alternative_offer - alternative_offer)
+    (alternative_offer_marked ?alternative_offer - alternative_offer)
+    (alternative_offer_flagged_for_compensation ?alternative_offer - alternative_offer)
+    (alternate_segment_confirmed ?alternate_segment - alternate_segment)
+    (recovery_package_draft_available ?recovery_package - recovery_package)
+    (recovery_package_selected ?recovery_package - recovery_package)
+    (recovery_package_includes_supplier_offer ?recovery_package - recovery_package ?supplier_offer - supplier_offer)
+    (recovery_package_includes_alternative_offer ?recovery_package - recovery_package ?alternative_offer - alternative_offer)
+    (recovery_package_requires_enrichment ?recovery_package - recovery_package)
+    (recovery_package_requires_additional_enrichment ?recovery_package - recovery_package)
+    (recovery_package_finalized ?recovery_package - recovery_package)
+    (case_handler_handles_booking_segment ?case_handler - case_handler ?booking_segment - booking_segment)
+    (case_handler_handles_alternate_segment ?case_handler - case_handler ?alternate_segment - alternate_segment)
+    (case_handler_assigned_package ?case_handler - case_handler ?recovery_package - recovery_package)
+    (document_template_available ?document_template - document_template)
+    (case_handler_document_template_assigned ?case_handler - case_handler ?document_template - document_template)
+    (document_template_assigned ?document_template - document_template)
+    (document_template_linked_to_package ?document_template - document_template ?recovery_package - recovery_package)
+    (case_handler_ready ?case_handler - case_handler)
+    (case_handler_approval_stage1 ?case_handler - case_handler)
+    (case_handler_approval_complete ?case_handler - case_handler)
+    (case_handler_has_policy_clause ?case_handler - case_handler)
+    (case_handler_policy_applied ?case_handler - case_handler)
+    (case_handler_enriched_with_documents ?case_handler - case_handler)
+    (case_handler_execution_ready ?case_handler - case_handler)
+    (third_party_approval_available ?third_party_approval - third_party_approval)
+    (case_handler_third_party_approval_link ?case_handler - case_handler ?third_party_approval - third_party_approval)
+    (case_handler_escalation_active ?case_handler - case_handler)
+    (case_handler_escalation_acknowledged ?case_handler - case_handler)
+    (case_handler_escalation_approved ?case_handler - case_handler)
+    (policy_clause_available ?policy_clause - policy_clause)
+    (case_handler_policy_clause_link ?case_handler - case_handler ?policy_clause - policy_clause)
+    (fulfillment_option_available ?fulfillment_option - fulfillment_option)
+    (case_handler_fulfillment_option_link ?case_handler - case_handler ?fulfillment_option - fulfillment_option)
+    (staff_credential_available ?staff_credential - staff_credential)
+    (case_handler_staff_credential_link ?case_handler - case_handler ?staff_credential - staff_credential)
+    (legal_approval_available ?legal_approval - legal_approval)
+    (case_handler_legal_approval_link ?case_handler - case_handler ?legal_approval - legal_approval)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (entity_authorization_link ?no_show_case - no_show_case ?authorization_token - authorization_token)
+    (booking_segment_flagged_for_package ?booking_segment - booking_segment)
+    (alternate_segment_flagged_for_package ?alternate_segment - alternate_segment)
+    (case_handler_finalized ?case_handler - case_handler)
+  )
+  (:action register_no_show_case
+    :parameters (?no_show_case - no_show_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?no_show_case)
+        )
+        (not
+          (entity_resolved ?no_show_case)
+        )
+      )
+    :effect (entity_registered ?no_show_case)
+  )
+  (:action assign_remedy_channel
+    :parameters (?no_show_case - no_show_case ?remedy_channel - remedy_channel)
+    :precondition
+      (and
+        (entity_registered ?no_show_case)
+        (not
+          (entity_remedy_assigned ?no_show_case)
+        )
+        (remedy_channel_available ?remedy_channel)
+      )
+    :effect
+      (and
+        (entity_remedy_assigned ?no_show_case)
+        (entity_remedy_link ?no_show_case ?remedy_channel)
+        (not
+          (remedy_channel_available ?remedy_channel)
+        )
+      )
+  )
+  (:action allocate_service_resource
+    :parameters (?no_show_case - no_show_case ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_registered ?no_show_case)
+        (entity_remedy_assigned ?no_show_case)
+        (resource_available ?service_resource)
+      )
+    :effect
+      (and
+        (entity_resource_assignment ?no_show_case ?service_resource)
+        (not
+          (resource_available ?service_resource)
+        )
+      )
+  )
+  (:action confirm_resource_assignment
+    :parameters (?no_show_case - no_show_case ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_registered ?no_show_case)
+        (entity_remedy_assigned ?no_show_case)
+        (entity_resource_assignment ?no_show_case ?service_resource)
+        (not
+          (entity_validated ?no_show_case)
+        )
+      )
+    :effect (entity_validated ?no_show_case)
+  )
+  (:action release_allocated_service_resource
+    :parameters (?no_show_case - no_show_case ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_resource_assignment ?no_show_case ?service_resource)
+      )
+    :effect
+      (and
+        (resource_available ?service_resource)
+        (not
+          (entity_resource_assignment ?no_show_case ?service_resource)
+        )
+      )
+  )
+  (:action assign_contact_point
+    :parameters (?no_show_case - no_show_case ?contact_point - contact_point)
+    :precondition
+      (and
+        (entity_validated ?no_show_case)
+        (contact_available ?contact_point)
+      )
+    :effect
+      (and
+        (entity_contact_assignment ?no_show_case ?contact_point)
+        (not
+          (contact_available ?contact_point)
+        )
+      )
+  )
+  (:action release_contact_point
+    :parameters (?no_show_case - no_show_case ?contact_point - contact_point)
+    :precondition
+      (and
+        (entity_contact_assignment ?no_show_case ?contact_point)
+      )
+    :effect
+      (and
+        (contact_available ?contact_point)
+        (not
+          (entity_contact_assignment ?no_show_case ?contact_point)
+        )
+      )
+  )
+  (:action assign_staff_credential_to_case_handler
+    :parameters (?case_handler - case_handler ?staff_credential - staff_credential)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (staff_credential_available ?staff_credential)
+      )
+    :effect
+      (and
+        (case_handler_staff_credential_link ?case_handler ?staff_credential)
+        (not
+          (staff_credential_available ?staff_credential)
+        )
+      )
+  )
+  (:action unassign_staff_credential_from_case_handler
+    :parameters (?case_handler - case_handler ?staff_credential - staff_credential)
+    :precondition
+      (and
+        (case_handler_staff_credential_link ?case_handler ?staff_credential)
+      )
+    :effect
+      (and
+        (staff_credential_available ?staff_credential)
+        (not
+          (case_handler_staff_credential_link ?case_handler ?staff_credential)
+        )
+      )
+  )
+  (:action attach_legal_approval_to_case_handler
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (legal_approval_available ?legal_approval)
+      )
+    :effect
+      (and
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (not
+          (legal_approval_available ?legal_approval)
+        )
+      )
+  )
+  (:action detach_legal_approval_from_case_handler
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval)
+    :precondition
+      (and
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+      )
+    :effect
+      (and
+        (legal_approval_available ?legal_approval)
+        (not
+          (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        )
+      )
+  )
+  (:action select_supplier_offer_for_segment
+    :parameters (?booking_segment - booking_segment ?supplier_offer - supplier_offer ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_validated ?booking_segment)
+        (entity_resource_assignment ?booking_segment ?service_resource)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (not
+          (supplier_offer_marked ?supplier_offer)
+        )
+        (not
+          (supplier_offer_flagged_for_compensation ?supplier_offer)
+        )
+      )
+    :effect (supplier_offer_marked ?supplier_offer)
+  )
+  (:action confirm_supplier_offer_and_lock_segment
+    :parameters (?booking_segment - booking_segment ?supplier_offer - supplier_offer ?contact_point - contact_point)
+    :precondition
+      (and
+        (entity_validated ?booking_segment)
+        (entity_contact_assignment ?booking_segment ?contact_point)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (supplier_offer_marked ?supplier_offer)
+        (not
+          (booking_segment_flagged_for_package ?booking_segment)
+        )
+      )
+    :effect
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (segment_confirmed ?booking_segment)
+      )
+  )
+  (:action flag_supplier_offer_for_compensation
+    :parameters (?booking_segment - booking_segment ?supplier_offer - supplier_offer ?compensation_item - compensation_item)
+    :precondition
+      (and
+        (entity_validated ?booking_segment)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (compensation_item_available ?compensation_item)
+        (not
+          (booking_segment_flagged_for_package ?booking_segment)
+        )
+      )
+    :effect
+      (and
+        (supplier_offer_flagged_for_compensation ?supplier_offer)
+        (booking_segment_flagged_for_package ?booking_segment)
+        (segment_compensation_assigned ?booking_segment ?compensation_item)
+        (not
+          (compensation_item_available ?compensation_item)
+        )
+      )
+  )
+  (:action apply_compensation_and_confirm_segment
+    :parameters (?booking_segment - booking_segment ?supplier_offer - supplier_offer ?service_resource - service_resource ?compensation_item - compensation_item)
+    :precondition
+      (and
+        (entity_validated ?booking_segment)
+        (entity_resource_assignment ?booking_segment ?service_resource)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (supplier_offer_flagged_for_compensation ?supplier_offer)
+        (segment_compensation_assigned ?booking_segment ?compensation_item)
+        (not
+          (segment_confirmed ?booking_segment)
+        )
+      )
+    :effect
+      (and
+        (supplier_offer_marked ?supplier_offer)
+        (segment_confirmed ?booking_segment)
+        (compensation_item_available ?compensation_item)
+        (not
+          (segment_compensation_assigned ?booking_segment ?compensation_item)
+        )
+      )
+  )
+  (:action select_alternative_offer_for_alt_segment
+    :parameters (?alternate_segment - alternate_segment ?alternative_offer - alternative_offer ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_validated ?alternate_segment)
+        (entity_resource_assignment ?alternate_segment ?service_resource)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (not
+          (alternative_offer_marked ?alternative_offer)
+        )
+        (not
+          (alternative_offer_flagged_for_compensation ?alternative_offer)
+        )
+      )
+    :effect (alternative_offer_marked ?alternative_offer)
+  )
+  (:action confirm_alternative_offer_and_lock
+    :parameters (?alternate_segment - alternate_segment ?alternative_offer - alternative_offer ?contact_point - contact_point)
+    :precondition
+      (and
+        (entity_validated ?alternate_segment)
+        (entity_contact_assignment ?alternate_segment ?contact_point)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (alternative_offer_marked ?alternative_offer)
+        (not
+          (alternate_segment_flagged_for_package ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (alternate_segment_confirmed ?alternate_segment)
+      )
+  )
+  (:action flag_alternative_offer_for_compensation
+    :parameters (?alternate_segment - alternate_segment ?alternative_offer - alternative_offer ?compensation_item - compensation_item)
+    :precondition
+      (and
+        (entity_validated ?alternate_segment)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (compensation_item_available ?compensation_item)
+        (not
+          (alternate_segment_flagged_for_package ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_offer_flagged_for_compensation ?alternative_offer)
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (alternate_segment_compensation_assigned ?alternate_segment ?compensation_item)
+        (not
+          (compensation_item_available ?compensation_item)
+        )
+      )
+  )
+  (:action apply_compensation_and_confirm_alternative_offer
+    :parameters (?alternate_segment - alternate_segment ?alternative_offer - alternative_offer ?service_resource - service_resource ?compensation_item - compensation_item)
+    :precondition
+      (and
+        (entity_validated ?alternate_segment)
+        (entity_resource_assignment ?alternate_segment ?service_resource)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (alternative_offer_flagged_for_compensation ?alternative_offer)
+        (alternate_segment_compensation_assigned ?alternate_segment ?compensation_item)
+        (not
+          (alternate_segment_confirmed ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_offer_marked ?alternative_offer)
+        (alternate_segment_confirmed ?alternate_segment)
+        (compensation_item_available ?compensation_item)
+        (not
+          (alternate_segment_compensation_assigned ?alternate_segment ?compensation_item)
+        )
+      )
+  )
+  (:action consolidate_recovery_package_basic
+    :parameters (?booking_segment - booking_segment ?alternate_segment - alternate_segment ?supplier_offer - supplier_offer ?alternative_offer - alternative_offer ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (supplier_offer_marked ?supplier_offer)
+        (alternative_offer_marked ?alternative_offer)
+        (segment_confirmed ?booking_segment)
+        (alternate_segment_confirmed ?alternate_segment)
+        (recovery_package_draft_available ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_includes_supplier_offer ?recovery_package ?supplier_offer)
+        (recovery_package_includes_alternative_offer ?recovery_package ?alternative_offer)
+        (not
+          (recovery_package_draft_available ?recovery_package)
+        )
+      )
+  )
+  (:action consolidate_recovery_package_with_enrichment
+    :parameters (?booking_segment - booking_segment ?alternate_segment - alternate_segment ?supplier_offer - supplier_offer ?alternative_offer - alternative_offer ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (supplier_offer_flagged_for_compensation ?supplier_offer)
+        (alternative_offer_marked ?alternative_offer)
+        (not
+          (segment_confirmed ?booking_segment)
+        )
+        (alternate_segment_confirmed ?alternate_segment)
+        (recovery_package_draft_available ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_includes_supplier_offer ?recovery_package ?supplier_offer)
+        (recovery_package_includes_alternative_offer ?recovery_package ?alternative_offer)
+        (recovery_package_requires_enrichment ?recovery_package)
+        (not
+          (recovery_package_draft_available ?recovery_package)
+        )
+      )
+  )
+  (:action consolidate_recovery_package_with_alt_priority
+    :parameters (?booking_segment - booking_segment ?alternate_segment - alternate_segment ?supplier_offer - supplier_offer ?alternative_offer - alternative_offer ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (supplier_offer_marked ?supplier_offer)
+        (alternative_offer_flagged_for_compensation ?alternative_offer)
+        (segment_confirmed ?booking_segment)
+        (not
+          (alternate_segment_confirmed ?alternate_segment)
+        )
+        (recovery_package_draft_available ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_includes_supplier_offer ?recovery_package ?supplier_offer)
+        (recovery_package_includes_alternative_offer ?recovery_package ?alternative_offer)
+        (recovery_package_requires_additional_enrichment ?recovery_package)
+        (not
+          (recovery_package_draft_available ?recovery_package)
+        )
+      )
+  )
+  (:action consolidate_recovery_package_full_enrichment
+    :parameters (?booking_segment - booking_segment ?alternate_segment - alternate_segment ?supplier_offer - supplier_offer ?alternative_offer - alternative_offer ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (segment_offer_link ?booking_segment ?supplier_offer)
+        (alternate_segment_offer_link ?alternate_segment ?alternative_offer)
+        (supplier_offer_flagged_for_compensation ?supplier_offer)
+        (alternative_offer_flagged_for_compensation ?alternative_offer)
+        (not
+          (segment_confirmed ?booking_segment)
+        )
+        (not
+          (alternate_segment_confirmed ?alternate_segment)
+        )
+        (recovery_package_draft_available ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_includes_supplier_offer ?recovery_package ?supplier_offer)
+        (recovery_package_includes_alternative_offer ?recovery_package ?alternative_offer)
+        (recovery_package_requires_enrichment ?recovery_package)
+        (recovery_package_requires_additional_enrichment ?recovery_package)
+        (not
+          (recovery_package_draft_available ?recovery_package)
+        )
+      )
+  )
+  (:action finalize_recovery_package_for_segment
+    :parameters (?recovery_package - recovery_package ?booking_segment - booking_segment ?service_resource - service_resource)
+    :precondition
+      (and
+        (recovery_package_selected ?recovery_package)
+        (booking_segment_flagged_for_package ?booking_segment)
+        (entity_resource_assignment ?booking_segment ?service_resource)
+        (not
+          (recovery_package_finalized ?recovery_package)
+        )
+      )
+    :effect (recovery_package_finalized ?recovery_package)
+  )
+  (:action attach_document_template_to_package
+    :parameters (?case_handler - case_handler ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (case_handler_assigned_package ?case_handler ?recovery_package)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_available ?document_template)
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_finalized ?recovery_package)
+        (not
+          (document_template_assigned ?document_template)
+        )
+      )
+    :effect
+      (and
+        (document_template_assigned ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action mark_case_handler_ready_with_documents
+    :parameters (?case_handler - case_handler ?document_template - document_template ?recovery_package - recovery_package ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_assigned ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (entity_resource_assignment ?case_handler ?service_resource)
+        (not
+          (recovery_package_requires_enrichment ?recovery_package)
+        )
+        (not
+          (case_handler_ready ?case_handler)
+        )
+      )
+    :effect (case_handler_ready ?case_handler)
+  )
+  (:action assign_policy_clause_to_case_handler
+    :parameters (?case_handler - case_handler ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (policy_clause_available ?policy_clause)
+        (not
+          (case_handler_has_policy_clause ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_has_policy_clause ?case_handler)
+        (case_handler_policy_clause_link ?case_handler ?policy_clause)
+        (not
+          (policy_clause_available ?policy_clause)
+        )
+      )
+  )
+  (:action apply_policy_and_documents_to_case_handler
+    :parameters (?case_handler - case_handler ?document_template - document_template ?recovery_package - recovery_package ?service_resource - service_resource ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_assigned ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (entity_resource_assignment ?case_handler ?service_resource)
+        (recovery_package_requires_enrichment ?recovery_package)
+        (case_handler_has_policy_clause ?case_handler)
+        (case_handler_policy_clause_link ?case_handler ?policy_clause)
+        (not
+          (case_handler_ready ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_ready ?case_handler)
+        (case_handler_policy_applied ?case_handler)
+      )
+  )
+  (:action authorize_case_handler_stage1_with_staff_credential
+    :parameters (?case_handler - case_handler ?staff_credential - staff_credential ?contact_point - contact_point ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_ready ?case_handler)
+        (case_handler_staff_credential_link ?case_handler ?staff_credential)
+        (entity_contact_assignment ?case_handler ?contact_point)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (not
+          (recovery_package_requires_additional_enrichment ?recovery_package)
+        )
+        (not
+          (case_handler_approval_stage1 ?case_handler)
+        )
+      )
+    :effect (case_handler_approval_stage1 ?case_handler)
+  )
+  (:action authorize_case_handler_stage1_alternative_with_staff_credential
+    :parameters (?case_handler - case_handler ?staff_credential - staff_credential ?contact_point - contact_point ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_ready ?case_handler)
+        (case_handler_staff_credential_link ?case_handler ?staff_credential)
+        (entity_contact_assignment ?case_handler ?contact_point)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (recovery_package_requires_additional_enrichment ?recovery_package)
+        (not
+          (case_handler_approval_stage1 ?case_handler)
+        )
+      )
+    :effect (case_handler_approval_stage1 ?case_handler)
+  )
+  (:action apply_legal_approval_to_case_handler
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_approval_stage1 ?case_handler)
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (not
+          (recovery_package_requires_enrichment ?recovery_package)
+        )
+        (not
+          (recovery_package_requires_additional_enrichment ?recovery_package)
+        )
+        (not
+          (case_handler_approval_complete ?case_handler)
+        )
+      )
+    :effect (case_handler_approval_complete ?case_handler)
+  )
+  (:action apply_legal_approval_and_enrich_case_handler
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_approval_stage1 ?case_handler)
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (recovery_package_requires_enrichment ?recovery_package)
+        (not
+          (recovery_package_requires_additional_enrichment ?recovery_package)
+        )
+        (not
+          (case_handler_approval_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_enriched_with_documents ?case_handler)
+      )
+  )
+  (:action apply_legal_approval_and_attach_policy_documents_to_case_handler
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_approval_stage1 ?case_handler)
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (not
+          (recovery_package_requires_enrichment ?recovery_package)
+        )
+        (recovery_package_requires_additional_enrichment ?recovery_package)
+        (not
+          (case_handler_approval_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_enriched_with_documents ?case_handler)
+      )
+  )
+  (:action apply_legal_approval_and_finalize_case_handler_enrichment
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval ?document_template - document_template ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (case_handler_approval_stage1 ?case_handler)
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (case_handler_document_template_assigned ?case_handler ?document_template)
+        (document_template_linked_to_package ?document_template ?recovery_package)
+        (recovery_package_requires_enrichment ?recovery_package)
+        (recovery_package_requires_additional_enrichment ?recovery_package)
+        (not
+          (case_handler_approval_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_enriched_with_documents ?case_handler)
+      )
+  )
+  (:action finalize_case_handler_and_mark_execution_complete
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (not
+          (case_handler_enriched_with_documents ?case_handler)
+        )
+        (not
+          (case_handler_finalized ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_finalized ?case_handler)
+        (entity_executed ?case_handler)
+      )
+  )
+  (:action attach_fulfillment_option_to_case_handler
+    :parameters (?case_handler - case_handler ?fulfillment_option - fulfillment_option)
+    :precondition
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_enriched_with_documents ?case_handler)
+        (fulfillment_option_available ?fulfillment_option)
+      )
+    :effect
+      (and
+        (case_handler_fulfillment_option_link ?case_handler ?fulfillment_option)
+        (not
+          (fulfillment_option_available ?fulfillment_option)
+        )
+      )
+  )
+  (:action confirm_case_handler_execution_readiness
+    :parameters (?case_handler - case_handler ?booking_segment - booking_segment ?alternate_segment - alternate_segment ?service_resource - service_resource ?fulfillment_option - fulfillment_option)
+    :precondition
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_enriched_with_documents ?case_handler)
+        (case_handler_fulfillment_option_link ?case_handler ?fulfillment_option)
+        (case_handler_handles_booking_segment ?case_handler ?booking_segment)
+        (case_handler_handles_alternate_segment ?case_handler ?alternate_segment)
+        (segment_confirmed ?booking_segment)
+        (alternate_segment_confirmed ?alternate_segment)
+        (entity_resource_assignment ?case_handler ?service_resource)
+        (not
+          (case_handler_execution_ready ?case_handler)
+        )
+      )
+    :effect (case_handler_execution_ready ?case_handler)
+  )
+  (:action finalize_case_handler_execution
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (case_handler_approval_complete ?case_handler)
+        (case_handler_execution_ready ?case_handler)
+        (not
+          (case_handler_finalized ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_finalized ?case_handler)
+        (entity_executed ?case_handler)
+      )
+  )
+  (:action trigger_third_party_escalation_for_case_handler
+    :parameters (?case_handler - case_handler ?third_party_approval - third_party_approval ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (entity_resource_assignment ?case_handler ?service_resource)
+        (third_party_approval_available ?third_party_approval)
+        (case_handler_third_party_approval_link ?case_handler ?third_party_approval)
+        (not
+          (case_handler_escalation_active ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_escalation_active ?case_handler)
+        (not
+          (third_party_approval_available ?third_party_approval)
+        )
+      )
+  )
+  (:action acknowledge_escalation_with_contact_point
+    :parameters (?case_handler - case_handler ?contact_point - contact_point)
+    :precondition
+      (and
+        (case_handler_escalation_active ?case_handler)
+        (entity_contact_assignment ?case_handler ?contact_point)
+        (not
+          (case_handler_escalation_acknowledged ?case_handler)
+        )
+      )
+    :effect (case_handler_escalation_acknowledged ?case_handler)
+  )
+  (:action approve_escalation_with_legal_approval
+    :parameters (?case_handler - case_handler ?legal_approval - legal_approval)
+    :precondition
+      (and
+        (case_handler_escalation_acknowledged ?case_handler)
+        (case_handler_legal_approval_link ?case_handler ?legal_approval)
+        (not
+          (case_handler_escalation_approved ?case_handler)
+        )
+      )
+    :effect (case_handler_escalation_approved ?case_handler)
+  )
+  (:action finalize_escalated_case_handler
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (case_handler_escalation_approved ?case_handler)
+        (not
+          (case_handler_finalized ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (case_handler_finalized ?case_handler)
+        (entity_executed ?case_handler)
+      )
+  )
+  (:action execute_recovery_package_on_booking_segment
+    :parameters (?booking_segment - booking_segment ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (booking_segment_flagged_for_package ?booking_segment)
+        (segment_confirmed ?booking_segment)
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_finalized ?recovery_package)
+        (not
+          (entity_executed ?booking_segment)
+        )
+      )
+    :effect (entity_executed ?booking_segment)
+  )
+  (:action execute_recovery_package_on_alternate_segment
+    :parameters (?alternate_segment - alternate_segment ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (alternate_segment_flagged_for_package ?alternate_segment)
+        (alternate_segment_confirmed ?alternate_segment)
+        (recovery_package_selected ?recovery_package)
+        (recovery_package_finalized ?recovery_package)
+        (not
+          (entity_executed ?alternate_segment)
+        )
+      )
+    :effect (entity_executed ?alternate_segment)
+  )
+  (:action authorize_settlement_for_case
+    :parameters (?no_show_case - no_show_case ?authorization_token - authorization_token ?service_resource - service_resource)
+    :precondition
+      (and
+        (entity_executed ?no_show_case)
+        (entity_resource_assignment ?no_show_case ?service_resource)
+        (authorization_token_available ?authorization_token)
+        (not
+          (entity_settlement_authorized ?no_show_case)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_authorized ?no_show_case)
+        (entity_authorization_link ?no_show_case ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action settle_booking_segment_via_remedy_channel
+    :parameters (?booking_segment - booking_segment ?remedy_channel - remedy_channel ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (entity_settlement_authorized ?booking_segment)
+        (entity_remedy_link ?booking_segment ?remedy_channel)
+        (entity_authorization_link ?booking_segment ?authorization_token)
+        (not
+          (entity_resolved ?booking_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?booking_segment)
+        (remedy_channel_available ?remedy_channel)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action settle_alternate_segment_via_remedy_channel
+    :parameters (?alternate_segment - alternate_segment ?remedy_channel - remedy_channel ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (entity_settlement_authorized ?alternate_segment)
+        (entity_remedy_link ?alternate_segment ?remedy_channel)
+        (entity_authorization_link ?alternate_segment ?authorization_token)
+        (not
+          (entity_resolved ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?alternate_segment)
+        (remedy_channel_available ?remedy_channel)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action settle_case_handler_via_remedy_channel
+    :parameters (?case_handler - case_handler ?remedy_channel - remedy_channel ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (entity_settlement_authorized ?case_handler)
+        (entity_remedy_link ?case_handler ?remedy_channel)
+        (entity_authorization_link ?case_handler ?authorization_token)
+        (not
+          (entity_resolved ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?case_handler)
+        (remedy_channel_available ?remedy_channel)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+)

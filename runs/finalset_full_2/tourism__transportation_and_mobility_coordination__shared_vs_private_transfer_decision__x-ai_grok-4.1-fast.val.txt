@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_transfer_coordination_shared_vs_private)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_domain - object offer_domain - object vehicle_location_domain - object abstract_segment - object transfer_task - abstract_segment transport_provider - service_domain transfer_option - service_domain vehicle_offer - service_domain passenger_preference - service_domain vehicle_category - service_domain time_buffer_slot - service_domain equipment_option - service_domain accessibility_service - service_domain ride_offer - offer_domain reservation_record - offer_domain promo_voucher - offer_domain pickup_location - vehicle_location_domain dropoff_location - vehicle_location_domain vehicle_asset - vehicle_location_domain segment_subtype - transfer_task operation_subtype - transfer_task arrival_segment - segment_subtype departure_segment - segment_subtype transfer_coordinator - operation_subtype)
+  (:predicates
+    (transfer_created ?transfer_task - transfer_task)
+    (transfer_confirmed ?transfer_task - transfer_task)
+    (provider_offer_recorded ?transfer_task - transfer_task)
+    (operation_activated ?transfer_task - transfer_task)
+    (transfer_ready ?transfer_task - transfer_task)
+    (transfer_buffer_confirmed ?transfer_task - transfer_task)
+    (provider_available ?transport_provider - transport_provider)
+    (transfer_provider_binding ?transfer_task - transfer_task ?transport_provider - transport_provider)
+    (transfer_option_available ?transfer_option - transfer_option)
+    (transfer_option_binding ?transfer_task - transfer_task ?transfer_option - transfer_option)
+    (vehicle_offer_available ?vehicle_offer - vehicle_offer)
+    (transfer_vehicle_binding ?transfer_task - transfer_task ?vehicle_offer - vehicle_offer)
+    (ride_offer_available ?ride_offer - ride_offer)
+    (arrival_segment_ride_offer_binding ?arrival_segment - arrival_segment ?ride_offer - ride_offer)
+    (departure_segment_ride_offer_binding ?departure_segment - departure_segment ?ride_offer - ride_offer)
+    (arrival_pickup_candidate ?arrival_segment - arrival_segment ?pickup_location - pickup_location)
+    (pickup_ready ?pickup_location - pickup_location)
+    (pickup_has_offer ?pickup_location - pickup_location)
+    (arrival_pickup_confirmed ?arrival_segment - arrival_segment)
+    (departure_dropoff_candidate ?departure_segment - departure_segment ?dropoff_location - dropoff_location)
+    (dropoff_ready ?dropoff_location - dropoff_location)
+    (dropoff_has_offer ?dropoff_location - dropoff_location)
+    (departure_offer_confirmed ?departure_segment - departure_segment)
+    (vehicle_asset_available ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_reserved ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_assigned_to_pickup ?vehicle_asset - vehicle_asset ?pickup_location - pickup_location)
+    (vehicle_asset_assigned_to_dropoff ?vehicle_asset - vehicle_asset ?dropoff_location - dropoff_location)
+    (vehicle_ready_for_pickup ?vehicle_asset - vehicle_asset)
+    (vehicle_ready_for_dropoff ?vehicle_asset - vehicle_asset)
+    (vehicle_preassignment_confirmed ?vehicle_asset - vehicle_asset)
+    (coordinator_links_arrival_segment ?transfer_coordinator - transfer_coordinator ?arrival_segment - arrival_segment)
+    (coordinator_links_departure_segment ?transfer_coordinator - transfer_coordinator ?departure_segment - departure_segment)
+    (coordinator_links_vehicle_instance ?transfer_coordinator - transfer_coordinator ?vehicle_asset - vehicle_asset)
+    (reservation_record_available ?reservation_record - reservation_record)
+    (coordinator_has_reservation ?transfer_coordinator - transfer_coordinator ?reservation_record - reservation_record)
+    (reservation_record_confirmed ?reservation_record - reservation_record)
+    (reservation_assigned_to_vehicle ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    (coordinator_manifest_registered ?transfer_coordinator - transfer_coordinator)
+    (coordinator_manifest_staged ?transfer_coordinator - transfer_coordinator)
+    (coordinator_preverified ?transfer_coordinator - transfer_coordinator)
+    (coordinator_verified ?transfer_coordinator - transfer_coordinator)
+    (coordinator_verification_complete ?transfer_coordinator - transfer_coordinator)
+    (coordinator_preferences_applied ?transfer_coordinator - transfer_coordinator)
+    (coordinator_execution_ready ?transfer_coordinator - transfer_coordinator)
+    (promo_voucher_available ?promo_voucher - promo_voucher)
+    (coordinator_voucher_binding ?transfer_coordinator - transfer_coordinator ?promo_voucher - promo_voucher)
+    (coordinator_voucher_consumed ?transfer_coordinator - transfer_coordinator)
+    (coordinator_authorization_step ?transfer_coordinator - transfer_coordinator)
+    (coordinator_final_authorization ?transfer_coordinator - transfer_coordinator)
+    (passenger_preference_available ?passenger_preference - passenger_preference)
+    (coordinator_applied_passenger_preference ?transfer_coordinator - transfer_coordinator ?passenger_preference - passenger_preference)
+    (vehicle_category_available ?vehicle_category - vehicle_category)
+    (coordinator_vehicle_category_applied ?transfer_coordinator - transfer_coordinator ?vehicle_category - vehicle_category)
+    (equipment_option_available ?equipment_option - equipment_option)
+    (coordinator_equipment_binding ?transfer_coordinator - transfer_coordinator ?equipment_option - equipment_option)
+    (accessibility_service_available ?accessibility_service - accessibility_service)
+    (coordinator_accessibility_binding ?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service)
+    (time_buffer_slot_available ?time_buffer_slot - time_buffer_slot)
+    (transfer_time_buffer_assigned ?transfer_task - transfer_task ?time_buffer_slot - time_buffer_slot)
+    (arrival_ready_for_vehicle_selection ?arrival_segment - arrival_segment)
+    (departure_ready_for_vehicle_selection ?departure_segment - departure_segment)
+    (coordinator_finalized_for_dispatch ?transfer_coordinator - transfer_coordinator)
+  )
+  (:action create_transfer_task
+    :parameters (?transfer_task - transfer_task)
+    :precondition
+      (and
+        (not
+          (transfer_created ?transfer_task)
+        )
+        (not
+          (operation_activated ?transfer_task)
+        )
+      )
+    :effect (transfer_created ?transfer_task)
+  )
+  (:action propose_provider_for_task
+    :parameters (?transfer_task - transfer_task ?transport_provider - transport_provider)
+    :precondition
+      (and
+        (transfer_created ?transfer_task)
+        (not
+          (provider_offer_recorded ?transfer_task)
+        )
+        (provider_available ?transport_provider)
+      )
+    :effect
+      (and
+        (provider_offer_recorded ?transfer_task)
+        (transfer_provider_binding ?transfer_task ?transport_provider)
+        (not
+          (provider_available ?transport_provider)
+        )
+      )
+  )
+  (:action propose_transfer_option
+    :parameters (?transfer_task - transfer_task ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_created ?transfer_task)
+        (provider_offer_recorded ?transfer_task)
+        (transfer_option_available ?transfer_option)
+      )
+    :effect
+      (and
+        (transfer_option_binding ?transfer_task ?transfer_option)
+        (not
+          (transfer_option_available ?transfer_option)
+        )
+      )
+  )
+  (:action confirm_transfer_option
+    :parameters (?transfer_task - transfer_task ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_created ?transfer_task)
+        (provider_offer_recorded ?transfer_task)
+        (transfer_option_binding ?transfer_task ?transfer_option)
+        (not
+          (transfer_confirmed ?transfer_task)
+        )
+      )
+    :effect (transfer_confirmed ?transfer_task)
+  )
+  (:action revoke_transfer_option
+    :parameters (?transfer_task - transfer_task ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_option_binding ?transfer_task ?transfer_option)
+      )
+    :effect
+      (and
+        (transfer_option_available ?transfer_option)
+        (not
+          (transfer_option_binding ?transfer_task ?transfer_option)
+        )
+      )
+  )
+  (:action reserve_vehicle_for_task
+    :parameters (?transfer_task - transfer_task ?vehicle_offer - vehicle_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_task)
+        (vehicle_offer_available ?vehicle_offer)
+      )
+    :effect
+      (and
+        (transfer_vehicle_binding ?transfer_task ?vehicle_offer)
+        (not
+          (vehicle_offer_available ?vehicle_offer)
+        )
+      )
+  )
+  (:action release_vehicle_from_task
+    :parameters (?transfer_task - transfer_task ?vehicle_offer - vehicle_offer)
+    :precondition
+      (and
+        (transfer_vehicle_binding ?transfer_task ?vehicle_offer)
+      )
+    :effect
+      (and
+        (vehicle_offer_available ?vehicle_offer)
+        (not
+          (transfer_vehicle_binding ?transfer_task ?vehicle_offer)
+        )
+      )
+  )
+  (:action coordinator_reserve_equipment
+    :parameters (?transfer_coordinator - transfer_coordinator ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (equipment_option_available ?equipment_option)
+      )
+    :effect
+      (and
+        (coordinator_equipment_binding ?transfer_coordinator ?equipment_option)
+        (not
+          (equipment_option_available ?equipment_option)
+        )
+      )
+  )
+  (:action coordinator_release_equipment
+    :parameters (?transfer_coordinator - transfer_coordinator ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (coordinator_equipment_binding ?transfer_coordinator ?equipment_option)
+      )
+    :effect
+      (and
+        (equipment_option_available ?equipment_option)
+        (not
+          (coordinator_equipment_binding ?transfer_coordinator ?equipment_option)
+        )
+      )
+  )
+  (:action coordinator_reserve_accessibility_service
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (accessibility_service_available ?accessibility_service)
+      )
+    :effect
+      (and
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (not
+          (accessibility_service_available ?accessibility_service)
+        )
+      )
+  )
+  (:action coordinator_release_accessibility_service
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service)
+    :precondition
+      (and
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+      )
+    :effect
+      (and
+        (accessibility_service_available ?accessibility_service)
+        (not
+          (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        )
+      )
+  )
+  (:action prepare_pickup_location
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_confirmed ?arrival_segment)
+        (transfer_option_binding ?arrival_segment ?transfer_option)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (not
+          (pickup_ready ?pickup_location)
+        )
+        (not
+          (pickup_has_offer ?pickup_location)
+        )
+      )
+    :effect (pickup_ready ?pickup_location)
+  )
+  (:action bind_vehicle_to_arrival_pickup
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?vehicle_offer - vehicle_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?arrival_segment)
+        (transfer_vehicle_binding ?arrival_segment ?vehicle_offer)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (pickup_ready ?pickup_location)
+        (not
+          (arrival_ready_for_vehicle_selection ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (arrival_pickup_confirmed ?arrival_segment)
+      )
+  )
+  (:action allocate_ride_offer_to_arrival
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?ride_offer - ride_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?arrival_segment)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (ride_offer_available ?ride_offer)
+        (not
+          (arrival_ready_for_vehicle_selection ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_has_offer ?pickup_location)
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (arrival_segment_ride_offer_binding ?arrival_segment ?ride_offer)
+        (not
+          (ride_offer_available ?ride_offer)
+        )
+      )
+  )
+  (:action confirm_arrival_ride_offer
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?transfer_option - transfer_option ?ride_offer - ride_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?arrival_segment)
+        (transfer_option_binding ?arrival_segment ?transfer_option)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (pickup_has_offer ?pickup_location)
+        (arrival_segment_ride_offer_binding ?arrival_segment ?ride_offer)
+        (not
+          (arrival_pickup_confirmed ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_ready ?pickup_location)
+        (arrival_pickup_confirmed ?arrival_segment)
+        (ride_offer_available ?ride_offer)
+        (not
+          (arrival_segment_ride_offer_binding ?arrival_segment ?ride_offer)
+        )
+      )
+  )
+  (:action prepare_dropoff_location
+    :parameters (?departure_segment - departure_segment ?dropoff_location - dropoff_location ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_confirmed ?departure_segment)
+        (transfer_option_binding ?departure_segment ?transfer_option)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (not
+          (dropoff_ready ?dropoff_location)
+        )
+        (not
+          (dropoff_has_offer ?dropoff_location)
+        )
+      )
+    :effect (dropoff_ready ?dropoff_location)
+  )
+  (:action assign_vehicle_to_departure_dropoff
+    :parameters (?departure_segment - departure_segment ?dropoff_location - dropoff_location ?vehicle_offer - vehicle_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?departure_segment)
+        (transfer_vehicle_binding ?departure_segment ?vehicle_offer)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (dropoff_ready ?dropoff_location)
+        (not
+          (departure_ready_for_vehicle_selection ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (departure_offer_confirmed ?departure_segment)
+      )
+  )
+  (:action allocate_ride_offer_to_departure
+    :parameters (?departure_segment - departure_segment ?dropoff_location - dropoff_location ?ride_offer - ride_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?departure_segment)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (ride_offer_available ?ride_offer)
+        (not
+          (departure_ready_for_vehicle_selection ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_has_offer ?dropoff_location)
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (departure_segment_ride_offer_binding ?departure_segment ?ride_offer)
+        (not
+          (ride_offer_available ?ride_offer)
+        )
+      )
+  )
+  (:action confirm_departure_ride_offer
+    :parameters (?departure_segment - departure_segment ?dropoff_location - dropoff_location ?transfer_option - transfer_option ?ride_offer - ride_offer)
+    :precondition
+      (and
+        (transfer_confirmed ?departure_segment)
+        (transfer_option_binding ?departure_segment ?transfer_option)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (dropoff_has_offer ?dropoff_location)
+        (departure_segment_ride_offer_binding ?departure_segment ?ride_offer)
+        (not
+          (departure_offer_confirmed ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_ready ?dropoff_location)
+        (departure_offer_confirmed ?departure_segment)
+        (ride_offer_available ?ride_offer)
+        (not
+          (departure_segment_ride_offer_binding ?departure_segment ?ride_offer)
+        )
+      )
+  )
+  (:action assign_vehicle_instance_when_both_ready
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (pickup_ready ?pickup_location)
+        (dropoff_ready ?dropoff_location)
+        (arrival_pickup_confirmed ?arrival_segment)
+        (departure_offer_confirmed ?departure_segment)
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_assigned_to_pickup ?vehicle_asset ?pickup_location)
+        (vehicle_asset_assigned_to_dropoff ?vehicle_asset ?dropoff_location)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action reserve_and_prepare_vehicle_instance
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (pickup_has_offer ?pickup_location)
+        (dropoff_ready ?dropoff_location)
+        (not
+          (arrival_pickup_confirmed ?arrival_segment)
+        )
+        (departure_offer_confirmed ?departure_segment)
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_assigned_to_pickup ?vehicle_asset ?pickup_location)
+        (vehicle_asset_assigned_to_dropoff ?vehicle_asset ?dropoff_location)
+        (vehicle_ready_for_pickup ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action reserve_and_prepare_vehicle_instance_for_dropoff
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (pickup_ready ?pickup_location)
+        (dropoff_has_offer ?dropoff_location)
+        (arrival_pickup_confirmed ?arrival_segment)
+        (not
+          (departure_offer_confirmed ?departure_segment)
+        )
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_assigned_to_pickup ?vehicle_asset ?pickup_location)
+        (vehicle_asset_assigned_to_dropoff ?vehicle_asset ?dropoff_location)
+        (vehicle_ready_for_dropoff ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action reserve_and_prepare_vehicle_instance_with_both_offers
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (arrival_pickup_candidate ?arrival_segment ?pickup_location)
+        (departure_dropoff_candidate ?departure_segment ?dropoff_location)
+        (pickup_has_offer ?pickup_location)
+        (dropoff_has_offer ?dropoff_location)
+        (not
+          (arrival_pickup_confirmed ?arrival_segment)
+        )
+        (not
+          (departure_offer_confirmed ?departure_segment)
+        )
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_assigned_to_pickup ?vehicle_asset ?pickup_location)
+        (vehicle_asset_assigned_to_dropoff ?vehicle_asset ?dropoff_location)
+        (vehicle_ready_for_pickup ?vehicle_asset)
+        (vehicle_ready_for_dropoff ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action confirm_vehicle_preassignment
+    :parameters (?vehicle_asset - vehicle_asset ?arrival_segment - arrival_segment ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (transfer_option_binding ?arrival_segment ?transfer_option)
+        (not
+          (vehicle_preassignment_confirmed ?vehicle_asset)
+        )
+      )
+    :effect (vehicle_preassignment_confirmed ?vehicle_asset)
+  )
+  (:action allocate_reservation_to_vehicle
+    :parameters (?transfer_coordinator - transfer_coordinator ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (coordinator_links_vehicle_instance ?transfer_coordinator ?vehicle_asset)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_record_available ?reservation_record)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_preassignment_confirmed ?vehicle_asset)
+        (not
+          (reservation_record_confirmed ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (reservation_record_confirmed ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (not
+          (reservation_record_available ?reservation_record)
+        )
+      )
+  )
+  (:action register_reservation_with_coordinator
+    :parameters (?transfer_coordinator - transfer_coordinator ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_record_confirmed ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (transfer_option_binding ?transfer_coordinator ?transfer_option)
+        (not
+          (vehicle_ready_for_pickup ?vehicle_asset)
+        )
+        (not
+          (coordinator_manifest_registered ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_manifest_registered ?transfer_coordinator)
+  )
+  (:action apply_passenger_preference
+    :parameters (?transfer_coordinator - transfer_coordinator ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (passenger_preference_available ?passenger_preference)
+        (not
+          (coordinator_verified ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_verified ?transfer_coordinator)
+        (coordinator_applied_passenger_preference ?transfer_coordinator ?passenger_preference)
+        (not
+          (passenger_preference_available ?passenger_preference)
+        )
+      )
+  )
+  (:action apply_preference_and_finalize_manifest
+    :parameters (?transfer_coordinator - transfer_coordinator ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset ?transfer_option - transfer_option ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_record_confirmed ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (transfer_option_binding ?transfer_coordinator ?transfer_option)
+        (vehicle_ready_for_pickup ?vehicle_asset)
+        (coordinator_verified ?transfer_coordinator)
+        (coordinator_applied_passenger_preference ?transfer_coordinator ?passenger_preference)
+        (not
+          (coordinator_manifest_registered ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_manifest_registered ?transfer_coordinator)
+        (coordinator_verification_complete ?transfer_coordinator)
+      )
+  )
+  (:action coordinator_attach_equipment_and_stage_manifest
+    :parameters (?transfer_coordinator - transfer_coordinator ?equipment_option - equipment_option ?vehicle_offer - vehicle_offer ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_registered ?transfer_coordinator)
+        (coordinator_equipment_binding ?transfer_coordinator ?equipment_option)
+        (transfer_vehicle_binding ?transfer_coordinator ?vehicle_offer)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (not
+          (vehicle_ready_for_dropoff ?vehicle_asset)
+        )
+        (not
+          (coordinator_manifest_staged ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_manifest_staged ?transfer_coordinator)
+  )
+  (:action coordinator_stage_manifest_with_vehicle_ready
+    :parameters (?transfer_coordinator - transfer_coordinator ?equipment_option - equipment_option ?vehicle_offer - vehicle_offer ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_registered ?transfer_coordinator)
+        (coordinator_equipment_binding ?transfer_coordinator ?equipment_option)
+        (transfer_vehicle_binding ?transfer_coordinator ?vehicle_offer)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (vehicle_ready_for_dropoff ?vehicle_asset)
+        (not
+          (coordinator_manifest_staged ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_manifest_staged ?transfer_coordinator)
+  )
+  (:action coordinator_preverify_with_accessibility
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_staged ?transfer_coordinator)
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (not
+          (vehicle_ready_for_pickup ?vehicle_asset)
+        )
+        (not
+          (vehicle_ready_for_dropoff ?vehicle_asset)
+        )
+        (not
+          (coordinator_preverified ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_preverified ?transfer_coordinator)
+  )
+  (:action coordinator_preverify_and_apply_preferences
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_staged ?transfer_coordinator)
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (vehicle_ready_for_pickup ?vehicle_asset)
+        (not
+          (vehicle_ready_for_dropoff ?vehicle_asset)
+        )
+        (not
+          (coordinator_preverified ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_preferences_applied ?transfer_coordinator)
+      )
+  )
+  (:action coordinator_preverify_and_apply_preferences_variant
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_staged ?transfer_coordinator)
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (not
+          (vehicle_ready_for_pickup ?vehicle_asset)
+        )
+        (vehicle_ready_for_dropoff ?vehicle_asset)
+        (not
+          (coordinator_preverified ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_preferences_applied ?transfer_coordinator)
+      )
+  )
+  (:action coordinator_preverify_and_apply_preferences_full
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service ?reservation_record - reservation_record ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (coordinator_manifest_staged ?transfer_coordinator)
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (coordinator_has_reservation ?transfer_coordinator ?reservation_record)
+        (reservation_assigned_to_vehicle ?reservation_record ?vehicle_asset)
+        (vehicle_ready_for_pickup ?vehicle_asset)
+        (vehicle_ready_for_dropoff ?vehicle_asset)
+        (not
+          (coordinator_preverified ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_preferences_applied ?transfer_coordinator)
+      )
+  )
+  (:action finalize_coordinator_for_dispatch
+    :parameters (?transfer_coordinator - transfer_coordinator)
+    :precondition
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (not
+          (coordinator_preferences_applied ?transfer_coordinator)
+        )
+        (not
+          (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        (transfer_ready ?transfer_coordinator)
+      )
+  )
+  (:action apply_vehicle_category_to_coordinator
+    :parameters (?transfer_coordinator - transfer_coordinator ?vehicle_category - vehicle_category)
+    :precondition
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_preferences_applied ?transfer_coordinator)
+        (vehicle_category_available ?vehicle_category)
+      )
+    :effect
+      (and
+        (coordinator_vehicle_category_applied ?transfer_coordinator ?vehicle_category)
+        (not
+          (vehicle_category_available ?vehicle_category)
+        )
+      )
+  )
+  (:action verify_and_mark_coordinator_execution_ready
+    :parameters (?transfer_coordinator - transfer_coordinator ?arrival_segment - arrival_segment ?departure_segment - departure_segment ?transfer_option - transfer_option ?vehicle_category - vehicle_category)
+    :precondition
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_preferences_applied ?transfer_coordinator)
+        (coordinator_vehicle_category_applied ?transfer_coordinator ?vehicle_category)
+        (coordinator_links_arrival_segment ?transfer_coordinator ?arrival_segment)
+        (coordinator_links_departure_segment ?transfer_coordinator ?departure_segment)
+        (arrival_pickup_confirmed ?arrival_segment)
+        (departure_offer_confirmed ?departure_segment)
+        (transfer_option_binding ?transfer_coordinator ?transfer_option)
+        (not
+          (coordinator_execution_ready ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_execution_ready ?transfer_coordinator)
+  )
+  (:action finalize_coordinator_post_verification
+    :parameters (?transfer_coordinator - transfer_coordinator)
+    :precondition
+      (and
+        (coordinator_preverified ?transfer_coordinator)
+        (coordinator_execution_ready ?transfer_coordinator)
+        (not
+          (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        (transfer_ready ?transfer_coordinator)
+      )
+  )
+  (:action consume_promo_voucher_for_coordinator_authorization
+    :parameters (?transfer_coordinator - transfer_coordinator ?promo_voucher - promo_voucher ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_confirmed ?transfer_coordinator)
+        (transfer_option_binding ?transfer_coordinator ?transfer_option)
+        (promo_voucher_available ?promo_voucher)
+        (coordinator_voucher_binding ?transfer_coordinator ?promo_voucher)
+        (not
+          (coordinator_voucher_consumed ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_voucher_consumed ?transfer_coordinator)
+        (not
+          (promo_voucher_available ?promo_voucher)
+        )
+      )
+  )
+  (:action authorize_coordinator_vehicle_binding
+    :parameters (?transfer_coordinator - transfer_coordinator ?vehicle_offer - vehicle_offer)
+    :precondition
+      (and
+        (coordinator_voucher_consumed ?transfer_coordinator)
+        (transfer_vehicle_binding ?transfer_coordinator ?vehicle_offer)
+        (not
+          (coordinator_authorization_step ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_authorization_step ?transfer_coordinator)
+  )
+  (:action authorize_coordinator_accessibility
+    :parameters (?transfer_coordinator - transfer_coordinator ?accessibility_service - accessibility_service)
+    :precondition
+      (and
+        (coordinator_authorization_step ?transfer_coordinator)
+        (coordinator_accessibility_binding ?transfer_coordinator ?accessibility_service)
+        (not
+          (coordinator_final_authorization ?transfer_coordinator)
+        )
+      )
+    :effect (coordinator_final_authorization ?transfer_coordinator)
+  )
+  (:action finalize_coordinator_authorization
+    :parameters (?transfer_coordinator - transfer_coordinator)
+    :precondition
+      (and
+        (coordinator_final_authorization ?transfer_coordinator)
+        (not
+          (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized_for_dispatch ?transfer_coordinator)
+        (transfer_ready ?transfer_coordinator)
+      )
+  )
+  (:action confirm_arrival_segment_ready
+    :parameters (?arrival_segment - arrival_segment ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (arrival_ready_for_vehicle_selection ?arrival_segment)
+        (arrival_pickup_confirmed ?arrival_segment)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_preassignment_confirmed ?vehicle_asset)
+        (not
+          (transfer_ready ?arrival_segment)
+        )
+      )
+    :effect (transfer_ready ?arrival_segment)
+  )
+  (:action confirm_departure_segment_ready
+    :parameters (?departure_segment - departure_segment ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (departure_ready_for_vehicle_selection ?departure_segment)
+        (departure_offer_confirmed ?departure_segment)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_preassignment_confirmed ?vehicle_asset)
+        (not
+          (transfer_ready ?departure_segment)
+        )
+      )
+    :effect (transfer_ready ?departure_segment)
+  )
+  (:action assign_time_buffer_to_task
+    :parameters (?transfer_task - transfer_task ?time_buffer_slot - time_buffer_slot ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_ready ?transfer_task)
+        (transfer_option_binding ?transfer_task ?transfer_option)
+        (time_buffer_slot_available ?time_buffer_slot)
+        (not
+          (transfer_buffer_confirmed ?transfer_task)
+        )
+      )
+    :effect
+      (and
+        (transfer_buffer_confirmed ?transfer_task)
+        (transfer_time_buffer_assigned ?transfer_task ?time_buffer_slot)
+        (not
+          (time_buffer_slot_available ?time_buffer_slot)
+        )
+      )
+  )
+  (:action bind_provider_to_arrival
+    :parameters (?arrival_segment - arrival_segment ?transport_provider - transport_provider ?time_buffer_slot - time_buffer_slot)
+    :precondition
+      (and
+        (transfer_buffer_confirmed ?arrival_segment)
+        (transfer_provider_binding ?arrival_segment ?transport_provider)
+        (transfer_time_buffer_assigned ?arrival_segment ?time_buffer_slot)
+        (not
+          (operation_activated ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (operation_activated ?arrival_segment)
+        (provider_available ?transport_provider)
+        (time_buffer_slot_available ?time_buffer_slot)
+      )
+  )
+  (:action bind_provider_to_departure
+    :parameters (?departure_segment - departure_segment ?transport_provider - transport_provider ?time_buffer_slot - time_buffer_slot)
+    :precondition
+      (and
+        (transfer_buffer_confirmed ?departure_segment)
+        (transfer_provider_binding ?departure_segment ?transport_provider)
+        (transfer_time_buffer_assigned ?departure_segment ?time_buffer_slot)
+        (not
+          (operation_activated ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (operation_activated ?departure_segment)
+        (provider_available ?transport_provider)
+        (time_buffer_slot_available ?time_buffer_slot)
+      )
+  )
+  (:action bind_provider_to_coordinator
+    :parameters (?transfer_coordinator - transfer_coordinator ?transport_provider - transport_provider ?time_buffer_slot - time_buffer_slot)
+    :precondition
+      (and
+        (transfer_buffer_confirmed ?transfer_coordinator)
+        (transfer_provider_binding ?transfer_coordinator ?transport_provider)
+        (transfer_time_buffer_assigned ?transfer_coordinator ?time_buffer_slot)
+        (not
+          (operation_activated ?transfer_coordinator)
+        )
+      )
+    :effect
+      (and
+        (operation_activated ?transfer_coordinator)
+        (provider_available ?transport_provider)
+        (time_buffer_slot_available ?time_buffer_slot)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem shared_vs_private_transfer_instance)
+  (:domain tourism_transfer_coordination_shared_vs_private)
+  (:objects arrival_segment_instance - arrival_segment departure_segment_instance - departure_segment transfer_coordinator_1 - transfer_coordinator transfer_coordinator_2 - transfer_coordinator transport_provider_1 - transport_provider transport_provider_2 - transport_provider transport_provider_3 - transport_provider transfer_option_instance - transfer_option vehicle_offer_instance - vehicle_offer ride_offer_instance - ride_offer pickup_location_instance - pickup_location dropoff_location_instance - dropoff_location vehicle_asset_instance - vehicle_asset reservation_record_1 - reservation_record reservation_record_2 - reservation_record passenger_preference_1 - passenger_preference passenger_preference_2 - passenger_preference vehicle_category_1 - vehicle_category vehicle_category_2 - vehicle_category time_buffer_slot_instance - time_buffer_slot equipment_option_instance - equipment_option promo_voucher_1 - promo_voucher promo_voucher_2 - promo_voucher accessibility_service_instance - accessibility_service)
+  (:init
+    (provider_available transport_provider_1)
+    (provider_available transport_provider_2)
+    (provider_available transport_provider_3)
+    (transfer_option_available transfer_option_instance)
+    (vehicle_offer_available vehicle_offer_instance)
+    (ride_offer_available ride_offer_instance)
+    (arrival_pickup_candidate arrival_segment_instance pickup_location_instance)
+    (departure_dropoff_candidate departure_segment_instance dropoff_location_instance)
+    (vehicle_asset_available vehicle_asset_instance)
+    (reservation_record_available reservation_record_1)
+    (reservation_record_available reservation_record_2)
+    (coordinator_links_arrival_segment transfer_coordinator_1 arrival_segment_instance)
+    (coordinator_links_arrival_segment transfer_coordinator_2 arrival_segment_instance)
+    (coordinator_links_departure_segment transfer_coordinator_1 departure_segment_instance)
+    (coordinator_links_departure_segment transfer_coordinator_2 departure_segment_instance)
+    (coordinator_links_vehicle_instance transfer_coordinator_1 vehicle_asset_instance)
+    (coordinator_links_vehicle_instance transfer_coordinator_2 vehicle_asset_instance)
+    (coordinator_has_reservation transfer_coordinator_1 reservation_record_1)
+    (coordinator_has_reservation transfer_coordinator_2 reservation_record_2)
+    (passenger_preference_available passenger_preference_1)
+    (passenger_preference_available passenger_preference_2)
+    (vehicle_category_available vehicle_category_1)
+    (vehicle_category_available vehicle_category_2)
+    (time_buffer_slot_available time_buffer_slot_instance)
+    (equipment_option_available equipment_option_instance)
+    (promo_voucher_available promo_voucher_1)
+    (coordinator_voucher_binding transfer_coordinator_1 promo_voucher_1)
+    (coordinator_voucher_binding transfer_coordinator_2 promo_voucher_2)
+    (accessibility_service_available accessibility_service_instance)
+  )
+  (:goal
+    (and
+      (operation_activated arrival_segment_instance)
+      (operation_activated departure_segment_instance)
+      (operation_activated transfer_coordinator_1)
+      (operation_activated transfer_coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_transfer_task arrival_segment_instance)
+(create_transfer_task departure_segment_instance)
+(create_transfer_task transfer_coordinator_1)
+(create_transfer_task transfer_coordinator_2)
+(propose_provider_for_task arrival_segment_instance transport_provider_1)
+(propose_provider_for_task departure_segment_instance transport_provider_2)
+(propose_provider_for_task transfer_coordinator_1 transport_provider_3)
+(propose_transfer_option arrival_segment_instance transfer_option_instance)
+(confirm_transfer_option arrival_segment_instance transfer_option_instance)
+(prepare_pickup_location arrival_segment_instance pickup_location_instance transfer_option_instance)
+(reserve_vehicle_for_task arrival_segment_instance vehicle_offer_instance)
+(bind_vehicle_to_arrival_pickup arrival_segment_instance pickup_location_instance vehicle_offer_instance)
+(revoke_transfer_option arrival_segment_instance transfer_option_instance)
+(release_vehicle_from_task arrival_segment_instance vehicle_offer_instance)
+(propose_transfer_option departure_segment_instance transfer_option_instance)
+(confirm_transfer_option departure_segment_instance transfer_option_instance)
+(prepare_dropoff_location departure_segment_instance dropoff_location_instance transfer_option_instance)
+(reserve_vehicle_for_task departure_segment_instance vehicle_offer_instance)
+(assign_vehicle_to_departure_dropoff departure_segment_instance dropoff_location_instance vehicle_offer_instance)
+(revoke_transfer_option departure_segment_instance transfer_option_instance)
+(propose_transfer_option arrival_segment_instance transfer_option_instance)
+(assign_vehicle_instance_when_both_ready arrival_segment_instance departure_segment_instance pickup_location_instance dropoff_location_instance vehicle_asset_instance)
+(confirm_vehicle_preassignment vehicle_asset_instance arrival_segment_instance transfer_option_instance)
+(confirm_arrival_segment_ready arrival_segment_instance vehicle_asset_instance)
+(confirm_departure_segment_ready departure_segment_instance vehicle_asset_instance)
+(release_vehicle_from_task departure_segment_instance vehicle_offer_instance)
+(revoke_transfer_option arrival_segment_instance transfer_option_instance)
+(propose_transfer_option transfer_coordinator_1 transfer_option_instance)
+(confirm_transfer_option transfer_coordinator_1 transfer_option_instance)
+(allocate_reservation_to_vehicle transfer_coordinator_1 reservation_record_1 vehicle_asset_instance)
+(register_reservation_with_coordinator transfer_coordinator_1 reservation_record_1 vehicle_asset_instance transfer_option_instance)
+(coordinator_reserve_equipment transfer_coordinator_1 equipment_option_instance)
+(reserve_vehicle_for_task transfer_coordinator_1 vehicle_offer_instance)
+(coordinator_attach_equipment_and_stage_manifest transfer_coordinator_1 equipment_option_instance vehicle_offer_instance reservation_record_1 vehicle_asset_instance)
+(coordinator_reserve_accessibility_service transfer_coordinator_1 accessibility_service_instance)
+(coordinator_preverify_with_accessibility transfer_coordinator_1 accessibility_service_instance reservation_record_1 vehicle_asset_instance)
+(finalize_coordinator_for_dispatch transfer_coordinator_1)
+(revoke_transfer_option transfer_coordinator_1 transfer_option_instance)
+(propose_transfer_option arrival_segment_instance transfer_option_instance)
+(assign_time_buffer_to_task arrival_segment_instance time_buffer_slot_instance transfer_option_instance)
+(bind_provider_to_arrival arrival_segment_instance transport_provider_1 time_buffer_slot_instance)
+(revoke_transfer_option arrival_segment_instance transfer_option_instance)
+(propose_transfer_option departure_segment_instance transfer_option_instance)
+(assign_time_buffer_to_task departure_segment_instance time_buffer_slot_instance transfer_option_instance)
+(bind_provider_to_departure departure_segment_instance transport_provider_2 time_buffer_slot_instance)
+(propose_transfer_option transfer_coordinator_1 transfer_option_instance)
+(assign_time_buffer_to_task transfer_coordinator_1 time_buffer_slot_instance transfer_option_instance)
+(bind_provider_to_coordinator transfer_coordinator_1 transport_provider_3 time_buffer_slot_instance)
+(coordinator_release_equipment transfer_coordinator_1 equipment_option_instance)
+(coordinator_release_accessibility_service transfer_coordinator_1 accessibility_service_instance)
+(release_vehicle_from_task transfer_coordinator_1 vehicle_offer_instance)
+(propose_provider_for_task transfer_coordinator_2 transport_provider_1)
+(revoke_transfer_option transfer_coordinator_1 transfer_option_instance)
+(propose_transfer_option transfer_coordinator_2 transfer_option_instance)
+(confirm_transfer_option transfer_coordinator_2 transfer_option_instance)
+(allocate_reservation_to_vehicle transfer_coordinator_2 reservation_record_2 vehicle_asset_instance)
+(register_reservation_with_coordinator transfer_coordinator_2 reservation_record_2 vehicle_asset_instance transfer_option_instance)
+(coordinator_reserve_equipment transfer_coordinator_2 equipment_option_instance)
+(reserve_vehicle_for_task transfer_coordinator_2 vehicle_offer_instance)
+(coordinator_attach_equipment_and_stage_manifest transfer_coordinator_2 equipment_option_instance vehicle_offer_instance reservation_record_2 vehicle_asset_instance)
+(coordinator_reserve_accessibility_service transfer_coordinator_2 accessibility_service_instance)
+(coordinator_preverify_with_accessibility transfer_coordinator_2 accessibility_service_instance reservation_record_2 vehicle_asset_instance)
+(finalize_coordinator_for_dispatch transfer_coordinator_2)
+(assign_time_buffer_to_task transfer_coordinator_2 time_buffer_slot_instance transfer_option_instance)
+(bind_provider_to_coordinator transfer_coordinator_2 transport_provider_1 time_buffer_slot_instance)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_fjx15i9j/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_fjx15i9j/plan.pddl 
+
+
+--- stderr ---
+

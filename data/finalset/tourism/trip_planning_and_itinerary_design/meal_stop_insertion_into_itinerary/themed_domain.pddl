@@ -1,0 +1,936 @@
+(define (domain meal_stop_insertion_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types venue_resource_class - object availability_class - object preference_class - object itinerary_root_class - object itinerary_entity - itinerary_root_class venue_availability_token - venue_resource_class service_time_window - venue_resource_class seating_option - venue_resource_class marketing_promotion - venue_resource_class dietary_constraint - venue_resource_class meal_category - venue_resource_class venue_feature - venue_resource_class time_preference - venue_resource_class menu_item_candidate - availability_class table_configuration - availability_class special_request_option - availability_class approach_leg_morning - preference_class approach_leg_afternoon - preference_class reservation_proposal - preference_class day_segment_class - itinerary_entity itinerary_cluster - itinerary_entity day_segment_morning - day_segment_class day_segment_afternoon - day_segment_class dining_venue - itinerary_cluster)
+  (:predicates
+    (itinerary_entity_open ?itinerary_entity - itinerary_entity)
+    (itinerary_entity_time_confirmed ?itinerary_entity - itinerary_entity)
+    (itinerary_entity_availability_allocated ?itinerary_entity - itinerary_entity)
+    (itinerary_entity_committed ?itinerary_entity - itinerary_entity)
+    (guest_binding_ready ?itinerary_entity - itinerary_entity)
+    (itinerary_entity_guest_bound ?itinerary_entity - itinerary_entity)
+    (availability_token_available ?availability_token - venue_availability_token)
+    (entity_allocated_to_availability_token ?itinerary_entity - itinerary_entity ?availability_token - venue_availability_token)
+    (service_time_window_available ?service_time_window - service_time_window)
+    (itinerary_entity_assigned_time_window ?itinerary_entity - itinerary_entity ?service_time_window - service_time_window)
+    (seating_option_available ?seating_option - seating_option)
+    (itinerary_entity_assigned_seating_option ?itinerary_entity - itinerary_entity ?seating_option - seating_option)
+    (menu_item_candidate_available ?menu_candidate - menu_item_candidate)
+    (morning_segment_selected_menu_item ?morning_segment - day_segment_morning ?menu_candidate - menu_item_candidate)
+    (afternoon_segment_selected_menu_item ?afternoon_segment - day_segment_afternoon ?menu_candidate - menu_item_candidate)
+    (morning_segment_linked_approach_leg ?morning_segment - day_segment_morning ?approach_leg_morning - approach_leg_morning)
+    (approach_leg_morning_candidate ?approach_leg_morning - approach_leg_morning)
+    (approach_leg_morning_menu_assigned ?approach_leg_morning - approach_leg_morning)
+    (morning_segment_marked_ready ?morning_segment - day_segment_morning)
+    (afternoon_segment_linked_approach_leg ?afternoon_segment - day_segment_afternoon ?approach_leg_afternoon - approach_leg_afternoon)
+    (approach_leg_afternoon_candidate ?approach_leg_afternoon - approach_leg_afternoon)
+    (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon - approach_leg_afternoon)
+    (afternoon_segment_marked_ready ?afternoon_segment - day_segment_afternoon)
+    (reservation_proposal_template_available ?reservation_proposal - reservation_proposal)
+    (reservation_proposal_created ?reservation_proposal - reservation_proposal)
+    (proposal_linked_to_morning_approach_leg ?reservation_proposal - reservation_proposal ?approach_leg_morning - approach_leg_morning)
+    (proposal_linked_to_afternoon_approach_leg ?reservation_proposal - reservation_proposal ?approach_leg_afternoon - approach_leg_afternoon)
+    (proposal_table_configuration_flag_primary ?reservation_proposal - reservation_proposal)
+    (proposal_table_configuration_flag_secondary ?reservation_proposal - reservation_proposal)
+    (proposal_table_assignment_locked ?reservation_proposal - reservation_proposal)
+    (venue_suitable_for_morning_segment ?dining_venue - dining_venue ?morning_segment - day_segment_morning)
+    (venue_suitable_for_afternoon_segment ?dining_venue - dining_venue ?afternoon_segment - day_segment_afternoon)
+    (venue_linked_to_reservation_proposal_template ?dining_venue - dining_venue ?reservation_proposal - reservation_proposal)
+    (table_configuration_available ?table_configuration - table_configuration)
+    (venue_supports_table_configuration ?dining_venue - dining_venue ?table_configuration - table_configuration)
+    (table_configuration_selected ?table_configuration - table_configuration)
+    (table_configuration_assigned_to_proposal ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    (venue_configuration_confirmed ?dining_venue - dining_venue)
+    (venue_feature_applied ?dining_venue - dining_venue)
+    (venue_ready_for_binding ?dining_venue - dining_venue)
+    (venue_promotion_attached ?dining_venue - dining_venue)
+    (venue_promotion_applied ?dining_venue - dining_venue)
+    (venue_ready_for_preference_binding ?dining_venue - dining_venue)
+    (venue_final_checks_passed ?dining_venue - dining_venue)
+    (special_request_option_available ?special_request_option - special_request_option)
+    (venue_supports_special_request_option ?dining_venue - dining_venue ?special_request_option - special_request_option)
+    (venue_special_request_bound ?dining_venue - dining_venue)
+    (venue_special_request_processed ?dining_venue - dining_venue)
+    (venue_special_request_confirmed ?dining_venue - dining_venue)
+    (promotion_available ?marketing_promotion - marketing_promotion)
+    (venue_linked_promotion ?dining_venue - dining_venue ?marketing_promotion - marketing_promotion)
+    (dietary_constraint_available ?dietary_constraint - dietary_constraint)
+    (venue_linked_dietary_constraint ?dining_venue - dining_venue ?dietary_constraint - dietary_constraint)
+    (venue_feature_available ?venue_feature - venue_feature)
+    (venue_feature_attached ?dining_venue - dining_venue ?venue_feature - venue_feature)
+    (time_preference_available ?time_preference - time_preference)
+    (venue_linked_time_preference_option ?dining_venue - dining_venue ?time_preference - time_preference)
+    (meal_category_available ?meal_category - meal_category)
+    (itinerary_entity_assigned_meal_category ?itinerary_entity - itinerary_entity ?meal_category - meal_category)
+    (morning_segment_ready_flag ?morning_segment - day_segment_morning)
+    (afternoon_segment_ready_flag ?afternoon_segment - day_segment_afternoon)
+    (venue_confirmed ?dining_venue - dining_venue)
+  )
+  (:action open_itinerary_entity
+    :parameters (?itinerary_entity - itinerary_entity)
+    :precondition
+      (and
+        (not
+          (itinerary_entity_open ?itinerary_entity)
+        )
+        (not
+          (itinerary_entity_committed ?itinerary_entity)
+        )
+      )
+    :effect (itinerary_entity_open ?itinerary_entity)
+  )
+  (:action allocate_availability_token
+    :parameters (?itinerary_entity - itinerary_entity ?availability_token - venue_availability_token)
+    :precondition
+      (and
+        (itinerary_entity_open ?itinerary_entity)
+        (not
+          (itinerary_entity_availability_allocated ?itinerary_entity)
+        )
+        (availability_token_available ?availability_token)
+      )
+    :effect
+      (and
+        (itinerary_entity_availability_allocated ?itinerary_entity)
+        (entity_allocated_to_availability_token ?itinerary_entity ?availability_token)
+        (not
+          (availability_token_available ?availability_token)
+        )
+      )
+  )
+  (:action reserve_service_time_window_for_entity
+    :parameters (?itinerary_entity - itinerary_entity ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_open ?itinerary_entity)
+        (itinerary_entity_availability_allocated ?itinerary_entity)
+        (service_time_window_available ?service_time_window)
+      )
+    :effect
+      (and
+        (itinerary_entity_assigned_time_window ?itinerary_entity ?service_time_window)
+        (not
+          (service_time_window_available ?service_time_window)
+        )
+      )
+  )
+  (:action confirm_entity_time_assignment
+    :parameters (?itinerary_entity - itinerary_entity ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_open ?itinerary_entity)
+        (itinerary_entity_availability_allocated ?itinerary_entity)
+        (itinerary_entity_assigned_time_window ?itinerary_entity ?service_time_window)
+        (not
+          (itinerary_entity_time_confirmed ?itinerary_entity)
+        )
+      )
+    :effect (itinerary_entity_time_confirmed ?itinerary_entity)
+  )
+  (:action release_time_window_from_entity
+    :parameters (?itinerary_entity - itinerary_entity ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_assigned_time_window ?itinerary_entity ?service_time_window)
+      )
+    :effect
+      (and
+        (service_time_window_available ?service_time_window)
+        (not
+          (itinerary_entity_assigned_time_window ?itinerary_entity ?service_time_window)
+        )
+      )
+  )
+  (:action assign_seating_option_to_entity
+    :parameters (?itinerary_entity - itinerary_entity ?seating_option - seating_option)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?itinerary_entity)
+        (seating_option_available ?seating_option)
+      )
+    :effect
+      (and
+        (itinerary_entity_assigned_seating_option ?itinerary_entity ?seating_option)
+        (not
+          (seating_option_available ?seating_option)
+        )
+      )
+  )
+  (:action unassign_seating_option_from_entity
+    :parameters (?itinerary_entity - itinerary_entity ?seating_option - seating_option)
+    :precondition
+      (and
+        (itinerary_entity_assigned_seating_option ?itinerary_entity ?seating_option)
+      )
+    :effect
+      (and
+        (seating_option_available ?seating_option)
+        (not
+          (itinerary_entity_assigned_seating_option ?itinerary_entity ?seating_option)
+        )
+      )
+  )
+  (:action attach_venue_feature
+    :parameters (?dining_venue - dining_venue ?venue_feature - venue_feature)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (venue_feature_available ?venue_feature)
+      )
+    :effect
+      (and
+        (venue_feature_attached ?dining_venue ?venue_feature)
+        (not
+          (venue_feature_available ?venue_feature)
+        )
+      )
+  )
+  (:action detach_venue_feature
+    :parameters (?dining_venue - dining_venue ?venue_feature - venue_feature)
+    :precondition
+      (and
+        (venue_feature_attached ?dining_venue ?venue_feature)
+      )
+    :effect
+      (and
+        (venue_feature_available ?venue_feature)
+        (not
+          (venue_feature_attached ?dining_venue ?venue_feature)
+        )
+      )
+  )
+  (:action attach_time_preference_option_to_venue
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (time_preference_available ?time_preference)
+      )
+    :effect
+      (and
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (not
+          (time_preference_available ?time_preference)
+        )
+      )
+  )
+  (:action detach_time_preference_option_from_venue
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference)
+    :precondition
+      (and
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+      )
+    :effect
+      (and
+        (time_preference_available ?time_preference)
+        (not
+          (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        )
+      )
+  )
+  (:action mark_morning_approach_leg_candidate
+    :parameters (?morning_segment - day_segment_morning ?approach_leg_morning - approach_leg_morning ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?morning_segment)
+        (itinerary_entity_assigned_time_window ?morning_segment ?service_time_window)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (not
+          (approach_leg_morning_candidate ?approach_leg_morning)
+        )
+        (not
+          (approach_leg_morning_menu_assigned ?approach_leg_morning)
+        )
+      )
+    :effect (approach_leg_morning_candidate ?approach_leg_morning)
+  )
+  (:action qualify_morning_segment_with_seating
+    :parameters (?morning_segment - day_segment_morning ?approach_leg_morning - approach_leg_morning ?seating_option - seating_option)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?morning_segment)
+        (itinerary_entity_assigned_seating_option ?morning_segment ?seating_option)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (approach_leg_morning_candidate ?approach_leg_morning)
+        (not
+          (morning_segment_ready_flag ?morning_segment)
+        )
+      )
+    :effect
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (morning_segment_marked_ready ?morning_segment)
+      )
+  )
+  (:action attach_menu_candidate_to_morning_segment
+    :parameters (?morning_segment - day_segment_morning ?approach_leg_morning - approach_leg_morning ?menu_candidate - menu_item_candidate)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?morning_segment)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (menu_item_candidate_available ?menu_candidate)
+        (not
+          (morning_segment_ready_flag ?morning_segment)
+        )
+      )
+    :effect
+      (and
+        (approach_leg_morning_menu_assigned ?approach_leg_morning)
+        (morning_segment_ready_flag ?morning_segment)
+        (morning_segment_selected_menu_item ?morning_segment ?menu_candidate)
+        (not
+          (menu_item_candidate_available ?menu_candidate)
+        )
+      )
+  )
+  (:action finalize_morning_segment_menu_selection
+    :parameters (?morning_segment - day_segment_morning ?approach_leg_morning - approach_leg_morning ?service_time_window - service_time_window ?menu_candidate - menu_item_candidate)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?morning_segment)
+        (itinerary_entity_assigned_time_window ?morning_segment ?service_time_window)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (approach_leg_morning_menu_assigned ?approach_leg_morning)
+        (morning_segment_selected_menu_item ?morning_segment ?menu_candidate)
+        (not
+          (morning_segment_marked_ready ?morning_segment)
+        )
+      )
+    :effect
+      (and
+        (approach_leg_morning_candidate ?approach_leg_morning)
+        (morning_segment_marked_ready ?morning_segment)
+        (menu_item_candidate_available ?menu_candidate)
+        (not
+          (morning_segment_selected_menu_item ?morning_segment ?menu_candidate)
+        )
+      )
+  )
+  (:action mark_afternoon_approach_leg_candidate
+    :parameters (?afternoon_segment - day_segment_afternoon ?approach_leg_afternoon - approach_leg_afternoon ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?afternoon_segment)
+        (itinerary_entity_assigned_time_window ?afternoon_segment ?service_time_window)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (not
+          (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+        )
+        (not
+          (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon)
+        )
+      )
+    :effect (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+  )
+  (:action qualify_afternoon_segment_with_seating
+    :parameters (?afternoon_segment - day_segment_afternoon ?approach_leg_afternoon - approach_leg_afternoon ?seating_option - seating_option)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?afternoon_segment)
+        (itinerary_entity_assigned_seating_option ?afternoon_segment ?seating_option)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+        (not
+          (afternoon_segment_ready_flag ?afternoon_segment)
+        )
+      )
+    :effect
+      (and
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (afternoon_segment_marked_ready ?afternoon_segment)
+      )
+  )
+  (:action attach_menu_candidate_to_afternoon_segment
+    :parameters (?afternoon_segment - day_segment_afternoon ?approach_leg_afternoon - approach_leg_afternoon ?menu_candidate - menu_item_candidate)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?afternoon_segment)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (menu_item_candidate_available ?menu_candidate)
+        (not
+          (afternoon_segment_ready_flag ?afternoon_segment)
+        )
+      )
+    :effect
+      (and
+        (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon)
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (afternoon_segment_selected_menu_item ?afternoon_segment ?menu_candidate)
+        (not
+          (menu_item_candidate_available ?menu_candidate)
+        )
+      )
+  )
+  (:action finalize_afternoon_segment_menu_selection
+    :parameters (?afternoon_segment - day_segment_afternoon ?approach_leg_afternoon - approach_leg_afternoon ?service_time_window - service_time_window ?menu_candidate - menu_item_candidate)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?afternoon_segment)
+        (itinerary_entity_assigned_time_window ?afternoon_segment ?service_time_window)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon)
+        (afternoon_segment_selected_menu_item ?afternoon_segment ?menu_candidate)
+        (not
+          (afternoon_segment_marked_ready ?afternoon_segment)
+        )
+      )
+    :effect
+      (and
+        (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+        (afternoon_segment_marked_ready ?afternoon_segment)
+        (menu_item_candidate_available ?menu_candidate)
+        (not
+          (afternoon_segment_selected_menu_item ?afternoon_segment ?menu_candidate)
+        )
+      )
+  )
+  (:action assemble_reservation_proposal
+    :parameters (?morning_segment - day_segment_morning ?afternoon_segment - day_segment_afternoon ?approach_leg_morning - approach_leg_morning ?approach_leg_afternoon - approach_leg_afternoon ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_morning_candidate ?approach_leg_morning)
+        (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+        (morning_segment_marked_ready ?morning_segment)
+        (afternoon_segment_marked_ready ?afternoon_segment)
+        (reservation_proposal_template_available ?reservation_proposal)
+      )
+    :effect
+      (and
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_linked_to_morning_approach_leg ?reservation_proposal ?approach_leg_morning)
+        (proposal_linked_to_afternoon_approach_leg ?reservation_proposal ?approach_leg_afternoon)
+        (not
+          (reservation_proposal_template_available ?reservation_proposal)
+        )
+      )
+  )
+  (:action assemble_reservation_proposal_with_primary_table_flag
+    :parameters (?morning_segment - day_segment_morning ?afternoon_segment - day_segment_afternoon ?approach_leg_morning - approach_leg_morning ?approach_leg_afternoon - approach_leg_afternoon ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_morning_menu_assigned ?approach_leg_morning)
+        (approach_leg_afternoon_candidate ?approach_leg_afternoon)
+        (not
+          (morning_segment_marked_ready ?morning_segment)
+        )
+        (afternoon_segment_marked_ready ?afternoon_segment)
+        (reservation_proposal_template_available ?reservation_proposal)
+      )
+    :effect
+      (and
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_linked_to_morning_approach_leg ?reservation_proposal ?approach_leg_morning)
+        (proposal_linked_to_afternoon_approach_leg ?reservation_proposal ?approach_leg_afternoon)
+        (proposal_table_configuration_flag_primary ?reservation_proposal)
+        (not
+          (reservation_proposal_template_available ?reservation_proposal)
+        )
+      )
+  )
+  (:action assemble_reservation_proposal_with_secondary_table_flag
+    :parameters (?morning_segment - day_segment_morning ?afternoon_segment - day_segment_afternoon ?approach_leg_morning - approach_leg_morning ?approach_leg_afternoon - approach_leg_afternoon ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_morning_candidate ?approach_leg_morning)
+        (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon)
+        (morning_segment_marked_ready ?morning_segment)
+        (not
+          (afternoon_segment_marked_ready ?afternoon_segment)
+        )
+        (reservation_proposal_template_available ?reservation_proposal)
+      )
+    :effect
+      (and
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_linked_to_morning_approach_leg ?reservation_proposal ?approach_leg_morning)
+        (proposal_linked_to_afternoon_approach_leg ?reservation_proposal ?approach_leg_afternoon)
+        (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        (not
+          (reservation_proposal_template_available ?reservation_proposal)
+        )
+      )
+  )
+  (:action assemble_reservation_proposal_with_both_table_flags
+    :parameters (?morning_segment - day_segment_morning ?afternoon_segment - day_segment_afternoon ?approach_leg_morning - approach_leg_morning ?approach_leg_afternoon - approach_leg_afternoon ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (morning_segment_linked_approach_leg ?morning_segment ?approach_leg_morning)
+        (afternoon_segment_linked_approach_leg ?afternoon_segment ?approach_leg_afternoon)
+        (approach_leg_morning_menu_assigned ?approach_leg_morning)
+        (approach_leg_afternoon_menu_assigned ?approach_leg_afternoon)
+        (not
+          (morning_segment_marked_ready ?morning_segment)
+        )
+        (not
+          (afternoon_segment_marked_ready ?afternoon_segment)
+        )
+        (reservation_proposal_template_available ?reservation_proposal)
+      )
+    :effect
+      (and
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_linked_to_morning_approach_leg ?reservation_proposal ?approach_leg_morning)
+        (proposal_linked_to_afternoon_approach_leg ?reservation_proposal ?approach_leg_afternoon)
+        (proposal_table_configuration_flag_primary ?reservation_proposal)
+        (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        (not
+          (reservation_proposal_template_available ?reservation_proposal)
+        )
+      )
+  )
+  (:action lock_reservation_proposal_for_table_assignment
+    :parameters (?reservation_proposal - reservation_proposal ?morning_segment - day_segment_morning ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (reservation_proposal_created ?reservation_proposal)
+        (morning_segment_ready_flag ?morning_segment)
+        (itinerary_entity_assigned_time_window ?morning_segment ?service_time_window)
+        (not
+          (proposal_table_assignment_locked ?reservation_proposal)
+        )
+      )
+    :effect (proposal_table_assignment_locked ?reservation_proposal)
+  )
+  (:action select_table_configuration_for_proposal
+    :parameters (?dining_venue - dining_venue ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (venue_linked_to_reservation_proposal_template ?dining_venue ?reservation_proposal)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_available ?table_configuration)
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_table_assignment_locked ?reservation_proposal)
+        (not
+          (table_configuration_selected ?table_configuration)
+        )
+      )
+    :effect
+      (and
+        (table_configuration_selected ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (not
+          (table_configuration_available ?table_configuration)
+        )
+      )
+  )
+  (:action confirm_table_configuration_with_venue
+    :parameters (?dining_venue - dining_venue ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_selected ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (itinerary_entity_assigned_time_window ?dining_venue ?service_time_window)
+        (not
+          (proposal_table_configuration_flag_primary ?reservation_proposal)
+        )
+        (not
+          (venue_configuration_confirmed ?dining_venue)
+        )
+      )
+    :effect (venue_configuration_confirmed ?dining_venue)
+  )
+  (:action attach_promotion_to_venue
+    :parameters (?dining_venue - dining_venue ?marketing_promotion - marketing_promotion)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (promotion_available ?marketing_promotion)
+        (not
+          (venue_promotion_attached ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_promotion_attached ?dining_venue)
+        (venue_linked_promotion ?dining_venue ?marketing_promotion)
+        (not
+          (promotion_available ?marketing_promotion)
+        )
+      )
+  )
+  (:action apply_promotion_and_confirm_configuration
+    :parameters (?dining_venue - dining_venue ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal ?service_time_window - service_time_window ?marketing_promotion - marketing_promotion)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_selected ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (itinerary_entity_assigned_time_window ?dining_venue ?service_time_window)
+        (proposal_table_configuration_flag_primary ?reservation_proposal)
+        (venue_promotion_attached ?dining_venue)
+        (venue_linked_promotion ?dining_venue ?marketing_promotion)
+        (not
+          (venue_configuration_confirmed ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_configuration_confirmed ?dining_venue)
+        (venue_promotion_applied ?dining_venue)
+      )
+  )
+  (:action apply_venue_feature_primary_flow
+    :parameters (?dining_venue - dining_venue ?venue_feature - venue_feature ?seating_option - seating_option ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_configuration_confirmed ?dining_venue)
+        (venue_feature_attached ?dining_venue ?venue_feature)
+        (itinerary_entity_assigned_seating_option ?dining_venue ?seating_option)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (not
+          (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        )
+        (not
+          (venue_feature_applied ?dining_venue)
+        )
+      )
+    :effect (venue_feature_applied ?dining_venue)
+  )
+  (:action apply_venue_feature_secondary_flow
+    :parameters (?dining_venue - dining_venue ?venue_feature - venue_feature ?seating_option - seating_option ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_configuration_confirmed ?dining_venue)
+        (venue_feature_attached ?dining_venue ?venue_feature)
+        (itinerary_entity_assigned_seating_option ?dining_venue ?seating_option)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        (not
+          (venue_feature_applied ?dining_venue)
+        )
+      )
+    :effect (venue_feature_applied ?dining_venue)
+  )
+  (:action bind_time_preference_and_mark_venue_ready
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_feature_applied ?dining_venue)
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (not
+          (proposal_table_configuration_flag_primary ?reservation_proposal)
+        )
+        (not
+          (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        )
+        (not
+          (venue_ready_for_binding ?dining_venue)
+        )
+      )
+    :effect (venue_ready_for_binding ?dining_venue)
+  )
+  (:action bind_time_preference_and_prepare_venue_for_preferences
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_feature_applied ?dining_venue)
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (proposal_table_configuration_flag_primary ?reservation_proposal)
+        (not
+          (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        )
+        (not
+          (venue_ready_for_binding ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_ready_for_preference_binding ?dining_venue)
+      )
+  )
+  (:action bind_time_preference_and_prepare_venue_variant_b
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_feature_applied ?dining_venue)
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (not
+          (proposal_table_configuration_flag_primary ?reservation_proposal)
+        )
+        (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        (not
+          (venue_ready_for_binding ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_ready_for_preference_binding ?dining_venue)
+      )
+  )
+  (:action bind_time_preference_and_prepare_venue_with_both_flags
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference ?table_configuration - table_configuration ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (venue_feature_applied ?dining_venue)
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (venue_supports_table_configuration ?dining_venue ?table_configuration)
+        (table_configuration_assigned_to_proposal ?table_configuration ?reservation_proposal)
+        (proposal_table_configuration_flag_primary ?reservation_proposal)
+        (proposal_table_configuration_flag_secondary ?reservation_proposal)
+        (not
+          (venue_ready_for_binding ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_ready_for_preference_binding ?dining_venue)
+      )
+  )
+  (:action confirm_venue_for_guest_binding
+    :parameters (?dining_venue - dining_venue)
+    :precondition
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (not
+          (venue_ready_for_preference_binding ?dining_venue)
+        )
+        (not
+          (venue_confirmed ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_confirmed ?dining_venue)
+        (guest_binding_ready ?dining_venue)
+      )
+  )
+  (:action attach_dietary_constraint_to_venue
+    :parameters (?dining_venue - dining_venue ?dietary_constraint - dietary_constraint)
+    :precondition
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_ready_for_preference_binding ?dining_venue)
+        (dietary_constraint_available ?dietary_constraint)
+      )
+    :effect
+      (and
+        (venue_linked_dietary_constraint ?dining_venue ?dietary_constraint)
+        (not
+          (dietary_constraint_available ?dietary_constraint)
+        )
+      )
+  )
+  (:action finalize_venue_check_and_mark_complete
+    :parameters (?dining_venue - dining_venue ?morning_segment - day_segment_morning ?afternoon_segment - day_segment_afternoon ?service_time_window - service_time_window ?dietary_constraint - dietary_constraint)
+    :precondition
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_ready_for_preference_binding ?dining_venue)
+        (venue_linked_dietary_constraint ?dining_venue ?dietary_constraint)
+        (venue_suitable_for_morning_segment ?dining_venue ?morning_segment)
+        (venue_suitable_for_afternoon_segment ?dining_venue ?afternoon_segment)
+        (morning_segment_marked_ready ?morning_segment)
+        (afternoon_segment_marked_ready ?afternoon_segment)
+        (itinerary_entity_assigned_time_window ?dining_venue ?service_time_window)
+        (not
+          (venue_final_checks_passed ?dining_venue)
+        )
+      )
+    :effect (venue_final_checks_passed ?dining_venue)
+  )
+  (:action final_confirm_venue_and_enable_guest_binding
+    :parameters (?dining_venue - dining_venue)
+    :precondition
+      (and
+        (venue_ready_for_binding ?dining_venue)
+        (venue_final_checks_passed ?dining_venue)
+        (not
+          (venue_confirmed ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_confirmed ?dining_venue)
+        (guest_binding_ready ?dining_venue)
+      )
+  )
+  (:action attach_special_request_to_venue
+    :parameters (?dining_venue - dining_venue ?special_request_option - special_request_option ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (itinerary_entity_time_confirmed ?dining_venue)
+        (itinerary_entity_assigned_time_window ?dining_venue ?service_time_window)
+        (special_request_option_available ?special_request_option)
+        (venue_supports_special_request_option ?dining_venue ?special_request_option)
+        (not
+          (venue_special_request_bound ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_special_request_bound ?dining_venue)
+        (not
+          (special_request_option_available ?special_request_option)
+        )
+      )
+  )
+  (:action process_venue_special_request
+    :parameters (?dining_venue - dining_venue ?seating_option - seating_option)
+    :precondition
+      (and
+        (venue_special_request_bound ?dining_venue)
+        (itinerary_entity_assigned_seating_option ?dining_venue ?seating_option)
+        (not
+          (venue_special_request_processed ?dining_venue)
+        )
+      )
+    :effect (venue_special_request_processed ?dining_venue)
+  )
+  (:action confirm_venue_time_preference_request
+    :parameters (?dining_venue - dining_venue ?time_preference - time_preference)
+    :precondition
+      (and
+        (venue_special_request_processed ?dining_venue)
+        (venue_linked_time_preference_option ?dining_venue ?time_preference)
+        (not
+          (venue_special_request_confirmed ?dining_venue)
+        )
+      )
+    :effect (venue_special_request_confirmed ?dining_venue)
+  )
+  (:action finalize_special_request_and_mark_venue
+    :parameters (?dining_venue - dining_venue)
+    :precondition
+      (and
+        (venue_special_request_confirmed ?dining_venue)
+        (not
+          (venue_confirmed ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (venue_confirmed ?dining_venue)
+        (guest_binding_ready ?dining_venue)
+      )
+  )
+  (:action commit_reservation_to_morning_segment
+    :parameters (?morning_segment - day_segment_morning ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (morning_segment_ready_flag ?morning_segment)
+        (morning_segment_marked_ready ?morning_segment)
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_table_assignment_locked ?reservation_proposal)
+        (not
+          (guest_binding_ready ?morning_segment)
+        )
+      )
+    :effect (guest_binding_ready ?morning_segment)
+  )
+  (:action commit_reservation_to_afternoon_segment
+    :parameters (?afternoon_segment - day_segment_afternoon ?reservation_proposal - reservation_proposal)
+    :precondition
+      (and
+        (afternoon_segment_ready_flag ?afternoon_segment)
+        (afternoon_segment_marked_ready ?afternoon_segment)
+        (reservation_proposal_created ?reservation_proposal)
+        (proposal_table_assignment_locked ?reservation_proposal)
+        (not
+          (guest_binding_ready ?afternoon_segment)
+        )
+      )
+    :effect (guest_binding_ready ?afternoon_segment)
+  )
+  (:action assign_meal_category_to_itinerary_entity
+    :parameters (?itinerary_entity - itinerary_entity ?meal_category - meal_category ?service_time_window - service_time_window)
+    :precondition
+      (and
+        (guest_binding_ready ?itinerary_entity)
+        (itinerary_entity_assigned_time_window ?itinerary_entity ?service_time_window)
+        (meal_category_available ?meal_category)
+        (not
+          (itinerary_entity_guest_bound ?itinerary_entity)
+        )
+      )
+    :effect
+      (and
+        (itinerary_entity_guest_bound ?itinerary_entity)
+        (itinerary_entity_assigned_meal_category ?itinerary_entity ?meal_category)
+        (not
+          (meal_category_available ?meal_category)
+        )
+      )
+  )
+  (:action finalize_and_commit_morning_segment_reservation
+    :parameters (?morning_segment - day_segment_morning ?availability_token - venue_availability_token ?meal_category - meal_category)
+    :precondition
+      (and
+        (itinerary_entity_guest_bound ?morning_segment)
+        (entity_allocated_to_availability_token ?morning_segment ?availability_token)
+        (itinerary_entity_assigned_meal_category ?morning_segment ?meal_category)
+        (not
+          (itinerary_entity_committed ?morning_segment)
+        )
+      )
+    :effect
+      (and
+        (itinerary_entity_committed ?morning_segment)
+        (availability_token_available ?availability_token)
+        (meal_category_available ?meal_category)
+      )
+  )
+  (:action finalize_and_commit_afternoon_segment_reservation
+    :parameters (?afternoon_segment - day_segment_afternoon ?availability_token - venue_availability_token ?meal_category - meal_category)
+    :precondition
+      (and
+        (itinerary_entity_guest_bound ?afternoon_segment)
+        (entity_allocated_to_availability_token ?afternoon_segment ?availability_token)
+        (itinerary_entity_assigned_meal_category ?afternoon_segment ?meal_category)
+        (not
+          (itinerary_entity_committed ?afternoon_segment)
+        )
+      )
+    :effect
+      (and
+        (itinerary_entity_committed ?afternoon_segment)
+        (availability_token_available ?availability_token)
+        (meal_category_available ?meal_category)
+      )
+  )
+  (:action finalize_and_commit_venue_reservation
+    :parameters (?dining_venue - dining_venue ?availability_token - venue_availability_token ?meal_category - meal_category)
+    :precondition
+      (and
+        (itinerary_entity_guest_bound ?dining_venue)
+        (entity_allocated_to_availability_token ?dining_venue ?availability_token)
+        (itinerary_entity_assigned_meal_category ?dining_venue ?meal_category)
+        (not
+          (itinerary_entity_committed ?dining_venue)
+        )
+      )
+    :effect
+      (and
+        (itinerary_entity_committed ?dining_venue)
+        (availability_token_available ?availability_token)
+        (meal_category_available ?meal_category)
+      )
+  )
+)

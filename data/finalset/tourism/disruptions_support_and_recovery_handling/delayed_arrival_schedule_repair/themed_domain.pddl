@@ -1,0 +1,937 @@
+(define (domain delayed_arrival_schedule_repair_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object provider_resource - domain_object service_entity - domain_object contract_entity - domain_object domain_entity - domain_object support_case - domain_entity communication_channel - provider_resource affected_booking - provider_resource provider_representative - provider_resource policy_reference - provider_resource escalation_path - provider_resource compensation_claim - provider_resource accommodation_offer - provider_resource third_party_contact - provider_resource compensation_option - service_entity vendor_confirmation_document - service_entity voucher_offer - service_entity arrival_delay_scenario - contract_entity connection_delay_scenario - contract_entity itinerary_proposal - contract_entity itinerary_component - support_case coordinator_role - support_case arrival_segment - itinerary_component connecting_segment - itinerary_component recovery_coordinator - coordinator_role)
+
+  (:predicates
+    (entity_registered ?support_record - support_case)
+    (entity_assigned_for_recovery ?support_record - support_case)
+    (entity_assigned_communication_channel ?support_record - support_case)
+    (entity_recovery_finalized ?support_record - support_case)
+    (entity_recovery_executed ?support_record - support_case)
+    (entity_compensation_processed ?support_record - support_case)
+    (entity_available_communication_channel ?communication_channel - communication_channel)
+    (support_record_assigned_communication_channel ?support_record - support_case ?communication_channel - communication_channel)
+    (entity_available_affected_booking ?affected_booking - affected_booking)
+    (support_record_linked_booking ?support_record - support_case ?affected_booking - affected_booking)
+    (entity_available_provider_representative ?provider_representative - provider_representative)
+    (support_record_assigned_provider_representative ?support_record - support_case ?provider_representative - provider_representative)
+    (entity_available_compensation_option ?compensation_option - compensation_option)
+    (arrival_segment_assigned_compensation_option ?arrival_segment - arrival_segment ?compensation_option - compensation_option)
+    (connecting_segment_assigned_compensation_option ?connecting_segment - connecting_segment ?compensation_option - compensation_option)
+    (arrival_segment_has_delay_scenario ?arrival_segment - arrival_segment ?arrival_delay_scenario - arrival_delay_scenario)
+    (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario - arrival_delay_scenario)
+    (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario - arrival_delay_scenario)
+    (arrival_segment_ready_for_proposal ?arrival_segment - arrival_segment)
+    (connecting_segment_has_connection_delay_scenario ?connecting_segment - connecting_segment ?connection_delay_scenario - connection_delay_scenario)
+    (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario - connection_delay_scenario)
+    (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario - connection_delay_scenario)
+    (connecting_segment_ready_for_proposal ?connecting_segment - connecting_segment)
+    (entity_available_itinerary_proposal ?itinerary_proposal - itinerary_proposal)
+    (itinerary_proposal_allocated ?itinerary_proposal - itinerary_proposal)
+    (itinerary_proposal_covers_arrival_scenario ?itinerary_proposal - itinerary_proposal ?arrival_delay_scenario - arrival_delay_scenario)
+    (itinerary_proposal_covers_connection_scenario ?itinerary_proposal - itinerary_proposal ?connection_delay_scenario - connection_delay_scenario)
+    (itinerary_proposal_routed_to_vendor ?itinerary_proposal - itinerary_proposal)
+    (itinerary_proposal_requires_escalation ?itinerary_proposal - itinerary_proposal)
+    (itinerary_proposal_validated ?itinerary_proposal - itinerary_proposal)
+    (coordinator_responsible_for_arrival_segment ?recovery_coordinator - recovery_coordinator ?arrival_segment - arrival_segment)
+    (coordinator_responsible_for_connecting_segment ?recovery_coordinator - recovery_coordinator ?connecting_segment - connecting_segment)
+    (coordinator_responsible_for_itinerary_proposal ?recovery_coordinator - recovery_coordinator ?itinerary_proposal - itinerary_proposal)
+    (vendor_confirmation_document_available ?vendor_confirmation_document - vendor_confirmation_document)
+    (coordinator_attached_vendor_confirmation_document ?recovery_coordinator - recovery_coordinator ?vendor_confirmation_document - vendor_confirmation_document)
+    (vendor_confirmation_document_consumed ?vendor_confirmation_document - vendor_confirmation_document)
+    (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    (coordinator_ready_for_approval ?recovery_coordinator - recovery_coordinator)
+    (coordinator_initiated_vendor_followup ?recovery_coordinator - recovery_coordinator)
+    (coordinator_received_all_confirmations ?recovery_coordinator - recovery_coordinator)
+    (coordinator_policy_engaged ?recovery_coordinator - recovery_coordinator)
+    (coordinator_policy_acknowledged ?recovery_coordinator - recovery_coordinator)
+    (coordinator_escalation_attached ?recovery_coordinator - recovery_coordinator)
+    (coordinator_approval_recorded ?recovery_coordinator - recovery_coordinator)
+    (voucher_offer_available ?voucher_offer - voucher_offer)
+    (coordinator_linked_voucher_offer ?recovery_coordinator - recovery_coordinator ?voucher_offer - voucher_offer)
+    (coordinator_voucher_reserved ?recovery_coordinator - recovery_coordinator)
+    (coordinator_voucher_issued_pending ?recovery_coordinator - recovery_coordinator)
+    (coordinator_voucher_issue_confirmed ?recovery_coordinator - recovery_coordinator)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (coordinator_linked_policy_reference ?recovery_coordinator - recovery_coordinator ?policy_reference - policy_reference)
+    (escalation_path_available ?escalation_path - escalation_path)
+    (coordinator_linked_escalation_path ?recovery_coordinator - recovery_coordinator ?escalation_path - escalation_path)
+    (accommodation_offer_available ?accommodation_offer - accommodation_offer)
+    (coordinator_linked_accommodation_offer ?recovery_coordinator - recovery_coordinator ?accommodation_offer - accommodation_offer)
+    (third_party_contact_available ?third_party_contact - third_party_contact)
+    (coordinator_assigned_third_party_contact ?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact)
+    (compensation_claim_available ?compensation_claim - compensation_claim)
+    (support_record_linked_compensation_claim ?support_record - support_case ?compensation_claim - compensation_claim)
+    (arrival_segment_engaged_in_process ?arrival_segment - arrival_segment)
+    (connecting_segment_engaged_in_process ?connecting_segment - connecting_segment)
+    (coordinator_final_signoff_completed ?recovery_coordinator - recovery_coordinator)
+  )
+  (:action register_support_record
+    :parameters (?support_record - support_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?support_record)
+        )
+        (not
+          (entity_recovery_finalized ?support_record)
+        )
+      )
+    :effect (entity_registered ?support_record)
+  )
+  (:action assign_communication_channel_to_support_record
+    :parameters (?support_record - support_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (entity_registered ?support_record)
+        (not
+          (entity_assigned_communication_channel ?support_record)
+        )
+        (entity_available_communication_channel ?communication_channel)
+      )
+    :effect
+      (and
+        (entity_assigned_communication_channel ?support_record)
+        (support_record_assigned_communication_channel ?support_record ?communication_channel)
+        (not
+          (entity_available_communication_channel ?communication_channel)
+        )
+      )
+  )
+  (:action attach_booking_to_support_record
+    :parameters (?support_record - support_case ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_registered ?support_record)
+        (entity_assigned_communication_channel ?support_record)
+        (entity_available_affected_booking ?affected_booking)
+      )
+    :effect
+      (and
+        (support_record_linked_booking ?support_record ?affected_booking)
+        (not
+          (entity_available_affected_booking ?affected_booking)
+        )
+      )
+  )
+  (:action assign_support_record_for_recovery
+    :parameters (?support_record - support_case ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_registered ?support_record)
+        (entity_assigned_communication_channel ?support_record)
+        (support_record_linked_booking ?support_record ?affected_booking)
+        (not
+          (entity_assigned_for_recovery ?support_record)
+        )
+      )
+    :effect (entity_assigned_for_recovery ?support_record)
+  )
+  (:action release_booking_from_support_record
+    :parameters (?support_record - support_case ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (support_record_linked_booking ?support_record ?affected_booking)
+      )
+    :effect
+      (and
+        (entity_available_affected_booking ?affected_booking)
+        (not
+          (support_record_linked_booking ?support_record ?affected_booking)
+        )
+      )
+  )
+  (:action assign_provider_representative_to_support_record
+    :parameters (?support_record - support_case ?provider_representative - provider_representative)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?support_record)
+        (entity_available_provider_representative ?provider_representative)
+      )
+    :effect
+      (and
+        (support_record_assigned_provider_representative ?support_record ?provider_representative)
+        (not
+          (entity_available_provider_representative ?provider_representative)
+        )
+      )
+  )
+  (:action release_provider_representative_from_support_record
+    :parameters (?support_record - support_case ?provider_representative - provider_representative)
+    :precondition
+      (and
+        (support_record_assigned_provider_representative ?support_record ?provider_representative)
+      )
+    :effect
+      (and
+        (entity_available_provider_representative ?provider_representative)
+        (not
+          (support_record_assigned_provider_representative ?support_record ?provider_representative)
+        )
+      )
+  )
+  (:action assign_accommodation_offer_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?accommodation_offer - accommodation_offer)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (accommodation_offer_available ?accommodation_offer)
+      )
+    :effect
+      (and
+        (coordinator_linked_accommodation_offer ?recovery_coordinator ?accommodation_offer)
+        (not
+          (accommodation_offer_available ?accommodation_offer)
+        )
+      )
+  )
+  (:action release_accommodation_offer_from_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?accommodation_offer - accommodation_offer)
+    :precondition
+      (and
+        (coordinator_linked_accommodation_offer ?recovery_coordinator ?accommodation_offer)
+      )
+    :effect
+      (and
+        (accommodation_offer_available ?accommodation_offer)
+        (not
+          (coordinator_linked_accommodation_offer ?recovery_coordinator ?accommodation_offer)
+        )
+      )
+  )
+  (:action assign_third_party_contact_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (third_party_contact_available ?third_party_contact)
+      )
+    :effect
+      (and
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (not
+          (third_party_contact_available ?third_party_contact)
+        )
+      )
+  )
+  (:action release_third_party_contact_from_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+      )
+    :effect
+      (and
+        (third_party_contact_available ?third_party_contact)
+        (not
+          (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        )
+      )
+  )
+  (:action assess_arrival_segment_delay_and_mark_for_proposal
+    :parameters (?arrival_segment - arrival_segment ?arrival_delay_scenario - arrival_delay_scenario ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?arrival_segment)
+        (support_record_linked_booking ?arrival_segment ?affected_booking)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (not
+          (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+        )
+        (not
+          (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario)
+        )
+      )
+    :effect (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+  )
+  (:action allocate_provider_and_prepare_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?arrival_delay_scenario - arrival_delay_scenario ?provider_representative - provider_representative)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?arrival_segment)
+        (support_record_assigned_provider_representative ?arrival_segment ?provider_representative)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+        (not
+          (arrival_segment_engaged_in_process ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+      )
+  )
+  (:action apply_compensation_option_to_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?arrival_delay_scenario - arrival_delay_scenario ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?arrival_segment)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (entity_available_compensation_option ?compensation_option)
+        (not
+          (arrival_segment_engaged_in_process ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario)
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (arrival_segment_assigned_compensation_option ?arrival_segment ?compensation_option)
+        (not
+          (entity_available_compensation_option ?compensation_option)
+        )
+      )
+  )
+  (:action confirm_compensation_option_for_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?arrival_delay_scenario - arrival_delay_scenario ?affected_booking - affected_booking ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?arrival_segment)
+        (support_record_linked_booking ?arrival_segment ?affected_booking)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario)
+        (arrival_segment_assigned_compensation_option ?arrival_segment ?compensation_option)
+        (not
+          (arrival_segment_ready_for_proposal ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+        (entity_available_compensation_option ?compensation_option)
+        (not
+          (arrival_segment_assigned_compensation_option ?arrival_segment ?compensation_option)
+        )
+      )
+  )
+  (:action assess_connecting_segment_delay_and_mark_for_proposal
+    :parameters (?connecting_segment - connecting_segment ?connection_delay_scenario - connection_delay_scenario ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?connecting_segment)
+        (support_record_linked_booking ?connecting_segment ?affected_booking)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (not
+          (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+        )
+        (not
+          (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario)
+        )
+      )
+    :effect (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+  )
+  (:action allocate_provider_and_prepare_connecting_segment
+    :parameters (?connecting_segment - connecting_segment ?connection_delay_scenario - connection_delay_scenario ?provider_representative - provider_representative)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?connecting_segment)
+        (support_record_assigned_provider_representative ?connecting_segment ?provider_representative)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+        (not
+          (connecting_segment_engaged_in_process ?connecting_segment)
+        )
+      )
+    :effect
+      (and
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+      )
+  )
+  (:action apply_compensation_option_to_connecting_segment
+    :parameters (?connecting_segment - connecting_segment ?connection_delay_scenario - connection_delay_scenario ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?connecting_segment)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (entity_available_compensation_option ?compensation_option)
+        (not
+          (connecting_segment_engaged_in_process ?connecting_segment)
+        )
+      )
+    :effect
+      (and
+        (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario)
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (connecting_segment_assigned_compensation_option ?connecting_segment ?compensation_option)
+        (not
+          (entity_available_compensation_option ?compensation_option)
+        )
+      )
+  )
+  (:action confirm_compensation_option_for_connecting_segment
+    :parameters (?connecting_segment - connecting_segment ?connection_delay_scenario - connection_delay_scenario ?affected_booking - affected_booking ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?connecting_segment)
+        (support_record_linked_booking ?connecting_segment ?affected_booking)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario)
+        (connecting_segment_assigned_compensation_option ?connecting_segment ?compensation_option)
+        (not
+          (connecting_segment_ready_for_proposal ?connecting_segment)
+        )
+      )
+    :effect
+      (and
+        (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+        (entity_available_compensation_option ?compensation_option)
+        (not
+          (connecting_segment_assigned_compensation_option ?connecting_segment ?compensation_option)
+        )
+      )
+  )
+  (:action assemble_and_allocate_itinerary_proposal
+    :parameters (?arrival_segment - arrival_segment ?connecting_segment - connecting_segment ?arrival_delay_scenario - arrival_delay_scenario ?connection_delay_scenario - connection_delay_scenario ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+        (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+        (entity_available_itinerary_proposal ?itinerary_proposal)
+      )
+    :effect
+      (and
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_covers_arrival_scenario ?itinerary_proposal ?arrival_delay_scenario)
+        (itinerary_proposal_covers_connection_scenario ?itinerary_proposal ?connection_delay_scenario)
+        (not
+          (entity_available_itinerary_proposal ?itinerary_proposal)
+        )
+      )
+  )
+  (:action assemble_itinerary_proposal_route_to_vendor
+    :parameters (?arrival_segment - arrival_segment ?connecting_segment - connecting_segment ?arrival_delay_scenario - arrival_delay_scenario ?connection_delay_scenario - connection_delay_scenario ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario)
+        (connection_delay_scenario_marked_for_proposal ?connection_delay_scenario)
+        (not
+          (arrival_segment_ready_for_proposal ?arrival_segment)
+        )
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+        (entity_available_itinerary_proposal ?itinerary_proposal)
+      )
+    :effect
+      (and
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_covers_arrival_scenario ?itinerary_proposal ?arrival_delay_scenario)
+        (itinerary_proposal_covers_connection_scenario ?itinerary_proposal ?connection_delay_scenario)
+        (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        (not
+          (entity_available_itinerary_proposal ?itinerary_proposal)
+        )
+      )
+  )
+  (:action assemble_itinerary_proposal_require_escalation
+    :parameters (?arrival_segment - arrival_segment ?connecting_segment - connecting_segment ?arrival_delay_scenario - arrival_delay_scenario ?connection_delay_scenario - connection_delay_scenario ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (arrival_delay_scenario_marked_for_proposal ?arrival_delay_scenario)
+        (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+        (not
+          (connecting_segment_ready_for_proposal ?connecting_segment)
+        )
+        (entity_available_itinerary_proposal ?itinerary_proposal)
+      )
+    :effect
+      (and
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_covers_arrival_scenario ?itinerary_proposal ?arrival_delay_scenario)
+        (itinerary_proposal_covers_connection_scenario ?itinerary_proposal ?connection_delay_scenario)
+        (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        (not
+          (entity_available_itinerary_proposal ?itinerary_proposal)
+        )
+      )
+  )
+  (:action assemble_itinerary_proposal_with_vendor_and_escalation
+    :parameters (?arrival_segment - arrival_segment ?connecting_segment - connecting_segment ?arrival_delay_scenario - arrival_delay_scenario ?connection_delay_scenario - connection_delay_scenario ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (arrival_segment_has_delay_scenario ?arrival_segment ?arrival_delay_scenario)
+        (connecting_segment_has_connection_delay_scenario ?connecting_segment ?connection_delay_scenario)
+        (arrival_delay_scenario_marked_for_accommodation ?arrival_delay_scenario)
+        (connection_delay_scenario_marked_for_alternative ?connection_delay_scenario)
+        (not
+          (arrival_segment_ready_for_proposal ?arrival_segment)
+        )
+        (not
+          (connecting_segment_ready_for_proposal ?connecting_segment)
+        )
+        (entity_available_itinerary_proposal ?itinerary_proposal)
+      )
+    :effect
+      (and
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_covers_arrival_scenario ?itinerary_proposal ?arrival_delay_scenario)
+        (itinerary_proposal_covers_connection_scenario ?itinerary_proposal ?connection_delay_scenario)
+        (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        (not
+          (entity_available_itinerary_proposal ?itinerary_proposal)
+        )
+      )
+  )
+  (:action coordinator_validate_itinerary_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?arrival_segment - arrival_segment ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (support_record_linked_booking ?arrival_segment ?affected_booking)
+        (not
+          (itinerary_proposal_validated ?itinerary_proposal)
+        )
+      )
+    :effect (itinerary_proposal_validated ?itinerary_proposal)
+  )
+  (:action attach_vendor_confirmation_document_to_proposal
+    :parameters (?recovery_coordinator - recovery_coordinator ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (coordinator_responsible_for_itinerary_proposal ?recovery_coordinator ?itinerary_proposal)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_available ?vendor_confirmation_document)
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_validated ?itinerary_proposal)
+        (not
+          (vendor_confirmation_document_consumed ?vendor_confirmation_document)
+        )
+      )
+    :effect
+      (and
+        (vendor_confirmation_document_consumed ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (not
+          (vendor_confirmation_document_available ?vendor_confirmation_document)
+        )
+      )
+  )
+  (:action mark_coordinator_ready_for_approval
+    :parameters (?recovery_coordinator - recovery_coordinator ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_consumed ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (support_record_linked_booking ?recovery_coordinator ?affected_booking)
+        (not
+          (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        )
+        (not
+          (coordinator_ready_for_approval ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_ready_for_approval ?recovery_coordinator)
+  )
+  (:action assign_policy_reference_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (policy_reference_available ?policy_reference)
+        (not
+          (coordinator_policy_engaged ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_policy_engaged ?recovery_coordinator)
+        (coordinator_linked_policy_reference ?recovery_coordinator ?policy_reference)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action acknowledge_policy_and_prepare_confirmation
+    :parameters (?recovery_coordinator - recovery_coordinator ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal ?affected_booking - affected_booking ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_consumed ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (support_record_linked_booking ?recovery_coordinator ?affected_booking)
+        (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        (coordinator_policy_engaged ?recovery_coordinator)
+        (coordinator_linked_policy_reference ?recovery_coordinator ?policy_reference)
+        (not
+          (coordinator_ready_for_approval ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_approval ?recovery_coordinator)
+        (coordinator_policy_acknowledged ?recovery_coordinator)
+      )
+  )
+  (:action coordinator_initiate_vendor_followup
+    :parameters (?recovery_coordinator - recovery_coordinator ?accommodation_offer - accommodation_offer ?provider_representative - provider_representative ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_ready_for_approval ?recovery_coordinator)
+        (coordinator_linked_accommodation_offer ?recovery_coordinator ?accommodation_offer)
+        (support_record_assigned_provider_representative ?recovery_coordinator ?provider_representative)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (not
+          (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        )
+        (not
+          (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_initiated_vendor_followup ?recovery_coordinator)
+  )
+  (:action coordinator_initiate_vendor_followup_with_escalation
+    :parameters (?recovery_coordinator - recovery_coordinator ?accommodation_offer - accommodation_offer ?provider_representative - provider_representative ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_ready_for_approval ?recovery_coordinator)
+        (coordinator_linked_accommodation_offer ?recovery_coordinator ?accommodation_offer)
+        (support_record_assigned_provider_representative ?recovery_coordinator ?provider_representative)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        (not
+          (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_initiated_vendor_followup ?recovery_coordinator)
+  )
+  (:action coordinator_confirm_vendor_followup_completion
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (not
+          (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        )
+        (not
+          (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        )
+        (not
+          (coordinator_received_all_confirmations ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_received_all_confirmations ?recovery_coordinator)
+  )
+  (:action coordinator_confirm_vendor_followup_and_attach_escalation
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        (not
+          (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        )
+        (not
+          (coordinator_received_all_confirmations ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_escalation_attached ?recovery_coordinator)
+      )
+  )
+  (:action coordinator_confirm_vendor_followup_and_attach_escalation_variant
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (not
+          (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        )
+        (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        (not
+          (coordinator_received_all_confirmations ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_escalation_attached ?recovery_coordinator)
+      )
+  )
+  (:action coordinator_confirm_vendor_followup_and_attach_escalation_all
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact ?vendor_confirmation_document - vendor_confirmation_document ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (coordinator_initiated_vendor_followup ?recovery_coordinator)
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (coordinator_attached_vendor_confirmation_document ?recovery_coordinator ?vendor_confirmation_document)
+        (vendor_confirmation_document_attaches_to_itinerary_proposal ?vendor_confirmation_document ?itinerary_proposal)
+        (itinerary_proposal_routed_to_vendor ?itinerary_proposal)
+        (itinerary_proposal_requires_escalation ?itinerary_proposal)
+        (not
+          (coordinator_received_all_confirmations ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_escalation_attached ?recovery_coordinator)
+      )
+  )
+  (:action finalize_recovery_plan
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (not
+          (coordinator_escalation_attached ?recovery_coordinator)
+        )
+        (not
+          (coordinator_final_signoff_completed ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_final_signoff_completed ?recovery_coordinator)
+        (entity_recovery_executed ?recovery_coordinator)
+      )
+  )
+  (:action attach_escalation_path_to_recovery_plan
+    :parameters (?recovery_coordinator - recovery_coordinator ?escalation_path - escalation_path)
+    :precondition
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_escalation_attached ?recovery_coordinator)
+        (escalation_path_available ?escalation_path)
+      )
+    :effect
+      (and
+        (coordinator_linked_escalation_path ?recovery_coordinator ?escalation_path)
+        (not
+          (escalation_path_available ?escalation_path)
+        )
+      )
+  )
+  (:action obtain_recovery_plan_approval
+    :parameters (?recovery_coordinator - recovery_coordinator ?arrival_segment - arrival_segment ?connecting_segment - connecting_segment ?affected_booking - affected_booking ?escalation_path - escalation_path)
+    :precondition
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_escalation_attached ?recovery_coordinator)
+        (coordinator_linked_escalation_path ?recovery_coordinator ?escalation_path)
+        (coordinator_responsible_for_arrival_segment ?recovery_coordinator ?arrival_segment)
+        (coordinator_responsible_for_connecting_segment ?recovery_coordinator ?connecting_segment)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+        (support_record_linked_booking ?recovery_coordinator ?affected_booking)
+        (not
+          (coordinator_approval_recorded ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_approval_recorded ?recovery_coordinator)
+  )
+  (:action finalize_and_mark_recovery_plan_ready
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_received_all_confirmations ?recovery_coordinator)
+        (coordinator_approval_recorded ?recovery_coordinator)
+        (not
+          (coordinator_final_signoff_completed ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_final_signoff_completed ?recovery_coordinator)
+        (entity_recovery_executed ?recovery_coordinator)
+      )
+  )
+  (:action assign_voucher_offer_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?voucher_offer - voucher_offer ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_assigned_for_recovery ?recovery_coordinator)
+        (support_record_linked_booking ?recovery_coordinator ?affected_booking)
+        (voucher_offer_available ?voucher_offer)
+        (coordinator_linked_voucher_offer ?recovery_coordinator ?voucher_offer)
+        (not
+          (coordinator_voucher_reserved ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_voucher_reserved ?recovery_coordinator)
+        (not
+          (voucher_offer_available ?voucher_offer)
+        )
+      )
+  )
+  (:action issue_voucher_pending_confirmation
+    :parameters (?recovery_coordinator - recovery_coordinator ?provider_representative - provider_representative)
+    :precondition
+      (and
+        (coordinator_voucher_reserved ?recovery_coordinator)
+        (support_record_assigned_provider_representative ?recovery_coordinator ?provider_representative)
+        (not
+          (coordinator_voucher_issued_pending ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_voucher_issued_pending ?recovery_coordinator)
+  )
+  (:action confirm_voucher_issue
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_contact - third_party_contact)
+    :precondition
+      (and
+        (coordinator_voucher_issued_pending ?recovery_coordinator)
+        (coordinator_assigned_third_party_contact ?recovery_coordinator ?third_party_contact)
+        (not
+          (coordinator_voucher_issue_confirmed ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_voucher_issue_confirmed ?recovery_coordinator)
+  )
+  (:action finalize_voucher_issue_and_signoff
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_voucher_issue_confirmed ?recovery_coordinator)
+        (not
+          (coordinator_final_signoff_completed ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_final_signoff_completed ?recovery_coordinator)
+        (entity_recovery_executed ?recovery_coordinator)
+      )
+  )
+  (:action execute_itinerary_proposal_for_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (arrival_segment_engaged_in_process ?arrival_segment)
+        (arrival_segment_ready_for_proposal ?arrival_segment)
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_validated ?itinerary_proposal)
+        (not
+          (entity_recovery_executed ?arrival_segment)
+        )
+      )
+    :effect (entity_recovery_executed ?arrival_segment)
+  )
+  (:action execute_itinerary_proposal_for_connecting_segment
+    :parameters (?connecting_segment - connecting_segment ?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (connecting_segment_engaged_in_process ?connecting_segment)
+        (connecting_segment_ready_for_proposal ?connecting_segment)
+        (itinerary_proposal_allocated ?itinerary_proposal)
+        (itinerary_proposal_validated ?itinerary_proposal)
+        (not
+          (entity_recovery_executed ?connecting_segment)
+        )
+      )
+    :effect (entity_recovery_executed ?connecting_segment)
+  )
+  (:action create_compensation_claim_for_support_record
+    :parameters (?support_record - support_case ?compensation_claim - compensation_claim ?affected_booking - affected_booking)
+    :precondition
+      (and
+        (entity_recovery_executed ?support_record)
+        (support_record_linked_booking ?support_record ?affected_booking)
+        (compensation_claim_available ?compensation_claim)
+        (not
+          (entity_compensation_processed ?support_record)
+        )
+      )
+    :effect
+      (and
+        (entity_compensation_processed ?support_record)
+        (support_record_linked_compensation_claim ?support_record ?compensation_claim)
+        (not
+          (compensation_claim_available ?compensation_claim)
+        )
+      )
+  )
+  (:action finalize_arrival_segment_recovery
+    :parameters (?arrival_segment - arrival_segment ?communication_channel - communication_channel ?compensation_claim - compensation_claim)
+    :precondition
+      (and
+        (entity_compensation_processed ?arrival_segment)
+        (support_record_assigned_communication_channel ?arrival_segment ?communication_channel)
+        (support_record_linked_compensation_claim ?arrival_segment ?compensation_claim)
+        (not
+          (entity_recovery_finalized ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_recovery_finalized ?arrival_segment)
+        (entity_available_communication_channel ?communication_channel)
+        (compensation_claim_available ?compensation_claim)
+      )
+  )
+  (:action finalize_connecting_segment_recovery
+    :parameters (?connecting_segment - connecting_segment ?communication_channel - communication_channel ?compensation_claim - compensation_claim)
+    :precondition
+      (and
+        (entity_compensation_processed ?connecting_segment)
+        (support_record_assigned_communication_channel ?connecting_segment ?communication_channel)
+        (support_record_linked_compensation_claim ?connecting_segment ?compensation_claim)
+        (not
+          (entity_recovery_finalized ?connecting_segment)
+        )
+      )
+    :effect
+      (and
+        (entity_recovery_finalized ?connecting_segment)
+        (entity_available_communication_channel ?communication_channel)
+        (compensation_claim_available ?compensation_claim)
+      )
+  )
+  (:action finalize_coordinator_recovery
+    :parameters (?recovery_coordinator - recovery_coordinator ?communication_channel - communication_channel ?compensation_claim - compensation_claim)
+    :precondition
+      (and
+        (entity_compensation_processed ?recovery_coordinator)
+        (support_record_assigned_communication_channel ?recovery_coordinator ?communication_channel)
+        (support_record_linked_compensation_claim ?recovery_coordinator ?compensation_claim)
+        (not
+          (entity_recovery_finalized ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (entity_recovery_finalized ?recovery_coordinator)
+        (entity_available_communication_channel ?communication_channel)
+        (compensation_claim_available ?compensation_claim)
+      )
+  )
+)

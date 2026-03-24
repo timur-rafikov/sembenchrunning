@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain agricultural_labor_shift_allocation_peak_period)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource_category - entity material_resource_category - entity logistics_resource_category - entity domain_root - entity labor_entity - domain_root equipment_unit - operational_resource_category skill_certification - operational_resource_category supervisor - operational_resource_category authorization_document - operational_resource_category toolkit - operational_resource_category contingency_reserve - operational_resource_category specialized_equipment - operational_resource_category weather_constraint - operational_resource_category consumable_supply - material_resource_category work_package - material_resource_category incentive_voucher - material_resource_category field_parcel - logistics_resource_category transport_route - logistics_resource_category shift_slot - logistics_resource_category labor_category - labor_entity labor_subcategory - labor_entity field_worker - labor_category support_worker - labor_category work_crew - labor_subcategory)
+
+  (:predicates
+    (labor_registered ?labor_entity_var - labor_entity)
+    (assignment_cleared ?labor_entity_var - labor_entity)
+    (equipment_linked ?labor_entity_var - labor_entity)
+    (labor_returned_to_pool ?labor_entity_var - labor_entity)
+    (on_shift ?labor_entity_var - labor_entity)
+    (shift_completed ?labor_entity_var - labor_entity)
+    (equipment_available ?equipment_unit_var - equipment_unit)
+    (labor_equipment_pair ?labor_entity_var - labor_entity ?equipment_unit_var - equipment_unit)
+    (skill_cert_available ?skill_certification_var - skill_certification)
+    (labor_skill_pair ?labor_entity_var - labor_entity ?skill_certification_var - skill_certification)
+    (supervisor_available ?supervisor_var - supervisor)
+    (labor_supervisor_pair ?labor_entity_var - labor_entity ?supervisor_var - supervisor)
+    (consumable_available ?consumable_supply_var - consumable_supply)
+    (field_worker_supply_pair ?field_worker_var - field_worker ?consumable_supply_var - consumable_supply)
+    (support_worker_supply_pair ?support_worker_var - support_worker ?consumable_supply_var - consumable_supply)
+    (worker_parcel_pair ?field_worker_var - field_worker ?field_parcel_var - field_parcel)
+    (parcel_reserved ?field_parcel_var - field_parcel)
+    (parcel_buffered ?field_parcel_var - field_parcel)
+    (field_worker_deployed ?field_worker_var - field_worker)
+    (support_worker_route_pair ?support_worker_var - support_worker ?transport_route_var - transport_route)
+    (route_reserved ?transport_route_var - transport_route)
+    (route_buffered ?transport_route_var - transport_route)
+    (support_worker_deployed ?support_worker_var - support_worker)
+    (shift_open ?shift_slot_var - shift_slot)
+    (shift_staged ?shift_slot_var - shift_slot)
+    (shift_parcel_linked ?shift_slot_var - shift_slot ?field_parcel_var - field_parcel)
+    (shift_route_linked ?shift_slot_var - shift_slot ?transport_route_var - transport_route)
+    (shift_flag_primary ?shift_slot_var - shift_slot)
+    (shift_flag_secondary ?shift_slot_var - shift_slot)
+    (shift_locked ?shift_slot_var - shift_slot)
+    (crew_field_worker_pair ?work_crew_var - work_crew ?field_worker_var - field_worker)
+    (crew_support_worker_pair ?work_crew_var - work_crew ?support_worker_var - support_worker)
+    (crew_shift_pair ?work_crew_var - work_crew ?shift_slot_var - shift_slot)
+    (work_package_available ?work_package_var - work_package)
+    (crew_work_package_pair ?work_crew_var - work_crew ?work_package_var - work_package)
+    (work_package_committed ?work_package_var - work_package)
+    (package_shift_pair ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    (crew_verified ?work_crew_var - work_crew)
+    (crew_approved ?work_crew_var - work_crew)
+    (crew_ready ?work_crew_var - work_crew)
+    (crew_authorization_document_linked ?work_crew_var - work_crew)
+    (crew_clearance_recorded ?work_crew_var - work_crew)
+    (crew_resourced ?work_crew_var - work_crew)
+    (crew_mobilized ?work_crew_var - work_crew)
+    (incentive_voucher_available ?incentive_voucher_var - incentive_voucher)
+    (crew_voucher_pair ?work_crew_var - work_crew ?incentive_voucher_var - incentive_voucher)
+    (crew_incentivized ?work_crew_var - work_crew)
+    (crew_toolkit_ready ?work_crew_var - work_crew)
+    (crew_weather_reviewed ?work_crew_var - work_crew)
+    (authorization_document_available ?authorization_document_var - authorization_document)
+    (crew_authorization_pair ?work_crew_var - work_crew ?authorization_document_var - authorization_document)
+    (toolkit_available ?toolkit_var - toolkit)
+    (crew_toolkit_pair ?work_crew_var - work_crew ?toolkit_var - toolkit)
+    (specialized_equipment_available ?specialized_equipment_var - specialized_equipment)
+    (crew_specialized_equipment_pair ?work_crew_var - work_crew ?specialized_equipment_var - specialized_equipment)
+    (weather_constraint_active ?weather_constraint_var - weather_constraint)
+    (crew_weather_pair ?work_crew_var - work_crew ?weather_constraint_var - weather_constraint)
+    (contingency_reserve_available ?contingency_reserve_var - contingency_reserve)
+    (labor_reserve_pair ?labor_entity_var - labor_entity ?contingency_reserve_var - contingency_reserve)
+    (field_worker_staged ?field_worker_var - field_worker)
+    (support_worker_staged ?support_worker_var - support_worker)
+    (crew_active ?work_crew_var - work_crew)
+  )
+  (:action register_labor_entity
+    :parameters (?labor_entity_var - labor_entity)
+    :precondition
+      (and
+        (not
+          (labor_registered ?labor_entity_var)
+        )
+        (not
+          (labor_returned_to_pool ?labor_entity_var)
+        )
+      )
+    :effect (labor_registered ?labor_entity_var)
+  )
+  (:action allocate_equipment_to_labor_entity
+    :parameters (?labor_entity_var - labor_entity ?equipment_unit_var - equipment_unit)
+    :precondition
+      (and
+        (labor_registered ?labor_entity_var)
+        (not
+          (equipment_linked ?labor_entity_var)
+        )
+        (equipment_available ?equipment_unit_var)
+      )
+    :effect
+      (and
+        (equipment_linked ?labor_entity_var)
+        (labor_equipment_pair ?labor_entity_var ?equipment_unit_var)
+        (not
+          (equipment_available ?equipment_unit_var)
+        )
+      )
+  )
+  (:action assign_skill_certification_to_labor_entity
+    :parameters (?labor_entity_var - labor_entity ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (labor_registered ?labor_entity_var)
+        (equipment_linked ?labor_entity_var)
+        (skill_cert_available ?skill_certification_var)
+      )
+    :effect
+      (and
+        (labor_skill_pair ?labor_entity_var ?skill_certification_var)
+        (not
+          (skill_cert_available ?skill_certification_var)
+        )
+      )
+  )
+  (:action clear_labor_for_assignment
+    :parameters (?labor_entity_var - labor_entity ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (labor_registered ?labor_entity_var)
+        (equipment_linked ?labor_entity_var)
+        (labor_skill_pair ?labor_entity_var ?skill_certification_var)
+        (not
+          (assignment_cleared ?labor_entity_var)
+        )
+      )
+    :effect (assignment_cleared ?labor_entity_var)
+  )
+  (:action release_skill_certification_from_labor_entity
+    :parameters (?labor_entity_var - labor_entity ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (labor_skill_pair ?labor_entity_var ?skill_certification_var)
+      )
+    :effect
+      (and
+        (skill_cert_available ?skill_certification_var)
+        (not
+          (labor_skill_pair ?labor_entity_var ?skill_certification_var)
+        )
+      )
+  )
+  (:action assign_supervisor_to_labor_entity
+    :parameters (?labor_entity_var - labor_entity ?supervisor_var - supervisor)
+    :precondition
+      (and
+        (assignment_cleared ?labor_entity_var)
+        (supervisor_available ?supervisor_var)
+      )
+    :effect
+      (and
+        (labor_supervisor_pair ?labor_entity_var ?supervisor_var)
+        (not
+          (supervisor_available ?supervisor_var)
+        )
+      )
+  )
+  (:action release_supervisor_from_labor_entity
+    :parameters (?labor_entity_var - labor_entity ?supervisor_var - supervisor)
+    :precondition
+      (and
+        (labor_supervisor_pair ?labor_entity_var ?supervisor_var)
+      )
+    :effect
+      (and
+        (supervisor_available ?supervisor_var)
+        (not
+          (labor_supervisor_pair ?labor_entity_var ?supervisor_var)
+        )
+      )
+  )
+  (:action allocate_specialized_equipment_to_crew
+    :parameters (?work_crew_var - work_crew ?specialized_equipment_var - specialized_equipment)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (specialized_equipment_available ?specialized_equipment_var)
+      )
+    :effect
+      (and
+        (crew_specialized_equipment_pair ?work_crew_var ?specialized_equipment_var)
+        (not
+          (specialized_equipment_available ?specialized_equipment_var)
+        )
+      )
+  )
+  (:action release_specialized_equipment_from_crew
+    :parameters (?work_crew_var - work_crew ?specialized_equipment_var - specialized_equipment)
+    :precondition
+      (and
+        (crew_specialized_equipment_pair ?work_crew_var ?specialized_equipment_var)
+      )
+    :effect
+      (and
+        (specialized_equipment_available ?specialized_equipment_var)
+        (not
+          (crew_specialized_equipment_pair ?work_crew_var ?specialized_equipment_var)
+        )
+      )
+  )
+  (:action bind_weather_constraint_to_crew
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (weather_constraint_active ?weather_constraint_var)
+      )
+    :effect
+      (and
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (not
+          (weather_constraint_active ?weather_constraint_var)
+        )
+      )
+  )
+  (:action release_weather_constraint_from_crew
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint)
+    :precondition
+      (and
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+      )
+    :effect
+      (and
+        (weather_constraint_active ?weather_constraint_var)
+        (not
+          (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        )
+      )
+  )
+  (:action stage_field_worker_at_parcel
+    :parameters (?field_worker_var - field_worker ?field_parcel_var - field_parcel ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (assignment_cleared ?field_worker_var)
+        (labor_skill_pair ?field_worker_var ?skill_certification_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (not
+          (parcel_reserved ?field_parcel_var)
+        )
+        (not
+          (parcel_buffered ?field_parcel_var)
+        )
+      )
+    :effect (parcel_reserved ?field_parcel_var)
+  )
+  (:action dispatch_field_worker_on_shift
+    :parameters (?field_worker_var - field_worker ?field_parcel_var - field_parcel ?supervisor_var - supervisor)
+    :precondition
+      (and
+        (assignment_cleared ?field_worker_var)
+        (labor_supervisor_pair ?field_worker_var ?supervisor_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (parcel_reserved ?field_parcel_var)
+        (not
+          (field_worker_staged ?field_worker_var)
+        )
+      )
+    :effect
+      (and
+        (field_worker_staged ?field_worker_var)
+        (field_worker_deployed ?field_worker_var)
+      )
+  )
+  (:action provision_field_worker_consumables
+    :parameters (?field_worker_var - field_worker ?field_parcel_var - field_parcel ?consumable_supply_var - consumable_supply)
+    :precondition
+      (and
+        (assignment_cleared ?field_worker_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (consumable_available ?consumable_supply_var)
+        (not
+          (field_worker_staged ?field_worker_var)
+        )
+      )
+    :effect
+      (and
+        (parcel_buffered ?field_parcel_var)
+        (field_worker_staged ?field_worker_var)
+        (field_worker_supply_pair ?field_worker_var ?consumable_supply_var)
+        (not
+          (consumable_available ?consumable_supply_var)
+        )
+      )
+  )
+  (:action replenish_field_worker_consumables
+    :parameters (?field_worker_var - field_worker ?field_parcel_var - field_parcel ?skill_certification_var - skill_certification ?consumable_supply_var - consumable_supply)
+    :precondition
+      (and
+        (assignment_cleared ?field_worker_var)
+        (labor_skill_pair ?field_worker_var ?skill_certification_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (parcel_buffered ?field_parcel_var)
+        (field_worker_supply_pair ?field_worker_var ?consumable_supply_var)
+        (not
+          (field_worker_deployed ?field_worker_var)
+        )
+      )
+    :effect
+      (and
+        (parcel_reserved ?field_parcel_var)
+        (field_worker_deployed ?field_worker_var)
+        (consumable_available ?consumable_supply_var)
+        (not
+          (field_worker_supply_pair ?field_worker_var ?consumable_supply_var)
+        )
+      )
+  )
+  (:action stage_support_worker_on_route
+    :parameters (?support_worker_var - support_worker ?transport_route_var - transport_route ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (assignment_cleared ?support_worker_var)
+        (labor_skill_pair ?support_worker_var ?skill_certification_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (not
+          (route_reserved ?transport_route_var)
+        )
+        (not
+          (route_buffered ?transport_route_var)
+        )
+      )
+    :effect (route_reserved ?transport_route_var)
+  )
+  (:action dispatch_support_worker_on_shift
+    :parameters (?support_worker_var - support_worker ?transport_route_var - transport_route ?supervisor_var - supervisor)
+    :precondition
+      (and
+        (assignment_cleared ?support_worker_var)
+        (labor_supervisor_pair ?support_worker_var ?supervisor_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (route_reserved ?transport_route_var)
+        (not
+          (support_worker_staged ?support_worker_var)
+        )
+      )
+    :effect
+      (and
+        (support_worker_staged ?support_worker_var)
+        (support_worker_deployed ?support_worker_var)
+      )
+  )
+  (:action provision_support_worker_consumables
+    :parameters (?support_worker_var - support_worker ?transport_route_var - transport_route ?consumable_supply_var - consumable_supply)
+    :precondition
+      (and
+        (assignment_cleared ?support_worker_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (consumable_available ?consumable_supply_var)
+        (not
+          (support_worker_staged ?support_worker_var)
+        )
+      )
+    :effect
+      (and
+        (route_buffered ?transport_route_var)
+        (support_worker_staged ?support_worker_var)
+        (support_worker_supply_pair ?support_worker_var ?consumable_supply_var)
+        (not
+          (consumable_available ?consumable_supply_var)
+        )
+      )
+  )
+  (:action replenish_support_worker_consumables
+    :parameters (?support_worker_var - support_worker ?transport_route_var - transport_route ?skill_certification_var - skill_certification ?consumable_supply_var - consumable_supply)
+    :precondition
+      (and
+        (assignment_cleared ?support_worker_var)
+        (labor_skill_pair ?support_worker_var ?skill_certification_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (route_buffered ?transport_route_var)
+        (support_worker_supply_pair ?support_worker_var ?consumable_supply_var)
+        (not
+          (support_worker_deployed ?support_worker_var)
+        )
+      )
+    :effect
+      (and
+        (route_reserved ?transport_route_var)
+        (support_worker_deployed ?support_worker_var)
+        (consumable_available ?consumable_supply_var)
+        (not
+          (support_worker_supply_pair ?support_worker_var ?consumable_supply_var)
+        )
+      )
+  )
+  (:action open_shift_slot
+    :parameters (?field_worker_var - field_worker ?support_worker_var - support_worker ?field_parcel_var - field_parcel ?transport_route_var - transport_route ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (field_worker_staged ?field_worker_var)
+        (support_worker_staged ?support_worker_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (parcel_reserved ?field_parcel_var)
+        (route_reserved ?transport_route_var)
+        (field_worker_deployed ?field_worker_var)
+        (support_worker_deployed ?support_worker_var)
+        (shift_open ?shift_slot_var)
+      )
+    :effect
+      (and
+        (shift_staged ?shift_slot_var)
+        (shift_parcel_linked ?shift_slot_var ?field_parcel_var)
+        (shift_route_linked ?shift_slot_var ?transport_route_var)
+        (not
+          (shift_open ?shift_slot_var)
+        )
+      )
+  )
+  (:action book_shift_slot_with_reserved_parcel
+    :parameters (?field_worker_var - field_worker ?support_worker_var - support_worker ?field_parcel_var - field_parcel ?transport_route_var - transport_route ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (field_worker_staged ?field_worker_var)
+        (support_worker_staged ?support_worker_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (parcel_buffered ?field_parcel_var)
+        (route_reserved ?transport_route_var)
+        (not
+          (field_worker_deployed ?field_worker_var)
+        )
+        (support_worker_deployed ?support_worker_var)
+        (shift_open ?shift_slot_var)
+      )
+    :effect
+      (and
+        (shift_staged ?shift_slot_var)
+        (shift_parcel_linked ?shift_slot_var ?field_parcel_var)
+        (shift_route_linked ?shift_slot_var ?transport_route_var)
+        (shift_flag_primary ?shift_slot_var)
+        (not
+          (shift_open ?shift_slot_var)
+        )
+      )
+  )
+  (:action book_shift_slot_with_buffered_route
+    :parameters (?field_worker_var - field_worker ?support_worker_var - support_worker ?field_parcel_var - field_parcel ?transport_route_var - transport_route ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (field_worker_staged ?field_worker_var)
+        (support_worker_staged ?support_worker_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (parcel_reserved ?field_parcel_var)
+        (route_buffered ?transport_route_var)
+        (field_worker_deployed ?field_worker_var)
+        (not
+          (support_worker_deployed ?support_worker_var)
+        )
+        (shift_open ?shift_slot_var)
+      )
+    :effect
+      (and
+        (shift_staged ?shift_slot_var)
+        (shift_parcel_linked ?shift_slot_var ?field_parcel_var)
+        (shift_route_linked ?shift_slot_var ?transport_route_var)
+        (shift_flag_secondary ?shift_slot_var)
+        (not
+          (shift_open ?shift_slot_var)
+        )
+      )
+  )
+  (:action book_shift_slot_with_buffered_parcel_and_route
+    :parameters (?field_worker_var - field_worker ?support_worker_var - support_worker ?field_parcel_var - field_parcel ?transport_route_var - transport_route ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (field_worker_staged ?field_worker_var)
+        (support_worker_staged ?support_worker_var)
+        (worker_parcel_pair ?field_worker_var ?field_parcel_var)
+        (support_worker_route_pair ?support_worker_var ?transport_route_var)
+        (parcel_buffered ?field_parcel_var)
+        (route_buffered ?transport_route_var)
+        (not
+          (field_worker_deployed ?field_worker_var)
+        )
+        (not
+          (support_worker_deployed ?support_worker_var)
+        )
+        (shift_open ?shift_slot_var)
+      )
+    :effect
+      (and
+        (shift_staged ?shift_slot_var)
+        (shift_parcel_linked ?shift_slot_var ?field_parcel_var)
+        (shift_route_linked ?shift_slot_var ?transport_route_var)
+        (shift_flag_primary ?shift_slot_var)
+        (shift_flag_secondary ?shift_slot_var)
+        (not
+          (shift_open ?shift_slot_var)
+        )
+      )
+  )
+  (:action lock_shift_slot
+    :parameters (?shift_slot_var - shift_slot ?field_worker_var - field_worker ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (shift_staged ?shift_slot_var)
+        (field_worker_staged ?field_worker_var)
+        (labor_skill_pair ?field_worker_var ?skill_certification_var)
+        (not
+          (shift_locked ?shift_slot_var)
+        )
+      )
+    :effect (shift_locked ?shift_slot_var)
+  )
+  (:action stage_work_package_to_shift_slot
+    :parameters (?work_crew_var - work_crew ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (crew_shift_pair ?work_crew_var ?shift_slot_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (work_package_available ?work_package_var)
+        (shift_staged ?shift_slot_var)
+        (shift_locked ?shift_slot_var)
+        (not
+          (work_package_committed ?work_package_var)
+        )
+      )
+    :effect
+      (and
+        (work_package_committed ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (not
+          (work_package_available ?work_package_var)
+        )
+      )
+  )
+  (:action confirm_work_package_allocation
+    :parameters (?work_crew_var - work_crew ?work_package_var - work_package ?shift_slot_var - shift_slot ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (work_package_committed ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (labor_skill_pair ?work_crew_var ?skill_certification_var)
+        (not
+          (shift_flag_primary ?shift_slot_var)
+        )
+        (not
+          (crew_verified ?work_crew_var)
+        )
+      )
+    :effect (crew_verified ?work_crew_var)
+  )
+  (:action attach_authorization_document_to_crew
+    :parameters (?work_crew_var - work_crew ?authorization_document_var - authorization_document)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (authorization_document_available ?authorization_document_var)
+        (not
+          (crew_authorization_document_linked ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_authorization_document_linked ?work_crew_var)
+        (crew_authorization_pair ?work_crew_var ?authorization_document_var)
+        (not
+          (authorization_document_available ?authorization_document_var)
+        )
+      )
+  )
+  (:action verify_crew_authorization
+    :parameters (?work_crew_var - work_crew ?work_package_var - work_package ?shift_slot_var - shift_slot ?skill_certification_var - skill_certification ?authorization_document_var - authorization_document)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (work_package_committed ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (labor_skill_pair ?work_crew_var ?skill_certification_var)
+        (shift_flag_primary ?shift_slot_var)
+        (crew_authorization_document_linked ?work_crew_var)
+        (crew_authorization_pair ?work_crew_var ?authorization_document_var)
+        (not
+          (crew_verified ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_verified ?work_crew_var)
+        (crew_clearance_recorded ?work_crew_var)
+      )
+  )
+  (:action authorize_crew_without_secondary_flag
+    :parameters (?work_crew_var - work_crew ?specialized_equipment_var - specialized_equipment ?supervisor_var - supervisor ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_verified ?work_crew_var)
+        (crew_specialized_equipment_pair ?work_crew_var ?specialized_equipment_var)
+        (labor_supervisor_pair ?work_crew_var ?supervisor_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (not
+          (shift_flag_secondary ?shift_slot_var)
+        )
+        (not
+          (crew_approved ?work_crew_var)
+        )
+      )
+    :effect (crew_approved ?work_crew_var)
+  )
+  (:action authorize_crew_with_secondary_flag
+    :parameters (?work_crew_var - work_crew ?specialized_equipment_var - specialized_equipment ?supervisor_var - supervisor ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_verified ?work_crew_var)
+        (crew_specialized_equipment_pair ?work_crew_var ?specialized_equipment_var)
+        (labor_supervisor_pair ?work_crew_var ?supervisor_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (shift_flag_secondary ?shift_slot_var)
+        (not
+          (crew_approved ?work_crew_var)
+        )
+      )
+    :effect (crew_approved ?work_crew_var)
+  )
+  (:action prepare_crew_without_shift_flags
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_approved ?work_crew_var)
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (not
+          (shift_flag_primary ?shift_slot_var)
+        )
+        (not
+          (shift_flag_secondary ?shift_slot_var)
+        )
+        (not
+          (crew_ready ?work_crew_var)
+        )
+      )
+    :effect (crew_ready ?work_crew_var)
+  )
+  (:action prepare_crew_with_primary_shift_flag
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_approved ?work_crew_var)
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (shift_flag_primary ?shift_slot_var)
+        (not
+          (shift_flag_secondary ?shift_slot_var)
+        )
+        (not
+          (crew_ready ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_resourced ?work_crew_var)
+      )
+  )
+  (:action prepare_crew_with_secondary_shift_flag
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_approved ?work_crew_var)
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (not
+          (shift_flag_primary ?shift_slot_var)
+        )
+        (shift_flag_secondary ?shift_slot_var)
+        (not
+          (crew_ready ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_resourced ?work_crew_var)
+      )
+  )
+  (:action prepare_crew_with_both_shift_flags
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint ?work_package_var - work_package ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (crew_approved ?work_crew_var)
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (crew_work_package_pair ?work_crew_var ?work_package_var)
+        (package_shift_pair ?work_package_var ?shift_slot_var)
+        (shift_flag_primary ?shift_slot_var)
+        (shift_flag_secondary ?shift_slot_var)
+        (not
+          (crew_ready ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_resourced ?work_crew_var)
+      )
+  )
+  (:action activate_crew_shift
+    :parameters (?work_crew_var - work_crew)
+    :precondition
+      (and
+        (crew_ready ?work_crew_var)
+        (not
+          (crew_resourced ?work_crew_var)
+        )
+        (not
+          (crew_active ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_active ?work_crew_var)
+        (on_shift ?work_crew_var)
+      )
+  )
+  (:action attach_toolkit_to_crew
+    :parameters (?work_crew_var - work_crew ?toolkit_var - toolkit)
+    :precondition
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_resourced ?work_crew_var)
+        (toolkit_available ?toolkit_var)
+      )
+    :effect
+      (and
+        (crew_toolkit_pair ?work_crew_var ?toolkit_var)
+        (not
+          (toolkit_available ?toolkit_var)
+        )
+      )
+  )
+  (:action mobilize_crew_with_workers
+    :parameters (?work_crew_var - work_crew ?field_worker_var - field_worker ?support_worker_var - support_worker ?skill_certification_var - skill_certification ?toolkit_var - toolkit)
+    :precondition
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_resourced ?work_crew_var)
+        (crew_toolkit_pair ?work_crew_var ?toolkit_var)
+        (crew_field_worker_pair ?work_crew_var ?field_worker_var)
+        (crew_support_worker_pair ?work_crew_var ?support_worker_var)
+        (field_worker_deployed ?field_worker_var)
+        (support_worker_deployed ?support_worker_var)
+        (labor_skill_pair ?work_crew_var ?skill_certification_var)
+        (not
+          (crew_mobilized ?work_crew_var)
+        )
+      )
+    :effect (crew_mobilized ?work_crew_var)
+  )
+  (:action confirm_crew_activation
+    :parameters (?work_crew_var - work_crew)
+    :precondition
+      (and
+        (crew_ready ?work_crew_var)
+        (crew_mobilized ?work_crew_var)
+        (not
+          (crew_active ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_active ?work_crew_var)
+        (on_shift ?work_crew_var)
+      )
+  )
+  (:action assign_incentive_voucher_to_crew
+    :parameters (?work_crew_var - work_crew ?incentive_voucher_var - incentive_voucher ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (assignment_cleared ?work_crew_var)
+        (labor_skill_pair ?work_crew_var ?skill_certification_var)
+        (incentive_voucher_available ?incentive_voucher_var)
+        (crew_voucher_pair ?work_crew_var ?incentive_voucher_var)
+        (not
+          (crew_incentivized ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_incentivized ?work_crew_var)
+        (not
+          (incentive_voucher_available ?incentive_voucher_var)
+        )
+      )
+  )
+  (:action pair_supervisor_with_crew
+    :parameters (?work_crew_var - work_crew ?supervisor_var - supervisor)
+    :precondition
+      (and
+        (crew_incentivized ?work_crew_var)
+        (labor_supervisor_pair ?work_crew_var ?supervisor_var)
+        (not
+          (crew_toolkit_ready ?work_crew_var)
+        )
+      )
+    :effect (crew_toolkit_ready ?work_crew_var)
+  )
+  (:action review_weather_clearance_for_crew
+    :parameters (?work_crew_var - work_crew ?weather_constraint_var - weather_constraint)
+    :precondition
+      (and
+        (crew_toolkit_ready ?work_crew_var)
+        (crew_weather_pair ?work_crew_var ?weather_constraint_var)
+        (not
+          (crew_weather_reviewed ?work_crew_var)
+        )
+      )
+    :effect (crew_weather_reviewed ?work_crew_var)
+  )
+  (:action finalize_crew_activation
+    :parameters (?work_crew_var - work_crew)
+    :precondition
+      (and
+        (crew_weather_reviewed ?work_crew_var)
+        (not
+          (crew_active ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (crew_active ?work_crew_var)
+        (on_shift ?work_crew_var)
+      )
+  )
+  (:action deploy_field_worker_on_shift
+    :parameters (?field_worker_var - field_worker ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (field_worker_staged ?field_worker_var)
+        (field_worker_deployed ?field_worker_var)
+        (shift_staged ?shift_slot_var)
+        (shift_locked ?shift_slot_var)
+        (not
+          (on_shift ?field_worker_var)
+        )
+      )
+    :effect (on_shift ?field_worker_var)
+  )
+  (:action deploy_support_worker_on_shift
+    :parameters (?support_worker_var - support_worker ?shift_slot_var - shift_slot)
+    :precondition
+      (and
+        (support_worker_staged ?support_worker_var)
+        (support_worker_deployed ?support_worker_var)
+        (shift_staged ?shift_slot_var)
+        (shift_locked ?shift_slot_var)
+        (not
+          (on_shift ?support_worker_var)
+        )
+      )
+    :effect (on_shift ?support_worker_var)
+  )
+  (:action close_shift_and_release_reserve
+    :parameters (?labor_entity_var - labor_entity ?contingency_reserve_var - contingency_reserve ?skill_certification_var - skill_certification)
+    :precondition
+      (and
+        (on_shift ?labor_entity_var)
+        (labor_skill_pair ?labor_entity_var ?skill_certification_var)
+        (contingency_reserve_available ?contingency_reserve_var)
+        (not
+          (shift_completed ?labor_entity_var)
+        )
+      )
+    :effect
+      (and
+        (shift_completed ?labor_entity_var)
+        (labor_reserve_pair ?labor_entity_var ?contingency_reserve_var)
+        (not
+          (contingency_reserve_available ?contingency_reserve_var)
+        )
+      )
+  )
+  (:action release_field_worker_and_equipment
+    :parameters (?field_worker_var - field_worker ?equipment_unit_var - equipment_unit ?contingency_reserve_var - contingency_reserve)
+    :precondition
+      (and
+        (shift_completed ?field_worker_var)
+        (labor_equipment_pair ?field_worker_var ?equipment_unit_var)
+        (labor_reserve_pair ?field_worker_var ?contingency_reserve_var)
+        (not
+          (labor_returned_to_pool ?field_worker_var)
+        )
+      )
+    :effect
+      (and
+        (labor_returned_to_pool ?field_worker_var)
+        (equipment_available ?equipment_unit_var)
+        (contingency_reserve_available ?contingency_reserve_var)
+      )
+  )
+  (:action release_support_worker_and_equipment
+    :parameters (?support_worker_var - support_worker ?equipment_unit_var - equipment_unit ?contingency_reserve_var - contingency_reserve)
+    :precondition
+      (and
+        (shift_completed ?support_worker_var)
+        (labor_equipment_pair ?support_worker_var ?equipment_unit_var)
+        (labor_reserve_pair ?support_worker_var ?contingency_reserve_var)
+        (not
+          (labor_returned_to_pool ?support_worker_var)
+        )
+      )
+    :effect
+      (and
+        (labor_returned_to_pool ?support_worker_var)
+        (equipment_available ?equipment_unit_var)
+        (contingency_reserve_available ?contingency_reserve_var)
+      )
+  )
+  (:action release_crew_and_equipment
+    :parameters (?work_crew_var - work_crew ?equipment_unit_var - equipment_unit ?contingency_reserve_var - contingency_reserve)
+    :precondition
+      (and
+        (shift_completed ?work_crew_var)
+        (labor_equipment_pair ?work_crew_var ?equipment_unit_var)
+        (labor_reserve_pair ?work_crew_var ?contingency_reserve_var)
+        (not
+          (labor_returned_to_pool ?work_crew_var)
+        )
+      )
+    :effect
+      (and
+        (labor_returned_to_pool ?work_crew_var)
+        (equipment_available ?equipment_unit_var)
+        (contingency_reserve_available ?contingency_reserve_var)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem agricultural_labor_shift_allocation_peak_period_problem)
+  (:domain agricultural_labor_shift_allocation_peak_period)
+  (:objects field_worker_a - field_worker support_worker_a - support_worker field_crew_a - work_crew field_crew_b - work_crew tractor_unit_a - equipment_unit sprayer_unit_a - equipment_unit harvester_unit_a - equipment_unit crop_operations_certification - skill_certification field_supervisor_a - supervisor input_supply_a - consumable_supply field_parcel_a - field_parcel transport_route_a - transport_route peak_shift_slot_a - shift_slot work_package_a - work_package work_package_b - work_package authorization_permit_a - authorization_document authorization_permit_b - authorization_document toolkit_a - toolkit toolkit_b - toolkit contingency_buffer_a - contingency_reserve specialized_harvester_a - specialized_equipment incentive_voucher_a - incentive_voucher incentive_voucher_b - incentive_voucher weather_constraint_a - weather_constraint)
+  (:init
+    (equipment_available tractor_unit_a)
+    (equipment_available sprayer_unit_a)
+    (equipment_available harvester_unit_a)
+    (skill_cert_available crop_operations_certification)
+    (supervisor_available field_supervisor_a)
+    (consumable_available input_supply_a)
+    (worker_parcel_pair field_worker_a field_parcel_a)
+    (support_worker_route_pair support_worker_a transport_route_a)
+    (shift_open peak_shift_slot_a)
+    (work_package_available work_package_a)
+    (work_package_available work_package_b)
+    (crew_field_worker_pair field_crew_a field_worker_a)
+    (crew_field_worker_pair field_crew_b field_worker_a)
+    (crew_support_worker_pair field_crew_a support_worker_a)
+    (crew_support_worker_pair field_crew_b support_worker_a)
+    (crew_shift_pair field_crew_a peak_shift_slot_a)
+    (crew_shift_pair field_crew_b peak_shift_slot_a)
+    (crew_work_package_pair field_crew_a work_package_a)
+    (crew_work_package_pair field_crew_b work_package_b)
+    (authorization_document_available authorization_permit_a)
+    (authorization_document_available authorization_permit_b)
+    (toolkit_available toolkit_a)
+    (toolkit_available toolkit_b)
+    (contingency_reserve_available contingency_buffer_a)
+    (specialized_equipment_available specialized_harvester_a)
+    (incentive_voucher_available incentive_voucher_a)
+    (crew_voucher_pair field_crew_a incentive_voucher_a)
+    (crew_voucher_pair field_crew_b incentive_voucher_b)
+    (weather_constraint_active weather_constraint_a)
+  )
+  (:goal
+    (and
+      (labor_returned_to_pool field_worker_a)
+      (labor_returned_to_pool support_worker_a)
+      (labor_returned_to_pool field_crew_a)
+      (labor_returned_to_pool field_crew_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_labor_entity field_worker_a)
+(register_labor_entity support_worker_a)
+(allocate_equipment_to_labor_entity field_worker_a tractor_unit_a)
+(allocate_equipment_to_labor_entity support_worker_a sprayer_unit_a)
+(assign_skill_certification_to_labor_entity field_worker_a crop_operations_certification)
+(clear_labor_for_assignment field_worker_a crop_operations_certification)
+(assign_supervisor_to_labor_entity field_worker_a field_supervisor_a)
+(stage_field_worker_at_parcel field_worker_a field_parcel_a crop_operations_certification)
+(dispatch_field_worker_on_shift field_worker_a field_parcel_a field_supervisor_a)
+(release_skill_certification_from_labor_entity field_worker_a crop_operations_certification)
+(release_supervisor_from_labor_entity field_worker_a field_supervisor_a)
+(assign_skill_certification_to_labor_entity support_worker_a crop_operations_certification)
+(clear_labor_for_assignment support_worker_a crop_operations_certification)
+(assign_supervisor_to_labor_entity support_worker_a field_supervisor_a)
+(stage_support_worker_on_route support_worker_a transport_route_a crop_operations_certification)
+(dispatch_support_worker_on_shift support_worker_a transport_route_a field_supervisor_a)
+(open_shift_slot field_worker_a support_worker_a field_parcel_a transport_route_a peak_shift_slot_a)
+(release_skill_certification_from_labor_entity support_worker_a crop_operations_certification)
+(assign_skill_certification_to_labor_entity field_worker_a crop_operations_certification)
+(lock_shift_slot peak_shift_slot_a field_worker_a crop_operations_certification)
+(deploy_field_worker_on_shift field_worker_a peak_shift_slot_a)
+(deploy_support_worker_on_shift support_worker_a peak_shift_slot_a)
+(close_shift_and_release_reserve field_worker_a contingency_buffer_a crop_operations_certification)
+(release_field_worker_and_equipment field_worker_a tractor_unit_a contingency_buffer_a)
+(release_skill_certification_from_labor_entity field_worker_a crop_operations_certification)
+(assign_skill_certification_to_labor_entity support_worker_a crop_operations_certification)
+(close_shift_and_release_reserve support_worker_a contingency_buffer_a crop_operations_certification)
+(release_support_worker_and_equipment support_worker_a sprayer_unit_a contingency_buffer_a)
+(release_supervisor_from_labor_entity support_worker_a field_supervisor_a)
+(register_labor_entity field_crew_a)
+(allocate_equipment_to_labor_entity field_crew_a harvester_unit_a)
+(assign_skill_certification_to_labor_entity field_crew_a crop_operations_certification)
+(clear_labor_for_assignment field_crew_a crop_operations_certification)
+(allocate_specialized_equipment_to_crew field_crew_a specialized_harvester_a)
+(bind_weather_constraint_to_crew field_crew_a weather_constraint_a)
+(assign_supervisor_to_labor_entity field_crew_a field_supervisor_a)
+(stage_work_package_to_shift_slot field_crew_a work_package_a peak_shift_slot_a)
+(confirm_work_package_allocation field_crew_a work_package_a peak_shift_slot_a crop_operations_certification)
+(authorize_crew_without_secondary_flag field_crew_a specialized_harvester_a field_supervisor_a work_package_a peak_shift_slot_a)
+(prepare_crew_without_shift_flags field_crew_a weather_constraint_a work_package_a peak_shift_slot_a)
+(activate_crew_shift field_crew_a)
+(close_shift_and_release_reserve field_crew_a contingency_buffer_a crop_operations_certification)
+(release_crew_and_equipment field_crew_a harvester_unit_a contingency_buffer_a)
+(release_skill_certification_from_labor_entity field_crew_a crop_operations_certification)
+(release_specialized_equipment_from_crew field_crew_a specialized_harvester_a)
+(release_weather_constraint_from_crew field_crew_a weather_constraint_a)
+(release_supervisor_from_labor_entity field_crew_a field_supervisor_a)
+(register_labor_entity field_crew_b)
+(allocate_equipment_to_labor_entity field_crew_b harvester_unit_a)
+(assign_skill_certification_to_labor_entity field_crew_b crop_operations_certification)
+(clear_labor_for_assignment field_crew_b crop_operations_certification)
+(allocate_specialized_equipment_to_crew field_crew_b specialized_harvester_a)
+(bind_weather_constraint_to_crew field_crew_b weather_constraint_a)
+(assign_supervisor_to_labor_entity field_crew_b field_supervisor_a)
+(stage_work_package_to_shift_slot field_crew_b work_package_b peak_shift_slot_a)
+(confirm_work_package_allocation field_crew_b work_package_b peak_shift_slot_a crop_operations_certification)
+(authorize_crew_without_secondary_flag field_crew_b specialized_harvester_a field_supervisor_a work_package_b peak_shift_slot_a)
+(prepare_crew_without_shift_flags field_crew_b weather_constraint_a work_package_b peak_shift_slot_a)
+(activate_crew_shift field_crew_b)
+(close_shift_and_release_reserve field_crew_b contingency_buffer_a crop_operations_certification)
+(release_crew_and_equipment field_crew_b harvester_unit_a contingency_buffer_a)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1twenes7/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_1twenes7/plan.pddl 
+
+
+--- stderr ---
+

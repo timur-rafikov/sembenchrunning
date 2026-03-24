@@ -1,0 +1,936 @@
+(define (domain weighted_assessment_priority_management)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_category - object resource_category - object priority_category - object assessment_root - object assessment_entity - assessment_root priority_slot - operational_resource_category exam_window - operational_resource_category reviewer - operational_resource_category administrative_flag - operational_resource_category eligibility_token - operational_resource_category resubmission_token - operational_resource_category grade_adjustment - operational_resource_category regulation_clause - operational_resource_category recovery_option - resource_category weight_component - resource_category approval_token - resource_category student_priority_choice - priority_category instructor_priority_choice - priority_category grade_batch - priority_category participant_group - assessment_entity course_component_group - assessment_entity student - participant_group instructor - participant_group assessment_instance - course_component_group)
+  (:predicates
+    (assessment_registered ?assessment_entity - assessment_entity)
+    (ready_for_assessment ?assessment_entity - assessment_entity)
+    (entity_priority_assigned ?assessment_entity - assessment_entity)
+    (participant_academic_progress_recorded ?assessment_entity - assessment_entity)
+    (instance_progression_recorded ?assessment_entity - assessment_entity)
+    (resubmission_processed ?assessment_entity - assessment_entity)
+    (priority_slot_available ?priority_slot - priority_slot)
+    (entity_assigned_priority_slot ?assessment_entity - assessment_entity ?priority_slot - priority_slot)
+    (exam_window_available ?exam_window - exam_window)
+    (reserved_exam_window ?assessment_entity - assessment_entity ?exam_window - exam_window)
+    (reviewer_available ?reviewer - reviewer)
+    (entity_assigned_reviewer ?assessment_entity - assessment_entity ?reviewer - reviewer)
+    (recovery_option_available ?recovery_option - recovery_option)
+    (student_assigned_recovery_option ?student - student ?recovery_option - recovery_option)
+    (instructor_assigned_recovery_option ?instructor - instructor ?recovery_option - recovery_option)
+    (student_has_priority_choice ?student - student ?student_priority_choice - student_priority_choice)
+    (student_choice_committed ?student_priority_choice - student_priority_choice)
+    (student_choice_allocated ?student_priority_choice - student_priority_choice)
+    (student_ready_for_batch ?student - student)
+    (instructor_has_priority_choice ?instructor - instructor ?instructor_priority_choice - instructor_priority_choice)
+    (instructor_choice_committed ?instructor_priority_choice - instructor_priority_choice)
+    (instructor_choice_allocated ?instructor_priority_choice - instructor_priority_choice)
+    (instructor_ready_for_batch ?instructor - instructor)
+    (grade_batch_available ?grade_batch - grade_batch)
+    (grade_batch_composed ?grade_batch - grade_batch)
+    (grade_batch_contains_student_choice ?grade_batch - grade_batch ?student_priority_choice - student_priority_choice)
+    (grade_batch_contains_instructor_choice ?grade_batch - grade_batch ?instructor_priority_choice - instructor_priority_choice)
+    (grade_batch_requires_instructor_review ?grade_batch - grade_batch)
+    (grade_batch_requires_peer_review ?grade_batch - grade_batch)
+    (grade_batch_locked_for_weight_binding ?grade_batch - grade_batch)
+    (assessment_instance_enrolled_student ?assessment_instance - assessment_instance ?student - student)
+    (assessment_instance_assigned_instructor ?assessment_instance - assessment_instance ?instructor - instructor)
+    (assessment_instance_in_grade_batch ?assessment_instance - assessment_instance ?grade_batch - grade_batch)
+    (weight_component_available ?weight_component - weight_component)
+    (assessment_instance_has_weight_component ?assessment_instance - assessment_instance ?weight_component - weight_component)
+    (weight_component_bound ?weight_component - weight_component)
+    (weight_component_bound_to_grade_batch ?weight_component - weight_component ?grade_batch - grade_batch)
+    (weight_applied_to_instance ?assessment_instance - assessment_instance)
+    (review_tasks_assigned_to_instance ?assessment_instance - assessment_instance)
+    (instance_verification_ready ?assessment_instance - assessment_instance)
+    (administrative_flag_applied ?assessment_instance - assessment_instance)
+    (administrative_review_completed ?assessment_instance - assessment_instance)
+    (eligibility_confirmed ?assessment_instance - assessment_instance)
+    (grading_verified ?assessment_instance - assessment_instance)
+    (approval_token_available ?approval_token - approval_token)
+    (assessment_has_approval_token ?assessment_instance - assessment_instance ?approval_token - approval_token)
+    (approval_granted ?assessment_instance - assessment_instance)
+    (approval_review_started ?assessment_instance - assessment_instance)
+    (approval_review_completed ?assessment_instance - assessment_instance)
+    (administrative_flag_available ?administrative_flag - administrative_flag)
+    (assessment_administrative_flag_assigned ?assessment_instance - assessment_instance ?administrative_flag - administrative_flag)
+    (eligibility_token_available ?eligibility_token - eligibility_token)
+    (eligibility_token_assigned_to_instance ?assessment_instance - assessment_instance ?eligibility_token - eligibility_token)
+    (grade_adjustment_available ?grade_adjustment - grade_adjustment)
+    (grade_adjustment_assigned_to_instance ?assessment_instance - assessment_instance ?grade_adjustment - grade_adjustment)
+    (regulation_clause_available ?regulation_clause - regulation_clause)
+    (regulation_clause_assigned_to_instance ?assessment_instance - assessment_instance ?regulation_clause - regulation_clause)
+    (resubmission_token_available ?resubmission_token - resubmission_token)
+    (entity_resubmission_token_assigned ?assessment_entity - assessment_entity ?resubmission_token - resubmission_token)
+    (student_ready_flag ?student - student)
+    (instructor_ready_flag ?instructor - instructor)
+    (instance_finalization_recorded ?assessment_instance - assessment_instance)
+  )
+  (:action register_assessment_entity
+    :parameters (?assessment_entity - assessment_entity)
+    :precondition
+      (and
+        (not
+          (assessment_registered ?assessment_entity)
+        )
+        (not
+          (participant_academic_progress_recorded ?assessment_entity)
+        )
+      )
+    :effect (assessment_registered ?assessment_entity)
+  )
+  (:action allocate_priority_slot_to_assessment
+    :parameters (?assessment_entity - assessment_entity ?priority_slot - priority_slot)
+    :precondition
+      (and
+        (assessment_registered ?assessment_entity)
+        (not
+          (entity_priority_assigned ?assessment_entity)
+        )
+        (priority_slot_available ?priority_slot)
+      )
+    :effect
+      (and
+        (entity_priority_assigned ?assessment_entity)
+        (entity_assigned_priority_slot ?assessment_entity ?priority_slot)
+        (not
+          (priority_slot_available ?priority_slot)
+        )
+      )
+  )
+  (:action reserve_exam_window_for_assessment
+    :parameters (?assessment_entity - assessment_entity ?exam_window - exam_window)
+    :precondition
+      (and
+        (assessment_registered ?assessment_entity)
+        (entity_priority_assigned ?assessment_entity)
+        (exam_window_available ?exam_window)
+      )
+    :effect
+      (and
+        (reserved_exam_window ?assessment_entity ?exam_window)
+        (not
+          (exam_window_available ?exam_window)
+        )
+      )
+  )
+  (:action confirm_reserved_exam_window
+    :parameters (?assessment_entity - assessment_entity ?exam_window - exam_window)
+    :precondition
+      (and
+        (assessment_registered ?assessment_entity)
+        (entity_priority_assigned ?assessment_entity)
+        (reserved_exam_window ?assessment_entity ?exam_window)
+        (not
+          (ready_for_assessment ?assessment_entity)
+        )
+      )
+    :effect (ready_for_assessment ?assessment_entity)
+  )
+  (:action release_exam_window_reservation
+    :parameters (?assessment_entity - assessment_entity ?exam_window - exam_window)
+    :precondition
+      (and
+        (reserved_exam_window ?assessment_entity ?exam_window)
+      )
+    :effect
+      (and
+        (exam_window_available ?exam_window)
+        (not
+          (reserved_exam_window ?assessment_entity ?exam_window)
+        )
+      )
+  )
+  (:action assign_reviewer_to_assessment
+    :parameters (?assessment_entity - assessment_entity ?reviewer - reviewer)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_entity)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (entity_assigned_reviewer ?assessment_entity ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_assessment
+    :parameters (?assessment_entity - assessment_entity ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_assigned_reviewer ?assessment_entity ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (entity_assigned_reviewer ?assessment_entity ?reviewer)
+        )
+      )
+  )
+  (:action apply_grade_adjustment_to_instance
+    :parameters (?assessment_instance - assessment_instance ?grade_adjustment - grade_adjustment)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (grade_adjustment_available ?grade_adjustment)
+      )
+    :effect
+      (and
+        (grade_adjustment_assigned_to_instance ?assessment_instance ?grade_adjustment)
+        (not
+          (grade_adjustment_available ?grade_adjustment)
+        )
+      )
+  )
+  (:action revert_grade_adjustment_from_instance
+    :parameters (?assessment_instance - assessment_instance ?grade_adjustment - grade_adjustment)
+    :precondition
+      (and
+        (grade_adjustment_assigned_to_instance ?assessment_instance ?grade_adjustment)
+      )
+    :effect
+      (and
+        (grade_adjustment_available ?grade_adjustment)
+        (not
+          (grade_adjustment_assigned_to_instance ?assessment_instance ?grade_adjustment)
+        )
+      )
+  )
+  (:action assign_regulation_clause_to_instance
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (regulation_clause_available ?regulation_clause)
+      )
+    :effect
+      (and
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (not
+          (regulation_clause_available ?regulation_clause)
+        )
+      )
+  )
+  (:action remove_regulation_clause_from_instance
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause)
+    :precondition
+      (and
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+      )
+    :effect
+      (and
+        (regulation_clause_available ?regulation_clause)
+        (not
+          (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        )
+      )
+  )
+  (:action confirm_student_priority_choice
+    :parameters (?student - student ?student_priority_choice - student_priority_choice ?exam_window - exam_window)
+    :precondition
+      (and
+        (ready_for_assessment ?student)
+        (reserved_exam_window ?student ?exam_window)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (not
+          (student_choice_committed ?student_priority_choice)
+        )
+        (not
+          (student_choice_allocated ?student_priority_choice)
+        )
+      )
+    :effect (student_choice_committed ?student_priority_choice)
+  )
+  (:action mark_student_ready_for_batch
+    :parameters (?student - student ?student_priority_choice - student_priority_choice ?reviewer - reviewer)
+    :precondition
+      (and
+        (ready_for_assessment ?student)
+        (entity_assigned_reviewer ?student ?reviewer)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (student_choice_committed ?student_priority_choice)
+        (not
+          (student_ready_flag ?student)
+        )
+      )
+    :effect
+      (and
+        (student_ready_flag ?student)
+        (student_ready_for_batch ?student)
+      )
+  )
+  (:action assign_recovery_option_to_student_choice
+    :parameters (?student - student ?student_priority_choice - student_priority_choice ?recovery_option - recovery_option)
+    :precondition
+      (and
+        (ready_for_assessment ?student)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (recovery_option_available ?recovery_option)
+        (not
+          (student_ready_flag ?student)
+        )
+      )
+    :effect
+      (and
+        (student_choice_allocated ?student_priority_choice)
+        (student_ready_flag ?student)
+        (student_assigned_recovery_option ?student ?recovery_option)
+        (not
+          (recovery_option_available ?recovery_option)
+        )
+      )
+  )
+  (:action process_student_recovery_attempt
+    :parameters (?student - student ?student_priority_choice - student_priority_choice ?exam_window - exam_window ?recovery_option - recovery_option)
+    :precondition
+      (and
+        (ready_for_assessment ?student)
+        (reserved_exam_window ?student ?exam_window)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (student_choice_allocated ?student_priority_choice)
+        (student_assigned_recovery_option ?student ?recovery_option)
+        (not
+          (student_ready_for_batch ?student)
+        )
+      )
+    :effect
+      (and
+        (student_choice_committed ?student_priority_choice)
+        (student_ready_for_batch ?student)
+        (recovery_option_available ?recovery_option)
+        (not
+          (student_assigned_recovery_option ?student ?recovery_option)
+        )
+      )
+  )
+  (:action confirm_instructor_priority_choice
+    :parameters (?instructor - instructor ?instructor_priority_choice - instructor_priority_choice ?exam_window - exam_window)
+    :precondition
+      (and
+        (ready_for_assessment ?instructor)
+        (reserved_exam_window ?instructor ?exam_window)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (not
+          (instructor_choice_committed ?instructor_priority_choice)
+        )
+        (not
+          (instructor_choice_allocated ?instructor_priority_choice)
+        )
+      )
+    :effect (instructor_choice_committed ?instructor_priority_choice)
+  )
+  (:action mark_instructor_ready_for_batch
+    :parameters (?instructor - instructor ?instructor_priority_choice - instructor_priority_choice ?reviewer - reviewer)
+    :precondition
+      (and
+        (ready_for_assessment ?instructor)
+        (entity_assigned_reviewer ?instructor ?reviewer)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (instructor_choice_committed ?instructor_priority_choice)
+        (not
+          (instructor_ready_flag ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_ready_flag ?instructor)
+        (instructor_ready_for_batch ?instructor)
+      )
+  )
+  (:action assign_recovery_option_to_instructor_choice
+    :parameters (?instructor - instructor ?instructor_priority_choice - instructor_priority_choice ?recovery_option - recovery_option)
+    :precondition
+      (and
+        (ready_for_assessment ?instructor)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (recovery_option_available ?recovery_option)
+        (not
+          (instructor_ready_flag ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_choice_allocated ?instructor_priority_choice)
+        (instructor_ready_flag ?instructor)
+        (instructor_assigned_recovery_option ?instructor ?recovery_option)
+        (not
+          (recovery_option_available ?recovery_option)
+        )
+      )
+  )
+  (:action process_instructor_recovery_attempt
+    :parameters (?instructor - instructor ?instructor_priority_choice - instructor_priority_choice ?exam_window - exam_window ?recovery_option - recovery_option)
+    :precondition
+      (and
+        (ready_for_assessment ?instructor)
+        (reserved_exam_window ?instructor ?exam_window)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (instructor_choice_allocated ?instructor_priority_choice)
+        (instructor_assigned_recovery_option ?instructor ?recovery_option)
+        (not
+          (instructor_ready_for_batch ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_choice_committed ?instructor_priority_choice)
+        (instructor_ready_for_batch ?instructor)
+        (recovery_option_available ?recovery_option)
+        (not
+          (instructor_assigned_recovery_option ?instructor ?recovery_option)
+        )
+      )
+  )
+  (:action assemble_grade_batch_standard
+    :parameters (?student - student ?instructor - instructor ?student_priority_choice - student_priority_choice ?instructor_priority_choice - instructor_priority_choice ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (student_ready_flag ?student)
+        (instructor_ready_flag ?instructor)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (student_choice_committed ?student_priority_choice)
+        (instructor_choice_committed ?instructor_priority_choice)
+        (student_ready_for_batch ?student)
+        (instructor_ready_for_batch ?instructor)
+        (grade_batch_available ?grade_batch)
+      )
+    :effect
+      (and
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_contains_student_choice ?grade_batch ?student_priority_choice)
+        (grade_batch_contains_instructor_choice ?grade_batch ?instructor_priority_choice)
+        (not
+          (grade_batch_available ?grade_batch)
+        )
+      )
+  )
+  (:action assemble_grade_batch_with_instructor_review
+    :parameters (?student - student ?instructor - instructor ?student_priority_choice - student_priority_choice ?instructor_priority_choice - instructor_priority_choice ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (student_ready_flag ?student)
+        (instructor_ready_flag ?instructor)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (student_choice_allocated ?student_priority_choice)
+        (instructor_choice_committed ?instructor_priority_choice)
+        (not
+          (student_ready_for_batch ?student)
+        )
+        (instructor_ready_for_batch ?instructor)
+        (grade_batch_available ?grade_batch)
+      )
+    :effect
+      (and
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_contains_student_choice ?grade_batch ?student_priority_choice)
+        (grade_batch_contains_instructor_choice ?grade_batch ?instructor_priority_choice)
+        (grade_batch_requires_instructor_review ?grade_batch)
+        (not
+          (grade_batch_available ?grade_batch)
+        )
+      )
+  )
+  (:action assemble_grade_batch_with_peer_review
+    :parameters (?student - student ?instructor - instructor ?student_priority_choice - student_priority_choice ?instructor_priority_choice - instructor_priority_choice ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (student_ready_flag ?student)
+        (instructor_ready_flag ?instructor)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (student_choice_committed ?student_priority_choice)
+        (instructor_choice_allocated ?instructor_priority_choice)
+        (student_ready_for_batch ?student)
+        (not
+          (instructor_ready_for_batch ?instructor)
+        )
+        (grade_batch_available ?grade_batch)
+      )
+    :effect
+      (and
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_contains_student_choice ?grade_batch ?student_priority_choice)
+        (grade_batch_contains_instructor_choice ?grade_batch ?instructor_priority_choice)
+        (grade_batch_requires_peer_review ?grade_batch)
+        (not
+          (grade_batch_available ?grade_batch)
+        )
+      )
+  )
+  (:action assemble_grade_batch_with_both_reviews
+    :parameters (?student - student ?instructor - instructor ?student_priority_choice - student_priority_choice ?instructor_priority_choice - instructor_priority_choice ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (student_ready_flag ?student)
+        (instructor_ready_flag ?instructor)
+        (student_has_priority_choice ?student ?student_priority_choice)
+        (instructor_has_priority_choice ?instructor ?instructor_priority_choice)
+        (student_choice_allocated ?student_priority_choice)
+        (instructor_choice_allocated ?instructor_priority_choice)
+        (not
+          (student_ready_for_batch ?student)
+        )
+        (not
+          (instructor_ready_for_batch ?instructor)
+        )
+        (grade_batch_available ?grade_batch)
+      )
+    :effect
+      (and
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_contains_student_choice ?grade_batch ?student_priority_choice)
+        (grade_batch_contains_instructor_choice ?grade_batch ?instructor_priority_choice)
+        (grade_batch_requires_instructor_review ?grade_batch)
+        (grade_batch_requires_peer_review ?grade_batch)
+        (not
+          (grade_batch_available ?grade_batch)
+        )
+      )
+  )
+  (:action lock_grade_batch_for_weight_binding
+    :parameters (?grade_batch - grade_batch ?student - student ?exam_window - exam_window)
+    :precondition
+      (and
+        (grade_batch_composed ?grade_batch)
+        (student_ready_flag ?student)
+        (reserved_exam_window ?student ?exam_window)
+        (not
+          (grade_batch_locked_for_weight_binding ?grade_batch)
+        )
+      )
+    :effect (grade_batch_locked_for_weight_binding ?grade_batch)
+  )
+  (:action bind_weight_component_to_instance_and_batch
+    :parameters (?assessment_instance - assessment_instance ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (assessment_instance_in_grade_batch ?assessment_instance ?grade_batch)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_available ?weight_component)
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_locked_for_weight_binding ?grade_batch)
+        (not
+          (weight_component_bound ?weight_component)
+        )
+      )
+    :effect
+      (and
+        (weight_component_bound ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (not
+          (weight_component_available ?weight_component)
+        )
+      )
+  )
+  (:action apply_weight_component_to_instance
+    :parameters (?assessment_instance - assessment_instance ?weight_component - weight_component ?grade_batch - grade_batch ?exam_window - exam_window)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (reserved_exam_window ?assessment_instance ?exam_window)
+        (not
+          (grade_batch_requires_instructor_review ?grade_batch)
+        )
+        (not
+          (weight_applied_to_instance ?assessment_instance)
+        )
+      )
+    :effect (weight_applied_to_instance ?assessment_instance)
+  )
+  (:action apply_administrative_flag_to_instance
+    :parameters (?assessment_instance - assessment_instance ?administrative_flag - administrative_flag)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (administrative_flag_available ?administrative_flag)
+        (not
+          (administrative_flag_applied ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (administrative_flag_applied ?assessment_instance)
+        (assessment_administrative_flag_assigned ?assessment_instance ?administrative_flag)
+        (not
+          (administrative_flag_available ?administrative_flag)
+        )
+      )
+  )
+  (:action complete_administrative_review_and_apply_weight
+    :parameters (?assessment_instance - assessment_instance ?weight_component - weight_component ?grade_batch - grade_batch ?exam_window - exam_window ?administrative_flag - administrative_flag)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (reserved_exam_window ?assessment_instance ?exam_window)
+        (grade_batch_requires_instructor_review ?grade_batch)
+        (administrative_flag_applied ?assessment_instance)
+        (assessment_administrative_flag_assigned ?assessment_instance ?administrative_flag)
+        (not
+          (weight_applied_to_instance ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (weight_applied_to_instance ?assessment_instance)
+        (administrative_review_completed ?assessment_instance)
+      )
+  )
+  (:action assign_review_tasks_primary
+    :parameters (?assessment_instance - assessment_instance ?grade_adjustment - grade_adjustment ?reviewer - reviewer ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (weight_applied_to_instance ?assessment_instance)
+        (grade_adjustment_assigned_to_instance ?assessment_instance ?grade_adjustment)
+        (entity_assigned_reviewer ?assessment_instance ?reviewer)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (not
+          (grade_batch_requires_peer_review ?grade_batch)
+        )
+        (not
+          (review_tasks_assigned_to_instance ?assessment_instance)
+        )
+      )
+    :effect (review_tasks_assigned_to_instance ?assessment_instance)
+  )
+  (:action assign_review_tasks_secondary
+    :parameters (?assessment_instance - assessment_instance ?grade_adjustment - grade_adjustment ?reviewer - reviewer ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (weight_applied_to_instance ?assessment_instance)
+        (grade_adjustment_assigned_to_instance ?assessment_instance ?grade_adjustment)
+        (entity_assigned_reviewer ?assessment_instance ?reviewer)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (grade_batch_requires_peer_review ?grade_batch)
+        (not
+          (review_tasks_assigned_to_instance ?assessment_instance)
+        )
+      )
+    :effect (review_tasks_assigned_to_instance ?assessment_instance)
+  )
+  (:action initiate_instance_verification
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (review_tasks_assigned_to_instance ?assessment_instance)
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (not
+          (grade_batch_requires_instructor_review ?grade_batch)
+        )
+        (not
+          (grade_batch_requires_peer_review ?grade_batch)
+        )
+        (not
+          (instance_verification_ready ?assessment_instance)
+        )
+      )
+    :effect (instance_verification_ready ?assessment_instance)
+  )
+  (:action initiate_instance_verification_instructor_only
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (review_tasks_assigned_to_instance ?assessment_instance)
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (grade_batch_requires_instructor_review ?grade_batch)
+        (not
+          (grade_batch_requires_peer_review ?grade_batch)
+        )
+        (not
+          (instance_verification_ready ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (eligibility_confirmed ?assessment_instance)
+      )
+  )
+  (:action initiate_instance_verification_peer_only
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (review_tasks_assigned_to_instance ?assessment_instance)
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (not
+          (grade_batch_requires_instructor_review ?grade_batch)
+        )
+        (grade_batch_requires_peer_review ?grade_batch)
+        (not
+          (instance_verification_ready ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (eligibility_confirmed ?assessment_instance)
+      )
+  )
+  (:action initiate_instance_verification_instructor_and_peer
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause ?weight_component - weight_component ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (review_tasks_assigned_to_instance ?assessment_instance)
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (assessment_instance_has_weight_component ?assessment_instance ?weight_component)
+        (weight_component_bound_to_grade_batch ?weight_component ?grade_batch)
+        (grade_batch_requires_instructor_review ?grade_batch)
+        (grade_batch_requires_peer_review ?grade_batch)
+        (not
+          (instance_verification_ready ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (eligibility_confirmed ?assessment_instance)
+      )
+  )
+  (:action finalize_instance_after_verification
+    :parameters (?assessment_instance - assessment_instance)
+    :precondition
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (not
+          (eligibility_confirmed ?assessment_instance)
+        )
+        (not
+          (instance_finalization_recorded ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_recorded ?assessment_instance)
+        (instance_progression_recorded ?assessment_instance)
+      )
+  )
+  (:action assign_eligibility_token_to_instance
+    :parameters (?assessment_instance - assessment_instance ?eligibility_token - eligibility_token)
+    :precondition
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (eligibility_confirmed ?assessment_instance)
+        (eligibility_token_available ?eligibility_token)
+      )
+    :effect
+      (and
+        (eligibility_token_assigned_to_instance ?assessment_instance ?eligibility_token)
+        (not
+          (eligibility_token_available ?eligibility_token)
+        )
+      )
+  )
+  (:action complete_grading_verification
+    :parameters (?assessment_instance - assessment_instance ?student - student ?instructor - instructor ?exam_window - exam_window ?eligibility_token - eligibility_token)
+    :precondition
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (eligibility_confirmed ?assessment_instance)
+        (eligibility_token_assigned_to_instance ?assessment_instance ?eligibility_token)
+        (assessment_instance_enrolled_student ?assessment_instance ?student)
+        (assessment_instance_assigned_instructor ?assessment_instance ?instructor)
+        (student_ready_for_batch ?student)
+        (instructor_ready_for_batch ?instructor)
+        (reserved_exam_window ?assessment_instance ?exam_window)
+        (not
+          (grading_verified ?assessment_instance)
+        )
+      )
+    :effect (grading_verified ?assessment_instance)
+  )
+  (:action finalize_instance_after_grading_verification
+    :parameters (?assessment_instance - assessment_instance)
+    :precondition
+      (and
+        (instance_verification_ready ?assessment_instance)
+        (grading_verified ?assessment_instance)
+        (not
+          (instance_finalization_recorded ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_recorded ?assessment_instance)
+        (instance_progression_recorded ?assessment_instance)
+      )
+  )
+  (:action grant_approval_to_instance
+    :parameters (?assessment_instance - assessment_instance ?approval_token - approval_token ?exam_window - exam_window)
+    :precondition
+      (and
+        (ready_for_assessment ?assessment_instance)
+        (reserved_exam_window ?assessment_instance ?exam_window)
+        (approval_token_available ?approval_token)
+        (assessment_has_approval_token ?assessment_instance ?approval_token)
+        (not
+          (approval_granted ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (approval_granted ?assessment_instance)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action start_approval_review
+    :parameters (?assessment_instance - assessment_instance ?reviewer - reviewer)
+    :precondition
+      (and
+        (approval_granted ?assessment_instance)
+        (entity_assigned_reviewer ?assessment_instance ?reviewer)
+        (not
+          (approval_review_started ?assessment_instance)
+        )
+      )
+    :effect (approval_review_started ?assessment_instance)
+  )
+  (:action complete_approval_review
+    :parameters (?assessment_instance - assessment_instance ?regulation_clause - regulation_clause)
+    :precondition
+      (and
+        (approval_review_started ?assessment_instance)
+        (regulation_clause_assigned_to_instance ?assessment_instance ?regulation_clause)
+        (not
+          (approval_review_completed ?assessment_instance)
+        )
+      )
+    :effect (approval_review_completed ?assessment_instance)
+  )
+  (:action finalize_instance_after_approval
+    :parameters (?assessment_instance - assessment_instance)
+    :precondition
+      (and
+        (approval_review_completed ?assessment_instance)
+        (not
+          (instance_finalization_recorded ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_finalization_recorded ?assessment_instance)
+        (instance_progression_recorded ?assessment_instance)
+      )
+  )
+  (:action finalize_student_progress
+    :parameters (?student - student ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (student_ready_flag ?student)
+        (student_ready_for_batch ?student)
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_locked_for_weight_binding ?grade_batch)
+        (not
+          (instance_progression_recorded ?student)
+        )
+      )
+    :effect (instance_progression_recorded ?student)
+  )
+  (:action finalize_instructor_progress
+    :parameters (?instructor - instructor ?grade_batch - grade_batch)
+    :precondition
+      (and
+        (instructor_ready_flag ?instructor)
+        (instructor_ready_for_batch ?instructor)
+        (grade_batch_composed ?grade_batch)
+        (grade_batch_locked_for_weight_binding ?grade_batch)
+        (not
+          (instance_progression_recorded ?instructor)
+        )
+      )
+    :effect (instance_progression_recorded ?instructor)
+  )
+  (:action process_resubmission_for_assessment
+    :parameters (?assessment_entity - assessment_entity ?resubmission_token - resubmission_token ?exam_window - exam_window)
+    :precondition
+      (and
+        (instance_progression_recorded ?assessment_entity)
+        (reserved_exam_window ?assessment_entity ?exam_window)
+        (resubmission_token_available ?resubmission_token)
+        (not
+          (resubmission_processed ?assessment_entity)
+        )
+      )
+    :effect
+      (and
+        (resubmission_processed ?assessment_entity)
+        (entity_resubmission_token_assigned ?assessment_entity ?resubmission_token)
+        (not
+          (resubmission_token_available ?resubmission_token)
+        )
+      )
+  )
+  (:action apply_resubmission_and_release_priority_slot_for_student
+    :parameters (?student - student ?priority_slot - priority_slot ?resubmission_token - resubmission_token)
+    :precondition
+      (and
+        (resubmission_processed ?student)
+        (entity_assigned_priority_slot ?student ?priority_slot)
+        (entity_resubmission_token_assigned ?student ?resubmission_token)
+        (not
+          (participant_academic_progress_recorded ?student)
+        )
+      )
+    :effect
+      (and
+        (participant_academic_progress_recorded ?student)
+        (priority_slot_available ?priority_slot)
+        (resubmission_token_available ?resubmission_token)
+      )
+  )
+  (:action apply_resubmission_and_release_priority_slot_for_instructor
+    :parameters (?instructor - instructor ?priority_slot - priority_slot ?resubmission_token - resubmission_token)
+    :precondition
+      (and
+        (resubmission_processed ?instructor)
+        (entity_assigned_priority_slot ?instructor ?priority_slot)
+        (entity_resubmission_token_assigned ?instructor ?resubmission_token)
+        (not
+          (participant_academic_progress_recorded ?instructor)
+        )
+      )
+    :effect
+      (and
+        (participant_academic_progress_recorded ?instructor)
+        (priority_slot_available ?priority_slot)
+        (resubmission_token_available ?resubmission_token)
+      )
+  )
+  (:action apply_resubmission_and_release_priority_slot_for_instance
+    :parameters (?assessment_instance - assessment_instance ?priority_slot - priority_slot ?resubmission_token - resubmission_token)
+    :precondition
+      (and
+        (resubmission_processed ?assessment_instance)
+        (entity_assigned_priority_slot ?assessment_instance ?priority_slot)
+        (entity_resubmission_token_assigned ?assessment_instance ?resubmission_token)
+        (not
+          (participant_academic_progress_recorded ?assessment_instance)
+        )
+      )
+    :effect
+      (and
+        (participant_academic_progress_recorded ?assessment_instance)
+        (priority_slot_available ?priority_slot)
+        (resubmission_token_available ?resubmission_token)
+      )
+  )
+)

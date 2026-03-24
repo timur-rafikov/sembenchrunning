@@ -15,6 +15,12 @@
 - AUTOPLANBENCH_ROOT — путь к корню autoplanbench (для вызова run_save_descriptions.py).
 - В sample.json должен быть domain_nl_path (путь к domain_description_seedN.json относительно
   корня датасета) или он будет создан автоматически (prepare или run_benchmark с --autoplanbench-root).
+
+Примечание: режим --type full в run_save_descriptions не вызывает LLM (шаблоны Jinja).
+LLM для PDDL→NL домена — run_domain_setup.py; лимиты и таймауты — translator_config.yaml
+и translator_settings.py (см. domain_setup.*).
+
+Логи AutoPlanBench в консоль: SEMBENCH_DEBUG=1 или run_benchmark --debug.
 """
 import os
 import subprocess
@@ -22,6 +28,9 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import Optional
+
+from autoplanbench_utils import apb_debug_inherit_stdio, apb_subprocess_stdio_kwargs
+from translator_settings import get_pddl2nl_timeout_seconds
 
 
 def pddl_to_nl_prompt(
@@ -70,7 +79,7 @@ def pddl_to_nl_prompt(
   if not script.exists():
     raise FileNotFoundError(f"Скрипт не найден: {script}")
 
-  timeout_s = int(os.environ.get("AUTOPLANBENCH_PDDL2NL_TIMEOUT", "600"))
+  timeout_s = get_pddl2nl_timeout_seconds()
 
   with tempfile.NamedTemporaryFile(
     mode="w", suffix=".txt", delete=False, encoding="utf-8"
@@ -86,17 +95,21 @@ def pddl_to_nl_prompt(
       "--prob", str(problem_path),
       "--out", out_file,
     ]
+    stdio_kw = apb_subprocess_stdio_kwargs()
     result = subprocess.run(
       cmd,
       cwd=root,
-      capture_output=True,
-      text=True,
       timeout=timeout_s,
-      encoding="utf-8",
+      **stdio_kw,
     )
     if result.returncode != 0:
+      tail = (
+        "(вывод AutoPlanBench в консоли; SEMBENCH_DEBUG)"
+        if apb_debug_inherit_stdio()
+        else (result.stderr or result.stdout or "")
+      )
       raise RuntimeError(
-        f"run_save_descriptions.py завершился с кодом {result.returncode}: {result.stderr or result.stdout}"
+        f"run_save_descriptions.py завершился с кодом {result.returncode}: {tail}"
       )
     return Path(out_file).read_text(encoding="utf-8").strip()
   finally:

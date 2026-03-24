@@ -1,0 +1,936 @@
+(define (domain specialist_unit_deployment_timing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types unit_class - object resource_class - object asset_class - object slot_root - object team_slot - slot_root specialist_token - unit_class timing_window - unit_class support_unit - unit_class upgrade_modifier - unit_class loadout_option - unit_class timing_token - unit_class special_configuration - unit_class priority_marker - unit_class utility_item - resource_class equipment_unit - resource_class mission_modifier - resource_class approach_node - asset_class threat_node - asset_class deployment_asset - asset_class slot_category - team_slot slot_category_alt - team_slot frontline_slot - slot_category support_slot - slot_category operation_context - slot_category_alt)
+  (:predicates
+    (entity_prepared ?team_slot - team_slot)
+    (entity_ready ?team_slot - team_slot)
+    (entity_claimed ?team_slot - team_slot)
+    (entity_committed ?team_slot - team_slot)
+    (entity_activated_flag ?team_slot - team_slot)
+    (entity_primed ?team_slot - team_slot)
+    (specialist_available ?specialist_token - specialist_token)
+    (entity_assigned_specialist ?team_slot - team_slot ?specialist_token - specialist_token)
+    (timing_window_available ?timing_window - timing_window)
+    (entity_scheduled_in_window ?team_slot - team_slot ?timing_window - timing_window)
+    (support_unit_available ?support_unit - support_unit)
+    (entity_assigned_support_unit ?team_slot - team_slot ?support_unit - support_unit)
+    (utility_item_available ?utility_item - utility_item)
+    (frontline_bound_utility ?frontline_slot - frontline_slot ?utility_item - utility_item)
+    (support_bound_utility ?support_slot - support_slot ?utility_item - utility_item)
+    (entity_assigned_approach ?frontline_slot - frontline_slot ?approach_node - approach_node)
+    (approach_node_primary_flag ?approach_node - approach_node)
+    (approach_node_secondary_flag ?approach_node - approach_node)
+    (frontline_ready_flag ?frontline_slot - frontline_slot)
+    (support_assigned_threat_node ?support_slot - support_slot ?threat_node - threat_node)
+    (threat_node_primary_flag ?threat_node - threat_node)
+    (threat_node_secondary_flag ?threat_node - threat_node)
+    (support_ready_flag ?support_slot - support_slot)
+    (asset_available ?deployment_asset - deployment_asset)
+    (asset_staged ?deployment_asset - deployment_asset)
+    (asset_assigned_approach ?deployment_asset - deployment_asset ?approach_node - approach_node)
+    (asset_assigned_threat ?deployment_asset - deployment_asset ?threat_node - threat_node)
+    (asset_ready_phase_a ?deployment_asset - deployment_asset)
+    (asset_ready_phase_b ?deployment_asset - deployment_asset)
+    (asset_ready_for_equipment ?deployment_asset - deployment_asset)
+    (context_has_frontline_slot ?operation_context - operation_context ?frontline_slot - frontline_slot)
+    (context_has_support_slot ?operation_context - operation_context ?support_slot - support_slot)
+    (context_assigned_asset ?operation_context - operation_context ?deployment_asset - deployment_asset)
+    (equipment_unit_available ?equipment_unit - equipment_unit)
+    (context_assigned_equipment ?operation_context - operation_context ?equipment_unit - equipment_unit)
+    (equipment_installed_flag ?equipment_unit - equipment_unit)
+    (equipment_bound_to_asset ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    (context_equipment_ready ?operation_context - operation_context)
+    (context_specialist_attached ?operation_context - operation_context)
+    (context_activation_ready ?operation_context - operation_context)
+    (context_commander_upgraded ?operation_context - operation_context)
+    (context_commander_prepared ?operation_context - operation_context)
+    (context_loadout_present ?operation_context - operation_context)
+    (context_roles_combined ?operation_context - operation_context)
+    (mission_modifier_available ?mission_modifier - mission_modifier)
+    (context_assigned_mission_modifier ?operation_context - operation_context ?mission_modifier - mission_modifier)
+    (context_modifier_bound ?operation_context - operation_context)
+    (context_modifier_followup_ready ?operation_context - operation_context)
+    (context_modifier_confirmed ?operation_context - operation_context)
+    (upgrade_modifier_available ?upgrade_modifier - upgrade_modifier)
+    (context_assigned_upgrade ?operation_context - operation_context ?upgrade_modifier - upgrade_modifier)
+    (loadout_option_available ?loadout_option - loadout_option)
+    (context_bound_loadout ?operation_context - operation_context ?loadout_option - loadout_option)
+    (special_configuration_available ?special_configuration - special_configuration)
+    (context_assigned_special_config ?operation_context - operation_context ?special_configuration - special_configuration)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (context_assigned_priority_marker ?operation_context - operation_context ?priority_marker - priority_marker)
+    (timing_token_available ?timing_token - timing_token)
+    (entity_has_timing_token ?team_slot - team_slot ?timing_token - timing_token)
+    (frontline_engaged_flag ?frontline_slot - frontline_slot)
+    (support_engaged_flag ?support_slot - support_slot)
+    (context_committed ?operation_context - operation_context)
+  )
+  (:action initialize_team_slot
+    :parameters (?team_slot - team_slot)
+    :precondition
+      (and
+        (not
+          (entity_prepared ?team_slot)
+        )
+        (not
+          (entity_committed ?team_slot)
+        )
+      )
+    :effect (entity_prepared ?team_slot)
+  )
+  (:action claim_specialist_for_slot
+    :parameters (?team_slot - team_slot ?specialist_token - specialist_token)
+    :precondition
+      (and
+        (entity_prepared ?team_slot)
+        (not
+          (entity_claimed ?team_slot)
+        )
+        (specialist_available ?specialist_token)
+      )
+    :effect
+      (and
+        (entity_claimed ?team_slot)
+        (entity_assigned_specialist ?team_slot ?specialist_token)
+        (not
+          (specialist_available ?specialist_token)
+        )
+      )
+  )
+  (:action link_slot_to_timing_window
+    :parameters (?team_slot - team_slot ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_prepared ?team_slot)
+        (entity_claimed ?team_slot)
+        (timing_window_available ?timing_window)
+      )
+    :effect
+      (and
+        (entity_scheduled_in_window ?team_slot ?timing_window)
+        (not
+          (timing_window_available ?timing_window)
+        )
+      )
+  )
+  (:action confirm_slot_timing
+    :parameters (?team_slot - team_slot ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_prepared ?team_slot)
+        (entity_claimed ?team_slot)
+        (entity_scheduled_in_window ?team_slot ?timing_window)
+        (not
+          (entity_ready ?team_slot)
+        )
+      )
+    :effect (entity_ready ?team_slot)
+  )
+  (:action release_timing_window_from_slot
+    :parameters (?team_slot - team_slot ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_scheduled_in_window ?team_slot ?timing_window)
+      )
+    :effect
+      (and
+        (timing_window_available ?timing_window)
+        (not
+          (entity_scheduled_in_window ?team_slot ?timing_window)
+        )
+      )
+  )
+  (:action assign_support_to_slot
+    :parameters (?team_slot - team_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_ready ?team_slot)
+        (support_unit_available ?support_unit)
+      )
+    :effect
+      (and
+        (entity_assigned_support_unit ?team_slot ?support_unit)
+        (not
+          (support_unit_available ?support_unit)
+        )
+      )
+  )
+  (:action unassign_support_from_slot
+    :parameters (?team_slot - team_slot ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_assigned_support_unit ?team_slot ?support_unit)
+      )
+    :effect
+      (and
+        (support_unit_available ?support_unit)
+        (not
+          (entity_assigned_support_unit ?team_slot ?support_unit)
+        )
+      )
+  )
+  (:action install_special_configuration_on_context
+    :parameters (?operation_context - operation_context ?special_configuration - special_configuration)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (special_configuration_available ?special_configuration)
+      )
+    :effect
+      (and
+        (context_assigned_special_config ?operation_context ?special_configuration)
+        (not
+          (special_configuration_available ?special_configuration)
+        )
+      )
+  )
+  (:action remove_special_configuration_from_context
+    :parameters (?operation_context - operation_context ?special_configuration - special_configuration)
+    :precondition
+      (and
+        (context_assigned_special_config ?operation_context ?special_configuration)
+      )
+    :effect
+      (and
+        (special_configuration_available ?special_configuration)
+        (not
+          (context_assigned_special_config ?operation_context ?special_configuration)
+        )
+      )
+  )
+  (:action attach_priority_marker_to_context
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (priority_marker_available ?priority_marker)
+      )
+    :effect
+      (and
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action detach_priority_marker_from_context
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+      )
+    :effect
+      (and
+        (priority_marker_available ?priority_marker)
+        (not
+          (context_assigned_priority_marker ?operation_context ?priority_marker)
+        )
+      )
+  )
+  (:action reserve_approach_for_frontline
+    :parameters (?frontline_slot - frontline_slot ?approach_node - approach_node ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_ready ?frontline_slot)
+        (entity_scheduled_in_window ?frontline_slot ?timing_window)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (not
+          (approach_node_primary_flag ?approach_node)
+        )
+        (not
+          (approach_node_secondary_flag ?approach_node)
+        )
+      )
+    :effect (approach_node_primary_flag ?approach_node)
+  )
+  (:action apply_support_coverage_to_frontline
+    :parameters (?frontline_slot - frontline_slot ?approach_node - approach_node ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_ready ?frontline_slot)
+        (entity_assigned_support_unit ?frontline_slot ?support_unit)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (approach_node_primary_flag ?approach_node)
+        (not
+          (frontline_engaged_flag ?frontline_slot)
+        )
+      )
+    :effect
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (frontline_ready_flag ?frontline_slot)
+      )
+  )
+  (:action deploy_utility_to_approach_for_frontline
+    :parameters (?frontline_slot - frontline_slot ?approach_node - approach_node ?utility_item - utility_item)
+    :precondition
+      (and
+        (entity_ready ?frontline_slot)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (utility_item_available ?utility_item)
+        (not
+          (frontline_engaged_flag ?frontline_slot)
+        )
+      )
+    :effect
+      (and
+        (approach_node_secondary_flag ?approach_node)
+        (frontline_engaged_flag ?frontline_slot)
+        (frontline_bound_utility ?frontline_slot ?utility_item)
+        (not
+          (utility_item_available ?utility_item)
+        )
+      )
+  )
+  (:action execute_frontline_utility_cycle
+    :parameters (?frontline_slot - frontline_slot ?approach_node - approach_node ?timing_window - timing_window ?utility_item - utility_item)
+    :precondition
+      (and
+        (entity_ready ?frontline_slot)
+        (entity_scheduled_in_window ?frontline_slot ?timing_window)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (approach_node_secondary_flag ?approach_node)
+        (frontline_bound_utility ?frontline_slot ?utility_item)
+        (not
+          (frontline_ready_flag ?frontline_slot)
+        )
+      )
+    :effect
+      (and
+        (approach_node_primary_flag ?approach_node)
+        (frontline_ready_flag ?frontline_slot)
+        (utility_item_available ?utility_item)
+        (not
+          (frontline_bound_utility ?frontline_slot ?utility_item)
+        )
+      )
+  )
+  (:action reserve_threat_node_for_support
+    :parameters (?support_slot - support_slot ?threat_node - threat_node ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_ready ?support_slot)
+        (entity_scheduled_in_window ?support_slot ?timing_window)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (not
+          (threat_node_primary_flag ?threat_node)
+        )
+        (not
+          (threat_node_secondary_flag ?threat_node)
+        )
+      )
+    :effect (threat_node_primary_flag ?threat_node)
+  )
+  (:action apply_support_unit_coverage_on_threat
+    :parameters (?support_slot - support_slot ?threat_node - threat_node ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_ready ?support_slot)
+        (entity_assigned_support_unit ?support_slot ?support_unit)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (threat_node_primary_flag ?threat_node)
+        (not
+          (support_engaged_flag ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (support_engaged_flag ?support_slot)
+        (support_ready_flag ?support_slot)
+      )
+  )
+  (:action deploy_utility_to_threat_for_support
+    :parameters (?support_slot - support_slot ?threat_node - threat_node ?utility_item - utility_item)
+    :precondition
+      (and
+        (entity_ready ?support_slot)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (utility_item_available ?utility_item)
+        (not
+          (support_engaged_flag ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (threat_node_secondary_flag ?threat_node)
+        (support_engaged_flag ?support_slot)
+        (support_bound_utility ?support_slot ?utility_item)
+        (not
+          (utility_item_available ?utility_item)
+        )
+      )
+  )
+  (:action execute_support_utility_cycle
+    :parameters (?support_slot - support_slot ?threat_node - threat_node ?timing_window - timing_window ?utility_item - utility_item)
+    :precondition
+      (and
+        (entity_ready ?support_slot)
+        (entity_scheduled_in_window ?support_slot ?timing_window)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (threat_node_secondary_flag ?threat_node)
+        (support_bound_utility ?support_slot ?utility_item)
+        (not
+          (support_ready_flag ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (threat_node_primary_flag ?threat_node)
+        (support_ready_flag ?support_slot)
+        (utility_item_available ?utility_item)
+        (not
+          (support_bound_utility ?support_slot ?utility_item)
+        )
+      )
+  )
+  (:action consolidate_subteams_into_asset
+    :parameters (?frontline_slot - frontline_slot ?support_slot - support_slot ?approach_node - approach_node ?threat_node - threat_node ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (support_engaged_flag ?support_slot)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (approach_node_primary_flag ?approach_node)
+        (threat_node_primary_flag ?threat_node)
+        (frontline_ready_flag ?frontline_slot)
+        (support_ready_flag ?support_slot)
+        (asset_available ?deployment_asset)
+      )
+    :effect
+      (and
+        (asset_staged ?deployment_asset)
+        (asset_assigned_approach ?deployment_asset ?approach_node)
+        (asset_assigned_threat ?deployment_asset ?threat_node)
+        (not
+          (asset_available ?deployment_asset)
+        )
+      )
+  )
+  (:action consolidate_subteams_into_asset_phase_b
+    :parameters (?frontline_slot - frontline_slot ?support_slot - support_slot ?approach_node - approach_node ?threat_node - threat_node ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (support_engaged_flag ?support_slot)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (approach_node_secondary_flag ?approach_node)
+        (threat_node_primary_flag ?threat_node)
+        (not
+          (frontline_ready_flag ?frontline_slot)
+        )
+        (support_ready_flag ?support_slot)
+        (asset_available ?deployment_asset)
+      )
+    :effect
+      (and
+        (asset_staged ?deployment_asset)
+        (asset_assigned_approach ?deployment_asset ?approach_node)
+        (asset_assigned_threat ?deployment_asset ?threat_node)
+        (asset_ready_phase_a ?deployment_asset)
+        (not
+          (asset_available ?deployment_asset)
+        )
+      )
+  )
+  (:action consolidate_subteams_into_asset_phase_c
+    :parameters (?frontline_slot - frontline_slot ?support_slot - support_slot ?approach_node - approach_node ?threat_node - threat_node ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (support_engaged_flag ?support_slot)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (approach_node_primary_flag ?approach_node)
+        (threat_node_secondary_flag ?threat_node)
+        (frontline_ready_flag ?frontline_slot)
+        (not
+          (support_ready_flag ?support_slot)
+        )
+        (asset_available ?deployment_asset)
+      )
+    :effect
+      (and
+        (asset_staged ?deployment_asset)
+        (asset_assigned_approach ?deployment_asset ?approach_node)
+        (asset_assigned_threat ?deployment_asset ?threat_node)
+        (asset_ready_phase_b ?deployment_asset)
+        (not
+          (asset_available ?deployment_asset)
+        )
+      )
+  )
+  (:action consolidate_subteams_into_asset_phase_d
+    :parameters (?frontline_slot - frontline_slot ?support_slot - support_slot ?approach_node - approach_node ?threat_node - threat_node ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (support_engaged_flag ?support_slot)
+        (entity_assigned_approach ?frontline_slot ?approach_node)
+        (support_assigned_threat_node ?support_slot ?threat_node)
+        (approach_node_secondary_flag ?approach_node)
+        (threat_node_secondary_flag ?threat_node)
+        (not
+          (frontline_ready_flag ?frontline_slot)
+        )
+        (not
+          (support_ready_flag ?support_slot)
+        )
+        (asset_available ?deployment_asset)
+      )
+    :effect
+      (and
+        (asset_staged ?deployment_asset)
+        (asset_assigned_approach ?deployment_asset ?approach_node)
+        (asset_assigned_threat ?deployment_asset ?threat_node)
+        (asset_ready_phase_a ?deployment_asset)
+        (asset_ready_phase_b ?deployment_asset)
+        (not
+          (asset_available ?deployment_asset)
+        )
+      )
+  )
+  (:action activate_asset_for_deployment
+    :parameters (?deployment_asset - deployment_asset ?frontline_slot - frontline_slot ?timing_window - timing_window)
+    :precondition
+      (and
+        (asset_staged ?deployment_asset)
+        (frontline_engaged_flag ?frontline_slot)
+        (entity_scheduled_in_window ?frontline_slot ?timing_window)
+        (not
+          (asset_ready_for_equipment ?deployment_asset)
+        )
+      )
+    :effect (asset_ready_for_equipment ?deployment_asset)
+  )
+  (:action install_equipment_on_asset_context
+    :parameters (?operation_context - operation_context ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (context_assigned_asset ?operation_context ?deployment_asset)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_unit_available ?equipment_unit)
+        (asset_staged ?deployment_asset)
+        (asset_ready_for_equipment ?deployment_asset)
+        (not
+          (equipment_installed_flag ?equipment_unit)
+        )
+      )
+    :effect
+      (and
+        (equipment_installed_flag ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action finalize_equipment_installation
+    :parameters (?operation_context - operation_context ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_installed_flag ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (entity_scheduled_in_window ?operation_context ?timing_window)
+        (not
+          (asset_ready_phase_a ?deployment_asset)
+        )
+        (not
+          (context_equipment_ready ?operation_context)
+        )
+      )
+    :effect (context_equipment_ready ?operation_context)
+  )
+  (:action apply_upgrade_modifier_to_context
+    :parameters (?operation_context - operation_context ?upgrade_modifier - upgrade_modifier)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (upgrade_modifier_available ?upgrade_modifier)
+        (not
+          (context_commander_upgraded ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_commander_upgraded ?operation_context)
+        (context_assigned_upgrade ?operation_context ?upgrade_modifier)
+        (not
+          (upgrade_modifier_available ?upgrade_modifier)
+        )
+      )
+  )
+  (:action prepare_commander_upgrade_and_equipment
+    :parameters (?operation_context - operation_context ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset ?timing_window - timing_window ?upgrade_modifier - upgrade_modifier)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_installed_flag ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (entity_scheduled_in_window ?operation_context ?timing_window)
+        (asset_ready_phase_a ?deployment_asset)
+        (context_commander_upgraded ?operation_context)
+        (context_assigned_upgrade ?operation_context ?upgrade_modifier)
+        (not
+          (context_equipment_ready ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_equipment_ready ?operation_context)
+        (context_commander_prepared ?operation_context)
+      )
+  )
+  (:action attach_special_configuration_to_context
+    :parameters (?operation_context - operation_context ?special_configuration - special_configuration ?support_unit - support_unit ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_equipment_ready ?operation_context)
+        (context_assigned_special_config ?operation_context ?special_configuration)
+        (entity_assigned_support_unit ?operation_context ?support_unit)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (not
+          (asset_ready_phase_b ?deployment_asset)
+        )
+        (not
+          (context_specialist_attached ?operation_context)
+        )
+      )
+    :effect (context_specialist_attached ?operation_context)
+  )
+  (:action attach_special_configuration_to_context_phase_b
+    :parameters (?operation_context - operation_context ?special_configuration - special_configuration ?support_unit - support_unit ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_equipment_ready ?operation_context)
+        (context_assigned_special_config ?operation_context ?special_configuration)
+        (entity_assigned_support_unit ?operation_context ?support_unit)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (asset_ready_phase_b ?deployment_asset)
+        (not
+          (context_specialist_attached ?operation_context)
+        )
+      )
+    :effect (context_specialist_attached ?operation_context)
+  )
+  (:action initiate_specialist_activation_sequence
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_specialist_attached ?operation_context)
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (not
+          (asset_ready_phase_a ?deployment_asset)
+        )
+        (not
+          (asset_ready_phase_b ?deployment_asset)
+        )
+        (not
+          (context_activation_ready ?operation_context)
+        )
+      )
+    :effect (context_activation_ready ?operation_context)
+  )
+  (:action activate_specialist_with_loadout_flag
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_specialist_attached ?operation_context)
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (asset_ready_phase_a ?deployment_asset)
+        (not
+          (asset_ready_phase_b ?deployment_asset)
+        )
+        (not
+          (context_activation_ready ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_activation_ready ?operation_context)
+        (context_loadout_present ?operation_context)
+      )
+  )
+  (:action activate_specialist_with_alternate_asset_phase
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_specialist_attached ?operation_context)
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (not
+          (asset_ready_phase_a ?deployment_asset)
+        )
+        (asset_ready_phase_b ?deployment_asset)
+        (not
+          (context_activation_ready ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_activation_ready ?operation_context)
+        (context_loadout_present ?operation_context)
+      )
+  )
+  (:action activate_specialist_full_asset_ready
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker ?equipment_unit - equipment_unit ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (context_specialist_attached ?operation_context)
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (context_assigned_equipment ?operation_context ?equipment_unit)
+        (equipment_bound_to_asset ?equipment_unit ?deployment_asset)
+        (asset_ready_phase_a ?deployment_asset)
+        (asset_ready_phase_b ?deployment_asset)
+        (not
+          (context_activation_ready ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_activation_ready ?operation_context)
+        (context_loadout_present ?operation_context)
+      )
+  )
+  (:action commit_context_activation
+    :parameters (?operation_context - operation_context)
+    :precondition
+      (and
+        (context_activation_ready ?operation_context)
+        (not
+          (context_loadout_present ?operation_context)
+        )
+        (not
+          (context_committed ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_committed ?operation_context)
+        (entity_activated_flag ?operation_context)
+      )
+  )
+  (:action assign_loadout_to_context
+    :parameters (?operation_context - operation_context ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (context_activation_ready ?operation_context)
+        (context_loadout_present ?operation_context)
+        (loadout_option_available ?loadout_option)
+      )
+    :effect
+      (and
+        (context_bound_loadout ?operation_context ?loadout_option)
+        (not
+          (loadout_option_available ?loadout_option)
+        )
+      )
+  )
+  (:action assign_final_roles_to_context
+    :parameters (?operation_context - operation_context ?frontline_slot - frontline_slot ?support_slot - support_slot ?timing_window - timing_window ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (context_activation_ready ?operation_context)
+        (context_loadout_present ?operation_context)
+        (context_bound_loadout ?operation_context ?loadout_option)
+        (context_has_frontline_slot ?operation_context ?frontline_slot)
+        (context_has_support_slot ?operation_context ?support_slot)
+        (frontline_ready_flag ?frontline_slot)
+        (support_ready_flag ?support_slot)
+        (entity_scheduled_in_window ?operation_context ?timing_window)
+        (not
+          (context_roles_combined ?operation_context)
+        )
+      )
+    :effect (context_roles_combined ?operation_context)
+  )
+  (:action commit_context_roles
+    :parameters (?operation_context - operation_context)
+    :precondition
+      (and
+        (context_activation_ready ?operation_context)
+        (context_roles_combined ?operation_context)
+        (not
+          (context_committed ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_committed ?operation_context)
+        (entity_activated_flag ?operation_context)
+      )
+  )
+  (:action apply_mission_modifier_to_context
+    :parameters (?operation_context - operation_context ?mission_modifier - mission_modifier ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_ready ?operation_context)
+        (entity_scheduled_in_window ?operation_context ?timing_window)
+        (mission_modifier_available ?mission_modifier)
+        (context_assigned_mission_modifier ?operation_context ?mission_modifier)
+        (not
+          (context_modifier_bound ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_modifier_bound ?operation_context)
+        (not
+          (mission_modifier_available ?mission_modifier)
+        )
+      )
+  )
+  (:action prepare_modifier_followup_for_context
+    :parameters (?operation_context - operation_context ?support_unit - support_unit)
+    :precondition
+      (and
+        (context_modifier_bound ?operation_context)
+        (entity_assigned_support_unit ?operation_context ?support_unit)
+        (not
+          (context_modifier_followup_ready ?operation_context)
+        )
+      )
+    :effect (context_modifier_followup_ready ?operation_context)
+  )
+  (:action apply_priority_marker_followup
+    :parameters (?operation_context - operation_context ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (context_modifier_followup_ready ?operation_context)
+        (context_assigned_priority_marker ?operation_context ?priority_marker)
+        (not
+          (context_modifier_confirmed ?operation_context)
+        )
+      )
+    :effect (context_modifier_confirmed ?operation_context)
+  )
+  (:action confirm_modifier_followup_and_commit_context
+    :parameters (?operation_context - operation_context)
+    :precondition
+      (and
+        (context_modifier_confirmed ?operation_context)
+        (not
+          (context_committed ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (context_committed ?operation_context)
+        (entity_activated_flag ?operation_context)
+      )
+  )
+  (:action activate_frontline_slot_on_asset
+    :parameters (?frontline_slot - frontline_slot ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (frontline_engaged_flag ?frontline_slot)
+        (frontline_ready_flag ?frontline_slot)
+        (asset_staged ?deployment_asset)
+        (asset_ready_for_equipment ?deployment_asset)
+        (not
+          (entity_activated_flag ?frontline_slot)
+        )
+      )
+    :effect (entity_activated_flag ?frontline_slot)
+  )
+  (:action activate_support_slot_on_asset
+    :parameters (?support_slot - support_slot ?deployment_asset - deployment_asset)
+    :precondition
+      (and
+        (support_engaged_flag ?support_slot)
+        (support_ready_flag ?support_slot)
+        (asset_staged ?deployment_asset)
+        (asset_ready_for_equipment ?deployment_asset)
+        (not
+          (entity_activated_flag ?support_slot)
+        )
+      )
+    :effect (entity_activated_flag ?support_slot)
+  )
+  (:action assign_timing_token_to_slot
+    :parameters (?team_slot - team_slot ?timing_token - timing_token ?timing_window - timing_window)
+    :precondition
+      (and
+        (entity_activated_flag ?team_slot)
+        (entity_scheduled_in_window ?team_slot ?timing_window)
+        (timing_token_available ?timing_token)
+        (not
+          (entity_primed ?team_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_primed ?team_slot)
+        (entity_has_timing_token ?team_slot ?timing_token)
+        (not
+          (timing_token_available ?timing_token)
+        )
+      )
+  )
+  (:action deploy_specialist_to_frontline_slot
+    :parameters (?frontline_slot - frontline_slot ?specialist_token - specialist_token ?timing_token - timing_token)
+    :precondition
+      (and
+        (entity_primed ?frontline_slot)
+        (entity_assigned_specialist ?frontline_slot ?specialist_token)
+        (entity_has_timing_token ?frontline_slot ?timing_token)
+        (not
+          (entity_committed ?frontline_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?frontline_slot)
+        (specialist_available ?specialist_token)
+        (timing_token_available ?timing_token)
+      )
+  )
+  (:action deploy_specialist_to_support_slot
+    :parameters (?support_slot - support_slot ?specialist_token - specialist_token ?timing_token - timing_token)
+    :precondition
+      (and
+        (entity_primed ?support_slot)
+        (entity_assigned_specialist ?support_slot ?specialist_token)
+        (entity_has_timing_token ?support_slot ?timing_token)
+        (not
+          (entity_committed ?support_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?support_slot)
+        (specialist_available ?specialist_token)
+        (timing_token_available ?timing_token)
+      )
+  )
+  (:action deploy_specialist_to_context
+    :parameters (?operation_context - operation_context ?specialist_token - specialist_token ?timing_token - timing_token)
+    :precondition
+      (and
+        (entity_primed ?operation_context)
+        (entity_assigned_specialist ?operation_context ?specialist_token)
+        (entity_has_timing_token ?operation_context ?timing_token)
+        (not
+          (entity_committed ?operation_context)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?operation_context)
+        (specialist_available ?specialist_token)
+        (timing_token_available ?timing_token)
+      )
+  )
+)

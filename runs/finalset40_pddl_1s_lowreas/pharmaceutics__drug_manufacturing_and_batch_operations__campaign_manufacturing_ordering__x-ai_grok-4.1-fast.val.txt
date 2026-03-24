@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain campaign_manufacturing_ordering)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object consumable_category - object process_stage_category - object campaign_root - object campaign_entity - campaign_root equipment_unit - resource_category operator - resource_category support_team - resource_category regulatory_document - resource_category packaging_spec - resource_category release_document - resource_category component_kit - resource_category certificate - resource_category material_lot - consumable_category qc_sample - consumable_category inspection_kit - consumable_category upstream_stage - process_stage_category downstream_stage - process_stage_category batch_record_document - process_stage_category line_segment - campaign_entity order_group - campaign_entity upstream_line - line_segment downstream_line - line_segment manufacturing_order - order_group)
+  (:predicates
+    (campaign_entity_initialized ?campaign_entity - campaign_entity)
+    (campaign_entity_operator_handover_complete ?campaign_entity - campaign_entity)
+    (campaign_entity_equipment_allocated ?campaign_entity - campaign_entity)
+    (campaign_entity_released ?campaign_entity - campaign_entity)
+    (campaign_entity_ready_for_release ?campaign_entity - campaign_entity)
+    (campaign_entity_release_document_attached ?campaign_entity - campaign_entity)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (campaign_entity_equipment_assigned ?campaign_entity - campaign_entity ?equipment_unit - equipment_unit)
+    (operator_available ?operator - operator)
+    (campaign_entity_operator_assigned ?campaign_entity - campaign_entity ?operator - operator)
+    (support_team_available ?support_team - support_team)
+    (campaign_entity_support_assigned ?campaign_entity - campaign_entity ?support_team - support_team)
+    (material_lot_available ?material_lot - material_lot)
+    (upstream_material_allocated ?upstream_line - upstream_line ?material_lot - material_lot)
+    (downstream_material_allocated ?downstream_line - downstream_line ?material_lot - material_lot)
+    (line_linked_to_upstream_stage ?upstream_line - upstream_line ?upstream_stage - upstream_stage)
+    (upstream_stage_ready ?upstream_stage - upstream_stage)
+    (upstream_stage_material_committed ?upstream_stage - upstream_stage)
+    (upstream_segment_completed ?upstream_line - upstream_line)
+    (line_linked_to_downstream_stage ?downstream_line - downstream_line ?downstream_stage - downstream_stage)
+    (downstream_stage_ready ?downstream_stage - downstream_stage)
+    (downstream_stage_material_committed ?downstream_stage - downstream_stage)
+    (downstream_segment_completed ?downstream_line - downstream_line)
+    (batch_record_document_available ?batch_record - batch_record_document)
+    (batch_record_document_active ?batch_record - batch_record_document)
+    (batch_record_document_links_upstream_stage ?batch_record - batch_record_document ?upstream_stage - upstream_stage)
+    (batch_record_document_links_downstream_stage ?batch_record - batch_record_document ?downstream_stage - downstream_stage)
+    (batch_record_document_upstream_approved ?batch_record - batch_record_document)
+    (batch_record_document_downstream_approved ?batch_record - batch_record_document)
+    (batch_record_document_qc_activated ?batch_record - batch_record_document)
+    (order_assigned_to_upstream_line ?manufacturing_order - manufacturing_order ?upstream_line - upstream_line)
+    (order_assigned_to_downstream_line ?manufacturing_order - manufacturing_order ?downstream_line - downstream_line)
+    (order_linked_to_batch_record ?manufacturing_order - manufacturing_order ?batch_record - batch_record_document)
+    (qc_sample_available ?qc_sample - qc_sample)
+    (order_linked_to_qc_sample ?manufacturing_order - manufacturing_order ?qc_sample - qc_sample)
+    (qc_sample_taken ?qc_sample - qc_sample)
+    (qc_sample_linked_to_batch_record_document ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    (order_qc_sequence_started ?manufacturing_order - manufacturing_order)
+    (order_qc_inspection_ready ?manufacturing_order - manufacturing_order)
+    (order_inspection_ready ?manufacturing_order - manufacturing_order)
+    (regulatory_review_attached ?manufacturing_order - manufacturing_order)
+    (order_regulatory_inspection_completed ?manufacturing_order - manufacturing_order)
+    (order_inspection_approved ?manufacturing_order - manufacturing_order)
+    (order_packaging_prepared ?manufacturing_order - manufacturing_order)
+    (inspection_kit_available ?inspection_kit - inspection_kit)
+    (order_linked_to_inspection_kit ?manufacturing_order - manufacturing_order ?inspection_kit - inspection_kit)
+    (inspection_path_initiated ?manufacturing_order - manufacturing_order)
+    (inspection_setup_complete ?manufacturing_order - manufacturing_order)
+    (inspection_certificate_verified ?manufacturing_order - manufacturing_order)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (order_linked_to_regulatory_document ?manufacturing_order - manufacturing_order ?regulatory_document - regulatory_document)
+    (packaging_spec_available ?packaging_spec - packaging_spec)
+    (order_linked_to_packaging_spec ?manufacturing_order - manufacturing_order ?packaging_spec - packaging_spec)
+    (component_kit_available ?component_kit - component_kit)
+    (order_linked_to_component_kit ?manufacturing_order - manufacturing_order ?component_kit - component_kit)
+    (certificate_available ?certificate - certificate)
+    (order_linked_to_certificate ?manufacturing_order - manufacturing_order ?certificate - certificate)
+    (release_document_available ?release_document - release_document)
+    (campaign_entity_release_document_attached_to_campaign ?campaign_entity - campaign_entity ?release_document - release_document)
+    (upstream_line_ready ?upstream_line - upstream_line)
+    (downstream_line_ready ?downstream_line - downstream_line)
+    (order_released ?manufacturing_order - manufacturing_order)
+  )
+  (:action initiate_campaign_entity
+    :parameters (?campaign_entity - campaign_entity)
+    :precondition
+      (and
+        (not
+          (campaign_entity_initialized ?campaign_entity)
+        )
+        (not
+          (campaign_entity_released ?campaign_entity)
+        )
+      )
+    :effect (campaign_entity_initialized ?campaign_entity)
+  )
+  (:action reserve_equipment_for_campaign
+    :parameters (?campaign_entity - campaign_entity ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (campaign_entity_initialized ?campaign_entity)
+        (not
+          (campaign_entity_equipment_allocated ?campaign_entity)
+        )
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (campaign_entity_equipment_allocated ?campaign_entity)
+        (campaign_entity_equipment_assigned ?campaign_entity ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_operator_to_campaign
+    :parameters (?campaign_entity - campaign_entity ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_initialized ?campaign_entity)
+        (campaign_entity_equipment_allocated ?campaign_entity)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (campaign_entity_operator_assigned ?campaign_entity ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action confirm_operator_handover
+    :parameters (?campaign_entity - campaign_entity ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_initialized ?campaign_entity)
+        (campaign_entity_equipment_allocated ?campaign_entity)
+        (campaign_entity_operator_assigned ?campaign_entity ?operator)
+        (not
+          (campaign_entity_operator_handover_complete ?campaign_entity)
+        )
+      )
+    :effect (campaign_entity_operator_handover_complete ?campaign_entity)
+  )
+  (:action release_operator_from_campaign
+    :parameters (?campaign_entity - campaign_entity ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_operator_assigned ?campaign_entity ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (campaign_entity_operator_assigned ?campaign_entity ?operator)
+        )
+      )
+  )
+  (:action assign_support_team_to_campaign
+    :parameters (?campaign_entity - campaign_entity ?support_team - support_team)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?campaign_entity)
+        (support_team_available ?support_team)
+      )
+    :effect
+      (and
+        (campaign_entity_support_assigned ?campaign_entity ?support_team)
+        (not
+          (support_team_available ?support_team)
+        )
+      )
+  )
+  (:action release_support_team_from_campaign
+    :parameters (?campaign_entity - campaign_entity ?support_team - support_team)
+    :precondition
+      (and
+        (campaign_entity_support_assigned ?campaign_entity ?support_team)
+      )
+    :effect
+      (and
+        (support_team_available ?support_team)
+        (not
+          (campaign_entity_support_assigned ?campaign_entity ?support_team)
+        )
+      )
+  )
+  (:action attach_component_kit_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?component_kit - component_kit)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (component_kit_available ?component_kit)
+      )
+    :effect
+      (and
+        (order_linked_to_component_kit ?manufacturing_order ?component_kit)
+        (not
+          (component_kit_available ?component_kit)
+        )
+      )
+  )
+  (:action detach_component_kit_from_order
+    :parameters (?manufacturing_order - manufacturing_order ?component_kit - component_kit)
+    :precondition
+      (and
+        (order_linked_to_component_kit ?manufacturing_order ?component_kit)
+      )
+    :effect
+      (and
+        (component_kit_available ?component_kit)
+        (not
+          (order_linked_to_component_kit ?manufacturing_order ?component_kit)
+        )
+      )
+  )
+  (:action attach_certificate_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (certificate_available ?certificate)
+      )
+    :effect
+      (and
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (not
+          (certificate_available ?certificate)
+        )
+      )
+  )
+  (:action detach_certificate_from_order
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate)
+    :precondition
+      (and
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+      )
+    :effect
+      (and
+        (certificate_available ?certificate)
+        (not
+          (order_linked_to_certificate ?manufacturing_order ?certificate)
+        )
+      )
+  )
+  (:action mark_upstream_stage_ready
+    :parameters (?upstream_line - upstream_line ?upstream_stage - upstream_stage ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?upstream_line)
+        (campaign_entity_operator_assigned ?upstream_line ?operator)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (not
+          (upstream_stage_ready ?upstream_stage)
+        )
+        (not
+          (upstream_stage_material_committed ?upstream_stage)
+        )
+      )
+    :effect (upstream_stage_ready ?upstream_stage)
+  )
+  (:action complete_upstream_setup_with_support
+    :parameters (?upstream_line - upstream_line ?upstream_stage - upstream_stage ?support_team - support_team)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?upstream_line)
+        (campaign_entity_support_assigned ?upstream_line ?support_team)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (upstream_stage_ready ?upstream_stage)
+        (not
+          (upstream_line_ready ?upstream_line)
+        )
+      )
+    :effect
+      (and
+        (upstream_line_ready ?upstream_line)
+        (upstream_segment_completed ?upstream_line)
+      )
+  )
+  (:action commit_material_to_upstream_stage
+    :parameters (?upstream_line - upstream_line ?upstream_stage - upstream_stage ?material_lot - material_lot)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?upstream_line)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (material_lot_available ?material_lot)
+        (not
+          (upstream_line_ready ?upstream_line)
+        )
+      )
+    :effect
+      (and
+        (upstream_stage_material_committed ?upstream_stage)
+        (upstream_line_ready ?upstream_line)
+        (upstream_material_allocated ?upstream_line ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action complete_upstream_stage_processing
+    :parameters (?upstream_line - upstream_line ?upstream_stage - upstream_stage ?operator - operator ?material_lot - material_lot)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?upstream_line)
+        (campaign_entity_operator_assigned ?upstream_line ?operator)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (upstream_stage_material_committed ?upstream_stage)
+        (upstream_material_allocated ?upstream_line ?material_lot)
+        (not
+          (upstream_segment_completed ?upstream_line)
+        )
+      )
+    :effect
+      (and
+        (upstream_stage_ready ?upstream_stage)
+        (upstream_segment_completed ?upstream_line)
+        (material_lot_available ?material_lot)
+        (not
+          (upstream_material_allocated ?upstream_line ?material_lot)
+        )
+      )
+  )
+  (:action mark_downstream_stage_ready
+    :parameters (?downstream_line - downstream_line ?downstream_stage - downstream_stage ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?downstream_line)
+        (campaign_entity_operator_assigned ?downstream_line ?operator)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (not
+          (downstream_stage_ready ?downstream_stage)
+        )
+        (not
+          (downstream_stage_material_committed ?downstream_stage)
+        )
+      )
+    :effect (downstream_stage_ready ?downstream_stage)
+  )
+  (:action complete_downstream_setup_with_support
+    :parameters (?downstream_line - downstream_line ?downstream_stage - downstream_stage ?support_team - support_team)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?downstream_line)
+        (campaign_entity_support_assigned ?downstream_line ?support_team)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (downstream_stage_ready ?downstream_stage)
+        (not
+          (downstream_line_ready ?downstream_line)
+        )
+      )
+    :effect
+      (and
+        (downstream_line_ready ?downstream_line)
+        (downstream_segment_completed ?downstream_line)
+      )
+  )
+  (:action commit_material_to_downstream_stage
+    :parameters (?downstream_line - downstream_line ?downstream_stage - downstream_stage ?material_lot - material_lot)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?downstream_line)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (material_lot_available ?material_lot)
+        (not
+          (downstream_line_ready ?downstream_line)
+        )
+      )
+    :effect
+      (and
+        (downstream_stage_material_committed ?downstream_stage)
+        (downstream_line_ready ?downstream_line)
+        (downstream_material_allocated ?downstream_line ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action complete_downstream_stage_processing
+    :parameters (?downstream_line - downstream_line ?downstream_stage - downstream_stage ?operator - operator ?material_lot - material_lot)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?downstream_line)
+        (campaign_entity_operator_assigned ?downstream_line ?operator)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (downstream_stage_material_committed ?downstream_stage)
+        (downstream_material_allocated ?downstream_line ?material_lot)
+        (not
+          (downstream_segment_completed ?downstream_line)
+        )
+      )
+    :effect
+      (and
+        (downstream_stage_ready ?downstream_stage)
+        (downstream_segment_completed ?downstream_line)
+        (material_lot_available ?material_lot)
+        (not
+          (downstream_material_allocated ?downstream_line ?material_lot)
+        )
+      )
+  )
+  (:action assemble_batch_record_document
+    :parameters (?upstream_line - upstream_line ?downstream_line - downstream_line ?upstream_stage - upstream_stage ?downstream_stage - downstream_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (upstream_line_ready ?upstream_line)
+        (downstream_line_ready ?downstream_line)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (upstream_stage_ready ?upstream_stage)
+        (downstream_stage_ready ?downstream_stage)
+        (upstream_segment_completed ?upstream_line)
+        (downstream_segment_completed ?downstream_line)
+        (batch_record_document_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_links_upstream_stage ?batch_record ?upstream_stage)
+        (batch_record_document_links_downstream_stage ?batch_record ?downstream_stage)
+        (not
+          (batch_record_document_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_document_with_upstream_commit
+    :parameters (?upstream_line - upstream_line ?downstream_line - downstream_line ?upstream_stage - upstream_stage ?downstream_stage - downstream_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (upstream_line_ready ?upstream_line)
+        (downstream_line_ready ?downstream_line)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (upstream_stage_material_committed ?upstream_stage)
+        (downstream_stage_ready ?downstream_stage)
+        (not
+          (upstream_segment_completed ?upstream_line)
+        )
+        (downstream_segment_completed ?downstream_line)
+        (batch_record_document_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_links_upstream_stage ?batch_record ?upstream_stage)
+        (batch_record_document_links_downstream_stage ?batch_record ?downstream_stage)
+        (batch_record_document_upstream_approved ?batch_record)
+        (not
+          (batch_record_document_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_document_with_downstream_commit
+    :parameters (?upstream_line - upstream_line ?downstream_line - downstream_line ?upstream_stage - upstream_stage ?downstream_stage - downstream_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (upstream_line_ready ?upstream_line)
+        (downstream_line_ready ?downstream_line)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (upstream_stage_ready ?upstream_stage)
+        (downstream_stage_material_committed ?downstream_stage)
+        (upstream_segment_completed ?upstream_line)
+        (not
+          (downstream_segment_completed ?downstream_line)
+        )
+        (batch_record_document_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_links_upstream_stage ?batch_record ?upstream_stage)
+        (batch_record_document_links_downstream_stage ?batch_record ?downstream_stage)
+        (batch_record_document_downstream_approved ?batch_record)
+        (not
+          (batch_record_document_available ?batch_record)
+        )
+      )
+  )
+  (:action assemble_batch_record_document_with_both_commits
+    :parameters (?upstream_line - upstream_line ?downstream_line - downstream_line ?upstream_stage - upstream_stage ?downstream_stage - downstream_stage ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (upstream_line_ready ?upstream_line)
+        (downstream_line_ready ?downstream_line)
+        (line_linked_to_upstream_stage ?upstream_line ?upstream_stage)
+        (line_linked_to_downstream_stage ?downstream_line ?downstream_stage)
+        (upstream_stage_material_committed ?upstream_stage)
+        (downstream_stage_material_committed ?downstream_stage)
+        (not
+          (upstream_segment_completed ?upstream_line)
+        )
+        (not
+          (downstream_segment_completed ?downstream_line)
+        )
+        (batch_record_document_available ?batch_record)
+      )
+    :effect
+      (and
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_links_upstream_stage ?batch_record ?upstream_stage)
+        (batch_record_document_links_downstream_stage ?batch_record ?downstream_stage)
+        (batch_record_document_upstream_approved ?batch_record)
+        (batch_record_document_downstream_approved ?batch_record)
+        (not
+          (batch_record_document_available ?batch_record)
+        )
+      )
+  )
+  (:action activate_batch_record_document_for_qc
+    :parameters (?batch_record - batch_record_document ?upstream_line - upstream_line ?operator - operator)
+    :precondition
+      (and
+        (batch_record_document_active ?batch_record)
+        (upstream_line_ready ?upstream_line)
+        (campaign_entity_operator_assigned ?upstream_line ?operator)
+        (not
+          (batch_record_document_qc_activated ?batch_record)
+        )
+      )
+    :effect (batch_record_document_qc_activated ?batch_record)
+  )
+  (:action issue_qc_sample_for_order
+    :parameters (?manufacturing_order - manufacturing_order ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (order_linked_to_batch_record ?manufacturing_order ?batch_record)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_available ?qc_sample)
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_qc_activated ?batch_record)
+        (not
+          (qc_sample_taken ?qc_sample)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_taken ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (not
+          (qc_sample_available ?qc_sample)
+        )
+      )
+  )
+  (:action start_qc_test_sequence
+    :parameters (?manufacturing_order - manufacturing_order ?qc_sample - qc_sample ?batch_record - batch_record_document ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_taken ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (campaign_entity_operator_assigned ?manufacturing_order ?operator)
+        (not
+          (batch_record_document_upstream_approved ?batch_record)
+        )
+        (not
+          (order_qc_sequence_started ?manufacturing_order)
+        )
+      )
+    :effect (order_qc_sequence_started ?manufacturing_order)
+  )
+  (:action assign_regulatory_document_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (regulatory_review_attached ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (regulatory_review_attached ?manufacturing_order)
+        (order_linked_to_regulatory_document ?manufacturing_order ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action process_qc_with_regulatory_review
+    :parameters (?manufacturing_order - manufacturing_order ?qc_sample - qc_sample ?batch_record - batch_record_document ?operator - operator ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_taken ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (campaign_entity_operator_assigned ?manufacturing_order ?operator)
+        (batch_record_document_upstream_approved ?batch_record)
+        (regulatory_review_attached ?manufacturing_order)
+        (order_linked_to_regulatory_document ?manufacturing_order ?regulatory_document)
+        (not
+          (order_qc_sequence_started ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_qc_sequence_started ?manufacturing_order)
+        (order_regulatory_inspection_completed ?manufacturing_order)
+      )
+  )
+  (:action execute_inspection_sequence_phase1
+    :parameters (?manufacturing_order - manufacturing_order ?component_kit - component_kit ?support_team - support_team ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_sequence_started ?manufacturing_order)
+        (order_linked_to_component_kit ?manufacturing_order ?component_kit)
+        (campaign_entity_support_assigned ?manufacturing_order ?support_team)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (not
+          (batch_record_document_downstream_approved ?batch_record)
+        )
+        (not
+          (order_qc_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect (order_qc_inspection_ready ?manufacturing_order)
+  )
+  (:action execute_inspection_sequence_phase2
+    :parameters (?manufacturing_order - manufacturing_order ?component_kit - component_kit ?support_team - support_team ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_sequence_started ?manufacturing_order)
+        (order_linked_to_component_kit ?manufacturing_order ?component_kit)
+        (campaign_entity_support_assigned ?manufacturing_order ?support_team)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (batch_record_document_downstream_approved ?batch_record)
+        (not
+          (order_qc_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect (order_qc_inspection_ready ?manufacturing_order)
+  )
+  (:action initiate_final_inspection_phase
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_inspection_ready ?manufacturing_order)
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (not
+          (batch_record_document_upstream_approved ?batch_record)
+        )
+        (not
+          (batch_record_document_downstream_approved ?batch_record)
+        )
+        (not
+          (order_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect (order_inspection_ready ?manufacturing_order)
+  )
+  (:action compile_inspection_results_variant1
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_inspection_ready ?manufacturing_order)
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (batch_record_document_upstream_approved ?batch_record)
+        (not
+          (batch_record_document_downstream_approved ?batch_record)
+        )
+        (not
+          (order_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_inspection_approved ?manufacturing_order)
+      )
+  )
+  (:action compile_inspection_results_variant2
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_inspection_ready ?manufacturing_order)
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (not
+          (batch_record_document_upstream_approved ?batch_record)
+        )
+        (batch_record_document_downstream_approved ?batch_record)
+        (not
+          (order_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_inspection_approved ?manufacturing_order)
+      )
+  )
+  (:action compile_inspection_results_variant3
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate ?qc_sample - qc_sample ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (order_qc_inspection_ready ?manufacturing_order)
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (order_linked_to_qc_sample ?manufacturing_order ?qc_sample)
+        (qc_sample_linked_to_batch_record_document ?qc_sample ?batch_record)
+        (batch_record_document_upstream_approved ?batch_record)
+        (batch_record_document_downstream_approved ?batch_record)
+        (not
+          (order_inspection_ready ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_inspection_approved ?manufacturing_order)
+      )
+  )
+  (:action finalize_order_release
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (not
+          (order_inspection_approved ?manufacturing_order)
+        )
+        (not
+          (order_released ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_released ?manufacturing_order)
+        (campaign_entity_ready_for_release ?manufacturing_order)
+      )
+  )
+  (:action attach_packaging_spec_to_order
+    :parameters (?manufacturing_order - manufacturing_order ?packaging_spec - packaging_spec)
+    :precondition
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_inspection_approved ?manufacturing_order)
+        (packaging_spec_available ?packaging_spec)
+      )
+    :effect
+      (and
+        (order_linked_to_packaging_spec ?manufacturing_order ?packaging_spec)
+        (not
+          (packaging_spec_available ?packaging_spec)
+        )
+      )
+  )
+  (:action prepare_packaging_and_finalize
+    :parameters (?manufacturing_order - manufacturing_order ?upstream_line - upstream_line ?downstream_line - downstream_line ?operator - operator ?packaging_spec - packaging_spec)
+    :precondition
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_inspection_approved ?manufacturing_order)
+        (order_linked_to_packaging_spec ?manufacturing_order ?packaging_spec)
+        (order_assigned_to_upstream_line ?manufacturing_order ?upstream_line)
+        (order_assigned_to_downstream_line ?manufacturing_order ?downstream_line)
+        (upstream_segment_completed ?upstream_line)
+        (downstream_segment_completed ?downstream_line)
+        (campaign_entity_operator_assigned ?manufacturing_order ?operator)
+        (not
+          (order_packaging_prepared ?manufacturing_order)
+        )
+      )
+    :effect (order_packaging_prepared ?manufacturing_order)
+  )
+  (:action complete_inspection_and_mark_release
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (order_inspection_ready ?manufacturing_order)
+        (order_packaging_prepared ?manufacturing_order)
+        (not
+          (order_released ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_released ?manufacturing_order)
+        (campaign_entity_ready_for_release ?manufacturing_order)
+      )
+  )
+  (:action initiate_regulatory_inspection_path
+    :parameters (?manufacturing_order - manufacturing_order ?inspection_kit - inspection_kit ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_operator_handover_complete ?manufacturing_order)
+        (campaign_entity_operator_assigned ?manufacturing_order ?operator)
+        (inspection_kit_available ?inspection_kit)
+        (order_linked_to_inspection_kit ?manufacturing_order ?inspection_kit)
+        (not
+          (inspection_path_initiated ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (inspection_path_initiated ?manufacturing_order)
+        (not
+          (inspection_kit_available ?inspection_kit)
+        )
+      )
+  )
+  (:action complete_regulatory_inspection_setup
+    :parameters (?manufacturing_order - manufacturing_order ?support_team - support_team)
+    :precondition
+      (and
+        (inspection_path_initiated ?manufacturing_order)
+        (campaign_entity_support_assigned ?manufacturing_order ?support_team)
+        (not
+          (inspection_setup_complete ?manufacturing_order)
+        )
+      )
+    :effect (inspection_setup_complete ?manufacturing_order)
+  )
+  (:action attach_certificate_for_inspection
+    :parameters (?manufacturing_order - manufacturing_order ?certificate - certificate)
+    :precondition
+      (and
+        (inspection_setup_complete ?manufacturing_order)
+        (order_linked_to_certificate ?manufacturing_order ?certificate)
+        (not
+          (inspection_certificate_verified ?manufacturing_order)
+        )
+      )
+    :effect (inspection_certificate_verified ?manufacturing_order)
+  )
+  (:action complete_regulatory_inspection_and_mark_release
+    :parameters (?manufacturing_order - manufacturing_order)
+    :precondition
+      (and
+        (inspection_certificate_verified ?manufacturing_order)
+        (not
+          (order_released ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (order_released ?manufacturing_order)
+        (campaign_entity_ready_for_release ?manufacturing_order)
+      )
+  )
+  (:action release_upstream_line
+    :parameters (?upstream_line - upstream_line ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (upstream_line_ready ?upstream_line)
+        (upstream_segment_completed ?upstream_line)
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_qc_activated ?batch_record)
+        (not
+          (campaign_entity_ready_for_release ?upstream_line)
+        )
+      )
+    :effect (campaign_entity_ready_for_release ?upstream_line)
+  )
+  (:action release_downstream_line
+    :parameters (?downstream_line - downstream_line ?batch_record - batch_record_document)
+    :precondition
+      (and
+        (downstream_line_ready ?downstream_line)
+        (downstream_segment_completed ?downstream_line)
+        (batch_record_document_active ?batch_record)
+        (batch_record_document_qc_activated ?batch_record)
+        (not
+          (campaign_entity_ready_for_release ?downstream_line)
+        )
+      )
+    :effect (campaign_entity_ready_for_release ?downstream_line)
+  )
+  (:action bind_release_document_by_operator
+    :parameters (?campaign_entity - campaign_entity ?release_document - release_document ?operator - operator)
+    :precondition
+      (and
+        (campaign_entity_ready_for_release ?campaign_entity)
+        (campaign_entity_operator_assigned ?campaign_entity ?operator)
+        (release_document_available ?release_document)
+        (not
+          (campaign_entity_release_document_attached ?campaign_entity)
+        )
+      )
+    :effect
+      (and
+        (campaign_entity_release_document_attached ?campaign_entity)
+        (campaign_entity_release_document_attached_to_campaign ?campaign_entity ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action release_line_and_return_equipment
+    :parameters (?upstream_line - upstream_line ?equipment_unit - equipment_unit ?release_document - release_document)
+    :precondition
+      (and
+        (campaign_entity_release_document_attached ?upstream_line)
+        (campaign_entity_equipment_assigned ?upstream_line ?equipment_unit)
+        (campaign_entity_release_document_attached_to_campaign ?upstream_line ?release_document)
+        (not
+          (campaign_entity_released ?upstream_line)
+        )
+      )
+    :effect
+      (and
+        (campaign_entity_released ?upstream_line)
+        (equipment_available ?equipment_unit)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_downstream_line_and_return_equipment
+    :parameters (?downstream_line - downstream_line ?equipment_unit - equipment_unit ?release_document - release_document)
+    :precondition
+      (and
+        (campaign_entity_release_document_attached ?downstream_line)
+        (campaign_entity_equipment_assigned ?downstream_line ?equipment_unit)
+        (campaign_entity_release_document_attached_to_campaign ?downstream_line ?release_document)
+        (not
+          (campaign_entity_released ?downstream_line)
+        )
+      )
+    :effect
+      (and
+        (campaign_entity_released ?downstream_line)
+        (equipment_available ?equipment_unit)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_order_and_return_equipment
+    :parameters (?manufacturing_order - manufacturing_order ?equipment_unit - equipment_unit ?release_document - release_document)
+    :precondition
+      (and
+        (campaign_entity_release_document_attached ?manufacturing_order)
+        (campaign_entity_equipment_assigned ?manufacturing_order ?equipment_unit)
+        (campaign_entity_release_document_attached_to_campaign ?manufacturing_order ?release_document)
+        (not
+          (campaign_entity_released ?manufacturing_order)
+        )
+      )
+    :effect
+      (and
+        (campaign_entity_released ?manufacturing_order)
+        (equipment_available ?equipment_unit)
+        (release_document_available ?release_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem campaign_manufacturing_ordering_problem)
+  (:domain campaign_manufacturing_ordering)
+  (:objects upstream_line_1 - upstream_line downstream_line_1 - downstream_line manufacturing_order_mo1 - manufacturing_order manufacturing_order_mo2 - manufacturing_order equipment_reactor_1 - equipment_unit equipment_filler_1 - equipment_unit equipment_packer_1 - equipment_unit operator_1 - operator support_team_alpha - support_team material_lot_a - material_lot stage_fermentation - upstream_stage stage_purification - downstream_stage batch_record_br001 - batch_record_document qc_sample_1 - qc_sample qc_sample_2 - qc_sample reg_doc_coa_1 - regulatory_document reg_doc_coa_2 - regulatory_document pack_spec_blister - packaging_spec pack_spec_bottle - packaging_spec release_doc_1 - release_document component_kit_1 - component_kit inspection_kit_1 - inspection_kit inspection_kit_2 - inspection_kit certificate_1 - certificate)
+  (:init
+    (equipment_available equipment_reactor_1)
+    (equipment_available equipment_filler_1)
+    (equipment_available equipment_packer_1)
+    (operator_available operator_1)
+    (support_team_available support_team_alpha)
+    (material_lot_available material_lot_a)
+    (line_linked_to_upstream_stage upstream_line_1 stage_fermentation)
+    (line_linked_to_downstream_stage downstream_line_1 stage_purification)
+    (batch_record_document_available batch_record_br001)
+    (qc_sample_available qc_sample_1)
+    (qc_sample_available qc_sample_2)
+    (order_assigned_to_upstream_line manufacturing_order_mo1 upstream_line_1)
+    (order_assigned_to_upstream_line manufacturing_order_mo2 upstream_line_1)
+    (order_assigned_to_downstream_line manufacturing_order_mo1 downstream_line_1)
+    (order_assigned_to_downstream_line manufacturing_order_mo2 downstream_line_1)
+    (order_linked_to_batch_record manufacturing_order_mo1 batch_record_br001)
+    (order_linked_to_batch_record manufacturing_order_mo2 batch_record_br001)
+    (order_linked_to_qc_sample manufacturing_order_mo1 qc_sample_1)
+    (order_linked_to_qc_sample manufacturing_order_mo2 qc_sample_2)
+    (regulatory_document_available reg_doc_coa_1)
+    (regulatory_document_available reg_doc_coa_2)
+    (packaging_spec_available pack_spec_blister)
+    (packaging_spec_available pack_spec_bottle)
+    (release_document_available release_doc_1)
+    (component_kit_available component_kit_1)
+    (inspection_kit_available inspection_kit_1)
+    (order_linked_to_inspection_kit manufacturing_order_mo1 inspection_kit_1)
+    (order_linked_to_inspection_kit manufacturing_order_mo2 inspection_kit_2)
+    (certificate_available certificate_1)
+  )
+  (:goal
+    (and
+      (campaign_entity_released upstream_line_1)
+      (campaign_entity_released downstream_line_1)
+      (campaign_entity_released manufacturing_order_mo1)
+      (campaign_entity_released manufacturing_order_mo2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_campaign_entity upstream_line_1)
+(reserve_equipment_for_campaign upstream_line_1 equipment_reactor_1)
+(assign_operator_to_campaign upstream_line_1 operator_1)
+(confirm_operator_handover upstream_line_1 operator_1)
+(mark_upstream_stage_ready upstream_line_1 stage_fermentation operator_1)
+(release_operator_from_campaign upstream_line_1 operator_1)
+(initiate_campaign_entity downstream_line_1)
+(reserve_equipment_for_campaign downstream_line_1 equipment_filler_1)
+(assign_operator_to_campaign downstream_line_1 operator_1)
+(confirm_operator_handover downstream_line_1 operator_1)
+(mark_downstream_stage_ready downstream_line_1 stage_purification operator_1)
+(release_operator_from_campaign downstream_line_1 operator_1)
+(assign_support_team_to_campaign upstream_line_1 support_team_alpha)
+(complete_upstream_setup_with_support upstream_line_1 stage_fermentation support_team_alpha)
+(release_support_team_from_campaign upstream_line_1 support_team_alpha)
+(assign_support_team_to_campaign downstream_line_1 support_team_alpha)
+(complete_downstream_setup_with_support downstream_line_1 stage_purification support_team_alpha)
+(release_support_team_from_campaign downstream_line_1 support_team_alpha)
+(assemble_batch_record_document upstream_line_1 downstream_line_1 stage_fermentation stage_purification batch_record_br001)
+(assign_operator_to_campaign upstream_line_1 operator_1)
+(activate_batch_record_document_for_qc batch_record_br001 upstream_line_1 operator_1)
+(release_operator_from_campaign upstream_line_1 operator_1)
+(initiate_campaign_entity manufacturing_order_mo1)
+(reserve_equipment_for_campaign manufacturing_order_mo1 equipment_packer_1)
+(assign_operator_to_campaign manufacturing_order_mo1 operator_1)
+(confirm_operator_handover manufacturing_order_mo1 operator_1)
+(attach_component_kit_to_order manufacturing_order_mo1 component_kit_1)
+(issue_qc_sample_for_order manufacturing_order_mo1 qc_sample_1 batch_record_br001)
+(assign_support_team_to_campaign manufacturing_order_mo1 support_team_alpha)
+(start_qc_test_sequence manufacturing_order_mo1 qc_sample_1 batch_record_br001 operator_1)
+(execute_inspection_sequence_phase1 manufacturing_order_mo1 component_kit_1 support_team_alpha qc_sample_1 batch_record_br001)
+(attach_certificate_to_order manufacturing_order_mo1 certificate_1)
+(initiate_final_inspection_phase manufacturing_order_mo1 certificate_1 qc_sample_1 batch_record_br001)
+(finalize_order_release manufacturing_order_mo1)
+(bind_release_document_by_operator manufacturing_order_mo1 release_doc_1 operator_1)
+(release_order_and_return_equipment manufacturing_order_mo1 equipment_packer_1 release_doc_1)
+(release_operator_from_campaign manufacturing_order_mo1 operator_1)
+(release_support_team_from_campaign manufacturing_order_mo1 support_team_alpha)
+(detach_component_kit_from_order manufacturing_order_mo1 component_kit_1)
+(detach_certificate_from_order manufacturing_order_mo1 certificate_1)
+(initiate_campaign_entity manufacturing_order_mo2)
+(reserve_equipment_for_campaign manufacturing_order_mo2 equipment_packer_1)
+(assign_operator_to_campaign manufacturing_order_mo2 operator_1)
+(confirm_operator_handover manufacturing_order_mo2 operator_1)
+(attach_component_kit_to_order manufacturing_order_mo2 component_kit_1)
+(issue_qc_sample_for_order manufacturing_order_mo2 qc_sample_2 batch_record_br001)
+(assign_support_team_to_campaign manufacturing_order_mo2 support_team_alpha)
+(start_qc_test_sequence manufacturing_order_mo2 qc_sample_2 batch_record_br001 operator_1)
+(execute_inspection_sequence_phase1 manufacturing_order_mo2 component_kit_1 support_team_alpha qc_sample_2 batch_record_br001)
+(attach_certificate_to_order manufacturing_order_mo2 certificate_1)
+(initiate_final_inspection_phase manufacturing_order_mo2 certificate_1 qc_sample_2 batch_record_br001)
+(finalize_order_release manufacturing_order_mo2)
+(bind_release_document_by_operator manufacturing_order_mo2 release_doc_1 operator_1)
+(release_order_and_return_equipment manufacturing_order_mo2 equipment_packer_1 release_doc_1)
+(release_operator_from_campaign manufacturing_order_mo2 operator_1)
+(release_support_team_from_campaign manufacturing_order_mo2 support_team_alpha)
+(detach_component_kit_from_order manufacturing_order_mo2 component_kit_1)
+(detach_certificate_from_order manufacturing_order_mo2 certificate_1)
+(assign_operator_to_campaign upstream_line_1 operator_1)
+(release_upstream_line upstream_line_1 batch_record_br001)
+(bind_release_document_by_operator upstream_line_1 release_doc_1 operator_1)
+(release_line_and_return_equipment upstream_line_1 equipment_reactor_1 release_doc_1)
+(release_operator_from_campaign upstream_line_1 operator_1)
+(assign_operator_to_campaign downstream_line_1 operator_1)
+(release_downstream_line downstream_line_1 batch_record_br001)
+(bind_release_document_by_operator downstream_line_1 release_doc_1 operator_1)
+(release_downstream_line_and_return_equipment downstream_line_1 equipment_filler_1 release_doc_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_61bjlyjq/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_61bjlyjq/plan.pddl 67 
+
+
+
+--- stderr ---
+

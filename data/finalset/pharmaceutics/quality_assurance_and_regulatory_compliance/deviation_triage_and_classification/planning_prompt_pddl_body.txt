@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain pharm_qms_deviation_triage)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types qms_entity - object resource_pool - qms_entity document_family - qms_entity classification_family - qms_entity deviation_family - qms_entity case_record - deviation_family triage_officer - resource_pool subject_matter_expert - resource_pool technical_reviewer - resource_pool escalation_criterion - resource_pool approver_role - resource_pool regulatory_contact - resource_pool validation_specialist - resource_pool external_consultant - resource_pool evidence_document - document_family supporting_document - document_family regulatory_guidance_document - document_family impact_category - classification_family regulatory_category - classification_family classification_package - classification_family operational_investigation_path - case_record quality_investigation_path - case_record originating_organizational_unit - operational_investigation_path affected_organizational_unit - operational_investigation_path investigation_case - quality_investigation_path)
+
+  (:predicates
+    (case_logged ?case_entity - case_record)
+    (case_classified ?case_entity - case_record)
+    (triage_assigned ?case_entity - case_record)
+    (case_action_initiated ?case_entity - case_record)
+    (case_closure_recorded ?case_entity - case_record)
+    (case_action_plan_issued ?case_entity - case_record)
+    (triage_officer_available ?triage_officer - triage_officer)
+    (case_triage_officer_assigned ?case_entity - case_record ?triage_officer - triage_officer)
+    (sme_available ?sme - subject_matter_expert)
+    (sme_assigned ?case_entity - case_record ?sme - subject_matter_expert)
+    (technical_reviewer_available ?technical_reviewer - technical_reviewer)
+    (technical_reviewer_assigned ?case_entity - case_record ?technical_reviewer - technical_reviewer)
+    (evidence_document_available ?evidence_doc - evidence_document)
+    (originating_unit_attached_evidence ?originating_unit - originating_organizational_unit ?evidence_doc - evidence_document)
+    (affected_unit_attached_evidence ?affected_unit - affected_organizational_unit ?evidence_doc - evidence_document)
+    (originating_unit_assigned_impact ?originating_unit - originating_organizational_unit ?impact_category - impact_category)
+    (impact_confirmed ?impact_category - impact_category)
+    (impact_validated ?impact_category - impact_category)
+    (originating_unit_findings_finalized ?originating_unit - originating_organizational_unit)
+    (affected_unit_assigned_regulatory_category ?affected_unit - affected_organizational_unit ?regulatory_category - regulatory_category)
+    (regulatory_category_confirmed ?regulatory_category - regulatory_category)
+    (regulatory_category_validated ?regulatory_category - regulatory_category)
+    (affected_unit_findings_finalized ?affected_unit - affected_organizational_unit)
+    (classification_package_available ?classification_package - classification_package)
+    (classification_package_created ?classification_package - classification_package)
+    (classification_package_includes_impact_category ?classification_package - classification_package ?impact_category - impact_category)
+    (classification_package_includes_regulatory_category ?classification_package - classification_package ?regulatory_category - regulatory_category)
+    (classification_package_requires_validation ?classification_package - classification_package)
+    (classification_package_requires_consultation ?classification_package - classification_package)
+    (classification_package_review_ready ?classification_package - classification_package)
+    (case_link_originating_unit ?case_file - investigation_case ?originating_unit - originating_organizational_unit)
+    (case_link_affected_unit ?case_file - investigation_case ?affected_unit - affected_organizational_unit)
+    (case_link_classification_package ?case_file - investigation_case ?classification_package - classification_package)
+    (supporting_document_available ?supporting_doc - supporting_document)
+    (case_has_supporting_document ?case_file - investigation_case ?supporting_doc - supporting_document)
+    (supporting_document_verified ?supporting_doc - supporting_document)
+    (supporting_document_linked_to_package ?supporting_doc - supporting_document ?classification_package - classification_package)
+    (case_documentation_verified ?case_file - investigation_case)
+    (case_ready_for_consultant_review ?case_file - investigation_case)
+    (case_consultant_review_completed ?case_file - investigation_case)
+    (case_escalation_flag_applied ?case_file - investigation_case)
+    (case_escalation_logged ?case_file - investigation_case)
+    (case_approver_assignment_flag ?case_file - investigation_case)
+    (case_authorization_recorded ?case_file - investigation_case)
+    (regulatory_guidance_document_available ?regulatory_guidance_doc - regulatory_guidance_document)
+    (case_link_regulatory_guidance_document ?case_file - investigation_case ?regulatory_guidance_doc - regulatory_guidance_document)
+    (case_flagged_for_regulatory_escalation ?case_file - investigation_case)
+    (case_reviewer_assigned_for_escalation ?case_file - investigation_case)
+    (case_escalation_review_completed ?case_file - investigation_case)
+    (escalation_criterion_available ?escalation_criterion - escalation_criterion)
+    (case_has_escalation_criterion ?case_file - investigation_case ?escalation_criterion - escalation_criterion)
+    (approver_available ?approver - approver_role)
+    (case_assigned_approver_role ?case_file - investigation_case ?approver - approver_role)
+    (validation_specialist_available ?validation_specialist - validation_specialist)
+    (case_validation_specialist_assigned ?case_file - investigation_case ?validation_specialist - validation_specialist)
+    (external_consultant_available ?external_consultant - external_consultant)
+    (case_external_consultant_assigned ?case_file - investigation_case ?external_consultant - external_consultant)
+    (regulatory_contact_available ?regulatory_contact - regulatory_contact)
+    (case_linked_regulatory_contact ?case_entity - case_record ?regulatory_contact - regulatory_contact)
+    (originating_unit_investigation_initiated ?originating_unit - originating_organizational_unit)
+    (affected_unit_investigation_initiated ?affected_unit - affected_organizational_unit)
+    (case_marked_final ?case_file - investigation_case)
+  )
+  (:action create_deviation_record
+    :parameters (?case_entity - case_record)
+    :precondition
+      (and
+        (not
+          (case_logged ?case_entity)
+        )
+        (not
+          (case_action_initiated ?case_entity)
+        )
+      )
+    :effect (case_logged ?case_entity)
+  )
+  (:action assign_triage_officer
+    :parameters (?case_entity - case_record ?triage_officer - triage_officer)
+    :precondition
+      (and
+        (case_logged ?case_entity)
+        (not
+          (triage_assigned ?case_entity)
+        )
+        (triage_officer_available ?triage_officer)
+      )
+    :effect
+      (and
+        (triage_assigned ?case_entity)
+        (case_triage_officer_assigned ?case_entity ?triage_officer)
+        (not
+          (triage_officer_available ?triage_officer)
+        )
+      )
+  )
+  (:action engage_sme_for_classification
+    :parameters (?case_entity - case_record ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_logged ?case_entity)
+        (triage_assigned ?case_entity)
+        (sme_available ?sme)
+      )
+    :effect
+      (and
+        (sme_assigned ?case_entity ?sme)
+        (not
+          (sme_available ?sme)
+        )
+      )
+  )
+  (:action finalize_sme_classification
+    :parameters (?case_entity - case_record ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_logged ?case_entity)
+        (triage_assigned ?case_entity)
+        (sme_assigned ?case_entity ?sme)
+        (not
+          (case_classified ?case_entity)
+        )
+      )
+    :effect (case_classified ?case_entity)
+  )
+  (:action revoke_sme_assignment
+    :parameters (?case_entity - case_record ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (sme_assigned ?case_entity ?sme)
+      )
+    :effect
+      (and
+        (sme_available ?sme)
+        (not
+          (sme_assigned ?case_entity ?sme)
+        )
+      )
+  )
+  (:action assign_technical_reviewer
+    :parameters (?case_entity - case_record ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (case_classified ?case_entity)
+        (technical_reviewer_available ?technical_reviewer)
+      )
+    :effect
+      (and
+        (technical_reviewer_assigned ?case_entity ?technical_reviewer)
+        (not
+          (technical_reviewer_available ?technical_reviewer)
+        )
+      )
+  )
+  (:action release_technical_reviewer
+    :parameters (?case_entity - case_record ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (technical_reviewer_assigned ?case_entity ?technical_reviewer)
+      )
+    :effect
+      (and
+        (technical_reviewer_available ?technical_reviewer)
+        (not
+          (technical_reviewer_assigned ?case_entity ?technical_reviewer)
+        )
+      )
+  )
+  (:action assign_validation_specialist_to_case
+    :parameters (?case_file - investigation_case ?validation_specialist - validation_specialist)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (validation_specialist_available ?validation_specialist)
+      )
+    :effect
+      (and
+        (case_validation_specialist_assigned ?case_file ?validation_specialist)
+        (not
+          (validation_specialist_available ?validation_specialist)
+        )
+      )
+  )
+  (:action release_validation_specialist_from_case
+    :parameters (?case_file - investigation_case ?validation_specialist - validation_specialist)
+    :precondition
+      (and
+        (case_validation_specialist_assigned ?case_file ?validation_specialist)
+      )
+    :effect
+      (and
+        (validation_specialist_available ?validation_specialist)
+        (not
+          (case_validation_specialist_assigned ?case_file ?validation_specialist)
+        )
+      )
+  )
+  (:action assign_external_consultant_to_case
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (external_consultant_available ?external_consultant)
+      )
+    :effect
+      (and
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (not
+          (external_consultant_available ?external_consultant)
+        )
+      )
+  )
+  (:action release_external_consultant_from_case
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant)
+    :precondition
+      (and
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+      )
+    :effect
+      (and
+        (external_consultant_available ?external_consultant)
+        (not
+          (case_external_consultant_assigned ?case_file ?external_consultant)
+        )
+      )
+  )
+  (:action confirm_impact_for_originating_unit
+    :parameters (?originating_unit - originating_organizational_unit ?impact_category - impact_category ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_classified ?originating_unit)
+        (sme_assigned ?originating_unit ?sme)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (not
+          (impact_confirmed ?impact_category)
+        )
+        (not
+          (impact_validated ?impact_category)
+        )
+      )
+    :effect (impact_confirmed ?impact_category)
+  )
+  (:action record_originating_unit_findings_with_reviewer
+    :parameters (?originating_unit - originating_organizational_unit ?impact_category - impact_category ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (case_classified ?originating_unit)
+        (technical_reviewer_assigned ?originating_unit ?technical_reviewer)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (impact_confirmed ?impact_category)
+        (not
+          (originating_unit_investigation_initiated ?originating_unit)
+        )
+      )
+    :effect
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (originating_unit_findings_finalized ?originating_unit)
+      )
+  )
+  (:action originating_unit_attach_evidence
+    :parameters (?originating_unit - originating_organizational_unit ?impact_category - impact_category ?evidence_doc - evidence_document)
+    :precondition
+      (and
+        (case_classified ?originating_unit)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (evidence_document_available ?evidence_doc)
+        (not
+          (originating_unit_investigation_initiated ?originating_unit)
+        )
+      )
+    :effect
+      (and
+        (impact_validated ?impact_category)
+        (originating_unit_investigation_initiated ?originating_unit)
+        (originating_unit_attached_evidence ?originating_unit ?evidence_doc)
+        (not
+          (evidence_document_available ?evidence_doc)
+        )
+      )
+  )
+  (:action originating_unit_process_evidence
+    :parameters (?originating_unit - originating_organizational_unit ?impact_category - impact_category ?sme - subject_matter_expert ?evidence_doc - evidence_document)
+    :precondition
+      (and
+        (case_classified ?originating_unit)
+        (sme_assigned ?originating_unit ?sme)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (impact_validated ?impact_category)
+        (originating_unit_attached_evidence ?originating_unit ?evidence_doc)
+        (not
+          (originating_unit_findings_finalized ?originating_unit)
+        )
+      )
+    :effect
+      (and
+        (impact_confirmed ?impact_category)
+        (originating_unit_findings_finalized ?originating_unit)
+        (evidence_document_available ?evidence_doc)
+        (not
+          (originating_unit_attached_evidence ?originating_unit ?evidence_doc)
+        )
+      )
+  )
+  (:action confirm_regulatory_category_for_affected_unit
+    :parameters (?affected_unit - affected_organizational_unit ?regulatory_category - regulatory_category ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_classified ?affected_unit)
+        (sme_assigned ?affected_unit ?sme)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (not
+          (regulatory_category_confirmed ?regulatory_category)
+        )
+        (not
+          (regulatory_category_validated ?regulatory_category)
+        )
+      )
+    :effect (regulatory_category_confirmed ?regulatory_category)
+  )
+  (:action record_affected_unit_findings_with_reviewer
+    :parameters (?affected_unit - affected_organizational_unit ?regulatory_category - regulatory_category ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (case_classified ?affected_unit)
+        (technical_reviewer_assigned ?affected_unit ?technical_reviewer)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (regulatory_category_confirmed ?regulatory_category)
+        (not
+          (affected_unit_investigation_initiated ?affected_unit)
+        )
+      )
+    :effect
+      (and
+        (affected_unit_investigation_initiated ?affected_unit)
+        (affected_unit_findings_finalized ?affected_unit)
+      )
+  )
+  (:action affected_unit_attach_evidence
+    :parameters (?affected_unit - affected_organizational_unit ?regulatory_category - regulatory_category ?evidence_doc - evidence_document)
+    :precondition
+      (and
+        (case_classified ?affected_unit)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (evidence_document_available ?evidence_doc)
+        (not
+          (affected_unit_investigation_initiated ?affected_unit)
+        )
+      )
+    :effect
+      (and
+        (regulatory_category_validated ?regulatory_category)
+        (affected_unit_investigation_initiated ?affected_unit)
+        (affected_unit_attached_evidence ?affected_unit ?evidence_doc)
+        (not
+          (evidence_document_available ?evidence_doc)
+        )
+      )
+  )
+  (:action affected_unit_process_evidence
+    :parameters (?affected_unit - affected_organizational_unit ?regulatory_category - regulatory_category ?sme - subject_matter_expert ?evidence_doc - evidence_document)
+    :precondition
+      (and
+        (case_classified ?affected_unit)
+        (sme_assigned ?affected_unit ?sme)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (regulatory_category_validated ?regulatory_category)
+        (affected_unit_attached_evidence ?affected_unit ?evidence_doc)
+        (not
+          (affected_unit_findings_finalized ?affected_unit)
+        )
+      )
+    :effect
+      (and
+        (regulatory_category_confirmed ?regulatory_category)
+        (affected_unit_findings_finalized ?affected_unit)
+        (evidence_document_available ?evidence_doc)
+        (not
+          (affected_unit_attached_evidence ?affected_unit ?evidence_doc)
+        )
+      )
+  )
+  (:action create_classification_package
+    :parameters (?originating_unit - originating_organizational_unit ?affected_unit - affected_organizational_unit ?impact_category - impact_category ?regulatory_category - regulatory_category ?classification_package - classification_package)
+    :precondition
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (affected_unit_investigation_initiated ?affected_unit)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (impact_confirmed ?impact_category)
+        (regulatory_category_confirmed ?regulatory_category)
+        (originating_unit_findings_finalized ?originating_unit)
+        (affected_unit_findings_finalized ?affected_unit)
+        (classification_package_available ?classification_package)
+      )
+    :effect
+      (and
+        (classification_package_created ?classification_package)
+        (classification_package_includes_impact_category ?classification_package ?impact_category)
+        (classification_package_includes_regulatory_category ?classification_package ?regulatory_category)
+        (not
+          (classification_package_available ?classification_package)
+        )
+      )
+  )
+  (:action create_classification_package_require_validation
+    :parameters (?originating_unit - originating_organizational_unit ?affected_unit - affected_organizational_unit ?impact_category - impact_category ?regulatory_category - regulatory_category ?classification_package - classification_package)
+    :precondition
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (affected_unit_investigation_initiated ?affected_unit)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (impact_validated ?impact_category)
+        (regulatory_category_confirmed ?regulatory_category)
+        (not
+          (originating_unit_findings_finalized ?originating_unit)
+        )
+        (affected_unit_findings_finalized ?affected_unit)
+        (classification_package_available ?classification_package)
+      )
+    :effect
+      (and
+        (classification_package_created ?classification_package)
+        (classification_package_includes_impact_category ?classification_package ?impact_category)
+        (classification_package_includes_regulatory_category ?classification_package ?regulatory_category)
+        (classification_package_requires_validation ?classification_package)
+        (not
+          (classification_package_available ?classification_package)
+        )
+      )
+  )
+  (:action create_classification_package_require_consultation
+    :parameters (?originating_unit - originating_organizational_unit ?affected_unit - affected_organizational_unit ?impact_category - impact_category ?regulatory_category - regulatory_category ?classification_package - classification_package)
+    :precondition
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (affected_unit_investigation_initiated ?affected_unit)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (impact_confirmed ?impact_category)
+        (regulatory_category_validated ?regulatory_category)
+        (originating_unit_findings_finalized ?originating_unit)
+        (not
+          (affected_unit_findings_finalized ?affected_unit)
+        )
+        (classification_package_available ?classification_package)
+      )
+    :effect
+      (and
+        (classification_package_created ?classification_package)
+        (classification_package_includes_impact_category ?classification_package ?impact_category)
+        (classification_package_includes_regulatory_category ?classification_package ?regulatory_category)
+        (classification_package_requires_consultation ?classification_package)
+        (not
+          (classification_package_available ?classification_package)
+        )
+      )
+  )
+  (:action create_classification_package_require_validation_and_consultation
+    :parameters (?originating_unit - originating_organizational_unit ?affected_unit - affected_organizational_unit ?impact_category - impact_category ?regulatory_category - regulatory_category ?classification_package - classification_package)
+    :precondition
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (affected_unit_investigation_initiated ?affected_unit)
+        (originating_unit_assigned_impact ?originating_unit ?impact_category)
+        (affected_unit_assigned_regulatory_category ?affected_unit ?regulatory_category)
+        (impact_validated ?impact_category)
+        (regulatory_category_validated ?regulatory_category)
+        (not
+          (originating_unit_findings_finalized ?originating_unit)
+        )
+        (not
+          (affected_unit_findings_finalized ?affected_unit)
+        )
+        (classification_package_available ?classification_package)
+      )
+    :effect
+      (and
+        (classification_package_created ?classification_package)
+        (classification_package_includes_impact_category ?classification_package ?impact_category)
+        (classification_package_includes_regulatory_category ?classification_package ?regulatory_category)
+        (classification_package_requires_validation ?classification_package)
+        (classification_package_requires_consultation ?classification_package)
+        (not
+          (classification_package_available ?classification_package)
+        )
+      )
+  )
+  (:action mark_classification_package_review_ready
+    :parameters (?classification_package - classification_package ?originating_unit - originating_organizational_unit ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (classification_package_created ?classification_package)
+        (originating_unit_investigation_initiated ?originating_unit)
+        (sme_assigned ?originating_unit ?sme)
+        (not
+          (classification_package_review_ready ?classification_package)
+        )
+      )
+    :effect (classification_package_review_ready ?classification_package)
+  )
+  (:action verify_supporting_document_for_case
+    :parameters (?case_file - investigation_case ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (case_link_classification_package ?case_file ?classification_package)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_available ?supporting_doc)
+        (classification_package_created ?classification_package)
+        (classification_package_review_ready ?classification_package)
+        (not
+          (supporting_document_verified ?supporting_doc)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_verified ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (not
+          (supporting_document_available ?supporting_doc)
+        )
+      )
+  )
+  (:action validate_supporting_document_and_mark_case
+    :parameters (?case_file - investigation_case ?supporting_doc - supporting_document ?classification_package - classification_package ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_verified ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (sme_assigned ?case_file ?sme)
+        (not
+          (classification_package_requires_validation ?classification_package)
+        )
+        (not
+          (case_documentation_verified ?case_file)
+        )
+      )
+    :effect (case_documentation_verified ?case_file)
+  )
+  (:action apply_escalation_criterion_to_case
+    :parameters (?case_file - investigation_case ?escalation_criterion - escalation_criterion)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (escalation_criterion_available ?escalation_criterion)
+        (not
+          (case_escalation_flag_applied ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_escalation_flag_applied ?case_file)
+        (case_has_escalation_criterion ?case_file ?escalation_criterion)
+        (not
+          (escalation_criterion_available ?escalation_criterion)
+        )
+      )
+  )
+  (:action process_escalation_with_supporting_document
+    :parameters (?case_file - investigation_case ?supporting_doc - supporting_document ?classification_package - classification_package ?sme - subject_matter_expert ?escalation_criterion - escalation_criterion)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_verified ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (sme_assigned ?case_file ?sme)
+        (classification_package_requires_validation ?classification_package)
+        (case_escalation_flag_applied ?case_file)
+        (case_has_escalation_criterion ?case_file ?escalation_criterion)
+        (not
+          (case_documentation_verified ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_documentation_verified ?case_file)
+        (case_escalation_logged ?case_file)
+      )
+  )
+  (:action prepare_case_for_consultant_review
+    :parameters (?case_file - investigation_case ?validation_specialist - validation_specialist ?technical_reviewer - technical_reviewer ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_documentation_verified ?case_file)
+        (case_validation_specialist_assigned ?case_file ?validation_specialist)
+        (technical_reviewer_assigned ?case_file ?technical_reviewer)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (not
+          (classification_package_requires_consultation ?classification_package)
+        )
+        (not
+          (case_ready_for_consultant_review ?case_file)
+        )
+      )
+    :effect (case_ready_for_consultant_review ?case_file)
+  )
+  (:action prepare_case_for_consultant_review_variant
+    :parameters (?case_file - investigation_case ?validation_specialist - validation_specialist ?technical_reviewer - technical_reviewer ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_documentation_verified ?case_file)
+        (case_validation_specialist_assigned ?case_file ?validation_specialist)
+        (technical_reviewer_assigned ?case_file ?technical_reviewer)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (classification_package_requires_consultation ?classification_package)
+        (not
+          (case_ready_for_consultant_review ?case_file)
+        )
+      )
+    :effect (case_ready_for_consultant_review ?case_file)
+  )
+  (:action complete_consultant_review
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_ready_for_consultant_review ?case_file)
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (not
+          (classification_package_requires_validation ?classification_package)
+        )
+        (not
+          (classification_package_requires_consultation ?classification_package)
+        )
+        (not
+          (case_consultant_review_completed ?case_file)
+        )
+      )
+    :effect (case_consultant_review_completed ?case_file)
+  )
+  (:action complete_consultant_review_and_flag_approver_assignment
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_ready_for_consultant_review ?case_file)
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (classification_package_requires_validation ?classification_package)
+        (not
+          (classification_package_requires_consultation ?classification_package)
+        )
+        (not
+          (case_consultant_review_completed ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_approver_assignment_flag ?case_file)
+      )
+  )
+  (:action complete_consultant_review_and_flag_approver_assignment_variant
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_ready_for_consultant_review ?case_file)
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (not
+          (classification_package_requires_validation ?classification_package)
+        )
+        (classification_package_requires_consultation ?classification_package)
+        (not
+          (case_consultant_review_completed ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_approver_assignment_flag ?case_file)
+      )
+  )
+  (:action complete_consultant_review_and_flag_approver_assignment_alt
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant ?supporting_doc - supporting_document ?classification_package - classification_package)
+    :precondition
+      (and
+        (case_ready_for_consultant_review ?case_file)
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (case_has_supporting_document ?case_file ?supporting_doc)
+        (supporting_document_linked_to_package ?supporting_doc ?classification_package)
+        (classification_package_requires_validation ?classification_package)
+        (classification_package_requires_consultation ?classification_package)
+        (not
+          (case_consultant_review_completed ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_approver_assignment_flag ?case_file)
+      )
+  )
+  (:action finalize_case_without_approver
+    :parameters (?case_file - investigation_case)
+    :precondition
+      (and
+        (case_consultant_review_completed ?case_file)
+        (not
+          (case_approver_assignment_flag ?case_file)
+        )
+        (not
+          (case_marked_final ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_marked_final ?case_file)
+        (case_closure_recorded ?case_file)
+      )
+  )
+  (:action assign_approver_to_case
+    :parameters (?case_file - investigation_case ?approver - approver_role)
+    :precondition
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_approver_assignment_flag ?case_file)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (case_assigned_approver_role ?case_file ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action obtain_case_authorization
+    :parameters (?case_file - investigation_case ?originating_unit - originating_organizational_unit ?affected_unit - affected_organizational_unit ?sme - subject_matter_expert ?approver - approver_role)
+    :precondition
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_approver_assignment_flag ?case_file)
+        (case_assigned_approver_role ?case_file ?approver)
+        (case_link_originating_unit ?case_file ?originating_unit)
+        (case_link_affected_unit ?case_file ?affected_unit)
+        (originating_unit_findings_finalized ?originating_unit)
+        (affected_unit_findings_finalized ?affected_unit)
+        (sme_assigned ?case_file ?sme)
+        (not
+          (case_authorization_recorded ?case_file)
+        )
+      )
+    :effect (case_authorization_recorded ?case_file)
+  )
+  (:action finalize_case_with_authorization
+    :parameters (?case_file - investigation_case)
+    :precondition
+      (and
+        (case_consultant_review_completed ?case_file)
+        (case_authorization_recorded ?case_file)
+        (not
+          (case_marked_final ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_marked_final ?case_file)
+        (case_closure_recorded ?case_file)
+      )
+  )
+  (:action flag_case_for_regulatory_escalation
+    :parameters (?case_file - investigation_case ?regulatory_guidance_doc - regulatory_guidance_document ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_classified ?case_file)
+        (sme_assigned ?case_file ?sme)
+        (regulatory_guidance_document_available ?regulatory_guidance_doc)
+        (case_link_regulatory_guidance_document ?case_file ?regulatory_guidance_doc)
+        (not
+          (case_flagged_for_regulatory_escalation ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_flagged_for_regulatory_escalation ?case_file)
+        (not
+          (regulatory_guidance_document_available ?regulatory_guidance_doc)
+        )
+      )
+  )
+  (:action assign_technical_reviewer_for_escalation
+    :parameters (?case_file - investigation_case ?technical_reviewer - technical_reviewer)
+    :precondition
+      (and
+        (case_flagged_for_regulatory_escalation ?case_file)
+        (technical_reviewer_assigned ?case_file ?technical_reviewer)
+        (not
+          (case_reviewer_assigned_for_escalation ?case_file)
+        )
+      )
+    :effect (case_reviewer_assigned_for_escalation ?case_file)
+  )
+  (:action record_escalation_review_completion
+    :parameters (?case_file - investigation_case ?external_consultant - external_consultant)
+    :precondition
+      (and
+        (case_reviewer_assigned_for_escalation ?case_file)
+        (case_external_consultant_assigned ?case_file ?external_consultant)
+        (not
+          (case_escalation_review_completed ?case_file)
+        )
+      )
+    :effect (case_escalation_review_completed ?case_file)
+  )
+  (:action finalize_case_after_escalation
+    :parameters (?case_file - investigation_case)
+    :precondition
+      (and
+        (case_escalation_review_completed ?case_file)
+        (not
+          (case_marked_final ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_marked_final ?case_file)
+        (case_closure_recorded ?case_file)
+      )
+  )
+  (:action mark_originating_unit_actions_completed
+    :parameters (?originating_unit - originating_organizational_unit ?classification_package - classification_package)
+    :precondition
+      (and
+        (originating_unit_investigation_initiated ?originating_unit)
+        (originating_unit_findings_finalized ?originating_unit)
+        (classification_package_created ?classification_package)
+        (classification_package_review_ready ?classification_package)
+        (not
+          (case_closure_recorded ?originating_unit)
+        )
+      )
+    :effect (case_closure_recorded ?originating_unit)
+  )
+  (:action mark_affected_unit_actions_completed
+    :parameters (?affected_unit - affected_organizational_unit ?classification_package - classification_package)
+    :precondition
+      (and
+        (affected_unit_investigation_initiated ?affected_unit)
+        (affected_unit_findings_finalized ?affected_unit)
+        (classification_package_created ?classification_package)
+        (classification_package_review_ready ?classification_package)
+        (not
+          (case_closure_recorded ?affected_unit)
+        )
+      )
+    :effect (case_closure_recorded ?affected_unit)
+  )
+  (:action issue_action_plan_and_link_regulatory_contact
+    :parameters (?case_entity - case_record ?regulatory_contact - regulatory_contact ?sme - subject_matter_expert)
+    :precondition
+      (and
+        (case_closure_recorded ?case_entity)
+        (sme_assigned ?case_entity ?sme)
+        (regulatory_contact_available ?regulatory_contact)
+        (not
+          (case_action_plan_issued ?case_entity)
+        )
+      )
+    :effect
+      (and
+        (case_action_plan_issued ?case_entity)
+        (case_linked_regulatory_contact ?case_entity ?regulatory_contact)
+        (not
+          (regulatory_contact_available ?regulatory_contact)
+        )
+      )
+  )
+  (:action assign_triage_officer_to_originating_unit
+    :parameters (?originating_unit - originating_organizational_unit ?triage_officer - triage_officer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (case_action_plan_issued ?originating_unit)
+        (case_triage_officer_assigned ?originating_unit ?triage_officer)
+        (case_linked_regulatory_contact ?originating_unit ?regulatory_contact)
+        (not
+          (case_action_initiated ?originating_unit)
+        )
+      )
+    :effect
+      (and
+        (case_action_initiated ?originating_unit)
+        (triage_officer_available ?triage_officer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+  (:action assign_triage_officer_to_affected_unit
+    :parameters (?affected_unit - affected_organizational_unit ?triage_officer - triage_officer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (case_action_plan_issued ?affected_unit)
+        (case_triage_officer_assigned ?affected_unit ?triage_officer)
+        (case_linked_regulatory_contact ?affected_unit ?regulatory_contact)
+        (not
+          (case_action_initiated ?affected_unit)
+        )
+      )
+    :effect
+      (and
+        (case_action_initiated ?affected_unit)
+        (triage_officer_available ?triage_officer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+  (:action assign_triage_officer_to_case
+    :parameters (?case_file - investigation_case ?triage_officer - triage_officer ?regulatory_contact - regulatory_contact)
+    :precondition
+      (and
+        (case_action_plan_issued ?case_file)
+        (case_triage_officer_assigned ?case_file ?triage_officer)
+        (case_linked_regulatory_contact ?case_file ?regulatory_contact)
+        (not
+          (case_action_initiated ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_action_initiated ?case_file)
+        (triage_officer_available ?triage_officer)
+        (regulatory_contact_available ?regulatory_contact)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem deviation_triage_scenario)
+  (:domain pharm_qms_deviation_triage)
+  (:objects originating_unit_manufacturing - originating_organizational_unit affected_unit_quality - affected_organizational_unit investigation_case_001 - investigation_case investigation_case_002 - investigation_case triage_officer_1 - triage_officer triage_officer_2 - triage_officer triage_officer_3 - triage_officer sme_1 - subject_matter_expert technical_reviewer_1 - technical_reviewer evidence_report_1 - evidence_document impact_category_high - impact_category regulatory_category_reportable - regulatory_category classification_package_slot_1 - classification_package supporting_document_1 - supporting_document supporting_document_2 - supporting_document escalation_criterion_severe - escalation_criterion escalation_criterion_jurisdictional - escalation_criterion approver_role_qa_manager - approver_role approver_role_regulatory_affairs - approver_role regulatory_contact_local_authority - regulatory_contact validation_specialist_1 - validation_specialist regulatory_doc_21_cfr - regulatory_guidance_document regulatory_doc_eu_gmp - regulatory_guidance_document external_consultant_1 - external_consultant)
+  (:init
+    (triage_officer_available triage_officer_1)
+    (triage_officer_available triage_officer_2)
+    (triage_officer_available triage_officer_3)
+    (sme_available sme_1)
+    (technical_reviewer_available technical_reviewer_1)
+    (evidence_document_available evidence_report_1)
+    (originating_unit_assigned_impact originating_unit_manufacturing impact_category_high)
+    (affected_unit_assigned_regulatory_category affected_unit_quality regulatory_category_reportable)
+    (classification_package_available classification_package_slot_1)
+    (supporting_document_available supporting_document_1)
+    (supporting_document_available supporting_document_2)
+    (case_link_originating_unit investigation_case_001 originating_unit_manufacturing)
+    (case_link_originating_unit investigation_case_002 originating_unit_manufacturing)
+    (case_link_affected_unit investigation_case_001 affected_unit_quality)
+    (case_link_affected_unit investigation_case_002 affected_unit_quality)
+    (case_link_classification_package investigation_case_001 classification_package_slot_1)
+    (case_link_classification_package investigation_case_002 classification_package_slot_1)
+    (case_has_supporting_document investigation_case_001 supporting_document_1)
+    (case_has_supporting_document investigation_case_002 supporting_document_2)
+    (escalation_criterion_available escalation_criterion_severe)
+    (escalation_criterion_available escalation_criterion_jurisdictional)
+    (approver_available approver_role_qa_manager)
+    (approver_available approver_role_regulatory_affairs)
+    (regulatory_contact_available regulatory_contact_local_authority)
+    (validation_specialist_available validation_specialist_1)
+    (regulatory_guidance_document_available regulatory_doc_21_cfr)
+    (case_link_regulatory_guidance_document investigation_case_001 regulatory_doc_21_cfr)
+    (case_link_regulatory_guidance_document investigation_case_002 regulatory_doc_eu_gmp)
+    (external_consultant_available external_consultant_1)
+  )
+  (:goal
+    (and
+      (case_action_initiated originating_unit_manufacturing)
+      (case_action_initiated affected_unit_quality)
+      (case_action_initiated investigation_case_001)
+      (case_action_initiated investigation_case_002)
+    )
+  )
+)

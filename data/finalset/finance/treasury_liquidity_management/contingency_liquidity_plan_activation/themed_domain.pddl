@@ -1,0 +1,936 @@
+(define (domain finance_contingency_liquidity_plan_activation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object channel_or_resource_category - object document_or_channel_category - object organization - object legal_entity - organization funding_source - resource_category activation_trigger - resource_category approver_role - resource_category policy_document - resource_category execution_strategy - resource_category approval_document - resource_category funding_instrument - resource_category external_confirmation - resource_category liquidity_asset - channel_or_resource_category liquidity_tool - channel_or_resource_category authority_code - channel_or_resource_category settlement_channel_a - document_or_channel_category settlement_channel_b - document_or_channel_category transfer_instruction - document_or_channel_category operating_entity_group - legal_entity treasury_unit_group - legal_entity central_operating_entity - operating_entity_group subsidiary_operating_entity - operating_entity_group treasury_desk - treasury_unit_group)
+  (:predicates
+    (legal_entity_registered_in_clp ?legal_entity - legal_entity)
+    (legal_entity_activation_authorized ?legal_entity - legal_entity)
+    (legal_entity_funding_assigned ?legal_entity - legal_entity)
+    (legal_entity_activated ?legal_entity - legal_entity)
+    (execution_confirmation_logged ?legal_entity - legal_entity)
+    (legal_entity_pre_activation_approved ?legal_entity - legal_entity)
+    (funding_source_available ?funding_source - funding_source)
+    (legal_entity_linked_to_funding_source ?legal_entity - legal_entity ?funding_source - funding_source)
+    (activation_trigger_available ?activation_trigger - activation_trigger)
+    (legal_entity_linked_to_activation_trigger ?legal_entity - legal_entity ?activation_trigger - activation_trigger)
+    (approver_available ?approver_role - approver_role)
+    (legal_entity_assigned_approver ?legal_entity - legal_entity ?approver_role - approver_role)
+    (liquidity_asset_available ?liquidity_asset - liquidity_asset)
+    (central_entity_allocated_liquidity_asset ?central_operating_entity - central_operating_entity ?liquidity_asset - liquidity_asset)
+    (subsidiary_allocated_liquidity_asset ?subsidiary_operating_entity - subsidiary_operating_entity ?liquidity_asset - liquidity_asset)
+    (legal_entity_linked_to_channel_a ?central_operating_entity - central_operating_entity ?settlement_channel_a - settlement_channel_a)
+    (channel_a_primary_selected ?settlement_channel_a - settlement_channel_a)
+    (channel_a_secondary_selected ?settlement_channel_a - settlement_channel_a)
+    (legal_entity_channel_a_confirmed ?central_operating_entity - central_operating_entity)
+    (legal_entity_linked_to_channel_b ?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_b - settlement_channel_b)
+    (channel_b_primary_selected ?settlement_channel_b - settlement_channel_b)
+    (channel_b_secondary_selected ?settlement_channel_b - settlement_channel_b)
+    (legal_entity_channel_b_confirmed ?subsidiary_operating_entity - subsidiary_operating_entity)
+    (transfer_instruction_pending ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_constructed ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_includes_channel_a ?transfer_instruction - transfer_instruction ?settlement_channel_a - settlement_channel_a)
+    (transfer_instruction_includes_channel_b ?transfer_instruction - transfer_instruction ?settlement_channel_b - settlement_channel_b)
+    (transfer_instruction_priority_flag ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_secondary_priority_flag ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_settlement_ready ?transfer_instruction - transfer_instruction)
+    (treasury_desk_assigned_to_central_entity ?treasury_desk - treasury_desk ?central_operating_entity - central_operating_entity)
+    (treasury_desk_assigned_to_subsidiary ?treasury_desk - treasury_desk ?subsidiary_operating_entity - subsidiary_operating_entity)
+    (treasury_desk_owns_transfer_instruction ?treasury_desk - treasury_desk ?transfer_instruction - transfer_instruction)
+    (liquidity_tool_available ?liquidity_tool - liquidity_tool)
+    (treasury_desk_has_liquidity_tool ?treasury_desk - treasury_desk ?liquidity_tool - liquidity_tool)
+    (liquidity_tool_committed ?liquidity_tool - liquidity_tool)
+    (liquidity_tool_allocated_to_instruction ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    (treasury_desk_execution_enabled ?treasury_desk - treasury_desk)
+    (treasury_desk_execution_stage1_confirmed ?treasury_desk - treasury_desk)
+    (treasury_desk_execution_stage2_confirmed ?treasury_desk - treasury_desk)
+    (treasury_desk_policy_document_attached ?treasury_desk - treasury_desk)
+    (treasury_desk_policy_document_enabled ?treasury_desk - treasury_desk)
+    (treasury_desk_execution_plan_assigned ?treasury_desk - treasury_desk)
+    (treasury_desk_compliance_checks_passed ?treasury_desk - treasury_desk)
+    (authority_code_available ?authority_code - authority_code)
+    (treasury_desk_assigned_authority_code ?treasury_desk - treasury_desk ?authority_code - authority_code)
+    (treasury_desk_authority_bound ?treasury_desk - treasury_desk)
+    (treasury_desk_authority_acknowledged ?treasury_desk - treasury_desk)
+    (treasury_desk_authority_confirmed ?treasury_desk - treasury_desk)
+    (policy_document_available ?policy_document - policy_document)
+    (treasury_desk_policy_document_link ?treasury_desk - treasury_desk ?policy_document - policy_document)
+    (execution_strategy_available ?execution_strategy - execution_strategy)
+    (treasury_desk_has_execution_strategy ?treasury_desk - treasury_desk ?execution_strategy - execution_strategy)
+    (funding_instrument_available ?funding_instrument - funding_instrument)
+    (treasury_desk_assigned_funding_instrument ?treasury_desk - treasury_desk ?funding_instrument - funding_instrument)
+    (external_confirmation_available ?external_confirmation - external_confirmation)
+    (treasury_desk_linked_external_confirmation ?treasury_desk - treasury_desk ?external_confirmation - external_confirmation)
+    (approval_document_available ?approval_document - approval_document)
+    (legal_entity_linked_approval_document ?legal_entity - legal_entity ?approval_document - approval_document)
+    (operating_entity_ready_for_execution ?central_operating_entity - central_operating_entity)
+    (subsidiary_ready_for_execution ?subsidiary_operating_entity - subsidiary_operating_entity)
+    (treasury_desk_confirmation_logged ?treasury_desk - treasury_desk)
+  )
+  (:action register_entity_in_clp
+    :parameters (?legal_entity - legal_entity)
+    :precondition
+      (and
+        (not
+          (legal_entity_registered_in_clp ?legal_entity)
+        )
+        (not
+          (legal_entity_activated ?legal_entity)
+        )
+      )
+    :effect (legal_entity_registered_in_clp ?legal_entity)
+  )
+  (:action attach_funding_source_to_entity
+    :parameters (?legal_entity - legal_entity ?funding_source - funding_source)
+    :precondition
+      (and
+        (legal_entity_registered_in_clp ?legal_entity)
+        (not
+          (legal_entity_funding_assigned ?legal_entity)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (legal_entity_funding_assigned ?legal_entity)
+        (legal_entity_linked_to_funding_source ?legal_entity ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action link_activation_trigger_to_entity
+    :parameters (?legal_entity - legal_entity ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_registered_in_clp ?legal_entity)
+        (legal_entity_funding_assigned ?legal_entity)
+        (activation_trigger_available ?activation_trigger)
+      )
+    :effect
+      (and
+        (legal_entity_linked_to_activation_trigger ?legal_entity ?activation_trigger)
+        (not
+          (activation_trigger_available ?activation_trigger)
+        )
+      )
+  )
+  (:action authorize_entity_activation
+    :parameters (?legal_entity - legal_entity ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_registered_in_clp ?legal_entity)
+        (legal_entity_funding_assigned ?legal_entity)
+        (legal_entity_linked_to_activation_trigger ?legal_entity ?activation_trigger)
+        (not
+          (legal_entity_activation_authorized ?legal_entity)
+        )
+      )
+    :effect (legal_entity_activation_authorized ?legal_entity)
+  )
+  (:action unlink_activation_trigger_from_entity
+    :parameters (?legal_entity - legal_entity ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_linked_to_activation_trigger ?legal_entity ?activation_trigger)
+      )
+    :effect
+      (and
+        (activation_trigger_available ?activation_trigger)
+        (not
+          (legal_entity_linked_to_activation_trigger ?legal_entity ?activation_trigger)
+        )
+      )
+  )
+  (:action assign_approver_to_entity
+    :parameters (?legal_entity - legal_entity ?approver_role - approver_role)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?legal_entity)
+        (approver_available ?approver_role)
+      )
+    :effect
+      (and
+        (legal_entity_assigned_approver ?legal_entity ?approver_role)
+        (not
+          (approver_available ?approver_role)
+        )
+      )
+  )
+  (:action unassign_approver_from_entity
+    :parameters (?legal_entity - legal_entity ?approver_role - approver_role)
+    :precondition
+      (and
+        (legal_entity_assigned_approver ?legal_entity ?approver_role)
+      )
+    :effect
+      (and
+        (approver_available ?approver_role)
+        (not
+          (legal_entity_assigned_approver ?legal_entity ?approver_role)
+        )
+      )
+  )
+  (:action bind_funding_instrument_to_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (funding_instrument_available ?funding_instrument)
+      )
+    :effect
+      (and
+        (treasury_desk_assigned_funding_instrument ?treasury_desk ?funding_instrument)
+        (not
+          (funding_instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action unbind_funding_instrument_from_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (treasury_desk_assigned_funding_instrument ?treasury_desk ?funding_instrument)
+      )
+    :effect
+      (and
+        (funding_instrument_available ?funding_instrument)
+        (not
+          (treasury_desk_assigned_funding_instrument ?treasury_desk ?funding_instrument)
+        )
+      )
+  )
+  (:action attach_external_confirmation_to_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (external_confirmation_available ?external_confirmation)
+      )
+    :effect
+      (and
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (not
+          (external_confirmation_available ?external_confirmation)
+        )
+      )
+  )
+  (:action detach_external_confirmation_from_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation)
+    :precondition
+      (and
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+      )
+    :effect
+      (and
+        (external_confirmation_available ?external_confirmation)
+        (not
+          (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        )
+      )
+  )
+  (:action prepare_channel_a_for_entity
+    :parameters (?central_operating_entity - central_operating_entity ?settlement_channel_a - settlement_channel_a ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?central_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?central_operating_entity ?activation_trigger)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (not
+          (channel_a_primary_selected ?settlement_channel_a)
+        )
+        (not
+          (channel_a_secondary_selected ?settlement_channel_a)
+        )
+      )
+    :effect (channel_a_primary_selected ?settlement_channel_a)
+  )
+  (:action confirm_channel_a_with_approver
+    :parameters (?central_operating_entity - central_operating_entity ?settlement_channel_a - settlement_channel_a ?approver_role - approver_role)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?central_operating_entity)
+        (legal_entity_assigned_approver ?central_operating_entity ?approver_role)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (channel_a_primary_selected ?settlement_channel_a)
+        (not
+          (operating_entity_ready_for_execution ?central_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+      )
+  )
+  (:action allocate_liquidity_asset_to_entity_for_channel_a
+    :parameters (?central_operating_entity - central_operating_entity ?settlement_channel_a - settlement_channel_a ?liquidity_asset - liquidity_asset)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?central_operating_entity)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (liquidity_asset_available ?liquidity_asset)
+        (not
+          (operating_entity_ready_for_execution ?central_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (channel_a_secondary_selected ?settlement_channel_a)
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (central_entity_allocated_liquidity_asset ?central_operating_entity ?liquidity_asset)
+        (not
+          (liquidity_asset_available ?liquidity_asset)
+        )
+      )
+  )
+  (:action execute_asset_allocation_for_channel_a
+    :parameters (?central_operating_entity - central_operating_entity ?settlement_channel_a - settlement_channel_a ?activation_trigger - activation_trigger ?liquidity_asset - liquidity_asset)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?central_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?central_operating_entity ?activation_trigger)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (channel_a_secondary_selected ?settlement_channel_a)
+        (central_entity_allocated_liquidity_asset ?central_operating_entity ?liquidity_asset)
+        (not
+          (legal_entity_channel_a_confirmed ?central_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (channel_a_primary_selected ?settlement_channel_a)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+        (liquidity_asset_available ?liquidity_asset)
+        (not
+          (central_entity_allocated_liquidity_asset ?central_operating_entity ?liquidity_asset)
+        )
+      )
+  )
+  (:action prepare_channel_b_for_subsidiary
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_b - settlement_channel_b ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?subsidiary_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?subsidiary_operating_entity ?activation_trigger)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (not
+          (channel_b_primary_selected ?settlement_channel_b)
+        )
+        (not
+          (channel_b_secondary_selected ?settlement_channel_b)
+        )
+      )
+    :effect (channel_b_primary_selected ?settlement_channel_b)
+  )
+  (:action confirm_channel_b_with_approver
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_b - settlement_channel_b ?approver_role - approver_role)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?subsidiary_operating_entity)
+        (legal_entity_assigned_approver ?subsidiary_operating_entity ?approver_role)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_b_primary_selected ?settlement_channel_b)
+        (not
+          (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+      )
+  )
+  (:action allocate_liquidity_asset_to_subsidiary_for_channel_b
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_b - settlement_channel_b ?liquidity_asset - liquidity_asset)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?subsidiary_operating_entity)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (liquidity_asset_available ?liquidity_asset)
+        (not
+          (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (channel_b_secondary_selected ?settlement_channel_b)
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (subsidiary_allocated_liquidity_asset ?subsidiary_operating_entity ?liquidity_asset)
+        (not
+          (liquidity_asset_available ?liquidity_asset)
+        )
+      )
+  )
+  (:action execute_asset_allocation_for_channel_b
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_b - settlement_channel_b ?activation_trigger - activation_trigger ?liquidity_asset - liquidity_asset)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?subsidiary_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?subsidiary_operating_entity ?activation_trigger)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_b_secondary_selected ?settlement_channel_b)
+        (subsidiary_allocated_liquidity_asset ?subsidiary_operating_entity ?liquidity_asset)
+        (not
+          (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (channel_b_primary_selected ?settlement_channel_b)
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        (liquidity_asset_available ?liquidity_asset)
+        (not
+          (subsidiary_allocated_liquidity_asset ?subsidiary_operating_entity ?liquidity_asset)
+        )
+      )
+  )
+  (:action construct_transfer_instruction_for_entities_channels
+    :parameters (?central_operating_entity - central_operating_entity ?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_a - settlement_channel_a ?settlement_channel_b - settlement_channel_b ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_a_primary_selected ?settlement_channel_a)
+        (channel_b_primary_selected ?settlement_channel_b)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        (transfer_instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_includes_channel_a ?transfer_instruction ?settlement_channel_a)
+        (transfer_instruction_includes_channel_b ?transfer_instruction ?settlement_channel_b)
+        (not
+          (transfer_instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action construct_transfer_instruction_with_channel_a_secondary
+    :parameters (?central_operating_entity - central_operating_entity ?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_a - settlement_channel_a ?settlement_channel_b - settlement_channel_b ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_a_secondary_selected ?settlement_channel_a)
+        (channel_b_primary_selected ?settlement_channel_b)
+        (not
+          (legal_entity_channel_a_confirmed ?central_operating_entity)
+        )
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        (transfer_instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_includes_channel_a ?transfer_instruction ?settlement_channel_a)
+        (transfer_instruction_includes_channel_b ?transfer_instruction ?settlement_channel_b)
+        (transfer_instruction_priority_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action construct_transfer_instruction_with_channel_b_secondary
+    :parameters (?central_operating_entity - central_operating_entity ?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_a - settlement_channel_a ?settlement_channel_b - settlement_channel_b ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_a_primary_selected ?settlement_channel_a)
+        (channel_b_secondary_selected ?settlement_channel_b)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+        (not
+          (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        )
+        (transfer_instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_includes_channel_a ?transfer_instruction ?settlement_channel_a)
+        (transfer_instruction_includes_channel_b ?transfer_instruction ?settlement_channel_b)
+        (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action construct_transfer_instruction_with_both_channels_secondary
+    :parameters (?central_operating_entity - central_operating_entity ?subsidiary_operating_entity - subsidiary_operating_entity ?settlement_channel_a - settlement_channel_a ?settlement_channel_b - settlement_channel_b ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_linked_to_channel_a ?central_operating_entity ?settlement_channel_a)
+        (legal_entity_linked_to_channel_b ?subsidiary_operating_entity ?settlement_channel_b)
+        (channel_a_secondary_selected ?settlement_channel_a)
+        (channel_b_secondary_selected ?settlement_channel_b)
+        (not
+          (legal_entity_channel_a_confirmed ?central_operating_entity)
+        )
+        (not
+          (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        )
+        (transfer_instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_includes_channel_a ?transfer_instruction ?settlement_channel_a)
+        (transfer_instruction_includes_channel_b ?transfer_instruction ?settlement_channel_b)
+        (transfer_instruction_priority_flag ?transfer_instruction)
+        (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action confirm_transfer_instruction_ready_for_settlement
+    :parameters (?transfer_instruction - transfer_instruction ?central_operating_entity - central_operating_entity ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (transfer_instruction_constructed ?transfer_instruction)
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?central_operating_entity ?activation_trigger)
+        (not
+          (transfer_instruction_settlement_ready ?transfer_instruction)
+        )
+      )
+    :effect (transfer_instruction_settlement_ready ?transfer_instruction)
+  )
+  (:action reserve_liquidity_tool_for_instruction
+    :parameters (?treasury_desk - treasury_desk ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (treasury_desk_owns_transfer_instruction ?treasury_desk ?transfer_instruction)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_available ?liquidity_tool)
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_settlement_ready ?transfer_instruction)
+        (not
+          (liquidity_tool_committed ?liquidity_tool)
+        )
+      )
+    :effect
+      (and
+        (liquidity_tool_committed ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (not
+          (liquidity_tool_available ?liquidity_tool)
+        )
+      )
+  )
+  (:action enable_treasury_desk_for_tool_execution
+    :parameters (?treasury_desk - treasury_desk ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_committed ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (legal_entity_linked_to_activation_trigger ?treasury_desk ?activation_trigger)
+        (not
+          (transfer_instruction_priority_flag ?transfer_instruction)
+        )
+        (not
+          (treasury_desk_execution_enabled ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_execution_enabled ?treasury_desk)
+  )
+  (:action assign_policy_document_to_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?policy_document - policy_document)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (policy_document_available ?policy_document)
+        (not
+          (treasury_desk_policy_document_attached ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_policy_document_attached ?treasury_desk)
+        (treasury_desk_policy_document_link ?treasury_desk ?policy_document)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action prepare_desk_tool_and_instruction_with_policy
+    :parameters (?treasury_desk - treasury_desk ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction ?activation_trigger - activation_trigger ?policy_document - policy_document)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_committed ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (legal_entity_linked_to_activation_trigger ?treasury_desk ?activation_trigger)
+        (transfer_instruction_priority_flag ?transfer_instruction)
+        (treasury_desk_policy_document_attached ?treasury_desk)
+        (treasury_desk_policy_document_link ?treasury_desk ?policy_document)
+        (not
+          (treasury_desk_execution_enabled ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_execution_enabled ?treasury_desk)
+        (treasury_desk_policy_document_enabled ?treasury_desk)
+      )
+  )
+  (:action confirm_treasury_desk_execution_stage1
+    :parameters (?treasury_desk - treasury_desk ?funding_instrument - funding_instrument ?approver_role - approver_role ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_enabled ?treasury_desk)
+        (treasury_desk_assigned_funding_instrument ?treasury_desk ?funding_instrument)
+        (legal_entity_assigned_approver ?treasury_desk ?approver_role)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (not
+          (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        )
+        (not
+          (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+  )
+  (:action confirm_treasury_desk_execution_stage1_alternative
+    :parameters (?treasury_desk - treasury_desk ?funding_instrument - funding_instrument ?approver_role - approver_role ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_enabled ?treasury_desk)
+        (treasury_desk_assigned_funding_instrument ?treasury_desk ?funding_instrument)
+        (legal_entity_assigned_approver ?treasury_desk ?approver_role)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        (not
+          (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+  )
+  (:action mark_treasury_desk_execution_stage2
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (not
+          (transfer_instruction_priority_flag ?transfer_instruction)
+        )
+        (not
+          (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        )
+        (not
+          (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+  )
+  (:action mark_treasury_desk_execution_stage2_and_assign_plan
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (transfer_instruction_priority_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        )
+        (not
+          (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_execution_plan_assigned ?treasury_desk)
+      )
+  )
+  (:action mark_treasury_desk_execution_stage2_with_secondary_flag
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (not
+          (transfer_instruction_priority_flag ?transfer_instruction)
+        )
+        (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        (not
+          (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_execution_plan_assigned ?treasury_desk)
+      )
+  )
+  (:action mark_treasury_desk_execution_stage2_all_flags
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation ?liquidity_tool - liquidity_tool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (treasury_desk_execution_stage1_confirmed ?treasury_desk)
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (treasury_desk_has_liquidity_tool ?treasury_desk ?liquidity_tool)
+        (liquidity_tool_allocated_to_instruction ?liquidity_tool ?transfer_instruction)
+        (transfer_instruction_priority_flag ?transfer_instruction)
+        (transfer_instruction_secondary_priority_flag ?transfer_instruction)
+        (not
+          (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_execution_plan_assigned ?treasury_desk)
+      )
+  )
+  (:action record_initial_execution_confirmation
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (not
+          (treasury_desk_execution_plan_assigned ?treasury_desk)
+        )
+        (not
+          (treasury_desk_confirmation_logged ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_confirmation_logged ?treasury_desk)
+        (execution_confirmation_logged ?treasury_desk)
+      )
+  )
+  (:action assign_execution_strategy_to_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_execution_plan_assigned ?treasury_desk)
+        (execution_strategy_available ?execution_strategy)
+      )
+    :effect
+      (and
+        (treasury_desk_has_execution_strategy ?treasury_desk ?execution_strategy)
+        (not
+          (execution_strategy_available ?execution_strategy)
+        )
+      )
+  )
+  (:action perform_compliance_checks_and_mark_execution_ready
+    :parameters (?treasury_desk - treasury_desk ?central_operating_entity - central_operating_entity ?subsidiary_operating_entity - subsidiary_operating_entity ?activation_trigger - activation_trigger ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_execution_plan_assigned ?treasury_desk)
+        (treasury_desk_has_execution_strategy ?treasury_desk ?execution_strategy)
+        (treasury_desk_assigned_to_central_entity ?treasury_desk ?central_operating_entity)
+        (treasury_desk_assigned_to_subsidiary ?treasury_desk ?subsidiary_operating_entity)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        (legal_entity_linked_to_activation_trigger ?treasury_desk ?activation_trigger)
+        (not
+          (treasury_desk_compliance_checks_passed ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_compliance_checks_passed ?treasury_desk)
+  )
+  (:action finalize_execution_confirmation_for_desk
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (treasury_desk_execution_stage2_confirmed ?treasury_desk)
+        (treasury_desk_compliance_checks_passed ?treasury_desk)
+        (not
+          (treasury_desk_confirmation_logged ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_confirmation_logged ?treasury_desk)
+        (execution_confirmation_logged ?treasury_desk)
+      )
+  )
+  (:action bind_authority_code_to_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?authority_code - authority_code ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (legal_entity_activation_authorized ?treasury_desk)
+        (legal_entity_linked_to_activation_trigger ?treasury_desk ?activation_trigger)
+        (authority_code_available ?authority_code)
+        (treasury_desk_assigned_authority_code ?treasury_desk ?authority_code)
+        (not
+          (treasury_desk_authority_bound ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_authority_bound ?treasury_desk)
+        (not
+          (authority_code_available ?authority_code)
+        )
+      )
+  )
+  (:action acknowledge_authority_by_approver
+    :parameters (?treasury_desk - treasury_desk ?approver_role - approver_role)
+    :precondition
+      (and
+        (treasury_desk_authority_bound ?treasury_desk)
+        (legal_entity_assigned_approver ?treasury_desk ?approver_role)
+        (not
+          (treasury_desk_authority_acknowledged ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_authority_acknowledged ?treasury_desk)
+  )
+  (:action confirm_authority_with_external_confirmation
+    :parameters (?treasury_desk - treasury_desk ?external_confirmation - external_confirmation)
+    :precondition
+      (and
+        (treasury_desk_authority_acknowledged ?treasury_desk)
+        (treasury_desk_linked_external_confirmation ?treasury_desk ?external_confirmation)
+        (not
+          (treasury_desk_authority_confirmed ?treasury_desk)
+        )
+      )
+    :effect (treasury_desk_authority_confirmed ?treasury_desk)
+  )
+  (:action record_authority_confirmation
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (treasury_desk_authority_confirmed ?treasury_desk)
+        (not
+          (treasury_desk_confirmation_logged ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (treasury_desk_confirmation_logged ?treasury_desk)
+        (execution_confirmation_logged ?treasury_desk)
+      )
+  )
+  (:action finalize_central_entity_activation
+    :parameters (?central_operating_entity - central_operating_entity ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_entity_ready_for_execution ?central_operating_entity)
+        (legal_entity_channel_a_confirmed ?central_operating_entity)
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_settlement_ready ?transfer_instruction)
+        (not
+          (execution_confirmation_logged ?central_operating_entity)
+        )
+      )
+    :effect (execution_confirmation_logged ?central_operating_entity)
+  )
+  (:action finalize_subsidiary_activation
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (subsidiary_ready_for_execution ?subsidiary_operating_entity)
+        (legal_entity_channel_b_confirmed ?subsidiary_operating_entity)
+        (transfer_instruction_constructed ?transfer_instruction)
+        (transfer_instruction_settlement_ready ?transfer_instruction)
+        (not
+          (execution_confirmation_logged ?subsidiary_operating_entity)
+        )
+      )
+    :effect (execution_confirmation_logged ?subsidiary_operating_entity)
+  )
+  (:action record_approval_document_and_mark_entity_preapproved
+    :parameters (?legal_entity - legal_entity ?approval_document - approval_document ?activation_trigger - activation_trigger)
+    :precondition
+      (and
+        (execution_confirmation_logged ?legal_entity)
+        (legal_entity_linked_to_activation_trigger ?legal_entity ?activation_trigger)
+        (approval_document_available ?approval_document)
+        (not
+          (legal_entity_pre_activation_approved ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (legal_entity_pre_activation_approved ?legal_entity)
+        (legal_entity_linked_approval_document ?legal_entity ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action activate_central_entity_using_funding_source
+    :parameters (?central_operating_entity - central_operating_entity ?funding_source - funding_source ?approval_document - approval_document)
+    :precondition
+      (and
+        (legal_entity_pre_activation_approved ?central_operating_entity)
+        (legal_entity_linked_to_funding_source ?central_operating_entity ?funding_source)
+        (legal_entity_linked_approval_document ?central_operating_entity ?approval_document)
+        (not
+          (legal_entity_activated ?central_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (legal_entity_activated ?central_operating_entity)
+        (funding_source_available ?funding_source)
+        (approval_document_available ?approval_document)
+      )
+  )
+  (:action activate_subsidiary_using_funding_source
+    :parameters (?subsidiary_operating_entity - subsidiary_operating_entity ?funding_source - funding_source ?approval_document - approval_document)
+    :precondition
+      (and
+        (legal_entity_pre_activation_approved ?subsidiary_operating_entity)
+        (legal_entity_linked_to_funding_source ?subsidiary_operating_entity ?funding_source)
+        (legal_entity_linked_approval_document ?subsidiary_operating_entity ?approval_document)
+        (not
+          (legal_entity_activated ?subsidiary_operating_entity)
+        )
+      )
+    :effect
+      (and
+        (legal_entity_activated ?subsidiary_operating_entity)
+        (funding_source_available ?funding_source)
+        (approval_document_available ?approval_document)
+      )
+  )
+  (:action activate_treasury_desk_using_funding_source
+    :parameters (?treasury_desk - treasury_desk ?funding_source - funding_source ?approval_document - approval_document)
+    :precondition
+      (and
+        (legal_entity_pre_activation_approved ?treasury_desk)
+        (legal_entity_linked_to_funding_source ?treasury_desk ?funding_source)
+        (legal_entity_linked_approval_document ?treasury_desk ?approval_document)
+        (not
+          (legal_entity_activated ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (legal_entity_activated ?treasury_desk)
+        (funding_source_available ?funding_source)
+        (approval_document_available ?approval_document)
+      )
+  )
+)

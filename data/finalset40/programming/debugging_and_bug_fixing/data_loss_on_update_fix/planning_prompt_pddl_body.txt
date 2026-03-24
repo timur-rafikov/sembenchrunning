@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain data_loss_on_update_fix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types code_repository - object test_environment - object review_pool - object code_entity_class - object code_entity - code_entity_class patch_candidate - code_repository test_artifact - code_repository reviewer - code_repository feature_flag - code_repository approval_ticket - code_repository rollback_token - code_repository data_migration_tool - code_repository compliance_artifact - code_repository dependency_artifact - test_environment migration_script - test_environment stakeholder_approval - test_environment backend_configuration - review_pool replica_configuration - review_pool deployment_unit - review_pool backend_class - code_entity replica_class - code_entity primary_backend_instance - backend_class replica_instance - backend_class subsystem - replica_class)
+  (:predicates
+    (component_issue_reported ?code_entity - code_entity)
+    (component_validated ?code_entity - code_entity)
+    (component_patch_assigned ?code_entity - code_entity)
+    (component_patched ?code_entity - code_entity)
+    (component_finalized ?code_entity - code_entity)
+    (has_rollback_token ?code_entity - code_entity)
+    (patch_candidate_available ?patch_candidate - patch_candidate)
+    (component_patch_assigned_to ?code_entity - code_entity ?patch_candidate - patch_candidate)
+    (test_available ?test_artifact - test_artifact)
+    (component_test_associated_with ?code_entity - code_entity ?test_artifact - test_artifact)
+    (reviewer_available ?reviewer - reviewer)
+    (component_reviewer_assigned ?code_entity - code_entity ?reviewer - reviewer)
+    (dependency_artifact_available ?dependency_artifact - dependency_artifact)
+    (primary_instance_dependency_bound ?primary_backend_instance - primary_backend_instance ?dependency_artifact - dependency_artifact)
+    (replica_instance_dependency_bound ?replica_instance - replica_instance ?dependency_artifact - dependency_artifact)
+    (instance_backend_config_assigned ?primary_backend_instance - primary_backend_instance ?backend_configuration - backend_configuration)
+    (backend_config_staged ?backend_configuration - backend_configuration)
+    (backend_config_has_dependency ?backend_configuration - backend_configuration)
+    (instance_ready_for_assembly ?primary_backend_instance - primary_backend_instance)
+    (replica_config_assigned ?replica_instance - replica_instance ?replica_configuration - replica_configuration)
+    (replica_config_staged ?replica_configuration - replica_configuration)
+    (replica_config_has_dependency ?replica_configuration - replica_configuration)
+    (replica_ready_for_assembly ?replica_instance - replica_instance)
+    (deployment_unit_available ?deployment_unit - deployment_unit)
+    (deployment_unit_built ?deployment_unit - deployment_unit)
+    (deployment_backend_configured ?deployment_unit - deployment_unit ?backend_configuration - backend_configuration)
+    (deployment_replica_configured ?deployment_unit - deployment_unit ?replica_configuration - replica_configuration)
+    (deployment_includes_schema_migration ?deployment_unit - deployment_unit)
+    (deployment_includes_replica_changes ?deployment_unit - deployment_unit)
+    (deployment_ready_for_migration ?deployment_unit - deployment_unit)
+    (subsystem_manages_primary_instance ?subsystem - subsystem ?primary_backend_instance - primary_backend_instance)
+    (subsystem_manages_replica_instance ?subsystem - subsystem ?replica_instance - replica_instance)
+    (subsystem_has_deployment_unit ?subsystem - subsystem ?deployment_unit - deployment_unit)
+    (migration_script_available ?migration_script - migration_script)
+    (subsystem_has_migration_script ?subsystem - subsystem ?migration_script - migration_script)
+    (migration_script_bound ?migration_script - migration_script)
+    (migration_script_bound_to_deployment ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    (subsystem_migration_executed ?subsystem - subsystem)
+    (subsystem_migration_validated ?subsystem - subsystem)
+    (subsystem_integration_ready ?subsystem - subsystem)
+    (feature_flag_active ?subsystem - subsystem)
+    (integration_check_passed ?subsystem - subsystem)
+    (approval_gate_open ?subsystem - subsystem)
+    (integration_tests_passed ?subsystem - subsystem)
+    (stakeholder_approval_available ?stakeholder_approval - stakeholder_approval)
+    (subsystem_has_stakeholder_approval ?subsystem - subsystem ?stakeholder_approval - stakeholder_approval)
+    (stakeholder_approval_applied ?subsystem - subsystem)
+    (stakeholder_approval_validated ?subsystem - subsystem)
+    (compliance_check_passed ?subsystem - subsystem)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (subsystem_has_feature_flag ?subsystem - subsystem ?feature_flag - feature_flag)
+    (approval_ticket_available ?approval_ticket - approval_ticket)
+    (approval_ticket_bound_to_subsystem ?subsystem - subsystem ?approval_ticket - approval_ticket)
+    (data_migration_tool_available ?data_migration_tool - data_migration_tool)
+    (subsystem_has_data_migration_tool ?subsystem - subsystem ?data_migration_tool - data_migration_tool)
+    (compliance_artifact_available ?compliance_artifact - compliance_artifact)
+    (subsystem_has_compliance_artifact ?subsystem - subsystem ?compliance_artifact - compliance_artifact)
+    (rollback_token_available ?rollback_token - rollback_token)
+    (component_rollback_token_bound ?code_entity - code_entity ?rollback_token - rollback_token)
+    (instance_prepared ?primary_backend_instance - primary_backend_instance)
+    (replica_prepared ?replica_instance - replica_instance)
+    (audit_logged ?subsystem - subsystem)
+  )
+  (:action register_affected_entity
+    :parameters (?code_entity - code_entity)
+    :precondition
+      (and
+        (not
+          (component_issue_reported ?code_entity)
+        )
+        (not
+          (component_patched ?code_entity)
+        )
+      )
+    :effect (component_issue_reported ?code_entity)
+  )
+  (:action assign_patch_candidate_to_entity
+    :parameters (?code_entity - code_entity ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (component_issue_reported ?code_entity)
+        (not
+          (component_patch_assigned ?code_entity)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (component_patch_assigned ?code_entity)
+        (component_patch_assigned_to ?code_entity ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action associate_test_artifact
+    :parameters (?code_entity - code_entity ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_issue_reported ?code_entity)
+        (component_patch_assigned ?code_entity)
+        (test_available ?test_artifact)
+      )
+    :effect
+      (and
+        (component_test_associated_with ?code_entity ?test_artifact)
+        (not
+          (test_available ?test_artifact)
+        )
+      )
+  )
+  (:action validate_entity_with_test
+    :parameters (?code_entity - code_entity ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_issue_reported ?code_entity)
+        (component_patch_assigned ?code_entity)
+        (component_test_associated_with ?code_entity ?test_artifact)
+        (not
+          (component_validated ?code_entity)
+        )
+      )
+    :effect (component_validated ?code_entity)
+  )
+  (:action release_test_artifact
+    :parameters (?code_entity - code_entity ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_test_associated_with ?code_entity ?test_artifact)
+      )
+    :effect
+      (and
+        (test_available ?test_artifact)
+        (not
+          (component_test_associated_with ?code_entity ?test_artifact)
+        )
+      )
+  )
+  (:action assign_reviewer_to_entity
+    :parameters (?code_entity - code_entity ?reviewer - reviewer)
+    :precondition
+      (and
+        (component_validated ?code_entity)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (component_reviewer_assigned ?code_entity ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_entity
+    :parameters (?code_entity - code_entity ?reviewer - reviewer)
+    :precondition
+      (and
+        (component_reviewer_assigned ?code_entity ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (component_reviewer_assigned ?code_entity ?reviewer)
+        )
+      )
+  )
+  (:action attach_data_migration_tool
+    :parameters (?subsystem - subsystem ?data_migration_tool - data_migration_tool)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (data_migration_tool_available ?data_migration_tool)
+      )
+    :effect
+      (and
+        (subsystem_has_data_migration_tool ?subsystem ?data_migration_tool)
+        (not
+          (data_migration_tool_available ?data_migration_tool)
+        )
+      )
+  )
+  (:action detach_data_migration_tool
+    :parameters (?subsystem - subsystem ?data_migration_tool - data_migration_tool)
+    :precondition
+      (and
+        (subsystem_has_data_migration_tool ?subsystem ?data_migration_tool)
+      )
+    :effect
+      (and
+        (data_migration_tool_available ?data_migration_tool)
+        (not
+          (subsystem_has_data_migration_tool ?subsystem ?data_migration_tool)
+        )
+      )
+  )
+  (:action attach_compliance_artifact
+    :parameters (?subsystem - subsystem ?compliance_artifact - compliance_artifact)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (compliance_artifact_available ?compliance_artifact)
+      )
+    :effect
+      (and
+        (subsystem_has_compliance_artifact ?subsystem ?compliance_artifact)
+        (not
+          (compliance_artifact_available ?compliance_artifact)
+        )
+      )
+  )
+  (:action detach_compliance_artifact
+    :parameters (?subsystem - subsystem ?compliance_artifact - compliance_artifact)
+    :precondition
+      (and
+        (subsystem_has_compliance_artifact ?subsystem ?compliance_artifact)
+      )
+    :effect
+      (and
+        (compliance_artifact_available ?compliance_artifact)
+        (not
+          (subsystem_has_compliance_artifact ?subsystem ?compliance_artifact)
+        )
+      )
+  )
+  (:action stage_backend_configuration
+    :parameters (?primary_backend_instance - primary_backend_instance ?backend_configuration - backend_configuration ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_validated ?primary_backend_instance)
+        (component_test_associated_with ?primary_backend_instance ?test_artifact)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (not
+          (backend_config_staged ?backend_configuration)
+        )
+        (not
+          (backend_config_has_dependency ?backend_configuration)
+        )
+      )
+    :effect (backend_config_staged ?backend_configuration)
+  )
+  (:action prepare_instance_for_deployment
+    :parameters (?primary_backend_instance - primary_backend_instance ?backend_configuration - backend_configuration ?reviewer - reviewer)
+    :precondition
+      (and
+        (component_validated ?primary_backend_instance)
+        (component_reviewer_assigned ?primary_backend_instance ?reviewer)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (backend_config_staged ?backend_configuration)
+        (not
+          (instance_prepared ?primary_backend_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (instance_ready_for_assembly ?primary_backend_instance)
+      )
+  )
+  (:action bind_dependency_to_instance
+    :parameters (?primary_backend_instance - primary_backend_instance ?backend_configuration - backend_configuration ?dependency_artifact - dependency_artifact)
+    :precondition
+      (and
+        (component_validated ?primary_backend_instance)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (dependency_artifact_available ?dependency_artifact)
+        (not
+          (instance_prepared ?primary_backend_instance)
+        )
+      )
+    :effect
+      (and
+        (backend_config_has_dependency ?backend_configuration)
+        (instance_prepared ?primary_backend_instance)
+        (primary_instance_dependency_bound ?primary_backend_instance ?dependency_artifact)
+        (not
+          (dependency_artifact_available ?dependency_artifact)
+        )
+      )
+  )
+  (:action resolve_instance_dependency
+    :parameters (?primary_backend_instance - primary_backend_instance ?backend_configuration - backend_configuration ?test_artifact - test_artifact ?dependency_artifact - dependency_artifact)
+    :precondition
+      (and
+        (component_validated ?primary_backend_instance)
+        (component_test_associated_with ?primary_backend_instance ?test_artifact)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (backend_config_has_dependency ?backend_configuration)
+        (primary_instance_dependency_bound ?primary_backend_instance ?dependency_artifact)
+        (not
+          (instance_ready_for_assembly ?primary_backend_instance)
+        )
+      )
+    :effect
+      (and
+        (backend_config_staged ?backend_configuration)
+        (instance_ready_for_assembly ?primary_backend_instance)
+        (dependency_artifact_available ?dependency_artifact)
+        (not
+          (primary_instance_dependency_bound ?primary_backend_instance ?dependency_artifact)
+        )
+      )
+  )
+  (:action stage_replica_configuration
+    :parameters (?replica_instance - replica_instance ?replica_configuration - replica_configuration ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_validated ?replica_instance)
+        (component_test_associated_with ?replica_instance ?test_artifact)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (not
+          (replica_config_staged ?replica_configuration)
+        )
+        (not
+          (replica_config_has_dependency ?replica_configuration)
+        )
+      )
+    :effect (replica_config_staged ?replica_configuration)
+  )
+  (:action prepare_replica_with_reviewer
+    :parameters (?replica_instance - replica_instance ?replica_configuration - replica_configuration ?reviewer - reviewer)
+    :precondition
+      (and
+        (component_validated ?replica_instance)
+        (component_reviewer_assigned ?replica_instance ?reviewer)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (replica_config_staged ?replica_configuration)
+        (not
+          (replica_prepared ?replica_instance)
+        )
+      )
+    :effect
+      (and
+        (replica_prepared ?replica_instance)
+        (replica_ready_for_assembly ?replica_instance)
+      )
+  )
+  (:action bind_dependency_to_replica
+    :parameters (?replica_instance - replica_instance ?replica_configuration - replica_configuration ?dependency_artifact - dependency_artifact)
+    :precondition
+      (and
+        (component_validated ?replica_instance)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (dependency_artifact_available ?dependency_artifact)
+        (not
+          (replica_prepared ?replica_instance)
+        )
+      )
+    :effect
+      (and
+        (replica_config_has_dependency ?replica_configuration)
+        (replica_prepared ?replica_instance)
+        (replica_instance_dependency_bound ?replica_instance ?dependency_artifact)
+        (not
+          (dependency_artifact_available ?dependency_artifact)
+        )
+      )
+  )
+  (:action resolve_replica_dependency
+    :parameters (?replica_instance - replica_instance ?replica_configuration - replica_configuration ?test_artifact - test_artifact ?dependency_artifact - dependency_artifact)
+    :precondition
+      (and
+        (component_validated ?replica_instance)
+        (component_test_associated_with ?replica_instance ?test_artifact)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (replica_config_has_dependency ?replica_configuration)
+        (replica_instance_dependency_bound ?replica_instance ?dependency_artifact)
+        (not
+          (replica_ready_for_assembly ?replica_instance)
+        )
+      )
+    :effect
+      (and
+        (replica_config_staged ?replica_configuration)
+        (replica_ready_for_assembly ?replica_instance)
+        (dependency_artifact_available ?dependency_artifact)
+        (not
+          (replica_instance_dependency_bound ?replica_instance ?dependency_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_unit
+    :parameters (?primary_backend_instance - primary_backend_instance ?replica_instance - replica_instance ?backend_configuration - backend_configuration ?replica_configuration - replica_configuration ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (replica_prepared ?replica_instance)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (backend_config_staged ?backend_configuration)
+        (replica_config_staged ?replica_configuration)
+        (instance_ready_for_assembly ?primary_backend_instance)
+        (replica_ready_for_assembly ?replica_instance)
+        (deployment_unit_available ?deployment_unit)
+      )
+    :effect
+      (and
+        (deployment_unit_built ?deployment_unit)
+        (deployment_backend_configured ?deployment_unit ?backend_configuration)
+        (deployment_replica_configured ?deployment_unit ?replica_configuration)
+        (not
+          (deployment_unit_available ?deployment_unit)
+        )
+      )
+  )
+  (:action assemble_deployment_with_schema_migration
+    :parameters (?primary_backend_instance - primary_backend_instance ?replica_instance - replica_instance ?backend_configuration - backend_configuration ?replica_configuration - replica_configuration ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (replica_prepared ?replica_instance)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (backend_config_has_dependency ?backend_configuration)
+        (replica_config_staged ?replica_configuration)
+        (not
+          (instance_ready_for_assembly ?primary_backend_instance)
+        )
+        (replica_ready_for_assembly ?replica_instance)
+        (deployment_unit_available ?deployment_unit)
+      )
+    :effect
+      (and
+        (deployment_unit_built ?deployment_unit)
+        (deployment_backend_configured ?deployment_unit ?backend_configuration)
+        (deployment_replica_configured ?deployment_unit ?replica_configuration)
+        (deployment_includes_schema_migration ?deployment_unit)
+        (not
+          (deployment_unit_available ?deployment_unit)
+        )
+      )
+  )
+  (:action assemble_deployment_with_replica_changes
+    :parameters (?primary_backend_instance - primary_backend_instance ?replica_instance - replica_instance ?backend_configuration - backend_configuration ?replica_configuration - replica_configuration ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (replica_prepared ?replica_instance)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (backend_config_staged ?backend_configuration)
+        (replica_config_has_dependency ?replica_configuration)
+        (instance_ready_for_assembly ?primary_backend_instance)
+        (not
+          (replica_ready_for_assembly ?replica_instance)
+        )
+        (deployment_unit_available ?deployment_unit)
+      )
+    :effect
+      (and
+        (deployment_unit_built ?deployment_unit)
+        (deployment_backend_configured ?deployment_unit ?backend_configuration)
+        (deployment_replica_configured ?deployment_unit ?replica_configuration)
+        (deployment_includes_replica_changes ?deployment_unit)
+        (not
+          (deployment_unit_available ?deployment_unit)
+        )
+      )
+  )
+  (:action assemble_deployment_with_schema_and_replica_changes
+    :parameters (?primary_backend_instance - primary_backend_instance ?replica_instance - replica_instance ?backend_configuration - backend_configuration ?replica_configuration - replica_configuration ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (replica_prepared ?replica_instance)
+        (instance_backend_config_assigned ?primary_backend_instance ?backend_configuration)
+        (replica_config_assigned ?replica_instance ?replica_configuration)
+        (backend_config_has_dependency ?backend_configuration)
+        (replica_config_has_dependency ?replica_configuration)
+        (not
+          (instance_ready_for_assembly ?primary_backend_instance)
+        )
+        (not
+          (replica_ready_for_assembly ?replica_instance)
+        )
+        (deployment_unit_available ?deployment_unit)
+      )
+    :effect
+      (and
+        (deployment_unit_built ?deployment_unit)
+        (deployment_backend_configured ?deployment_unit ?backend_configuration)
+        (deployment_replica_configured ?deployment_unit ?replica_configuration)
+        (deployment_includes_schema_migration ?deployment_unit)
+        (deployment_includes_replica_changes ?deployment_unit)
+        (not
+          (deployment_unit_available ?deployment_unit)
+        )
+      )
+  )
+  (:action mark_deployment_ready_for_migration
+    :parameters (?deployment_unit - deployment_unit ?primary_backend_instance - primary_backend_instance ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (deployment_unit_built ?deployment_unit)
+        (instance_prepared ?primary_backend_instance)
+        (component_test_associated_with ?primary_backend_instance ?test_artifact)
+        (not
+          (deployment_ready_for_migration ?deployment_unit)
+        )
+      )
+    :effect (deployment_ready_for_migration ?deployment_unit)
+  )
+  (:action attach_migration_script_to_deployment
+    :parameters (?subsystem - subsystem ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (subsystem_has_deployment_unit ?subsystem ?deployment_unit)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_available ?migration_script)
+        (deployment_unit_built ?deployment_unit)
+        (deployment_ready_for_migration ?deployment_unit)
+        (not
+          (migration_script_bound ?migration_script)
+        )
+      )
+    :effect
+      (and
+        (migration_script_bound ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (not
+          (migration_script_available ?migration_script)
+        )
+      )
+  )
+  (:action execute_migration_on_subsystem
+    :parameters (?subsystem - subsystem ?migration_script - migration_script ?deployment_unit - deployment_unit ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (component_test_associated_with ?subsystem ?test_artifact)
+        (not
+          (deployment_includes_schema_migration ?deployment_unit)
+        )
+        (not
+          (subsystem_migration_executed ?subsystem)
+        )
+      )
+    :effect (subsystem_migration_executed ?subsystem)
+  )
+  (:action apply_feature_flag
+    :parameters (?subsystem - subsystem ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (feature_flag_available ?feature_flag)
+        (not
+          (feature_flag_active ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (feature_flag_active ?subsystem)
+        (subsystem_has_feature_flag ?subsystem ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action integrate_feature_flag
+    :parameters (?subsystem - subsystem ?migration_script - migration_script ?deployment_unit - deployment_unit ?test_artifact - test_artifact ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (component_test_associated_with ?subsystem ?test_artifact)
+        (deployment_includes_schema_migration ?deployment_unit)
+        (feature_flag_active ?subsystem)
+        (subsystem_has_feature_flag ?subsystem ?feature_flag)
+        (not
+          (subsystem_migration_executed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_migration_executed ?subsystem)
+        (integration_check_passed ?subsystem)
+      )
+  )
+  (:action finalize_subsystem_with_migration_tool
+    :parameters (?subsystem - subsystem ?data_migration_tool - data_migration_tool ?reviewer - reviewer ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_executed ?subsystem)
+        (subsystem_has_data_migration_tool ?subsystem ?data_migration_tool)
+        (component_reviewer_assigned ?subsystem ?reviewer)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (not
+          (deployment_includes_replica_changes ?deployment_unit)
+        )
+        (not
+          (subsystem_migration_validated ?subsystem)
+        )
+      )
+    :effect (subsystem_migration_validated ?subsystem)
+  )
+  (:action finalize_subsystem_with_migration_tool_alternate
+    :parameters (?subsystem - subsystem ?data_migration_tool - data_migration_tool ?reviewer - reviewer ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_executed ?subsystem)
+        (subsystem_has_data_migration_tool ?subsystem ?data_migration_tool)
+        (component_reviewer_assigned ?subsystem ?reviewer)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (deployment_includes_replica_changes ?deployment_unit)
+        (not
+          (subsystem_migration_validated ?subsystem)
+        )
+      )
+    :effect (subsystem_migration_validated ?subsystem)
+  )
+  (:action start_integration_checks
+    :parameters (?subsystem - subsystem ?stakeholder_approval - compliance_artifact ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_validated ?subsystem)
+        (subsystem_has_compliance_artifact ?subsystem ?stakeholder_approval)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (not
+          (deployment_includes_schema_migration ?deployment_unit)
+        )
+        (not
+          (deployment_includes_replica_changes ?deployment_unit)
+        )
+        (not
+          (subsystem_integration_ready ?subsystem)
+        )
+      )
+    :effect (subsystem_integration_ready ?subsystem)
+  )
+  (:action start_integration_checks_with_approval_gate
+    :parameters (?subsystem - subsystem ?stakeholder_approval - compliance_artifact ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_validated ?subsystem)
+        (subsystem_has_compliance_artifact ?subsystem ?stakeholder_approval)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (deployment_includes_schema_migration ?deployment_unit)
+        (not
+          (deployment_includes_replica_changes ?deployment_unit)
+        )
+        (not
+          (subsystem_integration_ready ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (approval_gate_open ?subsystem)
+      )
+  )
+  (:action start_integration_checks_variant
+    :parameters (?subsystem - subsystem ?stakeholder_approval - compliance_artifact ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_validated ?subsystem)
+        (subsystem_has_compliance_artifact ?subsystem ?stakeholder_approval)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (not
+          (deployment_includes_schema_migration ?deployment_unit)
+        )
+        (deployment_includes_replica_changes ?deployment_unit)
+        (not
+          (subsystem_integration_ready ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (approval_gate_open ?subsystem)
+      )
+  )
+  (:action start_integration_checks_full
+    :parameters (?subsystem - subsystem ?stakeholder_approval - compliance_artifact ?migration_script - migration_script ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (subsystem_migration_validated ?subsystem)
+        (subsystem_has_compliance_artifact ?subsystem ?stakeholder_approval)
+        (subsystem_has_migration_script ?subsystem ?migration_script)
+        (migration_script_bound_to_deployment ?migration_script ?deployment_unit)
+        (deployment_includes_schema_migration ?deployment_unit)
+        (deployment_includes_replica_changes ?deployment_unit)
+        (not
+          (subsystem_integration_ready ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (approval_gate_open ?subsystem)
+      )
+  )
+  (:action finalize_subsystem_and_record_audit
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (not
+          (approval_gate_open ?subsystem)
+        )
+        (not
+          (audit_logged ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (audit_logged ?subsystem)
+        (component_finalized ?subsystem)
+      )
+  )
+  (:action attach_approval_ticket
+    :parameters (?subsystem - subsystem ?approval_ticket - approval_ticket)
+    :precondition
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (approval_gate_open ?subsystem)
+        (approval_ticket_available ?approval_ticket)
+      )
+    :effect
+      (and
+        (approval_ticket_bound_to_subsystem ?subsystem ?approval_ticket)
+        (not
+          (approval_ticket_available ?approval_ticket)
+        )
+      )
+  )
+  (:action perform_integration_tests
+    :parameters (?subsystem - subsystem ?primary_backend_instance - primary_backend_instance ?replica_instance - replica_instance ?test_artifact - test_artifact ?approval_ticket - approval_ticket)
+    :precondition
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (approval_gate_open ?subsystem)
+        (approval_ticket_bound_to_subsystem ?subsystem ?approval_ticket)
+        (subsystem_manages_primary_instance ?subsystem ?primary_backend_instance)
+        (subsystem_manages_replica_instance ?subsystem ?replica_instance)
+        (instance_ready_for_assembly ?primary_backend_instance)
+        (replica_ready_for_assembly ?replica_instance)
+        (component_test_associated_with ?subsystem ?test_artifact)
+        (not
+          (integration_tests_passed ?subsystem)
+        )
+      )
+    :effect (integration_tests_passed ?subsystem)
+  )
+  (:action finalize_integration_and_record_audit
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (subsystem_integration_ready ?subsystem)
+        (integration_tests_passed ?subsystem)
+        (not
+          (audit_logged ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (audit_logged ?subsystem)
+        (component_finalized ?subsystem)
+      )
+  )
+  (:action bind_stakeholder_approval
+    :parameters (?subsystem - subsystem ?stakeholder_approval - stakeholder_approval ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_validated ?subsystem)
+        (component_test_associated_with ?subsystem ?test_artifact)
+        (stakeholder_approval_available ?stakeholder_approval)
+        (subsystem_has_stakeholder_approval ?subsystem ?stakeholder_approval)
+        (not
+          (stakeholder_approval_applied ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (stakeholder_approval_applied ?subsystem)
+        (not
+          (stakeholder_approval_available ?stakeholder_approval)
+        )
+      )
+  )
+  (:action validate_stakeholder_approval
+    :parameters (?subsystem - subsystem ?reviewer - reviewer)
+    :precondition
+      (and
+        (stakeholder_approval_applied ?subsystem)
+        (component_reviewer_assigned ?subsystem ?reviewer)
+        (not
+          (stakeholder_approval_validated ?subsystem)
+        )
+      )
+    :effect (stakeholder_approval_validated ?subsystem)
+  )
+  (:action apply_compliance_artifact_check
+    :parameters (?subsystem - subsystem ?compliance_artifact - compliance_artifact)
+    :precondition
+      (and
+        (stakeholder_approval_validated ?subsystem)
+        (subsystem_has_compliance_artifact ?subsystem ?compliance_artifact)
+        (not
+          (compliance_check_passed ?subsystem)
+        )
+      )
+    :effect (compliance_check_passed ?subsystem)
+  )
+  (:action finalize_compliance_and_record_audit
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (compliance_check_passed ?subsystem)
+        (not
+          (audit_logged ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (audit_logged ?subsystem)
+        (component_finalized ?subsystem)
+      )
+  )
+  (:action finalize_deployment_on_primary_instance
+    :parameters (?primary_backend_instance - primary_backend_instance ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (instance_prepared ?primary_backend_instance)
+        (instance_ready_for_assembly ?primary_backend_instance)
+        (deployment_unit_built ?deployment_unit)
+        (deployment_ready_for_migration ?deployment_unit)
+        (not
+          (component_finalized ?primary_backend_instance)
+        )
+      )
+    :effect (component_finalized ?primary_backend_instance)
+  )
+  (:action finalize_deployment_on_replica_instance
+    :parameters (?replica_instance - replica_instance ?deployment_unit - deployment_unit)
+    :precondition
+      (and
+        (replica_prepared ?replica_instance)
+        (replica_ready_for_assembly ?replica_instance)
+        (deployment_unit_built ?deployment_unit)
+        (deployment_ready_for_migration ?deployment_unit)
+        (not
+          (component_finalized ?replica_instance)
+        )
+      )
+    :effect (component_finalized ?replica_instance)
+  )
+  (:action attach_rollback_token
+    :parameters (?code_entity - code_entity ?rollback_token - rollback_token ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (component_finalized ?code_entity)
+        (component_test_associated_with ?code_entity ?test_artifact)
+        (rollback_token_available ?rollback_token)
+        (not
+          (has_rollback_token ?code_entity)
+        )
+      )
+    :effect
+      (and
+        (has_rollback_token ?code_entity)
+        (component_rollback_token_bound ?code_entity ?rollback_token)
+        (not
+          (rollback_token_available ?rollback_token)
+        )
+      )
+  )
+  (:action apply_patch_to_primary_instance
+    :parameters (?primary_backend_instance - primary_backend_instance ?patch_candidate - patch_candidate ?rollback_token - rollback_token)
+    :precondition
+      (and
+        (has_rollback_token ?primary_backend_instance)
+        (component_patch_assigned_to ?primary_backend_instance ?patch_candidate)
+        (component_rollback_token_bound ?primary_backend_instance ?rollback_token)
+        (not
+          (component_patched ?primary_backend_instance)
+        )
+      )
+    :effect
+      (and
+        (component_patched ?primary_backend_instance)
+        (patch_candidate_available ?patch_candidate)
+        (rollback_token_available ?rollback_token)
+      )
+  )
+  (:action apply_patch_to_replica_instance
+    :parameters (?replica_instance - replica_instance ?patch_candidate - patch_candidate ?rollback_token - rollback_token)
+    :precondition
+      (and
+        (has_rollback_token ?replica_instance)
+        (component_patch_assigned_to ?replica_instance ?patch_candidate)
+        (component_rollback_token_bound ?replica_instance ?rollback_token)
+        (not
+          (component_patched ?replica_instance)
+        )
+      )
+    :effect
+      (and
+        (component_patched ?replica_instance)
+        (patch_candidate_available ?patch_candidate)
+        (rollback_token_available ?rollback_token)
+      )
+  )
+  (:action apply_patch_to_subsystem
+    :parameters (?subsystem - subsystem ?patch_candidate - patch_candidate ?rollback_token - rollback_token)
+    :precondition
+      (and
+        (has_rollback_token ?subsystem)
+        (component_patch_assigned_to ?subsystem ?patch_candidate)
+        (component_rollback_token_bound ?subsystem ?rollback_token)
+        (not
+          (component_patched ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (component_patched ?subsystem)
+        (patch_candidate_available ?patch_candidate)
+        (rollback_token_available ?rollback_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem production_data_loss_on_update_case)
+  (:domain data_loss_on_update_fix)
+  (:objects primary_backend_instance_1 - primary_backend_instance replica_instance_1 - replica_instance subsystem_service_1 - subsystem subsystem_service_2 - subsystem patch_candidate_a - patch_candidate patch_candidate_b - patch_candidate patch_candidate_c - patch_candidate regression_test_case_1 - test_artifact reviewer_1 - reviewer dependency_artifact_1 - dependency_artifact backend_config_v1 - backend_configuration replica_config_v1 - replica_configuration deployment_unit_v1 - deployment_unit migration_script_v1 - migration_script migration_script_v2 - migration_script feature_flag_a - feature_flag feature_flag_b - feature_flag approval_ticket_1 - approval_ticket approval_ticket_2 - approval_ticket rollback_token_1 - rollback_token data_migration_tool_1 - data_migration_tool stakeholder_approval_1 - stakeholder_approval stakeholder_approval_2 - stakeholder_approval compliance_artifact_1 - compliance_artifact)
+  (:init
+    (patch_candidate_available patch_candidate_a)
+    (patch_candidate_available patch_candidate_b)
+    (patch_candidate_available patch_candidate_c)
+    (test_available regression_test_case_1)
+    (reviewer_available reviewer_1)
+    (dependency_artifact_available dependency_artifact_1)
+    (instance_backend_config_assigned primary_backend_instance_1 backend_config_v1)
+    (replica_config_assigned replica_instance_1 replica_config_v1)
+    (deployment_unit_available deployment_unit_v1)
+    (migration_script_available migration_script_v1)
+    (migration_script_available migration_script_v2)
+    (subsystem_manages_primary_instance subsystem_service_1 primary_backend_instance_1)
+    (subsystem_manages_primary_instance subsystem_service_2 primary_backend_instance_1)
+    (subsystem_manages_replica_instance subsystem_service_1 replica_instance_1)
+    (subsystem_manages_replica_instance subsystem_service_2 replica_instance_1)
+    (subsystem_has_deployment_unit subsystem_service_1 deployment_unit_v1)
+    (subsystem_has_deployment_unit subsystem_service_2 deployment_unit_v1)
+    (subsystem_has_migration_script subsystem_service_1 migration_script_v1)
+    (subsystem_has_migration_script subsystem_service_2 migration_script_v2)
+    (feature_flag_available feature_flag_a)
+    (feature_flag_available feature_flag_b)
+    (approval_ticket_available approval_ticket_1)
+    (approval_ticket_available approval_ticket_2)
+    (rollback_token_available rollback_token_1)
+    (data_migration_tool_available data_migration_tool_1)
+    (stakeholder_approval_available stakeholder_approval_1)
+    (subsystem_has_stakeholder_approval subsystem_service_1 stakeholder_approval_1)
+    (subsystem_has_stakeholder_approval subsystem_service_2 stakeholder_approval_2)
+    (compliance_artifact_available compliance_artifact_1)
+  )
+  (:goal
+    (and
+      (component_patched primary_backend_instance_1)
+      (component_patched replica_instance_1)
+      (component_patched subsystem_service_1)
+      (component_patched subsystem_service_2)
+    )
+  )
+)

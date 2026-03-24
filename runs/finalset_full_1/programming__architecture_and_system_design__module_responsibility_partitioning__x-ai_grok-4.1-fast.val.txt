@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain module_responsibility_partitioning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_resource_group - object design_artifact_group - object runtime_artifact_group - object named_entity - object module - named_entity interface_spec - auxiliary_resource_group responsibility_token - auxiliary_resource_group stakeholder - auxiliary_resource_group extension_plugin - auxiliary_resource_group test_asset - auxiliary_resource_group nonfunctional_constraint - auxiliary_resource_group capability_descriptor - auxiliary_resource_group compliance_record - auxiliary_resource_group design_rationale - design_artifact_group configuration_asset - design_artifact_group review_record - design_artifact_group staging_runtime_context - runtime_artifact_group production_runtime_context - runtime_artifact_group deployment_artifact - runtime_artifact_group module_category - module implementation_category - module service_module - module_category client_module - module_category implementation_component - implementation_category)
+  (:predicates
+    (module_declared ?module - module)
+    (module_validated ?module - module)
+    (interface_assigned ?module - module)
+    (module_deployed ?module - module)
+    (ready_for_deployment ?module - module)
+    (module_approved_for_deployment ?module - module)
+    (interface_available ?interface_spec - interface_spec)
+    (module_interface_binding ?module - module ?interface_spec - interface_spec)
+    (responsibility_token_available ?responsibility_token - responsibility_token)
+    (module_responsibility_bound ?module - module ?responsibility_token - responsibility_token)
+    (stakeholder_available ?stakeholder - stakeholder)
+    (module_has_stakeholder ?module - module ?stakeholder - stakeholder)
+    (design_rationale_available ?design_rationale - design_rationale)
+    (service_has_design_rationale ?service_module - service_module ?design_rationale - design_rationale)
+    (client_has_design_rationale ?client_module - client_module ?design_rationale - design_rationale)
+    (service_bound_to_staging_runtime_context ?service_module - service_module ?staging_runtime_context - staging_runtime_context)
+    (staging_runtime_context_ready ?staging_runtime_context - staging_runtime_context)
+    (staging_runtime_context_allocated ?staging_runtime_context - staging_runtime_context)
+    (service_ready ?service_module - service_module)
+    (client_bound_to_production_runtime_context ?client_module - client_module ?production_runtime_context - production_runtime_context)
+    (production_runtime_context_ready ?production_runtime_context - production_runtime_context)
+    (production_runtime_context_allocated ?production_runtime_context - production_runtime_context)
+    (client_ready ?client_module - client_module)
+    (artifact_available ?deployment_artifact - deployment_artifact)
+    (artifact_packaged ?deployment_artifact - deployment_artifact)
+    (artifact_bound_to_staging_runtime_context ?deployment_artifact - deployment_artifact ?staging_runtime_context - staging_runtime_context)
+    (artifact_bound_to_production_runtime_context ?deployment_artifact - deployment_artifact ?production_runtime_context - production_runtime_context)
+    (artifact_includes_staging_context ?deployment_artifact - deployment_artifact)
+    (artifact_includes_production_context ?deployment_artifact - deployment_artifact)
+    (artifact_validated ?deployment_artifact - deployment_artifact)
+    (component_assigned_to_service ?implementation_component - implementation_component ?service_module - service_module)
+    (component_assigned_to_client ?implementation_component - implementation_component ?client_module - client_module)
+    (component_in_deployment_artifact ?implementation_component - implementation_component ?deployment_artifact - deployment_artifact)
+    (configuration_asset_available ?configuration_asset - configuration_asset)
+    (component_has_configuration_asset ?implementation_component - implementation_component ?configuration_asset - configuration_asset)
+    (configuration_asset_committed ?configuration_asset - configuration_asset)
+    (configuration_bound_to_artifact ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    (component_feature_gate_prepared ?implementation_component - implementation_component)
+    (component_feature_gate_started ?implementation_component - implementation_component)
+    (component_features_enabled ?implementation_component - implementation_component)
+    (component_extension_registered ?implementation_component - implementation_component)
+    (component_extension_configured ?implementation_component - implementation_component)
+    (component_test_ready ?implementation_component - implementation_component)
+    (component_integrated ?implementation_component - implementation_component)
+    (review_record_available ?review_record - review_record)
+    (component_has_review_record ?implementation_component - implementation_component ?review_record - review_record)
+    (component_under_review ?implementation_component - implementation_component)
+    (component_review_validated ?implementation_component - implementation_component)
+    (component_review_approved ?implementation_component - implementation_component)
+    (extension_plugin_available ?extension_plugin - extension_plugin)
+    (component_extension_assigned ?implementation_component - implementation_component ?extension_plugin - extension_plugin)
+    (test_asset_available ?test_asset - test_asset)
+    (component_has_test_asset ?implementation_component - implementation_component ?test_asset - test_asset)
+    (capability_descriptor_available ?capability_descriptor - capability_descriptor)
+    (component_has_capability_descriptor ?implementation_component - implementation_component ?capability_descriptor - capability_descriptor)
+    (compliance_record_available ?compliance_record - compliance_record)
+    (component_has_compliance_record ?implementation_component - implementation_component ?compliance_record - compliance_record)
+    (nonfunctional_constraint_available ?nonfunctional_constraint - nonfunctional_constraint)
+    (module_has_nonfunctional_constraint ?module - module ?nonfunctional_constraint - nonfunctional_constraint)
+    (service_packaging_flag ?service_module - service_module)
+    (client_packaging_flag ?client_module - client_module)
+    (component_release_staged ?implementation_component - implementation_component)
+  )
+  (:action declare_module
+    :parameters (?module - module)
+    :precondition
+      (and
+        (not
+          (module_declared ?module)
+        )
+        (not
+          (module_deployed ?module)
+        )
+      )
+    :effect (module_declared ?module)
+  )
+  (:action allocate_interface_to_module
+    :parameters (?module - module ?interface_spec - interface_spec)
+    :precondition
+      (and
+        (module_declared ?module)
+        (not
+          (interface_assigned ?module)
+        )
+        (interface_available ?interface_spec)
+      )
+    :effect
+      (and
+        (interface_assigned ?module)
+        (module_interface_binding ?module ?interface_spec)
+        (not
+          (interface_available ?interface_spec)
+        )
+      )
+  )
+  (:action assign_responsibility
+    :parameters (?module - module ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_declared ?module)
+        (interface_assigned ?module)
+        (responsibility_token_available ?responsibility_token)
+      )
+    :effect
+      (and
+        (module_responsibility_bound ?module ?responsibility_token)
+        (not
+          (responsibility_token_available ?responsibility_token)
+        )
+      )
+  )
+  (:action validate_responsibility
+    :parameters (?module - module ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_declared ?module)
+        (interface_assigned ?module)
+        (module_responsibility_bound ?module ?responsibility_token)
+        (not
+          (module_validated ?module)
+        )
+      )
+    :effect (module_validated ?module)
+  )
+  (:action release_responsibility
+    :parameters (?module - module ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_responsibility_bound ?module ?responsibility_token)
+      )
+    :effect
+      (and
+        (responsibility_token_available ?responsibility_token)
+        (not
+          (module_responsibility_bound ?module ?responsibility_token)
+        )
+      )
+  )
+  (:action assign_stakeholder_to_module
+    :parameters (?module - module ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (module_validated ?module)
+        (stakeholder_available ?stakeholder)
+      )
+    :effect
+      (and
+        (module_has_stakeholder ?module ?stakeholder)
+        (not
+          (stakeholder_available ?stakeholder)
+        )
+      )
+  )
+  (:action unassign_stakeholder_from_module
+    :parameters (?module - module ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (module_has_stakeholder ?module ?stakeholder)
+      )
+    :effect
+      (and
+        (stakeholder_available ?stakeholder)
+        (not
+          (module_has_stakeholder ?module ?stakeholder)
+        )
+      )
+  )
+  (:action attach_capability_descriptor
+    :parameters (?implementation_component - implementation_component ?capability_descriptor - capability_descriptor)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (capability_descriptor_available ?capability_descriptor)
+      )
+    :effect
+      (and
+        (component_has_capability_descriptor ?implementation_component ?capability_descriptor)
+        (not
+          (capability_descriptor_available ?capability_descriptor)
+        )
+      )
+  )
+  (:action detach_capability_descriptor
+    :parameters (?implementation_component - implementation_component ?capability_descriptor - capability_descriptor)
+    :precondition
+      (and
+        (component_has_capability_descriptor ?implementation_component ?capability_descriptor)
+      )
+    :effect
+      (and
+        (capability_descriptor_available ?capability_descriptor)
+        (not
+          (component_has_capability_descriptor ?implementation_component ?capability_descriptor)
+        )
+      )
+  )
+  (:action attach_compliance_record
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (compliance_record_available ?compliance_record)
+      )
+    :effect
+      (and
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (not
+          (compliance_record_available ?compliance_record)
+        )
+      )
+  )
+  (:action detach_compliance_record
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record)
+    :precondition
+      (and
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+      )
+    :effect
+      (and
+        (compliance_record_available ?compliance_record)
+        (not
+          (component_has_compliance_record ?implementation_component ?compliance_record)
+        )
+      )
+  )
+  (:action stage_service_staging_runtime_context
+    :parameters (?service_module - service_module ?staging_runtime_context - staging_runtime_context ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_validated ?service_module)
+        (module_responsibility_bound ?service_module ?responsibility_token)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (not
+          (staging_runtime_context_ready ?staging_runtime_context)
+        )
+        (not
+          (staging_runtime_context_allocated ?staging_runtime_context)
+        )
+      )
+    :effect (staging_runtime_context_ready ?staging_runtime_context)
+  )
+  (:action confirm_service_context_ready
+    :parameters (?service_module - service_module ?staging_runtime_context - staging_runtime_context ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (module_validated ?service_module)
+        (module_has_stakeholder ?service_module ?stakeholder)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (staging_runtime_context_ready ?staging_runtime_context)
+        (not
+          (service_packaging_flag ?service_module)
+        )
+      )
+    :effect
+      (and
+        (service_packaging_flag ?service_module)
+        (service_ready ?service_module)
+      )
+  )
+  (:action apply_rationale_to_service_context
+    :parameters (?service_module - service_module ?staging_runtime_context - staging_runtime_context ?design_rationale - design_rationale)
+    :precondition
+      (and
+        (module_validated ?service_module)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (design_rationale_available ?design_rationale)
+        (not
+          (service_packaging_flag ?service_module)
+        )
+      )
+    :effect
+      (and
+        (staging_runtime_context_allocated ?staging_runtime_context)
+        (service_packaging_flag ?service_module)
+        (service_has_design_rationale ?service_module ?design_rationale)
+        (not
+          (design_rationale_available ?design_rationale)
+        )
+      )
+  )
+  (:action synchronize_service_context_and_rationale
+    :parameters (?service_module - service_module ?staging_runtime_context - staging_runtime_context ?responsibility_token - responsibility_token ?design_rationale - design_rationale)
+    :precondition
+      (and
+        (module_validated ?service_module)
+        (module_responsibility_bound ?service_module ?responsibility_token)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (staging_runtime_context_allocated ?staging_runtime_context)
+        (service_has_design_rationale ?service_module ?design_rationale)
+        (not
+          (service_ready ?service_module)
+        )
+      )
+    :effect
+      (and
+        (staging_runtime_context_ready ?staging_runtime_context)
+        (service_ready ?service_module)
+        (design_rationale_available ?design_rationale)
+        (not
+          (service_has_design_rationale ?service_module ?design_rationale)
+        )
+      )
+  )
+  (:action stage_client_production_runtime_context
+    :parameters (?client_module - client_module ?production_runtime_context - production_runtime_context ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_validated ?client_module)
+        (module_responsibility_bound ?client_module ?responsibility_token)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (not
+          (production_runtime_context_ready ?production_runtime_context)
+        )
+        (not
+          (production_runtime_context_allocated ?production_runtime_context)
+        )
+      )
+    :effect (production_runtime_context_ready ?production_runtime_context)
+  )
+  (:action confirm_client_context_ready
+    :parameters (?client_module - client_module ?production_runtime_context - production_runtime_context ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (module_validated ?client_module)
+        (module_has_stakeholder ?client_module ?stakeholder)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (production_runtime_context_ready ?production_runtime_context)
+        (not
+          (client_packaging_flag ?client_module)
+        )
+      )
+    :effect
+      (and
+        (client_packaging_flag ?client_module)
+        (client_ready ?client_module)
+      )
+  )
+  (:action apply_rationale_to_client_context
+    :parameters (?client_module - client_module ?production_runtime_context - production_runtime_context ?design_rationale - design_rationale)
+    :precondition
+      (and
+        (module_validated ?client_module)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (design_rationale_available ?design_rationale)
+        (not
+          (client_packaging_flag ?client_module)
+        )
+      )
+    :effect
+      (and
+        (production_runtime_context_allocated ?production_runtime_context)
+        (client_packaging_flag ?client_module)
+        (client_has_design_rationale ?client_module ?design_rationale)
+        (not
+          (design_rationale_available ?design_rationale)
+        )
+      )
+  )
+  (:action synchronize_client_context_and_rationale
+    :parameters (?client_module - client_module ?production_runtime_context - production_runtime_context ?responsibility_token - responsibility_token ?design_rationale - design_rationale)
+    :precondition
+      (and
+        (module_validated ?client_module)
+        (module_responsibility_bound ?client_module ?responsibility_token)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (production_runtime_context_allocated ?production_runtime_context)
+        (client_has_design_rationale ?client_module ?design_rationale)
+        (not
+          (client_ready ?client_module)
+        )
+      )
+    :effect
+      (and
+        (production_runtime_context_ready ?production_runtime_context)
+        (client_ready ?client_module)
+        (design_rationale_available ?design_rationale)
+        (not
+          (client_has_design_rationale ?client_module ?design_rationale)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact
+    :parameters (?service_module - service_module ?client_module - client_module ?staging_runtime_context - staging_runtime_context ?production_runtime_context - production_runtime_context ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (service_packaging_flag ?service_module)
+        (client_packaging_flag ?client_module)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (staging_runtime_context_ready ?staging_runtime_context)
+        (production_runtime_context_ready ?production_runtime_context)
+        (service_ready ?service_module)
+        (client_ready ?client_module)
+        (artifact_available ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?deployment_artifact)
+        (artifact_bound_to_staging_runtime_context ?deployment_artifact ?staging_runtime_context)
+        (artifact_bound_to_production_runtime_context ?deployment_artifact ?production_runtime_context)
+        (not
+          (artifact_available ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_with_staging_context
+    :parameters (?service_module - service_module ?client_module - client_module ?staging_runtime_context - staging_runtime_context ?production_runtime_context - production_runtime_context ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (service_packaging_flag ?service_module)
+        (client_packaging_flag ?client_module)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (staging_runtime_context_allocated ?staging_runtime_context)
+        (production_runtime_context_ready ?production_runtime_context)
+        (not
+          (service_ready ?service_module)
+        )
+        (client_ready ?client_module)
+        (artifact_available ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?deployment_artifact)
+        (artifact_bound_to_staging_runtime_context ?deployment_artifact ?staging_runtime_context)
+        (artifact_bound_to_production_runtime_context ?deployment_artifact ?production_runtime_context)
+        (artifact_includes_staging_context ?deployment_artifact)
+        (not
+          (artifact_available ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_with_production_context
+    :parameters (?service_module - service_module ?client_module - client_module ?staging_runtime_context - staging_runtime_context ?production_runtime_context - production_runtime_context ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (service_packaging_flag ?service_module)
+        (client_packaging_flag ?client_module)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (staging_runtime_context_ready ?staging_runtime_context)
+        (production_runtime_context_allocated ?production_runtime_context)
+        (service_ready ?service_module)
+        (not
+          (client_ready ?client_module)
+        )
+        (artifact_available ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?deployment_artifact)
+        (artifact_bound_to_staging_runtime_context ?deployment_artifact ?staging_runtime_context)
+        (artifact_bound_to_production_runtime_context ?deployment_artifact ?production_runtime_context)
+        (artifact_includes_production_context ?deployment_artifact)
+        (not
+          (artifact_available ?deployment_artifact)
+        )
+      )
+  )
+  (:action assemble_deployment_artifact_with_both_contexts
+    :parameters (?service_module - service_module ?client_module - client_module ?staging_runtime_context - staging_runtime_context ?production_runtime_context - production_runtime_context ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (service_packaging_flag ?service_module)
+        (client_packaging_flag ?client_module)
+        (service_bound_to_staging_runtime_context ?service_module ?staging_runtime_context)
+        (client_bound_to_production_runtime_context ?client_module ?production_runtime_context)
+        (staging_runtime_context_allocated ?staging_runtime_context)
+        (production_runtime_context_allocated ?production_runtime_context)
+        (not
+          (service_ready ?service_module)
+        )
+        (not
+          (client_ready ?client_module)
+        )
+        (artifact_available ?deployment_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?deployment_artifact)
+        (artifact_bound_to_staging_runtime_context ?deployment_artifact ?staging_runtime_context)
+        (artifact_bound_to_production_runtime_context ?deployment_artifact ?production_runtime_context)
+        (artifact_includes_staging_context ?deployment_artifact)
+        (artifact_includes_production_context ?deployment_artifact)
+        (not
+          (artifact_available ?deployment_artifact)
+        )
+      )
+  )
+  (:action validate_deployment_artifact
+    :parameters (?deployment_artifact - deployment_artifact ?service_module - service_module ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (artifact_packaged ?deployment_artifact)
+        (service_packaging_flag ?service_module)
+        (module_responsibility_bound ?service_module ?responsibility_token)
+        (not
+          (artifact_validated ?deployment_artifact)
+        )
+      )
+    :effect (artifact_validated ?deployment_artifact)
+  )
+  (:action commit_configuration_asset_to_component
+    :parameters (?implementation_component - implementation_component ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (component_in_deployment_artifact ?implementation_component ?deployment_artifact)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_asset_available ?configuration_asset)
+        (artifact_packaged ?deployment_artifact)
+        (artifact_validated ?deployment_artifact)
+        (not
+          (configuration_asset_committed ?configuration_asset)
+        )
+      )
+    :effect
+      (and
+        (configuration_asset_committed ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (not
+          (configuration_asset_available ?configuration_asset)
+        )
+      )
+  )
+  (:action stage_component_for_feature_gating
+    :parameters (?implementation_component - implementation_component ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_asset_committed ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (module_responsibility_bound ?implementation_component ?responsibility_token)
+        (not
+          (artifact_includes_staging_context ?deployment_artifact)
+        )
+        (not
+          (component_feature_gate_prepared ?implementation_component)
+        )
+      )
+    :effect (component_feature_gate_prepared ?implementation_component)
+  )
+  (:action attach_extension_plugin
+    :parameters (?implementation_component - implementation_component ?extension_plugin - extension_plugin)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (extension_plugin_available ?extension_plugin)
+        (not
+          (component_extension_registered ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_extension_registered ?implementation_component)
+        (component_extension_assigned ?implementation_component ?extension_plugin)
+        (not
+          (extension_plugin_available ?extension_plugin)
+        )
+      )
+  )
+  (:action configure_component_extension
+    :parameters (?implementation_component - implementation_component ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact ?responsibility_token - responsibility_token ?extension_plugin - extension_plugin)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_asset_committed ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (module_responsibility_bound ?implementation_component ?responsibility_token)
+        (artifact_includes_staging_context ?deployment_artifact)
+        (component_extension_registered ?implementation_component)
+        (component_extension_assigned ?implementation_component ?extension_plugin)
+        (not
+          (component_feature_gate_prepared ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_feature_gate_prepared ?implementation_component)
+        (component_extension_configured ?implementation_component)
+      )
+  )
+  (:action start_feature_gating_primary
+    :parameters (?implementation_component - implementation_component ?capability_descriptor - capability_descriptor ?stakeholder - stakeholder ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_prepared ?implementation_component)
+        (component_has_capability_descriptor ?implementation_component ?capability_descriptor)
+        (module_has_stakeholder ?implementation_component ?stakeholder)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (not
+          (artifact_includes_production_context ?deployment_artifact)
+        )
+        (not
+          (component_feature_gate_started ?implementation_component)
+        )
+      )
+    :effect (component_feature_gate_started ?implementation_component)
+  )
+  (:action start_feature_gating_secondary
+    :parameters (?implementation_component - implementation_component ?capability_descriptor - capability_descriptor ?stakeholder - stakeholder ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_prepared ?implementation_component)
+        (component_has_capability_descriptor ?implementation_component ?capability_descriptor)
+        (module_has_stakeholder ?implementation_component ?stakeholder)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (artifact_includes_production_context ?deployment_artifact)
+        (not
+          (component_feature_gate_started ?implementation_component)
+        )
+      )
+    :effect (component_feature_gate_started ?implementation_component)
+  )
+  (:action enable_features_stage_1
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_started ?implementation_component)
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (not
+          (artifact_includes_staging_context ?deployment_artifact)
+        )
+        (not
+          (artifact_includes_production_context ?deployment_artifact)
+        )
+        (not
+          (component_features_enabled ?implementation_component)
+        )
+      )
+    :effect (component_features_enabled ?implementation_component)
+  )
+  (:action enable_features_stage_2
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_started ?implementation_component)
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (artifact_includes_staging_context ?deployment_artifact)
+        (not
+          (artifact_includes_production_context ?deployment_artifact)
+        )
+        (not
+          (component_features_enabled ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_test_ready ?implementation_component)
+      )
+  )
+  (:action enable_features_stage_3
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_started ?implementation_component)
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (not
+          (artifact_includes_staging_context ?deployment_artifact)
+        )
+        (artifact_includes_production_context ?deployment_artifact)
+        (not
+          (component_features_enabled ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_test_ready ?implementation_component)
+      )
+  )
+  (:action enable_features_stage_4
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record ?configuration_asset - configuration_asset ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (component_feature_gate_started ?implementation_component)
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (component_has_configuration_asset ?implementation_component ?configuration_asset)
+        (configuration_bound_to_artifact ?configuration_asset ?deployment_artifact)
+        (artifact_includes_staging_context ?deployment_artifact)
+        (artifact_includes_production_context ?deployment_artifact)
+        (not
+          (component_features_enabled ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_test_ready ?implementation_component)
+      )
+  )
+  (:action finalize_component_release
+    :parameters (?implementation_component - implementation_component)
+    :precondition
+      (and
+        (component_features_enabled ?implementation_component)
+        (not
+          (component_test_ready ?implementation_component)
+        )
+        (not
+          (component_release_staged ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_release_staged ?implementation_component)
+        (ready_for_deployment ?implementation_component)
+      )
+  )
+  (:action assign_test_asset_to_component
+    :parameters (?implementation_component - implementation_component ?test_asset - test_asset)
+    :precondition
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_test_ready ?implementation_component)
+        (test_asset_available ?test_asset)
+      )
+    :effect
+      (and
+        (component_has_test_asset ?implementation_component ?test_asset)
+        (not
+          (test_asset_available ?test_asset)
+        )
+      )
+  )
+  (:action perform_integration_checks
+    :parameters (?implementation_component - implementation_component ?service_module - service_module ?client_module - client_module ?responsibility_token - responsibility_token ?test_asset - test_asset)
+    :precondition
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_test_ready ?implementation_component)
+        (component_has_test_asset ?implementation_component ?test_asset)
+        (component_assigned_to_service ?implementation_component ?service_module)
+        (component_assigned_to_client ?implementation_component ?client_module)
+        (service_ready ?service_module)
+        (client_ready ?client_module)
+        (module_responsibility_bound ?implementation_component ?responsibility_token)
+        (not
+          (component_integrated ?implementation_component)
+        )
+      )
+    :effect (component_integrated ?implementation_component)
+  )
+  (:action finalize_integration_for_component
+    :parameters (?implementation_component - implementation_component)
+    :precondition
+      (and
+        (component_features_enabled ?implementation_component)
+        (component_integrated ?implementation_component)
+        (not
+          (component_release_staged ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_release_staged ?implementation_component)
+        (ready_for_deployment ?implementation_component)
+      )
+  )
+  (:action initiate_component_review
+    :parameters (?implementation_component - implementation_component ?review_record - review_record ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (module_validated ?implementation_component)
+        (module_responsibility_bound ?implementation_component ?responsibility_token)
+        (review_record_available ?review_record)
+        (component_has_review_record ?implementation_component ?review_record)
+        (not
+          (component_under_review ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_under_review ?implementation_component)
+        (not
+          (review_record_available ?review_record)
+        )
+      )
+  )
+  (:action validate_component_review
+    :parameters (?implementation_component - implementation_component ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (component_under_review ?implementation_component)
+        (module_has_stakeholder ?implementation_component ?stakeholder)
+        (not
+          (component_review_validated ?implementation_component)
+        )
+      )
+    :effect (component_review_validated ?implementation_component)
+  )
+  (:action approve_component_review
+    :parameters (?implementation_component - implementation_component ?compliance_record - compliance_record)
+    :precondition
+      (and
+        (component_review_validated ?implementation_component)
+        (component_has_compliance_record ?implementation_component ?compliance_record)
+        (not
+          (component_review_approved ?implementation_component)
+        )
+      )
+    :effect (component_review_approved ?implementation_component)
+  )
+  (:action finalize_review
+    :parameters (?implementation_component - implementation_component)
+    :precondition
+      (and
+        (component_review_approved ?implementation_component)
+        (not
+          (component_release_staged ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (component_release_staged ?implementation_component)
+        (ready_for_deployment ?implementation_component)
+      )
+  )
+  (:action deploy_service_artifact
+    :parameters (?service_module - service_module ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (service_packaging_flag ?service_module)
+        (service_ready ?service_module)
+        (artifact_packaged ?deployment_artifact)
+        (artifact_validated ?deployment_artifact)
+        (not
+          (ready_for_deployment ?service_module)
+        )
+      )
+    :effect (ready_for_deployment ?service_module)
+  )
+  (:action deploy_client_artifact
+    :parameters (?client_module - client_module ?deployment_artifact - deployment_artifact)
+    :precondition
+      (and
+        (client_packaging_flag ?client_module)
+        (client_ready ?client_module)
+        (artifact_packaged ?deployment_artifact)
+        (artifact_validated ?deployment_artifact)
+        (not
+          (ready_for_deployment ?client_module)
+        )
+      )
+    :effect (ready_for_deployment ?client_module)
+  )
+  (:action approve_module_for_production
+    :parameters (?module - module ?nonfunctional_constraint - nonfunctional_constraint ?responsibility_token - responsibility_token)
+    :precondition
+      (and
+        (ready_for_deployment ?module)
+        (module_responsibility_bound ?module ?responsibility_token)
+        (nonfunctional_constraint_available ?nonfunctional_constraint)
+        (not
+          (module_approved_for_deployment ?module)
+        )
+      )
+    :effect
+      (and
+        (module_approved_for_deployment ?module)
+        (module_has_nonfunctional_constraint ?module ?nonfunctional_constraint)
+        (not
+          (nonfunctional_constraint_available ?nonfunctional_constraint)
+        )
+      )
+  )
+  (:action finalize_service_deployment
+    :parameters (?service_module - service_module ?interface_spec - interface_spec ?nonfunctional_constraint - nonfunctional_constraint)
+    :precondition
+      (and
+        (module_approved_for_deployment ?service_module)
+        (module_interface_binding ?service_module ?interface_spec)
+        (module_has_nonfunctional_constraint ?service_module ?nonfunctional_constraint)
+        (not
+          (module_deployed ?service_module)
+        )
+      )
+    :effect
+      (and
+        (module_deployed ?service_module)
+        (interface_available ?interface_spec)
+        (nonfunctional_constraint_available ?nonfunctional_constraint)
+      )
+  )
+  (:action finalize_client_deployment
+    :parameters (?client_module - client_module ?interface_spec - interface_spec ?nonfunctional_constraint - nonfunctional_constraint)
+    :precondition
+      (and
+        (module_approved_for_deployment ?client_module)
+        (module_interface_binding ?client_module ?interface_spec)
+        (module_has_nonfunctional_constraint ?client_module ?nonfunctional_constraint)
+        (not
+          (module_deployed ?client_module)
+        )
+      )
+    :effect
+      (and
+        (module_deployed ?client_module)
+        (interface_available ?interface_spec)
+        (nonfunctional_constraint_available ?nonfunctional_constraint)
+      )
+  )
+  (:action finalize_component_deployment
+    :parameters (?implementation_component - implementation_component ?interface_spec - interface_spec ?nonfunctional_constraint - nonfunctional_constraint)
+    :precondition
+      (and
+        (module_approved_for_deployment ?implementation_component)
+        (module_interface_binding ?implementation_component ?interface_spec)
+        (module_has_nonfunctional_constraint ?implementation_component ?nonfunctional_constraint)
+        (not
+          (module_deployed ?implementation_component)
+        )
+      )
+    :effect
+      (and
+        (module_deployed ?implementation_component)
+        (interface_available ?interface_spec)
+        (nonfunctional_constraint_available ?nonfunctional_constraint)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem module_partitioning_scenario)
+  (:domain module_responsibility_partitioning)
+  (:objects user_service - service_module web_client - client_module core_component - implementation_component integration_component - implementation_component api_interface_v1 - interface_spec admin_interface - interface_spec metrics_interface - interface_spec authentication_responsibility - responsibility_token team_lead - stakeholder design_rationale_scalability - design_rationale staging_context - staging_runtime_context production_context - production_runtime_context app_deployment_artifact - deployment_artifact db_config - configuration_asset logging_config - configuration_asset auth_extension - extension_plugin metrics_extension - extension_plugin integration_test - test_asset smoke_test - test_asset latency_slo - nonfunctional_constraint capability_scaling - capability_descriptor review_security - review_record review_architecture - review_record compliance_policy - compliance_record)
+  (:init
+    (interface_available api_interface_v1)
+    (interface_available admin_interface)
+    (interface_available metrics_interface)
+    (responsibility_token_available authentication_responsibility)
+    (stakeholder_available team_lead)
+    (design_rationale_available design_rationale_scalability)
+    (service_bound_to_staging_runtime_context user_service staging_context)
+    (client_bound_to_production_runtime_context web_client production_context)
+    (artifact_available app_deployment_artifact)
+    (configuration_asset_available db_config)
+    (configuration_asset_available logging_config)
+    (component_assigned_to_service core_component user_service)
+    (component_assigned_to_service integration_component user_service)
+    (component_assigned_to_client core_component web_client)
+    (component_assigned_to_client integration_component web_client)
+    (component_in_deployment_artifact core_component app_deployment_artifact)
+    (component_in_deployment_artifact integration_component app_deployment_artifact)
+    (component_has_configuration_asset core_component db_config)
+    (component_has_configuration_asset integration_component logging_config)
+    (extension_plugin_available auth_extension)
+    (extension_plugin_available metrics_extension)
+    (test_asset_available integration_test)
+    (test_asset_available smoke_test)
+    (nonfunctional_constraint_available latency_slo)
+    (capability_descriptor_available capability_scaling)
+    (review_record_available review_security)
+    (component_has_review_record core_component review_security)
+    (component_has_review_record integration_component review_architecture)
+    (compliance_record_available compliance_policy)
+  )
+  (:goal
+    (and
+      (module_deployed user_service)
+      (module_deployed web_client)
+      (module_deployed core_component)
+      (module_deployed integration_component)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(declare_module user_service)
+(declare_module web_client)
+(declare_module core_component)
+(declare_module integration_component)
+(allocate_interface_to_module user_service api_interface_v1)
+(assign_responsibility user_service authentication_responsibility)
+(validate_responsibility user_service authentication_responsibility)
+(apply_rationale_to_service_context user_service staging_context design_rationale_scalability)
+(synchronize_service_context_and_rationale user_service staging_context authentication_responsibility design_rationale_scalability)
+(release_responsibility user_service authentication_responsibility)
+(allocate_interface_to_module web_client admin_interface)
+(assign_responsibility web_client authentication_responsibility)
+(validate_responsibility web_client authentication_responsibility)
+(apply_rationale_to_client_context web_client production_context design_rationale_scalability)
+(synchronize_client_context_and_rationale web_client production_context authentication_responsibility design_rationale_scalability)
+(assemble_deployment_artifact user_service web_client staging_context production_context app_deployment_artifact)
+(release_responsibility web_client authentication_responsibility)
+(assign_responsibility user_service authentication_responsibility)
+(validate_deployment_artifact app_deployment_artifact user_service authentication_responsibility)
+(release_responsibility user_service authentication_responsibility)
+(deploy_service_artifact user_service app_deployment_artifact)
+(deploy_client_artifact web_client app_deployment_artifact)
+(allocate_interface_to_module core_component metrics_interface)
+(assign_responsibility core_component authentication_responsibility)
+(validate_responsibility core_component authentication_responsibility)
+(assign_stakeholder_to_module core_component team_lead)
+(attach_capability_descriptor core_component capability_scaling)
+(attach_compliance_record core_component compliance_policy)
+(initiate_component_review core_component review_security authentication_responsibility)
+(validate_component_review core_component team_lead)
+(approve_component_review core_component compliance_policy)
+(finalize_review core_component)
+(approve_module_for_production core_component latency_slo authentication_responsibility)
+(finalize_component_deployment core_component metrics_interface latency_slo)
+(release_responsibility core_component authentication_responsibility)
+(unassign_stakeholder_from_module core_component team_lead)
+(detach_capability_descriptor core_component capability_scaling)
+(detach_compliance_record core_component compliance_policy)
+(allocate_interface_to_module integration_component metrics_interface)
+(assign_responsibility integration_component authentication_responsibility)
+(validate_responsibility integration_component authentication_responsibility)
+(assign_stakeholder_to_module integration_component team_lead)
+(attach_capability_descriptor integration_component capability_scaling)
+(attach_compliance_record integration_component compliance_policy)
+(commit_configuration_asset_to_component integration_component logging_config app_deployment_artifact)
+(stage_component_for_feature_gating integration_component logging_config app_deployment_artifact authentication_responsibility)
+(start_feature_gating_primary integration_component capability_scaling team_lead logging_config app_deployment_artifact)
+(enable_features_stage_1 integration_component compliance_policy logging_config app_deployment_artifact)
+(finalize_component_release integration_component)
+(approve_module_for_production integration_component latency_slo authentication_responsibility)
+(finalize_component_deployment integration_component metrics_interface latency_slo)
+(release_responsibility integration_component authentication_responsibility)
+(unassign_stakeholder_from_module integration_component team_lead)
+(detach_capability_descriptor integration_component capability_scaling)
+(detach_compliance_record integration_component compliance_policy)
+(assign_responsibility user_service authentication_responsibility)
+(approve_module_for_production user_service latency_slo authentication_responsibility)
+(finalize_service_deployment user_service api_interface_v1 latency_slo)
+(release_responsibility user_service authentication_responsibility)
+(assign_responsibility web_client authentication_responsibility)
+(approve_module_for_production web_client latency_slo authentication_responsibility)
+(finalize_client_deployment web_client admin_interface latency_slo)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_wxayelcq/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_wxayelcq/plan.pddl 62 
+
+
+
+--- stderr ---
+

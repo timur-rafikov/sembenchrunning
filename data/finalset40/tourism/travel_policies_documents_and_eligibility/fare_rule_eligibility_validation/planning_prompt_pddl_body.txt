@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain fare_rule_eligibility_validation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_base - object resource_category - entity_base requirement_category - entity_base classification_category - entity_base case_root - entity_base case_entity - case_root document_instance - resource_category required_document_type - resource_category verifying_authority - resource_category fare_class - resource_category concession_profile - resource_category certificate_type - resource_category endorsement_type - resource_category policy_exception - resource_category supporting_evidence - requirement_category document_template - requirement_category issuing_agency - requirement_category jurisdiction - classification_category jurisdiction_requirement_profile - classification_category fare_option - classification_category passenger_case_group - case_entity rule_case_group - case_entity primary_itinerary - passenger_case_group companion_itinerary - passenger_case_group fare_rule_case - rule_case_group)
+
+  (:predicates
+    (case_registered ?case_entity - case_entity)
+    (case_documents_verified ?case_entity - case_entity)
+    (case_document_attached ?case_entity - case_entity)
+    (eligibility_confirmed ?case_entity - case_entity)
+    (provisional_eligibility ?case_entity - case_entity)
+    (certificate_consumed ?case_entity - case_entity)
+    (document_available ?document_instance - document_instance)
+    (case_has_document ?case_entity - case_entity ?document_instance - document_instance)
+    (document_type_available ?document_type_requirement - required_document_type)
+    (case_matches_document_type_requirement ?case_entity - case_entity ?document_type_requirement - required_document_type)
+    (authority_available ?verifying_authority - verifying_authority)
+    (case_assigned_authority ?case_entity - case_entity ?verifying_authority - verifying_authority)
+    (evidence_available ?supporting_evidence - supporting_evidence)
+    (itinerary_evidence_link ?primary_itinerary - primary_itinerary ?supporting_evidence - supporting_evidence)
+    (companion_evidence_link ?companion_itinerary - companion_itinerary ?supporting_evidence - supporting_evidence)
+    (itinerary_jurisdiction_link ?primary_itinerary - primary_itinerary ?jurisdiction - jurisdiction)
+    (jurisdiction_document_match_flag ?jurisdiction - jurisdiction)
+    (jurisdiction_evidence_flag ?jurisdiction - jurisdiction)
+    (primary_itinerary_requirement_satisfied ?primary_itinerary - primary_itinerary)
+    (companion_jurisdiction_profile_link ?companion_itinerary - companion_itinerary ?jurisdiction_requirement_profile - jurisdiction_requirement_profile)
+    (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile - jurisdiction_requirement_profile)
+    (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile - jurisdiction_requirement_profile)
+    (companion_itinerary_requirement_satisfied ?companion_itinerary - companion_itinerary)
+    (fare_option_available ?fare_option - fare_option)
+    (fare_candidate_selected ?fare_option - fare_option)
+    (fare_option_jurisdiction_link ?fare_option - fare_option ?jurisdiction - jurisdiction)
+    (fare_option_profile_link ?fare_option - fare_option ?jurisdiction_requirement_profile - jurisdiction_requirement_profile)
+    (fare_option_primary_profile_restriction ?fare_option - fare_option)
+    (fare_option_companion_profile_restriction ?fare_option - fare_option)
+    (fare_option_ready_for_template_matching ?fare_option - fare_option)
+    (fare_rule_matches_primary_itinerary ?fare_rule_case - fare_rule_case ?primary_itinerary - primary_itinerary)
+    (fare_rule_matches_companion_itinerary ?fare_rule_case - fare_rule_case ?companion_itinerary - companion_itinerary)
+    (fare_rule_associated_fare_option ?fare_rule_case - fare_rule_case ?fare_option - fare_option)
+    (document_template_available ?document_template - document_template)
+    (fare_rule_template_match ?fare_rule_case - fare_rule_case ?document_template - document_template)
+    (document_template_consumed ?document_template - document_template)
+    (document_template_matches_fare_option ?document_template - document_template ?fare_option - fare_option)
+    (fare_rule_template_matching_complete ?fare_rule_case - fare_rule_case)
+    (fare_rule_endorsement_assigned ?fare_rule_case - fare_rule_case)
+    (fare_rule_scoring_complete ?fare_rule_case - fare_rule_case)
+    (fare_rule_has_assigned_fare_class ?fare_rule_case - fare_rule_case)
+    (fare_rule_template_and_class_linked ?fare_rule_case - fare_rule_case)
+    (fare_rule_concession_attached ?fare_rule_case - fare_rule_case)
+    (fare_rule_scored ?fare_rule_case - fare_rule_case)
+    (issuing_agency_available ?issuing_agency - issuing_agency)
+    (fare_rule_assigned_issuing_agency ?fare_rule_case - fare_rule_case ?issuing_agency - issuing_agency)
+    (fare_rule_alternative_agency_accepted ?fare_rule_case - fare_rule_case)
+    (fare_rule_alternative_authority_assigned ?fare_rule_case - fare_rule_case)
+    (fare_rule_alternative_path_ready ?fare_rule_case - fare_rule_case)
+    (fare_class_available ?fare_class - fare_class)
+    (fare_rule_assigned_fare_class ?fare_rule_case - fare_rule_case ?fare_class - fare_class)
+    (concession_profile_available ?concession_profile - concession_profile)
+    (fare_rule_assigned_concession_profile ?fare_rule_case - fare_rule_case ?concession_profile - concession_profile)
+    (endorsement_type_available ?endorsement_type - endorsement_type)
+    (fare_rule_assigned_endorsement ?fare_rule_case - fare_rule_case ?endorsement_type - endorsement_type)
+    (policy_exception_available ?policy_exception - policy_exception)
+    (fare_rule_assigned_policy_exception ?fare_rule_case - fare_rule_case ?policy_exception - policy_exception)
+    (certificate_available ?certificate_type - certificate_type)
+    (case_certificate_link ?case_entity - case_entity ?certificate_type - certificate_type)
+    (primary_itinerary_checks_completed ?primary_itinerary - primary_itinerary)
+    (companion_itinerary_checks_completed ?companion_itinerary - companion_itinerary)
+    (policy_decision_recorded ?fare_rule_case - fare_rule_case)
+  )
+  (:action register_validation_case
+    :parameters (?case_entity - case_entity)
+    :precondition
+      (and
+        (not
+          (case_registered ?case_entity)
+        )
+        (not
+          (eligibility_confirmed ?case_entity)
+        )
+      )
+    :effect (case_registered ?case_entity)
+  )
+  (:action attach_document_to_case
+    :parameters (?case_entity - case_entity ?document_instance - document_instance)
+    :precondition
+      (and
+        (case_registered ?case_entity)
+        (not
+          (case_document_attached ?case_entity)
+        )
+        (document_available ?document_instance)
+      )
+    :effect
+      (and
+        (case_document_attached ?case_entity)
+        (case_has_document ?case_entity ?document_instance)
+        (not
+          (document_available ?document_instance)
+        )
+      )
+  )
+  (:action match_case_with_doc_requirement
+    :parameters (?case_entity - case_entity ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_registered ?case_entity)
+        (case_document_attached ?case_entity)
+        (document_type_available ?document_type_requirement)
+      )
+    :effect
+      (and
+        (case_matches_document_type_requirement ?case_entity ?document_type_requirement)
+        (not
+          (document_type_available ?document_type_requirement)
+        )
+      )
+  )
+  (:action confirm_document_verification
+    :parameters (?case_entity - case_entity ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_registered ?case_entity)
+        (case_document_attached ?case_entity)
+        (case_matches_document_type_requirement ?case_entity ?document_type_requirement)
+        (not
+          (case_documents_verified ?case_entity)
+        )
+      )
+    :effect (case_documents_verified ?case_entity)
+  )
+  (:action unmatch_case_doc_requirement
+    :parameters (?case_entity - case_entity ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_matches_document_type_requirement ?case_entity ?document_type_requirement)
+      )
+    :effect
+      (and
+        (document_type_available ?document_type_requirement)
+        (not
+          (case_matches_document_type_requirement ?case_entity ?document_type_requirement)
+        )
+      )
+  )
+  (:action assign_verifying_authority_to_case
+    :parameters (?case_entity - case_entity ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (case_documents_verified ?case_entity)
+        (authority_available ?verifying_authority)
+      )
+    :effect
+      (and
+        (case_assigned_authority ?case_entity ?verifying_authority)
+        (not
+          (authority_available ?verifying_authority)
+        )
+      )
+  )
+  (:action unassign_verifying_authority_from_case
+    :parameters (?case_entity - case_entity ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (case_assigned_authority ?case_entity ?verifying_authority)
+      )
+    :effect
+      (and
+        (authority_available ?verifying_authority)
+        (not
+          (case_assigned_authority ?case_entity ?verifying_authority)
+        )
+      )
+  )
+  (:action assign_endorsement_to_fare_rule_case
+    :parameters (?fare_rule_case - fare_rule_case ?endorsement_type - endorsement_type)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (endorsement_type_available ?endorsement_type)
+      )
+    :effect
+      (and
+        (fare_rule_assigned_endorsement ?fare_rule_case ?endorsement_type)
+        (not
+          (endorsement_type_available ?endorsement_type)
+        )
+      )
+  )
+  (:action unassign_endorsement_from_fare_rule_case
+    :parameters (?fare_rule_case - fare_rule_case ?endorsement_type - endorsement_type)
+    :precondition
+      (and
+        (fare_rule_assigned_endorsement ?fare_rule_case ?endorsement_type)
+      )
+    :effect
+      (and
+        (endorsement_type_available ?endorsement_type)
+        (not
+          (fare_rule_assigned_endorsement ?fare_rule_case ?endorsement_type)
+        )
+      )
+  )
+  (:action attach_policy_exception_to_fare_rule_case
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (policy_exception_available ?policy_exception)
+      )
+    :effect
+      (and
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (not
+          (policy_exception_available ?policy_exception)
+        )
+      )
+  )
+  (:action detach_policy_exception_from_fare_rule_case
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception)
+    :precondition
+      (and
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+      )
+    :effect
+      (and
+        (policy_exception_available ?policy_exception)
+        (not
+          (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        )
+      )
+  )
+  (:action satisfy_jurisdiction_primary_requirement
+    :parameters (?primary_itinerary - primary_itinerary ?jurisdiction - jurisdiction ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_documents_verified ?primary_itinerary)
+        (case_matches_document_type_requirement ?primary_itinerary ?document_type_requirement)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (not
+          (jurisdiction_document_match_flag ?jurisdiction)
+        )
+        (not
+          (jurisdiction_evidence_flag ?jurisdiction)
+        )
+      )
+    :effect (jurisdiction_document_match_flag ?jurisdiction)
+  )
+  (:action apply_authority_verification_to_primary_itinerary
+    :parameters (?primary_itinerary - primary_itinerary ?jurisdiction - jurisdiction ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (case_documents_verified ?primary_itinerary)
+        (case_assigned_authority ?primary_itinerary ?verifying_authority)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (jurisdiction_document_match_flag ?jurisdiction)
+        (not
+          (primary_itinerary_checks_completed ?primary_itinerary)
+        )
+      )
+    :effect
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+      )
+  )
+  (:action apply_supporting_evidence_to_primary_itinerary
+    :parameters (?primary_itinerary - primary_itinerary ?jurisdiction - jurisdiction ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_documents_verified ?primary_itinerary)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (evidence_available ?supporting_evidence)
+        (not
+          (primary_itinerary_checks_completed ?primary_itinerary)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_evidence_flag ?jurisdiction)
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (itinerary_evidence_link ?primary_itinerary ?supporting_evidence)
+        (not
+          (evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action finalize_primary_itinerary_requirement_satisfaction
+    :parameters (?primary_itinerary - primary_itinerary ?jurisdiction - jurisdiction ?document_type_requirement - required_document_type ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_documents_verified ?primary_itinerary)
+        (case_matches_document_type_requirement ?primary_itinerary ?document_type_requirement)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (jurisdiction_evidence_flag ?jurisdiction)
+        (itinerary_evidence_link ?primary_itinerary ?supporting_evidence)
+        (not
+          (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_document_match_flag ?jurisdiction)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        (evidence_available ?supporting_evidence)
+        (not
+          (itinerary_evidence_link ?primary_itinerary ?supporting_evidence)
+        )
+      )
+  )
+  (:action satisfy_companion_jurisdiction_primary_requirement
+    :parameters (?companion_itinerary - companion_itinerary ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_documents_verified ?companion_itinerary)
+        (case_matches_document_type_requirement ?companion_itinerary ?document_type_requirement)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (not
+          (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+        )
+        (not
+          (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile)
+        )
+      )
+    :effect (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+  )
+  (:action apply_authority_verification_to_companion_itinerary
+    :parameters (?companion_itinerary - companion_itinerary ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (case_documents_verified ?companion_itinerary)
+        (case_assigned_authority ?companion_itinerary ?verifying_authority)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+        (not
+          (companion_itinerary_checks_completed ?companion_itinerary)
+        )
+      )
+    :effect
+      (and
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+      )
+  )
+  (:action apply_supporting_evidence_to_companion_itinerary
+    :parameters (?companion_itinerary - companion_itinerary ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_documents_verified ?companion_itinerary)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (evidence_available ?supporting_evidence)
+        (not
+          (companion_itinerary_checks_completed ?companion_itinerary)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile)
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (companion_evidence_link ?companion_itinerary ?supporting_evidence)
+        (not
+          (evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action finalize_companion_itinerary_requirement_satisfaction
+    :parameters (?companion_itinerary - companion_itinerary ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?document_type_requirement - required_document_type ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_documents_verified ?companion_itinerary)
+        (case_matches_document_type_requirement ?companion_itinerary ?document_type_requirement)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile)
+        (companion_evidence_link ?companion_itinerary ?supporting_evidence)
+        (not
+          (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        )
+      )
+    :effect
+      (and
+        (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        (evidence_available ?supporting_evidence)
+        (not
+          (companion_evidence_link ?companion_itinerary ?supporting_evidence)
+        )
+      )
+  )
+  (:action assemble_fare_candidate
+    :parameters (?primary_itinerary - primary_itinerary ?companion_itinerary - companion_itinerary ?jurisdiction - jurisdiction ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?fare_option - fare_option)
+    :precondition
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_document_match_flag ?jurisdiction)
+        (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        (fare_option_available ?fare_option)
+      )
+    :effect
+      (and
+        (fare_candidate_selected ?fare_option)
+        (fare_option_jurisdiction_link ?fare_option ?jurisdiction)
+        (fare_option_profile_link ?fare_option ?jurisdiction_requirement_profile)
+        (not
+          (fare_option_available ?fare_option)
+        )
+      )
+  )
+  (:action assemble_fare_candidate_with_primary_evidence
+    :parameters (?primary_itinerary - primary_itinerary ?companion_itinerary - companion_itinerary ?jurisdiction - jurisdiction ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?fare_option - fare_option)
+    :precondition
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_evidence_flag ?jurisdiction)
+        (jurisdiction_profile_primary_satisfied ?jurisdiction_requirement_profile)
+        (not
+          (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        )
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        (fare_option_available ?fare_option)
+      )
+    :effect
+      (and
+        (fare_candidate_selected ?fare_option)
+        (fare_option_jurisdiction_link ?fare_option ?jurisdiction)
+        (fare_option_profile_link ?fare_option ?jurisdiction_requirement_profile)
+        (fare_option_primary_profile_restriction ?fare_option)
+        (not
+          (fare_option_available ?fare_option)
+        )
+      )
+  )
+  (:action assemble_fare_candidate_with_companion_evidence
+    :parameters (?primary_itinerary - primary_itinerary ?companion_itinerary - companion_itinerary ?jurisdiction - jurisdiction ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?fare_option - fare_option)
+    :precondition
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_document_match_flag ?jurisdiction)
+        (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        (not
+          (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        )
+        (fare_option_available ?fare_option)
+      )
+    :effect
+      (and
+        (fare_candidate_selected ?fare_option)
+        (fare_option_jurisdiction_link ?fare_option ?jurisdiction)
+        (fare_option_profile_link ?fare_option ?jurisdiction_requirement_profile)
+        (fare_option_companion_profile_restriction ?fare_option)
+        (not
+          (fare_option_available ?fare_option)
+        )
+      )
+  )
+  (:action assemble_fare_candidate_with_both_evidences
+    :parameters (?primary_itinerary - primary_itinerary ?companion_itinerary - companion_itinerary ?jurisdiction - jurisdiction ?jurisdiction_requirement_profile - jurisdiction_requirement_profile ?fare_option - fare_option)
+    :precondition
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (itinerary_jurisdiction_link ?primary_itinerary ?jurisdiction)
+        (companion_jurisdiction_profile_link ?companion_itinerary ?jurisdiction_requirement_profile)
+        (jurisdiction_evidence_flag ?jurisdiction)
+        (jurisdiction_profile_evidence_satisfied ?jurisdiction_requirement_profile)
+        (not
+          (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        )
+        (not
+          (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        )
+        (fare_option_available ?fare_option)
+      )
+    :effect
+      (and
+        (fare_candidate_selected ?fare_option)
+        (fare_option_jurisdiction_link ?fare_option ?jurisdiction)
+        (fare_option_profile_link ?fare_option ?jurisdiction_requirement_profile)
+        (fare_option_primary_profile_restriction ?fare_option)
+        (fare_option_companion_profile_restriction ?fare_option)
+        (not
+          (fare_option_available ?fare_option)
+        )
+      )
+  )
+  (:action prepare_fare_option_for_template_matching
+    :parameters (?fare_option - fare_option ?primary_itinerary - primary_itinerary ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (fare_candidate_selected ?fare_option)
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (case_matches_document_type_requirement ?primary_itinerary ?document_type_requirement)
+        (not
+          (fare_option_ready_for_template_matching ?fare_option)
+        )
+      )
+    :effect (fare_option_ready_for_template_matching ?fare_option)
+  )
+  (:action apply_document_template_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (fare_rule_associated_fare_option ?fare_rule_case ?fare_option)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_available ?document_template)
+        (fare_candidate_selected ?fare_option)
+        (fare_option_ready_for_template_matching ?fare_option)
+        (not
+          (document_template_consumed ?document_template)
+        )
+      )
+    :effect
+      (and
+        (document_template_consumed ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action finalize_fare_rule_template_matching
+    :parameters (?fare_rule_case - fare_rule_case ?document_template - document_template ?fare_option - fare_option ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_consumed ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (case_matches_document_type_requirement ?fare_rule_case ?document_type_requirement)
+        (not
+          (fare_option_primary_profile_restriction ?fare_option)
+        )
+        (not
+          (fare_rule_template_matching_complete ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_template_matching_complete ?fare_rule_case)
+  )
+  (:action assign_fare_class_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?fare_class - fare_class)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (fare_class_available ?fare_class)
+        (not
+          (fare_rule_has_assigned_fare_class ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_has_assigned_fare_class ?fare_rule_case)
+        (fare_rule_assigned_fare_class ?fare_rule_case ?fare_class)
+        (not
+          (fare_class_available ?fare_class)
+        )
+      )
+  )
+  (:action apply_template_and_fare_class_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?document_template - document_template ?fare_option - fare_option ?document_type_requirement - required_document_type ?fare_class - fare_class)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_consumed ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (case_matches_document_type_requirement ?fare_rule_case ?document_type_requirement)
+        (fare_option_primary_profile_restriction ?fare_option)
+        (fare_rule_has_assigned_fare_class ?fare_rule_case)
+        (fare_rule_assigned_fare_class ?fare_rule_case ?fare_class)
+        (not
+          (fare_rule_template_matching_complete ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_template_matching_complete ?fare_rule_case)
+        (fare_rule_template_and_class_linked ?fare_rule_case)
+      )
+  )
+  (:action assign_endorsement_and_authority_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?endorsement_type - endorsement_type ?verifying_authority - verifying_authority ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_template_matching_complete ?fare_rule_case)
+        (fare_rule_assigned_endorsement ?fare_rule_case ?endorsement_type)
+        (case_assigned_authority ?fare_rule_case ?verifying_authority)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (not
+          (fare_option_companion_profile_restriction ?fare_option)
+        )
+        (not
+          (fare_rule_endorsement_assigned ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_endorsement_assigned ?fare_rule_case)
+  )
+  (:action assign_endorsement_and_authority_to_fare_rule_with_flag
+    :parameters (?fare_rule_case - fare_rule_case ?endorsement_type - endorsement_type ?verifying_authority - verifying_authority ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_template_matching_complete ?fare_rule_case)
+        (fare_rule_assigned_endorsement ?fare_rule_case ?endorsement_type)
+        (case_assigned_authority ?fare_rule_case ?verifying_authority)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (fare_option_companion_profile_restriction ?fare_option)
+        (not
+          (fare_rule_endorsement_assigned ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_endorsement_assigned ?fare_rule_case)
+  )
+  (:action finalize_rule_scoring_plain
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_endorsement_assigned ?fare_rule_case)
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (not
+          (fare_option_primary_profile_restriction ?fare_option)
+        )
+        (not
+          (fare_option_companion_profile_restriction ?fare_option)
+        )
+        (not
+          (fare_rule_scoring_complete ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_scoring_complete ?fare_rule_case)
+  )
+  (:action finalize_rule_scoring_with_primary_flag
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_endorsement_assigned ?fare_rule_case)
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (fare_option_primary_profile_restriction ?fare_option)
+        (not
+          (fare_option_companion_profile_restriction ?fare_option)
+        )
+        (not
+          (fare_rule_scoring_complete ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_concession_attached ?fare_rule_case)
+      )
+  )
+  (:action finalize_rule_scoring_with_companion_flag
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_endorsement_assigned ?fare_rule_case)
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (not
+          (fare_option_primary_profile_restriction ?fare_option)
+        )
+        (fare_option_companion_profile_restriction ?fare_option)
+        (not
+          (fare_rule_scoring_complete ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_concession_attached ?fare_rule_case)
+      )
+  )
+  (:action finalize_rule_scoring_with_both_flags
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception ?document_template - document_template ?fare_option - fare_option)
+    :precondition
+      (and
+        (fare_rule_endorsement_assigned ?fare_rule_case)
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (fare_rule_template_match ?fare_rule_case ?document_template)
+        (document_template_matches_fare_option ?document_template ?fare_option)
+        (fare_option_primary_profile_restriction ?fare_option)
+        (fare_option_companion_profile_restriction ?fare_option)
+        (not
+          (fare_rule_scoring_complete ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_concession_attached ?fare_rule_case)
+      )
+  )
+  (:action record_provisional_eligibility_for_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case)
+    :precondition
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (not
+          (fare_rule_concession_attached ?fare_rule_case)
+        )
+        (not
+          (policy_decision_recorded ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (policy_decision_recorded ?fare_rule_case)
+        (provisional_eligibility ?fare_rule_case)
+      )
+  )
+  (:action attach_concession_profile_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?concession_profile - concession_profile)
+    :precondition
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_concession_attached ?fare_rule_case)
+        (concession_profile_available ?concession_profile)
+      )
+    :effect
+      (and
+        (fare_rule_assigned_concession_profile ?fare_rule_case ?concession_profile)
+        (not
+          (concession_profile_available ?concession_profile)
+        )
+      )
+  )
+  (:action aggregate_policy_scoring_for_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?primary_itinerary - primary_itinerary ?companion_itinerary - companion_itinerary ?document_type_requirement - required_document_type ?concession_profile - concession_profile)
+    :precondition
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_concession_attached ?fare_rule_case)
+        (fare_rule_assigned_concession_profile ?fare_rule_case ?concession_profile)
+        (fare_rule_matches_primary_itinerary ?fare_rule_case ?primary_itinerary)
+        (fare_rule_matches_companion_itinerary ?fare_rule_case ?companion_itinerary)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        (case_matches_document_type_requirement ?fare_rule_case ?document_type_requirement)
+        (not
+          (fare_rule_scored ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_scored ?fare_rule_case)
+  )
+  (:action finalize_fare_rule_scoring
+    :parameters (?fare_rule_case - fare_rule_case)
+    :precondition
+      (and
+        (fare_rule_scoring_complete ?fare_rule_case)
+        (fare_rule_scored ?fare_rule_case)
+        (not
+          (policy_decision_recorded ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (policy_decision_recorded ?fare_rule_case)
+        (provisional_eligibility ?fare_rule_case)
+      )
+  )
+  (:action apply_alternative_issuing_agency_to_fare_rule
+    :parameters (?fare_rule_case - fare_rule_case ?issuing_agency - issuing_agency ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (case_documents_verified ?fare_rule_case)
+        (case_matches_document_type_requirement ?fare_rule_case ?document_type_requirement)
+        (issuing_agency_available ?issuing_agency)
+        (fare_rule_assigned_issuing_agency ?fare_rule_case ?issuing_agency)
+        (not
+          (fare_rule_alternative_agency_accepted ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_alternative_agency_accepted ?fare_rule_case)
+        (not
+          (issuing_agency_available ?issuing_agency)
+        )
+      )
+  )
+  (:action apply_verifying_authority_on_alternative_path
+    :parameters (?fare_rule_case - fare_rule_case ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (fare_rule_alternative_agency_accepted ?fare_rule_case)
+        (case_assigned_authority ?fare_rule_case ?verifying_authority)
+        (not
+          (fare_rule_alternative_authority_assigned ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_alternative_authority_assigned ?fare_rule_case)
+  )
+  (:action apply_policy_exception_after_alternative_authority
+    :parameters (?fare_rule_case - fare_rule_case ?policy_exception - policy_exception)
+    :precondition
+      (and
+        (fare_rule_alternative_authority_assigned ?fare_rule_case)
+        (fare_rule_assigned_policy_exception ?fare_rule_case ?policy_exception)
+        (not
+          (fare_rule_alternative_path_ready ?fare_rule_case)
+        )
+      )
+    :effect (fare_rule_alternative_path_ready ?fare_rule_case)
+  )
+  (:action finalize_alternative_path_policy_decision
+    :parameters (?fare_rule_case - fare_rule_case)
+    :precondition
+      (and
+        (fare_rule_alternative_path_ready ?fare_rule_case)
+        (not
+          (policy_decision_recorded ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (policy_decision_recorded ?fare_rule_case)
+        (provisional_eligibility ?fare_rule_case)
+      )
+  )
+  (:action propagate_eligibility_to_primary_itinerary
+    :parameters (?primary_itinerary - primary_itinerary ?fare_option - fare_option)
+    :precondition
+      (and
+        (primary_itinerary_checks_completed ?primary_itinerary)
+        (primary_itinerary_requirement_satisfied ?primary_itinerary)
+        (fare_candidate_selected ?fare_option)
+        (fare_option_ready_for_template_matching ?fare_option)
+        (not
+          (provisional_eligibility ?primary_itinerary)
+        )
+      )
+    :effect (provisional_eligibility ?primary_itinerary)
+  )
+  (:action propagate_eligibility_to_companion_itinerary
+    :parameters (?companion_itinerary - companion_itinerary ?fare_option - fare_option)
+    :precondition
+      (and
+        (companion_itinerary_checks_completed ?companion_itinerary)
+        (companion_itinerary_requirement_satisfied ?companion_itinerary)
+        (fare_candidate_selected ?fare_option)
+        (fare_option_ready_for_template_matching ?fare_option)
+        (not
+          (provisional_eligibility ?companion_itinerary)
+        )
+      )
+    :effect (provisional_eligibility ?companion_itinerary)
+  )
+  (:action consume_certificate_for_case
+    :parameters (?case_entity - case_entity ?certificate_type - certificate_type ?document_type_requirement - required_document_type)
+    :precondition
+      (and
+        (provisional_eligibility ?case_entity)
+        (case_matches_document_type_requirement ?case_entity ?document_type_requirement)
+        (certificate_available ?certificate_type)
+        (not
+          (certificate_consumed ?case_entity)
+        )
+      )
+    :effect
+      (and
+        (certificate_consumed ?case_entity)
+        (case_certificate_link ?case_entity ?certificate_type)
+        (not
+          (certificate_available ?certificate_type)
+        )
+      )
+  )
+  (:action finalize_eligibility_and_release_resources_primary_itinerary
+    :parameters (?primary_itinerary - primary_itinerary ?document_instance - document_instance ?certificate_type - certificate_type)
+    :precondition
+      (and
+        (certificate_consumed ?primary_itinerary)
+        (case_has_document ?primary_itinerary ?document_instance)
+        (case_certificate_link ?primary_itinerary ?certificate_type)
+        (not
+          (eligibility_confirmed ?primary_itinerary)
+        )
+      )
+    :effect
+      (and
+        (eligibility_confirmed ?primary_itinerary)
+        (document_available ?document_instance)
+        (certificate_available ?certificate_type)
+      )
+  )
+  (:action finalize_eligibility_and_release_resources_companion_itinerary
+    :parameters (?companion_itinerary - companion_itinerary ?document_instance - document_instance ?certificate_type - certificate_type)
+    :precondition
+      (and
+        (certificate_consumed ?companion_itinerary)
+        (case_has_document ?companion_itinerary ?document_instance)
+        (case_certificate_link ?companion_itinerary ?certificate_type)
+        (not
+          (eligibility_confirmed ?companion_itinerary)
+        )
+      )
+    :effect
+      (and
+        (eligibility_confirmed ?companion_itinerary)
+        (document_available ?document_instance)
+        (certificate_available ?certificate_type)
+      )
+  )
+  (:action finalize_eligibility_and_release_resources_fare_rule_case
+    :parameters (?fare_rule_case - fare_rule_case ?document_instance - document_instance ?certificate_type - certificate_type)
+    :precondition
+      (and
+        (certificate_consumed ?fare_rule_case)
+        (case_has_document ?fare_rule_case ?document_instance)
+        (case_certificate_link ?fare_rule_case ?certificate_type)
+        (not
+          (eligibility_confirmed ?fare_rule_case)
+        )
+      )
+    :effect
+      (and
+        (eligibility_confirmed ?fare_rule_case)
+        (document_available ?document_instance)
+        (certificate_available ?certificate_type)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem fare_rule_eligibility_validation_problem)
+  (:domain fare_rule_eligibility_validation_domain)
+  (:objects primary_itinerary_1 - primary_itinerary companion_itinerary_1 - companion_itinerary fare_rule_case_1 - fare_rule_case fare_rule_case_2 - fare_rule_case doc_instance_passport_1 - document_instance doc_instance_visa_1 - document_instance doc_instance_certificate_1 - document_instance doc_type_requirement_passport - required_document_type authority_border_office_1 - verifying_authority supporting_evidence_scan_1 - supporting_evidence jurisdiction_country_1 - jurisdiction jurisdiction_profile_country_1 - jurisdiction_requirement_profile fare_option_economy_1 - fare_option document_template_passport_scan_1 - document_template document_template_visa_scan_1 - document_template fare_class_economy - fare_class fare_class_business - fare_class concession_child - concession_profile concession_senior - concession_profile certificate_health_pass - certificate_type endorsement_refund - endorsement_type issuing_agency_embassy_1 - issuing_agency issuing_agency_carrier_office_1 - issuing_agency policy_exception_emergency_dispensation_1 - policy_exception)
+  (:init
+    (document_available doc_instance_passport_1)
+    (document_available doc_instance_visa_1)
+    (document_available doc_instance_certificate_1)
+    (document_type_available doc_type_requirement_passport)
+    (authority_available authority_border_office_1)
+    (evidence_available supporting_evidence_scan_1)
+    (itinerary_jurisdiction_link primary_itinerary_1 jurisdiction_country_1)
+    (companion_jurisdiction_profile_link companion_itinerary_1 jurisdiction_profile_country_1)
+    (fare_option_available fare_option_economy_1)
+    (document_template_available document_template_passport_scan_1)
+    (document_template_available document_template_visa_scan_1)
+    (fare_rule_matches_primary_itinerary fare_rule_case_1 primary_itinerary_1)
+    (fare_rule_matches_primary_itinerary fare_rule_case_2 primary_itinerary_1)
+    (fare_rule_matches_companion_itinerary fare_rule_case_1 companion_itinerary_1)
+    (fare_rule_matches_companion_itinerary fare_rule_case_2 companion_itinerary_1)
+    (fare_rule_associated_fare_option fare_rule_case_1 fare_option_economy_1)
+    (fare_rule_associated_fare_option fare_rule_case_2 fare_option_economy_1)
+    (fare_rule_template_match fare_rule_case_1 document_template_passport_scan_1)
+    (fare_rule_template_match fare_rule_case_2 document_template_visa_scan_1)
+    (fare_class_available fare_class_economy)
+    (fare_class_available fare_class_business)
+    (concession_profile_available concession_child)
+    (concession_profile_available concession_senior)
+    (certificate_available certificate_health_pass)
+    (endorsement_type_available endorsement_refund)
+    (issuing_agency_available issuing_agency_embassy_1)
+    (fare_rule_assigned_issuing_agency fare_rule_case_1 issuing_agency_embassy_1)
+    (fare_rule_assigned_issuing_agency fare_rule_case_2 issuing_agency_carrier_office_1)
+    (policy_exception_available policy_exception_emergency_dispensation_1)
+  )
+  (:goal
+    (and
+      (eligibility_confirmed primary_itinerary_1)
+      (eligibility_confirmed companion_itinerary_1)
+      (eligibility_confirmed fare_rule_case_1)
+      (eligibility_confirmed fare_rule_case_2)
+    )
+  )
+)

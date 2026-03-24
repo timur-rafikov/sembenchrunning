@@ -1,0 +1,936 @@
+(define (domain cancellation_policy_interpretation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types booking_grouping - object document_classification - object fare_classification - object case_root - object cancellation_case - case_root document_type - booking_grouping policy_rule_clause - booking_grouping verifying_authority - booking_grouping contract_clause - booking_grouping passenger_profile - booking_grouping evidence_bundle - booking_grouping refund_component - booking_grouping escalation_step - booking_grouping evidence_item - document_classification supporting_document_requirement - document_classification special_exception - document_classification fare_component - fare_classification fare_rule_unit - fare_classification cancellation_fee_record - fare_classification booking_root - cancellation_case evaluation_root - cancellation_case primary_booking - booking_root secondary_booking - booking_root evaluation_context - evaluation_root)
+  (:predicates
+    (entity_registered ?cancellation_case - cancellation_case)
+    (entity_evaluation_ready ?cancellation_case - cancellation_case)
+    (entity_documents_attached ?cancellation_case - cancellation_case)
+    (ready_for_final_resolution ?cancellation_case - cancellation_case)
+    (entity_decision_eligibility_confirmed ?cancellation_case - cancellation_case)
+    (entity_evidence_attached ?cancellation_case - cancellation_case)
+    (document_type_available ?document_type - document_type)
+    (entity_has_document_type ?cancellation_case - cancellation_case ?document_type - document_type)
+    (policy_clause_available ?policy_rule_clause - policy_rule_clause)
+    (entity_bound_policy_clause ?cancellation_case - cancellation_case ?policy_rule_clause - policy_rule_clause)
+    (verifier_available ?verifying_authority - verifying_authority)
+    (entity_assigned_verifier ?cancellation_case - cancellation_case ?verifying_authority - verifying_authority)
+    (evidence_item_available ?evidence_item - evidence_item)
+    (primary_booking_has_evidence_item ?primary_booking - primary_booking ?evidence_item - evidence_item)
+    (secondary_booking_has_evidence_item ?secondary_booking - secondary_booking ?evidence_item - evidence_item)
+    (booking_has_fare_component ?primary_booking - primary_booking ?fare_component - fare_component)
+    (fare_component_validated ?fare_component - fare_component)
+    (fare_component_has_evidence ?fare_component - fare_component)
+    (primary_booking_component_validated ?primary_booking - primary_booking)
+    (secondary_booking_fare_rule_bound ?secondary_booking - secondary_booking ?fare_rule_unit - fare_rule_unit)
+    (fare_rule_unit_validated ?fare_rule_unit - fare_rule_unit)
+    (fare_rule_unit_has_evidence ?fare_rule_unit - fare_rule_unit)
+    (secondary_booking_component_validated ?secondary_booking - secondary_booking)
+    (fee_record_available ?cancellation_fee_record - cancellation_fee_record)
+    (fee_record_created ?cancellation_fee_record - cancellation_fee_record)
+    (fee_record_includes_fare_component ?cancellation_fee_record - cancellation_fee_record ?fare_component - fare_component)
+    (fee_record_includes_fare_rule_unit ?cancellation_fee_record - cancellation_fee_record ?fare_rule_unit - fare_rule_unit)
+    (fee_record_requires_contract_review ?cancellation_fee_record - cancellation_fee_record)
+    (fee_record_requires_refund_review ?cancellation_fee_record - cancellation_fee_record)
+    (fee_record_documents_evaluated ?cancellation_fee_record - cancellation_fee_record)
+    (context_attached_primary_booking ?evaluation_context - evaluation_context ?primary_booking - primary_booking)
+    (context_attached_secondary_booking ?evaluation_context - evaluation_context ?secondary_booking - secondary_booking)
+    (context_associated_fee_record ?evaluation_context - evaluation_context ?cancellation_fee_record - cancellation_fee_record)
+    (supporting_requirement_available ?supporting_document_requirement - supporting_document_requirement)
+    (context_has_supporting_requirement ?evaluation_context - evaluation_context ?supporting_document_requirement - supporting_document_requirement)
+    (supporting_requirement_attached ?supporting_document_requirement - supporting_document_requirement)
+    (supporting_requirement_linked_fee_record ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    (context_contract_verified ?evaluation_context - evaluation_context)
+    (context_contract_review_completed ?evaluation_context - evaluation_context)
+    (context_documents_check_passed ?evaluation_context - evaluation_context)
+    (context_has_contract_clause ?evaluation_context - evaluation_context)
+    (context_contract_review_finalized ?evaluation_context - evaluation_context)
+    (context_requires_passenger_profile ?evaluation_context - evaluation_context)
+    (context_documentation_complete ?evaluation_context - evaluation_context)
+    (special_exception_available ?special_exception - special_exception)
+    (context_assigned_special_exception ?evaluation_context - evaluation_context ?special_exception - special_exception)
+    (context_special_exception_flag ?evaluation_context - evaluation_context)
+    (context_verifier_attached ?evaluation_context - evaluation_context)
+    (context_escalation_ready ?evaluation_context - evaluation_context)
+    (contract_clause_available ?contract_clause - contract_clause)
+    (context_assigned_contract_clause ?evaluation_context - evaluation_context ?contract_clause - contract_clause)
+    (passenger_profile_available ?passenger_profile - passenger_profile)
+    (context_assigned_passenger_profile ?evaluation_context - evaluation_context ?passenger_profile - passenger_profile)
+    (refund_component_available ?refund_component - refund_component)
+    (context_assigned_refund_component ?evaluation_context - evaluation_context ?refund_component - refund_component)
+    (escalation_step_available ?escalation_step - escalation_step)
+    (context_assigned_escalation_step ?evaluation_context - evaluation_context ?escalation_step - escalation_step)
+    (evidence_bundle_available ?evidence_bundle - evidence_bundle)
+    (entity_has_evidence_bundle ?cancellation_case - cancellation_case ?evidence_bundle - evidence_bundle)
+    (primary_booking_ready_for_fee_assembly ?primary_booking - primary_booking)
+    (secondary_booking_ready_for_fee_assembly ?secondary_booking - secondary_booking)
+    (evaluation_context_finalized ?evaluation_context - evaluation_context)
+  )
+  (:action create_cancellation_case
+    :parameters (?cancellation_case - cancellation_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?cancellation_case)
+        )
+        (not
+          (ready_for_final_resolution ?cancellation_case)
+        )
+      )
+    :effect (entity_registered ?cancellation_case)
+  )
+  (:action attach_document_type_to_case
+    :parameters (?cancellation_case - cancellation_case ?document_type - document_type)
+    :precondition
+      (and
+        (entity_registered ?cancellation_case)
+        (not
+          (entity_documents_attached ?cancellation_case)
+        )
+        (document_type_available ?document_type)
+      )
+    :effect
+      (and
+        (entity_documents_attached ?cancellation_case)
+        (entity_has_document_type ?cancellation_case ?document_type)
+        (not
+          (document_type_available ?document_type)
+        )
+      )
+  )
+  (:action bind_policy_clause_to_case
+    :parameters (?cancellation_case - cancellation_case ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_registered ?cancellation_case)
+        (entity_documents_attached ?cancellation_case)
+        (policy_clause_available ?policy_rule_clause)
+      )
+    :effect
+      (and
+        (entity_bound_policy_clause ?cancellation_case ?policy_rule_clause)
+        (not
+          (policy_clause_available ?policy_rule_clause)
+        )
+      )
+  )
+  (:action confirm_case_policy_binding
+    :parameters (?cancellation_case - cancellation_case ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_registered ?cancellation_case)
+        (entity_documents_attached ?cancellation_case)
+        (entity_bound_policy_clause ?cancellation_case ?policy_rule_clause)
+        (not
+          (entity_evaluation_ready ?cancellation_case)
+        )
+      )
+    :effect (entity_evaluation_ready ?cancellation_case)
+  )
+  (:action unbind_policy_clause_from_case
+    :parameters (?cancellation_case - cancellation_case ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_bound_policy_clause ?cancellation_case ?policy_rule_clause)
+      )
+    :effect
+      (and
+        (policy_clause_available ?policy_rule_clause)
+        (not
+          (entity_bound_policy_clause ?cancellation_case ?policy_rule_clause)
+        )
+      )
+  )
+  (:action assign_verifier_to_case
+    :parameters (?cancellation_case - cancellation_case ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (entity_evaluation_ready ?cancellation_case)
+        (verifier_available ?verifying_authority)
+      )
+    :effect
+      (and
+        (entity_assigned_verifier ?cancellation_case ?verifying_authority)
+        (not
+          (verifier_available ?verifying_authority)
+        )
+      )
+  )
+  (:action release_verifier_from_case
+    :parameters (?cancellation_case - cancellation_case ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (entity_assigned_verifier ?cancellation_case ?verifying_authority)
+      )
+    :effect
+      (and
+        (verifier_available ?verifying_authority)
+        (not
+          (entity_assigned_verifier ?cancellation_case ?verifying_authority)
+        )
+      )
+  )
+  (:action attach_refund_component_to_context
+    :parameters (?evaluation_context - evaluation_context ?refund_component - refund_component)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (refund_component_available ?refund_component)
+      )
+    :effect
+      (and
+        (context_assigned_refund_component ?evaluation_context ?refund_component)
+        (not
+          (refund_component_available ?refund_component)
+        )
+      )
+  )
+  (:action detach_refund_component_from_context
+    :parameters (?evaluation_context - evaluation_context ?refund_component - refund_component)
+    :precondition
+      (and
+        (context_assigned_refund_component ?evaluation_context ?refund_component)
+      )
+    :effect
+      (and
+        (refund_component_available ?refund_component)
+        (not
+          (context_assigned_refund_component ?evaluation_context ?refund_component)
+        )
+      )
+  )
+  (:action attach_escalation_step_to_context
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (escalation_step_available ?escalation_step)
+      )
+    :effect
+      (and
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (not
+          (escalation_step_available ?escalation_step)
+        )
+      )
+  )
+  (:action detach_escalation_step_from_context
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step)
+    :precondition
+      (and
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+      )
+    :effect
+      (and
+        (escalation_step_available ?escalation_step)
+        (not
+          (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        )
+      )
+  )
+  (:action validate_primary_fare_component
+    :parameters (?primary_booking - primary_booking ?fare_component - fare_component ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?primary_booking)
+        (entity_bound_policy_clause ?primary_booking ?policy_rule_clause)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (not
+          (fare_component_validated ?fare_component)
+        )
+        (not
+          (fare_component_has_evidence ?fare_component)
+        )
+      )
+    :effect (fare_component_validated ?fare_component)
+  )
+  (:action apply_verifier_to_primary_booking_component
+    :parameters (?primary_booking - primary_booking ?fare_component - fare_component ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (entity_evaluation_ready ?primary_booking)
+        (entity_assigned_verifier ?primary_booking ?verifying_authority)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (fare_component_validated ?fare_component)
+        (not
+          (primary_booking_ready_for_fee_assembly ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (primary_booking_component_validated ?primary_booking)
+      )
+  )
+  (:action attach_evidence_item_to_primary_booking_component
+    :parameters (?primary_booking - primary_booking ?fare_component - fare_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_evaluation_ready ?primary_booking)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (evidence_item_available ?evidence_item)
+        (not
+          (primary_booking_ready_for_fee_assembly ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (fare_component_has_evidence ?fare_component)
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (primary_booking_has_evidence_item ?primary_booking ?evidence_item)
+        (not
+          (evidence_item_available ?evidence_item)
+        )
+      )
+  )
+  (:action revalidate_primary_component_with_evidence
+    :parameters (?primary_booking - primary_booking ?fare_component - fare_component ?policy_rule_clause - policy_rule_clause ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_evaluation_ready ?primary_booking)
+        (entity_bound_policy_clause ?primary_booking ?policy_rule_clause)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (fare_component_has_evidence ?fare_component)
+        (primary_booking_has_evidence_item ?primary_booking ?evidence_item)
+        (not
+          (primary_booking_component_validated ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (fare_component_validated ?fare_component)
+        (primary_booking_component_validated ?primary_booking)
+        (evidence_item_available ?evidence_item)
+        (not
+          (primary_booking_has_evidence_item ?primary_booking ?evidence_item)
+        )
+      )
+  )
+  (:action validate_secondary_fare_component
+    :parameters (?secondary_booking - secondary_booking ?fare_rule_unit - fare_rule_unit ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?secondary_booking)
+        (entity_bound_policy_clause ?secondary_booking ?policy_rule_clause)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (not
+          (fare_rule_unit_validated ?fare_rule_unit)
+        )
+        (not
+          (fare_rule_unit_has_evidence ?fare_rule_unit)
+        )
+      )
+    :effect (fare_rule_unit_validated ?fare_rule_unit)
+  )
+  (:action apply_verifier_to_secondary_booking
+    :parameters (?secondary_booking - secondary_booking ?fare_rule_unit - fare_rule_unit ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (entity_evaluation_ready ?secondary_booking)
+        (entity_assigned_verifier ?secondary_booking ?verifying_authority)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_rule_unit_validated ?fare_rule_unit)
+        (not
+          (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        )
+      )
+    :effect
+      (and
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (secondary_booking_component_validated ?secondary_booking)
+      )
+  )
+  (:action attach_evidence_item_to_secondary_booking_component
+    :parameters (?secondary_booking - secondary_booking ?fare_rule_unit - fare_rule_unit ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_evaluation_ready ?secondary_booking)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (evidence_item_available ?evidence_item)
+        (not
+          (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_unit_has_evidence ?fare_rule_unit)
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (secondary_booking_has_evidence_item ?secondary_booking ?evidence_item)
+        (not
+          (evidence_item_available ?evidence_item)
+        )
+      )
+  )
+  (:action revalidate_secondary_component_with_evidence
+    :parameters (?secondary_booking - secondary_booking ?fare_rule_unit - fare_rule_unit ?policy_rule_clause - policy_rule_clause ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_evaluation_ready ?secondary_booking)
+        (entity_bound_policy_clause ?secondary_booking ?policy_rule_clause)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_rule_unit_has_evidence ?fare_rule_unit)
+        (secondary_booking_has_evidence_item ?secondary_booking ?evidence_item)
+        (not
+          (secondary_booking_component_validated ?secondary_booking)
+        )
+      )
+    :effect
+      (and
+        (fare_rule_unit_validated ?fare_rule_unit)
+        (secondary_booking_component_validated ?secondary_booking)
+        (evidence_item_available ?evidence_item)
+        (not
+          (secondary_booking_has_evidence_item ?secondary_booking ?evidence_item)
+        )
+      )
+  )
+  (:action assemble_fee_record_from_validated_components
+    :parameters (?primary_booking - primary_booking ?secondary_booking - secondary_booking ?fare_component - fare_component ?fare_rule_unit - fare_rule_unit ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_component_validated ?fare_component)
+        (fare_rule_unit_validated ?fare_rule_unit)
+        (primary_booking_component_validated ?primary_booking)
+        (secondary_booking_component_validated ?secondary_booking)
+        (fee_record_available ?cancellation_fee_record)
+      )
+    :effect
+      (and
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_includes_fare_component ?cancellation_fee_record ?fare_component)
+        (fee_record_includes_fare_rule_unit ?cancellation_fee_record ?fare_rule_unit)
+        (not
+          (fee_record_available ?cancellation_fee_record)
+        )
+      )
+  )
+  (:action assemble_fee_record_with_contract_review
+    :parameters (?primary_booking - primary_booking ?secondary_booking - secondary_booking ?fare_component - fare_component ?fare_rule_unit - fare_rule_unit ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_component_has_evidence ?fare_component)
+        (fare_rule_unit_validated ?fare_rule_unit)
+        (not
+          (primary_booking_component_validated ?primary_booking)
+        )
+        (secondary_booking_component_validated ?secondary_booking)
+        (fee_record_available ?cancellation_fee_record)
+      )
+    :effect
+      (and
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_includes_fare_component ?cancellation_fee_record ?fare_component)
+        (fee_record_includes_fare_rule_unit ?cancellation_fee_record ?fare_rule_unit)
+        (fee_record_requires_contract_review ?cancellation_fee_record)
+        (not
+          (fee_record_available ?cancellation_fee_record)
+        )
+      )
+  )
+  (:action assemble_fee_record_with_refund_review
+    :parameters (?primary_booking - primary_booking ?secondary_booking - secondary_booking ?fare_component - fare_component ?fare_rule_unit - fare_rule_unit ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_component_validated ?fare_component)
+        (fare_rule_unit_has_evidence ?fare_rule_unit)
+        (primary_booking_component_validated ?primary_booking)
+        (not
+          (secondary_booking_component_validated ?secondary_booking)
+        )
+        (fee_record_available ?cancellation_fee_record)
+      )
+    :effect
+      (and
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_includes_fare_component ?cancellation_fee_record ?fare_component)
+        (fee_record_includes_fare_rule_unit ?cancellation_fee_record ?fare_rule_unit)
+        (fee_record_requires_refund_review ?cancellation_fee_record)
+        (not
+          (fee_record_available ?cancellation_fee_record)
+        )
+      )
+  )
+  (:action assemble_fee_record_with_full_review
+    :parameters (?primary_booking - primary_booking ?secondary_booking - secondary_booking ?fare_component - fare_component ?fare_rule_unit - fare_rule_unit ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (booking_has_fare_component ?primary_booking ?fare_component)
+        (secondary_booking_fare_rule_bound ?secondary_booking ?fare_rule_unit)
+        (fare_component_has_evidence ?fare_component)
+        (fare_rule_unit_has_evidence ?fare_rule_unit)
+        (not
+          (primary_booking_component_validated ?primary_booking)
+        )
+        (not
+          (secondary_booking_component_validated ?secondary_booking)
+        )
+        (fee_record_available ?cancellation_fee_record)
+      )
+    :effect
+      (and
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_includes_fare_component ?cancellation_fee_record ?fare_component)
+        (fee_record_includes_fare_rule_unit ?cancellation_fee_record ?fare_rule_unit)
+        (fee_record_requires_contract_review ?cancellation_fee_record)
+        (fee_record_requires_refund_review ?cancellation_fee_record)
+        (not
+          (fee_record_available ?cancellation_fee_record)
+        )
+      )
+  )
+  (:action mark_fee_record_ready_for_document_evaluation
+    :parameters (?cancellation_fee_record - cancellation_fee_record ?primary_booking - primary_booking ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (fee_record_created ?cancellation_fee_record)
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (entity_bound_policy_clause ?primary_booking ?policy_rule_clause)
+        (not
+          (fee_record_documents_evaluated ?cancellation_fee_record)
+        )
+      )
+    :effect (fee_record_documents_evaluated ?cancellation_fee_record)
+  )
+  (:action attach_supporting_requirement_to_context
+    :parameters (?evaluation_context - evaluation_context ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (context_associated_fee_record ?evaluation_context ?cancellation_fee_record)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_available ?supporting_document_requirement)
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_documents_evaluated ?cancellation_fee_record)
+        (not
+          (supporting_requirement_attached ?supporting_document_requirement)
+        )
+      )
+    :effect
+      (and
+        (supporting_requirement_attached ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (not
+          (supporting_requirement_available ?supporting_document_requirement)
+        )
+      )
+  )
+  (:action initiate_supporting_document_evaluation
+    :parameters (?evaluation_context - evaluation_context ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_attached ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (entity_bound_policy_clause ?evaluation_context ?policy_rule_clause)
+        (not
+          (fee_record_requires_contract_review ?cancellation_fee_record)
+        )
+        (not
+          (context_contract_verified ?evaluation_context)
+        )
+      )
+    :effect (context_contract_verified ?evaluation_context)
+  )
+  (:action assign_contract_clause_to_context
+    :parameters (?evaluation_context - evaluation_context ?contract_clause - contract_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (contract_clause_available ?contract_clause)
+        (not
+          (context_has_contract_clause ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_has_contract_clause ?evaluation_context)
+        (context_assigned_contract_clause ?evaluation_context ?contract_clause)
+        (not
+          (contract_clause_available ?contract_clause)
+        )
+      )
+  )
+  (:action process_requirement_with_contract_clause
+    :parameters (?evaluation_context - evaluation_context ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record ?policy_rule_clause - policy_rule_clause ?contract_clause - contract_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_attached ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (entity_bound_policy_clause ?evaluation_context ?policy_rule_clause)
+        (fee_record_requires_contract_review ?cancellation_fee_record)
+        (context_has_contract_clause ?evaluation_context)
+        (context_assigned_contract_clause ?evaluation_context ?contract_clause)
+        (not
+          (context_contract_verified ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_contract_verified ?evaluation_context)
+        (context_contract_review_finalized ?evaluation_context)
+      )
+  )
+  (:action apply_refund_component_review
+    :parameters (?evaluation_context - evaluation_context ?refund_component - refund_component ?verifying_authority - verifying_authority ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_verified ?evaluation_context)
+        (context_assigned_refund_component ?evaluation_context ?refund_component)
+        (entity_assigned_verifier ?evaluation_context ?verifying_authority)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (not
+          (fee_record_requires_refund_review ?cancellation_fee_record)
+        )
+        (not
+          (context_contract_review_completed ?evaluation_context)
+        )
+      )
+    :effect (context_contract_review_completed ?evaluation_context)
+  )
+  (:action apply_refund_component_review_with_flag
+    :parameters (?evaluation_context - evaluation_context ?refund_component - refund_component ?verifying_authority - verifying_authority ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_verified ?evaluation_context)
+        (context_assigned_refund_component ?evaluation_context ?refund_component)
+        (entity_assigned_verifier ?evaluation_context ?verifying_authority)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (fee_record_requires_refund_review ?cancellation_fee_record)
+        (not
+          (context_contract_review_completed ?evaluation_context)
+        )
+      )
+    :effect (context_contract_review_completed ?evaluation_context)
+  )
+  (:action escalate_context_for_manual_review
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_review_completed ?evaluation_context)
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (not
+          (fee_record_requires_contract_review ?cancellation_fee_record)
+        )
+        (not
+          (fee_record_requires_refund_review ?cancellation_fee_record)
+        )
+        (not
+          (context_documents_check_passed ?evaluation_context)
+        )
+      )
+    :effect (context_documents_check_passed ?evaluation_context)
+  )
+  (:action escalate_context_for_passenger_profile_and_document_check
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_review_completed ?evaluation_context)
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (fee_record_requires_contract_review ?cancellation_fee_record)
+        (not
+          (fee_record_requires_refund_review ?cancellation_fee_record)
+        )
+        (not
+          (context_documents_check_passed ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_requires_passenger_profile ?evaluation_context)
+      )
+  )
+  (:action escalate_context_for_combined_review
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_review_completed ?evaluation_context)
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (not
+          (fee_record_requires_contract_review ?cancellation_fee_record)
+        )
+        (fee_record_requires_refund_review ?cancellation_fee_record)
+        (not
+          (context_documents_check_passed ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_requires_passenger_profile ?evaluation_context)
+      )
+  )
+  (:action escalate_context_for_extended_review
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step ?supporting_document_requirement - supporting_document_requirement ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (context_contract_review_completed ?evaluation_context)
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (context_has_supporting_requirement ?evaluation_context ?supporting_document_requirement)
+        (supporting_requirement_linked_fee_record ?supporting_document_requirement ?cancellation_fee_record)
+        (fee_record_requires_contract_review ?cancellation_fee_record)
+        (fee_record_requires_refund_review ?cancellation_fee_record)
+        (not
+          (context_documents_check_passed ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_requires_passenger_profile ?evaluation_context)
+      )
+  )
+  (:action finalize_context_and_mark_case_eligible
+    :parameters (?evaluation_context - evaluation_context)
+    :precondition
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (not
+          (context_requires_passenger_profile ?evaluation_context)
+        )
+        (not
+          (evaluation_context_finalized ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (evaluation_context_finalized ?evaluation_context)
+        (entity_decision_eligibility_confirmed ?evaluation_context)
+      )
+  )
+  (:action attach_passenger_profile_to_context
+    :parameters (?evaluation_context - evaluation_context ?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_requires_passenger_profile ?evaluation_context)
+        (passenger_profile_available ?passenger_profile)
+      )
+    :effect
+      (and
+        (context_assigned_passenger_profile ?evaluation_context ?passenger_profile)
+        (not
+          (passenger_profile_available ?passenger_profile)
+        )
+      )
+  )
+  (:action finalize_context_after_profile_and_booking_validations
+    :parameters (?evaluation_context - evaluation_context ?primary_booking - primary_booking ?secondary_booking - secondary_booking ?policy_rule_clause - policy_rule_clause ?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_requires_passenger_profile ?evaluation_context)
+        (context_assigned_passenger_profile ?evaluation_context ?passenger_profile)
+        (context_attached_primary_booking ?evaluation_context ?primary_booking)
+        (context_attached_secondary_booking ?evaluation_context ?secondary_booking)
+        (primary_booking_component_validated ?primary_booking)
+        (secondary_booking_component_validated ?secondary_booking)
+        (entity_bound_policy_clause ?evaluation_context ?policy_rule_clause)
+        (not
+          (context_documentation_complete ?evaluation_context)
+        )
+      )
+    :effect (context_documentation_complete ?evaluation_context)
+  )
+  (:action finalize_context_confirm_eligibility
+    :parameters (?evaluation_context - evaluation_context)
+    :precondition
+      (and
+        (context_documents_check_passed ?evaluation_context)
+        (context_documentation_complete ?evaluation_context)
+        (not
+          (evaluation_context_finalized ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (evaluation_context_finalized ?evaluation_context)
+        (entity_decision_eligibility_confirmed ?evaluation_context)
+      )
+  )
+  (:action apply_special_exception_to_context
+    :parameters (?evaluation_context - evaluation_context ?special_exception - special_exception ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_evaluation_ready ?evaluation_context)
+        (entity_bound_policy_clause ?evaluation_context ?policy_rule_clause)
+        (special_exception_available ?special_exception)
+        (context_assigned_special_exception ?evaluation_context ?special_exception)
+        (not
+          (context_special_exception_flag ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (context_special_exception_flag ?evaluation_context)
+        (not
+          (special_exception_available ?special_exception)
+        )
+      )
+  )
+  (:action verify_context_with_assigned_verifier
+    :parameters (?evaluation_context - evaluation_context ?verifying_authority - verifying_authority)
+    :precondition
+      (and
+        (context_special_exception_flag ?evaluation_context)
+        (entity_assigned_verifier ?evaluation_context ?verifying_authority)
+        (not
+          (context_verifier_attached ?evaluation_context)
+        )
+      )
+    :effect (context_verifier_attached ?evaluation_context)
+  )
+  (:action attach_escalation_step_to_context_after_verification
+    :parameters (?evaluation_context - evaluation_context ?escalation_step - escalation_step)
+    :precondition
+      (and
+        (context_verifier_attached ?evaluation_context)
+        (context_assigned_escalation_step ?evaluation_context ?escalation_step)
+        (not
+          (context_escalation_ready ?evaluation_context)
+        )
+      )
+    :effect (context_escalation_ready ?evaluation_context)
+  )
+  (:action finalize_context_after_escalation
+    :parameters (?evaluation_context - evaluation_context)
+    :precondition
+      (and
+        (context_escalation_ready ?evaluation_context)
+        (not
+          (evaluation_context_finalized ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (evaluation_context_finalized ?evaluation_context)
+        (entity_decision_eligibility_confirmed ?evaluation_context)
+      )
+  )
+  (:action finalize_primary_booking_decision
+    :parameters (?primary_booking - primary_booking ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (primary_booking_ready_for_fee_assembly ?primary_booking)
+        (primary_booking_component_validated ?primary_booking)
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_documents_evaluated ?cancellation_fee_record)
+        (not
+          (entity_decision_eligibility_confirmed ?primary_booking)
+        )
+      )
+    :effect (entity_decision_eligibility_confirmed ?primary_booking)
+  )
+  (:action finalize_secondary_booking_decision
+    :parameters (?secondary_booking - secondary_booking ?cancellation_fee_record - cancellation_fee_record)
+    :precondition
+      (and
+        (secondary_booking_ready_for_fee_assembly ?secondary_booking)
+        (secondary_booking_component_validated ?secondary_booking)
+        (fee_record_created ?cancellation_fee_record)
+        (fee_record_documents_evaluated ?cancellation_fee_record)
+        (not
+          (entity_decision_eligibility_confirmed ?secondary_booking)
+        )
+      )
+    :effect (entity_decision_eligibility_confirmed ?secondary_booking)
+  )
+  (:action apply_evidence_bundle_to_case
+    :parameters (?cancellation_case - cancellation_case ?evidence_bundle - evidence_bundle ?policy_rule_clause - policy_rule_clause)
+    :precondition
+      (and
+        (entity_decision_eligibility_confirmed ?cancellation_case)
+        (entity_bound_policy_clause ?cancellation_case ?policy_rule_clause)
+        (evidence_bundle_available ?evidence_bundle)
+        (not
+          (entity_evidence_attached ?cancellation_case)
+        )
+      )
+    :effect
+      (and
+        (entity_evidence_attached ?cancellation_case)
+        (entity_has_evidence_bundle ?cancellation_case ?evidence_bundle)
+        (not
+          (evidence_bundle_available ?evidence_bundle)
+        )
+      )
+  )
+  (:action finalize_primary_booking_with_evidence
+    :parameters (?primary_booking - primary_booking ?document_type - document_type ?evidence_bundle - evidence_bundle)
+    :precondition
+      (and
+        (entity_evidence_attached ?primary_booking)
+        (entity_has_document_type ?primary_booking ?document_type)
+        (entity_has_evidence_bundle ?primary_booking ?evidence_bundle)
+        (not
+          (ready_for_final_resolution ?primary_booking)
+        )
+      )
+    :effect
+      (and
+        (ready_for_final_resolution ?primary_booking)
+        (document_type_available ?document_type)
+        (evidence_bundle_available ?evidence_bundle)
+      )
+  )
+  (:action finalize_secondary_booking_with_evidence
+    :parameters (?secondary_booking - secondary_booking ?document_type - document_type ?evidence_bundle - evidence_bundle)
+    :precondition
+      (and
+        (entity_evidence_attached ?secondary_booking)
+        (entity_has_document_type ?secondary_booking ?document_type)
+        (entity_has_evidence_bundle ?secondary_booking ?evidence_bundle)
+        (not
+          (ready_for_final_resolution ?secondary_booking)
+        )
+      )
+    :effect
+      (and
+        (ready_for_final_resolution ?secondary_booking)
+        (document_type_available ?document_type)
+        (evidence_bundle_available ?evidence_bundle)
+      )
+  )
+  (:action finalize_context_with_evidence
+    :parameters (?evaluation_context - evaluation_context ?document_type - document_type ?evidence_bundle - evidence_bundle)
+    :precondition
+      (and
+        (entity_evidence_attached ?evaluation_context)
+        (entity_has_document_type ?evaluation_context ?document_type)
+        (entity_has_evidence_bundle ?evaluation_context ?evidence_bundle)
+        (not
+          (ready_for_final_resolution ?evaluation_context)
+        )
+      )
+    :effect
+      (and
+        (ready_for_final_resolution ?evaluation_context)
+        (document_type_available ?document_type)
+        (evidence_bundle_available ?evidence_bundle)
+      )
+  )
+)

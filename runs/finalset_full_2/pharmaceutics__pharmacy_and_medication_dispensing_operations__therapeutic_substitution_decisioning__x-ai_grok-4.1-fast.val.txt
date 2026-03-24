@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmacy_therapeutic_substitution_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types pharmacy_domain_entity - object resource_registry_group - object asset_group - object prescription_case_root - object prescription_case - prescription_case_root drug_product_candidate - pharmacy_domain_entity pharmacist - pharmacy_domain_entity prescriber_clinician - pharmacy_domain_entity special_handling_option - pharmacy_domain_entity patient_instruction_template - pharmacy_domain_entity patient_instruction_asset - pharmacy_domain_entity clinical_check_record - pharmacy_domain_entity clinical_override_record - pharmacy_domain_entity transient_resource_token - resource_registry_group label_template - resource_registry_group insurance_authorization_record - resource_registry_group formulation_component - asset_group packaging_component - asset_group package_unit - asset_group prescription_assignment_group - prescription_case prescription_line_group - prescription_case pharmacist_dispense_task - prescription_assignment_group technician_dispense_task - prescription_assignment_group prescription_line - prescription_line_group)
+  (:predicates
+    (prescription_case_registered ?prescription_case - prescription_case)
+    (pharmacist_review_completed_for_entity ?prescription_case - prescription_case)
+    (substitution_candidate_selected ?prescription_case - prescription_case)
+    (dispense_finalized_for_entity ?prescription_case - prescription_case)
+    (final_verification_completed_for_entity ?prescription_case - prescription_case)
+    (patient_instructions_attached_for_entity ?prescription_case - prescription_case)
+    (candidate_available ?drug_product_candidate - drug_product_candidate)
+    (selected_substitution_candidate_for_entity ?prescription_case - prescription_case ?drug_product_candidate - drug_product_candidate)
+    (pharmacist_available ?pharmacist - pharmacist)
+    (assigned_pharmacist_for_entity ?prescription_case - prescription_case ?pharmacist - pharmacist)
+    (prescriber_available ?prescriber_clinician - prescriber_clinician)
+    (authorization_request_pending_for_entity ?prescription_case - prescription_case ?prescriber_clinician - prescriber_clinician)
+    (transient_resource_available ?transient_resource_token - transient_resource_token)
+    (reserved_resource_for_pharmacist_task ?pharmacist_dispense_task - pharmacist_dispense_task ?transient_resource_token - transient_resource_token)
+    (reserved_resource_for_technician_task ?technician_dispense_task - technician_dispense_task ?transient_resource_token - transient_resource_token)
+    (dispense_task_requires_component ?pharmacist_dispense_task - pharmacist_dispense_task ?formulation_component - formulation_component)
+    (component_reserved ?formulation_component - formulation_component)
+    (component_staged ?formulation_component - formulation_component)
+    (formulation_component_confirmed_for_task ?pharmacist_dispense_task - pharmacist_dispense_task)
+    (technician_task_requires_packaging_component ?technician_dispense_task - technician_dispense_task ?packaging_component - packaging_component)
+    (packaging_component_reserved ?packaging_component - packaging_component)
+    (packaging_component_staged ?packaging_component - packaging_component)
+    (packaging_component_confirmed_for_task ?technician_dispense_task - technician_dispense_task)
+    (package_unit_available ?package_unit - package_unit)
+    (package_unit_allocated ?package_unit - package_unit)
+    (package_unit_has_formulation_component ?package_unit - package_unit ?formulation_component - formulation_component)
+    (package_unit_has_packaging_component ?package_unit - package_unit ?packaging_component - packaging_component)
+    (package_unit_requires_special_handling ?package_unit - package_unit)
+    (package_unit_requires_clinical_check ?package_unit - package_unit)
+    (package_unit_packaging_complete ?package_unit - package_unit)
+    (prescription_line_assigned_to_pharmacist_task ?prescription_line - prescription_line ?pharmacist_dispense_task - pharmacist_dispense_task)
+    (prescription_line_assigned_to_technician_task ?prescription_line - prescription_line ?technician_dispense_task - technician_dispense_task)
+    (prescription_line_assigned_package_unit ?prescription_line - prescription_line ?package_unit - package_unit)
+    (label_template_available ?label_template - label_template)
+    (line_label_template_association ?prescription_line - prescription_line ?label_template - label_template)
+    (label_template_bound ?label_template - label_template)
+    (label_template_bound_to_package_unit ?label_template - label_template ?package_unit - package_unit)
+    (label_binding_ready ?prescription_line - prescription_line)
+    (label_applied_to_line ?prescription_line - prescription_line)
+    (clinical_check_passed ?prescription_line - prescription_line)
+    (special_handling_assigned ?prescription_line - prescription_line)
+    (special_handling_applied ?prescription_line - prescription_line)
+    (label_and_instruction_binding_completed ?prescription_line - prescription_line)
+    (final_checks_completed_for_line ?prescription_line - prescription_line)
+    (authorization_record_available ?insurance_authorization_record - insurance_authorization_record)
+    (prescription_line_has_authorization_record ?prescription_line - prescription_line ?insurance_authorization_record - insurance_authorization_record)
+    (authorization_applied_to_line ?prescription_line - prescription_line)
+    (authorization_in_progress_for_line ?prescription_line - prescription_line)
+    (prescriber_response_recorded ?prescription_line - prescription_line)
+    (special_handling_option_available ?special_handling_option - special_handling_option)
+    (line_special_handling_association ?prescription_line - prescription_line ?special_handling_option - special_handling_option)
+    (patient_instruction_template_available ?patient_instruction_template - patient_instruction_template)
+    (line_bound_patient_instruction_template ?prescription_line - prescription_line ?patient_instruction_template - patient_instruction_template)
+    (clinical_check_record_available ?clinical_check_record - clinical_check_record)
+    (line_clinical_check_bound ?prescription_line - prescription_line ?clinical_check_record - clinical_check_record)
+    (clinical_override_record_available ?clinical_override_record - clinical_override_record)
+    (line_override_record_bound ?prescription_line - prescription_line ?clinical_override_record - clinical_override_record)
+    (patient_instruction_asset_available ?patient_instruction_asset - patient_instruction_asset)
+    (has_patient_instruction_asset_for_entity ?prescription_case - prescription_case ?patient_instruction_asset - patient_instruction_asset)
+    (dispense_task_components_ready ?pharmacist_dispense_task - pharmacist_dispense_task)
+    (technician_task_components_ready ?technician_dispense_task - technician_dispense_task)
+    (prescription_line_verification_completed ?prescription_line - prescription_line)
+  )
+  (:action register_prescription_case
+    :parameters (?prescription_case - prescription_case)
+    :precondition
+      (and
+        (not
+          (prescription_case_registered ?prescription_case)
+        )
+        (not
+          (dispense_finalized_for_entity ?prescription_case)
+        )
+      )
+    :effect (prescription_case_registered ?prescription_case)
+  )
+  (:action select_substitution_candidate_for_case
+    :parameters (?prescription_case - prescription_case ?drug_product_candidate - drug_product_candidate)
+    :precondition
+      (and
+        (prescription_case_registered ?prescription_case)
+        (not
+          (substitution_candidate_selected ?prescription_case)
+        )
+        (candidate_available ?drug_product_candidate)
+      )
+    :effect
+      (and
+        (substitution_candidate_selected ?prescription_case)
+        (selected_substitution_candidate_for_entity ?prescription_case ?drug_product_candidate)
+        (not
+          (candidate_available ?drug_product_candidate)
+        )
+      )
+  )
+  (:action assign_pharmacist_to_case
+    :parameters (?prescription_case - prescription_case ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (prescription_case_registered ?prescription_case)
+        (substitution_candidate_selected ?prescription_case)
+        (pharmacist_available ?pharmacist)
+      )
+    :effect
+      (and
+        (assigned_pharmacist_for_entity ?prescription_case ?pharmacist)
+        (not
+          (pharmacist_available ?pharmacist)
+        )
+      )
+  )
+  (:action complete_pharmacist_review
+    :parameters (?prescription_case - prescription_case ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (prescription_case_registered ?prescription_case)
+        (substitution_candidate_selected ?prescription_case)
+        (assigned_pharmacist_for_entity ?prescription_case ?pharmacist)
+        (not
+          (pharmacist_review_completed_for_entity ?prescription_case)
+        )
+      )
+    :effect (pharmacist_review_completed_for_entity ?prescription_case)
+  )
+  (:action release_pharmacist_assignment
+    :parameters (?prescription_case - prescription_case ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (assigned_pharmacist_for_entity ?prescription_case ?pharmacist)
+      )
+    :effect
+      (and
+        (pharmacist_available ?pharmacist)
+        (not
+          (assigned_pharmacist_for_entity ?prescription_case ?pharmacist)
+        )
+      )
+  )
+  (:action request_prescriber_authorization_for_case
+    :parameters (?prescription_case - prescription_case ?prescriber_clinician - prescriber_clinician)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_case)
+        (prescriber_available ?prescriber_clinician)
+      )
+    :effect
+      (and
+        (authorization_request_pending_for_entity ?prescription_case ?prescriber_clinician)
+        (not
+          (prescriber_available ?prescriber_clinician)
+        )
+      )
+  )
+  (:action cancel_prescriber_authorization_request
+    :parameters (?prescription_case - prescription_case ?prescriber_clinician - prescriber_clinician)
+    :precondition
+      (and
+        (authorization_request_pending_for_entity ?prescription_case ?prescriber_clinician)
+      )
+    :effect
+      (and
+        (prescriber_available ?prescriber_clinician)
+        (not
+          (authorization_request_pending_for_entity ?prescription_case ?prescriber_clinician)
+        )
+      )
+  )
+  (:action assign_clinical_check_to_line
+    :parameters (?prescription_line - prescription_line ?clinical_check_record - clinical_check_record)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (clinical_check_record_available ?clinical_check_record)
+      )
+    :effect
+      (and
+        (line_clinical_check_bound ?prescription_line ?clinical_check_record)
+        (not
+          (clinical_check_record_available ?clinical_check_record)
+        )
+      )
+  )
+  (:action release_clinical_check_from_line
+    :parameters (?prescription_line - prescription_line ?clinical_check_record - clinical_check_record)
+    :precondition
+      (and
+        (line_clinical_check_bound ?prescription_line ?clinical_check_record)
+      )
+    :effect
+      (and
+        (clinical_check_record_available ?clinical_check_record)
+        (not
+          (line_clinical_check_bound ?prescription_line ?clinical_check_record)
+        )
+      )
+  )
+  (:action assign_override_record_to_line
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (clinical_override_record_available ?clinical_override_record)
+      )
+    :effect
+      (and
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (not
+          (clinical_override_record_available ?clinical_override_record)
+        )
+      )
+  )
+  (:action release_override_record_from_line
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record)
+    :precondition
+      (and
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+      )
+    :effect
+      (and
+        (clinical_override_record_available ?clinical_override_record)
+        (not
+          (line_override_record_bound ?prescription_line ?clinical_override_record)
+        )
+      )
+  )
+  (:action reserve_formulation_component_for_task
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?formulation_component - formulation_component ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?pharmacist_dispense_task)
+        (assigned_pharmacist_for_entity ?pharmacist_dispense_task ?pharmacist)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (not
+          (component_reserved ?formulation_component)
+        )
+        (not
+          (component_staged ?formulation_component)
+        )
+      )
+    :effect (component_reserved ?formulation_component)
+  )
+  (:action finalize_formulation_component_with_prescriber
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?formulation_component - formulation_component ?prescriber_clinician - prescriber_clinician)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?pharmacist_dispense_task)
+        (authorization_request_pending_for_entity ?pharmacist_dispense_task ?prescriber_clinician)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (component_reserved ?formulation_component)
+        (not
+          (dispense_task_components_ready ?pharmacist_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+      )
+  )
+  (:action stage_formulation_component_with_resource
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?formulation_component - formulation_component ?transient_resource_token - transient_resource_token)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?pharmacist_dispense_task)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (transient_resource_available ?transient_resource_token)
+        (not
+          (dispense_task_components_ready ?pharmacist_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (component_staged ?formulation_component)
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (reserved_resource_for_pharmacist_task ?pharmacist_dispense_task ?transient_resource_token)
+        (not
+          (transient_resource_available ?transient_resource_token)
+        )
+      )
+  )
+  (:action finalize_staged_formulation_component
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?formulation_component - formulation_component ?pharmacist - pharmacist ?transient_resource_token - transient_resource_token)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?pharmacist_dispense_task)
+        (assigned_pharmacist_for_entity ?pharmacist_dispense_task ?pharmacist)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (component_staged ?formulation_component)
+        (reserved_resource_for_pharmacist_task ?pharmacist_dispense_task ?transient_resource_token)
+        (not
+          (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (component_reserved ?formulation_component)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        (transient_resource_available ?transient_resource_token)
+        (not
+          (reserved_resource_for_pharmacist_task ?pharmacist_dispense_task ?transient_resource_token)
+        )
+      )
+  )
+  (:action reserve_packaging_component_for_task
+    :parameters (?technician_dispense_task - technician_dispense_task ?packaging_component - packaging_component ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?technician_dispense_task)
+        (assigned_pharmacist_for_entity ?technician_dispense_task ?pharmacist)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (not
+          (packaging_component_reserved ?packaging_component)
+        )
+        (not
+          (packaging_component_staged ?packaging_component)
+        )
+      )
+    :effect (packaging_component_reserved ?packaging_component)
+  )
+  (:action finalize_packaging_component_with_prescriber
+    :parameters (?technician_dispense_task - technician_dispense_task ?packaging_component - packaging_component ?prescriber_clinician - prescriber_clinician)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?technician_dispense_task)
+        (authorization_request_pending_for_entity ?technician_dispense_task ?prescriber_clinician)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (packaging_component_reserved ?packaging_component)
+        (not
+          (technician_task_components_ready ?technician_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (technician_task_components_ready ?technician_dispense_task)
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+      )
+  )
+  (:action stage_packaging_component_with_resource
+    :parameters (?technician_dispense_task - technician_dispense_task ?packaging_component - packaging_component ?transient_resource_token - transient_resource_token)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?technician_dispense_task)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (transient_resource_available ?transient_resource_token)
+        (not
+          (technician_task_components_ready ?technician_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (packaging_component_staged ?packaging_component)
+        (technician_task_components_ready ?technician_dispense_task)
+        (reserved_resource_for_technician_task ?technician_dispense_task ?transient_resource_token)
+        (not
+          (transient_resource_available ?transient_resource_token)
+        )
+      )
+  )
+  (:action finalize_staged_packaging_component
+    :parameters (?technician_dispense_task - technician_dispense_task ?packaging_component - packaging_component ?pharmacist - pharmacist ?transient_resource_token - transient_resource_token)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?technician_dispense_task)
+        (assigned_pharmacist_for_entity ?technician_dispense_task ?pharmacist)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (packaging_component_staged ?packaging_component)
+        (reserved_resource_for_technician_task ?technician_dispense_task ?transient_resource_token)
+        (not
+          (packaging_component_confirmed_for_task ?technician_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (packaging_component_reserved ?packaging_component)
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+        (transient_resource_available ?transient_resource_token)
+        (not
+          (reserved_resource_for_technician_task ?technician_dispense_task ?transient_resource_token)
+        )
+      )
+  )
+  (:action assemble_package_unit_from_components
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?technician_dispense_task - technician_dispense_task ?formulation_component - formulation_component ?packaging_component - packaging_component ?package_unit - package_unit)
+    :precondition
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (technician_task_components_ready ?technician_dispense_task)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (component_reserved ?formulation_component)
+        (packaging_component_reserved ?packaging_component)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_allocated ?package_unit)
+        (package_unit_has_formulation_component ?package_unit ?formulation_component)
+        (package_unit_has_packaging_component ?package_unit ?packaging_component)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action assemble_package_unit_with_formulation_staged
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?technician_dispense_task - technician_dispense_task ?formulation_component - formulation_component ?packaging_component - packaging_component ?package_unit - package_unit)
+    :precondition
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (technician_task_components_ready ?technician_dispense_task)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (component_staged ?formulation_component)
+        (packaging_component_reserved ?packaging_component)
+        (not
+          (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        )
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_allocated ?package_unit)
+        (package_unit_has_formulation_component ?package_unit ?formulation_component)
+        (package_unit_has_packaging_component ?package_unit ?packaging_component)
+        (package_unit_requires_special_handling ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action assemble_package_unit_with_packaging_staged
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?technician_dispense_task - technician_dispense_task ?formulation_component - formulation_component ?packaging_component - packaging_component ?package_unit - package_unit)
+    :precondition
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (technician_task_components_ready ?technician_dispense_task)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (component_reserved ?formulation_component)
+        (packaging_component_staged ?packaging_component)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        (not
+          (packaging_component_confirmed_for_task ?technician_dispense_task)
+        )
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_allocated ?package_unit)
+        (package_unit_has_formulation_component ?package_unit ?formulation_component)
+        (package_unit_has_packaging_component ?package_unit ?packaging_component)
+        (package_unit_requires_clinical_check ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action assemble_package_unit_with_all_components_staged
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?technician_dispense_task - technician_dispense_task ?formulation_component - formulation_component ?packaging_component - packaging_component ?package_unit - package_unit)
+    :precondition
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (technician_task_components_ready ?technician_dispense_task)
+        (dispense_task_requires_component ?pharmacist_dispense_task ?formulation_component)
+        (technician_task_requires_packaging_component ?technician_dispense_task ?packaging_component)
+        (component_staged ?formulation_component)
+        (packaging_component_staged ?packaging_component)
+        (not
+          (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        )
+        (not
+          (packaging_component_confirmed_for_task ?technician_dispense_task)
+        )
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_allocated ?package_unit)
+        (package_unit_has_formulation_component ?package_unit ?formulation_component)
+        (package_unit_has_packaging_component ?package_unit ?packaging_component)
+        (package_unit_requires_special_handling ?package_unit)
+        (package_unit_requires_clinical_check ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action complete_package_unit_packaging
+    :parameters (?package_unit - package_unit ?pharmacist_dispense_task - pharmacist_dispense_task ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (package_unit_allocated ?package_unit)
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (assigned_pharmacist_for_entity ?pharmacist_dispense_task ?pharmacist)
+        (not
+          (package_unit_packaging_complete ?package_unit)
+        )
+      )
+    :effect (package_unit_packaging_complete ?package_unit)
+  )
+  (:action bind_label_template_to_package_unit
+    :parameters (?prescription_line - prescription_line ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (prescription_line_assigned_package_unit ?prescription_line ?package_unit)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_available ?label_template)
+        (package_unit_allocated ?package_unit)
+        (package_unit_packaging_complete ?package_unit)
+        (not
+          (label_template_bound ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action prepare_label_binding_for_line
+    :parameters (?prescription_line - prescription_line ?label_template - label_template ?package_unit - package_unit ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (assigned_pharmacist_for_entity ?prescription_line ?pharmacist)
+        (not
+          (package_unit_requires_special_handling ?package_unit)
+        )
+        (not
+          (label_binding_ready ?prescription_line)
+        )
+      )
+    :effect (label_binding_ready ?prescription_line)
+  )
+  (:action assign_special_handling_option_to_line
+    :parameters (?prescription_line - prescription_line ?special_handling_option - special_handling_option)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (special_handling_option_available ?special_handling_option)
+        (not
+          (special_handling_assigned ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (special_handling_assigned ?prescription_line)
+        (line_special_handling_association ?prescription_line ?special_handling_option)
+        (not
+          (special_handling_option_available ?special_handling_option)
+        )
+      )
+  )
+  (:action finalize_label_binding_with_special_handling
+    :parameters (?prescription_line - prescription_line ?label_template - label_template ?package_unit - package_unit ?pharmacist - pharmacist ?special_handling_option - special_handling_option)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (assigned_pharmacist_for_entity ?prescription_line ?pharmacist)
+        (package_unit_requires_special_handling ?package_unit)
+        (special_handling_assigned ?prescription_line)
+        (line_special_handling_association ?prescription_line ?special_handling_option)
+        (not
+          (label_binding_ready ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (label_binding_ready ?prescription_line)
+        (special_handling_applied ?prescription_line)
+      )
+  )
+  (:action initiate_clinical_check_for_label_binding
+    :parameters (?prescription_line - prescription_line ?clinical_check_record - clinical_check_record ?prescriber_clinician - prescriber_clinician ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_binding_ready ?prescription_line)
+        (line_clinical_check_bound ?prescription_line ?clinical_check_record)
+        (authorization_request_pending_for_entity ?prescription_line ?prescriber_clinician)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_unit_requires_clinical_check ?package_unit)
+        )
+        (not
+          (label_applied_to_line ?prescription_line)
+        )
+      )
+    :effect (label_applied_to_line ?prescription_line)
+  )
+  (:action apply_label_binding_after_special_flag
+    :parameters (?prescription_line - prescription_line ?clinical_check_record - clinical_check_record ?prescriber_clinician - prescriber_clinician ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_binding_ready ?prescription_line)
+        (line_clinical_check_bound ?prescription_line ?clinical_check_record)
+        (authorization_request_pending_for_entity ?prescription_line ?prescriber_clinician)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (package_unit_requires_clinical_check ?package_unit)
+        (not
+          (label_applied_to_line ?prescription_line)
+        )
+      )
+    :effect (label_applied_to_line ?prescription_line)
+  )
+  (:action complete_clinical_override_check
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_applied_to_line ?prescription_line)
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_unit_requires_special_handling ?package_unit)
+        )
+        (not
+          (package_unit_requires_clinical_check ?package_unit)
+        )
+        (not
+          (clinical_check_passed ?prescription_line)
+        )
+      )
+    :effect (clinical_check_passed ?prescription_line)
+  )
+  (:action complete_clinical_override_and_bind_instruction
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_applied_to_line ?prescription_line)
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (package_unit_requires_special_handling ?package_unit)
+        (not
+          (package_unit_requires_clinical_check ?package_unit)
+        )
+        (not
+          (clinical_check_passed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (clinical_check_passed ?prescription_line)
+        (label_and_instruction_binding_completed ?prescription_line)
+      )
+  )
+  (:action complete_clinical_override_and_bind_instruction_alt
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_applied_to_line ?prescription_line)
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_unit_requires_special_handling ?package_unit)
+        )
+        (package_unit_requires_clinical_check ?package_unit)
+        (not
+          (clinical_check_passed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (clinical_check_passed ?prescription_line)
+        (label_and_instruction_binding_completed ?prescription_line)
+      )
+  )
+  (:action complete_clinical_override_and_bind_instruction_full
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (label_applied_to_line ?prescription_line)
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (line_label_template_association ?prescription_line ?label_template)
+        (label_template_bound_to_package_unit ?label_template ?package_unit)
+        (package_unit_requires_special_handling ?package_unit)
+        (package_unit_requires_clinical_check ?package_unit)
+        (not
+          (clinical_check_passed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (clinical_check_passed ?prescription_line)
+        (label_and_instruction_binding_completed ?prescription_line)
+      )
+  )
+  (:action perform_final_verification_for_line
+    :parameters (?prescription_line - prescription_line)
+    :precondition
+      (and
+        (clinical_check_passed ?prescription_line)
+        (not
+          (label_and_instruction_binding_completed ?prescription_line)
+        )
+        (not
+          (prescription_line_verification_completed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (prescription_line_verification_completed ?prescription_line)
+        (final_verification_completed_for_entity ?prescription_line)
+      )
+  )
+  (:action bind_patient_instruction_template_to_line
+    :parameters (?prescription_line - prescription_line ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (clinical_check_passed ?prescription_line)
+        (label_and_instruction_binding_completed ?prescription_line)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+    :effect
+      (and
+        (line_bound_patient_instruction_template ?prescription_line ?patient_instruction_template)
+        (not
+          (patient_instruction_template_available ?patient_instruction_template)
+        )
+      )
+  )
+  (:action perform_final_verification_and_mark_for_release
+    :parameters (?prescription_line - prescription_line ?pharmacist_dispense_task - pharmacist_dispense_task ?technician_dispense_task - technician_dispense_task ?pharmacist - pharmacist ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (clinical_check_passed ?prescription_line)
+        (label_and_instruction_binding_completed ?prescription_line)
+        (line_bound_patient_instruction_template ?prescription_line ?patient_instruction_template)
+        (prescription_line_assigned_to_pharmacist_task ?prescription_line ?pharmacist_dispense_task)
+        (prescription_line_assigned_to_technician_task ?prescription_line ?technician_dispense_task)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+        (assigned_pharmacist_for_entity ?prescription_line ?pharmacist)
+        (not
+          (final_checks_completed_for_line ?prescription_line)
+        )
+      )
+    :effect (final_checks_completed_for_line ?prescription_line)
+  )
+  (:action perform_final_verification_with_alternate_checks
+    :parameters (?prescription_line - prescription_line)
+    :precondition
+      (and
+        (clinical_check_passed ?prescription_line)
+        (final_checks_completed_for_line ?prescription_line)
+        (not
+          (prescription_line_verification_completed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (prescription_line_verification_completed ?prescription_line)
+        (final_verification_completed_for_entity ?prescription_line)
+      )
+  )
+  (:action request_authorization_and_mark_line
+    :parameters (?prescription_line - prescription_line ?insurance_authorization_record - insurance_authorization_record ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (pharmacist_review_completed_for_entity ?prescription_line)
+        (assigned_pharmacist_for_entity ?prescription_line ?pharmacist)
+        (authorization_record_available ?insurance_authorization_record)
+        (prescription_line_has_authorization_record ?prescription_line ?insurance_authorization_record)
+        (not
+          (authorization_applied_to_line ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (authorization_applied_to_line ?prescription_line)
+        (not
+          (authorization_record_available ?insurance_authorization_record)
+        )
+      )
+  )
+  (:action apply_prescriber_response
+    :parameters (?prescription_line - prescription_line ?prescriber_clinician - prescriber_clinician)
+    :precondition
+      (and
+        (authorization_applied_to_line ?prescription_line)
+        (authorization_request_pending_for_entity ?prescription_line ?prescriber_clinician)
+        (not
+          (authorization_in_progress_for_line ?prescription_line)
+        )
+      )
+    :effect (authorization_in_progress_for_line ?prescription_line)
+  )
+  (:action record_prescriber_response_and_bind_override
+    :parameters (?prescription_line - prescription_line ?clinical_override_record - clinical_override_record)
+    :precondition
+      (and
+        (authorization_in_progress_for_line ?prescription_line)
+        (line_override_record_bound ?prescription_line ?clinical_override_record)
+        (not
+          (prescriber_response_recorded ?prescription_line)
+        )
+      )
+    :effect (prescriber_response_recorded ?prescription_line)
+  )
+  (:action finalize_after_prescriber_response
+    :parameters (?prescription_line - prescription_line)
+    :precondition
+      (and
+        (prescriber_response_recorded ?prescription_line)
+        (not
+          (prescription_line_verification_completed ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (prescription_line_verification_completed ?prescription_line)
+        (final_verification_completed_for_entity ?prescription_line)
+      )
+  )
+  (:action finalize_dispense_task_by_pharmacist
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?package_unit - package_unit)
+    :precondition
+      (and
+        (dispense_task_components_ready ?pharmacist_dispense_task)
+        (formulation_component_confirmed_for_task ?pharmacist_dispense_task)
+        (package_unit_allocated ?package_unit)
+        (package_unit_packaging_complete ?package_unit)
+        (not
+          (final_verification_completed_for_entity ?pharmacist_dispense_task)
+        )
+      )
+    :effect (final_verification_completed_for_entity ?pharmacist_dispense_task)
+  )
+  (:action finalize_dispense_task_by_technician
+    :parameters (?technician_dispense_task - technician_dispense_task ?package_unit - package_unit)
+    :precondition
+      (and
+        (technician_task_components_ready ?technician_dispense_task)
+        (packaging_component_confirmed_for_task ?technician_dispense_task)
+        (package_unit_allocated ?package_unit)
+        (package_unit_packaging_complete ?package_unit)
+        (not
+          (final_verification_completed_for_entity ?technician_dispense_task)
+        )
+      )
+    :effect (final_verification_completed_for_entity ?technician_dispense_task)
+  )
+  (:action generate_patient_instructions_for_case
+    :parameters (?prescription_case - prescription_case ?patient_instruction_asset - patient_instruction_asset ?pharmacist - pharmacist)
+    :precondition
+      (and
+        (final_verification_completed_for_entity ?prescription_case)
+        (assigned_pharmacist_for_entity ?prescription_case ?pharmacist)
+        (patient_instruction_asset_available ?patient_instruction_asset)
+        (not
+          (patient_instructions_attached_for_entity ?prescription_case)
+        )
+      )
+    :effect
+      (and
+        (patient_instructions_attached_for_entity ?prescription_case)
+        (has_patient_instruction_asset_for_entity ?prescription_case ?patient_instruction_asset)
+        (not
+          (patient_instruction_asset_available ?patient_instruction_asset)
+        )
+      )
+  )
+  (:action finalize_dispense_task_and_release_candidate
+    :parameters (?pharmacist_dispense_task - pharmacist_dispense_task ?drug_product_candidate - drug_product_candidate ?patient_instruction_asset - patient_instruction_asset)
+    :precondition
+      (and
+        (patient_instructions_attached_for_entity ?pharmacist_dispense_task)
+        (selected_substitution_candidate_for_entity ?pharmacist_dispense_task ?drug_product_candidate)
+        (has_patient_instruction_asset_for_entity ?pharmacist_dispense_task ?patient_instruction_asset)
+        (not
+          (dispense_finalized_for_entity ?pharmacist_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (dispense_finalized_for_entity ?pharmacist_dispense_task)
+        (candidate_available ?drug_product_candidate)
+        (patient_instruction_asset_available ?patient_instruction_asset)
+      )
+  )
+  (:action finalize_dispense_task_and_release_candidate_technician
+    :parameters (?technician_dispense_task - technician_dispense_task ?drug_product_candidate - drug_product_candidate ?patient_instruction_asset - patient_instruction_asset)
+    :precondition
+      (and
+        (patient_instructions_attached_for_entity ?technician_dispense_task)
+        (selected_substitution_candidate_for_entity ?technician_dispense_task ?drug_product_candidate)
+        (has_patient_instruction_asset_for_entity ?technician_dispense_task ?patient_instruction_asset)
+        (not
+          (dispense_finalized_for_entity ?technician_dispense_task)
+        )
+      )
+    :effect
+      (and
+        (dispense_finalized_for_entity ?technician_dispense_task)
+        (candidate_available ?drug_product_candidate)
+        (patient_instruction_asset_available ?patient_instruction_asset)
+      )
+  )
+  (:action finalize_line_and_release_candidate
+    :parameters (?prescription_line - prescription_line ?drug_product_candidate - drug_product_candidate ?patient_instruction_asset - patient_instruction_asset)
+    :precondition
+      (and
+        (patient_instructions_attached_for_entity ?prescription_line)
+        (selected_substitution_candidate_for_entity ?prescription_line ?drug_product_candidate)
+        (has_patient_instruction_asset_for_entity ?prescription_line ?patient_instruction_asset)
+        (not
+          (dispense_finalized_for_entity ?prescription_line)
+        )
+      )
+    :effect
+      (and
+        (dispense_finalized_for_entity ?prescription_line)
+        (candidate_available ?drug_product_candidate)
+        (patient_instruction_asset_available ?patient_instruction_asset)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem therapeutic_substitution_case)
+  (:domain pharmacy_therapeutic_substitution_domain)
+  (:objects pharmacist_dispense_task_1 - pharmacist_dispense_task technician_dispense_task_1 - technician_dispense_task prescription_line_primary - prescription_line prescription_line_secondary - prescription_line candidate_product_a - drug_product_candidate candidate_product_b - drug_product_candidate candidate_product_c - drug_product_candidate pharmacist_1 - pharmacist prescriber_1 - prescriber_clinician resource_token_1 - transient_resource_token formulation_component_1 - formulation_component packaging_component_1 - packaging_component package_unit_1 - package_unit label_template_standard - label_template label_template_alternate - label_template special_handling_refrigeration - special_handling_option special_handling_controlled_substance - special_handling_option patient_instruction_template_standard - patient_instruction_template patient_instruction_template_condensed - patient_instruction_template patient_instruction_asset_1 - patient_instruction_asset clinical_check_record_1 - clinical_check_record insurance_authorization_record_a - insurance_authorization_record insurance_authorization_record_b - insurance_authorization_record clinical_override_record_1 - clinical_override_record)
+  (:init
+    (candidate_available candidate_product_a)
+    (candidate_available candidate_product_b)
+    (candidate_available candidate_product_c)
+    (pharmacist_available pharmacist_1)
+    (prescriber_available prescriber_1)
+    (transient_resource_available resource_token_1)
+    (dispense_task_requires_component pharmacist_dispense_task_1 formulation_component_1)
+    (technician_task_requires_packaging_component technician_dispense_task_1 packaging_component_1)
+    (package_unit_available package_unit_1)
+    (label_template_available label_template_standard)
+    (label_template_available label_template_alternate)
+    (prescription_line_assigned_to_pharmacist_task prescription_line_primary pharmacist_dispense_task_1)
+    (prescription_line_assigned_to_pharmacist_task prescription_line_secondary pharmacist_dispense_task_1)
+    (prescription_line_assigned_to_technician_task prescription_line_primary technician_dispense_task_1)
+    (prescription_line_assigned_to_technician_task prescription_line_secondary technician_dispense_task_1)
+    (prescription_line_assigned_package_unit prescription_line_primary package_unit_1)
+    (prescription_line_assigned_package_unit prescription_line_secondary package_unit_1)
+    (line_label_template_association prescription_line_primary label_template_standard)
+    (line_label_template_association prescription_line_secondary label_template_alternate)
+    (special_handling_option_available special_handling_refrigeration)
+    (special_handling_option_available special_handling_controlled_substance)
+    (patient_instruction_template_available patient_instruction_template_standard)
+    (patient_instruction_template_available patient_instruction_template_condensed)
+    (patient_instruction_asset_available patient_instruction_asset_1)
+    (clinical_check_record_available clinical_check_record_1)
+    (authorization_record_available insurance_authorization_record_a)
+    (prescription_line_has_authorization_record prescription_line_primary insurance_authorization_record_a)
+    (prescription_line_has_authorization_record prescription_line_secondary insurance_authorization_record_b)
+    (clinical_override_record_available clinical_override_record_1)
+  )
+  (:goal
+    (and
+      (dispense_finalized_for_entity pharmacist_dispense_task_1)
+      (dispense_finalized_for_entity technician_dispense_task_1)
+      (dispense_finalized_for_entity prescription_line_primary)
+      (dispense_finalized_for_entity prescription_line_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_prescription_case pharmacist_dispense_task_1)
+(register_prescription_case technician_dispense_task_1)
+(register_prescription_case prescription_line_primary)
+(register_prescription_case prescription_line_secondary)
+(select_substitution_candidate_for_case pharmacist_dispense_task_1 candidate_product_a)
+(select_substitution_candidate_for_case technician_dispense_task_1 candidate_product_b)
+(assign_pharmacist_to_case pharmacist_dispense_task_1 pharmacist_1)
+(complete_pharmacist_review pharmacist_dispense_task_1 pharmacist_1)
+(request_prescriber_authorization_for_case pharmacist_dispense_task_1 prescriber_1)
+(reserve_formulation_component_for_task pharmacist_dispense_task_1 formulation_component_1 pharmacist_1)
+(finalize_formulation_component_with_prescriber pharmacist_dispense_task_1 formulation_component_1 prescriber_1)
+(cancel_prescriber_authorization_request pharmacist_dispense_task_1 prescriber_1)
+(release_pharmacist_assignment pharmacist_dispense_task_1 pharmacist_1)
+(assign_pharmacist_to_case technician_dispense_task_1 pharmacist_1)
+(complete_pharmacist_review technician_dispense_task_1 pharmacist_1)
+(request_prescriber_authorization_for_case technician_dispense_task_1 prescriber_1)
+(reserve_packaging_component_for_task technician_dispense_task_1 packaging_component_1 pharmacist_1)
+(finalize_packaging_component_with_prescriber technician_dispense_task_1 packaging_component_1 prescriber_1)
+(cancel_prescriber_authorization_request technician_dispense_task_1 prescriber_1)
+(release_pharmacist_assignment technician_dispense_task_1 pharmacist_1)
+(assign_pharmacist_to_case pharmacist_dispense_task_1 pharmacist_1)
+(assemble_package_unit_from_components pharmacist_dispense_task_1 technician_dispense_task_1 formulation_component_1 packaging_component_1 package_unit_1)
+(complete_package_unit_packaging package_unit_1 pharmacist_dispense_task_1 pharmacist_1)
+(finalize_dispense_task_by_pharmacist pharmacist_dispense_task_1 package_unit_1)
+(generate_patient_instructions_for_case pharmacist_dispense_task_1 patient_instruction_asset_1 pharmacist_1)
+(finalize_dispense_task_and_release_candidate pharmacist_dispense_task_1 candidate_product_a patient_instruction_asset_1)
+(release_pharmacist_assignment pharmacist_dispense_task_1 pharmacist_1)
+(finalize_dispense_task_by_technician technician_dispense_task_1 package_unit_1)
+(assign_pharmacist_to_case technician_dispense_task_1 pharmacist_1)
+(generate_patient_instructions_for_case technician_dispense_task_1 patient_instruction_asset_1 pharmacist_1)
+(finalize_dispense_task_and_release_candidate_technician technician_dispense_task_1 candidate_product_b patient_instruction_asset_1)
+(release_pharmacist_assignment technician_dispense_task_1 pharmacist_1)
+(select_substitution_candidate_for_case prescription_line_primary candidate_product_a)
+(assign_pharmacist_to_case prescription_line_primary pharmacist_1)
+(complete_pharmacist_review prescription_line_primary pharmacist_1)
+(bind_label_template_to_package_unit prescription_line_primary label_template_standard package_unit_1)
+(prepare_label_binding_for_line prescription_line_primary label_template_standard package_unit_1 pharmacist_1)
+(assign_clinical_check_to_line prescription_line_primary clinical_check_record_1)
+(assign_override_record_to_line prescription_line_primary clinical_override_record_1)
+(request_prescriber_authorization_for_case prescription_line_primary prescriber_1)
+(initiate_clinical_check_for_label_binding prescription_line_primary clinical_check_record_1 prescriber_1 label_template_standard package_unit_1)
+(cancel_prescriber_authorization_request prescription_line_primary prescriber_1)
+(complete_clinical_override_check prescription_line_primary clinical_override_record_1 label_template_standard package_unit_1)
+(perform_final_verification_for_line prescription_line_primary)
+(generate_patient_instructions_for_case prescription_line_primary patient_instruction_asset_1 pharmacist_1)
+(finalize_line_and_release_candidate prescription_line_primary candidate_product_a patient_instruction_asset_1)
+(release_pharmacist_assignment prescription_line_primary pharmacist_1)
+(release_clinical_check_from_line prescription_line_primary clinical_check_record_1)
+(release_override_record_from_line prescription_line_primary clinical_override_record_1)
+(select_substitution_candidate_for_case prescription_line_secondary candidate_product_b)
+(assign_pharmacist_to_case prescription_line_secondary pharmacist_1)
+(complete_pharmacist_review prescription_line_secondary pharmacist_1)
+(bind_label_template_to_package_unit prescription_line_secondary label_template_alternate package_unit_1)
+(prepare_label_binding_for_line prescription_line_secondary label_template_alternate package_unit_1 pharmacist_1)
+(assign_clinical_check_to_line prescription_line_secondary clinical_check_record_1)
+(assign_override_record_to_line prescription_line_secondary clinical_override_record_1)
+(request_prescriber_authorization_for_case prescription_line_secondary prescriber_1)
+(initiate_clinical_check_for_label_binding prescription_line_secondary clinical_check_record_1 prescriber_1 label_template_alternate package_unit_1)
+(cancel_prescriber_authorization_request prescription_line_secondary prescriber_1)
+(complete_clinical_override_check prescription_line_secondary clinical_override_record_1 label_template_alternate package_unit_1)
+(perform_final_verification_for_line prescription_line_secondary)
+(generate_patient_instructions_for_case prescription_line_secondary patient_instruction_asset_1 pharmacist_1)
+(finalize_line_and_release_candidate prescription_line_secondary candidate_product_b patient_instruction_asset_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_jeu8pb7v/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_jeu8pb7v/plan.pddl 63 
+
+
+
+--- stderr ---
+

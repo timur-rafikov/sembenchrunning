@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain excipient_compatibility_screening)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category - entity analytical_category - entity process_category - entity candidate_root - entity candidate - candidate_root excipient_supplier - resource_category analytical_method - resource_category process_step - resource_category critical_quality_attribute - resource_category resource_allocation_record - resource_category evidence_artifact - resource_category material_property_test - resource_category stress_condition - resource_category sample_material - analytical_category analytical_batch - analytical_category regulatory_submission_input - analytical_category compatibility_flag_a - process_category compatibility_flag_b - process_category stability_or_scaleup_plan - process_category excipient_candidate_family - candidate formulation_study_family - candidate excipient_candidate_a - excipient_candidate_family excipient_candidate_b - excipient_candidate_family formulation_study - formulation_study_family)
+
+  (:predicates
+    (api_registered ?api_candidate - candidate)
+    (entity_analysis_result_recorded ?api_candidate - candidate)
+    (supplier_allocated ?api_candidate - candidate)
+    (entity_compatibility_qualified ?api_candidate - candidate)
+    (entity_ready_for_final_qualification ?api_candidate - candidate)
+    (entity_final_review_completed ?api_candidate - candidate)
+    (supplier_available ?excipient_supplier - excipient_supplier)
+    (assigned_supplier ?api_candidate - candidate ?excipient_supplier - excipient_supplier)
+    (method_available ?analytical_method - analytical_method)
+    (entity_assigned_method ?api_candidate - candidate ?analytical_method - analytical_method)
+    (process_step_available ?process_step - process_step)
+    (assigned_process_step ?api_candidate - candidate ?process_step - process_step)
+    (sample_material_available ?sample_material - sample_material)
+    (sample_assigned_to_excipient_a ?excipient_candidate_a - excipient_candidate_a ?sample_material - sample_material)
+    (sample_assigned_to_excipient_b ?excipient_candidate_b - excipient_candidate_b ?sample_material - sample_material)
+    (compatibility_flag_a_applicable ?excipient_candidate_a - excipient_candidate_a ?compatibility_flag_a - compatibility_flag_a)
+    (compatibility_flag_a_positive ?compatibility_flag_a - compatibility_flag_a)
+    (compatibility_flag_a_negative ?compatibility_flag_a - compatibility_flag_a)
+    (excipient_a_test_confirmed ?excipient_candidate_a - excipient_candidate_a)
+    (compatibility_flag_b_applicable ?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_b - compatibility_flag_b)
+    (compatibility_flag_b_positive ?compatibility_flag_b - compatibility_flag_b)
+    (compatibility_flag_b_negative ?compatibility_flag_b - compatibility_flag_b)
+    (excipient_b_test_confirmed ?excipient_candidate_b - excipient_candidate_b)
+    (stability_plan_available ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (stability_plan_committed ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (plan_includes_flag_a ?stability_or_scaleup_plan - stability_or_scaleup_plan ?compatibility_flag_a - compatibility_flag_a)
+    (plan_includes_flag_b ?stability_or_scaleup_plan - stability_or_scaleup_plan ?compatibility_flag_b - compatibility_flag_b)
+    (plan_requires_cqa_investigation ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (plan_requires_additional_material_test ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (plan_analysis_scheduled ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (study_has_excipient_a ?formulation_study - formulation_study ?excipient_candidate_a - excipient_candidate_a)
+    (study_has_excipient_b ?formulation_study - formulation_study ?excipient_candidate_b - excipient_candidate_b)
+    (study_linked_to_plan ?formulation_study - formulation_study ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (analytical_batch_available ?analytical_batch - analytical_batch)
+    (study_assigned_analytical_batch ?formulation_study - formulation_study ?analytical_batch - analytical_batch)
+    (analytical_batch_reserved ?analytical_batch - analytical_batch)
+    (analytical_batch_linked_to_plan ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    (study_characterization_allocated ?formulation_study - formulation_study)
+    (material_test_allocated ?formulation_study - formulation_study)
+    (material_test_completed ?formulation_study - formulation_study)
+    (study_cqa_reserved ?formulation_study - formulation_study)
+    (study_cqa_reviewed ?formulation_study - formulation_study)
+    (study_evidence_ready ?formulation_study - formulation_study)
+    (study_characterization_confirmed ?formulation_study - formulation_study)
+    (regulatory_input_available ?regulatory_submission_input - regulatory_submission_input)
+    (study_link_regulatory_input ?formulation_study - formulation_study ?regulatory_submission_input - regulatory_submission_input)
+    (regulatory_input_acknowledged ?formulation_study - formulation_study)
+    (regulatory_review_started ?formulation_study - formulation_study)
+    (regulatory_review_completed ?formulation_study - formulation_study)
+    (cqa_available ?critical_quality_attribute - critical_quality_attribute)
+    (study_has_cqa ?formulation_study - formulation_study ?critical_quality_attribute - critical_quality_attribute)
+    (resource_allocation_available ?resource_allocation_record - resource_allocation_record)
+    (study_linked_resource_allocation ?formulation_study - formulation_study ?resource_allocation_record - resource_allocation_record)
+    (material_property_test_available ?material_property_test - material_property_test)
+    (study_has_material_test ?formulation_study - formulation_study ?material_property_test - material_property_test)
+    (stress_condition_available ?stress_condition - stress_condition)
+    (study_has_stress_condition ?formulation_study - formulation_study ?stress_condition - stress_condition)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (candidate_linked_evidence ?api_candidate - candidate ?evidence_artifact - evidence_artifact)
+    (excipient_a_ready_for_plan ?excipient_candidate_a - excipient_candidate_a)
+    (excipient_b_ready_for_plan ?excipient_candidate_b - excipient_candidate_b)
+    (study_finalized ?formulation_study - formulation_study)
+  )
+  (:action register_api_candidate
+    :parameters (?api_candidate - candidate)
+    :precondition
+      (and
+        (not
+          (api_registered ?api_candidate)
+        )
+        (not
+          (entity_compatibility_qualified ?api_candidate)
+        )
+      )
+    :effect (api_registered ?api_candidate)
+  )
+  (:action associate_supplier_with_candidate
+    :parameters (?api_candidate - candidate ?excipient_supplier - excipient_supplier)
+    :precondition
+      (and
+        (api_registered ?api_candidate)
+        (not
+          (supplier_allocated ?api_candidate)
+        )
+        (supplier_available ?excipient_supplier)
+      )
+    :effect
+      (and
+        (supplier_allocated ?api_candidate)
+        (assigned_supplier ?api_candidate ?excipient_supplier)
+        (not
+          (supplier_available ?excipient_supplier)
+        )
+      )
+  )
+  (:action allocate_analytical_method_to_candidate
+    :parameters (?api_candidate - candidate ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (api_registered ?api_candidate)
+        (supplier_allocated ?api_candidate)
+        (method_available ?analytical_method)
+      )
+    :effect
+      (and
+        (entity_assigned_method ?api_candidate ?analytical_method)
+        (not
+          (method_available ?analytical_method)
+        )
+      )
+  )
+  (:action confirm_candidate_analysis_result
+    :parameters (?api_candidate - candidate ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (api_registered ?api_candidate)
+        (supplier_allocated ?api_candidate)
+        (entity_assigned_method ?api_candidate ?analytical_method)
+        (not
+          (entity_analysis_result_recorded ?api_candidate)
+        )
+      )
+    :effect (entity_analysis_result_recorded ?api_candidate)
+  )
+  (:action release_analytical_method_from_candidate
+    :parameters (?api_candidate - candidate ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_assigned_method ?api_candidate ?analytical_method)
+      )
+    :effect
+      (and
+        (method_available ?analytical_method)
+        (not
+          (entity_assigned_method ?api_candidate ?analytical_method)
+        )
+      )
+  )
+  (:action assign_process_step_to_candidate
+    :parameters (?api_candidate - candidate ?process_step - process_step)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?api_candidate)
+        (process_step_available ?process_step)
+      )
+    :effect
+      (and
+        (assigned_process_step ?api_candidate ?process_step)
+        (not
+          (process_step_available ?process_step)
+        )
+      )
+  )
+  (:action release_process_step_from_candidate
+    :parameters (?api_candidate - candidate ?process_step - process_step)
+    :precondition
+      (and
+        (assigned_process_step ?api_candidate ?process_step)
+      )
+    :effect
+      (and
+        (process_step_available ?process_step)
+        (not
+          (assigned_process_step ?api_candidate ?process_step)
+        )
+      )
+  )
+  (:action assign_material_test_to_study
+    :parameters (?formulation_study - formulation_study ?material_property_test - material_property_test)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (material_property_test_available ?material_property_test)
+      )
+    :effect
+      (and
+        (study_has_material_test ?formulation_study ?material_property_test)
+        (not
+          (material_property_test_available ?material_property_test)
+        )
+      )
+  )
+  (:action release_material_test_from_study
+    :parameters (?formulation_study - formulation_study ?material_property_test - material_property_test)
+    :precondition
+      (and
+        (study_has_material_test ?formulation_study ?material_property_test)
+      )
+    :effect
+      (and
+        (material_property_test_available ?material_property_test)
+        (not
+          (study_has_material_test ?formulation_study ?material_property_test)
+        )
+      )
+  )
+  (:action assign_stress_condition_to_study
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (stress_condition_available ?stress_condition)
+      )
+    :effect
+      (and
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (not
+          (stress_condition_available ?stress_condition)
+        )
+      )
+  )
+  (:action release_stress_condition_from_study
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition)
+    :precondition
+      (and
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+      )
+    :effect
+      (and
+        (stress_condition_available ?stress_condition)
+        (not
+          (study_has_stress_condition ?formulation_study ?stress_condition)
+        )
+      )
+  )
+  (:action record_flag_a_positive
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?compatibility_flag_a - compatibility_flag_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_a)
+        (entity_assigned_method ?excipient_candidate_a ?analytical_method)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (not
+          (compatibility_flag_a_positive ?compatibility_flag_a)
+        )
+        (not
+          (compatibility_flag_a_negative ?compatibility_flag_a)
+        )
+      )
+    :effect (compatibility_flag_a_positive ?compatibility_flag_a)
+  )
+  (:action record_excipient_a_positive_outcome
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?compatibility_flag_a - compatibility_flag_a ?process_step - process_step)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_a)
+        (assigned_process_step ?excipient_candidate_a ?process_step)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_a_positive ?compatibility_flag_a)
+        (not
+          (excipient_a_ready_for_plan ?excipient_candidate_a)
+        )
+      )
+    :effect
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+      )
+  )
+  (:action record_flag_a_negative
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?compatibility_flag_a - compatibility_flag_a ?sample_material - sample_material)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_a)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (sample_material_available ?sample_material)
+        (not
+          (excipient_a_ready_for_plan ?excipient_candidate_a)
+        )
+      )
+    :effect
+      (and
+        (compatibility_flag_a_negative ?compatibility_flag_a)
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (sample_assigned_to_excipient_a ?excipient_candidate_a ?sample_material)
+        (not
+          (sample_material_available ?sample_material)
+        )
+      )
+  )
+  (:action reconcile_flag_a_results_for_excipient_a
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?compatibility_flag_a - compatibility_flag_a ?analytical_method - analytical_method ?sample_material - sample_material)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_a)
+        (entity_assigned_method ?excipient_candidate_a ?analytical_method)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_a_negative ?compatibility_flag_a)
+        (sample_assigned_to_excipient_a ?excipient_candidate_a ?sample_material)
+        (not
+          (excipient_a_test_confirmed ?excipient_candidate_a)
+        )
+      )
+    :effect
+      (and
+        (compatibility_flag_a_positive ?compatibility_flag_a)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+        (sample_material_available ?sample_material)
+        (not
+          (sample_assigned_to_excipient_a ?excipient_candidate_a ?sample_material)
+        )
+      )
+  )
+  (:action record_flag_b_positive
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_b - compatibility_flag_b ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_b)
+        (entity_assigned_method ?excipient_candidate_b ?analytical_method)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (not
+          (compatibility_flag_b_positive ?compatibility_flag_b)
+        )
+        (not
+          (compatibility_flag_b_negative ?compatibility_flag_b)
+        )
+      )
+    :effect (compatibility_flag_b_positive ?compatibility_flag_b)
+  )
+  (:action record_excipient_b_positive_outcome
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_b - compatibility_flag_b ?process_step - process_step)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_b)
+        (assigned_process_step ?excipient_candidate_b ?process_step)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_b_positive ?compatibility_flag_b)
+        (not
+          (excipient_b_ready_for_plan ?excipient_candidate_b)
+        )
+      )
+    :effect
+      (and
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+      )
+  )
+  (:action record_flag_b_negative
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_b - compatibility_flag_b ?sample_material - sample_material)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_b)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (sample_material_available ?sample_material)
+        (not
+          (excipient_b_ready_for_plan ?excipient_candidate_b)
+        )
+      )
+    :effect
+      (and
+        (compatibility_flag_b_negative ?compatibility_flag_b)
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (sample_assigned_to_excipient_b ?excipient_candidate_b ?sample_material)
+        (not
+          (sample_material_available ?sample_material)
+        )
+      )
+  )
+  (:action reconcile_flag_b_results_for_excipient_b
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_b - compatibility_flag_b ?analytical_method - analytical_method ?sample_material - sample_material)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?excipient_candidate_b)
+        (entity_assigned_method ?excipient_candidate_b ?analytical_method)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_b_negative ?compatibility_flag_b)
+        (sample_assigned_to_excipient_b ?excipient_candidate_b ?sample_material)
+        (not
+          (excipient_b_test_confirmed ?excipient_candidate_b)
+        )
+      )
+    :effect
+      (and
+        (compatibility_flag_b_positive ?compatibility_flag_b)
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+        (sample_material_available ?sample_material)
+        (not
+          (sample_assigned_to_excipient_b ?excipient_candidate_b ?sample_material)
+        )
+      )
+  )
+  (:action assemble_stability_plan_standard
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_a - compatibility_flag_a ?compatibility_flag_b - compatibility_flag_b ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_a_positive ?compatibility_flag_a)
+        (compatibility_flag_b_positive ?compatibility_flag_b)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+        (stability_plan_available ?stability_or_scaleup_plan)
+      )
+    :effect
+      (and
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_includes_flag_a ?stability_or_scaleup_plan ?compatibility_flag_a)
+        (plan_includes_flag_b ?stability_or_scaleup_plan ?compatibility_flag_b)
+        (not
+          (stability_plan_available ?stability_or_scaleup_plan)
+        )
+      )
+  )
+  (:action assemble_stability_plan_with_cqa_investigation
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_a - compatibility_flag_a ?compatibility_flag_b - compatibility_flag_b ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_a_negative ?compatibility_flag_a)
+        (compatibility_flag_b_positive ?compatibility_flag_b)
+        (not
+          (excipient_a_test_confirmed ?excipient_candidate_a)
+        )
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+        (stability_plan_available ?stability_or_scaleup_plan)
+      )
+    :effect
+      (and
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_includes_flag_a ?stability_or_scaleup_plan ?compatibility_flag_a)
+        (plan_includes_flag_b ?stability_or_scaleup_plan ?compatibility_flag_b)
+        (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        (not
+          (stability_plan_available ?stability_or_scaleup_plan)
+        )
+      )
+  )
+  (:action assemble_stability_plan_with_material_test_requirement
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_a - compatibility_flag_a ?compatibility_flag_b - compatibility_flag_b ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_a_positive ?compatibility_flag_a)
+        (compatibility_flag_b_negative ?compatibility_flag_b)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+        (not
+          (excipient_b_test_confirmed ?excipient_candidate_b)
+        )
+        (stability_plan_available ?stability_or_scaleup_plan)
+      )
+    :effect
+      (and
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_includes_flag_a ?stability_or_scaleup_plan ?compatibility_flag_a)
+        (plan_includes_flag_b ?stability_or_scaleup_plan ?compatibility_flag_b)
+        (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        (not
+          (stability_plan_available ?stability_or_scaleup_plan)
+        )
+      )
+  )
+  (:action assemble_stability_plan_with_cqa_and_material_tests
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?excipient_candidate_b - excipient_candidate_b ?compatibility_flag_a - compatibility_flag_a ?compatibility_flag_b - compatibility_flag_b ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (compatibility_flag_a_applicable ?excipient_candidate_a ?compatibility_flag_a)
+        (compatibility_flag_b_applicable ?excipient_candidate_b ?compatibility_flag_b)
+        (compatibility_flag_a_negative ?compatibility_flag_a)
+        (compatibility_flag_b_negative ?compatibility_flag_b)
+        (not
+          (excipient_a_test_confirmed ?excipient_candidate_a)
+        )
+        (not
+          (excipient_b_test_confirmed ?excipient_candidate_b)
+        )
+        (stability_plan_available ?stability_or_scaleup_plan)
+      )
+    :effect
+      (and
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_includes_flag_a ?stability_or_scaleup_plan ?compatibility_flag_a)
+        (plan_includes_flag_b ?stability_or_scaleup_plan ?compatibility_flag_b)
+        (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        (not
+          (stability_plan_available ?stability_or_scaleup_plan)
+        )
+      )
+  )
+  (:action schedule_plan_analysis
+    :parameters (?stability_or_scaleup_plan - stability_or_scaleup_plan ?excipient_candidate_a - excipient_candidate_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (entity_assigned_method ?excipient_candidate_a ?analytical_method)
+        (not
+          (plan_analysis_scheduled ?stability_or_scaleup_plan)
+        )
+      )
+    :effect (plan_analysis_scheduled ?stability_or_scaleup_plan)
+  )
+  (:action reserve_analytical_batch_for_study
+    :parameters (?formulation_study - formulation_study ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (study_linked_to_plan ?formulation_study ?stability_or_scaleup_plan)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_available ?analytical_batch)
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_analysis_scheduled ?stability_or_scaleup_plan)
+        (not
+          (analytical_batch_reserved ?analytical_batch)
+        )
+      )
+    :effect
+      (and
+        (analytical_batch_reserved ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (not
+          (analytical_batch_available ?analytical_batch)
+        )
+      )
+  )
+  (:action allocate_characterization_resources_to_study
+    :parameters (?formulation_study - formulation_study ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_reserved ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (entity_assigned_method ?formulation_study ?analytical_method)
+        (not
+          (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        )
+        (not
+          (study_characterization_allocated ?formulation_study)
+        )
+      )
+    :effect (study_characterization_allocated ?formulation_study)
+  )
+  (:action assign_cqa_to_study
+    :parameters (?formulation_study - formulation_study ?critical_quality_attribute - critical_quality_attribute)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (cqa_available ?critical_quality_attribute)
+        (not
+          (study_cqa_reserved ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (study_cqa_reserved ?formulation_study)
+        (study_has_cqa ?formulation_study ?critical_quality_attribute)
+        (not
+          (cqa_available ?critical_quality_attribute)
+        )
+      )
+  )
+  (:action activate_cqa_review_for_study
+    :parameters (?formulation_study - formulation_study ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan ?analytical_method - analytical_method ?critical_quality_attribute - critical_quality_attribute)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_reserved ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (entity_assigned_method ?formulation_study ?analytical_method)
+        (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        (study_cqa_reserved ?formulation_study)
+        (study_has_cqa ?formulation_study ?critical_quality_attribute)
+        (not
+          (study_characterization_allocated ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (study_characterization_allocated ?formulation_study)
+        (study_cqa_reviewed ?formulation_study)
+      )
+  )
+  (:action initiate_material_characterization_workflow
+    :parameters (?formulation_study - formulation_study ?material_property_test - material_property_test ?process_step - process_step ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (study_characterization_allocated ?formulation_study)
+        (study_has_material_test ?formulation_study ?material_property_test)
+        (assigned_process_step ?formulation_study ?process_step)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (not
+          (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        )
+        (not
+          (material_test_allocated ?formulation_study)
+        )
+      )
+    :effect (material_test_allocated ?formulation_study)
+  )
+  (:action initiate_material_characterization_workflow_alternative
+    :parameters (?formulation_study - formulation_study ?material_property_test - material_property_test ?process_step - process_step ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (study_characterization_allocated ?formulation_study)
+        (study_has_material_test ?formulation_study ?material_property_test)
+        (assigned_process_step ?formulation_study ?process_step)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        (not
+          (material_test_allocated ?formulation_study)
+        )
+      )
+    :effect (material_test_allocated ?formulation_study)
+  )
+  (:action complete_material_test_for_study
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (material_test_allocated ?formulation_study)
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (not
+          (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        )
+        (not
+          (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        )
+        (not
+          (material_test_completed ?formulation_study)
+        )
+      )
+    :effect (material_test_completed ?formulation_study)
+  )
+  (:action complete_material_test_and_record_evidence
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (material_test_allocated ?formulation_study)
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        (not
+          (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        )
+        (not
+          (material_test_completed ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (material_test_completed ?formulation_study)
+        (study_evidence_ready ?formulation_study)
+      )
+  )
+  (:action complete_material_test_and_flag_evidence_variant_1
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (material_test_allocated ?formulation_study)
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (not
+          (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        )
+        (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        (not
+          (material_test_completed ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (material_test_completed ?formulation_study)
+        (study_evidence_ready ?formulation_study)
+      )
+  )
+  (:action complete_material_test_and_flag_evidence_variant_2
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition ?analytical_batch - analytical_batch ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (material_test_allocated ?formulation_study)
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (study_assigned_analytical_batch ?formulation_study ?analytical_batch)
+        (analytical_batch_linked_to_plan ?analytical_batch ?stability_or_scaleup_plan)
+        (plan_requires_cqa_investigation ?stability_or_scaleup_plan)
+        (plan_requires_additional_material_test ?stability_or_scaleup_plan)
+        (not
+          (material_test_completed ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (material_test_completed ?formulation_study)
+        (study_evidence_ready ?formulation_study)
+      )
+  )
+  (:action mark_study_ready_for_final_consolidation
+    :parameters (?formulation_study - formulation_study)
+    :precondition
+      (and
+        (material_test_completed ?formulation_study)
+        (not
+          (study_evidence_ready ?formulation_study)
+        )
+        (not
+          (study_finalized ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (study_finalized ?formulation_study)
+        (entity_ready_for_final_qualification ?formulation_study)
+      )
+  )
+  (:action attach_resource_allocation_to_study
+    :parameters (?formulation_study - formulation_study ?resource_allocation_record - resource_allocation_record)
+    :precondition
+      (and
+        (material_test_completed ?formulation_study)
+        (study_evidence_ready ?formulation_study)
+        (resource_allocation_available ?resource_allocation_record)
+      )
+    :effect
+      (and
+        (study_linked_resource_allocation ?formulation_study ?resource_allocation_record)
+        (not
+          (resource_allocation_available ?resource_allocation_record)
+        )
+      )
+  )
+  (:action confirm_study_characterization
+    :parameters (?formulation_study - formulation_study ?excipient_candidate_a - excipient_candidate_a ?excipient_candidate_b - excipient_candidate_b ?analytical_method - analytical_method ?resource_allocation_record - resource_allocation_record)
+    :precondition
+      (and
+        (material_test_completed ?formulation_study)
+        (study_evidence_ready ?formulation_study)
+        (study_linked_resource_allocation ?formulation_study ?resource_allocation_record)
+        (study_has_excipient_a ?formulation_study ?excipient_candidate_a)
+        (study_has_excipient_b ?formulation_study ?excipient_candidate_b)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+        (entity_assigned_method ?formulation_study ?analytical_method)
+        (not
+          (study_characterization_confirmed ?formulation_study)
+        )
+      )
+    :effect (study_characterization_confirmed ?formulation_study)
+  )
+  (:action finalize_study_and_prepare_for_qualification
+    :parameters (?formulation_study - formulation_study)
+    :precondition
+      (and
+        (material_test_completed ?formulation_study)
+        (study_characterization_confirmed ?formulation_study)
+        (not
+          (study_finalized ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (study_finalized ?formulation_study)
+        (entity_ready_for_final_qualification ?formulation_study)
+      )
+  )
+  (:action assign_regulatory_input_to_study
+    :parameters (?formulation_study - formulation_study ?regulatory_submission_input - regulatory_submission_input ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_analysis_result_recorded ?formulation_study)
+        (entity_assigned_method ?formulation_study ?analytical_method)
+        (regulatory_input_available ?regulatory_submission_input)
+        (study_link_regulatory_input ?formulation_study ?regulatory_submission_input)
+        (not
+          (regulatory_input_acknowledged ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (regulatory_input_acknowledged ?formulation_study)
+        (not
+          (regulatory_input_available ?regulatory_submission_input)
+        )
+      )
+  )
+  (:action initiate_regulatory_review_for_study
+    :parameters (?formulation_study - formulation_study ?process_step - process_step)
+    :precondition
+      (and
+        (regulatory_input_acknowledged ?formulation_study)
+        (assigned_process_step ?formulation_study ?process_step)
+        (not
+          (regulatory_review_started ?formulation_study)
+        )
+      )
+    :effect (regulatory_review_started ?formulation_study)
+  )
+  (:action complete_regulatory_review
+    :parameters (?formulation_study - formulation_study ?stress_condition - stress_condition)
+    :precondition
+      (and
+        (regulatory_review_started ?formulation_study)
+        (study_has_stress_condition ?formulation_study ?stress_condition)
+        (not
+          (regulatory_review_completed ?formulation_study)
+        )
+      )
+    :effect (regulatory_review_completed ?formulation_study)
+  )
+  (:action finalize_regulatory_review_and_prepare_for_qualification
+    :parameters (?formulation_study - formulation_study)
+    :precondition
+      (and
+        (regulatory_review_completed ?formulation_study)
+        (not
+          (study_finalized ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (study_finalized ?formulation_study)
+        (entity_ready_for_final_qualification ?formulation_study)
+      )
+  )
+  (:action issue_final_qualification_for_excipient_a
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_a_ready_for_plan ?excipient_candidate_a)
+        (excipient_a_test_confirmed ?excipient_candidate_a)
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_analysis_scheduled ?stability_or_scaleup_plan)
+        (not
+          (entity_ready_for_final_qualification ?excipient_candidate_a)
+        )
+      )
+    :effect (entity_ready_for_final_qualification ?excipient_candidate_a)
+  )
+  (:action issue_final_qualification_for_excipient_b
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?stability_or_scaleup_plan - stability_or_scaleup_plan)
+    :precondition
+      (and
+        (excipient_b_ready_for_plan ?excipient_candidate_b)
+        (excipient_b_test_confirmed ?excipient_candidate_b)
+        (stability_plan_committed ?stability_or_scaleup_plan)
+        (plan_analysis_scheduled ?stability_or_scaleup_plan)
+        (not
+          (entity_ready_for_final_qualification ?excipient_candidate_b)
+        )
+      )
+    :effect (entity_ready_for_final_qualification ?excipient_candidate_b)
+  )
+  (:action attach_evidence_to_candidate
+    :parameters (?api_candidate - candidate ?evidence_artifact - evidence_artifact ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_ready_for_final_qualification ?api_candidate)
+        (entity_assigned_method ?api_candidate ?analytical_method)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (entity_final_review_completed ?api_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_final_review_completed ?api_candidate)
+        (candidate_linked_evidence ?api_candidate ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action finalize_qualification_for_excipient_a
+    :parameters (?excipient_candidate_a - excipient_candidate_a ?excipient_supplier - excipient_supplier ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_final_review_completed ?excipient_candidate_a)
+        (assigned_supplier ?excipient_candidate_a ?excipient_supplier)
+        (candidate_linked_evidence ?excipient_candidate_a ?evidence_artifact)
+        (not
+          (entity_compatibility_qualified ?excipient_candidate_a)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_qualified ?excipient_candidate_a)
+        (supplier_available ?excipient_supplier)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+  (:action finalize_qualification_for_excipient_b
+    :parameters (?excipient_candidate_b - excipient_candidate_b ?excipient_supplier - excipient_supplier ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_final_review_completed ?excipient_candidate_b)
+        (assigned_supplier ?excipient_candidate_b ?excipient_supplier)
+        (candidate_linked_evidence ?excipient_candidate_b ?evidence_artifact)
+        (not
+          (entity_compatibility_qualified ?excipient_candidate_b)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_qualified ?excipient_candidate_b)
+        (supplier_available ?excipient_supplier)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+  (:action finalize_qualification_for_study
+    :parameters (?formulation_study - formulation_study ?excipient_supplier - excipient_supplier ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (entity_final_review_completed ?formulation_study)
+        (assigned_supplier ?formulation_study ?excipient_supplier)
+        (candidate_linked_evidence ?formulation_study ?evidence_artifact)
+        (not
+          (entity_compatibility_qualified ?formulation_study)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_qualified ?formulation_study)
+        (supplier_available ?excipient_supplier)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem excipient_compatibility_screening_plan_problem)
+  (:domain excipient_compatibility_screening)
+  (:objects excipient_candidate_a_1 - excipient_candidate_a excipient_candidate_b_1 - excipient_candidate_b formulation_study_1 - formulation_study formulation_study_2 - formulation_study excipient_supplier_1 - excipient_supplier excipient_supplier_2 - excipient_supplier excipient_supplier_3 - excipient_supplier analytical_method_hplc - analytical_method process_equipment_1 - process_step sample_material_1 - sample_material compatibility_flag_a_1 - compatibility_flag_a compatibility_flag_b_1 - compatibility_flag_b stability_plan_1 - stability_or_scaleup_plan analytical_batch_1 - analytical_batch analytical_batch_2 - analytical_batch critical_quality_attribute_1 - critical_quality_attribute critical_quality_attribute_2 - critical_quality_attribute resource_allocation_record_1 - resource_allocation_record resource_allocation_record_2 - resource_allocation_record evidence_artifact_1 - evidence_artifact material_property_test_1 - material_property_test regulatory_submission_input_1 - regulatory_submission_input regulatory_submission_input_2 - regulatory_submission_input stress_condition_1 - stress_condition)
+  (:init
+    (supplier_available excipient_supplier_1)
+    (supplier_available excipient_supplier_2)
+    (supplier_available excipient_supplier_3)
+    (method_available analytical_method_hplc)
+    (process_step_available process_equipment_1)
+    (sample_material_available sample_material_1)
+    (compatibility_flag_a_applicable excipient_candidate_a_1 compatibility_flag_a_1)
+    (compatibility_flag_b_applicable excipient_candidate_b_1 compatibility_flag_b_1)
+    (stability_plan_available stability_plan_1)
+    (analytical_batch_available analytical_batch_1)
+    (analytical_batch_available analytical_batch_2)
+    (study_has_excipient_a formulation_study_1 excipient_candidate_a_1)
+    (study_has_excipient_a formulation_study_2 excipient_candidate_a_1)
+    (study_has_excipient_b formulation_study_1 excipient_candidate_b_1)
+    (study_has_excipient_b formulation_study_2 excipient_candidate_b_1)
+    (study_linked_to_plan formulation_study_1 stability_plan_1)
+    (study_linked_to_plan formulation_study_2 stability_plan_1)
+    (study_assigned_analytical_batch formulation_study_1 analytical_batch_1)
+    (study_assigned_analytical_batch formulation_study_2 analytical_batch_2)
+    (cqa_available critical_quality_attribute_1)
+    (cqa_available critical_quality_attribute_2)
+    (resource_allocation_available resource_allocation_record_1)
+    (resource_allocation_available resource_allocation_record_2)
+    (evidence_artifact_available evidence_artifact_1)
+    (material_property_test_available material_property_test_1)
+    (regulatory_input_available regulatory_submission_input_1)
+    (study_link_regulatory_input formulation_study_1 regulatory_submission_input_1)
+    (study_link_regulatory_input formulation_study_2 regulatory_submission_input_2)
+    (stress_condition_available stress_condition_1)
+  )
+  (:goal
+    (and
+      (entity_compatibility_qualified excipient_candidate_a_1)
+      (entity_compatibility_qualified excipient_candidate_b_1)
+      (entity_compatibility_qualified formulation_study_1)
+      (entity_compatibility_qualified formulation_study_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_api_candidate excipient_candidate_a_1)
+(register_api_candidate excipient_candidate_b_1)
+(register_api_candidate formulation_study_1)
+(register_api_candidate formulation_study_2)
+(associate_supplier_with_candidate excipient_candidate_a_1 excipient_supplier_1)
+(associate_supplier_with_candidate excipient_candidate_b_1 excipient_supplier_2)
+(associate_supplier_with_candidate formulation_study_1 excipient_supplier_3)
+(allocate_analytical_method_to_candidate excipient_candidate_a_1 analytical_method_hplc)
+(confirm_candidate_analysis_result excipient_candidate_a_1 analytical_method_hplc)
+(record_flag_a_positive excipient_candidate_a_1 compatibility_flag_a_1 analytical_method_hplc)
+(assign_process_step_to_candidate excipient_candidate_a_1 process_equipment_1)
+(record_excipient_a_positive_outcome excipient_candidate_a_1 compatibility_flag_a_1 process_equipment_1)
+(release_process_step_from_candidate excipient_candidate_a_1 process_equipment_1)
+(release_analytical_method_from_candidate excipient_candidate_a_1 analytical_method_hplc)
+(allocate_analytical_method_to_candidate excipient_candidate_b_1 analytical_method_hplc)
+(confirm_candidate_analysis_result excipient_candidate_b_1 analytical_method_hplc)
+(record_flag_b_positive excipient_candidate_b_1 compatibility_flag_b_1 analytical_method_hplc)
+(assign_process_step_to_candidate excipient_candidate_b_1 process_equipment_1)
+(record_excipient_b_positive_outcome excipient_candidate_b_1 compatibility_flag_b_1 process_equipment_1)
+(release_process_step_from_candidate excipient_candidate_b_1 process_equipment_1)
+(release_analytical_method_from_candidate excipient_candidate_b_1 analytical_method_hplc)
+(assemble_stability_plan_standard excipient_candidate_a_1 excipient_candidate_b_1 compatibility_flag_a_1 compatibility_flag_b_1 stability_plan_1)
+(allocate_analytical_method_to_candidate excipient_candidate_a_1 analytical_method_hplc)
+(schedule_plan_analysis stability_plan_1 excipient_candidate_a_1 analytical_method_hplc)
+(issue_final_qualification_for_excipient_a excipient_candidate_a_1 stability_plan_1)
+(issue_final_qualification_for_excipient_b excipient_candidate_b_1 stability_plan_1)
+(attach_evidence_to_candidate excipient_candidate_a_1 evidence_artifact_1 analytical_method_hplc)
+(finalize_qualification_for_excipient_a excipient_candidate_a_1 excipient_supplier_1 evidence_artifact_1)
+(release_analytical_method_from_candidate excipient_candidate_a_1 analytical_method_hplc)
+(allocate_analytical_method_to_candidate excipient_candidate_b_1 analytical_method_hplc)
+(attach_evidence_to_candidate excipient_candidate_b_1 evidence_artifact_1 analytical_method_hplc)
+(finalize_qualification_for_excipient_b excipient_candidate_b_1 excipient_supplier_2 evidence_artifact_1)
+(release_analytical_method_from_candidate excipient_candidate_b_1 analytical_method_hplc)
+(associate_supplier_with_candidate formulation_study_2 excipient_supplier_1)
+(allocate_analytical_method_to_candidate formulation_study_1 analytical_method_hplc)
+(confirm_candidate_analysis_result formulation_study_1 analytical_method_hplc)
+(reserve_analytical_batch_for_study formulation_study_1 analytical_batch_1 stability_plan_1)
+(allocate_characterization_resources_to_study formulation_study_1 analytical_batch_1 stability_plan_1 analytical_method_hplc)
+(assign_material_test_to_study formulation_study_1 material_property_test_1)
+(assign_stress_condition_to_study formulation_study_1 stress_condition_1)
+(assign_process_step_to_candidate formulation_study_1 process_equipment_1)
+(initiate_material_characterization_workflow formulation_study_1 material_property_test_1 process_equipment_1 analytical_batch_1 stability_plan_1)
+(complete_material_test_for_study formulation_study_1 stress_condition_1 analytical_batch_1 stability_plan_1)
+(mark_study_ready_for_final_consolidation formulation_study_1)
+(attach_evidence_to_candidate formulation_study_1 evidence_artifact_1 analytical_method_hplc)
+(finalize_qualification_for_study formulation_study_1 excipient_supplier_3 evidence_artifact_1)
+(release_analytical_method_from_candidate formulation_study_1 analytical_method_hplc)
+(release_process_step_from_candidate formulation_study_1 process_equipment_1)
+(release_material_test_from_study formulation_study_1 material_property_test_1)
+(release_stress_condition_from_study formulation_study_1 stress_condition_1)
+(allocate_analytical_method_to_candidate formulation_study_2 analytical_method_hplc)
+(confirm_candidate_analysis_result formulation_study_2 analytical_method_hplc)
+(reserve_analytical_batch_for_study formulation_study_2 analytical_batch_2 stability_plan_1)
+(allocate_characterization_resources_to_study formulation_study_2 analytical_batch_2 stability_plan_1 analytical_method_hplc)
+(assign_material_test_to_study formulation_study_2 material_property_test_1)
+(assign_stress_condition_to_study formulation_study_2 stress_condition_1)
+(assign_process_step_to_candidate formulation_study_2 process_equipment_1)
+(initiate_material_characterization_workflow formulation_study_2 material_property_test_1 process_equipment_1 analytical_batch_2 stability_plan_1)
+(complete_material_test_for_study formulation_study_2 stress_condition_1 analytical_batch_2 stability_plan_1)
+(mark_study_ready_for_final_consolidation formulation_study_2)
+(attach_evidence_to_candidate formulation_study_2 evidence_artifact_1 analytical_method_hplc)
+(finalize_qualification_for_study formulation_study_2 excipient_supplier_1 evidence_artifact_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mtag1avp/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_mtag1avp/plan.pddl 62 
+
+
+
+--- stderr ---
+

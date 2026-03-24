@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain bridge_height_restricted_route_adjustment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object item_category - object network_element_category - object plan_element_category - object plan_element - plan_element_category asset - resource_category schedule_slot - resource_category operator - resource_category operational_permit - resource_category shipment_order - resource_category clearance_profile - resource_category handling_equipment - resource_category regulatory_authorization - resource_category cargo_unit - item_category container - item_category route_constraint_document - item_category height_restricted_segment - network_element_category transfer_node - network_element_category transport_leg - network_element_category terminal - plan_element plan_element_subcategory2 - plan_element origin - terminal destination - terminal carrier_unit - plan_element_subcategory2)
+  (:predicates
+    (plan_element_initialized ?plan_element - plan_element)
+    (plan_element_ready ?plan_element - plan_element)
+    (asset_allocated ?plan_element - plan_element)
+    (dispatch_confirmed ?plan_element - plan_element)
+    (ready_for_dispatch ?plan_element - plan_element)
+    (clearance_assigned ?plan_element - plan_element)
+    (asset_available ?asset - asset)
+    (plan_has_asset ?plan_element - plan_element ?asset - asset)
+    (schedule_slot_available ?schedule_slot - schedule_slot)
+    (plan_has_schedule_slot ?plan_element - plan_element ?schedule_slot - schedule_slot)
+    (operator_available ?operator - operator)
+    (plan_assigned_operator ?plan_element - plan_element ?operator - operator)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (origin_has_cargo_unit ?origin - origin ?cargo_unit - cargo_unit)
+    (destination_has_cargo_unit ?destination - destination ?cargo_unit - cargo_unit)
+    (origin_has_segment ?origin - origin ?height_restricted_segment - height_restricted_segment)
+    (segment_assessed ?height_restricted_segment - height_restricted_segment)
+    (segment_mitigation_attached ?height_restricted_segment - height_restricted_segment)
+    (origin_mitigation_confirmed ?origin - origin)
+    (destination_has_transfer_node ?destination - destination ?transfer_node - transfer_node)
+    (transfer_node_assessed ?transfer_node - transfer_node)
+    (transfer_node_mitigation_attached ?transfer_node - transfer_node)
+    (destination_mitigation_confirmed ?destination - destination)
+    (transport_leg_provisioned ?transport_leg - transport_leg)
+    (transport_leg_created ?transport_leg - transport_leg)
+    (transport_leg_has_segment ?transport_leg - transport_leg ?height_restricted_segment - height_restricted_segment)
+    (transport_leg_has_transfer_node ?transport_leg - transport_leg ?transfer_node - transfer_node)
+    (transport_leg_segment_mitigated ?transport_leg - transport_leg)
+    (transport_leg_node_mitigated ?transport_leg - transport_leg)
+    (transport_leg_ready_for_departure ?transport_leg - transport_leg)
+    (carrier_has_origin ?carrier_unit - carrier_unit ?origin - origin)
+    (carrier_has_destination ?carrier_unit - carrier_unit ?destination - destination)
+    (carrier_attached_to_leg ?carrier_unit - carrier_unit ?transport_leg - transport_leg)
+    (container_available ?container - container)
+    (carrier_has_container ?carrier_unit - carrier_unit ?container - container)
+    (container_staged ?container - container)
+    (container_assigned_to_leg ?container - container ?transport_leg - transport_leg)
+    (carrier_staged_for_loading ?carrier_unit - carrier_unit)
+    (carrier_loading_ready ?carrier_unit - carrier_unit)
+    (carrier_authorized ?carrier_unit - carrier_unit)
+    (carrier_operational_permit_attached ?carrier_unit - carrier_unit)
+    (carrier_operational_permit_verified ?carrier_unit - carrier_unit)
+    (carrier_equipment_confirmed ?carrier_unit - carrier_unit)
+    (carrier_predeparture_flag ?carrier_unit - carrier_unit)
+    (route_constraint_document_available ?route_constraint_document - route_constraint_document)
+    (carrier_has_route_constraint_document ?carrier_unit - carrier_unit ?route_constraint_document - route_constraint_document)
+    (carrier_compliance_initiated ?carrier_unit - carrier_unit)
+    (carrier_compliance_step1_completed ?carrier_unit - carrier_unit)
+    (carrier_compliance_step2_completed ?carrier_unit - carrier_unit)
+    (operational_permit_available ?operational_permit - operational_permit)
+    (carrier_has_operational_permit ?carrier_unit - carrier_unit ?operational_permit - operational_permit)
+    (shipment_order_available ?shipment_order - shipment_order)
+    (carrier_has_shipment_order ?carrier_unit - carrier_unit ?shipment_order - shipment_order)
+    (handling_equipment_available ?handling_equipment - handling_equipment)
+    (carrier_has_handling_equipment ?carrier_unit - carrier_unit ?handling_equipment - handling_equipment)
+    (regulatory_authorization_available ?regulatory_authorization - regulatory_authorization)
+    (carrier_has_regulatory_authorization ?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization)
+    (clearance_profile_available ?clearance_profile - clearance_profile)
+    (plan_element_has_clearance_profile ?plan_element - plan_element ?clearance_profile - clearance_profile)
+    (origin_staged ?origin - origin)
+    (destination_staged ?destination - destination)
+    (predeparture_checks_completed ?carrier_unit - carrier_unit)
+  )
+  (:action create_plan_element
+    :parameters (?plan_element - plan_element)
+    :precondition
+      (and
+        (not
+          (plan_element_initialized ?plan_element)
+        )
+        (not
+          (dispatch_confirmed ?plan_element)
+        )
+      )
+    :effect (plan_element_initialized ?plan_element)
+  )
+  (:action assign_asset_to_plan
+    :parameters (?plan_element - plan_element ?asset - asset)
+    :precondition
+      (and
+        (plan_element_initialized ?plan_element)
+        (not
+          (asset_allocated ?plan_element)
+        )
+        (asset_available ?asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?plan_element)
+        (plan_has_asset ?plan_element ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action assign_schedule_slot_to_plan
+    :parameters (?plan_element - plan_element ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_initialized ?plan_element)
+        (asset_allocated ?plan_element)
+        (schedule_slot_available ?schedule_slot)
+      )
+    :effect
+      (and
+        (plan_has_schedule_slot ?plan_element ?schedule_slot)
+        (not
+          (schedule_slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action mark_plan_element_ready
+    :parameters (?plan_element - plan_element ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_initialized ?plan_element)
+        (asset_allocated ?plan_element)
+        (plan_has_schedule_slot ?plan_element ?schedule_slot)
+        (not
+          (plan_element_ready ?plan_element)
+        )
+      )
+    :effect (plan_element_ready ?plan_element)
+  )
+  (:action release_schedule_slot_from_plan
+    :parameters (?plan_element - plan_element ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_has_schedule_slot ?plan_element ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_available ?schedule_slot)
+        (not
+          (plan_has_schedule_slot ?plan_element ?schedule_slot)
+        )
+      )
+  )
+  (:action assign_operator_to_plan_element
+    :parameters (?plan_element - plan_element ?operator - operator)
+    :precondition
+      (and
+        (plan_element_ready ?plan_element)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (plan_assigned_operator ?plan_element ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_plan_element
+    :parameters (?plan_element - plan_element ?operator - operator)
+    :precondition
+      (and
+        (plan_assigned_operator ?plan_element ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (plan_assigned_operator ?plan_element ?operator)
+        )
+      )
+  )
+  (:action attach_handling_equipment_to_carrier
+    :parameters (?carrier_unit - carrier_unit ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (handling_equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (carrier_has_handling_equipment ?carrier_unit ?handling_equipment)
+        (not
+          (handling_equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action detach_handling_equipment_from_carrier
+    :parameters (?carrier_unit - carrier_unit ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (carrier_has_handling_equipment ?carrier_unit ?handling_equipment)
+      )
+    :effect
+      (and
+        (handling_equipment_available ?handling_equipment)
+        (not
+          (carrier_has_handling_equipment ?carrier_unit ?handling_equipment)
+        )
+      )
+  )
+  (:action attach_regulatory_authorization_to_carrier
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (regulatory_authorization_available ?regulatory_authorization)
+      )
+    :effect
+      (and
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (not
+          (regulatory_authorization_available ?regulatory_authorization)
+        )
+      )
+  )
+  (:action detach_regulatory_authorization_from_carrier
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization)
+    :precondition
+      (and
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+      )
+    :effect
+      (and
+        (regulatory_authorization_available ?regulatory_authorization)
+        (not
+          (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        )
+      )
+  )
+  (:action flag_origin_segment_for_assessment
+    :parameters (?origin - origin ?height_restricted_segment - height_restricted_segment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_ready ?origin)
+        (plan_has_schedule_slot ?origin ?schedule_slot)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (not
+          (segment_assessed ?height_restricted_segment)
+        )
+        (not
+          (segment_mitigation_attached ?height_restricted_segment)
+        )
+      )
+    :effect (segment_assessed ?height_restricted_segment)
+  )
+  (:action apply_operator_mitigation_for_origin_segment
+    :parameters (?origin - origin ?height_restricted_segment - height_restricted_segment ?operator - operator)
+    :precondition
+      (and
+        (plan_element_ready ?origin)
+        (plan_assigned_operator ?origin ?operator)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (segment_assessed ?height_restricted_segment)
+        (not
+          (origin_staged ?origin)
+        )
+      )
+    :effect
+      (and
+        (origin_staged ?origin)
+        (origin_mitigation_confirmed ?origin)
+      )
+  )
+  (:action stage_cargo_for_origin_segment
+    :parameters (?origin - origin ?height_restricted_segment - height_restricted_segment ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_element_ready ?origin)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_staged ?origin)
+        )
+      )
+    :effect
+      (and
+        (segment_mitigation_attached ?height_restricted_segment)
+        (origin_staged ?origin)
+        (origin_has_cargo_unit ?origin ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_origin_segment_mitigation
+    :parameters (?origin - origin ?height_restricted_segment - height_restricted_segment ?schedule_slot - schedule_slot ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_element_ready ?origin)
+        (plan_has_schedule_slot ?origin ?schedule_slot)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (segment_mitigation_attached ?height_restricted_segment)
+        (origin_has_cargo_unit ?origin ?cargo_unit)
+        (not
+          (origin_mitigation_confirmed ?origin)
+        )
+      )
+    :effect
+      (and
+        (segment_assessed ?height_restricted_segment)
+        (origin_mitigation_confirmed ?origin)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_has_cargo_unit ?origin ?cargo_unit)
+        )
+      )
+  )
+  (:action flag_transfer_node_for_assessment
+    :parameters (?destination - destination ?transfer_node - transfer_node ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_ready ?destination)
+        (plan_has_schedule_slot ?destination ?schedule_slot)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (not
+          (transfer_node_assessed ?transfer_node)
+        )
+        (not
+          (transfer_node_mitigation_attached ?transfer_node)
+        )
+      )
+    :effect (transfer_node_assessed ?transfer_node)
+  )
+  (:action apply_operator_mitigation_for_transfer_node
+    :parameters (?destination - destination ?transfer_node - transfer_node ?operator - operator)
+    :precondition
+      (and
+        (plan_element_ready ?destination)
+        (plan_assigned_operator ?destination ?operator)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (transfer_node_assessed ?transfer_node)
+        (not
+          (destination_staged ?destination)
+        )
+      )
+    :effect
+      (and
+        (destination_staged ?destination)
+        (destination_mitigation_confirmed ?destination)
+      )
+  )
+  (:action stage_cargo_for_transfer_node
+    :parameters (?destination - destination ?transfer_node - transfer_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_element_ready ?destination)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_staged ?destination)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_mitigation_attached ?transfer_node)
+        (destination_staged ?destination)
+        (destination_has_cargo_unit ?destination ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_transfer_node_mitigation
+    :parameters (?destination - destination ?transfer_node - transfer_node ?schedule_slot - schedule_slot ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_element_ready ?destination)
+        (plan_has_schedule_slot ?destination ?schedule_slot)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (transfer_node_mitigation_attached ?transfer_node)
+        (destination_has_cargo_unit ?destination ?cargo_unit)
+        (not
+          (destination_mitigation_confirmed ?destination)
+        )
+      )
+    :effect
+      (and
+        (transfer_node_assessed ?transfer_node)
+        (destination_mitigation_confirmed ?destination)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_has_cargo_unit ?destination ?cargo_unit)
+        )
+      )
+  )
+  (:action consolidate_transport_leg
+    :parameters (?origin - origin ?destination - destination ?height_restricted_segment - height_restricted_segment ?transfer_node - transfer_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_staged ?origin)
+        (destination_staged ?destination)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (segment_assessed ?height_restricted_segment)
+        (transfer_node_assessed ?transfer_node)
+        (origin_mitigation_confirmed ?origin)
+        (destination_mitigation_confirmed ?destination)
+        (transport_leg_provisioned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_created ?transport_leg)
+        (transport_leg_has_segment ?transport_leg ?height_restricted_segment)
+        (transport_leg_has_transfer_node ?transport_leg ?transfer_node)
+        (not
+          (transport_leg_provisioned ?transport_leg)
+        )
+      )
+  )
+  (:action consolidate_transport_leg_with_segment_mitigation
+    :parameters (?origin - origin ?destination - destination ?height_restricted_segment - height_restricted_segment ?transfer_node - transfer_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_staged ?origin)
+        (destination_staged ?destination)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (segment_mitigation_attached ?height_restricted_segment)
+        (transfer_node_assessed ?transfer_node)
+        (not
+          (origin_mitigation_confirmed ?origin)
+        )
+        (destination_mitigation_confirmed ?destination)
+        (transport_leg_provisioned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_created ?transport_leg)
+        (transport_leg_has_segment ?transport_leg ?height_restricted_segment)
+        (transport_leg_has_transfer_node ?transport_leg ?transfer_node)
+        (transport_leg_segment_mitigated ?transport_leg)
+        (not
+          (transport_leg_provisioned ?transport_leg)
+        )
+      )
+  )
+  (:action consolidate_transport_leg_with_node_mitigation
+    :parameters (?origin - origin ?destination - destination ?height_restricted_segment - height_restricted_segment ?transfer_node - transfer_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_staged ?origin)
+        (destination_staged ?destination)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (segment_assessed ?height_restricted_segment)
+        (transfer_node_mitigation_attached ?transfer_node)
+        (origin_mitigation_confirmed ?origin)
+        (not
+          (destination_mitigation_confirmed ?destination)
+        )
+        (transport_leg_provisioned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_created ?transport_leg)
+        (transport_leg_has_segment ?transport_leg ?height_restricted_segment)
+        (transport_leg_has_transfer_node ?transport_leg ?transfer_node)
+        (transport_leg_node_mitigated ?transport_leg)
+        (not
+          (transport_leg_provisioned ?transport_leg)
+        )
+      )
+  )
+  (:action consolidate_transport_leg_with_segment_and_node_mitigation
+    :parameters (?origin - origin ?destination - destination ?height_restricted_segment - height_restricted_segment ?transfer_node - transfer_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_staged ?origin)
+        (destination_staged ?destination)
+        (origin_has_segment ?origin ?height_restricted_segment)
+        (destination_has_transfer_node ?destination ?transfer_node)
+        (segment_mitigation_attached ?height_restricted_segment)
+        (transfer_node_mitigation_attached ?transfer_node)
+        (not
+          (origin_mitigation_confirmed ?origin)
+        )
+        (not
+          (destination_mitigation_confirmed ?destination)
+        )
+        (transport_leg_provisioned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_created ?transport_leg)
+        (transport_leg_has_segment ?transport_leg ?height_restricted_segment)
+        (transport_leg_has_transfer_node ?transport_leg ?transfer_node)
+        (transport_leg_segment_mitigated ?transport_leg)
+        (transport_leg_node_mitigated ?transport_leg)
+        (not
+          (transport_leg_provisioned ?transport_leg)
+        )
+      )
+  )
+  (:action set_transport_leg_ready_for_loading
+    :parameters (?transport_leg - transport_leg ?origin - origin ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (transport_leg_created ?transport_leg)
+        (origin_staged ?origin)
+        (plan_has_schedule_slot ?origin ?schedule_slot)
+        (not
+          (transport_leg_ready_for_departure ?transport_leg)
+        )
+      )
+    :effect (transport_leg_ready_for_departure ?transport_leg)
+  )
+  (:action stage_container_on_carrier_for_leg
+    :parameters (?carrier_unit - carrier_unit ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (carrier_attached_to_leg ?carrier_unit ?transport_leg)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_available ?container)
+        (transport_leg_created ?transport_leg)
+        (transport_leg_ready_for_departure ?transport_leg)
+        (not
+          (container_staged ?container)
+        )
+      )
+    :effect
+      (and
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action mark_carrier_staged_for_loading
+    :parameters (?carrier_unit - carrier_unit ?container - container ?transport_leg - transport_leg ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (plan_has_schedule_slot ?carrier_unit ?schedule_slot)
+        (not
+          (transport_leg_segment_mitigated ?transport_leg)
+        )
+        (not
+          (carrier_staged_for_loading ?carrier_unit)
+        )
+      )
+    :effect (carrier_staged_for_loading ?carrier_unit)
+  )
+  (:action attach_operational_permit_to_carrier
+    :parameters (?carrier_unit - carrier_unit ?operational_permit - operational_permit)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (operational_permit_available ?operational_permit)
+        (not
+          (carrier_operational_permit_attached ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_operational_permit_attached ?carrier_unit)
+        (carrier_has_operational_permit ?carrier_unit ?operational_permit)
+        (not
+          (operational_permit_available ?operational_permit)
+        )
+      )
+  )
+  (:action verify_carrier_container_and_permit
+    :parameters (?carrier_unit - carrier_unit ?container - container ?transport_leg - transport_leg ?schedule_slot - schedule_slot ?operational_permit - operational_permit)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (plan_has_schedule_slot ?carrier_unit ?schedule_slot)
+        (transport_leg_segment_mitigated ?transport_leg)
+        (carrier_operational_permit_attached ?carrier_unit)
+        (carrier_has_operational_permit ?carrier_unit ?operational_permit)
+        (not
+          (carrier_staged_for_loading ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_staged_for_loading ?carrier_unit)
+        (carrier_operational_permit_verified ?carrier_unit)
+      )
+  )
+  (:action confirm_carrier_loading_team_and_equipment_without_node_mitigation
+    :parameters (?carrier_unit - carrier_unit ?handling_equipment - handling_equipment ?operator - operator ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_staged_for_loading ?carrier_unit)
+        (carrier_has_handling_equipment ?carrier_unit ?handling_equipment)
+        (plan_assigned_operator ?carrier_unit ?operator)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (transport_leg_node_mitigated ?transport_leg)
+        )
+        (not
+          (carrier_loading_ready ?carrier_unit)
+        )
+      )
+    :effect (carrier_loading_ready ?carrier_unit)
+  )
+  (:action confirm_carrier_loading_team_and_equipment_with_node_mitigation
+    :parameters (?carrier_unit - carrier_unit ?handling_equipment - handling_equipment ?operator - operator ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_staged_for_loading ?carrier_unit)
+        (carrier_has_handling_equipment ?carrier_unit ?handling_equipment)
+        (plan_assigned_operator ?carrier_unit ?operator)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (transport_leg_node_mitigated ?transport_leg)
+        (not
+          (carrier_loading_ready ?carrier_unit)
+        )
+      )
+    :effect (carrier_loading_ready ?carrier_unit)
+  )
+  (:action authorize_carrier_for_departure_no_mitigation
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_loading_ready ?carrier_unit)
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (transport_leg_segment_mitigated ?transport_leg)
+        )
+        (not
+          (transport_leg_node_mitigated ?transport_leg)
+        )
+        (not
+          (carrier_authorized ?carrier_unit)
+        )
+      )
+    :effect (carrier_authorized ?carrier_unit)
+  )
+  (:action authorize_carrier_for_departure_segment_mitigated
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_loading_ready ?carrier_unit)
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (transport_leg_segment_mitigated ?transport_leg)
+        (not
+          (transport_leg_node_mitigated ?transport_leg)
+        )
+        (not
+          (carrier_authorized ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_equipment_confirmed ?carrier_unit)
+      )
+  )
+  (:action authorize_carrier_for_departure_node_mitigated
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_loading_ready ?carrier_unit)
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (transport_leg_segment_mitigated ?transport_leg)
+        )
+        (transport_leg_node_mitigated ?transport_leg)
+        (not
+          (carrier_authorized ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_equipment_confirmed ?carrier_unit)
+      )
+  )
+  (:action authorize_carrier_for_departure_both_mitigations
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (carrier_loading_ready ?carrier_unit)
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (carrier_has_container ?carrier_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (transport_leg_segment_mitigated ?transport_leg)
+        (transport_leg_node_mitigated ?transport_leg)
+        (not
+          (carrier_authorized ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_equipment_confirmed ?carrier_unit)
+      )
+  )
+  (:action complete_predeparture_checks_for_carrier
+    :parameters (?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (carrier_authorized ?carrier_unit)
+        (not
+          (carrier_equipment_confirmed ?carrier_unit)
+        )
+        (not
+          (predeparture_checks_completed ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (predeparture_checks_completed ?carrier_unit)
+        (ready_for_dispatch ?carrier_unit)
+      )
+  )
+  (:action attach_shipment_order_to_carrier
+    :parameters (?carrier_unit - carrier_unit ?shipment_order - shipment_order)
+    :precondition
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_equipment_confirmed ?carrier_unit)
+        (shipment_order_available ?shipment_order)
+      )
+    :effect
+      (and
+        (carrier_has_shipment_order ?carrier_unit ?shipment_order)
+        (not
+          (shipment_order_available ?shipment_order)
+        )
+      )
+  )
+  (:action finalize_carrier_predeparture_checks_and_lock
+    :parameters (?carrier_unit - carrier_unit ?origin - origin ?destination - destination ?schedule_slot - schedule_slot ?shipment_order - shipment_order)
+    :precondition
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_equipment_confirmed ?carrier_unit)
+        (carrier_has_shipment_order ?carrier_unit ?shipment_order)
+        (carrier_has_origin ?carrier_unit ?origin)
+        (carrier_has_destination ?carrier_unit ?destination)
+        (origin_mitigation_confirmed ?origin)
+        (destination_mitigation_confirmed ?destination)
+        (plan_has_schedule_slot ?carrier_unit ?schedule_slot)
+        (not
+          (carrier_predeparture_flag ?carrier_unit)
+        )
+      )
+    :effect (carrier_predeparture_flag ?carrier_unit)
+  )
+  (:action complete_final_predeparture_checks_and_mark_ready
+    :parameters (?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (carrier_authorized ?carrier_unit)
+        (carrier_predeparture_flag ?carrier_unit)
+        (not
+          (predeparture_checks_completed ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (predeparture_checks_completed ?carrier_unit)
+        (ready_for_dispatch ?carrier_unit)
+      )
+  )
+  (:action initiate_carrier_compliance_for_route_constraint
+    :parameters (?carrier_unit - carrier_unit ?route_constraint_document - route_constraint_document ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (plan_element_ready ?carrier_unit)
+        (plan_has_schedule_slot ?carrier_unit ?schedule_slot)
+        (route_constraint_document_available ?route_constraint_document)
+        (carrier_has_route_constraint_document ?carrier_unit ?route_constraint_document)
+        (not
+          (carrier_compliance_initiated ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (carrier_compliance_initiated ?carrier_unit)
+        (not
+          (route_constraint_document_available ?route_constraint_document)
+        )
+      )
+  )
+  (:action complete_compliance_step1
+    :parameters (?carrier_unit - carrier_unit ?operator - operator)
+    :precondition
+      (and
+        (carrier_compliance_initiated ?carrier_unit)
+        (plan_assigned_operator ?carrier_unit ?operator)
+        (not
+          (carrier_compliance_step1_completed ?carrier_unit)
+        )
+      )
+    :effect (carrier_compliance_step1_completed ?carrier_unit)
+  )
+  (:action complete_compliance_step2_with_regulatory_auth
+    :parameters (?carrier_unit - carrier_unit ?regulatory_authorization - regulatory_authorization)
+    :precondition
+      (and
+        (carrier_compliance_step1_completed ?carrier_unit)
+        (carrier_has_regulatory_authorization ?carrier_unit ?regulatory_authorization)
+        (not
+          (carrier_compliance_step2_completed ?carrier_unit)
+        )
+      )
+    :effect (carrier_compliance_step2_completed ?carrier_unit)
+  )
+  (:action finalize_compliance_and_mark_carrier_ready
+    :parameters (?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (carrier_compliance_step2_completed ?carrier_unit)
+        (not
+          (predeparture_checks_completed ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (predeparture_checks_completed ?carrier_unit)
+        (ready_for_dispatch ?carrier_unit)
+      )
+  )
+  (:action release_origin_for_dispatch
+    :parameters (?origin - origin ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_staged ?origin)
+        (origin_mitigation_confirmed ?origin)
+        (transport_leg_created ?transport_leg)
+        (transport_leg_ready_for_departure ?transport_leg)
+        (not
+          (ready_for_dispatch ?origin)
+        )
+      )
+    :effect (ready_for_dispatch ?origin)
+  )
+  (:action release_destination_for_dispatch
+    :parameters (?destination - destination ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (destination_staged ?destination)
+        (destination_mitigation_confirmed ?destination)
+        (transport_leg_created ?transport_leg)
+        (transport_leg_ready_for_departure ?transport_leg)
+        (not
+          (ready_for_dispatch ?destination)
+        )
+      )
+    :effect (ready_for_dispatch ?destination)
+  )
+  (:action apply_clearance_profile_to_plan_element
+    :parameters (?plan_element - plan_element ?clearance_profile - clearance_profile ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (ready_for_dispatch ?plan_element)
+        (plan_has_schedule_slot ?plan_element ?schedule_slot)
+        (clearance_profile_available ?clearance_profile)
+        (not
+          (clearance_assigned ?plan_element)
+        )
+      )
+    :effect
+      (and
+        (clearance_assigned ?plan_element)
+        (plan_element_has_clearance_profile ?plan_element ?clearance_profile)
+        (not
+          (clearance_profile_available ?clearance_profile)
+        )
+      )
+  )
+  (:action finalize_origin_dispatch_with_clearance
+    :parameters (?origin - origin ?asset - asset ?clearance_profile - clearance_profile)
+    :precondition
+      (and
+        (clearance_assigned ?origin)
+        (plan_has_asset ?origin ?asset)
+        (plan_element_has_clearance_profile ?origin ?clearance_profile)
+        (not
+          (dispatch_confirmed ?origin)
+        )
+      )
+    :effect
+      (and
+        (dispatch_confirmed ?origin)
+        (asset_available ?asset)
+        (clearance_profile_available ?clearance_profile)
+      )
+  )
+  (:action finalize_destination_dispatch_with_clearance
+    :parameters (?destination - destination ?asset - asset ?clearance_profile - clearance_profile)
+    :precondition
+      (and
+        (clearance_assigned ?destination)
+        (plan_has_asset ?destination ?asset)
+        (plan_element_has_clearance_profile ?destination ?clearance_profile)
+        (not
+          (dispatch_confirmed ?destination)
+        )
+      )
+    :effect
+      (and
+        (dispatch_confirmed ?destination)
+        (asset_available ?asset)
+        (clearance_profile_available ?clearance_profile)
+      )
+  )
+  (:action finalize_carrier_dispatch_with_clearance
+    :parameters (?carrier_unit - carrier_unit ?asset - asset ?clearance_profile - clearance_profile)
+    :precondition
+      (and
+        (clearance_assigned ?carrier_unit)
+        (plan_has_asset ?carrier_unit ?asset)
+        (plan_element_has_clearance_profile ?carrier_unit ?clearance_profile)
+        (not
+          (dispatch_confirmed ?carrier_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_confirmed ?carrier_unit)
+        (asset_available ?asset)
+        (clearance_profile_available ?clearance_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem bridge_height_restricted_route_adjustment_problem)
+  (:domain bridge_height_restricted_route_adjustment_domain)
+  (:objects origin_terminal_1 - origin destination_terminal_1 - destination carrier_unit_alpha - carrier_unit carrier_unit_bravo - carrier_unit asset_truck_1 - asset asset_truck_2 - asset asset_truck_3 - asset schedule_slot_1 - schedule_slot operator_team_a - operator cargo_unit_a - cargo_unit segment_bridge_low_1 - height_restricted_segment transfer_node_main - transfer_node transport_leg_placeholder_1 - transport_leg container_1 - container container_2 - container operational_permit_1 - operational_permit operational_permit_2 - operational_permit shipment_order_1 - shipment_order shipment_order_2 - shipment_order clearance_profile_standard - clearance_profile handling_crane_1 - handling_equipment route_constraint_doc_low_bridge_1 - route_constraint_document route_constraint_doc_low_bridge_2 - route_constraint_document regulatory_authorization_1 - regulatory_authorization)
+  (:init
+    (asset_available asset_truck_1)
+    (asset_available asset_truck_2)
+    (asset_available asset_truck_3)
+    (schedule_slot_available schedule_slot_1)
+    (operator_available operator_team_a)
+    (cargo_unit_available cargo_unit_a)
+    (origin_has_segment origin_terminal_1 segment_bridge_low_1)
+    (destination_has_transfer_node destination_terminal_1 transfer_node_main)
+    (transport_leg_provisioned transport_leg_placeholder_1)
+    (container_available container_1)
+    (container_available container_2)
+    (carrier_has_origin carrier_unit_alpha origin_terminal_1)
+    (carrier_has_origin carrier_unit_bravo origin_terminal_1)
+    (carrier_has_destination carrier_unit_alpha destination_terminal_1)
+    (carrier_has_destination carrier_unit_bravo destination_terminal_1)
+    (carrier_attached_to_leg carrier_unit_alpha transport_leg_placeholder_1)
+    (carrier_attached_to_leg carrier_unit_bravo transport_leg_placeholder_1)
+    (carrier_has_container carrier_unit_alpha container_1)
+    (carrier_has_container carrier_unit_bravo container_2)
+    (operational_permit_available operational_permit_1)
+    (operational_permit_available operational_permit_2)
+    (shipment_order_available shipment_order_1)
+    (shipment_order_available shipment_order_2)
+    (clearance_profile_available clearance_profile_standard)
+    (handling_equipment_available handling_crane_1)
+    (route_constraint_document_available route_constraint_doc_low_bridge_1)
+    (carrier_has_route_constraint_document carrier_unit_alpha route_constraint_doc_low_bridge_1)
+    (carrier_has_route_constraint_document carrier_unit_bravo route_constraint_doc_low_bridge_2)
+    (regulatory_authorization_available regulatory_authorization_1)
+  )
+  (:goal
+    (and
+      (dispatch_confirmed origin_terminal_1)
+      (dispatch_confirmed destination_terminal_1)
+      (dispatch_confirmed carrier_unit_alpha)
+      (dispatch_confirmed carrier_unit_bravo)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_plan_element origin_terminal_1)
+(assign_asset_to_plan origin_terminal_1 asset_truck_1)
+(assign_schedule_slot_to_plan origin_terminal_1 schedule_slot_1)
+(mark_plan_element_ready origin_terminal_1 schedule_slot_1)
+(stage_cargo_for_origin_segment origin_terminal_1 segment_bridge_low_1 cargo_unit_a)
+(finalize_origin_segment_mitigation origin_terminal_1 segment_bridge_low_1 schedule_slot_1 cargo_unit_a)
+(release_schedule_slot_from_plan origin_terminal_1 schedule_slot_1)
+(create_plan_element destination_terminal_1)
+(assign_asset_to_plan destination_terminal_1 asset_truck_2)
+(assign_schedule_slot_to_plan destination_terminal_1 schedule_slot_1)
+(mark_plan_element_ready destination_terminal_1 schedule_slot_1)
+(stage_cargo_for_transfer_node destination_terminal_1 transfer_node_main cargo_unit_a)
+(finalize_transfer_node_mitigation destination_terminal_1 transfer_node_main schedule_slot_1 cargo_unit_a)
+(release_schedule_slot_from_plan destination_terminal_1 schedule_slot_1)
+(consolidate_transport_leg origin_terminal_1 destination_terminal_1 segment_bridge_low_1 transfer_node_main transport_leg_placeholder_1)
+(assign_schedule_slot_to_plan origin_terminal_1 schedule_slot_1)
+(set_transport_leg_ready_for_loading transport_leg_placeholder_1 origin_terminal_1 schedule_slot_1)
+(release_schedule_slot_from_plan origin_terminal_1 schedule_slot_1)
+(release_origin_for_dispatch origin_terminal_1 transport_leg_placeholder_1)
+(release_destination_for_dispatch destination_terminal_1 transport_leg_placeholder_1)
+(create_plan_element carrier_unit_alpha)
+(assign_asset_to_plan carrier_unit_alpha asset_truck_3)
+(assign_schedule_slot_to_plan carrier_unit_alpha schedule_slot_1)
+(mark_plan_element_ready carrier_unit_alpha schedule_slot_1)
+(stage_container_on_carrier_for_leg carrier_unit_alpha container_1 transport_leg_placeholder_1)
+(mark_carrier_staged_for_loading carrier_unit_alpha container_1 transport_leg_placeholder_1 schedule_slot_1)
+(assign_operator_to_plan_element carrier_unit_alpha operator_team_a)
+(attach_handling_equipment_to_carrier carrier_unit_alpha handling_crane_1)
+(confirm_carrier_loading_team_and_equipment_without_node_mitigation carrier_unit_alpha handling_crane_1 operator_team_a container_1 transport_leg_placeholder_1)
+(attach_regulatory_authorization_to_carrier carrier_unit_alpha regulatory_authorization_1)
+(authorize_carrier_for_departure_no_mitigation carrier_unit_alpha regulatory_authorization_1 container_1 transport_leg_placeholder_1)
+(complete_predeparture_checks_for_carrier carrier_unit_alpha)
+(apply_clearance_profile_to_plan_element carrier_unit_alpha clearance_profile_standard schedule_slot_1)
+(finalize_carrier_dispatch_with_clearance carrier_unit_alpha asset_truck_3 clearance_profile_standard)
+(release_schedule_slot_from_plan carrier_unit_alpha schedule_slot_1)
+(release_operator_from_plan_element carrier_unit_alpha operator_team_a)
+(detach_handling_equipment_from_carrier carrier_unit_alpha handling_crane_1)
+(detach_regulatory_authorization_from_carrier carrier_unit_alpha regulatory_authorization_1)
+(assign_schedule_slot_to_plan origin_terminal_1 schedule_slot_1)
+(apply_clearance_profile_to_plan_element origin_terminal_1 clearance_profile_standard schedule_slot_1)
+(finalize_origin_dispatch_with_clearance origin_terminal_1 asset_truck_1 clearance_profile_standard)
+(release_schedule_slot_from_plan origin_terminal_1 schedule_slot_1)
+(assign_schedule_slot_to_plan destination_terminal_1 schedule_slot_1)
+(apply_clearance_profile_to_plan_element destination_terminal_1 clearance_profile_standard schedule_slot_1)
+(finalize_destination_dispatch_with_clearance destination_terminal_1 asset_truck_2 clearance_profile_standard)
+(release_schedule_slot_from_plan destination_terminal_1 schedule_slot_1)
+(create_plan_element carrier_unit_bravo)
+(assign_asset_to_plan carrier_unit_bravo asset_truck_3)
+(assign_schedule_slot_to_plan carrier_unit_bravo schedule_slot_1)
+(mark_plan_element_ready carrier_unit_bravo schedule_slot_1)
+(stage_container_on_carrier_for_leg carrier_unit_bravo container_2 transport_leg_placeholder_1)
+(mark_carrier_staged_for_loading carrier_unit_bravo container_2 transport_leg_placeholder_1 schedule_slot_1)
+(assign_operator_to_plan_element carrier_unit_bravo operator_team_a)
+(attach_handling_equipment_to_carrier carrier_unit_bravo handling_crane_1)
+(confirm_carrier_loading_team_and_equipment_without_node_mitigation carrier_unit_bravo handling_crane_1 operator_team_a container_2 transport_leg_placeholder_1)
+(attach_regulatory_authorization_to_carrier carrier_unit_bravo regulatory_authorization_1)
+(authorize_carrier_for_departure_no_mitigation carrier_unit_bravo regulatory_authorization_1 container_2 transport_leg_placeholder_1)
+(complete_predeparture_checks_for_carrier carrier_unit_bravo)
+(apply_clearance_profile_to_plan_element carrier_unit_bravo clearance_profile_standard schedule_slot_1)
+(finalize_carrier_dispatch_with_clearance carrier_unit_bravo asset_truck_3 clearance_profile_standard)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ojbakth4/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 60 
+
+Successful plans:
+Value: 60
+ /tmp/val_ojbakth4/plan.pddl 60 
+
+
+
+--- stderr ---
+

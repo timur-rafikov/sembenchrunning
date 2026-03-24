@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain missed_connection_recovery_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object transport_category - object service_category - object case_identifier - object recovery_case - case_identifier agent_resource_slot - operational_resource flight_leg - operational_resource service_desk - operational_resource compensation_scheme - operational_resource followup_task - operational_resource contact_channel - operational_resource compensation_offer - operational_resource assistance_resource - operational_resource consumable_voucher - transport_category document_bundle - transport_category policy_reference - transport_category alternative_option_a - service_category alternative_option_b - service_category recovery_package - service_category itinerary_component - recovery_case passenger_profile - recovery_case inbound_flight_segment - itinerary_component outbound_flight_segment - itinerary_component support_agent_team - passenger_profile)
+  (:predicates
+    (work_item_created ?recovery_case - recovery_case)
+    (work_item_triaged ?recovery_case - recovery_case)
+    (work_item_has_assigned_agent ?recovery_case - recovery_case)
+    (work_item_confirmed ?recovery_case - recovery_case)
+    (work_item_ready_for_notification ?recovery_case - recovery_case)
+    (work_item_notification_sent ?recovery_case - recovery_case)
+    (agent_slot_available ?agent_resource_slot - agent_resource_slot)
+    (work_item_allocated_agent_slot ?recovery_case - recovery_case ?agent_resource_slot - agent_resource_slot)
+    (flight_leg_available ?flight_leg - flight_leg)
+    (work_item_linked_to_flight_leg ?recovery_case - recovery_case ?flight_leg - flight_leg)
+    (service_desk_available ?service_desk - service_desk)
+    (work_item_assigned_service_desk ?recovery_case - recovery_case ?service_desk - service_desk)
+    (voucher_available ?consumable_voucher - consumable_voucher)
+    (inbound_voucher_assigned ?inbound_flight_segment - inbound_flight_segment ?consumable_voucher - consumable_voucher)
+    (outbound_voucher_assigned ?outbound_flight_segment - outbound_flight_segment ?consumable_voucher - consumable_voucher)
+    (inbound_has_alternative_a ?inbound_flight_segment - inbound_flight_segment ?alternative_option_a - alternative_option_a)
+    (alternative_a_approved ?alternative_option_a - alternative_option_a)
+    (alternative_a_requires_voucher ?alternative_option_a - alternative_option_a)
+    (inbound_option_finalized ?inbound_flight_segment - inbound_flight_segment)
+    (outbound_has_alternative_b ?outbound_flight_segment - outbound_flight_segment ?alternative_option_b - alternative_option_b)
+    (alternative_b_approved ?alternative_option_b - alternative_option_b)
+    (alternative_b_requires_voucher ?alternative_option_b - alternative_option_b)
+    (outbound_option_finalized ?outbound_flight_segment - outbound_flight_segment)
+    (recovery_package_pending ?recovery_package - recovery_package)
+    (recovery_package_assembled ?recovery_package - recovery_package)
+    (recovery_package_includes_option_a ?recovery_package - recovery_package ?alternative_option_a - alternative_option_a)
+    (recovery_package_includes_option_b ?recovery_package - recovery_package ?alternative_option_b - alternative_option_b)
+    (recovery_package_priority_flag_a ?recovery_package - recovery_package)
+    (recovery_package_priority_flag_b ?recovery_package - recovery_package)
+    (recovery_package_ready ?recovery_package - recovery_package)
+    (team_assigned_to_inbound_segment ?support_agent_team - support_agent_team ?inbound_flight_segment - inbound_flight_segment)
+    (team_assigned_to_outbound_segment ?support_agent_team - support_agent_team ?outbound_flight_segment - outbound_flight_segment)
+    (team_assigned_to_recovery_package ?support_agent_team - support_agent_team ?recovery_package - recovery_package)
+    (document_bundle_available ?document_bundle - document_bundle)
+    (team_has_document_bundle ?support_agent_team - support_agent_team ?document_bundle - document_bundle)
+    (document_bundle_attached ?document_bundle - document_bundle)
+    (document_bundle_attached_to_package ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    (team_documents_validated ?support_agent_team - support_agent_team)
+    (team_compensation_offer_attached ?support_agent_team - support_agent_team)
+    (team_assistance_resource_applied ?support_agent_team - support_agent_team)
+    (team_has_compensation_scheme ?support_agent_team - support_agent_team)
+    (team_compensation_endorsement ?support_agent_team - support_agent_team)
+    (team_enrichment_complete ?support_agent_team - support_agent_team)
+    (team_execution_performed ?support_agent_team - support_agent_team)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (team_has_policy_reference ?support_agent_team - support_agent_team ?policy_reference - policy_reference)
+    (team_policy_attached ?support_agent_team - support_agent_team)
+    (team_policy_validated ?support_agent_team - support_agent_team)
+    (team_policy_approved ?support_agent_team - support_agent_team)
+    (compensation_scheme_available ?compensation_scheme - compensation_scheme)
+    (team_assigned_compensation_scheme ?support_agent_team - support_agent_team ?compensation_scheme - compensation_scheme)
+    (followup_task_available ?followup_task - followup_task)
+    (team_assigned_followup_task ?support_agent_team - support_agent_team ?followup_task - followup_task)
+    (compensation_offer_available ?compensation_offer - compensation_offer)
+    (team_has_compensation_offer ?support_agent_team - support_agent_team ?compensation_offer - compensation_offer)
+    (assistance_resource_available ?assistance_resource - assistance_resource)
+    (team_allocated_assistance_resource ?support_agent_team - support_agent_team ?assistance_resource - assistance_resource)
+    (contact_channel_available ?contact_channel - contact_channel)
+    (work_item_contact_channel_registered ?recovery_case - recovery_case ?contact_channel - contact_channel)
+    (inbound_processing_flag ?inbound_flight_segment - inbound_flight_segment)
+    (outbound_processing_flag ?outbound_flight_segment - outbound_flight_segment)
+    (team_finalization_flag ?support_agent_team - support_agent_team)
+  )
+  (:action create_recovery_case
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (not
+          (work_item_created ?recovery_case)
+        )
+        (not
+          (work_item_confirmed ?recovery_case)
+        )
+      )
+    :effect (work_item_created ?recovery_case)
+  )
+  (:action allocate_agent_slot_to_case
+    :parameters (?recovery_case - recovery_case ?agent_resource_slot - agent_resource_slot)
+    :precondition
+      (and
+        (work_item_created ?recovery_case)
+        (not
+          (work_item_has_assigned_agent ?recovery_case)
+        )
+        (agent_slot_available ?agent_resource_slot)
+      )
+    :effect
+      (and
+        (work_item_has_assigned_agent ?recovery_case)
+        (work_item_allocated_agent_slot ?recovery_case ?agent_resource_slot)
+        (not
+          (agent_slot_available ?agent_resource_slot)
+        )
+      )
+  )
+  (:action attach_flight_leg_to_case
+    :parameters (?recovery_case - recovery_case ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_created ?recovery_case)
+        (work_item_has_assigned_agent ?recovery_case)
+        (flight_leg_available ?flight_leg)
+      )
+    :effect
+      (and
+        (work_item_linked_to_flight_leg ?recovery_case ?flight_leg)
+        (not
+          (flight_leg_available ?flight_leg)
+        )
+      )
+  )
+  (:action finalize_case_triage
+    :parameters (?recovery_case - recovery_case ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_created ?recovery_case)
+        (work_item_has_assigned_agent ?recovery_case)
+        (work_item_linked_to_flight_leg ?recovery_case ?flight_leg)
+        (not
+          (work_item_triaged ?recovery_case)
+        )
+      )
+    :effect (work_item_triaged ?recovery_case)
+  )
+  (:action unassign_flight_leg_from_case
+    :parameters (?recovery_case - recovery_case ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_linked_to_flight_leg ?recovery_case ?flight_leg)
+      )
+    :effect
+      (and
+        (flight_leg_available ?flight_leg)
+        (not
+          (work_item_linked_to_flight_leg ?recovery_case ?flight_leg)
+        )
+      )
+  )
+  (:action assign_service_desk_to_case
+    :parameters (?recovery_case - recovery_case ?service_desk - service_desk)
+    :precondition
+      (and
+        (work_item_triaged ?recovery_case)
+        (service_desk_available ?service_desk)
+      )
+    :effect
+      (and
+        (work_item_assigned_service_desk ?recovery_case ?service_desk)
+        (not
+          (service_desk_available ?service_desk)
+        )
+      )
+  )
+  (:action release_service_desk_from_case
+    :parameters (?recovery_case - recovery_case ?service_desk - service_desk)
+    :precondition
+      (and
+        (work_item_assigned_service_desk ?recovery_case ?service_desk)
+      )
+    :effect
+      (and
+        (service_desk_available ?service_desk)
+        (not
+          (work_item_assigned_service_desk ?recovery_case ?service_desk)
+        )
+      )
+  )
+  (:action attach_compensation_offer_to_team
+    :parameters (?support_agent_team - support_agent_team ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (compensation_offer_available ?compensation_offer)
+      )
+    :effect
+      (and
+        (team_has_compensation_offer ?support_agent_team ?compensation_offer)
+        (not
+          (compensation_offer_available ?compensation_offer)
+        )
+      )
+  )
+  (:action detach_compensation_offer_from_team
+    :parameters (?support_agent_team - support_agent_team ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (team_has_compensation_offer ?support_agent_team ?compensation_offer)
+      )
+    :effect
+      (and
+        (compensation_offer_available ?compensation_offer)
+        (not
+          (team_has_compensation_offer ?support_agent_team ?compensation_offer)
+        )
+      )
+  )
+  (:action assign_assistance_resource_to_team
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (assistance_resource_available ?assistance_resource)
+      )
+    :effect
+      (and
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (not
+          (assistance_resource_available ?assistance_resource)
+        )
+      )
+  )
+  (:action remove_assistance_resource_from_team
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource)
+    :precondition
+      (and
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+      )
+    :effect
+      (and
+        (assistance_resource_available ?assistance_resource)
+        (not
+          (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        )
+      )
+  )
+  (:action propose_inbound_option_a
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?alternative_option_a - alternative_option_a ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_triaged ?inbound_flight_segment)
+        (work_item_linked_to_flight_leg ?inbound_flight_segment ?flight_leg)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (not
+          (alternative_a_approved ?alternative_option_a)
+        )
+        (not
+          (alternative_a_requires_voucher ?alternative_option_a)
+        )
+      )
+    :effect (alternative_a_approved ?alternative_option_a)
+  )
+  (:action confirm_inbound_option_a
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?alternative_option_a - alternative_option_a ?service_desk - service_desk)
+    :precondition
+      (and
+        (work_item_triaged ?inbound_flight_segment)
+        (work_item_assigned_service_desk ?inbound_flight_segment ?service_desk)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (alternative_a_approved ?alternative_option_a)
+        (not
+          (inbound_processing_flag ?inbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (inbound_option_finalized ?inbound_flight_segment)
+      )
+  )
+  (:action assign_voucher_for_inbound_option_a
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?alternative_option_a - alternative_option_a ?consumable_voucher - consumable_voucher)
+    :precondition
+      (and
+        (work_item_triaged ?inbound_flight_segment)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (voucher_available ?consumable_voucher)
+        (not
+          (inbound_processing_flag ?inbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_a_requires_voucher ?alternative_option_a)
+        (inbound_processing_flag ?inbound_flight_segment)
+        (inbound_voucher_assigned ?inbound_flight_segment ?consumable_voucher)
+        (not
+          (voucher_available ?consumable_voucher)
+        )
+      )
+  )
+  (:action validate_inbound_option_a_with_voucher
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?alternative_option_a - alternative_option_a ?flight_leg - flight_leg ?consumable_voucher - consumable_voucher)
+    :precondition
+      (and
+        (work_item_triaged ?inbound_flight_segment)
+        (work_item_linked_to_flight_leg ?inbound_flight_segment ?flight_leg)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (alternative_a_requires_voucher ?alternative_option_a)
+        (inbound_voucher_assigned ?inbound_flight_segment ?consumable_voucher)
+        (not
+          (inbound_option_finalized ?inbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_a_approved ?alternative_option_a)
+        (inbound_option_finalized ?inbound_flight_segment)
+        (voucher_available ?consumable_voucher)
+        (not
+          (inbound_voucher_assigned ?inbound_flight_segment ?consumable_voucher)
+        )
+      )
+  )
+  (:action propose_outbound_option_b
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?alternative_option_b - alternative_option_b ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_triaged ?outbound_flight_segment)
+        (work_item_linked_to_flight_leg ?outbound_flight_segment ?flight_leg)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (not
+          (alternative_b_approved ?alternative_option_b)
+        )
+        (not
+          (alternative_b_requires_voucher ?alternative_option_b)
+        )
+      )
+    :effect (alternative_b_approved ?alternative_option_b)
+  )
+  (:action confirm_outbound_option_b
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?alternative_option_b - alternative_option_b ?service_desk - service_desk)
+    :precondition
+      (and
+        (work_item_triaged ?outbound_flight_segment)
+        (work_item_assigned_service_desk ?outbound_flight_segment ?service_desk)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_b_approved ?alternative_option_b)
+        (not
+          (outbound_processing_flag ?outbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (outbound_processing_flag ?outbound_flight_segment)
+        (outbound_option_finalized ?outbound_flight_segment)
+      )
+  )
+  (:action assign_voucher_for_outbound_option_b
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?alternative_option_b - alternative_option_b ?consumable_voucher - consumable_voucher)
+    :precondition
+      (and
+        (work_item_triaged ?outbound_flight_segment)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (voucher_available ?consumable_voucher)
+        (not
+          (outbound_processing_flag ?outbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_b_requires_voucher ?alternative_option_b)
+        (outbound_processing_flag ?outbound_flight_segment)
+        (outbound_voucher_assigned ?outbound_flight_segment ?consumable_voucher)
+        (not
+          (voucher_available ?consumable_voucher)
+        )
+      )
+  )
+  (:action validate_outbound_option_b_with_voucher
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?alternative_option_b - alternative_option_b ?flight_leg - flight_leg ?consumable_voucher - consumable_voucher)
+    :precondition
+      (and
+        (work_item_triaged ?outbound_flight_segment)
+        (work_item_linked_to_flight_leg ?outbound_flight_segment ?flight_leg)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_b_requires_voucher ?alternative_option_b)
+        (outbound_voucher_assigned ?outbound_flight_segment ?consumable_voucher)
+        (not
+          (outbound_option_finalized ?outbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (alternative_b_approved ?alternative_option_b)
+        (outbound_option_finalized ?outbound_flight_segment)
+        (voucher_available ?consumable_voucher)
+        (not
+          (outbound_voucher_assigned ?outbound_flight_segment ?consumable_voucher)
+        )
+      )
+  )
+  (:action assemble_recovery_package
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?outbound_flight_segment - outbound_flight_segment ?alternative_option_a - alternative_option_a ?alternative_option_b - alternative_option_b ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (outbound_processing_flag ?outbound_flight_segment)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_a_approved ?alternative_option_a)
+        (alternative_b_approved ?alternative_option_b)
+        (inbound_option_finalized ?inbound_flight_segment)
+        (outbound_option_finalized ?outbound_flight_segment)
+        (recovery_package_pending ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_includes_option_a ?recovery_package ?alternative_option_a)
+        (recovery_package_includes_option_b ?recovery_package ?alternative_option_b)
+        (not
+          (recovery_package_pending ?recovery_package)
+        )
+      )
+  )
+  (:action assemble_recovery_package_with_option_a_priority
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?outbound_flight_segment - outbound_flight_segment ?alternative_option_a - alternative_option_a ?alternative_option_b - alternative_option_b ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (outbound_processing_flag ?outbound_flight_segment)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_a_requires_voucher ?alternative_option_a)
+        (alternative_b_approved ?alternative_option_b)
+        (not
+          (inbound_option_finalized ?inbound_flight_segment)
+        )
+        (outbound_option_finalized ?outbound_flight_segment)
+        (recovery_package_pending ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_includes_option_a ?recovery_package ?alternative_option_a)
+        (recovery_package_includes_option_b ?recovery_package ?alternative_option_b)
+        (recovery_package_priority_flag_a ?recovery_package)
+        (not
+          (recovery_package_pending ?recovery_package)
+        )
+      )
+  )
+  (:action assemble_recovery_package_with_option_b_priority
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?outbound_flight_segment - outbound_flight_segment ?alternative_option_a - alternative_option_a ?alternative_option_b - alternative_option_b ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (outbound_processing_flag ?outbound_flight_segment)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_a_approved ?alternative_option_a)
+        (alternative_b_requires_voucher ?alternative_option_b)
+        (inbound_option_finalized ?inbound_flight_segment)
+        (not
+          (outbound_option_finalized ?outbound_flight_segment)
+        )
+        (recovery_package_pending ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_includes_option_a ?recovery_package ?alternative_option_a)
+        (recovery_package_includes_option_b ?recovery_package ?alternative_option_b)
+        (recovery_package_priority_flag_b ?recovery_package)
+        (not
+          (recovery_package_pending ?recovery_package)
+        )
+      )
+  )
+  (:action assemble_recovery_package_with_both_priorities
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?outbound_flight_segment - outbound_flight_segment ?alternative_option_a - alternative_option_a ?alternative_option_b - alternative_option_b ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (outbound_processing_flag ?outbound_flight_segment)
+        (inbound_has_alternative_a ?inbound_flight_segment ?alternative_option_a)
+        (outbound_has_alternative_b ?outbound_flight_segment ?alternative_option_b)
+        (alternative_a_requires_voucher ?alternative_option_a)
+        (alternative_b_requires_voucher ?alternative_option_b)
+        (not
+          (inbound_option_finalized ?inbound_flight_segment)
+        )
+        (not
+          (outbound_option_finalized ?outbound_flight_segment)
+        )
+        (recovery_package_pending ?recovery_package)
+      )
+    :effect
+      (and
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_includes_option_a ?recovery_package ?alternative_option_a)
+        (recovery_package_includes_option_b ?recovery_package ?alternative_option_b)
+        (recovery_package_priority_flag_a ?recovery_package)
+        (recovery_package_priority_flag_b ?recovery_package)
+        (not
+          (recovery_package_pending ?recovery_package)
+        )
+      )
+  )
+  (:action mark_recovery_package_ready
+    :parameters (?recovery_package - recovery_package ?inbound_flight_segment - inbound_flight_segment ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (recovery_package_assembled ?recovery_package)
+        (inbound_processing_flag ?inbound_flight_segment)
+        (work_item_linked_to_flight_leg ?inbound_flight_segment ?flight_leg)
+        (not
+          (recovery_package_ready ?recovery_package)
+        )
+      )
+    :effect (recovery_package_ready ?recovery_package)
+  )
+  (:action attach_document_bundle_to_package
+    :parameters (?support_agent_team - support_agent_team ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (team_assigned_to_recovery_package ?support_agent_team ?recovery_package)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_available ?document_bundle)
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_ready ?recovery_package)
+        (not
+          (document_bundle_attached ?document_bundle)
+        )
+      )
+    :effect
+      (and
+        (document_bundle_attached ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (not
+          (document_bundle_available ?document_bundle)
+        )
+      )
+  )
+  (:action validate_document_bundle_for_package
+    :parameters (?support_agent_team - support_agent_team ?document_bundle - document_bundle ?recovery_package - recovery_package ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (work_item_linked_to_flight_leg ?support_agent_team ?flight_leg)
+        (not
+          (recovery_package_priority_flag_a ?recovery_package)
+        )
+        (not
+          (team_documents_validated ?support_agent_team)
+        )
+      )
+    :effect (team_documents_validated ?support_agent_team)
+  )
+  (:action attach_compensation_scheme_to_team
+    :parameters (?support_agent_team - support_agent_team ?compensation_scheme - compensation_scheme)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (compensation_scheme_available ?compensation_scheme)
+        (not
+          (team_has_compensation_scheme ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_has_compensation_scheme ?support_agent_team)
+        (team_assigned_compensation_scheme ?support_agent_team ?compensation_scheme)
+        (not
+          (compensation_scheme_available ?compensation_scheme)
+        )
+      )
+  )
+  (:action apply_policy_and_compensation_to_package
+    :parameters (?support_agent_team - support_agent_team ?document_bundle - document_bundle ?recovery_package - recovery_package ?flight_leg - flight_leg ?compensation_scheme - compensation_scheme)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (work_item_linked_to_flight_leg ?support_agent_team ?flight_leg)
+        (recovery_package_priority_flag_a ?recovery_package)
+        (team_has_compensation_scheme ?support_agent_team)
+        (team_assigned_compensation_scheme ?support_agent_team ?compensation_scheme)
+        (not
+          (team_documents_validated ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_documents_validated ?support_agent_team)
+        (team_compensation_endorsement ?support_agent_team)
+      )
+  )
+  (:action apply_compensation_offer_to_package
+    :parameters (?support_agent_team - support_agent_team ?compensation_offer - compensation_offer ?service_desk - service_desk ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_documents_validated ?support_agent_team)
+        (team_has_compensation_offer ?support_agent_team ?compensation_offer)
+        (work_item_assigned_service_desk ?support_agent_team ?service_desk)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (not
+          (recovery_package_priority_flag_b ?recovery_package)
+        )
+        (not
+          (team_compensation_offer_attached ?support_agent_team)
+        )
+      )
+    :effect (team_compensation_offer_attached ?support_agent_team)
+  )
+  (:action apply_compensation_offer_to_package_alternate
+    :parameters (?support_agent_team - support_agent_team ?compensation_offer - compensation_offer ?service_desk - service_desk ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_documents_validated ?support_agent_team)
+        (team_has_compensation_offer ?support_agent_team ?compensation_offer)
+        (work_item_assigned_service_desk ?support_agent_team ?service_desk)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (recovery_package_priority_flag_b ?recovery_package)
+        (not
+          (team_compensation_offer_attached ?support_agent_team)
+        )
+      )
+    :effect (team_compensation_offer_attached ?support_agent_team)
+  )
+  (:action attach_assistance_resource_to_package
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_compensation_offer_attached ?support_agent_team)
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (not
+          (recovery_package_priority_flag_a ?recovery_package)
+        )
+        (not
+          (recovery_package_priority_flag_b ?recovery_package)
+        )
+        (not
+          (team_assistance_resource_applied ?support_agent_team)
+        )
+      )
+    :effect (team_assistance_resource_applied ?support_agent_team)
+  )
+  (:action attach_assistance_and_mark_enrichment
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_compensation_offer_attached ?support_agent_team)
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (recovery_package_priority_flag_a ?recovery_package)
+        (not
+          (recovery_package_priority_flag_b ?recovery_package)
+        )
+        (not
+          (team_assistance_resource_applied ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_enrichment_complete ?support_agent_team)
+      )
+  )
+  (:action attach_assistance_and_mark_enrichment_variant
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_compensation_offer_attached ?support_agent_team)
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (not
+          (recovery_package_priority_flag_a ?recovery_package)
+        )
+        (recovery_package_priority_flag_b ?recovery_package)
+        (not
+          (team_assistance_resource_applied ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_enrichment_complete ?support_agent_team)
+      )
+  )
+  (:action attach_assistance_and_mark_enrichment_full
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource ?document_bundle - document_bundle ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (team_compensation_offer_attached ?support_agent_team)
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (team_has_document_bundle ?support_agent_team ?document_bundle)
+        (document_bundle_attached_to_package ?document_bundle ?recovery_package)
+        (recovery_package_priority_flag_a ?recovery_package)
+        (recovery_package_priority_flag_b ?recovery_package)
+        (not
+          (team_assistance_resource_applied ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_enrichment_complete ?support_agent_team)
+      )
+  )
+  (:action finalize_team_enrichment
+    :parameters (?support_agent_team - support_agent_team)
+    :precondition
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (not
+          (team_enrichment_complete ?support_agent_team)
+        )
+        (not
+          (team_finalization_flag ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalization_flag ?support_agent_team)
+        (work_item_ready_for_notification ?support_agent_team)
+      )
+  )
+  (:action assign_followup_task_to_team
+    :parameters (?support_agent_team - support_agent_team ?followup_task - followup_task)
+    :precondition
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_enrichment_complete ?support_agent_team)
+        (followup_task_available ?followup_task)
+      )
+    :effect
+      (and
+        (team_assigned_followup_task ?support_agent_team ?followup_task)
+        (not
+          (followup_task_available ?followup_task)
+        )
+      )
+  )
+  (:action execute_recovery_actions_by_team
+    :parameters (?support_agent_team - support_agent_team ?inbound_flight_segment - inbound_flight_segment ?outbound_flight_segment - outbound_flight_segment ?flight_leg - flight_leg ?followup_task - followup_task)
+    :precondition
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_enrichment_complete ?support_agent_team)
+        (team_assigned_followup_task ?support_agent_team ?followup_task)
+        (team_assigned_to_inbound_segment ?support_agent_team ?inbound_flight_segment)
+        (team_assigned_to_outbound_segment ?support_agent_team ?outbound_flight_segment)
+        (inbound_option_finalized ?inbound_flight_segment)
+        (outbound_option_finalized ?outbound_flight_segment)
+        (work_item_linked_to_flight_leg ?support_agent_team ?flight_leg)
+        (not
+          (team_execution_performed ?support_agent_team)
+        )
+      )
+    :effect (team_execution_performed ?support_agent_team)
+  )
+  (:action record_execution_and_notify_case
+    :parameters (?support_agent_team - support_agent_team)
+    :precondition
+      (and
+        (team_assistance_resource_applied ?support_agent_team)
+        (team_execution_performed ?support_agent_team)
+        (not
+          (team_finalization_flag ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalization_flag ?support_agent_team)
+        (work_item_ready_for_notification ?support_agent_team)
+      )
+  )
+  (:action attach_policy_reference_to_team_for_leg
+    :parameters (?support_agent_team - support_agent_team ?policy_reference - policy_reference ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_triaged ?support_agent_team)
+        (work_item_linked_to_flight_leg ?support_agent_team ?flight_leg)
+        (policy_reference_available ?policy_reference)
+        (team_has_policy_reference ?support_agent_team ?policy_reference)
+        (not
+          (team_policy_attached ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_policy_attached ?support_agent_team)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action validate_policy_with_service_point
+    :parameters (?support_agent_team - support_agent_team ?service_desk - service_desk)
+    :precondition
+      (and
+        (team_policy_attached ?support_agent_team)
+        (work_item_assigned_service_desk ?support_agent_team ?service_desk)
+        (not
+          (team_policy_validated ?support_agent_team)
+        )
+      )
+    :effect (team_policy_validated ?support_agent_team)
+  )
+  (:action approve_assistance_resource_for_team
+    :parameters (?support_agent_team - support_agent_team ?assistance_resource - assistance_resource)
+    :precondition
+      (and
+        (team_policy_validated ?support_agent_team)
+        (team_allocated_assistance_resource ?support_agent_team ?assistance_resource)
+        (not
+          (team_policy_approved ?support_agent_team)
+        )
+      )
+    :effect (team_policy_approved ?support_agent_team)
+  )
+  (:action finalize_policy_approval_by_team
+    :parameters (?support_agent_team - support_agent_team)
+    :precondition
+      (and
+        (team_policy_approved ?support_agent_team)
+        (not
+          (team_finalization_flag ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalization_flag ?support_agent_team)
+        (work_item_ready_for_notification ?support_agent_team)
+      )
+  )
+  (:action mark_inbound_segment_notification_ready
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (inbound_processing_flag ?inbound_flight_segment)
+        (inbound_option_finalized ?inbound_flight_segment)
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_ready ?recovery_package)
+        (not
+          (work_item_ready_for_notification ?inbound_flight_segment)
+        )
+      )
+    :effect (work_item_ready_for_notification ?inbound_flight_segment)
+  )
+  (:action mark_outbound_segment_notification_ready
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?recovery_package - recovery_package)
+    :precondition
+      (and
+        (outbound_processing_flag ?outbound_flight_segment)
+        (outbound_option_finalized ?outbound_flight_segment)
+        (recovery_package_assembled ?recovery_package)
+        (recovery_package_ready ?recovery_package)
+        (not
+          (work_item_ready_for_notification ?outbound_flight_segment)
+        )
+      )
+    :effect (work_item_ready_for_notification ?outbound_flight_segment)
+  )
+  (:action notify_passenger_via_contact_channel
+    :parameters (?recovery_case - recovery_case ?contact_channel - contact_channel ?flight_leg - flight_leg)
+    :precondition
+      (and
+        (work_item_ready_for_notification ?recovery_case)
+        (work_item_linked_to_flight_leg ?recovery_case ?flight_leg)
+        (contact_channel_available ?contact_channel)
+        (not
+          (work_item_notification_sent ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (work_item_notification_sent ?recovery_case)
+        (work_item_contact_channel_registered ?recovery_case ?contact_channel)
+        (not
+          (contact_channel_available ?contact_channel)
+        )
+      )
+  )
+  (:action confirm_passenger_accepts_inbound_offer
+    :parameters (?inbound_flight_segment - inbound_flight_segment ?agent_resource_slot - agent_resource_slot ?contact_channel - contact_channel)
+    :precondition
+      (and
+        (work_item_notification_sent ?inbound_flight_segment)
+        (work_item_allocated_agent_slot ?inbound_flight_segment ?agent_resource_slot)
+        (work_item_contact_channel_registered ?inbound_flight_segment ?contact_channel)
+        (not
+          (work_item_confirmed ?inbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (work_item_confirmed ?inbound_flight_segment)
+        (agent_slot_available ?agent_resource_slot)
+        (contact_channel_available ?contact_channel)
+      )
+  )
+  (:action confirm_passenger_accepts_outbound_offer
+    :parameters (?outbound_flight_segment - outbound_flight_segment ?agent_resource_slot - agent_resource_slot ?contact_channel - contact_channel)
+    :precondition
+      (and
+        (work_item_notification_sent ?outbound_flight_segment)
+        (work_item_allocated_agent_slot ?outbound_flight_segment ?agent_resource_slot)
+        (work_item_contact_channel_registered ?outbound_flight_segment ?contact_channel)
+        (not
+          (work_item_confirmed ?outbound_flight_segment)
+        )
+      )
+    :effect
+      (and
+        (work_item_confirmed ?outbound_flight_segment)
+        (agent_slot_available ?agent_resource_slot)
+        (contact_channel_available ?contact_channel)
+      )
+  )
+  (:action confirm_team_and_resource_after_customer_confirmation
+    :parameters (?support_agent_team - support_agent_team ?agent_resource_slot - agent_resource_slot ?contact_channel - contact_channel)
+    :precondition
+      (and
+        (work_item_notification_sent ?support_agent_team)
+        (work_item_allocated_agent_slot ?support_agent_team ?agent_resource_slot)
+        (work_item_contact_channel_registered ?support_agent_team ?contact_channel)
+        (not
+          (work_item_confirmed ?support_agent_team)
+        )
+      )
+    :effect
+      (and
+        (work_item_confirmed ?support_agent_team)
+        (agent_slot_available ?agent_resource_slot)
+        (contact_channel_available ?contact_channel)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem missed_connection_recovery_problem)
+  (:domain missed_connection_recovery_domain)
+  (:objects inbound_segment_1 - inbound_flight_segment outbound_segment_1 - outbound_flight_segment support_team_alpha - support_agent_team support_team_beta - support_agent_team agent_slot_1 - agent_resource_slot agent_slot_2 - agent_resource_slot agent_slot_3 - agent_resource_slot flight_leg_1 - flight_leg service_desk_main - service_desk meal_voucher_1 - consumable_voucher alt_option_a1 - alternative_option_a alt_option_b1 - alternative_option_b recovery_package_template_1 - recovery_package document_bundle_1 - document_bundle document_bundle_2 - document_bundle compensation_scheme_standard - compensation_scheme compensation_scheme_exception - compensation_scheme followup_task_contact_passenger - followup_task followup_task_quality_check - followup_task contact_channel_email - contact_channel compensation_offer_standard - compensation_offer policy_reference_1 - policy_reference policy_reference_2 - policy_reference assistance_resource_1 - assistance_resource)
+  (:init
+    (agent_slot_available agent_slot_1)
+    (agent_slot_available agent_slot_2)
+    (agent_slot_available agent_slot_3)
+    (flight_leg_available flight_leg_1)
+    (service_desk_available service_desk_main)
+    (voucher_available meal_voucher_1)
+    (inbound_has_alternative_a inbound_segment_1 alt_option_a1)
+    (outbound_has_alternative_b outbound_segment_1 alt_option_b1)
+    (recovery_package_pending recovery_package_template_1)
+    (document_bundle_available document_bundle_1)
+    (document_bundle_available document_bundle_2)
+    (team_assigned_to_inbound_segment support_team_alpha inbound_segment_1)
+    (team_assigned_to_inbound_segment support_team_beta inbound_segment_1)
+    (team_assigned_to_outbound_segment support_team_alpha outbound_segment_1)
+    (team_assigned_to_outbound_segment support_team_beta outbound_segment_1)
+    (team_assigned_to_recovery_package support_team_alpha recovery_package_template_1)
+    (team_assigned_to_recovery_package support_team_beta recovery_package_template_1)
+    (team_has_document_bundle support_team_alpha document_bundle_1)
+    (team_has_document_bundle support_team_beta document_bundle_2)
+    (compensation_scheme_available compensation_scheme_standard)
+    (compensation_scheme_available compensation_scheme_exception)
+    (followup_task_available followup_task_contact_passenger)
+    (followup_task_available followup_task_quality_check)
+    (contact_channel_available contact_channel_email)
+    (compensation_offer_available compensation_offer_standard)
+    (policy_reference_available policy_reference_1)
+    (team_has_policy_reference support_team_alpha policy_reference_1)
+    (team_has_policy_reference support_team_beta policy_reference_2)
+    (assistance_resource_available assistance_resource_1)
+  )
+  (:goal
+    (and
+      (work_item_confirmed inbound_segment_1)
+      (work_item_confirmed outbound_segment_1)
+      (work_item_confirmed support_team_alpha)
+      (work_item_confirmed support_team_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create-recovery_case inbound_segment_1)
+(create-recovery_case outbound_segment_1)
+(create-recovery_case support_team_alpha)
+(create-recovery_case support_team_beta)
+(allocate-agent_slot_to_case inbound_segment_1 agent_slot_1)
+(allocate-agent_slot_to_case outbound_segment_1 agent_slot_2)
+(allocate-agent_slot_to_case support_team_alpha agent_slot_3)
+(attach_flight_leg_to_case inbound_segment_1 flight_leg_1)
+(finalize_case_triage inbound_segment_1 flight_leg_1)
+(unassign_flight_leg_from_case inbound_segment_1 flight_leg_1)
+(attach_flight_leg_to_case outbound_segment_1 flight_leg_1)
+(finalize_case_triage outbound_segment_1 flight_leg_1)
+(unassign_flight_leg_from_case outbound_segment_1 flight_leg_1)
+(attach_flight_leg_to_case support_team_alpha flight_leg_1)
+(finalize_case_triage support_team_alpha flight_leg_1)
+(unassign_flight_leg_from_case support_team_alpha flight_leg_1)
+(assign_voucher_for_inbound_option_a inbound_segment_1 alt_option_a1 meal_voucher_1)
+(attach_flight_leg_to_case inbound_segment_1 flight_leg_1)
+(validate_inbound_option_a_with_voucher inbound_segment_1 alt_option_a1 flight_leg_1 meal_voucher_1)
+(unassign_flight_leg_from_case inbound_segment_1 flight_leg_1)
+(assign_voucher_for_outbound_option_b outbound_segment_1 alt_option_b1 meal_voucher_1)
+(attach_flight_leg_to_case outbound_segment_1 flight_leg_1)
+(validate_outbound_option_b_with_voucher outbound_segment_1 alt_option_b1 flight_leg_1 meal_voucher_1)
+(unassign_flight_leg_from_case outbound_segment_1 flight_leg_1)
+(assemble-recovery_package inbound_segment_1 outbound_segment_1 alt_option_a1 alt_option_b1 recovery_package_template_1)
+(attach_flight_leg_to_case inbound_segment_1 flight_leg_1)
+(mark-recovery_package_ready recovery_package_template_1 inbound_segment_1 flight_leg_1)
+(unassign_flight_leg_from_case inbound_segment_1 flight_leg_1)
+(mark_inbound_segment_notification_ready inbound_segment_1 recovery_package_template_1)
+(mark_outbound_segment_notification_ready outbound_segment_1 recovery_package_template_1)
+(attach_flight_leg_to_case inbound_segment_1 flight_leg_1)
+(notify_passenger_via_contact_channel inbound_segment_1 contact_channel_email flight_leg_1)
+(confirm_passenger_accepts_inbound_offer inbound_segment_1 agent_slot_1 contact_channel_email)
+(unassign_flight_leg_from_case inbound_segment_1 flight_leg_1)
+(attach_flight_leg_to_case outbound_segment_1 flight_leg_1)
+(notify_passenger_via_contact_channel outbound_segment_1 contact_channel_email flight_leg_1)
+(confirm_passenger_accepts_outbound_offer outbound_segment_1 agent_slot_2 contact_channel_email)
+(unassign_flight_leg_from_case outbound_segment_1 flight_leg_1)
+(allocate-agent_slot_to_case support_team_beta agent_slot_1)
+(attach_flight_leg_to_case support_team_beta flight_leg_1)
+(finalize_case_triage support_team_beta flight_leg_1)
+(unassign_flight_leg_from_case support_team_beta flight_leg_1)
+(assign_assistance_resource_to_team support_team_alpha assistance_resource_1)
+(attach_compensation_offer_to_team support_team_alpha compensation_offer_standard)
+(assign_service_desk_to_case support_team_alpha service_desk_main)
+(attach_document_bundle_to_package support_team_alpha document_bundle_1 recovery_package_template_1)
+(attach_flight_leg_to_case support_team_alpha flight_leg_1)
+(validate_document_bundle_for_package support_team_alpha document_bundle_1 recovery_package_template_1 flight_leg_1)
+(apply_compensation_offer_to_package support_team_alpha compensation_offer_standard service_desk_main document_bundle_1 recovery_package_template_1)
+(attach_assistance_resource_to_package support_team_alpha assistance_resource_1 document_bundle_1 recovery_package_template_1)
+(finalize_team_enrichment support_team_alpha)
+(notify_passenger_via_contact_channel support_team_alpha contact_channel_email flight_leg_1)
+(confirm_team_and_resource_after_customer_confirmation support_team_alpha agent_slot_3 contact_channel_email)
+(release_service_desk_from_case support_team_alpha service_desk_main)
+(detach_compensation_offer_from_team support_team_alpha compensation_offer_standard)
+(remove_assistance_resource_from_team support_team_alpha assistance_resource_1)
+(attach_compensation_offer_to_team support_team_beta compensation_offer_standard)
+(assign_assistance_resource_to_team support_team_beta assistance_resource_1)
+(assign_service_desk_to_case support_team_beta service_desk_main)
+(attach_document_bundle_to_package support_team_beta document_bundle_2 recovery_package_template_1)
+(attach_flight_leg_to_case support_team_beta flight_leg_1)
+(validate_document_bundle_for_package support_team_beta document_bundle_2 recovery_package_template_1 flight_leg_1)
+(apply_compensation_offer_to_package support_team_beta compensation_offer_standard service_desk_main document_bundle_2 recovery_package_template_1)
+(attach_assistance_resource_to_package support_team_beta assistance_resource_1 document_bundle_2 recovery_package_template_1)
+(finalize_team_enrichment support_team_beta)
+(notify_passenger_via_contact_channel support_team_beta contact_channel_email flight_leg_1)
+(confirm_team_and_resource_after_customer_confirmation support_team_beta agent_slot_1 contact_channel_email)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_qhz1sm1l/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_qhz1sm1l/plan.pddl 
+
+
+--- stderr ---
+

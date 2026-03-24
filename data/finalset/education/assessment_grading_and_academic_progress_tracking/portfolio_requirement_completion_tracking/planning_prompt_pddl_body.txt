@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain portfolio_requirement_completion_tracking)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object assessment_actor_or_resource - generic_object schedule - generic_object resource_category - generic_object portfolio_container - generic_object portfolio_element - portfolio_container submission_slot - assessment_actor_or_resource assessment_event - assessment_actor_or_resource reviewer - assessment_actor_or_resource external_requirement - assessment_actor_or_resource approval_token - assessment_actor_or_resource remediation_option - assessment_actor_or_resource grade_component - assessment_actor_or_resource graduation_requirement - assessment_actor_or_resource evidence_artifact - schedule artifact_template - schedule credential_document - schedule rubric_criterion - resource_category milestone - resource_category assessment_package - resource_category participant_group - portfolio_element portfolio_subsection - portfolio_element learner - participant_group peer_learner - participant_group administrator_or_instructor - portfolio_subsection)
+
+  (:predicates
+    (element_registered ?portfolio_requirement - portfolio_element)
+    (element_ready_for_assessment ?portfolio_requirement - portfolio_element)
+    (element_slot_reserved ?portfolio_requirement - portfolio_element)
+    (element_completion_certificate_issued ?portfolio_requirement - portfolio_element)
+    (element_completion_recorded ?portfolio_requirement - portfolio_element)
+    (element_remediation_scheduled ?portfolio_requirement - portfolio_element)
+    (submission_slot_available ?submission_slot - submission_slot)
+    (element_assigned_slot ?portfolio_requirement - portfolio_element ?submission_slot - submission_slot)
+    (assessment_event_available ?assessment_event - assessment_event)
+    (element_assigned_event ?portfolio_requirement - portfolio_element ?assessment_event - assessment_event)
+    (reviewer_available ?reviewer - reviewer)
+    (element_reviewer_assigned ?portfolio_requirement - portfolio_element ?reviewer - reviewer)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (learner_submitted_artifact ?learner - learner ?evidence_artifact - evidence_artifact)
+    (peer_submitted_artifact ?peer_learner - peer_learner ?evidence_artifact - evidence_artifact)
+    (criterion_assigned_to_learner ?learner - learner ?rubric_criterion - rubric_criterion)
+    (criterion_signalled ?rubric_criterion - rubric_criterion)
+    (criterion_has_evidence ?rubric_criterion - rubric_criterion)
+    (learner_criterion_confirmed ?learner - learner)
+    (peer_assigned_milestone ?peer_learner - peer_learner ?milestone - milestone)
+    (milestone_signalled ?milestone - milestone)
+    (milestone_has_evidence ?milestone - milestone)
+    (peer_milestone_confirmed ?peer_learner - peer_learner)
+    (assessment_package_prepared ?assessment_package - assessment_package)
+    (assessment_package_locked ?assessment_package - assessment_package)
+    (package_includes_criterion ?assessment_package - assessment_package ?rubric_criterion - rubric_criterion)
+    (package_includes_milestone ?assessment_package - assessment_package ?milestone - milestone)
+    (package_stage_reviewed ?assessment_package - assessment_package)
+    (package_stage_validated ?assessment_package - assessment_package)
+    (package_ready_for_evaluation ?assessment_package - assessment_package)
+    (instructor_assigned_learner ?instructor - administrator_or_instructor ?learner - learner)
+    (instructor_assigned_peer ?instructor - administrator_or_instructor ?peer_learner - peer_learner)
+    (instructor_assigned_package ?instructor - administrator_or_instructor ?assessment_package - assessment_package)
+    (artifact_template_available ?artifact_template - artifact_template)
+    (instructor_assigned_template ?instructor - administrator_or_instructor ?artifact_template - artifact_template)
+    (artifact_template_instantiated ?artifact_template - artifact_template)
+    (template_applied_to_package ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    (instructor_stage_one_complete ?instructor - administrator_or_instructor)
+    (instructor_stage_two_completed ?instructor - administrator_or_instructor)
+    (instructor_stage_three_ready ?instructor - administrator_or_instructor)
+    (instructor_engaged_external_requirement ?instructor - administrator_or_instructor)
+    (instructor_post_verification_flag ?instructor - administrator_or_instructor)
+    (instructor_approval_granted ?instructor - administrator_or_instructor)
+    (instructor_evaluation_finalized ?instructor - administrator_or_instructor)
+    (credential_document_available ?credential_document - credential_document)
+    (instructor_linked_credential ?instructor - administrator_or_instructor ?credential_document - credential_document)
+    (instructor_endorsement_acknowledged ?instructor - administrator_or_instructor)
+    (instructor_endorsement_pending_review ?instructor - administrator_or_instructor)
+    (instructor_endorsement_finalized ?instructor - administrator_or_instructor)
+    (external_requirement_available ?external_requirement - external_requirement)
+    (instructor_linked_external_requirement ?instructor - administrator_or_instructor ?external_requirement - external_requirement)
+    (approval_token_available ?approval_token - approval_token)
+    (instructor_token_assigned ?instructor - administrator_or_instructor ?approval_token - approval_token)
+    (grade_component_available ?grade_component - grade_component)
+    (instructor_assigned_grade_component ?instructor - administrator_or_instructor ?grade_component - grade_component)
+    (graduation_requirement_available ?graduation_requirement - graduation_requirement)
+    (instructor_linked_graduation_requirement ?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement)
+    (remediation_option_available ?remediation_option - remediation_option)
+    (element_has_remediation_option ?portfolio_requirement - portfolio_element ?remediation_option - remediation_option)
+    (learner_ready_for_packaging ?learner - learner)
+    (peer_ready_for_packaging ?peer_learner - peer_learner)
+    (admin_signoff_recorded ?instructor - administrator_or_instructor)
+  )
+  (:action register_portfolio_requirement
+    :parameters (?portfolio_requirement - portfolio_element)
+    :precondition
+      (and
+        (not
+          (element_registered ?portfolio_requirement)
+        )
+        (not
+          (element_completion_certificate_issued ?portfolio_requirement)
+        )
+      )
+    :effect (element_registered ?portfolio_requirement)
+  )
+  (:action reserve_submission_slot
+    :parameters (?portfolio_requirement - portfolio_element ?submission_slot - submission_slot)
+    :precondition
+      (and
+        (element_registered ?portfolio_requirement)
+        (not
+          (element_slot_reserved ?portfolio_requirement)
+        )
+        (submission_slot_available ?submission_slot)
+      )
+    :effect
+      (and
+        (element_slot_reserved ?portfolio_requirement)
+        (element_assigned_slot ?portfolio_requirement ?submission_slot)
+        (not
+          (submission_slot_available ?submission_slot)
+        )
+      )
+  )
+  (:action assign_assessment_event
+    :parameters (?portfolio_requirement - portfolio_element ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_registered ?portfolio_requirement)
+        (element_slot_reserved ?portfolio_requirement)
+        (assessment_event_available ?assessment_event)
+      )
+    :effect
+      (and
+        (element_assigned_event ?portfolio_requirement ?assessment_event)
+        (not
+          (assessment_event_available ?assessment_event)
+        )
+      )
+  )
+  (:action confirm_assessment_assignment
+    :parameters (?portfolio_requirement - portfolio_element ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_registered ?portfolio_requirement)
+        (element_slot_reserved ?portfolio_requirement)
+        (element_assigned_event ?portfolio_requirement ?assessment_event)
+        (not
+          (element_ready_for_assessment ?portfolio_requirement)
+        )
+      )
+    :effect (element_ready_for_assessment ?portfolio_requirement)
+  )
+  (:action release_assessment_event
+    :parameters (?portfolio_requirement - portfolio_element ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_assigned_event ?portfolio_requirement ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_event_available ?assessment_event)
+        (not
+          (element_assigned_event ?portfolio_requirement ?assessment_event)
+        )
+      )
+  )
+  (:action assign_reviewer_to_requirement
+    :parameters (?portfolio_requirement - portfolio_element ?reviewer - reviewer)
+    :precondition
+      (and
+        (element_ready_for_assessment ?portfolio_requirement)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (element_reviewer_assigned ?portfolio_requirement ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_requirement
+    :parameters (?portfolio_requirement - portfolio_element ?reviewer - reviewer)
+    :precondition
+      (and
+        (element_reviewer_assigned ?portfolio_requirement ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (element_reviewer_assigned ?portfolio_requirement ?reviewer)
+        )
+      )
+  )
+  (:action associate_grade_component
+    :parameters (?instructor - administrator_or_instructor ?grade_component - grade_component)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (grade_component_available ?grade_component)
+      )
+    :effect
+      (and
+        (instructor_assigned_grade_component ?instructor ?grade_component)
+        (not
+          (grade_component_available ?grade_component)
+        )
+      )
+  )
+  (:action dissociate_grade_component
+    :parameters (?instructor - administrator_or_instructor ?grade_component - grade_component)
+    :precondition
+      (and
+        (instructor_assigned_grade_component ?instructor ?grade_component)
+      )
+    :effect
+      (and
+        (grade_component_available ?grade_component)
+        (not
+          (instructor_assigned_grade_component ?instructor ?grade_component)
+        )
+      )
+  )
+  (:action associate_graduation_requirement
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (graduation_requirement_available ?graduation_requirement)
+      )
+    :effect
+      (and
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (not
+          (graduation_requirement_available ?graduation_requirement)
+        )
+      )
+  )
+  (:action dissociate_graduation_requirement
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement)
+    :precondition
+      (and
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+      )
+    :effect
+      (and
+        (graduation_requirement_available ?graduation_requirement)
+        (not
+          (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        )
+      )
+  )
+  (:action signal_rubric_criterion
+    :parameters (?learner - learner ?rubric_criterion - rubric_criterion ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_ready_for_assessment ?learner)
+        (element_assigned_event ?learner ?assessment_event)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (not
+          (criterion_signalled ?rubric_criterion)
+        )
+        (not
+          (criterion_has_evidence ?rubric_criterion)
+        )
+      )
+    :effect (criterion_signalled ?rubric_criterion)
+  )
+  (:action assign_reviewer_for_criterion
+    :parameters (?learner - learner ?rubric_criterion - rubric_criterion ?reviewer - reviewer)
+    :precondition
+      (and
+        (element_ready_for_assessment ?learner)
+        (element_reviewer_assigned ?learner ?reviewer)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (criterion_signalled ?rubric_criterion)
+        (not
+          (learner_ready_for_packaging ?learner)
+        )
+      )
+    :effect
+      (and
+        (learner_ready_for_packaging ?learner)
+        (learner_criterion_confirmed ?learner)
+      )
+  )
+  (:action submit_evidence_artifact
+    :parameters (?learner - learner ?rubric_criterion - rubric_criterion ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (element_ready_for_assessment ?learner)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (learner_ready_for_packaging ?learner)
+        )
+      )
+    :effect
+      (and
+        (criterion_has_evidence ?rubric_criterion)
+        (learner_ready_for_packaging ?learner)
+        (learner_submitted_artifact ?learner ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action process_evidence_submission
+    :parameters (?learner - learner ?rubric_criterion - rubric_criterion ?assessment_event - assessment_event ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (element_ready_for_assessment ?learner)
+        (element_assigned_event ?learner ?assessment_event)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (criterion_has_evidence ?rubric_criterion)
+        (learner_submitted_artifact ?learner ?evidence_artifact)
+        (not
+          (learner_criterion_confirmed ?learner)
+        )
+      )
+    :effect
+      (and
+        (criterion_signalled ?rubric_criterion)
+        (learner_criterion_confirmed ?learner)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (learner_submitted_artifact ?learner ?evidence_artifact)
+        )
+      )
+  )
+  (:action signal_milestone_for_peer
+    :parameters (?peer_learner - peer_learner ?milestone - milestone ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_ready_for_assessment ?peer_learner)
+        (element_assigned_event ?peer_learner ?assessment_event)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (not
+          (milestone_signalled ?milestone)
+        )
+        (not
+          (milestone_has_evidence ?milestone)
+        )
+      )
+    :effect (milestone_signalled ?milestone)
+  )
+  (:action assign_reviewer_for_peer_milestone
+    :parameters (?peer_learner - peer_learner ?milestone - milestone ?reviewer - reviewer)
+    :precondition
+      (and
+        (element_ready_for_assessment ?peer_learner)
+        (element_reviewer_assigned ?peer_learner ?reviewer)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (milestone_signalled ?milestone)
+        (not
+          (peer_ready_for_packaging ?peer_learner)
+        )
+      )
+    :effect
+      (and
+        (peer_ready_for_packaging ?peer_learner)
+        (peer_milestone_confirmed ?peer_learner)
+      )
+  )
+  (:action peer_submit_evidence
+    :parameters (?peer_learner - peer_learner ?milestone - milestone ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (element_ready_for_assessment ?peer_learner)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (peer_ready_for_packaging ?peer_learner)
+        )
+      )
+    :effect
+      (and
+        (milestone_has_evidence ?milestone)
+        (peer_ready_for_packaging ?peer_learner)
+        (peer_submitted_artifact ?peer_learner ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action process_peer_evidence_submission
+    :parameters (?peer_learner - peer_learner ?milestone - milestone ?assessment_event - assessment_event ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (element_ready_for_assessment ?peer_learner)
+        (element_assigned_event ?peer_learner ?assessment_event)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (milestone_has_evidence ?milestone)
+        (peer_submitted_artifact ?peer_learner ?evidence_artifact)
+        (not
+          (peer_milestone_confirmed ?peer_learner)
+        )
+      )
+    :effect
+      (and
+        (milestone_signalled ?milestone)
+        (peer_milestone_confirmed ?peer_learner)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (peer_submitted_artifact ?peer_learner ?evidence_artifact)
+        )
+      )
+  )
+  (:action assemble_assessment_package
+    :parameters (?learner - learner ?peer_learner - peer_learner ?rubric_criterion - rubric_criterion ?milestone - milestone ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (learner_ready_for_packaging ?learner)
+        (peer_ready_for_packaging ?peer_learner)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (criterion_signalled ?rubric_criterion)
+        (milestone_signalled ?milestone)
+        (learner_criterion_confirmed ?learner)
+        (peer_milestone_confirmed ?peer_learner)
+        (assessment_package_prepared ?assessment_package)
+      )
+    :effect
+      (and
+        (assessment_package_locked ?assessment_package)
+        (package_includes_criterion ?assessment_package ?rubric_criterion)
+        (package_includes_milestone ?assessment_package ?milestone)
+        (not
+          (assessment_package_prepared ?assessment_package)
+        )
+      )
+  )
+  (:action assemble_package_with_reviewer_stage
+    :parameters (?learner - learner ?peer_learner - peer_learner ?rubric_criterion - rubric_criterion ?milestone - milestone ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (learner_ready_for_packaging ?learner)
+        (peer_ready_for_packaging ?peer_learner)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (criterion_has_evidence ?rubric_criterion)
+        (milestone_signalled ?milestone)
+        (not
+          (learner_criterion_confirmed ?learner)
+        )
+        (peer_milestone_confirmed ?peer_learner)
+        (assessment_package_prepared ?assessment_package)
+      )
+    :effect
+      (and
+        (assessment_package_locked ?assessment_package)
+        (package_includes_criterion ?assessment_package ?rubric_criterion)
+        (package_includes_milestone ?assessment_package ?milestone)
+        (package_stage_reviewed ?assessment_package)
+        (not
+          (assessment_package_prepared ?assessment_package)
+        )
+      )
+  )
+  (:action assemble_package_with_peer_milestone
+    :parameters (?learner - learner ?peer_learner - peer_learner ?rubric_criterion - rubric_criterion ?milestone - milestone ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (learner_ready_for_packaging ?learner)
+        (peer_ready_for_packaging ?peer_learner)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (criterion_signalled ?rubric_criterion)
+        (milestone_has_evidence ?milestone)
+        (learner_criterion_confirmed ?learner)
+        (not
+          (peer_milestone_confirmed ?peer_learner)
+        )
+        (assessment_package_prepared ?assessment_package)
+      )
+    :effect
+      (and
+        (assessment_package_locked ?assessment_package)
+        (package_includes_criterion ?assessment_package ?rubric_criterion)
+        (package_includes_milestone ?assessment_package ?milestone)
+        (package_stage_validated ?assessment_package)
+        (not
+          (assessment_package_prepared ?assessment_package)
+        )
+      )
+  )
+  (:action assemble_package_full
+    :parameters (?learner - learner ?peer_learner - peer_learner ?rubric_criterion - rubric_criterion ?milestone - milestone ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (learner_ready_for_packaging ?learner)
+        (peer_ready_for_packaging ?peer_learner)
+        (criterion_assigned_to_learner ?learner ?rubric_criterion)
+        (peer_assigned_milestone ?peer_learner ?milestone)
+        (criterion_has_evidence ?rubric_criterion)
+        (milestone_has_evidence ?milestone)
+        (not
+          (learner_criterion_confirmed ?learner)
+        )
+        (not
+          (peer_milestone_confirmed ?peer_learner)
+        )
+        (assessment_package_prepared ?assessment_package)
+      )
+    :effect
+      (and
+        (assessment_package_locked ?assessment_package)
+        (package_includes_criterion ?assessment_package ?rubric_criterion)
+        (package_includes_milestone ?assessment_package ?milestone)
+        (package_stage_reviewed ?assessment_package)
+        (package_stage_validated ?assessment_package)
+        (not
+          (assessment_package_prepared ?assessment_package)
+        )
+      )
+  )
+  (:action finalize_assessment_package
+    :parameters (?assessment_package - assessment_package ?learner - learner ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (assessment_package_locked ?assessment_package)
+        (learner_ready_for_packaging ?learner)
+        (element_assigned_event ?learner ?assessment_event)
+        (not
+          (package_ready_for_evaluation ?assessment_package)
+        )
+      )
+    :effect (package_ready_for_evaluation ?assessment_package)
+  )
+  (:action apply_artifact_template_to_package
+    :parameters (?instructor - administrator_or_instructor ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (instructor_assigned_package ?instructor ?assessment_package)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (artifact_template_available ?artifact_template)
+        (assessment_package_locked ?assessment_package)
+        (package_ready_for_evaluation ?assessment_package)
+        (not
+          (artifact_template_instantiated ?artifact_template)
+        )
+      )
+    :effect
+      (and
+        (artifact_template_instantiated ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (not
+          (artifact_template_available ?artifact_template)
+        )
+      )
+  )
+  (:action start_instructor_stage_one_review
+    :parameters (?instructor - administrator_or_instructor ?artifact_template - artifact_template ?assessment_package - assessment_package ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (artifact_template_instantiated ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (element_assigned_event ?instructor ?assessment_event)
+        (not
+          (package_stage_reviewed ?assessment_package)
+        )
+        (not
+          (instructor_stage_one_complete ?instructor)
+        )
+      )
+    :effect (instructor_stage_one_complete ?instructor)
+  )
+  (:action engage_external_requirement
+    :parameters (?instructor - administrator_or_instructor ?external_requirement - external_requirement)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (external_requirement_available ?external_requirement)
+        (not
+          (instructor_engaged_external_requirement ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_engaged_external_requirement ?instructor)
+        (instructor_linked_external_requirement ?instructor ?external_requirement)
+        (not
+          (external_requirement_available ?external_requirement)
+        )
+      )
+  )
+  (:action verify_package_with_external_requirement
+    :parameters (?instructor - administrator_or_instructor ?artifact_template - artifact_template ?assessment_package - assessment_package ?assessment_event - assessment_event ?external_requirement - external_requirement)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (artifact_template_instantiated ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (element_assigned_event ?instructor ?assessment_event)
+        (package_stage_reviewed ?assessment_package)
+        (instructor_engaged_external_requirement ?instructor)
+        (instructor_linked_external_requirement ?instructor ?external_requirement)
+        (not
+          (instructor_stage_one_complete ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_stage_one_complete ?instructor)
+        (instructor_post_verification_flag ?instructor)
+      )
+  )
+  (:action instructor_stage_two_complete
+    :parameters (?instructor - administrator_or_instructor ?grade_component - grade_component ?reviewer - reviewer ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_one_complete ?instructor)
+        (instructor_assigned_grade_component ?instructor ?grade_component)
+        (element_reviewer_assigned ?instructor ?reviewer)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (not
+          (package_stage_validated ?assessment_package)
+        )
+        (not
+          (instructor_stage_two_completed ?instructor)
+        )
+      )
+    :effect (instructor_stage_two_completed ?instructor)
+  )
+  (:action instructor_stage_two_complete_alternate
+    :parameters (?instructor - administrator_or_instructor ?grade_component - grade_component ?reviewer - reviewer ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_one_complete ?instructor)
+        (instructor_assigned_grade_component ?instructor ?grade_component)
+        (element_reviewer_assigned ?instructor ?reviewer)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (package_stage_validated ?assessment_package)
+        (not
+          (instructor_stage_two_completed ?instructor)
+        )
+      )
+    :effect (instructor_stage_two_completed ?instructor)
+  )
+  (:action instructor_stage_three_start
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_two_completed ?instructor)
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (not
+          (package_stage_reviewed ?assessment_package)
+        )
+        (not
+          (package_stage_validated ?assessment_package)
+        )
+        (not
+          (instructor_stage_three_ready ?instructor)
+        )
+      )
+    :effect (instructor_stage_three_ready ?instructor)
+  )
+  (:action instructor_stage_three_with_approval
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_two_completed ?instructor)
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (package_stage_reviewed ?assessment_package)
+        (not
+          (package_stage_validated ?assessment_package)
+        )
+        (not
+          (instructor_stage_three_ready ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_approval_granted ?instructor)
+      )
+  )
+  (:action instructor_stage_three_variant_a
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_two_completed ?instructor)
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (not
+          (package_stage_reviewed ?assessment_package)
+        )
+        (package_stage_validated ?assessment_package)
+        (not
+          (instructor_stage_three_ready ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_approval_granted ?instructor)
+      )
+  )
+  (:action instructor_stage_three_variant_b
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement ?artifact_template - artifact_template ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (instructor_stage_two_completed ?instructor)
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (instructor_assigned_template ?instructor ?artifact_template)
+        (template_applied_to_package ?artifact_template ?assessment_package)
+        (package_stage_reviewed ?assessment_package)
+        (package_stage_validated ?assessment_package)
+        (not
+          (instructor_stage_three_ready ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_approval_granted ?instructor)
+      )
+  )
+  (:action finalize_for_record_submission
+    :parameters (?instructor - administrator_or_instructor)
+    :precondition
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (not
+          (instructor_approval_granted ?instructor)
+        )
+        (not
+          (admin_signoff_recorded ?instructor)
+        )
+      )
+    :effect
+      (and
+        (admin_signoff_recorded ?instructor)
+        (element_completion_recorded ?instructor)
+      )
+  )
+  (:action assign_approval_token_to_instructor
+    :parameters (?instructor - administrator_or_instructor ?approval_token - approval_token)
+    :precondition
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_approval_granted ?instructor)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (instructor_token_assigned ?instructor ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action perform_final_quality_check
+    :parameters (?instructor - administrator_or_instructor ?learner - learner ?peer_learner - peer_learner ?assessment_event - assessment_event ?approval_token - approval_token)
+    :precondition
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_approval_granted ?instructor)
+        (instructor_token_assigned ?instructor ?approval_token)
+        (instructor_assigned_learner ?instructor ?learner)
+        (instructor_assigned_peer ?instructor ?peer_learner)
+        (learner_criterion_confirmed ?learner)
+        (peer_milestone_confirmed ?peer_learner)
+        (element_assigned_event ?instructor ?assessment_event)
+        (not
+          (instructor_evaluation_finalized ?instructor)
+        )
+      )
+    :effect (instructor_evaluation_finalized ?instructor)
+  )
+  (:action apply_final_administrative_signoff
+    :parameters (?instructor - administrator_or_instructor)
+    :precondition
+      (and
+        (instructor_stage_three_ready ?instructor)
+        (instructor_evaluation_finalized ?instructor)
+        (not
+          (admin_signoff_recorded ?instructor)
+        )
+      )
+    :effect
+      (and
+        (admin_signoff_recorded ?instructor)
+        (element_completion_recorded ?instructor)
+      )
+  )
+  (:action request_credential_endorsement
+    :parameters (?instructor - administrator_or_instructor ?credential_document - credential_document ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_ready_for_assessment ?instructor)
+        (element_assigned_event ?instructor ?assessment_event)
+        (credential_document_available ?credential_document)
+        (instructor_linked_credential ?instructor ?credential_document)
+        (not
+          (instructor_endorsement_acknowledged ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_endorsement_acknowledged ?instructor)
+        (not
+          (credential_document_available ?credential_document)
+        )
+      )
+  )
+  (:action acknowledge_endorsement
+    :parameters (?instructor - administrator_or_instructor ?reviewer - reviewer)
+    :precondition
+      (and
+        (instructor_endorsement_acknowledged ?instructor)
+        (element_reviewer_assigned ?instructor ?reviewer)
+        (not
+          (instructor_endorsement_pending_review ?instructor)
+        )
+      )
+    :effect (instructor_endorsement_pending_review ?instructor)
+  )
+  (:action complete_graduation_endorsement
+    :parameters (?instructor - administrator_or_instructor ?graduation_requirement - graduation_requirement)
+    :precondition
+      (and
+        (instructor_endorsement_pending_review ?instructor)
+        (instructor_linked_graduation_requirement ?instructor ?graduation_requirement)
+        (not
+          (instructor_endorsement_finalized ?instructor)
+        )
+      )
+    :effect (instructor_endorsement_finalized ?instructor)
+  )
+  (:action finalize_endorsement_and_record
+    :parameters (?instructor - administrator_or_instructor)
+    :precondition
+      (and
+        (instructor_endorsement_finalized ?instructor)
+        (not
+          (admin_signoff_recorded ?instructor)
+        )
+      )
+    :effect
+      (and
+        (admin_signoff_recorded ?instructor)
+        (element_completion_recorded ?instructor)
+      )
+  )
+  (:action issue_completion_for_learner
+    :parameters (?learner - learner ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (learner_ready_for_packaging ?learner)
+        (learner_criterion_confirmed ?learner)
+        (assessment_package_locked ?assessment_package)
+        (package_ready_for_evaluation ?assessment_package)
+        (not
+          (element_completion_recorded ?learner)
+        )
+      )
+    :effect (element_completion_recorded ?learner)
+  )
+  (:action issue_completion_for_peer
+    :parameters (?peer_learner - peer_learner ?assessment_package - assessment_package)
+    :precondition
+      (and
+        (peer_ready_for_packaging ?peer_learner)
+        (peer_milestone_confirmed ?peer_learner)
+        (assessment_package_locked ?assessment_package)
+        (package_ready_for_evaluation ?assessment_package)
+        (not
+          (element_completion_recorded ?peer_learner)
+        )
+      )
+    :effect (element_completion_recorded ?peer_learner)
+  )
+  (:action assign_remediation_option_to_requirement
+    :parameters (?portfolio_requirement - portfolio_element ?remediation_option - remediation_option ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (element_completion_recorded ?portfolio_requirement)
+        (element_assigned_event ?portfolio_requirement ?assessment_event)
+        (remediation_option_available ?remediation_option)
+        (not
+          (element_remediation_scheduled ?portfolio_requirement)
+        )
+      )
+    :effect
+      (and
+        (element_remediation_scheduled ?portfolio_requirement)
+        (element_has_remediation_option ?portfolio_requirement ?remediation_option)
+        (not
+          (remediation_option_available ?remediation_option)
+        )
+      )
+  )
+  (:action apply_remediation_and_release_slot_for_learner
+    :parameters (?learner - learner ?submission_slot - submission_slot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (element_remediation_scheduled ?learner)
+        (element_assigned_slot ?learner ?submission_slot)
+        (element_has_remediation_option ?learner ?remediation_option)
+        (not
+          (element_completion_certificate_issued ?learner)
+        )
+      )
+    :effect
+      (and
+        (element_completion_certificate_issued ?learner)
+        (submission_slot_available ?submission_slot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+  (:action apply_remediation_and_release_slot_for_peer
+    :parameters (?peer_learner - peer_learner ?submission_slot - submission_slot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (element_remediation_scheduled ?peer_learner)
+        (element_assigned_slot ?peer_learner ?submission_slot)
+        (element_has_remediation_option ?peer_learner ?remediation_option)
+        (not
+          (element_completion_certificate_issued ?peer_learner)
+        )
+      )
+    :effect
+      (and
+        (element_completion_certificate_issued ?peer_learner)
+        (submission_slot_available ?submission_slot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+  (:action apply_remediation_and_release_slot_for_instructor
+    :parameters (?instructor - administrator_or_instructor ?submission_slot - submission_slot ?remediation_option - remediation_option)
+    :precondition
+      (and
+        (element_remediation_scheduled ?instructor)
+        (element_assigned_slot ?instructor ?submission_slot)
+        (element_has_remediation_option ?instructor ?remediation_option)
+        (not
+          (element_completion_certificate_issued ?instructor)
+        )
+      )
+    :effect
+      (and
+        (element_completion_certificate_issued ?instructor)
+        (submission_slot_available ?submission_slot)
+        (remediation_option_available ?remediation_option)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem portfolio_requirement_completion_problem)
+  (:domain portfolio_requirement_completion_tracking)
+  (:objects learner_1 - learner peer_learner_1 - peer_learner instructor_primary - administrator_or_instructor instructor_secondary - administrator_or_instructor submission_slot_1 - submission_slot submission_slot_2 - submission_slot submission_slot_3 - submission_slot assessment_event_1 - assessment_event reviewer_1 - reviewer evidence_artifact_1 - evidence_artifact rubric_criterion_1 - rubric_criterion milestone_1 - milestone assessment_package_1 - assessment_package artifact_template_1 - artifact_template artifact_template_2 - artifact_template external_requirement_1 - external_requirement external_requirement_2 - external_requirement approval_token_1 - approval_token approval_token_2 - approval_token remediation_option_1 - remediation_option grade_component_1 - grade_component credential_document_1 - credential_document credential_document_2 - credential_document graduation_requirement_1 - graduation_requirement)
+  (:init
+    (submission_slot_available submission_slot_1)
+    (submission_slot_available submission_slot_2)
+    (submission_slot_available submission_slot_3)
+    (assessment_event_available assessment_event_1)
+    (reviewer_available reviewer_1)
+    (evidence_artifact_available evidence_artifact_1)
+    (criterion_assigned_to_learner learner_1 rubric_criterion_1)
+    (peer_assigned_milestone peer_learner_1 milestone_1)
+    (assessment_package_prepared assessment_package_1)
+    (artifact_template_available artifact_template_1)
+    (artifact_template_available artifact_template_2)
+    (instructor_assigned_learner instructor_primary learner_1)
+    (instructor_assigned_learner instructor_secondary learner_1)
+    (instructor_assigned_peer instructor_primary peer_learner_1)
+    (instructor_assigned_peer instructor_secondary peer_learner_1)
+    (instructor_assigned_package instructor_primary assessment_package_1)
+    (instructor_assigned_package instructor_secondary assessment_package_1)
+    (instructor_assigned_template instructor_primary artifact_template_1)
+    (instructor_assigned_template instructor_secondary artifact_template_2)
+    (external_requirement_available external_requirement_1)
+    (external_requirement_available external_requirement_2)
+    (approval_token_available approval_token_1)
+    (approval_token_available approval_token_2)
+    (remediation_option_available remediation_option_1)
+    (grade_component_available grade_component_1)
+    (credential_document_available credential_document_1)
+    (instructor_linked_credential instructor_primary credential_document_1)
+    (instructor_linked_credential instructor_secondary credential_document_2)
+    (graduation_requirement_available graduation_requirement_1)
+  )
+  (:goal
+    (and
+      (element_completion_certificate_issued learner_1)
+      (element_completion_certificate_issued peer_learner_1)
+      (element_completion_certificate_issued instructor_primary)
+      (element_completion_certificate_issued instructor_secondary)
+    )
+  )
+)

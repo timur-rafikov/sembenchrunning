@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_blending_order_compatibility)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object lab_resource - domain_object case_entity_group - domain_object run_entity_group - domain_object formulation_class - domain_object entity_instance - formulation_class material_source - lab_resource analytical_method - lab_resource equipment_unit - lab_resource formulation_constraint - lab_resource stability_plan - lab_resource evidence_item - lab_resource instrument - lab_resource risk_assessment - lab_resource sample - case_entity_group stability_condition - case_entity_group reviewer - case_entity_group blend_order_profile_a - run_entity_group blend_order_profile_b - run_entity_group experiment_batch - run_entity_group formulation_variant - entity_instance case_variant - entity_instance blend_sequence_a - formulation_variant blend_sequence_b - formulation_variant compatibility_review_case - case_variant)
+
+  (:predicates
+    (entity_registered ?formulation_candidate - entity_instance)
+    (entity_onboarded ?formulation_candidate - entity_instance)
+    (entity_material_assigned ?formulation_candidate - entity_instance)
+    (entity_compatibility_confirmed ?formulation_candidate - entity_instance)
+    (entity_marked_for_evidence ?formulation_candidate - entity_instance)
+    (entity_compatibility_decision_recorded ?formulation_candidate - entity_instance)
+    (material_source_available ?material_source - material_source)
+    (entity_material_source_association ?formulation_candidate - entity_instance ?material_source - material_source)
+    (analytical_method_available ?analytical_method - analytical_method)
+    (entity_method_assigned ?formulation_candidate - entity_instance ?analytical_method - analytical_method)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (entity_equipment_assigned ?formulation_candidate - entity_instance ?equipment_unit - equipment_unit)
+    (sample_available ?sample - sample)
+    (sequence_a_has_sample ?blend_sequence_a - blend_sequence_a ?sample - sample)
+    (sequence_b_has_sample ?blend_sequence_b - blend_sequence_b ?sample - sample)
+    (sequence_a_has_profile ?blend_sequence_a - blend_sequence_a ?blend_order_profile_a - blend_order_profile_a)
+    (profile_a_prepared ?blend_order_profile_a - blend_order_profile_a)
+    (profile_a_has_assigned_sample ?blend_order_profile_a - blend_order_profile_a)
+    (sequence_a_ready ?blend_sequence_a - blend_sequence_a)
+    (sequence_b_has_profile ?blend_sequence_b - blend_sequence_b ?blend_order_profile_b - blend_order_profile_b)
+    (profile_b_prepared ?blend_order_profile_b - blend_order_profile_b)
+    (profile_b_has_assigned_sample ?blend_order_profile_b - blend_order_profile_b)
+    (sequence_b_ready ?blend_sequence_b - blend_sequence_b)
+    (experiment_batch_available ?experiment_batch - experiment_batch)
+    (experiment_batch_prepared ?experiment_batch - experiment_batch)
+    (batch_includes_profile_a ?experiment_batch - experiment_batch ?blend_order_profile_a - blend_order_profile_a)
+    (batch_includes_profile_b ?experiment_batch - experiment_batch ?blend_order_profile_b - blend_order_profile_b)
+    (batch_requires_profile_a_instrument ?experiment_batch - experiment_batch)
+    (batch_requires_profile_b_instrument ?experiment_batch - experiment_batch)
+    (batch_executed ?experiment_batch - experiment_batch)
+    (case_includes_sequence_a ?compatibility_review_case - compatibility_review_case ?blend_sequence_a - blend_sequence_a)
+    (case_includes_sequence_b ?compatibility_review_case - compatibility_review_case ?blend_sequence_b - blend_sequence_b)
+    (case_includes_experiment_batch ?compatibility_review_case - compatibility_review_case ?experiment_batch - experiment_batch)
+    (stability_condition_available ?stability_condition - stability_condition)
+    (case_has_stability_condition ?compatibility_review_case - compatibility_review_case ?stability_condition - stability_condition)
+    (stability_condition_reserved ?stability_condition - stability_condition)
+    (stability_condition_applied_to_batch ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    (case_has_initial_results ?compatibility_review_case - compatibility_review_case)
+    (case_experiment_results_collected ?compatibility_review_case - compatibility_review_case)
+    (case_ready_for_reviewer_assignment ?compatibility_review_case - compatibility_review_case)
+    (case_constraint_attached ?compatibility_review_case - compatibility_review_case)
+    (case_constraint_validated ?compatibility_review_case - compatibility_review_case)
+    (case_has_sufficient_evidence ?compatibility_review_case - compatibility_review_case)
+    (case_reviewer_checks_passed ?compatibility_review_case - compatibility_review_case)
+    (reviewer_available ?reviewer - reviewer)
+    (case_reviewer_assignment ?compatibility_review_case - compatibility_review_case ?reviewer - reviewer)
+    (case_reviewer_engaged ?compatibility_review_case - compatibility_review_case)
+    (case_reviewer_check_acknowledged ?compatibility_review_case - compatibility_review_case)
+    (case_reviewer_signed_off ?compatibility_review_case - compatibility_review_case)
+    (formulation_constraint_available ?formulation_constraint - formulation_constraint)
+    (case_constraint_linked ?compatibility_review_case - compatibility_review_case ?formulation_constraint - formulation_constraint)
+    (stability_plan_available ?stability_plan - stability_plan)
+    (case_has_stability_plan ?compatibility_review_case - compatibility_review_case ?stability_plan - stability_plan)
+    (instrument_available ?instrument - instrument)
+    (case_instrument_assigned ?compatibility_review_case - compatibility_review_case ?instrument - instrument)
+    (risk_assessment_available ?risk_assessment - risk_assessment)
+    (case_has_risk_assessment ?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment)
+    (evidence_available ?evidence_item - evidence_item)
+    (entity_has_evidence ?formulation_candidate - entity_instance ?evidence_item - evidence_item)
+    (sequence_a_samples_allocated ?blend_sequence_a - blend_sequence_a)
+    (sequence_b_samples_allocated ?blend_sequence_b - blend_sequence_b)
+    (case_closed ?compatibility_review_case - compatibility_review_case)
+  )
+  (:action register_formulation_candidate
+    :parameters (?formulation_candidate - entity_instance)
+    :precondition
+      (and
+        (not
+          (entity_registered ?formulation_candidate)
+        )
+        (not
+          (entity_compatibility_confirmed ?formulation_candidate)
+        )
+      )
+    :effect (entity_registered ?formulation_candidate)
+  )
+  (:action assign_material_source_to_candidate
+    :parameters (?formulation_candidate - entity_instance ?material_source - material_source)
+    :precondition
+      (and
+        (entity_registered ?formulation_candidate)
+        (not
+          (entity_material_assigned ?formulation_candidate)
+        )
+        (material_source_available ?material_source)
+      )
+    :effect
+      (and
+        (entity_material_assigned ?formulation_candidate)
+        (entity_material_source_association ?formulation_candidate ?material_source)
+        (not
+          (material_source_available ?material_source)
+        )
+      )
+  )
+  (:action assign_analytical_method_to_candidate
+    :parameters (?formulation_candidate - entity_instance ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_registered ?formulation_candidate)
+        (entity_material_assigned ?formulation_candidate)
+        (analytical_method_available ?analytical_method)
+      )
+    :effect
+      (and
+        (entity_method_assigned ?formulation_candidate ?analytical_method)
+        (not
+          (analytical_method_available ?analytical_method)
+        )
+      )
+  )
+  (:action finalize_candidate_onboarding
+    :parameters (?formulation_candidate - entity_instance ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_registered ?formulation_candidate)
+        (entity_material_assigned ?formulation_candidate)
+        (entity_method_assigned ?formulation_candidate ?analytical_method)
+        (not
+          (entity_onboarded ?formulation_candidate)
+        )
+      )
+    :effect (entity_onboarded ?formulation_candidate)
+  )
+  (:action release_analytical_method
+    :parameters (?formulation_candidate - entity_instance ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_method_assigned ?formulation_candidate ?analytical_method)
+      )
+    :effect
+      (and
+        (analytical_method_available ?analytical_method)
+        (not
+          (entity_method_assigned ?formulation_candidate ?analytical_method)
+        )
+      )
+  )
+  (:action assign_equipment_to_candidate
+    :parameters (?formulation_candidate - entity_instance ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (entity_onboarded ?formulation_candidate)
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (entity_equipment_assigned ?formulation_candidate ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action release_equipment_from_candidate
+    :parameters (?formulation_candidate - entity_instance ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (entity_equipment_assigned ?formulation_candidate ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_unit)
+        (not
+          (entity_equipment_assigned ?formulation_candidate ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_instrument_to_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?instrument - instrument)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (instrument_available ?instrument)
+      )
+    :effect
+      (and
+        (case_instrument_assigned ?compatibility_review_case ?instrument)
+        (not
+          (instrument_available ?instrument)
+        )
+      )
+  )
+  (:action release_instrument_from_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?instrument - instrument)
+    :precondition
+      (and
+        (case_instrument_assigned ?compatibility_review_case ?instrument)
+      )
+    :effect
+      (and
+        (instrument_available ?instrument)
+        (not
+          (case_instrument_assigned ?compatibility_review_case ?instrument)
+        )
+      )
+  )
+  (:action assign_risk_assessment_to_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (risk_assessment_available ?risk_assessment)
+      )
+    :effect
+      (and
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (not
+          (risk_assessment_available ?risk_assessment)
+        )
+      )
+  )
+  (:action release_risk_assessment_from_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment)
+    :precondition
+      (and
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+      )
+    :effect
+      (and
+        (risk_assessment_available ?risk_assessment)
+        (not
+          (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        )
+      )
+  )
+  (:action prepare_profile_a_for_sequence
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_order_profile_a - blend_order_profile_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_a)
+        (entity_method_assigned ?blend_sequence_a ?analytical_method)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (not
+          (profile_a_prepared ?blend_order_profile_a)
+        )
+        (not
+          (profile_a_has_assigned_sample ?blend_order_profile_a)
+        )
+      )
+    :effect (profile_a_prepared ?blend_order_profile_a)
+  )
+  (:action allocate_equipment_and_mark_sequence_a_ready
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_order_profile_a - blend_order_profile_a ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_a)
+        (entity_equipment_assigned ?blend_sequence_a ?equipment_unit)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (profile_a_prepared ?blend_order_profile_a)
+        (not
+          (sequence_a_samples_allocated ?blend_sequence_a)
+        )
+      )
+    :effect
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_a_ready ?blend_sequence_a)
+      )
+  )
+  (:action assign_sample_to_sequence_a_profile
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_order_profile_a - blend_order_profile_a ?sample - sample)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_a)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (sample_available ?sample)
+        (not
+          (sequence_a_samples_allocated ?blend_sequence_a)
+        )
+      )
+    :effect
+      (and
+        (profile_a_has_assigned_sample ?blend_order_profile_a)
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_a_has_sample ?blend_sequence_a ?sample)
+        (not
+          (sample_available ?sample)
+        )
+      )
+  )
+  (:action process_sequence_a_sample
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_order_profile_a - blend_order_profile_a ?analytical_method - analytical_method ?sample - sample)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_a)
+        (entity_method_assigned ?blend_sequence_a ?analytical_method)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (profile_a_has_assigned_sample ?blend_order_profile_a)
+        (sequence_a_has_sample ?blend_sequence_a ?sample)
+        (not
+          (sequence_a_ready ?blend_sequence_a)
+        )
+      )
+    :effect
+      (and
+        (profile_a_prepared ?blend_order_profile_a)
+        (sequence_a_ready ?blend_sequence_a)
+        (sample_available ?sample)
+        (not
+          (sequence_a_has_sample ?blend_sequence_a ?sample)
+        )
+      )
+  )
+  (:action prepare_profile_b_for_sequence
+    :parameters (?blend_sequence_b - blend_sequence_b ?blend_order_profile_b - blend_order_profile_b ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_b)
+        (entity_method_assigned ?blend_sequence_b ?analytical_method)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (not
+          (profile_b_prepared ?blend_order_profile_b)
+        )
+        (not
+          (profile_b_has_assigned_sample ?blend_order_profile_b)
+        )
+      )
+    :effect (profile_b_prepared ?blend_order_profile_b)
+  )
+  (:action allocate_equipment_and_mark_sequence_b_ready
+    :parameters (?blend_sequence_b - blend_sequence_b ?blend_order_profile_b - blend_order_profile_b ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_b)
+        (entity_equipment_assigned ?blend_sequence_b ?equipment_unit)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_b_prepared ?blend_order_profile_b)
+        (not
+          (sequence_b_samples_allocated ?blend_sequence_b)
+        )
+      )
+    :effect
+      (and
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_b_ready ?blend_sequence_b)
+      )
+  )
+  (:action assign_sample_to_sequence_b_profile
+    :parameters (?blend_sequence_b - blend_sequence_b ?blend_order_profile_b - blend_order_profile_b ?sample - sample)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_b)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (sample_available ?sample)
+        (not
+          (sequence_b_samples_allocated ?blend_sequence_b)
+        )
+      )
+    :effect
+      (and
+        (profile_b_has_assigned_sample ?blend_order_profile_b)
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_b_has_sample ?blend_sequence_b ?sample)
+        (not
+          (sample_available ?sample)
+        )
+      )
+  )
+  (:action process_sequence_b_sample
+    :parameters (?blend_sequence_b - blend_sequence_b ?blend_order_profile_b - blend_order_profile_b ?analytical_method - analytical_method ?sample - sample)
+    :precondition
+      (and
+        (entity_onboarded ?blend_sequence_b)
+        (entity_method_assigned ?blend_sequence_b ?analytical_method)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_b_has_assigned_sample ?blend_order_profile_b)
+        (sequence_b_has_sample ?blend_sequence_b ?sample)
+        (not
+          (sequence_b_ready ?blend_sequence_b)
+        )
+      )
+    :effect
+      (and
+        (profile_b_prepared ?blend_order_profile_b)
+        (sequence_b_ready ?blend_sequence_b)
+        (sample_available ?sample)
+        (not
+          (sequence_b_has_sample ?blend_sequence_b ?sample)
+        )
+      )
+  )
+  (:action assemble_experiment_batch_standard
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_sequence_b - blend_sequence_b ?blend_order_profile_a - blend_order_profile_a ?blend_order_profile_b - blend_order_profile_b ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_a_prepared ?blend_order_profile_a)
+        (profile_b_prepared ?blend_order_profile_b)
+        (sequence_a_ready ?blend_sequence_a)
+        (sequence_b_ready ?blend_sequence_b)
+        (experiment_batch_available ?experiment_batch)
+      )
+    :effect
+      (and
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_includes_profile_a ?experiment_batch ?blend_order_profile_a)
+        (batch_includes_profile_b ?experiment_batch ?blend_order_profile_b)
+        (not
+          (experiment_batch_available ?experiment_batch)
+        )
+      )
+  )
+  (:action assemble_experiment_batch_require_profile_a_instrument
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_sequence_b - blend_sequence_b ?blend_order_profile_a - blend_order_profile_a ?blend_order_profile_b - blend_order_profile_b ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_a_has_assigned_sample ?blend_order_profile_a)
+        (profile_b_prepared ?blend_order_profile_b)
+        (not
+          (sequence_a_ready ?blend_sequence_a)
+        )
+        (sequence_b_ready ?blend_sequence_b)
+        (experiment_batch_available ?experiment_batch)
+      )
+    :effect
+      (and
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_includes_profile_a ?experiment_batch ?blend_order_profile_a)
+        (batch_includes_profile_b ?experiment_batch ?blend_order_profile_b)
+        (batch_requires_profile_a_instrument ?experiment_batch)
+        (not
+          (experiment_batch_available ?experiment_batch)
+        )
+      )
+  )
+  (:action assemble_experiment_batch_require_profile_b_instrument
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_sequence_b - blend_sequence_b ?blend_order_profile_a - blend_order_profile_a ?blend_order_profile_b - blend_order_profile_b ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_a_prepared ?blend_order_profile_a)
+        (profile_b_has_assigned_sample ?blend_order_profile_b)
+        (sequence_a_ready ?blend_sequence_a)
+        (not
+          (sequence_b_ready ?blend_sequence_b)
+        )
+        (experiment_batch_available ?experiment_batch)
+      )
+    :effect
+      (and
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_includes_profile_a ?experiment_batch ?blend_order_profile_a)
+        (batch_includes_profile_b ?experiment_batch ?blend_order_profile_b)
+        (batch_requires_profile_b_instrument ?experiment_batch)
+        (not
+          (experiment_batch_available ?experiment_batch)
+        )
+      )
+  )
+  (:action assemble_experiment_batch_require_both_profile_instruments
+    :parameters (?blend_sequence_a - blend_sequence_a ?blend_sequence_b - blend_sequence_b ?blend_order_profile_a - blend_order_profile_a ?blend_order_profile_b - blend_order_profile_b ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_a_has_profile ?blend_sequence_a ?blend_order_profile_a)
+        (sequence_b_has_profile ?blend_sequence_b ?blend_order_profile_b)
+        (profile_a_has_assigned_sample ?blend_order_profile_a)
+        (profile_b_has_assigned_sample ?blend_order_profile_b)
+        (not
+          (sequence_a_ready ?blend_sequence_a)
+        )
+        (not
+          (sequence_b_ready ?blend_sequence_b)
+        )
+        (experiment_batch_available ?experiment_batch)
+      )
+    :effect
+      (and
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_includes_profile_a ?experiment_batch ?blend_order_profile_a)
+        (batch_includes_profile_b ?experiment_batch ?blend_order_profile_b)
+        (batch_requires_profile_a_instrument ?experiment_batch)
+        (batch_requires_profile_b_instrument ?experiment_batch)
+        (not
+          (experiment_batch_available ?experiment_batch)
+        )
+      )
+  )
+  (:action execute_experiment_batch
+    :parameters (?experiment_batch - experiment_batch ?blend_sequence_a - blend_sequence_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (experiment_batch_prepared ?experiment_batch)
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (entity_method_assigned ?blend_sequence_a ?analytical_method)
+        (not
+          (batch_executed ?experiment_batch)
+        )
+      )
+    :effect (batch_executed ?experiment_batch)
+  )
+  (:action apply_stability_condition_to_batch
+    :parameters (?compatibility_review_case - compatibility_review_case ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (case_includes_experiment_batch ?compatibility_review_case ?experiment_batch)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_available ?stability_condition)
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_executed ?experiment_batch)
+        (not
+          (stability_condition_reserved ?stability_condition)
+        )
+      )
+    :effect
+      (and
+        (stability_condition_reserved ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (not
+          (stability_condition_available ?stability_condition)
+        )
+      )
+  )
+  (:action record_initial_case_results
+    :parameters (?compatibility_review_case - compatibility_review_case ?stability_condition - stability_condition ?experiment_batch - experiment_batch ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_reserved ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (entity_method_assigned ?compatibility_review_case ?analytical_method)
+        (not
+          (batch_requires_profile_a_instrument ?experiment_batch)
+        )
+        (not
+          (case_has_initial_results ?compatibility_review_case)
+        )
+      )
+    :effect (case_has_initial_results ?compatibility_review_case)
+  )
+  (:action attach_formulation_constraint
+    :parameters (?compatibility_review_case - compatibility_review_case ?formulation_constraint - formulation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (formulation_constraint_available ?formulation_constraint)
+        (not
+          (case_constraint_attached ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_constraint_attached ?compatibility_review_case)
+        (case_constraint_linked ?compatibility_review_case ?formulation_constraint)
+        (not
+          (formulation_constraint_available ?formulation_constraint)
+        )
+      )
+  )
+  (:action validate_case_constraints_with_batch
+    :parameters (?compatibility_review_case - compatibility_review_case ?stability_condition - stability_condition ?experiment_batch - experiment_batch ?analytical_method - analytical_method ?formulation_constraint - formulation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_reserved ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (entity_method_assigned ?compatibility_review_case ?analytical_method)
+        (batch_requires_profile_a_instrument ?experiment_batch)
+        (case_constraint_attached ?compatibility_review_case)
+        (case_constraint_linked ?compatibility_review_case ?formulation_constraint)
+        (not
+          (case_has_initial_results ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_initial_results ?compatibility_review_case)
+        (case_constraint_validated ?compatibility_review_case)
+      )
+  )
+  (:action ingest_instrument_results_for_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?instrument - instrument ?equipment_unit - equipment_unit ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_has_initial_results ?compatibility_review_case)
+        (case_instrument_assigned ?compatibility_review_case ?instrument)
+        (entity_equipment_assigned ?compatibility_review_case ?equipment_unit)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (not
+          (batch_requires_profile_b_instrument ?experiment_batch)
+        )
+        (not
+          (case_experiment_results_collected ?compatibility_review_case)
+        )
+      )
+    :effect (case_experiment_results_collected ?compatibility_review_case)
+  )
+  (:action ingest_secondary_instrument_results_for_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?instrument - instrument ?equipment_unit - equipment_unit ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_has_initial_results ?compatibility_review_case)
+        (case_instrument_assigned ?compatibility_review_case ?instrument)
+        (entity_equipment_assigned ?compatibility_review_case ?equipment_unit)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (batch_requires_profile_b_instrument ?experiment_batch)
+        (not
+          (case_experiment_results_collected ?compatibility_review_case)
+        )
+      )
+    :effect (case_experiment_results_collected ?compatibility_review_case)
+  )
+  (:action prepare_case_for_reviewer_assignment
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_experiment_results_collected ?compatibility_review_case)
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (not
+          (batch_requires_profile_a_instrument ?experiment_batch)
+        )
+        (not
+          (batch_requires_profile_b_instrument ?experiment_batch)
+        )
+        (not
+          (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        )
+      )
+    :effect (case_ready_for_reviewer_assignment ?compatibility_review_case)
+  )
+  (:action prepare_case_for_reviewer_with_profile_a_results
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_experiment_results_collected ?compatibility_review_case)
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (batch_requires_profile_a_instrument ?experiment_batch)
+        (not
+          (batch_requires_profile_b_instrument ?experiment_batch)
+        )
+        (not
+          (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_has_sufficient_evidence ?compatibility_review_case)
+      )
+  )
+  (:action prepare_case_for_reviewer_with_profile_b_results
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_experiment_results_collected ?compatibility_review_case)
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (not
+          (batch_requires_profile_a_instrument ?experiment_batch)
+        )
+        (batch_requires_profile_b_instrument ?experiment_batch)
+        (not
+          (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_has_sufficient_evidence ?compatibility_review_case)
+      )
+  )
+  (:action prepare_case_for_reviewer_with_both_profile_results
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment ?stability_condition - stability_condition ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (case_experiment_results_collected ?compatibility_review_case)
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (case_has_stability_condition ?compatibility_review_case ?stability_condition)
+        (stability_condition_applied_to_batch ?stability_condition ?experiment_batch)
+        (batch_requires_profile_a_instrument ?experiment_batch)
+        (batch_requires_profile_b_instrument ?experiment_batch)
+        (not
+          (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_has_sufficient_evidence ?compatibility_review_case)
+      )
+  )
+  (:action close_case_and_mark_for_evidence
+    :parameters (?compatibility_review_case - compatibility_review_case)
+    :precondition
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (not
+          (case_has_sufficient_evidence ?compatibility_review_case)
+        )
+        (not
+          (case_closed ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?compatibility_review_case)
+        (entity_marked_for_evidence ?compatibility_review_case)
+      )
+  )
+  (:action attach_stability_plan_to_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?stability_plan - stability_plan)
+    :precondition
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_has_sufficient_evidence ?compatibility_review_case)
+        (stability_plan_available ?stability_plan)
+      )
+    :effect
+      (and
+        (case_has_stability_plan ?compatibility_review_case ?stability_plan)
+        (not
+          (stability_plan_available ?stability_plan)
+        )
+      )
+  )
+  (:action perform_reviewer_checks
+    :parameters (?compatibility_review_case - compatibility_review_case ?blend_sequence_a - blend_sequence_a ?blend_sequence_b - blend_sequence_b ?analytical_method - analytical_method ?stability_plan - stability_plan)
+    :precondition
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_has_sufficient_evidence ?compatibility_review_case)
+        (case_has_stability_plan ?compatibility_review_case ?stability_plan)
+        (case_includes_sequence_a ?compatibility_review_case ?blend_sequence_a)
+        (case_includes_sequence_b ?compatibility_review_case ?blend_sequence_b)
+        (sequence_a_ready ?blend_sequence_a)
+        (sequence_b_ready ?blend_sequence_b)
+        (entity_method_assigned ?compatibility_review_case ?analytical_method)
+        (not
+          (case_reviewer_checks_passed ?compatibility_review_case)
+        )
+      )
+    :effect (case_reviewer_checks_passed ?compatibility_review_case)
+  )
+  (:action finalize_case_after_review_checks
+    :parameters (?compatibility_review_case - compatibility_review_case)
+    :precondition
+      (and
+        (case_ready_for_reviewer_assignment ?compatibility_review_case)
+        (case_reviewer_checks_passed ?compatibility_review_case)
+        (not
+          (case_closed ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?compatibility_review_case)
+        (entity_marked_for_evidence ?compatibility_review_case)
+      )
+  )
+  (:action engage_reviewer_on_case
+    :parameters (?compatibility_review_case - compatibility_review_case ?reviewer - reviewer ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_onboarded ?compatibility_review_case)
+        (entity_method_assigned ?compatibility_review_case ?analytical_method)
+        (reviewer_available ?reviewer)
+        (case_reviewer_assignment ?compatibility_review_case ?reviewer)
+        (not
+          (case_reviewer_engaged ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_reviewer_engaged ?compatibility_review_case)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action acknowledge_reviewer_equipment_check
+    :parameters (?compatibility_review_case - compatibility_review_case ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (case_reviewer_engaged ?compatibility_review_case)
+        (entity_equipment_assigned ?compatibility_review_case ?equipment_unit)
+        (not
+          (case_reviewer_check_acknowledged ?compatibility_review_case)
+        )
+      )
+    :effect (case_reviewer_check_acknowledged ?compatibility_review_case)
+  )
+  (:action record_reviewer_signoff
+    :parameters (?compatibility_review_case - compatibility_review_case ?risk_assessment - risk_assessment)
+    :precondition
+      (and
+        (case_reviewer_check_acknowledged ?compatibility_review_case)
+        (case_has_risk_assessment ?compatibility_review_case ?risk_assessment)
+        (not
+          (case_reviewer_signed_off ?compatibility_review_case)
+        )
+      )
+    :effect (case_reviewer_signed_off ?compatibility_review_case)
+  )
+  (:action close_case_and_mark_for_evidence_after_signoff
+    :parameters (?compatibility_review_case - compatibility_review_case)
+    :precondition
+      (and
+        (case_reviewer_signed_off ?compatibility_review_case)
+        (not
+          (case_closed ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?compatibility_review_case)
+        (entity_marked_for_evidence ?compatibility_review_case)
+      )
+  )
+  (:action finalize_sequence_a_for_decision
+    :parameters (?blend_sequence_a - blend_sequence_a ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_a_samples_allocated ?blend_sequence_a)
+        (sequence_a_ready ?blend_sequence_a)
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_executed ?experiment_batch)
+        (not
+          (entity_marked_for_evidence ?blend_sequence_a)
+        )
+      )
+    :effect (entity_marked_for_evidence ?blend_sequence_a)
+  )
+  (:action finalize_sequence_b_for_decision
+    :parameters (?blend_sequence_b - blend_sequence_b ?experiment_batch - experiment_batch)
+    :precondition
+      (and
+        (sequence_b_samples_allocated ?blend_sequence_b)
+        (sequence_b_ready ?blend_sequence_b)
+        (experiment_batch_prepared ?experiment_batch)
+        (batch_executed ?experiment_batch)
+        (not
+          (entity_marked_for_evidence ?blend_sequence_b)
+        )
+      )
+    :effect (entity_marked_for_evidence ?blend_sequence_b)
+  )
+  (:action record_candidate_decision_with_evidence
+    :parameters (?formulation_candidate - entity_instance ?evidence_item - evidence_item ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (entity_marked_for_evidence ?formulation_candidate)
+        (entity_method_assigned ?formulation_candidate ?analytical_method)
+        (evidence_available ?evidence_item)
+        (not
+          (entity_compatibility_decision_recorded ?formulation_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_decision_recorded ?formulation_candidate)
+        (entity_has_evidence ?formulation_candidate ?evidence_item)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action finalize_sequence_a_and_release_material_source
+    :parameters (?blend_sequence_a - blend_sequence_a ?material_source - material_source ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_compatibility_decision_recorded ?blend_sequence_a)
+        (entity_material_source_association ?blend_sequence_a ?material_source)
+        (entity_has_evidence ?blend_sequence_a ?evidence_item)
+        (not
+          (entity_compatibility_confirmed ?blend_sequence_a)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_confirmed ?blend_sequence_a)
+        (material_source_available ?material_source)
+        (evidence_available ?evidence_item)
+      )
+  )
+  (:action finalize_sequence_b_and_release_material_source
+    :parameters (?blend_sequence_b - blend_sequence_b ?material_source - material_source ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_compatibility_decision_recorded ?blend_sequence_b)
+        (entity_material_source_association ?blend_sequence_b ?material_source)
+        (entity_has_evidence ?blend_sequence_b ?evidence_item)
+        (not
+          (entity_compatibility_confirmed ?blend_sequence_b)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_confirmed ?blend_sequence_b)
+        (material_source_available ?material_source)
+        (evidence_available ?evidence_item)
+      )
+  )
+  (:action finalize_case_and_release_material_source
+    :parameters (?compatibility_review_case - compatibility_review_case ?material_source - material_source ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (entity_compatibility_decision_recorded ?compatibility_review_case)
+        (entity_material_source_association ?compatibility_review_case ?material_source)
+        (entity_has_evidence ?compatibility_review_case ?evidence_item)
+        (not
+          (entity_compatibility_confirmed ?compatibility_review_case)
+        )
+      )
+    :effect
+      (and
+        (entity_compatibility_confirmed ?compatibility_review_case)
+        (material_source_available ?material_source)
+        (evidence_available ?evidence_item)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem blending_order_compatibility_case_1)
+  (:domain pharmaceutics_blending_order_compatibility)
+  (:objects blend_sequence_a_1 - blend_sequence_a blend_sequence_b_1 - blend_sequence_b compatibility_review_case_1 - compatibility_review_case compatibility_review_case_2 - compatibility_review_case material_source_1 - material_source material_source_2 - material_source material_source_3 - material_source analytical_method_1 - analytical_method equipment_unit_1 - equipment_unit sample_1 - sample blend_order_profile_a_1 - blend_order_profile_a blend_order_profile_b_1 - blend_order_profile_b experiment_batch_1 - experiment_batch stability_condition_1 - stability_condition stability_condition_2 - stability_condition formulation_constraint_1 - formulation_constraint formulation_constraint_2 - formulation_constraint stability_plan_1 - stability_plan stability_plan_2 - stability_plan evidence_item_1 - evidence_item instrument_1 - instrument reviewer_1 - reviewer reviewer_2 - reviewer risk_assessment_1 - risk_assessment)
+  (:init
+    (material_source_available material_source_1)
+    (material_source_available material_source_2)
+    (material_source_available material_source_3)
+    (analytical_method_available analytical_method_1)
+    (equipment_available equipment_unit_1)
+    (sample_available sample_1)
+    (sequence_a_has_profile blend_sequence_a_1 blend_order_profile_a_1)
+    (sequence_b_has_profile blend_sequence_b_1 blend_order_profile_b_1)
+    (experiment_batch_available experiment_batch_1)
+    (stability_condition_available stability_condition_1)
+    (stability_condition_available stability_condition_2)
+    (case_includes_sequence_a compatibility_review_case_1 blend_sequence_a_1)
+    (case_includes_sequence_a compatibility_review_case_2 blend_sequence_a_1)
+    (case_includes_sequence_b compatibility_review_case_1 blend_sequence_b_1)
+    (case_includes_sequence_b compatibility_review_case_2 blend_sequence_b_1)
+    (case_includes_experiment_batch compatibility_review_case_1 experiment_batch_1)
+    (case_includes_experiment_batch compatibility_review_case_2 experiment_batch_1)
+    (case_has_stability_condition compatibility_review_case_1 stability_condition_1)
+    (case_has_stability_condition compatibility_review_case_2 stability_condition_2)
+    (formulation_constraint_available formulation_constraint_1)
+    (formulation_constraint_available formulation_constraint_2)
+    (stability_plan_available stability_plan_1)
+    (stability_plan_available stability_plan_2)
+    (evidence_available evidence_item_1)
+    (instrument_available instrument_1)
+    (reviewer_available reviewer_1)
+    (case_reviewer_assignment compatibility_review_case_1 reviewer_1)
+    (case_reviewer_assignment compatibility_review_case_2 reviewer_2)
+    (risk_assessment_available risk_assessment_1)
+  )
+  (:goal
+    (and
+      (entity_compatibility_confirmed blend_sequence_a_1)
+      (entity_compatibility_confirmed blend_sequence_b_1)
+      (entity_compatibility_confirmed compatibility_review_case_1)
+      (entity_compatibility_confirmed compatibility_review_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_formulation_candidate blend_sequence_a_1)
+(assign_material_source_to_candidate blend_sequence_a_1 material_source_1)
+(assign_analytical_method_to_candidate blend_sequence_a_1 analytical_method_1)
+(finalize_candidate_onboarding blend_sequence_a_1 analytical_method_1)
+(prepare_profile_a_for_sequence blend_sequence_a_1 blend_order_profile_a_1 analytical_method_1)
+(assign_equipment_to_candidate blend_sequence_a_1 equipment_unit_1)
+(allocate_equipment_and_mark_sequence_a_ready blend_sequence_a_1 blend_order_profile_a_1 equipment_unit_1)
+(release_equipment_from_candidate blend_sequence_a_1 equipment_unit_1)
+(release_analytical_method blend_sequence_a_1 analytical_method_1)
+(register_formulation_candidate blend_sequence_b_1)
+(assign_material_source_to_candidate blend_sequence_b_1 material_source_2)
+(assign_analytical_method_to_candidate blend_sequence_b_1 analytical_method_1)
+(finalize_candidate_onboarding blend_sequence_b_1 analytical_method_1)
+(prepare_profile_b_for_sequence blend_sequence_b_1 blend_order_profile_b_1 analytical_method_1)
+(assign_equipment_to_candidate blend_sequence_b_1 equipment_unit_1)
+(allocate_equipment_and_mark_sequence_b_ready blend_sequence_b_1 blend_order_profile_b_1 equipment_unit_1)
+(release_equipment_from_candidate blend_sequence_b_1 equipment_unit_1)
+(release_analytical_method blend_sequence_b_1 analytical_method_1)
+(assemble_experiment_batch_standard blend_sequence_a_1 blend_sequence_b_1 blend_order_profile_a_1 blend_order_profile_b_1 experiment_batch_1)
+(assign_analytical_method_to_candidate blend_sequence_a_1 analytical_method_1)
+(execute_experiment_batch experiment_batch_1 blend_sequence_a_1 analytical_method_1)
+(release_analytical_method blend_sequence_a_1 analytical_method_1)
+(finalize_sequence_a_for_decision blend_sequence_a_1 experiment_batch_1)
+(finalize_sequence_b_for_decision blend_sequence_b_1 experiment_batch_1)
+(register_formulation_candidate compatibility_review_case_1)
+(assign_material_source_to_candidate compatibility_review_case_1 material_source_3)
+(assign_analytical_method_to_candidate compatibility_review_case_1 analytical_method_1)
+(finalize_candidate_onboarding compatibility_review_case_1 analytical_method_1)
+(apply_stability_condition_to_batch compatibility_review_case_1 stability_condition_1 experiment_batch_1)
+(record_initial_case_results compatibility_review_case_1 stability_condition_1 experiment_batch_1 analytical_method_1)
+(assign_risk_assessment_to_case compatibility_review_case_1 risk_assessment_1)
+(assign_equipment_to_candidate compatibility_review_case_1 equipment_unit_1)
+(assign_instrument_to_case compatibility_review_case_1 instrument_1)
+(ingest_instrument_results_for_case compatibility_review_case_1 instrument_1 equipment_unit_1 stability_condition_1 experiment_batch_1)
+(prepare_case_for_reviewer_assignment compatibility_review_case_1 risk_assessment_1 stability_condition_1 experiment_batch_1)
+(close_case_and_mark_for_evidence compatibility_review_case_1)
+(record_candidate_decision_with_evidence compatibility_review_case_1 evidence_item_1 analytical_method_1)
+(finalize_case_and_release_material_source compatibility_review_case_1 material_source_3 evidence_item_1)
+(release_risk_assessment_from_case compatibility_review_case_1 risk_assessment_1)
+(release_equipment_from_candidate compatibility_review_case_1 equipment_unit_1)
+(release_instrument_from_case compatibility_review_case_1 instrument_1)
+(release_analytical_method compatibility_review_case_1 analytical_method_1)
+(register_formulation_candidate compatibility_review_case_2)
+(assign_material_source_to_candidate compatibility_review_case_2 material_source_3)
+(assign_analytical_method_to_candidate compatibility_review_case_2 analytical_method_1)
+(finalize_candidate_onboarding compatibility_review_case_2 analytical_method_1)
+(apply_stability_condition_to_batch compatibility_review_case_2 stability_condition_2 experiment_batch_1)
+(record_initial_case_results compatibility_review_case_2 stability_condition_2 experiment_batch_1 analytical_method_1)
+(assign_risk_assessment_to_case compatibility_review_case_2 risk_assessment_1)
+(assign_equipment_to_candidate compatibility_review_case_2 equipment_unit_1)
+(assign_instrument_to_case compatibility_review_case_2 instrument_1)
+(ingest_instrument_results_for_case compatibility_review_case_2 instrument_1 equipment_unit_1 stability_condition_2 experiment_batch_1)
+(prepare_case_for_reviewer_assignment compatibility_review_case_2 risk_assessment_1 stability_condition_2 experiment_batch_1)
+(close_case_and_mark_for_evidence compatibility_review_case_2)
+(record_candidate_decision_with_evidence compatibility_review_case_2 evidence_item_1 analytical_method_1)
+(finalize_case_and_release_material_source compatibility_review_case_2 material_source_3 evidence_item_1)
+(release_risk_assessment_from_case compatibility_review_case_2 risk_assessment_1)
+(release_equipment_from_candidate compatibility_review_case_2 equipment_unit_1)
+(release_instrument_from_case compatibility_review_case_2 instrument_1)
+(release_analytical_method compatibility_review_case_2 analytical_method_1)
+(assign_analytical_method_to_candidate blend_sequence_a_1 analytical_method_1)
+(record_candidate_decision_with_evidence blend_sequence_a_1 evidence_item_1 analytical_method_1)
+(finalize_sequence_a_and_release_material_source blend_sequence_a_1 material_source_1 evidence_item_1)
+(release_analytical_method blend_sequence_a_1 analytical_method_1)
+(assign_analytical_method_to_candidate blend_sequence_b_1 analytical_method_1)
+(record_candidate_decision_with_evidence blend_sequence_b_1 evidence_item_1 analytical_method_1)
+(finalize_sequence_b_and_release_material_source blend_sequence_b_1 material_source_2 evidence_item_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_a3zb74u2/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_a3zb74u2/plan.pddl 67 
+
+
+
+--- stderr ---
+

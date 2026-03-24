@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain risk_budget_reallocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object operational_artefact - object exposure_bucket_group - object investment_entity_root - object investment_entity - investment_entity_root risk_budget_unit - operational_resource trade_instruction - operational_resource compliance_rule - operational_resource execution_venue - operational_resource settlement_instruction - operational_resource risk_budget_request - operational_resource execution_parameter - operational_resource approval_record - operational_resource security_instrument - operational_artefact allocation_lot - operational_artefact compliance_exemption - operational_artefact source_exposure_bucket - exposure_bucket_group target_exposure_bucket - exposure_bucket_group order - exposure_bucket_group portfolio_category - investment_entity transition_category - investment_entity portfolio - portfolio_category strategy_sleeve - portfolio_category rebalance_plan - transition_category)
+  (:predicates
+    (investment_entity_registered ?investment_entity - investment_entity)
+    (entity_eligible ?investment_entity - investment_entity)
+    (risk_budget_reserved ?investment_entity - investment_entity)
+    (risk_budget_assignment_finalized ?investment_entity - investment_entity)
+    (entity_allocation_finalized ?investment_entity - investment_entity)
+    (risk_budget_request_attached_to_subject ?investment_entity - investment_entity)
+    (risk_budget_unit_available ?risk_budget_unit - risk_budget_unit)
+    (risk_budget_unit_reserved_for_subject ?investment_entity - investment_entity ?risk_budget_unit - risk_budget_unit)
+    (trade_instruction_available ?trade_instruction - trade_instruction)
+    (trade_instruction_bound ?investment_entity - investment_entity ?trade_instruction - trade_instruction)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (compliance_rule_bound ?investment_entity - investment_entity ?compliance_rule - compliance_rule)
+    (instrument_available ?security_instrument - security_instrument)
+    (portfolio_instrument_linked ?portfolio - portfolio ?security_instrument - security_instrument)
+    (sleeve_instrument_linked ?strategy_sleeve - strategy_sleeve ?security_instrument - security_instrument)
+    (portfolio_source_bucket_linked ?portfolio - portfolio ?source_exposure_bucket - source_exposure_bucket)
+    (source_bucket_selected ?source_exposure_bucket - source_exposure_bucket)
+    (source_bucket_reserved ?source_exposure_bucket - source_exposure_bucket)
+    (portfolio_source_confirmed ?portfolio - portfolio)
+    (sleeve_target_bucket_linked ?strategy_sleeve - strategy_sleeve ?target_exposure_bucket - target_exposure_bucket)
+    (target_bucket_selected ?target_exposure_bucket - target_exposure_bucket)
+    (target_bucket_reserved ?target_exposure_bucket - target_exposure_bucket)
+    (sleeve_target_confirmed ?strategy_sleeve - strategy_sleeve)
+    (order_queued ?order - order)
+    (order_constructed ?order - order)
+    (order_has_source_bucket ?order - order ?source_exposure_bucket - source_exposure_bucket)
+    (order_has_target_bucket ?order - order ?target_exposure_bucket - target_exposure_bucket)
+    (order_ready_for_plan_linking ?order - order)
+    (order_ready_for_allocation_linking ?order - order)
+    (order_confirmed_for_lot_creation ?order - order)
+    (plan_targets_portfolio ?rebalance_plan - rebalance_plan ?portfolio - portfolio)
+    (plan_targets_sleeve ?rebalance_plan - rebalance_plan ?strategy_sleeve - strategy_sleeve)
+    (plan_has_order ?rebalance_plan - rebalance_plan ?order - order)
+    (allocation_lot_available ?allocation_lot - allocation_lot)
+    (plan_has_allocation_lot ?rebalance_plan - rebalance_plan ?allocation_lot - allocation_lot)
+    (allocation_lot_locked ?allocation_lot - allocation_lot)
+    (allocation_lot_assigned_to_order ?allocation_lot - allocation_lot ?order - order)
+    (plan_ready_for_parameterization ?rebalance_plan - rebalance_plan)
+    (plan_parameters_staged ?rebalance_plan - rebalance_plan)
+    (plan_ready_for_finalization ?rebalance_plan - rebalance_plan)
+    (plan_bound_to_execution_venue ?rebalance_plan - rebalance_plan)
+    (plan_venue_link_confirmed ?rebalance_plan - rebalance_plan)
+    (plan_parameters_confirmed ?rebalance_plan - rebalance_plan)
+    (plan_allocation_committed ?rebalance_plan - rebalance_plan)
+    (compliance_exemption_available ?compliance_exemption - compliance_exemption)
+    (plan_has_compliance_exemption ?rebalance_plan - rebalance_plan ?compliance_exemption - compliance_exemption)
+    (plan_compliance_exemption_applied ?rebalance_plan - rebalance_plan)
+    (plan_compliance_checked ?rebalance_plan - rebalance_plan)
+    (plan_compliance_passed ?rebalance_plan - rebalance_plan)
+    (execution_venue_available ?execution_venue - execution_venue)
+    (plan_routed_to_execution_venue ?rebalance_plan - rebalance_plan ?execution_venue - execution_venue)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (plan_has_settlement_instruction ?rebalance_plan - rebalance_plan ?settlement_instruction - settlement_instruction)
+    (execution_parameter_available ?execution_parameter - execution_parameter)
+    (plan_has_execution_parameter ?rebalance_plan - rebalance_plan ?execution_parameter - execution_parameter)
+    (approval_record_available ?approval_record - approval_record)
+    (plan_has_approval ?rebalance_plan - rebalance_plan ?approval_record - approval_record)
+    (risk_budget_request_available ?risk_budget_request - risk_budget_request)
+    (subject_linked_to_risk_budget_request ?investment_entity - investment_entity ?risk_budget_request - risk_budget_request)
+    (portfolio_source_ready ?portfolio - portfolio)
+    (sleeve_target_ready ?strategy_sleeve - strategy_sleeve)
+    (plan_assignment_finalized ?rebalance_plan - rebalance_plan)
+  )
+  (:action register_investment_entity
+    :parameters (?investment_entity - investment_entity)
+    :precondition
+      (and
+        (not
+          (investment_entity_registered ?investment_entity)
+        )
+        (not
+          (risk_budget_assignment_finalized ?investment_entity)
+        )
+      )
+    :effect (investment_entity_registered ?investment_entity)
+  )
+  (:action reserve_risk_budget_unit_for_entity
+    :parameters (?investment_entity - investment_entity ?risk_budget_unit - risk_budget_unit)
+    :precondition
+      (and
+        (investment_entity_registered ?investment_entity)
+        (not
+          (risk_budget_reserved ?investment_entity)
+        )
+        (risk_budget_unit_available ?risk_budget_unit)
+      )
+    :effect
+      (and
+        (risk_budget_reserved ?investment_entity)
+        (risk_budget_unit_reserved_for_subject ?investment_entity ?risk_budget_unit)
+        (not
+          (risk_budget_unit_available ?risk_budget_unit)
+        )
+      )
+  )
+  (:action attach_trade_instruction_to_entity
+    :parameters (?investment_entity - investment_entity ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (investment_entity_registered ?investment_entity)
+        (risk_budget_reserved ?investment_entity)
+        (trade_instruction_available ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_bound ?investment_entity ?trade_instruction)
+        (not
+          (trade_instruction_available ?trade_instruction)
+        )
+      )
+  )
+  (:action confirm_trade_instruction_for_entity
+    :parameters (?investment_entity - investment_entity ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (investment_entity_registered ?investment_entity)
+        (risk_budget_reserved ?investment_entity)
+        (trade_instruction_bound ?investment_entity ?trade_instruction)
+        (not
+          (entity_eligible ?investment_entity)
+        )
+      )
+    :effect (entity_eligible ?investment_entity)
+  )
+  (:action release_trade_instruction
+    :parameters (?investment_entity - investment_entity ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (trade_instruction_bound ?investment_entity ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_available ?trade_instruction)
+        (not
+          (trade_instruction_bound ?investment_entity ?trade_instruction)
+        )
+      )
+  )
+  (:action bind_compliance_rule_to_entity
+    :parameters (?investment_entity - investment_entity ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (entity_eligible ?investment_entity)
+        (compliance_rule_available ?compliance_rule)
+      )
+    :effect
+      (and
+        (compliance_rule_bound ?investment_entity ?compliance_rule)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action unbind_compliance_rule_from_entity
+    :parameters (?investment_entity - investment_entity ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (compliance_rule_bound ?investment_entity ?compliance_rule)
+      )
+    :effect
+      (and
+        (compliance_rule_available ?compliance_rule)
+        (not
+          (compliance_rule_bound ?investment_entity ?compliance_rule)
+        )
+      )
+  )
+  (:action attach_execution_parameter_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (execution_parameter_available ?execution_parameter)
+      )
+    :effect
+      (and
+        (plan_has_execution_parameter ?rebalance_plan ?execution_parameter)
+        (not
+          (execution_parameter_available ?execution_parameter)
+        )
+      )
+  )
+  (:action remove_execution_parameter_from_plan
+    :parameters (?rebalance_plan - rebalance_plan ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (plan_has_execution_parameter ?rebalance_plan ?execution_parameter)
+      )
+    :effect
+      (and
+        (execution_parameter_available ?execution_parameter)
+        (not
+          (plan_has_execution_parameter ?rebalance_plan ?execution_parameter)
+        )
+      )
+  )
+  (:action attach_approval_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (approval_record_available ?approval_record)
+      )
+    :effect
+      (and
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (not
+          (approval_record_available ?approval_record)
+        )
+      )
+  )
+  (:action remove_approval_from_plan
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record)
+    :precondition
+      (and
+        (plan_has_approval ?rebalance_plan ?approval_record)
+      )
+    :effect
+      (and
+        (approval_record_available ?approval_record)
+        (not
+          (plan_has_approval ?rebalance_plan ?approval_record)
+        )
+      )
+  )
+  (:action select_source_bucket_for_portfolio_trade
+    :parameters (?portfolio - portfolio ?source_exposure_bucket - source_exposure_bucket ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligible ?portfolio)
+        (trade_instruction_bound ?portfolio ?trade_instruction)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (not
+          (source_bucket_selected ?source_exposure_bucket)
+        )
+        (not
+          (source_bucket_reserved ?source_exposure_bucket)
+        )
+      )
+    :effect (source_bucket_selected ?source_exposure_bucket)
+  )
+  (:action attach_compliance_and_prepare_portfolio_source
+    :parameters (?portfolio - portfolio ?source_exposure_bucket - source_exposure_bucket ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (entity_eligible ?portfolio)
+        (compliance_rule_bound ?portfolio ?compliance_rule)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (not
+          (portfolio_source_ready ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_source_ready ?portfolio)
+        (portfolio_source_confirmed ?portfolio)
+      )
+  )
+  (:action attach_instrument_to_portfolio_source
+    :parameters (?portfolio - portfolio ?source_exposure_bucket - source_exposure_bucket ?security_instrument - security_instrument)
+    :precondition
+      (and
+        (entity_eligible ?portfolio)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (instrument_available ?security_instrument)
+        (not
+          (portfolio_source_ready ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_reserved ?source_exposure_bucket)
+        (portfolio_source_ready ?portfolio)
+        (portfolio_instrument_linked ?portfolio ?security_instrument)
+        (not
+          (instrument_available ?security_instrument)
+        )
+      )
+  )
+  (:action confirm_portfolio_source_with_trade_and_instrument
+    :parameters (?portfolio - portfolio ?source_exposure_bucket - source_exposure_bucket ?trade_instruction - trade_instruction ?security_instrument - security_instrument)
+    :precondition
+      (and
+        (entity_eligible ?portfolio)
+        (trade_instruction_bound ?portfolio ?trade_instruction)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (source_bucket_reserved ?source_exposure_bucket)
+        (portfolio_instrument_linked ?portfolio ?security_instrument)
+        (not
+          (portfolio_source_confirmed ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_selected ?source_exposure_bucket)
+        (portfolio_source_confirmed ?portfolio)
+        (instrument_available ?security_instrument)
+        (not
+          (portfolio_instrument_linked ?portfolio ?security_instrument)
+        )
+      )
+  )
+  (:action select_target_bucket_for_sleeve_trade
+    :parameters (?strategy_sleeve - strategy_sleeve ?target_exposure_bucket - target_exposure_bucket ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligible ?strategy_sleeve)
+        (trade_instruction_bound ?strategy_sleeve ?trade_instruction)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (not
+          (target_bucket_selected ?target_exposure_bucket)
+        )
+        (not
+          (target_bucket_reserved ?target_exposure_bucket)
+        )
+      )
+    :effect (target_bucket_selected ?target_exposure_bucket)
+  )
+  (:action confirm_sleeve_target_with_compliance
+    :parameters (?strategy_sleeve - strategy_sleeve ?target_exposure_bucket - target_exposure_bucket ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (entity_eligible ?strategy_sleeve)
+        (compliance_rule_bound ?strategy_sleeve ?compliance_rule)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (not
+          (sleeve_target_ready ?strategy_sleeve)
+        )
+      )
+    :effect
+      (and
+        (sleeve_target_ready ?strategy_sleeve)
+        (sleeve_target_confirmed ?strategy_sleeve)
+      )
+  )
+  (:action attach_instrument_to_sleeve_target
+    :parameters (?strategy_sleeve - strategy_sleeve ?target_exposure_bucket - target_exposure_bucket ?security_instrument - security_instrument)
+    :precondition
+      (and
+        (entity_eligible ?strategy_sleeve)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (instrument_available ?security_instrument)
+        (not
+          (sleeve_target_ready ?strategy_sleeve)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_reserved ?target_exposure_bucket)
+        (sleeve_target_ready ?strategy_sleeve)
+        (sleeve_instrument_linked ?strategy_sleeve ?security_instrument)
+        (not
+          (instrument_available ?security_instrument)
+        )
+      )
+  )
+  (:action confirm_sleeve_target_with_trade_and_instrument
+    :parameters (?strategy_sleeve - strategy_sleeve ?target_exposure_bucket - target_exposure_bucket ?trade_instruction - trade_instruction ?security_instrument - security_instrument)
+    :precondition
+      (and
+        (entity_eligible ?strategy_sleeve)
+        (trade_instruction_bound ?strategy_sleeve ?trade_instruction)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (target_bucket_reserved ?target_exposure_bucket)
+        (sleeve_instrument_linked ?strategy_sleeve ?security_instrument)
+        (not
+          (sleeve_target_confirmed ?strategy_sleeve)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_selected ?target_exposure_bucket)
+        (sleeve_target_confirmed ?strategy_sleeve)
+        (instrument_available ?security_instrument)
+        (not
+          (sleeve_instrument_linked ?strategy_sleeve ?security_instrument)
+        )
+      )
+  )
+  (:action construct_order_from_mappings
+    :parameters (?portfolio - portfolio ?strategy_sleeve - strategy_sleeve ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?order - order)
+    :precondition
+      (and
+        (portfolio_source_ready ?portfolio)
+        (sleeve_target_ready ?strategy_sleeve)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (portfolio_source_confirmed ?portfolio)
+        (sleeve_target_confirmed ?strategy_sleeve)
+        (order_queued ?order)
+      )
+    :effect
+      (and
+        (order_constructed ?order)
+        (order_has_source_bucket ?order ?source_exposure_bucket)
+        (order_has_target_bucket ?order ?target_exposure_bucket)
+        (not
+          (order_queued ?order)
+        )
+      )
+  )
+  (:action construct_order_with_source_priority
+    :parameters (?portfolio - portfolio ?strategy_sleeve - strategy_sleeve ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?order - order)
+    :precondition
+      (and
+        (portfolio_source_ready ?portfolio)
+        (sleeve_target_ready ?strategy_sleeve)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (source_bucket_reserved ?source_exposure_bucket)
+        (target_bucket_selected ?target_exposure_bucket)
+        (not
+          (portfolio_source_confirmed ?portfolio)
+        )
+        (sleeve_target_confirmed ?strategy_sleeve)
+        (order_queued ?order)
+      )
+    :effect
+      (and
+        (order_constructed ?order)
+        (order_has_source_bucket ?order ?source_exposure_bucket)
+        (order_has_target_bucket ?order ?target_exposure_bucket)
+        (order_ready_for_plan_linking ?order)
+        (not
+          (order_queued ?order)
+        )
+      )
+  )
+  (:action construct_order_with_target_priority
+    :parameters (?portfolio - portfolio ?strategy_sleeve - strategy_sleeve ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?order - order)
+    :precondition
+      (and
+        (portfolio_source_ready ?portfolio)
+        (sleeve_target_ready ?strategy_sleeve)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (source_bucket_selected ?source_exposure_bucket)
+        (target_bucket_reserved ?target_exposure_bucket)
+        (portfolio_source_confirmed ?portfolio)
+        (not
+          (sleeve_target_confirmed ?strategy_sleeve)
+        )
+        (order_queued ?order)
+      )
+    :effect
+      (and
+        (order_constructed ?order)
+        (order_has_source_bucket ?order ?source_exposure_bucket)
+        (order_has_target_bucket ?order ?target_exposure_bucket)
+        (order_ready_for_allocation_linking ?order)
+        (not
+          (order_queued ?order)
+        )
+      )
+  )
+  (:action construct_fully_flagged_order
+    :parameters (?portfolio - portfolio ?strategy_sleeve - strategy_sleeve ?source_exposure_bucket - source_exposure_bucket ?target_exposure_bucket - target_exposure_bucket ?order - order)
+    :precondition
+      (and
+        (portfolio_source_ready ?portfolio)
+        (sleeve_target_ready ?strategy_sleeve)
+        (portfolio_source_bucket_linked ?portfolio ?source_exposure_bucket)
+        (sleeve_target_bucket_linked ?strategy_sleeve ?target_exposure_bucket)
+        (source_bucket_reserved ?source_exposure_bucket)
+        (target_bucket_reserved ?target_exposure_bucket)
+        (not
+          (portfolio_source_confirmed ?portfolio)
+        )
+        (not
+          (sleeve_target_confirmed ?strategy_sleeve)
+        )
+        (order_queued ?order)
+      )
+    :effect
+      (and
+        (order_constructed ?order)
+        (order_has_source_bucket ?order ?source_exposure_bucket)
+        (order_has_target_bucket ?order ?target_exposure_bucket)
+        (order_ready_for_plan_linking ?order)
+        (order_ready_for_allocation_linking ?order)
+        (not
+          (order_queued ?order)
+        )
+      )
+  )
+  (:action confirm_order_for_lot_creation
+    :parameters (?order - order ?portfolio - portfolio ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (order_constructed ?order)
+        (portfolio_source_ready ?portfolio)
+        (trade_instruction_bound ?portfolio ?trade_instruction)
+        (not
+          (order_confirmed_for_lot_creation ?order)
+        )
+      )
+    :effect (order_confirmed_for_lot_creation ?order)
+  )
+  (:action create_allocation_lot
+    :parameters (?rebalance_plan - rebalance_plan ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (plan_has_order ?rebalance_plan ?order)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_available ?allocation_lot)
+        (order_constructed ?order)
+        (order_confirmed_for_lot_creation ?order)
+        (not
+          (allocation_lot_locked ?allocation_lot)
+        )
+      )
+    :effect
+      (and
+        (allocation_lot_locked ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (not
+          (allocation_lot_available ?allocation_lot)
+        )
+      )
+  )
+  (:action stage_plan_for_parameterization
+    :parameters (?rebalance_plan - rebalance_plan ?allocation_lot - allocation_lot ?order - order ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_locked ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (trade_instruction_bound ?rebalance_plan ?trade_instruction)
+        (not
+          (order_ready_for_plan_linking ?order)
+        )
+        (not
+          (plan_ready_for_parameterization ?rebalance_plan)
+        )
+      )
+    :effect (plan_ready_for_parameterization ?rebalance_plan)
+  )
+  (:action bind_execution_venue_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (execution_venue_available ?execution_venue)
+        (not
+          (plan_bound_to_execution_venue ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_bound_to_execution_venue ?rebalance_plan)
+        (plan_routed_to_execution_venue ?rebalance_plan ?execution_venue)
+        (not
+          (execution_venue_available ?execution_venue)
+        )
+      )
+  )
+  (:action link_lot_and_venue_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?allocation_lot - allocation_lot ?order - order ?trade_instruction - trade_instruction ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_locked ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (trade_instruction_bound ?rebalance_plan ?trade_instruction)
+        (order_ready_for_plan_linking ?order)
+        (plan_bound_to_execution_venue ?rebalance_plan)
+        (plan_routed_to_execution_venue ?rebalance_plan ?execution_venue)
+        (not
+          (plan_ready_for_parameterization ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_parameterization ?rebalance_plan)
+        (plan_venue_link_confirmed ?rebalance_plan)
+      )
+  )
+  (:action stage_plan_parameters_without_order_flag
+    :parameters (?rebalance_plan - rebalance_plan ?execution_parameter - execution_parameter ?compliance_rule - compliance_rule ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_ready_for_parameterization ?rebalance_plan)
+        (plan_has_execution_parameter ?rebalance_plan ?execution_parameter)
+        (compliance_rule_bound ?rebalance_plan ?compliance_rule)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (not
+          (order_ready_for_allocation_linking ?order)
+        )
+        (not
+          (plan_parameters_staged ?rebalance_plan)
+        )
+      )
+    :effect (plan_parameters_staged ?rebalance_plan)
+  )
+  (:action stage_plan_parameters_with_order_flag
+    :parameters (?rebalance_plan - rebalance_plan ?execution_parameter - execution_parameter ?compliance_rule - compliance_rule ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_ready_for_parameterization ?rebalance_plan)
+        (plan_has_execution_parameter ?rebalance_plan ?execution_parameter)
+        (compliance_rule_bound ?rebalance_plan ?compliance_rule)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (order_ready_for_allocation_linking ?order)
+        (not
+          (plan_parameters_staged ?rebalance_plan)
+        )
+      )
+    :effect (plan_parameters_staged ?rebalance_plan)
+  )
+  (:action mark_plan_ready_for_finalization
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_parameters_staged ?rebalance_plan)
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (not
+          (order_ready_for_plan_linking ?order)
+        )
+        (not
+          (order_ready_for_allocation_linking ?order)
+        )
+        (not
+          (plan_ready_for_finalization ?rebalance_plan)
+        )
+      )
+    :effect (plan_ready_for_finalization ?rebalance_plan)
+  )
+  (:action confirm_plan_parameters_and_mark_ready_with_order_flag
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_parameters_staged ?rebalance_plan)
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (order_ready_for_plan_linking ?order)
+        (not
+          (order_ready_for_allocation_linking ?order)
+        )
+        (not
+          (plan_ready_for_finalization ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_parameters_confirmed ?rebalance_plan)
+      )
+  )
+  (:action confirm_plan_parameters_and_mark_ready_with_alternate_flags
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_parameters_staged ?rebalance_plan)
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (not
+          (order_ready_for_plan_linking ?order)
+        )
+        (order_ready_for_allocation_linking ?order)
+        (not
+          (plan_ready_for_finalization ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_parameters_confirmed ?rebalance_plan)
+      )
+  )
+  (:action confirm_plan_parameters_and_mark_ready_with_both_flags
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record ?allocation_lot - allocation_lot ?order - order)
+    :precondition
+      (and
+        (plan_parameters_staged ?rebalance_plan)
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (plan_has_allocation_lot ?rebalance_plan ?allocation_lot)
+        (allocation_lot_assigned_to_order ?allocation_lot ?order)
+        (order_ready_for_plan_linking ?order)
+        (order_ready_for_allocation_linking ?order)
+        (not
+          (plan_ready_for_finalization ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_parameters_confirmed ?rebalance_plan)
+      )
+  )
+  (:action finalize_plan_and_assign_allocation
+    :parameters (?rebalance_plan - rebalance_plan)
+    :precondition
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (not
+          (plan_parameters_confirmed ?rebalance_plan)
+        )
+        (not
+          (plan_assignment_finalized ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_assignment_finalized ?rebalance_plan)
+        (entity_allocation_finalized ?rebalance_plan)
+      )
+  )
+  (:action attach_settlement_instruction_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_parameters_confirmed ?rebalance_plan)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (plan_has_settlement_instruction ?rebalance_plan ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action execute_allocation_assignment
+    :parameters (?rebalance_plan - rebalance_plan ?portfolio - portfolio ?strategy_sleeve - strategy_sleeve ?trade_instruction - trade_instruction ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_parameters_confirmed ?rebalance_plan)
+        (plan_has_settlement_instruction ?rebalance_plan ?settlement_instruction)
+        (plan_targets_portfolio ?rebalance_plan ?portfolio)
+        (plan_targets_sleeve ?rebalance_plan ?strategy_sleeve)
+        (portfolio_source_confirmed ?portfolio)
+        (sleeve_target_confirmed ?strategy_sleeve)
+        (trade_instruction_bound ?rebalance_plan ?trade_instruction)
+        (not
+          (plan_allocation_committed ?rebalance_plan)
+        )
+      )
+    :effect (plan_allocation_committed ?rebalance_plan)
+  )
+  (:action finalize_plan_assignment
+    :parameters (?rebalance_plan - rebalance_plan)
+    :precondition
+      (and
+        (plan_ready_for_finalization ?rebalance_plan)
+        (plan_allocation_committed ?rebalance_plan)
+        (not
+          (plan_assignment_finalized ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_assignment_finalized ?rebalance_plan)
+        (entity_allocation_finalized ?rebalance_plan)
+      )
+  )
+  (:action apply_compliance_exemption_to_plan
+    :parameters (?rebalance_plan - rebalance_plan ?compliance_exemption - compliance_exemption ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligible ?rebalance_plan)
+        (trade_instruction_bound ?rebalance_plan ?trade_instruction)
+        (compliance_exemption_available ?compliance_exemption)
+        (plan_has_compliance_exemption ?rebalance_plan ?compliance_exemption)
+        (not
+          (plan_compliance_exemption_applied ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_compliance_exemption_applied ?rebalance_plan)
+        (not
+          (compliance_exemption_available ?compliance_exemption)
+        )
+      )
+  )
+  (:action mark_plan_compliance_checked
+    :parameters (?rebalance_plan - rebalance_plan ?compliance_rule - compliance_rule)
+    :precondition
+      (and
+        (plan_compliance_exemption_applied ?rebalance_plan)
+        (compliance_rule_bound ?rebalance_plan ?compliance_rule)
+        (not
+          (plan_compliance_checked ?rebalance_plan)
+        )
+      )
+    :effect (plan_compliance_checked ?rebalance_plan)
+  )
+  (:action attach_approval_to_plan_post_compliance
+    :parameters (?rebalance_plan - rebalance_plan ?approval_record - approval_record)
+    :precondition
+      (and
+        (plan_compliance_checked ?rebalance_plan)
+        (plan_has_approval ?rebalance_plan ?approval_record)
+        (not
+          (plan_compliance_passed ?rebalance_plan)
+        )
+      )
+    :effect (plan_compliance_passed ?rebalance_plan)
+  )
+  (:action finalize_compliance_and_mark_assignment
+    :parameters (?rebalance_plan - rebalance_plan)
+    :precondition
+      (and
+        (plan_compliance_passed ?rebalance_plan)
+        (not
+          (plan_assignment_finalized ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_assignment_finalized ?rebalance_plan)
+        (entity_allocation_finalized ?rebalance_plan)
+      )
+  )
+  (:action assign_allocation_to_portfolio
+    :parameters (?portfolio - portfolio ?order - order)
+    :precondition
+      (and
+        (portfolio_source_ready ?portfolio)
+        (portfolio_source_confirmed ?portfolio)
+        (order_constructed ?order)
+        (order_confirmed_for_lot_creation ?order)
+        (not
+          (entity_allocation_finalized ?portfolio)
+        )
+      )
+    :effect (entity_allocation_finalized ?portfolio)
+  )
+  (:action assign_allocation_to_sleeve
+    :parameters (?strategy_sleeve - strategy_sleeve ?order - order)
+    :precondition
+      (and
+        (sleeve_target_ready ?strategy_sleeve)
+        (sleeve_target_confirmed ?strategy_sleeve)
+        (order_constructed ?order)
+        (order_confirmed_for_lot_creation ?order)
+        (not
+          (entity_allocation_finalized ?strategy_sleeve)
+        )
+      )
+    :effect (entity_allocation_finalized ?strategy_sleeve)
+  )
+  (:action register_risk_budget_request_for_entity
+    :parameters (?investment_entity - investment_entity ?risk_budget_request - risk_budget_request ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_allocation_finalized ?investment_entity)
+        (trade_instruction_bound ?investment_entity ?trade_instruction)
+        (risk_budget_request_available ?risk_budget_request)
+        (not
+          (risk_budget_request_attached_to_subject ?investment_entity)
+        )
+      )
+    :effect
+      (and
+        (risk_budget_request_attached_to_subject ?investment_entity)
+        (subject_linked_to_risk_budget_request ?investment_entity ?risk_budget_request)
+        (not
+          (risk_budget_request_available ?risk_budget_request)
+        )
+      )
+  )
+  (:action finalize_risk_budget_assignment_for_portfolio
+    :parameters (?portfolio - portfolio ?risk_budget_unit - risk_budget_unit ?risk_budget_request - risk_budget_request)
+    :precondition
+      (and
+        (risk_budget_request_attached_to_subject ?portfolio)
+        (risk_budget_unit_reserved_for_subject ?portfolio ?risk_budget_unit)
+        (subject_linked_to_risk_budget_request ?portfolio ?risk_budget_request)
+        (not
+          (risk_budget_assignment_finalized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (risk_budget_assignment_finalized ?portfolio)
+        (risk_budget_unit_available ?risk_budget_unit)
+        (risk_budget_request_available ?risk_budget_request)
+      )
+  )
+  (:action finalize_risk_budget_assignment_for_sleeve
+    :parameters (?strategy_sleeve - strategy_sleeve ?risk_budget_unit - risk_budget_unit ?risk_budget_request - risk_budget_request)
+    :precondition
+      (and
+        (risk_budget_request_attached_to_subject ?strategy_sleeve)
+        (risk_budget_unit_reserved_for_subject ?strategy_sleeve ?risk_budget_unit)
+        (subject_linked_to_risk_budget_request ?strategy_sleeve ?risk_budget_request)
+        (not
+          (risk_budget_assignment_finalized ?strategy_sleeve)
+        )
+      )
+    :effect
+      (and
+        (risk_budget_assignment_finalized ?strategy_sleeve)
+        (risk_budget_unit_available ?risk_budget_unit)
+        (risk_budget_request_available ?risk_budget_request)
+      )
+  )
+  (:action finalize_risk_budget_assignment_for_plan
+    :parameters (?rebalance_plan - rebalance_plan ?risk_budget_unit - risk_budget_unit ?risk_budget_request - risk_budget_request)
+    :precondition
+      (and
+        (risk_budget_request_attached_to_subject ?rebalance_plan)
+        (risk_budget_unit_reserved_for_subject ?rebalance_plan ?risk_budget_unit)
+        (subject_linked_to_risk_budget_request ?rebalance_plan ?risk_budget_request)
+        (not
+          (risk_budget_assignment_finalized ?rebalance_plan)
+        )
+      )
+    :effect
+      (and
+        (risk_budget_assignment_finalized ?rebalance_plan)
+        (risk_budget_unit_available ?risk_budget_unit)
+        (risk_budget_request_available ?risk_budget_request)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem risk_budget_reallocation_problem)
+  (:domain risk_budget_reallocation_domain)
+  (:objects portfolio_1 - portfolio sleeve_1 - strategy_sleeve rebalance_plan_1 - rebalance_plan rebalance_plan_2 - rebalance_plan risk_budget_unit_a - risk_budget_unit risk_budget_unit_b - risk_budget_unit risk_budget_unit_c - risk_budget_unit trade_instruction_1 - trade_instruction compliance_rule_1 - compliance_rule security_instrument_1 - security_instrument source_bucket_1 - source_exposure_bucket target_bucket_1 - target_exposure_bucket order_1 - order allocation_lot_1 - allocation_lot allocation_lot_2 - allocation_lot execution_venue_a - execution_venue execution_venue_b - execution_venue settlement_instruction_a - settlement_instruction settlement_instruction_b - settlement_instruction risk_budget_request_1 - risk_budget_request execution_parameter_a - execution_parameter compliance_exemption_a - compliance_exemption compliance_exemption_b - compliance_exemption approval_record_1 - approval_record)
+  (:init
+    (risk_budget_unit_available risk_budget_unit_a)
+    (risk_budget_unit_available risk_budget_unit_b)
+    (risk_budget_unit_available risk_budget_unit_c)
+    (trade_instruction_available trade_instruction_1)
+    (compliance_rule_available compliance_rule_1)
+    (instrument_available security_instrument_1)
+    (portfolio_source_bucket_linked portfolio_1 source_bucket_1)
+    (sleeve_target_bucket_linked sleeve_1 target_bucket_1)
+    (order_queued order_1)
+    (allocation_lot_available allocation_lot_1)
+    (allocation_lot_available allocation_lot_2)
+    (plan_targets_portfolio rebalance_plan_1 portfolio_1)
+    (plan_targets_portfolio rebalance_plan_2 portfolio_1)
+    (plan_targets_sleeve rebalance_plan_1 sleeve_1)
+    (plan_targets_sleeve rebalance_plan_2 sleeve_1)
+    (plan_has_order rebalance_plan_1 order_1)
+    (plan_has_order rebalance_plan_2 order_1)
+    (plan_has_allocation_lot rebalance_plan_1 allocation_lot_1)
+    (plan_has_allocation_lot rebalance_plan_2 allocation_lot_2)
+    (execution_venue_available execution_venue_a)
+    (execution_venue_available execution_venue_b)
+    (settlement_instruction_available settlement_instruction_a)
+    (settlement_instruction_available settlement_instruction_b)
+    (risk_budget_request_available risk_budget_request_1)
+    (execution_parameter_available execution_parameter_a)
+    (compliance_exemption_available compliance_exemption_a)
+    (plan_has_compliance_exemption rebalance_plan_1 compliance_exemption_a)
+    (plan_has_compliance_exemption rebalance_plan_2 compliance_exemption_b)
+    (approval_record_available approval_record_1)
+  )
+  (:goal
+    (and
+      (risk_budget_assignment_finalized portfolio_1)
+      (risk_budget_assignment_finalized sleeve_1)
+      (risk_budget_assignment_finalized rebalance_plan_1)
+      (risk_budget_assignment_finalized rebalance_plan_2)
+    )
+  )
+)

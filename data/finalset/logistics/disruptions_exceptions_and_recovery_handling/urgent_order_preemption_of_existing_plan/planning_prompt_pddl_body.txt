@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain logistics_urgent_order_preemption)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object physical_asset_category - generic_entity logistics_item_category - generic_entity organizational_category - generic_entity case_type - generic_entity order_case - case_type transport_resource - physical_asset_category time_window - physical_asset_category service_location - physical_asset_category special_equipment - physical_asset_category authorization_credential - physical_asset_category urgency_token - physical_asset_category operator - physical_asset_category regulatory_permit - physical_asset_category package - logistics_item_category inventory_unit - logistics_item_category supervisor_directive - logistics_item_category origin_location - organizational_category destination_location - organizational_category replan_candidate - organizational_category task_group - order_case plan_component - order_case pickup_task - task_group delivery_task - task_group operational_plan - plan_component)
+
+  (:predicates
+    (case_registered ?order_case - order_case)
+    (case_confirmed ?order_case - order_case)
+    (case_assignment_reserved ?order_case - order_case)
+    (preempted ?order_case - order_case)
+    (dispatch_ready ?order_case - order_case)
+    (urgency_applied ?order_case - order_case)
+    (transport_resource_available ?transport_resource - transport_resource)
+    (case_assigned_to_resource ?order_case - order_case ?transport_resource - transport_resource)
+    (time_window_available ?time_window - time_window)
+    (case_reserved_time_window ?order_case - order_case ?time_window - time_window)
+    (service_location_available ?service_location - service_location)
+    (case_reserved_service_location ?order_case - order_case ?service_location - service_location)
+    (package_available ?package - package)
+    (pickup_assigned_package ?pickup_task - pickup_task ?package - package)
+    (delivery_assigned_package ?delivery_task - delivery_task ?package - package)
+    (pickup_origin_location ?pickup_task - pickup_task ?origin_location - origin_location)
+    (origin_ready ?origin_location - origin_location)
+    (origin_reserved ?origin_location - origin_location)
+    (pickup_ready ?pickup_task - pickup_task)
+    (delivery_destination ?delivery_task - delivery_task ?destination_location - destination_location)
+    (destination_ready ?destination_location - destination_location)
+    (destination_reserved ?destination_location - destination_location)
+    (delivery_ready ?delivery_task - delivery_task)
+    (candidate_available ?replan_candidate - replan_candidate)
+    (candidate_selected ?replan_candidate - replan_candidate)
+    (candidate_origin_location ?replan_candidate - replan_candidate ?origin_location - origin_location)
+    (candidate_destination_location ?replan_candidate - replan_candidate ?destination_location - destination_location)
+    (candidate_origin_reserved ?replan_candidate - replan_candidate)
+    (candidate_destination_reserved ?replan_candidate - replan_candidate)
+    (candidate_validated ?replan_candidate - replan_candidate)
+    (plan_includes_pickup ?operational_plan - operational_plan ?pickup_task - pickup_task)
+    (plan_includes_delivery ?operational_plan - operational_plan ?delivery_task - delivery_task)
+    (plan_associated_replan_candidate ?operational_plan - operational_plan ?replan_candidate - replan_candidate)
+    (inventory_available ?inventory_unit - inventory_unit)
+    (plan_has_inventory_unit ?operational_plan - operational_plan ?inventory_unit - inventory_unit)
+    (inventory_reserved ?inventory_unit - inventory_unit)
+    (inventory_allocated_to_candidate ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    (plan_eligible_for_confirmation ?operational_plan - operational_plan)
+    (operator_assigned_to_plan ?operational_plan - operational_plan)
+    (plan_authorized ?operational_plan - operational_plan)
+    (equipment_assigned_to_plan ?operational_plan - operational_plan)
+    (equipment_confirmed ?operational_plan - operational_plan)
+    (supervisor_directive_attached ?operational_plan - operational_plan)
+    (plan_consolidated ?operational_plan - operational_plan)
+    (supervisor_directive_available ?supervisor_directive - supervisor_directive)
+    (plan_has_supervisor_directive ?operational_plan - operational_plan ?supervisor_directive - supervisor_directive)
+    (supervisor_directive_applied ?operational_plan - operational_plan)
+    (directive_approved ?operational_plan - operational_plan)
+    (directive_confirmed ?operational_plan - operational_plan)
+    (equipment_available ?special_equipment - special_equipment)
+    (plan_assigned_equipment ?operational_plan - operational_plan ?special_equipment - special_equipment)
+    (credential_available ?authorization_credential - authorization_credential)
+    (plan_assigned_credential ?operational_plan - operational_plan ?authorization_credential - authorization_credential)
+    (operator_available ?operator - operator)
+    (plan_assigned_operator ?operational_plan - operational_plan ?operator - operator)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (plan_assigned_permit ?operational_plan - operational_plan ?regulatory_permit - regulatory_permit)
+    (urgency_token_available ?urgency_token - urgency_token)
+    (case_has_urgency_token ?order_case - order_case ?urgency_token - urgency_token)
+    (pickup_locked ?pickup_task - pickup_task)
+    (delivery_locked ?delivery_task - delivery_task)
+    (plan_dispatch_locked ?operational_plan - operational_plan)
+  )
+  (:action register_urgent_case
+    :parameters (?order_case - order_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?order_case)
+        )
+        (not
+          (preempted ?order_case)
+        )
+      )
+    :effect (case_registered ?order_case)
+  )
+  (:action assign_transport_to_case
+    :parameters (?order_case - order_case ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (case_registered ?order_case)
+        (not
+          (case_assignment_reserved ?order_case)
+        )
+        (transport_resource_available ?transport_resource)
+      )
+    :effect
+      (and
+        (case_assignment_reserved ?order_case)
+        (case_assigned_to_resource ?order_case ?transport_resource)
+        (not
+          (transport_resource_available ?transport_resource)
+        )
+      )
+  )
+  (:action reserve_time_window_for_case
+    :parameters (?order_case - order_case ?time_window - time_window)
+    :precondition
+      (and
+        (case_registered ?order_case)
+        (case_assignment_reserved ?order_case)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (case_reserved_time_window ?order_case ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_case_allocation
+    :parameters (?order_case - order_case ?time_window - time_window)
+    :precondition
+      (and
+        (case_registered ?order_case)
+        (case_assignment_reserved ?order_case)
+        (case_reserved_time_window ?order_case ?time_window)
+        (not
+          (case_confirmed ?order_case)
+        )
+      )
+    :effect (case_confirmed ?order_case)
+  )
+  (:action release_time_window_from_case
+    :parameters (?order_case - order_case ?time_window - time_window)
+    :precondition
+      (and
+        (case_reserved_time_window ?order_case ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (case_reserved_time_window ?order_case ?time_window)
+        )
+      )
+  )
+  (:action reserve_service_location_for_case
+    :parameters (?order_case - order_case ?service_location - service_location)
+    :precondition
+      (and
+        (case_confirmed ?order_case)
+        (service_location_available ?service_location)
+      )
+    :effect
+      (and
+        (case_reserved_service_location ?order_case ?service_location)
+        (not
+          (service_location_available ?service_location)
+        )
+      )
+  )
+  (:action release_service_location_from_case
+    :parameters (?order_case - order_case ?service_location - service_location)
+    :precondition
+      (and
+        (case_reserved_service_location ?order_case ?service_location)
+      )
+    :effect
+      (and
+        (service_location_available ?service_location)
+        (not
+          (case_reserved_service_location ?order_case ?service_location)
+        )
+      )
+  )
+  (:action assign_operator_to_plan
+    :parameters (?operational_plan - operational_plan ?operator - operator)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (plan_assigned_operator ?operational_plan ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_plan
+    :parameters (?operational_plan - operational_plan ?operator - operator)
+    :precondition
+      (and
+        (plan_assigned_operator ?operational_plan ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (plan_assigned_operator ?operational_plan ?operator)
+        )
+      )
+  )
+  (:action assign_permit_to_plan
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (regulatory_permit_available ?regulatory_permit)
+      )
+    :effect
+      (and
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action release_permit_from_plan
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+      )
+    :effect
+      (and
+        (regulatory_permit_available ?regulatory_permit)
+        (not
+          (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        )
+      )
+  )
+  (:action mark_origin_ready_for_pickup
+    :parameters (?pickup_task - pickup_task ?origin_location - origin_location ?time_window - time_window)
+    :precondition
+      (and
+        (case_confirmed ?pickup_task)
+        (case_reserved_time_window ?pickup_task ?time_window)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (not
+          (origin_ready ?origin_location)
+        )
+        (not
+          (origin_reserved ?origin_location)
+        )
+      )
+    :effect (origin_ready ?origin_location)
+  )
+  (:action lock_pickup_task
+    :parameters (?pickup_task - pickup_task ?origin_location - origin_location ?service_location - service_location)
+    :precondition
+      (and
+        (case_confirmed ?pickup_task)
+        (case_reserved_service_location ?pickup_task ?service_location)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (origin_ready ?origin_location)
+        (not
+          (pickup_locked ?pickup_task)
+        )
+      )
+    :effect
+      (and
+        (pickup_locked ?pickup_task)
+        (pickup_ready ?pickup_task)
+      )
+  )
+  (:action assign_package_to_pickup
+    :parameters (?pickup_task - pickup_task ?origin_location - origin_location ?package - package)
+    :precondition
+      (and
+        (case_confirmed ?pickup_task)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (package_available ?package)
+        (not
+          (pickup_locked ?pickup_task)
+        )
+      )
+    :effect
+      (and
+        (origin_reserved ?origin_location)
+        (pickup_locked ?pickup_task)
+        (pickup_assigned_package ?pickup_task ?package)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action finalize_pickup_package_assignment
+    :parameters (?pickup_task - pickup_task ?origin_location - origin_location ?time_window - time_window ?package - package)
+    :precondition
+      (and
+        (case_confirmed ?pickup_task)
+        (case_reserved_time_window ?pickup_task ?time_window)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (origin_reserved ?origin_location)
+        (pickup_assigned_package ?pickup_task ?package)
+        (not
+          (pickup_ready ?pickup_task)
+        )
+      )
+    :effect
+      (and
+        (origin_ready ?origin_location)
+        (pickup_ready ?pickup_task)
+        (package_available ?package)
+        (not
+          (pickup_assigned_package ?pickup_task ?package)
+        )
+      )
+  )
+  (:action mark_destination_ready_for_delivery
+    :parameters (?delivery_task - delivery_task ?destination_location - destination_location ?time_window - time_window)
+    :precondition
+      (and
+        (case_confirmed ?delivery_task)
+        (case_reserved_time_window ?delivery_task ?time_window)
+        (delivery_destination ?delivery_task ?destination_location)
+        (not
+          (destination_ready ?destination_location)
+        )
+        (not
+          (destination_reserved ?destination_location)
+        )
+      )
+    :effect (destination_ready ?destination_location)
+  )
+  (:action lock_delivery_task
+    :parameters (?delivery_task - delivery_task ?destination_location - destination_location ?service_location - service_location)
+    :precondition
+      (and
+        (case_confirmed ?delivery_task)
+        (case_reserved_service_location ?delivery_task ?service_location)
+        (delivery_destination ?delivery_task ?destination_location)
+        (destination_ready ?destination_location)
+        (not
+          (delivery_locked ?delivery_task)
+        )
+      )
+    :effect
+      (and
+        (delivery_locked ?delivery_task)
+        (delivery_ready ?delivery_task)
+      )
+  )
+  (:action assign_package_to_delivery
+    :parameters (?delivery_task - delivery_task ?destination_location - destination_location ?package - package)
+    :precondition
+      (and
+        (case_confirmed ?delivery_task)
+        (delivery_destination ?delivery_task ?destination_location)
+        (package_available ?package)
+        (not
+          (delivery_locked ?delivery_task)
+        )
+      )
+    :effect
+      (and
+        (destination_reserved ?destination_location)
+        (delivery_locked ?delivery_task)
+        (delivery_assigned_package ?delivery_task ?package)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action finalize_delivery_package_assignment
+    :parameters (?delivery_task - delivery_task ?destination_location - destination_location ?time_window - time_window ?package - package)
+    :precondition
+      (and
+        (case_confirmed ?delivery_task)
+        (case_reserved_time_window ?delivery_task ?time_window)
+        (delivery_destination ?delivery_task ?destination_location)
+        (destination_reserved ?destination_location)
+        (delivery_assigned_package ?delivery_task ?package)
+        (not
+          (delivery_ready ?delivery_task)
+        )
+      )
+    :effect
+      (and
+        (destination_ready ?destination_location)
+        (delivery_ready ?delivery_task)
+        (package_available ?package)
+        (not
+          (delivery_assigned_package ?delivery_task ?package)
+        )
+      )
+  )
+  (:action construct_replan_candidate
+    :parameters (?pickup_task - pickup_task ?delivery_task - delivery_task ?origin_location - origin_location ?destination_location - destination_location ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (pickup_locked ?pickup_task)
+        (delivery_locked ?delivery_task)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (delivery_destination ?delivery_task ?destination_location)
+        (origin_ready ?origin_location)
+        (destination_ready ?destination_location)
+        (pickup_ready ?pickup_task)
+        (delivery_ready ?delivery_task)
+        (candidate_available ?replan_candidate)
+      )
+    :effect
+      (and
+        (candidate_selected ?replan_candidate)
+        (candidate_origin_location ?replan_candidate ?origin_location)
+        (candidate_destination_location ?replan_candidate ?destination_location)
+        (not
+          (candidate_available ?replan_candidate)
+        )
+      )
+  )
+  (:action construct_replan_candidate_with_origin_reservation
+    :parameters (?pickup_task - pickup_task ?delivery_task - delivery_task ?origin_location - origin_location ?destination_location - destination_location ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (pickup_locked ?pickup_task)
+        (delivery_locked ?delivery_task)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (delivery_destination ?delivery_task ?destination_location)
+        (origin_reserved ?origin_location)
+        (destination_ready ?destination_location)
+        (not
+          (pickup_ready ?pickup_task)
+        )
+        (delivery_ready ?delivery_task)
+        (candidate_available ?replan_candidate)
+      )
+    :effect
+      (and
+        (candidate_selected ?replan_candidate)
+        (candidate_origin_location ?replan_candidate ?origin_location)
+        (candidate_destination_location ?replan_candidate ?destination_location)
+        (candidate_origin_reserved ?replan_candidate)
+        (not
+          (candidate_available ?replan_candidate)
+        )
+      )
+  )
+  (:action construct_replan_candidate_with_destination_reservation
+    :parameters (?pickup_task - pickup_task ?delivery_task - delivery_task ?origin_location - origin_location ?destination_location - destination_location ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (pickup_locked ?pickup_task)
+        (delivery_locked ?delivery_task)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (delivery_destination ?delivery_task ?destination_location)
+        (origin_ready ?origin_location)
+        (destination_reserved ?destination_location)
+        (pickup_ready ?pickup_task)
+        (not
+          (delivery_ready ?delivery_task)
+        )
+        (candidate_available ?replan_candidate)
+      )
+    :effect
+      (and
+        (candidate_selected ?replan_candidate)
+        (candidate_origin_location ?replan_candidate ?origin_location)
+        (candidate_destination_location ?replan_candidate ?destination_location)
+        (candidate_destination_reserved ?replan_candidate)
+        (not
+          (candidate_available ?replan_candidate)
+        )
+      )
+  )
+  (:action construct_replan_candidate_with_both_reservations
+    :parameters (?pickup_task - pickup_task ?delivery_task - delivery_task ?origin_location - origin_location ?destination_location - destination_location ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (pickup_locked ?pickup_task)
+        (delivery_locked ?delivery_task)
+        (pickup_origin_location ?pickup_task ?origin_location)
+        (delivery_destination ?delivery_task ?destination_location)
+        (origin_reserved ?origin_location)
+        (destination_reserved ?destination_location)
+        (not
+          (pickup_ready ?pickup_task)
+        )
+        (not
+          (delivery_ready ?delivery_task)
+        )
+        (candidate_available ?replan_candidate)
+      )
+    :effect
+      (and
+        (candidate_selected ?replan_candidate)
+        (candidate_origin_location ?replan_candidate ?origin_location)
+        (candidate_destination_location ?replan_candidate ?destination_location)
+        (candidate_origin_reserved ?replan_candidate)
+        (candidate_destination_reserved ?replan_candidate)
+        (not
+          (candidate_available ?replan_candidate)
+        )
+      )
+  )
+  (:action validate_replan_candidate_for_pickup
+    :parameters (?replan_candidate - replan_candidate ?pickup_task - pickup_task ?time_window - time_window)
+    :precondition
+      (and
+        (candidate_selected ?replan_candidate)
+        (pickup_locked ?pickup_task)
+        (case_reserved_time_window ?pickup_task ?time_window)
+        (not
+          (candidate_validated ?replan_candidate)
+        )
+      )
+    :effect (candidate_validated ?replan_candidate)
+  )
+  (:action allocate_inventory_to_candidate
+    :parameters (?operational_plan - operational_plan ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (plan_associated_replan_candidate ?operational_plan ?replan_candidate)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_available ?inventory_unit)
+        (candidate_selected ?replan_candidate)
+        (candidate_validated ?replan_candidate)
+        (not
+          (inventory_reserved ?inventory_unit)
+        )
+      )
+    :effect
+      (and
+        (inventory_reserved ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (not
+          (inventory_available ?inventory_unit)
+        )
+      )
+  )
+  (:action flag_plan_for_confirmation
+    :parameters (?operational_plan - operational_plan ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate ?time_window - time_window)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_reserved ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (case_reserved_time_window ?operational_plan ?time_window)
+        (not
+          (candidate_origin_reserved ?replan_candidate)
+        )
+        (not
+          (plan_eligible_for_confirmation ?operational_plan)
+        )
+      )
+    :effect (plan_eligible_for_confirmation ?operational_plan)
+  )
+  (:action assign_special_equipment_to_plan
+    :parameters (?operational_plan - operational_plan ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (equipment_available ?special_equipment)
+        (not
+          (equipment_assigned_to_plan ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (equipment_assigned_to_plan ?operational_plan)
+        (plan_assigned_equipment ?operational_plan ?special_equipment)
+        (not
+          (equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action validate_plan_with_equipment_and_candidate
+    :parameters (?operational_plan - operational_plan ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate ?time_window - time_window ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_reserved ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (case_reserved_time_window ?operational_plan ?time_window)
+        (candidate_origin_reserved ?replan_candidate)
+        (equipment_assigned_to_plan ?operational_plan)
+        (plan_assigned_equipment ?operational_plan ?special_equipment)
+        (not
+          (plan_eligible_for_confirmation ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_eligible_for_confirmation ?operational_plan)
+        (equipment_confirmed ?operational_plan)
+      )
+  )
+  (:action confirm_operator_assignment
+    :parameters (?operational_plan - operational_plan ?operator - operator ?service_location - service_location ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (plan_eligible_for_confirmation ?operational_plan)
+        (plan_assigned_operator ?operational_plan ?operator)
+        (case_reserved_service_location ?operational_plan ?service_location)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (not
+          (candidate_destination_reserved ?replan_candidate)
+        )
+        (not
+          (operator_assigned_to_plan ?operational_plan)
+        )
+      )
+    :effect (operator_assigned_to_plan ?operational_plan)
+  )
+  (:action confirm_operator_assignment_alternative
+    :parameters (?operational_plan - operational_plan ?operator - operator ?service_location - service_location ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (plan_eligible_for_confirmation ?operational_plan)
+        (plan_assigned_operator ?operational_plan ?operator)
+        (case_reserved_service_location ?operational_plan ?service_location)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (candidate_destination_reserved ?replan_candidate)
+        (not
+          (operator_assigned_to_plan ?operational_plan)
+        )
+      )
+    :effect (operator_assigned_to_plan ?operational_plan)
+  )
+  (:action authorize_plan_with_permit_path_a
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (operator_assigned_to_plan ?operational_plan)
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (not
+          (candidate_origin_reserved ?replan_candidate)
+        )
+        (not
+          (candidate_destination_reserved ?replan_candidate)
+        )
+        (not
+          (plan_authorized ?operational_plan)
+        )
+      )
+    :effect (plan_authorized ?operational_plan)
+  )
+  (:action authorize_plan_with_permit_path_b
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (operator_assigned_to_plan ?operational_plan)
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (candidate_origin_reserved ?replan_candidate)
+        (not
+          (candidate_destination_reserved ?replan_candidate)
+        )
+        (not
+          (plan_authorized ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?operational_plan)
+        (supervisor_directive_attached ?operational_plan)
+      )
+  )
+  (:action authorize_plan_with_permit_path_c
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (operator_assigned_to_plan ?operational_plan)
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (not
+          (candidate_origin_reserved ?replan_candidate)
+        )
+        (candidate_destination_reserved ?replan_candidate)
+        (not
+          (plan_authorized ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?operational_plan)
+        (supervisor_directive_attached ?operational_plan)
+      )
+  )
+  (:action authorize_plan_with_permit_path_d
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit ?inventory_unit - inventory_unit ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (operator_assigned_to_plan ?operational_plan)
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (plan_has_inventory_unit ?operational_plan ?inventory_unit)
+        (inventory_allocated_to_candidate ?inventory_unit ?replan_candidate)
+        (candidate_origin_reserved ?replan_candidate)
+        (candidate_destination_reserved ?replan_candidate)
+        (not
+          (plan_authorized ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_authorized ?operational_plan)
+        (supervisor_directive_attached ?operational_plan)
+      )
+  )
+  (:action finalize_plan_for_dispatch
+    :parameters (?operational_plan - operational_plan)
+    :precondition
+      (and
+        (plan_authorized ?operational_plan)
+        (not
+          (supervisor_directive_attached ?operational_plan)
+        )
+        (not
+          (plan_dispatch_locked ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_dispatch_locked ?operational_plan)
+        (dispatch_ready ?operational_plan)
+      )
+  )
+  (:action attach_credential_to_plan
+    :parameters (?operational_plan - operational_plan ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (plan_authorized ?operational_plan)
+        (supervisor_directive_attached ?operational_plan)
+        (credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (plan_assigned_credential ?operational_plan ?authorization_credential)
+        (not
+          (credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action consolidate_resources_and_authorizations
+    :parameters (?operational_plan - operational_plan ?pickup_task - pickup_task ?delivery_task - delivery_task ?time_window - time_window ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (plan_authorized ?operational_plan)
+        (supervisor_directive_attached ?operational_plan)
+        (plan_assigned_credential ?operational_plan ?authorization_credential)
+        (plan_includes_pickup ?operational_plan ?pickup_task)
+        (plan_includes_delivery ?operational_plan ?delivery_task)
+        (pickup_ready ?pickup_task)
+        (delivery_ready ?delivery_task)
+        (case_reserved_time_window ?operational_plan ?time_window)
+        (not
+          (plan_consolidated ?operational_plan)
+        )
+      )
+    :effect (plan_consolidated ?operational_plan)
+  )
+  (:action finalize_consolidated_plan_for_dispatch
+    :parameters (?operational_plan - operational_plan)
+    :precondition
+      (and
+        (plan_authorized ?operational_plan)
+        (plan_consolidated ?operational_plan)
+        (not
+          (plan_dispatch_locked ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_dispatch_locked ?operational_plan)
+        (dispatch_ready ?operational_plan)
+      )
+  )
+  (:action apply_supervisor_directive_to_plan
+    :parameters (?operational_plan - operational_plan ?supervisor_directive - supervisor_directive ?time_window - time_window)
+    :precondition
+      (and
+        (case_confirmed ?operational_plan)
+        (case_reserved_time_window ?operational_plan ?time_window)
+        (supervisor_directive_available ?supervisor_directive)
+        (plan_has_supervisor_directive ?operational_plan ?supervisor_directive)
+        (not
+          (supervisor_directive_applied ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (supervisor_directive_applied ?operational_plan)
+        (not
+          (supervisor_directive_available ?supervisor_directive)
+        )
+      )
+  )
+  (:action approve_supervisor_directive
+    :parameters (?operational_plan - operational_plan ?service_location - service_location)
+    :precondition
+      (and
+        (supervisor_directive_applied ?operational_plan)
+        (case_reserved_service_location ?operational_plan ?service_location)
+        (not
+          (directive_approved ?operational_plan)
+        )
+      )
+    :effect (directive_approved ?operational_plan)
+  )
+  (:action confirm_directive_with_permit
+    :parameters (?operational_plan - operational_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (directive_approved ?operational_plan)
+        (plan_assigned_permit ?operational_plan ?regulatory_permit)
+        (not
+          (directive_confirmed ?operational_plan)
+        )
+      )
+    :effect (directive_confirmed ?operational_plan)
+  )
+  (:action finalize_plan_with_confirmed_directive
+    :parameters (?operational_plan - operational_plan)
+    :precondition
+      (and
+        (directive_confirmed ?operational_plan)
+        (not
+          (plan_dispatch_locked ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_dispatch_locked ?operational_plan)
+        (dispatch_ready ?operational_plan)
+      )
+  )
+  (:action trigger_pickup_execution
+    :parameters (?pickup_task - pickup_task ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (pickup_locked ?pickup_task)
+        (pickup_ready ?pickup_task)
+        (candidate_selected ?replan_candidate)
+        (candidate_validated ?replan_candidate)
+        (not
+          (dispatch_ready ?pickup_task)
+        )
+      )
+    :effect (dispatch_ready ?pickup_task)
+  )
+  (:action trigger_delivery_execution
+    :parameters (?delivery_task - delivery_task ?replan_candidate - replan_candidate)
+    :precondition
+      (and
+        (delivery_locked ?delivery_task)
+        (delivery_ready ?delivery_task)
+        (candidate_selected ?replan_candidate)
+        (candidate_validated ?replan_candidate)
+        (not
+          (dispatch_ready ?delivery_task)
+        )
+      )
+    :effect (dispatch_ready ?delivery_task)
+  )
+  (:action consume_urgency_token_for_case
+    :parameters (?order_case - order_case ?urgency_token - urgency_token ?time_window - time_window)
+    :precondition
+      (and
+        (dispatch_ready ?order_case)
+        (case_reserved_time_window ?order_case ?time_window)
+        (urgency_token_available ?urgency_token)
+        (not
+          (urgency_applied ?order_case)
+        )
+      )
+    :effect
+      (and
+        (urgency_applied ?order_case)
+        (case_has_urgency_token ?order_case ?urgency_token)
+        (not
+          (urgency_token_available ?urgency_token)
+        )
+      )
+  )
+  (:action enforce_preemption_on_pickup_task
+    :parameters (?pickup_task - pickup_task ?transport_resource - transport_resource ?urgency_token - urgency_token)
+    :precondition
+      (and
+        (urgency_applied ?pickup_task)
+        (case_assigned_to_resource ?pickup_task ?transport_resource)
+        (case_has_urgency_token ?pickup_task ?urgency_token)
+        (not
+          (preempted ?pickup_task)
+        )
+      )
+    :effect
+      (and
+        (preempted ?pickup_task)
+        (transport_resource_available ?transport_resource)
+        (urgency_token_available ?urgency_token)
+      )
+  )
+  (:action enforce_preemption_on_delivery_task
+    :parameters (?delivery_task - delivery_task ?transport_resource - transport_resource ?urgency_token - urgency_token)
+    :precondition
+      (and
+        (urgency_applied ?delivery_task)
+        (case_assigned_to_resource ?delivery_task ?transport_resource)
+        (case_has_urgency_token ?delivery_task ?urgency_token)
+        (not
+          (preempted ?delivery_task)
+        )
+      )
+    :effect
+      (and
+        (preempted ?delivery_task)
+        (transport_resource_available ?transport_resource)
+        (urgency_token_available ?urgency_token)
+      )
+  )
+  (:action enforce_preemption_on_plan
+    :parameters (?operational_plan - operational_plan ?transport_resource - transport_resource ?urgency_token - urgency_token)
+    :precondition
+      (and
+        (urgency_applied ?operational_plan)
+        (case_assigned_to_resource ?operational_plan ?transport_resource)
+        (case_has_urgency_token ?operational_plan ?urgency_token)
+        (not
+          (preempted ?operational_plan)
+        )
+      )
+    :effect
+      (and
+        (preempted ?operational_plan)
+        (transport_resource_available ?transport_resource)
+        (urgency_token_available ?urgency_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem urgent_order_preemption_scenario)
+  (:domain logistics_urgent_order_preemption)
+  (:objects pickup_task_1 - pickup_task delivery_task_1 - delivery_task operational_plan_1 - operational_plan operational_plan_2 - operational_plan transport_resource_1 - transport_resource transport_resource_2 - transport_resource transport_resource_3 - transport_resource time_window_1 - time_window service_location_1 - service_location package_1 - package origin_location_1 - origin_location destination_location_1 - destination_location replan_candidate_1 - replan_candidate inventory_unit_1 - inventory_unit inventory_unit_2 - inventory_unit special_equipment_1 - special_equipment special_equipment_2 - special_equipment authorization_credential_1 - authorization_credential authorization_credential_2 - authorization_credential urgency_token_1 - urgency_token operator_1 - operator supervisor_directive_1 - supervisor_directive supervisor_directive_2 - supervisor_directive regulatory_permit_1 - regulatory_permit)
+  (:init
+    (transport_resource_available transport_resource_1)
+    (transport_resource_available transport_resource_2)
+    (transport_resource_available transport_resource_3)
+    (time_window_available time_window_1)
+    (service_location_available service_location_1)
+    (package_available package_1)
+    (pickup_origin_location pickup_task_1 origin_location_1)
+    (delivery_destination delivery_task_1 destination_location_1)
+    (candidate_available replan_candidate_1)
+    (inventory_available inventory_unit_1)
+    (inventory_available inventory_unit_2)
+    (plan_includes_pickup operational_plan_1 pickup_task_1)
+    (plan_includes_pickup operational_plan_2 pickup_task_1)
+    (plan_includes_delivery operational_plan_1 delivery_task_1)
+    (plan_includes_delivery operational_plan_2 delivery_task_1)
+    (plan_associated_replan_candidate operational_plan_1 replan_candidate_1)
+    (plan_associated_replan_candidate operational_plan_2 replan_candidate_1)
+    (plan_has_inventory_unit operational_plan_1 inventory_unit_1)
+    (plan_has_inventory_unit operational_plan_2 inventory_unit_2)
+    (equipment_available special_equipment_1)
+    (equipment_available special_equipment_2)
+    (credential_available authorization_credential_1)
+    (credential_available authorization_credential_2)
+    (urgency_token_available urgency_token_1)
+    (operator_available operator_1)
+    (supervisor_directive_available supervisor_directive_1)
+    (plan_has_supervisor_directive operational_plan_1 supervisor_directive_1)
+    (plan_has_supervisor_directive operational_plan_2 supervisor_directive_2)
+    (regulatory_permit_available regulatory_permit_1)
+  )
+  (:goal
+    (and
+      (preempted pickup_task_1)
+      (preempted delivery_task_1)
+      (preempted operational_plan_1)
+      (preempted operational_plan_2)
+    )
+  )
+)

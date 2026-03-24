@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain postharvest_destination_market_channel_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object infrastructure_category - object logistics_category - object inventory_category - object batch - inventory_category market_channel_option - resource_category quality_test_resource - resource_category conditioning_station - resource_category label_template - resource_category dispatch_document_template - resource_category destination_attribute - resource_category packaging_spec - resource_category certification_document - resource_category packaging_material - infrastructure_category sample_unit - infrastructure_category buyer - infrastructure_category temperature_zone - logistics_category transit_route - logistics_category consignment_unit - logistics_category storage_category - batch product_category - batch storage_slot - storage_category staging_slot - storage_category product_sku - product_category)
+  (:predicates
+    (received ?batch - batch)
+    (quality_approved ?batch - batch)
+    (channel_nominated ?batch - batch)
+    (released_for_destination ?batch - batch)
+    (ready_for_dispatch ?batch - batch)
+    (destination_assigned ?batch - batch)
+    (market_channel_available ?market_channel - market_channel_option)
+    (channel_assignment ?batch - batch ?market_channel - market_channel_option)
+    (test_resource_available ?test_resource - quality_test_resource)
+    (test_assignment ?batch - batch ?test_resource - quality_test_resource)
+    (conditioning_station_available ?conditioning_station - conditioning_station)
+    (conditioning_assignment ?batch - batch ?conditioning_station - conditioning_station)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (storage_slot_packaging_assignment ?storage_slot - storage_slot ?packaging_material - packaging_material)
+    (staging_slot_packaging_assignment ?staging_slot - staging_slot ?packaging_material - packaging_material)
+    (storage_slot_in_temperature_zone ?storage_slot - storage_slot ?temperature_zone - temperature_zone)
+    (temperature_zone_reserved ?temperature_zone - temperature_zone)
+    (temperature_zone_material_loaded ?temperature_zone - temperature_zone)
+    (storage_slot_occupied ?storage_slot - storage_slot)
+    (staging_slot_transit_assignment ?staging_slot - staging_slot ?transit_route - transit_route)
+    (transit_route_reserved ?transit_route - transit_route)
+    (transit_route_material_loaded ?transit_route - transit_route)
+    (staging_slot_occupied ?staging_slot - staging_slot)
+    (consignment_unit_available ?consignment_unit - consignment_unit)
+    (consignment_reserved ?consignment_unit - consignment_unit)
+    (consignment_in_temperature_zone ?consignment_unit - consignment_unit ?temperature_zone - temperature_zone)
+    (consignment_transit_assignment ?consignment_unit - consignment_unit ?transit_route - transit_route)
+    (consignment_temperature_allocated ?consignment_unit - consignment_unit)
+    (consignment_transit_allocated ?consignment_unit - consignment_unit)
+    (consignment_inspected ?consignment_unit - consignment_unit)
+    (sku_assigned_storage_slot ?sku - product_sku ?storage_slot - storage_slot)
+    (sku_assigned_staging_slot ?sku - product_sku ?staging_slot - staging_slot)
+    (sku_assigned_consignment ?sku - product_sku ?consignment_unit - consignment_unit)
+    (sample_unit_available ?sample_unit - sample_unit)
+    (sku_sample_association ?sku - product_sku ?sample_unit - sample_unit)
+    (sample_unit_reserved ?sample_unit - sample_unit)
+    (sample_assigned_consignment ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    (sku_inspected ?sku - product_sku)
+    (sku_label_applied ?sku - product_sku)
+    (sku_prepared_for_release ?sku - product_sku)
+    (sku_has_label_template ?sku - product_sku)
+    (sku_label_committed ?sku - product_sku)
+    (sku_dispatch_documents_attached ?sku - product_sku)
+    (sku_packing_confirmed ?sku - product_sku)
+    (buyer_available ?buyer - buyer)
+    (sku_buyer_assignment ?sku - product_sku ?buyer - buyer)
+    (sku_buyer_selected ?sku - product_sku)
+    (sku_buyer_assignment_confirmed ?sku - product_sku)
+    (sku_certification_attached ?sku - product_sku)
+    (label_template_available ?label_template - label_template)
+    (sku_label_template_assigned ?sku - product_sku ?label_template - label_template)
+    (dispatch_template_available ?dispatch_template - dispatch_document_template)
+    (sku_dispatch_template_assigned ?sku - product_sku ?dispatch_template - dispatch_document_template)
+    (packaging_spec_available ?packaging_spec - packaging_spec)
+    (sku_packaging_spec_assigned ?sku - product_sku ?packaging_spec - packaging_spec)
+    (certification_document_available ?certification_document - certification_document)
+    (sku_certification_assigned ?sku - product_sku ?certification_document - certification_document)
+    (destination_attribute_available ?destination_attribute - destination_attribute)
+    (inventory_destination_attribute_assignment ?batch - batch ?destination_attribute - destination_attribute)
+    (storage_slot_prepared ?storage_slot - storage_slot)
+    (staging_slot_prepared ?staging_slot - staging_slot)
+    (final_release_marker ?sku - product_sku)
+  )
+  (:action register_batch_receipt
+    :parameters (?batch - batch)
+    :precondition
+      (and
+        (not
+          (received ?batch)
+        )
+        (not
+          (released_for_destination ?batch)
+        )
+      )
+    :effect (received ?batch)
+  )
+  (:action nominate_batch_market_channel
+    :parameters (?batch - batch ?market_channel - market_channel_option)
+    :precondition
+      (and
+        (received ?batch)
+        (not
+          (channel_nominated ?batch)
+        )
+        (market_channel_available ?market_channel)
+      )
+    :effect
+      (and
+        (channel_nominated ?batch)
+        (channel_assignment ?batch ?market_channel)
+        (not
+          (market_channel_available ?market_channel)
+        )
+      )
+  )
+  (:action assign_test_resource_to_batch
+    :parameters (?batch - batch ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (received ?batch)
+        (channel_nominated ?batch)
+        (test_resource_available ?test_resource)
+      )
+    :effect
+      (and
+        (test_assignment ?batch ?test_resource)
+        (not
+          (test_resource_available ?test_resource)
+        )
+      )
+  )
+  (:action approve_batch_quality_test
+    :parameters (?batch - batch ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (received ?batch)
+        (channel_nominated ?batch)
+        (test_assignment ?batch ?test_resource)
+        (not
+          (quality_approved ?batch)
+        )
+      )
+    :effect (quality_approved ?batch)
+  )
+  (:action release_test_resource_from_batch
+    :parameters (?batch - batch ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (test_assignment ?batch ?test_resource)
+      )
+    :effect
+      (and
+        (test_resource_available ?test_resource)
+        (not
+          (test_assignment ?batch ?test_resource)
+        )
+      )
+  )
+  (:action assign_conditioning_station_to_batch
+    :parameters (?batch - batch ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (quality_approved ?batch)
+        (conditioning_station_available ?conditioning_station)
+      )
+    :effect
+      (and
+        (conditioning_assignment ?batch ?conditioning_station)
+        (not
+          (conditioning_station_available ?conditioning_station)
+        )
+      )
+  )
+  (:action release_conditioning_station_from_batch
+    :parameters (?batch - batch ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (conditioning_assignment ?batch ?conditioning_station)
+      )
+    :effect
+      (and
+        (conditioning_station_available ?conditioning_station)
+        (not
+          (conditioning_assignment ?batch ?conditioning_station)
+        )
+      )
+  )
+  (:action assign_packaging_spec_to_sku
+    :parameters (?sku - product_sku ?packaging_spec - packaging_spec)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (packaging_spec_available ?packaging_spec)
+      )
+    :effect
+      (and
+        (sku_packaging_spec_assigned ?sku ?packaging_spec)
+        (not
+          (packaging_spec_available ?packaging_spec)
+        )
+      )
+  )
+  (:action release_packaging_spec_from_sku
+    :parameters (?sku - product_sku ?packaging_spec - packaging_spec)
+    :precondition
+      (and
+        (sku_packaging_spec_assigned ?sku ?packaging_spec)
+      )
+    :effect
+      (and
+        (packaging_spec_available ?packaging_spec)
+        (not
+          (sku_packaging_spec_assigned ?sku ?packaging_spec)
+        )
+      )
+  )
+  (:action assign_certification_document_to_sku
+    :parameters (?sku - product_sku ?certification_document - certification_document)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (certification_document_available ?certification_document)
+      )
+    :effect
+      (and
+        (sku_certification_assigned ?sku ?certification_document)
+        (not
+          (certification_document_available ?certification_document)
+        )
+      )
+  )
+  (:action release_certification_document_from_sku
+    :parameters (?sku - product_sku ?certification_document - certification_document)
+    :precondition
+      (and
+        (sku_certification_assigned ?sku ?certification_document)
+      )
+    :effect
+      (and
+        (certification_document_available ?certification_document)
+        (not
+          (sku_certification_assigned ?sku ?certification_document)
+        )
+      )
+  )
+  (:action reserve_temperature_zone_for_storage_slot
+    :parameters (?storage_slot - storage_slot ?temperature_zone - temperature_zone ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (quality_approved ?storage_slot)
+        (test_assignment ?storage_slot ?test_resource)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (not
+          (temperature_zone_reserved ?temperature_zone)
+        )
+        (not
+          (temperature_zone_material_loaded ?temperature_zone)
+        )
+      )
+    :effect (temperature_zone_reserved ?temperature_zone)
+  )
+  (:action apply_conditioning_to_storage_slot
+    :parameters (?storage_slot - storage_slot ?temperature_zone - temperature_zone ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (quality_approved ?storage_slot)
+        (conditioning_assignment ?storage_slot ?conditioning_station)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (temperature_zone_reserved ?temperature_zone)
+        (not
+          (storage_slot_prepared ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (storage_slot_occupied ?storage_slot)
+      )
+  )
+  (:action assign_packaging_to_storage_slot
+    :parameters (?storage_slot - storage_slot ?temperature_zone - temperature_zone ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_approved ?storage_slot)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (packaging_material_available ?packaging_material)
+        (not
+          (storage_slot_prepared ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (temperature_zone_material_loaded ?temperature_zone)
+        (storage_slot_prepared ?storage_slot)
+        (storage_slot_packaging_assignment ?storage_slot ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action store_batch_in_storage_slot
+    :parameters (?storage_slot - storage_slot ?temperature_zone - temperature_zone ?test_resource - quality_test_resource ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_approved ?storage_slot)
+        (test_assignment ?storage_slot ?test_resource)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (temperature_zone_material_loaded ?temperature_zone)
+        (storage_slot_packaging_assignment ?storage_slot ?packaging_material)
+        (not
+          (storage_slot_occupied ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (temperature_zone_reserved ?temperature_zone)
+        (storage_slot_occupied ?storage_slot)
+        (packaging_material_available ?packaging_material)
+        (not
+          (storage_slot_packaging_assignment ?storage_slot ?packaging_material)
+        )
+      )
+  )
+  (:action reserve_transit_route_for_staging_slot
+    :parameters (?staging_slot - staging_slot ?transit_route - transit_route ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (quality_approved ?staging_slot)
+        (test_assignment ?staging_slot ?test_resource)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (not
+          (transit_route_reserved ?transit_route)
+        )
+        (not
+          (transit_route_material_loaded ?transit_route)
+        )
+      )
+    :effect (transit_route_reserved ?transit_route)
+  )
+  (:action apply_conditioning_to_staging_slot
+    :parameters (?staging_slot - staging_slot ?transit_route - transit_route ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (quality_approved ?staging_slot)
+        (conditioning_assignment ?staging_slot ?conditioning_station)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (transit_route_reserved ?transit_route)
+        (not
+          (staging_slot_prepared ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (staging_slot_prepared ?staging_slot)
+        (staging_slot_occupied ?staging_slot)
+      )
+  )
+  (:action assign_packaging_to_staging_slot
+    :parameters (?staging_slot - staging_slot ?transit_route - transit_route ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_approved ?staging_slot)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (packaging_material_available ?packaging_material)
+        (not
+          (staging_slot_prepared ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (transit_route_material_loaded ?transit_route)
+        (staging_slot_prepared ?staging_slot)
+        (staging_slot_packaging_assignment ?staging_slot ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action prepare_staging_slot_for_transit
+    :parameters (?staging_slot - staging_slot ?transit_route - transit_route ?test_resource - quality_test_resource ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (quality_approved ?staging_slot)
+        (test_assignment ?staging_slot ?test_resource)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (transit_route_material_loaded ?transit_route)
+        (staging_slot_packaging_assignment ?staging_slot ?packaging_material)
+        (not
+          (staging_slot_occupied ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (transit_route_reserved ?transit_route)
+        (staging_slot_occupied ?staging_slot)
+        (packaging_material_available ?packaging_material)
+        (not
+          (staging_slot_packaging_assignment ?staging_slot ?packaging_material)
+        )
+      )
+  )
+  (:action assemble_consignment_from_reserved_storage_and_staging
+    :parameters (?storage_slot - storage_slot ?staging_slot - staging_slot ?temperature_zone - temperature_zone ?transit_route - transit_route ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (staging_slot_prepared ?staging_slot)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (temperature_zone_reserved ?temperature_zone)
+        (transit_route_reserved ?transit_route)
+        (storage_slot_occupied ?storage_slot)
+        (staging_slot_occupied ?staging_slot)
+        (consignment_unit_available ?consignment_unit)
+      )
+    :effect
+      (and
+        (consignment_reserved ?consignment_unit)
+        (consignment_in_temperature_zone ?consignment_unit ?temperature_zone)
+        (consignment_transit_assignment ?consignment_unit ?transit_route)
+        (not
+          (consignment_unit_available ?consignment_unit)
+        )
+      )
+  )
+  (:action assemble_consignment_with_zone_material_loaded
+    :parameters (?storage_slot - storage_slot ?staging_slot - staging_slot ?temperature_zone - temperature_zone ?transit_route - transit_route ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (staging_slot_prepared ?staging_slot)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (temperature_zone_material_loaded ?temperature_zone)
+        (transit_route_reserved ?transit_route)
+        (not
+          (storage_slot_occupied ?storage_slot)
+        )
+        (staging_slot_occupied ?staging_slot)
+        (consignment_unit_available ?consignment_unit)
+      )
+    :effect
+      (and
+        (consignment_reserved ?consignment_unit)
+        (consignment_in_temperature_zone ?consignment_unit ?temperature_zone)
+        (consignment_transit_assignment ?consignment_unit ?transit_route)
+        (consignment_temperature_allocated ?consignment_unit)
+        (not
+          (consignment_unit_available ?consignment_unit)
+        )
+      )
+  )
+  (:action assemble_consignment_with_route_material_loaded
+    :parameters (?storage_slot - storage_slot ?staging_slot - staging_slot ?temperature_zone - temperature_zone ?transit_route - transit_route ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (staging_slot_prepared ?staging_slot)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (temperature_zone_reserved ?temperature_zone)
+        (transit_route_material_loaded ?transit_route)
+        (storage_slot_occupied ?storage_slot)
+        (not
+          (staging_slot_occupied ?staging_slot)
+        )
+        (consignment_unit_available ?consignment_unit)
+      )
+    :effect
+      (and
+        (consignment_reserved ?consignment_unit)
+        (consignment_in_temperature_zone ?consignment_unit ?temperature_zone)
+        (consignment_transit_assignment ?consignment_unit ?transit_route)
+        (consignment_transit_allocated ?consignment_unit)
+        (not
+          (consignment_unit_available ?consignment_unit)
+        )
+      )
+  )
+  (:action assemble_consignment_with_zone_and_route_material_loaded
+    :parameters (?storage_slot - storage_slot ?staging_slot - staging_slot ?temperature_zone - temperature_zone ?transit_route - transit_route ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (staging_slot_prepared ?staging_slot)
+        (storage_slot_in_temperature_zone ?storage_slot ?temperature_zone)
+        (staging_slot_transit_assignment ?staging_slot ?transit_route)
+        (temperature_zone_material_loaded ?temperature_zone)
+        (transit_route_material_loaded ?transit_route)
+        (not
+          (storage_slot_occupied ?storage_slot)
+        )
+        (not
+          (staging_slot_occupied ?staging_slot)
+        )
+        (consignment_unit_available ?consignment_unit)
+      )
+    :effect
+      (and
+        (consignment_reserved ?consignment_unit)
+        (consignment_in_temperature_zone ?consignment_unit ?temperature_zone)
+        (consignment_transit_assignment ?consignment_unit ?transit_route)
+        (consignment_temperature_allocated ?consignment_unit)
+        (consignment_transit_allocated ?consignment_unit)
+        (not
+          (consignment_unit_available ?consignment_unit)
+        )
+      )
+  )
+  (:action inspect_consignment
+    :parameters (?consignment_unit - consignment_unit ?storage_slot - storage_slot ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (consignment_reserved ?consignment_unit)
+        (storage_slot_prepared ?storage_slot)
+        (test_assignment ?storage_slot ?test_resource)
+        (not
+          (consignment_inspected ?consignment_unit)
+        )
+      )
+    :effect (consignment_inspected ?consignment_unit)
+  )
+  (:action bind_sample_to_consignment
+    :parameters (?sku - product_sku ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (sku_assigned_consignment ?sku ?consignment_unit)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_unit_available ?sample_unit)
+        (consignment_reserved ?consignment_unit)
+        (consignment_inspected ?consignment_unit)
+        (not
+          (sample_unit_reserved ?sample_unit)
+        )
+      )
+    :effect
+      (and
+        (sample_unit_reserved ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (not
+          (sample_unit_available ?sample_unit)
+        )
+      )
+  )
+  (:action record_sku_inspection
+    :parameters (?sku - product_sku ?sample_unit - sample_unit ?consignment_unit - consignment_unit ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_unit_reserved ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (test_assignment ?sku ?test_resource)
+        (not
+          (consignment_temperature_allocated ?consignment_unit)
+        )
+        (not
+          (sku_inspected ?sku)
+        )
+      )
+    :effect (sku_inspected ?sku)
+  )
+  (:action apply_label_template_to_sku
+    :parameters (?sku - product_sku ?label_template - label_template)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (label_template_available ?label_template)
+        (not
+          (sku_has_label_template ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_has_label_template ?sku)
+        (sku_label_template_assigned ?sku ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action assign_label_and_prepare_sku
+    :parameters (?sku - product_sku ?sample_unit - sample_unit ?consignment_unit - consignment_unit ?test_resource - quality_test_resource ?label_template - label_template)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_unit_reserved ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (test_assignment ?sku ?test_resource)
+        (consignment_temperature_allocated ?consignment_unit)
+        (sku_has_label_template ?sku)
+        (sku_label_template_assigned ?sku ?label_template)
+        (not
+          (sku_inspected ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_inspected ?sku)
+        (sku_label_committed ?sku)
+      )
+  )
+  (:action apply_label_and_seal_sku_stage_a
+    :parameters (?sku - product_sku ?packaging_spec - packaging_spec ?conditioning_station - conditioning_station ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_inspected ?sku)
+        (sku_packaging_spec_assigned ?sku ?packaging_spec)
+        (conditioning_assignment ?sku ?conditioning_station)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (not
+          (consignment_transit_allocated ?consignment_unit)
+        )
+        (not
+          (sku_label_applied ?sku)
+        )
+      )
+    :effect (sku_label_applied ?sku)
+  )
+  (:action apply_label_and_seal_sku_stage_b
+    :parameters (?sku - product_sku ?packaging_spec - packaging_spec ?conditioning_station - conditioning_station ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_inspected ?sku)
+        (sku_packaging_spec_assigned ?sku ?packaging_spec)
+        (conditioning_assignment ?sku ?conditioning_station)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (consignment_transit_allocated ?consignment_unit)
+        (not
+          (sku_label_applied ?sku)
+        )
+      )
+    :effect (sku_label_applied ?sku)
+  )
+  (:action initiate_sku_release_approval
+    :parameters (?sku - product_sku ?certification_document - certification_document ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_label_applied ?sku)
+        (sku_certification_assigned ?sku ?certification_document)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (not
+          (consignment_temperature_allocated ?consignment_unit)
+        )
+        (not
+          (consignment_transit_allocated ?consignment_unit)
+        )
+        (not
+          (sku_prepared_for_release ?sku)
+        )
+      )
+    :effect (sku_prepared_for_release ?sku)
+  )
+  (:action approve_sku_and_attach_dispatch_docs
+    :parameters (?sku - product_sku ?certification_document - certification_document ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_label_applied ?sku)
+        (sku_certification_assigned ?sku ?certification_document)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (consignment_temperature_allocated ?consignment_unit)
+        (not
+          (consignment_transit_allocated ?consignment_unit)
+        )
+        (not
+          (sku_prepared_for_release ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_dispatch_documents_attached ?sku)
+      )
+  )
+  (:action approve_sku_and_attach_dispatch_docs_variant_b
+    :parameters (?sku - product_sku ?certification_document - certification_document ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_label_applied ?sku)
+        (sku_certification_assigned ?sku ?certification_document)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (not
+          (consignment_temperature_allocated ?consignment_unit)
+        )
+        (consignment_transit_allocated ?consignment_unit)
+        (not
+          (sku_prepared_for_release ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_dispatch_documents_attached ?sku)
+      )
+  )
+  (:action approve_sku_and_attach_dispatch_docs_variant_c
+    :parameters (?sku - product_sku ?certification_document - certification_document ?sample_unit - sample_unit ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (sku_label_applied ?sku)
+        (sku_certification_assigned ?sku ?certification_document)
+        (sku_sample_association ?sku ?sample_unit)
+        (sample_assigned_consignment ?sample_unit ?consignment_unit)
+        (consignment_temperature_allocated ?consignment_unit)
+        (consignment_transit_allocated ?consignment_unit)
+        (not
+          (sku_prepared_for_release ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_dispatch_documents_attached ?sku)
+      )
+  )
+  (:action finalize_sku_release_without_dispatch_docs
+    :parameters (?sku - product_sku)
+    :precondition
+      (and
+        (sku_prepared_for_release ?sku)
+        (not
+          (sku_dispatch_documents_attached ?sku)
+        )
+        (not
+          (final_release_marker ?sku)
+        )
+      )
+    :effect
+      (and
+        (final_release_marker ?sku)
+        (ready_for_dispatch ?sku)
+      )
+  )
+  (:action assign_dispatch_document_to_sku
+    :parameters (?sku - product_sku ?dispatch_template - dispatch_document_template)
+    :precondition
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_dispatch_documents_attached ?sku)
+        (dispatch_template_available ?dispatch_template)
+      )
+    :effect
+      (and
+        (sku_dispatch_template_assigned ?sku ?dispatch_template)
+        (not
+          (dispatch_template_available ?dispatch_template)
+        )
+      )
+  )
+  (:action confirm_sku_and_mark_packed
+    :parameters (?sku - product_sku ?storage_slot - storage_slot ?staging_slot - staging_slot ?test_resource - quality_test_resource ?dispatch_template - dispatch_document_template)
+    :precondition
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_dispatch_documents_attached ?sku)
+        (sku_dispatch_template_assigned ?sku ?dispatch_template)
+        (sku_assigned_storage_slot ?sku ?storage_slot)
+        (sku_assigned_staging_slot ?sku ?staging_slot)
+        (storage_slot_occupied ?storage_slot)
+        (staging_slot_occupied ?staging_slot)
+        (test_assignment ?sku ?test_resource)
+        (not
+          (sku_packing_confirmed ?sku)
+        )
+      )
+    :effect (sku_packing_confirmed ?sku)
+  )
+  (:action finalize_sku_release_with_packing
+    :parameters (?sku - product_sku)
+    :precondition
+      (and
+        (sku_prepared_for_release ?sku)
+        (sku_packing_confirmed ?sku)
+        (not
+          (final_release_marker ?sku)
+        )
+      )
+    :effect
+      (and
+        (final_release_marker ?sku)
+        (ready_for_dispatch ?sku)
+      )
+  )
+  (:action assign_buyer_to_sku
+    :parameters (?sku - product_sku ?buyer - buyer ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (quality_approved ?sku)
+        (test_assignment ?sku ?test_resource)
+        (buyer_available ?buyer)
+        (sku_buyer_assignment ?sku ?buyer)
+        (not
+          (sku_buyer_selected ?sku)
+        )
+      )
+    :effect
+      (and
+        (sku_buyer_selected ?sku)
+        (not
+          (buyer_available ?buyer)
+        )
+      )
+  )
+  (:action confirm_buyer_assignment_for_sku
+    :parameters (?sku - product_sku ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (sku_buyer_selected ?sku)
+        (conditioning_assignment ?sku ?conditioning_station)
+        (not
+          (sku_buyer_assignment_confirmed ?sku)
+        )
+      )
+    :effect (sku_buyer_assignment_confirmed ?sku)
+  )
+  (:action attach_certification_to_sku
+    :parameters (?sku - product_sku ?certification_document - certification_document)
+    :precondition
+      (and
+        (sku_buyer_assignment_confirmed ?sku)
+        (sku_certification_assigned ?sku ?certification_document)
+        (not
+          (sku_certification_attached ?sku)
+        )
+      )
+    :effect (sku_certification_attached ?sku)
+  )
+  (:action finalize_sku_release_with_certification
+    :parameters (?sku - product_sku)
+    :precondition
+      (and
+        (sku_certification_attached ?sku)
+        (not
+          (final_release_marker ?sku)
+        )
+      )
+    :effect
+      (and
+        (final_release_marker ?sku)
+        (ready_for_dispatch ?sku)
+      )
+  )
+  (:action mark_storage_slot_ready_for_dispatch
+    :parameters (?storage_slot - storage_slot ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (storage_slot_prepared ?storage_slot)
+        (storage_slot_occupied ?storage_slot)
+        (consignment_reserved ?consignment_unit)
+        (consignment_inspected ?consignment_unit)
+        (not
+          (ready_for_dispatch ?storage_slot)
+        )
+      )
+    :effect (ready_for_dispatch ?storage_slot)
+  )
+  (:action mark_staging_slot_ready_for_dispatch
+    :parameters (?staging_slot - staging_slot ?consignment_unit - consignment_unit)
+    :precondition
+      (and
+        (staging_slot_prepared ?staging_slot)
+        (staging_slot_occupied ?staging_slot)
+        (consignment_reserved ?consignment_unit)
+        (consignment_inspected ?consignment_unit)
+        (not
+          (ready_for_dispatch ?staging_slot)
+        )
+      )
+    :effect (ready_for_dispatch ?staging_slot)
+  )
+  (:action assign_destination_attribute_to_batch
+    :parameters (?batch - batch ?destination_attribute - destination_attribute ?test_resource - quality_test_resource)
+    :precondition
+      (and
+        (ready_for_dispatch ?batch)
+        (test_assignment ?batch ?test_resource)
+        (destination_attribute_available ?destination_attribute)
+        (not
+          (destination_assigned ?batch)
+        )
+      )
+    :effect
+      (and
+        (destination_assigned ?batch)
+        (inventory_destination_attribute_assignment ?batch ?destination_attribute)
+        (not
+          (destination_attribute_available ?destination_attribute)
+        )
+      )
+  )
+  (:action propagate_destination_assignment_to_storage_slot
+    :parameters (?storage_slot - storage_slot ?market_channel - market_channel_option ?destination_attribute - destination_attribute)
+    :precondition
+      (and
+        (destination_assigned ?storage_slot)
+        (channel_assignment ?storage_slot ?market_channel)
+        (inventory_destination_attribute_assignment ?storage_slot ?destination_attribute)
+        (not
+          (released_for_destination ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (released_for_destination ?storage_slot)
+        (market_channel_available ?market_channel)
+        (destination_attribute_available ?destination_attribute)
+      )
+  )
+  (:action propagate_destination_assignment_to_staging_slot
+    :parameters (?staging_slot - staging_slot ?market_channel - market_channel_option ?destination_attribute - destination_attribute)
+    :precondition
+      (and
+        (destination_assigned ?staging_slot)
+        (channel_assignment ?staging_slot ?market_channel)
+        (inventory_destination_attribute_assignment ?staging_slot ?destination_attribute)
+        (not
+          (released_for_destination ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (released_for_destination ?staging_slot)
+        (market_channel_available ?market_channel)
+        (destination_attribute_available ?destination_attribute)
+      )
+  )
+  (:action propagate_destination_assignment_to_sku
+    :parameters (?sku - product_sku ?market_channel - market_channel_option ?destination_attribute - destination_attribute)
+    :precondition
+      (and
+        (destination_assigned ?sku)
+        (channel_assignment ?sku ?market_channel)
+        (inventory_destination_attribute_assignment ?sku ?destination_attribute)
+        (not
+          (released_for_destination ?sku)
+        )
+      )
+    :effect
+      (and
+        (released_for_destination ?sku)
+        (market_channel_available ?market_channel)
+        (destination_attribute_available ?destination_attribute)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem destination_market_channel_assignment_problem)
+  (:domain postharvest_destination_market_channel_assignment)
+  (:objects storage_slot_1 - storage_slot staging_slot_1 - staging_slot sku_1 - product_sku sku_2 - product_sku channel_wholesale - market_channel_option channel_retail - market_channel_option channel_export - market_channel_option test_resource_1 - quality_test_resource conditioning_station_1 - conditioning_station packaging_material_1 - packaging_material temperature_zone_cold - temperature_zone transit_route_1 - transit_route consignment_1 - consignment_unit sample_1 - sample_unit sample_2 - sample_unit label_template_1 - label_template label_template_2 - label_template dispatch_template_1 - dispatch_document_template dispatch_template_2 - dispatch_document_template destination_attribute_1 - destination_attribute packaging_spec_1 - packaging_spec buyer_1 - buyer buyer_2 - buyer cert_doc_1 - certification_document)
+  (:init
+    (market_channel_available channel_wholesale)
+    (market_channel_available channel_retail)
+    (market_channel_available channel_export)
+    (test_resource_available test_resource_1)
+    (conditioning_station_available conditioning_station_1)
+    (packaging_material_available packaging_material_1)
+    (storage_slot_in_temperature_zone storage_slot_1 temperature_zone_cold)
+    (staging_slot_transit_assignment staging_slot_1 transit_route_1)
+    (consignment_unit_available consignment_1)
+    (sample_unit_available sample_1)
+    (sample_unit_available sample_2)
+    (sku_assigned_storage_slot sku_1 storage_slot_1)
+    (sku_assigned_storage_slot sku_2 storage_slot_1)
+    (sku_assigned_staging_slot sku_1 staging_slot_1)
+    (sku_assigned_staging_slot sku_2 staging_slot_1)
+    (sku_assigned_consignment sku_1 consignment_1)
+    (sku_assigned_consignment sku_2 consignment_1)
+    (sku_sample_association sku_1 sample_1)
+    (sku_sample_association sku_2 sample_2)
+    (label_template_available label_template_1)
+    (label_template_available label_template_2)
+    (dispatch_template_available dispatch_template_1)
+    (dispatch_template_available dispatch_template_2)
+    (destination_attribute_available destination_attribute_1)
+    (packaging_spec_available packaging_spec_1)
+    (buyer_available buyer_1)
+    (sku_buyer_assignment sku_1 buyer_1)
+    (sku_buyer_assignment sku_2 buyer_2)
+    (certification_document_available cert_doc_1)
+  )
+  (:goal
+    (and
+      (released_for_destination storage_slot_1)
+      (released_for_destination staging_slot_1)
+      (released_for_destination sku_1)
+      (released_for_destination sku_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_batch_receipt storage_slot_1)
+(nominate_batch_market_channel storage_slot_1 channel_wholesale)
+(assign_test_resource_to_batch storage_slot_1 test_resource_1)
+(approve_batch_quality_test storage_slot_1 test_resource_1)
+(assign_conditioning_station_to_batch storage_slot_1 conditioning_station_1)
+(reserve_temperature_zone_for_storage_slot storage_slot_1 temperature_zone_cold test_resource_1)
+(apply_conditioning_to_storage_slot storage_slot_1 temperature_zone_cold conditioning_station_1)
+(release_conditioning_station_from_batch storage_slot_1 conditioning_station_1)
+(register_batch_receipt staging_slot_1)
+(nominate_batch_market_channel staging_slot_1 channel_retail)
+(release_test_resource_from_batch storage_slot_1 test_resource_1)
+(assign_test_resource_to_batch staging_slot_1 test_resource_1)
+(approve_batch_quality_test staging_slot_1 test_resource_1)
+(assign_conditioning_station_to_batch staging_slot_1 conditioning_station_1)
+(reserve_transit_route_for_staging_slot staging_slot_1 transit_route_1 test_resource_1)
+(apply_conditioning_to_staging_slot staging_slot_1 transit_route_1 conditioning_station_1)
+(release_conditioning_station_from_batch staging_slot_1 conditioning_station_1)
+(assemble_consignment_from_reserved_storage_and_staging storage_slot_1 staging_slot_1 temperature_zone_cold transit_route_1 consignment_1)
+(release_test_resource_from_batch staging_slot_1 test_resource_1)
+(assign_test_resource_to_batch storage_slot_1 test_resource_1)
+(inspect_consignment consignment_1 storage_slot_1 test_resource_1)
+(mark_storage_slot_ready_for_dispatch storage_slot_1 consignment_1)
+(mark_staging_slot_ready_for_dispatch staging_slot_1 consignment_1)
+(assign_destination_attribute_to_batch storage_slot_1 destination_attribute_1 test_resource_1)
+(propagate_destination_assignment_to_storage_slot storage_slot_1 channel_wholesale destination_attribute_1)
+(release_test_resource_from_batch storage_slot_1 test_resource_1)
+(assign_test_resource_to_batch staging_slot_1 test_resource_1)
+(assign_destination_attribute_to_batch staging_slot_1 destination_attribute_1 test_resource_1)
+(propagate_destination_assignment_to_staging_slot staging_slot_1 channel_retail destination_attribute_1)
+(release_test_resource_from_batch staging_slot_1 test_resource_1)
+(register_batch_receipt sku_1)
+(nominate_batch_market_channel sku_1 channel_wholesale)
+(assign_test_resource_to_batch sku_1 test_resource_1)
+(approve_batch_quality_test sku_1 test_resource_1)
+(assign_buyer_to_sku sku_1 buyer_1 test_resource_1)
+(assign_conditioning_station_to_batch sku_1 conditioning_station_1)
+(confirm_buyer_assignment_for_sku sku_1 conditioning_station_1)
+(assign_certification_document_to_sku sku_1 cert_doc_1)
+(attach_certification_to_sku sku_1 cert_doc_1)
+(finalize_sku_release_with_certification sku_1)
+(assign_destination_attribute_to_batch sku_1 destination_attribute_1 test_resource_1)
+(propagate_destination_assignment_to_sku sku_1 channel_wholesale destination_attribute_1)
+(release_conditioning_station_from_batch sku_1 conditioning_station_1)
+(release_certification_document_from_sku sku_1 cert_doc_1)
+(release_test_resource_from_batch sku_1 test_resource_1)
+(register_batch_receipt sku_2)
+(nominate_batch_market_channel sku_2 channel_retail)
+(assign_test_resource_to_batch sku_2 test_resource_1)
+(approve_batch_quality_test sku_2 test_resource_1)
+(assign_buyer_to_sku sku_2 buyer_2 test_resource_1)
+(assign_conditioning_station_to_batch sku_2 conditioning_station_1)
+(confirm_buyer_assignment_for_sku sku_2 conditioning_station_1)
+(assign_certification_document_to_sku sku_2 cert_doc_1)
+(attach_certification_to_sku sku_2 cert_doc_1)
+(finalize_sku_release_with_certification sku_2)
+(assign_destination_attribute_to_batch sku_2 destination_attribute_1 test_resource_1)
+(propagate_destination_assignment_to_sku sku_2 channel_retail destination_attribute_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_a7shbx7c/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_a7shbx7c/plan.pddl 
+
+
+--- stderr ---
+

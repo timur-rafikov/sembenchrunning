@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain layered_architecture_definition)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object specification_artifact_category - object connector_artifact_category - object architectural_entity - object component - architectural_entity interface_spec - resource_category communication_protocol - resource_category integrator_team - resource_category non_functional_constraint - resource_category deployment_constraint - resource_category operational_environment - resource_category service_contract - resource_category governance_policy - resource_category design_pattern - specification_artifact_category library_resource - specification_artifact_category stakeholder_requirement - specification_artifact_category data_channel - connector_artifact_category control_channel - connector_artifact_category build_artifact - connector_artifact_category module_category - component composite_category - component provider_module - module_category consumer_module - module_category subsystem - composite_category)
+  (:predicates
+    (component_registered ?component_spec - component)
+    (entity_instantiated ?component_spec - component)
+    (interface_assigned ?component_spec - component)
+    (integration_complete ?component_spec - component)
+    (integration_verified ?component_spec - component)
+    (component_finalized ?component_spec - component)
+    (interface_available ?interface_spec - interface_spec)
+    (has_interface ?component_spec - component ?interface_spec - interface_spec)
+    (protocol_available ?communication_protocol - communication_protocol)
+    (has_protocol ?component_spec - component ?communication_protocol - communication_protocol)
+    (integrator_available ?integrator_team - integrator_team)
+    (assigned_integrator ?component_spec - component ?integrator_team - integrator_team)
+    (pattern_available ?design_pattern - design_pattern)
+    (module_has_pattern ?provider_module - provider_module ?design_pattern - design_pattern)
+    (consumer_has_pattern ?consumer_module - consumer_module ?design_pattern - design_pattern)
+    (bound_data_channel ?provider_module - provider_module ?data_channel - data_channel)
+    (data_channel_active ?data_channel - data_channel)
+    (data_channel_configured ?data_channel - data_channel)
+    (provider_ready ?provider_module - provider_module)
+    (consumer_bound_control_channel ?consumer_module - consumer_module ?control_channel - control_channel)
+    (control_channel_active ?control_channel - control_channel)
+    (control_channel_configured ?control_channel - control_channel)
+    (consumer_ready ?consumer_module - consumer_module)
+    (artifact_available ?build_artifact - build_artifact)
+    (artifact_packaged ?build_artifact - build_artifact)
+    (artifact_bound_data_channel ?build_artifact - build_artifact ?data_channel - data_channel)
+    (artifact_bound_control_channel ?build_artifact - build_artifact ?control_channel - control_channel)
+    (artifact_verified ?build_artifact - build_artifact)
+    (artifact_compatible ?build_artifact - build_artifact)
+    (artifact_ready ?build_artifact - build_artifact)
+    (subsystem_has_provider ?subsystem - subsystem ?provider_module - provider_module)
+    (subsystem_has_consumer ?subsystem - subsystem ?consumer_module - consumer_module)
+    (subsystem_includes_artifact ?subsystem - subsystem ?build_artifact - build_artifact)
+    (library_resource_available ?library_resource - library_resource)
+    (subsystem_has_library_resource ?subsystem - subsystem ?library_resource - library_resource)
+    (library_resource_staged ?library_resource - library_resource)
+    (resource_staged_into_artifact ?library_resource - library_resource ?build_artifact - build_artifact)
+    (enrichment_started ?subsystem - subsystem)
+    (enrichment_completed ?subsystem - subsystem)
+    (verification_passed ?subsystem - subsystem)
+    (constraint_attached ?subsystem - subsystem)
+    (constraint_propagated ?subsystem - subsystem)
+    (deployment_constraints_allowed ?subsystem - subsystem)
+    (cross_module_checks_passed ?subsystem - subsystem)
+    (stakeholder_requirement_available ?stakeholder_requirement - stakeholder_requirement)
+    (subsystem_has_stakeholder_requirement ?subsystem - subsystem ?stakeholder_requirement - stakeholder_requirement)
+    (review_requested ?subsystem - subsystem)
+    (review_assigned ?subsystem - subsystem)
+    (review_approved ?subsystem - subsystem)
+    (nonfunctional_constraint_available ?non_functional_constraint - non_functional_constraint)
+    (subsystem_has_nonfunctional_constraint ?subsystem - subsystem ?non_functional_constraint - non_functional_constraint)
+    (deployment_constraint_available ?deployment_constraint - deployment_constraint)
+    (subsystem_has_deployment_constraint ?subsystem - subsystem ?deployment_constraint - deployment_constraint)
+    (service_contract_available ?service_contract - service_contract)
+    (subsystem_has_service_contract ?subsystem - subsystem ?service_contract - service_contract)
+    (policy_available ?governance_policy - governance_policy)
+    (subsystem_has_policy ?subsystem - subsystem ?governance_policy - governance_policy)
+    (environment_available ?operational_environment - operational_environment)
+    (component_bound_environment ?component_spec - component ?operational_environment - operational_environment)
+    (module_staged ?provider_module - provider_module)
+    (consumer_staged ?consumer_module - consumer_module)
+    (finalization_completed ?subsystem - subsystem)
+  )
+  (:action register_component
+    :parameters (?component_spec - component)
+    :precondition
+      (and
+        (not
+          (component_registered ?component_spec)
+        )
+        (not
+          (integration_complete ?component_spec)
+        )
+      )
+    :effect (component_registered ?component_spec)
+  )
+  (:action bind_interface_to_component
+    :parameters (?component_spec - component ?interface_spec - interface_spec)
+    :precondition
+      (and
+        (component_registered ?component_spec)
+        (not
+          (interface_assigned ?component_spec)
+        )
+        (interface_available ?interface_spec)
+      )
+    :effect
+      (and
+        (interface_assigned ?component_spec)
+        (has_interface ?component_spec ?interface_spec)
+        (not
+          (interface_available ?interface_spec)
+        )
+      )
+  )
+  (:action bind_protocol_to_component
+    :parameters (?component_spec - component ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (component_registered ?component_spec)
+        (interface_assigned ?component_spec)
+        (protocol_available ?communication_protocol)
+      )
+    :effect
+      (and
+        (has_protocol ?component_spec ?communication_protocol)
+        (not
+          (protocol_available ?communication_protocol)
+        )
+      )
+  )
+  (:action confirm_component_protocol_binding
+    :parameters (?component_spec - component ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (component_registered ?component_spec)
+        (interface_assigned ?component_spec)
+        (has_protocol ?component_spec ?communication_protocol)
+        (not
+          (entity_instantiated ?component_spec)
+        )
+      )
+    :effect (entity_instantiated ?component_spec)
+  )
+  (:action unbind_protocol_from_component
+    :parameters (?component_spec - component ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (has_protocol ?component_spec ?communication_protocol)
+      )
+    :effect
+      (and
+        (protocol_available ?communication_protocol)
+        (not
+          (has_protocol ?component_spec ?communication_protocol)
+        )
+      )
+  )
+  (:action assign_integrator_to_component
+    :parameters (?component_spec - component ?integrator_team - integrator_team)
+    :precondition
+      (and
+        (entity_instantiated ?component_spec)
+        (integrator_available ?integrator_team)
+      )
+    :effect
+      (and
+        (assigned_integrator ?component_spec ?integrator_team)
+        (not
+          (integrator_available ?integrator_team)
+        )
+      )
+  )
+  (:action release_integrator_from_component
+    :parameters (?component_spec - component ?integrator_team - integrator_team)
+    :precondition
+      (and
+        (assigned_integrator ?component_spec ?integrator_team)
+      )
+    :effect
+      (and
+        (integrator_available ?integrator_team)
+        (not
+          (assigned_integrator ?component_spec ?integrator_team)
+        )
+      )
+  )
+  (:action attach_service_contract_to_subsystem
+    :parameters (?subsystem - subsystem ?service_contract - service_contract)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (service_contract_available ?service_contract)
+      )
+    :effect
+      (and
+        (subsystem_has_service_contract ?subsystem ?service_contract)
+        (not
+          (service_contract_available ?service_contract)
+        )
+      )
+  )
+  (:action detach_service_contract_from_subsystem
+    :parameters (?subsystem - subsystem ?service_contract - service_contract)
+    :precondition
+      (and
+        (subsystem_has_service_contract ?subsystem ?service_contract)
+      )
+    :effect
+      (and
+        (service_contract_available ?service_contract)
+        (not
+          (subsystem_has_service_contract ?subsystem ?service_contract)
+        )
+      )
+  )
+  (:action attach_policy_to_subsystem
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (policy_available ?governance_policy)
+      )
+    :effect
+      (and
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (not
+          (policy_available ?governance_policy)
+        )
+      )
+  )
+  (:action detach_policy_from_subsystem
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy)
+    :precondition
+      (and
+        (subsystem_has_policy ?subsystem ?governance_policy)
+      )
+    :effect
+      (and
+        (policy_available ?governance_policy)
+        (not
+          (subsystem_has_policy ?subsystem ?governance_policy)
+        )
+      )
+  )
+  (:action activate_data_channel_for_provider
+    :parameters (?provider_module - provider_module ?data_channel - data_channel ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (entity_instantiated ?provider_module)
+        (has_protocol ?provider_module ?communication_protocol)
+        (bound_data_channel ?provider_module ?data_channel)
+        (not
+          (data_channel_active ?data_channel)
+        )
+        (not
+          (data_channel_configured ?data_channel)
+        )
+      )
+    :effect (data_channel_active ?data_channel)
+  )
+  (:action configure_provider_module_with_integrator
+    :parameters (?provider_module - provider_module ?data_channel - data_channel ?integrator_team - integrator_team)
+    :precondition
+      (and
+        (entity_instantiated ?provider_module)
+        (assigned_integrator ?provider_module ?integrator_team)
+        (bound_data_channel ?provider_module ?data_channel)
+        (data_channel_active ?data_channel)
+        (not
+          (module_staged ?provider_module)
+        )
+      )
+    :effect
+      (and
+        (module_staged ?provider_module)
+        (provider_ready ?provider_module)
+      )
+  )
+  (:action apply_pattern_to_provider_module
+    :parameters (?provider_module - provider_module ?data_channel - data_channel ?design_pattern - design_pattern)
+    :precondition
+      (and
+        (entity_instantiated ?provider_module)
+        (bound_data_channel ?provider_module ?data_channel)
+        (pattern_available ?design_pattern)
+        (not
+          (module_staged ?provider_module)
+        )
+      )
+    :effect
+      (and
+        (data_channel_configured ?data_channel)
+        (module_staged ?provider_module)
+        (module_has_pattern ?provider_module ?design_pattern)
+        (not
+          (pattern_available ?design_pattern)
+        )
+      )
+  )
+  (:action finalize_provider_module_configuration
+    :parameters (?provider_module - provider_module ?data_channel - data_channel ?communication_protocol - communication_protocol ?design_pattern - design_pattern)
+    :precondition
+      (and
+        (entity_instantiated ?provider_module)
+        (has_protocol ?provider_module ?communication_protocol)
+        (bound_data_channel ?provider_module ?data_channel)
+        (data_channel_configured ?data_channel)
+        (module_has_pattern ?provider_module ?design_pattern)
+        (not
+          (provider_ready ?provider_module)
+        )
+      )
+    :effect
+      (and
+        (data_channel_active ?data_channel)
+        (provider_ready ?provider_module)
+        (pattern_available ?design_pattern)
+        (not
+          (module_has_pattern ?provider_module ?design_pattern)
+        )
+      )
+  )
+  (:action activate_control_channel_for_consumer
+    :parameters (?consumer_module - consumer_module ?control_channel - control_channel ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (entity_instantiated ?consumer_module)
+        (has_protocol ?consumer_module ?communication_protocol)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (not
+          (control_channel_active ?control_channel)
+        )
+        (not
+          (control_channel_configured ?control_channel)
+        )
+      )
+    :effect (control_channel_active ?control_channel)
+  )
+  (:action configure_consumer_module_with_integrator
+    :parameters (?consumer_module - consumer_module ?control_channel - control_channel ?integrator_team - integrator_team)
+    :precondition
+      (and
+        (entity_instantiated ?consumer_module)
+        (assigned_integrator ?consumer_module ?integrator_team)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (control_channel_active ?control_channel)
+        (not
+          (consumer_staged ?consumer_module)
+        )
+      )
+    :effect
+      (and
+        (consumer_staged ?consumer_module)
+        (consumer_ready ?consumer_module)
+      )
+  )
+  (:action apply_pattern_to_consumer_module
+    :parameters (?consumer_module - consumer_module ?control_channel - control_channel ?design_pattern - design_pattern)
+    :precondition
+      (and
+        (entity_instantiated ?consumer_module)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (pattern_available ?design_pattern)
+        (not
+          (consumer_staged ?consumer_module)
+        )
+      )
+    :effect
+      (and
+        (control_channel_configured ?control_channel)
+        (consumer_staged ?consumer_module)
+        (consumer_has_pattern ?consumer_module ?design_pattern)
+        (not
+          (pattern_available ?design_pattern)
+        )
+      )
+  )
+  (:action finalize_consumer_module_configuration
+    :parameters (?consumer_module - consumer_module ?control_channel - control_channel ?communication_protocol - communication_protocol ?design_pattern - design_pattern)
+    :precondition
+      (and
+        (entity_instantiated ?consumer_module)
+        (has_protocol ?consumer_module ?communication_protocol)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (control_channel_configured ?control_channel)
+        (consumer_has_pattern ?consumer_module ?design_pattern)
+        (not
+          (consumer_ready ?consumer_module)
+        )
+      )
+    :effect
+      (and
+        (control_channel_active ?control_channel)
+        (consumer_ready ?consumer_module)
+        (pattern_available ?design_pattern)
+        (not
+          (consumer_has_pattern ?consumer_module ?design_pattern)
+        )
+      )
+  )
+  (:action assemble_build_artifact
+    :parameters (?provider_module - provider_module ?consumer_module - consumer_module ?data_channel - data_channel ?control_channel - control_channel ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_staged ?provider_module)
+        (consumer_staged ?consumer_module)
+        (bound_data_channel ?provider_module ?data_channel)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (data_channel_active ?data_channel)
+        (control_channel_active ?control_channel)
+        (provider_ready ?provider_module)
+        (consumer_ready ?consumer_module)
+        (artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?build_artifact)
+        (artifact_bound_data_channel ?build_artifact ?data_channel)
+        (artifact_bound_control_channel ?build_artifact ?control_channel)
+        (not
+          (artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action assemble_and_verify_build_artifact
+    :parameters (?provider_module - provider_module ?consumer_module - consumer_module ?data_channel - data_channel ?control_channel - control_channel ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_staged ?provider_module)
+        (consumer_staged ?consumer_module)
+        (bound_data_channel ?provider_module ?data_channel)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (data_channel_configured ?data_channel)
+        (control_channel_active ?control_channel)
+        (not
+          (provider_ready ?provider_module)
+        )
+        (consumer_ready ?consumer_module)
+        (artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?build_artifact)
+        (artifact_bound_data_channel ?build_artifact ?data_channel)
+        (artifact_bound_control_channel ?build_artifact ?control_channel)
+        (artifact_verified ?build_artifact)
+        (not
+          (artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action assemble_and_mark_artifact_compatible
+    :parameters (?provider_module - provider_module ?consumer_module - consumer_module ?data_channel - data_channel ?control_channel - control_channel ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_staged ?provider_module)
+        (consumer_staged ?consumer_module)
+        (bound_data_channel ?provider_module ?data_channel)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (data_channel_active ?data_channel)
+        (control_channel_configured ?control_channel)
+        (provider_ready ?provider_module)
+        (not
+          (consumer_ready ?consumer_module)
+        )
+        (artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?build_artifact)
+        (artifact_bound_data_channel ?build_artifact ?data_channel)
+        (artifact_bound_control_channel ?build_artifact ?control_channel)
+        (artifact_compatible ?build_artifact)
+        (not
+          (artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action package_build_artifact_with_quality_flags
+    :parameters (?provider_module - provider_module ?consumer_module - consumer_module ?data_channel - data_channel ?control_channel - control_channel ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_staged ?provider_module)
+        (consumer_staged ?consumer_module)
+        (bound_data_channel ?provider_module ?data_channel)
+        (consumer_bound_control_channel ?consumer_module ?control_channel)
+        (data_channel_configured ?data_channel)
+        (control_channel_configured ?control_channel)
+        (not
+          (provider_ready ?provider_module)
+        )
+        (not
+          (consumer_ready ?consumer_module)
+        )
+        (artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (artifact_packaged ?build_artifact)
+        (artifact_bound_data_channel ?build_artifact ?data_channel)
+        (artifact_bound_control_channel ?build_artifact ?control_channel)
+        (artifact_verified ?build_artifact)
+        (artifact_compatible ?build_artifact)
+        (not
+          (artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action mark_artifact_ready
+    :parameters (?build_artifact - build_artifact ?provider_module - provider_module ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (artifact_packaged ?build_artifact)
+        (module_staged ?provider_module)
+        (has_protocol ?provider_module ?communication_protocol)
+        (not
+          (artifact_ready ?build_artifact)
+        )
+      )
+    :effect (artifact_ready ?build_artifact)
+  )
+  (:action stage_library_resource_into_artifact
+    :parameters (?subsystem - subsystem ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (subsystem_includes_artifact ?subsystem ?build_artifact)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (library_resource_available ?library_resource)
+        (artifact_packaged ?build_artifact)
+        (artifact_ready ?build_artifact)
+        (not
+          (library_resource_staged ?library_resource)
+        )
+      )
+    :effect
+      (and
+        (library_resource_staged ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (not
+          (library_resource_available ?library_resource)
+        )
+      )
+  )
+  (:action finalize_library_staging
+    :parameters (?subsystem - subsystem ?library_resource - library_resource ?build_artifact - build_artifact ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (library_resource_staged ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (has_protocol ?subsystem ?communication_protocol)
+        (not
+          (artifact_verified ?build_artifact)
+        )
+        (not
+          (enrichment_started ?subsystem)
+        )
+      )
+    :effect (enrichment_started ?subsystem)
+  )
+  (:action attach_nonfunctional_constraint_to_subsystem
+    :parameters (?subsystem - subsystem ?non_functional_constraint - non_functional_constraint)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (nonfunctional_constraint_available ?non_functional_constraint)
+        (not
+          (constraint_attached ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (constraint_attached ?subsystem)
+        (subsystem_has_nonfunctional_constraint ?subsystem ?non_functional_constraint)
+        (not
+          (nonfunctional_constraint_available ?non_functional_constraint)
+        )
+      )
+  )
+  (:action enrich_subsystem_with_constraint
+    :parameters (?subsystem - subsystem ?library_resource - library_resource ?build_artifact - build_artifact ?communication_protocol - communication_protocol ?non_functional_constraint - non_functional_constraint)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (library_resource_staged ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (has_protocol ?subsystem ?communication_protocol)
+        (artifact_verified ?build_artifact)
+        (constraint_attached ?subsystem)
+        (subsystem_has_nonfunctional_constraint ?subsystem ?non_functional_constraint)
+        (not
+          (enrichment_started ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (enrichment_started ?subsystem)
+        (constraint_propagated ?subsystem)
+      )
+  )
+  (:action initiate_subsystem_enrichment
+    :parameters (?subsystem - subsystem ?service_contract - service_contract ?integrator_team - integrator_team ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_started ?subsystem)
+        (subsystem_has_service_contract ?subsystem ?service_contract)
+        (assigned_integrator ?subsystem ?integrator_team)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (not
+          (artifact_compatible ?build_artifact)
+        )
+        (not
+          (enrichment_completed ?subsystem)
+        )
+      )
+    :effect (enrichment_completed ?subsystem)
+  )
+  (:action finalize_subsystem_enrichment
+    :parameters (?subsystem - subsystem ?service_contract - service_contract ?integrator_team - integrator_team ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_started ?subsystem)
+        (subsystem_has_service_contract ?subsystem ?service_contract)
+        (assigned_integrator ?subsystem ?integrator_team)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (artifact_compatible ?build_artifact)
+        (not
+          (enrichment_completed ?subsystem)
+        )
+      )
+    :effect (enrichment_completed ?subsystem)
+  )
+  (:action run_subsystem_verification
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_completed ?subsystem)
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (not
+          (artifact_verified ?build_artifact)
+        )
+        (not
+          (artifact_compatible ?build_artifact)
+        )
+        (not
+          (verification_passed ?subsystem)
+        )
+      )
+    :effect (verification_passed ?subsystem)
+  )
+  (:action run_subsystem_extended_verification
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_completed ?subsystem)
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (artifact_verified ?build_artifact)
+        (not
+          (artifact_compatible ?build_artifact)
+        )
+        (not
+          (verification_passed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (verification_passed ?subsystem)
+        (deployment_constraints_allowed ?subsystem)
+      )
+  )
+  (:action run_subsystem_verification_with_compatibility
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_completed ?subsystem)
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (not
+          (artifact_verified ?build_artifact)
+        )
+        (artifact_compatible ?build_artifact)
+        (not
+          (verification_passed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (verification_passed ?subsystem)
+        (deployment_constraints_allowed ?subsystem)
+      )
+  )
+  (:action run_subsystem_full_verification
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy ?library_resource - library_resource ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (enrichment_completed ?subsystem)
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (subsystem_has_library_resource ?subsystem ?library_resource)
+        (resource_staged_into_artifact ?library_resource ?build_artifact)
+        (artifact_verified ?build_artifact)
+        (artifact_compatible ?build_artifact)
+        (not
+          (verification_passed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (verification_passed ?subsystem)
+        (deployment_constraints_allowed ?subsystem)
+      )
+  )
+  (:action finalize_subsystem_certification
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (verification_passed ?subsystem)
+        (not
+          (deployment_constraints_allowed ?subsystem)
+        )
+        (not
+          (finalization_completed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (finalization_completed ?subsystem)
+        (integration_verified ?subsystem)
+      )
+  )
+  (:action attach_deployment_constraint_to_subsystem
+    :parameters (?subsystem - subsystem ?deployment_constraint - deployment_constraint)
+    :precondition
+      (and
+        (verification_passed ?subsystem)
+        (deployment_constraints_allowed ?subsystem)
+        (deployment_constraint_available ?deployment_constraint)
+      )
+    :effect
+      (and
+        (subsystem_has_deployment_constraint ?subsystem ?deployment_constraint)
+        (not
+          (deployment_constraint_available ?deployment_constraint)
+        )
+      )
+  )
+  (:action run_cross_module_integration_checks
+    :parameters (?subsystem - subsystem ?provider_module - provider_module ?consumer_module - consumer_module ?communication_protocol - communication_protocol ?deployment_constraint - deployment_constraint)
+    :precondition
+      (and
+        (verification_passed ?subsystem)
+        (deployment_constraints_allowed ?subsystem)
+        (subsystem_has_deployment_constraint ?subsystem ?deployment_constraint)
+        (subsystem_has_provider ?subsystem ?provider_module)
+        (subsystem_has_consumer ?subsystem ?consumer_module)
+        (provider_ready ?provider_module)
+        (consumer_ready ?consumer_module)
+        (has_protocol ?subsystem ?communication_protocol)
+        (not
+          (cross_module_checks_passed ?subsystem)
+        )
+      )
+    :effect (cross_module_checks_passed ?subsystem)
+  )
+  (:action certify_subsystem_after_checks
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (verification_passed ?subsystem)
+        (cross_module_checks_passed ?subsystem)
+        (not
+          (finalization_completed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (finalization_completed ?subsystem)
+        (integration_verified ?subsystem)
+      )
+  )
+  (:action request_stakeholder_review
+    :parameters (?subsystem - subsystem ?stakeholder_requirement - stakeholder_requirement ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (entity_instantiated ?subsystem)
+        (has_protocol ?subsystem ?communication_protocol)
+        (stakeholder_requirement_available ?stakeholder_requirement)
+        (subsystem_has_stakeholder_requirement ?subsystem ?stakeholder_requirement)
+        (not
+          (review_requested ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (review_requested ?subsystem)
+        (not
+          (stakeholder_requirement_available ?stakeholder_requirement)
+        )
+      )
+  )
+  (:action assign_reviewer_to_subsystem
+    :parameters (?subsystem - subsystem ?integrator_team - integrator_team)
+    :precondition
+      (and
+        (review_requested ?subsystem)
+        (assigned_integrator ?subsystem ?integrator_team)
+        (not
+          (review_assigned ?subsystem)
+        )
+      )
+    :effect (review_assigned ?subsystem)
+  )
+  (:action approve_subsystem_review
+    :parameters (?subsystem - subsystem ?governance_policy - governance_policy)
+    :precondition
+      (and
+        (review_assigned ?subsystem)
+        (subsystem_has_policy ?subsystem ?governance_policy)
+        (not
+          (review_approved ?subsystem)
+        )
+      )
+    :effect (review_approved ?subsystem)
+  )
+  (:action finalize_subsystem_review
+    :parameters (?subsystem - subsystem)
+    :precondition
+      (and
+        (review_approved ?subsystem)
+        (not
+          (finalization_completed ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (finalization_completed ?subsystem)
+        (integration_verified ?subsystem)
+      )
+  )
+  (:action integrate_provider_module
+    :parameters (?provider_module - provider_module ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_staged ?provider_module)
+        (provider_ready ?provider_module)
+        (artifact_packaged ?build_artifact)
+        (artifact_ready ?build_artifact)
+        (not
+          (integration_verified ?provider_module)
+        )
+      )
+    :effect (integration_verified ?provider_module)
+  )
+  (:action integrate_consumer_module
+    :parameters (?consumer_module - consumer_module ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (consumer_staged ?consumer_module)
+        (consumer_ready ?consumer_module)
+        (artifact_packaged ?build_artifact)
+        (artifact_ready ?build_artifact)
+        (not
+          (integration_verified ?consumer_module)
+        )
+      )
+    :effect (integration_verified ?consumer_module)
+  )
+  (:action finalize_component_with_environment
+    :parameters (?component_spec - component ?operational_environment - operational_environment ?communication_protocol - communication_protocol)
+    :precondition
+      (and
+        (integration_verified ?component_spec)
+        (has_protocol ?component_spec ?communication_protocol)
+        (environment_available ?operational_environment)
+        (not
+          (component_finalized ?component_spec)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?component_spec)
+        (component_bound_environment ?component_spec ?operational_environment)
+        (not
+          (environment_available ?operational_environment)
+        )
+      )
+  )
+  (:action propagate_component_finalization_to_provider
+    :parameters (?provider_module - provider_module ?interface_spec - interface_spec ?operational_environment - operational_environment)
+    :precondition
+      (and
+        (component_finalized ?provider_module)
+        (has_interface ?provider_module ?interface_spec)
+        (component_bound_environment ?provider_module ?operational_environment)
+        (not
+          (integration_complete ?provider_module)
+        )
+      )
+    :effect
+      (and
+        (integration_complete ?provider_module)
+        (interface_available ?interface_spec)
+        (environment_available ?operational_environment)
+      )
+  )
+  (:action propagate_component_finalization_to_consumer
+    :parameters (?consumer_module - consumer_module ?interface_spec - interface_spec ?operational_environment - operational_environment)
+    :precondition
+      (and
+        (component_finalized ?consumer_module)
+        (has_interface ?consumer_module ?interface_spec)
+        (component_bound_environment ?consumer_module ?operational_environment)
+        (not
+          (integration_complete ?consumer_module)
+        )
+      )
+    :effect
+      (and
+        (integration_complete ?consumer_module)
+        (interface_available ?interface_spec)
+        (environment_available ?operational_environment)
+      )
+  )
+  (:action propagate_component_finalization_to_subsystem
+    :parameters (?subsystem - subsystem ?interface_spec - interface_spec ?operational_environment - operational_environment)
+    :precondition
+      (and
+        (component_finalized ?subsystem)
+        (has_interface ?subsystem ?interface_spec)
+        (component_bound_environment ?subsystem ?operational_environment)
+        (not
+          (integration_complete ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (integration_complete ?subsystem)
+        (interface_available ?interface_spec)
+        (environment_available ?operational_environment)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem layered_architecture_definition_problem)
+  (:domain layered_architecture_definition)
+  (:objects provider_module_1 - provider_module consumer_module_1 - consumer_module subsystem_1 - subsystem subsystem_2 - subsystem interface_spec_1 - interface_spec interface_spec_2 - interface_spec interface_spec_3 - interface_spec communication_protocol_1 - communication_protocol integrator_team_1 - integrator_team design_pattern_1 - design_pattern data_channel_1 - data_channel control_channel_1 - control_channel build_artifact_1 - build_artifact library_resource_1 - library_resource library_resource_2 - library_resource non_functional_constraint_1 - non_functional_constraint non_functional_constraint_2 - non_functional_constraint deployment_constraint_1 - deployment_constraint deployment_constraint_2 - deployment_constraint operational_environment_1 - operational_environment service_contract_1 - service_contract stakeholder_requirement_1 - stakeholder_requirement stakeholder_requirement_2 - stakeholder_requirement governance_policy_1 - governance_policy)
+  (:init
+    (interface_available interface_spec_1)
+    (interface_available interface_spec_2)
+    (interface_available interface_spec_3)
+    (protocol_available communication_protocol_1)
+    (integrator_available integrator_team_1)
+    (pattern_available design_pattern_1)
+    (bound_data_channel provider_module_1 data_channel_1)
+    (consumer_bound_control_channel consumer_module_1 control_channel_1)
+    (artifact_available build_artifact_1)
+    (library_resource_available library_resource_1)
+    (library_resource_available library_resource_2)
+    (subsystem_has_provider subsystem_1 provider_module_1)
+    (subsystem_has_provider subsystem_2 provider_module_1)
+    (subsystem_has_consumer subsystem_1 consumer_module_1)
+    (subsystem_has_consumer subsystem_2 consumer_module_1)
+    (subsystem_includes_artifact subsystem_1 build_artifact_1)
+    (subsystem_includes_artifact subsystem_2 build_artifact_1)
+    (subsystem_has_library_resource subsystem_1 library_resource_1)
+    (subsystem_has_library_resource subsystem_2 library_resource_2)
+    (nonfunctional_constraint_available non_functional_constraint_1)
+    (nonfunctional_constraint_available non_functional_constraint_2)
+    (deployment_constraint_available deployment_constraint_1)
+    (deployment_constraint_available deployment_constraint_2)
+    (environment_available operational_environment_1)
+    (service_contract_available service_contract_1)
+    (stakeholder_requirement_available stakeholder_requirement_1)
+    (subsystem_has_stakeholder_requirement subsystem_1 stakeholder_requirement_1)
+    (subsystem_has_stakeholder_requirement subsystem_2 stakeholder_requirement_2)
+    (policy_available governance_policy_1)
+  )
+  (:goal
+    (and
+      (integration_complete provider_module_1)
+      (integration_complete consumer_module_1)
+      (integration_complete subsystem_1)
+      (integration_complete subsystem_2)
+    )
+  )
+)

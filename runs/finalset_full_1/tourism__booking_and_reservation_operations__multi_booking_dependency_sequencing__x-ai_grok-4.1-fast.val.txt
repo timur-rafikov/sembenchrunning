@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_multi_booking_dependency_sequencing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_option_family - object ancillary_and_document_family - object inventory_and_reservation_family - object booking_aggregate_root - object booking_unit - booking_aggregate_root supplier_option - service_option_family service_variant_quote - service_option_family provider_resource - service_option_family rate_plan - service_option_family payment_method - service_option_family confirmation_token - service_option_family supplier_credential - service_option_family customer_reference - service_option_family ancillary_option - ancillary_and_document_family fulfillment_document - ancillary_and_document_family vendor_contract - ancillary_and_document_family provider_availability - inventory_and_reservation_family inventory_allocation - inventory_and_reservation_family reservation_record - inventory_and_reservation_family service_booking_category - booking_unit booking_context_category - booking_unit lead_service_booking - service_booking_category dependent_service_booking - service_booking_category booking_unit_context - booking_context_category)
+  (:predicates
+    (booking_unit_selected ?booking_unit - booking_unit)
+    (booking_unit_confirmed ?booking_unit - booking_unit)
+    (booking_has_supplier_allocation ?booking_unit - booking_unit)
+    (booking_committed ?booking_unit - booking_unit)
+    (booking_ready ?booking_unit - booking_unit)
+    (booking_customer_confirmed ?booking_unit - booking_unit)
+    (supplier_option_available ?supplier_option - supplier_option)
+    (booking_has_supplier_option ?booking_unit - booking_unit ?supplier_option - supplier_option)
+    (service_variant_available ?service_variant_quote - service_variant_quote)
+    (booking_has_variant_hold ?booking_unit - booking_unit ?service_variant_quote - service_variant_quote)
+    (provider_resource_available ?provider_resource - provider_resource)
+    (booking_attached_provider_resource ?booking_unit - booking_unit ?provider_resource - provider_resource)
+    (ancillary_option_available ?ancillary_option - ancillary_option)
+    (lead_booking_has_ancillary ?lead_service_booking - lead_service_booking ?ancillary_option - ancillary_option)
+    (dependent_booking_has_ancillary ?dependent_service_booking - dependent_service_booking ?ancillary_option - ancillary_option)
+    (service_booking_has_availability ?lead_service_booking - lead_service_booking ?provider_availability - provider_availability)
+    (availability_reserved ?provider_availability - provider_availability)
+    (availability_with_ancillary ?provider_availability - provider_availability)
+    (lead_booking_processed ?lead_service_booking - lead_service_booking)
+    (dependent_booking_has_inventory_allocation ?dependent_service_booking - dependent_service_booking ?inventory_allocation - inventory_allocation)
+    (inventory_allocation_reserved ?inventory_allocation - inventory_allocation)
+    (inventory_allocation_with_ancillary ?inventory_allocation - inventory_allocation)
+    (dependent_booking_processed ?dependent_service_booking - dependent_service_booking)
+    (reservation_record_pending ?reservation_record - reservation_record)
+    (reservation_record_created ?reservation_record - reservation_record)
+    (reservation_has_availability ?reservation_record - reservation_record ?provider_availability - provider_availability)
+    (reservation_has_inventory_allocation ?reservation_record - reservation_record ?inventory_allocation - inventory_allocation)
+    (reservation_includes_lead_component ?reservation_record - reservation_record)
+    (reservation_includes_dependent_component ?reservation_record - reservation_record)
+    (reservation_record_verified ?reservation_record - reservation_record)
+    (booking_context_has_lead_booking ?booking_context - booking_unit_context ?lead_service_booking - lead_service_booking)
+    (booking_context_has_dependent_booking ?booking_context - booking_unit_context ?dependent_service_booking - dependent_service_booking)
+    (booking_context_has_reservation_record ?booking_context - booking_unit_context ?reservation_record - reservation_record)
+    (fulfillment_document_available ?fulfillment_document - fulfillment_document)
+    (booking_context_has_fulfillment_document ?booking_context - booking_unit_context ?fulfillment_document - fulfillment_document)
+    (fulfillment_document_issued ?fulfillment_document - fulfillment_document)
+    (fulfillment_document_attached_to_reservation ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    (booking_context_documents_bound ?booking_context - booking_unit_context)
+    (booking_context_credentials_bound ?booking_context - booking_unit_context)
+    (booking_context_authorized_for_finalization ?booking_context - booking_unit_context)
+    (booking_context_rate_plan_marked ?booking_context - booking_unit_context)
+    (booking_context_rate_plan_confirmed ?booking_context - booking_unit_context)
+    (booking_context_requires_payment ?booking_context - booking_unit_context)
+    (booking_context_checks_passed ?booking_context - booking_unit_context)
+    (vendor_contract_available ?vendor_contract - vendor_contract)
+    (booking_context_has_vendor_contract ?booking_context - booking_unit_context ?vendor_contract - vendor_contract)
+    (vendor_contract_accepted ?booking_context - booking_unit_context)
+    (vendor_contract_prepared ?booking_context - booking_unit_context)
+    (vendor_contract_authorized ?booking_context - booking_unit_context)
+    (rate_plan_available ?rate_plan - rate_plan)
+    (booking_context_has_rate_plan ?booking_context - booking_unit_context ?rate_plan - rate_plan)
+    (payment_method_available ?payment_method - payment_method)
+    (booking_context_has_payment_method ?booking_context - booking_unit_context ?payment_method - payment_method)
+    (supplier_credential_available ?supplier_credential - supplier_credential)
+    (booking_context_has_supplier_credential ?booking_context - booking_unit_context ?supplier_credential - supplier_credential)
+    (customer_reference_available ?customer_reference - customer_reference)
+    (booking_context_has_customer_reference ?booking_context - booking_unit_context ?customer_reference - customer_reference)
+    (confirmation_token_available ?confirmation_token - confirmation_token)
+    (booking_has_confirmation_token ?booking_unit - booking_unit ?confirmation_token - confirmation_token)
+    (lead_booking_initialized ?lead_service_booking - lead_service_booking)
+    (dependent_booking_initialized ?dependent_service_booking - dependent_service_booking)
+    (booking_context_finalized ?booking_context - booking_unit_context)
+  )
+  (:action select_booking_unit
+    :parameters (?booking_unit - booking_unit)
+    :precondition
+      (and
+        (not
+          (booking_unit_selected ?booking_unit)
+        )
+        (not
+          (booking_committed ?booking_unit)
+        )
+      )
+    :effect (booking_unit_selected ?booking_unit)
+  )
+  (:action allocate_supplier_option
+    :parameters (?booking_unit - booking_unit ?supplier_option - supplier_option)
+    :precondition
+      (and
+        (booking_unit_selected ?booking_unit)
+        (not
+          (booking_has_supplier_allocation ?booking_unit)
+        )
+        (supplier_option_available ?supplier_option)
+      )
+    :effect
+      (and
+        (booking_has_supplier_allocation ?booking_unit)
+        (booking_has_supplier_option ?booking_unit ?supplier_option)
+        (not
+          (supplier_option_available ?supplier_option)
+        )
+      )
+  )
+  (:action hold_service_variant
+    :parameters (?booking_unit - booking_unit ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_selected ?booking_unit)
+        (booking_has_supplier_allocation ?booking_unit)
+        (service_variant_available ?service_variant_quote)
+      )
+    :effect
+      (and
+        (booking_has_variant_hold ?booking_unit ?service_variant_quote)
+        (not
+          (service_variant_available ?service_variant_quote)
+        )
+      )
+  )
+  (:action confirm_variant_hold
+    :parameters (?booking_unit - booking_unit ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_selected ?booking_unit)
+        (booking_has_supplier_allocation ?booking_unit)
+        (booking_has_variant_hold ?booking_unit ?service_variant_quote)
+        (not
+          (booking_unit_confirmed ?booking_unit)
+        )
+      )
+    :effect (booking_unit_confirmed ?booking_unit)
+  )
+  (:action release_variant_hold
+    :parameters (?booking_unit - booking_unit ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_has_variant_hold ?booking_unit ?service_variant_quote)
+      )
+    :effect
+      (and
+        (service_variant_available ?service_variant_quote)
+        (not
+          (booking_has_variant_hold ?booking_unit ?service_variant_quote)
+        )
+      )
+  )
+  (:action attach_provider_resource
+    :parameters (?booking_unit - booking_unit ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_unit)
+        (provider_resource_available ?provider_resource)
+      )
+    :effect
+      (and
+        (booking_attached_provider_resource ?booking_unit ?provider_resource)
+        (not
+          (provider_resource_available ?provider_resource)
+        )
+      )
+  )
+  (:action detach_provider_resource
+    :parameters (?booking_unit - booking_unit ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_attached_provider_resource ?booking_unit ?provider_resource)
+      )
+    :effect
+      (and
+        (provider_resource_available ?provider_resource)
+        (not
+          (booking_attached_provider_resource ?booking_unit ?provider_resource)
+        )
+      )
+  )
+  (:action bind_supplier_credential
+    :parameters (?booking_context - booking_unit_context ?supplier_credential - supplier_credential)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (supplier_credential_available ?supplier_credential)
+      )
+    :effect
+      (and
+        (booking_context_has_supplier_credential ?booking_context ?supplier_credential)
+        (not
+          (supplier_credential_available ?supplier_credential)
+        )
+      )
+  )
+  (:action unbind_supplier_credential
+    :parameters (?booking_context - booking_unit_context ?supplier_credential - supplier_credential)
+    :precondition
+      (and
+        (booking_context_has_supplier_credential ?booking_context ?supplier_credential)
+      )
+    :effect
+      (and
+        (supplier_credential_available ?supplier_credential)
+        (not
+          (booking_context_has_supplier_credential ?booking_context ?supplier_credential)
+        )
+      )
+  )
+  (:action bind_customer_reference
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (customer_reference_available ?customer_reference)
+      )
+    :effect
+      (and
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (not
+          (customer_reference_available ?customer_reference)
+        )
+      )
+  )
+  (:action unbind_customer_reference
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference)
+    :precondition
+      (and
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+      )
+    :effect
+      (and
+        (customer_reference_available ?customer_reference)
+        (not
+          (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        )
+      )
+  )
+  (:action reserve_provider_availability_for_lead
+    :parameters (?lead_service_booking - lead_service_booking ?provider_availability - provider_availability ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_confirmed ?lead_service_booking)
+        (booking_has_variant_hold ?lead_service_booking ?service_variant_quote)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (not
+          (availability_reserved ?provider_availability)
+        )
+        (not
+          (availability_with_ancillary ?provider_availability)
+        )
+      )
+    :effect (availability_reserved ?provider_availability)
+  )
+  (:action process_lead_booking_provider_attach
+    :parameters (?lead_service_booking - lead_service_booking ?provider_availability - provider_availability ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_unit_confirmed ?lead_service_booking)
+        (booking_attached_provider_resource ?lead_service_booking ?provider_resource)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (availability_reserved ?provider_availability)
+        (not
+          (lead_booking_initialized ?lead_service_booking)
+        )
+      )
+    :effect
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (lead_booking_processed ?lead_service_booking)
+      )
+  )
+  (:action attach_ancillary_to_lead_booking
+    :parameters (?lead_service_booking - lead_service_booking ?provider_availability - provider_availability ?ancillary_option - ancillary_option)
+    :precondition
+      (and
+        (booking_unit_confirmed ?lead_service_booking)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (ancillary_option_available ?ancillary_option)
+        (not
+          (lead_booking_initialized ?lead_service_booking)
+        )
+      )
+    :effect
+      (and
+        (availability_with_ancillary ?provider_availability)
+        (lead_booking_initialized ?lead_service_booking)
+        (lead_booking_has_ancillary ?lead_service_booking ?ancillary_option)
+        (not
+          (ancillary_option_available ?ancillary_option)
+        )
+      )
+  )
+  (:action finalize_lead_ancillary_processing
+    :parameters (?lead_service_booking - lead_service_booking ?provider_availability - provider_availability ?service_variant_quote - service_variant_quote ?ancillary_option - ancillary_option)
+    :precondition
+      (and
+        (booking_unit_confirmed ?lead_service_booking)
+        (booking_has_variant_hold ?lead_service_booking ?service_variant_quote)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (availability_with_ancillary ?provider_availability)
+        (lead_booking_has_ancillary ?lead_service_booking ?ancillary_option)
+        (not
+          (lead_booking_processed ?lead_service_booking)
+        )
+      )
+    :effect
+      (and
+        (availability_reserved ?provider_availability)
+        (lead_booking_processed ?lead_service_booking)
+        (ancillary_option_available ?ancillary_option)
+        (not
+          (lead_booking_has_ancillary ?lead_service_booking ?ancillary_option)
+        )
+      )
+  )
+  (:action reserve_inventory_for_dependent
+    :parameters (?dependent_service_booking - dependent_service_booking ?inventory_allocation - inventory_allocation ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_confirmed ?dependent_service_booking)
+        (booking_has_variant_hold ?dependent_service_booking ?service_variant_quote)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (not
+          (inventory_allocation_reserved ?inventory_allocation)
+        )
+        (not
+          (inventory_allocation_with_ancillary ?inventory_allocation)
+        )
+      )
+    :effect (inventory_allocation_reserved ?inventory_allocation)
+  )
+  (:action process_dependent_booking_provider_attach
+    :parameters (?dependent_service_booking - dependent_service_booking ?inventory_allocation - inventory_allocation ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_unit_confirmed ?dependent_service_booking)
+        (booking_attached_provider_resource ?dependent_service_booking ?provider_resource)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (inventory_allocation_reserved ?inventory_allocation)
+        (not
+          (dependent_booking_initialized ?dependent_service_booking)
+        )
+      )
+    :effect
+      (and
+        (dependent_booking_initialized ?dependent_service_booking)
+        (dependent_booking_processed ?dependent_service_booking)
+      )
+  )
+  (:action attach_ancillary_to_dependent_booking
+    :parameters (?dependent_service_booking - dependent_service_booking ?inventory_allocation - inventory_allocation ?ancillary_option - ancillary_option)
+    :precondition
+      (and
+        (booking_unit_confirmed ?dependent_service_booking)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (ancillary_option_available ?ancillary_option)
+        (not
+          (dependent_booking_initialized ?dependent_service_booking)
+        )
+      )
+    :effect
+      (and
+        (inventory_allocation_with_ancillary ?inventory_allocation)
+        (dependent_booking_initialized ?dependent_service_booking)
+        (dependent_booking_has_ancillary ?dependent_service_booking ?ancillary_option)
+        (not
+          (ancillary_option_available ?ancillary_option)
+        )
+      )
+  )
+  (:action finalize_dependent_ancillary_processing
+    :parameters (?dependent_service_booking - dependent_service_booking ?inventory_allocation - inventory_allocation ?service_variant_quote - service_variant_quote ?ancillary_option - ancillary_option)
+    :precondition
+      (and
+        (booking_unit_confirmed ?dependent_service_booking)
+        (booking_has_variant_hold ?dependent_service_booking ?service_variant_quote)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (inventory_allocation_with_ancillary ?inventory_allocation)
+        (dependent_booking_has_ancillary ?dependent_service_booking ?ancillary_option)
+        (not
+          (dependent_booking_processed ?dependent_service_booking)
+        )
+      )
+    :effect
+      (and
+        (inventory_allocation_reserved ?inventory_allocation)
+        (dependent_booking_processed ?dependent_service_booking)
+        (ancillary_option_available ?ancillary_option)
+        (not
+          (dependent_booking_has_ancillary ?dependent_service_booking ?ancillary_option)
+        )
+      )
+  )
+  (:action compose_reservation_record_both_processed
+    :parameters (?lead_service_booking - lead_service_booking ?dependent_service_booking - dependent_service_booking ?provider_availability - provider_availability ?inventory_allocation - inventory_allocation ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (dependent_booking_initialized ?dependent_service_booking)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (availability_reserved ?provider_availability)
+        (inventory_allocation_reserved ?inventory_allocation)
+        (lead_booking_processed ?lead_service_booking)
+        (dependent_booking_processed ?dependent_service_booking)
+        (reservation_record_pending ?reservation_record)
+      )
+    :effect
+      (and
+        (reservation_record_created ?reservation_record)
+        (reservation_has_availability ?reservation_record ?provider_availability)
+        (reservation_has_inventory_allocation ?reservation_record ?inventory_allocation)
+        (not
+          (reservation_record_pending ?reservation_record)
+        )
+      )
+  )
+  (:action compose_reservation_record_lead_unprocessed
+    :parameters (?lead_service_booking - lead_service_booking ?dependent_service_booking - dependent_service_booking ?provider_availability - provider_availability ?inventory_allocation - inventory_allocation ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (dependent_booking_initialized ?dependent_service_booking)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (availability_with_ancillary ?provider_availability)
+        (inventory_allocation_reserved ?inventory_allocation)
+        (not
+          (lead_booking_processed ?lead_service_booking)
+        )
+        (dependent_booking_processed ?dependent_service_booking)
+        (reservation_record_pending ?reservation_record)
+      )
+    :effect
+      (and
+        (reservation_record_created ?reservation_record)
+        (reservation_has_availability ?reservation_record ?provider_availability)
+        (reservation_has_inventory_allocation ?reservation_record ?inventory_allocation)
+        (reservation_includes_lead_component ?reservation_record)
+        (not
+          (reservation_record_pending ?reservation_record)
+        )
+      )
+  )
+  (:action compose_reservation_record_dependent_unprocessed
+    :parameters (?lead_service_booking - lead_service_booking ?dependent_service_booking - dependent_service_booking ?provider_availability - provider_availability ?inventory_allocation - inventory_allocation ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (dependent_booking_initialized ?dependent_service_booking)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (availability_reserved ?provider_availability)
+        (inventory_allocation_with_ancillary ?inventory_allocation)
+        (lead_booking_processed ?lead_service_booking)
+        (not
+          (dependent_booking_processed ?dependent_service_booking)
+        )
+        (reservation_record_pending ?reservation_record)
+      )
+    :effect
+      (and
+        (reservation_record_created ?reservation_record)
+        (reservation_has_availability ?reservation_record ?provider_availability)
+        (reservation_has_inventory_allocation ?reservation_record ?inventory_allocation)
+        (reservation_includes_dependent_component ?reservation_record)
+        (not
+          (reservation_record_pending ?reservation_record)
+        )
+      )
+  )
+  (:action compose_reservation_record_both_unprocessed
+    :parameters (?lead_service_booking - lead_service_booking ?dependent_service_booking - dependent_service_booking ?provider_availability - provider_availability ?inventory_allocation - inventory_allocation ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (dependent_booking_initialized ?dependent_service_booking)
+        (service_booking_has_availability ?lead_service_booking ?provider_availability)
+        (dependent_booking_has_inventory_allocation ?dependent_service_booking ?inventory_allocation)
+        (availability_with_ancillary ?provider_availability)
+        (inventory_allocation_with_ancillary ?inventory_allocation)
+        (not
+          (lead_booking_processed ?lead_service_booking)
+        )
+        (not
+          (dependent_booking_processed ?dependent_service_booking)
+        )
+        (reservation_record_pending ?reservation_record)
+      )
+    :effect
+      (and
+        (reservation_record_created ?reservation_record)
+        (reservation_has_availability ?reservation_record ?provider_availability)
+        (reservation_has_inventory_allocation ?reservation_record ?inventory_allocation)
+        (reservation_includes_lead_component ?reservation_record)
+        (reservation_includes_dependent_component ?reservation_record)
+        (not
+          (reservation_record_pending ?reservation_record)
+        )
+      )
+  )
+  (:action verify_reservation_record_for_lead
+    :parameters (?reservation_record - reservation_record ?lead_service_booking - lead_service_booking ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (reservation_record_created ?reservation_record)
+        (lead_booking_initialized ?lead_service_booking)
+        (booking_has_variant_hold ?lead_service_booking ?service_variant_quote)
+        (not
+          (reservation_record_verified ?reservation_record)
+        )
+      )
+    :effect (reservation_record_verified ?reservation_record)
+  )
+  (:action issue_fulfillment_document
+    :parameters (?booking_context - booking_unit_context ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (booking_context_has_reservation_record ?booking_context ?reservation_record)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_available ?fulfillment_document)
+        (reservation_record_created ?reservation_record)
+        (reservation_record_verified ?reservation_record)
+        (not
+          (fulfillment_document_issued ?fulfillment_document)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (not
+          (fulfillment_document_available ?fulfillment_document)
+        )
+      )
+  )
+  (:action bind_fulfillment_document
+    :parameters (?booking_context - booking_unit_context ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (booking_has_variant_hold ?booking_context ?service_variant_quote)
+        (not
+          (reservation_includes_lead_component ?reservation_record)
+        )
+        (not
+          (booking_context_documents_bound ?booking_context)
+        )
+      )
+    :effect (booking_context_documents_bound ?booking_context)
+  )
+  (:action apply_rate_plan_to_context
+    :parameters (?booking_context - booking_unit_context ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (rate_plan_available ?rate_plan)
+        (not
+          (booking_context_rate_plan_marked ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_rate_plan_marked ?booking_context)
+        (booking_context_has_rate_plan ?booking_context ?rate_plan)
+        (not
+          (rate_plan_available ?rate_plan)
+        )
+      )
+  )
+  (:action process_rate_plan_and_bind
+    :parameters (?booking_context - booking_unit_context ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record ?service_variant_quote - service_variant_quote ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (booking_has_variant_hold ?booking_context ?service_variant_quote)
+        (reservation_includes_lead_component ?reservation_record)
+        (booking_context_rate_plan_marked ?booking_context)
+        (booking_context_has_rate_plan ?booking_context ?rate_plan)
+        (not
+          (booking_context_documents_bound ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_documents_bound ?booking_context)
+        (booking_context_rate_plan_confirmed ?booking_context)
+      )
+  )
+  (:action authorize_supplier_credential_for_documents
+    :parameters (?booking_context - booking_unit_context ?supplier_credential - supplier_credential ?provider_resource - provider_resource ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_documents_bound ?booking_context)
+        (booking_context_has_supplier_credential ?booking_context ?supplier_credential)
+        (booking_attached_provider_resource ?booking_context ?provider_resource)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (not
+          (reservation_includes_dependent_component ?reservation_record)
+        )
+        (not
+          (booking_context_credentials_bound ?booking_context)
+        )
+      )
+    :effect (booking_context_credentials_bound ?booking_context)
+  )
+  (:action authorize_supplier_credential_for_documents_with_flag
+    :parameters (?booking_context - booking_unit_context ?supplier_credential - supplier_credential ?provider_resource - provider_resource ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_documents_bound ?booking_context)
+        (booking_context_has_supplier_credential ?booking_context ?supplier_credential)
+        (booking_attached_provider_resource ?booking_context ?provider_resource)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (reservation_includes_dependent_component ?reservation_record)
+        (not
+          (booking_context_credentials_bound ?booking_context)
+        )
+      )
+    :effect (booking_context_credentials_bound ?booking_context)
+  )
+  (:action authorize_customer_reference_basic
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_credentials_bound ?booking_context)
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (not
+          (reservation_includes_lead_component ?reservation_record)
+        )
+        (not
+          (reservation_includes_dependent_component ?reservation_record)
+        )
+        (not
+          (booking_context_authorized_for_finalization ?booking_context)
+        )
+      )
+    :effect (booking_context_authorized_for_finalization ?booking_context)
+  )
+  (:action authorize_customer_reference_and_require_payment
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_credentials_bound ?booking_context)
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (reservation_includes_lead_component ?reservation_record)
+        (not
+          (reservation_includes_dependent_component ?reservation_record)
+        )
+        (not
+          (booking_context_authorized_for_finalization ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_requires_payment ?booking_context)
+      )
+  )
+  (:action authorize_customer_reference_and_require_payment_variant
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_credentials_bound ?booking_context)
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (not
+          (reservation_includes_lead_component ?reservation_record)
+        )
+        (reservation_includes_dependent_component ?reservation_record)
+        (not
+          (booking_context_authorized_for_finalization ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_requires_payment ?booking_context)
+      )
+  )
+  (:action authorize_customer_reference_and_require_payment_alternate
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference ?fulfillment_document - fulfillment_document ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (booking_context_credentials_bound ?booking_context)
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (booking_context_has_fulfillment_document ?booking_context ?fulfillment_document)
+        (fulfillment_document_attached_to_reservation ?fulfillment_document ?reservation_record)
+        (reservation_includes_lead_component ?reservation_record)
+        (reservation_includes_dependent_component ?reservation_record)
+        (not
+          (booking_context_authorized_for_finalization ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_requires_payment ?booking_context)
+      )
+  )
+  (:action finalize_booking_context_no_payment
+    :parameters (?booking_context - booking_unit_context)
+    :precondition
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (not
+          (booking_context_requires_payment ?booking_context)
+        )
+        (not
+          (booking_context_finalized ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_finalized ?booking_context)
+        (booking_ready ?booking_context)
+      )
+  )
+  (:action attach_payment_method_to_context
+    :parameters (?booking_context - booking_unit_context ?payment_method - payment_method)
+    :precondition
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_requires_payment ?booking_context)
+        (payment_method_available ?payment_method)
+      )
+    :effect
+      (and
+        (booking_context_has_payment_method ?booking_context ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action validate_booking_context_and_mark_ready
+    :parameters (?booking_context - booking_unit_context ?lead_service_booking - lead_service_booking ?dependent_service_booking - dependent_service_booking ?service_variant_quote - service_variant_quote ?payment_method - payment_method)
+    :precondition
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_requires_payment ?booking_context)
+        (booking_context_has_payment_method ?booking_context ?payment_method)
+        (booking_context_has_lead_booking ?booking_context ?lead_service_booking)
+        (booking_context_has_dependent_booking ?booking_context ?dependent_service_booking)
+        (lead_booking_processed ?lead_service_booking)
+        (dependent_booking_processed ?dependent_service_booking)
+        (booking_has_variant_hold ?booking_context ?service_variant_quote)
+        (not
+          (booking_context_checks_passed ?booking_context)
+        )
+      )
+    :effect (booking_context_checks_passed ?booking_context)
+  )
+  (:action finalize_booking_context_after_validation
+    :parameters (?booking_context - booking_unit_context)
+    :precondition
+      (and
+        (booking_context_authorized_for_finalization ?booking_context)
+        (booking_context_checks_passed ?booking_context)
+        (not
+          (booking_context_finalized ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_finalized ?booking_context)
+        (booking_ready ?booking_context)
+      )
+  )
+  (:action accept_vendor_contract
+    :parameters (?booking_context - booking_unit_context ?vendor_contract - vendor_contract ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_unit_confirmed ?booking_context)
+        (booking_has_variant_hold ?booking_context ?service_variant_quote)
+        (vendor_contract_available ?vendor_contract)
+        (booking_context_has_vendor_contract ?booking_context ?vendor_contract)
+        (not
+          (vendor_contract_accepted ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (vendor_contract_accepted ?booking_context)
+        (not
+          (vendor_contract_available ?vendor_contract)
+        )
+      )
+  )
+  (:action prepare_vendor_contract_processing
+    :parameters (?booking_context - booking_unit_context ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (vendor_contract_accepted ?booking_context)
+        (booking_attached_provider_resource ?booking_context ?provider_resource)
+        (not
+          (vendor_contract_prepared ?booking_context)
+        )
+      )
+    :effect (vendor_contract_prepared ?booking_context)
+  )
+  (:action authorize_vendor_contract
+    :parameters (?booking_context - booking_unit_context ?customer_reference - customer_reference)
+    :precondition
+      (and
+        (vendor_contract_prepared ?booking_context)
+        (booking_context_has_customer_reference ?booking_context ?customer_reference)
+        (not
+          (vendor_contract_authorized ?booking_context)
+        )
+      )
+    :effect (vendor_contract_authorized ?booking_context)
+  )
+  (:action finalize_booking_context_via_vendor_contract
+    :parameters (?booking_context - booking_unit_context)
+    :precondition
+      (and
+        (vendor_contract_authorized ?booking_context)
+        (not
+          (booking_context_finalized ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_context_finalized ?booking_context)
+        (booking_ready ?booking_context)
+      )
+  )
+  (:action mark_lead_service_as_processed
+    :parameters (?lead_service_booking - lead_service_booking ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (lead_booking_initialized ?lead_service_booking)
+        (lead_booking_processed ?lead_service_booking)
+        (reservation_record_created ?reservation_record)
+        (reservation_record_verified ?reservation_record)
+        (not
+          (booking_ready ?lead_service_booking)
+        )
+      )
+    :effect (booking_ready ?lead_service_booking)
+  )
+  (:action mark_dependent_service_as_processed
+    :parameters (?dependent_service_booking - dependent_service_booking ?reservation_record - reservation_record)
+    :precondition
+      (and
+        (dependent_booking_initialized ?dependent_service_booking)
+        (dependent_booking_processed ?dependent_service_booking)
+        (reservation_record_created ?reservation_record)
+        (reservation_record_verified ?reservation_record)
+        (not
+          (booking_ready ?dependent_service_booking)
+        )
+      )
+    :effect (booking_ready ?dependent_service_booking)
+  )
+  (:action accept_customer_confirmation_token
+    :parameters (?booking_unit - booking_unit ?confirmation_token - confirmation_token ?service_variant_quote - service_variant_quote)
+    :precondition
+      (and
+        (booking_ready ?booking_unit)
+        (booking_has_variant_hold ?booking_unit ?service_variant_quote)
+        (confirmation_token_available ?confirmation_token)
+        (not
+          (booking_customer_confirmed ?booking_unit)
+        )
+      )
+    :effect
+      (and
+        (booking_customer_confirmed ?booking_unit)
+        (booking_has_confirmation_token ?booking_unit ?confirmation_token)
+        (not
+          (confirmation_token_available ?confirmation_token)
+        )
+      )
+  )
+  (:action propagate_commit_to_lead_booking
+    :parameters (?lead_service_booking - lead_service_booking ?supplier_option - supplier_option ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (booking_customer_confirmed ?lead_service_booking)
+        (booking_has_supplier_option ?lead_service_booking ?supplier_option)
+        (booking_has_confirmation_token ?lead_service_booking ?confirmation_token)
+        (not
+          (booking_committed ?lead_service_booking)
+        )
+      )
+    :effect
+      (and
+        (booking_committed ?lead_service_booking)
+        (supplier_option_available ?supplier_option)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action propagate_commit_to_dependent_booking
+    :parameters (?dependent_service_booking - dependent_service_booking ?supplier_option - supplier_option ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (booking_customer_confirmed ?dependent_service_booking)
+        (booking_has_supplier_option ?dependent_service_booking ?supplier_option)
+        (booking_has_confirmation_token ?dependent_service_booking ?confirmation_token)
+        (not
+          (booking_committed ?dependent_service_booking)
+        )
+      )
+    :effect
+      (and
+        (booking_committed ?dependent_service_booking)
+        (supplier_option_available ?supplier_option)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action propagate_commit_to_booking_context
+    :parameters (?booking_context - booking_unit_context ?supplier_option - supplier_option ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (booking_customer_confirmed ?booking_context)
+        (booking_has_supplier_option ?booking_context ?supplier_option)
+        (booking_has_confirmation_token ?booking_context ?confirmation_token)
+        (not
+          (booking_committed ?booking_context)
+        )
+      )
+    :effect
+      (and
+        (booking_committed ?booking_context)
+        (supplier_option_available ?supplier_option)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem multi_booking_dependency_case)
+  (:domain tourism_multi_booking_dependency_sequencing)
+  (:objects lead_booking_1 - lead_service_booking dependent_booking_1 - dependent_service_booking booking_context_1 - booking_unit_context booking_context_2 - booking_unit_context supplier_option_1 - supplier_option supplier_option_2 - supplier_option supplier_option_3 - supplier_option service_variant_quote_1 - service_variant_quote provider_resource_1 - provider_resource ancillary_option_1 - ancillary_option provider_availability_1 - provider_availability inventory_allocation_1 - inventory_allocation reservation_record_template_1 - reservation_record fulfillment_document_template_1 - fulfillment_document fulfillment_document_template_2 - fulfillment_document rate_plan_1 - rate_plan rate_plan_2 - rate_plan payment_method_1 - payment_method payment_method_2 - payment_method confirmation_token_1 - confirmation_token supplier_credential_1 - supplier_credential vendor_contract_1 - vendor_contract vendor_contract_2 - vendor_contract customer_reference_1 - customer_reference)
+  (:init
+    (supplier_option_available supplier_option_1)
+    (supplier_option_available supplier_option_2)
+    (supplier_option_available supplier_option_3)
+    (service_variant_available service_variant_quote_1)
+    (provider_resource_available provider_resource_1)
+    (ancillary_option_available ancillary_option_1)
+    (service_booking_has_availability lead_booking_1 provider_availability_1)
+    (dependent_booking_has_inventory_allocation dependent_booking_1 inventory_allocation_1)
+    (reservation_record_pending reservation_record_template_1)
+    (fulfillment_document_available fulfillment_document_template_1)
+    (fulfillment_document_available fulfillment_document_template_2)
+    (booking_context_has_lead_booking booking_context_1 lead_booking_1)
+    (booking_context_has_lead_booking booking_context_2 lead_booking_1)
+    (booking_context_has_dependent_booking booking_context_1 dependent_booking_1)
+    (booking_context_has_dependent_booking booking_context_2 dependent_booking_1)
+    (booking_context_has_reservation_record booking_context_1 reservation_record_template_1)
+    (booking_context_has_reservation_record booking_context_2 reservation_record_template_1)
+    (booking_context_has_fulfillment_document booking_context_1 fulfillment_document_template_1)
+    (booking_context_has_fulfillment_document booking_context_2 fulfillment_document_template_2)
+    (rate_plan_available rate_plan_1)
+    (rate_plan_available rate_plan_2)
+    (payment_method_available payment_method_1)
+    (payment_method_available payment_method_2)
+    (confirmation_token_available confirmation_token_1)
+    (supplier_credential_available supplier_credential_1)
+    (vendor_contract_available vendor_contract_1)
+    (booking_context_has_vendor_contract booking_context_1 vendor_contract_1)
+    (booking_context_has_vendor_contract booking_context_2 vendor_contract_2)
+    (customer_reference_available customer_reference_1)
+  )
+  (:goal
+    (and
+      (booking_committed lead_booking_1)
+      (booking_committed dependent_booking_1)
+      (booking_committed booking_context_1)
+      (booking_committed booking_context_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(select_booking_unit lead_booking_1)
+(allocate_supplier_option lead_booking_1 supplier_option_1)
+(hold_service_variant lead_booking_1 service_variant_quote_1)
+(confirm_variant_hold lead_booking_1 service_variant_quote_1)
+(attach_provider_resource lead_booking_1 provider_resource_1)
+(reserve_provider_availability_for_lead lead_booking_1 provider_availability_1 service_variant_quote_1)
+(process_lead_booking_provider_attach lead_booking_1 provider_availability_1 provider_resource_1)
+(release_variant_hold lead_booking_1 service_variant_quote_1)
+(select_booking_unit dependent_booking_1)
+(allocate_supplier_option dependent_booking_1 supplier_option_2)
+(hold_service_variant dependent_booking_1 service_variant_quote_1)
+(confirm_variant_hold dependent_booking_1 service_variant_quote_1)
+(detach_provider_resource lead_booking_1 provider_resource_1)
+(attach_provider_resource dependent_booking_1 provider_resource_1)
+(reserve_inventory_for_dependent dependent_booking_1 inventory_allocation_1 service_variant_quote_1)
+(process_dependent_booking_provider_attach dependent_booking_1 inventory_allocation_1 provider_resource_1)
+(release_variant_hold dependent_booking_1 service_variant_quote_1)
+(compose_reservation_record_both_processed lead_booking_1 dependent_booking_1 provider_availability_1 inventory_allocation_1 reservation_record_template_1)
+(hold_service_variant lead_booking_1 service_variant_quote_1)
+(verify_reservation_record_for_lead reservation_record_template_1 lead_booking_1 service_variant_quote_1)
+(release_variant_hold lead_booking_1 service_variant_quote_1)
+(mark_lead_service_as_processed lead_booking_1 reservation_record_template_1)
+(mark_dependent_service_as_processed dependent_booking_1 reservation_record_template_1)
+(detach_provider_resource dependent_booking_1 provider_resource_1)
+(select_booking_unit booking_context_1)
+(allocate_supplier_option booking_context_1 supplier_option_3)
+(hold_service_variant booking_context_1 service_variant_quote_1)
+(confirm_variant_hold booking_context_1 service_variant_quote_1)
+(issue_fulfillment_document booking_context_1 fulfillment_document_template_1 reservation_record_template_1)
+(bind_fulfillment_document booking_context_1 fulfillment_document_template_1 reservation_record_template_1 service_variant_quote_1)
+(bind_supplier_credential booking_context_1 supplier_credential_1)
+(bind_customer_reference booking_context_1 customer_reference_1)
+(attach_provider_resource booking_context_1 provider_resource_1)
+(authorize_supplier_credential_for_documents booking_context_1 supplier_credential_1 provider_resource_1 fulfillment_document_template_1 reservation_record_template_1)
+(authorize_customer_reference_basic booking_context_1 customer_reference_1 fulfillment_document_template_1 reservation_record_template_1)
+(finalize_booking_context_no_payment booking_context_1)
+(accept_customer_confirmation_token booking_context_1 confirmation_token_1 service_variant_quote_1)
+(propagate_commit_to_booking_context booking_context_1 supplier_option_3 confirmation_token_1)
+(release_variant_hold booking_context_1 service_variant_quote_1)
+(detach_provider_resource booking_context_1 provider_resource_1)
+(unbind_supplier_credential booking_context_1 supplier_credential_1)
+(unbind_customer_reference booking_context_1 customer_reference_1)
+(hold_service_variant lead_booking_1 service_variant_quote_1)
+(accept_customer_confirmation_token lead_booking_1 confirmation_token_1 service_variant_quote_1)
+(propagate_commit_to_lead_booking lead_booking_1 supplier_option_1 confirmation_token_1)
+(release_variant_hold lead_booking_1 service_variant_quote_1)
+(hold_service_variant dependent_booking_1 service_variant_quote_1)
+(accept_customer_confirmation_token dependent_booking_1 confirmation_token_1 service_variant_quote_1)
+(propagate_commit_to_dependent_booking dependent_booking_1 supplier_option_2 confirmation_token_1)
+(release_variant_hold dependent_booking_1 service_variant_quote_1)
+(select_booking_unit booking_context_2)
+(allocate_supplier_option booking_context_2 supplier_option_3)
+(hold_service_variant booking_context_2 service_variant_quote_1)
+(confirm_variant_hold booking_context_2 service_variant_quote_1)
+(issue_fulfillment_document booking_context_2 fulfillment_document_template_2 reservation_record_template_1)
+(bind_fulfillment_document booking_context_2 fulfillment_document_template_2 reservation_record_template_1 service_variant_quote_1)
+(bind_supplier_credential booking_context_2 supplier_credential_1)
+(bind_customer_reference booking_context_2 customer_reference_1)
+(attach_provider_resource booking_context_2 provider_resource_1)
+(authorize_supplier_credential_for_documents booking_context_2 supplier_credential_1 provider_resource_1 fulfillment_document_template_2 reservation_record_template_1)
+(authorize_customer_reference_basic booking_context_2 customer_reference_1 fulfillment_document_template_2 reservation_record_template_1)
+(finalize_booking_context_no_payment booking_context_2)
+(accept_customer_confirmation_token booking_context_2 confirmation_token_1 service_variant_quote_1)
+(propagate_commit_to_booking_context booking_context_2 supplier_option_3 confirmation_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1yb8h8e9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_1yb8h8e9/plan.pddl 64 
+
+
+
+--- stderr ---
+

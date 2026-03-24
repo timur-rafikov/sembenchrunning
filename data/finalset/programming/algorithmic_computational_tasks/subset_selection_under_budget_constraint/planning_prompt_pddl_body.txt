@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain subset_selection_under_budget)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity_supertype - object grouping_supertype_a - object grouping_supertype_b - object candidate_root - object candidate_unit - candidate_root resource_token - domain_entity_supertype feature_descriptor - domain_entity_supertype operator_agent - domain_entity_supertype tag_token - domain_entity_supertype attribute_token - domain_entity_supertype budget_item - domain_entity_supertype capability_token - domain_entity_supertype constraint_flag - domain_entity_supertype consumable_item - grouping_supertype_a module_component - grouping_supertype_a label_token - grouping_supertype_a resource_class_a - grouping_supertype_b resource_class_b - grouping_supertype_b package_entity - grouping_supertype_b candidate_subtype_group1 - candidate_unit candidate_subtype_group2 - candidate_unit candidate_slot_primary - candidate_subtype_group1 candidate_slot_secondary - candidate_subtype_group1 composite_candidate - candidate_subtype_group2)
+  (:predicates
+    (candidate_in_consideration ?candidate_unit - candidate_unit)
+    (candidate_validated ?candidate_unit - candidate_unit)
+    (candidate_has_resource_allocation ?candidate_unit - candidate_unit)
+    (candidate_finalized ?candidate_unit - candidate_unit)
+    (candidate_ready_for_budget_allocation ?candidate_unit - candidate_unit)
+    (candidate_budget_allocated ?candidate_unit - candidate_unit)
+    (resource_token_available ?resource_token - resource_token)
+    (candidate_allocated_resource ?candidate_unit - candidate_unit ?resource_token - resource_token)
+    (feature_descriptor_available ?feature_descriptor - feature_descriptor)
+    (candidate_has_feature ?candidate_unit - candidate_unit ?feature_descriptor - feature_descriptor)
+    (operator_available ?operator_agent - operator_agent)
+    (candidate_assigned_operator ?candidate_unit - candidate_unit ?operator_agent - operator_agent)
+    (consumable_available ?consumable_item - consumable_item)
+    (slot_consumable_bound ?candidate_slot_primary - candidate_slot_primary ?consumable_item - consumable_item)
+    (secondary_slot_consumable_bound ?candidate_slot_secondary - candidate_slot_secondary ?consumable_item - consumable_item)
+    (slot_offers_resource_class_a ?candidate_slot_primary - candidate_slot_primary ?resource_class_a - resource_class_a)
+    (resource_class_a_confirmed ?resource_class_a - resource_class_a)
+    (resource_class_a_engaged ?resource_class_a - resource_class_a)
+    (slot_primary_confirmed ?candidate_slot_primary - candidate_slot_primary)
+    (slot_offers_resource_class_b ?candidate_slot_secondary - candidate_slot_secondary ?resource_class_b - resource_class_b)
+    (resource_class_b_confirmed ?resource_class_b - resource_class_b)
+    (resource_class_b_engaged ?resource_class_b - resource_class_b)
+    (slot_secondary_confirmed ?candidate_slot_secondary - candidate_slot_secondary)
+    (package_available ?package_entity - package_entity)
+    (package_configured ?package_entity - package_entity)
+    (package_includes_class_a ?package_entity - package_entity ?resource_class_a - resource_class_a)
+    (package_includes_class_b ?package_entity - package_entity ?resource_class_b - resource_class_b)
+    (package_variant_1 ?package_entity - package_entity)
+    (package_variant_2 ?package_entity - package_entity)
+    (package_finalized ?package_entity - package_entity)
+    (composite_has_primary_slot ?composite_candidate - composite_candidate ?candidate_slot_primary - candidate_slot_primary)
+    (composite_has_secondary_slot ?composite_candidate - composite_candidate ?candidate_slot_secondary - candidate_slot_secondary)
+    (composite_has_package ?composite_candidate - composite_candidate ?package_entity - package_entity)
+    (module_component_available ?module_component - module_component)
+    (composite_has_module ?composite_candidate - composite_candidate ?module_component - module_component)
+    (module_component_bound ?module_component - module_component)
+    (module_bound_to_package ?module_component - module_component ?package_entity - package_entity)
+    (composite_modules_attached ?composite_candidate - composite_candidate)
+    (composite_stage_assembly_complete ?composite_candidate - composite_candidate)
+    (composite_ready_for_commitment ?composite_candidate - composite_candidate)
+    (composite_has_tag ?composite_candidate - composite_candidate)
+    (composite_tag_confirmed ?composite_candidate - composite_candidate)
+    (composite_attribute_integrated ?composite_candidate - composite_candidate)
+    (composite_capability_validated ?composite_candidate - composite_candidate)
+    (label_token_available ?label_token - label_token)
+    (composite_has_label ?composite_candidate - composite_candidate ?label_token - label_token)
+    (composite_label_attached ?composite_candidate - composite_candidate)
+    (composite_label_confirmed ?composite_candidate - composite_candidate)
+    (composite_label_validated ?composite_candidate - composite_candidate)
+    (tag_token_available ?tag_token - tag_token)
+    (composite_assigned_tag ?composite_candidate - composite_candidate ?tag_token - tag_token)
+    (attribute_token_available ?attribute_token - attribute_token)
+    (composite_has_attribute ?composite_candidate - composite_candidate ?attribute_token - attribute_token)
+    (capability_token_available ?capability_token - capability_token)
+    (composite_has_capability ?composite_candidate - composite_candidate ?capability_token - capability_token)
+    (constraint_flag_available ?constraint_flag - constraint_flag)
+    (composite_bound_constraint ?composite_candidate - composite_candidate ?constraint_flag - constraint_flag)
+    (budget_item_available ?budget_item - budget_item)
+    (candidate_bound_to_budget ?candidate_unit - candidate_unit ?budget_item - budget_item)
+    (slot_primary_ready ?candidate_slot_primary - candidate_slot_primary)
+    (slot_secondary_ready ?candidate_slot_secondary - candidate_slot_secondary)
+    (composite_commit_marker ?composite_candidate - composite_candidate)
+  )
+  (:action open_candidate_for_evaluation
+    :parameters (?candidate_unit - candidate_unit)
+    :precondition
+      (and
+        (not
+          (candidate_in_consideration ?candidate_unit)
+        )
+        (not
+          (candidate_finalized ?candidate_unit)
+        )
+      )
+    :effect (candidate_in_consideration ?candidate_unit)
+  )
+  (:action allocate_resource_to_candidate
+    :parameters (?candidate_unit - candidate_unit ?resource_token - resource_token)
+    :precondition
+      (and
+        (candidate_in_consideration ?candidate_unit)
+        (not
+          (candidate_has_resource_allocation ?candidate_unit)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (candidate_has_resource_allocation ?candidate_unit)
+        (candidate_allocated_resource ?candidate_unit ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action attach_feature_to_candidate
+    :parameters (?candidate_unit - candidate_unit ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_in_consideration ?candidate_unit)
+        (candidate_has_resource_allocation ?candidate_unit)
+        (feature_descriptor_available ?feature_descriptor)
+      )
+    :effect
+      (and
+        (candidate_has_feature ?candidate_unit ?feature_descriptor)
+        (not
+          (feature_descriptor_available ?feature_descriptor)
+        )
+      )
+  )
+  (:action finalize_candidate_validation
+    :parameters (?candidate_unit - candidate_unit ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_in_consideration ?candidate_unit)
+        (candidate_has_resource_allocation ?candidate_unit)
+        (candidate_has_feature ?candidate_unit ?feature_descriptor)
+        (not
+          (candidate_validated ?candidate_unit)
+        )
+      )
+    :effect (candidate_validated ?candidate_unit)
+  )
+  (:action detach_feature_from_candidate
+    :parameters (?candidate_unit - candidate_unit ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_has_feature ?candidate_unit ?feature_descriptor)
+      )
+    :effect
+      (and
+        (feature_descriptor_available ?feature_descriptor)
+        (not
+          (candidate_has_feature ?candidate_unit ?feature_descriptor)
+        )
+      )
+  )
+  (:action assign_operator_to_candidate
+    :parameters (?candidate_unit - candidate_unit ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (candidate_validated ?candidate_unit)
+        (operator_available ?operator_agent)
+      )
+    :effect
+      (and
+        (candidate_assigned_operator ?candidate_unit ?operator_agent)
+        (not
+          (operator_available ?operator_agent)
+        )
+      )
+  )
+  (:action release_operator_from_candidate
+    :parameters (?candidate_unit - candidate_unit ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (candidate_assigned_operator ?candidate_unit ?operator_agent)
+      )
+    :effect
+      (and
+        (operator_available ?operator_agent)
+        (not
+          (candidate_assigned_operator ?candidate_unit ?operator_agent)
+        )
+      )
+  )
+  (:action bind_capability_to_composite
+    :parameters (?composite_candidate - composite_candidate ?capability_token - capability_token)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (capability_token_available ?capability_token)
+      )
+    :effect
+      (and
+        (composite_has_capability ?composite_candidate ?capability_token)
+        (not
+          (capability_token_available ?capability_token)
+        )
+      )
+  )
+  (:action unbind_capability_from_composite
+    :parameters (?composite_candidate - composite_candidate ?capability_token - capability_token)
+    :precondition
+      (and
+        (composite_has_capability ?composite_candidate ?capability_token)
+      )
+    :effect
+      (and
+        (capability_token_available ?capability_token)
+        (not
+          (composite_has_capability ?composite_candidate ?capability_token)
+        )
+      )
+  )
+  (:action bind_constraint_to_composite
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (constraint_flag_available ?constraint_flag)
+      )
+    :effect
+      (and
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (not
+          (constraint_flag_available ?constraint_flag)
+        )
+      )
+  )
+  (:action unbind_constraint_from_composite
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag)
+    :precondition
+      (and
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+      )
+    :effect
+      (and
+        (constraint_flag_available ?constraint_flag)
+        (not
+          (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        )
+      )
+  )
+  (:action confirm_class_a_for_slot
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?resource_class_a - resource_class_a ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_primary)
+        (candidate_has_feature ?candidate_slot_primary ?feature_descriptor)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (not
+          (resource_class_a_confirmed ?resource_class_a)
+        )
+        (not
+          (resource_class_a_engaged ?resource_class_a)
+        )
+      )
+    :effect (resource_class_a_confirmed ?resource_class_a)
+  )
+  (:action confirm_primary_slot_with_operator
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?resource_class_a - resource_class_a ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_primary)
+        (candidate_assigned_operator ?candidate_slot_primary ?operator_agent)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (resource_class_a_confirmed ?resource_class_a)
+        (not
+          (slot_primary_ready ?candidate_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_primary_confirmed ?candidate_slot_primary)
+      )
+  )
+  (:action apply_consumable_to_primary_slot
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?resource_class_a - resource_class_a ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_primary)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (consumable_available ?consumable_item)
+        (not
+          (slot_primary_ready ?candidate_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (resource_class_a_engaged ?resource_class_a)
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_consumable_bound ?candidate_slot_primary ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_primary_slot_consumable_assignment
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?resource_class_a - resource_class_a ?feature_descriptor - feature_descriptor ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_primary)
+        (candidate_has_feature ?candidate_slot_primary ?feature_descriptor)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (resource_class_a_engaged ?resource_class_a)
+        (slot_consumable_bound ?candidate_slot_primary ?consumable_item)
+        (not
+          (slot_primary_confirmed ?candidate_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (resource_class_a_confirmed ?resource_class_a)
+        (slot_primary_confirmed ?candidate_slot_primary)
+        (consumable_available ?consumable_item)
+        (not
+          (slot_consumable_bound ?candidate_slot_primary ?consumable_item)
+        )
+      )
+  )
+  (:action confirm_class_b_for_secondary_slot
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?resource_class_b - resource_class_b ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_secondary)
+        (candidate_has_feature ?candidate_slot_secondary ?feature_descriptor)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (not
+          (resource_class_b_confirmed ?resource_class_b)
+        )
+        (not
+          (resource_class_b_engaged ?resource_class_b)
+        )
+      )
+    :effect (resource_class_b_confirmed ?resource_class_b)
+  )
+  (:action confirm_secondary_slot_with_operator
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?resource_class_b - resource_class_b ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_secondary)
+        (candidate_assigned_operator ?candidate_slot_secondary ?operator_agent)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_b_confirmed ?resource_class_b)
+        (not
+          (slot_secondary_ready ?candidate_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+      )
+  )
+  (:action apply_consumable_to_secondary_slot
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?resource_class_b - resource_class_b ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_secondary)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (consumable_available ?consumable_item)
+        (not
+          (slot_secondary_ready ?candidate_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (resource_class_b_engaged ?resource_class_b)
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (secondary_slot_consumable_bound ?candidate_slot_secondary ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_consumable_assignment
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?resource_class_b - resource_class_b ?feature_descriptor - feature_descriptor ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (candidate_validated ?candidate_slot_secondary)
+        (candidate_has_feature ?candidate_slot_secondary ?feature_descriptor)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_b_engaged ?resource_class_b)
+        (secondary_slot_consumable_bound ?candidate_slot_secondary ?consumable_item)
+        (not
+          (slot_secondary_confirmed ?candidate_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (resource_class_b_confirmed ?resource_class_b)
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+        (consumable_available ?consumable_item)
+        (not
+          (secondary_slot_consumable_bound ?candidate_slot_secondary ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_package
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?candidate_slot_secondary - candidate_slot_secondary ?resource_class_a - resource_class_a ?resource_class_b - resource_class_b ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_a_confirmed ?resource_class_a)
+        (resource_class_b_confirmed ?resource_class_b)
+        (slot_primary_confirmed ?candidate_slot_primary)
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+        (package_available ?package_entity)
+      )
+    :effect
+      (and
+        (package_configured ?package_entity)
+        (package_includes_class_a ?package_entity ?resource_class_a)
+        (package_includes_class_b ?package_entity ?resource_class_b)
+        (not
+          (package_available ?package_entity)
+        )
+      )
+  )
+  (:action assemble_package_variant_1
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?candidate_slot_secondary - candidate_slot_secondary ?resource_class_a - resource_class_a ?resource_class_b - resource_class_b ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_a_engaged ?resource_class_a)
+        (resource_class_b_confirmed ?resource_class_b)
+        (not
+          (slot_primary_confirmed ?candidate_slot_primary)
+        )
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+        (package_available ?package_entity)
+      )
+    :effect
+      (and
+        (package_configured ?package_entity)
+        (package_includes_class_a ?package_entity ?resource_class_a)
+        (package_includes_class_b ?package_entity ?resource_class_b)
+        (package_variant_1 ?package_entity)
+        (not
+          (package_available ?package_entity)
+        )
+      )
+  )
+  (:action assemble_package_variant_2
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?candidate_slot_secondary - candidate_slot_secondary ?resource_class_a - resource_class_a ?resource_class_b - resource_class_b ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_a_confirmed ?resource_class_a)
+        (resource_class_b_engaged ?resource_class_b)
+        (slot_primary_confirmed ?candidate_slot_primary)
+        (not
+          (slot_secondary_confirmed ?candidate_slot_secondary)
+        )
+        (package_available ?package_entity)
+      )
+    :effect
+      (and
+        (package_configured ?package_entity)
+        (package_includes_class_a ?package_entity ?resource_class_a)
+        (package_includes_class_b ?package_entity ?resource_class_b)
+        (package_variant_2 ?package_entity)
+        (not
+          (package_available ?package_entity)
+        )
+      )
+  )
+  (:action assemble_full_package
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?candidate_slot_secondary - candidate_slot_secondary ?resource_class_a - resource_class_a ?resource_class_b - resource_class_b ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_offers_resource_class_a ?candidate_slot_primary ?resource_class_a)
+        (slot_offers_resource_class_b ?candidate_slot_secondary ?resource_class_b)
+        (resource_class_a_engaged ?resource_class_a)
+        (resource_class_b_engaged ?resource_class_b)
+        (not
+          (slot_primary_confirmed ?candidate_slot_primary)
+        )
+        (not
+          (slot_secondary_confirmed ?candidate_slot_secondary)
+        )
+        (package_available ?package_entity)
+      )
+    :effect
+      (and
+        (package_configured ?package_entity)
+        (package_includes_class_a ?package_entity ?resource_class_a)
+        (package_includes_class_b ?package_entity ?resource_class_b)
+        (package_variant_1 ?package_entity)
+        (package_variant_2 ?package_entity)
+        (not
+          (package_available ?package_entity)
+        )
+      )
+  )
+  (:action finalize_package
+    :parameters (?package_entity - package_entity ?candidate_slot_primary - candidate_slot_primary ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (package_configured ?package_entity)
+        (slot_primary_ready ?candidate_slot_primary)
+        (candidate_has_feature ?candidate_slot_primary ?feature_descriptor)
+        (not
+          (package_finalized ?package_entity)
+        )
+      )
+    :effect (package_finalized ?package_entity)
+  )
+  (:action bind_module_component_to_package
+    :parameters (?composite_candidate - composite_candidate ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (composite_has_package ?composite_candidate ?package_entity)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_component_available ?module_component)
+        (package_configured ?package_entity)
+        (package_finalized ?package_entity)
+        (not
+          (module_component_bound ?module_component)
+        )
+      )
+    :effect
+      (and
+        (module_component_bound ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (not
+          (module_component_available ?module_component)
+        )
+      )
+  )
+  (:action prepare_composite_modules_attached
+    :parameters (?composite_candidate - composite_candidate ?module_component - module_component ?package_entity - package_entity ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_component_bound ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (candidate_has_feature ?composite_candidate ?feature_descriptor)
+        (not
+          (package_variant_1 ?package_entity)
+        )
+        (not
+          (composite_modules_attached ?composite_candidate)
+        )
+      )
+    :effect (composite_modules_attached ?composite_candidate)
+  )
+  (:action attach_tag_to_composite
+    :parameters (?composite_candidate - composite_candidate ?tag_token - tag_token)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (tag_token_available ?tag_token)
+        (not
+          (composite_has_tag ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_has_tag ?composite_candidate)
+        (composite_assigned_tag ?composite_candidate ?tag_token)
+        (not
+          (tag_token_available ?tag_token)
+        )
+      )
+  )
+  (:action integrate_tag_into_composite
+    :parameters (?composite_candidate - composite_candidate ?module_component - module_component ?package_entity - package_entity ?feature_descriptor - feature_descriptor ?tag_token - tag_token)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_component_bound ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (candidate_has_feature ?composite_candidate ?feature_descriptor)
+        (package_variant_1 ?package_entity)
+        (composite_has_tag ?composite_candidate)
+        (composite_assigned_tag ?composite_candidate ?tag_token)
+        (not
+          (composite_modules_attached ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_modules_attached ?composite_candidate)
+        (composite_tag_confirmed ?composite_candidate)
+      )
+  )
+  (:action stage_capability_validation
+    :parameters (?composite_candidate - composite_candidate ?capability_token - capability_token ?operator_agent - operator_agent ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_modules_attached ?composite_candidate)
+        (composite_has_capability ?composite_candidate ?capability_token)
+        (candidate_assigned_operator ?composite_candidate ?operator_agent)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (not
+          (package_variant_2 ?package_entity)
+        )
+        (not
+          (composite_stage_assembly_complete ?composite_candidate)
+        )
+      )
+    :effect (composite_stage_assembly_complete ?composite_candidate)
+  )
+  (:action stage_capability_validation_alternate
+    :parameters (?composite_candidate - composite_candidate ?capability_token - capability_token ?operator_agent - operator_agent ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_modules_attached ?composite_candidate)
+        (composite_has_capability ?composite_candidate ?capability_token)
+        (candidate_assigned_operator ?composite_candidate ?operator_agent)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (package_variant_2 ?package_entity)
+        (not
+          (composite_stage_assembly_complete ?composite_candidate)
+        )
+      )
+    :effect (composite_stage_assembly_complete ?composite_candidate)
+  )
+  (:action apply_constraint_and_mark_ready
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_stage_assembly_complete ?composite_candidate)
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (not
+          (package_variant_1 ?package_entity)
+        )
+        (not
+          (package_variant_2 ?package_entity)
+        )
+        (not
+          (composite_ready_for_commitment ?composite_candidate)
+        )
+      )
+    :effect (composite_ready_for_commitment ?composite_candidate)
+  )
+  (:action apply_constraint_and_integrate_attributes
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_stage_assembly_complete ?composite_candidate)
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (package_variant_1 ?package_entity)
+        (not
+          (package_variant_2 ?package_entity)
+        )
+        (not
+          (composite_ready_for_commitment ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_attribute_integrated ?composite_candidate)
+      )
+  )
+  (:action apply_constraint_with_variant_1
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_stage_assembly_complete ?composite_candidate)
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (not
+          (package_variant_1 ?package_entity)
+        )
+        (package_variant_2 ?package_entity)
+        (not
+          (composite_ready_for_commitment ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_attribute_integrated ?composite_candidate)
+      )
+  )
+  (:action apply_constraint_with_variant_2
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag ?module_component - module_component ?package_entity - package_entity)
+    :precondition
+      (and
+        (composite_stage_assembly_complete ?composite_candidate)
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (composite_has_module ?composite_candidate ?module_component)
+        (module_bound_to_package ?module_component ?package_entity)
+        (package_variant_1 ?package_entity)
+        (package_variant_2 ?package_entity)
+        (not
+          (composite_ready_for_commitment ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_attribute_integrated ?composite_candidate)
+      )
+  )
+  (:action finalize_composite_commit
+    :parameters (?composite_candidate - composite_candidate)
+    :precondition
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (not
+          (composite_attribute_integrated ?composite_candidate)
+        )
+        (not
+          (composite_commit_marker ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_commit_marker ?composite_candidate)
+        (candidate_ready_for_budget_allocation ?composite_candidate)
+      )
+  )
+  (:action attach_attribute_to_composite
+    :parameters (?composite_candidate - composite_candidate ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_attribute_integrated ?composite_candidate)
+        (attribute_token_available ?attribute_token)
+      )
+    :effect
+      (and
+        (composite_has_attribute ?composite_candidate ?attribute_token)
+        (not
+          (attribute_token_available ?attribute_token)
+        )
+      )
+  )
+  (:action run_composite_final_validation
+    :parameters (?composite_candidate - composite_candidate ?candidate_slot_primary - candidate_slot_primary ?candidate_slot_secondary - candidate_slot_secondary ?feature_descriptor - feature_descriptor ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_attribute_integrated ?composite_candidate)
+        (composite_has_attribute ?composite_candidate ?attribute_token)
+        (composite_has_primary_slot ?composite_candidate ?candidate_slot_primary)
+        (composite_has_secondary_slot ?composite_candidate ?candidate_slot_secondary)
+        (slot_primary_confirmed ?candidate_slot_primary)
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+        (candidate_has_feature ?composite_candidate ?feature_descriptor)
+        (not
+          (composite_capability_validated ?composite_candidate)
+        )
+      )
+    :effect (composite_capability_validated ?composite_candidate)
+  )
+  (:action finalize_composite_commit_after_validation
+    :parameters (?composite_candidate - composite_candidate)
+    :precondition
+      (and
+        (composite_ready_for_commitment ?composite_candidate)
+        (composite_capability_validated ?composite_candidate)
+        (not
+          (composite_commit_marker ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_commit_marker ?composite_candidate)
+        (candidate_ready_for_budget_allocation ?composite_candidate)
+      )
+  )
+  (:action attach_label_to_composite
+    :parameters (?composite_candidate - composite_candidate ?label_token - label_token ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_validated ?composite_candidate)
+        (candidate_has_feature ?composite_candidate ?feature_descriptor)
+        (label_token_available ?label_token)
+        (composite_has_label ?composite_candidate ?label_token)
+        (not
+          (composite_label_attached ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_label_attached ?composite_candidate)
+        (not
+          (label_token_available ?label_token)
+        )
+      )
+  )
+  (:action confirm_label_with_operator
+    :parameters (?composite_candidate - composite_candidate ?operator_agent - operator_agent)
+    :precondition
+      (and
+        (composite_label_attached ?composite_candidate)
+        (candidate_assigned_operator ?composite_candidate ?operator_agent)
+        (not
+          (composite_label_confirmed ?composite_candidate)
+        )
+      )
+    :effect (composite_label_confirmed ?composite_candidate)
+  )
+  (:action validate_label_constraints
+    :parameters (?composite_candidate - composite_candidate ?constraint_flag - constraint_flag)
+    :precondition
+      (and
+        (composite_label_confirmed ?composite_candidate)
+        (composite_bound_constraint ?composite_candidate ?constraint_flag)
+        (not
+          (composite_label_validated ?composite_candidate)
+        )
+      )
+    :effect (composite_label_validated ?composite_candidate)
+  )
+  (:action finalize_composite_commit_after_label_validation
+    :parameters (?composite_candidate - composite_candidate)
+    :precondition
+      (and
+        (composite_label_validated ?composite_candidate)
+        (not
+          (composite_commit_marker ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (composite_commit_marker ?composite_candidate)
+        (candidate_ready_for_budget_allocation ?composite_candidate)
+      )
+  )
+  (:action commit_primary_slot
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_primary_ready ?candidate_slot_primary)
+        (slot_primary_confirmed ?candidate_slot_primary)
+        (package_configured ?package_entity)
+        (package_finalized ?package_entity)
+        (not
+          (candidate_ready_for_budget_allocation ?candidate_slot_primary)
+        )
+      )
+    :effect (candidate_ready_for_budget_allocation ?candidate_slot_primary)
+  )
+  (:action commit_secondary_slot
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?package_entity - package_entity)
+    :precondition
+      (and
+        (slot_secondary_ready ?candidate_slot_secondary)
+        (slot_secondary_confirmed ?candidate_slot_secondary)
+        (package_configured ?package_entity)
+        (package_finalized ?package_entity)
+        (not
+          (candidate_ready_for_budget_allocation ?candidate_slot_secondary)
+        )
+      )
+    :effect (candidate_ready_for_budget_allocation ?candidate_slot_secondary)
+  )
+  (:action allocate_budget_to_candidate
+    :parameters (?candidate_unit - candidate_unit ?budget_item - budget_item ?feature_descriptor - feature_descriptor)
+    :precondition
+      (and
+        (candidate_ready_for_budget_allocation ?candidate_unit)
+        (candidate_has_feature ?candidate_unit ?feature_descriptor)
+        (budget_item_available ?budget_item)
+        (not
+          (candidate_budget_allocated ?candidate_unit)
+        )
+      )
+    :effect
+      (and
+        (candidate_budget_allocated ?candidate_unit)
+        (candidate_bound_to_budget ?candidate_unit ?budget_item)
+        (not
+          (budget_item_available ?budget_item)
+        )
+      )
+  )
+  (:action finalize_selection_and_release_resources_primary
+    :parameters (?candidate_slot_primary - candidate_slot_primary ?resource_token - resource_token ?budget_item - budget_item)
+    :precondition
+      (and
+        (candidate_budget_allocated ?candidate_slot_primary)
+        (candidate_allocated_resource ?candidate_slot_primary ?resource_token)
+        (candidate_bound_to_budget ?candidate_slot_primary ?budget_item)
+        (not
+          (candidate_finalized ?candidate_slot_primary)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?candidate_slot_primary)
+        (resource_token_available ?resource_token)
+        (budget_item_available ?budget_item)
+      )
+  )
+  (:action finalize_selection_and_release_resources_secondary
+    :parameters (?candidate_slot_secondary - candidate_slot_secondary ?resource_token - resource_token ?budget_item - budget_item)
+    :precondition
+      (and
+        (candidate_budget_allocated ?candidate_slot_secondary)
+        (candidate_allocated_resource ?candidate_slot_secondary ?resource_token)
+        (candidate_bound_to_budget ?candidate_slot_secondary ?budget_item)
+        (not
+          (candidate_finalized ?candidate_slot_secondary)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?candidate_slot_secondary)
+        (resource_token_available ?resource_token)
+        (budget_item_available ?budget_item)
+      )
+  )
+  (:action finalize_selection_and_release_resources_composite
+    :parameters (?composite_candidate - composite_candidate ?resource_token - resource_token ?budget_item - budget_item)
+    :precondition
+      (and
+        (candidate_budget_allocated ?composite_candidate)
+        (candidate_allocated_resource ?composite_candidate ?resource_token)
+        (candidate_bound_to_budget ?composite_candidate ?budget_item)
+        (not
+          (candidate_finalized ?composite_candidate)
+        )
+      )
+    :effect
+      (and
+        (candidate_finalized ?composite_candidate)
+        (resource_token_available ?resource_token)
+        (budget_item_available ?budget_item)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem subset_selection_instance)
+  (:domain subset_selection_under_budget)
+  (:objects slot_primary_1 - candidate_slot_primary slot_secondary_1 - candidate_slot_secondary composite_candidate_a - composite_candidate composite_candidate_b - composite_candidate resource_token_a - resource_token resource_token_b - resource_token resource_token_c - resource_token feature_descriptor_a - feature_descriptor operator_agent_a - operator_agent consumable_item_a - consumable_item resource_class_a_1 - resource_class_a resource_class_b_1 - resource_class_b package_template_a - package_entity module_component_a - module_component module_component_b - module_component tag_token_a - tag_token tag_token_b - tag_token attribute_token_a - attribute_token attribute_token_b - attribute_token budget_item_a - budget_item capability_token_a - capability_token label_token_a - label_token label_token_b - label_token constraint_flag_a - constraint_flag)
+  (:init
+    (resource_token_available resource_token_a)
+    (resource_token_available resource_token_b)
+    (resource_token_available resource_token_c)
+    (feature_descriptor_available feature_descriptor_a)
+    (operator_available operator_agent_a)
+    (consumable_available consumable_item_a)
+    (slot_offers_resource_class_a slot_primary_1 resource_class_a_1)
+    (slot_offers_resource_class_b slot_secondary_1 resource_class_b_1)
+    (package_available package_template_a)
+    (module_component_available module_component_a)
+    (module_component_available module_component_b)
+    (composite_has_primary_slot composite_candidate_a slot_primary_1)
+    (composite_has_primary_slot composite_candidate_b slot_primary_1)
+    (composite_has_secondary_slot composite_candidate_a slot_secondary_1)
+    (composite_has_secondary_slot composite_candidate_b slot_secondary_1)
+    (composite_has_package composite_candidate_a package_template_a)
+    (composite_has_package composite_candidate_b package_template_a)
+    (composite_has_module composite_candidate_a module_component_a)
+    (composite_has_module composite_candidate_b module_component_b)
+    (tag_token_available tag_token_a)
+    (tag_token_available tag_token_b)
+    (attribute_token_available attribute_token_a)
+    (attribute_token_available attribute_token_b)
+    (budget_item_available budget_item_a)
+    (capability_token_available capability_token_a)
+    (label_token_available label_token_a)
+    (composite_has_label composite_candidate_a label_token_a)
+    (composite_has_label composite_candidate_b label_token_b)
+    (constraint_flag_available constraint_flag_a)
+  )
+  (:goal
+    (and
+      (candidate_finalized slot_primary_1)
+      (candidate_finalized slot_secondary_1)
+      (candidate_finalized composite_candidate_a)
+      (candidate_finalized composite_candidate_b)
+    )
+  )
+)

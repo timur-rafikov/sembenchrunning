@@ -1,0 +1,1023 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain mobility_accessibility_requirement_matching)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types transport_resource_category - object infrastructure_category - object equipment_category - object trip_component - object passenger_request - trip_component transport_resource - transport_resource_category accessibility_requirement - transport_resource_category local_assistance - transport_resource_category passenger_preference - transport_resource_category operator_credential - transport_resource_category accessibility_tag - transport_resource_category vehicle_feature - transport_resource_category service_attribute - transport_resource_category auxiliary_item_type - infrastructure_category equipment_instance - infrastructure_category policy_document - infrastructure_category transfer_node_inbound - equipment_category transfer_node_outbound - equipment_category vehicle_unit - equipment_category request_variant_inbound - passenger_request request_variant_outbound - passenger_request boarding_activity - request_variant_inbound alighting_activity - request_variant_inbound itinerary_segment - request_variant_outbound)
+  (:predicates
+    (request_registered ?passenger_request - passenger_request)
+    (assignment_confirmed_flag ?passenger_request - passenger_request)
+    (reservation_tentative ?passenger_request - passenger_request)
+    (assignment_finalized ?passenger_request - passenger_request)
+    (assignment_ready ?passenger_request - passenger_request)
+    (allocation_committed ?passenger_request - passenger_request)
+    (resource_available ?transport_resource - transport_resource)
+    (reserved_for_resource ?passenger_request - passenger_request ?transport_resource - transport_resource)
+    (requirement_available ?accessibility_requirement - accessibility_requirement)
+    (bound_to_requirement ?passenger_request - passenger_request ?accessibility_requirement - accessibility_requirement)
+    (assistance_available ?local_assistance - local_assistance)
+    (assistance_assigned ?passenger_request - passenger_request ?local_assistance - local_assistance)
+    (aux_item_type_available ?auxiliary_item_type - auxiliary_item_type)
+    (boarding_activity_equipment_allocated ?boarding_activity - boarding_activity ?auxiliary_item_type - auxiliary_item_type)
+    (alighting_activity_equipment_allocated ?alighting_activity - alighting_activity ?auxiliary_item_type - auxiliary_item_type)
+    (activity_inbound_node ?boarding_activity - boarding_activity ?transfer_node_inbound - transfer_node_inbound)
+    (inbound_node_ready ?transfer_node_inbound - transfer_node_inbound)
+    (inbound_node_equipment_staged ?transfer_node_inbound - transfer_node_inbound)
+    (boarding_activity_ready ?boarding_activity - boarding_activity)
+    (activity_outbound_node ?alighting_activity - alighting_activity ?transfer_node_outbound - transfer_node_outbound)
+    (outbound_node_ready ?transfer_node_outbound - transfer_node_outbound)
+    (outbound_node_equipment_staged ?transfer_node_outbound - transfer_node_outbound)
+    (alighting_activity_ready ?alighting_activity - alighting_activity)
+    (vehicle_available ?vehicle_unit - vehicle_unit)
+    (vehicle_reserved ?vehicle_unit - vehicle_unit)
+    (vehicle_at_inbound_node ?vehicle_unit - vehicle_unit ?transfer_node_inbound - transfer_node_inbound)
+    (vehicle_at_outbound_node ?vehicle_unit - vehicle_unit ?transfer_node_outbound - transfer_node_outbound)
+    (vehicle_timing_buffer_applied ?vehicle_unit - vehicle_unit)
+    (vehicle_extra_buffer_applied ?vehicle_unit - vehicle_unit)
+    (vehicle_locked ?vehicle_unit - vehicle_unit)
+    (segment_has_boarding_activity ?itinerary_segment - itinerary_segment ?boarding_activity - boarding_activity)
+    (segment_has_alighting_activity ?itinerary_segment - itinerary_segment ?alighting_activity - alighting_activity)
+    (segment_associated_vehicle ?itinerary_segment - itinerary_segment ?vehicle_unit - vehicle_unit)
+    (equipment_available ?equipment_instance - equipment_instance)
+    (segment_equipment_association ?itinerary_segment - itinerary_segment ?equipment_instance - equipment_instance)
+    (equipment_checked_in ?equipment_instance - equipment_instance)
+    (equipment_staged_on_vehicle ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    (segment_equipment_ready ?itinerary_segment - itinerary_segment)
+    (segment_equipment_allocated ?itinerary_segment - itinerary_segment)
+    (segment_attributes_present ?itinerary_segment - itinerary_segment)
+    (segment_preference_applied ?itinerary_segment - itinerary_segment)
+    (segment_preference_secondary_flag ?itinerary_segment - itinerary_segment)
+    (segment_attributes_verified ?itinerary_segment - itinerary_segment)
+    (segment_ready_for_handoff ?itinerary_segment - itinerary_segment)
+    (policy_document_available ?policy_document - policy_document)
+    (segment_policy_document ?itinerary_segment - itinerary_segment ?policy_document - policy_document)
+    (policy_approved_for_segment ?itinerary_segment - itinerary_segment)
+    (policy_intermediate_approved ?itinerary_segment - itinerary_segment)
+    (policy_fully_approved ?itinerary_segment - itinerary_segment)
+    (preference_available ?passenger_preference - passenger_preference)
+    (segment_preference_assigned ?itinerary_segment - itinerary_segment ?passenger_preference - passenger_preference)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (segment_operator_credential_assigned ?itinerary_segment - itinerary_segment ?operator_credential - operator_credential)
+    (vehicle_feature_available ?vehicle_feature - vehicle_feature)
+    (segment_vehicle_feature_assigned ?itinerary_segment - itinerary_segment ?vehicle_feature - vehicle_feature)
+    (service_attribute_available ?service_attribute - service_attribute)
+    (segment_service_attribute_assigned ?itinerary_segment - itinerary_segment ?service_attribute - service_attribute)
+    (accessibility_tag_available ?accessibility_tag - accessibility_tag)
+    (tag_assigned ?passenger_request - passenger_request ?accessibility_tag - accessibility_tag)
+    (boarding_preparation_initiated ?boarding_activity - boarding_activity)
+    (alighting_preparation_initiated ?alighting_activity - alighting_activity)
+    (handoff_confirmed ?itinerary_segment - itinerary_segment)
+  )
+  (:action register_passenger_request
+    :parameters (?passenger_request - passenger_request)
+    :precondition
+      (and
+        (not
+          (request_registered ?passenger_request)
+        )
+        (not
+          (assignment_finalized ?passenger_request)
+        )
+      )
+    :effect (request_registered ?passenger_request)
+  )
+  (:action propose_transport_reservation
+    :parameters (?passenger_request - passenger_request ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (request_registered ?passenger_request)
+        (not
+          (reservation_tentative ?passenger_request)
+        )
+        (resource_available ?transport_resource)
+      )
+    :effect
+      (and
+        (reservation_tentative ?passenger_request)
+        (reserved_for_resource ?passenger_request ?transport_resource)
+        (not
+          (resource_available ?transport_resource)
+        )
+      )
+  )
+  (:action assign_accessibility_requirement_to_request
+    :parameters (?passenger_request - passenger_request ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (request_registered ?passenger_request)
+        (reservation_tentative ?passenger_request)
+        (requirement_available ?accessibility_requirement)
+      )
+    :effect
+      (and
+        (bound_to_requirement ?passenger_request ?accessibility_requirement)
+        (not
+          (requirement_available ?accessibility_requirement)
+        )
+      )
+  )
+  (:action confirm_resource_reservation
+    :parameters (?passenger_request - passenger_request ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (request_registered ?passenger_request)
+        (reservation_tentative ?passenger_request)
+        (bound_to_requirement ?passenger_request ?accessibility_requirement)
+        (not
+          (assignment_confirmed_flag ?passenger_request)
+        )
+      )
+    :effect (assignment_confirmed_flag ?passenger_request)
+  )
+  (:action rollback_requirement_assignment
+    :parameters (?passenger_request - passenger_request ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (bound_to_requirement ?passenger_request ?accessibility_requirement)
+      )
+    :effect
+      (and
+        (requirement_available ?accessibility_requirement)
+        (not
+          (bound_to_requirement ?passenger_request ?accessibility_requirement)
+        )
+      )
+  )
+  (:action assign_local_assistance_to_request
+    :parameters (?passenger_request - passenger_request ?local_assistance - local_assistance)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?passenger_request)
+        (assistance_available ?local_assistance)
+      )
+    :effect
+      (and
+        (assistance_assigned ?passenger_request ?local_assistance)
+        (not
+          (assistance_available ?local_assistance)
+        )
+      )
+  )
+  (:action release_local_assistance_from_request
+    :parameters (?passenger_request - passenger_request ?local_assistance - local_assistance)
+    :precondition
+      (and
+        (assistance_assigned ?passenger_request ?local_assistance)
+      )
+    :effect
+      (and
+        (assistance_available ?local_assistance)
+        (not
+          (assistance_assigned ?passenger_request ?local_assistance)
+        )
+      )
+  )
+  (:action allocate_vehicle_feature_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (vehicle_feature_available ?vehicle_feature)
+      )
+    :effect
+      (and
+        (segment_vehicle_feature_assigned ?itinerary_segment ?vehicle_feature)
+        (not
+          (vehicle_feature_available ?vehicle_feature)
+        )
+      )
+  )
+  (:action release_vehicle_feature_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (segment_vehicle_feature_assigned ?itinerary_segment ?vehicle_feature)
+      )
+    :effect
+      (and
+        (vehicle_feature_available ?vehicle_feature)
+        (not
+          (segment_vehicle_feature_assigned ?itinerary_segment ?vehicle_feature)
+        )
+      )
+  )
+  (:action allocate_service_attribute_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (service_attribute_available ?service_attribute)
+      )
+    :effect
+      (and
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (not
+          (service_attribute_available ?service_attribute)
+        )
+      )
+  )
+  (:action release_service_attribute_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute)
+    :precondition
+      (and
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+      )
+    :effect
+      (and
+        (service_attribute_available ?service_attribute)
+        (not
+          (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        )
+      )
+  )
+  (:action confirm_inbound_node_readiness
+    :parameters (?boarding_activity - boarding_activity ?transfer_node_inbound - transfer_node_inbound ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?boarding_activity)
+        (bound_to_requirement ?boarding_activity ?accessibility_requirement)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (not
+          (inbound_node_ready ?transfer_node_inbound)
+        )
+        (not
+          (inbound_node_equipment_staged ?transfer_node_inbound)
+        )
+      )
+    :effect (inbound_node_ready ?transfer_node_inbound)
+  )
+  (:action assign_local_assistance_to_boarding_activity
+    :parameters (?boarding_activity - boarding_activity ?transfer_node_inbound - transfer_node_inbound ?local_assistance - local_assistance)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?boarding_activity)
+        (assistance_assigned ?boarding_activity ?local_assistance)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (inbound_node_ready ?transfer_node_inbound)
+        (not
+          (boarding_preparation_initiated ?boarding_activity)
+        )
+      )
+    :effect
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (boarding_activity_ready ?boarding_activity)
+      )
+  )
+  (:action stage_auxiliary_equipment_to_boarding_activity
+    :parameters (?boarding_activity - boarding_activity ?transfer_node_inbound - transfer_node_inbound ?auxiliary_item_type - auxiliary_item_type)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?boarding_activity)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (aux_item_type_available ?auxiliary_item_type)
+        (not
+          (boarding_preparation_initiated ?boarding_activity)
+        )
+      )
+    :effect
+      (and
+        (inbound_node_equipment_staged ?transfer_node_inbound)
+        (boarding_preparation_initiated ?boarding_activity)
+        (boarding_activity_equipment_allocated ?boarding_activity ?auxiliary_item_type)
+        (not
+          (aux_item_type_available ?auxiliary_item_type)
+        )
+      )
+  )
+  (:action finalize_boarding_equipment_binding
+    :parameters (?boarding_activity - boarding_activity ?transfer_node_inbound - transfer_node_inbound ?accessibility_requirement - accessibility_requirement ?auxiliary_item_type - auxiliary_item_type)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?boarding_activity)
+        (bound_to_requirement ?boarding_activity ?accessibility_requirement)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (inbound_node_equipment_staged ?transfer_node_inbound)
+        (boarding_activity_equipment_allocated ?boarding_activity ?auxiliary_item_type)
+        (not
+          (boarding_activity_ready ?boarding_activity)
+        )
+      )
+    :effect
+      (and
+        (inbound_node_ready ?transfer_node_inbound)
+        (boarding_activity_ready ?boarding_activity)
+        (aux_item_type_available ?auxiliary_item_type)
+        (not
+          (boarding_activity_equipment_allocated ?boarding_activity ?auxiliary_item_type)
+        )
+      )
+  )
+  (:action confirm_outbound_node_readiness
+    :parameters (?alighting_activity - alighting_activity ?transfer_node_outbound - transfer_node_outbound ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?alighting_activity)
+        (bound_to_requirement ?alighting_activity ?accessibility_requirement)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (not
+          (outbound_node_ready ?transfer_node_outbound)
+        )
+        (not
+          (outbound_node_equipment_staged ?transfer_node_outbound)
+        )
+      )
+    :effect (outbound_node_ready ?transfer_node_outbound)
+  )
+  (:action assign_local_assistance_to_alighting_activity
+    :parameters (?alighting_activity - alighting_activity ?transfer_node_outbound - transfer_node_outbound ?local_assistance - local_assistance)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?alighting_activity)
+        (assistance_assigned ?alighting_activity ?local_assistance)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (outbound_node_ready ?transfer_node_outbound)
+        (not
+          (alighting_preparation_initiated ?alighting_activity)
+        )
+      )
+    :effect
+      (and
+        (alighting_preparation_initiated ?alighting_activity)
+        (alighting_activity_ready ?alighting_activity)
+      )
+  )
+  (:action stage_auxiliary_equipment_to_outbound_node
+    :parameters (?alighting_activity - alighting_activity ?transfer_node_outbound - transfer_node_outbound ?auxiliary_item_type - auxiliary_item_type)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?alighting_activity)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (aux_item_type_available ?auxiliary_item_type)
+        (not
+          (alighting_preparation_initiated ?alighting_activity)
+        )
+      )
+    :effect
+      (and
+        (outbound_node_equipment_staged ?transfer_node_outbound)
+        (alighting_preparation_initiated ?alighting_activity)
+        (alighting_activity_equipment_allocated ?alighting_activity ?auxiliary_item_type)
+        (not
+          (aux_item_type_available ?auxiliary_item_type)
+        )
+      )
+  )
+  (:action finalize_alighting_equipment_binding
+    :parameters (?alighting_activity - alighting_activity ?transfer_node_outbound - transfer_node_outbound ?accessibility_requirement - accessibility_requirement ?auxiliary_item_type - auxiliary_item_type)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?alighting_activity)
+        (bound_to_requirement ?alighting_activity ?accessibility_requirement)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (outbound_node_equipment_staged ?transfer_node_outbound)
+        (alighting_activity_equipment_allocated ?alighting_activity ?auxiliary_item_type)
+        (not
+          (alighting_activity_ready ?alighting_activity)
+        )
+      )
+    :effect
+      (and
+        (outbound_node_ready ?transfer_node_outbound)
+        (alighting_activity_ready ?alighting_activity)
+        (aux_item_type_available ?auxiliary_item_type)
+        (not
+          (alighting_activity_equipment_allocated ?alighting_activity ?auxiliary_item_type)
+        )
+      )
+  )
+  (:action create_vehicle_candidate_full_confirm
+    :parameters (?boarding_activity - boarding_activity ?alighting_activity - alighting_activity ?transfer_node_inbound - transfer_node_inbound ?transfer_node_outbound - transfer_node_outbound ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (alighting_preparation_initiated ?alighting_activity)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (inbound_node_ready ?transfer_node_inbound)
+        (outbound_node_ready ?transfer_node_outbound)
+        (boarding_activity_ready ?boarding_activity)
+        (alighting_activity_ready ?alighting_activity)
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_at_inbound_node ?vehicle_unit ?transfer_node_inbound)
+        (vehicle_at_outbound_node ?vehicle_unit ?transfer_node_outbound)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action create_vehicle_candidate_inbound_equipped
+    :parameters (?boarding_activity - boarding_activity ?alighting_activity - alighting_activity ?transfer_node_inbound - transfer_node_inbound ?transfer_node_outbound - transfer_node_outbound ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (alighting_preparation_initiated ?alighting_activity)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (inbound_node_equipment_staged ?transfer_node_inbound)
+        (outbound_node_ready ?transfer_node_outbound)
+        (not
+          (boarding_activity_ready ?boarding_activity)
+        )
+        (alighting_activity_ready ?alighting_activity)
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_at_inbound_node ?vehicle_unit ?transfer_node_inbound)
+        (vehicle_at_outbound_node ?vehicle_unit ?transfer_node_outbound)
+        (vehicle_timing_buffer_applied ?vehicle_unit)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action create_vehicle_candidate_outbound_equipped
+    :parameters (?boarding_activity - boarding_activity ?alighting_activity - alighting_activity ?transfer_node_inbound - transfer_node_inbound ?transfer_node_outbound - transfer_node_outbound ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (alighting_preparation_initiated ?alighting_activity)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (inbound_node_ready ?transfer_node_inbound)
+        (outbound_node_equipment_staged ?transfer_node_outbound)
+        (boarding_activity_ready ?boarding_activity)
+        (not
+          (alighting_activity_ready ?alighting_activity)
+        )
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_at_inbound_node ?vehicle_unit ?transfer_node_inbound)
+        (vehicle_at_outbound_node ?vehicle_unit ?transfer_node_outbound)
+        (vehicle_extra_buffer_applied ?vehicle_unit)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action create_vehicle_candidate_both_equipped
+    :parameters (?boarding_activity - boarding_activity ?alighting_activity - alighting_activity ?transfer_node_inbound - transfer_node_inbound ?transfer_node_outbound - transfer_node_outbound ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (alighting_preparation_initiated ?alighting_activity)
+        (activity_inbound_node ?boarding_activity ?transfer_node_inbound)
+        (activity_outbound_node ?alighting_activity ?transfer_node_outbound)
+        (inbound_node_equipment_staged ?transfer_node_inbound)
+        (outbound_node_equipment_staged ?transfer_node_outbound)
+        (not
+          (boarding_activity_ready ?boarding_activity)
+        )
+        (not
+          (alighting_activity_ready ?alighting_activity)
+        )
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_at_inbound_node ?vehicle_unit ?transfer_node_inbound)
+        (vehicle_at_outbound_node ?vehicle_unit ?transfer_node_outbound)
+        (vehicle_timing_buffer_applied ?vehicle_unit)
+        (vehicle_extra_buffer_applied ?vehicle_unit)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action lock_vehicle_for_boarding_activity
+    :parameters (?vehicle_unit - vehicle_unit ?boarding_activity - boarding_activity ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (vehicle_reserved ?vehicle_unit)
+        (boarding_preparation_initiated ?boarding_activity)
+        (bound_to_requirement ?boarding_activity ?accessibility_requirement)
+        (not
+          (vehicle_locked ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_locked ?vehicle_unit)
+  )
+  (:action checkin_equipment_to_vehicle
+    :parameters (?itinerary_segment - itinerary_segment ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (segment_associated_vehicle ?itinerary_segment ?vehicle_unit)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_available ?equipment_instance)
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_locked ?vehicle_unit)
+        (not
+          (equipment_checked_in ?equipment_instance)
+        )
+      )
+    :effect
+      (and
+        (equipment_checked_in ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (not
+          (equipment_available ?equipment_instance)
+        )
+      )
+  )
+  (:action finalize_equipment_checkin_for_segment
+    :parameters (?itinerary_segment - itinerary_segment ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_checked_in ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (bound_to_requirement ?itinerary_segment ?accessibility_requirement)
+        (not
+          (vehicle_timing_buffer_applied ?vehicle_unit)
+        )
+        (not
+          (segment_equipment_ready ?itinerary_segment)
+        )
+      )
+    :effect (segment_equipment_ready ?itinerary_segment)
+  )
+  (:action apply_passenger_preference_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (preference_available ?passenger_preference)
+        (not
+          (segment_preference_applied ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_preference_applied ?itinerary_segment)
+        (segment_preference_assigned ?itinerary_segment ?passenger_preference)
+        (not
+          (preference_available ?passenger_preference)
+        )
+      )
+  )
+  (:action apply_preference_with_vehicle_and_equipment
+    :parameters (?itinerary_segment - itinerary_segment ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit ?accessibility_requirement - accessibility_requirement ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_checked_in ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (bound_to_requirement ?itinerary_segment ?accessibility_requirement)
+        (vehicle_timing_buffer_applied ?vehicle_unit)
+        (segment_preference_applied ?itinerary_segment)
+        (segment_preference_assigned ?itinerary_segment ?passenger_preference)
+        (not
+          (segment_equipment_ready ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_equipment_ready ?itinerary_segment)
+        (segment_preference_secondary_flag ?itinerary_segment)
+      )
+  )
+  (:action assign_feature_and_assistance_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?vehicle_feature - vehicle_feature ?local_assistance - local_assistance ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_ready ?itinerary_segment)
+        (segment_vehicle_feature_assigned ?itinerary_segment ?vehicle_feature)
+        (assistance_assigned ?itinerary_segment ?local_assistance)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (not
+          (vehicle_extra_buffer_applied ?vehicle_unit)
+        )
+        (not
+          (segment_equipment_allocated ?itinerary_segment)
+        )
+      )
+    :effect (segment_equipment_allocated ?itinerary_segment)
+  )
+  (:action assign_feature_and_assistance_to_segment_with_buffer
+    :parameters (?itinerary_segment - itinerary_segment ?vehicle_feature - vehicle_feature ?local_assistance - local_assistance ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_ready ?itinerary_segment)
+        (segment_vehicle_feature_assigned ?itinerary_segment ?vehicle_feature)
+        (assistance_assigned ?itinerary_segment ?local_assistance)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (vehicle_extra_buffer_applied ?vehicle_unit)
+        (not
+          (segment_equipment_allocated ?itinerary_segment)
+        )
+      )
+    :effect (segment_equipment_allocated ?itinerary_segment)
+  )
+  (:action initiate_service_attribute_verification
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_allocated ?itinerary_segment)
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (not
+          (vehicle_timing_buffer_applied ?vehicle_unit)
+        )
+        (not
+          (vehicle_extra_buffer_applied ?vehicle_unit)
+        )
+        (not
+          (segment_attributes_present ?itinerary_segment)
+        )
+      )
+    :effect (segment_attributes_present ?itinerary_segment)
+  )
+  (:action verify_and_mark_segment_attributes
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_allocated ?itinerary_segment)
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (vehicle_timing_buffer_applied ?vehicle_unit)
+        (not
+          (vehicle_extra_buffer_applied ?vehicle_unit)
+        )
+        (not
+          (segment_attributes_present ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_attributes_verified ?itinerary_segment)
+      )
+  )
+  (:action verify_and_mark_segment_attributes_variant
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_allocated ?itinerary_segment)
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (not
+          (vehicle_timing_buffer_applied ?vehicle_unit)
+        )
+        (vehicle_extra_buffer_applied ?vehicle_unit)
+        (not
+          (segment_attributes_present ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_attributes_verified ?itinerary_segment)
+      )
+  )
+  (:action finalize_attribute_verification_variant
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute ?equipment_instance - equipment_instance ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (segment_equipment_allocated ?itinerary_segment)
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (segment_equipment_association ?itinerary_segment ?equipment_instance)
+        (equipment_staged_on_vehicle ?equipment_instance ?vehicle_unit)
+        (vehicle_timing_buffer_applied ?vehicle_unit)
+        (vehicle_extra_buffer_applied ?vehicle_unit)
+        (not
+          (segment_attributes_present ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_attributes_verified ?itinerary_segment)
+      )
+  )
+  (:action finalize_segment_verification
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (not
+          (segment_attributes_verified ?itinerary_segment)
+        )
+        (not
+          (handoff_confirmed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (handoff_confirmed ?itinerary_segment)
+        (assignment_ready ?itinerary_segment)
+      )
+  )
+  (:action assign_operator_credential_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_attributes_verified ?itinerary_segment)
+        (operator_credential_available ?operator_credential)
+      )
+    :effect
+      (and
+        (segment_operator_credential_assigned ?itinerary_segment ?operator_credential)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action confirm_segment_attributes_and_mark_ready
+    :parameters (?itinerary_segment - itinerary_segment ?boarding_activity - boarding_activity ?alighting_activity - alighting_activity ?accessibility_requirement - accessibility_requirement ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_attributes_verified ?itinerary_segment)
+        (segment_operator_credential_assigned ?itinerary_segment ?operator_credential)
+        (segment_has_boarding_activity ?itinerary_segment ?boarding_activity)
+        (segment_has_alighting_activity ?itinerary_segment ?alighting_activity)
+        (boarding_activity_ready ?boarding_activity)
+        (alighting_activity_ready ?alighting_activity)
+        (bound_to_requirement ?itinerary_segment ?accessibility_requirement)
+        (not
+          (segment_ready_for_handoff ?itinerary_segment)
+        )
+      )
+    :effect (segment_ready_for_handoff ?itinerary_segment)
+  )
+  (:action verify_handoff_and_mark_ready
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (segment_attributes_present ?itinerary_segment)
+        (segment_ready_for_handoff ?itinerary_segment)
+        (not
+          (handoff_confirmed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (handoff_confirmed ?itinerary_segment)
+        (assignment_ready ?itinerary_segment)
+      )
+  )
+  (:action apply_policy_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?policy_document - policy_document ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (assignment_confirmed_flag ?itinerary_segment)
+        (bound_to_requirement ?itinerary_segment ?accessibility_requirement)
+        (policy_document_available ?policy_document)
+        (segment_policy_document ?itinerary_segment ?policy_document)
+        (not
+          (policy_approved_for_segment ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (policy_approved_for_segment ?itinerary_segment)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action approve_policy_with_local_assistance
+    :parameters (?itinerary_segment - itinerary_segment ?local_assistance - local_assistance)
+    :precondition
+      (and
+        (policy_approved_for_segment ?itinerary_segment)
+        (assistance_assigned ?itinerary_segment ?local_assistance)
+        (not
+          (policy_intermediate_approved ?itinerary_segment)
+        )
+      )
+    :effect (policy_intermediate_approved ?itinerary_segment)
+  )
+  (:action confirm_policy_service_attribute
+    :parameters (?itinerary_segment - itinerary_segment ?service_attribute - service_attribute)
+    :precondition
+      (and
+        (policy_intermediate_approved ?itinerary_segment)
+        (segment_service_attribute_assigned ?itinerary_segment ?service_attribute)
+        (not
+          (policy_fully_approved ?itinerary_segment)
+        )
+      )
+    :effect (policy_fully_approved ?itinerary_segment)
+  )
+  (:action finalize_policy_handoff
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (policy_fully_approved ?itinerary_segment)
+        (not
+          (handoff_confirmed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (handoff_confirmed ?itinerary_segment)
+        (assignment_ready ?itinerary_segment)
+      )
+  )
+  (:action finalize_boarding_assignment
+    :parameters (?boarding_activity - boarding_activity ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (boarding_preparation_initiated ?boarding_activity)
+        (boarding_activity_ready ?boarding_activity)
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_locked ?vehicle_unit)
+        (not
+          (assignment_ready ?boarding_activity)
+        )
+      )
+    :effect (assignment_ready ?boarding_activity)
+  )
+  (:action finalize_alighting_assignment
+    :parameters (?alighting_activity - alighting_activity ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (alighting_preparation_initiated ?alighting_activity)
+        (alighting_activity_ready ?alighting_activity)
+        (vehicle_reserved ?vehicle_unit)
+        (vehicle_locked ?vehicle_unit)
+        (not
+          (assignment_ready ?alighting_activity)
+        )
+      )
+    :effect (assignment_ready ?alighting_activity)
+  )
+  (:action bind_accessibility_tag_to_request
+    :parameters (?passenger_request - passenger_request ?accessibility_tag - accessibility_tag ?accessibility_requirement - accessibility_requirement)
+    :precondition
+      (and
+        (assignment_ready ?passenger_request)
+        (bound_to_requirement ?passenger_request ?accessibility_requirement)
+        (accessibility_tag_available ?accessibility_tag)
+        (not
+          (allocation_committed ?passenger_request)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?passenger_request)
+        (tag_assigned ?passenger_request ?accessibility_tag)
+        (not
+          (accessibility_tag_available ?accessibility_tag)
+        )
+      )
+  )
+  (:action finalize_boarding_activity_assignment
+    :parameters (?boarding_activity - boarding_activity ?transport_resource - transport_resource ?accessibility_tag - accessibility_tag)
+    :precondition
+      (and
+        (allocation_committed ?boarding_activity)
+        (reserved_for_resource ?boarding_activity ?transport_resource)
+        (tag_assigned ?boarding_activity ?accessibility_tag)
+        (not
+          (assignment_finalized ?boarding_activity)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?boarding_activity)
+        (resource_available ?transport_resource)
+        (accessibility_tag_available ?accessibility_tag)
+      )
+  )
+  (:action finalize_alighting_activity_assignment
+    :parameters (?alighting_activity - alighting_activity ?transport_resource - transport_resource ?accessibility_tag - accessibility_tag)
+    :precondition
+      (and
+        (allocation_committed ?alighting_activity)
+        (reserved_for_resource ?alighting_activity ?transport_resource)
+        (tag_assigned ?alighting_activity ?accessibility_tag)
+        (not
+          (assignment_finalized ?alighting_activity)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?alighting_activity)
+        (resource_available ?transport_resource)
+        (accessibility_tag_available ?accessibility_tag)
+      )
+  )
+  (:action finalize_segment_assignment_with_resource
+    :parameters (?itinerary_segment - itinerary_segment ?transport_resource - transport_resource ?accessibility_tag - accessibility_tag)
+    :precondition
+      (and
+        (allocation_committed ?itinerary_segment)
+        (reserved_for_resource ?itinerary_segment ?transport_resource)
+        (tag_assigned ?itinerary_segment ?accessibility_tag)
+        (not
+          (assignment_finalized ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?itinerary_segment)
+        (resource_available ?transport_resource)
+        (accessibility_tag_available ?accessibility_tag)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem tourist_multi_segment_accessibility_matching)
+  (:domain mobility_accessibility_requirement_matching)
+  (:objects boarding_activity_1 - boarding_activity alighting_activity_1 - alighting_activity itinerary_segment_1 - itinerary_segment itinerary_segment_2 - itinerary_segment transport_resource_1 - transport_resource transport_resource_2 - transport_resource transport_resource_3 - transport_resource requirement_wheelchair - accessibility_requirement assistance_staff_ramp - local_assistance aux_item_ramp - auxiliary_item_type transfer_node_inbound_a - transfer_node_inbound transfer_node_outbound_b - transfer_node_outbound vehicle_unit_1 - vehicle_unit equipment_ramp_1 - equipment_instance equipment_ramp_2 - equipment_instance preference_seat_near_door - passenger_preference preference_aisle_seat - passenger_preference operator_credential_certified_lift - operator_credential operator_credential_medical_trained - operator_credential accessibility_tag_priority - accessibility_tag vehicle_feature_low_floor - vehicle_feature policy_wheelchair_access - policy_document policy_service_animals - policy_document service_attribute_staff_assist - service_attribute)
+  (:init
+    (resource_available transport_resource_1)
+    (resource_available transport_resource_2)
+    (resource_available transport_resource_3)
+    (requirement_available requirement_wheelchair)
+    (assistance_available assistance_staff_ramp)
+    (aux_item_type_available aux_item_ramp)
+    (activity_inbound_node boarding_activity_1 transfer_node_inbound_a)
+    (activity_outbound_node alighting_activity_1 transfer_node_outbound_b)
+    (vehicle_available vehicle_unit_1)
+    (equipment_available equipment_ramp_1)
+    (equipment_available equipment_ramp_2)
+    (segment_has_boarding_activity itinerary_segment_1 boarding_activity_1)
+    (segment_has_boarding_activity itinerary_segment_2 boarding_activity_1)
+    (segment_has_alighting_activity itinerary_segment_1 alighting_activity_1)
+    (segment_has_alighting_activity itinerary_segment_2 alighting_activity_1)
+    (segment_associated_vehicle itinerary_segment_1 vehicle_unit_1)
+    (segment_associated_vehicle itinerary_segment_2 vehicle_unit_1)
+    (segment_equipment_association itinerary_segment_1 equipment_ramp_1)
+    (segment_equipment_association itinerary_segment_2 equipment_ramp_2)
+    (preference_available preference_seat_near_door)
+    (preference_available preference_aisle_seat)
+    (operator_credential_available operator_credential_certified_lift)
+    (operator_credential_available operator_credential_medical_trained)
+    (accessibility_tag_available accessibility_tag_priority)
+    (vehicle_feature_available vehicle_feature_low_floor)
+    (policy_document_available policy_wheelchair_access)
+    (segment_policy_document itinerary_segment_1 policy_wheelchair_access)
+    (segment_policy_document itinerary_segment_2 policy_service_animals)
+    (service_attribute_available service_attribute_staff_assist)
+  )
+  (:goal
+    (and
+      (assignment_finalized boarding_activity_1)
+      (assignment_finalized alighting_activity_1)
+      (assignment_finalized itinerary_segment_1)
+      (assignment_finalized itinerary_segment_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_passenger_request itinerary_segment_1)
+(propose_transport_reservation itinerary_segment_1 transport_resource_1)
+(assign_accessibility_requirement_to_request itinerary_segment_1 requirement_wheelchair)
+(confirm_resource_reservation itinerary_segment_1 requirement_wheelchair)
+(assign_local_assistance_to_request itinerary_segment_1 assistance_staff_ramp)
+(allocate_service_attribute_to_segment itinerary_segment_1 service_attribute_staff_assist)
+(apply_policy_to_segment itinerary_segment_1 policy_wheelchair_access requirement_wheelchair)
+(approve_policy_with_local_assistance itinerary_segment_1 assistance_staff_ramp)
+(confirm_policy_service_attribute itinerary_segment_1 service_attribute_staff_assist)
+(finalize_policy_handoff itinerary_segment_1)
+(bind_accessibility_tag_to_request itinerary_segment_1 accessibility_tag_priority requirement_wheelchair)
+(finalize_segment_assignment_with_resource itinerary_segment_1 transport_resource_1 accessibility_tag_priority)
+(rollback_requirement_assignment itinerary_segment_1 requirement_wheelchair)
+(release_local_assistance_from_request itinerary_segment_1 assistance_staff_ramp)
+(release_service_attribute_from_segment itinerary_segment_1 service_attribute_staff_assist)
+(register_passenger_request alighting_activity_1)
+(propose_transport_reservation alighting_activity_1 transport_resource_2)
+(assign_accessibility_requirement_to_request alighting_activity_1 requirement_wheelchair)
+(confirm_resource_reservation alighting_activity_1 requirement_wheelchair)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ohfsrcbd/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_ohfsrcbd/plan.pddl 
+
+
+--- stderr ---
+

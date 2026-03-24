@@ -1,0 +1,936 @@
+(define (domain tourism_geocluster_day_grouping)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types place_category - object resource_category - object service_category - object place_base - object place - place_base transport_resource - place_category time_window - place_category service_provider - place_category optional_service - place_category preference_profile - place_category constraint_tag - place_category feature_flag - place_category time_preference - place_category activity_token - resource_category attraction - resource_category promotion - resource_category geo_zone - service_category subzone - service_category day_package - service_category cluster_role - place day_role - place geo_cluster_slot_a - cluster_role geo_cluster_slot_b - cluster_role day_plan - day_role)
+  (:predicates
+    (candidate_place ?place - place)
+    (entity_confirmed ?place - place)
+    (place_transport_reserved ?place - place)
+    (item_finalized ?place - place)
+    (ready_for_confirmation_for_item ?place - place)
+    (constraint_applied_to_itinerary_item ?place - place)
+    (transport_available ?transport_resource - transport_resource)
+    (entity_allocated_transport ?place - place ?transport_resource - transport_resource)
+    (time_window_available ?time_window - time_window)
+    (entity_assigned_time_window ?place - place ?time_window - time_window)
+    (provider_available ?service_provider - service_provider)
+    (entity_assigned_service_provider ?place - place ?service_provider - service_provider)
+    (activity_token_available ?activity_token - activity_token)
+    (cluster_slot_a_assigned_activity ?geo_cluster_slot_a - geo_cluster_slot_a ?activity_token - activity_token)
+    (cluster_slot_b_assigned_activity ?geo_cluster_slot_b - geo_cluster_slot_b ?activity_token - activity_token)
+    (cluster_slot_mapped_to_zone ?geo_cluster_slot_a - geo_cluster_slot_a ?geo_zone - geo_zone)
+    (zone_active ?geo_zone - geo_zone)
+    (zone_activity_assigned ?geo_zone - geo_zone)
+    (cluster_slot_a_ready ?geo_cluster_slot_a - geo_cluster_slot_a)
+    (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b - geo_cluster_slot_b ?subzone - subzone)
+    (subzone_active ?subzone - subzone)
+    (subzone_activity_assigned ?subzone - subzone)
+    (cluster_slot_b_ready ?geo_cluster_slot_b - geo_cluster_slot_b)
+    (day_package_available ?day_package - day_package)
+    (day_package_ready ?day_package - day_package)
+    (day_package_assigned_zone ?day_package - day_package ?geo_zone - geo_zone)
+    (day_package_assigned_subzone ?day_package - day_package ?subzone - subzone)
+    (day_package_zone_activity_flag ?day_package - day_package)
+    (day_package_subzone_activity_flag ?day_package - day_package)
+    (day_package_activated ?day_package - day_package)
+    (day_plan_includes_cluster_slot_a ?day_plan - day_plan ?geo_cluster_slot_a - geo_cluster_slot_a)
+    (day_plan_includes_cluster_slot_b ?day_plan - day_plan ?geo_cluster_slot_b - geo_cluster_slot_b)
+    (day_plan_assigned_package ?day_plan - day_plan ?day_package - day_package)
+    (attraction_available ?attraction - attraction)
+    (day_plan_has_attraction ?day_plan - day_plan ?attraction - attraction)
+    (attraction_reserved ?attraction - attraction)
+    (attraction_assigned_to_package ?attraction - attraction ?day_package - day_package)
+    (day_plan_ready_for_service_sequence ?day_plan - day_plan)
+    (services_assigned ?day_plan - day_plan)
+    (service_prereqs_satisfied ?day_plan - day_plan)
+    (optional_service_attached ?day_plan - day_plan)
+    (optional_service_sequence_progress ?day_plan - day_plan)
+    (services_fully_configured ?day_plan - day_plan)
+    (final_checks_passed ?day_plan - day_plan)
+    (promotion_available ?promotion - promotion)
+    (day_plan_has_promotion ?day_plan - day_plan ?promotion - promotion)
+    (promotion_selected_for_day_plan ?day_plan - day_plan)
+    (promotion_activation_started ?day_plan - day_plan)
+    (promotion_confirmed ?day_plan - day_plan)
+    (optional_service_available ?optional_service - optional_service)
+    (optional_service_assigned_to_day_plan ?day_plan - day_plan ?optional_service - optional_service)
+    (preference_profile_available ?preference_profile - preference_profile)
+    (preference_profile_assigned_to_day_plan ?day_plan - day_plan ?preference_profile - preference_profile)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (day_plan_has_feature_flag ?day_plan - day_plan ?feature_flag - feature_flag)
+    (time_preference_available ?time_preference - time_preference)
+    (day_plan_has_time_preference ?day_plan - day_plan ?time_preference - time_preference)
+    (constraint_tag_available ?constraint_tag - constraint_tag)
+    (entity_assigned_constraint_tag ?place - place ?constraint_tag - constraint_tag)
+    (cluster_slot_a_locked ?geo_cluster_slot_a - geo_cluster_slot_a)
+    (cluster_slot_b_locked ?geo_cluster_slot_b - geo_cluster_slot_b)
+    (confirmation_token_issued ?day_plan - day_plan)
+  )
+  (:action mark_place_candidate
+    :parameters (?place - place)
+    :precondition
+      (and
+        (not
+          (candidate_place ?place)
+        )
+        (not
+          (item_finalized ?place)
+        )
+      )
+    :effect (candidate_place ?place)
+  )
+  (:action reserve_transport_for_place
+    :parameters (?place - place ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (candidate_place ?place)
+        (not
+          (place_transport_reserved ?place)
+        )
+        (transport_available ?transport_resource)
+      )
+    :effect
+      (and
+        (place_transport_reserved ?place)
+        (entity_allocated_transport ?place ?transport_resource)
+        (not
+          (transport_available ?transport_resource)
+        )
+      )
+  )
+  (:action reserve_time_window_for_place
+    :parameters (?place - place ?time_window - time_window)
+    :precondition
+      (and
+        (candidate_place ?place)
+        (place_transport_reserved ?place)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (entity_assigned_time_window ?place ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_place_schedule
+    :parameters (?place - place ?time_window - time_window)
+    :precondition
+      (and
+        (candidate_place ?place)
+        (place_transport_reserved ?place)
+        (entity_assigned_time_window ?place ?time_window)
+        (not
+          (entity_confirmed ?place)
+        )
+      )
+    :effect (entity_confirmed ?place)
+  )
+  (:action release_time_window_for_place
+    :parameters (?place - place ?time_window - time_window)
+    :precondition
+      (and
+        (entity_assigned_time_window ?place ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (entity_assigned_time_window ?place ?time_window)
+        )
+      )
+  )
+  (:action assign_service_provider_to_place
+    :parameters (?place - place ?service_provider - service_provider)
+    :precondition
+      (and
+        (entity_confirmed ?place)
+        (provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (entity_assigned_service_provider ?place ?service_provider)
+        (not
+          (provider_available ?service_provider)
+        )
+      )
+  )
+  (:action release_service_provider_from_place
+    :parameters (?place - place ?service_provider - service_provider)
+    :precondition
+      (and
+        (entity_assigned_service_provider ?place ?service_provider)
+      )
+    :effect
+      (and
+        (provider_available ?service_provider)
+        (not
+          (entity_assigned_service_provider ?place ?service_provider)
+        )
+      )
+  )
+  (:action attach_feature_flag_to_day_plan
+    :parameters (?day_plan - day_plan ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (feature_flag_available ?feature_flag)
+      )
+    :effect
+      (and
+        (day_plan_has_feature_flag ?day_plan ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action detach_feature_flag_from_day_plan
+    :parameters (?day_plan - day_plan ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (day_plan_has_feature_flag ?day_plan ?feature_flag)
+      )
+    :effect
+      (and
+        (feature_flag_available ?feature_flag)
+        (not
+          (day_plan_has_feature_flag ?day_plan ?feature_flag)
+        )
+      )
+  )
+  (:action attach_time_preference_to_day_plan
+    :parameters (?day_plan - day_plan ?time_preference - time_preference)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (time_preference_available ?time_preference)
+      )
+    :effect
+      (and
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (not
+          (time_preference_available ?time_preference)
+        )
+      )
+  )
+  (:action detach_time_preference_from_day_plan
+    :parameters (?day_plan - day_plan ?time_preference - time_preference)
+    :precondition
+      (and
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+      )
+    :effect
+      (and
+        (time_preference_available ?time_preference)
+        (not
+          (day_plan_has_time_preference ?day_plan ?time_preference)
+        )
+      )
+  )
+  (:action activate_geo_zone_for_cluster_slot_a
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_zone - geo_zone ?time_window - time_window)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_a)
+        (entity_assigned_time_window ?geo_cluster_slot_a ?time_window)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (not
+          (zone_active ?geo_zone)
+        )
+        (not
+          (zone_activity_assigned ?geo_zone)
+        )
+      )
+    :effect (zone_active ?geo_zone)
+  )
+  (:action confirm_provider_for_cluster_slot_a
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_zone - geo_zone ?service_provider - service_provider)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_a)
+        (entity_assigned_service_provider ?geo_cluster_slot_a ?service_provider)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (zone_active ?geo_zone)
+        (not
+          (cluster_slot_a_locked ?geo_cluster_slot_a)
+        )
+      )
+    :effect
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+      )
+  )
+  (:action assign_activity_token_to_cluster_slot_a
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_zone - geo_zone ?activity_token - activity_token)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_a)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (activity_token_available ?activity_token)
+        (not
+          (cluster_slot_a_locked ?geo_cluster_slot_a)
+        )
+      )
+    :effect
+      (and
+        (zone_activity_assigned ?geo_zone)
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_a_assigned_activity ?geo_cluster_slot_a ?activity_token)
+        (not
+          (activity_token_available ?activity_token)
+        )
+      )
+  )
+  (:action finalize_activity_assignment_for_cluster_slot_a
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_zone - geo_zone ?time_window - time_window ?activity_token - activity_token)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_a)
+        (entity_assigned_time_window ?geo_cluster_slot_a ?time_window)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (zone_activity_assigned ?geo_zone)
+        (cluster_slot_a_assigned_activity ?geo_cluster_slot_a ?activity_token)
+        (not
+          (cluster_slot_a_ready ?geo_cluster_slot_a)
+        )
+      )
+    :effect
+      (and
+        (zone_active ?geo_zone)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+        (activity_token_available ?activity_token)
+        (not
+          (cluster_slot_a_assigned_activity ?geo_cluster_slot_a ?activity_token)
+        )
+      )
+  )
+  (:action activate_subzone_for_cluster_slot_b
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?subzone - subzone ?time_window - time_window)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_b)
+        (entity_assigned_time_window ?geo_cluster_slot_b ?time_window)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (not
+          (subzone_active ?subzone)
+        )
+        (not
+          (subzone_activity_assigned ?subzone)
+        )
+      )
+    :effect (subzone_active ?subzone)
+  )
+  (:action confirm_provider_for_cluster_slot_b
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?subzone - subzone ?service_provider - service_provider)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_b)
+        (entity_assigned_service_provider ?geo_cluster_slot_b ?service_provider)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (subzone_active ?subzone)
+        (not
+          (cluster_slot_b_locked ?geo_cluster_slot_b)
+        )
+      )
+    :effect
+      (and
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+      )
+  )
+  (:action assign_activity_token_to_cluster_slot_b
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?subzone - subzone ?activity_token - activity_token)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_b)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (activity_token_available ?activity_token)
+        (not
+          (cluster_slot_b_locked ?geo_cluster_slot_b)
+        )
+      )
+    :effect
+      (and
+        (subzone_activity_assigned ?subzone)
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_b_assigned_activity ?geo_cluster_slot_b ?activity_token)
+        (not
+          (activity_token_available ?activity_token)
+        )
+      )
+  )
+  (:action finalize_activity_assignment_for_cluster_slot_b
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?subzone - subzone ?time_window - time_window ?activity_token - activity_token)
+    :precondition
+      (and
+        (entity_confirmed ?geo_cluster_slot_b)
+        (entity_assigned_time_window ?geo_cluster_slot_b ?time_window)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (subzone_activity_assigned ?subzone)
+        (cluster_slot_b_assigned_activity ?geo_cluster_slot_b ?activity_token)
+        (not
+          (cluster_slot_b_ready ?geo_cluster_slot_b)
+        )
+      )
+    :effect
+      (and
+        (subzone_active ?subzone)
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+        (activity_token_available ?activity_token)
+        (not
+          (cluster_slot_b_assigned_activity ?geo_cluster_slot_b ?activity_token)
+        )
+      )
+  )
+  (:action assemble_day_package_from_slots
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_cluster_slot_b - geo_cluster_slot_b ?geo_zone - geo_zone ?subzone - subzone ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (zone_active ?geo_zone)
+        (subzone_active ?subzone)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+        (day_package_available ?day_package)
+      )
+    :effect
+      (and
+        (day_package_ready ?day_package)
+        (day_package_assigned_zone ?day_package ?geo_zone)
+        (day_package_assigned_subzone ?day_package ?subzone)
+        (not
+          (day_package_available ?day_package)
+        )
+      )
+  )
+  (:action assemble_day_package_with_zone_activity
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_cluster_slot_b - geo_cluster_slot_b ?geo_zone - geo_zone ?subzone - subzone ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (zone_activity_assigned ?geo_zone)
+        (subzone_active ?subzone)
+        (not
+          (cluster_slot_a_ready ?geo_cluster_slot_a)
+        )
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+        (day_package_available ?day_package)
+      )
+    :effect
+      (and
+        (day_package_ready ?day_package)
+        (day_package_assigned_zone ?day_package ?geo_zone)
+        (day_package_assigned_subzone ?day_package ?subzone)
+        (day_package_zone_activity_flag ?day_package)
+        (not
+          (day_package_available ?day_package)
+        )
+      )
+  )
+  (:action assemble_day_package_with_subzone_activity
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_cluster_slot_b - geo_cluster_slot_b ?geo_zone - geo_zone ?subzone - subzone ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (zone_active ?geo_zone)
+        (subzone_activity_assigned ?subzone)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+        (not
+          (cluster_slot_b_ready ?geo_cluster_slot_b)
+        )
+        (day_package_available ?day_package)
+      )
+    :effect
+      (and
+        (day_package_ready ?day_package)
+        (day_package_assigned_zone ?day_package ?geo_zone)
+        (day_package_assigned_subzone ?day_package ?subzone)
+        (day_package_subzone_activity_flag ?day_package)
+        (not
+          (day_package_available ?day_package)
+        )
+      )
+  )
+  (:action assemble_day_package_with_zone_and_subzone_activity
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?geo_cluster_slot_b - geo_cluster_slot_b ?geo_zone - geo_zone ?subzone - subzone ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_mapped_to_zone ?geo_cluster_slot_a ?geo_zone)
+        (cluster_slot_mapped_to_subzone ?geo_cluster_slot_b ?subzone)
+        (zone_activity_assigned ?geo_zone)
+        (subzone_activity_assigned ?subzone)
+        (not
+          (cluster_slot_a_ready ?geo_cluster_slot_a)
+        )
+        (not
+          (cluster_slot_b_ready ?geo_cluster_slot_b)
+        )
+        (day_package_available ?day_package)
+      )
+    :effect
+      (and
+        (day_package_ready ?day_package)
+        (day_package_assigned_zone ?day_package ?geo_zone)
+        (day_package_assigned_subzone ?day_package ?subzone)
+        (day_package_zone_activity_flag ?day_package)
+        (day_package_subzone_activity_flag ?day_package)
+        (not
+          (day_package_available ?day_package)
+        )
+      )
+  )
+  (:action activate_day_package_for_attraction_assignment
+    :parameters (?day_package - day_package ?geo_cluster_slot_a - geo_cluster_slot_a ?time_window - time_window)
+    :precondition
+      (and
+        (day_package_ready ?day_package)
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (entity_assigned_time_window ?geo_cluster_slot_a ?time_window)
+        (not
+          (day_package_activated ?day_package)
+        )
+      )
+    :effect (day_package_activated ?day_package)
+  )
+  (:action reserve_attraction_slot_for_package
+    :parameters (?day_plan - day_plan ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (day_plan_assigned_package ?day_plan ?day_package)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_available ?attraction)
+        (day_package_ready ?day_package)
+        (day_package_activated ?day_package)
+        (not
+          (attraction_reserved ?attraction)
+        )
+      )
+    :effect
+      (and
+        (attraction_reserved ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (not
+          (attraction_available ?attraction)
+        )
+      )
+  )
+  (:action validate_attraction_assignment_and_mark_day_plan
+    :parameters (?day_plan - day_plan ?attraction - attraction ?day_package - day_package ?time_window - time_window)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_reserved ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (entity_assigned_time_window ?day_plan ?time_window)
+        (not
+          (day_package_zone_activity_flag ?day_package)
+        )
+        (not
+          (day_plan_ready_for_service_sequence ?day_plan)
+        )
+      )
+    :effect (day_plan_ready_for_service_sequence ?day_plan)
+  )
+  (:action bind_optional_service_to_day_plan
+    :parameters (?day_plan - day_plan ?optional_service - optional_service)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (optional_service_available ?optional_service)
+        (not
+          (optional_service_attached ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (optional_service_attached ?day_plan)
+        (optional_service_assigned_to_day_plan ?day_plan ?optional_service)
+        (not
+          (optional_service_available ?optional_service)
+        )
+      )
+  )
+  (:action prepare_optional_service_sequence
+    :parameters (?day_plan - day_plan ?attraction - attraction ?day_package - day_package ?time_window - time_window ?optional_service - optional_service)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_reserved ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (entity_assigned_time_window ?day_plan ?time_window)
+        (day_package_zone_activity_flag ?day_package)
+        (optional_service_attached ?day_plan)
+        (optional_service_assigned_to_day_plan ?day_plan ?optional_service)
+        (not
+          (day_plan_ready_for_service_sequence ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (day_plan_ready_for_service_sequence ?day_plan)
+        (optional_service_sequence_progress ?day_plan)
+      )
+  )
+  (:action start_service_prerequisite_flow
+    :parameters (?day_plan - day_plan ?feature_flag - feature_flag ?service_provider - service_provider ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (day_plan_ready_for_service_sequence ?day_plan)
+        (day_plan_has_feature_flag ?day_plan ?feature_flag)
+        (entity_assigned_service_provider ?day_plan ?service_provider)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (not
+          (day_package_subzone_activity_flag ?day_package)
+        )
+        (not
+          (services_assigned ?day_plan)
+        )
+      )
+    :effect (services_assigned ?day_plan)
+  )
+  (:action continue_service_prerequisite_flow
+    :parameters (?day_plan - day_plan ?feature_flag - feature_flag ?service_provider - service_provider ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (day_plan_ready_for_service_sequence ?day_plan)
+        (day_plan_has_feature_flag ?day_plan ?feature_flag)
+        (entity_assigned_service_provider ?day_plan ?service_provider)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (day_package_subzone_activity_flag ?day_package)
+        (not
+          (services_assigned ?day_plan)
+        )
+      )
+    :effect (services_assigned ?day_plan)
+  )
+  (:action apply_time_preference_service_step1
+    :parameters (?day_plan - day_plan ?time_preference - time_preference ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (services_assigned ?day_plan)
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (not
+          (day_package_zone_activity_flag ?day_package)
+        )
+        (not
+          (day_package_subzone_activity_flag ?day_package)
+        )
+        (not
+          (service_prereqs_satisfied ?day_plan)
+        )
+      )
+    :effect (service_prereqs_satisfied ?day_plan)
+  )
+  (:action apply_time_preference_service_step2
+    :parameters (?day_plan - day_plan ?time_preference - time_preference ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (services_assigned ?day_plan)
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (day_package_zone_activity_flag ?day_package)
+        (not
+          (day_package_subzone_activity_flag ?day_package)
+        )
+        (not
+          (service_prereqs_satisfied ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (services_fully_configured ?day_plan)
+      )
+  )
+  (:action apply_time_preference_service_step3
+    :parameters (?day_plan - day_plan ?time_preference - time_preference ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (services_assigned ?day_plan)
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (not
+          (day_package_zone_activity_flag ?day_package)
+        )
+        (day_package_subzone_activity_flag ?day_package)
+        (not
+          (service_prereqs_satisfied ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (services_fully_configured ?day_plan)
+      )
+  )
+  (:action apply_time_preference_service_step4
+    :parameters (?day_plan - day_plan ?time_preference - time_preference ?attraction - attraction ?day_package - day_package)
+    :precondition
+      (and
+        (services_assigned ?day_plan)
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (day_plan_has_attraction ?day_plan ?attraction)
+        (attraction_assigned_to_package ?attraction ?day_package)
+        (day_package_zone_activity_flag ?day_package)
+        (day_package_subzone_activity_flag ?day_package)
+        (not
+          (service_prereqs_satisfied ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (services_fully_configured ?day_plan)
+      )
+  )
+  (:action finalize_day_plan_from_services
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (not
+          (services_fully_configured ?day_plan)
+        )
+        (not
+          (confirmation_token_issued ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (confirmation_token_issued ?day_plan)
+        (ready_for_confirmation_for_item ?day_plan)
+      )
+  )
+  (:action attach_preference_profile_to_day_plan
+    :parameters (?day_plan - day_plan ?preference_profile - preference_profile)
+    :precondition
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (services_fully_configured ?day_plan)
+        (preference_profile_available ?preference_profile)
+      )
+    :effect
+      (and
+        (preference_profile_assigned_to_day_plan ?day_plan ?preference_profile)
+        (not
+          (preference_profile_available ?preference_profile)
+        )
+      )
+  )
+  (:action perform_day_plan_multi_resource_checks
+    :parameters (?day_plan - day_plan ?geo_cluster_slot_a - geo_cluster_slot_a ?geo_cluster_slot_b - geo_cluster_slot_b ?time_window - time_window ?preference_profile - preference_profile)
+    :precondition
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (services_fully_configured ?day_plan)
+        (preference_profile_assigned_to_day_plan ?day_plan ?preference_profile)
+        (day_plan_includes_cluster_slot_a ?day_plan ?geo_cluster_slot_a)
+        (day_plan_includes_cluster_slot_b ?day_plan ?geo_cluster_slot_b)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+        (entity_assigned_time_window ?day_plan ?time_window)
+        (not
+          (final_checks_passed ?day_plan)
+        )
+      )
+    :effect (final_checks_passed ?day_plan)
+  )
+  (:action confirm_day_plan_after_checks
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (service_prereqs_satisfied ?day_plan)
+        (final_checks_passed ?day_plan)
+        (not
+          (confirmation_token_issued ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (confirmation_token_issued ?day_plan)
+        (ready_for_confirmation_for_item ?day_plan)
+      )
+  )
+  (:action start_promotion_binding_process
+    :parameters (?day_plan - day_plan ?promotion - promotion ?time_window - time_window)
+    :precondition
+      (and
+        (entity_confirmed ?day_plan)
+        (entity_assigned_time_window ?day_plan ?time_window)
+        (promotion_available ?promotion)
+        (day_plan_has_promotion ?day_plan ?promotion)
+        (not
+          (promotion_selected_for_day_plan ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (promotion_selected_for_day_plan ?day_plan)
+        (not
+          (promotion_available ?promotion)
+        )
+      )
+  )
+  (:action begin_promotion_activation
+    :parameters (?day_plan - day_plan ?service_provider - service_provider)
+    :precondition
+      (and
+        (promotion_selected_for_day_plan ?day_plan)
+        (entity_assigned_service_provider ?day_plan ?service_provider)
+        (not
+          (promotion_activation_started ?day_plan)
+        )
+      )
+    :effect (promotion_activation_started ?day_plan)
+  )
+  (:action activate_promotion_with_time_preference
+    :parameters (?day_plan - day_plan ?time_preference - time_preference)
+    :precondition
+      (and
+        (promotion_activation_started ?day_plan)
+        (day_plan_has_time_preference ?day_plan ?time_preference)
+        (not
+          (promotion_confirmed ?day_plan)
+        )
+      )
+    :effect (promotion_confirmed ?day_plan)
+  )
+  (:action finalize_day_plan_with_promotion
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (promotion_confirmed ?day_plan)
+        (not
+          (confirmation_token_issued ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (confirmation_token_issued ?day_plan)
+        (ready_for_confirmation_for_item ?day_plan)
+      )
+  )
+  (:action confirm_cluster_slot_a
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_a_locked ?geo_cluster_slot_a)
+        (cluster_slot_a_ready ?geo_cluster_slot_a)
+        (day_package_ready ?day_package)
+        (day_package_activated ?day_package)
+        (not
+          (ready_for_confirmation_for_item ?geo_cluster_slot_a)
+        )
+      )
+    :effect (ready_for_confirmation_for_item ?geo_cluster_slot_a)
+  )
+  (:action confirm_cluster_slot_b
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?day_package - day_package)
+    :precondition
+      (and
+        (cluster_slot_b_locked ?geo_cluster_slot_b)
+        (cluster_slot_b_ready ?geo_cluster_slot_b)
+        (day_package_ready ?day_package)
+        (day_package_activated ?day_package)
+        (not
+          (ready_for_confirmation_for_item ?geo_cluster_slot_b)
+        )
+      )
+    :effect (ready_for_confirmation_for_item ?geo_cluster_slot_b)
+  )
+  (:action apply_constraint_tag_to_place
+    :parameters (?place - place ?constraint_tag - constraint_tag ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_confirmation_for_item ?place)
+        (entity_assigned_time_window ?place ?time_window)
+        (constraint_tag_available ?constraint_tag)
+        (not
+          (constraint_applied_to_itinerary_item ?place)
+        )
+      )
+    :effect
+      (and
+        (constraint_applied_to_itinerary_item ?place)
+        (entity_assigned_constraint_tag ?place ?constraint_tag)
+        (not
+          (constraint_tag_available ?constraint_tag)
+        )
+      )
+  )
+  (:action finalize_cluster_slot_a_assignment
+    :parameters (?geo_cluster_slot_a - geo_cluster_slot_a ?transport_resource - transport_resource ?constraint_tag - constraint_tag)
+    :precondition
+      (and
+        (constraint_applied_to_itinerary_item ?geo_cluster_slot_a)
+        (entity_allocated_transport ?geo_cluster_slot_a ?transport_resource)
+        (entity_assigned_constraint_tag ?geo_cluster_slot_a ?constraint_tag)
+        (not
+          (item_finalized ?geo_cluster_slot_a)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?geo_cluster_slot_a)
+        (transport_available ?transport_resource)
+        (constraint_tag_available ?constraint_tag)
+      )
+  )
+  (:action finalize_cluster_slot_b_assignment
+    :parameters (?geo_cluster_slot_b - geo_cluster_slot_b ?transport_resource - transport_resource ?constraint_tag - constraint_tag)
+    :precondition
+      (and
+        (constraint_applied_to_itinerary_item ?geo_cluster_slot_b)
+        (entity_allocated_transport ?geo_cluster_slot_b ?transport_resource)
+        (entity_assigned_constraint_tag ?geo_cluster_slot_b ?constraint_tag)
+        (not
+          (item_finalized ?geo_cluster_slot_b)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?geo_cluster_slot_b)
+        (transport_available ?transport_resource)
+        (constraint_tag_available ?constraint_tag)
+      )
+  )
+  (:action assign_transport_and_constraint_to_day_plan
+    :parameters (?day_plan - day_plan ?transport_resource - transport_resource ?constraint_tag - constraint_tag)
+    :precondition
+      (and
+        (constraint_applied_to_itinerary_item ?day_plan)
+        (entity_allocated_transport ?day_plan ?transport_resource)
+        (entity_assigned_constraint_tag ?day_plan ?constraint_tag)
+        (not
+          (item_finalized ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?day_plan)
+        (transport_available ?transport_resource)
+        (constraint_tag_available ?constraint_tag)
+      )
+  )
+)

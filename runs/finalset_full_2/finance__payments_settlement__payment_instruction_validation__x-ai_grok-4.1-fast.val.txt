@@ -1,0 +1,1011 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain payments_settlement_validation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types participant_supertype - object resource_supertype - object channel_supertype - object node_supertype - object instruction_record - node_supertype authorization_resource - participant_supertype validation_profile - participant_supertype validator - participant_supertype fee_schedule - participant_supertype settlement_policy - participant_supertype settlement_authorization_token - participant_supertype compliance_check - participant_supertype third_party_confirmation - participant_supertype channel_profile - resource_supertype compliance_artifact - resource_supertype regulatory_approval - resource_supertype clearing_channel_instance - channel_supertype counterparty_channel - channel_supertype settlement_batch - channel_supertype originating_role_subtype - instruction_record beneficiary_role_subtype - instruction_record originating_participant - originating_role_subtype beneficiary_participant - originating_role_subtype processing_node - beneficiary_role_subtype)
+  (:predicates
+    (instruction_registered ?instruction_record - instruction_record)
+    (released_for_processing ?instruction_record - instruction_record)
+    (authorization_attached ?instruction_record - instruction_record)
+    (entity_committed ?instruction_record - instruction_record)
+    (settlement_executed ?instruction_record - instruction_record)
+    (settlement_authorized ?instruction_record - instruction_record)
+    (auth_resource_available ?authorization_resource - authorization_resource)
+    (authorization_assignment ?instruction_record - instruction_record ?authorization_resource - authorization_resource)
+    (validation_profile_available ?validation_profile - validation_profile)
+    (validation_profile_assigned ?instruction_record - instruction_record ?validation_profile - validation_profile)
+    (validator_available ?validator - validator)
+    (validator_assigned ?instruction_record - instruction_record ?validator - validator)
+    (channel_profile_available ?channel_profile - channel_profile)
+    (originating_channel_profile_bound ?originating_participant - originating_participant ?channel_profile - channel_profile)
+    (beneficiary_channel_profile_bound ?beneficiary_participant - beneficiary_participant ?channel_profile - channel_profile)
+    (originating_channel_instance_linked ?originating_participant - originating_participant ?clearing_channel_instance - clearing_channel_instance)
+    (channel_instance_marked_ready ?clearing_channel_instance - clearing_channel_instance)
+    (channel_instance_profile_attached ?clearing_channel_instance - clearing_channel_instance)
+    (originating_routing_ready ?originating_participant - originating_participant)
+    (beneficiary_counterparty_channel_linked ?beneficiary_participant - beneficiary_participant ?counterparty_channel - counterparty_channel)
+    (counterparty_channel_marked_ready ?counterparty_channel - counterparty_channel)
+    (counterparty_channel_profile_attached ?counterparty_channel - counterparty_channel)
+    (beneficiary_routing_ready ?beneficiary_participant - beneficiary_participant)
+    (settlement_batch_available ?settlement_batch - settlement_batch)
+    (settlement_batch_active ?settlement_batch - settlement_batch)
+    (batch_assigned_channel_instance ?settlement_batch - settlement_batch ?clearing_channel_instance - clearing_channel_instance)
+    (batch_assigned_counterparty_channel ?settlement_batch - settlement_batch ?counterparty_channel - counterparty_channel)
+    (batch_requires_priority_processing ?settlement_batch - settlement_batch)
+    (batch_requires_additional_confirmation ?settlement_batch - settlement_batch)
+    (batch_preflight_completed ?settlement_batch - settlement_batch)
+    (node_originating_assignment ?processing_node - processing_node ?originating_participant - originating_participant)
+    (node_beneficiary_assignment ?processing_node - processing_node ?beneficiary_participant - beneficiary_participant)
+    (node_batch_assignment ?processing_node - processing_node ?settlement_batch - settlement_batch)
+    (compliance_artifact_available ?compliance_artifact - compliance_artifact)
+    (node_compliance_artifact_association ?processing_node - processing_node ?compliance_artifact - compliance_artifact)
+    (compliance_artifact_attached ?compliance_artifact - compliance_artifact)
+    (compliance_artifact_attached_to_batch ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    (node_compliance_ready ?processing_node - processing_node)
+    (node_compliance_review_completed ?processing_node - processing_node)
+    (node_checks_finalized ?processing_node - processing_node)
+    (node_fee_applied ?processing_node - processing_node)
+    (node_fee_confirmed ?processing_node - processing_node)
+    (node_policy_applicable ?processing_node - processing_node)
+    (node_ready_for_settlement ?processing_node - processing_node)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (node_regulatory_approval_assigned ?processing_node - processing_node ?regulatory_approval - regulatory_approval)
+    (node_regulatory_approved ?processing_node - processing_node)
+    (node_validator_signoff_acquired ?processing_node - processing_node)
+    (node_third_party_confirmed ?processing_node - processing_node)
+    (fee_schedule_available ?fee_schedule - fee_schedule)
+    (node_fee_schedule_bound ?processing_node - processing_node ?fee_schedule - fee_schedule)
+    (settlement_policy_available ?settlement_policy - settlement_policy)
+    (node_policy_attached ?processing_node - processing_node ?settlement_policy - settlement_policy)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (node_compliance_check_assigned ?processing_node - processing_node ?compliance_check - compliance_check)
+    (third_party_confirmation_available ?third_party_confirmation - third_party_confirmation)
+    (node_third_party_confirmation_attached ?processing_node - processing_node ?third_party_confirmation - third_party_confirmation)
+    (settlement_token_available ?settlement_authorization_token - settlement_authorization_token)
+    (settlement_token_bound ?instruction_record - instruction_record ?settlement_authorization_token - settlement_authorization_token)
+    (originating_ready_for_batch ?originating_participant - originating_participant)
+    (beneficiary_ready_for_batch ?beneficiary_participant - beneficiary_participant)
+    (node_finalized ?processing_node - processing_node)
+  )
+  (:action register_instruction
+    :parameters (?instruction_record - instruction_record)
+    :precondition
+      (and
+        (not
+          (instruction_registered ?instruction_record)
+        )
+        (not
+          (entity_committed ?instruction_record)
+        )
+      )
+    :effect (instruction_registered ?instruction_record)
+  )
+  (:action assign_auth_resource_to_instruction
+    :parameters (?instruction_record - instruction_record ?authorization_resource - authorization_resource)
+    :precondition
+      (and
+        (instruction_registered ?instruction_record)
+        (not
+          (authorization_attached ?instruction_record)
+        )
+        (auth_resource_available ?authorization_resource)
+      )
+    :effect
+      (and
+        (authorization_attached ?instruction_record)
+        (authorization_assignment ?instruction_record ?authorization_resource)
+        (not
+          (auth_resource_available ?authorization_resource)
+        )
+      )
+  )
+  (:action assign_validation_profile_to_instruction
+    :parameters (?instruction_record - instruction_record ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (instruction_registered ?instruction_record)
+        (authorization_attached ?instruction_record)
+        (validation_profile_available ?validation_profile)
+      )
+    :effect
+      (and
+        (validation_profile_assigned ?instruction_record ?validation_profile)
+        (not
+          (validation_profile_available ?validation_profile)
+        )
+      )
+  )
+  (:action finalize_instruction_validation
+    :parameters (?instruction_record - instruction_record ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (instruction_registered ?instruction_record)
+        (authorization_attached ?instruction_record)
+        (validation_profile_assigned ?instruction_record ?validation_profile)
+        (not
+          (released_for_processing ?instruction_record)
+        )
+      )
+    :effect (released_for_processing ?instruction_record)
+  )
+  (:action release_validation_profile
+    :parameters (?instruction_record - instruction_record ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (validation_profile_assigned ?instruction_record ?validation_profile)
+      )
+    :effect
+      (and
+        (validation_profile_available ?validation_profile)
+        (not
+          (validation_profile_assigned ?instruction_record ?validation_profile)
+        )
+      )
+  )
+  (:action assign_validator_to_instruction
+    :parameters (?instruction_record - instruction_record ?validator - validator)
+    :precondition
+      (and
+        (released_for_processing ?instruction_record)
+        (validator_available ?validator)
+      )
+    :effect
+      (and
+        (validator_assigned ?instruction_record ?validator)
+        (not
+          (validator_available ?validator)
+        )
+      )
+  )
+  (:action release_validator_from_instruction
+    :parameters (?instruction_record - instruction_record ?validator - validator)
+    :precondition
+      (and
+        (validator_assigned ?instruction_record ?validator)
+      )
+    :effect
+      (and
+        (validator_available ?validator)
+        (not
+          (validator_assigned ?instruction_record ?validator)
+        )
+      )
+  )
+  (:action assign_compliance_check_to_node
+    :parameters (?processing_node - processing_node ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (node_compliance_check_assigned ?processing_node ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action release_compliance_check_from_node
+    :parameters (?processing_node - processing_node ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (node_compliance_check_assigned ?processing_node ?compliance_check)
+      )
+    :effect
+      (and
+        (compliance_check_available ?compliance_check)
+        (not
+          (node_compliance_check_assigned ?processing_node ?compliance_check)
+        )
+      )
+  )
+  (:action assign_third_party_confirmation_to_node
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (third_party_confirmation_available ?third_party_confirmation)
+      )
+    :effect
+      (and
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (not
+          (third_party_confirmation_available ?third_party_confirmation)
+        )
+      )
+  )
+  (:action release_third_party_confirmation_from_node
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation)
+    :precondition
+      (and
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+      )
+    :effect
+      (and
+        (third_party_confirmation_available ?third_party_confirmation)
+        (not
+          (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        )
+      )
+  )
+  (:action confirm_clearing_channel_instance_ready
+    :parameters (?originating_participant - originating_participant ?clearing_channel_instance - clearing_channel_instance ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (released_for_processing ?originating_participant)
+        (validation_profile_assigned ?originating_participant ?validation_profile)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (not
+          (channel_instance_marked_ready ?clearing_channel_instance)
+        )
+        (not
+          (channel_instance_profile_attached ?clearing_channel_instance)
+        )
+      )
+    :effect (channel_instance_marked_ready ?clearing_channel_instance)
+  )
+  (:action prepare_originating_participant_for_batch
+    :parameters (?originating_participant - originating_participant ?clearing_channel_instance - clearing_channel_instance ?validator - validator)
+    :precondition
+      (and
+        (released_for_processing ?originating_participant)
+        (validator_assigned ?originating_participant ?validator)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (channel_instance_marked_ready ?clearing_channel_instance)
+        (not
+          (originating_ready_for_batch ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (originating_routing_ready ?originating_participant)
+      )
+  )
+  (:action apply_channel_profile_to_originator
+    :parameters (?originating_participant - originating_participant ?clearing_channel_instance - clearing_channel_instance ?channel_profile - channel_profile)
+    :precondition
+      (and
+        (released_for_processing ?originating_participant)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (channel_profile_available ?channel_profile)
+        (not
+          (originating_ready_for_batch ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (channel_instance_profile_attached ?clearing_channel_instance)
+        (originating_ready_for_batch ?originating_participant)
+        (originating_channel_profile_bound ?originating_participant ?channel_profile)
+        (not
+          (channel_profile_available ?channel_profile)
+        )
+      )
+  )
+  (:action finalize_originating_routing_preparation
+    :parameters (?originating_participant - originating_participant ?clearing_channel_instance - clearing_channel_instance ?validation_profile - validation_profile ?channel_profile - channel_profile)
+    :precondition
+      (and
+        (released_for_processing ?originating_participant)
+        (validation_profile_assigned ?originating_participant ?validation_profile)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (channel_instance_profile_attached ?clearing_channel_instance)
+        (originating_channel_profile_bound ?originating_participant ?channel_profile)
+        (not
+          (originating_routing_ready ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (channel_instance_marked_ready ?clearing_channel_instance)
+        (originating_routing_ready ?originating_participant)
+        (channel_profile_available ?channel_profile)
+        (not
+          (originating_channel_profile_bound ?originating_participant ?channel_profile)
+        )
+      )
+  )
+  (:action confirm_counterparty_channel_ready
+    :parameters (?beneficiary_participant - beneficiary_participant ?counterparty_channel - counterparty_channel ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_participant)
+        (validation_profile_assigned ?beneficiary_participant ?validation_profile)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (not
+          (counterparty_channel_marked_ready ?counterparty_channel)
+        )
+        (not
+          (counterparty_channel_profile_attached ?counterparty_channel)
+        )
+      )
+    :effect (counterparty_channel_marked_ready ?counterparty_channel)
+  )
+  (:action prepare_beneficiary_participant_for_batch
+    :parameters (?beneficiary_participant - beneficiary_participant ?counterparty_channel - counterparty_channel ?validator - validator)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_participant)
+        (validator_assigned ?beneficiary_participant ?validator)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (counterparty_channel_marked_ready ?counterparty_channel)
+        (not
+          (beneficiary_ready_for_batch ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (beneficiary_routing_ready ?beneficiary_participant)
+      )
+  )
+  (:action apply_channel_profile_to_beneficiary
+    :parameters (?beneficiary_participant - beneficiary_participant ?counterparty_channel - counterparty_channel ?channel_profile - channel_profile)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_participant)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (channel_profile_available ?channel_profile)
+        (not
+          (beneficiary_ready_for_batch ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (counterparty_channel_profile_attached ?counterparty_channel)
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (beneficiary_channel_profile_bound ?beneficiary_participant ?channel_profile)
+        (not
+          (channel_profile_available ?channel_profile)
+        )
+      )
+  )
+  (:action finalize_beneficiary_routing_preparation
+    :parameters (?beneficiary_participant - beneficiary_participant ?counterparty_channel - counterparty_channel ?validation_profile - validation_profile ?channel_profile - channel_profile)
+    :precondition
+      (and
+        (released_for_processing ?beneficiary_participant)
+        (validation_profile_assigned ?beneficiary_participant ?validation_profile)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (counterparty_channel_profile_attached ?counterparty_channel)
+        (beneficiary_channel_profile_bound ?beneficiary_participant ?channel_profile)
+        (not
+          (beneficiary_routing_ready ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (counterparty_channel_marked_ready ?counterparty_channel)
+        (beneficiary_routing_ready ?beneficiary_participant)
+        (channel_profile_available ?channel_profile)
+        (not
+          (beneficiary_channel_profile_bound ?beneficiary_participant ?channel_profile)
+        )
+      )
+  )
+  (:action create_settlement_batch_standard
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?clearing_channel_instance - clearing_channel_instance ?counterparty_channel - counterparty_channel ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (channel_instance_marked_ready ?clearing_channel_instance)
+        (counterparty_channel_marked_ready ?counterparty_channel)
+        (originating_routing_ready ?originating_participant)
+        (beneficiary_routing_ready ?beneficiary_participant)
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_assigned_channel_instance ?settlement_batch ?clearing_channel_instance)
+        (batch_assigned_counterparty_channel ?settlement_batch ?counterparty_channel)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_priority
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?clearing_channel_instance - clearing_channel_instance ?counterparty_channel - counterparty_channel ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (channel_instance_profile_attached ?clearing_channel_instance)
+        (counterparty_channel_marked_ready ?counterparty_channel)
+        (not
+          (originating_routing_ready ?originating_participant)
+        )
+        (beneficiary_routing_ready ?beneficiary_participant)
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_assigned_channel_instance ?settlement_batch ?clearing_channel_instance)
+        (batch_assigned_counterparty_channel ?settlement_batch ?counterparty_channel)
+        (batch_requires_priority_processing ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_alternate_route
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?clearing_channel_instance - clearing_channel_instance ?counterparty_channel - counterparty_channel ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (channel_instance_marked_ready ?clearing_channel_instance)
+        (counterparty_channel_profile_attached ?counterparty_channel)
+        (originating_routing_ready ?originating_participant)
+        (not
+          (beneficiary_routing_ready ?beneficiary_participant)
+        )
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_assigned_channel_instance ?settlement_batch ?clearing_channel_instance)
+        (batch_assigned_counterparty_channel ?settlement_batch ?counterparty_channel)
+        (batch_requires_additional_confirmation ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action create_settlement_batch_priority_and_alternate_route
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?clearing_channel_instance - clearing_channel_instance ?counterparty_channel - counterparty_channel ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (originating_channel_instance_linked ?originating_participant ?clearing_channel_instance)
+        (beneficiary_counterparty_channel_linked ?beneficiary_participant ?counterparty_channel)
+        (channel_instance_profile_attached ?clearing_channel_instance)
+        (counterparty_channel_profile_attached ?counterparty_channel)
+        (not
+          (originating_routing_ready ?originating_participant)
+        )
+        (not
+          (beneficiary_routing_ready ?beneficiary_participant)
+        )
+        (settlement_batch_available ?settlement_batch)
+      )
+    :effect
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (batch_assigned_channel_instance ?settlement_batch ?clearing_channel_instance)
+        (batch_assigned_counterparty_channel ?settlement_batch ?counterparty_channel)
+        (batch_requires_priority_processing ?settlement_batch)
+        (batch_requires_additional_confirmation ?settlement_batch)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action complete_batch_preflight
+    :parameters (?settlement_batch - settlement_batch ?originating_participant - originating_participant ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (settlement_batch_active ?settlement_batch)
+        (originating_ready_for_batch ?originating_participant)
+        (validation_profile_assigned ?originating_participant ?validation_profile)
+        (not
+          (batch_preflight_completed ?settlement_batch)
+        )
+      )
+    :effect (batch_preflight_completed ?settlement_batch)
+  )
+  (:action attach_compliance_artifact_to_batch
+    :parameters (?processing_node - processing_node ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (node_batch_assignment ?processing_node ?settlement_batch)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_available ?compliance_artifact)
+        (settlement_batch_active ?settlement_batch)
+        (batch_preflight_completed ?settlement_batch)
+        (not
+          (compliance_artifact_attached ?compliance_artifact)
+        )
+      )
+    :effect
+      (and
+        (compliance_artifact_attached ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (not
+          (compliance_artifact_available ?compliance_artifact)
+        )
+      )
+  )
+  (:action verify_compliance_and_mark_node_ready
+    :parameters (?processing_node - processing_node ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (validation_profile_assigned ?processing_node ?validation_profile)
+        (not
+          (batch_requires_priority_processing ?settlement_batch)
+        )
+        (not
+          (node_compliance_ready ?processing_node)
+        )
+      )
+    :effect (node_compliance_ready ?processing_node)
+  )
+  (:action apply_fee_schedule_to_node
+    :parameters (?processing_node - processing_node ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (fee_schedule_available ?fee_schedule)
+        (not
+          (node_fee_applied ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_fee_applied ?processing_node)
+        (node_fee_schedule_bound ?processing_node ?fee_schedule)
+        (not
+          (fee_schedule_available ?fee_schedule)
+        )
+      )
+  )
+  (:action process_node_with_fee_and_compliance
+    :parameters (?processing_node - processing_node ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch ?validation_profile - validation_profile ?fee_schedule - fee_schedule)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (validation_profile_assigned ?processing_node ?validation_profile)
+        (batch_requires_priority_processing ?settlement_batch)
+        (node_fee_applied ?processing_node)
+        (node_fee_schedule_bound ?processing_node ?fee_schedule)
+        (not
+          (node_compliance_ready ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_compliance_ready ?processing_node)
+        (node_fee_confirmed ?processing_node)
+      )
+  )
+  (:action execute_node_compliance_check
+    :parameters (?processing_node - processing_node ?compliance_check - compliance_check ?validator - validator ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_ready ?processing_node)
+        (node_compliance_check_assigned ?processing_node ?compliance_check)
+        (validator_assigned ?processing_node ?validator)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (not
+          (batch_requires_additional_confirmation ?settlement_batch)
+        )
+        (not
+          (node_compliance_review_completed ?processing_node)
+        )
+      )
+    :effect (node_compliance_review_completed ?processing_node)
+  )
+  (:action execute_node_compliance_check_with_confirmation
+    :parameters (?processing_node - processing_node ?compliance_check - compliance_check ?validator - validator ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_ready ?processing_node)
+        (node_compliance_check_assigned ?processing_node ?compliance_check)
+        (validator_assigned ?processing_node ?validator)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (batch_requires_additional_confirmation ?settlement_batch)
+        (not
+          (node_compliance_review_completed ?processing_node)
+        )
+      )
+    :effect (node_compliance_review_completed ?processing_node)
+  )
+  (:action finalize_node_third_party_confirmation
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_review_completed ?processing_node)
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (not
+          (batch_requires_priority_processing ?settlement_batch)
+        )
+        (not
+          (batch_requires_additional_confirmation ?settlement_batch)
+        )
+        (not
+          (node_checks_finalized ?processing_node)
+        )
+      )
+    :effect (node_checks_finalized ?processing_node)
+  )
+  (:action finalize_node_checks_priority
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_review_completed ?processing_node)
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (batch_requires_priority_processing ?settlement_batch)
+        (not
+          (batch_requires_additional_confirmation ?settlement_batch)
+        )
+        (not
+          (node_checks_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_policy_applicable ?processing_node)
+      )
+  )
+  (:action finalize_node_checks_with_additional_confirmation
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_review_completed ?processing_node)
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (not
+          (batch_requires_priority_processing ?settlement_batch)
+        )
+        (batch_requires_additional_confirmation ?settlement_batch)
+        (not
+          (node_checks_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_policy_applicable ?processing_node)
+      )
+  )
+  (:action finalize_node_checks_priority_and_confirmation
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation ?compliance_artifact - compliance_artifact ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (node_compliance_review_completed ?processing_node)
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (node_compliance_artifact_association ?processing_node ?compliance_artifact)
+        (compliance_artifact_attached_to_batch ?compliance_artifact ?settlement_batch)
+        (batch_requires_priority_processing ?settlement_batch)
+        (batch_requires_additional_confirmation ?settlement_batch)
+        (not
+          (node_checks_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_policy_applicable ?processing_node)
+      )
+  )
+  (:action finalize_node_and_mark_settlement
+    :parameters (?processing_node - processing_node)
+    :precondition
+      (and
+        (node_checks_finalized ?processing_node)
+        (not
+          (node_policy_applicable ?processing_node)
+        )
+        (not
+          (node_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?processing_node)
+        (settlement_executed ?processing_node)
+      )
+  )
+  (:action attach_settlement_policy_to_node
+    :parameters (?processing_node - processing_node ?settlement_policy - settlement_policy)
+    :precondition
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_policy_applicable ?processing_node)
+        (settlement_policy_available ?settlement_policy)
+      )
+    :effect
+      (and
+        (node_policy_attached ?processing_node ?settlement_policy)
+        (not
+          (settlement_policy_available ?settlement_policy)
+        )
+      )
+  )
+  (:action prepare_node_for_execution
+    :parameters (?processing_node - processing_node ?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?validation_profile - validation_profile ?settlement_policy - settlement_policy)
+    :precondition
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_policy_applicable ?processing_node)
+        (node_policy_attached ?processing_node ?settlement_policy)
+        (node_originating_assignment ?processing_node ?originating_participant)
+        (node_beneficiary_assignment ?processing_node ?beneficiary_participant)
+        (originating_routing_ready ?originating_participant)
+        (beneficiary_routing_ready ?beneficiary_participant)
+        (validation_profile_assigned ?processing_node ?validation_profile)
+        (not
+          (node_ready_for_settlement ?processing_node)
+        )
+      )
+    :effect (node_ready_for_settlement ?processing_node)
+  )
+  (:action complete_node_finalization
+    :parameters (?processing_node - processing_node)
+    :precondition
+      (and
+        (node_checks_finalized ?processing_node)
+        (node_ready_for_settlement ?processing_node)
+        (not
+          (node_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?processing_node)
+        (settlement_executed ?processing_node)
+      )
+  )
+  (:action apply_regulatory_approval_to_node
+    :parameters (?processing_node - processing_node ?regulatory_approval - regulatory_approval ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (released_for_processing ?processing_node)
+        (validation_profile_assigned ?processing_node ?validation_profile)
+        (regulatory_approval_available ?regulatory_approval)
+        (node_regulatory_approval_assigned ?processing_node ?regulatory_approval)
+        (not
+          (node_regulatory_approved ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_regulatory_approved ?processing_node)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action validator_signoff_on_node
+    :parameters (?processing_node - processing_node ?validator - validator)
+    :precondition
+      (and
+        (node_regulatory_approved ?processing_node)
+        (validator_assigned ?processing_node ?validator)
+        (not
+          (node_validator_signoff_acquired ?processing_node)
+        )
+      )
+    :effect (node_validator_signoff_acquired ?processing_node)
+  )
+  (:action record_validator_signoff_and_request_third_party_confirmation
+    :parameters (?processing_node - processing_node ?third_party_confirmation - third_party_confirmation)
+    :precondition
+      (and
+        (node_validator_signoff_acquired ?processing_node)
+        (node_third_party_confirmation_attached ?processing_node ?third_party_confirmation)
+        (not
+          (node_third_party_confirmed ?processing_node)
+        )
+      )
+    :effect (node_third_party_confirmed ?processing_node)
+  )
+  (:action finalize_node_authorization
+    :parameters (?processing_node - processing_node)
+    :precondition
+      (and
+        (node_third_party_confirmed ?processing_node)
+        (not
+          (node_finalized ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (node_finalized ?processing_node)
+        (settlement_executed ?processing_node)
+      )
+  )
+  (:action execute_originating_participant_settlement
+    :parameters (?originating_participant - originating_participant ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (originating_ready_for_batch ?originating_participant)
+        (originating_routing_ready ?originating_participant)
+        (settlement_batch_active ?settlement_batch)
+        (batch_preflight_completed ?settlement_batch)
+        (not
+          (settlement_executed ?originating_participant)
+        )
+      )
+    :effect (settlement_executed ?originating_participant)
+  )
+  (:action execute_beneficiary_participant_settlement
+    :parameters (?beneficiary_participant - beneficiary_participant ?settlement_batch - settlement_batch)
+    :precondition
+      (and
+        (beneficiary_ready_for_batch ?beneficiary_participant)
+        (beneficiary_routing_ready ?beneficiary_participant)
+        (settlement_batch_active ?settlement_batch)
+        (batch_preflight_completed ?settlement_batch)
+        (not
+          (settlement_executed ?beneficiary_participant)
+        )
+      )
+    :effect (settlement_executed ?beneficiary_participant)
+  )
+  (:action attach_settlement_authorization_token_to_instruction
+    :parameters (?instruction_record - instruction_record ?settlement_authorization_token - settlement_authorization_token ?validation_profile - validation_profile)
+    :precondition
+      (and
+        (settlement_executed ?instruction_record)
+        (validation_profile_assigned ?instruction_record ?validation_profile)
+        (settlement_token_available ?settlement_authorization_token)
+        (not
+          (settlement_authorized ?instruction_record)
+        )
+      )
+    :effect
+      (and
+        (settlement_authorized ?instruction_record)
+        (settlement_token_bound ?instruction_record ?settlement_authorization_token)
+        (not
+          (settlement_token_available ?settlement_authorization_token)
+        )
+      )
+  )
+  (:action release_entity_post_authorization_originator
+    :parameters (?originating_participant - originating_participant ?authorization_resource - authorization_resource ?settlement_authorization_token - settlement_authorization_token)
+    :precondition
+      (and
+        (settlement_authorized ?originating_participant)
+        (authorization_assignment ?originating_participant ?authorization_resource)
+        (settlement_token_bound ?originating_participant ?settlement_authorization_token)
+        (not
+          (entity_committed ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?originating_participant)
+        (auth_resource_available ?authorization_resource)
+        (settlement_token_available ?settlement_authorization_token)
+      )
+  )
+  (:action release_entity_post_authorization_beneficiary
+    :parameters (?beneficiary_participant - beneficiary_participant ?authorization_resource - authorization_resource ?settlement_authorization_token - settlement_authorization_token)
+    :precondition
+      (and
+        (settlement_authorized ?beneficiary_participant)
+        (authorization_assignment ?beneficiary_participant ?authorization_resource)
+        (settlement_token_bound ?beneficiary_participant ?settlement_authorization_token)
+        (not
+          (entity_committed ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?beneficiary_participant)
+        (auth_resource_available ?authorization_resource)
+        (settlement_token_available ?settlement_authorization_token)
+      )
+  )
+  (:action release_node_post_authorization
+    :parameters (?processing_node - processing_node ?authorization_resource - authorization_resource ?settlement_authorization_token - settlement_authorization_token)
+    :precondition
+      (and
+        (settlement_authorized ?processing_node)
+        (authorization_assignment ?processing_node ?authorization_resource)
+        (settlement_token_bound ?processing_node ?settlement_authorization_token)
+        (not
+          (entity_committed ?processing_node)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?processing_node)
+        (auth_resource_available ?authorization_resource)
+        (settlement_token_available ?settlement_authorization_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem payment_validation_scenario)
+  (:domain payments_settlement_validation_domain)
+  (:objects originating_participant_1 - originating_participant beneficiary_participant_1 - beneficiary_participant processing_node_1 - processing_node processing_node_2 - processing_node auth_slot_1 - authorization_resource auth_slot_2 - authorization_resource auth_slot_3 - authorization_resource validation_profile_standard - validation_profile validator_handler_1 - validator channel_profile_default - channel_profile clearing_channel_instance_a - clearing_channel_instance counterparty_channel_a - counterparty_channel settlement_batch_1 - settlement_batch compliance_artifact_1 - compliance_artifact compliance_artifact_2 - compliance_artifact fee_schedule_standard - fee_schedule fee_schedule_premium - fee_schedule settlement_policy_standard - settlement_policy settlement_policy_expedited - settlement_policy settlement_token_1 - settlement_authorization_token compliance_check_1 - compliance_check regulatory_approval_1 - regulatory_approval regulatory_approval_2 - regulatory_approval third_party_confirmation_1 - third_party_confirmation)
+  (:init
+    (auth_resource_available auth_slot_1)
+    (auth_resource_available auth_slot_2)
+    (auth_resource_available auth_slot_3)
+    (validation_profile_available validation_profile_standard)
+    (validator_available validator_handler_1)
+    (channel_profile_available channel_profile_default)
+    (originating_channel_instance_linked originating_participant_1 clearing_channel_instance_a)
+    (beneficiary_counterparty_channel_linked beneficiary_participant_1 counterparty_channel_a)
+    (settlement_batch_available settlement_batch_1)
+    (compliance_artifact_available compliance_artifact_1)
+    (compliance_artifact_available compliance_artifact_2)
+    (node_originating_assignment processing_node_1 originating_participant_1)
+    (node_originating_assignment processing_node_2 originating_participant_1)
+    (node_beneficiary_assignment processing_node_1 beneficiary_participant_1)
+    (node_beneficiary_assignment processing_node_2 beneficiary_participant_1)
+    (node_batch_assignment processing_node_1 settlement_batch_1)
+    (node_batch_assignment processing_node_2 settlement_batch_1)
+    (node_compliance_artifact_association processing_node_1 compliance_artifact_1)
+    (node_compliance_artifact_association processing_node_2 compliance_artifact_2)
+    (fee_schedule_available fee_schedule_standard)
+    (fee_schedule_available fee_schedule_premium)
+    (settlement_policy_available settlement_policy_standard)
+    (settlement_policy_available settlement_policy_expedited)
+    (settlement_token_available settlement_token_1)
+    (compliance_check_available compliance_check_1)
+    (regulatory_approval_available regulatory_approval_1)
+    (node_regulatory_approval_assigned processing_node_1 regulatory_approval_1)
+    (node_regulatory_approval_assigned processing_node_2 regulatory_approval_2)
+    (third_party_confirmation_available third_party_confirmation_1)
+  )
+  (:goal
+    (and
+      (entity_committed originating_participant_1)
+      (entity_committed beneficiary_participant_1)
+      (entity_committed processing_node_1)
+      (entity_committed processing_node_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_instruction originating_participant_1)
+(assign_auth_resource_to_instruction originating_participant_1 auth_slot_1)
+(assign_validation_profile_to_instruction originating_participant_1 validation_profile_standard)
+(finalize_instruction_validation originating_participant_1 validation_profile_standard)
+(apply_channel_profile_to_originator originating_participant_1 clearing_channel_instance_a channel_profile_default)
+(release_validation_profile originating_participant_1 validation_profile_standard)
+(register_instruction beneficiary_participant_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_b4ozgmsf/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_b4ozgmsf/plan.pddl 
+
+
+--- stderr ---
+

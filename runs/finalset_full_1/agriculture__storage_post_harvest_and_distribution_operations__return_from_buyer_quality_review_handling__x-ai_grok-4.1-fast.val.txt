@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain post_harvest_return_handling_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object process_resource - object location_resource - object product_batch_type - object returned_batch - product_batch_type buyer_channel - operational_resource quality_test - operational_resource technician - operational_resource certificate_template - operational_resource packing_specification - operational_resource release_authorization_token - operational_resource conditioning_equipment - operational_resource environment_profile - operational_resource conditioning_process - process_resource container_batch - process_resource buyer_claim_reference - process_resource storage_zone - location_resource distribution_channel - location_resource outbound_shipment - location_resource consignment_group - returned_batch handling_record_group - returned_batch inbound_unit - consignment_group outbound_unit - consignment_group return_case_record - handling_record_group)
+  (:predicates
+    (return_registered ?returned_batch - returned_batch)
+    (return_quality_decision_recorded ?returned_batch - returned_batch)
+    (channel_assignment_recorded ?returned_batch - returned_batch)
+    (return_reconciled ?returned_batch - returned_batch)
+    (return_ready_for_release ?returned_batch - returned_batch)
+    (return_release_authorized ?returned_batch - returned_batch)
+    (buyer_channel_available ?buyer_channel - buyer_channel)
+    (assigned_to_buyer_channel ?returned_batch - returned_batch ?buyer_channel - buyer_channel)
+    (quality_test_available ?quality_test - quality_test)
+    (quality_test_assigned_to_item ?returned_batch - returned_batch ?quality_test - quality_test)
+    (technician_available ?technician - technician)
+    (technician_assigned_to_item ?returned_batch - returned_batch ?technician - technician)
+    (conditioning_process_available ?conditioning_process - conditioning_process)
+    (inbound_unit_conditioning_assigned ?inbound_unit - inbound_unit ?conditioning_process - conditioning_process)
+    (outbound_unit_conditioning_assigned ?outbound_unit - outbound_unit ?conditioning_process - conditioning_process)
+    (inbound_unit_in_storage_zone ?inbound_unit - inbound_unit ?storage_zone - storage_zone)
+    (storage_zone_reserved ?storage_zone - storage_zone)
+    (storage_zone_staged ?storage_zone - storage_zone)
+    (inbound_unit_ready_for_shipment ?inbound_unit - inbound_unit)
+    (assigned_to_distribution_channel ?outbound_unit - outbound_unit ?distribution_channel - distribution_channel)
+    (distribution_channel_reserved ?distribution_channel - distribution_channel)
+    (distribution_channel_staged ?distribution_channel - distribution_channel)
+    (outbound_unit_ready_for_shipment ?outbound_unit - outbound_unit)
+    (outbound_shipment_available ?outbound_shipment - outbound_shipment)
+    (outbound_shipment_staged ?outbound_shipment - outbound_shipment)
+    (shipment_in_storage_zone ?outbound_shipment - outbound_shipment ?storage_zone - storage_zone)
+    (shipment_assigned_to_distribution_channel ?outbound_shipment - outbound_shipment ?distribution_channel - distribution_channel)
+    (shipment_label_ready ?outbound_shipment - outbound_shipment)
+    (shipment_label_verified ?outbound_shipment - outbound_shipment)
+    (shipment_verification_completed ?outbound_shipment - outbound_shipment)
+    (case_includes_inbound_unit ?return_case_record - return_case_record ?inbound_unit - inbound_unit)
+    (case_includes_outbound_unit ?return_case_record - return_case_record ?outbound_unit - outbound_unit)
+    (case_links_to_shipment ?return_case_record - return_case_record ?outbound_shipment - outbound_shipment)
+    (container_available ?container_batch - container_batch)
+    (case_includes_container_batch ?return_case_record - return_case_record ?container_batch - container_batch)
+    (container_allocated ?container_batch - container_batch)
+    (container_linked_to_shipment ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    (case_labeling_started ?return_case_record - return_case_record)
+    (case_label_evidence_recorded ?return_case_record - return_case_record)
+    (case_ready_for_finalization ?return_case_record - return_case_record)
+    (certificate_attached_flag ?return_case_record - return_case_record)
+    (label_verification_recorded ?return_case_record - return_case_record)
+    (packing_spec_flagged ?return_case_record - return_case_record)
+    (final_checks_completed ?return_case_record - return_case_record)
+    (buyer_claim_reference_available ?buyer_claim_reference - buyer_claim_reference)
+    (case_linked_to_buyer_claim ?return_case_record - return_case_record ?buyer_claim_reference - buyer_claim_reference)
+    (case_buyer_claim_attached ?return_case_record - return_case_record)
+    (case_label_check_performed ?return_case_record - return_case_record)
+    (case_label_verified ?return_case_record - return_case_record)
+    (certificate_template_available ?certificate_template - certificate_template)
+    (attached_certificate_template ?return_case_record - return_case_record ?certificate_template - certificate_template)
+    (packing_specification_available ?packing_specification - packing_specification)
+    (case_attached_packing_spec ?return_case_record - return_case_record ?packing_specification - packing_specification)
+    (conditioning_equipment_available ?conditioning_equipment - conditioning_equipment)
+    (case_assigned_conditioning_equipment ?return_case_record - return_case_record ?conditioning_equipment - conditioning_equipment)
+    (environment_profile_available ?environment_profile - environment_profile)
+    (case_assigned_environment_profile ?return_case_record - return_case_record ?environment_profile - environment_profile)
+    (release_authorization_token_available ?release_authorization_token - release_authorization_token)
+    (return_linked_release_authorization_token ?returned_batch - returned_batch ?release_authorization_token - release_authorization_token)
+    (inbound_unit_conditioning_completed ?inbound_unit - inbound_unit)
+    (outbound_unit_conditioning_completed ?outbound_unit - outbound_unit)
+    (case_closed ?return_case_record - return_case_record)
+  )
+  (:action register_returned_batch
+    :parameters (?returned_batch - returned_batch)
+    :precondition
+      (and
+        (not
+          (return_registered ?returned_batch)
+        )
+        (not
+          (return_reconciled ?returned_batch)
+        )
+      )
+    :effect (return_registered ?returned_batch)
+  )
+  (:action link_returned_batch_to_buyer_channel
+    :parameters (?returned_batch - returned_batch ?buyer_channel - buyer_channel)
+    :precondition
+      (and
+        (return_registered ?returned_batch)
+        (not
+          (channel_assignment_recorded ?returned_batch)
+        )
+        (buyer_channel_available ?buyer_channel)
+      )
+    :effect
+      (and
+        (channel_assignment_recorded ?returned_batch)
+        (assigned_to_buyer_channel ?returned_batch ?buyer_channel)
+        (not
+          (buyer_channel_available ?buyer_channel)
+        )
+      )
+  )
+  (:action assign_quality_test_to_returned_batch
+    :parameters (?returned_batch - returned_batch ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_registered ?returned_batch)
+        (channel_assignment_recorded ?returned_batch)
+        (quality_test_available ?quality_test)
+      )
+    :effect
+      (and
+        (quality_test_assigned_to_item ?returned_batch ?quality_test)
+        (not
+          (quality_test_available ?quality_test)
+        )
+      )
+  )
+  (:action finalize_batch_grading
+    :parameters (?returned_batch - returned_batch ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_registered ?returned_batch)
+        (channel_assignment_recorded ?returned_batch)
+        (quality_test_assigned_to_item ?returned_batch ?quality_test)
+        (not
+          (return_quality_decision_recorded ?returned_batch)
+        )
+      )
+    :effect (return_quality_decision_recorded ?returned_batch)
+  )
+  (:action release_quality_test
+    :parameters (?returned_batch - returned_batch ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_test_assigned_to_item ?returned_batch ?quality_test)
+      )
+    :effect
+      (and
+        (quality_test_available ?quality_test)
+        (not
+          (quality_test_assigned_to_item ?returned_batch ?quality_test)
+        )
+      )
+  )
+  (:action assign_technician_to_return_case
+    :parameters (?returned_batch - returned_batch ?technician - technician)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?returned_batch)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (technician_assigned_to_item ?returned_batch ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action unassign_technician_from_return_case
+    :parameters (?returned_batch - returned_batch ?technician - technician)
+    :precondition
+      (and
+        (technician_assigned_to_item ?returned_batch ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (technician_assigned_to_item ?returned_batch ?technician)
+        )
+      )
+  )
+  (:action assign_conditioning_equipment_to_case
+    :parameters (?return_case_record - return_case_record ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (conditioning_equipment_available ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (case_assigned_conditioning_equipment ?return_case_record ?conditioning_equipment)
+        (not
+          (conditioning_equipment_available ?conditioning_equipment)
+        )
+      )
+  )
+  (:action release_conditioning_equipment_from_case
+    :parameters (?return_case_record - return_case_record ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (case_assigned_conditioning_equipment ?return_case_record ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (conditioning_equipment_available ?conditioning_equipment)
+        (not
+          (case_assigned_conditioning_equipment ?return_case_record ?conditioning_equipment)
+        )
+      )
+  )
+  (:action assign_environment_profile_to_case
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (environment_profile_available ?environment_profile)
+      )
+    :effect
+      (and
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (not
+          (environment_profile_available ?environment_profile)
+        )
+      )
+  )
+  (:action release_environment_profile_from_case
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile)
+    :precondition
+      (and
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+      )
+    :effect
+      (and
+        (environment_profile_available ?environment_profile)
+        (not
+          (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        )
+      )
+  )
+  (:action reserve_storage_zone_for_inbound_unit
+    :parameters (?inbound_unit - inbound_unit ?storage_zone - storage_zone ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?inbound_unit)
+        (quality_test_assigned_to_item ?inbound_unit ?quality_test)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (not
+          (storage_zone_reserved ?storage_zone)
+        )
+        (not
+          (storage_zone_staged ?storage_zone)
+        )
+      )
+    :effect (storage_zone_reserved ?storage_zone)
+  )
+  (:action execute_conditioning_on_inbound_unit
+    :parameters (?inbound_unit - inbound_unit ?storage_zone - storage_zone ?technician - technician)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?inbound_unit)
+        (technician_assigned_to_item ?inbound_unit ?technician)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (storage_zone_reserved ?storage_zone)
+        (not
+          (inbound_unit_conditioning_completed ?inbound_unit)
+        )
+      )
+    :effect
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+      )
+  )
+  (:action start_conditioning_process_on_inbound_unit
+    :parameters (?inbound_unit - inbound_unit ?storage_zone - storage_zone ?conditioning_process - conditioning_process)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?inbound_unit)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (conditioning_process_available ?conditioning_process)
+        (not
+          (inbound_unit_conditioning_completed ?inbound_unit)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_staged ?storage_zone)
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (inbound_unit_conditioning_assigned ?inbound_unit ?conditioning_process)
+        (not
+          (conditioning_process_available ?conditioning_process)
+        )
+      )
+  )
+  (:action finalize_conditioning_on_inbound_unit
+    :parameters (?inbound_unit - inbound_unit ?storage_zone - storage_zone ?quality_test - quality_test ?conditioning_process - conditioning_process)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?inbound_unit)
+        (quality_test_assigned_to_item ?inbound_unit ?quality_test)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (storage_zone_staged ?storage_zone)
+        (inbound_unit_conditioning_assigned ?inbound_unit ?conditioning_process)
+        (not
+          (inbound_unit_ready_for_shipment ?inbound_unit)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_reserved ?storage_zone)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+        (conditioning_process_available ?conditioning_process)
+        (not
+          (inbound_unit_conditioning_assigned ?inbound_unit ?conditioning_process)
+        )
+      )
+  )
+  (:action reserve_distribution_channel_for_outbound_unit
+    :parameters (?outbound_unit - outbound_unit ?distribution_channel - distribution_channel ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?outbound_unit)
+        (quality_test_assigned_to_item ?outbound_unit ?quality_test)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (not
+          (distribution_channel_reserved ?distribution_channel)
+        )
+        (not
+          (distribution_channel_staged ?distribution_channel)
+        )
+      )
+    :effect (distribution_channel_reserved ?distribution_channel)
+  )
+  (:action assign_technician_to_outbound_unit
+    :parameters (?outbound_unit - outbound_unit ?distribution_channel - distribution_channel ?technician - technician)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?outbound_unit)
+        (technician_assigned_to_item ?outbound_unit ?technician)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (distribution_channel_reserved ?distribution_channel)
+        (not
+          (outbound_unit_conditioning_completed ?outbound_unit)
+        )
+      )
+    :effect
+      (and
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+      )
+  )
+  (:action assign_conditioning_process_to_outbound_unit
+    :parameters (?outbound_unit - outbound_unit ?distribution_channel - distribution_channel ?conditioning_process - conditioning_process)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?outbound_unit)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (conditioning_process_available ?conditioning_process)
+        (not
+          (outbound_unit_conditioning_completed ?outbound_unit)
+        )
+      )
+    :effect
+      (and
+        (distribution_channel_staged ?distribution_channel)
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (outbound_unit_conditioning_assigned ?outbound_unit ?conditioning_process)
+        (not
+          (conditioning_process_available ?conditioning_process)
+        )
+      )
+  )
+  (:action finalize_conditioning_on_outbound_unit
+    :parameters (?outbound_unit - outbound_unit ?distribution_channel - distribution_channel ?quality_test - quality_test ?conditioning_process - conditioning_process)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?outbound_unit)
+        (quality_test_assigned_to_item ?outbound_unit ?quality_test)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (distribution_channel_staged ?distribution_channel)
+        (outbound_unit_conditioning_assigned ?outbound_unit ?conditioning_process)
+        (not
+          (outbound_unit_ready_for_shipment ?outbound_unit)
+        )
+      )
+    :effect
+      (and
+        (distribution_channel_reserved ?distribution_channel)
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+        (conditioning_process_available ?conditioning_process)
+        (not
+          (outbound_unit_conditioning_assigned ?outbound_unit ?conditioning_process)
+        )
+      )
+  )
+  (:action assemble_and_stage_shipment_zone_reserved_channel_reserved
+    :parameters (?inbound_unit - inbound_unit ?outbound_unit - outbound_unit ?storage_zone - storage_zone ?distribution_channel - distribution_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (storage_zone_reserved ?storage_zone)
+        (distribution_channel_reserved ?distribution_channel)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+        (outbound_shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_in_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_distribution_channel ?outbound_shipment ?distribution_channel)
+        (not
+          (outbound_shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_and_stage_shipment_zone_staged_channel_reserved
+    :parameters (?inbound_unit - inbound_unit ?outbound_unit - outbound_unit ?storage_zone - storage_zone ?distribution_channel - distribution_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (storage_zone_staged ?storage_zone)
+        (distribution_channel_reserved ?distribution_channel)
+        (not
+          (inbound_unit_ready_for_shipment ?inbound_unit)
+        )
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+        (outbound_shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_in_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_distribution_channel ?outbound_shipment ?distribution_channel)
+        (shipment_label_ready ?outbound_shipment)
+        (not
+          (outbound_shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_and_stage_shipment_zone_reserved_channel_staged
+    :parameters (?inbound_unit - inbound_unit ?outbound_unit - outbound_unit ?storage_zone - storage_zone ?distribution_channel - distribution_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (storage_zone_reserved ?storage_zone)
+        (distribution_channel_staged ?distribution_channel)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+        (not
+          (outbound_unit_ready_for_shipment ?outbound_unit)
+        )
+        (outbound_shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_in_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_distribution_channel ?outbound_shipment ?distribution_channel)
+        (shipment_label_verified ?outbound_shipment)
+        (not
+          (outbound_shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action assemble_and_stage_shipment_zone_staged_channel_staged
+    :parameters (?inbound_unit - inbound_unit ?outbound_unit - outbound_unit ?storage_zone - storage_zone ?distribution_channel - distribution_channel ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (inbound_unit_in_storage_zone ?inbound_unit ?storage_zone)
+        (assigned_to_distribution_channel ?outbound_unit ?distribution_channel)
+        (storage_zone_staged ?storage_zone)
+        (distribution_channel_staged ?distribution_channel)
+        (not
+          (inbound_unit_ready_for_shipment ?inbound_unit)
+        )
+        (not
+          (outbound_unit_ready_for_shipment ?outbound_unit)
+        )
+        (outbound_shipment_available ?outbound_shipment)
+      )
+    :effect
+      (and
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_in_storage_zone ?outbound_shipment ?storage_zone)
+        (shipment_assigned_to_distribution_channel ?outbound_shipment ?distribution_channel)
+        (shipment_label_ready ?outbound_shipment)
+        (shipment_label_verified ?outbound_shipment)
+        (not
+          (outbound_shipment_available ?outbound_shipment)
+        )
+      )
+  )
+  (:action verify_shipment_before_labeling
+    :parameters (?outbound_shipment - outbound_shipment ?inbound_unit - inbound_unit ?quality_test - quality_test)
+    :precondition
+      (and
+        (outbound_shipment_staged ?outbound_shipment)
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (quality_test_assigned_to_item ?inbound_unit ?quality_test)
+        (not
+          (shipment_verification_completed ?outbound_shipment)
+        )
+      )
+    :effect (shipment_verification_completed ?outbound_shipment)
+  )
+  (:action allocate_container_to_shipment
+    :parameters (?return_case_record - return_case_record ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (case_links_to_shipment ?return_case_record ?outbound_shipment)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_available ?container_batch)
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_verification_completed ?outbound_shipment)
+        (not
+          (container_allocated ?container_batch)
+        )
+      )
+    :effect
+      (and
+        (container_allocated ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (not
+          (container_available ?container_batch)
+        )
+      )
+  )
+  (:action prepare_case_for_labeling
+    :parameters (?return_case_record - return_case_record ?container_batch - container_batch ?outbound_shipment - outbound_shipment ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_allocated ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (quality_test_assigned_to_item ?return_case_record ?quality_test)
+        (not
+          (shipment_label_ready ?outbound_shipment)
+        )
+        (not
+          (case_labeling_started ?return_case_record)
+        )
+      )
+    :effect (case_labeling_started ?return_case_record)
+  )
+  (:action attach_certificate_template_to_case
+    :parameters (?return_case_record - return_case_record ?certificate_template - certificate_template)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (certificate_template_available ?certificate_template)
+        (not
+          (certificate_attached_flag ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (certificate_attached_flag ?return_case_record)
+        (attached_certificate_template ?return_case_record ?certificate_template)
+        (not
+          (certificate_template_available ?certificate_template)
+        )
+      )
+  )
+  (:action apply_container_label_and_record_validation
+    :parameters (?return_case_record - return_case_record ?container_batch - container_batch ?outbound_shipment - outbound_shipment ?quality_test - quality_test ?certificate_template - certificate_template)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_allocated ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (quality_test_assigned_to_item ?return_case_record ?quality_test)
+        (shipment_label_ready ?outbound_shipment)
+        (certificate_attached_flag ?return_case_record)
+        (attached_certificate_template ?return_case_record ?certificate_template)
+        (not
+          (case_labeling_started ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_labeling_started ?return_case_record)
+        (label_verification_recorded ?return_case_record)
+      )
+  )
+  (:action record_container_label_inspection
+    :parameters (?return_case_record - return_case_record ?conditioning_equipment - conditioning_equipment ?technician - technician ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_labeling_started ?return_case_record)
+        (case_assigned_conditioning_equipment ?return_case_record ?conditioning_equipment)
+        (technician_assigned_to_item ?return_case_record ?technician)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (not
+          (shipment_label_verified ?outbound_shipment)
+        )
+        (not
+          (case_label_evidence_recorded ?return_case_record)
+        )
+      )
+    :effect (case_label_evidence_recorded ?return_case_record)
+  )
+  (:action re_record_container_label_inspection
+    :parameters (?return_case_record - return_case_record ?conditioning_equipment - conditioning_equipment ?technician - technician ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_labeling_started ?return_case_record)
+        (case_assigned_conditioning_equipment ?return_case_record ?conditioning_equipment)
+        (technician_assigned_to_item ?return_case_record ?technician)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (shipment_label_verified ?outbound_shipment)
+        (not
+          (case_label_evidence_recorded ?return_case_record)
+        )
+      )
+    :effect (case_label_evidence_recorded ?return_case_record)
+  )
+  (:action approve_case_label_evidence
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_label_evidence_recorded ?return_case_record)
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (not
+          (shipment_label_ready ?outbound_shipment)
+        )
+        (not
+          (shipment_label_verified ?outbound_shipment)
+        )
+        (not
+          (case_ready_for_finalization ?return_case_record)
+        )
+      )
+    :effect (case_ready_for_finalization ?return_case_record)
+  )
+  (:action approve_case_label_evidence_and_flag_packing_spec
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_label_evidence_recorded ?return_case_record)
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (shipment_label_ready ?outbound_shipment)
+        (not
+          (shipment_label_verified ?outbound_shipment)
+        )
+        (not
+          (case_ready_for_finalization ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (packing_spec_flagged ?return_case_record)
+      )
+  )
+  (:action approve_case_label_evidence_variant
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_label_evidence_recorded ?return_case_record)
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (not
+          (shipment_label_ready ?outbound_shipment)
+        )
+        (shipment_label_verified ?outbound_shipment)
+        (not
+          (case_ready_for_finalization ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (packing_spec_flagged ?return_case_record)
+      )
+  )
+  (:action approve_case_label_evidence_full
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile ?container_batch - container_batch ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (case_label_evidence_recorded ?return_case_record)
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (case_includes_container_batch ?return_case_record ?container_batch)
+        (container_linked_to_shipment ?container_batch ?outbound_shipment)
+        (shipment_label_ready ?outbound_shipment)
+        (shipment_label_verified ?outbound_shipment)
+        (not
+          (case_ready_for_finalization ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (packing_spec_flagged ?return_case_record)
+      )
+  )
+  (:action finalize_case_without_packing_spec
+    :parameters (?return_case_record - return_case_record)
+    :precondition
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (not
+          (packing_spec_flagged ?return_case_record)
+        )
+        (not
+          (case_closed ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?return_case_record)
+        (return_ready_for_release ?return_case_record)
+      )
+  )
+  (:action attach_packing_specification_to_case
+    :parameters (?return_case_record - return_case_record ?packing_specification - packing_specification)
+    :precondition
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (packing_spec_flagged ?return_case_record)
+        (packing_specification_available ?packing_specification)
+      )
+    :effect
+      (and
+        (case_attached_packing_spec ?return_case_record ?packing_specification)
+        (not
+          (packing_specification_available ?packing_specification)
+        )
+      )
+  )
+  (:action perform_final_verification_checks_on_case
+    :parameters (?return_case_record - return_case_record ?inbound_unit - inbound_unit ?outbound_unit - outbound_unit ?quality_test - quality_test ?packing_specification - packing_specification)
+    :precondition
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (packing_spec_flagged ?return_case_record)
+        (case_attached_packing_spec ?return_case_record ?packing_specification)
+        (case_includes_inbound_unit ?return_case_record ?inbound_unit)
+        (case_includes_outbound_unit ?return_case_record ?outbound_unit)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+        (quality_test_assigned_to_item ?return_case_record ?quality_test)
+        (not
+          (final_checks_completed ?return_case_record)
+        )
+      )
+    :effect (final_checks_completed ?return_case_record)
+  )
+  (:action finalize_case_after_verification
+    :parameters (?return_case_record - return_case_record)
+    :precondition
+      (and
+        (case_ready_for_finalization ?return_case_record)
+        (final_checks_completed ?return_case_record)
+        (not
+          (case_closed ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?return_case_record)
+        (return_ready_for_release ?return_case_record)
+      )
+  )
+  (:action link_case_to_buyer_claim_reference
+    :parameters (?return_case_record - return_case_record ?buyer_claim_reference - buyer_claim_reference ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_quality_decision_recorded ?return_case_record)
+        (quality_test_assigned_to_item ?return_case_record ?quality_test)
+        (buyer_claim_reference_available ?buyer_claim_reference)
+        (case_linked_to_buyer_claim ?return_case_record ?buyer_claim_reference)
+        (not
+          (case_buyer_claim_attached ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_buyer_claim_attached ?return_case_record)
+        (not
+          (buyer_claim_reference_available ?buyer_claim_reference)
+        )
+      )
+  )
+  (:action perform_claim_label_check_on_case
+    :parameters (?return_case_record - return_case_record ?technician - technician)
+    :precondition
+      (and
+        (case_buyer_claim_attached ?return_case_record)
+        (technician_assigned_to_item ?return_case_record ?technician)
+        (not
+          (case_label_check_performed ?return_case_record)
+        )
+      )
+    :effect (case_label_check_performed ?return_case_record)
+  )
+  (:action apply_environment_profile_and_mark_label_verification
+    :parameters (?return_case_record - return_case_record ?environment_profile - environment_profile)
+    :precondition
+      (and
+        (case_label_check_performed ?return_case_record)
+        (case_assigned_environment_profile ?return_case_record ?environment_profile)
+        (not
+          (case_label_verified ?return_case_record)
+        )
+      )
+    :effect (case_label_verified ?return_case_record)
+  )
+  (:action finalize_case_after_label_verification
+    :parameters (?return_case_record - return_case_record)
+    :precondition
+      (and
+        (case_label_verified ?return_case_record)
+        (not
+          (case_closed ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?return_case_record)
+        (return_ready_for_release ?return_case_record)
+      )
+  )
+  (:action mark_inbound_unit_ready_for_release
+    :parameters (?inbound_unit - inbound_unit ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (inbound_unit_conditioning_completed ?inbound_unit)
+        (inbound_unit_ready_for_shipment ?inbound_unit)
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_verification_completed ?outbound_shipment)
+        (not
+          (return_ready_for_release ?inbound_unit)
+        )
+      )
+    :effect (return_ready_for_release ?inbound_unit)
+  )
+  (:action mark_outbound_unit_ready_for_release
+    :parameters (?outbound_unit - outbound_unit ?outbound_shipment - outbound_shipment)
+    :precondition
+      (and
+        (outbound_unit_conditioning_completed ?outbound_unit)
+        (outbound_unit_ready_for_shipment ?outbound_unit)
+        (outbound_shipment_staged ?outbound_shipment)
+        (shipment_verification_completed ?outbound_shipment)
+        (not
+          (return_ready_for_release ?outbound_unit)
+        )
+      )
+    :effect (return_ready_for_release ?outbound_unit)
+  )
+  (:action authorize_release_for_returned_batch
+    :parameters (?returned_batch - returned_batch ?release_authorization_token - release_authorization_token ?quality_test - quality_test)
+    :precondition
+      (and
+        (return_ready_for_release ?returned_batch)
+        (quality_test_assigned_to_item ?returned_batch ?quality_test)
+        (release_authorization_token_available ?release_authorization_token)
+        (not
+          (return_release_authorized ?returned_batch)
+        )
+      )
+    :effect
+      (and
+        (return_release_authorized ?returned_batch)
+        (return_linked_release_authorization_token ?returned_batch ?release_authorization_token)
+        (not
+          (release_authorization_token_available ?release_authorization_token)
+        )
+      )
+  )
+  (:action reconcile_and_reassign_inbound_unit
+    :parameters (?inbound_unit - inbound_unit ?buyer_channel - buyer_channel ?release_authorization_token - release_authorization_token)
+    :precondition
+      (and
+        (return_release_authorized ?inbound_unit)
+        (assigned_to_buyer_channel ?inbound_unit ?buyer_channel)
+        (return_linked_release_authorization_token ?inbound_unit ?release_authorization_token)
+        (not
+          (return_reconciled ?inbound_unit)
+        )
+      )
+    :effect
+      (and
+        (return_reconciled ?inbound_unit)
+        (buyer_channel_available ?buyer_channel)
+        (release_authorization_token_available ?release_authorization_token)
+      )
+  )
+  (:action reconcile_and_reassign_outbound_unit
+    :parameters (?outbound_unit - outbound_unit ?buyer_channel - buyer_channel ?release_authorization_token - release_authorization_token)
+    :precondition
+      (and
+        (return_release_authorized ?outbound_unit)
+        (assigned_to_buyer_channel ?outbound_unit ?buyer_channel)
+        (return_linked_release_authorization_token ?outbound_unit ?release_authorization_token)
+        (not
+          (return_reconciled ?outbound_unit)
+        )
+      )
+    :effect
+      (and
+        (return_reconciled ?outbound_unit)
+        (buyer_channel_available ?buyer_channel)
+        (release_authorization_token_available ?release_authorization_token)
+      )
+  )
+  (:action reconcile_and_reassign_case_record
+    :parameters (?return_case_record - return_case_record ?buyer_channel - buyer_channel ?release_authorization_token - release_authorization_token)
+    :precondition
+      (and
+        (return_release_authorized ?return_case_record)
+        (assigned_to_buyer_channel ?return_case_record ?buyer_channel)
+        (return_linked_release_authorization_token ?return_case_record ?release_authorization_token)
+        (not
+          (return_reconciled ?return_case_record)
+        )
+      )
+    :effect
+      (and
+        (return_reconciled ?return_case_record)
+        (buyer_channel_available ?buyer_channel)
+        (release_authorization_token_available ?release_authorization_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem return_from_buyer_quality_review_scenario)
+  (:domain post_harvest_return_handling_domain)
+  (:objects inbound_unit_1 - inbound_unit outbound_unit_1 - outbound_unit return_case_record_1 - return_case_record return_case_record_2 - return_case_record buyer_channel_primary - buyer_channel buyer_channel_secondary - buyer_channel buyer_channel_alternate - buyer_channel quality_test_moisture - quality_test technician_inspector_1 - technician conditioning_drying - conditioning_process storage_zone_a - storage_zone distribution_channel_resale - distribution_channel outbound_shipment_1 - outbound_shipment container_batch_1 - container_batch container_batch_2 - container_batch certificate_template_quality - certificate_template certificate_template_safety - certificate_template packing_spec_standard - packing_specification packing_spec_special - packing_specification release_token_1 - release_authorization_token conditioning_equipment_dryer - conditioning_equipment buyer_claim_ref_1 - buyer_claim_reference buyer_claim_ref_2 - buyer_claim_reference environment_profile_cool_storage - environment_profile)
+  (:init
+    (buyer_channel_available buyer_channel_primary)
+    (buyer_channel_available buyer_channel_secondary)
+    (buyer_channel_available buyer_channel_alternate)
+    (quality_test_available quality_test_moisture)
+    (technician_available technician_inspector_1)
+    (conditioning_process_available conditioning_drying)
+    (inbound_unit_in_storage_zone inbound_unit_1 storage_zone_a)
+    (assigned_to_distribution_channel outbound_unit_1 distribution_channel_resale)
+    (outbound_shipment_available outbound_shipment_1)
+    (container_available container_batch_1)
+    (container_available container_batch_2)
+    (case_includes_inbound_unit return_case_record_1 inbound_unit_1)
+    (case_includes_inbound_unit return_case_record_2 inbound_unit_1)
+    (case_includes_outbound_unit return_case_record_1 outbound_unit_1)
+    (case_includes_outbound_unit return_case_record_2 outbound_unit_1)
+    (case_links_to_shipment return_case_record_1 outbound_shipment_1)
+    (case_links_to_shipment return_case_record_2 outbound_shipment_1)
+    (case_includes_container_batch return_case_record_1 container_batch_1)
+    (case_includes_container_batch return_case_record_2 container_batch_2)
+    (certificate_template_available certificate_template_quality)
+    (certificate_template_available certificate_template_safety)
+    (packing_specification_available packing_spec_standard)
+    (packing_specification_available packing_spec_special)
+    (release_authorization_token_available release_token_1)
+    (conditioning_equipment_available conditioning_equipment_dryer)
+    (buyer_claim_reference_available buyer_claim_ref_1)
+    (case_linked_to_buyer_claim return_case_record_1 buyer_claim_ref_1)
+    (case_linked_to_buyer_claim return_case_record_2 buyer_claim_ref_2)
+    (environment_profile_available environment_profile_cool_storage)
+  )
+  (:goal
+    (and
+      (return_reconciled inbound_unit_1)
+      (return_reconciled outbound_unit_1)
+      (return_reconciled return_case_record_1)
+      (return_reconciled return_case_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_returned_batch inbound_unit_1)
+(link_returned_batch_to_buyer_channel inbound_unit_1 buyer_channel_primary)
+(assign_quality_test_to_returned_batch inbound_unit_1 quality_test_moisture)
+(finalize_batch_grading inbound_unit_1 quality_test_moisture)
+(assign_technician_to_return_case inbound_unit_1 technician_inspector_1)
+(reserve_storage_zone_for_inbound_unit inbound_unit_1 storage_zone_a quality_test_moisture)
+(execute_conditioning_on_inbound_unit inbound_unit_1 storage_zone_a technician_inspector_1)
+(release_quality_test inbound_unit_1 quality_test_moisture)
+(unassign_technician_from_return_case inbound_unit_1 technician_inspector_1)
+(register_returned_batch outbound_unit_1)
+(link_returned_batch_to_buyer_channel outbound_unit_1 buyer_channel_secondary)
+(assign_quality_test_to_returned_batch outbound_unit_1 quality_test_moisture)
+(finalize_batch_grading outbound_unit_1 quality_test_moisture)
+(assign_technician_to_return_case outbound_unit_1 technician_inspector_1)
+(reserve_distribution_channel_for_outbound_unit outbound_unit_1 distribution_channel_resale quality_test_moisture)
+(assign_technician_to_outbound_unit outbound_unit_1 distribution_channel_resale technician_inspector_1)
+(unassign_technician_from_return_case outbound_unit_1 technician_inspector_1)
+(release_quality_test outbound_unit_1 quality_test_moisture)
+(assemble_and_stage_shipment_zone_reserved_channel_reserved inbound_unit_1 outbound_unit_1 storage_zone_a distribution_channel_resale outbound_shipment_1)
+(assign_quality_test_to_returned_batch inbound_unit_1 quality_test_moisture)
+(verify_shipment_before_labeling outbound_shipment_1 inbound_unit_1 quality_test_moisture)
+(mark_inbound_unit_ready_for_release inbound_unit_1 outbound_shipment_1)
+(mark_outbound_unit_ready_for_release outbound_unit_1 outbound_shipment_1)
+(authorize_release_for_returned_batch inbound_unit_1 release_token_1 quality_test_moisture)
+(reconcile_and_reassign_inbound_unit inbound_unit_1 buyer_channel_primary release_token_1)
+(release_quality_test inbound_unit_1 quality_test_moisture)
+(assign_quality_test_to_returned_batch outbound_unit_1 quality_test_moisture)
+(authorize_release_for_returned_batch outbound_unit_1 release_token_1 quality_test_moisture)
+(reconcile_and_reassign_outbound_unit outbound_unit_1 buyer_channel_secondary release_token_1)
+(register_returned_batch return_case_record_1)
+(link_returned_batch_to_buyer_channel return_case_record_1 buyer_channel_alternate)
+(assign_quality_test_to_returned_batch return_case_record_1 quality_test_moisture)
+(finalize_batch_grading return_case_record_1 quality_test_moisture)
+(allocate_container_to_shipment return_case_record_1 container_batch_1 outbound_shipment_1)
+(prepare_case_for_labeling return_case_record_1 container_batch_1 outbound_shipment_1 quality_test_moisture)
+(assign_conditioning_equipment_to_case return_case_record_1 conditioning_equipment_dryer)
+(assign_environment_profile_to_case return_case_record_1 environment_profile_cool_storage)
+(assign_technician_to_return_case return_case_record_1 technician_inspector_1)
+(record_container_label_inspection return_case_record_1 conditioning_equipment_dryer technician_inspector_1 container_batch_1 outbound_shipment_1)
+(approve_case_label_evidence return_case_record_1 environment_profile_cool_storage container_batch_1 outbound_shipment_1)
+(finalize_case_without_packing_spec return_case_record_1)
+(authorize_release_for_returned_batch return_case_record_1 release_token_1 quality_test_moisture)
+(reconcile_and_reassign_case_record return_case_record_1 buyer_channel_alternate release_token_1)
+(release_quality_test return_case_record_1 quality_test_moisture)
+(release_conditioning_equipment_from_case return_case_record_1 conditioning_equipment_dryer)
+(release_environment_profile_from_case return_case_record_1 environment_profile_cool_storage)
+(unassign_technician_from_return_case return_case_record_1 technician_inspector_1)
+(register_returned_batch return_case_record_2)
+(link_returned_batch_to_buyer_channel return_case_record_2 buyer_channel_primary)
+(assign_quality_test_to_returned_batch return_case_record_2 quality_test_moisture)
+(finalize_batch_grading return_case_record_2 quality_test_moisture)
+(allocate_container_to_shipment return_case_record_2 container_batch_2 outbound_shipment_1)
+(prepare_case_for_labeling return_case_record_2 container_batch_2 outbound_shipment_1 quality_test_moisture)
+(assign_conditioning_equipment_to_case return_case_record_2 conditioning_equipment_dryer)
+(assign_environment_profile_to_case return_case_record_2 environment_profile_cool_storage)
+(assign_technician_to_return_case return_case_record_2 technician_inspector_1)
+(record_container_label_inspection return_case_record_2 conditioning_equipment_dryer technician_inspector_1 container_batch_2 outbound_shipment_1)
+(approve_case_label_evidence return_case_record_2 environment_profile_cool_storage container_batch_2 outbound_shipment_1)
+(finalize_case_without_packing_spec return_case_record_2)
+(authorize_release_for_returned_batch return_case_record_2 release_token_1 quality_test_moisture)
+(reconcile_and_reassign_case_record return_case_record_2 buyer_channel_primary release_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__e5k1t2m/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val__e5k1t2m/plan.pddl 
+
+
+--- stderr ---
+

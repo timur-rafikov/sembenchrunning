@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain cancellation_penalty_minimization_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types offer_and_resource_category - object policy_and_document_category - object rule_and_record_category - object reservation_cluster - object reservation_option - reservation_cluster service_offer - offer_and_resource_category selection_detail - offer_and_resource_category provider_resource - offer_and_resource_category optional_service - offer_and_resource_category confirmation_option - offer_and_resource_category refund_method - offer_and_resource_category billing_profile - offer_and_resource_category external_authorization - offer_and_resource_category penalty_waiver_option - policy_and_document_category fulfillment_document - policy_and_document_category approval_token - policy_and_document_category segment_cancellation_rule - rule_and_record_category counterparty_cancellation_rule - rule_and_record_category itinerary_record - rule_and_record_category primary_booking_cluster - reservation_option operator_booking_cluster - reservation_option primary_segment - primary_booking_cluster secondary_segment - primary_booking_cluster booking_operator - operator_booking_cluster)
+  (:predicates
+    (booking_entity_initialized ?reservation_option - reservation_option)
+    (booking_entity_confirmed ?reservation_option - reservation_option)
+    (booking_entity_offer_reserved ?reservation_option - reservation_option)
+    (booking_entity_committed ?reservation_option - reservation_option)
+    (finalized_for_settlement ?reservation_option - reservation_option)
+    (cancellation_requested ?reservation_option - reservation_option)
+    (service_offer_available ?service_offer - service_offer)
+    (booking_entity_assigned_offer ?reservation_option - reservation_option ?service_offer - service_offer)
+    (selection_detail_available ?selection_detail - selection_detail)
+    (booking_entity_bound_selection_detail ?reservation_option - reservation_option ?selection_detail - selection_detail)
+    (provider_resource_available ?provider_resource - provider_resource)
+    (booking_entity_allocated_resource ?reservation_option - reservation_option ?provider_resource - provider_resource)
+    (penalty_waiver_available ?penalty_waiver_option - penalty_waiver_option)
+    (primary_segment_bound_waiver ?primary_segment - primary_segment ?penalty_waiver_option - penalty_waiver_option)
+    (secondary_segment_bound_waiver ?secondary_segment - secondary_segment ?penalty_waiver_option - penalty_waiver_option)
+    (primary_segment_has_cancellation_rule ?primary_segment - primary_segment ?segment_cancellation_rule - segment_cancellation_rule)
+    (segment_cancellation_rule_flagged ?segment_cancellation_rule - segment_cancellation_rule)
+    (segment_cancellation_rule_waived ?segment_cancellation_rule - segment_cancellation_rule)
+    (primary_segment_ready ?primary_segment - primary_segment)
+    (secondary_segment_has_counterparty_rule ?secondary_segment - secondary_segment ?counterparty_cancellation_rule - counterparty_cancellation_rule)
+    (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule - counterparty_cancellation_rule)
+    (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule - counterparty_cancellation_rule)
+    (secondary_segment_ready ?secondary_segment - secondary_segment)
+    (itinerary_record_slot_available ?itinerary_record - itinerary_record)
+    (itinerary_record_composed ?itinerary_record - itinerary_record)
+    (itinerary_associated_segment_rule ?itinerary_record - itinerary_record ?segment_cancellation_rule - segment_cancellation_rule)
+    (itinerary_associated_counterparty_rule ?itinerary_record - itinerary_record ?counterparty_cancellation_rule - counterparty_cancellation_rule)
+    (itinerary_includes_primary_waiver ?itinerary_record - itinerary_record)
+    (itinerary_includes_secondary_waiver ?itinerary_record - itinerary_record)
+    (itinerary_ready_for_document_issuance ?itinerary_record - itinerary_record)
+    (operator_assigned_primary_segment ?booking_operator - booking_operator ?primary_segment - primary_segment)
+    (operator_assigned_secondary_segment ?booking_operator - booking_operator ?secondary_segment - secondary_segment)
+    (operator_assigned_itinerary ?booking_operator - booking_operator ?itinerary_record - itinerary_record)
+    (fulfillment_document_available ?fulfillment_document - fulfillment_document)
+    (operator_has_fulfillment_document ?booking_operator - booking_operator ?fulfillment_document - fulfillment_document)
+    (fulfillment_document_issued ?fulfillment_document - fulfillment_document)
+    (fulfillment_document_bound_to_itinerary ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    (operator_document_prepared ?booking_operator - booking_operator)
+    (operator_document_finalized ?booking_operator - booking_operator)
+    (operator_ready_for_consolidation ?booking_operator - booking_operator)
+    (operator_optional_service_pending ?booking_operator - booking_operator)
+    (operator_optional_service_bound ?booking_operator - booking_operator)
+    (operator_confirmation_attached ?booking_operator - booking_operator)
+    (operator_consolidation_completed ?booking_operator - booking_operator)
+    (approval_token_available ?approval_token - approval_token)
+    (operator_has_approval_token ?booking_operator - booking_operator ?approval_token - approval_token)
+    (operator_approval_requested ?booking_operator - booking_operator)
+    (operator_approval_in_progress ?booking_operator - booking_operator)
+    (operator_approval_completed ?booking_operator - booking_operator)
+    (optional_service_available ?optional_service - optional_service)
+    (operator_attached_optional_service ?booking_operator - booking_operator ?optional_service - optional_service)
+    (confirmation_option_available ?confirmation_option - confirmation_option)
+    (operator_has_confirmation_option ?booking_operator - booking_operator ?confirmation_option - confirmation_option)
+    (billing_profile_available ?billing_profile - billing_profile)
+    (operator_has_billing_profile ?booking_operator - booking_operator ?billing_profile - billing_profile)
+    (external_authorization_available ?external_authorization - external_authorization)
+    (operator_has_external_authorization ?booking_operator - booking_operator ?external_authorization - external_authorization)
+    (refund_method_available ?refund_method - refund_method)
+    (booking_entity_assigned_refund_method ?reservation_option - reservation_option ?refund_method - refund_method)
+    (primary_segment_processed ?primary_segment - primary_segment)
+    (secondary_segment_processed ?secondary_segment - secondary_segment)
+    (operator_record_locked ?booking_operator - booking_operator)
+  )
+  (:action create_reservation_option
+    :parameters (?reservation_option - reservation_option)
+    :precondition
+      (and
+        (not
+          (booking_entity_initialized ?reservation_option)
+        )
+        (not
+          (booking_entity_committed ?reservation_option)
+        )
+      )
+    :effect (booking_entity_initialized ?reservation_option)
+  )
+  (:action assign_service_offer_to_option
+    :parameters (?reservation_option - reservation_option ?service_offer - service_offer)
+    :precondition
+      (and
+        (booking_entity_initialized ?reservation_option)
+        (not
+          (booking_entity_offer_reserved ?reservation_option)
+        )
+        (service_offer_available ?service_offer)
+      )
+    :effect
+      (and
+        (booking_entity_offer_reserved ?reservation_option)
+        (booking_entity_assigned_offer ?reservation_option ?service_offer)
+        (not
+          (service_offer_available ?service_offer)
+        )
+      )
+  )
+  (:action bind_selection_detail_to_option
+    :parameters (?reservation_option - reservation_option ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_initialized ?reservation_option)
+        (booking_entity_offer_reserved ?reservation_option)
+        (selection_detail_available ?selection_detail)
+      )
+    :effect
+      (and
+        (booking_entity_bound_selection_detail ?reservation_option ?selection_detail)
+        (not
+          (selection_detail_available ?selection_detail)
+        )
+      )
+  )
+  (:action confirm_reservation_option
+    :parameters (?reservation_option - reservation_option ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_initialized ?reservation_option)
+        (booking_entity_offer_reserved ?reservation_option)
+        (booking_entity_bound_selection_detail ?reservation_option ?selection_detail)
+        (not
+          (booking_entity_confirmed ?reservation_option)
+        )
+      )
+    :effect (booking_entity_confirmed ?reservation_option)
+  )
+  (:action unbind_selection_detail_from_option
+    :parameters (?reservation_option - reservation_option ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_bound_selection_detail ?reservation_option ?selection_detail)
+      )
+    :effect
+      (and
+        (selection_detail_available ?selection_detail)
+        (not
+          (booking_entity_bound_selection_detail ?reservation_option ?selection_detail)
+        )
+      )
+  )
+  (:action allocate_provider_resource_to_option
+    :parameters (?reservation_option - reservation_option ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_entity_confirmed ?reservation_option)
+        (provider_resource_available ?provider_resource)
+      )
+    :effect
+      (and
+        (booking_entity_allocated_resource ?reservation_option ?provider_resource)
+        (not
+          (provider_resource_available ?provider_resource)
+        )
+      )
+  )
+  (:action release_provider_resource_from_option
+    :parameters (?reservation_option - reservation_option ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_entity_allocated_resource ?reservation_option ?provider_resource)
+      )
+    :effect
+      (and
+        (provider_resource_available ?provider_resource)
+        (not
+          (booking_entity_allocated_resource ?reservation_option ?provider_resource)
+        )
+      )
+  )
+  (:action attach_billing_profile_to_operator
+    :parameters (?booking_operator - booking_operator ?billing_profile - billing_profile)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (billing_profile_available ?billing_profile)
+      )
+    :effect
+      (and
+        (operator_has_billing_profile ?booking_operator ?billing_profile)
+        (not
+          (billing_profile_available ?billing_profile)
+        )
+      )
+  )
+  (:action detach_billing_profile_from_operator
+    :parameters (?booking_operator - booking_operator ?billing_profile - billing_profile)
+    :precondition
+      (and
+        (operator_has_billing_profile ?booking_operator ?billing_profile)
+      )
+    :effect
+      (and
+        (billing_profile_available ?billing_profile)
+        (not
+          (operator_has_billing_profile ?booking_operator ?billing_profile)
+        )
+      )
+  )
+  (:action attach_external_authorization_to_operator
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (external_authorization_available ?external_authorization)
+      )
+    :effect
+      (and
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (not
+          (external_authorization_available ?external_authorization)
+        )
+      )
+  )
+  (:action detach_external_authorization_from_operator
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+      )
+    :effect
+      (and
+        (external_authorization_available ?external_authorization)
+        (not
+          (operator_has_external_authorization ?booking_operator ?external_authorization)
+        )
+      )
+  )
+  (:action flag_segment_cancellation_rule
+    :parameters (?primary_segment - primary_segment ?segment_cancellation_rule - segment_cancellation_rule ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_confirmed ?primary_segment)
+        (booking_entity_bound_selection_detail ?primary_segment ?selection_detail)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (not
+          (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+        )
+        (not
+          (segment_cancellation_rule_waived ?segment_cancellation_rule)
+        )
+      )
+    :effect (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+  )
+  (:action prepare_primary_segment_for_itinerary
+    :parameters (?primary_segment - primary_segment ?segment_cancellation_rule - segment_cancellation_rule ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_entity_confirmed ?primary_segment)
+        (booking_entity_allocated_resource ?primary_segment ?provider_resource)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+        (not
+          (primary_segment_processed ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (primary_segment_processed ?primary_segment)
+        (primary_segment_ready ?primary_segment)
+      )
+  )
+  (:action apply_penalty_waiver_to_primary_segment
+    :parameters (?primary_segment - primary_segment ?segment_cancellation_rule - segment_cancellation_rule ?penalty_waiver_option - penalty_waiver_option)
+    :precondition
+      (and
+        (booking_entity_confirmed ?primary_segment)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (penalty_waiver_available ?penalty_waiver_option)
+        (not
+          (primary_segment_processed ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_cancellation_rule_waived ?segment_cancellation_rule)
+        (primary_segment_processed ?primary_segment)
+        (primary_segment_bound_waiver ?primary_segment ?penalty_waiver_option)
+        (not
+          (penalty_waiver_available ?penalty_waiver_option)
+        )
+      )
+  )
+  (:action resolve_primary_segment_waiver
+    :parameters (?primary_segment - primary_segment ?segment_cancellation_rule - segment_cancellation_rule ?selection_detail - selection_detail ?penalty_waiver_option - penalty_waiver_option)
+    :precondition
+      (and
+        (booking_entity_confirmed ?primary_segment)
+        (booking_entity_bound_selection_detail ?primary_segment ?selection_detail)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (segment_cancellation_rule_waived ?segment_cancellation_rule)
+        (primary_segment_bound_waiver ?primary_segment ?penalty_waiver_option)
+        (not
+          (primary_segment_ready ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+        (primary_segment_ready ?primary_segment)
+        (penalty_waiver_available ?penalty_waiver_option)
+        (not
+          (primary_segment_bound_waiver ?primary_segment ?penalty_waiver_option)
+        )
+      )
+  )
+  (:action flag_secondary_segment_cancellation_rule
+    :parameters (?secondary_segment - secondary_segment ?counterparty_cancellation_rule - counterparty_cancellation_rule ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_confirmed ?secondary_segment)
+        (booking_entity_bound_selection_detail ?secondary_segment ?selection_detail)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (not
+          (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+        )
+        (not
+          (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule)
+        )
+      )
+    :effect (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+  )
+  (:action prepare_secondary_segment_for_itinerary
+    :parameters (?secondary_segment - secondary_segment ?counterparty_cancellation_rule - counterparty_cancellation_rule ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (booking_entity_confirmed ?secondary_segment)
+        (booking_entity_allocated_resource ?secondary_segment ?provider_resource)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+        (not
+          (secondary_segment_processed ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (secondary_segment_processed ?secondary_segment)
+        (secondary_segment_ready ?secondary_segment)
+      )
+  )
+  (:action apply_penalty_waiver_to_secondary_segment
+    :parameters (?secondary_segment - secondary_segment ?counterparty_cancellation_rule - counterparty_cancellation_rule ?penalty_waiver_option - penalty_waiver_option)
+    :precondition
+      (and
+        (booking_entity_confirmed ?secondary_segment)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (penalty_waiver_available ?penalty_waiver_option)
+        (not
+          (secondary_segment_processed ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule)
+        (secondary_segment_processed ?secondary_segment)
+        (secondary_segment_bound_waiver ?secondary_segment ?penalty_waiver_option)
+        (not
+          (penalty_waiver_available ?penalty_waiver_option)
+        )
+      )
+  )
+  (:action resolve_secondary_segment_waiver
+    :parameters (?secondary_segment - secondary_segment ?counterparty_cancellation_rule - counterparty_cancellation_rule ?selection_detail - selection_detail ?penalty_waiver_option - penalty_waiver_option)
+    :precondition
+      (and
+        (booking_entity_confirmed ?secondary_segment)
+        (booking_entity_bound_selection_detail ?secondary_segment ?selection_detail)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule)
+        (secondary_segment_bound_waiver ?secondary_segment ?penalty_waiver_option)
+        (not
+          (secondary_segment_ready ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+        (secondary_segment_ready ?secondary_segment)
+        (penalty_waiver_available ?penalty_waiver_option)
+        (not
+          (secondary_segment_bound_waiver ?secondary_segment ?penalty_waiver_option)
+        )
+      )
+  )
+  (:action compose_itinerary_from_segments
+    :parameters (?primary_segment - primary_segment ?secondary_segment - secondary_segment ?segment_cancellation_rule - segment_cancellation_rule ?counterparty_cancellation_rule - counterparty_cancellation_rule ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (primary_segment_processed ?primary_segment)
+        (secondary_segment_processed ?secondary_segment)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+        (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+        (primary_segment_ready ?primary_segment)
+        (secondary_segment_ready ?secondary_segment)
+        (itinerary_record_slot_available ?itinerary_record)
+      )
+    :effect
+      (and
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_associated_segment_rule ?itinerary_record ?segment_cancellation_rule)
+        (itinerary_associated_counterparty_rule ?itinerary_record ?counterparty_cancellation_rule)
+        (not
+          (itinerary_record_slot_available ?itinerary_record)
+        )
+      )
+  )
+  (:action compose_itinerary_with_primary_waiver
+    :parameters (?primary_segment - primary_segment ?secondary_segment - secondary_segment ?segment_cancellation_rule - segment_cancellation_rule ?counterparty_cancellation_rule - counterparty_cancellation_rule ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (primary_segment_processed ?primary_segment)
+        (secondary_segment_processed ?secondary_segment)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (segment_cancellation_rule_waived ?segment_cancellation_rule)
+        (counterparty_cancellation_rule_flagged ?counterparty_cancellation_rule)
+        (not
+          (primary_segment_ready ?primary_segment)
+        )
+        (secondary_segment_ready ?secondary_segment)
+        (itinerary_record_slot_available ?itinerary_record)
+      )
+    :effect
+      (and
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_associated_segment_rule ?itinerary_record ?segment_cancellation_rule)
+        (itinerary_associated_counterparty_rule ?itinerary_record ?counterparty_cancellation_rule)
+        (itinerary_includes_primary_waiver ?itinerary_record)
+        (not
+          (itinerary_record_slot_available ?itinerary_record)
+        )
+      )
+  )
+  (:action compose_itinerary_with_secondary_waiver
+    :parameters (?primary_segment - primary_segment ?secondary_segment - secondary_segment ?segment_cancellation_rule - segment_cancellation_rule ?counterparty_cancellation_rule - counterparty_cancellation_rule ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (primary_segment_processed ?primary_segment)
+        (secondary_segment_processed ?secondary_segment)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (segment_cancellation_rule_flagged ?segment_cancellation_rule)
+        (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule)
+        (primary_segment_ready ?primary_segment)
+        (not
+          (secondary_segment_ready ?secondary_segment)
+        )
+        (itinerary_record_slot_available ?itinerary_record)
+      )
+    :effect
+      (and
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_associated_segment_rule ?itinerary_record ?segment_cancellation_rule)
+        (itinerary_associated_counterparty_rule ?itinerary_record ?counterparty_cancellation_rule)
+        (itinerary_includes_secondary_waiver ?itinerary_record)
+        (not
+          (itinerary_record_slot_available ?itinerary_record)
+        )
+      )
+  )
+  (:action compose_itinerary_with_both_waivers
+    :parameters (?primary_segment - primary_segment ?secondary_segment - secondary_segment ?segment_cancellation_rule - segment_cancellation_rule ?counterparty_cancellation_rule - counterparty_cancellation_rule ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (primary_segment_processed ?primary_segment)
+        (secondary_segment_processed ?secondary_segment)
+        (primary_segment_has_cancellation_rule ?primary_segment ?segment_cancellation_rule)
+        (secondary_segment_has_counterparty_rule ?secondary_segment ?counterparty_cancellation_rule)
+        (segment_cancellation_rule_waived ?segment_cancellation_rule)
+        (counterparty_cancellation_rule_waived ?counterparty_cancellation_rule)
+        (not
+          (primary_segment_ready ?primary_segment)
+        )
+        (not
+          (secondary_segment_ready ?secondary_segment)
+        )
+        (itinerary_record_slot_available ?itinerary_record)
+      )
+    :effect
+      (and
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_associated_segment_rule ?itinerary_record ?segment_cancellation_rule)
+        (itinerary_associated_counterparty_rule ?itinerary_record ?counterparty_cancellation_rule)
+        (itinerary_includes_primary_waiver ?itinerary_record)
+        (itinerary_includes_secondary_waiver ?itinerary_record)
+        (not
+          (itinerary_record_slot_available ?itinerary_record)
+        )
+      )
+  )
+  (:action mark_itinerary_ready_for_issuance
+    :parameters (?itinerary_record - itinerary_record ?primary_segment - primary_segment ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (itinerary_record_composed ?itinerary_record)
+        (primary_segment_processed ?primary_segment)
+        (booking_entity_bound_selection_detail ?primary_segment ?selection_detail)
+        (not
+          (itinerary_ready_for_document_issuance ?itinerary_record)
+        )
+      )
+    :effect (itinerary_ready_for_document_issuance ?itinerary_record)
+  )
+  (:action issue_fulfillment_document
+    :parameters (?booking_operator - booking_operator ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (operator_assigned_itinerary ?booking_operator ?itinerary_record)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_available ?fulfillment_document)
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_ready_for_document_issuance ?itinerary_record)
+        (not
+          (fulfillment_document_issued ?fulfillment_document)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (not
+          (fulfillment_document_available ?fulfillment_document)
+        )
+      )
+  )
+  (:action operator_prepare_document_for_itinerary
+    :parameters (?booking_operator - booking_operator ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (booking_entity_bound_selection_detail ?booking_operator ?selection_detail)
+        (not
+          (itinerary_includes_primary_waiver ?itinerary_record)
+        )
+        (not
+          (operator_document_prepared ?booking_operator)
+        )
+      )
+    :effect (operator_document_prepared ?booking_operator)
+  )
+  (:action attach_optional_service_to_operator
+    :parameters (?booking_operator - booking_operator ?optional_service - optional_service)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (optional_service_available ?optional_service)
+        (not
+          (operator_optional_service_pending ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_optional_service_pending ?booking_operator)
+        (operator_attached_optional_service ?booking_operator ?optional_service)
+        (not
+          (optional_service_available ?optional_service)
+        )
+      )
+  )
+  (:action bind_optional_service_and_prepare_document
+    :parameters (?booking_operator - booking_operator ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record ?selection_detail - selection_detail ?optional_service - optional_service)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_issued ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (booking_entity_bound_selection_detail ?booking_operator ?selection_detail)
+        (itinerary_includes_primary_waiver ?itinerary_record)
+        (operator_optional_service_pending ?booking_operator)
+        (operator_attached_optional_service ?booking_operator ?optional_service)
+        (not
+          (operator_document_prepared ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_document_prepared ?booking_operator)
+        (operator_optional_service_bound ?booking_operator)
+      )
+  )
+  (:action finalize_operator_document_stage1
+    :parameters (?booking_operator - booking_operator ?billing_profile - billing_profile ?provider_resource - provider_resource ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_prepared ?booking_operator)
+        (operator_has_billing_profile ?booking_operator ?billing_profile)
+        (booking_entity_allocated_resource ?booking_operator ?provider_resource)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (not
+          (itinerary_includes_secondary_waiver ?itinerary_record)
+        )
+        (not
+          (operator_document_finalized ?booking_operator)
+        )
+      )
+    :effect (operator_document_finalized ?booking_operator)
+  )
+  (:action finalize_operator_document_stage2
+    :parameters (?booking_operator - booking_operator ?billing_profile - billing_profile ?provider_resource - provider_resource ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_prepared ?booking_operator)
+        (operator_has_billing_profile ?booking_operator ?billing_profile)
+        (booking_entity_allocated_resource ?booking_operator ?provider_resource)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (itinerary_includes_secondary_waiver ?itinerary_record)
+        (not
+          (operator_document_finalized ?booking_operator)
+        )
+      )
+    :effect (operator_document_finalized ?booking_operator)
+  )
+  (:action operator_apply_external_authorization_stage1
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_finalized ?booking_operator)
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (not
+          (itinerary_includes_primary_waiver ?itinerary_record)
+        )
+        (not
+          (itinerary_includes_secondary_waiver ?itinerary_record)
+        )
+        (not
+          (operator_ready_for_consolidation ?booking_operator)
+        )
+      )
+    :effect (operator_ready_for_consolidation ?booking_operator)
+  )
+  (:action operator_apply_external_authorization_stage2
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_finalized ?booking_operator)
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (itinerary_includes_primary_waiver ?itinerary_record)
+        (not
+          (itinerary_includes_secondary_waiver ?itinerary_record)
+        )
+        (not
+          (operator_ready_for_consolidation ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_confirmation_attached ?booking_operator)
+      )
+  )
+  (:action operator_apply_external_authorization_stage3
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_finalized ?booking_operator)
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (not
+          (itinerary_includes_primary_waiver ?itinerary_record)
+        )
+        (itinerary_includes_secondary_waiver ?itinerary_record)
+        (not
+          (operator_ready_for_consolidation ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_confirmation_attached ?booking_operator)
+      )
+  )
+  (:action operator_apply_external_authorization_stage4
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization ?fulfillment_document - fulfillment_document ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (operator_document_finalized ?booking_operator)
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (operator_has_fulfillment_document ?booking_operator ?fulfillment_document)
+        (fulfillment_document_bound_to_itinerary ?fulfillment_document ?itinerary_record)
+        (itinerary_includes_primary_waiver ?itinerary_record)
+        (itinerary_includes_secondary_waiver ?itinerary_record)
+        (not
+          (operator_ready_for_consolidation ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_confirmation_attached ?booking_operator)
+      )
+  )
+  (:action finalize_operator_record
+    :parameters (?booking_operator - booking_operator)
+    :precondition
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (not
+          (operator_confirmation_attached ?booking_operator)
+        )
+        (not
+          (operator_record_locked ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_record_locked ?booking_operator)
+        (finalized_for_settlement ?booking_operator)
+      )
+  )
+  (:action attach_confirmation_option_to_operator
+    :parameters (?booking_operator - booking_operator ?confirmation_option - confirmation_option)
+    :precondition
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_confirmation_attached ?booking_operator)
+        (confirmation_option_available ?confirmation_option)
+      )
+    :effect
+      (and
+        (operator_has_confirmation_option ?booking_operator ?confirmation_option)
+        (not
+          (confirmation_option_available ?confirmation_option)
+        )
+      )
+  )
+  (:action consolidate_and_finalize_booking
+    :parameters (?booking_operator - booking_operator ?primary_segment - primary_segment ?secondary_segment - secondary_segment ?selection_detail - selection_detail ?confirmation_option - confirmation_option)
+    :precondition
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_confirmation_attached ?booking_operator)
+        (operator_has_confirmation_option ?booking_operator ?confirmation_option)
+        (operator_assigned_primary_segment ?booking_operator ?primary_segment)
+        (operator_assigned_secondary_segment ?booking_operator ?secondary_segment)
+        (primary_segment_ready ?primary_segment)
+        (secondary_segment_ready ?secondary_segment)
+        (booking_entity_bound_selection_detail ?booking_operator ?selection_detail)
+        (not
+          (operator_consolidation_completed ?booking_operator)
+        )
+      )
+    :effect (operator_consolidation_completed ?booking_operator)
+  )
+  (:action settle_operator_record
+    :parameters (?booking_operator - booking_operator)
+    :precondition
+      (and
+        (operator_ready_for_consolidation ?booking_operator)
+        (operator_consolidation_completed ?booking_operator)
+        (not
+          (operator_record_locked ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_record_locked ?booking_operator)
+        (finalized_for_settlement ?booking_operator)
+      )
+  )
+  (:action claim_approval_token_for_operator
+    :parameters (?booking_operator - booking_operator ?approval_token - approval_token ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (booking_entity_confirmed ?booking_operator)
+        (booking_entity_bound_selection_detail ?booking_operator ?selection_detail)
+        (approval_token_available ?approval_token)
+        (operator_has_approval_token ?booking_operator ?approval_token)
+        (not
+          (operator_approval_requested ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_approval_requested ?booking_operator)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action initiate_operator_approval_step
+    :parameters (?booking_operator - booking_operator ?provider_resource - provider_resource)
+    :precondition
+      (and
+        (operator_approval_requested ?booking_operator)
+        (booking_entity_allocated_resource ?booking_operator ?provider_resource)
+        (not
+          (operator_approval_in_progress ?booking_operator)
+        )
+      )
+    :effect (operator_approval_in_progress ?booking_operator)
+  )
+  (:action apply_external_authorization_during_approval
+    :parameters (?booking_operator - booking_operator ?external_authorization - external_authorization)
+    :precondition
+      (and
+        (operator_approval_in_progress ?booking_operator)
+        (operator_has_external_authorization ?booking_operator ?external_authorization)
+        (not
+          (operator_approval_completed ?booking_operator)
+        )
+      )
+    :effect (operator_approval_completed ?booking_operator)
+  )
+  (:action finalize_approval_for_operator
+    :parameters (?booking_operator - booking_operator)
+    :precondition
+      (and
+        (operator_approval_completed ?booking_operator)
+        (not
+          (operator_record_locked ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_record_locked ?booking_operator)
+        (finalized_for_settlement ?booking_operator)
+      )
+  )
+  (:action finalize_primary_segment
+    :parameters (?primary_segment - primary_segment ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (primary_segment_processed ?primary_segment)
+        (primary_segment_ready ?primary_segment)
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_ready_for_document_issuance ?itinerary_record)
+        (not
+          (finalized_for_settlement ?primary_segment)
+        )
+      )
+    :effect (finalized_for_settlement ?primary_segment)
+  )
+  (:action finalize_secondary_segment
+    :parameters (?secondary_segment - secondary_segment ?itinerary_record - itinerary_record)
+    :precondition
+      (and
+        (secondary_segment_processed ?secondary_segment)
+        (secondary_segment_ready ?secondary_segment)
+        (itinerary_record_composed ?itinerary_record)
+        (itinerary_ready_for_document_issuance ?itinerary_record)
+        (not
+          (finalized_for_settlement ?secondary_segment)
+        )
+      )
+    :effect (finalized_for_settlement ?secondary_segment)
+  )
+  (:action initiate_cancellation_processing_for_option
+    :parameters (?reservation_option - reservation_option ?refund_method - refund_method ?selection_detail - selection_detail)
+    :precondition
+      (and
+        (finalized_for_settlement ?reservation_option)
+        (booking_entity_bound_selection_detail ?reservation_option ?selection_detail)
+        (refund_method_available ?refund_method)
+        (not
+          (cancellation_requested ?reservation_option)
+        )
+      )
+    :effect
+      (and
+        (cancellation_requested ?reservation_option)
+        (booking_entity_assigned_refund_method ?reservation_option ?refund_method)
+        (not
+          (refund_method_available ?refund_method)
+        )
+      )
+  )
+  (:action apply_refund_and_release_offer_for_primary_segment
+    :parameters (?primary_segment - primary_segment ?service_offer - service_offer ?refund_method - refund_method)
+    :precondition
+      (and
+        (cancellation_requested ?primary_segment)
+        (booking_entity_assigned_offer ?primary_segment ?service_offer)
+        (booking_entity_assigned_refund_method ?primary_segment ?refund_method)
+        (not
+          (booking_entity_committed ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (booking_entity_committed ?primary_segment)
+        (service_offer_available ?service_offer)
+        (refund_method_available ?refund_method)
+      )
+  )
+  (:action apply_refund_and_release_offer_for_secondary_segment
+    :parameters (?secondary_segment - secondary_segment ?service_offer - service_offer ?refund_method - refund_method)
+    :precondition
+      (and
+        (cancellation_requested ?secondary_segment)
+        (booking_entity_assigned_offer ?secondary_segment ?service_offer)
+        (booking_entity_assigned_refund_method ?secondary_segment ?refund_method)
+        (not
+          (booking_entity_committed ?secondary_segment)
+        )
+      )
+    :effect
+      (and
+        (booking_entity_committed ?secondary_segment)
+        (service_offer_available ?service_offer)
+        (refund_method_available ?refund_method)
+      )
+  )
+  (:action apply_refund_and_release_offer_for_operator
+    :parameters (?booking_operator - booking_operator ?service_offer - service_offer ?refund_method - refund_method)
+    :precondition
+      (and
+        (cancellation_requested ?booking_operator)
+        (booking_entity_assigned_offer ?booking_operator ?service_offer)
+        (booking_entity_assigned_refund_method ?booking_operator ?refund_method)
+        (not
+          (booking_entity_committed ?booking_operator)
+        )
+      )
+    :effect
+      (and
+        (booking_entity_committed ?booking_operator)
+        (service_offer_available ?service_offer)
+        (refund_method_available ?refund_method)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem minimize_cancellation_penalties_problem)
+  (:domain cancellation_penalty_minimization_domain)
+  (:objects primary_segment_1 - primary_segment secondary_segment_1 - secondary_segment booking_operator_1 - booking_operator booking_operator_2 - booking_operator service_offer_1 - service_offer service_offer_2 - service_offer service_offer_3 - service_offer selection_detail_1 - selection_detail provider_resource_1 - provider_resource penalty_waiver_1 - penalty_waiver_option segment_cancellation_rule_1 - segment_cancellation_rule counterparty_cancellation_rule_1 - counterparty_cancellation_rule itinerary_record_1 - itinerary_record fulfillment_document_1 - fulfillment_document fulfillment_document_2 - fulfillment_document optional_service_1 - optional_service optional_service_2 - optional_service confirmation_option_1 - confirmation_option confirmation_option_2 - confirmation_option refund_method_1 - refund_method billing_profile_1 - billing_profile approval_token_1 - approval_token approval_token_2 - approval_token external_authorization_1 - external_authorization)
+  (:init
+    (service_offer_available service_offer_1)
+    (service_offer_available service_offer_2)
+    (service_offer_available service_offer_3)
+    (selection_detail_available selection_detail_1)
+    (provider_resource_available provider_resource_1)
+    (penalty_waiver_available penalty_waiver_1)
+    (primary_segment_has_cancellation_rule primary_segment_1 segment_cancellation_rule_1)
+    (secondary_segment_has_counterparty_rule secondary_segment_1 counterparty_cancellation_rule_1)
+    (itinerary_record_slot_available itinerary_record_1)
+    (fulfillment_document_available fulfillment_document_1)
+    (fulfillment_document_available fulfillment_document_2)
+    (operator_assigned_primary_segment booking_operator_1 primary_segment_1)
+    (operator_assigned_primary_segment booking_operator_2 primary_segment_1)
+    (operator_assigned_secondary_segment booking_operator_1 secondary_segment_1)
+    (operator_assigned_secondary_segment booking_operator_2 secondary_segment_1)
+    (operator_assigned_itinerary booking_operator_1 itinerary_record_1)
+    (operator_assigned_itinerary booking_operator_2 itinerary_record_1)
+    (operator_has_fulfillment_document booking_operator_1 fulfillment_document_1)
+    (operator_has_fulfillment_document booking_operator_2 fulfillment_document_2)
+    (optional_service_available optional_service_1)
+    (optional_service_available optional_service_2)
+    (confirmation_option_available confirmation_option_1)
+    (confirmation_option_available confirmation_option_2)
+    (refund_method_available refund_method_1)
+    (billing_profile_available billing_profile_1)
+    (approval_token_available approval_token_1)
+    (operator_has_approval_token booking_operator_1 approval_token_1)
+    (operator_has_approval_token booking_operator_2 approval_token_2)
+    (external_authorization_available external_authorization_1)
+  )
+  (:goal
+    (and
+      (booking_entity_committed primary_segment_1)
+      (booking_entity_committed secondary_segment_1)
+      (booking_entity_committed booking_operator_1)
+      (booking_entity_committed booking_operator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_reservation_option booking_operator_1)
+(assign_service_offer_to_option booking_operator_1 service_offer_1)
+(bind_selection_detail_to_option booking_operator_1 selection_detail_1)
+(confirm_reservation_option booking_operator_1 selection_detail_1)
+(attach_external_authorization_to_operator booking_operator_1 external_authorization_1)
+(allocate_provider_resource_to_option booking_operator_1 provider_resource_1)
+(claim_approval_token_for_operator booking_operator_1 approval_token_1 selection_detail_1)
+(initiate_operator_approval_step booking_operator_1 provider_resource_1)
+(apply_external_authorization_during_approval booking_operator_1 external_authorization_1)
+(finalize_approval_for_operator booking_operator_1)
+(initiate_cancellation_processing_for_option booking_operator_1 refund_method_1 selection_detail_1)
+(apply_refund_and_release_offer_for_operator booking_operator_1 service_offer_1 refund_method_1)
+(unbind_selection_detail_from_option booking_operator_1 selection_detail_1)
+(release_provider_resource_from_option booking_operator_1 provider_resource_1)
+(detach_external_authorization_from_operator booking_operator_1 external_authorization_1)
+(create_reservation_option primary_segment_1)
+(assign_service_offer_to_option primary_segment_1 service_offer_1)
+(bind_selection_detail_to_option primary_segment_1 selection_detail_1)
+(confirm_reservation_option primary_segment_1 selection_detail_1)
+(flag_segment_cancellation_rule primary_segment_1 segment_cancellation_rule_1 selection_detail_1)
+(allocate_provider_resource_to_option primary_segment_1 provider_resource_1)
+(prepare_primary_segment_for_itinerary primary_segment_1 segment_cancellation_rule_1 provider_resource_1)
+(unbind_selection_detail_from_option primary_segment_1 selection_detail_1)
+(release_provider_resource_from_option primary_segment_1 provider_resource_1)
+(create_reservation_option secondary_segment_1)
+(assign_service_offer_to_option secondary_segment_1 service_offer_2)
+(bind_selection_detail_to_option secondary_segment_1 selection_detail_1)
+(confirm_reservation_option secondary_segment_1 selection_detail_1)
+(flag_secondary_segment_cancellation_rule secondary_segment_1 counterparty_cancellation_rule_1 selection_detail_1)
+(allocate_provider_resource_to_option secondary_segment_1 provider_resource_1)
+(prepare_secondary_segment_for_itinerary secondary_segment_1 counterparty_cancellation_rule_1 provider_resource_1)
+(unbind_selection_detail_from_option secondary_segment_1 selection_detail_1)
+(release_provider_resource_from_option secondary_segment_1 provider_resource_1)
+(compose_itinerary_from_segments primary_segment_1 secondary_segment_1 segment_cancellation_rule_1 counterparty_cancellation_rule_1 itinerary_record_1)
+(bind_selection_detail_to_option primary_segment_1 selection_detail_1)
+(mark_itinerary_ready_for_issuance itinerary_record_1 primary_segment_1 selection_detail_1)
+(unbind_selection_detail_from_option primary_segment_1 selection_detail_1)
+(create_reservation_option booking_operator_2)
+(assign_service_offer_to_option booking_operator_2 service_offer_3)
+(bind_selection_detail_to_option booking_operator_2 selection_detail_1)
+(confirm_reservation_option booking_operator_2 selection_detail_1)
+(issue_fulfillment_document booking_operator_2 fulfillment_document_2 itinerary_record_1)
+(operator_prepare_document_for_itinerary booking_operator_2 fulfillment_document_2 itinerary_record_1 selection_detail_1)
+(attach_billing_profile_to_operator booking_operator_2 billing_profile_1)
+(allocate_provider_resource_to_option booking_operator_2 provider_resource_1)
+(finalize_operator_document_stage1 booking_operator_2 billing_profile_1 provider_resource_1 fulfillment_document_2 itinerary_record_1)
+(attach_external_authorization_to_operator booking_operator_2 external_authorization_1)
+(operator_apply_external_authorization_stage1 booking_operator_2 external_authorization_1 fulfillment_document_2 itinerary_record_1)
+(finalize_operator_record booking_operator_2)
+(initiate_cancellation_processing_for_option booking_operator_2 refund_method_1 selection_detail_1)
+(apply_refund_and_release_offer_for_operator booking_operator_2 service_offer_3 refund_method_1)
+(unbind_selection_detail_from_option booking_operator_2 selection_detail_1)
+(finalize_primary_segment primary_segment_1 itinerary_record_1)
+(finalize_secondary_segment secondary_segment_1 itinerary_record_1)
+(bind_selection_detail_to_option primary_segment_1 selection_detail_1)
+(initiate_cancellation_processing_for_option primary_segment_1 refund_method_1 selection_detail_1)
+(apply_refund_and_release_offer_for_primary_segment primary_segment_1 service_offer_1 refund_method_1)
+(unbind_selection_detail_from_option primary_segment_1 selection_detail_1)
+(bind_selection_detail_to_option secondary_segment_1 selection_detail_1)
+(initiate_cancellation_processing_for_option secondary_segment_1 refund_method_1 selection_detail_1)
+(apply_refund_and_release_offer_for_secondary_segment secondary_segment_1 service_offer_2 refund_method_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_9g4karqj/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 61 
+
+Successful plans:
+Value: 61
+ /tmp/val_9g4karqj/plan.pddl 61 
+
+
+
+--- stderr ---
+

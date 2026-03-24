@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain weather_aware_itinerary_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object forecast_supertype - object weather_window_supertype - object itinerary_slot_root - object itinerary_slot - itinerary_slot_root transport_option - resource_category weather_forecast - resource_category venue - resource_category special_request - resource_category traveler_preference - resource_category weather_constraint - resource_category equipment_provision - resource_category contingency_option - resource_category activity_candidate - forecast_supertype time_window - forecast_supertype guideline - forecast_supertype weather_window_type_a - weather_window_supertype weather_window_type_b - weather_window_supertype reservation - weather_window_supertype day_segment_root - itinerary_slot location_root - itinerary_slot day_segment_a - day_segment_root day_segment_b - day_segment_root itinerary_plan - location_root)
+  (:predicates
+    (slot_initialized ?itinerary_slot - itinerary_slot)
+    (ready_for_processing ?itinerary_slot - itinerary_slot)
+    (transport_assigned ?itinerary_slot - itinerary_slot)
+    (slot_integration_completed ?itinerary_slot - itinerary_slot)
+    (allocation_confirmed ?itinerary_slot - itinerary_slot)
+    (preference_applied ?itinerary_slot - itinerary_slot)
+    (transport_available ?transport_option - transport_option)
+    (transport_binding ?itinerary_slot - itinerary_slot ?transport_option - transport_option)
+    (forecast_available ?weather_forecast - weather_forecast)
+    (forecast_binding ?itinerary_slot - itinerary_slot ?weather_forecast - weather_forecast)
+    (venue_available ?venue - venue)
+    (venue_assignment ?itinerary_slot - itinerary_slot ?venue - venue)
+    (activity_candidate_available ?activity_candidate - activity_candidate)
+    (segment_a_activity_binding ?day_segment_a - day_segment_a ?activity_candidate - activity_candidate)
+    (segment_b_activity_binding ?day_segment_b - day_segment_b ?activity_candidate - activity_candidate)
+    (day_segment_a_weather_window_binding ?day_segment_a - day_segment_a ?weather_window_type_a - weather_window_type_a)
+    (weather_window_type_a_selected ?weather_window_type_a - weather_window_type_a)
+    (weather_window_type_a_alternative ?weather_window_type_a - weather_window_type_a)
+    (day_segment_a_ready_for_reservation ?day_segment_a - day_segment_a)
+    (day_segment_b_weather_window_binding ?day_segment_b - day_segment_b ?weather_window_type_b - weather_window_type_b)
+    (weather_window_type_b_selected ?weather_window_type_b - weather_window_type_b)
+    (weather_window_type_b_alternative ?weather_window_type_b - weather_window_type_b)
+    (day_segment_b_ready_for_reservation ?day_segment_b - day_segment_b)
+    (reservation_slot_available ?reservation - reservation)
+    (reservation_created ?reservation - reservation)
+    (reservation_weather_window_a_binding ?reservation - reservation ?weather_window_type_a - weather_window_type_a)
+    (reservation_weather_window_b_binding ?reservation - reservation ?weather_window_type_b - weather_window_type_b)
+    (reservation_tagged_window_a_secondary ?reservation - reservation)
+    (reservation_tagged_window_b_secondary ?reservation - reservation)
+    (reservation_time_window_prepared ?reservation - reservation)
+    (plan_has_daysegment_a_association ?itinerary_plan - itinerary_plan ?day_segment_a - day_segment_a)
+    (plan_has_daysegment_b_association ?itinerary_plan - itinerary_plan ?day_segment_b - day_segment_b)
+    (plan_has_reservation_binding ?itinerary_plan - itinerary_plan ?reservation - reservation)
+    (time_window_available ?time_window - time_window)
+    (plan_has_timewindow_binding ?itinerary_plan - itinerary_plan ?time_window - time_window)
+    (time_window_claimed ?time_window - time_window)
+    (time_window_reservation_binding ?time_window - time_window ?reservation - reservation)
+    (plan_ready_for_enrichment ?itinerary_plan - itinerary_plan)
+    (plan_enrichment_stage_one ?itinerary_plan - itinerary_plan)
+    (plan_resources_allocated ?itinerary_plan - itinerary_plan)
+    (plan_has_special_request_flag ?itinerary_plan - itinerary_plan)
+    (plan_special_request_applied ?itinerary_plan - itinerary_plan)
+    (plan_preference_attached ?itinerary_plan - itinerary_plan)
+    (plan_activity_allocations_committed ?itinerary_plan - itinerary_plan)
+    (guideline_available ?guideline - guideline)
+    (plan_has_guideline_binding ?itinerary_plan - itinerary_plan ?guideline - guideline)
+    (plan_guideline_selected ?itinerary_plan - itinerary_plan)
+    (plan_guideline_revision_applied ?itinerary_plan - itinerary_plan)
+    (plan_guideline_confirmed ?itinerary_plan - itinerary_plan)
+    (special_request_available ?special_request - special_request)
+    (plan_special_request_binding ?itinerary_plan - itinerary_plan ?special_request - special_request)
+    (traveler_preference_available ?traveler_preference - traveler_preference)
+    (plan_traveler_preference_binding ?itinerary_plan - itinerary_plan ?traveler_preference - traveler_preference)
+    (equipment_available ?equipment_provision - equipment_provision)
+    (plan_equipment_binding ?itinerary_plan - itinerary_plan ?equipment_provision - equipment_provision)
+    (contingency_option_available ?contingency_option - contingency_option)
+    (plan_contingency_binding ?itinerary_plan - itinerary_plan ?contingency_option - contingency_option)
+    (weather_constraint_available ?weather_constraint - weather_constraint)
+    (weather_constraint_binding ?itinerary_slot - itinerary_slot ?weather_constraint - weather_constraint)
+    (day_segment_a_prepared ?day_segment_a - day_segment_a)
+    (day_segment_b_prepared ?day_segment_b - day_segment_b)
+    (plan_approved ?itinerary_plan - itinerary_plan)
+  )
+  (:action initialize_itinerary_slot
+    :parameters (?itinerary_slot - itinerary_slot)
+    :precondition
+      (and
+        (not
+          (slot_initialized ?itinerary_slot)
+        )
+        (not
+          (slot_integration_completed ?itinerary_slot)
+        )
+      )
+    :effect (slot_initialized ?itinerary_slot)
+  )
+  (:action bind_transport_to_slot
+    :parameters (?itinerary_slot - itinerary_slot ?transport_option - transport_option)
+    :precondition
+      (and
+        (slot_initialized ?itinerary_slot)
+        (not
+          (transport_assigned ?itinerary_slot)
+        )
+        (transport_available ?transport_option)
+      )
+    :effect
+      (and
+        (transport_assigned ?itinerary_slot)
+        (transport_binding ?itinerary_slot ?transport_option)
+        (not
+          (transport_available ?transport_option)
+        )
+      )
+  )
+  (:action attach_forecast_to_slot
+    :parameters (?itinerary_slot - itinerary_slot ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (slot_initialized ?itinerary_slot)
+        (transport_assigned ?itinerary_slot)
+        (forecast_available ?weather_forecast)
+      )
+    :effect
+      (and
+        (forecast_binding ?itinerary_slot ?weather_forecast)
+        (not
+          (forecast_available ?weather_forecast)
+        )
+      )
+  )
+  (:action validate_slot_with_forecast
+    :parameters (?itinerary_slot - itinerary_slot ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (slot_initialized ?itinerary_slot)
+        (transport_assigned ?itinerary_slot)
+        (forecast_binding ?itinerary_slot ?weather_forecast)
+        (not
+          (ready_for_processing ?itinerary_slot)
+        )
+      )
+    :effect (ready_for_processing ?itinerary_slot)
+  )
+  (:action release_forecast_from_slot
+    :parameters (?itinerary_slot - itinerary_slot ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (forecast_binding ?itinerary_slot ?weather_forecast)
+      )
+    :effect
+      (and
+        (forecast_available ?weather_forecast)
+        (not
+          (forecast_binding ?itinerary_slot ?weather_forecast)
+        )
+      )
+  )
+  (:action reserve_venue_for_slot
+    :parameters (?itinerary_slot - itinerary_slot ?venue - venue)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_slot)
+        (venue_available ?venue)
+      )
+    :effect
+      (and
+        (venue_assignment ?itinerary_slot ?venue)
+        (not
+          (venue_available ?venue)
+        )
+      )
+  )
+  (:action release_venue_from_slot
+    :parameters (?itinerary_slot - itinerary_slot ?venue - venue)
+    :precondition
+      (and
+        (venue_assignment ?itinerary_slot ?venue)
+      )
+    :effect
+      (and
+        (venue_available ?venue)
+        (not
+          (venue_assignment ?itinerary_slot ?venue)
+        )
+      )
+  )
+  (:action allocate_equipment_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?equipment_provision - equipment_provision)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (equipment_available ?equipment_provision)
+      )
+    :effect
+      (and
+        (plan_equipment_binding ?itinerary_plan ?equipment_provision)
+        (not
+          (equipment_available ?equipment_provision)
+        )
+      )
+  )
+  (:action release_equipment_from_plan
+    :parameters (?itinerary_plan - itinerary_plan ?equipment_provision - equipment_provision)
+    :precondition
+      (and
+        (plan_equipment_binding ?itinerary_plan ?equipment_provision)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_provision)
+        (not
+          (plan_equipment_binding ?itinerary_plan ?equipment_provision)
+        )
+      )
+  )
+  (:action attach_contingency_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (contingency_option_available ?contingency_option)
+      )
+    :effect
+      (and
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (not
+          (contingency_option_available ?contingency_option)
+        )
+      )
+  )
+  (:action detach_contingency_from_plan
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+      )
+    :effect
+      (and
+        (contingency_option_available ?contingency_option)
+        (not
+          (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        )
+      )
+  )
+  (:action select_weather_window_a_for_segment
+    :parameters (?day_segment_a - day_segment_a ?weather_window_type_a - weather_window_type_a ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_a)
+        (forecast_binding ?day_segment_a ?weather_forecast)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (not
+          (weather_window_type_a_selected ?weather_window_type_a)
+        )
+        (not
+          (weather_window_type_a_alternative ?weather_window_type_a)
+        )
+      )
+    :effect (weather_window_type_a_selected ?weather_window_type_a)
+  )
+  (:action allocate_venue_to_daysegment_a_under_window
+    :parameters (?day_segment_a - day_segment_a ?weather_window_type_a - weather_window_type_a ?venue - venue)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_a)
+        (venue_assignment ?day_segment_a ?venue)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (weather_window_type_a_selected ?weather_window_type_a)
+        (not
+          (day_segment_a_prepared ?day_segment_a)
+        )
+      )
+    :effect
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+      )
+  )
+  (:action assign_activity_candidate_to_daysegment_a
+    :parameters (?day_segment_a - day_segment_a ?weather_window_type_a - weather_window_type_a ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_a)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (activity_candidate_available ?activity_candidate)
+        (not
+          (day_segment_a_prepared ?day_segment_a)
+        )
+      )
+    :effect
+      (and
+        (weather_window_type_a_alternative ?weather_window_type_a)
+        (day_segment_a_prepared ?day_segment_a)
+        (segment_a_activity_binding ?day_segment_a ?activity_candidate)
+        (not
+          (activity_candidate_available ?activity_candidate)
+        )
+      )
+  )
+  (:action confirm_activity_candidate_for_daysegment_a
+    :parameters (?day_segment_a - day_segment_a ?weather_window_type_a - weather_window_type_a ?weather_forecast - weather_forecast ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_a)
+        (forecast_binding ?day_segment_a ?weather_forecast)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (weather_window_type_a_alternative ?weather_window_type_a)
+        (segment_a_activity_binding ?day_segment_a ?activity_candidate)
+        (not
+          (day_segment_a_ready_for_reservation ?day_segment_a)
+        )
+      )
+    :effect
+      (and
+        (weather_window_type_a_selected ?weather_window_type_a)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+        (activity_candidate_available ?activity_candidate)
+        (not
+          (segment_a_activity_binding ?day_segment_a ?activity_candidate)
+        )
+      )
+  )
+  (:action select_weather_window_b_for_segment
+    :parameters (?day_segment_b - day_segment_b ?weather_window_type_b - weather_window_type_b ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_b)
+        (forecast_binding ?day_segment_b ?weather_forecast)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (not
+          (weather_window_type_b_selected ?weather_window_type_b)
+        )
+        (not
+          (weather_window_type_b_alternative ?weather_window_type_b)
+        )
+      )
+    :effect (weather_window_type_b_selected ?weather_window_type_b)
+  )
+  (:action allocate_venue_to_daysegment_b_under_window
+    :parameters (?day_segment_b - day_segment_b ?weather_window_type_b - weather_window_type_b ?venue - venue)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_b)
+        (venue_assignment ?day_segment_b ?venue)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_b_selected ?weather_window_type_b)
+        (not
+          (day_segment_b_prepared ?day_segment_b)
+        )
+      )
+    :effect
+      (and
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+      )
+  )
+  (:action assign_activity_candidate_to_daysegment_b
+    :parameters (?day_segment_b - day_segment_b ?weather_window_type_b - weather_window_type_b ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_b)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (activity_candidate_available ?activity_candidate)
+        (not
+          (day_segment_b_prepared ?day_segment_b)
+        )
+      )
+    :effect
+      (and
+        (weather_window_type_b_alternative ?weather_window_type_b)
+        (day_segment_b_prepared ?day_segment_b)
+        (segment_b_activity_binding ?day_segment_b ?activity_candidate)
+        (not
+          (activity_candidate_available ?activity_candidate)
+        )
+      )
+  )
+  (:action confirm_activity_candidate_for_daysegment_b
+    :parameters (?day_segment_b - day_segment_b ?weather_window_type_b - weather_window_type_b ?weather_forecast - weather_forecast ?activity_candidate - activity_candidate)
+    :precondition
+      (and
+        (ready_for_processing ?day_segment_b)
+        (forecast_binding ?day_segment_b ?weather_forecast)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_b_alternative ?weather_window_type_b)
+        (segment_b_activity_binding ?day_segment_b ?activity_candidate)
+        (not
+          (day_segment_b_ready_for_reservation ?day_segment_b)
+        )
+      )
+    :effect
+      (and
+        (weather_window_type_b_selected ?weather_window_type_b)
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+        (activity_candidate_available ?activity_candidate)
+        (not
+          (segment_b_activity_binding ?day_segment_b ?activity_candidate)
+        )
+      )
+  )
+  (:action create_reservation_from_segments_and_windows
+    :parameters (?day_segment_a - day_segment_a ?day_segment_b - day_segment_b ?weather_window_type_a - weather_window_type_a ?weather_window_type_b - weather_window_type_b ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_a_selected ?weather_window_type_a)
+        (weather_window_type_b_selected ?weather_window_type_b)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+        (reservation_slot_available ?reservation)
+      )
+    :effect
+      (and
+        (reservation_created ?reservation)
+        (reservation_weather_window_a_binding ?reservation ?weather_window_type_a)
+        (reservation_weather_window_b_binding ?reservation ?weather_window_type_b)
+        (not
+          (reservation_slot_available ?reservation)
+        )
+      )
+  )
+  (:action create_enriched_reservation_with_window_a_secondary
+    :parameters (?day_segment_a - day_segment_a ?day_segment_b - day_segment_b ?weather_window_type_a - weather_window_type_a ?weather_window_type_b - weather_window_type_b ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_a_alternative ?weather_window_type_a)
+        (weather_window_type_b_selected ?weather_window_type_b)
+        (not
+          (day_segment_a_ready_for_reservation ?day_segment_a)
+        )
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+        (reservation_slot_available ?reservation)
+      )
+    :effect
+      (and
+        (reservation_created ?reservation)
+        (reservation_weather_window_a_binding ?reservation ?weather_window_type_a)
+        (reservation_weather_window_b_binding ?reservation ?weather_window_type_b)
+        (reservation_tagged_window_a_secondary ?reservation)
+        (not
+          (reservation_slot_available ?reservation)
+        )
+      )
+  )
+  (:action create_enriched_reservation_with_window_b_secondary
+    :parameters (?day_segment_a - day_segment_a ?day_segment_b - day_segment_b ?weather_window_type_a - weather_window_type_a ?weather_window_type_b - weather_window_type_b ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_a_selected ?weather_window_type_a)
+        (weather_window_type_b_alternative ?weather_window_type_b)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+        (not
+          (day_segment_b_ready_for_reservation ?day_segment_b)
+        )
+        (reservation_slot_available ?reservation)
+      )
+    :effect
+      (and
+        (reservation_created ?reservation)
+        (reservation_weather_window_a_binding ?reservation ?weather_window_type_a)
+        (reservation_weather_window_b_binding ?reservation ?weather_window_type_b)
+        (reservation_tagged_window_b_secondary ?reservation)
+        (not
+          (reservation_slot_available ?reservation)
+        )
+      )
+  )
+  (:action create_enriched_reservation_with_both_secondary_windows
+    :parameters (?day_segment_a - day_segment_a ?day_segment_b - day_segment_b ?weather_window_type_a - weather_window_type_a ?weather_window_type_b - weather_window_type_b ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_a_weather_window_binding ?day_segment_a ?weather_window_type_a)
+        (day_segment_b_weather_window_binding ?day_segment_b ?weather_window_type_b)
+        (weather_window_type_a_alternative ?weather_window_type_a)
+        (weather_window_type_b_alternative ?weather_window_type_b)
+        (not
+          (day_segment_a_ready_for_reservation ?day_segment_a)
+        )
+        (not
+          (day_segment_b_ready_for_reservation ?day_segment_b)
+        )
+        (reservation_slot_available ?reservation)
+      )
+    :effect
+      (and
+        (reservation_created ?reservation)
+        (reservation_weather_window_a_binding ?reservation ?weather_window_type_a)
+        (reservation_weather_window_b_binding ?reservation ?weather_window_type_b)
+        (reservation_tagged_window_a_secondary ?reservation)
+        (reservation_tagged_window_b_secondary ?reservation)
+        (not
+          (reservation_slot_available ?reservation)
+        )
+      )
+  )
+  (:action mark_reservation_time_window_ready
+    :parameters (?reservation - reservation ?day_segment_a - day_segment_a ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (reservation_created ?reservation)
+        (day_segment_a_prepared ?day_segment_a)
+        (forecast_binding ?day_segment_a ?weather_forecast)
+        (not
+          (reservation_time_window_prepared ?reservation)
+        )
+      )
+    :effect (reservation_time_window_prepared ?reservation)
+  )
+  (:action claim_time_window_for_reservation
+    :parameters (?itinerary_plan - itinerary_plan ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (plan_has_reservation_binding ?itinerary_plan ?reservation)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_available ?time_window)
+        (reservation_created ?reservation)
+        (reservation_time_window_prepared ?reservation)
+        (not
+          (time_window_claimed ?time_window)
+        )
+      )
+    :effect
+      (and
+        (time_window_claimed ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action mark_plan_ready_for_enrichment
+    :parameters (?itinerary_plan - itinerary_plan ?time_window - time_window ?reservation - reservation ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_claimed ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (forecast_binding ?itinerary_plan ?weather_forecast)
+        (not
+          (reservation_tagged_window_a_secondary ?reservation)
+        )
+        (not
+          (plan_ready_for_enrichment ?itinerary_plan)
+        )
+      )
+    :effect (plan_ready_for_enrichment ?itinerary_plan)
+  )
+  (:action attach_special_request_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?special_request - special_request)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (special_request_available ?special_request)
+        (not
+          (plan_has_special_request_flag ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_special_request_flag ?itinerary_plan)
+        (plan_special_request_binding ?itinerary_plan ?special_request)
+        (not
+          (special_request_available ?special_request)
+        )
+      )
+  )
+  (:action apply_special_request_enrichment_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?time_window - time_window ?reservation - reservation ?weather_forecast - weather_forecast ?special_request - special_request)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_claimed ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (forecast_binding ?itinerary_plan ?weather_forecast)
+        (reservation_tagged_window_a_secondary ?reservation)
+        (plan_has_special_request_flag ?itinerary_plan)
+        (plan_special_request_binding ?itinerary_plan ?special_request)
+        (not
+          (plan_ready_for_enrichment ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_enrichment ?itinerary_plan)
+        (plan_special_request_applied ?itinerary_plan)
+      )
+  )
+  (:action attach_equipment_and_venue_to_plan_variant_primary
+    :parameters (?itinerary_plan - itinerary_plan ?equipment_provision - equipment_provision ?venue - venue ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_ready_for_enrichment ?itinerary_plan)
+        (plan_equipment_binding ?itinerary_plan ?equipment_provision)
+        (venue_assignment ?itinerary_plan ?venue)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (not
+          (reservation_tagged_window_b_secondary ?reservation)
+        )
+        (not
+          (plan_enrichment_stage_one ?itinerary_plan)
+        )
+      )
+    :effect (plan_enrichment_stage_one ?itinerary_plan)
+  )
+  (:action attach_equipment_and_venue_to_plan_variant_secondary
+    :parameters (?itinerary_plan - itinerary_plan ?equipment_provision - equipment_provision ?venue - venue ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_ready_for_enrichment ?itinerary_plan)
+        (plan_equipment_binding ?itinerary_plan ?equipment_provision)
+        (venue_assignment ?itinerary_plan ?venue)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (reservation_tagged_window_b_secondary ?reservation)
+        (not
+          (plan_enrichment_stage_one ?itinerary_plan)
+        )
+      )
+    :effect (plan_enrichment_stage_one ?itinerary_plan)
+  )
+  (:action apply_contingency_and_mark_plan_resources_allocated
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_enrichment_stage_one ?itinerary_plan)
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (not
+          (reservation_tagged_window_a_secondary ?reservation)
+        )
+        (not
+          (reservation_tagged_window_b_secondary ?reservation)
+        )
+        (not
+          (plan_resources_allocated ?itinerary_plan)
+        )
+      )
+    :effect (plan_resources_allocated ?itinerary_plan)
+  )
+  (:action apply_contingency_and_attach_preference_variant_a
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_enrichment_stage_one ?itinerary_plan)
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (reservation_tagged_window_a_secondary ?reservation)
+        (not
+          (reservation_tagged_window_b_secondary ?reservation)
+        )
+        (not
+          (plan_resources_allocated ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_preference_attached ?itinerary_plan)
+      )
+  )
+  (:action apply_contingency_and_attach_preference_variant_b
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_enrichment_stage_one ?itinerary_plan)
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (not
+          (reservation_tagged_window_a_secondary ?reservation)
+        )
+        (reservation_tagged_window_b_secondary ?reservation)
+        (not
+          (plan_resources_allocated ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_preference_attached ?itinerary_plan)
+      )
+  )
+  (:action apply_contingency_and_attach_preference_variant_c
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option ?time_window - time_window ?reservation - reservation)
+    :precondition
+      (and
+        (plan_enrichment_stage_one ?itinerary_plan)
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (plan_has_timewindow_binding ?itinerary_plan ?time_window)
+        (time_window_reservation_binding ?time_window ?reservation)
+        (reservation_tagged_window_a_secondary ?reservation)
+        (reservation_tagged_window_b_secondary ?reservation)
+        (not
+          (plan_resources_allocated ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_preference_attached ?itinerary_plan)
+      )
+  )
+  (:action approve_plan_without_preferences
+    :parameters (?itinerary_plan - itinerary_plan)
+    :precondition
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (not
+          (plan_preference_attached ?itinerary_plan)
+        )
+        (not
+          (plan_approved ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approved ?itinerary_plan)
+        (allocation_confirmed ?itinerary_plan)
+      )
+  )
+  (:action attach_preference_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?traveler_preference - traveler_preference)
+    :precondition
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_preference_attached ?itinerary_plan)
+        (traveler_preference_available ?traveler_preference)
+      )
+    :effect
+      (and
+        (plan_traveler_preference_binding ?itinerary_plan ?traveler_preference)
+        (not
+          (traveler_preference_available ?traveler_preference)
+        )
+      )
+  )
+  (:action commit_activity_allocations
+    :parameters (?itinerary_plan - itinerary_plan ?day_segment_a - day_segment_a ?day_segment_b - day_segment_b ?weather_forecast - weather_forecast ?traveler_preference - traveler_preference)
+    :precondition
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_preference_attached ?itinerary_plan)
+        (plan_traveler_preference_binding ?itinerary_plan ?traveler_preference)
+        (plan_has_daysegment_a_association ?itinerary_plan ?day_segment_a)
+        (plan_has_daysegment_b_association ?itinerary_plan ?day_segment_b)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+        (forecast_binding ?itinerary_plan ?weather_forecast)
+        (not
+          (plan_activity_allocations_committed ?itinerary_plan)
+        )
+      )
+    :effect (plan_activity_allocations_committed ?itinerary_plan)
+  )
+  (:action approve_plan_after_activity_commit
+    :parameters (?itinerary_plan - itinerary_plan)
+    :precondition
+      (and
+        (plan_resources_allocated ?itinerary_plan)
+        (plan_activity_allocations_committed ?itinerary_plan)
+        (not
+          (plan_approved ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approved ?itinerary_plan)
+        (allocation_confirmed ?itinerary_plan)
+      )
+  )
+  (:action bind_guideline_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?guideline - guideline ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (ready_for_processing ?itinerary_plan)
+        (forecast_binding ?itinerary_plan ?weather_forecast)
+        (guideline_available ?guideline)
+        (plan_has_guideline_binding ?itinerary_plan ?guideline)
+        (not
+          (plan_guideline_selected ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_guideline_selected ?itinerary_plan)
+        (not
+          (guideline_available ?guideline)
+        )
+      )
+  )
+  (:action apply_guideline_revision_to_plan
+    :parameters (?itinerary_plan - itinerary_plan ?venue - venue)
+    :precondition
+      (and
+        (plan_guideline_selected ?itinerary_plan)
+        (venue_assignment ?itinerary_plan ?venue)
+        (not
+          (plan_guideline_revision_applied ?itinerary_plan)
+        )
+      )
+    :effect (plan_guideline_revision_applied ?itinerary_plan)
+  )
+  (:action confirm_guideline_on_plan
+    :parameters (?itinerary_plan - itinerary_plan ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (plan_guideline_revision_applied ?itinerary_plan)
+        (plan_contingency_binding ?itinerary_plan ?contingency_option)
+        (not
+          (plan_guideline_confirmed ?itinerary_plan)
+        )
+      )
+    :effect (plan_guideline_confirmed ?itinerary_plan)
+  )
+  (:action approve_plan_after_guideline
+    :parameters (?itinerary_plan - itinerary_plan)
+    :precondition
+      (and
+        (plan_guideline_confirmed ?itinerary_plan)
+        (not
+          (plan_approved ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approved ?itinerary_plan)
+        (allocation_confirmed ?itinerary_plan)
+      )
+  )
+  (:action finalize_day_segment_a_allocation
+    :parameters (?day_segment_a - day_segment_a ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_a_prepared ?day_segment_a)
+        (day_segment_a_ready_for_reservation ?day_segment_a)
+        (reservation_created ?reservation)
+        (reservation_time_window_prepared ?reservation)
+        (not
+          (allocation_confirmed ?day_segment_a)
+        )
+      )
+    :effect (allocation_confirmed ?day_segment_a)
+  )
+  (:action finalize_day_segment_b_allocation
+    :parameters (?day_segment_b - day_segment_b ?reservation - reservation)
+    :precondition
+      (and
+        (day_segment_b_prepared ?day_segment_b)
+        (day_segment_b_ready_for_reservation ?day_segment_b)
+        (reservation_created ?reservation)
+        (reservation_time_window_prepared ?reservation)
+        (not
+          (allocation_confirmed ?day_segment_b)
+        )
+      )
+    :effect (allocation_confirmed ?day_segment_b)
+  )
+  (:action apply_traveler_preference_and_constraint_to_slot
+    :parameters (?itinerary_slot - itinerary_slot ?weather_constraint - weather_constraint ?weather_forecast - weather_forecast)
+    :precondition
+      (and
+        (allocation_confirmed ?itinerary_slot)
+        (forecast_binding ?itinerary_slot ?weather_forecast)
+        (weather_constraint_available ?weather_constraint)
+        (not
+          (preference_applied ?itinerary_slot)
+        )
+      )
+    :effect
+      (and
+        (preference_applied ?itinerary_slot)
+        (weather_constraint_binding ?itinerary_slot ?weather_constraint)
+        (not
+          (weather_constraint_available ?weather_constraint)
+        )
+      )
+  )
+  (:action integrate_preference_and_constraint_into_daysegment_a
+    :parameters (?day_segment_a - day_segment_a ?transport_option - transport_option ?weather_constraint - weather_constraint)
+    :precondition
+      (and
+        (preference_applied ?day_segment_a)
+        (transport_binding ?day_segment_a ?transport_option)
+        (weather_constraint_binding ?day_segment_a ?weather_constraint)
+        (not
+          (slot_integration_completed ?day_segment_a)
+        )
+      )
+    :effect
+      (and
+        (slot_integration_completed ?day_segment_a)
+        (transport_available ?transport_option)
+        (weather_constraint_available ?weather_constraint)
+      )
+  )
+  (:action integrate_preference_and_constraint_into_daysegment_b
+    :parameters (?day_segment_b - day_segment_b ?transport_option - transport_option ?weather_constraint - weather_constraint)
+    :precondition
+      (and
+        (preference_applied ?day_segment_b)
+        (transport_binding ?day_segment_b ?transport_option)
+        (weather_constraint_binding ?day_segment_b ?weather_constraint)
+        (not
+          (slot_integration_completed ?day_segment_b)
+        )
+      )
+    :effect
+      (and
+        (slot_integration_completed ?day_segment_b)
+        (transport_available ?transport_option)
+        (weather_constraint_available ?weather_constraint)
+      )
+  )
+  (:action integrate_preference_and_constraint_into_itinerary_plan
+    :parameters (?itinerary_plan - itinerary_plan ?transport_option - transport_option ?weather_constraint - weather_constraint)
+    :precondition
+      (and
+        (preference_applied ?itinerary_plan)
+        (transport_binding ?itinerary_plan ?transport_option)
+        (weather_constraint_binding ?itinerary_plan ?weather_constraint)
+        (not
+          (slot_integration_completed ?itinerary_plan)
+        )
+      )
+    :effect
+      (and
+        (slot_integration_completed ?itinerary_plan)
+        (transport_available ?transport_option)
+        (weather_constraint_available ?weather_constraint)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem trip_itinerary_weather_reordering_problem)
+  (:domain weather_aware_itinerary_planning_domain)
+  (:objects day1_morning_segment - day_segment_a day1_afternoon_segment - day_segment_b primary_itinerary_plan - itinerary_plan alternate_itinerary_plan - itinerary_plan transport_option_train - transport_option transport_option_bus - transport_option transport_option_taxi - transport_option weather_forecast_day1 - weather_forecast venue_art_museum - venue activity_sightseeing_tour - activity_candidate weather_window_precipitation_ok - weather_window_type_a weather_window_temperature_ok - weather_window_type_b reservation_slot_1 - reservation time_window_morning - time_window time_window_afternoon - time_window special_request_accessibility - special_request special_request_dietary - special_request preference_relaxed_pace - traveler_preference preference_active_pace - traveler_preference weather_constraint_no_heavy_rain - weather_constraint equipment_raincoat - equipment_provision guideline_safety_brief - guideline guideline_crowd_control - guideline contingency_indoor_tour - contingency_option)
+  (:init
+    (transport_available transport_option_train)
+    (transport_available transport_option_bus)
+    (transport_available transport_option_taxi)
+    (forecast_available weather_forecast_day1)
+    (venue_available venue_art_museum)
+    (activity_candidate_available activity_sightseeing_tour)
+    (day_segment_a_weather_window_binding day1_morning_segment weather_window_precipitation_ok)
+    (day_segment_b_weather_window_binding day1_afternoon_segment weather_window_temperature_ok)
+    (reservation_slot_available reservation_slot_1)
+    (time_window_available time_window_morning)
+    (time_window_available time_window_afternoon)
+    (plan_has_daysegment_a_association primary_itinerary_plan day1_morning_segment)
+    (plan_has_daysegment_a_association alternate_itinerary_plan day1_morning_segment)
+    (plan_has_daysegment_b_association primary_itinerary_plan day1_afternoon_segment)
+    (plan_has_daysegment_b_association alternate_itinerary_plan day1_afternoon_segment)
+    (plan_has_reservation_binding primary_itinerary_plan reservation_slot_1)
+    (plan_has_reservation_binding alternate_itinerary_plan reservation_slot_1)
+    (plan_has_timewindow_binding primary_itinerary_plan time_window_morning)
+    (plan_has_timewindow_binding alternate_itinerary_plan time_window_afternoon)
+    (special_request_available special_request_accessibility)
+    (special_request_available special_request_dietary)
+    (traveler_preference_available preference_relaxed_pace)
+    (traveler_preference_available preference_active_pace)
+    (weather_constraint_available weather_constraint_no_heavy_rain)
+    (equipment_available equipment_raincoat)
+    (guideline_available guideline_safety_brief)
+    (plan_has_guideline_binding primary_itinerary_plan guideline_safety_brief)
+    (plan_has_guideline_binding alternate_itinerary_plan guideline_crowd_control)
+    (contingency_option_available contingency_indoor_tour)
+  )
+  (:goal
+    (and
+      (slot_integration_completed day1_morning_segment)
+      (slot_integration_completed day1_afternoon_segment)
+      (slot_integration_completed primary_itinerary_plan)
+      (slot_integration_completed alternate_itinerary_plan)
+    )
+  )
+)

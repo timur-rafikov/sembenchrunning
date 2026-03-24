@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain portal_network_usage_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types device_family - object artifact_family - object item_family - object location_family - object location - location_family portal_device - device_family probe_unit - device_family control_switch - device_family upgrade_module - device_family permission_token - device_family hazard_marker - device_family special_modifier - device_family timed_event - device_family consumable_resource - artifact_family map_fragment - artifact_family mission_marker - artifact_family entry_interface - item_family exit_interface - item_family route_plan - item_family site_family_entry - location site_family_hub - location origin_site - site_family_entry destination_site - site_family_entry hub_node - site_family_hub)
+  (:predicates
+    (location_claimed ?location - location)
+    (location_verified ?location - location)
+    (location_device_installed ?location - location)
+    (location_covered ?location - location)
+    (visit_confirmed ?location - location)
+    (return_path_provisioned ?location - location)
+    (device_available ?portal_device - portal_device)
+    (device_installed_at ?location - location ?portal_device - portal_device)
+    (probe_available ?probe_unit - probe_unit)
+    (probe_deployed_at ?location - location ?probe_unit - probe_unit)
+    (switch_available ?control_switch - control_switch)
+    (switch_attached_to_location ?location - location ?control_switch - control_switch)
+    (consumable_available ?resource - consumable_resource)
+    (origin_has_consumable ?origin_site - origin_site ?resource - consumable_resource)
+    (destination_has_consumable ?destination_site - destination_site ?resource - consumable_resource)
+    (origin_has_entry_interface ?origin_site - origin_site ?entry_interface - entry_interface)
+    (entry_interface_discovered ?entry_interface - entry_interface)
+    (entry_interface_validated ?entry_interface - entry_interface)
+    (origin_routing_ready ?origin_site - origin_site)
+    (destination_has_exit_interface ?destination_site - destination_site ?exit_interface - exit_interface)
+    (exit_interface_discovered ?exit_interface - exit_interface)
+    (exit_interface_validated ?exit_interface - exit_interface)
+    (destination_routing_ready ?destination_site - destination_site)
+    (route_slot_available ?route_plan - route_plan)
+    (route_allocated ?route_plan - route_plan)
+    (route_links_entry_interface ?route_plan - route_plan ?entry_interface - entry_interface)
+    (route_links_exit_interface ?route_plan - route_plan ?exit_interface - exit_interface)
+    (route_entry_return_candidate ?route_plan - route_plan)
+    (route_exit_return_candidate ?route_plan - route_plan)
+    (route_return_confirmed ?route_plan - route_plan)
+    (hub_links_origin_site ?hub_node - hub_node ?origin_site - origin_site)
+    (hub_links_destination_site ?hub_node - hub_node ?destination_site - destination_site)
+    (hub_links_route_plan ?hub_node - hub_node ?route_plan - route_plan)
+    (map_fragment_available ?map_fragment - map_fragment)
+    (hub_has_map_fragment ?hub_node - hub_node ?map_fragment - map_fragment)
+    (map_fragment_consumed ?map_fragment - map_fragment)
+    (map_fragment_assigned_to_route ?map_fragment - map_fragment ?route_plan - route_plan)
+    (hub_integration_ready ?hub_node - hub_node)
+    (hub_upgrade_applied ?hub_node - hub_node)
+    (hub_pre_activation_complete ?hub_node - hub_node)
+    (upgrade_marker_registered ?hub_node - hub_node)
+    (hub_upgrade_applied_secondary ?hub_node - hub_node)
+    (hub_ready_for_permission_token ?hub_node - hub_node)
+    (hub_final_checks_completed ?hub_node - hub_node)
+    (mission_marker_available ?mission_marker - mission_marker)
+    (hub_has_mission_marker ?hub_node - hub_node ?mission_marker - mission_marker)
+    (mission_claimed_at_hub ?hub_node - hub_node)
+    (mission_task_initialized ?hub_node - hub_node)
+    (mission_task_completed ?hub_node - hub_node)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (hub_has_upgrade_module ?hub_node - hub_node ?upgrade_module - upgrade_module)
+    (permission_token_available ?permission_token - permission_token)
+    (hub_has_permission_token ?hub_node - hub_node ?permission_token - permission_token)
+    (special_modifier_available ?special_modifier - special_modifier)
+    (hub_has_special_modifier ?hub_node - hub_node ?special_modifier - special_modifier)
+    (timed_event_active ?timed_event - timed_event)
+    (hub_has_timed_event ?hub_node - hub_node ?timed_event - timed_event)
+    (hazard_marker_available ?hazard_marker - hazard_marker)
+    (location_has_hazard_marker ?location - location ?hazard_marker - hazard_marker)
+    (origin_probe_completed ?origin_site - origin_site)
+    (destination_probe_completed ?destination_site - destination_site)
+    (hub_operational ?hub_node - hub_node)
+  )
+  (:action claim_location
+    :parameters (?location - location)
+    :precondition
+      (and
+        (not
+          (location_claimed ?location)
+        )
+        (not
+          (location_covered ?location)
+        )
+      )
+    :effect (location_claimed ?location)
+  )
+  (:action install_portal_device_at_location
+    :parameters (?location - location ?portal_device - portal_device)
+    :precondition
+      (and
+        (location_claimed ?location)
+        (not
+          (location_device_installed ?location)
+        )
+        (device_available ?portal_device)
+      )
+    :effect
+      (and
+        (location_device_installed ?location)
+        (device_installed_at ?location ?portal_device)
+        (not
+          (device_available ?portal_device)
+        )
+      )
+  )
+  (:action deploy_probe_to_location
+    :parameters (?location - location ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_claimed ?location)
+        (location_device_installed ?location)
+        (probe_available ?probe_unit)
+      )
+    :effect
+      (and
+        (probe_deployed_at ?location ?probe_unit)
+        (not
+          (probe_available ?probe_unit)
+        )
+      )
+  )
+  (:action validate_location_with_probe
+    :parameters (?location - location ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_claimed ?location)
+        (location_device_installed ?location)
+        (probe_deployed_at ?location ?probe_unit)
+        (not
+          (location_verified ?location)
+        )
+      )
+    :effect (location_verified ?location)
+  )
+  (:action retrieve_probe_from_location
+    :parameters (?location - location ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (probe_deployed_at ?location ?probe_unit)
+      )
+    :effect
+      (and
+        (probe_available ?probe_unit)
+        (not
+          (probe_deployed_at ?location ?probe_unit)
+        )
+      )
+  )
+  (:action attach_control_switch_to_location
+    :parameters (?location - location ?control_switch - control_switch)
+    :precondition
+      (and
+        (location_verified ?location)
+        (switch_available ?control_switch)
+      )
+    :effect
+      (and
+        (switch_attached_to_location ?location ?control_switch)
+        (not
+          (switch_available ?control_switch)
+        )
+      )
+  )
+  (:action detach_control_switch_from_location
+    :parameters (?location - location ?control_switch - control_switch)
+    :precondition
+      (and
+        (switch_attached_to_location ?location ?control_switch)
+      )
+    :effect
+      (and
+        (switch_available ?control_switch)
+        (not
+          (switch_attached_to_location ?location ?control_switch)
+        )
+      )
+  )
+  (:action apply_special_modifier_to_hub
+    :parameters (?hub_node - hub_node ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (special_modifier_available ?special_modifier)
+      )
+    :effect
+      (and
+        (hub_has_special_modifier ?hub_node ?special_modifier)
+        (not
+          (special_modifier_available ?special_modifier)
+        )
+      )
+  )
+  (:action remove_special_modifier_from_hub
+    :parameters (?hub_node - hub_node ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (hub_has_special_modifier ?hub_node ?special_modifier)
+      )
+    :effect
+      (and
+        (special_modifier_available ?special_modifier)
+        (not
+          (hub_has_special_modifier ?hub_node ?special_modifier)
+        )
+      )
+  )
+  (:action attach_timed_event_to_hub
+    :parameters (?hub_node - hub_node ?timed_event - timed_event)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (timed_event_active ?timed_event)
+      )
+    :effect
+      (and
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (not
+          (timed_event_active ?timed_event)
+        )
+      )
+  )
+  (:action detach_timed_event_from_hub
+    :parameters (?hub_node - hub_node ?timed_event - timed_event)
+    :precondition
+      (and
+        (hub_has_timed_event ?hub_node ?timed_event)
+      )
+    :effect
+      (and
+        (timed_event_active ?timed_event)
+        (not
+          (hub_has_timed_event ?hub_node ?timed_event)
+        )
+      )
+  )
+  (:action probe_entry_interface
+    :parameters (?origin_site - origin_site ?entry_interface - entry_interface ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_verified ?origin_site)
+        (probe_deployed_at ?origin_site ?probe_unit)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (not
+          (entry_interface_discovered ?entry_interface)
+        )
+        (not
+          (entry_interface_validated ?entry_interface)
+        )
+      )
+    :effect (entry_interface_discovered ?entry_interface)
+  )
+  (:action activate_entry_interface_with_switch
+    :parameters (?origin_site - origin_site ?entry_interface - entry_interface ?control_switch - control_switch)
+    :precondition
+      (and
+        (location_verified ?origin_site)
+        (switch_attached_to_location ?origin_site ?control_switch)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (entry_interface_discovered ?entry_interface)
+        (not
+          (origin_probe_completed ?origin_site)
+        )
+      )
+    :effect
+      (and
+        (origin_probe_completed ?origin_site)
+        (origin_routing_ready ?origin_site)
+      )
+  )
+  (:action use_consumable_on_entry_interface
+    :parameters (?origin_site - origin_site ?entry_interface - entry_interface ?resource - consumable_resource)
+    :precondition
+      (and
+        (location_verified ?origin_site)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (consumable_available ?resource)
+        (not
+          (origin_probe_completed ?origin_site)
+        )
+      )
+    :effect
+      (and
+        (entry_interface_validated ?entry_interface)
+        (origin_probe_completed ?origin_site)
+        (origin_has_consumable ?origin_site ?resource)
+        (not
+          (consumable_available ?resource)
+        )
+      )
+  )
+  (:action finalize_entry_interface_validation
+    :parameters (?origin_site - origin_site ?entry_interface - entry_interface ?probe_unit - probe_unit ?resource - consumable_resource)
+    :precondition
+      (and
+        (location_verified ?origin_site)
+        (probe_deployed_at ?origin_site ?probe_unit)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (entry_interface_validated ?entry_interface)
+        (origin_has_consumable ?origin_site ?resource)
+        (not
+          (origin_routing_ready ?origin_site)
+        )
+      )
+    :effect
+      (and
+        (entry_interface_discovered ?entry_interface)
+        (origin_routing_ready ?origin_site)
+        (consumable_available ?resource)
+        (not
+          (origin_has_consumable ?origin_site ?resource)
+        )
+      )
+  )
+  (:action probe_exit_interface
+    :parameters (?destination_site - destination_site ?exit_interface - exit_interface ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_verified ?destination_site)
+        (probe_deployed_at ?destination_site ?probe_unit)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (not
+          (exit_interface_discovered ?exit_interface)
+        )
+        (not
+          (exit_interface_validated ?exit_interface)
+        )
+      )
+    :effect (exit_interface_discovered ?exit_interface)
+  )
+  (:action activate_exit_interface_with_switch
+    :parameters (?destination_site - destination_site ?exit_interface - exit_interface ?control_switch - control_switch)
+    :precondition
+      (and
+        (location_verified ?destination_site)
+        (switch_attached_to_location ?destination_site ?control_switch)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (exit_interface_discovered ?exit_interface)
+        (not
+          (destination_probe_completed ?destination_site)
+        )
+      )
+    :effect
+      (and
+        (destination_probe_completed ?destination_site)
+        (destination_routing_ready ?destination_site)
+      )
+  )
+  (:action use_consumable_on_exit_interface
+    :parameters (?destination_site - destination_site ?exit_interface - exit_interface ?resource - consumable_resource)
+    :precondition
+      (and
+        (location_verified ?destination_site)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (consumable_available ?resource)
+        (not
+          (destination_probe_completed ?destination_site)
+        )
+      )
+    :effect
+      (and
+        (exit_interface_validated ?exit_interface)
+        (destination_probe_completed ?destination_site)
+        (destination_has_consumable ?destination_site ?resource)
+        (not
+          (consumable_available ?resource)
+        )
+      )
+  )
+  (:action finalize_exit_interface_validation
+    :parameters (?destination_site - destination_site ?exit_interface - exit_interface ?probe_unit - probe_unit ?resource - consumable_resource)
+    :precondition
+      (and
+        (location_verified ?destination_site)
+        (probe_deployed_at ?destination_site ?probe_unit)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (exit_interface_validated ?exit_interface)
+        (destination_has_consumable ?destination_site ?resource)
+        (not
+          (destination_routing_ready ?destination_site)
+        )
+      )
+    :effect
+      (and
+        (exit_interface_discovered ?exit_interface)
+        (destination_routing_ready ?destination_site)
+        (consumable_available ?resource)
+        (not
+          (destination_has_consumable ?destination_site ?resource)
+        )
+      )
+  )
+  (:action create_route_plan_standard
+    :parameters (?origin_site - origin_site ?destination_site - destination_site ?entry_interface - entry_interface ?exit_interface - exit_interface ?route_plan - route_plan)
+    :precondition
+      (and
+        (origin_probe_completed ?origin_site)
+        (destination_probe_completed ?destination_site)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (entry_interface_discovered ?entry_interface)
+        (exit_interface_discovered ?exit_interface)
+        (origin_routing_ready ?origin_site)
+        (destination_routing_ready ?destination_site)
+        (route_slot_available ?route_plan)
+      )
+    :effect
+      (and
+        (route_allocated ?route_plan)
+        (route_links_entry_interface ?route_plan ?entry_interface)
+        (route_links_exit_interface ?route_plan ?exit_interface)
+        (not
+          (route_slot_available ?route_plan)
+        )
+      )
+  )
+  (:action create_route_plan_entry_validated
+    :parameters (?origin_site - origin_site ?destination_site - destination_site ?entry_interface - entry_interface ?exit_interface - exit_interface ?route_plan - route_plan)
+    :precondition
+      (and
+        (origin_probe_completed ?origin_site)
+        (destination_probe_completed ?destination_site)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (entry_interface_validated ?entry_interface)
+        (exit_interface_discovered ?exit_interface)
+        (not
+          (origin_routing_ready ?origin_site)
+        )
+        (destination_routing_ready ?destination_site)
+        (route_slot_available ?route_plan)
+      )
+    :effect
+      (and
+        (route_allocated ?route_plan)
+        (route_links_entry_interface ?route_plan ?entry_interface)
+        (route_links_exit_interface ?route_plan ?exit_interface)
+        (route_entry_return_candidate ?route_plan)
+        (not
+          (route_slot_available ?route_plan)
+        )
+      )
+  )
+  (:action create_route_plan_exit_validated
+    :parameters (?origin_site - origin_site ?destination_site - destination_site ?entry_interface - entry_interface ?exit_interface - exit_interface ?route_plan - route_plan)
+    :precondition
+      (and
+        (origin_probe_completed ?origin_site)
+        (destination_probe_completed ?destination_site)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (entry_interface_discovered ?entry_interface)
+        (exit_interface_validated ?exit_interface)
+        (origin_routing_ready ?origin_site)
+        (not
+          (destination_routing_ready ?destination_site)
+        )
+        (route_slot_available ?route_plan)
+      )
+    :effect
+      (and
+        (route_allocated ?route_plan)
+        (route_links_entry_interface ?route_plan ?entry_interface)
+        (route_links_exit_interface ?route_plan ?exit_interface)
+        (route_exit_return_candidate ?route_plan)
+        (not
+          (route_slot_available ?route_plan)
+        )
+      )
+  )
+  (:action create_route_plan_fully_validated
+    :parameters (?origin_site - origin_site ?destination_site - destination_site ?entry_interface - entry_interface ?exit_interface - exit_interface ?route_plan - route_plan)
+    :precondition
+      (and
+        (origin_probe_completed ?origin_site)
+        (destination_probe_completed ?destination_site)
+        (origin_has_entry_interface ?origin_site ?entry_interface)
+        (destination_has_exit_interface ?destination_site ?exit_interface)
+        (entry_interface_validated ?entry_interface)
+        (exit_interface_validated ?exit_interface)
+        (not
+          (origin_routing_ready ?origin_site)
+        )
+        (not
+          (destination_routing_ready ?destination_site)
+        )
+        (route_slot_available ?route_plan)
+      )
+    :effect
+      (and
+        (route_allocated ?route_plan)
+        (route_links_entry_interface ?route_plan ?entry_interface)
+        (route_links_exit_interface ?route_plan ?exit_interface)
+        (route_entry_return_candidate ?route_plan)
+        (route_exit_return_candidate ?route_plan)
+        (not
+          (route_slot_available ?route_plan)
+        )
+      )
+  )
+  (:action confirm_route_return_path
+    :parameters (?route_plan - route_plan ?origin_site - origin_site ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (route_allocated ?route_plan)
+        (origin_probe_completed ?origin_site)
+        (probe_deployed_at ?origin_site ?probe_unit)
+        (not
+          (route_return_confirmed ?route_plan)
+        )
+      )
+    :effect (route_return_confirmed ?route_plan)
+  )
+  (:action integrate_map_fragment_at_hub
+    :parameters (?hub_node - hub_node ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (hub_links_route_plan ?hub_node ?route_plan)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_available ?map_fragment)
+        (route_allocated ?route_plan)
+        (route_return_confirmed ?route_plan)
+        (not
+          (map_fragment_consumed ?map_fragment)
+        )
+      )
+    :effect
+      (and
+        (map_fragment_consumed ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (not
+          (map_fragment_available ?map_fragment)
+        )
+      )
+  )
+  (:action initialize_hub_integration
+    :parameters (?hub_node - hub_node ?map_fragment - map_fragment ?route_plan - route_plan ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_consumed ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (probe_deployed_at ?hub_node ?probe_unit)
+        (not
+          (route_entry_return_candidate ?route_plan)
+        )
+        (not
+          (hub_integration_ready ?hub_node)
+        )
+      )
+    :effect (hub_integration_ready ?hub_node)
+  )
+  (:action install_upgrade_module_on_hub
+    :parameters (?hub_node - hub_node ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (upgrade_module_available ?upgrade_module)
+        (not
+          (upgrade_marker_registered ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (upgrade_marker_registered ?hub_node)
+        (hub_has_upgrade_module ?hub_node ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action apply_upgrade_module_with_fragment
+    :parameters (?hub_node - hub_node ?map_fragment - map_fragment ?route_plan - route_plan ?probe_unit - probe_unit ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_consumed ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (probe_deployed_at ?hub_node ?probe_unit)
+        (route_entry_return_candidate ?route_plan)
+        (upgrade_marker_registered ?hub_node)
+        (hub_has_upgrade_module ?hub_node ?upgrade_module)
+        (not
+          (hub_integration_ready ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_integration_ready ?hub_node)
+        (hub_upgrade_applied_secondary ?hub_node)
+      )
+  )
+  (:action stage_special_modifier_integration
+    :parameters (?hub_node - hub_node ?special_modifier - special_modifier ?control_switch - control_switch ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_integration_ready ?hub_node)
+        (hub_has_special_modifier ?hub_node ?special_modifier)
+        (switch_attached_to_location ?hub_node ?control_switch)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (not
+          (route_exit_return_candidate ?route_plan)
+        )
+        (not
+          (hub_upgrade_applied ?hub_node)
+        )
+      )
+    :effect (hub_upgrade_applied ?hub_node)
+  )
+  (:action finalize_special_modifier_integration
+    :parameters (?hub_node - hub_node ?special_modifier - special_modifier ?control_switch - control_switch ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_integration_ready ?hub_node)
+        (hub_has_special_modifier ?hub_node ?special_modifier)
+        (switch_attached_to_location ?hub_node ?control_switch)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (route_exit_return_candidate ?route_plan)
+        (not
+          (hub_upgrade_applied ?hub_node)
+        )
+      )
+    :effect (hub_upgrade_applied ?hub_node)
+  )
+  (:action start_hub_activation
+    :parameters (?hub_node - hub_node ?timed_event - timed_event ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_upgrade_applied ?hub_node)
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (not
+          (route_entry_return_candidate ?route_plan)
+        )
+        (not
+          (route_exit_return_candidate ?route_plan)
+        )
+        (not
+          (hub_pre_activation_complete ?hub_node)
+        )
+      )
+    :effect (hub_pre_activation_complete ?hub_node)
+  )
+  (:action start_hub_activation_and_prepare_token
+    :parameters (?hub_node - hub_node ?timed_event - timed_event ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_upgrade_applied ?hub_node)
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (route_entry_return_candidate ?route_plan)
+        (not
+          (route_exit_return_candidate ?route_plan)
+        )
+        (not
+          (hub_pre_activation_complete ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_ready_for_permission_token ?hub_node)
+      )
+  )
+  (:action advance_hub_activation_and_prepare_token
+    :parameters (?hub_node - hub_node ?timed_event - timed_event ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_upgrade_applied ?hub_node)
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (not
+          (route_entry_return_candidate ?route_plan)
+        )
+        (route_exit_return_candidate ?route_plan)
+        (not
+          (hub_pre_activation_complete ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_ready_for_permission_token ?hub_node)
+      )
+  )
+  (:action activate_hub_with_full_route_features
+    :parameters (?hub_node - hub_node ?timed_event - timed_event ?map_fragment - map_fragment ?route_plan - route_plan)
+    :precondition
+      (and
+        (hub_upgrade_applied ?hub_node)
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (hub_has_map_fragment ?hub_node ?map_fragment)
+        (map_fragment_assigned_to_route ?map_fragment ?route_plan)
+        (route_entry_return_candidate ?route_plan)
+        (route_exit_return_candidate ?route_plan)
+        (not
+          (hub_pre_activation_complete ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_ready_for_permission_token ?hub_node)
+      )
+  )
+  (:action finalize_hub_activation
+    :parameters (?hub_node - hub_node)
+    :precondition
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (not
+          (hub_ready_for_permission_token ?hub_node)
+        )
+        (not
+          (hub_operational ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_operational ?hub_node)
+        (visit_confirmed ?hub_node)
+      )
+  )
+  (:action attach_permission_token_to_hub
+    :parameters (?hub_node - hub_node ?permission_token - permission_token)
+    :precondition
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_ready_for_permission_token ?hub_node)
+        (permission_token_available ?permission_token)
+      )
+    :effect
+      (and
+        (hub_has_permission_token ?hub_node ?permission_token)
+        (not
+          (permission_token_available ?permission_token)
+        )
+      )
+  )
+  (:action perform_hub_final_checks
+    :parameters (?hub_node - hub_node ?origin_site - origin_site ?destination_site - destination_site ?probe_unit - probe_unit ?permission_token - permission_token)
+    :precondition
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_ready_for_permission_token ?hub_node)
+        (hub_has_permission_token ?hub_node ?permission_token)
+        (hub_links_origin_site ?hub_node ?origin_site)
+        (hub_links_destination_site ?hub_node ?destination_site)
+        (origin_routing_ready ?origin_site)
+        (destination_routing_ready ?destination_site)
+        (probe_deployed_at ?hub_node ?probe_unit)
+        (not
+          (hub_final_checks_completed ?hub_node)
+        )
+      )
+    :effect (hub_final_checks_completed ?hub_node)
+  )
+  (:action activate_hub_operational
+    :parameters (?hub_node - hub_node)
+    :precondition
+      (and
+        (hub_pre_activation_complete ?hub_node)
+        (hub_final_checks_completed ?hub_node)
+        (not
+          (hub_operational ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_operational ?hub_node)
+        (visit_confirmed ?hub_node)
+      )
+  )
+  (:action claim_mission_marker
+    :parameters (?hub_node - hub_node ?mission_marker - mission_marker ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (location_verified ?hub_node)
+        (probe_deployed_at ?hub_node ?probe_unit)
+        (mission_marker_available ?mission_marker)
+        (hub_has_mission_marker ?hub_node ?mission_marker)
+        (not
+          (mission_claimed_at_hub ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (mission_claimed_at_hub ?hub_node)
+        (not
+          (mission_marker_available ?mission_marker)
+        )
+      )
+  )
+  (:action initialize_mission_task_for_hub
+    :parameters (?hub_node - hub_node ?control_switch - control_switch)
+    :precondition
+      (and
+        (mission_claimed_at_hub ?hub_node)
+        (switch_attached_to_location ?hub_node ?control_switch)
+        (not
+          (mission_task_initialized ?hub_node)
+        )
+      )
+    :effect (mission_task_initialized ?hub_node)
+  )
+  (:action complete_mission_task
+    :parameters (?hub_node - hub_node ?timed_event - timed_event)
+    :precondition
+      (and
+        (mission_task_initialized ?hub_node)
+        (hub_has_timed_event ?hub_node ?timed_event)
+        (not
+          (mission_task_completed ?hub_node)
+        )
+      )
+    :effect (mission_task_completed ?hub_node)
+  )
+  (:action finalize_mission_task
+    :parameters (?hub_node - hub_node)
+    :precondition
+      (and
+        (mission_task_completed ?hub_node)
+        (not
+          (hub_operational ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (hub_operational ?hub_node)
+        (visit_confirmed ?hub_node)
+      )
+  )
+  (:action confirm_origin_visit
+    :parameters (?origin_site - origin_site ?route_plan - route_plan)
+    :precondition
+      (and
+        (origin_probe_completed ?origin_site)
+        (origin_routing_ready ?origin_site)
+        (route_allocated ?route_plan)
+        (route_return_confirmed ?route_plan)
+        (not
+          (visit_confirmed ?origin_site)
+        )
+      )
+    :effect (visit_confirmed ?origin_site)
+  )
+  (:action confirm_destination_visit
+    :parameters (?destination_site - destination_site ?route_plan - route_plan)
+    :precondition
+      (and
+        (destination_probe_completed ?destination_site)
+        (destination_routing_ready ?destination_site)
+        (route_allocated ?route_plan)
+        (route_return_confirmed ?route_plan)
+        (not
+          (visit_confirmed ?destination_site)
+        )
+      )
+    :effect (visit_confirmed ?destination_site)
+  )
+  (:action provision_return_path
+    :parameters (?location - location ?hazard_marker - hazard_marker ?probe_unit - probe_unit)
+    :precondition
+      (and
+        (visit_confirmed ?location)
+        (probe_deployed_at ?location ?probe_unit)
+        (hazard_marker_available ?hazard_marker)
+        (not
+          (return_path_provisioned ?location)
+        )
+      )
+    :effect
+      (and
+        (return_path_provisioned ?location)
+        (location_has_hazard_marker ?location ?hazard_marker)
+        (not
+          (hazard_marker_available ?hazard_marker)
+        )
+      )
+  )
+  (:action establish_return_link_origin_and_reclaim_device
+    :parameters (?origin_site - origin_site ?portal_device - portal_device ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (return_path_provisioned ?origin_site)
+        (device_installed_at ?origin_site ?portal_device)
+        (location_has_hazard_marker ?origin_site ?hazard_marker)
+        (not
+          (location_covered ?origin_site)
+        )
+      )
+    :effect
+      (and
+        (location_covered ?origin_site)
+        (device_available ?portal_device)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action establish_return_link_destination_and_reclaim_device
+    :parameters (?destination_site - destination_site ?portal_device - portal_device ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (return_path_provisioned ?destination_site)
+        (device_installed_at ?destination_site ?portal_device)
+        (location_has_hazard_marker ?destination_site ?hazard_marker)
+        (not
+          (location_covered ?destination_site)
+        )
+      )
+    :effect
+      (and
+        (location_covered ?destination_site)
+        (device_available ?portal_device)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action establish_return_link_at_hub_and_reclaim_device
+    :parameters (?hub_node - hub_node ?portal_device - portal_device ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (return_path_provisioned ?hub_node)
+        (device_installed_at ?hub_node ?portal_device)
+        (location_has_hazard_marker ?hub_node ?hazard_marker)
+        (not
+          (location_covered ?hub_node)
+        )
+      )
+    :effect
+      (and
+        (location_covered ?hub_node)
+        (device_available ?portal_device)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem portal_network_usage_planning_problem)
+  (:domain portal_network_usage_planning_domain)
+  (:objects origin_site_a - origin_site destination_site_a - destination_site hub_node_alpha - hub_node hub_node_beta - hub_node portal_device_1 - portal_device portal_device_2 - portal_device portal_device_3 - portal_device probe_unit_1 - probe_unit control_switch_1 - control_switch consumable_resource_1 - consumable_resource entry_interface_1 - entry_interface exit_interface_1 - exit_interface route_plan_slot_1 - route_plan map_fragment_a - map_fragment map_fragment_b - map_fragment upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module permission_token_a - permission_token permission_token_b - permission_token hazard_marker_a - hazard_marker special_modifier_a - special_modifier mission_marker_a - mission_marker mission_marker_b - mission_marker timed_event_a - timed_event)
+  (:init
+    (device_available portal_device_1)
+    (device_available portal_device_2)
+    (device_available portal_device_3)
+    (probe_available probe_unit_1)
+    (switch_available control_switch_1)
+    (consumable_available consumable_resource_1)
+    (origin_has_entry_interface origin_site_a entry_interface_1)
+    (destination_has_exit_interface destination_site_a exit_interface_1)
+    (route_slot_available route_plan_slot_1)
+    (map_fragment_available map_fragment_a)
+    (map_fragment_available map_fragment_b)
+    (hub_links_origin_site hub_node_alpha origin_site_a)
+    (hub_links_origin_site hub_node_beta origin_site_a)
+    (hub_links_destination_site hub_node_alpha destination_site_a)
+    (hub_links_destination_site hub_node_beta destination_site_a)
+    (hub_links_route_plan hub_node_alpha route_plan_slot_1)
+    (hub_links_route_plan hub_node_beta route_plan_slot_1)
+    (hub_has_map_fragment hub_node_alpha map_fragment_a)
+    (hub_has_map_fragment hub_node_beta map_fragment_b)
+    (upgrade_module_available upgrade_module_1)
+    (upgrade_module_available upgrade_module_2)
+    (permission_token_available permission_token_a)
+    (permission_token_available permission_token_b)
+    (hazard_marker_available hazard_marker_a)
+    (special_modifier_available special_modifier_a)
+    (mission_marker_available mission_marker_a)
+    (hub_has_mission_marker hub_node_alpha mission_marker_a)
+    (hub_has_mission_marker hub_node_beta mission_marker_b)
+    (timed_event_active timed_event_a)
+  )
+  (:goal
+    (and
+      (location_covered origin_site_a)
+      (location_covered destination_site_a)
+      (location_covered hub_node_alpha)
+      (location_covered hub_node_beta)
+    )
+  )
+)

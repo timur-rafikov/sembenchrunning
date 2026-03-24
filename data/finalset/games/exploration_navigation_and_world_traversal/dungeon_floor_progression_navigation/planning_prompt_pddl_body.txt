@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain dungeon_floor_progression_navigation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types interaction_category - object entity_category - object object_category - object floor_category - object discoverable_floor - floor_category traversal_token - interaction_category scout_device - interaction_category interaction_tool - interaction_category construction_plan - interaction_category upgrade_module - interaction_category hazard_marker - interaction_category attachment_item - interaction_category signature_key - interaction_category consumable_resource - entity_category map_checkpoint - entity_category special_encounter_marker - entity_category endpoint_a - object_category endpoint_b - object_category constructed_connection - object_category entrypoint_category - discoverable_floor connector_category - discoverable_floor zone_anchor - entrypoint_category adjacent_zone - entrypoint_category registered_floor_instance - connector_category)
+  (:predicates
+    (floor_discovered ?dungeon_floor - discoverable_floor)
+    (instance_registered ?dungeon_floor - discoverable_floor)
+    (floor_token_assigned ?dungeon_floor - discoverable_floor)
+    (floor_unlocked ?dungeon_floor - discoverable_floor)
+    (instance_integration_complete ?dungeon_floor - discoverable_floor)
+    (floor_progression_ready ?dungeon_floor - discoverable_floor)
+    (traversal_token_available ?traversal_token - traversal_token)
+    (token_assigned_to_floor ?dungeon_floor - discoverable_floor ?traversal_token - traversal_token)
+    (scout_device_available ?scout_device - scout_device)
+    (scout_deployed_on_floor ?dungeon_floor - discoverable_floor ?scout_device - scout_device)
+    (interaction_tool_available ?interaction_tool - interaction_tool)
+    (tool_attached_to_floor ?dungeon_floor - discoverable_floor ?interaction_tool - interaction_tool)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (consumable_bound_to_anchor ?zone_anchor - zone_anchor ?consumable_resource - consumable_resource)
+    (consumable_bound_to_adjacent ?adjacent_zone - adjacent_zone ?consumable_resource - consumable_resource)
+    (anchor_connected_to_endpoint_a ?zone_anchor - zone_anchor ?endpoint_a - endpoint_a)
+    (endpoint_a_scanned ?endpoint_a - endpoint_a)
+    (endpoint_a_marked ?endpoint_a - endpoint_a)
+    (anchor_ready_for_connection ?zone_anchor - zone_anchor)
+    (adjacent_has_endpoint_b ?adjacent_zone - adjacent_zone ?endpoint_b - endpoint_b)
+    (endpoint_b_scanned ?endpoint_b - endpoint_b)
+    (endpoint_b_marked ?endpoint_b - endpoint_b)
+    (adjacent_ready_for_connection ?adjacent_zone - adjacent_zone)
+    (connection_slot_available ?constructed_connection - constructed_connection)
+    (connection_constructed ?constructed_connection - constructed_connection)
+    (connection_endpoint_a_linked ?constructed_connection - constructed_connection ?endpoint_a - endpoint_a)
+    (connection_endpoint_b_linked ?constructed_connection - constructed_connection ?endpoint_b - endpoint_b)
+    (connection_side_a_verified ?constructed_connection - constructed_connection)
+    (connection_side_b_verified ?constructed_connection - constructed_connection)
+    (connection_quality_checked ?constructed_connection - constructed_connection)
+    (floor_instance_has_anchor ?floor_instance - registered_floor_instance ?zone_anchor - zone_anchor)
+    (floor_instance_has_adjacent ?floor_instance - registered_floor_instance ?adjacent_zone - adjacent_zone)
+    (floor_instance_has_connection ?floor_instance - registered_floor_instance ?constructed_connection - constructed_connection)
+    (checkpoint_available ?map_checkpoint - map_checkpoint)
+    (instance_has_checkpoint ?floor_instance - registered_floor_instance ?map_checkpoint - map_checkpoint)
+    (checkpoint_installed ?map_checkpoint - map_checkpoint)
+    (checkpoint_bound_to_connection ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    (instance_connection_validated ?floor_instance - registered_floor_instance)
+    (instance_ready_for_finalization ?floor_instance - registered_floor_instance)
+    (instance_signature_verified ?floor_instance - registered_floor_instance)
+    (instance_has_construction_plan ?floor_instance - registered_floor_instance)
+    (instance_mapping_updated ?floor_instance - registered_floor_instance)
+    (instance_allows_upgrades ?floor_instance - registered_floor_instance)
+    (instance_final_checks_passed ?floor_instance - registered_floor_instance)
+    (special_encounter_marker_available ?special_encounter_marker - special_encounter_marker)
+    (instance_bound_to_special_marker ?floor_instance - registered_floor_instance ?special_encounter_marker - special_encounter_marker)
+    (instance_special_encounter_active ?floor_instance - registered_floor_instance)
+    (instance_special_interaction_performed ?floor_instance - registered_floor_instance)
+    (instance_special_interaction_validated ?floor_instance - registered_floor_instance)
+    (construction_plan_available ?construction_plan - construction_plan)
+    (instance_bound_to_plan ?floor_instance - registered_floor_instance ?construction_plan - construction_plan)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (instance_has_upgrade_module ?floor_instance - registered_floor_instance ?upgrade_module - upgrade_module)
+    (attachment_item_available ?attachment_item - attachment_item)
+    (instance_has_attachment_item ?floor_instance - registered_floor_instance ?attachment_item - attachment_item)
+    (signature_key_available ?signature_key - signature_key)
+    (instance_bound_to_signature_key ?floor_instance - registered_floor_instance ?signature_key - signature_key)
+    (hazard_marker_available ?hazard_marker - hazard_marker)
+    (floor_bound_to_hazard_marker ?dungeon_floor - discoverable_floor ?hazard_marker - hazard_marker)
+    (anchor_marked ?zone_anchor - zone_anchor)
+    (adjacent_marked ?adjacent_zone - adjacent_zone)
+    (instance_progression_registered ?floor_instance - registered_floor_instance)
+  )
+  (:action discover_floor
+    :parameters (?dungeon_floor - discoverable_floor)
+    :precondition
+      (and
+        (not
+          (floor_discovered ?dungeon_floor)
+        )
+        (not
+          (floor_unlocked ?dungeon_floor)
+        )
+      )
+    :effect (floor_discovered ?dungeon_floor)
+  )
+  (:action assign_traversal_token_to_floor
+    :parameters (?dungeon_floor - discoverable_floor ?traversal_token - traversal_token)
+    :precondition
+      (and
+        (floor_discovered ?dungeon_floor)
+        (not
+          (floor_token_assigned ?dungeon_floor)
+        )
+        (traversal_token_available ?traversal_token)
+      )
+    :effect
+      (and
+        (floor_token_assigned ?dungeon_floor)
+        (token_assigned_to_floor ?dungeon_floor ?traversal_token)
+        (not
+          (traversal_token_available ?traversal_token)
+        )
+      )
+  )
+  (:action deploy_scout_device
+    :parameters (?dungeon_floor - discoverable_floor ?scout_device - scout_device)
+    :precondition
+      (and
+        (floor_discovered ?dungeon_floor)
+        (floor_token_assigned ?dungeon_floor)
+        (scout_device_available ?scout_device)
+      )
+    :effect
+      (and
+        (scout_deployed_on_floor ?dungeon_floor ?scout_device)
+        (not
+          (scout_device_available ?scout_device)
+        )
+      )
+  )
+  (:action register_floor
+    :parameters (?dungeon_floor - discoverable_floor ?scout_device - scout_device)
+    :precondition
+      (and
+        (floor_discovered ?dungeon_floor)
+        (floor_token_assigned ?dungeon_floor)
+        (scout_deployed_on_floor ?dungeon_floor ?scout_device)
+        (not
+          (instance_registered ?dungeon_floor)
+        )
+      )
+    :effect (instance_registered ?dungeon_floor)
+  )
+  (:action recall_scout_device
+    :parameters (?dungeon_floor - discoverable_floor ?scout_device - scout_device)
+    :precondition
+      (and
+        (scout_deployed_on_floor ?dungeon_floor ?scout_device)
+      )
+    :effect
+      (and
+        (scout_device_available ?scout_device)
+        (not
+          (scout_deployed_on_floor ?dungeon_floor ?scout_device)
+        )
+      )
+  )
+  (:action attach_interaction_tool_to_floor
+    :parameters (?dungeon_floor - discoverable_floor ?interaction_tool - interaction_tool)
+    :precondition
+      (and
+        (instance_registered ?dungeon_floor)
+        (interaction_tool_available ?interaction_tool)
+      )
+    :effect
+      (and
+        (tool_attached_to_floor ?dungeon_floor ?interaction_tool)
+        (not
+          (interaction_tool_available ?interaction_tool)
+        )
+      )
+  )
+  (:action detach_interaction_tool_from_floor
+    :parameters (?dungeon_floor - discoverable_floor ?interaction_tool - interaction_tool)
+    :precondition
+      (and
+        (tool_attached_to_floor ?dungeon_floor ?interaction_tool)
+      )
+    :effect
+      (and
+        (interaction_tool_available ?interaction_tool)
+        (not
+          (tool_attached_to_floor ?dungeon_floor ?interaction_tool)
+        )
+      )
+  )
+  (:action attach_item_to_instance
+    :parameters (?floor_instance - registered_floor_instance ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (attachment_item_available ?attachment_item)
+      )
+    :effect
+      (and
+        (instance_has_attachment_item ?floor_instance ?attachment_item)
+        (not
+          (attachment_item_available ?attachment_item)
+        )
+      )
+  )
+  (:action remove_attachment_from_instance
+    :parameters (?floor_instance - registered_floor_instance ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (instance_has_attachment_item ?floor_instance ?attachment_item)
+      )
+    :effect
+      (and
+        (attachment_item_available ?attachment_item)
+        (not
+          (instance_has_attachment_item ?floor_instance ?attachment_item)
+        )
+      )
+  )
+  (:action attach_signature_key_to_instance
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (signature_key_available ?signature_key)
+      )
+    :effect
+      (and
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (not
+          (signature_key_available ?signature_key)
+        )
+      )
+  )
+  (:action remove_signature_key_from_instance
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key)
+    :precondition
+      (and
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+      )
+    :effect
+      (and
+        (signature_key_available ?signature_key)
+        (not
+          (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        )
+      )
+  )
+  (:action probe_endpoint_a
+    :parameters (?zone_anchor - zone_anchor ?endpoint_a - endpoint_a ?scout_device - scout_device)
+    :precondition
+      (and
+        (instance_registered ?zone_anchor)
+        (scout_deployed_on_floor ?zone_anchor ?scout_device)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (not
+          (endpoint_a_scanned ?endpoint_a)
+        )
+        (not
+          (endpoint_a_marked ?endpoint_a)
+        )
+      )
+    :effect (endpoint_a_scanned ?endpoint_a)
+  )
+  (:action validate_anchor_with_tool
+    :parameters (?zone_anchor - zone_anchor ?endpoint_a - endpoint_a ?interaction_tool - interaction_tool)
+    :precondition
+      (and
+        (instance_registered ?zone_anchor)
+        (tool_attached_to_floor ?zone_anchor ?interaction_tool)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (endpoint_a_scanned ?endpoint_a)
+        (not
+          (anchor_marked ?zone_anchor)
+        )
+      )
+    :effect
+      (and
+        (anchor_marked ?zone_anchor)
+        (anchor_ready_for_connection ?zone_anchor)
+      )
+  )
+  (:action apply_consumable_to_endpoint_a
+    :parameters (?zone_anchor - zone_anchor ?endpoint_a - endpoint_a ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (instance_registered ?zone_anchor)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (consumable_available ?consumable_resource)
+        (not
+          (anchor_marked ?zone_anchor)
+        )
+      )
+    :effect
+      (and
+        (endpoint_a_marked ?endpoint_a)
+        (anchor_marked ?zone_anchor)
+        (consumable_bound_to_anchor ?zone_anchor ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action confirm_endpoint_a_with_scout
+    :parameters (?zone_anchor - zone_anchor ?endpoint_a - endpoint_a ?scout_device - scout_device ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (instance_registered ?zone_anchor)
+        (scout_deployed_on_floor ?zone_anchor ?scout_device)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (endpoint_a_marked ?endpoint_a)
+        (consumable_bound_to_anchor ?zone_anchor ?consumable_resource)
+        (not
+          (anchor_ready_for_connection ?zone_anchor)
+        )
+      )
+    :effect
+      (and
+        (endpoint_a_scanned ?endpoint_a)
+        (anchor_ready_for_connection ?zone_anchor)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumable_bound_to_anchor ?zone_anchor ?consumable_resource)
+        )
+      )
+  )
+  (:action probe_endpoint_b
+    :parameters (?adjacent_zone - adjacent_zone ?endpoint_b - endpoint_b ?scout_device - scout_device)
+    :precondition
+      (and
+        (instance_registered ?adjacent_zone)
+        (scout_deployed_on_floor ?adjacent_zone ?scout_device)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (not
+          (endpoint_b_scanned ?endpoint_b)
+        )
+        (not
+          (endpoint_b_marked ?endpoint_b)
+        )
+      )
+    :effect (endpoint_b_scanned ?endpoint_b)
+  )
+  (:action validate_adjacent_with_tool
+    :parameters (?adjacent_zone - adjacent_zone ?endpoint_b - endpoint_b ?interaction_tool - interaction_tool)
+    :precondition
+      (and
+        (instance_registered ?adjacent_zone)
+        (tool_attached_to_floor ?adjacent_zone ?interaction_tool)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_b_scanned ?endpoint_b)
+        (not
+          (adjacent_marked ?adjacent_zone)
+        )
+      )
+    :effect
+      (and
+        (adjacent_marked ?adjacent_zone)
+        (adjacent_ready_for_connection ?adjacent_zone)
+      )
+  )
+  (:action apply_consumable_to_endpoint_b
+    :parameters (?adjacent_zone - adjacent_zone ?endpoint_b - endpoint_b ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (instance_registered ?adjacent_zone)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (consumable_available ?consumable_resource)
+        (not
+          (adjacent_marked ?adjacent_zone)
+        )
+      )
+    :effect
+      (and
+        (endpoint_b_marked ?endpoint_b)
+        (adjacent_marked ?adjacent_zone)
+        (consumable_bound_to_adjacent ?adjacent_zone ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action confirm_endpoint_b_with_scout
+    :parameters (?adjacent_zone - adjacent_zone ?endpoint_b - endpoint_b ?scout_device - scout_device ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (instance_registered ?adjacent_zone)
+        (scout_deployed_on_floor ?adjacent_zone ?scout_device)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_b_marked ?endpoint_b)
+        (consumable_bound_to_adjacent ?adjacent_zone ?consumable_resource)
+        (not
+          (adjacent_ready_for_connection ?adjacent_zone)
+        )
+      )
+    :effect
+      (and
+        (endpoint_b_scanned ?endpoint_b)
+        (adjacent_ready_for_connection ?adjacent_zone)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumable_bound_to_adjacent ?adjacent_zone ?consumable_resource)
+        )
+      )
+  )
+  (:action construct_connection_from_verified_endpoints
+    :parameters (?zone_anchor - zone_anchor ?adjacent_zone - adjacent_zone ?endpoint_a - endpoint_a ?endpoint_b - endpoint_b ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (anchor_marked ?zone_anchor)
+        (adjacent_marked ?adjacent_zone)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_a_scanned ?endpoint_a)
+        (endpoint_b_scanned ?endpoint_b)
+        (anchor_ready_for_connection ?zone_anchor)
+        (adjacent_ready_for_connection ?adjacent_zone)
+        (connection_slot_available ?constructed_connection)
+      )
+    :effect
+      (and
+        (connection_constructed ?constructed_connection)
+        (connection_endpoint_a_linked ?constructed_connection ?endpoint_a)
+        (connection_endpoint_b_linked ?constructed_connection ?endpoint_b)
+        (not
+          (connection_slot_available ?constructed_connection)
+        )
+      )
+  )
+  (:action construct_connection_from_marked_a
+    :parameters (?zone_anchor - zone_anchor ?adjacent_zone - adjacent_zone ?endpoint_a - endpoint_a ?endpoint_b - endpoint_b ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (anchor_marked ?zone_anchor)
+        (adjacent_marked ?adjacent_zone)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_a_marked ?endpoint_a)
+        (endpoint_b_scanned ?endpoint_b)
+        (not
+          (anchor_ready_for_connection ?zone_anchor)
+        )
+        (adjacent_ready_for_connection ?adjacent_zone)
+        (connection_slot_available ?constructed_connection)
+      )
+    :effect
+      (and
+        (connection_constructed ?constructed_connection)
+        (connection_endpoint_a_linked ?constructed_connection ?endpoint_a)
+        (connection_endpoint_b_linked ?constructed_connection ?endpoint_b)
+        (connection_side_a_verified ?constructed_connection)
+        (not
+          (connection_slot_available ?constructed_connection)
+        )
+      )
+  )
+  (:action construct_connection_from_marked_b
+    :parameters (?zone_anchor - zone_anchor ?adjacent_zone - adjacent_zone ?endpoint_a - endpoint_a ?endpoint_b - endpoint_b ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (anchor_marked ?zone_anchor)
+        (adjacent_marked ?adjacent_zone)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_a_scanned ?endpoint_a)
+        (endpoint_b_marked ?endpoint_b)
+        (anchor_ready_for_connection ?zone_anchor)
+        (not
+          (adjacent_ready_for_connection ?adjacent_zone)
+        )
+        (connection_slot_available ?constructed_connection)
+      )
+    :effect
+      (and
+        (connection_constructed ?constructed_connection)
+        (connection_endpoint_a_linked ?constructed_connection ?endpoint_a)
+        (connection_endpoint_b_linked ?constructed_connection ?endpoint_b)
+        (connection_side_b_verified ?constructed_connection)
+        (not
+          (connection_slot_available ?constructed_connection)
+        )
+      )
+  )
+  (:action construct_connection_from_marked_both
+    :parameters (?zone_anchor - zone_anchor ?adjacent_zone - adjacent_zone ?endpoint_a - endpoint_a ?endpoint_b - endpoint_b ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (anchor_marked ?zone_anchor)
+        (adjacent_marked ?adjacent_zone)
+        (anchor_connected_to_endpoint_a ?zone_anchor ?endpoint_a)
+        (adjacent_has_endpoint_b ?adjacent_zone ?endpoint_b)
+        (endpoint_a_marked ?endpoint_a)
+        (endpoint_b_marked ?endpoint_b)
+        (not
+          (anchor_ready_for_connection ?zone_anchor)
+        )
+        (not
+          (adjacent_ready_for_connection ?adjacent_zone)
+        )
+        (connection_slot_available ?constructed_connection)
+      )
+    :effect
+      (and
+        (connection_constructed ?constructed_connection)
+        (connection_endpoint_a_linked ?constructed_connection ?endpoint_a)
+        (connection_endpoint_b_linked ?constructed_connection ?endpoint_b)
+        (connection_side_a_verified ?constructed_connection)
+        (connection_side_b_verified ?constructed_connection)
+        (not
+          (connection_slot_available ?constructed_connection)
+        )
+      )
+  )
+  (:action activate_connection
+    :parameters (?constructed_connection - constructed_connection ?zone_anchor - zone_anchor ?scout_device - scout_device)
+    :precondition
+      (and
+        (connection_constructed ?constructed_connection)
+        (anchor_marked ?zone_anchor)
+        (scout_deployed_on_floor ?zone_anchor ?scout_device)
+        (not
+          (connection_quality_checked ?constructed_connection)
+        )
+      )
+    :effect (connection_quality_checked ?constructed_connection)
+  )
+  (:action install_checkpoint_on_instance
+    :parameters (?floor_instance - registered_floor_instance ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (floor_instance_has_connection ?floor_instance ?constructed_connection)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_available ?map_checkpoint)
+        (connection_constructed ?constructed_connection)
+        (connection_quality_checked ?constructed_connection)
+        (not
+          (checkpoint_installed ?map_checkpoint)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_installed ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (not
+          (checkpoint_available ?map_checkpoint)
+        )
+      )
+  )
+  (:action validate_checkpoint_on_instance
+    :parameters (?floor_instance - registered_floor_instance ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection ?scout_device - scout_device)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_installed ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (scout_deployed_on_floor ?floor_instance ?scout_device)
+        (not
+          (connection_side_a_verified ?constructed_connection)
+        )
+        (not
+          (instance_connection_validated ?floor_instance)
+        )
+      )
+    :effect (instance_connection_validated ?floor_instance)
+  )
+  (:action attach_construction_plan_to_instance
+    :parameters (?floor_instance - registered_floor_instance ?construction_plan - construction_plan)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (construction_plan_available ?construction_plan)
+        (not
+          (instance_has_construction_plan ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_has_construction_plan ?floor_instance)
+        (instance_bound_to_plan ?floor_instance ?construction_plan)
+        (not
+          (construction_plan_available ?construction_plan)
+        )
+      )
+  )
+  (:action integrate_plan_and_checkpoint
+    :parameters (?floor_instance - registered_floor_instance ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection ?scout_device - scout_device ?construction_plan - construction_plan)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_installed ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (scout_deployed_on_floor ?floor_instance ?scout_device)
+        (connection_side_a_verified ?constructed_connection)
+        (instance_has_construction_plan ?floor_instance)
+        (instance_bound_to_plan ?floor_instance ?construction_plan)
+        (not
+          (instance_connection_validated ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_connection_validated ?floor_instance)
+        (instance_mapping_updated ?floor_instance)
+      )
+  )
+  (:action integrate_attachment_standard
+    :parameters (?floor_instance - registered_floor_instance ?attachment_item - attachment_item ?interaction_tool - interaction_tool ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_connection_validated ?floor_instance)
+        (instance_has_attachment_item ?floor_instance ?attachment_item)
+        (tool_attached_to_floor ?floor_instance ?interaction_tool)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (not
+          (connection_side_b_verified ?constructed_connection)
+        )
+        (not
+          (instance_ready_for_finalization ?floor_instance)
+        )
+      )
+    :effect (instance_ready_for_finalization ?floor_instance)
+  )
+  (:action integrate_attachment_with_flag
+    :parameters (?floor_instance - registered_floor_instance ?attachment_item - attachment_item ?interaction_tool - interaction_tool ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_connection_validated ?floor_instance)
+        (instance_has_attachment_item ?floor_instance ?attachment_item)
+        (tool_attached_to_floor ?floor_instance ?interaction_tool)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (connection_side_b_verified ?constructed_connection)
+        (not
+          (instance_ready_for_finalization ?floor_instance)
+        )
+      )
+    :effect (instance_ready_for_finalization ?floor_instance)
+  )
+  (:action apply_signature_for_integration_stage1
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_ready_for_finalization ?floor_instance)
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (not
+          (connection_side_a_verified ?constructed_connection)
+        )
+        (not
+          (connection_side_b_verified ?constructed_connection)
+        )
+        (not
+          (instance_signature_verified ?floor_instance)
+        )
+      )
+    :effect (instance_signature_verified ?floor_instance)
+  )
+  (:action apply_signature_for_integration_stage2
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_ready_for_finalization ?floor_instance)
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (connection_side_a_verified ?constructed_connection)
+        (not
+          (connection_side_b_verified ?constructed_connection)
+        )
+        (not
+          (instance_signature_verified ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_allows_upgrades ?floor_instance)
+      )
+  )
+  (:action apply_signature_for_integration_stage3
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_ready_for_finalization ?floor_instance)
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (not
+          (connection_side_a_verified ?constructed_connection)
+        )
+        (connection_side_b_verified ?constructed_connection)
+        (not
+          (instance_signature_verified ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_allows_upgrades ?floor_instance)
+      )
+  )
+  (:action apply_signature_for_integration_stage4
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key ?map_checkpoint - map_checkpoint ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (instance_ready_for_finalization ?floor_instance)
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (instance_has_checkpoint ?floor_instance ?map_checkpoint)
+        (checkpoint_bound_to_connection ?map_checkpoint ?constructed_connection)
+        (connection_side_a_verified ?constructed_connection)
+        (connection_side_b_verified ?constructed_connection)
+        (not
+          (instance_signature_verified ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_allows_upgrades ?floor_instance)
+      )
+  )
+  (:action finalize_instance_integration_basic
+    :parameters (?floor_instance - registered_floor_instance)
+    :precondition
+      (and
+        (instance_signature_verified ?floor_instance)
+        (not
+          (instance_allows_upgrades ?floor_instance)
+        )
+        (not
+          (instance_progression_registered ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_progression_registered ?floor_instance)
+        (instance_integration_complete ?floor_instance)
+      )
+  )
+  (:action attach_upgrade_module_to_instance
+    :parameters (?floor_instance - registered_floor_instance ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_allows_upgrades ?floor_instance)
+        (upgrade_module_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (instance_has_upgrade_module ?floor_instance ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action perform_final_integration_checks
+    :parameters (?floor_instance - registered_floor_instance ?zone_anchor - zone_anchor ?adjacent_zone - adjacent_zone ?scout_device - scout_device ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_allows_upgrades ?floor_instance)
+        (instance_has_upgrade_module ?floor_instance ?upgrade_module)
+        (floor_instance_has_anchor ?floor_instance ?zone_anchor)
+        (floor_instance_has_adjacent ?floor_instance ?adjacent_zone)
+        (anchor_ready_for_connection ?zone_anchor)
+        (adjacent_ready_for_connection ?adjacent_zone)
+        (scout_deployed_on_floor ?floor_instance ?scout_device)
+        (not
+          (instance_final_checks_passed ?floor_instance)
+        )
+      )
+    :effect (instance_final_checks_passed ?floor_instance)
+  )
+  (:action finalize_instance_integration_with_checks
+    :parameters (?floor_instance - registered_floor_instance)
+    :precondition
+      (and
+        (instance_signature_verified ?floor_instance)
+        (instance_final_checks_passed ?floor_instance)
+        (not
+          (instance_progression_registered ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_progression_registered ?floor_instance)
+        (instance_integration_complete ?floor_instance)
+      )
+  )
+  (:action activate_special_encounter
+    :parameters (?floor_instance - registered_floor_instance ?special_encounter_marker - special_encounter_marker ?scout_device - scout_device)
+    :precondition
+      (and
+        (instance_registered ?floor_instance)
+        (scout_deployed_on_floor ?floor_instance ?scout_device)
+        (special_encounter_marker_available ?special_encounter_marker)
+        (instance_bound_to_special_marker ?floor_instance ?special_encounter_marker)
+        (not
+          (instance_special_encounter_active ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_special_encounter_active ?floor_instance)
+        (not
+          (special_encounter_marker_available ?special_encounter_marker)
+        )
+      )
+  )
+  (:action perform_special_interaction_with_tool
+    :parameters (?floor_instance - registered_floor_instance ?interaction_tool - interaction_tool)
+    :precondition
+      (and
+        (instance_special_encounter_active ?floor_instance)
+        (tool_attached_to_floor ?floor_instance ?interaction_tool)
+        (not
+          (instance_special_interaction_performed ?floor_instance)
+        )
+      )
+    :effect (instance_special_interaction_performed ?floor_instance)
+  )
+  (:action validate_special_interaction_with_signature
+    :parameters (?floor_instance - registered_floor_instance ?signature_key - signature_key)
+    :precondition
+      (and
+        (instance_special_interaction_performed ?floor_instance)
+        (instance_bound_to_signature_key ?floor_instance ?signature_key)
+        (not
+          (instance_special_interaction_validated ?floor_instance)
+        )
+      )
+    :effect (instance_special_interaction_validated ?floor_instance)
+  )
+  (:action finalize_special_interaction
+    :parameters (?floor_instance - registered_floor_instance)
+    :precondition
+      (and
+        (instance_special_interaction_validated ?floor_instance)
+        (not
+          (instance_progression_registered ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (instance_progression_registered ?floor_instance)
+        (instance_integration_complete ?floor_instance)
+      )
+  )
+  (:action claim_anchor_progression
+    :parameters (?zone_anchor - zone_anchor ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (anchor_marked ?zone_anchor)
+        (anchor_ready_for_connection ?zone_anchor)
+        (connection_constructed ?constructed_connection)
+        (connection_quality_checked ?constructed_connection)
+        (not
+          (instance_integration_complete ?zone_anchor)
+        )
+      )
+    :effect (instance_integration_complete ?zone_anchor)
+  )
+  (:action claim_adjacent_progression
+    :parameters (?adjacent_zone - adjacent_zone ?constructed_connection - constructed_connection)
+    :precondition
+      (and
+        (adjacent_marked ?adjacent_zone)
+        (adjacent_ready_for_connection ?adjacent_zone)
+        (connection_constructed ?constructed_connection)
+        (connection_quality_checked ?constructed_connection)
+        (not
+          (instance_integration_complete ?adjacent_zone)
+        )
+      )
+    :effect (instance_integration_complete ?adjacent_zone)
+  )
+  (:action apply_hazard_marker_to_floor
+    :parameters (?dungeon_floor - discoverable_floor ?hazard_marker - hazard_marker ?scout_device - scout_device)
+    :precondition
+      (and
+        (instance_integration_complete ?dungeon_floor)
+        (scout_deployed_on_floor ?dungeon_floor ?scout_device)
+        (hazard_marker_available ?hazard_marker)
+        (not
+          (floor_progression_ready ?dungeon_floor)
+        )
+      )
+    :effect
+      (and
+        (floor_progression_ready ?dungeon_floor)
+        (floor_bound_to_hazard_marker ?dungeon_floor ?hazard_marker)
+        (not
+          (hazard_marker_available ?hazard_marker)
+        )
+      )
+  )
+  (:action unlock_floor_from_anchor
+    :parameters (?zone_anchor - zone_anchor ?traversal_token - traversal_token ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (floor_progression_ready ?zone_anchor)
+        (token_assigned_to_floor ?zone_anchor ?traversal_token)
+        (floor_bound_to_hazard_marker ?zone_anchor ?hazard_marker)
+        (not
+          (floor_unlocked ?zone_anchor)
+        )
+      )
+    :effect
+      (and
+        (floor_unlocked ?zone_anchor)
+        (traversal_token_available ?traversal_token)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action unlock_floor_from_adjacent
+    :parameters (?adjacent_zone - adjacent_zone ?traversal_token - traversal_token ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (floor_progression_ready ?adjacent_zone)
+        (token_assigned_to_floor ?adjacent_zone ?traversal_token)
+        (floor_bound_to_hazard_marker ?adjacent_zone ?hazard_marker)
+        (not
+          (floor_unlocked ?adjacent_zone)
+        )
+      )
+    :effect
+      (and
+        (floor_unlocked ?adjacent_zone)
+        (traversal_token_available ?traversal_token)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+  (:action unlock_floor_from_instance
+    :parameters (?floor_instance - registered_floor_instance ?traversal_token - traversal_token ?hazard_marker - hazard_marker)
+    :precondition
+      (and
+        (floor_progression_ready ?floor_instance)
+        (token_assigned_to_floor ?floor_instance ?traversal_token)
+        (floor_bound_to_hazard_marker ?floor_instance ?hazard_marker)
+        (not
+          (floor_unlocked ?floor_instance)
+        )
+      )
+    :effect
+      (and
+        (floor_unlocked ?floor_instance)
+        (traversal_token_available ?traversal_token)
+        (hazard_marker_available ?hazard_marker)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem dungeon_floor_progression_navigation_scenario)
+  (:domain dungeon_floor_progression_navigation)
+  (:objects zone_anchor_1 - zone_anchor adjacent_zone_1 - adjacent_zone floor_instance_1 - registered_floor_instance floor_instance_2 - registered_floor_instance traversal_token_1 - traversal_token traversal_token_2 - traversal_token traversal_token_3 - traversal_token scout_device_1 - scout_device interaction_tool_1 - interaction_tool consumable_resource_1 - consumable_resource endpoint_a_1 - endpoint_a endpoint_b_1 - endpoint_b constructed_connection_1 - constructed_connection map_checkpoint_1 - map_checkpoint map_checkpoint_2 - map_checkpoint construction_plan_1 - construction_plan construction_plan_2 - construction_plan upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module hazard_marker_1 - hazard_marker attachment_item_1 - attachment_item special_encounter_marker_1 - special_encounter_marker special_encounter_marker_2 - special_encounter_marker signature_key_1 - signature_key)
+  (:init
+    (traversal_token_available traversal_token_1)
+    (traversal_token_available traversal_token_2)
+    (traversal_token_available traversal_token_3)
+    (scout_device_available scout_device_1)
+    (interaction_tool_available interaction_tool_1)
+    (consumable_available consumable_resource_1)
+    (anchor_connected_to_endpoint_a zone_anchor_1 endpoint_a_1)
+    (adjacent_has_endpoint_b adjacent_zone_1 endpoint_b_1)
+    (connection_slot_available constructed_connection_1)
+    (checkpoint_available map_checkpoint_1)
+    (checkpoint_available map_checkpoint_2)
+    (floor_instance_has_anchor floor_instance_1 zone_anchor_1)
+    (floor_instance_has_anchor floor_instance_2 zone_anchor_1)
+    (floor_instance_has_adjacent floor_instance_1 adjacent_zone_1)
+    (floor_instance_has_adjacent floor_instance_2 adjacent_zone_1)
+    (floor_instance_has_connection floor_instance_1 constructed_connection_1)
+    (floor_instance_has_connection floor_instance_2 constructed_connection_1)
+    (instance_has_checkpoint floor_instance_1 map_checkpoint_1)
+    (instance_has_checkpoint floor_instance_2 map_checkpoint_2)
+    (construction_plan_available construction_plan_1)
+    (construction_plan_available construction_plan_2)
+    (upgrade_module_available upgrade_module_1)
+    (upgrade_module_available upgrade_module_2)
+    (hazard_marker_available hazard_marker_1)
+    (attachment_item_available attachment_item_1)
+    (special_encounter_marker_available special_encounter_marker_1)
+    (instance_bound_to_special_marker floor_instance_1 special_encounter_marker_1)
+    (instance_bound_to_special_marker floor_instance_2 special_encounter_marker_2)
+    (signature_key_available signature_key_1)
+  )
+  (:goal
+    (and
+      (floor_unlocked zone_anchor_1)
+      (floor_unlocked adjacent_zone_1)
+      (floor_unlocked floor_instance_1)
+      (floor_unlocked floor_instance_2)
+    )
+  )
+)

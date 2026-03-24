@@ -1,0 +1,936 @@
+(define (domain late_arrival_fallback_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types transport_asset_type - object node_type - object mode_type - object segment_group - object itinerary_segment - segment_group transport_asset_candidate - transport_asset_type schedule_slot - transport_asset_type local_agent - transport_asset_type vehicle_feature - transport_asset_type passenger_preference - transport_asset_type fallback_mode - transport_asset_type onboard_equipment - transport_asset_type authorization_token - transport_asset_type local_mode_option - node_type asset_token - node_type contractual_option - node_type arrival_node - mode_type departure_node - mode_type vehicle_assignment_record - mode_type leg_group - itinerary_segment coordination_group - itinerary_segment arriving_leg - leg_group departing_leg - leg_group coordination_agent - coordination_group)
+  (:predicates
+    (entity_registered ?segment - itinerary_segment)
+    (entity_confirmed ?segment - itinerary_segment)
+    (entity_candidate_reserved ?segment - itinerary_segment)
+    (assignment_committed ?segment - itinerary_segment)
+    (approved_for_fallback ?segment - itinerary_segment)
+    (fallback_booking_created ?segment - itinerary_segment)
+    (asset_candidate_available ?asset_candidate - transport_asset_candidate)
+    (candidate_assigned_to_entity ?segment - itinerary_segment ?asset_candidate - transport_asset_candidate)
+    (schedule_slot_available ?schedule_slot - schedule_slot)
+    (entity_schedule_binding ?segment - itinerary_segment ?schedule_slot - schedule_slot)
+    (local_agent_available ?local_agent - local_agent)
+    (local_agent_assigned_to_entity ?segment - itinerary_segment ?local_agent - local_agent)
+    (local_mode_option_available ?local_mode - local_mode_option)
+    (arriving_leg_local_mode_binding ?arriving_leg - arriving_leg ?local_mode - local_mode_option)
+    (departing_leg_local_mode_binding ?departing_leg - departing_leg ?local_mode - local_mode_option)
+    (arriving_leg_arrival_node_link ?arriving_leg - arriving_leg ?arrival_node - arrival_node)
+    (arrival_node_ready ?arrival_node - arrival_node)
+    (arrival_node_local_mode_reserved ?arrival_node - arrival_node)
+    (arriving_leg_ready ?arriving_leg - arriving_leg)
+    (departing_leg_departure_node_link ?departing_leg - departing_leg ?departure_node - departure_node)
+    (departure_node_ready ?departure_node - departure_node)
+    (departure_node_local_mode_reserved ?departure_node - departure_node)
+    (departing_leg_ready ?departing_leg - departing_leg)
+    (assignment_record_available ?assignment_record - vehicle_assignment_record)
+    (assignment_record_allocated ?assignment_record - vehicle_assignment_record)
+    (assignment_arrival_node_link ?assignment_record - vehicle_assignment_record ?arrival_node - arrival_node)
+    (assignment_departure_node_link ?assignment_record - vehicle_assignment_record ?departure_node - departure_node)
+    (assignment_feature_verification_flag ?assignment_record - vehicle_assignment_record)
+    (assignment_authorization_verification_flag ?assignment_record - vehicle_assignment_record)
+    (assignment_ready_for_boarding ?assignment_record - vehicle_assignment_record)
+    (coordinator_arriving_leg_link ?coordinator - coordination_agent ?arriving_leg - arriving_leg)
+    (coordinator_departing_leg_link ?coordinator - coordination_agent ?departing_leg - departing_leg)
+    (coordinator_assignment_link ?coordinator - coordination_agent ?assignment_record - vehicle_assignment_record)
+    (asset_token_available ?asset_token - asset_token)
+    (coordinator_asset_token_link ?coordinator - coordination_agent ?asset_token - asset_token)
+    (asset_token_reserved ?asset_token - asset_token)
+    (asset_token_assignment_link ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    (coordinator_feature_bound ?coordinator - coordination_agent)
+    (coordinator_feature_committed ?coordinator - coordination_agent)
+    (coordinator_authorized_for_assignment ?coordinator - coordination_agent)
+    (coordinator_feature_option_available ?coordinator - coordination_agent)
+    (coordinator_feature_marker ?coordinator - coordination_agent)
+    (coordinator_checks_passed ?coordinator - coordination_agent)
+    (coordinator_ready_for_approval ?coordinator - coordination_agent)
+    (contract_option_available ?contract_option - contractual_option)
+    (coordinator_contract_option_link ?coordinator - coordination_agent ?contract_option - contractual_option)
+    (coordinator_contract_selected ?coordinator - coordination_agent)
+    (coordinator_contract_bound ?coordinator - coordination_agent)
+    (coordinator_contract_authorized ?coordinator - coordination_agent)
+    (vehicle_feature_available ?vehicle_feature - vehicle_feature)
+    (coordinator_vehicle_feature_link ?coordinator - coordination_agent ?vehicle_feature - vehicle_feature)
+    (passenger_preference_available ?passenger_preference - passenger_preference)
+    (coordinator_preference_binding ?coordinator - coordination_agent ?passenger_preference - passenger_preference)
+    (onboard_equipment_available ?onboard_equipment - onboard_equipment)
+    (coordinator_equipment_binding ?coordinator - coordination_agent ?onboard_equipment - onboard_equipment)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (coordinator_authorization_binding ?coordinator - coordination_agent ?authorization_token - authorization_token)
+    (fallback_mode_available ?fallback_mode - fallback_mode)
+    (entity_fallback_mode_binding ?segment - itinerary_segment ?fallback_mode - fallback_mode)
+    (arriving_leg_resources_marked ?arriving_leg - arriving_leg)
+    (departing_leg_resources_marked ?departing_leg - departing_leg)
+    (coordinator_finalized ?coordinator - coordination_agent)
+  )
+  (:action register_itinerary_entity
+    :parameters (?segment - itinerary_segment)
+    :precondition
+      (and
+        (not
+          (entity_registered ?segment)
+        )
+        (not
+          (assignment_committed ?segment)
+        )
+      )
+    :effect (entity_registered ?segment)
+  )
+  (:action reserve_candidate_for_entity
+    :parameters (?segment - itinerary_segment ?asset_candidate - transport_asset_candidate)
+    :precondition
+      (and
+        (entity_registered ?segment)
+        (not
+          (entity_candidate_reserved ?segment)
+        )
+        (asset_candidate_available ?asset_candidate)
+      )
+    :effect
+      (and
+        (entity_candidate_reserved ?segment)
+        (candidate_assigned_to_entity ?segment ?asset_candidate)
+        (not
+          (asset_candidate_available ?asset_candidate)
+        )
+      )
+  )
+  (:action bind_schedule_slot_to_entity
+    :parameters (?segment - itinerary_segment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_registered ?segment)
+        (entity_candidate_reserved ?segment)
+        (schedule_slot_available ?schedule_slot)
+      )
+    :effect
+      (and
+        (entity_schedule_binding ?segment ?schedule_slot)
+        (not
+          (schedule_slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action confirm_entity_for_coordination
+    :parameters (?segment - itinerary_segment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_registered ?segment)
+        (entity_candidate_reserved ?segment)
+        (entity_schedule_binding ?segment ?schedule_slot)
+        (not
+          (entity_confirmed ?segment)
+        )
+      )
+    :effect (entity_confirmed ?segment)
+  )
+  (:action release_schedule_slot_from_entity
+    :parameters (?segment - itinerary_segment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_schedule_binding ?segment ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_available ?schedule_slot)
+        (not
+          (entity_schedule_binding ?segment ?schedule_slot)
+        )
+      )
+  )
+  (:action assign_local_agent_to_entity
+    :parameters (?segment - itinerary_segment ?local_agent - local_agent)
+    :precondition
+      (and
+        (entity_confirmed ?segment)
+        (local_agent_available ?local_agent)
+      )
+    :effect
+      (and
+        (local_agent_assigned_to_entity ?segment ?local_agent)
+        (not
+          (local_agent_available ?local_agent)
+        )
+      )
+  )
+  (:action release_local_agent_from_entity
+    :parameters (?segment - itinerary_segment ?local_agent - local_agent)
+    :precondition
+      (and
+        (local_agent_assigned_to_entity ?segment ?local_agent)
+      )
+    :effect
+      (and
+        (local_agent_available ?local_agent)
+        (not
+          (local_agent_assigned_to_entity ?segment ?local_agent)
+        )
+      )
+  )
+  (:action reserve_onboard_equipment_for_coordinator
+    :parameters (?coordinator - coordination_agent ?onboard_equipment - onboard_equipment)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (onboard_equipment_available ?onboard_equipment)
+      )
+    :effect
+      (and
+        (coordinator_equipment_binding ?coordinator ?onboard_equipment)
+        (not
+          (onboard_equipment_available ?onboard_equipment)
+        )
+      )
+  )
+  (:action release_onboard_equipment_from_coordinator
+    :parameters (?coordinator - coordination_agent ?onboard_equipment - onboard_equipment)
+    :precondition
+      (and
+        (coordinator_equipment_binding ?coordinator ?onboard_equipment)
+      )
+    :effect
+      (and
+        (onboard_equipment_available ?onboard_equipment)
+        (not
+          (coordinator_equipment_binding ?coordinator ?onboard_equipment)
+        )
+      )
+  )
+  (:action reserve_authorization_token_for_coordinator
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action release_authorization_token_from_coordinator
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+      )
+    :effect
+      (and
+        (authorization_token_available ?authorization_token)
+        (not
+          (coordinator_authorization_binding ?coordinator ?authorization_token)
+        )
+      )
+  )
+  (:action prepare_arrival_node_for_leg
+    :parameters (?arriving_leg - arriving_leg ?arrival_node - arrival_node ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_confirmed ?arriving_leg)
+        (entity_schedule_binding ?arriving_leg ?schedule_slot)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (not
+          (arrival_node_ready ?arrival_node)
+        )
+        (not
+          (arrival_node_local_mode_reserved ?arrival_node)
+        )
+      )
+    :effect (arrival_node_ready ?arrival_node)
+  )
+  (:action finalize_arrival_leg_with_local_agent
+    :parameters (?arriving_leg - arriving_leg ?arrival_node - arrival_node ?local_agent - local_agent)
+    :precondition
+      (and
+        (entity_confirmed ?arriving_leg)
+        (local_agent_assigned_to_entity ?arriving_leg ?local_agent)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (arrival_node_ready ?arrival_node)
+        (not
+          (arriving_leg_resources_marked ?arriving_leg)
+        )
+      )
+    :effect
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (arriving_leg_ready ?arriving_leg)
+      )
+  )
+  (:action reserve_local_mode_for_arriving_leg
+    :parameters (?arriving_leg - arriving_leg ?arrival_node - arrival_node ?local_mode - local_mode_option)
+    :precondition
+      (and
+        (entity_confirmed ?arriving_leg)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (local_mode_option_available ?local_mode)
+        (not
+          (arriving_leg_resources_marked ?arriving_leg)
+        )
+      )
+    :effect
+      (and
+        (arrival_node_local_mode_reserved ?arrival_node)
+        (arriving_leg_resources_marked ?arriving_leg)
+        (arriving_leg_local_mode_binding ?arriving_leg ?local_mode)
+        (not
+          (local_mode_option_available ?local_mode)
+        )
+      )
+  )
+  (:action confirm_arriving_leg_node_and_mode
+    :parameters (?arriving_leg - arriving_leg ?arrival_node - arrival_node ?schedule_slot - schedule_slot ?local_mode - local_mode_option)
+    :precondition
+      (and
+        (entity_confirmed ?arriving_leg)
+        (entity_schedule_binding ?arriving_leg ?schedule_slot)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (arrival_node_local_mode_reserved ?arrival_node)
+        (arriving_leg_local_mode_binding ?arriving_leg ?local_mode)
+        (not
+          (arriving_leg_ready ?arriving_leg)
+        )
+      )
+    :effect
+      (and
+        (arrival_node_ready ?arrival_node)
+        (arriving_leg_ready ?arriving_leg)
+        (local_mode_option_available ?local_mode)
+        (not
+          (arriving_leg_local_mode_binding ?arriving_leg ?local_mode)
+        )
+      )
+  )
+  (:action prepare_departure_node_for_leg
+    :parameters (?departing_leg - departing_leg ?departure_node - departure_node ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_confirmed ?departing_leg)
+        (entity_schedule_binding ?departing_leg ?schedule_slot)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (not
+          (departure_node_ready ?departure_node)
+        )
+        (not
+          (departure_node_local_mode_reserved ?departure_node)
+        )
+      )
+    :effect (departure_node_ready ?departure_node)
+  )
+  (:action finalize_departing_leg_with_local_agent
+    :parameters (?departing_leg - departing_leg ?departure_node - departure_node ?local_agent - local_agent)
+    :precondition
+      (and
+        (entity_confirmed ?departing_leg)
+        (local_agent_assigned_to_entity ?departing_leg ?local_agent)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (departure_node_ready ?departure_node)
+        (not
+          (departing_leg_resources_marked ?departing_leg)
+        )
+      )
+    :effect
+      (and
+        (departing_leg_resources_marked ?departing_leg)
+        (departing_leg_ready ?departing_leg)
+      )
+  )
+  (:action reserve_local_mode_for_departing_leg
+    :parameters (?departing_leg - departing_leg ?departure_node - departure_node ?local_mode - local_mode_option)
+    :precondition
+      (and
+        (entity_confirmed ?departing_leg)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (local_mode_option_available ?local_mode)
+        (not
+          (departing_leg_resources_marked ?departing_leg)
+        )
+      )
+    :effect
+      (and
+        (departure_node_local_mode_reserved ?departure_node)
+        (departing_leg_resources_marked ?departing_leg)
+        (departing_leg_local_mode_binding ?departing_leg ?local_mode)
+        (not
+          (local_mode_option_available ?local_mode)
+        )
+      )
+  )
+  (:action confirm_departing_leg_node_and_mode
+    :parameters (?departing_leg - departing_leg ?departure_node - departure_node ?schedule_slot - schedule_slot ?local_mode - local_mode_option)
+    :precondition
+      (and
+        (entity_confirmed ?departing_leg)
+        (entity_schedule_binding ?departing_leg ?schedule_slot)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (departure_node_local_mode_reserved ?departure_node)
+        (departing_leg_local_mode_binding ?departing_leg ?local_mode)
+        (not
+          (departing_leg_ready ?departing_leg)
+        )
+      )
+    :effect
+      (and
+        (departure_node_ready ?departure_node)
+        (departing_leg_ready ?departing_leg)
+        (local_mode_option_available ?local_mode)
+        (not
+          (departing_leg_local_mode_binding ?departing_leg ?local_mode)
+        )
+      )
+  )
+  (:action create_vehicle_assignment_candidate
+    :parameters (?arriving_leg - arriving_leg ?departing_leg - departing_leg ?arrival_node - arrival_node ?departure_node - departure_node ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (departing_leg_resources_marked ?departing_leg)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (arrival_node_ready ?arrival_node)
+        (departure_node_ready ?departure_node)
+        (arriving_leg_ready ?arriving_leg)
+        (departing_leg_ready ?departing_leg)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_allocated ?assignment_record)
+        (assignment_arrival_node_link ?assignment_record ?arrival_node)
+        (assignment_departure_node_link ?assignment_record ?departure_node)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_candidate_with_feature_flag
+    :parameters (?arriving_leg - arriving_leg ?departing_leg - departing_leg ?arrival_node - arrival_node ?departure_node - departure_node ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (departing_leg_resources_marked ?departing_leg)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (arrival_node_local_mode_reserved ?arrival_node)
+        (departure_node_ready ?departure_node)
+        (not
+          (arriving_leg_ready ?arriving_leg)
+        )
+        (departing_leg_ready ?departing_leg)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_allocated ?assignment_record)
+        (assignment_arrival_node_link ?assignment_record ?arrival_node)
+        (assignment_departure_node_link ?assignment_record ?departure_node)
+        (assignment_feature_verification_flag ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_candidate_with_authorization_flag
+    :parameters (?arriving_leg - arriving_leg ?departing_leg - departing_leg ?arrival_node - arrival_node ?departure_node - departure_node ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (departing_leg_resources_marked ?departing_leg)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (arrival_node_ready ?arrival_node)
+        (departure_node_local_mode_reserved ?departure_node)
+        (arriving_leg_ready ?arriving_leg)
+        (not
+          (departing_leg_ready ?departing_leg)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_allocated ?assignment_record)
+        (assignment_arrival_node_link ?assignment_record ?arrival_node)
+        (assignment_departure_node_link ?assignment_record ?departure_node)
+        (assignment_authorization_verification_flag ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action create_assignment_candidate_with_both_flags
+    :parameters (?arriving_leg - arriving_leg ?departing_leg - departing_leg ?arrival_node - arrival_node ?departure_node - departure_node ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (departing_leg_resources_marked ?departing_leg)
+        (arriving_leg_arrival_node_link ?arriving_leg ?arrival_node)
+        (departing_leg_departure_node_link ?departing_leg ?departure_node)
+        (arrival_node_local_mode_reserved ?arrival_node)
+        (departure_node_local_mode_reserved ?departure_node)
+        (not
+          (arriving_leg_ready ?arriving_leg)
+        )
+        (not
+          (departing_leg_ready ?departing_leg)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_allocated ?assignment_record)
+        (assignment_arrival_node_link ?assignment_record ?arrival_node)
+        (assignment_departure_node_link ?assignment_record ?departure_node)
+        (assignment_feature_verification_flag ?assignment_record)
+        (assignment_authorization_verification_flag ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action mark_assignment_ready_for_boarding
+    :parameters (?assignment_record - vehicle_assignment_record ?arriving_leg - arriving_leg ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (assignment_record_allocated ?assignment_record)
+        (arriving_leg_resources_marked ?arriving_leg)
+        (entity_schedule_binding ?arriving_leg ?schedule_slot)
+        (not
+          (assignment_ready_for_boarding ?assignment_record)
+        )
+      )
+    :effect (assignment_ready_for_boarding ?assignment_record)
+  )
+  (:action reserve_asset_token_for_assignment
+    :parameters (?coordinator - coordination_agent ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (coordinator_assignment_link ?coordinator ?assignment_record)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_available ?asset_token)
+        (assignment_record_allocated ?assignment_record)
+        (assignment_ready_for_boarding ?assignment_record)
+        (not
+          (asset_token_reserved ?asset_token)
+        )
+      )
+    :effect
+      (and
+        (asset_token_reserved ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (not
+          (asset_token_available ?asset_token)
+        )
+      )
+  )
+  (:action confirm_asset_token_allocation
+    :parameters (?coordinator - coordination_agent ?asset_token - asset_token ?assignment_record - vehicle_assignment_record ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_reserved ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (entity_schedule_binding ?coordinator ?schedule_slot)
+        (not
+          (assignment_feature_verification_flag ?assignment_record)
+        )
+        (not
+          (coordinator_feature_bound ?coordinator)
+        )
+      )
+    :effect (coordinator_feature_bound ?coordinator)
+  )
+  (:action offer_vehicle_feature_to_coordinator
+    :parameters (?coordinator - coordination_agent ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (vehicle_feature_available ?vehicle_feature)
+        (not
+          (coordinator_feature_option_available ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_feature_option_available ?coordinator)
+        (coordinator_vehicle_feature_link ?coordinator ?vehicle_feature)
+        (not
+          (vehicle_feature_available ?vehicle_feature)
+        )
+      )
+  )
+  (:action apply_vehicle_feature_and_prepare_authorization
+    :parameters (?coordinator - coordination_agent ?asset_token - asset_token ?assignment_record - vehicle_assignment_record ?schedule_slot - schedule_slot ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_reserved ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (entity_schedule_binding ?coordinator ?schedule_slot)
+        (assignment_feature_verification_flag ?assignment_record)
+        (coordinator_feature_option_available ?coordinator)
+        (coordinator_vehicle_feature_link ?coordinator ?vehicle_feature)
+        (not
+          (coordinator_feature_bound ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_feature_bound ?coordinator)
+        (coordinator_feature_marker ?coordinator)
+      )
+  )
+  (:action submit_equipment_binding_request
+    :parameters (?coordinator - coordination_agent ?onboard_equipment - onboard_equipment ?local_agent - local_agent ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_bound ?coordinator)
+        (coordinator_equipment_binding ?coordinator ?onboard_equipment)
+        (local_agent_assigned_to_entity ?coordinator ?local_agent)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (not
+          (assignment_authorization_verification_flag ?assignment_record)
+        )
+        (not
+          (coordinator_feature_committed ?coordinator)
+        )
+      )
+    :effect (coordinator_feature_committed ?coordinator)
+  )
+  (:action confirm_equipment_binding_request
+    :parameters (?coordinator - coordination_agent ?onboard_equipment - onboard_equipment ?local_agent - local_agent ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_bound ?coordinator)
+        (coordinator_equipment_binding ?coordinator ?onboard_equipment)
+        (local_agent_assigned_to_entity ?coordinator ?local_agent)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (assignment_authorization_verification_flag ?assignment_record)
+        (not
+          (coordinator_feature_committed ?coordinator)
+        )
+      )
+    :effect (coordinator_feature_committed ?coordinator)
+  )
+  (:action apply_authorization_token
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_committed ?coordinator)
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (not
+          (assignment_feature_verification_flag ?assignment_record)
+        )
+        (not
+          (assignment_authorization_verification_flag ?assignment_record)
+        )
+        (not
+          (coordinator_authorized_for_assignment ?coordinator)
+        )
+      )
+    :effect (coordinator_authorized_for_assignment ?coordinator)
+  )
+  (:action apply_authorization_and_register_checks
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_committed ?coordinator)
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (assignment_feature_verification_flag ?assignment_record)
+        (not
+          (assignment_authorization_verification_flag ?assignment_record)
+        )
+        (not
+          (coordinator_authorized_for_assignment ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_checks_passed ?coordinator)
+      )
+  )
+  (:action apply_authorization_and_confirm_checks
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_committed ?coordinator)
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (not
+          (assignment_feature_verification_flag ?assignment_record)
+        )
+        (assignment_authorization_verification_flag ?assignment_record)
+        (not
+          (coordinator_authorized_for_assignment ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_checks_passed ?coordinator)
+      )
+  )
+  (:action apply_authorization_and_finalize_checks
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token ?asset_token - asset_token ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (coordinator_feature_committed ?coordinator)
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (coordinator_asset_token_link ?coordinator ?asset_token)
+        (asset_token_assignment_link ?asset_token ?assignment_record)
+        (assignment_feature_verification_flag ?assignment_record)
+        (assignment_authorization_verification_flag ?assignment_record)
+        (not
+          (coordinator_authorized_for_assignment ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_checks_passed ?coordinator)
+      )
+  )
+  (:action coordinator_mark_for_approval
+    :parameters (?coordinator - coordination_agent)
+    :precondition
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (not
+          (coordinator_checks_passed ?coordinator)
+        )
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (approved_for_fallback ?coordinator)
+      )
+  )
+  (:action apply_passenger_preference_to_coordinator
+    :parameters (?coordinator - coordination_agent ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_checks_passed ?coordinator)
+        (passenger_preference_available ?passenger_preference)
+      )
+    :effect
+      (and
+        (coordinator_preference_binding ?coordinator ?passenger_preference)
+        (not
+          (passenger_preference_available ?passenger_preference)
+        )
+      )
+  )
+  (:action finalize_coordinator_assignment_with_preferences
+    :parameters (?coordinator - coordination_agent ?arriving_leg - arriving_leg ?departing_leg - departing_leg ?schedule_slot - schedule_slot ?passenger_preference - passenger_preference)
+    :precondition
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_checks_passed ?coordinator)
+        (coordinator_preference_binding ?coordinator ?passenger_preference)
+        (coordinator_arriving_leg_link ?coordinator ?arriving_leg)
+        (coordinator_departing_leg_link ?coordinator ?departing_leg)
+        (arriving_leg_ready ?arriving_leg)
+        (departing_leg_ready ?departing_leg)
+        (entity_schedule_binding ?coordinator ?schedule_slot)
+        (not
+          (coordinator_ready_for_approval ?coordinator)
+        )
+      )
+    :effect (coordinator_ready_for_approval ?coordinator)
+  )
+  (:action coordinator_finalize_and_publish_approval
+    :parameters (?coordinator - coordination_agent)
+    :precondition
+      (and
+        (coordinator_authorized_for_assignment ?coordinator)
+        (coordinator_ready_for_approval ?coordinator)
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (approved_for_fallback ?coordinator)
+      )
+  )
+  (:action select_contract_option_for_coordinator
+    :parameters (?coordinator - coordination_agent ?contract_option - contractual_option ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (entity_confirmed ?coordinator)
+        (entity_schedule_binding ?coordinator ?schedule_slot)
+        (contract_option_available ?contract_option)
+        (coordinator_contract_option_link ?coordinator ?contract_option)
+        (not
+          (coordinator_contract_selected ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_contract_selected ?coordinator)
+        (not
+          (contract_option_available ?contract_option)
+        )
+      )
+  )
+  (:action bind_contract_to_coordinator
+    :parameters (?coordinator - coordination_agent ?local_agent - local_agent)
+    :precondition
+      (and
+        (coordinator_contract_selected ?coordinator)
+        (local_agent_assigned_to_entity ?coordinator ?local_agent)
+        (not
+          (coordinator_contract_bound ?coordinator)
+        )
+      )
+    :effect (coordinator_contract_bound ?coordinator)
+  )
+  (:action authorize_contract_with_token
+    :parameters (?coordinator - coordination_agent ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (coordinator_contract_bound ?coordinator)
+        (coordinator_authorization_binding ?coordinator ?authorization_token)
+        (not
+          (coordinator_contract_authorized ?coordinator)
+        )
+      )
+    :effect (coordinator_contract_authorized ?coordinator)
+  )
+  (:action coordinator_contract_approve
+    :parameters (?coordinator - coordination_agent)
+    :precondition
+      (and
+        (coordinator_contract_authorized ?coordinator)
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (approved_for_fallback ?coordinator)
+      )
+  )
+  (:action confirm_arriving_leg_ready_for_dispatch
+    :parameters (?arriving_leg - arriving_leg ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (arriving_leg_resources_marked ?arriving_leg)
+        (arriving_leg_ready ?arriving_leg)
+        (assignment_record_allocated ?assignment_record)
+        (assignment_ready_for_boarding ?assignment_record)
+        (not
+          (approved_for_fallback ?arriving_leg)
+        )
+      )
+    :effect (approved_for_fallback ?arriving_leg)
+  )
+  (:action confirm_departing_leg_ready_for_dispatch
+    :parameters (?departing_leg - departing_leg ?assignment_record - vehicle_assignment_record)
+    :precondition
+      (and
+        (departing_leg_resources_marked ?departing_leg)
+        (departing_leg_ready ?departing_leg)
+        (assignment_record_allocated ?assignment_record)
+        (assignment_ready_for_boarding ?assignment_record)
+        (not
+          (approved_for_fallback ?departing_leg)
+        )
+      )
+    :effect (approved_for_fallback ?departing_leg)
+  )
+  (:action create_fallback_booking_for_entity
+    :parameters (?segment - itinerary_segment ?fallback_mode - fallback_mode ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (approved_for_fallback ?segment)
+        (entity_schedule_binding ?segment ?schedule_slot)
+        (fallback_mode_available ?fallback_mode)
+        (not
+          (fallback_booking_created ?segment)
+        )
+      )
+    :effect
+      (and
+        (fallback_booking_created ?segment)
+        (entity_fallback_mode_binding ?segment ?fallback_mode)
+        (not
+          (fallback_mode_available ?fallback_mode)
+        )
+      )
+  )
+  (:action propagate_fallback_booking_to_arriving_leg
+    :parameters (?arriving_leg - arriving_leg ?asset_candidate - transport_asset_candidate ?fallback_mode - fallback_mode)
+    :precondition
+      (and
+        (fallback_booking_created ?arriving_leg)
+        (candidate_assigned_to_entity ?arriving_leg ?asset_candidate)
+        (entity_fallback_mode_binding ?arriving_leg ?fallback_mode)
+        (not
+          (assignment_committed ?arriving_leg)
+        )
+      )
+    :effect
+      (and
+        (assignment_committed ?arriving_leg)
+        (asset_candidate_available ?asset_candidate)
+        (fallback_mode_available ?fallback_mode)
+      )
+  )
+  (:action propagate_fallback_booking_to_departing_leg
+    :parameters (?departing_leg - departing_leg ?asset_candidate - transport_asset_candidate ?fallback_mode - fallback_mode)
+    :precondition
+      (and
+        (fallback_booking_created ?departing_leg)
+        (candidate_assigned_to_entity ?departing_leg ?asset_candidate)
+        (entity_fallback_mode_binding ?departing_leg ?fallback_mode)
+        (not
+          (assignment_committed ?departing_leg)
+        )
+      )
+    :effect
+      (and
+        (assignment_committed ?departing_leg)
+        (asset_candidate_available ?asset_candidate)
+        (fallback_mode_available ?fallback_mode)
+      )
+  )
+  (:action propagate_fallback_booking_to_coordinator
+    :parameters (?coordinator - coordination_agent ?asset_candidate - transport_asset_candidate ?fallback_mode - fallback_mode)
+    :precondition
+      (and
+        (fallback_booking_created ?coordinator)
+        (candidate_assigned_to_entity ?coordinator ?asset_candidate)
+        (entity_fallback_mode_binding ?coordinator ?fallback_mode)
+        (not
+          (assignment_committed ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (assignment_committed ?coordinator)
+        (asset_candidate_available ?asset_candidate)
+        (fallback_mode_available ?fallback_mode)
+      )
+  )
+)

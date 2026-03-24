@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharm_shortage_mitigation_priority_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_type_category - entity product_type_category - entity supply_type_category - entity allocation_root_category - entity allocation_subject - allocation_root_category priority_slot_token - resource_type_category clinical_justification_document - resource_type_category containment_or_recall_action - resource_type_category regulatory_waiver_document - resource_type_category distribution_channel - resource_type_category notification_template - resource_type_category clinical_priority_category - resource_type_category regulatory_constraint - resource_type_category substitute_product_unit - product_type_category product_lot - product_type_category external_stakeholder - product_type_category primary_supplier - supply_type_category secondary_supplier - supply_type_category allocation_package - supply_type_category supply_node_group - allocation_subject response_unit_group - allocation_subject primary_distribution_site - supply_node_group secondary_distribution_site - supply_node_group response_team_unit - response_unit_group)
+
+  (:predicates
+    (allocation_registered ?case - allocation_subject)
+    (priority_validated ?case - allocation_subject)
+    (priority_assigned ?case - allocation_subject)
+    (allocation_committed ?case - allocation_subject)
+    (execution_authorized ?case - allocation_subject)
+    (allocation_finalized ?case - allocation_subject)
+    (priority_slot_available ?priority_slot - priority_slot_token)
+    (slot_assigned ?case - allocation_subject ?priority_slot - priority_slot_token)
+    (justification_available ?justification_doc - clinical_justification_document)
+    (justification_linked ?case - allocation_subject ?justification_doc - clinical_justification_document)
+    (containment_action_available ?containment_action - containment_or_recall_action)
+    (containment_assigned ?case - allocation_subject ?containment_action - containment_or_recall_action)
+    (substitute_product_available ?substitute_product - substitute_product_unit)
+    (primary_site_substitute_assigned ?primary_site - primary_distribution_site ?substitute_product - substitute_product_unit)
+    (secondary_site_substitute_assigned ?secondary_site - secondary_distribution_site ?substitute_product - substitute_product_unit)
+    (primary_supplier_linked_to_site ?primary_site - primary_distribution_site ?primary_supplier - primary_supplier)
+    (primary_supplier_selected ?primary_supplier - primary_supplier)
+    (primary_supplier_substitute_selected ?primary_supplier - primary_supplier)
+    (primary_site_supplier_confirmed ?primary_site - primary_distribution_site)
+    (secondary_supplier_linked_to_site ?secondary_site - secondary_distribution_site ?secondary_supplier - secondary_supplier)
+    (secondary_supplier_selected ?secondary_supplier - secondary_supplier)
+    (secondary_supplier_substitute_selected ?secondary_supplier - secondary_supplier)
+    (secondary_site_supplier_confirmed ?secondary_site - secondary_distribution_site)
+    (allocation_package_open ?allocation_package - allocation_package)
+    (allocation_package_prepared ?allocation_package - allocation_package)
+    (package_includes_primary_supplier ?allocation_package - allocation_package ?primary_supplier - primary_supplier)
+    (package_includes_secondary_supplier ?allocation_package - allocation_package ?secondary_supplier - secondary_supplier)
+    (package_primary_coverage_flag ?allocation_package - allocation_package)
+    (package_secondary_coverage_flag ?allocation_package - allocation_package)
+    (package_ready_for_lot_assignment ?allocation_package - allocation_package)
+    (team_covers_primary_site ?response_team - response_team_unit ?primary_site - primary_distribution_site)
+    (team_covers_secondary_site ?response_team - response_team_unit ?secondary_site - secondary_distribution_site)
+    (team_assigned_package ?response_team - response_team_unit ?allocation_package - allocation_package)
+    (lot_available ?product_lot - product_lot)
+    (team_has_lot ?response_team - response_team_unit ?product_lot - product_lot)
+    (lot_marked_assigned ?product_lot - product_lot)
+    (lot_assigned_to_package ?product_lot - product_lot ?allocation_package - allocation_package)
+    (team_technical_check_passed ?response_team - response_team_unit)
+    (team_clinical_check_passed ?response_team - response_team_unit)
+    (team_regulatory_check_passed ?response_team - response_team_unit)
+    (team_has_regulatory_waiver ?response_team - response_team_unit)
+    (team_regulatory_waiver_verified ?response_team - response_team_unit)
+    (team_channel_bound ?response_team - response_team_unit)
+    (team_ready_for_execution ?response_team - response_team_unit)
+    (external_stakeholder_available ?external_stakeholder - external_stakeholder)
+    (team_engaged_with_external_stakeholder ?response_team - response_team_unit ?external_stakeholder - external_stakeholder)
+    (team_stakeholder_confirmation_obtained ?response_team - response_team_unit)
+    (stakeholder_approval_recorded ?response_team - response_team_unit)
+    (stakeholder_approval_finalized ?response_team - response_team_unit)
+    (regulatory_waiver_available ?regulatory_waiver - regulatory_waiver_document)
+    (team_linked_waiver_doc ?response_team - response_team_unit ?regulatory_waiver - regulatory_waiver_document)
+    (distribution_channel_available ?distribution_channel - distribution_channel)
+    (team_bound_to_channel ?response_team - response_team_unit ?distribution_channel - distribution_channel)
+    (clinical_priority_category_available ?clinical_priority_category - clinical_priority_category)
+    (team_assigned_clinical_priority_category ?response_team - response_team_unit ?clinical_priority_category - clinical_priority_category)
+    (regulatory_constraint_available ?regulatory_constraint - regulatory_constraint)
+    (team_assigned_regulatory_constraint ?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint)
+    (notification_template_available ?notification_template - notification_template)
+    (subject_linked_notification_template ?case - allocation_subject ?notification_template - notification_template)
+    (primary_site_ready_flag ?primary_site - primary_distribution_site)
+    (secondary_site_ready_flag ?secondary_site - secondary_distribution_site)
+    (team_final_approval ?response_team - response_team_unit)
+  )
+  (:action register_allocation_subject
+    :parameters (?case - allocation_subject)
+    :precondition
+      (and
+        (not
+          (allocation_registered ?case)
+        )
+        (not
+          (allocation_committed ?case)
+        )
+      )
+    :effect (allocation_registered ?case)
+  )
+  (:action assign_priority_slot_to_subject
+    :parameters (?case - allocation_subject ?priority_slot - priority_slot_token)
+    :precondition
+      (and
+        (allocation_registered ?case)
+        (not
+          (priority_assigned ?case)
+        )
+        (priority_slot_available ?priority_slot)
+      )
+    :effect
+      (and
+        (priority_assigned ?case)
+        (slot_assigned ?case ?priority_slot)
+        (not
+          (priority_slot_available ?priority_slot)
+        )
+      )
+  )
+  (:action link_justification_to_subject
+    :parameters (?case - allocation_subject ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (allocation_registered ?case)
+        (priority_assigned ?case)
+        (justification_available ?justification_doc)
+      )
+    :effect
+      (and
+        (justification_linked ?case ?justification_doc)
+        (not
+          (justification_available ?justification_doc)
+        )
+      )
+  )
+  (:action approve_subject_priority
+    :parameters (?case - allocation_subject ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (allocation_registered ?case)
+        (priority_assigned ?case)
+        (justification_linked ?case ?justification_doc)
+        (not
+          (priority_validated ?case)
+        )
+      )
+    :effect (priority_validated ?case)
+  )
+  (:action unlink_justification_from_subject
+    :parameters (?case - allocation_subject ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (justification_linked ?case ?justification_doc)
+      )
+    :effect
+      (and
+        (justification_available ?justification_doc)
+        (not
+          (justification_linked ?case ?justification_doc)
+        )
+      )
+  )
+  (:action engage_containment_action
+    :parameters (?case - allocation_subject ?containment_action - containment_or_recall_action)
+    :precondition
+      (and
+        (priority_validated ?case)
+        (containment_action_available ?containment_action)
+      )
+    :effect
+      (and
+        (containment_assigned ?case ?containment_action)
+        (not
+          (containment_action_available ?containment_action)
+        )
+      )
+  )
+  (:action release_containment_action
+    :parameters (?case - allocation_subject ?containment_action - containment_or_recall_action)
+    :precondition
+      (and
+        (containment_assigned ?case ?containment_action)
+      )
+    :effect
+      (and
+        (containment_action_available ?containment_action)
+        (not
+          (containment_assigned ?case ?containment_action)
+        )
+      )
+  )
+  (:action assign_clinical_priority_to_team
+    :parameters (?response_team - response_team_unit ?clinical_priority_category - clinical_priority_category)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (clinical_priority_category_available ?clinical_priority_category)
+      )
+    :effect
+      (and
+        (team_assigned_clinical_priority_category ?response_team ?clinical_priority_category)
+        (not
+          (clinical_priority_category_available ?clinical_priority_category)
+        )
+      )
+  )
+  (:action remove_clinical_priority_from_team
+    :parameters (?response_team - response_team_unit ?clinical_priority_category - clinical_priority_category)
+    :precondition
+      (and
+        (team_assigned_clinical_priority_category ?response_team ?clinical_priority_category)
+      )
+    :effect
+      (and
+        (clinical_priority_category_available ?clinical_priority_category)
+        (not
+          (team_assigned_clinical_priority_category ?response_team ?clinical_priority_category)
+        )
+      )
+  )
+  (:action assign_regulatory_constraint_to_team
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (regulatory_constraint_available ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (not
+          (regulatory_constraint_available ?regulatory_constraint)
+        )
+      )
+  )
+  (:action remove_regulatory_constraint_from_team
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (regulatory_constraint_available ?regulatory_constraint)
+        (not
+          (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        )
+      )
+  )
+  (:action select_primary_supplier_for_site
+    :parameters (?primary_site - primary_distribution_site ?primary_supplier - primary_supplier ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (priority_validated ?primary_site)
+        (justification_linked ?primary_site ?justification_doc)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (not
+          (primary_supplier_selected ?primary_supplier)
+        )
+        (not
+          (primary_supplier_substitute_selected ?primary_supplier)
+        )
+      )
+    :effect (primary_supplier_selected ?primary_supplier)
+  )
+  (:action confirm_primary_supplier_and_flag_site_ready
+    :parameters (?primary_site - primary_distribution_site ?primary_supplier - primary_supplier ?containment_action - containment_or_recall_action)
+    :precondition
+      (and
+        (priority_validated ?primary_site)
+        (containment_assigned ?primary_site ?containment_action)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (primary_supplier_selected ?primary_supplier)
+        (not
+          (primary_site_ready_flag ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (primary_site_supplier_confirmed ?primary_site)
+      )
+  )
+  (:action assign_substitute_product_to_primary_site
+    :parameters (?primary_site - primary_distribution_site ?primary_supplier - primary_supplier ?substitute_product - substitute_product_unit)
+    :precondition
+      (and
+        (priority_validated ?primary_site)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (substitute_product_available ?substitute_product)
+        (not
+          (primary_site_ready_flag ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (primary_supplier_substitute_selected ?primary_supplier)
+        (primary_site_ready_flag ?primary_site)
+        (primary_site_substitute_assigned ?primary_site ?substitute_product)
+        (not
+          (substitute_product_available ?substitute_product)
+        )
+      )
+  )
+  (:action finalize_primary_supplier_selection_for_site
+    :parameters (?primary_site - primary_distribution_site ?primary_supplier - primary_supplier ?justification_doc - clinical_justification_document ?substitute_product - substitute_product_unit)
+    :precondition
+      (and
+        (priority_validated ?primary_site)
+        (justification_linked ?primary_site ?justification_doc)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (primary_supplier_substitute_selected ?primary_supplier)
+        (primary_site_substitute_assigned ?primary_site ?substitute_product)
+        (not
+          (primary_site_supplier_confirmed ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (primary_supplier_selected ?primary_supplier)
+        (primary_site_supplier_confirmed ?primary_site)
+        (substitute_product_available ?substitute_product)
+        (not
+          (primary_site_substitute_assigned ?primary_site ?substitute_product)
+        )
+      )
+  )
+  (:action select_secondary_supplier_for_site
+    :parameters (?secondary_site - secondary_distribution_site ?secondary_supplier - secondary_supplier ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (priority_validated ?secondary_site)
+        (justification_linked ?secondary_site ?justification_doc)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (not
+          (secondary_supplier_selected ?secondary_supplier)
+        )
+        (not
+          (secondary_supplier_substitute_selected ?secondary_supplier)
+        )
+      )
+    :effect (secondary_supplier_selected ?secondary_supplier)
+  )
+  (:action confirm_secondary_supplier_and_flag_site_ready
+    :parameters (?secondary_site - secondary_distribution_site ?secondary_supplier - secondary_supplier ?containment_action - containment_or_recall_action)
+    :precondition
+      (and
+        (priority_validated ?secondary_site)
+        (containment_assigned ?secondary_site ?containment_action)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (secondary_supplier_selected ?secondary_supplier)
+        (not
+          (secondary_site_ready_flag ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_site_ready_flag ?secondary_site)
+        (secondary_site_supplier_confirmed ?secondary_site)
+      )
+  )
+  (:action assign_substitute_product_to_secondary_site
+    :parameters (?secondary_site - secondary_distribution_site ?secondary_supplier - secondary_supplier ?substitute_product - substitute_product_unit)
+    :precondition
+      (and
+        (priority_validated ?secondary_site)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (substitute_product_available ?substitute_product)
+        (not
+          (secondary_site_ready_flag ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_supplier_substitute_selected ?secondary_supplier)
+        (secondary_site_ready_flag ?secondary_site)
+        (secondary_site_substitute_assigned ?secondary_site ?substitute_product)
+        (not
+          (substitute_product_available ?substitute_product)
+        )
+      )
+  )
+  (:action finalize_secondary_supplier_selection_for_site
+    :parameters (?secondary_site - secondary_distribution_site ?secondary_supplier - secondary_supplier ?justification_doc - clinical_justification_document ?substitute_product - substitute_product_unit)
+    :precondition
+      (and
+        (priority_validated ?secondary_site)
+        (justification_linked ?secondary_site ?justification_doc)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (secondary_supplier_substitute_selected ?secondary_supplier)
+        (secondary_site_substitute_assigned ?secondary_site ?substitute_product)
+        (not
+          (secondary_site_supplier_confirmed ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_supplier_selected ?secondary_supplier)
+        (secondary_site_supplier_confirmed ?secondary_site)
+        (substitute_product_available ?substitute_product)
+        (not
+          (secondary_site_substitute_assigned ?secondary_site ?substitute_product)
+        )
+      )
+  )
+  (:action assemble_allocation_package
+    :parameters (?primary_site - primary_distribution_site ?secondary_site - secondary_distribution_site ?primary_supplier - primary_supplier ?secondary_supplier - secondary_supplier ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (secondary_site_ready_flag ?secondary_site)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (primary_supplier_selected ?primary_supplier)
+        (secondary_supplier_selected ?secondary_supplier)
+        (primary_site_supplier_confirmed ?primary_site)
+        (secondary_site_supplier_confirmed ?secondary_site)
+        (allocation_package_open ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_prepared ?allocation_package)
+        (package_includes_primary_supplier ?allocation_package ?primary_supplier)
+        (package_includes_secondary_supplier ?allocation_package ?secondary_supplier)
+        (not
+          (allocation_package_open ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_primary_coverage
+    :parameters (?primary_site - primary_distribution_site ?secondary_site - secondary_distribution_site ?primary_supplier - primary_supplier ?secondary_supplier - secondary_supplier ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (secondary_site_ready_flag ?secondary_site)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (primary_supplier_substitute_selected ?primary_supplier)
+        (secondary_supplier_selected ?secondary_supplier)
+        (not
+          (primary_site_supplier_confirmed ?primary_site)
+        )
+        (secondary_site_supplier_confirmed ?secondary_site)
+        (allocation_package_open ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_prepared ?allocation_package)
+        (package_includes_primary_supplier ?allocation_package ?primary_supplier)
+        (package_includes_secondary_supplier ?allocation_package ?secondary_supplier)
+        (package_primary_coverage_flag ?allocation_package)
+        (not
+          (allocation_package_open ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_secondary_coverage
+    :parameters (?primary_site - primary_distribution_site ?secondary_site - secondary_distribution_site ?primary_supplier - primary_supplier ?secondary_supplier - secondary_supplier ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (secondary_site_ready_flag ?secondary_site)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (primary_supplier_selected ?primary_supplier)
+        (secondary_supplier_substitute_selected ?secondary_supplier)
+        (primary_site_supplier_confirmed ?primary_site)
+        (not
+          (secondary_site_supplier_confirmed ?secondary_site)
+        )
+        (allocation_package_open ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_prepared ?allocation_package)
+        (package_includes_primary_supplier ?allocation_package ?primary_supplier)
+        (package_includes_secondary_supplier ?allocation_package ?secondary_supplier)
+        (package_secondary_coverage_flag ?allocation_package)
+        (not
+          (allocation_package_open ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_allocation_package_with_both_coverages
+    :parameters (?primary_site - primary_distribution_site ?secondary_site - secondary_distribution_site ?primary_supplier - primary_supplier ?secondary_supplier - secondary_supplier ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (secondary_site_ready_flag ?secondary_site)
+        (primary_supplier_linked_to_site ?primary_site ?primary_supplier)
+        (secondary_supplier_linked_to_site ?secondary_site ?secondary_supplier)
+        (primary_supplier_substitute_selected ?primary_supplier)
+        (secondary_supplier_substitute_selected ?secondary_supplier)
+        (not
+          (primary_site_supplier_confirmed ?primary_site)
+        )
+        (not
+          (secondary_site_supplier_confirmed ?secondary_site)
+        )
+        (allocation_package_open ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_prepared ?allocation_package)
+        (package_includes_primary_supplier ?allocation_package ?primary_supplier)
+        (package_includes_secondary_supplier ?allocation_package ?secondary_supplier)
+        (package_primary_coverage_flag ?allocation_package)
+        (package_secondary_coverage_flag ?allocation_package)
+        (not
+          (allocation_package_open ?allocation_package)
+        )
+      )
+  )
+  (:action mark_package_ready_for_lot_assignment
+    :parameters (?allocation_package - allocation_package ?primary_site - primary_distribution_site ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (allocation_package_prepared ?allocation_package)
+        (primary_site_ready_flag ?primary_site)
+        (justification_linked ?primary_site ?justification_doc)
+        (not
+          (package_ready_for_lot_assignment ?allocation_package)
+        )
+      )
+    :effect (package_ready_for_lot_assignment ?allocation_package)
+  )
+  (:action assign_lot_to_package
+    :parameters (?response_team - response_team_unit ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (team_assigned_package ?response_team ?allocation_package)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_available ?product_lot)
+        (allocation_package_prepared ?allocation_package)
+        (package_ready_for_lot_assignment ?allocation_package)
+        (not
+          (lot_marked_assigned ?product_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_marked_assigned ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (not
+          (lot_available ?product_lot)
+        )
+      )
+  )
+  (:action authorize_team_technical_check
+    :parameters (?response_team - response_team_unit ?product_lot - product_lot ?allocation_package - allocation_package ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_marked_assigned ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (justification_linked ?response_team ?justification_doc)
+        (not
+          (package_primary_coverage_flag ?allocation_package)
+        )
+        (not
+          (team_technical_check_passed ?response_team)
+        )
+      )
+    :effect (team_technical_check_passed ?response_team)
+  )
+  (:action attach_regulatory_waiver_to_team
+    :parameters (?response_team - response_team_unit ?regulatory_waiver - regulatory_waiver_document)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (regulatory_waiver_available ?regulatory_waiver)
+        (not
+          (team_has_regulatory_waiver ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_has_regulatory_waiver ?response_team)
+        (team_linked_waiver_doc ?response_team ?regulatory_waiver)
+        (not
+          (regulatory_waiver_available ?regulatory_waiver)
+        )
+      )
+  )
+  (:action verify_team_waiver_and_mark_technical
+    :parameters (?response_team - response_team_unit ?product_lot - product_lot ?allocation_package - allocation_package ?justification_doc - clinical_justification_document ?regulatory_waiver - regulatory_waiver_document)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_marked_assigned ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (justification_linked ?response_team ?justification_doc)
+        (package_primary_coverage_flag ?allocation_package)
+        (team_has_regulatory_waiver ?response_team)
+        (team_linked_waiver_doc ?response_team ?regulatory_waiver)
+        (not
+          (team_technical_check_passed ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_technical_check_passed ?response_team)
+        (team_regulatory_waiver_verified ?response_team)
+      )
+  )
+  (:action pass_team_clinical_check
+    :parameters (?response_team - response_team_unit ?clinical_priority_category - clinical_priority_category ?containment_action - containment_or_recall_action ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_technical_check_passed ?response_team)
+        (team_assigned_clinical_priority_category ?response_team ?clinical_priority_category)
+        (containment_assigned ?response_team ?containment_action)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (not
+          (package_secondary_coverage_flag ?allocation_package)
+        )
+        (not
+          (team_clinical_check_passed ?response_team)
+        )
+      )
+    :effect (team_clinical_check_passed ?response_team)
+  )
+  (:action pass_team_clinical_check_alt
+    :parameters (?response_team - response_team_unit ?clinical_priority_category - clinical_priority_category ?containment_action - containment_or_recall_action ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_technical_check_passed ?response_team)
+        (team_assigned_clinical_priority_category ?response_team ?clinical_priority_category)
+        (containment_assigned ?response_team ?containment_action)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (package_secondary_coverage_flag ?allocation_package)
+        (not
+          (team_clinical_check_passed ?response_team)
+        )
+      )
+    :effect (team_clinical_check_passed ?response_team)
+  )
+  (:action pass_team_regulatory_check
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_clinical_check_passed ?response_team)
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (not
+          (package_primary_coverage_flag ?allocation_package)
+        )
+        (not
+          (package_secondary_coverage_flag ?allocation_package)
+        )
+        (not
+          (team_regulatory_check_passed ?response_team)
+        )
+      )
+    :effect (team_regulatory_check_passed ?response_team)
+  )
+  (:action pass_team_regulatory_check_and_bind_channel
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_clinical_check_passed ?response_team)
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (package_primary_coverage_flag ?allocation_package)
+        (not
+          (package_secondary_coverage_flag ?allocation_package)
+        )
+        (not
+          (team_regulatory_check_passed ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_channel_bound ?response_team)
+      )
+  )
+  (:action pass_team_regulatory_check_and_bind_channel_alt1
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_clinical_check_passed ?response_team)
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (not
+          (package_primary_coverage_flag ?allocation_package)
+        )
+        (package_secondary_coverage_flag ?allocation_package)
+        (not
+          (team_regulatory_check_passed ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_channel_bound ?response_team)
+      )
+  )
+  (:action pass_team_regulatory_check_and_bind_channel_alt2
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint ?product_lot - product_lot ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (team_clinical_check_passed ?response_team)
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (team_has_lot ?response_team ?product_lot)
+        (lot_assigned_to_package ?product_lot ?allocation_package)
+        (package_primary_coverage_flag ?allocation_package)
+        (package_secondary_coverage_flag ?allocation_package)
+        (not
+          (team_regulatory_check_passed ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_channel_bound ?response_team)
+      )
+  )
+  (:action finalize_team_and_mark_execution_authorized
+    :parameters (?response_team - response_team_unit)
+    :precondition
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (not
+          (team_channel_bound ?response_team)
+        )
+        (not
+          (team_final_approval ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_final_approval ?response_team)
+        (execution_authorized ?response_team)
+      )
+  )
+  (:action bind_distribution_channel_to_team
+    :parameters (?response_team - response_team_unit ?distribution_channel - distribution_channel)
+    :precondition
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_channel_bound ?response_team)
+        (distribution_channel_available ?distribution_channel)
+      )
+    :effect
+      (and
+        (team_bound_to_channel ?response_team ?distribution_channel)
+        (not
+          (distribution_channel_available ?distribution_channel)
+        )
+      )
+  )
+  (:action finalize_team_checks_and_mark_ready
+    :parameters (?response_team - response_team_unit ?primary_site - primary_distribution_site ?secondary_site - secondary_distribution_site ?justification_doc - clinical_justification_document ?distribution_channel - distribution_channel)
+    :precondition
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_channel_bound ?response_team)
+        (team_bound_to_channel ?response_team ?distribution_channel)
+        (team_covers_primary_site ?response_team ?primary_site)
+        (team_covers_secondary_site ?response_team ?secondary_site)
+        (primary_site_supplier_confirmed ?primary_site)
+        (secondary_site_supplier_confirmed ?secondary_site)
+        (justification_linked ?response_team ?justification_doc)
+        (not
+          (team_ready_for_execution ?response_team)
+        )
+      )
+    :effect (team_ready_for_execution ?response_team)
+  )
+  (:action finalize_and_authorize_team_execution
+    :parameters (?response_team - response_team_unit)
+    :precondition
+      (and
+        (team_regulatory_check_passed ?response_team)
+        (team_ready_for_execution ?response_team)
+        (not
+          (team_final_approval ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_final_approval ?response_team)
+        (execution_authorized ?response_team)
+      )
+  )
+  (:action record_external_stakeholder_confirmation
+    :parameters (?response_team - response_team_unit ?external_stakeholder - external_stakeholder ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (priority_validated ?response_team)
+        (justification_linked ?response_team ?justification_doc)
+        (external_stakeholder_available ?external_stakeholder)
+        (team_engaged_with_external_stakeholder ?response_team ?external_stakeholder)
+        (not
+          (team_stakeholder_confirmation_obtained ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_stakeholder_confirmation_obtained ?response_team)
+        (not
+          (external_stakeholder_available ?external_stakeholder)
+        )
+      )
+  )
+  (:action request_stakeholder_approval
+    :parameters (?response_team - response_team_unit ?containment_action - containment_or_recall_action)
+    :precondition
+      (and
+        (team_stakeholder_confirmation_obtained ?response_team)
+        (containment_assigned ?response_team ?containment_action)
+        (not
+          (stakeholder_approval_recorded ?response_team)
+        )
+      )
+    :effect (stakeholder_approval_recorded ?response_team)
+  )
+  (:action record_stakeholder_approval_finalized
+    :parameters (?response_team - response_team_unit ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (stakeholder_approval_recorded ?response_team)
+        (team_assigned_regulatory_constraint ?response_team ?regulatory_constraint)
+        (not
+          (stakeholder_approval_finalized ?response_team)
+        )
+      )
+    :effect (stakeholder_approval_finalized ?response_team)
+  )
+  (:action finalize_stakeholder_approval_and_authorize
+    :parameters (?response_team - response_team_unit)
+    :precondition
+      (and
+        (stakeholder_approval_finalized ?response_team)
+        (not
+          (team_final_approval ?response_team)
+        )
+      )
+    :effect
+      (and
+        (team_final_approval ?response_team)
+        (execution_authorized ?response_team)
+      )
+  )
+  (:action release_primary_site_for_recovery
+    :parameters (?primary_site - primary_distribution_site ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (primary_site_ready_flag ?primary_site)
+        (primary_site_supplier_confirmed ?primary_site)
+        (allocation_package_prepared ?allocation_package)
+        (package_ready_for_lot_assignment ?allocation_package)
+        (not
+          (execution_authorized ?primary_site)
+        )
+      )
+    :effect (execution_authorized ?primary_site)
+  )
+  (:action release_secondary_site_for_recovery
+    :parameters (?secondary_site - secondary_distribution_site ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (secondary_site_ready_flag ?secondary_site)
+        (secondary_site_supplier_confirmed ?secondary_site)
+        (allocation_package_prepared ?allocation_package)
+        (package_ready_for_lot_assignment ?allocation_package)
+        (not
+          (execution_authorized ?secondary_site)
+        )
+      )
+    :effect (execution_authorized ?secondary_site)
+  )
+  (:action finalize_subject_and_schedule_notification
+    :parameters (?case - allocation_subject ?notification_template - notification_template ?justification_doc - clinical_justification_document)
+    :precondition
+      (and
+        (execution_authorized ?case)
+        (justification_linked ?case ?justification_doc)
+        (notification_template_available ?notification_template)
+        (not
+          (allocation_finalized ?case)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?case)
+        (subject_linked_notification_template ?case ?notification_template)
+        (not
+          (notification_template_available ?notification_template)
+        )
+      )
+  )
+  (:action bind_allocation_to_primary_site
+    :parameters (?primary_site - primary_distribution_site ?priority_slot - priority_slot_token ?notification_template - notification_template)
+    :precondition
+      (and
+        (allocation_finalized ?primary_site)
+        (slot_assigned ?primary_site ?priority_slot)
+        (subject_linked_notification_template ?primary_site ?notification_template)
+        (not
+          (allocation_committed ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?primary_site)
+        (priority_slot_available ?priority_slot)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action bind_allocation_to_secondary_site
+    :parameters (?secondary_site - secondary_distribution_site ?priority_slot - priority_slot_token ?notification_template - notification_template)
+    :precondition
+      (and
+        (allocation_finalized ?secondary_site)
+        (slot_assigned ?secondary_site ?priority_slot)
+        (subject_linked_notification_template ?secondary_site ?notification_template)
+        (not
+          (allocation_committed ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?secondary_site)
+        (priority_slot_available ?priority_slot)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action bind_allocation_to_response_team
+    :parameters (?response_team - response_team_unit ?priority_slot - priority_slot_token ?notification_template - notification_template)
+    :precondition
+      (and
+        (allocation_finalized ?response_team)
+        (slot_assigned ?response_team ?priority_slot)
+        (subject_linked_notification_template ?response_team ?notification_template)
+        (not
+          (allocation_committed ?response_team)
+        )
+      )
+    :effect
+      (and
+        (allocation_committed ?response_team)
+        (priority_slot_available ?priority_slot)
+        (notification_template_available ?notification_template)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem shortage_mitigation_priority_allocation_problem)
+  (:domain pharm_shortage_mitigation_priority_allocation)
+  (:objects primary_distribution_site_a - primary_distribution_site secondary_distribution_site_a - secondary_distribution_site response_team_alpha - response_team_unit response_team_beta - response_team_unit priority_slot_1 - priority_slot_token priority_slot_2 - priority_slot_token priority_slot_3 - priority_slot_token justification_doc_1 - clinical_justification_document containment_action_team_1 - containment_or_recall_action substitute_product_1 - substitute_product_unit primary_supplier_1 - primary_supplier secondary_supplier_1 - secondary_supplier allocation_package_1 - allocation_package product_lot_a - product_lot product_lot_b - product_lot regulatory_waiver_1 - regulatory_waiver_document regulatory_waiver_2 - regulatory_waiver_document distribution_channel_a - distribution_channel distribution_channel_b - distribution_channel notification_template_1 - notification_template clinical_priority_category_1 - clinical_priority_category external_stakeholder_1 - external_stakeholder external_stakeholder_2 - external_stakeholder regulatory_constraint_1 - regulatory_constraint)
+  (:init
+    (priority_slot_available priority_slot_1)
+    (priority_slot_available priority_slot_2)
+    (priority_slot_available priority_slot_3)
+    (justification_available justification_doc_1)
+    (containment_action_available containment_action_team_1)
+    (substitute_product_available substitute_product_1)
+    (primary_supplier_linked_to_site primary_distribution_site_a primary_supplier_1)
+    (secondary_supplier_linked_to_site secondary_distribution_site_a secondary_supplier_1)
+    (allocation_package_open allocation_package_1)
+    (lot_available product_lot_a)
+    (lot_available product_lot_b)
+    (team_covers_primary_site response_team_alpha primary_distribution_site_a)
+    (team_covers_primary_site response_team_beta primary_distribution_site_a)
+    (team_covers_secondary_site response_team_alpha secondary_distribution_site_a)
+    (team_covers_secondary_site response_team_beta secondary_distribution_site_a)
+    (team_assigned_package response_team_alpha allocation_package_1)
+    (team_assigned_package response_team_beta allocation_package_1)
+    (team_has_lot response_team_alpha product_lot_a)
+    (team_has_lot response_team_beta product_lot_b)
+    (regulatory_waiver_available regulatory_waiver_1)
+    (regulatory_waiver_available regulatory_waiver_2)
+    (distribution_channel_available distribution_channel_a)
+    (distribution_channel_available distribution_channel_b)
+    (notification_template_available notification_template_1)
+    (clinical_priority_category_available clinical_priority_category_1)
+    (external_stakeholder_available external_stakeholder_1)
+    (team_engaged_with_external_stakeholder response_team_alpha external_stakeholder_1)
+    (team_engaged_with_external_stakeholder response_team_beta external_stakeholder_2)
+    (regulatory_constraint_available regulatory_constraint_1)
+  )
+  (:goal
+    (and
+      (allocation_committed primary_distribution_site_a)
+      (allocation_committed secondary_distribution_site_a)
+      (allocation_committed response_team_alpha)
+      (allocation_committed response_team_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_allocation_subject primary_distribution_site_a)
+(register_allocation_subject secondary_distribution_site_a)
+(register_allocation_subject response_team_alpha)
+(register_allocation_subject response_team_beta)
+(assign_priority_slot_to_subject primary_distribution_site_a priority_slot_1)
+(assign_priority_slot_to_subject secondary_distribution_site_a priority_slot_2)
+(assign_priority_slot_to_subject response_team_alpha priority_slot_3)
+(link_justification_to_subject primary_distribution_site_a justification_doc_1)
+(approve_subject_priority primary_distribution_site_a justification_doc_1)
+(engage_containment_action primary_distribution_site_a containment_action_team_1)
+(select_primary_supplier_for_site primary_distribution_site_a primary_supplier_1 justification_doc_1)
+(confirm_primary_supplier_and_flag_site_ready primary_distribution_site_a primary_supplier_1 containment_action_team_1)
+(release_containment_action primary_distribution_site_a containment_action_team_1)
+(unlink_justification_from_subject primary_distribution_site_a justification_doc_1)
+(link_justification_to_subject secondary_distribution_site_a justification_doc_1)
+(approve_subject_priority secondary_distribution_site_a justification_doc_1)
+(engage_containment_action secondary_distribution_site_a containment_action_team_1)
+(select_secondary_supplier_for_site secondary_distribution_site_a secondary_supplier_1 justification_doc_1)
+(confirm_secondary_supplier_and_flag_site_ready secondary_distribution_site_a secondary_supplier_1 containment_action_team_1)
+(release_containment_action secondary_distribution_site_a containment_action_team_1)
+(assemble_allocation_package primary_distribution_site_a secondary_distribution_site_a primary_supplier_1 secondary_supplier_1 allocation_package_1)
+(link_justification_to_subject primary_distribution_site_a justification_doc_1)
+(mark_package_ready_for_lot_assignment allocation_package_1 primary_distribution_site_a justification_doc_1)
+(release_primary_site_for_recovery primary_distribution_site_a allocation_package_1)
+(release_secondary_site_for_recovery secondary_distribution_site_a allocation_package_1)
+(finalize_subject_and_schedule_notification primary_distribution_site_a notification_template_1 justification_doc_1)
+(bind_allocation_to_primary_site primary_distribution_site_a priority_slot_1 notification_template_1)
+(unlink_justification_from_subject primary_distribution_site_a justification_doc_1)
+(link_justification_to_subject secondary_distribution_site_a justification_doc_1)
+(finalize_subject_and_schedule_notification secondary_distribution_site_a notification_template_1 justification_doc_1)
+(bind_allocation_to_secondary_site secondary_distribution_site_a priority_slot_2 notification_template_1)
+(unlink_justification_from_subject secondary_distribution_site_a justification_doc_1)
+(link_justification_to_subject response_team_alpha justification_doc_1)
+(approve_subject_priority response_team_alpha justification_doc_1)
+(assign_lot_to_package response_team_alpha product_lot_a allocation_package_1)
+(authorize_team_technical_check response_team_alpha product_lot_a allocation_package_1 justification_doc_1)
+(assign_clinical_priority_to_team response_team_alpha clinical_priority_category_1)
+(engage_containment_action response_team_alpha containment_action_team_1)
+(pass_team_clinical_check response_team_alpha clinical_priority_category_1 containment_action_team_1 product_lot_a allocation_package_1)
+(assign_regulatory_constraint_to_team response_team_alpha regulatory_constraint_1)
+(pass_team_regulatory_check response_team_alpha regulatory_constraint_1 product_lot_a allocation_package_1)
+(finalize_team_and_mark_execution_authorized response_team_alpha)
+(finalize_subject_and_schedule_notification response_team_alpha notification_template_1 justification_doc_1)
+(bind_allocation_to_response_team response_team_alpha priority_slot_3 notification_template_1)
+(unlink_justification_from_subject response_team_alpha justification_doc_1)
+(assign_priority_slot_to_subject response_team_beta priority_slot_1)
+(link_justification_to_subject response_team_beta justification_doc_1)
+(approve_subject_priority response_team_beta justification_doc_1)
+(assign_lot_to_package response_team_beta product_lot_b allocation_package_1)
+(authorize_team_technical_check response_team_beta product_lot_b allocation_package_1 justification_doc_1)
+(remove_clinical_priority_from_team response_team_alpha clinical_priority_category_1)
+(assign_clinical_priority_to_team response_team_beta clinical_priority_category_1)
+(release_containment_action response_team_alpha containment_action_team_1)
+(engage_containment_action response_team_beta containment_action_team_1)
+(pass_team_clinical_check response_team_beta clinical_priority_category_1 containment_action_team_1 product_lot_b allocation_package_1)
+(remove_regulatory_constraint_from_team response_team_alpha regulatory_constraint_1)
+(assign_regulatory_constraint_to_team response_team_beta regulatory_constraint_1)
+(pass_team_regulatory_check response_team_beta regulatory_constraint_1 product_lot_b allocation_package_1)
+(finalize_team_and_mark_execution_authorized response_team_beta)
+(finalize_subject_and_schedule_notification response_team_beta notification_template_1 justification_doc_1)
+(bind_allocation_to_response_team response_team_beta priority_slot_1 notification_template_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_yeh0lcc5/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_yeh0lcc5/plan.pddl 
+
+
+--- stderr ---
+

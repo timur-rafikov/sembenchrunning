@@ -1,0 +1,936 @@
+(define (domain loadout_failure_rebuild_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types item_category - object resource_category - object equipment_category - object entity_supertype - object unit_entity - entity_supertype component_option - item_category attachment_pool_item - item_category support_item_pool - item_category cosmetic_variant - item_category perk_token - item_category override_token - item_category attachment_configuration - item_category special_modifier - item_category consumable_item - resource_category upgrade_module - resource_category mission_modifier - resource_category primary_weapon_type - equipment_category secondary_weapon_type - equipment_category kit_template - equipment_category slot_class - unit_entity template_class - unit_entity player_slot - slot_class ally_slot - slot_class agent_template - template_class)
+  (:predicates
+    (needs_rebuild ?unit_entity - unit_entity)
+    (rebuild_prepared ?unit_entity - unit_entity)
+    (component_assigned_flag ?unit_entity - unit_entity)
+    (loadout_applied ?unit_entity - unit_entity)
+    (ready_for_activation ?unit_entity - unit_entity)
+    (activation_approved ?unit_entity - unit_entity)
+    (component_available ?component_option - component_option)
+    (component_assigned_to ?unit_entity - unit_entity ?component_option - component_option)
+    (attachment_available ?attachment_pool_item - attachment_pool_item)
+    (attachment_assigned_to ?unit_entity - unit_entity ?attachment_pool_item - attachment_pool_item)
+    (support_item_available ?support_item_pool - support_item_pool)
+    (support_assigned_to ?unit_entity - unit_entity ?support_item_pool - support_item_pool)
+    (consumable_available ?consumable_item - consumable_item)
+    (consumable_assigned_to_slot ?player_slot - player_slot ?consumable_item - consumable_item)
+    (consumable_assigned_to_ally ?ally_slot - ally_slot ?consumable_item - consumable_item)
+    (slot_primary_type ?player_slot - player_slot ?primary_weapon_type - primary_weapon_type)
+    (primary_ready ?primary_weapon_type - primary_weapon_type)
+    (primary_configured ?primary_weapon_type - primary_weapon_type)
+    (slot_primary_confirmed ?player_slot - player_slot)
+    (ally_secondary_type ?ally_slot - ally_slot ?secondary_weapon_type - secondary_weapon_type)
+    (secondary_ready ?secondary_weapon_type - secondary_weapon_type)
+    (secondary_configured ?secondary_weapon_type - secondary_weapon_type)
+    (ally_secondary_confirmed ?ally_slot - ally_slot)
+    (kit_template_available ?kit_template - kit_template)
+    (kit_constructed ?kit_template - kit_template)
+    (kit_has_primary_type ?kit_template - kit_template ?primary_weapon_type - primary_weapon_type)
+    (kit_has_secondary_type ?kit_template - kit_template ?secondary_weapon_type - secondary_weapon_type)
+    (kit_primary_marker ?kit_template - kit_template)
+    (kit_secondary_marker ?kit_template - kit_template)
+    (kit_ready_for_modules ?kit_template - kit_template)
+    (agent_assigned_to_slot ?recovery_agent - agent_template ?player_slot - player_slot)
+    (agent_assigned_to_ally_slot ?recovery_agent - agent_template ?ally_slot - ally_slot)
+    (agent_has_template ?recovery_agent - agent_template ?kit_template - kit_template)
+    (module_available ?upgrade_module - upgrade_module)
+    (agent_has_module ?recovery_agent - agent_template ?upgrade_module - upgrade_module)
+    (module_installed_flag ?upgrade_module - upgrade_module)
+    (module_installed_on_kit ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    (agent_module_ready ?recovery_agent - agent_template)
+    (agent_module_validated ?recovery_agent - agent_template)
+    (agent_checks_finalized ?recovery_agent - agent_template)
+    (variant_bound ?recovery_agent - agent_template)
+    (agent_variant_feature_set ?recovery_agent - agent_template)
+    (agent_feature_ready ?recovery_agent - agent_template)
+    (agent_checks_passed ?recovery_agent - agent_template)
+    (mission_modifier_available ?mission_modifier - mission_modifier)
+    (agent_has_mission_modifier ?recovery_agent - agent_template ?mission_modifier - mission_modifier)
+    (agent_modifier_bound ?recovery_agent - agent_template)
+    (agent_patch_ready ?recovery_agent - agent_template)
+    (agent_patch_applied ?recovery_agent - agent_template)
+    (cosmetic_available ?cosmetic_variant - cosmetic_variant)
+    (agent_has_cosmetic_variant ?recovery_agent - agent_template ?cosmetic_variant - cosmetic_variant)
+    (perk_available ?perk_token - perk_token)
+    (agent_has_perk_token ?recovery_agent - agent_template ?perk_token - perk_token)
+    (attachment_configuration_available ?attachment_configuration - attachment_configuration)
+    (agent_has_attachment_config ?recovery_agent - agent_template ?attachment_configuration - attachment_configuration)
+    (special_modifier_available ?special_modifier - special_modifier)
+    (agent_has_special_modifier ?recovery_agent - agent_template ?special_modifier - special_modifier)
+    (override_token_available ?override_token - override_token)
+    (entity_bound_override_token ?unit_entity - unit_entity ?override_token - override_token)
+    (slot_ready_for_kit ?player_slot - player_slot)
+    (ally_slot_ready_for_kit ?ally_slot - ally_slot)
+    (finalized_marker ?recovery_agent - agent_template)
+  )
+  (:action flag_loadout_failure
+    :parameters (?unit_entity - unit_entity)
+    :precondition
+      (and
+        (not
+          (needs_rebuild ?unit_entity)
+        )
+        (not
+          (loadout_applied ?unit_entity)
+        )
+      )
+    :effect (needs_rebuild ?unit_entity)
+  )
+  (:action reserve_component_for_unit
+    :parameters (?unit_entity - unit_entity ?component_option - component_option)
+    :precondition
+      (and
+        (needs_rebuild ?unit_entity)
+        (not
+          (component_assigned_flag ?unit_entity)
+        )
+        (component_available ?component_option)
+      )
+    :effect
+      (and
+        (component_assigned_flag ?unit_entity)
+        (component_assigned_to ?unit_entity ?component_option)
+        (not
+          (component_available ?component_option)
+        )
+      )
+  )
+  (:action claim_attachment_for_unit
+    :parameters (?unit_entity - unit_entity ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (needs_rebuild ?unit_entity)
+        (component_assigned_flag ?unit_entity)
+        (attachment_available ?attachment_pool_item)
+      )
+    :effect
+      (and
+        (attachment_assigned_to ?unit_entity ?attachment_pool_item)
+        (not
+          (attachment_available ?attachment_pool_item)
+        )
+      )
+  )
+  (:action confirm_attachment_selection
+    :parameters (?unit_entity - unit_entity ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (needs_rebuild ?unit_entity)
+        (component_assigned_flag ?unit_entity)
+        (attachment_assigned_to ?unit_entity ?attachment_pool_item)
+        (not
+          (rebuild_prepared ?unit_entity)
+        )
+      )
+    :effect (rebuild_prepared ?unit_entity)
+  )
+  (:action release_attachment_from_unit
+    :parameters (?unit_entity - unit_entity ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (attachment_assigned_to ?unit_entity ?attachment_pool_item)
+      )
+    :effect
+      (and
+        (attachment_available ?attachment_pool_item)
+        (not
+          (attachment_assigned_to ?unit_entity ?attachment_pool_item)
+        )
+      )
+  )
+  (:action reserve_support_item_for_unit
+    :parameters (?unit_entity - unit_entity ?support_item_pool - support_item_pool)
+    :precondition
+      (and
+        (rebuild_prepared ?unit_entity)
+        (support_item_available ?support_item_pool)
+      )
+    :effect
+      (and
+        (support_assigned_to ?unit_entity ?support_item_pool)
+        (not
+          (support_item_available ?support_item_pool)
+        )
+      )
+  )
+  (:action release_support_item_from_unit
+    :parameters (?unit_entity - unit_entity ?support_item_pool - support_item_pool)
+    :precondition
+      (and
+        (support_assigned_to ?unit_entity ?support_item_pool)
+      )
+    :effect
+      (and
+        (support_item_available ?support_item_pool)
+        (not
+          (support_assigned_to ?unit_entity ?support_item_pool)
+        )
+      )
+  )
+  (:action assign_attachment_config_to_agent
+    :parameters (?recovery_agent - agent_template ?attachment_configuration - attachment_configuration)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (attachment_configuration_available ?attachment_configuration)
+      )
+    :effect
+      (and
+        (agent_has_attachment_config ?recovery_agent ?attachment_configuration)
+        (not
+          (attachment_configuration_available ?attachment_configuration)
+        )
+      )
+  )
+  (:action release_attachment_config_from_agent
+    :parameters (?recovery_agent - agent_template ?attachment_configuration - attachment_configuration)
+    :precondition
+      (and
+        (agent_has_attachment_config ?recovery_agent ?attachment_configuration)
+      )
+    :effect
+      (and
+        (attachment_configuration_available ?attachment_configuration)
+        (not
+          (agent_has_attachment_config ?recovery_agent ?attachment_configuration)
+        )
+      )
+  )
+  (:action assign_special_modifier_to_agent
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (special_modifier_available ?special_modifier)
+      )
+    :effect
+      (and
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (not
+          (special_modifier_available ?special_modifier)
+        )
+      )
+  )
+  (:action release_special_modifier_from_agent
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+      )
+    :effect
+      (and
+        (special_modifier_available ?special_modifier)
+        (not
+          (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        )
+      )
+  )
+  (:action set_primary_ready_marker
+    :parameters (?player_slot - player_slot ?primary_weapon_type - primary_weapon_type ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (rebuild_prepared ?player_slot)
+        (attachment_assigned_to ?player_slot ?attachment_pool_item)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (not
+          (primary_ready ?primary_weapon_type)
+        )
+        (not
+          (primary_configured ?primary_weapon_type)
+        )
+      )
+    :effect (primary_ready ?primary_weapon_type)
+  )
+  (:action finalize_primary_selection_for_slot
+    :parameters (?player_slot - player_slot ?primary_weapon_type - primary_weapon_type ?support_item_pool - support_item_pool)
+    :precondition
+      (and
+        (rebuild_prepared ?player_slot)
+        (support_assigned_to ?player_slot ?support_item_pool)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (primary_ready ?primary_weapon_type)
+        (not
+          (slot_ready_for_kit ?player_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (slot_primary_confirmed ?player_slot)
+      )
+  )
+  (:action apply_consumable_to_slot_primary
+    :parameters (?player_slot - player_slot ?primary_weapon_type - primary_weapon_type ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (rebuild_prepared ?player_slot)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (consumable_available ?consumable_item)
+        (not
+          (slot_ready_for_kit ?player_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_configured ?primary_weapon_type)
+        (slot_ready_for_kit ?player_slot)
+        (consumable_assigned_to_slot ?player_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action update_primary_selection_for_slot
+    :parameters (?player_slot - player_slot ?primary_weapon_type - primary_weapon_type ?attachment_pool_item - attachment_pool_item ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (rebuild_prepared ?player_slot)
+        (attachment_assigned_to ?player_slot ?attachment_pool_item)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (primary_configured ?primary_weapon_type)
+        (consumable_assigned_to_slot ?player_slot ?consumable_item)
+        (not
+          (slot_primary_confirmed ?player_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_ready ?primary_weapon_type)
+        (slot_primary_confirmed ?player_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (consumable_assigned_to_slot ?player_slot ?consumable_item)
+        )
+      )
+  )
+  (:action set_ally_secondary_ready_marker
+    :parameters (?ally_slot - ally_slot ?secondary_weapon_type - secondary_weapon_type ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (rebuild_prepared ?ally_slot)
+        (attachment_assigned_to ?ally_slot ?attachment_pool_item)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (not
+          (secondary_ready ?secondary_weapon_type)
+        )
+        (not
+          (secondary_configured ?secondary_weapon_type)
+        )
+      )
+    :effect (secondary_ready ?secondary_weapon_type)
+  )
+  (:action finalize_secondary_selection_for_ally
+    :parameters (?ally_slot - ally_slot ?secondary_weapon_type - secondary_weapon_type ?support_item_pool - support_item_pool)
+    :precondition
+      (and
+        (rebuild_prepared ?ally_slot)
+        (support_assigned_to ?ally_slot ?support_item_pool)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (secondary_ready ?secondary_weapon_type)
+        (not
+          (ally_slot_ready_for_kit ?ally_slot)
+        )
+      )
+    :effect
+      (and
+        (ally_slot_ready_for_kit ?ally_slot)
+        (ally_secondary_confirmed ?ally_slot)
+      )
+  )
+  (:action apply_consumable_to_ally_secondary
+    :parameters (?ally_slot - ally_slot ?secondary_weapon_type - secondary_weapon_type ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (rebuild_prepared ?ally_slot)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (consumable_available ?consumable_item)
+        (not
+          (ally_slot_ready_for_kit ?ally_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_configured ?secondary_weapon_type)
+        (ally_slot_ready_for_kit ?ally_slot)
+        (consumable_assigned_to_ally ?ally_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action update_secondary_selection_for_ally
+    :parameters (?ally_slot - ally_slot ?secondary_weapon_type - secondary_weapon_type ?attachment_pool_item - attachment_pool_item ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (rebuild_prepared ?ally_slot)
+        (attachment_assigned_to ?ally_slot ?attachment_pool_item)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (secondary_configured ?secondary_weapon_type)
+        (consumable_assigned_to_ally ?ally_slot ?consumable_item)
+        (not
+          (ally_secondary_confirmed ?ally_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready ?secondary_weapon_type)
+        (ally_secondary_confirmed ?ally_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (consumable_assigned_to_ally ?ally_slot ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_kit_standard
+    :parameters (?player_slot - player_slot ?ally_slot - ally_slot ?primary_weapon_type - primary_weapon_type ?secondary_weapon_type - secondary_weapon_type ?kit_template - kit_template)
+    :precondition
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (ally_slot_ready_for_kit ?ally_slot)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (primary_ready ?primary_weapon_type)
+        (secondary_ready ?secondary_weapon_type)
+        (slot_primary_confirmed ?player_slot)
+        (ally_secondary_confirmed ?ally_slot)
+        (kit_template_available ?kit_template)
+      )
+    :effect
+      (and
+        (kit_constructed ?kit_template)
+        (kit_has_primary_type ?kit_template ?primary_weapon_type)
+        (kit_has_secondary_type ?kit_template ?secondary_weapon_type)
+        (not
+          (kit_template_available ?kit_template)
+        )
+      )
+  )
+  (:action assemble_kit_primary_specialized
+    :parameters (?player_slot - player_slot ?ally_slot - ally_slot ?primary_weapon_type - primary_weapon_type ?secondary_weapon_type - secondary_weapon_type ?kit_template - kit_template)
+    :precondition
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (ally_slot_ready_for_kit ?ally_slot)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (primary_configured ?primary_weapon_type)
+        (secondary_ready ?secondary_weapon_type)
+        (not
+          (slot_primary_confirmed ?player_slot)
+        )
+        (ally_secondary_confirmed ?ally_slot)
+        (kit_template_available ?kit_template)
+      )
+    :effect
+      (and
+        (kit_constructed ?kit_template)
+        (kit_has_primary_type ?kit_template ?primary_weapon_type)
+        (kit_has_secondary_type ?kit_template ?secondary_weapon_type)
+        (kit_primary_marker ?kit_template)
+        (not
+          (kit_template_available ?kit_template)
+        )
+      )
+  )
+  (:action assemble_kit_secondary_specialized
+    :parameters (?player_slot - player_slot ?ally_slot - ally_slot ?primary_weapon_type - primary_weapon_type ?secondary_weapon_type - secondary_weapon_type ?kit_template - kit_template)
+    :precondition
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (ally_slot_ready_for_kit ?ally_slot)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (primary_ready ?primary_weapon_type)
+        (secondary_configured ?secondary_weapon_type)
+        (slot_primary_confirmed ?player_slot)
+        (not
+          (ally_secondary_confirmed ?ally_slot)
+        )
+        (kit_template_available ?kit_template)
+      )
+    :effect
+      (and
+        (kit_constructed ?kit_template)
+        (kit_has_primary_type ?kit_template ?primary_weapon_type)
+        (kit_has_secondary_type ?kit_template ?secondary_weapon_type)
+        (kit_secondary_marker ?kit_template)
+        (not
+          (kit_template_available ?kit_template)
+        )
+      )
+  )
+  (:action assemble_kit_fully_specialized
+    :parameters (?player_slot - player_slot ?ally_slot - ally_slot ?primary_weapon_type - primary_weapon_type ?secondary_weapon_type - secondary_weapon_type ?kit_template - kit_template)
+    :precondition
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (ally_slot_ready_for_kit ?ally_slot)
+        (slot_primary_type ?player_slot ?primary_weapon_type)
+        (ally_secondary_type ?ally_slot ?secondary_weapon_type)
+        (primary_configured ?primary_weapon_type)
+        (secondary_configured ?secondary_weapon_type)
+        (not
+          (slot_primary_confirmed ?player_slot)
+        )
+        (not
+          (ally_secondary_confirmed ?ally_slot)
+        )
+        (kit_template_available ?kit_template)
+      )
+    :effect
+      (and
+        (kit_constructed ?kit_template)
+        (kit_has_primary_type ?kit_template ?primary_weapon_type)
+        (kit_has_secondary_type ?kit_template ?secondary_weapon_type)
+        (kit_primary_marker ?kit_template)
+        (kit_secondary_marker ?kit_template)
+        (not
+          (kit_template_available ?kit_template)
+        )
+      )
+  )
+  (:action validate_kit_for_module_install
+    :parameters (?kit_template - kit_template ?player_slot - player_slot ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (kit_constructed ?kit_template)
+        (slot_ready_for_kit ?player_slot)
+        (attachment_assigned_to ?player_slot ?attachment_pool_item)
+        (not
+          (kit_ready_for_modules ?kit_template)
+        )
+      )
+    :effect (kit_ready_for_modules ?kit_template)
+  )
+  (:action install_module_into_kit
+    :parameters (?recovery_agent - agent_template ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (agent_has_template ?recovery_agent ?kit_template)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_available ?upgrade_module)
+        (kit_constructed ?kit_template)
+        (kit_ready_for_modules ?kit_template)
+        (not
+          (module_installed_flag ?upgrade_module)
+        )
+      )
+    :effect
+      (and
+        (module_installed_flag ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (not
+          (module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action commit_module_installation
+    :parameters (?recovery_agent - agent_template ?upgrade_module - upgrade_module ?kit_template - kit_template ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_flag ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (attachment_assigned_to ?recovery_agent ?attachment_pool_item)
+        (not
+          (kit_primary_marker ?kit_template)
+        )
+        (not
+          (agent_module_ready ?recovery_agent)
+        )
+      )
+    :effect (agent_module_ready ?recovery_agent)
+  )
+  (:action bind_cosmetic_variant_to_agent
+    :parameters (?recovery_agent - agent_template ?cosmetic_variant - cosmetic_variant)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (cosmetic_available ?cosmetic_variant)
+        (not
+          (variant_bound ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (variant_bound ?recovery_agent)
+        (agent_has_cosmetic_variant ?recovery_agent ?cosmetic_variant)
+        (not
+          (cosmetic_available ?cosmetic_variant)
+        )
+      )
+  )
+  (:action attach_cosmetic_and_prepare_agent
+    :parameters (?recovery_agent - agent_template ?upgrade_module - upgrade_module ?kit_template - kit_template ?attachment_pool_item - attachment_pool_item ?cosmetic_variant - cosmetic_variant)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_flag ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (attachment_assigned_to ?recovery_agent ?attachment_pool_item)
+        (kit_primary_marker ?kit_template)
+        (variant_bound ?recovery_agent)
+        (agent_has_cosmetic_variant ?recovery_agent ?cosmetic_variant)
+        (not
+          (agent_module_ready ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_module_ready ?recovery_agent)
+        (agent_variant_feature_set ?recovery_agent)
+      )
+  )
+  (:action start_agent_module_check
+    :parameters (?recovery_agent - agent_template ?attachment_configuration - attachment_configuration ?support_item_pool - support_item_pool ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_ready ?recovery_agent)
+        (agent_has_attachment_config ?recovery_agent ?attachment_configuration)
+        (support_assigned_to ?recovery_agent ?support_item_pool)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (not
+          (kit_secondary_marker ?kit_template)
+        )
+        (not
+          (agent_module_validated ?recovery_agent)
+        )
+      )
+    :effect (agent_module_validated ?recovery_agent)
+  )
+  (:action complete_agent_module_check
+    :parameters (?recovery_agent - agent_template ?attachment_configuration - attachment_configuration ?support_item_pool - support_item_pool ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_ready ?recovery_agent)
+        (agent_has_attachment_config ?recovery_agent ?attachment_configuration)
+        (support_assigned_to ?recovery_agent ?support_item_pool)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (kit_secondary_marker ?kit_template)
+        (not
+          (agent_module_validated ?recovery_agent)
+        )
+      )
+    :effect (agent_module_validated ?recovery_agent)
+  )
+  (:action commit_module_validation_stage1
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_validated ?recovery_agent)
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (not
+          (kit_primary_marker ?kit_template)
+        )
+        (not
+          (kit_secondary_marker ?kit_template)
+        )
+        (not
+          (agent_checks_finalized ?recovery_agent)
+        )
+      )
+    :effect (agent_checks_finalized ?recovery_agent)
+  )
+  (:action commit_module_validation_stage2
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_validated ?recovery_agent)
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (kit_primary_marker ?kit_template)
+        (not
+          (kit_secondary_marker ?kit_template)
+        )
+        (not
+          (agent_checks_finalized ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_feature_ready ?recovery_agent)
+      )
+  )
+  (:action commit_module_validation_stage3
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_validated ?recovery_agent)
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (not
+          (kit_primary_marker ?kit_template)
+        )
+        (kit_secondary_marker ?kit_template)
+        (not
+          (agent_checks_finalized ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_feature_ready ?recovery_agent)
+      )
+  )
+  (:action commit_module_validation_stage4
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier ?upgrade_module - upgrade_module ?kit_template - kit_template)
+    :precondition
+      (and
+        (agent_module_validated ?recovery_agent)
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (agent_has_module ?recovery_agent ?upgrade_module)
+        (module_installed_on_kit ?upgrade_module ?kit_template)
+        (kit_primary_marker ?kit_template)
+        (kit_secondary_marker ?kit_template)
+        (not
+          (agent_checks_finalized ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_feature_ready ?recovery_agent)
+      )
+  )
+  (:action finalize_template_base
+    :parameters (?recovery_agent - agent_template)
+    :precondition
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (not
+          (agent_feature_ready ?recovery_agent)
+        )
+        (not
+          (finalized_marker ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (finalized_marker ?recovery_agent)
+        (ready_for_activation ?recovery_agent)
+      )
+  )
+  (:action attach_perk_to_agent_template
+    :parameters (?recovery_agent - agent_template ?perk_token - perk_token)
+    :precondition
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_feature_ready ?recovery_agent)
+        (perk_available ?perk_token)
+      )
+    :effect
+      (and
+        (agent_has_perk_token ?recovery_agent ?perk_token)
+        (not
+          (perk_available ?perk_token)
+        )
+      )
+  )
+  (:action perform_final_template_checks
+    :parameters (?recovery_agent - agent_template ?player_slot - player_slot ?ally_slot - ally_slot ?attachment_pool_item - attachment_pool_item ?perk_token - perk_token)
+    :precondition
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_feature_ready ?recovery_agent)
+        (agent_has_perk_token ?recovery_agent ?perk_token)
+        (agent_assigned_to_slot ?recovery_agent ?player_slot)
+        (agent_assigned_to_ally_slot ?recovery_agent ?ally_slot)
+        (slot_primary_confirmed ?player_slot)
+        (ally_secondary_confirmed ?ally_slot)
+        (attachment_assigned_to ?recovery_agent ?attachment_pool_item)
+        (not
+          (agent_checks_passed ?recovery_agent)
+        )
+      )
+    :effect (agent_checks_passed ?recovery_agent)
+  )
+  (:action make_template_available
+    :parameters (?recovery_agent - agent_template)
+    :precondition
+      (and
+        (agent_checks_finalized ?recovery_agent)
+        (agent_checks_passed ?recovery_agent)
+        (not
+          (finalized_marker ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (finalized_marker ?recovery_agent)
+        (ready_for_activation ?recovery_agent)
+      )
+  )
+  (:action bind_mission_modifier_to_agent
+    :parameters (?recovery_agent - agent_template ?mission_modifier - mission_modifier ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (rebuild_prepared ?recovery_agent)
+        (attachment_assigned_to ?recovery_agent ?attachment_pool_item)
+        (mission_modifier_available ?mission_modifier)
+        (agent_has_mission_modifier ?recovery_agent ?mission_modifier)
+        (not
+          (agent_modifier_bound ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_modifier_bound ?recovery_agent)
+        (not
+          (mission_modifier_available ?mission_modifier)
+        )
+      )
+  )
+  (:action start_modifier_patch_for_agent
+    :parameters (?recovery_agent - agent_template ?support_item_pool - support_item_pool)
+    :precondition
+      (and
+        (agent_modifier_bound ?recovery_agent)
+        (support_assigned_to ?recovery_agent ?support_item_pool)
+        (not
+          (agent_patch_ready ?recovery_agent)
+        )
+      )
+    :effect (agent_patch_ready ?recovery_agent)
+  )
+  (:action apply_modifier_to_agent
+    :parameters (?recovery_agent - agent_template ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (agent_patch_ready ?recovery_agent)
+        (agent_has_special_modifier ?recovery_agent ?special_modifier)
+        (not
+          (agent_patch_applied ?recovery_agent)
+        )
+      )
+    :effect (agent_patch_applied ?recovery_agent)
+  )
+  (:action finalize_modifier_and_mark_agent_ready
+    :parameters (?recovery_agent - agent_template)
+    :precondition
+      (and
+        (agent_patch_applied ?recovery_agent)
+        (not
+          (finalized_marker ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (finalized_marker ?recovery_agent)
+        (ready_for_activation ?recovery_agent)
+      )
+  )
+  (:action apply_kit_to_player_slot
+    :parameters (?player_slot - player_slot ?kit_template - kit_template)
+    :precondition
+      (and
+        (slot_ready_for_kit ?player_slot)
+        (slot_primary_confirmed ?player_slot)
+        (kit_constructed ?kit_template)
+        (kit_ready_for_modules ?kit_template)
+        (not
+          (ready_for_activation ?player_slot)
+        )
+      )
+    :effect (ready_for_activation ?player_slot)
+  )
+  (:action apply_kit_to_ally_slot
+    :parameters (?ally_slot - ally_slot ?kit_template - kit_template)
+    :precondition
+      (and
+        (ally_slot_ready_for_kit ?ally_slot)
+        (ally_secondary_confirmed ?ally_slot)
+        (kit_constructed ?kit_template)
+        (kit_ready_for_modules ?kit_template)
+        (not
+          (ready_for_activation ?ally_slot)
+        )
+      )
+    :effect (ready_for_activation ?ally_slot)
+  )
+  (:action activate_unit_with_override
+    :parameters (?unit_entity - unit_entity ?override_token - override_token ?attachment_pool_item - attachment_pool_item)
+    :precondition
+      (and
+        (ready_for_activation ?unit_entity)
+        (attachment_assigned_to ?unit_entity ?attachment_pool_item)
+        (override_token_available ?override_token)
+        (not
+          (activation_approved ?unit_entity)
+        )
+      )
+    :effect
+      (and
+        (activation_approved ?unit_entity)
+        (entity_bound_override_token ?unit_entity ?override_token)
+        (not
+          (override_token_available ?override_token)
+        )
+      )
+  )
+  (:action apply_finalized_template_to_player_slot
+    :parameters (?player_slot - player_slot ?component_option - component_option ?override_token - override_token)
+    :precondition
+      (and
+        (activation_approved ?player_slot)
+        (component_assigned_to ?player_slot ?component_option)
+        (entity_bound_override_token ?player_slot ?override_token)
+        (not
+          (loadout_applied ?player_slot)
+        )
+      )
+    :effect
+      (and
+        (loadout_applied ?player_slot)
+        (component_available ?component_option)
+        (override_token_available ?override_token)
+      )
+  )
+  (:action apply_finalized_template_to_ally_slot
+    :parameters (?ally_slot - ally_slot ?component_option - component_option ?override_token - override_token)
+    :precondition
+      (and
+        (activation_approved ?ally_slot)
+        (component_assigned_to ?ally_slot ?component_option)
+        (entity_bound_override_token ?ally_slot ?override_token)
+        (not
+          (loadout_applied ?ally_slot)
+        )
+      )
+    :effect
+      (and
+        (loadout_applied ?ally_slot)
+        (component_available ?component_option)
+        (override_token_available ?override_token)
+      )
+  )
+  (:action apply_finalized_template_to_agent
+    :parameters (?recovery_agent - agent_template ?component_option - component_option ?override_token - override_token)
+    :precondition
+      (and
+        (activation_approved ?recovery_agent)
+        (component_assigned_to ?recovery_agent ?component_option)
+        (entity_bound_override_token ?recovery_agent ?override_token)
+        (not
+          (loadout_applied ?recovery_agent)
+        )
+      )
+    :effect
+      (and
+        (loadout_applied ?recovery_agent)
+        (component_available ?component_option)
+        (override_token_available ?override_token)
+      )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain machinery_breakdown_workaround_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types personnel_or_material_pool - object material_category - object logistics_category - object workflow_root - object repair_entity - workflow_root contingency_resource_provider - personnel_or_material_pool diagnostic_tool - personnel_or_material_pool technician_team - personnel_or_material_pool vendor_contract - personnel_or_material_pool authorization_token - personnel_or_material_pool repair_time_slot - personnel_or_material_pool specialist_tool - personnel_or_material_pool external_service_provider - personnel_or_material_pool spare_part - material_category inspection_batch - material_category warranty_or_policy - material_category isolation_staging_area - logistics_category transport_route - logistics_category contingency_package - logistics_category machine_category - repair_entity organizational_role - repair_entity machine_unit - machine_category associated_machine_unit - machine_category repair_facility - organizational_role)
+  (:predicates
+    (incident_reported ?repair_entity - repair_entity)
+    (diagnosis_validated ?repair_entity - repair_entity)
+    (provider_allocated ?repair_entity - repair_entity)
+    (restored_to_service ?repair_entity - repair_entity)
+    (repair_authorization_granted ?repair_entity - repair_entity)
+    (repair_scheduled ?repair_entity - repair_entity)
+    (contingency_provider_available ?contingency_resource_provider - contingency_resource_provider)
+    (entity_assigned_provider ?repair_entity - repair_entity ?contingency_resource_provider - contingency_resource_provider)
+    (diagnostic_tool_available ?diagnostic_tool - diagnostic_tool)
+    (diagnostic_tool_assigned_to_entity ?repair_entity - repair_entity ?diagnostic_tool - diagnostic_tool)
+    (technician_team_available ?technician_team - technician_team)
+    (technician_team_assigned_to_entity ?repair_entity - repair_entity ?technician_team - technician_team)
+    (spare_part_available ?spare_part - spare_part)
+    (spare_allocated_to_machine ?machine_unit - machine_unit ?spare_part - spare_part)
+    (spare_allocated_to_associated_machine ?associated_machine_unit - associated_machine_unit ?spare_part - spare_part)
+    (machine_staged_at_area ?machine_unit - machine_unit ?isolation_staging_area - isolation_staging_area)
+    (staging_area_prepared ?isolation_staging_area - isolation_staging_area)
+    (staging_area_contains_spare ?isolation_staging_area - isolation_staging_area)
+    (machine_ready_for_deployment ?machine_unit - machine_unit)
+    (associated_machine_assigned_route ?associated_machine_unit - associated_machine_unit ?transport_route - transport_route)
+    (route_prepared_for_transport ?transport_route - transport_route)
+    (route_contains_spare ?transport_route - transport_route)
+    (associated_machine_ready_for_dispatch ?associated_machine_unit - associated_machine_unit)
+    (contingency_package_available ?contingency_package - contingency_package)
+    (contingency_package_staged ?contingency_package - contingency_package)
+    (package_bound_to_staging_area ?contingency_package - contingency_package ?isolation_staging_area - isolation_staging_area)
+    (package_bound_to_route ?contingency_package - contingency_package ?transport_route - transport_route)
+    (package_includes_staging_spare ?contingency_package - contingency_package)
+    (package_includes_route_spare ?contingency_package - contingency_package)
+    (package_quality_checked ?contingency_package - contingency_package)
+    (facility_assigned_to_machine ?repair_facility - repair_facility ?machine_unit - machine_unit)
+    (facility_assigned_to_associated_machine ?repair_facility - repair_facility ?associated_machine_unit - associated_machine_unit)
+    (facility_assigned_package ?repair_facility - repair_facility ?contingency_package - contingency_package)
+    (inspection_batch_available ?inspection_batch - inspection_batch)
+    (facility_has_inspection_batch ?repair_facility - repair_facility ?inspection_batch - inspection_batch)
+    (inspection_batch_certified ?inspection_batch - inspection_batch)
+    (inspection_batch_bound_to_package ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    (facility_inspection_ready ?repair_facility - repair_facility)
+    (facility_inspection_completed ?repair_facility - repair_facility)
+    (external_validation_performed ?repair_facility - repair_facility)
+    (vendor_contract_activated ?repair_facility - repair_facility)
+    (facility_vendor_authorized ?repair_facility - repair_facility)
+    (inspection_secondary_approval ?repair_facility - repair_facility)
+    (final_readiness_confirmed ?repair_facility - repair_facility)
+    (warranty_or_policy_available ?warranty_or_policy - warranty_or_policy)
+    (facility_bound_to_warranty ?repair_facility - repair_facility ?warranty_or_policy - warranty_or_policy)
+    (facility_warranty_engaged ?repair_facility - repair_facility)
+    (warranty_processing_started ?repair_facility - repair_facility)
+    (warranty_execution_confirmed ?repair_facility - repair_facility)
+    (vendor_contract_available ?vendor_contract - vendor_contract)
+    (facility_bound_to_vendor_contract ?repair_facility - repair_facility ?vendor_contract - vendor_contract)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (facility_bound_to_authorization_token ?repair_facility - repair_facility ?authorization_token - authorization_token)
+    (specialist_tool_available ?specialist_tool - specialist_tool)
+    (facility_bound_to_specialist_tool ?repair_facility - repair_facility ?specialist_tool - specialist_tool)
+    (external_service_provider_available ?external_service_provider - external_service_provider)
+    (facility_bound_to_external_service_provider ?repair_facility - repair_facility ?external_service_provider - external_service_provider)
+    (repair_time_slot_available ?repair_time_slot - repair_time_slot)
+    (entity_reserved_time_slot ?repair_entity - repair_entity ?repair_time_slot - repair_time_slot)
+    (machine_preparation_complete ?machine_unit - machine_unit)
+    (associated_machine_preparation_complete ?associated_machine_unit - associated_machine_unit)
+    (facility_inspection_verification_logged ?repair_facility - repair_facility)
+  )
+  (:action register_incident
+    :parameters (?repair_entity - repair_entity)
+    :precondition
+      (and
+        (not
+          (incident_reported ?repair_entity)
+        )
+        (not
+          (restored_to_service ?repair_entity)
+        )
+      )
+    :effect (incident_reported ?repair_entity)
+  )
+  (:action assign_contingency_provider
+    :parameters (?repair_entity - repair_entity ?contingency_resource_provider - contingency_resource_provider)
+    :precondition
+      (and
+        (incident_reported ?repair_entity)
+        (not
+          (provider_allocated ?repair_entity)
+        )
+        (contingency_provider_available ?contingency_resource_provider)
+      )
+    :effect
+      (and
+        (provider_allocated ?repair_entity)
+        (entity_assigned_provider ?repair_entity ?contingency_resource_provider)
+        (not
+          (contingency_provider_available ?contingency_resource_provider)
+        )
+      )
+  )
+  (:action assign_diagnostic_tool
+    :parameters (?repair_entity - repair_entity ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (incident_reported ?repair_entity)
+        (provider_allocated ?repair_entity)
+        (diagnostic_tool_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_tool_assigned_to_entity ?repair_entity ?diagnostic_tool)
+        (not
+          (diagnostic_tool_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action validate_diagnostic_result
+    :parameters (?repair_entity - repair_entity ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (incident_reported ?repair_entity)
+        (provider_allocated ?repair_entity)
+        (diagnostic_tool_assigned_to_entity ?repair_entity ?diagnostic_tool)
+        (not
+          (diagnosis_validated ?repair_entity)
+        )
+      )
+    :effect (diagnosis_validated ?repair_entity)
+  )
+  (:action release_diagnostic_tool
+    :parameters (?repair_entity - repair_entity ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnostic_tool_assigned_to_entity ?repair_entity ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_tool_available ?diagnostic_tool)
+        (not
+          (diagnostic_tool_assigned_to_entity ?repair_entity ?diagnostic_tool)
+        )
+      )
+  )
+  (:action assign_technician_team
+    :parameters (?repair_entity - repair_entity ?technician_team - technician_team)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_entity)
+        (technician_team_available ?technician_team)
+      )
+    :effect
+      (and
+        (technician_team_assigned_to_entity ?repair_entity ?technician_team)
+        (not
+          (technician_team_available ?technician_team)
+        )
+      )
+  )
+  (:action release_technician_team
+    :parameters (?repair_entity - repair_entity ?technician_team - technician_team)
+    :precondition
+      (and
+        (technician_team_assigned_to_entity ?repair_entity ?technician_team)
+      )
+    :effect
+      (and
+        (technician_team_available ?technician_team)
+        (not
+          (technician_team_assigned_to_entity ?repair_entity ?technician_team)
+        )
+      )
+  )
+  (:action assign_specialist_tool_to_facility
+    :parameters (?repair_facility - repair_facility ?specialist_tool - specialist_tool)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (specialist_tool_available ?specialist_tool)
+      )
+    :effect
+      (and
+        (facility_bound_to_specialist_tool ?repair_facility ?specialist_tool)
+        (not
+          (specialist_tool_available ?specialist_tool)
+        )
+      )
+  )
+  (:action release_specialist_tool_from_facility
+    :parameters (?repair_facility - repair_facility ?specialist_tool - specialist_tool)
+    :precondition
+      (and
+        (facility_bound_to_specialist_tool ?repair_facility ?specialist_tool)
+      )
+    :effect
+      (and
+        (specialist_tool_available ?specialist_tool)
+        (not
+          (facility_bound_to_specialist_tool ?repair_facility ?specialist_tool)
+        )
+      )
+  )
+  (:action assign_external_service_provider_to_facility
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (external_service_provider_available ?external_service_provider)
+      )
+    :effect
+      (and
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (not
+          (external_service_provider_available ?external_service_provider)
+        )
+      )
+  )
+  (:action release_external_service_provider_from_facility
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider)
+    :precondition
+      (and
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+      )
+    :effect
+      (and
+        (external_service_provider_available ?external_service_provider)
+        (not
+          (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        )
+      )
+  )
+  (:action initialize_staging_area
+    :parameters (?machine_unit - machine_unit ?isolation_staging_area - isolation_staging_area ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_validated ?machine_unit)
+        (diagnostic_tool_assigned_to_entity ?machine_unit ?diagnostic_tool)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (not
+          (staging_area_prepared ?isolation_staging_area)
+        )
+        (not
+          (staging_area_contains_spare ?isolation_staging_area)
+        )
+      )
+    :effect (staging_area_prepared ?isolation_staging_area)
+  )
+  (:action perform_containment_and_mark_machine_prepared
+    :parameters (?machine_unit - machine_unit ?isolation_staging_area - isolation_staging_area ?technician_team - technician_team)
+    :precondition
+      (and
+        (diagnosis_validated ?machine_unit)
+        (technician_team_assigned_to_entity ?machine_unit ?technician_team)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (staging_area_prepared ?isolation_staging_area)
+        (not
+          (machine_preparation_complete ?machine_unit)
+        )
+      )
+    :effect
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (machine_ready_for_deployment ?machine_unit)
+      )
+  )
+  (:action allocate_spare_and_mark_machine_prepared
+    :parameters (?machine_unit - machine_unit ?isolation_staging_area - isolation_staging_area ?spare_part - spare_part)
+    :precondition
+      (and
+        (diagnosis_validated ?machine_unit)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (spare_part_available ?spare_part)
+        (not
+          (machine_preparation_complete ?machine_unit)
+        )
+      )
+    :effect
+      (and
+        (staging_area_contains_spare ?isolation_staging_area)
+        (machine_preparation_complete ?machine_unit)
+        (spare_allocated_to_machine ?machine_unit ?spare_part)
+        (not
+          (spare_part_available ?spare_part)
+        )
+      )
+  )
+  (:action process_spare_return_and_confirm_preparation
+    :parameters (?machine_unit - machine_unit ?isolation_staging_area - isolation_staging_area ?diagnostic_tool - diagnostic_tool ?spare_part - spare_part)
+    :precondition
+      (and
+        (diagnosis_validated ?machine_unit)
+        (diagnostic_tool_assigned_to_entity ?machine_unit ?diagnostic_tool)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (staging_area_contains_spare ?isolation_staging_area)
+        (spare_allocated_to_machine ?machine_unit ?spare_part)
+        (not
+          (machine_ready_for_deployment ?machine_unit)
+        )
+      )
+    :effect
+      (and
+        (staging_area_prepared ?isolation_staging_area)
+        (machine_ready_for_deployment ?machine_unit)
+        (spare_part_available ?spare_part)
+        (not
+          (spare_allocated_to_machine ?machine_unit ?spare_part)
+        )
+      )
+  )
+  (:action initialize_transport_route
+    :parameters (?associated_machine_unit - associated_machine_unit ?transport_route - transport_route ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_validated ?associated_machine_unit)
+        (diagnostic_tool_assigned_to_entity ?associated_machine_unit ?diagnostic_tool)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (not
+          (route_prepared_for_transport ?transport_route)
+        )
+        (not
+          (route_contains_spare ?transport_route)
+        )
+      )
+    :effect (route_prepared_for_transport ?transport_route)
+  )
+  (:action deploy_technician_and_mark_associated_prepared
+    :parameters (?associated_machine_unit - associated_machine_unit ?transport_route - transport_route ?technician_team - technician_team)
+    :precondition
+      (and
+        (diagnosis_validated ?associated_machine_unit)
+        (technician_team_assigned_to_entity ?associated_machine_unit ?technician_team)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (route_prepared_for_transport ?transport_route)
+        (not
+          (associated_machine_preparation_complete ?associated_machine_unit)
+        )
+      )
+    :effect
+      (and
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+      )
+  )
+  (:action allocate_spare_and_mark_associated_prepared
+    :parameters (?associated_machine_unit - associated_machine_unit ?transport_route - transport_route ?spare_part - spare_part)
+    :precondition
+      (and
+        (diagnosis_validated ?associated_machine_unit)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (spare_part_available ?spare_part)
+        (not
+          (associated_machine_preparation_complete ?associated_machine_unit)
+        )
+      )
+    :effect
+      (and
+        (route_contains_spare ?transport_route)
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (spare_allocated_to_associated_machine ?associated_machine_unit ?spare_part)
+        (not
+          (spare_part_available ?spare_part)
+        )
+      )
+  )
+  (:action process_spare_return_and_confirm_associated_preparation
+    :parameters (?associated_machine_unit - associated_machine_unit ?transport_route - transport_route ?diagnostic_tool - diagnostic_tool ?spare_part - spare_part)
+    :precondition
+      (and
+        (diagnosis_validated ?associated_machine_unit)
+        (diagnostic_tool_assigned_to_entity ?associated_machine_unit ?diagnostic_tool)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (route_contains_spare ?transport_route)
+        (spare_allocated_to_associated_machine ?associated_machine_unit ?spare_part)
+        (not
+          (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        )
+      )
+    :effect
+      (and
+        (route_prepared_for_transport ?transport_route)
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        (spare_part_available ?spare_part)
+        (not
+          (spare_allocated_to_associated_machine ?associated_machine_unit ?spare_part)
+        )
+      )
+  )
+  (:action stage_contingency_package
+    :parameters (?machine_unit - machine_unit ?associated_machine_unit - associated_machine_unit ?isolation_staging_area - isolation_staging_area ?transport_route - transport_route ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (staging_area_prepared ?isolation_staging_area)
+        (route_prepared_for_transport ?transport_route)
+        (machine_ready_for_deployment ?machine_unit)
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        (contingency_package_available ?contingency_package)
+      )
+    :effect
+      (and
+        (contingency_package_staged ?contingency_package)
+        (package_bound_to_staging_area ?contingency_package ?isolation_staging_area)
+        (package_bound_to_route ?contingency_package ?transport_route)
+        (not
+          (contingency_package_available ?contingency_package)
+        )
+      )
+  )
+  (:action stage_package_with_area_spare
+    :parameters (?machine_unit - machine_unit ?associated_machine_unit - associated_machine_unit ?isolation_staging_area - isolation_staging_area ?transport_route - transport_route ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (staging_area_contains_spare ?isolation_staging_area)
+        (route_prepared_for_transport ?transport_route)
+        (not
+          (machine_ready_for_deployment ?machine_unit)
+        )
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        (contingency_package_available ?contingency_package)
+      )
+    :effect
+      (and
+        (contingency_package_staged ?contingency_package)
+        (package_bound_to_staging_area ?contingency_package ?isolation_staging_area)
+        (package_bound_to_route ?contingency_package ?transport_route)
+        (package_includes_staging_spare ?contingency_package)
+        (not
+          (contingency_package_available ?contingency_package)
+        )
+      )
+  )
+  (:action stage_package_with_route_spare
+    :parameters (?machine_unit - machine_unit ?associated_machine_unit - associated_machine_unit ?isolation_staging_area - isolation_staging_area ?transport_route - transport_route ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (staging_area_prepared ?isolation_staging_area)
+        (route_contains_spare ?transport_route)
+        (machine_ready_for_deployment ?machine_unit)
+        (not
+          (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        )
+        (contingency_package_available ?contingency_package)
+      )
+    :effect
+      (and
+        (contingency_package_staged ?contingency_package)
+        (package_bound_to_staging_area ?contingency_package ?isolation_staging_area)
+        (package_bound_to_route ?contingency_package ?transport_route)
+        (package_includes_route_spare ?contingency_package)
+        (not
+          (contingency_package_available ?contingency_package)
+        )
+      )
+  )
+  (:action stage_package_with_combined_spare_options
+    :parameters (?machine_unit - machine_unit ?associated_machine_unit - associated_machine_unit ?isolation_staging_area - isolation_staging_area ?transport_route - transport_route ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (machine_staged_at_area ?machine_unit ?isolation_staging_area)
+        (associated_machine_assigned_route ?associated_machine_unit ?transport_route)
+        (staging_area_contains_spare ?isolation_staging_area)
+        (route_contains_spare ?transport_route)
+        (not
+          (machine_ready_for_deployment ?machine_unit)
+        )
+        (not
+          (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        )
+        (contingency_package_available ?contingency_package)
+      )
+    :effect
+      (and
+        (contingency_package_staged ?contingency_package)
+        (package_bound_to_staging_area ?contingency_package ?isolation_staging_area)
+        (package_bound_to_route ?contingency_package ?transport_route)
+        (package_includes_staging_spare ?contingency_package)
+        (package_includes_route_spare ?contingency_package)
+        (not
+          (contingency_package_available ?contingency_package)
+        )
+      )
+  )
+  (:action finalize_contingency_package
+    :parameters (?contingency_package - contingency_package ?machine_unit - machine_unit ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (contingency_package_staged ?contingency_package)
+        (machine_preparation_complete ?machine_unit)
+        (diagnostic_tool_assigned_to_entity ?machine_unit ?diagnostic_tool)
+        (not
+          (package_quality_checked ?contingency_package)
+        )
+      )
+    :effect (package_quality_checked ?contingency_package)
+  )
+  (:action perform_inspection_batch_certification
+    :parameters (?repair_facility - repair_facility ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (facility_assigned_package ?repair_facility ?contingency_package)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_available ?inspection_batch)
+        (contingency_package_staged ?contingency_package)
+        (package_quality_checked ?contingency_package)
+        (not
+          (inspection_batch_certified ?inspection_batch)
+        )
+      )
+    :effect
+      (and
+        (inspection_batch_certified ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (not
+          (inspection_batch_available ?inspection_batch)
+        )
+      )
+  )
+  (:action prepare_facility_for_inspection
+    :parameters (?repair_facility - repair_facility ?inspection_batch - inspection_batch ?contingency_package - contingency_package ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_certified ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (diagnostic_tool_assigned_to_entity ?repair_facility ?diagnostic_tool)
+        (not
+          (package_includes_staging_spare ?contingency_package)
+        )
+        (not
+          (facility_inspection_ready ?repair_facility)
+        )
+      )
+    :effect (facility_inspection_ready ?repair_facility)
+  )
+  (:action assign_vendor_contract_to_facility
+    :parameters (?repair_facility - repair_facility ?vendor_contract - vendor_contract)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (vendor_contract_available ?vendor_contract)
+        (not
+          (vendor_contract_activated ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (vendor_contract_activated ?repair_facility)
+        (facility_bound_to_vendor_contract ?repair_facility ?vendor_contract)
+        (not
+          (vendor_contract_available ?vendor_contract)
+        )
+      )
+  )
+  (:action authorize_facility_with_vendor_contract
+    :parameters (?repair_facility - repair_facility ?inspection_batch - inspection_batch ?contingency_package - contingency_package ?diagnostic_tool - diagnostic_tool ?vendor_contract - vendor_contract)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_certified ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (diagnostic_tool_assigned_to_entity ?repair_facility ?diagnostic_tool)
+        (package_includes_staging_spare ?contingency_package)
+        (vendor_contract_activated ?repair_facility)
+        (facility_bound_to_vendor_contract ?repair_facility ?vendor_contract)
+        (not
+          (facility_inspection_ready ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_inspection_ready ?repair_facility)
+        (facility_vendor_authorized ?repair_facility)
+      )
+  )
+  (:action perform_specialist_tool_inspection
+    :parameters (?repair_facility - repair_facility ?specialist_tool - specialist_tool ?technician_team - technician_team ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_ready ?repair_facility)
+        (facility_bound_to_specialist_tool ?repair_facility ?specialist_tool)
+        (technician_team_assigned_to_entity ?repair_facility ?technician_team)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (not
+          (package_includes_route_spare ?contingency_package)
+        )
+        (not
+          (facility_inspection_completed ?repair_facility)
+        )
+      )
+    :effect (facility_inspection_completed ?repair_facility)
+  )
+  (:action perform_specialist_tool_inspection_variant
+    :parameters (?repair_facility - repair_facility ?specialist_tool - specialist_tool ?technician_team - technician_team ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_ready ?repair_facility)
+        (facility_bound_to_specialist_tool ?repair_facility ?specialist_tool)
+        (technician_team_assigned_to_entity ?repair_facility ?technician_team)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (package_includes_route_spare ?contingency_package)
+        (not
+          (facility_inspection_completed ?repair_facility)
+        )
+      )
+    :effect (facility_inspection_completed ?repair_facility)
+  )
+  (:action engage_external_service_validation
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_completed ?repair_facility)
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (not
+          (package_includes_staging_spare ?contingency_package)
+        )
+        (not
+          (package_includes_route_spare ?contingency_package)
+        )
+        (not
+          (external_validation_performed ?repair_facility)
+        )
+      )
+    :effect (external_validation_performed ?repair_facility)
+  )
+  (:action engage_external_service_validation_with_secondary_approval
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_completed ?repair_facility)
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (package_includes_staging_spare ?contingency_package)
+        (not
+          (package_includes_route_spare ?contingency_package)
+        )
+        (not
+          (external_validation_performed ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (external_validation_performed ?repair_facility)
+        (inspection_secondary_approval ?repair_facility)
+      )
+  )
+  (:action engage_external_service_validation_variant_b
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_completed ?repair_facility)
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (not
+          (package_includes_staging_spare ?contingency_package)
+        )
+        (package_includes_route_spare ?contingency_package)
+        (not
+          (external_validation_performed ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (external_validation_performed ?repair_facility)
+        (inspection_secondary_approval ?repair_facility)
+      )
+  )
+  (:action engage_external_service_full_validation
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider ?inspection_batch - inspection_batch ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (facility_inspection_completed ?repair_facility)
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (facility_has_inspection_batch ?repair_facility ?inspection_batch)
+        (inspection_batch_bound_to_package ?inspection_batch ?contingency_package)
+        (package_includes_staging_spare ?contingency_package)
+        (package_includes_route_spare ?contingency_package)
+        (not
+          (external_validation_performed ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (external_validation_performed ?repair_facility)
+        (inspection_secondary_approval ?repair_facility)
+      )
+  )
+  (:action log_inspection_verification_and_authorize_repair
+    :parameters (?repair_facility - repair_facility)
+    :precondition
+      (and
+        (external_validation_performed ?repair_facility)
+        (not
+          (inspection_secondary_approval ?repair_facility)
+        )
+        (not
+          (facility_inspection_verification_logged ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_inspection_verification_logged ?repair_facility)
+        (repair_authorization_granted ?repair_facility)
+      )
+  )
+  (:action assign_authorization_token_to_facility
+    :parameters (?repair_facility - repair_facility ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (external_validation_performed ?repair_facility)
+        (inspection_secondary_approval ?repair_facility)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (facility_bound_to_authorization_token ?repair_facility ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action perform_final_checks_before_repair
+    :parameters (?repair_facility - repair_facility ?machine_unit - machine_unit ?associated_machine_unit - associated_machine_unit ?diagnostic_tool - diagnostic_tool ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (external_validation_performed ?repair_facility)
+        (inspection_secondary_approval ?repair_facility)
+        (facility_bound_to_authorization_token ?repair_facility ?authorization_token)
+        (facility_assigned_to_machine ?repair_facility ?machine_unit)
+        (facility_assigned_to_associated_machine ?repair_facility ?associated_machine_unit)
+        (machine_ready_for_deployment ?machine_unit)
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        (diagnostic_tool_assigned_to_entity ?repair_facility ?diagnostic_tool)
+        (not
+          (final_readiness_confirmed ?repair_facility)
+        )
+      )
+    :effect (final_readiness_confirmed ?repair_facility)
+  )
+  (:action finalize_verification_and_authorize_repair
+    :parameters (?repair_facility - repair_facility)
+    :precondition
+      (and
+        (external_validation_performed ?repair_facility)
+        (final_readiness_confirmed ?repair_facility)
+        (not
+          (facility_inspection_verification_logged ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_inspection_verification_logged ?repair_facility)
+        (repair_authorization_granted ?repair_facility)
+      )
+  )
+  (:action activate_warranty_for_facility
+    :parameters (?repair_facility - repair_facility ?warranty_or_policy - warranty_or_policy ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnosis_validated ?repair_facility)
+        (diagnostic_tool_assigned_to_entity ?repair_facility ?diagnostic_tool)
+        (warranty_or_policy_available ?warranty_or_policy)
+        (facility_bound_to_warranty ?repair_facility ?warranty_or_policy)
+        (not
+          (facility_warranty_engaged ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_warranty_engaged ?repair_facility)
+        (not
+          (warranty_or_policy_available ?warranty_or_policy)
+        )
+      )
+  )
+  (:action start_warranty_processing_for_facility
+    :parameters (?repair_facility - repair_facility ?technician_team - technician_team)
+    :precondition
+      (and
+        (facility_warranty_engaged ?repair_facility)
+        (technician_team_assigned_to_entity ?repair_facility ?technician_team)
+        (not
+          (warranty_processing_started ?repair_facility)
+        )
+      )
+    :effect (warranty_processing_started ?repair_facility)
+  )
+  (:action confirm_warranty_execution
+    :parameters (?repair_facility - repair_facility ?external_service_provider - external_service_provider)
+    :precondition
+      (and
+        (warranty_processing_started ?repair_facility)
+        (facility_bound_to_external_service_provider ?repair_facility ?external_service_provider)
+        (not
+          (warranty_execution_confirmed ?repair_facility)
+        )
+      )
+    :effect (warranty_execution_confirmed ?repair_facility)
+  )
+  (:action finalize_warranty_and_authorize_repair
+    :parameters (?repair_facility - repair_facility)
+    :precondition
+      (and
+        (warranty_execution_confirmed ?repair_facility)
+        (not
+          (facility_inspection_verification_logged ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_inspection_verification_logged ?repair_facility)
+        (repair_authorization_granted ?repair_facility)
+      )
+  )
+  (:action finalize_machine_repair_with_package
+    :parameters (?machine_unit - machine_unit ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (machine_preparation_complete ?machine_unit)
+        (machine_ready_for_deployment ?machine_unit)
+        (contingency_package_staged ?contingency_package)
+        (package_quality_checked ?contingency_package)
+        (not
+          (repair_authorization_granted ?machine_unit)
+        )
+      )
+    :effect (repair_authorization_granted ?machine_unit)
+  )
+  (:action finalize_associated_machine_repair_with_package
+    :parameters (?associated_machine_unit - associated_machine_unit ?contingency_package - contingency_package)
+    :precondition
+      (and
+        (associated_machine_preparation_complete ?associated_machine_unit)
+        (associated_machine_ready_for_dispatch ?associated_machine_unit)
+        (contingency_package_staged ?contingency_package)
+        (package_quality_checked ?contingency_package)
+        (not
+          (repair_authorization_granted ?associated_machine_unit)
+        )
+      )
+    :effect (repair_authorization_granted ?associated_machine_unit)
+  )
+  (:action reserve_repair_time_slot
+    :parameters (?repair_entity - repair_entity ?repair_time_slot - repair_time_slot ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (repair_authorization_granted ?repair_entity)
+        (diagnostic_tool_assigned_to_entity ?repair_entity ?diagnostic_tool)
+        (repair_time_slot_available ?repair_time_slot)
+        (not
+          (repair_scheduled ?repair_entity)
+        )
+      )
+    :effect
+      (and
+        (repair_scheduled ?repair_entity)
+        (entity_reserved_time_slot ?repair_entity ?repair_time_slot)
+        (not
+          (repair_time_slot_available ?repair_time_slot)
+        )
+      )
+  )
+  (:action perform_repair_and_release_resources
+    :parameters (?machine_unit - machine_unit ?contingency_resource_provider - contingency_resource_provider ?repair_time_slot - repair_time_slot)
+    :precondition
+      (and
+        (repair_scheduled ?machine_unit)
+        (entity_assigned_provider ?machine_unit ?contingency_resource_provider)
+        (entity_reserved_time_slot ?machine_unit ?repair_time_slot)
+        (not
+          (restored_to_service ?machine_unit)
+        )
+      )
+    :effect
+      (and
+        (restored_to_service ?machine_unit)
+        (contingency_provider_available ?contingency_resource_provider)
+        (repair_time_slot_available ?repair_time_slot)
+      )
+  )
+  (:action perform_associated_repair_and_release_resources
+    :parameters (?associated_machine_unit - associated_machine_unit ?contingency_resource_provider - contingency_resource_provider ?repair_time_slot - repair_time_slot)
+    :precondition
+      (and
+        (repair_scheduled ?associated_machine_unit)
+        (entity_assigned_provider ?associated_machine_unit ?contingency_resource_provider)
+        (entity_reserved_time_slot ?associated_machine_unit ?repair_time_slot)
+        (not
+          (restored_to_service ?associated_machine_unit)
+        )
+      )
+    :effect
+      (and
+        (restored_to_service ?associated_machine_unit)
+        (contingency_provider_available ?contingency_resource_provider)
+        (repair_time_slot_available ?repair_time_slot)
+      )
+  )
+  (:action perform_repair_and_release_resources_at_facility
+    :parameters (?repair_facility - repair_facility ?contingency_resource_provider - contingency_resource_provider ?repair_time_slot - repair_time_slot)
+    :precondition
+      (and
+        (repair_scheduled ?repair_facility)
+        (entity_assigned_provider ?repair_facility ?contingency_resource_provider)
+        (entity_reserved_time_slot ?repair_facility ?repair_time_slot)
+        (not
+          (restored_to_service ?repair_facility)
+        )
+      )
+    :effect
+      (and
+        (restored_to_service ?repair_facility)
+        (contingency_provider_available ?contingency_resource_provider)
+        (repair_time_slot_available ?repair_time_slot)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem farm_machinery_breakdown_case)
+  (:domain machinery_breakdown_workaround_planning)
+  (:objects combine_harvester_01 - machine_unit field_tractor_02 - associated_machine_unit maintenance_facility_alpha - repair_facility maintenance_facility_beta - repair_facility local_spare_provider_a - contingency_resource_provider local_spare_provider_b - contingency_resource_provider regional_spare_provider_c - contingency_resource_provider diagnostic_tool_01 - diagnostic_tool technician_team_alpha - technician_team spare_fuel_pump_01 - spare_part isolation_staging_area_north - isolation_staging_area transport_route_1 - transport_route contingency_package_kit_1 - contingency_package inspection_batch_a - inspection_batch inspection_batch_b - inspection_batch vendor_contract_zenith - vendor_contract vendor_contract_apex - vendor_contract auth_token_alpha - authorization_token auth_token_beta - authorization_token repair_time_slot_0800 - repair_time_slot torque_calibration_kit - specialist_tool warranty_policy_standard - warranty_or_policy warranty_policy_extended - warranty_or_policy external_service_contractor_x - external_service_provider)
+  (:init
+    (contingency_provider_available local_spare_provider_a)
+    (contingency_provider_available local_spare_provider_b)
+    (contingency_provider_available regional_spare_provider_c)
+    (diagnostic_tool_available diagnostic_tool_01)
+    (technician_team_available technician_team_alpha)
+    (spare_part_available spare_fuel_pump_01)
+    (machine_staged_at_area combine_harvester_01 isolation_staging_area_north)
+    (associated_machine_assigned_route field_tractor_02 transport_route_1)
+    (contingency_package_available contingency_package_kit_1)
+    (inspection_batch_available inspection_batch_a)
+    (inspection_batch_available inspection_batch_b)
+    (facility_assigned_to_machine maintenance_facility_alpha combine_harvester_01)
+    (facility_assigned_to_machine maintenance_facility_beta combine_harvester_01)
+    (facility_assigned_to_associated_machine maintenance_facility_alpha field_tractor_02)
+    (facility_assigned_to_associated_machine maintenance_facility_beta field_tractor_02)
+    (facility_assigned_package maintenance_facility_alpha contingency_package_kit_1)
+    (facility_assigned_package maintenance_facility_beta contingency_package_kit_1)
+    (facility_has_inspection_batch maintenance_facility_alpha inspection_batch_a)
+    (facility_has_inspection_batch maintenance_facility_beta inspection_batch_b)
+    (vendor_contract_available vendor_contract_zenith)
+    (vendor_contract_available vendor_contract_apex)
+    (authorization_token_available auth_token_alpha)
+    (authorization_token_available auth_token_beta)
+    (repair_time_slot_available repair_time_slot_0800)
+    (specialist_tool_available torque_calibration_kit)
+    (warranty_or_policy_available warranty_policy_standard)
+    (facility_bound_to_warranty maintenance_facility_alpha warranty_policy_standard)
+    (facility_bound_to_warranty maintenance_facility_beta warranty_policy_extended)
+    (external_service_provider_available external_service_contractor_x)
+  )
+  (:goal
+    (and
+      (restored_to_service combine_harvester_01)
+      (restored_to_service field_tractor_02)
+      (restored_to_service maintenance_facility_alpha)
+      (restored_to_service maintenance_facility_beta)
+    )
+  )
+)

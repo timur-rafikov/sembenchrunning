@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_patient_specific_labeling_and_instruction_generation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object formulary_domain - generic_object product_domain - generic_object human_resource_domain - generic_object prescription_domain - generic_object prescription_item - prescription_domain formulary_option - formulary_domain drug_product - formulary_domain authorized_reviewer - formulary_domain language_preference - formulary_domain instruction_variant - formulary_domain authorization_token - formulary_domain packaging_device - formulary_domain counseling_record - formulary_domain accessory_material - product_domain patient_data_profile - product_domain external_signature_reference - product_domain container_type - human_resource_domain packaging_unit - human_resource_domain label_template - human_resource_domain preparation_role_group - prescription_item verification_role_group - prescription_item preparation_station - preparation_role_group labeling_station - preparation_role_group pharmacy_operator - verification_role_group)
+
+  (:predicates
+    (prescription_intake_registered ?prescription_item - prescription_item)
+    (ready_for_review ?prescription_item - prescription_item)
+    (formulary_assignment_made ?prescription_item - prescription_item)
+    (dispense_authorized ?prescription_item - prescription_item)
+    (labeling_completed ?prescription_item - prescription_item)
+    (instructions_generated ?prescription_item - prescription_item)
+    (formulary_option_available ?formulary_option - formulary_option)
+    (formulary_option_assigned ?prescription_item - prescription_item ?formulary_option - formulary_option)
+    (drug_product_available ?drug_product - drug_product)
+    (product_assigned ?prescription_item - prescription_item ?drug_product - drug_product)
+    (reviewer_available ?authorized_reviewer - authorized_reviewer)
+    (prescription_reviewer_assigned ?prescription_item - prescription_item ?authorized_reviewer - authorized_reviewer)
+    (accessory_material_available ?accessory_material - accessory_material)
+    (preparation_station_material_allocated ?preparation_station - preparation_station ?accessory_material - accessory_material)
+    (labeling_station_material_allocated ?labeling_station - labeling_station ?accessory_material - accessory_material)
+    (preparation_station_container_binding ?preparation_station - preparation_station ?container_type - container_type)
+    (container_reserved ?container_type - container_type)
+    (container_alternative_allocated ?container_type - container_type)
+    (preparation_station_packaging_ready ?preparation_station - preparation_station)
+    (labeling_station_packaging_unit_assigned ?labeling_station - labeling_station ?packaging_unit - packaging_unit)
+    (packaging_unit_reserved ?packaging_unit - packaging_unit)
+    (packaging_unit_allocated ?packaging_unit - packaging_unit)
+    (labeling_station_packaging_ready ?labeling_station - labeling_station)
+    (label_template_available ?label_template - label_template)
+    (label_template_bound ?label_template - label_template)
+    (label_template_bound_to_container ?label_template - label_template ?container_type - container_type)
+    (label_template_bound_to_packaging_unit ?label_template - label_template ?packaging_unit - packaging_unit)
+    (label_template_language_attribute_set ?label_template - label_template)
+    (label_template_variant_attribute_set ?label_template - label_template)
+    (label_instance_generated ?label_template - label_template)
+    (operator_assigned_to_preparation_station ?pharmacy_operator - pharmacy_operator ?preparation_station - preparation_station)
+    (operator_assigned_to_labeling_station ?pharmacy_operator - pharmacy_operator ?labeling_station - labeling_station)
+    (operator_assigned_to_template ?pharmacy_operator - pharmacy_operator ?label_template - label_template)
+    (patient_data_profile_available ?patient_data_profile - patient_data_profile)
+    (operator_has_patient_data_profile ?pharmacy_operator - pharmacy_operator ?patient_data_profile - patient_data_profile)
+    (patient_data_profile_attached ?patient_data_profile - patient_data_profile)
+    (patient_profile_bound_to_template ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    (operator_template_validated ?pharmacy_operator - pharmacy_operator)
+    (operator_print_prepared ?pharmacy_operator - pharmacy_operator)
+    (operator_verification_completed ?pharmacy_operator - pharmacy_operator)
+    (operator_language_selected ?pharmacy_operator - pharmacy_operator)
+    (operator_language_bound ?pharmacy_operator - pharmacy_operator)
+    (operator_instruction_variant_assigned ?pharmacy_operator - pharmacy_operator)
+    (operator_packaging_verification_completed ?pharmacy_operator - pharmacy_operator)
+    (external_signature_available ?external_signature_reference - external_signature_reference)
+    (operator_external_signature_associated ?pharmacy_operator - pharmacy_operator ?external_signature_reference - external_signature_reference)
+    (operator_external_approval_recorded ?pharmacy_operator - pharmacy_operator)
+    (operator_signature_capture_initiated ?pharmacy_operator - pharmacy_operator)
+    (operator_signature_captured ?pharmacy_operator - pharmacy_operator)
+    (language_preference_available ?language_preference - language_preference)
+    (operator_language_assigned ?pharmacy_operator - pharmacy_operator ?language_preference - language_preference)
+    (instruction_variant_available ?instruction_variant - instruction_variant)
+    (operator_bound_instruction_variant ?pharmacy_operator - pharmacy_operator ?instruction_variant - instruction_variant)
+    (packaging_device_available ?packaging_device - packaging_device)
+    (operator_packaging_device_assigned ?pharmacy_operator - pharmacy_operator ?packaging_device - packaging_device)
+    (counseling_record_available ?counseling_record - counseling_record)
+    (operator_counseling_record_associated ?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (authorization_associated ?prescription_item - prescription_item ?authorization_token - authorization_token)
+    (preparation_station_material_reserved ?preparation_station - preparation_station)
+    (labeling_station_material_reserved ?labeling_station - labeling_station)
+    (operator_signoff_recorded ?pharmacy_operator - pharmacy_operator)
+  )
+  (:action register_prescription_intake
+    :parameters (?prescription_item - prescription_item)
+    :precondition
+      (and
+        (not
+          (prescription_intake_registered ?prescription_item)
+        )
+        (not
+          (dispense_authorized ?prescription_item)
+        )
+      )
+    :effect (prescription_intake_registered ?prescription_item)
+  )
+  (:action assign_formulary_option_to_prescription
+    :parameters (?prescription_item - prescription_item ?formulary_option - formulary_option)
+    :precondition
+      (and
+        (prescription_intake_registered ?prescription_item)
+        (not
+          (formulary_assignment_made ?prescription_item)
+        )
+        (formulary_option_available ?formulary_option)
+      )
+    :effect
+      (and
+        (formulary_assignment_made ?prescription_item)
+        (formulary_option_assigned ?prescription_item ?formulary_option)
+        (not
+          (formulary_option_available ?formulary_option)
+        )
+      )
+  )
+  (:action select_drug_product_for_prescription
+    :parameters (?prescription_item - prescription_item ?drug_product - drug_product)
+    :precondition
+      (and
+        (prescription_intake_registered ?prescription_item)
+        (formulary_assignment_made ?prescription_item)
+        (drug_product_available ?drug_product)
+      )
+    :effect
+      (and
+        (product_assigned ?prescription_item ?drug_product)
+        (not
+          (drug_product_available ?drug_product)
+        )
+      )
+  )
+  (:action finalize_product_selection_for_review
+    :parameters (?prescription_item - prescription_item ?drug_product - drug_product)
+    :precondition
+      (and
+        (prescription_intake_registered ?prescription_item)
+        (formulary_assignment_made ?prescription_item)
+        (product_assigned ?prescription_item ?drug_product)
+        (not
+          (ready_for_review ?prescription_item)
+        )
+      )
+    :effect (ready_for_review ?prescription_item)
+  )
+  (:action release_drug_product_assignment
+    :parameters (?prescription_item - prescription_item ?drug_product - drug_product)
+    :precondition
+      (and
+        (product_assigned ?prescription_item ?drug_product)
+      )
+    :effect
+      (and
+        (drug_product_available ?drug_product)
+        (not
+          (product_assigned ?prescription_item ?drug_product)
+        )
+      )
+  )
+  (:action assign_authorized_reviewer
+    :parameters (?prescription_item - prescription_item ?authorized_reviewer - authorized_reviewer)
+    :precondition
+      (and
+        (ready_for_review ?prescription_item)
+        (reviewer_available ?authorized_reviewer)
+      )
+    :effect
+      (and
+        (prescription_reviewer_assigned ?prescription_item ?authorized_reviewer)
+        (not
+          (reviewer_available ?authorized_reviewer)
+        )
+      )
+  )
+  (:action unassign_authorized_reviewer
+    :parameters (?prescription_item - prescription_item ?authorized_reviewer - authorized_reviewer)
+    :precondition
+      (and
+        (prescription_reviewer_assigned ?prescription_item ?authorized_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?authorized_reviewer)
+        (not
+          (prescription_reviewer_assigned ?prescription_item ?authorized_reviewer)
+        )
+      )
+  )
+  (:action assign_packaging_device_to_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?packaging_device - packaging_device)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (packaging_device_available ?packaging_device)
+      )
+    :effect
+      (and
+        (operator_packaging_device_assigned ?pharmacy_operator ?packaging_device)
+        (not
+          (packaging_device_available ?packaging_device)
+        )
+      )
+  )
+  (:action release_packaging_device_from_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?packaging_device - packaging_device)
+    :precondition
+      (and
+        (operator_packaging_device_assigned ?pharmacy_operator ?packaging_device)
+      )
+    :effect
+      (and
+        (packaging_device_available ?packaging_device)
+        (not
+          (operator_packaging_device_assigned ?pharmacy_operator ?packaging_device)
+        )
+      )
+  )
+  (:action assign_counseling_record_to_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (counseling_record_available ?counseling_record)
+      )
+    :effect
+      (and
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (not
+          (counseling_record_available ?counseling_record)
+        )
+      )
+  )
+  (:action release_counseling_record_from_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record)
+    :precondition
+      (and
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+      )
+    :effect
+      (and
+        (counseling_record_available ?counseling_record)
+        (not
+          (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        )
+      )
+  )
+  (:action reserve_container_for_preparation_station
+    :parameters (?preparation_station - preparation_station ?container_type - container_type ?drug_product - drug_product)
+    :precondition
+      (and
+        (ready_for_review ?preparation_station)
+        (product_assigned ?preparation_station ?drug_product)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (not
+          (container_reserved ?container_type)
+        )
+        (not
+          (container_alternative_allocated ?container_type)
+        )
+      )
+    :effect (container_reserved ?container_type)
+  )
+  (:action confirm_container_allocation_at_preparation_station
+    :parameters (?preparation_station - preparation_station ?container_type - container_type ?authorized_reviewer - authorized_reviewer)
+    :precondition
+      (and
+        (ready_for_review ?preparation_station)
+        (prescription_reviewer_assigned ?preparation_station ?authorized_reviewer)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (container_reserved ?container_type)
+        (not
+          (preparation_station_material_reserved ?preparation_station)
+        )
+      )
+    :effect
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (preparation_station_packaging_ready ?preparation_station)
+      )
+  )
+  (:action allocate_accessory_material_to_preparation_station
+    :parameters (?preparation_station - preparation_station ?container_type - container_type ?accessory_material - accessory_material)
+    :precondition
+      (and
+        (ready_for_review ?preparation_station)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (accessory_material_available ?accessory_material)
+        (not
+          (preparation_station_material_reserved ?preparation_station)
+        )
+      )
+    :effect
+      (and
+        (container_alternative_allocated ?container_type)
+        (preparation_station_material_reserved ?preparation_station)
+        (preparation_station_material_allocated ?preparation_station ?accessory_material)
+        (not
+          (accessory_material_available ?accessory_material)
+        )
+      )
+  )
+  (:action finalize_preparation_station_materials
+    :parameters (?preparation_station - preparation_station ?container_type - container_type ?drug_product - drug_product ?accessory_material - accessory_material)
+    :precondition
+      (and
+        (ready_for_review ?preparation_station)
+        (product_assigned ?preparation_station ?drug_product)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (container_alternative_allocated ?container_type)
+        (preparation_station_material_allocated ?preparation_station ?accessory_material)
+        (not
+          (preparation_station_packaging_ready ?preparation_station)
+        )
+      )
+    :effect
+      (and
+        (container_reserved ?container_type)
+        (preparation_station_packaging_ready ?preparation_station)
+        (accessory_material_available ?accessory_material)
+        (not
+          (preparation_station_material_allocated ?preparation_station ?accessory_material)
+        )
+      )
+  )
+  (:action reserve_packaging_unit_for_labeling_station
+    :parameters (?labeling_station - labeling_station ?packaging_unit - packaging_unit ?drug_product - drug_product)
+    :precondition
+      (and
+        (ready_for_review ?labeling_station)
+        (product_assigned ?labeling_station ?drug_product)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (not
+          (packaging_unit_reserved ?packaging_unit)
+        )
+        (not
+          (packaging_unit_allocated ?packaging_unit)
+        )
+      )
+    :effect (packaging_unit_reserved ?packaging_unit)
+  )
+  (:action confirm_packaging_unit_assignment_for_labeling_station
+    :parameters (?labeling_station - labeling_station ?packaging_unit - packaging_unit ?authorized_reviewer - authorized_reviewer)
+    :precondition
+      (and
+        (ready_for_review ?labeling_station)
+        (prescription_reviewer_assigned ?labeling_station ?authorized_reviewer)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (packaging_unit_reserved ?packaging_unit)
+        (not
+          (labeling_station_material_reserved ?labeling_station)
+        )
+      )
+    :effect
+      (and
+        (labeling_station_material_reserved ?labeling_station)
+        (labeling_station_packaging_ready ?labeling_station)
+      )
+  )
+  (:action allocate_accessory_material_to_labeling_station
+    :parameters (?labeling_station - labeling_station ?packaging_unit - packaging_unit ?accessory_material - accessory_material)
+    :precondition
+      (and
+        (ready_for_review ?labeling_station)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (accessory_material_available ?accessory_material)
+        (not
+          (labeling_station_material_reserved ?labeling_station)
+        )
+      )
+    :effect
+      (and
+        (packaging_unit_allocated ?packaging_unit)
+        (labeling_station_material_reserved ?labeling_station)
+        (labeling_station_material_allocated ?labeling_station ?accessory_material)
+        (not
+          (accessory_material_available ?accessory_material)
+        )
+      )
+  )
+  (:action finalize_labeling_station_materials
+    :parameters (?labeling_station - labeling_station ?packaging_unit - packaging_unit ?drug_product - drug_product ?accessory_material - accessory_material)
+    :precondition
+      (and
+        (ready_for_review ?labeling_station)
+        (product_assigned ?labeling_station ?drug_product)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (packaging_unit_allocated ?packaging_unit)
+        (labeling_station_material_allocated ?labeling_station ?accessory_material)
+        (not
+          (labeling_station_packaging_ready ?labeling_station)
+        )
+      )
+    :effect
+      (and
+        (packaging_unit_reserved ?packaging_unit)
+        (labeling_station_packaging_ready ?labeling_station)
+        (accessory_material_available ?accessory_material)
+        (not
+          (labeling_station_material_allocated ?labeling_station ?accessory_material)
+        )
+      )
+  )
+  (:action bind_label_template_to_package_instance
+    :parameters (?preparation_station - preparation_station ?labeling_station - labeling_station ?container_type - container_type ?packaging_unit - packaging_unit ?label_template - label_template)
+    :precondition
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (labeling_station_material_reserved ?labeling_station)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (container_reserved ?container_type)
+        (packaging_unit_reserved ?packaging_unit)
+        (preparation_station_packaging_ready ?preparation_station)
+        (labeling_station_packaging_ready ?labeling_station)
+        (label_template_available ?label_template)
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_bound_to_container ?label_template ?container_type)
+        (label_template_bound_to_packaging_unit ?label_template ?packaging_unit)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action bind_label_template_with_language_attribute
+    :parameters (?preparation_station - preparation_station ?labeling_station - labeling_station ?container_type - container_type ?packaging_unit - packaging_unit ?label_template - label_template)
+    :precondition
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (labeling_station_material_reserved ?labeling_station)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (container_alternative_allocated ?container_type)
+        (packaging_unit_reserved ?packaging_unit)
+        (not
+          (preparation_station_packaging_ready ?preparation_station)
+        )
+        (labeling_station_packaging_ready ?labeling_station)
+        (label_template_available ?label_template)
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_bound_to_container ?label_template ?container_type)
+        (label_template_bound_to_packaging_unit ?label_template ?packaging_unit)
+        (label_template_language_attribute_set ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action bind_label_template_with_variant_attribute
+    :parameters (?preparation_station - preparation_station ?labeling_station - labeling_station ?container_type - container_type ?packaging_unit - packaging_unit ?label_template - label_template)
+    :precondition
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (labeling_station_material_reserved ?labeling_station)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (container_reserved ?container_type)
+        (packaging_unit_allocated ?packaging_unit)
+        (preparation_station_packaging_ready ?preparation_station)
+        (not
+          (labeling_station_packaging_ready ?labeling_station)
+        )
+        (label_template_available ?label_template)
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_bound_to_container ?label_template ?container_type)
+        (label_template_bound_to_packaging_unit ?label_template ?packaging_unit)
+        (label_template_variant_attribute_set ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action bind_label_template_with_language_and_variant_attributes
+    :parameters (?preparation_station - preparation_station ?labeling_station - labeling_station ?container_type - container_type ?packaging_unit - packaging_unit ?label_template - label_template)
+    :precondition
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (labeling_station_material_reserved ?labeling_station)
+        (preparation_station_container_binding ?preparation_station ?container_type)
+        (labeling_station_packaging_unit_assigned ?labeling_station ?packaging_unit)
+        (container_alternative_allocated ?container_type)
+        (packaging_unit_allocated ?packaging_unit)
+        (not
+          (preparation_station_packaging_ready ?preparation_station)
+        )
+        (not
+          (labeling_station_packaging_ready ?labeling_station)
+        )
+        (label_template_available ?label_template)
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_bound_to_container ?label_template ?container_type)
+        (label_template_bound_to_packaging_unit ?label_template ?packaging_unit)
+        (label_template_language_attribute_set ?label_template)
+        (label_template_variant_attribute_set ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action generate_label_instance
+    :parameters (?label_template - label_template ?preparation_station - preparation_station ?drug_product - drug_product)
+    :precondition
+      (and
+        (label_template_bound ?label_template)
+        (preparation_station_material_reserved ?preparation_station)
+        (product_assigned ?preparation_station ?drug_product)
+        (not
+          (label_instance_generated ?label_template)
+        )
+      )
+    :effect (label_instance_generated ?label_template)
+  )
+  (:action attach_patient_profile_to_template
+    :parameters (?pharmacy_operator - pharmacy_operator ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (operator_assigned_to_template ?pharmacy_operator ?label_template)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_data_profile_available ?patient_data_profile)
+        (label_template_bound ?label_template)
+        (label_instance_generated ?label_template)
+        (not
+          (patient_data_profile_attached ?patient_data_profile)
+        )
+      )
+    :effect
+      (and
+        (patient_data_profile_attached ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (not
+          (patient_data_profile_available ?patient_data_profile)
+        )
+      )
+  )
+  (:action operator_validate_label_template
+    :parameters (?pharmacy_operator - pharmacy_operator ?patient_data_profile - patient_data_profile ?label_template - label_template ?drug_product - drug_product)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_data_profile_attached ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (product_assigned ?pharmacy_operator ?drug_product)
+        (not
+          (label_template_language_attribute_set ?label_template)
+        )
+        (not
+          (operator_template_validated ?pharmacy_operator)
+        )
+      )
+    :effect (operator_template_validated ?pharmacy_operator)
+  )
+  (:action assign_language_preference_to_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?language_preference - language_preference)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (language_preference_available ?language_preference)
+        (not
+          (operator_language_selected ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_language_selected ?pharmacy_operator)
+        (operator_language_assigned ?pharmacy_operator ?language_preference)
+        (not
+          (language_preference_available ?language_preference)
+        )
+      )
+  )
+  (:action apply_language_preference_and_mark_operator_validated
+    :parameters (?pharmacy_operator - pharmacy_operator ?patient_data_profile - patient_data_profile ?label_template - label_template ?drug_product - drug_product ?language_preference - language_preference)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_data_profile_attached ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (product_assigned ?pharmacy_operator ?drug_product)
+        (label_template_language_attribute_set ?label_template)
+        (operator_language_selected ?pharmacy_operator)
+        (operator_language_assigned ?pharmacy_operator ?language_preference)
+        (not
+          (operator_template_validated ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_template_validated ?pharmacy_operator)
+        (operator_language_bound ?pharmacy_operator)
+      )
+  )
+  (:action operator_prepare_print_resources
+    :parameters (?pharmacy_operator - pharmacy_operator ?packaging_device - packaging_device ?authorized_reviewer - authorized_reviewer ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_template_validated ?pharmacy_operator)
+        (operator_packaging_device_assigned ?pharmacy_operator ?packaging_device)
+        (prescription_reviewer_assigned ?pharmacy_operator ?authorized_reviewer)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (not
+          (label_template_variant_attribute_set ?label_template)
+        )
+        (not
+          (operator_print_prepared ?pharmacy_operator)
+        )
+      )
+    :effect (operator_print_prepared ?pharmacy_operator)
+  )
+  (:action operator_prepare_print_resources_with_variant
+    :parameters (?pharmacy_operator - pharmacy_operator ?packaging_device - packaging_device ?authorized_reviewer - authorized_reviewer ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_template_validated ?pharmacy_operator)
+        (operator_packaging_device_assigned ?pharmacy_operator ?packaging_device)
+        (prescription_reviewer_assigned ?pharmacy_operator ?authorized_reviewer)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (label_template_variant_attribute_set ?label_template)
+        (not
+          (operator_print_prepared ?pharmacy_operator)
+        )
+      )
+    :effect (operator_print_prepared ?pharmacy_operator)
+  )
+  (:action operator_perform_signature_capture_verification
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_print_prepared ?pharmacy_operator)
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (not
+          (label_template_language_attribute_set ?label_template)
+        )
+        (not
+          (label_template_variant_attribute_set ?label_template)
+        )
+        (not
+          (operator_verification_completed ?pharmacy_operator)
+        )
+      )
+    :effect (operator_verification_completed ?pharmacy_operator)
+  )
+  (:action operator_apply_language_variant_and_verify
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_print_prepared ?pharmacy_operator)
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (label_template_language_attribute_set ?label_template)
+        (not
+          (label_template_variant_attribute_set ?label_template)
+        )
+        (not
+          (operator_verification_completed ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_instruction_variant_assigned ?pharmacy_operator)
+      )
+  )
+  (:action operator_apply_variant_and_verify
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_print_prepared ?pharmacy_operator)
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (not
+          (label_template_language_attribute_set ?label_template)
+        )
+        (label_template_variant_attribute_set ?label_template)
+        (not
+          (operator_verification_completed ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_instruction_variant_assigned ?pharmacy_operator)
+      )
+  )
+  (:action operator_apply_language_and_variant_and_verify
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record ?patient_data_profile - patient_data_profile ?label_template - label_template)
+    :precondition
+      (and
+        (operator_print_prepared ?pharmacy_operator)
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (operator_has_patient_data_profile ?pharmacy_operator ?patient_data_profile)
+        (patient_profile_bound_to_template ?patient_data_profile ?label_template)
+        (label_template_language_attribute_set ?label_template)
+        (label_template_variant_attribute_set ?label_template)
+        (not
+          (operator_verification_completed ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_instruction_variant_assigned ?pharmacy_operator)
+      )
+  )
+  (:action operator_finalize_and_signoff_label
+    :parameters (?pharmacy_operator - pharmacy_operator)
+    :precondition
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (not
+          (operator_instruction_variant_assigned ?pharmacy_operator)
+        )
+        (not
+          (operator_signoff_recorded ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_signoff_recorded ?pharmacy_operator)
+        (labeling_completed ?pharmacy_operator)
+      )
+  )
+  (:action assign_instruction_variant_to_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?instruction_variant - instruction_variant)
+    :precondition
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_instruction_variant_assigned ?pharmacy_operator)
+        (instruction_variant_available ?instruction_variant)
+      )
+    :effect
+      (and
+        (operator_bound_instruction_variant ?pharmacy_operator ?instruction_variant)
+        (not
+          (instruction_variant_available ?instruction_variant)
+        )
+      )
+  )
+  (:action operator_complete_multistage_verification
+    :parameters (?pharmacy_operator - pharmacy_operator ?preparation_station - preparation_station ?labeling_station - labeling_station ?drug_product - drug_product ?instruction_variant - instruction_variant)
+    :precondition
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_instruction_variant_assigned ?pharmacy_operator)
+        (operator_bound_instruction_variant ?pharmacy_operator ?instruction_variant)
+        (operator_assigned_to_preparation_station ?pharmacy_operator ?preparation_station)
+        (operator_assigned_to_labeling_station ?pharmacy_operator ?labeling_station)
+        (preparation_station_packaging_ready ?preparation_station)
+        (labeling_station_packaging_ready ?labeling_station)
+        (product_assigned ?pharmacy_operator ?drug_product)
+        (not
+          (operator_packaging_verification_completed ?pharmacy_operator)
+        )
+      )
+    :effect (operator_packaging_verification_completed ?pharmacy_operator)
+  )
+  (:action operator_finalize_and_signoff_after_packaging
+    :parameters (?pharmacy_operator - pharmacy_operator)
+    :precondition
+      (and
+        (operator_verification_completed ?pharmacy_operator)
+        (operator_packaging_verification_completed ?pharmacy_operator)
+        (not
+          (operator_signoff_recorded ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_signoff_recorded ?pharmacy_operator)
+        (labeling_completed ?pharmacy_operator)
+      )
+  )
+  (:action associate_external_signature_with_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?external_signature_reference - external_signature_reference ?drug_product - drug_product)
+    :precondition
+      (and
+        (ready_for_review ?pharmacy_operator)
+        (product_assigned ?pharmacy_operator ?drug_product)
+        (external_signature_available ?external_signature_reference)
+        (operator_external_signature_associated ?pharmacy_operator ?external_signature_reference)
+        (not
+          (operator_external_approval_recorded ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_external_approval_recorded ?pharmacy_operator)
+        (not
+          (external_signature_available ?external_signature_reference)
+        )
+      )
+  )
+  (:action initiate_signature_capture_for_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?authorized_reviewer - authorized_reviewer)
+    :precondition
+      (and
+        (operator_external_approval_recorded ?pharmacy_operator)
+        (prescription_reviewer_assigned ?pharmacy_operator ?authorized_reviewer)
+        (not
+          (operator_signature_capture_initiated ?pharmacy_operator)
+        )
+      )
+    :effect (operator_signature_capture_initiated ?pharmacy_operator)
+  )
+  (:action capture_signature_for_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?counseling_record - counseling_record)
+    :precondition
+      (and
+        (operator_signature_capture_initiated ?pharmacy_operator)
+        (operator_counseling_record_associated ?pharmacy_operator ?counseling_record)
+        (not
+          (operator_signature_captured ?pharmacy_operator)
+        )
+      )
+    :effect (operator_signature_captured ?pharmacy_operator)
+  )
+  (:action operator_finalize_and_signoff_after_signature
+    :parameters (?pharmacy_operator - pharmacy_operator)
+    :precondition
+      (and
+        (operator_signature_captured ?pharmacy_operator)
+        (not
+          (operator_signoff_recorded ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_signoff_recorded ?pharmacy_operator)
+        (labeling_completed ?pharmacy_operator)
+      )
+  )
+  (:action release_package_from_preparation_station
+    :parameters (?preparation_station - preparation_station ?label_template - label_template)
+    :precondition
+      (and
+        (preparation_station_material_reserved ?preparation_station)
+        (preparation_station_packaging_ready ?preparation_station)
+        (label_template_bound ?label_template)
+        (label_instance_generated ?label_template)
+        (not
+          (labeling_completed ?preparation_station)
+        )
+      )
+    :effect (labeling_completed ?preparation_station)
+  )
+  (:action release_package_from_labeling_station
+    :parameters (?labeling_station - labeling_station ?label_template - label_template)
+    :precondition
+      (and
+        (labeling_station_material_reserved ?labeling_station)
+        (labeling_station_packaging_ready ?labeling_station)
+        (label_template_bound ?label_template)
+        (label_instance_generated ?label_template)
+        (not
+          (labeling_completed ?labeling_station)
+        )
+      )
+    :effect (labeling_completed ?labeling_station)
+  )
+  (:action generate_patient_specific_instructions
+    :parameters (?prescription_item - prescription_item ?authorization_token - authorization_token ?drug_product - drug_product)
+    :precondition
+      (and
+        (labeling_completed ?prescription_item)
+        (product_assigned ?prescription_item ?drug_product)
+        (authorization_token_available ?authorization_token)
+        (not
+          (instructions_generated ?prescription_item)
+        )
+      )
+    :effect
+      (and
+        (instructions_generated ?prescription_item)
+        (authorization_associated ?prescription_item ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action authorize_and_release_preparation_station
+    :parameters (?preparation_station - preparation_station ?formulary_option - formulary_option ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (instructions_generated ?preparation_station)
+        (formulary_option_assigned ?preparation_station ?formulary_option)
+        (authorization_associated ?preparation_station ?authorization_token)
+        (not
+          (dispense_authorized ?preparation_station)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?preparation_station)
+        (formulary_option_available ?formulary_option)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action authorize_and_release_labeling_station
+    :parameters (?labeling_station - labeling_station ?formulary_option - formulary_option ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (instructions_generated ?labeling_station)
+        (formulary_option_assigned ?labeling_station ?formulary_option)
+        (authorization_associated ?labeling_station ?authorization_token)
+        (not
+          (dispense_authorized ?labeling_station)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?labeling_station)
+        (formulary_option_available ?formulary_option)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+  (:action authorize_and_release_operator
+    :parameters (?pharmacy_operator - pharmacy_operator ?formulary_option - formulary_option ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (instructions_generated ?pharmacy_operator)
+        (formulary_option_assigned ?pharmacy_operator ?formulary_option)
+        (authorization_associated ?pharmacy_operator ?authorization_token)
+        (not
+          (dispense_authorized ?pharmacy_operator)
+        )
+      )
+    :effect
+      (and
+        (dispense_authorized ?pharmacy_operator)
+        (formulary_option_available ?formulary_option)
+        (authorization_token_available ?authorization_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem patient_labeling_and_instruction_generation_problem)
+  (:domain pharmaceutics_patient_specific_labeling_and_instruction_generation)
+  (:objects preparation_station_1 - preparation_station labeling_station_1 - labeling_station pharmacist_1 - pharmacy_operator pharmacist_2 - pharmacy_operator formulary_option_generic - formulary_option formulary_option_brand - formulary_option formulary_option_alternate - formulary_option drug_product_amlodipine_5mg - drug_product licensed_pharmacist_1 - authorized_reviewer auxiliary_material_1 - accessory_material container_bottle_100ml - container_type packaging_unit_1 - packaging_unit label_template_standard - label_template patient_profile_1 - patient_data_profile patient_profile_2 - patient_data_profile language_en - language_preference language_es - language_preference instruction_variant_standard - instruction_variant instruction_variant_simplified - instruction_variant auth_token_1 - authorization_token label_printer_1 - packaging_device prescriber_signature_ref_1 - external_signature_reference prescriber_signature_ref_2 - external_signature_reference counseling_record_1 - counseling_record)
+  (:init
+    (formulary_option_available formulary_option_generic)
+    (formulary_option_available formulary_option_brand)
+    (formulary_option_available formulary_option_alternate)
+    (drug_product_available drug_product_amlodipine_5mg)
+    (reviewer_available licensed_pharmacist_1)
+    (accessory_material_available auxiliary_material_1)
+    (preparation_station_container_binding preparation_station_1 container_bottle_100ml)
+    (labeling_station_packaging_unit_assigned labeling_station_1 packaging_unit_1)
+    (label_template_available label_template_standard)
+    (patient_data_profile_available patient_profile_1)
+    (patient_data_profile_available patient_profile_2)
+    (operator_assigned_to_preparation_station pharmacist_1 preparation_station_1)
+    (operator_assigned_to_preparation_station pharmacist_2 preparation_station_1)
+    (operator_assigned_to_labeling_station pharmacist_1 labeling_station_1)
+    (operator_assigned_to_labeling_station pharmacist_2 labeling_station_1)
+    (operator_assigned_to_template pharmacist_1 label_template_standard)
+    (operator_assigned_to_template pharmacist_2 label_template_standard)
+    (operator_has_patient_data_profile pharmacist_1 patient_profile_1)
+    (operator_has_patient_data_profile pharmacist_2 patient_profile_2)
+    (language_preference_available language_en)
+    (language_preference_available language_es)
+    (instruction_variant_available instruction_variant_standard)
+    (instruction_variant_available instruction_variant_simplified)
+    (authorization_token_available auth_token_1)
+    (packaging_device_available label_printer_1)
+    (external_signature_available prescriber_signature_ref_1)
+    (operator_external_signature_associated pharmacist_1 prescriber_signature_ref_1)
+    (operator_external_signature_associated pharmacist_2 prescriber_signature_ref_2)
+    (counseling_record_available counseling_record_1)
+  )
+  (:goal
+    (and
+      (dispense_authorized preparation_station_1)
+      (dispense_authorized labeling_station_1)
+      (dispense_authorized pharmacist_1)
+      (dispense_authorized pharmacist_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_prescription_intake preparation_station_1)
+(assign_formulary_option_to_prescription preparation_station_1 formulary_option_generic)
+(select_drug_product_for_prescription preparation_station_1 drug_product_amlodipine_5mg)
+(finalize_product_selection_for_review preparation_station_1 drug_product_amlodipine_5mg)
+(assign_authorized_reviewer preparation_station_1 licensed_pharmacist_1)
+(reserve_container_for_preparation_station preparation_station_1 container_bottle_100ml drug_product_amlodipine_5mg)
+(confirm_container_allocation_at_preparation_station preparation_station_1 container_bottle_100ml licensed_pharmacist_1)
+(unassign_authorized_reviewer preparation_station_1 licensed_pharmacist_1)
+(release_drug_product_assignment preparation_station_1 drug_product_amlodipine_5mg)
+(register_prescription_intake labeling_station_1)
+(assign_formulary_option_to_prescription labeling_station_1 formulary_option_brand)
+(select_drug_product_for_prescription labeling_station_1 drug_product_amlodipine_5mg)
+(finalize_product_selection_for_review labeling_station_1 drug_product_amlodipine_5mg)
+(assign_authorized_reviewer labeling_station_1 licensed_pharmacist_1)
+(reserve_packaging_unit_for_labeling_station labeling_station_1 packaging_unit_1 drug_product_amlodipine_5mg)
+(confirm_packaging_unit_assignment_for_labeling_station labeling_station_1 packaging_unit_1 licensed_pharmacist_1)
+(unassign_authorized_reviewer labeling_station_1 licensed_pharmacist_1)
+(release_drug_product_assignment labeling_station_1 drug_product_amlodipine_5mg)
+(bind_label_template_to_package_instance preparation_station_1 labeling_station_1 container_bottle_100ml packaging_unit_1 label_template_standard)
+(select_drug_product_for_prescription preparation_station_1 drug_product_amlodipine_5mg)
+(generate_label_instance label_template_standard preparation_station_1 drug_product_amlodipine_5mg)
+(release_package_from_preparation_station preparation_station_1 label_template_standard)
+(release_package_from_labeling_station labeling_station_1 label_template_standard)
+(release_drug_product_assignment preparation_station_1 drug_product_amlodipine_5mg)
+(register_prescription_intake pharmacist_1)
+(assign_formulary_option_to_prescription pharmacist_1 formulary_option_alternate)
+(select_drug_product_for_prescription pharmacist_1 drug_product_amlodipine_5mg)
+(finalize_product_selection_for_review pharmacist_1 drug_product_amlodipine_5mg)
+(assign_authorized_reviewer pharmacist_1 licensed_pharmacist_1)
+(assign_packaging_device_to_operator pharmacist_1 label_printer_1)
+(assign_counseling_record_to_operator pharmacist_1 counseling_record_1)
+(attach_patient_profile_to_template pharmacist_1 patient_profile_1 label_template_standard)
+(operator_validate_label_template pharmacist_1 patient_profile_1 label_template_standard drug_product_amlodipine_5mg)
+(operator_prepare_print_resources pharmacist_1 label_printer_1 licensed_pharmacist_1 patient_profile_1 label_template_standard)
+(unassign_authorized_reviewer pharmacist_1 licensed_pharmacist_1)
+(operator_perform_signature_capture_verification pharmacist_1 counseling_record_1 patient_profile_1 label_template_standard)
+(operator_finalize_and_signoff_label pharmacist_1)
+(generate_patient_specific_instructions pharmacist_1 auth_token_1 drug_product_amlodipine_5mg)
+(authorize_and_release_operator pharmacist_1 formulary_option_alternate auth_token_1)
+(release_packaging_device_from_operator pharmacist_1 label_printer_1)
+(release_counseling_record_from_operator pharmacist_1 counseling_record_1)
+(release_drug_product_assignment pharmacist_1 drug_product_amlodipine_5mg)
+(register_prescription_intake pharmacist_2)
+(assign_formulary_option_to_prescription pharmacist_2 formulary_option_alternate)
+(select_drug_product_for_prescription pharmacist_2 drug_product_amlodipine_5mg)
+(finalize_product_selection_for_review pharmacist_2 drug_product_amlodipine_5mg)
+(assign_authorized_reviewer pharmacist_2 licensed_pharmacist_1)
+(assign_packaging_device_to_operator pharmacist_2 label_printer_1)
+(assign_counseling_record_to_operator pharmacist_2 counseling_record_1)
+(attach_patient_profile_to_template pharmacist_2 patient_profile_2 label_template_standard)
+(operator_validate_label_template pharmacist_2 patient_profile_2 label_template_standard drug_product_amlodipine_5mg)
+(operator_prepare_print_resources pharmacist_2 label_printer_1 licensed_pharmacist_1 patient_profile_2 label_template_standard)
+(unassign_authorized_reviewer pharmacist_2 licensed_pharmacist_1)
+(operator_perform_signature_capture_verification pharmacist_2 counseling_record_1 patient_profile_2 label_template_standard)
+(operator_finalize_and_signoff_label pharmacist_2)
+(generate_patient_specific_instructions pharmacist_2 auth_token_1 drug_product_amlodipine_5mg)
+(authorize_and_release_operator pharmacist_2 formulary_option_alternate auth_token_1)
+(release_packaging_device_from_operator pharmacist_2 label_printer_1)
+(release_counseling_record_from_operator pharmacist_2 counseling_record_1)
+(release_drug_product_assignment pharmacist_2 drug_product_amlodipine_5mg)
+(select_drug_product_for_prescription preparation_station_1 drug_product_amlodipine_5mg)
+(generate_patient_specific_instructions preparation_station_1 auth_token_1 drug_product_amlodipine_5mg)
+(authorize_and_release_preparation_station preparation_station_1 formulary_option_generic auth_token_1)
+(select_drug_product_for_prescription labeling_station_1 drug_product_amlodipine_5mg)
+(generate_patient_specific_instructions labeling_station_1 auth_token_1 drug_product_amlodipine_5mg)
+(authorize_and_release_labeling_station labeling_station_1 formulary_option_brand auth_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_z__ua4re/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_z__ua4re/plan.pddl 
+
+
+--- stderr ---
+

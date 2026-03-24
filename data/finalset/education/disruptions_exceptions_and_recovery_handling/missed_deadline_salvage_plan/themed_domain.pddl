@@ -1,0 +1,936 @@
+(define (domain missed_deadline_salvage_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_supertype - object resource_supertype - object option_supertype - object case_identifier_supertype - object exception_case - case_identifier_supertype case_reviewer - entity_supertype evidence_document - entity_supertype faculty_approver - entity_supertype policy_clause - entity_supertype authorization_token - entity_supertype supporting_certificate - entity_supertype remedial_action_type - entity_supertype escalation_justification - entity_supertype remedy_option - resource_supertype document_bundle - resource_supertype endorsement_record - resource_supertype rescheduled_deadline_slot - option_supertype alternate_deadline_option - option_supertype salvage_plan_package - option_supertype case_subtype_reference - exception_case case_subtype_reference_2 - exception_case submission_record - case_subtype_reference course_component - case_subtype_reference case_actor - case_subtype_reference_2)
+  (:predicates
+    (entity_opened ?exception_case - exception_case)
+    (entity_ready_for_approval ?exception_case - exception_case)
+    (entity_review_assigned ?exception_case - exception_case)
+    (entity_closed ?exception_case - exception_case)
+    (entity_finalized ?exception_case - exception_case)
+    (entity_administratively_corrected ?exception_case - exception_case)
+    (reviewer_available ?case_reviewer - case_reviewer)
+    (assigned_reviewer ?exception_case - exception_case ?case_reviewer - case_reviewer)
+    (evidence_available ?evidence_document - evidence_document)
+    (entity_has_evidence ?exception_case - exception_case ?evidence_document - evidence_document)
+    (approver_available ?faculty_approver - faculty_approver)
+    (assigned_approver ?exception_case - exception_case ?faculty_approver - faculty_approver)
+    (remedy_option_available ?remedy_option - remedy_option)
+    (submission_has_remedy_option ?submission_record - submission_record ?remedy_option - remedy_option)
+    (component_has_remedy_option ?course_component - course_component ?remedy_option - remedy_option)
+    (submission_candidate_slot ?submission_record - submission_record ?rescheduled_deadline_slot - rescheduled_deadline_slot)
+    (slot_reserved ?rescheduled_deadline_slot - rescheduled_deadline_slot)
+    (slot_assigned ?rescheduled_deadline_slot - rescheduled_deadline_slot)
+    (submission_slot_confirmed ?submission_record - submission_record)
+    (component_has_alternate_deadline ?course_component - course_component ?alternate_deadline_option - alternate_deadline_option)
+    (alternate_deadline_reserved ?alternate_deadline_option - alternate_deadline_option)
+    (alternate_deadline_assigned ?alternate_deadline_option - alternate_deadline_option)
+    (component_deadline_confirmed ?course_component - course_component)
+    (salvage_plan_package_available ?salvage_plan_package - salvage_plan_package)
+    (salvage_package_claimed ?salvage_plan_package - salvage_plan_package)
+    (package_includes_slot ?salvage_plan_package - salvage_plan_package ?rescheduled_deadline_slot - rescheduled_deadline_slot)
+    (package_includes_alternate_deadline ?salvage_plan_package - salvage_plan_package ?alternate_deadline_option - alternate_deadline_option)
+    (package_requires_faculty_endorsement ?salvage_plan_package - salvage_plan_package)
+    (package_requires_additional_authorization ?salvage_plan_package - salvage_plan_package)
+    (salvage_package_validated ?salvage_plan_package - salvage_plan_package)
+    (actor_linked_submission ?case_actor - case_actor ?submission_record - submission_record)
+    (actor_linked_component ?case_actor - case_actor ?course_component - course_component)
+    (actor_linked_package ?case_actor - case_actor ?salvage_plan_package - salvage_plan_package)
+    (document_bundle_available ?document_bundle - document_bundle)
+    (actor_has_document_bundle ?case_actor - case_actor ?document_bundle - document_bundle)
+    (document_bundle_finalized ?document_bundle - document_bundle)
+    (bundle_attached_to_package ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    (actor_documentation_verified ?case_actor - case_actor)
+    (actor_documentation_complete ?case_actor - case_actor)
+    (actor_ready_for_finalization ?case_actor - case_actor)
+    (actor_policy_engaged ?case_actor - case_actor)
+    (actor_policy_acknowledged ?case_actor - case_actor)
+    (actor_authorized ?case_actor - case_actor)
+    (actor_remedial_action_selected ?case_actor - case_actor)
+    (endorsement_available ?endorsement_record - endorsement_record)
+    (actor_has_endorsement ?case_actor - case_actor ?endorsement_record - endorsement_record)
+    (actor_endorsed ?case_actor - case_actor)
+    (actor_endorsement_confirmed ?case_actor - case_actor)
+    (actor_approval_granted ?case_actor - case_actor)
+    (policy_clause_available ?policy_clause - policy_clause)
+    (actor_cited_policy_clause ?case_actor - case_actor ?policy_clause - policy_clause)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (actor_has_authorization_token ?case_actor - case_actor ?authorization_token - authorization_token)
+    (remedial_action_type_available ?remedial_action_type - remedial_action_type)
+    (actor_selected_remedial_action ?case_actor - case_actor ?remedial_action_type - remedial_action_type)
+    (escalation_justification_available ?escalation_justification - escalation_justification)
+    (actor_has_escalation_justification ?case_actor - case_actor ?escalation_justification - escalation_justification)
+    (supporting_certificate_available ?supporting_certificate - supporting_certificate)
+    (entity_has_supporting_certificate ?exception_case - exception_case ?supporting_certificate - supporting_certificate)
+    (submission_eligibility_confirmed ?submission_record - submission_record)
+    (component_eligibility_confirmed ?course_component - course_component)
+    (actor_finalized ?case_actor - case_actor)
+  )
+  (:action open_exception_case
+    :parameters (?exception_case - exception_case)
+    :precondition
+      (and
+        (not
+          (entity_opened ?exception_case)
+        )
+        (not
+          (entity_closed ?exception_case)
+        )
+      )
+    :effect (entity_opened ?exception_case)
+  )
+  (:action assign_reviewer_to_case
+    :parameters (?exception_case - exception_case ?case_reviewer - case_reviewer)
+    :precondition
+      (and
+        (entity_opened ?exception_case)
+        (not
+          (entity_review_assigned ?exception_case)
+        )
+        (reviewer_available ?case_reviewer)
+      )
+    :effect
+      (and
+        (entity_review_assigned ?exception_case)
+        (assigned_reviewer ?exception_case ?case_reviewer)
+        (not
+          (reviewer_available ?case_reviewer)
+        )
+      )
+  )
+  (:action attach_evidence_to_case
+    :parameters (?exception_case - exception_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_opened ?exception_case)
+        (entity_review_assigned ?exception_case)
+        (evidence_available ?evidence_document)
+      )
+    :effect
+      (and
+        (entity_has_evidence ?exception_case ?evidence_document)
+        (not
+          (evidence_available ?evidence_document)
+        )
+      )
+  )
+  (:action validate_case_for_approval
+    :parameters (?exception_case - exception_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_opened ?exception_case)
+        (entity_review_assigned ?exception_case)
+        (entity_has_evidence ?exception_case ?evidence_document)
+        (not
+          (entity_ready_for_approval ?exception_case)
+        )
+      )
+    :effect (entity_ready_for_approval ?exception_case)
+  )
+  (:action detach_evidence_from_case
+    :parameters (?exception_case - exception_case ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_has_evidence ?exception_case ?evidence_document)
+      )
+    :effect
+      (and
+        (evidence_available ?evidence_document)
+        (not
+          (entity_has_evidence ?exception_case ?evidence_document)
+        )
+      )
+  )
+  (:action engage_faculty_approver
+    :parameters (?exception_case - exception_case ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (entity_ready_for_approval ?exception_case)
+        (approver_available ?faculty_approver)
+      )
+    :effect
+      (and
+        (assigned_approver ?exception_case ?faculty_approver)
+        (not
+          (approver_available ?faculty_approver)
+        )
+      )
+  )
+  (:action release_approver_from_case
+    :parameters (?exception_case - exception_case ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (assigned_approver ?exception_case ?faculty_approver)
+      )
+    :effect
+      (and
+        (approver_available ?faculty_approver)
+        (not
+          (assigned_approver ?exception_case ?faculty_approver)
+        )
+      )
+  )
+  (:action assign_remedial_action_to_actor
+    :parameters (?case_actor - case_actor ?remedial_action_type - remedial_action_type)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (remedial_action_type_available ?remedial_action_type)
+      )
+    :effect
+      (and
+        (actor_selected_remedial_action ?case_actor ?remedial_action_type)
+        (not
+          (remedial_action_type_available ?remedial_action_type)
+        )
+      )
+  )
+  (:action unassign_remedial_action_from_actor
+    :parameters (?case_actor - case_actor ?remedial_action_type - remedial_action_type)
+    :precondition
+      (and
+        (actor_selected_remedial_action ?case_actor ?remedial_action_type)
+      )
+    :effect
+      (and
+        (remedial_action_type_available ?remedial_action_type)
+        (not
+          (actor_selected_remedial_action ?case_actor ?remedial_action_type)
+        )
+      )
+  )
+  (:action assign_escalation_justification_to_actor
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (escalation_justification_available ?escalation_justification)
+      )
+    :effect
+      (and
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (not
+          (escalation_justification_available ?escalation_justification)
+        )
+      )
+  )
+  (:action remove_escalation_justification_from_actor
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification)
+    :precondition
+      (and
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+      )
+    :effect
+      (and
+        (escalation_justification_available ?escalation_justification)
+        (not
+          (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        )
+      )
+  )
+  (:action reserve_rescheduled_deadline_slot
+    :parameters (?submission_record - submission_record ?rescheduled_deadline_slot - rescheduled_deadline_slot ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_approval ?submission_record)
+        (entity_has_evidence ?submission_record ?evidence_document)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (not
+          (slot_reserved ?rescheduled_deadline_slot)
+        )
+        (not
+          (slot_assigned ?rescheduled_deadline_slot)
+        )
+      )
+    :effect (slot_reserved ?rescheduled_deadline_slot)
+  )
+  (:action confirm_submission_slot
+    :parameters (?submission_record - submission_record ?rescheduled_deadline_slot - rescheduled_deadline_slot ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (entity_ready_for_approval ?submission_record)
+        (assigned_approver ?submission_record ?faculty_approver)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (slot_reserved ?rescheduled_deadline_slot)
+        (not
+          (submission_eligibility_confirmed ?submission_record)
+        )
+      )
+    :effect
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (submission_slot_confirmed ?submission_record)
+      )
+  )
+  (:action assign_remedy_option_to_submission
+    :parameters (?submission_record - submission_record ?rescheduled_deadline_slot - rescheduled_deadline_slot ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (entity_ready_for_approval ?submission_record)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (remedy_option_available ?remedy_option)
+        (not
+          (submission_eligibility_confirmed ?submission_record)
+        )
+      )
+    :effect
+      (and
+        (slot_assigned ?rescheduled_deadline_slot)
+        (submission_eligibility_confirmed ?submission_record)
+        (submission_has_remedy_option ?submission_record ?remedy_option)
+        (not
+          (remedy_option_available ?remedy_option)
+        )
+      )
+  )
+  (:action finalize_slot_and_remedy_for_submission
+    :parameters (?submission_record - submission_record ?rescheduled_deadline_slot - rescheduled_deadline_slot ?evidence_document - evidence_document ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (entity_ready_for_approval ?submission_record)
+        (entity_has_evidence ?submission_record ?evidence_document)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (slot_assigned ?rescheduled_deadline_slot)
+        (submission_has_remedy_option ?submission_record ?remedy_option)
+        (not
+          (submission_slot_confirmed ?submission_record)
+        )
+      )
+    :effect
+      (and
+        (slot_reserved ?rescheduled_deadline_slot)
+        (submission_slot_confirmed ?submission_record)
+        (remedy_option_available ?remedy_option)
+        (not
+          (submission_has_remedy_option ?submission_record ?remedy_option)
+        )
+      )
+  )
+  (:action reserve_alternate_deadline_option
+    :parameters (?course_component - course_component ?alternate_deadline_option - alternate_deadline_option ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_approval ?course_component)
+        (entity_has_evidence ?course_component ?evidence_document)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (not
+          (alternate_deadline_reserved ?alternate_deadline_option)
+        )
+        (not
+          (alternate_deadline_assigned ?alternate_deadline_option)
+        )
+      )
+    :effect (alternate_deadline_reserved ?alternate_deadline_option)
+  )
+  (:action confirm_alternate_deadline_with_approver
+    :parameters (?course_component - course_component ?alternate_deadline_option - alternate_deadline_option ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (entity_ready_for_approval ?course_component)
+        (assigned_approver ?course_component ?faculty_approver)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (alternate_deadline_reserved ?alternate_deadline_option)
+        (not
+          (component_eligibility_confirmed ?course_component)
+        )
+      )
+    :effect
+      (and
+        (component_eligibility_confirmed ?course_component)
+        (component_deadline_confirmed ?course_component)
+      )
+  )
+  (:action assign_remedy_option_to_component
+    :parameters (?course_component - course_component ?alternate_deadline_option - alternate_deadline_option ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (entity_ready_for_approval ?course_component)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (remedy_option_available ?remedy_option)
+        (not
+          (component_eligibility_confirmed ?course_component)
+        )
+      )
+    :effect
+      (and
+        (alternate_deadline_assigned ?alternate_deadline_option)
+        (component_eligibility_confirmed ?course_component)
+        (component_has_remedy_option ?course_component ?remedy_option)
+        (not
+          (remedy_option_available ?remedy_option)
+        )
+      )
+  )
+  (:action finalize_alternate_and_remedy_for_component
+    :parameters (?course_component - course_component ?alternate_deadline_option - alternate_deadline_option ?evidence_document - evidence_document ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (entity_ready_for_approval ?course_component)
+        (entity_has_evidence ?course_component ?evidence_document)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (alternate_deadline_assigned ?alternate_deadline_option)
+        (component_has_remedy_option ?course_component ?remedy_option)
+        (not
+          (component_deadline_confirmed ?course_component)
+        )
+      )
+    :effect
+      (and
+        (alternate_deadline_reserved ?alternate_deadline_option)
+        (component_deadline_confirmed ?course_component)
+        (remedy_option_available ?remedy_option)
+        (not
+          (component_has_remedy_option ?course_component ?remedy_option)
+        )
+      )
+  )
+  (:action create_salvage_package
+    :parameters (?submission_record - submission_record ?course_component - course_component ?rescheduled_deadline_slot - rescheduled_deadline_slot ?alternate_deadline_option - alternate_deadline_option ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (component_eligibility_confirmed ?course_component)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (slot_reserved ?rescheduled_deadline_slot)
+        (alternate_deadline_reserved ?alternate_deadline_option)
+        (submission_slot_confirmed ?submission_record)
+        (component_deadline_confirmed ?course_component)
+        (salvage_plan_package_available ?salvage_plan_package)
+      )
+    :effect
+      (and
+        (salvage_package_claimed ?salvage_plan_package)
+        (package_includes_slot ?salvage_plan_package ?rescheduled_deadline_slot)
+        (package_includes_alternate_deadline ?salvage_plan_package ?alternate_deadline_option)
+        (not
+          (salvage_plan_package_available ?salvage_plan_package)
+        )
+      )
+  )
+  (:action create_salvage_package_require_endorsement
+    :parameters (?submission_record - submission_record ?course_component - course_component ?rescheduled_deadline_slot - rescheduled_deadline_slot ?alternate_deadline_option - alternate_deadline_option ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (component_eligibility_confirmed ?course_component)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (slot_assigned ?rescheduled_deadline_slot)
+        (alternate_deadline_reserved ?alternate_deadline_option)
+        (not
+          (submission_slot_confirmed ?submission_record)
+        )
+        (component_deadline_confirmed ?course_component)
+        (salvage_plan_package_available ?salvage_plan_package)
+      )
+    :effect
+      (and
+        (salvage_package_claimed ?salvage_plan_package)
+        (package_includes_slot ?salvage_plan_package ?rescheduled_deadline_slot)
+        (package_includes_alternate_deadline ?salvage_plan_package ?alternate_deadline_option)
+        (package_requires_faculty_endorsement ?salvage_plan_package)
+        (not
+          (salvage_plan_package_available ?salvage_plan_package)
+        )
+      )
+  )
+  (:action create_salvage_package_require_authorization
+    :parameters (?submission_record - submission_record ?course_component - course_component ?rescheduled_deadline_slot - rescheduled_deadline_slot ?alternate_deadline_option - alternate_deadline_option ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (component_eligibility_confirmed ?course_component)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (slot_reserved ?rescheduled_deadline_slot)
+        (alternate_deadline_assigned ?alternate_deadline_option)
+        (submission_slot_confirmed ?submission_record)
+        (not
+          (component_deadline_confirmed ?course_component)
+        )
+        (salvage_plan_package_available ?salvage_plan_package)
+      )
+    :effect
+      (and
+        (salvage_package_claimed ?salvage_plan_package)
+        (package_includes_slot ?salvage_plan_package ?rescheduled_deadline_slot)
+        (package_includes_alternate_deadline ?salvage_plan_package ?alternate_deadline_option)
+        (package_requires_additional_authorization ?salvage_plan_package)
+        (not
+          (salvage_plan_package_available ?salvage_plan_package)
+        )
+      )
+  )
+  (:action create_salvage_package_require_endorsement_and_authorization
+    :parameters (?submission_record - submission_record ?course_component - course_component ?rescheduled_deadline_slot - rescheduled_deadline_slot ?alternate_deadline_option - alternate_deadline_option ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (component_eligibility_confirmed ?course_component)
+        (submission_candidate_slot ?submission_record ?rescheduled_deadline_slot)
+        (component_has_alternate_deadline ?course_component ?alternate_deadline_option)
+        (slot_assigned ?rescheduled_deadline_slot)
+        (alternate_deadline_assigned ?alternate_deadline_option)
+        (not
+          (submission_slot_confirmed ?submission_record)
+        )
+        (not
+          (component_deadline_confirmed ?course_component)
+        )
+        (salvage_plan_package_available ?salvage_plan_package)
+      )
+    :effect
+      (and
+        (salvage_package_claimed ?salvage_plan_package)
+        (package_includes_slot ?salvage_plan_package ?rescheduled_deadline_slot)
+        (package_includes_alternate_deadline ?salvage_plan_package ?alternate_deadline_option)
+        (package_requires_faculty_endorsement ?salvage_plan_package)
+        (package_requires_additional_authorization ?salvage_plan_package)
+        (not
+          (salvage_plan_package_available ?salvage_plan_package)
+        )
+      )
+  )
+  (:action validate_salvage_package
+    :parameters (?salvage_plan_package - salvage_plan_package ?submission_record - submission_record ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (salvage_package_claimed ?salvage_plan_package)
+        (submission_eligibility_confirmed ?submission_record)
+        (entity_has_evidence ?submission_record ?evidence_document)
+        (not
+          (salvage_package_validated ?salvage_plan_package)
+        )
+      )
+    :effect (salvage_package_validated ?salvage_plan_package)
+  )
+  (:action finalize_document_bundle_and_attach_to_package
+    :parameters (?case_actor - case_actor ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (actor_linked_package ?case_actor ?salvage_plan_package)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (document_bundle_available ?document_bundle)
+        (salvage_package_claimed ?salvage_plan_package)
+        (salvage_package_validated ?salvage_plan_package)
+        (not
+          (document_bundle_finalized ?document_bundle)
+        )
+      )
+    :effect
+      (and
+        (document_bundle_finalized ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (not
+          (document_bundle_available ?document_bundle)
+        )
+      )
+  )
+  (:action verify_document_bundle_for_actor
+    :parameters (?case_actor - case_actor ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (document_bundle_finalized ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (entity_has_evidence ?case_actor ?evidence_document)
+        (not
+          (package_requires_faculty_endorsement ?salvage_plan_package)
+        )
+        (not
+          (actor_documentation_verified ?case_actor)
+        )
+      )
+    :effect (actor_documentation_verified ?case_actor)
+  )
+  (:action assign_policy_clause_to_actor
+    :parameters (?case_actor - case_actor ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (policy_clause_available ?policy_clause)
+        (not
+          (actor_policy_engaged ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_policy_engaged ?case_actor)
+        (actor_cited_policy_clause ?case_actor ?policy_clause)
+        (not
+          (policy_clause_available ?policy_clause)
+        )
+      )
+  )
+  (:action apply_policy_clause_to_actor_and_acknowledge
+    :parameters (?case_actor - case_actor ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package ?evidence_document - evidence_document ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (document_bundle_finalized ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (entity_has_evidence ?case_actor ?evidence_document)
+        (package_requires_faculty_endorsement ?salvage_plan_package)
+        (actor_policy_engaged ?case_actor)
+        (actor_cited_policy_clause ?case_actor ?policy_clause)
+        (not
+          (actor_documentation_verified ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_documentation_verified ?case_actor)
+        (actor_policy_acknowledged ?case_actor)
+      )
+  )
+  (:action complete_actor_documentation
+    :parameters (?case_actor - case_actor ?remedial_action_type - remedial_action_type ?faculty_approver - faculty_approver ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_verified ?case_actor)
+        (actor_selected_remedial_action ?case_actor ?remedial_action_type)
+        (assigned_approver ?case_actor ?faculty_approver)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (not
+          (package_requires_additional_authorization ?salvage_plan_package)
+        )
+        (not
+          (actor_documentation_complete ?case_actor)
+        )
+      )
+    :effect (actor_documentation_complete ?case_actor)
+  )
+  (:action complete_actor_documentation_with_authorization
+    :parameters (?case_actor - case_actor ?remedial_action_type - remedial_action_type ?faculty_approver - faculty_approver ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_verified ?case_actor)
+        (actor_selected_remedial_action ?case_actor ?remedial_action_type)
+        (assigned_approver ?case_actor ?faculty_approver)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (package_requires_additional_authorization ?salvage_plan_package)
+        (not
+          (actor_documentation_complete ?case_actor)
+        )
+      )
+    :effect (actor_documentation_complete ?case_actor)
+  )
+  (:action prompt_actor_finalization
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_complete ?case_actor)
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (not
+          (package_requires_faculty_endorsement ?salvage_plan_package)
+        )
+        (not
+          (package_requires_additional_authorization ?salvage_plan_package)
+        )
+        (not
+          (actor_ready_for_finalization ?case_actor)
+        )
+      )
+    :effect (actor_ready_for_finalization ?case_actor)
+  )
+  (:action prompt_actor_finalization_and_authorize
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_complete ?case_actor)
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (package_requires_faculty_endorsement ?salvage_plan_package)
+        (not
+          (package_requires_additional_authorization ?salvage_plan_package)
+        )
+        (not
+          (actor_ready_for_finalization ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_authorized ?case_actor)
+      )
+  )
+  (:action prompt_actor_finalization_and_authorize_variant
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_complete ?case_actor)
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (not
+          (package_requires_faculty_endorsement ?salvage_plan_package)
+        )
+        (package_requires_additional_authorization ?salvage_plan_package)
+        (not
+          (actor_ready_for_finalization ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_authorized ?case_actor)
+      )
+  )
+  (:action prompt_actor_finalization_and_authorize_alternate
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification ?document_bundle - document_bundle ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (actor_documentation_complete ?case_actor)
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (actor_has_document_bundle ?case_actor ?document_bundle)
+        (bundle_attached_to_package ?document_bundle ?salvage_plan_package)
+        (package_requires_faculty_endorsement ?salvage_plan_package)
+        (package_requires_additional_authorization ?salvage_plan_package)
+        (not
+          (actor_ready_for_finalization ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_authorized ?case_actor)
+      )
+  )
+  (:action finalize_actor_documentation_and_flag_case
+    :parameters (?case_actor - case_actor)
+    :precondition
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (not
+          (actor_authorized ?case_actor)
+        )
+        (not
+          (actor_finalized ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_finalized ?case_actor)
+        (entity_finalized ?case_actor)
+      )
+  )
+  (:action consume_authorization_token_for_actor
+    :parameters (?case_actor - case_actor ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_authorized ?case_actor)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (actor_has_authorization_token ?case_actor ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action apply_remedial_action_and_mark_actor
+    :parameters (?case_actor - case_actor ?submission_record - submission_record ?course_component - course_component ?evidence_document - evidence_document ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_authorized ?case_actor)
+        (actor_has_authorization_token ?case_actor ?authorization_token)
+        (actor_linked_submission ?case_actor ?submission_record)
+        (actor_linked_component ?case_actor ?course_component)
+        (submission_slot_confirmed ?submission_record)
+        (component_deadline_confirmed ?course_component)
+        (entity_has_evidence ?case_actor ?evidence_document)
+        (not
+          (actor_remedial_action_selected ?case_actor)
+        )
+      )
+    :effect (actor_remedial_action_selected ?case_actor)
+  )
+  (:action finalize_actor_and_register_case_closure
+    :parameters (?case_actor - case_actor)
+    :precondition
+      (and
+        (actor_ready_for_finalization ?case_actor)
+        (actor_remedial_action_selected ?case_actor)
+        (not
+          (actor_finalized ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_finalized ?case_actor)
+        (entity_finalized ?case_actor)
+      )
+  )
+  (:action apply_endorsement_to_actor
+    :parameters (?case_actor - case_actor ?endorsement_record - endorsement_record ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_approval ?case_actor)
+        (entity_has_evidence ?case_actor ?evidence_document)
+        (endorsement_available ?endorsement_record)
+        (actor_has_endorsement ?case_actor ?endorsement_record)
+        (not
+          (actor_endorsed ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_endorsed ?case_actor)
+        (not
+          (endorsement_available ?endorsement_record)
+        )
+      )
+  )
+  (:action acknowledge_actor_endorsement
+    :parameters (?case_actor - case_actor ?faculty_approver - faculty_approver)
+    :precondition
+      (and
+        (actor_endorsed ?case_actor)
+        (assigned_approver ?case_actor ?faculty_approver)
+        (not
+          (actor_endorsement_confirmed ?case_actor)
+        )
+      )
+    :effect (actor_endorsement_confirmed ?case_actor)
+  )
+  (:action grant_actor_approval
+    :parameters (?case_actor - case_actor ?escalation_justification - escalation_justification)
+    :precondition
+      (and
+        (actor_endorsement_confirmed ?case_actor)
+        (actor_has_escalation_justification ?case_actor ?escalation_justification)
+        (not
+          (actor_approval_granted ?case_actor)
+        )
+      )
+    :effect (actor_approval_granted ?case_actor)
+  )
+  (:action finalize_actor_approval_and_flag_case
+    :parameters (?case_actor - case_actor)
+    :precondition
+      (and
+        (actor_approval_granted ?case_actor)
+        (not
+          (actor_finalized ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_finalized ?case_actor)
+        (entity_finalized ?case_actor)
+      )
+  )
+  (:action apply_salvage_package_to_submission
+    :parameters (?submission_record - submission_record ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (submission_eligibility_confirmed ?submission_record)
+        (submission_slot_confirmed ?submission_record)
+        (salvage_package_claimed ?salvage_plan_package)
+        (salvage_package_validated ?salvage_plan_package)
+        (not
+          (entity_finalized ?submission_record)
+        )
+      )
+    :effect (entity_finalized ?submission_record)
+  )
+  (:action apply_salvage_package_to_component
+    :parameters (?course_component - course_component ?salvage_plan_package - salvage_plan_package)
+    :precondition
+      (and
+        (component_eligibility_confirmed ?course_component)
+        (component_deadline_confirmed ?course_component)
+        (salvage_package_claimed ?salvage_plan_package)
+        (salvage_package_validated ?salvage_plan_package)
+        (not
+          (entity_finalized ?course_component)
+        )
+      )
+    :effect (entity_finalized ?course_component)
+  )
+  (:action apply_administrative_correction_to_case
+    :parameters (?exception_case - exception_case ?supporting_certificate - supporting_certificate ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_finalized ?exception_case)
+        (entity_has_evidence ?exception_case ?evidence_document)
+        (supporting_certificate_available ?supporting_certificate)
+        (not
+          (entity_administratively_corrected ?exception_case)
+        )
+      )
+    :effect
+      (and
+        (entity_administratively_corrected ?exception_case)
+        (entity_has_supporting_certificate ?exception_case ?supporting_certificate)
+        (not
+          (supporting_certificate_available ?supporting_certificate)
+        )
+      )
+  )
+  (:action close_submission_and_release_reviewer
+    :parameters (?submission_record - submission_record ?case_reviewer - case_reviewer ?supporting_certificate - supporting_certificate)
+    :precondition
+      (and
+        (entity_administratively_corrected ?submission_record)
+        (assigned_reviewer ?submission_record ?case_reviewer)
+        (entity_has_supporting_certificate ?submission_record ?supporting_certificate)
+        (not
+          (entity_closed ?submission_record)
+        )
+      )
+    :effect
+      (and
+        (entity_closed ?submission_record)
+        (reviewer_available ?case_reviewer)
+        (supporting_certificate_available ?supporting_certificate)
+      )
+  )
+  (:action close_component_and_release_reviewer
+    :parameters (?course_component - course_component ?case_reviewer - case_reviewer ?supporting_certificate - supporting_certificate)
+    :precondition
+      (and
+        (entity_administratively_corrected ?course_component)
+        (assigned_reviewer ?course_component ?case_reviewer)
+        (entity_has_supporting_certificate ?course_component ?supporting_certificate)
+        (not
+          (entity_closed ?course_component)
+        )
+      )
+    :effect
+      (and
+        (entity_closed ?course_component)
+        (reviewer_available ?case_reviewer)
+        (supporting_certificate_available ?supporting_certificate)
+      )
+  )
+  (:action close_actor_and_release_reviewer
+    :parameters (?case_actor - case_actor ?case_reviewer - case_reviewer ?supporting_certificate - supporting_certificate)
+    :precondition
+      (and
+        (entity_administratively_corrected ?case_actor)
+        (assigned_reviewer ?case_actor ?case_reviewer)
+        (entity_has_supporting_certificate ?case_actor ?supporting_certificate)
+        (not
+          (entity_closed ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (entity_closed ?case_actor)
+        (reviewer_available ?case_reviewer)
+        (supporting_certificate_available ?supporting_certificate)
+      )
+  )
+)

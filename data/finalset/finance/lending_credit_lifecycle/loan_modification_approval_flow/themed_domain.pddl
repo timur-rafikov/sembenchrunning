@@ -1,0 +1,937 @@
+(define (domain loan_modification_approval_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object case_resource_group - generic_entity evidence_group - generic_entity check_group - generic_entity case_root - generic_entity loan_case - case_root credit_officer_slot - case_resource_group analysis_artifact - case_resource_group specialist_reviewer - case_resource_group escalation_reason - case_resource_group decision_criterion - case_resource_group execution_instruction - case_resource_group pricing_input - case_resource_group compliance_evidence - case_resource_group document_resource - evidence_group valuation_report - evidence_group external_opinion - evidence_group automated_risk_check - check_group policy_rule_check - check_group approval_package - check_group loan_segment - loan_case modification_segment - loan_case loan_account - loan_segment co_borrower_account - loan_segment modification_request - modification_segment)
+
+  (:predicates
+    (request_registered ?loan_case - loan_case)
+    (request_in_review ?loan_case - loan_case)
+    (request_credit_officer_assignment_flag ?loan_case - loan_case)
+    (request_execution_recorded ?loan_case - loan_case)
+    (request_decision_final ?loan_case - loan_case)
+    (request_execution_authorized ?loan_case - loan_case)
+    (credit_officer_available ?credit_officer_slot - credit_officer_slot)
+    (request_assigned_credit_officer ?loan_case - loan_case ?credit_officer_slot - credit_officer_slot)
+    (analysis_artifact_available ?analysis_artifact - analysis_artifact)
+    (request_has_analysis_artifact ?loan_case - loan_case ?analysis_artifact - analysis_artifact)
+    (specialist_available ?specialist_reviewer - specialist_reviewer)
+    (request_assigned_specialist ?loan_case - loan_case ?specialist_reviewer - specialist_reviewer)
+    (document_available ?document_resource - document_resource)
+    (loan_account_document_link ?loan_account - loan_account ?document_resource - document_resource)
+    (co_borrower_document_link ?co_borrower_account - co_borrower_account ?document_resource - document_resource)
+    (loan_account_risk_check_link ?loan_account - loan_account ?automated_risk_check - automated_risk_check)
+    (risk_check_triggered ?automated_risk_check - automated_risk_check)
+    (risk_check_document_flag ?automated_risk_check - automated_risk_check)
+    (loan_account_risk_cleared ?loan_account - loan_account)
+    (co_borrower_policy_link ?co_borrower_account - co_borrower_account ?policy_rule_check - policy_rule_check)
+    (policy_check_triggered ?policy_rule_check - policy_rule_check)
+    (policy_check_document_flag ?policy_rule_check - policy_rule_check)
+    (co_borrower_policy_cleared ?co_borrower_account - co_borrower_account)
+    (approval_package_slot ?approval_package - approval_package)
+    (approval_package_ready ?approval_package - approval_package)
+    (approval_package_has_risk_check ?approval_package - approval_package ?automated_risk_check - automated_risk_check)
+    (approval_package_has_policy_check ?approval_package - approval_package ?policy_rule_check - policy_rule_check)
+    (package_flag_escalation ?approval_package - approval_package)
+    (package_flag_secondary_review ?approval_package - approval_package)
+    (approval_package_validated ?approval_package - approval_package)
+    (request_links_account ?modification_request - modification_request ?loan_account - loan_account)
+    (request_links_co_borrower ?modification_request - modification_request ?co_borrower_account - co_borrower_account)
+    (request_has_approval_package ?modification_request - modification_request ?approval_package - approval_package)
+    (valuation_report_available ?valuation_report - valuation_report)
+    (request_has_valuation_report ?modification_request - modification_request ?valuation_report - valuation_report)
+    (valuation_report_attached ?valuation_report - valuation_report)
+    (valuation_report_linked_to_package ?valuation_report - valuation_report ?approval_package - approval_package)
+    (valuation_confirmed ?modification_request - modification_request)
+    (underwriter_signoff_ready ?modification_request - modification_request)
+    (underwriter_signed_off ?modification_request - modification_request)
+    (escalation_raised ?modification_request - modification_request)
+    (escalation_processed ?modification_request - modification_request)
+    (decision_criteria_attached ?modification_request - modification_request)
+    (final_checks_completed ?modification_request - modification_request)
+    (external_opinion_available ?external_opinion - external_opinion)
+    (request_has_external_opinion ?modification_request - modification_request ?external_opinion - external_opinion)
+    (external_opinion_attached ?modification_request - modification_request)
+    (external_opinion_reviewed ?modification_request - modification_request)
+    (external_opinion_validated ?modification_request - modification_request)
+    (escalation_reason_available ?escalation_reason - escalation_reason)
+    (request_has_escalation_reason ?modification_request - modification_request ?escalation_reason - escalation_reason)
+    (decision_criterion_available ?decision_criterion - decision_criterion)
+    (request_has_decision_criterion ?modification_request - modification_request ?decision_criterion - decision_criterion)
+    (pricing_input_available ?pricing_input - pricing_input)
+    (request_has_pricing_input ?modification_request - modification_request ?pricing_input - pricing_input)
+    (compliance_evidence_available ?compliance_evidence - compliance_evidence)
+    (request_has_compliance_evidence ?modification_request - modification_request ?compliance_evidence - compliance_evidence)
+    (execution_instruction_available ?execution_instruction - execution_instruction)
+    (request_has_execution_instruction ?loan_case - loan_case ?execution_instruction - execution_instruction)
+    (loan_account_evaluation_recorded ?loan_account - loan_account)
+    (co_borrower_evaluation_recorded ?co_borrower_account - co_borrower_account)
+    (decision_log_recorded ?modification_request - modification_request)
+  )
+  (:action register_modification_case
+    :parameters (?loan_case - loan_case)
+    :precondition
+      (and
+        (not
+          (request_registered ?loan_case)
+        )
+        (not
+          (request_execution_recorded ?loan_case)
+        )
+      )
+    :effect (request_registered ?loan_case)
+  )
+  (:action assign_credit_officer_to_case
+    :parameters (?loan_case - loan_case ?credit_officer_slot - credit_officer_slot)
+    :precondition
+      (and
+        (request_registered ?loan_case)
+        (not
+          (request_credit_officer_assignment_flag ?loan_case)
+        )
+        (credit_officer_available ?credit_officer_slot)
+      )
+    :effect
+      (and
+        (request_credit_officer_assignment_flag ?loan_case)
+        (request_assigned_credit_officer ?loan_case ?credit_officer_slot)
+        (not
+          (credit_officer_available ?credit_officer_slot)
+        )
+      )
+  )
+  (:action attach_analysis_artifact_to_case
+    :parameters (?loan_case - loan_case ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_registered ?loan_case)
+        (request_credit_officer_assignment_flag ?loan_case)
+        (analysis_artifact_available ?analysis_artifact)
+      )
+    :effect
+      (and
+        (request_has_analysis_artifact ?loan_case ?analysis_artifact)
+        (not
+          (analysis_artifact_available ?analysis_artifact)
+        )
+      )
+  )
+  (:action activate_case_for_review
+    :parameters (?loan_case - loan_case ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_registered ?loan_case)
+        (request_credit_officer_assignment_flag ?loan_case)
+        (request_has_analysis_artifact ?loan_case ?analysis_artifact)
+        (not
+          (request_in_review ?loan_case)
+        )
+      )
+    :effect (request_in_review ?loan_case)
+  )
+  (:action release_analysis_artifact_from_case
+    :parameters (?loan_case - loan_case ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_has_analysis_artifact ?loan_case ?analysis_artifact)
+      )
+    :effect
+      (and
+        (analysis_artifact_available ?analysis_artifact)
+        (not
+          (request_has_analysis_artifact ?loan_case ?analysis_artifact)
+        )
+      )
+  )
+  (:action assign_specialist_to_case
+    :parameters (?loan_case - loan_case ?specialist_reviewer - specialist_reviewer)
+    :precondition
+      (and
+        (request_in_review ?loan_case)
+        (specialist_available ?specialist_reviewer)
+      )
+    :effect
+      (and
+        (request_assigned_specialist ?loan_case ?specialist_reviewer)
+        (not
+          (specialist_available ?specialist_reviewer)
+        )
+      )
+  )
+  (:action release_specialist_from_case
+    :parameters (?loan_case - loan_case ?specialist_reviewer - specialist_reviewer)
+    :precondition
+      (and
+        (request_assigned_specialist ?loan_case ?specialist_reviewer)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist_reviewer)
+        (not
+          (request_assigned_specialist ?loan_case ?specialist_reviewer)
+        )
+      )
+  )
+  (:action attach_pricing_input_to_request
+    :parameters (?modification_request - modification_request ?pricing_input - pricing_input)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (pricing_input_available ?pricing_input)
+      )
+    :effect
+      (and
+        (request_has_pricing_input ?modification_request ?pricing_input)
+        (not
+          (pricing_input_available ?pricing_input)
+        )
+      )
+  )
+  (:action detach_pricing_input_from_request
+    :parameters (?modification_request - modification_request ?pricing_input - pricing_input)
+    :precondition
+      (and
+        (request_has_pricing_input ?modification_request ?pricing_input)
+      )
+    :effect
+      (and
+        (pricing_input_available ?pricing_input)
+        (not
+          (request_has_pricing_input ?modification_request ?pricing_input)
+        )
+      )
+  )
+  (:action attach_compliance_evidence_to_request
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (compliance_evidence_available ?compliance_evidence)
+      )
+    :effect
+      (and
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (not
+          (compliance_evidence_available ?compliance_evidence)
+        )
+      )
+  )
+  (:action detach_compliance_evidence_from_request
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+      )
+    :effect
+      (and
+        (compliance_evidence_available ?compliance_evidence)
+        (not
+          (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        )
+      )
+  )
+  (:action trigger_automated_risk_check_for_account
+    :parameters (?loan_account - loan_account ?automated_risk_check - automated_risk_check ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_in_review ?loan_account)
+        (request_has_analysis_artifact ?loan_account ?analysis_artifact)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (not
+          (risk_check_triggered ?automated_risk_check)
+        )
+        (not
+          (risk_check_document_flag ?automated_risk_check)
+        )
+      )
+    :effect (risk_check_triggered ?automated_risk_check)
+  )
+  (:action apply_specialist_risk_evaluation
+    :parameters (?loan_account - loan_account ?automated_risk_check - automated_risk_check ?specialist_reviewer - specialist_reviewer)
+    :precondition
+      (and
+        (request_in_review ?loan_account)
+        (request_assigned_specialist ?loan_account ?specialist_reviewer)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (risk_check_triggered ?automated_risk_check)
+        (not
+          (loan_account_evaluation_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (loan_account_risk_cleared ?loan_account)
+      )
+  )
+  (:action apply_document_based_risk_evaluation_to_account
+    :parameters (?loan_account - loan_account ?automated_risk_check - automated_risk_check ?document_resource - document_resource)
+    :precondition
+      (and
+        (request_in_review ?loan_account)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (document_available ?document_resource)
+        (not
+          (loan_account_evaluation_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (risk_check_document_flag ?automated_risk_check)
+        (loan_account_evaluation_recorded ?loan_account)
+        (loan_account_document_link ?loan_account ?document_resource)
+        (not
+          (document_available ?document_resource)
+        )
+      )
+  )
+  (:action finalize_account_risk_evaluation
+    :parameters (?loan_account - loan_account ?automated_risk_check - automated_risk_check ?analysis_artifact - analysis_artifact ?document_resource - document_resource)
+    :precondition
+      (and
+        (request_in_review ?loan_account)
+        (request_has_analysis_artifact ?loan_account ?analysis_artifact)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (risk_check_document_flag ?automated_risk_check)
+        (loan_account_document_link ?loan_account ?document_resource)
+        (not
+          (loan_account_risk_cleared ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (risk_check_triggered ?automated_risk_check)
+        (loan_account_risk_cleared ?loan_account)
+        (document_available ?document_resource)
+        (not
+          (loan_account_document_link ?loan_account ?document_resource)
+        )
+      )
+  )
+  (:action trigger_policy_check_for_co_borrower
+    :parameters (?co_borrower_account - co_borrower_account ?policy_rule_check - policy_rule_check ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_in_review ?co_borrower_account)
+        (request_has_analysis_artifact ?co_borrower_account ?analysis_artifact)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (not
+          (policy_check_triggered ?policy_rule_check)
+        )
+        (not
+          (policy_check_document_flag ?policy_rule_check)
+        )
+      )
+    :effect (policy_check_triggered ?policy_rule_check)
+  )
+  (:action apply_specialist_policy_evaluation_for_co_borrower
+    :parameters (?co_borrower_account - co_borrower_account ?policy_rule_check - policy_rule_check ?specialist_reviewer - specialist_reviewer)
+    :precondition
+      (and
+        (request_in_review ?co_borrower_account)
+        (request_assigned_specialist ?co_borrower_account ?specialist_reviewer)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (policy_check_triggered ?policy_rule_check)
+        (not
+          (co_borrower_evaluation_recorded ?co_borrower_account)
+        )
+      )
+    :effect
+      (and
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (co_borrower_policy_cleared ?co_borrower_account)
+      )
+  )
+  (:action apply_document_based_policy_evaluation_for_co_borrower
+    :parameters (?co_borrower_account - co_borrower_account ?policy_rule_check - policy_rule_check ?document_resource - document_resource)
+    :precondition
+      (and
+        (request_in_review ?co_borrower_account)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (document_available ?document_resource)
+        (not
+          (co_borrower_evaluation_recorded ?co_borrower_account)
+        )
+      )
+    :effect
+      (and
+        (policy_check_document_flag ?policy_rule_check)
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (co_borrower_document_link ?co_borrower_account ?document_resource)
+        (not
+          (document_available ?document_resource)
+        )
+      )
+  )
+  (:action finalize_co_borrower_policy_evaluation
+    :parameters (?co_borrower_account - co_borrower_account ?policy_rule_check - policy_rule_check ?analysis_artifact - analysis_artifact ?document_resource - document_resource)
+    :precondition
+      (and
+        (request_in_review ?co_borrower_account)
+        (request_has_analysis_artifact ?co_borrower_account ?analysis_artifact)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (policy_check_document_flag ?policy_rule_check)
+        (co_borrower_document_link ?co_borrower_account ?document_resource)
+        (not
+          (co_borrower_policy_cleared ?co_borrower_account)
+        )
+      )
+    :effect
+      (and
+        (policy_check_triggered ?policy_rule_check)
+        (co_borrower_policy_cleared ?co_borrower_account)
+        (document_available ?document_resource)
+        (not
+          (co_borrower_document_link ?co_borrower_account ?document_resource)
+        )
+      )
+  )
+  (:action assemble_approval_package_standard
+    :parameters (?loan_account - loan_account ?co_borrower_account - co_borrower_account ?automated_risk_check - automated_risk_check ?policy_rule_check - policy_rule_check ?approval_package - approval_package)
+    :precondition
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (risk_check_triggered ?automated_risk_check)
+        (policy_check_triggered ?policy_rule_check)
+        (loan_account_risk_cleared ?loan_account)
+        (co_borrower_policy_cleared ?co_borrower_account)
+        (approval_package_slot ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_ready ?approval_package)
+        (approval_package_has_risk_check ?approval_package ?automated_risk_check)
+        (approval_package_has_policy_check ?approval_package ?policy_rule_check)
+        (not
+          (approval_package_slot ?approval_package)
+        )
+      )
+  )
+  (:action assemble_approval_package_variant_a
+    :parameters (?loan_account - loan_account ?co_borrower_account - co_borrower_account ?automated_risk_check - automated_risk_check ?policy_rule_check - policy_rule_check ?approval_package - approval_package)
+    :precondition
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (risk_check_document_flag ?automated_risk_check)
+        (policy_check_triggered ?policy_rule_check)
+        (not
+          (loan_account_risk_cleared ?loan_account)
+        )
+        (co_borrower_policy_cleared ?co_borrower_account)
+        (approval_package_slot ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_ready ?approval_package)
+        (approval_package_has_risk_check ?approval_package ?automated_risk_check)
+        (approval_package_has_policy_check ?approval_package ?policy_rule_check)
+        (package_flag_escalation ?approval_package)
+        (not
+          (approval_package_slot ?approval_package)
+        )
+      )
+  )
+  (:action assemble_approval_package_variant_b
+    :parameters (?loan_account - loan_account ?co_borrower_account - co_borrower_account ?automated_risk_check - automated_risk_check ?policy_rule_check - policy_rule_check ?approval_package - approval_package)
+    :precondition
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (risk_check_triggered ?automated_risk_check)
+        (policy_check_document_flag ?policy_rule_check)
+        (loan_account_risk_cleared ?loan_account)
+        (not
+          (co_borrower_policy_cleared ?co_borrower_account)
+        )
+        (approval_package_slot ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_ready ?approval_package)
+        (approval_package_has_risk_check ?approval_package ?automated_risk_check)
+        (approval_package_has_policy_check ?approval_package ?policy_rule_check)
+        (package_flag_secondary_review ?approval_package)
+        (not
+          (approval_package_slot ?approval_package)
+        )
+      )
+  )
+  (:action assemble_approval_package_variant_full
+    :parameters (?loan_account - loan_account ?co_borrower_account - co_borrower_account ?automated_risk_check - automated_risk_check ?policy_rule_check - policy_rule_check ?approval_package - approval_package)
+    :precondition
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (loan_account_risk_check_link ?loan_account ?automated_risk_check)
+        (co_borrower_policy_link ?co_borrower_account ?policy_rule_check)
+        (risk_check_document_flag ?automated_risk_check)
+        (policy_check_document_flag ?policy_rule_check)
+        (not
+          (loan_account_risk_cleared ?loan_account)
+        )
+        (not
+          (co_borrower_policy_cleared ?co_borrower_account)
+        )
+        (approval_package_slot ?approval_package)
+      )
+    :effect
+      (and
+        (approval_package_ready ?approval_package)
+        (approval_package_has_risk_check ?approval_package ?automated_risk_check)
+        (approval_package_has_policy_check ?approval_package ?policy_rule_check)
+        (package_flag_escalation ?approval_package)
+        (package_flag_secondary_review ?approval_package)
+        (not
+          (approval_package_slot ?approval_package)
+        )
+      )
+  )
+  (:action validate_approval_package_for_account
+    :parameters (?approval_package - approval_package ?loan_account - loan_account ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (approval_package_ready ?approval_package)
+        (loan_account_evaluation_recorded ?loan_account)
+        (request_has_analysis_artifact ?loan_account ?analysis_artifact)
+        (not
+          (approval_package_validated ?approval_package)
+        )
+      )
+    :effect (approval_package_validated ?approval_package)
+  )
+  (:action attach_valuation_report_to_package
+    :parameters (?modification_request - modification_request ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (request_has_approval_package ?modification_request ?approval_package)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_available ?valuation_report)
+        (approval_package_ready ?approval_package)
+        (approval_package_validated ?approval_package)
+        (not
+          (valuation_report_attached ?valuation_report)
+        )
+      )
+    :effect
+      (and
+        (valuation_report_attached ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (not
+          (valuation_report_available ?valuation_report)
+        )
+      )
+  )
+  (:action confirm_valuation_report_for_request
+    :parameters (?modification_request - modification_request ?valuation_report - valuation_report ?approval_package - approval_package ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_attached ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (request_has_analysis_artifact ?modification_request ?analysis_artifact)
+        (not
+          (package_flag_escalation ?approval_package)
+        )
+        (not
+          (valuation_confirmed ?modification_request)
+        )
+      )
+    :effect (valuation_confirmed ?modification_request)
+  )
+  (:action attach_escalation_reason_to_request
+    :parameters (?modification_request - modification_request ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (escalation_reason_available ?escalation_reason)
+        (not
+          (escalation_raised ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (escalation_raised ?modification_request)
+        (request_has_escalation_reason ?modification_request ?escalation_reason)
+        (not
+          (escalation_reason_available ?escalation_reason)
+        )
+      )
+  )
+  (:action process_escalation_and_confirm_valuation
+    :parameters (?modification_request - modification_request ?valuation_report - valuation_report ?approval_package - approval_package ?analysis_artifact - analysis_artifact ?escalation_reason - escalation_reason)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_attached ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (request_has_analysis_artifact ?modification_request ?analysis_artifact)
+        (package_flag_escalation ?approval_package)
+        (escalation_raised ?modification_request)
+        (request_has_escalation_reason ?modification_request ?escalation_reason)
+        (not
+          (valuation_confirmed ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (valuation_confirmed ?modification_request)
+        (escalation_processed ?modification_request)
+      )
+  )
+  (:action prepare_underwriter_signoff
+    :parameters (?modification_request - modification_request ?pricing_input - pricing_input ?specialist_reviewer - specialist_reviewer ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (valuation_confirmed ?modification_request)
+        (request_has_pricing_input ?modification_request ?pricing_input)
+        (request_assigned_specialist ?modification_request ?specialist_reviewer)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (not
+          (package_flag_secondary_review ?approval_package)
+        )
+        (not
+          (underwriter_signoff_ready ?modification_request)
+        )
+      )
+    :effect (underwriter_signoff_ready ?modification_request)
+  )
+  (:action prepare_underwriter_signoff_secondary
+    :parameters (?modification_request - modification_request ?pricing_input - pricing_input ?specialist_reviewer - specialist_reviewer ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (valuation_confirmed ?modification_request)
+        (request_has_pricing_input ?modification_request ?pricing_input)
+        (request_assigned_specialist ?modification_request ?specialist_reviewer)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (package_flag_secondary_review ?approval_package)
+        (not
+          (underwriter_signoff_ready ?modification_request)
+        )
+      )
+    :effect (underwriter_signoff_ready ?modification_request)
+  )
+  (:action underwriter_signoff_with_compliance_evidence
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (underwriter_signoff_ready ?modification_request)
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (not
+          (package_flag_escalation ?approval_package)
+        )
+        (not
+          (package_flag_secondary_review ?approval_package)
+        )
+        (not
+          (underwriter_signed_off ?modification_request)
+        )
+      )
+    :effect (underwriter_signed_off ?modification_request)
+  )
+  (:action underwriter_signoff_with_attached_criteria
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (underwriter_signoff_ready ?modification_request)
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (package_flag_escalation ?approval_package)
+        (not
+          (package_flag_secondary_review ?approval_package)
+        )
+        (not
+          (underwriter_signed_off ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (underwriter_signed_off ?modification_request)
+        (decision_criteria_attached ?modification_request)
+      )
+  )
+  (:action underwriter_signoff_with_attached_criteria_variant_b
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (underwriter_signoff_ready ?modification_request)
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (not
+          (package_flag_escalation ?approval_package)
+        )
+        (package_flag_secondary_review ?approval_package)
+        (not
+          (underwriter_signed_off ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (underwriter_signed_off ?modification_request)
+        (decision_criteria_attached ?modification_request)
+      )
+  )
+  (:action underwriter_signoff_with_attached_criteria_variant_c
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence ?valuation_report - valuation_report ?approval_package - approval_package)
+    :precondition
+      (and
+        (underwriter_signoff_ready ?modification_request)
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (request_has_valuation_report ?modification_request ?valuation_report)
+        (valuation_report_linked_to_package ?valuation_report ?approval_package)
+        (package_flag_escalation ?approval_package)
+        (package_flag_secondary_review ?approval_package)
+        (not
+          (underwriter_signed_off ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (underwriter_signed_off ?modification_request)
+        (decision_criteria_attached ?modification_request)
+      )
+  )
+  (:action record_final_decision_on_request
+    :parameters (?modification_request - modification_request)
+    :precondition
+      (and
+        (underwriter_signed_off ?modification_request)
+        (not
+          (decision_criteria_attached ?modification_request)
+        )
+        (not
+          (decision_log_recorded ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (decision_log_recorded ?modification_request)
+        (request_decision_final ?modification_request)
+      )
+  )
+  (:action attach_decision_criterion_to_request
+    :parameters (?modification_request - modification_request ?decision_criterion - decision_criterion)
+    :precondition
+      (and
+        (underwriter_signed_off ?modification_request)
+        (decision_criteria_attached ?modification_request)
+        (decision_criterion_available ?decision_criterion)
+      )
+    :effect
+      (and
+        (request_has_decision_criterion ?modification_request ?decision_criterion)
+        (not
+          (decision_criterion_available ?decision_criterion)
+        )
+      )
+  )
+  (:action perform_underwriter_final_checks
+    :parameters (?modification_request - modification_request ?loan_account - loan_account ?co_borrower_account - co_borrower_account ?analysis_artifact - analysis_artifact ?decision_criterion - decision_criterion)
+    :precondition
+      (and
+        (underwriter_signed_off ?modification_request)
+        (decision_criteria_attached ?modification_request)
+        (request_has_decision_criterion ?modification_request ?decision_criterion)
+        (request_links_account ?modification_request ?loan_account)
+        (request_links_co_borrower ?modification_request ?co_borrower_account)
+        (loan_account_risk_cleared ?loan_account)
+        (co_borrower_policy_cleared ?co_borrower_account)
+        (request_has_analysis_artifact ?modification_request ?analysis_artifact)
+        (not
+          (final_checks_completed ?modification_request)
+        )
+      )
+    :effect (final_checks_completed ?modification_request)
+  )
+  (:action record_final_decision_after_final_checks
+    :parameters (?modification_request - modification_request)
+    :precondition
+      (and
+        (underwriter_signed_off ?modification_request)
+        (final_checks_completed ?modification_request)
+        (not
+          (decision_log_recorded ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (decision_log_recorded ?modification_request)
+        (request_decision_final ?modification_request)
+      )
+  )
+  (:action attach_external_opinion_to_request
+    :parameters (?modification_request - modification_request ?external_opinion - external_opinion ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_in_review ?modification_request)
+        (request_has_analysis_artifact ?modification_request ?analysis_artifact)
+        (external_opinion_available ?external_opinion)
+        (request_has_external_opinion ?modification_request ?external_opinion)
+        (not
+          (external_opinion_attached ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (external_opinion_attached ?modification_request)
+        (not
+          (external_opinion_available ?external_opinion)
+        )
+      )
+  )
+  (:action specialist_review_external_opinion
+    :parameters (?modification_request - modification_request ?specialist_reviewer - specialist_reviewer)
+    :precondition
+      (and
+        (external_opinion_attached ?modification_request)
+        (request_assigned_specialist ?modification_request ?specialist_reviewer)
+        (not
+          (external_opinion_reviewed ?modification_request)
+        )
+      )
+    :effect (external_opinion_reviewed ?modification_request)
+  )
+  (:action link_external_opinion_to_compliance_evidence
+    :parameters (?modification_request - modification_request ?compliance_evidence - compliance_evidence)
+    :precondition
+      (and
+        (external_opinion_reviewed ?modification_request)
+        (request_has_compliance_evidence ?modification_request ?compliance_evidence)
+        (not
+          (external_opinion_validated ?modification_request)
+        )
+      )
+    :effect (external_opinion_validated ?modification_request)
+  )
+  (:action record_decision_from_external_opinion
+    :parameters (?modification_request - modification_request)
+    :precondition
+      (and
+        (external_opinion_validated ?modification_request)
+        (not
+          (decision_log_recorded ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (decision_log_recorded ?modification_request)
+        (request_decision_final ?modification_request)
+      )
+  )
+  (:action apply_decision_to_loan_account
+    :parameters (?loan_account - loan_account ?approval_package - approval_package)
+    :precondition
+      (and
+        (loan_account_evaluation_recorded ?loan_account)
+        (loan_account_risk_cleared ?loan_account)
+        (approval_package_ready ?approval_package)
+        (approval_package_validated ?approval_package)
+        (not
+          (request_decision_final ?loan_account)
+        )
+      )
+    :effect (request_decision_final ?loan_account)
+  )
+  (:action apply_decision_to_co_borrower_account
+    :parameters (?co_borrower_account - co_borrower_account ?approval_package - approval_package)
+    :precondition
+      (and
+        (co_borrower_evaluation_recorded ?co_borrower_account)
+        (co_borrower_policy_cleared ?co_borrower_account)
+        (approval_package_ready ?approval_package)
+        (approval_package_validated ?approval_package)
+        (not
+          (request_decision_final ?co_borrower_account)
+        )
+      )
+    :effect (request_decision_final ?co_borrower_account)
+  )
+  (:action generate_execution_instruction_for_case
+    :parameters (?loan_case - loan_case ?execution_instruction - execution_instruction ?analysis_artifact - analysis_artifact)
+    :precondition
+      (and
+        (request_decision_final ?loan_case)
+        (request_has_analysis_artifact ?loan_case ?analysis_artifact)
+        (execution_instruction_available ?execution_instruction)
+        (not
+          (request_execution_authorized ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (request_execution_authorized ?loan_case)
+        (request_has_execution_instruction ?loan_case ?execution_instruction)
+        (not
+          (execution_instruction_available ?execution_instruction)
+        )
+      )
+  )
+  (:action execute_instruction_on_loan_account
+    :parameters (?loan_account - loan_account ?credit_officer_slot - credit_officer_slot ?execution_instruction - execution_instruction)
+    :precondition
+      (and
+        (request_execution_authorized ?loan_account)
+        (request_assigned_credit_officer ?loan_account ?credit_officer_slot)
+        (request_has_execution_instruction ?loan_account ?execution_instruction)
+        (not
+          (request_execution_recorded ?loan_account)
+        )
+      )
+    :effect
+      (and
+        (request_execution_recorded ?loan_account)
+        (credit_officer_available ?credit_officer_slot)
+        (execution_instruction_available ?execution_instruction)
+      )
+  )
+  (:action execute_instruction_on_co_borrower_account
+    :parameters (?co_borrower_account - co_borrower_account ?credit_officer_slot - credit_officer_slot ?execution_instruction - execution_instruction)
+    :precondition
+      (and
+        (request_execution_authorized ?co_borrower_account)
+        (request_assigned_credit_officer ?co_borrower_account ?credit_officer_slot)
+        (request_has_execution_instruction ?co_borrower_account ?execution_instruction)
+        (not
+          (request_execution_recorded ?co_borrower_account)
+        )
+      )
+    :effect
+      (and
+        (request_execution_recorded ?co_borrower_account)
+        (credit_officer_available ?credit_officer_slot)
+        (execution_instruction_available ?execution_instruction)
+      )
+  )
+  (:action execute_instruction_on_request
+    :parameters (?modification_request - modification_request ?credit_officer_slot - credit_officer_slot ?execution_instruction - execution_instruction)
+    :precondition
+      (and
+        (request_execution_authorized ?modification_request)
+        (request_assigned_credit_officer ?modification_request ?credit_officer_slot)
+        (request_has_execution_instruction ?modification_request ?execution_instruction)
+        (not
+          (request_execution_recorded ?modification_request)
+        )
+      )
+    :effect
+      (and
+        (request_execution_recorded ?modification_request)
+        (credit_officer_available ?credit_officer_slot)
+        (execution_instruction_available ?execution_instruction)
+      )
+  )
+)

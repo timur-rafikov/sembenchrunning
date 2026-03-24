@@ -1,0 +1,1077 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_stability_window_batch_timing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object resource_entity - base_object artifact_entity - base_object timing_entity - base_object manufacturing_entity - base_object batch_entity - manufacturing_entity manufacturing_line - resource_entity process_stage - resource_entity operator_team - resource_entity batch_label - resource_entity release_document - resource_entity stability_profile - resource_entity equipment_asset - resource_entity qa_approver_role - resource_entity consumable_material - artifact_entity qc_sample - artifact_entity specification_document - artifact_entity upstream_timing_window - timing_entity downstream_timing_window - timing_entity process_unit_container - timing_entity process_slot_entity - batch_entity batch_record_entity - batch_entity upstream_process_slot - process_slot_entity downstream_process_slot - process_slot_entity batch_record - batch_record_entity)
+
+  (:predicates
+    (batch_initiated ?batch - batch_entity)
+    (batch_in_process ?batch - batch_entity)
+    (line_reserved ?batch - batch_entity)
+    (released_for_distribution ?batch - batch_entity)
+    (release_ready ?batch - batch_entity)
+    (stability_profile_applied ?batch - batch_entity)
+    (line_available ?manufacturing_line - manufacturing_line)
+    (entity_line_assigned ?batch - batch_entity ?manufacturing_line - manufacturing_line)
+    (stage_available ?process_stage - process_stage)
+    (entity_stage_assigned ?batch - batch_entity ?process_stage - process_stage)
+    (operator_available ?operator - operator_team)
+    (entity_operator_assigned ?batch - batch_entity ?operator - operator_team)
+    (material_available ?material - consumable_material)
+    (upstream_slot_material_assigned ?upstream_slot - upstream_process_slot ?material - consumable_material)
+    (downstream_slot_material_assigned ?downstream_slot - downstream_process_slot ?material - consumable_material)
+    (upstream_slot_window_linked ?upstream_slot - upstream_process_slot ?upstream_window - upstream_timing_window)
+    (upstream_window_open ?upstream_window - upstream_timing_window)
+    (upstream_window_held ?upstream_window - upstream_timing_window)
+    (upstream_slot_qualified ?upstream_slot - upstream_process_slot)
+    (downstream_slot_window_linked ?downstream_slot - downstream_process_slot ?downstream_window - downstream_timing_window)
+    (downstream_window_open ?downstream_window - downstream_timing_window)
+    (downstream_window_held ?downstream_window - downstream_timing_window)
+    (downstream_slot_qualified ?downstream_slot - downstream_process_slot)
+    (container_available ?container - process_unit_container)
+    (container_window_binding_complete ?container - process_unit_container)
+    (container_upstream_window_linked ?container - process_unit_container ?upstream_window - upstream_timing_window)
+    (container_downstream_window_linked ?container - process_unit_container ?downstream_window - downstream_timing_window)
+    (container_upstream_condition_verified ?container - process_unit_container)
+    (container_downstream_condition_verified ?container - process_unit_container)
+    (container_qc_ready ?container - process_unit_container)
+    (record_linked_to_upstream_slot ?batch_record - batch_record ?upstream_slot - upstream_process_slot)
+    (record_linked_to_downstream_slot ?batch_record - batch_record ?downstream_slot - downstream_process_slot)
+    (record_linked_to_container ?batch_record - batch_record ?container - process_unit_container)
+    (qc_sample_available ?qc_sample - qc_sample)
+    (record_requires_qc_sample ?batch_record - batch_record ?qc_sample - qc_sample)
+    (qc_sample_assigned ?qc_sample - qc_sample)
+    (sample_linked_to_container ?qc_sample - qc_sample ?container - process_unit_container)
+    (qc_sample_logged ?batch_record - batch_record)
+    (record_under_review ?batch_record - batch_record)
+    (record_approved ?batch_record - batch_record)
+    (record_labeled ?batch_record - batch_record)
+    (record_pre_release_cleared ?batch_record - batch_record)
+    (record_release_dossier_ready ?batch_record - batch_record)
+    (release_dossier_compiled ?batch_record - batch_record)
+    (spec_document_available ?specification_document - specification_document)
+    (record_linked_to_spec_document ?batch_record - batch_record ?specification_document - specification_document)
+    (spec_document_attached ?batch_record - batch_record)
+    (operator_signoff_recorded ?batch_record - batch_record)
+    (approver_signoff_recorded ?batch_record - batch_record)
+    (label_available ?batch_label - batch_label)
+    (record_linked_to_label ?batch_record - batch_record ?batch_label - batch_label)
+    (release_document_available ?release_document - release_document)
+    (record_linked_to_release_document ?batch_record - batch_record ?release_document - release_document)
+    (equipment_available ?equipment_asset - equipment_asset)
+    (entity_equipment_assigned ?batch_record - batch_record ?equipment_asset - equipment_asset)
+    (approver_available ?approver_role - qa_approver_role)
+    (entity_approver_assigned ?batch_record - batch_record ?approver_role - qa_approver_role)
+    (stability_profile_available ?stability_profile - stability_profile)
+    (entity_stability_profile_linked ?batch - batch_entity ?stability_profile - stability_profile)
+    (upstream_slot_engaged ?upstream_slot - upstream_process_slot)
+    (downstream_slot_engaged ?downstream_slot - downstream_process_slot)
+    (record_closed ?batch_record - batch_record)
+  )
+  (:action initiate_batch
+    :parameters (?batch - batch_entity)
+    :precondition
+      (and
+        (not
+          (batch_initiated ?batch)
+        )
+        (not
+          (released_for_distribution ?batch)
+        )
+      )
+    :effect (batch_initiated ?batch)
+  )
+  (:action reserve_manufacturing_line
+    :parameters (?batch - batch_entity ?manufacturing_line - manufacturing_line)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (not
+          (line_reserved ?batch)
+        )
+        (line_available ?manufacturing_line)
+      )
+    :effect
+      (and
+        (line_reserved ?batch)
+        (entity_line_assigned ?batch ?manufacturing_line)
+        (not
+          (line_available ?manufacturing_line)
+        )
+      )
+  )
+  (:action assign_process_stage
+    :parameters (?batch - batch_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (line_reserved ?batch)
+        (stage_available ?process_stage)
+      )
+    :effect
+      (and
+        (entity_stage_assigned ?batch ?process_stage)
+        (not
+          (stage_available ?process_stage)
+        )
+      )
+  )
+  (:action confirm_process_stage
+    :parameters (?batch - batch_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_initiated ?batch)
+        (line_reserved ?batch)
+        (entity_stage_assigned ?batch ?process_stage)
+        (not
+          (batch_in_process ?batch)
+        )
+      )
+    :effect (batch_in_process ?batch)
+  )
+  (:action clear_process_stage
+    :parameters (?batch - batch_entity ?process_stage - process_stage)
+    :precondition
+      (and
+        (entity_stage_assigned ?batch ?process_stage)
+      )
+    :effect
+      (and
+        (stage_available ?process_stage)
+        (not
+          (entity_stage_assigned ?batch ?process_stage)
+        )
+      )
+  )
+  (:action assign_operator
+    :parameters (?batch - batch_entity ?operator - operator_team)
+    :precondition
+      (and
+        (batch_in_process ?batch)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (entity_operator_assigned ?batch ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator
+    :parameters (?batch - batch_entity ?operator - operator_team)
+    :precondition
+      (and
+        (entity_operator_assigned ?batch ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (entity_operator_assigned ?batch ?operator)
+        )
+      )
+  )
+  (:action assign_equipment
+    :parameters (?batch_record - batch_record ?equipment_asset - equipment_asset)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (equipment_available ?equipment_asset)
+      )
+    :effect
+      (and
+        (entity_equipment_assigned ?batch_record ?equipment_asset)
+        (not
+          (equipment_available ?equipment_asset)
+        )
+      )
+  )
+  (:action release_equipment
+    :parameters (?batch_record - batch_record ?equipment_asset - equipment_asset)
+    :precondition
+      (and
+        (entity_equipment_assigned ?batch_record ?equipment_asset)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_asset)
+        (not
+          (entity_equipment_assigned ?batch_record ?equipment_asset)
+        )
+      )
+  )
+  (:action assign_approver
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (approver_available ?approver_role)
+      )
+    :effect
+      (and
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (not
+          (approver_available ?approver_role)
+        )
+      )
+  )
+  (:action release_approver
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role)
+    :precondition
+      (and
+        (entity_approver_assigned ?batch_record ?approver_role)
+      )
+    :effect
+      (and
+        (approver_available ?approver_role)
+        (not
+          (entity_approver_assigned ?batch_record ?approver_role)
+        )
+      )
+  )
+  (:action open_upstream_timing_window
+    :parameters (?upstream_slot - upstream_process_slot ?upstream_window - upstream_timing_window ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_in_process ?upstream_slot)
+        (entity_stage_assigned ?upstream_slot ?process_stage)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (not
+          (upstream_window_open ?upstream_window)
+        )
+        (not
+          (upstream_window_held ?upstream_window)
+        )
+      )
+    :effect (upstream_window_open ?upstream_window)
+  )
+  (:action start_upstream_processing
+    :parameters (?upstream_slot - upstream_process_slot ?upstream_window - upstream_timing_window ?operator - operator_team)
+    :precondition
+      (and
+        (batch_in_process ?upstream_slot)
+        (entity_operator_assigned ?upstream_slot ?operator)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (upstream_window_open ?upstream_window)
+        (not
+          (upstream_slot_engaged ?upstream_slot)
+        )
+      )
+    :effect
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (upstream_slot_qualified ?upstream_slot)
+      )
+  )
+  (:action allocate_upstream_material
+    :parameters (?upstream_slot - upstream_process_slot ?upstream_window - upstream_timing_window ?material - consumable_material)
+    :precondition
+      (and
+        (batch_in_process ?upstream_slot)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (material_available ?material)
+        (not
+          (upstream_slot_engaged ?upstream_slot)
+        )
+      )
+    :effect
+      (and
+        (upstream_window_held ?upstream_window)
+        (upstream_slot_engaged ?upstream_slot)
+        (upstream_slot_material_assigned ?upstream_slot ?material)
+        (not
+          (material_available ?material)
+        )
+      )
+  )
+  (:action complete_upstream_processing
+    :parameters (?upstream_slot - upstream_process_slot ?upstream_window - upstream_timing_window ?process_stage - process_stage ?material - consumable_material)
+    :precondition
+      (and
+        (batch_in_process ?upstream_slot)
+        (entity_stage_assigned ?upstream_slot ?process_stage)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (upstream_window_held ?upstream_window)
+        (upstream_slot_material_assigned ?upstream_slot ?material)
+        (not
+          (upstream_slot_qualified ?upstream_slot)
+        )
+      )
+    :effect
+      (and
+        (upstream_window_open ?upstream_window)
+        (upstream_slot_qualified ?upstream_slot)
+        (material_available ?material)
+        (not
+          (upstream_slot_material_assigned ?upstream_slot ?material)
+        )
+      )
+  )
+  (:action open_downstream_timing_window
+    :parameters (?downstream_slot - downstream_process_slot ?downstream_window - downstream_timing_window ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_in_process ?downstream_slot)
+        (entity_stage_assigned ?downstream_slot ?process_stage)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (not
+          (downstream_window_open ?downstream_window)
+        )
+        (not
+          (downstream_window_held ?downstream_window)
+        )
+      )
+    :effect (downstream_window_open ?downstream_window)
+  )
+  (:action start_downstream_processing
+    :parameters (?downstream_slot - downstream_process_slot ?downstream_window - downstream_timing_window ?operator - operator_team)
+    :precondition
+      (and
+        (batch_in_process ?downstream_slot)
+        (entity_operator_assigned ?downstream_slot ?operator)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (downstream_window_open ?downstream_window)
+        (not
+          (downstream_slot_engaged ?downstream_slot)
+        )
+      )
+    :effect
+      (and
+        (downstream_slot_engaged ?downstream_slot)
+        (downstream_slot_qualified ?downstream_slot)
+      )
+  )
+  (:action allocate_downstream_material
+    :parameters (?downstream_slot - downstream_process_slot ?downstream_window - downstream_timing_window ?material - consumable_material)
+    :precondition
+      (and
+        (batch_in_process ?downstream_slot)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (material_available ?material)
+        (not
+          (downstream_slot_engaged ?downstream_slot)
+        )
+      )
+    :effect
+      (and
+        (downstream_window_held ?downstream_window)
+        (downstream_slot_engaged ?downstream_slot)
+        (downstream_slot_material_assigned ?downstream_slot ?material)
+        (not
+          (material_available ?material)
+        )
+      )
+  )
+  (:action complete_downstream_processing
+    :parameters (?downstream_slot - downstream_process_slot ?downstream_window - downstream_timing_window ?process_stage - process_stage ?material - consumable_material)
+    :precondition
+      (and
+        (batch_in_process ?downstream_slot)
+        (entity_stage_assigned ?downstream_slot ?process_stage)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (downstream_window_held ?downstream_window)
+        (downstream_slot_material_assigned ?downstream_slot ?material)
+        (not
+          (downstream_slot_qualified ?downstream_slot)
+        )
+      )
+    :effect
+      (and
+        (downstream_window_open ?downstream_window)
+        (downstream_slot_qualified ?downstream_slot)
+        (material_available ?material)
+        (not
+          (downstream_slot_material_assigned ?downstream_slot ?material)
+        )
+      )
+  )
+  (:action link_container_to_timing_windows
+    :parameters (?upstream_slot - upstream_process_slot ?downstream_slot - downstream_process_slot ?upstream_window - upstream_timing_window ?downstream_window - downstream_timing_window ?container - process_unit_container)
+    :precondition
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (downstream_slot_engaged ?downstream_slot)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (upstream_window_open ?upstream_window)
+        (downstream_window_open ?downstream_window)
+        (upstream_slot_qualified ?upstream_slot)
+        (downstream_slot_qualified ?downstream_slot)
+        (container_available ?container)
+      )
+    :effect
+      (and
+        (container_window_binding_complete ?container)
+        (container_upstream_window_linked ?container ?upstream_window)
+        (container_downstream_window_linked ?container ?downstream_window)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action verify_container_upstream_condition
+    :parameters (?upstream_slot - upstream_process_slot ?downstream_slot - downstream_process_slot ?upstream_window - upstream_timing_window ?downstream_window - downstream_timing_window ?container - process_unit_container)
+    :precondition
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (downstream_slot_engaged ?downstream_slot)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (upstream_window_held ?upstream_window)
+        (downstream_window_open ?downstream_window)
+        (not
+          (upstream_slot_qualified ?upstream_slot)
+        )
+        (downstream_slot_qualified ?downstream_slot)
+        (container_available ?container)
+      )
+    :effect
+      (and
+        (container_window_binding_complete ?container)
+        (container_upstream_window_linked ?container ?upstream_window)
+        (container_downstream_window_linked ?container ?downstream_window)
+        (container_upstream_condition_verified ?container)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action verify_container_downstream_condition
+    :parameters (?upstream_slot - upstream_process_slot ?downstream_slot - downstream_process_slot ?upstream_window - upstream_timing_window ?downstream_window - downstream_timing_window ?container - process_unit_container)
+    :precondition
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (downstream_slot_engaged ?downstream_slot)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (upstream_window_open ?upstream_window)
+        (downstream_window_held ?downstream_window)
+        (upstream_slot_qualified ?upstream_slot)
+        (not
+          (downstream_slot_qualified ?downstream_slot)
+        )
+        (container_available ?container)
+      )
+    :effect
+      (and
+        (container_window_binding_complete ?container)
+        (container_upstream_window_linked ?container ?upstream_window)
+        (container_downstream_window_linked ?container ?downstream_window)
+        (container_downstream_condition_verified ?container)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action verify_container_dual_condition
+    :parameters (?upstream_slot - upstream_process_slot ?downstream_slot - downstream_process_slot ?upstream_window - upstream_timing_window ?downstream_window - downstream_timing_window ?container - process_unit_container)
+    :precondition
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (downstream_slot_engaged ?downstream_slot)
+        (upstream_slot_window_linked ?upstream_slot ?upstream_window)
+        (downstream_slot_window_linked ?downstream_slot ?downstream_window)
+        (upstream_window_held ?upstream_window)
+        (downstream_window_held ?downstream_window)
+        (not
+          (upstream_slot_qualified ?upstream_slot)
+        )
+        (not
+          (downstream_slot_qualified ?downstream_slot)
+        )
+        (container_available ?container)
+      )
+    :effect
+      (and
+        (container_window_binding_complete ?container)
+        (container_upstream_window_linked ?container ?upstream_window)
+        (container_downstream_window_linked ?container ?downstream_window)
+        (container_upstream_condition_verified ?container)
+        (container_downstream_condition_verified ?container)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action prepare_container_for_qc_sampling
+    :parameters (?container - process_unit_container ?upstream_slot - upstream_process_slot ?process_stage - process_stage)
+    :precondition
+      (and
+        (container_window_binding_complete ?container)
+        (upstream_slot_engaged ?upstream_slot)
+        (entity_stage_assigned ?upstream_slot ?process_stage)
+        (not
+          (container_qc_ready ?container)
+        )
+      )
+    :effect (container_qc_ready ?container)
+  )
+  (:action assign_qc_sample_to_container
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (record_linked_to_container ?batch_record ?container)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (qc_sample_available ?qc_sample)
+        (container_window_binding_complete ?container)
+        (container_qc_ready ?container)
+        (not
+          (qc_sample_assigned ?qc_sample)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_assigned ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (not
+          (qc_sample_available ?qc_sample)
+        )
+      )
+  )
+  (:action log_qc_sample_receipt
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?container - process_unit_container ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (entity_stage_assigned ?batch_record ?process_stage)
+        (not
+          (container_upstream_condition_verified ?container)
+        )
+        (not
+          (qc_sample_logged ?batch_record)
+        )
+      )
+    :effect (qc_sample_logged ?batch_record)
+  )
+  (:action attach_batch_label_to_record
+    :parameters (?batch_record - batch_record ?batch_label - batch_label)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (label_available ?batch_label)
+        (not
+          (record_labeled ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_labeled ?batch_record)
+        (record_linked_to_label ?batch_record ?batch_label)
+        (not
+          (label_available ?batch_label)
+        )
+      )
+  )
+  (:action complete_record_precheck
+    :parameters (?batch_record - batch_record ?qc_sample - qc_sample ?container - process_unit_container ?process_stage - process_stage ?batch_label - batch_label)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (qc_sample_assigned ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (entity_stage_assigned ?batch_record ?process_stage)
+        (container_upstream_condition_verified ?container)
+        (record_labeled ?batch_record)
+        (record_linked_to_label ?batch_record ?batch_label)
+        (not
+          (qc_sample_logged ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_logged ?batch_record)
+        (record_pre_release_cleared ?batch_record)
+      )
+  )
+  (:action record_primary_review
+    :parameters (?batch_record - batch_record ?equipment_asset - equipment_asset ?operator - operator_team ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (qc_sample_logged ?batch_record)
+        (entity_equipment_assigned ?batch_record ?equipment_asset)
+        (entity_operator_assigned ?batch_record ?operator)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (not
+          (container_downstream_condition_verified ?container)
+        )
+        (not
+          (record_under_review ?batch_record)
+        )
+      )
+    :effect (record_under_review ?batch_record)
+  )
+  (:action record_secondary_review
+    :parameters (?batch_record - batch_record ?equipment_asset - equipment_asset ?operator - operator_team ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (qc_sample_logged ?batch_record)
+        (entity_equipment_assigned ?batch_record ?equipment_asset)
+        (entity_operator_assigned ?batch_record ?operator)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (container_downstream_condition_verified ?container)
+        (not
+          (record_under_review ?batch_record)
+        )
+      )
+    :effect (record_under_review ?batch_record)
+  )
+  (:action complete_approval_gate
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (record_under_review ?batch_record)
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (not
+          (container_upstream_condition_verified ?container)
+        )
+        (not
+          (container_downstream_condition_verified ?container)
+        )
+        (not
+          (record_approved ?batch_record)
+        )
+      )
+    :effect (record_approved ?batch_record)
+  )
+  (:action complete_approval_gate_upstream
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (record_under_review ?batch_record)
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (container_upstream_condition_verified ?container)
+        (not
+          (container_downstream_condition_verified ?container)
+        )
+        (not
+          (record_approved ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_approved ?batch_record)
+        (record_release_dossier_ready ?batch_record)
+      )
+  )
+  (:action complete_approval_gate_downstream
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (record_under_review ?batch_record)
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (not
+          (container_upstream_condition_verified ?container)
+        )
+        (container_downstream_condition_verified ?container)
+        (not
+          (record_approved ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_approved ?batch_record)
+        (record_release_dossier_ready ?batch_record)
+      )
+  )
+  (:action complete_approval_gate_dual
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role ?qc_sample - qc_sample ?container - process_unit_container)
+    :precondition
+      (and
+        (record_under_review ?batch_record)
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (record_requires_qc_sample ?batch_record ?qc_sample)
+        (sample_linked_to_container ?qc_sample ?container)
+        (container_upstream_condition_verified ?container)
+        (container_downstream_condition_verified ?container)
+        (not
+          (record_approved ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_approved ?batch_record)
+        (record_release_dossier_ready ?batch_record)
+      )
+  )
+  (:action close_record_for_release
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (record_approved ?batch_record)
+        (not
+          (record_release_dossier_ready ?batch_record)
+        )
+        (not
+          (record_closed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?batch_record)
+        (release_ready ?batch_record)
+      )
+  )
+  (:action attach_release_document_to_record
+    :parameters (?batch_record - batch_record ?release_document - release_document)
+    :precondition
+      (and
+        (record_approved ?batch_record)
+        (record_release_dossier_ready ?batch_record)
+        (release_document_available ?release_document)
+      )
+    :effect
+      (and
+        (record_linked_to_release_document ?batch_record ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action compile_release_dossier
+    :parameters (?batch_record - batch_record ?upstream_slot - upstream_process_slot ?downstream_slot - downstream_process_slot ?process_stage - process_stage ?release_document - release_document)
+    :precondition
+      (and
+        (record_approved ?batch_record)
+        (record_release_dossier_ready ?batch_record)
+        (record_linked_to_release_document ?batch_record ?release_document)
+        (record_linked_to_upstream_slot ?batch_record ?upstream_slot)
+        (record_linked_to_downstream_slot ?batch_record ?downstream_slot)
+        (upstream_slot_qualified ?upstream_slot)
+        (downstream_slot_qualified ?downstream_slot)
+        (entity_stage_assigned ?batch_record ?process_stage)
+        (not
+          (release_dossier_compiled ?batch_record)
+        )
+      )
+    :effect (release_dossier_compiled ?batch_record)
+  )
+  (:action authorize_record_release
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (record_approved ?batch_record)
+        (release_dossier_compiled ?batch_record)
+        (not
+          (record_closed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?batch_record)
+        (release_ready ?batch_record)
+      )
+  )
+  (:action attach_specification_document_to_record
+    :parameters (?batch_record - batch_record ?specification_document - specification_document ?process_stage - process_stage)
+    :precondition
+      (and
+        (batch_in_process ?batch_record)
+        (entity_stage_assigned ?batch_record ?process_stage)
+        (spec_document_available ?specification_document)
+        (record_linked_to_spec_document ?batch_record ?specification_document)
+        (not
+          (spec_document_attached ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (spec_document_attached ?batch_record)
+        (not
+          (spec_document_available ?specification_document)
+        )
+      )
+  )
+  (:action record_operator_signoff
+    :parameters (?batch_record - batch_record ?operator - operator_team)
+    :precondition
+      (and
+        (spec_document_attached ?batch_record)
+        (entity_operator_assigned ?batch_record ?operator)
+        (not
+          (operator_signoff_recorded ?batch_record)
+        )
+      )
+    :effect (operator_signoff_recorded ?batch_record)
+  )
+  (:action record_approver_signoff
+    :parameters (?batch_record - batch_record ?approver_role - qa_approver_role)
+    :precondition
+      (and
+        (operator_signoff_recorded ?batch_record)
+        (entity_approver_assigned ?batch_record ?approver_role)
+        (not
+          (approver_signoff_recorded ?batch_record)
+        )
+      )
+    :effect (approver_signoff_recorded ?batch_record)
+  )
+  (:action finalize_batch_record
+    :parameters (?batch_record - batch_record)
+    :precondition
+      (and
+        (approver_signoff_recorded ?batch_record)
+        (not
+          (record_closed ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?batch_record)
+        (release_ready ?batch_record)
+      )
+  )
+  (:action mark_upstream_slot_release_ready
+    :parameters (?upstream_slot - upstream_process_slot ?container - process_unit_container)
+    :precondition
+      (and
+        (upstream_slot_engaged ?upstream_slot)
+        (upstream_slot_qualified ?upstream_slot)
+        (container_window_binding_complete ?container)
+        (container_qc_ready ?container)
+        (not
+          (release_ready ?upstream_slot)
+        )
+      )
+    :effect (release_ready ?upstream_slot)
+  )
+  (:action mark_downstream_slot_release_ready
+    :parameters (?downstream_slot - downstream_process_slot ?container - process_unit_container)
+    :precondition
+      (and
+        (downstream_slot_engaged ?downstream_slot)
+        (downstream_slot_qualified ?downstream_slot)
+        (container_window_binding_complete ?container)
+        (container_qc_ready ?container)
+        (not
+          (release_ready ?downstream_slot)
+        )
+      )
+    :effect (release_ready ?downstream_slot)
+  )
+  (:action apply_stability_profile
+    :parameters (?batch - batch_entity ?stability_profile - stability_profile ?process_stage - process_stage)
+    :precondition
+      (and
+        (release_ready ?batch)
+        (entity_stage_assigned ?batch ?process_stage)
+        (stability_profile_available ?stability_profile)
+        (not
+          (stability_profile_applied ?batch)
+        )
+      )
+    :effect
+      (and
+        (stability_profile_applied ?batch)
+        (entity_stability_profile_linked ?batch ?stability_profile)
+        (not
+          (stability_profile_available ?stability_profile)
+        )
+      )
+  )
+  (:action final_release_upstream_slot
+    :parameters (?upstream_slot - upstream_process_slot ?manufacturing_line - manufacturing_line ?stability_profile - stability_profile)
+    :precondition
+      (and
+        (stability_profile_applied ?upstream_slot)
+        (entity_line_assigned ?upstream_slot ?manufacturing_line)
+        (entity_stability_profile_linked ?upstream_slot ?stability_profile)
+        (not
+          (released_for_distribution ?upstream_slot)
+        )
+      )
+    :effect
+      (and
+        (released_for_distribution ?upstream_slot)
+        (line_available ?manufacturing_line)
+        (stability_profile_available ?stability_profile)
+      )
+  )
+  (:action final_release_downstream_slot
+    :parameters (?downstream_slot - downstream_process_slot ?manufacturing_line - manufacturing_line ?stability_profile - stability_profile)
+    :precondition
+      (and
+        (stability_profile_applied ?downstream_slot)
+        (entity_line_assigned ?downstream_slot ?manufacturing_line)
+        (entity_stability_profile_linked ?downstream_slot ?stability_profile)
+        (not
+          (released_for_distribution ?downstream_slot)
+        )
+      )
+    :effect
+      (and
+        (released_for_distribution ?downstream_slot)
+        (line_available ?manufacturing_line)
+        (stability_profile_available ?stability_profile)
+      )
+  )
+  (:action final_release_batch_record
+    :parameters (?batch_record - batch_record ?manufacturing_line - manufacturing_line ?stability_profile - stability_profile)
+    :precondition
+      (and
+        (stability_profile_applied ?batch_record)
+        (entity_line_assigned ?batch_record ?manufacturing_line)
+        (entity_stability_profile_linked ?batch_record ?stability_profile)
+        (not
+          (released_for_distribution ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (released_for_distribution ?batch_record)
+        (line_available ?manufacturing_line)
+        (stability_profile_available ?stability_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem pharmaceutics_stability_window_batch_timing_problem)
+  (:domain pharmaceutics_stability_window_batch_timing_domain)
+  (:objects upstream_process_slot_a - upstream_process_slot downstream_process_slot_a - downstream_process_slot batch_record_a - batch_record batch_record_b - batch_record manufacturing_line_a - manufacturing_line manufacturing_line_b - manufacturing_line manufacturing_line_c - manufacturing_line process_stage_a - process_stage operator_team_a - operator_team consumable_material_a - consumable_material upstream_timing_window_a - upstream_timing_window downstream_timing_window_a - downstream_timing_window process_unit_container_a - process_unit_container qc_sample_a - qc_sample qc_sample_b - qc_sample batch_label_a - batch_label batch_label_b - batch_label release_document_a - release_document release_document_b - release_document stability_profile_a - stability_profile equipment_asset_a - equipment_asset specification_document_a - specification_document specification_document_b - specification_document qa_approver_a - qa_approver_role)
+  (:init
+    (line_available manufacturing_line_a)
+    (line_available manufacturing_line_b)
+    (line_available manufacturing_line_c)
+    (stage_available process_stage_a)
+    (operator_available operator_team_a)
+    (material_available consumable_material_a)
+    (upstream_slot_window_linked upstream_process_slot_a upstream_timing_window_a)
+    (downstream_slot_window_linked downstream_process_slot_a downstream_timing_window_a)
+    (container_available process_unit_container_a)
+    (qc_sample_available qc_sample_a)
+    (qc_sample_available qc_sample_b)
+    (record_linked_to_upstream_slot batch_record_a upstream_process_slot_a)
+    (record_linked_to_upstream_slot batch_record_b upstream_process_slot_a)
+    (record_linked_to_downstream_slot batch_record_a downstream_process_slot_a)
+    (record_linked_to_downstream_slot batch_record_b downstream_process_slot_a)
+    (record_linked_to_container batch_record_a process_unit_container_a)
+    (record_linked_to_container batch_record_b process_unit_container_a)
+    (record_requires_qc_sample batch_record_a qc_sample_a)
+    (record_requires_qc_sample batch_record_b qc_sample_b)
+    (label_available batch_label_a)
+    (label_available batch_label_b)
+    (release_document_available release_document_a)
+    (release_document_available release_document_b)
+    (stability_profile_available stability_profile_a)
+    (equipment_available equipment_asset_a)
+    (spec_document_available specification_document_a)
+    (record_linked_to_spec_document batch_record_a specification_document_a)
+    (record_linked_to_spec_document batch_record_b specification_document_b)
+    (approver_available qa_approver_a)
+  )
+  (:goal
+    (and
+      (released_for_distribution upstream_process_slot_a)
+      (released_for_distribution downstream_process_slot_a)
+      (released_for_distribution batch_record_a)
+      (released_for_distribution batch_record_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_batch upstream_process_slot_a)
+(initiate_batch downstream_process_slot_a)
+(initiate_batch batch_record_a)
+(initiate_batch batch_record_b)
+(reserve_manufacturing_line upstream_process_slot_a manufacturing_line_a)
+(reserve_manufacturing_line downstream_process_slot_a manufacturing_line_b)
+(reserve_manufacturing_line batch_record_a manufacturing_line_c)
+(assign_process_stage upstream_process_slot_a process_stage_a)
+(confirm_process_stage upstream_process_slot_a process_stage_a)
+(assign_operator upstream_process_slot_a operator_team_a)
+(open_upstream_timing_window upstream_process_slot_a upstream_timing_window_a process_stage_a)
+(start_upstream_processing upstream_process_slot_a upstream_timing_window_a operator_team_a)
+(release_operator upstream_process_slot_a operator_team_a)
+(clear_process_stage upstream_process_slot_a process_stage_a)
+(assign_process_stage downstream_process_slot_a process_stage_a)
+(confirm_process_stage downstream_process_slot_a process_stage_a)
+(assign_operator downstream_process_slot_a operator_team_a)
+(open_downstream_timing_window downstream_process_slot_a downstream_timing_window_a process_stage_a)
+(start_downstream_processing downstream_process_slot_a downstream_timing_window_a operator_team_a)
+(release_operator downstream_process_slot_a operator_team_a)
+(link_container_to_timing_windows upstream_process_slot_a downstream_process_slot_a upstream_timing_window_a downstream_timing_window_a process_unit_container_a)
+(clear_process_stage downstream_process_slot_a process_stage_a)
+(assign_process_stage upstream_process_slot_a process_stage_a)
+(prepare_container_for_qc_sampling process_unit_container_a upstream_process_slot_a process_stage_a)
+(mark_upstream_slot_release_ready upstream_process_slot_a process_unit_container_a)
+(mark_downstream_slot_release_ready downstream_process_slot_a process_unit_container_a)
+(clear_process_stage upstream_process_slot_a process_stage_a)
+(assign_process_stage batch_record_a process_stage_a)
+(confirm_process_stage batch_record_a process_stage_a)
+(assign_qc_sample_to_container batch_record_a qc_sample_a process_unit_container_a)
+(log_qc_sample_receipt batch_record_a qc_sample_a process_unit_container_a process_stage_a)
+(assign_equipment batch_record_a equipment_asset_a)
+(assign_operator batch_record_a operator_team_a)
+(assign_approver batch_record_a qa_approver_a)
+(record_primary_review batch_record_a equipment_asset_a operator_team_a qc_sample_a process_unit_container_a)
+(complete_approval_gate batch_record_a qa_approver_a qc_sample_a process_unit_container_a)
+(close_record_for_release batch_record_a)
+(release_operator batch_record_a operator_team_a)
+(release_equipment batch_record_a equipment_asset_a)
+(release_approver batch_record_a qa_approver_a)
+(clear_process_stage batch_record_a process_stage_a)
+(assign_process_stage batch_record_a process_stage_a)
+(apply_stability_profile batch_record_a stability_profile_a process_stage_a)
+(final_release_batch_record batch_record_a manufacturing_line_c stability_profile_a)
+(clear_process_stage batch_record_a process_stage_a)
+(reserve_manufacturing_line batch_record_b manufacturing_line_c)
+(assign_process_stage batch_record_b process_stage_a)
+(confirm_process_stage batch_record_b process_stage_a)
+(assign_qc_sample_to_container batch_record_b qc_sample_b process_unit_container_a)
+(log_qc_sample_receipt batch_record_b qc_sample_b process_unit_container_a process_stage_a)
+(assign_equipment batch_record_b equipment_asset_a)
+(assign_operator batch_record_b operator_team_a)
+(assign_approver batch_record_b qa_approver_a)
+(record_primary_review batch_record_b equipment_asset_a operator_team_a qc_sample_b process_unit_container_a)
+(complete_approval_gate batch_record_b qa_approver_a qc_sample_b process_unit_container_a)
+(close_record_for_release batch_record_b)
+(release_operator batch_record_b operator_team_a)
+(release_equipment batch_record_b equipment_asset_a)
+(release_approver batch_record_b qa_approver_a)
+(clear_process_stage batch_record_b process_stage_a)
+(assign_process_stage batch_record_b process_stage_a)
+(apply_stability_profile batch_record_b stability_profile_a process_stage_a)
+(final_release_batch_record batch_record_b manufacturing_line_c stability_profile_a)
+(clear_process_stage batch_record_b process_stage_a)
+(assign_process_stage upstream_process_slot_a process_stage_a)
+(apply_stability_profile upstream_process_slot_a stability_profile_a process_stage_a)
+(final_release_upstream_slot upstream_process_slot_a manufacturing_line_a stability_profile_a)
+(clear_process_stage upstream_process_slot_a process_stage_a)
+(assign_process_stage downstream_process_slot_a process_stage_a)
+(apply_stability_profile downstream_process_slot_a stability_profile_a process_stage_a)
+(final_release_downstream_slot downstream_process_slot_a manufacturing_line_b stability_profile_a)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_brr7_qto/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 71 
+
+Successful plans:
+Value: 71
+ /tmp/val_brr7_qto/plan.pddl 71 
+
+
+
+--- stderr ---
+

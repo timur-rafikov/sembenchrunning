@@ -1,0 +1,1062 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain filtered_entity_query_execution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types runtime_object - object entity_subtype_marker - runtime_object descriptor_subtype_marker - runtime_object index_subtype_marker - runtime_object entity_supertype - runtime_object entity - entity_supertype filter_token - entity_subtype_marker attribute_constraint - entity_subtype_marker auth_credential - entity_subtype_marker sort_spec - entity_subtype_marker projection_spec - entity_subtype_marker resource_token - entity_subtype_marker aggregator_descriptor - entity_subtype_marker decorator_descriptor - entity_subtype_marker join_candidate - descriptor_subtype_marker facet_bucket - descriptor_subtype_marker execution_hint - descriptor_subtype_marker index_key - index_subtype_marker secondary_index_key - index_subtype_marker result_placeholder - index_subtype_marker collection_supertype - entity collection_partition_supertype - entity primary_partition_left - collection_supertype primary_partition_right - collection_supertype query_executor - collection_partition_supertype)
+
+  (:predicates
+    (session_created ?entity - entity)
+    (validated ?entity - entity)
+    (filter_attached ?entity - entity)
+    (selected ?entity - entity)
+    (output_ready ?entity - entity)
+    (subject_authorization_satisfied ?entity - entity)
+    (filter_token_available ?filter_token - filter_token)
+    (subject_filter_binding ?entity - entity ?filter_token - filter_token)
+    (attribute_constraint_available ?attribute_constraint - attribute_constraint)
+    (subject_matches_attribute ?entity - entity ?attribute_constraint - attribute_constraint)
+    (credential_available ?auth_credential - auth_credential)
+    (subject_credential_binding ?entity - entity ?auth_credential - auth_credential)
+    (join_candidate_available ?join_candidate - join_candidate)
+    (partition_left_join_association ?partition_left - primary_partition_left ?join_candidate - join_candidate)
+    (partition_right_join_association ?partition_right - primary_partition_right ?join_candidate - join_candidate)
+    (partition_index_mapping ?partition_left - primary_partition_left ?index_key - index_key)
+    (index_key_matched ?index_key - index_key)
+    (index_key_matched_alt ?index_key - index_key)
+    (partition_marked_processed ?partition_left - primary_partition_left)
+    (partition_secondary_mapping ?partition_right - primary_partition_right ?secondary_key - secondary_index_key)
+    (secondary_key_matched ?secondary_key - secondary_index_key)
+    (secondary_key_matched_alt ?secondary_key - secondary_index_key)
+    (partition_secondary_processed ?partition_right - primary_partition_right)
+    (result_placeholder_available ?result_doc - result_placeholder)
+    (result_placeholder_reserved ?result_doc - result_placeholder)
+    (result_bound_index_key ?result_doc - result_placeholder ?index_key - index_key)
+    (result_bound_secondary_key ?result_doc - result_placeholder ?secondary_key - secondary_index_key)
+    (result_meta_flag_left ?result_doc - result_placeholder)
+    (result_meta_flag_right ?result_doc - result_placeholder)
+    (result_placeholder_materialized ?result_doc - result_placeholder)
+    (executor_bound_partition_left ?executor - query_executor ?partition_left - primary_partition_left)
+    (executor_bound_partition_right ?executor - query_executor ?partition_right - primary_partition_right)
+    (executor_assigned_result ?executor - query_executor ?result_doc - result_placeholder)
+    (facet_bucket_available ?facet_bucket - facet_bucket)
+    (executor_assigned_facet ?executor - query_executor ?facet_bucket - facet_bucket)
+    (facet_bucket_materialized ?facet_bucket - facet_bucket)
+    (facet_bucket_bound_to_result ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    (executor_ready_phase_1 ?executor - query_executor)
+    (executor_ready_phase_2 ?executor - query_executor)
+    (executor_pre_final_ready ?executor - query_executor)
+    (executor_feature_available ?executor - query_executor)
+    (executor_feature_applied ?executor - query_executor)
+    (executor_projection_bound ?executor - query_executor)
+    (executor_finalized ?executor - query_executor)
+    (static_hint_available ?exec_hint - execution_hint)
+    (executor_annotated_with_hint ?executor - query_executor ?exec_hint - execution_hint)
+    (executor_prepared_with_hint ?executor - query_executor)
+    (executor_ready_for_hint_steps ?executor - query_executor)
+    (executor_hint_applied ?executor - query_executor)
+    (sort_spec_available ?sort_spec - sort_spec)
+    (executor_bound_sort_spec ?executor - query_executor ?sort_spec - sort_spec)
+    (projection_spec_available ?projection_spec - projection_spec)
+    (executor_bound_projection ?executor - query_executor ?projection_spec - projection_spec)
+    (aggregator_descriptor_available ?aggregator - aggregator_descriptor)
+    (executor_bound_aggregator ?executor - query_executor ?aggregator - aggregator_descriptor)
+    (decorator_descriptor_available ?decorator - decorator_descriptor)
+    (executor_bound_decorator ?executor - query_executor ?decorator - decorator_descriptor)
+    (resource_token_available ?resource_token - resource_token)
+    (subject_resource_binding ?entity - entity ?resource_token - resource_token)
+    (partition_phase_flag_left ?partition_left - primary_partition_left)
+    (partition_phase_flag_right ?partition_right - primary_partition_right)
+    (executor_emitted_output ?executor - query_executor)
+  )
+  (:action create_query_session
+    :parameters (?entity - entity)
+    :precondition
+      (and
+        (not
+          (session_created ?entity)
+        )
+        (not
+          (selected ?entity)
+        )
+      )
+    :effect (session_created ?entity)
+  )
+  (:action attach_filter_to_session
+    :parameters (?entity - entity ?filter_token - filter_token)
+    :precondition
+      (and
+        (session_created ?entity)
+        (not
+          (filter_attached ?entity)
+        )
+        (filter_token_available ?filter_token)
+      )
+    :effect
+      (and
+        (filter_attached ?entity)
+        (subject_filter_binding ?entity ?filter_token)
+        (not
+          (filter_token_available ?filter_token)
+        )
+      )
+  )
+  (:action apply_attribute_constraint
+    :parameters (?entity - entity ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (session_created ?entity)
+        (filter_attached ?entity)
+        (attribute_constraint_available ?attribute_constraint)
+      )
+    :effect
+      (and
+        (subject_matches_attribute ?entity ?attribute_constraint)
+        (not
+          (attribute_constraint_available ?attribute_constraint)
+        )
+      )
+  )
+  (:action validate_session
+    :parameters (?entity - entity ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (session_created ?entity)
+        (filter_attached ?entity)
+        (subject_matches_attribute ?entity ?attribute_constraint)
+        (not
+          (validated ?entity)
+        )
+      )
+    :effect (validated ?entity)
+  )
+  (:action release_attribute_constraint
+    :parameters (?entity - entity ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (subject_matches_attribute ?entity ?attribute_constraint)
+      )
+    :effect
+      (and
+        (attribute_constraint_available ?attribute_constraint)
+        (not
+          (subject_matches_attribute ?entity ?attribute_constraint)
+        )
+      )
+  )
+  (:action attach_credential_to_session
+    :parameters (?entity - entity ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (validated ?entity)
+        (credential_available ?auth_credential)
+      )
+    :effect
+      (and
+        (subject_credential_binding ?entity ?auth_credential)
+        (not
+          (credential_available ?auth_credential)
+        )
+      )
+  )
+  (:action release_credential_from_session
+    :parameters (?entity - entity ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (subject_credential_binding ?entity ?auth_credential)
+      )
+    :effect
+      (and
+        (credential_available ?auth_credential)
+        (not
+          (subject_credential_binding ?entity ?auth_credential)
+        )
+      )
+  )
+  (:action bind_aggregator_to_executor
+    :parameters (?executor - query_executor ?aggregator - aggregator_descriptor)
+    :precondition
+      (and
+        (validated ?executor)
+        (aggregator_descriptor_available ?aggregator)
+      )
+    :effect
+      (and
+        (executor_bound_aggregator ?executor ?aggregator)
+        (not
+          (aggregator_descriptor_available ?aggregator)
+        )
+      )
+  )
+  (:action release_aggregator_from_executor
+    :parameters (?executor - query_executor ?aggregator - aggregator_descriptor)
+    :precondition
+      (and
+        (executor_bound_aggregator ?executor ?aggregator)
+      )
+    :effect
+      (and
+        (aggregator_descriptor_available ?aggregator)
+        (not
+          (executor_bound_aggregator ?executor ?aggregator)
+        )
+      )
+  )
+  (:action bind_decorator_to_executor
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor)
+    :precondition
+      (and
+        (validated ?executor)
+        (decorator_descriptor_available ?decorator)
+      )
+    :effect
+      (and
+        (executor_bound_decorator ?executor ?decorator)
+        (not
+          (decorator_descriptor_available ?decorator)
+        )
+      )
+  )
+  (:action release_decorator_from_executor
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor)
+    :precondition
+      (and
+        (executor_bound_decorator ?executor ?decorator)
+      )
+    :effect
+      (and
+        (decorator_descriptor_available ?decorator)
+        (not
+          (executor_bound_decorator ?executor ?decorator)
+        )
+      )
+  )
+  (:action mark_index_key_match
+    :parameters (?partition_left - primary_partition_left ?index_key - index_key ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (validated ?partition_left)
+        (subject_matches_attribute ?partition_left ?attribute_constraint)
+        (partition_index_mapping ?partition_left ?index_key)
+        (not
+          (index_key_matched ?index_key)
+        )
+        (not
+          (index_key_matched_alt ?index_key)
+        )
+      )
+    :effect (index_key_matched ?index_key)
+  )
+  (:action mark_partition_processed_with_credential
+    :parameters (?partition_left - primary_partition_left ?index_key - index_key ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (validated ?partition_left)
+        (subject_credential_binding ?partition_left ?auth_credential)
+        (partition_index_mapping ?partition_left ?index_key)
+        (index_key_matched ?index_key)
+        (not
+          (partition_phase_flag_left ?partition_left)
+        )
+      )
+    :effect
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_marked_processed ?partition_left)
+      )
+  )
+  (:action attach_join_candidate_to_partition
+    :parameters (?partition_left - primary_partition_left ?index_key - index_key ?join_candidate - join_candidate)
+    :precondition
+      (and
+        (validated ?partition_left)
+        (partition_index_mapping ?partition_left ?index_key)
+        (join_candidate_available ?join_candidate)
+        (not
+          (partition_phase_flag_left ?partition_left)
+        )
+      )
+    :effect
+      (and
+        (index_key_matched_alt ?index_key)
+        (partition_phase_flag_left ?partition_left)
+        (partition_left_join_association ?partition_left ?join_candidate)
+        (not
+          (join_candidate_available ?join_candidate)
+        )
+      )
+  )
+  (:action resolve_join_and_mark_partition
+    :parameters (?partition_left - primary_partition_left ?index_key - index_key ?attribute_constraint - attribute_constraint ?join_candidate - join_candidate)
+    :precondition
+      (and
+        (validated ?partition_left)
+        (subject_matches_attribute ?partition_left ?attribute_constraint)
+        (partition_index_mapping ?partition_left ?index_key)
+        (index_key_matched_alt ?index_key)
+        (partition_left_join_association ?partition_left ?join_candidate)
+        (not
+          (partition_marked_processed ?partition_left)
+        )
+      )
+    :effect
+      (and
+        (index_key_matched ?index_key)
+        (partition_marked_processed ?partition_left)
+        (join_candidate_available ?join_candidate)
+        (not
+          (partition_left_join_association ?partition_left ?join_candidate)
+        )
+      )
+  )
+  (:action mark_secondary_key_match
+    :parameters (?partition_right - primary_partition_right ?secondary_key - secondary_index_key ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (validated ?partition_right)
+        (subject_matches_attribute ?partition_right ?attribute_constraint)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (not
+          (secondary_key_matched ?secondary_key)
+        )
+        (not
+          (secondary_key_matched_alt ?secondary_key)
+        )
+      )
+    :effect (secondary_key_matched ?secondary_key)
+  )
+  (:action mark_partition_b_processed_with_credential
+    :parameters (?partition_right - primary_partition_right ?secondary_key - secondary_index_key ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (validated ?partition_right)
+        (subject_credential_binding ?partition_right ?auth_credential)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (secondary_key_matched ?secondary_key)
+        (not
+          (partition_phase_flag_right ?partition_right)
+        )
+      )
+    :effect
+      (and
+        (partition_phase_flag_right ?partition_right)
+        (partition_secondary_processed ?partition_right)
+      )
+  )
+  (:action attach_join_candidate_to_partition_b
+    :parameters (?partition_right - primary_partition_right ?secondary_key - secondary_index_key ?join_candidate - join_candidate)
+    :precondition
+      (and
+        (validated ?partition_right)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (join_candidate_available ?join_candidate)
+        (not
+          (partition_phase_flag_right ?partition_right)
+        )
+      )
+    :effect
+      (and
+        (secondary_key_matched_alt ?secondary_key)
+        (partition_phase_flag_right ?partition_right)
+        (partition_right_join_association ?partition_right ?join_candidate)
+        (not
+          (join_candidate_available ?join_candidate)
+        )
+      )
+  )
+  (:action resolve_join_and_mark_partition_b
+    :parameters (?partition_right - primary_partition_right ?secondary_key - secondary_index_key ?attribute_constraint - attribute_constraint ?join_candidate - join_candidate)
+    :precondition
+      (and
+        (validated ?partition_right)
+        (subject_matches_attribute ?partition_right ?attribute_constraint)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (secondary_key_matched_alt ?secondary_key)
+        (partition_right_join_association ?partition_right ?join_candidate)
+        (not
+          (partition_secondary_processed ?partition_right)
+        )
+      )
+    :effect
+      (and
+        (secondary_key_matched ?secondary_key)
+        (partition_secondary_processed ?partition_right)
+        (join_candidate_available ?join_candidate)
+        (not
+          (partition_right_join_association ?partition_right ?join_candidate)
+        )
+      )
+  )
+  (:action reserve_result_placeholder
+    :parameters (?partition_left - primary_partition_left ?partition_right - primary_partition_right ?index_key - index_key ?secondary_key - secondary_index_key ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_phase_flag_right ?partition_right)
+        (partition_index_mapping ?partition_left ?index_key)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (index_key_matched ?index_key)
+        (secondary_key_matched ?secondary_key)
+        (partition_marked_processed ?partition_left)
+        (partition_secondary_processed ?partition_right)
+        (result_placeholder_available ?result_doc)
+      )
+    :effect
+      (and
+        (result_placeholder_reserved ?result_doc)
+        (result_bound_index_key ?result_doc ?index_key)
+        (result_bound_secondary_key ?result_doc ?secondary_key)
+        (not
+          (result_placeholder_available ?result_doc)
+        )
+      )
+  )
+  (:action reserve_result_with_meta_a
+    :parameters (?partition_left - primary_partition_left ?partition_right - primary_partition_right ?index_key - index_key ?secondary_key - secondary_index_key ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_phase_flag_right ?partition_right)
+        (partition_index_mapping ?partition_left ?index_key)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (index_key_matched_alt ?index_key)
+        (secondary_key_matched ?secondary_key)
+        (not
+          (partition_marked_processed ?partition_left)
+        )
+        (partition_secondary_processed ?partition_right)
+        (result_placeholder_available ?result_doc)
+      )
+    :effect
+      (and
+        (result_placeholder_reserved ?result_doc)
+        (result_bound_index_key ?result_doc ?index_key)
+        (result_bound_secondary_key ?result_doc ?secondary_key)
+        (result_meta_flag_left ?result_doc)
+        (not
+          (result_placeholder_available ?result_doc)
+        )
+      )
+  )
+  (:action reserve_result_with_meta_b
+    :parameters (?partition_left - primary_partition_left ?partition_right - primary_partition_right ?index_key - index_key ?secondary_key - secondary_index_key ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_phase_flag_right ?partition_right)
+        (partition_index_mapping ?partition_left ?index_key)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (index_key_matched ?index_key)
+        (secondary_key_matched_alt ?secondary_key)
+        (partition_marked_processed ?partition_left)
+        (not
+          (partition_secondary_processed ?partition_right)
+        )
+        (result_placeholder_available ?result_doc)
+      )
+    :effect
+      (and
+        (result_placeholder_reserved ?result_doc)
+        (result_bound_index_key ?result_doc ?index_key)
+        (result_bound_secondary_key ?result_doc ?secondary_key)
+        (result_meta_flag_right ?result_doc)
+        (not
+          (result_placeholder_available ?result_doc)
+        )
+      )
+  )
+  (:action reserve_result_with_meta_flags_both
+    :parameters (?partition_left - primary_partition_left ?partition_right - primary_partition_right ?index_key - index_key ?secondary_key - secondary_index_key ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_phase_flag_right ?partition_right)
+        (partition_index_mapping ?partition_left ?index_key)
+        (partition_secondary_mapping ?partition_right ?secondary_key)
+        (index_key_matched_alt ?index_key)
+        (secondary_key_matched_alt ?secondary_key)
+        (not
+          (partition_marked_processed ?partition_left)
+        )
+        (not
+          (partition_secondary_processed ?partition_right)
+        )
+        (result_placeholder_available ?result_doc)
+      )
+    :effect
+      (and
+        (result_placeholder_reserved ?result_doc)
+        (result_bound_index_key ?result_doc ?index_key)
+        (result_bound_secondary_key ?result_doc ?secondary_key)
+        (result_meta_flag_left ?result_doc)
+        (result_meta_flag_right ?result_doc)
+        (not
+          (result_placeholder_available ?result_doc)
+        )
+      )
+  )
+  (:action materialize_result_placeholder
+    :parameters (?result_doc - result_placeholder ?partition_left - primary_partition_left ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (result_placeholder_reserved ?result_doc)
+        (partition_phase_flag_left ?partition_left)
+        (subject_matches_attribute ?partition_left ?attribute_constraint)
+        (not
+          (result_placeholder_materialized ?result_doc)
+        )
+      )
+    :effect (result_placeholder_materialized ?result_doc)
+  )
+  (:action materialize_facet_and_bind_to_result
+    :parameters (?executor - query_executor ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (validated ?executor)
+        (executor_assigned_result ?executor ?result_doc)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_available ?facet_bucket)
+        (result_placeholder_reserved ?result_doc)
+        (result_placeholder_materialized ?result_doc)
+        (not
+          (facet_bucket_materialized ?facet_bucket)
+        )
+      )
+    :effect
+      (and
+        (facet_bucket_materialized ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (not
+          (facet_bucket_available ?facet_bucket)
+        )
+      )
+  )
+  (:action advance_executor_to_phase1
+    :parameters (?executor - query_executor ?facet_bucket - facet_bucket ?result_doc - result_placeholder ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (validated ?executor)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_materialized ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (subject_matches_attribute ?executor ?attribute_constraint)
+        (not
+          (result_meta_flag_left ?result_doc)
+        )
+        (not
+          (executor_ready_phase_1 ?executor)
+        )
+      )
+    :effect (executor_ready_phase_1 ?executor)
+  )
+  (:action bind_sort_spec_to_executor
+    :parameters (?executor - query_executor ?sort_spec - sort_spec)
+    :precondition
+      (and
+        (validated ?executor)
+        (sort_spec_available ?sort_spec)
+        (not
+          (executor_feature_available ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_feature_available ?executor)
+        (executor_bound_sort_spec ?executor ?sort_spec)
+        (not
+          (sort_spec_available ?sort_spec)
+        )
+      )
+  )
+  (:action apply_sort_and_advance_executor
+    :parameters (?executor - query_executor ?facet_bucket - facet_bucket ?result_doc - result_placeholder ?attribute_constraint - attribute_constraint ?sort_spec - sort_spec)
+    :precondition
+      (and
+        (validated ?executor)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_materialized ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (subject_matches_attribute ?executor ?attribute_constraint)
+        (result_meta_flag_left ?result_doc)
+        (executor_feature_available ?executor)
+        (executor_bound_sort_spec ?executor ?sort_spec)
+        (not
+          (executor_ready_phase_1 ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_ready_phase_1 ?executor)
+        (executor_feature_applied ?executor)
+      )
+  )
+  (:action advance_executor_to_phase_2_path_a
+    :parameters (?executor - query_executor ?aggregator - aggregator_descriptor ?auth_credential - auth_credential ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_1 ?executor)
+        (executor_bound_aggregator ?executor ?aggregator)
+        (subject_credential_binding ?executor ?auth_credential)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (not
+          (result_meta_flag_right ?result_doc)
+        )
+        (not
+          (executor_ready_phase_2 ?executor)
+        )
+      )
+    :effect (executor_ready_phase_2 ?executor)
+  )
+  (:action advance_executor_to_phase_2_path_b
+    :parameters (?executor - query_executor ?aggregator - aggregator_descriptor ?auth_credential - auth_credential ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_1 ?executor)
+        (executor_bound_aggregator ?executor ?aggregator)
+        (subject_credential_binding ?executor ?auth_credential)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (result_meta_flag_right ?result_doc)
+        (not
+          (executor_ready_phase_2 ?executor)
+        )
+      )
+    :effect (executor_ready_phase_2 ?executor)
+  )
+  (:action advance_executor_to_pre_final
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_2 ?executor)
+        (executor_bound_decorator ?executor ?decorator)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (not
+          (result_meta_flag_left ?result_doc)
+        )
+        (not
+          (result_meta_flag_right ?result_doc)
+        )
+        (not
+          (executor_pre_final_ready ?executor)
+        )
+      )
+    :effect (executor_pre_final_ready ?executor)
+  )
+  (:action attach_projection_and_advance_pre_final
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_2 ?executor)
+        (executor_bound_decorator ?executor ?decorator)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (result_meta_flag_left ?result_doc)
+        (not
+          (result_meta_flag_right ?result_doc)
+        )
+        (not
+          (executor_pre_final_ready ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_projection_bound ?executor)
+      )
+  )
+  (:action attach_projection_and_advance_pre_final_alt
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_2 ?executor)
+        (executor_bound_decorator ?executor ?decorator)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (not
+          (result_meta_flag_left ?result_doc)
+        )
+        (result_meta_flag_right ?result_doc)
+        (not
+          (executor_pre_final_ready ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_projection_bound ?executor)
+      )
+  )
+  (:action attach_projection_and_advance_pre_final_both
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor ?facet_bucket - facet_bucket ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (executor_ready_phase_2 ?executor)
+        (executor_bound_decorator ?executor ?decorator)
+        (executor_assigned_facet ?executor ?facet_bucket)
+        (facet_bucket_bound_to_result ?facet_bucket ?result_doc)
+        (result_meta_flag_left ?result_doc)
+        (result_meta_flag_right ?result_doc)
+        (not
+          (executor_pre_final_ready ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_projection_bound ?executor)
+      )
+  )
+  (:action mark_executor_ready_for_emission
+    :parameters (?executor - query_executor)
+    :precondition
+      (and
+        (executor_pre_final_ready ?executor)
+        (not
+          (executor_projection_bound ?executor)
+        )
+        (not
+          (executor_emitted_output ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_emitted_output ?executor)
+        (output_ready ?executor)
+      )
+  )
+  (:action bind_projection_to_executor
+    :parameters (?executor - query_executor ?projection_spec - projection_spec)
+    :precondition
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_projection_bound ?executor)
+        (projection_spec_available ?projection_spec)
+      )
+    :effect
+      (and
+        (executor_bound_projection ?executor ?projection_spec)
+        (not
+          (projection_spec_available ?projection_spec)
+        )
+      )
+  )
+  (:action apply_projection_and_finalize_executor
+    :parameters (?executor - query_executor ?partition_left - primary_partition_left ?partition_right - primary_partition_right ?attribute_constraint - attribute_constraint ?projection_spec - projection_spec)
+    :precondition
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_projection_bound ?executor)
+        (executor_bound_projection ?executor ?projection_spec)
+        (executor_bound_partition_left ?executor ?partition_left)
+        (executor_bound_partition_right ?executor ?partition_right)
+        (partition_marked_processed ?partition_left)
+        (partition_secondary_processed ?partition_right)
+        (subject_matches_attribute ?executor ?attribute_constraint)
+        (not
+          (executor_finalized ?executor)
+        )
+      )
+    :effect (executor_finalized ?executor)
+  )
+  (:action finalize_and_mark_executor_emission
+    :parameters (?executor - query_executor)
+    :precondition
+      (and
+        (executor_pre_final_ready ?executor)
+        (executor_finalized ?executor)
+        (not
+          (executor_emitted_output ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_emitted_output ?executor)
+        (output_ready ?executor)
+      )
+  )
+  (:action prepare_executor_with_static_hint
+    :parameters (?executor - query_executor ?exec_hint - execution_hint ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (validated ?executor)
+        (subject_matches_attribute ?executor ?attribute_constraint)
+        (static_hint_available ?exec_hint)
+        (executor_annotated_with_hint ?executor ?exec_hint)
+        (not
+          (executor_prepared_with_hint ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_prepared_with_hint ?executor)
+        (not
+          (static_hint_available ?exec_hint)
+        )
+      )
+  )
+  (:action enable_hint_driven_steps
+    :parameters (?executor - query_executor ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (executor_prepared_with_hint ?executor)
+        (subject_credential_binding ?executor ?auth_credential)
+        (not
+          (executor_ready_for_hint_steps ?executor)
+        )
+      )
+    :effect (executor_ready_for_hint_steps ?executor)
+  )
+  (:action apply_hint_driven_step
+    :parameters (?executor - query_executor ?decorator - decorator_descriptor)
+    :precondition
+      (and
+        (executor_ready_for_hint_steps ?executor)
+        (executor_bound_decorator ?executor ?decorator)
+        (not
+          (executor_hint_applied ?executor)
+        )
+      )
+    :effect (executor_hint_applied ?executor)
+  )
+  (:action finalize_executor_after_hint_step
+    :parameters (?executor - query_executor)
+    :precondition
+      (and
+        (executor_hint_applied ?executor)
+        (not
+          (executor_emitted_output ?executor)
+        )
+      )
+    :effect
+      (and
+        (executor_emitted_output ?executor)
+        (output_ready ?executor)
+      )
+  )
+  (:action emit_result_for_partition_a
+    :parameters (?partition_left - primary_partition_left ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_left ?partition_left)
+        (partition_marked_processed ?partition_left)
+        (result_placeholder_reserved ?result_doc)
+        (result_placeholder_materialized ?result_doc)
+        (not
+          (output_ready ?partition_left)
+        )
+      )
+    :effect (output_ready ?partition_left)
+  )
+  (:action emit_result_for_partition_b
+    :parameters (?partition_right - primary_partition_right ?result_doc - result_placeholder)
+    :precondition
+      (and
+        (partition_phase_flag_right ?partition_right)
+        (partition_secondary_processed ?partition_right)
+        (result_placeholder_reserved ?result_doc)
+        (result_placeholder_materialized ?result_doc)
+        (not
+          (output_ready ?partition_right)
+        )
+      )
+    :effect (output_ready ?partition_right)
+  )
+  (:action authorize_entity_with_resource
+    :parameters (?entity - entity ?resource_token - resource_token ?attribute_constraint - attribute_constraint)
+    :precondition
+      (and
+        (output_ready ?entity)
+        (subject_matches_attribute ?entity ?attribute_constraint)
+        (resource_token_available ?resource_token)
+        (not
+          (subject_authorization_satisfied ?entity)
+        )
+      )
+    :effect
+      (and
+        (subject_authorization_satisfied ?entity)
+        (subject_resource_binding ?entity ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action authorize_and_select_partition_a
+    :parameters (?partition_left - primary_partition_left ?filter_token - filter_token ?resource_token - resource_token)
+    :precondition
+      (and
+        (subject_authorization_satisfied ?partition_left)
+        (subject_filter_binding ?partition_left ?filter_token)
+        (subject_resource_binding ?partition_left ?resource_token)
+        (not
+          (selected ?partition_left)
+        )
+      )
+    :effect
+      (and
+        (selected ?partition_left)
+        (filter_token_available ?filter_token)
+        (resource_token_available ?resource_token)
+      )
+  )
+  (:action authorize_and_select_partition_b
+    :parameters (?partition_right - primary_partition_right ?filter_token - filter_token ?resource_token - resource_token)
+    :precondition
+      (and
+        (subject_authorization_satisfied ?partition_right)
+        (subject_filter_binding ?partition_right ?filter_token)
+        (subject_resource_binding ?partition_right ?resource_token)
+        (not
+          (selected ?partition_right)
+        )
+      )
+    :effect
+      (and
+        (selected ?partition_right)
+        (filter_token_available ?filter_token)
+        (resource_token_available ?resource_token)
+      )
+  )
+  (:action authorize_and_select_executor
+    :parameters (?executor - query_executor ?filter_token - filter_token ?resource_token - resource_token)
+    :precondition
+      (and
+        (subject_authorization_satisfied ?executor)
+        (subject_filter_binding ?executor ?filter_token)
+        (subject_resource_binding ?executor ?resource_token)
+        (not
+          (selected ?executor)
+        )
+      )
+    :effect
+      (and
+        (selected ?executor)
+        (filter_token_available ?filter_token)
+        (resource_token_available ?resource_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem filtered_entity_query_execution_problem)
+  (:domain filtered_entity_query_execution)
+  (:objects partition_left_1 - primary_partition_left partition_right_1 - primary_partition_right executor_1 - query_executor executor_2 - query_executor filter_token_1 - filter_token filter_token_2 - filter_token filter_token_3 - filter_token attr_constraint_1 - attribute_constraint auth_cred_1 - auth_credential join_candidate_1 - join_candidate index_key_1 - index_key secondary_key_1 - secondary_index_key result_placeholder_1 - result_placeholder facet_bucket_1 - facet_bucket facet_bucket_2 - facet_bucket sort_spec_1 - sort_spec sort_spec_2 - sort_spec projection_spec_1 - projection_spec projection_spec_2 - projection_spec resource_token_1 - resource_token aggregator_1 - aggregator_descriptor exec_hint_1 - execution_hint exec_hint_2 - execution_hint decorator_1 - decorator_descriptor)
+  (:init
+    (filter_token_available filter_token_1)
+    (filter_token_available filter_token_2)
+    (filter_token_available filter_token_3)
+    (attribute_constraint_available attr_constraint_1)
+    (credential_available auth_cred_1)
+    (join_candidate_available join_candidate_1)
+    (partition_index_mapping partition_left_1 index_key_1)
+    (partition_secondary_mapping partition_right_1 secondary_key_1)
+    (result_placeholder_available result_placeholder_1)
+    (facet_bucket_available facet_bucket_1)
+    (facet_bucket_available facet_bucket_2)
+    (executor_bound_partition_left executor_1 partition_left_1)
+    (executor_bound_partition_left executor_2 partition_left_1)
+    (executor_bound_partition_right executor_1 partition_right_1)
+    (executor_bound_partition_right executor_2 partition_right_1)
+    (executor_assigned_result executor_1 result_placeholder_1)
+    (executor_assigned_result executor_2 result_placeholder_1)
+    (executor_assigned_facet executor_1 facet_bucket_1)
+    (executor_assigned_facet executor_2 facet_bucket_2)
+    (sort_spec_available sort_spec_1)
+    (sort_spec_available sort_spec_2)
+    (projection_spec_available projection_spec_1)
+    (projection_spec_available projection_spec_2)
+    (resource_token_available resource_token_1)
+    (aggregator_descriptor_available aggregator_1)
+    (static_hint_available exec_hint_1)
+    (executor_annotated_with_hint executor_1 exec_hint_1)
+    (executor_annotated_with_hint executor_2 exec_hint_2)
+    (decorator_descriptor_available decorator_1)
+  )
+  (:goal
+    (and
+      (selected partition_left_1)
+      (selected partition_right_1)
+      (selected executor_1)
+      (selected executor_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_query_session partition_left_1)
+(attach_filter_to_session partition_left_1 filter_token_1)
+(apply_attribute_constraint partition_left_1 attr_constraint_1)
+(validate_session partition_left_1 attr_constraint_1)
+(mark_index_key_match partition_left_1 index_key_1 attr_constraint_1)
+(attach_credential_to_session partition_left_1 auth_cred_1)
+(mark_partition_processed_with_credential partition_left_1 index_key_1 auth_cred_1)
+(release_attribute_constraint partition_left_1 attr_constraint_1)
+(release_credential_from_session partition_left_1 auth_cred_1)
+(create_query_session partition_right_1)
+(attach_filter_to_session partition_right_1 filter_token_2)
+(apply_attribute_constraint partition_right_1 attr_constraint_1)
+(validate_session partition_right_1 attr_constraint_1)
+(mark_secondary_key_match partition_right_1 secondary_key_1 attr_constraint_1)
+(attach_credential_to_session partition_right_1 auth_cred_1)
+(mark_partition_b_processed_with_credential partition_right_1 secondary_key_1 auth_cred_1)
+(release_attribute_constraint partition_right_1 attr_constraint_1)
+(release_credential_from_session partition_right_1 auth_cred_1)
+(reserve_result_placeholder partition_left_1 partition_right_1 index_key_1 secondary_key_1 result_placeholder_1)
+(apply_attribute_constraint partition_left_1 attr_constraint_1)
+(materialize_result_placeholder result_placeholder_1 partition_left_1 attr_constraint_1)
+(emit_result_for_partition_a partition_left_1 result_placeholder_1)
+(emit_result_for_partition_b partition_right_1 result_placeholder_1)
+(authorize_entity_with_resource partition_left_1 resource_token_1 attr_constraint_1)
+(authorize_and_select_partition_a partition_left_1 filter_token_1 resource_token_1)
+(release_attribute_constraint partition_left_1 attr_constraint_1)
+(apply_attribute_constraint partition_right_1 attr_constraint_1)
+(authorize_entity_with_resource partition_right_1 resource_token_1 attr_constraint_1)
+(authorize_and_select_partition_b partition_right_1 filter_token_2 resource_token_1)
+(create_query_session executor_1)
+(attach_filter_to_session executor_1 filter_token_1)
+(release_attribute_constraint partition_right_1 attr_constraint_1)
+(apply_attribute_constraint executor_1 attr_constraint_1)
+(validate_session executor_1 attr_constraint_1)
+(prepare_executor_with_static_hint executor_1 exec_hint_1 attr_constraint_1)
+(attach_credential_to_session executor_1 auth_cred_1)
+(enable_hint_driven_steps executor_1 auth_cred_1)
+(bind_decorator_to_executor executor_1 decorator_1)
+(apply_hint_driven_step executor_1 decorator_1)
+(release_decorator_from_executor executor_1 decorator_1)
+(finalize_executor_after_hint_step executor_1)
+(authorize_entity_with_resource executor_1 resource_token_1 attr_constraint_1)
+(authorize_and_select_executor executor_1 filter_token_1 resource_token_1)
+(create_query_session executor_2)
+(attach_filter_to_session executor_2 filter_token_2)
+(release_attribute_constraint executor_1 attr_constraint_1)
+(apply_attribute_constraint executor_2 attr_constraint_1)
+(validate_session executor_2 attr_constraint_1)
+(materialize_facet_and_bind_to_result executor_2 facet_bucket_2 result_placeholder_1)
+(advance_executor_to_phase1 executor_2 facet_bucket_2 result_placeholder_1 attr_constraint_1)
+(attach_credential_to_session executor_2 auth_cred_1)
+(bind_aggregator_to_executor executor_2 aggregator_1)
+(advance_executor_to_phase_2_path_a executor_2 aggregator_1 auth_cred_1 facet_bucket_2 result_placeholder_1)
+(bind_decorator_to_executor executor_2 decorator_1)
+(advance_executor_to_pre_final executor_2 decorator_1 facet_bucket_2 result_placeholder_1)
+(mark_executor_ready_for_emission executor_2)
+(authorize_entity_with_resource executor_2 resource_token_1 attr_constraint_1)
+(authorize_and_select_executor executor_2 filter_token_2 resource_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_12kh2wvb/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_12kh2wvb/plan.pddl 
+
+
+--- stderr ---
+

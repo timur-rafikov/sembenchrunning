@@ -1,0 +1,936 @@
+(define (domain investment_portfolio_hedge_ratio_adjustment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types financial_asset - object financial_identifier - object trade_identifier - object adjustment_request_supertype - object adjustment_request - adjustment_request_supertype candidate_hedge_instrument - financial_asset market_signal_asset - financial_asset execution_agent_asset - financial_asset approval_document_asset - financial_asset allocation_instruction_asset - financial_asset compliance_packet_asset - financial_asset pricing_model_asset - financial_asset compliance_rule_asset - financial_asset allocation_template - financial_identifier settlement_account - financial_identifier mandate_clause - financial_identifier hedge_target_bucket - trade_identifier instrument_market_context - trade_identifier execution_ticket - trade_identifier portfolio_leg_request_group - adjustment_request portfolio_manager_request_group - adjustment_request portfolio_leg_primary - portfolio_leg_request_group portfolio_leg_hedge - portfolio_leg_request_group portfolio_manager_unit - portfolio_manager_request_group)
+  (:predicates
+    (registered ?adjustment_request - adjustment_request)
+    (validated ?adjustment_request - adjustment_request)
+    (candidate_selected ?adjustment_request - adjustment_request)
+    (adjustment_applied ?adjustment_request - adjustment_request)
+    (post_trade_allocated ?adjustment_request - adjustment_request)
+    (execution_recorded ?adjustment_request - adjustment_request)
+    (candidate_instrument_available ?candidate_instrument - candidate_hedge_instrument)
+    (assigned_instrument ?adjustment_request - adjustment_request ?candidate_instrument - candidate_hedge_instrument)
+    (market_signal_available ?market_signal - market_signal_asset)
+    (assigned_market_signal ?adjustment_request - adjustment_request ?market_signal - market_signal_asset)
+    (execution_agent_available ?execution_agent - execution_agent_asset)
+    (assigned_execution_agent ?adjustment_request - adjustment_request ?execution_agent - execution_agent_asset)
+    (allocation_template_available ?allocation_template - allocation_template)
+    (leg_primary_allocation_assigned ?portfolio_leg_primary - portfolio_leg_primary ?allocation_template - allocation_template)
+    (leg_hedge_allocation_assigned ?portfolio_leg_hedge - portfolio_leg_hedge ?allocation_template - allocation_template)
+    (leg_to_hedge_bucket ?portfolio_leg_primary - portfolio_leg_primary ?hedge_target_bucket - hedge_target_bucket)
+    (hedge_bucket_ready ?hedge_target_bucket - hedge_target_bucket)
+    (hedge_bucket_locked ?hedge_target_bucket - hedge_target_bucket)
+    (leg_primary_prepared ?portfolio_leg_primary - portfolio_leg_primary)
+    (leg_hedge_to_market_context ?portfolio_leg_hedge - portfolio_leg_hedge ?market_context - instrument_market_context)
+    (market_context_ready ?market_context - instrument_market_context)
+    (market_context_locked ?market_context - instrument_market_context)
+    (leg_hedge_prepared ?portfolio_leg_hedge - portfolio_leg_hedge)
+    (execution_ticket_draft ?execution_ticket - execution_ticket)
+    (execution_ticket_assembled ?execution_ticket - execution_ticket)
+    (ticket_assigned_to_hedge_bucket ?execution_ticket - execution_ticket ?hedge_target_bucket - hedge_target_bucket)
+    (ticket_assigned_to_market_context ?execution_ticket - execution_ticket ?market_context - instrument_market_context)
+    (ticket_bucket_a_locked_flag ?execution_ticket - execution_ticket)
+    (ticket_bucket_b_locked_flag ?execution_ticket - execution_ticket)
+    (execution_ticket_ready_for_settlement ?execution_ticket - execution_ticket)
+    (manager_unit_has_leg_primary ?manager_unit - portfolio_manager_unit ?portfolio_leg_primary - portfolio_leg_primary)
+    (manager_unit_has_leg_hedge ?manager_unit - portfolio_manager_unit ?portfolio_leg_hedge - portfolio_leg_hedge)
+    (manager_unit_associated_with_ticket ?manager_unit - portfolio_manager_unit ?execution_ticket - execution_ticket)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (manager_unit_associated_settlement_account ?manager_unit - portfolio_manager_unit ?settlement_account - settlement_account)
+    (settlement_account_registered ?settlement_account - settlement_account)
+    (settlement_account_linked_to_ticket ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    (manager_unit_account_mapping_confirmed ?manager_unit - portfolio_manager_unit)
+    (manager_unit_settlement_ready ?manager_unit - portfolio_manager_unit)
+    (manager_unit_ready_for_finalization ?manager_unit - portfolio_manager_unit)
+    (approval_document_attached ?manager_unit - portfolio_manager_unit)
+    (approval_progressed ?manager_unit - portfolio_manager_unit)
+    (allocation_instructions_attached ?manager_unit - portfolio_manager_unit)
+    (post_trade_assignment_performed ?manager_unit - portfolio_manager_unit)
+    (mandate_clause_available ?mandate_clause - mandate_clause)
+    (manager_unit_has_mandate_clause ?manager_unit - portfolio_manager_unit ?mandate_clause - mandate_clause)
+    (manager_unit_mandate_applied ?manager_unit - portfolio_manager_unit)
+    (manager_unit_ready_for_instruction ?manager_unit - portfolio_manager_unit)
+    (manager_unit_instructions_finalized ?manager_unit - portfolio_manager_unit)
+    (approval_document_available ?approval_document - approval_document_asset)
+    (manager_unit_linked_approval_document ?manager_unit - portfolio_manager_unit ?approval_document - approval_document_asset)
+    (allocation_instruction_available ?allocation_instruction - allocation_instruction_asset)
+    (manager_unit_attached_allocation_instruction ?manager_unit - portfolio_manager_unit ?allocation_instruction - allocation_instruction_asset)
+    (pricing_model_available ?pricing_model - pricing_model_asset)
+    (manager_unit_pricing_model_attached ?manager_unit - portfolio_manager_unit ?pricing_model - pricing_model_asset)
+    (compliance_rule_available ?compliance_rule - compliance_rule_asset)
+    (manager_unit_compliance_rule_attached ?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset)
+    (compliance_packet_available ?compliance_packet - compliance_packet_asset)
+    (bound_to_compliance_packet ?adjustment_request - adjustment_request ?compliance_packet - compliance_packet_asset)
+    (portfolio_leg_primary_ready ?portfolio_leg_primary - portfolio_leg_primary)
+    (portfolio_leg_hedge_ready ?portfolio_leg_hedge - portfolio_leg_hedge)
+    (completion_recorded ?manager_unit - portfolio_manager_unit)
+  )
+  (:action register_adjustment_request
+    :parameters (?adjustment_request - adjustment_request)
+    :precondition
+      (and
+        (not
+          (registered ?adjustment_request)
+        )
+        (not
+          (adjustment_applied ?adjustment_request)
+        )
+      )
+    :effect (registered ?adjustment_request)
+  )
+  (:action assign_candidate_instrument_to_request
+    :parameters (?adjustment_request - adjustment_request ?candidate_instrument - candidate_hedge_instrument)
+    :precondition
+      (and
+        (registered ?adjustment_request)
+        (not
+          (candidate_selected ?adjustment_request)
+        )
+        (candidate_instrument_available ?candidate_instrument)
+      )
+    :effect
+      (and
+        (candidate_selected ?adjustment_request)
+        (assigned_instrument ?adjustment_request ?candidate_instrument)
+        (not
+          (candidate_instrument_available ?candidate_instrument)
+        )
+      )
+  )
+  (:action assign_market_signal_to_request
+    :parameters (?adjustment_request - adjustment_request ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (registered ?adjustment_request)
+        (candidate_selected ?adjustment_request)
+        (market_signal_available ?market_signal)
+      )
+    :effect
+      (and
+        (assigned_market_signal ?adjustment_request ?market_signal)
+        (not
+          (market_signal_available ?market_signal)
+        )
+      )
+  )
+  (:action validate_adjustment_request
+    :parameters (?adjustment_request - adjustment_request ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (registered ?adjustment_request)
+        (candidate_selected ?adjustment_request)
+        (assigned_market_signal ?adjustment_request ?market_signal)
+        (not
+          (validated ?adjustment_request)
+        )
+      )
+    :effect (validated ?adjustment_request)
+  )
+  (:action release_market_signal
+    :parameters (?adjustment_request - adjustment_request ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (assigned_market_signal ?adjustment_request ?market_signal)
+      )
+    :effect
+      (and
+        (market_signal_available ?market_signal)
+        (not
+          (assigned_market_signal ?adjustment_request ?market_signal)
+        )
+      )
+  )
+  (:action assign_execution_agent_to_request
+    :parameters (?adjustment_request - adjustment_request ?execution_agent - execution_agent_asset)
+    :precondition
+      (and
+        (validated ?adjustment_request)
+        (execution_agent_available ?execution_agent)
+      )
+    :effect
+      (and
+        (assigned_execution_agent ?adjustment_request ?execution_agent)
+        (not
+          (execution_agent_available ?execution_agent)
+        )
+      )
+  )
+  (:action unassign_execution_agent_from_request
+    :parameters (?adjustment_request - adjustment_request ?execution_agent - execution_agent_asset)
+    :precondition
+      (and
+        (assigned_execution_agent ?adjustment_request ?execution_agent)
+      )
+    :effect
+      (and
+        (execution_agent_available ?execution_agent)
+        (not
+          (assigned_execution_agent ?adjustment_request ?execution_agent)
+        )
+      )
+  )
+  (:action attach_pricing_model_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?pricing_model - pricing_model_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (pricing_model_available ?pricing_model)
+      )
+    :effect
+      (and
+        (manager_unit_pricing_model_attached ?manager_unit ?pricing_model)
+        (not
+          (pricing_model_available ?pricing_model)
+        )
+      )
+  )
+  (:action detach_pricing_model_from_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?pricing_model - pricing_model_asset)
+    :precondition
+      (and
+        (manager_unit_pricing_model_attached ?manager_unit ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_available ?pricing_model)
+        (not
+          (manager_unit_pricing_model_attached ?manager_unit ?pricing_model)
+        )
+      )
+  )
+  (:action attach_compliance_rule_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (compliance_rule_available ?compliance_rule)
+      )
+    :effect
+      (and
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action detach_compliance_rule_from_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset)
+    :precondition
+      (and
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+      )
+    :effect
+      (and
+        (compliance_rule_available ?compliance_rule)
+        (not
+          (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        )
+      )
+  )
+  (:action flag_hedge_bucket_ready_for_leg
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?hedge_target_bucket - hedge_target_bucket ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (validated ?portfolio_leg_primary)
+        (assigned_market_signal ?portfolio_leg_primary ?market_signal)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (not
+          (hedge_bucket_ready ?hedge_target_bucket)
+        )
+        (not
+          (hedge_bucket_locked ?hedge_target_bucket)
+        )
+      )
+    :effect (hedge_bucket_ready ?hedge_target_bucket)
+  )
+  (:action confirm_bucket_assignment_with_agent
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?hedge_target_bucket - hedge_target_bucket ?execution_agent - execution_agent_asset)
+    :precondition
+      (and
+        (validated ?portfolio_leg_primary)
+        (assigned_execution_agent ?portfolio_leg_primary ?execution_agent)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (hedge_bucket_ready ?hedge_target_bucket)
+        (not
+          (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (leg_primary_prepared ?portfolio_leg_primary)
+      )
+  )
+  (:action apply_allocation_template_to_leg
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?hedge_target_bucket - hedge_target_bucket ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (validated ?portfolio_leg_primary)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (allocation_template_available ?allocation_template)
+        (not
+          (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (hedge_bucket_locked ?hedge_target_bucket)
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (leg_primary_allocation_assigned ?portfolio_leg_primary ?allocation_template)
+        (not
+          (allocation_template_available ?allocation_template)
+        )
+      )
+  )
+  (:action finalize_allocation_preparation_for_leg
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?hedge_target_bucket - hedge_target_bucket ?market_signal - market_signal_asset ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (validated ?portfolio_leg_primary)
+        (assigned_market_signal ?portfolio_leg_primary ?market_signal)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (hedge_bucket_locked ?hedge_target_bucket)
+        (leg_primary_allocation_assigned ?portfolio_leg_primary ?allocation_template)
+        (not
+          (leg_primary_prepared ?portfolio_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (hedge_bucket_ready ?hedge_target_bucket)
+        (leg_primary_prepared ?portfolio_leg_primary)
+        (allocation_template_available ?allocation_template)
+        (not
+          (leg_primary_allocation_assigned ?portfolio_leg_primary ?allocation_template)
+        )
+      )
+  )
+  (:action flag_hedge_bucket_ready_for_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?market_context - instrument_market_context ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (validated ?portfolio_leg_hedge)
+        (assigned_market_signal ?portfolio_leg_hedge ?market_signal)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (not
+          (market_context_ready ?market_context)
+        )
+        (not
+          (market_context_locked ?market_context)
+        )
+      )
+    :effect (market_context_ready ?market_context)
+  )
+  (:action confirm_bucket_assignment_with_agent_for_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?market_context - instrument_market_context ?execution_agent - execution_agent_asset)
+    :precondition
+      (and
+        (validated ?portfolio_leg_hedge)
+        (assigned_execution_agent ?portfolio_leg_hedge ?execution_agent)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (market_context_ready ?market_context)
+        (not
+          (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        )
+      )
+    :effect
+      (and
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+      )
+  )
+  (:action apply_allocation_template_to_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?market_context - instrument_market_context ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (validated ?portfolio_leg_hedge)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (allocation_template_available ?allocation_template)
+        (not
+          (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        )
+      )
+    :effect
+      (and
+        (market_context_locked ?market_context)
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_hedge_allocation_assigned ?portfolio_leg_hedge ?allocation_template)
+        (not
+          (allocation_template_available ?allocation_template)
+        )
+      )
+  )
+  (:action finalize_allocation_preparation_for_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?market_context - instrument_market_context ?market_signal - market_signal_asset ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (validated ?portfolio_leg_hedge)
+        (assigned_market_signal ?portfolio_leg_hedge ?market_signal)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (market_context_locked ?market_context)
+        (leg_hedge_allocation_assigned ?portfolio_leg_hedge ?allocation_template)
+        (not
+          (leg_hedge_prepared ?portfolio_leg_hedge)
+        )
+      )
+    :effect
+      (and
+        (market_context_ready ?market_context)
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+        (allocation_template_available ?allocation_template)
+        (not
+          (leg_hedge_allocation_assigned ?portfolio_leg_hedge ?allocation_template)
+        )
+      )
+  )
+  (:action assemble_execution_ticket_from_ready_buckets
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?portfolio_leg_hedge - portfolio_leg_hedge ?hedge_target_bucket - hedge_target_bucket ?market_context - instrument_market_context ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (hedge_bucket_ready ?hedge_target_bucket)
+        (market_context_ready ?market_context)
+        (leg_primary_prepared ?portfolio_leg_primary)
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+        (execution_ticket_draft ?execution_ticket)
+      )
+    :effect
+      (and
+        (execution_ticket_assembled ?execution_ticket)
+        (ticket_assigned_to_hedge_bucket ?execution_ticket ?hedge_target_bucket)
+        (ticket_assigned_to_market_context ?execution_ticket ?market_context)
+        (not
+          (execution_ticket_draft ?execution_ticket)
+        )
+      )
+  )
+  (:action assemble_execution_ticket_with_bucket_a_locked
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?portfolio_leg_hedge - portfolio_leg_hedge ?hedge_target_bucket - hedge_target_bucket ?market_context - instrument_market_context ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (hedge_bucket_locked ?hedge_target_bucket)
+        (market_context_ready ?market_context)
+        (not
+          (leg_primary_prepared ?portfolio_leg_primary)
+        )
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+        (execution_ticket_draft ?execution_ticket)
+      )
+    :effect
+      (and
+        (execution_ticket_assembled ?execution_ticket)
+        (ticket_assigned_to_hedge_bucket ?execution_ticket ?hedge_target_bucket)
+        (ticket_assigned_to_market_context ?execution_ticket ?market_context)
+        (ticket_bucket_a_locked_flag ?execution_ticket)
+        (not
+          (execution_ticket_draft ?execution_ticket)
+        )
+      )
+  )
+  (:action assemble_execution_ticket_with_bucket_b_locked
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?portfolio_leg_hedge - portfolio_leg_hedge ?hedge_target_bucket - hedge_target_bucket ?market_context - instrument_market_context ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (hedge_bucket_ready ?hedge_target_bucket)
+        (market_context_locked ?market_context)
+        (leg_primary_prepared ?portfolio_leg_primary)
+        (not
+          (leg_hedge_prepared ?portfolio_leg_hedge)
+        )
+        (execution_ticket_draft ?execution_ticket)
+      )
+    :effect
+      (and
+        (execution_ticket_assembled ?execution_ticket)
+        (ticket_assigned_to_hedge_bucket ?execution_ticket ?hedge_target_bucket)
+        (ticket_assigned_to_market_context ?execution_ticket ?market_context)
+        (ticket_bucket_b_locked_flag ?execution_ticket)
+        (not
+          (execution_ticket_draft ?execution_ticket)
+        )
+      )
+  )
+  (:action assemble_execution_ticket_with_both_buckets_locked
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?portfolio_leg_hedge - portfolio_leg_hedge ?hedge_target_bucket - hedge_target_bucket ?market_context - instrument_market_context ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_to_hedge_bucket ?portfolio_leg_primary ?hedge_target_bucket)
+        (leg_hedge_to_market_context ?portfolio_leg_hedge ?market_context)
+        (hedge_bucket_locked ?hedge_target_bucket)
+        (market_context_locked ?market_context)
+        (not
+          (leg_primary_prepared ?portfolio_leg_primary)
+        )
+        (not
+          (leg_hedge_prepared ?portfolio_leg_hedge)
+        )
+        (execution_ticket_draft ?execution_ticket)
+      )
+    :effect
+      (and
+        (execution_ticket_assembled ?execution_ticket)
+        (ticket_assigned_to_hedge_bucket ?execution_ticket ?hedge_target_bucket)
+        (ticket_assigned_to_market_context ?execution_ticket ?market_context)
+        (ticket_bucket_a_locked_flag ?execution_ticket)
+        (ticket_bucket_b_locked_flag ?execution_ticket)
+        (not
+          (execution_ticket_draft ?execution_ticket)
+        )
+      )
+  )
+  (:action mark_execution_ticket_ready_for_settlement_mapping
+    :parameters (?execution_ticket - execution_ticket ?portfolio_leg_primary - portfolio_leg_primary ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (execution_ticket_assembled ?execution_ticket)
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (assigned_market_signal ?portfolio_leg_primary ?market_signal)
+        (not
+          (execution_ticket_ready_for_settlement ?execution_ticket)
+        )
+      )
+    :effect (execution_ticket_ready_for_settlement ?execution_ticket)
+  )
+  (:action map_ticket_to_settlement_account
+    :parameters (?manager_unit - portfolio_manager_unit ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (manager_unit_associated_with_ticket ?manager_unit ?execution_ticket)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_available ?settlement_account)
+        (execution_ticket_assembled ?execution_ticket)
+        (execution_ticket_ready_for_settlement ?execution_ticket)
+        (not
+          (settlement_account_registered ?settlement_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_account_registered ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action finalize_settlement_account_mapping_for_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?settlement_account - settlement_account ?execution_ticket - execution_ticket ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_registered ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (assigned_market_signal ?manager_unit ?market_signal)
+        (not
+          (ticket_bucket_a_locked_flag ?execution_ticket)
+        )
+        (not
+          (manager_unit_account_mapping_confirmed ?manager_unit)
+        )
+      )
+    :effect (manager_unit_account_mapping_confirmed ?manager_unit)
+  )
+  (:action apply_approval_document_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?approval_document - approval_document_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (approval_document_available ?approval_document)
+        (not
+          (approval_document_attached ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (approval_document_attached ?manager_unit)
+        (manager_unit_linked_approval_document ?manager_unit ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action advance_approval_and_link_settlement
+    :parameters (?manager_unit - portfolio_manager_unit ?settlement_account - settlement_account ?execution_ticket - execution_ticket ?market_signal - market_signal_asset ?approval_document - approval_document_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_registered ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (assigned_market_signal ?manager_unit ?market_signal)
+        (ticket_bucket_a_locked_flag ?execution_ticket)
+        (approval_document_attached ?manager_unit)
+        (manager_unit_linked_approval_document ?manager_unit ?approval_document)
+        (not
+          (manager_unit_account_mapping_confirmed ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_account_mapping_confirmed ?manager_unit)
+        (approval_progressed ?manager_unit)
+      )
+  )
+  (:action prepare_manager_unit_for_settlement
+    :parameters (?manager_unit - portfolio_manager_unit ?pricing_model - pricing_model_asset ?execution_agent - execution_agent_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_account_mapping_confirmed ?manager_unit)
+        (manager_unit_pricing_model_attached ?manager_unit ?pricing_model)
+        (assigned_execution_agent ?manager_unit ?execution_agent)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (not
+          (ticket_bucket_b_locked_flag ?execution_ticket)
+        )
+        (not
+          (manager_unit_settlement_ready ?manager_unit)
+        )
+      )
+    :effect (manager_unit_settlement_ready ?manager_unit)
+  )
+  (:action prepare_manager_unit_for_settlement_alternate
+    :parameters (?manager_unit - portfolio_manager_unit ?pricing_model - pricing_model_asset ?execution_agent - execution_agent_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_account_mapping_confirmed ?manager_unit)
+        (manager_unit_pricing_model_attached ?manager_unit ?pricing_model)
+        (assigned_execution_agent ?manager_unit ?execution_agent)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (ticket_bucket_b_locked_flag ?execution_ticket)
+        (not
+          (manager_unit_settlement_ready ?manager_unit)
+        )
+      )
+    :effect (manager_unit_settlement_ready ?manager_unit)
+  )
+  (:action mark_manager_unit_ready_for_finalization
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_settlement_ready ?manager_unit)
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (not
+          (ticket_bucket_a_locked_flag ?execution_ticket)
+        )
+        (not
+          (ticket_bucket_b_locked_flag ?execution_ticket)
+        )
+        (not
+          (manager_unit_ready_for_finalization ?manager_unit)
+        )
+      )
+    :effect (manager_unit_ready_for_finalization ?manager_unit)
+  )
+  (:action advance_manager_unit_approval_with_allocation_flag
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_settlement_ready ?manager_unit)
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (ticket_bucket_a_locked_flag ?execution_ticket)
+        (not
+          (ticket_bucket_b_locked_flag ?execution_ticket)
+        )
+        (not
+          (manager_unit_ready_for_finalization ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (allocation_instructions_attached ?manager_unit)
+      )
+  )
+  (:action confirm_manager_unit_approval_and_allocation_flag
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_settlement_ready ?manager_unit)
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (not
+          (ticket_bucket_a_locked_flag ?execution_ticket)
+        )
+        (ticket_bucket_b_locked_flag ?execution_ticket)
+        (not
+          (manager_unit_ready_for_finalization ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (allocation_instructions_attached ?manager_unit)
+      )
+  )
+  (:action finalize_manager_unit_approval_and_allocation_flag
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset ?settlement_account - settlement_account ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (manager_unit_settlement_ready ?manager_unit)
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (manager_unit_associated_settlement_account ?manager_unit ?settlement_account)
+        (settlement_account_linked_to_ticket ?settlement_account ?execution_ticket)
+        (ticket_bucket_a_locked_flag ?execution_ticket)
+        (ticket_bucket_b_locked_flag ?execution_ticket)
+        (not
+          (manager_unit_ready_for_finalization ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (allocation_instructions_attached ?manager_unit)
+      )
+  )
+  (:action finalize_post_trade_assignment_for_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit)
+    :precondition
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (not
+          (allocation_instructions_attached ?manager_unit)
+        )
+        (not
+          (completion_recorded ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (completion_recorded ?manager_unit)
+        (post_trade_allocated ?manager_unit)
+      )
+  )
+  (:action attach_allocation_instruction_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?allocation_instruction - allocation_instruction_asset)
+    :precondition
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (allocation_instructions_attached ?manager_unit)
+        (allocation_instruction_available ?allocation_instruction)
+      )
+    :effect
+      (and
+        (manager_unit_attached_allocation_instruction ?manager_unit ?allocation_instruction)
+        (not
+          (allocation_instruction_available ?allocation_instruction)
+        )
+      )
+  )
+  (:action execute_post_trade_allocation_for_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?portfolio_leg_primary - portfolio_leg_primary ?portfolio_leg_hedge - portfolio_leg_hedge ?market_signal - market_signal_asset ?allocation_instruction - allocation_instruction_asset)
+    :precondition
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (allocation_instructions_attached ?manager_unit)
+        (manager_unit_attached_allocation_instruction ?manager_unit ?allocation_instruction)
+        (manager_unit_has_leg_primary ?manager_unit ?portfolio_leg_primary)
+        (manager_unit_has_leg_hedge ?manager_unit ?portfolio_leg_hedge)
+        (leg_primary_prepared ?portfolio_leg_primary)
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+        (assigned_market_signal ?manager_unit ?market_signal)
+        (not
+          (post_trade_assignment_performed ?manager_unit)
+        )
+      )
+    :effect (post_trade_assignment_performed ?manager_unit)
+  )
+  (:action complete_post_trade_assignment_for_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit)
+    :precondition
+      (and
+        (manager_unit_ready_for_finalization ?manager_unit)
+        (post_trade_assignment_performed ?manager_unit)
+        (not
+          (completion_recorded ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (completion_recorded ?manager_unit)
+        (post_trade_allocated ?manager_unit)
+      )
+  )
+  (:action apply_mandate_clause_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?mandate_clause - mandate_clause ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (validated ?manager_unit)
+        (assigned_market_signal ?manager_unit ?market_signal)
+        (mandate_clause_available ?mandate_clause)
+        (manager_unit_has_mandate_clause ?manager_unit ?mandate_clause)
+        (not
+          (manager_unit_mandate_applied ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (manager_unit_mandate_applied ?manager_unit)
+        (not
+          (mandate_clause_available ?mandate_clause)
+        )
+      )
+  )
+  (:action prepare_manager_unit_for_instruction
+    :parameters (?manager_unit - portfolio_manager_unit ?execution_agent - execution_agent_asset)
+    :precondition
+      (and
+        (manager_unit_mandate_applied ?manager_unit)
+        (assigned_execution_agent ?manager_unit ?execution_agent)
+        (not
+          (manager_unit_ready_for_instruction ?manager_unit)
+        )
+      )
+    :effect (manager_unit_ready_for_instruction ?manager_unit)
+  )
+  (:action mark_manager_unit_instructions_finalized
+    :parameters (?manager_unit - portfolio_manager_unit ?compliance_rule - compliance_rule_asset)
+    :precondition
+      (and
+        (manager_unit_ready_for_instruction ?manager_unit)
+        (manager_unit_compliance_rule_attached ?manager_unit ?compliance_rule)
+        (not
+          (manager_unit_instructions_finalized ?manager_unit)
+        )
+      )
+    :effect (manager_unit_instructions_finalized ?manager_unit)
+  )
+  (:action record_manager_unit_completion
+    :parameters (?manager_unit - portfolio_manager_unit)
+    :precondition
+      (and
+        (manager_unit_instructions_finalized ?manager_unit)
+        (not
+          (completion_recorded ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (completion_recorded ?manager_unit)
+        (post_trade_allocated ?manager_unit)
+      )
+  )
+  (:action finalize_post_trade_allocation_for_primary_leg
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_primary_ready ?portfolio_leg_primary)
+        (leg_primary_prepared ?portfolio_leg_primary)
+        (execution_ticket_assembled ?execution_ticket)
+        (execution_ticket_ready_for_settlement ?execution_ticket)
+        (not
+          (post_trade_allocated ?portfolio_leg_primary)
+        )
+      )
+    :effect (post_trade_allocated ?portfolio_leg_primary)
+  )
+  (:action finalize_post_trade_allocation_for_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?execution_ticket - execution_ticket)
+    :precondition
+      (and
+        (portfolio_leg_hedge_ready ?portfolio_leg_hedge)
+        (leg_hedge_prepared ?portfolio_leg_hedge)
+        (execution_ticket_assembled ?execution_ticket)
+        (execution_ticket_ready_for_settlement ?execution_ticket)
+        (not
+          (post_trade_allocated ?portfolio_leg_hedge)
+        )
+      )
+    :effect (post_trade_allocated ?portfolio_leg_hedge)
+  )
+  (:action bind_execution_to_adjustment_request
+    :parameters (?adjustment_request - adjustment_request ?compliance_packet - compliance_packet_asset ?market_signal - market_signal_asset)
+    :precondition
+      (and
+        (post_trade_allocated ?adjustment_request)
+        (assigned_market_signal ?adjustment_request ?market_signal)
+        (compliance_packet_available ?compliance_packet)
+        (not
+          (execution_recorded ?adjustment_request)
+        )
+      )
+    :effect
+      (and
+        (execution_recorded ?adjustment_request)
+        (bound_to_compliance_packet ?adjustment_request ?compliance_packet)
+        (not
+          (compliance_packet_available ?compliance_packet)
+        )
+      )
+  )
+  (:action apply_execution_to_primary_leg
+    :parameters (?portfolio_leg_primary - portfolio_leg_primary ?candidate_instrument - candidate_hedge_instrument ?compliance_packet - compliance_packet_asset)
+    :precondition
+      (and
+        (execution_recorded ?portfolio_leg_primary)
+        (assigned_instrument ?portfolio_leg_primary ?candidate_instrument)
+        (bound_to_compliance_packet ?portfolio_leg_primary ?compliance_packet)
+        (not
+          (adjustment_applied ?portfolio_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (adjustment_applied ?portfolio_leg_primary)
+        (candidate_instrument_available ?candidate_instrument)
+        (compliance_packet_available ?compliance_packet)
+      )
+  )
+  (:action apply_execution_to_hedge_leg
+    :parameters (?portfolio_leg_hedge - portfolio_leg_hedge ?candidate_instrument - candidate_hedge_instrument ?compliance_packet - compliance_packet_asset)
+    :precondition
+      (and
+        (execution_recorded ?portfolio_leg_hedge)
+        (assigned_instrument ?portfolio_leg_hedge ?candidate_instrument)
+        (bound_to_compliance_packet ?portfolio_leg_hedge ?compliance_packet)
+        (not
+          (adjustment_applied ?portfolio_leg_hedge)
+        )
+      )
+    :effect
+      (and
+        (adjustment_applied ?portfolio_leg_hedge)
+        (candidate_instrument_available ?candidate_instrument)
+        (compliance_packet_available ?compliance_packet)
+      )
+  )
+  (:action apply_execution_to_manager_unit
+    :parameters (?manager_unit - portfolio_manager_unit ?candidate_instrument - candidate_hedge_instrument ?compliance_packet - compliance_packet_asset)
+    :precondition
+      (and
+        (execution_recorded ?manager_unit)
+        (assigned_instrument ?manager_unit ?candidate_instrument)
+        (bound_to_compliance_packet ?manager_unit ?compliance_packet)
+        (not
+          (adjustment_applied ?manager_unit)
+        )
+      )
+    :effect
+      (and
+        (adjustment_applied ?manager_unit)
+        (candidate_instrument_available ?candidate_instrument)
+        (compliance_packet_available ?compliance_packet)
+      )
+  )
+)

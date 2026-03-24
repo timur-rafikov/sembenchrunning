@@ -1,0 +1,937 @@
+(define (domain logistics_bundled_order_component_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_entity - object location_ancestor - physical_entity asset_ancestor - physical_entity logistics_primitive - physical_entity order_component_root - physical_entity order_component - order_component_root inventory_source - location_ancestor sku_item - location_ancestor fulfillment_resource - location_ancestor packing_profile - location_ancestor service_level_option - location_ancestor delivery_time_window - location_ancestor handling_requirement - location_ancestor carrier_preference - location_ancestor inventory_unit - asset_ancestor package_type - asset_ancestor customer_instruction - asset_ancestor consolidation_slot - logistics_primitive transport_route_segment - logistics_primitive shipment - logistics_primitive fulfillment_task_group - order_component order_grouping - order_component pick_task - fulfillment_task_group pack_task - fulfillment_task_group customer_order - order_grouping)
+
+  (:predicates
+    (order_component_released ?order_component - order_component)
+    (entity_sourced ?order_component - order_component)
+    (component_source_reserved ?order_component - order_component)
+    (ready_for_outbound ?order_component - order_component)
+    (entity_finalized ?order_component - order_component)
+    (entity_service_level_assigned ?order_component - order_component)
+    (inventory_source_available ?inventory_source - inventory_source)
+    (entity_assigned_to_source ?order_component - order_component ?inventory_source - inventory_source)
+    (sku_available ?sku_item_var - sku_item)
+    (entity_allocated_sku ?order_component - order_component ?sku_item_var - sku_item)
+    (fulfillment_resource_available ?fulfillment_resource - fulfillment_resource)
+    (entity_assigned_to_resource ?order_component - order_component ?fulfillment_resource - fulfillment_resource)
+    (inventory_unit_available ?inventory_unit - inventory_unit)
+    (pick_task_assigned_unit ?pick_task_var - pick_task ?inventory_unit - inventory_unit)
+    (pack_task_assigned_unit ?pack_task_var - pack_task ?inventory_unit - inventory_unit)
+    (pick_task_assigned_slot ?pick_task_var - pick_task ?consolidation_slot - consolidation_slot)
+    (consolidation_slot_ready ?consolidation_slot - consolidation_slot)
+    (consolidation_slot_populated ?consolidation_slot - consolidation_slot)
+    (pick_task_completed ?pick_task_var - pick_task)
+    (pack_task_assigned_route_segment ?pack_task_var - pack_task ?transport_route_segment - transport_route_segment)
+    (route_segment_ready ?transport_route_segment - transport_route_segment)
+    (route_segment_populated ?transport_route_segment - transport_route_segment)
+    (pack_task_completed ?pack_task_var - pack_task)
+    (shipment_placeholder_available ?shipment - shipment)
+    (shipment_created ?shipment - shipment)
+    (shipment_includes_slot ?shipment - shipment ?consolidation_slot - consolidation_slot)
+    (shipment_assigned_route_segment ?shipment - shipment ?transport_route_segment - transport_route_segment)
+    (shipment_requires_slot_confirmation ?shipment - shipment)
+    (shipment_requires_route_confirmation ?shipment - shipment)
+    (shipment_ready_for_pack_assignment ?shipment - shipment)
+    (customer_order_includes_pick_task ?customer_order - customer_order ?pick_task_var - pick_task)
+    (customer_order_includes_pack_task ?customer_order - customer_order ?pack_task_var - pack_task)
+    (customer_order_assigned_shipment ?customer_order - customer_order ?shipment - shipment)
+    (package_type_available ?package_type - package_type)
+    (order_assigned_package_type ?customer_order - customer_order ?package_type - package_type)
+    (package_type_reserved ?package_type - package_type)
+    (package_assigned_to_shipment ?package_type - package_type ?shipment - shipment)
+    (order_packaging_initialized ?customer_order - customer_order)
+    (order_packaging_assigned ?customer_order - customer_order)
+    (order_packaging_completed ?customer_order - customer_order)
+    (packing_profile_assigned ?customer_order - customer_order)
+    (packing_profile_applied ?customer_order - customer_order)
+    (packing_labels_applied ?customer_order - customer_order)
+    (pre_manifest_checks_passed ?customer_order - customer_order)
+    (customer_instruction_available ?customer_instruction - customer_instruction)
+    (order_assigned_customer_instruction ?customer_order - customer_order ?customer_instruction - customer_instruction)
+    (customer_instruction_attached ?customer_order - customer_order)
+    (customer_instruction_processed ?customer_order - customer_order)
+    (customer_instruction_confirmed ?customer_order - customer_order)
+    (packing_profile_available ?packing_profile - packing_profile)
+    (order_assigned_packing_profile ?customer_order - customer_order ?packing_profile - packing_profile)
+    (service_level_option_available ?service_level_option_var - service_level_option)
+    (order_assigned_service_level ?customer_order - customer_order ?service_level_option_var - service_level_option)
+    (handling_requirement_available ?handling_requirement - handling_requirement)
+    (order_assigned_handling_requirement ?customer_order - customer_order ?handling_requirement - handling_requirement)
+    (carrier_preference_available ?carrier_preference - carrier_preference)
+    (order_assigned_carrier_preference ?customer_order - customer_order ?carrier_preference - carrier_preference)
+    (delivery_time_window_available ?delivery_time_window - delivery_time_window)
+    (entity_assigned_delivery_window ?order_component - order_component ?delivery_time_window - delivery_time_window)
+    (pick_task_ready ?pick_task_var - pick_task)
+    (pack_task_ready ?pack_task_var - pack_task)
+    (order_manifested ?customer_order - customer_order)
+  )
+  (:action release_order_component
+    :parameters (?order_component - order_component)
+    :precondition
+      (and
+        (not
+          (order_component_released ?order_component)
+        )
+        (not
+          (ready_for_outbound ?order_component)
+        )
+      )
+    :effect (order_component_released ?order_component)
+  )
+  (:action assign_inventory_source_to_component
+    :parameters (?order_component - order_component ?inventory_source - inventory_source)
+    :precondition
+      (and
+        (order_component_released ?order_component)
+        (not
+          (component_source_reserved ?order_component)
+        )
+        (inventory_source_available ?inventory_source)
+      )
+    :effect
+      (and
+        (component_source_reserved ?order_component)
+        (entity_assigned_to_source ?order_component ?inventory_source)
+        (not
+          (inventory_source_available ?inventory_source)
+        )
+      )
+  )
+  (:action reserve_sku_item_for_component
+    :parameters (?order_component - order_component ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (order_component_released ?order_component)
+        (component_source_reserved ?order_component)
+        (sku_available ?sku_item_var)
+      )
+    :effect
+      (and
+        (entity_allocated_sku ?order_component ?sku_item_var)
+        (not
+          (sku_available ?sku_item_var)
+        )
+      )
+  )
+  (:action finalize_component_sourcing
+    :parameters (?order_component - order_component ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (order_component_released ?order_component)
+        (component_source_reserved ?order_component)
+        (entity_allocated_sku ?order_component ?sku_item_var)
+        (not
+          (entity_sourced ?order_component)
+        )
+      )
+    :effect (entity_sourced ?order_component)
+  )
+  (:action release_sku_reservation
+    :parameters (?order_component - order_component ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_allocated_sku ?order_component ?sku_item_var)
+      )
+    :effect
+      (and
+        (sku_available ?sku_item_var)
+        (not
+          (entity_allocated_sku ?order_component ?sku_item_var)
+        )
+      )
+  )
+  (:action reserve_fulfillment_resource_for_component
+    :parameters (?order_component - order_component ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (entity_sourced ?order_component)
+        (fulfillment_resource_available ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (entity_assigned_to_resource ?order_component ?fulfillment_resource)
+        (not
+          (fulfillment_resource_available ?fulfillment_resource)
+        )
+      )
+  )
+  (:action release_fulfillment_resource_from_component
+    :parameters (?order_component - order_component ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (entity_assigned_to_resource ?order_component ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (fulfillment_resource_available ?fulfillment_resource)
+        (not
+          (entity_assigned_to_resource ?order_component ?fulfillment_resource)
+        )
+      )
+  )
+  (:action assign_handling_requirement_to_order
+    :parameters (?customer_order - customer_order ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (handling_requirement_available ?handling_requirement)
+      )
+    :effect
+      (and
+        (order_assigned_handling_requirement ?customer_order ?handling_requirement)
+        (not
+          (handling_requirement_available ?handling_requirement)
+        )
+      )
+  )
+  (:action unassign_handling_requirement_from_order
+    :parameters (?customer_order - customer_order ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (order_assigned_handling_requirement ?customer_order ?handling_requirement)
+      )
+    :effect
+      (and
+        (handling_requirement_available ?handling_requirement)
+        (not
+          (order_assigned_handling_requirement ?customer_order ?handling_requirement)
+        )
+      )
+  )
+  (:action assign_carrier_preference_to_order
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (carrier_preference_available ?carrier_preference)
+      )
+    :effect
+      (and
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (not
+          (carrier_preference_available ?carrier_preference)
+        )
+      )
+  )
+  (:action unassign_carrier_preference_from_order
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference)
+    :precondition
+      (and
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+      )
+    :effect
+      (and
+        (carrier_preference_available ?carrier_preference)
+        (not
+          (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        )
+      )
+  )
+  (:action set_consolidation_slot_ready
+    :parameters (?pick_task_var - pick_task ?consolidation_slot - consolidation_slot ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_sourced ?pick_task_var)
+        (entity_allocated_sku ?pick_task_var ?sku_item_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (not
+          (consolidation_slot_ready ?consolidation_slot)
+        )
+        (not
+          (consolidation_slot_populated ?consolidation_slot)
+        )
+      )
+    :effect (consolidation_slot_ready ?consolidation_slot)
+  )
+  (:action start_pick_task_with_resource
+    :parameters (?pick_task_var - pick_task ?consolidation_slot - consolidation_slot ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (entity_sourced ?pick_task_var)
+        (entity_assigned_to_resource ?pick_task_var ?fulfillment_resource)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (consolidation_slot_ready ?consolidation_slot)
+        (not
+          (pick_task_ready ?pick_task_var)
+        )
+      )
+    :effect
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pick_task_completed ?pick_task_var)
+      )
+  )
+  (:action assign_inventory_unit_to_pick_task
+    :parameters (?pick_task_var - pick_task ?consolidation_slot - consolidation_slot ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourced ?pick_task_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (pick_task_ready ?pick_task_var)
+        )
+      )
+    :effect
+      (and
+        (consolidation_slot_populated ?consolidation_slot)
+        (pick_task_ready ?pick_task_var)
+        (pick_task_assigned_unit ?pick_task_var ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action commit_pick_to_consolidation_slot
+    :parameters (?pick_task_var - pick_task ?consolidation_slot - consolidation_slot ?sku_item_var - sku_item ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourced ?pick_task_var)
+        (entity_allocated_sku ?pick_task_var ?sku_item_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (consolidation_slot_populated ?consolidation_slot)
+        (pick_task_assigned_unit ?pick_task_var ?inventory_unit)
+        (not
+          (pick_task_completed ?pick_task_var)
+        )
+      )
+    :effect
+      (and
+        (consolidation_slot_ready ?consolidation_slot)
+        (pick_task_completed ?pick_task_var)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (pick_task_assigned_unit ?pick_task_var ?inventory_unit)
+        )
+      )
+  )
+  (:action set_route_segment_ready
+    :parameters (?pack_task_var - pack_task ?transport_route_segment - transport_route_segment ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_sourced ?pack_task_var)
+        (entity_allocated_sku ?pack_task_var ?sku_item_var)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (not
+          (route_segment_ready ?transport_route_segment)
+        )
+        (not
+          (route_segment_populated ?transport_route_segment)
+        )
+      )
+    :effect (route_segment_ready ?transport_route_segment)
+  )
+  (:action start_pack_task_with_resource
+    :parameters (?pack_task_var - pack_task ?transport_route_segment - transport_route_segment ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (entity_sourced ?pack_task_var)
+        (entity_assigned_to_resource ?pack_task_var ?fulfillment_resource)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (route_segment_ready ?transport_route_segment)
+        (not
+          (pack_task_ready ?pack_task_var)
+        )
+      )
+    :effect
+      (and
+        (pack_task_ready ?pack_task_var)
+        (pack_task_completed ?pack_task_var)
+      )
+  )
+  (:action assign_inventory_unit_to_pack_task
+    :parameters (?pack_task_var - pack_task ?transport_route_segment - transport_route_segment ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourced ?pack_task_var)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (pack_task_ready ?pack_task_var)
+        )
+      )
+    :effect
+      (and
+        (route_segment_populated ?transport_route_segment)
+        (pack_task_ready ?pack_task_var)
+        (pack_task_assigned_unit ?pack_task_var ?inventory_unit)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action commit_pack_to_route_segment
+    :parameters (?pack_task_var - pack_task ?transport_route_segment - transport_route_segment ?sku_item_var - sku_item ?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (entity_sourced ?pack_task_var)
+        (entity_allocated_sku ?pack_task_var ?sku_item_var)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (route_segment_populated ?transport_route_segment)
+        (pack_task_assigned_unit ?pack_task_var ?inventory_unit)
+        (not
+          (pack_task_completed ?pack_task_var)
+        )
+      )
+    :effect
+      (and
+        (route_segment_ready ?transport_route_segment)
+        (pack_task_completed ?pack_task_var)
+        (inventory_unit_available ?inventory_unit)
+        (not
+          (pack_task_assigned_unit ?pack_task_var ?inventory_unit)
+        )
+      )
+  )
+  (:action create_shipment_standard
+    :parameters (?pick_task_var - pick_task ?pack_task_var - pack_task ?consolidation_slot - consolidation_slot ?transport_route_segment - transport_route_segment ?shipment - shipment)
+    :precondition
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pack_task_ready ?pack_task_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (consolidation_slot_ready ?consolidation_slot)
+        (route_segment_ready ?transport_route_segment)
+        (pick_task_completed ?pick_task_var)
+        (pack_task_completed ?pack_task_var)
+        (shipment_placeholder_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_created ?shipment)
+        (shipment_includes_slot ?shipment ?consolidation_slot)
+        (shipment_assigned_route_segment ?shipment ?transport_route_segment)
+        (not
+          (shipment_placeholder_available ?shipment)
+        )
+      )
+  )
+  (:action create_shipment_with_populated_slot
+    :parameters (?pick_task_var - pick_task ?pack_task_var - pack_task ?consolidation_slot - consolidation_slot ?transport_route_segment - transport_route_segment ?shipment - shipment)
+    :precondition
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pack_task_ready ?pack_task_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (consolidation_slot_populated ?consolidation_slot)
+        (route_segment_ready ?transport_route_segment)
+        (not
+          (pick_task_completed ?pick_task_var)
+        )
+        (pack_task_completed ?pack_task_var)
+        (shipment_placeholder_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_created ?shipment)
+        (shipment_includes_slot ?shipment ?consolidation_slot)
+        (shipment_assigned_route_segment ?shipment ?transport_route_segment)
+        (shipment_requires_slot_confirmation ?shipment)
+        (not
+          (shipment_placeholder_available ?shipment)
+        )
+      )
+  )
+  (:action create_shipment_with_populated_route
+    :parameters (?pick_task_var - pick_task ?pack_task_var - pack_task ?consolidation_slot - consolidation_slot ?transport_route_segment - transport_route_segment ?shipment - shipment)
+    :precondition
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pack_task_ready ?pack_task_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (consolidation_slot_ready ?consolidation_slot)
+        (route_segment_populated ?transport_route_segment)
+        (pick_task_completed ?pick_task_var)
+        (not
+          (pack_task_completed ?pack_task_var)
+        )
+        (shipment_placeholder_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_created ?shipment)
+        (shipment_includes_slot ?shipment ?consolidation_slot)
+        (shipment_assigned_route_segment ?shipment ?transport_route_segment)
+        (shipment_requires_route_confirmation ?shipment)
+        (not
+          (shipment_placeholder_available ?shipment)
+        )
+      )
+  )
+  (:action create_shipment_with_populated_slot_and_route
+    :parameters (?pick_task_var - pick_task ?pack_task_var - pack_task ?consolidation_slot - consolidation_slot ?transport_route_segment - transport_route_segment ?shipment - shipment)
+    :precondition
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pack_task_ready ?pack_task_var)
+        (pick_task_assigned_slot ?pick_task_var ?consolidation_slot)
+        (pack_task_assigned_route_segment ?pack_task_var ?transport_route_segment)
+        (consolidation_slot_populated ?consolidation_slot)
+        (route_segment_populated ?transport_route_segment)
+        (not
+          (pick_task_completed ?pick_task_var)
+        )
+        (not
+          (pack_task_completed ?pack_task_var)
+        )
+        (shipment_placeholder_available ?shipment)
+      )
+    :effect
+      (and
+        (shipment_created ?shipment)
+        (shipment_includes_slot ?shipment ?consolidation_slot)
+        (shipment_assigned_route_segment ?shipment ?transport_route_segment)
+        (shipment_requires_slot_confirmation ?shipment)
+        (shipment_requires_route_confirmation ?shipment)
+        (not
+          (shipment_placeholder_available ?shipment)
+        )
+      )
+  )
+  (:action mark_shipment_ready_for_pack_assignment
+    :parameters (?shipment - shipment ?pick_task_var - pick_task ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (shipment_created ?shipment)
+        (pick_task_ready ?pick_task_var)
+        (entity_allocated_sku ?pick_task_var ?sku_item_var)
+        (not
+          (shipment_ready_for_pack_assignment ?shipment)
+        )
+      )
+    :effect (shipment_ready_for_pack_assignment ?shipment)
+  )
+  (:action reserve_package_type_and_assign_to_shipment
+    :parameters (?customer_order - customer_order ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (customer_order_assigned_shipment ?customer_order ?shipment)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_type_available ?package_type)
+        (shipment_created ?shipment)
+        (shipment_ready_for_pack_assignment ?shipment)
+        (not
+          (package_type_reserved ?package_type)
+        )
+      )
+    :effect
+      (and
+        (package_type_reserved ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (not
+          (package_type_available ?package_type)
+        )
+      )
+  )
+  (:action initialize_order_packaging
+    :parameters (?customer_order - customer_order ?package_type - package_type ?shipment - shipment ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_type_reserved ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (entity_allocated_sku ?customer_order ?sku_item_var)
+        (not
+          (shipment_requires_slot_confirmation ?shipment)
+        )
+        (not
+          (order_packaging_initialized ?customer_order)
+        )
+      )
+    :effect (order_packaging_initialized ?customer_order)
+  )
+  (:action assign_packing_profile_to_order
+    :parameters (?customer_order - customer_order ?packing_profile - packing_profile)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (packing_profile_available ?packing_profile)
+        (not
+          (packing_profile_assigned ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (packing_profile_assigned ?customer_order)
+        (order_assigned_packing_profile ?customer_order ?packing_profile)
+        (not
+          (packing_profile_available ?packing_profile)
+        )
+      )
+  )
+  (:action apply_packing_profile_and_confirm
+    :parameters (?customer_order - customer_order ?package_type - package_type ?shipment - shipment ?sku_item_var - sku_item ?packing_profile - packing_profile)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_type_reserved ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (entity_allocated_sku ?customer_order ?sku_item_var)
+        (shipment_requires_slot_confirmation ?shipment)
+        (packing_profile_assigned ?customer_order)
+        (order_assigned_packing_profile ?customer_order ?packing_profile)
+        (not
+          (order_packaging_initialized ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_packaging_initialized ?customer_order)
+        (packing_profile_applied ?customer_order)
+      )
+  )
+  (:action prepare_order_packaging_with_handling
+    :parameters (?customer_order - customer_order ?handling_requirement - handling_requirement ?fulfillment_resource - fulfillment_resource ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_initialized ?customer_order)
+        (order_assigned_handling_requirement ?customer_order ?handling_requirement)
+        (entity_assigned_to_resource ?customer_order ?fulfillment_resource)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (not
+          (shipment_requires_route_confirmation ?shipment)
+        )
+        (not
+          (order_packaging_assigned ?customer_order)
+        )
+      )
+    :effect (order_packaging_assigned ?customer_order)
+  )
+  (:action confirm_order_packaging_with_handling
+    :parameters (?customer_order - customer_order ?handling_requirement - handling_requirement ?fulfillment_resource - fulfillment_resource ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_initialized ?customer_order)
+        (order_assigned_handling_requirement ?customer_order ?handling_requirement)
+        (entity_assigned_to_resource ?customer_order ?fulfillment_resource)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (shipment_requires_route_confirmation ?shipment)
+        (not
+          (order_packaging_assigned ?customer_order)
+        )
+      )
+    :effect (order_packaging_assigned ?customer_order)
+  )
+  (:action finalize_packaging_stage
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_assigned ?customer_order)
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (not
+          (shipment_requires_slot_confirmation ?shipment)
+        )
+        (not
+          (shipment_requires_route_confirmation ?shipment)
+        )
+        (not
+          (order_packaging_completed ?customer_order)
+        )
+      )
+    :effect (order_packaging_completed ?customer_order)
+  )
+  (:action finalize_packaging_stage_and_apply_labels
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_assigned ?customer_order)
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (shipment_requires_slot_confirmation ?shipment)
+        (not
+          (shipment_requires_route_confirmation ?shipment)
+        )
+        (not
+          (order_packaging_completed ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_packaging_completed ?customer_order)
+        (packing_labels_applied ?customer_order)
+      )
+  )
+  (:action finalize_packaging_stage_and_apply_labels_variant1
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_assigned ?customer_order)
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (not
+          (shipment_requires_slot_confirmation ?shipment)
+        )
+        (shipment_requires_route_confirmation ?shipment)
+        (not
+          (order_packaging_completed ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_packaging_completed ?customer_order)
+        (packing_labels_applied ?customer_order)
+      )
+  )
+  (:action finalize_packaging_stage_and_apply_labels_variant2
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference ?package_type - package_type ?shipment - shipment)
+    :precondition
+      (and
+        (order_packaging_assigned ?customer_order)
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (order_assigned_package_type ?customer_order ?package_type)
+        (package_assigned_to_shipment ?package_type ?shipment)
+        (shipment_requires_slot_confirmation ?shipment)
+        (shipment_requires_route_confirmation ?shipment)
+        (not
+          (order_packaging_completed ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_packaging_completed ?customer_order)
+        (packing_labels_applied ?customer_order)
+      )
+  )
+  (:action manifest_order
+    :parameters (?customer_order - customer_order)
+    :precondition
+      (and
+        (order_packaging_completed ?customer_order)
+        (not
+          (packing_labels_applied ?customer_order)
+        )
+        (not
+          (order_manifested ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_manifested ?customer_order)
+        (entity_finalized ?customer_order)
+      )
+  )
+  (:action assign_service_level_to_order
+    :parameters (?customer_order - customer_order ?service_level_option_var - service_level_option)
+    :precondition
+      (and
+        (order_packaging_completed ?customer_order)
+        (packing_labels_applied ?customer_order)
+        (service_level_option_available ?service_level_option_var)
+      )
+    :effect
+      (and
+        (order_assigned_service_level ?customer_order ?service_level_option_var)
+        (not
+          (service_level_option_available ?service_level_option_var)
+        )
+      )
+  )
+  (:action perform_final_checks
+    :parameters (?customer_order - customer_order ?pick_task_var - pick_task ?pack_task_var - pack_task ?sku_item_var - sku_item ?service_level_option_var - service_level_option)
+    :precondition
+      (and
+        (order_packaging_completed ?customer_order)
+        (packing_labels_applied ?customer_order)
+        (order_assigned_service_level ?customer_order ?service_level_option_var)
+        (customer_order_includes_pick_task ?customer_order ?pick_task_var)
+        (customer_order_includes_pack_task ?customer_order ?pack_task_var)
+        (pick_task_completed ?pick_task_var)
+        (pack_task_completed ?pack_task_var)
+        (entity_allocated_sku ?customer_order ?sku_item_var)
+        (not
+          (pre_manifest_checks_passed ?customer_order)
+        )
+      )
+    :effect (pre_manifest_checks_passed ?customer_order)
+  )
+  (:action manifest_order_post_checks
+    :parameters (?customer_order - customer_order)
+    :precondition
+      (and
+        (order_packaging_completed ?customer_order)
+        (pre_manifest_checks_passed ?customer_order)
+        (not
+          (order_manifested ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_manifested ?customer_order)
+        (entity_finalized ?customer_order)
+      )
+  )
+  (:action attach_customer_instruction_to_order
+    :parameters (?customer_order - customer_order ?customer_instruction - customer_instruction ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_sourced ?customer_order)
+        (entity_allocated_sku ?customer_order ?sku_item_var)
+        (customer_instruction_available ?customer_instruction)
+        (order_assigned_customer_instruction ?customer_order ?customer_instruction)
+        (not
+          (customer_instruction_attached ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (customer_instruction_attached ?customer_order)
+        (not
+          (customer_instruction_available ?customer_instruction)
+        )
+      )
+  )
+  (:action process_customer_instruction
+    :parameters (?customer_order - customer_order ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (customer_instruction_attached ?customer_order)
+        (entity_assigned_to_resource ?customer_order ?fulfillment_resource)
+        (not
+          (customer_instruction_processed ?customer_order)
+        )
+      )
+    :effect (customer_instruction_processed ?customer_order)
+  )
+  (:action confirm_customer_instruction_processing
+    :parameters (?customer_order - customer_order ?carrier_preference - carrier_preference)
+    :precondition
+      (and
+        (customer_instruction_processed ?customer_order)
+        (order_assigned_carrier_preference ?customer_order ?carrier_preference)
+        (not
+          (customer_instruction_confirmed ?customer_order)
+        )
+      )
+    :effect (customer_instruction_confirmed ?customer_order)
+  )
+  (:action manifest_order_with_customer_instruction
+    :parameters (?customer_order - customer_order)
+    :precondition
+      (and
+        (customer_instruction_confirmed ?customer_order)
+        (not
+          (order_manifested ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (order_manifested ?customer_order)
+        (entity_finalized ?customer_order)
+      )
+  )
+  (:action mark_pick_task_ready_for_outbound
+    :parameters (?pick_task_var - pick_task ?shipment - shipment)
+    :precondition
+      (and
+        (pick_task_ready ?pick_task_var)
+        (pick_task_completed ?pick_task_var)
+        (shipment_created ?shipment)
+        (shipment_ready_for_pack_assignment ?shipment)
+        (not
+          (entity_finalized ?pick_task_var)
+        )
+      )
+    :effect (entity_finalized ?pick_task_var)
+  )
+  (:action mark_pack_task_ready_for_outbound
+    :parameters (?pack_task_var - pack_task ?shipment - shipment)
+    :precondition
+      (and
+        (pack_task_ready ?pack_task_var)
+        (pack_task_completed ?pack_task_var)
+        (shipment_created ?shipment)
+        (shipment_ready_for_pack_assignment ?shipment)
+        (not
+          (entity_finalized ?pack_task_var)
+        )
+      )
+    :effect (entity_finalized ?pack_task_var)
+  )
+  (:action assign_delivery_window_and_service_to_component
+    :parameters (?order_component - order_component ?delivery_time_window - delivery_time_window ?sku_item_var - sku_item)
+    :precondition
+      (and
+        (entity_finalized ?order_component)
+        (entity_allocated_sku ?order_component ?sku_item_var)
+        (delivery_time_window_available ?delivery_time_window)
+        (not
+          (entity_service_level_assigned ?order_component)
+        )
+      )
+    :effect
+      (and
+        (entity_service_level_assigned ?order_component)
+        (entity_assigned_delivery_window ?order_component ?delivery_time_window)
+        (not
+          (delivery_time_window_available ?delivery_time_window)
+        )
+      )
+  )
+  (:action assign_service_to_pick_task_and_resupply_source
+    :parameters (?pick_task_var - pick_task ?inventory_source - inventory_source ?delivery_time_window - delivery_time_window)
+    :precondition
+      (and
+        (entity_service_level_assigned ?pick_task_var)
+        (entity_assigned_to_source ?pick_task_var ?inventory_source)
+        (entity_assigned_delivery_window ?pick_task_var ?delivery_time_window)
+        (not
+          (ready_for_outbound ?pick_task_var)
+        )
+      )
+    :effect
+      (and
+        (ready_for_outbound ?pick_task_var)
+        (inventory_source_available ?inventory_source)
+        (delivery_time_window_available ?delivery_time_window)
+      )
+  )
+  (:action assign_service_to_pack_task_and_resupply_source
+    :parameters (?pack_task_var - pack_task ?inventory_source - inventory_source ?delivery_time_window - delivery_time_window)
+    :precondition
+      (and
+        (entity_service_level_assigned ?pack_task_var)
+        (entity_assigned_to_source ?pack_task_var ?inventory_source)
+        (entity_assigned_delivery_window ?pack_task_var ?delivery_time_window)
+        (not
+          (ready_for_outbound ?pack_task_var)
+        )
+      )
+    :effect
+      (and
+        (ready_for_outbound ?pack_task_var)
+        (inventory_source_available ?inventory_source)
+        (delivery_time_window_available ?delivery_time_window)
+      )
+  )
+  (:action assign_service_to_order_and_resupply_source
+    :parameters (?customer_order - customer_order ?inventory_source - inventory_source ?delivery_time_window - delivery_time_window)
+    :precondition
+      (and
+        (entity_service_level_assigned ?customer_order)
+        (entity_assigned_to_source ?customer_order ?inventory_source)
+        (entity_assigned_delivery_window ?customer_order ?delivery_time_window)
+        (not
+          (ready_for_outbound ?customer_order)
+        )
+      )
+    :effect
+      (and
+        (ready_for_outbound ?customer_order)
+        (inventory_source_available ?inventory_source)
+        (delivery_time_window_available ?delivery_time_window)
+      )
+  )
+)

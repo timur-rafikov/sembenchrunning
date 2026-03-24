@@ -1,0 +1,937 @@
+(define (domain finance_payments_settlement_nostro_vostro_balance_sensitive_release)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object operational_artifact - generic_object account_role - generic_object channel_role - generic_object domain_entity - generic_object settlement_instruction - domain_entity release_channel_token - operational_artifact payment_message - operational_artifact authorizing_operator - operational_artifact compliance_credential - operational_artifact execution_profile - operational_artifact release_permit - operational_artifact fee_instruction - operational_artifact operational_approval - operational_artifact liquidity_reservation - account_role correspondent_message - account_role regulatory_attestation - account_role nostro_account - channel_role vostro_account - channel_role settlement_channel_instance - channel_role participant_role - settlement_instruction participant_subtype - settlement_instruction originating_participant - participant_role beneficiary_participant - participant_role settlement_transaction - participant_subtype)
+
+  (:predicates
+    (payment_instruction_registered ?payment_instruction - settlement_instruction)
+    (payment_entity_validated ?payment_instruction - settlement_instruction)
+    (release_token_assigned ?payment_instruction - settlement_instruction)
+    (release_committed ?payment_instruction - settlement_instruction)
+    (final_checks_passed ?payment_instruction - settlement_instruction)
+    (release_approved ?payment_instruction - settlement_instruction)
+    (release_token_available ?release_channel_token - release_channel_token)
+    (release_token_binding ?payment_instruction - settlement_instruction ?release_channel_token - release_channel_token)
+    (payment_message_available ?payment_message - payment_message)
+    (payment_message_attached ?payment_instruction - settlement_instruction ?payment_message - payment_message)
+    (authorizing_operator_available ?authorizing_operator - authorizing_operator)
+    (assigned_to_authorizer ?payment_instruction - settlement_instruction ?authorizing_operator - authorizing_operator)
+    (liquidity_reservation_available ?liquidity_reservation - liquidity_reservation)
+    (participant_liquidity_reservation_binding ?originating_participant - originating_participant ?liquidity_reservation - liquidity_reservation)
+    (beneficiary_liquidity_reservation_binding ?beneficiary_participant - beneficiary_participant ?liquidity_reservation - liquidity_reservation)
+    (participant_nostro_account_mapping ?originating_participant - originating_participant ?nostro_account - nostro_account)
+    (nostro_account_balance_sufficient ?nostro_account - nostro_account)
+    (nostro_account_reservation_active ?nostro_account - nostro_account)
+    (originating_liquidity_confirmed ?originating_participant - originating_participant)
+    (participant_vostro_account_mapping ?beneficiary_participant - beneficiary_participant ?vostro_account - vostro_account)
+    (vostro_account_balance_sufficient ?vostro_account - vostro_account)
+    (vostro_account_reservation_active ?vostro_account - vostro_account)
+    (beneficiary_liquidity_confirmed ?beneficiary_participant - beneficiary_participant)
+    (channel_instance_available ?settlement_channel_instance - settlement_channel_instance)
+    (channel_dispatch_enqueued ?settlement_channel_instance - settlement_channel_instance)
+    (channel_nostro_binding ?settlement_channel_instance - settlement_channel_instance ?nostro_account - nostro_account)
+    (channel_vostro_binding ?settlement_channel_instance - settlement_channel_instance ?vostro_account - vostro_account)
+    (channel_requires_regulatory_attestation ?settlement_channel_instance - settlement_channel_instance)
+    (channel_requires_operational_approval ?settlement_channel_instance - settlement_channel_instance)
+    (channel_dispatch_acknowledged ?settlement_channel_instance - settlement_channel_instance)
+    (transaction_originating_participant_mapping ?settlement_transaction - settlement_transaction ?originating_participant - originating_participant)
+    (transaction_beneficiary_participant_mapping ?settlement_transaction - settlement_transaction ?beneficiary_participant - beneficiary_participant)
+    (transaction_channel_binding ?settlement_transaction - settlement_transaction ?settlement_channel_instance - settlement_channel_instance)
+    (correspondent_message_available ?correspondent_message - correspondent_message)
+    (transaction_correspondent_message_binding ?settlement_transaction - settlement_transaction ?correspondent_message - correspondent_message)
+    (correspondent_message_generated ?correspondent_message - correspondent_message)
+    (correspondent_message_channel_binding ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    (transaction_channel_submission_ready ?settlement_transaction - settlement_transaction)
+    (transaction_channel_processed ?settlement_transaction - settlement_transaction)
+    (transaction_ready_for_finalization ?settlement_transaction - settlement_transaction)
+    (transaction_regulatory_attestation_attached ?settlement_transaction - settlement_transaction)
+    (transaction_regulatory_attestation_confirmed ?settlement_transaction - settlement_transaction)
+    (transaction_fee_required ?settlement_transaction - settlement_transaction)
+    (transaction_posting_initiated ?settlement_transaction - settlement_transaction)
+    (regulatory_attestation_available ?regulatory_attestation - regulatory_attestation)
+    (transaction_regulatory_attestation_binding ?settlement_transaction - settlement_transaction ?regulatory_attestation - regulatory_attestation)
+    (transaction_regulatory_attestation_reserved ?settlement_transaction - settlement_transaction)
+    (transaction_sent_for_regulatory_approval ?settlement_transaction - settlement_transaction)
+    (transaction_regulatory_approval_confirmed ?settlement_transaction - settlement_transaction)
+    (compliance_credential_available ?compliance_credential - compliance_credential)
+    (transaction_compliance_credential_binding ?settlement_transaction - settlement_transaction ?compliance_credential - compliance_credential)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (transaction_execution_profile_binding ?settlement_transaction - settlement_transaction ?execution_profile - execution_profile)
+    (fee_instruction_available ?fee_instruction - fee_instruction)
+    (transaction_fee_binding ?settlement_transaction - settlement_transaction ?fee_instruction - fee_instruction)
+    (operational_approval_available ?operational_approval - operational_approval)
+    (transaction_operational_approval_binding ?settlement_transaction - settlement_transaction ?operational_approval - operational_approval)
+    (release_permit_available ?release_permit - release_permit)
+    (release_permit_binding ?payment_instruction - settlement_instruction ?release_permit - release_permit)
+    (originating_participant_ready ?originating_participant - originating_participant)
+    (beneficiary_participant_ready ?beneficiary_participant - beneficiary_participant)
+    (transaction_finalized ?settlement_transaction - settlement_transaction)
+  )
+  (:action register_payment_instruction
+    :parameters (?payment_instruction - settlement_instruction)
+    :precondition
+      (and
+        (not
+          (payment_instruction_registered ?payment_instruction)
+        )
+        (not
+          (release_committed ?payment_instruction)
+        )
+      )
+    :effect (payment_instruction_registered ?payment_instruction)
+  )
+  (:action assign_release_token_to_instruction
+    :parameters (?payment_instruction - settlement_instruction ?release_channel_token - release_channel_token)
+    :precondition
+      (and
+        (payment_instruction_registered ?payment_instruction)
+        (not
+          (release_token_assigned ?payment_instruction)
+        )
+        (release_token_available ?release_channel_token)
+      )
+    :effect
+      (and
+        (release_token_assigned ?payment_instruction)
+        (release_token_binding ?payment_instruction ?release_channel_token)
+        (not
+          (release_token_available ?release_channel_token)
+        )
+      )
+  )
+  (:action attach_payment_message_to_instruction
+    :parameters (?payment_instruction - settlement_instruction ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_instruction_registered ?payment_instruction)
+        (release_token_assigned ?payment_instruction)
+        (payment_message_available ?payment_message)
+      )
+    :effect
+      (and
+        (payment_message_attached ?payment_instruction ?payment_message)
+        (not
+          (payment_message_available ?payment_message)
+        )
+      )
+  )
+  (:action validate_and_route_payment_instruction
+    :parameters (?payment_instruction - settlement_instruction ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_instruction_registered ?payment_instruction)
+        (release_token_assigned ?payment_instruction)
+        (payment_message_attached ?payment_instruction ?payment_message)
+        (not
+          (payment_entity_validated ?payment_instruction)
+        )
+      )
+    :effect (payment_entity_validated ?payment_instruction)
+  )
+  (:action detach_payment_message_from_instruction
+    :parameters (?payment_instruction - settlement_instruction ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_message_attached ?payment_instruction ?payment_message)
+      )
+    :effect
+      (and
+        (payment_message_available ?payment_message)
+        (not
+          (payment_message_attached ?payment_instruction ?payment_message)
+        )
+      )
+  )
+  (:action assign_authorizer_to_instruction
+    :parameters (?payment_instruction - settlement_instruction ?authorizing_operator - authorizing_operator)
+    :precondition
+      (and
+        (payment_entity_validated ?payment_instruction)
+        (authorizing_operator_available ?authorizing_operator)
+      )
+    :effect
+      (and
+        (assigned_to_authorizer ?payment_instruction ?authorizing_operator)
+        (not
+          (authorizing_operator_available ?authorizing_operator)
+        )
+      )
+  )
+  (:action unassign_authorizer_from_instruction
+    :parameters (?payment_instruction - settlement_instruction ?authorizing_operator - authorizing_operator)
+    :precondition
+      (and
+        (assigned_to_authorizer ?payment_instruction ?authorizing_operator)
+      )
+    :effect
+      (and
+        (authorizing_operator_available ?authorizing_operator)
+        (not
+          (assigned_to_authorizer ?payment_instruction ?authorizing_operator)
+        )
+      )
+  )
+  (:action attach_fee_instruction_to_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?fee_instruction - fee_instruction)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (fee_instruction_available ?fee_instruction)
+      )
+    :effect
+      (and
+        (transaction_fee_binding ?settlement_transaction ?fee_instruction)
+        (not
+          (fee_instruction_available ?fee_instruction)
+        )
+      )
+  )
+  (:action detach_fee_instruction_from_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?fee_instruction - fee_instruction)
+    :precondition
+      (and
+        (transaction_fee_binding ?settlement_transaction ?fee_instruction)
+      )
+    :effect
+      (and
+        (fee_instruction_available ?fee_instruction)
+        (not
+          (transaction_fee_binding ?settlement_transaction ?fee_instruction)
+        )
+      )
+  )
+  (:action assign_operational_approval
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (operational_approval_available ?operational_approval)
+      )
+    :effect
+      (and
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (not
+          (operational_approval_available ?operational_approval)
+        )
+      )
+  )
+  (:action revoke_operational_approval
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval)
+    :precondition
+      (and
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+      )
+    :effect
+      (and
+        (operational_approval_available ?operational_approval)
+        (not
+          (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        )
+      )
+  )
+  (:action verify_nostro_account_balance_for_participant
+    :parameters (?originating_participant - originating_participant ?nostro_account - nostro_account ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_entity_validated ?originating_participant)
+        (payment_message_attached ?originating_participant ?payment_message)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (not
+          (nostro_account_balance_sufficient ?nostro_account)
+        )
+        (not
+          (nostro_account_reservation_active ?nostro_account)
+        )
+      )
+    :effect (nostro_account_balance_sufficient ?nostro_account)
+  )
+  (:action confirm_originating_liquidity_with_authorizer
+    :parameters (?originating_participant - originating_participant ?nostro_account - nostro_account ?authorizing_operator - authorizing_operator)
+    :precondition
+      (and
+        (payment_entity_validated ?originating_participant)
+        (assigned_to_authorizer ?originating_participant ?authorizing_operator)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (nostro_account_balance_sufficient ?nostro_account)
+        (not
+          (originating_participant_ready ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (originating_participant_ready ?originating_participant)
+        (originating_liquidity_confirmed ?originating_participant)
+      )
+  )
+  (:action reserve_nostro_liquidity_for_participant
+    :parameters (?originating_participant - originating_participant ?nostro_account - nostro_account ?liquidity_reservation - liquidity_reservation)
+    :precondition
+      (and
+        (payment_entity_validated ?originating_participant)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (liquidity_reservation_available ?liquidity_reservation)
+        (not
+          (originating_participant_ready ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (nostro_account_reservation_active ?nostro_account)
+        (originating_participant_ready ?originating_participant)
+        (participant_liquidity_reservation_binding ?originating_participant ?liquidity_reservation)
+        (not
+          (liquidity_reservation_available ?liquidity_reservation)
+        )
+      )
+  )
+  (:action finalize_nostro_liquidity_check_for_participant
+    :parameters (?originating_participant - originating_participant ?nostro_account - nostro_account ?payment_message - payment_message ?liquidity_reservation - liquidity_reservation)
+    :precondition
+      (and
+        (payment_entity_validated ?originating_participant)
+        (payment_message_attached ?originating_participant ?payment_message)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (nostro_account_reservation_active ?nostro_account)
+        (participant_liquidity_reservation_binding ?originating_participant ?liquidity_reservation)
+        (not
+          (originating_liquidity_confirmed ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (nostro_account_balance_sufficient ?nostro_account)
+        (originating_liquidity_confirmed ?originating_participant)
+        (liquidity_reservation_available ?liquidity_reservation)
+        (not
+          (participant_liquidity_reservation_binding ?originating_participant ?liquidity_reservation)
+        )
+      )
+  )
+  (:action verify_vostro_account_balance_for_participant
+    :parameters (?beneficiary_participant - beneficiary_participant ?vostro_account - vostro_account ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_entity_validated ?beneficiary_participant)
+        (payment_message_attached ?beneficiary_participant ?payment_message)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (not
+          (vostro_account_balance_sufficient ?vostro_account)
+        )
+        (not
+          (vostro_account_reservation_active ?vostro_account)
+        )
+      )
+    :effect (vostro_account_balance_sufficient ?vostro_account)
+  )
+  (:action confirm_beneficiary_liquidity_with_authorizer
+    :parameters (?beneficiary_participant - beneficiary_participant ?vostro_account - vostro_account ?authorizing_operator - authorizing_operator)
+    :precondition
+      (and
+        (payment_entity_validated ?beneficiary_participant)
+        (assigned_to_authorizer ?beneficiary_participant ?authorizing_operator)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (vostro_account_balance_sufficient ?vostro_account)
+        (not
+          (beneficiary_participant_ready ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+      )
+  )
+  (:action reserve_vostro_liquidity_for_participant
+    :parameters (?beneficiary_participant - beneficiary_participant ?vostro_account - vostro_account ?liquidity_reservation - liquidity_reservation)
+    :precondition
+      (and
+        (payment_entity_validated ?beneficiary_participant)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (liquidity_reservation_available ?liquidity_reservation)
+        (not
+          (beneficiary_participant_ready ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (vostro_account_reservation_active ?vostro_account)
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (beneficiary_liquidity_reservation_binding ?beneficiary_participant ?liquidity_reservation)
+        (not
+          (liquidity_reservation_available ?liquidity_reservation)
+        )
+      )
+  )
+  (:action finalize_vostro_liquidity_check_for_participant
+    :parameters (?beneficiary_participant - beneficiary_participant ?vostro_account - vostro_account ?payment_message - payment_message ?liquidity_reservation - liquidity_reservation)
+    :precondition
+      (and
+        (payment_entity_validated ?beneficiary_participant)
+        (payment_message_attached ?beneficiary_participant ?payment_message)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (vostro_account_reservation_active ?vostro_account)
+        (beneficiary_liquidity_reservation_binding ?beneficiary_participant ?liquidity_reservation)
+        (not
+          (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (vostro_account_balance_sufficient ?vostro_account)
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        (liquidity_reservation_available ?liquidity_reservation)
+        (not
+          (beneficiary_liquidity_reservation_binding ?beneficiary_participant ?liquidity_reservation)
+        )
+      )
+  )
+  (:action assemble_settlement_channel_payload_for_instance
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?nostro_account - nostro_account ?vostro_account - vostro_account ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (originating_participant_ready ?originating_participant)
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (nostro_account_balance_sufficient ?nostro_account)
+        (vostro_account_balance_sufficient ?vostro_account)
+        (originating_liquidity_confirmed ?originating_participant)
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        (channel_instance_available ?settlement_channel_instance)
+      )
+    :effect
+      (and
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_nostro_binding ?settlement_channel_instance ?nostro_account)
+        (channel_vostro_binding ?settlement_channel_instance ?vostro_account)
+        (not
+          (channel_instance_available ?settlement_channel_instance)
+        )
+      )
+  )
+  (:action assemble_channel_payload_with_regulatory_requirement
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?nostro_account - nostro_account ?vostro_account - vostro_account ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (originating_participant_ready ?originating_participant)
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (nostro_account_reservation_active ?nostro_account)
+        (vostro_account_balance_sufficient ?vostro_account)
+        (not
+          (originating_liquidity_confirmed ?originating_participant)
+        )
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        (channel_instance_available ?settlement_channel_instance)
+      )
+    :effect
+      (and
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_nostro_binding ?settlement_channel_instance ?nostro_account)
+        (channel_vostro_binding ?settlement_channel_instance ?vostro_account)
+        (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        (not
+          (channel_instance_available ?settlement_channel_instance)
+        )
+      )
+  )
+  (:action assemble_channel_payload_with_operational_requirement
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?nostro_account - nostro_account ?vostro_account - vostro_account ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (originating_participant_ready ?originating_participant)
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (nostro_account_balance_sufficient ?nostro_account)
+        (vostro_account_reservation_active ?vostro_account)
+        (originating_liquidity_confirmed ?originating_participant)
+        (not
+          (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        )
+        (channel_instance_available ?settlement_channel_instance)
+      )
+    :effect
+      (and
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_nostro_binding ?settlement_channel_instance ?nostro_account)
+        (channel_vostro_binding ?settlement_channel_instance ?vostro_account)
+        (channel_requires_operational_approval ?settlement_channel_instance)
+        (not
+          (channel_instance_available ?settlement_channel_instance)
+        )
+      )
+  )
+  (:action assemble_channel_payload_with_regulatory_and_operational_requirements
+    :parameters (?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?nostro_account - nostro_account ?vostro_account - vostro_account ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (originating_participant_ready ?originating_participant)
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (participant_nostro_account_mapping ?originating_participant ?nostro_account)
+        (participant_vostro_account_mapping ?beneficiary_participant ?vostro_account)
+        (nostro_account_reservation_active ?nostro_account)
+        (vostro_account_reservation_active ?vostro_account)
+        (not
+          (originating_liquidity_confirmed ?originating_participant)
+        )
+        (not
+          (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        )
+        (channel_instance_available ?settlement_channel_instance)
+      )
+    :effect
+      (and
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_nostro_binding ?settlement_channel_instance ?nostro_account)
+        (channel_vostro_binding ?settlement_channel_instance ?vostro_account)
+        (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        (channel_requires_operational_approval ?settlement_channel_instance)
+        (not
+          (channel_instance_available ?settlement_channel_instance)
+        )
+      )
+  )
+  (:action acknowledge_channel_dispatch
+    :parameters (?settlement_channel_instance - settlement_channel_instance ?originating_participant - originating_participant ?payment_message - payment_message)
+    :precondition
+      (and
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (originating_participant_ready ?originating_participant)
+        (payment_message_attached ?originating_participant ?payment_message)
+        (not
+          (channel_dispatch_acknowledged ?settlement_channel_instance)
+        )
+      )
+    :effect (channel_dispatch_acknowledged ?settlement_channel_instance)
+  )
+  (:action generate_correspondent_message_for_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (transaction_channel_binding ?settlement_transaction ?settlement_channel_instance)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_available ?correspondent_message)
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_dispatch_acknowledged ?settlement_channel_instance)
+        (not
+          (correspondent_message_generated ?correspondent_message)
+        )
+      )
+    :effect
+      (and
+        (correspondent_message_generated ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (not
+          (correspondent_message_available ?correspondent_message)
+        )
+      )
+  )
+  (:action submit_transaction_to_correspondent_standard
+    :parameters (?settlement_transaction - settlement_transaction ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_generated ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (payment_message_attached ?settlement_transaction ?payment_message)
+        (not
+          (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        )
+        (not
+          (transaction_channel_submission_ready ?settlement_transaction)
+        )
+      )
+    :effect (transaction_channel_submission_ready ?settlement_transaction)
+  )
+  (:action attach_compliance_credential_to_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (compliance_credential_available ?compliance_credential)
+        (not
+          (transaction_regulatory_attestation_attached ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_regulatory_attestation_attached ?settlement_transaction)
+        (transaction_compliance_credential_binding ?settlement_transaction ?compliance_credential)
+        (not
+          (compliance_credential_available ?compliance_credential)
+        )
+      )
+  )
+  (:action submit_transaction_to_correspondent_with_compliance
+    :parameters (?settlement_transaction - settlement_transaction ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance ?payment_message - payment_message ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_generated ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (payment_message_attached ?settlement_transaction ?payment_message)
+        (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        (transaction_regulatory_attestation_attached ?settlement_transaction)
+        (transaction_compliance_credential_binding ?settlement_transaction ?compliance_credential)
+        (not
+          (transaction_channel_submission_ready ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_channel_submission_ready ?settlement_transaction)
+        (transaction_regulatory_attestation_confirmed ?settlement_transaction)
+      )
+  )
+  (:action advance_correspondent_processing_standard
+    :parameters (?settlement_transaction - settlement_transaction ?fee_instruction - fee_instruction ?authorizing_operator - authorizing_operator ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_submission_ready ?settlement_transaction)
+        (transaction_fee_binding ?settlement_transaction ?fee_instruction)
+        (assigned_to_authorizer ?settlement_transaction ?authorizing_operator)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (not
+          (channel_requires_operational_approval ?settlement_channel_instance)
+        )
+        (not
+          (transaction_channel_processed ?settlement_transaction)
+        )
+      )
+    :effect (transaction_channel_processed ?settlement_transaction)
+  )
+  (:action advance_correspondent_processing_operational
+    :parameters (?settlement_transaction - settlement_transaction ?fee_instruction - fee_instruction ?authorizing_operator - authorizing_operator ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_submission_ready ?settlement_transaction)
+        (transaction_fee_binding ?settlement_transaction ?fee_instruction)
+        (assigned_to_authorizer ?settlement_transaction ?authorizing_operator)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (channel_requires_operational_approval ?settlement_channel_instance)
+        (not
+          (transaction_channel_processed ?settlement_transaction)
+        )
+      )
+    :effect (transaction_channel_processed ?settlement_transaction)
+  )
+  (:action process_operational_approval_standard
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_processed ?settlement_transaction)
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (not
+          (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        )
+        (not
+          (channel_requires_operational_approval ?settlement_channel_instance)
+        )
+        (not
+          (transaction_ready_for_finalization ?settlement_transaction)
+        )
+      )
+    :effect (transaction_ready_for_finalization ?settlement_transaction)
+  )
+  (:action process_operational_approval_with_regulatory_attestation
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_processed ?settlement_transaction)
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        (not
+          (channel_requires_operational_approval ?settlement_channel_instance)
+        )
+        (not
+          (transaction_ready_for_finalization ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_fee_required ?settlement_transaction)
+      )
+  )
+  (:action process_operational_approval_with_fee
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_processed ?settlement_transaction)
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (not
+          (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        )
+        (channel_requires_operational_approval ?settlement_channel_instance)
+        (not
+          (transaction_ready_for_finalization ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_fee_required ?settlement_transaction)
+      )
+  )
+  (:action process_operational_approval_with_regulatory_and_fee
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval ?correspondent_message - correspondent_message ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (transaction_channel_processed ?settlement_transaction)
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (transaction_correspondent_message_binding ?settlement_transaction ?correspondent_message)
+        (correspondent_message_channel_binding ?correspondent_message ?settlement_channel_instance)
+        (channel_requires_regulatory_attestation ?settlement_channel_instance)
+        (channel_requires_operational_approval ?settlement_channel_instance)
+        (not
+          (transaction_ready_for_finalization ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_fee_required ?settlement_transaction)
+      )
+  )
+  (:action post_transaction_without_fee
+    :parameters (?settlement_transaction - settlement_transaction)
+    :precondition
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (not
+          (transaction_fee_required ?settlement_transaction)
+        )
+        (not
+          (transaction_finalized ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_finalized ?settlement_transaction)
+        (final_checks_passed ?settlement_transaction)
+      )
+  )
+  (:action attach_execution_profile_to_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_fee_required ?settlement_transaction)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (transaction_execution_profile_binding ?settlement_transaction ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action finalize_and_post_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?originating_participant - originating_participant ?beneficiary_participant - beneficiary_participant ?payment_message - payment_message ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_fee_required ?settlement_transaction)
+        (transaction_execution_profile_binding ?settlement_transaction ?execution_profile)
+        (transaction_originating_participant_mapping ?settlement_transaction ?originating_participant)
+        (transaction_beneficiary_participant_mapping ?settlement_transaction ?beneficiary_participant)
+        (originating_liquidity_confirmed ?originating_participant)
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        (payment_message_attached ?settlement_transaction ?payment_message)
+        (not
+          (transaction_posting_initiated ?settlement_transaction)
+        )
+      )
+    :effect (transaction_posting_initiated ?settlement_transaction)
+  )
+  (:action confirm_transaction_posting
+    :parameters (?settlement_transaction - settlement_transaction)
+    :precondition
+      (and
+        (transaction_ready_for_finalization ?settlement_transaction)
+        (transaction_posting_initiated ?settlement_transaction)
+        (not
+          (transaction_finalized ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_finalized ?settlement_transaction)
+        (final_checks_passed ?settlement_transaction)
+      )
+  )
+  (:action reserve_regulatory_attestation_for_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?regulatory_attestation - regulatory_attestation ?payment_message - payment_message)
+    :precondition
+      (and
+        (payment_entity_validated ?settlement_transaction)
+        (payment_message_attached ?settlement_transaction ?payment_message)
+        (regulatory_attestation_available ?regulatory_attestation)
+        (transaction_regulatory_attestation_binding ?settlement_transaction ?regulatory_attestation)
+        (not
+          (transaction_regulatory_attestation_reserved ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_regulatory_attestation_reserved ?settlement_transaction)
+        (not
+          (regulatory_attestation_available ?regulatory_attestation)
+        )
+      )
+  )
+  (:action submit_transaction_for_regulatory_approval
+    :parameters (?settlement_transaction - settlement_transaction ?authorizing_operator - authorizing_operator)
+    :precondition
+      (and
+        (transaction_regulatory_attestation_reserved ?settlement_transaction)
+        (assigned_to_authorizer ?settlement_transaction ?authorizing_operator)
+        (not
+          (transaction_sent_for_regulatory_approval ?settlement_transaction)
+        )
+      )
+    :effect (transaction_sent_for_regulatory_approval ?settlement_transaction)
+  )
+  (:action receive_regulatory_approval
+    :parameters (?settlement_transaction - settlement_transaction ?operational_approval - operational_approval)
+    :precondition
+      (and
+        (transaction_sent_for_regulatory_approval ?settlement_transaction)
+        (transaction_operational_approval_binding ?settlement_transaction ?operational_approval)
+        (not
+          (transaction_regulatory_approval_confirmed ?settlement_transaction)
+        )
+      )
+    :effect (transaction_regulatory_approval_confirmed ?settlement_transaction)
+  )
+  (:action finalize_transaction_after_regulatory_approval
+    :parameters (?settlement_transaction - settlement_transaction)
+    :precondition
+      (and
+        (transaction_regulatory_approval_confirmed ?settlement_transaction)
+        (not
+          (transaction_finalized ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (transaction_finalized ?settlement_transaction)
+        (final_checks_passed ?settlement_transaction)
+      )
+  )
+  (:action confirm_originating_participant_posting
+    :parameters (?originating_participant - originating_participant ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (originating_participant_ready ?originating_participant)
+        (originating_liquidity_confirmed ?originating_participant)
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_dispatch_acknowledged ?settlement_channel_instance)
+        (not
+          (final_checks_passed ?originating_participant)
+        )
+      )
+    :effect (final_checks_passed ?originating_participant)
+  )
+  (:action confirm_beneficiary_participant_posting
+    :parameters (?beneficiary_participant - beneficiary_participant ?settlement_channel_instance - settlement_channel_instance)
+    :precondition
+      (and
+        (beneficiary_participant_ready ?beneficiary_participant)
+        (beneficiary_liquidity_confirmed ?beneficiary_participant)
+        (channel_dispatch_enqueued ?settlement_channel_instance)
+        (channel_dispatch_acknowledged ?settlement_channel_instance)
+        (not
+          (final_checks_passed ?beneficiary_participant)
+        )
+      )
+    :effect (final_checks_passed ?beneficiary_participant)
+  )
+  (:action consume_release_permit_and_mark_instruction_for_release
+    :parameters (?payment_instruction - settlement_instruction ?release_permit - release_permit ?payment_message - payment_message)
+    :precondition
+      (and
+        (final_checks_passed ?payment_instruction)
+        (payment_message_attached ?payment_instruction ?payment_message)
+        (release_permit_available ?release_permit)
+        (not
+          (release_approved ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (release_approved ?payment_instruction)
+        (release_permit_binding ?payment_instruction ?release_permit)
+        (not
+          (release_permit_available ?release_permit)
+        )
+      )
+  )
+  (:action execute_release_and_replenish_token_for_originator
+    :parameters (?originating_participant - originating_participant ?release_channel_token - release_channel_token ?release_permit - release_permit)
+    :precondition
+      (and
+        (release_approved ?originating_participant)
+        (release_token_binding ?originating_participant ?release_channel_token)
+        (release_permit_binding ?originating_participant ?release_permit)
+        (not
+          (release_committed ?originating_participant)
+        )
+      )
+    :effect
+      (and
+        (release_committed ?originating_participant)
+        (release_token_available ?release_channel_token)
+        (release_permit_available ?release_permit)
+      )
+  )
+  (:action execute_release_and_replenish_token_for_beneficiary
+    :parameters (?beneficiary_participant - beneficiary_participant ?release_channel_token - release_channel_token ?release_permit - release_permit)
+    :precondition
+      (and
+        (release_approved ?beneficiary_participant)
+        (release_token_binding ?beneficiary_participant ?release_channel_token)
+        (release_permit_binding ?beneficiary_participant ?release_permit)
+        (not
+          (release_committed ?beneficiary_participant)
+        )
+      )
+    :effect
+      (and
+        (release_committed ?beneficiary_participant)
+        (release_token_available ?release_channel_token)
+        (release_permit_available ?release_permit)
+      )
+  )
+  (:action execute_release_and_replenish_token_for_transaction
+    :parameters (?settlement_transaction - settlement_transaction ?release_channel_token - release_channel_token ?release_permit - release_permit)
+    :precondition
+      (and
+        (release_approved ?settlement_transaction)
+        (release_token_binding ?settlement_transaction ?release_channel_token)
+        (release_permit_binding ?settlement_transaction ?release_permit)
+        (not
+          (release_committed ?settlement_transaction)
+        )
+      )
+    :effect
+      (and
+        (release_committed ?settlement_transaction)
+        (release_token_available ?release_channel_token)
+        (release_permit_available ?release_permit)
+      )
+  )
+)

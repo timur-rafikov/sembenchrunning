@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmacy_dosage_strength_selection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types supporting_resource - object asset_category - object option_category - object medication_case_root - object medication_request - medication_case_root inventory_stock_unit - supporting_resource pharmacist_reviewer - supporting_resource pharmacy_technician - supporting_resource special_authorization - supporting_resource label_template - supporting_resource patient_instruction_template - supporting_resource handling_requirement - supporting_resource clinical_reason_code - supporting_resource accessory_item - asset_category packaging_component_type - asset_category prior_authorization - asset_category strength_profile_outpatient - option_category strength_profile_inpatient - option_category packaging_unit - option_category medication_request_variant - medication_request dispensing_variant - medication_request outpatient_order - medication_request_variant inpatient_order - medication_request_variant dispensing_unit - dispensing_variant)
+  (:predicates
+    (item_registered ?medication_request - medication_request)
+    (item_review_approved ?medication_request - medication_request)
+    (item_stock_allocated ?medication_request - medication_request)
+    (item_finalized ?medication_request - medication_request)
+    (item_ready_for_final_review ?medication_request - medication_request)
+    (item_patient_instructions_attached ?medication_request - medication_request)
+    (stock_available ?inventory_stock_unit - inventory_stock_unit)
+    (assigned_item_stock_unit ?medication_request - medication_request ?inventory_stock_unit - inventory_stock_unit)
+    (pharmacist_available ?pharmacist_reviewer - pharmacist_reviewer)
+    (assigned_item_pharmacist ?medication_request - medication_request ?pharmacist_reviewer - pharmacist_reviewer)
+    (technician_available ?pharmacy_technician - pharmacy_technician)
+    (assigned_item_technician ?medication_request - medication_request ?pharmacy_technician - pharmacy_technician)
+    (accessory_available ?accessory_item - accessory_item)
+    (outpatient_order_assigned_accessory ?outpatient_order - outpatient_order ?accessory_item - accessory_item)
+    (inpatient_order_assigned_accessory ?inpatient_order - inpatient_order ?accessory_item - accessory_item)
+    (outpatient_order_strength_option ?outpatient_order - outpatient_order ?outpatient_strength_profile - strength_profile_outpatient)
+    (outpatient_strength_reserved ?outpatient_strength_profile - strength_profile_outpatient)
+    (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile - strength_profile_outpatient)
+    (outpatient_order_strength_confirmed ?outpatient_order - outpatient_order)
+    (inpatient_order_strength_option ?inpatient_order - inpatient_order ?inpatient_strength_profile - strength_profile_inpatient)
+    (inpatient_strength_reserved ?inpatient_strength_profile - strength_profile_inpatient)
+    (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile - strength_profile_inpatient)
+    (inpatient_order_strength_confirmed ?inpatient_order - inpatient_order)
+    (packaging_unit_available ?packaging_unit - packaging_unit)
+    (packaging_unit_prepared ?packaging_unit - packaging_unit)
+    (packaging_unit_has_outpatient_strength ?packaging_unit - packaging_unit ?outpatient_strength_profile - strength_profile_outpatient)
+    (packaging_unit_has_inpatient_strength ?packaging_unit - packaging_unit ?inpatient_strength_profile - strength_profile_inpatient)
+    (packaging_unit_requires_accessory_integration ?packaging_unit - packaging_unit)
+    (packaging_unit_requires_additional_verification ?packaging_unit - packaging_unit)
+    (packaging_unit_validated ?packaging_unit - packaging_unit)
+    (dispensing_unit_linked_outpatient_order ?dispensing_unit - dispensing_unit ?outpatient_order - outpatient_order)
+    (dispensing_unit_linked_inpatient_order ?dispensing_unit - dispensing_unit ?inpatient_order - inpatient_order)
+    (dispensing_unit_assigned_packaging_unit ?dispensing_unit - dispensing_unit ?packaging_unit - packaging_unit)
+    (packaging_component_type_available ?packaging_component_type - packaging_component_type)
+    (dispensing_unit_has_component_type ?dispensing_unit - dispensing_unit ?packaging_component_type - packaging_component_type)
+    (packaging_component_type_reserved ?packaging_component_type - packaging_component_type)
+    (packaging_component_bound_to_unit ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    (dispensing_unit_component_validated ?dispensing_unit - dispensing_unit)
+    (ready_for_authorization_augmentation ?dispensing_unit - dispensing_unit)
+    (authorization_and_template_applied ?dispensing_unit - dispensing_unit)
+    (special_authorization_applied ?dispensing_unit - dispensing_unit)
+    (authorization_template_attached ?dispensing_unit - dispensing_unit)
+    (dispensing_unit_label_template_pending ?dispensing_unit - dispensing_unit)
+    (final_verification_passed ?dispensing_unit - dispensing_unit)
+    (prior_authorization_available ?prior_authorization - prior_authorization)
+    (dispensing_unit_has_prior_authorization ?dispensing_unit - dispensing_unit ?prior_authorization - prior_authorization)
+    (prior_authorization_applied ?dispensing_unit - dispensing_unit)
+    (prior_authorization_verified ?dispensing_unit - dispensing_unit)
+    (prior_authorization_finalized ?dispensing_unit - dispensing_unit)
+    (special_authorization_available ?special_authorization - special_authorization)
+    (dispensing_unit_has_special_authorization ?dispensing_unit - dispensing_unit ?special_authorization - special_authorization)
+    (label_template_available ?label_template - label_template)
+    (dispensing_unit_has_label_template ?dispensing_unit - dispensing_unit ?label_template - label_template)
+    (handling_requirement_available ?handling_requirement - handling_requirement)
+    (dispensing_unit_assigned_handling_requirement ?dispensing_unit - dispensing_unit ?handling_requirement - handling_requirement)
+    (clinical_reason_code_available ?clinical_reason_code - clinical_reason_code)
+    (dispensing_unit_assigned_clinical_reason ?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code)
+    (patient_instruction_template_available ?patient_instruction_template - patient_instruction_template)
+    (item_assigned_patient_instruction ?medication_request - medication_request ?patient_instruction_template - patient_instruction_template)
+    (outpatient_order_ready_for_packaging ?outpatient_order - outpatient_order)
+    (inpatient_order_ready_for_packaging ?inpatient_order - inpatient_order)
+    (dispensing_unit_marked_for_release ?dispensing_unit - dispensing_unit)
+  )
+  (:action register_medication_request
+    :parameters (?medication_request - medication_request)
+    :precondition
+      (and
+        (not
+          (item_registered ?medication_request)
+        )
+        (not
+          (item_finalized ?medication_request)
+        )
+      )
+    :effect (item_registered ?medication_request)
+  )
+  (:action assign_stock_unit_to_request
+    :parameters (?medication_request - medication_request ?inventory_stock_unit - inventory_stock_unit)
+    :precondition
+      (and
+        (item_registered ?medication_request)
+        (not
+          (item_stock_allocated ?medication_request)
+        )
+        (stock_available ?inventory_stock_unit)
+      )
+    :effect
+      (and
+        (item_stock_allocated ?medication_request)
+        (assigned_item_stock_unit ?medication_request ?inventory_stock_unit)
+        (not
+          (stock_available ?inventory_stock_unit)
+        )
+      )
+  )
+  (:action assign_pharmacist_to_request
+    :parameters (?medication_request - medication_request ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_registered ?medication_request)
+        (item_stock_allocated ?medication_request)
+        (pharmacist_available ?pharmacist_reviewer)
+      )
+    :effect
+      (and
+        (assigned_item_pharmacist ?medication_request ?pharmacist_reviewer)
+        (not
+          (pharmacist_available ?pharmacist_reviewer)
+        )
+      )
+  )
+  (:action finalize_pharmacist_review
+    :parameters (?medication_request - medication_request ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_registered ?medication_request)
+        (item_stock_allocated ?medication_request)
+        (assigned_item_pharmacist ?medication_request ?pharmacist_reviewer)
+        (not
+          (item_review_approved ?medication_request)
+        )
+      )
+    :effect (item_review_approved ?medication_request)
+  )
+  (:action unassign_pharmacist_from_request
+    :parameters (?medication_request - medication_request ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (assigned_item_pharmacist ?medication_request ?pharmacist_reviewer)
+      )
+    :effect
+      (and
+        (pharmacist_available ?pharmacist_reviewer)
+        (not
+          (assigned_item_pharmacist ?medication_request ?pharmacist_reviewer)
+        )
+      )
+  )
+  (:action assign_technician_to_request
+    :parameters (?medication_request - medication_request ?pharmacy_technician - pharmacy_technician)
+    :precondition
+      (and
+        (item_review_approved ?medication_request)
+        (technician_available ?pharmacy_technician)
+      )
+    :effect
+      (and
+        (assigned_item_technician ?medication_request ?pharmacy_technician)
+        (not
+          (technician_available ?pharmacy_technician)
+        )
+      )
+  )
+  (:action unassign_technician_from_request
+    :parameters (?medication_request - medication_request ?pharmacy_technician - pharmacy_technician)
+    :precondition
+      (and
+        (assigned_item_technician ?medication_request ?pharmacy_technician)
+      )
+    :effect
+      (and
+        (technician_available ?pharmacy_technician)
+        (not
+          (assigned_item_technician ?medication_request ?pharmacy_technician)
+        )
+      )
+  )
+  (:action assign_handling_requirement_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (handling_requirement_available ?handling_requirement)
+      )
+    :effect
+      (and
+        (dispensing_unit_assigned_handling_requirement ?dispensing_unit ?handling_requirement)
+        (not
+          (handling_requirement_available ?handling_requirement)
+        )
+      )
+  )
+  (:action unassign_handling_requirement_from_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (dispensing_unit_assigned_handling_requirement ?dispensing_unit ?handling_requirement)
+      )
+    :effect
+      (and
+        (handling_requirement_available ?handling_requirement)
+        (not
+          (dispensing_unit_assigned_handling_requirement ?dispensing_unit ?handling_requirement)
+        )
+      )
+  )
+  (:action assign_clinical_reason_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (clinical_reason_code_available ?clinical_reason_code)
+      )
+    :effect
+      (and
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (not
+          (clinical_reason_code_available ?clinical_reason_code)
+        )
+      )
+  )
+  (:action unassign_clinical_reason_from_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code)
+    :precondition
+      (and
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+      )
+    :effect
+      (and
+        (clinical_reason_code_available ?clinical_reason_code)
+        (not
+          (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        )
+      )
+  )
+  (:action reserve_outpatient_strength_profile
+    :parameters (?outpatient_order - outpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_review_approved ?outpatient_order)
+        (assigned_item_pharmacist ?outpatient_order ?pharmacist_reviewer)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (not
+          (outpatient_strength_reserved ?outpatient_strength_profile)
+        )
+        (not
+          (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile)
+        )
+      )
+    :effect (outpatient_strength_reserved ?outpatient_strength_profile)
+  )
+  (:action technician_confirm_outpatient_strength_selection
+    :parameters (?outpatient_order - outpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?pharmacy_technician - pharmacy_technician)
+    :precondition
+      (and
+        (item_review_approved ?outpatient_order)
+        (assigned_item_technician ?outpatient_order ?pharmacy_technician)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (outpatient_strength_reserved ?outpatient_strength_profile)
+        (not
+          (outpatient_order_ready_for_packaging ?outpatient_order)
+        )
+      )
+    :effect
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+      )
+  )
+  (:action assign_accessory_to_outpatient_order
+    :parameters (?outpatient_order - outpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (item_review_approved ?outpatient_order)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (accessory_available ?accessory_item)
+        (not
+          (outpatient_order_ready_for_packaging ?outpatient_order)
+        )
+      )
+    :effect
+      (and
+        (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile)
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (outpatient_order_assigned_accessory ?outpatient_order ?accessory_item)
+        (not
+          (accessory_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_outpatient_strength_selection
+    :parameters (?outpatient_order - outpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?pharmacist_reviewer - pharmacist_reviewer ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (item_review_approved ?outpatient_order)
+        (assigned_item_pharmacist ?outpatient_order ?pharmacist_reviewer)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile)
+        (outpatient_order_assigned_accessory ?outpatient_order ?accessory_item)
+        (not
+          (outpatient_order_strength_confirmed ?outpatient_order)
+        )
+      )
+    :effect
+      (and
+        (outpatient_strength_reserved ?outpatient_strength_profile)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+        (accessory_available ?accessory_item)
+        (not
+          (outpatient_order_assigned_accessory ?outpatient_order ?accessory_item)
+        )
+      )
+  )
+  (:action reserve_inpatient_strength_profile
+    :parameters (?inpatient_order - inpatient_order ?inpatient_strength_profile - strength_profile_inpatient ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_review_approved ?inpatient_order)
+        (assigned_item_pharmacist ?inpatient_order ?pharmacist_reviewer)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (not
+          (inpatient_strength_reserved ?inpatient_strength_profile)
+        )
+        (not
+          (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile)
+        )
+      )
+    :effect (inpatient_strength_reserved ?inpatient_strength_profile)
+  )
+  (:action technician_confirm_inpatient_strength_selection
+    :parameters (?inpatient_order - inpatient_order ?inpatient_strength_profile - strength_profile_inpatient ?pharmacy_technician - pharmacy_technician)
+    :precondition
+      (and
+        (item_review_approved ?inpatient_order)
+        (assigned_item_technician ?inpatient_order ?pharmacy_technician)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (inpatient_strength_reserved ?inpatient_strength_profile)
+        (not
+          (inpatient_order_ready_for_packaging ?inpatient_order)
+        )
+      )
+    :effect
+      (and
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (inpatient_order_strength_confirmed ?inpatient_order)
+      )
+  )
+  (:action assign_accessory_to_inpatient_order
+    :parameters (?inpatient_order - inpatient_order ?inpatient_strength_profile - strength_profile_inpatient ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (item_review_approved ?inpatient_order)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (accessory_available ?accessory_item)
+        (not
+          (inpatient_order_ready_for_packaging ?inpatient_order)
+        )
+      )
+    :effect
+      (and
+        (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile)
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (inpatient_order_assigned_accessory ?inpatient_order ?accessory_item)
+        (not
+          (accessory_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_inpatient_strength_selection
+    :parameters (?inpatient_order - inpatient_order ?inpatient_strength_profile - strength_profile_inpatient ?pharmacist_reviewer - pharmacist_reviewer ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (item_review_approved ?inpatient_order)
+        (assigned_item_pharmacist ?inpatient_order ?pharmacist_reviewer)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile)
+        (inpatient_order_assigned_accessory ?inpatient_order ?accessory_item)
+        (not
+          (inpatient_order_strength_confirmed ?inpatient_order)
+        )
+      )
+    :effect
+      (and
+        (inpatient_strength_reserved ?inpatient_strength_profile)
+        (inpatient_order_strength_confirmed ?inpatient_order)
+        (accessory_available ?accessory_item)
+        (not
+          (inpatient_order_assigned_accessory ?inpatient_order ?accessory_item)
+        )
+      )
+  )
+  (:action assemble_packaging_unit_for_orders
+    :parameters (?outpatient_order - outpatient_order ?inpatient_order - inpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?inpatient_strength_profile - strength_profile_inpatient ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (outpatient_strength_reserved ?outpatient_strength_profile)
+        (inpatient_strength_reserved ?inpatient_strength_profile)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+        (inpatient_order_strength_confirmed ?inpatient_order)
+        (packaging_unit_available ?packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_has_outpatient_strength ?packaging_unit ?outpatient_strength_profile)
+        (packaging_unit_has_inpatient_strength ?packaging_unit ?inpatient_strength_profile)
+        (not
+          (packaging_unit_available ?packaging_unit)
+        )
+      )
+  )
+  (:action assemble_packaging_unit_with_accessory
+    :parameters (?outpatient_order - outpatient_order ?inpatient_order - inpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?inpatient_strength_profile - strength_profile_inpatient ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile)
+        (inpatient_strength_reserved ?inpatient_strength_profile)
+        (not
+          (outpatient_order_strength_confirmed ?outpatient_order)
+        )
+        (inpatient_order_strength_confirmed ?inpatient_order)
+        (packaging_unit_available ?packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_has_outpatient_strength ?packaging_unit ?outpatient_strength_profile)
+        (packaging_unit_has_inpatient_strength ?packaging_unit ?inpatient_strength_profile)
+        (packaging_unit_requires_accessory_integration ?packaging_unit)
+        (not
+          (packaging_unit_available ?packaging_unit)
+        )
+      )
+  )
+  (:action assemble_packaging_unit_with_alternate_verification
+    :parameters (?outpatient_order - outpatient_order ?inpatient_order - inpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?inpatient_strength_profile - strength_profile_inpatient ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (outpatient_strength_reserved ?outpatient_strength_profile)
+        (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+        (not
+          (inpatient_order_strength_confirmed ?inpatient_order)
+        )
+        (packaging_unit_available ?packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_has_outpatient_strength ?packaging_unit ?outpatient_strength_profile)
+        (packaging_unit_has_inpatient_strength ?packaging_unit ?inpatient_strength_profile)
+        (packaging_unit_requires_additional_verification ?packaging_unit)
+        (not
+          (packaging_unit_available ?packaging_unit)
+        )
+      )
+  )
+  (:action assemble_packaging_unit_with_complex_requirements
+    :parameters (?outpatient_order - outpatient_order ?inpatient_order - inpatient_order ?outpatient_strength_profile - strength_profile_outpatient ?inpatient_strength_profile - strength_profile_inpatient ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (outpatient_order_strength_option ?outpatient_order ?outpatient_strength_profile)
+        (inpatient_order_strength_option ?inpatient_order ?inpatient_strength_profile)
+        (outpatient_strength_tagged_with_accessory ?outpatient_strength_profile)
+        (inpatient_strength_tagged_with_accessory ?inpatient_strength_profile)
+        (not
+          (outpatient_order_strength_confirmed ?outpatient_order)
+        )
+        (not
+          (inpatient_order_strength_confirmed ?inpatient_order)
+        )
+        (packaging_unit_available ?packaging_unit)
+      )
+    :effect
+      (and
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_has_outpatient_strength ?packaging_unit ?outpatient_strength_profile)
+        (packaging_unit_has_inpatient_strength ?packaging_unit ?inpatient_strength_profile)
+        (packaging_unit_requires_accessory_integration ?packaging_unit)
+        (packaging_unit_requires_additional_verification ?packaging_unit)
+        (not
+          (packaging_unit_available ?packaging_unit)
+        )
+      )
+  )
+  (:action validate_packaging_unit
+    :parameters (?packaging_unit - packaging_unit ?outpatient_order - outpatient_order ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (packaging_unit_prepared ?packaging_unit)
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (assigned_item_pharmacist ?outpatient_order ?pharmacist_reviewer)
+        (not
+          (packaging_unit_validated ?packaging_unit)
+        )
+      )
+    :effect (packaging_unit_validated ?packaging_unit)
+  )
+  (:action attach_packaging_component_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (dispensing_unit_assigned_packaging_unit ?dispensing_unit ?packaging_unit)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_type_available ?packaging_component_type)
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_validated ?packaging_unit)
+        (not
+          (packaging_component_type_reserved ?packaging_component_type)
+        )
+      )
+    :effect
+      (and
+        (packaging_component_type_reserved ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (not
+          (packaging_component_type_available ?packaging_component_type)
+        )
+      )
+  )
+  (:action validate_component_binding_on_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_type_reserved ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (assigned_item_pharmacist ?dispensing_unit ?pharmacist_reviewer)
+        (not
+          (packaging_unit_requires_accessory_integration ?packaging_unit)
+        )
+        (not
+          (dispensing_unit_component_validated ?dispensing_unit)
+        )
+      )
+    :effect (dispensing_unit_component_validated ?dispensing_unit)
+  )
+  (:action apply_special_authorization_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?special_authorization - special_authorization)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (special_authorization_available ?special_authorization)
+        (not
+          (special_authorization_applied ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (special_authorization_applied ?dispensing_unit)
+        (dispensing_unit_has_special_authorization ?dispensing_unit ?special_authorization)
+        (not
+          (special_authorization_available ?special_authorization)
+        )
+      )
+  )
+  (:action augment_dispensing_unit_with_special_authorization_and_templates
+    :parameters (?dispensing_unit - dispensing_unit ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit ?pharmacist_reviewer - pharmacist_reviewer ?special_authorization - special_authorization)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_type_reserved ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (assigned_item_pharmacist ?dispensing_unit ?pharmacist_reviewer)
+        (packaging_unit_requires_accessory_integration ?packaging_unit)
+        (special_authorization_applied ?dispensing_unit)
+        (dispensing_unit_has_special_authorization ?dispensing_unit ?special_authorization)
+        (not
+          (dispensing_unit_component_validated ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (dispensing_unit_component_validated ?dispensing_unit)
+        (authorization_template_attached ?dispensing_unit)
+      )
+  )
+  (:action acknowledge_handling_and_prepare_for_authorizations
+    :parameters (?dispensing_unit - dispensing_unit ?handling_requirement - handling_requirement ?pharmacy_technician - pharmacy_technician ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (dispensing_unit_component_validated ?dispensing_unit)
+        (dispensing_unit_assigned_handling_requirement ?dispensing_unit ?handling_requirement)
+        (assigned_item_technician ?dispensing_unit ?pharmacy_technician)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (not
+          (packaging_unit_requires_additional_verification ?packaging_unit)
+        )
+        (not
+          (ready_for_authorization_augmentation ?dispensing_unit)
+        )
+      )
+    :effect (ready_for_authorization_augmentation ?dispensing_unit)
+  )
+  (:action acknowledge_handling_and_prepare_for_authorizations_alternate
+    :parameters (?dispensing_unit - dispensing_unit ?handling_requirement - handling_requirement ?pharmacy_technician - pharmacy_technician ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (dispensing_unit_component_validated ?dispensing_unit)
+        (dispensing_unit_assigned_handling_requirement ?dispensing_unit ?handling_requirement)
+        (assigned_item_technician ?dispensing_unit ?pharmacy_technician)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (packaging_unit_requires_additional_verification ?packaging_unit)
+        (not
+          (ready_for_authorization_augmentation ?dispensing_unit)
+        )
+      )
+    :effect (ready_for_authorization_augmentation ?dispensing_unit)
+  )
+  (:action apply_clinical_reason_augmentation
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (ready_for_authorization_augmentation ?dispensing_unit)
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (not
+          (packaging_unit_requires_accessory_integration ?packaging_unit)
+        )
+        (not
+          (packaging_unit_requires_additional_verification ?packaging_unit)
+        )
+        (not
+          (authorization_and_template_applied ?dispensing_unit)
+        )
+      )
+    :effect (authorization_and_template_applied ?dispensing_unit)
+  )
+  (:action apply_clinical_reason_and_attach_label_variant_a
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (ready_for_authorization_augmentation ?dispensing_unit)
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (packaging_unit_requires_accessory_integration ?packaging_unit)
+        (not
+          (packaging_unit_requires_additional_verification ?packaging_unit)
+        )
+        (not
+          (authorization_and_template_applied ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (dispensing_unit_label_template_pending ?dispensing_unit)
+      )
+  )
+  (:action apply_clinical_reason_and_attach_label_variant_b
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (ready_for_authorization_augmentation ?dispensing_unit)
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (not
+          (packaging_unit_requires_accessory_integration ?packaging_unit)
+        )
+        (packaging_unit_requires_additional_verification ?packaging_unit)
+        (not
+          (authorization_and_template_applied ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (dispensing_unit_label_template_pending ?dispensing_unit)
+      )
+  )
+  (:action apply_clinical_reason_and_attach_label_variant_combined
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code ?packaging_component_type - packaging_component_type ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (ready_for_authorization_augmentation ?dispensing_unit)
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (dispensing_unit_has_component_type ?dispensing_unit ?packaging_component_type)
+        (packaging_component_bound_to_unit ?packaging_component_type ?packaging_unit)
+        (packaging_unit_requires_accessory_integration ?packaging_unit)
+        (packaging_unit_requires_additional_verification ?packaging_unit)
+        (not
+          (authorization_and_template_applied ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (dispensing_unit_label_template_pending ?dispensing_unit)
+      )
+  )
+  (:action mark_dispensing_unit_ready_for_verification
+    :parameters (?dispensing_unit - dispensing_unit)
+    :precondition
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (not
+          (dispensing_unit_label_template_pending ?dispensing_unit)
+        )
+        (not
+          (dispensing_unit_marked_for_release ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (dispensing_unit_marked_for_release ?dispensing_unit)
+        (item_ready_for_final_review ?dispensing_unit)
+      )
+  )
+  (:action attach_label_template_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?label_template - label_template)
+    :precondition
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (dispensing_unit_label_template_pending ?dispensing_unit)
+        (label_template_available ?label_template)
+      )
+    :effect
+      (and
+        (dispensing_unit_has_label_template ?dispensing_unit ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action perform_final_checks_on_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?outpatient_order - outpatient_order ?inpatient_order - inpatient_order ?pharmacist_reviewer - pharmacist_reviewer ?label_template - label_template)
+    :precondition
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (dispensing_unit_label_template_pending ?dispensing_unit)
+        (dispensing_unit_has_label_template ?dispensing_unit ?label_template)
+        (dispensing_unit_linked_outpatient_order ?dispensing_unit ?outpatient_order)
+        (dispensing_unit_linked_inpatient_order ?dispensing_unit ?inpatient_order)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+        (inpatient_order_strength_confirmed ?inpatient_order)
+        (assigned_item_pharmacist ?dispensing_unit ?pharmacist_reviewer)
+        (not
+          (final_verification_passed ?dispensing_unit)
+        )
+      )
+    :effect (final_verification_passed ?dispensing_unit)
+  )
+  (:action finalize_dispensing_unit_after_verification
+    :parameters (?dispensing_unit - dispensing_unit)
+    :precondition
+      (and
+        (authorization_and_template_applied ?dispensing_unit)
+        (final_verification_passed ?dispensing_unit)
+        (not
+          (dispensing_unit_marked_for_release ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (dispensing_unit_marked_for_release ?dispensing_unit)
+        (item_ready_for_final_review ?dispensing_unit)
+      )
+  )
+  (:action apply_prior_authorization_to_dispensing_unit
+    :parameters (?dispensing_unit - dispensing_unit ?prior_authorization - prior_authorization ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_review_approved ?dispensing_unit)
+        (assigned_item_pharmacist ?dispensing_unit ?pharmacist_reviewer)
+        (prior_authorization_available ?prior_authorization)
+        (dispensing_unit_has_prior_authorization ?dispensing_unit ?prior_authorization)
+        (not
+          (prior_authorization_applied ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (prior_authorization_applied ?dispensing_unit)
+        (not
+          (prior_authorization_available ?prior_authorization)
+        )
+      )
+  )
+  (:action verify_prior_authorization_with_technician
+    :parameters (?dispensing_unit - dispensing_unit ?pharmacy_technician - pharmacy_technician)
+    :precondition
+      (and
+        (prior_authorization_applied ?dispensing_unit)
+        (assigned_item_technician ?dispensing_unit ?pharmacy_technician)
+        (not
+          (prior_authorization_verified ?dispensing_unit)
+        )
+      )
+    :effect (prior_authorization_verified ?dispensing_unit)
+  )
+  (:action finalize_prior_authorization_with_clinical_reason
+    :parameters (?dispensing_unit - dispensing_unit ?clinical_reason_code - clinical_reason_code)
+    :precondition
+      (and
+        (prior_authorization_verified ?dispensing_unit)
+        (dispensing_unit_assigned_clinical_reason ?dispensing_unit ?clinical_reason_code)
+        (not
+          (prior_authorization_finalized ?dispensing_unit)
+        )
+      )
+    :effect (prior_authorization_finalized ?dispensing_unit)
+  )
+  (:action finalize_dispensing_unit_after_prior_authorization
+    :parameters (?dispensing_unit - dispensing_unit)
+    :precondition
+      (and
+        (prior_authorization_finalized ?dispensing_unit)
+        (not
+          (dispensing_unit_marked_for_release ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (dispensing_unit_marked_for_release ?dispensing_unit)
+        (item_ready_for_final_review ?dispensing_unit)
+      )
+  )
+  (:action finalize_outpatient_order_for_review
+    :parameters (?outpatient_order - outpatient_order ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (outpatient_order_ready_for_packaging ?outpatient_order)
+        (outpatient_order_strength_confirmed ?outpatient_order)
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_validated ?packaging_unit)
+        (not
+          (item_ready_for_final_review ?outpatient_order)
+        )
+      )
+    :effect (item_ready_for_final_review ?outpatient_order)
+  )
+  (:action finalize_inpatient_order_for_review
+    :parameters (?inpatient_order - inpatient_order ?packaging_unit - packaging_unit)
+    :precondition
+      (and
+        (inpatient_order_ready_for_packaging ?inpatient_order)
+        (inpatient_order_strength_confirmed ?inpatient_order)
+        (packaging_unit_prepared ?packaging_unit)
+        (packaging_unit_validated ?packaging_unit)
+        (not
+          (item_ready_for_final_review ?inpatient_order)
+        )
+      )
+    :effect (item_ready_for_final_review ?inpatient_order)
+  )
+  (:action attach_patient_instruction_template_to_request
+    :parameters (?medication_request - medication_request ?patient_instruction_template - patient_instruction_template ?pharmacist_reviewer - pharmacist_reviewer)
+    :precondition
+      (and
+        (item_ready_for_final_review ?medication_request)
+        (assigned_item_pharmacist ?medication_request ?pharmacist_reviewer)
+        (patient_instruction_template_available ?patient_instruction_template)
+        (not
+          (item_patient_instructions_attached ?medication_request)
+        )
+      )
+    :effect
+      (and
+        (item_patient_instructions_attached ?medication_request)
+        (item_assigned_patient_instruction ?medication_request ?patient_instruction_template)
+        (not
+          (patient_instruction_template_available ?patient_instruction_template)
+        )
+      )
+  )
+  (:action finalize_outpatient_order_and_release_resources
+    :parameters (?outpatient_order - outpatient_order ?inventory_stock_unit - inventory_stock_unit ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (item_patient_instructions_attached ?outpatient_order)
+        (assigned_item_stock_unit ?outpatient_order ?inventory_stock_unit)
+        (item_assigned_patient_instruction ?outpatient_order ?patient_instruction_template)
+        (not
+          (item_finalized ?outpatient_order)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?outpatient_order)
+        (stock_available ?inventory_stock_unit)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+  (:action finalize_inpatient_order_and_release_resources
+    :parameters (?inpatient_order - inpatient_order ?inventory_stock_unit - inventory_stock_unit ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (item_patient_instructions_attached ?inpatient_order)
+        (assigned_item_stock_unit ?inpatient_order ?inventory_stock_unit)
+        (item_assigned_patient_instruction ?inpatient_order ?patient_instruction_template)
+        (not
+          (item_finalized ?inpatient_order)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?inpatient_order)
+        (stock_available ?inventory_stock_unit)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+  (:action finalize_dispensing_unit_and_release_resources
+    :parameters (?dispensing_unit - dispensing_unit ?inventory_stock_unit - inventory_stock_unit ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (item_patient_instructions_attached ?dispensing_unit)
+        (assigned_item_stock_unit ?dispensing_unit ?inventory_stock_unit)
+        (item_assigned_patient_instruction ?dispensing_unit ?patient_instruction_template)
+        (not
+          (item_finalized ?dispensing_unit)
+        )
+      )
+    :effect
+      (and
+        (item_finalized ?dispensing_unit)
+        (stock_available ?inventory_stock_unit)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem dosage_strength_selection_problem)
+  (:domain pharmacy_dosage_strength_selection)
+  (:objects outpatient_order_rx1 - outpatient_order inpatient_order_rx1 - inpatient_order dispensing_unit_pkg1 - dispensing_unit dispensing_unit_pkg2 - dispensing_unit stock_unit_lot_a - inventory_stock_unit stock_unit_lot_b - inventory_stock_unit stock_unit_lot_c - inventory_stock_unit pharmacist_reviewer_1 - pharmacist_reviewer pharmacy_technician_1 - pharmacy_technician accessory_leaflet_1 - accessory_item strength_profile_outpatient_10mg - strength_profile_outpatient strength_profile_inpatient_5mg - strength_profile_inpatient packaging_unit_box1 - packaging_unit packaging_component_vial - packaging_component_type packaging_component_blister - packaging_component_type special_authorization_pa1 - special_authorization special_authorization_pa2 - special_authorization label_template_standard - label_template label_template_hospital - label_template patient_instruction_template_standard - patient_instruction_template handling_requirement_refrigeration - handling_requirement prior_authorization_provider1 - prior_authorization prior_authorization_provider2 - prior_authorization clinical_reason_code_medically_necessary - clinical_reason_code)
+  (:init
+    (stock_available stock_unit_lot_a)
+    (stock_available stock_unit_lot_b)
+    (stock_available stock_unit_lot_c)
+    (pharmacist_available pharmacist_reviewer_1)
+    (technician_available pharmacy_technician_1)
+    (accessory_available accessory_leaflet_1)
+    (outpatient_order_strength_option outpatient_order_rx1 strength_profile_outpatient_10mg)
+    (inpatient_order_strength_option inpatient_order_rx1 strength_profile_inpatient_5mg)
+    (packaging_unit_available packaging_unit_box1)
+    (packaging_component_type_available packaging_component_vial)
+    (packaging_component_type_available packaging_component_blister)
+    (dispensing_unit_linked_outpatient_order dispensing_unit_pkg1 outpatient_order_rx1)
+    (dispensing_unit_linked_outpatient_order dispensing_unit_pkg2 outpatient_order_rx1)
+    (dispensing_unit_linked_inpatient_order dispensing_unit_pkg1 inpatient_order_rx1)
+    (dispensing_unit_linked_inpatient_order dispensing_unit_pkg2 inpatient_order_rx1)
+    (dispensing_unit_assigned_packaging_unit dispensing_unit_pkg1 packaging_unit_box1)
+    (dispensing_unit_assigned_packaging_unit dispensing_unit_pkg2 packaging_unit_box1)
+    (dispensing_unit_has_component_type dispensing_unit_pkg1 packaging_component_vial)
+    (dispensing_unit_has_component_type dispensing_unit_pkg2 packaging_component_blister)
+    (special_authorization_available special_authorization_pa1)
+    (special_authorization_available special_authorization_pa2)
+    (label_template_available label_template_standard)
+    (label_template_available label_template_hospital)
+    (patient_instruction_template_available patient_instruction_template_standard)
+    (handling_requirement_available handling_requirement_refrigeration)
+    (prior_authorization_available prior_authorization_provider1)
+    (dispensing_unit_has_prior_authorization dispensing_unit_pkg1 prior_authorization_provider1)
+    (dispensing_unit_has_prior_authorization dispensing_unit_pkg2 prior_authorization_provider2)
+    (clinical_reason_code_available clinical_reason_code_medically_necessary)
+  )
+  (:goal
+    (and
+      (item_finalized outpatient_order_rx1)
+      (item_finalized inpatient_order_rx1)
+      (item_finalized dispensing_unit_pkg1)
+      (item_finalized dispensing_unit_pkg2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_medication_request outpatient_order_rx1)
+(register_medication_request inpatient_order_rx1)
+(register_medication_request dispensing_unit_pkg1)
+(register_medication_request dispensing_unit_pkg2)
+(assign_stock_unit_to_request outpatient_order_rx1 stock_unit_lot_a)
+(assign_stock_unit_to_request inpatient_order_rx1 stock_unit_lot_b)
+(assign_pharmacist_to_request outpatient_order_rx1 pharmacist_reviewer_1)
+(finalize_pharmacist_review outpatient_order_rx1 pharmacist_reviewer_1)
+(reserve_outpatient_strength_profile outpatient_order_rx1 strength_profile_outpatient_10mg pharmacist_reviewer_1)
+(unassign_pharmacist_from_request outpatient_order_rx1 pharmacist_reviewer_1)
+(assign_technician_to_request outpatient_order_rx1 pharmacy_technician_1)
+(technician_confirm_outpatient_strength_selection outpatient_order_rx1 strength_profile_outpatient_10mg pharmacy_technician_1)
+(unassign_technician_from_request outpatient_order_rx1 pharmacy_technician_1)
+(assign_pharmacist_to_request inpatient_order_rx1 pharmacist_reviewer_1)
+(finalize_pharmacist_review inpatient_order_rx1 pharmacist_reviewer_1)
+(reserve_inpatient_strength_profile inpatient_order_rx1 strength_profile_inpatient_5mg pharmacist_reviewer_1)
+(unassign_pharmacist_from_request inpatient_order_rx1 pharmacist_reviewer_1)
+(assign_technician_to_request inpatient_order_rx1 pharmacy_technician_1)
+(technician_confirm_inpatient_strength_selection inpatient_order_rx1 strength_profile_inpatient_5mg pharmacy_technician_1)
+(unassign_technician_from_request inpatient_order_rx1 pharmacy_technician_1)
+(assemble_packaging_unit_for_orders outpatient_order_rx1 inpatient_order_rx1 strength_profile_outpatient_10mg strength_profile_inpatient_5mg packaging_unit_box1)
+(assign_pharmacist_to_request outpatient_order_rx1 pharmacist_reviewer_1)
+(validate_packaging_unit packaging_unit_box1 outpatient_order_rx1 pharmacist_reviewer_1)
+(unassign_pharmacist_from_request outpatient_order_rx1 pharmacist_reviewer_1)
+(finalize_outpatient_order_for_review outpatient_order_rx1 packaging_unit_box1)
+(finalize_inpatient_order_for_review inpatient_order_rx1 packaging_unit_box1)
+(assign_stock_unit_to_request dispensing_unit_pkg1 stock_unit_lot_c)
+(assign_pharmacist_to_request dispensing_unit_pkg1 pharmacist_reviewer_1)
+(finalize_pharmacist_review dispensing_unit_pkg1 pharmacist_reviewer_1)
+(attach_packaging_component_to_dispensing_unit dispensing_unit_pkg1 packaging_component_vial packaging_unit_box1)
+(validate_component_binding_on_dispensing_unit dispensing_unit_pkg1 packaging_component_vial packaging_unit_box1 pharmacist_reviewer_1)
+(assign_handling_requirement_to_dispensing_unit dispensing_unit_pkg1 handling_requirement_refrigeration)
+(assign_clinical_reason_to_dispensing_unit dispensing_unit_pkg1 clinical_reason_code_medically_necessary)
+(assign_technician_to_request dispensing_unit_pkg1 pharmacy_technician_1)
+(acknowledge_handling_and_prepare_for_authorizations dispensing_unit_pkg1 handling_requirement_refrigeration pharmacy_technician_1 packaging_component_vial packaging_unit_box1)
+(apply_clinical_reason_augmentation dispensing_unit_pkg1 clinical_reason_code_medically_necessary packaging_component_vial packaging_unit_box1)
+(mark_dispensing_unit_ready_for_verification dispensing_unit_pkg1)
+(attach_patient_instruction_template_to_request dispensing_unit_pkg1 patient_instruction_template_standard pharmacist_reviewer_1)
+(finalize_dispensing_unit_and_release_resources dispensing_unit_pkg1 stock_unit_lot_c patient_instruction_template_standard)
+(unassign_pharmacist_from_request dispensing_unit_pkg1 pharmacist_reviewer_1)
+(unassign_technician_from_request dispensing_unit_pkg1 pharmacy_technician_1)
+(unassign_handling_requirement_from_dispensing_unit dispensing_unit_pkg1 handling_requirement_refrigeration)
+(unassign_clinical_reason_from_dispensing_unit dispensing_unit_pkg1 clinical_reason_code_medically_necessary)
+(assign_stock_unit_to_request dispensing_unit_pkg2 stock_unit_lot_c)
+(assign_pharmacist_to_request dispensing_unit_pkg2 pharmacist_reviewer_1)
+(finalize_pharmacist_review dispensing_unit_pkg2 pharmacist_reviewer_1)
+(attach_packaging_component_to_dispensing_unit dispensing_unit_pkg2 packaging_component_blister packaging_unit_box1)
+(validate_component_binding_on_dispensing_unit dispensing_unit_pkg2 packaging_component_blister packaging_unit_box1 pharmacist_reviewer_1)
+(assign_handling_requirement_to_dispensing_unit dispensing_unit_pkg2 handling_requirement_refrigeration)
+(assign_clinical_reason_to_dispensing_unit dispensing_unit_pkg2 clinical_reason_code_medically_necessary)
+(assign_technician_to_request dispensing_unit_pkg2 pharmacy_technician_1)
+(acknowledge_handling_and_prepare_for_authorizations dispensing_unit_pkg2 handling_requirement_refrigeration pharmacy_technician_1 packaging_component_blister packaging_unit_box1)
+(apply_clinical_reason_augmentation dispensing_unit_pkg2 clinical_reason_code_medically_necessary packaging_component_blister packaging_unit_box1)
+(mark_dispensing_unit_ready_for_verification dispensing_unit_pkg2)
+(attach_patient_instruction_template_to_request dispensing_unit_pkg2 patient_instruction_template_standard pharmacist_reviewer_1)
+(finalize_dispensing_unit_and_release_resources dispensing_unit_pkg2 stock_unit_lot_c patient_instruction_template_standard)
+(unassign_pharmacist_from_request dispensing_unit_pkg2 pharmacist_reviewer_1)
+(unassign_technician_from_request dispensing_unit_pkg2 pharmacy_technician_1)
+(assign_pharmacist_to_request outpatient_order_rx1 pharmacist_reviewer_1)
+(attach_patient_instruction_template_to_request outpatient_order_rx1 patient_instruction_template_standard pharmacist_reviewer_1)
+(finalize_outpatient_order_and_release_resources outpatient_order_rx1 stock_unit_lot_a patient_instruction_template_standard)
+(assign_pharmacist_to_request inpatient_order_rx1 pharmacist_reviewer_1)
+(attach_patient_instruction_template_to_request inpatient_order_rx1 patient_instruction_template_standard pharmacist_reviewer_1)
+(finalize_inpatient_order_and_release_resources inpatient_order_rx1 stock_unit_lot_b patient_instruction_template_standard)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_5vkl9yhg/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_5vkl9yhg/plan.pddl 
+
+
+--- stderr ---
+

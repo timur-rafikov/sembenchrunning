@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain kitting_and_dekitting_work_order_handling_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_or_item - entity component_or_slot_type - entity slot_or_container_type - entity work_order_root - entity work_order - work_order_root material_handler - resource_or_item kit_spec - resource_or_item transport_equipment - resource_or_item quality_profile - resource_or_item assembly_instructions - resource_or_item order_label - resource_or_item packing_material - resource_or_item inspection_seal - resource_or_item component_unit - component_or_slot_type component_bin - component_or_slot_type authorization_badge - component_or_slot_type source_slot - slot_or_container_type destination_slot - slot_or_container_type kit_container - slot_or_container_type work_order_source_role - work_order work_order_destination_role - work_order source_storage_location - work_order_source_role destination_storage_location - work_order_source_role workstation - work_order_destination_role)
+
+  (:predicates
+    (work_order_created ?work_order - work_order)
+    (ready_for_work_order ?work_order - work_order)
+    (work_order_assigned ?work_order - work_order)
+    (finalized_for_work_order ?work_order - work_order)
+    (ready_for_labeling ?work_order - work_order)
+    (labeled_for_work_order ?work_order - work_order)
+    (handler_available ?material_handler - material_handler)
+    (assigned_to_handler ?work_order - work_order ?material_handler - material_handler)
+    (kit_spec_available ?kit_spec - kit_spec)
+    (assigned_kit_spec ?work_order - work_order ?kit_spec - kit_spec)
+    (transport_equipment_available ?transport_equipment - transport_equipment)
+    (assigned_transport_equipment ?work_order - work_order ?transport_equipment - transport_equipment)
+    (component_available ?component_unit - component_unit)
+    (source_location_holds_component ?source_storage_location - source_storage_location ?component_unit - component_unit)
+    (destination_location_holds_component ?destination_storage_location - destination_storage_location ?component_unit - component_unit)
+    (source_location_has_slot ?source_storage_location - source_storage_location ?source_slot - source_slot)
+    (source_slot_staged ?source_slot - source_slot)
+    (source_slot_reserved ?source_slot - source_slot)
+    (source_location_pick_completed ?source_storage_location - source_storage_location)
+    (destination_location_has_slot ?destination_storage_location - destination_storage_location ?destination_slot - destination_slot)
+    (destination_slot_staged ?destination_slot - destination_slot)
+    (destination_slot_reserved ?destination_slot - destination_slot)
+    (destination_location_receive_completed ?destination_storage_location - destination_storage_location)
+    (kit_container_available ?kit_container - kit_container)
+    (kit_container_prepared ?kit_container - kit_container)
+    (kit_container_linked_source_slot ?kit_container - kit_container ?source_slot - source_slot)
+    (kit_container_linked_destination_slot ?kit_container - kit_container ?destination_slot - destination_slot)
+    (kit_container_flag_source_staged ?kit_container - kit_container)
+    (kit_container_flag_source_reserved ?kit_container - kit_container)
+    (kit_container_ready_for_binding ?kit_container - kit_container)
+    (workstation_assigned_source_location ?workstation - workstation ?source_storage_location - source_storage_location)
+    (workstation_assigned_destination_location ?workstation - workstation ?destination_storage_location - destination_storage_location)
+    (workstation_linked_kit_container ?workstation - workstation ?kit_container - kit_container)
+    (component_bin_available ?component_bin - component_bin)
+    (workstation_assigned_component_bin ?workstation - workstation ?component_bin - component_bin)
+    (component_bin_staged ?component_bin - component_bin)
+    (component_bin_linked_to_container ?component_bin - component_bin ?kit_container - kit_container)
+    (workstation_component_ready ?workstation - workstation)
+    (workstation_component_bound ?workstation - workstation)
+    (workstation_ready_for_finalization ?workstation - workstation)
+    (quality_profile_applied ?workstation - workstation)
+    (packing_material_applied ?workstation - workstation)
+    (workstation_ready_for_instructions ?workstation - workstation)
+    (workstation_assembly_completed ?workstation - workstation)
+    (authorization_badge_available ?authorization_badge - authorization_badge)
+    (workstation_authorized_with_badge ?workstation - workstation ?authorization_badge - authorization_badge)
+    (authorization_applied_on_workstation ?workstation - workstation)
+    (authorization_confirmed ?workstation - workstation)
+    (workstation_inspection_passed ?workstation - workstation)
+    (quality_profile_available ?quality_profile - quality_profile)
+    (workstation_assigned_quality_profile ?workstation - workstation ?quality_profile - quality_profile)
+    (assembly_instructions_available ?assembly_instructions - assembly_instructions)
+    (workstation_assigned_instructions ?workstation - workstation ?assembly_instructions - assembly_instructions)
+    (packing_material_available ?packing_material - packing_material)
+    (workstation_assigned_packing_material ?workstation - workstation ?packing_material - packing_material)
+    (inspection_seal_available ?inspection_seal - inspection_seal)
+    (workstation_assigned_inspection_seal ?workstation - workstation ?inspection_seal - inspection_seal)
+    (order_label_available ?order_label - order_label)
+    (assigned_label ?work_order - work_order ?order_label - order_label)
+    (source_location_pick_in_progress ?source_storage_location - source_storage_location)
+    (destination_location_receive_in_progress ?destination_storage_location - destination_storage_location)
+    (workstation_finalized ?workstation - workstation)
+  )
+  (:action create_work_order
+    :parameters (?work_order - work_order)
+    :precondition
+      (and
+        (not
+          (work_order_created ?work_order)
+        )
+        (not
+          (finalized_for_work_order ?work_order)
+        )
+      )
+    :effect (work_order_created ?work_order)
+  )
+  (:action assign_handler_to_work_order
+    :parameters (?work_order - work_order ?material_handler - material_handler)
+    :precondition
+      (and
+        (work_order_created ?work_order)
+        (not
+          (work_order_assigned ?work_order)
+        )
+        (handler_available ?material_handler)
+      )
+    :effect
+      (and
+        (work_order_assigned ?work_order)
+        (assigned_to_handler ?work_order ?material_handler)
+        (not
+          (handler_available ?material_handler)
+        )
+      )
+  )
+  (:action assign_kit_spec_to_work_order
+    :parameters (?work_order - work_order ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (work_order_created ?work_order)
+        (work_order_assigned ?work_order)
+        (kit_spec_available ?kit_spec)
+      )
+    :effect
+      (and
+        (assigned_kit_spec ?work_order ?kit_spec)
+        (not
+          (kit_spec_available ?kit_spec)
+        )
+      )
+  )
+  (:action confirm_kit_spec_assignment
+    :parameters (?work_order - work_order ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (work_order_created ?work_order)
+        (work_order_assigned ?work_order)
+        (assigned_kit_spec ?work_order ?kit_spec)
+        (not
+          (ready_for_work_order ?work_order)
+        )
+      )
+    :effect (ready_for_work_order ?work_order)
+  )
+  (:action release_kit_spec_from_work_order
+    :parameters (?work_order - work_order ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (assigned_kit_spec ?work_order ?kit_spec)
+      )
+    :effect
+      (and
+        (kit_spec_available ?kit_spec)
+        (not
+          (assigned_kit_spec ?work_order ?kit_spec)
+        )
+      )
+  )
+  (:action assign_transport_equipment_to_work_order
+    :parameters (?work_order - work_order ?transport_equipment - transport_equipment)
+    :precondition
+      (and
+        (ready_for_work_order ?work_order)
+        (transport_equipment_available ?transport_equipment)
+      )
+    :effect
+      (and
+        (assigned_transport_equipment ?work_order ?transport_equipment)
+        (not
+          (transport_equipment_available ?transport_equipment)
+        )
+      )
+  )
+  (:action release_transport_equipment_from_work_order
+    :parameters (?work_order - work_order ?transport_equipment - transport_equipment)
+    :precondition
+      (and
+        (assigned_transport_equipment ?work_order ?transport_equipment)
+      )
+    :effect
+      (and
+        (transport_equipment_available ?transport_equipment)
+        (not
+          (assigned_transport_equipment ?work_order ?transport_equipment)
+        )
+      )
+  )
+  (:action assign_packing_material_to_workstation
+    :parameters (?workstation - workstation ?packing_material - packing_material)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (packing_material_available ?packing_material)
+      )
+    :effect
+      (and
+        (workstation_assigned_packing_material ?workstation ?packing_material)
+        (not
+          (packing_material_available ?packing_material)
+        )
+      )
+  )
+  (:action release_packing_material_from_workstation
+    :parameters (?workstation - workstation ?packing_material - packing_material)
+    :precondition
+      (and
+        (workstation_assigned_packing_material ?workstation ?packing_material)
+      )
+    :effect
+      (and
+        (packing_material_available ?packing_material)
+        (not
+          (workstation_assigned_packing_material ?workstation ?packing_material)
+        )
+      )
+  )
+  (:action assign_inspection_seal_to_workstation
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (inspection_seal_available ?inspection_seal)
+      )
+    :effect
+      (and
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (not
+          (inspection_seal_available ?inspection_seal)
+        )
+      )
+  )
+  (:action release_inspection_seal_from_workstation
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal)
+    :precondition
+      (and
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+      )
+    :effect
+      (and
+        (inspection_seal_available ?inspection_seal)
+        (not
+          (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        )
+      )
+  )
+  (:action stage_source_slot_for_order
+    :parameters (?source_storage_location - source_storage_location ?source_slot - source_slot ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (ready_for_work_order ?source_storage_location)
+        (assigned_kit_spec ?source_storage_location ?kit_spec)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (not
+          (source_slot_staged ?source_slot)
+        )
+        (not
+          (source_slot_reserved ?source_slot)
+        )
+      )
+    :effect (source_slot_staged ?source_slot)
+  )
+  (:action start_pick_with_equipment_at_source
+    :parameters (?source_storage_location - source_storage_location ?source_slot - source_slot ?transport_equipment - transport_equipment)
+    :precondition
+      (and
+        (ready_for_work_order ?source_storage_location)
+        (assigned_transport_equipment ?source_storage_location ?transport_equipment)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (source_slot_staged ?source_slot)
+        (not
+          (source_location_pick_in_progress ?source_storage_location)
+        )
+      )
+    :effect
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (source_location_pick_completed ?source_storage_location)
+      )
+  )
+  (:action reserve_component_at_source_slot
+    :parameters (?source_storage_location - source_storage_location ?source_slot - source_slot ?component_unit - component_unit)
+    :precondition
+      (and
+        (ready_for_work_order ?source_storage_location)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (component_available ?component_unit)
+        (not
+          (source_location_pick_in_progress ?source_storage_location)
+        )
+      )
+    :effect
+      (and
+        (source_slot_reserved ?source_slot)
+        (source_location_pick_in_progress ?source_storage_location)
+        (source_location_holds_component ?source_storage_location ?component_unit)
+        (not
+          (component_available ?component_unit)
+        )
+      )
+  )
+  (:action complete_component_pick_at_source
+    :parameters (?source_storage_location - source_storage_location ?source_slot - source_slot ?kit_spec - kit_spec ?component_unit - component_unit)
+    :precondition
+      (and
+        (ready_for_work_order ?source_storage_location)
+        (assigned_kit_spec ?source_storage_location ?kit_spec)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (source_slot_reserved ?source_slot)
+        (source_location_holds_component ?source_storage_location ?component_unit)
+        (not
+          (source_location_pick_completed ?source_storage_location)
+        )
+      )
+    :effect
+      (and
+        (source_slot_staged ?source_slot)
+        (source_location_pick_completed ?source_storage_location)
+        (component_available ?component_unit)
+        (not
+          (source_location_holds_component ?source_storage_location ?component_unit)
+        )
+      )
+  )
+  (:action stage_destination_slot_for_order
+    :parameters (?destination_storage_location - destination_storage_location ?destination_slot - destination_slot ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (ready_for_work_order ?destination_storage_location)
+        (assigned_kit_spec ?destination_storage_location ?kit_spec)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (not
+          (destination_slot_staged ?destination_slot)
+        )
+        (not
+          (destination_slot_reserved ?destination_slot)
+        )
+      )
+    :effect (destination_slot_staged ?destination_slot)
+  )
+  (:action start_receive_with_equipment_at_destination
+    :parameters (?destination_storage_location - destination_storage_location ?destination_slot - destination_slot ?transport_equipment - transport_equipment)
+    :precondition
+      (and
+        (ready_for_work_order ?destination_storage_location)
+        (assigned_transport_equipment ?destination_storage_location ?transport_equipment)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (destination_slot_staged ?destination_slot)
+        (not
+          (destination_location_receive_in_progress ?destination_storage_location)
+        )
+      )
+    :effect
+      (and
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (destination_location_receive_completed ?destination_storage_location)
+      )
+  )
+  (:action reserve_component_for_destination_slot
+    :parameters (?destination_storage_location - destination_storage_location ?destination_slot - destination_slot ?component_unit - component_unit)
+    :precondition
+      (and
+        (ready_for_work_order ?destination_storage_location)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (component_available ?component_unit)
+        (not
+          (destination_location_receive_in_progress ?destination_storage_location)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_reserved ?destination_slot)
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (destination_location_holds_component ?destination_storage_location ?component_unit)
+        (not
+          (component_available ?component_unit)
+        )
+      )
+  )
+  (:action complete_component_receive_at_destination
+    :parameters (?destination_storage_location - destination_storage_location ?destination_slot - destination_slot ?kit_spec - kit_spec ?component_unit - component_unit)
+    :precondition
+      (and
+        (ready_for_work_order ?destination_storage_location)
+        (assigned_kit_spec ?destination_storage_location ?kit_spec)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (destination_slot_reserved ?destination_slot)
+        (destination_location_holds_component ?destination_storage_location ?component_unit)
+        (not
+          (destination_location_receive_completed ?destination_storage_location)
+        )
+      )
+    :effect
+      (and
+        (destination_slot_staged ?destination_slot)
+        (destination_location_receive_completed ?destination_storage_location)
+        (component_available ?component_unit)
+        (not
+          (destination_location_holds_component ?destination_storage_location ?component_unit)
+        )
+      )
+  )
+  (:action configure_kit_container
+    :parameters (?source_storage_location - source_storage_location ?destination_storage_location - destination_storage_location ?source_slot - source_slot ?destination_slot - destination_slot ?kit_container - kit_container)
+    :precondition
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (source_slot_staged ?source_slot)
+        (destination_slot_staged ?destination_slot)
+        (source_location_pick_completed ?source_storage_location)
+        (destination_location_receive_completed ?destination_storage_location)
+        (kit_container_available ?kit_container)
+      )
+    :effect
+      (and
+        (kit_container_prepared ?kit_container)
+        (kit_container_linked_source_slot ?kit_container ?source_slot)
+        (kit_container_linked_destination_slot ?kit_container ?destination_slot)
+        (not
+          (kit_container_available ?kit_container)
+        )
+      )
+  )
+  (:action configure_kit_container_with_reserved_source
+    :parameters (?source_storage_location - source_storage_location ?destination_storage_location - destination_storage_location ?source_slot - source_slot ?destination_slot - destination_slot ?kit_container - kit_container)
+    :precondition
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (source_slot_reserved ?source_slot)
+        (destination_slot_staged ?destination_slot)
+        (not
+          (source_location_pick_completed ?source_storage_location)
+        )
+        (destination_location_receive_completed ?destination_storage_location)
+        (kit_container_available ?kit_container)
+      )
+    :effect
+      (and
+        (kit_container_prepared ?kit_container)
+        (kit_container_linked_source_slot ?kit_container ?source_slot)
+        (kit_container_linked_destination_slot ?kit_container ?destination_slot)
+        (kit_container_flag_source_staged ?kit_container)
+        (not
+          (kit_container_available ?kit_container)
+        )
+      )
+  )
+  (:action configure_kit_container_with_staged_source
+    :parameters (?source_storage_location - source_storage_location ?destination_storage_location - destination_storage_location ?source_slot - source_slot ?destination_slot - destination_slot ?kit_container - kit_container)
+    :precondition
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (source_slot_staged ?source_slot)
+        (destination_slot_reserved ?destination_slot)
+        (source_location_pick_completed ?source_storage_location)
+        (not
+          (destination_location_receive_completed ?destination_storage_location)
+        )
+        (kit_container_available ?kit_container)
+      )
+    :effect
+      (and
+        (kit_container_prepared ?kit_container)
+        (kit_container_linked_source_slot ?kit_container ?source_slot)
+        (kit_container_linked_destination_slot ?kit_container ?destination_slot)
+        (kit_container_flag_source_reserved ?kit_container)
+        (not
+          (kit_container_available ?kit_container)
+        )
+      )
+  )
+  (:action configure_kit_container_with_both_reserved
+    :parameters (?source_storage_location - source_storage_location ?destination_storage_location - destination_storage_location ?source_slot - source_slot ?destination_slot - destination_slot ?kit_container - kit_container)
+    :precondition
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (source_location_has_slot ?source_storage_location ?source_slot)
+        (destination_location_has_slot ?destination_storage_location ?destination_slot)
+        (source_slot_reserved ?source_slot)
+        (destination_slot_reserved ?destination_slot)
+        (not
+          (source_location_pick_completed ?source_storage_location)
+        )
+        (not
+          (destination_location_receive_completed ?destination_storage_location)
+        )
+        (kit_container_available ?kit_container)
+      )
+    :effect
+      (and
+        (kit_container_prepared ?kit_container)
+        (kit_container_linked_source_slot ?kit_container ?source_slot)
+        (kit_container_linked_destination_slot ?kit_container ?destination_slot)
+        (kit_container_flag_source_staged ?kit_container)
+        (kit_container_flag_source_reserved ?kit_container)
+        (not
+          (kit_container_available ?kit_container)
+        )
+      )
+  )
+  (:action mark_kit_container_ready_for_binding
+    :parameters (?kit_container - kit_container ?source_storage_location - source_storage_location ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (kit_container_prepared ?kit_container)
+        (source_location_pick_in_progress ?source_storage_location)
+        (assigned_kit_spec ?source_storage_location ?kit_spec)
+        (not
+          (kit_container_ready_for_binding ?kit_container)
+        )
+      )
+    :effect (kit_container_ready_for_binding ?kit_container)
+  )
+  (:action reserve_component_bin_for_container
+    :parameters (?workstation - workstation ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (workstation_linked_kit_container ?workstation ?kit_container)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_available ?component_bin)
+        (kit_container_prepared ?kit_container)
+        (kit_container_ready_for_binding ?kit_container)
+        (not
+          (component_bin_staged ?component_bin)
+        )
+      )
+    :effect
+      (and
+        (component_bin_staged ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (not
+          (component_bin_available ?component_bin)
+        )
+      )
+  )
+  (:action bind_component_bin_to_workstation
+    :parameters (?workstation - workstation ?component_bin - component_bin ?kit_container - kit_container ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_staged ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (assigned_kit_spec ?workstation ?kit_spec)
+        (not
+          (kit_container_flag_source_staged ?kit_container)
+        )
+        (not
+          (workstation_component_ready ?workstation)
+        )
+      )
+    :effect (workstation_component_ready ?workstation)
+  )
+  (:action attach_quality_profile_to_workstation
+    :parameters (?workstation - workstation ?quality_profile - quality_profile)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (quality_profile_available ?quality_profile)
+        (not
+          (quality_profile_applied ?workstation)
+        )
+      )
+    :effect
+      (and
+        (quality_profile_applied ?workstation)
+        (workstation_assigned_quality_profile ?workstation ?quality_profile)
+        (not
+          (quality_profile_available ?quality_profile)
+        )
+      )
+  )
+  (:action configure_workstation_for_assembly
+    :parameters (?workstation - workstation ?component_bin - component_bin ?kit_container - kit_container ?kit_spec - kit_spec ?quality_profile - quality_profile)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_staged ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (assigned_kit_spec ?workstation ?kit_spec)
+        (kit_container_flag_source_staged ?kit_container)
+        (quality_profile_applied ?workstation)
+        (workstation_assigned_quality_profile ?workstation ?quality_profile)
+        (not
+          (workstation_component_ready ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_component_ready ?workstation)
+        (packing_material_applied ?workstation)
+      )
+  )
+  (:action apply_packing_material_to_workstation_from_equipment
+    :parameters (?workstation - workstation ?packing_material - packing_material ?transport_equipment - transport_equipment ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_ready ?workstation)
+        (workstation_assigned_packing_material ?workstation ?packing_material)
+        (assigned_transport_equipment ?workstation ?transport_equipment)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (not
+          (kit_container_flag_source_reserved ?kit_container)
+        )
+        (not
+          (workstation_component_bound ?workstation)
+        )
+      )
+    :effect (workstation_component_bound ?workstation)
+  )
+  (:action apply_packing_material_to_workstation_from_bin
+    :parameters (?workstation - workstation ?packing_material - packing_material ?transport_equipment - transport_equipment ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_ready ?workstation)
+        (workstation_assigned_packing_material ?workstation ?packing_material)
+        (assigned_transport_equipment ?workstation ?transport_equipment)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (kit_container_flag_source_reserved ?kit_container)
+        (not
+          (workstation_component_bound ?workstation)
+        )
+      )
+    :effect (workstation_component_bound ?workstation)
+  )
+  (:action start_finalization_phase_at_workstation
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_bound ?workstation)
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (not
+          (kit_container_flag_source_staged ?kit_container)
+        )
+        (not
+          (kit_container_flag_source_reserved ?kit_container)
+        )
+        (not
+          (workstation_ready_for_finalization ?workstation)
+        )
+      )
+    :effect (workstation_ready_for_finalization ?workstation)
+  )
+  (:action start_finalization_and_attach_instructions
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_bound ?workstation)
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (kit_container_flag_source_staged ?kit_container)
+        (not
+          (kit_container_flag_source_reserved ?kit_container)
+        )
+        (not
+          (workstation_ready_for_finalization ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_ready_for_instructions ?workstation)
+      )
+  )
+  (:action start_finalization_and_attach_instructions_variant
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_bound ?workstation)
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (not
+          (kit_container_flag_source_staged ?kit_container)
+        )
+        (kit_container_flag_source_reserved ?kit_container)
+        (not
+          (workstation_ready_for_finalization ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_ready_for_instructions ?workstation)
+      )
+  )
+  (:action start_finalization_and_attach_instructions_variant_b
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal ?component_bin - component_bin ?kit_container - kit_container)
+    :precondition
+      (and
+        (workstation_component_bound ?workstation)
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (workstation_assigned_component_bin ?workstation ?component_bin)
+        (component_bin_linked_to_container ?component_bin ?kit_container)
+        (kit_container_flag_source_staged ?kit_container)
+        (kit_container_flag_source_reserved ?kit_container)
+        (not
+          (workstation_ready_for_finalization ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_ready_for_instructions ?workstation)
+      )
+  )
+  (:action finalize_workstation_for_labeling_without_instructions
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (not
+          (workstation_ready_for_instructions ?workstation)
+        )
+        (not
+          (workstation_finalized ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_finalized ?workstation)
+        (ready_for_labeling ?workstation)
+      )
+  )
+  (:action attach_assembly_instructions_to_workstation
+    :parameters (?workstation - workstation ?assembly_instructions - assembly_instructions)
+    :precondition
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_ready_for_instructions ?workstation)
+        (assembly_instructions_available ?assembly_instructions)
+      )
+    :effect
+      (and
+        (workstation_assigned_instructions ?workstation ?assembly_instructions)
+        (not
+          (assembly_instructions_available ?assembly_instructions)
+        )
+      )
+  )
+  (:action perform_assembly_at_workstation
+    :parameters (?workstation - workstation ?source_storage_location - source_storage_location ?destination_storage_location - destination_storage_location ?kit_spec - kit_spec ?assembly_instructions - assembly_instructions)
+    :precondition
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_ready_for_instructions ?workstation)
+        (workstation_assigned_instructions ?workstation ?assembly_instructions)
+        (workstation_assigned_source_location ?workstation ?source_storage_location)
+        (workstation_assigned_destination_location ?workstation ?destination_storage_location)
+        (source_location_pick_completed ?source_storage_location)
+        (destination_location_receive_completed ?destination_storage_location)
+        (assigned_kit_spec ?workstation ?kit_spec)
+        (not
+          (workstation_assembly_completed ?workstation)
+        )
+      )
+    :effect (workstation_assembly_completed ?workstation)
+  )
+  (:action finalize_workstation_and_mark_complete
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_ready_for_finalization ?workstation)
+        (workstation_assembly_completed ?workstation)
+        (not
+          (workstation_finalized ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_finalized ?workstation)
+        (ready_for_labeling ?workstation)
+      )
+  )
+  (:action apply_authorization_badge_to_workstation
+    :parameters (?workstation - workstation ?authorization_badge - authorization_badge ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (ready_for_work_order ?workstation)
+        (assigned_kit_spec ?workstation ?kit_spec)
+        (authorization_badge_available ?authorization_badge)
+        (workstation_authorized_with_badge ?workstation ?authorization_badge)
+        (not
+          (authorization_applied_on_workstation ?workstation)
+        )
+      )
+    :effect
+      (and
+        (authorization_applied_on_workstation ?workstation)
+        (not
+          (authorization_badge_available ?authorization_badge)
+        )
+      )
+  )
+  (:action confirm_authorization_on_workstation
+    :parameters (?workstation - workstation ?transport_equipment - transport_equipment)
+    :precondition
+      (and
+        (authorization_applied_on_workstation ?workstation)
+        (assigned_transport_equipment ?workstation ?transport_equipment)
+        (not
+          (authorization_confirmed ?workstation)
+        )
+      )
+    :effect (authorization_confirmed ?workstation)
+  )
+  (:action attach_inspection_seal_to_workstation
+    :parameters (?workstation - workstation ?inspection_seal - inspection_seal)
+    :precondition
+      (and
+        (authorization_confirmed ?workstation)
+        (workstation_assigned_inspection_seal ?workstation ?inspection_seal)
+        (not
+          (workstation_inspection_passed ?workstation)
+        )
+      )
+    :effect (workstation_inspection_passed ?workstation)
+  )
+  (:action finalize_inspection_and_mark_workstation_complete
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_inspection_passed ?workstation)
+        (not
+          (workstation_finalized ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_finalized ?workstation)
+        (ready_for_labeling ?workstation)
+      )
+  )
+  (:action mark_source_location_pick_complete
+    :parameters (?source_storage_location - source_storage_location ?kit_container - kit_container)
+    :precondition
+      (and
+        (source_location_pick_in_progress ?source_storage_location)
+        (source_location_pick_completed ?source_storage_location)
+        (kit_container_prepared ?kit_container)
+        (kit_container_ready_for_binding ?kit_container)
+        (not
+          (ready_for_labeling ?source_storage_location)
+        )
+      )
+    :effect (ready_for_labeling ?source_storage_location)
+  )
+  (:action mark_destination_location_as_receive_completed
+    :parameters (?destination_storage_location - destination_storage_location ?kit_container - kit_container)
+    :precondition
+      (and
+        (destination_location_receive_in_progress ?destination_storage_location)
+        (destination_location_receive_completed ?destination_storage_location)
+        (kit_container_prepared ?kit_container)
+        (kit_container_ready_for_binding ?kit_container)
+        (not
+          (ready_for_labeling ?destination_storage_location)
+        )
+      )
+    :effect (ready_for_labeling ?destination_storage_location)
+  )
+  (:action attach_order_label_to_work_order
+    :parameters (?work_order - work_order ?order_label - order_label ?kit_spec - kit_spec)
+    :precondition
+      (and
+        (ready_for_labeling ?work_order)
+        (assigned_kit_spec ?work_order ?kit_spec)
+        (order_label_available ?order_label)
+        (not
+          (labeled_for_work_order ?work_order)
+        )
+      )
+    :effect
+      (and
+        (labeled_for_work_order ?work_order)
+        (assigned_label ?work_order ?order_label)
+        (not
+          (order_label_available ?order_label)
+        )
+      )
+  )
+  (:action finalize_source_location_and_release_handler
+    :parameters (?source_storage_location - source_storage_location ?material_handler - material_handler ?order_label - order_label)
+    :precondition
+      (and
+        (labeled_for_work_order ?source_storage_location)
+        (assigned_to_handler ?source_storage_location ?material_handler)
+        (assigned_label ?source_storage_location ?order_label)
+        (not
+          (finalized_for_work_order ?source_storage_location)
+        )
+      )
+    :effect
+      (and
+        (finalized_for_work_order ?source_storage_location)
+        (handler_available ?material_handler)
+        (order_label_available ?order_label)
+      )
+  )
+  (:action finalize_destination_location_and_release_handler
+    :parameters (?destination_storage_location - destination_storage_location ?material_handler - material_handler ?order_label - order_label)
+    :precondition
+      (and
+        (labeled_for_work_order ?destination_storage_location)
+        (assigned_to_handler ?destination_storage_location ?material_handler)
+        (assigned_label ?destination_storage_location ?order_label)
+        (not
+          (finalized_for_work_order ?destination_storage_location)
+        )
+      )
+    :effect
+      (and
+        (finalized_for_work_order ?destination_storage_location)
+        (handler_available ?material_handler)
+        (order_label_available ?order_label)
+      )
+  )
+  (:action finalize_workstation_and_release_handler
+    :parameters (?workstation - workstation ?material_handler - material_handler ?order_label - order_label)
+    :precondition
+      (and
+        (labeled_for_work_order ?workstation)
+        (assigned_to_handler ?workstation ?material_handler)
+        (assigned_label ?workstation ?order_label)
+        (not
+          (finalized_for_work_order ?workstation)
+        )
+      )
+    :effect
+      (and
+        (finalized_for_work_order ?workstation)
+        (handler_available ?material_handler)
+        (order_label_available ?order_label)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem kitting_dekitting_scenario)
+  (:domain kitting_and_dekitting_work_order_handling_domain)
+  (:objects src_location_1 - source_storage_location dest_location_1 - destination_storage_location workstation_1 - workstation workstation_2 - workstation material_handler_1 - material_handler material_handler_2 - material_handler material_handler_3 - material_handler kit_spec_alpha - kit_spec transport_equipment_1 - transport_equipment component_unit_1 - component_unit source_slot_1 - source_slot destination_slot_1 - destination_slot kit_container_1 - kit_container component_bin_1 - component_bin component_bin_2 - component_bin quality_profile_standard - quality_profile quality_profile_extended - quality_profile assembly_instructions_v1 - assembly_instructions assembly_instructions_v2 - assembly_instructions order_label_1 - order_label packing_material_wrap_1 - packing_material authorization_badge_1 - authorization_badge authorization_badge_2 - authorization_badge inspection_seal_1 - inspection_seal)
+  (:init
+    (handler_available material_handler_1)
+    (handler_available material_handler_2)
+    (handler_available material_handler_3)
+    (kit_spec_available kit_spec_alpha)
+    (transport_equipment_available transport_equipment_1)
+    (component_available component_unit_1)
+    (source_location_has_slot src_location_1 source_slot_1)
+    (destination_location_has_slot dest_location_1 destination_slot_1)
+    (kit_container_available kit_container_1)
+    (component_bin_available component_bin_1)
+    (component_bin_available component_bin_2)
+    (workstation_assigned_source_location workstation_1 src_location_1)
+    (workstation_assigned_source_location workstation_2 src_location_1)
+    (workstation_assigned_destination_location workstation_1 dest_location_1)
+    (workstation_assigned_destination_location workstation_2 dest_location_1)
+    (workstation_linked_kit_container workstation_1 kit_container_1)
+    (workstation_linked_kit_container workstation_2 kit_container_1)
+    (workstation_assigned_component_bin workstation_1 component_bin_1)
+    (workstation_assigned_component_bin workstation_2 component_bin_2)
+    (quality_profile_available quality_profile_standard)
+    (quality_profile_available quality_profile_extended)
+    (assembly_instructions_available assembly_instructions_v1)
+    (assembly_instructions_available assembly_instructions_v2)
+    (order_label_available order_label_1)
+    (packing_material_available packing_material_wrap_1)
+    (authorization_badge_available authorization_badge_1)
+    (workstation_authorized_with_badge workstation_1 authorization_badge_1)
+    (workstation_authorized_with_badge workstation_2 authorization_badge_2)
+    (inspection_seal_available inspection_seal_1)
+  )
+  (:goal
+    (and
+      (finalized_for_work_order src_location_1)
+      (finalized_for_work_order dest_location_1)
+      (finalized_for_work_order workstation_1)
+      (finalized_for_work_order workstation_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_work_order src_location_1)
+(assign_handler_to_work_order src_location_1 material_handler_1)
+(assign_kit_spec_to_work_order src_location_1 kit_spec_alpha)
+(confirm_kit_spec_assignment src_location_1 kit_spec_alpha)
+(stage_source_slot_for_order src_location_1 source_slot_1 kit_spec_alpha)
+(assign_transport_equipment_to_work_order src_location_1 transport_equipment_1)
+(start_pick_with_equipment_at_source src_location_1 source_slot_1 transport_equipment_1)
+(release_transport_equipment_from_work_order src_location_1 transport_equipment_1)
+(release_kit_spec_from_work_order src_location_1 kit_spec_alpha)
+(create_work_order dest_location_1)
+(assign_handler_to_work_order dest_location_1 material_handler_2)
+(assign_kit_spec_to_work_order dest_location_1 kit_spec_alpha)
+(confirm_kit_spec_assignment dest_location_1 kit_spec_alpha)
+(stage_destination_slot_for_order dest_location_1 destination_slot_1 kit_spec_alpha)
+(assign_transport_equipment_to_work_order dest_location_1 transport_equipment_1)
+(start_receive_with_equipment_at_destination dest_location_1 destination_slot_1 transport_equipment_1)
+(release_transport_equipment_from_work_order dest_location_1 transport_equipment_1)
+(release_kit_spec_from_work_order dest_location_1 kit_spec_alpha)
+(configure_kit_container src_location_1 dest_location_1 source_slot_1 destination_slot_1 kit_container_1)
+(assign_kit_spec_to_work_order src_location_1 kit_spec_alpha)
+(mark_kit_container_ready_for_binding kit_container_1 src_location_1 kit_spec_alpha)
+(mark_source_location_pick_complete src_location_1 kit_container_1)
+(mark_destination_location_as_receive_completed dest_location_1 kit_container_1)
+(attach_order_label_to_work_order src_location_1 order_label_1 kit_spec_alpha)
+(finalize_source_location_and_release_handler src_location_1 material_handler_1 order_label_1)
+(release_kit_spec_from_work_order src_location_1 kit_spec_alpha)
+(assign_kit_spec_to_work_order dest_location_1 kit_spec_alpha)
+(attach_order_label_to_work_order dest_location_1 order_label_1 kit_spec_alpha)
+(finalize_destination_location_and_release_handler dest_location_1 material_handler_2 order_label_1)
+(release_kit_spec_from_work_order dest_location_1 kit_spec_alpha)
+(create_work_order workstation_1)
+(assign_handler_to_work_order workstation_1 material_handler_1)
+(assign_kit_spec_to_work_order workstation_1 kit_spec_alpha)
+(confirm_kit_spec_assignment workstation_1 kit_spec_alpha)
+(assign_packing_material_to_workstation workstation_1 packing_material_wrap_1)
+(assign_inspection_seal_to_workstation workstation_1 inspection_seal_1)
+(assign_transport_equipment_to_work_order workstation_1 transport_equipment_1)
+(reserve_component_bin_for_container workstation_1 component_bin_1 kit_container_1)
+(bind_component_bin_to_workstation workstation_1 component_bin_1 kit_container_1 kit_spec_alpha)
+(apply_packing_material_to_workstation_from_equipment workstation_1 packing_material_wrap_1 transport_equipment_1 component_bin_1 kit_container_1)
+(start_finalization_phase_at_workstation workstation_1 inspection_seal_1 component_bin_1 kit_container_1)
+(finalize_workstation_for_labeling_without_instructions workstation_1)
+(attach_order_label_to_work_order workstation_1 order_label_1 kit_spec_alpha)
+(finalize_workstation_and_release_handler workstation_1 material_handler_1 order_label_1)
+(release_kit_spec_from_work_order workstation_1 kit_spec_alpha)
+(release_packing_material_from_workstation workstation_1 packing_material_wrap_1)
+(release_inspection_seal_from_workstation workstation_1 inspection_seal_1)
+(release_transport_equipment_from_work_order workstation_1 transport_equipment_1)
+(create_work_order workstation_2)
+(assign_handler_to_work_order workstation_2 material_handler_2)
+(assign_kit_spec_to_work_order workstation_2 kit_spec_alpha)
+(confirm_kit_spec_assignment workstation_2 kit_spec_alpha)
+(assign_packing_material_to_workstation workstation_2 packing_material_wrap_1)
+(assign_inspection_seal_to_workstation workstation_2 inspection_seal_1)
+(assign_transport_equipment_to_work_order workstation_2 transport_equipment_1)
+(reserve_component_bin_for_container workstation_2 component_bin_2 kit_container_1)
+(bind_component_bin_to_workstation workstation_2 component_bin_2 kit_container_1 kit_spec_alpha)
+(apply_packing_material_to_workstation_from_equipment workstation_2 packing_material_wrap_1 transport_equipment_1 component_bin_2 kit_container_1)
+(start_finalization_phase_at_workstation workstation_2 inspection_seal_1 component_bin_2 kit_container_1)
+(finalize_workstation_for_labeling_without_instructions workstation_2)
+(attach_order_label_to_work_order workstation_2 order_label_1 kit_spec_alpha)
+(finalize_workstation_and_release_handler workstation_2 material_handler_2 order_label_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2d7ckfu9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_2d7ckfu9/plan.pddl 62 
+
+
+
+--- stderr ---
+

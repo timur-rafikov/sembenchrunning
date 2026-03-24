@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain delayed_linehaul_rerouting)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_group - object auxiliary_asset_class - object itinerary_component_class - object logistics_item - object shipment_segment - logistics_item carrier_unit - operational_resource_group schedule_option - operational_resource_group operator_resource - operational_resource_group authorization_document - operational_resource_group operational_permit - operational_resource_group claim_document - operational_resource_group service_provider - operational_resource_group external_approval - operational_resource_group alternative_service - auxiliary_asset_class freight_unit - auxiliary_asset_class escalation_contact - auxiliary_asset_class upstream_route_option - itinerary_component_class downstream_route_option - itinerary_component_class contingency_itinerary - itinerary_component_class shipment_leg_role - shipment_segment shipment_subleg_role - shipment_segment origin_leg - shipment_leg_role destination_leg - shipment_leg_role reroute_case - shipment_subleg_role)
+  (:predicates
+    (incident_registered_for_subject ?shipment_segment - shipment_segment)
+    (rebooking_confirmed_for_subject ?shipment_segment - shipment_segment)
+    (carrier_tentative_assigned ?shipment_segment - shipment_segment)
+    (restoration_confirmed_for_subject ?shipment_segment - shipment_segment)
+    (execution_confirmed_for_subject ?shipment_segment - shipment_segment)
+    (claim_recorded_for_subject ?shipment_segment - shipment_segment)
+    (carrier_available ?carrier_unit - carrier_unit)
+    (assigned_carrier_for_subject ?shipment_segment - shipment_segment ?carrier_unit - carrier_unit)
+    (schedule_option_available ?schedule_option - schedule_option)
+    (assigned_schedule_option_for_subject ?shipment_segment - shipment_segment ?schedule_option - schedule_option)
+    (operator_resource_available ?operator_resource - operator_resource)
+    (assigned_operator_resource_for_subject ?shipment_segment - shipment_segment ?operator_resource - operator_resource)
+    (alternative_service_available ?alternative_service - alternative_service)
+    (assigned_alternative_service_origin ?origin_leg - origin_leg ?alternative_service - alternative_service)
+    (assigned_alternative_service_destination ?destination_leg - destination_leg ?alternative_service - alternative_service)
+    (origin_leg_upstream_option_link ?origin_leg - origin_leg ?upstream_route_option - upstream_route_option)
+    (upstream_option_marked ?upstream_route_option - upstream_route_option)
+    (upstream_option_confirmed ?upstream_route_option - upstream_route_option)
+    (origin_leg_ready ?origin_leg - origin_leg)
+    (destination_leg_downstream_option_link ?destination_leg - destination_leg ?downstream_route_option - downstream_route_option)
+    (downstream_option_marked ?downstream_route_option - downstream_route_option)
+    (downstream_option_confirmed ?downstream_route_option - downstream_route_option)
+    (destination_leg_ready ?destination_leg - destination_leg)
+    (contingency_itinerary_unallocated ?contingency_itinerary - contingency_itinerary)
+    (contingency_itinerary_created ?contingency_itinerary - contingency_itinerary)
+    (itinerary_includes_upstream_option ?contingency_itinerary - contingency_itinerary ?upstream_route_option - upstream_route_option)
+    (itinerary_includes_downstream_option ?contingency_itinerary - contingency_itinerary ?downstream_route_option - downstream_route_option)
+    (itinerary_requires_upstream_authorization ?contingency_itinerary - contingency_itinerary)
+    (itinerary_requires_downstream_authorization ?contingency_itinerary - contingency_itinerary)
+    (itinerary_manifest_locked ?contingency_itinerary - contingency_itinerary)
+    (case_origin_leg_link ?reroute_case - reroute_case ?origin_leg - origin_leg)
+    (case_destination_leg_link ?reroute_case - reroute_case ?destination_leg - destination_leg)
+    (case_linked_itinerary ?reroute_case - reroute_case ?contingency_itinerary - contingency_itinerary)
+    (freight_unit_available ?freight_unit - freight_unit)
+    (case_has_freight_unit ?reroute_case - reroute_case ?freight_unit - freight_unit)
+    (freight_unit_locked ?freight_unit - freight_unit)
+    (freight_unit_assigned_to_itinerary ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    (case_authorization_applied ?reroute_case - reroute_case)
+    (case_service_provider_engaged ?reroute_case - reroute_case)
+    (case_external_approval_obtained ?reroute_case - reroute_case)
+    (case_has_authorization_document ?reroute_case - reroute_case)
+    (case_authorization_validated ?reroute_case - reroute_case)
+    (case_operational_permit_applied ?reroute_case - reroute_case)
+    (case_execution_ready ?reroute_case - reroute_case)
+    (escalation_contact_available ?escalation_contact - escalation_contact)
+    (case_has_escalation_contact ?reroute_case - reroute_case ?escalation_contact - escalation_contact)
+    (case_escalation_engaged ?reroute_case - reroute_case)
+    (case_operator_task_initiated ?reroute_case - reroute_case)
+    (case_operator_task_completed ?reroute_case - reroute_case)
+    (authorization_document_available ?authorization_document - authorization_document)
+    (case_assigned_authorization_document ?reroute_case - reroute_case ?authorization_document - authorization_document)
+    (operational_permit_available ?operational_permit - operational_permit)
+    (case_has_operational_permit ?reroute_case - reroute_case ?operational_permit - operational_permit)
+    (service_provider_available ?service_provider - service_provider)
+    (case_assigned_service_provider ?reroute_case - reroute_case ?service_provider - service_provider)
+    (external_approval_available ?external_approval - external_approval)
+    (case_has_external_approval ?reroute_case - reroute_case ?external_approval - external_approval)
+    (claim_document_available ?claim_document - claim_document)
+    (claim_associated_with_subject ?shipment_segment - shipment_segment ?claim_document - claim_document)
+    (origin_leg_operator_allocated ?origin_leg - origin_leg)
+    (destination_leg_operator_allocated ?destination_leg - destination_leg)
+    (case_finalized ?reroute_case - reroute_case)
+  )
+  (:action detect_and_register_incident
+    :parameters (?shipment_segment - shipment_segment)
+    :precondition
+      (and
+        (not
+          (incident_registered_for_subject ?shipment_segment)
+        )
+        (not
+          (restoration_confirmed_for_subject ?shipment_segment)
+        )
+      )
+    :effect (incident_registered_for_subject ?shipment_segment)
+  )
+  (:action reserve_carrier_tentative
+    :parameters (?shipment_segment - shipment_segment ?carrier_unit - carrier_unit)
+    :precondition
+      (and
+        (incident_registered_for_subject ?shipment_segment)
+        (not
+          (carrier_tentative_assigned ?shipment_segment)
+        )
+        (carrier_available ?carrier_unit)
+      )
+    :effect
+      (and
+        (carrier_tentative_assigned ?shipment_segment)
+        (assigned_carrier_for_subject ?shipment_segment ?carrier_unit)
+        (not
+          (carrier_available ?carrier_unit)
+        )
+      )
+  )
+  (:action reserve_schedule_option_tentative
+    :parameters (?shipment_segment - shipment_segment ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (incident_registered_for_subject ?shipment_segment)
+        (carrier_tentative_assigned ?shipment_segment)
+        (schedule_option_available ?schedule_option)
+      )
+    :effect
+      (and
+        (assigned_schedule_option_for_subject ?shipment_segment ?schedule_option)
+        (not
+          (schedule_option_available ?schedule_option)
+        )
+      )
+  )
+  (:action confirm_schedule_booking
+    :parameters (?shipment_segment - shipment_segment ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (incident_registered_for_subject ?shipment_segment)
+        (carrier_tentative_assigned ?shipment_segment)
+        (assigned_schedule_option_for_subject ?shipment_segment ?schedule_option)
+        (not
+          (rebooking_confirmed_for_subject ?shipment_segment)
+        )
+      )
+    :effect (rebooking_confirmed_for_subject ?shipment_segment)
+  )
+  (:action release_schedule_option
+    :parameters (?shipment_segment - shipment_segment ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (assigned_schedule_option_for_subject ?shipment_segment ?schedule_option)
+      )
+    :effect
+      (and
+        (schedule_option_available ?schedule_option)
+        (not
+          (assigned_schedule_option_for_subject ?shipment_segment ?schedule_option)
+        )
+      )
+  )
+  (:action assign_operator_resource
+    :parameters (?shipment_segment - shipment_segment ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?shipment_segment)
+        (operator_resource_available ?operator_resource)
+      )
+    :effect
+      (and
+        (assigned_operator_resource_for_subject ?shipment_segment ?operator_resource)
+        (not
+          (operator_resource_available ?operator_resource)
+        )
+      )
+  )
+  (:action release_operator_resource
+    :parameters (?shipment_segment - shipment_segment ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (assigned_operator_resource_for_subject ?shipment_segment ?operator_resource)
+      )
+    :effect
+      (and
+        (operator_resource_available ?operator_resource)
+        (not
+          (assigned_operator_resource_for_subject ?shipment_segment ?operator_resource)
+        )
+      )
+  )
+  (:action assign_service_provider
+    :parameters (?reroute_case - reroute_case ?service_provider - service_provider)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (service_provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (case_assigned_service_provider ?reroute_case ?service_provider)
+        (not
+          (service_provider_available ?service_provider)
+        )
+      )
+  )
+  (:action release_service_provider
+    :parameters (?reroute_case - reroute_case ?service_provider - service_provider)
+    :precondition
+      (and
+        (case_assigned_service_provider ?reroute_case ?service_provider)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider)
+        (not
+          (case_assigned_service_provider ?reroute_case ?service_provider)
+        )
+      )
+  )
+  (:action assign_external_approval
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (external_approval_available ?external_approval)
+      )
+    :effect
+      (and
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action release_external_approval
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (case_has_external_approval ?reroute_case ?external_approval)
+      )
+    :effect
+      (and
+        (external_approval_available ?external_approval)
+        (not
+          (case_has_external_approval ?reroute_case ?external_approval)
+        )
+      )
+  )
+  (:action evaluate_upstream_option
+    :parameters (?origin_leg - origin_leg ?upstream_route_option - upstream_route_option ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?origin_leg)
+        (assigned_schedule_option_for_subject ?origin_leg ?schedule_option)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (not
+          (upstream_option_marked ?upstream_route_option)
+        )
+        (not
+          (upstream_option_confirmed ?upstream_route_option)
+        )
+      )
+    :effect (upstream_option_marked ?upstream_route_option)
+  )
+  (:action confirm_upstream_option_with_operator
+    :parameters (?origin_leg - origin_leg ?upstream_route_option - upstream_route_option ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?origin_leg)
+        (assigned_operator_resource_for_subject ?origin_leg ?operator_resource)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (upstream_option_marked ?upstream_route_option)
+        (not
+          (origin_leg_operator_allocated ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+      )
+  )
+  (:action assign_alternative_service_to_origin_option
+    :parameters (?origin_leg - origin_leg ?upstream_route_option - upstream_route_option ?alternative_service - alternative_service)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?origin_leg)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (alternative_service_available ?alternative_service)
+        (not
+          (origin_leg_operator_allocated ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (upstream_option_confirmed ?upstream_route_option)
+        (origin_leg_operator_allocated ?origin_leg)
+        (assigned_alternative_service_origin ?origin_leg ?alternative_service)
+        (not
+          (alternative_service_available ?alternative_service)
+        )
+      )
+  )
+  (:action finalize_upstream_option_selection
+    :parameters (?origin_leg - origin_leg ?upstream_route_option - upstream_route_option ?schedule_option - schedule_option ?alternative_service - alternative_service)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?origin_leg)
+        (assigned_schedule_option_for_subject ?origin_leg ?schedule_option)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (upstream_option_confirmed ?upstream_route_option)
+        (assigned_alternative_service_origin ?origin_leg ?alternative_service)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (upstream_option_marked ?upstream_route_option)
+        (origin_leg_ready ?origin_leg)
+        (alternative_service_available ?alternative_service)
+        (not
+          (assigned_alternative_service_origin ?origin_leg ?alternative_service)
+        )
+      )
+  )
+  (:action evaluate_downstream_option
+    :parameters (?destination_leg - destination_leg ?downstream_route_option - downstream_route_option ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?destination_leg)
+        (assigned_schedule_option_for_subject ?destination_leg ?schedule_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (not
+          (downstream_option_marked ?downstream_route_option)
+        )
+        (not
+          (downstream_option_confirmed ?downstream_route_option)
+        )
+      )
+    :effect (downstream_option_marked ?downstream_route_option)
+  )
+  (:action confirm_downstream_option_with_operator
+    :parameters (?destination_leg - destination_leg ?downstream_route_option - downstream_route_option ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?destination_leg)
+        (assigned_operator_resource_for_subject ?destination_leg ?operator_resource)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (downstream_option_marked ?downstream_route_option)
+        (not
+          (destination_leg_operator_allocated ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_operator_allocated ?destination_leg)
+        (destination_leg_ready ?destination_leg)
+      )
+  )
+  (:action assign_alternative_service_to_destination_option
+    :parameters (?destination_leg - destination_leg ?downstream_route_option - downstream_route_option ?alternative_service - alternative_service)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?destination_leg)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (alternative_service_available ?alternative_service)
+        (not
+          (destination_leg_operator_allocated ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (downstream_option_confirmed ?downstream_route_option)
+        (destination_leg_operator_allocated ?destination_leg)
+        (assigned_alternative_service_destination ?destination_leg ?alternative_service)
+        (not
+          (alternative_service_available ?alternative_service)
+        )
+      )
+  )
+  (:action finalize_downstream_option_selection
+    :parameters (?destination_leg - destination_leg ?downstream_route_option - downstream_route_option ?schedule_option - schedule_option ?alternative_service - alternative_service)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?destination_leg)
+        (assigned_schedule_option_for_subject ?destination_leg ?schedule_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (downstream_option_confirmed ?downstream_route_option)
+        (assigned_alternative_service_destination ?destination_leg ?alternative_service)
+        (not
+          (destination_leg_ready ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (downstream_option_marked ?downstream_route_option)
+        (destination_leg_ready ?destination_leg)
+        (alternative_service_available ?alternative_service)
+        (not
+          (assigned_alternative_service_destination ?destination_leg ?alternative_service)
+        )
+      )
+  )
+  (:action assemble_contingency_itinerary
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?upstream_route_option - upstream_route_option ?downstream_route_option - downstream_route_option ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (destination_leg_operator_allocated ?destination_leg)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (upstream_option_marked ?upstream_route_option)
+        (downstream_option_marked ?downstream_route_option)
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (contingency_itinerary_unallocated ?contingency_itinerary)
+      )
+    :effect
+      (and
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_includes_upstream_option ?contingency_itinerary ?upstream_route_option)
+        (itinerary_includes_downstream_option ?contingency_itinerary ?downstream_route_option)
+        (not
+          (contingency_itinerary_unallocated ?contingency_itinerary)
+        )
+      )
+  )
+  (:action assemble_itinerary_with_upstream_alt
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?upstream_route_option - upstream_route_option ?downstream_route_option - downstream_route_option ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (destination_leg_operator_allocated ?destination_leg)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (upstream_option_confirmed ?upstream_route_option)
+        (downstream_option_marked ?downstream_route_option)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (destination_leg_ready ?destination_leg)
+        (contingency_itinerary_unallocated ?contingency_itinerary)
+      )
+    :effect
+      (and
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_includes_upstream_option ?contingency_itinerary ?upstream_route_option)
+        (itinerary_includes_downstream_option ?contingency_itinerary ?downstream_route_option)
+        (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        (not
+          (contingency_itinerary_unallocated ?contingency_itinerary)
+        )
+      )
+  )
+  (:action assemble_itinerary_with_downstream_alt
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?upstream_route_option - upstream_route_option ?downstream_route_option - downstream_route_option ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (destination_leg_operator_allocated ?destination_leg)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (upstream_option_marked ?upstream_route_option)
+        (downstream_option_confirmed ?downstream_route_option)
+        (origin_leg_ready ?origin_leg)
+        (not
+          (destination_leg_ready ?destination_leg)
+        )
+        (contingency_itinerary_unallocated ?contingency_itinerary)
+      )
+    :effect
+      (and
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_includes_upstream_option ?contingency_itinerary ?upstream_route_option)
+        (itinerary_includes_downstream_option ?contingency_itinerary ?downstream_route_option)
+        (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        (not
+          (contingency_itinerary_unallocated ?contingency_itinerary)
+        )
+      )
+  )
+  (:action assemble_itinerary_with_both_alts
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?upstream_route_option - upstream_route_option ?downstream_route_option - downstream_route_option ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (destination_leg_operator_allocated ?destination_leg)
+        (origin_leg_upstream_option_link ?origin_leg ?upstream_route_option)
+        (destination_leg_downstream_option_link ?destination_leg ?downstream_route_option)
+        (upstream_option_confirmed ?upstream_route_option)
+        (downstream_option_confirmed ?downstream_route_option)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (not
+          (destination_leg_ready ?destination_leg)
+        )
+        (contingency_itinerary_unallocated ?contingency_itinerary)
+      )
+    :effect
+      (and
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_includes_upstream_option ?contingency_itinerary ?upstream_route_option)
+        (itinerary_includes_downstream_option ?contingency_itinerary ?downstream_route_option)
+        (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        (not
+          (contingency_itinerary_unallocated ?contingency_itinerary)
+        )
+      )
+  )
+  (:action validate_and_lock_itinerary_manifest
+    :parameters (?contingency_itinerary - contingency_itinerary ?origin_leg - origin_leg ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (contingency_itinerary_created ?contingency_itinerary)
+        (origin_leg_operator_allocated ?origin_leg)
+        (assigned_schedule_option_for_subject ?origin_leg ?schedule_option)
+        (not
+          (itinerary_manifest_locked ?contingency_itinerary)
+        )
+      )
+    :effect (itinerary_manifest_locked ?contingency_itinerary)
+  )
+  (:action manifest_freight_unit_to_itinerary
+    :parameters (?reroute_case - reroute_case ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (case_linked_itinerary ?reroute_case ?contingency_itinerary)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_available ?freight_unit)
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_manifest_locked ?contingency_itinerary)
+        (not
+          (freight_unit_locked ?freight_unit)
+        )
+      )
+    :effect
+      (and
+        (freight_unit_locked ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (not
+          (freight_unit_available ?freight_unit)
+        )
+      )
+  )
+  (:action authorize_case_for_execution_with_freight
+    :parameters (?reroute_case - reroute_case ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_locked ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (assigned_schedule_option_for_subject ?reroute_case ?schedule_option)
+        (not
+          (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        )
+        (not
+          (case_authorization_applied ?reroute_case)
+        )
+      )
+    :effect (case_authorization_applied ?reroute_case)
+  )
+  (:action attach_authorization_document
+    :parameters (?reroute_case - reroute_case ?authorization_document - authorization_document)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (authorization_document_available ?authorization_document)
+        (not
+          (case_has_authorization_document ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_authorization_document ?reroute_case)
+        (case_assigned_authorization_document ?reroute_case ?authorization_document)
+        (not
+          (authorization_document_available ?authorization_document)
+        )
+      )
+  )
+  (:action apply_authorization_to_case_itinerary
+    :parameters (?reroute_case - reroute_case ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary ?schedule_option - schedule_option ?authorization_document - authorization_document)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_locked ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (assigned_schedule_option_for_subject ?reroute_case ?schedule_option)
+        (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        (case_has_authorization_document ?reroute_case)
+        (case_assigned_authorization_document ?reroute_case ?authorization_document)
+        (not
+          (case_authorization_applied ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_authorization_applied ?reroute_case)
+        (case_authorization_validated ?reroute_case)
+      )
+  )
+  (:action engage_service_provider_for_execution
+    :parameters (?reroute_case - reroute_case ?service_provider - service_provider ?operator_resource - operator_resource ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_authorization_applied ?reroute_case)
+        (case_assigned_service_provider ?reroute_case ?service_provider)
+        (assigned_operator_resource_for_subject ?reroute_case ?operator_resource)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (not
+          (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        )
+        (not
+          (case_service_provider_engaged ?reroute_case)
+        )
+      )
+    :effect (case_service_provider_engaged ?reroute_case)
+  )
+  (:action engage_service_provider_with_downstream_auth
+    :parameters (?reroute_case - reroute_case ?service_provider - service_provider ?operator_resource - operator_resource ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_authorization_applied ?reroute_case)
+        (case_assigned_service_provider ?reroute_case ?service_provider)
+        (assigned_operator_resource_for_subject ?reroute_case ?operator_resource)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        (not
+          (case_service_provider_engaged ?reroute_case)
+        )
+      )
+    :effect (case_service_provider_engaged ?reroute_case)
+  )
+  (:action obtain_external_approval_for_case
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_service_provider_engaged ?reroute_case)
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (not
+          (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        )
+        (not
+          (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        )
+        (not
+          (case_external_approval_obtained ?reroute_case)
+        )
+      )
+    :effect (case_external_approval_obtained ?reroute_case)
+  )
+  (:action obtain_approval_and_record_permit
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_service_provider_engaged ?reroute_case)
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        (not
+          (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        )
+        (not
+          (case_external_approval_obtained ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_operational_permit_applied ?reroute_case)
+      )
+  )
+  (:action obtain_approval_and_record_permit_variant
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_service_provider_engaged ?reroute_case)
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (not
+          (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        )
+        (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        (not
+          (case_external_approval_obtained ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_operational_permit_applied ?reroute_case)
+      )
+  )
+  (:action obtain_approval_and_record_permit_both
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval ?freight_unit - freight_unit ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (case_service_provider_engaged ?reroute_case)
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (case_has_freight_unit ?reroute_case ?freight_unit)
+        (freight_unit_assigned_to_itinerary ?freight_unit ?contingency_itinerary)
+        (itinerary_requires_upstream_authorization ?contingency_itinerary)
+        (itinerary_requires_downstream_authorization ?contingency_itinerary)
+        (not
+          (case_external_approval_obtained ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_operational_permit_applied ?reroute_case)
+      )
+  )
+  (:action finalize_case_for_execution
+    :parameters (?reroute_case - reroute_case)
+    :precondition
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (not
+          (case_operational_permit_applied ?reroute_case)
+        )
+        (not
+          (case_finalized ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?reroute_case)
+        (execution_confirmed_for_subject ?reroute_case)
+      )
+  )
+  (:action apply_operational_permit_to_case
+    :parameters (?reroute_case - reroute_case ?operational_permit - operational_permit)
+    :precondition
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_operational_permit_applied ?reroute_case)
+        (operational_permit_available ?operational_permit)
+      )
+    :effect
+      (and
+        (case_has_operational_permit ?reroute_case ?operational_permit)
+        (not
+          (operational_permit_available ?operational_permit)
+        )
+      )
+  )
+  (:action mark_case_execution_ready
+    :parameters (?reroute_case - reroute_case ?origin_leg - origin_leg ?destination_leg - destination_leg ?schedule_option - schedule_option ?operational_permit - operational_permit)
+    :precondition
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_operational_permit_applied ?reroute_case)
+        (case_has_operational_permit ?reroute_case ?operational_permit)
+        (case_origin_leg_link ?reroute_case ?origin_leg)
+        (case_destination_leg_link ?reroute_case ?destination_leg)
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (assigned_schedule_option_for_subject ?reroute_case ?schedule_option)
+        (not
+          (case_execution_ready ?reroute_case)
+        )
+      )
+    :effect (case_execution_ready ?reroute_case)
+  )
+  (:action finalize_case_execution_after_readiness
+    :parameters (?reroute_case - reroute_case)
+    :precondition
+      (and
+        (case_external_approval_obtained ?reroute_case)
+        (case_execution_ready ?reroute_case)
+        (not
+          (case_finalized ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?reroute_case)
+        (execution_confirmed_for_subject ?reroute_case)
+      )
+  )
+  (:action engage_escalation_contact
+    :parameters (?reroute_case - reroute_case ?escalation_contact - escalation_contact ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (rebooking_confirmed_for_subject ?reroute_case)
+        (assigned_schedule_option_for_subject ?reroute_case ?schedule_option)
+        (escalation_contact_available ?escalation_contact)
+        (case_has_escalation_contact ?reroute_case ?escalation_contact)
+        (not
+          (case_escalation_engaged ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_escalation_engaged ?reroute_case)
+        (not
+          (escalation_contact_available ?escalation_contact)
+        )
+      )
+  )
+  (:action initiate_operator_task
+    :parameters (?reroute_case - reroute_case ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (case_escalation_engaged ?reroute_case)
+        (assigned_operator_resource_for_subject ?reroute_case ?operator_resource)
+        (not
+          (case_operator_task_initiated ?reroute_case)
+        )
+      )
+    :effect (case_operator_task_initiated ?reroute_case)
+  )
+  (:action complete_operator_task
+    :parameters (?reroute_case - reroute_case ?external_approval - external_approval)
+    :precondition
+      (and
+        (case_operator_task_initiated ?reroute_case)
+        (case_has_external_approval ?reroute_case ?external_approval)
+        (not
+          (case_operator_task_completed ?reroute_case)
+        )
+      )
+    :effect (case_operator_task_completed ?reroute_case)
+  )
+  (:action finalize_case_after_operator_task
+    :parameters (?reroute_case - reroute_case)
+    :precondition
+      (and
+        (case_operator_task_completed ?reroute_case)
+        (not
+          (case_finalized ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?reroute_case)
+        (execution_confirmed_for_subject ?reroute_case)
+      )
+  )
+  (:action execute_origin_reroute
+    :parameters (?origin_leg - origin_leg ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (origin_leg_operator_allocated ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_manifest_locked ?contingency_itinerary)
+        (not
+          (execution_confirmed_for_subject ?origin_leg)
+        )
+      )
+    :effect (execution_confirmed_for_subject ?origin_leg)
+  )
+  (:action execute_destination_reroute
+    :parameters (?destination_leg - destination_leg ?contingency_itinerary - contingency_itinerary)
+    :precondition
+      (and
+        (destination_leg_operator_allocated ?destination_leg)
+        (destination_leg_ready ?destination_leg)
+        (contingency_itinerary_created ?contingency_itinerary)
+        (itinerary_manifest_locked ?contingency_itinerary)
+        (not
+          (execution_confirmed_for_subject ?destination_leg)
+        )
+      )
+    :effect (execution_confirmed_for_subject ?destination_leg)
+  )
+  (:action capture_claim_document_for_segment
+    :parameters (?shipment_segment - shipment_segment ?claim_document - claim_document ?schedule_option - schedule_option)
+    :precondition
+      (and
+        (execution_confirmed_for_subject ?shipment_segment)
+        (assigned_schedule_option_for_subject ?shipment_segment ?schedule_option)
+        (claim_document_available ?claim_document)
+        (not
+          (claim_recorded_for_subject ?shipment_segment)
+        )
+      )
+    :effect
+      (and
+        (claim_recorded_for_subject ?shipment_segment)
+        (claim_associated_with_subject ?shipment_segment ?claim_document)
+        (not
+          (claim_document_available ?claim_document)
+        )
+      )
+  )
+  (:action process_claim_and_restore_origin_leg
+    :parameters (?origin_leg - origin_leg ?carrier_unit - carrier_unit ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_recorded_for_subject ?origin_leg)
+        (assigned_carrier_for_subject ?origin_leg ?carrier_unit)
+        (claim_associated_with_subject ?origin_leg ?claim_document)
+        (not
+          (restoration_confirmed_for_subject ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (restoration_confirmed_for_subject ?origin_leg)
+        (carrier_available ?carrier_unit)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action process_claim_and_restore_destination_leg
+    :parameters (?destination_leg - destination_leg ?carrier_unit - carrier_unit ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_recorded_for_subject ?destination_leg)
+        (assigned_carrier_for_subject ?destination_leg ?carrier_unit)
+        (claim_associated_with_subject ?destination_leg ?claim_document)
+        (not
+          (restoration_confirmed_for_subject ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (restoration_confirmed_for_subject ?destination_leg)
+        (carrier_available ?carrier_unit)
+        (claim_document_available ?claim_document)
+      )
+  )
+  (:action process_claim_and_restore_case
+    :parameters (?reroute_case - reroute_case ?carrier_unit - carrier_unit ?claim_document - claim_document)
+    :precondition
+      (and
+        (claim_recorded_for_subject ?reroute_case)
+        (assigned_carrier_for_subject ?reroute_case ?carrier_unit)
+        (claim_associated_with_subject ?reroute_case ?claim_document)
+        (not
+          (restoration_confirmed_for_subject ?reroute_case)
+        )
+      )
+    :effect
+      (and
+        (restoration_confirmed_for_subject ?reroute_case)
+        (carrier_available ?carrier_unit)
+        (claim_document_available ?claim_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem delayed_linehaul_case_instance)
+  (:domain delayed_linehaul_rerouting)
+  (:objects origin_leg_1 - origin_leg destination_leg_1 - destination_leg reroute_case_1 - reroute_case reroute_case_2 - reroute_case carrier_unit_1 - carrier_unit carrier_unit_2 - carrier_unit carrier_unit_3 - carrier_unit schedule_option_1 - schedule_option operator_resource_1 - operator_resource alternative_service_1 - alternative_service upstream_route_option_1 - upstream_route_option downstream_route_option_1 - downstream_route_option contingency_itinerary_1 - contingency_itinerary freight_unit_1 - freight_unit freight_unit_2 - freight_unit authorization_document_1 - authorization_document authorization_document_2 - authorization_document operational_permit_1 - operational_permit operational_permit_2 - operational_permit claim_document_1 - claim_document service_provider_1 - service_provider escalation_contact_1 - escalation_contact escalation_contact_2 - escalation_contact external_approval_1 - external_approval)
+  (:init
+    (carrier_available carrier_unit_1)
+    (carrier_available carrier_unit_2)
+    (carrier_available carrier_unit_3)
+    (schedule_option_available schedule_option_1)
+    (operator_resource_available operator_resource_1)
+    (alternative_service_available alternative_service_1)
+    (origin_leg_upstream_option_link origin_leg_1 upstream_route_option_1)
+    (destination_leg_downstream_option_link destination_leg_1 downstream_route_option_1)
+    (contingency_itinerary_unallocated contingency_itinerary_1)
+    (freight_unit_available freight_unit_1)
+    (freight_unit_available freight_unit_2)
+    (case_origin_leg_link reroute_case_1 origin_leg_1)
+    (case_origin_leg_link reroute_case_2 origin_leg_1)
+    (case_destination_leg_link reroute_case_1 destination_leg_1)
+    (case_destination_leg_link reroute_case_2 destination_leg_1)
+    (case_linked_itinerary reroute_case_1 contingency_itinerary_1)
+    (case_linked_itinerary reroute_case_2 contingency_itinerary_1)
+    (case_has_freight_unit reroute_case_1 freight_unit_1)
+    (case_has_freight_unit reroute_case_2 freight_unit_2)
+    (authorization_document_available authorization_document_1)
+    (authorization_document_available authorization_document_2)
+    (operational_permit_available operational_permit_1)
+    (operational_permit_available operational_permit_2)
+    (claim_document_available claim_document_1)
+    (service_provider_available service_provider_1)
+    (escalation_contact_available escalation_contact_1)
+    (case_has_escalation_contact reroute_case_1 escalation_contact_1)
+    (case_has_escalation_contact reroute_case_2 escalation_contact_2)
+    (external_approval_available external_approval_1)
+  )
+  (:goal
+    (and
+      (restoration_confirmed_for_subject origin_leg_1)
+      (restoration_confirmed_for_subject destination_leg_1)
+      (restoration_confirmed_for_subject reroute_case_1)
+      (restoration_confirmed_for_subject reroute_case_2)
+    )
+  )
+)

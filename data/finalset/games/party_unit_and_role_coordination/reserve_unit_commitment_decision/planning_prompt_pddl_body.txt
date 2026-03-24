@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain reserve_unit_commitment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types token_type - object provision_type - object package_anchor_type - object slot_container - object unit_slot - slot_container reserve_token - token_type role_profile - token_type actor - token_type tactical_modifier - token_type augmentation_slot - token_type commitment_marker - token_type specialization_token - token_type priority_token - token_type consumable - provision_type supply_item - provision_type strategy_token - provision_type coverage_anchor_a - package_anchor_type coverage_anchor_b - package_anchor_type commitment_package - package_anchor_type frontline_slot - unit_slot coordinator_slot - unit_slot primary_subunit - frontline_slot secondary_subunit - frontline_slot coordinator - coordinator_slot)
+  (:predicates
+    (candidate_mark ?unit_slot - unit_slot)
+    (candidate_confirmed ?unit_slot - unit_slot)
+    (unit_prepared ?unit_slot - unit_slot)
+    (unit_committed ?unit_slot - unit_slot)
+    (unit_ready ?unit_slot - unit_slot)
+    (unit_finalized ?unit_slot - unit_slot)
+    (reserve_available ?reserve_token - reserve_token)
+    (reserve_assigned ?unit_slot - unit_slot ?reserve_token - reserve_token)
+    (role_available ?role_profile - role_profile)
+    (role_assigned ?unit_slot - unit_slot ?role_profile - role_profile)
+    (actor_available ?actor - actor)
+    (actor_assigned ?unit_slot - unit_slot ?actor - actor)
+    (consumable_available ?consumable - consumable)
+    (consumable_attached_primary ?primary_subunit - primary_subunit ?consumable - consumable)
+    (consumable_attached_secondary ?secondary_subunit - secondary_subunit ?consumable - consumable)
+    (subunit_a_anchor_binding ?primary_subunit - primary_subunit ?coverage_anchor_a - coverage_anchor_a)
+    (anchor_a_claimed ?coverage_anchor_a - coverage_anchor_a)
+    (anchor_a_locked ?coverage_anchor_a - coverage_anchor_a)
+    (subunit_a_engaged ?primary_subunit - primary_subunit)
+    (subunit_b_anchor_binding ?secondary_subunit - secondary_subunit ?coverage_anchor_b - coverage_anchor_b)
+    (anchor_b_claimed ?coverage_anchor_b - coverage_anchor_b)
+    (anchor_b_locked ?coverage_anchor_b - coverage_anchor_b)
+    (subunit_b_engaged ?secondary_subunit - secondary_subunit)
+    (commitment_package_candidate ?commitment_package - commitment_package)
+    (commitment_package_assembled ?commitment_package - commitment_package)
+    (commitment_package_anchor_a_bound ?commitment_package - commitment_package ?coverage_anchor_a - coverage_anchor_a)
+    (commitment_package_anchor_b_bound ?commitment_package - commitment_package ?coverage_anchor_b - coverage_anchor_b)
+    (commitment_package_ready_phase1 ?commitment_package - commitment_package)
+    (commitment_package_ready_phase2 ?commitment_package - commitment_package)
+    (commitment_package_enacted ?commitment_package - commitment_package)
+    (coordinator_assigned_primary ?coordinator - coordinator ?primary_subunit - primary_subunit)
+    (coordinator_assigned_secondary ?coordinator - coordinator ?secondary_subunit - secondary_subunit)
+    (coordinator_commitment_package_link ?coordinator - coordinator ?commitment_package - commitment_package)
+    (supply_available ?supply_item - supply_item)
+    (coordinator_has_supply ?coordinator - coordinator ?supply_item - supply_item)
+    (supply_bound ?supply_item - supply_item)
+    (supply_attached_to_commitment_package ?supply_item - supply_item ?commitment_package - commitment_package)
+    (coordinator_flag_staged ?coordinator - coordinator)
+    (coordinator_flag_prepared ?coordinator - coordinator)
+    (coordinator_flag_finalized ?coordinator - coordinator)
+    (has_tactical_modifier ?coordinator - coordinator)
+    (coordinator_modifier_registered ?coordinator - coordinator)
+    (coordinator_augmented ?coordinator - coordinator)
+    (constraints_validated ?coordinator - coordinator)
+    (strategy_available ?strategy_token - strategy_token)
+    (strategy_assigned ?coordinator - coordinator ?strategy_token - strategy_token)
+    (strategy_applied ?coordinator - coordinator)
+    (strategy_staged ?coordinator - coordinator)
+    (strategy_finalized ?coordinator - coordinator)
+    (modifier_available ?tactical_modifier - tactical_modifier)
+    (coordinator_modifier_attached ?coordinator - coordinator ?tactical_modifier - tactical_modifier)
+    (augmentation_available ?augmentation_slot - augmentation_slot)
+    (coordinator_augmentation_attached ?coordinator - coordinator ?augmentation_slot - augmentation_slot)
+    (specialization_available ?specialization_token - specialization_token)
+    (specialization_assigned ?coordinator - coordinator ?specialization_token - specialization_token)
+    (priority_available ?priority_token - priority_token)
+    (priority_assigned ?coordinator - coordinator ?priority_token - priority_token)
+    (commitment_marker_available ?commitment_marker - commitment_marker)
+    (commitment_marker_attached ?unit_slot - unit_slot ?commitment_marker - commitment_marker)
+    (primary_ready ?primary_subunit - primary_subunit)
+    (secondary_ready ?secondary_subunit - secondary_subunit)
+    (unit_global_ready ?coordinator - coordinator)
+  )
+  (:action mark_candidate
+    :parameters (?unit_slot - unit_slot)
+    :precondition
+      (and
+        (not
+          (candidate_mark ?unit_slot)
+        )
+        (not
+          (unit_committed ?unit_slot)
+        )
+      )
+    :effect (candidate_mark ?unit_slot)
+  )
+  (:action assign_reserve_token
+    :parameters (?unit_slot - unit_slot ?reserve_token - reserve_token)
+    :precondition
+      (and
+        (candidate_mark ?unit_slot)
+        (not
+          (unit_prepared ?unit_slot)
+        )
+        (reserve_available ?reserve_token)
+      )
+    :effect
+      (and
+        (unit_prepared ?unit_slot)
+        (reserve_assigned ?unit_slot ?reserve_token)
+        (not
+          (reserve_available ?reserve_token)
+        )
+      )
+  )
+  (:action assign_role_profile
+    :parameters (?unit_slot - unit_slot ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_mark ?unit_slot)
+        (unit_prepared ?unit_slot)
+        (role_available ?role_profile)
+      )
+    :effect
+      (and
+        (role_assigned ?unit_slot ?role_profile)
+        (not
+          (role_available ?role_profile)
+        )
+      )
+  )
+  (:action confirm_candidate
+    :parameters (?unit_slot - unit_slot ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_mark ?unit_slot)
+        (unit_prepared ?unit_slot)
+        (role_assigned ?unit_slot ?role_profile)
+        (not
+          (candidate_confirmed ?unit_slot)
+        )
+      )
+    :effect (candidate_confirmed ?unit_slot)
+  )
+  (:action release_role_profile
+    :parameters (?unit_slot - unit_slot ?role_profile - role_profile)
+    :precondition
+      (and
+        (role_assigned ?unit_slot ?role_profile)
+      )
+    :effect
+      (and
+        (role_available ?role_profile)
+        (not
+          (role_assigned ?unit_slot ?role_profile)
+        )
+      )
+  )
+  (:action assign_actor
+    :parameters (?unit_slot - unit_slot ?actor - actor)
+    :precondition
+      (and
+        (candidate_confirmed ?unit_slot)
+        (actor_available ?actor)
+      )
+    :effect
+      (and
+        (actor_assigned ?unit_slot ?actor)
+        (not
+          (actor_available ?actor)
+        )
+      )
+  )
+  (:action release_actor
+    :parameters (?unit_slot - unit_slot ?actor - actor)
+    :precondition
+      (and
+        (actor_assigned ?unit_slot ?actor)
+      )
+    :effect
+      (and
+        (actor_available ?actor)
+        (not
+          (actor_assigned ?unit_slot ?actor)
+        )
+      )
+  )
+  (:action assign_specialization
+    :parameters (?coordinator - coordinator ?specialization_token - specialization_token)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (specialization_available ?specialization_token)
+      )
+    :effect
+      (and
+        (specialization_assigned ?coordinator ?specialization_token)
+        (not
+          (specialization_available ?specialization_token)
+        )
+      )
+  )
+  (:action release_specialization
+    :parameters (?coordinator - coordinator ?specialization_token - specialization_token)
+    :precondition
+      (and
+        (specialization_assigned ?coordinator ?specialization_token)
+      )
+    :effect
+      (and
+        (specialization_available ?specialization_token)
+        (not
+          (specialization_assigned ?coordinator ?specialization_token)
+        )
+      )
+  )
+  (:action assign_priority
+    :parameters (?coordinator - coordinator ?priority_token - priority_token)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (priority_available ?priority_token)
+      )
+    :effect
+      (and
+        (priority_assigned ?coordinator ?priority_token)
+        (not
+          (priority_available ?priority_token)
+        )
+      )
+  )
+  (:action release_priority
+    :parameters (?coordinator - coordinator ?priority_token - priority_token)
+    :precondition
+      (and
+        (priority_assigned ?coordinator ?priority_token)
+      )
+    :effect
+      (and
+        (priority_available ?priority_token)
+        (not
+          (priority_assigned ?coordinator ?priority_token)
+        )
+      )
+  )
+  (:action claim_anchor_a
+    :parameters (?primary_subunit - primary_subunit ?coverage_anchor_a - coverage_anchor_a ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_confirmed ?primary_subunit)
+        (role_assigned ?primary_subunit ?role_profile)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (not
+          (anchor_a_claimed ?coverage_anchor_a)
+        )
+        (not
+          (anchor_a_locked ?coverage_anchor_a)
+        )
+      )
+    :effect (anchor_a_claimed ?coverage_anchor_a)
+  )
+  (:action activate_primary_anchor
+    :parameters (?primary_subunit - primary_subunit ?coverage_anchor_a - coverage_anchor_a ?actor - actor)
+    :precondition
+      (and
+        (candidate_confirmed ?primary_subunit)
+        (actor_assigned ?primary_subunit ?actor)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (anchor_a_claimed ?coverage_anchor_a)
+        (not
+          (primary_ready ?primary_subunit)
+        )
+      )
+    :effect
+      (and
+        (primary_ready ?primary_subunit)
+        (subunit_a_engaged ?primary_subunit)
+      )
+  )
+  (:action allocate_consumable_primary
+    :parameters (?primary_subunit - primary_subunit ?coverage_anchor_a - coverage_anchor_a ?consumable - consumable)
+    :precondition
+      (and
+        (candidate_confirmed ?primary_subunit)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (consumable_available ?consumable)
+        (not
+          (primary_ready ?primary_subunit)
+        )
+      )
+    :effect
+      (and
+        (anchor_a_locked ?coverage_anchor_a)
+        (primary_ready ?primary_subunit)
+        (consumable_attached_primary ?primary_subunit ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action engage_primary_anchor
+    :parameters (?primary_subunit - primary_subunit ?coverage_anchor_a - coverage_anchor_a ?role_profile - role_profile ?consumable - consumable)
+    :precondition
+      (and
+        (candidate_confirmed ?primary_subunit)
+        (role_assigned ?primary_subunit ?role_profile)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (anchor_a_locked ?coverage_anchor_a)
+        (consumable_attached_primary ?primary_subunit ?consumable)
+        (not
+          (subunit_a_engaged ?primary_subunit)
+        )
+      )
+    :effect
+      (and
+        (anchor_a_claimed ?coverage_anchor_a)
+        (subunit_a_engaged ?primary_subunit)
+        (consumable_available ?consumable)
+        (not
+          (consumable_attached_primary ?primary_subunit ?consumable)
+        )
+      )
+  )
+  (:action claim_anchor_b
+    :parameters (?secondary_subunit - secondary_subunit ?coverage_anchor_b - coverage_anchor_b ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_confirmed ?secondary_subunit)
+        (role_assigned ?secondary_subunit ?role_profile)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (not
+          (anchor_b_claimed ?coverage_anchor_b)
+        )
+        (not
+          (anchor_b_locked ?coverage_anchor_b)
+        )
+      )
+    :effect (anchor_b_claimed ?coverage_anchor_b)
+  )
+  (:action activate_secondary_anchor
+    :parameters (?secondary_subunit - secondary_subunit ?coverage_anchor_b - coverage_anchor_b ?actor - actor)
+    :precondition
+      (and
+        (candidate_confirmed ?secondary_subunit)
+        (actor_assigned ?secondary_subunit ?actor)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_b_claimed ?coverage_anchor_b)
+        (not
+          (secondary_ready ?secondary_subunit)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready ?secondary_subunit)
+        (subunit_b_engaged ?secondary_subunit)
+      )
+  )
+  (:action allocate_consumable_secondary
+    :parameters (?secondary_subunit - secondary_subunit ?coverage_anchor_b - coverage_anchor_b ?consumable - consumable)
+    :precondition
+      (and
+        (candidate_confirmed ?secondary_subunit)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (consumable_available ?consumable)
+        (not
+          (secondary_ready ?secondary_subunit)
+        )
+      )
+    :effect
+      (and
+        (anchor_b_locked ?coverage_anchor_b)
+        (secondary_ready ?secondary_subunit)
+        (consumable_attached_secondary ?secondary_subunit ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action engage_secondary_anchor
+    :parameters (?secondary_subunit - secondary_subunit ?coverage_anchor_b - coverage_anchor_b ?role_profile - role_profile ?consumable - consumable)
+    :precondition
+      (and
+        (candidate_confirmed ?secondary_subunit)
+        (role_assigned ?secondary_subunit ?role_profile)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_b_locked ?coverage_anchor_b)
+        (consumable_attached_secondary ?secondary_subunit ?consumable)
+        (not
+          (subunit_b_engaged ?secondary_subunit)
+        )
+      )
+    :effect
+      (and
+        (anchor_b_claimed ?coverage_anchor_b)
+        (subunit_b_engaged ?secondary_subunit)
+        (consumable_available ?consumable)
+        (not
+          (consumable_attached_secondary ?secondary_subunit ?consumable)
+        )
+      )
+  )
+  (:action assemble_package_basic
+    :parameters (?primary_subunit - primary_subunit ?secondary_subunit - secondary_subunit ?coverage_anchor_a - coverage_anchor_a ?coverage_anchor_b - coverage_anchor_b ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (primary_ready ?primary_subunit)
+        (secondary_ready ?secondary_subunit)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_a_claimed ?coverage_anchor_a)
+        (anchor_b_claimed ?coverage_anchor_b)
+        (subunit_a_engaged ?primary_subunit)
+        (subunit_b_engaged ?secondary_subunit)
+        (commitment_package_candidate ?commitment_package)
+      )
+    :effect
+      (and
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_anchor_a_bound ?commitment_package ?coverage_anchor_a)
+        (commitment_package_anchor_b_bound ?commitment_package ?coverage_anchor_b)
+        (not
+          (commitment_package_candidate ?commitment_package)
+        )
+      )
+  )
+  (:action assemble_package_stage1
+    :parameters (?primary_subunit - primary_subunit ?secondary_subunit - secondary_subunit ?coverage_anchor_a - coverage_anchor_a ?coverage_anchor_b - coverage_anchor_b ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (primary_ready ?primary_subunit)
+        (secondary_ready ?secondary_subunit)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_a_locked ?coverage_anchor_a)
+        (anchor_b_claimed ?coverage_anchor_b)
+        (not
+          (subunit_a_engaged ?primary_subunit)
+        )
+        (subunit_b_engaged ?secondary_subunit)
+        (commitment_package_candidate ?commitment_package)
+      )
+    :effect
+      (and
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_anchor_a_bound ?commitment_package ?coverage_anchor_a)
+        (commitment_package_anchor_b_bound ?commitment_package ?coverage_anchor_b)
+        (commitment_package_ready_phase1 ?commitment_package)
+        (not
+          (commitment_package_candidate ?commitment_package)
+        )
+      )
+  )
+  (:action assemble_package_stage2
+    :parameters (?primary_subunit - primary_subunit ?secondary_subunit - secondary_subunit ?coverage_anchor_a - coverage_anchor_a ?coverage_anchor_b - coverage_anchor_b ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (primary_ready ?primary_subunit)
+        (secondary_ready ?secondary_subunit)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_a_claimed ?coverage_anchor_a)
+        (anchor_b_locked ?coverage_anchor_b)
+        (subunit_a_engaged ?primary_subunit)
+        (not
+          (subunit_b_engaged ?secondary_subunit)
+        )
+        (commitment_package_candidate ?commitment_package)
+      )
+    :effect
+      (and
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_anchor_a_bound ?commitment_package ?coverage_anchor_a)
+        (commitment_package_anchor_b_bound ?commitment_package ?coverage_anchor_b)
+        (commitment_package_ready_phase2 ?commitment_package)
+        (not
+          (commitment_package_candidate ?commitment_package)
+        )
+      )
+  )
+  (:action assemble_package_full
+    :parameters (?primary_subunit - primary_subunit ?secondary_subunit - secondary_subunit ?coverage_anchor_a - coverage_anchor_a ?coverage_anchor_b - coverage_anchor_b ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (primary_ready ?primary_subunit)
+        (secondary_ready ?secondary_subunit)
+        (subunit_a_anchor_binding ?primary_subunit ?coverage_anchor_a)
+        (subunit_b_anchor_binding ?secondary_subunit ?coverage_anchor_b)
+        (anchor_a_locked ?coverage_anchor_a)
+        (anchor_b_locked ?coverage_anchor_b)
+        (not
+          (subunit_a_engaged ?primary_subunit)
+        )
+        (not
+          (subunit_b_engaged ?secondary_subunit)
+        )
+        (commitment_package_candidate ?commitment_package)
+      )
+    :effect
+      (and
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_anchor_a_bound ?commitment_package ?coverage_anchor_a)
+        (commitment_package_anchor_b_bound ?commitment_package ?coverage_anchor_b)
+        (commitment_package_ready_phase1 ?commitment_package)
+        (commitment_package_ready_phase2 ?commitment_package)
+        (not
+          (commitment_package_candidate ?commitment_package)
+        )
+      )
+  )
+  (:action lock_package_for_enactment
+    :parameters (?commitment_package - commitment_package ?primary_subunit - primary_subunit ?role_profile - role_profile)
+    :precondition
+      (and
+        (commitment_package_assembled ?commitment_package)
+        (primary_ready ?primary_subunit)
+        (role_assigned ?primary_subunit ?role_profile)
+        (not
+          (commitment_package_enacted ?commitment_package)
+        )
+      )
+    :effect (commitment_package_enacted ?commitment_package)
+  )
+  (:action attach_supply_to_package
+    :parameters (?coordinator - coordinator ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (coordinator_commitment_package_link ?coordinator ?commitment_package)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_available ?supply_item)
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_enacted ?commitment_package)
+        (not
+          (supply_bound ?supply_item)
+        )
+      )
+    :effect
+      (and
+        (supply_bound ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (not
+          (supply_available ?supply_item)
+        )
+      )
+  )
+  (:action stage_coordinator_supply
+    :parameters (?coordinator - coordinator ?supply_item - supply_item ?commitment_package - commitment_package ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_bound ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (role_assigned ?coordinator ?role_profile)
+        (not
+          (commitment_package_ready_phase1 ?commitment_package)
+        )
+        (not
+          (coordinator_flag_staged ?coordinator)
+        )
+      )
+    :effect (coordinator_flag_staged ?coordinator)
+  )
+  (:action attach_tactical_modifier
+    :parameters (?coordinator - coordinator ?tactical_modifier - tactical_modifier)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (modifier_available ?tactical_modifier)
+        (not
+          (has_tactical_modifier ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (has_tactical_modifier ?coordinator)
+        (coordinator_modifier_attached ?coordinator ?tactical_modifier)
+        (not
+          (modifier_available ?tactical_modifier)
+        )
+      )
+  )
+  (:action stage_modifier_for_coordinator
+    :parameters (?coordinator - coordinator ?supply_item - supply_item ?commitment_package - commitment_package ?role_profile - role_profile ?tactical_modifier - tactical_modifier)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_bound ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (role_assigned ?coordinator ?role_profile)
+        (commitment_package_ready_phase1 ?commitment_package)
+        (has_tactical_modifier ?coordinator)
+        (coordinator_modifier_attached ?coordinator ?tactical_modifier)
+        (not
+          (coordinator_flag_staged ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_flag_staged ?coordinator)
+        (coordinator_modifier_registered ?coordinator)
+      )
+  )
+  (:action apply_specialization
+    :parameters (?coordinator - coordinator ?specialization_token - specialization_token ?actor - actor ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_staged ?coordinator)
+        (specialization_assigned ?coordinator ?specialization_token)
+        (actor_assigned ?coordinator ?actor)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (not
+          (commitment_package_ready_phase2 ?commitment_package)
+        )
+        (not
+          (coordinator_flag_prepared ?coordinator)
+        )
+      )
+    :effect (coordinator_flag_prepared ?coordinator)
+  )
+  (:action apply_specialization_secondary
+    :parameters (?coordinator - coordinator ?specialization_token - specialization_token ?actor - actor ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_staged ?coordinator)
+        (specialization_assigned ?coordinator ?specialization_token)
+        (actor_assigned ?coordinator ?actor)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (commitment_package_ready_phase2 ?commitment_package)
+        (not
+          (coordinator_flag_prepared ?coordinator)
+        )
+      )
+    :effect (coordinator_flag_prepared ?coordinator)
+  )
+  (:action promote_coordinator_priority
+    :parameters (?coordinator - coordinator ?priority_token - priority_token ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_prepared ?coordinator)
+        (priority_assigned ?coordinator ?priority_token)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (not
+          (commitment_package_ready_phase1 ?commitment_package)
+        )
+        (not
+          (commitment_package_ready_phase2 ?commitment_package)
+        )
+        (not
+          (coordinator_flag_finalized ?coordinator)
+        )
+      )
+    :effect (coordinator_flag_finalized ?coordinator)
+  )
+  (:action promote_coordinator_priority_with_stage1
+    :parameters (?coordinator - coordinator ?priority_token - priority_token ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_prepared ?coordinator)
+        (priority_assigned ?coordinator ?priority_token)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (commitment_package_ready_phase1 ?commitment_package)
+        (not
+          (commitment_package_ready_phase2 ?commitment_package)
+        )
+        (not
+          (coordinator_flag_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (coordinator_augmented ?coordinator)
+      )
+  )
+  (:action promote_coordinator_priority_stage2
+    :parameters (?coordinator - coordinator ?priority_token - priority_token ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_prepared ?coordinator)
+        (priority_assigned ?coordinator ?priority_token)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (not
+          (commitment_package_ready_phase1 ?commitment_package)
+        )
+        (commitment_package_ready_phase2 ?commitment_package)
+        (not
+          (coordinator_flag_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (coordinator_augmented ?coordinator)
+      )
+  )
+  (:action promote_coordinator_priority_full
+    :parameters (?coordinator - coordinator ?priority_token - priority_token ?supply_item - supply_item ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (coordinator_flag_prepared ?coordinator)
+        (priority_assigned ?coordinator ?priority_token)
+        (coordinator_has_supply ?coordinator ?supply_item)
+        (supply_attached_to_commitment_package ?supply_item ?commitment_package)
+        (commitment_package_ready_phase1 ?commitment_package)
+        (commitment_package_ready_phase2 ?commitment_package)
+        (not
+          (coordinator_flag_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (coordinator_augmented ?coordinator)
+      )
+  )
+  (:action confirm_coordinator_ready
+    :parameters (?coordinator - coordinator)
+    :precondition
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (not
+          (coordinator_augmented ?coordinator)
+        )
+        (not
+          (unit_global_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (unit_global_ready ?coordinator)
+        (unit_ready ?coordinator)
+      )
+  )
+  (:action attach_augmentation
+    :parameters (?coordinator - coordinator ?augmentation_slot - augmentation_slot)
+    :precondition
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (coordinator_augmented ?coordinator)
+        (augmentation_available ?augmentation_slot)
+      )
+    :effect
+      (and
+        (coordinator_augmentation_attached ?coordinator ?augmentation_slot)
+        (not
+          (augmentation_available ?augmentation_slot)
+        )
+      )
+  )
+  (:action validate_cross_subunit_constraints
+    :parameters (?coordinator - coordinator ?primary_subunit - primary_subunit ?secondary_subunit - secondary_subunit ?role_profile - role_profile ?augmentation_slot - augmentation_slot)
+    :precondition
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (coordinator_augmented ?coordinator)
+        (coordinator_augmentation_attached ?coordinator ?augmentation_slot)
+        (coordinator_assigned_primary ?coordinator ?primary_subunit)
+        (coordinator_assigned_secondary ?coordinator ?secondary_subunit)
+        (subunit_a_engaged ?primary_subunit)
+        (subunit_b_engaged ?secondary_subunit)
+        (role_assigned ?coordinator ?role_profile)
+        (not
+          (constraints_validated ?coordinator)
+        )
+      )
+    :effect (constraints_validated ?coordinator)
+  )
+  (:action finalize_coordinator_global_ready
+    :parameters (?coordinator - coordinator)
+    :precondition
+      (and
+        (coordinator_flag_finalized ?coordinator)
+        (constraints_validated ?coordinator)
+        (not
+          (unit_global_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (unit_global_ready ?coordinator)
+        (unit_ready ?coordinator)
+      )
+  )
+  (:action apply_strategy_token
+    :parameters (?coordinator - coordinator ?strategy_token - strategy_token ?role_profile - role_profile)
+    :precondition
+      (and
+        (candidate_confirmed ?coordinator)
+        (role_assigned ?coordinator ?role_profile)
+        (strategy_available ?strategy_token)
+        (strategy_assigned ?coordinator ?strategy_token)
+        (not
+          (strategy_applied ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (strategy_applied ?coordinator)
+        (not
+          (strategy_available ?strategy_token)
+        )
+      )
+  )
+  (:action stage_strategy_for_coordinator
+    :parameters (?coordinator - coordinator ?actor - actor)
+    :precondition
+      (and
+        (strategy_applied ?coordinator)
+        (actor_assigned ?coordinator ?actor)
+        (not
+          (strategy_staged ?coordinator)
+        )
+      )
+    :effect (strategy_staged ?coordinator)
+  )
+  (:action apply_priority_with_strategy
+    :parameters (?coordinator - coordinator ?priority_token - priority_token)
+    :precondition
+      (and
+        (strategy_staged ?coordinator)
+        (priority_assigned ?coordinator ?priority_token)
+        (not
+          (strategy_finalized ?coordinator)
+        )
+      )
+    :effect (strategy_finalized ?coordinator)
+  )
+  (:action finalize_strategy_readiness
+    :parameters (?coordinator - coordinator)
+    :precondition
+      (and
+        (strategy_finalized ?coordinator)
+        (not
+          (unit_global_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (unit_global_ready ?coordinator)
+        (unit_ready ?coordinator)
+      )
+  )
+  (:action enable_primary_subunit_commitment
+    :parameters (?primary_subunit - primary_subunit ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (primary_ready ?primary_subunit)
+        (subunit_a_engaged ?primary_subunit)
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_enacted ?commitment_package)
+        (not
+          (unit_ready ?primary_subunit)
+        )
+      )
+    :effect (unit_ready ?primary_subunit)
+  )
+  (:action enable_secondary_subunit_commitment
+    :parameters (?secondary_subunit - secondary_subunit ?commitment_package - commitment_package)
+    :precondition
+      (and
+        (secondary_ready ?secondary_subunit)
+        (subunit_b_engaged ?secondary_subunit)
+        (commitment_package_assembled ?commitment_package)
+        (commitment_package_enacted ?commitment_package)
+        (not
+          (unit_ready ?secondary_subunit)
+        )
+      )
+    :effect (unit_ready ?secondary_subunit)
+  )
+  (:action finalize_unit_commit
+    :parameters (?unit_slot - unit_slot ?commitment_marker - commitment_marker ?role_profile - role_profile)
+    :precondition
+      (and
+        (unit_ready ?unit_slot)
+        (role_assigned ?unit_slot ?role_profile)
+        (commitment_marker_available ?commitment_marker)
+        (not
+          (unit_finalized ?unit_slot)
+        )
+      )
+    :effect
+      (and
+        (unit_finalized ?unit_slot)
+        (commitment_marker_attached ?unit_slot ?commitment_marker)
+        (not
+          (commitment_marker_available ?commitment_marker)
+        )
+      )
+  )
+  (:action commit_subunit_with_reserve
+    :parameters (?primary_subunit - primary_subunit ?reserve_token - reserve_token ?commitment_marker - commitment_marker)
+    :precondition
+      (and
+        (unit_finalized ?primary_subunit)
+        (reserve_assigned ?primary_subunit ?reserve_token)
+        (commitment_marker_attached ?primary_subunit ?commitment_marker)
+        (not
+          (unit_committed ?primary_subunit)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?primary_subunit)
+        (reserve_available ?reserve_token)
+        (commitment_marker_available ?commitment_marker)
+      )
+  )
+  (:action commit_secondary_with_reserve
+    :parameters (?secondary_subunit - secondary_subunit ?reserve_token - reserve_token ?commitment_marker - commitment_marker)
+    :precondition
+      (and
+        (unit_finalized ?secondary_subunit)
+        (reserve_assigned ?secondary_subunit ?reserve_token)
+        (commitment_marker_attached ?secondary_subunit ?commitment_marker)
+        (not
+          (unit_committed ?secondary_subunit)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?secondary_subunit)
+        (reserve_available ?reserve_token)
+        (commitment_marker_available ?commitment_marker)
+      )
+  )
+  (:action commit_coordinator_with_reserve
+    :parameters (?coordinator - coordinator ?reserve_token - reserve_token ?commitment_marker - commitment_marker)
+    :precondition
+      (and
+        (unit_finalized ?coordinator)
+        (reserve_assigned ?coordinator ?reserve_token)
+        (commitment_marker_attached ?coordinator ?commitment_marker)
+        (not
+          (unit_committed ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?coordinator)
+        (reserve_available ?reserve_token)
+        (commitment_marker_available ?commitment_marker)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem reserve_unit_commitment_scenario)
+  (:domain reserve_unit_commitment)
+  (:objects primary_subunit_1 - primary_subunit secondary_subunit_1 - secondary_subunit coordinator_1 - coordinator coordinator_2 - coordinator reserve_token_1 - reserve_token reserve_token_2 - reserve_token reserve_token_3 - reserve_token role_profile_1 - role_profile actor_1 - actor consumable_1 - consumable coverage_anchor_a_1 - coverage_anchor_a coverage_anchor_b_1 - coverage_anchor_b commitment_package_1 - commitment_package supply_item_1 - supply_item supply_item_2 - supply_item tactical_modifier_1 - tactical_modifier tactical_modifier_2 - tactical_modifier augmentation_slot_1 - augmentation_slot augmentation_slot_2 - augmentation_slot commitment_marker_1 - commitment_marker specialization_token_1 - specialization_token strategy_token_1 - strategy_token strategy_token_2 - strategy_token priority_token_1 - priority_token)
+  (:init
+    (reserve_available reserve_token_1)
+    (reserve_available reserve_token_2)
+    (reserve_available reserve_token_3)
+    (role_available role_profile_1)
+    (actor_available actor_1)
+    (consumable_available consumable_1)
+    (subunit_a_anchor_binding primary_subunit_1 coverage_anchor_a_1)
+    (subunit_b_anchor_binding secondary_subunit_1 coverage_anchor_b_1)
+    (commitment_package_candidate commitment_package_1)
+    (supply_available supply_item_1)
+    (supply_available supply_item_2)
+    (coordinator_assigned_primary coordinator_1 primary_subunit_1)
+    (coordinator_assigned_primary coordinator_2 primary_subunit_1)
+    (coordinator_assigned_secondary coordinator_1 secondary_subunit_1)
+    (coordinator_assigned_secondary coordinator_2 secondary_subunit_1)
+    (coordinator_commitment_package_link coordinator_1 commitment_package_1)
+    (coordinator_commitment_package_link coordinator_2 commitment_package_1)
+    (coordinator_has_supply coordinator_1 supply_item_1)
+    (coordinator_has_supply coordinator_2 supply_item_2)
+    (modifier_available tactical_modifier_1)
+    (modifier_available tactical_modifier_2)
+    (augmentation_available augmentation_slot_1)
+    (augmentation_available augmentation_slot_2)
+    (commitment_marker_available commitment_marker_1)
+    (specialization_available specialization_token_1)
+    (strategy_available strategy_token_1)
+    (strategy_assigned coordinator_1 strategy_token_1)
+    (strategy_assigned coordinator_2 strategy_token_2)
+    (priority_available priority_token_1)
+  )
+  (:goal
+    (and
+      (unit_committed primary_subunit_1)
+      (unit_committed secondary_subunit_1)
+      (unit_committed coordinator_1)
+      (unit_committed coordinator_2)
+    )
+  )
+)

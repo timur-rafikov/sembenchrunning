@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain herd_health_check_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_class - object slot_class - object node_class - object herd_entity_root - object herd_member - herd_entity_root route_slot - resource_class appointment_slot - resource_class handling_station - resource_class certificate_type - resource_class treatment_protocol - resource_class health_record - resource_class equipment - resource_class diagnostic_test - resource_class consumable_supply - slot_class sample_kit - slot_class authorization_token - slot_class checkpoint - node_class route_node - node_class inspection_round - node_class herd_subgroup_type - herd_member team_subtype - herd_member animal_primary - herd_subgroup_type animal_secondary - herd_subgroup_type inspection_team - team_subtype)
+  (:predicates
+    (intake_registered ?herd_member - herd_member)
+    (processing_cleared ?herd_member - herd_member)
+    (assigned_to_route_slot ?herd_member - herd_member)
+    (resources_returned ?herd_member - herd_member)
+    (inspection_ready ?herd_member - herd_member)
+    (health_check_recorded ?herd_member - herd_member)
+    (route_slot_available ?route_slot - route_slot)
+    (member_assigned_to_route_slot ?herd_member - herd_member ?route_slot - route_slot)
+    (appointment_slot_available ?appointment_slot - appointment_slot)
+    (appointment_scheduled ?herd_member - herd_member ?appointment_slot - appointment_slot)
+    (handling_station_available ?handling_station - handling_station)
+    (assigned_to_handling_station ?herd_member - herd_member ?handling_station - handling_station)
+    (consumable_available ?consumable_supply - consumable_supply)
+    (supply_allocated_to_primary ?animal_primary - animal_primary ?consumable_supply - consumable_supply)
+    (supply_allocated_to_secondary ?animal_secondary - animal_secondary ?consumable_supply - consumable_supply)
+    (assigned_to_checkpoint ?animal_primary - animal_primary ?checkpoint - checkpoint)
+    (checkpoint_prepared ?checkpoint - checkpoint)
+    (checkpoint_supply_loaded ?checkpoint - checkpoint)
+    (primary_processed ?animal_primary - animal_primary)
+    (assigned_to_route_node ?animal_secondary - animal_secondary ?route_node - route_node)
+    (route_node_prepared ?route_node - route_node)
+    (route_node_supply_loaded ?route_node - route_node)
+    (secondary_processed ?animal_secondary - animal_secondary)
+    (inspection_round_available ?inspection_round - inspection_round)
+    (inspection_round_allocated ?inspection_round - inspection_round)
+    (round_includes_checkpoint ?inspection_round - inspection_round ?checkpoint - checkpoint)
+    (round_includes_route_node ?inspection_round - inspection_round ?route_node - route_node)
+    (round_has_checkpoint_supply ?inspection_round - inspection_round)
+    (round_has_node_supply ?inspection_round - inspection_round)
+    (round_activated ?inspection_round - inspection_round)
+    (team_assigned_to_primary ?inspection_team - inspection_team ?animal_primary - animal_primary)
+    (team_assigned_to_secondary ?inspection_team - inspection_team ?animal_secondary - animal_secondary)
+    (team_assigned_to_round ?inspection_team - inspection_team ?inspection_round - inspection_round)
+    (sample_kit_available ?sample_kit - sample_kit)
+    (team_has_sample_kit ?inspection_team - inspection_team ?sample_kit - sample_kit)
+    (sample_kit_in_use ?sample_kit - sample_kit)
+    (sample_kit_assigned_to_round ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    (team_prepared_for_sampling ?inspection_team - inspection_team)
+    (team_sample_collected ?inspection_team - inspection_team)
+    (team_sample_verified ?inspection_team - inspection_team)
+    (team_certificate_assigned ?inspection_team - inspection_team)
+    (team_certificate_engaged ?inspection_team - inspection_team)
+    (team_lab_ready ?inspection_team - inspection_team)
+    (team_ready_for_finalization ?inspection_team - inspection_team)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (team_has_authorization_token ?inspection_team - inspection_team ?authorization_token - authorization_token)
+    (team_authorized ?inspection_team - inspection_team)
+    (team_certificate_submitted ?inspection_team - inspection_team)
+    (team_certificate_validated ?inspection_team - inspection_team)
+    (certificate_type_available ?certificate_type - certificate_type)
+    (team_assigned_certificate_type ?inspection_team - inspection_team ?certificate_type - certificate_type)
+    (treatment_protocol_available ?treatment_protocol - treatment_protocol)
+    (team_assigned_treatment_protocol ?inspection_team - inspection_team ?treatment_protocol - treatment_protocol)
+    (equipment_available ?equipment - equipment)
+    (team_has_equipment ?inspection_team - inspection_team ?equipment - equipment)
+    (diagnostic_test_available ?diagnostic_test - diagnostic_test)
+    (team_has_diagnostic_test ?inspection_team - inspection_team ?diagnostic_test - diagnostic_test)
+    (health_record_available ?health_record - health_record)
+    (assigned_health_record ?herd_member - herd_member ?health_record - health_record)
+    (primary_ready ?animal_primary - animal_primary)
+    (secondary_ready ?animal_secondary - animal_secondary)
+    (team_finalized ?inspection_team - inspection_team)
+  )
+  (:action register_herd_member
+    :parameters (?herd_member - herd_member)
+    :precondition
+      (and
+        (not
+          (intake_registered ?herd_member)
+        )
+        (not
+          (resources_returned ?herd_member)
+        )
+      )
+    :effect (intake_registered ?herd_member)
+  )
+  (:action assign_member_to_route_slot
+    :parameters (?herd_member - herd_member ?route_slot - route_slot)
+    :precondition
+      (and
+        (intake_registered ?herd_member)
+        (not
+          (assigned_to_route_slot ?herd_member)
+        )
+        (route_slot_available ?route_slot)
+      )
+    :effect
+      (and
+        (assigned_to_route_slot ?herd_member)
+        (member_assigned_to_route_slot ?herd_member ?route_slot)
+        (not
+          (route_slot_available ?route_slot)
+        )
+      )
+  )
+  (:action schedule_appointment_slot
+    :parameters (?herd_member - herd_member ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_registered ?herd_member)
+        (assigned_to_route_slot ?herd_member)
+        (appointment_slot_available ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_scheduled ?herd_member ?appointment_slot)
+        (not
+          (appointment_slot_available ?appointment_slot)
+        )
+      )
+  )
+  (:action confirm_appointment
+    :parameters (?herd_member - herd_member ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_registered ?herd_member)
+        (assigned_to_route_slot ?herd_member)
+        (appointment_scheduled ?herd_member ?appointment_slot)
+        (not
+          (processing_cleared ?herd_member)
+        )
+      )
+    :effect (processing_cleared ?herd_member)
+  )
+  (:action release_appointment_slot
+    :parameters (?herd_member - herd_member ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (appointment_scheduled ?herd_member ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_slot_available ?appointment_slot)
+        (not
+          (appointment_scheduled ?herd_member ?appointment_slot)
+        )
+      )
+  )
+  (:action assign_handling_station
+    :parameters (?herd_member - herd_member ?handling_station - handling_station)
+    :precondition
+      (and
+        (processing_cleared ?herd_member)
+        (handling_station_available ?handling_station)
+      )
+    :effect
+      (and
+        (assigned_to_handling_station ?herd_member ?handling_station)
+        (not
+          (handling_station_available ?handling_station)
+        )
+      )
+  )
+  (:action release_handling_station
+    :parameters (?herd_member - herd_member ?handling_station - handling_station)
+    :precondition
+      (and
+        (assigned_to_handling_station ?herd_member ?handling_station)
+      )
+    :effect
+      (and
+        (handling_station_available ?handling_station)
+        (not
+          (assigned_to_handling_station ?herd_member ?handling_station)
+        )
+      )
+  )
+  (:action checkout_team_equipment
+    :parameters (?inspection_team - inspection_team ?equipment - equipment)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (team_has_equipment ?inspection_team ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action return_team_equipment
+    :parameters (?inspection_team - inspection_team ?equipment - equipment)
+    :precondition
+      (and
+        (team_has_equipment ?inspection_team ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (team_has_equipment ?inspection_team ?equipment)
+        )
+      )
+  )
+  (:action checkout_team_diagnostic_test
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (diagnostic_test_available ?diagnostic_test)
+      )
+    :effect
+      (and
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (not
+          (diagnostic_test_available ?diagnostic_test)
+        )
+      )
+  )
+  (:action return_team_diagnostic_test
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test)
+    :precondition
+      (and
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+      )
+    :effect
+      (and
+        (diagnostic_test_available ?diagnostic_test)
+        (not
+          (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        )
+      )
+  )
+  (:action prepare_primary_at_checkpoint
+    :parameters (?animal_primary - animal_primary ?checkpoint - checkpoint ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (processing_cleared ?animal_primary)
+        (appointment_scheduled ?animal_primary ?appointment_slot)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (not
+          (checkpoint_prepared ?checkpoint)
+        )
+        (not
+          (checkpoint_supply_loaded ?checkpoint)
+        )
+      )
+    :effect (checkpoint_prepared ?checkpoint)
+  )
+  (:action process_primary_at_handling_station
+    :parameters (?animal_primary - animal_primary ?checkpoint - checkpoint ?handling_station - handling_station)
+    :precondition
+      (and
+        (processing_cleared ?animal_primary)
+        (assigned_to_handling_station ?animal_primary ?handling_station)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (checkpoint_prepared ?checkpoint)
+        (not
+          (primary_ready ?animal_primary)
+        )
+      )
+    :effect
+      (and
+        (primary_ready ?animal_primary)
+        (primary_processed ?animal_primary)
+      )
+  )
+  (:action allocate_consumable_to_primary
+    :parameters (?animal_primary - animal_primary ?checkpoint - checkpoint ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (processing_cleared ?animal_primary)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (consumable_available ?consumable_supply)
+        (not
+          (primary_ready ?animal_primary)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_supply_loaded ?checkpoint)
+        (primary_ready ?animal_primary)
+        (supply_allocated_to_primary ?animal_primary ?consumable_supply)
+        (not
+          (consumable_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_primary_processing
+    :parameters (?animal_primary - animal_primary ?checkpoint - checkpoint ?appointment_slot - appointment_slot ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (processing_cleared ?animal_primary)
+        (appointment_scheduled ?animal_primary ?appointment_slot)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (checkpoint_supply_loaded ?checkpoint)
+        (supply_allocated_to_primary ?animal_primary ?consumable_supply)
+        (not
+          (primary_processed ?animal_primary)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_prepared ?checkpoint)
+        (primary_processed ?animal_primary)
+        (consumable_available ?consumable_supply)
+        (not
+          (supply_allocated_to_primary ?animal_primary ?consumable_supply)
+        )
+      )
+  )
+  (:action prepare_secondary_at_node
+    :parameters (?animal_secondary - animal_secondary ?route_node - route_node ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (processing_cleared ?animal_secondary)
+        (appointment_scheduled ?animal_secondary ?appointment_slot)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (not
+          (route_node_prepared ?route_node)
+        )
+        (not
+          (route_node_supply_loaded ?route_node)
+        )
+      )
+    :effect (route_node_prepared ?route_node)
+  )
+  (:action process_secondary_at_handling_station
+    :parameters (?animal_secondary - animal_secondary ?route_node - route_node ?handling_station - handling_station)
+    :precondition
+      (and
+        (processing_cleared ?animal_secondary)
+        (assigned_to_handling_station ?animal_secondary ?handling_station)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (route_node_prepared ?route_node)
+        (not
+          (secondary_ready ?animal_secondary)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready ?animal_secondary)
+        (secondary_processed ?animal_secondary)
+      )
+  )
+  (:action allocate_consumable_to_secondary
+    :parameters (?animal_secondary - animal_secondary ?route_node - route_node ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (processing_cleared ?animal_secondary)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (consumable_available ?consumable_supply)
+        (not
+          (secondary_ready ?animal_secondary)
+        )
+      )
+    :effect
+      (and
+        (route_node_supply_loaded ?route_node)
+        (secondary_ready ?animal_secondary)
+        (supply_allocated_to_secondary ?animal_secondary ?consumable_supply)
+        (not
+          (consumable_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_secondary_processing
+    :parameters (?animal_secondary - animal_secondary ?route_node - route_node ?appointment_slot - appointment_slot ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (processing_cleared ?animal_secondary)
+        (appointment_scheduled ?animal_secondary ?appointment_slot)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (route_node_supply_loaded ?route_node)
+        (supply_allocated_to_secondary ?animal_secondary ?consumable_supply)
+        (not
+          (secondary_processed ?animal_secondary)
+        )
+      )
+    :effect
+      (and
+        (route_node_prepared ?route_node)
+        (secondary_processed ?animal_secondary)
+        (consumable_available ?consumable_supply)
+        (not
+          (supply_allocated_to_secondary ?animal_secondary ?consumable_supply)
+        )
+      )
+  )
+  (:action consolidate_inspection_round_standard
+    :parameters (?animal_primary - animal_primary ?animal_secondary - animal_secondary ?checkpoint - checkpoint ?route_node - route_node ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (primary_ready ?animal_primary)
+        (secondary_ready ?animal_secondary)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (checkpoint_prepared ?checkpoint)
+        (route_node_prepared ?route_node)
+        (primary_processed ?animal_primary)
+        (secondary_processed ?animal_secondary)
+        (inspection_round_available ?inspection_round)
+      )
+    :effect
+      (and
+        (inspection_round_allocated ?inspection_round)
+        (round_includes_checkpoint ?inspection_round ?checkpoint)
+        (round_includes_route_node ?inspection_round ?route_node)
+        (not
+          (inspection_round_available ?inspection_round)
+        )
+      )
+  )
+  (:action consolidate_inspection_round_with_checkpoint_supply
+    :parameters (?animal_primary - animal_primary ?animal_secondary - animal_secondary ?checkpoint - checkpoint ?route_node - route_node ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (primary_ready ?animal_primary)
+        (secondary_ready ?animal_secondary)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (checkpoint_supply_loaded ?checkpoint)
+        (route_node_prepared ?route_node)
+        (not
+          (primary_processed ?animal_primary)
+        )
+        (secondary_processed ?animal_secondary)
+        (inspection_round_available ?inspection_round)
+      )
+    :effect
+      (and
+        (inspection_round_allocated ?inspection_round)
+        (round_includes_checkpoint ?inspection_round ?checkpoint)
+        (round_includes_route_node ?inspection_round ?route_node)
+        (round_has_checkpoint_supply ?inspection_round)
+        (not
+          (inspection_round_available ?inspection_round)
+        )
+      )
+  )
+  (:action consolidate_inspection_round_with_node_supply
+    :parameters (?animal_primary - animal_primary ?animal_secondary - animal_secondary ?checkpoint - checkpoint ?route_node - route_node ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (primary_ready ?animal_primary)
+        (secondary_ready ?animal_secondary)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (checkpoint_prepared ?checkpoint)
+        (route_node_supply_loaded ?route_node)
+        (primary_processed ?animal_primary)
+        (not
+          (secondary_processed ?animal_secondary)
+        )
+        (inspection_round_available ?inspection_round)
+      )
+    :effect
+      (and
+        (inspection_round_allocated ?inspection_round)
+        (round_includes_checkpoint ?inspection_round ?checkpoint)
+        (round_includes_route_node ?inspection_round ?route_node)
+        (round_has_node_supply ?inspection_round)
+        (not
+          (inspection_round_available ?inspection_round)
+        )
+      )
+  )
+  (:action consolidate_inspection_round_with_checkpoint_and_node_supply
+    :parameters (?animal_primary - animal_primary ?animal_secondary - animal_secondary ?checkpoint - checkpoint ?route_node - route_node ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (primary_ready ?animal_primary)
+        (secondary_ready ?animal_secondary)
+        (assigned_to_checkpoint ?animal_primary ?checkpoint)
+        (assigned_to_route_node ?animal_secondary ?route_node)
+        (checkpoint_supply_loaded ?checkpoint)
+        (route_node_supply_loaded ?route_node)
+        (not
+          (primary_processed ?animal_primary)
+        )
+        (not
+          (secondary_processed ?animal_secondary)
+        )
+        (inspection_round_available ?inspection_round)
+      )
+    :effect
+      (and
+        (inspection_round_allocated ?inspection_round)
+        (round_includes_checkpoint ?inspection_round ?checkpoint)
+        (round_includes_route_node ?inspection_round ?route_node)
+        (round_has_checkpoint_supply ?inspection_round)
+        (round_has_node_supply ?inspection_round)
+        (not
+          (inspection_round_available ?inspection_round)
+        )
+      )
+  )
+  (:action activate_inspection_round
+    :parameters (?inspection_round - inspection_round ?animal_primary - animal_primary ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (inspection_round_allocated ?inspection_round)
+        (primary_ready ?animal_primary)
+        (appointment_scheduled ?animal_primary ?appointment_slot)
+        (not
+          (round_activated ?inspection_round)
+        )
+      )
+    :effect (round_activated ?inspection_round)
+  )
+  (:action assign_sample_kit_to_round
+    :parameters (?inspection_team - inspection_team ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (team_assigned_to_round ?inspection_team ?inspection_round)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_available ?sample_kit)
+        (inspection_round_allocated ?inspection_round)
+        (round_activated ?inspection_round)
+        (not
+          (sample_kit_in_use ?sample_kit)
+        )
+      )
+    :effect
+      (and
+        (sample_kit_in_use ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (not
+          (sample_kit_available ?sample_kit)
+        )
+      )
+  )
+  (:action prepare_team_for_field_sampling
+    :parameters (?inspection_team - inspection_team ?sample_kit - sample_kit ?inspection_round - inspection_round ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_in_use ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (appointment_scheduled ?inspection_team ?appointment_slot)
+        (not
+          (round_has_checkpoint_supply ?inspection_round)
+        )
+        (not
+          (team_prepared_for_sampling ?inspection_team)
+        )
+      )
+    :effect (team_prepared_for_sampling ?inspection_team)
+  )
+  (:action assign_certificate_to_team
+    :parameters (?inspection_team - inspection_team ?certificate_type - certificate_type)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (certificate_type_available ?certificate_type)
+        (not
+          (team_certificate_assigned ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_certificate_assigned ?inspection_team)
+        (team_assigned_certificate_type ?inspection_team ?certificate_type)
+        (not
+          (certificate_type_available ?certificate_type)
+        )
+      )
+  )
+  (:action prepare_team_sampling_with_certificate
+    :parameters (?inspection_team - inspection_team ?sample_kit - sample_kit ?inspection_round - inspection_round ?appointment_slot - appointment_slot ?certificate_type - certificate_type)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_in_use ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (appointment_scheduled ?inspection_team ?appointment_slot)
+        (round_has_checkpoint_supply ?inspection_round)
+        (team_certificate_assigned ?inspection_team)
+        (team_assigned_certificate_type ?inspection_team ?certificate_type)
+        (not
+          (team_prepared_for_sampling ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_prepared_for_sampling ?inspection_team)
+        (team_certificate_engaged ?inspection_team)
+      )
+  )
+  (:action collect_sample_at_handling_station_a
+    :parameters (?inspection_team - inspection_team ?equipment - equipment ?handling_station - handling_station ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_prepared_for_sampling ?inspection_team)
+        (team_has_equipment ?inspection_team ?equipment)
+        (assigned_to_handling_station ?inspection_team ?handling_station)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (not
+          (round_has_node_supply ?inspection_round)
+        )
+        (not
+          (team_sample_collected ?inspection_team)
+        )
+      )
+    :effect (team_sample_collected ?inspection_team)
+  )
+  (:action collect_sample_at_handling_station_b
+    :parameters (?inspection_team - inspection_team ?equipment - equipment ?handling_station - handling_station ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_prepared_for_sampling ?inspection_team)
+        (team_has_equipment ?inspection_team ?equipment)
+        (assigned_to_handling_station ?inspection_team ?handling_station)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (round_has_node_supply ?inspection_round)
+        (not
+          (team_sample_collected ?inspection_team)
+        )
+      )
+    :effect (team_sample_collected ?inspection_team)
+  )
+  (:action verify_sample_variant_a
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_sample_collected ?inspection_team)
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (not
+          (round_has_checkpoint_supply ?inspection_round)
+        )
+        (not
+          (round_has_node_supply ?inspection_round)
+        )
+        (not
+          (team_sample_verified ?inspection_team)
+        )
+      )
+    :effect (team_sample_verified ?inspection_team)
+  )
+  (:action verify_sample_variant_b
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_sample_collected ?inspection_team)
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (round_has_checkpoint_supply ?inspection_round)
+        (not
+          (round_has_node_supply ?inspection_round)
+        )
+        (not
+          (team_sample_verified ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_lab_ready ?inspection_team)
+      )
+  )
+  (:action verify_sample_variant_c
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_sample_collected ?inspection_team)
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (not
+          (round_has_checkpoint_supply ?inspection_round)
+        )
+        (round_has_node_supply ?inspection_round)
+        (not
+          (team_sample_verified ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_lab_ready ?inspection_team)
+      )
+  )
+  (:action verify_sample_variant_d
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test ?sample_kit - sample_kit ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (team_sample_collected ?inspection_team)
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (team_has_sample_kit ?inspection_team ?sample_kit)
+        (sample_kit_assigned_to_round ?sample_kit ?inspection_round)
+        (round_has_checkpoint_supply ?inspection_round)
+        (round_has_node_supply ?inspection_round)
+        (not
+          (team_sample_verified ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_lab_ready ?inspection_team)
+      )
+  )
+  (:action mark_team_sampling_ready
+    :parameters (?inspection_team - inspection_team)
+    :precondition
+      (and
+        (team_sample_verified ?inspection_team)
+        (not
+          (team_lab_ready ?inspection_team)
+        )
+        (not
+          (team_finalized ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalized ?inspection_team)
+        (inspection_ready ?inspection_team)
+      )
+  )
+  (:action assign_treatment_protocol_to_team
+    :parameters (?inspection_team - inspection_team ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_lab_ready ?inspection_team)
+        (treatment_protocol_available ?treatment_protocol)
+      )
+    :effect
+      (and
+        (team_assigned_treatment_protocol ?inspection_team ?treatment_protocol)
+        (not
+          (treatment_protocol_available ?treatment_protocol)
+        )
+      )
+  )
+  (:action prepare_team_for_finalization
+    :parameters (?inspection_team - inspection_team ?animal_primary - animal_primary ?animal_secondary - animal_secondary ?appointment_slot - appointment_slot ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_lab_ready ?inspection_team)
+        (team_assigned_treatment_protocol ?inspection_team ?treatment_protocol)
+        (team_assigned_to_primary ?inspection_team ?animal_primary)
+        (team_assigned_to_secondary ?inspection_team ?animal_secondary)
+        (primary_processed ?animal_primary)
+        (secondary_processed ?animal_secondary)
+        (appointment_scheduled ?inspection_team ?appointment_slot)
+        (not
+          (team_ready_for_finalization ?inspection_team)
+        )
+      )
+    :effect (team_ready_for_finalization ?inspection_team)
+  )
+  (:action finalize_team_sampling
+    :parameters (?inspection_team - inspection_team)
+    :precondition
+      (and
+        (team_sample_verified ?inspection_team)
+        (team_ready_for_finalization ?inspection_team)
+        (not
+          (team_finalized ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalized ?inspection_team)
+        (inspection_ready ?inspection_team)
+      )
+  )
+  (:action apply_authorization_token_to_team
+    :parameters (?inspection_team - inspection_team ?authorization_token - authorization_token ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (processing_cleared ?inspection_team)
+        (appointment_scheduled ?inspection_team ?appointment_slot)
+        (authorization_token_available ?authorization_token)
+        (team_has_authorization_token ?inspection_team ?authorization_token)
+        (not
+          (team_authorized ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_authorized ?inspection_team)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action begin_certificate_validation
+    :parameters (?inspection_team - inspection_team ?handling_station - handling_station)
+    :precondition
+      (and
+        (team_authorized ?inspection_team)
+        (assigned_to_handling_station ?inspection_team ?handling_station)
+        (not
+          (team_certificate_submitted ?inspection_team)
+        )
+      )
+    :effect (team_certificate_submitted ?inspection_team)
+  )
+  (:action validate_certificate_with_test
+    :parameters (?inspection_team - inspection_team ?diagnostic_test - diagnostic_test)
+    :precondition
+      (and
+        (team_certificate_submitted ?inspection_team)
+        (team_has_diagnostic_test ?inspection_team ?diagnostic_test)
+        (not
+          (team_certificate_validated ?inspection_team)
+        )
+      )
+    :effect (team_certificate_validated ?inspection_team)
+  )
+  (:action complete_certificate_validation
+    :parameters (?inspection_team - inspection_team)
+    :precondition
+      (and
+        (team_certificate_validated ?inspection_team)
+        (not
+          (team_finalized ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (team_finalized ?inspection_team)
+        (inspection_ready ?inspection_team)
+      )
+  )
+  (:action finalize_primary_group_processing
+    :parameters (?animal_primary - animal_primary ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (primary_ready ?animal_primary)
+        (primary_processed ?animal_primary)
+        (inspection_round_allocated ?inspection_round)
+        (round_activated ?inspection_round)
+        (not
+          (inspection_ready ?animal_primary)
+        )
+      )
+    :effect (inspection_ready ?animal_primary)
+  )
+  (:action finalize_secondary_group_processing
+    :parameters (?animal_secondary - animal_secondary ?inspection_round - inspection_round)
+    :precondition
+      (and
+        (secondary_ready ?animal_secondary)
+        (secondary_processed ?animal_secondary)
+        (inspection_round_allocated ?inspection_round)
+        (round_activated ?inspection_round)
+        (not
+          (inspection_ready ?animal_secondary)
+        )
+      )
+    :effect (inspection_ready ?animal_secondary)
+  )
+  (:action record_health_check_result
+    :parameters (?herd_member - herd_member ?health_record - health_record ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (inspection_ready ?herd_member)
+        (appointment_scheduled ?herd_member ?appointment_slot)
+        (health_record_available ?health_record)
+        (not
+          (health_check_recorded ?herd_member)
+        )
+      )
+    :effect
+      (and
+        (health_check_recorded ?herd_member)
+        (assigned_health_record ?herd_member ?health_record)
+        (not
+          (health_record_available ?health_record)
+        )
+      )
+  )
+  (:action return_resources_for_primary
+    :parameters (?animal_primary - animal_primary ?route_slot - route_slot ?health_record - health_record)
+    :precondition
+      (and
+        (health_check_recorded ?animal_primary)
+        (member_assigned_to_route_slot ?animal_primary ?route_slot)
+        (assigned_health_record ?animal_primary ?health_record)
+        (not
+          (resources_returned ?animal_primary)
+        )
+      )
+    :effect
+      (and
+        (resources_returned ?animal_primary)
+        (route_slot_available ?route_slot)
+        (health_record_available ?health_record)
+      )
+  )
+  (:action return_resources_for_secondary
+    :parameters (?animal_secondary - animal_secondary ?route_slot - route_slot ?health_record - health_record)
+    :precondition
+      (and
+        (health_check_recorded ?animal_secondary)
+        (member_assigned_to_route_slot ?animal_secondary ?route_slot)
+        (assigned_health_record ?animal_secondary ?health_record)
+        (not
+          (resources_returned ?animal_secondary)
+        )
+      )
+    :effect
+      (and
+        (resources_returned ?animal_secondary)
+        (route_slot_available ?route_slot)
+        (health_record_available ?health_record)
+      )
+  )
+  (:action return_resources_for_team
+    :parameters (?inspection_team - inspection_team ?route_slot - route_slot ?health_record - health_record)
+    :precondition
+      (and
+        (health_check_recorded ?inspection_team)
+        (member_assigned_to_route_slot ?inspection_team ?route_slot)
+        (assigned_health_record ?inspection_team ?health_record)
+        (not
+          (resources_returned ?inspection_team)
+        )
+      )
+    :effect
+      (and
+        (resources_returned ?inspection_team)
+        (route_slot_available ?route_slot)
+        (health_record_available ?health_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem herd_health_check_routing_problem)
+  (:domain herd_health_check_routing)
+  (:objects primary_animal_1 - animal_primary secondary_animal_1 - animal_secondary inspection_team_alpha - inspection_team inspection_team_bravo - inspection_team route_slot_1 - route_slot route_slot_2 - route_slot route_slot_3 - route_slot appointment_slot_1 - appointment_slot handling_station_1 - handling_station consumable_supply_1 - consumable_supply checkpoint_1 - checkpoint route_node_1 - route_node inspection_round_1 - inspection_round sample_kit_1 - sample_kit sample_kit_2 - sample_kit certificate_type_movement - certificate_type certificate_type_compliance - certificate_type treatment_protocol_standard - treatment_protocol treatment_protocol_vaccination - treatment_protocol health_record_slot_1 - health_record equipment_portable_reader - equipment authorization_token_authority - authorization_token authorization_token_regulator - authorization_token diagnostic_test_pcr - diagnostic_test)
+  (:init
+    (route_slot_available route_slot_1)
+    (route_slot_available route_slot_2)
+    (route_slot_available route_slot_3)
+    (appointment_slot_available appointment_slot_1)
+    (handling_station_available handling_station_1)
+    (consumable_available consumable_supply_1)
+    (assigned_to_checkpoint primary_animal_1 checkpoint_1)
+    (assigned_to_route_node secondary_animal_1 route_node_1)
+    (inspection_round_available inspection_round_1)
+    (sample_kit_available sample_kit_1)
+    (sample_kit_available sample_kit_2)
+    (team_assigned_to_primary inspection_team_alpha primary_animal_1)
+    (team_assigned_to_primary inspection_team_bravo primary_animal_1)
+    (team_assigned_to_secondary inspection_team_alpha secondary_animal_1)
+    (team_assigned_to_secondary inspection_team_bravo secondary_animal_1)
+    (team_assigned_to_round inspection_team_alpha inspection_round_1)
+    (team_assigned_to_round inspection_team_bravo inspection_round_1)
+    (team_has_sample_kit inspection_team_alpha sample_kit_1)
+    (team_has_sample_kit inspection_team_bravo sample_kit_2)
+    (certificate_type_available certificate_type_movement)
+    (certificate_type_available certificate_type_compliance)
+    (treatment_protocol_available treatment_protocol_standard)
+    (treatment_protocol_available treatment_protocol_vaccination)
+    (health_record_available health_record_slot_1)
+    (equipment_available equipment_portable_reader)
+    (authorization_token_available authorization_token_authority)
+    (team_has_authorization_token inspection_team_alpha authorization_token_authority)
+    (team_has_authorization_token inspection_team_bravo authorization_token_regulator)
+    (diagnostic_test_available diagnostic_test_pcr)
+  )
+  (:goal
+    (and
+      (resources_returned primary_animal_1)
+      (resources_returned secondary_animal_1)
+      (resources_returned inspection_team_alpha)
+      (resources_returned inspection_team_bravo)
+    )
+  )
+)

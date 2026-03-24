@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain currency_position_rebalancing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object treasury_entity - domain_object instrument_category - domain_object scheduling_category - domain_object position_container - domain_object rebalancing_entity - position_container funding_source - treasury_entity fx_quote - treasury_entity approver - treasury_entity execution_venue - treasury_entity funding_priority - treasury_entity execution_window - treasury_entity settlement_profile - treasury_entity regulatory_constraint - treasury_entity liquidity_instrument - instrument_category liquidity_buffer - instrument_category limit_profile - instrument_category local_currency - scheduling_category counterparty_currency - scheduling_category transfer_order - scheduling_category account_class - rebalancing_entity desk_class - rebalancing_entity operating_account - account_class subsidiary_account - account_class treasury_desk - desk_class)
+
+  (:predicates
+    (position_registered ?rebalancing_entity - rebalancing_entity)
+    (requires_approval ?rebalancing_entity - rebalancing_entity)
+    (position_funding_allocated ?rebalancing_entity - rebalancing_entity)
+    (position_settled ?rebalancing_entity - rebalancing_entity)
+    (position_ready_for_posting ?rebalancing_entity - rebalancing_entity)
+    (position_posting_authorized ?rebalancing_entity - rebalancing_entity)
+    (funding_source_available ?funding_source - funding_source)
+    (position_funded_from ?rebalancing_entity - rebalancing_entity ?funding_source - funding_source)
+    (fx_quote_available ?fx_quote - fx_quote)
+    (position_assigned_fx_quote ?rebalancing_entity - rebalancing_entity ?fx_quote - fx_quote)
+    (approver_available ?approver - approver)
+    (position_assigned_approver ?rebalancing_entity - rebalancing_entity ?approver - approver)
+    (liquidity_instrument_available ?liquidity_instrument - liquidity_instrument)
+    (operating_account_assigned_instrument ?operating_account - operating_account ?liquidity_instrument - liquidity_instrument)
+    (subsidiary_account_assigned_instrument ?subsidiary_account - subsidiary_account ?liquidity_instrument - liquidity_instrument)
+    (operating_account_local_currency ?operating_account - operating_account ?local_currency - local_currency)
+    (currency_pending_allocation ?local_currency - local_currency)
+    (currency_buffer_reserved ?local_currency - local_currency)
+    (operating_account_buffer_allocated ?operating_account - operating_account)
+    (subsidiary_counterparty_currency_assigned ?subsidiary_account - subsidiary_account ?counterparty_currency - counterparty_currency)
+    (counterparty_currency_selected ?counterparty_currency - counterparty_currency)
+    (counterparty_currency_buffer_reserved ?counterparty_currency - counterparty_currency)
+    (subsidiary_account_buffer_allocated ?subsidiary_account - subsidiary_account)
+    (transfer_order_draft ?transfer_order - transfer_order)
+    (transfer_order_created ?transfer_order - transfer_order)
+    (transfer_order_local_currency ?transfer_order - transfer_order ?local_currency - local_currency)
+    (transfer_order_counterparty_currency ?transfer_order - transfer_order ?counterparty_currency - counterparty_currency)
+    (transfer_order_requires_local_profile ?transfer_order - transfer_order)
+    (transfer_order_requires_counterparty_profile ?transfer_order - transfer_order)
+    (transfer_order_validated ?transfer_order - transfer_order)
+    (desk_manages_operating_account ?treasury_desk - treasury_desk ?operating_account - operating_account)
+    (desk_manages_subsidiary_account ?treasury_desk - treasury_desk ?subsidiary_account - subsidiary_account)
+    (desk_assigned_transfer_order ?treasury_desk - treasury_desk ?transfer_order - transfer_order)
+    (liquidity_buffer_available ?liquidity_buffer - liquidity_buffer)
+    (desk_allocated_liquidity_buffer ?treasury_desk - treasury_desk ?liquidity_buffer - liquidity_buffer)
+    (liquidity_buffer_reserved ?liquidity_buffer - liquidity_buffer)
+    (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    (desk_ready_for_execution_routing ?treasury_desk - treasury_desk)
+    (desk_ready_for_validation ?treasury_desk - treasury_desk)
+    (desk_routing_finalized ?treasury_desk - treasury_desk)
+    (desk_venue_assigned ?treasury_desk - treasury_desk)
+    (desk_venue_validation_complete ?treasury_desk - treasury_desk)
+    (desk_execution_requirements_satisfied ?treasury_desk - treasury_desk)
+    (desk_pre_posting_checks_completed ?treasury_desk - treasury_desk)
+    (limit_profile_available ?limit_profile - limit_profile)
+    (desk_assigned_limit_profile ?treasury_desk - treasury_desk ?limit_profile - limit_profile)
+    (desk_limit_profile_locked ?treasury_desk - treasury_desk)
+    (desk_limit_profile_validated ?treasury_desk - treasury_desk)
+    (desk_limit_profile_confirmed ?treasury_desk - treasury_desk)
+    (execution_venue_available ?execution_venue - execution_venue)
+    (desk_assigned_execution_venue ?treasury_desk - treasury_desk ?execution_venue - execution_venue)
+    (funding_priority_available ?funding_priority - funding_priority)
+    (desk_assigned_funding_priority ?treasury_desk - treasury_desk ?funding_priority - funding_priority)
+    (settlement_profile_available ?settlement_profile - settlement_profile)
+    (desk_assigned_settlement_profile ?treasury_desk - treasury_desk ?settlement_profile - settlement_profile)
+    (regulatory_constraint_available ?regulatory_constraint - regulatory_constraint)
+    (desk_assigned_regulatory_constraint ?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint)
+    (execution_window_available ?execution_window - execution_window)
+    (position_assigned_execution_window ?rebalancing_entity - rebalancing_entity ?execution_window - execution_window)
+    (operating_account_eligibility ?operating_account - operating_account)
+    (subsidiary_account_eligibility ?subsidiary_account - subsidiary_account)
+    (desk_final_signoff ?treasury_desk - treasury_desk)
+  )
+  (:action register_position
+    :parameters (?rebalancing_entity - rebalancing_entity)
+    :precondition
+      (and
+        (not
+          (position_registered ?rebalancing_entity)
+        )
+        (not
+          (position_settled ?rebalancing_entity)
+        )
+      )
+    :effect (position_registered ?rebalancing_entity)
+  )
+  (:action allocate_funding_for_position
+    :parameters (?rebalancing_entity - rebalancing_entity ?funding_source - funding_source)
+    :precondition
+      (and
+        (position_registered ?rebalancing_entity)
+        (not
+          (position_funding_allocated ?rebalancing_entity)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (position_funding_allocated ?rebalancing_entity)
+        (position_funded_from ?rebalancing_entity ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action assign_fx_quote_to_position
+    :parameters (?rebalancing_entity - rebalancing_entity ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (position_registered ?rebalancing_entity)
+        (position_funding_allocated ?rebalancing_entity)
+        (fx_quote_available ?fx_quote)
+      )
+    :effect
+      (and
+        (position_assigned_fx_quote ?rebalancing_entity ?fx_quote)
+        (not
+          (fx_quote_available ?fx_quote)
+        )
+      )
+  )
+  (:action request_position_approval
+    :parameters (?rebalancing_entity - rebalancing_entity ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (position_registered ?rebalancing_entity)
+        (position_funding_allocated ?rebalancing_entity)
+        (position_assigned_fx_quote ?rebalancing_entity ?fx_quote)
+        (not
+          (requires_approval ?rebalancing_entity)
+        )
+      )
+    :effect (requires_approval ?rebalancing_entity)
+  )
+  (:action unassign_fx_quote_from_position
+    :parameters (?rebalancing_entity - rebalancing_entity ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (position_assigned_fx_quote ?rebalancing_entity ?fx_quote)
+      )
+    :effect
+      (and
+        (fx_quote_available ?fx_quote)
+        (not
+          (position_assigned_fx_quote ?rebalancing_entity ?fx_quote)
+        )
+      )
+  )
+  (:action assign_approver_to_position
+    :parameters (?rebalancing_entity - rebalancing_entity ?approver - approver)
+    :precondition
+      (and
+        (requires_approval ?rebalancing_entity)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (position_assigned_approver ?rebalancing_entity ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action unassign_approver_from_position
+    :parameters (?rebalancing_entity - rebalancing_entity ?approver - approver)
+    :precondition
+      (and
+        (position_assigned_approver ?rebalancing_entity ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (position_assigned_approver ?rebalancing_entity ?approver)
+        )
+      )
+  )
+  (:action assign_settlement_profile_to_desk
+    :parameters (?treasury_desk - treasury_desk ?settlement_profile - settlement_profile)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (settlement_profile_available ?settlement_profile)
+      )
+    :effect
+      (and
+        (desk_assigned_settlement_profile ?treasury_desk ?settlement_profile)
+        (not
+          (settlement_profile_available ?settlement_profile)
+        )
+      )
+  )
+  (:action unassign_settlement_profile_from_desk
+    :parameters (?treasury_desk - treasury_desk ?settlement_profile - settlement_profile)
+    :precondition
+      (and
+        (desk_assigned_settlement_profile ?treasury_desk ?settlement_profile)
+      )
+    :effect
+      (and
+        (settlement_profile_available ?settlement_profile)
+        (not
+          (desk_assigned_settlement_profile ?treasury_desk ?settlement_profile)
+        )
+      )
+  )
+  (:action assign_regulatory_constraint_to_desk
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (regulatory_constraint_available ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (not
+          (regulatory_constraint_available ?regulatory_constraint)
+        )
+      )
+  )
+  (:action unassign_regulatory_constraint_from_desk
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (regulatory_constraint_available ?regulatory_constraint)
+        (not
+          (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        )
+      )
+  )
+  (:action flag_currency_pending_allocation
+    :parameters (?operating_account - operating_account ?local_currency - local_currency ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (requires_approval ?operating_account)
+        (position_assigned_fx_quote ?operating_account ?fx_quote)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (not
+          (currency_pending_allocation ?local_currency)
+        )
+        (not
+          (currency_buffer_reserved ?local_currency)
+        )
+      )
+    :effect (currency_pending_allocation ?local_currency)
+  )
+  (:action assign_buffer_with_approver
+    :parameters (?operating_account - operating_account ?local_currency - local_currency ?approver - approver)
+    :precondition
+      (and
+        (requires_approval ?operating_account)
+        (position_assigned_approver ?operating_account ?approver)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (currency_pending_allocation ?local_currency)
+        (not
+          (operating_account_eligibility ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (operating_account_eligibility ?operating_account)
+        (operating_account_buffer_allocated ?operating_account)
+      )
+  )
+  (:action allocate_liquidity_instrument_to_operating_account
+    :parameters (?operating_account - operating_account ?local_currency - local_currency ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (requires_approval ?operating_account)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (operating_account_eligibility ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (currency_buffer_reserved ?local_currency)
+        (operating_account_eligibility ?operating_account)
+        (operating_account_assigned_instrument ?operating_account ?liquidity_instrument)
+        (not
+          (liquidity_instrument_available ?liquidity_instrument)
+        )
+      )
+  )
+  (:action finalize_currency_buffer_allocation_for_operating_account
+    :parameters (?operating_account - operating_account ?local_currency - local_currency ?fx_quote - fx_quote ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (requires_approval ?operating_account)
+        (position_assigned_fx_quote ?operating_account ?fx_quote)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (currency_buffer_reserved ?local_currency)
+        (operating_account_assigned_instrument ?operating_account ?liquidity_instrument)
+        (not
+          (operating_account_buffer_allocated ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (currency_pending_allocation ?local_currency)
+        (operating_account_buffer_allocated ?operating_account)
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (operating_account_assigned_instrument ?operating_account ?liquidity_instrument)
+        )
+      )
+  )
+  (:action flag_counterparty_currency_pending_allocation
+    :parameters (?subsidiary_account - subsidiary_account ?counterparty_currency - counterparty_currency ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (requires_approval ?subsidiary_account)
+        (position_assigned_fx_quote ?subsidiary_account ?fx_quote)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (not
+          (counterparty_currency_selected ?counterparty_currency)
+        )
+        (not
+          (counterparty_currency_buffer_reserved ?counterparty_currency)
+        )
+      )
+    :effect (counterparty_currency_selected ?counterparty_currency)
+  )
+  (:action assign_approver_to_subsidiary
+    :parameters (?subsidiary_account - subsidiary_account ?counterparty_currency - counterparty_currency ?approver - approver)
+    :precondition
+      (and
+        (requires_approval ?subsidiary_account)
+        (position_assigned_approver ?subsidiary_account ?approver)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (counterparty_currency_selected ?counterparty_currency)
+        (not
+          (subsidiary_account_eligibility ?subsidiary_account)
+        )
+      )
+    :effect
+      (and
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+      )
+  )
+  (:action allocate_liquidity_instrument_to_subsidiary_account
+    :parameters (?subsidiary_account - subsidiary_account ?counterparty_currency - counterparty_currency ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (requires_approval ?subsidiary_account)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (subsidiary_account_eligibility ?subsidiary_account)
+        )
+      )
+    :effect
+      (and
+        (counterparty_currency_buffer_reserved ?counterparty_currency)
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (subsidiary_account_assigned_instrument ?subsidiary_account ?liquidity_instrument)
+        (not
+          (liquidity_instrument_available ?liquidity_instrument)
+        )
+      )
+  )
+  (:action finalize_counterparty_buffer_allocation_for_subsidiary
+    :parameters (?subsidiary_account - subsidiary_account ?counterparty_currency - counterparty_currency ?fx_quote - fx_quote ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (requires_approval ?subsidiary_account)
+        (position_assigned_fx_quote ?subsidiary_account ?fx_quote)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (counterparty_currency_buffer_reserved ?counterparty_currency)
+        (subsidiary_account_assigned_instrument ?subsidiary_account ?liquidity_instrument)
+        (not
+          (subsidiary_account_buffer_allocated ?subsidiary_account)
+        )
+      )
+    :effect
+      (and
+        (counterparty_currency_selected ?counterparty_currency)
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (subsidiary_account_assigned_instrument ?subsidiary_account ?liquidity_instrument)
+        )
+      )
+  )
+  (:action assemble_transfer_order
+    :parameters (?operating_account - operating_account ?subsidiary_account - subsidiary_account ?local_currency - local_currency ?counterparty_currency - counterparty_currency ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operating_account_eligibility ?operating_account)
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (currency_pending_allocation ?local_currency)
+        (counterparty_currency_selected ?counterparty_currency)
+        (operating_account_buffer_allocated ?operating_account)
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (transfer_order_local_currency ?transfer_order ?local_currency)
+        (transfer_order_counterparty_currency ?transfer_order ?counterparty_currency)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action assemble_transfer_order_with_local_profile
+    :parameters (?operating_account - operating_account ?subsidiary_account - subsidiary_account ?local_currency - local_currency ?counterparty_currency - counterparty_currency ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operating_account_eligibility ?operating_account)
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (currency_buffer_reserved ?local_currency)
+        (counterparty_currency_selected ?counterparty_currency)
+        (not
+          (operating_account_buffer_allocated ?operating_account)
+        )
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (transfer_order_local_currency ?transfer_order ?local_currency)
+        (transfer_order_counterparty_currency ?transfer_order ?counterparty_currency)
+        (transfer_order_requires_local_profile ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action assemble_transfer_order_with_counterparty_profile
+    :parameters (?operating_account - operating_account ?subsidiary_account - subsidiary_account ?local_currency - local_currency ?counterparty_currency - counterparty_currency ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operating_account_eligibility ?operating_account)
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (currency_pending_allocation ?local_currency)
+        (counterparty_currency_buffer_reserved ?counterparty_currency)
+        (operating_account_buffer_allocated ?operating_account)
+        (not
+          (subsidiary_account_buffer_allocated ?subsidiary_account)
+        )
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (transfer_order_local_currency ?transfer_order ?local_currency)
+        (transfer_order_counterparty_currency ?transfer_order ?counterparty_currency)
+        (transfer_order_requires_counterparty_profile ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action assemble_transfer_order_with_both_profiles
+    :parameters (?operating_account - operating_account ?subsidiary_account - subsidiary_account ?local_currency - local_currency ?counterparty_currency - counterparty_currency ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operating_account_eligibility ?operating_account)
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (operating_account_local_currency ?operating_account ?local_currency)
+        (subsidiary_counterparty_currency_assigned ?subsidiary_account ?counterparty_currency)
+        (currency_buffer_reserved ?local_currency)
+        (counterparty_currency_buffer_reserved ?counterparty_currency)
+        (not
+          (operating_account_buffer_allocated ?operating_account)
+        )
+        (not
+          (subsidiary_account_buffer_allocated ?subsidiary_account)
+        )
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_created ?transfer_order)
+        (transfer_order_local_currency ?transfer_order ?local_currency)
+        (transfer_order_counterparty_currency ?transfer_order ?counterparty_currency)
+        (transfer_order_requires_local_profile ?transfer_order)
+        (transfer_order_requires_counterparty_profile ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action validate_transfer_order
+    :parameters (?transfer_order - transfer_order ?operating_account - operating_account ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (transfer_order_created ?transfer_order)
+        (operating_account_eligibility ?operating_account)
+        (position_assigned_fx_quote ?operating_account ?fx_quote)
+        (not
+          (transfer_order_validated ?transfer_order)
+        )
+      )
+    :effect (transfer_order_validated ?transfer_order)
+  )
+  (:action reserve_liquidity_buffer_for_transfer_order
+    :parameters (?treasury_desk - treasury_desk ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (desk_assigned_transfer_order ?treasury_desk ?transfer_order)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_available ?liquidity_buffer)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_validated ?transfer_order)
+        (not
+          (liquidity_buffer_reserved ?liquidity_buffer)
+        )
+      )
+    :effect
+      (and
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (not
+          (liquidity_buffer_available ?liquidity_buffer)
+        )
+      )
+  )
+  (:action prepare_desk_for_execution_routing
+    :parameters (?treasury_desk - treasury_desk ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (position_assigned_fx_quote ?treasury_desk ?fx_quote)
+        (not
+          (transfer_order_requires_local_profile ?transfer_order)
+        )
+        (not
+          (desk_ready_for_execution_routing ?treasury_desk)
+        )
+      )
+    :effect (desk_ready_for_execution_routing ?treasury_desk)
+  )
+  (:action assign_execution_venue_to_desk
+    :parameters (?treasury_desk - treasury_desk ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (execution_venue_available ?execution_venue)
+        (not
+          (desk_venue_assigned ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_venue_assigned ?treasury_desk)
+        (desk_assigned_execution_venue ?treasury_desk ?execution_venue)
+        (not
+          (execution_venue_available ?execution_venue)
+        )
+      )
+  )
+  (:action attach_execution_venue_and_prepare_desk
+    :parameters (?treasury_desk - treasury_desk ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order ?fx_quote - fx_quote ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_reserved ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (position_assigned_fx_quote ?treasury_desk ?fx_quote)
+        (transfer_order_requires_local_profile ?transfer_order)
+        (desk_venue_assigned ?treasury_desk)
+        (desk_assigned_execution_venue ?treasury_desk ?execution_venue)
+        (not
+          (desk_ready_for_execution_routing ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_ready_for_execution_routing ?treasury_desk)
+        (desk_venue_validation_complete ?treasury_desk)
+      )
+  )
+  (:action apply_venue_profiles_and_fees
+    :parameters (?treasury_desk - treasury_desk ?settlement_profile - settlement_profile ?approver - approver ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_execution_routing ?treasury_desk)
+        (desk_assigned_settlement_profile ?treasury_desk ?settlement_profile)
+        (position_assigned_approver ?treasury_desk ?approver)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (not
+          (transfer_order_requires_counterparty_profile ?transfer_order)
+        )
+        (not
+          (desk_ready_for_validation ?treasury_desk)
+        )
+      )
+    :effect (desk_ready_for_validation ?treasury_desk)
+  )
+  (:action apply_venue_profiles_and_fees_counterparty
+    :parameters (?treasury_desk - treasury_desk ?settlement_profile - settlement_profile ?approver - approver ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_execution_routing ?treasury_desk)
+        (desk_assigned_settlement_profile ?treasury_desk ?settlement_profile)
+        (position_assigned_approver ?treasury_desk ?approver)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (transfer_order_requires_counterparty_profile ?transfer_order)
+        (not
+          (desk_ready_for_validation ?treasury_desk)
+        )
+      )
+    :effect (desk_ready_for_validation ?treasury_desk)
+  )
+  (:action finalize_desk_routing_default
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_validation ?treasury_desk)
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (not
+          (transfer_order_requires_local_profile ?transfer_order)
+        )
+        (not
+          (transfer_order_requires_counterparty_profile ?transfer_order)
+        )
+        (not
+          (desk_routing_finalized ?treasury_desk)
+        )
+      )
+    :effect (desk_routing_finalized ?treasury_desk)
+  )
+  (:action finalize_desk_routing_with_local_profile
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_validation ?treasury_desk)
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (transfer_order_requires_local_profile ?transfer_order)
+        (not
+          (transfer_order_requires_counterparty_profile ?transfer_order)
+        )
+        (not
+          (desk_routing_finalized ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_execution_requirements_satisfied ?treasury_desk)
+      )
+  )
+  (:action finalize_desk_routing_with_counterparty_profile
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_validation ?treasury_desk)
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (not
+          (transfer_order_requires_local_profile ?transfer_order)
+        )
+        (transfer_order_requires_counterparty_profile ?transfer_order)
+        (not
+          (desk_routing_finalized ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_execution_requirements_satisfied ?treasury_desk)
+      )
+  )
+  (:action finalize_desk_routing_with_both_profiles
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint ?liquidity_buffer - liquidity_buffer ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (desk_ready_for_validation ?treasury_desk)
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (desk_allocated_liquidity_buffer ?treasury_desk ?liquidity_buffer)
+        (liquidity_buffer_bound_to_transfer_order ?liquidity_buffer ?transfer_order)
+        (transfer_order_requires_local_profile ?transfer_order)
+        (transfer_order_requires_counterparty_profile ?transfer_order)
+        (not
+          (desk_routing_finalized ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_execution_requirements_satisfied ?treasury_desk)
+      )
+  )
+  (:action confirm_execution_readiness_for_desk
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (not
+          (desk_execution_requirements_satisfied ?treasury_desk)
+        )
+        (not
+          (desk_final_signoff ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_final_signoff ?treasury_desk)
+        (position_ready_for_posting ?treasury_desk)
+      )
+  )
+  (:action assign_funding_priority_to_desk
+    :parameters (?treasury_desk - treasury_desk ?funding_priority - funding_priority)
+    :precondition
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_execution_requirements_satisfied ?treasury_desk)
+        (funding_priority_available ?funding_priority)
+      )
+    :effect
+      (and
+        (desk_assigned_funding_priority ?treasury_desk ?funding_priority)
+        (not
+          (funding_priority_available ?funding_priority)
+        )
+      )
+  )
+  (:action perform_final_pre_settlement_checks
+    :parameters (?treasury_desk - treasury_desk ?operating_account - operating_account ?subsidiary_account - subsidiary_account ?fx_quote - fx_quote ?funding_priority - funding_priority)
+    :precondition
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_execution_requirements_satisfied ?treasury_desk)
+        (desk_assigned_funding_priority ?treasury_desk ?funding_priority)
+        (desk_manages_operating_account ?treasury_desk ?operating_account)
+        (desk_manages_subsidiary_account ?treasury_desk ?subsidiary_account)
+        (operating_account_buffer_allocated ?operating_account)
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+        (position_assigned_fx_quote ?treasury_desk ?fx_quote)
+        (not
+          (desk_pre_posting_checks_completed ?treasury_desk)
+        )
+      )
+    :effect (desk_pre_posting_checks_completed ?treasury_desk)
+  )
+  (:action finalize_desk_readiness_for_posting
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (desk_routing_finalized ?treasury_desk)
+        (desk_pre_posting_checks_completed ?treasury_desk)
+        (not
+          (desk_final_signoff ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_final_signoff ?treasury_desk)
+        (position_ready_for_posting ?treasury_desk)
+      )
+  )
+  (:action lock_limit_profile_on_desk
+    :parameters (?treasury_desk - treasury_desk ?limit_profile - limit_profile ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (requires_approval ?treasury_desk)
+        (position_assigned_fx_quote ?treasury_desk ?fx_quote)
+        (limit_profile_available ?limit_profile)
+        (desk_assigned_limit_profile ?treasury_desk ?limit_profile)
+        (not
+          (desk_limit_profile_locked ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_limit_profile_locked ?treasury_desk)
+        (not
+          (limit_profile_available ?limit_profile)
+        )
+      )
+  )
+  (:action validate_limit_profile_with_approver
+    :parameters (?treasury_desk - treasury_desk ?approver - approver)
+    :precondition
+      (and
+        (desk_limit_profile_locked ?treasury_desk)
+        (position_assigned_approver ?treasury_desk ?approver)
+        (not
+          (desk_limit_profile_validated ?treasury_desk)
+        )
+      )
+    :effect (desk_limit_profile_validated ?treasury_desk)
+  )
+  (:action confirm_limit_profile_with_regulatory_constraint
+    :parameters (?treasury_desk - treasury_desk ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (desk_limit_profile_validated ?treasury_desk)
+        (desk_assigned_regulatory_constraint ?treasury_desk ?regulatory_constraint)
+        (not
+          (desk_limit_profile_confirmed ?treasury_desk)
+        )
+      )
+    :effect (desk_limit_profile_confirmed ?treasury_desk)
+  )
+  (:action finalize_limit_profile_and_mark_desk_ready
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (desk_limit_profile_confirmed ?treasury_desk)
+        (not
+          (desk_final_signoff ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_final_signoff ?treasury_desk)
+        (position_ready_for_posting ?treasury_desk)
+      )
+  )
+  (:action mark_operating_account_ready_for_posting
+    :parameters (?operating_account - operating_account ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operating_account_eligibility ?operating_account)
+        (operating_account_buffer_allocated ?operating_account)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_validated ?transfer_order)
+        (not
+          (position_ready_for_posting ?operating_account)
+        )
+      )
+    :effect (position_ready_for_posting ?operating_account)
+  )
+  (:action mark_subsidiary_account_ready_for_posting
+    :parameters (?subsidiary_account - subsidiary_account ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (subsidiary_account_eligibility ?subsidiary_account)
+        (subsidiary_account_buffer_allocated ?subsidiary_account)
+        (transfer_order_created ?transfer_order)
+        (transfer_order_validated ?transfer_order)
+        (not
+          (position_ready_for_posting ?subsidiary_account)
+        )
+      )
+    :effect (position_ready_for_posting ?subsidiary_account)
+  )
+  (:action authorize_posting_and_assign_execution_window
+    :parameters (?rebalancing_entity - rebalancing_entity ?execution_window - execution_window ?fx_quote - fx_quote)
+    :precondition
+      (and
+        (position_ready_for_posting ?rebalancing_entity)
+        (position_assigned_fx_quote ?rebalancing_entity ?fx_quote)
+        (execution_window_available ?execution_window)
+        (not
+          (position_posting_authorized ?rebalancing_entity)
+        )
+      )
+    :effect
+      (and
+        (position_posting_authorized ?rebalancing_entity)
+        (position_assigned_execution_window ?rebalancing_entity ?execution_window)
+        (not
+          (execution_window_available ?execution_window)
+        )
+      )
+  )
+  (:action execute_transfer_from_operating_account
+    :parameters (?operating_account - operating_account ?funding_source - funding_source ?execution_window - execution_window)
+    :precondition
+      (and
+        (position_posting_authorized ?operating_account)
+        (position_funded_from ?operating_account ?funding_source)
+        (position_assigned_execution_window ?operating_account ?execution_window)
+        (not
+          (position_settled ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (position_settled ?operating_account)
+        (funding_source_available ?funding_source)
+        (execution_window_available ?execution_window)
+      )
+  )
+  (:action execute_transfer_from_subsidiary_account
+    :parameters (?subsidiary_account - subsidiary_account ?funding_source - funding_source ?execution_window - execution_window)
+    :precondition
+      (and
+        (position_posting_authorized ?subsidiary_account)
+        (position_funded_from ?subsidiary_account ?funding_source)
+        (position_assigned_execution_window ?subsidiary_account ?execution_window)
+        (not
+          (position_settled ?subsidiary_account)
+        )
+      )
+    :effect
+      (and
+        (position_settled ?subsidiary_account)
+        (funding_source_available ?funding_source)
+        (execution_window_available ?execution_window)
+      )
+  )
+  (:action execute_transfer_from_treasury_desk
+    :parameters (?treasury_desk - treasury_desk ?funding_source - funding_source ?execution_window - execution_window)
+    :precondition
+      (and
+        (position_posting_authorized ?treasury_desk)
+        (position_funded_from ?treasury_desk ?funding_source)
+        (position_assigned_execution_window ?treasury_desk ?execution_window)
+        (not
+          (position_settled ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (position_settled ?treasury_desk)
+        (funding_source_available ?funding_source)
+        (execution_window_available ?execution_window)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem currency_position_rebalancing_problem)
+  (:domain currency_position_rebalancing_domain)
+  (:objects operating_account_hq - operating_account subsidiary_account_branch - subsidiary_account treasury_desk_primary - treasury_desk treasury_desk_secondary - treasury_desk funding_source_pool_a - funding_source funding_source_pool_b - funding_source funding_source_pool_c - funding_source fx_quote_usd_eur - fx_quote approver_primary - approver liquidity_instrument_short_term_note - liquidity_instrument currency_usd - local_currency currency_eur - counterparty_currency transfer_order_001 - transfer_order liquidity_buffer_usd - liquidity_buffer liquidity_buffer_eur - liquidity_buffer venue_swift - execution_venue venue_local_rtgs - execution_venue funding_priority_high - funding_priority funding_priority_low - funding_priority execution_window_morning - execution_window settlement_profile_standard - settlement_profile limit_profile_default - limit_profile limit_profile_special - limit_profile regulatory_constraint_standard - regulatory_constraint)
+  (:init
+    (funding_source_available funding_source_pool_a)
+    (funding_source_available funding_source_pool_b)
+    (funding_source_available funding_source_pool_c)
+    (fx_quote_available fx_quote_usd_eur)
+    (approver_available approver_primary)
+    (liquidity_instrument_available liquidity_instrument_short_term_note)
+    (operating_account_local_currency operating_account_hq currency_usd)
+    (subsidiary_counterparty_currency_assigned subsidiary_account_branch currency_eur)
+    (transfer_order_draft transfer_order_001)
+    (liquidity_buffer_available liquidity_buffer_usd)
+    (liquidity_buffer_available liquidity_buffer_eur)
+    (desk_manages_operating_account treasury_desk_primary operating_account_hq)
+    (desk_manages_operating_account treasury_desk_secondary operating_account_hq)
+    (desk_manages_subsidiary_account treasury_desk_primary subsidiary_account_branch)
+    (desk_manages_subsidiary_account treasury_desk_secondary subsidiary_account_branch)
+    (desk_assigned_transfer_order treasury_desk_primary transfer_order_001)
+    (desk_assigned_transfer_order treasury_desk_secondary transfer_order_001)
+    (desk_allocated_liquidity_buffer treasury_desk_primary liquidity_buffer_usd)
+    (desk_allocated_liquidity_buffer treasury_desk_secondary liquidity_buffer_eur)
+    (execution_venue_available venue_swift)
+    (execution_venue_available venue_local_rtgs)
+    (funding_priority_available funding_priority_high)
+    (funding_priority_available funding_priority_low)
+    (execution_window_available execution_window_morning)
+    (settlement_profile_available settlement_profile_standard)
+    (limit_profile_available limit_profile_default)
+    (desk_assigned_limit_profile treasury_desk_primary limit_profile_default)
+    (desk_assigned_limit_profile treasury_desk_secondary limit_profile_special)
+    (regulatory_constraint_available regulatory_constraint_standard)
+  )
+  (:goal
+    (and
+      (position_settled operating_account_hq)
+      (position_settled subsidiary_account_branch)
+      (position_settled treasury_desk_primary)
+      (position_settled treasury_desk_secondary)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain logistics_sanctions_screening)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_type_watch - object auxiliary_type_geo - object auxiliary_type_doc - object case_container - object screening_case - case_container screening_service - auxiliary_type_watch party_record - auxiliary_type_watch review_resource - auxiliary_type_watch permit_type - auxiliary_type_watch payment_receipt - auxiliary_type_watch sanctions_alert_token - auxiliary_type_watch license_document - auxiliary_type_watch regulation_reference - auxiliary_type_watch evidence_attachment - auxiliary_type_geo commodity_line - auxiliary_type_geo regulatory_authority - auxiliary_type_geo export_jurisdiction - auxiliary_type_doc import_jurisdiction - auxiliary_type_doc submission_package - auxiliary_type_doc shipment_leg_group - screening_case document_group - screening_case export_shipment - shipment_leg_group import_shipment - shipment_leg_group case_handler - document_group)
+  (:predicates
+    (screening_case_created ?screening_case - screening_case)
+    (screening_check_requested_for_entity ?screening_case - screening_case)
+    (screening_service_allocated ?screening_case - screening_case)
+    (final_clearance_granted_for_entity ?screening_case - screening_case)
+    (ready_for_final_review_for_entity ?screening_case - screening_case)
+    (final_review_approved_for_entity ?screening_case - screening_case)
+    (screening_service_available ?screening_service - screening_service)
+    (entity_assigned_to_screening_service ?screening_case - screening_case ?screening_service - screening_service)
+    (party_record_available ?party_record - party_record)
+    (entity_has_party_record ?screening_case - screening_case ?party_record - party_record)
+    (review_resource_available ?review_resource - review_resource)
+    (entity_assigned_review_resource ?screening_case - screening_case ?review_resource - review_resource)
+    (evidence_attachment_available ?evidence_attachment - evidence_attachment)
+    (export_shipment_evidence_linked ?export_shipment - export_shipment ?evidence_attachment - evidence_attachment)
+    (import_shipment_evidence_linked ?import_shipment - import_shipment ?evidence_attachment - evidence_attachment)
+    (export_shipment_in_jurisdiction ?export_shipment - export_shipment ?export_jurisdiction - export_jurisdiction)
+    (export_jurisdiction_cleared ?export_jurisdiction - export_jurisdiction)
+    (export_jurisdiction_flagged ?export_jurisdiction - export_jurisdiction)
+    (export_shipment_assessed ?export_shipment - export_shipment)
+    (import_shipment_in_jurisdiction ?import_shipment - import_shipment ?import_jurisdiction - import_jurisdiction)
+    (import_jurisdiction_cleared ?import_jurisdiction - import_jurisdiction)
+    (import_jurisdiction_flagged ?import_jurisdiction - import_jurisdiction)
+    (import_shipment_assessed ?import_shipment - import_shipment)
+    (submission_package_available ?submission_package - submission_package)
+    (submission_package_ready ?submission_package - submission_package)
+    (submission_package_linked_to_export_jurisdiction ?submission_package - submission_package ?export_jurisdiction - export_jurisdiction)
+    (submission_package_linked_to_import_jurisdiction ?submission_package - submission_package ?import_jurisdiction - import_jurisdiction)
+    (submission_package_export_documents_complete ?submission_package - submission_package)
+    (submission_package_import_documents_complete ?submission_package - submission_package)
+    (submission_package_validated ?submission_package - submission_package)
+    (handler_assigned_to_export_shipment ?case_handler - case_handler ?export_shipment - export_shipment)
+    (handler_assigned_to_import_shipment ?case_handler - case_handler ?import_shipment - import_shipment)
+    (handler_assigned_to_submission_package ?case_handler - case_handler ?submission_package - submission_package)
+    (commodity_line_available ?commodity_line - commodity_line)
+    (handler_assigned_to_commodity_line ?case_handler - case_handler ?commodity_line - commodity_line)
+    (commodity_line_validated ?commodity_line - commodity_line)
+    (commodity_line_in_submission_package ?commodity_line - commodity_line ?submission_package - submission_package)
+    (handler_document_validation_completed ?case_handler - case_handler)
+    (handler_license_check_completed ?case_handler - case_handler)
+    (handler_regulation_check_completed ?case_handler - case_handler)
+    (handler_permit_recorded ?case_handler - case_handler)
+    (handler_permit_validated ?case_handler - case_handler)
+    (handler_ready_for_finalization ?case_handler - case_handler)
+    (handler_final_checks_completed ?case_handler - case_handler)
+    (regulatory_authority_available ?regulatory_authority - regulatory_authority)
+    (handler_linked_regulatory_authority ?case_handler - case_handler ?regulatory_authority - regulatory_authority)
+    (handler_regulatory_consultation_requested ?case_handler - case_handler)
+    (handler_regulatory_response_received ?case_handler - case_handler)
+    (handler_regulatory_approval_received ?case_handler - case_handler)
+    (permit_type_available ?permit_type - permit_type)
+    (handler_assigned_permit_type ?case_handler - case_handler ?permit_type - permit_type)
+    (payment_receipt_available ?payment_receipt - payment_receipt)
+    (handler_recorded_payment_receipt ?case_handler - case_handler ?payment_receipt - payment_receipt)
+    (license_document_available ?license_document - license_document)
+    (handler_linked_license_document ?case_handler - case_handler ?license_document - license_document)
+    (regulation_reference_available ?regulation_reference - regulation_reference)
+    (handler_linked_regulation_reference ?case_handler - case_handler ?regulation_reference - regulation_reference)
+    (sanctions_alert_token_available ?sanctions_alert_token - sanctions_alert_token)
+    (entity_linked_alert_token ?screening_case - screening_case ?sanctions_alert_token - sanctions_alert_token)
+    (export_shipment_jurisdiction_checked ?export_shipment - export_shipment)
+    (import_shipment_jurisdiction_checked ?import_shipment - import_shipment)
+    (handler_signoff_completed ?case_handler - case_handler)
+  )
+  (:action open_screening_case
+    :parameters (?screening_case - screening_case)
+    :precondition
+      (and
+        (not
+          (screening_case_created ?screening_case)
+        )
+        (not
+          (final_clearance_granted_for_entity ?screening_case)
+        )
+      )
+    :effect (screening_case_created ?screening_case)
+  )
+  (:action assign_screening_service
+    :parameters (?screening_case - screening_case ?screening_service - screening_service)
+    :precondition
+      (and
+        (screening_case_created ?screening_case)
+        (not
+          (screening_service_allocated ?screening_case)
+        )
+        (screening_service_available ?screening_service)
+      )
+    :effect
+      (and
+        (screening_service_allocated ?screening_case)
+        (entity_assigned_to_screening_service ?screening_case ?screening_service)
+        (not
+          (screening_service_available ?screening_service)
+        )
+      )
+  )
+  (:action attach_party_record
+    :parameters (?screening_case - screening_case ?party_record - party_record)
+    :precondition
+      (and
+        (screening_case_created ?screening_case)
+        (screening_service_allocated ?screening_case)
+        (party_record_available ?party_record)
+      )
+    :effect
+      (and
+        (entity_has_party_record ?screening_case ?party_record)
+        (not
+          (party_record_available ?party_record)
+        )
+      )
+  )
+  (:action request_automated_screening_check
+    :parameters (?screening_case - screening_case ?party_record - party_record)
+    :precondition
+      (and
+        (screening_case_created ?screening_case)
+        (screening_service_allocated ?screening_case)
+        (entity_has_party_record ?screening_case ?party_record)
+        (not
+          (screening_check_requested_for_entity ?screening_case)
+        )
+      )
+    :effect (screening_check_requested_for_entity ?screening_case)
+  )
+  (:action release_party_record
+    :parameters (?screening_case - screening_case ?party_record - party_record)
+    :precondition
+      (and
+        (entity_has_party_record ?screening_case ?party_record)
+      )
+    :effect
+      (and
+        (party_record_available ?party_record)
+        (not
+          (entity_has_party_record ?screening_case ?party_record)
+        )
+      )
+  )
+  (:action assign_review_resource
+    :parameters (?screening_case - screening_case ?review_resource - review_resource)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?screening_case)
+        (review_resource_available ?review_resource)
+      )
+    :effect
+      (and
+        (entity_assigned_review_resource ?screening_case ?review_resource)
+        (not
+          (review_resource_available ?review_resource)
+        )
+      )
+  )
+  (:action release_review_resource
+    :parameters (?screening_case - screening_case ?review_resource - review_resource)
+    :precondition
+      (and
+        (entity_assigned_review_resource ?screening_case ?review_resource)
+      )
+    :effect
+      (and
+        (review_resource_available ?review_resource)
+        (not
+          (entity_assigned_review_resource ?screening_case ?review_resource)
+        )
+      )
+  )
+  (:action attach_license_document_to_handler
+    :parameters (?case_handler - case_handler ?license_document - license_document)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (license_document_available ?license_document)
+      )
+    :effect
+      (and
+        (handler_linked_license_document ?case_handler ?license_document)
+        (not
+          (license_document_available ?license_document)
+        )
+      )
+  )
+  (:action detach_license_document_from_handler
+    :parameters (?case_handler - case_handler ?license_document - license_document)
+    :precondition
+      (and
+        (handler_linked_license_document ?case_handler ?license_document)
+      )
+    :effect
+      (and
+        (license_document_available ?license_document)
+        (not
+          (handler_linked_license_document ?case_handler ?license_document)
+        )
+      )
+  )
+  (:action attach_regulation_reference_to_handler
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (regulation_reference_available ?regulation_reference)
+      )
+    :effect
+      (and
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (not
+          (regulation_reference_available ?regulation_reference)
+        )
+      )
+  )
+  (:action detach_regulation_reference_from_handler
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference)
+    :precondition
+      (and
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+      )
+    :effect
+      (and
+        (regulation_reference_available ?regulation_reference)
+        (not
+          (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        )
+      )
+  )
+  (:action confirm_export_jurisdiction
+    :parameters (?export_shipment - export_shipment ?export_jurisdiction - export_jurisdiction ?party_record - party_record)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?export_shipment)
+        (entity_has_party_record ?export_shipment ?party_record)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (not
+          (export_jurisdiction_cleared ?export_jurisdiction)
+        )
+        (not
+          (export_jurisdiction_flagged ?export_jurisdiction)
+        )
+      )
+    :effect (export_jurisdiction_cleared ?export_jurisdiction)
+  )
+  (:action record_export_jurisdiction_review
+    :parameters (?export_shipment - export_shipment ?export_jurisdiction - export_jurisdiction ?review_resource - review_resource)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?export_shipment)
+        (entity_assigned_review_resource ?export_shipment ?review_resource)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (export_jurisdiction_cleared ?export_jurisdiction)
+        (not
+          (export_shipment_jurisdiction_checked ?export_shipment)
+        )
+      )
+    :effect
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (export_shipment_assessed ?export_shipment)
+      )
+  )
+  (:action attach_evidence_to_export_shipment
+    :parameters (?export_shipment - export_shipment ?export_jurisdiction - export_jurisdiction ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?export_shipment)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (evidence_attachment_available ?evidence_attachment)
+        (not
+          (export_shipment_jurisdiction_checked ?export_shipment)
+        )
+      )
+    :effect
+      (and
+        (export_jurisdiction_flagged ?export_jurisdiction)
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (export_shipment_evidence_linked ?export_shipment ?evidence_attachment)
+        (not
+          (evidence_attachment_available ?evidence_attachment)
+        )
+      )
+  )
+  (:action resolve_export_jurisdiction_with_evidence
+    :parameters (?export_shipment - export_shipment ?export_jurisdiction - export_jurisdiction ?party_record - party_record ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?export_shipment)
+        (entity_has_party_record ?export_shipment ?party_record)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (export_jurisdiction_flagged ?export_jurisdiction)
+        (export_shipment_evidence_linked ?export_shipment ?evidence_attachment)
+        (not
+          (export_shipment_assessed ?export_shipment)
+        )
+      )
+    :effect
+      (and
+        (export_jurisdiction_cleared ?export_jurisdiction)
+        (export_shipment_assessed ?export_shipment)
+        (evidence_attachment_available ?evidence_attachment)
+        (not
+          (export_shipment_evidence_linked ?export_shipment ?evidence_attachment)
+        )
+      )
+  )
+  (:action confirm_import_jurisdiction
+    :parameters (?import_shipment - import_shipment ?import_jurisdiction - import_jurisdiction ?party_record - party_record)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?import_shipment)
+        (entity_has_party_record ?import_shipment ?party_record)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (not
+          (import_jurisdiction_cleared ?import_jurisdiction)
+        )
+        (not
+          (import_jurisdiction_flagged ?import_jurisdiction)
+        )
+      )
+    :effect (import_jurisdiction_cleared ?import_jurisdiction)
+  )
+  (:action record_import_jurisdiction_review
+    :parameters (?import_shipment - import_shipment ?import_jurisdiction - import_jurisdiction ?review_resource - review_resource)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?import_shipment)
+        (entity_assigned_review_resource ?import_shipment ?review_resource)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (import_jurisdiction_cleared ?import_jurisdiction)
+        (not
+          (import_shipment_jurisdiction_checked ?import_shipment)
+        )
+      )
+    :effect
+      (and
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (import_shipment_assessed ?import_shipment)
+      )
+  )
+  (:action attach_evidence_to_import_shipment
+    :parameters (?import_shipment - import_shipment ?import_jurisdiction - import_jurisdiction ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?import_shipment)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (evidence_attachment_available ?evidence_attachment)
+        (not
+          (import_shipment_jurisdiction_checked ?import_shipment)
+        )
+      )
+    :effect
+      (and
+        (import_jurisdiction_flagged ?import_jurisdiction)
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (import_shipment_evidence_linked ?import_shipment ?evidence_attachment)
+        (not
+          (evidence_attachment_available ?evidence_attachment)
+        )
+      )
+  )
+  (:action resolve_import_jurisdiction_with_evidence
+    :parameters (?import_shipment - import_shipment ?import_jurisdiction - import_jurisdiction ?party_record - party_record ?evidence_attachment - evidence_attachment)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?import_shipment)
+        (entity_has_party_record ?import_shipment ?party_record)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (import_jurisdiction_flagged ?import_jurisdiction)
+        (import_shipment_evidence_linked ?import_shipment ?evidence_attachment)
+        (not
+          (import_shipment_assessed ?import_shipment)
+        )
+      )
+    :effect
+      (and
+        (import_jurisdiction_cleared ?import_jurisdiction)
+        (import_shipment_assessed ?import_shipment)
+        (evidence_attachment_available ?evidence_attachment)
+        (not
+          (import_shipment_evidence_linked ?import_shipment ?evidence_attachment)
+        )
+      )
+  )
+  (:action create_submission_package_standard
+    :parameters (?export_shipment - export_shipment ?import_shipment - import_shipment ?export_jurisdiction - export_jurisdiction ?import_jurisdiction - import_jurisdiction ?submission_package - submission_package)
+    :precondition
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (export_jurisdiction_cleared ?export_jurisdiction)
+        (import_jurisdiction_cleared ?import_jurisdiction)
+        (export_shipment_assessed ?export_shipment)
+        (import_shipment_assessed ?import_shipment)
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_ready ?submission_package)
+        (submission_package_linked_to_export_jurisdiction ?submission_package ?export_jurisdiction)
+        (submission_package_linked_to_import_jurisdiction ?submission_package ?import_jurisdiction)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action create_submission_package_with_export_documents
+    :parameters (?export_shipment - export_shipment ?import_shipment - import_shipment ?export_jurisdiction - export_jurisdiction ?import_jurisdiction - import_jurisdiction ?submission_package - submission_package)
+    :precondition
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (export_jurisdiction_flagged ?export_jurisdiction)
+        (import_jurisdiction_cleared ?import_jurisdiction)
+        (not
+          (export_shipment_assessed ?export_shipment)
+        )
+        (import_shipment_assessed ?import_shipment)
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_ready ?submission_package)
+        (submission_package_linked_to_export_jurisdiction ?submission_package ?export_jurisdiction)
+        (submission_package_linked_to_import_jurisdiction ?submission_package ?import_jurisdiction)
+        (submission_package_export_documents_complete ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action create_submission_package_with_import_documents
+    :parameters (?export_shipment - export_shipment ?import_shipment - import_shipment ?export_jurisdiction - export_jurisdiction ?import_jurisdiction - import_jurisdiction ?submission_package - submission_package)
+    :precondition
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (export_jurisdiction_cleared ?export_jurisdiction)
+        (import_jurisdiction_flagged ?import_jurisdiction)
+        (export_shipment_assessed ?export_shipment)
+        (not
+          (import_shipment_assessed ?import_shipment)
+        )
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_ready ?submission_package)
+        (submission_package_linked_to_export_jurisdiction ?submission_package ?export_jurisdiction)
+        (submission_package_linked_to_import_jurisdiction ?submission_package ?import_jurisdiction)
+        (submission_package_import_documents_complete ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action create_submission_package_with_both_documents
+    :parameters (?export_shipment - export_shipment ?import_shipment - import_shipment ?export_jurisdiction - export_jurisdiction ?import_jurisdiction - import_jurisdiction ?submission_package - submission_package)
+    :precondition
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (export_shipment_in_jurisdiction ?export_shipment ?export_jurisdiction)
+        (import_shipment_in_jurisdiction ?import_shipment ?import_jurisdiction)
+        (export_jurisdiction_flagged ?export_jurisdiction)
+        (import_jurisdiction_flagged ?import_jurisdiction)
+        (not
+          (export_shipment_assessed ?export_shipment)
+        )
+        (not
+          (import_shipment_assessed ?import_shipment)
+        )
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_ready ?submission_package)
+        (submission_package_linked_to_export_jurisdiction ?submission_package ?export_jurisdiction)
+        (submission_package_linked_to_import_jurisdiction ?submission_package ?import_jurisdiction)
+        (submission_package_export_documents_complete ?submission_package)
+        (submission_package_import_documents_complete ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action validate_submission_package
+    :parameters (?submission_package - submission_package ?export_shipment - export_shipment ?party_record - party_record)
+    :precondition
+      (and
+        (submission_package_ready ?submission_package)
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (entity_has_party_record ?export_shipment ?party_record)
+        (not
+          (submission_package_validated ?submission_package)
+        )
+      )
+    :effect (submission_package_validated ?submission_package)
+  )
+  (:action validate_commodity_line
+    :parameters (?case_handler - case_handler ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (handler_assigned_to_submission_package ?case_handler ?submission_package)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_available ?commodity_line)
+        (submission_package_ready ?submission_package)
+        (submission_package_validated ?submission_package)
+        (not
+          (commodity_line_validated ?commodity_line)
+        )
+      )
+    :effect
+      (and
+        (commodity_line_validated ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (not
+          (commodity_line_available ?commodity_line)
+        )
+      )
+  )
+  (:action verify_handler_documents
+    :parameters (?case_handler - case_handler ?commodity_line - commodity_line ?submission_package - submission_package ?party_record - party_record)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_validated ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (entity_has_party_record ?case_handler ?party_record)
+        (not
+          (submission_package_export_documents_complete ?submission_package)
+        )
+        (not
+          (handler_document_validation_completed ?case_handler)
+        )
+      )
+    :effect (handler_document_validation_completed ?case_handler)
+  )
+  (:action assign_permit_type_to_handler
+    :parameters (?case_handler - case_handler ?permit_type - permit_type)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (permit_type_available ?permit_type)
+        (not
+          (handler_permit_recorded ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_permit_recorded ?case_handler)
+        (handler_assigned_permit_type ?case_handler ?permit_type)
+        (not
+          (permit_type_available ?permit_type)
+        )
+      )
+  )
+  (:action process_permit_and_package
+    :parameters (?case_handler - case_handler ?commodity_line - commodity_line ?submission_package - submission_package ?party_record - party_record ?permit_type - permit_type)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_validated ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (entity_has_party_record ?case_handler ?party_record)
+        (submission_package_export_documents_complete ?submission_package)
+        (handler_permit_recorded ?case_handler)
+        (handler_assigned_permit_type ?case_handler ?permit_type)
+        (not
+          (handler_document_validation_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_document_validation_completed ?case_handler)
+        (handler_permit_validated ?case_handler)
+      )
+  )
+  (:action initiate_license_adjudication
+    :parameters (?case_handler - case_handler ?license_document - license_document ?review_resource - review_resource ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_document_validation_completed ?case_handler)
+        (handler_linked_license_document ?case_handler ?license_document)
+        (entity_assigned_review_resource ?case_handler ?review_resource)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (not
+          (submission_package_import_documents_complete ?submission_package)
+        )
+        (not
+          (handler_license_check_completed ?case_handler)
+        )
+      )
+    :effect (handler_license_check_completed ?case_handler)
+  )
+  (:action complete_license_adjudication
+    :parameters (?case_handler - case_handler ?license_document - license_document ?review_resource - review_resource ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_document_validation_completed ?case_handler)
+        (handler_linked_license_document ?case_handler ?license_document)
+        (entity_assigned_review_resource ?case_handler ?review_resource)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (submission_package_import_documents_complete ?submission_package)
+        (not
+          (handler_license_check_completed ?case_handler)
+        )
+      )
+    :effect (handler_license_check_completed ?case_handler)
+  )
+  (:action initiate_regulation_adjudication
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_license_check_completed ?case_handler)
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (not
+          (submission_package_export_documents_complete ?submission_package)
+        )
+        (not
+          (submission_package_import_documents_complete ?submission_package)
+        )
+        (not
+          (handler_regulation_check_completed ?case_handler)
+        )
+      )
+    :effect (handler_regulation_check_completed ?case_handler)
+  )
+  (:action advance_regulation_adjudication
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_license_check_completed ?case_handler)
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (submission_package_export_documents_complete ?submission_package)
+        (not
+          (submission_package_import_documents_complete ?submission_package)
+        )
+        (not
+          (handler_regulation_check_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_ready_for_finalization ?case_handler)
+      )
+  )
+  (:action finalize_regulation_adjudication
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_license_check_completed ?case_handler)
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (not
+          (submission_package_export_documents_complete ?submission_package)
+        )
+        (submission_package_import_documents_complete ?submission_package)
+        (not
+          (handler_regulation_check_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_ready_for_finalization ?case_handler)
+      )
+  )
+  (:action confirm_regulation_adjudication
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference ?commodity_line - commodity_line ?submission_package - submission_package)
+    :precondition
+      (and
+        (handler_license_check_completed ?case_handler)
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (handler_assigned_to_commodity_line ?case_handler ?commodity_line)
+        (commodity_line_in_submission_package ?commodity_line ?submission_package)
+        (submission_package_export_documents_complete ?submission_package)
+        (submission_package_import_documents_complete ?submission_package)
+        (not
+          (handler_regulation_check_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_ready_for_finalization ?case_handler)
+      )
+  )
+  (:action prepare_handler_for_final_signoff
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (not
+          (handler_ready_for_finalization ?case_handler)
+        )
+        (not
+          (handler_signoff_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_signoff_completed ?case_handler)
+        (ready_for_final_review_for_entity ?case_handler)
+      )
+  )
+  (:action record_payment_receipt_for_handler
+    :parameters (?case_handler - case_handler ?payment_receipt - payment_receipt)
+    :precondition
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_ready_for_finalization ?case_handler)
+        (payment_receipt_available ?payment_receipt)
+      )
+    :effect
+      (and
+        (handler_recorded_payment_receipt ?case_handler ?payment_receipt)
+        (not
+          (payment_receipt_available ?payment_receipt)
+        )
+      )
+  )
+  (:action complete_handler_full_validation
+    :parameters (?case_handler - case_handler ?export_shipment - export_shipment ?import_shipment - import_shipment ?party_record - party_record ?payment_receipt - payment_receipt)
+    :precondition
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_ready_for_finalization ?case_handler)
+        (handler_recorded_payment_receipt ?case_handler ?payment_receipt)
+        (handler_assigned_to_export_shipment ?case_handler ?export_shipment)
+        (handler_assigned_to_import_shipment ?case_handler ?import_shipment)
+        (export_shipment_assessed ?export_shipment)
+        (import_shipment_assessed ?import_shipment)
+        (entity_has_party_record ?case_handler ?party_record)
+        (not
+          (handler_final_checks_completed ?case_handler)
+        )
+      )
+    :effect (handler_final_checks_completed ?case_handler)
+  )
+  (:action finalize_handler_signoff
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_regulation_check_completed ?case_handler)
+        (handler_final_checks_completed ?case_handler)
+        (not
+          (handler_signoff_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_signoff_completed ?case_handler)
+        (ready_for_final_review_for_entity ?case_handler)
+      )
+  )
+  (:action engage_regulatory_authority
+    :parameters (?case_handler - case_handler ?regulatory_authority - regulatory_authority ?party_record - party_record)
+    :precondition
+      (and
+        (screening_check_requested_for_entity ?case_handler)
+        (entity_has_party_record ?case_handler ?party_record)
+        (regulatory_authority_available ?regulatory_authority)
+        (handler_linked_regulatory_authority ?case_handler ?regulatory_authority)
+        (not
+          (handler_regulatory_consultation_requested ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_regulatory_consultation_requested ?case_handler)
+        (not
+          (regulatory_authority_available ?regulatory_authority)
+        )
+      )
+  )
+  (:action record_regulatory_response
+    :parameters (?case_handler - case_handler ?review_resource - review_resource)
+    :precondition
+      (and
+        (handler_regulatory_consultation_requested ?case_handler)
+        (entity_assigned_review_resource ?case_handler ?review_resource)
+        (not
+          (handler_regulatory_response_received ?case_handler)
+        )
+      )
+    :effect (handler_regulatory_response_received ?case_handler)
+  )
+  (:action record_regulatory_approval
+    :parameters (?case_handler - case_handler ?regulation_reference - regulation_reference)
+    :precondition
+      (and
+        (handler_regulatory_response_received ?case_handler)
+        (handler_linked_regulation_reference ?case_handler ?regulation_reference)
+        (not
+          (handler_regulatory_approval_received ?case_handler)
+        )
+      )
+    :effect (handler_regulatory_approval_received ?case_handler)
+  )
+  (:action finalize_regulatory_approval
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_regulatory_approval_received ?case_handler)
+        (not
+          (handler_signoff_completed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_signoff_completed ?case_handler)
+        (ready_for_final_review_for_entity ?case_handler)
+      )
+  )
+  (:action mark_export_shipment_ready_for_final_review
+    :parameters (?export_shipment - export_shipment ?submission_package - submission_package)
+    :precondition
+      (and
+        (export_shipment_jurisdiction_checked ?export_shipment)
+        (export_shipment_assessed ?export_shipment)
+        (submission_package_ready ?submission_package)
+        (submission_package_validated ?submission_package)
+        (not
+          (ready_for_final_review_for_entity ?export_shipment)
+        )
+      )
+    :effect (ready_for_final_review_for_entity ?export_shipment)
+  )
+  (:action mark_import_shipment_ready_for_final_review
+    :parameters (?import_shipment - import_shipment ?submission_package - submission_package)
+    :precondition
+      (and
+        (import_shipment_jurisdiction_checked ?import_shipment)
+        (import_shipment_assessed ?import_shipment)
+        (submission_package_ready ?submission_package)
+        (submission_package_validated ?submission_package)
+        (not
+          (ready_for_final_review_for_entity ?import_shipment)
+        )
+      )
+    :effect (ready_for_final_review_for_entity ?import_shipment)
+  )
+  (:action approve_final_review_and_link_alert
+    :parameters (?screening_case - screening_case ?sanctions_alert_token - sanctions_alert_token ?party_record - party_record)
+    :precondition
+      (and
+        (ready_for_final_review_for_entity ?screening_case)
+        (entity_has_party_record ?screening_case ?party_record)
+        (sanctions_alert_token_available ?sanctions_alert_token)
+        (not
+          (final_review_approved_for_entity ?screening_case)
+        )
+      )
+    :effect
+      (and
+        (final_review_approved_for_entity ?screening_case)
+        (entity_linked_alert_token ?screening_case ?sanctions_alert_token)
+        (not
+          (sanctions_alert_token_available ?sanctions_alert_token)
+        )
+      )
+  )
+  (:action grant_clearance_to_export_shipment
+    :parameters (?export_shipment - export_shipment ?screening_service - screening_service ?sanctions_alert_token - sanctions_alert_token)
+    :precondition
+      (and
+        (final_review_approved_for_entity ?export_shipment)
+        (entity_assigned_to_screening_service ?export_shipment ?screening_service)
+        (entity_linked_alert_token ?export_shipment ?sanctions_alert_token)
+        (not
+          (final_clearance_granted_for_entity ?export_shipment)
+        )
+      )
+    :effect
+      (and
+        (final_clearance_granted_for_entity ?export_shipment)
+        (screening_service_available ?screening_service)
+        (sanctions_alert_token_available ?sanctions_alert_token)
+      )
+  )
+  (:action grant_clearance_to_import_shipment
+    :parameters (?import_shipment - import_shipment ?screening_service - screening_service ?sanctions_alert_token - sanctions_alert_token)
+    :precondition
+      (and
+        (final_review_approved_for_entity ?import_shipment)
+        (entity_assigned_to_screening_service ?import_shipment ?screening_service)
+        (entity_linked_alert_token ?import_shipment ?sanctions_alert_token)
+        (not
+          (final_clearance_granted_for_entity ?import_shipment)
+        )
+      )
+    :effect
+      (and
+        (final_clearance_granted_for_entity ?import_shipment)
+        (screening_service_available ?screening_service)
+        (sanctions_alert_token_available ?sanctions_alert_token)
+      )
+  )
+  (:action grant_clearance_to_handler
+    :parameters (?case_handler - case_handler ?screening_service - screening_service ?sanctions_alert_token - sanctions_alert_token)
+    :precondition
+      (and
+        (final_review_approved_for_entity ?case_handler)
+        (entity_assigned_to_screening_service ?case_handler ?screening_service)
+        (entity_linked_alert_token ?case_handler ?sanctions_alert_token)
+        (not
+          (final_clearance_granted_for_entity ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (final_clearance_granted_for_entity ?case_handler)
+        (screening_service_available ?screening_service)
+        (sanctions_alert_token_available ?sanctions_alert_token)
+      )
+  )
+)

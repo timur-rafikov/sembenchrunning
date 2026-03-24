@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain alternative_itinerary_branch_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types planning_asset - object offerable - object service_resource - object itinerary_root - object itinerary_element - itinerary_root transport_option - planning_asset activity_template - planning_asset service_provider - planning_asset attraction_category - planning_asset logistics_option - planning_asset traveler_resource - planning_asset amenity - planning_asset availability_constraint - planning_asset activity_option - offerable venue_feature - offerable promotion - offerable location_context_primary - service_resource location_context_secondary - service_resource proposal_bundle - service_resource day_group - itinerary_element segment_group - itinerary_element day_slot_primary - day_group day_slot_secondary - day_group segment_proposal - segment_group)
+  (:predicates
+    (itinerary_element_initialized ?itinerary_element - itinerary_element)
+    (itinerary_element_confirmed ?itinerary_element - itinerary_element)
+    (itinerary_element_transport_reserved ?itinerary_element - itinerary_element)
+    (itinerary_element_finalized ?itinerary_element - itinerary_element)
+    (itinerary_element_validated ?itinerary_element - itinerary_element)
+    (itinerary_element_traveler_resource_linked ?itinerary_element - itinerary_element)
+    (transport_option_available ?transport_option - transport_option)
+    (itinerary_element_assigned_transport ?itinerary_element - itinerary_element ?transport_option - transport_option)
+    (activity_template_available ?activity_template - activity_template)
+    (itinerary_element_assigned_activity_template ?itinerary_element - itinerary_element ?activity_template - activity_template)
+    (service_provider_available ?service_provider - service_provider)
+    (itinerary_element_assigned_service_provider ?itinerary_element - itinerary_element ?service_provider - service_provider)
+    (activity_option_available ?activity_option - activity_option)
+    (day_slot_primary_has_activity_option ?day_slot_a - day_slot_primary ?activity_option - activity_option)
+    (day_slot_secondary_has_activity_option ?day_slot_b - day_slot_secondary ?activity_option - activity_option)
+    (day_slot_primary_has_location_context_primary ?day_slot_a - day_slot_primary ?location_context_a - location_context_primary)
+    (location_context_primary_is_chosen ?location_context_a - location_context_primary)
+    (location_context_primary_is_alternative ?location_context_a - location_context_primary)
+    (day_slot_primary_pacing_indicator ?day_slot_a - day_slot_primary)
+    (day_slot_secondary_has_location_context_secondary ?day_slot_b - day_slot_secondary ?location_context_b - location_context_secondary)
+    (location_context_secondary_is_chosen ?location_context_b - location_context_secondary)
+    (location_context_secondary_is_alternative ?location_context_b - location_context_secondary)
+    (day_slot_secondary_pacing_indicator ?day_slot_b - day_slot_secondary)
+    (proposal_bundle_available ?proposal_bundle - proposal_bundle)
+    (proposal_bundle_assembled ?proposal_bundle - proposal_bundle)
+    (proposal_bundle_associated_location_context_primary ?proposal_bundle - proposal_bundle ?location_context_a - location_context_primary)
+    (proposal_bundle_associated_location_context_secondary ?proposal_bundle - proposal_bundle ?location_context_b - location_context_secondary)
+    (proposal_bundle_primary_context_flag ?proposal_bundle - proposal_bundle)
+    (proposal_bundle_secondary_context_flag ?proposal_bundle - proposal_bundle)
+    (proposal_bundle_ready_for_venue_assignment ?proposal_bundle - proposal_bundle)
+    (segment_proposal_has_day_slot_primary ?segment_proposal - segment_proposal ?day_slot_a - day_slot_primary)
+    (segment_proposal_has_day_slot_secondary ?segment_proposal - segment_proposal ?day_slot_b - day_slot_secondary)
+    (segment_proposal_in_proposal_bundle ?segment_proposal - segment_proposal ?proposal_bundle - proposal_bundle)
+    (venue_feature_available ?venue_feature - venue_feature)
+    (segment_proposal_has_venue_feature ?segment_proposal - segment_proposal ?venue_feature - venue_feature)
+    (venue_feature_claimed ?venue_feature - venue_feature)
+    (venue_feature_assigned_to_proposal_bundle ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    (segment_venue_linked ?segment_proposal - segment_proposal)
+    (segment_venue_requirements_satisfied ?segment_proposal - segment_proposal)
+    (segment_prevalidation_complete ?segment_proposal - segment_proposal)
+    (segment_category_attached ?segment_proposal - segment_proposal)
+    (segment_venue_secondary_verified ?segment_proposal - segment_proposal)
+    (segment_post_venue_checks_passed ?segment_proposal - segment_proposal)
+    (segment_final_checks_passed ?segment_proposal - segment_proposal)
+    (promotion_available ?promotion - promotion)
+    (segment_assigned_promotion ?segment_proposal - segment_proposal ?promotion - promotion)
+    (promotion_applied_to_segment ?segment_proposal - segment_proposal)
+    (segment_provider_enriched ?segment_proposal - segment_proposal)
+    (segment_provider_enrichment_confirmed ?segment_proposal - segment_proposal)
+    (attraction_category_available ?attraction_category - attraction_category)
+    (segment_assigned_attraction_category ?segment_proposal - segment_proposal ?attraction_category - attraction_category)
+    (logistics_option_available ?logistics_option - logistics_option)
+    (segment_assigned_logistics_option ?segment_proposal - segment_proposal ?logistics_option - logistics_option)
+    (amenity_available ?amenity - amenity)
+    (segment_assigned_amenity ?segment_proposal - segment_proposal ?amenity - amenity)
+    (availability_constraint_available ?availability_constraint - availability_constraint)
+    (segment_assigned_availability_constraint ?segment_proposal - segment_proposal ?availability_constraint - availability_constraint)
+    (traveler_resource_available ?traveler_resource - traveler_resource)
+    (itinerary_element_assigned_traveler_resource ?itinerary_element - itinerary_element ?traveler_resource - traveler_resource)
+    (day_slot_primary_pacing_locked ?day_slot_a - day_slot_primary)
+    (day_slot_secondary_pacing_locked ?day_slot_b - day_slot_secondary)
+    (segment_validation_marker ?segment_proposal - segment_proposal)
+  )
+  (:action initialize_itinerary_element
+    :parameters (?itinerary_element - itinerary_element)
+    :precondition
+      (and
+        (not
+          (itinerary_element_initialized ?itinerary_element)
+        )
+        (not
+          (itinerary_element_finalized ?itinerary_element)
+        )
+      )
+    :effect (itinerary_element_initialized ?itinerary_element)
+  )
+  (:action attach_transport_to_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_element)
+        (not
+          (itinerary_element_transport_reserved ?itinerary_element)
+        )
+        (transport_option_available ?transport_option)
+      )
+    :effect
+      (and
+        (itinerary_element_transport_reserved ?itinerary_element)
+        (itinerary_element_assigned_transport ?itinerary_element ?transport_option)
+        (not
+          (transport_option_available ?transport_option)
+        )
+      )
+  )
+  (:action assign_activity_template_to_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_element)
+        (itinerary_element_transport_reserved ?itinerary_element)
+        (activity_template_available ?activity_template)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_activity_template ?itinerary_element ?activity_template)
+        (not
+          (activity_template_available ?activity_template)
+        )
+      )
+  )
+  (:action confirm_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_initialized ?itinerary_element)
+        (itinerary_element_transport_reserved ?itinerary_element)
+        (itinerary_element_assigned_activity_template ?itinerary_element ?activity_template)
+        (not
+          (itinerary_element_confirmed ?itinerary_element)
+        )
+      )
+    :effect (itinerary_element_confirmed ?itinerary_element)
+  )
+  (:action release_activity_template_from_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_assigned_activity_template ?itinerary_element ?activity_template)
+      )
+    :effect
+      (and
+        (activity_template_available ?activity_template)
+        (not
+          (itinerary_element_assigned_activity_template ?itinerary_element ?activity_template)
+        )
+      )
+  )
+  (:action attach_service_provider_to_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?service_provider - service_provider)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?itinerary_element)
+        (service_provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (itinerary_element_assigned_service_provider ?itinerary_element ?service_provider)
+        (not
+          (service_provider_available ?service_provider)
+        )
+      )
+  )
+  (:action detach_service_provider_from_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?service_provider - service_provider)
+    :precondition
+      (and
+        (itinerary_element_assigned_service_provider ?itinerary_element ?service_provider)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider)
+        (not
+          (itinerary_element_assigned_service_provider ?itinerary_element ?service_provider)
+        )
+      )
+  )
+  (:action assign_amenity_to_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?amenity - amenity)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (amenity_available ?amenity)
+      )
+    :effect
+      (and
+        (segment_assigned_amenity ?segment_proposal ?amenity)
+        (not
+          (amenity_available ?amenity)
+        )
+      )
+  )
+  (:action remove_amenity_from_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?amenity - amenity)
+    :precondition
+      (and
+        (segment_assigned_amenity ?segment_proposal ?amenity)
+      )
+    :effect
+      (and
+        (amenity_available ?amenity)
+        (not
+          (segment_assigned_amenity ?segment_proposal ?amenity)
+        )
+      )
+  )
+  (:action assign_availability_constraint_to_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (availability_constraint_available ?availability_constraint)
+      )
+    :effect
+      (and
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (not
+          (availability_constraint_available ?availability_constraint)
+        )
+      )
+  )
+  (:action remove_availability_constraint_from_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint)
+    :precondition
+      (and
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+      )
+    :effect
+      (and
+        (availability_constraint_available ?availability_constraint)
+        (not
+          (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        )
+      )
+  )
+  (:action mark_location_context_primary_primary_for_day_slot
+    :parameters (?day_slot_a - day_slot_primary ?location_context_a - location_context_primary ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_a)
+        (itinerary_element_assigned_activity_template ?day_slot_a ?activity_template)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (not
+          (location_context_primary_is_chosen ?location_context_a)
+        )
+        (not
+          (location_context_primary_is_alternative ?location_context_a)
+        )
+      )
+    :effect (location_context_primary_is_chosen ?location_context_a)
+  )
+  (:action allocate_provider_and_mark_pacing_for_day_slot_primary
+    :parameters (?day_slot_a - day_slot_primary ?location_context_a - location_context_primary ?service_provider - service_provider)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_a)
+        (itinerary_element_assigned_service_provider ?day_slot_a ?service_provider)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (location_context_primary_is_chosen ?location_context_a)
+        (not
+          (day_slot_primary_pacing_locked ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+      )
+  )
+  (:action assign_activity_option_and_mark_context_secondary_for_day_slot_primary
+    :parameters (?day_slot_a - day_slot_primary ?location_context_a - location_context_primary ?activity_option - activity_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_a)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (activity_option_available ?activity_option)
+        (not
+          (day_slot_primary_pacing_locked ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (location_context_primary_is_alternative ?location_context_a)
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_primary_has_activity_option ?day_slot_a ?activity_option)
+        (not
+          (activity_option_available ?activity_option)
+        )
+      )
+  )
+  (:action promote_activity_option_and_update_pacing_for_day_slot_primary
+    :parameters (?day_slot_a - day_slot_primary ?location_context_a - location_context_primary ?activity_template - activity_template ?activity_option - activity_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_a)
+        (itinerary_element_assigned_activity_template ?day_slot_a ?activity_template)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (location_context_primary_is_alternative ?location_context_a)
+        (day_slot_primary_has_activity_option ?day_slot_a ?activity_option)
+        (not
+          (day_slot_primary_pacing_indicator ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (location_context_primary_is_chosen ?location_context_a)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+        (activity_option_available ?activity_option)
+        (not
+          (day_slot_primary_has_activity_option ?day_slot_a ?activity_option)
+        )
+      )
+  )
+  (:action mark_location_context_secondary_primary_for_day_slot
+    :parameters (?day_slot_b - day_slot_secondary ?location_context_b - location_context_secondary ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_b)
+        (itinerary_element_assigned_activity_template ?day_slot_b ?activity_template)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (not
+          (location_context_secondary_is_chosen ?location_context_b)
+        )
+        (not
+          (location_context_secondary_is_alternative ?location_context_b)
+        )
+      )
+    :effect (location_context_secondary_is_chosen ?location_context_b)
+  )
+  (:action allocate_provider_and_mark_pacing_for_day_slot_secondary
+    :parameters (?day_slot_b - day_slot_secondary ?location_context_b - location_context_secondary ?service_provider - service_provider)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_b)
+        (itinerary_element_assigned_service_provider ?day_slot_b ?service_provider)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_secondary_is_chosen ?location_context_b)
+        (not
+          (day_slot_secondary_pacing_locked ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+      )
+  )
+  (:action assign_activity_option_and_mark_context_secondary_for_day_slot_secondary
+    :parameters (?day_slot_b - day_slot_secondary ?location_context_b - location_context_secondary ?activity_option - activity_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_b)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (activity_option_available ?activity_option)
+        (not
+          (day_slot_secondary_pacing_locked ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (location_context_secondary_is_alternative ?location_context_b)
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_secondary_has_activity_option ?day_slot_b ?activity_option)
+        (not
+          (activity_option_available ?activity_option)
+        )
+      )
+  )
+  (:action promote_activity_option_and_update_pacing_for_day_slot_secondary
+    :parameters (?day_slot_b - day_slot_secondary ?location_context_b - location_context_secondary ?activity_template - activity_template ?activity_option - activity_option)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?day_slot_b)
+        (itinerary_element_assigned_activity_template ?day_slot_b ?activity_template)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_secondary_is_alternative ?location_context_b)
+        (day_slot_secondary_has_activity_option ?day_slot_b ?activity_option)
+        (not
+          (day_slot_secondary_pacing_indicator ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (location_context_secondary_is_chosen ?location_context_b)
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+        (activity_option_available ?activity_option)
+        (not
+          (day_slot_secondary_has_activity_option ?day_slot_b ?activity_option)
+        )
+      )
+  )
+  (:action assemble_proposal_bundle_primary_primary
+    :parameters (?day_slot_a - day_slot_primary ?day_slot_b - day_slot_secondary ?location_context_a - location_context_primary ?location_context_b - location_context_secondary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_primary_is_chosen ?location_context_a)
+        (location_context_secondary_is_chosen ?location_context_b)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+        (proposal_bundle_available ?proposal_bundle)
+      )
+    :effect
+      (and
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_associated_location_context_primary ?proposal_bundle ?location_context_a)
+        (proposal_bundle_associated_location_context_secondary ?proposal_bundle ?location_context_b)
+        (not
+          (proposal_bundle_available ?proposal_bundle)
+        )
+      )
+  )
+  (:action assemble_proposal_bundle_secondary_a_primary_b
+    :parameters (?day_slot_a - day_slot_primary ?day_slot_b - day_slot_secondary ?location_context_a - location_context_primary ?location_context_b - location_context_secondary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_primary_is_alternative ?location_context_a)
+        (location_context_secondary_is_chosen ?location_context_b)
+        (not
+          (day_slot_primary_pacing_indicator ?day_slot_a)
+        )
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+        (proposal_bundle_available ?proposal_bundle)
+      )
+    :effect
+      (and
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_associated_location_context_primary ?proposal_bundle ?location_context_a)
+        (proposal_bundle_associated_location_context_secondary ?proposal_bundle ?location_context_b)
+        (proposal_bundle_primary_context_flag ?proposal_bundle)
+        (not
+          (proposal_bundle_available ?proposal_bundle)
+        )
+      )
+  )
+  (:action assemble_proposal_bundle_primary_a_secondary_b
+    :parameters (?day_slot_a - day_slot_primary ?day_slot_b - day_slot_secondary ?location_context_a - location_context_primary ?location_context_b - location_context_secondary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_primary_is_chosen ?location_context_a)
+        (location_context_secondary_is_alternative ?location_context_b)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+        (not
+          (day_slot_secondary_pacing_indicator ?day_slot_b)
+        )
+        (proposal_bundle_available ?proposal_bundle)
+      )
+    :effect
+      (and
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_associated_location_context_primary ?proposal_bundle ?location_context_a)
+        (proposal_bundle_associated_location_context_secondary ?proposal_bundle ?location_context_b)
+        (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        (not
+          (proposal_bundle_available ?proposal_bundle)
+        )
+      )
+  )
+  (:action assemble_proposal_bundle_secondary_both
+    :parameters (?day_slot_a - day_slot_primary ?day_slot_b - day_slot_secondary ?location_context_a - location_context_primary ?location_context_b - location_context_secondary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_primary_has_location_context_primary ?day_slot_a ?location_context_a)
+        (day_slot_secondary_has_location_context_secondary ?day_slot_b ?location_context_b)
+        (location_context_primary_is_alternative ?location_context_a)
+        (location_context_secondary_is_alternative ?location_context_b)
+        (not
+          (day_slot_primary_pacing_indicator ?day_slot_a)
+        )
+        (not
+          (day_slot_secondary_pacing_indicator ?day_slot_b)
+        )
+        (proposal_bundle_available ?proposal_bundle)
+      )
+    :effect
+      (and
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_associated_location_context_primary ?proposal_bundle ?location_context_a)
+        (proposal_bundle_associated_location_context_secondary ?proposal_bundle ?location_context_b)
+        (proposal_bundle_primary_context_flag ?proposal_bundle)
+        (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        (not
+          (proposal_bundle_available ?proposal_bundle)
+        )
+      )
+  )
+  (:action mark_proposal_bundle_ready_for_venue_assignment
+    :parameters (?proposal_bundle - proposal_bundle ?day_slot_a - day_slot_primary ?activity_template - activity_template)
+    :precondition
+      (and
+        (proposal_bundle_assembled ?proposal_bundle)
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (itinerary_element_assigned_activity_template ?day_slot_a ?activity_template)
+        (not
+          (proposal_bundle_ready_for_venue_assignment ?proposal_bundle)
+        )
+      )
+    :effect (proposal_bundle_ready_for_venue_assignment ?proposal_bundle)
+  )
+  (:action attach_venue_feature_to_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (segment_proposal_in_proposal_bundle ?segment_proposal ?proposal_bundle)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_available ?venue_feature)
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_ready_for_venue_assignment ?proposal_bundle)
+        (not
+          (venue_feature_claimed ?venue_feature)
+        )
+      )
+    :effect
+      (and
+        (venue_feature_claimed ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (not
+          (venue_feature_available ?venue_feature)
+        )
+      )
+  )
+  (:action verify_and_link_venue_feature_for_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_claimed ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (itinerary_element_assigned_activity_template ?segment_proposal ?activity_template)
+        (not
+          (proposal_bundle_primary_context_flag ?proposal_bundle)
+        )
+        (not
+          (segment_venue_linked ?segment_proposal)
+        )
+      )
+    :effect (segment_venue_linked ?segment_proposal)
+  )
+  (:action tag_segment_proposal_with_category
+    :parameters (?segment_proposal - segment_proposal ?attraction_category - attraction_category)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (attraction_category_available ?attraction_category)
+        (not
+          (segment_category_attached ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_category_attached ?segment_proposal)
+        (segment_assigned_attraction_category ?segment_proposal ?attraction_category)
+        (not
+          (attraction_category_available ?attraction_category)
+        )
+      )
+  )
+  (:action verify_and_link_venue_feature_and_mark_secondary_for_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle ?activity_template - activity_template ?attraction_category - attraction_category)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_claimed ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (itinerary_element_assigned_activity_template ?segment_proposal ?activity_template)
+        (proposal_bundle_primary_context_flag ?proposal_bundle)
+        (segment_category_attached ?segment_proposal)
+        (segment_assigned_attraction_category ?segment_proposal ?attraction_category)
+        (not
+          (segment_venue_linked ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_venue_linked ?segment_proposal)
+        (segment_venue_secondary_verified ?segment_proposal)
+      )
+  )
+  (:action apply_amenity_and_provider_checks_for_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?amenity - amenity ?service_provider - service_provider ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_linked ?segment_proposal)
+        (segment_assigned_amenity ?segment_proposal ?amenity)
+        (itinerary_element_assigned_service_provider ?segment_proposal ?service_provider)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (not
+          (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        )
+        (not
+          (segment_venue_requirements_satisfied ?segment_proposal)
+        )
+      )
+    :effect (segment_venue_requirements_satisfied ?segment_proposal)
+  )
+  (:action apply_amenity_and_provider_checks_for_segment_proposal_secondary
+    :parameters (?segment_proposal - segment_proposal ?amenity - amenity ?service_provider - service_provider ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_linked ?segment_proposal)
+        (segment_assigned_amenity ?segment_proposal ?amenity)
+        (itinerary_element_assigned_service_provider ?segment_proposal ?service_provider)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        (not
+          (segment_venue_requirements_satisfied ?segment_proposal)
+        )
+      )
+    :effect (segment_venue_requirements_satisfied ?segment_proposal)
+  )
+  (:action apply_availability_constraint_checks_for_segment_proposal_primary
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_requirements_satisfied ?segment_proposal)
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (not
+          (proposal_bundle_primary_context_flag ?proposal_bundle)
+        )
+        (not
+          (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        )
+        (not
+          (segment_prevalidation_complete ?segment_proposal)
+        )
+      )
+    :effect (segment_prevalidation_complete ?segment_proposal)
+  )
+  (:action apply_availability_and_postvenue_checks_for_segment_proposal_primary
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_requirements_satisfied ?segment_proposal)
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (proposal_bundle_primary_context_flag ?proposal_bundle)
+        (not
+          (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        )
+        (not
+          (segment_prevalidation_complete ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_post_venue_checks_passed ?segment_proposal)
+      )
+  )
+  (:action apply_availability_and_postvenue_checks_for_segment_proposal_secondary
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_requirements_satisfied ?segment_proposal)
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (not
+          (proposal_bundle_primary_context_flag ?proposal_bundle)
+        )
+        (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        (not
+          (segment_prevalidation_complete ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_post_venue_checks_passed ?segment_proposal)
+      )
+  )
+  (:action apply_availability_and_postvenue_checks_for_segment_proposal_both
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint ?venue_feature - venue_feature ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (segment_venue_requirements_satisfied ?segment_proposal)
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (segment_proposal_has_venue_feature ?segment_proposal ?venue_feature)
+        (venue_feature_assigned_to_proposal_bundle ?venue_feature ?proposal_bundle)
+        (proposal_bundle_primary_context_flag ?proposal_bundle)
+        (proposal_bundle_secondary_context_flag ?proposal_bundle)
+        (not
+          (segment_prevalidation_complete ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_post_venue_checks_passed ?segment_proposal)
+      )
+  )
+  (:action finalize_segment_proposal_minimal
+    :parameters (?segment_proposal - segment_proposal)
+    :precondition
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (not
+          (segment_post_venue_checks_passed ?segment_proposal)
+        )
+        (not
+          (segment_validation_marker ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_validation_marker ?segment_proposal)
+        (itinerary_element_validated ?segment_proposal)
+      )
+  )
+  (:action attach_logistics_option_to_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?logistics_option - logistics_option)
+    :precondition
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_post_venue_checks_passed ?segment_proposal)
+        (logistics_option_available ?logistics_option)
+      )
+    :effect
+      (and
+        (segment_assigned_logistics_option ?segment_proposal ?logistics_option)
+        (not
+          (logistics_option_available ?logistics_option)
+        )
+      )
+  )
+  (:action finalize_segment_proposal_integration_checks
+    :parameters (?segment_proposal - segment_proposal ?day_slot_a - day_slot_primary ?day_slot_b - day_slot_secondary ?activity_template - activity_template ?logistics_option - logistics_option)
+    :precondition
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_post_venue_checks_passed ?segment_proposal)
+        (segment_assigned_logistics_option ?segment_proposal ?logistics_option)
+        (segment_proposal_has_day_slot_primary ?segment_proposal ?day_slot_a)
+        (segment_proposal_has_day_slot_secondary ?segment_proposal ?day_slot_b)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+        (itinerary_element_assigned_activity_template ?segment_proposal ?activity_template)
+        (not
+          (segment_final_checks_passed ?segment_proposal)
+        )
+      )
+    :effect (segment_final_checks_passed ?segment_proposal)
+  )
+  (:action finalize_segment_proposal_post_integration
+    :parameters (?segment_proposal - segment_proposal)
+    :precondition
+      (and
+        (segment_prevalidation_complete ?segment_proposal)
+        (segment_final_checks_passed ?segment_proposal)
+        (not
+          (segment_validation_marker ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_validation_marker ?segment_proposal)
+        (itinerary_element_validated ?segment_proposal)
+      )
+  )
+  (:action apply_promotion_to_segment_proposal
+    :parameters (?segment_proposal - segment_proposal ?promotion - promotion ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_confirmed ?segment_proposal)
+        (itinerary_element_assigned_activity_template ?segment_proposal ?activity_template)
+        (promotion_available ?promotion)
+        (segment_assigned_promotion ?segment_proposal ?promotion)
+        (not
+          (promotion_applied_to_segment ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (promotion_applied_to_segment ?segment_proposal)
+        (not
+          (promotion_available ?promotion)
+        )
+      )
+  )
+  (:action enrich_segment_with_provider_after_promotion
+    :parameters (?segment_proposal - segment_proposal ?service_provider - service_provider)
+    :precondition
+      (and
+        (promotion_applied_to_segment ?segment_proposal)
+        (itinerary_element_assigned_service_provider ?segment_proposal ?service_provider)
+        (not
+          (segment_provider_enriched ?segment_proposal)
+        )
+      )
+    :effect (segment_provider_enriched ?segment_proposal)
+  )
+  (:action confirm_provider_enrichment_with_availability_constraint
+    :parameters (?segment_proposal - segment_proposal ?availability_constraint - availability_constraint)
+    :precondition
+      (and
+        (segment_provider_enriched ?segment_proposal)
+        (segment_assigned_availability_constraint ?segment_proposal ?availability_constraint)
+        (not
+          (segment_provider_enrichment_confirmed ?segment_proposal)
+        )
+      )
+    :effect (segment_provider_enrichment_confirmed ?segment_proposal)
+  )
+  (:action finalize_segment_proposal_after_promotion_enrichment
+    :parameters (?segment_proposal - segment_proposal)
+    :precondition
+      (and
+        (segment_provider_enrichment_confirmed ?segment_proposal)
+        (not
+          (segment_validation_marker ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (segment_validation_marker ?segment_proposal)
+        (itinerary_element_validated ?segment_proposal)
+      )
+  )
+  (:action finalize_day_slot_primary_from_bundle
+    :parameters (?day_slot_a - day_slot_primary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_primary_pacing_locked ?day_slot_a)
+        (day_slot_primary_pacing_indicator ?day_slot_a)
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_ready_for_venue_assignment ?proposal_bundle)
+        (not
+          (itinerary_element_validated ?day_slot_a)
+        )
+      )
+    :effect (itinerary_element_validated ?day_slot_a)
+  )
+  (:action finalize_day_slot_secondary_from_bundle
+    :parameters (?day_slot_b - day_slot_secondary ?proposal_bundle - proposal_bundle)
+    :precondition
+      (and
+        (day_slot_secondary_pacing_locked ?day_slot_b)
+        (day_slot_secondary_pacing_indicator ?day_slot_b)
+        (proposal_bundle_assembled ?proposal_bundle)
+        (proposal_bundle_ready_for_venue_assignment ?proposal_bundle)
+        (not
+          (itinerary_element_validated ?day_slot_b)
+        )
+      )
+    :effect (itinerary_element_validated ?day_slot_b)
+  )
+  (:action assign_traveler_resource_to_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?traveler_resource - traveler_resource ?activity_template - activity_template)
+    :precondition
+      (and
+        (itinerary_element_validated ?itinerary_element)
+        (itinerary_element_assigned_activity_template ?itinerary_element ?activity_template)
+        (traveler_resource_available ?traveler_resource)
+        (not
+          (itinerary_element_traveler_resource_linked ?itinerary_element)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_traveler_resource_linked ?itinerary_element)
+        (itinerary_element_assigned_traveler_resource ?itinerary_element ?traveler_resource)
+        (not
+          (traveler_resource_available ?traveler_resource)
+        )
+      )
+  )
+  (:action finalize_day_slot_primary_with_traveler_integration
+    :parameters (?day_slot_a - day_slot_primary ?transport_option - transport_option ?traveler_resource - traveler_resource)
+    :precondition
+      (and
+        (itinerary_element_traveler_resource_linked ?day_slot_a)
+        (itinerary_element_assigned_transport ?day_slot_a ?transport_option)
+        (itinerary_element_assigned_traveler_resource ?day_slot_a ?traveler_resource)
+        (not
+          (itinerary_element_finalized ?day_slot_a)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?day_slot_a)
+        (transport_option_available ?transport_option)
+        (traveler_resource_available ?traveler_resource)
+      )
+  )
+  (:action finalize_day_slot_secondary_with_traveler_integration
+    :parameters (?day_slot_b - day_slot_secondary ?transport_option - transport_option ?traveler_resource - traveler_resource)
+    :precondition
+      (and
+        (itinerary_element_traveler_resource_linked ?day_slot_b)
+        (itinerary_element_assigned_transport ?day_slot_b ?transport_option)
+        (itinerary_element_assigned_traveler_resource ?day_slot_b ?traveler_resource)
+        (not
+          (itinerary_element_finalized ?day_slot_b)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?day_slot_b)
+        (transport_option_available ?transport_option)
+        (traveler_resource_available ?traveler_resource)
+      )
+  )
+  (:action finalize_segment_proposal_with_traveler_integration
+    :parameters (?segment_proposal - segment_proposal ?transport_option - transport_option ?traveler_resource - traveler_resource)
+    :precondition
+      (and
+        (itinerary_element_traveler_resource_linked ?segment_proposal)
+        (itinerary_element_assigned_transport ?segment_proposal ?transport_option)
+        (itinerary_element_assigned_traveler_resource ?segment_proposal ?traveler_resource)
+        (not
+          (itinerary_element_finalized ?segment_proposal)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_finalized ?segment_proposal)
+        (transport_option_available ?transport_option)
+        (traveler_resource_available ?traveler_resource)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem example_trip_alternative_branch)
+  (:domain alternative_itinerary_branch_preparation)
+  (:objects day_slot_primary_1 - day_slot_primary day_slot_secondary_1 - day_slot_secondary segment_proposal_1 - segment_proposal segment_proposal_2 - segment_proposal transport_option_train_1 - transport_option transport_option_bus_1 - transport_option transport_option_ferry_1 - transport_option activity_template_morning_walk - activity_template service_provider_local_guide - service_provider activity_option_museum_tour - activity_option location_context_primary_city_center - location_context_primary location_context_secondary_central_hub - location_context_secondary proposal_bundle_1 - proposal_bundle venue_feature_history_museum - venue_feature venue_feature_city_park - venue_feature attraction_category_cultural - attraction_category attraction_category_nature - attraction_category logistics_option_meal_plan - logistics_option logistics_option_accommodation - logistics_option traveler_resource_profile_slot - traveler_resource amenity_wifi - amenity promotion_summer_discount - promotion promotion_partner_offer - promotion availability_constraint_morning_window - availability_constraint)
+  (:init
+    (transport_option_available transport_option_train_1)
+    (transport_option_available transport_option_bus_1)
+    (transport_option_available transport_option_ferry_1)
+    (activity_template_available activity_template_morning_walk)
+    (service_provider_available service_provider_local_guide)
+    (activity_option_available activity_option_museum_tour)
+    (day_slot_primary_has_location_context_primary day_slot_primary_1 location_context_primary_city_center)
+    (day_slot_secondary_has_location_context_secondary day_slot_secondary_1 location_context_secondary_central_hub)
+    (proposal_bundle_available proposal_bundle_1)
+    (venue_feature_available venue_feature_history_museum)
+    (venue_feature_available venue_feature_city_park)
+    (segment_proposal_has_day_slot_primary segment_proposal_1 day_slot_primary_1)
+    (segment_proposal_has_day_slot_primary segment_proposal_2 day_slot_primary_1)
+    (segment_proposal_has_day_slot_secondary segment_proposal_1 day_slot_secondary_1)
+    (segment_proposal_has_day_slot_secondary segment_proposal_2 day_slot_secondary_1)
+    (segment_proposal_in_proposal_bundle segment_proposal_1 proposal_bundle_1)
+    (segment_proposal_in_proposal_bundle segment_proposal_2 proposal_bundle_1)
+    (segment_proposal_has_venue_feature segment_proposal_1 venue_feature_history_museum)
+    (segment_proposal_has_venue_feature segment_proposal_2 venue_feature_city_park)
+    (attraction_category_available attraction_category_cultural)
+    (attraction_category_available attraction_category_nature)
+    (logistics_option_available logistics_option_meal_plan)
+    (logistics_option_available logistics_option_accommodation)
+    (traveler_resource_available traveler_resource_profile_slot)
+    (amenity_available amenity_wifi)
+    (promotion_available promotion_summer_discount)
+    (segment_assigned_promotion segment_proposal_1 promotion_summer_discount)
+    (segment_assigned_promotion segment_proposal_2 promotion_partner_offer)
+    (availability_constraint_available availability_constraint_morning_window)
+  )
+  (:goal
+    (and
+      (itinerary_element_finalized day_slot_primary_1)
+      (itinerary_element_finalized day_slot_secondary_1)
+      (itinerary_element_finalized segment_proposal_1)
+      (itinerary_element_finalized segment_proposal_2)
+    )
+  )
+)

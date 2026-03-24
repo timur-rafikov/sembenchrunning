@@ -1,6 +1,9 @@
 """
 Общие хелперы для интеграции с AutoPlanBench.
 Используются prepare_autoplanbench_data.py и run_benchmark.py.
+
+Параметры domain setup (таймаут, parallel, max_tokens, llm по умолчанию): см. translator_config.yaml
+и translator_settings.py. Переменные окружения по-прежнему переопределяют YAML.
 """
 import hashlib
 import json
@@ -10,6 +13,34 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from translator_settings import (
+  effective_domain_setup_parallel,
+  get_domain_setup_max_tokens,
+  get_domain_setup_openrouter_parallel_timeout_seconds,
+  get_domain_setup_timeout_seconds,
+)
+
+# При SEMBENCH_DEBUG=1 субпроцессы AutoPlanBench наследуют stdout/stderr — видны print() из APB.
+# run_benchmark выставляет это при флаге --debug (можно задать вручную до запуска).
+_DEBUG_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
+
+
+def apb_debug_inherit_stdio() -> bool:
+  """True, если логи AutoPlanBench (print в дочерних процессах) должны идти в консоль."""
+  v = os.environ.get("SEMBENCH_DEBUG", "").strip().lower()
+  return v in _DEBUG_ENV_VALUES
+
+
+def apb_subprocess_stdio_kwargs() -> Dict[str, Any]:
+  """
+  Аргументы для subprocess.run при вызове скриптов AutoPlanBench.
+  Без SEMBENCH_DEBUG — перехват stdout/stderr для ошибок и nl2pddl debug.
+  С SEMBENCH_DEBUG — наследование консоли (как у библиотеки/скриптов APB с print).
+  """
+  if apb_debug_inherit_stdio():
+    return {}
+  return {"capture_output": True, "text": True, "encoding": "utf-8"}
 
 
 def get_apb_root(apb_root: Optional[Path] = None) -> Optional[Path]:
@@ -49,12 +80,16 @@ def _build_domain_setup_manifest(
   apb_root: Path,
   llm: str,
   seed: int,
+  max_tokens: int,
+  parallel: int,
 ) -> Dict[str, Any]:
   script_path = apb_root / "run_domain_setup.py"
   return {
     "version": 1,
     "seed": int(seed),
     "llm": llm,
+    "max_tokens": int(max_tokens),
+    "parallel": int(parallel),
     "domain_sha256": sha256_file(first_domain_pddl),
     "problem_sha256": sha256_file(first_problem_pddl),
     "apb_root": str(apb_root.resolve()),
@@ -85,17 +120,22 @@ def ensure_domain_json(
   """
   Создаёт data/<section>/domain_description_seedN.json, вызывая run_domain_setup.py.
   Использует временную папку _apb_setup внутри section. Если файл уже есть — возвращает путь,
-  но пересобирает его при изменении входного домена/задачи, seed, llm или run_domain_setup.py.
+  но пересобирает его при изменении входного домена/задачи, seed, llm, max_tokens/parallel
+  в настройках переводчика или run_domain_setup.py.
   """
   section_dir = dataset_dir / section
   out_json = section_dir / f"domain_description_seed{seed}.json"
   manifest_path = _domain_setup_manifest_path(section_dir, seed)
+  ds_max_tok = get_domain_setup_max_tokens()
+  ds_par = effective_domain_setup_parallel()
   desired_manifest = _build_domain_setup_manifest(
     first_domain_pddl=first_domain_pddl,
     first_problem_pddl=first_problem_pddl,
     apb_root=apb_root,
     llm=llm,
     seed=seed,
+    max_tokens=ds_max_tok,
+    parallel=ds_par,
   )
   current_manifest = _load_domain_setup_manifest(manifest_path)
   usage_path = section_dir / f"domain_llm_usage_seed{seed}.json"
@@ -119,11 +159,31 @@ def ensure_domain_json(
     "--llm", llm,
     "--seed", str(seed),
     "-n", "0",
+    "--max-tokens", str(ds_max_tok),
+    "--parallel",
+    str(ds_par),
   ]
-  print(f"{log_prefix} Running domain setup for section {section!r}...", flush=True)
-  result = subprocess.run(cmd, cwd=str(apb_root), capture_output=True, text=True, timeout=600, encoding="utf-8")
+  setup_timeout = get_domain_setup_timeout_seconds()
+  print(f"{log_prefix} Running domain setup for section {section!r} (APB --parallel {ds_par})...", flush=True)
+  stdio_kw = apb_subprocess_stdio_kwargs()
+  sub_env = os.environ.copy()
+  sub_env["OPENROUTER_PARALLEL_HTTP_TIMEOUT_S"] = str(
+    get_domain_setup_openrouter_parallel_timeout_seconds()
+  )
+  result = subprocess.run(
+    cmd,
+    cwd=str(apb_root),
+    timeout=max(1, setup_timeout),
+    env=sub_env,
+    **stdio_kw,
+  )
   if result.returncode != 0:
-    print(f"{log_prefix} run_domain_setup failed: {result.stderr or result.stdout}", flush=True)
+    detail = (
+      "(вывод AutoPlanBench выше в консоли; SEMBENCH_DEBUG)"
+      if apb_debug_inherit_stdio()
+      else (result.stderr or result.stdout or "")
+    )
+    print(f"{log_prefix} run_domain_setup failed: {detail}", flush=True)
     raise RuntimeError(f"run_domain_setup.py exited with {result.returncode}")
 
   generated = setup_dir / f"domain_description_seed{seed}.json"

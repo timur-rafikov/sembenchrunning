@@ -1,0 +1,937 @@
+(define (domain tourism_vehicle_capacity_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_root - entity service_slot_root - entity infrastructure_root - entity movement_root - entity travel_unit - movement_root vehicle_pool - resource_root time_slot - resource_root local_transfer_option - resource_root vehicle_feature_option - resource_root service_option - resource_root timing_buffer - resource_root certification_token - resource_root operational_credential - resource_root equipment_option - service_slot_root boarding_position - service_slot_root authorization_token - service_slot_root pickup_node - infrastructure_root dropoff_node - infrastructure_root vehicle_asset - infrastructure_root passenger_subgroup_root - travel_unit itinerary_component_root - travel_unit passenger_subgroup_a - passenger_subgroup_root passenger_subgroup_b - passenger_subgroup_root dispatch_case - itinerary_component_root)
+
+  (:predicates
+    (travel_unit_registered ?travel_unit - travel_unit)
+    (travel_unit_ready ?travel_unit - travel_unit)
+    (travel_unit_pool_bound ?travel_unit - travel_unit)
+    (travel_unit_assigned ?travel_unit - travel_unit)
+    (ready_for_assignment ?travel_unit - travel_unit)
+    (ready_for_vehicle_binding ?travel_unit - travel_unit)
+    (vehicle_pool_available ?vehicle_pool - vehicle_pool)
+    (travel_unit_pool_binding ?travel_unit - travel_unit ?vehicle_pool - vehicle_pool)
+    (time_slot_available ?time_slot - time_slot)
+    (travel_unit_time_slot_reserved ?travel_unit - travel_unit ?time_slot - time_slot)
+    (transfer_option_available ?local_transfer_option - local_transfer_option)
+    (travel_unit_transfer_selected ?travel_unit - travel_unit ?local_transfer_option - local_transfer_option)
+    (equipment_available ?equipment_option - equipment_option)
+    (subgroup_a_equipment_allocated ?passenger_subgroup_a - passenger_subgroup_a ?equipment_option - equipment_option)
+    (subgroup_b_equipment_allocated ?passenger_subgroup_b - passenger_subgroup_b ?equipment_option - equipment_option)
+    (subgroup_a_pickup_link ?passenger_subgroup_a - passenger_subgroup_a ?pickup_node - pickup_node)
+    (pickup_node_ready ?pickup_node - pickup_node)
+    (pickup_node_equipped ?pickup_node - pickup_node)
+    (subgroup_a_ready ?passenger_subgroup_a - passenger_subgroup_a)
+    (subgroup_b_dropoff_link ?passenger_subgroup_b - passenger_subgroup_b ?dropoff_node - dropoff_node)
+    (dropoff_node_ready ?dropoff_node - dropoff_node)
+    (dropoff_node_equipped ?dropoff_node - dropoff_node)
+    (subgroup_b_ready ?passenger_subgroup_b - passenger_subgroup_b)
+    (vehicle_asset_available ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_reserved ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_pickup_binding ?vehicle_asset - vehicle_asset ?pickup_node - pickup_node)
+    (vehicle_asset_dropoff_binding ?vehicle_asset - vehicle_asset ?dropoff_node - dropoff_node)
+    (vehicle_asset_requires_feature_check ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_requires_authorization_check ?vehicle_asset - vehicle_asset)
+    (vehicle_asset_ready_flag ?vehicle_asset - vehicle_asset)
+    (dispatch_has_subgroup_a ?dispatch_case - dispatch_case ?passenger_subgroup_a - passenger_subgroup_a)
+    (dispatch_has_subgroup_b ?dispatch_case - dispatch_case ?passenger_subgroup_b - passenger_subgroup_b)
+    (dispatch_vehicle_binding ?dispatch_case - dispatch_case ?vehicle_asset - vehicle_asset)
+    (boarding_position_available ?boarding_position - boarding_position)
+    (dispatch_boarding_position_binding ?dispatch_case - dispatch_case ?boarding_position - boarding_position)
+    (boarding_position_allocated ?boarding_position - boarding_position)
+    (boarding_position_vehicle_asset_binding ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    (dispatch_feature_verified ?dispatch_case - dispatch_case)
+    (dispatch_feature_applied ?dispatch_case - dispatch_case)
+    (dispatch_credential_verified ?dispatch_case - dispatch_case)
+    (dispatch_feature_claimed ?dispatch_case - dispatch_case)
+    (dispatch_feature_checked ?dispatch_case - dispatch_case)
+    (dispatch_authorization_attached ?dispatch_case - dispatch_case)
+    (dispatch_confirmed ?dispatch_case - dispatch_case)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (dispatch_authorization_binding ?dispatch_case - dispatch_case ?authorization_token - authorization_token)
+    (dispatch_authorization_granted ?dispatch_case - dispatch_case)
+    (dispatch_authorization_confirmed ?dispatch_case - dispatch_case)
+    (dispatch_authorization_finalized ?dispatch_case - dispatch_case)
+    (vehicle_feature_option_available ?vehicle_feature_option - vehicle_feature_option)
+    (dispatch_vehicle_feature_binding ?dispatch_case - dispatch_case ?vehicle_feature_option - vehicle_feature_option)
+    (service_option_available ?service_option - service_option)
+    (dispatch_service_option_binding ?dispatch_case - dispatch_case ?service_option - service_option)
+    (certification_token_available ?certification_token - certification_token)
+    (dispatch_certification_binding ?dispatch_case - dispatch_case ?certification_token - certification_token)
+    (operational_credential_available ?operational_credential - operational_credential)
+    (dispatch_operational_credential_binding ?dispatch_case - dispatch_case ?operational_credential - operational_credential)
+    (timing_buffer_available ?timing_buffer - timing_buffer)
+    (travel_unit_timing_buffer_binding ?travel_unit - travel_unit ?timing_buffer - timing_buffer)
+    (subgroup_a_assignment_flag ?passenger_subgroup_a - passenger_subgroup_a)
+    (subgroup_b_assignment_flag ?passenger_subgroup_b - passenger_subgroup_b)
+    (dispatch_finalized ?dispatch_case - dispatch_case)
+  )
+  (:action register_travel_unit
+    :parameters (?travel_unit - travel_unit)
+    :precondition
+      (and
+        (not
+          (travel_unit_registered ?travel_unit)
+        )
+        (not
+          (travel_unit_assigned ?travel_unit)
+        )
+      )
+    :effect (travel_unit_registered ?travel_unit)
+  )
+  (:action claim_pool_for_travel_unit
+    :parameters (?travel_unit - travel_unit ?vehicle_pool - vehicle_pool)
+    :precondition
+      (and
+        (travel_unit_registered ?travel_unit)
+        (not
+          (travel_unit_pool_bound ?travel_unit)
+        )
+        (vehicle_pool_available ?vehicle_pool)
+      )
+    :effect
+      (and
+        (travel_unit_pool_bound ?travel_unit)
+        (travel_unit_pool_binding ?travel_unit ?vehicle_pool)
+        (not
+          (vehicle_pool_available ?vehicle_pool)
+        )
+      )
+  )
+  (:action reserve_time_slot
+    :parameters (?travel_unit - travel_unit ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_registered ?travel_unit)
+        (travel_unit_pool_bound ?travel_unit)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (travel_unit_time_slot_reserved ?travel_unit ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_time_slot
+    :parameters (?travel_unit - travel_unit ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_registered ?travel_unit)
+        (travel_unit_pool_bound ?travel_unit)
+        (travel_unit_time_slot_reserved ?travel_unit ?time_slot)
+        (not
+          (travel_unit_ready ?travel_unit)
+        )
+      )
+    :effect (travel_unit_ready ?travel_unit)
+  )
+  (:action release_time_slot_reservation
+    :parameters (?travel_unit - travel_unit ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_time_slot_reserved ?travel_unit ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (travel_unit_time_slot_reserved ?travel_unit ?time_slot)
+        )
+      )
+  )
+  (:action select_local_transfer
+    :parameters (?travel_unit - travel_unit ?local_transfer_option - local_transfer_option)
+    :precondition
+      (and
+        (travel_unit_ready ?travel_unit)
+        (transfer_option_available ?local_transfer_option)
+      )
+    :effect
+      (and
+        (travel_unit_transfer_selected ?travel_unit ?local_transfer_option)
+        (not
+          (transfer_option_available ?local_transfer_option)
+        )
+      )
+  )
+  (:action release_local_transfer
+    :parameters (?travel_unit - travel_unit ?local_transfer_option - local_transfer_option)
+    :precondition
+      (and
+        (travel_unit_transfer_selected ?travel_unit ?local_transfer_option)
+      )
+    :effect
+      (and
+        (transfer_option_available ?local_transfer_option)
+        (not
+          (travel_unit_transfer_selected ?travel_unit ?local_transfer_option)
+        )
+      )
+  )
+  (:action attach_certification_token
+    :parameters (?dispatch_case - dispatch_case ?certification_token - certification_token)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (certification_token_available ?certification_token)
+      )
+    :effect
+      (and
+        (dispatch_certification_binding ?dispatch_case ?certification_token)
+        (not
+          (certification_token_available ?certification_token)
+        )
+      )
+  )
+  (:action detach_certification_token
+    :parameters (?dispatch_case - dispatch_case ?certification_token - certification_token)
+    :precondition
+      (and
+        (dispatch_certification_binding ?dispatch_case ?certification_token)
+      )
+    :effect
+      (and
+        (certification_token_available ?certification_token)
+        (not
+          (dispatch_certification_binding ?dispatch_case ?certification_token)
+        )
+      )
+  )
+  (:action attach_operational_credential
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (operational_credential_available ?operational_credential)
+      )
+    :effect
+      (and
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (not
+          (operational_credential_available ?operational_credential)
+        )
+      )
+  )
+  (:action detach_operational_credential
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential)
+    :precondition
+      (and
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+      )
+    :effect
+      (and
+        (operational_credential_available ?operational_credential)
+        (not
+          (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        )
+      )
+  )
+  (:action set_pickup_node_ready_for_subgroup
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?pickup_node - pickup_node ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_a)
+        (travel_unit_time_slot_reserved ?passenger_subgroup_a ?time_slot)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (not
+          (pickup_node_ready ?pickup_node)
+        )
+        (not
+          (pickup_node_equipped ?pickup_node)
+        )
+      )
+    :effect (pickup_node_ready ?pickup_node)
+  )
+  (:action confirm_local_transfer_for_subgroup_a
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?pickup_node - pickup_node ?local_transfer_option - local_transfer_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_a)
+        (travel_unit_transfer_selected ?passenger_subgroup_a ?local_transfer_option)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (pickup_node_ready ?pickup_node)
+        (not
+          (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        )
+      )
+    :effect
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_a_ready ?passenger_subgroup_a)
+      )
+  )
+  (:action allocate_equipment_to_subgroup_a
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?pickup_node - pickup_node ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_a)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (equipment_available ?equipment_option)
+        (not
+          (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_equipped ?pickup_node)
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_a_equipment_allocated ?passenger_subgroup_a ?equipment_option)
+        (not
+          (equipment_available ?equipment_option)
+        )
+      )
+  )
+  (:action finalize_pickup_for_subgroup_a
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?pickup_node - pickup_node ?time_slot - time_slot ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_a)
+        (travel_unit_time_slot_reserved ?passenger_subgroup_a ?time_slot)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (pickup_node_equipped ?pickup_node)
+        (subgroup_a_equipment_allocated ?passenger_subgroup_a ?equipment_option)
+        (not
+          (subgroup_a_ready ?passenger_subgroup_a)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_ready ?pickup_node)
+        (subgroup_a_ready ?passenger_subgroup_a)
+        (equipment_available ?equipment_option)
+        (not
+          (subgroup_a_equipment_allocated ?passenger_subgroup_a ?equipment_option)
+        )
+      )
+  )
+  (:action set_dropoff_node_ready_for_subgroup_b
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?dropoff_node - dropoff_node ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_b)
+        (travel_unit_time_slot_reserved ?passenger_subgroup_b ?time_slot)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (not
+          (dropoff_node_ready ?dropoff_node)
+        )
+        (not
+          (dropoff_node_equipped ?dropoff_node)
+        )
+      )
+    :effect (dropoff_node_ready ?dropoff_node)
+  )
+  (:action confirm_local_transfer_for_subgroup_b
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?dropoff_node - dropoff_node ?local_transfer_option - local_transfer_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_b)
+        (travel_unit_transfer_selected ?passenger_subgroup_b ?local_transfer_option)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (dropoff_node_ready ?dropoff_node)
+        (not
+          (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        )
+      )
+    :effect
+      (and
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_b_ready ?passenger_subgroup_b)
+      )
+  )
+  (:action allocate_equipment_to_subgroup_b
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?dropoff_node - dropoff_node ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_b)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (equipment_available ?equipment_option)
+        (not
+          (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        )
+      )
+    :effect
+      (and
+        (dropoff_node_equipped ?dropoff_node)
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_b_equipment_allocated ?passenger_subgroup_b ?equipment_option)
+        (not
+          (equipment_available ?equipment_option)
+        )
+      )
+  )
+  (:action finalize_dropoff_for_subgroup_b
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?dropoff_node - dropoff_node ?time_slot - time_slot ?equipment_option - equipment_option)
+    :precondition
+      (and
+        (travel_unit_ready ?passenger_subgroup_b)
+        (travel_unit_time_slot_reserved ?passenger_subgroup_b ?time_slot)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (dropoff_node_equipped ?dropoff_node)
+        (subgroup_b_equipment_allocated ?passenger_subgroup_b ?equipment_option)
+        (not
+          (subgroup_b_ready ?passenger_subgroup_b)
+        )
+      )
+    :effect
+      (and
+        (dropoff_node_ready ?dropoff_node)
+        (subgroup_b_ready ?passenger_subgroup_b)
+        (equipment_available ?equipment_option)
+        (not
+          (subgroup_b_equipment_allocated ?passenger_subgroup_b ?equipment_option)
+        )
+      )
+  )
+  (:action select_and_bind_vehicle_asset
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?passenger_subgroup_b - passenger_subgroup_b ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (pickup_node_ready ?pickup_node)
+        (dropoff_node_ready ?dropoff_node)
+        (subgroup_a_ready ?passenger_subgroup_a)
+        (subgroup_b_ready ?passenger_subgroup_b)
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_pickup_binding ?vehicle_asset ?pickup_node)
+        (vehicle_asset_dropoff_binding ?vehicle_asset ?dropoff_node)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action select_bind_vehicle_asset_with_pickup_equipment
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?passenger_subgroup_b - passenger_subgroup_b ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (pickup_node_equipped ?pickup_node)
+        (dropoff_node_ready ?dropoff_node)
+        (not
+          (subgroup_a_ready ?passenger_subgroup_a)
+        )
+        (subgroup_b_ready ?passenger_subgroup_b)
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_pickup_binding ?vehicle_asset ?pickup_node)
+        (vehicle_asset_dropoff_binding ?vehicle_asset ?dropoff_node)
+        (vehicle_asset_requires_feature_check ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action select_bind_vehicle_asset_with_dropoff_equipment
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?passenger_subgroup_b - passenger_subgroup_b ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (pickup_node_ready ?pickup_node)
+        (dropoff_node_equipped ?dropoff_node)
+        (subgroup_a_ready ?passenger_subgroup_a)
+        (not
+          (subgroup_b_ready ?passenger_subgroup_b)
+        )
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_pickup_binding ?vehicle_asset ?pickup_node)
+        (vehicle_asset_dropoff_binding ?vehicle_asset ?dropoff_node)
+        (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action select_bind_vehicle_asset_with_both_equipment_flags
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?passenger_subgroup_b - passenger_subgroup_b ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_a_pickup_link ?passenger_subgroup_a ?pickup_node)
+        (subgroup_b_dropoff_link ?passenger_subgroup_b ?dropoff_node)
+        (pickup_node_equipped ?pickup_node)
+        (dropoff_node_equipped ?dropoff_node)
+        (not
+          (subgroup_a_ready ?passenger_subgroup_a)
+        )
+        (not
+          (subgroup_b_ready ?passenger_subgroup_b)
+        )
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_pickup_binding ?vehicle_asset ?pickup_node)
+        (vehicle_asset_dropoff_binding ?vehicle_asset ?dropoff_node)
+        (vehicle_asset_requires_feature_check ?vehicle_asset)
+        (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action confirm_vehicle_readiness
+    :parameters (?vehicle_asset - vehicle_asset ?passenger_subgroup_a - passenger_subgroup_a ?time_slot - time_slot)
+    :precondition
+      (and
+        (vehicle_asset_reserved ?vehicle_asset)
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (travel_unit_time_slot_reserved ?passenger_subgroup_a ?time_slot)
+        (not
+          (vehicle_asset_ready_flag ?vehicle_asset)
+        )
+      )
+    :effect (vehicle_asset_ready_flag ?vehicle_asset)
+  )
+  (:action reserve_boarding_position_for_dispatch
+    :parameters (?dispatch_case - dispatch_case ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (dispatch_vehicle_binding ?dispatch_case ?vehicle_asset)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_available ?boarding_position)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_ready_flag ?vehicle_asset)
+        (not
+          (boarding_position_allocated ?boarding_position)
+        )
+      )
+    :effect
+      (and
+        (boarding_position_allocated ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (not
+          (boarding_position_available ?boarding_position)
+        )
+      )
+  )
+  (:action verify_dispatch_feature
+    :parameters (?dispatch_case - dispatch_case ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_allocated ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (travel_unit_time_slot_reserved ?dispatch_case ?time_slot)
+        (not
+          (vehicle_asset_requires_feature_check ?vehicle_asset)
+        )
+        (not
+          (dispatch_feature_verified ?dispatch_case)
+        )
+      )
+    :effect (dispatch_feature_verified ?dispatch_case)
+  )
+  (:action claim_vehicle_feature_option_for_dispatch
+    :parameters (?dispatch_case - dispatch_case ?vehicle_feature_option - vehicle_feature_option)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (vehicle_feature_option_available ?vehicle_feature_option)
+        (not
+          (dispatch_feature_claimed ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_feature_claimed ?dispatch_case)
+        (dispatch_vehicle_feature_binding ?dispatch_case ?vehicle_feature_option)
+        (not
+          (vehicle_feature_option_available ?vehicle_feature_option)
+        )
+      )
+  )
+  (:action apply_vehicle_feature_to_dispatch
+    :parameters (?dispatch_case - dispatch_case ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset ?time_slot - time_slot ?vehicle_feature_option - vehicle_feature_option)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_allocated ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (travel_unit_time_slot_reserved ?dispatch_case ?time_slot)
+        (vehicle_asset_requires_feature_check ?vehicle_asset)
+        (dispatch_feature_claimed ?dispatch_case)
+        (dispatch_vehicle_feature_binding ?dispatch_case ?vehicle_feature_option)
+        (not
+          (dispatch_feature_verified ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_feature_verified ?dispatch_case)
+        (dispatch_feature_checked ?dispatch_case)
+      )
+  )
+  (:action attach_certification_before_authorization_check
+    :parameters (?dispatch_case - dispatch_case ?certification_token - certification_token ?local_transfer_option - local_transfer_option ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_verified ?dispatch_case)
+        (dispatch_certification_binding ?dispatch_case ?certification_token)
+        (travel_unit_transfer_selected ?dispatch_case ?local_transfer_option)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (not
+          (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        )
+        (not
+          (dispatch_feature_applied ?dispatch_case)
+        )
+      )
+    :effect (dispatch_feature_applied ?dispatch_case)
+  )
+  (:action attach_certification_with_authorization_check
+    :parameters (?dispatch_case - dispatch_case ?certification_token - certification_token ?local_transfer_option - local_transfer_option ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_verified ?dispatch_case)
+        (dispatch_certification_binding ?dispatch_case ?certification_token)
+        (travel_unit_transfer_selected ?dispatch_case ?local_transfer_option)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        (not
+          (dispatch_feature_applied ?dispatch_case)
+        )
+      )
+    :effect (dispatch_feature_applied ?dispatch_case)
+  )
+  (:action attach_operational_credential_to_dispatch
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_applied ?dispatch_case)
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (not
+          (vehicle_asset_requires_feature_check ?vehicle_asset)
+        )
+        (not
+          (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        )
+        (not
+          (dispatch_credential_verified ?dispatch_case)
+        )
+      )
+    :effect (dispatch_credential_verified ?dispatch_case)
+  )
+  (:action attach_operational_credential_and_mark_authorization
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_applied ?dispatch_case)
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (vehicle_asset_requires_feature_check ?vehicle_asset)
+        (not
+          (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        )
+        (not
+          (dispatch_credential_verified ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_authorization_attached ?dispatch_case)
+      )
+  )
+  (:action attach_operational_credential_and_mark_authorization_alt
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_applied ?dispatch_case)
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (not
+          (vehicle_asset_requires_feature_check ?vehicle_asset)
+        )
+        (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        (not
+          (dispatch_credential_verified ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_authorization_attached ?dispatch_case)
+      )
+  )
+  (:action attach_operational_credential_and_mark_authorization_variant
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential ?boarding_position - boarding_position ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (dispatch_feature_applied ?dispatch_case)
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (dispatch_boarding_position_binding ?dispatch_case ?boarding_position)
+        (boarding_position_vehicle_asset_binding ?boarding_position ?vehicle_asset)
+        (vehicle_asset_requires_feature_check ?vehicle_asset)
+        (vehicle_asset_requires_authorization_check ?vehicle_asset)
+        (not
+          (dispatch_credential_verified ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_authorization_attached ?dispatch_case)
+      )
+  )
+  (:action finalize_dispatch_case_initial
+    :parameters (?dispatch_case - dispatch_case)
+    :precondition
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (not
+          (dispatch_authorization_attached ?dispatch_case)
+        )
+        (not
+          (dispatch_finalized ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?dispatch_case)
+        (ready_for_assignment ?dispatch_case)
+      )
+  )
+  (:action attach_service_option_to_dispatch
+    :parameters (?dispatch_case - dispatch_case ?service_option - service_option)
+    :precondition
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_authorization_attached ?dispatch_case)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (dispatch_service_option_binding ?dispatch_case ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action verify_dispatch_links_and_confirm
+    :parameters (?dispatch_case - dispatch_case ?passenger_subgroup_a - passenger_subgroup_a ?passenger_subgroup_b - passenger_subgroup_b ?time_slot - time_slot ?service_option - service_option)
+    :precondition
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_authorization_attached ?dispatch_case)
+        (dispatch_service_option_binding ?dispatch_case ?service_option)
+        (dispatch_has_subgroup_a ?dispatch_case ?passenger_subgroup_a)
+        (dispatch_has_subgroup_b ?dispatch_case ?passenger_subgroup_b)
+        (subgroup_a_ready ?passenger_subgroup_a)
+        (subgroup_b_ready ?passenger_subgroup_b)
+        (travel_unit_time_slot_reserved ?dispatch_case ?time_slot)
+        (not
+          (dispatch_confirmed ?dispatch_case)
+        )
+      )
+    :effect (dispatch_confirmed ?dispatch_case)
+  )
+  (:action finalize_dispatch_case_with_confirmed_links
+    :parameters (?dispatch_case - dispatch_case)
+    :precondition
+      (and
+        (dispatch_credential_verified ?dispatch_case)
+        (dispatch_confirmed ?dispatch_case)
+        (not
+          (dispatch_finalized ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?dispatch_case)
+        (ready_for_assignment ?dispatch_case)
+      )
+  )
+  (:action claim_authorization_for_dispatch
+    :parameters (?dispatch_case - dispatch_case ?authorization_token - authorization_token ?time_slot - time_slot)
+    :precondition
+      (and
+        (travel_unit_ready ?dispatch_case)
+        (travel_unit_time_slot_reserved ?dispatch_case ?time_slot)
+        (authorization_token_available ?authorization_token)
+        (dispatch_authorization_binding ?dispatch_case ?authorization_token)
+        (not
+          (dispatch_authorization_granted ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_authorization_granted ?dispatch_case)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action verify_dispatch_authorization
+    :parameters (?dispatch_case - dispatch_case ?local_transfer_option - local_transfer_option)
+    :precondition
+      (and
+        (dispatch_authorization_granted ?dispatch_case)
+        (travel_unit_transfer_selected ?dispatch_case ?local_transfer_option)
+        (not
+          (dispatch_authorization_confirmed ?dispatch_case)
+        )
+      )
+    :effect (dispatch_authorization_confirmed ?dispatch_case)
+  )
+  (:action finalize_authorization
+    :parameters (?dispatch_case - dispatch_case ?operational_credential - operational_credential)
+    :precondition
+      (and
+        (dispatch_authorization_confirmed ?dispatch_case)
+        (dispatch_operational_credential_binding ?dispatch_case ?operational_credential)
+        (not
+          (dispatch_authorization_finalized ?dispatch_case)
+        )
+      )
+    :effect (dispatch_authorization_finalized ?dispatch_case)
+  )
+  (:action finalize_authorization_and_mark_dispatch_actionable
+    :parameters (?dispatch_case - dispatch_case)
+    :precondition
+      (and
+        (dispatch_authorization_finalized ?dispatch_case)
+        (not
+          (dispatch_finalized ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (dispatch_finalized ?dispatch_case)
+        (ready_for_assignment ?dispatch_case)
+      )
+  )
+  (:action confirm_subgroup_a_readiness_for_assignment
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_a_assignment_flag ?passenger_subgroup_a)
+        (subgroup_a_ready ?passenger_subgroup_a)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_ready_flag ?vehicle_asset)
+        (not
+          (ready_for_assignment ?passenger_subgroup_a)
+        )
+      )
+    :effect (ready_for_assignment ?passenger_subgroup_a)
+  )
+  (:action confirm_subgroup_b_readiness_for_assignment
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (subgroup_b_assignment_flag ?passenger_subgroup_b)
+        (subgroup_b_ready ?passenger_subgroup_b)
+        (vehicle_asset_reserved ?vehicle_asset)
+        (vehicle_asset_ready_flag ?vehicle_asset)
+        (not
+          (ready_for_assignment ?passenger_subgroup_b)
+        )
+      )
+    :effect (ready_for_assignment ?passenger_subgroup_b)
+  )
+  (:action attach_timing_buffer_to_travel_unit
+    :parameters (?travel_unit - travel_unit ?timing_buffer - timing_buffer ?time_slot - time_slot)
+    :precondition
+      (and
+        (ready_for_assignment ?travel_unit)
+        (travel_unit_time_slot_reserved ?travel_unit ?time_slot)
+        (timing_buffer_available ?timing_buffer)
+        (not
+          (ready_for_vehicle_binding ?travel_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_vehicle_binding ?travel_unit)
+        (travel_unit_timing_buffer_binding ?travel_unit ?timing_buffer)
+        (not
+          (timing_buffer_available ?timing_buffer)
+        )
+      )
+  )
+  (:action assign_subgroup_a_to_pool
+    :parameters (?passenger_subgroup_a - passenger_subgroup_a ?vehicle_pool - vehicle_pool ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (ready_for_vehicle_binding ?passenger_subgroup_a)
+        (travel_unit_pool_binding ?passenger_subgroup_a ?vehicle_pool)
+        (travel_unit_timing_buffer_binding ?passenger_subgroup_a ?timing_buffer)
+        (not
+          (travel_unit_assigned ?passenger_subgroup_a)
+        )
+      )
+    :effect
+      (and
+        (travel_unit_assigned ?passenger_subgroup_a)
+        (vehicle_pool_available ?vehicle_pool)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action assign_subgroup_b_to_pool
+    :parameters (?passenger_subgroup_b - passenger_subgroup_b ?vehicle_pool - vehicle_pool ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (ready_for_vehicle_binding ?passenger_subgroup_b)
+        (travel_unit_pool_binding ?passenger_subgroup_b ?vehicle_pool)
+        (travel_unit_timing_buffer_binding ?passenger_subgroup_b ?timing_buffer)
+        (not
+          (travel_unit_assigned ?passenger_subgroup_b)
+        )
+      )
+    :effect
+      (and
+        (travel_unit_assigned ?passenger_subgroup_b)
+        (vehicle_pool_available ?vehicle_pool)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action assign_dispatch_case_to_pool
+    :parameters (?dispatch_case - dispatch_case ?vehicle_pool - vehicle_pool ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (ready_for_vehicle_binding ?dispatch_case)
+        (travel_unit_pool_binding ?dispatch_case ?vehicle_pool)
+        (travel_unit_timing_buffer_binding ?dispatch_case ?timing_buffer)
+        (not
+          (travel_unit_assigned ?dispatch_case)
+        )
+      )
+    :effect
+      (and
+        (travel_unit_assigned ?dispatch_case)
+        (vehicle_pool_available ?vehicle_pool)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+)

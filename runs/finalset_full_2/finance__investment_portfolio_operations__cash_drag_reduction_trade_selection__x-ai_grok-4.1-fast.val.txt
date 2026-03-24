@@ -1,0 +1,1061 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_investment_portfolio_cash_drag_reduction_trade_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types financial_domain_object - object selection_strategy_family - financial_domain_object liquidity_profile_family - financial_domain_object operational_resource_family - financial_domain_object case_supertype - financial_domain_object case_subject - case_supertype selection_strategy - selection_strategy_family instrument - selection_strategy_family trading_desk - selection_strategy_family order_constraint - selection_strategy_family allocation_preference - selection_strategy_family cash_lot - selection_strategy_family execution_instruction_template - selection_strategy_family settlement_parameter - selection_strategy_family liquidity_profile_template - liquidity_profile_family holding_lot - liquidity_profile_family compliance_rule - liquidity_profile_family source_liquidity_profile - operational_resource_family destination_liquidity_profile - operational_resource_family trade_proposal - operational_resource_family tranche_supertype - case_subject portfolio_supertype - case_subject source_tranche - tranche_supertype destination_tranche - tranche_supertype portfolio - portfolio_supertype)
+
+  (:predicates
+    (trade_entity_registered ?trade_case - case_subject)
+    (trade_entity_qualified ?trade_case - case_subject)
+    (selection_strategy_applied ?trade_case - case_subject)
+    (post_trade_settled ?trade_case - case_subject)
+    (trade_release_ready ?trade_case - case_subject)
+    (trade_executed ?trade_case - case_subject)
+    (selection_strategy_available ?selection_strategy - selection_strategy)
+    (entity_selection_strategy_binding ?trade_case - case_subject ?selection_strategy - selection_strategy)
+    (instrument_available ?instrument - instrument)
+    (instrument_selected ?trade_case - case_subject ?instrument - instrument)
+    (trading_desk_available ?trading_desk - trading_desk)
+    (trading_desk_reserved ?trade_case - case_subject ?trading_desk - trading_desk)
+    (liquidity_template_available ?liquidity_template - liquidity_profile_template)
+    (source_liquidity_template_bound ?source_tranche - source_tranche ?liquidity_template - liquidity_profile_template)
+    (destination_liquidity_template_bound ?destination_tranche - destination_tranche ?liquidity_template - liquidity_profile_template)
+    (source_liquidity_profile_linked ?source_tranche - source_tranche ?source_liquidity_profile - source_liquidity_profile)
+    (source_liquidity_screened ?source_liquidity_profile - source_liquidity_profile)
+    (source_liquidity_bound ?source_liquidity_profile - source_liquidity_profile)
+    (source_tranche_committed ?source_tranche - source_tranche)
+    (destination_liquidity_profile_linked ?destination_tranche - destination_tranche ?destination_liquidity_profile - destination_liquidity_profile)
+    (destination_liquidity_screened ?destination_liquidity_profile - destination_liquidity_profile)
+    (destination_liquidity_bound ?destination_liquidity_profile - destination_liquidity_profile)
+    (destination_tranche_committed ?destination_tranche - destination_tranche)
+    (trade_proposal_available ?trade_proposal - trade_proposal)
+    (trade_proposal_assembled ?trade_proposal - trade_proposal)
+    (proposal_source_liquidity_linked ?trade_proposal - trade_proposal ?source_liquidity_profile - source_liquidity_profile)
+    (proposal_destination_liquidity_linked ?trade_proposal - trade_proposal ?destination_liquidity_profile - destination_liquidity_profile)
+    (source_leg_enriched ?trade_proposal - trade_proposal)
+    (destination_leg_enriched ?trade_proposal - trade_proposal)
+    (trade_proposal_authorized ?trade_proposal - trade_proposal)
+    (portfolio_source_tranche_linked ?portfolio - portfolio ?source_tranche - source_tranche)
+    (portfolio_destination_tranche_linked ?portfolio - portfolio ?destination_tranche - destination_tranche)
+    (portfolio_trade_proposal_linked ?portfolio - portfolio ?trade_proposal - trade_proposal)
+    (holding_lot_available ?holding_lot - holding_lot)
+    (portfolio_holding_lot_linked ?portfolio - portfolio ?holding_lot - holding_lot)
+    (holding_lot_allocated ?holding_lot - holding_lot)
+    (holding_lot_bound_to_proposal ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    (portfolio_proposal_staged ?portfolio - portfolio)
+    (execution_packet_prepared ?portfolio - portfolio)
+    (settlement_packet_ready ?portfolio - portfolio)
+    (portfolio_order_constraint_bound ?portfolio - portfolio)
+    (order_constraint_bundle_reviewed ?portfolio - portfolio)
+    (execution_bundle_complete ?portfolio - portfolio)
+    (transition_validation_complete ?portfolio - portfolio)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (portfolio_compliance_rule_linked ?portfolio - portfolio ?compliance_rule - compliance_rule)
+    (compliance_review_started ?portfolio - portfolio)
+    (portfolio_desk_compliance_bound ?portfolio - portfolio)
+    (portfolio_execution_cleared ?portfolio - portfolio)
+    (order_constraint_available ?order_constraint - order_constraint)
+    (portfolio_order_constraint_linked ?portfolio - portfolio ?order_constraint - order_constraint)
+    (allocation_preference_available ?allocation_preference - allocation_preference)
+    (portfolio_allocation_preference_linked ?portfolio - portfolio ?allocation_preference - allocation_preference)
+    (execution_template_available ?execution_instruction_template - execution_instruction_template)
+    (portfolio_execution_template_linked ?portfolio - portfolio ?execution_instruction_template - execution_instruction_template)
+    (settlement_parameter_available ?settlement_parameter - settlement_parameter)
+    (portfolio_settlement_parameter_linked ?portfolio - portfolio ?settlement_parameter - settlement_parameter)
+    (cash_lot_available ?cash_lot - cash_lot)
+    (cash_lot_assigned ?trade_case - case_subject ?cash_lot - cash_lot)
+    (source_tranche_execution_ready ?source_tranche - source_tranche)
+    (destination_tranche_execution_ready ?destination_tranche - destination_tranche)
+    (execution_release_authorized ?portfolio - portfolio)
+  )
+  (:action register_trade_case
+    :parameters (?trade_case - case_subject)
+    :precondition
+      (and
+        (not
+          (trade_entity_registered ?trade_case)
+        )
+        (not
+          (post_trade_settled ?trade_case)
+        )
+      )
+    :effect (trade_entity_registered ?trade_case)
+  )
+  (:action apply_selection_strategy
+    :parameters (?trade_case - case_subject ?selection_strategy - selection_strategy)
+    :precondition
+      (and
+        (trade_entity_registered ?trade_case)
+        (not
+          (selection_strategy_applied ?trade_case)
+        )
+        (selection_strategy_available ?selection_strategy)
+      )
+    :effect
+      (and
+        (selection_strategy_applied ?trade_case)
+        (entity_selection_strategy_binding ?trade_case ?selection_strategy)
+        (not
+          (selection_strategy_available ?selection_strategy)
+        )
+      )
+  )
+  (:action select_instrument
+    :parameters (?trade_case - case_subject ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_registered ?trade_case)
+        (selection_strategy_applied ?trade_case)
+        (instrument_available ?instrument)
+      )
+    :effect
+      (and
+        (instrument_selected ?trade_case ?instrument)
+        (not
+          (instrument_available ?instrument)
+        )
+      )
+  )
+  (:action confirm_instrument_screening
+    :parameters (?trade_case - case_subject ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_registered ?trade_case)
+        (selection_strategy_applied ?trade_case)
+        (instrument_selected ?trade_case ?instrument)
+        (not
+          (trade_entity_qualified ?trade_case)
+        )
+      )
+    :effect (trade_entity_qualified ?trade_case)
+  )
+  (:action release_instrument_selection
+    :parameters (?trade_case - case_subject ?instrument - instrument)
+    :precondition
+      (and
+        (instrument_selected ?trade_case ?instrument)
+      )
+    :effect
+      (and
+        (instrument_available ?instrument)
+        (not
+          (instrument_selected ?trade_case ?instrument)
+        )
+      )
+  )
+  (:action reserve_trading_desk
+    :parameters (?trade_case - case_subject ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (trade_entity_qualified ?trade_case)
+        (trading_desk_available ?trading_desk)
+      )
+    :effect
+      (and
+        (trading_desk_reserved ?trade_case ?trading_desk)
+        (not
+          (trading_desk_available ?trading_desk)
+        )
+      )
+  )
+  (:action release_trading_desk
+    :parameters (?trade_case - case_subject ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (trading_desk_reserved ?trade_case ?trading_desk)
+      )
+    :effect
+      (and
+        (trading_desk_available ?trading_desk)
+        (not
+          (trading_desk_reserved ?trade_case ?trading_desk)
+        )
+      )
+  )
+  (:action reserve_execution_instruction_template
+    :parameters (?portfolio - portfolio ?execution_instruction_template - execution_instruction_template)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (execution_template_available ?execution_instruction_template)
+      )
+    :effect
+      (and
+        (portfolio_execution_template_linked ?portfolio ?execution_instruction_template)
+        (not
+          (execution_template_available ?execution_instruction_template)
+        )
+      )
+  )
+  (:action release_execution_instruction_template
+    :parameters (?portfolio - portfolio ?execution_instruction_template - execution_instruction_template)
+    :precondition
+      (and
+        (portfolio_execution_template_linked ?portfolio ?execution_instruction_template)
+      )
+    :effect
+      (and
+        (execution_template_available ?execution_instruction_template)
+        (not
+          (portfolio_execution_template_linked ?portfolio ?execution_instruction_template)
+        )
+      )
+  )
+  (:action reserve_settlement_parameter
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (settlement_parameter_available ?settlement_parameter)
+      )
+    :effect
+      (and
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (not
+          (settlement_parameter_available ?settlement_parameter)
+        )
+      )
+  )
+  (:action release_settlement_parameter
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter)
+    :precondition
+      (and
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+      )
+    :effect
+      (and
+        (settlement_parameter_available ?settlement_parameter)
+        (not
+          (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        )
+      )
+  )
+  (:action screen_source_liquidity
+    :parameters (?source_tranche - source_tranche ?source_liquidity_profile - source_liquidity_profile ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_qualified ?source_tranche)
+        (instrument_selected ?source_tranche ?instrument)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (not
+          (source_liquidity_screened ?source_liquidity_profile)
+        )
+        (not
+          (source_liquidity_bound ?source_liquidity_profile)
+        )
+      )
+    :effect (source_liquidity_screened ?source_liquidity_profile)
+  )
+  (:action commit_source_tranche
+    :parameters (?source_tranche - source_tranche ?source_liquidity_profile - source_liquidity_profile ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (trade_entity_qualified ?source_tranche)
+        (trading_desk_reserved ?source_tranche ?trading_desk)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (source_liquidity_screened ?source_liquidity_profile)
+        (not
+          (source_tranche_execution_ready ?source_tranche)
+        )
+      )
+    :effect
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (source_tranche_committed ?source_tranche)
+      )
+  )
+  (:action bind_source_liquidity_template
+    :parameters (?source_tranche - source_tranche ?source_liquidity_profile - source_liquidity_profile ?liquidity_template - liquidity_profile_template)
+    :precondition
+      (and
+        (trade_entity_qualified ?source_tranche)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (liquidity_template_available ?liquidity_template)
+        (not
+          (source_tranche_execution_ready ?source_tranche)
+        )
+      )
+    :effect
+      (and
+        (source_liquidity_bound ?source_liquidity_profile)
+        (source_tranche_execution_ready ?source_tranche)
+        (source_liquidity_template_bound ?source_tranche ?liquidity_template)
+        (not
+          (liquidity_template_available ?liquidity_template)
+        )
+      )
+  )
+  (:action finalize_source_tranche_selection
+    :parameters (?source_tranche - source_tranche ?source_liquidity_profile - source_liquidity_profile ?instrument - instrument ?liquidity_template - liquidity_profile_template)
+    :precondition
+      (and
+        (trade_entity_qualified ?source_tranche)
+        (instrument_selected ?source_tranche ?instrument)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (source_liquidity_bound ?source_liquidity_profile)
+        (source_liquidity_template_bound ?source_tranche ?liquidity_template)
+        (not
+          (source_tranche_committed ?source_tranche)
+        )
+      )
+    :effect
+      (and
+        (source_liquidity_screened ?source_liquidity_profile)
+        (source_tranche_committed ?source_tranche)
+        (liquidity_template_available ?liquidity_template)
+        (not
+          (source_liquidity_template_bound ?source_tranche ?liquidity_template)
+        )
+      )
+  )
+  (:action screen_destination_liquidity
+    :parameters (?destination_tranche - destination_tranche ?destination_liquidity_profile - destination_liquidity_profile ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_qualified ?destination_tranche)
+        (instrument_selected ?destination_tranche ?instrument)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (not
+          (destination_liquidity_screened ?destination_liquidity_profile)
+        )
+        (not
+          (destination_liquidity_bound ?destination_liquidity_profile)
+        )
+      )
+    :effect (destination_liquidity_screened ?destination_liquidity_profile)
+  )
+  (:action commit_destination_tranche
+    :parameters (?destination_tranche - destination_tranche ?destination_liquidity_profile - destination_liquidity_profile ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (trade_entity_qualified ?destination_tranche)
+        (trading_desk_reserved ?destination_tranche ?trading_desk)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (destination_liquidity_screened ?destination_liquidity_profile)
+        (not
+          (destination_tranche_execution_ready ?destination_tranche)
+        )
+      )
+    :effect
+      (and
+        (destination_tranche_execution_ready ?destination_tranche)
+        (destination_tranche_committed ?destination_tranche)
+      )
+  )
+  (:action bind_destination_liquidity_template
+    :parameters (?destination_tranche - destination_tranche ?destination_liquidity_profile - destination_liquidity_profile ?liquidity_template - liquidity_profile_template)
+    :precondition
+      (and
+        (trade_entity_qualified ?destination_tranche)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (liquidity_template_available ?liquidity_template)
+        (not
+          (destination_tranche_execution_ready ?destination_tranche)
+        )
+      )
+    :effect
+      (and
+        (destination_liquidity_bound ?destination_liquidity_profile)
+        (destination_tranche_execution_ready ?destination_tranche)
+        (destination_liquidity_template_bound ?destination_tranche ?liquidity_template)
+        (not
+          (liquidity_template_available ?liquidity_template)
+        )
+      )
+  )
+  (:action finalize_destination_tranche_selection
+    :parameters (?destination_tranche - destination_tranche ?destination_liquidity_profile - destination_liquidity_profile ?instrument - instrument ?liquidity_template - liquidity_profile_template)
+    :precondition
+      (and
+        (trade_entity_qualified ?destination_tranche)
+        (instrument_selected ?destination_tranche ?instrument)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (destination_liquidity_bound ?destination_liquidity_profile)
+        (destination_liquidity_template_bound ?destination_tranche ?liquidity_template)
+        (not
+          (destination_tranche_committed ?destination_tranche)
+        )
+      )
+    :effect
+      (and
+        (destination_liquidity_screened ?destination_liquidity_profile)
+        (destination_tranche_committed ?destination_tranche)
+        (liquidity_template_available ?liquidity_template)
+        (not
+          (destination_liquidity_template_bound ?destination_tranche ?liquidity_template)
+        )
+      )
+  )
+  (:action assemble_trade_proposal
+    :parameters (?source_tranche - source_tranche ?destination_tranche - destination_tranche ?source_liquidity_profile - source_liquidity_profile ?destination_liquidity_profile - destination_liquidity_profile ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (destination_tranche_execution_ready ?destination_tranche)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (source_liquidity_screened ?source_liquidity_profile)
+        (destination_liquidity_screened ?destination_liquidity_profile)
+        (source_tranche_committed ?source_tranche)
+        (destination_tranche_committed ?destination_tranche)
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_assembled ?trade_proposal)
+        (proposal_source_liquidity_linked ?trade_proposal ?source_liquidity_profile)
+        (proposal_destination_liquidity_linked ?trade_proposal ?destination_liquidity_profile)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_source_aligned
+    :parameters (?source_tranche - source_tranche ?destination_tranche - destination_tranche ?source_liquidity_profile - source_liquidity_profile ?destination_liquidity_profile - destination_liquidity_profile ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (destination_tranche_execution_ready ?destination_tranche)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (source_liquidity_bound ?source_liquidity_profile)
+        (destination_liquidity_screened ?destination_liquidity_profile)
+        (not
+          (source_tranche_committed ?source_tranche)
+        )
+        (destination_tranche_committed ?destination_tranche)
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_assembled ?trade_proposal)
+        (proposal_source_liquidity_linked ?trade_proposal ?source_liquidity_profile)
+        (proposal_destination_liquidity_linked ?trade_proposal ?destination_liquidity_profile)
+        (source_leg_enriched ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_destination_aligned
+    :parameters (?source_tranche - source_tranche ?destination_tranche - destination_tranche ?source_liquidity_profile - source_liquidity_profile ?destination_liquidity_profile - destination_liquidity_profile ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (destination_tranche_execution_ready ?destination_tranche)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (source_liquidity_screened ?source_liquidity_profile)
+        (destination_liquidity_bound ?destination_liquidity_profile)
+        (source_tranche_committed ?source_tranche)
+        (not
+          (destination_tranche_committed ?destination_tranche)
+        )
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_assembled ?trade_proposal)
+        (proposal_source_liquidity_linked ?trade_proposal ?source_liquidity_profile)
+        (proposal_destination_liquidity_linked ?trade_proposal ?destination_liquidity_profile)
+        (destination_leg_enriched ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_fully_aligned
+    :parameters (?source_tranche - source_tranche ?destination_tranche - destination_tranche ?source_liquidity_profile - source_liquidity_profile ?destination_liquidity_profile - destination_liquidity_profile ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (destination_tranche_execution_ready ?destination_tranche)
+        (source_liquidity_profile_linked ?source_tranche ?source_liquidity_profile)
+        (destination_liquidity_profile_linked ?destination_tranche ?destination_liquidity_profile)
+        (source_liquidity_bound ?source_liquidity_profile)
+        (destination_liquidity_bound ?destination_liquidity_profile)
+        (not
+          (source_tranche_committed ?source_tranche)
+        )
+        (not
+          (destination_tranche_committed ?destination_tranche)
+        )
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_assembled ?trade_proposal)
+        (proposal_source_liquidity_linked ?trade_proposal ?source_liquidity_profile)
+        (proposal_destination_liquidity_linked ?trade_proposal ?destination_liquidity_profile)
+        (source_leg_enriched ?trade_proposal)
+        (destination_leg_enriched ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action authorize_trade_proposal
+    :parameters (?trade_proposal - trade_proposal ?source_tranche - source_tranche ?instrument - instrument)
+    :precondition
+      (and
+        (trade_proposal_assembled ?trade_proposal)
+        (source_tranche_execution_ready ?source_tranche)
+        (instrument_selected ?source_tranche ?instrument)
+        (not
+          (trade_proposal_authorized ?trade_proposal)
+        )
+      )
+    :effect (trade_proposal_authorized ?trade_proposal)
+  )
+  (:action bind_holding_lot_to_proposal
+    :parameters (?portfolio - portfolio ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (portfolio_trade_proposal_linked ?portfolio ?trade_proposal)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_available ?holding_lot)
+        (trade_proposal_assembled ?trade_proposal)
+        (trade_proposal_authorized ?trade_proposal)
+        (not
+          (holding_lot_allocated ?holding_lot)
+        )
+      )
+    :effect
+      (and
+        (holding_lot_allocated ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (not
+          (holding_lot_available ?holding_lot)
+        )
+      )
+  )
+  (:action stage_portfolio_proposal
+    :parameters (?portfolio - portfolio ?holding_lot - holding_lot ?trade_proposal - trade_proposal ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_allocated ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (instrument_selected ?portfolio ?instrument)
+        (not
+          (source_leg_enriched ?trade_proposal)
+        )
+        (not
+          (portfolio_proposal_staged ?portfolio)
+        )
+      )
+    :effect (portfolio_proposal_staged ?portfolio)
+  )
+  (:action attach_order_constraint
+    :parameters (?portfolio - portfolio ?order_constraint - order_constraint)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (order_constraint_available ?order_constraint)
+        (not
+          (portfolio_order_constraint_bound ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_order_constraint_bound ?portfolio)
+        (portfolio_order_constraint_linked ?portfolio ?order_constraint)
+        (not
+          (order_constraint_available ?order_constraint)
+        )
+      )
+  )
+  (:action confirm_order_constraint_bundle
+    :parameters (?portfolio - portfolio ?holding_lot - holding_lot ?trade_proposal - trade_proposal ?instrument - instrument ?order_constraint - order_constraint)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_allocated ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (instrument_selected ?portfolio ?instrument)
+        (source_leg_enriched ?trade_proposal)
+        (portfolio_order_constraint_bound ?portfolio)
+        (portfolio_order_constraint_linked ?portfolio ?order_constraint)
+        (not
+          (portfolio_proposal_staged ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (portfolio_proposal_staged ?portfolio)
+        (order_constraint_bundle_reviewed ?portfolio)
+      )
+  )
+  (:action package_execution_instructions
+    :parameters (?portfolio - portfolio ?execution_instruction_template - execution_instruction_template ?trading_desk - trading_desk ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_proposal_staged ?portfolio)
+        (portfolio_execution_template_linked ?portfolio ?execution_instruction_template)
+        (trading_desk_reserved ?portfolio ?trading_desk)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (not
+          (destination_leg_enriched ?trade_proposal)
+        )
+        (not
+          (execution_packet_prepared ?portfolio)
+        )
+      )
+    :effect (execution_packet_prepared ?portfolio)
+  )
+  (:action package_execution_instructions_destination_aligned
+    :parameters (?portfolio - portfolio ?execution_instruction_template - execution_instruction_template ?trading_desk - trading_desk ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_proposal_staged ?portfolio)
+        (portfolio_execution_template_linked ?portfolio ?execution_instruction_template)
+        (trading_desk_reserved ?portfolio ?trading_desk)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (destination_leg_enriched ?trade_proposal)
+        (not
+          (execution_packet_prepared ?portfolio)
+        )
+      )
+    :effect (execution_packet_prepared ?portfolio)
+  )
+  (:action compile_settlement_packet
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (execution_packet_prepared ?portfolio)
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (not
+          (source_leg_enriched ?trade_proposal)
+        )
+        (not
+          (destination_leg_enriched ?trade_proposal)
+        )
+        (not
+          (settlement_packet_ready ?portfolio)
+        )
+      )
+    :effect (settlement_packet_ready ?portfolio)
+  )
+  (:action compile_settlement_packet_source_aligned
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (execution_packet_prepared ?portfolio)
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (source_leg_enriched ?trade_proposal)
+        (not
+          (destination_leg_enriched ?trade_proposal)
+        )
+        (not
+          (settlement_packet_ready ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (settlement_packet_ready ?portfolio)
+        (execution_bundle_complete ?portfolio)
+      )
+  )
+  (:action compile_settlement_packet_destination_aligned
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (execution_packet_prepared ?portfolio)
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (not
+          (source_leg_enriched ?trade_proposal)
+        )
+        (destination_leg_enriched ?trade_proposal)
+        (not
+          (settlement_packet_ready ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (settlement_packet_ready ?portfolio)
+        (execution_bundle_complete ?portfolio)
+      )
+  )
+  (:action compile_settlement_packet_fully_aligned
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter ?holding_lot - holding_lot ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (execution_packet_prepared ?portfolio)
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (portfolio_holding_lot_linked ?portfolio ?holding_lot)
+        (holding_lot_bound_to_proposal ?holding_lot ?trade_proposal)
+        (source_leg_enriched ?trade_proposal)
+        (destination_leg_enriched ?trade_proposal)
+        (not
+          (settlement_packet_ready ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (settlement_packet_ready ?portfolio)
+        (execution_bundle_complete ?portfolio)
+      )
+  )
+  (:action authorize_execution_release
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (settlement_packet_ready ?portfolio)
+        (not
+          (execution_bundle_complete ?portfolio)
+        )
+        (not
+          (execution_release_authorized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (execution_release_authorized ?portfolio)
+        (trade_release_ready ?portfolio)
+      )
+  )
+  (:action attach_allocation_preference
+    :parameters (?portfolio - portfolio ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (settlement_packet_ready ?portfolio)
+        (execution_bundle_complete ?portfolio)
+        (allocation_preference_available ?allocation_preference)
+      )
+    :effect
+      (and
+        (portfolio_allocation_preference_linked ?portfolio ?allocation_preference)
+        (not
+          (allocation_preference_available ?allocation_preference)
+        )
+      )
+  )
+  (:action validate_portfolio_transition
+    :parameters (?portfolio - portfolio ?source_tranche - source_tranche ?destination_tranche - destination_tranche ?instrument - instrument ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (settlement_packet_ready ?portfolio)
+        (execution_bundle_complete ?portfolio)
+        (portfolio_allocation_preference_linked ?portfolio ?allocation_preference)
+        (portfolio_source_tranche_linked ?portfolio ?source_tranche)
+        (portfolio_destination_tranche_linked ?portfolio ?destination_tranche)
+        (source_tranche_committed ?source_tranche)
+        (destination_tranche_committed ?destination_tranche)
+        (instrument_selected ?portfolio ?instrument)
+        (not
+          (transition_validation_complete ?portfolio)
+        )
+      )
+    :effect (transition_validation_complete ?portfolio)
+  )
+  (:action authorize_execution_release_after_transition_validation
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (settlement_packet_ready ?portfolio)
+        (transition_validation_complete ?portfolio)
+        (not
+          (execution_release_authorized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (execution_release_authorized ?portfolio)
+        (trade_release_ready ?portfolio)
+      )
+  )
+  (:action start_compliance_review
+    :parameters (?portfolio - portfolio ?compliance_rule - compliance_rule ?instrument - instrument)
+    :precondition
+      (and
+        (trade_entity_qualified ?portfolio)
+        (instrument_selected ?portfolio ?instrument)
+        (compliance_rule_available ?compliance_rule)
+        (portfolio_compliance_rule_linked ?portfolio ?compliance_rule)
+        (not
+          (compliance_review_started ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (compliance_review_started ?portfolio)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action bind_compliance_to_trading_desk
+    :parameters (?portfolio - portfolio ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (compliance_review_started ?portfolio)
+        (trading_desk_reserved ?portfolio ?trading_desk)
+        (not
+          (portfolio_desk_compliance_bound ?portfolio)
+        )
+      )
+    :effect (portfolio_desk_compliance_bound ?portfolio)
+  )
+  (:action confirm_portfolio_execution_clearance
+    :parameters (?portfolio - portfolio ?settlement_parameter - settlement_parameter)
+    :precondition
+      (and
+        (portfolio_desk_compliance_bound ?portfolio)
+        (portfolio_settlement_parameter_linked ?portfolio ?settlement_parameter)
+        (not
+          (portfolio_execution_cleared ?portfolio)
+        )
+      )
+    :effect (portfolio_execution_cleared ?portfolio)
+  )
+  (:action authorize_execution_release_after_compliance_clearance
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (portfolio_execution_cleared ?portfolio)
+        (not
+          (execution_release_authorized ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (execution_release_authorized ?portfolio)
+        (trade_release_ready ?portfolio)
+      )
+  )
+  (:action release_source_tranche_for_settlement
+    :parameters (?source_tranche - source_tranche ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (source_tranche_execution_ready ?source_tranche)
+        (source_tranche_committed ?source_tranche)
+        (trade_proposal_assembled ?trade_proposal)
+        (trade_proposal_authorized ?trade_proposal)
+        (not
+          (trade_release_ready ?source_tranche)
+        )
+      )
+    :effect (trade_release_ready ?source_tranche)
+  )
+  (:action release_destination_tranche_for_settlement
+    :parameters (?destination_tranche - destination_tranche ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (destination_tranche_execution_ready ?destination_tranche)
+        (destination_tranche_committed ?destination_tranche)
+        (trade_proposal_assembled ?trade_proposal)
+        (trade_proposal_authorized ?trade_proposal)
+        (not
+          (trade_release_ready ?destination_tranche)
+        )
+      )
+    :effect (trade_release_ready ?destination_tranche)
+  )
+  (:action reserve_cash_lot_for_settlement
+    :parameters (?trade_case - case_subject ?cash_lot - cash_lot ?instrument - instrument)
+    :precondition
+      (and
+        (trade_release_ready ?trade_case)
+        (instrument_selected ?trade_case ?instrument)
+        (cash_lot_available ?cash_lot)
+        (not
+          (trade_executed ?trade_case)
+        )
+      )
+    :effect
+      (and
+        (trade_executed ?trade_case)
+        (cash_lot_assigned ?trade_case ?cash_lot)
+        (not
+          (cash_lot_available ?cash_lot)
+        )
+      )
+  )
+  (:action settle_source_tranche
+    :parameters (?source_tranche - source_tranche ?selection_strategy - selection_strategy ?cash_lot - cash_lot)
+    :precondition
+      (and
+        (trade_executed ?source_tranche)
+        (entity_selection_strategy_binding ?source_tranche ?selection_strategy)
+        (cash_lot_assigned ?source_tranche ?cash_lot)
+        (not
+          (post_trade_settled ?source_tranche)
+        )
+      )
+    :effect
+      (and
+        (post_trade_settled ?source_tranche)
+        (selection_strategy_available ?selection_strategy)
+        (cash_lot_available ?cash_lot)
+      )
+  )
+  (:action settle_destination_tranche
+    :parameters (?destination_tranche - destination_tranche ?selection_strategy - selection_strategy ?cash_lot - cash_lot)
+    :precondition
+      (and
+        (trade_executed ?destination_tranche)
+        (entity_selection_strategy_binding ?destination_tranche ?selection_strategy)
+        (cash_lot_assigned ?destination_tranche ?cash_lot)
+        (not
+          (post_trade_settled ?destination_tranche)
+        )
+      )
+    :effect
+      (and
+        (post_trade_settled ?destination_tranche)
+        (selection_strategy_available ?selection_strategy)
+        (cash_lot_available ?cash_lot)
+      )
+  )
+  (:action settle_portfolio
+    :parameters (?portfolio - portfolio ?selection_strategy - selection_strategy ?cash_lot - cash_lot)
+    :precondition
+      (and
+        (trade_executed ?portfolio)
+        (entity_selection_strategy_binding ?portfolio ?selection_strategy)
+        (cash_lot_assigned ?portfolio ?cash_lot)
+        (not
+          (post_trade_settled ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (post_trade_settled ?portfolio)
+        (selection_strategy_available ?selection_strategy)
+        (cash_lot_available ?cash_lot)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem finance_investment_portfolio_cash_drag_reduction_trade_selection_problem)
+  (:domain finance_investment_portfolio_cash_drag_reduction_trade_selection_domain)
+  (:objects source_liquidity_tranche - source_tranche destination_liquidity_tranche - destination_tranche cash_drag_portfolio_alpha - portfolio cash_drag_portfolio_beta - portfolio cash_drag_minimization_strategy - selection_strategy liquidity_screening_strategy - selection_strategy rebalancing_strategy - selection_strategy target_security - instrument equities_trading_desk - trading_desk standard_liquidity_profile_template - liquidity_profile_template source_liquidity_snapshot - source_liquidity_profile destination_liquidity_snapshot - destination_liquidity_profile candidate_trade_proposal - trade_proposal holding_lot_alpha - holding_lot holding_lot_beta - holding_lot minimum_fill_constraint - order_constraint maximum_slippage_constraint - order_constraint source_allocation_preference - allocation_preference destination_allocation_preference - allocation_preference available_cash_lot - cash_lot execution_instruction_template_alpha - execution_instruction_template mandate_compliance_rule - compliance_rule portfolio_guardrail_rule - compliance_rule settlement_parameter_alpha - settlement_parameter)
+  (:init
+    (selection_strategy_available cash_drag_minimization_strategy)
+    (selection_strategy_available liquidity_screening_strategy)
+    (selection_strategy_available rebalancing_strategy)
+    (instrument_available target_security)
+    (trading_desk_available equities_trading_desk)
+    (liquidity_template_available standard_liquidity_profile_template)
+    (source_liquidity_profile_linked source_liquidity_tranche source_liquidity_snapshot)
+    (destination_liquidity_profile_linked destination_liquidity_tranche destination_liquidity_snapshot)
+    (trade_proposal_available candidate_trade_proposal)
+    (holding_lot_available holding_lot_alpha)
+    (holding_lot_available holding_lot_beta)
+    (portfolio_source_tranche_linked cash_drag_portfolio_alpha source_liquidity_tranche)
+    (portfolio_source_tranche_linked cash_drag_portfolio_beta source_liquidity_tranche)
+    (portfolio_destination_tranche_linked cash_drag_portfolio_alpha destination_liquidity_tranche)
+    (portfolio_destination_tranche_linked cash_drag_portfolio_beta destination_liquidity_tranche)
+    (portfolio_trade_proposal_linked cash_drag_portfolio_alpha candidate_trade_proposal)
+    (portfolio_trade_proposal_linked cash_drag_portfolio_beta candidate_trade_proposal)
+    (portfolio_holding_lot_linked cash_drag_portfolio_alpha holding_lot_alpha)
+    (portfolio_holding_lot_linked cash_drag_portfolio_beta holding_lot_beta)
+    (order_constraint_available minimum_fill_constraint)
+    (order_constraint_available maximum_slippage_constraint)
+    (allocation_preference_available source_allocation_preference)
+    (allocation_preference_available destination_allocation_preference)
+    (cash_lot_available available_cash_lot)
+    (execution_template_available execution_instruction_template_alpha)
+    (compliance_rule_available mandate_compliance_rule)
+    (portfolio_compliance_rule_linked cash_drag_portfolio_alpha mandate_compliance_rule)
+    (portfolio_compliance_rule_linked cash_drag_portfolio_beta portfolio_guardrail_rule)
+    (settlement_parameter_available settlement_parameter_alpha)
+  )
+  (:goal
+    (and
+      (post_trade_settled source_liquidity_tranche)
+      (post_trade_settled destination_liquidity_tranche)
+      (post_trade_settled cash_drag_portfolio_alpha)
+      (post_trade_settled cash_drag_portfolio_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_trade_case source_liquidity_tranche)
+(apply_selection_strategy source_liquidity_tranche cash_drag_minimization_strategy)
+(select_instrument source_liquidity_tranche target_security)
+(confirm_instrument_screening source_liquidity_tranche target_security)
+(bind_source_liquidity_template source_liquidity_tranche source_liquidity_snapshot standard_liquidity_profile_template)
+(finalize_source_tranche_selection source_liquidity_tranche source_liquidity_snapshot target_security standard_liquidity_profile_template)
+(release_instrument_selection source_liquidity_tranche target_security)
+(register_trade_case destination_liquidity_tranche)
+(apply_selection_strategy destination_liquidity_tranche liquidity_screening_strategy)
+(select_instrument destination_liquidity_tranche target_security)
+(confirm_instrument_screening destination_liquidity_tranche target_security)
+(bind_destination_liquidity_template destination_liquidity_tranche destination_liquidity_snapshot standard_liquidity_profile_template)
+(finalize_destination_tranche_selection destination_liquidity_tranche destination_liquidity_snapshot target_security standard_liquidity_profile_template)
+(release_instrument_selection destination_liquidity_tranche target_security)
+(select_instrument source_liquidity_tranche target_security)
+(assemble_trade_proposal source_liquidity_tranche destination_liquidity_tranche source_liquidity_snapshot destination_liquidity_snapshot candidate_trade_proposal)
+(authorize_trade_proposal candidate_trade_proposal source_liquidity_tranche target_security)
+(release_source_tranche_for_settlement source_liquidity_tranche candidate_trade_proposal)
+(release_destination_tranche_for_settlement destination_liquidity_tranche candidate_trade_proposal)
+(reserve_cash_lot_for_settlement source_liquidity_tranche available_cash_lot target_security)
+(settle_source_tranche source_liquidity_tranche cash_drag_minimization_strategy available_cash_lot)
+(release_instrument_selection source_liquidity_tranche target_security)
+(select_instrument destination_liquidity_tranche target_security)
+(reserve_cash_lot_for_settlement destination_liquidity_tranche available_cash_lot target_security)
+(settle_destination_tranche destination_liquidity_tranche liquidity_screening_strategy available_cash_lot)
+(register_trade_case cash_drag_portfolio_alpha)
+(apply_selection_strategy cash_drag_portfolio_alpha rebalancing_strategy)
+(select_instrument cash_drag_portfolio_alpha target_security)
+(confirm_instrument_screening cash_drag_portfolio_alpha target_security)
+(reserve_execution_instruction_template cash_drag_portfolio_alpha execution_instruction_template_alpha)
+(reserve_settlement_parameter cash_drag_portfolio_alpha settlement_parameter_alpha)
+(reserve_trading_desk cash_drag_portfolio_alpha equities_trading_desk)
+(bind_holding_lot_to_proposal cash_drag_portfolio_alpha holding_lot_alpha candidate_trade_proposal)
+(stage_portfolio_proposal cash_drag_portfolio_alpha holding_lot_alpha candidate_trade_proposal target_security)
+(package_execution_instructions cash_drag_portfolio_alpha execution_instruction_template_alpha equities_trading_desk holding_lot_alpha candidate_trade_proposal)
+(compile_settlement_packet cash_drag_portfolio_alpha settlement_parameter_alpha holding_lot_alpha candidate_trade_proposal)
+(authorize_execution_release cash_drag_portfolio_alpha)
+(reserve_cash_lot_for_settlement cash_drag_portfolio_alpha available_cash_lot target_security)
+(settle_portfolio cash_drag_portfolio_alpha rebalancing_strategy available_cash_lot)
+(release_instrument_selection cash_drag_portfolio_alpha target_security)
+(release_trading_desk cash_drag_portfolio_alpha equities_trading_desk)
+(release_execution_instruction_template cash_drag_portfolio_alpha execution_instruction_template_alpha)
+(release_settlement_parameter cash_drag_portfolio_alpha settlement_parameter_alpha)
+(register_trade_case cash_drag_portfolio_beta)
+(apply_selection_strategy cash_drag_portfolio_beta cash_drag_minimization_strategy)
+(select_instrument cash_drag_portfolio_beta target_security)
+(confirm_instrument_screening cash_drag_portfolio_beta target_security)
+(reserve_execution_instruction_template cash_drag_portfolio_beta execution_instruction_template_alpha)
+(reserve_settlement_parameter cash_drag_portfolio_beta settlement_parameter_alpha)
+(reserve_trading_desk cash_drag_portfolio_beta equities_trading_desk)
+(bind_holding_lot_to_proposal cash_drag_portfolio_beta holding_lot_beta candidate_trade_proposal)
+(stage_portfolio_proposal cash_drag_portfolio_beta holding_lot_beta candidate_trade_proposal target_security)
+(package_execution_instructions cash_drag_portfolio_beta execution_instruction_template_alpha equities_trading_desk holding_lot_beta candidate_trade_proposal)
+(compile_settlement_packet cash_drag_portfolio_beta settlement_parameter_alpha holding_lot_beta candidate_trade_proposal)
+(authorize_execution_release cash_drag_portfolio_beta)
+(reserve_cash_lot_for_settlement cash_drag_portfolio_beta available_cash_lot target_security)
+(settle_portfolio cash_drag_portfolio_beta cash_drag_minimization_strategy available_cash_lot)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_30fsmfou/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_30fsmfou/plan.pddl 
+
+
+--- stderr ---
+

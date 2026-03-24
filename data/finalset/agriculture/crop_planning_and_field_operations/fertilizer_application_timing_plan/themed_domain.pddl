@@ -1,0 +1,936 @@
+(define (domain fertilizer_application_timing_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types farm_resource - object material_spec - object schedule_entity - object domain_root - object field_parcel - domain_root application_equipment - farm_resource fertilizer_product - farm_resource application_operator - farm_resource supplier_certificate - farm_resource calibration_record - farm_resource soil_sample - farm_resource approval_document - farm_resource regulatory_permit - farm_resource fertilizer_batch - material_spec attachment_kit - material_spec operator_credential - material_spec timing_window - schedule_entity weather_window - schedule_entity application_slot - schedule_entity field_subdivision - field_parcel task_subdivision - field_parcel primary_section - field_subdivision secondary_section - field_subdivision field_task_plan - task_subdivision)
+  (:predicates
+    (parcel_registered ?field_parcel - field_parcel)
+    (entity_finalized ?field_parcel - field_parcel)
+    (equipment_reserved_for_parcel ?field_parcel - field_parcel)
+    (target_application_completed ?field_parcel - field_parcel)
+    (target_approved_for_execution ?field_parcel - field_parcel)
+    (target_execution_authorized ?field_parcel - field_parcel)
+    (equipment_available ?application_equipment - application_equipment)
+    (target_assigned_equipment ?field_parcel - field_parcel ?application_equipment - application_equipment)
+    (product_available ?fertilizer_product - fertilizer_product)
+    (assigned_product ?field_parcel - field_parcel ?fertilizer_product - fertilizer_product)
+    (operator_available ?application_operator - application_operator)
+    (target_assigned_operator ?field_parcel - field_parcel ?application_operator - application_operator)
+    (fertilizer_batch_available ?fertilizer_batch - fertilizer_batch)
+    (primary_section_assigned_batch ?primary_section - primary_section ?fertilizer_batch - fertilizer_batch)
+    (secondary_section_assigned_batch ?secondary_section - secondary_section ?fertilizer_batch - fertilizer_batch)
+    (primary_section_has_timing_window ?primary_section - primary_section ?timing_window - timing_window)
+    (timing_window_active ?timing_window - timing_window)
+    (timing_window_prepared ?timing_window - timing_window)
+    (primary_section_ready ?primary_section - primary_section)
+    (secondary_section_has_weather_window ?secondary_section - secondary_section ?weather_window - weather_window)
+    (weather_window_active ?weather_window - weather_window)
+    (weather_window_prepared ?weather_window - weather_window)
+    (secondary_section_ready ?secondary_section - secondary_section)
+    (slot_available ?application_slot - application_slot)
+    (slot_prepared ?application_slot - application_slot)
+    (slot_has_timing_window ?application_slot - application_slot ?timing_window - timing_window)
+    (slot_has_weather_window ?application_slot - application_slot ?weather_window - weather_window)
+    (slot_timing_confirmed ?application_slot - application_slot)
+    (slot_weather_confirmed ?application_slot - application_slot)
+    (slot_ready_for_attachments ?application_slot - application_slot)
+    (plan_targets_primary_section ?field_task_plan - field_task_plan ?primary_section - primary_section)
+    (plan_targets_secondary_section ?field_task_plan - field_task_plan ?secondary_section - secondary_section)
+    (plan_assigned_slot ?field_task_plan - field_task_plan ?application_slot - application_slot)
+    (attachment_kit_available ?attachment_kit - attachment_kit)
+    (plan_assigned_attachment_kit ?field_task_plan - field_task_plan ?attachment_kit - attachment_kit)
+    (attachment_kit_reserved ?attachment_kit - attachment_kit)
+    (attachment_kit_assigned_to_slot ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    (plan_attachments_confirmed ?field_task_plan - field_task_plan)
+    (plan_attachments_assigned ?field_task_plan - field_task_plan)
+    (plan_ready_for_checks ?field_task_plan - field_task_plan)
+    (plan_has_supplier_certificate ?field_task_plan - field_task_plan)
+    (plan_attachment_checked ?field_task_plan - field_task_plan)
+    (plan_requires_calibration ?field_task_plan - field_task_plan)
+    (plan_checks_completed ?field_task_plan - field_task_plan)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (plan_operator_credential_present ?field_task_plan - field_task_plan ?operator_credential - operator_credential)
+    (operator_credential_acknowledged ?field_task_plan - field_task_plan)
+    (operator_credential_verified ?field_task_plan - field_task_plan)
+    (operator_credential_approved ?field_task_plan - field_task_plan)
+    (supplier_certificate_available ?supplier_certificate - supplier_certificate)
+    (plan_assigned_supplier_certificate ?field_task_plan - field_task_plan ?supplier_certificate - supplier_certificate)
+    (calibration_record_available ?calibration_record - calibration_record)
+    (plan_assigned_calibration_record ?field_task_plan - field_task_plan ?calibration_record - calibration_record)
+    (approval_document_available ?approval_document - approval_document)
+    (plan_assigned_approval_document ?field_task_plan - field_task_plan ?approval_document - approval_document)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (plan_assigned_regulatory_permit ?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit)
+    (soil_sample_available ?soil_sample - soil_sample)
+    (target_assigned_soil_sample ?field_parcel - field_parcel ?soil_sample - soil_sample)
+    (primary_section_ready_for_slot ?primary_section - primary_section)
+    (secondary_section_ready_for_slot ?secondary_section - secondary_section)
+    (plan_finalized ?field_task_plan - field_task_plan)
+  )
+  (:action register_field_parcel
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (not
+          (parcel_registered ?field_parcel)
+        )
+        (not
+          (target_application_completed ?field_parcel)
+        )
+      )
+    :effect (parcel_registered ?field_parcel)
+  )
+  (:action reserve_equipment_for_parcel
+    :parameters (?field_parcel - field_parcel ?application_equipment - application_equipment)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (not
+          (equipment_reserved_for_parcel ?field_parcel)
+        )
+        (equipment_available ?application_equipment)
+      )
+    :effect
+      (and
+        (equipment_reserved_for_parcel ?field_parcel)
+        (target_assigned_equipment ?field_parcel ?application_equipment)
+        (not
+          (equipment_available ?application_equipment)
+        )
+      )
+  )
+  (:action assign_product_to_parcel
+    :parameters (?field_parcel - field_parcel ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (equipment_reserved_for_parcel ?field_parcel)
+        (product_available ?fertilizer_product)
+      )
+    :effect
+      (and
+        (assigned_product ?field_parcel ?fertilizer_product)
+        (not
+          (product_available ?fertilizer_product)
+        )
+      )
+  )
+  (:action finalize_parcel_resources
+    :parameters (?field_parcel - field_parcel ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (parcel_registered ?field_parcel)
+        (equipment_reserved_for_parcel ?field_parcel)
+        (assigned_product ?field_parcel ?fertilizer_product)
+        (not
+          (entity_finalized ?field_parcel)
+        )
+      )
+    :effect (entity_finalized ?field_parcel)
+  )
+  (:action unassign_product_from_parcel
+    :parameters (?field_parcel - field_parcel ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (assigned_product ?field_parcel ?fertilizer_product)
+      )
+    :effect
+      (and
+        (product_available ?fertilizer_product)
+        (not
+          (assigned_product ?field_parcel ?fertilizer_product)
+        )
+      )
+  )
+  (:action assign_operator_to_parcel
+    :parameters (?field_parcel - field_parcel ?application_operator - application_operator)
+    :precondition
+      (and
+        (entity_finalized ?field_parcel)
+        (operator_available ?application_operator)
+      )
+    :effect
+      (and
+        (target_assigned_operator ?field_parcel ?application_operator)
+        (not
+          (operator_available ?application_operator)
+        )
+      )
+  )
+  (:action unassign_operator_from_parcel
+    :parameters (?field_parcel - field_parcel ?application_operator - application_operator)
+    :precondition
+      (and
+        (target_assigned_operator ?field_parcel ?application_operator)
+      )
+    :effect
+      (and
+        (operator_available ?application_operator)
+        (not
+          (target_assigned_operator ?field_parcel ?application_operator)
+        )
+      )
+  )
+  (:action assign_approval_to_plan
+    :parameters (?field_task_plan - field_task_plan ?approval_document - approval_document)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (approval_document_available ?approval_document)
+      )
+    :effect
+      (and
+        (plan_assigned_approval_document ?field_task_plan ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action remove_approval_from_plan
+    :parameters (?field_task_plan - field_task_plan ?approval_document - approval_document)
+    :precondition
+      (and
+        (plan_assigned_approval_document ?field_task_plan ?approval_document)
+      )
+    :effect
+      (and
+        (approval_document_available ?approval_document)
+        (not
+          (plan_assigned_approval_document ?field_task_plan ?approval_document)
+        )
+      )
+  )
+  (:action assign_regulatory_permit_to_plan
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (regulatory_permit_available ?regulatory_permit)
+      )
+    :effect
+      (and
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action remove_regulatory_permit_from_plan
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+      )
+    :effect
+      (and
+        (regulatory_permit_available ?regulatory_permit)
+        (not
+          (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        )
+      )
+  )
+  (:action activate_timing_window_for_primary_section
+    :parameters (?primary_section - primary_section ?timing_window - timing_window ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (entity_finalized ?primary_section)
+        (assigned_product ?primary_section ?fertilizer_product)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (not
+          (timing_window_active ?timing_window)
+        )
+        (not
+          (timing_window_prepared ?timing_window)
+        )
+      )
+    :effect (timing_window_active ?timing_window)
+  )
+  (:action confirm_operator_for_primary_section
+    :parameters (?primary_section - primary_section ?timing_window - timing_window ?application_operator - application_operator)
+    :precondition
+      (and
+        (entity_finalized ?primary_section)
+        (target_assigned_operator ?primary_section ?application_operator)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (timing_window_active ?timing_window)
+        (not
+          (primary_section_ready_for_slot ?primary_section)
+        )
+      )
+    :effect
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (primary_section_ready ?primary_section)
+      )
+  )
+  (:action assign_batch_to_primary_section
+    :parameters (?primary_section - primary_section ?timing_window - timing_window ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (entity_finalized ?primary_section)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (fertilizer_batch_available ?fertilizer_batch)
+        (not
+          (primary_section_ready_for_slot ?primary_section)
+        )
+      )
+    :effect
+      (and
+        (timing_window_prepared ?timing_window)
+        (primary_section_ready_for_slot ?primary_section)
+        (primary_section_assigned_batch ?primary_section ?fertilizer_batch)
+        (not
+          (fertilizer_batch_available ?fertilizer_batch)
+        )
+      )
+  )
+  (:action finalize_primary_section_batch_and_timing
+    :parameters (?primary_section - primary_section ?timing_window - timing_window ?fertilizer_product - fertilizer_product ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (entity_finalized ?primary_section)
+        (assigned_product ?primary_section ?fertilizer_product)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (timing_window_prepared ?timing_window)
+        (primary_section_assigned_batch ?primary_section ?fertilizer_batch)
+        (not
+          (primary_section_ready ?primary_section)
+        )
+      )
+    :effect
+      (and
+        (timing_window_active ?timing_window)
+        (primary_section_ready ?primary_section)
+        (fertilizer_batch_available ?fertilizer_batch)
+        (not
+          (primary_section_assigned_batch ?primary_section ?fertilizer_batch)
+        )
+      )
+  )
+  (:action activate_weather_window_for_secondary_section
+    :parameters (?secondary_section - secondary_section ?weather_window - weather_window ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (entity_finalized ?secondary_section)
+        (assigned_product ?secondary_section ?fertilizer_product)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (not
+          (weather_window_active ?weather_window)
+        )
+        (not
+          (weather_window_prepared ?weather_window)
+        )
+      )
+    :effect (weather_window_active ?weather_window)
+  )
+  (:action confirm_operator_for_secondary_section
+    :parameters (?secondary_section - secondary_section ?weather_window - weather_window ?application_operator - application_operator)
+    :precondition
+      (and
+        (entity_finalized ?secondary_section)
+        (target_assigned_operator ?secondary_section ?application_operator)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (weather_window_active ?weather_window)
+        (not
+          (secondary_section_ready_for_slot ?secondary_section)
+        )
+      )
+    :effect
+      (and
+        (secondary_section_ready_for_slot ?secondary_section)
+        (secondary_section_ready ?secondary_section)
+      )
+  )
+  (:action assign_batch_to_secondary_section
+    :parameters (?secondary_section - secondary_section ?weather_window - weather_window ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (entity_finalized ?secondary_section)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (fertilizer_batch_available ?fertilizer_batch)
+        (not
+          (secondary_section_ready_for_slot ?secondary_section)
+        )
+      )
+    :effect
+      (and
+        (weather_window_prepared ?weather_window)
+        (secondary_section_ready_for_slot ?secondary_section)
+        (secondary_section_assigned_batch ?secondary_section ?fertilizer_batch)
+        (not
+          (fertilizer_batch_available ?fertilizer_batch)
+        )
+      )
+  )
+  (:action finalize_secondary_section_batch_and_weather
+    :parameters (?secondary_section - secondary_section ?weather_window - weather_window ?fertilizer_product - fertilizer_product ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (entity_finalized ?secondary_section)
+        (assigned_product ?secondary_section ?fertilizer_product)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (weather_window_prepared ?weather_window)
+        (secondary_section_assigned_batch ?secondary_section ?fertilizer_batch)
+        (not
+          (secondary_section_ready ?secondary_section)
+        )
+      )
+    :effect
+      (and
+        (weather_window_active ?weather_window)
+        (secondary_section_ready ?secondary_section)
+        (fertilizer_batch_available ?fertilizer_batch)
+        (not
+          (secondary_section_assigned_batch ?secondary_section ?fertilizer_batch)
+        )
+      )
+  )
+  (:action create_application_slot
+    :parameters (?primary_section - primary_section ?secondary_section - secondary_section ?timing_window - timing_window ?weather_window - weather_window ?application_slot - application_slot)
+    :precondition
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (secondary_section_ready_for_slot ?secondary_section)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (timing_window_active ?timing_window)
+        (weather_window_active ?weather_window)
+        (primary_section_ready ?primary_section)
+        (secondary_section_ready ?secondary_section)
+        (slot_available ?application_slot)
+      )
+    :effect
+      (and
+        (slot_prepared ?application_slot)
+        (slot_has_timing_window ?application_slot ?timing_window)
+        (slot_has_weather_window ?application_slot ?weather_window)
+        (not
+          (slot_available ?application_slot)
+        )
+      )
+  )
+  (:action create_application_slot_with_timing_confirmation
+    :parameters (?primary_section - primary_section ?secondary_section - secondary_section ?timing_window - timing_window ?weather_window - weather_window ?application_slot - application_slot)
+    :precondition
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (secondary_section_ready_for_slot ?secondary_section)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (timing_window_prepared ?timing_window)
+        (weather_window_active ?weather_window)
+        (not
+          (primary_section_ready ?primary_section)
+        )
+        (secondary_section_ready ?secondary_section)
+        (slot_available ?application_slot)
+      )
+    :effect
+      (and
+        (slot_prepared ?application_slot)
+        (slot_has_timing_window ?application_slot ?timing_window)
+        (slot_has_weather_window ?application_slot ?weather_window)
+        (slot_timing_confirmed ?application_slot)
+        (not
+          (slot_available ?application_slot)
+        )
+      )
+  )
+  (:action create_application_slot_with_weather_confirmation
+    :parameters (?primary_section - primary_section ?secondary_section - secondary_section ?timing_window - timing_window ?weather_window - weather_window ?application_slot - application_slot)
+    :precondition
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (secondary_section_ready_for_slot ?secondary_section)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (timing_window_active ?timing_window)
+        (weather_window_prepared ?weather_window)
+        (primary_section_ready ?primary_section)
+        (not
+          (secondary_section_ready ?secondary_section)
+        )
+        (slot_available ?application_slot)
+      )
+    :effect
+      (and
+        (slot_prepared ?application_slot)
+        (slot_has_timing_window ?application_slot ?timing_window)
+        (slot_has_weather_window ?application_slot ?weather_window)
+        (slot_weather_confirmed ?application_slot)
+        (not
+          (slot_available ?application_slot)
+        )
+      )
+  )
+  (:action create_application_slot_fully_confirmed
+    :parameters (?primary_section - primary_section ?secondary_section - secondary_section ?timing_window - timing_window ?weather_window - weather_window ?application_slot - application_slot)
+    :precondition
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (secondary_section_ready_for_slot ?secondary_section)
+        (primary_section_has_timing_window ?primary_section ?timing_window)
+        (secondary_section_has_weather_window ?secondary_section ?weather_window)
+        (timing_window_prepared ?timing_window)
+        (weather_window_prepared ?weather_window)
+        (not
+          (primary_section_ready ?primary_section)
+        )
+        (not
+          (secondary_section_ready ?secondary_section)
+        )
+        (slot_available ?application_slot)
+      )
+    :effect
+      (and
+        (slot_prepared ?application_slot)
+        (slot_has_timing_window ?application_slot ?timing_window)
+        (slot_has_weather_window ?application_slot ?weather_window)
+        (slot_timing_confirmed ?application_slot)
+        (slot_weather_confirmed ?application_slot)
+        (not
+          (slot_available ?application_slot)
+        )
+      )
+  )
+  (:action finalize_slot_for_attachments
+    :parameters (?application_slot - application_slot ?primary_section - primary_section ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (slot_prepared ?application_slot)
+        (primary_section_ready_for_slot ?primary_section)
+        (assigned_product ?primary_section ?fertilizer_product)
+        (not
+          (slot_ready_for_attachments ?application_slot)
+        )
+      )
+    :effect (slot_ready_for_attachments ?application_slot)
+  )
+  (:action reserve_attachment_kit_for_plan
+    :parameters (?field_task_plan - field_task_plan ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (plan_assigned_slot ?field_task_plan ?application_slot)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_available ?attachment_kit)
+        (slot_prepared ?application_slot)
+        (slot_ready_for_attachments ?application_slot)
+        (not
+          (attachment_kit_reserved ?attachment_kit)
+        )
+      )
+    :effect
+      (and
+        (attachment_kit_reserved ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (not
+          (attachment_kit_available ?attachment_kit)
+        )
+      )
+  )
+  (:action confirm_attachment_and_prepare_plan
+    :parameters (?field_task_plan - field_task_plan ?attachment_kit - attachment_kit ?application_slot - application_slot ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_reserved ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (assigned_product ?field_task_plan ?fertilizer_product)
+        (not
+          (slot_timing_confirmed ?application_slot)
+        )
+        (not
+          (plan_attachments_confirmed ?field_task_plan)
+        )
+      )
+    :effect (plan_attachments_confirmed ?field_task_plan)
+  )
+  (:action assign_supplier_certificate_to_plan
+    :parameters (?field_task_plan - field_task_plan ?supplier_certificate - supplier_certificate)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (supplier_certificate_available ?supplier_certificate)
+        (not
+          (plan_has_supplier_certificate ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_supplier_certificate ?field_task_plan)
+        (plan_assigned_supplier_certificate ?field_task_plan ?supplier_certificate)
+        (not
+          (supplier_certificate_available ?supplier_certificate)
+        )
+      )
+  )
+  (:action verify_plan_attachment_and_certificate
+    :parameters (?field_task_plan - field_task_plan ?attachment_kit - attachment_kit ?application_slot - application_slot ?fertilizer_product - fertilizer_product ?supplier_certificate - supplier_certificate)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_reserved ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (assigned_product ?field_task_plan ?fertilizer_product)
+        (slot_timing_confirmed ?application_slot)
+        (plan_has_supplier_certificate ?field_task_plan)
+        (plan_assigned_supplier_certificate ?field_task_plan ?supplier_certificate)
+        (not
+          (plan_attachments_confirmed ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_attachments_confirmed ?field_task_plan)
+        (plan_attachment_checked ?field_task_plan)
+      )
+  )
+  (:action acknowledge_approval_and_attachments
+    :parameters (?field_task_plan - field_task_plan ?approval_document - approval_document ?application_operator - application_operator ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_confirmed ?field_task_plan)
+        (plan_assigned_approval_document ?field_task_plan ?approval_document)
+        (target_assigned_operator ?field_task_plan ?application_operator)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (not
+          (slot_weather_confirmed ?application_slot)
+        )
+        (not
+          (plan_attachments_assigned ?field_task_plan)
+        )
+      )
+    :effect (plan_attachments_assigned ?field_task_plan)
+  )
+  (:action acknowledge_approval_and_attachments_alt
+    :parameters (?field_task_plan - field_task_plan ?approval_document - approval_document ?application_operator - application_operator ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_confirmed ?field_task_plan)
+        (plan_assigned_approval_document ?field_task_plan ?approval_document)
+        (target_assigned_operator ?field_task_plan ?application_operator)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (slot_weather_confirmed ?application_slot)
+        (not
+          (plan_attachments_assigned ?field_task_plan)
+        )
+      )
+    :effect (plan_attachments_assigned ?field_task_plan)
+  )
+  (:action apply_permit_and_attachment_checks
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_assigned ?field_task_plan)
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (not
+          (slot_timing_confirmed ?application_slot)
+        )
+        (not
+          (slot_weather_confirmed ?application_slot)
+        )
+        (not
+          (plan_ready_for_checks ?field_task_plan)
+        )
+      )
+    :effect (plan_ready_for_checks ?field_task_plan)
+  )
+  (:action apply_permit_checks_and_mark_calibration
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_assigned ?field_task_plan)
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (slot_timing_confirmed ?application_slot)
+        (not
+          (slot_weather_confirmed ?application_slot)
+        )
+        (not
+          (plan_ready_for_checks ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_requires_calibration ?field_task_plan)
+      )
+  )
+  (:action apply_permit_checks_and_mark_calibration_alt
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_assigned ?field_task_plan)
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (not
+          (slot_timing_confirmed ?application_slot)
+        )
+        (slot_weather_confirmed ?application_slot)
+        (not
+          (plan_ready_for_checks ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_requires_calibration ?field_task_plan)
+      )
+  )
+  (:action apply_permit_checks_and_mark_calibration_full
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit ?attachment_kit - attachment_kit ?application_slot - application_slot)
+    :precondition
+      (and
+        (plan_attachments_assigned ?field_task_plan)
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (plan_assigned_attachment_kit ?field_task_plan ?attachment_kit)
+        (attachment_kit_assigned_to_slot ?attachment_kit ?application_slot)
+        (slot_timing_confirmed ?application_slot)
+        (slot_weather_confirmed ?application_slot)
+        (not
+          (plan_ready_for_checks ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_requires_calibration ?field_task_plan)
+      )
+  )
+  (:action finalize_plan_without_calibration
+    :parameters (?field_task_plan - field_task_plan)
+    :precondition
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (not
+          (plan_requires_calibration ?field_task_plan)
+        )
+        (not
+          (plan_finalized ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_task_plan)
+        (target_approved_for_execution ?field_task_plan)
+      )
+  )
+  (:action assign_calibration_record_to_plan
+    :parameters (?field_task_plan - field_task_plan ?calibration_record - calibration_record)
+    :precondition
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_requires_calibration ?field_task_plan)
+        (calibration_record_available ?calibration_record)
+      )
+    :effect
+      (and
+        (plan_assigned_calibration_record ?field_task_plan ?calibration_record)
+        (not
+          (calibration_record_available ?calibration_record)
+        )
+      )
+  )
+  (:action complete_plan_checks
+    :parameters (?field_task_plan - field_task_plan ?primary_section - primary_section ?secondary_section - secondary_section ?fertilizer_product - fertilizer_product ?calibration_record - calibration_record)
+    :precondition
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_requires_calibration ?field_task_plan)
+        (plan_assigned_calibration_record ?field_task_plan ?calibration_record)
+        (plan_targets_primary_section ?field_task_plan ?primary_section)
+        (plan_targets_secondary_section ?field_task_plan ?secondary_section)
+        (primary_section_ready ?primary_section)
+        (secondary_section_ready ?secondary_section)
+        (assigned_product ?field_task_plan ?fertilizer_product)
+        (not
+          (plan_checks_completed ?field_task_plan)
+        )
+      )
+    :effect (plan_checks_completed ?field_task_plan)
+  )
+  (:action finalize_plan_after_checks
+    :parameters (?field_task_plan - field_task_plan)
+    :precondition
+      (and
+        (plan_ready_for_checks ?field_task_plan)
+        (plan_checks_completed ?field_task_plan)
+        (not
+          (plan_finalized ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_task_plan)
+        (target_approved_for_execution ?field_task_plan)
+      )
+  )
+  (:action assign_operator_credential_to_plan
+    :parameters (?field_task_plan - field_task_plan ?operator_credential - operator_credential ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (entity_finalized ?field_task_plan)
+        (assigned_product ?field_task_plan ?fertilizer_product)
+        (operator_credential_available ?operator_credential)
+        (plan_operator_credential_present ?field_task_plan ?operator_credential)
+        (not
+          (operator_credential_acknowledged ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (operator_credential_acknowledged ?field_task_plan)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action verify_operator_assignment_for_credential
+    :parameters (?field_task_plan - field_task_plan ?application_operator - application_operator)
+    :precondition
+      (and
+        (operator_credential_acknowledged ?field_task_plan)
+        (target_assigned_operator ?field_task_plan ?application_operator)
+        (not
+          (operator_credential_verified ?field_task_plan)
+        )
+      )
+    :effect (operator_credential_verified ?field_task_plan)
+  )
+  (:action authorize_operator_credential_with_permit
+    :parameters (?field_task_plan - field_task_plan ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (operator_credential_verified ?field_task_plan)
+        (plan_assigned_regulatory_permit ?field_task_plan ?regulatory_permit)
+        (not
+          (operator_credential_approved ?field_task_plan)
+        )
+      )
+    :effect (operator_credential_approved ?field_task_plan)
+  )
+  (:action finalize_plan_after_operator_credential
+    :parameters (?field_task_plan - field_task_plan)
+    :precondition
+      (and
+        (operator_credential_approved ?field_task_plan)
+        (not
+          (plan_finalized ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?field_task_plan)
+        (target_approved_for_execution ?field_task_plan)
+      )
+  )
+  (:action confirm_primary_section_ready_for_execution
+    :parameters (?primary_section - primary_section ?application_slot - application_slot)
+    :precondition
+      (and
+        (primary_section_ready_for_slot ?primary_section)
+        (primary_section_ready ?primary_section)
+        (slot_prepared ?application_slot)
+        (slot_ready_for_attachments ?application_slot)
+        (not
+          (target_approved_for_execution ?primary_section)
+        )
+      )
+    :effect (target_approved_for_execution ?primary_section)
+  )
+  (:action confirm_secondary_section_ready_for_execution
+    :parameters (?secondary_section - secondary_section ?application_slot - application_slot)
+    :precondition
+      (and
+        (secondary_section_ready_for_slot ?secondary_section)
+        (secondary_section_ready ?secondary_section)
+        (slot_prepared ?application_slot)
+        (slot_ready_for_attachments ?application_slot)
+        (not
+          (target_approved_for_execution ?secondary_section)
+        )
+      )
+    :effect (target_approved_for_execution ?secondary_section)
+  )
+  (:action attach_soil_sample_and_authorize_parcel
+    :parameters (?field_parcel - field_parcel ?soil_sample - soil_sample ?fertilizer_product - fertilizer_product)
+    :precondition
+      (and
+        (target_approved_for_execution ?field_parcel)
+        (assigned_product ?field_parcel ?fertilizer_product)
+        (soil_sample_available ?soil_sample)
+        (not
+          (target_execution_authorized ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (target_execution_authorized ?field_parcel)
+        (target_assigned_soil_sample ?field_parcel ?soil_sample)
+        (not
+          (soil_sample_available ?soil_sample)
+        )
+      )
+  )
+  (:action execute_application_on_primary_section
+    :parameters (?primary_section - primary_section ?application_equipment - application_equipment ?soil_sample - soil_sample)
+    :precondition
+      (and
+        (target_execution_authorized ?primary_section)
+        (target_assigned_equipment ?primary_section ?application_equipment)
+        (target_assigned_soil_sample ?primary_section ?soil_sample)
+        (not
+          (target_application_completed ?primary_section)
+        )
+      )
+    :effect
+      (and
+        (target_application_completed ?primary_section)
+        (equipment_available ?application_equipment)
+        (soil_sample_available ?soil_sample)
+      )
+  )
+  (:action execute_application_on_secondary_section
+    :parameters (?secondary_section - secondary_section ?application_equipment - application_equipment ?soil_sample - soil_sample)
+    :precondition
+      (and
+        (target_execution_authorized ?secondary_section)
+        (target_assigned_equipment ?secondary_section ?application_equipment)
+        (target_assigned_soil_sample ?secondary_section ?soil_sample)
+        (not
+          (target_application_completed ?secondary_section)
+        )
+      )
+    :effect
+      (and
+        (target_application_completed ?secondary_section)
+        (equipment_available ?application_equipment)
+        (soil_sample_available ?soil_sample)
+      )
+  )
+  (:action execute_application_for_plan
+    :parameters (?field_task_plan - field_task_plan ?application_equipment - application_equipment ?soil_sample - soil_sample)
+    :precondition
+      (and
+        (target_execution_authorized ?field_task_plan)
+        (target_assigned_equipment ?field_task_plan ?application_equipment)
+        (target_assigned_soil_sample ?field_task_plan ?soil_sample)
+        (not
+          (target_application_completed ?field_task_plan)
+        )
+      )
+    :effect
+      (and
+        (target_application_completed ?field_task_plan)
+        (equipment_available ?application_equipment)
+        (soil_sample_available ?soil_sample)
+      )
+  )
+)

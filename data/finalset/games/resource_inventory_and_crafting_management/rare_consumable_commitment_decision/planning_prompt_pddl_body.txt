@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain rare_consumable_commitment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_game_object - object item_supertype - base_game_object class_a_items_supertype - base_game_object class_b_items_supertype - base_game_object preparation_target_base - base_game_object preparation_target - preparation_target_base consumable_unit - item_supertype consumable_effect - item_supertype maintenance_tool - item_supertype upgrade_token - item_supertype accessory_attachment - item_supertype rare_consumable - item_supertype durability_kit - item_supertype affinity_module - item_supertype material_component - class_a_items_supertype enhancement_module - class_a_items_supertype special_catalyst - class_a_items_supertype consumable_class_a - class_b_items_supertype consumable_class_b - class_b_items_supertype prepared_loadout - class_b_items_supertype slot_category_alpha - preparation_target slot_category_beta - preparation_target primary_slot - slot_category_alpha secondary_slot - slot_category_alpha equipment_item - slot_category_beta)
+
+  (:predicates
+    (preparation_target_available ?preparation_target - preparation_target)
+    (preparation_target_prepared ?preparation_target - preparation_target)
+    (preparation_target_allocated ?preparation_target - preparation_target)
+    (preparation_target_committed ?preparation_target - preparation_target)
+    (preparation_target_ready_for_commitment ?preparation_target - preparation_target)
+    (preparation_target_rare_consumable_reserved ?preparation_target - preparation_target)
+    (consumable_available ?consumable_unit - consumable_unit)
+    (preparation_target_consumable_allocated ?preparation_target - preparation_target ?consumable_unit - consumable_unit)
+    (consumable_effect_available ?consumable_effect - consumable_effect)
+    (preparation_target_effect_assigned ?preparation_target - preparation_target ?consumable_effect - consumable_effect)
+    (tool_available ?maintenance_tool - maintenance_tool)
+    (preparation_target_tool_allocated ?preparation_target - preparation_target ?maintenance_tool - maintenance_tool)
+    (material_component_available ?material_component - material_component)
+    (reserved_material_for_primary_slot ?primary_slot - primary_slot ?material_component - material_component)
+    (reserved_material_for_secondary_slot ?secondary_slot - secondary_slot ?material_component - material_component)
+    (primary_slot_compatible_with_class_a ?primary_slot - primary_slot ?consumable_class_a - consumable_class_a)
+    (class_a_reserved ?consumable_class_a - consumable_class_a)
+    (class_a_component_attached ?consumable_class_a - consumable_class_a)
+    (primary_slot_ready ?primary_slot - primary_slot)
+    (secondary_slot_compatible_with_class_b ?secondary_slot - secondary_slot ?consumable_class_b - consumable_class_b)
+    (class_b_reserved ?consumable_class_b - consumable_class_b)
+    (class_b_component_attached ?consumable_class_b - consumable_class_b)
+    (secondary_slot_ready ?secondary_slot - secondary_slot)
+    (loadout_available_for_assembly ?prepared_loadout - prepared_loadout)
+    (loadout_assembled ?prepared_loadout - prepared_loadout)
+    (loadout_includes_class_a ?prepared_loadout - prepared_loadout ?consumable_class_a - consumable_class_a)
+    (loadout_includes_class_b ?prepared_loadout - prepared_loadout ?consumable_class_b - consumable_class_b)
+    (loadout_attached_class_a_component ?prepared_loadout - prepared_loadout)
+    (loadout_attached_class_b_component ?prepared_loadout - prepared_loadout)
+    (loadout_validated ?prepared_loadout - prepared_loadout)
+    (equipment_has_primary_slot ?equipment_item - equipment_item ?primary_slot - primary_slot)
+    (equipment_has_secondary_slot ?equipment_item - equipment_item ?secondary_slot - secondary_slot)
+    (equipment_compatible_with_loadout ?equipment_item - equipment_item ?prepared_loadout - prepared_loadout)
+    (module_available ?enhancement_module - enhancement_module)
+    (equipment_has_module ?equipment_item - equipment_item ?enhancement_module - enhancement_module)
+    (module_installed ?enhancement_module - enhancement_module)
+    (module_attached_to_loadout ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    (equipment_prepared_for_modification ?equipment_item - equipment_item)
+    (equipment_attachments_installed ?equipment_item - equipment_item)
+    (equipment_ready_for_final_validation ?equipment_item - equipment_item)
+    (equipment_upgrade_token_allocated ?equipment_item - equipment_item)
+    (equipment_upgraded ?equipment_item - equipment_item)
+    (equipment_has_accessory ?equipment_item - equipment_item)
+    (equipment_validated_for_binding ?equipment_item - equipment_item)
+    (special_catalyst_available ?special_catalyst - special_catalyst)
+    (equipment_catalyst_assigned ?equipment_item - equipment_item ?special_catalyst - special_catalyst)
+    (equipment_catalyst_allocated ?equipment_item - equipment_item)
+    (equipment_catalyst_applied ?equipment_item - equipment_item)
+    (equipment_catalyst_ready_for_binding ?equipment_item - equipment_item)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (upgrade_token_assigned_to_equipment ?equipment_item - equipment_item ?upgrade_token - upgrade_token)
+    (accessory_available ?accessory_attachment - accessory_attachment)
+    (accessory_assigned_to_equipment ?equipment_item - equipment_item ?accessory_attachment - accessory_attachment)
+    (durability_kit_available ?durability_kit - durability_kit)
+    (durability_kit_assigned_to_equipment ?equipment_item - equipment_item ?durability_kit - durability_kit)
+    (affinity_module_available ?affinity_module - affinity_module)
+    (affinity_module_assigned_to_equipment ?equipment_item - equipment_item ?affinity_module - affinity_module)
+    (rare_consumable_available ?rare_consumable - rare_consumable)
+    (preparation_target_rare_consumable_assigned ?preparation_target - preparation_target ?rare_consumable - rare_consumable)
+    (primary_slot_marked ?primary_slot - primary_slot)
+    (secondary_slot_marked ?secondary_slot - secondary_slot)
+    (binding_finalized ?equipment_item - equipment_item)
+  )
+  (:action select_preparation_target
+    :parameters (?preparation_target - preparation_target)
+    :precondition
+      (and
+        (not
+          (preparation_target_available ?preparation_target)
+        )
+        (not
+          (preparation_target_committed ?preparation_target)
+        )
+      )
+    :effect (preparation_target_available ?preparation_target)
+  )
+  (:action preparation_target_allocate_consumable
+    :parameters (?preparation_target - preparation_target ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (preparation_target_available ?preparation_target)
+        (not
+          (preparation_target_allocated ?preparation_target)
+        )
+        (consumable_available ?consumable_unit)
+      )
+    :effect
+      (and
+        (preparation_target_allocated ?preparation_target)
+        (preparation_target_consumable_allocated ?preparation_target ?consumable_unit)
+        (not
+          (consumable_available ?consumable_unit)
+        )
+      )
+  )
+  (:action preparation_target_assign_consumable_effect
+    :parameters (?preparation_target - preparation_target ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_available ?preparation_target)
+        (preparation_target_allocated ?preparation_target)
+        (consumable_effect_available ?consumable_effect)
+      )
+    :effect
+      (and
+        (preparation_target_effect_assigned ?preparation_target ?consumable_effect)
+        (not
+          (consumable_effect_available ?consumable_effect)
+        )
+      )
+  )
+  (:action preparation_target_finalize_preparation
+    :parameters (?preparation_target - preparation_target ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_available ?preparation_target)
+        (preparation_target_allocated ?preparation_target)
+        (preparation_target_effect_assigned ?preparation_target ?consumable_effect)
+        (not
+          (preparation_target_prepared ?preparation_target)
+        )
+      )
+    :effect (preparation_target_prepared ?preparation_target)
+  )
+  (:action preparation_target_unassign_consumable_effect
+    :parameters (?preparation_target - preparation_target ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_effect_assigned ?preparation_target ?consumable_effect)
+      )
+    :effect
+      (and
+        (consumable_effect_available ?consumable_effect)
+        (not
+          (preparation_target_effect_assigned ?preparation_target ?consumable_effect)
+        )
+      )
+  )
+  (:action preparation_target_allocate_tool
+    :parameters (?preparation_target - preparation_target ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (preparation_target_prepared ?preparation_target)
+        (tool_available ?maintenance_tool)
+      )
+    :effect
+      (and
+        (preparation_target_tool_allocated ?preparation_target ?maintenance_tool)
+        (not
+          (tool_available ?maintenance_tool)
+        )
+      )
+  )
+  (:action preparation_target_release_tool
+    :parameters (?preparation_target - preparation_target ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (preparation_target_tool_allocated ?preparation_target ?maintenance_tool)
+      )
+    :effect
+      (and
+        (tool_available ?maintenance_tool)
+        (not
+          (preparation_target_tool_allocated ?preparation_target ?maintenance_tool)
+        )
+      )
+  )
+  (:action apply_durability_kit_to_equipment
+    :parameters (?equipment_item - equipment_item ?durability_kit - durability_kit)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (durability_kit_available ?durability_kit)
+      )
+    :effect
+      (and
+        (durability_kit_assigned_to_equipment ?equipment_item ?durability_kit)
+        (not
+          (durability_kit_available ?durability_kit)
+        )
+      )
+  )
+  (:action remove_durability_kit_from_equipment
+    :parameters (?equipment_item - equipment_item ?durability_kit - durability_kit)
+    :precondition
+      (and
+        (durability_kit_assigned_to_equipment ?equipment_item ?durability_kit)
+      )
+    :effect
+      (and
+        (durability_kit_available ?durability_kit)
+        (not
+          (durability_kit_assigned_to_equipment ?equipment_item ?durability_kit)
+        )
+      )
+  )
+  (:action attach_affinity_module_to_equipment
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (affinity_module_available ?affinity_module)
+      )
+    :effect
+      (and
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (not
+          (affinity_module_available ?affinity_module)
+        )
+      )
+  )
+  (:action remove_affinity_module_from_equipment
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module)
+    :precondition
+      (and
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+      )
+    :effect
+      (and
+        (affinity_module_available ?affinity_module)
+        (not
+          (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        )
+      )
+  )
+  (:action reserve_class_a_for_primary_slot
+    :parameters (?primary_slot - primary_slot ?consumable_class_a - consumable_class_a ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_prepared ?primary_slot)
+        (preparation_target_effect_assigned ?primary_slot ?consumable_effect)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (not
+          (class_a_reserved ?consumable_class_a)
+        )
+        (not
+          (class_a_component_attached ?consumable_class_a)
+        )
+      )
+    :effect (class_a_reserved ?consumable_class_a)
+  )
+  (:action apply_tool_to_primary_slot
+    :parameters (?primary_slot - primary_slot ?consumable_class_a - consumable_class_a ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (preparation_target_prepared ?primary_slot)
+        (preparation_target_tool_allocated ?primary_slot ?maintenance_tool)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (class_a_reserved ?consumable_class_a)
+        (not
+          (primary_slot_marked ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_marked ?primary_slot)
+        (primary_slot_ready ?primary_slot)
+      )
+  )
+  (:action attach_material_to_primary_slot
+    :parameters (?primary_slot - primary_slot ?consumable_class_a - consumable_class_a ?material_component - material_component)
+    :precondition
+      (and
+        (preparation_target_prepared ?primary_slot)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (material_component_available ?material_component)
+        (not
+          (primary_slot_marked ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (class_a_component_attached ?consumable_class_a)
+        (primary_slot_marked ?primary_slot)
+        (reserved_material_for_primary_slot ?primary_slot ?material_component)
+        (not
+          (material_component_available ?material_component)
+        )
+      )
+  )
+  (:action finalize_primary_slot_preparation
+    :parameters (?primary_slot - primary_slot ?consumable_class_a - consumable_class_a ?consumable_effect - consumable_effect ?material_component - material_component)
+    :precondition
+      (and
+        (preparation_target_prepared ?primary_slot)
+        (preparation_target_effect_assigned ?primary_slot ?consumable_effect)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (class_a_component_attached ?consumable_class_a)
+        (reserved_material_for_primary_slot ?primary_slot ?material_component)
+        (not
+          (primary_slot_ready ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (class_a_reserved ?consumable_class_a)
+        (primary_slot_ready ?primary_slot)
+        (material_component_available ?material_component)
+        (not
+          (reserved_material_for_primary_slot ?primary_slot ?material_component)
+        )
+      )
+  )
+  (:action reserve_class_b_for_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?consumable_class_b - consumable_class_b ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_prepared ?secondary_slot)
+        (preparation_target_effect_assigned ?secondary_slot ?consumable_effect)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (not
+          (class_b_reserved ?consumable_class_b)
+        )
+        (not
+          (class_b_component_attached ?consumable_class_b)
+        )
+      )
+    :effect (class_b_reserved ?consumable_class_b)
+  )
+  (:action apply_tool_to_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?consumable_class_b - consumable_class_b ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (preparation_target_prepared ?secondary_slot)
+        (preparation_target_tool_allocated ?secondary_slot ?maintenance_tool)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_b_reserved ?consumable_class_b)
+        (not
+          (secondary_slot_marked ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_marked ?secondary_slot)
+        (secondary_slot_ready ?secondary_slot)
+      )
+  )
+  (:action attach_material_to_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?consumable_class_b - consumable_class_b ?material_component - material_component)
+    :precondition
+      (and
+        (preparation_target_prepared ?secondary_slot)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (material_component_available ?material_component)
+        (not
+          (secondary_slot_marked ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (class_b_component_attached ?consumable_class_b)
+        (secondary_slot_marked ?secondary_slot)
+        (reserved_material_for_secondary_slot ?secondary_slot ?material_component)
+        (not
+          (material_component_available ?material_component)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_preparation
+    :parameters (?secondary_slot - secondary_slot ?consumable_class_b - consumable_class_b ?consumable_effect - consumable_effect ?material_component - material_component)
+    :precondition
+      (and
+        (preparation_target_prepared ?secondary_slot)
+        (preparation_target_effect_assigned ?secondary_slot ?consumable_effect)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_b_component_attached ?consumable_class_b)
+        (reserved_material_for_secondary_slot ?secondary_slot ?material_component)
+        (not
+          (secondary_slot_ready ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (class_b_reserved ?consumable_class_b)
+        (secondary_slot_ready ?secondary_slot)
+        (material_component_available ?material_component)
+        (not
+          (reserved_material_for_secondary_slot ?secondary_slot ?material_component)
+        )
+      )
+  )
+  (:action compose_loadout_from_both_branches
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?consumable_class_a - consumable_class_a ?consumable_class_b - consumable_class_b ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (primary_slot_marked ?primary_slot)
+        (secondary_slot_marked ?secondary_slot)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_a_reserved ?consumable_class_a)
+        (class_b_reserved ?consumable_class_b)
+        (primary_slot_ready ?primary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (loadout_available_for_assembly ?prepared_loadout)
+      )
+    :effect
+      (and
+        (loadout_assembled ?prepared_loadout)
+        (loadout_includes_class_a ?prepared_loadout ?consumable_class_a)
+        (loadout_includes_class_b ?prepared_loadout ?consumable_class_b)
+        (not
+          (loadout_available_for_assembly ?prepared_loadout)
+        )
+      )
+  )
+  (:action compose_loadout_with_primary_component_attached
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?consumable_class_a - consumable_class_a ?consumable_class_b - consumable_class_b ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (primary_slot_marked ?primary_slot)
+        (secondary_slot_marked ?secondary_slot)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_a_component_attached ?consumable_class_a)
+        (class_b_reserved ?consumable_class_b)
+        (not
+          (primary_slot_ready ?primary_slot)
+        )
+        (secondary_slot_ready ?secondary_slot)
+        (loadout_available_for_assembly ?prepared_loadout)
+      )
+    :effect
+      (and
+        (loadout_assembled ?prepared_loadout)
+        (loadout_includes_class_a ?prepared_loadout ?consumable_class_a)
+        (loadout_includes_class_b ?prepared_loadout ?consumable_class_b)
+        (loadout_attached_class_a_component ?prepared_loadout)
+        (not
+          (loadout_available_for_assembly ?prepared_loadout)
+        )
+      )
+  )
+  (:action compose_loadout_with_secondary_component_attached
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?consumable_class_a - consumable_class_a ?consumable_class_b - consumable_class_b ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (primary_slot_marked ?primary_slot)
+        (secondary_slot_marked ?secondary_slot)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_a_reserved ?consumable_class_a)
+        (class_b_component_attached ?consumable_class_b)
+        (primary_slot_ready ?primary_slot)
+        (not
+          (secondary_slot_ready ?secondary_slot)
+        )
+        (loadout_available_for_assembly ?prepared_loadout)
+      )
+    :effect
+      (and
+        (loadout_assembled ?prepared_loadout)
+        (loadout_includes_class_a ?prepared_loadout ?consumable_class_a)
+        (loadout_includes_class_b ?prepared_loadout ?consumable_class_b)
+        (loadout_attached_class_b_component ?prepared_loadout)
+        (not
+          (loadout_available_for_assembly ?prepared_loadout)
+        )
+      )
+  )
+  (:action compose_loadout_with_both_components_attached
+    :parameters (?primary_slot - primary_slot ?secondary_slot - secondary_slot ?consumable_class_a - consumable_class_a ?consumable_class_b - consumable_class_b ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (primary_slot_marked ?primary_slot)
+        (secondary_slot_marked ?secondary_slot)
+        (primary_slot_compatible_with_class_a ?primary_slot ?consumable_class_a)
+        (secondary_slot_compatible_with_class_b ?secondary_slot ?consumable_class_b)
+        (class_a_component_attached ?consumable_class_a)
+        (class_b_component_attached ?consumable_class_b)
+        (not
+          (primary_slot_ready ?primary_slot)
+        )
+        (not
+          (secondary_slot_ready ?secondary_slot)
+        )
+        (loadout_available_for_assembly ?prepared_loadout)
+      )
+    :effect
+      (and
+        (loadout_assembled ?prepared_loadout)
+        (loadout_includes_class_a ?prepared_loadout ?consumable_class_a)
+        (loadout_includes_class_b ?prepared_loadout ?consumable_class_b)
+        (loadout_attached_class_a_component ?prepared_loadout)
+        (loadout_attached_class_b_component ?prepared_loadout)
+        (not
+          (loadout_available_for_assembly ?prepared_loadout)
+        )
+      )
+  )
+  (:action validate_loadout_for_primary_slot
+    :parameters (?prepared_loadout - prepared_loadout ?primary_slot - primary_slot ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (loadout_assembled ?prepared_loadout)
+        (primary_slot_marked ?primary_slot)
+        (preparation_target_effect_assigned ?primary_slot ?consumable_effect)
+        (not
+          (loadout_validated ?prepared_loadout)
+        )
+      )
+    :effect (loadout_validated ?prepared_loadout)
+  )
+  (:action attach_module_to_loadout
+    :parameters (?equipment_item - equipment_item ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (equipment_compatible_with_loadout ?equipment_item ?prepared_loadout)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_available ?enhancement_module)
+        (loadout_assembled ?prepared_loadout)
+        (loadout_validated ?prepared_loadout)
+        (not
+          (module_installed ?enhancement_module)
+        )
+      )
+    :effect
+      (and
+        (module_installed ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (not
+          (module_available ?enhancement_module)
+        )
+      )
+  )
+  (:action initiate_equipment_enhancement
+    :parameters (?equipment_item - equipment_item ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_installed ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (preparation_target_effect_assigned ?equipment_item ?consumable_effect)
+        (not
+          (loadout_attached_class_a_component ?prepared_loadout)
+        )
+        (not
+          (equipment_prepared_for_modification ?equipment_item)
+        )
+      )
+    :effect (equipment_prepared_for_modification ?equipment_item)
+  )
+  (:action allocate_upgrade_token_to_equipment
+    :parameters (?equipment_item - equipment_item ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (upgrade_token_available ?upgrade_token)
+        (not
+          (equipment_upgrade_token_allocated ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_upgrade_token_allocated ?equipment_item)
+        (upgrade_token_assigned_to_equipment ?equipment_item ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action apply_upgrade_token_with_module_and_loadout
+    :parameters (?equipment_item - equipment_item ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout ?consumable_effect - consumable_effect ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_installed ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (preparation_target_effect_assigned ?equipment_item ?consumable_effect)
+        (loadout_attached_class_a_component ?prepared_loadout)
+        (equipment_upgrade_token_allocated ?equipment_item)
+        (upgrade_token_assigned_to_equipment ?equipment_item ?upgrade_token)
+        (not
+          (equipment_prepared_for_modification ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_prepared_for_modification ?equipment_item)
+        (equipment_upgraded ?equipment_item)
+      )
+  )
+  (:action prepare_equipment_with_durability_kit
+    :parameters (?equipment_item - equipment_item ?durability_kit - durability_kit ?maintenance_tool - maintenance_tool ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_prepared_for_modification ?equipment_item)
+        (durability_kit_assigned_to_equipment ?equipment_item ?durability_kit)
+        (preparation_target_tool_allocated ?equipment_item ?maintenance_tool)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (not
+          (loadout_attached_class_b_component ?prepared_loadout)
+        )
+        (not
+          (equipment_attachments_installed ?equipment_item)
+        )
+      )
+    :effect (equipment_attachments_installed ?equipment_item)
+  )
+  (:action finalize_equipment_attachment_with_kit
+    :parameters (?equipment_item - equipment_item ?durability_kit - durability_kit ?maintenance_tool - maintenance_tool ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_prepared_for_modification ?equipment_item)
+        (durability_kit_assigned_to_equipment ?equipment_item ?durability_kit)
+        (preparation_target_tool_allocated ?equipment_item ?maintenance_tool)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (loadout_attached_class_b_component ?prepared_loadout)
+        (not
+          (equipment_attachments_installed ?equipment_item)
+        )
+      )
+    :effect (equipment_attachments_installed ?equipment_item)
+  )
+  (:action stage_equipment_with_affinity_no_components
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_attachments_installed ?equipment_item)
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (not
+          (loadout_attached_class_a_component ?prepared_loadout)
+        )
+        (not
+          (loadout_attached_class_b_component ?prepared_loadout)
+        )
+        (not
+          (equipment_ready_for_final_validation ?equipment_item)
+        )
+      )
+    :effect (equipment_ready_for_final_validation ?equipment_item)
+  )
+  (:action stage_equipment_with_affinity_and_primary_component
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_attachments_installed ?equipment_item)
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (loadout_attached_class_a_component ?prepared_loadout)
+        (not
+          (loadout_attached_class_b_component ?prepared_loadout)
+        )
+        (not
+          (equipment_ready_for_final_validation ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_has_accessory ?equipment_item)
+      )
+  )
+  (:action stage_equipment_with_affinity_and_secondary_component
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_attachments_installed ?equipment_item)
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (not
+          (loadout_attached_class_a_component ?prepared_loadout)
+        )
+        (loadout_attached_class_b_component ?prepared_loadout)
+        (not
+          (equipment_ready_for_final_validation ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_has_accessory ?equipment_item)
+      )
+  )
+  (:action stage_equipment_with_affinity_and_both_components
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module ?enhancement_module - enhancement_module ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (equipment_attachments_installed ?equipment_item)
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (equipment_has_module ?equipment_item ?enhancement_module)
+        (module_attached_to_loadout ?enhancement_module ?prepared_loadout)
+        (loadout_attached_class_a_component ?prepared_loadout)
+        (loadout_attached_class_b_component ?prepared_loadout)
+        (not
+          (equipment_ready_for_final_validation ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_has_accessory ?equipment_item)
+      )
+  )
+  (:action finalize_equipment_without_accessory
+    :parameters (?equipment_item - equipment_item)
+    :precondition
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (not
+          (equipment_has_accessory ?equipment_item)
+        )
+        (not
+          (binding_finalized ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (binding_finalized ?equipment_item)
+        (preparation_target_ready_for_commitment ?equipment_item)
+      )
+  )
+  (:action attach_accessory_to_equipment
+    :parameters (?equipment_item - equipment_item ?accessory_attachment - accessory_attachment)
+    :precondition
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_has_accessory ?equipment_item)
+        (accessory_available ?accessory_attachment)
+      )
+    :effect
+      (and
+        (accessory_assigned_to_equipment ?equipment_item ?accessory_attachment)
+        (not
+          (accessory_available ?accessory_attachment)
+        )
+      )
+  )
+  (:action validate_equipment_for_binding
+    :parameters (?equipment_item - equipment_item ?primary_slot - primary_slot ?secondary_slot - secondary_slot ?consumable_effect - consumable_effect ?accessory_attachment - accessory_attachment)
+    :precondition
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_has_accessory ?equipment_item)
+        (accessory_assigned_to_equipment ?equipment_item ?accessory_attachment)
+        (equipment_has_primary_slot ?equipment_item ?primary_slot)
+        (equipment_has_secondary_slot ?equipment_item ?secondary_slot)
+        (primary_slot_ready ?primary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (preparation_target_effect_assigned ?equipment_item ?consumable_effect)
+        (not
+          (equipment_validated_for_binding ?equipment_item)
+        )
+      )
+    :effect (equipment_validated_for_binding ?equipment_item)
+  )
+  (:action finalize_equipment_binding
+    :parameters (?equipment_item - equipment_item)
+    :precondition
+      (and
+        (equipment_ready_for_final_validation ?equipment_item)
+        (equipment_validated_for_binding ?equipment_item)
+        (not
+          (binding_finalized ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (binding_finalized ?equipment_item)
+        (preparation_target_ready_for_commitment ?equipment_item)
+      )
+  )
+  (:action reserve_catalyst_for_equipment
+    :parameters (?equipment_item - equipment_item ?special_catalyst - special_catalyst ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_prepared ?equipment_item)
+        (preparation_target_effect_assigned ?equipment_item ?consumable_effect)
+        (special_catalyst_available ?special_catalyst)
+        (equipment_catalyst_assigned ?equipment_item ?special_catalyst)
+        (not
+          (equipment_catalyst_allocated ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (equipment_catalyst_allocated ?equipment_item)
+        (not
+          (special_catalyst_available ?special_catalyst)
+        )
+      )
+  )
+  (:action apply_catalyst_with_tool_to_equipment
+    :parameters (?equipment_item - equipment_item ?maintenance_tool - maintenance_tool)
+    :precondition
+      (and
+        (equipment_catalyst_allocated ?equipment_item)
+        (preparation_target_tool_allocated ?equipment_item ?maintenance_tool)
+        (not
+          (equipment_catalyst_applied ?equipment_item)
+        )
+      )
+    :effect (equipment_catalyst_applied ?equipment_item)
+  )
+  (:action apply_affinity_post_catalyst
+    :parameters (?equipment_item - equipment_item ?affinity_module - affinity_module)
+    :precondition
+      (and
+        (equipment_catalyst_applied ?equipment_item)
+        (affinity_module_assigned_to_equipment ?equipment_item ?affinity_module)
+        (not
+          (equipment_catalyst_ready_for_binding ?equipment_item)
+        )
+      )
+    :effect (equipment_catalyst_ready_for_binding ?equipment_item)
+  )
+  (:action finalize_equipment_binding_with_catalyst
+    :parameters (?equipment_item - equipment_item)
+    :precondition
+      (and
+        (equipment_catalyst_ready_for_binding ?equipment_item)
+        (not
+          (binding_finalized ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (binding_finalized ?equipment_item)
+        (preparation_target_ready_for_commitment ?equipment_item)
+      )
+  )
+  (:action bind_loadout_to_primary_slot
+    :parameters (?primary_slot - primary_slot ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (primary_slot_marked ?primary_slot)
+        (primary_slot_ready ?primary_slot)
+        (loadout_assembled ?prepared_loadout)
+        (loadout_validated ?prepared_loadout)
+        (not
+          (preparation_target_ready_for_commitment ?primary_slot)
+        )
+      )
+    :effect (preparation_target_ready_for_commitment ?primary_slot)
+  )
+  (:action bind_loadout_to_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?prepared_loadout - prepared_loadout)
+    :precondition
+      (and
+        (secondary_slot_marked ?secondary_slot)
+        (secondary_slot_ready ?secondary_slot)
+        (loadout_assembled ?prepared_loadout)
+        (loadout_validated ?prepared_loadout)
+        (not
+          (preparation_target_ready_for_commitment ?secondary_slot)
+        )
+      )
+    :effect (preparation_target_ready_for_commitment ?secondary_slot)
+  )
+  (:action preparation_target_reserve_rare_consumable
+    :parameters (?preparation_target - preparation_target ?rare_consumable - rare_consumable ?consumable_effect - consumable_effect)
+    :precondition
+      (and
+        (preparation_target_ready_for_commitment ?preparation_target)
+        (preparation_target_effect_assigned ?preparation_target ?consumable_effect)
+        (rare_consumable_available ?rare_consumable)
+        (not
+          (preparation_target_rare_consumable_reserved ?preparation_target)
+        )
+      )
+    :effect
+      (and
+        (preparation_target_rare_consumable_reserved ?preparation_target)
+        (preparation_target_rare_consumable_assigned ?preparation_target ?rare_consumable)
+        (not
+          (rare_consumable_available ?rare_consumable)
+        )
+      )
+  )
+  (:action commit_rare_consumable_to_primary_slot
+    :parameters (?primary_slot - primary_slot ?consumable_unit - consumable_unit ?rare_consumable - rare_consumable)
+    :precondition
+      (and
+        (preparation_target_rare_consumable_reserved ?primary_slot)
+        (preparation_target_consumable_allocated ?primary_slot ?consumable_unit)
+        (preparation_target_rare_consumable_assigned ?primary_slot ?rare_consumable)
+        (not
+          (preparation_target_committed ?primary_slot)
+        )
+      )
+    :effect
+      (and
+        (preparation_target_committed ?primary_slot)
+        (consumable_available ?consumable_unit)
+        (rare_consumable_available ?rare_consumable)
+      )
+  )
+  (:action commit_rare_consumable_to_secondary_slot
+    :parameters (?secondary_slot - secondary_slot ?consumable_unit - consumable_unit ?rare_consumable - rare_consumable)
+    :precondition
+      (and
+        (preparation_target_rare_consumable_reserved ?secondary_slot)
+        (preparation_target_consumable_allocated ?secondary_slot ?consumable_unit)
+        (preparation_target_rare_consumable_assigned ?secondary_slot ?rare_consumable)
+        (not
+          (preparation_target_committed ?secondary_slot)
+        )
+      )
+    :effect
+      (and
+        (preparation_target_committed ?secondary_slot)
+        (consumable_available ?consumable_unit)
+        (rare_consumable_available ?rare_consumable)
+      )
+  )
+  (:action commit_rare_consumable_to_equipment
+    :parameters (?equipment_item - equipment_item ?consumable_unit - consumable_unit ?rare_consumable - rare_consumable)
+    :precondition
+      (and
+        (preparation_target_rare_consumable_reserved ?equipment_item)
+        (preparation_target_consumable_allocated ?equipment_item ?consumable_unit)
+        (preparation_target_rare_consumable_assigned ?equipment_item ?rare_consumable)
+        (not
+          (preparation_target_committed ?equipment_item)
+        )
+      )
+    :effect
+      (and
+        (preparation_target_committed ?equipment_item)
+        (consumable_available ?consumable_unit)
+        (rare_consumable_available ?rare_consumable)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem rare_consumable_commitment_scenario)
+  (:domain rare_consumable_commitment_domain)
+  (:objects primary_slot_1 - primary_slot secondary_slot_1 - secondary_slot equipment_weapon_alpha - equipment_item equipment_weapon_beta - equipment_item consumable_unit_1 - consumable_unit consumable_unit_2 - consumable_unit consumable_unit_3 - consumable_unit consumable_effect_alpha - consumable_effect repair_tool_basic - maintenance_tool material_component_1 - material_component class_a_consumable_1 - consumable_class_a class_b_consumable_1 - consumable_class_b prepared_loadout_1 - prepared_loadout enhancement_module_1 - enhancement_module enhancement_module_2 - enhancement_module upgrade_token_1 - upgrade_token upgrade_token_2 - upgrade_token accessory_attachment_1 - accessory_attachment accessory_attachment_2 - accessory_attachment rare_elixir_1 - rare_consumable durability_kit_1 - durability_kit special_catalyst_alpha - special_catalyst special_catalyst_beta - special_catalyst affinity_module_1 - affinity_module)
+  (:init
+    (consumable_available consumable_unit_1)
+    (consumable_available consumable_unit_2)
+    (consumable_available consumable_unit_3)
+    (consumable_effect_available consumable_effect_alpha)
+    (tool_available repair_tool_basic)
+    (material_component_available material_component_1)
+    (primary_slot_compatible_with_class_a primary_slot_1 class_a_consumable_1)
+    (secondary_slot_compatible_with_class_b secondary_slot_1 class_b_consumable_1)
+    (loadout_available_for_assembly prepared_loadout_1)
+    (module_available enhancement_module_1)
+    (module_available enhancement_module_2)
+    (equipment_has_primary_slot equipment_weapon_alpha primary_slot_1)
+    (equipment_has_primary_slot equipment_weapon_beta primary_slot_1)
+    (equipment_has_secondary_slot equipment_weapon_alpha secondary_slot_1)
+    (equipment_has_secondary_slot equipment_weapon_beta secondary_slot_1)
+    (equipment_compatible_with_loadout equipment_weapon_alpha prepared_loadout_1)
+    (equipment_compatible_with_loadout equipment_weapon_beta prepared_loadout_1)
+    (equipment_has_module equipment_weapon_alpha enhancement_module_1)
+    (equipment_has_module equipment_weapon_beta enhancement_module_2)
+    (upgrade_token_available upgrade_token_1)
+    (upgrade_token_available upgrade_token_2)
+    (accessory_available accessory_attachment_1)
+    (accessory_available accessory_attachment_2)
+    (rare_consumable_available rare_elixir_1)
+    (durability_kit_available durability_kit_1)
+    (special_catalyst_available special_catalyst_alpha)
+    (equipment_catalyst_assigned equipment_weapon_alpha special_catalyst_alpha)
+    (equipment_catalyst_assigned equipment_weapon_beta special_catalyst_beta)
+    (affinity_module_available affinity_module_1)
+  )
+  (:goal
+    (and
+      (preparation_target_committed primary_slot_1)
+      (preparation_target_committed secondary_slot_1)
+      (preparation_target_committed equipment_weapon_alpha)
+      (preparation_target_committed equipment_weapon_beta)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain delayed_grade_release_contingency_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource_supertype - object document_supertype - object communication_artifact_supertype - object academic_domain_root - object domain_entity - academic_domain_root staff_assignment - actor_or_resource_supertype grade_record - actor_or_resource_supertype instructor_reviewer - actor_or_resource_supertype departmental_approval - actor_or_resource_supertype final_approval - actor_or_resource_supertype timestamp_token - actor_or_resource_supertype technical_service - actor_or_resource_supertype compliance_officer - actor_or_resource_supertype evidence_document - document_supertype support_package - document_supertype audit_token - document_supertype student_notification_channel - communication_artifact_supertype instructor_notification_channel - communication_artifact_supertype recovery_plan - communication_artifact_supertype participant_role - domain_entity administrative_unit - domain_entity student_account - participant_role course_section - participant_role registrar_handler - administrative_unit)
+  (:predicates
+    (entity_registered ?grade_exception_case - domain_entity)
+    (entity_ready_for_review ?grade_exception_case - domain_entity)
+    (entity_assigned ?grade_exception_case - domain_entity)
+    (remediation_applied ?grade_exception_case - domain_entity)
+    (entity_closed ?grade_exception_case - domain_entity)
+    (entity_timestamped ?grade_exception_case - domain_entity)
+    (staff_assignment_available ?staff_assignment - staff_assignment)
+    (entity_staff_binding ?grade_exception_case - domain_entity ?staff_assignment - staff_assignment)
+    (grade_record_available ?grade_record - grade_record)
+    (entity_has_grade_record ?grade_exception_case - domain_entity ?grade_record - grade_record)
+    (instructor_reviewer_available ?instructor_reviewer - instructor_reviewer)
+    (entity_instructor_binding ?grade_exception_case - domain_entity ?instructor_reviewer - instructor_reviewer)
+    (evidence_available ?evidence_document - evidence_document)
+    (account_evidence_link ?student_account - student_account ?evidence_document - evidence_document)
+    (course_evidence_link ?course_section - course_section ?evidence_document - evidence_document)
+    (account_notification_channel_binding ?student_account - student_account ?student_notification_channel - student_notification_channel)
+    (student_channel_marked_ready ?student_notification_channel - student_notification_channel)
+    (student_channel_evidence_flagged ?student_notification_channel - student_notification_channel)
+    (account_notification_logged ?student_account - student_account)
+    (course_notification_channel_binding ?course_section - course_section ?instructor_notification_channel - instructor_notification_channel)
+    (instructor_channel_marked_ready ?instructor_notification_channel - instructor_notification_channel)
+    (instructor_channel_evidence_flagged ?instructor_notification_channel - instructor_notification_channel)
+    (course_notification_logged ?course_section - course_section)
+    (recovery_plan_available ?recovery_plan - recovery_plan)
+    (recovery_plan_selected ?recovery_plan - recovery_plan)
+    (plan_student_channel_binding ?recovery_plan - recovery_plan ?student_notification_channel - student_notification_channel)
+    (plan_instructor_channel_binding ?recovery_plan - recovery_plan ?instructor_notification_channel - instructor_notification_channel)
+    (plan_requires_departmental_approval ?recovery_plan - recovery_plan)
+    (plan_requires_final_approval ?recovery_plan - recovery_plan)
+    (recovery_plan_assembled ?recovery_plan - recovery_plan)
+    (handler_assigned_to_account ?registrar_handler - registrar_handler ?student_account - student_account)
+    (handler_assigned_to_course ?registrar_handler - registrar_handler ?course_section - course_section)
+    (handler_has_recovery_plan ?registrar_handler - registrar_handler ?recovery_plan - recovery_plan)
+    (support_package_available ?support_package - support_package)
+    (handler_support_package_link ?registrar_handler - registrar_handler ?support_package - support_package)
+    (support_package_staged ?support_package - support_package)
+    (support_package_bundled_with_plan ?support_package - support_package ?recovery_plan - recovery_plan)
+    (handler_authorized_for_execution ?registrar_handler - registrar_handler)
+    (handler_prepared_for_compliance_review ?registrar_handler - registrar_handler)
+    (handler_compliance_reviewed ?registrar_handler - registrar_handler)
+    (handler_has_departmental_approval ?registrar_handler - registrar_handler)
+    (handler_departmental_approval_recorded ?registrar_handler - registrar_handler)
+    (handler_has_final_approval ?registrar_handler - registrar_handler)
+    (handler_execution_confirmed ?registrar_handler - registrar_handler)
+    (audit_token_available ?audit_token - audit_token)
+    (handler_audit_token_link ?registrar_handler - registrar_handler ?audit_token - audit_token)
+    (handler_audit_token_claimed ?registrar_handler - registrar_handler)
+    (handler_audit_initiated ?registrar_handler - registrar_handler)
+    (handler_audit_completed ?registrar_handler - registrar_handler)
+    (departmental_approval_available ?departmental_approval - departmental_approval)
+    (handler_departmental_approval_link ?registrar_handler - registrar_handler ?departmental_approval - departmental_approval)
+    (final_approval_available ?final_approval - final_approval)
+    (handler_final_approval_link ?registrar_handler - registrar_handler ?final_approval - final_approval)
+    (technical_service_available ?technical_service - technical_service)
+    (handler_technical_service_link ?registrar_handler - registrar_handler ?technical_service - technical_service)
+    (compliance_officer_available ?compliance_officer - compliance_officer)
+    (handler_compliance_officer_link ?registrar_handler - registrar_handler ?compliance_officer - compliance_officer)
+    (timestamp_token_available ?timestamp_token - timestamp_token)
+    (entity_timestamp_link ?grade_exception_case - domain_entity ?timestamp_token - timestamp_token)
+    (account_recovery_ready ?student_account - student_account)
+    (course_recovery_ready ?course_section - course_section)
+    (handler_released ?registrar_handler - registrar_handler)
+  )
+  (:action register_grade_exception_case
+    :parameters (?grade_exception_case - domain_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?grade_exception_case)
+        )
+        (not
+          (remediation_applied ?grade_exception_case)
+        )
+      )
+    :effect (entity_registered ?grade_exception_case)
+  )
+  (:action assign_staff_to_case
+    :parameters (?grade_exception_case - domain_entity ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (entity_registered ?grade_exception_case)
+        (not
+          (entity_assigned ?grade_exception_case)
+        )
+        (staff_assignment_available ?staff_assignment)
+      )
+    :effect
+      (and
+        (entity_assigned ?grade_exception_case)
+        (entity_staff_binding ?grade_exception_case ?staff_assignment)
+        (not
+          (staff_assignment_available ?staff_assignment)
+        )
+      )
+  )
+  (:action attach_grade_record_to_case
+    :parameters (?grade_exception_case - domain_entity ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_registered ?grade_exception_case)
+        (entity_assigned ?grade_exception_case)
+        (grade_record_available ?grade_record)
+      )
+    :effect
+      (and
+        (entity_has_grade_record ?grade_exception_case ?grade_record)
+        (not
+          (grade_record_available ?grade_record)
+        )
+      )
+  )
+  (:action confirm_grade_record_and_mark_case_ready
+    :parameters (?grade_exception_case - domain_entity ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_registered ?grade_exception_case)
+        (entity_assigned ?grade_exception_case)
+        (entity_has_grade_record ?grade_exception_case ?grade_record)
+        (not
+          (entity_ready_for_review ?grade_exception_case)
+        )
+      )
+    :effect (entity_ready_for_review ?grade_exception_case)
+  )
+  (:action detach_grade_record_from_case
+    :parameters (?grade_exception_case - domain_entity ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_has_grade_record ?grade_exception_case ?grade_record)
+      )
+    :effect
+      (and
+        (grade_record_available ?grade_record)
+        (not
+          (entity_has_grade_record ?grade_exception_case ?grade_record)
+        )
+      )
+  )
+  (:action assign_instructor_reviewer
+    :parameters (?grade_exception_case - domain_entity ?instructor_reviewer - instructor_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_review ?grade_exception_case)
+        (instructor_reviewer_available ?instructor_reviewer)
+      )
+    :effect
+      (and
+        (entity_instructor_binding ?grade_exception_case ?instructor_reviewer)
+        (not
+          (instructor_reviewer_available ?instructor_reviewer)
+        )
+      )
+  )
+  (:action unassign_instructor_reviewer
+    :parameters (?grade_exception_case - domain_entity ?instructor_reviewer - instructor_reviewer)
+    :precondition
+      (and
+        (entity_instructor_binding ?grade_exception_case ?instructor_reviewer)
+      )
+    :effect
+      (and
+        (instructor_reviewer_available ?instructor_reviewer)
+        (not
+          (entity_instructor_binding ?grade_exception_case ?instructor_reviewer)
+        )
+      )
+  )
+  (:action bind_technical_service_to_handler
+    :parameters (?registrar_handler - registrar_handler ?technical_service - technical_service)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (technical_service_available ?technical_service)
+      )
+    :effect
+      (and
+        (handler_technical_service_link ?registrar_handler ?technical_service)
+        (not
+          (technical_service_available ?technical_service)
+        )
+      )
+  )
+  (:action unbind_technical_service_from_handler
+    :parameters (?registrar_handler - registrar_handler ?technical_service - technical_service)
+    :precondition
+      (and
+        (handler_technical_service_link ?registrar_handler ?technical_service)
+      )
+    :effect
+      (and
+        (technical_service_available ?technical_service)
+        (not
+          (handler_technical_service_link ?registrar_handler ?technical_service)
+        )
+      )
+  )
+  (:action bind_compliance_officer_to_handler
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (compliance_officer_available ?compliance_officer)
+      )
+    :effect
+      (and
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (not
+          (compliance_officer_available ?compliance_officer)
+        )
+      )
+  )
+  (:action unbind_compliance_officer_from_handler
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+      )
+    :effect
+      (and
+        (compliance_officer_available ?compliance_officer)
+        (not
+          (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        )
+      )
+  )
+  (:action prepare_student_notification_channel
+    :parameters (?student_account - student_account ?student_notification_channel - student_notification_channel ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_ready_for_review ?student_account)
+        (entity_has_grade_record ?student_account ?grade_record)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (not
+          (student_channel_marked_ready ?student_notification_channel)
+        )
+        (not
+          (student_channel_evidence_flagged ?student_notification_channel)
+        )
+      )
+    :effect (student_channel_marked_ready ?student_notification_channel)
+  )
+  (:action activate_student_channel_and_flag_account
+    :parameters (?student_account - student_account ?student_notification_channel - student_notification_channel ?instructor_reviewer - instructor_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_review ?student_account)
+        (entity_instructor_binding ?student_account ?instructor_reviewer)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (student_channel_marked_ready ?student_notification_channel)
+        (not
+          (account_recovery_ready ?student_account)
+        )
+      )
+    :effect
+      (and
+        (account_recovery_ready ?student_account)
+        (account_notification_logged ?student_account)
+      )
+  )
+  (:action queue_student_notification_with_evidence
+    :parameters (?student_account - student_account ?student_notification_channel - student_notification_channel ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_review ?student_account)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (evidence_available ?evidence_document)
+        (not
+          (account_recovery_ready ?student_account)
+        )
+      )
+    :effect
+      (and
+        (student_channel_evidence_flagged ?student_notification_channel)
+        (account_recovery_ready ?student_account)
+        (account_evidence_link ?student_account ?evidence_document)
+        (not
+          (evidence_available ?evidence_document)
+        )
+      )
+  )
+  (:action finalize_student_notification_processing
+    :parameters (?student_account - student_account ?student_notification_channel - student_notification_channel ?grade_record - grade_record ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_review ?student_account)
+        (entity_has_grade_record ?student_account ?grade_record)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (student_channel_evidence_flagged ?student_notification_channel)
+        (account_evidence_link ?student_account ?evidence_document)
+        (not
+          (account_notification_logged ?student_account)
+        )
+      )
+    :effect
+      (and
+        (student_channel_marked_ready ?student_notification_channel)
+        (account_notification_logged ?student_account)
+        (evidence_available ?evidence_document)
+        (not
+          (account_evidence_link ?student_account ?evidence_document)
+        )
+      )
+  )
+  (:action prepare_instructor_notification_channel
+    :parameters (?course_section - course_section ?instructor_notification_channel - instructor_notification_channel ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_ready_for_review ?course_section)
+        (entity_has_grade_record ?course_section ?grade_record)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (not
+          (instructor_channel_marked_ready ?instructor_notification_channel)
+        )
+        (not
+          (instructor_channel_evidence_flagged ?instructor_notification_channel)
+        )
+      )
+    :effect (instructor_channel_marked_ready ?instructor_notification_channel)
+  )
+  (:action activate_instructor_channel_and_flag_course
+    :parameters (?course_section - course_section ?instructor_notification_channel - instructor_notification_channel ?instructor_reviewer - instructor_reviewer)
+    :precondition
+      (and
+        (entity_ready_for_review ?course_section)
+        (entity_instructor_binding ?course_section ?instructor_reviewer)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (instructor_channel_marked_ready ?instructor_notification_channel)
+        (not
+          (course_recovery_ready ?course_section)
+        )
+      )
+    :effect
+      (and
+        (course_recovery_ready ?course_section)
+        (course_notification_logged ?course_section)
+      )
+  )
+  (:action queue_instructor_notification_with_evidence
+    :parameters (?course_section - course_section ?instructor_notification_channel - instructor_notification_channel ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_review ?course_section)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (evidence_available ?evidence_document)
+        (not
+          (course_recovery_ready ?course_section)
+        )
+      )
+    :effect
+      (and
+        (instructor_channel_evidence_flagged ?instructor_notification_channel)
+        (course_recovery_ready ?course_section)
+        (course_evidence_link ?course_section ?evidence_document)
+        (not
+          (evidence_available ?evidence_document)
+        )
+      )
+  )
+  (:action finalize_instructor_notification_processing
+    :parameters (?course_section - course_section ?instructor_notification_channel - instructor_notification_channel ?grade_record - grade_record ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (entity_ready_for_review ?course_section)
+        (entity_has_grade_record ?course_section ?grade_record)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (instructor_channel_evidence_flagged ?instructor_notification_channel)
+        (course_evidence_link ?course_section ?evidence_document)
+        (not
+          (course_notification_logged ?course_section)
+        )
+      )
+    :effect
+      (and
+        (instructor_channel_marked_ready ?instructor_notification_channel)
+        (course_notification_logged ?course_section)
+        (evidence_available ?evidence_document)
+        (not
+          (course_evidence_link ?course_section ?evidence_document)
+        )
+      )
+  )
+  (:action reserve_recovery_plan_standard
+    :parameters (?student_account - student_account ?course_section - course_section ?student_notification_channel - student_notification_channel ?instructor_notification_channel - instructor_notification_channel ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (account_recovery_ready ?student_account)
+        (course_recovery_ready ?course_section)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (student_channel_marked_ready ?student_notification_channel)
+        (instructor_channel_marked_ready ?instructor_notification_channel)
+        (account_notification_logged ?student_account)
+        (course_notification_logged ?course_section)
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_selected ?recovery_plan)
+        (plan_student_channel_binding ?recovery_plan ?student_notification_channel)
+        (plan_instructor_channel_binding ?recovery_plan ?instructor_notification_channel)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action reserve_recovery_plan_requires_departmental_approval
+    :parameters (?student_account - student_account ?course_section - course_section ?student_notification_channel - student_notification_channel ?instructor_notification_channel - instructor_notification_channel ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (account_recovery_ready ?student_account)
+        (course_recovery_ready ?course_section)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (student_channel_evidence_flagged ?student_notification_channel)
+        (instructor_channel_marked_ready ?instructor_notification_channel)
+        (not
+          (account_notification_logged ?student_account)
+        )
+        (course_notification_logged ?course_section)
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_selected ?recovery_plan)
+        (plan_student_channel_binding ?recovery_plan ?student_notification_channel)
+        (plan_instructor_channel_binding ?recovery_plan ?instructor_notification_channel)
+        (plan_requires_departmental_approval ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action reserve_recovery_plan_requires_final_approval
+    :parameters (?student_account - student_account ?course_section - course_section ?student_notification_channel - student_notification_channel ?instructor_notification_channel - instructor_notification_channel ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (account_recovery_ready ?student_account)
+        (course_recovery_ready ?course_section)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (student_channel_marked_ready ?student_notification_channel)
+        (instructor_channel_evidence_flagged ?instructor_notification_channel)
+        (account_notification_logged ?student_account)
+        (not
+          (course_notification_logged ?course_section)
+        )
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_selected ?recovery_plan)
+        (plan_student_channel_binding ?recovery_plan ?student_notification_channel)
+        (plan_instructor_channel_binding ?recovery_plan ?instructor_notification_channel)
+        (plan_requires_final_approval ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action reserve_recovery_plan_requires_dept_and_final_approval
+    :parameters (?student_account - student_account ?course_section - course_section ?student_notification_channel - student_notification_channel ?instructor_notification_channel - instructor_notification_channel ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (account_recovery_ready ?student_account)
+        (course_recovery_ready ?course_section)
+        (account_notification_channel_binding ?student_account ?student_notification_channel)
+        (course_notification_channel_binding ?course_section ?instructor_notification_channel)
+        (student_channel_evidence_flagged ?student_notification_channel)
+        (instructor_channel_evidence_flagged ?instructor_notification_channel)
+        (not
+          (account_notification_logged ?student_account)
+        )
+        (not
+          (course_notification_logged ?course_section)
+        )
+        (recovery_plan_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_selected ?recovery_plan)
+        (plan_student_channel_binding ?recovery_plan ?student_notification_channel)
+        (plan_instructor_channel_binding ?recovery_plan ?instructor_notification_channel)
+        (plan_requires_departmental_approval ?recovery_plan)
+        (plan_requires_final_approval ?recovery_plan)
+        (not
+          (recovery_plan_available ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan
+    :parameters (?recovery_plan - recovery_plan ?student_account - student_account ?grade_record - grade_record)
+    :precondition
+      (and
+        (recovery_plan_selected ?recovery_plan)
+        (account_recovery_ready ?student_account)
+        (entity_has_grade_record ?student_account ?grade_record)
+        (not
+          (recovery_plan_assembled ?recovery_plan)
+        )
+      )
+    :effect (recovery_plan_assembled ?recovery_plan)
+  )
+  (:action stage_support_package_for_plan
+    :parameters (?registrar_handler - registrar_handler ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (handler_has_recovery_plan ?registrar_handler ?recovery_plan)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_available ?support_package)
+        (recovery_plan_selected ?recovery_plan)
+        (recovery_plan_assembled ?recovery_plan)
+        (not
+          (support_package_staged ?support_package)
+        )
+      )
+    :effect
+      (and
+        (support_package_staged ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (not
+          (support_package_available ?support_package)
+        )
+      )
+  )
+  (:action authorize_handler_for_execution
+    :parameters (?registrar_handler - registrar_handler ?support_package - support_package ?recovery_plan - recovery_plan ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_staged ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (entity_has_grade_record ?registrar_handler ?grade_record)
+        (not
+          (plan_requires_departmental_approval ?recovery_plan)
+        )
+        (not
+          (handler_authorized_for_execution ?registrar_handler)
+        )
+      )
+    :effect (handler_authorized_for_execution ?registrar_handler)
+  )
+  (:action claim_departmental_approval_for_handler
+    :parameters (?registrar_handler - registrar_handler ?departmental_approval - departmental_approval)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (departmental_approval_available ?departmental_approval)
+        (not
+          (handler_has_departmental_approval ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_has_departmental_approval ?registrar_handler)
+        (handler_departmental_approval_link ?registrar_handler ?departmental_approval)
+        (not
+          (departmental_approval_available ?departmental_approval)
+        )
+      )
+  )
+  (:action finalize_departmental_approval_for_handler
+    :parameters (?registrar_handler - registrar_handler ?support_package - support_package ?recovery_plan - recovery_plan ?grade_record - grade_record ?departmental_approval - departmental_approval)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_staged ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (entity_has_grade_record ?registrar_handler ?grade_record)
+        (plan_requires_departmental_approval ?recovery_plan)
+        (handler_has_departmental_approval ?registrar_handler)
+        (handler_departmental_approval_link ?registrar_handler ?departmental_approval)
+        (not
+          (handler_authorized_for_execution ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_authorized_for_execution ?registrar_handler)
+        (handler_departmental_approval_recorded ?registrar_handler)
+      )
+  )
+  (:action prepare_handler_for_compliance_review
+    :parameters (?registrar_handler - registrar_handler ?technical_service - technical_service ?instructor_reviewer - instructor_reviewer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_authorized_for_execution ?registrar_handler)
+        (handler_technical_service_link ?registrar_handler ?technical_service)
+        (entity_instructor_binding ?registrar_handler ?instructor_reviewer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (not
+          (plan_requires_final_approval ?recovery_plan)
+        )
+        (not
+          (handler_prepared_for_compliance_review ?registrar_handler)
+        )
+      )
+    :effect (handler_prepared_for_compliance_review ?registrar_handler)
+  )
+  (:action prepare_handler_for_compliance_review_with_plan_lock
+    :parameters (?registrar_handler - registrar_handler ?technical_service - technical_service ?instructor_reviewer - instructor_reviewer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_authorized_for_execution ?registrar_handler)
+        (handler_technical_service_link ?registrar_handler ?technical_service)
+        (entity_instructor_binding ?registrar_handler ?instructor_reviewer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (plan_requires_final_approval ?recovery_plan)
+        (not
+          (handler_prepared_for_compliance_review ?registrar_handler)
+        )
+      )
+    :effect (handler_prepared_for_compliance_review ?registrar_handler)
+  )
+  (:action perform_compliance_review_basic
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_prepared_for_compliance_review ?registrar_handler)
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (not
+          (plan_requires_departmental_approval ?recovery_plan)
+        )
+        (not
+          (plan_requires_final_approval ?recovery_plan)
+        )
+        (not
+          (handler_compliance_reviewed ?registrar_handler)
+        )
+      )
+    :effect (handler_compliance_reviewed ?registrar_handler)
+  )
+  (:action perform_compliance_review_with_departmental_approval
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_prepared_for_compliance_review ?registrar_handler)
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (plan_requires_departmental_approval ?recovery_plan)
+        (not
+          (plan_requires_final_approval ?recovery_plan)
+        )
+        (not
+          (handler_compliance_reviewed ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_has_final_approval ?registrar_handler)
+      )
+  )
+  (:action perform_compliance_review_with_final_approval
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_prepared_for_compliance_review ?registrar_handler)
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (not
+          (plan_requires_departmental_approval ?recovery_plan)
+        )
+        (plan_requires_final_approval ?recovery_plan)
+        (not
+          (handler_compliance_reviewed ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_has_final_approval ?registrar_handler)
+      )
+  )
+  (:action perform_compliance_review_with_dept_and_final_approvals
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer ?support_package - support_package ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (handler_prepared_for_compliance_review ?registrar_handler)
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (handler_support_package_link ?registrar_handler ?support_package)
+        (support_package_bundled_with_plan ?support_package ?recovery_plan)
+        (plan_requires_departmental_approval ?recovery_plan)
+        (plan_requires_final_approval ?recovery_plan)
+        (not
+          (handler_compliance_reviewed ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_has_final_approval ?registrar_handler)
+      )
+  )
+  (:action close_case_and_release_handler
+    :parameters (?registrar_handler - registrar_handler)
+    :precondition
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (not
+          (handler_has_final_approval ?registrar_handler)
+        )
+        (not
+          (handler_released ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_released ?registrar_handler)
+        (entity_closed ?registrar_handler)
+      )
+  )
+  (:action attach_final_approval_to_handler
+    :parameters (?registrar_handler - registrar_handler ?final_approval - final_approval)
+    :precondition
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_has_final_approval ?registrar_handler)
+        (final_approval_available ?final_approval)
+      )
+    :effect
+      (and
+        (handler_final_approval_link ?registrar_handler ?final_approval)
+        (not
+          (final_approval_available ?final_approval)
+        )
+      )
+  )
+  (:action execute_recovery_plan_by_handler
+    :parameters (?registrar_handler - registrar_handler ?student_account - student_account ?course_section - course_section ?grade_record - grade_record ?final_approval - final_approval)
+    :precondition
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_has_final_approval ?registrar_handler)
+        (handler_final_approval_link ?registrar_handler ?final_approval)
+        (handler_assigned_to_account ?registrar_handler ?student_account)
+        (handler_assigned_to_course ?registrar_handler ?course_section)
+        (account_notification_logged ?student_account)
+        (course_notification_logged ?course_section)
+        (entity_has_grade_record ?registrar_handler ?grade_record)
+        (not
+          (handler_execution_confirmed ?registrar_handler)
+        )
+      )
+    :effect (handler_execution_confirmed ?registrar_handler)
+  )
+  (:action finalize_handler_execution_and_release
+    :parameters (?registrar_handler - registrar_handler)
+    :precondition
+      (and
+        (handler_compliance_reviewed ?registrar_handler)
+        (handler_execution_confirmed ?registrar_handler)
+        (not
+          (handler_released ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_released ?registrar_handler)
+        (entity_closed ?registrar_handler)
+      )
+  )
+  (:action claim_audit_token_for_handler
+    :parameters (?registrar_handler - registrar_handler ?audit_token - audit_token ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_ready_for_review ?registrar_handler)
+        (entity_has_grade_record ?registrar_handler ?grade_record)
+        (audit_token_available ?audit_token)
+        (handler_audit_token_link ?registrar_handler ?audit_token)
+        (not
+          (handler_audit_token_claimed ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_audit_token_claimed ?registrar_handler)
+        (not
+          (audit_token_available ?audit_token)
+        )
+      )
+  )
+  (:action initiate_audit_for_handler
+    :parameters (?registrar_handler - registrar_handler ?instructor_reviewer - instructor_reviewer)
+    :precondition
+      (and
+        (handler_audit_token_claimed ?registrar_handler)
+        (entity_instructor_binding ?registrar_handler ?instructor_reviewer)
+        (not
+          (handler_audit_initiated ?registrar_handler)
+        )
+      )
+    :effect (handler_audit_initiated ?registrar_handler)
+  )
+  (:action record_audit_review
+    :parameters (?registrar_handler - registrar_handler ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (handler_audit_initiated ?registrar_handler)
+        (handler_compliance_officer_link ?registrar_handler ?compliance_officer)
+        (not
+          (handler_audit_completed ?registrar_handler)
+        )
+      )
+    :effect (handler_audit_completed ?registrar_handler)
+  )
+  (:action close_case_after_audit
+    :parameters (?registrar_handler - registrar_handler)
+    :precondition
+      (and
+        (handler_audit_completed ?registrar_handler)
+        (not
+          (handler_released ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_released ?registrar_handler)
+        (entity_closed ?registrar_handler)
+      )
+  )
+  (:action apply_correction_and_close_account_case
+    :parameters (?student_account - student_account ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (account_recovery_ready ?student_account)
+        (account_notification_logged ?student_account)
+        (recovery_plan_selected ?recovery_plan)
+        (recovery_plan_assembled ?recovery_plan)
+        (not
+          (entity_closed ?student_account)
+        )
+      )
+    :effect (entity_closed ?student_account)
+  )
+  (:action apply_correction_and_close_course_case
+    :parameters (?course_section - course_section ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (course_recovery_ready ?course_section)
+        (course_notification_logged ?course_section)
+        (recovery_plan_selected ?recovery_plan)
+        (recovery_plan_assembled ?recovery_plan)
+        (not
+          (entity_closed ?course_section)
+        )
+      )
+    :effect (entity_closed ?course_section)
+  )
+  (:action capture_case_timestamp
+    :parameters (?grade_exception_case - domain_entity ?timestamp_token - timestamp_token ?grade_record - grade_record)
+    :precondition
+      (and
+        (entity_closed ?grade_exception_case)
+        (entity_has_grade_record ?grade_exception_case ?grade_record)
+        (timestamp_token_available ?timestamp_token)
+        (not
+          (entity_timestamped ?grade_exception_case)
+        )
+      )
+    :effect
+      (and
+        (entity_timestamped ?grade_exception_case)
+        (entity_timestamp_link ?grade_exception_case ?timestamp_token)
+        (not
+          (timestamp_token_available ?timestamp_token)
+        )
+      )
+  )
+  (:action assign_staff_and_activate_case_for_account
+    :parameters (?student_account - student_account ?staff_assignment - staff_assignment ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (entity_timestamped ?student_account)
+        (entity_staff_binding ?student_account ?staff_assignment)
+        (entity_timestamp_link ?student_account ?timestamp_token)
+        (not
+          (remediation_applied ?student_account)
+        )
+      )
+    :effect
+      (and
+        (remediation_applied ?student_account)
+        (staff_assignment_available ?staff_assignment)
+        (timestamp_token_available ?timestamp_token)
+      )
+  )
+  (:action assign_staff_and_activate_case_for_course
+    :parameters (?course_section - course_section ?staff_assignment - staff_assignment ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (entity_timestamped ?course_section)
+        (entity_staff_binding ?course_section ?staff_assignment)
+        (entity_timestamp_link ?course_section ?timestamp_token)
+        (not
+          (remediation_applied ?course_section)
+        )
+      )
+    :effect
+      (and
+        (remediation_applied ?course_section)
+        (staff_assignment_available ?staff_assignment)
+        (timestamp_token_available ?timestamp_token)
+      )
+  )
+  (:action assign_staff_and_activate_case_for_handler
+    :parameters (?registrar_handler - registrar_handler ?staff_assignment - staff_assignment ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (entity_timestamped ?registrar_handler)
+        (entity_staff_binding ?registrar_handler ?staff_assignment)
+        (entity_timestamp_link ?registrar_handler ?timestamp_token)
+        (not
+          (remediation_applied ?registrar_handler)
+        )
+      )
+    :effect
+      (and
+        (remediation_applied ?registrar_handler)
+        (staff_assignment_available ?staff_assignment)
+        (timestamp_token_available ?timestamp_token)
+      )
+  )
+)

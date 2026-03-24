@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cross_border_labeling_compliance)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types compliance_resource_group - object classification_resource_group - object jurisdiction_group - object consignment_root - object consignment_record - consignment_root classification_resource - compliance_resource_group commodity_classification_candidate - compliance_resource_group independent_validator - compliance_resource_group declaration_statement - compliance_resource_group inspection_certificate - compliance_resource_group authority_credential - compliance_resource_group regulatory_authorization - compliance_resource_group agency_certificate - compliance_resource_group permit_requirement - classification_resource_group supporting_document - classification_resource_group legal_reference - classification_resource_group origin_regime - jurisdiction_group destination_regime - jurisdiction_group broker_submission_package - jurisdiction_group consignment_segment - consignment_record consignment_batch - consignment_record export_line_item - consignment_segment import_line_item - consignment_segment customs_entry_package - consignment_batch)
+  (:predicates
+    (case_registered ?consignment_record - consignment_record)
+    (classification_confirmed_for_item ?consignment_record - consignment_record)
+    (classification_assigned ?consignment_record - consignment_record)
+    (item_compliance_cleared ?consignment_record - consignment_record)
+    (item_compliance_accepted ?consignment_record - consignment_record)
+    (item_clearance_ready ?consignment_record - consignment_record)
+    (classification_resource_available ?classification_resource - classification_resource)
+    (item_assigned_classification_resource ?consignment_record - consignment_record ?classification_resource - classification_resource)
+    (classification_candidate_available ?commodity_classification_candidate - commodity_classification_candidate)
+    (item_has_classification_candidate ?consignment_record - consignment_record ?commodity_classification_candidate - commodity_classification_candidate)
+    (validator_available ?independent_validator - independent_validator)
+    (item_assigned_validator ?consignment_record - consignment_record ?independent_validator - independent_validator)
+    (permit_requirement_available ?permit_requirement - permit_requirement)
+    (export_line_item_permit_link ?export_line_item - export_line_item ?permit_requirement - permit_requirement)
+    (import_line_item_permit_link ?import_line_item - import_line_item ?permit_requirement - permit_requirement)
+    (export_line_item_origin_regime ?export_line_item - export_line_item ?origin_regime - origin_regime)
+    (origin_regime_verified ?origin_regime - origin_regime)
+    (origin_regime_requires_permit ?origin_regime - origin_regime)
+    (export_line_item_ready ?export_line_item - export_line_item)
+    (import_line_item_destination_regime ?import_line_item - import_line_item ?destination_regime - destination_regime)
+    (destination_regime_verified ?destination_regime - destination_regime)
+    (destination_regime_requires_permit ?destination_regime - destination_regime)
+    (import_line_item_ready ?import_line_item - import_line_item)
+    (broker_submission_package_available ?broker_submission_package - broker_submission_package)
+    (broker_submission_package_prepared ?broker_submission_package - broker_submission_package)
+    (broker_submission_package_origin_regime_link ?broker_submission_package - broker_submission_package ?origin_regime - origin_regime)
+    (broker_submission_package_destination_regime_link ?broker_submission_package - broker_submission_package ?destination_regime - destination_regime)
+    (broker_submission_package_includes_origin_declaration ?broker_submission_package - broker_submission_package)
+    (broker_submission_package_includes_destination_declaration ?broker_submission_package - broker_submission_package)
+    (broker_submission_package_ready_for_filing ?broker_submission_package - broker_submission_package)
+    (customs_entry_package_has_export_line_item ?customs_entry_package - customs_entry_package ?export_line_item - export_line_item)
+    (customs_entry_package_has_import_line_item ?customs_entry_package - customs_entry_package ?import_line_item - import_line_item)
+    (customs_entry_package_linked_broker_submission_package ?customs_entry_package - customs_entry_package ?broker_submission_package - broker_submission_package)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (customs_entry_package_supporting_document_requirement ?customs_entry_package - customs_entry_package ?supporting_document - supporting_document)
+    (supporting_document_attached ?supporting_document - supporting_document)
+    (supporting_document_attached_to_broker_submission_package ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    (customs_entry_package_claimed_for_review ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_review_in_progress ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_review_completed ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_declaration_assigned ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_declaration_verified ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_authorization_granted ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_technical_review_signed ?customs_entry_package - customs_entry_package)
+    (legal_reference_available ?legal_reference - legal_reference)
+    (customs_entry_package_legal_reference_link ?customs_entry_package - customs_entry_package ?legal_reference - legal_reference)
+    (customs_entry_package_legal_acceptance_recorded ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_internal_approval_requested ?customs_entry_package - customs_entry_package)
+    (customs_entry_package_internal_approval_granted ?customs_entry_package - customs_entry_package)
+    (declaration_statement_available ?declaration_statement - declaration_statement)
+    (customs_entry_package_declaration_link ?customs_entry_package - customs_entry_package ?declaration_statement - declaration_statement)
+    (inspection_certificate_available ?inspection_certificate - inspection_certificate)
+    (customs_entry_package_inspection_certificate_link ?customs_entry_package - customs_entry_package ?inspection_certificate - inspection_certificate)
+    (regulatory_authorization_available ?regulatory_authorization - regulatory_authorization)
+    (customs_entry_package_regulatory_authorization_link ?customs_entry_package - customs_entry_package ?regulatory_authorization - regulatory_authorization)
+    (agency_certificate_available ?agency_certificate - agency_certificate)
+    (customs_entry_package_agency_certificate_link ?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate)
+    (authority_credential_available ?authority_credential - authority_credential)
+    (item_authority_credential_link ?consignment_record - consignment_record ?authority_credential - authority_credential)
+    (export_line_item_validated ?export_line_item - export_line_item)
+    (import_line_item_validated ?import_line_item - import_line_item)
+    (customs_entry_package_finalized ?customs_entry_package - customs_entry_package)
+  )
+  (:action register_consignment_case
+    :parameters (?consignment_record - consignment_record)
+    :precondition
+      (and
+        (not
+          (case_registered ?consignment_record)
+        )
+        (not
+          (item_compliance_cleared ?consignment_record)
+        )
+      )
+    :effect (case_registered ?consignment_record)
+  )
+  (:action assign_classification_resource_to_consignment
+    :parameters (?consignment_record - consignment_record ?classification_resource - classification_resource)
+    :precondition
+      (and
+        (case_registered ?consignment_record)
+        (not
+          (classification_assigned ?consignment_record)
+        )
+        (classification_resource_available ?classification_resource)
+      )
+    :effect
+      (and
+        (classification_assigned ?consignment_record)
+        (item_assigned_classification_resource ?consignment_record ?classification_resource)
+        (not
+          (classification_resource_available ?classification_resource)
+        )
+      )
+  )
+  (:action propose_classification_candidate_for_consignment
+    :parameters (?consignment_record - consignment_record ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (case_registered ?consignment_record)
+        (classification_assigned ?consignment_record)
+        (classification_candidate_available ?commodity_classification_candidate)
+      )
+    :effect
+      (and
+        (item_has_classification_candidate ?consignment_record ?commodity_classification_candidate)
+        (not
+          (classification_candidate_available ?commodity_classification_candidate)
+        )
+      )
+  )
+  (:action confirm_classification_candidate_for_consignment
+    :parameters (?consignment_record - consignment_record ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (case_registered ?consignment_record)
+        (classification_assigned ?consignment_record)
+        (item_has_classification_candidate ?consignment_record ?commodity_classification_candidate)
+        (not
+          (classification_confirmed_for_item ?consignment_record)
+        )
+      )
+    :effect (classification_confirmed_for_item ?consignment_record)
+  )
+  (:action revert_classification_candidate_assignment
+    :parameters (?consignment_record - consignment_record ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (item_has_classification_candidate ?consignment_record ?commodity_classification_candidate)
+      )
+    :effect
+      (and
+        (classification_candidate_available ?commodity_classification_candidate)
+        (not
+          (item_has_classification_candidate ?consignment_record ?commodity_classification_candidate)
+        )
+      )
+  )
+  (:action assign_validator_to_consignment
+    :parameters (?consignment_record - consignment_record ?independent_validator - independent_validator)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?consignment_record)
+        (validator_available ?independent_validator)
+      )
+    :effect
+      (and
+        (item_assigned_validator ?consignment_record ?independent_validator)
+        (not
+          (validator_available ?independent_validator)
+        )
+      )
+  )
+  (:action release_validator_from_consignment
+    :parameters (?consignment_record - consignment_record ?independent_validator - independent_validator)
+    :precondition
+      (and
+        (item_assigned_validator ?consignment_record ?independent_validator)
+      )
+    :effect
+      (and
+        (validator_available ?independent_validator)
+        (not
+          (item_assigned_validator ?consignment_record ?independent_validator)
+        )
+      )
+  )
+  (:action attach_regulatory_authorization_to_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?regulatory_authorization - regulatory_authorization)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (regulatory_authorization_available ?regulatory_authorization)
+      )
+    :effect
+      (and
+        (customs_entry_package_regulatory_authorization_link ?customs_entry_package ?regulatory_authorization)
+        (not
+          (regulatory_authorization_available ?regulatory_authorization)
+        )
+      )
+  )
+  (:action detach_regulatory_authorization_from_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?regulatory_authorization - regulatory_authorization)
+    :precondition
+      (and
+        (customs_entry_package_regulatory_authorization_link ?customs_entry_package ?regulatory_authorization)
+      )
+    :effect
+      (and
+        (regulatory_authorization_available ?regulatory_authorization)
+        (not
+          (customs_entry_package_regulatory_authorization_link ?customs_entry_package ?regulatory_authorization)
+        )
+      )
+  )
+  (:action attach_agency_certificate_to_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (agency_certificate_available ?agency_certificate)
+      )
+    :effect
+      (and
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (not
+          (agency_certificate_available ?agency_certificate)
+        )
+      )
+  )
+  (:action detach_agency_certificate_from_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate)
+    :precondition
+      (and
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+      )
+    :effect
+      (and
+        (agency_certificate_available ?agency_certificate)
+        (not
+          (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        )
+      )
+  )
+  (:action initiate_origin_regime_validation_for_export_item
+    :parameters (?export_line_item - export_line_item ?origin_regime - origin_regime ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?export_line_item)
+        (item_has_classification_candidate ?export_line_item ?commodity_classification_candidate)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (not
+          (origin_regime_verified ?origin_regime)
+        )
+        (not
+          (origin_regime_requires_permit ?origin_regime)
+        )
+      )
+    :effect (origin_regime_verified ?origin_regime)
+  )
+  (:action validator_approve_export_item_origin_regime
+    :parameters (?export_line_item - export_line_item ?origin_regime - origin_regime ?independent_validator - independent_validator)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?export_line_item)
+        (item_assigned_validator ?export_line_item ?independent_validator)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (origin_regime_verified ?origin_regime)
+        (not
+          (export_line_item_validated ?export_line_item)
+        )
+      )
+    :effect
+      (and
+        (export_line_item_validated ?export_line_item)
+        (export_line_item_ready ?export_line_item)
+      )
+  )
+  (:action apply_permit_requirement_to_export_item
+    :parameters (?export_line_item - export_line_item ?origin_regime - origin_regime ?permit_requirement - permit_requirement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?export_line_item)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (permit_requirement_available ?permit_requirement)
+        (not
+          (export_line_item_validated ?export_line_item)
+        )
+      )
+    :effect
+      (and
+        (origin_regime_requires_permit ?origin_regime)
+        (export_line_item_validated ?export_line_item)
+        (export_line_item_permit_link ?export_line_item ?permit_requirement)
+        (not
+          (permit_requirement_available ?permit_requirement)
+        )
+      )
+  )
+  (:action finalize_export_item_origin_and_permit_assessment
+    :parameters (?export_line_item - export_line_item ?origin_regime - origin_regime ?commodity_classification_candidate - commodity_classification_candidate ?permit_requirement - permit_requirement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?export_line_item)
+        (item_has_classification_candidate ?export_line_item ?commodity_classification_candidate)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (origin_regime_requires_permit ?origin_regime)
+        (export_line_item_permit_link ?export_line_item ?permit_requirement)
+        (not
+          (export_line_item_ready ?export_line_item)
+        )
+      )
+    :effect
+      (and
+        (origin_regime_verified ?origin_regime)
+        (export_line_item_ready ?export_line_item)
+        (permit_requirement_available ?permit_requirement)
+        (not
+          (export_line_item_permit_link ?export_line_item ?permit_requirement)
+        )
+      )
+  )
+  (:action initiate_destination_regime_validation_for_import_item
+    :parameters (?import_line_item - import_line_item ?destination_regime - destination_regime ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?import_line_item)
+        (item_has_classification_candidate ?import_line_item ?commodity_classification_candidate)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (not
+          (destination_regime_verified ?destination_regime)
+        )
+        (not
+          (destination_regime_requires_permit ?destination_regime)
+        )
+      )
+    :effect (destination_regime_verified ?destination_regime)
+  )
+  (:action validator_approve_import_item_destination_regime
+    :parameters (?import_line_item - import_line_item ?destination_regime - destination_regime ?independent_validator - independent_validator)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?import_line_item)
+        (item_assigned_validator ?import_line_item ?independent_validator)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (destination_regime_verified ?destination_regime)
+        (not
+          (import_line_item_validated ?import_line_item)
+        )
+      )
+    :effect
+      (and
+        (import_line_item_validated ?import_line_item)
+        (import_line_item_ready ?import_line_item)
+      )
+  )
+  (:action apply_permit_requirement_to_import_item
+    :parameters (?import_line_item - import_line_item ?destination_regime - destination_regime ?permit_requirement - permit_requirement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?import_line_item)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (permit_requirement_available ?permit_requirement)
+        (not
+          (import_line_item_validated ?import_line_item)
+        )
+      )
+    :effect
+      (and
+        (destination_regime_requires_permit ?destination_regime)
+        (import_line_item_validated ?import_line_item)
+        (import_line_item_permit_link ?import_line_item ?permit_requirement)
+        (not
+          (permit_requirement_available ?permit_requirement)
+        )
+      )
+  )
+  (:action finalize_import_item_destination_and_permit_assessment
+    :parameters (?import_line_item - import_line_item ?destination_regime - destination_regime ?commodity_classification_candidate - commodity_classification_candidate ?permit_requirement - permit_requirement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?import_line_item)
+        (item_has_classification_candidate ?import_line_item ?commodity_classification_candidate)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (destination_regime_requires_permit ?destination_regime)
+        (import_line_item_permit_link ?import_line_item ?permit_requirement)
+        (not
+          (import_line_item_ready ?import_line_item)
+        )
+      )
+    :effect
+      (and
+        (destination_regime_verified ?destination_regime)
+        (import_line_item_ready ?import_line_item)
+        (permit_requirement_available ?permit_requirement)
+        (not
+          (import_line_item_permit_link ?import_line_item ?permit_requirement)
+        )
+      )
+  )
+  (:action prepare_broker_submission_package_standard
+    :parameters (?export_line_item - export_line_item ?import_line_item - import_line_item ?origin_regime - origin_regime ?destination_regime - destination_regime ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (export_line_item_validated ?export_line_item)
+        (import_line_item_validated ?import_line_item)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (origin_regime_verified ?origin_regime)
+        (destination_regime_verified ?destination_regime)
+        (export_line_item_ready ?export_line_item)
+        (import_line_item_ready ?import_line_item)
+        (broker_submission_package_available ?broker_submission_package)
+      )
+    :effect
+      (and
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_origin_regime_link ?broker_submission_package ?origin_regime)
+        (broker_submission_package_destination_regime_link ?broker_submission_package ?destination_regime)
+        (not
+          (broker_submission_package_available ?broker_submission_package)
+        )
+      )
+  )
+  (:action prepare_broker_submission_package_with_origin_declaration
+    :parameters (?export_line_item - export_line_item ?import_line_item - import_line_item ?origin_regime - origin_regime ?destination_regime - destination_regime ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (export_line_item_validated ?export_line_item)
+        (import_line_item_validated ?import_line_item)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (origin_regime_requires_permit ?origin_regime)
+        (destination_regime_verified ?destination_regime)
+        (not
+          (export_line_item_ready ?export_line_item)
+        )
+        (import_line_item_ready ?import_line_item)
+        (broker_submission_package_available ?broker_submission_package)
+      )
+    :effect
+      (and
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_origin_regime_link ?broker_submission_package ?origin_regime)
+        (broker_submission_package_destination_regime_link ?broker_submission_package ?destination_regime)
+        (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        (not
+          (broker_submission_package_available ?broker_submission_package)
+        )
+      )
+  )
+  (:action prepare_broker_submission_package_with_destination_declaration
+    :parameters (?export_line_item - export_line_item ?import_line_item - import_line_item ?origin_regime - origin_regime ?destination_regime - destination_regime ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (export_line_item_validated ?export_line_item)
+        (import_line_item_validated ?import_line_item)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (origin_regime_verified ?origin_regime)
+        (destination_regime_requires_permit ?destination_regime)
+        (export_line_item_ready ?export_line_item)
+        (not
+          (import_line_item_ready ?import_line_item)
+        )
+        (broker_submission_package_available ?broker_submission_package)
+      )
+    :effect
+      (and
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_origin_regime_link ?broker_submission_package ?origin_regime)
+        (broker_submission_package_destination_regime_link ?broker_submission_package ?destination_regime)
+        (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        (not
+          (broker_submission_package_available ?broker_submission_package)
+        )
+      )
+  )
+  (:action prepare_broker_submission_package_with_both_declarations
+    :parameters (?export_line_item - export_line_item ?import_line_item - import_line_item ?origin_regime - origin_regime ?destination_regime - destination_regime ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (export_line_item_validated ?export_line_item)
+        (import_line_item_validated ?import_line_item)
+        (export_line_item_origin_regime ?export_line_item ?origin_regime)
+        (import_line_item_destination_regime ?import_line_item ?destination_regime)
+        (origin_regime_requires_permit ?origin_regime)
+        (destination_regime_requires_permit ?destination_regime)
+        (not
+          (export_line_item_ready ?export_line_item)
+        )
+        (not
+          (import_line_item_ready ?import_line_item)
+        )
+        (broker_submission_package_available ?broker_submission_package)
+      )
+    :effect
+      (and
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_origin_regime_link ?broker_submission_package ?origin_regime)
+        (broker_submission_package_destination_regime_link ?broker_submission_package ?destination_regime)
+        (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        (not
+          (broker_submission_package_available ?broker_submission_package)
+        )
+      )
+  )
+  (:action finalize_submission_package_for_filing
+    :parameters (?broker_submission_package - broker_submission_package ?export_line_item - export_line_item ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (broker_submission_package_prepared ?broker_submission_package)
+        (export_line_item_validated ?export_line_item)
+        (item_has_classification_candidate ?export_line_item ?commodity_classification_candidate)
+        (not
+          (broker_submission_package_ready_for_filing ?broker_submission_package)
+        )
+      )
+    :effect (broker_submission_package_ready_for_filing ?broker_submission_package)
+  )
+  (:action attach_supporting_document_to_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (customs_entry_package_linked_broker_submission_package ?customs_entry_package ?broker_submission_package)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_ready_for_filing ?broker_submission_package)
+        (not
+          (supporting_document_attached ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action claim_customs_entry_package_for_review
+    :parameters (?customs_entry_package - customs_entry_package ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (item_has_classification_candidate ?customs_entry_package ?commodity_classification_candidate)
+        (not
+          (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        )
+        (not
+          (customs_entry_package_claimed_for_review ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_claimed_for_review ?customs_entry_package)
+  )
+  (:action assign_declaration_statement_to_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?declaration_statement - declaration_statement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (declaration_statement_available ?declaration_statement)
+        (not
+          (customs_entry_package_declaration_assigned ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_declaration_assigned ?customs_entry_package)
+        (customs_entry_package_declaration_link ?customs_entry_package ?declaration_statement)
+        (not
+          (declaration_statement_available ?declaration_statement)
+        )
+      )
+  )
+  (:action attach_declaration_and_claim_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package ?commodity_classification_candidate - commodity_classification_candidate ?declaration_statement - declaration_statement)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (item_has_classification_candidate ?customs_entry_package ?commodity_classification_candidate)
+        (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        (customs_entry_package_declaration_assigned ?customs_entry_package)
+        (customs_entry_package_declaration_link ?customs_entry_package ?declaration_statement)
+        (not
+          (customs_entry_package_claimed_for_review ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_claimed_for_review ?customs_entry_package)
+        (customs_entry_package_declaration_verified ?customs_entry_package)
+      )
+  )
+  (:action approve_package_with_regulatory_authorization
+    :parameters (?customs_entry_package - customs_entry_package ?regulatory_authorization - regulatory_authorization ?independent_validator - independent_validator ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_claimed_for_review ?customs_entry_package)
+        (customs_entry_package_regulatory_authorization_link ?customs_entry_package ?regulatory_authorization)
+        (item_assigned_validator ?customs_entry_package ?independent_validator)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (not
+          (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        )
+        (not
+          (customs_entry_package_review_in_progress ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_review_in_progress ?customs_entry_package)
+  )
+  (:action approve_package_with_regulatory_authorization_and_destination_declaration
+    :parameters (?customs_entry_package - customs_entry_package ?regulatory_authorization - regulatory_authorization ?independent_validator - independent_validator ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_claimed_for_review ?customs_entry_package)
+        (customs_entry_package_regulatory_authorization_link ?customs_entry_package ?regulatory_authorization)
+        (item_assigned_validator ?customs_entry_package ?independent_validator)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        (not
+          (customs_entry_package_review_in_progress ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_review_in_progress ?customs_entry_package)
+  )
+  (:action apply_agency_certificate_complete_review_no_declarations
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_review_in_progress ?customs_entry_package)
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (not
+          (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        )
+        (not
+          (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        )
+        (not
+          (customs_entry_package_review_completed ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_review_completed ?customs_entry_package)
+  )
+  (:action apply_agency_certificate_complete_review_with_origin_declaration
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_review_in_progress ?customs_entry_package)
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        (not
+          (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        )
+        (not
+          (customs_entry_package_review_completed ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_authorization_granted ?customs_entry_package)
+      )
+  )
+  (:action apply_agency_certificate_complete_review_with_destination_declaration
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_review_in_progress ?customs_entry_package)
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (not
+          (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        )
+        (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        (not
+          (customs_entry_package_review_completed ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_authorization_granted ?customs_entry_package)
+      )
+  )
+  (:action apply_agency_certificate_complete_review_with_both_declarations
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate ?supporting_document - supporting_document ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (customs_entry_package_review_in_progress ?customs_entry_package)
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (customs_entry_package_supporting_document_requirement ?customs_entry_package ?supporting_document)
+        (supporting_document_attached_to_broker_submission_package ?supporting_document ?broker_submission_package)
+        (broker_submission_package_includes_origin_declaration ?broker_submission_package)
+        (broker_submission_package_includes_destination_declaration ?broker_submission_package)
+        (not
+          (customs_entry_package_review_completed ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_authorization_granted ?customs_entry_package)
+      )
+  )
+  (:action finalize_customs_entry_package_post_review
+    :parameters (?customs_entry_package - customs_entry_package)
+    :precondition
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (not
+          (customs_entry_package_authorization_granted ?customs_entry_package)
+        )
+        (not
+          (customs_entry_package_finalized ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_finalized ?customs_entry_package)
+        (item_compliance_accepted ?customs_entry_package)
+      )
+  )
+  (:action attach_inspection_certificate_to_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?inspection_certificate - inspection_certificate)
+    :precondition
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_authorization_granted ?customs_entry_package)
+        (inspection_certificate_available ?inspection_certificate)
+      )
+    :effect
+      (and
+        (customs_entry_package_inspection_certificate_link ?customs_entry_package ?inspection_certificate)
+        (not
+          (inspection_certificate_available ?inspection_certificate)
+        )
+      )
+  )
+  (:action perform_technical_review_and_sign_off_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?export_line_item - export_line_item ?import_line_item - import_line_item ?commodity_classification_candidate - commodity_classification_candidate ?inspection_certificate - inspection_certificate)
+    :precondition
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_authorization_granted ?customs_entry_package)
+        (customs_entry_package_inspection_certificate_link ?customs_entry_package ?inspection_certificate)
+        (customs_entry_package_has_export_line_item ?customs_entry_package ?export_line_item)
+        (customs_entry_package_has_import_line_item ?customs_entry_package ?import_line_item)
+        (export_line_item_ready ?export_line_item)
+        (import_line_item_ready ?import_line_item)
+        (item_has_classification_candidate ?customs_entry_package ?commodity_classification_candidate)
+        (not
+          (customs_entry_package_technical_review_signed ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_technical_review_signed ?customs_entry_package)
+  )
+  (:action finalize_customs_entry_package_after_technical_review
+    :parameters (?customs_entry_package - customs_entry_package)
+    :precondition
+      (and
+        (customs_entry_package_review_completed ?customs_entry_package)
+        (customs_entry_package_technical_review_signed ?customs_entry_package)
+        (not
+          (customs_entry_package_finalized ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_finalized ?customs_entry_package)
+        (item_compliance_accepted ?customs_entry_package)
+      )
+  )
+  (:action record_legal_reference_for_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?legal_reference - legal_reference ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (classification_confirmed_for_item ?customs_entry_package)
+        (item_has_classification_candidate ?customs_entry_package ?commodity_classification_candidate)
+        (legal_reference_available ?legal_reference)
+        (customs_entry_package_legal_reference_link ?customs_entry_package ?legal_reference)
+        (not
+          (customs_entry_package_legal_acceptance_recorded ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_legal_acceptance_recorded ?customs_entry_package)
+        (not
+          (legal_reference_available ?legal_reference)
+        )
+      )
+  )
+  (:action request_internal_approval_for_customs_entry_package_by_validator
+    :parameters (?customs_entry_package - customs_entry_package ?independent_validator - independent_validator)
+    :precondition
+      (and
+        (customs_entry_package_legal_acceptance_recorded ?customs_entry_package)
+        (item_assigned_validator ?customs_entry_package ?independent_validator)
+        (not
+          (customs_entry_package_internal_approval_requested ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_internal_approval_requested ?customs_entry_package)
+  )
+  (:action apply_agency_certificate_for_internal_approval
+    :parameters (?customs_entry_package - customs_entry_package ?agency_certificate - agency_certificate)
+    :precondition
+      (and
+        (customs_entry_package_internal_approval_requested ?customs_entry_package)
+        (customs_entry_package_agency_certificate_link ?customs_entry_package ?agency_certificate)
+        (not
+          (customs_entry_package_internal_approval_granted ?customs_entry_package)
+        )
+      )
+    :effect (customs_entry_package_internal_approval_granted ?customs_entry_package)
+  )
+  (:action finalize_customs_entry_package_after_internal_approval
+    :parameters (?customs_entry_package - customs_entry_package)
+    :precondition
+      (and
+        (customs_entry_package_internal_approval_granted ?customs_entry_package)
+        (not
+          (customs_entry_package_finalized ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (customs_entry_package_finalized ?customs_entry_package)
+        (item_compliance_accepted ?customs_entry_package)
+      )
+  )
+  (:action clear_export_line_item
+    :parameters (?export_line_item - export_line_item ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (export_line_item_validated ?export_line_item)
+        (export_line_item_ready ?export_line_item)
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_ready_for_filing ?broker_submission_package)
+        (not
+          (item_compliance_accepted ?export_line_item)
+        )
+      )
+    :effect (item_compliance_accepted ?export_line_item)
+  )
+  (:action clear_import_line_item
+    :parameters (?import_line_item - import_line_item ?broker_submission_package - broker_submission_package)
+    :precondition
+      (and
+        (import_line_item_validated ?import_line_item)
+        (import_line_item_ready ?import_line_item)
+        (broker_submission_package_prepared ?broker_submission_package)
+        (broker_submission_package_ready_for_filing ?broker_submission_package)
+        (not
+          (item_compliance_accepted ?import_line_item)
+        )
+      )
+    :effect (item_compliance_accepted ?import_line_item)
+  )
+  (:action assign_authority_credential_to_consignment
+    :parameters (?consignment_record - consignment_record ?authority_credential - authority_credential ?commodity_classification_candidate - commodity_classification_candidate)
+    :precondition
+      (and
+        (item_compliance_accepted ?consignment_record)
+        (item_has_classification_candidate ?consignment_record ?commodity_classification_candidate)
+        (authority_credential_available ?authority_credential)
+        (not
+          (item_clearance_ready ?consignment_record)
+        )
+      )
+    :effect
+      (and
+        (item_clearance_ready ?consignment_record)
+        (item_authority_credential_link ?consignment_record ?authority_credential)
+        (not
+          (authority_credential_available ?authority_credential)
+        )
+      )
+  )
+  (:action finalize_clearance_for_export_line_item
+    :parameters (?export_line_item - export_line_item ?classification_resource - classification_resource ?authority_credential - authority_credential)
+    :precondition
+      (and
+        (item_clearance_ready ?export_line_item)
+        (item_assigned_classification_resource ?export_line_item ?classification_resource)
+        (item_authority_credential_link ?export_line_item ?authority_credential)
+        (not
+          (item_compliance_cleared ?export_line_item)
+        )
+      )
+    :effect
+      (and
+        (item_compliance_cleared ?export_line_item)
+        (classification_resource_available ?classification_resource)
+        (authority_credential_available ?authority_credential)
+      )
+  )
+  (:action finalize_clearance_for_import_line_item
+    :parameters (?import_line_item - import_line_item ?classification_resource - classification_resource ?authority_credential - authority_credential)
+    :precondition
+      (and
+        (item_clearance_ready ?import_line_item)
+        (item_assigned_classification_resource ?import_line_item ?classification_resource)
+        (item_authority_credential_link ?import_line_item ?authority_credential)
+        (not
+          (item_compliance_cleared ?import_line_item)
+        )
+      )
+    :effect
+      (and
+        (item_compliance_cleared ?import_line_item)
+        (classification_resource_available ?classification_resource)
+        (authority_credential_available ?authority_credential)
+      )
+  )
+  (:action finalize_clearance_for_customs_entry_package
+    :parameters (?customs_entry_package - customs_entry_package ?classification_resource - classification_resource ?authority_credential - authority_credential)
+    :precondition
+      (and
+        (item_clearance_ready ?customs_entry_package)
+        (item_assigned_classification_resource ?customs_entry_package ?classification_resource)
+        (item_authority_credential_link ?customs_entry_package ?authority_credential)
+        (not
+          (item_compliance_cleared ?customs_entry_package)
+        )
+      )
+    :effect
+      (and
+        (item_compliance_cleared ?customs_entry_package)
+        (classification_resource_available ?classification_resource)
+        (authority_credential_available ?authority_credential)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem cross_border_labeling_case_instance)
+  (:domain cross_border_labeling_compliance)
+  (:objects export_item_1 - export_line_item import_item_1 - import_line_item entry_package_1 - customs_entry_package entry_package_2 - customs_entry_package classification_resource_1 - classification_resource classification_resource_2 - classification_resource classification_resource_3 - classification_resource classification_candidate_1 - commodity_classification_candidate validator_1 - independent_validator permit_requirement_1 - permit_requirement origin_regime_1 - origin_regime destination_regime_1 - destination_regime broker_package_1 - broker_submission_package supporting_document_1 - supporting_document supporting_document_2 - supporting_document declaration_statement_1 - declaration_statement declaration_statement_2 - declaration_statement inspection_certificate_1 - inspection_certificate inspection_certificate_2 - inspection_certificate authority_credential_1 - authority_credential regulatory_authorization_1 - regulatory_authorization legal_reference_1 - legal_reference legal_reference_2 - legal_reference agency_certificate_1 - agency_certificate)
+  (:init
+    (classification_resource_available classification_resource_1)
+    (classification_resource_available classification_resource_2)
+    (classification_resource_available classification_resource_3)
+    (classification_candidate_available classification_candidate_1)
+    (validator_available validator_1)
+    (permit_requirement_available permit_requirement_1)
+    (export_line_item_origin_regime export_item_1 origin_regime_1)
+    (import_line_item_destination_regime import_item_1 destination_regime_1)
+    (broker_submission_package_available broker_package_1)
+    (supporting_document_available supporting_document_1)
+    (supporting_document_available supporting_document_2)
+    (customs_entry_package_has_export_line_item entry_package_1 export_item_1)
+    (customs_entry_package_has_export_line_item entry_package_2 export_item_1)
+    (customs_entry_package_has_import_line_item entry_package_1 import_item_1)
+    (customs_entry_package_has_import_line_item entry_package_2 import_item_1)
+    (customs_entry_package_linked_broker_submission_package entry_package_1 broker_package_1)
+    (customs_entry_package_linked_broker_submission_package entry_package_2 broker_package_1)
+    (customs_entry_package_supporting_document_requirement entry_package_1 supporting_document_1)
+    (customs_entry_package_supporting_document_requirement entry_package_2 supporting_document_2)
+    (declaration_statement_available declaration_statement_1)
+    (declaration_statement_available declaration_statement_2)
+    (inspection_certificate_available inspection_certificate_1)
+    (inspection_certificate_available inspection_certificate_2)
+    (authority_credential_available authority_credential_1)
+    (regulatory_authorization_available regulatory_authorization_1)
+    (legal_reference_available legal_reference_1)
+    (customs_entry_package_legal_reference_link entry_package_1 legal_reference_1)
+    (customs_entry_package_legal_reference_link entry_package_2 legal_reference_2)
+    (agency_certificate_available agency_certificate_1)
+  )
+  (:goal
+    (and
+      (item_compliance_cleared export_item_1)
+      (item_compliance_cleared import_item_1)
+      (item_compliance_cleared entry_package_1)
+      (item_compliance_cleared entry_package_2)
+    )
+  )
+)

@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain warehouse_slotting_reconfiguration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_entity - object physical_resource - base_entity processing_resource - base_entity logistics_resource - base_entity warehouse - base_entity entity - warehouse handling_resource - physical_resource classification_station - physical_resource operator - physical_resource slot_attribute - physical_resource label_tag - physical_resource wms_record - physical_resource slot_capacity_profile - physical_resource approval_token - physical_resource transfer_tote - processing_resource staging_tote - processing_resource operational_constraint - processing_resource source_velocity_band - logistics_resource target_velocity_band - logistics_resource move_order - logistics_resource slot_group - entity slot_subgroup - entity donor_slot - slot_group recipient_slot - slot_group slot_record - slot_subgroup)
+
+  (:predicates
+    (entity_received ?inventory_item - entity)
+    (entity_ready_for_slotting ?inventory_item - entity)
+    (entity_assigned ?inventory_item - entity)
+    (reconfiguration_committed ?inventory_item - entity)
+    (change_finalized ?inventory_item - entity)
+    (wms_record_updated ?inventory_item - entity)
+    (handling_resource_available ?handling_resource - handling_resource)
+    (entity_assigned_to_resource ?inventory_item - entity ?handling_resource - handling_resource)
+    (classification_station_available ?classification_station - classification_station)
+    (entity_at_classification_station ?inventory_item - entity ?classification_station - classification_station)
+    (operator_available ?operator - operator)
+    (entity_assigned_to_operator ?inventory_item - entity ?operator - operator)
+    (transfer_tote_available ?transfer_tote - transfer_tote)
+    (donor_slot_assigned_tote ?donor_slot - donor_slot ?transfer_tote - transfer_tote)
+    (recipient_slot_assigned_tote ?recipient_slot - recipient_slot ?transfer_tote - transfer_tote)
+    (slot_current_velocity_band ?donor_slot - donor_slot ?source_velocity_band - source_velocity_band)
+    (source_band_ready ?source_velocity_band - source_velocity_band)
+    (source_band_staged ?source_velocity_band - source_velocity_band)
+    (donor_slot_prepared ?donor_slot - donor_slot)
+    (slot_target_velocity_band ?recipient_slot - recipient_slot ?target_velocity_band - target_velocity_band)
+    (target_band_ready ?target_velocity_band - target_velocity_band)
+    (target_band_staged ?target_velocity_band - target_velocity_band)
+    (recipient_slot_prepared ?recipient_slot - recipient_slot)
+    (move_order_pending ?move_order - move_order)
+    (move_order_staged ?move_order - move_order)
+    (move_order_assigned_source_band ?move_order - move_order ?source_velocity_band - source_velocity_band)
+    (move_order_assigned_target_band ?move_order - move_order ?target_velocity_band - target_velocity_band)
+    (move_order_needs_source_staging ?move_order - move_order)
+    (move_order_needs_target_staging ?move_order - move_order)
+    (move_order_ready_for_allocation ?move_order - move_order)
+    (slot_record_associated_with_donor_slot ?slot_record - slot_record ?donor_slot - donor_slot)
+    (slot_record_associated_with_recipient_slot ?slot_record - slot_record ?recipient_slot - recipient_slot)
+    (slot_record_linked_move_order ?slot_record - slot_record ?move_order - move_order)
+    (staging_tote_available ?staging_tote - staging_tote)
+    (slot_record_has_staging_tote ?slot_record - slot_record ?staging_tote - staging_tote)
+    (staging_tote_allocated ?staging_tote - staging_tote)
+    (staging_tote_assigned_to_move_order ?staging_tote - staging_tote ?move_order - move_order)
+    (slot_container_selected ?slot_record - slot_record)
+    (slot_configuration_applied ?slot_record - slot_record)
+    (slot_change_ready_for_finalization ?slot_record - slot_record)
+    (slot_fixture_applied ?slot_record - slot_record)
+    (slot_attribute_pending_verification ?slot_record - slot_record)
+    (slot_labels_attached ?slot_record - slot_record)
+    (slot_modification_verified ?slot_record - slot_record)
+    (operational_constraint_present ?operational_constraint - operational_constraint)
+    (slot_has_constraint ?slot_record - slot_record ?operational_constraint - operational_constraint)
+    (constraint_cleared ?slot_record - slot_record)
+    (constraint_clearance_initiated ?slot_record - slot_record)
+    (supervisor_approval_confirmed ?slot_record - slot_record)
+    (slot_attribute_available ?slot_attribute - slot_attribute)
+    (slot_has_attribute ?slot_record - slot_record ?slot_attribute - slot_attribute)
+    (label_tag_available ?label_tag - label_tag)
+    (slot_assigned_label ?slot_record - slot_record ?label_tag - label_tag)
+    (slot_capacity_profile_available ?slot_capacity_profile - slot_capacity_profile)
+    (slot_assigned_capacity_profile ?slot_record - slot_record ?slot_capacity_profile - slot_capacity_profile)
+    (approval_token_available ?approval_token - approval_token)
+    (slot_has_approval_token ?slot_record - slot_record ?approval_token - approval_token)
+    (wms_record_available ?wms_record - wms_record)
+    (wms_record_association ?inventory_item - entity ?wms_record - wms_record)
+    (donor_slot_locked_for_move ?donor_slot - donor_slot)
+    (recipient_slot_locked_for_move ?recipient_slot - recipient_slot)
+    (slot_verification_enabled ?slot_record - slot_record)
+  )
+  (:action register_inbound_item
+    :parameters (?inventory_item - entity)
+    :precondition
+      (and
+        (not
+          (entity_received ?inventory_item)
+        )
+        (not
+          (reconfiguration_committed ?inventory_item)
+        )
+      )
+    :effect (entity_received ?inventory_item)
+  )
+  (:action assign_handling_resource_to_item
+    :parameters (?inventory_item - entity ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (entity_received ?inventory_item)
+        (not
+          (entity_assigned ?inventory_item)
+        )
+        (handling_resource_available ?handling_resource)
+      )
+    :effect
+      (and
+        (entity_assigned ?inventory_item)
+        (entity_assigned_to_resource ?inventory_item ?handling_resource)
+        (not
+          (handling_resource_available ?handling_resource)
+        )
+      )
+  )
+  (:action classify_item_at_station
+    :parameters (?inventory_item - entity ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_received ?inventory_item)
+        (entity_assigned ?inventory_item)
+        (classification_station_available ?classification_station)
+      )
+    :effect
+      (and
+        (entity_at_classification_station ?inventory_item ?classification_station)
+        (not
+          (classification_station_available ?classification_station)
+        )
+      )
+  )
+  (:action validate_item_for_slotting
+    :parameters (?inventory_item - entity ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_received ?inventory_item)
+        (entity_assigned ?inventory_item)
+        (entity_at_classification_station ?inventory_item ?classification_station)
+        (not
+          (entity_ready_for_slotting ?inventory_item)
+        )
+      )
+    :effect (entity_ready_for_slotting ?inventory_item)
+  )
+  (:action release_classification_station
+    :parameters (?inventory_item - entity ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_at_classification_station ?inventory_item ?classification_station)
+      )
+    :effect
+      (and
+        (classification_station_available ?classification_station)
+        (not
+          (entity_at_classification_station ?inventory_item ?classification_station)
+        )
+      )
+  )
+  (:action assign_operator_to_item
+    :parameters (?inventory_item - entity ?operator - operator)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?inventory_item)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (entity_assigned_to_operator ?inventory_item ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_item
+    :parameters (?inventory_item - entity ?operator - operator)
+    :precondition
+      (and
+        (entity_assigned_to_operator ?inventory_item ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (entity_assigned_to_operator ?inventory_item ?operator)
+        )
+      )
+  )
+  (:action assign_capacity_profile_to_slot
+    :parameters (?slot_record - slot_record ?slot_capacity_profile - slot_capacity_profile)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (slot_capacity_profile_available ?slot_capacity_profile)
+      )
+    :effect
+      (and
+        (slot_assigned_capacity_profile ?slot_record ?slot_capacity_profile)
+        (not
+          (slot_capacity_profile_available ?slot_capacity_profile)
+        )
+      )
+  )
+  (:action release_capacity_profile_from_slot
+    :parameters (?slot_record - slot_record ?slot_capacity_profile - slot_capacity_profile)
+    :precondition
+      (and
+        (slot_assigned_capacity_profile ?slot_record ?slot_capacity_profile)
+      )
+    :effect
+      (and
+        (slot_capacity_profile_available ?slot_capacity_profile)
+        (not
+          (slot_assigned_capacity_profile ?slot_record ?slot_capacity_profile)
+        )
+      )
+  )
+  (:action assign_approval_token_to_slot
+    :parameters (?slot_record - slot_record ?approval_token - approval_token)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action release_approval_token_from_slot
+    :parameters (?slot_record - slot_record ?approval_token - approval_token)
+    :precondition
+      (and
+        (slot_has_approval_token ?slot_record ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (slot_has_approval_token ?slot_record ?approval_token)
+        )
+      )
+  )
+  (:action prepare_donor_slot_for_extraction
+    :parameters (?donor_slot - donor_slot ?source_velocity_band - source_velocity_band ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?donor_slot)
+        (entity_at_classification_station ?donor_slot ?classification_station)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (not
+          (source_band_ready ?source_velocity_band)
+        )
+        (not
+          (source_band_staged ?source_velocity_band)
+        )
+      )
+    :effect (source_band_ready ?source_velocity_band)
+  )
+  (:action operator_claims_donor_slot
+    :parameters (?donor_slot - donor_slot ?source_velocity_band - source_velocity_band ?operator - operator)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?donor_slot)
+        (entity_assigned_to_operator ?donor_slot ?operator)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (source_band_ready ?source_velocity_band)
+        (not
+          (donor_slot_locked_for_move ?donor_slot)
+        )
+      )
+    :effect
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (donor_slot_prepared ?donor_slot)
+      )
+  )
+  (:action assign_tote_to_donor_slot
+    :parameters (?donor_slot - donor_slot ?source_velocity_band - source_velocity_band ?transfer_tote - transfer_tote)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?donor_slot)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (transfer_tote_available ?transfer_tote)
+        (not
+          (donor_slot_locked_for_move ?donor_slot)
+        )
+      )
+    :effect
+      (and
+        (source_band_staged ?source_velocity_band)
+        (donor_slot_locked_for_move ?donor_slot)
+        (donor_slot_assigned_tote ?donor_slot ?transfer_tote)
+        (not
+          (transfer_tote_available ?transfer_tote)
+        )
+      )
+  )
+  (:action finalize_donor_slot_staging
+    :parameters (?donor_slot - donor_slot ?source_velocity_band - source_velocity_band ?classification_station - classification_station ?transfer_tote - transfer_tote)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?donor_slot)
+        (entity_at_classification_station ?donor_slot ?classification_station)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (source_band_staged ?source_velocity_band)
+        (donor_slot_assigned_tote ?donor_slot ?transfer_tote)
+        (not
+          (donor_slot_prepared ?donor_slot)
+        )
+      )
+    :effect
+      (and
+        (source_band_ready ?source_velocity_band)
+        (donor_slot_prepared ?donor_slot)
+        (transfer_tote_available ?transfer_tote)
+        (not
+          (donor_slot_assigned_tote ?donor_slot ?transfer_tote)
+        )
+      )
+  )
+  (:action prepare_recipient_slot_for_receipt
+    :parameters (?recipient_slot - recipient_slot ?target_velocity_band - target_velocity_band ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?recipient_slot)
+        (entity_at_classification_station ?recipient_slot ?classification_station)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (not
+          (target_band_ready ?target_velocity_band)
+        )
+        (not
+          (target_band_staged ?target_velocity_band)
+        )
+      )
+    :effect (target_band_ready ?target_velocity_band)
+  )
+  (:action operator_claims_recipient_slot
+    :parameters (?recipient_slot - recipient_slot ?target_velocity_band - target_velocity_band ?operator - operator)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?recipient_slot)
+        (entity_assigned_to_operator ?recipient_slot ?operator)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (target_band_ready ?target_velocity_band)
+        (not
+          (recipient_slot_locked_for_move ?recipient_slot)
+        )
+      )
+    :effect
+      (and
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (recipient_slot_prepared ?recipient_slot)
+      )
+  )
+  (:action assign_tote_to_recipient_slot
+    :parameters (?recipient_slot - recipient_slot ?target_velocity_band - target_velocity_band ?transfer_tote - transfer_tote)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?recipient_slot)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (transfer_tote_available ?transfer_tote)
+        (not
+          (recipient_slot_locked_for_move ?recipient_slot)
+        )
+      )
+    :effect
+      (and
+        (target_band_staged ?target_velocity_band)
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (recipient_slot_assigned_tote ?recipient_slot ?transfer_tote)
+        (not
+          (transfer_tote_available ?transfer_tote)
+        )
+      )
+  )
+  (:action finalize_recipient_slot_staging
+    :parameters (?recipient_slot - recipient_slot ?target_velocity_band - target_velocity_band ?classification_station - classification_station ?transfer_tote - transfer_tote)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?recipient_slot)
+        (entity_at_classification_station ?recipient_slot ?classification_station)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (target_band_staged ?target_velocity_band)
+        (recipient_slot_assigned_tote ?recipient_slot ?transfer_tote)
+        (not
+          (recipient_slot_prepared ?recipient_slot)
+        )
+      )
+    :effect
+      (and
+        (target_band_ready ?target_velocity_band)
+        (recipient_slot_prepared ?recipient_slot)
+        (transfer_tote_available ?transfer_tote)
+        (not
+          (recipient_slot_assigned_tote ?recipient_slot ?transfer_tote)
+        )
+      )
+  )
+  (:action create_and_stage_move_order
+    :parameters (?donor_slot - donor_slot ?recipient_slot - recipient_slot ?source_velocity_band - source_velocity_band ?target_velocity_band - target_velocity_band ?move_order - move_order)
+    :precondition
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (source_band_ready ?source_velocity_band)
+        (target_band_ready ?target_velocity_band)
+        (donor_slot_prepared ?donor_slot)
+        (recipient_slot_prepared ?recipient_slot)
+        (move_order_pending ?move_order)
+      )
+    :effect
+      (and
+        (move_order_staged ?move_order)
+        (move_order_assigned_source_band ?move_order ?source_velocity_band)
+        (move_order_assigned_target_band ?move_order ?target_velocity_band)
+        (not
+          (move_order_pending ?move_order)
+        )
+      )
+  )
+  (:action stage_move_order_with_source_staging
+    :parameters (?donor_slot - donor_slot ?recipient_slot - recipient_slot ?source_velocity_band - source_velocity_band ?target_velocity_band - target_velocity_band ?move_order - move_order)
+    :precondition
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (source_band_staged ?source_velocity_band)
+        (target_band_ready ?target_velocity_band)
+        (not
+          (donor_slot_prepared ?donor_slot)
+        )
+        (recipient_slot_prepared ?recipient_slot)
+        (move_order_pending ?move_order)
+      )
+    :effect
+      (and
+        (move_order_staged ?move_order)
+        (move_order_assigned_source_band ?move_order ?source_velocity_band)
+        (move_order_assigned_target_band ?move_order ?target_velocity_band)
+        (move_order_needs_source_staging ?move_order)
+        (not
+          (move_order_pending ?move_order)
+        )
+      )
+  )
+  (:action stage_move_order_with_target_staging
+    :parameters (?donor_slot - donor_slot ?recipient_slot - recipient_slot ?source_velocity_band - source_velocity_band ?target_velocity_band - target_velocity_band ?move_order - move_order)
+    :precondition
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (source_band_ready ?source_velocity_band)
+        (target_band_staged ?target_velocity_band)
+        (donor_slot_prepared ?donor_slot)
+        (not
+          (recipient_slot_prepared ?recipient_slot)
+        )
+        (move_order_pending ?move_order)
+      )
+    :effect
+      (and
+        (move_order_staged ?move_order)
+        (move_order_assigned_source_band ?move_order ?source_velocity_band)
+        (move_order_assigned_target_band ?move_order ?target_velocity_band)
+        (move_order_needs_target_staging ?move_order)
+        (not
+          (move_order_pending ?move_order)
+        )
+      )
+  )
+  (:action stage_move_order_with_both_staging
+    :parameters (?donor_slot - donor_slot ?recipient_slot - recipient_slot ?source_velocity_band - source_velocity_band ?target_velocity_band - target_velocity_band ?move_order - move_order)
+    :precondition
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (slot_current_velocity_band ?donor_slot ?source_velocity_band)
+        (slot_target_velocity_band ?recipient_slot ?target_velocity_band)
+        (source_band_staged ?source_velocity_band)
+        (target_band_staged ?target_velocity_band)
+        (not
+          (donor_slot_prepared ?donor_slot)
+        )
+        (not
+          (recipient_slot_prepared ?recipient_slot)
+        )
+        (move_order_pending ?move_order)
+      )
+    :effect
+      (and
+        (move_order_staged ?move_order)
+        (move_order_assigned_source_band ?move_order ?source_velocity_band)
+        (move_order_assigned_target_band ?move_order ?target_velocity_band)
+        (move_order_needs_source_staging ?move_order)
+        (move_order_needs_target_staging ?move_order)
+        (not
+          (move_order_pending ?move_order)
+        )
+      )
+  )
+  (:action confirm_move_order_ready
+    :parameters (?move_order - move_order ?donor_slot - donor_slot ?classification_station - classification_station)
+    :precondition
+      (and
+        (move_order_staged ?move_order)
+        (donor_slot_locked_for_move ?donor_slot)
+        (entity_at_classification_station ?donor_slot ?classification_station)
+        (not
+          (move_order_ready_for_allocation ?move_order)
+        )
+      )
+    :effect (move_order_ready_for_allocation ?move_order)
+  )
+  (:action allocate_staging_tote_to_slot_for_move_order
+    :parameters (?slot_record - slot_record ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (slot_record_linked_move_order ?slot_record ?move_order)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_available ?staging_tote)
+        (move_order_staged ?move_order)
+        (move_order_ready_for_allocation ?move_order)
+        (not
+          (staging_tote_allocated ?staging_tote)
+        )
+      )
+    :effect
+      (and
+        (staging_tote_allocated ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (not
+          (staging_tote_available ?staging_tote)
+        )
+      )
+  )
+  (:action select_container_for_slot
+    :parameters (?slot_record - slot_record ?staging_tote - staging_tote ?move_order - move_order ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_allocated ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (entity_at_classification_station ?slot_record ?classification_station)
+        (not
+          (move_order_needs_source_staging ?move_order)
+        )
+        (not
+          (slot_container_selected ?slot_record)
+        )
+      )
+    :effect (slot_container_selected ?slot_record)
+  )
+  (:action apply_slot_attribute
+    :parameters (?slot_record - slot_record ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (slot_attribute_available ?slot_attribute)
+        (not
+          (slot_fixture_applied ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_fixture_applied ?slot_record)
+        (slot_has_attribute ?slot_record ?slot_attribute)
+        (not
+          (slot_attribute_available ?slot_attribute)
+        )
+      )
+  )
+  (:action activate_slot_attribute_and_mark_ready
+    :parameters (?slot_record - slot_record ?staging_tote - staging_tote ?move_order - move_order ?classification_station - classification_station ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_allocated ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (entity_at_classification_station ?slot_record ?classification_station)
+        (move_order_needs_source_staging ?move_order)
+        (slot_fixture_applied ?slot_record)
+        (slot_has_attribute ?slot_record ?slot_attribute)
+        (not
+          (slot_container_selected ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_container_selected ?slot_record)
+        (slot_attribute_pending_verification ?slot_record)
+      )
+  )
+  (:action apply_capacity_profile_to_slot
+    :parameters (?slot_record - slot_record ?slot_capacity_profile - slot_capacity_profile ?operator - operator ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_container_selected ?slot_record)
+        (slot_assigned_capacity_profile ?slot_record ?slot_capacity_profile)
+        (entity_assigned_to_operator ?slot_record ?operator)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (not
+          (move_order_needs_target_staging ?move_order)
+        )
+        (not
+          (slot_configuration_applied ?slot_record)
+        )
+      )
+    :effect (slot_configuration_applied ?slot_record)
+  )
+  (:action apply_capacity_profile_to_slot_alternative
+    :parameters (?slot_record - slot_record ?slot_capacity_profile - slot_capacity_profile ?operator - operator ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_container_selected ?slot_record)
+        (slot_assigned_capacity_profile ?slot_record ?slot_capacity_profile)
+        (entity_assigned_to_operator ?slot_record ?operator)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (move_order_needs_target_staging ?move_order)
+        (not
+          (slot_configuration_applied ?slot_record)
+        )
+      )
+    :effect (slot_configuration_applied ?slot_record)
+  )
+  (:action prepare_slot_for_final_approval
+    :parameters (?slot_record - slot_record ?approval_token - approval_token ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_configuration_applied ?slot_record)
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (not
+          (move_order_needs_source_staging ?move_order)
+        )
+        (not
+          (move_order_needs_target_staging ?move_order)
+        )
+        (not
+          (slot_change_ready_for_finalization ?slot_record)
+        )
+      )
+    :effect (slot_change_ready_for_finalization ?slot_record)
+  )
+  (:action mark_slot_ready_and_attach_label
+    :parameters (?slot_record - slot_record ?approval_token - approval_token ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_configuration_applied ?slot_record)
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (move_order_needs_source_staging ?move_order)
+        (not
+          (move_order_needs_target_staging ?move_order)
+        )
+        (not
+          (slot_change_ready_for_finalization ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_labels_attached ?slot_record)
+      )
+  )
+  (:action mark_slot_ready_and_attach_label_alternate
+    :parameters (?slot_record - slot_record ?approval_token - approval_token ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_configuration_applied ?slot_record)
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (not
+          (move_order_needs_source_staging ?move_order)
+        )
+        (move_order_needs_target_staging ?move_order)
+        (not
+          (slot_change_ready_for_finalization ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_labels_attached ?slot_record)
+      )
+  )
+  (:action mark_slot_ready_and_attach_label_both
+    :parameters (?slot_record - slot_record ?approval_token - approval_token ?staging_tote - staging_tote ?move_order - move_order)
+    :precondition
+      (and
+        (slot_configuration_applied ?slot_record)
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (slot_record_has_staging_tote ?slot_record ?staging_tote)
+        (staging_tote_assigned_to_move_order ?staging_tote ?move_order)
+        (move_order_needs_source_staging ?move_order)
+        (move_order_needs_target_staging ?move_order)
+        (not
+          (slot_change_ready_for_finalization ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_labels_attached ?slot_record)
+      )
+  )
+  (:action enable_slot_verification_and_finalize
+    :parameters (?slot_record - slot_record)
+    :precondition
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (not
+          (slot_labels_attached ?slot_record)
+        )
+        (not
+          (slot_verification_enabled ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verification_enabled ?slot_record)
+        (change_finalized ?slot_record)
+      )
+  )
+  (:action attach_label_to_slot
+    :parameters (?slot_record - slot_record ?label_tag - label_tag)
+    :precondition
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_labels_attached ?slot_record)
+        (label_tag_available ?label_tag)
+      )
+    :effect
+      (and
+        (slot_assigned_label ?slot_record ?label_tag)
+        (not
+          (label_tag_available ?label_tag)
+        )
+      )
+  )
+  (:action verify_slot_modifications
+    :parameters (?slot_record - slot_record ?donor_slot - donor_slot ?recipient_slot - recipient_slot ?classification_station - classification_station ?label_tag - label_tag)
+    :precondition
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_labels_attached ?slot_record)
+        (slot_assigned_label ?slot_record ?label_tag)
+        (slot_record_associated_with_donor_slot ?slot_record ?donor_slot)
+        (slot_record_associated_with_recipient_slot ?slot_record ?recipient_slot)
+        (donor_slot_prepared ?donor_slot)
+        (recipient_slot_prepared ?recipient_slot)
+        (entity_at_classification_station ?slot_record ?classification_station)
+        (not
+          (slot_modification_verified ?slot_record)
+        )
+      )
+    :effect (slot_modification_verified ?slot_record)
+  )
+  (:action commit_slot_change
+    :parameters (?slot_record - slot_record)
+    :precondition
+      (and
+        (slot_change_ready_for_finalization ?slot_record)
+        (slot_modification_verified ?slot_record)
+        (not
+          (slot_verification_enabled ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verification_enabled ?slot_record)
+        (change_finalized ?slot_record)
+      )
+  )
+  (:action request_constraint_clearance
+    :parameters (?slot_record - slot_record ?operational_constraint - operational_constraint ?classification_station - classification_station)
+    :precondition
+      (and
+        (entity_ready_for_slotting ?slot_record)
+        (entity_at_classification_station ?slot_record ?classification_station)
+        (operational_constraint_present ?operational_constraint)
+        (slot_has_constraint ?slot_record ?operational_constraint)
+        (not
+          (constraint_cleared ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (constraint_cleared ?slot_record)
+        (not
+          (operational_constraint_present ?operational_constraint)
+        )
+      )
+  )
+  (:action initiate_constraint_clearance
+    :parameters (?slot_record - slot_record ?operator - operator)
+    :precondition
+      (and
+        (constraint_cleared ?slot_record)
+        (entity_assigned_to_operator ?slot_record ?operator)
+        (not
+          (constraint_clearance_initiated ?slot_record)
+        )
+      )
+    :effect (constraint_clearance_initiated ?slot_record)
+  )
+  (:action apply_supervisor_approval
+    :parameters (?slot_record - slot_record ?approval_token - approval_token)
+    :precondition
+      (and
+        (constraint_clearance_initiated ?slot_record)
+        (slot_has_approval_token ?slot_record ?approval_token)
+        (not
+          (supervisor_approval_confirmed ?slot_record)
+        )
+      )
+    :effect (supervisor_approval_confirmed ?slot_record)
+  )
+  (:action finalize_constraint_clearance_and_enable_verification
+    :parameters (?slot_record - slot_record)
+    :precondition
+      (and
+        (supervisor_approval_confirmed ?slot_record)
+        (not
+          (slot_verification_enabled ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (slot_verification_enabled ?slot_record)
+        (change_finalized ?slot_record)
+      )
+  )
+  (:action complete_move_from_donor_slot
+    :parameters (?donor_slot - donor_slot ?move_order - move_order)
+    :precondition
+      (and
+        (donor_slot_locked_for_move ?donor_slot)
+        (donor_slot_prepared ?donor_slot)
+        (move_order_staged ?move_order)
+        (move_order_ready_for_allocation ?move_order)
+        (not
+          (change_finalized ?donor_slot)
+        )
+      )
+    :effect (change_finalized ?donor_slot)
+  )
+  (:action complete_move_to_recipient_slot
+    :parameters (?recipient_slot - recipient_slot ?move_order - move_order)
+    :precondition
+      (and
+        (recipient_slot_locked_for_move ?recipient_slot)
+        (recipient_slot_prepared ?recipient_slot)
+        (move_order_staged ?move_order)
+        (move_order_ready_for_allocation ?move_order)
+        (not
+          (change_finalized ?recipient_slot)
+        )
+      )
+    :effect (change_finalized ?recipient_slot)
+  )
+  (:action link_inventory_item_to_wms_record
+    :parameters (?inventory_item - entity ?wms_record - wms_record ?classification_station - classification_station)
+    :precondition
+      (and
+        (change_finalized ?inventory_item)
+        (entity_at_classification_station ?inventory_item ?classification_station)
+        (wms_record_available ?wms_record)
+        (not
+          (wms_record_updated ?inventory_item)
+        )
+      )
+    :effect
+      (and
+        (wms_record_updated ?inventory_item)
+        (wms_record_association ?inventory_item ?wms_record)
+        (not
+          (wms_record_available ?wms_record)
+        )
+      )
+  )
+  (:action commit_donor_slot_inventory_and_release_resource
+    :parameters (?donor_slot - donor_slot ?handling_resource - handling_resource ?wms_record - wms_record)
+    :precondition
+      (and
+        (wms_record_updated ?donor_slot)
+        (entity_assigned_to_resource ?donor_slot ?handling_resource)
+        (wms_record_association ?donor_slot ?wms_record)
+        (not
+          (reconfiguration_committed ?donor_slot)
+        )
+      )
+    :effect
+      (and
+        (reconfiguration_committed ?donor_slot)
+        (handling_resource_available ?handling_resource)
+        (wms_record_available ?wms_record)
+      )
+  )
+  (:action commit_recipient_slot_inventory_and_release_resource
+    :parameters (?recipient_slot - recipient_slot ?handling_resource - handling_resource ?wms_record - wms_record)
+    :precondition
+      (and
+        (wms_record_updated ?recipient_slot)
+        (entity_assigned_to_resource ?recipient_slot ?handling_resource)
+        (wms_record_association ?recipient_slot ?wms_record)
+        (not
+          (reconfiguration_committed ?recipient_slot)
+        )
+      )
+    :effect
+      (and
+        (reconfiguration_committed ?recipient_slot)
+        (handling_resource_available ?handling_resource)
+        (wms_record_available ?wms_record)
+      )
+  )
+  (:action commit_slot_record_inventory_and_release_resource
+    :parameters (?slot_record - slot_record ?handling_resource - handling_resource ?wms_record - wms_record)
+    :precondition
+      (and
+        (wms_record_updated ?slot_record)
+        (entity_assigned_to_resource ?slot_record ?handling_resource)
+        (wms_record_association ?slot_record ?wms_record)
+        (not
+          (reconfiguration_committed ?slot_record)
+        )
+      )
+    :effect
+      (and
+        (reconfiguration_committed ?slot_record)
+        (handling_resource_available ?handling_resource)
+        (wms_record_available ?wms_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem slotting_reconfiguration_velocity_case)
+  (:domain warehouse_slotting_reconfiguration)
+  (:objects donor_slot_1 - donor_slot recipient_slot_1 - recipient_slot storage_slot_001 - slot_record storage_slot_002 - slot_record handling_resource_1 - handling_resource handling_resource_2 - handling_resource handling_resource_3 - handling_resource classification_station_1 - classification_station operator_1 - operator transfer_tote_1 - transfer_tote source_velocity_band_fast - source_velocity_band target_velocity_band_fast - target_velocity_band move_order_1 - move_order staging_tote_1 - staging_tote staging_tote_2 - staging_tote slot_attribute_fixture_a - slot_attribute slot_attribute_fixture_b - slot_attribute label_tag_1 - label_tag label_tag_2 - label_tag wms_record_1 - wms_record slot_capacity_profile_1 - slot_capacity_profile operational_constraint_1 - operational_constraint operational_constraint_2 - operational_constraint approval_token_1 - approval_token)
+  (:init
+    (handling_resource_available handling_resource_1)
+    (handling_resource_available handling_resource_2)
+    (handling_resource_available handling_resource_3)
+    (classification_station_available classification_station_1)
+    (operator_available operator_1)
+    (transfer_tote_available transfer_tote_1)
+    (slot_current_velocity_band donor_slot_1 source_velocity_band_fast)
+    (slot_target_velocity_band recipient_slot_1 target_velocity_band_fast)
+    (move_order_pending move_order_1)
+    (staging_tote_available staging_tote_1)
+    (staging_tote_available staging_tote_2)
+    (slot_record_associated_with_donor_slot storage_slot_001 donor_slot_1)
+    (slot_record_associated_with_donor_slot storage_slot_002 donor_slot_1)
+    (slot_record_associated_with_recipient_slot storage_slot_001 recipient_slot_1)
+    (slot_record_associated_with_recipient_slot storage_slot_002 recipient_slot_1)
+    (slot_record_linked_move_order storage_slot_001 move_order_1)
+    (slot_record_linked_move_order storage_slot_002 move_order_1)
+    (slot_record_has_staging_tote storage_slot_001 staging_tote_1)
+    (slot_record_has_staging_tote storage_slot_002 staging_tote_2)
+    (slot_attribute_available slot_attribute_fixture_a)
+    (slot_attribute_available slot_attribute_fixture_b)
+    (label_tag_available label_tag_1)
+    (label_tag_available label_tag_2)
+    (wms_record_available wms_record_1)
+    (slot_capacity_profile_available slot_capacity_profile_1)
+    (operational_constraint_present operational_constraint_1)
+    (slot_has_constraint storage_slot_001 operational_constraint_1)
+    (slot_has_constraint storage_slot_002 operational_constraint_2)
+    (approval_token_available approval_token_1)
+  )
+  (:goal
+    (and
+      (reconfiguration_committed donor_slot_1)
+      (reconfiguration_committed recipient_slot_1)
+      (reconfiguration_committed storage_slot_001)
+      (reconfiguration_committed storage_slot_002)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain stability_protocol_amendment_review_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types organizational_resource - object role_category - object resource_category - object case_category - object amendable_entity - case_category reviewer_resource - organizational_resource subject_matter_expert - organizational_resource approver_resource - organizational_resource safety_assessment - organizational_resource inspection_checklist - organizational_resource implementation_window - organizational_resource validation_activity - organizational_resource consultant_engagement - organizational_resource supporting_document - role_category test_sample_record - role_category external_stakeholder_input - role_category storage_condition - resource_category analytical_method - resource_category amendment_dossier - resource_category subunit - amendable_entity team - amendable_entity stability_unit - subunit analytical_unit - subunit protocol_amendment_document - team)
+  (:predicates
+    (entity_registered ?amendment_record - amendable_entity)
+    (entity_technical_review_complete ?amendment_record - amendable_entity)
+    (review_assigned ?amendment_record - amendable_entity)
+    (entity_implementation_complete ?amendment_record - amendable_entity)
+    (entity_released ?amendment_record - amendable_entity)
+    (entity_implementation_scheduled ?amendment_record - amendable_entity)
+    (reviewer_available ?reviewer_resource - reviewer_resource)
+    (entity_assigned_reviewer ?amendment_record - amendable_entity ?reviewer_resource - reviewer_resource)
+    (sme_available ?subject_matter_expert - subject_matter_expert)
+    (entity_assigned_sme ?amendment_record - amendable_entity ?subject_matter_expert - subject_matter_expert)
+    (approver_available ?approver_resource - approver_resource)
+    (entity_assigned_approver ?amendment_record - amendable_entity ?approver_resource - approver_resource)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (supporting_document_linked_to_stability_unit ?stability_unit - stability_unit ?supporting_document - supporting_document)
+    (supporting_document_linked_to_analytical_unit ?analytical_unit - analytical_unit ?supporting_document - supporting_document)
+    (stability_unit_assigned_condition ?stability_unit - stability_unit ?storage_condition - storage_condition)
+    (storage_condition_confirmed ?storage_condition - storage_condition)
+    (storage_condition_requested ?storage_condition - storage_condition)
+    (stability_unit_ready ?stability_unit - stability_unit)
+    (analytical_unit_assigned_method ?analytical_unit - analytical_unit ?analytical_method - analytical_method)
+    (analytical_method_allocated ?analytical_method - analytical_method)
+    (analytical_method_requested ?analytical_method - analytical_method)
+    (analytical_unit_ready ?analytical_unit - analytical_unit)
+    (dossier_needs_assembly ?amendment_dossier - amendment_dossier)
+    (dossier_initialized ?amendment_dossier - amendment_dossier)
+    (dossier_assigned_storage_condition ?amendment_dossier - amendment_dossier ?storage_condition - storage_condition)
+    (dossier_assigned_analytical_method ?amendment_dossier - amendment_dossier ?analytical_method - analytical_method)
+    (dossier_has_validation_output ?amendment_dossier - amendment_dossier)
+    (dossier_has_external_input ?amendment_dossier - amendment_dossier)
+    (dossier_ready_for_testing ?amendment_dossier - amendment_dossier)
+    (document_links_stability_unit ?document_entity - protocol_amendment_document ?stability_unit - stability_unit)
+    (document_links_analytical_unit ?document_entity - protocol_amendment_document ?analytical_unit - analytical_unit)
+    (document_linked_to_dossier ?document_entity - protocol_amendment_document ?amendment_dossier - amendment_dossier)
+    (test_sample_record_available ?test_sample_record - test_sample_record)
+    (document_has_sample_record ?document_entity - protocol_amendment_document ?test_sample_record - test_sample_record)
+    (test_sample_record_reserved ?test_sample_record - test_sample_record)
+    (test_sample_linked_to_dossier ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    (document_precheck_complete ?document_entity - protocol_amendment_document)
+    (document_validation_signed_off ?document_entity - protocol_amendment_document)
+    (technical_clearance_ready ?document_entity - protocol_amendment_document)
+    (safety_assessment_attached ?document_entity - protocol_amendment_document)
+    (safety_assessment_completed ?document_entity - protocol_amendment_document)
+    (inspection_checklist_required ?document_entity - protocol_amendment_document)
+    (technical_clearance_obtained ?document_entity - protocol_amendment_document)
+    (external_stakeholder_input_available ?external_stakeholder_input - external_stakeholder_input)
+    (document_linked_to_external_input ?document_entity - protocol_amendment_document ?external_stakeholder_input - external_stakeholder_input)
+    (external_input_recorded ?document_entity - protocol_amendment_document)
+    (specialist_assessment_initiated ?document_entity - protocol_amendment_document)
+    (specialist_assessment_completed ?document_entity - protocol_amendment_document)
+    (safety_assessment_available ?safety_assessment - safety_assessment)
+    (document_attached_safety_assessment ?document_entity - protocol_amendment_document ?safety_assessment - safety_assessment)
+    (inspection_checklist_available ?inspection_checklist - inspection_checklist)
+    (document_attached_inspection_checklist ?document_entity - protocol_amendment_document ?inspection_checklist - inspection_checklist)
+    (validation_activity_available ?validation_activity - validation_activity)
+    (document_assigned_validation_activity ?document_entity - protocol_amendment_document ?validation_activity - validation_activity)
+    (consultant_engagement_available ?consultant_engagement - consultant_engagement)
+    (document_assigned_consultant_engagement ?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement)
+    (implementation_window_available ?implementation_window - implementation_window)
+    (entity_scheduled_in_window ?amendment_record - amendable_entity ?implementation_window - implementation_window)
+    (stability_unit_allocation_confirmed ?stability_unit - stability_unit)
+    (analytical_unit_allocation_confirmed ?analytical_unit - analytical_unit)
+    (release_recorded ?document_entity - protocol_amendment_document)
+  )
+  (:action register_amendment_record
+    :parameters (?amendment_record - amendable_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?amendment_record)
+        )
+        (not
+          (entity_implementation_complete ?amendment_record)
+        )
+      )
+    :effect (entity_registered ?amendment_record)
+  )
+  (:action assign_reviewer
+    :parameters (?amendment_record - amendable_entity ?reviewer_resource - reviewer_resource)
+    :precondition
+      (and
+        (entity_registered ?amendment_record)
+        (not
+          (review_assigned ?amendment_record)
+        )
+        (reviewer_available ?reviewer_resource)
+      )
+    :effect
+      (and
+        (review_assigned ?amendment_record)
+        (entity_assigned_reviewer ?amendment_record ?reviewer_resource)
+        (not
+          (reviewer_available ?reviewer_resource)
+        )
+      )
+  )
+  (:action assign_sme
+    :parameters (?amendment_record - amendable_entity ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_registered ?amendment_record)
+        (review_assigned ?amendment_record)
+        (sme_available ?subject_matter_expert)
+      )
+    :effect
+      (and
+        (entity_assigned_sme ?amendment_record ?subject_matter_expert)
+        (not
+          (sme_available ?subject_matter_expert)
+        )
+      )
+  )
+  (:action complete_technical_review
+    :parameters (?amendment_record - amendable_entity ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_registered ?amendment_record)
+        (review_assigned ?amendment_record)
+        (entity_assigned_sme ?amendment_record ?subject_matter_expert)
+        (not
+          (entity_technical_review_complete ?amendment_record)
+        )
+      )
+    :effect (entity_technical_review_complete ?amendment_record)
+  )
+  (:action unassign_sme
+    :parameters (?amendment_record - amendable_entity ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_assigned_sme ?amendment_record ?subject_matter_expert)
+      )
+    :effect
+      (and
+        (sme_available ?subject_matter_expert)
+        (not
+          (entity_assigned_sme ?amendment_record ?subject_matter_expert)
+        )
+      )
+  )
+  (:action assign_approver
+    :parameters (?amendment_record - amendable_entity ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (entity_technical_review_complete ?amendment_record)
+        (approver_available ?approver_resource)
+      )
+    :effect
+      (and
+        (entity_assigned_approver ?amendment_record ?approver_resource)
+        (not
+          (approver_available ?approver_resource)
+        )
+      )
+  )
+  (:action unassign_approver
+    :parameters (?amendment_record - amendable_entity ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (entity_assigned_approver ?amendment_record ?approver_resource)
+      )
+    :effect
+      (and
+        (approver_available ?approver_resource)
+        (not
+          (entity_assigned_approver ?amendment_record ?approver_resource)
+        )
+      )
+  )
+  (:action assign_validation_activity_to_document
+    :parameters (?document_entity - protocol_amendment_document ?validation_activity - validation_activity)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (validation_activity_available ?validation_activity)
+      )
+    :effect
+      (and
+        (document_assigned_validation_activity ?document_entity ?validation_activity)
+        (not
+          (validation_activity_available ?validation_activity)
+        )
+      )
+  )
+  (:action release_validation_activity_from_document
+    :parameters (?document_entity - protocol_amendment_document ?validation_activity - validation_activity)
+    :precondition
+      (and
+        (document_assigned_validation_activity ?document_entity ?validation_activity)
+      )
+    :effect
+      (and
+        (validation_activity_available ?validation_activity)
+        (not
+          (document_assigned_validation_activity ?document_entity ?validation_activity)
+        )
+      )
+  )
+  (:action assign_consultant_engagement_to_document
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (consultant_engagement_available ?consultant_engagement)
+      )
+    :effect
+      (and
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (not
+          (consultant_engagement_available ?consultant_engagement)
+        )
+      )
+  )
+  (:action release_consultant_engagement_from_document
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement)
+    :precondition
+      (and
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+      )
+    :effect
+      (and
+        (consultant_engagement_available ?consultant_engagement)
+        (not
+          (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        )
+      )
+  )
+  (:action confirm_storage_condition_assignment
+    :parameters (?stability_unit - stability_unit ?storage_condition - storage_condition ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_technical_review_complete ?stability_unit)
+        (entity_assigned_sme ?stability_unit ?subject_matter_expert)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (not
+          (storage_condition_confirmed ?storage_condition)
+        )
+        (not
+          (storage_condition_requested ?storage_condition)
+        )
+      )
+    :effect (storage_condition_confirmed ?storage_condition)
+  )
+  (:action confirm_stability_unit_readiness
+    :parameters (?stability_unit - stability_unit ?storage_condition - storage_condition ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (entity_technical_review_complete ?stability_unit)
+        (entity_assigned_approver ?stability_unit ?approver_resource)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (storage_condition_confirmed ?storage_condition)
+        (not
+          (stability_unit_allocation_confirmed ?stability_unit)
+        )
+      )
+    :effect
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (stability_unit_ready ?stability_unit)
+      )
+  )
+  (:action link_supporting_document_to_stability_unit
+    :parameters (?stability_unit - stability_unit ?storage_condition - storage_condition ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_technical_review_complete ?stability_unit)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (supporting_document_available ?supporting_document)
+        (not
+          (stability_unit_allocation_confirmed ?stability_unit)
+        )
+      )
+    :effect
+      (and
+        (storage_condition_requested ?storage_condition)
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (supporting_document_linked_to_stability_unit ?stability_unit ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action complete_supporting_document_processing
+    :parameters (?stability_unit - stability_unit ?storage_condition - storage_condition ?subject_matter_expert - subject_matter_expert ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_technical_review_complete ?stability_unit)
+        (entity_assigned_sme ?stability_unit ?subject_matter_expert)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (storage_condition_requested ?storage_condition)
+        (supporting_document_linked_to_stability_unit ?stability_unit ?supporting_document)
+        (not
+          (stability_unit_ready ?stability_unit)
+        )
+      )
+    :effect
+      (and
+        (storage_condition_confirmed ?storage_condition)
+        (stability_unit_ready ?stability_unit)
+        (supporting_document_available ?supporting_document)
+        (not
+          (supporting_document_linked_to_stability_unit ?stability_unit ?supporting_document)
+        )
+      )
+  )
+  (:action reserve_analytical_method
+    :parameters (?analytical_unit - analytical_unit ?analytical_method - analytical_method ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_technical_review_complete ?analytical_unit)
+        (entity_assigned_sme ?analytical_unit ?subject_matter_expert)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (not
+          (analytical_method_allocated ?analytical_method)
+        )
+        (not
+          (analytical_method_requested ?analytical_method)
+        )
+      )
+    :effect (analytical_method_allocated ?analytical_method)
+  )
+  (:action confirm_analytical_unit_readiness
+    :parameters (?analytical_unit - analytical_unit ?analytical_method - analytical_method ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (entity_technical_review_complete ?analytical_unit)
+        (entity_assigned_approver ?analytical_unit ?approver_resource)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (analytical_method_allocated ?analytical_method)
+        (not
+          (analytical_unit_allocation_confirmed ?analytical_unit)
+        )
+      )
+    :effect
+      (and
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (analytical_unit_ready ?analytical_unit)
+      )
+  )
+  (:action assign_supporting_document_to_analytical_unit
+    :parameters (?analytical_unit - analytical_unit ?analytical_method - analytical_method ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_technical_review_complete ?analytical_unit)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (supporting_document_available ?supporting_document)
+        (not
+          (analytical_unit_allocation_confirmed ?analytical_unit)
+        )
+      )
+    :effect
+      (and
+        (analytical_method_requested ?analytical_method)
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (supporting_document_linked_to_analytical_unit ?analytical_unit ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action complete_supporting_document_processing_for_analytical_unit
+    :parameters (?analytical_unit - analytical_unit ?analytical_method - analytical_method ?subject_matter_expert - subject_matter_expert ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_technical_review_complete ?analytical_unit)
+        (entity_assigned_sme ?analytical_unit ?subject_matter_expert)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (analytical_method_requested ?analytical_method)
+        (supporting_document_linked_to_analytical_unit ?analytical_unit ?supporting_document)
+        (not
+          (analytical_unit_ready ?analytical_unit)
+        )
+      )
+    :effect
+      (and
+        (analytical_method_allocated ?analytical_method)
+        (analytical_unit_ready ?analytical_unit)
+        (supporting_document_available ?supporting_document)
+        (not
+          (supporting_document_linked_to_analytical_unit ?analytical_unit ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_dossier_initial
+    :parameters (?stability_unit - stability_unit ?analytical_unit - analytical_unit ?storage_condition - storage_condition ?analytical_method - analytical_method ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (storage_condition_confirmed ?storage_condition)
+        (analytical_method_allocated ?analytical_method)
+        (stability_unit_ready ?stability_unit)
+        (analytical_unit_ready ?analytical_unit)
+        (dossier_needs_assembly ?amendment_dossier)
+      )
+    :effect
+      (and
+        (dossier_initialized ?amendment_dossier)
+        (dossier_assigned_storage_condition ?amendment_dossier ?storage_condition)
+        (dossier_assigned_analytical_method ?amendment_dossier ?analytical_method)
+        (not
+          (dossier_needs_assembly ?amendment_dossier)
+        )
+      )
+  )
+  (:action assemble_dossier_with_validation_output
+    :parameters (?stability_unit - stability_unit ?analytical_unit - analytical_unit ?storage_condition - storage_condition ?analytical_method - analytical_method ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (storage_condition_requested ?storage_condition)
+        (analytical_method_allocated ?analytical_method)
+        (not
+          (stability_unit_ready ?stability_unit)
+        )
+        (analytical_unit_ready ?analytical_unit)
+        (dossier_needs_assembly ?amendment_dossier)
+      )
+    :effect
+      (and
+        (dossier_initialized ?amendment_dossier)
+        (dossier_assigned_storage_condition ?amendment_dossier ?storage_condition)
+        (dossier_assigned_analytical_method ?amendment_dossier ?analytical_method)
+        (dossier_has_validation_output ?amendment_dossier)
+        (not
+          (dossier_needs_assembly ?amendment_dossier)
+        )
+      )
+  )
+  (:action assemble_dossier_with_external_input
+    :parameters (?stability_unit - stability_unit ?analytical_unit - analytical_unit ?storage_condition - storage_condition ?analytical_method - analytical_method ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (storage_condition_confirmed ?storage_condition)
+        (analytical_method_requested ?analytical_method)
+        (stability_unit_ready ?stability_unit)
+        (not
+          (analytical_unit_ready ?analytical_unit)
+        )
+        (dossier_needs_assembly ?amendment_dossier)
+      )
+    :effect
+      (and
+        (dossier_initialized ?amendment_dossier)
+        (dossier_assigned_storage_condition ?amendment_dossier ?storage_condition)
+        (dossier_assigned_analytical_method ?amendment_dossier ?analytical_method)
+        (dossier_has_external_input ?amendment_dossier)
+        (not
+          (dossier_needs_assembly ?amendment_dossier)
+        )
+      )
+  )
+  (:action assemble_complete_dossier
+    :parameters (?stability_unit - stability_unit ?analytical_unit - analytical_unit ?storage_condition - storage_condition ?analytical_method - analytical_method ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (stability_unit_assigned_condition ?stability_unit ?storage_condition)
+        (analytical_unit_assigned_method ?analytical_unit ?analytical_method)
+        (storage_condition_requested ?storage_condition)
+        (analytical_method_requested ?analytical_method)
+        (not
+          (stability_unit_ready ?stability_unit)
+        )
+        (not
+          (analytical_unit_ready ?analytical_unit)
+        )
+        (dossier_needs_assembly ?amendment_dossier)
+      )
+    :effect
+      (and
+        (dossier_initialized ?amendment_dossier)
+        (dossier_assigned_storage_condition ?amendment_dossier ?storage_condition)
+        (dossier_assigned_analytical_method ?amendment_dossier ?analytical_method)
+        (dossier_has_validation_output ?amendment_dossier)
+        (dossier_has_external_input ?amendment_dossier)
+        (not
+          (dossier_needs_assembly ?amendment_dossier)
+        )
+      )
+  )
+  (:action mark_dossier_ready_for_testing
+    :parameters (?amendment_dossier - amendment_dossier ?stability_unit - stability_unit ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (dossier_initialized ?amendment_dossier)
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (entity_assigned_sme ?stability_unit ?subject_matter_expert)
+        (not
+          (dossier_ready_for_testing ?amendment_dossier)
+        )
+      )
+    :effect (dossier_ready_for_testing ?amendment_dossier)
+  )
+  (:action reserve_test_sample_for_dossier
+    :parameters (?document_entity - protocol_amendment_document ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (document_linked_to_dossier ?document_entity ?amendment_dossier)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_record_available ?test_sample_record)
+        (dossier_initialized ?amendment_dossier)
+        (dossier_ready_for_testing ?amendment_dossier)
+        (not
+          (test_sample_record_reserved ?test_sample_record)
+        )
+      )
+    :effect
+      (and
+        (test_sample_record_reserved ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (not
+          (test_sample_record_available ?test_sample_record)
+        )
+      )
+  )
+  (:action process_test_sample_record
+    :parameters (?document_entity - protocol_amendment_document ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_record_reserved ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (entity_assigned_sme ?document_entity ?subject_matter_expert)
+        (not
+          (dossier_has_validation_output ?amendment_dossier)
+        )
+        (not
+          (document_precheck_complete ?document_entity)
+        )
+      )
+    :effect (document_precheck_complete ?document_entity)
+  )
+  (:action attach_safety_assessment
+    :parameters (?document_entity - protocol_amendment_document ?safety_assessment - safety_assessment)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (safety_assessment_available ?safety_assessment)
+        (not
+          (safety_assessment_attached ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (safety_assessment_attached ?document_entity)
+        (document_attached_safety_assessment ?document_entity ?safety_assessment)
+        (not
+          (safety_assessment_available ?safety_assessment)
+        )
+      )
+  )
+  (:action complete_document_prechecks_with_safety_assessment
+    :parameters (?document_entity - protocol_amendment_document ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier ?subject_matter_expert - subject_matter_expert ?safety_assessment - safety_assessment)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_record_reserved ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (entity_assigned_sme ?document_entity ?subject_matter_expert)
+        (dossier_has_validation_output ?amendment_dossier)
+        (safety_assessment_attached ?document_entity)
+        (document_attached_safety_assessment ?document_entity ?safety_assessment)
+        (not
+          (document_precheck_complete ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (document_precheck_complete ?document_entity)
+        (safety_assessment_completed ?document_entity)
+      )
+  )
+  (:action perform_validation_signoff_without_external_input
+    :parameters (?document_entity - protocol_amendment_document ?validation_activity - validation_activity ?approver_resource - approver_resource ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_precheck_complete ?document_entity)
+        (document_assigned_validation_activity ?document_entity ?validation_activity)
+        (entity_assigned_approver ?document_entity ?approver_resource)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (not
+          (dossier_has_external_input ?amendment_dossier)
+        )
+        (not
+          (document_validation_signed_off ?document_entity)
+        )
+      )
+    :effect (document_validation_signed_off ?document_entity)
+  )
+  (:action perform_validation_signoff_with_external_input
+    :parameters (?document_entity - protocol_amendment_document ?validation_activity - validation_activity ?approver_resource - approver_resource ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_precheck_complete ?document_entity)
+        (document_assigned_validation_activity ?document_entity ?validation_activity)
+        (entity_assigned_approver ?document_entity ?approver_resource)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (dossier_has_external_input ?amendment_dossier)
+        (not
+          (document_validation_signed_off ?document_entity)
+        )
+      )
+    :effect (document_validation_signed_off ?document_entity)
+  )
+  (:action initiate_technical_clearance
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_validation_signed_off ?document_entity)
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (not
+          (dossier_has_validation_output ?amendment_dossier)
+        )
+        (not
+          (dossier_has_external_input ?amendment_dossier)
+        )
+        (not
+          (technical_clearance_ready ?document_entity)
+        )
+      )
+    :effect (technical_clearance_ready ?document_entity)
+  )
+  (:action initiate_technical_clearance_with_inspection_requirement
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_validation_signed_off ?document_entity)
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (dossier_has_validation_output ?amendment_dossier)
+        (not
+          (dossier_has_external_input ?amendment_dossier)
+        )
+        (not
+          (technical_clearance_ready ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (technical_clearance_ready ?document_entity)
+        (inspection_checklist_required ?document_entity)
+      )
+  )
+  (:action finalize_technical_clearance_with_external_input
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_validation_signed_off ?document_entity)
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (not
+          (dossier_has_validation_output ?amendment_dossier)
+        )
+        (dossier_has_external_input ?amendment_dossier)
+        (not
+          (technical_clearance_ready ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (technical_clearance_ready ?document_entity)
+        (inspection_checklist_required ?document_entity)
+      )
+  )
+  (:action finalize_technical_clearance_with_validation_and_external_input
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement ?test_sample_record - test_sample_record ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (document_validation_signed_off ?document_entity)
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (document_has_sample_record ?document_entity ?test_sample_record)
+        (test_sample_linked_to_dossier ?test_sample_record ?amendment_dossier)
+        (dossier_has_validation_output ?amendment_dossier)
+        (dossier_has_external_input ?amendment_dossier)
+        (not
+          (technical_clearance_ready ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (technical_clearance_ready ?document_entity)
+        (inspection_checklist_required ?document_entity)
+      )
+  )
+  (:action record_release_without_inspection
+    :parameters (?document_entity - protocol_amendment_document)
+    :precondition
+      (and
+        (technical_clearance_ready ?document_entity)
+        (not
+          (inspection_checklist_required ?document_entity)
+        )
+        (not
+          (release_recorded ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (release_recorded ?document_entity)
+        (entity_released ?document_entity)
+      )
+  )
+  (:action attach_inspection_checklist
+    :parameters (?document_entity - protocol_amendment_document ?inspection_checklist - inspection_checklist)
+    :precondition
+      (and
+        (technical_clearance_ready ?document_entity)
+        (inspection_checklist_required ?document_entity)
+        (inspection_checklist_available ?inspection_checklist)
+      )
+    :effect
+      (and
+        (document_attached_inspection_checklist ?document_entity ?inspection_checklist)
+        (not
+          (inspection_checklist_available ?inspection_checklist)
+        )
+      )
+  )
+  (:action obtain_technical_clearance
+    :parameters (?document_entity - protocol_amendment_document ?stability_unit - stability_unit ?analytical_unit - analytical_unit ?subject_matter_expert - subject_matter_expert ?inspection_checklist - inspection_checklist)
+    :precondition
+      (and
+        (technical_clearance_ready ?document_entity)
+        (inspection_checklist_required ?document_entity)
+        (document_attached_inspection_checklist ?document_entity ?inspection_checklist)
+        (document_links_stability_unit ?document_entity ?stability_unit)
+        (document_links_analytical_unit ?document_entity ?analytical_unit)
+        (stability_unit_ready ?stability_unit)
+        (analytical_unit_ready ?analytical_unit)
+        (entity_assigned_sme ?document_entity ?subject_matter_expert)
+        (not
+          (technical_clearance_obtained ?document_entity)
+        )
+      )
+    :effect (technical_clearance_obtained ?document_entity)
+  )
+  (:action record_release_after_clearance
+    :parameters (?document_entity - protocol_amendment_document)
+    :precondition
+      (and
+        (technical_clearance_ready ?document_entity)
+        (technical_clearance_obtained ?document_entity)
+        (not
+          (release_recorded ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (release_recorded ?document_entity)
+        (entity_released ?document_entity)
+      )
+  )
+  (:action record_external_stakeholder_input
+    :parameters (?document_entity - protocol_amendment_document ?external_stakeholder_input - external_stakeholder_input ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_technical_review_complete ?document_entity)
+        (entity_assigned_sme ?document_entity ?subject_matter_expert)
+        (external_stakeholder_input_available ?external_stakeholder_input)
+        (document_linked_to_external_input ?document_entity ?external_stakeholder_input)
+        (not
+          (external_input_recorded ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (external_input_recorded ?document_entity)
+        (not
+          (external_stakeholder_input_available ?external_stakeholder_input)
+        )
+      )
+  )
+  (:action initiate_specialist_assessment
+    :parameters (?document_entity - protocol_amendment_document ?approver_resource - approver_resource)
+    :precondition
+      (and
+        (external_input_recorded ?document_entity)
+        (entity_assigned_approver ?document_entity ?approver_resource)
+        (not
+          (specialist_assessment_initiated ?document_entity)
+        )
+      )
+    :effect (specialist_assessment_initiated ?document_entity)
+  )
+  (:action complete_specialist_assessment
+    :parameters (?document_entity - protocol_amendment_document ?consultant_engagement - consultant_engagement)
+    :precondition
+      (and
+        (specialist_assessment_initiated ?document_entity)
+        (document_assigned_consultant_engagement ?document_entity ?consultant_engagement)
+        (not
+          (specialist_assessment_completed ?document_entity)
+        )
+      )
+    :effect (specialist_assessment_completed ?document_entity)
+  )
+  (:action record_release_after_specialist_assessment
+    :parameters (?document_entity - protocol_amendment_document)
+    :precondition
+      (and
+        (specialist_assessment_completed ?document_entity)
+        (not
+          (release_recorded ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (release_recorded ?document_entity)
+        (entity_released ?document_entity)
+      )
+  )
+  (:action release_stability_unit_for_implementation
+    :parameters (?stability_unit - stability_unit ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (stability_unit_allocation_confirmed ?stability_unit)
+        (stability_unit_ready ?stability_unit)
+        (dossier_initialized ?amendment_dossier)
+        (dossier_ready_for_testing ?amendment_dossier)
+        (not
+          (entity_released ?stability_unit)
+        )
+      )
+    :effect (entity_released ?stability_unit)
+  )
+  (:action release_analytical_unit_for_implementation
+    :parameters (?analytical_unit - analytical_unit ?amendment_dossier - amendment_dossier)
+    :precondition
+      (and
+        (analytical_unit_allocation_confirmed ?analytical_unit)
+        (analytical_unit_ready ?analytical_unit)
+        (dossier_initialized ?amendment_dossier)
+        (dossier_ready_for_testing ?amendment_dossier)
+        (not
+          (entity_released ?analytical_unit)
+        )
+      )
+    :effect (entity_released ?analytical_unit)
+  )
+  (:action schedule_implementation_window
+    :parameters (?amendment_record - amendable_entity ?implementation_window - implementation_window ?subject_matter_expert - subject_matter_expert)
+    :precondition
+      (and
+        (entity_released ?amendment_record)
+        (entity_assigned_sme ?amendment_record ?subject_matter_expert)
+        (implementation_window_available ?implementation_window)
+        (not
+          (entity_implementation_scheduled ?amendment_record)
+        )
+      )
+    :effect
+      (and
+        (entity_implementation_scheduled ?amendment_record)
+        (entity_scheduled_in_window ?amendment_record ?implementation_window)
+        (not
+          (implementation_window_available ?implementation_window)
+        )
+      )
+  )
+  (:action implement_amendment_on_stability_unit
+    :parameters (?stability_unit - stability_unit ?reviewer_resource - reviewer_resource ?implementation_window - implementation_window)
+    :precondition
+      (and
+        (entity_implementation_scheduled ?stability_unit)
+        (entity_assigned_reviewer ?stability_unit ?reviewer_resource)
+        (entity_scheduled_in_window ?stability_unit ?implementation_window)
+        (not
+          (entity_implementation_complete ?stability_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_implementation_complete ?stability_unit)
+        (reviewer_available ?reviewer_resource)
+        (implementation_window_available ?implementation_window)
+      )
+  )
+  (:action implement_amendment_on_analytical_unit
+    :parameters (?analytical_unit - analytical_unit ?reviewer_resource - reviewer_resource ?implementation_window - implementation_window)
+    :precondition
+      (and
+        (entity_implementation_scheduled ?analytical_unit)
+        (entity_assigned_reviewer ?analytical_unit ?reviewer_resource)
+        (entity_scheduled_in_window ?analytical_unit ?implementation_window)
+        (not
+          (entity_implementation_complete ?analytical_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_implementation_complete ?analytical_unit)
+        (reviewer_available ?reviewer_resource)
+        (implementation_window_available ?implementation_window)
+      )
+  )
+  (:action implement_amendment_on_document
+    :parameters (?document_entity - protocol_amendment_document ?reviewer_resource - reviewer_resource ?implementation_window - implementation_window)
+    :precondition
+      (and
+        (entity_implementation_scheduled ?document_entity)
+        (entity_assigned_reviewer ?document_entity ?reviewer_resource)
+        (entity_scheduled_in_window ?document_entity ?implementation_window)
+        (not
+          (entity_implementation_complete ?document_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_implementation_complete ?document_entity)
+        (reviewer_available ?reviewer_resource)
+        (implementation_window_available ?implementation_window)
+      )
+  )
+)

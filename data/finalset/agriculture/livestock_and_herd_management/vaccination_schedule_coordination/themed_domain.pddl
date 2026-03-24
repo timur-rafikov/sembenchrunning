@@ -1,0 +1,937 @@
+(define (domain livestock_vaccination_schedule_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object operational_resource - domain_object supply_or_document - domain_object facility_or_session_type - domain_object subject_supertype - domain_object vaccination_subject - subject_supertype vaccinator_team - operational_resource vaccine_product - operational_resource veterinary_staff - operational_resource owner_consent_document - operational_resource administration_protocol - operational_resource dose_record_template - operational_resource administration_kit - operational_resource veterinary_clearance - operational_resource medical_supply - supply_or_document vaccine_lot - supply_or_document regulatory_certificate - supply_or_document injection_station - facility_or_session_type observation_station - facility_or_session_type vaccination_session - facility_or_session_type individual_animal_category - vaccination_subject herd_unit_category - vaccination_subject individual_animal - individual_animal_category animal_cohort - individual_animal_category herd_unit - herd_unit_category)
+
+  (:predicates
+    (subject_registered ?vaccination_subject - vaccination_subject)
+    (subject_scheduled ?vaccination_subject - vaccination_subject)
+    (vaccinator_assignment_confirmed ?vaccination_subject - vaccination_subject)
+    (vaccination_administered ?vaccination_subject - vaccination_subject)
+    (ready_for_administration ?vaccination_subject - vaccination_subject)
+    (administration_recorded ?vaccination_subject - vaccination_subject)
+    (vaccinator_available ?vaccinator_team - vaccinator_team)
+    (assigned_vaccinator ?vaccination_subject - vaccination_subject ?vaccinator_team - vaccinator_team)
+    (vaccine_product_available ?vaccine_product - vaccine_product)
+    (vaccine_assigned_to_subject ?vaccination_subject - vaccination_subject ?vaccine_product - vaccine_product)
+    (veterinary_staff_available ?veterinary_staff - veterinary_staff)
+    (assigned_veterinary_staff ?vaccination_subject - vaccination_subject ?veterinary_staff - veterinary_staff)
+    (medical_supply_available ?medical_supply - medical_supply)
+    (supply_allocated_to_animal ?individual_animal - individual_animal ?medical_supply - medical_supply)
+    (supply_allocated_to_cohort ?animal_cohort - animal_cohort ?medical_supply - medical_supply)
+    (animal_assigned_injection_station ?individual_animal - individual_animal ?injection_station - injection_station)
+    (injection_station_reserved ?injection_station - injection_station)
+    (injection_station_staged_with_supply ?injection_station - injection_station)
+    (animal_prepared_flag ?individual_animal - individual_animal)
+    (cohort_assigned_observation_station ?animal_cohort - animal_cohort ?observation_station - observation_station)
+    (observation_station_reserved ?observation_station - observation_station)
+    (observation_station_staged_with_supply ?observation_station - observation_station)
+    (cohort_prepared_flag ?animal_cohort - animal_cohort)
+    (session_open ?vaccination_session - vaccination_session)
+    (session_prepared ?vaccination_session - vaccination_session)
+    (session_includes_injection_station ?vaccination_session - vaccination_session ?injection_station - injection_station)
+    (session_includes_observation_station ?vaccination_session - vaccination_session ?observation_station - observation_station)
+    (session_injection_ready ?vaccination_session - vaccination_session)
+    (session_observation_ready ?vaccination_session - vaccination_session)
+    (session_finalized ?vaccination_session - vaccination_session)
+    (herd_contains_animal ?herd_unit - herd_unit ?individual_animal - individual_animal)
+    (herd_contains_cohort ?herd_unit - herd_unit ?animal_cohort - animal_cohort)
+    (herd_enrolled_in_session ?herd_unit - herd_unit ?vaccination_session - vaccination_session)
+    (vaccine_lot_available ?vaccine_lot - vaccine_lot)
+    (herd_has_vaccine_lot ?herd_unit - herd_unit ?vaccine_lot - vaccine_lot)
+    (vaccine_lot_staged ?vaccine_lot - vaccine_lot)
+    (vaccine_lot_assigned_to_session ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    (herd_kit_and_lot_verified ?herd_unit - herd_unit)
+    (herd_kitting_stage_one_complete ?herd_unit - herd_unit)
+    (herd_kitting_stage_two_complete ?herd_unit - herd_unit)
+    (herd_consent_attached ?herd_unit - herd_unit)
+    (herd_consent_verified ?herd_unit - herd_unit)
+    (herd_protocol_flag ?herd_unit - herd_unit)
+    (herd_preparation_confirmed ?herd_unit - herd_unit)
+    (regulatory_certificate_available ?regulatory_certificate - regulatory_certificate)
+    (herd_has_regulatory_certificate ?herd_unit - herd_unit ?regulatory_certificate - regulatory_certificate)
+    (herd_regulatory_acknowledged ?herd_unit - herd_unit)
+    (herd_veterinary_authorized ?herd_unit - herd_unit)
+    (herd_veterinary_authorization_confirmed ?herd_unit - herd_unit)
+    (owner_consent_document_available ?owner_consent_document - owner_consent_document)
+    (herd_has_owner_consent_document ?herd_unit - herd_unit ?owner_consent_document - owner_consent_document)
+    (administration_protocol_available ?administration_protocol - administration_protocol)
+    (herd_has_administration_protocol ?herd_unit - herd_unit ?administration_protocol - administration_protocol)
+    (administration_kit_available ?administration_kit - administration_kit)
+    (herd_has_administration_kit ?herd_unit - herd_unit ?administration_kit - administration_kit)
+    (veterinary_clearance_available ?veterinary_clearance - veterinary_clearance)
+    (herd_has_veterinary_clearance ?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance)
+    (dose_record_template_available ?dose_record_template - dose_record_template)
+    (subject_linked_to_dose_record_template ?vaccination_subject - vaccination_subject ?dose_record_template - dose_record_template)
+    (animal_ready ?individual_animal - individual_animal)
+    (cohort_ready ?animal_cohort - animal_cohort)
+    (herd_manifest_finalized ?herd_unit - herd_unit)
+  )
+  (:action register_subject
+    :parameters (?vaccination_subject - vaccination_subject)
+    :precondition
+      (and
+        (not
+          (subject_registered ?vaccination_subject)
+        )
+        (not
+          (vaccination_administered ?vaccination_subject)
+        )
+      )
+    :effect (subject_registered ?vaccination_subject)
+  )
+  (:action assign_vaccinator_team_to_subject
+    :parameters (?vaccination_subject - vaccination_subject ?vaccinator_team - vaccinator_team)
+    :precondition
+      (and
+        (subject_registered ?vaccination_subject)
+        (not
+          (vaccinator_assignment_confirmed ?vaccination_subject)
+        )
+        (vaccinator_available ?vaccinator_team)
+      )
+    :effect
+      (and
+        (vaccinator_assignment_confirmed ?vaccination_subject)
+        (assigned_vaccinator ?vaccination_subject ?vaccinator_team)
+        (not
+          (vaccinator_available ?vaccinator_team)
+        )
+      )
+  )
+  (:action assign_vaccine_product_to_subject
+    :parameters (?vaccination_subject - vaccination_subject ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_registered ?vaccination_subject)
+        (vaccinator_assignment_confirmed ?vaccination_subject)
+        (vaccine_product_available ?vaccine_product)
+      )
+    :effect
+      (and
+        (vaccine_assigned_to_subject ?vaccination_subject ?vaccine_product)
+        (not
+          (vaccine_product_available ?vaccine_product)
+        )
+      )
+  )
+  (:action schedule_subject_for_administration
+    :parameters (?vaccination_subject - vaccination_subject ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_registered ?vaccination_subject)
+        (vaccinator_assignment_confirmed ?vaccination_subject)
+        (vaccine_assigned_to_subject ?vaccination_subject ?vaccine_product)
+        (not
+          (subject_scheduled ?vaccination_subject)
+        )
+      )
+    :effect (subject_scheduled ?vaccination_subject)
+  )
+  (:action release_vaccine_product_from_subject
+    :parameters (?vaccination_subject - vaccination_subject ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (vaccine_assigned_to_subject ?vaccination_subject ?vaccine_product)
+      )
+    :effect
+      (and
+        (vaccine_product_available ?vaccine_product)
+        (not
+          (vaccine_assigned_to_subject ?vaccination_subject ?vaccine_product)
+        )
+      )
+  )
+  (:action assign_veterinary_staff_to_subject
+    :parameters (?vaccination_subject - vaccination_subject ?veterinary_staff - veterinary_staff)
+    :precondition
+      (and
+        (subject_scheduled ?vaccination_subject)
+        (veterinary_staff_available ?veterinary_staff)
+      )
+    :effect
+      (and
+        (assigned_veterinary_staff ?vaccination_subject ?veterinary_staff)
+        (not
+          (veterinary_staff_available ?veterinary_staff)
+        )
+      )
+  )
+  (:action release_veterinary_staff_from_subject
+    :parameters (?vaccination_subject - vaccination_subject ?veterinary_staff - veterinary_staff)
+    :precondition
+      (and
+        (assigned_veterinary_staff ?vaccination_subject ?veterinary_staff)
+      )
+    :effect
+      (and
+        (veterinary_staff_available ?veterinary_staff)
+        (not
+          (assigned_veterinary_staff ?vaccination_subject ?veterinary_staff)
+        )
+      )
+  )
+  (:action reserve_administration_kit_for_herd
+    :parameters (?herd_unit - herd_unit ?administration_kit - administration_kit)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (administration_kit_available ?administration_kit)
+      )
+    :effect
+      (and
+        (herd_has_administration_kit ?herd_unit ?administration_kit)
+        (not
+          (administration_kit_available ?administration_kit)
+        )
+      )
+  )
+  (:action release_administration_kit_from_herd
+    :parameters (?herd_unit - herd_unit ?administration_kit - administration_kit)
+    :precondition
+      (and
+        (herd_has_administration_kit ?herd_unit ?administration_kit)
+      )
+    :effect
+      (and
+        (administration_kit_available ?administration_kit)
+        (not
+          (herd_has_administration_kit ?herd_unit ?administration_kit)
+        )
+      )
+  )
+  (:action assign_veterinary_clearance_to_herd
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (veterinary_clearance_available ?veterinary_clearance)
+      )
+    :effect
+      (and
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (not
+          (veterinary_clearance_available ?veterinary_clearance)
+        )
+      )
+  )
+  (:action release_veterinary_clearance_from_herd
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance)
+    :precondition
+      (and
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+      )
+    :effect
+      (and
+        (veterinary_clearance_available ?veterinary_clearance)
+        (not
+          (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        )
+      )
+  )
+  (:action prepare_injection_station_for_animal
+    :parameters (?individual_animal - individual_animal ?injection_station - injection_station ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_scheduled ?individual_animal)
+        (vaccine_assigned_to_subject ?individual_animal ?vaccine_product)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (not
+          (injection_station_reserved ?injection_station)
+        )
+        (not
+          (injection_station_staged_with_supply ?injection_station)
+        )
+      )
+    :effect (injection_station_reserved ?injection_station)
+  )
+  (:action vet_check_and_mark_animal_ready
+    :parameters (?individual_animal - individual_animal ?injection_station - injection_station ?veterinary_staff - veterinary_staff)
+    :precondition
+      (and
+        (subject_scheduled ?individual_animal)
+        (assigned_veterinary_staff ?individual_animal ?veterinary_staff)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (injection_station_reserved ?injection_station)
+        (not
+          (animal_ready ?individual_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_ready ?individual_animal)
+        (animal_prepared_flag ?individual_animal)
+      )
+  )
+  (:action stage_supply_and_mark_animal_ready
+    :parameters (?individual_animal - individual_animal ?injection_station - injection_station ?medical_supply - medical_supply)
+    :precondition
+      (and
+        (subject_scheduled ?individual_animal)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (medical_supply_available ?medical_supply)
+        (not
+          (animal_ready ?individual_animal)
+        )
+      )
+    :effect
+      (and
+        (injection_station_staged_with_supply ?injection_station)
+        (animal_ready ?individual_animal)
+        (supply_allocated_to_animal ?individual_animal ?medical_supply)
+        (not
+          (medical_supply_available ?medical_supply)
+        )
+      )
+  )
+  (:action finalize_animal_preparation_and_restore_supply
+    :parameters (?individual_animal - individual_animal ?injection_station - injection_station ?vaccine_product - vaccine_product ?medical_supply - medical_supply)
+    :precondition
+      (and
+        (subject_scheduled ?individual_animal)
+        (vaccine_assigned_to_subject ?individual_animal ?vaccine_product)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (injection_station_staged_with_supply ?injection_station)
+        (supply_allocated_to_animal ?individual_animal ?medical_supply)
+        (not
+          (animal_prepared_flag ?individual_animal)
+        )
+      )
+    :effect
+      (and
+        (injection_station_reserved ?injection_station)
+        (animal_prepared_flag ?individual_animal)
+        (medical_supply_available ?medical_supply)
+        (not
+          (supply_allocated_to_animal ?individual_animal ?medical_supply)
+        )
+      )
+  )
+  (:action prepare_observation_station_for_cohort
+    :parameters (?animal_cohort - animal_cohort ?observation_station - observation_station ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_scheduled ?animal_cohort)
+        (vaccine_assigned_to_subject ?animal_cohort ?vaccine_product)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (not
+          (observation_station_reserved ?observation_station)
+        )
+        (not
+          (observation_station_staged_with_supply ?observation_station)
+        )
+      )
+    :effect (observation_station_reserved ?observation_station)
+  )
+  (:action vet_check_and_mark_cohort_ready
+    :parameters (?animal_cohort - animal_cohort ?observation_station - observation_station ?veterinary_staff - veterinary_staff)
+    :precondition
+      (and
+        (subject_scheduled ?animal_cohort)
+        (assigned_veterinary_staff ?animal_cohort ?veterinary_staff)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (observation_station_reserved ?observation_station)
+        (not
+          (cohort_ready ?animal_cohort)
+        )
+      )
+    :effect
+      (and
+        (cohort_ready ?animal_cohort)
+        (cohort_prepared_flag ?animal_cohort)
+      )
+  )
+  (:action stage_supply_and_mark_cohort_ready
+    :parameters (?animal_cohort - animal_cohort ?observation_station - observation_station ?medical_supply - medical_supply)
+    :precondition
+      (and
+        (subject_scheduled ?animal_cohort)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (medical_supply_available ?medical_supply)
+        (not
+          (cohort_ready ?animal_cohort)
+        )
+      )
+    :effect
+      (and
+        (observation_station_staged_with_supply ?observation_station)
+        (cohort_ready ?animal_cohort)
+        (supply_allocated_to_cohort ?animal_cohort ?medical_supply)
+        (not
+          (medical_supply_available ?medical_supply)
+        )
+      )
+  )
+  (:action finalize_cohort_preparation_and_restore_supply
+    :parameters (?animal_cohort - animal_cohort ?observation_station - observation_station ?vaccine_product - vaccine_product ?medical_supply - medical_supply)
+    :precondition
+      (and
+        (subject_scheduled ?animal_cohort)
+        (vaccine_assigned_to_subject ?animal_cohort ?vaccine_product)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (observation_station_staged_with_supply ?observation_station)
+        (supply_allocated_to_cohort ?animal_cohort ?medical_supply)
+        (not
+          (cohort_prepared_flag ?animal_cohort)
+        )
+      )
+    :effect
+      (and
+        (observation_station_reserved ?observation_station)
+        (cohort_prepared_flag ?animal_cohort)
+        (medical_supply_available ?medical_supply)
+        (not
+          (supply_allocated_to_cohort ?animal_cohort ?medical_supply)
+        )
+      )
+  )
+  (:action assemble_vaccination_session
+    :parameters (?individual_animal - individual_animal ?animal_cohort - animal_cohort ?injection_station - injection_station ?observation_station - observation_station ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (animal_ready ?individual_animal)
+        (cohort_ready ?animal_cohort)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (injection_station_reserved ?injection_station)
+        (observation_station_reserved ?observation_station)
+        (animal_prepared_flag ?individual_animal)
+        (cohort_prepared_flag ?animal_cohort)
+        (session_open ?vaccination_session)
+      )
+    :effect
+      (and
+        (session_prepared ?vaccination_session)
+        (session_includes_injection_station ?vaccination_session ?injection_station)
+        (session_includes_observation_station ?vaccination_session ?observation_station)
+        (not
+          (session_open ?vaccination_session)
+        )
+      )
+  )
+  (:action prepare_session_injection_ready
+    :parameters (?individual_animal - individual_animal ?animal_cohort - animal_cohort ?injection_station - injection_station ?observation_station - observation_station ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (animal_ready ?individual_animal)
+        (cohort_ready ?animal_cohort)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (injection_station_staged_with_supply ?injection_station)
+        (observation_station_reserved ?observation_station)
+        (not
+          (animal_prepared_flag ?individual_animal)
+        )
+        (cohort_prepared_flag ?animal_cohort)
+        (session_open ?vaccination_session)
+      )
+    :effect
+      (and
+        (session_prepared ?vaccination_session)
+        (session_includes_injection_station ?vaccination_session ?injection_station)
+        (session_includes_observation_station ?vaccination_session ?observation_station)
+        (session_injection_ready ?vaccination_session)
+        (not
+          (session_open ?vaccination_session)
+        )
+      )
+  )
+  (:action prepare_session_observation_ready
+    :parameters (?individual_animal - individual_animal ?animal_cohort - animal_cohort ?injection_station - injection_station ?observation_station - observation_station ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (animal_ready ?individual_animal)
+        (cohort_ready ?animal_cohort)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (injection_station_reserved ?injection_station)
+        (observation_station_staged_with_supply ?observation_station)
+        (animal_prepared_flag ?individual_animal)
+        (not
+          (cohort_prepared_flag ?animal_cohort)
+        )
+        (session_open ?vaccination_session)
+      )
+    :effect
+      (and
+        (session_prepared ?vaccination_session)
+        (session_includes_injection_station ?vaccination_session ?injection_station)
+        (session_includes_observation_station ?vaccination_session ?observation_station)
+        (session_observation_ready ?vaccination_session)
+        (not
+          (session_open ?vaccination_session)
+        )
+      )
+  )
+  (:action prepare_session_both_stations_ready
+    :parameters (?individual_animal - individual_animal ?animal_cohort - animal_cohort ?injection_station - injection_station ?observation_station - observation_station ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (animal_ready ?individual_animal)
+        (cohort_ready ?animal_cohort)
+        (animal_assigned_injection_station ?individual_animal ?injection_station)
+        (cohort_assigned_observation_station ?animal_cohort ?observation_station)
+        (injection_station_staged_with_supply ?injection_station)
+        (observation_station_staged_with_supply ?observation_station)
+        (not
+          (animal_prepared_flag ?individual_animal)
+        )
+        (not
+          (cohort_prepared_flag ?animal_cohort)
+        )
+        (session_open ?vaccination_session)
+      )
+    :effect
+      (and
+        (session_prepared ?vaccination_session)
+        (session_includes_injection_station ?vaccination_session ?injection_station)
+        (session_includes_observation_station ?vaccination_session ?observation_station)
+        (session_injection_ready ?vaccination_session)
+        (session_observation_ready ?vaccination_session)
+        (not
+          (session_open ?vaccination_session)
+        )
+      )
+  )
+  (:action finalize_session_manifest
+    :parameters (?vaccination_session - vaccination_session ?individual_animal - individual_animal ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (session_prepared ?vaccination_session)
+        (animal_ready ?individual_animal)
+        (vaccine_assigned_to_subject ?individual_animal ?vaccine_product)
+        (not
+          (session_finalized ?vaccination_session)
+        )
+      )
+    :effect (session_finalized ?vaccination_session)
+  )
+  (:action load_vaccine_lot_into_session_for_herd
+    :parameters (?herd_unit - herd_unit ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (herd_enrolled_in_session ?herd_unit ?vaccination_session)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_available ?vaccine_lot)
+        (session_prepared ?vaccination_session)
+        (session_finalized ?vaccination_session)
+        (not
+          (vaccine_lot_staged ?vaccine_lot)
+        )
+      )
+    :effect
+      (and
+        (vaccine_lot_staged ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (not
+          (vaccine_lot_available ?vaccine_lot)
+        )
+      )
+  )
+  (:action verify_and_mark_herd_after_lot_loading
+    :parameters (?herd_unit - herd_unit ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_staged ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (vaccine_assigned_to_subject ?herd_unit ?vaccine_product)
+        (not
+          (session_injection_ready ?vaccination_session)
+        )
+        (not
+          (herd_kit_and_lot_verified ?herd_unit)
+        )
+      )
+    :effect (herd_kit_and_lot_verified ?herd_unit)
+  )
+  (:action attach_owner_consent_to_herd
+    :parameters (?herd_unit - herd_unit ?owner_consent_document - owner_consent_document)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (owner_consent_document_available ?owner_consent_document)
+        (not
+          (herd_consent_attached ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_consent_attached ?herd_unit)
+        (herd_has_owner_consent_document ?herd_unit ?owner_consent_document)
+        (not
+          (owner_consent_document_available ?owner_consent_document)
+        )
+      )
+  )
+  (:action verify_consent_and_prepare_herd
+    :parameters (?herd_unit - herd_unit ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session ?vaccine_product - vaccine_product ?owner_consent_document - owner_consent_document)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_staged ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (vaccine_assigned_to_subject ?herd_unit ?vaccine_product)
+        (session_injection_ready ?vaccination_session)
+        (herd_consent_attached ?herd_unit)
+        (herd_has_owner_consent_document ?herd_unit ?owner_consent_document)
+        (not
+          (herd_kit_and_lot_verified ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_kit_and_lot_verified ?herd_unit)
+        (herd_consent_verified ?herd_unit)
+      )
+  )
+  (:action perform_herd_kitting_validation_stage1
+    :parameters (?herd_unit - herd_unit ?administration_kit - administration_kit ?veterinary_staff - veterinary_staff ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kit_and_lot_verified ?herd_unit)
+        (herd_has_administration_kit ?herd_unit ?administration_kit)
+        (assigned_veterinary_staff ?herd_unit ?veterinary_staff)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (not
+          (session_observation_ready ?vaccination_session)
+        )
+        (not
+          (herd_kitting_stage_one_complete ?herd_unit)
+        )
+      )
+    :effect (herd_kitting_stage_one_complete ?herd_unit)
+  )
+  (:action confirm_herd_kitting_stage1
+    :parameters (?herd_unit - herd_unit ?administration_kit - administration_kit ?veterinary_staff - veterinary_staff ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kit_and_lot_verified ?herd_unit)
+        (herd_has_administration_kit ?herd_unit ?administration_kit)
+        (assigned_veterinary_staff ?herd_unit ?veterinary_staff)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (session_observation_ready ?vaccination_session)
+        (not
+          (herd_kitting_stage_one_complete ?herd_unit)
+        )
+      )
+    :effect (herd_kitting_stage_one_complete ?herd_unit)
+  )
+  (:action perform_veterinary_clearance_and_mark_herd_stage_two
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kitting_stage_one_complete ?herd_unit)
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (not
+          (session_injection_ready ?vaccination_session)
+        )
+        (not
+          (session_observation_ready ?vaccination_session)
+        )
+        (not
+          (herd_kitting_stage_two_complete ?herd_unit)
+        )
+      )
+    :effect (herd_kitting_stage_two_complete ?herd_unit)
+  )
+  (:action authorize_herd_and_attach_protocol_flag
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kitting_stage_one_complete ?herd_unit)
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (session_injection_ready ?vaccination_session)
+        (not
+          (session_observation_ready ?vaccination_session)
+        )
+        (not
+          (herd_kitting_stage_two_complete ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_protocol_flag ?herd_unit)
+      )
+  )
+  (:action authorize_herd_and_mark_protocol_ready
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kitting_stage_one_complete ?herd_unit)
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (not
+          (session_injection_ready ?vaccination_session)
+        )
+        (session_observation_ready ?vaccination_session)
+        (not
+          (herd_kitting_stage_two_complete ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_protocol_flag ?herd_unit)
+      )
+  )
+  (:action authorize_herd_with_full_kitting_and_protocol
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance ?vaccine_lot - vaccine_lot ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (herd_kitting_stage_one_complete ?herd_unit)
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (herd_has_vaccine_lot ?herd_unit ?vaccine_lot)
+        (vaccine_lot_assigned_to_session ?vaccine_lot ?vaccination_session)
+        (session_injection_ready ?vaccination_session)
+        (session_observation_ready ?vaccination_session)
+        (not
+          (herd_kitting_stage_two_complete ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_protocol_flag ?herd_unit)
+      )
+  )
+  (:action finalize_herd_preparation_and_mark_ready
+    :parameters (?herd_unit - herd_unit)
+    :precondition
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (not
+          (herd_protocol_flag ?herd_unit)
+        )
+        (not
+          (herd_manifest_finalized ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_manifest_finalized ?herd_unit)
+        (ready_for_administration ?herd_unit)
+      )
+  )
+  (:action attach_administration_protocol_to_herd
+    :parameters (?herd_unit - herd_unit ?administration_protocol - administration_protocol)
+    :precondition
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_protocol_flag ?herd_unit)
+        (administration_protocol_available ?administration_protocol)
+      )
+    :effect
+      (and
+        (herd_has_administration_protocol ?herd_unit ?administration_protocol)
+        (not
+          (administration_protocol_available ?administration_protocol)
+        )
+      )
+  )
+  (:action prepare_herd_for_administration_procedures
+    :parameters (?herd_unit - herd_unit ?individual_animal - individual_animal ?animal_cohort - animal_cohort ?vaccine_product - vaccine_product ?administration_protocol - administration_protocol)
+    :precondition
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_protocol_flag ?herd_unit)
+        (herd_has_administration_protocol ?herd_unit ?administration_protocol)
+        (herd_contains_animal ?herd_unit ?individual_animal)
+        (herd_contains_cohort ?herd_unit ?animal_cohort)
+        (animal_prepared_flag ?individual_animal)
+        (cohort_prepared_flag ?animal_cohort)
+        (vaccine_assigned_to_subject ?herd_unit ?vaccine_product)
+        (not
+          (herd_preparation_confirmed ?herd_unit)
+        )
+      )
+    :effect (herd_preparation_confirmed ?herd_unit)
+  )
+  (:action finalize_herd_preparation_confirm
+    :parameters (?herd_unit - herd_unit)
+    :precondition
+      (and
+        (herd_kitting_stage_two_complete ?herd_unit)
+        (herd_preparation_confirmed ?herd_unit)
+        (not
+          (herd_manifest_finalized ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_manifest_finalized ?herd_unit)
+        (ready_for_administration ?herd_unit)
+      )
+  )
+  (:action attach_regulatory_certificate_to_herd
+    :parameters (?herd_unit - herd_unit ?regulatory_certificate - regulatory_certificate ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (subject_scheduled ?herd_unit)
+        (vaccine_assigned_to_subject ?herd_unit ?vaccine_product)
+        (regulatory_certificate_available ?regulatory_certificate)
+        (herd_has_regulatory_certificate ?herd_unit ?regulatory_certificate)
+        (not
+          (herd_regulatory_acknowledged ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_regulatory_acknowledged ?herd_unit)
+        (not
+          (regulatory_certificate_available ?regulatory_certificate)
+        )
+      )
+  )
+  (:action authorize_herd_with_veterinary_staff
+    :parameters (?herd_unit - herd_unit ?veterinary_staff - veterinary_staff)
+    :precondition
+      (and
+        (herd_regulatory_acknowledged ?herd_unit)
+        (assigned_veterinary_staff ?herd_unit ?veterinary_staff)
+        (not
+          (herd_veterinary_authorized ?herd_unit)
+        )
+      )
+    :effect (herd_veterinary_authorized ?herd_unit)
+  )
+  (:action finalize_veterinary_authorization_for_herd
+    :parameters (?herd_unit - herd_unit ?veterinary_clearance - veterinary_clearance)
+    :precondition
+      (and
+        (herd_veterinary_authorized ?herd_unit)
+        (herd_has_veterinary_clearance ?herd_unit ?veterinary_clearance)
+        (not
+          (herd_veterinary_authorization_confirmed ?herd_unit)
+        )
+      )
+    :effect (herd_veterinary_authorization_confirmed ?herd_unit)
+  )
+  (:action confirm_veterinary_authorization_and_mark_herd_ready
+    :parameters (?herd_unit - herd_unit)
+    :precondition
+      (and
+        (herd_veterinary_authorization_confirmed ?herd_unit)
+        (not
+          (herd_manifest_finalized ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (herd_manifest_finalized ?herd_unit)
+        (ready_for_administration ?herd_unit)
+      )
+  )
+  (:action confirm_animal_administration
+    :parameters (?individual_animal - individual_animal ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (animal_ready ?individual_animal)
+        (animal_prepared_flag ?individual_animal)
+        (session_prepared ?vaccination_session)
+        (session_finalized ?vaccination_session)
+        (not
+          (ready_for_administration ?individual_animal)
+        )
+      )
+    :effect (ready_for_administration ?individual_animal)
+  )
+  (:action confirm_cohort_administration
+    :parameters (?animal_cohort - animal_cohort ?vaccination_session - vaccination_session)
+    :precondition
+      (and
+        (cohort_ready ?animal_cohort)
+        (cohort_prepared_flag ?animal_cohort)
+        (session_prepared ?vaccination_session)
+        (session_finalized ?vaccination_session)
+        (not
+          (ready_for_administration ?animal_cohort)
+        )
+      )
+    :effect (ready_for_administration ?animal_cohort)
+  )
+  (:action submit_administration_record_for_subject
+    :parameters (?vaccination_subject - vaccination_subject ?dose_record_template - dose_record_template ?vaccine_product - vaccine_product)
+    :precondition
+      (and
+        (ready_for_administration ?vaccination_subject)
+        (vaccine_assigned_to_subject ?vaccination_subject ?vaccine_product)
+        (dose_record_template_available ?dose_record_template)
+        (not
+          (administration_recorded ?vaccination_subject)
+        )
+      )
+    :effect
+      (and
+        (administration_recorded ?vaccination_subject)
+        (subject_linked_to_dose_record_template ?vaccination_subject ?dose_record_template)
+        (not
+          (dose_record_template_available ?dose_record_template)
+        )
+      )
+  )
+  (:action complete_administration_for_individual
+    :parameters (?individual_animal - individual_animal ?vaccinator_team - vaccinator_team ?dose_record_template - dose_record_template)
+    :precondition
+      (and
+        (administration_recorded ?individual_animal)
+        (assigned_vaccinator ?individual_animal ?vaccinator_team)
+        (subject_linked_to_dose_record_template ?individual_animal ?dose_record_template)
+        (not
+          (vaccination_administered ?individual_animal)
+        )
+      )
+    :effect
+      (and
+        (vaccination_administered ?individual_animal)
+        (vaccinator_available ?vaccinator_team)
+        (dose_record_template_available ?dose_record_template)
+      )
+  )
+  (:action complete_administration_for_cohort
+    :parameters (?animal_cohort - animal_cohort ?vaccinator_team - vaccinator_team ?dose_record_template - dose_record_template)
+    :precondition
+      (and
+        (administration_recorded ?animal_cohort)
+        (assigned_vaccinator ?animal_cohort ?vaccinator_team)
+        (subject_linked_to_dose_record_template ?animal_cohort ?dose_record_template)
+        (not
+          (vaccination_administered ?animal_cohort)
+        )
+      )
+    :effect
+      (and
+        (vaccination_administered ?animal_cohort)
+        (vaccinator_available ?vaccinator_team)
+        (dose_record_template_available ?dose_record_template)
+      )
+  )
+  (:action complete_administration_for_herd
+    :parameters (?herd_unit - herd_unit ?vaccinator_team - vaccinator_team ?dose_record_template - dose_record_template)
+    :precondition
+      (and
+        (administration_recorded ?herd_unit)
+        (assigned_vaccinator ?herd_unit ?vaccinator_team)
+        (subject_linked_to_dose_record_template ?herd_unit ?dose_record_template)
+        (not
+          (vaccination_administered ?herd_unit)
+        )
+      )
+    :effect
+      (and
+        (vaccination_administered ?herd_unit)
+        (vaccinator_available ?vaccinator_team)
+        (dose_record_template_available ?dose_record_template)
+      )
+  )
+)

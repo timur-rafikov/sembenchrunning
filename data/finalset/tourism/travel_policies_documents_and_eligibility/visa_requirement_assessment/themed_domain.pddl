@@ -1,0 +1,936 @@
+(define (domain visa_requirement_assessment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object document_category - object policy_component - object case_root - object case_entity - case_root issuing_authority - resource document_type - resource assessor - resource special_condition - resource fee_option - resource policy_source - resource waiver_provision - resource exception_claim - resource evidence_item - document_category checklist_item - document_category exception_category - document_category origin_policy_profile - policy_component destination_policy_profile - policy_component decision_package - policy_component person_profile - case_entity case_record_type - case_entity primary_applicant - person_profile secondary_applicant - person_profile visa_case - case_record_type)
+  (:predicates
+    (assessment_initiated ?case_actor - case_entity)
+    (document_verified_for_case_actor ?case_actor - case_entity)
+    (jurisdiction_assigned ?case_actor - case_entity)
+    (entry_requirement_resolved ?case_actor - case_entity)
+    (decision_recorded_for_case_actor ?case_actor - case_entity)
+    (outcome_confirmed ?case_actor - case_entity)
+    (authority_available ?issuing_authority - issuing_authority)
+    (assigned_to_authority ?case_actor - case_entity ?issuing_authority - issuing_authority)
+    (document_available ?document_type - document_type)
+    (document_bound_to_actor ?case_actor - case_entity ?document_type - document_type)
+    (assessor_available ?assessor - assessor)
+    (assessor_assigned ?case_actor - case_entity ?assessor - assessor)
+    (evidence_available ?evidence_item - evidence_item)
+    (primary_has_evidence ?primary_applicant - primary_applicant ?evidence_item - evidence_item)
+    (secondary_has_evidence ?secondary_applicant - secondary_applicant ?evidence_item - evidence_item)
+    (primary_has_origin_policy_profile ?primary_applicant - primary_applicant ?origin_policy_profile - origin_policy_profile)
+    (origin_profile_satisfied ?origin_policy_profile - origin_policy_profile)
+    (origin_profile_requires_evidence ?origin_policy_profile - origin_policy_profile)
+    (primary_origin_requirement_satisfied ?primary_applicant - primary_applicant)
+    (secondary_has_destination_policy_profile ?secondary_applicant - secondary_applicant ?destination_policy_profile - destination_policy_profile)
+    (destination_profile_satisfied ?destination_policy_profile - destination_policy_profile)
+    (destination_profile_requires_evidence ?destination_policy_profile - destination_policy_profile)
+    (secondary_destination_requirement_satisfied ?secondary_applicant - secondary_applicant)
+    (decision_package_available ?decision_package - decision_package)
+    (decision_package_created ?decision_package - decision_package)
+    (package_linked_to_origin_profile ?decision_package - decision_package ?origin_policy_profile - origin_policy_profile)
+    (package_linked_to_destination_profile ?decision_package - decision_package ?destination_policy_profile - destination_policy_profile)
+    (package_origin_requires_evidence ?decision_package - decision_package)
+    (package_destination_requires_evidence ?decision_package - decision_package)
+    (package_lock_set ?decision_package - decision_package)
+    (case_has_primary_applicant ?visa_case - visa_case ?primary_applicant - primary_applicant)
+    (case_has_secondary_applicant ?visa_case - visa_case ?secondary_applicant - secondary_applicant)
+    (case_linked_to_decision_package ?visa_case - visa_case ?decision_package - decision_package)
+    (checklist_item_available ?checklist_item - checklist_item)
+    (case_has_checklist_item ?visa_case - visa_case ?checklist_item - checklist_item)
+    (checklist_item_locked ?checklist_item - checklist_item)
+    (checklist_item_linked_to_package ?checklist_item - checklist_item ?decision_package - decision_package)
+    (case_authorization_granted ?visa_case - visa_case)
+    (case_condition_evaluation_done ?visa_case - visa_case)
+    (case_ready_for_final_checks ?visa_case - visa_case)
+    (case_has_special_condition ?visa_case - visa_case)
+    (case_special_condition_confirmed ?visa_case - visa_case)
+    (case_fee_option_selected ?visa_case - visa_case)
+    (assessor_conclusions_recorded ?visa_case - visa_case)
+    (exception_category_available ?exception_category - exception_category)
+    (case_has_exception_category ?visa_case - visa_case ?exception_category - exception_category)
+    (exception_category_applied ?visa_case - visa_case)
+    (exception_reviewed ?visa_case - visa_case)
+    (exception_approved ?visa_case - visa_case)
+    (special_condition_available ?special_condition - special_condition)
+    (case_has_special_condition_selected ?visa_case - visa_case ?special_condition - special_condition)
+    (fee_option_available ?fee_option - fee_option)
+    (case_has_fee_option_selected ?visa_case - visa_case ?fee_option - fee_option)
+    (waiver_provision_available ?waiver_provision - waiver_provision)
+    (case_has_waiver_provision ?visa_case - visa_case ?waiver_provision - waiver_provision)
+    (exception_claim_available ?exception_claim - exception_claim)
+    (case_has_exception_claim ?visa_case - visa_case ?exception_claim - exception_claim)
+    (policy_source_available ?policy_source - policy_source)
+    (bound_to_policy_source ?case_actor - case_entity ?policy_source - policy_source)
+    (primary_applicant_evaluation_complete ?primary_applicant - primary_applicant)
+    (secondary_applicant_evaluation_complete ?secondary_applicant - secondary_applicant)
+    (case_final_checks_done ?visa_case - visa_case)
+  )
+  (:action initiate_assessment
+    :parameters (?case_actor - case_entity)
+    :precondition
+      (and
+        (not
+          (assessment_initiated ?case_actor)
+        )
+        (not
+          (entry_requirement_resolved ?case_actor)
+        )
+      )
+    :effect (assessment_initiated ?case_actor)
+  )
+  (:action assign_issuing_authority
+    :parameters (?case_actor - case_entity ?issuing_authority - issuing_authority)
+    :precondition
+      (and
+        (assessment_initiated ?case_actor)
+        (not
+          (jurisdiction_assigned ?case_actor)
+        )
+        (authority_available ?issuing_authority)
+      )
+    :effect
+      (and
+        (jurisdiction_assigned ?case_actor)
+        (assigned_to_authority ?case_actor ?issuing_authority)
+        (not
+          (authority_available ?issuing_authority)
+        )
+      )
+  )
+  (:action bind_document_to_actor
+    :parameters (?case_actor - case_entity ?document_type - document_type)
+    :precondition
+      (and
+        (assessment_initiated ?case_actor)
+        (jurisdiction_assigned ?case_actor)
+        (document_available ?document_type)
+      )
+    :effect
+      (and
+        (document_bound_to_actor ?case_actor ?document_type)
+        (not
+          (document_available ?document_type)
+        )
+      )
+  )
+  (:action verify_document_for_actor
+    :parameters (?case_actor - case_entity ?document_type - document_type)
+    :precondition
+      (and
+        (assessment_initiated ?case_actor)
+        (jurisdiction_assigned ?case_actor)
+        (document_bound_to_actor ?case_actor ?document_type)
+        (not
+          (document_verified_for_case_actor ?case_actor)
+        )
+      )
+    :effect (document_verified_for_case_actor ?case_actor)
+  )
+  (:action unbind_document_from_actor
+    :parameters (?case_actor - case_entity ?document_type - document_type)
+    :precondition
+      (and
+        (document_bound_to_actor ?case_actor ?document_type)
+      )
+    :effect
+      (and
+        (document_available ?document_type)
+        (not
+          (document_bound_to_actor ?case_actor ?document_type)
+        )
+      )
+  )
+  (:action assign_assessor_to_actor
+    :parameters (?case_actor - case_entity ?assessor - assessor)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?case_actor)
+        (assessor_available ?assessor)
+      )
+    :effect
+      (and
+        (assessor_assigned ?case_actor ?assessor)
+        (not
+          (assessor_available ?assessor)
+        )
+      )
+  )
+  (:action release_assessor_from_actor
+    :parameters (?case_actor - case_entity ?assessor - assessor)
+    :precondition
+      (and
+        (assessor_assigned ?case_actor ?assessor)
+      )
+    :effect
+      (and
+        (assessor_available ?assessor)
+        (not
+          (assessor_assigned ?case_actor ?assessor)
+        )
+      )
+  )
+  (:action apply_waiver_to_case
+    :parameters (?visa_case - visa_case ?waiver_provision - waiver_provision)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (waiver_provision_available ?waiver_provision)
+      )
+    :effect
+      (and
+        (case_has_waiver_provision ?visa_case ?waiver_provision)
+        (not
+          (waiver_provision_available ?waiver_provision)
+        )
+      )
+  )
+  (:action remove_waiver_from_case
+    :parameters (?visa_case - visa_case ?waiver_provision - waiver_provision)
+    :precondition
+      (and
+        (case_has_waiver_provision ?visa_case ?waiver_provision)
+      )
+    :effect
+      (and
+        (waiver_provision_available ?waiver_provision)
+        (not
+          (case_has_waiver_provision ?visa_case ?waiver_provision)
+        )
+      )
+  )
+  (:action apply_exception_claim_to_case
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (exception_claim_available ?exception_claim)
+      )
+    :effect
+      (and
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (not
+          (exception_claim_available ?exception_claim)
+        )
+      )
+  )
+  (:action remove_exception_claim_from_case
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim)
+    :precondition
+      (and
+        (case_has_exception_claim ?visa_case ?exception_claim)
+      )
+    :effect
+      (and
+        (exception_claim_available ?exception_claim)
+        (not
+          (case_has_exception_claim ?visa_case ?exception_claim)
+        )
+      )
+  )
+  (:action mark_origin_profile_satisfied
+    :parameters (?primary_applicant - primary_applicant ?origin_policy_profile - origin_policy_profile ?document_type - document_type)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?primary_applicant)
+        (document_bound_to_actor ?primary_applicant ?document_type)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (not
+          (origin_profile_satisfied ?origin_policy_profile)
+        )
+        (not
+          (origin_profile_requires_evidence ?origin_policy_profile)
+        )
+      )
+    :effect (origin_profile_satisfied ?origin_policy_profile)
+  )
+  (:action evaluate_primary_origin_with_assessor
+    :parameters (?primary_applicant - primary_applicant ?origin_policy_profile - origin_policy_profile ?assessor - assessor)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?primary_applicant)
+        (assessor_assigned ?primary_applicant ?assessor)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (origin_profile_satisfied ?origin_policy_profile)
+        (not
+          (primary_applicant_evaluation_complete ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+      )
+  )
+  (:action require_evidence_for_primary_origin_and_attach_evidence
+    :parameters (?primary_applicant - primary_applicant ?origin_policy_profile - origin_policy_profile ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?primary_applicant)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (evidence_available ?evidence_item)
+        (not
+          (primary_applicant_evaluation_complete ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (origin_profile_requires_evidence ?origin_policy_profile)
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (primary_has_evidence ?primary_applicant ?evidence_item)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action satisfy_primary_origin_profile_with_evidence
+    :parameters (?primary_applicant - primary_applicant ?origin_policy_profile - origin_policy_profile ?document_type - document_type ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?primary_applicant)
+        (document_bound_to_actor ?primary_applicant ?document_type)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (origin_profile_requires_evidence ?origin_policy_profile)
+        (primary_has_evidence ?primary_applicant ?evidence_item)
+        (not
+          (primary_origin_requirement_satisfied ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (origin_profile_satisfied ?origin_policy_profile)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+        (evidence_available ?evidence_item)
+        (not
+          (primary_has_evidence ?primary_applicant ?evidence_item)
+        )
+      )
+  )
+  (:action mark_destination_profile_satisfied
+    :parameters (?secondary_applicant - secondary_applicant ?destination_policy_profile - destination_policy_profile ?document_type - document_type)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?secondary_applicant)
+        (document_bound_to_actor ?secondary_applicant ?document_type)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (not
+          (destination_profile_satisfied ?destination_policy_profile)
+        )
+        (not
+          (destination_profile_requires_evidence ?destination_policy_profile)
+        )
+      )
+    :effect (destination_profile_satisfied ?destination_policy_profile)
+  )
+  (:action evaluate_secondary_destination_with_assessor
+    :parameters (?secondary_applicant - secondary_applicant ?destination_policy_profile - destination_policy_profile ?assessor - assessor)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?secondary_applicant)
+        (assessor_assigned ?secondary_applicant ?assessor)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (destination_profile_satisfied ?destination_policy_profile)
+        (not
+          (secondary_applicant_evaluation_complete ?secondary_applicant)
+        )
+      )
+    :effect
+      (and
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+      )
+  )
+  (:action require_evidence_for_secondary_destination_and_attach_evidence
+    :parameters (?secondary_applicant - secondary_applicant ?destination_policy_profile - destination_policy_profile ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?secondary_applicant)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (evidence_available ?evidence_item)
+        (not
+          (secondary_applicant_evaluation_complete ?secondary_applicant)
+        )
+      )
+    :effect
+      (and
+        (destination_profile_requires_evidence ?destination_policy_profile)
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (secondary_has_evidence ?secondary_applicant ?evidence_item)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action satisfy_secondary_destination_profile_with_evidence
+    :parameters (?secondary_applicant - secondary_applicant ?destination_policy_profile - destination_policy_profile ?document_type - document_type ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?secondary_applicant)
+        (document_bound_to_actor ?secondary_applicant ?document_type)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (destination_profile_requires_evidence ?destination_policy_profile)
+        (secondary_has_evidence ?secondary_applicant ?evidence_item)
+        (not
+          (secondary_destination_requirement_satisfied ?secondary_applicant)
+        )
+      )
+    :effect
+      (and
+        (destination_profile_satisfied ?destination_policy_profile)
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+        (evidence_available ?evidence_item)
+        (not
+          (secondary_has_evidence ?secondary_applicant ?evidence_item)
+        )
+      )
+  )
+  (:action assemble_decision_package_standard
+    :parameters (?primary_applicant - primary_applicant ?secondary_applicant - secondary_applicant ?origin_policy_profile - origin_policy_profile ?destination_policy_profile - destination_policy_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (origin_profile_satisfied ?origin_policy_profile)
+        (destination_profile_satisfied ?destination_policy_profile)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_created ?decision_package)
+        (package_linked_to_origin_profile ?decision_package ?origin_policy_profile)
+        (package_linked_to_destination_profile ?decision_package ?destination_policy_profile)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_decision_package_origin_requires_evidence
+    :parameters (?primary_applicant - primary_applicant ?secondary_applicant - secondary_applicant ?origin_policy_profile - origin_policy_profile ?destination_policy_profile - destination_policy_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (origin_profile_requires_evidence ?origin_policy_profile)
+        (destination_profile_satisfied ?destination_policy_profile)
+        (not
+          (primary_origin_requirement_satisfied ?primary_applicant)
+        )
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_created ?decision_package)
+        (package_linked_to_origin_profile ?decision_package ?origin_policy_profile)
+        (package_linked_to_destination_profile ?decision_package ?destination_policy_profile)
+        (package_origin_requires_evidence ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_decision_package_destination_requires_evidence
+    :parameters (?primary_applicant - primary_applicant ?secondary_applicant - secondary_applicant ?origin_policy_profile - origin_policy_profile ?destination_policy_profile - destination_policy_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (origin_profile_satisfied ?origin_policy_profile)
+        (destination_profile_requires_evidence ?destination_policy_profile)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+        (not
+          (secondary_destination_requirement_satisfied ?secondary_applicant)
+        )
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_created ?decision_package)
+        (package_linked_to_origin_profile ?decision_package ?origin_policy_profile)
+        (package_linked_to_destination_profile ?decision_package ?destination_policy_profile)
+        (package_destination_requires_evidence ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_decision_package_both_require_evidence
+    :parameters (?primary_applicant - primary_applicant ?secondary_applicant - secondary_applicant ?origin_policy_profile - origin_policy_profile ?destination_policy_profile - destination_policy_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (primary_has_origin_policy_profile ?primary_applicant ?origin_policy_profile)
+        (secondary_has_destination_policy_profile ?secondary_applicant ?destination_policy_profile)
+        (origin_profile_requires_evidence ?origin_policy_profile)
+        (destination_profile_requires_evidence ?destination_policy_profile)
+        (not
+          (primary_origin_requirement_satisfied ?primary_applicant)
+        )
+        (not
+          (secondary_destination_requirement_satisfied ?secondary_applicant)
+        )
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_created ?decision_package)
+        (package_linked_to_origin_profile ?decision_package ?origin_policy_profile)
+        (package_linked_to_destination_profile ?decision_package ?destination_policy_profile)
+        (package_origin_requires_evidence ?decision_package)
+        (package_destination_requires_evidence ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action lock_decision_package
+    :parameters (?decision_package - decision_package ?primary_applicant - primary_applicant ?document_type - document_type)
+    :precondition
+      (and
+        (decision_package_created ?decision_package)
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (document_bound_to_actor ?primary_applicant ?document_type)
+        (not
+          (package_lock_set ?decision_package)
+        )
+      )
+    :effect (package_lock_set ?decision_package)
+  )
+  (:action lock_checklist_item
+    :parameters (?visa_case - visa_case ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (case_linked_to_decision_package ?visa_case ?decision_package)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_available ?checklist_item)
+        (decision_package_created ?decision_package)
+        (package_lock_set ?decision_package)
+        (not
+          (checklist_item_locked ?checklist_item)
+        )
+      )
+    :effect
+      (and
+        (checklist_item_locked ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (not
+          (checklist_item_available ?checklist_item)
+        )
+      )
+  )
+  (:action authorize_case_without_origin_evidence
+    :parameters (?visa_case - visa_case ?checklist_item - checklist_item ?decision_package - decision_package ?document_type - document_type)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_locked ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (document_bound_to_actor ?visa_case ?document_type)
+        (not
+          (package_origin_requires_evidence ?decision_package)
+        )
+        (not
+          (case_authorization_granted ?visa_case)
+        )
+      )
+    :effect (case_authorization_granted ?visa_case)
+  )
+  (:action apply_special_condition_to_case
+    :parameters (?visa_case - visa_case ?special_condition - special_condition)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (special_condition_available ?special_condition)
+        (not
+          (case_has_special_condition ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_special_condition ?visa_case)
+        (case_has_special_condition_selected ?visa_case ?special_condition)
+        (not
+          (special_condition_available ?special_condition)
+        )
+      )
+  )
+  (:action authorize_case_with_special_condition
+    :parameters (?visa_case - visa_case ?checklist_item - checklist_item ?decision_package - decision_package ?document_type - document_type ?special_condition - special_condition)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_locked ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (document_bound_to_actor ?visa_case ?document_type)
+        (package_origin_requires_evidence ?decision_package)
+        (case_has_special_condition ?visa_case)
+        (case_has_special_condition_selected ?visa_case ?special_condition)
+        (not
+          (case_authorization_granted ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_authorization_granted ?visa_case)
+        (case_special_condition_confirmed ?visa_case)
+      )
+  )
+  (:action evaluate_waiver_for_case_no_destination_evidence
+    :parameters (?visa_case - visa_case ?waiver_provision - waiver_provision ?assessor - assessor ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_authorization_granted ?visa_case)
+        (case_has_waiver_provision ?visa_case ?waiver_provision)
+        (assessor_assigned ?visa_case ?assessor)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (not
+          (package_destination_requires_evidence ?decision_package)
+        )
+        (not
+          (case_condition_evaluation_done ?visa_case)
+        )
+      )
+    :effect (case_condition_evaluation_done ?visa_case)
+  )
+  (:action evaluate_waiver_for_case_with_destination_evidence
+    :parameters (?visa_case - visa_case ?waiver_provision - waiver_provision ?assessor - assessor ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_authorization_granted ?visa_case)
+        (case_has_waiver_provision ?visa_case ?waiver_provision)
+        (assessor_assigned ?visa_case ?assessor)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (package_destination_requires_evidence ?decision_package)
+        (not
+          (case_condition_evaluation_done ?visa_case)
+        )
+      )
+    :effect (case_condition_evaluation_done ?visa_case)
+  )
+  (:action apply_exception_claim_and_prepare_case_for_final_checks
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_condition_evaluation_done ?visa_case)
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (not
+          (package_origin_requires_evidence ?decision_package)
+        )
+        (not
+          (package_destination_requires_evidence ?decision_package)
+        )
+        (not
+          (case_ready_for_final_checks ?visa_case)
+        )
+      )
+    :effect (case_ready_for_final_checks ?visa_case)
+  )
+  (:action prepare_case_for_final_checks_with_origin_flag
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_condition_evaluation_done ?visa_case)
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (package_origin_requires_evidence ?decision_package)
+        (not
+          (package_destination_requires_evidence ?decision_package)
+        )
+        (not
+          (case_ready_for_final_checks ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (case_fee_option_selected ?visa_case)
+      )
+  )
+  (:action prepare_case_for_final_checks_with_destination_flag
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_condition_evaluation_done ?visa_case)
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (not
+          (package_origin_requires_evidence ?decision_package)
+        )
+        (package_destination_requires_evidence ?decision_package)
+        (not
+          (case_ready_for_final_checks ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (case_fee_option_selected ?visa_case)
+      )
+  )
+  (:action prepare_case_for_final_checks_with_both_flags
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim ?checklist_item - checklist_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_condition_evaluation_done ?visa_case)
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (case_has_checklist_item ?visa_case ?checklist_item)
+        (checklist_item_linked_to_package ?checklist_item ?decision_package)
+        (package_origin_requires_evidence ?decision_package)
+        (package_destination_requires_evidence ?decision_package)
+        (not
+          (case_ready_for_final_checks ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (case_fee_option_selected ?visa_case)
+      )
+  )
+  (:action finalize_case_without_fee_option
+    :parameters (?visa_case - visa_case)
+    :precondition
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (not
+          (case_fee_option_selected ?visa_case)
+        )
+        (not
+          (case_final_checks_done ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_checks_done ?visa_case)
+        (decision_recorded_for_case_actor ?visa_case)
+      )
+  )
+  (:action apply_fee_option_to_case
+    :parameters (?visa_case - visa_case ?fee_option - fee_option)
+    :precondition
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (case_fee_option_selected ?visa_case)
+        (fee_option_available ?fee_option)
+      )
+    :effect
+      (and
+        (case_has_fee_option_selected ?visa_case ?fee_option)
+        (not
+          (fee_option_available ?fee_option)
+        )
+      )
+  )
+  (:action record_assessor_conclusions_for_case
+    :parameters (?visa_case - visa_case ?primary_applicant - primary_applicant ?secondary_applicant - secondary_applicant ?document_type - document_type ?fee_option - fee_option)
+    :precondition
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (case_fee_option_selected ?visa_case)
+        (case_has_fee_option_selected ?visa_case ?fee_option)
+        (case_has_primary_applicant ?visa_case ?primary_applicant)
+        (case_has_secondary_applicant ?visa_case ?secondary_applicant)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+        (document_bound_to_actor ?visa_case ?document_type)
+        (not
+          (assessor_conclusions_recorded ?visa_case)
+        )
+      )
+    :effect (assessor_conclusions_recorded ?visa_case)
+  )
+  (:action finalize_case_after_assessor_conclusions
+    :parameters (?visa_case - visa_case)
+    :precondition
+      (and
+        (case_ready_for_final_checks ?visa_case)
+        (assessor_conclusions_recorded ?visa_case)
+        (not
+          (case_final_checks_done ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_checks_done ?visa_case)
+        (decision_recorded_for_case_actor ?visa_case)
+      )
+  )
+  (:action apply_exception_category_to_case
+    :parameters (?visa_case - visa_case ?exception_category - exception_category ?document_type - document_type)
+    :precondition
+      (and
+        (document_verified_for_case_actor ?visa_case)
+        (document_bound_to_actor ?visa_case ?document_type)
+        (exception_category_available ?exception_category)
+        (case_has_exception_category ?visa_case ?exception_category)
+        (not
+          (exception_category_applied ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (exception_category_applied ?visa_case)
+        (not
+          (exception_category_available ?exception_category)
+        )
+      )
+  )
+  (:action assign_assessor_for_exception_review
+    :parameters (?visa_case - visa_case ?assessor - assessor)
+    :precondition
+      (and
+        (exception_category_applied ?visa_case)
+        (assessor_assigned ?visa_case ?assessor)
+        (not
+          (exception_reviewed ?visa_case)
+        )
+      )
+    :effect (exception_reviewed ?visa_case)
+  )
+  (:action approve_exception_by_assessor
+    :parameters (?visa_case - visa_case ?exception_claim - exception_claim)
+    :precondition
+      (and
+        (exception_reviewed ?visa_case)
+        (case_has_exception_claim ?visa_case ?exception_claim)
+        (not
+          (exception_approved ?visa_case)
+        )
+      )
+    :effect (exception_approved ?visa_case)
+  )
+  (:action finalize_case_after_exception_approval
+    :parameters (?visa_case - visa_case)
+    :precondition
+      (and
+        (exception_approved ?visa_case)
+        (not
+          (case_final_checks_done ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (case_final_checks_done ?visa_case)
+        (decision_recorded_for_case_actor ?visa_case)
+      )
+  )
+  (:action record_primary_applicant_decision_from_package
+    :parameters (?primary_applicant - primary_applicant ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_applicant_evaluation_complete ?primary_applicant)
+        (primary_origin_requirement_satisfied ?primary_applicant)
+        (decision_package_created ?decision_package)
+        (package_lock_set ?decision_package)
+        (not
+          (decision_recorded_for_case_actor ?primary_applicant)
+        )
+      )
+    :effect (decision_recorded_for_case_actor ?primary_applicant)
+  )
+  (:action record_secondary_applicant_decision_from_package
+    :parameters (?secondary_applicant - secondary_applicant ?decision_package - decision_package)
+    :precondition
+      (and
+        (secondary_applicant_evaluation_complete ?secondary_applicant)
+        (secondary_destination_requirement_satisfied ?secondary_applicant)
+        (decision_package_created ?decision_package)
+        (package_lock_set ?decision_package)
+        (not
+          (decision_recorded_for_case_actor ?secondary_applicant)
+        )
+      )
+    :effect (decision_recorded_for_case_actor ?secondary_applicant)
+  )
+  (:action bind_policy_source_and_confirm_outcome
+    :parameters (?case_actor - case_entity ?policy_source - policy_source ?document_type - document_type)
+    :precondition
+      (and
+        (decision_recorded_for_case_actor ?case_actor)
+        (document_bound_to_actor ?case_actor ?document_type)
+        (policy_source_available ?policy_source)
+        (not
+          (outcome_confirmed ?case_actor)
+        )
+      )
+    :effect
+      (and
+        (outcome_confirmed ?case_actor)
+        (bound_to_policy_source ?case_actor ?policy_source)
+        (not
+          (policy_source_available ?policy_source)
+        )
+      )
+  )
+  (:action apply_outcome_to_primary_and_release_authority
+    :parameters (?primary_applicant - primary_applicant ?issuing_authority - issuing_authority ?policy_source - policy_source)
+    :precondition
+      (and
+        (outcome_confirmed ?primary_applicant)
+        (assigned_to_authority ?primary_applicant ?issuing_authority)
+        (bound_to_policy_source ?primary_applicant ?policy_source)
+        (not
+          (entry_requirement_resolved ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (entry_requirement_resolved ?primary_applicant)
+        (authority_available ?issuing_authority)
+        (policy_source_available ?policy_source)
+      )
+  )
+  (:action apply_outcome_to_secondary_and_release_authority
+    :parameters (?secondary_applicant - secondary_applicant ?issuing_authority - issuing_authority ?policy_source - policy_source)
+    :precondition
+      (and
+        (outcome_confirmed ?secondary_applicant)
+        (assigned_to_authority ?secondary_applicant ?issuing_authority)
+        (bound_to_policy_source ?secondary_applicant ?policy_source)
+        (not
+          (entry_requirement_resolved ?secondary_applicant)
+        )
+      )
+    :effect
+      (and
+        (entry_requirement_resolved ?secondary_applicant)
+        (authority_available ?issuing_authority)
+        (policy_source_available ?policy_source)
+      )
+  )
+  (:action apply_outcome_to_case_and_release_authority
+    :parameters (?visa_case - visa_case ?issuing_authority - issuing_authority ?policy_source - policy_source)
+    :precondition
+      (and
+        (outcome_confirmed ?visa_case)
+        (assigned_to_authority ?visa_case ?issuing_authority)
+        (bound_to_policy_source ?visa_case ?policy_source)
+        (not
+          (entry_requirement_resolved ?visa_case)
+        )
+      )
+    :effect
+      (and
+        (entry_requirement_resolved ?visa_case)
+        (authority_available ?issuing_authority)
+        (policy_source_available ?policy_source)
+      )
+  )
+)

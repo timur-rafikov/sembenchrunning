@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain veterinary_intervention_priority_ordering)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource - entity material - entity classification - entity animal - entity animal_patient - animal treatment_station - resource diagnostic_kit - resource procedure_equipment - resource regulatory_document - resource consumable_unit - resource schedule_slot - resource specialist_resource - resource diagnostic_device - resource medication_batch - material sample_record - material owner_authorization - material clinical_signature - classification triage_category - classification intervention_bundle - classification animal_age_group - animal_patient case_file_group - animal_patient adult_animal - animal_age_group juvenile_animal - animal_age_group case_file - case_file_group)
+
+  (:predicates
+    (animal_registered ?animal_patient - animal_patient)
+    (subject_ready_for_intervention ?animal_patient - animal_patient)
+    (station_allocated ?animal_patient - animal_patient)
+    (discharged_entity ?animal_patient - animal_patient)
+    (treatment_performed_on_subject ?animal_patient - animal_patient)
+    (release_ready ?animal_patient - animal_patient)
+    (station_available ?treatment_station - treatment_station)
+    (assigned_to_station ?animal_patient - animal_patient ?treatment_station - treatment_station)
+    (diagnostic_kit_available ?diagnostic_kit - diagnostic_kit)
+    (diagnostic_kit_assigned ?animal_patient - animal_patient ?diagnostic_kit - diagnostic_kit)
+    (equipment_available ?procedure_equipment - procedure_equipment)
+    (equipment_allocated ?animal_patient - animal_patient ?procedure_equipment - procedure_equipment)
+    (medication_batch_available ?medication_batch - medication_batch)
+    (medication_allocated_to_adult ?adult_animal - adult_animal ?medication_batch - medication_batch)
+    (medication_allocated_to_juvenile ?juvenile_animal - juvenile_animal ?medication_batch - medication_batch)
+    (adult_has_clinical_signature ?adult_animal - adult_animal ?clinical_signature - clinical_signature)
+    (clinical_signature_flag_primary ?clinical_signature - clinical_signature)
+    (clinical_signature_flag_secondary ?clinical_signature - clinical_signature)
+    (adult_ready_for_bundle ?adult_animal - adult_animal)
+    (juvenile_has_triage_category ?juvenile_animal - juvenile_animal ?triage_category - triage_category)
+    (triage_category_assigned ?triage_category - triage_category)
+    (triage_category_secondary_assigned ?triage_category - triage_category)
+    (juvenile_ready_for_bundle ?juvenile_animal - juvenile_animal)
+    (intervention_bundle_available ?intervention_bundle - intervention_bundle)
+    (intervention_bundle_ready ?intervention_bundle - intervention_bundle)
+    (bundle_includes_clinical_signature ?intervention_bundle - intervention_bundle ?clinical_signature - clinical_signature)
+    (bundle_includes_triage_category ?intervention_bundle - intervention_bundle ?triage_category - triage_category)
+    (bundle_flag_consents_required ?intervention_bundle - intervention_bundle)
+    (bundle_flag_specialist_required ?intervention_bundle - intervention_bundle)
+    (bundle_locked_for_execution ?intervention_bundle - intervention_bundle)
+    (case_linked_to_adult ?case_file - case_file ?adult_animal - adult_animal)
+    (case_linked_to_juvenile ?case_file - case_file ?juvenile_animal - juvenile_animal)
+    (case_linked_to_bundle ?case_file - case_file ?intervention_bundle - intervention_bundle)
+    (sample_record_available ?sample_record - sample_record)
+    (case_has_sample ?case_file - case_file ?sample_record - sample_record)
+    (sample_taken ?sample_record - sample_record)
+    (sample_linked_to_bundle ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    (case_ready_for_specialist_allocation ?case_file - case_file)
+    (specialist_resource_allocated ?case_file - case_file)
+    (specialist_resource_ready ?case_file - case_file)
+    (regulatory_document_attached ?case_file - case_file)
+    (specialist_document_verified ?case_file - case_file)
+    (specialist_checks_completed ?case_file - case_file)
+    (procedure_executed_on_case ?case_file - case_file)
+    (owner_authorization_available ?owner_authorization - owner_authorization)
+    (case_has_owner_authorization ?case_file - case_file ?owner_authorization - owner_authorization)
+    (owner_authorization_attached ?case_file - case_file)
+    (equipment_cleared ?case_file - case_file)
+    (equipment_verified ?case_file - case_file)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (case_has_regulatory_document ?case_file - case_file ?regulatory_document - regulatory_document)
+    (consumable_unit_available ?consumable_unit - consumable_unit)
+    (case_allocated_consumable_unit ?case_file - case_file ?consumable_unit - consumable_unit)
+    (specialist_resource_available ?specialist_resource - specialist_resource)
+    (allocated_specialist_resource ?case_file - case_file ?specialist_resource - specialist_resource)
+    (diagnostic_device_available ?diagnostic_device - diagnostic_device)
+    (assigned_diagnostic_device ?case_file - case_file ?diagnostic_device - diagnostic_device)
+    (schedule_slot_available ?schedule_slot - schedule_slot)
+    (assigned_schedule_slot ?animal_patient - animal_patient ?schedule_slot - schedule_slot)
+    (adult_flagged_for_bundle ?adult_animal - adult_animal)
+    (juvenile_flagged_for_bundle ?juvenile_animal - juvenile_animal)
+    (case_file_finalized ?case_file - case_file)
+  )
+  (:action register_animal
+    :parameters (?animal_patient - animal_patient)
+    :precondition
+      (and
+        (not
+          (animal_registered ?animal_patient)
+        )
+        (not
+          (discharged_entity ?animal_patient)
+        )
+      )
+    :effect (animal_registered ?animal_patient)
+  )
+  (:action assign_treatment_station
+    :parameters (?animal_patient - animal_patient ?treatment_station - treatment_station)
+    :precondition
+      (and
+        (animal_registered ?animal_patient)
+        (not
+          (station_allocated ?animal_patient)
+        )
+        (station_available ?treatment_station)
+      )
+    :effect
+      (and
+        (station_allocated ?animal_patient)
+        (assigned_to_station ?animal_patient ?treatment_station)
+        (not
+          (station_available ?treatment_station)
+        )
+      )
+  )
+  (:action assign_diagnostic_kit
+    :parameters (?animal_patient - animal_patient ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (animal_registered ?animal_patient)
+        (station_allocated ?animal_patient)
+        (diagnostic_kit_available ?diagnostic_kit)
+      )
+    :effect
+      (and
+        (diagnostic_kit_assigned ?animal_patient ?diagnostic_kit)
+        (not
+          (diagnostic_kit_available ?diagnostic_kit)
+        )
+      )
+  )
+  (:action finalize_diagnostics
+    :parameters (?animal_patient - animal_patient ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (animal_registered ?animal_patient)
+        (station_allocated ?animal_patient)
+        (diagnostic_kit_assigned ?animal_patient ?diagnostic_kit)
+        (not
+          (subject_ready_for_intervention ?animal_patient)
+        )
+      )
+    :effect (subject_ready_for_intervention ?animal_patient)
+  )
+  (:action release_diagnostic_kit
+    :parameters (?animal_patient - animal_patient ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (diagnostic_kit_assigned ?animal_patient ?diagnostic_kit)
+      )
+    :effect
+      (and
+        (diagnostic_kit_available ?diagnostic_kit)
+        (not
+          (diagnostic_kit_assigned ?animal_patient ?diagnostic_kit)
+        )
+      )
+  )
+  (:action allocate_procedure_equipment
+    :parameters (?animal_patient - animal_patient ?procedure_equipment - procedure_equipment)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?animal_patient)
+        (equipment_available ?procedure_equipment)
+      )
+    :effect
+      (and
+        (equipment_allocated ?animal_patient ?procedure_equipment)
+        (not
+          (equipment_available ?procedure_equipment)
+        )
+      )
+  )
+  (:action release_procedure_equipment
+    :parameters (?animal_patient - animal_patient ?procedure_equipment - procedure_equipment)
+    :precondition
+      (and
+        (equipment_allocated ?animal_patient ?procedure_equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?procedure_equipment)
+        (not
+          (equipment_allocated ?animal_patient ?procedure_equipment)
+        )
+      )
+  )
+  (:action assign_specialist_resource
+    :parameters (?case_file - case_file ?specialist_resource - specialist_resource)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (specialist_resource_available ?specialist_resource)
+      )
+    :effect
+      (and
+        (allocated_specialist_resource ?case_file ?specialist_resource)
+        (not
+          (specialist_resource_available ?specialist_resource)
+        )
+      )
+  )
+  (:action release_specialist_resource
+    :parameters (?case_file - case_file ?specialist_resource - specialist_resource)
+    :precondition
+      (and
+        (allocated_specialist_resource ?case_file ?specialist_resource)
+      )
+    :effect
+      (and
+        (specialist_resource_available ?specialist_resource)
+        (not
+          (allocated_specialist_resource ?case_file ?specialist_resource)
+        )
+      )
+  )
+  (:action assign_diagnostic_device
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (diagnostic_device_available ?diagnostic_device)
+      )
+    :effect
+      (and
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (not
+          (diagnostic_device_available ?diagnostic_device)
+        )
+      )
+  )
+  (:action release_diagnostic_device
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device)
+    :precondition
+      (and
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+      )
+    :effect
+      (and
+        (diagnostic_device_available ?diagnostic_device)
+        (not
+          (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        )
+      )
+  )
+  (:action activate_clinical_signature
+    :parameters (?adult_animal - adult_animal ?clinical_signature - clinical_signature ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?adult_animal)
+        (diagnostic_kit_assigned ?adult_animal ?diagnostic_kit)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (not
+          (clinical_signature_flag_primary ?clinical_signature)
+        )
+        (not
+          (clinical_signature_flag_secondary ?clinical_signature)
+        )
+      )
+    :effect (clinical_signature_flag_primary ?clinical_signature)
+  )
+  (:action confirm_equipment_and_flag_adult
+    :parameters (?adult_animal - adult_animal ?clinical_signature - clinical_signature ?procedure_equipment - procedure_equipment)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?adult_animal)
+        (equipment_allocated ?adult_animal ?procedure_equipment)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (clinical_signature_flag_primary ?clinical_signature)
+        (not
+          (adult_flagged_for_bundle ?adult_animal)
+        )
+      )
+    :effect
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (adult_ready_for_bundle ?adult_animal)
+      )
+  )
+  (:action allocate_medication_to_adult
+    :parameters (?adult_animal - adult_animal ?clinical_signature - clinical_signature ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?adult_animal)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (medication_batch_available ?medication_batch)
+        (not
+          (adult_flagged_for_bundle ?adult_animal)
+        )
+      )
+    :effect
+      (and
+        (clinical_signature_flag_secondary ?clinical_signature)
+        (adult_flagged_for_bundle ?adult_animal)
+        (medication_allocated_to_adult ?adult_animal ?medication_batch)
+        (not
+          (medication_batch_available ?medication_batch)
+        )
+      )
+  )
+  (:action finalize_adult_medication_allocation
+    :parameters (?adult_animal - adult_animal ?clinical_signature - clinical_signature ?diagnostic_kit - diagnostic_kit ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?adult_animal)
+        (diagnostic_kit_assigned ?adult_animal ?diagnostic_kit)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (clinical_signature_flag_secondary ?clinical_signature)
+        (medication_allocated_to_adult ?adult_animal ?medication_batch)
+        (not
+          (adult_ready_for_bundle ?adult_animal)
+        )
+      )
+    :effect
+      (and
+        (clinical_signature_flag_primary ?clinical_signature)
+        (adult_ready_for_bundle ?adult_animal)
+        (medication_batch_available ?medication_batch)
+        (not
+          (medication_allocated_to_adult ?adult_animal ?medication_batch)
+        )
+      )
+  )
+  (:action assign_triage_category_to_juvenile
+    :parameters (?juvenile_animal - juvenile_animal ?triage_category - triage_category ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?juvenile_animal)
+        (diagnostic_kit_assigned ?juvenile_animal ?diagnostic_kit)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (not
+          (triage_category_assigned ?triage_category)
+        )
+        (not
+          (triage_category_secondary_assigned ?triage_category)
+        )
+      )
+    :effect (triage_category_assigned ?triage_category)
+  )
+  (:action confirm_equipment_for_juvenile
+    :parameters (?juvenile_animal - juvenile_animal ?triage_category - triage_category ?procedure_equipment - procedure_equipment)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?juvenile_animal)
+        (equipment_allocated ?juvenile_animal ?procedure_equipment)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (triage_category_assigned ?triage_category)
+        (not
+          (juvenile_flagged_for_bundle ?juvenile_animal)
+        )
+      )
+    :effect
+      (and
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (juvenile_ready_for_bundle ?juvenile_animal)
+      )
+  )
+  (:action allocate_medication_to_juvenile
+    :parameters (?juvenile_animal - juvenile_animal ?triage_category - triage_category ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?juvenile_animal)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (medication_batch_available ?medication_batch)
+        (not
+          (juvenile_flagged_for_bundle ?juvenile_animal)
+        )
+      )
+    :effect
+      (and
+        (triage_category_secondary_assigned ?triage_category)
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (medication_allocated_to_juvenile ?juvenile_animal ?medication_batch)
+        (not
+          (medication_batch_available ?medication_batch)
+        )
+      )
+  )
+  (:action finalize_juvenile_medication_allocation
+    :parameters (?juvenile_animal - juvenile_animal ?triage_category - triage_category ?diagnostic_kit - diagnostic_kit ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?juvenile_animal)
+        (diagnostic_kit_assigned ?juvenile_animal ?diagnostic_kit)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (triage_category_secondary_assigned ?triage_category)
+        (medication_allocated_to_juvenile ?juvenile_animal ?medication_batch)
+        (not
+          (juvenile_ready_for_bundle ?juvenile_animal)
+        )
+      )
+    :effect
+      (and
+        (triage_category_assigned ?triage_category)
+        (juvenile_ready_for_bundle ?juvenile_animal)
+        (medication_batch_available ?medication_batch)
+        (not
+          (medication_allocated_to_juvenile ?juvenile_animal ?medication_batch)
+        )
+      )
+  )
+  (:action assemble_intervention_bundle
+    :parameters (?adult_animal - adult_animal ?juvenile_animal - juvenile_animal ?clinical_signature - clinical_signature ?triage_category - triage_category ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (clinical_signature_flag_primary ?clinical_signature)
+        (triage_category_assigned ?triage_category)
+        (adult_ready_for_bundle ?adult_animal)
+        (juvenile_ready_for_bundle ?juvenile_animal)
+        (intervention_bundle_available ?intervention_bundle)
+      )
+    :effect
+      (and
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_includes_clinical_signature ?intervention_bundle ?clinical_signature)
+        (bundle_includes_triage_category ?intervention_bundle ?triage_category)
+        (not
+          (intervention_bundle_available ?intervention_bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_secondary_signature
+    :parameters (?adult_animal - adult_animal ?juvenile_animal - juvenile_animal ?clinical_signature - clinical_signature ?triage_category - triage_category ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (clinical_signature_flag_secondary ?clinical_signature)
+        (triage_category_assigned ?triage_category)
+        (not
+          (adult_ready_for_bundle ?adult_animal)
+        )
+        (juvenile_ready_for_bundle ?juvenile_animal)
+        (intervention_bundle_available ?intervention_bundle)
+      )
+    :effect
+      (and
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_includes_clinical_signature ?intervention_bundle ?clinical_signature)
+        (bundle_includes_triage_category ?intervention_bundle ?triage_category)
+        (bundle_flag_consents_required ?intervention_bundle)
+        (not
+          (intervention_bundle_available ?intervention_bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_specialist_flag
+    :parameters (?adult_animal - adult_animal ?juvenile_animal - juvenile_animal ?clinical_signature - clinical_signature ?triage_category - triage_category ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (clinical_signature_flag_primary ?clinical_signature)
+        (triage_category_secondary_assigned ?triage_category)
+        (adult_ready_for_bundle ?adult_animal)
+        (not
+          (juvenile_ready_for_bundle ?juvenile_animal)
+        )
+        (intervention_bundle_available ?intervention_bundle)
+      )
+    :effect
+      (and
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_includes_clinical_signature ?intervention_bundle ?clinical_signature)
+        (bundle_includes_triage_category ?intervention_bundle ?triage_category)
+        (bundle_flag_specialist_required ?intervention_bundle)
+        (not
+          (intervention_bundle_available ?intervention_bundle)
+        )
+      )
+  )
+  (:action assemble_bundle_with_both_flags
+    :parameters (?adult_animal - adult_animal ?juvenile_animal - juvenile_animal ?clinical_signature - clinical_signature ?triage_category - triage_category ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (adult_has_clinical_signature ?adult_animal ?clinical_signature)
+        (juvenile_has_triage_category ?juvenile_animal ?triage_category)
+        (clinical_signature_flag_secondary ?clinical_signature)
+        (triage_category_secondary_assigned ?triage_category)
+        (not
+          (adult_ready_for_bundle ?adult_animal)
+        )
+        (not
+          (juvenile_ready_for_bundle ?juvenile_animal)
+        )
+        (intervention_bundle_available ?intervention_bundle)
+      )
+    :effect
+      (and
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_includes_clinical_signature ?intervention_bundle ?clinical_signature)
+        (bundle_includes_triage_category ?intervention_bundle ?triage_category)
+        (bundle_flag_consents_required ?intervention_bundle)
+        (bundle_flag_specialist_required ?intervention_bundle)
+        (not
+          (intervention_bundle_available ?intervention_bundle)
+        )
+      )
+  )
+  (:action lock_bundle_for_execution
+    :parameters (?intervention_bundle - intervention_bundle ?adult_animal - adult_animal ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (intervention_bundle_ready ?intervention_bundle)
+        (adult_flagged_for_bundle ?adult_animal)
+        (diagnostic_kit_assigned ?adult_animal ?diagnostic_kit)
+        (not
+          (bundle_locked_for_execution ?intervention_bundle)
+        )
+      )
+    :effect (bundle_locked_for_execution ?intervention_bundle)
+  )
+  (:action reserve_and_link_sample_to_bundle
+    :parameters (?case_file - case_file ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (case_linked_to_bundle ?case_file ?intervention_bundle)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_record_available ?sample_record)
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_locked_for_execution ?intervention_bundle)
+        (not
+          (sample_taken ?sample_record)
+        )
+      )
+    :effect
+      (and
+        (sample_taken ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (not
+          (sample_record_available ?sample_record)
+        )
+      )
+  )
+  (:action prepare_case_for_specialist_allocation
+    :parameters (?case_file - case_file ?sample_record - sample_record ?intervention_bundle - intervention_bundle ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_taken ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (diagnostic_kit_assigned ?case_file ?diagnostic_kit)
+        (not
+          (bundle_flag_consents_required ?intervention_bundle)
+        )
+        (not
+          (case_ready_for_specialist_allocation ?case_file)
+        )
+      )
+    :effect (case_ready_for_specialist_allocation ?case_file)
+  )
+  (:action attach_regulatory_document_to_case
+    :parameters (?case_file - case_file ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (regulatory_document_attached ?case_file)
+        )
+      )
+    :effect
+      (and
+        (regulatory_document_attached ?case_file)
+        (case_has_regulatory_document ?case_file ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action verify_regulatory_and_ready_case
+    :parameters (?case_file - case_file ?sample_record - sample_record ?intervention_bundle - intervention_bundle ?diagnostic_kit - diagnostic_kit ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_taken ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (diagnostic_kit_assigned ?case_file ?diagnostic_kit)
+        (bundle_flag_consents_required ?intervention_bundle)
+        (regulatory_document_attached ?case_file)
+        (case_has_regulatory_document ?case_file ?regulatory_document)
+        (not
+          (case_ready_for_specialist_allocation ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_specialist_allocation ?case_file)
+        (specialist_document_verified ?case_file)
+      )
+  )
+  (:action assign_specialist_and_confirm
+    :parameters (?case_file - case_file ?specialist_resource - specialist_resource ?procedure_equipment - procedure_equipment ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (case_ready_for_specialist_allocation ?case_file)
+        (allocated_specialist_resource ?case_file ?specialist_resource)
+        (equipment_allocated ?case_file ?procedure_equipment)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (not
+          (bundle_flag_specialist_required ?intervention_bundle)
+        )
+        (not
+          (specialist_resource_allocated ?case_file)
+        )
+      )
+    :effect (specialist_resource_allocated ?case_file)
+  )
+  (:action assign_specialist_and_confirm_variant
+    :parameters (?case_file - case_file ?specialist_resource - specialist_resource ?procedure_equipment - procedure_equipment ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (case_ready_for_specialist_allocation ?case_file)
+        (allocated_specialist_resource ?case_file ?specialist_resource)
+        (equipment_allocated ?case_file ?procedure_equipment)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (bundle_flag_specialist_required ?intervention_bundle)
+        (not
+          (specialist_resource_allocated ?case_file)
+        )
+      )
+    :effect (specialist_resource_allocated ?case_file)
+  )
+  (:action confirm_diagnostic_device_and_specialist_ready
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (specialist_resource_allocated ?case_file)
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (not
+          (bundle_flag_consents_required ?intervention_bundle)
+        )
+        (not
+          (bundle_flag_specialist_required ?intervention_bundle)
+        )
+        (not
+          (specialist_resource_ready ?case_file)
+        )
+      )
+    :effect (specialist_resource_ready ?case_file)
+  )
+  (:action confirm_specialist_ready_and_record_checks
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (specialist_resource_allocated ?case_file)
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (bundle_flag_consents_required ?intervention_bundle)
+        (not
+          (bundle_flag_specialist_required ?intervention_bundle)
+        )
+        (not
+          (specialist_resource_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (specialist_resource_ready ?case_file)
+        (specialist_checks_completed ?case_file)
+      )
+  )
+  (:action confirm_specialist_ready_and_record_checks_variant
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (specialist_resource_allocated ?case_file)
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (not
+          (bundle_flag_consents_required ?intervention_bundle)
+        )
+        (bundle_flag_specialist_required ?intervention_bundle)
+        (not
+          (specialist_resource_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (specialist_resource_ready ?case_file)
+        (specialist_checks_completed ?case_file)
+      )
+  )
+  (:action confirm_specialist_ready_and_record_checks_final
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device ?sample_record - sample_record ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (specialist_resource_allocated ?case_file)
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (case_has_sample ?case_file ?sample_record)
+        (sample_linked_to_bundle ?sample_record ?intervention_bundle)
+        (bundle_flag_consents_required ?intervention_bundle)
+        (bundle_flag_specialist_required ?intervention_bundle)
+        (not
+          (specialist_resource_ready ?case_file)
+        )
+      )
+    :effect
+      (and
+        (specialist_resource_ready ?case_file)
+        (specialist_checks_completed ?case_file)
+      )
+  )
+  (:action execute_procedure_on_case
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (specialist_resource_ready ?case_file)
+        (not
+          (specialist_checks_completed ?case_file)
+        )
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (treatment_performed_on_subject ?case_file)
+      )
+  )
+  (:action allocate_consumable_to_case
+    :parameters (?case_file - case_file ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (specialist_resource_ready ?case_file)
+        (specialist_checks_completed ?case_file)
+        (consumable_unit_available ?consumable_unit)
+      )
+    :effect
+      (and
+        (case_allocated_consumable_unit ?case_file ?consumable_unit)
+        (not
+          (consumable_unit_available ?consumable_unit)
+        )
+      )
+  )
+  (:action apply_intervention_steps_to_case
+    :parameters (?case_file - case_file ?adult_animal - adult_animal ?juvenile_animal - juvenile_animal ?diagnostic_kit - diagnostic_kit ?consumable_unit - consumable_unit)
+    :precondition
+      (and
+        (specialist_resource_ready ?case_file)
+        (specialist_checks_completed ?case_file)
+        (case_allocated_consumable_unit ?case_file ?consumable_unit)
+        (case_linked_to_adult ?case_file ?adult_animal)
+        (case_linked_to_juvenile ?case_file ?juvenile_animal)
+        (adult_ready_for_bundle ?adult_animal)
+        (juvenile_ready_for_bundle ?juvenile_animal)
+        (diagnostic_kit_assigned ?case_file ?diagnostic_kit)
+        (not
+          (procedure_executed_on_case ?case_file)
+        )
+      )
+    :effect (procedure_executed_on_case ?case_file)
+  )
+  (:action finalize_case_after_execution
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (specialist_resource_ready ?case_file)
+        (procedure_executed_on_case ?case_file)
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (treatment_performed_on_subject ?case_file)
+      )
+  )
+  (:action attach_owner_authorization
+    :parameters (?case_file - case_file ?owner_authorization - owner_authorization ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (subject_ready_for_intervention ?case_file)
+        (diagnostic_kit_assigned ?case_file ?diagnostic_kit)
+        (owner_authorization_available ?owner_authorization)
+        (case_has_owner_authorization ?case_file ?owner_authorization)
+        (not
+          (owner_authorization_attached ?case_file)
+        )
+      )
+    :effect
+      (and
+        (owner_authorization_attached ?case_file)
+        (not
+          (owner_authorization_available ?owner_authorization)
+        )
+      )
+  )
+  (:action clear_equipment_for_case
+    :parameters (?case_file - case_file ?procedure_equipment - procedure_equipment)
+    :precondition
+      (and
+        (owner_authorization_attached ?case_file)
+        (equipment_allocated ?case_file ?procedure_equipment)
+        (not
+          (equipment_cleared ?case_file)
+        )
+      )
+    :effect (equipment_cleared ?case_file)
+  )
+  (:action verify_equipment_with_device
+    :parameters (?case_file - case_file ?diagnostic_device - diagnostic_device)
+    :precondition
+      (and
+        (equipment_cleared ?case_file)
+        (assigned_diagnostic_device ?case_file ?diagnostic_device)
+        (not
+          (equipment_verified ?case_file)
+        )
+      )
+    :effect (equipment_verified ?case_file)
+  )
+  (:action finalize_case_with_equipment_verification
+    :parameters (?case_file - case_file)
+    :precondition
+      (and
+        (equipment_verified ?case_file)
+        (not
+          (case_file_finalized ?case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?case_file)
+        (treatment_performed_on_subject ?case_file)
+      )
+  )
+  (:action mark_adult_as_treated
+    :parameters (?adult_animal - adult_animal ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (adult_flagged_for_bundle ?adult_animal)
+        (adult_ready_for_bundle ?adult_animal)
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_locked_for_execution ?intervention_bundle)
+        (not
+          (treatment_performed_on_subject ?adult_animal)
+        )
+      )
+    :effect (treatment_performed_on_subject ?adult_animal)
+  )
+  (:action mark_juvenile_as_treated
+    :parameters (?juvenile_animal - juvenile_animal ?intervention_bundle - intervention_bundle)
+    :precondition
+      (and
+        (juvenile_flagged_for_bundle ?juvenile_animal)
+        (juvenile_ready_for_bundle ?juvenile_animal)
+        (intervention_bundle_ready ?intervention_bundle)
+        (bundle_locked_for_execution ?intervention_bundle)
+        (not
+          (treatment_performed_on_subject ?juvenile_animal)
+        )
+      )
+    :effect (treatment_performed_on_subject ?juvenile_animal)
+  )
+  (:action schedule_animal_for_release
+    :parameters (?animal_patient - animal_patient ?schedule_slot - schedule_slot ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (treatment_performed_on_subject ?animal_patient)
+        (diagnostic_kit_assigned ?animal_patient ?diagnostic_kit)
+        (schedule_slot_available ?schedule_slot)
+        (not
+          (release_ready ?animal_patient)
+        )
+      )
+    :effect
+      (and
+        (release_ready ?animal_patient)
+        (assigned_schedule_slot ?animal_patient ?schedule_slot)
+        (not
+          (schedule_slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action discharge_adult_and_release_resources
+    :parameters (?adult_animal - adult_animal ?treatment_station - treatment_station ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (release_ready ?adult_animal)
+        (assigned_to_station ?adult_animal ?treatment_station)
+        (assigned_schedule_slot ?adult_animal ?schedule_slot)
+        (not
+          (discharged_entity ?adult_animal)
+        )
+      )
+    :effect
+      (and
+        (discharged_entity ?adult_animal)
+        (station_available ?treatment_station)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+  (:action discharge_juvenile_and_release_resources
+    :parameters (?juvenile_animal - juvenile_animal ?treatment_station - treatment_station ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (release_ready ?juvenile_animal)
+        (assigned_to_station ?juvenile_animal ?treatment_station)
+        (assigned_schedule_slot ?juvenile_animal ?schedule_slot)
+        (not
+          (discharged_entity ?juvenile_animal)
+        )
+      )
+    :effect
+      (and
+        (discharged_entity ?juvenile_animal)
+        (station_available ?treatment_station)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+  (:action discharge_case_and_release_resources
+    :parameters (?case_file - case_file ?treatment_station - treatment_station ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (release_ready ?case_file)
+        (assigned_to_station ?case_file ?treatment_station)
+        (assigned_schedule_slot ?case_file ?schedule_slot)
+        (not
+          (discharged_entity ?case_file)
+        )
+      )
+    :effect
+      (and
+        (discharged_entity ?case_file)
+        (station_available ?treatment_station)
+        (schedule_slot_available ?schedule_slot)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem herd_veterinary_intervention_problem)
+  (:domain veterinary_intervention_priority_ordering)
+  (:objects adult_animal_1 - adult_animal juvenile_animal_1 - juvenile_animal case_file_1 - case_file case_file_2 - case_file treatment_station_1 - treatment_station treatment_station_2 - treatment_station treatment_station_3 - treatment_station diagnostic_kit_1 - diagnostic_kit procedure_equipment_1 - procedure_equipment medication_batch_1 - medication_batch clinical_signature_1 - clinical_signature triage_category_1 - triage_category intervention_bundle_1 - intervention_bundle sample_record_1 - sample_record sample_record_2 - sample_record regulatory_document_1 - regulatory_document regulatory_document_2 - regulatory_document consumable_unit_1 - consumable_unit consumable_unit_2 - consumable_unit schedule_slot_1 - schedule_slot specialist_resource_1 - specialist_resource owner_authorization_1 - owner_authorization owner_authorization_2 - owner_authorization diagnostic_device_1 - diagnostic_device)
+  (:init
+    (station_available treatment_station_1)
+    (station_available treatment_station_2)
+    (station_available treatment_station_3)
+    (diagnostic_kit_available diagnostic_kit_1)
+    (equipment_available procedure_equipment_1)
+    (medication_batch_available medication_batch_1)
+    (adult_has_clinical_signature adult_animal_1 clinical_signature_1)
+    (juvenile_has_triage_category juvenile_animal_1 triage_category_1)
+    (intervention_bundle_available intervention_bundle_1)
+    (sample_record_available sample_record_1)
+    (sample_record_available sample_record_2)
+    (case_linked_to_adult case_file_1 adult_animal_1)
+    (case_linked_to_adult case_file_2 adult_animal_1)
+    (case_linked_to_juvenile case_file_1 juvenile_animal_1)
+    (case_linked_to_juvenile case_file_2 juvenile_animal_1)
+    (case_linked_to_bundle case_file_1 intervention_bundle_1)
+    (case_linked_to_bundle case_file_2 intervention_bundle_1)
+    (case_has_sample case_file_1 sample_record_1)
+    (case_has_sample case_file_2 sample_record_2)
+    (regulatory_document_available regulatory_document_1)
+    (regulatory_document_available regulatory_document_2)
+    (consumable_unit_available consumable_unit_1)
+    (consumable_unit_available consumable_unit_2)
+    (schedule_slot_available schedule_slot_1)
+    (specialist_resource_available specialist_resource_1)
+    (owner_authorization_available owner_authorization_1)
+    (case_has_owner_authorization case_file_1 owner_authorization_1)
+    (case_has_owner_authorization case_file_2 owner_authorization_2)
+    (diagnostic_device_available diagnostic_device_1)
+  )
+  (:goal
+    (and
+      (discharged_entity adult_animal_1)
+      (discharged_entity juvenile_animal_1)
+      (discharged_entity case_file_1)
+      (discharged_entity case_file_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_animal adult_animal_1)
+(assign_treatment_station adult_animal_1 treatment_station_1)
+(assign_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(finalize_diagnostics adult_animal_1 diagnostic_kit_1)
+(activate_clinical_signature adult_animal_1 clinical_signature_1 diagnostic_kit_1)
+(allocate_procedure_equipment adult_animal_1 procedure_equipment_1)
+(confirm_equipment_and_flag_adult adult_animal_1 clinical_signature_1 procedure_equipment_1)
+(release_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(register_animal juvenile_animal_1)
+(assign_treatment_station juvenile_animal_1 treatment_station_2)
+(assign_diagnostic_kit juvenile_animal_1 diagnostic_kit_1)
+(finalize_diagnostics juvenile_animal_1 diagnostic_kit_1)
+(assign_triage_category_to_juvenile juvenile_animal_1 triage_category_1 diagnostic_kit_1)
+(release_procedure_equipment adult_animal_1 procedure_equipment_1)
+(allocate_procedure_equipment juvenile_animal_1 procedure_equipment_1)
+(confirm_equipment_for_juvenile juvenile_animal_1 triage_category_1 procedure_equipment_1)
+(assemble_intervention_bundle adult_animal_1 juvenile_animal_1 clinical_signature_1 triage_category_1 intervention_bundle_1)
+(release_diagnostic_kit juvenile_animal_1 diagnostic_kit_1)
+(assign_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(lock_bundle_for_execution intervention_bundle_1 adult_animal_1 diagnostic_kit_1)
+(mark_adult_as_treated adult_animal_1 intervention_bundle_1)
+(mark_juvenile_as_treated juvenile_animal_1 intervention_bundle_1)
+(release_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(release_procedure_equipment juvenile_animal_1 procedure_equipment_1)
+(register_animal case_file_1)
+(assign_treatment_station case_file_1 treatment_station_3)
+(assign_diagnostic_kit case_file_1 diagnostic_kit_1)
+(finalize_diagnostics case_file_1 diagnostic_kit_1)
+(reserve_and_link_sample_to_bundle case_file_1 sample_record_1 intervention_bundle_1)
+(prepare_case_for_specialist_allocation case_file_1 sample_record_1 intervention_bundle_1 diagnostic_kit_1)
+(assign_specialist_resource case_file_1 specialist_resource_1)
+(allocate_procedure_equipment case_file_1 procedure_equipment_1)
+(assign_specialist_and_confirm case_file_1 specialist_resource_1 procedure_equipment_1 sample_record_1 intervention_bundle_1)
+(assign_diagnostic_device case_file_1 diagnostic_device_1)
+(confirm_diagnostic_device_and_specialist_ready case_file_1 diagnostic_device_1 sample_record_1 intervention_bundle_1)
+(execute_procedure_on_case case_file_1)
+(schedule_animal_for_release case_file_1 schedule_slot_1 diagnostic_kit_1)
+(discharge_case_and_release_resources case_file_1 treatment_station_3 schedule_slot_1)
+(release_diagnostic_kit case_file_1 diagnostic_kit_1)
+(release_procedure_equipment case_file_1 procedure_equipment_1)
+(release_diagnostic_device case_file_1 diagnostic_device_1)
+(release_specialist_resource case_file_1 specialist_resource_1)
+(register_animal case_file_2)
+(assign_treatment_station case_file_2 treatment_station_3)
+(assign_diagnostic_kit case_file_2 diagnostic_kit_1)
+(finalize_diagnostics case_file_2 diagnostic_kit_1)
+(reserve_and_link_sample_to_bundle case_file_2 sample_record_2 intervention_bundle_1)
+(prepare_case_for_specialist_allocation case_file_2 sample_record_2 intervention_bundle_1 diagnostic_kit_1)
+(assign_specialist_resource case_file_2 specialist_resource_1)
+(allocate_procedure_equipment case_file_2 procedure_equipment_1)
+(assign_specialist_and_confirm case_file_2 specialist_resource_1 procedure_equipment_1 sample_record_2 intervention_bundle_1)
+(assign_diagnostic_device case_file_2 diagnostic_device_1)
+(confirm_diagnostic_device_and_specialist_ready case_file_2 diagnostic_device_1 sample_record_2 intervention_bundle_1)
+(execute_procedure_on_case case_file_2)
+(schedule_animal_for_release case_file_2 schedule_slot_1 diagnostic_kit_1)
+(discharge_case_and_release_resources case_file_2 treatment_station_3 schedule_slot_1)
+(release_diagnostic_kit case_file_2 diagnostic_kit_1)
+(release_procedure_equipment case_file_2 procedure_equipment_1)
+(release_diagnostic_device case_file_2 diagnostic_device_1)
+(release_specialist_resource case_file_2 specialist_resource_1)
+(assign_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(schedule_animal_for_release adult_animal_1 schedule_slot_1 diagnostic_kit_1)
+(discharge_adult_and_release_resources adult_animal_1 treatment_station_1 schedule_slot_1)
+(release_diagnostic_kit adult_animal_1 diagnostic_kit_1)
+(assign_diagnostic_kit juvenile_animal_1 diagnostic_kit_1)
+(schedule_animal_for_release juvenile_animal_1 schedule_slot_1 diagnostic_kit_1)
+(discharge_juvenile_and_release_resources juvenile_animal_1 treatment_station_2 schedule_slot_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ydf124hd/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_ydf124hd/plan.pddl 67 
+
+
+
+--- stderr ---
+

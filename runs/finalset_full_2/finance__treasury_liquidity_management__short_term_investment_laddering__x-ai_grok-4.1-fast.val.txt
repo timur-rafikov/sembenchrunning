@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain short_term_investment_laddering_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types account_category - object counterparty_category - object instrument_category - object account_generic - object account_unit - account_generic counterparty_bank - account_category instrument_offer - account_category execution_channel - account_category approval_token - account_category allocation_policy - account_category liquidity_tag - account_category pricing_eligibility - account_category settlement_option - account_category buffer_tranche - counterparty_category security_id - counterparty_category deal_approval - counterparty_category maturity_bucket_short - instrument_category maturity_bucket_medium - instrument_category investment_lot - instrument_category account_subtype_a - account_unit account_subtype_b - account_unit entity_a_account - account_subtype_a entity_b_account - account_subtype_a treasury_pool - account_subtype_b)
+  (:predicates
+    (account_candidate ?account_unit - account_unit)
+    (account_approved ?account_unit - account_unit)
+    (counterparty_assigned_to_account ?account_unit - account_unit)
+    (invested_status ?account_unit - account_unit)
+    (processed_settlement_flag ?account_unit - account_unit)
+    (investment_finalized_for_account ?account_unit - account_unit)
+    (counterparty_available ?counterparty_bank - counterparty_bank)
+    (account_to_counterparty_link ?account_unit - account_unit ?counterparty_bank - counterparty_bank)
+    (instrument_offer_available ?instrument_offer - instrument_offer)
+    (instrument_reserved_for_account ?account_unit - account_unit ?instrument_offer - instrument_offer)
+    (execution_channel_available ?execution_channel - execution_channel)
+    (execution_channel_booked ?account_unit - account_unit ?execution_channel - execution_channel)
+    (buffer_tranche_available ?buffer_tranche - buffer_tranche)
+    (entity_a_buffer_allocated ?entity_a_account - entity_a_account ?buffer_tranche - buffer_tranche)
+    (entity_b_buffer_allocated ?entity_b_account - entity_b_account ?buffer_tranche - buffer_tranche)
+    (entity_a_to_maturity_bucket_link ?entity_a_account - entity_a_account ?maturity_bucket_short - maturity_bucket_short)
+    (bucket_signal_primary_short ?maturity_bucket_short - maturity_bucket_short)
+    (bucket_signal_secondary_short ?maturity_bucket_short - maturity_bucket_short)
+    (entity_a_ready_flag ?entity_a_account - entity_a_account)
+    (entity_b_to_maturity_bucket_link ?entity_b_account - entity_b_account ?maturity_bucket_medium - maturity_bucket_medium)
+    (bucket_signal_primary_medium ?maturity_bucket_medium - maturity_bucket_medium)
+    (bucket_signal_secondary_medium ?maturity_bucket_medium - maturity_bucket_medium)
+    (entity_b_ready_flag ?entity_b_account - entity_b_account)
+    (investment_lot_available ?investment_lot - investment_lot)
+    (investment_lot_allocated ?investment_lot - investment_lot)
+    (lot_linked_to_bucket_short ?investment_lot - investment_lot ?maturity_bucket_short - maturity_bucket_short)
+    (lot_linked_to_bucket_medium ?investment_lot - investment_lot ?maturity_bucket_medium - maturity_bucket_medium)
+    (lot_attribute_first_leg ?investment_lot - investment_lot)
+    (lot_attribute_second_leg ?investment_lot - investment_lot)
+    (lot_attribute_settlement_ready ?investment_lot - investment_lot)
+    (pool_to_entity_a_mapping ?treasury_pool - treasury_pool ?entity_a_account - entity_a_account)
+    (pool_to_entity_b_mapping ?treasury_pool - treasury_pool ?entity_b_account - entity_b_account)
+    (pool_to_lot_mapping ?treasury_pool - treasury_pool ?investment_lot - investment_lot)
+    (security_id_unbound ?security_id - security_id)
+    (pool_to_security_mapping ?treasury_pool - treasury_pool ?security_id - security_id)
+    (security_id_bound ?security_id - security_id)
+    (security_bound_to_lot ?security_id - security_id ?investment_lot - investment_lot)
+    (pool_flag_stage1 ?treasury_pool - treasury_pool)
+    (pool_flag_stage2 ?treasury_pool - treasury_pool)
+    (pool_flag_approval_complete ?treasury_pool - treasury_pool)
+    (pool_flag_approval_attached ?treasury_pool - treasury_pool)
+    (pool_allocations_validated ?treasury_pool - treasury_pool)
+    (pool_allocations_confirmed ?treasury_pool - treasury_pool)
+    (pool_validation_done ?treasury_pool - treasury_pool)
+    (deal_approval_available ?deal_approval - deal_approval)
+    (pool_has_deal_approval ?treasury_pool - treasury_pool ?deal_approval - deal_approval)
+    (pool_flag_deal_approval ?treasury_pool - treasury_pool)
+    (pool_flag_deal_approval_stage ?treasury_pool - treasury_pool)
+    (pool_flag_deal_approval_confirmed ?treasury_pool - treasury_pool)
+    (approval_token_available ?approval_token - approval_token)
+    (pool_has_approval_token ?treasury_pool - treasury_pool ?approval_token - approval_token)
+    (allocation_policy_available ?allocation_policy - allocation_policy)
+    (pool_has_allocation_policy ?treasury_pool - treasury_pool ?allocation_policy - allocation_policy)
+    (pricing_eligibility_available ?pricing_eligibility - pricing_eligibility)
+    (pool_has_pricing_eligibility ?treasury_pool - treasury_pool ?pricing_eligibility - pricing_eligibility)
+    (settlement_option_available ?settlement_option - settlement_option)
+    (pool_has_settlement_option ?treasury_pool - treasury_pool ?settlement_option - settlement_option)
+    (liquidity_tag_available ?liquidity_tag - liquidity_tag)
+    (account_has_liquidity_tag ?account_unit - account_unit ?liquidity_tag - liquidity_tag)
+    (entity_a_processing_flag ?entity_a_account - entity_a_account)
+    (entity_b_processing_flag ?entity_b_account - entity_b_account)
+    (pool_postprocessing_flag ?treasury_pool - treasury_pool)
+  )
+  (:action identify_account_candidate
+    :parameters (?account_unit - account_unit)
+    :precondition
+      (and
+        (not
+          (account_candidate ?account_unit)
+        )
+        (not
+          (invested_status ?account_unit)
+        )
+      )
+    :effect (account_candidate ?account_unit)
+  )
+  (:action assign_counterparty_to_account
+    :parameters (?account_unit - account_unit ?counterparty_bank - counterparty_bank)
+    :precondition
+      (and
+        (account_candidate ?account_unit)
+        (not
+          (counterparty_assigned_to_account ?account_unit)
+        )
+        (counterparty_available ?counterparty_bank)
+      )
+    :effect
+      (and
+        (counterparty_assigned_to_account ?account_unit)
+        (account_to_counterparty_link ?account_unit ?counterparty_bank)
+        (not
+          (counterparty_available ?counterparty_bank)
+        )
+      )
+  )
+  (:action reserve_instrument_for_account
+    :parameters (?account_unit - account_unit ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_candidate ?account_unit)
+        (counterparty_assigned_to_account ?account_unit)
+        (instrument_offer_available ?instrument_offer)
+      )
+    :effect
+      (and
+        (instrument_reserved_for_account ?account_unit ?instrument_offer)
+        (not
+          (instrument_offer_available ?instrument_offer)
+        )
+      )
+  )
+  (:action approve_account_for_investment
+    :parameters (?account_unit - account_unit ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_candidate ?account_unit)
+        (counterparty_assigned_to_account ?account_unit)
+        (instrument_reserved_for_account ?account_unit ?instrument_offer)
+        (not
+          (account_approved ?account_unit)
+        )
+      )
+    :effect (account_approved ?account_unit)
+  )
+  (:action release_instrument_reservation
+    :parameters (?account_unit - account_unit ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (instrument_reserved_for_account ?account_unit ?instrument_offer)
+      )
+    :effect
+      (and
+        (instrument_offer_available ?instrument_offer)
+        (not
+          (instrument_reserved_for_account ?account_unit ?instrument_offer)
+        )
+      )
+  )
+  (:action book_execution_channel_for_account
+    :parameters (?account_unit - account_unit ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (account_approved ?account_unit)
+        (execution_channel_available ?execution_channel)
+      )
+    :effect
+      (and
+        (execution_channel_booked ?account_unit ?execution_channel)
+        (not
+          (execution_channel_available ?execution_channel)
+        )
+      )
+  )
+  (:action release_execution_channel_for_account
+    :parameters (?account_unit - account_unit ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (execution_channel_booked ?account_unit ?execution_channel)
+      )
+    :effect
+      (and
+        (execution_channel_available ?execution_channel)
+        (not
+          (execution_channel_booked ?account_unit ?execution_channel)
+        )
+      )
+  )
+  (:action attach_pricing_eligibility_to_pool
+    :parameters (?treasury_pool - treasury_pool ?pricing_eligibility - pricing_eligibility)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (pricing_eligibility_available ?pricing_eligibility)
+      )
+    :effect
+      (and
+        (pool_has_pricing_eligibility ?treasury_pool ?pricing_eligibility)
+        (not
+          (pricing_eligibility_available ?pricing_eligibility)
+        )
+      )
+  )
+  (:action detach_pricing_eligibility_from_pool
+    :parameters (?treasury_pool - treasury_pool ?pricing_eligibility - pricing_eligibility)
+    :precondition
+      (and
+        (pool_has_pricing_eligibility ?treasury_pool ?pricing_eligibility)
+      )
+    :effect
+      (and
+        (pricing_eligibility_available ?pricing_eligibility)
+        (not
+          (pool_has_pricing_eligibility ?treasury_pool ?pricing_eligibility)
+        )
+      )
+  )
+  (:action attach_settlement_option_to_pool
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (settlement_option_available ?settlement_option)
+      )
+    :effect
+      (and
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (not
+          (settlement_option_available ?settlement_option)
+        )
+      )
+  )
+  (:action detach_settlement_option_from_pool
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option)
+    :precondition
+      (and
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+      )
+    :effect
+      (and
+        (settlement_option_available ?settlement_option)
+        (not
+          (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        )
+      )
+  )
+  (:action set_primary_short_bucket_signal_for_entity_a
+    :parameters (?entity_a_account - entity_a_account ?maturity_bucket_short - maturity_bucket_short ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_approved ?entity_a_account)
+        (instrument_reserved_for_account ?entity_a_account ?instrument_offer)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (not
+          (bucket_signal_primary_short ?maturity_bucket_short)
+        )
+        (not
+          (bucket_signal_secondary_short ?maturity_bucket_short)
+        )
+      )
+    :effect (bucket_signal_primary_short ?maturity_bucket_short)
+  )
+  (:action confirm_entity_a_ready_for_assignment
+    :parameters (?entity_a_account - entity_a_account ?maturity_bucket_short - maturity_bucket_short ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (account_approved ?entity_a_account)
+        (execution_channel_booked ?entity_a_account ?execution_channel)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (bucket_signal_primary_short ?maturity_bucket_short)
+        (not
+          (entity_a_processing_flag ?entity_a_account)
+        )
+      )
+    :effect
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_a_ready_flag ?entity_a_account)
+      )
+  )
+  (:action assign_buffer_tranche_to_entity_a
+    :parameters (?entity_a_account - entity_a_account ?maturity_bucket_short - maturity_bucket_short ?buffer_tranche - buffer_tranche)
+    :precondition
+      (and
+        (account_approved ?entity_a_account)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (buffer_tranche_available ?buffer_tranche)
+        (not
+          (entity_a_processing_flag ?entity_a_account)
+        )
+      )
+    :effect
+      (and
+        (bucket_signal_secondary_short ?maturity_bucket_short)
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_a_buffer_allocated ?entity_a_account ?buffer_tranche)
+        (not
+          (buffer_tranche_available ?buffer_tranche)
+        )
+      )
+  )
+  (:action process_entity_a_secondary_bucket_signal
+    :parameters (?entity_a_account - entity_a_account ?maturity_bucket_short - maturity_bucket_short ?instrument_offer - instrument_offer ?buffer_tranche - buffer_tranche)
+    :precondition
+      (and
+        (account_approved ?entity_a_account)
+        (instrument_reserved_for_account ?entity_a_account ?instrument_offer)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (bucket_signal_secondary_short ?maturity_bucket_short)
+        (entity_a_buffer_allocated ?entity_a_account ?buffer_tranche)
+        (not
+          (entity_a_ready_flag ?entity_a_account)
+        )
+      )
+    :effect
+      (and
+        (bucket_signal_primary_short ?maturity_bucket_short)
+        (entity_a_ready_flag ?entity_a_account)
+        (buffer_tranche_available ?buffer_tranche)
+        (not
+          (entity_a_buffer_allocated ?entity_a_account ?buffer_tranche)
+        )
+      )
+  )
+  (:action set_primary_medium_bucket_signal_for_entity_b
+    :parameters (?entity_b_account - entity_b_account ?maturity_bucket_medium - maturity_bucket_medium ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_approved ?entity_b_account)
+        (instrument_reserved_for_account ?entity_b_account ?instrument_offer)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (not
+          (bucket_signal_primary_medium ?maturity_bucket_medium)
+        )
+        (not
+          (bucket_signal_secondary_medium ?maturity_bucket_medium)
+        )
+      )
+    :effect (bucket_signal_primary_medium ?maturity_bucket_medium)
+  )
+  (:action confirm_entity_b_ready_for_assignment
+    :parameters (?entity_b_account - entity_b_account ?maturity_bucket_medium - maturity_bucket_medium ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (account_approved ?entity_b_account)
+        (execution_channel_booked ?entity_b_account ?execution_channel)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_primary_medium ?maturity_bucket_medium)
+        (not
+          (entity_b_processing_flag ?entity_b_account)
+        )
+      )
+    :effect
+      (and
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_b_ready_flag ?entity_b_account)
+      )
+  )
+  (:action assign_buffer_tranche_to_entity_b
+    :parameters (?entity_b_account - entity_b_account ?maturity_bucket_medium - maturity_bucket_medium ?buffer_tranche - buffer_tranche)
+    :precondition
+      (and
+        (account_approved ?entity_b_account)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (buffer_tranche_available ?buffer_tranche)
+        (not
+          (entity_b_processing_flag ?entity_b_account)
+        )
+      )
+    :effect
+      (and
+        (bucket_signal_secondary_medium ?maturity_bucket_medium)
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_b_buffer_allocated ?entity_b_account ?buffer_tranche)
+        (not
+          (buffer_tranche_available ?buffer_tranche)
+        )
+      )
+  )
+  (:action process_entity_b_secondary_bucket_signal
+    :parameters (?entity_b_account - entity_b_account ?maturity_bucket_medium - maturity_bucket_medium ?instrument_offer - instrument_offer ?buffer_tranche - buffer_tranche)
+    :precondition
+      (and
+        (account_approved ?entity_b_account)
+        (instrument_reserved_for_account ?entity_b_account ?instrument_offer)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_secondary_medium ?maturity_bucket_medium)
+        (entity_b_buffer_allocated ?entity_b_account ?buffer_tranche)
+        (not
+          (entity_b_ready_flag ?entity_b_account)
+        )
+      )
+    :effect
+      (and
+        (bucket_signal_primary_medium ?maturity_bucket_medium)
+        (entity_b_ready_flag ?entity_b_account)
+        (buffer_tranche_available ?buffer_tranche)
+        (not
+          (entity_b_buffer_allocated ?entity_b_account ?buffer_tranche)
+        )
+      )
+  )
+  (:action allocate_investment_lot_to_buckets
+    :parameters (?entity_a_account - entity_a_account ?entity_b_account - entity_b_account ?maturity_bucket_short - maturity_bucket_short ?maturity_bucket_medium - maturity_bucket_medium ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_primary_short ?maturity_bucket_short)
+        (bucket_signal_primary_medium ?maturity_bucket_medium)
+        (entity_a_ready_flag ?entity_a_account)
+        (entity_b_ready_flag ?entity_b_account)
+        (investment_lot_available ?investment_lot)
+      )
+    :effect
+      (and
+        (investment_lot_allocated ?investment_lot)
+        (lot_linked_to_bucket_short ?investment_lot ?maturity_bucket_short)
+        (lot_linked_to_bucket_medium ?investment_lot ?maturity_bucket_medium)
+        (not
+          (investment_lot_available ?investment_lot)
+        )
+      )
+  )
+  (:action allocate_investment_lot_with_first_leg
+    :parameters (?entity_a_account - entity_a_account ?entity_b_account - entity_b_account ?maturity_bucket_short - maturity_bucket_short ?maturity_bucket_medium - maturity_bucket_medium ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_secondary_short ?maturity_bucket_short)
+        (bucket_signal_primary_medium ?maturity_bucket_medium)
+        (not
+          (entity_a_ready_flag ?entity_a_account)
+        )
+        (entity_b_ready_flag ?entity_b_account)
+        (investment_lot_available ?investment_lot)
+      )
+    :effect
+      (and
+        (investment_lot_allocated ?investment_lot)
+        (lot_linked_to_bucket_short ?investment_lot ?maturity_bucket_short)
+        (lot_linked_to_bucket_medium ?investment_lot ?maturity_bucket_medium)
+        (lot_attribute_first_leg ?investment_lot)
+        (not
+          (investment_lot_available ?investment_lot)
+        )
+      )
+  )
+  (:action allocate_investment_lot_with_second_leg
+    :parameters (?entity_a_account - entity_a_account ?entity_b_account - entity_b_account ?maturity_bucket_short - maturity_bucket_short ?maturity_bucket_medium - maturity_bucket_medium ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_primary_short ?maturity_bucket_short)
+        (bucket_signal_secondary_medium ?maturity_bucket_medium)
+        (entity_a_ready_flag ?entity_a_account)
+        (not
+          (entity_b_ready_flag ?entity_b_account)
+        )
+        (investment_lot_available ?investment_lot)
+      )
+    :effect
+      (and
+        (investment_lot_allocated ?investment_lot)
+        (lot_linked_to_bucket_short ?investment_lot ?maturity_bucket_short)
+        (lot_linked_to_bucket_medium ?investment_lot ?maturity_bucket_medium)
+        (lot_attribute_second_leg ?investment_lot)
+        (not
+          (investment_lot_available ?investment_lot)
+        )
+      )
+  )
+  (:action allocate_investment_lot_with_both_legs
+    :parameters (?entity_a_account - entity_a_account ?entity_b_account - entity_b_account ?maturity_bucket_short - maturity_bucket_short ?maturity_bucket_medium - maturity_bucket_medium ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_a_to_maturity_bucket_link ?entity_a_account ?maturity_bucket_short)
+        (entity_b_to_maturity_bucket_link ?entity_b_account ?maturity_bucket_medium)
+        (bucket_signal_secondary_short ?maturity_bucket_short)
+        (bucket_signal_secondary_medium ?maturity_bucket_medium)
+        (not
+          (entity_a_ready_flag ?entity_a_account)
+        )
+        (not
+          (entity_b_ready_flag ?entity_b_account)
+        )
+        (investment_lot_available ?investment_lot)
+      )
+    :effect
+      (and
+        (investment_lot_allocated ?investment_lot)
+        (lot_linked_to_bucket_short ?investment_lot ?maturity_bucket_short)
+        (lot_linked_to_bucket_medium ?investment_lot ?maturity_bucket_medium)
+        (lot_attribute_first_leg ?investment_lot)
+        (lot_attribute_second_leg ?investment_lot)
+        (not
+          (investment_lot_available ?investment_lot)
+        )
+      )
+  )
+  (:action mark_lot_settlement_ready
+    :parameters (?investment_lot - investment_lot ?entity_a_account - entity_a_account ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (investment_lot_allocated ?investment_lot)
+        (entity_a_processing_flag ?entity_a_account)
+        (instrument_reserved_for_account ?entity_a_account ?instrument_offer)
+        (not
+          (lot_attribute_settlement_ready ?investment_lot)
+        )
+      )
+    :effect (lot_attribute_settlement_ready ?investment_lot)
+  )
+  (:action bind_security_id_to_lot
+    :parameters (?treasury_pool - treasury_pool ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (pool_to_lot_mapping ?treasury_pool ?investment_lot)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_id_unbound ?security_id)
+        (investment_lot_allocated ?investment_lot)
+        (lot_attribute_settlement_ready ?investment_lot)
+        (not
+          (security_id_bound ?security_id)
+        )
+      )
+    :effect
+      (and
+        (security_id_bound ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (not
+          (security_id_unbound ?security_id)
+        )
+      )
+  )
+  (:action set_pool_flag_stage1
+    :parameters (?treasury_pool - treasury_pool ?security_id - security_id ?investment_lot - investment_lot ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_id_bound ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (instrument_reserved_for_account ?treasury_pool ?instrument_offer)
+        (not
+          (lot_attribute_first_leg ?investment_lot)
+        )
+        (not
+          (pool_flag_stage1 ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_stage1 ?treasury_pool)
+  )
+  (:action attach_approval_token_to_pool
+    :parameters (?treasury_pool - treasury_pool ?approval_token - approval_token)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (approval_token_available ?approval_token)
+        (not
+          (pool_flag_approval_attached ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_approval_attached ?treasury_pool)
+        (pool_has_approval_token ?treasury_pool ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action advance_pool_after_security_and_approval
+    :parameters (?treasury_pool - treasury_pool ?security_id - security_id ?investment_lot - investment_lot ?instrument_offer - instrument_offer ?approval_token - approval_token)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_id_bound ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (instrument_reserved_for_account ?treasury_pool ?instrument_offer)
+        (lot_attribute_first_leg ?investment_lot)
+        (pool_flag_approval_attached ?treasury_pool)
+        (pool_has_approval_token ?treasury_pool ?approval_token)
+        (not
+          (pool_flag_stage1 ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_stage1 ?treasury_pool)
+        (pool_allocations_validated ?treasury_pool)
+      )
+  )
+  (:action set_pool_flag_stage2_path_a
+    :parameters (?treasury_pool - treasury_pool ?pricing_eligibility - pricing_eligibility ?execution_channel - execution_channel ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage1 ?treasury_pool)
+        (pool_has_pricing_eligibility ?treasury_pool ?pricing_eligibility)
+        (execution_channel_booked ?treasury_pool ?execution_channel)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (not
+          (lot_attribute_second_leg ?investment_lot)
+        )
+        (not
+          (pool_flag_stage2 ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_stage2 ?treasury_pool)
+  )
+  (:action set_pool_flag_stage2_path_b
+    :parameters (?treasury_pool - treasury_pool ?pricing_eligibility - pricing_eligibility ?execution_channel - execution_channel ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage1 ?treasury_pool)
+        (pool_has_pricing_eligibility ?treasury_pool ?pricing_eligibility)
+        (execution_channel_booked ?treasury_pool ?execution_channel)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (lot_attribute_second_leg ?investment_lot)
+        (not
+          (pool_flag_stage2 ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_stage2 ?treasury_pool)
+  )
+  (:action complete_pool_approval_step1
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage2 ?treasury_pool)
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (not
+          (lot_attribute_first_leg ?investment_lot)
+        )
+        (not
+          (lot_attribute_second_leg ?investment_lot)
+        )
+        (not
+          (pool_flag_approval_complete ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_approval_complete ?treasury_pool)
+  )
+  (:action complete_pool_approval_step2
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage2 ?treasury_pool)
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (lot_attribute_first_leg ?investment_lot)
+        (not
+          (lot_attribute_second_leg ?investment_lot)
+        )
+        (not
+          (pool_flag_approval_complete ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_allocations_confirmed ?treasury_pool)
+      )
+  )
+  (:action complete_pool_approval_step3
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage2 ?treasury_pool)
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (not
+          (lot_attribute_first_leg ?investment_lot)
+        )
+        (lot_attribute_second_leg ?investment_lot)
+        (not
+          (pool_flag_approval_complete ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_allocations_confirmed ?treasury_pool)
+      )
+  )
+  (:action complete_pool_approval_step4
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option ?security_id - security_id ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (pool_flag_stage2 ?treasury_pool)
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (pool_to_security_mapping ?treasury_pool ?security_id)
+        (security_bound_to_lot ?security_id ?investment_lot)
+        (lot_attribute_first_leg ?investment_lot)
+        (lot_attribute_second_leg ?investment_lot)
+        (not
+          (pool_flag_approval_complete ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_allocations_confirmed ?treasury_pool)
+      )
+  )
+  (:action finalize_pool_postprocessing
+    :parameters (?treasury_pool - treasury_pool)
+    :precondition
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (not
+          (pool_allocations_confirmed ?treasury_pool)
+        )
+        (not
+          (pool_postprocessing_flag ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_postprocessing_flag ?treasury_pool)
+        (processed_settlement_flag ?treasury_pool)
+      )
+  )
+  (:action attach_allocation_policy_to_pool
+    :parameters (?treasury_pool - treasury_pool ?allocation_policy - allocation_policy)
+    :precondition
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_allocations_confirmed ?treasury_pool)
+        (allocation_policy_available ?allocation_policy)
+      )
+    :effect
+      (and
+        (pool_has_allocation_policy ?treasury_pool ?allocation_policy)
+        (not
+          (allocation_policy_available ?allocation_policy)
+        )
+      )
+  )
+  (:action validate_pool_before_settlement
+    :parameters (?treasury_pool - treasury_pool ?entity_a_account - entity_a_account ?entity_b_account - entity_b_account ?instrument_offer - instrument_offer ?allocation_policy - allocation_policy)
+    :precondition
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_allocations_confirmed ?treasury_pool)
+        (pool_has_allocation_policy ?treasury_pool ?allocation_policy)
+        (pool_to_entity_a_mapping ?treasury_pool ?entity_a_account)
+        (pool_to_entity_b_mapping ?treasury_pool ?entity_b_account)
+        (entity_a_ready_flag ?entity_a_account)
+        (entity_b_ready_flag ?entity_b_account)
+        (instrument_reserved_for_account ?treasury_pool ?instrument_offer)
+        (not
+          (pool_validation_done ?treasury_pool)
+        )
+      )
+    :effect (pool_validation_done ?treasury_pool)
+  )
+  (:action finalize_pool_postprocessing_with_validation
+    :parameters (?treasury_pool - treasury_pool)
+    :precondition
+      (and
+        (pool_flag_approval_complete ?treasury_pool)
+        (pool_validation_done ?treasury_pool)
+        (not
+          (pool_postprocessing_flag ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_postprocessing_flag ?treasury_pool)
+        (processed_settlement_flag ?treasury_pool)
+      )
+  )
+  (:action attach_deal_approval_to_pool
+    :parameters (?treasury_pool - treasury_pool ?deal_approval - deal_approval ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (account_approved ?treasury_pool)
+        (instrument_reserved_for_account ?treasury_pool ?instrument_offer)
+        (deal_approval_available ?deal_approval)
+        (pool_has_deal_approval ?treasury_pool ?deal_approval)
+        (not
+          (pool_flag_deal_approval ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_flag_deal_approval ?treasury_pool)
+        (not
+          (deal_approval_available ?deal_approval)
+        )
+      )
+  )
+  (:action flag_pool_deal_approval_stage
+    :parameters (?treasury_pool - treasury_pool ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (pool_flag_deal_approval ?treasury_pool)
+        (execution_channel_booked ?treasury_pool ?execution_channel)
+        (not
+          (pool_flag_deal_approval_stage ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_deal_approval_stage ?treasury_pool)
+  )
+  (:action set_pool_deal_approval_confirmed
+    :parameters (?treasury_pool - treasury_pool ?settlement_option - settlement_option)
+    :precondition
+      (and
+        (pool_flag_deal_approval_stage ?treasury_pool)
+        (pool_has_settlement_option ?treasury_pool ?settlement_option)
+        (not
+          (pool_flag_deal_approval_confirmed ?treasury_pool)
+        )
+      )
+    :effect (pool_flag_deal_approval_confirmed ?treasury_pool)
+  )
+  (:action finalize_pool_postprocessing_and_mark_processed
+    :parameters (?treasury_pool - treasury_pool)
+    :precondition
+      (and
+        (pool_flag_deal_approval_confirmed ?treasury_pool)
+        (not
+          (pool_postprocessing_flag ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (pool_postprocessing_flag ?treasury_pool)
+        (processed_settlement_flag ?treasury_pool)
+      )
+  )
+  (:action mark_entity_a_settled_from_lot
+    :parameters (?entity_a_account - entity_a_account ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_a_processing_flag ?entity_a_account)
+        (entity_a_ready_flag ?entity_a_account)
+        (investment_lot_allocated ?investment_lot)
+        (lot_attribute_settlement_ready ?investment_lot)
+        (not
+          (processed_settlement_flag ?entity_a_account)
+        )
+      )
+    :effect (processed_settlement_flag ?entity_a_account)
+  )
+  (:action mark_entity_b_settled_from_lot
+    :parameters (?entity_b_account - entity_b_account ?investment_lot - investment_lot)
+    :precondition
+      (and
+        (entity_b_processing_flag ?entity_b_account)
+        (entity_b_ready_flag ?entity_b_account)
+        (investment_lot_allocated ?investment_lot)
+        (lot_attribute_settlement_ready ?investment_lot)
+        (not
+          (processed_settlement_flag ?entity_b_account)
+        )
+      )
+    :effect (processed_settlement_flag ?entity_b_account)
+  )
+  (:action finalize_account_investment_and_attach_liquidity_tag
+    :parameters (?account_unit - account_unit ?liquidity_tag - liquidity_tag ?instrument_offer - instrument_offer)
+    :precondition
+      (and
+        (processed_settlement_flag ?account_unit)
+        (instrument_reserved_for_account ?account_unit ?instrument_offer)
+        (liquidity_tag_available ?liquidity_tag)
+        (not
+          (investment_finalized_for_account ?account_unit)
+        )
+      )
+    :effect
+      (and
+        (investment_finalized_for_account ?account_unit)
+        (account_has_liquidity_tag ?account_unit ?liquidity_tag)
+        (not
+          (liquidity_tag_available ?liquidity_tag)
+        )
+      )
+  )
+  (:action settle_entity_a_account_and_release_counterparty
+    :parameters (?entity_a_account - entity_a_account ?counterparty_bank - counterparty_bank ?liquidity_tag - liquidity_tag)
+    :precondition
+      (and
+        (investment_finalized_for_account ?entity_a_account)
+        (account_to_counterparty_link ?entity_a_account ?counterparty_bank)
+        (account_has_liquidity_tag ?entity_a_account ?liquidity_tag)
+        (not
+          (invested_status ?entity_a_account)
+        )
+      )
+    :effect
+      (and
+        (invested_status ?entity_a_account)
+        (counterparty_available ?counterparty_bank)
+        (liquidity_tag_available ?liquidity_tag)
+      )
+  )
+  (:action settle_entity_b_account_and_release_counterparty
+    :parameters (?entity_b_account - entity_b_account ?counterparty_bank - counterparty_bank ?liquidity_tag - liquidity_tag)
+    :precondition
+      (and
+        (investment_finalized_for_account ?entity_b_account)
+        (account_to_counterparty_link ?entity_b_account ?counterparty_bank)
+        (account_has_liquidity_tag ?entity_b_account ?liquidity_tag)
+        (not
+          (invested_status ?entity_b_account)
+        )
+      )
+    :effect
+      (and
+        (invested_status ?entity_b_account)
+        (counterparty_available ?counterparty_bank)
+        (liquidity_tag_available ?liquidity_tag)
+      )
+  )
+  (:action settle_pool_allocation_and_release_counterparty
+    :parameters (?treasury_pool - treasury_pool ?counterparty_bank - counterparty_bank ?liquidity_tag - liquidity_tag)
+    :precondition
+      (and
+        (investment_finalized_for_account ?treasury_pool)
+        (account_to_counterparty_link ?treasury_pool ?counterparty_bank)
+        (account_has_liquidity_tag ?treasury_pool ?liquidity_tag)
+        (not
+          (invested_status ?treasury_pool)
+        )
+      )
+    :effect
+      (and
+        (invested_status ?treasury_pool)
+        (counterparty_available ?counterparty_bank)
+        (liquidity_tag_available ?liquidity_tag)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem short_term_investment_laddering_problem)
+  (:domain short_term_investment_laddering_domain)
+  (:objects entity_a_account_1 - entity_a_account entity_b_account_1 - entity_b_account treasury_pool_primary - treasury_pool treasury_pool_secondary - treasury_pool counterparty_bank_1 - counterparty_bank counterparty_bank_2 - counterparty_bank counterparty_bank_3 - counterparty_bank instrument_offer_1 - instrument_offer execution_channel_1 - execution_channel buffer_tranche_1 - buffer_tranche maturity_bucket_short_1 - maturity_bucket_short maturity_bucket_medium_1 - maturity_bucket_medium investment_lot_1 - investment_lot security_id_1 - security_id security_id_2 - security_id approval_token_1 - approval_token approval_token_2 - approval_token allocation_policy_1 - allocation_policy allocation_policy_2 - allocation_policy liquidity_tag_1 - liquidity_tag pricing_eligibility_1 - pricing_eligibility deal_approval_1 - deal_approval deal_approval_2 - deal_approval settlement_option_1 - settlement_option)
+  (:init
+    (counterparty_available counterparty_bank_1)
+    (counterparty_available counterparty_bank_2)
+    (counterparty_available counterparty_bank_3)
+    (instrument_offer_available instrument_offer_1)
+    (execution_channel_available execution_channel_1)
+    (buffer_tranche_available buffer_tranche_1)
+    (entity_a_to_maturity_bucket_link entity_a_account_1 maturity_bucket_short_1)
+    (entity_b_to_maturity_bucket_link entity_b_account_1 maturity_bucket_medium_1)
+    (investment_lot_available investment_lot_1)
+    (security_id_unbound security_id_1)
+    (security_id_unbound security_id_2)
+    (pool_to_entity_a_mapping treasury_pool_primary entity_a_account_1)
+    (pool_to_entity_a_mapping treasury_pool_secondary entity_a_account_1)
+    (pool_to_entity_b_mapping treasury_pool_primary entity_b_account_1)
+    (pool_to_entity_b_mapping treasury_pool_secondary entity_b_account_1)
+    (pool_to_lot_mapping treasury_pool_primary investment_lot_1)
+    (pool_to_lot_mapping treasury_pool_secondary investment_lot_1)
+    (pool_to_security_mapping treasury_pool_primary security_id_1)
+    (pool_to_security_mapping treasury_pool_secondary security_id_2)
+    (approval_token_available approval_token_1)
+    (approval_token_available approval_token_2)
+    (allocation_policy_available allocation_policy_1)
+    (allocation_policy_available allocation_policy_2)
+    (liquidity_tag_available liquidity_tag_1)
+    (pricing_eligibility_available pricing_eligibility_1)
+    (deal_approval_available deal_approval_1)
+    (pool_has_deal_approval treasury_pool_primary deal_approval_1)
+    (pool_has_deal_approval treasury_pool_secondary deal_approval_2)
+    (settlement_option_available settlement_option_1)
+  )
+  (:goal
+    (and
+      (invested_status entity_a_account_1)
+      (invested_status entity_b_account_1)
+      (invested_status treasury_pool_primary)
+      (invested_status treasury_pool_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(identify_account_candidate entity_a_account_1)
+(assign_counterparty_to_account entity_a_account_1 counterparty_bank_1)
+(reserve_instrument_for_account entity_a_account_1 instrument_offer_1)
+(approve_account_for_investment entity_a_account_1 instrument_offer_1)
+(book_execution_channel_for_account entity_a_account_1 execution_channel_1)
+(set_primary_short_bucket_signal_for_entity_a entity_a_account_1 maturity_bucket_short_1 instrument_offer_1)
+(confirm_entity_a_ready_for_assignment entity_a_account_1 maturity_bucket_short_1 execution_channel_1)
+(release_instrument_reservation entity_a_account_1 instrument_offer_1)
+(release_execution_channel_for_account entity_a_account_1 execution_channel_1)
+(identify_account_candidate entity_b_account_1)
+(assign_counterparty_to_account entity_b_account_1 counterparty_bank_2)
+(reserve_instrument_for_account entity_b_account_1 instrument_offer_1)
+(approve_account_for_investment entity_b_account_1 instrument_offer_1)
+(book_execution_channel_for_account entity_b_account_1 execution_channel_1)
+(set_primary_medium_bucket_signal_for_entity_b entity_b_account_1 maturity_bucket_medium_1 instrument_offer_1)
+(confirm_entity_b_ready_for_assignment entity_b_account_1 maturity_bucket_medium_1 execution_channel_1)
+(allocate_investment_lot_to_buckets entity_a_account_1 entity_b_account_1 maturity_bucket_short_1 maturity_bucket_medium_1 investment_lot_1)
+(release_instrument_reservation entity_b_account_1 instrument_offer_1)
+(release_execution_channel_for_account entity_b_account_1 execution_channel_1)
+(reserve_instrument_for_account entity_a_account_1 instrument_offer_1)
+(mark_lot_settlement_ready investment_lot_1 entity_a_account_1 instrument_offer_1)
+(release_instrument_reservation entity_a_account_1 instrument_offer_1)
+(identify_account_candidate treasury_pool_primary)
+(assign_counterparty_to_account treasury_pool_primary counterparty_bank_3)
+(reserve_instrument_for_account treasury_pool_primary instrument_offer_1)
+(approve_account_for_investment treasury_pool_primary instrument_offer_1)
+(bind_security_id_to_lot treasury_pool_primary security_id_1 investment_lot_1)
+(set_pool_flag_stage1 treasury_pool_primary security_id_1 investment_lot_1 instrument_offer_1)
+(attach_pricing_eligibility_to_pool treasury_pool_primary pricing_eligibility_1)
+(book_execution_channel_for_account treasury_pool_primary execution_channel_1)
+(set_pool_flag_stage2_path_a treasury_pool_primary pricing_eligibility_1 execution_channel_1 security_id_1 investment_lot_1)
+(attach_settlement_option_to_pool treasury_pool_primary settlement_option_1)
+(complete_pool_approval_step1 treasury_pool_primary settlement_option_1 security_id_1 investment_lot_1)
+(finalize_pool_postprocessing treasury_pool_primary)
+(finalize_account_investment_and_attach_liquidity_tag treasury_pool_primary liquidity_tag_1 instrument_offer_1)
+(settle_pool_allocation_and_release_counterparty treasury_pool_primary counterparty_bank_3 liquidity_tag_1)
+(release_instrument_reservation treasury_pool_primary instrument_offer_1)
+(release_execution_channel_for_account treasury_pool_primary execution_channel_1)
+(detach_pricing_eligibility_from_pool treasury_pool_primary pricing_eligibility_1)
+(detach_settlement_option_from_pool treasury_pool_primary settlement_option_1)
+(identify_account_candidate treasury_pool_secondary)
+(assign_counterparty_to_account treasury_pool_secondary counterparty_bank_3)
+(reserve_instrument_for_account treasury_pool_secondary instrument_offer_1)
+(approve_account_for_investment treasury_pool_secondary instrument_offer_1)
+(bind_security_id_to_lot treasury_pool_secondary security_id_2 investment_lot_1)
+(set_pool_flag_stage1 treasury_pool_secondary security_id_2 investment_lot_1 instrument_offer_1)
+(attach_pricing_eligibility_to_pool treasury_pool_secondary pricing_eligibility_1)
+(book_execution_channel_for_account treasury_pool_secondary execution_channel_1)
+(set_pool_flag_stage2_path_a treasury_pool_secondary pricing_eligibility_1 execution_channel_1 security_id_2 investment_lot_1)
+(attach_settlement_option_to_pool treasury_pool_secondary settlement_option_1)
+(complete_pool_approval_step1 treasury_pool_secondary settlement_option_1 security_id_2 investment_lot_1)
+(finalize_pool_postprocessing treasury_pool_secondary)
+(finalize_account_investment_and_attach_liquidity_tag treasury_pool_secondary liquidity_tag_1 instrument_offer_1)
+(settle_pool_allocation_and_release_counterparty treasury_pool_secondary counterparty_bank_3 liquidity_tag_1)
+(release_instrument_reservation treasury_pool_secondary instrument_offer_1)
+(release_execution_channel_for_account treasury_pool_secondary execution_channel_1)
+(detach_pricing_eligibility_from_pool treasury_pool_secondary pricing_eligibility_1)
+(detach_settlement_option_from_pool treasury_pool_secondary settlement_option_1)
+(mark_entity_a_settled_from_lot entity_a_account_1 investment_lot_1)
+(mark_entity_b_settled_from_lot entity_b_account_1 investment_lot_1)
+(reserve_instrument_for_account entity_a_account_1 instrument_offer_1)
+(finalize_account_investment_and_attach_liquidity_tag entity_a_account_1 liquidity_tag_1 instrument_offer_1)
+(settle_entity_a_account_and_release_counterparty entity_a_account_1 counterparty_bank_1 liquidity_tag_1)
+(release_instrument_reservation entity_a_account_1 instrument_offer_1)
+(reserve_instrument_for_account entity_b_account_1 instrument_offer_1)
+(finalize_account_investment_and_attach_liquidity_tag entity_b_account_1 liquidity_tag_1 instrument_offer_1)
+(settle_entity_b_account_and_release_counterparty entity_b_account_1 counterparty_bank_2 liquidity_tag_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_yehz08u8/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_yehz08u8/plan.pddl 67 
+
+
+
+--- stderr ---
+

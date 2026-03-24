@@ -1,0 +1,937 @@
+(define (domain accrual_calculation_and_posting_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object resource_type - domain_object document_control_type - domain_object posting_recon_type - domain_object case_container - domain_object accrual_case - case_container calculation_service - resource_type calculation_rule - resource_type reviewer_role - resource_type external_approval - resource_type report_template - resource_type accrual_category - resource_type accounting_policy - resource_type signoff_procedure - resource_type supporting_document - document_control_type control_check - document_control_type audit_evidence - document_control_type source_dataset - posting_recon_type reconciliation_item - posting_recon_type journal_posting - posting_recon_type account_slot - accrual_case unit_slot - accrual_case gl_account - account_slot operational_unit - account_slot posting_batch - unit_slot)
+
+  (:predicates
+    (accrual_case_registered ?accrual_case - accrual_case)
+    (calculation_completed ?accrual_case - accrual_case)
+    (calc_service_assigned ?accrual_case - accrual_case)
+    (ready_for_posting ?accrual_case - accrual_case)
+    (approved_for_posting ?accrual_case - accrual_case)
+    (journal_post_created ?accrual_case - accrual_case)
+    (calc_service_available ?calc_service - calculation_service)
+    (assigned_to_calc_service ?accrual_case - accrual_case ?calc_service - calculation_service)
+    (calc_rule_available ?calc_rule - calculation_rule)
+    (calculation_applied ?accrual_case - accrual_case ?calc_rule - calculation_rule)
+    (reviewer_available ?reviewer - reviewer_role)
+    (assigned_reviewer ?accrual_case - accrual_case ?reviewer - reviewer_role)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (account_has_supporting_document ?gl_account - gl_account ?supporting_document - supporting_document)
+    (unit_has_supporting_document ?operational_unit - operational_unit ?supporting_document - supporting_document)
+    (gl_account_linked_to_source_dataset ?gl_account - gl_account ?source_dataset - source_dataset)
+    (source_dataset_processed ?source_dataset - source_dataset)
+    (source_dataset_documented ?source_dataset - source_dataset)
+    (gl_account_ready_for_journal_assembly ?gl_account - gl_account)
+    (operational_unit_has_recon_item ?operational_unit - operational_unit ?recon_item - reconciliation_item)
+    (recon_item_processed ?recon_item - reconciliation_item)
+    (recon_item_documented ?recon_item - reconciliation_item)
+    (operational_unit_ready_for_journal_assembly ?operational_unit - operational_unit)
+    (journal_posting_available ?journal_posting - journal_posting)
+    (journal_posting_assembled ?journal_posting - journal_posting)
+    (journal_posting_attached_source_dataset ?journal_posting - journal_posting ?source_dataset - source_dataset)
+    (journal_posting_attached_recon_item ?journal_posting - journal_posting ?recon_item - reconciliation_item)
+    (journal_posting_source_document_attached ?journal_posting - journal_posting)
+    (journal_posting_source_dataset_processed ?journal_posting - journal_posting)
+    (journal_posting_validated_for_control ?journal_posting - journal_posting)
+    (batch_contains_gl_account ?posting_batch - posting_batch ?gl_account - gl_account)
+    (batch_contains_operational_unit ?posting_batch - posting_batch ?operational_unit - operational_unit)
+    (batch_contains_journal_posting ?posting_batch - posting_batch ?journal_posting - journal_posting)
+    (control_check_available ?control_check - control_check)
+    (batch_assigned_control_check ?posting_batch - posting_batch ?control_check - control_check)
+    (control_check_completed ?control_check - control_check)
+    (control_check_linked_to_posting ?control_check - control_check ?journal_posting - journal_posting)
+    (batch_control_successful ?posting_batch - posting_batch)
+    (batch_ready_for_approval ?posting_batch - posting_batch)
+    (batch_verification_ready ?posting_batch - posting_batch)
+    (batch_external_approval_allocated ?posting_batch - posting_batch)
+    (batch_evidence_collected ?posting_batch - posting_batch)
+    (batch_report_ready ?posting_batch - posting_batch)
+    (batch_final_verification_completed ?posting_batch - posting_batch)
+    (audit_evidence_available ?audit_evidence - audit_evidence)
+    (batch_linked_audit_evidence ?posting_batch - posting_batch ?audit_evidence - audit_evidence)
+    (batch_special_approval_flag ?posting_batch - posting_batch)
+    (batch_signoff_initiated ?posting_batch - posting_batch)
+    (batch_signoff_completed ?posting_batch - posting_batch)
+    (external_approval_available ?external_approval - external_approval)
+    (batch_linked_external_approval ?posting_batch - posting_batch ?external_approval - external_approval)
+    (report_template_available ?report_template - report_template)
+    (batch_linked_report_template ?posting_batch - posting_batch ?report_template - report_template)
+    (accounting_policy_available ?accounting_policy - accounting_policy)
+    (batch_assigned_accounting_policy ?posting_batch - posting_batch ?accounting_policy - accounting_policy)
+    (signoff_procedure_available ?signoff_procedure - signoff_procedure)
+    (batch_linked_signoff_procedure ?posting_batch - posting_batch ?signoff_procedure - signoff_procedure)
+    (accrual_category_available ?accrual_category - accrual_category)
+    (case_classified_as_accrual_category ?accrual_case - accrual_case ?accrual_category - accrual_category)
+    (gl_account_processing_flag ?gl_account - gl_account)
+    (operational_unit_processing_flag ?operational_unit - operational_unit)
+    (batch_finalized ?posting_batch - posting_batch)
+  )
+  (:action create_accrual_case
+    :parameters (?accrual_case - accrual_case)
+    :precondition
+      (and
+        (not
+          (accrual_case_registered ?accrual_case)
+        )
+        (not
+          (ready_for_posting ?accrual_case)
+        )
+      )
+    :effect (accrual_case_registered ?accrual_case)
+  )
+  (:action assign_calculation_service_to_case
+    :parameters (?accrual_case - accrual_case ?calc_service - calculation_service)
+    :precondition
+      (and
+        (accrual_case_registered ?accrual_case)
+        (not
+          (calc_service_assigned ?accrual_case)
+        )
+        (calc_service_available ?calc_service)
+      )
+    :effect
+      (and
+        (calc_service_assigned ?accrual_case)
+        (assigned_to_calc_service ?accrual_case ?calc_service)
+        (not
+          (calc_service_available ?calc_service)
+        )
+      )
+  )
+  (:action apply_calculation_rule_to_case
+    :parameters (?accrual_case - accrual_case ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (accrual_case_registered ?accrual_case)
+        (calc_service_assigned ?accrual_case)
+        (calc_rule_available ?calc_rule)
+      )
+    :effect
+      (and
+        (calculation_applied ?accrual_case ?calc_rule)
+        (not
+          (calc_rule_available ?calc_rule)
+        )
+      )
+  )
+  (:action finalize_case_calculation
+    :parameters (?accrual_case - accrual_case ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (accrual_case_registered ?accrual_case)
+        (calc_service_assigned ?accrual_case)
+        (calculation_applied ?accrual_case ?calc_rule)
+        (not
+          (calculation_completed ?accrual_case)
+        )
+      )
+    :effect (calculation_completed ?accrual_case)
+  )
+  (:action release_calculation_rule_from_case
+    :parameters (?accrual_case - accrual_case ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (calculation_applied ?accrual_case ?calc_rule)
+      )
+    :effect
+      (and
+        (calc_rule_available ?calc_rule)
+        (not
+          (calculation_applied ?accrual_case ?calc_rule)
+        )
+      )
+  )
+  (:action assign_reviewer_to_case
+    :parameters (?accrual_case - accrual_case ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (calculation_completed ?accrual_case)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (assigned_reviewer ?accrual_case ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_case
+    :parameters (?accrual_case - accrual_case ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (assigned_reviewer ?accrual_case ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (assigned_reviewer ?accrual_case ?reviewer)
+        )
+      )
+  )
+  (:action attach_accounting_policy_to_batch
+    :parameters (?posting_batch - posting_batch ?accounting_policy - accounting_policy)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (accounting_policy_available ?accounting_policy)
+      )
+    :effect
+      (and
+        (batch_assigned_accounting_policy ?posting_batch ?accounting_policy)
+        (not
+          (accounting_policy_available ?accounting_policy)
+        )
+      )
+  )
+  (:action detach_accounting_policy_from_batch
+    :parameters (?posting_batch - posting_batch ?accounting_policy - accounting_policy)
+    :precondition
+      (and
+        (batch_assigned_accounting_policy ?posting_batch ?accounting_policy)
+      )
+    :effect
+      (and
+        (accounting_policy_available ?accounting_policy)
+        (not
+          (batch_assigned_accounting_policy ?posting_batch ?accounting_policy)
+        )
+      )
+  )
+  (:action attach_signoff_procedure_to_batch
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (signoff_procedure_available ?signoff_procedure)
+      )
+    :effect
+      (and
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (not
+          (signoff_procedure_available ?signoff_procedure)
+        )
+      )
+  )
+  (:action detach_signoff_procedure_from_batch
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure)
+    :precondition
+      (and
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+      )
+    :effect
+      (and
+        (signoff_procedure_available ?signoff_procedure)
+        (not
+          (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        )
+      )
+  )
+  (:action flag_source_dataset_processed_for_account
+    :parameters (?gl_account - gl_account ?source_dataset - source_dataset ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (calculation_completed ?gl_account)
+        (calculation_applied ?gl_account ?calc_rule)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (not
+          (source_dataset_processed ?source_dataset)
+        )
+        (not
+          (source_dataset_documented ?source_dataset)
+        )
+      )
+    :effect (source_dataset_processed ?source_dataset)
+  )
+  (:action complete_account_level_checks
+    :parameters (?gl_account - gl_account ?source_dataset - source_dataset ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (calculation_completed ?gl_account)
+        (assigned_reviewer ?gl_account ?reviewer)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (source_dataset_processed ?source_dataset)
+        (not
+          (gl_account_processing_flag ?gl_account)
+        )
+      )
+    :effect
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+      )
+  )
+  (:action attach_supporting_document_to_account
+    :parameters (?gl_account - gl_account ?source_dataset - source_dataset ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (calculation_completed ?gl_account)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (supporting_document_available ?supporting_document)
+        (not
+          (gl_account_processing_flag ?gl_account)
+        )
+      )
+    :effect
+      (and
+        (source_dataset_documented ?source_dataset)
+        (gl_account_processing_flag ?gl_account)
+        (account_has_supporting_document ?gl_account ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_account_processing_with_document
+    :parameters (?gl_account - gl_account ?source_dataset - source_dataset ?calc_rule - calculation_rule ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (calculation_completed ?gl_account)
+        (calculation_applied ?gl_account ?calc_rule)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (source_dataset_documented ?source_dataset)
+        (account_has_supporting_document ?gl_account ?supporting_document)
+        (not
+          (gl_account_ready_for_journal_assembly ?gl_account)
+        )
+      )
+    :effect
+      (and
+        (source_dataset_processed ?source_dataset)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+        (supporting_document_available ?supporting_document)
+        (not
+          (account_has_supporting_document ?gl_account ?supporting_document)
+        )
+      )
+  )
+  (:action flag_recon_item_processed_for_unit
+    :parameters (?operational_unit - operational_unit ?recon_item - reconciliation_item ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (calculation_completed ?operational_unit)
+        (calculation_applied ?operational_unit ?calc_rule)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (not
+          (recon_item_processed ?recon_item)
+        )
+        (not
+          (recon_item_documented ?recon_item)
+        )
+      )
+    :effect (recon_item_processed ?recon_item)
+  )
+  (:action assign_reviewer_to_unit
+    :parameters (?operational_unit - operational_unit ?recon_item - reconciliation_item ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (calculation_completed ?operational_unit)
+        (assigned_reviewer ?operational_unit ?reviewer)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (recon_item_processed ?recon_item)
+        (not
+          (operational_unit_processing_flag ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (operational_unit_processing_flag ?operational_unit)
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+      )
+  )
+  (:action attach_supporting_document_to_unit
+    :parameters (?operational_unit - operational_unit ?recon_item - reconciliation_item ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (calculation_completed ?operational_unit)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (supporting_document_available ?supporting_document)
+        (not
+          (operational_unit_processing_flag ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (recon_item_documented ?recon_item)
+        (operational_unit_processing_flag ?operational_unit)
+        (unit_has_supporting_document ?operational_unit ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_unit_processing_with_document
+    :parameters (?operational_unit - operational_unit ?recon_item - reconciliation_item ?calc_rule - calculation_rule ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (calculation_completed ?operational_unit)
+        (calculation_applied ?operational_unit ?calc_rule)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (recon_item_documented ?recon_item)
+        (unit_has_supporting_document ?operational_unit ?supporting_document)
+        (not
+          (operational_unit_ready_for_journal_assembly ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (recon_item_processed ?recon_item)
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+        (supporting_document_available ?supporting_document)
+        (not
+          (unit_has_supporting_document ?operational_unit ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_journal_posting_reconciled
+    :parameters (?gl_account - gl_account ?operational_unit - operational_unit ?source_dataset - source_dataset ?recon_item - reconciliation_item ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (operational_unit_processing_flag ?operational_unit)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (source_dataset_processed ?source_dataset)
+        (recon_item_processed ?recon_item)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+        (journal_posting_available ?journal_posting)
+      )
+    :effect
+      (and
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_attached_source_dataset ?journal_posting ?source_dataset)
+        (journal_posting_attached_recon_item ?journal_posting ?recon_item)
+        (not
+          (journal_posting_available ?journal_posting)
+        )
+      )
+  )
+  (:action assemble_journal_posting_with_attached_documents
+    :parameters (?gl_account - gl_account ?operational_unit - operational_unit ?source_dataset - source_dataset ?recon_item - reconciliation_item ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (operational_unit_processing_flag ?operational_unit)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (source_dataset_documented ?source_dataset)
+        (recon_item_processed ?recon_item)
+        (not
+          (gl_account_ready_for_journal_assembly ?gl_account)
+        )
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+        (journal_posting_available ?journal_posting)
+      )
+    :effect
+      (and
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_attached_source_dataset ?journal_posting ?source_dataset)
+        (journal_posting_attached_recon_item ?journal_posting ?recon_item)
+        (journal_posting_source_document_attached ?journal_posting)
+        (not
+          (journal_posting_available ?journal_posting)
+        )
+      )
+  )
+  (:action assemble_journal_posting_with_processed_source
+    :parameters (?gl_account - gl_account ?operational_unit - operational_unit ?source_dataset - source_dataset ?recon_item - reconciliation_item ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (operational_unit_processing_flag ?operational_unit)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (source_dataset_processed ?source_dataset)
+        (recon_item_documented ?recon_item)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+        (not
+          (operational_unit_ready_for_journal_assembly ?operational_unit)
+        )
+        (journal_posting_available ?journal_posting)
+      )
+    :effect
+      (and
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_attached_source_dataset ?journal_posting ?source_dataset)
+        (journal_posting_attached_recon_item ?journal_posting ?recon_item)
+        (journal_posting_source_dataset_processed ?journal_posting)
+        (not
+          (journal_posting_available ?journal_posting)
+        )
+      )
+  )
+  (:action assemble_journal_posting_with_both_flags
+    :parameters (?gl_account - gl_account ?operational_unit - operational_unit ?source_dataset - source_dataset ?recon_item - reconciliation_item ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (operational_unit_processing_flag ?operational_unit)
+        (gl_account_linked_to_source_dataset ?gl_account ?source_dataset)
+        (operational_unit_has_recon_item ?operational_unit ?recon_item)
+        (source_dataset_documented ?source_dataset)
+        (recon_item_documented ?recon_item)
+        (not
+          (gl_account_ready_for_journal_assembly ?gl_account)
+        )
+        (not
+          (operational_unit_ready_for_journal_assembly ?operational_unit)
+        )
+        (journal_posting_available ?journal_posting)
+      )
+    :effect
+      (and
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_attached_source_dataset ?journal_posting ?source_dataset)
+        (journal_posting_attached_recon_item ?journal_posting ?recon_item)
+        (journal_posting_source_document_attached ?journal_posting)
+        (journal_posting_source_dataset_processed ?journal_posting)
+        (not
+          (journal_posting_available ?journal_posting)
+        )
+      )
+  )
+  (:action validate_journal_posting_for_control
+    :parameters (?journal_posting - journal_posting ?gl_account - gl_account ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (journal_posting_assembled ?journal_posting)
+        (gl_account_processing_flag ?gl_account)
+        (calculation_applied ?gl_account ?calc_rule)
+        (not
+          (journal_posting_validated_for_control ?journal_posting)
+        )
+      )
+    :effect (journal_posting_validated_for_control ?journal_posting)
+  )
+  (:action execute_control_check
+    :parameters (?posting_batch - posting_batch ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (batch_contains_journal_posting ?posting_batch ?journal_posting)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_available ?control_check)
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_validated_for_control ?journal_posting)
+        (not
+          (control_check_completed ?control_check)
+        )
+      )
+    :effect
+      (and
+        (control_check_completed ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (not
+          (control_check_available ?control_check)
+        )
+      )
+  )
+  (:action record_control_check_result
+    :parameters (?posting_batch - posting_batch ?control_check - control_check ?journal_posting - journal_posting ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_completed ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (calculation_applied ?posting_batch ?calc_rule)
+        (not
+          (journal_posting_source_document_attached ?journal_posting)
+        )
+        (not
+          (batch_control_successful ?posting_batch)
+        )
+      )
+    :effect (batch_control_successful ?posting_batch)
+  )
+  (:action assign_external_approval_to_batch
+    :parameters (?posting_batch - posting_batch ?external_approval - external_approval)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (external_approval_available ?external_approval)
+        (not
+          (batch_external_approval_allocated ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_external_approval_allocated ?posting_batch)
+        (batch_linked_external_approval ?posting_batch ?external_approval)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action process_external_approval_for_batch
+    :parameters (?posting_batch - posting_batch ?control_check - control_check ?journal_posting - journal_posting ?calc_rule - calculation_rule ?external_approval - external_approval)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_completed ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (calculation_applied ?posting_batch ?calc_rule)
+        (journal_posting_source_document_attached ?journal_posting)
+        (batch_external_approval_allocated ?posting_batch)
+        (batch_linked_external_approval ?posting_batch ?external_approval)
+        (not
+          (batch_control_successful ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_control_successful ?posting_batch)
+        (batch_evidence_collected ?posting_batch)
+      )
+  )
+  (:action advance_batch_to_approval_stage_policy_path
+    :parameters (?posting_batch - posting_batch ?accounting_policy - accounting_policy ?reviewer - reviewer_role ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_control_successful ?posting_batch)
+        (batch_assigned_accounting_policy ?posting_batch ?accounting_policy)
+        (assigned_reviewer ?posting_batch ?reviewer)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (not
+          (journal_posting_source_dataset_processed ?journal_posting)
+        )
+        (not
+          (batch_ready_for_approval ?posting_batch)
+        )
+      )
+    :effect (batch_ready_for_approval ?posting_batch)
+  )
+  (:action advance_batch_to_approval_stage_processed_path
+    :parameters (?posting_batch - posting_batch ?accounting_policy - accounting_policy ?reviewer - reviewer_role ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_control_successful ?posting_batch)
+        (batch_assigned_accounting_policy ?posting_batch ?accounting_policy)
+        (assigned_reviewer ?posting_batch ?reviewer)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (journal_posting_source_dataset_processed ?journal_posting)
+        (not
+          (batch_ready_for_approval ?posting_batch)
+        )
+      )
+    :effect (batch_ready_for_approval ?posting_batch)
+  )
+  (:action initiate_batch_final_verification
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_ready_for_approval ?posting_batch)
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (not
+          (journal_posting_source_document_attached ?journal_posting)
+        )
+        (not
+          (journal_posting_source_dataset_processed ?journal_posting)
+        )
+        (not
+          (batch_verification_ready ?posting_batch)
+        )
+      )
+    :effect (batch_verification_ready ?posting_batch)
+  )
+  (:action initiate_batch_final_verification_with_report
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_ready_for_approval ?posting_batch)
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (journal_posting_source_document_attached ?journal_posting)
+        (not
+          (journal_posting_source_dataset_processed ?journal_posting)
+        )
+        (not
+          (batch_verification_ready ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_report_ready ?posting_batch)
+      )
+  )
+  (:action initiate_batch_final_verification_with_processed_source
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_ready_for_approval ?posting_batch)
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (not
+          (journal_posting_source_document_attached ?journal_posting)
+        )
+        (journal_posting_source_dataset_processed ?journal_posting)
+        (not
+          (batch_verification_ready ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_report_ready ?posting_batch)
+      )
+  )
+  (:action initiate_batch_final_verification_with_full_evidence
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure ?control_check - control_check ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (batch_ready_for_approval ?posting_batch)
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (batch_assigned_control_check ?posting_batch ?control_check)
+        (control_check_linked_to_posting ?control_check ?journal_posting)
+        (journal_posting_source_document_attached ?journal_posting)
+        (journal_posting_source_dataset_processed ?journal_posting)
+        (not
+          (batch_verification_ready ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_report_ready ?posting_batch)
+      )
+  )
+  (:action finalize_batch_verification
+    :parameters (?posting_batch - posting_batch)
+    :precondition
+      (and
+        (batch_verification_ready ?posting_batch)
+        (not
+          (batch_report_ready ?posting_batch)
+        )
+        (not
+          (batch_finalized ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_finalized ?posting_batch)
+        (approved_for_posting ?posting_batch)
+      )
+  )
+  (:action attach_report_template_to_batch
+    :parameters (?posting_batch - posting_batch ?report_template - report_template)
+    :precondition
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_report_ready ?posting_batch)
+        (report_template_available ?report_template)
+      )
+    :effect
+      (and
+        (batch_linked_report_template ?posting_batch ?report_template)
+        (not
+          (report_template_available ?report_template)
+        )
+      )
+  )
+  (:action perform_final_reconciliation_and_verification
+    :parameters (?posting_batch - posting_batch ?gl_account - gl_account ?operational_unit - operational_unit ?calc_rule - calculation_rule ?report_template - report_template)
+    :precondition
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_report_ready ?posting_batch)
+        (batch_linked_report_template ?posting_batch ?report_template)
+        (batch_contains_gl_account ?posting_batch ?gl_account)
+        (batch_contains_operational_unit ?posting_batch ?operational_unit)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+        (calculation_applied ?posting_batch ?calc_rule)
+        (not
+          (batch_final_verification_completed ?posting_batch)
+        )
+      )
+    :effect (batch_final_verification_completed ?posting_batch)
+  )
+  (:action finalize_batch_after_reconciliation
+    :parameters (?posting_batch - posting_batch)
+    :precondition
+      (and
+        (batch_verification_ready ?posting_batch)
+        (batch_final_verification_completed ?posting_batch)
+        (not
+          (batch_finalized ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_finalized ?posting_batch)
+        (approved_for_posting ?posting_batch)
+      )
+  )
+  (:action assign_special_approval_flag_to_batch
+    :parameters (?posting_batch - posting_batch ?audit_evidence - audit_evidence ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (calculation_completed ?posting_batch)
+        (calculation_applied ?posting_batch ?calc_rule)
+        (audit_evidence_available ?audit_evidence)
+        (batch_linked_audit_evidence ?posting_batch ?audit_evidence)
+        (not
+          (batch_special_approval_flag ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_special_approval_flag ?posting_batch)
+        (not
+          (audit_evidence_available ?audit_evidence)
+        )
+      )
+  )
+  (:action start_batch_signoff
+    :parameters (?posting_batch - posting_batch ?reviewer - reviewer_role)
+    :precondition
+      (and
+        (batch_special_approval_flag ?posting_batch)
+        (assigned_reviewer ?posting_batch ?reviewer)
+        (not
+          (batch_signoff_initiated ?posting_batch)
+        )
+      )
+    :effect (batch_signoff_initiated ?posting_batch)
+  )
+  (:action complete_signoff_procedure_for_batch
+    :parameters (?posting_batch - posting_batch ?signoff_procedure - signoff_procedure)
+    :precondition
+      (and
+        (batch_signoff_initiated ?posting_batch)
+        (batch_linked_signoff_procedure ?posting_batch ?signoff_procedure)
+        (not
+          (batch_signoff_completed ?posting_batch)
+        )
+      )
+    :effect (batch_signoff_completed ?posting_batch)
+  )
+  (:action finalize_batch_after_signoff
+    :parameters (?posting_batch - posting_batch)
+    :precondition
+      (and
+        (batch_signoff_completed ?posting_batch)
+        (not
+          (batch_finalized ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_finalized ?posting_batch)
+        (approved_for_posting ?posting_batch)
+      )
+  )
+  (:action approve_gl_account_for_posting
+    :parameters (?gl_account - gl_account ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (gl_account_processing_flag ?gl_account)
+        (gl_account_ready_for_journal_assembly ?gl_account)
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_validated_for_control ?journal_posting)
+        (not
+          (approved_for_posting ?gl_account)
+        )
+      )
+    :effect (approved_for_posting ?gl_account)
+  )
+  (:action approve_operational_unit_for_posting
+    :parameters (?operational_unit - operational_unit ?journal_posting - journal_posting)
+    :precondition
+      (and
+        (operational_unit_processing_flag ?operational_unit)
+        (operational_unit_ready_for_journal_assembly ?operational_unit)
+        (journal_posting_assembled ?journal_posting)
+        (journal_posting_validated_for_control ?journal_posting)
+        (not
+          (approved_for_posting ?operational_unit)
+        )
+      )
+    :effect (approved_for_posting ?operational_unit)
+  )
+  (:action create_journal_post_for_accrual_case
+    :parameters (?accrual_case - accrual_case ?accrual_category - accrual_category ?calc_rule - calculation_rule)
+    :precondition
+      (and
+        (approved_for_posting ?accrual_case)
+        (calculation_applied ?accrual_case ?calc_rule)
+        (accrual_category_available ?accrual_category)
+        (not
+          (journal_post_created ?accrual_case)
+        )
+      )
+    :effect
+      (and
+        (journal_post_created ?accrual_case)
+        (case_classified_as_accrual_category ?accrual_case ?accrual_category)
+        (not
+          (accrual_category_available ?accrual_category)
+        )
+      )
+  )
+  (:action finalize_account_posting_and_release_service
+    :parameters (?gl_account - gl_account ?calc_service - calculation_service ?accrual_category - accrual_category)
+    :precondition
+      (and
+        (journal_post_created ?gl_account)
+        (assigned_to_calc_service ?gl_account ?calc_service)
+        (case_classified_as_accrual_category ?gl_account ?accrual_category)
+        (not
+          (ready_for_posting ?gl_account)
+        )
+      )
+    :effect
+      (and
+        (ready_for_posting ?gl_account)
+        (calc_service_available ?calc_service)
+        (accrual_category_available ?accrual_category)
+      )
+  )
+  (:action finalize_unit_posting_and_release_service
+    :parameters (?operational_unit - operational_unit ?calc_service - calculation_service ?accrual_category - accrual_category)
+    :precondition
+      (and
+        (journal_post_created ?operational_unit)
+        (assigned_to_calc_service ?operational_unit ?calc_service)
+        (case_classified_as_accrual_category ?operational_unit ?accrual_category)
+        (not
+          (ready_for_posting ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_posting ?operational_unit)
+        (calc_service_available ?calc_service)
+        (accrual_category_available ?accrual_category)
+      )
+  )
+  (:action finalize_batch_posting_and_release_service
+    :parameters (?posting_batch - posting_batch ?calc_service - calculation_service ?accrual_category - accrual_category)
+    :precondition
+      (and
+        (journal_post_created ?posting_batch)
+        (assigned_to_calc_service ?posting_batch ?calc_service)
+        (case_classified_as_accrual_category ?posting_batch ?accrual_category)
+        (not
+          (ready_for_posting ?posting_batch)
+        )
+      )
+    :effect
+      (and
+        (ready_for_posting ?posting_batch)
+        (calc_service_available ?calc_service)
+        (accrual_category_available ?accrual_category)
+      )
+  )
+)

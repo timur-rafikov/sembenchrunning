@@ -1,0 +1,1014 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain expedited_vs_economy_fulfillment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object physical_asset - object logistics_node - object domain_entity_root - object fulfillment_entity - domain_entity_root supply_source - resource_category service_level_option - resource_category fulfillment_station - resource_category label_template - resource_category routing_profile - resource_category dispatch_window - resource_category handling_equipment - resource_category third_party_consent - resource_category order_line_item - physical_asset package_container - physical_asset regulatory_clearance - physical_asset inventory_location - logistics_node transport_lane - logistics_node shipment_unit - logistics_node fulfillment_unit - fulfillment_entity process_unit - fulfillment_entity sales_order - fulfillment_unit work_batch - fulfillment_unit fulfillment_process - process_unit)
+  (:predicates
+    (entity_released ?fulfillment_entity - fulfillment_entity)
+    (allocation_ready ?fulfillment_entity - fulfillment_entity)
+    (source_allocated ?fulfillment_entity - fulfillment_entity)
+    (dispatch_authorized ?fulfillment_entity - fulfillment_entity)
+    (finalization_completed ?fulfillment_entity - fulfillment_entity)
+    (service_level_bound ?fulfillment_entity - fulfillment_entity)
+    (source_available ?supply_source - supply_source)
+    (sourced_from ?fulfillment_entity - fulfillment_entity ?supply_source - supply_source)
+    (service_level_option_available ?service_level_option - service_level_option)
+    (service_level_assigned ?fulfillment_entity - fulfillment_entity ?service_level_option - service_level_option)
+    (station_available ?fulfillment_station - fulfillment_station)
+    (assigned_to_station ?fulfillment_entity - fulfillment_entity ?fulfillment_station - fulfillment_station)
+    (line_available ?order_line_item - order_line_item)
+    (order_contains_line ?sales_order - sales_order ?order_line_item - order_line_item)
+    (batch_contains_line ?work_batch - work_batch ?order_line_item - order_line_item)
+    (allocated_to_location ?sales_order - sales_order ?inventory_location - inventory_location)
+    (location_reserved ?inventory_location - inventory_location)
+    (location_pending ?inventory_location - inventory_location)
+    (has_location_booking ?sales_order - sales_order)
+    (batch_assigned_to_lane ?work_batch - work_batch ?transport_lane - transport_lane)
+    (lane_reserved ?transport_lane - transport_lane)
+    (lane_pending ?transport_lane - transport_lane)
+    (batch_ready ?work_batch - work_batch)
+    (shipment_open ?shipment_unit - shipment_unit)
+    (shipment_reserved ?shipment_unit - shipment_unit)
+    (shipment_allocated_from_location ?shipment_unit - shipment_unit ?inventory_location - inventory_location)
+    (shipment_assigned_to_lane ?shipment_unit - shipment_unit ?transport_lane - transport_lane)
+    (shipment_expedited ?shipment_unit - shipment_unit)
+    (shipment_economy ?shipment_unit - shipment_unit)
+    (shipment_packed ?shipment_unit - shipment_unit)
+    (process_handles_order ?fulfillment_process - fulfillment_process ?sales_order - sales_order)
+    (process_handles_batch ?fulfillment_process - fulfillment_process ?work_batch - work_batch)
+    (process_assigned_shipment ?fulfillment_process - fulfillment_process ?shipment_unit - shipment_unit)
+    (container_available ?package_container - package_container)
+    (process_assigned_container ?fulfillment_process - fulfillment_process ?package_container - package_container)
+    (container_prepared ?package_container - package_container)
+    (container_assigned_to_shipment ?package_container - package_container ?shipment_unit - shipment_unit)
+    (packaging_ready ?fulfillment_process - fulfillment_process)
+    (packing_allocated ?fulfillment_process - fulfillment_process)
+    (handling_profile_applied ?fulfillment_process - fulfillment_process)
+    (label_bound ?fulfillment_process - fulfillment_process)
+    (labeling_confirmed ?fulfillment_process - fulfillment_process)
+    (label_applied ?fulfillment_process - fulfillment_process)
+    (final_checks_completed ?fulfillment_process - fulfillment_process)
+    (regulatory_clearance_available ?regulatory_clearance - regulatory_clearance)
+    (process_has_regulatory_clearance ?fulfillment_process - fulfillment_process ?regulatory_clearance - regulatory_clearance)
+    (regulatory_clearance_applied ?fulfillment_process - fulfillment_process)
+    (regulatory_clearance_verified ?fulfillment_process - fulfillment_process)
+    (consent_attested ?fulfillment_process - fulfillment_process)
+    (label_template_available ?label_template - label_template)
+    (label_assigned_to_process ?fulfillment_process - fulfillment_process ?label_template - label_template)
+    (routing_profile_available ?routing_profile - routing_profile)
+    (routing_profile_assigned ?fulfillment_process - fulfillment_process ?routing_profile - routing_profile)
+    (equipment_available ?handling_equipment - handling_equipment)
+    (equipment_allocated_to_process ?fulfillment_process - fulfillment_process ?handling_equipment - handling_equipment)
+    (third_party_consent_available ?third_party_consent - third_party_consent)
+    (consent_bound_to_process ?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent)
+    (dispatch_window_available ?dispatch_window - dispatch_window)
+    (assigned_dispatch_window ?fulfillment_entity - fulfillment_entity ?dispatch_window - dispatch_window)
+    (location_lock_set ?sales_order - sales_order)
+    (batch_lock_set ?work_batch - work_batch)
+    (dispatch_logged ?fulfillment_process - fulfillment_process)
+  )
+  (:action release_entity
+    :parameters (?fulfillment_entity - fulfillment_entity)
+    :precondition
+      (and
+        (not
+          (entity_released ?fulfillment_entity)
+        )
+        (not
+          (dispatch_authorized ?fulfillment_entity)
+        )
+      )
+    :effect (entity_released ?fulfillment_entity)
+  )
+  (:action allocate_source
+    :parameters (?fulfillment_entity - fulfillment_entity ?supply_source - supply_source)
+    :precondition
+      (and
+        (entity_released ?fulfillment_entity)
+        (not
+          (source_allocated ?fulfillment_entity)
+        )
+        (source_available ?supply_source)
+      )
+    :effect
+      (and
+        (source_allocated ?fulfillment_entity)
+        (sourced_from ?fulfillment_entity ?supply_source)
+        (not
+          (source_available ?supply_source)
+        )
+      )
+  )
+  (:action assign_service_option
+    :parameters (?fulfillment_entity - fulfillment_entity ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (entity_released ?fulfillment_entity)
+        (source_allocated ?fulfillment_entity)
+        (service_level_option_available ?service_level_option)
+      )
+    :effect
+      (and
+        (service_level_assigned ?fulfillment_entity ?service_level_option)
+        (not
+          (service_level_option_available ?service_level_option)
+        )
+      )
+  )
+  (:action confirm_allocation_ready
+    :parameters (?fulfillment_entity - fulfillment_entity ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (entity_released ?fulfillment_entity)
+        (source_allocated ?fulfillment_entity)
+        (service_level_assigned ?fulfillment_entity ?service_level_option)
+        (not
+          (allocation_ready ?fulfillment_entity)
+        )
+      )
+    :effect (allocation_ready ?fulfillment_entity)
+  )
+  (:action release_service_option
+    :parameters (?fulfillment_entity - fulfillment_entity ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (service_level_assigned ?fulfillment_entity ?service_level_option)
+      )
+    :effect
+      (and
+        (service_level_option_available ?service_level_option)
+        (not
+          (service_level_assigned ?fulfillment_entity ?service_level_option)
+        )
+      )
+  )
+  (:action assign_station_to_entity
+    :parameters (?fulfillment_entity - fulfillment_entity ?fulfillment_station - fulfillment_station)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_entity)
+        (station_available ?fulfillment_station)
+      )
+    :effect
+      (and
+        (assigned_to_station ?fulfillment_entity ?fulfillment_station)
+        (not
+          (station_available ?fulfillment_station)
+        )
+      )
+  )
+  (:action release_station_from_entity
+    :parameters (?fulfillment_entity - fulfillment_entity ?fulfillment_station - fulfillment_station)
+    :precondition
+      (and
+        (assigned_to_station ?fulfillment_entity ?fulfillment_station)
+      )
+    :effect
+      (and
+        (station_available ?fulfillment_station)
+        (not
+          (assigned_to_station ?fulfillment_entity ?fulfillment_station)
+        )
+      )
+  )
+  (:action reserve_equipment_for_process
+    :parameters (?fulfillment_process - fulfillment_process ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (equipment_allocated_to_process ?fulfillment_process ?handling_equipment)
+        (not
+          (equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_process
+    :parameters (?fulfillment_process - fulfillment_process ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (equipment_allocated_to_process ?fulfillment_process ?handling_equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?handling_equipment)
+        (not
+          (equipment_allocated_to_process ?fulfillment_process ?handling_equipment)
+        )
+      )
+  )
+  (:action bind_consent_to_process
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (third_party_consent_available ?third_party_consent)
+      )
+    :effect
+      (and
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (not
+          (third_party_consent_available ?third_party_consent)
+        )
+      )
+  )
+  (:action release_consent_from_process
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent)
+    :precondition
+      (and
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+      )
+    :effect
+      (and
+        (third_party_consent_available ?third_party_consent)
+        (not
+          (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        )
+      )
+  )
+  (:action reserve_inventory_location_for_unit
+    :parameters (?sales_order - sales_order ?inventory_location - inventory_location ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (allocation_ready ?sales_order)
+        (service_level_assigned ?sales_order ?service_level_option)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (not
+          (location_reserved ?inventory_location)
+        )
+        (not
+          (location_pending ?inventory_location)
+        )
+      )
+    :effect (location_reserved ?inventory_location)
+  )
+  (:action confirm_location_allocation
+    :parameters (?sales_order - sales_order ?inventory_location - inventory_location ?fulfillment_station - fulfillment_station)
+    :precondition
+      (and
+        (allocation_ready ?sales_order)
+        (assigned_to_station ?sales_order ?fulfillment_station)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (location_reserved ?inventory_location)
+        (not
+          (location_lock_set ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (location_lock_set ?sales_order)
+        (has_location_booking ?sales_order)
+      )
+  )
+  (:action allocate_line_to_location
+    :parameters (?sales_order - sales_order ?inventory_location - inventory_location ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (allocation_ready ?sales_order)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (line_available ?order_line_item)
+        (not
+          (location_lock_set ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (location_pending ?inventory_location)
+        (location_lock_set ?sales_order)
+        (order_contains_line ?sales_order ?order_line_item)
+        (not
+          (line_available ?order_line_item)
+        )
+      )
+  )
+  (:action finalize_location_allocation_for_line
+    :parameters (?sales_order - sales_order ?inventory_location - inventory_location ?service_level_option - service_level_option ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (allocation_ready ?sales_order)
+        (service_level_assigned ?sales_order ?service_level_option)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (location_pending ?inventory_location)
+        (order_contains_line ?sales_order ?order_line_item)
+        (not
+          (has_location_booking ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (location_reserved ?inventory_location)
+        (has_location_booking ?sales_order)
+        (line_available ?order_line_item)
+        (not
+          (order_contains_line ?sales_order ?order_line_item)
+        )
+      )
+  )
+  (:action reserve_lane_for_batch
+    :parameters (?work_batch - work_batch ?transport_lane - transport_lane ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (allocation_ready ?work_batch)
+        (service_level_assigned ?work_batch ?service_level_option)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (not
+          (lane_reserved ?transport_lane)
+        )
+        (not
+          (lane_pending ?transport_lane)
+        )
+      )
+    :effect (lane_reserved ?transport_lane)
+  )
+  (:action confirm_batch_lane_assignment
+    :parameters (?work_batch - work_batch ?transport_lane - transport_lane ?fulfillment_station - fulfillment_station)
+    :precondition
+      (and
+        (allocation_ready ?work_batch)
+        (assigned_to_station ?work_batch ?fulfillment_station)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (lane_reserved ?transport_lane)
+        (not
+          (batch_lock_set ?work_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_lock_set ?work_batch)
+        (batch_ready ?work_batch)
+      )
+  )
+  (:action allocate_line_to_batch
+    :parameters (?work_batch - work_batch ?transport_lane - transport_lane ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (allocation_ready ?work_batch)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (line_available ?order_line_item)
+        (not
+          (batch_lock_set ?work_batch)
+        )
+      )
+    :effect
+      (and
+        (lane_pending ?transport_lane)
+        (batch_lock_set ?work_batch)
+        (batch_contains_line ?work_batch ?order_line_item)
+        (not
+          (line_available ?order_line_item)
+        )
+      )
+  )
+  (:action finalize_batch_lane_allocation
+    :parameters (?work_batch - work_batch ?transport_lane - transport_lane ?service_level_option - service_level_option ?order_line_item - order_line_item)
+    :precondition
+      (and
+        (allocation_ready ?work_batch)
+        (service_level_assigned ?work_batch ?service_level_option)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (lane_pending ?transport_lane)
+        (batch_contains_line ?work_batch ?order_line_item)
+        (not
+          (batch_ready ?work_batch)
+        )
+      )
+    :effect
+      (and
+        (lane_reserved ?transport_lane)
+        (batch_ready ?work_batch)
+        (line_available ?order_line_item)
+        (not
+          (batch_contains_line ?work_batch ?order_line_item)
+        )
+      )
+  )
+  (:action assemble_shipment_unit
+    :parameters (?sales_order - sales_order ?work_batch - work_batch ?inventory_location - inventory_location ?transport_lane - transport_lane ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (location_lock_set ?sales_order)
+        (batch_lock_set ?work_batch)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (location_reserved ?inventory_location)
+        (lane_reserved ?transport_lane)
+        (has_location_booking ?sales_order)
+        (batch_ready ?work_batch)
+        (shipment_open ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_allocated_from_location ?shipment_unit ?inventory_location)
+        (shipment_assigned_to_lane ?shipment_unit ?transport_lane)
+        (not
+          (shipment_open ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_expedited
+    :parameters (?sales_order - sales_order ?work_batch - work_batch ?inventory_location - inventory_location ?transport_lane - transport_lane ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (location_lock_set ?sales_order)
+        (batch_lock_set ?work_batch)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (location_pending ?inventory_location)
+        (lane_reserved ?transport_lane)
+        (not
+          (has_location_booking ?sales_order)
+        )
+        (batch_ready ?work_batch)
+        (shipment_open ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_allocated_from_location ?shipment_unit ?inventory_location)
+        (shipment_assigned_to_lane ?shipment_unit ?transport_lane)
+        (shipment_expedited ?shipment_unit)
+        (not
+          (shipment_open ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_economy
+    :parameters (?sales_order - sales_order ?work_batch - work_batch ?inventory_location - inventory_location ?transport_lane - transport_lane ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (location_lock_set ?sales_order)
+        (batch_lock_set ?work_batch)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (location_reserved ?inventory_location)
+        (lane_pending ?transport_lane)
+        (has_location_booking ?sales_order)
+        (not
+          (batch_ready ?work_batch)
+        )
+        (shipment_open ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_allocated_from_location ?shipment_unit ?inventory_location)
+        (shipment_assigned_to_lane ?shipment_unit ?transport_lane)
+        (shipment_economy ?shipment_unit)
+        (not
+          (shipment_open ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_mixed_mode
+    :parameters (?sales_order - sales_order ?work_batch - work_batch ?inventory_location - inventory_location ?transport_lane - transport_lane ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (location_lock_set ?sales_order)
+        (batch_lock_set ?work_batch)
+        (allocated_to_location ?sales_order ?inventory_location)
+        (batch_assigned_to_lane ?work_batch ?transport_lane)
+        (location_pending ?inventory_location)
+        (lane_pending ?transport_lane)
+        (not
+          (has_location_booking ?sales_order)
+        )
+        (not
+          (batch_ready ?work_batch)
+        )
+        (shipment_open ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment_unit)
+        (shipment_allocated_from_location ?shipment_unit ?inventory_location)
+        (shipment_assigned_to_lane ?shipment_unit ?transport_lane)
+        (shipment_expedited ?shipment_unit)
+        (shipment_economy ?shipment_unit)
+        (not
+          (shipment_open ?shipment_unit)
+        )
+      )
+  )
+  (:action mark_shipment_as_packed
+    :parameters (?shipment_unit - shipment_unit ?sales_order - sales_order ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (shipment_reserved ?shipment_unit)
+        (location_lock_set ?sales_order)
+        (service_level_assigned ?sales_order ?service_level_option)
+        (not
+          (shipment_packed ?shipment_unit)
+        )
+      )
+    :effect (shipment_packed ?shipment_unit)
+  )
+  (:action assign_container_to_shipment
+    :parameters (?fulfillment_process - fulfillment_process ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (process_assigned_shipment ?fulfillment_process ?shipment_unit)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_available ?package_container)
+        (shipment_reserved ?shipment_unit)
+        (shipment_packed ?shipment_unit)
+        (not
+          (container_prepared ?package_container)
+        )
+      )
+    :effect
+      (and
+        (container_prepared ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (not
+          (container_available ?package_container)
+        )
+      )
+  )
+  (:action mark_process_packaging_ready
+    :parameters (?fulfillment_process - fulfillment_process ?package_container - package_container ?shipment_unit - shipment_unit ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_prepared ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (service_level_assigned ?fulfillment_process ?service_level_option)
+        (not
+          (shipment_expedited ?shipment_unit)
+        )
+        (not
+          (packaging_ready ?fulfillment_process)
+        )
+      )
+    :effect (packaging_ready ?fulfillment_process)
+  )
+  (:action assign_label_template_to_process
+    :parameters (?fulfillment_process - fulfillment_process ?label_template - label_template)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (label_template_available ?label_template)
+        (not
+          (label_bound ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (label_bound ?fulfillment_process)
+        (label_assigned_to_process ?fulfillment_process ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action apply_label_and_prepare_packaging
+    :parameters (?fulfillment_process - fulfillment_process ?package_container - package_container ?shipment_unit - shipment_unit ?service_level_option - service_level_option ?label_template - label_template)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_prepared ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (service_level_assigned ?fulfillment_process ?service_level_option)
+        (shipment_expedited ?shipment_unit)
+        (label_bound ?fulfillment_process)
+        (label_assigned_to_process ?fulfillment_process ?label_template)
+        (not
+          (packaging_ready ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (packaging_ready ?fulfillment_process)
+        (labeling_confirmed ?fulfillment_process)
+      )
+  )
+  (:action allocate_packing_for_process
+    :parameters (?fulfillment_process - fulfillment_process ?handling_equipment - handling_equipment ?fulfillment_station - fulfillment_station ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packaging_ready ?fulfillment_process)
+        (equipment_allocated_to_process ?fulfillment_process ?handling_equipment)
+        (assigned_to_station ?fulfillment_process ?fulfillment_station)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (not
+          (shipment_economy ?shipment_unit)
+        )
+        (not
+          (packing_allocated ?fulfillment_process)
+        )
+      )
+    :effect (packing_allocated ?fulfillment_process)
+  )
+  (:action allocate_packing_for_process_alternate
+    :parameters (?fulfillment_process - fulfillment_process ?handling_equipment - handling_equipment ?fulfillment_station - fulfillment_station ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packaging_ready ?fulfillment_process)
+        (equipment_allocated_to_process ?fulfillment_process ?handling_equipment)
+        (assigned_to_station ?fulfillment_process ?fulfillment_station)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (shipment_economy ?shipment_unit)
+        (not
+          (packing_allocated ?fulfillment_process)
+        )
+      )
+    :effect (packing_allocated ?fulfillment_process)
+  )
+  (:action apply_handling_profile
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packing_allocated ?fulfillment_process)
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (not
+          (shipment_expedited ?shipment_unit)
+        )
+        (not
+          (shipment_economy ?shipment_unit)
+        )
+        (not
+          (handling_profile_applied ?fulfillment_process)
+        )
+      )
+    :effect (handling_profile_applied ?fulfillment_process)
+  )
+  (:action apply_handling_and_label_expedited
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packing_allocated ?fulfillment_process)
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (shipment_expedited ?shipment_unit)
+        (not
+          (shipment_economy ?shipment_unit)
+        )
+        (not
+          (handling_profile_applied ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (label_applied ?fulfillment_process)
+      )
+  )
+  (:action apply_handling_and_label_economy
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packing_allocated ?fulfillment_process)
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (not
+          (shipment_expedited ?shipment_unit)
+        )
+        (shipment_economy ?shipment_unit)
+        (not
+          (handling_profile_applied ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (label_applied ?fulfillment_process)
+      )
+  )
+  (:action apply_handling_and_label_mixed
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent ?package_container - package_container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (packing_allocated ?fulfillment_process)
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (process_assigned_container ?fulfillment_process ?package_container)
+        (container_assigned_to_shipment ?package_container ?shipment_unit)
+        (shipment_expedited ?shipment_unit)
+        (shipment_economy ?shipment_unit)
+        (not
+          (handling_profile_applied ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (label_applied ?fulfillment_process)
+      )
+  )
+  (:action finalize_process_without_label
+    :parameters (?fulfillment_process - fulfillment_process)
+    :precondition
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (not
+          (label_applied ?fulfillment_process)
+        )
+        (not
+          (dispatch_logged ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (dispatch_logged ?fulfillment_process)
+        (finalization_completed ?fulfillment_process)
+      )
+  )
+  (:action assign_routing_profile
+    :parameters (?fulfillment_process - fulfillment_process ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (label_applied ?fulfillment_process)
+        (routing_profile_available ?routing_profile)
+      )
+    :effect
+      (and
+        (routing_profile_assigned ?fulfillment_process ?routing_profile)
+        (not
+          (routing_profile_available ?routing_profile)
+        )
+      )
+  )
+  (:action perform_final_checks
+    :parameters (?fulfillment_process - fulfillment_process ?sales_order - sales_order ?work_batch - work_batch ?service_level_option - service_level_option ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (label_applied ?fulfillment_process)
+        (routing_profile_assigned ?fulfillment_process ?routing_profile)
+        (process_handles_order ?fulfillment_process ?sales_order)
+        (process_handles_batch ?fulfillment_process ?work_batch)
+        (has_location_booking ?sales_order)
+        (batch_ready ?work_batch)
+        (service_level_assigned ?fulfillment_process ?service_level_option)
+        (not
+          (final_checks_completed ?fulfillment_process)
+        )
+      )
+    :effect (final_checks_completed ?fulfillment_process)
+  )
+  (:action record_dispatch_for_process
+    :parameters (?fulfillment_process - fulfillment_process)
+    :precondition
+      (and
+        (handling_profile_applied ?fulfillment_process)
+        (final_checks_completed ?fulfillment_process)
+        (not
+          (dispatch_logged ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (dispatch_logged ?fulfillment_process)
+        (finalization_completed ?fulfillment_process)
+      )
+  )
+  (:action claim_regulatory_clearance
+    :parameters (?fulfillment_process - fulfillment_process ?regulatory_clearance - regulatory_clearance ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (allocation_ready ?fulfillment_process)
+        (service_level_assigned ?fulfillment_process ?service_level_option)
+        (regulatory_clearance_available ?regulatory_clearance)
+        (process_has_regulatory_clearance ?fulfillment_process ?regulatory_clearance)
+        (not
+          (regulatory_clearance_applied ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (regulatory_clearance_applied ?fulfillment_process)
+        (not
+          (regulatory_clearance_available ?regulatory_clearance)
+        )
+      )
+  )
+  (:action verify_clearance
+    :parameters (?fulfillment_process - fulfillment_process ?fulfillment_station - fulfillment_station)
+    :precondition
+      (and
+        (regulatory_clearance_applied ?fulfillment_process)
+        (assigned_to_station ?fulfillment_process ?fulfillment_station)
+        (not
+          (regulatory_clearance_verified ?fulfillment_process)
+        )
+      )
+    :effect (regulatory_clearance_verified ?fulfillment_process)
+  )
+  (:action attest_third_party_consent
+    :parameters (?fulfillment_process - fulfillment_process ?third_party_consent - third_party_consent)
+    :precondition
+      (and
+        (regulatory_clearance_verified ?fulfillment_process)
+        (consent_bound_to_process ?fulfillment_process ?third_party_consent)
+        (not
+          (consent_attested ?fulfillment_process)
+        )
+      )
+    :effect (consent_attested ?fulfillment_process)
+  )
+  (:action finalize_process_with_clearance
+    :parameters (?fulfillment_process - fulfillment_process)
+    :precondition
+      (and
+        (consent_attested ?fulfillment_process)
+        (not
+          (dispatch_logged ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (dispatch_logged ?fulfillment_process)
+        (finalization_completed ?fulfillment_process)
+      )
+  )
+  (:action finalize_sales_order
+    :parameters (?sales_order - sales_order ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (location_lock_set ?sales_order)
+        (has_location_booking ?sales_order)
+        (shipment_reserved ?shipment_unit)
+        (shipment_packed ?shipment_unit)
+        (not
+          (finalization_completed ?sales_order)
+        )
+      )
+    :effect (finalization_completed ?sales_order)
+  )
+  (:action finalize_work_batch
+    :parameters (?work_batch - work_batch ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_lock_set ?work_batch)
+        (batch_ready ?work_batch)
+        (shipment_reserved ?shipment_unit)
+        (shipment_packed ?shipment_unit)
+        (not
+          (finalization_completed ?work_batch)
+        )
+      )
+    :effect (finalization_completed ?work_batch)
+  )
+  (:action assign_service_level_and_dispatch_window
+    :parameters (?fulfillment_entity - fulfillment_entity ?dispatch_window - dispatch_window ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (finalization_completed ?fulfillment_entity)
+        (service_level_assigned ?fulfillment_entity ?service_level_option)
+        (dispatch_window_available ?dispatch_window)
+        (not
+          (service_level_bound ?fulfillment_entity)
+        )
+      )
+    :effect
+      (and
+        (service_level_bound ?fulfillment_entity)
+        (assigned_dispatch_window ?fulfillment_entity ?dispatch_window)
+        (not
+          (dispatch_window_available ?dispatch_window)
+        )
+      )
+  )
+  (:action confirm_release_and_reserve_source
+    :parameters (?sales_order - sales_order ?supply_source - supply_source ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (service_level_bound ?sales_order)
+        (sourced_from ?sales_order ?supply_source)
+        (assigned_dispatch_window ?sales_order ?dispatch_window)
+        (not
+          (dispatch_authorized ?sales_order)
+        )
+      )
+    :effect
+      (and
+        (dispatch_authorized ?sales_order)
+        (source_available ?supply_source)
+        (dispatch_window_available ?dispatch_window)
+      )
+  )
+  (:action confirm_batch_release_and_reserve_source
+    :parameters (?work_batch - work_batch ?supply_source - supply_source ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (service_level_bound ?work_batch)
+        (sourced_from ?work_batch ?supply_source)
+        (assigned_dispatch_window ?work_batch ?dispatch_window)
+        (not
+          (dispatch_authorized ?work_batch)
+        )
+      )
+    :effect
+      (and
+        (dispatch_authorized ?work_batch)
+        (source_available ?supply_source)
+        (dispatch_window_available ?dispatch_window)
+      )
+  )
+  (:action confirm_process_release_and_reserve_source
+    :parameters (?fulfillment_process - fulfillment_process ?supply_source - supply_source ?dispatch_window - dispatch_window)
+    :precondition
+      (and
+        (service_level_bound ?fulfillment_process)
+        (sourced_from ?fulfillment_process ?supply_source)
+        (assigned_dispatch_window ?fulfillment_process ?dispatch_window)
+        (not
+          (dispatch_authorized ?fulfillment_process)
+        )
+      )
+    :effect
+      (and
+        (dispatch_authorized ?fulfillment_process)
+        (source_available ?supply_source)
+        (dispatch_window_available ?dispatch_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem expedited_vs_economy_case)
+  (:domain expedited_vs_economy_fulfillment)
+  (:objects sales_order_1 - sales_order work_batch_1 - work_batch fulfillment_process_1 - fulfillment_process fulfillment_process_2 - fulfillment_process supply_source_1 - supply_source supply_source_2 - supply_source supply_source_3 - supply_source service_level_option_1 - service_level_option fulfillment_station_1 - fulfillment_station order_line_item_1 - order_line_item inventory_location_1 - inventory_location transport_lane_1 - transport_lane shipment_unit_1 - shipment_unit package_container_1 - package_container package_container_2 - package_container label_template_1 - label_template label_template_2 - label_template routing_profile_1 - routing_profile routing_profile_2 - routing_profile dispatch_window_1 - dispatch_window handling_equipment_1 - handling_equipment regulatory_clearance_1 - regulatory_clearance regulatory_clearance_2 - regulatory_clearance third_party_consent_1 - third_party_consent)
+  (:init
+    (source_available supply_source_1)
+    (source_available supply_source_2)
+    (source_available supply_source_3)
+    (service_level_option_available service_level_option_1)
+    (station_available fulfillment_station_1)
+    (line_available order_line_item_1)
+    (allocated_to_location sales_order_1 inventory_location_1)
+    (batch_assigned_to_lane work_batch_1 transport_lane_1)
+    (shipment_open shipment_unit_1)
+    (container_available package_container_1)
+    (container_available package_container_2)
+    (process_handles_order fulfillment_process_1 sales_order_1)
+    (process_handles_order fulfillment_process_2 sales_order_1)
+    (process_handles_batch fulfillment_process_1 work_batch_1)
+    (process_handles_batch fulfillment_process_2 work_batch_1)
+    (process_assigned_shipment fulfillment_process_1 shipment_unit_1)
+    (process_assigned_shipment fulfillment_process_2 shipment_unit_1)
+    (process_assigned_container fulfillment_process_1 package_container_1)
+    (process_assigned_container fulfillment_process_2 package_container_2)
+    (label_template_available label_template_1)
+    (label_template_available label_template_2)
+    (routing_profile_available routing_profile_1)
+    (routing_profile_available routing_profile_2)
+    (dispatch_window_available dispatch_window_1)
+    (equipment_available handling_equipment_1)
+    (regulatory_clearance_available regulatory_clearance_1)
+    (process_has_regulatory_clearance fulfillment_process_1 regulatory_clearance_1)
+    (process_has_regulatory_clearance fulfillment_process_2 regulatory_clearance_2)
+    (third_party_consent_available third_party_consent_1)
+  )
+  (:goal
+    (and
+      (dispatch_authorized sales_order_1)
+      (dispatch_authorized work_batch_1)
+      (dispatch_authorized fulfillment_process_1)
+      (dispatch_authorized fulfillment_process_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(release_entity sales_order_1)
+(allocate_source sales_order_1 supply_source_1)
+(assign_service_option sales_order_1 service_level_option_1)
+(confirm_allocation_ready sales_order_1 service_level_option_1)
+(allocate_line_to_location sales_order_1 inventory_location_1 order_line_item_1)
+(finalize_location_allocation_for_line sales_order_1 inventory_location_1 service_level_option_1 order_line_item_1)
+(release_service_option sales_order_1 service_level_option_1)
+(release_entity work_batch_1)
+(allocate_source work_batch_1 supply_source_2)
+(assign_service_option work_batch_1 service_level_option_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_brsl1f1l/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_brsl1f1l/plan.pddl 
+
+
+--- stderr ---
+

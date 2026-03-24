@@ -1,0 +1,937 @@
+(define (domain returning_adult_learner_support_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object entity_category - generic_object resource_category - generic_object administrative_entity - generic_object support_case - generic_object learner_case - support_case advisor - entity_category appointment_slot - entity_category service_provider - entity_category service_code - entity_category funding_stream - entity_category accommodation_request - entity_category accommodation_detail - entity_category specialist_consultant - entity_category referral_package - resource_category accommodation_asset - resource_category community_partner - resource_category identified_barrier - administrative_entity referral_pathway - administrative_entity case_conference_record - administrative_entity advisor_assignment_group - learner_case advisor_assignment_group_variant - learner_case primary_advisor_profile - advisor_assignment_group secondary_advisor_profile - advisor_assignment_group support_plan_document - advisor_assignment_group_variant)
+
+  (:predicates
+    (intake_recorded ?learner_case - learner_case)
+    (triage_completed_subject ?learner_case - learner_case)
+    (advisor_assignment_confirmed ?learner_case - learner_case)
+    (record_closed ?learner_case - learner_case)
+    (approval_recorded ?learner_case - learner_case)
+    (accommodation_initiated_subject ?learner_case - learner_case)
+    (advisor_available ?advisor - advisor)
+    (advisor_assigned_to_subject ?learner_case - learner_case ?advisor - advisor)
+    (appointment_slot_available ?appointment_slot - appointment_slot)
+    (appointment_linked ?learner_case - learner_case ?appointment_slot - appointment_slot)
+    (service_provider_available ?service_provider - service_provider)
+    (provider_assigned_to_subject ?learner_case - learner_case ?service_provider - service_provider)
+    (referral_package_available ?referral_package - referral_package)
+    (primary_advisor_has_referral ?primary_advisor - primary_advisor_profile ?referral_package - referral_package)
+    (secondary_advisor_has_referral ?secondary_advisor - secondary_advisor_profile ?referral_package - referral_package)
+    (advisor_barrier_link ?primary_advisor - primary_advisor_profile ?identified_barrier - identified_barrier)
+    (barrier_flagged ?identified_barrier - identified_barrier)
+    (barrier_matched_to_resource ?identified_barrier - identified_barrier)
+    (advisor_followup_required ?primary_advisor - primary_advisor_profile)
+    (advisor_referral_pathway_link ?secondary_advisor - secondary_advisor_profile ?referral_pathway - referral_pathway)
+    (referral_pathway_flagged ?referral_pathway - referral_pathway)
+    (referral_pathway_matched ?referral_pathway - referral_pathway)
+    (secondary_advisor_followup_required ?secondary_advisor - secondary_advisor_profile)
+    (conference_preparation_pending ?case_conference - case_conference_record)
+    (conference_compiled ?case_conference - case_conference_record)
+    (conference_links_barrier ?case_conference - case_conference_record ?identified_barrier - identified_barrier)
+    (conference_links_referral_pathway ?case_conference - case_conference_record ?referral_pathway - referral_pathway)
+    (conference_ready_for_review ?case_conference - case_conference_record)
+    (conference_review_complete ?case_conference - case_conference_record)
+    (conference_evidence_collected ?case_conference - case_conference_record)
+    (plan_primary_advisor_link ?support_plan - support_plan_document ?primary_advisor - primary_advisor_profile)
+    (plan_secondary_advisor_link ?support_plan - support_plan_document ?secondary_advisor - secondary_advisor_profile)
+    (plan_conference_link ?support_plan - support_plan_document ?case_conference - case_conference_record)
+    (accommodation_asset_available ?accommodation_asset - accommodation_asset)
+    (plan_asset_link ?support_plan - support_plan_document ?accommodation_asset - accommodation_asset)
+    (accommodation_asset_allocated ?accommodation_asset - accommodation_asset)
+    (asset_linked_to_conference ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    (plan_assets_confirmed ?support_plan - support_plan_document)
+    (plan_under_asset_review ?support_plan - support_plan_document)
+    (plan_ready_for_signoff ?support_plan - support_plan_document)
+    (service_code_assigned ?support_plan - support_plan_document)
+    (service_code_confirmed ?support_plan - support_plan_document)
+    (funding_confirmed ?support_plan - support_plan_document)
+    (plan_pre_finalization ?support_plan - support_plan_document)
+    (community_partner_available ?community_partner - community_partner)
+    (plan_partner_link ?support_plan - support_plan_document ?community_partner - community_partner)
+    (partner_referral_recorded ?support_plan - support_plan_document)
+    (partner_action_pending ?support_plan - support_plan_document)
+    (partner_action_recorded ?support_plan - support_plan_document)
+    (service_code_available ?service_code - service_code)
+    (plan_service_code_link ?support_plan - support_plan_document ?service_code - service_code)
+    (funding_stream_available ?funding_stream - funding_stream)
+    (plan_funding_link ?support_plan - support_plan_document ?funding_stream - funding_stream)
+    (accommodation_detail_available ?accommodation_detail - accommodation_detail)
+    (plan_accommodation_detail_link ?support_plan - support_plan_document ?accommodation_detail - accommodation_detail)
+    (specialist_available ?specialist_consultant - specialist_consultant)
+    (plan_specialist_link ?support_plan - support_plan_document ?specialist_consultant - specialist_consultant)
+    (accommodation_request_available ?accommodation_request - accommodation_request)
+    (accommodation_request_link ?learner_case - learner_case ?accommodation_request - accommodation_request)
+    (primary_advisor_task_assigned ?primary_advisor - primary_advisor_profile)
+    (secondary_advisor_task_assigned ?secondary_advisor - secondary_advisor_profile)
+    (plan_finalized ?support_plan - support_plan_document)
+  )
+  (:action record_intake
+    :parameters (?learner_case - learner_case)
+    :precondition
+      (and
+        (not
+          (intake_recorded ?learner_case)
+        )
+        (not
+          (record_closed ?learner_case)
+        )
+      )
+    :effect (intake_recorded ?learner_case)
+  )
+  (:action assign_advisor_to_case
+    :parameters (?learner_case - learner_case ?advisor - advisor)
+    :precondition
+      (and
+        (intake_recorded ?learner_case)
+        (not
+          (advisor_assignment_confirmed ?learner_case)
+        )
+        (advisor_available ?advisor)
+      )
+    :effect
+      (and
+        (advisor_assignment_confirmed ?learner_case)
+        (advisor_assigned_to_subject ?learner_case ?advisor)
+        (not
+          (advisor_available ?advisor)
+        )
+      )
+  )
+  (:action schedule_appointment_slot
+    :parameters (?learner_case - learner_case ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_recorded ?learner_case)
+        (advisor_assignment_confirmed ?learner_case)
+        (appointment_slot_available ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_linked ?learner_case ?appointment_slot)
+        (not
+          (appointment_slot_available ?appointment_slot)
+        )
+      )
+  )
+  (:action complete_triage
+    :parameters (?learner_case - learner_case ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_recorded ?learner_case)
+        (advisor_assignment_confirmed ?learner_case)
+        (appointment_linked ?learner_case ?appointment_slot)
+        (not
+          (triage_completed_subject ?learner_case)
+        )
+      )
+    :effect (triage_completed_subject ?learner_case)
+  )
+  (:action cancel_appointment_slot
+    :parameters (?learner_case - learner_case ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (appointment_linked ?learner_case ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_slot_available ?appointment_slot)
+        (not
+          (appointment_linked ?learner_case ?appointment_slot)
+        )
+      )
+  )
+  (:action create_provider_referral
+    :parameters (?learner_case - learner_case ?service_provider - service_provider)
+    :precondition
+      (and
+        (triage_completed_subject ?learner_case)
+        (service_provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (provider_assigned_to_subject ?learner_case ?service_provider)
+        (not
+          (service_provider_available ?service_provider)
+        )
+      )
+  )
+  (:action rollback_provider_referral
+    :parameters (?learner_case - learner_case ?service_provider - service_provider)
+    :precondition
+      (and
+        (provider_assigned_to_subject ?learner_case ?service_provider)
+      )
+    :effect
+      (and
+        (service_provider_available ?service_provider)
+        (not
+          (provider_assigned_to_subject ?learner_case ?service_provider)
+        )
+      )
+  )
+  (:action link_accommodation_detail_to_plan
+    :parameters (?support_plan - support_plan_document ?accommodation_detail - accommodation_detail)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (accommodation_detail_available ?accommodation_detail)
+      )
+    :effect
+      (and
+        (plan_accommodation_detail_link ?support_plan ?accommodation_detail)
+        (not
+          (accommodation_detail_available ?accommodation_detail)
+        )
+      )
+  )
+  (:action unlink_accommodation_detail_from_plan
+    :parameters (?support_plan - support_plan_document ?accommodation_detail - accommodation_detail)
+    :precondition
+      (and
+        (plan_accommodation_detail_link ?support_plan ?accommodation_detail)
+      )
+    :effect
+      (and
+        (accommodation_detail_available ?accommodation_detail)
+        (not
+          (plan_accommodation_detail_link ?support_plan ?accommodation_detail)
+        )
+      )
+  )
+  (:action assign_specialist_consultant_to_plan
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (specialist_available ?specialist_consultant)
+      )
+    :effect
+      (and
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (not
+          (specialist_available ?specialist_consultant)
+        )
+      )
+  )
+  (:action remove_specialist_consultant_from_plan
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist_consultant)
+        (not
+          (plan_specialist_link ?support_plan ?specialist_consultant)
+        )
+      )
+  )
+  (:action screen_identified_barrier
+    :parameters (?primary_advisor - primary_advisor_profile ?identified_barrier - identified_barrier ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (triage_completed_subject ?primary_advisor)
+        (appointment_linked ?primary_advisor ?appointment_slot)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (not
+          (barrier_flagged ?identified_barrier)
+        )
+        (not
+          (barrier_matched_to_resource ?identified_barrier)
+        )
+      )
+    :effect (barrier_flagged ?identified_barrier)
+  )
+  (:action initiate_provider_followup_for_barrier
+    :parameters (?primary_advisor - primary_advisor_profile ?identified_barrier - identified_barrier ?service_provider - service_provider)
+    :precondition
+      (and
+        (triage_completed_subject ?primary_advisor)
+        (provider_assigned_to_subject ?primary_advisor ?service_provider)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (barrier_flagged ?identified_barrier)
+        (not
+          (primary_advisor_task_assigned ?primary_advisor)
+        )
+      )
+    :effect
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (advisor_followup_required ?primary_advisor)
+      )
+  )
+  (:action match_barrier_to_referral_package
+    :parameters (?primary_advisor - primary_advisor_profile ?identified_barrier - identified_barrier ?referral_package - referral_package)
+    :precondition
+      (and
+        (triage_completed_subject ?primary_advisor)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (referral_package_available ?referral_package)
+        (not
+          (primary_advisor_task_assigned ?primary_advisor)
+        )
+      )
+    :effect
+      (and
+        (barrier_matched_to_resource ?identified_barrier)
+        (primary_advisor_task_assigned ?primary_advisor)
+        (primary_advisor_has_referral ?primary_advisor ?referral_package)
+        (not
+          (referral_package_available ?referral_package)
+        )
+      )
+  )
+  (:action resolve_barrier_with_referral_package
+    :parameters (?primary_advisor - primary_advisor_profile ?identified_barrier - identified_barrier ?appointment_slot - appointment_slot ?referral_package - referral_package)
+    :precondition
+      (and
+        (triage_completed_subject ?primary_advisor)
+        (appointment_linked ?primary_advisor ?appointment_slot)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (barrier_matched_to_resource ?identified_barrier)
+        (primary_advisor_has_referral ?primary_advisor ?referral_package)
+        (not
+          (advisor_followup_required ?primary_advisor)
+        )
+      )
+    :effect
+      (and
+        (barrier_flagged ?identified_barrier)
+        (advisor_followup_required ?primary_advisor)
+        (referral_package_available ?referral_package)
+        (not
+          (primary_advisor_has_referral ?primary_advisor ?referral_package)
+        )
+      )
+  )
+  (:action flag_referral_pathway_for_assessment
+    :parameters (?secondary_advisor - secondary_advisor_profile ?referral_pathway - referral_pathway ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (triage_completed_subject ?secondary_advisor)
+        (appointment_linked ?secondary_advisor ?appointment_slot)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (not
+          (referral_pathway_flagged ?referral_pathway)
+        )
+        (not
+          (referral_pathway_matched ?referral_pathway)
+        )
+      )
+    :effect (referral_pathway_flagged ?referral_pathway)
+  )
+  (:action initiate_secondary_provider_followup
+    :parameters (?secondary_advisor - secondary_advisor_profile ?referral_pathway - referral_pathway ?service_provider - service_provider)
+    :precondition
+      (and
+        (triage_completed_subject ?secondary_advisor)
+        (provider_assigned_to_subject ?secondary_advisor ?service_provider)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (referral_pathway_flagged ?referral_pathway)
+        (not
+          (secondary_advisor_task_assigned ?secondary_advisor)
+        )
+      )
+    :effect
+      (and
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (secondary_advisor_followup_required ?secondary_advisor)
+      )
+  )
+  (:action match_referral_pathway_to_referral_package
+    :parameters (?secondary_advisor - secondary_advisor_profile ?referral_pathway - referral_pathway ?referral_package - referral_package)
+    :precondition
+      (and
+        (triage_completed_subject ?secondary_advisor)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (referral_package_available ?referral_package)
+        (not
+          (secondary_advisor_task_assigned ?secondary_advisor)
+        )
+      )
+    :effect
+      (and
+        (referral_pathway_matched ?referral_pathway)
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (secondary_advisor_has_referral ?secondary_advisor ?referral_package)
+        (not
+          (referral_package_available ?referral_package)
+        )
+      )
+  )
+  (:action process_pathway_referral_outcome
+    :parameters (?secondary_advisor - secondary_advisor_profile ?referral_pathway - referral_pathway ?appointment_slot - appointment_slot ?referral_package - referral_package)
+    :precondition
+      (and
+        (triage_completed_subject ?secondary_advisor)
+        (appointment_linked ?secondary_advisor ?appointment_slot)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (referral_pathway_matched ?referral_pathway)
+        (secondary_advisor_has_referral ?secondary_advisor ?referral_package)
+        (not
+          (secondary_advisor_followup_required ?secondary_advisor)
+        )
+      )
+    :effect
+      (and
+        (referral_pathway_flagged ?referral_pathway)
+        (secondary_advisor_followup_required ?secondary_advisor)
+        (referral_package_available ?referral_package)
+        (not
+          (secondary_advisor_has_referral ?secondary_advisor ?referral_package)
+        )
+      )
+  )
+  (:action assemble_case_conference
+    :parameters (?primary_advisor - primary_advisor_profile ?secondary_advisor - secondary_advisor_profile ?identified_barrier - identified_barrier ?referral_pathway - referral_pathway ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (barrier_flagged ?identified_barrier)
+        (referral_pathway_flagged ?referral_pathway)
+        (advisor_followup_required ?primary_advisor)
+        (secondary_advisor_followup_required ?secondary_advisor)
+        (conference_preparation_pending ?case_conference)
+      )
+    :effect
+      (and
+        (conference_compiled ?case_conference)
+        (conference_links_barrier ?case_conference ?identified_barrier)
+        (conference_links_referral_pathway ?case_conference ?referral_pathway)
+        (not
+          (conference_preparation_pending ?case_conference)
+        )
+      )
+  )
+  (:action assemble_case_conference_with_barrier_review
+    :parameters (?primary_advisor - primary_advisor_profile ?secondary_advisor - secondary_advisor_profile ?identified_barrier - identified_barrier ?referral_pathway - referral_pathway ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (barrier_matched_to_resource ?identified_barrier)
+        (referral_pathway_flagged ?referral_pathway)
+        (not
+          (advisor_followup_required ?primary_advisor)
+        )
+        (secondary_advisor_followup_required ?secondary_advisor)
+        (conference_preparation_pending ?case_conference)
+      )
+    :effect
+      (and
+        (conference_compiled ?case_conference)
+        (conference_links_barrier ?case_conference ?identified_barrier)
+        (conference_links_referral_pathway ?case_conference ?referral_pathway)
+        (conference_ready_for_review ?case_conference)
+        (not
+          (conference_preparation_pending ?case_conference)
+        )
+      )
+  )
+  (:action assemble_case_conference_with_pathway_review
+    :parameters (?primary_advisor - primary_advisor_profile ?secondary_advisor - secondary_advisor_profile ?identified_barrier - identified_barrier ?referral_pathway - referral_pathway ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (barrier_flagged ?identified_barrier)
+        (referral_pathway_matched ?referral_pathway)
+        (advisor_followup_required ?primary_advisor)
+        (not
+          (secondary_advisor_followup_required ?secondary_advisor)
+        )
+        (conference_preparation_pending ?case_conference)
+      )
+    :effect
+      (and
+        (conference_compiled ?case_conference)
+        (conference_links_barrier ?case_conference ?identified_barrier)
+        (conference_links_referral_pathway ?case_conference ?referral_pathway)
+        (conference_review_complete ?case_conference)
+        (not
+          (conference_preparation_pending ?case_conference)
+        )
+      )
+  )
+  (:action assemble_full_case_conference
+    :parameters (?primary_advisor - primary_advisor_profile ?secondary_advisor - secondary_advisor_profile ?identified_barrier - identified_barrier ?referral_pathway - referral_pathway ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (advisor_barrier_link ?primary_advisor ?identified_barrier)
+        (advisor_referral_pathway_link ?secondary_advisor ?referral_pathway)
+        (barrier_matched_to_resource ?identified_barrier)
+        (referral_pathway_matched ?referral_pathway)
+        (not
+          (advisor_followup_required ?primary_advisor)
+        )
+        (not
+          (secondary_advisor_followup_required ?secondary_advisor)
+        )
+        (conference_preparation_pending ?case_conference)
+      )
+    :effect
+      (and
+        (conference_compiled ?case_conference)
+        (conference_links_barrier ?case_conference ?identified_barrier)
+        (conference_links_referral_pathway ?case_conference ?referral_pathway)
+        (conference_ready_for_review ?case_conference)
+        (conference_review_complete ?case_conference)
+        (not
+          (conference_preparation_pending ?case_conference)
+        )
+      )
+  )
+  (:action finalize_case_conference_preparation
+    :parameters (?case_conference - case_conference_record ?primary_advisor - primary_advisor_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (conference_compiled ?case_conference)
+        (primary_advisor_task_assigned ?primary_advisor)
+        (appointment_linked ?primary_advisor ?appointment_slot)
+        (not
+          (conference_evidence_collected ?case_conference)
+        )
+      )
+    :effect (conference_evidence_collected ?case_conference)
+  )
+  (:action attach_accommodation_asset_to_plan
+    :parameters (?support_plan - support_plan_document ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (plan_conference_link ?support_plan ?case_conference)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (accommodation_asset_available ?accommodation_asset)
+        (conference_compiled ?case_conference)
+        (conference_evidence_collected ?case_conference)
+        (not
+          (accommodation_asset_allocated ?accommodation_asset)
+        )
+      )
+    :effect
+      (and
+        (accommodation_asset_allocated ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (not
+          (accommodation_asset_available ?accommodation_asset)
+        )
+      )
+  )
+  (:action confirm_accommodation_asset_on_plan
+    :parameters (?support_plan - support_plan_document ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (accommodation_asset_allocated ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (appointment_linked ?support_plan ?appointment_slot)
+        (not
+          (conference_ready_for_review ?case_conference)
+        )
+        (not
+          (plan_assets_confirmed ?support_plan)
+        )
+      )
+    :effect (plan_assets_confirmed ?support_plan)
+  )
+  (:action assign_service_code_to_plan
+    :parameters (?support_plan - support_plan_document ?service_code - service_code)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (service_code_available ?service_code)
+        (not
+          (service_code_assigned ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (service_code_assigned ?support_plan)
+        (plan_service_code_link ?support_plan ?service_code)
+        (not
+          (service_code_available ?service_code)
+        )
+      )
+  )
+  (:action advance_plan_with_service_code_and_assets
+    :parameters (?support_plan - support_plan_document ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record ?appointment_slot - appointment_slot ?service_code - service_code)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (accommodation_asset_allocated ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (appointment_linked ?support_plan ?appointment_slot)
+        (conference_ready_for_review ?case_conference)
+        (service_code_assigned ?support_plan)
+        (plan_service_code_link ?support_plan ?service_code)
+        (not
+          (plan_assets_confirmed ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_assets_confirmed ?support_plan)
+        (service_code_confirmed ?support_plan)
+      )
+  )
+  (:action start_accommodation_detail_review
+    :parameters (?support_plan - support_plan_document ?accommodation_detail - accommodation_detail ?service_provider - service_provider ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_assets_confirmed ?support_plan)
+        (plan_accommodation_detail_link ?support_plan ?accommodation_detail)
+        (provider_assigned_to_subject ?support_plan ?service_provider)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (not
+          (conference_review_complete ?case_conference)
+        )
+        (not
+          (plan_under_asset_review ?support_plan)
+        )
+      )
+    :effect (plan_under_asset_review ?support_plan)
+  )
+  (:action continue_accommodation_detail_review
+    :parameters (?support_plan - support_plan_document ?accommodation_detail - accommodation_detail ?service_provider - service_provider ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_assets_confirmed ?support_plan)
+        (plan_accommodation_detail_link ?support_plan ?accommodation_detail)
+        (provider_assigned_to_subject ?support_plan ?service_provider)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (conference_review_complete ?case_conference)
+        (not
+          (plan_under_asset_review ?support_plan)
+        )
+      )
+    :effect (plan_under_asset_review ?support_plan)
+  )
+  (:action start_specialist_consultation_review
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_under_asset_review ?support_plan)
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (not
+          (conference_ready_for_review ?case_conference)
+        )
+        (not
+          (conference_review_complete ?case_conference)
+        )
+        (not
+          (plan_ready_for_signoff ?support_plan)
+        )
+      )
+    :effect (plan_ready_for_signoff ?support_plan)
+  )
+  (:action continue_specialist_consultation_review
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_under_asset_review ?support_plan)
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (conference_ready_for_review ?case_conference)
+        (not
+          (conference_review_complete ?case_conference)
+        )
+        (not
+          (plan_ready_for_signoff ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (funding_confirmed ?support_plan)
+      )
+  )
+  (:action alternate_specialist_consultation_review
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_under_asset_review ?support_plan)
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (not
+          (conference_ready_for_review ?case_conference)
+        )
+        (conference_review_complete ?case_conference)
+        (not
+          (plan_ready_for_signoff ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (funding_confirmed ?support_plan)
+      )
+  )
+  (:action finalize_specialist_consultation_review
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant ?accommodation_asset - accommodation_asset ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (plan_under_asset_review ?support_plan)
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (plan_asset_link ?support_plan ?accommodation_asset)
+        (asset_linked_to_conference ?accommodation_asset ?case_conference)
+        (conference_ready_for_review ?case_conference)
+        (conference_review_complete ?case_conference)
+        (not
+          (plan_ready_for_signoff ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (funding_confirmed ?support_plan)
+      )
+  )
+  (:action begin_plan_signoff
+    :parameters (?support_plan - support_plan_document)
+    :precondition
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (not
+          (funding_confirmed ?support_plan)
+        )
+        (not
+          (plan_finalized ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?support_plan)
+        (approval_recorded ?support_plan)
+      )
+  )
+  (:action link_funding_to_plan
+    :parameters (?support_plan - support_plan_document ?funding_stream - funding_stream)
+    :precondition
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (funding_confirmed ?support_plan)
+        (funding_stream_available ?funding_stream)
+      )
+    :effect
+      (and
+        (plan_funding_link ?support_plan ?funding_stream)
+        (not
+          (funding_stream_available ?funding_stream)
+        )
+      )
+  )
+  (:action authorize_plan_for_implementation
+    :parameters (?support_plan - support_plan_document ?primary_advisor - primary_advisor_profile ?secondary_advisor - secondary_advisor_profile ?appointment_slot - appointment_slot ?funding_stream - funding_stream)
+    :precondition
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (funding_confirmed ?support_plan)
+        (plan_funding_link ?support_plan ?funding_stream)
+        (plan_primary_advisor_link ?support_plan ?primary_advisor)
+        (plan_secondary_advisor_link ?support_plan ?secondary_advisor)
+        (advisor_followup_required ?primary_advisor)
+        (secondary_advisor_followup_required ?secondary_advisor)
+        (appointment_linked ?support_plan ?appointment_slot)
+        (not
+          (plan_pre_finalization ?support_plan)
+        )
+      )
+    :effect (plan_pre_finalization ?support_plan)
+  )
+  (:action complete_plan_signoff
+    :parameters (?support_plan - support_plan_document)
+    :precondition
+      (and
+        (plan_ready_for_signoff ?support_plan)
+        (plan_pre_finalization ?support_plan)
+        (not
+          (plan_finalized ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?support_plan)
+        (approval_recorded ?support_plan)
+      )
+  )
+  (:action create_partner_referral
+    :parameters (?support_plan - support_plan_document ?community_partner - community_partner ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (triage_completed_subject ?support_plan)
+        (appointment_linked ?support_plan ?appointment_slot)
+        (community_partner_available ?community_partner)
+        (plan_partner_link ?support_plan ?community_partner)
+        (not
+          (partner_referral_recorded ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (partner_referral_recorded ?support_plan)
+        (not
+          (community_partner_available ?community_partner)
+        )
+      )
+  )
+  (:action request_partner_action
+    :parameters (?support_plan - support_plan_document ?service_provider - service_provider)
+    :precondition
+      (and
+        (partner_referral_recorded ?support_plan)
+        (provider_assigned_to_subject ?support_plan ?service_provider)
+        (not
+          (partner_action_pending ?support_plan)
+        )
+      )
+    :effect (partner_action_pending ?support_plan)
+  )
+  (:action record_partner_action_confirmation
+    :parameters (?support_plan - support_plan_document ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (partner_action_pending ?support_plan)
+        (plan_specialist_link ?support_plan ?specialist_consultant)
+        (not
+          (partner_action_recorded ?support_plan)
+        )
+      )
+    :effect (partner_action_recorded ?support_plan)
+  )
+  (:action finalize_partner_action_and_mark_plan
+    :parameters (?support_plan - support_plan_document)
+    :precondition
+      (and
+        (partner_action_recorded ?support_plan)
+        (not
+          (plan_finalized ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?support_plan)
+        (approval_recorded ?support_plan)
+      )
+  )
+  (:action record_primary_advisor_confirmation
+    :parameters (?primary_advisor - primary_advisor_profile ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (primary_advisor_task_assigned ?primary_advisor)
+        (advisor_followup_required ?primary_advisor)
+        (conference_compiled ?case_conference)
+        (conference_evidence_collected ?case_conference)
+        (not
+          (approval_recorded ?primary_advisor)
+        )
+      )
+    :effect (approval_recorded ?primary_advisor)
+  )
+  (:action record_secondary_advisor_confirmation
+    :parameters (?secondary_advisor - secondary_advisor_profile ?case_conference - case_conference_record)
+    :precondition
+      (and
+        (secondary_advisor_task_assigned ?secondary_advisor)
+        (secondary_advisor_followup_required ?secondary_advisor)
+        (conference_compiled ?case_conference)
+        (conference_evidence_collected ?case_conference)
+        (not
+          (approval_recorded ?secondary_advisor)
+        )
+      )
+    :effect (approval_recorded ?secondary_advisor)
+  )
+  (:action initiate_accommodation_request_for_learner
+    :parameters (?learner_case - learner_case ?accommodation_request - accommodation_request ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (approval_recorded ?learner_case)
+        (appointment_linked ?learner_case ?appointment_slot)
+        (accommodation_request_available ?accommodation_request)
+        (not
+          (accommodation_initiated_subject ?learner_case)
+        )
+      )
+    :effect
+      (and
+        (accommodation_initiated_subject ?learner_case)
+        (accommodation_request_link ?learner_case ?accommodation_request)
+        (not
+          (accommodation_request_available ?accommodation_request)
+        )
+      )
+  )
+  (:action finalize_accommodation_assignment_by_primary_advisor
+    :parameters (?primary_advisor - primary_advisor_profile ?advisor - advisor ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_initiated_subject ?primary_advisor)
+        (advisor_assigned_to_subject ?primary_advisor ?advisor)
+        (accommodation_request_link ?primary_advisor ?accommodation_request)
+        (not
+          (record_closed ?primary_advisor)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?primary_advisor)
+        (advisor_available ?advisor)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+  (:action finalize_accommodation_assignment_by_secondary_advisor
+    :parameters (?secondary_advisor - secondary_advisor_profile ?advisor - advisor ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_initiated_subject ?secondary_advisor)
+        (advisor_assigned_to_subject ?secondary_advisor ?advisor)
+        (accommodation_request_link ?secondary_advisor ?accommodation_request)
+        (not
+          (record_closed ?secondary_advisor)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?secondary_advisor)
+        (advisor_available ?advisor)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+  (:action assign_accommodation_implementation_to_plan
+    :parameters (?support_plan - support_plan_document ?advisor - advisor ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_initiated_subject ?support_plan)
+        (advisor_assigned_to_subject ?support_plan ?advisor)
+        (accommodation_request_link ?support_plan ?accommodation_request)
+        (not
+          (record_closed ?support_plan)
+        )
+      )
+    :effect
+      (and
+        (record_closed ?support_plan)
+        (advisor_available ?advisor)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+)

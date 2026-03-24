@@ -1,0 +1,1066 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain crafting_dependency_chain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_supertype - entity material_supertype - entity component_supertype - entity task_supertype - entity craft_task - task_supertype raw_resource_batch - resource_supertype material_type - resource_supertype tool - resource_supertype special_component - resource_supertype calibration_token - resource_supertype preservative_item - resource_supertype station_upgrade_a - resource_supertype station_upgrade_c - resource_supertype consumable - material_supertype module_slot - material_supertype station_upgrade_b - material_supertype material_variant_a - component_supertype material_variant_b - component_supertype assembly_core - component_supertype subassembly_supertype - craft_task subassembly_variant_supertype - craft_task subassembly_a - subassembly_supertype subassembly_b - subassembly_supertype workstation_task - subassembly_variant_supertype)
+
+  (:predicates
+    (entity_registered ?craft_task - craft_task)
+    (entity_material_ready ?craft_task - craft_task)
+    (entity_resource_allocated ?craft_task - craft_task)
+    (entity_goal_satisfied ?craft_task - craft_task)
+    (entity_release_token ?craft_task - craft_task)
+    (entity_preservation_applied ?craft_task - craft_task)
+    (resource_batch_available ?raw_resource_batch - raw_resource_batch)
+    (resource_reserved_for_entity ?craft_task - craft_task ?raw_resource_batch - raw_resource_batch)
+    (material_type_available ?material_type - material_type)
+    (entity_material_binding ?craft_task - craft_task ?material_type - material_type)
+    (tool_available ?tool - tool)
+    (entity_tool_binding ?craft_task - craft_task ?tool - tool)
+    (consumable_available ?consumable - consumable)
+    (subassembly_a_consumable_reserved ?subassembly_a - subassembly_a ?consumable - consumable)
+    (subassembly_b_consumable_reserved ?subassembly_b - subassembly_b ?consumable - consumable)
+    (subassembly_a_variant_compat ?subassembly_a - subassembly_a ?material_variant_a - material_variant_a)
+    (variant_a_reserved ?material_variant_a - material_variant_a)
+    (variant_a_allocated ?material_variant_a - material_variant_a)
+    (subassembly_a_ready ?subassembly_a - subassembly_a)
+    (subassembly_b_variant_compat ?subassembly_b - subassembly_b ?material_variant_b - material_variant_b)
+    (variant_b_reserved ?material_variant_b - material_variant_b)
+    (variant_b_allocated ?material_variant_b - material_variant_b)
+    (subassembly_b_ready ?subassembly_b - subassembly_b)
+    (assembly_core_idle ?assembly_core - assembly_core)
+    (assembly_core_reserved ?assembly_core - assembly_core)
+    (core_has_variant_a ?assembly_core - assembly_core ?material_variant_a - material_variant_a)
+    (core_has_variant_b ?assembly_core - assembly_core ?material_variant_b - material_variant_b)
+    (core_variant_a_verified ?assembly_core - assembly_core)
+    (core_variant_b_verified ?assembly_core - assembly_core)
+    (core_preassembly_checked ?assembly_core - assembly_core)
+    (workstation_supports_subassembly_a ?workstation - workstation_task ?subassembly_a - subassembly_a)
+    (workstation_supports_subassembly_b ?workstation - workstation_task ?subassembly_b - subassembly_b)
+    (workstation_core_compatible ?workstation - workstation_task ?assembly_core - assembly_core)
+    (module_slot_available ?module_slot - module_slot)
+    (workstation_has_module_slot ?workstation - workstation_task ?module_slot - module_slot)
+    (module_installed ?module_slot - module_slot)
+    (module_slot_bound_to_core ?module_slot - module_slot ?assembly_core - assembly_core)
+    (workstation_config_stage_1 ?workstation - workstation_task)
+    (workstation_activation_stage_configured ?workstation - workstation_task)
+    (workstation_validation_passed ?workstation - workstation_task)
+    (special_component_installed ?workstation - workstation_task)
+    (workstation_module_bindings_verified ?workstation - workstation_task)
+    (workstation_calibrated ?workstation - workstation_task)
+    (workstation_final_checks_passed ?workstation - workstation_task)
+    (upgrade_b_available ?station_upgrade_b - station_upgrade_b)
+    (workstation_upgrade_b_attached ?workstation - workstation_task ?station_upgrade_b - station_upgrade_b)
+    (workstation_upgrade_b_active ?workstation - workstation_task)
+    (workstation_calibration_prep_stage_configured ?workstation - workstation_task)
+    (workstation_calibration_complete ?workstation - workstation_task)
+    (special_component_available ?special_component - special_component)
+    (workstation_has_special_component ?workstation - workstation_task ?special_component - special_component)
+    (calibration_token_available ?calibration_token - calibration_token)
+    (workstation_has_calibration_token ?workstation - workstation_task ?calibration_token - calibration_token)
+    (upgrade_a_available ?station_upgrade_a - station_upgrade_a)
+    (workstation_has_upgrade_a ?workstation - workstation_task ?station_upgrade_a - station_upgrade_a)
+    (upgrade_c_available ?station_upgrade_c - station_upgrade_c)
+    (workstation_has_upgrade_c ?workstation - workstation_task ?station_upgrade_c - station_upgrade_c)
+    (preservative_item_available ?preservative_item - preservative_item)
+    (entity_preservative_bound ?craft_task - craft_task ?preservative_item - preservative_item)
+    (subassembly_a_processed ?subassembly_a - subassembly_a)
+    (subassembly_b_processed ?subassembly_b - subassembly_b)
+    (workstation_ready_token ?workstation - workstation_task)
+  )
+  (:action create_craft_task
+    :parameters (?craft_task - craft_task)
+    :precondition
+      (and
+        (not
+          (entity_registered ?craft_task)
+        )
+        (not
+          (entity_goal_satisfied ?craft_task)
+        )
+      )
+    :effect (entity_registered ?craft_task)
+  )
+  (:action assign_resource_batch_to_task
+    :parameters (?craft_task - craft_task ?raw_resource_batch - raw_resource_batch)
+    :precondition
+      (and
+        (entity_registered ?craft_task)
+        (not
+          (entity_resource_allocated ?craft_task)
+        )
+        (resource_batch_available ?raw_resource_batch)
+      )
+    :effect
+      (and
+        (entity_resource_allocated ?craft_task)
+        (resource_reserved_for_entity ?craft_task ?raw_resource_batch)
+        (not
+          (resource_batch_available ?raw_resource_batch)
+        )
+      )
+  )
+  (:action assign_material_type_to_task
+    :parameters (?craft_task - craft_task ?material_type - material_type)
+    :precondition
+      (and
+        (entity_registered ?craft_task)
+        (entity_resource_allocated ?craft_task)
+        (material_type_available ?material_type)
+      )
+    :effect
+      (and
+        (entity_material_binding ?craft_task ?material_type)
+        (not
+          (material_type_available ?material_type)
+        )
+      )
+  )
+  (:action mark_task_material_ready
+    :parameters (?craft_task - craft_task ?material_type - material_type)
+    :precondition
+      (and
+        (entity_registered ?craft_task)
+        (entity_resource_allocated ?craft_task)
+        (entity_material_binding ?craft_task ?material_type)
+        (not
+          (entity_material_ready ?craft_task)
+        )
+      )
+    :effect (entity_material_ready ?craft_task)
+  )
+  (:action release_material_binding
+    :parameters (?craft_task - craft_task ?material_type - material_type)
+    :precondition
+      (and
+        (entity_material_binding ?craft_task ?material_type)
+      )
+    :effect
+      (and
+        (material_type_available ?material_type)
+        (not
+          (entity_material_binding ?craft_task ?material_type)
+        )
+      )
+  )
+  (:action attach_tool_to_task
+    :parameters (?craft_task - craft_task ?tool - tool)
+    :precondition
+      (and
+        (entity_material_ready ?craft_task)
+        (tool_available ?tool)
+      )
+    :effect
+      (and
+        (entity_tool_binding ?craft_task ?tool)
+        (not
+          (tool_available ?tool)
+        )
+      )
+  )
+  (:action detach_tool_from_task
+    :parameters (?craft_task - craft_task ?tool - tool)
+    :precondition
+      (and
+        (entity_tool_binding ?craft_task ?tool)
+      )
+    :effect
+      (and
+        (tool_available ?tool)
+        (not
+          (entity_tool_binding ?craft_task ?tool)
+        )
+      )
+  )
+  (:action install_station_upgrade_a
+    :parameters (?workstation - workstation_task ?station_upgrade_a - station_upgrade_a)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (upgrade_a_available ?station_upgrade_a)
+      )
+    :effect
+      (and
+        (workstation_has_upgrade_a ?workstation ?station_upgrade_a)
+        (not
+          (upgrade_a_available ?station_upgrade_a)
+        )
+      )
+  )
+  (:action remove_station_upgrade_a
+    :parameters (?workstation - workstation_task ?station_upgrade_a - station_upgrade_a)
+    :precondition
+      (and
+        (workstation_has_upgrade_a ?workstation ?station_upgrade_a)
+      )
+    :effect
+      (and
+        (upgrade_a_available ?station_upgrade_a)
+        (not
+          (workstation_has_upgrade_a ?workstation ?station_upgrade_a)
+        )
+      )
+  )
+  (:action install_station_upgrade_c
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (upgrade_c_available ?station_upgrade_c)
+      )
+    :effect
+      (and
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (not
+          (upgrade_c_available ?station_upgrade_c)
+        )
+      )
+  )
+  (:action remove_station_upgrade_c
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c)
+    :precondition
+      (and
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+      )
+    :effect
+      (and
+        (upgrade_c_available ?station_upgrade_c)
+        (not
+          (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        )
+      )
+  )
+  (:action reserve_material_variant_a_for_subassembly
+    :parameters (?subassembly_a - subassembly_a ?material_variant_a - material_variant_a ?material_type - material_type)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_a)
+        (entity_material_binding ?subassembly_a ?material_type)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (not
+          (variant_a_reserved ?material_variant_a)
+        )
+        (not
+          (variant_a_allocated ?material_variant_a)
+        )
+      )
+    :effect (variant_a_reserved ?material_variant_a)
+  )
+  (:action start_processing_subassembly_a_with_tool
+    :parameters (?subassembly_a - subassembly_a ?material_variant_a - material_variant_a ?tool - tool)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_a)
+        (entity_tool_binding ?subassembly_a ?tool)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (variant_a_reserved ?material_variant_a)
+        (not
+          (subassembly_a_processed ?subassembly_a)
+        )
+      )
+    :effect
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_a_ready ?subassembly_a)
+      )
+  )
+  (:action assign_consumable_to_subassembly_a
+    :parameters (?subassembly_a - subassembly_a ?material_variant_a - material_variant_a ?consumable - consumable)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_a)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (consumable_available ?consumable)
+        (not
+          (subassembly_a_processed ?subassembly_a)
+        )
+      )
+    :effect
+      (and
+        (variant_a_allocated ?material_variant_a)
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_a_consumable_reserved ?subassembly_a ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_subassembly_a_preparation
+    :parameters (?subassembly_a - subassembly_a ?material_variant_a - material_variant_a ?material_type - material_type ?consumable - consumable)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_a)
+        (entity_material_binding ?subassembly_a ?material_type)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (variant_a_allocated ?material_variant_a)
+        (subassembly_a_consumable_reserved ?subassembly_a ?consumable)
+        (not
+          (subassembly_a_ready ?subassembly_a)
+        )
+      )
+    :effect
+      (and
+        (variant_a_reserved ?material_variant_a)
+        (subassembly_a_ready ?subassembly_a)
+        (consumable_available ?consumable)
+        (not
+          (subassembly_a_consumable_reserved ?subassembly_a ?consumable)
+        )
+      )
+  )
+  (:action reserve_material_variant_b_for_subassembly
+    :parameters (?subassembly_b - subassembly_b ?material_variant_b - material_variant_b ?material_type - material_type)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_b)
+        (entity_material_binding ?subassembly_b ?material_type)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (not
+          (variant_b_reserved ?material_variant_b)
+        )
+        (not
+          (variant_b_allocated ?material_variant_b)
+        )
+      )
+    :effect (variant_b_reserved ?material_variant_b)
+  )
+  (:action start_processing_subassembly_b_with_tool
+    :parameters (?subassembly_b - subassembly_b ?material_variant_b - material_variant_b ?tool - tool)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_b)
+        (entity_tool_binding ?subassembly_b ?tool)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_b_reserved ?material_variant_b)
+        (not
+          (subassembly_b_processed ?subassembly_b)
+        )
+      )
+    :effect
+      (and
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_b_ready ?subassembly_b)
+      )
+  )
+  (:action assign_consumable_to_subassembly_b
+    :parameters (?subassembly_b - subassembly_b ?material_variant_b - material_variant_b ?consumable - consumable)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_b)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (consumable_available ?consumable)
+        (not
+          (subassembly_b_processed ?subassembly_b)
+        )
+      )
+    :effect
+      (and
+        (variant_b_allocated ?material_variant_b)
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_b_consumable_reserved ?subassembly_b ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_subassembly_b_preparation
+    :parameters (?subassembly_b - subassembly_b ?material_variant_b - material_variant_b ?material_type - material_type ?consumable - consumable)
+    :precondition
+      (and
+        (entity_material_ready ?subassembly_b)
+        (entity_material_binding ?subassembly_b ?material_type)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_b_allocated ?material_variant_b)
+        (subassembly_b_consumable_reserved ?subassembly_b ?consumable)
+        (not
+          (subassembly_b_ready ?subassembly_b)
+        )
+      )
+    :effect
+      (and
+        (variant_b_reserved ?material_variant_b)
+        (subassembly_b_ready ?subassembly_b)
+        (consumable_available ?consumable)
+        (not
+          (subassembly_b_consumable_reserved ?subassembly_b ?consumable)
+        )
+      )
+  )
+  (:action claim_core_and_attach_variants
+    :parameters (?subassembly_a - subassembly_a ?subassembly_b - subassembly_b ?material_variant_a - material_variant_a ?material_variant_b - material_variant_b ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_a_reserved ?material_variant_a)
+        (variant_b_reserved ?material_variant_b)
+        (subassembly_a_ready ?subassembly_a)
+        (subassembly_b_ready ?subassembly_b)
+        (assembly_core_idle ?assembly_core)
+      )
+    :effect
+      (and
+        (assembly_core_reserved ?assembly_core)
+        (core_has_variant_a ?assembly_core ?material_variant_a)
+        (core_has_variant_b ?assembly_core ?material_variant_b)
+        (not
+          (assembly_core_idle ?assembly_core)
+        )
+      )
+  )
+  (:action claim_core_attach_and_mark_variant_a_verified
+    :parameters (?subassembly_a - subassembly_a ?subassembly_b - subassembly_b ?material_variant_a - material_variant_a ?material_variant_b - material_variant_b ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_a_allocated ?material_variant_a)
+        (variant_b_reserved ?material_variant_b)
+        (not
+          (subassembly_a_ready ?subassembly_a)
+        )
+        (subassembly_b_ready ?subassembly_b)
+        (assembly_core_idle ?assembly_core)
+      )
+    :effect
+      (and
+        (assembly_core_reserved ?assembly_core)
+        (core_has_variant_a ?assembly_core ?material_variant_a)
+        (core_has_variant_b ?assembly_core ?material_variant_b)
+        (core_variant_a_verified ?assembly_core)
+        (not
+          (assembly_core_idle ?assembly_core)
+        )
+      )
+  )
+  (:action claim_core_attach_and_mark_variant_b_verified
+    :parameters (?subassembly_a - subassembly_a ?subassembly_b - subassembly_b ?material_variant_a - material_variant_a ?material_variant_b - material_variant_b ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_a_reserved ?material_variant_a)
+        (variant_b_allocated ?material_variant_b)
+        (subassembly_a_ready ?subassembly_a)
+        (not
+          (subassembly_b_ready ?subassembly_b)
+        )
+        (assembly_core_idle ?assembly_core)
+      )
+    :effect
+      (and
+        (assembly_core_reserved ?assembly_core)
+        (core_has_variant_a ?assembly_core ?material_variant_a)
+        (core_has_variant_b ?assembly_core ?material_variant_b)
+        (core_variant_b_verified ?assembly_core)
+        (not
+          (assembly_core_idle ?assembly_core)
+        )
+      )
+  )
+  (:action claim_core_attach_and_mark_both_variants_verified
+    :parameters (?subassembly_a - subassembly_a ?subassembly_b - subassembly_b ?material_variant_a - material_variant_a ?material_variant_b - material_variant_b ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_a_variant_compat ?subassembly_a ?material_variant_a)
+        (subassembly_b_variant_compat ?subassembly_b ?material_variant_b)
+        (variant_a_allocated ?material_variant_a)
+        (variant_b_allocated ?material_variant_b)
+        (not
+          (subassembly_a_ready ?subassembly_a)
+        )
+        (not
+          (subassembly_b_ready ?subassembly_b)
+        )
+        (assembly_core_idle ?assembly_core)
+      )
+    :effect
+      (and
+        (assembly_core_reserved ?assembly_core)
+        (core_has_variant_a ?assembly_core ?material_variant_a)
+        (core_has_variant_b ?assembly_core ?material_variant_b)
+        (core_variant_a_verified ?assembly_core)
+        (core_variant_b_verified ?assembly_core)
+        (not
+          (assembly_core_idle ?assembly_core)
+        )
+      )
+  )
+  (:action verify_core_preassembly
+    :parameters (?assembly_core - assembly_core ?subassembly_a - subassembly_a ?material_type - material_type)
+    :precondition
+      (and
+        (assembly_core_reserved ?assembly_core)
+        (subassembly_a_processed ?subassembly_a)
+        (entity_material_binding ?subassembly_a ?material_type)
+        (not
+          (core_preassembly_checked ?assembly_core)
+        )
+      )
+    :effect (core_preassembly_checked ?assembly_core)
+  )
+  (:action install_module_and_bind_to_core
+    :parameters (?workstation - workstation_task ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (workstation_core_compatible ?workstation ?assembly_core)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_available ?module_slot)
+        (assembly_core_reserved ?assembly_core)
+        (core_preassembly_checked ?assembly_core)
+        (not
+          (module_installed ?module_slot)
+        )
+      )
+    :effect
+      (and
+        (module_installed ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (not
+          (module_slot_available ?module_slot)
+        )
+      )
+  )
+  (:action configure_workstation_after_module_install
+    :parameters (?workstation - workstation_task ?module_slot - module_slot ?assembly_core - assembly_core ?material_type - material_type)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_installed ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (entity_material_binding ?workstation ?material_type)
+        (not
+          (core_variant_a_verified ?assembly_core)
+        )
+        (not
+          (workstation_config_stage_1 ?workstation)
+        )
+      )
+    :effect (workstation_config_stage_1 ?workstation)
+  )
+  (:action attach_special_component_to_workstation
+    :parameters (?workstation - workstation_task ?special_component - special_component)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (special_component_available ?special_component)
+        (not
+          (special_component_installed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (special_component_installed ?workstation)
+        (workstation_has_special_component ?workstation ?special_component)
+        (not
+          (special_component_available ?special_component)
+        )
+      )
+  )
+  (:action finalize_workstation_module_and_component_binding
+    :parameters (?workstation - workstation_task ?module_slot - module_slot ?assembly_core - assembly_core ?material_type - material_type ?special_component - special_component)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_installed ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (entity_material_binding ?workstation ?material_type)
+        (core_variant_a_verified ?assembly_core)
+        (special_component_installed ?workstation)
+        (workstation_has_special_component ?workstation ?special_component)
+        (not
+          (workstation_config_stage_1 ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_config_stage_1 ?workstation)
+        (workstation_module_bindings_verified ?workstation)
+      )
+  )
+  (:action activate_workstation_with_upgrade_a
+    :parameters (?workstation - workstation_task ?station_upgrade_a - station_upgrade_a ?tool - tool ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_config_stage_1 ?workstation)
+        (workstation_has_upgrade_a ?workstation ?station_upgrade_a)
+        (entity_tool_binding ?workstation ?tool)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (not
+          (core_variant_b_verified ?assembly_core)
+        )
+        (not
+          (workstation_activation_stage_configured ?workstation)
+        )
+      )
+    :effect (workstation_activation_stage_configured ?workstation)
+  )
+  (:action finalize_workstation_upgrade_a_application
+    :parameters (?workstation - workstation_task ?station_upgrade_a - station_upgrade_a ?tool - tool ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_config_stage_1 ?workstation)
+        (workstation_has_upgrade_a ?workstation ?station_upgrade_a)
+        (entity_tool_binding ?workstation ?tool)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (core_variant_b_verified ?assembly_core)
+        (not
+          (workstation_activation_stage_configured ?workstation)
+        )
+      )
+    :effect (workstation_activation_stage_configured ?workstation)
+  )
+  (:action activate_workstation_with_upgrade_c
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_activation_stage_configured ?workstation)
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (not
+          (core_variant_a_verified ?assembly_core)
+        )
+        (not
+          (core_variant_b_verified ?assembly_core)
+        )
+        (not
+          (workstation_validation_passed ?workstation)
+        )
+      )
+    :effect (workstation_validation_passed ?workstation)
+  )
+  (:action activate_and_calibrate_workstation_variant_a_verified
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_activation_stage_configured ?workstation)
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (core_variant_a_verified ?assembly_core)
+        (not
+          (core_variant_b_verified ?assembly_core)
+        )
+        (not
+          (workstation_validation_passed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_calibrated ?workstation)
+      )
+  )
+  (:action activate_and_calibrate_workstation_variant_b_verified
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_activation_stage_configured ?workstation)
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (not
+          (core_variant_a_verified ?assembly_core)
+        )
+        (core_variant_b_verified ?assembly_core)
+        (not
+          (workstation_validation_passed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_calibrated ?workstation)
+      )
+  )
+  (:action activate_and_calibrate_workstation_both_variants_verified
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c ?module_slot - module_slot ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (workstation_activation_stage_configured ?workstation)
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (workstation_has_module_slot ?workstation ?module_slot)
+        (module_slot_bound_to_core ?module_slot ?assembly_core)
+        (core_variant_a_verified ?assembly_core)
+        (core_variant_b_verified ?assembly_core)
+        (not
+          (workstation_validation_passed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_calibrated ?workstation)
+      )
+  )
+  (:action finalize_workstation_validation_and_mark_ready
+    :parameters (?workstation - workstation_task)
+    :precondition
+      (and
+        (workstation_validation_passed ?workstation)
+        (not
+          (workstation_calibrated ?workstation)
+        )
+        (not
+          (workstation_ready_token ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_token ?workstation)
+        (entity_release_token ?workstation)
+      )
+  )
+  (:action apply_calibration_token_to_workstation
+    :parameters (?workstation - workstation_task ?calibration_token - calibration_token)
+    :precondition
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_calibrated ?workstation)
+        (calibration_token_available ?calibration_token)
+      )
+    :effect
+      (and
+        (workstation_has_calibration_token ?workstation ?calibration_token)
+        (not
+          (calibration_token_available ?calibration_token)
+        )
+      )
+  )
+  (:action run_workstation_final_integration_check
+    :parameters (?workstation - workstation_task ?subassembly_a - subassembly_a ?subassembly_b - subassembly_b ?material_type - material_type ?calibration_token - calibration_token)
+    :precondition
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_calibrated ?workstation)
+        (workstation_has_calibration_token ?workstation ?calibration_token)
+        (workstation_supports_subassembly_a ?workstation ?subassembly_a)
+        (workstation_supports_subassembly_b ?workstation ?subassembly_b)
+        (subassembly_a_ready ?subassembly_a)
+        (subassembly_b_ready ?subassembly_b)
+        (entity_material_binding ?workstation ?material_type)
+        (not
+          (workstation_final_checks_passed ?workstation)
+        )
+      )
+    :effect (workstation_final_checks_passed ?workstation)
+  )
+  (:action finalize_workstation_post_integration_and_mark_ready
+    :parameters (?workstation - workstation_task)
+    :precondition
+      (and
+        (workstation_validation_passed ?workstation)
+        (workstation_final_checks_passed ?workstation)
+        (not
+          (workstation_ready_token ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_token ?workstation)
+        (entity_release_token ?workstation)
+      )
+  )
+  (:action install_station_upgrade_b
+    :parameters (?workstation - workstation_task ?station_upgrade_b - station_upgrade_b ?material_type - material_type)
+    :precondition
+      (and
+        (entity_material_ready ?workstation)
+        (entity_material_binding ?workstation ?material_type)
+        (upgrade_b_available ?station_upgrade_b)
+        (workstation_upgrade_b_attached ?workstation ?station_upgrade_b)
+        (not
+          (workstation_upgrade_b_active ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_upgrade_b_active ?workstation)
+        (not
+          (upgrade_b_available ?station_upgrade_b)
+        )
+      )
+  )
+  (:action prepare_workstation_for_calibration_with_tool
+    :parameters (?workstation - workstation_task ?tool - tool)
+    :precondition
+      (and
+        (workstation_upgrade_b_active ?workstation)
+        (entity_tool_binding ?workstation ?tool)
+        (not
+          (workstation_calibration_prep_stage_configured ?workstation)
+        )
+      )
+    :effect (workstation_calibration_prep_stage_configured ?workstation)
+  )
+  (:action perform_upgrade_c_calibration
+    :parameters (?workstation - workstation_task ?station_upgrade_c - station_upgrade_c)
+    :precondition
+      (and
+        (workstation_calibration_prep_stage_configured ?workstation)
+        (workstation_has_upgrade_c ?workstation ?station_upgrade_c)
+        (not
+          (workstation_calibration_complete ?workstation)
+        )
+      )
+    :effect (workstation_calibration_complete ?workstation)
+  )
+  (:action finalize_calibration_and_mark_workstation_ready
+    :parameters (?workstation - workstation_task)
+    :precondition
+      (and
+        (workstation_calibration_complete ?workstation)
+        (not
+          (workstation_ready_token ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready_token ?workstation)
+        (entity_release_token ?workstation)
+      )
+  )
+  (:action finalize_subassembly_a_and_mark_ready
+    :parameters (?subassembly_a - subassembly_a ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_a_processed ?subassembly_a)
+        (subassembly_a_ready ?subassembly_a)
+        (assembly_core_reserved ?assembly_core)
+        (core_preassembly_checked ?assembly_core)
+        (not
+          (entity_release_token ?subassembly_a)
+        )
+      )
+    :effect (entity_release_token ?subassembly_a)
+  )
+  (:action finalize_subassembly_b_and_mark_ready
+    :parameters (?subassembly_b - subassembly_b ?assembly_core - assembly_core)
+    :precondition
+      (and
+        (subassembly_b_processed ?subassembly_b)
+        (subassembly_b_ready ?subassembly_b)
+        (assembly_core_reserved ?assembly_core)
+        (core_preassembly_checked ?assembly_core)
+        (not
+          (entity_release_token ?subassembly_b)
+        )
+      )
+    :effect (entity_release_token ?subassembly_b)
+  )
+  (:action apply_preservative_to_task
+    :parameters (?craft_task - craft_task ?preservative_item - preservative_item ?material_type - material_type)
+    :precondition
+      (and
+        (entity_release_token ?craft_task)
+        (entity_material_binding ?craft_task ?material_type)
+        (preservative_item_available ?preservative_item)
+        (not
+          (entity_preservation_applied ?craft_task)
+        )
+      )
+    :effect
+      (and
+        (entity_preservation_applied ?craft_task)
+        (entity_preservative_bound ?craft_task ?preservative_item)
+        (not
+          (preservative_item_available ?preservative_item)
+        )
+      )
+  )
+  (:action finalize_subassembly_a_allocation
+    :parameters (?subassembly_a - subassembly_a ?raw_resource_batch - raw_resource_batch ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (entity_preservation_applied ?subassembly_a)
+        (resource_reserved_for_entity ?subassembly_a ?raw_resource_batch)
+        (entity_preservative_bound ?subassembly_a ?preservative_item)
+        (not
+          (entity_goal_satisfied ?subassembly_a)
+        )
+      )
+    :effect
+      (and
+        (entity_goal_satisfied ?subassembly_a)
+        (resource_batch_available ?raw_resource_batch)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+  (:action finalize_subassembly_b_allocation
+    :parameters (?subassembly_b - subassembly_b ?raw_resource_batch - raw_resource_batch ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (entity_preservation_applied ?subassembly_b)
+        (resource_reserved_for_entity ?subassembly_b ?raw_resource_batch)
+        (entity_preservative_bound ?subassembly_b ?preservative_item)
+        (not
+          (entity_goal_satisfied ?subassembly_b)
+        )
+      )
+    :effect
+      (and
+        (entity_goal_satisfied ?subassembly_b)
+        (resource_batch_available ?raw_resource_batch)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+  (:action finalize_workstation_allocation
+    :parameters (?workstation - workstation_task ?raw_resource_batch - raw_resource_batch ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (entity_preservation_applied ?workstation)
+        (resource_reserved_for_entity ?workstation ?raw_resource_batch)
+        (entity_preservative_bound ?workstation ?preservative_item)
+        (not
+          (entity_goal_satisfied ?workstation)
+        )
+      )
+    :effect
+      (and
+        (entity_goal_satisfied ?workstation)
+        (resource_batch_available ?raw_resource_batch)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem crafting_chain_completion_problem)
+  (:domain crafting_dependency_chain)
+  (:objects subassembly_a_1 - subassembly_a subassembly_b_1 - subassembly_b workstation_alpha - workstation_task workstation_beta - workstation_task iron_ore_batch - raw_resource_batch wood_bundle - raw_resource_batch reagent_stack - raw_resource_batch metal_type - material_type assembly_tool - tool adhesive_packet - consumable variant_a_standard - material_variant_a variant_b_standard - material_variant_b assembly_core_alpha - assembly_core module_slot_1 - module_slot module_slot_2 - module_slot special_component_alpha - special_component special_component_beta - special_component calibration_token_a - calibration_token calibration_token_b - calibration_token preservative_canister - preservative_item station_upgrade_a_booster - station_upgrade_a station_upgrade_b_alpha - station_upgrade_b station_upgrade_b_beta - station_upgrade_b station_upgrade_c_precision - station_upgrade_c)
+  (:init
+    (resource_batch_available iron_ore_batch)
+    (resource_batch_available wood_bundle)
+    (resource_batch_available reagent_stack)
+    (material_type_available metal_type)
+    (tool_available assembly_tool)
+    (consumable_available adhesive_packet)
+    (subassembly_a_variant_compat subassembly_a_1 variant_a_standard)
+    (subassembly_b_variant_compat subassembly_b_1 variant_b_standard)
+    (assembly_core_idle assembly_core_alpha)
+    (module_slot_available module_slot_1)
+    (module_slot_available module_slot_2)
+    (workstation_supports_subassembly_a workstation_alpha subassembly_a_1)
+    (workstation_supports_subassembly_a workstation_beta subassembly_a_1)
+    (workstation_supports_subassembly_b workstation_alpha subassembly_b_1)
+    (workstation_supports_subassembly_b workstation_beta subassembly_b_1)
+    (workstation_core_compatible workstation_alpha assembly_core_alpha)
+    (workstation_core_compatible workstation_beta assembly_core_alpha)
+    (workstation_has_module_slot workstation_alpha module_slot_1)
+    (workstation_has_module_slot workstation_beta module_slot_2)
+    (special_component_available special_component_alpha)
+    (special_component_available special_component_beta)
+    (calibration_token_available calibration_token_a)
+    (calibration_token_available calibration_token_b)
+    (preservative_item_available preservative_canister)
+    (upgrade_a_available station_upgrade_a_booster)
+    (upgrade_b_available station_upgrade_b_alpha)
+    (workstation_upgrade_b_attached workstation_alpha station_upgrade_b_alpha)
+    (workstation_upgrade_b_attached workstation_beta station_upgrade_b_beta)
+    (upgrade_c_available station_upgrade_c_precision)
+  )
+  (:goal
+    (and
+      (entity_goal_satisfied subassembly_a_1)
+      (entity_goal_satisfied subassembly_b_1)
+      (entity_goal_satisfied workstation_alpha)
+      (entity_goal_satisfied workstation_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_craft_task subassembly_a_1)
+(assign_resource_batch_to_task subassembly_a_1 iron_ore_batch)
+(assign_material_type_to_task subassembly_a_1 metal_type)
+(mark_task_material_ready subassembly_a_1 metal_type)
+(assign_consumable_to_subassembly_a subassembly_a_1 variant_a_standard adhesive_packet)
+(finalize_subassembly_a_preparation subassembly_a_1 variant_a_standard metal_type adhesive_packet)
+(release_material_binding subassembly_a_1 metal_type)
+(create_craft_task subassembly_b_1)
+(assign_resource_batch_to_task subassembly_b_1 wood_bundle)
+(assign_material_type_to_task subassembly_b_1 metal_type)
+(mark_task_material_ready subassembly_b_1 metal_type)
+(assign_consumable_to_subassembly_b subassembly_b_1 variant_b_standard adhesive_packet)
+(finalize_subassembly_b_preparation subassembly_b_1 variant_b_standard metal_type adhesive_packet)
+(release_material_binding subassembly_b_1 metal_type)
+(claim_core_and_attach_variants subassembly_a_1 subassembly_b_1 variant_a_standard variant_b_standard assembly_core_alpha)
+(assign_material_type_to_task subassembly_a_1 metal_type)
+(verify_core_preassembly assembly_core_alpha subassembly_a_1 metal_type)
+(release_material_binding subassembly_a_1 metal_type)
+(finalize_subassembly_a_and_mark_ready subassembly_a_1 assembly_core_alpha)
+(finalize_subassembly_b_and_mark_ready subassembly_b_1 assembly_core_alpha)
+(create_craft_task workstation_alpha)
+(assign_resource_batch_to_task workstation_alpha reagent_stack)
+(assign_material_type_to_task workstation_alpha metal_type)
+(mark_task_material_ready workstation_alpha metal_type)
+(attach_tool_to_task workstation_alpha assembly_tool)
+(install_module_and_bind_to_core workstation_alpha module_slot_1 assembly_core_alpha)
+(configure_workstation_after_module_install workstation_alpha module_slot_1 assembly_core_alpha metal_type)
+(install_station_upgrade_a workstation_alpha station_upgrade_a_booster)
+(activate_workstation_with_upgrade_a workstation_alpha station_upgrade_a_booster assembly_tool module_slot_1 assembly_core_alpha)
+(install_station_upgrade_c workstation_alpha station_upgrade_c_precision)
+(activate_workstation_with_upgrade_c workstation_alpha station_upgrade_c_precision module_slot_1 assembly_core_alpha)
+(finalize_workstation_validation_and_mark_ready workstation_alpha)
+(detach_tool_from_task workstation_alpha assembly_tool)
+(remove_station_upgrade_a workstation_alpha station_upgrade_a_booster)
+(remove_station_upgrade_c workstation_alpha station_upgrade_c_precision)
+(apply_preservative_to_task workstation_alpha preservative_canister metal_type)
+(release_material_binding workstation_alpha metal_type)
+(finalize_workstation_allocation workstation_alpha reagent_stack preservative_canister)
+(create_craft_task workstation_beta)
+(assign_resource_batch_to_task workstation_beta reagent_stack)
+(assign_material_type_to_task workstation_beta metal_type)
+(mark_task_material_ready workstation_beta metal_type)
+(attach_tool_to_task workstation_beta assembly_tool)
+(install_module_and_bind_to_core workstation_beta module_slot_2 assembly_core_alpha)
+(configure_workstation_after_module_install workstation_beta module_slot_2 assembly_core_alpha metal_type)
+(install_station_upgrade_a workstation_beta station_upgrade_a_booster)
+(activate_workstation_with_upgrade_a workstation_beta station_upgrade_a_booster assembly_tool module_slot_2 assembly_core_alpha)
+(install_station_upgrade_c workstation_beta station_upgrade_c_precision)
+(activate_workstation_with_upgrade_c workstation_beta station_upgrade_c_precision module_slot_2 assembly_core_alpha)
+(finalize_workstation_validation_and_mark_ready workstation_beta)
+(detach_tool_from_task workstation_beta assembly_tool)
+(remove_station_upgrade_a workstation_beta station_upgrade_a_booster)
+(remove_station_upgrade_c workstation_beta station_upgrade_c_precision)
+(apply_preservative_to_task workstation_beta preservative_canister metal_type)
+(release_material_binding workstation_beta metal_type)
+(finalize_workstation_allocation workstation_beta reagent_stack preservative_canister)
+(assign_material_type_to_task subassembly_a_1 metal_type)
+(apply_preservative_to_task subassembly_a_1 preservative_canister metal_type)
+(finalize_subassembly_a_allocation subassembly_a_1 iron_ore_batch preservative_canister)
+(assign_material_type_to_task subassembly_b_1 metal_type)
+(apply_preservative_to_task subassembly_b_1 preservative_canister metal_type)
+(finalize_subassembly_b_allocation subassembly_b_1 wood_bundle preservative_canister)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_46mnyksj/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_46mnyksj/plan.pddl 
+
+
+--- stderr ---
+

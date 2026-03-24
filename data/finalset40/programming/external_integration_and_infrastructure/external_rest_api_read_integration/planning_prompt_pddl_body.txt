@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain external_rest_api_read_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object data_type - object execution_resource_type - object integration_template - object endpoint - integration_template connector - resource_type api_request_template - resource_type credential - resource_type optional_modifier - resource_type processing_option - resource_type integration_context - resource_type worker_token - resource_type timeout_profile - resource_type data_mapping - data_type response_resource - data_type remote_header - data_type source_variant - execution_resource_type destination_variant - execution_resource_type execution_task - execution_resource_type consumer_role - endpoint component_type - endpoint consumer_primary - consumer_role consumer_secondary - consumer_role component_instance - component_type)
+  (:predicates
+    (registered ?endpoint - endpoint)
+    (ready ?endpoint - endpoint)
+    (connector_allocated ?endpoint - endpoint)
+    (integration_committed ?endpoint - endpoint)
+    (processing_result_committed ?endpoint - endpoint)
+    (context_attached ?endpoint - endpoint)
+    (connector_available ?connector - connector)
+    (connector_bound ?endpoint - endpoint ?connector - connector)
+    (request_template_available ?request_template - api_request_template)
+    (bound_request_template ?endpoint - endpoint ?request_template - api_request_template)
+    (credential_available ?credential - credential)
+    (credential_bound ?endpoint - endpoint ?credential - credential)
+    (data_mapping_available ?data_mapping - data_mapping)
+    (consumer_primary_mapping_assigned ?consumer_primary - consumer_primary ?data_mapping - data_mapping)
+    (consumer_secondary_mapping_assigned ?consumer_secondary - consumer_secondary ?data_mapping - data_mapping)
+    (consumer_primary_source_variant ?consumer_primary - consumer_primary ?source_variant - source_variant)
+    (source_variant_signaled ?source_variant - source_variant)
+    (source_variant_mapped ?source_variant - source_variant)
+    (consumer_primary_ready ?consumer_primary - consumer_primary)
+    (consumer_secondary_destination_variant ?consumer_secondary - consumer_secondary ?destination_variant - destination_variant)
+    (destination_variant_signaled ?destination_variant - destination_variant)
+    (destination_variant_mapped ?destination_variant - destination_variant)
+    (consumer_secondary_ready ?consumer_secondary - consumer_secondary)
+    (execution_task_placeholder ?execution_task - execution_task)
+    (execution_task_reserved ?execution_task - execution_task)
+    (execution_task_source_variant ?execution_task - execution_task ?source_variant - source_variant)
+    (execution_task_destination_variant ?execution_task - execution_task ?destination_variant - destination_variant)
+    (execution_task_option_a ?execution_task - execution_task)
+    (execution_task_option_b ?execution_task - execution_task)
+    (execution_task_scheduled ?execution_task - execution_task)
+    (component_bound_consumer_primary ?component_instance - component_instance ?consumer_primary - consumer_primary)
+    (component_bound_consumer_secondary ?component_instance - component_instance ?consumer_secondary - consumer_secondary)
+    (component_execution_task_assigned ?component_instance - component_instance ?execution_task - execution_task)
+    (response_resource_available ?response_resource - response_resource)
+    (component_response_resource_bound ?component_instance - component_instance ?response_resource - response_resource)
+    (response_resource_reserved ?response_resource - response_resource)
+    (response_resource_attached_to_task ?response_resource - response_resource ?execution_task - execution_task)
+    (component_primed ?component_instance - component_instance)
+    (component_modifier_applied ?component_instance - component_instance)
+    (component_ready_for_finalization ?component_instance - component_instance)
+    (component_modifier_enabled ?component_instance - component_instance)
+    (component_modifier_activated ?component_instance - component_instance)
+    (component_feature_bindings_present ?component_instance - component_instance)
+    (component_promoted ?component_instance - component_instance)
+    (remote_header_available ?remote_header - remote_header)
+    (component_remote_header_bound ?component_instance - component_instance ?remote_header - remote_header)
+    (component_feature_activation_flag ?component_instance - component_instance)
+    (component_feature_configured ?component_instance - component_instance)
+    (component_feature_committed ?component_instance - component_instance)
+    (optional_modifier_available ?optional_modifier - optional_modifier)
+    (component_optional_modifier_bound ?component_instance - component_instance ?optional_modifier - optional_modifier)
+    (processing_option_available ?processing_option - processing_option)
+    (component_processing_option_bound ?component_instance - component_instance ?processing_option - processing_option)
+    (worker_token_available ?worker_token - worker_token)
+    (component_worker_token_bound ?component_instance - component_instance ?worker_token - worker_token)
+    (timeout_profile_available ?timeout_profile - timeout_profile)
+    (component_timeout_profile_bound ?component_instance - component_instance ?timeout_profile - timeout_profile)
+    (integration_context_available ?integration_context - integration_context)
+    (integration_context_assigned ?endpoint - endpoint ?integration_context - integration_context)
+    (consumer_primary_signal_set ?consumer_primary - consumer_primary)
+    (consumer_secondary_signal_set ?consumer_secondary - consumer_secondary)
+    (component_completion_flag ?component_instance - component_instance)
+  )
+  (:action register_endpoint
+    :parameters (?endpoint - endpoint)
+    :precondition
+      (and
+        (not
+          (registered ?endpoint)
+        )
+        (not
+          (integration_committed ?endpoint)
+        )
+      )
+    :effect (registered ?endpoint)
+  )
+  (:action claim_connector_for_endpoint
+    :parameters (?endpoint - endpoint ?connector - connector)
+    :precondition
+      (and
+        (registered ?endpoint)
+        (not
+          (connector_allocated ?endpoint)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (connector_allocated ?endpoint)
+        (connector_bound ?endpoint ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action bind_request_template_to_endpoint
+    :parameters (?endpoint - endpoint ?request_template - api_request_template)
+    :precondition
+      (and
+        (registered ?endpoint)
+        (connector_allocated ?endpoint)
+        (request_template_available ?request_template)
+      )
+    :effect
+      (and
+        (bound_request_template ?endpoint ?request_template)
+        (not
+          (request_template_available ?request_template)
+        )
+      )
+  )
+  (:action finalize_endpoint_configuration
+    :parameters (?endpoint - endpoint ?request_template - api_request_template)
+    :precondition
+      (and
+        (registered ?endpoint)
+        (connector_allocated ?endpoint)
+        (bound_request_template ?endpoint ?request_template)
+        (not
+          (ready ?endpoint)
+        )
+      )
+    :effect (ready ?endpoint)
+  )
+  (:action release_request_template_from_endpoint
+    :parameters (?endpoint - endpoint ?request_template - api_request_template)
+    :precondition
+      (and
+        (bound_request_template ?endpoint ?request_template)
+      )
+    :effect
+      (and
+        (request_template_available ?request_template)
+        (not
+          (bound_request_template ?endpoint ?request_template)
+        )
+      )
+  )
+  (:action attach_credential_to_endpoint
+    :parameters (?endpoint - endpoint ?credential - credential)
+    :precondition
+      (and
+        (ready ?endpoint)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (credential_bound ?endpoint ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action detach_credential_from_endpoint
+    :parameters (?endpoint - endpoint ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?endpoint ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (credential_bound ?endpoint ?credential)
+        )
+      )
+  )
+  (:action bind_worker_token_to_component
+    :parameters (?component_instance - component_instance ?worker_token - worker_token)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (worker_token_available ?worker_token)
+      )
+    :effect
+      (and
+        (component_worker_token_bound ?component_instance ?worker_token)
+        (not
+          (worker_token_available ?worker_token)
+        )
+      )
+  )
+  (:action release_worker_token_from_component
+    :parameters (?component_instance - component_instance ?worker_token - worker_token)
+    :precondition
+      (and
+        (component_worker_token_bound ?component_instance ?worker_token)
+      )
+    :effect
+      (and
+        (worker_token_available ?worker_token)
+        (not
+          (component_worker_token_bound ?component_instance ?worker_token)
+        )
+      )
+  )
+  (:action bind_timeout_profile_to_component
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (timeout_profile_available ?timeout_profile)
+      )
+    :effect
+      (and
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (not
+          (timeout_profile_available ?timeout_profile)
+        )
+      )
+  )
+  (:action release_timeout_profile_from_component
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile)
+    :precondition
+      (and
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+      )
+    :effect
+      (and
+        (timeout_profile_available ?timeout_profile)
+        (not
+          (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        )
+      )
+  )
+  (:action discover_and_signal_source_variant
+    :parameters (?consumer_primary - consumer_primary ?source_variant - source_variant ?request_template - api_request_template)
+    :precondition
+      (and
+        (ready ?consumer_primary)
+        (bound_request_template ?consumer_primary ?request_template)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (not
+          (source_variant_signaled ?source_variant)
+        )
+        (not
+          (source_variant_mapped ?source_variant)
+        )
+      )
+    :effect (source_variant_signaled ?source_variant)
+  )
+  (:action process_signaled_source_variant_primary
+    :parameters (?consumer_primary - consumer_primary ?source_variant - source_variant ?credential - credential)
+    :precondition
+      (and
+        (ready ?consumer_primary)
+        (credential_bound ?consumer_primary ?credential)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (source_variant_signaled ?source_variant)
+        (not
+          (consumer_primary_signal_set ?consumer_primary)
+        )
+      )
+    :effect
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_primary_ready ?consumer_primary)
+      )
+  )
+  (:action assign_data_mapping_to_consumer_primary
+    :parameters (?consumer_primary - consumer_primary ?source_variant - source_variant ?data_mapping - data_mapping)
+    :precondition
+      (and
+        (ready ?consumer_primary)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (data_mapping_available ?data_mapping)
+        (not
+          (consumer_primary_signal_set ?consumer_primary)
+        )
+      )
+    :effect
+      (and
+        (source_variant_mapped ?source_variant)
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_primary_mapping_assigned ?consumer_primary ?data_mapping)
+        (not
+          (data_mapping_available ?data_mapping)
+        )
+      )
+  )
+  (:action finalize_primary_variant_handling
+    :parameters (?consumer_primary - consumer_primary ?source_variant - source_variant ?request_template - api_request_template ?data_mapping - data_mapping)
+    :precondition
+      (and
+        (ready ?consumer_primary)
+        (bound_request_template ?consumer_primary ?request_template)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (source_variant_mapped ?source_variant)
+        (consumer_primary_mapping_assigned ?consumer_primary ?data_mapping)
+        (not
+          (consumer_primary_ready ?consumer_primary)
+        )
+      )
+    :effect
+      (and
+        (source_variant_signaled ?source_variant)
+        (consumer_primary_ready ?consumer_primary)
+        (data_mapping_available ?data_mapping)
+        (not
+          (consumer_primary_mapping_assigned ?consumer_primary ?data_mapping)
+        )
+      )
+  )
+  (:action discover_and_signal_destination_variant
+    :parameters (?consumer_secondary - consumer_secondary ?destination_variant - destination_variant ?request_template - api_request_template)
+    :precondition
+      (and
+        (ready ?consumer_secondary)
+        (bound_request_template ?consumer_secondary ?request_template)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (not
+          (destination_variant_signaled ?destination_variant)
+        )
+        (not
+          (destination_variant_mapped ?destination_variant)
+        )
+      )
+    :effect (destination_variant_signaled ?destination_variant)
+  )
+  (:action process_signaled_destination_variant_secondary
+    :parameters (?consumer_secondary - consumer_secondary ?destination_variant - destination_variant ?credential - credential)
+    :precondition
+      (and
+        (ready ?consumer_secondary)
+        (credential_bound ?consumer_secondary ?credential)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (destination_variant_signaled ?destination_variant)
+        (not
+          (consumer_secondary_signal_set ?consumer_secondary)
+        )
+      )
+    :effect
+      (and
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_secondary_ready ?consumer_secondary)
+      )
+  )
+  (:action assign_data_mapping_to_consumer_secondary
+    :parameters (?consumer_secondary - consumer_secondary ?destination_variant - destination_variant ?data_mapping - data_mapping)
+    :precondition
+      (and
+        (ready ?consumer_secondary)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (data_mapping_available ?data_mapping)
+        (not
+          (consumer_secondary_signal_set ?consumer_secondary)
+        )
+      )
+    :effect
+      (and
+        (destination_variant_mapped ?destination_variant)
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_secondary_mapping_assigned ?consumer_secondary ?data_mapping)
+        (not
+          (data_mapping_available ?data_mapping)
+        )
+      )
+  )
+  (:action finalize_secondary_variant_handling
+    :parameters (?consumer_secondary - consumer_secondary ?destination_variant - destination_variant ?request_template - api_request_template ?data_mapping - data_mapping)
+    :precondition
+      (and
+        (ready ?consumer_secondary)
+        (bound_request_template ?consumer_secondary ?request_template)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (destination_variant_mapped ?destination_variant)
+        (consumer_secondary_mapping_assigned ?consumer_secondary ?data_mapping)
+        (not
+          (consumer_secondary_ready ?consumer_secondary)
+        )
+      )
+    :effect
+      (and
+        (destination_variant_signaled ?destination_variant)
+        (consumer_secondary_ready ?consumer_secondary)
+        (data_mapping_available ?data_mapping)
+        (not
+          (consumer_secondary_mapping_assigned ?consumer_secondary ?data_mapping)
+        )
+      )
+  )
+  (:action create_execution_task
+    :parameters (?consumer_primary - consumer_primary ?consumer_secondary - consumer_secondary ?source_variant - source_variant ?destination_variant - destination_variant ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (source_variant_signaled ?source_variant)
+        (destination_variant_signaled ?destination_variant)
+        (consumer_primary_ready ?consumer_primary)
+        (consumer_secondary_ready ?consumer_secondary)
+        (execution_task_placeholder ?execution_task)
+      )
+    :effect
+      (and
+        (execution_task_reserved ?execution_task)
+        (execution_task_source_variant ?execution_task ?source_variant)
+        (execution_task_destination_variant ?execution_task ?destination_variant)
+        (not
+          (execution_task_placeholder ?execution_task)
+        )
+      )
+  )
+  (:action create_execution_task_option_a
+    :parameters (?consumer_primary - consumer_primary ?consumer_secondary - consumer_secondary ?source_variant - source_variant ?destination_variant - destination_variant ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (source_variant_mapped ?source_variant)
+        (destination_variant_signaled ?destination_variant)
+        (not
+          (consumer_primary_ready ?consumer_primary)
+        )
+        (consumer_secondary_ready ?consumer_secondary)
+        (execution_task_placeholder ?execution_task)
+      )
+    :effect
+      (and
+        (execution_task_reserved ?execution_task)
+        (execution_task_source_variant ?execution_task ?source_variant)
+        (execution_task_destination_variant ?execution_task ?destination_variant)
+        (execution_task_option_a ?execution_task)
+        (not
+          (execution_task_placeholder ?execution_task)
+        )
+      )
+  )
+  (:action create_execution_task_option_b
+    :parameters (?consumer_primary - consumer_primary ?consumer_secondary - consumer_secondary ?source_variant - source_variant ?destination_variant - destination_variant ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (source_variant_signaled ?source_variant)
+        (destination_variant_mapped ?destination_variant)
+        (consumer_primary_ready ?consumer_primary)
+        (not
+          (consumer_secondary_ready ?consumer_secondary)
+        )
+        (execution_task_placeholder ?execution_task)
+      )
+    :effect
+      (and
+        (execution_task_reserved ?execution_task)
+        (execution_task_source_variant ?execution_task ?source_variant)
+        (execution_task_destination_variant ?execution_task ?destination_variant)
+        (execution_task_option_b ?execution_task)
+        (not
+          (execution_task_placeholder ?execution_task)
+        )
+      )
+  )
+  (:action create_execution_task_options_ab
+    :parameters (?consumer_primary - consumer_primary ?consumer_secondary - consumer_secondary ?source_variant - source_variant ?destination_variant - destination_variant ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_primary_source_variant ?consumer_primary ?source_variant)
+        (consumer_secondary_destination_variant ?consumer_secondary ?destination_variant)
+        (source_variant_mapped ?source_variant)
+        (destination_variant_mapped ?destination_variant)
+        (not
+          (consumer_primary_ready ?consumer_primary)
+        )
+        (not
+          (consumer_secondary_ready ?consumer_secondary)
+        )
+        (execution_task_placeholder ?execution_task)
+      )
+    :effect
+      (and
+        (execution_task_reserved ?execution_task)
+        (execution_task_source_variant ?execution_task ?source_variant)
+        (execution_task_destination_variant ?execution_task ?destination_variant)
+        (execution_task_option_a ?execution_task)
+        (execution_task_option_b ?execution_task)
+        (not
+          (execution_task_placeholder ?execution_task)
+        )
+      )
+  )
+  (:action mark_execution_task_scheduled
+    :parameters (?execution_task - execution_task ?consumer_primary - consumer_primary ?request_template - api_request_template)
+    :precondition
+      (and
+        (execution_task_reserved ?execution_task)
+        (consumer_primary_signal_set ?consumer_primary)
+        (bound_request_template ?consumer_primary ?request_template)
+        (not
+          (execution_task_scheduled ?execution_task)
+        )
+      )
+    :effect (execution_task_scheduled ?execution_task)
+  )
+  (:action materialize_response_resource
+    :parameters (?component_instance - component_instance ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (component_execution_task_assigned ?component_instance ?execution_task)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_available ?response_resource)
+        (execution_task_reserved ?execution_task)
+        (execution_task_scheduled ?execution_task)
+        (not
+          (response_resource_reserved ?response_resource)
+        )
+      )
+    :effect
+      (and
+        (response_resource_reserved ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (not
+          (response_resource_available ?response_resource)
+        )
+      )
+  )
+  (:action confirm_response_resource_materialization
+    :parameters (?component_instance - component_instance ?response_resource - response_resource ?execution_task - execution_task ?request_template - api_request_template)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_reserved ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (bound_request_template ?component_instance ?request_template)
+        (not
+          (execution_task_option_a ?execution_task)
+        )
+        (not
+          (component_primed ?component_instance)
+        )
+      )
+    :effect (component_primed ?component_instance)
+  )
+  (:action apply_optional_modifier_to_component
+    :parameters (?component_instance - component_instance ?optional_modifier - optional_modifier)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (optional_modifier_available ?optional_modifier)
+        (not
+          (component_modifier_enabled ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_modifier_enabled ?component_instance)
+        (component_optional_modifier_bound ?component_instance ?optional_modifier)
+        (not
+          (optional_modifier_available ?optional_modifier)
+        )
+      )
+  )
+  (:action activate_optional_modifier_on_component
+    :parameters (?component_instance - component_instance ?response_resource - response_resource ?execution_task - execution_task ?request_template - api_request_template ?optional_modifier - optional_modifier)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_reserved ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (bound_request_template ?component_instance ?request_template)
+        (execution_task_option_a ?execution_task)
+        (component_modifier_enabled ?component_instance)
+        (component_optional_modifier_bound ?component_instance ?optional_modifier)
+        (not
+          (component_primed ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_primed ?component_instance)
+        (component_modifier_activated ?component_instance)
+      )
+  )
+  (:action apply_worker_token_feature
+    :parameters (?component_instance - component_instance ?worker_token - worker_token ?credential - credential ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_primed ?component_instance)
+        (component_worker_token_bound ?component_instance ?worker_token)
+        (credential_bound ?component_instance ?credential)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (not
+          (execution_task_option_b ?execution_task)
+        )
+        (not
+          (component_modifier_applied ?component_instance)
+        )
+      )
+    :effect (component_modifier_applied ?component_instance)
+  )
+  (:action apply_worker_token_feature_confirm
+    :parameters (?component_instance - component_instance ?worker_token - worker_token ?credential - credential ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_primed ?component_instance)
+        (component_worker_token_bound ?component_instance ?worker_token)
+        (credential_bound ?component_instance ?credential)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (execution_task_option_b ?execution_task)
+        (not
+          (component_modifier_applied ?component_instance)
+        )
+      )
+    :effect (component_modifier_applied ?component_instance)
+  )
+  (:action enable_component_with_timeout_profile
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_modifier_applied ?component_instance)
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (not
+          (execution_task_option_a ?execution_task)
+        )
+        (not
+          (execution_task_option_b ?execution_task)
+        )
+        (not
+          (component_ready_for_finalization ?component_instance)
+        )
+      )
+    :effect (component_ready_for_finalization ?component_instance)
+  )
+  (:action enable_component_with_timeout_and_option_a
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_modifier_applied ?component_instance)
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (execution_task_option_a ?execution_task)
+        (not
+          (execution_task_option_b ?execution_task)
+        )
+        (not
+          (component_ready_for_finalization ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_feature_bindings_present ?component_instance)
+      )
+  )
+  (:action enable_component_with_timeout_and_option_b
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_modifier_applied ?component_instance)
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (not
+          (execution_task_option_a ?execution_task)
+        )
+        (execution_task_option_b ?execution_task)
+        (not
+          (component_ready_for_finalization ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_feature_bindings_present ?component_instance)
+      )
+  )
+  (:action enable_component_with_timeout_and_options_ab
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile ?response_resource - response_resource ?execution_task - execution_task)
+    :precondition
+      (and
+        (component_modifier_applied ?component_instance)
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (component_response_resource_bound ?component_instance ?response_resource)
+        (response_resource_attached_to_task ?response_resource ?execution_task)
+        (execution_task_option_a ?execution_task)
+        (execution_task_option_b ?execution_task)
+        (not
+          (component_ready_for_finalization ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_feature_bindings_present ?component_instance)
+      )
+  )
+  (:action finalize_component
+    :parameters (?component_instance - component_instance)
+    :precondition
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (not
+          (component_feature_bindings_present ?component_instance)
+        )
+        (not
+          (component_completion_flag ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_completion_flag ?component_instance)
+        (processing_result_committed ?component_instance)
+      )
+  )
+  (:action attach_processing_option_to_component
+    :parameters (?component_instance - component_instance ?processing_option - processing_option)
+    :precondition
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_feature_bindings_present ?component_instance)
+        (processing_option_available ?processing_option)
+      )
+    :effect
+      (and
+        (component_processing_option_bound ?component_instance ?processing_option)
+        (not
+          (processing_option_available ?processing_option)
+        )
+      )
+  )
+  (:action promote_component_to_finalization
+    :parameters (?component_instance - component_instance ?consumer_primary - consumer_primary ?consumer_secondary - consumer_secondary ?request_template - api_request_template ?processing_option - processing_option)
+    :precondition
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_feature_bindings_present ?component_instance)
+        (component_processing_option_bound ?component_instance ?processing_option)
+        (component_bound_consumer_primary ?component_instance ?consumer_primary)
+        (component_bound_consumer_secondary ?component_instance ?consumer_secondary)
+        (consumer_primary_ready ?consumer_primary)
+        (consumer_secondary_ready ?consumer_secondary)
+        (bound_request_template ?component_instance ?request_template)
+        (not
+          (component_promoted ?component_instance)
+        )
+      )
+    :effect (component_promoted ?component_instance)
+  )
+  (:action finalize_component_after_promotion
+    :parameters (?component_instance - component_instance)
+    :precondition
+      (and
+        (component_ready_for_finalization ?component_instance)
+        (component_promoted ?component_instance)
+        (not
+          (component_completion_flag ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_completion_flag ?component_instance)
+        (processing_result_committed ?component_instance)
+      )
+  )
+  (:action enable_component_feature_via_header
+    :parameters (?component_instance - component_instance ?remote_header - remote_header ?request_template - api_request_template)
+    :precondition
+      (and
+        (ready ?component_instance)
+        (bound_request_template ?component_instance ?request_template)
+        (remote_header_available ?remote_header)
+        (component_remote_header_bound ?component_instance ?remote_header)
+        (not
+          (component_feature_activation_flag ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_feature_activation_flag ?component_instance)
+        (not
+          (remote_header_available ?remote_header)
+        )
+      )
+  )
+  (:action prepare_component_feature_for_configuration
+    :parameters (?component_instance - component_instance ?credential - credential)
+    :precondition
+      (and
+        (component_feature_activation_flag ?component_instance)
+        (credential_bound ?component_instance ?credential)
+        (not
+          (component_feature_configured ?component_instance)
+        )
+      )
+    :effect (component_feature_configured ?component_instance)
+  )
+  (:action configure_component_feature_timeout
+    :parameters (?component_instance - component_instance ?timeout_profile - timeout_profile)
+    :precondition
+      (and
+        (component_feature_configured ?component_instance)
+        (component_timeout_profile_bound ?component_instance ?timeout_profile)
+        (not
+          (component_feature_committed ?component_instance)
+        )
+      )
+    :effect (component_feature_committed ?component_instance)
+  )
+  (:action commit_component_feature_activation
+    :parameters (?component_instance - component_instance)
+    :precondition
+      (and
+        (component_feature_committed ?component_instance)
+        (not
+          (component_completion_flag ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (component_completion_flag ?component_instance)
+        (processing_result_committed ?component_instance)
+      )
+  )
+  (:action propagate_result_to_primary_consumer
+    :parameters (?consumer_primary - consumer_primary ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_primary_signal_set ?consumer_primary)
+        (consumer_primary_ready ?consumer_primary)
+        (execution_task_reserved ?execution_task)
+        (execution_task_scheduled ?execution_task)
+        (not
+          (processing_result_committed ?consumer_primary)
+        )
+      )
+    :effect (processing_result_committed ?consumer_primary)
+  )
+  (:action propagate_result_to_secondary_consumer
+    :parameters (?consumer_secondary - consumer_secondary ?execution_task - execution_task)
+    :precondition
+      (and
+        (consumer_secondary_signal_set ?consumer_secondary)
+        (consumer_secondary_ready ?consumer_secondary)
+        (execution_task_reserved ?execution_task)
+        (execution_task_scheduled ?execution_task)
+        (not
+          (processing_result_committed ?consumer_secondary)
+        )
+      )
+    :effect (processing_result_committed ?consumer_secondary)
+  )
+  (:action attach_integration_context_to_endpoint
+    :parameters (?endpoint - endpoint ?integration_context - integration_context ?request_template - api_request_template)
+    :precondition
+      (and
+        (processing_result_committed ?endpoint)
+        (bound_request_template ?endpoint ?request_template)
+        (integration_context_available ?integration_context)
+        (not
+          (context_attached ?endpoint)
+        )
+      )
+    :effect
+      (and
+        (context_attached ?endpoint)
+        (integration_context_assigned ?endpoint ?integration_context)
+        (not
+          (integration_context_available ?integration_context)
+        )
+      )
+  )
+  (:action propagate_context_to_consumer_and_release_connector
+    :parameters (?consumer_primary - consumer_primary ?connector - connector ?integration_context - integration_context)
+    :precondition
+      (and
+        (context_attached ?consumer_primary)
+        (connector_bound ?consumer_primary ?connector)
+        (integration_context_assigned ?consumer_primary ?integration_context)
+        (not
+          (integration_committed ?consumer_primary)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?consumer_primary)
+        (connector_available ?connector)
+        (integration_context_available ?integration_context)
+      )
+  )
+  (:action propagate_context_to_secondary_and_release_connector
+    :parameters (?consumer_secondary - consumer_secondary ?connector - connector ?integration_context - integration_context)
+    :precondition
+      (and
+        (context_attached ?consumer_secondary)
+        (connector_bound ?consumer_secondary ?connector)
+        (integration_context_assigned ?consumer_secondary ?integration_context)
+        (not
+          (integration_committed ?consumer_secondary)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?consumer_secondary)
+        (connector_available ?connector)
+        (integration_context_available ?integration_context)
+      )
+  )
+  (:action propagate_context_to_component_and_release_connector
+    :parameters (?component_instance - component_instance ?connector - connector ?integration_context - integration_context)
+    :precondition
+      (and
+        (context_attached ?component_instance)
+        (connector_bound ?component_instance ?connector)
+        (integration_context_assigned ?component_instance ?integration_context)
+        (not
+          (integration_committed ?component_instance)
+        )
+      )
+    :effect
+      (and
+        (integration_committed ?component_instance)
+        (connector_available ?connector)
+        (integration_context_available ?integration_context)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem external_rest_api_read_integration_problem)
+  (:domain external_rest_api_read_integration)
+  (:objects consumer_primary_1 - consumer_primary consumer_secondary_1 - consumer_secondary component_instance_a - component_instance component_instance_b - component_instance connector_1 - connector connector_2 - connector connector_3 - connector api_request_template_1 - api_request_template credential_1 - credential data_mapping_1 - data_mapping source_variant_1 - source_variant destination_variant_1 - destination_variant execution_task_slot_1 - execution_task response_resource_1 - response_resource response_resource_2 - response_resource optional_modifier_feature_x - optional_modifier optional_modifier_feature_y - optional_modifier processing_option_alpha - processing_option processing_option_beta - processing_option integration_context_1 - integration_context worker_token_1 - worker_token remote_header_x - remote_header remote_header_y - remote_header timeout_profile_default - timeout_profile)
+  (:init
+    (connector_available connector_1)
+    (connector_available connector_2)
+    (connector_available connector_3)
+    (request_template_available api_request_template_1)
+    (credential_available credential_1)
+    (data_mapping_available data_mapping_1)
+    (consumer_primary_source_variant consumer_primary_1 source_variant_1)
+    (consumer_secondary_destination_variant consumer_secondary_1 destination_variant_1)
+    (execution_task_placeholder execution_task_slot_1)
+    (response_resource_available response_resource_1)
+    (response_resource_available response_resource_2)
+    (component_bound_consumer_primary component_instance_a consumer_primary_1)
+    (component_bound_consumer_primary component_instance_b consumer_primary_1)
+    (component_bound_consumer_secondary component_instance_a consumer_secondary_1)
+    (component_bound_consumer_secondary component_instance_b consumer_secondary_1)
+    (component_execution_task_assigned component_instance_a execution_task_slot_1)
+    (component_execution_task_assigned component_instance_b execution_task_slot_1)
+    (component_response_resource_bound component_instance_a response_resource_1)
+    (component_response_resource_bound component_instance_b response_resource_2)
+    (optional_modifier_available optional_modifier_feature_x)
+    (optional_modifier_available optional_modifier_feature_y)
+    (processing_option_available processing_option_alpha)
+    (processing_option_available processing_option_beta)
+    (integration_context_available integration_context_1)
+    (worker_token_available worker_token_1)
+    (remote_header_available remote_header_x)
+    (component_remote_header_bound component_instance_a remote_header_x)
+    (component_remote_header_bound component_instance_b remote_header_y)
+    (timeout_profile_available timeout_profile_default)
+  )
+  (:goal
+    (and
+      (integration_committed consumer_primary_1)
+      (integration_committed consumer_secondary_1)
+      (integration_committed component_instance_a)
+      (integration_committed component_instance_b)
+    )
+  )
+)

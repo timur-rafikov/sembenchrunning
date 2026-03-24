@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain entity_cloning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types runtime_object - object resource_type - runtime_object slot_type - runtime_object value_type - runtime_object entity_type - runtime_object domain_entity - entity_type resource_token - resource_type field_identifier - resource_type actor_worker - resource_type policy_tag - resource_type postprocess_config - resource_type input_parameter - resource_type variant_option - resource_type validation_rule - resource_type attribute_value - slot_type template_fragment - slot_type external_reference - slot_type field_slot - value_type alternate_field_slot - value_type clone_artifact - value_type entity_partition - domain_entity entity_group - domain_entity source_record - entity_partition target_record - entity_partition clone_job - entity_group)
+
+  (:predicates
+    (entity_created ?entity - domain_entity)
+    (entity_prepared ?entity - domain_entity)
+    (entity_token_bound ?entity - domain_entity)
+    (entity_committed ?entity - domain_entity)
+    (ready_for_finalization ?entity - domain_entity)
+    (entity_validated ?entity - domain_entity)
+    (resource_token_available ?resource_token - resource_token)
+    (entity_token_assigned ?entity - domain_entity ?resource_token - resource_token)
+    (field_identifier_available ?field_identifier - field_identifier)
+    (entity_field_bound ?entity - domain_entity ?field_identifier - field_identifier)
+    (worker_available ?worker - actor_worker)
+    (entity_worker_assigned ?entity - domain_entity ?worker - actor_worker)
+    (attribute_value_available ?attribute_value - attribute_value)
+    (source_attribute_assigned ?source_record - source_record ?attribute_value - attribute_value)
+    (target_attribute_assigned ?target_record - target_record ?attribute_value - attribute_value)
+    (record_slot_bound ?source_record - source_record ?field_slot - field_slot)
+    (field_slot_claimed ?field_slot - field_slot)
+    (field_slot_has_attribute ?field_slot - field_slot)
+    (record_ready ?source_record - source_record)
+    (record_alt_slot_bound ?target_record - target_record ?alt_field_slot - alternate_field_slot)
+    (alt_slot_claimed ?alt_field_slot - alternate_field_slot)
+    (alt_slot_has_attribute ?alt_field_slot - alternate_field_slot)
+    (target_record_ready ?target_record - target_record)
+    (artifact_uninitialized ?artifact - clone_artifact)
+    (artifact_initialized ?artifact - clone_artifact)
+    (artifact_slot_linked ?artifact - clone_artifact ?field_slot - field_slot)
+    (artifact_alt_slot_linked ?artifact - clone_artifact ?alt_field_slot - alternate_field_slot)
+    (artifact_source_value_flag ?artifact - clone_artifact)
+    (artifact_alternate_value_flag ?artifact - clone_artifact)
+    (artifact_ready_for_materialization ?artifact - clone_artifact)
+    (clone_job_source_link ?clone_job - clone_job ?source_record - source_record)
+    (clone_job_target_link ?clone_job - clone_job ?target_record - target_record)
+    (clone_job_artifact_link ?clone_job - clone_job ?artifact - clone_artifact)
+    (template_fragment_available ?template_fragment - template_fragment)
+    (clone_job_fragment_link ?clone_job - clone_job ?template_fragment - template_fragment)
+    (fragment_materialized ?template_fragment - template_fragment)
+    (fragment_materialized_into_artifact ?template_fragment - template_fragment ?artifact - clone_artifact)
+    (clone_job_fragment_ready ?clone_job - clone_job)
+    (clone_job_variant_applied ?clone_job - clone_job)
+    (clone_job_fragment_finalized ?clone_job - clone_job)
+    (clone_job_policy_bound ?clone_job - clone_job)
+    (clone_job_policy_applied ?clone_job - clone_job)
+    (clone_job_postprocess_applied ?clone_job - clone_job)
+    (clone_job_materialized ?clone_job - clone_job)
+    (external_reference_available ?external_reference - external_reference)
+    (clone_job_external_reference_link ?clone_job - clone_job ?external_reference - external_reference)
+    (clone_job_reference_attached ?clone_job - clone_job)
+    (clone_job_reference_verified ?clone_job - clone_job)
+    (clone_job_reference_validated ?clone_job - clone_job)
+    (policy_tag_available ?policy_tag - policy_tag)
+    (clone_job_policy_link ?clone_job - clone_job ?policy_tag - policy_tag)
+    (postprocess_config_available ?postprocess_config - postprocess_config)
+    (clone_job_postprocess_link ?clone_job - clone_job ?postprocess_config - postprocess_config)
+    (variant_option_available ?variant_option - variant_option)
+    (clone_job_variant_link ?clone_job - clone_job ?variant_option - variant_option)
+    (validation_rule_available ?validation_rule - validation_rule)
+    (clone_job_validation_link ?clone_job - clone_job ?validation_rule - validation_rule)
+    (input_parameter_available ?input_parameter - input_parameter)
+    (entity_input_parameter_bound ?entity - domain_entity ?input_parameter - input_parameter)
+    (source_ready_for_assembly ?source_record - source_record)
+    (target_ready_for_assembly ?target_record - target_record)
+    (clone_job_finalize_claimed ?clone_job - clone_job)
+  )
+  (:action create_entity
+    :parameters (?entity - domain_entity)
+    :precondition
+      (and
+        (not
+          (entity_created ?entity)
+        )
+        (not
+          (entity_committed ?entity)
+        )
+      )
+    :effect (entity_created ?entity)
+  )
+  (:action assign_resource_token
+    :parameters (?entity - domain_entity ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_created ?entity)
+        (not
+          (entity_token_bound ?entity)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (entity_token_bound ?entity)
+        (entity_token_assigned ?entity ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action bind_field_identifier_to_entity
+    :parameters (?entity - domain_entity ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_created ?entity)
+        (entity_token_bound ?entity)
+        (field_identifier_available ?field_identifier)
+      )
+    :effect
+      (and
+        (entity_field_bound ?entity ?field_identifier)
+        (not
+          (field_identifier_available ?field_identifier)
+        )
+      )
+  )
+  (:action prepare_entity
+    :parameters (?entity - domain_entity ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_created ?entity)
+        (entity_token_bound ?entity)
+        (entity_field_bound ?entity ?field_identifier)
+        (not
+          (entity_prepared ?entity)
+        )
+      )
+    :effect (entity_prepared ?entity)
+  )
+  (:action release_field_identifier
+    :parameters (?entity - domain_entity ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_field_bound ?entity ?field_identifier)
+      )
+    :effect
+      (and
+        (field_identifier_available ?field_identifier)
+        (not
+          (entity_field_bound ?entity ?field_identifier)
+        )
+      )
+  )
+  (:action assign_worker_to_entity
+    :parameters (?entity - domain_entity ?worker - actor_worker)
+    :precondition
+      (and
+        (entity_prepared ?entity)
+        (worker_available ?worker)
+      )
+    :effect
+      (and
+        (entity_worker_assigned ?entity ?worker)
+        (not
+          (worker_available ?worker)
+        )
+      )
+  )
+  (:action unassign_worker_from_entity
+    :parameters (?entity - domain_entity ?worker - actor_worker)
+    :precondition
+      (and
+        (entity_worker_assigned ?entity ?worker)
+      )
+    :effect
+      (and
+        (worker_available ?worker)
+        (not
+          (entity_worker_assigned ?entity ?worker)
+        )
+      )
+  )
+  (:action attach_variant_option
+    :parameters (?clone_job - clone_job ?variant_option - variant_option)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (variant_option_available ?variant_option)
+      )
+    :effect
+      (and
+        (clone_job_variant_link ?clone_job ?variant_option)
+        (not
+          (variant_option_available ?variant_option)
+        )
+      )
+  )
+  (:action detach_variant_option
+    :parameters (?clone_job - clone_job ?variant_option - variant_option)
+    :precondition
+      (and
+        (clone_job_variant_link ?clone_job ?variant_option)
+      )
+    :effect
+      (and
+        (variant_option_available ?variant_option)
+        (not
+          (clone_job_variant_link ?clone_job ?variant_option)
+        )
+      )
+  )
+  (:action attach_validation_rule
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (validation_rule_available ?validation_rule)
+      )
+    :effect
+      (and
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (not
+          (validation_rule_available ?validation_rule)
+        )
+      )
+  )
+  (:action detach_validation_rule
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (clone_job_validation_link ?clone_job ?validation_rule)
+      )
+    :effect
+      (and
+        (validation_rule_available ?validation_rule)
+        (not
+          (clone_job_validation_link ?clone_job ?validation_rule)
+        )
+      )
+  )
+  (:action claim_field_slot
+    :parameters (?source_record - source_record ?field_slot - field_slot ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_prepared ?source_record)
+        (entity_field_bound ?source_record ?field_identifier)
+        (record_slot_bound ?source_record ?field_slot)
+        (not
+          (field_slot_claimed ?field_slot)
+        )
+        (not
+          (field_slot_has_attribute ?field_slot)
+        )
+      )
+    :effect (field_slot_claimed ?field_slot)
+  )
+  (:action finalize_field_slot_claim
+    :parameters (?source_record - source_record ?field_slot - field_slot ?worker - actor_worker)
+    :precondition
+      (and
+        (entity_prepared ?source_record)
+        (entity_worker_assigned ?source_record ?worker)
+        (record_slot_bound ?source_record ?field_slot)
+        (field_slot_claimed ?field_slot)
+        (not
+          (source_ready_for_assembly ?source_record)
+        )
+      )
+    :effect
+      (and
+        (source_ready_for_assembly ?source_record)
+        (record_ready ?source_record)
+      )
+  )
+  (:action populate_slot_with_attribute
+    :parameters (?source_record - source_record ?field_slot - field_slot ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (entity_prepared ?source_record)
+        (record_slot_bound ?source_record ?field_slot)
+        (attribute_value_available ?attribute_value)
+        (not
+          (source_ready_for_assembly ?source_record)
+        )
+      )
+    :effect
+      (and
+        (field_slot_has_attribute ?field_slot)
+        (source_ready_for_assembly ?source_record)
+        (source_attribute_assigned ?source_record ?attribute_value)
+        (not
+          (attribute_value_available ?attribute_value)
+        )
+      )
+  )
+  (:action commit_slot_attribute_to_record
+    :parameters (?source_record - source_record ?field_slot - field_slot ?field_identifier - field_identifier ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (entity_prepared ?source_record)
+        (entity_field_bound ?source_record ?field_identifier)
+        (record_slot_bound ?source_record ?field_slot)
+        (field_slot_has_attribute ?field_slot)
+        (source_attribute_assigned ?source_record ?attribute_value)
+        (not
+          (record_ready ?source_record)
+        )
+      )
+    :effect
+      (and
+        (field_slot_claimed ?field_slot)
+        (record_ready ?source_record)
+        (attribute_value_available ?attribute_value)
+        (not
+          (source_attribute_assigned ?source_record ?attribute_value)
+        )
+      )
+  )
+  (:action claim_alt_field_slot
+    :parameters (?target_record - target_record ?alt_field_slot - alternate_field_slot ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_prepared ?target_record)
+        (entity_field_bound ?target_record ?field_identifier)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (not
+          (alt_slot_claimed ?alt_field_slot)
+        )
+        (not
+          (alt_slot_has_attribute ?alt_field_slot)
+        )
+      )
+    :effect (alt_slot_claimed ?alt_field_slot)
+  )
+  (:action finalize_alt_field_slot_claim
+    :parameters (?target_record - target_record ?alt_field_slot - alternate_field_slot ?worker - actor_worker)
+    :precondition
+      (and
+        (entity_prepared ?target_record)
+        (entity_worker_assigned ?target_record ?worker)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (alt_slot_claimed ?alt_field_slot)
+        (not
+          (target_ready_for_assembly ?target_record)
+        )
+      )
+    :effect
+      (and
+        (target_ready_for_assembly ?target_record)
+        (target_record_ready ?target_record)
+      )
+  )
+  (:action populate_alt_slot_with_attribute
+    :parameters (?target_record - target_record ?alt_field_slot - alternate_field_slot ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (entity_prepared ?target_record)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (attribute_value_available ?attribute_value)
+        (not
+          (target_ready_for_assembly ?target_record)
+        )
+      )
+    :effect
+      (and
+        (alt_slot_has_attribute ?alt_field_slot)
+        (target_ready_for_assembly ?target_record)
+        (target_attribute_assigned ?target_record ?attribute_value)
+        (not
+          (attribute_value_available ?attribute_value)
+        )
+      )
+  )
+  (:action commit_alt_slot_attribute_to_record
+    :parameters (?target_record - target_record ?alt_field_slot - alternate_field_slot ?field_identifier - field_identifier ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (entity_prepared ?target_record)
+        (entity_field_bound ?target_record ?field_identifier)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (alt_slot_has_attribute ?alt_field_slot)
+        (target_attribute_assigned ?target_record ?attribute_value)
+        (not
+          (target_record_ready ?target_record)
+        )
+      )
+    :effect
+      (and
+        (alt_slot_claimed ?alt_field_slot)
+        (target_record_ready ?target_record)
+        (attribute_value_available ?attribute_value)
+        (not
+          (target_attribute_assigned ?target_record ?attribute_value)
+        )
+      )
+  )
+  (:action assemble_artifact_from_slots
+    :parameters (?source_record - source_record ?target_record - target_record ?field_slot - field_slot ?alt_field_slot - alternate_field_slot ?artifact - clone_artifact)
+    :precondition
+      (and
+        (source_ready_for_assembly ?source_record)
+        (target_ready_for_assembly ?target_record)
+        (record_slot_bound ?source_record ?field_slot)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (field_slot_claimed ?field_slot)
+        (alt_slot_claimed ?alt_field_slot)
+        (record_ready ?source_record)
+        (target_record_ready ?target_record)
+        (artifact_uninitialized ?artifact)
+      )
+    :effect
+      (and
+        (artifact_initialized ?artifact)
+        (artifact_slot_linked ?artifact ?field_slot)
+        (artifact_alt_slot_linked ?artifact ?alt_field_slot)
+        (not
+          (artifact_uninitialized ?artifact)
+        )
+      )
+  )
+  (:action assemble_artifact_with_source_value
+    :parameters (?source_record - source_record ?target_record - target_record ?field_slot - field_slot ?alt_field_slot - alternate_field_slot ?artifact - clone_artifact)
+    :precondition
+      (and
+        (source_ready_for_assembly ?source_record)
+        (target_ready_for_assembly ?target_record)
+        (record_slot_bound ?source_record ?field_slot)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (field_slot_has_attribute ?field_slot)
+        (alt_slot_claimed ?alt_field_slot)
+        (not
+          (record_ready ?source_record)
+        )
+        (target_record_ready ?target_record)
+        (artifact_uninitialized ?artifact)
+      )
+    :effect
+      (and
+        (artifact_initialized ?artifact)
+        (artifact_slot_linked ?artifact ?field_slot)
+        (artifact_alt_slot_linked ?artifact ?alt_field_slot)
+        (artifact_source_value_flag ?artifact)
+        (not
+          (artifact_uninitialized ?artifact)
+        )
+      )
+  )
+  (:action assemble_artifact_with_alt_value
+    :parameters (?source_record - source_record ?target_record - target_record ?field_slot - field_slot ?alt_field_slot - alternate_field_slot ?artifact - clone_artifact)
+    :precondition
+      (and
+        (source_ready_for_assembly ?source_record)
+        (target_ready_for_assembly ?target_record)
+        (record_slot_bound ?source_record ?field_slot)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (field_slot_claimed ?field_slot)
+        (alt_slot_has_attribute ?alt_field_slot)
+        (record_ready ?source_record)
+        (not
+          (target_record_ready ?target_record)
+        )
+        (artifact_uninitialized ?artifact)
+      )
+    :effect
+      (and
+        (artifact_initialized ?artifact)
+        (artifact_slot_linked ?artifact ?field_slot)
+        (artifact_alt_slot_linked ?artifact ?alt_field_slot)
+        (artifact_alternate_value_flag ?artifact)
+        (not
+          (artifact_uninitialized ?artifact)
+        )
+      )
+  )
+  (:action assemble_artifact_with_both_values
+    :parameters (?source_record - source_record ?target_record - target_record ?field_slot - field_slot ?alt_field_slot - alternate_field_slot ?artifact - clone_artifact)
+    :precondition
+      (and
+        (source_ready_for_assembly ?source_record)
+        (target_ready_for_assembly ?target_record)
+        (record_slot_bound ?source_record ?field_slot)
+        (record_alt_slot_bound ?target_record ?alt_field_slot)
+        (field_slot_has_attribute ?field_slot)
+        (alt_slot_has_attribute ?alt_field_slot)
+        (not
+          (record_ready ?source_record)
+        )
+        (not
+          (target_record_ready ?target_record)
+        )
+        (artifact_uninitialized ?artifact)
+      )
+    :effect
+      (and
+        (artifact_initialized ?artifact)
+        (artifact_slot_linked ?artifact ?field_slot)
+        (artifact_alt_slot_linked ?artifact ?alt_field_slot)
+        (artifact_source_value_flag ?artifact)
+        (artifact_alternate_value_flag ?artifact)
+        (not
+          (artifact_uninitialized ?artifact)
+        )
+      )
+  )
+  (:action mark_artifact_ready_for_materialization
+    :parameters (?artifact - clone_artifact ?source_record - source_record ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (artifact_initialized ?artifact)
+        (source_ready_for_assembly ?source_record)
+        (entity_field_bound ?source_record ?field_identifier)
+        (not
+          (artifact_ready_for_materialization ?artifact)
+        )
+      )
+    :effect (artifact_ready_for_materialization ?artifact)
+  )
+  (:action materialize_fragment_into_artifact
+    :parameters (?clone_job - clone_job ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (clone_job_artifact_link ?clone_job ?artifact)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (template_fragment_available ?template_fragment)
+        (artifact_initialized ?artifact)
+        (artifact_ready_for_materialization ?artifact)
+        (not
+          (fragment_materialized ?template_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_materialized ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (not
+          (template_fragment_available ?template_fragment)
+        )
+      )
+  )
+  (:action confirm_fragment_materialization
+    :parameters (?clone_job - clone_job ?template_fragment - template_fragment ?artifact - clone_artifact ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (entity_field_bound ?clone_job ?field_identifier)
+        (not
+          (artifact_source_value_flag ?artifact)
+        )
+        (not
+          (clone_job_fragment_ready ?clone_job)
+        )
+      )
+    :effect (clone_job_fragment_ready ?clone_job)
+  )
+  (:action assign_policy_tag_to_clone_job
+    :parameters (?clone_job - clone_job ?policy_tag - policy_tag)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (policy_tag_available ?policy_tag)
+        (not
+          (clone_job_policy_bound ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_policy_bound ?clone_job)
+        (clone_job_policy_link ?clone_job ?policy_tag)
+        (not
+          (policy_tag_available ?policy_tag)
+        )
+      )
+  )
+  (:action apply_policy_to_job
+    :parameters (?clone_job - clone_job ?template_fragment - template_fragment ?artifact - clone_artifact ?field_identifier - field_identifier ?policy_tag - policy_tag)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (entity_field_bound ?clone_job ?field_identifier)
+        (artifact_source_value_flag ?artifact)
+        (clone_job_policy_bound ?clone_job)
+        (clone_job_policy_link ?clone_job ?policy_tag)
+        (not
+          (clone_job_fragment_ready ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_fragment_ready ?clone_job)
+        (clone_job_policy_applied ?clone_job)
+      )
+  )
+  (:action apply_variant_option_initial
+    :parameters (?clone_job - clone_job ?variant_option - variant_option ?worker - actor_worker ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_fragment_ready ?clone_job)
+        (clone_job_variant_link ?clone_job ?variant_option)
+        (entity_worker_assigned ?clone_job ?worker)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (not
+          (artifact_alternate_value_flag ?artifact)
+        )
+        (not
+          (clone_job_variant_applied ?clone_job)
+        )
+      )
+    :effect (clone_job_variant_applied ?clone_job)
+  )
+  (:action apply_variant_option_secondary
+    :parameters (?clone_job - clone_job ?variant_option - variant_option ?worker - actor_worker ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_fragment_ready ?clone_job)
+        (clone_job_variant_link ?clone_job ?variant_option)
+        (entity_worker_assigned ?clone_job ?worker)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (artifact_alternate_value_flag ?artifact)
+        (not
+          (clone_job_variant_applied ?clone_job)
+        )
+      )
+    :effect (clone_job_variant_applied ?clone_job)
+  )
+  (:action apply_validation_rule_primary
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_variant_applied ?clone_job)
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (not
+          (artifact_source_value_flag ?artifact)
+        )
+        (not
+          (artifact_alternate_value_flag ?artifact)
+        )
+        (not
+          (clone_job_fragment_finalized ?clone_job)
+        )
+      )
+    :effect (clone_job_fragment_finalized ?clone_job)
+  )
+  (:action apply_validation_rule_and_mark_postprocess
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_variant_applied ?clone_job)
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (artifact_source_value_flag ?artifact)
+        (not
+          (artifact_alternate_value_flag ?artifact)
+        )
+        (not
+          (clone_job_fragment_finalized ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_postprocess_applied ?clone_job)
+      )
+  )
+  (:action apply_validation_rule_and_mark_postprocess_alt
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_variant_applied ?clone_job)
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (not
+          (artifact_source_value_flag ?artifact)
+        )
+        (artifact_alternate_value_flag ?artifact)
+        (not
+          (clone_job_fragment_finalized ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_postprocess_applied ?clone_job)
+      )
+  )
+  (:action apply_validation_rule_and_mark_postprocess_both
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule ?template_fragment - template_fragment ?artifact - clone_artifact)
+    :precondition
+      (and
+        (clone_job_variant_applied ?clone_job)
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (clone_job_fragment_link ?clone_job ?template_fragment)
+        (fragment_materialized_into_artifact ?template_fragment ?artifact)
+        (artifact_source_value_flag ?artifact)
+        (artifact_alternate_value_flag ?artifact)
+        (not
+          (clone_job_fragment_finalized ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_postprocess_applied ?clone_job)
+      )
+  )
+  (:action claim_clone_job_for_finalization
+    :parameters (?clone_job - clone_job)
+    :precondition
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (not
+          (clone_job_postprocess_applied ?clone_job)
+        )
+        (not
+          (clone_job_finalize_claimed ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_finalize_claimed ?clone_job)
+        (ready_for_finalization ?clone_job)
+      )
+  )
+  (:action attach_postprocess_config_to_clone_job
+    :parameters (?clone_job - clone_job ?postprocess_config - postprocess_config)
+    :precondition
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_postprocess_applied ?clone_job)
+        (postprocess_config_available ?postprocess_config)
+      )
+    :effect
+      (and
+        (clone_job_postprocess_link ?clone_job ?postprocess_config)
+        (not
+          (postprocess_config_available ?postprocess_config)
+        )
+      )
+  )
+  (:action apply_postprocess_and_materialize_clone_job
+    :parameters (?clone_job - clone_job ?source_record - source_record ?target_record - target_record ?field_identifier - field_identifier ?postprocess_config - postprocess_config)
+    :precondition
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_postprocess_applied ?clone_job)
+        (clone_job_postprocess_link ?clone_job ?postprocess_config)
+        (clone_job_source_link ?clone_job ?source_record)
+        (clone_job_target_link ?clone_job ?target_record)
+        (record_ready ?source_record)
+        (target_record_ready ?target_record)
+        (entity_field_bound ?clone_job ?field_identifier)
+        (not
+          (clone_job_materialized ?clone_job)
+        )
+      )
+    :effect (clone_job_materialized ?clone_job)
+  )
+  (:action finalize_clone_job_materialization
+    :parameters (?clone_job - clone_job)
+    :precondition
+      (and
+        (clone_job_fragment_finalized ?clone_job)
+        (clone_job_materialized ?clone_job)
+        (not
+          (clone_job_finalize_claimed ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_finalize_claimed ?clone_job)
+        (ready_for_finalization ?clone_job)
+      )
+  )
+  (:action attach_external_reference_to_clone_job
+    :parameters (?clone_job - clone_job ?external_reference - external_reference ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (entity_prepared ?clone_job)
+        (entity_field_bound ?clone_job ?field_identifier)
+        (external_reference_available ?external_reference)
+        (clone_job_external_reference_link ?clone_job ?external_reference)
+        (not
+          (clone_job_reference_attached ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_reference_attached ?clone_job)
+        (not
+          (external_reference_available ?external_reference)
+        )
+      )
+  )
+  (:action verify_clone_job_reference
+    :parameters (?clone_job - clone_job ?worker - actor_worker)
+    :precondition
+      (and
+        (clone_job_reference_attached ?clone_job)
+        (entity_worker_assigned ?clone_job ?worker)
+        (not
+          (clone_job_reference_verified ?clone_job)
+        )
+      )
+    :effect (clone_job_reference_verified ?clone_job)
+  )
+  (:action apply_validation_rule_to_reference
+    :parameters (?clone_job - clone_job ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (clone_job_reference_verified ?clone_job)
+        (clone_job_validation_link ?clone_job ?validation_rule)
+        (not
+          (clone_job_reference_validated ?clone_job)
+        )
+      )
+    :effect (clone_job_reference_validated ?clone_job)
+  )
+  (:action finalize_clone_job_with_reference
+    :parameters (?clone_job - clone_job)
+    :precondition
+      (and
+        (clone_job_reference_validated ?clone_job)
+        (not
+          (clone_job_finalize_claimed ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (clone_job_finalize_claimed ?clone_job)
+        (ready_for_finalization ?clone_job)
+      )
+  )
+  (:action finalize_source_record
+    :parameters (?source_record - source_record ?artifact - clone_artifact)
+    :precondition
+      (and
+        (source_ready_for_assembly ?source_record)
+        (record_ready ?source_record)
+        (artifact_initialized ?artifact)
+        (artifact_ready_for_materialization ?artifact)
+        (not
+          (ready_for_finalization ?source_record)
+        )
+      )
+    :effect (ready_for_finalization ?source_record)
+  )
+  (:action finalize_target_record
+    :parameters (?target_record - target_record ?artifact - clone_artifact)
+    :precondition
+      (and
+        (target_ready_for_assembly ?target_record)
+        (target_record_ready ?target_record)
+        (artifact_initialized ?artifact)
+        (artifact_ready_for_materialization ?artifact)
+        (not
+          (ready_for_finalization ?target_record)
+        )
+      )
+    :effect (ready_for_finalization ?target_record)
+  )
+  (:action apply_validation_and_bind_input_parameter
+    :parameters (?entity - domain_entity ?input_parameter - input_parameter ?field_identifier - field_identifier)
+    :precondition
+      (and
+        (ready_for_finalization ?entity)
+        (entity_field_bound ?entity ?field_identifier)
+        (input_parameter_available ?input_parameter)
+        (not
+          (entity_validated ?entity)
+        )
+      )
+    :effect
+      (and
+        (entity_validated ?entity)
+        (entity_input_parameter_bound ?entity ?input_parameter)
+        (not
+          (input_parameter_available ?input_parameter)
+        )
+      )
+  )
+  (:action commit_source_record
+    :parameters (?source_record - source_record ?resource_token - resource_token ?input_parameter - input_parameter)
+    :precondition
+      (and
+        (entity_validated ?source_record)
+        (entity_token_assigned ?source_record ?resource_token)
+        (entity_input_parameter_bound ?source_record ?input_parameter)
+        (not
+          (entity_committed ?source_record)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?source_record)
+        (resource_token_available ?resource_token)
+        (input_parameter_available ?input_parameter)
+      )
+  )
+  (:action commit_target_record
+    :parameters (?target_record - target_record ?resource_token - resource_token ?input_parameter - input_parameter)
+    :precondition
+      (and
+        (entity_validated ?target_record)
+        (entity_token_assigned ?target_record ?resource_token)
+        (entity_input_parameter_bound ?target_record ?input_parameter)
+        (not
+          (entity_committed ?target_record)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?target_record)
+        (resource_token_available ?resource_token)
+        (input_parameter_available ?input_parameter)
+      )
+  )
+  (:action commit_clone_job
+    :parameters (?clone_job - clone_job ?resource_token - resource_token ?input_parameter - input_parameter)
+    :precondition
+      (and
+        (entity_validated ?clone_job)
+        (entity_token_assigned ?clone_job ?resource_token)
+        (entity_input_parameter_bound ?clone_job ?input_parameter)
+        (not
+          (entity_committed ?clone_job)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?clone_job)
+        (resource_token_available ?resource_token)
+        (input_parameter_available ?input_parameter)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem entity_clone_problem)
+  (:domain entity_cloning_domain)
+  (:objects source_record_1 - source_record target_record_1 - target_record clone_job_1 - clone_job clone_job_2 - clone_job resource_token_a - resource_token resource_token_b - resource_token resource_token_c - resource_token field_identifier_1 - field_identifier worker_1 - actor_worker attribute_value_1 - attribute_value field_slot_1 - field_slot alt_field_slot_1 - alternate_field_slot artifact_1 - clone_artifact template_fragment_1 - template_fragment template_fragment_2 - template_fragment policy_tag_a - policy_tag policy_tag_b - policy_tag postprocess_config_a - postprocess_config postprocess_config_b - postprocess_config input_parameter_1 - input_parameter variant_option_a - variant_option external_ref_1 - external_reference external_ref_2 - external_reference validation_rule_1 - validation_rule)
+  (:init
+    (resource_token_available resource_token_a)
+    (resource_token_available resource_token_b)
+    (resource_token_available resource_token_c)
+    (field_identifier_available field_identifier_1)
+    (worker_available worker_1)
+    (attribute_value_available attribute_value_1)
+    (record_slot_bound source_record_1 field_slot_1)
+    (record_alt_slot_bound target_record_1 alt_field_slot_1)
+    (artifact_uninitialized artifact_1)
+    (template_fragment_available template_fragment_1)
+    (template_fragment_available template_fragment_2)
+    (clone_job_source_link clone_job_1 source_record_1)
+    (clone_job_source_link clone_job_2 source_record_1)
+    (clone_job_target_link clone_job_1 target_record_1)
+    (clone_job_target_link clone_job_2 target_record_1)
+    (clone_job_artifact_link clone_job_1 artifact_1)
+    (clone_job_artifact_link clone_job_2 artifact_1)
+    (clone_job_fragment_link clone_job_1 template_fragment_1)
+    (clone_job_fragment_link clone_job_2 template_fragment_2)
+    (policy_tag_available policy_tag_a)
+    (policy_tag_available policy_tag_b)
+    (postprocess_config_available postprocess_config_a)
+    (postprocess_config_available postprocess_config_b)
+    (input_parameter_available input_parameter_1)
+    (variant_option_available variant_option_a)
+    (external_reference_available external_ref_1)
+    (clone_job_external_reference_link clone_job_1 external_ref_1)
+    (clone_job_external_reference_link clone_job_2 external_ref_2)
+    (validation_rule_available validation_rule_1)
+  )
+  (:goal
+    (and
+      (entity_committed source_record_1)
+      (entity_committed target_record_1)
+      (entity_committed clone_job_1)
+      (entity_committed clone_job_2)
+    )
+  )
+)

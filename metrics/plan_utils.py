@@ -5,6 +5,9 @@ from typing import List, Union
 
 _PDDL_ACTION_RE = re.compile(r"^\(\s*[\w][\w-]*(\s+[\w][\w-]*)*\s*\)$")
 
+_STEP_NUMBER_PREFIX_RE = re.compile(r"^\d+[\s.:;)\]]*")
+_TRAILING_ANNOTATION_RE = re.compile(r"\)\s*[\[;].*$")
+
 
 def _normalize_pddl_step(step: str) -> str:
     """
@@ -27,6 +30,14 @@ def first_deviation_step(pred_steps: List[str], ref_steps: List[str]) -> int:
     if len(pred_steps) != len(ref_steps):
         return min(len(pred_steps), len(ref_steps)) + 1
     return 0
+
+
+def _strip_step_decoration(line: str) -> str:
+    """Strip common plan format decorations (step numbers, trailing annotations)."""
+    s = line.strip()
+    s = _STEP_NUMBER_PREFIX_RE.sub("", s).strip()
+    s = _TRAILING_ANNOTATION_RE.sub(")", s).strip()
+    return s
 
 
 def _looks_like_pddl_action(line: str) -> bool:
@@ -59,4 +70,9 @@ def pddl_plan_to_steps(plan_pddl: Union[str, List[str]]) -> List[str]:
         ]
     else:
         return []
-    return [line for line in raw if _looks_like_pddl_action(line)]
+    return [
+        cleaned
+        for line in raw
+        for cleaned in [_strip_step_decoration(line)]
+        if _looks_like_pddl_action(cleaned)
+    ]

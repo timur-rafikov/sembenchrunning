@@ -1,0 +1,936 @@
+(define (domain intercompany_settlement_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object compliance_artifact - object channel_candidate - object domain_object - object payment_instruction - domain_object release_token - operational_resource validation_rule - operational_resource approver_role - operational_resource fee_profile - operational_resource reconciliation_batch - operational_resource settlement_reference - operational_resource liquidity_source - operational_resource regulatory_approval - operational_resource payment_payload - compliance_artifact compliance_check - compliance_artifact external_approval - compliance_artifact settlement_channel_option - channel_candidate clearing_channel_option - channel_candidate settlement_record - channel_candidate originating_subtype - payment_instruction receiving_subtype - payment_instruction originating_leg - originating_subtype receiving_leg - originating_subtype coordinator_instance - receiving_subtype)
+  (:predicates
+    (entity_registered ?payment_instruction - payment_instruction)
+    (entity_validated ?payment_instruction - payment_instruction)
+    (entity_release_token_assigned ?payment_instruction - payment_instruction)
+    (released ?payment_instruction - payment_instruction)
+    (execution_confirmed ?payment_instruction - payment_instruction)
+    (settlement_reference_bound ?payment_instruction - payment_instruction)
+    (release_token_available ?release_token - release_token)
+    (entity_assigned_release_token ?payment_instruction - payment_instruction ?release_token - release_token)
+    (validation_rule_available ?validation_rule - validation_rule)
+    (entity_assigned_validation_rule ?payment_instruction - payment_instruction ?validation_rule - validation_rule)
+    (approver_available ?approver_role - approver_role)
+    (entity_assigned_approver ?payment_instruction - payment_instruction ?approver_role - approver_role)
+    (payment_payload_available ?payment_payload - payment_payload)
+    (originating_leg_has_payment_payload ?originating_leg - originating_leg ?payment_payload - payment_payload)
+    (receiving_leg_has_payment_payload ?receiving_leg - receiving_leg ?payment_payload - payment_payload)
+    (originating_leg_channel_candidate ?originating_leg - originating_leg ?settlement_channel_option - settlement_channel_option)
+    (settlement_channel_origin_reserved ?settlement_channel_option - settlement_channel_option)
+    (settlement_channel_origin_confirmed ?settlement_channel_option - settlement_channel_option)
+    (originating_leg_channel_confirmed ?originating_leg - originating_leg)
+    (receiving_leg_clearing_candidate ?receiving_leg - receiving_leg ?clearing_channel_option - clearing_channel_option)
+    (clearing_channel_receive_reserved ?clearing_channel_option - clearing_channel_option)
+    (clearing_channel_receive_confirmed ?clearing_channel_option - clearing_channel_option)
+    (receiving_leg_channel_confirmed ?receiving_leg - receiving_leg)
+    (settlement_record_available ?settlement_record - settlement_record)
+    (settlement_record_created ?settlement_record - settlement_record)
+    (settlement_record_assigned_settlement_channel ?settlement_record - settlement_record ?settlement_channel_option - settlement_channel_option)
+    (settlement_record_assigned_clearing_channel ?settlement_record - settlement_record ?clearing_channel_option - clearing_channel_option)
+    (settlement_record_origin_confirmed ?settlement_record - settlement_record)
+    (settlement_record_receive_confirmed ?settlement_record - settlement_record)
+    (settlement_record_marked_for_execution ?settlement_record - settlement_record)
+    (coordinator_assigned_originating_leg ?coordinator_instance - coordinator_instance ?originating_leg - originating_leg)
+    (coordinator_assigned_receiving_leg ?coordinator_instance - coordinator_instance ?receiving_leg - receiving_leg)
+    (coordinator_assigned_settlement_record ?coordinator_instance - coordinator_instance ?settlement_record - settlement_record)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (coordinator_assigned_compliance_check ?coordinator_instance - coordinator_instance ?compliance_check - compliance_check)
+    (compliance_check_consumed ?compliance_check - compliance_check)
+    (compliance_check_attached_to_record ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    (coordinator_compliance_cleared ?coordinator_instance - coordinator_instance)
+    (coordinator_documents_processed ?coordinator_instance - coordinator_instance)
+    (coordinator_ready_for_execution ?coordinator_instance - coordinator_instance)
+    (coordinator_fee_applied ?coordinator_instance - coordinator_instance)
+    (coordinator_fee_confirmed ?coordinator_instance - coordinator_instance)
+    (coordinator_reconciliation_attached ?coordinator_instance - coordinator_instance)
+    (coordinator_execution_started ?coordinator_instance - coordinator_instance)
+    (external_approval_available ?external_approval - external_approval)
+    (coordinator_assigned_external_approval ?coordinator_instance - coordinator_instance ?external_approval - external_approval)
+    (coordinator_external_approval_requested ?coordinator_instance - coordinator_instance)
+    (coordinator_external_approver_assigned ?coordinator_instance - coordinator_instance)
+    (coordinator_external_approval_granted ?coordinator_instance - coordinator_instance)
+    (fee_profile_available ?fee_profile - fee_profile)
+    (coordinator_has_fee_profile ?coordinator_instance - coordinator_instance ?fee_profile - fee_profile)
+    (reconciliation_batch_available ?reconciliation_batch - reconciliation_batch)
+    (coordinator_assigned_reconciliation_batch ?coordinator_instance - coordinator_instance ?reconciliation_batch - reconciliation_batch)
+    (liquidity_source_available ?liquidity_source - liquidity_source)
+    (coordinator_assigned_liquidity_source ?coordinator_instance - coordinator_instance ?liquidity_source - liquidity_source)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (coordinator_assigned_regulatory_approval ?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval)
+    (settlement_reference_available ?settlement_reference - settlement_reference)
+    (entity_bound_to_settlement_reference ?payment_instruction - payment_instruction ?settlement_reference - settlement_reference)
+    (originating_leg_ready_for_batch ?originating_leg - originating_leg)
+    (receiving_leg_ready_for_batch ?receiving_leg - receiving_leg)
+    (coordinator_finalized ?coordinator_instance - coordinator_instance)
+  )
+  (:action register_payment_entity
+    :parameters (?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (entity_registered ?payment_instruction)
+        )
+        (not
+          (released ?payment_instruction)
+        )
+      )
+    :effect (entity_registered ?payment_instruction)
+  )
+  (:action assign_release_token_to_entity
+    :parameters (?payment_instruction - payment_instruction ?release_token - release_token)
+    :precondition
+      (and
+        (entity_registered ?payment_instruction)
+        (not
+          (entity_release_token_assigned ?payment_instruction)
+        )
+        (release_token_available ?release_token)
+      )
+    :effect
+      (and
+        (entity_release_token_assigned ?payment_instruction)
+        (entity_assigned_release_token ?payment_instruction ?release_token)
+        (not
+          (release_token_available ?release_token)
+        )
+      )
+  )
+  (:action assign_validation_rule_to_entity
+    :parameters (?payment_instruction - payment_instruction ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_registered ?payment_instruction)
+        (entity_release_token_assigned ?payment_instruction)
+        (validation_rule_available ?validation_rule)
+      )
+    :effect
+      (and
+        (entity_assigned_validation_rule ?payment_instruction ?validation_rule)
+        (not
+          (validation_rule_available ?validation_rule)
+        )
+      )
+  )
+  (:action mark_entity_validated
+    :parameters (?payment_instruction - payment_instruction ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_registered ?payment_instruction)
+        (entity_release_token_assigned ?payment_instruction)
+        (entity_assigned_validation_rule ?payment_instruction ?validation_rule)
+        (not
+          (entity_validated ?payment_instruction)
+        )
+      )
+    :effect (entity_validated ?payment_instruction)
+  )
+  (:action revoke_validation_assignment
+    :parameters (?payment_instruction - payment_instruction ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_assigned_validation_rule ?payment_instruction ?validation_rule)
+      )
+    :effect
+      (and
+        (validation_rule_available ?validation_rule)
+        (not
+          (entity_assigned_validation_rule ?payment_instruction ?validation_rule)
+        )
+      )
+  )
+  (:action assign_approver_to_entity
+    :parameters (?payment_instruction - payment_instruction ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_validated ?payment_instruction)
+        (approver_available ?approver_role)
+      )
+    :effect
+      (and
+        (entity_assigned_approver ?payment_instruction ?approver_role)
+        (not
+          (approver_available ?approver_role)
+        )
+      )
+  )
+  (:action release_approver_from_entity
+    :parameters (?payment_instruction - payment_instruction ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_assigned_approver ?payment_instruction ?approver_role)
+      )
+    :effect
+      (and
+        (approver_available ?approver_role)
+        (not
+          (entity_assigned_approver ?payment_instruction ?approver_role)
+        )
+      )
+  )
+  (:action allocate_liquidity_to_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?liquidity_source - liquidity_source)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (liquidity_source_available ?liquidity_source)
+      )
+    :effect
+      (and
+        (coordinator_assigned_liquidity_source ?coordinator_instance ?liquidity_source)
+        (not
+          (liquidity_source_available ?liquidity_source)
+        )
+      )
+  )
+  (:action return_liquidity_from_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?liquidity_source - liquidity_source)
+    :precondition
+      (and
+        (coordinator_assigned_liquidity_source ?coordinator_instance ?liquidity_source)
+      )
+    :effect
+      (and
+        (liquidity_source_available ?liquidity_source)
+        (not
+          (coordinator_assigned_liquidity_source ?coordinator_instance ?liquidity_source)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action release_regulatory_approval_from_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        )
+      )
+  )
+  (:action reserve_settlement_channel_for_originating_leg
+    :parameters (?originating_leg - originating_leg ?settlement_channel_option - settlement_channel_option ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated ?originating_leg)
+        (entity_assigned_validation_rule ?originating_leg ?validation_rule)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (not
+          (settlement_channel_origin_reserved ?settlement_channel_option)
+        )
+        (not
+          (settlement_channel_origin_confirmed ?settlement_channel_option)
+        )
+      )
+    :effect (settlement_channel_origin_reserved ?settlement_channel_option)
+  )
+  (:action confirm_originating_channel_with_approver
+    :parameters (?originating_leg - originating_leg ?settlement_channel_option - settlement_channel_option ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_validated ?originating_leg)
+        (entity_assigned_approver ?originating_leg ?approver_role)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (settlement_channel_origin_reserved ?settlement_channel_option)
+        (not
+          (originating_leg_ready_for_batch ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (originating_leg_channel_confirmed ?originating_leg)
+      )
+  )
+  (:action assign_payload_and_reserve_originating_channel
+    :parameters (?originating_leg - originating_leg ?settlement_channel_option - settlement_channel_option ?payment_payload - payment_payload)
+    :precondition
+      (and
+        (entity_validated ?originating_leg)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (payment_payload_available ?payment_payload)
+        (not
+          (originating_leg_ready_for_batch ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (settlement_channel_origin_confirmed ?settlement_channel_option)
+        (originating_leg_ready_for_batch ?originating_leg)
+        (originating_leg_has_payment_payload ?originating_leg ?payment_payload)
+        (not
+          (payment_payload_available ?payment_payload)
+        )
+      )
+  )
+  (:action finalize_origin_channel_selection
+    :parameters (?originating_leg - originating_leg ?settlement_channel_option - settlement_channel_option ?validation_rule - validation_rule ?payment_payload - payment_payload)
+    :precondition
+      (and
+        (entity_validated ?originating_leg)
+        (entity_assigned_validation_rule ?originating_leg ?validation_rule)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (settlement_channel_origin_confirmed ?settlement_channel_option)
+        (originating_leg_has_payment_payload ?originating_leg ?payment_payload)
+        (not
+          (originating_leg_channel_confirmed ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (settlement_channel_origin_reserved ?settlement_channel_option)
+        (originating_leg_channel_confirmed ?originating_leg)
+        (payment_payload_available ?payment_payload)
+        (not
+          (originating_leg_has_payment_payload ?originating_leg ?payment_payload)
+        )
+      )
+  )
+  (:action reserve_clearing_channel_for_receiving_leg
+    :parameters (?receiving_leg - receiving_leg ?clearing_channel_option - clearing_channel_option ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated ?receiving_leg)
+        (entity_assigned_validation_rule ?receiving_leg ?validation_rule)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (not
+          (clearing_channel_receive_reserved ?clearing_channel_option)
+        )
+        (not
+          (clearing_channel_receive_confirmed ?clearing_channel_option)
+        )
+      )
+    :effect (clearing_channel_receive_reserved ?clearing_channel_option)
+  )
+  (:action confirm_receiving_channel_with_approver
+    :parameters (?receiving_leg - receiving_leg ?clearing_channel_option - clearing_channel_option ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_validated ?receiving_leg)
+        (entity_assigned_approver ?receiving_leg ?approver_role)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (clearing_channel_receive_reserved ?clearing_channel_option)
+        (not
+          (receiving_leg_ready_for_batch ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (receiving_leg_channel_confirmed ?receiving_leg)
+      )
+  )
+  (:action assign_payload_and_reserve_receiving_channel
+    :parameters (?receiving_leg - receiving_leg ?clearing_channel_option - clearing_channel_option ?payment_payload - payment_payload)
+    :precondition
+      (and
+        (entity_validated ?receiving_leg)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (payment_payload_available ?payment_payload)
+        (not
+          (receiving_leg_ready_for_batch ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (clearing_channel_receive_confirmed ?clearing_channel_option)
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (receiving_leg_has_payment_payload ?receiving_leg ?payment_payload)
+        (not
+          (payment_payload_available ?payment_payload)
+        )
+      )
+  )
+  (:action finalize_receiving_channel_selection
+    :parameters (?receiving_leg - receiving_leg ?clearing_channel_option - clearing_channel_option ?validation_rule - validation_rule ?payment_payload - payment_payload)
+    :precondition
+      (and
+        (entity_validated ?receiving_leg)
+        (entity_assigned_validation_rule ?receiving_leg ?validation_rule)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (clearing_channel_receive_confirmed ?clearing_channel_option)
+        (receiving_leg_has_payment_payload ?receiving_leg ?payment_payload)
+        (not
+          (receiving_leg_channel_confirmed ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (clearing_channel_receive_reserved ?clearing_channel_option)
+        (receiving_leg_channel_confirmed ?receiving_leg)
+        (payment_payload_available ?payment_payload)
+        (not
+          (receiving_leg_has_payment_payload ?receiving_leg ?payment_payload)
+        )
+      )
+  )
+  (:action assemble_settlement_record
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?settlement_channel_option - settlement_channel_option ?clearing_channel_option - clearing_channel_option ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (settlement_channel_origin_reserved ?settlement_channel_option)
+        (clearing_channel_receive_reserved ?clearing_channel_option)
+        (originating_leg_channel_confirmed ?originating_leg)
+        (receiving_leg_channel_confirmed ?receiving_leg)
+        (settlement_record_available ?settlement_record)
+      )
+    :effect
+      (and
+        (settlement_record_created ?settlement_record)
+        (settlement_record_assigned_settlement_channel ?settlement_record ?settlement_channel_option)
+        (settlement_record_assigned_clearing_channel ?settlement_record ?clearing_channel_option)
+        (not
+          (settlement_record_available ?settlement_record)
+        )
+      )
+  )
+  (:action assemble_settlement_record_with_origin_flag
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?settlement_channel_option - settlement_channel_option ?clearing_channel_option - clearing_channel_option ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (settlement_channel_origin_confirmed ?settlement_channel_option)
+        (clearing_channel_receive_reserved ?clearing_channel_option)
+        (not
+          (originating_leg_channel_confirmed ?originating_leg)
+        )
+        (receiving_leg_channel_confirmed ?receiving_leg)
+        (settlement_record_available ?settlement_record)
+      )
+    :effect
+      (and
+        (settlement_record_created ?settlement_record)
+        (settlement_record_assigned_settlement_channel ?settlement_record ?settlement_channel_option)
+        (settlement_record_assigned_clearing_channel ?settlement_record ?clearing_channel_option)
+        (settlement_record_origin_confirmed ?settlement_record)
+        (not
+          (settlement_record_available ?settlement_record)
+        )
+      )
+  )
+  (:action assemble_settlement_record_with_receive_flag
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?settlement_channel_option - settlement_channel_option ?clearing_channel_option - clearing_channel_option ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (settlement_channel_origin_reserved ?settlement_channel_option)
+        (clearing_channel_receive_confirmed ?clearing_channel_option)
+        (originating_leg_channel_confirmed ?originating_leg)
+        (not
+          (receiving_leg_channel_confirmed ?receiving_leg)
+        )
+        (settlement_record_available ?settlement_record)
+      )
+    :effect
+      (and
+        (settlement_record_created ?settlement_record)
+        (settlement_record_assigned_settlement_channel ?settlement_record ?settlement_channel_option)
+        (settlement_record_assigned_clearing_channel ?settlement_record ?clearing_channel_option)
+        (settlement_record_receive_confirmed ?settlement_record)
+        (not
+          (settlement_record_available ?settlement_record)
+        )
+      )
+  )
+  (:action assemble_settlement_record_with_both_flags
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?settlement_channel_option - settlement_channel_option ?clearing_channel_option - clearing_channel_option ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (originating_leg_channel_candidate ?originating_leg ?settlement_channel_option)
+        (receiving_leg_clearing_candidate ?receiving_leg ?clearing_channel_option)
+        (settlement_channel_origin_confirmed ?settlement_channel_option)
+        (clearing_channel_receive_confirmed ?clearing_channel_option)
+        (not
+          (originating_leg_channel_confirmed ?originating_leg)
+        )
+        (not
+          (receiving_leg_channel_confirmed ?receiving_leg)
+        )
+        (settlement_record_available ?settlement_record)
+      )
+    :effect
+      (and
+        (settlement_record_created ?settlement_record)
+        (settlement_record_assigned_settlement_channel ?settlement_record ?settlement_channel_option)
+        (settlement_record_assigned_clearing_channel ?settlement_record ?clearing_channel_option)
+        (settlement_record_origin_confirmed ?settlement_record)
+        (settlement_record_receive_confirmed ?settlement_record)
+        (not
+          (settlement_record_available ?settlement_record)
+        )
+      )
+  )
+  (:action mark_settlement_record_execution_ready
+    :parameters (?settlement_record - settlement_record ?originating_leg - originating_leg ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (settlement_record_created ?settlement_record)
+        (originating_leg_ready_for_batch ?originating_leg)
+        (entity_assigned_validation_rule ?originating_leg ?validation_rule)
+        (not
+          (settlement_record_marked_for_execution ?settlement_record)
+        )
+      )
+    :effect (settlement_record_marked_for_execution ?settlement_record)
+  )
+  (:action consume_and_attach_compliance_check_to_record
+    :parameters (?coordinator_instance - coordinator_instance ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (coordinator_assigned_settlement_record ?coordinator_instance ?settlement_record)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_available ?compliance_check)
+        (settlement_record_created ?settlement_record)
+        (settlement_record_marked_for_execution ?settlement_record)
+        (not
+          (compliance_check_consumed ?compliance_check)
+        )
+      )
+    :effect
+      (and
+        (compliance_check_consumed ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action finalize_compliance_check_for_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?compliance_check - compliance_check ?settlement_record - settlement_record ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_consumed ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (entity_assigned_validation_rule ?coordinator_instance ?validation_rule)
+        (not
+          (settlement_record_origin_confirmed ?settlement_record)
+        )
+        (not
+          (coordinator_compliance_cleared ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_compliance_cleared ?coordinator_instance)
+  )
+  (:action attach_fee_profile_to_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (fee_profile_available ?fee_profile)
+        (not
+          (coordinator_fee_applied ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_fee_applied ?coordinator_instance)
+        (coordinator_has_fee_profile ?coordinator_instance ?fee_profile)
+        (not
+          (fee_profile_available ?fee_profile)
+        )
+      )
+  )
+  (:action confirm_fee_and_compliance_for_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?compliance_check - compliance_check ?settlement_record - settlement_record ?validation_rule - validation_rule ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_consumed ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (entity_assigned_validation_rule ?coordinator_instance ?validation_rule)
+        (settlement_record_origin_confirmed ?settlement_record)
+        (coordinator_fee_applied ?coordinator_instance)
+        (coordinator_has_fee_profile ?coordinator_instance ?fee_profile)
+        (not
+          (coordinator_compliance_cleared ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_compliance_cleared ?coordinator_instance)
+        (coordinator_fee_confirmed ?coordinator_instance)
+      )
+  )
+  (:action process_documents_and_mark_coordinator_variant1
+    :parameters (?coordinator_instance - coordinator_instance ?liquidity_source - liquidity_source ?approver_role - approver_role ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_compliance_cleared ?coordinator_instance)
+        (coordinator_assigned_liquidity_source ?coordinator_instance ?liquidity_source)
+        (entity_assigned_approver ?coordinator_instance ?approver_role)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (not
+          (settlement_record_receive_confirmed ?settlement_record)
+        )
+        (not
+          (coordinator_documents_processed ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_documents_processed ?coordinator_instance)
+  )
+  (:action process_documents_and_mark_coordinator_variant2
+    :parameters (?coordinator_instance - coordinator_instance ?liquidity_source - liquidity_source ?approver_role - approver_role ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_compliance_cleared ?coordinator_instance)
+        (coordinator_assigned_liquidity_source ?coordinator_instance ?liquidity_source)
+        (entity_assigned_approver ?coordinator_instance ?approver_role)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (settlement_record_receive_confirmed ?settlement_record)
+        (not
+          (coordinator_documents_processed ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_documents_processed ?coordinator_instance)
+  )
+  (:action set_coordinator_documents_verified
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_documents_processed ?coordinator_instance)
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (not
+          (settlement_record_origin_confirmed ?settlement_record)
+        )
+        (not
+          (settlement_record_receive_confirmed ?settlement_record)
+        )
+        (not
+          (coordinator_ready_for_execution ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_ready_for_execution ?coordinator_instance)
+  )
+  (:action set_coordinator_documents_verified_and_attach_reconciliation
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_documents_processed ?coordinator_instance)
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (settlement_record_origin_confirmed ?settlement_record)
+        (not
+          (settlement_record_receive_confirmed ?settlement_record)
+        )
+        (not
+          (coordinator_ready_for_execution ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_reconciliation_attached ?coordinator_instance)
+      )
+  )
+  (:action set_coordinator_documents_verified_variant2
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_documents_processed ?coordinator_instance)
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (not
+          (settlement_record_origin_confirmed ?settlement_record)
+        )
+        (settlement_record_receive_confirmed ?settlement_record)
+        (not
+          (coordinator_ready_for_execution ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_reconciliation_attached ?coordinator_instance)
+      )
+  )
+  (:action set_coordinator_documents_verified_variant3
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval ?compliance_check - compliance_check ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (coordinator_documents_processed ?coordinator_instance)
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (coordinator_assigned_compliance_check ?coordinator_instance ?compliance_check)
+        (compliance_check_attached_to_record ?compliance_check ?settlement_record)
+        (settlement_record_origin_confirmed ?settlement_record)
+        (settlement_record_receive_confirmed ?settlement_record)
+        (not
+          (coordinator_ready_for_execution ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_reconciliation_attached ?coordinator_instance)
+      )
+  )
+  (:action finalize_coordinator_without_reconciliation
+    :parameters (?coordinator_instance - coordinator_instance)
+    :precondition
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (not
+          (coordinator_reconciliation_attached ?coordinator_instance)
+        )
+        (not
+          (coordinator_finalized ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_instance)
+        (execution_confirmed ?coordinator_instance)
+      )
+  )
+  (:action attach_reconciliation_batch_to_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?reconciliation_batch - reconciliation_batch)
+    :precondition
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_reconciliation_attached ?coordinator_instance)
+        (reconciliation_batch_available ?reconciliation_batch)
+      )
+    :effect
+      (and
+        (coordinator_assigned_reconciliation_batch ?coordinator_instance ?reconciliation_batch)
+        (not
+          (reconciliation_batch_available ?reconciliation_batch)
+        )
+      )
+  )
+  (:action start_coordinator_execution
+    :parameters (?coordinator_instance - coordinator_instance ?originating_leg - originating_leg ?receiving_leg - receiving_leg ?validation_rule - validation_rule ?reconciliation_batch - reconciliation_batch)
+    :precondition
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_reconciliation_attached ?coordinator_instance)
+        (coordinator_assigned_reconciliation_batch ?coordinator_instance ?reconciliation_batch)
+        (coordinator_assigned_originating_leg ?coordinator_instance ?originating_leg)
+        (coordinator_assigned_receiving_leg ?coordinator_instance ?receiving_leg)
+        (originating_leg_channel_confirmed ?originating_leg)
+        (receiving_leg_channel_confirmed ?receiving_leg)
+        (entity_assigned_validation_rule ?coordinator_instance ?validation_rule)
+        (not
+          (coordinator_execution_started ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_execution_started ?coordinator_instance)
+  )
+  (:action complete_coordinator_execution
+    :parameters (?coordinator_instance - coordinator_instance)
+    :precondition
+      (and
+        (coordinator_ready_for_execution ?coordinator_instance)
+        (coordinator_execution_started ?coordinator_instance)
+        (not
+          (coordinator_finalized ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_instance)
+        (execution_confirmed ?coordinator_instance)
+      )
+  )
+  (:action request_external_approval_for_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?external_approval - external_approval ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (entity_validated ?coordinator_instance)
+        (entity_assigned_validation_rule ?coordinator_instance ?validation_rule)
+        (external_approval_available ?external_approval)
+        (coordinator_assigned_external_approval ?coordinator_instance ?external_approval)
+        (not
+          (coordinator_external_approval_requested ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_external_approval_requested ?coordinator_instance)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action assign_approver_for_external_approval
+    :parameters (?coordinator_instance - coordinator_instance ?approver_role - approver_role)
+    :precondition
+      (and
+        (coordinator_external_approval_requested ?coordinator_instance)
+        (entity_assigned_approver ?coordinator_instance ?approver_role)
+        (not
+          (coordinator_external_approver_assigned ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_external_approver_assigned ?coordinator_instance)
+  )
+  (:action record_regulatory_approval_for_coordinator
+    :parameters (?coordinator_instance - coordinator_instance ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (coordinator_external_approver_assigned ?coordinator_instance)
+        (coordinator_assigned_regulatory_approval ?coordinator_instance ?regulatory_approval)
+        (not
+          (coordinator_external_approval_granted ?coordinator_instance)
+        )
+      )
+    :effect (coordinator_external_approval_granted ?coordinator_instance)
+  )
+  (:action finalize_coordinator_after_external_approval
+    :parameters (?coordinator_instance - coordinator_instance)
+    :precondition
+      (and
+        (coordinator_external_approval_granted ?coordinator_instance)
+        (not
+          (coordinator_finalized ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator_instance)
+        (execution_confirmed ?coordinator_instance)
+      )
+  )
+  (:action confirm_originating_leg_execution
+    :parameters (?originating_leg - originating_leg ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (originating_leg_ready_for_batch ?originating_leg)
+        (originating_leg_channel_confirmed ?originating_leg)
+        (settlement_record_created ?settlement_record)
+        (settlement_record_marked_for_execution ?settlement_record)
+        (not
+          (execution_confirmed ?originating_leg)
+        )
+      )
+    :effect (execution_confirmed ?originating_leg)
+  )
+  (:action confirm_receiving_leg_execution
+    :parameters (?receiving_leg - receiving_leg ?settlement_record - settlement_record)
+    :precondition
+      (and
+        (receiving_leg_ready_for_batch ?receiving_leg)
+        (receiving_leg_channel_confirmed ?receiving_leg)
+        (settlement_record_created ?settlement_record)
+        (settlement_record_marked_for_execution ?settlement_record)
+        (not
+          (execution_confirmed ?receiving_leg)
+        )
+      )
+    :effect (execution_confirmed ?receiving_leg)
+  )
+  (:action bind_settlement_reference_to_entity
+    :parameters (?payment_instruction - payment_instruction ?settlement_reference - settlement_reference ?validation_rule - validation_rule)
+    :precondition
+      (and
+        (execution_confirmed ?payment_instruction)
+        (entity_assigned_validation_rule ?payment_instruction ?validation_rule)
+        (settlement_reference_available ?settlement_reference)
+        (not
+          (settlement_reference_bound ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (settlement_reference_bound ?payment_instruction)
+        (entity_bound_to_settlement_reference ?payment_instruction ?settlement_reference)
+        (not
+          (settlement_reference_available ?settlement_reference)
+        )
+      )
+  )
+  (:action release_originating_leg_and_return_token
+    :parameters (?originating_leg - originating_leg ?release_token - release_token ?settlement_reference - settlement_reference)
+    :precondition
+      (and
+        (settlement_reference_bound ?originating_leg)
+        (entity_assigned_release_token ?originating_leg ?release_token)
+        (entity_bound_to_settlement_reference ?originating_leg ?settlement_reference)
+        (not
+          (released ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (released ?originating_leg)
+        (release_token_available ?release_token)
+        (settlement_reference_available ?settlement_reference)
+      )
+  )
+  (:action release_receiving_leg_and_return_token
+    :parameters (?receiving_leg - receiving_leg ?release_token - release_token ?settlement_reference - settlement_reference)
+    :precondition
+      (and
+        (settlement_reference_bound ?receiving_leg)
+        (entity_assigned_release_token ?receiving_leg ?release_token)
+        (entity_bound_to_settlement_reference ?receiving_leg ?settlement_reference)
+        (not
+          (released ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (released ?receiving_leg)
+        (release_token_available ?release_token)
+        (settlement_reference_available ?settlement_reference)
+      )
+  )
+  (:action release_coordinator_and_return_token
+    :parameters (?coordinator_instance - coordinator_instance ?release_token - release_token ?settlement_reference - settlement_reference)
+    :precondition
+      (and
+        (settlement_reference_bound ?coordinator_instance)
+        (entity_assigned_release_token ?coordinator_instance ?release_token)
+        (entity_bound_to_settlement_reference ?coordinator_instance ?settlement_reference)
+        (not
+          (released ?coordinator_instance)
+        )
+      )
+    :effect
+      (and
+        (released ?coordinator_instance)
+        (release_token_available ?release_token)
+        (settlement_reference_available ?settlement_reference)
+      )
+  )
+)

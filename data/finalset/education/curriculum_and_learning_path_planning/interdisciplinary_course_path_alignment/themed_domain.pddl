@@ -1,0 +1,937 @@
+(define (domain interdisciplinary_course_path_alignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object curricular_element - entity pedagogical_element - entity scheduling_element - entity academic_plan_entity - entity learner_plan - academic_plan_entity course_section - curricular_element assessment_instrument - curricular_element instructor - curricular_element pedagogy_mode - curricular_element partner_credential - curricular_element credit_transfer_document - curricular_element facility_resource - curricular_element accreditation_record - curricular_element elective_credit_unit - pedagogical_element assessment_module - pedagogical_element capstone_project - pedagogical_element semester_slot - scheduling_element term_slot - scheduling_element schedule_package - scheduling_element track_instance - learner_plan subtrack_instance - learner_plan major_track - track_instance minor_track - track_instance course - subtrack_instance)
+
+  (:predicates
+    (learner_plan_registered ?learner_plan - learner_plan)
+    (assessment_cleared ?learner_plan - learner_plan)
+    (learner_enrolled ?learner_plan - learner_plan)
+    (conferral_granted ?learner_plan - learner_plan)
+    (conferral_eligibility ?learner_plan - learner_plan)
+    (credit_transfer_applied ?learner_plan - learner_plan)
+    (course_section_available ?course_section - course_section)
+    (entity_assigned_to_section ?learner_plan - learner_plan ?course_section - course_section)
+    (assessment_instrument_available ?assessment_instrument - assessment_instrument)
+    (entity_assigned_assessment_instrument ?learner_plan - learner_plan ?assessment_instrument - assessment_instrument)
+    (instructor_available ?instructor - instructor)
+    (instructor_assigned_to_entity ?learner_plan - learner_plan ?instructor - instructor)
+    (elective_credit_available ?elective_credit_unit - elective_credit_unit)
+    (major_track_consumed_elective ?major_track - major_track ?elective_credit_unit - elective_credit_unit)
+    (minor_track_consumed_elective ?minor_track - minor_track ?elective_credit_unit - elective_credit_unit)
+    (track_assigned_semester_slot ?major_track - major_track ?semester_slot - semester_slot)
+    (semester_slot_reserved ?semester_slot - semester_slot)
+    (semester_slot_allocated_for_elective ?semester_slot - semester_slot)
+    (major_track_milestone_achieved ?major_track - major_track)
+    (track_assigned_term_slot ?minor_track - minor_track ?term_slot - term_slot)
+    (term_slot_reserved ?term_slot - term_slot)
+    (term_slot_allocated_for_elective ?term_slot - term_slot)
+    (minor_track_milestone_achieved ?minor_track - minor_track)
+    (schedule_package_available ?schedule_package - schedule_package)
+    (schedule_package_materialized ?schedule_package - schedule_package)
+    (schedule_package_includes_semester_slot ?schedule_package - schedule_package ?semester_slot - semester_slot)
+    (schedule_package_includes_term_slot ?schedule_package - schedule_package ?term_slot - term_slot)
+    (schedule_package_has_semester_elective_component ?schedule_package - schedule_package)
+    (schedule_package_has_term_elective_component ?schedule_package - schedule_package)
+    (schedule_package_activated ?schedule_package - schedule_package)
+    (course_required_by_major_track ?course - course ?major_track - major_track)
+    (course_required_by_minor_track ?course - course ?minor_track - minor_track)
+    (course_in_schedule_package ?course - course ?schedule_package - schedule_package)
+    (assessment_module_available ?assessment_module - assessment_module)
+    (course_has_assessment_module ?course - course ?assessment_module - assessment_module)
+    (assessment_module_registered ?assessment_module - assessment_module)
+    (assessment_module_in_schedule_package ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    (course_ready_for_resource_allocation ?course - course)
+    (course_resource_assignment_confirmed ?course - course)
+    (course_ready_for_finalization ?course - course)
+    (pedagogy_mode_assigned ?course - course)
+    (pedagogy_mode_confirmed ?course - course)
+    (course_quality_assurance_completed ?course - course)
+    (course_certification_ready ?course - course)
+    (capstone_project_available ?capstone_project - capstone_project)
+    (course_has_capstone_project ?course - course ?capstone_project - capstone_project)
+    (capstone_assigned_to_course ?course - course)
+    (capstone_ready_for_accreditation ?course - course)
+    (capstone_accreditation_bound ?course - course)
+    (pedagogy_mode_available ?pedagogy_mode - pedagogy_mode)
+    (course_pedagogy_bound ?course - course ?pedagogy_mode - pedagogy_mode)
+    (partner_credential_available ?partner_credential - partner_credential)
+    (course_partner_credential_bound ?course - course ?partner_credential - partner_credential)
+    (facility_resource_available ?facility_resource - facility_resource)
+    (course_facility_bound ?course - course ?facility_resource - facility_resource)
+    (accreditation_record_available ?accreditation_record - accreditation_record)
+    (course_accreditation_bound ?course - course ?accreditation_record - accreditation_record)
+    (credit_transfer_document_available ?credit_transfer_document - credit_transfer_document)
+    (entity_linked_to_credit_transfer_document ?learner_plan - learner_plan ?credit_transfer_document - credit_transfer_document)
+    (major_track_ready_for_scheduling ?major_track - major_track)
+    (minor_track_ready_for_scheduling ?minor_track - minor_track)
+    (course_certification_processed ?course - course)
+  )
+  (:action onboard_learner_plan
+    :parameters (?learner_plan - learner_plan)
+    :precondition
+      (and
+        (not
+          (learner_plan_registered ?learner_plan)
+        )
+        (not
+          (conferral_granted ?learner_plan)
+        )
+      )
+    :effect (learner_plan_registered ?learner_plan)
+  )
+  (:action enroll_learner_plan_in_section
+    :parameters (?learner_plan - learner_plan ?course_section - course_section)
+    :precondition
+      (and
+        (learner_plan_registered ?learner_plan)
+        (not
+          (learner_enrolled ?learner_plan)
+        )
+        (course_section_available ?course_section)
+      )
+    :effect
+      (and
+        (learner_enrolled ?learner_plan)
+        (entity_assigned_to_section ?learner_plan ?course_section)
+        (not
+          (course_section_available ?course_section)
+        )
+      )
+  )
+  (:action assign_assessment_to_learner_plan
+    :parameters (?learner_plan - learner_plan ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (learner_plan_registered ?learner_plan)
+        (learner_enrolled ?learner_plan)
+        (assessment_instrument_available ?assessment_instrument)
+      )
+    :effect
+      (and
+        (entity_assigned_assessment_instrument ?learner_plan ?assessment_instrument)
+        (not
+          (assessment_instrument_available ?assessment_instrument)
+        )
+      )
+  )
+  (:action finalize_plan_assessment
+    :parameters (?learner_plan - learner_plan ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (learner_plan_registered ?learner_plan)
+        (learner_enrolled ?learner_plan)
+        (entity_assigned_assessment_instrument ?learner_plan ?assessment_instrument)
+        (not
+          (assessment_cleared ?learner_plan)
+        )
+      )
+    :effect (assessment_cleared ?learner_plan)
+  )
+  (:action release_assessment_from_plan
+    :parameters (?learner_plan - learner_plan ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (entity_assigned_assessment_instrument ?learner_plan ?assessment_instrument)
+      )
+    :effect
+      (and
+        (assessment_instrument_available ?assessment_instrument)
+        (not
+          (entity_assigned_assessment_instrument ?learner_plan ?assessment_instrument)
+        )
+      )
+  )
+  (:action assign_instructor_to_plan
+    :parameters (?learner_plan - learner_plan ?instructor - instructor)
+    :precondition
+      (and
+        (assessment_cleared ?learner_plan)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (instructor_assigned_to_entity ?learner_plan ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action release_instructor_from_plan
+    :parameters (?learner_plan - learner_plan ?instructor - instructor)
+    :precondition
+      (and
+        (instructor_assigned_to_entity ?learner_plan ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (instructor_assigned_to_entity ?learner_plan ?instructor)
+        )
+      )
+  )
+  (:action attach_facility_to_course
+    :parameters (?course - course ?facility_resource - facility_resource)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (facility_resource_available ?facility_resource)
+      )
+    :effect
+      (and
+        (course_facility_bound ?course ?facility_resource)
+        (not
+          (facility_resource_available ?facility_resource)
+        )
+      )
+  )
+  (:action detach_facility_from_course
+    :parameters (?course - course ?facility_resource - facility_resource)
+    :precondition
+      (and
+        (course_facility_bound ?course ?facility_resource)
+      )
+    :effect
+      (and
+        (facility_resource_available ?facility_resource)
+        (not
+          (course_facility_bound ?course ?facility_resource)
+        )
+      )
+  )
+  (:action attach_accreditation_to_course
+    :parameters (?course - course ?accreditation_record - accreditation_record)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (accreditation_record_available ?accreditation_record)
+      )
+    :effect
+      (and
+        (course_accreditation_bound ?course ?accreditation_record)
+        (not
+          (accreditation_record_available ?accreditation_record)
+        )
+      )
+  )
+  (:action detach_accreditation_from_course
+    :parameters (?course - course ?accreditation_record - accreditation_record)
+    :precondition
+      (and
+        (course_accreditation_bound ?course ?accreditation_record)
+      )
+    :effect
+      (and
+        (accreditation_record_available ?accreditation_record)
+        (not
+          (course_accreditation_bound ?course ?accreditation_record)
+        )
+      )
+  )
+  (:action reserve_semester_slot_for_track
+    :parameters (?major_track - major_track ?semester_slot - semester_slot ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (assessment_cleared ?major_track)
+        (entity_assigned_assessment_instrument ?major_track ?assessment_instrument)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (not
+          (semester_slot_reserved ?semester_slot)
+        )
+        (not
+          (semester_slot_allocated_for_elective ?semester_slot)
+        )
+      )
+    :effect (semester_slot_reserved ?semester_slot)
+  )
+  (:action confirm_instructor_and_mark_major_track
+    :parameters (?major_track - major_track ?semester_slot - semester_slot ?instructor - instructor)
+    :precondition
+      (and
+        (assessment_cleared ?major_track)
+        (instructor_assigned_to_entity ?major_track ?instructor)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (semester_slot_reserved ?semester_slot)
+        (not
+          (major_track_ready_for_scheduling ?major_track)
+        )
+      )
+    :effect
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (major_track_milestone_achieved ?major_track)
+      )
+  )
+  (:action consume_elective_unit_for_major_track
+    :parameters (?major_track - major_track ?semester_slot - semester_slot ?elective_credit_unit - elective_credit_unit)
+    :precondition
+      (and
+        (assessment_cleared ?major_track)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (elective_credit_available ?elective_credit_unit)
+        (not
+          (major_track_ready_for_scheduling ?major_track)
+        )
+      )
+    :effect
+      (and
+        (semester_slot_allocated_for_elective ?semester_slot)
+        (major_track_ready_for_scheduling ?major_track)
+        (major_track_consumed_elective ?major_track ?elective_credit_unit)
+        (not
+          (elective_credit_available ?elective_credit_unit)
+        )
+      )
+  )
+  (:action apply_elective_and_mark_major_track
+    :parameters (?major_track - major_track ?semester_slot - semester_slot ?assessment_instrument - assessment_instrument ?elective_credit_unit - elective_credit_unit)
+    :precondition
+      (and
+        (assessment_cleared ?major_track)
+        (entity_assigned_assessment_instrument ?major_track ?assessment_instrument)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (semester_slot_allocated_for_elective ?semester_slot)
+        (major_track_consumed_elective ?major_track ?elective_credit_unit)
+        (not
+          (major_track_milestone_achieved ?major_track)
+        )
+      )
+    :effect
+      (and
+        (semester_slot_reserved ?semester_slot)
+        (major_track_milestone_achieved ?major_track)
+        (elective_credit_available ?elective_credit_unit)
+        (not
+          (major_track_consumed_elective ?major_track ?elective_credit_unit)
+        )
+      )
+  )
+  (:action reserve_term_slot_for_minor_track
+    :parameters (?minor_track - minor_track ?term_slot - term_slot ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (assessment_cleared ?minor_track)
+        (entity_assigned_assessment_instrument ?minor_track ?assessment_instrument)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (not
+          (term_slot_reserved ?term_slot)
+        )
+        (not
+          (term_slot_allocated_for_elective ?term_slot)
+        )
+      )
+    :effect (term_slot_reserved ?term_slot)
+  )
+  (:action confirm_instructor_and_mark_minor_track
+    :parameters (?minor_track - minor_track ?term_slot - term_slot ?instructor - instructor)
+    :precondition
+      (and
+        (assessment_cleared ?minor_track)
+        (instructor_assigned_to_entity ?minor_track ?instructor)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (term_slot_reserved ?term_slot)
+        (not
+          (minor_track_ready_for_scheduling ?minor_track)
+        )
+      )
+    :effect
+      (and
+        (minor_track_ready_for_scheduling ?minor_track)
+        (minor_track_milestone_achieved ?minor_track)
+      )
+  )
+  (:action consume_elective_unit_for_minor_track
+    :parameters (?minor_track - minor_track ?term_slot - term_slot ?elective_credit_unit - elective_credit_unit)
+    :precondition
+      (and
+        (assessment_cleared ?minor_track)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (elective_credit_available ?elective_credit_unit)
+        (not
+          (minor_track_ready_for_scheduling ?minor_track)
+        )
+      )
+    :effect
+      (and
+        (term_slot_allocated_for_elective ?term_slot)
+        (minor_track_ready_for_scheduling ?minor_track)
+        (minor_track_consumed_elective ?minor_track ?elective_credit_unit)
+        (not
+          (elective_credit_available ?elective_credit_unit)
+        )
+      )
+  )
+  (:action apply_elective_and_mark_minor_track
+    :parameters (?minor_track - minor_track ?term_slot - term_slot ?assessment_instrument - assessment_instrument ?elective_credit_unit - elective_credit_unit)
+    :precondition
+      (and
+        (assessment_cleared ?minor_track)
+        (entity_assigned_assessment_instrument ?minor_track ?assessment_instrument)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (term_slot_allocated_for_elective ?term_slot)
+        (minor_track_consumed_elective ?minor_track ?elective_credit_unit)
+        (not
+          (minor_track_milestone_achieved ?minor_track)
+        )
+      )
+    :effect
+      (and
+        (term_slot_reserved ?term_slot)
+        (minor_track_milestone_achieved ?minor_track)
+        (elective_credit_available ?elective_credit_unit)
+        (not
+          (minor_track_consumed_elective ?minor_track ?elective_credit_unit)
+        )
+      )
+  )
+  (:action assemble_schedule_package
+    :parameters (?major_track - major_track ?minor_track - minor_track ?semester_slot - semester_slot ?term_slot - term_slot ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (minor_track_ready_for_scheduling ?minor_track)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (semester_slot_reserved ?semester_slot)
+        (term_slot_reserved ?term_slot)
+        (major_track_milestone_achieved ?major_track)
+        (minor_track_milestone_achieved ?minor_track)
+        (schedule_package_available ?schedule_package)
+      )
+    :effect
+      (and
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_includes_semester_slot ?schedule_package ?semester_slot)
+        (schedule_package_includes_term_slot ?schedule_package ?term_slot)
+        (not
+          (schedule_package_available ?schedule_package)
+        )
+      )
+  )
+  (:action assemble_schedule_package_with_semester_elective
+    :parameters (?major_track - major_track ?minor_track - minor_track ?semester_slot - semester_slot ?term_slot - term_slot ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (minor_track_ready_for_scheduling ?minor_track)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (semester_slot_allocated_for_elective ?semester_slot)
+        (term_slot_reserved ?term_slot)
+        (not
+          (major_track_milestone_achieved ?major_track)
+        )
+        (minor_track_milestone_achieved ?minor_track)
+        (schedule_package_available ?schedule_package)
+      )
+    :effect
+      (and
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_includes_semester_slot ?schedule_package ?semester_slot)
+        (schedule_package_includes_term_slot ?schedule_package ?term_slot)
+        (schedule_package_has_semester_elective_component ?schedule_package)
+        (not
+          (schedule_package_available ?schedule_package)
+        )
+      )
+  )
+  (:action assemble_schedule_package_with_term_elective
+    :parameters (?major_track - major_track ?minor_track - minor_track ?semester_slot - semester_slot ?term_slot - term_slot ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (minor_track_ready_for_scheduling ?minor_track)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (semester_slot_reserved ?semester_slot)
+        (term_slot_allocated_for_elective ?term_slot)
+        (major_track_milestone_achieved ?major_track)
+        (not
+          (minor_track_milestone_achieved ?minor_track)
+        )
+        (schedule_package_available ?schedule_package)
+      )
+    :effect
+      (and
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_includes_semester_slot ?schedule_package ?semester_slot)
+        (schedule_package_includes_term_slot ?schedule_package ?term_slot)
+        (schedule_package_has_term_elective_component ?schedule_package)
+        (not
+          (schedule_package_available ?schedule_package)
+        )
+      )
+  )
+  (:action assemble_schedule_package_with_both_electives
+    :parameters (?major_track - major_track ?minor_track - minor_track ?semester_slot - semester_slot ?term_slot - term_slot ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (minor_track_ready_for_scheduling ?minor_track)
+        (track_assigned_semester_slot ?major_track ?semester_slot)
+        (track_assigned_term_slot ?minor_track ?term_slot)
+        (semester_slot_allocated_for_elective ?semester_slot)
+        (term_slot_allocated_for_elective ?term_slot)
+        (not
+          (major_track_milestone_achieved ?major_track)
+        )
+        (not
+          (minor_track_milestone_achieved ?minor_track)
+        )
+        (schedule_package_available ?schedule_package)
+      )
+    :effect
+      (and
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_includes_semester_slot ?schedule_package ?semester_slot)
+        (schedule_package_includes_term_slot ?schedule_package ?term_slot)
+        (schedule_package_has_semester_elective_component ?schedule_package)
+        (schedule_package_has_term_elective_component ?schedule_package)
+        (not
+          (schedule_package_available ?schedule_package)
+        )
+      )
+  )
+  (:action activate_schedule_package_for_track
+    :parameters (?schedule_package - schedule_package ?major_track - major_track ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (schedule_package_materialized ?schedule_package)
+        (major_track_ready_for_scheduling ?major_track)
+        (entity_assigned_assessment_instrument ?major_track ?assessment_instrument)
+        (not
+          (schedule_package_activated ?schedule_package)
+        )
+      )
+    :effect (schedule_package_activated ?schedule_package)
+  )
+  (:action register_assessment_module_for_course
+    :parameters (?course - course ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (course_in_schedule_package ?course ?schedule_package)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_available ?assessment_module)
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_activated ?schedule_package)
+        (not
+          (assessment_module_registered ?assessment_module)
+        )
+      )
+    :effect
+      (and
+        (assessment_module_registered ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (not
+          (assessment_module_available ?assessment_module)
+        )
+      )
+  )
+  (:action finalize_course_module_registration
+    :parameters (?course - course ?assessment_module - assessment_module ?schedule_package - schedule_package ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_registered ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (entity_assigned_assessment_instrument ?course ?assessment_instrument)
+        (not
+          (schedule_package_has_semester_elective_component ?schedule_package)
+        )
+        (not
+          (course_ready_for_resource_allocation ?course)
+        )
+      )
+    :effect (course_ready_for_resource_allocation ?course)
+  )
+  (:action assign_pedagogy_mode_to_course
+    :parameters (?course - course ?pedagogy_mode - pedagogy_mode)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (pedagogy_mode_available ?pedagogy_mode)
+        (not
+          (pedagogy_mode_assigned ?course)
+        )
+      )
+    :effect
+      (and
+        (pedagogy_mode_assigned ?course)
+        (course_pedagogy_bound ?course ?pedagogy_mode)
+        (not
+          (pedagogy_mode_available ?pedagogy_mode)
+        )
+      )
+  )
+  (:action confirm_pedagogy_and_module_package
+    :parameters (?course - course ?assessment_module - assessment_module ?schedule_package - schedule_package ?assessment_instrument - assessment_instrument ?pedagogy_mode - pedagogy_mode)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_registered ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (entity_assigned_assessment_instrument ?course ?assessment_instrument)
+        (schedule_package_has_semester_elective_component ?schedule_package)
+        (pedagogy_mode_assigned ?course)
+        (course_pedagogy_bound ?course ?pedagogy_mode)
+        (not
+          (course_ready_for_resource_allocation ?course)
+        )
+      )
+    :effect
+      (and
+        (course_ready_for_resource_allocation ?course)
+        (pedagogy_mode_confirmed ?course)
+      )
+  )
+  (:action allocate_facility_and_confirm_course
+    :parameters (?course - course ?facility_resource - facility_resource ?instructor - instructor ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_ready_for_resource_allocation ?course)
+        (course_facility_bound ?course ?facility_resource)
+        (instructor_assigned_to_entity ?course ?instructor)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (not
+          (schedule_package_has_term_elective_component ?schedule_package)
+        )
+        (not
+          (course_resource_assignment_confirmed ?course)
+        )
+      )
+    :effect (course_resource_assignment_confirmed ?course)
+  )
+  (:action allocate_facility_and_confirm_course_alternate
+    :parameters (?course - course ?facility_resource - facility_resource ?instructor - instructor ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_ready_for_resource_allocation ?course)
+        (course_facility_bound ?course ?facility_resource)
+        (instructor_assigned_to_entity ?course ?instructor)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (schedule_package_has_term_elective_component ?schedule_package)
+        (not
+          (course_resource_assignment_confirmed ?course)
+        )
+      )
+    :effect (course_resource_assignment_confirmed ?course)
+  )
+  (:action bind_accreditation_and_mark_course_ready
+    :parameters (?course - course ?accreditation_record - accreditation_record ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_resource_assignment_confirmed ?course)
+        (course_accreditation_bound ?course ?accreditation_record)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (not
+          (schedule_package_has_semester_elective_component ?schedule_package)
+        )
+        (not
+          (schedule_package_has_term_elective_component ?schedule_package)
+        )
+        (not
+          (course_ready_for_finalization ?course)
+        )
+      )
+    :effect (course_ready_for_finalization ?course)
+  )
+  (:action bind_accreditation_and_confirm_course_variant
+    :parameters (?course - course ?accreditation_record - accreditation_record ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_resource_assignment_confirmed ?course)
+        (course_accreditation_bound ?course ?accreditation_record)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (schedule_package_has_semester_elective_component ?schedule_package)
+        (not
+          (schedule_package_has_term_elective_component ?schedule_package)
+        )
+        (not
+          (course_ready_for_finalization ?course)
+        )
+      )
+    :effect
+      (and
+        (course_ready_for_finalization ?course)
+        (course_quality_assurance_completed ?course)
+      )
+  )
+  (:action bind_accreditation_and_confirm_course_variant2
+    :parameters (?course - course ?accreditation_record - accreditation_record ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_resource_assignment_confirmed ?course)
+        (course_accreditation_bound ?course ?accreditation_record)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (not
+          (schedule_package_has_semester_elective_component ?schedule_package)
+        )
+        (schedule_package_has_term_elective_component ?schedule_package)
+        (not
+          (course_ready_for_finalization ?course)
+        )
+      )
+    :effect
+      (and
+        (course_ready_for_finalization ?course)
+        (course_quality_assurance_completed ?course)
+      )
+  )
+  (:action bind_accreditation_and_confirm_course_variant3
+    :parameters (?course - course ?accreditation_record - accreditation_record ?assessment_module - assessment_module ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (course_resource_assignment_confirmed ?course)
+        (course_accreditation_bound ?course ?accreditation_record)
+        (course_has_assessment_module ?course ?assessment_module)
+        (assessment_module_in_schedule_package ?assessment_module ?schedule_package)
+        (schedule_package_has_semester_elective_component ?schedule_package)
+        (schedule_package_has_term_elective_component ?schedule_package)
+        (not
+          (course_ready_for_finalization ?course)
+        )
+      )
+    :effect
+      (and
+        (course_ready_for_finalization ?course)
+        (course_quality_assurance_completed ?course)
+      )
+  )
+  (:action finalize_course_certification
+    :parameters (?course - course)
+    :precondition
+      (and
+        (course_ready_for_finalization ?course)
+        (not
+          (course_quality_assurance_completed ?course)
+        )
+        (not
+          (course_certification_processed ?course)
+        )
+      )
+    :effect
+      (and
+        (course_certification_processed ?course)
+        (conferral_eligibility ?course)
+      )
+  )
+  (:action assign_partner_credential_to_course
+    :parameters (?course - course ?partner_credential - partner_credential)
+    :precondition
+      (and
+        (course_ready_for_finalization ?course)
+        (course_quality_assurance_completed ?course)
+        (partner_credential_available ?partner_credential)
+      )
+    :effect
+      (and
+        (course_partner_credential_bound ?course ?partner_credential)
+        (not
+          (partner_credential_available ?partner_credential)
+        )
+      )
+  )
+  (:action certify_course_and_mark_conferral_ready
+    :parameters (?course - course ?major_track - major_track ?minor_track - minor_track ?assessment_instrument - assessment_instrument ?partner_credential - partner_credential)
+    :precondition
+      (and
+        (course_ready_for_finalization ?course)
+        (course_quality_assurance_completed ?course)
+        (course_partner_credential_bound ?course ?partner_credential)
+        (course_required_by_major_track ?course ?major_track)
+        (course_required_by_minor_track ?course ?minor_track)
+        (major_track_milestone_achieved ?major_track)
+        (minor_track_milestone_achieved ?minor_track)
+        (entity_assigned_assessment_instrument ?course ?assessment_instrument)
+        (not
+          (course_certification_ready ?course)
+        )
+      )
+    :effect (course_certification_ready ?course)
+  )
+  (:action finalize_course_and_mark_conferral
+    :parameters (?course - course)
+    :precondition
+      (and
+        (course_ready_for_finalization ?course)
+        (course_certification_ready ?course)
+        (not
+          (course_certification_processed ?course)
+        )
+      )
+    :effect
+      (and
+        (course_certification_processed ?course)
+        (conferral_eligibility ?course)
+      )
+  )
+  (:action assign_capstone_project_to_course
+    :parameters (?course - course ?capstone_project - capstone_project ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (assessment_cleared ?course)
+        (entity_assigned_assessment_instrument ?course ?assessment_instrument)
+        (capstone_project_available ?capstone_project)
+        (course_has_capstone_project ?course ?capstone_project)
+        (not
+          (capstone_assigned_to_course ?course)
+        )
+      )
+    :effect
+      (and
+        (capstone_assigned_to_course ?course)
+        (not
+          (capstone_project_available ?capstone_project)
+        )
+      )
+  )
+  (:action prepare_course_for_capstone_accreditation
+    :parameters (?course - course ?instructor - instructor)
+    :precondition
+      (and
+        (capstone_assigned_to_course ?course)
+        (instructor_assigned_to_entity ?course ?instructor)
+        (not
+          (capstone_ready_for_accreditation ?course)
+        )
+      )
+    :effect (capstone_ready_for_accreditation ?course)
+  )
+  (:action bind_capstone_accreditation_to_course
+    :parameters (?course - course ?accreditation_record - accreditation_record)
+    :precondition
+      (and
+        (capstone_ready_for_accreditation ?course)
+        (course_accreditation_bound ?course ?accreditation_record)
+        (not
+          (capstone_accreditation_bound ?course)
+        )
+      )
+    :effect (capstone_accreditation_bound ?course)
+  )
+  (:action finalize_capstone_and_mark_course_conferral
+    :parameters (?course - course)
+    :precondition
+      (and
+        (capstone_accreditation_bound ?course)
+        (not
+          (course_certification_processed ?course)
+        )
+      )
+    :effect
+      (and
+        (course_certification_processed ?course)
+        (conferral_eligibility ?course)
+      )
+  )
+  (:action award_conferral_to_major_track
+    :parameters (?major_track - major_track ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (major_track_ready_for_scheduling ?major_track)
+        (major_track_milestone_achieved ?major_track)
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_activated ?schedule_package)
+        (not
+          (conferral_eligibility ?major_track)
+        )
+      )
+    :effect (conferral_eligibility ?major_track)
+  )
+  (:action award_conferral_to_minor_track
+    :parameters (?minor_track - minor_track ?schedule_package - schedule_package)
+    :precondition
+      (and
+        (minor_track_ready_for_scheduling ?minor_track)
+        (minor_track_milestone_achieved ?minor_track)
+        (schedule_package_materialized ?schedule_package)
+        (schedule_package_activated ?schedule_package)
+        (not
+          (conferral_eligibility ?minor_track)
+        )
+      )
+    :effect (conferral_eligibility ?minor_track)
+  )
+  (:action apply_credit_transfer_to_plan
+    :parameters (?learner_plan - learner_plan ?credit_transfer_document - credit_transfer_document ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (conferral_eligibility ?learner_plan)
+        (entity_assigned_assessment_instrument ?learner_plan ?assessment_instrument)
+        (credit_transfer_document_available ?credit_transfer_document)
+        (not
+          (credit_transfer_applied ?learner_plan)
+        )
+      )
+    :effect
+      (and
+        (credit_transfer_applied ?learner_plan)
+        (entity_linked_to_credit_transfer_document ?learner_plan ?credit_transfer_document)
+        (not
+          (credit_transfer_document_available ?credit_transfer_document)
+        )
+      )
+  )
+  (:action apply_credit_transfer_and_grant_track_conferral
+    :parameters (?major_track - major_track ?course_section - course_section ?credit_transfer_document - credit_transfer_document)
+    :precondition
+      (and
+        (credit_transfer_applied ?major_track)
+        (entity_assigned_to_section ?major_track ?course_section)
+        (entity_linked_to_credit_transfer_document ?major_track ?credit_transfer_document)
+        (not
+          (conferral_granted ?major_track)
+        )
+      )
+    :effect
+      (and
+        (conferral_granted ?major_track)
+        (course_section_available ?course_section)
+        (credit_transfer_document_available ?credit_transfer_document)
+      )
+  )
+  (:action apply_credit_transfer_and_grant_minor_track_conferral
+    :parameters (?minor_track - minor_track ?course_section - course_section ?credit_transfer_document - credit_transfer_document)
+    :precondition
+      (and
+        (credit_transfer_applied ?minor_track)
+        (entity_assigned_to_section ?minor_track ?course_section)
+        (entity_linked_to_credit_transfer_document ?minor_track ?credit_transfer_document)
+        (not
+          (conferral_granted ?minor_track)
+        )
+      )
+    :effect
+      (and
+        (conferral_granted ?minor_track)
+        (course_section_available ?course_section)
+        (credit_transfer_document_available ?credit_transfer_document)
+      )
+  )
+  (:action apply_credit_transfer_and_grant_course_conferral
+    :parameters (?course - course ?course_section - course_section ?credit_transfer_document - credit_transfer_document)
+    :precondition
+      (and
+        (credit_transfer_applied ?course)
+        (entity_assigned_to_section ?course ?course_section)
+        (entity_linked_to_credit_transfer_document ?course ?credit_transfer_document)
+        (not
+          (conferral_granted ?course)
+        )
+      )
+    :effect
+      (and
+        (conferral_granted ?course)
+        (course_section_available ?course_section)
+        (credit_transfer_document_available ?credit_transfer_document)
+      )
+  )
+)

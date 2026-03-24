@@ -1,0 +1,937 @@
+(define (domain aggro_management_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object token_category - base_object target_category - base_object slot_category - base_object unit_category - base_object combat_unit - unit_category aggro_anchor - token_category enemy_target - token_category support_agent - token_category tactic_token - token_category buff_token - token_category taunt_charge - token_category special_device - token_category timed_trigger - token_category consumable_resource - target_category mechanic_objective - target_category priority_flag - target_category melee_threat_slot - slot_category ranged_threat_slot - slot_category engagement_marker - slot_category frontline_category - combat_unit controller_category - combat_unit tank_unit - frontline_category dps_unit - frontline_category encounter_coordinator - controller_category)
+
+  (:predicates
+    (unit_registered ?combat_unit - combat_unit)
+    (role_locked ?combat_unit - combat_unit)
+    (unit_has_aggro_anchor ?combat_unit - combat_unit)
+    (engagement_committed ?combat_unit - combat_unit)
+    (ready_for_engagement ?combat_unit - combat_unit)
+    (taunt_ready ?combat_unit - combat_unit)
+    (anchor_available ?aggro_anchor - aggro_anchor)
+    (unit_bound_to_aggro_anchor ?combat_unit - combat_unit ?aggro_anchor - aggro_anchor)
+    (enemy_target_available ?enemy_target - enemy_target)
+    (target_locked ?combat_unit - combat_unit ?enemy_target - enemy_target)
+    (support_available ?support_agent - support_agent)
+    (unit_assigned_support_agent ?combat_unit - combat_unit ?support_agent - support_agent)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (consumable_bound_to_tank ?tank_unit - tank_unit ?consumable_resource - consumable_resource)
+    (consumable_bound_to_dps ?dps_unit - dps_unit ?consumable_resource - consumable_resource)
+    (assigned_melee_slot ?tank_unit - tank_unit ?melee_threat_slot - melee_threat_slot)
+    (melee_slot_reserved ?melee_threat_slot - melee_threat_slot)
+    (melee_slot_boosted ?melee_threat_slot - melee_threat_slot)
+    (tank_slot_confirmed ?tank_unit - tank_unit)
+    (assigned_ranged_slot ?dps_unit - dps_unit ?ranged_threat_slot - ranged_threat_slot)
+    (ranged_slot_reserved ?ranged_threat_slot - ranged_threat_slot)
+    (ranged_slot_boosted ?ranged_threat_slot - ranged_threat_slot)
+    (dps_slot_confirmed ?dps_unit - dps_unit)
+    (marker_available ?engagement_marker - engagement_marker)
+    (marker_activated ?engagement_marker - engagement_marker)
+    (marker_linked_melee ?engagement_marker - engagement_marker ?melee_threat_slot - melee_threat_slot)
+    (marker_linked_ranged ?engagement_marker - engagement_marker ?ranged_threat_slot - ranged_threat_slot)
+    (marker_melee_boosted ?engagement_marker - engagement_marker)
+    (marker_ranged_boosted ?engagement_marker - engagement_marker)
+    (marker_finalized ?engagement_marker - engagement_marker)
+    (coordinator_bound_to_tank ?encounter_coordinator - encounter_coordinator ?tank_unit - tank_unit)
+    (coordinator_bound_to_dps ?encounter_coordinator - encounter_coordinator ?dps_unit - dps_unit)
+    (coordinator_bound_to_marker ?encounter_coordinator - encounter_coordinator ?engagement_marker - engagement_marker)
+    (mechanic_available ?mechanic_objective - mechanic_objective)
+    (coordinator_assigned_mechanic ?encounter_coordinator - encounter_coordinator ?mechanic_objective - mechanic_objective)
+    (mechanic_allocated ?mechanic_objective - mechanic_objective)
+    (mechanic_bound_to_marker ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    (coordinator_stage_one_ready ?encounter_coordinator - encounter_coordinator)
+    (coordinator_stage_two_ready ?encounter_coordinator - encounter_coordinator)
+    (coordinator_stage_three_ready ?encounter_coordinator - encounter_coordinator)
+    (coordinator_has_tactic ?encounter_coordinator - encounter_coordinator)
+    (coordinator_tactic_applied ?encounter_coordinator - encounter_coordinator)
+    (coordinator_ready_final ?encounter_coordinator - encounter_coordinator)
+    (coordinator_assembly_complete ?encounter_coordinator - encounter_coordinator)
+    (priority_flag_available ?priority_flag - priority_flag)
+    (coordinator_assigned_priority ?encounter_coordinator - encounter_coordinator ?priority_flag - priority_flag)
+    (coordinator_has_priority ?encounter_coordinator - encounter_coordinator)
+    (coordinator_priority_engaged ?encounter_coordinator - encounter_coordinator)
+    (coordinator_priority_finalized ?encounter_coordinator - encounter_coordinator)
+    (tactic_token_available ?tactic_token - tactic_token)
+    (coordinator_assigned_tactic ?encounter_coordinator - encounter_coordinator ?tactic_token - tactic_token)
+    (buff_token_available ?buff_token - buff_token)
+    (coordinator_assigned_buff ?encounter_coordinator - encounter_coordinator ?buff_token - buff_token)
+    (special_device_available ?special_device - special_device)
+    (coordinator_bound_to_device ?encounter_coordinator - encounter_coordinator ?special_device - special_device)
+    (timed_trigger_available ?timed_trigger - timed_trigger)
+    (coordinator_assigned_trigger ?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger)
+    (taunt_charge_available ?taunt_charge - taunt_charge)
+    (taunt_bound_to_unit ?combat_unit - combat_unit ?taunt_charge - taunt_charge)
+    (tank_ready ?tank_unit - tank_unit)
+    (dps_ready ?dps_unit - dps_unit)
+    (coordinator_committed ?encounter_coordinator - encounter_coordinator)
+  )
+  (:action register_unit
+    :parameters (?combat_unit - combat_unit)
+    :precondition
+      (and
+        (not
+          (unit_registered ?combat_unit)
+        )
+        (not
+          (engagement_committed ?combat_unit)
+        )
+      )
+    :effect (unit_registered ?combat_unit)
+  )
+  (:action assign_anchor_to_unit
+    :parameters (?combat_unit - combat_unit ?aggro_anchor - aggro_anchor)
+    :precondition
+      (and
+        (unit_registered ?combat_unit)
+        (not
+          (unit_has_aggro_anchor ?combat_unit)
+        )
+        (anchor_available ?aggro_anchor)
+      )
+    :effect
+      (and
+        (unit_has_aggro_anchor ?combat_unit)
+        (unit_bound_to_aggro_anchor ?combat_unit ?aggro_anchor)
+        (not
+          (anchor_available ?aggro_anchor)
+        )
+      )
+  )
+  (:action lock_target_for_unit
+    :parameters (?combat_unit - combat_unit ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (unit_registered ?combat_unit)
+        (unit_has_aggro_anchor ?combat_unit)
+        (enemy_target_available ?enemy_target)
+      )
+    :effect
+      (and
+        (target_locked ?combat_unit ?enemy_target)
+        (not
+          (enemy_target_available ?enemy_target)
+        )
+      )
+  )
+  (:action confirm_role_lock
+    :parameters (?combat_unit - combat_unit ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (unit_registered ?combat_unit)
+        (unit_has_aggro_anchor ?combat_unit)
+        (target_locked ?combat_unit ?enemy_target)
+        (not
+          (role_locked ?combat_unit)
+        )
+      )
+    :effect (role_locked ?combat_unit)
+  )
+  (:action release_target_from_unit
+    :parameters (?combat_unit - combat_unit ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (target_locked ?combat_unit ?enemy_target)
+      )
+    :effect
+      (and
+        (enemy_target_available ?enemy_target)
+        (not
+          (target_locked ?combat_unit ?enemy_target)
+        )
+      )
+  )
+  (:action assign_support_to_unit
+    :parameters (?combat_unit - combat_unit ?support_agent - support_agent)
+    :precondition
+      (and
+        (role_locked ?combat_unit)
+        (support_available ?support_agent)
+      )
+    :effect
+      (and
+        (unit_assigned_support_agent ?combat_unit ?support_agent)
+        (not
+          (support_available ?support_agent)
+        )
+      )
+  )
+  (:action release_support_from_unit
+    :parameters (?combat_unit - combat_unit ?support_agent - support_agent)
+    :precondition
+      (and
+        (unit_assigned_support_agent ?combat_unit ?support_agent)
+      )
+    :effect
+      (and
+        (support_available ?support_agent)
+        (not
+          (unit_assigned_support_agent ?combat_unit ?support_agent)
+        )
+      )
+  )
+  (:action attach_device_to_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?special_device - special_device)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (special_device_available ?special_device)
+      )
+    :effect
+      (and
+        (coordinator_bound_to_device ?encounter_coordinator ?special_device)
+        (not
+          (special_device_available ?special_device)
+        )
+      )
+  )
+  (:action detach_device_from_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?special_device - special_device)
+    :precondition
+      (and
+        (coordinator_bound_to_device ?encounter_coordinator ?special_device)
+      )
+    :effect
+      (and
+        (special_device_available ?special_device)
+        (not
+          (coordinator_bound_to_device ?encounter_coordinator ?special_device)
+        )
+      )
+  )
+  (:action attach_timed_trigger_to_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (timed_trigger_available ?timed_trigger)
+      )
+    :effect
+      (and
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (not
+          (timed_trigger_available ?timed_trigger)
+        )
+      )
+  )
+  (:action detach_timed_trigger_from_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger)
+    :precondition
+      (and
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+      )
+    :effect
+      (and
+        (timed_trigger_available ?timed_trigger)
+        (not
+          (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        )
+      )
+  )
+  (:action reserve_melee_slot
+    :parameters (?tank_unit - tank_unit ?melee_threat_slot - melee_threat_slot ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (role_locked ?tank_unit)
+        (target_locked ?tank_unit ?enemy_target)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (not
+          (melee_slot_reserved ?melee_threat_slot)
+        )
+        (not
+          (melee_slot_boosted ?melee_threat_slot)
+        )
+      )
+    :effect (melee_slot_reserved ?melee_threat_slot)
+  )
+  (:action confirm_melee_slot_with_support
+    :parameters (?tank_unit - tank_unit ?melee_threat_slot - melee_threat_slot ?support_agent - support_agent)
+    :precondition
+      (and
+        (role_locked ?tank_unit)
+        (unit_assigned_support_agent ?tank_unit ?support_agent)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (melee_slot_reserved ?melee_threat_slot)
+        (not
+          (tank_ready ?tank_unit)
+        )
+      )
+    :effect
+      (and
+        (tank_ready ?tank_unit)
+        (tank_slot_confirmed ?tank_unit)
+      )
+  )
+  (:action boost_melee_slot_with_consumable
+    :parameters (?tank_unit - tank_unit ?melee_threat_slot - melee_threat_slot ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (role_locked ?tank_unit)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (tank_ready ?tank_unit)
+        )
+      )
+    :effect
+      (and
+        (melee_slot_boosted ?melee_threat_slot)
+        (tank_ready ?tank_unit)
+        (consumable_bound_to_tank ?tank_unit ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_melee_slot_after_boost
+    :parameters (?tank_unit - tank_unit ?melee_threat_slot - melee_threat_slot ?enemy_target - enemy_target ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (role_locked ?tank_unit)
+        (target_locked ?tank_unit ?enemy_target)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (melee_slot_boosted ?melee_threat_slot)
+        (consumable_bound_to_tank ?tank_unit ?consumable_resource)
+        (not
+          (tank_slot_confirmed ?tank_unit)
+        )
+      )
+    :effect
+      (and
+        (melee_slot_reserved ?melee_threat_slot)
+        (tank_slot_confirmed ?tank_unit)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumable_bound_to_tank ?tank_unit ?consumable_resource)
+        )
+      )
+  )
+  (:action reserve_ranged_slot
+    :parameters (?dps_unit - dps_unit ?ranged_threat_slot - ranged_threat_slot ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (role_locked ?dps_unit)
+        (target_locked ?dps_unit ?enemy_target)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (not
+          (ranged_slot_reserved ?ranged_threat_slot)
+        )
+        (not
+          (ranged_slot_boosted ?ranged_threat_slot)
+        )
+      )
+    :effect (ranged_slot_reserved ?ranged_threat_slot)
+  )
+  (:action confirm_ranged_slot_with_support
+    :parameters (?dps_unit - dps_unit ?ranged_threat_slot - ranged_threat_slot ?support_agent - support_agent)
+    :precondition
+      (and
+        (role_locked ?dps_unit)
+        (unit_assigned_support_agent ?dps_unit ?support_agent)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (ranged_slot_reserved ?ranged_threat_slot)
+        (not
+          (dps_ready ?dps_unit)
+        )
+      )
+    :effect
+      (and
+        (dps_ready ?dps_unit)
+        (dps_slot_confirmed ?dps_unit)
+      )
+  )
+  (:action boost_ranged_slot_with_consumable
+    :parameters (?dps_unit - dps_unit ?ranged_threat_slot - ranged_threat_slot ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (role_locked ?dps_unit)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (dps_ready ?dps_unit)
+        )
+      )
+    :effect
+      (and
+        (ranged_slot_boosted ?ranged_threat_slot)
+        (dps_ready ?dps_unit)
+        (consumable_bound_to_dps ?dps_unit ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_ranged_slot_after_boost
+    :parameters (?dps_unit - dps_unit ?ranged_threat_slot - ranged_threat_slot ?enemy_target - enemy_target ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (role_locked ?dps_unit)
+        (target_locked ?dps_unit ?enemy_target)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (ranged_slot_boosted ?ranged_threat_slot)
+        (consumable_bound_to_dps ?dps_unit ?consumable_resource)
+        (not
+          (dps_slot_confirmed ?dps_unit)
+        )
+      )
+    :effect
+      (and
+        (ranged_slot_reserved ?ranged_threat_slot)
+        (dps_slot_confirmed ?dps_unit)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumable_bound_to_dps ?dps_unit ?consumable_resource)
+        )
+      )
+  )
+  (:action create_engagement_marker_standard
+    :parameters (?tank_unit - tank_unit ?dps_unit - dps_unit ?melee_threat_slot - melee_threat_slot ?ranged_threat_slot - ranged_threat_slot ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (tank_ready ?tank_unit)
+        (dps_ready ?dps_unit)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (melee_slot_reserved ?melee_threat_slot)
+        (ranged_slot_reserved ?ranged_threat_slot)
+        (tank_slot_confirmed ?tank_unit)
+        (dps_slot_confirmed ?dps_unit)
+        (marker_available ?engagement_marker)
+      )
+    :effect
+      (and
+        (marker_activated ?engagement_marker)
+        (marker_linked_melee ?engagement_marker ?melee_threat_slot)
+        (marker_linked_ranged ?engagement_marker ?ranged_threat_slot)
+        (not
+          (marker_available ?engagement_marker)
+        )
+      )
+  )
+  (:action create_engagement_marker_melee_boost
+    :parameters (?tank_unit - tank_unit ?dps_unit - dps_unit ?melee_threat_slot - melee_threat_slot ?ranged_threat_slot - ranged_threat_slot ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (tank_ready ?tank_unit)
+        (dps_ready ?dps_unit)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (melee_slot_boosted ?melee_threat_slot)
+        (ranged_slot_reserved ?ranged_threat_slot)
+        (not
+          (tank_slot_confirmed ?tank_unit)
+        )
+        (dps_slot_confirmed ?dps_unit)
+        (marker_available ?engagement_marker)
+      )
+    :effect
+      (and
+        (marker_activated ?engagement_marker)
+        (marker_linked_melee ?engagement_marker ?melee_threat_slot)
+        (marker_linked_ranged ?engagement_marker ?ranged_threat_slot)
+        (marker_melee_boosted ?engagement_marker)
+        (not
+          (marker_available ?engagement_marker)
+        )
+      )
+  )
+  (:action create_engagement_marker_ranged_boost
+    :parameters (?tank_unit - tank_unit ?dps_unit - dps_unit ?melee_threat_slot - melee_threat_slot ?ranged_threat_slot - ranged_threat_slot ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (tank_ready ?tank_unit)
+        (dps_ready ?dps_unit)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (melee_slot_reserved ?melee_threat_slot)
+        (ranged_slot_boosted ?ranged_threat_slot)
+        (tank_slot_confirmed ?tank_unit)
+        (not
+          (dps_slot_confirmed ?dps_unit)
+        )
+        (marker_available ?engagement_marker)
+      )
+    :effect
+      (and
+        (marker_activated ?engagement_marker)
+        (marker_linked_melee ?engagement_marker ?melee_threat_slot)
+        (marker_linked_ranged ?engagement_marker ?ranged_threat_slot)
+        (marker_ranged_boosted ?engagement_marker)
+        (not
+          (marker_available ?engagement_marker)
+        )
+      )
+  )
+  (:action create_engagement_marker_both_boosts
+    :parameters (?tank_unit - tank_unit ?dps_unit - dps_unit ?melee_threat_slot - melee_threat_slot ?ranged_threat_slot - ranged_threat_slot ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (tank_ready ?tank_unit)
+        (dps_ready ?dps_unit)
+        (assigned_melee_slot ?tank_unit ?melee_threat_slot)
+        (assigned_ranged_slot ?dps_unit ?ranged_threat_slot)
+        (melee_slot_boosted ?melee_threat_slot)
+        (ranged_slot_boosted ?ranged_threat_slot)
+        (not
+          (tank_slot_confirmed ?tank_unit)
+        )
+        (not
+          (dps_slot_confirmed ?dps_unit)
+        )
+        (marker_available ?engagement_marker)
+      )
+    :effect
+      (and
+        (marker_activated ?engagement_marker)
+        (marker_linked_melee ?engagement_marker ?melee_threat_slot)
+        (marker_linked_ranged ?engagement_marker ?ranged_threat_slot)
+        (marker_melee_boosted ?engagement_marker)
+        (marker_ranged_boosted ?engagement_marker)
+        (not
+          (marker_available ?engagement_marker)
+        )
+      )
+  )
+  (:action finalize_engagement_marker
+    :parameters (?engagement_marker - engagement_marker ?tank_unit - tank_unit ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (marker_activated ?engagement_marker)
+        (tank_ready ?tank_unit)
+        (target_locked ?tank_unit ?enemy_target)
+        (not
+          (marker_finalized ?engagement_marker)
+        )
+      )
+    :effect (marker_finalized ?engagement_marker)
+  )
+  (:action allocate_mechanic_to_marker
+    :parameters (?encounter_coordinator - encounter_coordinator ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (coordinator_bound_to_marker ?encounter_coordinator ?engagement_marker)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_available ?mechanic_objective)
+        (marker_activated ?engagement_marker)
+        (marker_finalized ?engagement_marker)
+        (not
+          (mechanic_allocated ?mechanic_objective)
+        )
+      )
+    :effect
+      (and
+        (mechanic_allocated ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (not
+          (mechanic_available ?mechanic_objective)
+        )
+      )
+  )
+  (:action coordinator_prepare_stage_one
+    :parameters (?encounter_coordinator - encounter_coordinator ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_allocated ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (target_locked ?encounter_coordinator ?enemy_target)
+        (not
+          (marker_melee_boosted ?engagement_marker)
+        )
+        (not
+          (coordinator_stage_one_ready ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_stage_one_ready ?encounter_coordinator)
+  )
+  (:action assign_tactic_to_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (tactic_token_available ?tactic_token)
+        (not
+          (coordinator_has_tactic ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_has_tactic ?encounter_coordinator)
+        (coordinator_assigned_tactic ?encounter_coordinator ?tactic_token)
+        (not
+          (tactic_token_available ?tactic_token)
+        )
+      )
+  )
+  (:action coordinator_apply_tactic_to_marker
+    :parameters (?encounter_coordinator - encounter_coordinator ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker ?enemy_target - enemy_target ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_allocated ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (target_locked ?encounter_coordinator ?enemy_target)
+        (marker_melee_boosted ?engagement_marker)
+        (coordinator_has_tactic ?encounter_coordinator)
+        (coordinator_assigned_tactic ?encounter_coordinator ?tactic_token)
+        (not
+          (coordinator_stage_one_ready ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_stage_one_ready ?encounter_coordinator)
+        (coordinator_tactic_applied ?encounter_coordinator)
+      )
+  )
+  (:action coordinator_lock_device_for_marker
+    :parameters (?encounter_coordinator - encounter_coordinator ?special_device - special_device ?support_agent - support_agent ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_one_ready ?encounter_coordinator)
+        (coordinator_bound_to_device ?encounter_coordinator ?special_device)
+        (unit_assigned_support_agent ?encounter_coordinator ?support_agent)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (not
+          (marker_ranged_boosted ?engagement_marker)
+        )
+        (not
+          (coordinator_stage_two_ready ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_stage_two_ready ?encounter_coordinator)
+  )
+  (:action coordinator_activate_device_on_marker
+    :parameters (?encounter_coordinator - encounter_coordinator ?special_device - special_device ?support_agent - support_agent ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_one_ready ?encounter_coordinator)
+        (coordinator_bound_to_device ?encounter_coordinator ?special_device)
+        (unit_assigned_support_agent ?encounter_coordinator ?support_agent)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (marker_ranged_boosted ?engagement_marker)
+        (not
+          (coordinator_stage_two_ready ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_stage_two_ready ?encounter_coordinator)
+  )
+  (:action coordinator_arm_trigger
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_two_ready ?encounter_coordinator)
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (not
+          (marker_melee_boosted ?engagement_marker)
+        )
+        (not
+          (marker_ranged_boosted ?engagement_marker)
+        )
+        (not
+          (coordinator_stage_three_ready ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_stage_three_ready ?encounter_coordinator)
+  )
+  (:action coordinator_arm_trigger_with_melee_boost
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_two_ready ?encounter_coordinator)
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (marker_melee_boosted ?engagement_marker)
+        (not
+          (marker_ranged_boosted ?engagement_marker)
+        )
+        (not
+          (coordinator_stage_three_ready ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_ready_final ?encounter_coordinator)
+      )
+  )
+  (:action coordinator_arm_trigger_with_ranged_boost
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_two_ready ?encounter_coordinator)
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (not
+          (marker_melee_boosted ?engagement_marker)
+        )
+        (marker_ranged_boosted ?engagement_marker)
+        (not
+          (coordinator_stage_three_ready ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_ready_final ?encounter_coordinator)
+      )
+  )
+  (:action coordinator_arm_trigger_with_both_boosts
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger ?mechanic_objective - mechanic_objective ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (coordinator_stage_two_ready ?encounter_coordinator)
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (coordinator_assigned_mechanic ?encounter_coordinator ?mechanic_objective)
+        (mechanic_bound_to_marker ?mechanic_objective ?engagement_marker)
+        (marker_melee_boosted ?engagement_marker)
+        (marker_ranged_boosted ?engagement_marker)
+        (not
+          (coordinator_stage_three_ready ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_ready_final ?encounter_coordinator)
+      )
+  )
+  (:action finalize_coordinator_preparation_basic
+    :parameters (?encounter_coordinator - encounter_coordinator)
+    :precondition
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (not
+          (coordinator_ready_final ?encounter_coordinator)
+        )
+        (not
+          (coordinator_committed ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?encounter_coordinator)
+        (ready_for_engagement ?encounter_coordinator)
+      )
+  )
+  (:action assign_buff_to_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?buff_token - buff_token)
+    :precondition
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_ready_final ?encounter_coordinator)
+        (buff_token_available ?buff_token)
+      )
+    :effect
+      (and
+        (coordinator_assigned_buff ?encounter_coordinator ?buff_token)
+        (not
+          (buff_token_available ?buff_token)
+        )
+      )
+  )
+  (:action coordinator_assemble_engagement
+    :parameters (?encounter_coordinator - encounter_coordinator ?tank_unit - tank_unit ?dps_unit - dps_unit ?enemy_target - enemy_target ?buff_token - buff_token)
+    :precondition
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_ready_final ?encounter_coordinator)
+        (coordinator_assigned_buff ?encounter_coordinator ?buff_token)
+        (coordinator_bound_to_tank ?encounter_coordinator ?tank_unit)
+        (coordinator_bound_to_dps ?encounter_coordinator ?dps_unit)
+        (tank_slot_confirmed ?tank_unit)
+        (dps_slot_confirmed ?dps_unit)
+        (target_locked ?encounter_coordinator ?enemy_target)
+        (not
+          (coordinator_assembly_complete ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_assembly_complete ?encounter_coordinator)
+  )
+  (:action finalize_coordinator_preparation_with_assembly
+    :parameters (?encounter_coordinator - encounter_coordinator)
+    :precondition
+      (and
+        (coordinator_stage_three_ready ?encounter_coordinator)
+        (coordinator_assembly_complete ?encounter_coordinator)
+        (not
+          (coordinator_committed ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?encounter_coordinator)
+        (ready_for_engagement ?encounter_coordinator)
+      )
+  )
+  (:action assign_priority_flag_to_coordinator
+    :parameters (?encounter_coordinator - encounter_coordinator ?priority_flag - priority_flag ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (role_locked ?encounter_coordinator)
+        (target_locked ?encounter_coordinator ?enemy_target)
+        (priority_flag_available ?priority_flag)
+        (coordinator_assigned_priority ?encounter_coordinator ?priority_flag)
+        (not
+          (coordinator_has_priority ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_has_priority ?encounter_coordinator)
+        (not
+          (priority_flag_available ?priority_flag)
+        )
+      )
+  )
+  (:action activate_priority_flag
+    :parameters (?encounter_coordinator - encounter_coordinator ?support_agent - support_agent)
+    :precondition
+      (and
+        (coordinator_has_priority ?encounter_coordinator)
+        (unit_assigned_support_agent ?encounter_coordinator ?support_agent)
+        (not
+          (coordinator_priority_engaged ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_priority_engaged ?encounter_coordinator)
+  )
+  (:action finalize_priority_flag_with_trigger
+    :parameters (?encounter_coordinator - encounter_coordinator ?timed_trigger - timed_trigger)
+    :precondition
+      (and
+        (coordinator_priority_engaged ?encounter_coordinator)
+        (coordinator_assigned_trigger ?encounter_coordinator ?timed_trigger)
+        (not
+          (coordinator_priority_finalized ?encounter_coordinator)
+        )
+      )
+    :effect (coordinator_priority_finalized ?encounter_coordinator)
+  )
+  (:action finalize_priority_and_mark_ready
+    :parameters (?encounter_coordinator - encounter_coordinator)
+    :precondition
+      (and
+        (coordinator_priority_finalized ?encounter_coordinator)
+        (not
+          (coordinator_committed ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?encounter_coordinator)
+        (ready_for_engagement ?encounter_coordinator)
+      )
+  )
+  (:action mark_tank_ready_for_engagement
+    :parameters (?tank_unit - tank_unit ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (tank_ready ?tank_unit)
+        (tank_slot_confirmed ?tank_unit)
+        (marker_activated ?engagement_marker)
+        (marker_finalized ?engagement_marker)
+        (not
+          (ready_for_engagement ?tank_unit)
+        )
+      )
+    :effect (ready_for_engagement ?tank_unit)
+  )
+  (:action mark_dps_ready_for_engagement
+    :parameters (?dps_unit - dps_unit ?engagement_marker - engagement_marker)
+    :precondition
+      (and
+        (dps_ready ?dps_unit)
+        (dps_slot_confirmed ?dps_unit)
+        (marker_activated ?engagement_marker)
+        (marker_finalized ?engagement_marker)
+        (not
+          (ready_for_engagement ?dps_unit)
+        )
+      )
+    :effect (ready_for_engagement ?dps_unit)
+  )
+  (:action bind_taunt_charge_to_unit
+    :parameters (?combat_unit - combat_unit ?taunt_charge - taunt_charge ?enemy_target - enemy_target)
+    :precondition
+      (and
+        (ready_for_engagement ?combat_unit)
+        (target_locked ?combat_unit ?enemy_target)
+        (taunt_charge_available ?taunt_charge)
+        (not
+          (taunt_ready ?combat_unit)
+        )
+      )
+    :effect
+      (and
+        (taunt_ready ?combat_unit)
+        (taunt_bound_to_unit ?combat_unit ?taunt_charge)
+        (not
+          (taunt_charge_available ?taunt_charge)
+        )
+      )
+  )
+  (:action commit_tank_engagement
+    :parameters (?tank_unit - tank_unit ?aggro_anchor - aggro_anchor ?taunt_charge - taunt_charge)
+    :precondition
+      (and
+        (taunt_ready ?tank_unit)
+        (unit_bound_to_aggro_anchor ?tank_unit ?aggro_anchor)
+        (taunt_bound_to_unit ?tank_unit ?taunt_charge)
+        (not
+          (engagement_committed ?tank_unit)
+        )
+      )
+    :effect
+      (and
+        (engagement_committed ?tank_unit)
+        (anchor_available ?aggro_anchor)
+        (taunt_charge_available ?taunt_charge)
+      )
+  )
+  (:action commit_dps_engagement
+    :parameters (?dps_unit - dps_unit ?aggro_anchor - aggro_anchor ?taunt_charge - taunt_charge)
+    :precondition
+      (and
+        (taunt_ready ?dps_unit)
+        (unit_bound_to_aggro_anchor ?dps_unit ?aggro_anchor)
+        (taunt_bound_to_unit ?dps_unit ?taunt_charge)
+        (not
+          (engagement_committed ?dps_unit)
+        )
+      )
+    :effect
+      (and
+        (engagement_committed ?dps_unit)
+        (anchor_available ?aggro_anchor)
+        (taunt_charge_available ?taunt_charge)
+      )
+  )
+  (:action commit_coordinator_engagement
+    :parameters (?encounter_coordinator - encounter_coordinator ?aggro_anchor - aggro_anchor ?taunt_charge - taunt_charge)
+    :precondition
+      (and
+        (taunt_ready ?encounter_coordinator)
+        (unit_bound_to_aggro_anchor ?encounter_coordinator ?aggro_anchor)
+        (taunt_bound_to_unit ?encounter_coordinator ?taunt_charge)
+        (not
+          (engagement_committed ?encounter_coordinator)
+        )
+      )
+    :effect
+      (and
+        (engagement_committed ?encounter_coordinator)
+        (anchor_available ?aggro_anchor)
+        (taunt_charge_available ?taunt_charge)
+      )
+  )
+)

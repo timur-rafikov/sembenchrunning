@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain collectible_route_under_time_constraints)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_root - object item_group - object route_group - object location_root - object location - location_root collector_unit - entity_root movement_token - entity_root gate_key - entity_root bonus_node - entity_root upgrade_module - entity_root time_credit - entity_root modifier_item - entity_root condition_marker - entity_root consumable_resource - item_group scannable_subzone - item_group clue_token - item_group route_branch_a - route_group route_branch_b - route_group checkpoint_hub - route_group site_subgroup - location objective_subgroup - location primary_site - site_subgroup secondary_site - site_subgroup objective_site - objective_subgroup)
+  (:predicates
+    (site_discovered ?location - location)
+    (site_activated ?location - location)
+    (site_assigned ?location - location)
+    (site_collected ?location - location)
+    (ready_for_collection ?location - location)
+    (collection_in_progress ?location - location)
+    (collector_available ?collector_unit - collector_unit)
+    (collector_assigned_to_site ?location - location ?collector_unit - collector_unit)
+    (movement_token_available ?movement_token - movement_token)
+    (movement_token_attached_to_site ?location - location ?movement_token - movement_token)
+    (gate_key_available ?gate_key - gate_key)
+    (gate_key_attached_to_site ?location - location ?gate_key - gate_key)
+    (consumable_available ?consumable - consumable_resource)
+    (primary_site_tagged_with_consumable ?primary_site - primary_site ?consumable - consumable_resource)
+    (secondary_site_tagged_with_consumable ?secondary_site - secondary_site ?consumable - consumable_resource)
+    (primary_site_has_branch_a ?primary_site - primary_site ?branch_a - route_branch_a)
+    (branch_a_flag ?branch_a - route_branch_a)
+    (branch_a_tagged ?branch_a - route_branch_a)
+    (primary_site_ready_for_hub ?primary_site - primary_site)
+    (secondary_site_has_branch_b ?secondary_site - secondary_site ?branch_b - route_branch_b)
+    (branch_b_flag ?branch_b - route_branch_b)
+    (branch_b_tagged ?branch_b - route_branch_b)
+    (secondary_site_ready_for_hub ?secondary_site - secondary_site)
+    (checkpoint_available ?checkpoint - checkpoint_hub)
+    (checkpoint_assembled ?checkpoint - checkpoint_hub)
+    (checkpoint_records_branch_a ?checkpoint - checkpoint_hub ?branch_a - route_branch_a)
+    (checkpoint_records_branch_b ?checkpoint - checkpoint_hub ?branch_b - route_branch_b)
+    (checkpoint_variant_a ?checkpoint - checkpoint_hub)
+    (checkpoint_variant_b ?checkpoint - checkpoint_hub)
+    (checkpoint_primed ?checkpoint - checkpoint_hub)
+    (objective_has_primary_site ?objective - objective_site ?primary_site - primary_site)
+    (objective_has_secondary_site ?objective - objective_site ?secondary_site - secondary_site)
+    (objective_linked_to_checkpoint ?objective - objective_site ?checkpoint - checkpoint_hub)
+    (subzone_available ?subzone - scannable_subzone)
+    (objective_has_subzone ?objective - objective_site ?subzone - scannable_subzone)
+    (subzone_scanned ?subzone - scannable_subzone)
+    (subzone_scanned_for_checkpoint ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    (objective_ready_for_modifiers ?objective - objective_site)
+    (objective_modifier_applied ?objective - objective_site)
+    (objective_condition_met ?objective - objective_site)
+    (objective_has_active_bonus ?objective - objective_site)
+    (objective_bonus_applied ?objective - objective_site)
+    (objective_upgraded ?objective - objective_site)
+    (objective_processed ?objective - objective_site)
+    (clue_available ?clue_token - clue_token)
+    (objective_has_clue ?objective - objective_site ?clue_token - clue_token)
+    (objective_clue_registered ?objective - objective_site)
+    (objective_clue_handled ?objective - objective_site)
+    (objective_clue_finalized ?objective - objective_site)
+    (bonus_available ?bonus_node - bonus_node)
+    (objective_linked_to_bonus ?objective - objective_site ?bonus_node - bonus_node)
+    (upgrade_available ?upgrade_module - upgrade_module)
+    (objective_has_upgrade ?objective - objective_site ?upgrade_module - upgrade_module)
+    (modifier_available ?modifier_item - modifier_item)
+    (objective_has_modifier ?objective - objective_site ?modifier_item - modifier_item)
+    (condition_marker_available ?condition_marker - condition_marker)
+    (objective_has_condition_marker ?objective - objective_site ?condition_marker - condition_marker)
+    (time_credit_available ?time_credit - time_credit)
+    (site_time_credit_assigned ?location - location ?time_credit - time_credit)
+    (primary_site_flag_present ?primary_site - primary_site)
+    (secondary_site_flag_present ?secondary_site - secondary_site)
+    (objective_finalized ?objective - objective_site)
+  )
+  (:action discover_site
+    :parameters (?location - location)
+    :precondition
+      (and
+        (not
+          (site_discovered ?location)
+        )
+        (not
+          (site_collected ?location)
+        )
+      )
+    :effect (site_discovered ?location)
+  )
+  (:action assign_collector_to_site
+    :parameters (?location - location ?collector_unit - collector_unit)
+    :precondition
+      (and
+        (site_discovered ?location)
+        (not
+          (site_assigned ?location)
+        )
+        (collector_available ?collector_unit)
+      )
+    :effect
+      (and
+        (site_assigned ?location)
+        (collector_assigned_to_site ?location ?collector_unit)
+        (not
+          (collector_available ?collector_unit)
+        )
+      )
+  )
+  (:action attach_movement_token_to_site
+    :parameters (?location - location ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_discovered ?location)
+        (site_assigned ?location)
+        (movement_token_available ?movement_token)
+      )
+    :effect
+      (and
+        (movement_token_attached_to_site ?location ?movement_token)
+        (not
+          (movement_token_available ?movement_token)
+        )
+      )
+  )
+  (:action activate_site
+    :parameters (?location - location ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_discovered ?location)
+        (site_assigned ?location)
+        (movement_token_attached_to_site ?location ?movement_token)
+        (not
+          (site_activated ?location)
+        )
+      )
+    :effect (site_activated ?location)
+  )
+  (:action return_movement_token
+    :parameters (?location - location ?movement_token - movement_token)
+    :precondition
+      (and
+        (movement_token_attached_to_site ?location ?movement_token)
+      )
+    :effect
+      (and
+        (movement_token_available ?movement_token)
+        (not
+          (movement_token_attached_to_site ?location ?movement_token)
+        )
+      )
+  )
+  (:action attach_gate_key_to_site
+    :parameters (?location - location ?gate_key - gate_key)
+    :precondition
+      (and
+        (site_activated ?location)
+        (gate_key_available ?gate_key)
+      )
+    :effect
+      (and
+        (gate_key_attached_to_site ?location ?gate_key)
+        (not
+          (gate_key_available ?gate_key)
+        )
+      )
+  )
+  (:action detach_gate_key_from_site
+    :parameters (?location - location ?gate_key - gate_key)
+    :precondition
+      (and
+        (gate_key_attached_to_site ?location ?gate_key)
+      )
+    :effect
+      (and
+        (gate_key_available ?gate_key)
+        (not
+          (gate_key_attached_to_site ?location ?gate_key)
+        )
+      )
+  )
+  (:action attach_modifier_to_objective
+    :parameters (?objective - objective_site ?modifier_item - modifier_item)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (modifier_available ?modifier_item)
+      )
+    :effect
+      (and
+        (objective_has_modifier ?objective ?modifier_item)
+        (not
+          (modifier_available ?modifier_item)
+        )
+      )
+  )
+  (:action detach_modifier_from_objective
+    :parameters (?objective - objective_site ?modifier_item - modifier_item)
+    :precondition
+      (and
+        (objective_has_modifier ?objective ?modifier_item)
+      )
+    :effect
+      (and
+        (modifier_available ?modifier_item)
+        (not
+          (objective_has_modifier ?objective ?modifier_item)
+        )
+      )
+  )
+  (:action attach_condition_to_objective
+    :parameters (?objective - objective_site ?condition_marker - condition_marker)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (condition_marker_available ?condition_marker)
+      )
+    :effect
+      (and
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (not
+          (condition_marker_available ?condition_marker)
+        )
+      )
+  )
+  (:action detach_condition_from_objective
+    :parameters (?objective - objective_site ?condition_marker - condition_marker)
+    :precondition
+      (and
+        (objective_has_condition_marker ?objective ?condition_marker)
+      )
+    :effect
+      (and
+        (condition_marker_available ?condition_marker)
+        (not
+          (objective_has_condition_marker ?objective ?condition_marker)
+        )
+      )
+  )
+  (:action flag_primary_branch_a
+    :parameters (?primary_site - primary_site ?branch_a - route_branch_a ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_activated ?primary_site)
+        (movement_token_attached_to_site ?primary_site ?movement_token)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (not
+          (branch_a_flag ?branch_a)
+        )
+        (not
+          (branch_a_tagged ?branch_a)
+        )
+      )
+    :effect (branch_a_flag ?branch_a)
+  )
+  (:action process_primary_branch_a_with_key
+    :parameters (?primary_site - primary_site ?branch_a - route_branch_a ?gate_key - gate_key)
+    :precondition
+      (and
+        (site_activated ?primary_site)
+        (gate_key_attached_to_site ?primary_site ?gate_key)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (branch_a_flag ?branch_a)
+        (not
+          (primary_site_flag_present ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (primary_site_flag_present ?primary_site)
+        (primary_site_ready_for_hub ?primary_site)
+      )
+  )
+  (:action tag_primary_branch_a_with_consumable
+    :parameters (?primary_site - primary_site ?branch_a - route_branch_a ?consumable - consumable_resource)
+    :precondition
+      (and
+        (site_activated ?primary_site)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (consumable_available ?consumable)
+        (not
+          (primary_site_flag_present ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (branch_a_tagged ?branch_a)
+        (primary_site_flag_present ?primary_site)
+        (primary_site_tagged_with_consumable ?primary_site ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_primary_branch_a_with_consumable
+    :parameters (?primary_site - primary_site ?branch_a - route_branch_a ?movement_token - movement_token ?consumable - consumable_resource)
+    :precondition
+      (and
+        (site_activated ?primary_site)
+        (movement_token_attached_to_site ?primary_site ?movement_token)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (branch_a_tagged ?branch_a)
+        (primary_site_tagged_with_consumable ?primary_site ?consumable)
+        (not
+          (primary_site_ready_for_hub ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (branch_a_flag ?branch_a)
+        (primary_site_ready_for_hub ?primary_site)
+        (consumable_available ?consumable)
+        (not
+          (primary_site_tagged_with_consumable ?primary_site ?consumable)
+        )
+      )
+  )
+  (:action flag_secondary_branch_b
+    :parameters (?secondary_site - secondary_site ?branch_b - route_branch_b ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_activated ?secondary_site)
+        (movement_token_attached_to_site ?secondary_site ?movement_token)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (not
+          (branch_b_flag ?branch_b)
+        )
+        (not
+          (branch_b_tagged ?branch_b)
+        )
+      )
+    :effect (branch_b_flag ?branch_b)
+  )
+  (:action process_secondary_branch_b_with_key
+    :parameters (?secondary_site - secondary_site ?branch_b - route_branch_b ?gate_key - gate_key)
+    :precondition
+      (and
+        (site_activated ?secondary_site)
+        (gate_key_attached_to_site ?secondary_site ?gate_key)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_b_flag ?branch_b)
+        (not
+          (secondary_site_flag_present ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_site_flag_present ?secondary_site)
+        (secondary_site_ready_for_hub ?secondary_site)
+      )
+  )
+  (:action tag_secondary_branch_b_with_consumable
+    :parameters (?secondary_site - secondary_site ?branch_b - route_branch_b ?consumable - consumable_resource)
+    :precondition
+      (and
+        (site_activated ?secondary_site)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (consumable_available ?consumable)
+        (not
+          (secondary_site_flag_present ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (branch_b_tagged ?branch_b)
+        (secondary_site_flag_present ?secondary_site)
+        (secondary_site_tagged_with_consumable ?secondary_site ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_secondary_branch_b_with_consumable
+    :parameters (?secondary_site - secondary_site ?branch_b - route_branch_b ?movement_token - movement_token ?consumable - consumable_resource)
+    :precondition
+      (and
+        (site_activated ?secondary_site)
+        (movement_token_attached_to_site ?secondary_site ?movement_token)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_b_tagged ?branch_b)
+        (secondary_site_tagged_with_consumable ?secondary_site ?consumable)
+        (not
+          (secondary_site_ready_for_hub ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (branch_b_flag ?branch_b)
+        (secondary_site_ready_for_hub ?secondary_site)
+        (consumable_available ?consumable)
+        (not
+          (secondary_site_tagged_with_consumable ?secondary_site ?consumable)
+        )
+      )
+  )
+  (:action assemble_checkpoint_hub
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?branch_a - route_branch_a ?branch_b - route_branch_b ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (primary_site_flag_present ?primary_site)
+        (secondary_site_flag_present ?secondary_site)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_a_flag ?branch_a)
+        (branch_b_flag ?branch_b)
+        (primary_site_ready_for_hub ?primary_site)
+        (secondary_site_ready_for_hub ?secondary_site)
+        (checkpoint_available ?checkpoint)
+      )
+    :effect
+      (and
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_records_branch_a ?checkpoint ?branch_a)
+        (checkpoint_records_branch_b ?checkpoint ?branch_b)
+        (not
+          (checkpoint_available ?checkpoint)
+        )
+      )
+  )
+  (:action assemble_checkpoint_hub_variant_a
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?branch_a - route_branch_a ?branch_b - route_branch_b ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (primary_site_flag_present ?primary_site)
+        (secondary_site_flag_present ?secondary_site)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_a_tagged ?branch_a)
+        (branch_b_flag ?branch_b)
+        (not
+          (primary_site_ready_for_hub ?primary_site)
+        )
+        (secondary_site_ready_for_hub ?secondary_site)
+        (checkpoint_available ?checkpoint)
+      )
+    :effect
+      (and
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_records_branch_a ?checkpoint ?branch_a)
+        (checkpoint_records_branch_b ?checkpoint ?branch_b)
+        (checkpoint_variant_a ?checkpoint)
+        (not
+          (checkpoint_available ?checkpoint)
+        )
+      )
+  )
+  (:action assemble_checkpoint_hub_variant_b
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?branch_a - route_branch_a ?branch_b - route_branch_b ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (primary_site_flag_present ?primary_site)
+        (secondary_site_flag_present ?secondary_site)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_a_flag ?branch_a)
+        (branch_b_tagged ?branch_b)
+        (primary_site_ready_for_hub ?primary_site)
+        (not
+          (secondary_site_ready_for_hub ?secondary_site)
+        )
+        (checkpoint_available ?checkpoint)
+      )
+    :effect
+      (and
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_records_branch_a ?checkpoint ?branch_a)
+        (checkpoint_records_branch_b ?checkpoint ?branch_b)
+        (checkpoint_variant_b ?checkpoint)
+        (not
+          (checkpoint_available ?checkpoint)
+        )
+      )
+  )
+  (:action assemble_checkpoint_hub_variant_ab
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?branch_a - route_branch_a ?branch_b - route_branch_b ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (primary_site_flag_present ?primary_site)
+        (secondary_site_flag_present ?secondary_site)
+        (primary_site_has_branch_a ?primary_site ?branch_a)
+        (secondary_site_has_branch_b ?secondary_site ?branch_b)
+        (branch_a_tagged ?branch_a)
+        (branch_b_tagged ?branch_b)
+        (not
+          (primary_site_ready_for_hub ?primary_site)
+        )
+        (not
+          (secondary_site_ready_for_hub ?secondary_site)
+        )
+        (checkpoint_available ?checkpoint)
+      )
+    :effect
+      (and
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_records_branch_a ?checkpoint ?branch_a)
+        (checkpoint_records_branch_b ?checkpoint ?branch_b)
+        (checkpoint_variant_a ?checkpoint)
+        (checkpoint_variant_b ?checkpoint)
+        (not
+          (checkpoint_available ?checkpoint)
+        )
+      )
+  )
+  (:action prime_checkpoint_for_subzone
+    :parameters (?checkpoint - checkpoint_hub ?primary_site - primary_site ?movement_token - movement_token)
+    :precondition
+      (and
+        (checkpoint_assembled ?checkpoint)
+        (primary_site_flag_present ?primary_site)
+        (movement_token_attached_to_site ?primary_site ?movement_token)
+        (not
+          (checkpoint_primed ?checkpoint)
+        )
+      )
+    :effect (checkpoint_primed ?checkpoint)
+  )
+  (:action scan_subzone_into_checkpoint
+    :parameters (?objective - objective_site ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (objective_linked_to_checkpoint ?objective ?checkpoint)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_available ?subzone)
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_primed ?checkpoint)
+        (not
+          (subzone_scanned ?subzone)
+        )
+      )
+    :effect
+      (and
+        (subzone_scanned ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (not
+          (subzone_available ?subzone)
+        )
+      )
+  )
+  (:action prepare_objective_after_subzone_scan
+    :parameters (?objective - objective_site ?subzone - scannable_subzone ?checkpoint - checkpoint_hub ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (movement_token_attached_to_site ?objective ?movement_token)
+        (not
+          (checkpoint_variant_a ?checkpoint)
+        )
+        (not
+          (objective_ready_for_modifiers ?objective)
+        )
+      )
+    :effect (objective_ready_for_modifiers ?objective)
+  )
+  (:action attach_bonus_to_objective
+    :parameters (?objective - objective_site ?bonus_node - bonus_node)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (bonus_available ?bonus_node)
+        (not
+          (objective_has_active_bonus ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_has_active_bonus ?objective)
+        (objective_linked_to_bonus ?objective ?bonus_node)
+        (not
+          (bonus_available ?bonus_node)
+        )
+      )
+  )
+  (:action apply_bonus_variant_to_objective
+    :parameters (?objective - objective_site ?subzone - scannable_subzone ?checkpoint - checkpoint_hub ?movement_token - movement_token ?bonus_node - bonus_node)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (movement_token_attached_to_site ?objective ?movement_token)
+        (checkpoint_variant_a ?checkpoint)
+        (objective_has_active_bonus ?objective)
+        (objective_linked_to_bonus ?objective ?bonus_node)
+        (not
+          (objective_ready_for_modifiers ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_ready_for_modifiers ?objective)
+        (objective_bonus_applied ?objective)
+      )
+  )
+  (:action apply_modifier_to_objective_variant_a
+    :parameters (?objective - objective_site ?modifier_item - modifier_item ?gate_key - gate_key ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_ready_for_modifiers ?objective)
+        (objective_has_modifier ?objective ?modifier_item)
+        (gate_key_attached_to_site ?objective ?gate_key)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (not
+          (checkpoint_variant_b ?checkpoint)
+        )
+        (not
+          (objective_modifier_applied ?objective)
+        )
+      )
+    :effect (objective_modifier_applied ?objective)
+  )
+  (:action apply_modifier_to_objective_variant_b
+    :parameters (?objective - objective_site ?modifier_item - modifier_item ?gate_key - gate_key ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_ready_for_modifiers ?objective)
+        (objective_has_modifier ?objective ?modifier_item)
+        (gate_key_attached_to_site ?objective ?gate_key)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (checkpoint_variant_b ?checkpoint)
+        (not
+          (objective_modifier_applied ?objective)
+        )
+      )
+    :effect (objective_modifier_applied ?objective)
+  )
+  (:action apply_condition_marker_to_objective
+    :parameters (?objective - objective_site ?condition_marker - condition_marker ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_modifier_applied ?objective)
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (not
+          (checkpoint_variant_a ?checkpoint)
+        )
+        (not
+          (checkpoint_variant_b ?checkpoint)
+        )
+        (not
+          (objective_condition_met ?objective)
+        )
+      )
+    :effect (objective_condition_met ?objective)
+  )
+  (:action apply_condition_with_variant_a
+    :parameters (?objective - objective_site ?condition_marker - condition_marker ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_modifier_applied ?objective)
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (checkpoint_variant_a ?checkpoint)
+        (not
+          (checkpoint_variant_b ?checkpoint)
+        )
+        (not
+          (objective_condition_met ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_condition_met ?objective)
+        (objective_upgraded ?objective)
+      )
+  )
+  (:action apply_condition_with_variant_b
+    :parameters (?objective - objective_site ?condition_marker - condition_marker ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_modifier_applied ?objective)
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (not
+          (checkpoint_variant_a ?checkpoint)
+        )
+        (checkpoint_variant_b ?checkpoint)
+        (not
+          (objective_condition_met ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_condition_met ?objective)
+        (objective_upgraded ?objective)
+      )
+  )
+  (:action apply_condition_with_both_variants
+    :parameters (?objective - objective_site ?condition_marker - condition_marker ?subzone - scannable_subzone ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (objective_modifier_applied ?objective)
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (objective_has_subzone ?objective ?subzone)
+        (subzone_scanned_for_checkpoint ?subzone ?checkpoint)
+        (checkpoint_variant_a ?checkpoint)
+        (checkpoint_variant_b ?checkpoint)
+        (not
+          (objective_condition_met ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_condition_met ?objective)
+        (objective_upgraded ?objective)
+      )
+  )
+  (:action finalize_objective_without_upgrade
+    :parameters (?objective - objective_site)
+    :precondition
+      (and
+        (objective_condition_met ?objective)
+        (not
+          (objective_upgraded ?objective)
+        )
+        (not
+          (objective_finalized ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_finalized ?objective)
+        (ready_for_collection ?objective)
+      )
+  )
+  (:action attach_upgrade_to_objective
+    :parameters (?objective - objective_site ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (objective_condition_met ?objective)
+        (objective_upgraded ?objective)
+        (upgrade_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (objective_has_upgrade ?objective ?upgrade_module)
+        (not
+          (upgrade_available ?upgrade_module)
+        )
+      )
+  )
+  (:action complete_objective_processing
+    :parameters (?objective - objective_site ?primary_site - primary_site ?secondary_site - secondary_site ?movement_token - movement_token ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (objective_condition_met ?objective)
+        (objective_upgraded ?objective)
+        (objective_has_upgrade ?objective ?upgrade_module)
+        (objective_has_primary_site ?objective ?primary_site)
+        (objective_has_secondary_site ?objective ?secondary_site)
+        (primary_site_ready_for_hub ?primary_site)
+        (secondary_site_ready_for_hub ?secondary_site)
+        (movement_token_attached_to_site ?objective ?movement_token)
+        (not
+          (objective_processed ?objective)
+        )
+      )
+    :effect (objective_processed ?objective)
+  )
+  (:action finalize_processed_objective
+    :parameters (?objective - objective_site)
+    :precondition
+      (and
+        (objective_condition_met ?objective)
+        (objective_processed ?objective)
+        (not
+          (objective_finalized ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_finalized ?objective)
+        (ready_for_collection ?objective)
+      )
+  )
+  (:action attach_clue_to_objective
+    :parameters (?objective - objective_site ?clue_token - clue_token ?movement_token - movement_token)
+    :precondition
+      (and
+        (site_activated ?objective)
+        (movement_token_attached_to_site ?objective ?movement_token)
+        (clue_available ?clue_token)
+        (objective_has_clue ?objective ?clue_token)
+        (not
+          (objective_clue_registered ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_clue_registered ?objective)
+        (not
+          (clue_available ?clue_token)
+        )
+      )
+  )
+  (:action advance_objective_clue_stage
+    :parameters (?objective - objective_site ?gate_key - gate_key)
+    :precondition
+      (and
+        (objective_clue_registered ?objective)
+        (gate_key_attached_to_site ?objective ?gate_key)
+        (not
+          (objective_clue_handled ?objective)
+        )
+      )
+    :effect (objective_clue_handled ?objective)
+  )
+  (:action finalize_objective_clue
+    :parameters (?objective - objective_site ?condition_marker - condition_marker)
+    :precondition
+      (and
+        (objective_clue_handled ?objective)
+        (objective_has_condition_marker ?objective ?condition_marker)
+        (not
+          (objective_clue_finalized ?objective)
+        )
+      )
+    :effect (objective_clue_finalized ?objective)
+  )
+  (:action finalize_objective_after_clue
+    :parameters (?objective - objective_site)
+    :precondition
+      (and
+        (objective_clue_finalized ?objective)
+        (not
+          (objective_finalized ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_finalized ?objective)
+        (ready_for_collection ?objective)
+      )
+  )
+  (:action mark_primary_site_ready_for_collection
+    :parameters (?primary_site - primary_site ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (primary_site_flag_present ?primary_site)
+        (primary_site_ready_for_hub ?primary_site)
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_primed ?checkpoint)
+        (not
+          (ready_for_collection ?primary_site)
+        )
+      )
+    :effect (ready_for_collection ?primary_site)
+  )
+  (:action mark_secondary_site_ready_for_collection
+    :parameters (?secondary_site - secondary_site ?checkpoint - checkpoint_hub)
+    :precondition
+      (and
+        (secondary_site_flag_present ?secondary_site)
+        (secondary_site_ready_for_hub ?secondary_site)
+        (checkpoint_assembled ?checkpoint)
+        (checkpoint_primed ?checkpoint)
+        (not
+          (ready_for_collection ?secondary_site)
+        )
+      )
+    :effect (ready_for_collection ?secondary_site)
+  )
+  (:action collect_with_time_credit
+    :parameters (?location - location ?time_credit - time_credit ?movement_token - movement_token)
+    :precondition
+      (and
+        (ready_for_collection ?location)
+        (movement_token_attached_to_site ?location ?movement_token)
+        (time_credit_available ?time_credit)
+        (not
+          (collection_in_progress ?location)
+        )
+      )
+    :effect
+      (and
+        (collection_in_progress ?location)
+        (site_time_credit_assigned ?location ?time_credit)
+        (not
+          (time_credit_available ?time_credit)
+        )
+      )
+  )
+  (:action finalize_collection_and_return_collector
+    :parameters (?primary_site - primary_site ?collector_unit - collector_unit ?time_credit - time_credit)
+    :precondition
+      (and
+        (collection_in_progress ?primary_site)
+        (collector_assigned_to_site ?primary_site ?collector_unit)
+        (site_time_credit_assigned ?primary_site ?time_credit)
+        (not
+          (site_collected ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (site_collected ?primary_site)
+        (collector_available ?collector_unit)
+        (time_credit_available ?time_credit)
+      )
+  )
+  (:action finalize_collection_and_return_collector_secondary
+    :parameters (?secondary_site - secondary_site ?collector_unit - collector_unit ?time_credit - time_credit)
+    :precondition
+      (and
+        (collection_in_progress ?secondary_site)
+        (collector_assigned_to_site ?secondary_site ?collector_unit)
+        (site_time_credit_assigned ?secondary_site ?time_credit)
+        (not
+          (site_collected ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (site_collected ?secondary_site)
+        (collector_available ?collector_unit)
+        (time_credit_available ?time_credit)
+      )
+  )
+  (:action finalize_collection_and_return_collector_from_objective
+    :parameters (?objective - objective_site ?collector_unit - collector_unit ?time_credit - time_credit)
+    :precondition
+      (and
+        (collection_in_progress ?objective)
+        (collector_assigned_to_site ?objective ?collector_unit)
+        (site_time_credit_assigned ?objective ?time_credit)
+        (not
+          (site_collected ?objective)
+        )
+      )
+    :effect
+      (and
+        (site_collected ?objective)
+        (collector_available ?collector_unit)
+        (time_credit_available ?time_credit)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem collectible_route_scenario_01)
+  (:domain collectible_route_under_time_constraints)
+  (:objects primary_site_1 - primary_site secondary_site_1 - secondary_site objective_site_1 - objective_site objective_site_2 - objective_site collector_unit_1 - collector_unit collector_unit_2 - collector_unit collector_unit_3 - collector_unit movement_token_1 - movement_token gate_key_1 - gate_key consumable_1 - consumable_resource route_branch_a_1 - route_branch_a route_branch_b_1 - route_branch_b checkpoint_hub_1 - checkpoint_hub subzone_1 - scannable_subzone subzone_2 - scannable_subzone bonus_node_1 - bonus_node bonus_node_2 - bonus_node upgrade_module_1 - upgrade_module upgrade_module_2 - upgrade_module time_credit_1 - time_credit modifier_item_1 - modifier_item clue_token_1 - clue_token clue_token_2 - clue_token condition_marker_1 - condition_marker)
+  (:init
+    (collector_available collector_unit_1)
+    (collector_available collector_unit_2)
+    (collector_available collector_unit_3)
+    (movement_token_available movement_token_1)
+    (gate_key_available gate_key_1)
+    (consumable_available consumable_1)
+    (primary_site_has_branch_a primary_site_1 route_branch_a_1)
+    (secondary_site_has_branch_b secondary_site_1 route_branch_b_1)
+    (checkpoint_available checkpoint_hub_1)
+    (subzone_available subzone_1)
+    (subzone_available subzone_2)
+    (objective_has_primary_site objective_site_1 primary_site_1)
+    (objective_has_primary_site objective_site_2 primary_site_1)
+    (objective_has_secondary_site objective_site_1 secondary_site_1)
+    (objective_has_secondary_site objective_site_2 secondary_site_1)
+    (objective_linked_to_checkpoint objective_site_1 checkpoint_hub_1)
+    (objective_linked_to_checkpoint objective_site_2 checkpoint_hub_1)
+    (objective_has_subzone objective_site_1 subzone_1)
+    (objective_has_subzone objective_site_2 subzone_2)
+    (bonus_available bonus_node_1)
+    (bonus_available bonus_node_2)
+    (upgrade_available upgrade_module_1)
+    (upgrade_available upgrade_module_2)
+    (time_credit_available time_credit_1)
+    (modifier_available modifier_item_1)
+    (clue_available clue_token_1)
+    (objective_has_clue objective_site_1 clue_token_1)
+    (objective_has_clue objective_site_2 clue_token_2)
+    (condition_marker_available condition_marker_1)
+  )
+  (:goal
+    (and
+      (site_collected primary_site_1)
+      (site_collected secondary_site_1)
+      (site_collected objective_site_1)
+      (site_collected objective_site_2)
+    )
+  )
+)

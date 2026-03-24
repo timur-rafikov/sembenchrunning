@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain end_of_day_settlement_position_closure)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_endpoint_root - object settlement_endpoint_category - object settlement_channel_family - object settlement_entity - object settlement_instruction - settlement_entity settlement_channel_endpoint - service_endpoint_root validation_service - service_endpoint_root authorizing_service - service_endpoint_root compliance_credential - service_endpoint_root approval_token - service_endpoint_root reconciliation_record - service_endpoint_root settlement_funding_resource - service_endpoint_root escalation_ticket - service_endpoint_root exception_record - settlement_endpoint_category control_record - settlement_endpoint_category regulatory_approval - settlement_endpoint_category debit_channel_instance - settlement_channel_family credit_channel_instance - settlement_channel_family closure_slot - settlement_channel_family participant_position_role - settlement_instruction instruction_closure_container - settlement_instruction debit_position - participant_position_role credit_position - participant_position_role processing_agent - instruction_closure_container)
+  (:predicates
+    (settlement_entity_registered ?settlement_instruction - settlement_instruction)
+    (settlement_entity_validated ?settlement_instruction - settlement_instruction)
+    (settlement_entity_routed ?settlement_instruction - settlement_instruction)
+    (settlement_entity_closed ?settlement_instruction - settlement_instruction)
+    (settlement_entity_settled ?settlement_instruction - settlement_instruction)
+    (settlement_entity_reconciliation_initiated ?settlement_instruction - settlement_instruction)
+    (settlement_channel_endpoint_available ?settlement_channel_endpoint - settlement_channel_endpoint)
+    (settlement_entity_assigned_channel_endpoint ?settlement_instruction - settlement_instruction ?settlement_channel_endpoint - settlement_channel_endpoint)
+    (validation_service_available ?validation_service - validation_service)
+    (settlement_entity_validated_by_validation_service ?settlement_instruction - settlement_instruction ?validation_service - validation_service)
+    (authorizing_service_available ?authorizing_service - authorizing_service)
+    (settlement_entity_assigned_authorizing_service ?settlement_instruction - settlement_instruction ?authorizing_service - authorizing_service)
+    (exception_record_available ?exception_record - exception_record)
+    (debit_position_assigned_exception_record ?debit_position - debit_position ?exception_record - exception_record)
+    (credit_position_assigned_exception_record ?credit_position - credit_position ?exception_record - exception_record)
+    (debit_position_assigned_debit_channel_instance ?debit_position - debit_position ?debit_channel_instance - debit_channel_instance)
+    (debit_channel_instance_reserved ?debit_channel_instance - debit_channel_instance)
+    (debit_channel_instance_flagged ?debit_channel_instance - debit_channel_instance)
+    (debit_position_locked ?debit_position - debit_position)
+    (credit_position_assigned_credit_channel_instance ?credit_position - credit_position ?credit_channel_instance - credit_channel_instance)
+    (credit_channel_instance_reserved ?credit_channel_instance - credit_channel_instance)
+    (credit_channel_instance_flagged ?credit_channel_instance - credit_channel_instance)
+    (credit_position_locked ?credit_position - credit_position)
+    (closure_slot_available ?closure_slot - closure_slot)
+    (closure_slot_prepared ?closure_slot - closure_slot)
+    (closure_slot_assigned_debit_channel_instance ?closure_slot - closure_slot ?debit_channel_instance - debit_channel_instance)
+    (closure_slot_assigned_credit_channel_instance ?closure_slot - closure_slot ?credit_channel_instance - credit_channel_instance)
+    (closure_slot_includes_flagged_debit_channel_instance ?closure_slot - closure_slot)
+    (closure_slot_includes_flagged_credit_channel_instance ?closure_slot - closure_slot)
+    (closure_slot_executed ?closure_slot - closure_slot)
+    (settlement_entity_assigned_debit_position ?processing_agent - processing_agent ?debit_position - debit_position)
+    (settlement_entity_assigned_credit_position ?processing_agent - processing_agent ?credit_position - credit_position)
+    (settlement_entity_assigned_closure_slot ?processing_agent - processing_agent ?closure_slot - closure_slot)
+    (control_record_available ?control_record - control_record)
+    (processing_agent_attached_control_record ?processing_agent - processing_agent ?control_record - control_record)
+    (control_record_processed ?control_record - control_record)
+    (control_record_linked_closure_slot ?control_record - control_record ?closure_slot - closure_slot)
+    (processing_agent_control_verified ?processing_agent - processing_agent)
+    (processing_agent_prepared_for_approval ?processing_agent - processing_agent)
+    (processing_agent_approved ?processing_agent - processing_agent)
+    (processing_agent_has_compliance_credential ?processing_agent - processing_agent)
+    (processing_agent_compliance_verified ?processing_agent - processing_agent)
+    (processing_agent_requires_approval_token ?processing_agent - processing_agent)
+    (processing_agent_execution_ready ?processing_agent - processing_agent)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (processing_agent_has_regulatory_approval ?processing_agent - processing_agent ?regulatory_approval - regulatory_approval)
+    (processing_agent_regulatory_acknowledged ?processing_agent - processing_agent)
+    (processing_agent_regulatory_checks_passed ?processing_agent - processing_agent)
+    (processing_agent_regulatory_approval_confirmed ?processing_agent - processing_agent)
+    (compliance_credential_available ?compliance_credential - compliance_credential)
+    (processing_agent_associated_compliance_credential ?processing_agent - processing_agent ?compliance_credential - compliance_credential)
+    (approval_token_available ?approval_token - approval_token)
+    (processing_agent_associated_approval_token ?processing_agent - processing_agent ?approval_token - approval_token)
+    (settlement_funding_resource_available ?settlement_funding_resource - settlement_funding_resource)
+    (processing_agent_allocated_funding_resource ?processing_agent - processing_agent ?settlement_funding_resource - settlement_funding_resource)
+    (escalation_ticket_available ?escalation_ticket - escalation_ticket)
+    (processing_agent_assigned_escalation_ticket ?processing_agent - processing_agent ?escalation_ticket - escalation_ticket)
+    (reconciliation_record_available ?reconciliation_record - reconciliation_record)
+    (settlement_instruction_linked_reconciliation_record ?settlement_instruction - settlement_instruction ?reconciliation_record - reconciliation_record)
+    (debit_position_prepared ?debit_position - debit_position)
+    (credit_position_prepared ?credit_position - credit_position)
+    (processing_agent_finalized ?processing_agent - processing_agent)
+  )
+  (:action register_settlement_instruction
+    :parameters (?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (not
+          (settlement_entity_registered ?settlement_instruction)
+        )
+        (not
+          (settlement_entity_closed ?settlement_instruction)
+        )
+      )
+    :effect (settlement_entity_registered ?settlement_instruction)
+  )
+  (:action assign_instruction_to_channel_endpoint
+    :parameters (?settlement_instruction - settlement_instruction ?settlement_channel_endpoint - settlement_channel_endpoint)
+    :precondition
+      (and
+        (settlement_entity_registered ?settlement_instruction)
+        (not
+          (settlement_entity_routed ?settlement_instruction)
+        )
+        (settlement_channel_endpoint_available ?settlement_channel_endpoint)
+      )
+    :effect
+      (and
+        (settlement_entity_routed ?settlement_instruction)
+        (settlement_entity_assigned_channel_endpoint ?settlement_instruction ?settlement_channel_endpoint)
+        (not
+          (settlement_channel_endpoint_available ?settlement_channel_endpoint)
+        )
+      )
+  )
+  (:action submit_instruction_to_validation_service
+    :parameters (?settlement_instruction - settlement_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_registered ?settlement_instruction)
+        (settlement_entity_routed ?settlement_instruction)
+        (validation_service_available ?validation_service)
+      )
+    :effect
+      (and
+        (settlement_entity_validated_by_validation_service ?settlement_instruction ?validation_service)
+        (not
+          (validation_service_available ?validation_service)
+        )
+      )
+  )
+  (:action confirm_instruction_validation
+    :parameters (?settlement_instruction - settlement_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_registered ?settlement_instruction)
+        (settlement_entity_routed ?settlement_instruction)
+        (settlement_entity_validated_by_validation_service ?settlement_instruction ?validation_service)
+        (not
+          (settlement_entity_validated ?settlement_instruction)
+        )
+      )
+    :effect (settlement_entity_validated ?settlement_instruction)
+  )
+  (:action release_validation_service
+    :parameters (?settlement_instruction - settlement_instruction ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_validated_by_validation_service ?settlement_instruction ?validation_service)
+      )
+    :effect
+      (and
+        (validation_service_available ?validation_service)
+        (not
+          (settlement_entity_validated_by_validation_service ?settlement_instruction ?validation_service)
+        )
+      )
+  )
+  (:action assign_authorizing_service_to_instruction
+    :parameters (?settlement_instruction - settlement_instruction ?authorizing_service - authorizing_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?settlement_instruction)
+        (authorizing_service_available ?authorizing_service)
+      )
+    :effect
+      (and
+        (settlement_entity_assigned_authorizing_service ?settlement_instruction ?authorizing_service)
+        (not
+          (authorizing_service_available ?authorizing_service)
+        )
+      )
+  )
+  (:action release_authorizing_service_from_instruction
+    :parameters (?settlement_instruction - settlement_instruction ?authorizing_service - authorizing_service)
+    :precondition
+      (and
+        (settlement_entity_assigned_authorizing_service ?settlement_instruction ?authorizing_service)
+      )
+    :effect
+      (and
+        (authorizing_service_available ?authorizing_service)
+        (not
+          (settlement_entity_assigned_authorizing_service ?settlement_instruction ?authorizing_service)
+        )
+      )
+  )
+  (:action allocate_funding_to_processing_agent
+    :parameters (?processing_agent - processing_agent ?settlement_funding_resource - settlement_funding_resource)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (settlement_funding_resource_available ?settlement_funding_resource)
+      )
+    :effect
+      (and
+        (processing_agent_allocated_funding_resource ?processing_agent ?settlement_funding_resource)
+        (not
+          (settlement_funding_resource_available ?settlement_funding_resource)
+        )
+      )
+  )
+  (:action release_funding_from_processing_agent
+    :parameters (?processing_agent - processing_agent ?settlement_funding_resource - settlement_funding_resource)
+    :precondition
+      (and
+        (processing_agent_allocated_funding_resource ?processing_agent ?settlement_funding_resource)
+      )
+    :effect
+      (and
+        (settlement_funding_resource_available ?settlement_funding_resource)
+        (not
+          (processing_agent_allocated_funding_resource ?processing_agent ?settlement_funding_resource)
+        )
+      )
+  )
+  (:action assign_escalation_ticket_to_processing_agent
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (escalation_ticket_available ?escalation_ticket)
+      )
+    :effect
+      (and
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (not
+          (escalation_ticket_available ?escalation_ticket)
+        )
+      )
+  )
+  (:action release_escalation_ticket_from_processing_agent
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+      )
+    :effect
+      (and
+        (escalation_ticket_available ?escalation_ticket)
+        (not
+          (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        )
+      )
+  )
+  (:action reserve_debit_channel_for_debit_position
+    :parameters (?debit_position - debit_position ?debit_channel_instance - debit_channel_instance ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?debit_position)
+        (settlement_entity_validated_by_validation_service ?debit_position ?validation_service)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (not
+          (debit_channel_instance_reserved ?debit_channel_instance)
+        )
+        (not
+          (debit_channel_instance_flagged ?debit_channel_instance)
+        )
+      )
+    :effect (debit_channel_instance_reserved ?debit_channel_instance)
+  )
+  (:action lock_debit_position_with_authorizer
+    :parameters (?debit_position - debit_position ?debit_channel_instance - debit_channel_instance ?authorizing_service - authorizing_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?debit_position)
+        (settlement_entity_assigned_authorizing_service ?debit_position ?authorizing_service)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (debit_channel_instance_reserved ?debit_channel_instance)
+        (not
+          (debit_position_prepared ?debit_position)
+        )
+      )
+    :effect
+      (and
+        (debit_position_prepared ?debit_position)
+        (debit_position_locked ?debit_position)
+      )
+  )
+  (:action assign_exception_record_and_prepare_debit_position
+    :parameters (?debit_position - debit_position ?debit_channel_instance - debit_channel_instance ?exception_record - exception_record)
+    :precondition
+      (and
+        (settlement_entity_validated ?debit_position)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (exception_record_available ?exception_record)
+        (not
+          (debit_position_prepared ?debit_position)
+        )
+      )
+    :effect
+      (and
+        (debit_channel_instance_flagged ?debit_channel_instance)
+        (debit_position_prepared ?debit_position)
+        (debit_position_assigned_exception_record ?debit_position ?exception_record)
+        (not
+          (exception_record_available ?exception_record)
+        )
+      )
+  )
+  (:action finalize_debit_position_preparation
+    :parameters (?debit_position - debit_position ?debit_channel_instance - debit_channel_instance ?validation_service - validation_service ?exception_record - exception_record)
+    :precondition
+      (and
+        (settlement_entity_validated ?debit_position)
+        (settlement_entity_validated_by_validation_service ?debit_position ?validation_service)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (debit_channel_instance_flagged ?debit_channel_instance)
+        (debit_position_assigned_exception_record ?debit_position ?exception_record)
+        (not
+          (debit_position_locked ?debit_position)
+        )
+      )
+    :effect
+      (and
+        (debit_channel_instance_reserved ?debit_channel_instance)
+        (debit_position_locked ?debit_position)
+        (exception_record_available ?exception_record)
+        (not
+          (debit_position_assigned_exception_record ?debit_position ?exception_record)
+        )
+      )
+  )
+  (:action reserve_credit_channel_for_credit_position
+    :parameters (?credit_position - credit_position ?credit_channel_instance - credit_channel_instance ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?credit_position)
+        (settlement_entity_validated_by_validation_service ?credit_position ?validation_service)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (not
+          (credit_channel_instance_reserved ?credit_channel_instance)
+        )
+        (not
+          (credit_channel_instance_flagged ?credit_channel_instance)
+        )
+      )
+    :effect (credit_channel_instance_reserved ?credit_channel_instance)
+  )
+  (:action lock_credit_position_with_authorizer
+    :parameters (?credit_position - credit_position ?credit_channel_instance - credit_channel_instance ?authorizing_service - authorizing_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?credit_position)
+        (settlement_entity_assigned_authorizing_service ?credit_position ?authorizing_service)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (credit_channel_instance_reserved ?credit_channel_instance)
+        (not
+          (credit_position_prepared ?credit_position)
+        )
+      )
+    :effect
+      (and
+        (credit_position_prepared ?credit_position)
+        (credit_position_locked ?credit_position)
+      )
+  )
+  (:action assign_exception_record_and_prepare_credit_position
+    :parameters (?credit_position - credit_position ?credit_channel_instance - credit_channel_instance ?exception_record - exception_record)
+    :precondition
+      (and
+        (settlement_entity_validated ?credit_position)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (exception_record_available ?exception_record)
+        (not
+          (credit_position_prepared ?credit_position)
+        )
+      )
+    :effect
+      (and
+        (credit_channel_instance_flagged ?credit_channel_instance)
+        (credit_position_prepared ?credit_position)
+        (credit_position_assigned_exception_record ?credit_position ?exception_record)
+        (not
+          (exception_record_available ?exception_record)
+        )
+      )
+  )
+  (:action finalize_credit_position_preparation
+    :parameters (?credit_position - credit_position ?credit_channel_instance - credit_channel_instance ?validation_service - validation_service ?exception_record - exception_record)
+    :precondition
+      (and
+        (settlement_entity_validated ?credit_position)
+        (settlement_entity_validated_by_validation_service ?credit_position ?validation_service)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (credit_channel_instance_flagged ?credit_channel_instance)
+        (credit_position_assigned_exception_record ?credit_position ?exception_record)
+        (not
+          (credit_position_locked ?credit_position)
+        )
+      )
+    :effect
+      (and
+        (credit_channel_instance_reserved ?credit_channel_instance)
+        (credit_position_locked ?credit_position)
+        (exception_record_available ?exception_record)
+        (not
+          (credit_position_assigned_exception_record ?credit_position ?exception_record)
+        )
+      )
+  )
+  (:action assemble_closure_slot
+    :parameters (?debit_position - debit_position ?credit_position - credit_position ?debit_channel_instance - debit_channel_instance ?credit_channel_instance - credit_channel_instance ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (debit_position_prepared ?debit_position)
+        (credit_position_prepared ?credit_position)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (debit_channel_instance_reserved ?debit_channel_instance)
+        (credit_channel_instance_reserved ?credit_channel_instance)
+        (debit_position_locked ?debit_position)
+        (credit_position_locked ?credit_position)
+        (closure_slot_available ?closure_slot)
+      )
+    :effect
+      (and
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_assigned_debit_channel_instance ?closure_slot ?debit_channel_instance)
+        (closure_slot_assigned_credit_channel_instance ?closure_slot ?credit_channel_instance)
+        (not
+          (closure_slot_available ?closure_slot)
+        )
+      )
+  )
+  (:action assemble_closure_slot_with_flagged_debit_channel
+    :parameters (?debit_position - debit_position ?credit_position - credit_position ?debit_channel_instance - debit_channel_instance ?credit_channel_instance - credit_channel_instance ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (debit_position_prepared ?debit_position)
+        (credit_position_prepared ?credit_position)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (debit_channel_instance_flagged ?debit_channel_instance)
+        (credit_channel_instance_reserved ?credit_channel_instance)
+        (not
+          (debit_position_locked ?debit_position)
+        )
+        (credit_position_locked ?credit_position)
+        (closure_slot_available ?closure_slot)
+      )
+    :effect
+      (and
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_assigned_debit_channel_instance ?closure_slot ?debit_channel_instance)
+        (closure_slot_assigned_credit_channel_instance ?closure_slot ?credit_channel_instance)
+        (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        (not
+          (closure_slot_available ?closure_slot)
+        )
+      )
+  )
+  (:action assemble_closure_slot_with_flagged_credit_channel
+    :parameters (?debit_position - debit_position ?credit_position - credit_position ?debit_channel_instance - debit_channel_instance ?credit_channel_instance - credit_channel_instance ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (debit_position_prepared ?debit_position)
+        (credit_position_prepared ?credit_position)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (debit_channel_instance_reserved ?debit_channel_instance)
+        (credit_channel_instance_flagged ?credit_channel_instance)
+        (debit_position_locked ?debit_position)
+        (not
+          (credit_position_locked ?credit_position)
+        )
+        (closure_slot_available ?closure_slot)
+      )
+    :effect
+      (and
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_assigned_debit_channel_instance ?closure_slot ?debit_channel_instance)
+        (closure_slot_assigned_credit_channel_instance ?closure_slot ?credit_channel_instance)
+        (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        (not
+          (closure_slot_available ?closure_slot)
+        )
+      )
+  )
+  (:action assemble_closure_slot_with_both_flags
+    :parameters (?debit_position - debit_position ?credit_position - credit_position ?debit_channel_instance - debit_channel_instance ?credit_channel_instance - credit_channel_instance ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (debit_position_prepared ?debit_position)
+        (credit_position_prepared ?credit_position)
+        (debit_position_assigned_debit_channel_instance ?debit_position ?debit_channel_instance)
+        (credit_position_assigned_credit_channel_instance ?credit_position ?credit_channel_instance)
+        (debit_channel_instance_flagged ?debit_channel_instance)
+        (credit_channel_instance_flagged ?credit_channel_instance)
+        (not
+          (debit_position_locked ?debit_position)
+        )
+        (not
+          (credit_position_locked ?credit_position)
+        )
+        (closure_slot_available ?closure_slot)
+      )
+    :effect
+      (and
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_assigned_debit_channel_instance ?closure_slot ?debit_channel_instance)
+        (closure_slot_assigned_credit_channel_instance ?closure_slot ?credit_channel_instance)
+        (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        (not
+          (closure_slot_available ?closure_slot)
+        )
+      )
+  )
+  (:action execute_closure_slot
+    :parameters (?closure_slot - closure_slot ?debit_position - debit_position ?validation_service - validation_service)
+    :precondition
+      (and
+        (closure_slot_prepared ?closure_slot)
+        (debit_position_prepared ?debit_position)
+        (settlement_entity_validated_by_validation_service ?debit_position ?validation_service)
+        (not
+          (closure_slot_executed ?closure_slot)
+        )
+      )
+    :effect (closure_slot_executed ?closure_slot)
+  )
+  (:action annex_control_record_to_closure_slot
+    :parameters (?processing_agent - processing_agent ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (settlement_entity_assigned_closure_slot ?processing_agent ?closure_slot)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_available ?control_record)
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_executed ?closure_slot)
+        (not
+          (control_record_processed ?control_record)
+        )
+      )
+    :effect
+      (and
+        (control_record_processed ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (not
+          (control_record_available ?control_record)
+        )
+      )
+  )
+  (:action verify_control_record_and_mark_agent
+    :parameters (?processing_agent - processing_agent ?control_record - control_record ?closure_slot - closure_slot ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_processed ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (settlement_entity_validated_by_validation_service ?processing_agent ?validation_service)
+        (not
+          (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        )
+        (not
+          (processing_agent_control_verified ?processing_agent)
+        )
+      )
+    :effect (processing_agent_control_verified ?processing_agent)
+  )
+  (:action attach_compliance_credential_to_processing_agent
+    :parameters (?processing_agent - processing_agent ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (compliance_credential_available ?compliance_credential)
+        (not
+          (processing_agent_has_compliance_credential ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_has_compliance_credential ?processing_agent)
+        (processing_agent_associated_compliance_credential ?processing_agent ?compliance_credential)
+        (not
+          (compliance_credential_available ?compliance_credential)
+        )
+      )
+  )
+  (:action apply_compliance_credential_and_verify_processing_agent
+    :parameters (?processing_agent - processing_agent ?control_record - control_record ?closure_slot - closure_slot ?validation_service - validation_service ?compliance_credential - compliance_credential)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_processed ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (settlement_entity_validated_by_validation_service ?processing_agent ?validation_service)
+        (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        (processing_agent_has_compliance_credential ?processing_agent)
+        (processing_agent_associated_compliance_credential ?processing_agent ?compliance_credential)
+        (not
+          (processing_agent_control_verified ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_control_verified ?processing_agent)
+        (processing_agent_compliance_verified ?processing_agent)
+      )
+  )
+  (:action prepare_processing_agent_for_approval_standard
+    :parameters (?processing_agent - processing_agent ?settlement_funding_resource - settlement_funding_resource ?authorizing_service - authorizing_service ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_control_verified ?processing_agent)
+        (processing_agent_allocated_funding_resource ?processing_agent ?settlement_funding_resource)
+        (settlement_entity_assigned_authorizing_service ?processing_agent ?authorizing_service)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (not
+          (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        )
+        (not
+          (processing_agent_prepared_for_approval ?processing_agent)
+        )
+      )
+    :effect (processing_agent_prepared_for_approval ?processing_agent)
+  )
+  (:action prepare_processing_agent_for_approval_flagged_slot
+    :parameters (?processing_agent - processing_agent ?settlement_funding_resource - settlement_funding_resource ?authorizing_service - authorizing_service ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_control_verified ?processing_agent)
+        (processing_agent_allocated_funding_resource ?processing_agent ?settlement_funding_resource)
+        (settlement_entity_assigned_authorizing_service ?processing_agent ?authorizing_service)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        (not
+          (processing_agent_prepared_for_approval ?processing_agent)
+        )
+      )
+    :effect (processing_agent_prepared_for_approval ?processing_agent)
+  )
+  (:action confirm_agent_escalation_no_slot_flags
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_prepared_for_approval ?processing_agent)
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (not
+          (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        )
+        (not
+          (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        )
+        (not
+          (processing_agent_approved ?processing_agent)
+        )
+      )
+    :effect (processing_agent_approved ?processing_agent)
+  )
+  (:action confirm_agent_escalation_with_debit_flag
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_prepared_for_approval ?processing_agent)
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        (not
+          (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        )
+        (not
+          (processing_agent_approved ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_requires_approval_token ?processing_agent)
+      )
+  )
+  (:action confirm_agent_escalation_with_credit_flag
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_prepared_for_approval ?processing_agent)
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (not
+          (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        )
+        (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        (not
+          (processing_agent_approved ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_requires_approval_token ?processing_agent)
+      )
+  )
+  (:action confirm_agent_escalation_with_both_slot_flags
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket ?control_record - control_record ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (processing_agent_prepared_for_approval ?processing_agent)
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (processing_agent_attached_control_record ?processing_agent ?control_record)
+        (control_record_linked_closure_slot ?control_record ?closure_slot)
+        (closure_slot_includes_flagged_debit_channel_instance ?closure_slot)
+        (closure_slot_includes_flagged_credit_channel_instance ?closure_slot)
+        (not
+          (processing_agent_approved ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_requires_approval_token ?processing_agent)
+      )
+  )
+  (:action finalize_processing_agent_without_approval_token
+    :parameters (?processing_agent - processing_agent)
+    :precondition
+      (and
+        (processing_agent_approved ?processing_agent)
+        (not
+          (processing_agent_requires_approval_token ?processing_agent)
+        )
+        (not
+          (processing_agent_finalized ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_finalized ?processing_agent)
+        (settlement_entity_settled ?processing_agent)
+      )
+  )
+  (:action attach_approval_token_to_processing_agent
+    :parameters (?processing_agent - processing_agent ?approval_token - approval_token)
+    :precondition
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_requires_approval_token ?processing_agent)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (processing_agent_associated_approval_token ?processing_agent ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action execute_position_closure
+    :parameters (?processing_agent - processing_agent ?debit_position - debit_position ?credit_position - credit_position ?validation_service - validation_service ?approval_token - approval_token)
+    :precondition
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_requires_approval_token ?processing_agent)
+        (processing_agent_associated_approval_token ?processing_agent ?approval_token)
+        (settlement_entity_assigned_debit_position ?processing_agent ?debit_position)
+        (settlement_entity_assigned_credit_position ?processing_agent ?credit_position)
+        (debit_position_locked ?debit_position)
+        (credit_position_locked ?credit_position)
+        (settlement_entity_validated_by_validation_service ?processing_agent ?validation_service)
+        (not
+          (processing_agent_execution_ready ?processing_agent)
+        )
+      )
+    :effect (processing_agent_execution_ready ?processing_agent)
+  )
+  (:action finalize_processing_agent_after_execution
+    :parameters (?processing_agent - processing_agent)
+    :precondition
+      (and
+        (processing_agent_approved ?processing_agent)
+        (processing_agent_execution_ready ?processing_agent)
+        (not
+          (processing_agent_finalized ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_finalized ?processing_agent)
+        (settlement_entity_settled ?processing_agent)
+      )
+  )
+  (:action apply_regulatory_approval_to_processing_agent
+    :parameters (?processing_agent - processing_agent ?regulatory_approval - regulatory_approval ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_validated ?processing_agent)
+        (settlement_entity_validated_by_validation_service ?processing_agent ?validation_service)
+        (regulatory_approval_available ?regulatory_approval)
+        (processing_agent_has_regulatory_approval ?processing_agent ?regulatory_approval)
+        (not
+          (processing_agent_regulatory_acknowledged ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_regulatory_acknowledged ?processing_agent)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action acknowledge_regulatory_and_prepare_escalation
+    :parameters (?processing_agent - processing_agent ?authorizing_service - authorizing_service)
+    :precondition
+      (and
+        (processing_agent_regulatory_acknowledged ?processing_agent)
+        (settlement_entity_assigned_authorizing_service ?processing_agent ?authorizing_service)
+        (not
+          (processing_agent_regulatory_checks_passed ?processing_agent)
+        )
+      )
+    :effect (processing_agent_regulatory_checks_passed ?processing_agent)
+  )
+  (:action assign_escalation_ticket_after_regulatory_ack
+    :parameters (?processing_agent - processing_agent ?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (processing_agent_regulatory_checks_passed ?processing_agent)
+        (processing_agent_assigned_escalation_ticket ?processing_agent ?escalation_ticket)
+        (not
+          (processing_agent_regulatory_approval_confirmed ?processing_agent)
+        )
+      )
+    :effect (processing_agent_regulatory_approval_confirmed ?processing_agent)
+  )
+  (:action finalize_processing_agent_post_regulatory_approval
+    :parameters (?processing_agent - processing_agent)
+    :precondition
+      (and
+        (processing_agent_regulatory_approval_confirmed ?processing_agent)
+        (not
+          (processing_agent_finalized ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (processing_agent_finalized ?processing_agent)
+        (settlement_entity_settled ?processing_agent)
+      )
+  )
+  (:action finalize_debit_position_settlement
+    :parameters (?debit_position - debit_position ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (debit_position_prepared ?debit_position)
+        (debit_position_locked ?debit_position)
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_executed ?closure_slot)
+        (not
+          (settlement_entity_settled ?debit_position)
+        )
+      )
+    :effect (settlement_entity_settled ?debit_position)
+  )
+  (:action finalize_credit_position_settlement
+    :parameters (?credit_position - credit_position ?closure_slot - closure_slot)
+    :precondition
+      (and
+        (credit_position_prepared ?credit_position)
+        (credit_position_locked ?credit_position)
+        (closure_slot_prepared ?closure_slot)
+        (closure_slot_executed ?closure_slot)
+        (not
+          (settlement_entity_settled ?credit_position)
+        )
+      )
+    :effect (settlement_entity_settled ?credit_position)
+  )
+  (:action create_reconciliation_record_for_instruction
+    :parameters (?settlement_instruction - settlement_instruction ?reconciliation_record - reconciliation_record ?validation_service - validation_service)
+    :precondition
+      (and
+        (settlement_entity_settled ?settlement_instruction)
+        (settlement_entity_validated_by_validation_service ?settlement_instruction ?validation_service)
+        (reconciliation_record_available ?reconciliation_record)
+        (not
+          (settlement_entity_reconciliation_initiated ?settlement_instruction)
+        )
+      )
+    :effect
+      (and
+        (settlement_entity_reconciliation_initiated ?settlement_instruction)
+        (settlement_instruction_linked_reconciliation_record ?settlement_instruction ?reconciliation_record)
+        (not
+          (reconciliation_record_available ?reconciliation_record)
+        )
+      )
+  )
+  (:action reassign_debit_position_to_channel_and_mark_closed
+    :parameters (?debit_position - debit_position ?settlement_channel_endpoint - settlement_channel_endpoint ?reconciliation_record - reconciliation_record)
+    :precondition
+      (and
+        (settlement_entity_reconciliation_initiated ?debit_position)
+        (settlement_entity_assigned_channel_endpoint ?debit_position ?settlement_channel_endpoint)
+        (settlement_instruction_linked_reconciliation_record ?debit_position ?reconciliation_record)
+        (not
+          (settlement_entity_closed ?debit_position)
+        )
+      )
+    :effect
+      (and
+        (settlement_entity_closed ?debit_position)
+        (settlement_channel_endpoint_available ?settlement_channel_endpoint)
+        (reconciliation_record_available ?reconciliation_record)
+      )
+  )
+  (:action reassign_credit_position_to_channel_and_mark_closed
+    :parameters (?credit_position - credit_position ?settlement_channel_endpoint - settlement_channel_endpoint ?reconciliation_record - reconciliation_record)
+    :precondition
+      (and
+        (settlement_entity_reconciliation_initiated ?credit_position)
+        (settlement_entity_assigned_channel_endpoint ?credit_position ?settlement_channel_endpoint)
+        (settlement_instruction_linked_reconciliation_record ?credit_position ?reconciliation_record)
+        (not
+          (settlement_entity_closed ?credit_position)
+        )
+      )
+    :effect
+      (and
+        (settlement_entity_closed ?credit_position)
+        (settlement_channel_endpoint_available ?settlement_channel_endpoint)
+        (reconciliation_record_available ?reconciliation_record)
+      )
+  )
+  (:action reassign_processing_agent_to_channel_and_mark_closed
+    :parameters (?processing_agent - processing_agent ?settlement_channel_endpoint - settlement_channel_endpoint ?reconciliation_record - reconciliation_record)
+    :precondition
+      (and
+        (settlement_entity_reconciliation_initiated ?processing_agent)
+        (settlement_entity_assigned_channel_endpoint ?processing_agent ?settlement_channel_endpoint)
+        (settlement_instruction_linked_reconciliation_record ?processing_agent ?reconciliation_record)
+        (not
+          (settlement_entity_closed ?processing_agent)
+        )
+      )
+    :effect
+      (and
+        (settlement_entity_closed ?processing_agent)
+        (settlement_channel_endpoint_available ?settlement_channel_endpoint)
+        (reconciliation_record_available ?reconciliation_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem end_of_day_settlement_closure_problem)
+  (:domain end_of_day_settlement_position_closure)
+  (:objects debit_position_1 - debit_position credit_position_1 - credit_position processing_agent_alpha - processing_agent processing_agent_beta - processing_agent channel_endpoint_a - settlement_channel_endpoint channel_endpoint_b - settlement_channel_endpoint channel_endpoint_c - settlement_channel_endpoint validation_service_core - validation_service authorizing_service_ops - authorizing_service exception_record_1 - exception_record debit_channel_instance_1 - debit_channel_instance credit_channel_instance_1 - credit_channel_instance closure_slot_1 - closure_slot control_record_1 - control_record control_record_2 - control_record compliance_credential_primary - compliance_credential compliance_credential_secondary - compliance_credential approval_token_1 - approval_token approval_token_2 - approval_token reconciliation_record_1 - reconciliation_record settlement_funding_resource_1 - settlement_funding_resource regulatory_approval_authority_1 - regulatory_approval regulatory_approval_authority_2 - regulatory_approval escalation_ticket_1 - escalation_ticket)
+  (:init
+    (settlement_channel_endpoint_available channel_endpoint_a)
+    (settlement_channel_endpoint_available channel_endpoint_b)
+    (settlement_channel_endpoint_available channel_endpoint_c)
+    (validation_service_available validation_service_core)
+    (authorizing_service_available authorizing_service_ops)
+    (exception_record_available exception_record_1)
+    (debit_position_assigned_debit_channel_instance debit_position_1 debit_channel_instance_1)
+    (credit_position_assigned_credit_channel_instance credit_position_1 credit_channel_instance_1)
+    (closure_slot_available closure_slot_1)
+    (control_record_available control_record_1)
+    (control_record_available control_record_2)
+    (settlement_entity_assigned_debit_position processing_agent_alpha debit_position_1)
+    (settlement_entity_assigned_debit_position processing_agent_beta debit_position_1)
+    (settlement_entity_assigned_credit_position processing_agent_alpha credit_position_1)
+    (settlement_entity_assigned_credit_position processing_agent_beta credit_position_1)
+    (settlement_entity_assigned_closure_slot processing_agent_alpha closure_slot_1)
+    (settlement_entity_assigned_closure_slot processing_agent_beta closure_slot_1)
+    (processing_agent_attached_control_record processing_agent_alpha control_record_1)
+    (processing_agent_attached_control_record processing_agent_beta control_record_2)
+    (compliance_credential_available compliance_credential_primary)
+    (compliance_credential_available compliance_credential_secondary)
+    (approval_token_available approval_token_1)
+    (approval_token_available approval_token_2)
+    (reconciliation_record_available reconciliation_record_1)
+    (settlement_funding_resource_available settlement_funding_resource_1)
+    (regulatory_approval_available regulatory_approval_authority_1)
+    (processing_agent_has_regulatory_approval processing_agent_alpha regulatory_approval_authority_1)
+    (processing_agent_has_regulatory_approval processing_agent_beta regulatory_approval_authority_2)
+    (escalation_ticket_available escalation_ticket_1)
+  )
+  (:goal
+    (and
+      (settlement_entity_closed debit_position_1)
+      (settlement_entity_closed credit_position_1)
+      (settlement_entity_closed processing_agent_alpha)
+      (settlement_entity_closed processing_agent_beta)
+    )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain waitlist_priority_and_backup_enrollment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types person - object resource - object schedule_element - object registration_entity - object enrollment_entity - registration_entity waitlist_position - person section_preference - person instructor - person room_feature - person scheduling_constraint - person consent_document - person instructor_availability_slot - person registrar_clearance - person administrative_resource_token - resource classroom - resource department_approval - resource primary_time_slot - schedule_element secondary_time_slot - schedule_element enrollment_proposal - schedule_element student_record_group - enrollment_entity student_subgroup - enrollment_entity priority_waitlist_candidate - student_record_group backup_waitlist_candidate - student_record_group section_enrollment_case - student_subgroup)
+  (:predicates
+    (entity_request_recorded ?registration_request - enrollment_entity)
+    (entity_activated ?registration_request - enrollment_entity)
+    (entity_waitlist_assigned ?registration_request - enrollment_entity)
+    (entity_enrolled ?registration_request - enrollment_entity)
+    (entity_enrollment_offer_issued ?registration_request - enrollment_entity)
+    (entity_consent_recorded ?registration_request - enrollment_entity)
+    (waitlist_slot_available ?waitlist_position - waitlist_position)
+    (entity_assigned_waitlist_slot ?registration_request - enrollment_entity ?waitlist_position - waitlist_position)
+    (preference_available ?section_preference - section_preference)
+    (entity_bound_section_preference ?registration_request - enrollment_entity ?section_preference - section_preference)
+    (instructor_available ?instructor_assignment - instructor)
+    (entity_has_assigned_instructor ?registration_request - enrollment_entity ?instructor_assignment - instructor)
+    (administrative_resource_available ?administrative_resource_token - administrative_resource_token)
+    (allocated_administrative_resource ?priority_waitlist_candidate - priority_waitlist_candidate ?administrative_resource_token - administrative_resource_token)
+    (allocated_administrative_resource_backup ?backup_waitlist_candidate - backup_waitlist_candidate ?administrative_resource_token - administrative_resource_token)
+    (candidate_primary_timeslot_compatible ?priority_waitlist_candidate - priority_waitlist_candidate ?primary_time_slot - primary_time_slot)
+    (primary_timeslot_marked ?primary_time_slot - primary_time_slot)
+    (primary_timeslot_locked ?primary_time_slot - primary_time_slot)
+    (candidate_primary_timeslot_finalized ?priority_waitlist_candidate - priority_waitlist_candidate)
+    (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate - backup_waitlist_candidate ?secondary_time_slot - secondary_time_slot)
+    (secondary_timeslot_marked ?secondary_time_slot - secondary_time_slot)
+    (secondary_timeslot_locked ?secondary_time_slot - secondary_time_slot)
+    (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate - backup_waitlist_candidate)
+    (proposal_available ?enrollment_proposal - enrollment_proposal)
+    (proposal_reserved ?enrollment_proposal - enrollment_proposal)
+    (proposal_primary_timeslot_assigned ?enrollment_proposal - enrollment_proposal ?primary_time_slot - primary_time_slot)
+    (proposal_secondary_timeslot_assigned ?enrollment_proposal - enrollment_proposal ?secondary_time_slot - secondary_time_slot)
+    (proposal_primary_confirmed ?enrollment_proposal - enrollment_proposal)
+    (proposal_secondary_confirmed ?enrollment_proposal - enrollment_proposal)
+    (proposal_ready_for_room_assignment ?enrollment_proposal - enrollment_proposal)
+    (case_has_priority_candidate ?section_enrollment_case - section_enrollment_case ?priority_waitlist_candidate - priority_waitlist_candidate)
+    (case_has_backup_candidate ?section_enrollment_case - section_enrollment_case ?backup_waitlist_candidate - backup_waitlist_candidate)
+    (case_has_enrollment_proposal ?section_enrollment_case - section_enrollment_case ?enrollment_proposal - enrollment_proposal)
+    (classroom_available ?classroom - classroom)
+    (case_compatible_classroom ?section_enrollment_case - section_enrollment_case ?classroom - classroom)
+    (classroom_reserved ?classroom - classroom)
+    (classroom_allocated_to_proposal ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    (case_room_assignment_confirmed ?section_enrollment_case - section_enrollment_case)
+    (case_resources_committed ?section_enrollment_case - section_enrollment_case)
+    (case_ready_for_enrollment ?section_enrollment_case - section_enrollment_case)
+    (case_room_feature_reserved ?section_enrollment_case - section_enrollment_case)
+    (case_room_feature_confirmed ?section_enrollment_case - section_enrollment_case)
+    (case_authorized ?section_enrollment_case - section_enrollment_case)
+    (case_conflict_checks_passed ?section_enrollment_case - section_enrollment_case)
+    (department_approval_available ?department_approval - department_approval)
+    (case_department_approval_linked ?section_enrollment_case - section_enrollment_case ?department_approval - department_approval)
+    (case_department_approved ?section_enrollment_case - section_enrollment_case)
+    (case_instructor_assignment_confirmed ?section_enrollment_case - section_enrollment_case)
+    (case_registrar_approval_confirmed ?section_enrollment_case - section_enrollment_case)
+    (room_feature_available ?room_feature - room_feature)
+    (case_has_room_feature ?section_enrollment_case - section_enrollment_case ?room_feature - room_feature)
+    (scheduling_constraint_available ?scheduling_constraint - scheduling_constraint)
+    (case_scheduling_constraint_assigned ?section_enrollment_case - section_enrollment_case ?scheduling_constraint - scheduling_constraint)
+    (instructor_availability_slot_available ?instructor_availability_slot - instructor_availability_slot)
+    (case_instructor_availability_assigned ?section_enrollment_case - section_enrollment_case ?instructor_availability_slot - instructor_availability_slot)
+    (registrar_clearance_available ?registrar_clearance - registrar_clearance)
+    (case_registrar_clearance_assigned ?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance)
+    (consent_document_available ?consent_document - consent_document)
+    (entity_has_consent_document_attached ?registration_request - enrollment_entity ?consent_document - consent_document)
+    (priority_candidate_ready ?priority_waitlist_candidate - priority_waitlist_candidate)
+    (backup_candidate_ready ?backup_waitlist_candidate - backup_waitlist_candidate)
+    (case_offer_flagged ?section_enrollment_case - section_enrollment_case)
+  )
+  (:action record_registration_request
+    :parameters (?registration_request - enrollment_entity)
+    :precondition
+      (and
+        (not
+          (entity_request_recorded ?registration_request)
+        )
+        (not
+          (entity_enrolled ?registration_request)
+        )
+      )
+    :effect (entity_request_recorded ?registration_request)
+  )
+  (:action assign_waitlist_position
+    :parameters (?registration_request - enrollment_entity ?waitlist_position - waitlist_position)
+    :precondition
+      (and
+        (entity_request_recorded ?registration_request)
+        (not
+          (entity_waitlist_assigned ?registration_request)
+        )
+        (waitlist_slot_available ?waitlist_position)
+      )
+    :effect
+      (and
+        (entity_waitlist_assigned ?registration_request)
+        (entity_assigned_waitlist_slot ?registration_request ?waitlist_position)
+        (not
+          (waitlist_slot_available ?waitlist_position)
+        )
+      )
+  )
+  (:action bind_request_to_section_preference
+    :parameters (?registration_request - enrollment_entity ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_request_recorded ?registration_request)
+        (entity_waitlist_assigned ?registration_request)
+        (preference_available ?section_preference)
+      )
+    :effect
+      (and
+        (entity_bound_section_preference ?registration_request ?section_preference)
+        (not
+          (preference_available ?section_preference)
+        )
+      )
+  )
+  (:action activate_registration_case
+    :parameters (?registration_request - enrollment_entity ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_request_recorded ?registration_request)
+        (entity_waitlist_assigned ?registration_request)
+        (entity_bound_section_preference ?registration_request ?section_preference)
+        (not
+          (entity_activated ?registration_request)
+        )
+      )
+    :effect (entity_activated ?registration_request)
+  )
+  (:action release_section_preference
+    :parameters (?registration_request - enrollment_entity ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_bound_section_preference ?registration_request ?section_preference)
+      )
+    :effect
+      (and
+        (preference_available ?section_preference)
+        (not
+          (entity_bound_section_preference ?registration_request ?section_preference)
+        )
+      )
+  )
+  (:action assign_instructor_to_request
+    :parameters (?registration_request - enrollment_entity ?instructor_assignment - instructor)
+    :precondition
+      (and
+        (entity_activated ?registration_request)
+        (instructor_available ?instructor_assignment)
+      )
+    :effect
+      (and
+        (entity_has_assigned_instructor ?registration_request ?instructor_assignment)
+        (not
+          (instructor_available ?instructor_assignment)
+        )
+      )
+  )
+  (:action release_instructor_assignment
+    :parameters (?registration_request - enrollment_entity ?instructor_assignment - instructor)
+    :precondition
+      (and
+        (entity_has_assigned_instructor ?registration_request ?instructor_assignment)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor_assignment)
+        (not
+          (entity_has_assigned_instructor ?registration_request ?instructor_assignment)
+        )
+      )
+  )
+  (:action reserve_instructor_availability_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?instructor_availability_slot - instructor_availability_slot)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (instructor_availability_slot_available ?instructor_availability_slot)
+      )
+    :effect
+      (and
+        (case_instructor_availability_assigned ?section_enrollment_case ?instructor_availability_slot)
+        (not
+          (instructor_availability_slot_available ?instructor_availability_slot)
+        )
+      )
+  )
+  (:action release_instructor_availability_from_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?instructor_availability_slot - instructor_availability_slot)
+    :precondition
+      (and
+        (case_instructor_availability_assigned ?section_enrollment_case ?instructor_availability_slot)
+      )
+    :effect
+      (and
+        (instructor_availability_slot_available ?instructor_availability_slot)
+        (not
+          (case_instructor_availability_assigned ?section_enrollment_case ?instructor_availability_slot)
+        )
+      )
+  )
+  (:action reserve_registrar_clearance_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (registrar_clearance_available ?registrar_clearance)
+      )
+    :effect
+      (and
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (not
+          (registrar_clearance_available ?registrar_clearance)
+        )
+      )
+  )
+  (:action release_registrar_clearance_from_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+      )
+    :effect
+      (and
+        (registrar_clearance_available ?registrar_clearance)
+        (not
+          (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        )
+      )
+  )
+  (:action mark_primary_timeslot_for_candidate
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?primary_time_slot - primary_time_slot ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_activated ?priority_waitlist_candidate)
+        (entity_bound_section_preference ?priority_waitlist_candidate ?section_preference)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (not
+          (primary_timeslot_marked ?primary_time_slot)
+        )
+        (not
+          (primary_timeslot_locked ?primary_time_slot)
+        )
+      )
+    :effect (primary_timeslot_marked ?primary_time_slot)
+  )
+  (:action confirm_priority_candidate_primary_timeslot
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?primary_time_slot - primary_time_slot ?instructor_assignment - instructor)
+    :precondition
+      (and
+        (entity_activated ?priority_waitlist_candidate)
+        (entity_has_assigned_instructor ?priority_waitlist_candidate ?instructor_assignment)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (primary_timeslot_marked ?primary_time_slot)
+        (not
+          (priority_candidate_ready ?priority_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+      )
+  )
+  (:action allocate_admin_resource_for_priority_candidate
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?primary_time_slot - primary_time_slot ?administrative_resource_token - administrative_resource_token)
+    :precondition
+      (and
+        (entity_activated ?priority_waitlist_candidate)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (administrative_resource_available ?administrative_resource_token)
+        (not
+          (priority_candidate_ready ?priority_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_locked ?primary_time_slot)
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (allocated_administrative_resource ?priority_waitlist_candidate ?administrative_resource_token)
+        (not
+          (administrative_resource_available ?administrative_resource_token)
+        )
+      )
+  )
+  (:action finalize_priority_candidate_primary_timeslot
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?primary_time_slot - primary_time_slot ?section_preference - section_preference ?administrative_resource_token - administrative_resource_token)
+    :precondition
+      (and
+        (entity_activated ?priority_waitlist_candidate)
+        (entity_bound_section_preference ?priority_waitlist_candidate ?section_preference)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (primary_timeslot_locked ?primary_time_slot)
+        (allocated_administrative_resource ?priority_waitlist_candidate ?administrative_resource_token)
+        (not
+          (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_marked ?primary_time_slot)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        (administrative_resource_available ?administrative_resource_token)
+        (not
+          (allocated_administrative_resource ?priority_waitlist_candidate ?administrative_resource_token)
+        )
+      )
+  )
+  (:action mark_secondary_timeslot_for_backup_candidate
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?secondary_time_slot - secondary_time_slot ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_activated ?backup_waitlist_candidate)
+        (entity_bound_section_preference ?backup_waitlist_candidate ?section_preference)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (not
+          (secondary_timeslot_marked ?secondary_time_slot)
+        )
+        (not
+          (secondary_timeslot_locked ?secondary_time_slot)
+        )
+      )
+    :effect (secondary_timeslot_marked ?secondary_time_slot)
+  )
+  (:action confirm_backup_candidate_secondary_timeslot
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?secondary_time_slot - secondary_time_slot ?instructor_assignment - instructor)
+    :precondition
+      (and
+        (entity_activated ?backup_waitlist_candidate)
+        (entity_has_assigned_instructor ?backup_waitlist_candidate ?instructor_assignment)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (secondary_timeslot_marked ?secondary_time_slot)
+        (not
+          (backup_candidate_ready ?backup_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+      )
+  )
+  (:action allocate_admin_resource_for_backup_candidate
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?secondary_time_slot - secondary_time_slot ?administrative_resource_token - administrative_resource_token)
+    :precondition
+      (and
+        (entity_activated ?backup_waitlist_candidate)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (administrative_resource_available ?administrative_resource_token)
+        (not
+          (backup_candidate_ready ?backup_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (secondary_timeslot_locked ?secondary_time_slot)
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (allocated_administrative_resource_backup ?backup_waitlist_candidate ?administrative_resource_token)
+        (not
+          (administrative_resource_available ?administrative_resource_token)
+        )
+      )
+  )
+  (:action finalize_backup_candidate_secondary_timeslot
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?secondary_time_slot - secondary_time_slot ?section_preference - section_preference ?administrative_resource_token - administrative_resource_token)
+    :precondition
+      (and
+        (entity_activated ?backup_waitlist_candidate)
+        (entity_bound_section_preference ?backup_waitlist_candidate ?section_preference)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (secondary_timeslot_locked ?secondary_time_slot)
+        (allocated_administrative_resource_backup ?backup_waitlist_candidate ?administrative_resource_token)
+        (not
+          (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (secondary_timeslot_marked ?secondary_time_slot)
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        (administrative_resource_available ?administrative_resource_token)
+        (not
+          (allocated_administrative_resource_backup ?backup_waitlist_candidate ?administrative_resource_token)
+        )
+      )
+  )
+  (:action form_enrollment_proposal
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?backup_waitlist_candidate - backup_waitlist_candidate ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (primary_timeslot_marked ?primary_time_slot)
+        (secondary_timeslot_marked ?secondary_time_slot)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        (proposal_available ?enrollment_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_primary_timeslot_assigned ?enrollment_proposal ?primary_time_slot)
+        (proposal_secondary_timeslot_assigned ?enrollment_proposal ?secondary_time_slot)
+        (not
+          (proposal_available ?enrollment_proposal)
+        )
+      )
+  )
+  (:action form_enrollment_proposal_with_primary_lock
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?backup_waitlist_candidate - backup_waitlist_candidate ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (primary_timeslot_locked ?primary_time_slot)
+        (secondary_timeslot_marked ?secondary_time_slot)
+        (not
+          (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        )
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        (proposal_available ?enrollment_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_primary_timeslot_assigned ?enrollment_proposal ?primary_time_slot)
+        (proposal_secondary_timeslot_assigned ?enrollment_proposal ?secondary_time_slot)
+        (proposal_primary_confirmed ?enrollment_proposal)
+        (not
+          (proposal_available ?enrollment_proposal)
+        )
+      )
+  )
+  (:action form_enrollment_proposal_with_secondary_lock
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?backup_waitlist_candidate - backup_waitlist_candidate ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (primary_timeslot_marked ?primary_time_slot)
+        (secondary_timeslot_locked ?secondary_time_slot)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        (not
+          (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        )
+        (proposal_available ?enrollment_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_primary_timeslot_assigned ?enrollment_proposal ?primary_time_slot)
+        (proposal_secondary_timeslot_assigned ?enrollment_proposal ?secondary_time_slot)
+        (proposal_secondary_confirmed ?enrollment_proposal)
+        (not
+          (proposal_available ?enrollment_proposal)
+        )
+      )
+  )
+  (:action form_enrollment_proposal_with_both_locks
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?backup_waitlist_candidate - backup_waitlist_candidate ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_primary_timeslot_compatible ?priority_waitlist_candidate ?primary_time_slot)
+        (candidate_secondary_timeslot_compatible ?backup_waitlist_candidate ?secondary_time_slot)
+        (primary_timeslot_locked ?primary_time_slot)
+        (secondary_timeslot_locked ?secondary_time_slot)
+        (not
+          (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        )
+        (not
+          (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        )
+        (proposal_available ?enrollment_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_primary_timeslot_assigned ?enrollment_proposal ?primary_time_slot)
+        (proposal_secondary_timeslot_assigned ?enrollment_proposal ?secondary_time_slot)
+        (proposal_primary_confirmed ?enrollment_proposal)
+        (proposal_secondary_confirmed ?enrollment_proposal)
+        (not
+          (proposal_available ?enrollment_proposal)
+        )
+      )
+  )
+  (:action validate_proposal_for_room_assignment
+    :parameters (?enrollment_proposal - enrollment_proposal ?priority_waitlist_candidate - priority_waitlist_candidate ?section_preference - section_preference)
+    :precondition
+      (and
+        (proposal_reserved ?enrollment_proposal)
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (entity_bound_section_preference ?priority_waitlist_candidate ?section_preference)
+        (not
+          (proposal_ready_for_room_assignment ?enrollment_proposal)
+        )
+      )
+    :effect (proposal_ready_for_room_assignment ?enrollment_proposal)
+  )
+  (:action allocate_classroom_to_proposal
+    :parameters (?section_enrollment_case - section_enrollment_case ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (case_has_enrollment_proposal ?section_enrollment_case ?enrollment_proposal)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_available ?classroom)
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_ready_for_room_assignment ?enrollment_proposal)
+        (not
+          (classroom_reserved ?classroom)
+        )
+      )
+    :effect
+      (and
+        (classroom_reserved ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (not
+          (classroom_available ?classroom)
+        )
+      )
+  )
+  (:action confirm_room_assignment_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?classroom - classroom ?enrollment_proposal - enrollment_proposal ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_reserved ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (entity_bound_section_preference ?section_enrollment_case ?section_preference)
+        (not
+          (proposal_primary_confirmed ?enrollment_proposal)
+        )
+        (not
+          (case_room_assignment_confirmed ?section_enrollment_case)
+        )
+      )
+    :effect (case_room_assignment_confirmed ?section_enrollment_case)
+  )
+  (:action assign_room_feature_to_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?room_feature - room_feature)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (room_feature_available ?room_feature)
+        (not
+          (case_room_feature_reserved ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_room_feature_reserved ?section_enrollment_case)
+        (case_has_room_feature ?section_enrollment_case ?room_feature)
+        (not
+          (room_feature_available ?room_feature)
+        )
+      )
+  )
+  (:action confirm_room_feature_and_room_assignment
+    :parameters (?section_enrollment_case - section_enrollment_case ?classroom - classroom ?enrollment_proposal - enrollment_proposal ?section_preference - section_preference ?room_feature - room_feature)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_reserved ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (entity_bound_section_preference ?section_enrollment_case ?section_preference)
+        (proposal_primary_confirmed ?enrollment_proposal)
+        (case_room_feature_reserved ?section_enrollment_case)
+        (case_has_room_feature ?section_enrollment_case ?room_feature)
+        (not
+          (case_room_assignment_confirmed ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_room_assignment_confirmed ?section_enrollment_case)
+        (case_room_feature_confirmed ?section_enrollment_case)
+      )
+  )
+  (:action commit_case_resources
+    :parameters (?section_enrollment_case - section_enrollment_case ?instructor_availability_slot - instructor_availability_slot ?instructor_assignment - instructor ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_room_assignment_confirmed ?section_enrollment_case)
+        (case_instructor_availability_assigned ?section_enrollment_case ?instructor_availability_slot)
+        (entity_has_assigned_instructor ?section_enrollment_case ?instructor_assignment)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (not
+          (proposal_secondary_confirmed ?enrollment_proposal)
+        )
+        (not
+          (case_resources_committed ?section_enrollment_case)
+        )
+      )
+    :effect (case_resources_committed ?section_enrollment_case)
+  )
+  (:action commit_case_resources_secondary_confirmation
+    :parameters (?section_enrollment_case - section_enrollment_case ?instructor_availability_slot - instructor_availability_slot ?instructor_assignment - instructor ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_room_assignment_confirmed ?section_enrollment_case)
+        (case_instructor_availability_assigned ?section_enrollment_case ?instructor_availability_slot)
+        (entity_has_assigned_instructor ?section_enrollment_case ?instructor_assignment)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (proposal_secondary_confirmed ?enrollment_proposal)
+        (not
+          (case_resources_committed ?section_enrollment_case)
+        )
+      )
+    :effect (case_resources_committed ?section_enrollment_case)
+  )
+  (:action mark_case_ready_for_enrollment
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_resources_committed ?section_enrollment_case)
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (not
+          (proposal_primary_confirmed ?enrollment_proposal)
+        )
+        (not
+          (proposal_secondary_confirmed ?enrollment_proposal)
+        )
+        (not
+          (case_ready_for_enrollment ?section_enrollment_case)
+        )
+      )
+    :effect (case_ready_for_enrollment ?section_enrollment_case)
+  )
+  (:action authorize_case_with_partial_room_flags
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_resources_committed ?section_enrollment_case)
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (proposal_primary_confirmed ?enrollment_proposal)
+        (not
+          (proposal_secondary_confirmed ?enrollment_proposal)
+        )
+        (not
+          (case_ready_for_enrollment ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_authorized ?section_enrollment_case)
+      )
+  )
+  (:action authorize_case_with_secondary_room_flag
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_resources_committed ?section_enrollment_case)
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (not
+          (proposal_primary_confirmed ?enrollment_proposal)
+        )
+        (proposal_secondary_confirmed ?enrollment_proposal)
+        (not
+          (case_ready_for_enrollment ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_authorized ?section_enrollment_case)
+      )
+  )
+  (:action authorize_case_with_both_room_flags
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance ?classroom - classroom ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (case_resources_committed ?section_enrollment_case)
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (case_compatible_classroom ?section_enrollment_case ?classroom)
+        (classroom_allocated_to_proposal ?classroom ?enrollment_proposal)
+        (proposal_primary_confirmed ?enrollment_proposal)
+        (proposal_secondary_confirmed ?enrollment_proposal)
+        (not
+          (case_ready_for_enrollment ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_authorized ?section_enrollment_case)
+      )
+  )
+  (:action issue_enrollment_offer_initial
+    :parameters (?section_enrollment_case - section_enrollment_case)
+    :precondition
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (not
+          (case_authorized ?section_enrollment_case)
+        )
+        (not
+          (case_offer_flagged ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_offer_flagged ?section_enrollment_case)
+        (entity_enrollment_offer_issued ?section_enrollment_case)
+      )
+  )
+  (:action assign_scheduling_constraint_to_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?scheduling_constraint - scheduling_constraint)
+    :precondition
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_authorized ?section_enrollment_case)
+        (scheduling_constraint_available ?scheduling_constraint)
+      )
+    :effect
+      (and
+        (case_scheduling_constraint_assigned ?section_enrollment_case ?scheduling_constraint)
+        (not
+          (scheduling_constraint_available ?scheduling_constraint)
+        )
+      )
+  )
+  (:action perform_final_conflict_checks_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?priority_waitlist_candidate - priority_waitlist_candidate ?backup_waitlist_candidate - backup_waitlist_candidate ?section_preference - section_preference ?scheduling_constraint - scheduling_constraint)
+    :precondition
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_authorized ?section_enrollment_case)
+        (case_scheduling_constraint_assigned ?section_enrollment_case ?scheduling_constraint)
+        (case_has_priority_candidate ?section_enrollment_case ?priority_waitlist_candidate)
+        (case_has_backup_candidate ?section_enrollment_case ?backup_waitlist_candidate)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        (entity_bound_section_preference ?section_enrollment_case ?section_preference)
+        (not
+          (case_conflict_checks_passed ?section_enrollment_case)
+        )
+      )
+    :effect (case_conflict_checks_passed ?section_enrollment_case)
+  )
+  (:action issue_enrollment_offer_after_conflict_checks
+    :parameters (?section_enrollment_case - section_enrollment_case)
+    :precondition
+      (and
+        (case_ready_for_enrollment ?section_enrollment_case)
+        (case_conflict_checks_passed ?section_enrollment_case)
+        (not
+          (case_offer_flagged ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_offer_flagged ?section_enrollment_case)
+        (entity_enrollment_offer_issued ?section_enrollment_case)
+      )
+  )
+  (:action apply_department_approval_to_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?department_approval - department_approval ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_activated ?section_enrollment_case)
+        (entity_bound_section_preference ?section_enrollment_case ?section_preference)
+        (department_approval_available ?department_approval)
+        (case_department_approval_linked ?section_enrollment_case ?department_approval)
+        (not
+          (case_department_approved ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_department_approved ?section_enrollment_case)
+        (not
+          (department_approval_available ?department_approval)
+        )
+      )
+  )
+  (:action confirm_instructor_assignment_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?instructor_assignment - instructor)
+    :precondition
+      (and
+        (case_department_approved ?section_enrollment_case)
+        (entity_has_assigned_instructor ?section_enrollment_case ?instructor_assignment)
+        (not
+          (case_instructor_assignment_confirmed ?section_enrollment_case)
+        )
+      )
+    :effect (case_instructor_assignment_confirmed ?section_enrollment_case)
+  )
+  (:action record_registrar_approval_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case ?registrar_clearance - registrar_clearance)
+    :precondition
+      (and
+        (case_instructor_assignment_confirmed ?section_enrollment_case)
+        (case_registrar_clearance_assigned ?section_enrollment_case ?registrar_clearance)
+        (not
+          (case_registrar_approval_confirmed ?section_enrollment_case)
+        )
+      )
+    :effect (case_registrar_approval_confirmed ?section_enrollment_case)
+  )
+  (:action finalize_enrollment_offer_for_case
+    :parameters (?section_enrollment_case - section_enrollment_case)
+    :precondition
+      (and
+        (case_registrar_approval_confirmed ?section_enrollment_case)
+        (not
+          (case_offer_flagged ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (case_offer_flagged ?section_enrollment_case)
+        (entity_enrollment_offer_issued ?section_enrollment_case)
+      )
+  )
+  (:action confirm_enrollment_for_priority_candidate
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (priority_candidate_ready ?priority_waitlist_candidate)
+        (candidate_primary_timeslot_finalized ?priority_waitlist_candidate)
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_ready_for_room_assignment ?enrollment_proposal)
+        (not
+          (entity_enrollment_offer_issued ?priority_waitlist_candidate)
+        )
+      )
+    :effect (entity_enrollment_offer_issued ?priority_waitlist_candidate)
+  )
+  (:action confirm_enrollment_for_backup_candidate
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?enrollment_proposal - enrollment_proposal)
+    :precondition
+      (and
+        (backup_candidate_ready ?backup_waitlist_candidate)
+        (candidate_secondary_timeslot_finalized ?backup_waitlist_candidate)
+        (proposal_reserved ?enrollment_proposal)
+        (proposal_ready_for_room_assignment ?enrollment_proposal)
+        (not
+          (entity_enrollment_offer_issued ?backup_waitlist_candidate)
+        )
+      )
+    :effect (entity_enrollment_offer_issued ?backup_waitlist_candidate)
+  )
+  (:action record_student_consent_for_request
+    :parameters (?registration_request - enrollment_entity ?consent_document - consent_document ?section_preference - section_preference)
+    :precondition
+      (and
+        (entity_enrollment_offer_issued ?registration_request)
+        (entity_bound_section_preference ?registration_request ?section_preference)
+        (consent_document_available ?consent_document)
+        (not
+          (entity_consent_recorded ?registration_request)
+        )
+      )
+    :effect
+      (and
+        (entity_consent_recorded ?registration_request)
+        (entity_has_consent_document_attached ?registration_request ?consent_document)
+        (not
+          (consent_document_available ?consent_document)
+        )
+      )
+  )
+  (:action enroll_priority_candidate_with_consent
+    :parameters (?priority_waitlist_candidate - priority_waitlist_candidate ?waitlist_position - waitlist_position ?consent_document - consent_document)
+    :precondition
+      (and
+        (entity_consent_recorded ?priority_waitlist_candidate)
+        (entity_assigned_waitlist_slot ?priority_waitlist_candidate ?waitlist_position)
+        (entity_has_consent_document_attached ?priority_waitlist_candidate ?consent_document)
+        (not
+          (entity_enrolled ?priority_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_enrolled ?priority_waitlist_candidate)
+        (waitlist_slot_available ?waitlist_position)
+        (consent_document_available ?consent_document)
+      )
+  )
+  (:action enroll_backup_candidate_with_consent
+    :parameters (?backup_waitlist_candidate - backup_waitlist_candidate ?waitlist_position - waitlist_position ?consent_document - consent_document)
+    :precondition
+      (and
+        (entity_consent_recorded ?backup_waitlist_candidate)
+        (entity_assigned_waitlist_slot ?backup_waitlist_candidate ?waitlist_position)
+        (entity_has_consent_document_attached ?backup_waitlist_candidate ?consent_document)
+        (not
+          (entity_enrolled ?backup_waitlist_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_enrolled ?backup_waitlist_candidate)
+        (waitlist_slot_available ?waitlist_position)
+        (consent_document_available ?consent_document)
+      )
+  )
+  (:action enroll_case_with_consent
+    :parameters (?section_enrollment_case - section_enrollment_case ?waitlist_position - waitlist_position ?consent_document - consent_document)
+    :precondition
+      (and
+        (entity_consent_recorded ?section_enrollment_case)
+        (entity_assigned_waitlist_slot ?section_enrollment_case ?waitlist_position)
+        (entity_has_consent_document_attached ?section_enrollment_case ?consent_document)
+        (not
+          (entity_enrolled ?section_enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_enrolled ?section_enrollment_case)
+        (waitlist_slot_available ?waitlist_position)
+        (consent_document_available ?consent_document)
+      )
+  )
+)

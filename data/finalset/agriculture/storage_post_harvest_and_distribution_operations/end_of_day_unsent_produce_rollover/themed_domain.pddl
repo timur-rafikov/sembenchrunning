@@ -1,0 +1,936 @@
+(define (domain end_of_day_unsent_produce_rollover_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object equipment_group - object logistics_group - object core_entity - object consignment_unit - core_entity dispatch_channel_slot - resource_group grader_station - resource_group conditioning_unit - resource_group destination_channel - resource_group carrier_manifest - resource_group rollover_window - resource_group quality_certificate - resource_group traceability_tag - resource_group packing_material - equipment_group storage_bin - equipment_group priority_flag - equipment_group storage_location - logistics_group transport_channel - logistics_group outbound_container - logistics_group pallet_type - consignment_unit case_type - consignment_unit consignment_inbound_pallet - pallet_type consignment_outbound_pallet - pallet_type consignment_case - case_type)
+  (:predicates
+    (consignment_item_received ?produce_consignment - consignment_unit)
+    (consignment_item_cleared_for_conditioning ?produce_consignment - consignment_unit)
+    (consignment_item_allocated ?produce_consignment - consignment_unit)
+    (consignment_item_marked_for_release ?produce_consignment - consignment_unit)
+    (consignment_item_handover_completed ?produce_consignment - consignment_unit)
+    (consignment_item_marked_for_rollover ?produce_consignment - consignment_unit)
+    (dispatch_slot_available ?dispatch_channel_slot - dispatch_channel_slot)
+    (assigned_to_dispatch_slot ?produce_consignment - consignment_unit ?dispatch_channel_slot - dispatch_channel_slot)
+    (grader_available ?grader_station - grader_station)
+    (assigned_to_grader ?produce_consignment - consignment_unit ?grader_station - grader_station)
+    (conditioning_unit_available ?conditioning_unit - conditioning_unit)
+    (assigned_to_conditioning_unit ?produce_consignment - consignment_unit ?conditioning_unit - conditioning_unit)
+    (packing_material_available ?packing_material - packing_material)
+    (inbound_pallet_packing_material_assigned ?inbound_pallet - consignment_inbound_pallet ?packing_material - packing_material)
+    (outbound_pallet_packing_material_assigned ?outbound_pallet - consignment_outbound_pallet ?packing_material - packing_material)
+    (inbound_pallet_assigned_storage_location ?inbound_pallet - consignment_inbound_pallet ?storage_location - storage_location)
+    (storage_location_signal ?storage_location - storage_location)
+    (storage_location_reserved ?storage_location - storage_location)
+    (inbound_pallet_ready ?inbound_pallet - consignment_inbound_pallet)
+    (outbound_pallet_assigned_transport_channel ?outbound_pallet - consignment_outbound_pallet ?transport_channel - transport_channel)
+    (transport_channel_signal ?transport_channel - transport_channel)
+    (transport_channel_reserved ?transport_channel - transport_channel)
+    (outbound_pallet_ready ?outbound_pallet - consignment_outbound_pallet)
+    (outbound_container_available ?outbound_container - outbound_container)
+    (outbound_container_staged ?outbound_container - outbound_container)
+    (container_assigned_storage_location ?outbound_container - outbound_container ?storage_location - storage_location)
+    (container_assigned_transport_channel ?outbound_container - outbound_container ?transport_channel - transport_channel)
+    (container_flag_priority_a ?outbound_container - outbound_container)
+    (container_flag_priority_b ?outbound_container - outbound_container)
+    (outbound_container_verified ?outbound_container - outbound_container)
+    (case_loaded_on_inbound_pallet ?handling_unit_case - consignment_case ?inbound_pallet - consignment_inbound_pallet)
+    (case_loaded_on_outbound_pallet ?handling_unit_case - consignment_case ?outbound_pallet - consignment_outbound_pallet)
+    (case_assigned_to_outbound_container ?handling_unit_case - consignment_case ?outbound_container - outbound_container)
+    (storage_bin_available ?storage_bin - storage_bin)
+    (case_assigned_to_storage_bin ?handling_unit_case - consignment_case ?storage_bin - storage_bin)
+    (storage_bin_claimed ?storage_bin - storage_bin)
+    (storage_bin_assigned_to_container ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    (case_staging_confirmed ?handling_unit_case - consignment_case)
+    (case_quality_stage_passed ?handling_unit_case - consignment_case)
+    (case_quality_checks_completed ?handling_unit_case - consignment_case)
+    (case_destination_claimed ?handling_unit_case - consignment_case)
+    (case_manifest_linked ?handling_unit_case - consignment_case)
+    (case_quality_tagged ?handling_unit_case - consignment_case)
+    (case_consolidation_confirmed ?handling_unit_case - consignment_case)
+    (priority_flag_available ?priority_flag - priority_flag)
+    (case_assigned_priority_flag ?handling_unit_case - consignment_case ?priority_flag - priority_flag)
+    (case_priority_attached ?handling_unit_case - consignment_case)
+    (case_conditioning_assigned ?handling_unit_case - consignment_case)
+    (case_ready_for_finalize ?handling_unit_case - consignment_case)
+    (destination_channel_available ?destination_channel - destination_channel)
+    (case_assigned_destination_channel ?handling_unit_case - consignment_case ?destination_channel - destination_channel)
+    (carrier_manifest_available ?carrier_manifest - carrier_manifest)
+    (case_assigned_carrier_manifest ?handling_unit_case - consignment_case ?carrier_manifest - carrier_manifest)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (case_assigned_quality_certificate ?handling_unit_case - consignment_case ?quality_certificate - quality_certificate)
+    (traceability_tag_available ?traceability_tag - traceability_tag)
+    (case_assigned_traceability_tag ?handling_unit_case - consignment_case ?traceability_tag - traceability_tag)
+    (rollover_window_available ?rollover_window - rollover_window)
+    (assigned_rollover_window ?produce_consignment - consignment_unit ?rollover_window - rollover_window)
+    (inbound_pallet_processing_flag ?inbound_pallet - consignment_inbound_pallet)
+    (outbound_pallet_processing_flag ?outbound_pallet - consignment_outbound_pallet)
+    (case_finalized ?handling_unit_case - consignment_case)
+  )
+  (:action register_consignment_received
+    :parameters (?produce_consignment - consignment_unit)
+    :precondition
+      (and
+        (not
+          (consignment_item_received ?produce_consignment)
+        )
+        (not
+          (consignment_item_marked_for_release ?produce_consignment)
+        )
+      )
+    :effect (consignment_item_received ?produce_consignment)
+  )
+  (:action allocate_dispatch_slot_to_consignment
+    :parameters (?produce_consignment - consignment_unit ?dispatch_channel_slot - dispatch_channel_slot)
+    :precondition
+      (and
+        (consignment_item_received ?produce_consignment)
+        (not
+          (consignment_item_allocated ?produce_consignment)
+        )
+        (dispatch_slot_available ?dispatch_channel_slot)
+      )
+    :effect
+      (and
+        (consignment_item_allocated ?produce_consignment)
+        (assigned_to_dispatch_slot ?produce_consignment ?dispatch_channel_slot)
+        (not
+          (dispatch_slot_available ?dispatch_channel_slot)
+        )
+      )
+  )
+  (:action assign_grader_to_consignment
+    :parameters (?produce_consignment - consignment_unit ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_received ?produce_consignment)
+        (consignment_item_allocated ?produce_consignment)
+        (grader_available ?grader_station)
+      )
+    :effect
+      (and
+        (assigned_to_grader ?produce_consignment ?grader_station)
+        (not
+          (grader_available ?grader_station)
+        )
+      )
+  )
+  (:action mark_consignment_graded
+    :parameters (?produce_consignment - consignment_unit ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_received ?produce_consignment)
+        (consignment_item_allocated ?produce_consignment)
+        (assigned_to_grader ?produce_consignment ?grader_station)
+        (not
+          (consignment_item_cleared_for_conditioning ?produce_consignment)
+        )
+      )
+    :effect (consignment_item_cleared_for_conditioning ?produce_consignment)
+  )
+  (:action release_grader
+    :parameters (?produce_consignment - consignment_unit ?grader_station - grader_station)
+    :precondition
+      (and
+        (assigned_to_grader ?produce_consignment ?grader_station)
+      )
+    :effect
+      (and
+        (grader_available ?grader_station)
+        (not
+          (assigned_to_grader ?produce_consignment ?grader_station)
+        )
+      )
+  )
+  (:action assign_conditioning_unit_to_consignment
+    :parameters (?produce_consignment - consignment_unit ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?produce_consignment)
+        (conditioning_unit_available ?conditioning_unit)
+      )
+    :effect
+      (and
+        (assigned_to_conditioning_unit ?produce_consignment ?conditioning_unit)
+        (not
+          (conditioning_unit_available ?conditioning_unit)
+        )
+      )
+  )
+  (:action release_conditioning_unit_from_consignment
+    :parameters (?produce_consignment - consignment_unit ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (assigned_to_conditioning_unit ?produce_consignment ?conditioning_unit)
+      )
+    :effect
+      (and
+        (conditioning_unit_available ?conditioning_unit)
+        (not
+          (assigned_to_conditioning_unit ?produce_consignment ?conditioning_unit)
+        )
+      )
+  )
+  (:action attach_quality_certificate_to_case
+    :parameters (?handling_unit_case - consignment_case ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (quality_certificate_available ?quality_certificate)
+      )
+    :effect
+      (and
+        (case_assigned_quality_certificate ?handling_unit_case ?quality_certificate)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action detach_quality_certificate_from_case
+    :parameters (?handling_unit_case - consignment_case ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (case_assigned_quality_certificate ?handling_unit_case ?quality_certificate)
+      )
+    :effect
+      (and
+        (quality_certificate_available ?quality_certificate)
+        (not
+          (case_assigned_quality_certificate ?handling_unit_case ?quality_certificate)
+        )
+      )
+  )
+  (:action attach_traceability_tag_to_case
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (traceability_tag_available ?traceability_tag)
+      )
+    :effect
+      (and
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (not
+          (traceability_tag_available ?traceability_tag)
+        )
+      )
+  )
+  (:action detach_traceability_tag_from_case
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+      )
+    :effect
+      (and
+        (traceability_tag_available ?traceability_tag)
+        (not
+          (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        )
+      )
+  )
+  (:action signal_storage_location_availability
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?storage_location - storage_location ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?inbound_pallet)
+        (assigned_to_grader ?inbound_pallet ?grader_station)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (not
+          (storage_location_signal ?storage_location)
+        )
+        (not
+          (storage_location_reserved ?storage_location)
+        )
+      )
+    :effect (storage_location_signal ?storage_location)
+  )
+  (:action claim_storage_location_for_pallet
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?storage_location - storage_location ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?inbound_pallet)
+        (assigned_to_conditioning_unit ?inbound_pallet ?conditioning_unit)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (storage_location_signal ?storage_location)
+        (not
+          (inbound_pallet_processing_flag ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (inbound_pallet_ready ?inbound_pallet)
+      )
+  )
+  (:action assign_packing_material_to_pallet
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?storage_location - storage_location ?packing_material - packing_material)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?inbound_pallet)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (packing_material_available ?packing_material)
+        (not
+          (inbound_pallet_processing_flag ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (storage_location_reserved ?storage_location)
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (inbound_pallet_packing_material_assigned ?inbound_pallet ?packing_material)
+        (not
+          (packing_material_available ?packing_material)
+        )
+      )
+  )
+  (:action finalize_pallet_storage_assignment
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?storage_location - storage_location ?grader_station - grader_station ?packing_material - packing_material)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?inbound_pallet)
+        (assigned_to_grader ?inbound_pallet ?grader_station)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (storage_location_reserved ?storage_location)
+        (inbound_pallet_packing_material_assigned ?inbound_pallet ?packing_material)
+        (not
+          (inbound_pallet_ready ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (storage_location_signal ?storage_location)
+        (inbound_pallet_ready ?inbound_pallet)
+        (packing_material_available ?packing_material)
+        (not
+          (inbound_pallet_packing_material_assigned ?inbound_pallet ?packing_material)
+        )
+      )
+  )
+  (:action signal_transport_channel_availability
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?transport_channel - transport_channel ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?outbound_pallet)
+        (assigned_to_grader ?outbound_pallet ?grader_station)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (not
+          (transport_channel_signal ?transport_channel)
+        )
+        (not
+          (transport_channel_reserved ?transport_channel)
+        )
+      )
+    :effect (transport_channel_signal ?transport_channel)
+  )
+  (:action assign_conditioning_unit_to_outbound_pallet
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?transport_channel - transport_channel ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?outbound_pallet)
+        (assigned_to_conditioning_unit ?outbound_pallet ?conditioning_unit)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (transport_channel_signal ?transport_channel)
+        (not
+          (outbound_pallet_processing_flag ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (outbound_pallet_ready ?outbound_pallet)
+      )
+  )
+  (:action assign_packing_material_to_outbound_pallet
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?transport_channel - transport_channel ?packing_material - packing_material)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?outbound_pallet)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (packing_material_available ?packing_material)
+        (not
+          (outbound_pallet_processing_flag ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (transport_channel_reserved ?transport_channel)
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (outbound_pallet_packing_material_assigned ?outbound_pallet ?packing_material)
+        (not
+          (packing_material_available ?packing_material)
+        )
+      )
+  )
+  (:action finalize_outbound_pallet_slot_assignment
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?transport_channel - transport_channel ?grader_station - grader_station ?packing_material - packing_material)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?outbound_pallet)
+        (assigned_to_grader ?outbound_pallet ?grader_station)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (transport_channel_reserved ?transport_channel)
+        (outbound_pallet_packing_material_assigned ?outbound_pallet ?packing_material)
+        (not
+          (outbound_pallet_ready ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (transport_channel_signal ?transport_channel)
+        (outbound_pallet_ready ?outbound_pallet)
+        (packing_material_available ?packing_material)
+        (not
+          (outbound_pallet_packing_material_assigned ?outbound_pallet ?packing_material)
+        )
+      )
+  )
+  (:action create_outbound_container_using_primary_signals
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?outbound_pallet - consignment_outbound_pallet ?storage_location - storage_location ?transport_channel - transport_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (storage_location_signal ?storage_location)
+        (transport_channel_signal ?transport_channel)
+        (inbound_pallet_ready ?inbound_pallet)
+        (outbound_pallet_ready ?outbound_pallet)
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_staged ?outbound_container)
+        (container_assigned_storage_location ?outbound_container ?storage_location)
+        (container_assigned_transport_channel ?outbound_container ?transport_channel)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action create_outbound_container_using_secondary_storage_signal
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?outbound_pallet - consignment_outbound_pallet ?storage_location - storage_location ?transport_channel - transport_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (storage_location_reserved ?storage_location)
+        (transport_channel_signal ?transport_channel)
+        (not
+          (inbound_pallet_ready ?inbound_pallet)
+        )
+        (outbound_pallet_ready ?outbound_pallet)
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_staged ?outbound_container)
+        (container_assigned_storage_location ?outbound_container ?storage_location)
+        (container_assigned_transport_channel ?outbound_container ?transport_channel)
+        (container_flag_priority_a ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action create_outbound_container_using_primary_storage_alternate
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?outbound_pallet - consignment_outbound_pallet ?storage_location - storage_location ?transport_channel - transport_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (storage_location_signal ?storage_location)
+        (transport_channel_reserved ?transport_channel)
+        (inbound_pallet_ready ?inbound_pallet)
+        (not
+          (outbound_pallet_ready ?outbound_pallet)
+        )
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_staged ?outbound_container)
+        (container_assigned_storage_location ?outbound_container ?storage_location)
+        (container_assigned_transport_channel ?outbound_container ?transport_channel)
+        (container_flag_priority_b ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action create_outbound_container_using_secondary_storage_and_transport
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?outbound_pallet - consignment_outbound_pallet ?storage_location - storage_location ?transport_channel - transport_channel ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (inbound_pallet_assigned_storage_location ?inbound_pallet ?storage_location)
+        (outbound_pallet_assigned_transport_channel ?outbound_pallet ?transport_channel)
+        (storage_location_reserved ?storage_location)
+        (transport_channel_reserved ?transport_channel)
+        (not
+          (inbound_pallet_ready ?inbound_pallet)
+        )
+        (not
+          (outbound_pallet_ready ?outbound_pallet)
+        )
+        (outbound_container_available ?outbound_container)
+      )
+    :effect
+      (and
+        (outbound_container_staged ?outbound_container)
+        (container_assigned_storage_location ?outbound_container ?storage_location)
+        (container_assigned_transport_channel ?outbound_container ?transport_channel)
+        (container_flag_priority_a ?outbound_container)
+        (container_flag_priority_b ?outbound_container)
+        (not
+          (outbound_container_available ?outbound_container)
+        )
+      )
+  )
+  (:action verify_outbound_container_staged
+    :parameters (?outbound_container - outbound_container ?inbound_pallet - consignment_inbound_pallet ?grader_station - grader_station)
+    :precondition
+      (and
+        (outbound_container_staged ?outbound_container)
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (assigned_to_grader ?inbound_pallet ?grader_station)
+        (not
+          (outbound_container_verified ?outbound_container)
+        )
+      )
+    :effect (outbound_container_verified ?outbound_container)
+  )
+  (:action claim_storage_bin_for_case
+    :parameters (?handling_unit_case - consignment_case ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (case_assigned_to_outbound_container ?handling_unit_case ?outbound_container)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_available ?storage_bin)
+        (outbound_container_staged ?outbound_container)
+        (outbound_container_verified ?outbound_container)
+        (not
+          (storage_bin_claimed ?storage_bin)
+        )
+      )
+    :effect
+      (and
+        (storage_bin_claimed ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (not
+          (storage_bin_available ?storage_bin)
+        )
+      )
+  )
+  (:action confirm_case_staging
+    :parameters (?handling_unit_case - consignment_case ?storage_bin - storage_bin ?outbound_container - outbound_container ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_claimed ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (assigned_to_grader ?handling_unit_case ?grader_station)
+        (not
+          (container_flag_priority_a ?outbound_container)
+        )
+        (not
+          (case_staging_confirmed ?handling_unit_case)
+        )
+      )
+    :effect (case_staging_confirmed ?handling_unit_case)
+  )
+  (:action assign_destination_to_case
+    :parameters (?handling_unit_case - consignment_case ?destination_channel - destination_channel)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (destination_channel_available ?destination_channel)
+        (not
+          (case_destination_claimed ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_destination_claimed ?handling_unit_case)
+        (case_assigned_destination_channel ?handling_unit_case ?destination_channel)
+        (not
+          (destination_channel_available ?destination_channel)
+        )
+      )
+  )
+  (:action apply_destination_and_manifest_and_link_case
+    :parameters (?handling_unit_case - consignment_case ?storage_bin - storage_bin ?outbound_container - outbound_container ?grader_station - grader_station ?destination_channel - destination_channel)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_claimed ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (assigned_to_grader ?handling_unit_case ?grader_station)
+        (container_flag_priority_a ?outbound_container)
+        (case_destination_claimed ?handling_unit_case)
+        (case_assigned_destination_channel ?handling_unit_case ?destination_channel)
+        (not
+          (case_staging_confirmed ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_staging_confirmed ?handling_unit_case)
+        (case_manifest_linked ?handling_unit_case)
+      )
+  )
+  (:action assign_manifest_path_a_to_case
+    :parameters (?handling_unit_case - consignment_case ?quality_certificate - quality_certificate ?conditioning_unit - conditioning_unit ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_staging_confirmed ?handling_unit_case)
+        (case_assigned_quality_certificate ?handling_unit_case ?quality_certificate)
+        (assigned_to_conditioning_unit ?handling_unit_case ?conditioning_unit)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (not
+          (container_flag_priority_b ?outbound_container)
+        )
+        (not
+          (case_quality_stage_passed ?handling_unit_case)
+        )
+      )
+    :effect (case_quality_stage_passed ?handling_unit_case)
+  )
+  (:action assign_manifest_path_b_to_case
+    :parameters (?handling_unit_case - consignment_case ?quality_certificate - quality_certificate ?conditioning_unit - conditioning_unit ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_staging_confirmed ?handling_unit_case)
+        (case_assigned_quality_certificate ?handling_unit_case ?quality_certificate)
+        (assigned_to_conditioning_unit ?handling_unit_case ?conditioning_unit)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (container_flag_priority_b ?outbound_container)
+        (not
+          (case_quality_stage_passed ?handling_unit_case)
+        )
+      )
+    :effect (case_quality_stage_passed ?handling_unit_case)
+  )
+  (:action complete_quality_checks_stage2
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_quality_stage_passed ?handling_unit_case)
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (not
+          (container_flag_priority_a ?outbound_container)
+        )
+        (not
+          (container_flag_priority_b ?outbound_container)
+        )
+        (not
+          (case_quality_checks_completed ?handling_unit_case)
+        )
+      )
+    :effect (case_quality_checks_completed ?handling_unit_case)
+  )
+  (:action complete_quality_checks_and_attach_quality_flag
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_quality_stage_passed ?handling_unit_case)
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (container_flag_priority_a ?outbound_container)
+        (not
+          (container_flag_priority_b ?outbound_container)
+        )
+        (not
+          (case_quality_checks_completed ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_quality_tagged ?handling_unit_case)
+      )
+  )
+  (:action complete_quality_checks_and_attach_quality_flag_variant_b
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_quality_stage_passed ?handling_unit_case)
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (not
+          (container_flag_priority_a ?outbound_container)
+        )
+        (container_flag_priority_b ?outbound_container)
+        (not
+          (case_quality_checks_completed ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_quality_tagged ?handling_unit_case)
+      )
+  )
+  (:action complete_quality_checks_and_attach_quality_flag_variant_c
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag ?storage_bin - storage_bin ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (case_quality_stage_passed ?handling_unit_case)
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (case_assigned_to_storage_bin ?handling_unit_case ?storage_bin)
+        (storage_bin_assigned_to_container ?storage_bin ?outbound_container)
+        (container_flag_priority_a ?outbound_container)
+        (container_flag_priority_b ?outbound_container)
+        (not
+          (case_quality_checks_completed ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_quality_tagged ?handling_unit_case)
+      )
+  )
+  (:action finalize_case_for_handover
+    :parameters (?handling_unit_case - consignment_case)
+    :precondition
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (not
+          (case_quality_tagged ?handling_unit_case)
+        )
+        (not
+          (case_finalized ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?handling_unit_case)
+        (consignment_item_handover_completed ?handling_unit_case)
+      )
+  )
+  (:action attach_carrier_manifest_to_case
+    :parameters (?handling_unit_case - consignment_case ?carrier_manifest - carrier_manifest)
+    :precondition
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_quality_tagged ?handling_unit_case)
+        (carrier_manifest_available ?carrier_manifest)
+      )
+    :effect
+      (and
+        (case_assigned_carrier_manifest ?handling_unit_case ?carrier_manifest)
+        (not
+          (carrier_manifest_available ?carrier_manifest)
+        )
+      )
+  )
+  (:action consolidate_case_for_finalization
+    :parameters (?handling_unit_case - consignment_case ?inbound_pallet - consignment_inbound_pallet ?outbound_pallet - consignment_outbound_pallet ?grader_station - grader_station ?carrier_manifest - carrier_manifest)
+    :precondition
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_quality_tagged ?handling_unit_case)
+        (case_assigned_carrier_manifest ?handling_unit_case ?carrier_manifest)
+        (case_loaded_on_inbound_pallet ?handling_unit_case ?inbound_pallet)
+        (case_loaded_on_outbound_pallet ?handling_unit_case ?outbound_pallet)
+        (inbound_pallet_ready ?inbound_pallet)
+        (outbound_pallet_ready ?outbound_pallet)
+        (assigned_to_grader ?handling_unit_case ?grader_station)
+        (not
+          (case_consolidation_confirmed ?handling_unit_case)
+        )
+      )
+    :effect (case_consolidation_confirmed ?handling_unit_case)
+  )
+  (:action finalize_case_for_dispatch
+    :parameters (?handling_unit_case - consignment_case)
+    :precondition
+      (and
+        (case_quality_checks_completed ?handling_unit_case)
+        (case_consolidation_confirmed ?handling_unit_case)
+        (not
+          (case_finalized ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?handling_unit_case)
+        (consignment_item_handover_completed ?handling_unit_case)
+      )
+  )
+  (:action assign_priority_flag_to_case
+    :parameters (?handling_unit_case - consignment_case ?priority_flag - priority_flag ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_cleared_for_conditioning ?handling_unit_case)
+        (assigned_to_grader ?handling_unit_case ?grader_station)
+        (priority_flag_available ?priority_flag)
+        (case_assigned_priority_flag ?handling_unit_case ?priority_flag)
+        (not
+          (case_priority_attached ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_priority_attached ?handling_unit_case)
+        (not
+          (priority_flag_available ?priority_flag)
+        )
+      )
+  )
+  (:action mark_case_for_conditioning
+    :parameters (?handling_unit_case - consignment_case ?conditioning_unit - conditioning_unit)
+    :precondition
+      (and
+        (case_priority_attached ?handling_unit_case)
+        (assigned_to_conditioning_unit ?handling_unit_case ?conditioning_unit)
+        (not
+          (case_conditioning_assigned ?handling_unit_case)
+        )
+      )
+    :effect (case_conditioning_assigned ?handling_unit_case)
+  )
+  (:action complete_conditioning_for_case
+    :parameters (?handling_unit_case - consignment_case ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (case_conditioning_assigned ?handling_unit_case)
+        (case_assigned_traceability_tag ?handling_unit_case ?traceability_tag)
+        (not
+          (case_ready_for_finalize ?handling_unit_case)
+        )
+      )
+    :effect (case_ready_for_finalize ?handling_unit_case)
+  )
+  (:action finalize_case_post_conditioning
+    :parameters (?handling_unit_case - consignment_case)
+    :precondition
+      (and
+        (case_ready_for_finalize ?handling_unit_case)
+        (not
+          (case_finalized ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?handling_unit_case)
+        (consignment_item_handover_completed ?handling_unit_case)
+      )
+  )
+  (:action handover_inbound_pallet
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (inbound_pallet_processing_flag ?inbound_pallet)
+        (inbound_pallet_ready ?inbound_pallet)
+        (outbound_container_staged ?outbound_container)
+        (outbound_container_verified ?outbound_container)
+        (not
+          (consignment_item_handover_completed ?inbound_pallet)
+        )
+      )
+    :effect (consignment_item_handover_completed ?inbound_pallet)
+  )
+  (:action handover_outbound_pallet
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?outbound_container - outbound_container)
+    :precondition
+      (and
+        (outbound_pallet_processing_flag ?outbound_pallet)
+        (outbound_pallet_ready ?outbound_pallet)
+        (outbound_container_staged ?outbound_container)
+        (outbound_container_verified ?outbound_container)
+        (not
+          (consignment_item_handover_completed ?outbound_pallet)
+        )
+      )
+    :effect (consignment_item_handover_completed ?outbound_pallet)
+  )
+  (:action attach_rollover_window_to_consignment
+    :parameters (?produce_consignment - consignment_unit ?rollover_window - rollover_window ?grader_station - grader_station)
+    :precondition
+      (and
+        (consignment_item_handover_completed ?produce_consignment)
+        (assigned_to_grader ?produce_consignment ?grader_station)
+        (rollover_window_available ?rollover_window)
+        (not
+          (consignment_item_marked_for_rollover ?produce_consignment)
+        )
+      )
+    :effect
+      (and
+        (consignment_item_marked_for_rollover ?produce_consignment)
+        (assigned_rollover_window ?produce_consignment ?rollover_window)
+        (not
+          (rollover_window_available ?rollover_window)
+        )
+      )
+  )
+  (:action assign_rollover_window_and_allocate_slot_to_pallet
+    :parameters (?inbound_pallet - consignment_inbound_pallet ?dispatch_channel_slot - dispatch_channel_slot ?rollover_window - rollover_window)
+    :precondition
+      (and
+        (consignment_item_marked_for_rollover ?inbound_pallet)
+        (assigned_to_dispatch_slot ?inbound_pallet ?dispatch_channel_slot)
+        (assigned_rollover_window ?inbound_pallet ?rollover_window)
+        (not
+          (consignment_item_marked_for_release ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (consignment_item_marked_for_release ?inbound_pallet)
+        (dispatch_slot_available ?dispatch_channel_slot)
+        (rollover_window_available ?rollover_window)
+      )
+  )
+  (:action assign_rollover_window_and_allocate_slot_to_outbound_pallet
+    :parameters (?outbound_pallet - consignment_outbound_pallet ?dispatch_channel_slot - dispatch_channel_slot ?rollover_window - rollover_window)
+    :precondition
+      (and
+        (consignment_item_marked_for_rollover ?outbound_pallet)
+        (assigned_to_dispatch_slot ?outbound_pallet ?dispatch_channel_slot)
+        (assigned_rollover_window ?outbound_pallet ?rollover_window)
+        (not
+          (consignment_item_marked_for_release ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (consignment_item_marked_for_release ?outbound_pallet)
+        (dispatch_slot_available ?dispatch_channel_slot)
+        (rollover_window_available ?rollover_window)
+      )
+  )
+  (:action assign_rollover_window_and_allocate_slot_to_case
+    :parameters (?handling_unit_case - consignment_case ?dispatch_channel_slot - dispatch_channel_slot ?rollover_window - rollover_window)
+    :precondition
+      (and
+        (consignment_item_marked_for_rollover ?handling_unit_case)
+        (assigned_to_dispatch_slot ?handling_unit_case ?dispatch_channel_slot)
+        (assigned_rollover_window ?handling_unit_case ?rollover_window)
+        (not
+          (consignment_item_marked_for_release ?handling_unit_case)
+        )
+      )
+    :effect
+      (and
+        (consignment_item_marked_for_release ?handling_unit_case)
+        (dispatch_slot_available ?dispatch_channel_slot)
+        (rollover_window_available ?rollover_window)
+      )
+  )
+)

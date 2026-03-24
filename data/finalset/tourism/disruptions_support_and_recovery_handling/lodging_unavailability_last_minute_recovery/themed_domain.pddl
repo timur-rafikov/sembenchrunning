@@ -1,0 +1,936 @@
+(define (domain lodging_unavailability_last_minute_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_entity - object offer_entity - object search_solution_entity - object case_entity - object recovery_case - case_entity lodging_option - operational_entity booking_token - operational_entity local_partner_contact - operational_entity priority_tag - operational_entity service_level_option - operational_entity compensation_instrument - operational_entity voucher_template - operational_entity escalation_authorization - operational_entity compensation_option - offer_entity candidate_property - offer_entity policy_clause - offer_entity availability_search - search_solution_entity inventory_offer - search_solution_entity recovery_proposal - search_solution_entity reservation_group - recovery_case handler_group - recovery_case original_reservation - reservation_group alternate_reservation - reservation_group case_handler - handler_group)
+  (:predicates
+    (entity_opened ?case - recovery_case)
+    (entity_validated ?case - recovery_case)
+    (entity_option_selected ?case - recovery_case)
+    (entity_resolved ?case - recovery_case)
+    (entity_ready ?case - recovery_case)
+    (entity_compensation_initiated ?case - recovery_case)
+    (lodging_option_available ?lodging_option - lodging_option)
+    (entity_lodging_option_reserved ?case - recovery_case ?lodging_option - lodging_option)
+    (booking_token_available ?booking_token - booking_token)
+    (entity_booking_token_bound ?case - recovery_case ?booking_token - booking_token)
+    (local_partner_available ?local_partner - local_partner_contact)
+    (local_partner_assigned ?case - recovery_case ?local_partner - local_partner_contact)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (original_reservation_compensation_bound ?original_reservation - original_reservation ?compensation_option - compensation_option)
+    (alternate_reservation_compensation_bound ?alternate_reservation - alternate_reservation ?compensation_option - compensation_option)
+    (reservation_availability_search_link ?original_reservation - original_reservation ?availability_search - availability_search)
+    (availability_search_confirmed ?availability_search - availability_search)
+    (availability_search_provisional_hold ?availability_search - availability_search)
+    (original_reservation_offer_confirmed ?original_reservation - original_reservation)
+    (alternate_reservation_inventory_offer_link ?alternate_reservation - alternate_reservation ?inventory_offer - inventory_offer)
+    (inventory_offer_confirmed ?inventory_offer - inventory_offer)
+    (inventory_offer_provisional_hold ?inventory_offer - inventory_offer)
+    (alternate_reservation_offer_confirmed ?alternate_reservation - alternate_reservation)
+    (recovery_proposal_available ?recovery_proposal - recovery_proposal)
+    (recovery_proposal_selected ?recovery_proposal - recovery_proposal)
+    (proposal_includes_search ?recovery_proposal - recovery_proposal ?availability_search - availability_search)
+    (proposal_includes_inventory_offer ?recovery_proposal - recovery_proposal ?inventory_offer - inventory_offer)
+    (recovery_proposal_variant_primary ?recovery_proposal - recovery_proposal)
+    (recovery_proposal_variant_secondary ?recovery_proposal - recovery_proposal)
+    (recovery_proposal_confirmed_for_reservation ?recovery_proposal - recovery_proposal)
+    (handler_assigned_to_original_reservation ?case_handler - case_handler ?original_reservation - original_reservation)
+    (handler_assigned_to_alternate_reservation ?case_handler - case_handler ?alternate_reservation - alternate_reservation)
+    (handler_linked_to_recovery_proposal ?case_handler - case_handler ?recovery_proposal - recovery_proposal)
+    (candidate_property_available ?candidate_property - candidate_property)
+    (handler_candidate_property_link ?case_handler - case_handler ?candidate_property - candidate_property)
+    (candidate_property_held ?candidate_property - candidate_property)
+    (candidate_property_in_proposal ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    (handler_candidate_property_validated ?case_handler - case_handler)
+    (handler_property_hold_confirmed ?case_handler - case_handler)
+    (handler_escalation_requested ?case_handler - case_handler)
+    (handler_has_priority_tag ?case_handler - case_handler)
+    (handler_priority_tag_applied ?case_handler - case_handler)
+    (handler_escalation_approved ?case_handler - case_handler)
+    (handler_final_readiness_marked ?case_handler - case_handler)
+    (policy_clause_available ?policy_clause - policy_clause)
+    (handler_policy_clause_applied ?case_handler - case_handler ?policy_clause - policy_clause)
+    (handler_policy_checked ?case_handler - case_handler)
+    (handler_policy_approval_requested ?case_handler - case_handler)
+    (handler_policy_approved ?case_handler - case_handler)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (handler_priority_tag_bound ?case_handler - case_handler ?priority_tag - priority_tag)
+    (service_level_option_available ?service_level_option - service_level_option)
+    (handler_service_level_option_bound ?case_handler - case_handler ?service_level_option - service_level_option)
+    (voucher_template_available ?voucher_template - voucher_template)
+    (handler_voucher_bound ?case_handler - case_handler ?voucher_template - voucher_template)
+    (escalation_authorization_available ?escalation_authorization - escalation_authorization)
+    (handler_escalation_authorization_bound ?case_handler - case_handler ?escalation_authorization - escalation_authorization)
+    (compensation_instrument_available ?compensation_instrument - compensation_instrument)
+    (entity_compensation_instrument_bound ?case - recovery_case ?compensation_instrument - compensation_instrument)
+    (reservation_negotiation_flag ?original_reservation - original_reservation)
+    (alternate_reservation_negotiation_flag ?alternate_reservation - alternate_reservation)
+    (handler_execution_committed ?case_handler - case_handler)
+  )
+  (:action open_recovery_case
+    :parameters (?case - recovery_case)
+    :precondition
+      (and
+        (not
+          (entity_opened ?case)
+        )
+        (not
+          (entity_resolved ?case)
+        )
+      )
+    :effect (entity_opened ?case)
+  )
+  (:action reserve_lodging_option_for_case
+    :parameters (?case - recovery_case ?lodging_option - lodging_option)
+    :precondition
+      (and
+        (entity_opened ?case)
+        (not
+          (entity_option_selected ?case)
+        )
+        (lodging_option_available ?lodging_option)
+      )
+    :effect
+      (and
+        (entity_option_selected ?case)
+        (entity_lodging_option_reserved ?case ?lodging_option)
+        (not
+          (lodging_option_available ?lodging_option)
+        )
+      )
+  )
+  (:action bind_booking_token_to_case
+    :parameters (?case - recovery_case ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_opened ?case)
+        (entity_option_selected ?case)
+        (booking_token_available ?booking_token)
+      )
+    :effect
+      (and
+        (entity_booking_token_bound ?case ?booking_token)
+        (not
+          (booking_token_available ?booking_token)
+        )
+      )
+  )
+  (:action validate_case_booking_token
+    :parameters (?case - recovery_case ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_opened ?case)
+        (entity_option_selected ?case)
+        (entity_booking_token_bound ?case ?booking_token)
+        (not
+          (entity_validated ?case)
+        )
+      )
+    :effect (entity_validated ?case)
+  )
+  (:action release_booking_token_from_case
+    :parameters (?case - recovery_case ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_booking_token_bound ?case ?booking_token)
+      )
+    :effect
+      (and
+        (booking_token_available ?booking_token)
+        (not
+          (entity_booking_token_bound ?case ?booking_token)
+        )
+      )
+  )
+  (:action assign_local_partner_to_case
+    :parameters (?case - recovery_case ?local_partner - local_partner_contact)
+    :precondition
+      (and
+        (entity_validated ?case)
+        (local_partner_available ?local_partner)
+      )
+    :effect
+      (and
+        (local_partner_assigned ?case ?local_partner)
+        (not
+          (local_partner_available ?local_partner)
+        )
+      )
+  )
+  (:action release_local_partner_from_case
+    :parameters (?case - recovery_case ?local_partner - local_partner_contact)
+    :precondition
+      (and
+        (local_partner_assigned ?case ?local_partner)
+      )
+    :effect
+      (and
+        (local_partner_available ?local_partner)
+        (not
+          (local_partner_assigned ?case ?local_partner)
+        )
+      )
+  )
+  (:action bind_voucher_to_handler
+    :parameters (?case_handler - case_handler ?voucher_template - voucher_template)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (voucher_template_available ?voucher_template)
+      )
+    :effect
+      (and
+        (handler_voucher_bound ?case_handler ?voucher_template)
+        (not
+          (voucher_template_available ?voucher_template)
+        )
+      )
+  )
+  (:action unbind_voucher_from_handler
+    :parameters (?case_handler - case_handler ?voucher_template - voucher_template)
+    :precondition
+      (and
+        (handler_voucher_bound ?case_handler ?voucher_template)
+      )
+    :effect
+      (and
+        (voucher_template_available ?voucher_template)
+        (not
+          (handler_voucher_bound ?case_handler ?voucher_template)
+        )
+      )
+  )
+  (:action bind_escalation_authorization_to_handler
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (escalation_authorization_available ?escalation_authorization)
+      )
+    :effect
+      (and
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (not
+          (escalation_authorization_available ?escalation_authorization)
+        )
+      )
+  )
+  (:action unbind_escalation_authorization_from_handler
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization)
+    :precondition
+      (and
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+      )
+    :effect
+      (and
+        (escalation_authorization_available ?escalation_authorization)
+        (not
+          (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        )
+      )
+  )
+  (:action confirm_availability_search_for_reservation
+    :parameters (?original_reservation - original_reservation ?availability_search - availability_search ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_validated ?original_reservation)
+        (entity_booking_token_bound ?original_reservation ?booking_token)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (not
+          (availability_search_confirmed ?availability_search)
+        )
+        (not
+          (availability_search_provisional_hold ?availability_search)
+        )
+      )
+    :effect (availability_search_confirmed ?availability_search)
+  )
+  (:action negotiate_with_local_partner_for_reservation
+    :parameters (?original_reservation - original_reservation ?availability_search - availability_search ?local_partner - local_partner_contact)
+    :precondition
+      (and
+        (entity_validated ?original_reservation)
+        (local_partner_assigned ?original_reservation ?local_partner)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (availability_search_confirmed ?availability_search)
+        (not
+          (reservation_negotiation_flag ?original_reservation)
+        )
+      )
+    :effect
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (original_reservation_offer_confirmed ?original_reservation)
+      )
+  )
+  (:action apply_compensation_option_to_reservation
+    :parameters (?original_reservation - original_reservation ?availability_search - availability_search ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_validated ?original_reservation)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (compensation_option_available ?compensation_option)
+        (not
+          (reservation_negotiation_flag ?original_reservation)
+        )
+      )
+    :effect
+      (and
+        (availability_search_provisional_hold ?availability_search)
+        (reservation_negotiation_flag ?original_reservation)
+        (original_reservation_compensation_bound ?original_reservation ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action finalize_reservation_compensation_offer
+    :parameters (?original_reservation - original_reservation ?availability_search - availability_search ?booking_token - booking_token ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_validated ?original_reservation)
+        (entity_booking_token_bound ?original_reservation ?booking_token)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (availability_search_provisional_hold ?availability_search)
+        (original_reservation_compensation_bound ?original_reservation ?compensation_option)
+        (not
+          (original_reservation_offer_confirmed ?original_reservation)
+        )
+      )
+    :effect
+      (and
+        (availability_search_confirmed ?availability_search)
+        (original_reservation_offer_confirmed ?original_reservation)
+        (compensation_option_available ?compensation_option)
+        (not
+          (original_reservation_compensation_bound ?original_reservation ?compensation_option)
+        )
+      )
+  )
+  (:action confirm_availability_search_for_alternate_reservation
+    :parameters (?alternate_reservation - alternate_reservation ?inventory_offer - inventory_offer ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_validated ?alternate_reservation)
+        (entity_booking_token_bound ?alternate_reservation ?booking_token)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (not
+          (inventory_offer_confirmed ?inventory_offer)
+        )
+        (not
+          (inventory_offer_provisional_hold ?inventory_offer)
+        )
+      )
+    :effect (inventory_offer_confirmed ?inventory_offer)
+  )
+  (:action negotiate_with_local_partner_for_alternate_reservation
+    :parameters (?alternate_reservation - alternate_reservation ?inventory_offer - inventory_offer ?local_partner - local_partner_contact)
+    :precondition
+      (and
+        (entity_validated ?alternate_reservation)
+        (local_partner_assigned ?alternate_reservation ?local_partner)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (inventory_offer_confirmed ?inventory_offer)
+        (not
+          (alternate_reservation_negotiation_flag ?alternate_reservation)
+        )
+      )
+    :effect
+      (and
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+      )
+  )
+  (:action apply_compensation_option_to_alternate_reservation
+    :parameters (?alternate_reservation - alternate_reservation ?inventory_offer - inventory_offer ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_validated ?alternate_reservation)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (compensation_option_available ?compensation_option)
+        (not
+          (alternate_reservation_negotiation_flag ?alternate_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_provisional_hold ?inventory_offer)
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (alternate_reservation_compensation_bound ?alternate_reservation ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action finalize_alternate_reservation_compensation_offer
+    :parameters (?alternate_reservation - alternate_reservation ?inventory_offer - inventory_offer ?booking_token - booking_token ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (entity_validated ?alternate_reservation)
+        (entity_booking_token_bound ?alternate_reservation ?booking_token)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (inventory_offer_provisional_hold ?inventory_offer)
+        (alternate_reservation_compensation_bound ?alternate_reservation ?compensation_option)
+        (not
+          (alternate_reservation_offer_confirmed ?alternate_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_confirmed ?inventory_offer)
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+        (compensation_option_available ?compensation_option)
+        (not
+          (alternate_reservation_compensation_bound ?alternate_reservation ?compensation_option)
+        )
+      )
+  )
+  (:action compose_recovery_proposal_variant_basic
+    :parameters (?original_reservation - original_reservation ?alternate_reservation - alternate_reservation ?availability_search - availability_search ?inventory_offer - inventory_offer ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (availability_search_confirmed ?availability_search)
+        (inventory_offer_confirmed ?inventory_offer)
+        (original_reservation_offer_confirmed ?original_reservation)
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+        (recovery_proposal_available ?recovery_proposal)
+      )
+    :effect
+      (and
+        (recovery_proposal_selected ?recovery_proposal)
+        (proposal_includes_search ?recovery_proposal ?availability_search)
+        (proposal_includes_inventory_offer ?recovery_proposal ?inventory_offer)
+        (not
+          (recovery_proposal_available ?recovery_proposal)
+        )
+      )
+  )
+  (:action compose_recovery_proposal_variant_with_primary_flag
+    :parameters (?original_reservation - original_reservation ?alternate_reservation - alternate_reservation ?availability_search - availability_search ?inventory_offer - inventory_offer ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (availability_search_provisional_hold ?availability_search)
+        (inventory_offer_confirmed ?inventory_offer)
+        (not
+          (original_reservation_offer_confirmed ?original_reservation)
+        )
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+        (recovery_proposal_available ?recovery_proposal)
+      )
+    :effect
+      (and
+        (recovery_proposal_selected ?recovery_proposal)
+        (proposal_includes_search ?recovery_proposal ?availability_search)
+        (proposal_includes_inventory_offer ?recovery_proposal ?inventory_offer)
+        (recovery_proposal_variant_primary ?recovery_proposal)
+        (not
+          (recovery_proposal_available ?recovery_proposal)
+        )
+      )
+  )
+  (:action compose_recovery_proposal_variant_with_secondary_flag
+    :parameters (?original_reservation - original_reservation ?alternate_reservation - alternate_reservation ?availability_search - availability_search ?inventory_offer - inventory_offer ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (availability_search_confirmed ?availability_search)
+        (inventory_offer_provisional_hold ?inventory_offer)
+        (original_reservation_offer_confirmed ?original_reservation)
+        (not
+          (alternate_reservation_offer_confirmed ?alternate_reservation)
+        )
+        (recovery_proposal_available ?recovery_proposal)
+      )
+    :effect
+      (and
+        (recovery_proposal_selected ?recovery_proposal)
+        (proposal_includes_search ?recovery_proposal ?availability_search)
+        (proposal_includes_inventory_offer ?recovery_proposal ?inventory_offer)
+        (recovery_proposal_variant_secondary ?recovery_proposal)
+        (not
+          (recovery_proposal_available ?recovery_proposal)
+        )
+      )
+  )
+  (:action compose_recovery_proposal_variant_full
+    :parameters (?original_reservation - original_reservation ?alternate_reservation - alternate_reservation ?availability_search - availability_search ?inventory_offer - inventory_offer ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (reservation_availability_search_link ?original_reservation ?availability_search)
+        (alternate_reservation_inventory_offer_link ?alternate_reservation ?inventory_offer)
+        (availability_search_provisional_hold ?availability_search)
+        (inventory_offer_provisional_hold ?inventory_offer)
+        (not
+          (original_reservation_offer_confirmed ?original_reservation)
+        )
+        (not
+          (alternate_reservation_offer_confirmed ?alternate_reservation)
+        )
+        (recovery_proposal_available ?recovery_proposal)
+      )
+    :effect
+      (and
+        (recovery_proposal_selected ?recovery_proposal)
+        (proposal_includes_search ?recovery_proposal ?availability_search)
+        (proposal_includes_inventory_offer ?recovery_proposal ?inventory_offer)
+        (recovery_proposal_variant_primary ?recovery_proposal)
+        (recovery_proposal_variant_secondary ?recovery_proposal)
+        (not
+          (recovery_proposal_available ?recovery_proposal)
+        )
+      )
+  )
+  (:action confirm_recovery_proposal_for_reservation
+    :parameters (?recovery_proposal - recovery_proposal ?original_reservation - original_reservation ?booking_token - booking_token)
+    :precondition
+      (and
+        (recovery_proposal_selected ?recovery_proposal)
+        (reservation_negotiation_flag ?original_reservation)
+        (entity_booking_token_bound ?original_reservation ?booking_token)
+        (not
+          (recovery_proposal_confirmed_for_reservation ?recovery_proposal)
+        )
+      )
+    :effect (recovery_proposal_confirmed_for_reservation ?recovery_proposal)
+  )
+  (:action place_candidate_property_hold
+    :parameters (?case_handler - case_handler ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (handler_linked_to_recovery_proposal ?case_handler ?recovery_proposal)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_available ?candidate_property)
+        (recovery_proposal_selected ?recovery_proposal)
+        (recovery_proposal_confirmed_for_reservation ?recovery_proposal)
+        (not
+          (candidate_property_held ?candidate_property)
+        )
+      )
+    :effect
+      (and
+        (candidate_property_held ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (not
+          (candidate_property_available ?candidate_property)
+        )
+      )
+  )
+  (:action validate_candidate_property_for_handler
+    :parameters (?case_handler - case_handler ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_held ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (entity_booking_token_bound ?case_handler ?booking_token)
+        (not
+          (recovery_proposal_variant_primary ?recovery_proposal)
+        )
+        (not
+          (handler_candidate_property_validated ?case_handler)
+        )
+      )
+    :effect (handler_candidate_property_validated ?case_handler)
+  )
+  (:action assign_priority_tag_to_handler
+    :parameters (?case_handler - case_handler ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (priority_tag_available ?priority_tag)
+        (not
+          (handler_has_priority_tag ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_has_priority_tag ?case_handler)
+        (handler_priority_tag_bound ?case_handler ?priority_tag)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action apply_priority_tag_to_handler_property_validation
+    :parameters (?case_handler - case_handler ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal ?booking_token - booking_token ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_held ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (entity_booking_token_bound ?case_handler ?booking_token)
+        (recovery_proposal_variant_primary ?recovery_proposal)
+        (handler_has_priority_tag ?case_handler)
+        (handler_priority_tag_bound ?case_handler ?priority_tag)
+        (not
+          (handler_candidate_property_validated ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_candidate_property_validated ?case_handler)
+        (handler_priority_tag_applied ?case_handler)
+      )
+  )
+  (:action confirm_property_hold_with_voucher
+    :parameters (?case_handler - case_handler ?voucher_template - voucher_template ?local_partner - local_partner_contact ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_candidate_property_validated ?case_handler)
+        (handler_voucher_bound ?case_handler ?voucher_template)
+        (local_partner_assigned ?case_handler ?local_partner)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (not
+          (recovery_proposal_variant_secondary ?recovery_proposal)
+        )
+        (not
+          (handler_property_hold_confirmed ?case_handler)
+        )
+      )
+    :effect (handler_property_hold_confirmed ?case_handler)
+  )
+  (:action finalize_property_hold_with_voucher
+    :parameters (?case_handler - case_handler ?voucher_template - voucher_template ?local_partner - local_partner_contact ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_candidate_property_validated ?case_handler)
+        (handler_voucher_bound ?case_handler ?voucher_template)
+        (local_partner_assigned ?case_handler ?local_partner)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (recovery_proposal_variant_secondary ?recovery_proposal)
+        (not
+          (handler_property_hold_confirmed ?case_handler)
+        )
+      )
+    :effect (handler_property_hold_confirmed ?case_handler)
+  )
+  (:action request_handler_escalation
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_property_hold_confirmed ?case_handler)
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (not
+          (recovery_proposal_variant_primary ?recovery_proposal)
+        )
+        (not
+          (recovery_proposal_variant_secondary ?recovery_proposal)
+        )
+        (not
+          (handler_escalation_requested ?case_handler)
+        )
+      )
+    :effect (handler_escalation_requested ?case_handler)
+  )
+  (:action request_escalation_and_approve_for_handler
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_property_hold_confirmed ?case_handler)
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (recovery_proposal_variant_primary ?recovery_proposal)
+        (not
+          (recovery_proposal_variant_secondary ?recovery_proposal)
+        )
+        (not
+          (handler_escalation_requested ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_escalation_approved ?case_handler)
+      )
+  )
+  (:action request_escalation_and_approve_variant_secondary
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_property_hold_confirmed ?case_handler)
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (not
+          (recovery_proposal_variant_primary ?recovery_proposal)
+        )
+        (recovery_proposal_variant_secondary ?recovery_proposal)
+        (not
+          (handler_escalation_requested ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_escalation_approved ?case_handler)
+      )
+  )
+  (:action request_escalation_and_approve_variant_full
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization ?candidate_property - candidate_property ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (handler_property_hold_confirmed ?case_handler)
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (handler_candidate_property_link ?case_handler ?candidate_property)
+        (candidate_property_in_proposal ?candidate_property ?recovery_proposal)
+        (recovery_proposal_variant_primary ?recovery_proposal)
+        (recovery_proposal_variant_secondary ?recovery_proposal)
+        (not
+          (handler_escalation_requested ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_escalation_approved ?case_handler)
+      )
+  )
+  (:action finalize_handler_readiness
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_escalation_requested ?case_handler)
+        (not
+          (handler_escalation_approved ?case_handler)
+        )
+        (not
+          (handler_execution_committed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_execution_committed ?case_handler)
+        (entity_ready ?case_handler)
+      )
+  )
+  (:action bind_service_level_option_to_handler
+    :parameters (?case_handler - case_handler ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_escalation_approved ?case_handler)
+        (service_level_option_available ?service_level_option)
+      )
+    :effect
+      (and
+        (handler_service_level_option_bound ?case_handler ?service_level_option)
+        (not
+          (service_level_option_available ?service_level_option)
+        )
+      )
+  )
+  (:action approve_handler_and_mark_final_readiness
+    :parameters (?case_handler - case_handler ?original_reservation - original_reservation ?alternate_reservation - alternate_reservation ?booking_token - booking_token ?service_level_option - service_level_option)
+    :precondition
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_escalation_approved ?case_handler)
+        (handler_service_level_option_bound ?case_handler ?service_level_option)
+        (handler_assigned_to_original_reservation ?case_handler ?original_reservation)
+        (handler_assigned_to_alternate_reservation ?case_handler ?alternate_reservation)
+        (original_reservation_offer_confirmed ?original_reservation)
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+        (entity_booking_token_bound ?case_handler ?booking_token)
+        (not
+          (handler_final_readiness_marked ?case_handler)
+        )
+      )
+    :effect (handler_final_readiness_marked ?case_handler)
+  )
+  (:action finalize_handler_readiness_after_approval
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_escalation_requested ?case_handler)
+        (handler_final_readiness_marked ?case_handler)
+        (not
+          (handler_execution_committed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_execution_committed ?case_handler)
+        (entity_ready ?case_handler)
+      )
+  )
+  (:action apply_policy_clause_to_handler
+    :parameters (?case_handler - case_handler ?policy_clause - policy_clause ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_validated ?case_handler)
+        (entity_booking_token_bound ?case_handler ?booking_token)
+        (policy_clause_available ?policy_clause)
+        (handler_policy_clause_applied ?case_handler ?policy_clause)
+        (not
+          (handler_policy_checked ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_policy_checked ?case_handler)
+        (not
+          (policy_clause_available ?policy_clause)
+        )
+      )
+  )
+  (:action request_policy_approval_for_handler
+    :parameters (?case_handler - case_handler ?local_partner - local_partner_contact)
+    :precondition
+      (and
+        (handler_policy_checked ?case_handler)
+        (local_partner_assigned ?case_handler ?local_partner)
+        (not
+          (handler_policy_approval_requested ?case_handler)
+        )
+      )
+    :effect (handler_policy_approval_requested ?case_handler)
+  )
+  (:action approve_policy_for_handler
+    :parameters (?case_handler - case_handler ?escalation_authorization - escalation_authorization)
+    :precondition
+      (and
+        (handler_policy_approval_requested ?case_handler)
+        (handler_escalation_authorization_bound ?case_handler ?escalation_authorization)
+        (not
+          (handler_policy_approved ?case_handler)
+        )
+      )
+    :effect (handler_policy_approved ?case_handler)
+  )
+  (:action finalize_handler_readiness_after_policy_approval
+    :parameters (?case_handler - case_handler)
+    :precondition
+      (and
+        (handler_policy_approved ?case_handler)
+        (not
+          (handler_execution_committed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_execution_committed ?case_handler)
+        (entity_ready ?case_handler)
+      )
+  )
+  (:action apply_recovery_proposal_to_original_reservation
+    :parameters (?original_reservation - original_reservation ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (reservation_negotiation_flag ?original_reservation)
+        (original_reservation_offer_confirmed ?original_reservation)
+        (recovery_proposal_selected ?recovery_proposal)
+        (recovery_proposal_confirmed_for_reservation ?recovery_proposal)
+        (not
+          (entity_ready ?original_reservation)
+        )
+      )
+    :effect (entity_ready ?original_reservation)
+  )
+  (:action apply_recovery_proposal_to_alternate_reservation
+    :parameters (?alternate_reservation - alternate_reservation ?recovery_proposal - recovery_proposal)
+    :precondition
+      (and
+        (alternate_reservation_negotiation_flag ?alternate_reservation)
+        (alternate_reservation_offer_confirmed ?alternate_reservation)
+        (recovery_proposal_selected ?recovery_proposal)
+        (recovery_proposal_confirmed_for_reservation ?recovery_proposal)
+        (not
+          (entity_ready ?alternate_reservation)
+        )
+      )
+    :effect (entity_ready ?alternate_reservation)
+  )
+  (:action bind_compensation_instrument_to_case
+    :parameters (?case - recovery_case ?compensation_instrument - compensation_instrument ?booking_token - booking_token)
+    :precondition
+      (and
+        (entity_ready ?case)
+        (entity_booking_token_bound ?case ?booking_token)
+        (compensation_instrument_available ?compensation_instrument)
+        (not
+          (entity_compensation_initiated ?case)
+        )
+      )
+    :effect
+      (and
+        (entity_compensation_initiated ?case)
+        (entity_compensation_instrument_bound ?case ?compensation_instrument)
+        (not
+          (compensation_instrument_available ?compensation_instrument)
+        )
+      )
+  )
+  (:action execute_recovery_on_original_reservation
+    :parameters (?original_reservation - original_reservation ?lodging_option - lodging_option ?compensation_instrument - compensation_instrument)
+    :precondition
+      (and
+        (entity_compensation_initiated ?original_reservation)
+        (entity_lodging_option_reserved ?original_reservation ?lodging_option)
+        (entity_compensation_instrument_bound ?original_reservation ?compensation_instrument)
+        (not
+          (entity_resolved ?original_reservation)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?original_reservation)
+        (lodging_option_available ?lodging_option)
+        (compensation_instrument_available ?compensation_instrument)
+      )
+  )
+  (:action execute_recovery_on_alternate_reservation
+    :parameters (?alternate_reservation - alternate_reservation ?lodging_option - lodging_option ?compensation_instrument - compensation_instrument)
+    :precondition
+      (and
+        (entity_compensation_initiated ?alternate_reservation)
+        (entity_lodging_option_reserved ?alternate_reservation ?lodging_option)
+        (entity_compensation_instrument_bound ?alternate_reservation ?compensation_instrument)
+        (not
+          (entity_resolved ?alternate_reservation)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?alternate_reservation)
+        (lodging_option_available ?lodging_option)
+        (compensation_instrument_available ?compensation_instrument)
+      )
+  )
+  (:action handler_execute_recovery
+    :parameters (?case_handler - case_handler ?lodging_option - lodging_option ?compensation_instrument - compensation_instrument)
+    :precondition
+      (and
+        (entity_compensation_initiated ?case_handler)
+        (entity_lodging_option_reserved ?case_handler ?lodging_option)
+        (entity_compensation_instrument_bound ?case_handler ?compensation_instrument)
+        (not
+          (entity_resolved ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (entity_resolved ?case_handler)
+        (lodging_option_available ?lodging_option)
+        (compensation_instrument_available ?compensation_instrument)
+      )
+  )
+)

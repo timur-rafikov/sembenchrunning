@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain transfer_buffer_insertion_resilience_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object infrastructure_resource - base_object physical_item - base_object transfer_control_entity - base_object dispatchable_subtype - base_object dispatchable_entity - dispatchable_subtype receiving_dock - infrastructure_resource transport_service - infrastructure_resource handling_resource - infrastructure_resource equipment_profile_a - infrastructure_resource equipment_profile_b - infrastructure_resource delivery_token - infrastructure_resource asset_equipment_a - infrastructure_resource asset_equipment_c - infrastructure_resource cargo_unit - physical_item load_manifest - physical_item asset_equipment_b - physical_item upstream_transfer_node - transfer_control_entity downstream_transfer_node - transfer_control_entity transfer_buffer_slot - transfer_control_entity route_segment_category - dispatchable_entity asset_category - dispatchable_entity upstream_route_segment - route_segment_category downstream_route_segment - route_segment_category transport_asset - asset_category)
+
+  (:predicates
+    (dispatchable_entity_prepared ?dispatchable_entity - dispatchable_entity)
+    (dispatchable_entity_routed ?dispatchable_entity - dispatchable_entity)
+    (has_receiving_dock_reserved_dispatchable_entity ?dispatchable_entity - dispatchable_entity)
+    (dispatchable_entity_committed_for_dispatch ?dispatchable_entity - dispatchable_entity)
+    (dispatchable_entity_ready_for_execution ?dispatchable_entity - dispatchable_entity)
+    (has_delivery_token_assigned_dispatchable_entity ?dispatchable_entity - dispatchable_entity)
+    (receiving_dock_available ?receiving_dock - receiving_dock)
+    (assigned_receiving_dock_to_dispatchable_entity ?dispatchable_entity - dispatchable_entity ?receiving_dock - receiving_dock)
+    (transport_service_available ?transport_service - transport_service)
+    (dispatchable_entity_bound_to_transport_service ?dispatchable_entity - dispatchable_entity ?transport_service - transport_service)
+    (handling_resource_available ?handling_resource - handling_resource)
+    (dispatchable_entity_assigned_handling_resource ?dispatchable_entity - dispatchable_entity ?handling_resource - handling_resource)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (upstream_segment_has_cargo_unit ?upstream_route_segment - upstream_route_segment ?cargo_unit - cargo_unit)
+    (downstream_segment_has_cargo_unit ?downstream_route_segment - downstream_route_segment ?cargo_unit - cargo_unit)
+    (upstream_segment_linked_to_upstream_node ?upstream_route_segment - upstream_route_segment ?upstream_transfer_node - upstream_transfer_node)
+    (upstream_transfer_node_ready ?upstream_transfer_node - upstream_transfer_node)
+    (upstream_transfer_node_reserved ?upstream_transfer_node - upstream_transfer_node)
+    (upstream_segment_ready_for_handoff ?upstream_route_segment - upstream_route_segment)
+    (downstream_segment_linked_to_downstream_node ?downstream_route_segment - downstream_route_segment ?downstream_transfer_node - downstream_transfer_node)
+    (downstream_transfer_node_ready ?downstream_transfer_node - downstream_transfer_node)
+    (downstream_transfer_node_reserved ?downstream_transfer_node - downstream_transfer_node)
+    (downstream_segment_ready_for_handoff ?downstream_route_segment - downstream_route_segment)
+    (transfer_buffer_slot_available ?transfer_buffer_slot - transfer_buffer_slot)
+    (transfer_buffer_slot_allocated ?transfer_buffer_slot - transfer_buffer_slot)
+    (buffer_slot_bound_to_upstream_node ?transfer_buffer_slot - transfer_buffer_slot ?upstream_transfer_node - upstream_transfer_node)
+    (buffer_slot_bound_to_downstream_node ?transfer_buffer_slot - transfer_buffer_slot ?downstream_transfer_node - downstream_transfer_node)
+    (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot - transfer_buffer_slot)
+    (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot - transfer_buffer_slot)
+    (transfer_buffer_slot_occupied ?transfer_buffer_slot - transfer_buffer_slot)
+    (transport_asset_assigned_to_upstream_segment ?transport_asset - transport_asset ?upstream_route_segment - upstream_route_segment)
+    (transport_asset_assigned_to_downstream_segment ?transport_asset - transport_asset ?downstream_route_segment - downstream_route_segment)
+    (transport_asset_assigned_to_buffer_slot ?transport_asset - transport_asset ?transfer_buffer_slot - transfer_buffer_slot)
+    (load_manifest_unsealed ?load_manifest - load_manifest)
+    (transport_asset_assigned_manifest ?transport_asset - transport_asset ?load_manifest - load_manifest)
+    (load_manifest_sealed ?load_manifest - load_manifest)
+    (load_manifest_bound_to_buffer_slot ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    (transport_asset_sealed ?transport_asset - transport_asset)
+    (transport_asset_manifest_ready ?transport_asset - transport_asset)
+    (transport_asset_cleared_for_dispatch ?transport_asset - transport_asset)
+    (transport_asset_has_equipment_profile_a ?transport_asset - transport_asset)
+    (transport_asset_profile_a_confirmed ?transport_asset - transport_asset)
+    (transport_asset_equipment_profiles_attached ?transport_asset - transport_asset)
+    (transport_asset_checks_completed ?transport_asset - transport_asset)
+    (asset_equipment_b_available ?asset_equipment_b - asset_equipment_b)
+    (transport_asset_assigned_equipment_b ?transport_asset - transport_asset ?asset_equipment_b - asset_equipment_b)
+    (transport_asset_equipment_b_registered ?transport_asset - transport_asset)
+    (transport_asset_authorization_flag ?transport_asset - transport_asset)
+    (transport_asset_authorized ?transport_asset - transport_asset)
+    (equipment_profile_a_available ?equipment_profile_a - equipment_profile_a)
+    (transport_asset_assigned_equipment_profile_a ?transport_asset - transport_asset ?equipment_profile_a - equipment_profile_a)
+    (equipment_profile_b_available ?equipment_profile_b - equipment_profile_b)
+    (transport_asset_assigned_equipment_profile_b ?transport_asset - transport_asset ?equipment_profile_b - equipment_profile_b)
+    (asset_equipment_a_available ?asset_equipment_a - asset_equipment_a)
+    (transport_asset_assigned_equipment_a ?transport_asset - transport_asset ?asset_equipment_a - asset_equipment_a)
+    (asset_equipment_c_available ?asset_equipment_c - asset_equipment_c)
+    (transport_asset_assigned_equipment_c ?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c)
+    (delivery_token_available ?delivery_token - delivery_token)
+    (assigned_delivery_token_to_dispatchable_entity ?dispatchable_entity - dispatchable_entity ?delivery_token - delivery_token)
+    (upstream_segment_buffer_ready ?upstream_route_segment - upstream_route_segment)
+    (downstream_segment_buffer_ready ?downstream_route_segment - downstream_route_segment)
+    (transport_asset_finalized_for_execution ?transport_asset - transport_asset)
+  )
+  (:action prepare_dispatchable_entity
+    :parameters (?dispatchable_entity - dispatchable_entity)
+    :precondition
+      (and
+        (not
+          (dispatchable_entity_prepared ?dispatchable_entity)
+        )
+        (not
+          (dispatchable_entity_committed_for_dispatch ?dispatchable_entity)
+        )
+      )
+    :effect (dispatchable_entity_prepared ?dispatchable_entity)
+  )
+  (:action assign_receiving_dock_to_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?receiving_dock - receiving_dock)
+    :precondition
+      (and
+        (dispatchable_entity_prepared ?dispatchable_entity)
+        (not
+          (has_receiving_dock_reserved_dispatchable_entity ?dispatchable_entity)
+        )
+        (receiving_dock_available ?receiving_dock)
+      )
+    :effect
+      (and
+        (has_receiving_dock_reserved_dispatchable_entity ?dispatchable_entity)
+        (assigned_receiving_dock_to_dispatchable_entity ?dispatchable_entity ?receiving_dock)
+        (not
+          (receiving_dock_available ?receiving_dock)
+        )
+      )
+  )
+  (:action acquire_transport_service_for_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_prepared ?dispatchable_entity)
+        (has_receiving_dock_reserved_dispatchable_entity ?dispatchable_entity)
+        (transport_service_available ?transport_service)
+      )
+    :effect
+      (and
+        (dispatchable_entity_bound_to_transport_service ?dispatchable_entity ?transport_service)
+        (not
+          (transport_service_available ?transport_service)
+        )
+      )
+  )
+  (:action finalize_transport_service_assignment_for_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_prepared ?dispatchable_entity)
+        (has_receiving_dock_reserved_dispatchable_entity ?dispatchable_entity)
+        (dispatchable_entity_bound_to_transport_service ?dispatchable_entity ?transport_service)
+        (not
+          (dispatchable_entity_routed ?dispatchable_entity)
+        )
+      )
+    :effect (dispatchable_entity_routed ?dispatchable_entity)
+  )
+  (:action release_transport_service_from_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_bound_to_transport_service ?dispatchable_entity ?transport_service)
+      )
+    :effect
+      (and
+        (transport_service_available ?transport_service)
+        (not
+          (dispatchable_entity_bound_to_transport_service ?dispatchable_entity ?transport_service)
+        )
+      )
+  )
+  (:action assign_handling_resource_to_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?dispatchable_entity)
+        (handling_resource_available ?handling_resource)
+      )
+    :effect
+      (and
+        (dispatchable_entity_assigned_handling_resource ?dispatchable_entity ?handling_resource)
+        (not
+          (handling_resource_available ?handling_resource)
+        )
+      )
+  )
+  (:action release_handling_resource_from_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (dispatchable_entity_assigned_handling_resource ?dispatchable_entity ?handling_resource)
+      )
+    :effect
+      (and
+        (handling_resource_available ?handling_resource)
+        (not
+          (dispatchable_entity_assigned_handling_resource ?dispatchable_entity ?handling_resource)
+        )
+      )
+  )
+  (:action attach_equipment_a_to_asset
+    :parameters (?transport_asset - transport_asset ?asset_equipment_a - asset_equipment_a)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (asset_equipment_a_available ?asset_equipment_a)
+      )
+    :effect
+      (and
+        (transport_asset_assigned_equipment_a ?transport_asset ?asset_equipment_a)
+        (not
+          (asset_equipment_a_available ?asset_equipment_a)
+        )
+      )
+  )
+  (:action detach_equipment_a_from_asset
+    :parameters (?transport_asset - transport_asset ?asset_equipment_a - asset_equipment_a)
+    :precondition
+      (and
+        (transport_asset_assigned_equipment_a ?transport_asset ?asset_equipment_a)
+      )
+    :effect
+      (and
+        (asset_equipment_a_available ?asset_equipment_a)
+        (not
+          (transport_asset_assigned_equipment_a ?transport_asset ?asset_equipment_a)
+        )
+      )
+  )
+  (:action attach_equipment_c_to_asset
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (asset_equipment_c_available ?asset_equipment_c)
+      )
+    :effect
+      (and
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (not
+          (asset_equipment_c_available ?asset_equipment_c)
+        )
+      )
+  )
+  (:action detach_equipment_c_from_asset
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c)
+    :precondition
+      (and
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+      )
+    :effect
+      (and
+        (asset_equipment_c_available ?asset_equipment_c)
+        (not
+          (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        )
+      )
+  )
+  (:action prepare_upstream_node_for_segment
+    :parameters (?upstream_route_segment - upstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?upstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?upstream_route_segment ?transport_service)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (not
+          (upstream_transfer_node_ready ?upstream_transfer_node)
+        )
+        (not
+          (upstream_transfer_node_reserved ?upstream_transfer_node)
+        )
+      )
+    :effect (upstream_transfer_node_ready ?upstream_transfer_node)
+  )
+  (:action mark_upstream_segment_as_handoff_ready
+    :parameters (?upstream_route_segment - upstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?upstream_route_segment)
+        (dispatchable_entity_assigned_handling_resource ?upstream_route_segment ?handling_resource)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (upstream_transfer_node_ready ?upstream_transfer_node)
+        (not
+          (upstream_segment_buffer_ready ?upstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+      )
+  )
+  (:action attach_cargo_to_upstream_segment
+    :parameters (?upstream_route_segment - upstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?upstream_route_segment)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (upstream_segment_buffer_ready ?upstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (upstream_transfer_node_reserved ?upstream_transfer_node)
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (upstream_segment_has_cargo_unit ?upstream_route_segment ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action execute_upstream_handoff_with_cargo
+    :parameters (?upstream_route_segment - upstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?transport_service - transport_service ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?upstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?upstream_route_segment ?transport_service)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (upstream_transfer_node_reserved ?upstream_transfer_node)
+        (upstream_segment_has_cargo_unit ?upstream_route_segment ?cargo_unit)
+        (not
+          (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (upstream_transfer_node_ready ?upstream_transfer_node)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (upstream_segment_has_cargo_unit ?upstream_route_segment ?cargo_unit)
+        )
+      )
+  )
+  (:action prepare_downstream_node_for_segment
+    :parameters (?downstream_route_segment - downstream_route_segment ?downstream_transfer_node - downstream_transfer_node ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?downstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?downstream_route_segment ?transport_service)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (not
+          (downstream_transfer_node_ready ?downstream_transfer_node)
+        )
+        (not
+          (downstream_transfer_node_reserved ?downstream_transfer_node)
+        )
+      )
+    :effect (downstream_transfer_node_ready ?downstream_transfer_node)
+  )
+  (:action mark_downstream_segment_ready_for_handoff
+    :parameters (?downstream_route_segment - downstream_route_segment ?downstream_transfer_node - downstream_transfer_node ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?downstream_route_segment)
+        (dispatchable_entity_assigned_handling_resource ?downstream_route_segment ?handling_resource)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (downstream_transfer_node_ready ?downstream_transfer_node)
+        (not
+          (downstream_segment_buffer_ready ?downstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+      )
+  )
+  (:action assign_cargo_to_downstream_segment_and_reserve_node
+    :parameters (?downstream_route_segment - downstream_route_segment ?downstream_transfer_node - downstream_transfer_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?downstream_route_segment)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (downstream_segment_buffer_ready ?downstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (downstream_transfer_node_reserved ?downstream_transfer_node)
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (downstream_segment_has_cargo_unit ?downstream_route_segment ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action execute_downstream_handoff_with_cargo
+    :parameters (?downstream_route_segment - downstream_route_segment ?downstream_transfer_node - downstream_transfer_node ?transport_service - transport_service ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?downstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?downstream_route_segment ?transport_service)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (downstream_transfer_node_reserved ?downstream_transfer_node)
+        (downstream_segment_has_cargo_unit ?downstream_route_segment ?cargo_unit)
+        (not
+          (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (downstream_transfer_node_ready ?downstream_transfer_node)
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (downstream_segment_has_cargo_unit ?downstream_route_segment ?cargo_unit)
+        )
+      )
+  )
+  (:action allocate_transfer_buffer_slot_and_bind_nodes
+    :parameters (?upstream_route_segment - upstream_route_segment ?downstream_route_segment - downstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?downstream_transfer_node - downstream_transfer_node ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (upstream_transfer_node_ready ?upstream_transfer_node)
+        (downstream_transfer_node_ready ?downstream_transfer_node)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        (transfer_buffer_slot_available ?transfer_buffer_slot)
+      )
+    :effect
+      (and
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (buffer_slot_bound_to_upstream_node ?transfer_buffer_slot ?upstream_transfer_node)
+        (buffer_slot_bound_to_downstream_node ?transfer_buffer_slot ?downstream_transfer_node)
+        (not
+          (transfer_buffer_slot_available ?transfer_buffer_slot)
+        )
+      )
+  )
+  (:action allocate_transfer_buffer_slot_with_downstream_confirmation
+    :parameters (?upstream_route_segment - upstream_route_segment ?downstream_route_segment - downstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?downstream_transfer_node - downstream_transfer_node ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (upstream_transfer_node_reserved ?upstream_transfer_node)
+        (downstream_transfer_node_ready ?downstream_transfer_node)
+        (not
+          (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        )
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        (transfer_buffer_slot_available ?transfer_buffer_slot)
+      )
+    :effect
+      (and
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (buffer_slot_bound_to_upstream_node ?transfer_buffer_slot ?upstream_transfer_node)
+        (buffer_slot_bound_to_downstream_node ?transfer_buffer_slot ?downstream_transfer_node)
+        (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_available ?transfer_buffer_slot)
+        )
+      )
+  )
+  (:action allocate_transfer_buffer_slot_with_upstream_confirmation
+    :parameters (?upstream_route_segment - upstream_route_segment ?downstream_route_segment - downstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?downstream_transfer_node - downstream_transfer_node ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (upstream_transfer_node_ready ?upstream_transfer_node)
+        (downstream_transfer_node_reserved ?downstream_transfer_node)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        (not
+          (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        )
+        (transfer_buffer_slot_available ?transfer_buffer_slot)
+      )
+    :effect
+      (and
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (buffer_slot_bound_to_upstream_node ?transfer_buffer_slot ?upstream_transfer_node)
+        (buffer_slot_bound_to_downstream_node ?transfer_buffer_slot ?downstream_transfer_node)
+        (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_available ?transfer_buffer_slot)
+        )
+      )
+  )
+  (:action allocate_transfer_buffer_slot_with_both_confirmations
+    :parameters (?upstream_route_segment - upstream_route_segment ?downstream_route_segment - downstream_route_segment ?upstream_transfer_node - upstream_transfer_node ?downstream_transfer_node - downstream_transfer_node ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (upstream_segment_linked_to_upstream_node ?upstream_route_segment ?upstream_transfer_node)
+        (downstream_segment_linked_to_downstream_node ?downstream_route_segment ?downstream_transfer_node)
+        (upstream_transfer_node_reserved ?upstream_transfer_node)
+        (downstream_transfer_node_reserved ?downstream_transfer_node)
+        (not
+          (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        )
+        (not
+          (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        )
+        (transfer_buffer_slot_available ?transfer_buffer_slot)
+      )
+    :effect
+      (and
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (buffer_slot_bound_to_upstream_node ?transfer_buffer_slot ?upstream_transfer_node)
+        (buffer_slot_bound_to_downstream_node ?transfer_buffer_slot ?downstream_transfer_node)
+        (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_available ?transfer_buffer_slot)
+        )
+      )
+  )
+  (:action mark_transfer_buffer_slot_occupied
+    :parameters (?transfer_buffer_slot - transfer_buffer_slot ?upstream_route_segment - upstream_route_segment ?transport_service - transport_service)
+    :precondition
+      (and
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?upstream_route_segment ?transport_service)
+        (not
+          (transfer_buffer_slot_occupied ?transfer_buffer_slot)
+        )
+      )
+    :effect (transfer_buffer_slot_occupied ?transfer_buffer_slot)
+  )
+  (:action seal_and_bind_manifest_to_buffer_and_asset
+    :parameters (?transport_asset - transport_asset ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (transport_asset_assigned_to_buffer_slot ?transport_asset ?transfer_buffer_slot)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_unsealed ?load_manifest)
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (transfer_buffer_slot_occupied ?transfer_buffer_slot)
+        (not
+          (load_manifest_sealed ?load_manifest)
+        )
+      )
+    :effect
+      (and
+        (load_manifest_sealed ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (not
+          (load_manifest_unsealed ?load_manifest)
+        )
+      )
+  )
+  (:action mark_asset_sealed_after_manifest_attach
+    :parameters (?transport_asset - transport_asset ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_sealed ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (dispatchable_entity_bound_to_transport_service ?transport_asset ?transport_service)
+        (not
+          (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        )
+        (not
+          (transport_asset_sealed ?transport_asset)
+        )
+      )
+    :effect (transport_asset_sealed ?transport_asset)
+  )
+  (:action assign_equipment_profile_a_to_asset
+    :parameters (?transport_asset - transport_asset ?equipment_profile_a - equipment_profile_a)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (equipment_profile_a_available ?equipment_profile_a)
+        (not
+          (transport_asset_has_equipment_profile_a ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_has_equipment_profile_a ?transport_asset)
+        (transport_asset_assigned_equipment_profile_a ?transport_asset ?equipment_profile_a)
+        (not
+          (equipment_profile_a_available ?equipment_profile_a)
+        )
+      )
+  )
+  (:action apply_equipment_profile_a_and_confirm_asset_configuration
+    :parameters (?transport_asset - transport_asset ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot ?transport_service - transport_service ?equipment_profile_a - equipment_profile_a)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_sealed ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (dispatchable_entity_bound_to_transport_service ?transport_asset ?transport_service)
+        (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        (transport_asset_has_equipment_profile_a ?transport_asset)
+        (transport_asset_assigned_equipment_profile_a ?transport_asset ?equipment_profile_a)
+        (not
+          (transport_asset_sealed ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_sealed ?transport_asset)
+        (transport_asset_profile_a_confirmed ?transport_asset)
+      )
+  )
+  (:action start_asset_equipment_checks_and_prepare
+    :parameters (?transport_asset - transport_asset ?asset_equipment_a - asset_equipment_a ?handling_resource - handling_resource ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_sealed ?transport_asset)
+        (transport_asset_assigned_equipment_a ?transport_asset ?asset_equipment_a)
+        (dispatchable_entity_assigned_handling_resource ?transport_asset ?handling_resource)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        )
+        (not
+          (transport_asset_manifest_ready ?transport_asset)
+        )
+      )
+    :effect (transport_asset_manifest_ready ?transport_asset)
+  )
+  (:action continue_asset_equipment_checks_and_prepare
+    :parameters (?transport_asset - transport_asset ?asset_equipment_a - asset_equipment_a ?handling_resource - handling_resource ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_sealed ?transport_asset)
+        (transport_asset_assigned_equipment_a ?transport_asset ?asset_equipment_a)
+        (dispatchable_entity_assigned_handling_resource ?transport_asset ?handling_resource)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        (not
+          (transport_asset_manifest_ready ?transport_asset)
+        )
+      )
+    :effect (transport_asset_manifest_ready ?transport_asset)
+  )
+  (:action authorize_asset_for_final_seal_checks
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_manifest_ready ?transport_asset)
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        )
+        (not
+          (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        )
+        (not
+          (transport_asset_cleared_for_dispatch ?transport_asset)
+        )
+      )
+    :effect (transport_asset_cleared_for_dispatch ?transport_asset)
+  )
+  (:action authorize_asset_and_register_profile_signature
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_manifest_ready ?transport_asset)
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        )
+        (not
+          (transport_asset_cleared_for_dispatch ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_equipment_profiles_attached ?transport_asset)
+      )
+  )
+  (:action authorize_asset_and_attach_profile_signature
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_manifest_ready ?transport_asset)
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (not
+          (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        )
+        (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        (not
+          (transport_asset_cleared_for_dispatch ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_equipment_profiles_attached ?transport_asset)
+      )
+  )
+  (:action authorize_asset_and_attach_profile_signatures_both
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c ?load_manifest - load_manifest ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (transport_asset_manifest_ready ?transport_asset)
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (transport_asset_assigned_manifest ?transport_asset ?load_manifest)
+        (load_manifest_bound_to_buffer_slot ?load_manifest ?transfer_buffer_slot)
+        (transfer_buffer_slot_confirmed_by_downstream ?transfer_buffer_slot)
+        (transfer_buffer_slot_confirmed_by_upstream ?transfer_buffer_slot)
+        (not
+          (transport_asset_cleared_for_dispatch ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_equipment_profiles_attached ?transport_asset)
+      )
+  )
+  (:action finalize_asset_preparation
+    :parameters (?transport_asset - transport_asset)
+    :precondition
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (not
+          (transport_asset_equipment_profiles_attached ?transport_asset)
+        )
+        (not
+          (transport_asset_finalized_for_execution ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_finalized_for_execution ?transport_asset)
+        (dispatchable_entity_ready_for_execution ?transport_asset)
+      )
+  )
+  (:action attach_equipment_profile_b_to_asset
+    :parameters (?transport_asset - transport_asset ?equipment_profile_b - equipment_profile_b)
+    :precondition
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_equipment_profiles_attached ?transport_asset)
+        (equipment_profile_b_available ?equipment_profile_b)
+      )
+    :effect
+      (and
+        (transport_asset_assigned_equipment_profile_b ?transport_asset ?equipment_profile_b)
+        (not
+          (equipment_profile_b_available ?equipment_profile_b)
+        )
+      )
+  )
+  (:action mark_asset_ready_for_dispatch_checks_passed
+    :parameters (?transport_asset - transport_asset ?upstream_route_segment - upstream_route_segment ?downstream_route_segment - downstream_route_segment ?transport_service - transport_service ?equipment_profile_b - equipment_profile_b)
+    :precondition
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_equipment_profiles_attached ?transport_asset)
+        (transport_asset_assigned_equipment_profile_b ?transport_asset ?equipment_profile_b)
+        (transport_asset_assigned_to_upstream_segment ?transport_asset ?upstream_route_segment)
+        (transport_asset_assigned_to_downstream_segment ?transport_asset ?downstream_route_segment)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        (dispatchable_entity_bound_to_transport_service ?transport_asset ?transport_service)
+        (not
+          (transport_asset_checks_completed ?transport_asset)
+        )
+      )
+    :effect (transport_asset_checks_completed ?transport_asset)
+  )
+  (:action finalize_asset_preparation_after_checks
+    :parameters (?transport_asset - transport_asset)
+    :precondition
+      (and
+        (transport_asset_cleared_for_dispatch ?transport_asset)
+        (transport_asset_checks_completed ?transport_asset)
+        (not
+          (transport_asset_finalized_for_execution ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_finalized_for_execution ?transport_asset)
+        (dispatchable_entity_ready_for_execution ?transport_asset)
+      )
+  )
+  (:action assign_equipment_b_to_asset_and_consume_availability
+    :parameters (?transport_asset - transport_asset ?asset_equipment_b - asset_equipment_b ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_routed ?transport_asset)
+        (dispatchable_entity_bound_to_transport_service ?transport_asset ?transport_service)
+        (asset_equipment_b_available ?asset_equipment_b)
+        (transport_asset_assigned_equipment_b ?transport_asset ?asset_equipment_b)
+        (not
+          (transport_asset_equipment_b_registered ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_equipment_b_registered ?transport_asset)
+        (not
+          (asset_equipment_b_available ?asset_equipment_b)
+        )
+      )
+  )
+  (:action grant_asset_authorization_flag
+    :parameters (?transport_asset - transport_asset ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (transport_asset_equipment_b_registered ?transport_asset)
+        (dispatchable_entity_assigned_handling_resource ?transport_asset ?handling_resource)
+        (not
+          (transport_asset_authorization_flag ?transport_asset)
+        )
+      )
+    :effect (transport_asset_authorization_flag ?transport_asset)
+  )
+  (:action confirm_asset_authorization_with_equipment_c
+    :parameters (?transport_asset - transport_asset ?asset_equipment_c - asset_equipment_c)
+    :precondition
+      (and
+        (transport_asset_authorization_flag ?transport_asset)
+        (transport_asset_assigned_equipment_c ?transport_asset ?asset_equipment_c)
+        (not
+          (transport_asset_authorized ?transport_asset)
+        )
+      )
+    :effect (transport_asset_authorized ?transport_asset)
+  )
+  (:action finalize_asset_authorization_and_mark_ready
+    :parameters (?transport_asset - transport_asset)
+    :precondition
+      (and
+        (transport_asset_authorized ?transport_asset)
+        (not
+          (transport_asset_finalized_for_execution ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (transport_asset_finalized_for_execution ?transport_asset)
+        (dispatchable_entity_ready_for_execution ?transport_asset)
+      )
+  )
+  (:action finalize_upstream_segment_dispatch_ready
+    :parameters (?upstream_route_segment - upstream_route_segment ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (upstream_segment_buffer_ready ?upstream_route_segment)
+        (upstream_segment_ready_for_handoff ?upstream_route_segment)
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (transfer_buffer_slot_occupied ?transfer_buffer_slot)
+        (not
+          (dispatchable_entity_ready_for_execution ?upstream_route_segment)
+        )
+      )
+    :effect (dispatchable_entity_ready_for_execution ?upstream_route_segment)
+  )
+  (:action finalize_downstream_segment_dispatch_ready
+    :parameters (?downstream_route_segment - downstream_route_segment ?transfer_buffer_slot - transfer_buffer_slot)
+    :precondition
+      (and
+        (downstream_segment_buffer_ready ?downstream_route_segment)
+        (downstream_segment_ready_for_handoff ?downstream_route_segment)
+        (transfer_buffer_slot_allocated ?transfer_buffer_slot)
+        (transfer_buffer_slot_occupied ?transfer_buffer_slot)
+        (not
+          (dispatchable_entity_ready_for_execution ?downstream_route_segment)
+        )
+      )
+    :effect (dispatchable_entity_ready_for_execution ?downstream_route_segment)
+  )
+  (:action assign_delivery_token_to_entity
+    :parameters (?dispatchable_entity - dispatchable_entity ?delivery_token - delivery_token ?transport_service - transport_service)
+    :precondition
+      (and
+        (dispatchable_entity_ready_for_execution ?dispatchable_entity)
+        (dispatchable_entity_bound_to_transport_service ?dispatchable_entity ?transport_service)
+        (delivery_token_available ?delivery_token)
+        (not
+          (has_delivery_token_assigned_dispatchable_entity ?dispatchable_entity)
+        )
+      )
+    :effect
+      (and
+        (has_delivery_token_assigned_dispatchable_entity ?dispatchable_entity)
+        (assigned_delivery_token_to_dispatchable_entity ?dispatchable_entity ?delivery_token)
+        (not
+          (delivery_token_available ?delivery_token)
+        )
+      )
+  )
+  (:action finalize_segment_dispatch_and_assign_receiving_dock
+    :parameters (?upstream_route_segment - upstream_route_segment ?receiving_dock - receiving_dock ?delivery_token - delivery_token)
+    :precondition
+      (and
+        (has_delivery_token_assigned_dispatchable_entity ?upstream_route_segment)
+        (assigned_receiving_dock_to_dispatchable_entity ?upstream_route_segment ?receiving_dock)
+        (assigned_delivery_token_to_dispatchable_entity ?upstream_route_segment ?delivery_token)
+        (not
+          (dispatchable_entity_committed_for_dispatch ?upstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (dispatchable_entity_committed_for_dispatch ?upstream_route_segment)
+        (receiving_dock_available ?receiving_dock)
+        (delivery_token_available ?delivery_token)
+      )
+  )
+  (:action finalize_downstream_segment_dispatch_and_assign_receiving_dock
+    :parameters (?downstream_route_segment - downstream_route_segment ?receiving_dock - receiving_dock ?delivery_token - delivery_token)
+    :precondition
+      (and
+        (has_delivery_token_assigned_dispatchable_entity ?downstream_route_segment)
+        (assigned_receiving_dock_to_dispatchable_entity ?downstream_route_segment ?receiving_dock)
+        (assigned_delivery_token_to_dispatchable_entity ?downstream_route_segment ?delivery_token)
+        (not
+          (dispatchable_entity_committed_for_dispatch ?downstream_route_segment)
+        )
+      )
+    :effect
+      (and
+        (dispatchable_entity_committed_for_dispatch ?downstream_route_segment)
+        (receiving_dock_available ?receiving_dock)
+        (delivery_token_available ?delivery_token)
+      )
+  )
+  (:action finalize_asset_dispatch_and_assign_receiving_dock
+    :parameters (?transport_asset - transport_asset ?receiving_dock - receiving_dock ?delivery_token - delivery_token)
+    :precondition
+      (and
+        (has_delivery_token_assigned_dispatchable_entity ?transport_asset)
+        (assigned_receiving_dock_to_dispatchable_entity ?transport_asset ?receiving_dock)
+        (assigned_delivery_token_to_dispatchable_entity ?transport_asset ?delivery_token)
+        (not
+          (dispatchable_entity_committed_for_dispatch ?transport_asset)
+        )
+      )
+    :effect
+      (and
+        (dispatchable_entity_committed_for_dispatch ?transport_asset)
+        (receiving_dock_available ?receiving_dock)
+        (delivery_token_available ?delivery_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem transfer_buffer_insertion_case)
+  (:domain transfer_buffer_insertion_resilience_domain)
+  (:objects upstream_route_segment_1 - upstream_route_segment downstream_route_segment_1 - downstream_route_segment transport_asset_1 - transport_asset transport_asset_2 - transport_asset receiving_dock_1 - receiving_dock receiving_dock_2 - receiving_dock receiving_dock_3 - receiving_dock transport_service_1 - transport_service handling_resource_1 - handling_resource cargo_unit_1 - cargo_unit upstream_transfer_node_1 - upstream_transfer_node downstream_transfer_node_1 - downstream_transfer_node transfer_buffer_slot_1 - transfer_buffer_slot load_manifest_1 - load_manifest load_manifest_2 - load_manifest equipment_profile_a_1 - equipment_profile_a equipment_profile_a_2 - equipment_profile_a equipment_profile_b_1 - equipment_profile_b equipment_profile_b_2 - equipment_profile_b delivery_token_1 - delivery_token asset_equipment_a_1 - asset_equipment_a asset_equipment_b_1 - asset_equipment_b asset_equipment_b_2 - asset_equipment_b asset_equipment_c_1 - asset_equipment_c)
+  (:init
+    (receiving_dock_available receiving_dock_1)
+    (receiving_dock_available receiving_dock_2)
+    (receiving_dock_available receiving_dock_3)
+    (transport_service_available transport_service_1)
+    (handling_resource_available handling_resource_1)
+    (cargo_unit_available cargo_unit_1)
+    (upstream_segment_linked_to_upstream_node upstream_route_segment_1 upstream_transfer_node_1)
+    (downstream_segment_linked_to_downstream_node downstream_route_segment_1 downstream_transfer_node_1)
+    (transfer_buffer_slot_available transfer_buffer_slot_1)
+    (load_manifest_unsealed load_manifest_1)
+    (load_manifest_unsealed load_manifest_2)
+    (transport_asset_assigned_to_upstream_segment transport_asset_1 upstream_route_segment_1)
+    (transport_asset_assigned_to_upstream_segment transport_asset_2 upstream_route_segment_1)
+    (transport_asset_assigned_to_downstream_segment transport_asset_1 downstream_route_segment_1)
+    (transport_asset_assigned_to_downstream_segment transport_asset_2 downstream_route_segment_1)
+    (transport_asset_assigned_to_buffer_slot transport_asset_1 transfer_buffer_slot_1)
+    (transport_asset_assigned_to_buffer_slot transport_asset_2 transfer_buffer_slot_1)
+    (transport_asset_assigned_manifest transport_asset_1 load_manifest_1)
+    (transport_asset_assigned_manifest transport_asset_2 load_manifest_2)
+    (equipment_profile_a_available equipment_profile_a_1)
+    (equipment_profile_a_available equipment_profile_a_2)
+    (equipment_profile_b_available equipment_profile_b_1)
+    (equipment_profile_b_available equipment_profile_b_2)
+    (delivery_token_available delivery_token_1)
+    (asset_equipment_a_available asset_equipment_a_1)
+    (asset_equipment_b_available asset_equipment_b_1)
+    (transport_asset_assigned_equipment_b transport_asset_1 asset_equipment_b_1)
+    (transport_asset_assigned_equipment_b transport_asset_2 asset_equipment_b_2)
+    (asset_equipment_c_available asset_equipment_c_1)
+  )
+  (:goal
+    (and
+      (dispatchable_entity_committed_for_dispatch upstream_route_segment_1)
+      (dispatchable_entity_committed_for_dispatch downstream_route_segment_1)
+      (dispatchable_entity_committed_for_dispatch transport_asset_1)
+      (dispatchable_entity_committed_for_dispatch transport_asset_2)
+    )
+  )
+)

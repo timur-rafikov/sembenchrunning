@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain airport_transfer_alignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object asset_category - base_object resource_category - base_object spatial_node_category - base_object entity_root - base_object transfer_entity - entity_root vehicle_option - asset_category traveler - asset_category local_operator - asset_category service_option - asset_category passenger_option - asset_category time_buffer - asset_category equipment - asset_category credential - asset_category auxiliary_resource - resource_category booking_token - resource_category permit - resource_category pickup_node - spatial_node_category dropoff_node - spatial_node_category vehicle_unit - spatial_node_category segment_group - transfer_entity case_group - transfer_entity arrival_segment - segment_group departure_segment - segment_group transfer_case - case_group)
+
+  (:predicates
+    (registered ?transfer_entity - transfer_entity)
+    (confirmed ?transfer_entity - transfer_entity)
+    (entity_vehicle_option_reserved ?transfer_entity - transfer_entity)
+    (alignment_finalized ?transfer_entity - transfer_entity)
+    (ready_for_alignment ?transfer_entity - transfer_entity)
+    (entity_buffer_assigned ?transfer_entity - transfer_entity)
+    (vehicle_option_available ?vehicle_option - vehicle_option)
+    (entity_vehicle_option_binding ?transfer_entity - transfer_entity ?vehicle_option - vehicle_option)
+    (traveler_available ?traveler - traveler)
+    (entity_traveler_assignment ?transfer_entity - transfer_entity ?traveler - traveler)
+    (operator_available ?local_operator - local_operator)
+    (entity_operator_assignment ?transfer_entity - transfer_entity ?local_operator - local_operator)
+    (auxiliary_resource_available ?auxiliary_resource - auxiliary_resource)
+    (arrival_segment_aux_resource_assigned ?arrival_segment - arrival_segment ?auxiliary_resource - auxiliary_resource)
+    (departure_segment_aux_resource_assigned ?departure_segment - departure_segment ?auxiliary_resource - auxiliary_resource)
+    (arrival_segment_pickup_node ?arrival_segment - arrival_segment ?pickup_node - pickup_node)
+    (pickup_node_ready ?pickup_node - pickup_node)
+    (pickup_node_reserved_auxiliary ?pickup_node - pickup_node)
+    (arrival_segment_aux_resource_in_use ?arrival_segment - arrival_segment)
+    (departure_segment_dropoff_node ?departure_segment - departure_segment ?dropoff_node - dropoff_node)
+    (dropoff_node_ready ?dropoff_node - dropoff_node)
+    (dropoff_node_reserved_auxiliary ?dropoff_node - dropoff_node)
+    (departure_segment_aux_resource_in_use ?departure_segment - departure_segment)
+    (vehicle_unit_available ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_allocated ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_assigned_to_pickup ?vehicle_unit - vehicle_unit ?pickup_node - pickup_node)
+    (vehicle_unit_assigned_to_dropoff ?vehicle_unit - vehicle_unit ?dropoff_node - dropoff_node)
+    (vehicle_unit_pickup_ready ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_dropoff_ready ?vehicle_unit - vehicle_unit)
+    (vehicle_unit_confirmed ?vehicle_unit - vehicle_unit)
+    (case_has_arrival_segment ?transfer_case - transfer_case ?arrival_segment - arrival_segment)
+    (case_has_departure_segment ?transfer_case - transfer_case ?departure_segment - departure_segment)
+    (case_assigned_vehicle_unit ?transfer_case - transfer_case ?vehicle_unit - vehicle_unit)
+    (booking_token_available ?booking_token - booking_token)
+    (case_has_booking_token ?transfer_case - transfer_case ?booking_token - booking_token)
+    (booking_token_locked ?booking_token - booking_token)
+    (booking_token_assigned_vehicle ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    (case_ready_for_resource_allocation ?transfer_case - transfer_case)
+    (case_resources_locked ?transfer_case - transfer_case)
+    (case_credentials_verified ?transfer_case - transfer_case)
+    (case_service_option_assigned ?transfer_case - transfer_case)
+    (case_service_option_confirmed ?transfer_case - transfer_case)
+    (case_secondary_checks_passed ?transfer_case - transfer_case)
+    (case_operational_checks_passed ?transfer_case - transfer_case)
+    (permit_available ?permit - permit)
+    (case_has_permit ?transfer_case - transfer_case ?permit - permit)
+    (case_permit_granted ?transfer_case - transfer_case)
+    (case_permit_applied ?transfer_case - transfer_case)
+    (case_permit_verified ?transfer_case - transfer_case)
+    (service_option_available ?service_option - service_option)
+    (case_service_option_binding ?transfer_case - transfer_case ?service_option - service_option)
+    (passenger_option_available ?passenger_option - passenger_option)
+    (case_passenger_option_binding ?transfer_case - transfer_case ?passenger_option - passenger_option)
+    (equipment_available ?equipment - equipment)
+    (case_equipment_binding ?transfer_case - transfer_case ?equipment - equipment)
+    (credential_available ?credential - credential)
+    (case_credential_binding ?transfer_case - transfer_case ?credential - credential)
+    (time_buffer_available ?time_buffer - time_buffer)
+    (entity_time_buffer_binding ?transfer_entity - transfer_entity ?time_buffer - time_buffer)
+    (arrival_preparation_complete ?arrival_segment - arrival_segment)
+    (departure_preparation_complete ?departure_segment - departure_segment)
+    (case_finalized ?transfer_case - transfer_case)
+  )
+  (:action register_transfer_entity
+    :parameters (?transfer_entity - transfer_entity)
+    :precondition
+      (and
+        (not
+          (registered ?transfer_entity)
+        )
+        (not
+          (alignment_finalized ?transfer_entity)
+        )
+      )
+    :effect (registered ?transfer_entity)
+  )
+  (:action reserve_vehicle_option_for_entity
+    :parameters (?transfer_entity - transfer_entity ?vehicle_option - vehicle_option)
+    :precondition
+      (and
+        (registered ?transfer_entity)
+        (not
+          (entity_vehicle_option_reserved ?transfer_entity)
+        )
+        (vehicle_option_available ?vehicle_option)
+      )
+    :effect
+      (and
+        (entity_vehicle_option_reserved ?transfer_entity)
+        (entity_vehicle_option_binding ?transfer_entity ?vehicle_option)
+        (not
+          (vehicle_option_available ?vehicle_option)
+        )
+      )
+  )
+  (:action assign_traveler_to_entity
+    :parameters (?transfer_entity - transfer_entity ?traveler - traveler)
+    :precondition
+      (and
+        (registered ?transfer_entity)
+        (entity_vehicle_option_reserved ?transfer_entity)
+        (traveler_available ?traveler)
+      )
+    :effect
+      (and
+        (entity_traveler_assignment ?transfer_entity ?traveler)
+        (not
+          (traveler_available ?traveler)
+        )
+      )
+  )
+  (:action confirm_transfer_entity
+    :parameters (?transfer_entity - transfer_entity ?traveler - traveler)
+    :precondition
+      (and
+        (registered ?transfer_entity)
+        (entity_vehicle_option_reserved ?transfer_entity)
+        (entity_traveler_assignment ?transfer_entity ?traveler)
+        (not
+          (confirmed ?transfer_entity)
+        )
+      )
+    :effect (confirmed ?transfer_entity)
+  )
+  (:action release_traveler_from_entity
+    :parameters (?transfer_entity - transfer_entity ?traveler - traveler)
+    :precondition
+      (and
+        (entity_traveler_assignment ?transfer_entity ?traveler)
+      )
+    :effect
+      (and
+        (traveler_available ?traveler)
+        (not
+          (entity_traveler_assignment ?transfer_entity ?traveler)
+        )
+      )
+  )
+  (:action assign_operator_to_entity
+    :parameters (?transfer_entity - transfer_entity ?local_operator - local_operator)
+    :precondition
+      (and
+        (confirmed ?transfer_entity)
+        (operator_available ?local_operator)
+      )
+    :effect
+      (and
+        (entity_operator_assignment ?transfer_entity ?local_operator)
+        (not
+          (operator_available ?local_operator)
+        )
+      )
+  )
+  (:action release_operator_from_entity
+    :parameters (?transfer_entity - transfer_entity ?local_operator - local_operator)
+    :precondition
+      (and
+        (entity_operator_assignment ?transfer_entity ?local_operator)
+      )
+    :effect
+      (and
+        (operator_available ?local_operator)
+        (not
+          (entity_operator_assignment ?transfer_entity ?local_operator)
+        )
+      )
+  )
+  (:action assign_equipment_to_case
+    :parameters (?transfer_case - transfer_case ?equipment - equipment)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (case_equipment_binding ?transfer_case ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_case
+    :parameters (?transfer_case - transfer_case ?equipment - equipment)
+    :precondition
+      (and
+        (case_equipment_binding ?transfer_case ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (case_equipment_binding ?transfer_case ?equipment)
+        )
+      )
+  )
+  (:action assign_credential_to_case
+    :parameters (?transfer_case - transfer_case ?credential - credential)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (case_credential_binding ?transfer_case ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action release_credential_from_case
+    :parameters (?transfer_case - transfer_case ?credential - credential)
+    :precondition
+      (and
+        (case_credential_binding ?transfer_case ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (case_credential_binding ?transfer_case ?credential)
+        )
+      )
+  )
+  (:action mark_pickup_node_ready_for_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?pickup_node - pickup_node ?traveler - traveler)
+    :precondition
+      (and
+        (confirmed ?arrival_segment)
+        (entity_traveler_assignment ?arrival_segment ?traveler)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (not
+          (pickup_node_ready ?pickup_node)
+        )
+        (not
+          (pickup_node_reserved_auxiliary ?pickup_node)
+        )
+      )
+    :effect (pickup_node_ready ?pickup_node)
+  )
+  (:action confirm_arrival_segment_preparation
+    :parameters (?arrival_segment - arrival_segment ?pickup_node - pickup_node ?local_operator - local_operator)
+    :precondition
+      (and
+        (confirmed ?arrival_segment)
+        (entity_operator_assignment ?arrival_segment ?local_operator)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (pickup_node_ready ?pickup_node)
+        (not
+          (arrival_preparation_complete ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+      )
+  )
+  (:action reserve_auxiliary_resource_for_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?pickup_node - pickup_node ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (confirmed ?arrival_segment)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (arrival_preparation_complete ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_reserved_auxiliary ?pickup_node)
+        (arrival_preparation_complete ?arrival_segment)
+        (arrival_segment_aux_resource_assigned ?arrival_segment ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_auxiliary_resource_use_at_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?pickup_node - pickup_node ?traveler - traveler ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (confirmed ?arrival_segment)
+        (entity_traveler_assignment ?arrival_segment ?traveler)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (pickup_node_reserved_auxiliary ?pickup_node)
+        (arrival_segment_aux_resource_assigned ?arrival_segment ?auxiliary_resource)
+        (not
+          (arrival_segment_aux_resource_in_use ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_node_ready ?pickup_node)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (arrival_segment_aux_resource_assigned ?arrival_segment ?auxiliary_resource)
+        )
+      )
+  )
+  (:action mark_dropoff_node_ready_for_departure_segment
+    :parameters (?departure_segment - departure_segment ?dropoff_node - dropoff_node ?traveler - traveler)
+    :precondition
+      (and
+        (confirmed ?departure_segment)
+        (entity_traveler_assignment ?departure_segment ?traveler)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (not
+          (dropoff_node_ready ?dropoff_node)
+        )
+        (not
+          (dropoff_node_reserved_auxiliary ?dropoff_node)
+        )
+      )
+    :effect (dropoff_node_ready ?dropoff_node)
+  )
+  (:action confirm_departure_segment_preparation
+    :parameters (?departure_segment - departure_segment ?dropoff_node - dropoff_node ?local_operator - local_operator)
+    :precondition
+      (and
+        (confirmed ?departure_segment)
+        (entity_operator_assignment ?departure_segment ?local_operator)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (dropoff_node_ready ?dropoff_node)
+        (not
+          (departure_preparation_complete ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (departure_preparation_complete ?departure_segment)
+        (departure_segment_aux_resource_in_use ?departure_segment)
+      )
+  )
+  (:action reserve_auxiliary_resource_for_departure_segment
+    :parameters (?departure_segment - departure_segment ?dropoff_node - dropoff_node ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (confirmed ?departure_segment)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (departure_preparation_complete ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_node_reserved_auxiliary ?dropoff_node)
+        (departure_preparation_complete ?departure_segment)
+        (departure_segment_aux_resource_assigned ?departure_segment ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_auxiliary_resource_use_at_departure_segment
+    :parameters (?departure_segment - departure_segment ?dropoff_node - dropoff_node ?traveler - traveler ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (confirmed ?departure_segment)
+        (entity_traveler_assignment ?departure_segment ?traveler)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (dropoff_node_reserved_auxiliary ?dropoff_node)
+        (departure_segment_aux_resource_assigned ?departure_segment ?auxiliary_resource)
+        (not
+          (departure_segment_aux_resource_in_use ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_node_ready ?dropoff_node)
+        (departure_segment_aux_resource_in_use ?departure_segment)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (departure_segment_aux_resource_assigned ?departure_segment ?auxiliary_resource)
+        )
+      )
+  )
+  (:action allocate_vehicle_unit_to_pairing
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (departure_preparation_complete ?departure_segment)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (pickup_node_ready ?pickup_node)
+        (dropoff_node_ready ?dropoff_node)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+        (departure_segment_aux_resource_in_use ?departure_segment)
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_node)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_node)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action allocate_vehicle_unit_with_pickup_aux
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (departure_preparation_complete ?departure_segment)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (pickup_node_reserved_auxiliary ?pickup_node)
+        (dropoff_node_ready ?dropoff_node)
+        (not
+          (arrival_segment_aux_resource_in_use ?arrival_segment)
+        )
+        (departure_segment_aux_resource_in_use ?departure_segment)
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_node)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_node)
+        (vehicle_unit_pickup_ready ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action allocate_vehicle_unit_with_dropoff_aux
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (departure_preparation_complete ?departure_segment)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (pickup_node_ready ?pickup_node)
+        (dropoff_node_reserved_auxiliary ?dropoff_node)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+        (not
+          (departure_segment_aux_resource_in_use ?departure_segment)
+        )
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_node)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_node)
+        (vehicle_unit_dropoff_ready ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action allocate_vehicle_unit_with_pickup_and_dropoff_aux
+    :parameters (?arrival_segment - arrival_segment ?departure_segment - departure_segment ?pickup_node - pickup_node ?dropoff_node - dropoff_node ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (departure_preparation_complete ?departure_segment)
+        (arrival_segment_pickup_node ?arrival_segment ?pickup_node)
+        (departure_segment_dropoff_node ?departure_segment ?dropoff_node)
+        (pickup_node_reserved_auxiliary ?pickup_node)
+        (dropoff_node_reserved_auxiliary ?dropoff_node)
+        (not
+          (arrival_segment_aux_resource_in_use ?arrival_segment)
+        )
+        (not
+          (departure_segment_aux_resource_in_use ?departure_segment)
+        )
+        (vehicle_unit_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_assigned_to_pickup ?vehicle_unit ?pickup_node)
+        (vehicle_unit_assigned_to_dropoff ?vehicle_unit ?dropoff_node)
+        (vehicle_unit_pickup_ready ?vehicle_unit)
+        (vehicle_unit_dropoff_ready ?vehicle_unit)
+        (not
+          (vehicle_unit_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action confirm_vehicle_unit_ready_for_pickup
+    :parameters (?vehicle_unit - vehicle_unit ?arrival_segment - arrival_segment ?traveler - traveler)
+    :precondition
+      (and
+        (vehicle_unit_allocated ?vehicle_unit)
+        (arrival_preparation_complete ?arrival_segment)
+        (entity_traveler_assignment ?arrival_segment ?traveler)
+        (not
+          (vehicle_unit_confirmed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_unit_confirmed ?vehicle_unit)
+  )
+  (:action bind_booking_token_to_vehicle_for_case
+    :parameters (?transfer_case - transfer_case ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (case_assigned_vehicle_unit ?transfer_case ?vehicle_unit)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_available ?booking_token)
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_confirmed ?vehicle_unit)
+        (not
+          (booking_token_locked ?booking_token)
+        )
+      )
+    :effect
+      (and
+        (booking_token_locked ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (not
+          (booking_token_available ?booking_token)
+        )
+      )
+  )
+  (:action flag_case_ready_for_resource_allocation
+    :parameters (?transfer_case - transfer_case ?booking_token - booking_token ?vehicle_unit - vehicle_unit ?traveler - traveler)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_locked ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (entity_traveler_assignment ?transfer_case ?traveler)
+        (not
+          (vehicle_unit_pickup_ready ?vehicle_unit)
+        )
+        (not
+          (case_ready_for_resource_allocation ?transfer_case)
+        )
+      )
+    :effect (case_ready_for_resource_allocation ?transfer_case)
+  )
+  (:action assign_service_option_to_case
+    :parameters (?transfer_case - transfer_case ?service_option - service_option)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (service_option_available ?service_option)
+        (not
+          (case_service_option_assigned ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_service_option_assigned ?transfer_case)
+        (case_service_option_binding ?transfer_case ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action confirm_service_option_and_progress_case
+    :parameters (?transfer_case - transfer_case ?booking_token - booking_token ?vehicle_unit - vehicle_unit ?traveler - traveler ?service_option - service_option)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_locked ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (entity_traveler_assignment ?transfer_case ?traveler)
+        (vehicle_unit_pickup_ready ?vehicle_unit)
+        (case_service_option_assigned ?transfer_case)
+        (case_service_option_binding ?transfer_case ?service_option)
+        (not
+          (case_ready_for_resource_allocation ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_resource_allocation ?transfer_case)
+        (case_service_option_confirmed ?transfer_case)
+      )
+  )
+  (:action lock_case_resources_for_execution
+    :parameters (?transfer_case - transfer_case ?equipment - equipment ?local_operator - local_operator ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_ready_for_resource_allocation ?transfer_case)
+        (case_equipment_binding ?transfer_case ?equipment)
+        (entity_operator_assignment ?transfer_case ?local_operator)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (not
+          (vehicle_unit_dropoff_ready ?vehicle_unit)
+        )
+        (not
+          (case_resources_locked ?transfer_case)
+        )
+      )
+    :effect (case_resources_locked ?transfer_case)
+  )
+  (:action lock_case_resources_for_execution_alternate
+    :parameters (?transfer_case - transfer_case ?equipment - equipment ?local_operator - local_operator ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_ready_for_resource_allocation ?transfer_case)
+        (case_equipment_binding ?transfer_case ?equipment)
+        (entity_operator_assignment ?transfer_case ?local_operator)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (vehicle_unit_dropoff_ready ?vehicle_unit)
+        (not
+          (case_resources_locked ?transfer_case)
+        )
+      )
+    :effect (case_resources_locked ?transfer_case)
+  )
+  (:action verify_case_credentials
+    :parameters (?transfer_case - transfer_case ?credential - credential ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_resources_locked ?transfer_case)
+        (case_credential_binding ?transfer_case ?credential)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (not
+          (vehicle_unit_pickup_ready ?vehicle_unit)
+        )
+        (not
+          (vehicle_unit_dropoff_ready ?vehicle_unit)
+        )
+        (not
+          (case_credentials_verified ?transfer_case)
+        )
+      )
+    :effect (case_credentials_verified ?transfer_case)
+  )
+  (:action verify_credentials_and_mark_secondary_checks_with_pickup_ready
+    :parameters (?transfer_case - transfer_case ?credential - credential ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_resources_locked ?transfer_case)
+        (case_credential_binding ?transfer_case ?credential)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (vehicle_unit_pickup_ready ?vehicle_unit)
+        (not
+          (vehicle_unit_dropoff_ready ?vehicle_unit)
+        )
+        (not
+          (case_credentials_verified ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_secondary_checks_passed ?transfer_case)
+      )
+  )
+  (:action verify_credentials_and_mark_secondary_checks_with_dropoff_ready
+    :parameters (?transfer_case - transfer_case ?credential - credential ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_resources_locked ?transfer_case)
+        (case_credential_binding ?transfer_case ?credential)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (not
+          (vehicle_unit_pickup_ready ?vehicle_unit)
+        )
+        (vehicle_unit_dropoff_ready ?vehicle_unit)
+        (not
+          (case_credentials_verified ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_secondary_checks_passed ?transfer_case)
+      )
+  )
+  (:action verify_credentials_and_mark_secondary_checks_with_both_nodes_ready
+    :parameters (?transfer_case - transfer_case ?credential - credential ?booking_token - booking_token ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (case_resources_locked ?transfer_case)
+        (case_credential_binding ?transfer_case ?credential)
+        (case_has_booking_token ?transfer_case ?booking_token)
+        (booking_token_assigned_vehicle ?booking_token ?vehicle_unit)
+        (vehicle_unit_pickup_ready ?vehicle_unit)
+        (vehicle_unit_dropoff_ready ?vehicle_unit)
+        (not
+          (case_credentials_verified ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_secondary_checks_passed ?transfer_case)
+      )
+  )
+  (:action finalize_case_ready_for_alignment
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_credentials_verified ?transfer_case)
+        (not
+          (case_secondary_checks_passed ?transfer_case)
+        )
+        (not
+          (case_finalized ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?transfer_case)
+        (ready_for_alignment ?transfer_case)
+      )
+  )
+  (:action assign_passenger_option_to_case
+    :parameters (?transfer_case - transfer_case ?passenger_option - passenger_option)
+    :precondition
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_secondary_checks_passed ?transfer_case)
+        (passenger_option_available ?passenger_option)
+      )
+    :effect
+      (and
+        (case_passenger_option_binding ?transfer_case ?passenger_option)
+        (not
+          (passenger_option_available ?passenger_option)
+        )
+      )
+  )
+  (:action perform_case_operational_checks
+    :parameters (?transfer_case - transfer_case ?arrival_segment - arrival_segment ?departure_segment - departure_segment ?traveler - traveler ?passenger_option - passenger_option)
+    :precondition
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_secondary_checks_passed ?transfer_case)
+        (case_passenger_option_binding ?transfer_case ?passenger_option)
+        (case_has_arrival_segment ?transfer_case ?arrival_segment)
+        (case_has_departure_segment ?transfer_case ?departure_segment)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+        (departure_segment_aux_resource_in_use ?departure_segment)
+        (entity_traveler_assignment ?transfer_case ?traveler)
+        (not
+          (case_operational_checks_passed ?transfer_case)
+        )
+      )
+    :effect (case_operational_checks_passed ?transfer_case)
+  )
+  (:action finalize_case_from_operational_checks
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_credentials_verified ?transfer_case)
+        (case_operational_checks_passed ?transfer_case)
+        (not
+          (case_finalized ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?transfer_case)
+        (ready_for_alignment ?transfer_case)
+      )
+  )
+  (:action assign_permit_to_case
+    :parameters (?transfer_case - transfer_case ?permit - permit ?traveler - traveler)
+    :precondition
+      (and
+        (confirmed ?transfer_case)
+        (entity_traveler_assignment ?transfer_case ?traveler)
+        (permit_available ?permit)
+        (case_has_permit ?transfer_case ?permit)
+        (not
+          (case_permit_granted ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_permit_granted ?transfer_case)
+        (not
+          (permit_available ?permit)
+        )
+      )
+  )
+  (:action apply_permit_to_case
+    :parameters (?transfer_case - transfer_case ?local_operator - local_operator)
+    :precondition
+      (and
+        (case_permit_granted ?transfer_case)
+        (entity_operator_assignment ?transfer_case ?local_operator)
+        (not
+          (case_permit_applied ?transfer_case)
+        )
+      )
+    :effect (case_permit_applied ?transfer_case)
+  )
+  (:action verify_permit_with_credential
+    :parameters (?transfer_case - transfer_case ?credential - credential)
+    :precondition
+      (and
+        (case_permit_applied ?transfer_case)
+        (case_credential_binding ?transfer_case ?credential)
+        (not
+          (case_permit_verified ?transfer_case)
+        )
+      )
+    :effect (case_permit_verified ?transfer_case)
+  )
+  (:action finalize_case_after_permit_check
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_permit_verified ?transfer_case)
+        (not
+          (case_finalized ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?transfer_case)
+        (ready_for_alignment ?transfer_case)
+      )
+  )
+  (:action activate_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (arrival_preparation_complete ?arrival_segment)
+        (arrival_segment_aux_resource_in_use ?arrival_segment)
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_confirmed ?vehicle_unit)
+        (not
+          (ready_for_alignment ?arrival_segment)
+        )
+      )
+    :effect (ready_for_alignment ?arrival_segment)
+  )
+  (:action activate_departure_segment
+    :parameters (?departure_segment - departure_segment ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (departure_preparation_complete ?departure_segment)
+        (departure_segment_aux_resource_in_use ?departure_segment)
+        (vehicle_unit_allocated ?vehicle_unit)
+        (vehicle_unit_confirmed ?vehicle_unit)
+        (not
+          (ready_for_alignment ?departure_segment)
+        )
+      )
+    :effect (ready_for_alignment ?departure_segment)
+  )
+  (:action assign_time_buffer_to_entity
+    :parameters (?transfer_entity - transfer_entity ?time_buffer - time_buffer ?traveler - traveler)
+    :precondition
+      (and
+        (ready_for_alignment ?transfer_entity)
+        (entity_traveler_assignment ?transfer_entity ?traveler)
+        (time_buffer_available ?time_buffer)
+        (not
+          (entity_buffer_assigned ?transfer_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_buffer_assigned ?transfer_entity)
+        (entity_time_buffer_binding ?transfer_entity ?time_buffer)
+        (not
+          (time_buffer_available ?time_buffer)
+        )
+      )
+  )
+  (:action finalize_arrival_segment_alignment
+    :parameters (?arrival_segment - arrival_segment ?vehicle_option - vehicle_option ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (entity_buffer_assigned ?arrival_segment)
+        (entity_vehicle_option_binding ?arrival_segment ?vehicle_option)
+        (entity_time_buffer_binding ?arrival_segment ?time_buffer)
+        (not
+          (alignment_finalized ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (alignment_finalized ?arrival_segment)
+        (vehicle_option_available ?vehicle_option)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+  (:action finalize_departure_segment_alignment
+    :parameters (?departure_segment - departure_segment ?vehicle_option - vehicle_option ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (entity_buffer_assigned ?departure_segment)
+        (entity_vehicle_option_binding ?departure_segment ?vehicle_option)
+        (entity_time_buffer_binding ?departure_segment ?time_buffer)
+        (not
+          (alignment_finalized ?departure_segment)
+        )
+      )
+    :effect
+      (and
+        (alignment_finalized ?departure_segment)
+        (vehicle_option_available ?vehicle_option)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+  (:action finalize_case_alignment
+    :parameters (?transfer_case - transfer_case ?vehicle_option - vehicle_option ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (entity_buffer_assigned ?transfer_case)
+        (entity_vehicle_option_binding ?transfer_case ?vehicle_option)
+        (entity_time_buffer_binding ?transfer_case ?time_buffer)
+        (not
+          (alignment_finalized ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (alignment_finalized ?transfer_case)
+        (vehicle_option_available ?vehicle_option)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem airport_transfer_alignment_scenario)
+  (:domain airport_transfer_alignment)
+  (:objects arrival_segment_1 - arrival_segment departure_segment_1 - departure_segment transfer_case_1 - transfer_case transfer_case_2 - transfer_case vehicle_option_sedan - vehicle_option vehicle_option_shuttle - vehicle_option vehicle_option_minivan - vehicle_option traveler_1 - traveler local_operator_1 - local_operator aux_resource_child_seat - auxiliary_resource pickup_node_terminal_curb - pickup_node dropoff_node_terminal_door - dropoff_node vehicle_unit_v001 - vehicle_unit booking_token_1 - booking_token booking_token_2 - booking_token service_option_priority_pickup - service_option service_option_standard - service_option passenger_option_vip_seat - passenger_option passenger_option_extra_luggage - passenger_option time_buffer_standard_15min - time_buffer equipment_wheelchair_ramp - equipment permit_airside_access_1 - permit permit_airside_access_2 - permit credential_driver_id_1 - credential)
+  (:init
+    (vehicle_option_available vehicle_option_sedan)
+    (vehicle_option_available vehicle_option_shuttle)
+    (vehicle_option_available vehicle_option_minivan)
+    (traveler_available traveler_1)
+    (operator_available local_operator_1)
+    (auxiliary_resource_available aux_resource_child_seat)
+    (arrival_segment_pickup_node arrival_segment_1 pickup_node_terminal_curb)
+    (departure_segment_dropoff_node departure_segment_1 dropoff_node_terminal_door)
+    (vehicle_unit_available vehicle_unit_v001)
+    (booking_token_available booking_token_1)
+    (booking_token_available booking_token_2)
+    (case_has_arrival_segment transfer_case_1 arrival_segment_1)
+    (case_has_arrival_segment transfer_case_2 arrival_segment_1)
+    (case_has_departure_segment transfer_case_1 departure_segment_1)
+    (case_has_departure_segment transfer_case_2 departure_segment_1)
+    (case_assigned_vehicle_unit transfer_case_1 vehicle_unit_v001)
+    (case_assigned_vehicle_unit transfer_case_2 vehicle_unit_v001)
+    (case_has_booking_token transfer_case_1 booking_token_1)
+    (case_has_booking_token transfer_case_2 booking_token_2)
+    (service_option_available service_option_priority_pickup)
+    (service_option_available service_option_standard)
+    (passenger_option_available passenger_option_vip_seat)
+    (passenger_option_available passenger_option_extra_luggage)
+    (time_buffer_available time_buffer_standard_15min)
+    (equipment_available equipment_wheelchair_ramp)
+    (permit_available permit_airside_access_1)
+    (case_has_permit transfer_case_1 permit_airside_access_1)
+    (case_has_permit transfer_case_2 permit_airside_access_2)
+    (credential_available credential_driver_id_1)
+  )
+  (:goal
+    (and
+      (alignment_finalized arrival_segment_1)
+      (alignment_finalized departure_segment_1)
+      (alignment_finalized transfer_case_1)
+      (alignment_finalized transfer_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_transfer_entity arrival_segment_1)
+(reserve_vehicle_option_for_entity arrival_segment_1 vehicle_option_sedan)
+(assign_traveler_to_entity arrival_segment_1 traveler_1)
+(confirm_transfer_entity arrival_segment_1 traveler_1)
+(reserve_auxiliary_resource_for_arrival_segment arrival_segment_1 pickup_node_terminal_curb aux_resource_child_seat)
+(finalize_auxiliary_resource_use_at_arrival_segment arrival_segment_1 pickup_node_terminal_curb traveler_1 aux_resource_child_seat)
+(register_transfer_entity departure_segment_1)
+(reserve_vehicle_option_for_entity departure_segment_1 vehicle_option_shuttle)
+(release_traveler_from_entity arrival_segment_1 traveler_1)
+(assign_traveler_to_entity departure_segment_1 traveler_1)
+(confirm_transfer_entity departure_segment_1 traveler_1)
+(reserve_auxiliary_resource_for_departure_segment departure_segment_1 dropoff_node_terminal_door aux_resource_child_seat)
+(finalize_auxiliary_resource_use_at_departure_segment departure_segment_1 dropoff_node_terminal_door traveler_1 aux_resource_child_seat)
+(allocate_vehicle_unit_to_pairing arrival_segment_1 departure_segment_1 pickup_node_terminal_curb dropoff_node_terminal_door vehicle_unit_v001)
+(release_traveler_from_entity departure_segment_1 traveler_1)
+(assign_traveler_to_entity arrival_segment_1 traveler_1)
+(confirm_vehicle_unit_ready_for_pickup vehicle_unit_v001 arrival_segment_1 traveler_1)
+(activate_arrival_segment arrival_segment_1 vehicle_unit_v001)
+(activate_departure_segment departure_segment_1 vehicle_unit_v001)
+(assign_time_buffer_to_entity arrival_segment_1 time_buffer_standard_15min traveler_1)
+(finalize_arrival_segment_alignment arrival_segment_1 vehicle_option_sedan time_buffer_standard_15min)
+(release_traveler_from_entity arrival_segment_1 traveler_1)
+(assign_traveler_to_entity departure_segment_1 traveler_1)
+(assign_time_buffer_to_entity departure_segment_1 time_buffer_standard_15min traveler_1)
+(finalize_departure_segment_alignment departure_segment_1 vehicle_option_shuttle time_buffer_standard_15min)
+(release_traveler_from_entity departure_segment_1 traveler_1)
+(register_transfer_entity transfer_case_1)
+(reserve_vehicle_option_for_entity transfer_case_1 vehicle_option_sedan)
+(assign_traveler_to_entity transfer_case_1 traveler_1)
+(confirm_transfer_entity transfer_case_1 traveler_1)
+(bind_booking_token_to_vehicle_for_case transfer_case_1 booking_token_1 vehicle_unit_v001)
+(flag_case_ready_for_resource_allocation transfer_case_1 booking_token_1 vehicle_unit_v001 traveler_1)
+(assign_equipment_to_case transfer_case_1 equipment_wheelchair_ramp)
+(assign_credential_to_case transfer_case_1 credential_driver_id_1)
+(assign_operator_to_entity transfer_case_1 local_operator_1)
+(lock_case_resources_for_execution transfer_case_1 equipment_wheelchair_ramp local_operator_1 booking_token_1 vehicle_unit_v001)
+(verify_case_credentials transfer_case_1 credential_driver_id_1 booking_token_1 vehicle_unit_v001)
+(finalize_case_ready_for_alignment transfer_case_1)
+(assign_time_buffer_to_entity transfer_case_1 time_buffer_standard_15min traveler_1)
+(finalize_case_alignment transfer_case_1 vehicle_option_sedan time_buffer_standard_15min)
+(release_traveler_from_entity transfer_case_1 traveler_1)
+(release_operator_from_entity transfer_case_1 local_operator_1)
+(release_equipment_from_case transfer_case_1 equipment_wheelchair_ramp)
+(release_credential_from_case transfer_case_1 credential_driver_id_1)
+(register_transfer_entity transfer_case_2)
+(reserve_vehicle_option_for_entity transfer_case_2 vehicle_option_shuttle)
+(assign_traveler_to_entity transfer_case_2 traveler_1)
+(confirm_transfer_entity transfer_case_2 traveler_1)
+(bind_booking_token_to_vehicle_for_case transfer_case_2 booking_token_2 vehicle_unit_v001)
+(flag_case_ready_for_resource_allocation transfer_case_2 booking_token_2 vehicle_unit_v001 traveler_1)
+(assign_equipment_to_case transfer_case_2 equipment_wheelchair_ramp)
+(assign_credential_to_case transfer_case_2 credential_driver_id_1)
+(assign_operator_to_entity transfer_case_2 local_operator_1)
+(lock_case_resources_for_execution transfer_case_2 equipment_wheelchair_ramp local_operator_1 booking_token_2 vehicle_unit_v001)
+(verify_case_credentials transfer_case_2 credential_driver_id_1 booking_token_2 vehicle_unit_v001)
+(finalize_case_ready_for_alignment transfer_case_2)
+(assign_time_buffer_to_entity transfer_case_2 time_buffer_standard_15min traveler_1)
+(finalize_case_alignment transfer_case_2 vehicle_option_shuttle time_buffer_standard_15min)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_bvypknqa/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_bvypknqa/plan.pddl 58 
+
+
+
+--- stderr ---
+

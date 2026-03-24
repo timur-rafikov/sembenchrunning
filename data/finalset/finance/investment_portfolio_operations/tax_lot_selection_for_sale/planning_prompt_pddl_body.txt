@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain investment_portfolio_tax_lot_selection_for_sale)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_base - object auxiliary_resource - object bucket_resource - object lot_root - object lot - lot_root selection_profile - resource_base security - resource_base execution_venue - resource_base execution_strategy - resource_base order_constraint - resource_base tax_profile - resource_base settlement_window - resource_base approval_token - resource_base lot_tag - auxiliary_resource lot_record - auxiliary_resource compliance_check - auxiliary_resource tax_bucket_source - bucket_resource tax_bucket_counterpart - bucket_resource trade_candidate - bucket_resource lot_subclass_a - lot lot_subclass_b - lot source_lot - lot_subclass_a counterparty_lot - lot_subclass_a sell_instruction - lot_subclass_b)
+  (:predicates
+    (lot_identified ?tax_lot - lot)
+    (lot_eligible_for_sale ?tax_lot - lot)
+    (lot_selection_profile_attached ?tax_lot - lot)
+    (lot_finalized ?tax_lot - lot)
+    (lot_assigned ?tax_lot - lot)
+    (tax_profile_applied ?tax_lot - lot)
+    (selection_profile_available ?selection_profile - selection_profile)
+    (lot_allocated_selection_profile ?tax_lot - lot ?selection_profile - selection_profile)
+    (security_available ?security - security)
+    (lot_linked_security ?tax_lot - lot ?security - security)
+    (execution_venue_available ?execution_venue - execution_venue)
+    (lot_reserved_execution_venue ?tax_lot - lot ?execution_venue - execution_venue)
+    (lot_tag_available ?lot_tag - lot_tag)
+    (source_lot_assigned_tag ?source_lot - source_lot ?lot_tag - lot_tag)
+    (counterparty_lot_assigned_tag ?counterparty_lot - counterparty_lot ?lot_tag - lot_tag)
+    (source_lot_in_tax_bucket ?source_lot - source_lot ?tax_bucket_source - tax_bucket_source)
+    (tax_bucket_source_reserved ?tax_bucket_source - tax_bucket_source)
+    (tax_bucket_source_tagged ?tax_bucket_source - tax_bucket_source)
+    (source_lot_ready_for_matching ?source_lot - source_lot)
+    (counterparty_lot_in_tax_bucket ?counterparty_lot - counterparty_lot ?tax_bucket_counterpart - tax_bucket_counterpart)
+    (tax_bucket_counterpart_reserved ?tax_bucket_counterpart - tax_bucket_counterpart)
+    (tax_bucket_counterpart_tagged ?tax_bucket_counterpart - tax_bucket_counterpart)
+    (counterparty_lot_ready_for_matching ?counterparty_lot - counterparty_lot)
+    (trade_candidate_available ?trade_candidate - trade_candidate)
+    (trade_candidate_created ?trade_candidate - trade_candidate)
+    (trade_candidate_linked_source_bucket ?trade_candidate - trade_candidate ?tax_bucket_source - tax_bucket_source)
+    (trade_candidate_linked_counterpart_bucket ?trade_candidate - trade_candidate ?tax_bucket_counterpart - tax_bucket_counterpart)
+    (trade_candidate_flag_source_tag ?trade_candidate - trade_candidate)
+    (trade_candidate_flag_counterparty_tag ?trade_candidate - trade_candidate)
+    (trade_candidate_bound_to_source_lot ?trade_candidate - trade_candidate)
+    (instruction_includes_source_lot ?sell_instruction - sell_instruction ?source_lot - source_lot)
+    (instruction_includes_counterparty_lot ?sell_instruction - sell_instruction ?counterparty_lot - counterparty_lot)
+    (instruction_associated_with_trade_candidate ?sell_instruction - sell_instruction ?trade_candidate - trade_candidate)
+    (lot_record_available ?lot_record - lot_record)
+    (instruction_has_lot_record ?sell_instruction - sell_instruction ?lot_record - lot_record)
+    (lot_record_bound ?lot_record - lot_record)
+    (lot_record_linked_trade_candidate ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    (instruction_verified ?sell_instruction - sell_instruction)
+    (instruction_prepared_for_approval ?sell_instruction - sell_instruction)
+    (instruction_approval_attached ?sell_instruction - sell_instruction)
+    (instruction_execution_strategy_reserved ?sell_instruction - sell_instruction)
+    (instruction_strategy_finalized ?sell_instruction - sell_instruction)
+    (instruction_approval_recorded ?sell_instruction - sell_instruction)
+    (instruction_ready_for_assignment ?sell_instruction - sell_instruction)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (instruction_compliance_attached ?sell_instruction - sell_instruction ?compliance_check - compliance_check)
+    (instruction_compliance_cleared ?sell_instruction - sell_instruction)
+    (instruction_compliance_signed_off ?sell_instruction - sell_instruction)
+    (instruction_compliance_finalized ?sell_instruction - sell_instruction)
+    (execution_strategy_available ?execution_strategy - execution_strategy)
+    (instruction_assigned_execution_strategy ?sell_instruction - sell_instruction ?execution_strategy - execution_strategy)
+    (order_constraint_available ?order_constraint - order_constraint)
+    (instruction_assigned_order_constraint ?sell_instruction - sell_instruction ?order_constraint - order_constraint)
+    (settlement_window_available ?settlement_window - settlement_window)
+    (instruction_assigned_settlement_window ?sell_instruction - sell_instruction ?settlement_window - settlement_window)
+    (approval_token_available ?approval_token - approval_token)
+    (instruction_assigned_approval_token ?sell_instruction - sell_instruction ?approval_token - approval_token)
+    (tax_profile_available ?tax_profile - tax_profile)
+    (tax_profile_assigned_to_lot ?tax_lot - lot ?tax_profile - tax_profile)
+    (source_lot_prepared ?source_lot - source_lot)
+    (counterparty_lot_prepared ?counterparty_lot - counterparty_lot)
+    (instruction_assigned ?sell_instruction - sell_instruction)
+  )
+  (:action identify_lot
+    :parameters (?tax_lot - lot)
+    :precondition
+      (and
+        (not
+          (lot_identified ?tax_lot)
+        )
+        (not
+          (lot_finalized ?tax_lot)
+        )
+      )
+    :effect (lot_identified ?tax_lot)
+  )
+  (:action attach_selection_profile_to_lot
+    :parameters (?tax_lot - lot ?selection_profile - selection_profile)
+    :precondition
+      (and
+        (lot_identified ?tax_lot)
+        (not
+          (lot_selection_profile_attached ?tax_lot)
+        )
+        (selection_profile_available ?selection_profile)
+      )
+    :effect
+      (and
+        (lot_selection_profile_attached ?tax_lot)
+        (lot_allocated_selection_profile ?tax_lot ?selection_profile)
+        (not
+          (selection_profile_available ?selection_profile)
+        )
+      )
+  )
+  (:action assign_security_to_lot
+    :parameters (?tax_lot - lot ?security - security)
+    :precondition
+      (and
+        (lot_identified ?tax_lot)
+        (lot_selection_profile_attached ?tax_lot)
+        (security_available ?security)
+      )
+    :effect
+      (and
+        (lot_linked_security ?tax_lot ?security)
+        (not
+          (security_available ?security)
+        )
+      )
+  )
+  (:action confirm_lot_eligibility_with_security
+    :parameters (?tax_lot - lot ?security - security)
+    :precondition
+      (and
+        (lot_identified ?tax_lot)
+        (lot_selection_profile_attached ?tax_lot)
+        (lot_linked_security ?tax_lot ?security)
+        (not
+          (lot_eligible_for_sale ?tax_lot)
+        )
+      )
+    :effect (lot_eligible_for_sale ?tax_lot)
+  )
+  (:action release_security_from_lot
+    :parameters (?tax_lot - lot ?security - security)
+    :precondition
+      (and
+        (lot_linked_security ?tax_lot ?security)
+      )
+    :effect
+      (and
+        (security_available ?security)
+        (not
+          (lot_linked_security ?tax_lot ?security)
+        )
+      )
+  )
+  (:action reserve_execution_venue_for_lot
+    :parameters (?tax_lot - lot ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?tax_lot)
+        (execution_venue_available ?execution_venue)
+      )
+    :effect
+      (and
+        (lot_reserved_execution_venue ?tax_lot ?execution_venue)
+        (not
+          (execution_venue_available ?execution_venue)
+        )
+      )
+  )
+  (:action release_execution_venue_from_lot
+    :parameters (?tax_lot - lot ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (lot_reserved_execution_venue ?tax_lot ?execution_venue)
+      )
+    :effect
+      (and
+        (execution_venue_available ?execution_venue)
+        (not
+          (lot_reserved_execution_venue ?tax_lot ?execution_venue)
+        )
+      )
+  )
+  (:action attach_settlement_window_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (settlement_window_available ?settlement_window)
+      )
+    :effect
+      (and
+        (instruction_assigned_settlement_window ?sell_instruction ?settlement_window)
+        (not
+          (settlement_window_available ?settlement_window)
+        )
+      )
+  )
+  (:action detach_settlement_window_from_instruction
+    :parameters (?sell_instruction - sell_instruction ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (instruction_assigned_settlement_window ?sell_instruction ?settlement_window)
+      )
+    :effect
+      (and
+        (settlement_window_available ?settlement_window)
+        (not
+          (instruction_assigned_settlement_window ?sell_instruction ?settlement_window)
+        )
+      )
+  )
+  (:action attach_approval_token_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action detach_approval_token_from_instruction
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token)
+    :precondition
+      (and
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        )
+      )
+  )
+  (:action evaluate_source_bucket_and_reserve
+    :parameters (?source_lot - source_lot ?tax_bucket_source - tax_bucket_source ?security - security)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?source_lot)
+        (lot_linked_security ?source_lot ?security)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (not
+          (tax_bucket_source_reserved ?tax_bucket_source)
+        )
+        (not
+          (tax_bucket_source_tagged ?tax_bucket_source)
+        )
+      )
+    :effect (tax_bucket_source_reserved ?tax_bucket_source)
+  )
+  (:action confirm_source_lot_preparation
+    :parameters (?source_lot - source_lot ?tax_bucket_source - tax_bucket_source ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?source_lot)
+        (lot_reserved_execution_venue ?source_lot ?execution_venue)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (tax_bucket_source_reserved ?tax_bucket_source)
+        (not
+          (source_lot_prepared ?source_lot)
+        )
+      )
+    :effect
+      (and
+        (source_lot_prepared ?source_lot)
+        (source_lot_ready_for_matching ?source_lot)
+      )
+  )
+  (:action assign_tag_to_source_lot
+    :parameters (?source_lot - source_lot ?tax_bucket_source - tax_bucket_source ?lot_tag - lot_tag)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?source_lot)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (lot_tag_available ?lot_tag)
+        (not
+          (source_lot_prepared ?source_lot)
+        )
+      )
+    :effect
+      (and
+        (tax_bucket_source_tagged ?tax_bucket_source)
+        (source_lot_prepared ?source_lot)
+        (source_lot_assigned_tag ?source_lot ?lot_tag)
+        (not
+          (lot_tag_available ?lot_tag)
+        )
+      )
+  )
+  (:action reassign_source_lot_tag_and_update_bucket
+    :parameters (?source_lot - source_lot ?tax_bucket_source - tax_bucket_source ?security - security ?lot_tag - lot_tag)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?source_lot)
+        (lot_linked_security ?source_lot ?security)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (tax_bucket_source_tagged ?tax_bucket_source)
+        (source_lot_assigned_tag ?source_lot ?lot_tag)
+        (not
+          (source_lot_ready_for_matching ?source_lot)
+        )
+      )
+    :effect
+      (and
+        (tax_bucket_source_reserved ?tax_bucket_source)
+        (source_lot_ready_for_matching ?source_lot)
+        (lot_tag_available ?lot_tag)
+        (not
+          (source_lot_assigned_tag ?source_lot ?lot_tag)
+        )
+      )
+  )
+  (:action evaluate_counterparty_bucket_and_reserve
+    :parameters (?counterparty_lot - counterparty_lot ?tax_bucket_counterpart - tax_bucket_counterpart ?security - security)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?counterparty_lot)
+        (lot_linked_security ?counterparty_lot ?security)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (not
+          (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+        )
+        (not
+          (tax_bucket_counterpart_tagged ?tax_bucket_counterpart)
+        )
+      )
+    :effect (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+  )
+  (:action confirm_counterparty_lot_preparation
+    :parameters (?counterparty_lot - counterparty_lot ?tax_bucket_counterpart - tax_bucket_counterpart ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?counterparty_lot)
+        (lot_reserved_execution_venue ?counterparty_lot ?execution_venue)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+        (not
+          (counterparty_lot_prepared ?counterparty_lot)
+        )
+      )
+    :effect
+      (and
+        (counterparty_lot_prepared ?counterparty_lot)
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+      )
+  )
+  (:action assign_tag_to_counterparty_lot
+    :parameters (?counterparty_lot - counterparty_lot ?tax_bucket_counterpart - tax_bucket_counterpart ?lot_tag - lot_tag)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?counterparty_lot)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (lot_tag_available ?lot_tag)
+        (not
+          (counterparty_lot_prepared ?counterparty_lot)
+        )
+      )
+    :effect
+      (and
+        (tax_bucket_counterpart_tagged ?tax_bucket_counterpart)
+        (counterparty_lot_prepared ?counterparty_lot)
+        (counterparty_lot_assigned_tag ?counterparty_lot ?lot_tag)
+        (not
+          (lot_tag_available ?lot_tag)
+        )
+      )
+  )
+  (:action reassign_counterparty_lot_tag_and_update_bucket
+    :parameters (?counterparty_lot - counterparty_lot ?tax_bucket_counterpart - tax_bucket_counterpart ?security - security ?lot_tag - lot_tag)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?counterparty_lot)
+        (lot_linked_security ?counterparty_lot ?security)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_counterpart_tagged ?tax_bucket_counterpart)
+        (counterparty_lot_assigned_tag ?counterparty_lot ?lot_tag)
+        (not
+          (counterparty_lot_ready_for_matching ?counterparty_lot)
+        )
+      )
+    :effect
+      (and
+        (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+        (lot_tag_available ?lot_tag)
+        (not
+          (counterparty_lot_assigned_tag ?counterparty_lot ?lot_tag)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_from_prepared_lots
+    :parameters (?source_lot - source_lot ?counterparty_lot - counterparty_lot ?tax_bucket_source - tax_bucket_source ?tax_bucket_counterpart - tax_bucket_counterpart ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (source_lot_prepared ?source_lot)
+        (counterparty_lot_prepared ?counterparty_lot)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_source_reserved ?tax_bucket_source)
+        (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+        (source_lot_ready_for_matching ?source_lot)
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_linked_source_bucket ?trade_candidate ?tax_bucket_source)
+        (trade_candidate_linked_counterpart_bucket ?trade_candidate ?tax_bucket_counterpart)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_with_source_tag
+    :parameters (?source_lot - source_lot ?counterparty_lot - counterparty_lot ?tax_bucket_source - tax_bucket_source ?tax_bucket_counterpart - tax_bucket_counterpart ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (source_lot_prepared ?source_lot)
+        (counterparty_lot_prepared ?counterparty_lot)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_source_tagged ?tax_bucket_source)
+        (tax_bucket_counterpart_reserved ?tax_bucket_counterpart)
+        (not
+          (source_lot_ready_for_matching ?source_lot)
+        )
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_linked_source_bucket ?trade_candidate ?tax_bucket_source)
+        (trade_candidate_linked_counterpart_bucket ?trade_candidate ?tax_bucket_counterpart)
+        (trade_candidate_flag_source_tag ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_with_counterparty_tag
+    :parameters (?source_lot - source_lot ?counterparty_lot - counterparty_lot ?tax_bucket_source - tax_bucket_source ?tax_bucket_counterpart - tax_bucket_counterpart ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (source_lot_prepared ?source_lot)
+        (counterparty_lot_prepared ?counterparty_lot)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_source_reserved ?tax_bucket_source)
+        (tax_bucket_counterpart_tagged ?tax_bucket_counterpart)
+        (source_lot_ready_for_matching ?source_lot)
+        (not
+          (counterparty_lot_ready_for_matching ?counterparty_lot)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_linked_source_bucket ?trade_candidate ?tax_bucket_source)
+        (trade_candidate_linked_counterpart_bucket ?trade_candidate ?tax_bucket_counterpart)
+        (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action assemble_trade_candidate_with_both_tags
+    :parameters (?source_lot - source_lot ?counterparty_lot - counterparty_lot ?tax_bucket_source - tax_bucket_source ?tax_bucket_counterpart - tax_bucket_counterpart ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (source_lot_prepared ?source_lot)
+        (counterparty_lot_prepared ?counterparty_lot)
+        (source_lot_in_tax_bucket ?source_lot ?tax_bucket_source)
+        (counterparty_lot_in_tax_bucket ?counterparty_lot ?tax_bucket_counterpart)
+        (tax_bucket_source_tagged ?tax_bucket_source)
+        (tax_bucket_counterpart_tagged ?tax_bucket_counterpart)
+        (not
+          (source_lot_ready_for_matching ?source_lot)
+        )
+        (not
+          (counterparty_lot_ready_for_matching ?counterparty_lot)
+        )
+        (trade_candidate_available ?trade_candidate)
+      )
+    :effect
+      (and
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_linked_source_bucket ?trade_candidate ?tax_bucket_source)
+        (trade_candidate_linked_counterpart_bucket ?trade_candidate ?tax_bucket_counterpart)
+        (trade_candidate_flag_source_tag ?trade_candidate)
+        (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        (not
+          (trade_candidate_available ?trade_candidate)
+        )
+      )
+  )
+  (:action bind_trade_candidate_to_source_lot
+    :parameters (?trade_candidate - trade_candidate ?source_lot - source_lot ?security - security)
+    :precondition
+      (and
+        (trade_candidate_created ?trade_candidate)
+        (source_lot_prepared ?source_lot)
+        (lot_linked_security ?source_lot ?security)
+        (not
+          (trade_candidate_bound_to_source_lot ?trade_candidate)
+        )
+      )
+    :effect (trade_candidate_bound_to_source_lot ?trade_candidate)
+  )
+  (:action bind_lot_record_to_instruction_and_candidate
+    :parameters (?sell_instruction - sell_instruction ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (instruction_associated_with_trade_candidate ?sell_instruction ?trade_candidate)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_available ?lot_record)
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_bound_to_source_lot ?trade_candidate)
+        (not
+          (lot_record_bound ?lot_record)
+        )
+      )
+    :effect
+      (and
+        (lot_record_bound ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (not
+          (lot_record_available ?lot_record)
+        )
+      )
+  )
+  (:action verify_instruction_records
+    :parameters (?sell_instruction - sell_instruction ?lot_record - lot_record ?trade_candidate - trade_candidate ?security - security)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_bound ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (lot_linked_security ?sell_instruction ?security)
+        (not
+          (trade_candidate_flag_source_tag ?trade_candidate)
+        )
+        (not
+          (instruction_verified ?sell_instruction)
+        )
+      )
+    :effect (instruction_verified ?sell_instruction)
+  )
+  (:action attach_execution_strategy_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (execution_strategy_available ?execution_strategy)
+        (not
+          (instruction_execution_strategy_reserved ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_execution_strategy_reserved ?sell_instruction)
+        (instruction_assigned_execution_strategy ?sell_instruction ?execution_strategy)
+        (not
+          (execution_strategy_available ?execution_strategy)
+        )
+      )
+  )
+  (:action finalize_execution_strategy_and_prepare_instruction
+    :parameters (?sell_instruction - sell_instruction ?lot_record - lot_record ?trade_candidate - trade_candidate ?security - security ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_bound ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (lot_linked_security ?sell_instruction ?security)
+        (trade_candidate_flag_source_tag ?trade_candidate)
+        (instruction_execution_strategy_reserved ?sell_instruction)
+        (instruction_assigned_execution_strategy ?sell_instruction ?execution_strategy)
+        (not
+          (instruction_verified ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_verified ?sell_instruction)
+        (instruction_strategy_finalized ?sell_instruction)
+      )
+  )
+  (:action stage_instruction_for_settlement_with_venue
+    :parameters (?sell_instruction - sell_instruction ?settlement_window - settlement_window ?execution_venue - execution_venue ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_verified ?sell_instruction)
+        (instruction_assigned_settlement_window ?sell_instruction ?settlement_window)
+        (lot_reserved_execution_venue ?sell_instruction ?execution_venue)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (not
+          (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        )
+        (not
+          (instruction_prepared_for_approval ?sell_instruction)
+        )
+      )
+    :effect (instruction_prepared_for_approval ?sell_instruction)
+  )
+  (:action stage_instruction_for_settlement_variant
+    :parameters (?sell_instruction - sell_instruction ?settlement_window - settlement_window ?execution_venue - execution_venue ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_verified ?sell_instruction)
+        (instruction_assigned_settlement_window ?sell_instruction ?settlement_window)
+        (lot_reserved_execution_venue ?sell_instruction ?execution_venue)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        (not
+          (instruction_prepared_for_approval ?sell_instruction)
+        )
+      )
+    :effect (instruction_prepared_for_approval ?sell_instruction)
+  )
+  (:action attach_approval_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_prepared_for_approval ?sell_instruction)
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (not
+          (trade_candidate_flag_source_tag ?trade_candidate)
+        )
+        (not
+          (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        )
+        (not
+          (instruction_approval_attached ?sell_instruction)
+        )
+      )
+    :effect (instruction_approval_attached ?sell_instruction)
+  )
+  (:action attach_approval_and_record_for_instruction
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_prepared_for_approval ?sell_instruction)
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (trade_candidate_flag_source_tag ?trade_candidate)
+        (not
+          (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        )
+        (not
+          (instruction_approval_attached ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_approval_recorded ?sell_instruction)
+      )
+  )
+  (:action attach_approval_and_record_for_instruction_variant_b
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_prepared_for_approval ?sell_instruction)
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (not
+          (trade_candidate_flag_source_tag ?trade_candidate)
+        )
+        (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        (not
+          (instruction_approval_attached ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_approval_recorded ?sell_instruction)
+      )
+  )
+  (:action attach_approval_and_record_for_instruction_variant_c
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token ?lot_record - lot_record ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (instruction_prepared_for_approval ?sell_instruction)
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (instruction_has_lot_record ?sell_instruction ?lot_record)
+        (lot_record_linked_trade_candidate ?lot_record ?trade_candidate)
+        (trade_candidate_flag_source_tag ?trade_candidate)
+        (trade_candidate_flag_counterparty_tag ?trade_candidate)
+        (not
+          (instruction_approval_attached ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_approval_recorded ?sell_instruction)
+      )
+  )
+  (:action claim_instruction_for_assignment
+    :parameters (?sell_instruction - sell_instruction)
+    :precondition
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (not
+          (instruction_approval_recorded ?sell_instruction)
+        )
+        (not
+          (instruction_assigned ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_assigned ?sell_instruction)
+        (lot_assigned ?sell_instruction)
+      )
+  )
+  (:action attach_order_constraint_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?order_constraint - order_constraint)
+    :precondition
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_approval_recorded ?sell_instruction)
+        (order_constraint_available ?order_constraint)
+      )
+    :effect
+      (and
+        (instruction_assigned_order_constraint ?sell_instruction ?order_constraint)
+        (not
+          (order_constraint_available ?order_constraint)
+        )
+      )
+  )
+  (:action complete_instruction_verification_and_mark_ready_for_assignment
+    :parameters (?sell_instruction - sell_instruction ?source_lot - source_lot ?counterparty_lot - counterparty_lot ?security - security ?order_constraint - order_constraint)
+    :precondition
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_approval_recorded ?sell_instruction)
+        (instruction_assigned_order_constraint ?sell_instruction ?order_constraint)
+        (instruction_includes_source_lot ?sell_instruction ?source_lot)
+        (instruction_includes_counterparty_lot ?sell_instruction ?counterparty_lot)
+        (source_lot_ready_for_matching ?source_lot)
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+        (lot_linked_security ?sell_instruction ?security)
+        (not
+          (instruction_ready_for_assignment ?sell_instruction)
+        )
+      )
+    :effect (instruction_ready_for_assignment ?sell_instruction)
+  )
+  (:action claim_instruction_for_assignment_after_verification
+    :parameters (?sell_instruction - sell_instruction)
+    :precondition
+      (and
+        (instruction_approval_attached ?sell_instruction)
+        (instruction_ready_for_assignment ?sell_instruction)
+        (not
+          (instruction_assigned ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_assigned ?sell_instruction)
+        (lot_assigned ?sell_instruction)
+      )
+  )
+  (:action assign_compliance_check_to_instruction
+    :parameters (?sell_instruction - sell_instruction ?compliance_check - compliance_check ?security - security)
+    :precondition
+      (and
+        (lot_eligible_for_sale ?sell_instruction)
+        (lot_linked_security ?sell_instruction ?security)
+        (compliance_check_available ?compliance_check)
+        (instruction_compliance_attached ?sell_instruction ?compliance_check)
+        (not
+          (instruction_compliance_cleared ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_compliance_cleared ?sell_instruction)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action record_compliance_step_for_instruction
+    :parameters (?sell_instruction - sell_instruction ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (instruction_compliance_cleared ?sell_instruction)
+        (lot_reserved_execution_venue ?sell_instruction ?execution_venue)
+        (not
+          (instruction_compliance_signed_off ?sell_instruction)
+        )
+      )
+    :effect (instruction_compliance_signed_off ?sell_instruction)
+  )
+  (:action apply_approval_token_post_compliance
+    :parameters (?sell_instruction - sell_instruction ?approval_token - approval_token)
+    :precondition
+      (and
+        (instruction_compliance_signed_off ?sell_instruction)
+        (instruction_assigned_approval_token ?sell_instruction ?approval_token)
+        (not
+          (instruction_compliance_finalized ?sell_instruction)
+        )
+      )
+    :effect (instruction_compliance_finalized ?sell_instruction)
+  )
+  (:action finalize_compliance_and_mark_instruction_assigned
+    :parameters (?sell_instruction - sell_instruction)
+    :precondition
+      (and
+        (instruction_compliance_finalized ?sell_instruction)
+        (not
+          (instruction_assigned ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (instruction_assigned ?sell_instruction)
+        (lot_assigned ?sell_instruction)
+      )
+  )
+  (:action assign_trade_candidate_to_source_lot
+    :parameters (?source_lot - source_lot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (source_lot_prepared ?source_lot)
+        (source_lot_ready_for_matching ?source_lot)
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_bound_to_source_lot ?trade_candidate)
+        (not
+          (lot_assigned ?source_lot)
+        )
+      )
+    :effect (lot_assigned ?source_lot)
+  )
+  (:action assign_trade_candidate_to_counterparty_lot
+    :parameters (?counterparty_lot - counterparty_lot ?trade_candidate - trade_candidate)
+    :precondition
+      (and
+        (counterparty_lot_prepared ?counterparty_lot)
+        (counterparty_lot_ready_for_matching ?counterparty_lot)
+        (trade_candidate_created ?trade_candidate)
+        (trade_candidate_bound_to_source_lot ?trade_candidate)
+        (not
+          (lot_assigned ?counterparty_lot)
+        )
+      )
+    :effect (lot_assigned ?counterparty_lot)
+  )
+  (:action apply_tax_profile_to_lot
+    :parameters (?tax_lot - lot ?tax_profile - tax_profile ?security - security)
+    :precondition
+      (and
+        (lot_assigned ?tax_lot)
+        (lot_linked_security ?tax_lot ?security)
+        (tax_profile_available ?tax_profile)
+        (not
+          (tax_profile_applied ?tax_lot)
+        )
+      )
+    :effect
+      (and
+        (tax_profile_applied ?tax_lot)
+        (tax_profile_assigned_to_lot ?tax_lot ?tax_profile)
+        (not
+          (tax_profile_available ?tax_profile)
+        )
+      )
+  )
+  (:action finalize_source_lot_and_release_selection_profile
+    :parameters (?source_lot - source_lot ?selection_profile - selection_profile ?tax_profile - tax_profile)
+    :precondition
+      (and
+        (tax_profile_applied ?source_lot)
+        (lot_allocated_selection_profile ?source_lot ?selection_profile)
+        (tax_profile_assigned_to_lot ?source_lot ?tax_profile)
+        (not
+          (lot_finalized ?source_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_finalized ?source_lot)
+        (selection_profile_available ?selection_profile)
+        (tax_profile_available ?tax_profile)
+      )
+  )
+  (:action finalize_counterparty_lot_and_release_selection_profile
+    :parameters (?counterparty_lot - counterparty_lot ?selection_profile - selection_profile ?tax_profile - tax_profile)
+    :precondition
+      (and
+        (tax_profile_applied ?counterparty_lot)
+        (lot_allocated_selection_profile ?counterparty_lot ?selection_profile)
+        (tax_profile_assigned_to_lot ?counterparty_lot ?tax_profile)
+        (not
+          (lot_finalized ?counterparty_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_finalized ?counterparty_lot)
+        (selection_profile_available ?selection_profile)
+        (tax_profile_available ?tax_profile)
+      )
+  )
+  (:action finalize_instruction_and_release_selection_profile
+    :parameters (?sell_instruction - sell_instruction ?selection_profile - selection_profile ?tax_profile - tax_profile)
+    :precondition
+      (and
+        (tax_profile_applied ?sell_instruction)
+        (lot_allocated_selection_profile ?sell_instruction ?selection_profile)
+        (tax_profile_assigned_to_lot ?sell_instruction ?tax_profile)
+        (not
+          (lot_finalized ?sell_instruction)
+        )
+      )
+    :effect
+      (and
+        (lot_finalized ?sell_instruction)
+        (selection_profile_available ?selection_profile)
+        (tax_profile_available ?tax_profile)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem tax_lot_selection_for_sale_problem)
+  (:domain investment_portfolio_tax_lot_selection_for_sale)
+  (:objects source_lot_1 - source_lot counterparty_lot_1 - counterparty_lot sell_instruction_1 - sell_instruction sell_instruction_2 - sell_instruction selection_profile_1 - selection_profile selection_profile_2 - selection_profile selection_profile_3 - selection_profile security_1 - security execution_venue_1 - execution_venue lot_tag_1 - lot_tag tax_bucket_source_1 - tax_bucket_source tax_bucket_counterpart_1 - tax_bucket_counterpart trade_candidate_1 - trade_candidate lot_record_1 - lot_record lot_record_2 - lot_record execution_strategy_1 - execution_strategy execution_strategy_2 - execution_strategy order_constraint_1 - order_constraint order_constraint_2 - order_constraint tax_profile_1 - tax_profile settlement_window_1 - settlement_window compliance_check_1 - compliance_check compliance_check_2 - compliance_check approval_token_1 - approval_token)
+  (:init
+    (selection_profile_available selection_profile_1)
+    (selection_profile_available selection_profile_2)
+    (selection_profile_available selection_profile_3)
+    (security_available security_1)
+    (execution_venue_available execution_venue_1)
+    (lot_tag_available lot_tag_1)
+    (source_lot_in_tax_bucket source_lot_1 tax_bucket_source_1)
+    (counterparty_lot_in_tax_bucket counterparty_lot_1 tax_bucket_counterpart_1)
+    (trade_candidate_available trade_candidate_1)
+    (lot_record_available lot_record_1)
+    (lot_record_available lot_record_2)
+    (instruction_includes_source_lot sell_instruction_1 source_lot_1)
+    (instruction_includes_source_lot sell_instruction_2 source_lot_1)
+    (instruction_includes_counterparty_lot sell_instruction_1 counterparty_lot_1)
+    (instruction_includes_counterparty_lot sell_instruction_2 counterparty_lot_1)
+    (instruction_associated_with_trade_candidate sell_instruction_1 trade_candidate_1)
+    (instruction_associated_with_trade_candidate sell_instruction_2 trade_candidate_1)
+    (instruction_has_lot_record sell_instruction_1 lot_record_1)
+    (instruction_has_lot_record sell_instruction_2 lot_record_2)
+    (execution_strategy_available execution_strategy_1)
+    (execution_strategy_available execution_strategy_2)
+    (order_constraint_available order_constraint_1)
+    (order_constraint_available order_constraint_2)
+    (tax_profile_available tax_profile_1)
+    (settlement_window_available settlement_window_1)
+    (compliance_check_available compliance_check_1)
+    (instruction_compliance_attached sell_instruction_1 compliance_check_1)
+    (instruction_compliance_attached sell_instruction_2 compliance_check_2)
+    (approval_token_available approval_token_1)
+  )
+  (:goal
+    (and
+      (lot_finalized source_lot_1)
+      (lot_finalized counterparty_lot_1)
+      (lot_finalized sell_instruction_1)
+      (lot_finalized sell_instruction_2)
+    )
+  )
+)

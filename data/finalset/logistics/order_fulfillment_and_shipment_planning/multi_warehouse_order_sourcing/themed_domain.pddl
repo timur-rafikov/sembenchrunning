@@ -1,0 +1,936 @@
+(define (domain multi_warehouse_order_sourcing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types logistics_resource - object auxiliary_asset_group - object physical_location_or_vehicle_group - object fulfillment_entity_root - object fulfillment_unit - fulfillment_entity_root warehouse - logistics_resource inventory_item - logistics_resource material_handler - logistics_resource routing_profile - logistics_resource transport_service_option - logistics_resource delivery_point - logistics_resource handling_instruction - logistics_resource compliance_document - logistics_resource allocation_token - auxiliary_asset_group package_unit - auxiliary_asset_group delivery_appointment - auxiliary_asset_group pick_zone - physical_location_or_vehicle_group pack_zone - physical_location_or_vehicle_group transport_unit - physical_location_or_vehicle_group warehouse_sourcing_record - fulfillment_unit shipment_record - fulfillment_unit warehouse_sourcing_instance_pick - warehouse_sourcing_record warehouse_sourcing_instance_pack - warehouse_sourcing_record shipment - shipment_record)
+  (:predicates
+    (fulfillment_unit_released ?fulfillment_unit - fulfillment_unit)
+    (fulfillment_committed ?fulfillment_unit - fulfillment_unit)
+    (sourcing_warehouse_assigned ?fulfillment_unit - fulfillment_unit)
+    (fulfillment_finalized ?fulfillment_unit - fulfillment_unit)
+    (dispatch_confirmed ?fulfillment_unit - fulfillment_unit)
+    (service_option_assigned_to_entity ?fulfillment_unit - fulfillment_unit)
+    (warehouse_available ?warehouse - warehouse)
+    (entity_assigned_to_warehouse ?fulfillment_unit - fulfillment_unit ?warehouse - warehouse)
+    (inventory_available ?inventory_item - inventory_item)
+    (inventory_allocated ?fulfillment_unit - fulfillment_unit ?inventory_item - inventory_item)
+    (handler_available ?material_handler - material_handler)
+    (handler_assigned_to_entity ?fulfillment_unit - fulfillment_unit ?material_handler - material_handler)
+    (allocation_token_available ?allocation_token - allocation_token)
+    (allocation_token_reserved_pick ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?allocation_token - allocation_token)
+    (allocation_token_reserved_pack ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?allocation_token - allocation_token)
+    (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?pick_zone - pick_zone)
+    (pick_zone_ready ?pick_zone - pick_zone)
+    (pick_zone_active ?pick_zone - pick_zone)
+    (pick_completed ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick)
+    (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pack_zone - pack_zone)
+    (pack_zone_ready ?pack_zone - pack_zone)
+    (pack_zone_active ?pack_zone - pack_zone)
+    (pack_completed ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_reserved ?transport_unit - transport_unit)
+    (transport_unit_assigned_pick_zone ?transport_unit - transport_unit ?pick_zone - pick_zone)
+    (transport_unit_assigned_pack_zone ?transport_unit - transport_unit ?pack_zone - pack_zone)
+    (transport_unit_has_pick_items ?transport_unit - transport_unit)
+    (transport_unit_has_pack_items ?transport_unit - transport_unit)
+    (transport_unit_load_accepted ?transport_unit - transport_unit)
+    (shipment_contains_sourcing_instance_pick ?shipment - shipment ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick)
+    (shipment_contains_sourcing_instance_pack ?shipment - shipment ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack)
+    (shipment_assigned_to_transport_unit ?shipment - shipment ?transport_unit - transport_unit)
+    (package_unit_available ?package_unit - package_unit)
+    (shipment_supports_package_unit ?shipment - shipment ?package_unit - package_unit)
+    (package_unit_allocated ?package_unit - package_unit)
+    (package_assigned_to_transport_unit ?package_unit - package_unit ?transport_unit - transport_unit)
+    (shipment_accepted ?shipment - shipment)
+    (routing_profile_committed ?shipment - shipment)
+    (shipment_appointment_requested ?shipment - shipment)
+    (routing_profile_reserved ?shipment - shipment)
+    (shipment_appointment_ready ?shipment - shipment)
+    (shipment_labeled ?shipment - shipment)
+    (shipment_pre_dispatch_checks_passed ?shipment - shipment)
+    (delivery_appointment_available ?delivery_appointment - delivery_appointment)
+    (shipment_assigned_appointment ?shipment - shipment ?delivery_appointment - delivery_appointment)
+    (shipment_appointment_confirmed ?shipment - shipment)
+    (shipment_ready_for_documentation ?shipment - shipment)
+    (shipment_documentation_attached ?shipment - shipment)
+    (routing_profile_available ?routing_profile - routing_profile)
+    (shipment_routing_profile_linked ?shipment - shipment ?routing_profile - routing_profile)
+    (transport_service_option_available ?transport_service_option - transport_service_option)
+    (shipment_attached_service_option ?shipment - shipment ?transport_service_option - transport_service_option)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (shipment_assigned_handling_instruction ?shipment - shipment ?handling_instruction - handling_instruction)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (shipment_assigned_compliance_document ?shipment - shipment ?compliance_document - compliance_document)
+    (delivery_point_available ?delivery_point - delivery_point)
+    (entity_assigned_delivery_point ?fulfillment_unit - fulfillment_unit ?delivery_point - delivery_point)
+    (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick)
+    (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack)
+    (shipment_ready_for_dispatch ?shipment - shipment)
+  )
+  (:action receive_and_release_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit)
+    :precondition
+      (and
+        (not
+          (fulfillment_unit_released ?fulfillment_unit)
+        )
+        (not
+          (fulfillment_finalized ?fulfillment_unit)
+        )
+      )
+    :effect (fulfillment_unit_released ?fulfillment_unit)
+  )
+  (:action assign_warehouse_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?warehouse - warehouse)
+    :precondition
+      (and
+        (fulfillment_unit_released ?fulfillment_unit)
+        (not
+          (sourcing_warehouse_assigned ?fulfillment_unit)
+        )
+        (warehouse_available ?warehouse)
+      )
+    :effect
+      (and
+        (sourcing_warehouse_assigned ?fulfillment_unit)
+        (entity_assigned_to_warehouse ?fulfillment_unit ?warehouse)
+        (not
+          (warehouse_available ?warehouse)
+        )
+      )
+  )
+  (:action reserve_inventory_for_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_unit_released ?fulfillment_unit)
+        (sourcing_warehouse_assigned ?fulfillment_unit)
+        (inventory_available ?inventory_item)
+      )
+    :effect
+      (and
+        (inventory_allocated ?fulfillment_unit ?inventory_item)
+        (not
+          (inventory_available ?inventory_item)
+        )
+      )
+  )
+  (:action confirm_inventory_reservation
+    :parameters (?fulfillment_unit - fulfillment_unit ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_unit_released ?fulfillment_unit)
+        (sourcing_warehouse_assigned ?fulfillment_unit)
+        (inventory_allocated ?fulfillment_unit ?inventory_item)
+        (not
+          (fulfillment_committed ?fulfillment_unit)
+        )
+      )
+    :effect (fulfillment_committed ?fulfillment_unit)
+  )
+  (:action cancel_inventory_reservation
+    :parameters (?fulfillment_unit - fulfillment_unit ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (inventory_allocated ?fulfillment_unit ?inventory_item)
+      )
+    :effect
+      (and
+        (inventory_available ?inventory_item)
+        (not
+          (inventory_allocated ?fulfillment_unit ?inventory_item)
+        )
+      )
+  )
+  (:action assign_handler_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?material_handler - material_handler)
+    :precondition
+      (and
+        (fulfillment_committed ?fulfillment_unit)
+        (handler_available ?material_handler)
+      )
+    :effect
+      (and
+        (handler_assigned_to_entity ?fulfillment_unit ?material_handler)
+        (not
+          (handler_available ?material_handler)
+        )
+      )
+  )
+  (:action release_handler_from_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?material_handler - material_handler)
+    :precondition
+      (and
+        (handler_assigned_to_entity ?fulfillment_unit ?material_handler)
+      )
+    :effect
+      (and
+        (handler_available ?material_handler)
+        (not
+          (handler_assigned_to_entity ?fulfillment_unit ?material_handler)
+        )
+      )
+  )
+  (:action attach_handling_instruction_to_shipment
+    :parameters (?shipment - shipment ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (handling_instruction_available ?handling_instruction)
+      )
+    :effect
+      (and
+        (shipment_assigned_handling_instruction ?shipment ?handling_instruction)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action detach_handling_instruction_from_shipment
+    :parameters (?shipment - shipment ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (shipment_assigned_handling_instruction ?shipment ?handling_instruction)
+      )
+    :effect
+      (and
+        (handling_instruction_available ?handling_instruction)
+        (not
+          (shipment_assigned_handling_instruction ?shipment ?handling_instruction)
+        )
+      )
+  )
+  (:action attach_compliance_document_to_shipment
+    :parameters (?shipment - shipment ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (compliance_document_available ?compliance_document)
+      )
+    :effect
+      (and
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action detach_compliance_document_from_shipment
+    :parameters (?shipment - shipment ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+      )
+    :effect
+      (and
+        (compliance_document_available ?compliance_document)
+        (not
+          (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        )
+      )
+  )
+  (:action reserve_pick_zone_for_sourcing_instance
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?pick_zone - pick_zone ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_a)
+        (inventory_allocated ?warehouse_sourcing_instance_a ?inventory_item)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (not
+          (pick_zone_ready ?pick_zone)
+        )
+        (not
+          (pick_zone_active ?pick_zone)
+        )
+      )
+    :effect (pick_zone_ready ?pick_zone)
+  )
+  (:action assign_handler_and_record_pick_completion
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?pick_zone - pick_zone ?material_handler - material_handler)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_a)
+        (handler_assigned_to_entity ?warehouse_sourcing_instance_a ?material_handler)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (pick_zone_ready ?pick_zone)
+        (not
+          (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        )
+      )
+    :effect
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (pick_completed ?warehouse_sourcing_instance_a)
+      )
+  )
+  (:action reserve_allocation_and_activate_pick_zone
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?pick_zone - pick_zone ?allocation_token - allocation_token)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_a)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (allocation_token_available ?allocation_token)
+        (not
+          (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_active ?pick_zone)
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (allocation_token_reserved_pick ?warehouse_sourcing_instance_a ?allocation_token)
+        (not
+          (allocation_token_available ?allocation_token)
+        )
+      )
+  )
+  (:action finalize_pick_and_release_allocation
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?pick_zone - pick_zone ?inventory_item - inventory_item ?allocation_token - allocation_token)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_a)
+        (inventory_allocated ?warehouse_sourcing_instance_a ?inventory_item)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (pick_zone_active ?pick_zone)
+        (allocation_token_reserved_pick ?warehouse_sourcing_instance_a ?allocation_token)
+        (not
+          (pick_completed ?warehouse_sourcing_instance_a)
+        )
+      )
+    :effect
+      (and
+        (pick_zone_ready ?pick_zone)
+        (pick_completed ?warehouse_sourcing_instance_a)
+        (allocation_token_available ?allocation_token)
+        (not
+          (allocation_token_reserved_pick ?warehouse_sourcing_instance_a ?allocation_token)
+        )
+      )
+  )
+  (:action reserve_pack_zone_for_sourcing_instance
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pack_zone - pack_zone ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_b)
+        (inventory_allocated ?warehouse_sourcing_instance_b ?inventory_item)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (not
+          (pack_zone_ready ?pack_zone)
+        )
+        (not
+          (pack_zone_active ?pack_zone)
+        )
+      )
+    :effect (pack_zone_ready ?pack_zone)
+  )
+  (:action assign_handler_and_record_pack_completion
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pack_zone - pack_zone ?material_handler - material_handler)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_b)
+        (handler_assigned_to_entity ?warehouse_sourcing_instance_b ?material_handler)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pack_zone_ready ?pack_zone)
+        (not
+          (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        )
+      )
+    :effect
+      (and
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (pack_completed ?warehouse_sourcing_instance_b)
+      )
+  )
+  (:action reserve_allocation_and_activate_pack_zone
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pack_zone - pack_zone ?allocation_token - allocation_token)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_b)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (allocation_token_available ?allocation_token)
+        (not
+          (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        )
+      )
+    :effect
+      (and
+        (pack_zone_active ?pack_zone)
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (allocation_token_reserved_pack ?warehouse_sourcing_instance_b ?allocation_token)
+        (not
+          (allocation_token_available ?allocation_token)
+        )
+      )
+  )
+  (:action finalize_pack_and_release_allocation
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pack_zone - pack_zone ?inventory_item - inventory_item ?allocation_token - allocation_token)
+    :precondition
+      (and
+        (fulfillment_committed ?warehouse_sourcing_instance_b)
+        (inventory_allocated ?warehouse_sourcing_instance_b ?inventory_item)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pack_zone_active ?pack_zone)
+        (allocation_token_reserved_pack ?warehouse_sourcing_instance_b ?allocation_token)
+        (not
+          (pack_completed ?warehouse_sourcing_instance_b)
+        )
+      )
+    :effect
+      (and
+        (pack_zone_ready ?pack_zone)
+        (pack_completed ?warehouse_sourcing_instance_b)
+        (allocation_token_available ?allocation_token)
+        (not
+          (allocation_token_reserved_pack ?warehouse_sourcing_instance_b ?allocation_token)
+        )
+      )
+  )
+  (:action consolidate_sourcings_into_transport_unit_standard
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pick_zone - pick_zone ?pack_zone - pack_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pick_zone_ready ?pick_zone)
+        (pack_zone_ready ?pack_zone)
+        (pick_completed ?warehouse_sourcing_instance_a)
+        (pack_completed ?warehouse_sourcing_instance_b)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_pick_zone ?transport_unit ?pick_zone)
+        (transport_unit_assigned_pack_zone ?transport_unit ?pack_zone)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action consolidate_sourcings_into_transport_unit_with_pick_active
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pick_zone - pick_zone ?pack_zone - pack_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pick_zone_active ?pick_zone)
+        (pack_zone_ready ?pack_zone)
+        (not
+          (pick_completed ?warehouse_sourcing_instance_a)
+        )
+        (pack_completed ?warehouse_sourcing_instance_b)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_pick_zone ?transport_unit ?pick_zone)
+        (transport_unit_assigned_pack_zone ?transport_unit ?pack_zone)
+        (transport_unit_has_pick_items ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action consolidate_sourcings_into_transport_unit_with_pack_active
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pick_zone - pick_zone ?pack_zone - pack_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pick_zone_ready ?pick_zone)
+        (pack_zone_active ?pack_zone)
+        (pick_completed ?warehouse_sourcing_instance_a)
+        (not
+          (pack_completed ?warehouse_sourcing_instance_b)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_pick_zone ?transport_unit ?pick_zone)
+        (transport_unit_assigned_pack_zone ?transport_unit ?pack_zone)
+        (transport_unit_has_pack_items ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action consolidate_sourcings_into_transport_unit_with_pick_and_pack_active
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?pick_zone - pick_zone ?pack_zone - pack_zone ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (sourcing_pick_zone_assigned ?warehouse_sourcing_instance_a ?pick_zone)
+        (sourcing_pack_zone_assigned ?warehouse_sourcing_instance_b ?pack_zone)
+        (pick_zone_active ?pick_zone)
+        (pack_zone_active ?pack_zone)
+        (not
+          (pick_completed ?warehouse_sourcing_instance_a)
+        )
+        (not
+          (pack_completed ?warehouse_sourcing_instance_b)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_assigned_pick_zone ?transport_unit ?pick_zone)
+        (transport_unit_assigned_pack_zone ?transport_unit ?pack_zone)
+        (transport_unit_has_pick_items ?transport_unit)
+        (transport_unit_has_pack_items ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action accept_load_on_transport_unit
+    :parameters (?transport_unit - transport_unit ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (transport_unit_reserved ?transport_unit)
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (inventory_allocated ?warehouse_sourcing_instance_a ?inventory_item)
+        (not
+          (transport_unit_load_accepted ?transport_unit)
+        )
+      )
+    :effect (transport_unit_load_accepted ?transport_unit)
+  )
+  (:action bind_package_unit_to_shipment
+    :parameters (?shipment - shipment ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (shipment_assigned_to_transport_unit ?shipment ?transport_unit)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_unit_available ?package_unit)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_load_accepted ?transport_unit)
+        (not
+          (package_unit_allocated ?package_unit)
+        )
+      )
+    :effect
+      (and
+        (package_unit_allocated ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action prepare_shipment_for_routing
+    :parameters (?shipment - shipment ?package_unit - package_unit ?transport_unit - transport_unit ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_unit_allocated ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (inventory_allocated ?shipment ?inventory_item)
+        (not
+          (transport_unit_has_pick_items ?transport_unit)
+        )
+        (not
+          (shipment_accepted ?shipment)
+        )
+      )
+    :effect (shipment_accepted ?shipment)
+  )
+  (:action assign_routing_profile_to_shipment
+    :parameters (?shipment - shipment ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (routing_profile_available ?routing_profile)
+        (not
+          (routing_profile_reserved ?shipment)
+        )
+      )
+    :effect
+      (and
+        (routing_profile_reserved ?shipment)
+        (shipment_routing_profile_linked ?shipment ?routing_profile)
+        (not
+          (routing_profile_available ?routing_profile)
+        )
+      )
+  )
+  (:action finalize_routing_and_appointment
+    :parameters (?shipment - shipment ?package_unit - package_unit ?transport_unit - transport_unit ?inventory_item - inventory_item ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_unit_allocated ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (inventory_allocated ?shipment ?inventory_item)
+        (transport_unit_has_pick_items ?transport_unit)
+        (routing_profile_reserved ?shipment)
+        (shipment_routing_profile_linked ?shipment ?routing_profile)
+        (not
+          (shipment_accepted ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_accepted ?shipment)
+        (shipment_appointment_ready ?shipment)
+      )
+  )
+  (:action commit_routing_with_handling_instruction
+    :parameters (?shipment - shipment ?handling_instruction - handling_instruction ?material_handler - material_handler ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_accepted ?shipment)
+        (shipment_assigned_handling_instruction ?shipment ?handling_instruction)
+        (handler_assigned_to_entity ?shipment ?material_handler)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (not
+          (transport_unit_has_pack_items ?transport_unit)
+        )
+        (not
+          (routing_profile_committed ?shipment)
+        )
+      )
+    :effect (routing_profile_committed ?shipment)
+  )
+  (:action commit_routing_with_handling_instruction_alternate
+    :parameters (?shipment - shipment ?handling_instruction - handling_instruction ?material_handler - material_handler ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (shipment_accepted ?shipment)
+        (shipment_assigned_handling_instruction ?shipment ?handling_instruction)
+        (handler_assigned_to_entity ?shipment ?material_handler)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (transport_unit_has_pack_items ?transport_unit)
+        (not
+          (routing_profile_committed ?shipment)
+        )
+      )
+    :effect (routing_profile_committed ?shipment)
+  )
+  (:action attach_compliance_and_request_appointment
+    :parameters (?shipment - shipment ?compliance_document - compliance_document ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (routing_profile_committed ?shipment)
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (not
+          (transport_unit_has_pick_items ?transport_unit)
+        )
+        (not
+          (transport_unit_has_pack_items ?transport_unit)
+        )
+        (not
+          (shipment_appointment_requested ?shipment)
+        )
+      )
+    :effect (shipment_appointment_requested ?shipment)
+  )
+  (:action attach_compliance_and_mark_labels_ready
+    :parameters (?shipment - shipment ?compliance_document - compliance_document ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (routing_profile_committed ?shipment)
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (transport_unit_has_pick_items ?transport_unit)
+        (not
+          (transport_unit_has_pack_items ?transport_unit)
+        )
+        (not
+          (shipment_appointment_requested ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_labeled ?shipment)
+      )
+  )
+  (:action attach_compliance_and_mark_labels_ready_secondary
+    :parameters (?shipment - shipment ?compliance_document - compliance_document ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (routing_profile_committed ?shipment)
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (not
+          (transport_unit_has_pick_items ?transport_unit)
+        )
+        (transport_unit_has_pack_items ?transport_unit)
+        (not
+          (shipment_appointment_requested ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_labeled ?shipment)
+      )
+  )
+  (:action attach_compliance_and_mark_labels_ready_alternate
+    :parameters (?shipment - shipment ?compliance_document - compliance_document ?package_unit - package_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (routing_profile_committed ?shipment)
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (shipment_supports_package_unit ?shipment ?package_unit)
+        (package_assigned_to_transport_unit ?package_unit ?transport_unit)
+        (transport_unit_has_pick_items ?transport_unit)
+        (transport_unit_has_pack_items ?transport_unit)
+        (not
+          (shipment_appointment_requested ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_labeled ?shipment)
+      )
+  )
+  (:action perform_pre_dispatch_checks
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (shipment_appointment_requested ?shipment)
+        (not
+          (shipment_labeled ?shipment)
+        )
+        (not
+          (shipment_ready_for_dispatch ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_dispatch ?shipment)
+        (dispatch_confirmed ?shipment)
+      )
+  )
+  (:action attach_transport_service_option_to_shipment
+    :parameters (?shipment - shipment ?transport_service_option - transport_service_option)
+    :precondition
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_labeled ?shipment)
+        (transport_service_option_available ?transport_service_option)
+      )
+    :effect
+      (and
+        (shipment_attached_service_option ?shipment ?transport_service_option)
+        (not
+          (transport_service_option_available ?transport_service_option)
+        )
+      )
+  )
+  (:action finalize_shipment_pre_dispatch_checks
+    :parameters (?shipment - shipment ?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?inventory_item - inventory_item ?transport_service_option - transport_service_option)
+    :precondition
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_labeled ?shipment)
+        (shipment_attached_service_option ?shipment ?transport_service_option)
+        (shipment_contains_sourcing_instance_pick ?shipment ?warehouse_sourcing_instance_a)
+        (shipment_contains_sourcing_instance_pack ?shipment ?warehouse_sourcing_instance_b)
+        (pick_completed ?warehouse_sourcing_instance_a)
+        (pack_completed ?warehouse_sourcing_instance_b)
+        (inventory_allocated ?shipment ?inventory_item)
+        (not
+          (shipment_pre_dispatch_checks_passed ?shipment)
+        )
+      )
+    :effect (shipment_pre_dispatch_checks_passed ?shipment)
+  )
+  (:action finalize_pre_dispatch_and_mark_ready
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (shipment_appointment_requested ?shipment)
+        (shipment_pre_dispatch_checks_passed ?shipment)
+        (not
+          (shipment_ready_for_dispatch ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_dispatch ?shipment)
+        (dispatch_confirmed ?shipment)
+      )
+  )
+  (:action confirm_delivery_appointment_for_shipment
+    :parameters (?shipment - shipment ?delivery_appointment - delivery_appointment ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (fulfillment_committed ?shipment)
+        (inventory_allocated ?shipment ?inventory_item)
+        (delivery_appointment_available ?delivery_appointment)
+        (shipment_assigned_appointment ?shipment ?delivery_appointment)
+        (not
+          (shipment_appointment_confirmed ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_appointment_confirmed ?shipment)
+        (not
+          (delivery_appointment_available ?delivery_appointment)
+        )
+      )
+  )
+  (:action prepare_shipment_for_documentation
+    :parameters (?shipment - shipment ?material_handler - material_handler)
+    :precondition
+      (and
+        (shipment_appointment_confirmed ?shipment)
+        (handler_assigned_to_entity ?shipment ?material_handler)
+        (not
+          (shipment_ready_for_documentation ?shipment)
+        )
+      )
+    :effect (shipment_ready_for_documentation ?shipment)
+  )
+  (:action attach_compliance_documentation_to_shipment
+    :parameters (?shipment - shipment ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (shipment_ready_for_documentation ?shipment)
+        (shipment_assigned_compliance_document ?shipment ?compliance_document)
+        (not
+          (shipment_documentation_attached ?shipment)
+        )
+      )
+    :effect (shipment_documentation_attached ?shipment)
+  )
+  (:action finalize_documentation_and_mark_ready_for_dispatch
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (shipment_documentation_attached ?shipment)
+        (not
+          (shipment_ready_for_dispatch ?shipment)
+        )
+      )
+    :effect
+      (and
+        (shipment_ready_for_dispatch ?shipment)
+        (dispatch_confirmed ?shipment)
+      )
+  )
+  (:action confirm_sourcing_dispatch_on_transport_unit_from_warehouse
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pick_ready ?warehouse_sourcing_instance_a)
+        (pick_completed ?warehouse_sourcing_instance_a)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_load_accepted ?transport_unit)
+        (not
+          (dispatch_confirmed ?warehouse_sourcing_instance_a)
+        )
+      )
+    :effect (dispatch_confirmed ?warehouse_sourcing_instance_a)
+  )
+  (:action confirm_sourcing_dispatch_on_transport_unit_from_pack
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (sourcing_instance_pack_ready ?warehouse_sourcing_instance_b)
+        (pack_completed ?warehouse_sourcing_instance_b)
+        (transport_unit_reserved ?transport_unit)
+        (transport_unit_load_accepted ?transport_unit)
+        (not
+          (dispatch_confirmed ?warehouse_sourcing_instance_b)
+        )
+      )
+    :effect (dispatch_confirmed ?warehouse_sourcing_instance_b)
+  )
+  (:action assign_delivery_point_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?delivery_point - delivery_point ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (dispatch_confirmed ?fulfillment_unit)
+        (inventory_allocated ?fulfillment_unit ?inventory_item)
+        (delivery_point_available ?delivery_point)
+        (not
+          (service_option_assigned_to_entity ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (service_option_assigned_to_entity ?fulfillment_unit)
+        (entity_assigned_delivery_point ?fulfillment_unit ?delivery_point)
+        (not
+          (delivery_point_available ?delivery_point)
+        )
+      )
+  )
+  (:action finalize_warehouse_sourcing_instance
+    :parameters (?warehouse_sourcing_instance_a - warehouse_sourcing_instance_pick ?warehouse - warehouse ?delivery_point - delivery_point)
+    :precondition
+      (and
+        (service_option_assigned_to_entity ?warehouse_sourcing_instance_a)
+        (entity_assigned_to_warehouse ?warehouse_sourcing_instance_a ?warehouse)
+        (entity_assigned_delivery_point ?warehouse_sourcing_instance_a ?delivery_point)
+        (not
+          (fulfillment_finalized ?warehouse_sourcing_instance_a)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_finalized ?warehouse_sourcing_instance_a)
+        (warehouse_available ?warehouse)
+        (delivery_point_available ?delivery_point)
+      )
+  )
+  (:action finalize_alternate_warehouse_sourcing_instance
+    :parameters (?warehouse_sourcing_instance_b - warehouse_sourcing_instance_pack ?warehouse - warehouse ?delivery_point - delivery_point)
+    :precondition
+      (and
+        (service_option_assigned_to_entity ?warehouse_sourcing_instance_b)
+        (entity_assigned_to_warehouse ?warehouse_sourcing_instance_b ?warehouse)
+        (entity_assigned_delivery_point ?warehouse_sourcing_instance_b ?delivery_point)
+        (not
+          (fulfillment_finalized ?warehouse_sourcing_instance_b)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_finalized ?warehouse_sourcing_instance_b)
+        (warehouse_available ?warehouse)
+        (delivery_point_available ?delivery_point)
+      )
+  )
+  (:action finalize_shipment_with_delivery_point
+    :parameters (?shipment - shipment ?warehouse - warehouse ?delivery_point - delivery_point)
+    :precondition
+      (and
+        (service_option_assigned_to_entity ?shipment)
+        (entity_assigned_to_warehouse ?shipment ?warehouse)
+        (entity_assigned_delivery_point ?shipment ?delivery_point)
+        (not
+          (fulfillment_finalized ?shipment)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_finalized ?shipment)
+        (warehouse_available ?warehouse)
+        (delivery_point_available ?delivery_point)
+      )
+  )
+)

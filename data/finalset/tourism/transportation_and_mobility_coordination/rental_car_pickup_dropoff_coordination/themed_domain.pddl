@@ -1,0 +1,937 @@
+(define (domain rental_car_pickup_dropoff_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource - entity transfer_category - entity document_category - entity segment_supertype - entity trip_segment - segment_supertype vehicle_asset - operational_resource arrival_event - operational_resource counter_agent - operational_resource vendor_service_option - operational_resource payment_instrument - operational_resource timing_buffer_window - operational_resource vehicle_key - operational_resource provider_document - operational_resource accessory_item - transfer_category inspection_point - transfer_category provider_confirmation_token - transfer_category pickup_transfer_option - document_category dropoff_transfer_option - document_category vehicle_allocation_record - document_category pickup_group - trip_segment reservation_group - trip_segment pickup_leg - pickup_group dropoff_leg - pickup_group reservation_record - reservation_group)
+
+  (:predicates
+    (segment_intent_created ?trip_segment - trip_segment)
+    (segment_confirmed ?trip_segment - trip_segment)
+    (vehicle_candidate_assigned_flag ?trip_segment - trip_segment)
+    (handover_completed ?trip_segment - trip_segment)
+    (segment_ready_for_handover ?trip_segment - trip_segment)
+    (segment_reservation_finalized ?trip_segment - trip_segment)
+    (vehicle_available ?vehicle_asset - vehicle_asset)
+    (segment_to_vehicle_candidate ?trip_segment - trip_segment ?vehicle_asset - vehicle_asset)
+    (arrival_event_available ?arrival_event - arrival_event)
+    (segment_has_arrival_event ?trip_segment - trip_segment ?arrival_event - arrival_event)
+    (agent_available ?counter_agent - counter_agent)
+    (segment_assigned_agent ?trip_segment - trip_segment ?counter_agent - counter_agent)
+    (accessory_available ?accessory_item - accessory_item)
+    (pickup_leg_accessory_reserved ?pickup_leg - pickup_leg ?accessory_item - accessory_item)
+    (dropoff_leg_accessory_reserved ?dropoff_leg - dropoff_leg ?accessory_item - accessory_item)
+    (leg_has_transfer_option ?pickup_leg - pickup_leg ?pickup_transfer_option - pickup_transfer_option)
+    (pickup_transfer_locked ?pickup_transfer_option - pickup_transfer_option)
+    (pickup_transfer_conflicting_lock ?pickup_transfer_option - pickup_transfer_option)
+    (pickup_leg_transfer_confirmed ?pickup_leg - pickup_leg)
+    (dropoff_leg_has_transfer_option ?dropoff_leg - dropoff_leg ?dropoff_transfer_option - dropoff_transfer_option)
+    (dropoff_transfer_locked_state ?dropoff_transfer_option - dropoff_transfer_option)
+    (dropoff_transfer_flag_secondary ?dropoff_transfer_option - dropoff_transfer_option)
+    (dropoff_leg_transfer_confirmed ?dropoff_leg - dropoff_leg)
+    (allocation_record_available ?vehicle_allocation_record - vehicle_allocation_record)
+    (allocation_record_created ?vehicle_allocation_record - vehicle_allocation_record)
+    (allocation_bound_to_pickup_transfer ?vehicle_allocation_record - vehicle_allocation_record ?pickup_transfer_option - pickup_transfer_option)
+    (allocation_bound_to_dropoff_transfer ?vehicle_allocation_record - vehicle_allocation_record ?dropoff_transfer_option - dropoff_transfer_option)
+    (allocation_flag_pickup_priority ?vehicle_allocation_record - vehicle_allocation_record)
+    (allocation_flag_dropoff_priority ?vehicle_allocation_record - vehicle_allocation_record)
+    (allocation_readiness_flag ?vehicle_allocation_record - vehicle_allocation_record)
+    (reservation_to_pickup_leg_link ?reservation_record - reservation_record ?pickup_leg - pickup_leg)
+    (reservation_to_dropoff_leg_link ?reservation_record - reservation_record ?dropoff_leg - dropoff_leg)
+    (reservation_to_allocation_link ?reservation_record - reservation_record ?vehicle_allocation_record - vehicle_allocation_record)
+    (inspection_point_available ?inspection_point - inspection_point)
+    (reservation_has_inspection_point ?reservation_record - reservation_record ?inspection_point - inspection_point)
+    (inspection_completed_flag ?inspection_point - inspection_point)
+    (inspection_to_allocation_link ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    (preparation_stage_one_complete ?reservation_record - reservation_record)
+    (preparation_stage_two_complete ?reservation_record - reservation_record)
+    (key_assigned_ready_flag ?reservation_record - reservation_record)
+    (vendor_option_available ?reservation_record - reservation_record)
+    (vendor_option_applied ?reservation_record - reservation_record)
+    (vendor_options_confirmed ?reservation_record - reservation_record)
+    (final_preparation_complete ?reservation_record - reservation_record)
+    (provider_confirmation_available ?provider_confirmation_token - provider_confirmation_token)
+    (reservation_bound_to_provider_confirmation ?reservation_record - reservation_record ?provider_confirmation_token - provider_confirmation_token)
+    (provider_confirmation_applied_flag ?reservation_record - reservation_record)
+    (provider_confirmation_stage_two ?reservation_record - reservation_record)
+    (provider_confirmation_final ?reservation_record - reservation_record)
+    (vendor_service_option_available ?vendor_service_option - vendor_service_option)
+    (reservation_applied_vendor_option ?reservation_record - reservation_record ?vendor_service_option - vendor_service_option)
+    (payment_method_available ?payment_instrument - payment_instrument)
+    (reservation_payment_bound ?reservation_record - reservation_record ?payment_instrument - payment_instrument)
+    (vehicle_key_available ?vehicle_key - vehicle_key)
+    (reservation_key_reserved ?reservation_record - reservation_record ?vehicle_key - vehicle_key)
+    (provider_document_available ?provider_document - provider_document)
+    (reservation_bound_provider_document ?reservation_record - reservation_record ?provider_document - provider_document)
+    (timing_buffer_available ?timing_buffer_window - timing_buffer_window)
+    (segment_bound_to_timing_buffer ?trip_segment - trip_segment ?timing_buffer_window - timing_buffer_window)
+    (pickup_leg_ready_flag ?pickup_leg - pickup_leg)
+    (dropoff_leg_ready_flag ?dropoff_leg - dropoff_leg)
+    (handover_recorded_flag ?reservation_record - reservation_record)
+  )
+  (:action create_segment_intent
+    :parameters (?trip_segment - trip_segment)
+    :precondition
+      (and
+        (not
+          (segment_intent_created ?trip_segment)
+        )
+        (not
+          (handover_completed ?trip_segment)
+        )
+      )
+    :effect (segment_intent_created ?trip_segment)
+  )
+  (:action assign_vehicle_candidate_to_segment
+    :parameters (?trip_segment - trip_segment ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (segment_intent_created ?trip_segment)
+        (not
+          (vehicle_candidate_assigned_flag ?trip_segment)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_candidate_assigned_flag ?trip_segment)
+        (segment_to_vehicle_candidate ?trip_segment ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action associate_arrival_event_with_segment
+    :parameters (?trip_segment - trip_segment ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_intent_created ?trip_segment)
+        (vehicle_candidate_assigned_flag ?trip_segment)
+        (arrival_event_available ?arrival_event)
+      )
+    :effect
+      (and
+        (segment_has_arrival_event ?trip_segment ?arrival_event)
+        (not
+          (arrival_event_available ?arrival_event)
+        )
+      )
+  )
+  (:action confirm_segment
+    :parameters (?trip_segment - trip_segment ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_intent_created ?trip_segment)
+        (vehicle_candidate_assigned_flag ?trip_segment)
+        (segment_has_arrival_event ?trip_segment ?arrival_event)
+        (not
+          (segment_confirmed ?trip_segment)
+        )
+      )
+    :effect (segment_confirmed ?trip_segment)
+  )
+  (:action release_arrival_event_from_segment
+    :parameters (?trip_segment - trip_segment ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_has_arrival_event ?trip_segment ?arrival_event)
+      )
+    :effect
+      (and
+        (arrival_event_available ?arrival_event)
+        (not
+          (segment_has_arrival_event ?trip_segment ?arrival_event)
+        )
+      )
+  )
+  (:action assign_agent_to_segment
+    :parameters (?trip_segment - trip_segment ?counter_agent - counter_agent)
+    :precondition
+      (and
+        (segment_confirmed ?trip_segment)
+        (agent_available ?counter_agent)
+      )
+    :effect
+      (and
+        (segment_assigned_agent ?trip_segment ?counter_agent)
+        (not
+          (agent_available ?counter_agent)
+        )
+      )
+  )
+  (:action release_agent_from_segment
+    :parameters (?trip_segment - trip_segment ?counter_agent - counter_agent)
+    :precondition
+      (and
+        (segment_assigned_agent ?trip_segment ?counter_agent)
+      )
+    :effect
+      (and
+        (agent_available ?counter_agent)
+        (not
+          (segment_assigned_agent ?trip_segment ?counter_agent)
+        )
+      )
+  )
+  (:action reserve_vehicle_key_for_reservation_record
+    :parameters (?reservation_record - reservation_record ?vehicle_key - vehicle_key)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (vehicle_key_available ?vehicle_key)
+      )
+    :effect
+      (and
+        (reservation_key_reserved ?reservation_record ?vehicle_key)
+        (not
+          (vehicle_key_available ?vehicle_key)
+        )
+      )
+  )
+  (:action release_vehicle_key_from_reservation_record
+    :parameters (?reservation_record - reservation_record ?vehicle_key - vehicle_key)
+    :precondition
+      (and
+        (reservation_key_reserved ?reservation_record ?vehicle_key)
+      )
+    :effect
+      (and
+        (vehicle_key_available ?vehicle_key)
+        (not
+          (reservation_key_reserved ?reservation_record ?vehicle_key)
+        )
+      )
+  )
+  (:action bind_provider_document_to_reservation_record
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (provider_document_available ?provider_document)
+      )
+    :effect
+      (and
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (not
+          (provider_document_available ?provider_document)
+        )
+      )
+  )
+  (:action release_provider_document_from_reservation_record
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document)
+    :precondition
+      (and
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+      )
+    :effect
+      (and
+        (provider_document_available ?provider_document)
+        (not
+          (reservation_bound_provider_document ?reservation_record ?provider_document)
+        )
+      )
+  )
+  (:action lock_pickup_transfer_option
+    :parameters (?pickup_leg - pickup_leg ?pickup_transfer_option - pickup_transfer_option ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_confirmed ?pickup_leg)
+        (segment_has_arrival_event ?pickup_leg ?arrival_event)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (not
+          (pickup_transfer_locked ?pickup_transfer_option)
+        )
+        (not
+          (pickup_transfer_conflicting_lock ?pickup_transfer_option)
+        )
+      )
+    :effect (pickup_transfer_locked ?pickup_transfer_option)
+  )
+  (:action confirm_pickup_transfer_with_agent
+    :parameters (?pickup_leg - pickup_leg ?pickup_transfer_option - pickup_transfer_option ?counter_agent - counter_agent)
+    :precondition
+      (and
+        (segment_confirmed ?pickup_leg)
+        (segment_assigned_agent ?pickup_leg ?counter_agent)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (pickup_transfer_locked ?pickup_transfer_option)
+        (not
+          (pickup_leg_ready_flag ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+      )
+  )
+  (:action reserve_accessory_for_pickup_leg
+    :parameters (?pickup_leg - pickup_leg ?pickup_transfer_option - pickup_transfer_option ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (segment_confirmed ?pickup_leg)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (accessory_available ?accessory_item)
+        (not
+          (pickup_leg_ready_flag ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_transfer_conflicting_lock ?pickup_transfer_option)
+        (pickup_leg_ready_flag ?pickup_leg)
+        (pickup_leg_accessory_reserved ?pickup_leg ?accessory_item)
+        (not
+          (accessory_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_pickup_transfer_and_release_accessory
+    :parameters (?pickup_leg - pickup_leg ?pickup_transfer_option - pickup_transfer_option ?arrival_event - arrival_event ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (segment_confirmed ?pickup_leg)
+        (segment_has_arrival_event ?pickup_leg ?arrival_event)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (pickup_transfer_conflicting_lock ?pickup_transfer_option)
+        (pickup_leg_accessory_reserved ?pickup_leg ?accessory_item)
+        (not
+          (pickup_leg_transfer_confirmed ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (pickup_transfer_locked ?pickup_transfer_option)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+        (accessory_available ?accessory_item)
+        (not
+          (pickup_leg_accessory_reserved ?pickup_leg ?accessory_item)
+        )
+      )
+  )
+  (:action lock_dropoff_transfer_option
+    :parameters (?dropoff_leg - dropoff_leg ?dropoff_transfer_option - dropoff_transfer_option ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_confirmed ?dropoff_leg)
+        (segment_has_arrival_event ?dropoff_leg ?arrival_event)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (not
+          (dropoff_transfer_locked_state ?dropoff_transfer_option)
+        )
+        (not
+          (dropoff_transfer_flag_secondary ?dropoff_transfer_option)
+        )
+      )
+    :effect (dropoff_transfer_locked_state ?dropoff_transfer_option)
+  )
+  (:action confirm_dropoff_transfer_with_agent
+    :parameters (?dropoff_leg - dropoff_leg ?dropoff_transfer_option - dropoff_transfer_option ?counter_agent - counter_agent)
+    :precondition
+      (and
+        (segment_confirmed ?dropoff_leg)
+        (segment_assigned_agent ?dropoff_leg ?counter_agent)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (dropoff_transfer_locked_state ?dropoff_transfer_option)
+        (not
+          (dropoff_leg_ready_flag ?dropoff_leg)
+        )
+      )
+    :effect
+      (and
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+      )
+  )
+  (:action reserve_accessory_for_dropoff_leg
+    :parameters (?dropoff_leg - dropoff_leg ?dropoff_transfer_option - dropoff_transfer_option ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (segment_confirmed ?dropoff_leg)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (accessory_available ?accessory_item)
+        (not
+          (dropoff_leg_ready_flag ?dropoff_leg)
+        )
+      )
+    :effect
+      (and
+        (dropoff_transfer_flag_secondary ?dropoff_transfer_option)
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (dropoff_leg_accessory_reserved ?dropoff_leg ?accessory_item)
+        (not
+          (accessory_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_dropoff_transfer_and_release_accessory
+    :parameters (?dropoff_leg - dropoff_leg ?dropoff_transfer_option - dropoff_transfer_option ?arrival_event - arrival_event ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (segment_confirmed ?dropoff_leg)
+        (segment_has_arrival_event ?dropoff_leg ?arrival_event)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (dropoff_transfer_flag_secondary ?dropoff_transfer_option)
+        (dropoff_leg_accessory_reserved ?dropoff_leg ?accessory_item)
+        (not
+          (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        )
+      )
+    :effect
+      (and
+        (dropoff_transfer_locked_state ?dropoff_transfer_option)
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        (accessory_available ?accessory_item)
+        (not
+          (dropoff_leg_accessory_reserved ?dropoff_leg ?accessory_item)
+        )
+      )
+  )
+  (:action create_allocation_record_with_transfer_bindings
+    :parameters (?pickup_leg - pickup_leg ?dropoff_leg - dropoff_leg ?pickup_transfer_option - pickup_transfer_option ?dropoff_transfer_option - dropoff_transfer_option ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (pickup_transfer_locked ?pickup_transfer_option)
+        (dropoff_transfer_locked_state ?dropoff_transfer_option)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        (allocation_record_available ?vehicle_allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_bound_to_pickup_transfer ?vehicle_allocation_record ?pickup_transfer_option)
+        (allocation_bound_to_dropoff_transfer ?vehicle_allocation_record ?dropoff_transfer_option)
+        (not
+          (allocation_record_available ?vehicle_allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_pickup_priority
+    :parameters (?pickup_leg - pickup_leg ?dropoff_leg - dropoff_leg ?pickup_transfer_option - pickup_transfer_option ?dropoff_transfer_option - dropoff_transfer_option ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (pickup_transfer_conflicting_lock ?pickup_transfer_option)
+        (dropoff_transfer_locked_state ?dropoff_transfer_option)
+        (not
+          (pickup_leg_transfer_confirmed ?pickup_leg)
+        )
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        (allocation_record_available ?vehicle_allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_bound_to_pickup_transfer ?vehicle_allocation_record ?pickup_transfer_option)
+        (allocation_bound_to_dropoff_transfer ?vehicle_allocation_record ?dropoff_transfer_option)
+        (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        (not
+          (allocation_record_available ?vehicle_allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_dropoff_priority
+    :parameters (?pickup_leg - pickup_leg ?dropoff_leg - dropoff_leg ?pickup_transfer_option - pickup_transfer_option ?dropoff_transfer_option - dropoff_transfer_option ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (pickup_transfer_locked ?pickup_transfer_option)
+        (dropoff_transfer_flag_secondary ?dropoff_transfer_option)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+        (not
+          (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        )
+        (allocation_record_available ?vehicle_allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_bound_to_pickup_transfer ?vehicle_allocation_record ?pickup_transfer_option)
+        (allocation_bound_to_dropoff_transfer ?vehicle_allocation_record ?dropoff_transfer_option)
+        (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        (not
+          (allocation_record_available ?vehicle_allocation_record)
+        )
+      )
+  )
+  (:action create_allocation_record_with_both_priorities
+    :parameters (?pickup_leg - pickup_leg ?dropoff_leg - dropoff_leg ?pickup_transfer_option - pickup_transfer_option ?dropoff_transfer_option - dropoff_transfer_option ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (leg_has_transfer_option ?pickup_leg ?pickup_transfer_option)
+        (dropoff_leg_has_transfer_option ?dropoff_leg ?dropoff_transfer_option)
+        (pickup_transfer_conflicting_lock ?pickup_transfer_option)
+        (dropoff_transfer_flag_secondary ?dropoff_transfer_option)
+        (not
+          (pickup_leg_transfer_confirmed ?pickup_leg)
+        )
+        (not
+          (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        )
+        (allocation_record_available ?vehicle_allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_bound_to_pickup_transfer ?vehicle_allocation_record ?pickup_transfer_option)
+        (allocation_bound_to_dropoff_transfer ?vehicle_allocation_record ?dropoff_transfer_option)
+        (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        (not
+          (allocation_record_available ?vehicle_allocation_record)
+        )
+      )
+  )
+  (:action flag_allocation_record_readiness
+    :parameters (?vehicle_allocation_record - vehicle_allocation_record ?pickup_leg - pickup_leg ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (allocation_record_created ?vehicle_allocation_record)
+        (pickup_leg_ready_flag ?pickup_leg)
+        (segment_has_arrival_event ?pickup_leg ?arrival_event)
+        (not
+          (allocation_readiness_flag ?vehicle_allocation_record)
+        )
+      )
+    :effect (allocation_readiness_flag ?vehicle_allocation_record)
+  )
+  (:action complete_inspection_and_link_to_allocation
+    :parameters (?reservation_record - reservation_record ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (reservation_to_allocation_link ?reservation_record ?vehicle_allocation_record)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_point_available ?inspection_point)
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_readiness_flag ?vehicle_allocation_record)
+        (not
+          (inspection_completed_flag ?inspection_point)
+        )
+      )
+    :effect
+      (and
+        (inspection_completed_flag ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (not
+          (inspection_point_available ?inspection_point)
+        )
+      )
+  )
+  (:action complete_preparation_stage_one
+    :parameters (?reservation_record - reservation_record ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_completed_flag ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (segment_has_arrival_event ?reservation_record ?arrival_event)
+        (not
+          (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        )
+        (not
+          (preparation_stage_one_complete ?reservation_record)
+        )
+      )
+    :effect (preparation_stage_one_complete ?reservation_record)
+  )
+  (:action apply_vendor_service_option_to_reservation_record
+    :parameters (?reservation_record - reservation_record ?vendor_service_option - vendor_service_option)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (vendor_service_option_available ?vendor_service_option)
+        (not
+          (vendor_option_available ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (vendor_option_available ?reservation_record)
+        (reservation_applied_vendor_option ?reservation_record ?vendor_service_option)
+        (not
+          (vendor_service_option_available ?vendor_service_option)
+        )
+      )
+  )
+  (:action apply_vendor_option_and_progress_preparation
+    :parameters (?reservation_record - reservation_record ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record ?arrival_event - arrival_event ?vendor_service_option - vendor_service_option)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_completed_flag ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (segment_has_arrival_event ?reservation_record ?arrival_event)
+        (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        (vendor_option_available ?reservation_record)
+        (reservation_applied_vendor_option ?reservation_record ?vendor_service_option)
+        (not
+          (preparation_stage_one_complete ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (preparation_stage_one_complete ?reservation_record)
+        (vendor_option_applied ?reservation_record)
+      )
+  )
+  (:action complete_preparation_stage_two_initial
+    :parameters (?reservation_record - reservation_record ?vehicle_key - vehicle_key ?counter_agent - counter_agent ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_one_complete ?reservation_record)
+        (reservation_key_reserved ?reservation_record ?vehicle_key)
+        (segment_assigned_agent ?reservation_record ?counter_agent)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (not
+          (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        )
+        (not
+          (preparation_stage_two_complete ?reservation_record)
+        )
+      )
+    :effect (preparation_stage_two_complete ?reservation_record)
+  )
+  (:action complete_preparation_stage_two_with_dropoff_priority
+    :parameters (?reservation_record - reservation_record ?vehicle_key - vehicle_key ?counter_agent - counter_agent ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_one_complete ?reservation_record)
+        (reservation_key_reserved ?reservation_record ?vehicle_key)
+        (segment_assigned_agent ?reservation_record ?counter_agent)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        (not
+          (preparation_stage_two_complete ?reservation_record)
+        )
+      )
+    :effect (preparation_stage_two_complete ?reservation_record)
+  )
+  (:action assign_vehicle_key_and_start_readiness_check
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_two_complete ?reservation_record)
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (not
+          (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        )
+        (not
+          (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        )
+        (not
+          (key_assigned_ready_flag ?reservation_record)
+        )
+      )
+    :effect (key_assigned_ready_flag ?reservation_record)
+  )
+  (:action assign_vehicle_key_and_confirm_vendor_options_with_pickup_priority
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_two_complete ?reservation_record)
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        (not
+          (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        )
+        (not
+          (key_assigned_ready_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (vendor_options_confirmed ?reservation_record)
+      )
+  )
+  (:action assign_vehicle_key_and_confirm_vendor_options_with_dropoff_priority
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_two_complete ?reservation_record)
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (not
+          (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        )
+        (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        (not
+          (key_assigned_ready_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (vendor_options_confirmed ?reservation_record)
+      )
+  )
+  (:action assign_vehicle_key_and_confirm_vendor_options_with_both_priorities
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document ?inspection_point - inspection_point ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (preparation_stage_two_complete ?reservation_record)
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (reservation_has_inspection_point ?reservation_record ?inspection_point)
+        (inspection_to_allocation_link ?inspection_point ?vehicle_allocation_record)
+        (allocation_flag_pickup_priority ?vehicle_allocation_record)
+        (allocation_flag_dropoff_priority ?vehicle_allocation_record)
+        (not
+          (key_assigned_ready_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (vendor_options_confirmed ?reservation_record)
+      )
+  )
+  (:action record_handover_readiness_for_reservation_record
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (not
+          (vendor_options_confirmed ?reservation_record)
+        )
+        (not
+          (handover_recorded_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (handover_recorded_flag ?reservation_record)
+        (segment_ready_for_handover ?reservation_record)
+      )
+  )
+  (:action bind_payment_instrument_to_reservation_record
+    :parameters (?reservation_record - reservation_record ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (vendor_options_confirmed ?reservation_record)
+        (payment_method_available ?payment_instrument)
+      )
+    :effect
+      (and
+        (reservation_payment_bound ?reservation_record ?payment_instrument)
+        (not
+          (payment_method_available ?payment_instrument)
+        )
+      )
+  )
+  (:action finalize_reservation_record_preparation
+    :parameters (?reservation_record - reservation_record ?pickup_leg - pickup_leg ?dropoff_leg - dropoff_leg ?arrival_event - arrival_event ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (vendor_options_confirmed ?reservation_record)
+        (reservation_payment_bound ?reservation_record ?payment_instrument)
+        (reservation_to_pickup_leg_link ?reservation_record ?pickup_leg)
+        (reservation_to_dropoff_leg_link ?reservation_record ?dropoff_leg)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        (segment_has_arrival_event ?reservation_record ?arrival_event)
+        (not
+          (final_preparation_complete ?reservation_record)
+        )
+      )
+    :effect (final_preparation_complete ?reservation_record)
+  )
+  (:action record_handover_for_reservation_record
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (key_assigned_ready_flag ?reservation_record)
+        (final_preparation_complete ?reservation_record)
+        (not
+          (handover_recorded_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (handover_recorded_flag ?reservation_record)
+        (segment_ready_for_handover ?reservation_record)
+      )
+  )
+  (:action apply_provider_confirmation_to_reservation_record
+    :parameters (?reservation_record - reservation_record ?provider_confirmation_token - provider_confirmation_token ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_confirmed ?reservation_record)
+        (segment_has_arrival_event ?reservation_record ?arrival_event)
+        (provider_confirmation_available ?provider_confirmation_token)
+        (reservation_bound_to_provider_confirmation ?reservation_record ?provider_confirmation_token)
+        (not
+          (provider_confirmation_applied_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (provider_confirmation_applied_flag ?reservation_record)
+        (not
+          (provider_confirmation_available ?provider_confirmation_token)
+        )
+      )
+  )
+  (:action advance_provider_confirmation_stage_two_for_reservation_record
+    :parameters (?reservation_record - reservation_record ?counter_agent - counter_agent)
+    :precondition
+      (and
+        (provider_confirmation_applied_flag ?reservation_record)
+        (segment_assigned_agent ?reservation_record ?counter_agent)
+        (not
+          (provider_confirmation_stage_two ?reservation_record)
+        )
+      )
+    :effect (provider_confirmation_stage_two ?reservation_record)
+  )
+  (:action finalize_provider_confirmation_for_reservation_record
+    :parameters (?reservation_record - reservation_record ?provider_document - provider_document)
+    :precondition
+      (and
+        (provider_confirmation_stage_two ?reservation_record)
+        (reservation_bound_provider_document ?reservation_record ?provider_document)
+        (not
+          (provider_confirmation_final ?reservation_record)
+        )
+      )
+    :effect (provider_confirmation_final ?reservation_record)
+  )
+  (:action record_handover_after_provider_confirmation
+    :parameters (?reservation_record - reservation_record)
+    :precondition
+      (and
+        (provider_confirmation_final ?reservation_record)
+        (not
+          (handover_recorded_flag ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (handover_recorded_flag ?reservation_record)
+        (segment_ready_for_handover ?reservation_record)
+      )
+  )
+  (:action mark_pickup_leg_ready_for_handover
+    :parameters (?pickup_leg - pickup_leg ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (pickup_leg_ready_flag ?pickup_leg)
+        (pickup_leg_transfer_confirmed ?pickup_leg)
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_readiness_flag ?vehicle_allocation_record)
+        (not
+          (segment_ready_for_handover ?pickup_leg)
+        )
+      )
+    :effect (segment_ready_for_handover ?pickup_leg)
+  )
+  (:action mark_dropoff_leg_ready_for_handover
+    :parameters (?dropoff_leg - dropoff_leg ?vehicle_allocation_record - vehicle_allocation_record)
+    :precondition
+      (and
+        (dropoff_leg_ready_flag ?dropoff_leg)
+        (dropoff_leg_transfer_confirmed ?dropoff_leg)
+        (allocation_record_created ?vehicle_allocation_record)
+        (allocation_readiness_flag ?vehicle_allocation_record)
+        (not
+          (segment_ready_for_handover ?dropoff_leg)
+        )
+      )
+    :effect (segment_ready_for_handover ?dropoff_leg)
+  )
+  (:action finalize_segment_reservation_and_bind_timing_buffer
+    :parameters (?trip_segment - trip_segment ?timing_buffer_window - timing_buffer_window ?arrival_event - arrival_event)
+    :precondition
+      (and
+        (segment_ready_for_handover ?trip_segment)
+        (segment_has_arrival_event ?trip_segment ?arrival_event)
+        (timing_buffer_available ?timing_buffer_window)
+        (not
+          (segment_reservation_finalized ?trip_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_reservation_finalized ?trip_segment)
+        (segment_bound_to_timing_buffer ?trip_segment ?timing_buffer_window)
+        (not
+          (timing_buffer_available ?timing_buffer_window)
+        )
+      )
+  )
+  (:action complete_pickup_handover_and_release_resources
+    :parameters (?pickup_leg - pickup_leg ?vehicle_asset - vehicle_asset ?timing_buffer_window - timing_buffer_window)
+    :precondition
+      (and
+        (segment_reservation_finalized ?pickup_leg)
+        (segment_to_vehicle_candidate ?pickup_leg ?vehicle_asset)
+        (segment_bound_to_timing_buffer ?pickup_leg ?timing_buffer_window)
+        (not
+          (handover_completed ?pickup_leg)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?pickup_leg)
+        (vehicle_available ?vehicle_asset)
+        (timing_buffer_available ?timing_buffer_window)
+      )
+  )
+  (:action complete_dropoff_handover_and_release_resources
+    :parameters (?dropoff_leg - dropoff_leg ?vehicle_asset - vehicle_asset ?timing_buffer_window - timing_buffer_window)
+    :precondition
+      (and
+        (segment_reservation_finalized ?dropoff_leg)
+        (segment_to_vehicle_candidate ?dropoff_leg ?vehicle_asset)
+        (segment_bound_to_timing_buffer ?dropoff_leg ?timing_buffer_window)
+        (not
+          (handover_completed ?dropoff_leg)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?dropoff_leg)
+        (vehicle_available ?vehicle_asset)
+        (timing_buffer_available ?timing_buffer_window)
+      )
+  )
+  (:action complete_reservation_record_handover_and_release_resources
+    :parameters (?reservation_record - reservation_record ?vehicle_asset - vehicle_asset ?timing_buffer_window - timing_buffer_window)
+    :precondition
+      (and
+        (segment_reservation_finalized ?reservation_record)
+        (segment_to_vehicle_candidate ?reservation_record ?vehicle_asset)
+        (segment_bound_to_timing_buffer ?reservation_record ?timing_buffer_window)
+        (not
+          (handover_completed ?reservation_record)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?reservation_record)
+        (vehicle_available ?vehicle_asset)
+        (timing_buffer_available ?timing_buffer_window)
+      )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain deletion_archival_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_resource_type - object secondary_resource_type - object tertiary_resource_type - object domain_entity_type - object entity - domain_entity_type deletion_request_token - generic_resource_type approval_token - generic_resource_type retention_policy - generic_resource_type label - generic_resource_type credential - generic_resource_type archive_location - generic_resource_type attachment_type - generic_resource_type compliance_checkpoint - generic_resource_type attachment_resource - secondary_resource_type data_partition - secondary_resource_type tag - secondary_resource_type dependent_resource_a - tertiary_resource_type dependent_resource_b - tertiary_resource_type deletion_bundle - tertiary_resource_type related_role_type - entity operator_role_type - entity related_owner - related_role_type related_project - related_role_type operator - operator_role_type)
+  (:predicates
+    (deletion_candidate ?primary_entity - entity)
+    (eligible_for_deletion ?primary_entity - entity)
+    (deletion_request_attached ?primary_entity - entity)
+    (archived ?primary_entity - entity)
+    (marked_for_archival ?primary_entity - entity)
+    (archival_initiated ?primary_entity - entity)
+    (deletion_request_token_available ?deletion_request_token - deletion_request_token)
+    (attached_deletion_request_token ?primary_entity - entity ?deletion_request_token - deletion_request_token)
+    (approval_token_available ?approval_token - approval_token)
+    (attached_approval_token ?primary_entity - entity ?approval_token - approval_token)
+    (retention_policy_available ?retention_policy - retention_policy)
+    (attached_retention_policy ?primary_entity - entity ?retention_policy - retention_policy)
+    (attachment_resource_available ?attachment_resource - attachment_resource)
+    (owner_attachment_resource ?related_owner - related_owner ?attachment_resource - attachment_resource)
+    (project_attachment_resource ?related_project - related_project ?attachment_resource - attachment_resource)
+    (owner_has_dependent_a ?related_owner - related_owner ?dependent_resource_a - dependent_resource_a)
+    (dependent_a_ready ?dependent_resource_a - dependent_resource_a)
+    (dependent_a_pending ?dependent_resource_a - dependent_resource_a)
+    (owner_dependency_resolved ?related_owner - related_owner)
+    (project_has_dependent_b ?related_project - related_project ?dependent_resource_b - dependent_resource_b)
+    (dependent_b_ready ?dependent_resource_b - dependent_resource_b)
+    (dependent_b_pending ?dependent_resource_b - dependent_resource_b)
+    (project_dependency_resolved ?related_project - related_project)
+    (bundle_active ?deletion_bundle - deletion_bundle)
+    (bundle_validated ?deletion_bundle - deletion_bundle)
+    (bundle_has_dependent_a ?deletion_bundle - deletion_bundle ?dependent_resource_a - dependent_resource_a)
+    (bundle_has_dependent_b ?deletion_bundle - deletion_bundle ?dependent_resource_b - dependent_resource_b)
+    (bundle_marker_dep_a ?deletion_bundle - deletion_bundle)
+    (bundle_marker_dep_b ?deletion_bundle - deletion_bundle)
+    (bundle_partition_attached ?deletion_bundle - deletion_bundle)
+    (operator_assigned_owner ?operator - operator ?related_owner - related_owner)
+    (operator_assigned_project ?operator - operator ?related_project - related_project)
+    (operator_assigned_bundle ?operator - operator ?deletion_bundle - deletion_bundle)
+    (data_partition_available ?data_partition - data_partition)
+    (operator_has_partition ?operator - operator ?data_partition - data_partition)
+    (data_partition_staged ?data_partition - data_partition)
+    (partition_attached_to_bundle ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    (operator_attachment_staged ?operator - operator)
+    (operator_attachment_verified ?operator - operator)
+    (operator_prepared ?operator - operator)
+    (operator_has_label ?operator - operator)
+    (operator_label_validated ?operator - operator)
+    (operator_tagged ?operator - operator)
+    (operator_finalized_checks ?operator - operator)
+    (tag_available ?tag - tag)
+    (operator_has_tag ?operator - operator ?tag - tag)
+    (operator_tag_acknowledged ?operator - operator)
+    (operator_compliance_step1 ?operator - operator)
+    (operator_compliance_step2 ?operator - operator)
+    (label_available ?label - label)
+    (operator_label_association ?operator - operator ?label - label)
+    (credential_available ?credential - credential)
+    (operator_has_credential ?operator - operator ?credential - credential)
+    (attachment_type_available ?attachment_type - attachment_type)
+    (operator_has_attachment_type ?operator - operator ?attachment_type - attachment_type)
+    (compliance_checkpoint_available ?compliance_checkpoint - compliance_checkpoint)
+    (operator_has_compliance_checkpoint ?operator - operator ?compliance_checkpoint - compliance_checkpoint)
+    (archive_location_available ?archive_location - archive_location)
+    (entity_archive_location_assigned ?primary_entity - entity ?archive_location - archive_location)
+    (owner_processing_flag ?related_owner - related_owner)
+    (project_processing_flag ?related_project - related_project)
+    (operator_final_marker ?operator - operator)
+  )
+  (:action create_deletion_candidate
+    :parameters (?primary_entity - entity)
+    :precondition
+      (and
+        (not
+          (deletion_candidate ?primary_entity)
+        )
+        (not
+          (archived ?primary_entity)
+        )
+      )
+    :effect (deletion_candidate ?primary_entity)
+  )
+  (:action attach_deletion_request_token
+    :parameters (?primary_entity - entity ?deletion_request_token - deletion_request_token)
+    :precondition
+      (and
+        (deletion_candidate ?primary_entity)
+        (not
+          (deletion_request_attached ?primary_entity)
+        )
+        (deletion_request_token_available ?deletion_request_token)
+      )
+    :effect
+      (and
+        (deletion_request_attached ?primary_entity)
+        (attached_deletion_request_token ?primary_entity ?deletion_request_token)
+        (not
+          (deletion_request_token_available ?deletion_request_token)
+        )
+      )
+  )
+  (:action attach_and_consume_approval_token
+    :parameters (?primary_entity - entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (deletion_candidate ?primary_entity)
+        (deletion_request_attached ?primary_entity)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (attached_approval_token ?primary_entity ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action mark_entity_verified
+    :parameters (?primary_entity - entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (deletion_candidate ?primary_entity)
+        (deletion_request_attached ?primary_entity)
+        (attached_approval_token ?primary_entity ?approval_token)
+        (not
+          (eligible_for_deletion ?primary_entity)
+        )
+      )
+    :effect (eligible_for_deletion ?primary_entity)
+  )
+  (:action release_approval_token
+    :parameters (?primary_entity - entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (attached_approval_token ?primary_entity ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (attached_approval_token ?primary_entity ?approval_token)
+        )
+      )
+  )
+  (:action attach_retention_policy
+    :parameters (?primary_entity - entity ?retention_policy - retention_policy)
+    :precondition
+      (and
+        (eligible_for_deletion ?primary_entity)
+        (retention_policy_available ?retention_policy)
+      )
+    :effect
+      (and
+        (attached_retention_policy ?primary_entity ?retention_policy)
+        (not
+          (retention_policy_available ?retention_policy)
+        )
+      )
+  )
+  (:action detach_retention_policy
+    :parameters (?primary_entity - entity ?retention_policy - retention_policy)
+    :precondition
+      (and
+        (attached_retention_policy ?primary_entity ?retention_policy)
+      )
+    :effect
+      (and
+        (retention_policy_available ?retention_policy)
+        (not
+          (attached_retention_policy ?primary_entity ?retention_policy)
+        )
+      )
+  )
+  (:action assign_attachment_type_to_operator
+    :parameters (?operator - operator ?attachment_type - attachment_type)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (attachment_type_available ?attachment_type)
+      )
+    :effect
+      (and
+        (operator_has_attachment_type ?operator ?attachment_type)
+        (not
+          (attachment_type_available ?attachment_type)
+        )
+      )
+  )
+  (:action unassign_attachment_type_from_operator
+    :parameters (?operator - operator ?attachment_type - attachment_type)
+    :precondition
+      (and
+        (operator_has_attachment_type ?operator ?attachment_type)
+      )
+    :effect
+      (and
+        (attachment_type_available ?attachment_type)
+        (not
+          (operator_has_attachment_type ?operator ?attachment_type)
+        )
+      )
+  )
+  (:action assign_compliance_checkpoint_to_operator
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (compliance_checkpoint_available ?compliance_checkpoint)
+      )
+    :effect
+      (and
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (not
+          (compliance_checkpoint_available ?compliance_checkpoint)
+        )
+      )
+  )
+  (:action unassign_compliance_checkpoint_from_operator
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint)
+    :precondition
+      (and
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+      )
+    :effect
+      (and
+        (compliance_checkpoint_available ?compliance_checkpoint)
+        (not
+          (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        )
+      )
+  )
+  (:action probe_dependent_resource_a
+    :parameters (?related_owner - related_owner ?dependent_resource_a - dependent_resource_a ?approval_token - approval_token)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_owner)
+        (attached_approval_token ?related_owner ?approval_token)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (not
+          (dependent_a_ready ?dependent_resource_a)
+        )
+        (not
+          (dependent_a_pending ?dependent_resource_a)
+        )
+      )
+    :effect (dependent_a_ready ?dependent_resource_a)
+  )
+  (:action finalize_owner_dependency_assessment
+    :parameters (?related_owner - related_owner ?dependent_resource_a - dependent_resource_a ?retention_policy - retention_policy)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_owner)
+        (attached_retention_policy ?related_owner ?retention_policy)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (dependent_a_ready ?dependent_resource_a)
+        (not
+          (owner_processing_flag ?related_owner)
+        )
+      )
+    :effect
+      (and
+        (owner_processing_flag ?related_owner)
+        (owner_dependency_resolved ?related_owner)
+      )
+  )
+  (:action attach_attachment_to_owner_and_mark_pending
+    :parameters (?related_owner - related_owner ?dependent_resource_a - dependent_resource_a ?attachment_resource - attachment_resource)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_owner)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (attachment_resource_available ?attachment_resource)
+        (not
+          (owner_processing_flag ?related_owner)
+        )
+      )
+    :effect
+      (and
+        (dependent_a_pending ?dependent_resource_a)
+        (owner_processing_flag ?related_owner)
+        (owner_attachment_resource ?related_owner ?attachment_resource)
+        (not
+          (attachment_resource_available ?attachment_resource)
+        )
+      )
+  )
+  (:action process_owner_attachment_and_restore
+    :parameters (?related_owner - related_owner ?dependent_resource_a - dependent_resource_a ?approval_token - approval_token ?attachment_resource - attachment_resource)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_owner)
+        (attached_approval_token ?related_owner ?approval_token)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (dependent_a_pending ?dependent_resource_a)
+        (owner_attachment_resource ?related_owner ?attachment_resource)
+        (not
+          (owner_dependency_resolved ?related_owner)
+        )
+      )
+    :effect
+      (and
+        (dependent_a_ready ?dependent_resource_a)
+        (owner_dependency_resolved ?related_owner)
+        (attachment_resource_available ?attachment_resource)
+        (not
+          (owner_attachment_resource ?related_owner ?attachment_resource)
+        )
+      )
+  )
+  (:action probe_dependent_resource_b
+    :parameters (?related_project - related_project ?dependent_resource_b - dependent_resource_b ?approval_token - approval_token)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_project)
+        (attached_approval_token ?related_project ?approval_token)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (not
+          (dependent_b_ready ?dependent_resource_b)
+        )
+        (not
+          (dependent_b_pending ?dependent_resource_b)
+        )
+      )
+    :effect (dependent_b_ready ?dependent_resource_b)
+  )
+  (:action finalize_project_dependency_assessment
+    :parameters (?related_project - related_project ?dependent_resource_b - dependent_resource_b ?retention_policy - retention_policy)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_project)
+        (attached_retention_policy ?related_project ?retention_policy)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_b_ready ?dependent_resource_b)
+        (not
+          (project_processing_flag ?related_project)
+        )
+      )
+    :effect
+      (and
+        (project_processing_flag ?related_project)
+        (project_dependency_resolved ?related_project)
+      )
+  )
+  (:action attach_attachment_to_project_and_mark_pending
+    :parameters (?related_project - related_project ?dependent_resource_b - dependent_resource_b ?attachment_resource - attachment_resource)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_project)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (attachment_resource_available ?attachment_resource)
+        (not
+          (project_processing_flag ?related_project)
+        )
+      )
+    :effect
+      (and
+        (dependent_b_pending ?dependent_resource_b)
+        (project_processing_flag ?related_project)
+        (project_attachment_resource ?related_project ?attachment_resource)
+        (not
+          (attachment_resource_available ?attachment_resource)
+        )
+      )
+  )
+  (:action process_project_attachment_and_restore
+    :parameters (?related_project - related_project ?dependent_resource_b - dependent_resource_b ?approval_token - approval_token ?attachment_resource - attachment_resource)
+    :precondition
+      (and
+        (eligible_for_deletion ?related_project)
+        (attached_approval_token ?related_project ?approval_token)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_b_pending ?dependent_resource_b)
+        (project_attachment_resource ?related_project ?attachment_resource)
+        (not
+          (project_dependency_resolved ?related_project)
+        )
+      )
+    :effect
+      (and
+        (dependent_b_ready ?dependent_resource_b)
+        (project_dependency_resolved ?related_project)
+        (attachment_resource_available ?attachment_resource)
+        (not
+          (project_attachment_resource ?related_project ?attachment_resource)
+        )
+      )
+  )
+  (:action assemble_deletion_bundle
+    :parameters (?related_owner - related_owner ?related_project - related_project ?dependent_resource_a - dependent_resource_a ?dependent_resource_b - dependent_resource_b ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (owner_processing_flag ?related_owner)
+        (project_processing_flag ?related_project)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_a_ready ?dependent_resource_a)
+        (dependent_b_ready ?dependent_resource_b)
+        (owner_dependency_resolved ?related_owner)
+        (project_dependency_resolved ?related_project)
+        (bundle_active ?deletion_bundle)
+      )
+    :effect
+      (and
+        (bundle_validated ?deletion_bundle)
+        (bundle_has_dependent_a ?deletion_bundle ?dependent_resource_a)
+        (bundle_has_dependent_b ?deletion_bundle ?dependent_resource_b)
+        (not
+          (bundle_active ?deletion_bundle)
+        )
+      )
+  )
+  (:action assemble_deletion_bundle_with_dep_a_pending
+    :parameters (?related_owner - related_owner ?related_project - related_project ?dependent_resource_a - dependent_resource_a ?dependent_resource_b - dependent_resource_b ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (owner_processing_flag ?related_owner)
+        (project_processing_flag ?related_project)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_a_pending ?dependent_resource_a)
+        (dependent_b_ready ?dependent_resource_b)
+        (not
+          (owner_dependency_resolved ?related_owner)
+        )
+        (project_dependency_resolved ?related_project)
+        (bundle_active ?deletion_bundle)
+      )
+    :effect
+      (and
+        (bundle_validated ?deletion_bundle)
+        (bundle_has_dependent_a ?deletion_bundle ?dependent_resource_a)
+        (bundle_has_dependent_b ?deletion_bundle ?dependent_resource_b)
+        (bundle_marker_dep_a ?deletion_bundle)
+        (not
+          (bundle_active ?deletion_bundle)
+        )
+      )
+  )
+  (:action assemble_deletion_bundle_with_dep_b_pending
+    :parameters (?related_owner - related_owner ?related_project - related_project ?dependent_resource_a - dependent_resource_a ?dependent_resource_b - dependent_resource_b ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (owner_processing_flag ?related_owner)
+        (project_processing_flag ?related_project)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_a_ready ?dependent_resource_a)
+        (dependent_b_pending ?dependent_resource_b)
+        (owner_dependency_resolved ?related_owner)
+        (not
+          (project_dependency_resolved ?related_project)
+        )
+        (bundle_active ?deletion_bundle)
+      )
+    :effect
+      (and
+        (bundle_validated ?deletion_bundle)
+        (bundle_has_dependent_a ?deletion_bundle ?dependent_resource_a)
+        (bundle_has_dependent_b ?deletion_bundle ?dependent_resource_b)
+        (bundle_marker_dep_b ?deletion_bundle)
+        (not
+          (bundle_active ?deletion_bundle)
+        )
+      )
+  )
+  (:action assemble_deletion_bundle_with_both_pending
+    :parameters (?related_owner - related_owner ?related_project - related_project ?dependent_resource_a - dependent_resource_a ?dependent_resource_b - dependent_resource_b ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (owner_processing_flag ?related_owner)
+        (project_processing_flag ?related_project)
+        (owner_has_dependent_a ?related_owner ?dependent_resource_a)
+        (project_has_dependent_b ?related_project ?dependent_resource_b)
+        (dependent_a_pending ?dependent_resource_a)
+        (dependent_b_pending ?dependent_resource_b)
+        (not
+          (owner_dependency_resolved ?related_owner)
+        )
+        (not
+          (project_dependency_resolved ?related_project)
+        )
+        (bundle_active ?deletion_bundle)
+      )
+    :effect
+      (and
+        (bundle_validated ?deletion_bundle)
+        (bundle_has_dependent_a ?deletion_bundle ?dependent_resource_a)
+        (bundle_has_dependent_b ?deletion_bundle ?dependent_resource_b)
+        (bundle_marker_dep_a ?deletion_bundle)
+        (bundle_marker_dep_b ?deletion_bundle)
+        (not
+          (bundle_active ?deletion_bundle)
+        )
+      )
+  )
+  (:action attach_partition_to_bundle
+    :parameters (?deletion_bundle - deletion_bundle ?related_owner - related_owner ?approval_token - approval_token)
+    :precondition
+      (and
+        (bundle_validated ?deletion_bundle)
+        (owner_processing_flag ?related_owner)
+        (attached_approval_token ?related_owner ?approval_token)
+        (not
+          (bundle_partition_attached ?deletion_bundle)
+        )
+      )
+    :effect (bundle_partition_attached ?deletion_bundle)
+  )
+  (:action stage_partition_for_bundle
+    :parameters (?operator - operator ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (operator_assigned_bundle ?operator ?deletion_bundle)
+        (operator_has_partition ?operator ?data_partition)
+        (data_partition_available ?data_partition)
+        (bundle_validated ?deletion_bundle)
+        (bundle_partition_attached ?deletion_bundle)
+        (not
+          (data_partition_staged ?data_partition)
+        )
+      )
+    :effect
+      (and
+        (data_partition_staged ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (not
+          (data_partition_available ?data_partition)
+        )
+      )
+  )
+  (:action confirm_partition_processing_by_operator
+    :parameters (?operator - operator ?data_partition - data_partition ?deletion_bundle - deletion_bundle ?approval_token - approval_token)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (operator_has_partition ?operator ?data_partition)
+        (data_partition_staged ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (attached_approval_token ?operator ?approval_token)
+        (not
+          (bundle_marker_dep_a ?deletion_bundle)
+        )
+        (not
+          (operator_attachment_staged ?operator)
+        )
+      )
+    :effect (operator_attachment_staged ?operator)
+  )
+  (:action attach_label_to_operator
+    :parameters (?operator - operator ?label - label)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (label_available ?label)
+        (not
+          (operator_has_label ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_has_label ?operator)
+        (operator_label_association ?operator ?label)
+        (not
+          (label_available ?label)
+        )
+      )
+  )
+  (:action process_operator_label
+    :parameters (?operator - operator ?data_partition - data_partition ?deletion_bundle - deletion_bundle ?approval_token - approval_token ?label - label)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (operator_has_partition ?operator ?data_partition)
+        (data_partition_staged ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (attached_approval_token ?operator ?approval_token)
+        (bundle_marker_dep_a ?deletion_bundle)
+        (operator_has_label ?operator)
+        (operator_label_association ?operator ?label)
+        (not
+          (operator_attachment_staged ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_attachment_staged ?operator)
+        (operator_label_validated ?operator)
+      )
+  )
+  (:action prepare_operator_attachment_confirmation
+    :parameters (?operator - operator ?attachment_type - attachment_type ?retention_policy - retention_policy ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_staged ?operator)
+        (operator_has_attachment_type ?operator ?attachment_type)
+        (attached_retention_policy ?operator ?retention_policy)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (not
+          (bundle_marker_dep_b ?deletion_bundle)
+        )
+        (not
+          (operator_attachment_verified ?operator)
+        )
+      )
+    :effect (operator_attachment_verified ?operator)
+  )
+  (:action confirm_operator_attachment_type
+    :parameters (?operator - operator ?attachment_type - attachment_type ?retention_policy - retention_policy ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_staged ?operator)
+        (operator_has_attachment_type ?operator ?attachment_type)
+        (attached_retention_policy ?operator ?retention_policy)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (bundle_marker_dep_b ?deletion_bundle)
+        (not
+          (operator_attachment_verified ?operator)
+        )
+      )
+    :effect (operator_attachment_verified ?operator)
+  )
+  (:action operator_prepare_final_checks
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_verified ?operator)
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (not
+          (bundle_marker_dep_a ?deletion_bundle)
+        )
+        (not
+          (bundle_marker_dep_b ?deletion_bundle)
+        )
+        (not
+          (operator_prepared ?operator)
+        )
+      )
+    :effect (operator_prepared ?operator)
+  )
+  (:action operator_prepare_final_checks_with_tagging
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_verified ?operator)
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (bundle_marker_dep_a ?deletion_bundle)
+        (not
+          (bundle_marker_dep_b ?deletion_bundle)
+        )
+        (not
+          (operator_prepared ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_prepared ?operator)
+        (operator_tagged ?operator)
+      )
+  )
+  (:action operator_prepare_final_checks_with_tagging_variant
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_verified ?operator)
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (not
+          (bundle_marker_dep_a ?deletion_bundle)
+        )
+        (bundle_marker_dep_b ?deletion_bundle)
+        (not
+          (operator_prepared ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_prepared ?operator)
+        (operator_tagged ?operator)
+      )
+  )
+  (:action operator_prepare_final_checks_with_tagging_complete
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint ?data_partition - data_partition ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (operator_attachment_verified ?operator)
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (operator_has_partition ?operator ?data_partition)
+        (partition_attached_to_bundle ?data_partition ?deletion_bundle)
+        (bundle_marker_dep_a ?deletion_bundle)
+        (bundle_marker_dep_b ?deletion_bundle)
+        (not
+          (operator_prepared ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_prepared ?operator)
+        (operator_tagged ?operator)
+      )
+  )
+  (:action finalize_operator_soft_delete_stage
+    :parameters (?operator - operator)
+    :precondition
+      (and
+        (operator_prepared ?operator)
+        (not
+          (operator_tagged ?operator)
+        )
+        (not
+          (operator_final_marker ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_final_marker ?operator)
+        (marked_for_archival ?operator)
+      )
+  )
+  (:action attach_credential_to_operator
+    :parameters (?operator - operator ?credential - credential)
+    :precondition
+      (and
+        (operator_prepared ?operator)
+        (operator_tagged ?operator)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (operator_has_credential ?operator ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action operator_execute_finalization_checks
+    :parameters (?operator - operator ?related_owner - related_owner ?related_project - related_project ?approval_token - approval_token ?credential - credential)
+    :precondition
+      (and
+        (operator_prepared ?operator)
+        (operator_tagged ?operator)
+        (operator_has_credential ?operator ?credential)
+        (operator_assigned_owner ?operator ?related_owner)
+        (operator_assigned_project ?operator ?related_project)
+        (owner_dependency_resolved ?related_owner)
+        (project_dependency_resolved ?related_project)
+        (attached_approval_token ?operator ?approval_token)
+        (not
+          (operator_finalized_checks ?operator)
+        )
+      )
+    :effect (operator_finalized_checks ?operator)
+  )
+  (:action finalize_operator_post_checks
+    :parameters (?operator - operator)
+    :precondition
+      (and
+        (operator_prepared ?operator)
+        (operator_finalized_checks ?operator)
+        (not
+          (operator_final_marker ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_final_marker ?operator)
+        (marked_for_archival ?operator)
+      )
+  )
+  (:action apply_operator_tag
+    :parameters (?operator - operator ?tag - tag ?approval_token - approval_token)
+    :precondition
+      (and
+        (eligible_for_deletion ?operator)
+        (attached_approval_token ?operator ?approval_token)
+        (tag_available ?tag)
+        (operator_has_tag ?operator ?tag)
+        (not
+          (operator_tag_acknowledged ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_tag_acknowledged ?operator)
+        (not
+          (tag_available ?tag)
+        )
+      )
+  )
+  (:action record_operator_tag_acknowledgement
+    :parameters (?operator - operator ?retention_policy - retention_policy)
+    :precondition
+      (and
+        (operator_tag_acknowledged ?operator)
+        (attached_retention_policy ?operator ?retention_policy)
+        (not
+          (operator_compliance_step1 ?operator)
+        )
+      )
+    :effect (operator_compliance_step1 ?operator)
+  )
+  (:action assign_operator_compliance_checkpoint
+    :parameters (?operator - operator ?compliance_checkpoint - compliance_checkpoint)
+    :precondition
+      (and
+        (operator_compliance_step1 ?operator)
+        (operator_has_compliance_checkpoint ?operator ?compliance_checkpoint)
+        (not
+          (operator_compliance_step2 ?operator)
+        )
+      )
+    :effect (operator_compliance_step2 ?operator)
+  )
+  (:action finalize_operator_compliance
+    :parameters (?operator - operator)
+    :precondition
+      (and
+        (operator_compliance_step2 ?operator)
+        (not
+          (operator_final_marker ?operator)
+        )
+      )
+    :effect
+      (and
+        (operator_final_marker ?operator)
+        (marked_for_archival ?operator)
+      )
+  )
+  (:action mark_owner_for_archival
+    :parameters (?related_owner - related_owner ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (owner_processing_flag ?related_owner)
+        (owner_dependency_resolved ?related_owner)
+        (bundle_validated ?deletion_bundle)
+        (bundle_partition_attached ?deletion_bundle)
+        (not
+          (marked_for_archival ?related_owner)
+        )
+      )
+    :effect (marked_for_archival ?related_owner)
+  )
+  (:action mark_project_for_archival
+    :parameters (?related_project - related_project ?deletion_bundle - deletion_bundle)
+    :precondition
+      (and
+        (project_processing_flag ?related_project)
+        (project_dependency_resolved ?related_project)
+        (bundle_validated ?deletion_bundle)
+        (bundle_partition_attached ?deletion_bundle)
+        (not
+          (marked_for_archival ?related_project)
+        )
+      )
+    :effect (marked_for_archival ?related_project)
+  )
+  (:action assign_archive_location_to_entity
+    :parameters (?primary_entity - entity ?archive_location - archive_location ?approval_token - approval_token)
+    :precondition
+      (and
+        (marked_for_archival ?primary_entity)
+        (attached_approval_token ?primary_entity ?approval_token)
+        (archive_location_available ?archive_location)
+        (not
+          (archival_initiated ?primary_entity)
+        )
+      )
+    :effect
+      (and
+        (archival_initiated ?primary_entity)
+        (entity_archive_location_assigned ?primary_entity ?archive_location)
+        (not
+          (archive_location_available ?archive_location)
+        )
+      )
+  )
+  (:action finalize_owner_archival
+    :parameters (?related_owner - related_owner ?deletion_request_token - deletion_request_token ?archive_location - archive_location)
+    :precondition
+      (and
+        (archival_initiated ?related_owner)
+        (attached_deletion_request_token ?related_owner ?deletion_request_token)
+        (entity_archive_location_assigned ?related_owner ?archive_location)
+        (not
+          (archived ?related_owner)
+        )
+      )
+    :effect
+      (and
+        (archived ?related_owner)
+        (deletion_request_token_available ?deletion_request_token)
+        (archive_location_available ?archive_location)
+      )
+  )
+  (:action finalize_project_archival
+    :parameters (?related_project - related_project ?deletion_request_token - deletion_request_token ?archive_location - archive_location)
+    :precondition
+      (and
+        (archival_initiated ?related_project)
+        (attached_deletion_request_token ?related_project ?deletion_request_token)
+        (entity_archive_location_assigned ?related_project ?archive_location)
+        (not
+          (archived ?related_project)
+        )
+      )
+    :effect
+      (and
+        (archived ?related_project)
+        (deletion_request_token_available ?deletion_request_token)
+        (archive_location_available ?archive_location)
+      )
+  )
+  (:action finalize_operator_archival
+    :parameters (?operator - operator ?deletion_request_token - deletion_request_token ?archive_location - archive_location)
+    :precondition
+      (and
+        (archival_initiated ?operator)
+        (attached_deletion_request_token ?operator ?deletion_request_token)
+        (entity_archive_location_assigned ?operator ?archive_location)
+        (not
+          (archived ?operator)
+        )
+      )
+    :effect
+      (and
+        (archived ?operator)
+        (deletion_request_token_available ?deletion_request_token)
+        (archive_location_available ?archive_location)
+      )
+  )
+)

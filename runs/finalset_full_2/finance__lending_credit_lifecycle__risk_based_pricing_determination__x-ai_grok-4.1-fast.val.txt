@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain risk_based_pricing_determination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object pricing_participant - entity market_input - entity asset_input - entity case_group - entity credit_case - case_group rate_source - pricing_participant score_model - pricing_participant underwriter - pricing_participant distribution_channel - pricing_participant compliance_check - pricing_participant regulatory_rule - pricing_participant rate_parameter - pricing_participant manager_override - pricing_participant collateral_option - market_input collateral_asset - market_input discount_condition - market_input risk_adjustment - asset_input product_adjustment - asset_input pricing_proposal - asset_input facility_group - credit_case job_group - credit_case primary_facility - facility_group secondary_facility - facility_group pricing_job - job_group)
+
+  (:predicates
+    (entity_registered ?credit_case - credit_case)
+    (scoring_completed ?credit_case - credit_case)
+    (has_rate_source ?credit_case - credit_case)
+    (pricing_committed ?credit_case - credit_case)
+    (ready_for_commit ?credit_case - credit_case)
+    (regulatory_rule_linked ?credit_case - credit_case)
+    (rate_source_available ?rate_source - rate_source)
+    (assigned_rate_source ?credit_case - credit_case ?rate_source - rate_source)
+    (score_model_available ?score_model - score_model)
+    (assigned_score_model ?credit_case - credit_case ?score_model - score_model)
+    (underwriter_available ?underwriter - underwriter)
+    (assigned_underwriter ?credit_case - credit_case ?underwriter - underwriter)
+    (collateral_option_available ?collateral_option - collateral_option)
+    (primary_facility_assigned_collateral ?primary_facility - primary_facility ?collateral_option - collateral_option)
+    (secondary_facility_assigned_collateral ?secondary_facility - secondary_facility ?collateral_option - collateral_option)
+    (primary_facility_selected_risk_adjustment ?primary_facility - primary_facility ?risk_adjustment - risk_adjustment)
+    (risk_adjustment_selected ?risk_adjustment - risk_adjustment)
+    (risk_adjustment_collateral_attached ?risk_adjustment - risk_adjustment)
+    (primary_adjustment_confirmed ?primary_facility - primary_facility)
+    (secondary_facility_selected_product_adjustment ?secondary_facility - secondary_facility ?product_adjustment - product_adjustment)
+    (product_adjustment_selected ?product_adjustment - product_adjustment)
+    (product_adjustment_asset_attached ?product_adjustment - product_adjustment)
+    (secondary_adjustment_confirmed ?secondary_facility - secondary_facility)
+    (pricing_proposal_available ?pricing_proposal - pricing_proposal)
+    (pricing_proposal_created ?pricing_proposal - pricing_proposal)
+    (proposal_has_risk_adjustment ?pricing_proposal - pricing_proposal ?risk_adjustment - risk_adjustment)
+    (proposal_has_product_adjustment ?pricing_proposal - pricing_proposal ?product_adjustment - product_adjustment)
+    (proposal_includes_primary_collateral ?pricing_proposal - pricing_proposal)
+    (proposal_includes_secondary_asset ?pricing_proposal - pricing_proposal)
+    (pricing_proposal_locked ?pricing_proposal - pricing_proposal)
+    (job_attached_primary_facility ?pricing_job - pricing_job ?primary_facility - primary_facility)
+    (job_attached_secondary_facility ?pricing_job - pricing_job ?secondary_facility - secondary_facility)
+    (job_attached_proposal ?pricing_job - pricing_job ?pricing_proposal - pricing_proposal)
+    (collateral_asset_available ?collateral_asset - collateral_asset)
+    (job_assigned_collateral_asset ?pricing_job - pricing_job ?collateral_asset - collateral_asset)
+    (collateral_asset_in_use ?collateral_asset - collateral_asset)
+    (collateral_asset_linked_proposal ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    (job_preparation_started ?pricing_job - pricing_job)
+    (job_model_prepared ?pricing_job - pricing_job)
+    (job_ready_for_approval ?pricing_job - pricing_job)
+    (job_channel_selected ?pricing_job - pricing_job)
+    (job_channel_confirmed ?pricing_job - pricing_job)
+    (job_requires_compliance ?pricing_job - pricing_job)
+    (job_preparation_validated ?pricing_job - pricing_job)
+    (discount_condition_available ?discount_condition - discount_condition)
+    (job_assigned_discount_condition ?pricing_job - pricing_job ?discount_condition - discount_condition)
+    (discount_condition_applied ?pricing_job - pricing_job)
+    (job_policy_applied ?pricing_job - pricing_job)
+    (manager_override_accepted ?pricing_job - pricing_job)
+    (distribution_channel_available ?distribution_channel - distribution_channel)
+    (job_assigned_distribution_channel ?pricing_job - pricing_job ?distribution_channel - distribution_channel)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (job_assigned_compliance_check ?pricing_job - pricing_job ?compliance_check - compliance_check)
+    (rate_parameter_available ?rate_parameter - rate_parameter)
+    (job_loaded_rate_parameter ?pricing_job - pricing_job ?rate_parameter - rate_parameter)
+    (manager_override_available ?manager_override - manager_override)
+    (job_assigned_manager_override ?pricing_job - pricing_job ?manager_override - manager_override)
+    (regulatory_rule_available ?regulatory_rule - regulatory_rule)
+    (linked_regulatory_rule ?credit_case - credit_case ?regulatory_rule - regulatory_rule)
+    (primary_adjustment_locked ?primary_facility - primary_facility)
+    (secondary_adjustment_locked ?secondary_facility - secondary_facility)
+    (job_marked_for_commit ?pricing_job - pricing_job)
+  )
+  (:action register_credit_case
+    :parameters (?credit_case - credit_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?credit_case)
+        )
+        (not
+          (pricing_committed ?credit_case)
+        )
+      )
+    :effect (entity_registered ?credit_case)
+  )
+  (:action assign_rate_source_to_case
+    :parameters (?credit_case - credit_case ?rate_source - rate_source)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (not
+          (has_rate_source ?credit_case)
+        )
+        (rate_source_available ?rate_source)
+      )
+    :effect
+      (and
+        (has_rate_source ?credit_case)
+        (assigned_rate_source ?credit_case ?rate_source)
+        (not
+          (rate_source_available ?rate_source)
+        )
+      )
+  )
+  (:action bind_score_model_to_case
+    :parameters (?credit_case - credit_case ?score_model - score_model)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (has_rate_source ?credit_case)
+        (score_model_available ?score_model)
+      )
+    :effect
+      (and
+        (assigned_score_model ?credit_case ?score_model)
+        (not
+          (score_model_available ?score_model)
+        )
+      )
+  )
+  (:action confirm_score_binding
+    :parameters (?credit_case - credit_case ?score_model - score_model)
+    :precondition
+      (and
+        (entity_registered ?credit_case)
+        (has_rate_source ?credit_case)
+        (assigned_score_model ?credit_case ?score_model)
+        (not
+          (scoring_completed ?credit_case)
+        )
+      )
+    :effect (scoring_completed ?credit_case)
+  )
+  (:action unbind_score_model_from_case
+    :parameters (?credit_case - credit_case ?score_model - score_model)
+    :precondition
+      (and
+        (assigned_score_model ?credit_case ?score_model)
+      )
+    :effect
+      (and
+        (score_model_available ?score_model)
+        (not
+          (assigned_score_model ?credit_case ?score_model)
+        )
+      )
+  )
+  (:action assign_underwriter_to_case
+    :parameters (?credit_case - credit_case ?underwriter - underwriter)
+    :precondition
+      (and
+        (scoring_completed ?credit_case)
+        (underwriter_available ?underwriter)
+      )
+    :effect
+      (and
+        (assigned_underwriter ?credit_case ?underwriter)
+        (not
+          (underwriter_available ?underwriter)
+        )
+      )
+  )
+  (:action unassign_underwriter_from_case
+    :parameters (?credit_case - credit_case ?underwriter - underwriter)
+    :precondition
+      (and
+        (assigned_underwriter ?credit_case ?underwriter)
+      )
+    :effect
+      (and
+        (underwriter_available ?underwriter)
+        (not
+          (assigned_underwriter ?credit_case ?underwriter)
+        )
+      )
+  )
+  (:action load_rate_parameter_into_job
+    :parameters (?pricing_job - pricing_job ?rate_parameter - rate_parameter)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (rate_parameter_available ?rate_parameter)
+      )
+    :effect
+      (and
+        (job_loaded_rate_parameter ?pricing_job ?rate_parameter)
+        (not
+          (rate_parameter_available ?rate_parameter)
+        )
+      )
+  )
+  (:action unload_rate_parameter_from_job
+    :parameters (?pricing_job - pricing_job ?rate_parameter - rate_parameter)
+    :precondition
+      (and
+        (job_loaded_rate_parameter ?pricing_job ?rate_parameter)
+      )
+    :effect
+      (and
+        (rate_parameter_available ?rate_parameter)
+        (not
+          (job_loaded_rate_parameter ?pricing_job ?rate_parameter)
+        )
+      )
+  )
+  (:action load_manager_override_into_job
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (manager_override_available ?manager_override)
+      )
+    :effect
+      (and
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (not
+          (manager_override_available ?manager_override)
+        )
+      )
+  )
+  (:action unload_manager_override_from_job
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override)
+    :precondition
+      (and
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+      )
+    :effect
+      (and
+        (manager_override_available ?manager_override)
+        (not
+          (job_assigned_manager_override ?pricing_job ?manager_override)
+        )
+      )
+  )
+  (:action flag_primary_risk_adjustment
+    :parameters (?primary_facility - primary_facility ?risk_adjustment - risk_adjustment ?score_model - score_model)
+    :precondition
+      (and
+        (scoring_completed ?primary_facility)
+        (assigned_score_model ?primary_facility ?score_model)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (not
+          (risk_adjustment_selected ?risk_adjustment)
+        )
+        (not
+          (risk_adjustment_collateral_attached ?risk_adjustment)
+        )
+      )
+    :effect (risk_adjustment_selected ?risk_adjustment)
+  )
+  (:action confirm_primary_risk_adjustment_by_underwriter
+    :parameters (?primary_facility - primary_facility ?risk_adjustment - risk_adjustment ?underwriter - underwriter)
+    :precondition
+      (and
+        (scoring_completed ?primary_facility)
+        (assigned_underwriter ?primary_facility ?underwriter)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (risk_adjustment_selected ?risk_adjustment)
+        (not
+          (primary_adjustment_locked ?primary_facility)
+        )
+      )
+    :effect
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (primary_adjustment_confirmed ?primary_facility)
+      )
+  )
+  (:action attach_collateral_to_primary_facility
+    :parameters (?primary_facility - primary_facility ?risk_adjustment - risk_adjustment ?collateral_option - collateral_option)
+    :precondition
+      (and
+        (scoring_completed ?primary_facility)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (collateral_option_available ?collateral_option)
+        (not
+          (primary_adjustment_locked ?primary_facility)
+        )
+      )
+    :effect
+      (and
+        (risk_adjustment_collateral_attached ?risk_adjustment)
+        (primary_adjustment_locked ?primary_facility)
+        (primary_facility_assigned_collateral ?primary_facility ?collateral_option)
+        (not
+          (collateral_option_available ?collateral_option)
+        )
+      )
+  )
+  (:action finalize_primary_risk_adjustment
+    :parameters (?primary_facility - primary_facility ?risk_adjustment - risk_adjustment ?score_model - score_model ?collateral_option - collateral_option)
+    :precondition
+      (and
+        (scoring_completed ?primary_facility)
+        (assigned_score_model ?primary_facility ?score_model)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (risk_adjustment_collateral_attached ?risk_adjustment)
+        (primary_facility_assigned_collateral ?primary_facility ?collateral_option)
+        (not
+          (primary_adjustment_confirmed ?primary_facility)
+        )
+      )
+    :effect
+      (and
+        (risk_adjustment_selected ?risk_adjustment)
+        (primary_adjustment_confirmed ?primary_facility)
+        (collateral_option_available ?collateral_option)
+        (not
+          (primary_facility_assigned_collateral ?primary_facility ?collateral_option)
+        )
+      )
+  )
+  (:action flag_secondary_product_adjustment
+    :parameters (?secondary_facility - secondary_facility ?product_adjustment - product_adjustment ?score_model - score_model)
+    :precondition
+      (and
+        (scoring_completed ?secondary_facility)
+        (assigned_score_model ?secondary_facility ?score_model)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (not
+          (product_adjustment_selected ?product_adjustment)
+        )
+        (not
+          (product_adjustment_asset_attached ?product_adjustment)
+        )
+      )
+    :effect (product_adjustment_selected ?product_adjustment)
+  )
+  (:action confirm_secondary_product_adjustment_by_underwriter
+    :parameters (?secondary_facility - secondary_facility ?product_adjustment - product_adjustment ?underwriter - underwriter)
+    :precondition
+      (and
+        (scoring_completed ?secondary_facility)
+        (assigned_underwriter ?secondary_facility ?underwriter)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (product_adjustment_selected ?product_adjustment)
+        (not
+          (secondary_adjustment_locked ?secondary_facility)
+        )
+      )
+    :effect
+      (and
+        (secondary_adjustment_locked ?secondary_facility)
+        (secondary_adjustment_confirmed ?secondary_facility)
+      )
+  )
+  (:action attach_collateral_to_secondary_facility
+    :parameters (?secondary_facility - secondary_facility ?product_adjustment - product_adjustment ?collateral_option - collateral_option)
+    :precondition
+      (and
+        (scoring_completed ?secondary_facility)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (collateral_option_available ?collateral_option)
+        (not
+          (secondary_adjustment_locked ?secondary_facility)
+        )
+      )
+    :effect
+      (and
+        (product_adjustment_asset_attached ?product_adjustment)
+        (secondary_adjustment_locked ?secondary_facility)
+        (secondary_facility_assigned_collateral ?secondary_facility ?collateral_option)
+        (not
+          (collateral_option_available ?collateral_option)
+        )
+      )
+  )
+  (:action finalize_secondary_product_adjustment
+    :parameters (?secondary_facility - secondary_facility ?product_adjustment - product_adjustment ?score_model - score_model ?collateral_option - collateral_option)
+    :precondition
+      (and
+        (scoring_completed ?secondary_facility)
+        (assigned_score_model ?secondary_facility ?score_model)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (product_adjustment_asset_attached ?product_adjustment)
+        (secondary_facility_assigned_collateral ?secondary_facility ?collateral_option)
+        (not
+          (secondary_adjustment_confirmed ?secondary_facility)
+        )
+      )
+    :effect
+      (and
+        (product_adjustment_selected ?product_adjustment)
+        (secondary_adjustment_confirmed ?secondary_facility)
+        (collateral_option_available ?collateral_option)
+        (not
+          (secondary_facility_assigned_collateral ?secondary_facility ?collateral_option)
+        )
+      )
+  )
+  (:action aggregate_confirmed_adjustments_into_proposal
+    :parameters (?primary_facility - primary_facility ?secondary_facility - secondary_facility ?risk_adjustment - risk_adjustment ?product_adjustment - product_adjustment ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (secondary_adjustment_locked ?secondary_facility)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (risk_adjustment_selected ?risk_adjustment)
+        (product_adjustment_selected ?product_adjustment)
+        (primary_adjustment_confirmed ?primary_facility)
+        (secondary_adjustment_confirmed ?secondary_facility)
+        (pricing_proposal_available ?pricing_proposal)
+      )
+    :effect
+      (and
+        (pricing_proposal_created ?pricing_proposal)
+        (proposal_has_risk_adjustment ?pricing_proposal ?risk_adjustment)
+        (proposal_has_product_adjustment ?pricing_proposal ?product_adjustment)
+        (not
+          (pricing_proposal_available ?pricing_proposal)
+        )
+      )
+  )
+  (:action aggregate_proposal_with_primary_collateral
+    :parameters (?primary_facility - primary_facility ?secondary_facility - secondary_facility ?risk_adjustment - risk_adjustment ?product_adjustment - product_adjustment ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (secondary_adjustment_locked ?secondary_facility)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (risk_adjustment_collateral_attached ?risk_adjustment)
+        (product_adjustment_selected ?product_adjustment)
+        (not
+          (primary_adjustment_confirmed ?primary_facility)
+        )
+        (secondary_adjustment_confirmed ?secondary_facility)
+        (pricing_proposal_available ?pricing_proposal)
+      )
+    :effect
+      (and
+        (pricing_proposal_created ?pricing_proposal)
+        (proposal_has_risk_adjustment ?pricing_proposal ?risk_adjustment)
+        (proposal_has_product_adjustment ?pricing_proposal ?product_adjustment)
+        (proposal_includes_primary_collateral ?pricing_proposal)
+        (not
+          (pricing_proposal_available ?pricing_proposal)
+        )
+      )
+  )
+  (:action aggregate_proposal_with_secondary_asset
+    :parameters (?primary_facility - primary_facility ?secondary_facility - secondary_facility ?risk_adjustment - risk_adjustment ?product_adjustment - product_adjustment ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (secondary_adjustment_locked ?secondary_facility)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (risk_adjustment_selected ?risk_adjustment)
+        (product_adjustment_asset_attached ?product_adjustment)
+        (primary_adjustment_confirmed ?primary_facility)
+        (not
+          (secondary_adjustment_confirmed ?secondary_facility)
+        )
+        (pricing_proposal_available ?pricing_proposal)
+      )
+    :effect
+      (and
+        (pricing_proposal_created ?pricing_proposal)
+        (proposal_has_risk_adjustment ?pricing_proposal ?risk_adjustment)
+        (proposal_has_product_adjustment ?pricing_proposal ?product_adjustment)
+        (proposal_includes_secondary_asset ?pricing_proposal)
+        (not
+          (pricing_proposal_available ?pricing_proposal)
+        )
+      )
+  )
+  (:action aggregate_proposal_with_both_collaterals
+    :parameters (?primary_facility - primary_facility ?secondary_facility - secondary_facility ?risk_adjustment - risk_adjustment ?product_adjustment - product_adjustment ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (secondary_adjustment_locked ?secondary_facility)
+        (primary_facility_selected_risk_adjustment ?primary_facility ?risk_adjustment)
+        (secondary_facility_selected_product_adjustment ?secondary_facility ?product_adjustment)
+        (risk_adjustment_collateral_attached ?risk_adjustment)
+        (product_adjustment_asset_attached ?product_adjustment)
+        (not
+          (primary_adjustment_confirmed ?primary_facility)
+        )
+        (not
+          (secondary_adjustment_confirmed ?secondary_facility)
+        )
+        (pricing_proposal_available ?pricing_proposal)
+      )
+    :effect
+      (and
+        (pricing_proposal_created ?pricing_proposal)
+        (proposal_has_risk_adjustment ?pricing_proposal ?risk_adjustment)
+        (proposal_has_product_adjustment ?pricing_proposal ?product_adjustment)
+        (proposal_includes_primary_collateral ?pricing_proposal)
+        (proposal_includes_secondary_asset ?pricing_proposal)
+        (not
+          (pricing_proposal_available ?pricing_proposal)
+        )
+      )
+  )
+  (:action lock_pricing_proposal
+    :parameters (?pricing_proposal - pricing_proposal ?primary_facility - primary_facility ?score_model - score_model)
+    :precondition
+      (and
+        (pricing_proposal_created ?pricing_proposal)
+        (primary_adjustment_locked ?primary_facility)
+        (assigned_score_model ?primary_facility ?score_model)
+        (not
+          (pricing_proposal_locked ?pricing_proposal)
+        )
+      )
+    :effect (pricing_proposal_locked ?pricing_proposal)
+  )
+  (:action attach_collateral_asset_to_job
+    :parameters (?pricing_job - pricing_job ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (job_attached_proposal ?pricing_job ?pricing_proposal)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_available ?collateral_asset)
+        (pricing_proposal_created ?pricing_proposal)
+        (pricing_proposal_locked ?pricing_proposal)
+        (not
+          (collateral_asset_in_use ?collateral_asset)
+        )
+      )
+    :effect
+      (and
+        (collateral_asset_in_use ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action prepare_pricing_job_with_collateral
+    :parameters (?pricing_job - pricing_job ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal ?score_model - score_model)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_in_use ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (assigned_score_model ?pricing_job ?score_model)
+        (not
+          (proposal_includes_primary_collateral ?pricing_proposal)
+        )
+        (not
+          (job_preparation_started ?pricing_job)
+        )
+      )
+    :effect (job_preparation_started ?pricing_job)
+  )
+  (:action select_distribution_channel_for_job
+    :parameters (?pricing_job - pricing_job ?distribution_channel - distribution_channel)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (distribution_channel_available ?distribution_channel)
+        (not
+          (job_channel_selected ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_channel_selected ?pricing_job)
+        (job_assigned_distribution_channel ?pricing_job ?distribution_channel)
+        (not
+          (distribution_channel_available ?distribution_channel)
+        )
+      )
+  )
+  (:action confirm_distribution_channel_for_job
+    :parameters (?pricing_job - pricing_job ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal ?score_model - score_model ?distribution_channel - distribution_channel)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_in_use ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (assigned_score_model ?pricing_job ?score_model)
+        (proposal_includes_primary_collateral ?pricing_proposal)
+        (job_channel_selected ?pricing_job)
+        (job_assigned_distribution_channel ?pricing_job ?distribution_channel)
+        (not
+          (job_preparation_started ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_preparation_started ?pricing_job)
+        (job_channel_confirmed ?pricing_job)
+      )
+  )
+  (:action run_model_preparation_stage1
+    :parameters (?pricing_job - pricing_job ?rate_parameter - rate_parameter ?underwriter - underwriter ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_preparation_started ?pricing_job)
+        (job_loaded_rate_parameter ?pricing_job ?rate_parameter)
+        (assigned_underwriter ?pricing_job ?underwriter)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (not
+          (proposal_includes_secondary_asset ?pricing_proposal)
+        )
+        (not
+          (job_model_prepared ?pricing_job)
+        )
+      )
+    :effect (job_model_prepared ?pricing_job)
+  )
+  (:action run_model_preparation_stage1_with_proposal_flag
+    :parameters (?pricing_job - pricing_job ?rate_parameter - rate_parameter ?underwriter - underwriter ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_preparation_started ?pricing_job)
+        (job_loaded_rate_parameter ?pricing_job ?rate_parameter)
+        (assigned_underwriter ?pricing_job ?underwriter)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (proposal_includes_secondary_asset ?pricing_proposal)
+        (not
+          (job_model_prepared ?pricing_job)
+        )
+      )
+    :effect (job_model_prepared ?pricing_job)
+  )
+  (:action apply_manager_override_and_progress_model
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_model_prepared ?pricing_job)
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (not
+          (proposal_includes_primary_collateral ?pricing_proposal)
+        )
+        (not
+          (proposal_includes_secondary_asset ?pricing_proposal)
+        )
+        (not
+          (job_ready_for_approval ?pricing_job)
+        )
+      )
+    :effect (job_ready_for_approval ?pricing_job)
+  )
+  (:action apply_manager_override_with_primary_flag_and_progress
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_model_prepared ?pricing_job)
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (proposal_includes_primary_collateral ?pricing_proposal)
+        (not
+          (proposal_includes_secondary_asset ?pricing_proposal)
+        )
+        (not
+          (job_ready_for_approval ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_requires_compliance ?pricing_job)
+      )
+  )
+  (:action apply_manager_override_with_secondary_flag_and_progress
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_model_prepared ?pricing_job)
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (not
+          (proposal_includes_primary_collateral ?pricing_proposal)
+        )
+        (proposal_includes_secondary_asset ?pricing_proposal)
+        (not
+          (job_ready_for_approval ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_requires_compliance ?pricing_job)
+      )
+  )
+  (:action apply_manager_override_with_both_flags_and_progress
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override ?collateral_asset - collateral_asset ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (job_model_prepared ?pricing_job)
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (job_assigned_collateral_asset ?pricing_job ?collateral_asset)
+        (collateral_asset_linked_proposal ?collateral_asset ?pricing_proposal)
+        (proposal_includes_primary_collateral ?pricing_proposal)
+        (proposal_includes_secondary_asset ?pricing_proposal)
+        (not
+          (job_ready_for_approval ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_requires_compliance ?pricing_job)
+      )
+  )
+  (:action finalize_pricing_job_if_no_compliance
+    :parameters (?pricing_job - pricing_job)
+    :precondition
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (not
+          (job_requires_compliance ?pricing_job)
+        )
+        (not
+          (job_marked_for_commit ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_marked_for_commit ?pricing_job)
+        (ready_for_commit ?pricing_job)
+      )
+  )
+  (:action attach_compliance_check_to_job
+    :parameters (?pricing_job - pricing_job ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_requires_compliance ?pricing_job)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (job_assigned_compliance_check ?pricing_job ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action approve_pricing_job
+    :parameters (?pricing_job - pricing_job ?primary_facility - primary_facility ?secondary_facility - secondary_facility ?score_model - score_model ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_requires_compliance ?pricing_job)
+        (job_assigned_compliance_check ?pricing_job ?compliance_check)
+        (job_attached_primary_facility ?pricing_job ?primary_facility)
+        (job_attached_secondary_facility ?pricing_job ?secondary_facility)
+        (primary_adjustment_confirmed ?primary_facility)
+        (secondary_adjustment_confirmed ?secondary_facility)
+        (assigned_score_model ?pricing_job ?score_model)
+        (not
+          (job_preparation_validated ?pricing_job)
+        )
+      )
+    :effect (job_preparation_validated ?pricing_job)
+  )
+  (:action finalize_pricing_job_after_approval
+    :parameters (?pricing_job - pricing_job)
+    :precondition
+      (and
+        (job_ready_for_approval ?pricing_job)
+        (job_preparation_validated ?pricing_job)
+        (not
+          (job_marked_for_commit ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_marked_for_commit ?pricing_job)
+        (ready_for_commit ?pricing_job)
+      )
+  )
+  (:action apply_discount_condition_and_mark_job
+    :parameters (?pricing_job - pricing_job ?discount_condition - discount_condition ?score_model - score_model)
+    :precondition
+      (and
+        (scoring_completed ?pricing_job)
+        (assigned_score_model ?pricing_job ?score_model)
+        (discount_condition_available ?discount_condition)
+        (job_assigned_discount_condition ?pricing_job ?discount_condition)
+        (not
+          (discount_condition_applied ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (discount_condition_applied ?pricing_job)
+        (not
+          (discount_condition_available ?discount_condition)
+        )
+      )
+  )
+  (:action apply_policy_after_discount
+    :parameters (?pricing_job - pricing_job ?underwriter - underwriter)
+    :precondition
+      (and
+        (discount_condition_applied ?pricing_job)
+        (assigned_underwriter ?pricing_job ?underwriter)
+        (not
+          (job_policy_applied ?pricing_job)
+        )
+      )
+    :effect (job_policy_applied ?pricing_job)
+  )
+  (:action apply_manager_override_confirmation
+    :parameters (?pricing_job - pricing_job ?manager_override - manager_override)
+    :precondition
+      (and
+        (job_policy_applied ?pricing_job)
+        (job_assigned_manager_override ?pricing_job ?manager_override)
+        (not
+          (manager_override_accepted ?pricing_job)
+        )
+      )
+    :effect (manager_override_accepted ?pricing_job)
+  )
+  (:action finalize_job_post_override
+    :parameters (?pricing_job - pricing_job)
+    :precondition
+      (and
+        (manager_override_accepted ?pricing_job)
+        (not
+          (job_marked_for_commit ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (job_marked_for_commit ?pricing_job)
+        (ready_for_commit ?pricing_job)
+      )
+  )
+  (:action apply_pricing_to_primary_facility
+    :parameters (?primary_facility - primary_facility ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (primary_adjustment_locked ?primary_facility)
+        (primary_adjustment_confirmed ?primary_facility)
+        (pricing_proposal_created ?pricing_proposal)
+        (pricing_proposal_locked ?pricing_proposal)
+        (not
+          (ready_for_commit ?primary_facility)
+        )
+      )
+    :effect (ready_for_commit ?primary_facility)
+  )
+  (:action apply_pricing_to_secondary_facility
+    :parameters (?secondary_facility - secondary_facility ?pricing_proposal - pricing_proposal)
+    :precondition
+      (and
+        (secondary_adjustment_locked ?secondary_facility)
+        (secondary_adjustment_confirmed ?secondary_facility)
+        (pricing_proposal_created ?pricing_proposal)
+        (pricing_proposal_locked ?pricing_proposal)
+        (not
+          (ready_for_commit ?secondary_facility)
+        )
+      )
+    :effect (ready_for_commit ?secondary_facility)
+  )
+  (:action link_regulatory_rule_to_case
+    :parameters (?credit_case - credit_case ?regulatory_rule - regulatory_rule ?score_model - score_model)
+    :precondition
+      (and
+        (ready_for_commit ?credit_case)
+        (assigned_score_model ?credit_case ?score_model)
+        (regulatory_rule_available ?regulatory_rule)
+        (not
+          (regulatory_rule_linked ?credit_case)
+        )
+      )
+    :effect
+      (and
+        (regulatory_rule_linked ?credit_case)
+        (linked_regulatory_rule ?credit_case ?regulatory_rule)
+        (not
+          (regulatory_rule_available ?regulatory_rule)
+        )
+      )
+  )
+  (:action commit_pricing_to_primary_facility
+    :parameters (?primary_facility - primary_facility ?rate_source - rate_source ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (regulatory_rule_linked ?primary_facility)
+        (assigned_rate_source ?primary_facility ?rate_source)
+        (linked_regulatory_rule ?primary_facility ?regulatory_rule)
+        (not
+          (pricing_committed ?primary_facility)
+        )
+      )
+    :effect
+      (and
+        (pricing_committed ?primary_facility)
+        (rate_source_available ?rate_source)
+        (regulatory_rule_available ?regulatory_rule)
+      )
+  )
+  (:action commit_pricing_to_secondary_facility
+    :parameters (?secondary_facility - secondary_facility ?rate_source - rate_source ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (regulatory_rule_linked ?secondary_facility)
+        (assigned_rate_source ?secondary_facility ?rate_source)
+        (linked_regulatory_rule ?secondary_facility ?regulatory_rule)
+        (not
+          (pricing_committed ?secondary_facility)
+        )
+      )
+    :effect
+      (and
+        (pricing_committed ?secondary_facility)
+        (rate_source_available ?rate_source)
+        (regulatory_rule_available ?regulatory_rule)
+      )
+  )
+  (:action commit_pricing_job_and_release_resources
+    :parameters (?pricing_job - pricing_job ?rate_source - rate_source ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (regulatory_rule_linked ?pricing_job)
+        (assigned_rate_source ?pricing_job ?rate_source)
+        (linked_regulatory_rule ?pricing_job ?regulatory_rule)
+        (not
+          (pricing_committed ?pricing_job)
+        )
+      )
+    :effect
+      (and
+        (pricing_committed ?pricing_job)
+        (rate_source_available ?rate_source)
+        (regulatory_rule_available ?regulatory_rule)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem risk_based_pricing_scenario)
+  (:domain risk_based_pricing_determination)
+  (:objects primary_facility_1 - primary_facility secondary_facility_1 - secondary_facility pricing_job_1 - pricing_job pricing_job_2 - pricing_job rate_source_1 - rate_source rate_source_2 - rate_source rate_source_3 - rate_source score_model_v1 - score_model underwriter_1 - underwriter collateral_option_standard - collateral_option risk_adjustment_bucket_a - risk_adjustment product_adjustment_tier_a - product_adjustment pricing_proposal_candidate_1 - pricing_proposal collateral_asset_1 - collateral_asset collateral_asset_2 - collateral_asset channel_online - distribution_channel channel_branch - distribution_channel compliance_check_aml - compliance_check compliance_check_kyc - compliance_check regulatory_rule_default - regulatory_rule rate_parameter_base - rate_parameter discount_condition_volume_discount - discount_condition discount_condition_promotional - discount_condition manager_override_standard - manager_override)
+  (:init
+    (rate_source_available rate_source_1)
+    (rate_source_available rate_source_2)
+    (rate_source_available rate_source_3)
+    (score_model_available score_model_v1)
+    (underwriter_available underwriter_1)
+    (collateral_option_available collateral_option_standard)
+    (primary_facility_selected_risk_adjustment primary_facility_1 risk_adjustment_bucket_a)
+    (secondary_facility_selected_product_adjustment secondary_facility_1 product_adjustment_tier_a)
+    (pricing_proposal_available pricing_proposal_candidate_1)
+    (collateral_asset_available collateral_asset_1)
+    (collateral_asset_available collateral_asset_2)
+    (job_attached_primary_facility pricing_job_1 primary_facility_1)
+    (job_attached_primary_facility pricing_job_2 primary_facility_1)
+    (job_attached_secondary_facility pricing_job_1 secondary_facility_1)
+    (job_attached_secondary_facility pricing_job_2 secondary_facility_1)
+    (job_attached_proposal pricing_job_1 pricing_proposal_candidate_1)
+    (job_attached_proposal pricing_job_2 pricing_proposal_candidate_1)
+    (job_assigned_collateral_asset pricing_job_1 collateral_asset_1)
+    (job_assigned_collateral_asset pricing_job_2 collateral_asset_2)
+    (distribution_channel_available channel_online)
+    (distribution_channel_available channel_branch)
+    (compliance_check_available compliance_check_aml)
+    (compliance_check_available compliance_check_kyc)
+    (regulatory_rule_available regulatory_rule_default)
+    (rate_parameter_available rate_parameter_base)
+    (discount_condition_available discount_condition_volume_discount)
+    (job_assigned_discount_condition pricing_job_1 discount_condition_volume_discount)
+    (job_assigned_discount_condition pricing_job_2 discount_condition_promotional)
+    (manager_override_available manager_override_standard)
+  )
+  (:goal
+    (and
+      (pricing_committed primary_facility_1)
+      (pricing_committed secondary_facility_1)
+      (pricing_committed pricing_job_1)
+      (pricing_committed pricing_job_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_credit_case primary_facility_1)
+(assign_rate_source_to_case primary_facility_1 rate_source_1)
+(bind_score_model_to_case primary_facility_1 score_model_v1)
+(confirm_score_binding primary_facility_1 score_model_v1)
+(flag_primary_risk_adjustment primary_facility_1 risk_adjustment_bucket_a score_model_v1)
+(assign_underwriter_to_case primary_facility_1 underwriter_1)
+(confirm_primary_risk_adjustment_by_underwriter primary_facility_1 risk_adjustment_bucket_a underwriter_1)
+(unbind_score_model_from_case primary_facility_1 score_model_v1)
+(unassign_underwriter_from_case primary_facility_1 underwriter_1)
+(register_credit_case secondary_facility_1)
+(assign_rate_source_to_case secondary_facility_1 rate_source_2)
+(bind_score_model_to_case secondary_facility_1 score_model_v1)
+(confirm_score_binding secondary_facility_1 score_model_v1)
+(flag_secondary_product_adjustment secondary_facility_1 product_adjustment_tier_a score_model_v1)
+(assign_underwriter_to_case secondary_facility_1 underwriter_1)
+(confirm_secondary_product_adjustment_by_underwriter secondary_facility_1 product_adjustment_tier_a underwriter_1)
+(aggregate_confirmed_adjustments_into_proposal primary_facility_1 secondary_facility_1 risk_adjustment_bucket_a product_adjustment_tier_a pricing_proposal_candidate_1)
+(unbind_score_model_from_case secondary_facility_1 score_model_v1)
+(bind_score_model_to_case primary_facility_1 score_model_v1)
+(lock_pricing_proposal pricing_proposal_candidate_1 primary_facility_1 score_model_v1)
+(apply_pricing_to_primary_facility primary_facility_1 pricing_proposal_candidate_1)
+(apply_pricing_to_secondary_facility secondary_facility_1 pricing_proposal_candidate_1)
+(link_regulatory_rule_to_case primary_facility_1 regulatory_rule_default score_model_v1)
+(commit_pricing_to_primary_facility primary_facility_1 rate_source_1 regulatory_rule_default)
+(unbind_score_model_from_case primary_facility_1 score_model_v1)
+(register_credit_case pricing_job_1)
+(assign_rate_source_to_case pricing_job_1 rate_source_1)
+(bind_score_model_to_case pricing_job_1 score_model_v1)
+(confirm_score_binding pricing_job_1 score_model_v1)
+(attach_collateral_asset_to_job pricing_job_1 collateral_asset_1 pricing_proposal_candidate_1)
+(prepare_pricing_job_with_collateral pricing_job_1 collateral_asset_1 pricing_proposal_candidate_1 score_model_v1)
+(load_rate_parameter_into_job pricing_job_1 rate_parameter_base)
+(unassign_underwriter_from_case secondary_facility_1 underwriter_1)
+(assign_underwriter_to_case pricing_job_1 underwriter_1)
+(run_model_preparation_stage1 pricing_job_1 rate_parameter_base underwriter_1 collateral_asset_1 pricing_proposal_candidate_1)
+(load_manager_override_into_job pricing_job_1 manager_override_standard)
+(apply_manager_override_and_progress_model pricing_job_1 manager_override_standard collateral_asset_1 pricing_proposal_candidate_1)
+(finalize_pricing_job_if_no_compliance pricing_job_1)
+(unload_rate_parameter_from_job pricing_job_1 rate_parameter_base)
+(unload_manager_override_from_job pricing_job_1 manager_override_standard)
+(unassign_underwriter_from_case pricing_job_1 underwriter_1)
+(unbind_score_model_from_case pricing_job_1 score_model_v1)
+(register_credit_case pricing_job_2)
+(assign_rate_source_to_case pricing_job_2 rate_source_3)
+(bind_score_model_to_case pricing_job_2 score_model_v1)
+(confirm_score_binding pricing_job_2 score_model_v1)
+(attach_collateral_asset_to_job pricing_job_2 collateral_asset_2 pricing_proposal_candidate_1)
+(prepare_pricing_job_with_collateral pricing_job_2 collateral_asset_2 pricing_proposal_candidate_1 score_model_v1)
+(load_rate_parameter_into_job pricing_job_2 rate_parameter_base)
+(assign_underwriter_to_case pricing_job_2 underwriter_1)
+(run_model_preparation_stage1 pricing_job_2 rate_parameter_base underwriter_1 collateral_asset_2 pricing_proposal_candidate_1)
+(load_manager_override_into_job pricing_job_2 manager_override_standard)
+(apply_manager_override_and_progress_model pricing_job_2 manager_override_standard collateral_asset_2 pricing_proposal_candidate_1)
+(finalize_pricing_job_if_no_compliance pricing_job_2)
+(unload_rate_parameter_from_job pricing_job_2 rate_parameter_base)
+(unload_manager_override_from_job pricing_job_2 manager_override_standard)
+(unassign_underwriter_from_case pricing_job_2 underwriter_1)
+(unbind_score_model_from_case pricing_job_2 score_model_v1)
+(bind_score_model_to_case pricing_job_1 score_model_v1)
+(link_regulatory_rule_to_case pricing_job_1 regulatory_rule_default score_model_v1)
+(commit_pricing_job_and_release_resources pricing_job_1 rate_source_1 regulatory_rule_default)
+(unbind_score_model_from_case pricing_job_1 score_model_v1)
+(bind_score_model_to_case pricing_job_2 score_model_v1)
+(link_regulatory_rule_to_case pricing_job_2 regulatory_rule_default score_model_v1)
+(commit_pricing_job_and_release_resources pricing_job_2 rate_source_3 regulatory_rule_default)
+(unbind_score_model_from_case pricing_job_2 score_model_v1)
+(bind_score_model_to_case secondary_facility_1 score_model_v1)
+(link_regulatory_rule_to_case secondary_facility_1 regulatory_rule_default score_model_v1)
+(commit_pricing_to_secondary_facility secondary_facility_1 rate_source_2 regulatory_rule_default)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_whwg18yc/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 69 
+
+Successful plans:
+Value: 69
+ /tmp/val_whwg18yc/plan.pddl 69 
+
+
+
+--- stderr ---
+

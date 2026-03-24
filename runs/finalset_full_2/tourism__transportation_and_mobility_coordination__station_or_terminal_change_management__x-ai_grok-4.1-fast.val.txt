@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain station_transfer_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object resource_category - generic_object support_resource_category - generic_object connector_category - generic_object traveler_entity - generic_object transfer_entity - traveler_entity local_vehicle_unit - resource_category transfer_option - resource_category staff_resource - resource_category priority_service_type - resource_category special_service_option - resource_category time_window - resource_category vehicle_capability - resource_category operational_constraint - resource_category baggage_or_mobility_aid - support_resource_category facility_resource - support_resource_category document_or_authorization - support_resource_category incoming_access_path - connector_category outgoing_access_path - connector_category connector_instance - connector_category segment_entity - transfer_entity case_entity - transfer_entity incoming_segment - segment_entity outgoing_segment - segment_entity transfer_case - case_entity)
+
+  (:predicates
+    (traveler_registered ?traveler - transfer_entity)
+    (confirmed_for_handover ?traveler - transfer_entity)
+    (vehicle_reserved_flag ?traveler - transfer_entity)
+    (handover_completed ?traveler - transfer_entity)
+    (ready_for_handover ?traveler - transfer_entity)
+    (time_window_assigned ?traveler - transfer_entity)
+    (vehicle_available ?local_vehicle - local_vehicle_unit)
+    (assigned_vehicle ?traveler - transfer_entity ?local_vehicle - local_vehicle_unit)
+    (transfer_option_available ?transfer_option - transfer_option)
+    (transfer_option_selected ?traveler - transfer_entity ?transfer_option - transfer_option)
+    (staff_available ?staff_resource - staff_resource)
+    (staff_assigned ?traveler - transfer_entity ?staff_resource - staff_resource)
+    (baggage_available ?baggage_item - baggage_or_mobility_aid)
+    (incoming_segment_baggage_assigned ?incoming_segment - incoming_segment ?baggage_item - baggage_or_mobility_aid)
+    (outgoing_segment_baggage_assigned ?outgoing_segment - outgoing_segment ?baggage_item - baggage_or_mobility_aid)
+    (incoming_segment_on_access_path ?incoming_segment - incoming_segment ?incoming_access_path - incoming_access_path)
+    (incoming_access_path_ready ?incoming_access_path - incoming_access_path)
+    (incoming_access_path_occupied ?incoming_access_path - incoming_access_path)
+    (incoming_segment_ready ?incoming_segment - incoming_segment)
+    (outgoing_segment_on_access_path ?outgoing_segment - outgoing_segment ?outgoing_access_path - outgoing_access_path)
+    (outgoing_access_path_ready ?outgoing_access_path - outgoing_access_path)
+    (outgoing_access_path_occupied ?outgoing_access_path - outgoing_access_path)
+    (outgoing_segment_ready ?outgoing_segment - outgoing_segment)
+    (connector_available ?connector - connector_instance)
+    (connector_reserved ?connector - connector_instance)
+    (connector_assigned_incoming ?connector - connector_instance ?incoming_access_path - incoming_access_path)
+    (connector_assigned_outgoing ?connector - connector_instance ?outgoing_access_path - outgoing_access_path)
+    (connector_incoming_configured ?connector - connector_instance)
+    (connector_outgoing_configured ?connector - connector_instance)
+    (connector_boarding_ready ?connector - connector_instance)
+    (case_incoming_segment ?transfer_case - transfer_case ?incoming_segment - incoming_segment)
+    (case_outgoing_segment ?transfer_case - transfer_case ?outgoing_segment - outgoing_segment)
+    (case_assigned_connector ?transfer_case - transfer_case ?connector - connector_instance)
+    (facility_available ?facility_resource - facility_resource)
+    (case_requires_facility ?transfer_case - transfer_case ?facility_resource - facility_resource)
+    (facility_allocated ?facility_resource - facility_resource)
+    (facility_assigned_to_connector ?facility_resource - facility_resource ?connector - connector_instance)
+    (case_facility_verified ?transfer_case - transfer_case)
+    (case_resource_compatibility_verified ?transfer_case - transfer_case)
+    (case_operationally_compliant ?transfer_case - transfer_case)
+    (case_priority_selected ?transfer_case - transfer_case)
+    (case_priority_acknowledged ?transfer_case - transfer_case)
+    (case_ready_for_special_service ?transfer_case - transfer_case)
+    (case_preparation_finalized ?transfer_case - transfer_case)
+    (document_available ?document - document_or_authorization)
+    (case_document_linked ?transfer_case - transfer_case ?document - document_or_authorization)
+    (case_document_locked ?transfer_case - transfer_case)
+    (case_document_verified ?transfer_case - transfer_case)
+    (case_document_constraint_applied ?transfer_case - transfer_case)
+    (priority_service_available ?priority_service - priority_service_type)
+    (case_linked_priority_service ?transfer_case - transfer_case ?priority_service - priority_service_type)
+    (special_service_available ?special_service - special_service_option)
+    (case_special_service_assigned ?transfer_case - transfer_case ?special_service - special_service_option)
+    (vehicle_capability_available ?vehicle_capability - vehicle_capability)
+    (case_vehicle_capability_assigned ?transfer_case - transfer_case ?vehicle_capability - vehicle_capability)
+    (operational_constraint_available ?operational_constraint - operational_constraint)
+    (case_operational_constraint_assigned ?transfer_case - transfer_case ?operational_constraint - operational_constraint)
+    (time_window_available ?time_window - time_window)
+    (assigned_time_window ?traveler - transfer_entity ?time_window - time_window)
+    (incoming_segment_flagged ?incoming_segment - incoming_segment)
+    (outgoing_segment_flagged ?outgoing_segment - outgoing_segment)
+    (case_validated ?transfer_case - transfer_case)
+  )
+  (:action register_traveler
+    :parameters (?traveler - transfer_entity)
+    :precondition
+      (and
+        (not
+          (traveler_registered ?traveler)
+        )
+        (not
+          (handover_completed ?traveler)
+        )
+      )
+    :effect (traveler_registered ?traveler)
+  )
+  (:action reserve_local_vehicle
+    :parameters (?traveler - transfer_entity ?local_vehicle - local_vehicle_unit)
+    :precondition
+      (and
+        (traveler_registered ?traveler)
+        (not
+          (vehicle_reserved_flag ?traveler)
+        )
+        (vehicle_available ?local_vehicle)
+      )
+    :effect
+      (and
+        (vehicle_reserved_flag ?traveler)
+        (assigned_vehicle ?traveler ?local_vehicle)
+        (not
+          (vehicle_available ?local_vehicle)
+        )
+      )
+  )
+  (:action select_transfer_option
+    :parameters (?traveler - transfer_entity ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (traveler_registered ?traveler)
+        (vehicle_reserved_flag ?traveler)
+        (transfer_option_available ?transfer_option)
+      )
+    :effect
+      (and
+        (transfer_option_selected ?traveler ?transfer_option)
+        (not
+          (transfer_option_available ?transfer_option)
+        )
+      )
+  )
+  (:action confirm_transfer_option
+    :parameters (?traveler - transfer_entity ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (traveler_registered ?traveler)
+        (vehicle_reserved_flag ?traveler)
+        (transfer_option_selected ?traveler ?transfer_option)
+        (not
+          (confirmed_for_handover ?traveler)
+        )
+      )
+    :effect (confirmed_for_handover ?traveler)
+  )
+  (:action release_transfer_option
+    :parameters (?traveler - transfer_entity ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (transfer_option_selected ?traveler ?transfer_option)
+      )
+    :effect
+      (and
+        (transfer_option_available ?transfer_option)
+        (not
+          (transfer_option_selected ?traveler ?transfer_option)
+        )
+      )
+  )
+  (:action assign_staff
+    :parameters (?traveler - transfer_entity ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (confirmed_for_handover ?traveler)
+        (staff_available ?staff_resource)
+      )
+    :effect
+      (and
+        (staff_assigned ?traveler ?staff_resource)
+        (not
+          (staff_available ?staff_resource)
+        )
+      )
+  )
+  (:action release_staff
+    :parameters (?traveler - transfer_entity ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (staff_assigned ?traveler ?staff_resource)
+      )
+    :effect
+      (and
+        (staff_available ?staff_resource)
+        (not
+          (staff_assigned ?traveler ?staff_resource)
+        )
+      )
+  )
+  (:action assign_vehicle_capability
+    :parameters (?transfer_case - transfer_case ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (vehicle_capability_available ?vehicle_capability)
+      )
+    :effect
+      (and
+        (case_vehicle_capability_assigned ?transfer_case ?vehicle_capability)
+        (not
+          (vehicle_capability_available ?vehicle_capability)
+        )
+      )
+  )
+  (:action release_vehicle_capability
+    :parameters (?transfer_case - transfer_case ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (case_vehicle_capability_assigned ?transfer_case ?vehicle_capability)
+      )
+    :effect
+      (and
+        (vehicle_capability_available ?vehicle_capability)
+        (not
+          (case_vehicle_capability_assigned ?transfer_case ?vehicle_capability)
+        )
+      )
+  )
+  (:action assign_operational_constraint
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (operational_constraint_available ?operational_constraint)
+      )
+    :effect
+      (and
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (not
+          (operational_constraint_available ?operational_constraint)
+        )
+      )
+  )
+  (:action remove_operational_constraint
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+      )
+    :effect
+      (and
+        (operational_constraint_available ?operational_constraint)
+        (not
+          (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        )
+      )
+  )
+  (:action mark_incoming_access_path_ready
+    :parameters (?incoming_segment - incoming_segment ?incoming_access_path - incoming_access_path ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (confirmed_for_handover ?incoming_segment)
+        (transfer_option_selected ?incoming_segment ?transfer_option)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (not
+          (incoming_access_path_ready ?incoming_access_path)
+        )
+        (not
+          (incoming_access_path_occupied ?incoming_access_path)
+        )
+      )
+    :effect (incoming_access_path_ready ?incoming_access_path)
+  )
+  (:action confirm_incoming_staff_assignment
+    :parameters (?incoming_segment - incoming_segment ?incoming_access_path - incoming_access_path ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (confirmed_for_handover ?incoming_segment)
+        (staff_assigned ?incoming_segment ?staff_resource)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (incoming_access_path_ready ?incoming_access_path)
+        (not
+          (incoming_segment_flagged ?incoming_segment)
+        )
+      )
+    :effect
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (incoming_segment_ready ?incoming_segment)
+      )
+  )
+  (:action assign_baggage_to_incoming
+    :parameters (?incoming_segment - incoming_segment ?incoming_access_path - incoming_access_path ?baggage_item - baggage_or_mobility_aid)
+    :precondition
+      (and
+        (confirmed_for_handover ?incoming_segment)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (baggage_available ?baggage_item)
+        (not
+          (incoming_segment_flagged ?incoming_segment)
+        )
+      )
+    :effect
+      (and
+        (incoming_access_path_occupied ?incoming_access_path)
+        (incoming_segment_flagged ?incoming_segment)
+        (incoming_segment_baggage_assigned ?incoming_segment ?baggage_item)
+        (not
+          (baggage_available ?baggage_item)
+        )
+      )
+  )
+  (:action finalize_incoming_baggage_allocation
+    :parameters (?incoming_segment - incoming_segment ?incoming_access_path - incoming_access_path ?transfer_option - transfer_option ?baggage_item - baggage_or_mobility_aid)
+    :precondition
+      (and
+        (confirmed_for_handover ?incoming_segment)
+        (transfer_option_selected ?incoming_segment ?transfer_option)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (incoming_access_path_occupied ?incoming_access_path)
+        (incoming_segment_baggage_assigned ?incoming_segment ?baggage_item)
+        (not
+          (incoming_segment_ready ?incoming_segment)
+        )
+      )
+    :effect
+      (and
+        (incoming_access_path_ready ?incoming_access_path)
+        (incoming_segment_ready ?incoming_segment)
+        (baggage_available ?baggage_item)
+        (not
+          (incoming_segment_baggage_assigned ?incoming_segment ?baggage_item)
+        )
+      )
+  )
+  (:action mark_outgoing_access_path_ready
+    :parameters (?outgoing_segment - outgoing_segment ?outgoing_access_path - outgoing_access_path ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (confirmed_for_handover ?outgoing_segment)
+        (transfer_option_selected ?outgoing_segment ?transfer_option)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (not
+          (outgoing_access_path_ready ?outgoing_access_path)
+        )
+        (not
+          (outgoing_access_path_occupied ?outgoing_access_path)
+        )
+      )
+    :effect (outgoing_access_path_ready ?outgoing_access_path)
+  )
+  (:action assign_staff_to_outgoing
+    :parameters (?outgoing_segment - outgoing_segment ?outgoing_access_path - outgoing_access_path ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (confirmed_for_handover ?outgoing_segment)
+        (staff_assigned ?outgoing_segment ?staff_resource)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (outgoing_access_path_ready ?outgoing_access_path)
+        (not
+          (outgoing_segment_flagged ?outgoing_segment)
+        )
+      )
+    :effect
+      (and
+        (outgoing_segment_flagged ?outgoing_segment)
+        (outgoing_segment_ready ?outgoing_segment)
+      )
+  )
+  (:action assign_baggage_to_outgoing
+    :parameters (?outgoing_segment - outgoing_segment ?outgoing_access_path - outgoing_access_path ?baggage_item - baggage_or_mobility_aid)
+    :precondition
+      (and
+        (confirmed_for_handover ?outgoing_segment)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (baggage_available ?baggage_item)
+        (not
+          (outgoing_segment_flagged ?outgoing_segment)
+        )
+      )
+    :effect
+      (and
+        (outgoing_access_path_occupied ?outgoing_access_path)
+        (outgoing_segment_flagged ?outgoing_segment)
+        (outgoing_segment_baggage_assigned ?outgoing_segment ?baggage_item)
+        (not
+          (baggage_available ?baggage_item)
+        )
+      )
+  )
+  (:action finalize_outgoing_baggage_allocation
+    :parameters (?outgoing_segment - outgoing_segment ?outgoing_access_path - outgoing_access_path ?transfer_option - transfer_option ?baggage_item - baggage_or_mobility_aid)
+    :precondition
+      (and
+        (confirmed_for_handover ?outgoing_segment)
+        (transfer_option_selected ?outgoing_segment ?transfer_option)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (outgoing_access_path_occupied ?outgoing_access_path)
+        (outgoing_segment_baggage_assigned ?outgoing_segment ?baggage_item)
+        (not
+          (outgoing_segment_ready ?outgoing_segment)
+        )
+      )
+    :effect
+      (and
+        (outgoing_access_path_ready ?outgoing_access_path)
+        (outgoing_segment_ready ?outgoing_segment)
+        (baggage_available ?baggage_item)
+        (not
+          (outgoing_segment_baggage_assigned ?outgoing_segment ?baggage_item)
+        )
+      )
+  )
+  (:action allocate_connector
+    :parameters (?incoming_segment - incoming_segment ?outgoing_segment - outgoing_segment ?incoming_access_path - incoming_access_path ?outgoing_access_path - outgoing_access_path ?connector - connector_instance)
+    :precondition
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (outgoing_segment_flagged ?outgoing_segment)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (incoming_access_path_ready ?incoming_access_path)
+        (outgoing_access_path_ready ?outgoing_access_path)
+        (incoming_segment_ready ?incoming_segment)
+        (outgoing_segment_ready ?outgoing_segment)
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (connector_reserved ?connector)
+        (connector_assigned_incoming ?connector ?incoming_access_path)
+        (connector_assigned_outgoing ?connector ?outgoing_access_path)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action allocate_connector_incoming_occupied
+    :parameters (?incoming_segment - incoming_segment ?outgoing_segment - outgoing_segment ?incoming_access_path - incoming_access_path ?outgoing_access_path - outgoing_access_path ?connector - connector_instance)
+    :precondition
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (outgoing_segment_flagged ?outgoing_segment)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (incoming_access_path_occupied ?incoming_access_path)
+        (outgoing_access_path_ready ?outgoing_access_path)
+        (not
+          (incoming_segment_ready ?incoming_segment)
+        )
+        (outgoing_segment_ready ?outgoing_segment)
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (connector_reserved ?connector)
+        (connector_assigned_incoming ?connector ?incoming_access_path)
+        (connector_assigned_outgoing ?connector ?outgoing_access_path)
+        (connector_incoming_configured ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action allocate_connector_outgoing_occupied
+    :parameters (?incoming_segment - incoming_segment ?outgoing_segment - outgoing_segment ?incoming_access_path - incoming_access_path ?outgoing_access_path - outgoing_access_path ?connector - connector_instance)
+    :precondition
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (outgoing_segment_flagged ?outgoing_segment)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (incoming_access_path_ready ?incoming_access_path)
+        (outgoing_access_path_occupied ?outgoing_access_path)
+        (incoming_segment_ready ?incoming_segment)
+        (not
+          (outgoing_segment_ready ?outgoing_segment)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (connector_reserved ?connector)
+        (connector_assigned_incoming ?connector ?incoming_access_path)
+        (connector_assigned_outgoing ?connector ?outgoing_access_path)
+        (connector_outgoing_configured ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action allocate_connector_both_occupied
+    :parameters (?incoming_segment - incoming_segment ?outgoing_segment - outgoing_segment ?incoming_access_path - incoming_access_path ?outgoing_access_path - outgoing_access_path ?connector - connector_instance)
+    :precondition
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (outgoing_segment_flagged ?outgoing_segment)
+        (incoming_segment_on_access_path ?incoming_segment ?incoming_access_path)
+        (outgoing_segment_on_access_path ?outgoing_segment ?outgoing_access_path)
+        (incoming_access_path_occupied ?incoming_access_path)
+        (outgoing_access_path_occupied ?outgoing_access_path)
+        (not
+          (incoming_segment_ready ?incoming_segment)
+        )
+        (not
+          (outgoing_segment_ready ?outgoing_segment)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (connector_reserved ?connector)
+        (connector_assigned_incoming ?connector ?incoming_access_path)
+        (connector_assigned_outgoing ?connector ?outgoing_access_path)
+        (connector_incoming_configured ?connector)
+        (connector_outgoing_configured ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action confirm_connector_boarding_ready
+    :parameters (?connector - connector_instance ?incoming_segment - incoming_segment ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (connector_reserved ?connector)
+        (incoming_segment_flagged ?incoming_segment)
+        (transfer_option_selected ?incoming_segment ?transfer_option)
+        (not
+          (connector_boarding_ready ?connector)
+        )
+      )
+    :effect (connector_boarding_ready ?connector)
+  )
+  (:action provision_facility
+    :parameters (?transfer_case - transfer_case ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (case_assigned_connector ?transfer_case ?connector)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_available ?facility_resource)
+        (connector_reserved ?connector)
+        (connector_boarding_ready ?connector)
+        (not
+          (facility_allocated ?facility_resource)
+        )
+      )
+    :effect
+      (and
+        (facility_allocated ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (not
+          (facility_available ?facility_resource)
+        )
+      )
+  )
+  (:action verify_facility_and_mark_case
+    :parameters (?transfer_case - transfer_case ?facility_resource - facility_resource ?connector - connector_instance ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_allocated ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (transfer_option_selected ?transfer_case ?transfer_option)
+        (not
+          (connector_incoming_configured ?connector)
+        )
+        (not
+          (case_facility_verified ?transfer_case)
+        )
+      )
+    :effect (case_facility_verified ?transfer_case)
+  )
+  (:action apply_priority_service
+    :parameters (?transfer_case - transfer_case ?priority_service - priority_service_type)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (priority_service_available ?priority_service)
+        (not
+          (case_priority_selected ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_priority_selected ?transfer_case)
+        (case_linked_priority_service ?transfer_case ?priority_service)
+        (not
+          (priority_service_available ?priority_service)
+        )
+      )
+  )
+  (:action finalize_priority_and_prepare_case
+    :parameters (?transfer_case - transfer_case ?facility_resource - facility_resource ?connector - connector_instance ?transfer_option - transfer_option ?priority_service - priority_service_type)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_allocated ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (transfer_option_selected ?transfer_case ?transfer_option)
+        (connector_incoming_configured ?connector)
+        (case_priority_selected ?transfer_case)
+        (case_linked_priority_service ?transfer_case ?priority_service)
+        (not
+          (case_facility_verified ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_facility_verified ?transfer_case)
+        (case_priority_acknowledged ?transfer_case)
+      )
+  )
+  (:action assign_vehicle_capability_to_case
+    :parameters (?transfer_case - transfer_case ?vehicle_capability - vehicle_capability ?staff_resource - staff_resource ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_facility_verified ?transfer_case)
+        (case_vehicle_capability_assigned ?transfer_case ?vehicle_capability)
+        (staff_assigned ?transfer_case ?staff_resource)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (not
+          (connector_outgoing_configured ?connector)
+        )
+        (not
+          (case_resource_compatibility_verified ?transfer_case)
+        )
+      )
+    :effect (case_resource_compatibility_verified ?transfer_case)
+  )
+  (:action confirm_vehicle_capability_for_case
+    :parameters (?transfer_case - transfer_case ?vehicle_capability - vehicle_capability ?staff_resource - staff_resource ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_facility_verified ?transfer_case)
+        (case_vehicle_capability_assigned ?transfer_case ?vehicle_capability)
+        (staff_assigned ?transfer_case ?staff_resource)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (connector_outgoing_configured ?connector)
+        (not
+          (case_resource_compatibility_verified ?transfer_case)
+        )
+      )
+    :effect (case_resource_compatibility_verified ?transfer_case)
+  )
+  (:action apply_operational_constraint_and_verify
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_resource_compatibility_verified ?transfer_case)
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (not
+          (connector_incoming_configured ?connector)
+        )
+        (not
+          (connector_outgoing_configured ?connector)
+        )
+        (not
+          (case_operationally_compliant ?transfer_case)
+        )
+      )
+    :effect (case_operationally_compliant ?transfer_case)
+  )
+  (:action apply_operational_constraint_and_confirm_special_service
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_resource_compatibility_verified ?transfer_case)
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (connector_incoming_configured ?connector)
+        (not
+          (connector_outgoing_configured ?connector)
+        )
+        (not
+          (case_operationally_compliant ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_ready_for_special_service ?transfer_case)
+      )
+  )
+  (:action apply_operational_constraint_and_finalize_special_service
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_resource_compatibility_verified ?transfer_case)
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (not
+          (connector_incoming_configured ?connector)
+        )
+        (connector_outgoing_configured ?connector)
+        (not
+          (case_operationally_compliant ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_ready_for_special_service ?transfer_case)
+      )
+  )
+  (:action apply_operational_constraint_and_complete
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint ?facility_resource - facility_resource ?connector - connector_instance)
+    :precondition
+      (and
+        (case_resource_compatibility_verified ?transfer_case)
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (case_requires_facility ?transfer_case ?facility_resource)
+        (facility_assigned_to_connector ?facility_resource ?connector)
+        (connector_incoming_configured ?connector)
+        (connector_outgoing_configured ?connector)
+        (not
+          (case_operationally_compliant ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_ready_for_special_service ?transfer_case)
+      )
+  )
+  (:action finalize_case_validation
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (not
+          (case_ready_for_special_service ?transfer_case)
+        )
+        (not
+          (case_validated ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?transfer_case)
+        (ready_for_handover ?transfer_case)
+      )
+  )
+  (:action apply_special_service_option
+    :parameters (?transfer_case - transfer_case ?special_service - special_service_option)
+    :precondition
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_ready_for_special_service ?transfer_case)
+        (special_service_available ?special_service)
+      )
+    :effect
+      (and
+        (case_special_service_assigned ?transfer_case ?special_service)
+        (not
+          (special_service_available ?special_service)
+        )
+      )
+  )
+  (:action prepare_case_for_handover
+    :parameters (?transfer_case - transfer_case ?incoming_segment - incoming_segment ?outgoing_segment - outgoing_segment ?transfer_option - transfer_option ?special_service - special_service_option)
+    :precondition
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_ready_for_special_service ?transfer_case)
+        (case_special_service_assigned ?transfer_case ?special_service)
+        (case_incoming_segment ?transfer_case ?incoming_segment)
+        (case_outgoing_segment ?transfer_case ?outgoing_segment)
+        (incoming_segment_ready ?incoming_segment)
+        (outgoing_segment_ready ?outgoing_segment)
+        (transfer_option_selected ?transfer_case ?transfer_option)
+        (not
+          (case_preparation_finalized ?transfer_case)
+        )
+      )
+    :effect (case_preparation_finalized ?transfer_case)
+  )
+  (:action complete_case_final_checks
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_operationally_compliant ?transfer_case)
+        (case_preparation_finalized ?transfer_case)
+        (not
+          (case_validated ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?transfer_case)
+        (ready_for_handover ?transfer_case)
+      )
+  )
+  (:action validate_document_and_lock_case
+    :parameters (?transfer_case - transfer_case ?document - document_or_authorization ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (confirmed_for_handover ?transfer_case)
+        (transfer_option_selected ?transfer_case ?transfer_option)
+        (document_available ?document)
+        (case_document_linked ?transfer_case ?document)
+        (not
+          (case_document_locked ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_document_locked ?transfer_case)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action verify_document_requirement
+    :parameters (?transfer_case - transfer_case ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (case_document_locked ?transfer_case)
+        (staff_assigned ?transfer_case ?staff_resource)
+        (not
+          (case_document_verified ?transfer_case)
+        )
+      )
+    :effect (case_document_verified ?transfer_case)
+  )
+  (:action apply_constraint_after_document_verification
+    :parameters (?transfer_case - transfer_case ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (case_document_verified ?transfer_case)
+        (case_operational_constraint_assigned ?transfer_case ?operational_constraint)
+        (not
+          (case_document_constraint_applied ?transfer_case)
+        )
+      )
+    :effect (case_document_constraint_applied ?transfer_case)
+  )
+  (:action finalize_case_after_document_check
+    :parameters (?transfer_case - transfer_case)
+    :precondition
+      (and
+        (case_document_constraint_applied ?transfer_case)
+        (not
+          (case_validated ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?transfer_case)
+        (ready_for_handover ?transfer_case)
+      )
+  )
+  (:action finalize_incoming_segment_ready_for_handover
+    :parameters (?incoming_segment - incoming_segment ?connector - connector_instance)
+    :precondition
+      (and
+        (incoming_segment_flagged ?incoming_segment)
+        (incoming_segment_ready ?incoming_segment)
+        (connector_reserved ?connector)
+        (connector_boarding_ready ?connector)
+        (not
+          (ready_for_handover ?incoming_segment)
+        )
+      )
+    :effect (ready_for_handover ?incoming_segment)
+  )
+  (:action finalize_outgoing_segment_ready_for_handover
+    :parameters (?outgoing_segment - outgoing_segment ?connector - connector_instance)
+    :precondition
+      (and
+        (outgoing_segment_flagged ?outgoing_segment)
+        (outgoing_segment_ready ?outgoing_segment)
+        (connector_reserved ?connector)
+        (connector_boarding_ready ?connector)
+        (not
+          (ready_for_handover ?outgoing_segment)
+        )
+      )
+    :effect (ready_for_handover ?outgoing_segment)
+  )
+  (:action assign_time_window_to_traveler
+    :parameters (?traveler - transfer_entity ?time_window - time_window ?transfer_option - transfer_option)
+    :precondition
+      (and
+        (ready_for_handover ?traveler)
+        (transfer_option_selected ?traveler ?transfer_option)
+        (time_window_available ?time_window)
+        (not
+          (time_window_assigned ?traveler)
+        )
+      )
+    :effect
+      (and
+        (time_window_assigned ?traveler)
+        (assigned_time_window ?traveler ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action propagate_time_window_to_incoming_segment
+    :parameters (?incoming_segment - incoming_segment ?local_vehicle - local_vehicle_unit ?time_window - time_window)
+    :precondition
+      (and
+        (time_window_assigned ?incoming_segment)
+        (assigned_vehicle ?incoming_segment ?local_vehicle)
+        (assigned_time_window ?incoming_segment ?time_window)
+        (not
+          (handover_completed ?incoming_segment)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?incoming_segment)
+        (vehicle_available ?local_vehicle)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action propagate_time_window_to_outgoing_segment
+    :parameters (?outgoing_segment - outgoing_segment ?local_vehicle - local_vehicle_unit ?time_window - time_window)
+    :precondition
+      (and
+        (time_window_assigned ?outgoing_segment)
+        (assigned_vehicle ?outgoing_segment ?local_vehicle)
+        (assigned_time_window ?outgoing_segment ?time_window)
+        (not
+          (handover_completed ?outgoing_segment)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?outgoing_segment)
+        (vehicle_available ?local_vehicle)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action propagate_time_window_to_case
+    :parameters (?transfer_case - transfer_case ?local_vehicle - local_vehicle_unit ?time_window - time_window)
+    :precondition
+      (and
+        (time_window_assigned ?transfer_case)
+        (assigned_vehicle ?transfer_case ?local_vehicle)
+        (assigned_time_window ?transfer_case ?time_window)
+        (not
+          (handover_completed ?transfer_case)
+        )
+      )
+    :effect
+      (and
+        (handover_completed ?transfer_case)
+        (vehicle_available ?local_vehicle)
+        (time_window_available ?time_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem station_transfer_scenario)
+  (:domain station_transfer_coordination)
+  (:objects arrival_segment_1 - incoming_segment departure_segment_1 - outgoing_segment transfer_case_alpha - transfer_case transfer_case_beta - transfer_case shuttle_1 - local_vehicle_unit shuttle_2 - local_vehicle_unit shuttle_3 - local_vehicle_unit transfer_option_walk_1 - transfer_option porter_1 - staff_resource baggage_1 - baggage_or_mobility_aid arrival_corridor_1 - incoming_access_path departure_corridor_1 - outgoing_access_path connector_gate_1 - connector_instance elevator_1 - facility_resource escalator_1 - facility_resource priority_service_vip - priority_service_type priority_service_fast_track - priority_service_type special_service_wheelchair - special_service_option special_service_assistance - special_service_option time_window_slot_1 - time_window vehicle_capability_standard - vehicle_capability passport_1 - document_or_authorization visa_1 - document_or_authorization operational_constraint_security_check - operational_constraint)
+  (:init
+    (vehicle_available shuttle_1)
+    (vehicle_available shuttle_2)
+    (vehicle_available shuttle_3)
+    (transfer_option_available transfer_option_walk_1)
+    (staff_available porter_1)
+    (baggage_available baggage_1)
+    (incoming_segment_on_access_path arrival_segment_1 arrival_corridor_1)
+    (outgoing_segment_on_access_path departure_segment_1 departure_corridor_1)
+    (connector_available connector_gate_1)
+    (facility_available elevator_1)
+    (facility_available escalator_1)
+    (case_incoming_segment transfer_case_alpha arrival_segment_1)
+    (case_incoming_segment transfer_case_beta arrival_segment_1)
+    (case_outgoing_segment transfer_case_alpha departure_segment_1)
+    (case_outgoing_segment transfer_case_beta departure_segment_1)
+    (case_assigned_connector transfer_case_alpha connector_gate_1)
+    (case_assigned_connector transfer_case_beta connector_gate_1)
+    (case_requires_facility transfer_case_alpha elevator_1)
+    (case_requires_facility transfer_case_beta escalator_1)
+    (priority_service_available priority_service_vip)
+    (priority_service_available priority_service_fast_track)
+    (special_service_available special_service_wheelchair)
+    (special_service_available special_service_assistance)
+    (time_window_available time_window_slot_1)
+    (vehicle_capability_available vehicle_capability_standard)
+    (document_available passport_1)
+    (case_document_linked transfer_case_alpha passport_1)
+    (case_document_linked transfer_case_beta visa_1)
+    (operational_constraint_available operational_constraint_security_check)
+  )
+  (:goal
+    (and
+      (handover_completed arrival_segment_1)
+      (handover_completed departure_segment_1)
+      (handover_completed transfer_case_alpha)
+      (handover_completed transfer_case_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_traveler departure_segment_1)
+(reserve_local_vehicle departure_segment_1 shuttle_1)
+(select_transfer_option departure_segment_1 transfer_option_walk_1)
+(confirm_transfer_option departure_segment_1 transfer_option_walk_1)
+(mark_outgoing_access_path_ready departure_segment_1 departure_corridor_1 transfer_option_walk_1)
+(assign_staff departure_segment_1 porter_1)
+(assign_staff_to_outgoing departure_segment_1 departure_corridor_1 porter_1)
+(release_staff departure_segment_1 porter_1)
+(release_transfer_option departure_segment_1 transfer_option_walk_1)
+(register_traveler arrival_segment_1)
+(reserve_local_vehicle arrival_segment_1 shuttle_2)
+(select_transfer_option arrival_segment_1 transfer_option_walk_1)
+(confirm_transfer_option arrival_segment_1 transfer_option_walk_1)
+(assign_baggage_to_incoming arrival_segment_1 arrival_corridor_1 baggage_1)
+(allocate_connector_incoming_occupied arrival_segment_1 departure_segment_1 arrival_corridor_1 departure_corridor_1 connector_gate_1)
+(confirm_connector_boarding_ready connector_gate_1 arrival_segment_1 transfer_option_walk_1)
+(finalize_incoming_baggage_allocation arrival_segment_1 arrival_corridor_1 transfer_option_walk_1 baggage_1)
+(finalize_incoming_segment_ready_for_handover arrival_segment_1 connector_gate_1)
+(finalize_outgoing_segment_ready_for_handover departure_segment_1 connector_gate_1)
+(assign_time_window_to_traveler arrival_segment_1 time_window_slot_1 transfer_option_walk_1)
+(propagate_time_window_to_incoming_segment arrival_segment_1 shuttle_2 time_window_slot_1)
+(release_transfer_option arrival_segment_1 transfer_option_walk_1)
+(select_transfer_option departure_segment_1 transfer_option_walk_1)
+(assign_time_window_to_traveler departure_segment_1 time_window_slot_1 transfer_option_walk_1)
+(propagate_time_window_to_outgoing_segment departure_segment_1 shuttle_1 time_window_slot_1)
+(release_transfer_option departure_segment_1 transfer_option_walk_1)
+(register_traveler transfer_case_alpha)
+(reserve_local_vehicle transfer_case_alpha shuttle_1)
+(select_transfer_option transfer_case_alpha transfer_option_walk_1)
+(confirm_transfer_option transfer_case_alpha transfer_option_walk_1)
+(provision_facility transfer_case_alpha elevator_1 connector_gate_1)
+(apply_priority_service transfer_case_alpha priority_service_vip)
+(finalize_priority_and_prepare_case transfer_case_alpha elevator_1 connector_gate_1 transfer_option_walk_1 priority_service_vip)
+(assign_vehicle_capability transfer_case_alpha vehicle_capability_standard)
+(assign_staff transfer_case_alpha porter_1)
+(assign_vehicle_capability_to_case transfer_case_alpha vehicle_capability_standard porter_1 elevator_1 connector_gate_1)
+(assign_operational_constraint transfer_case_alpha operational_constraint_security_check)
+(apply_operational_constraint_and_confirm_special_service transfer_case_alpha operational_constraint_security_check elevator_1 connector_gate_1)
+(apply_special_service_option transfer_case_alpha special_service_wheelchair)
+(prepare_case_for_handover transfer_case_alpha arrival_segment_1 departure_segment_1 transfer_option_walk_1 special_service_wheelchair)
+(complete_case_final_checks transfer_case_alpha)
+(assign_time_window_to_traveler transfer_case_alpha time_window_slot_1 transfer_option_walk_1)
+(propagate_time_window_to_case transfer_case_alpha shuttle_1 time_window_slot_1)
+(release_transfer_option transfer_case_alpha transfer_option_walk_1)
+(release_vehicle_capability transfer_case_alpha vehicle_capability_standard)
+(remove_operational_constraint transfer_case_alpha operational_constraint_security_check)
+(release_staff transfer_case_alpha porter_1)
+(register_traveler transfer_case_beta)
+(reserve_local_vehicle transfer_case_beta shuttle_1)
+(select_transfer_option transfer_case_beta transfer_option_walk_1)
+(confirm_transfer_option transfer_case_beta transfer_option_walk_1)
+(provision_facility transfer_case_beta escalator_1 connector_gate_1)
+(apply_priority_service transfer_case_beta priority_service_fast_track)
+(finalize_priority_and_prepare_case transfer_case_beta escalator_1 connector_gate_1 transfer_option_walk_1 priority_service_fast_track)
+(assign_vehicle_capability transfer_case_beta vehicle_capability_standard)
+(assign_staff transfer_case_beta porter_1)
+(assign_vehicle_capability_to_case transfer_case_beta vehicle_capability_standard porter_1 escalator_1 connector_gate_1)
+(assign_operational_constraint transfer_case_beta operational_constraint_security_check)
+(apply_operational_constraint_and_confirm_special_service transfer_case_beta operational_constraint_security_check escalator_1 connector_gate_1)
+(apply_special_service_option transfer_case_beta special_service_assistance)
+(prepare_case_for_handover transfer_case_beta arrival_segment_1 departure_segment_1 transfer_option_walk_1 special_service_assistance)
+(complete_case_final_checks transfer_case_beta)
+(assign_time_window_to_traveler transfer_case_beta time_window_slot_1 transfer_option_walk_1)
+(propagate_time_window_to_case transfer_case_beta shuttle_1 time_window_slot_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_3a808lzh/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_3a808lzh/plan.pddl 64 
+
+
+
+--- stderr ---
+

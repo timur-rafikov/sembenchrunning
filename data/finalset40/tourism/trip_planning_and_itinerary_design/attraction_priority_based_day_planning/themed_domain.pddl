@@ -1,0 +1,937 @@
+(define (domain attraction_priority_day_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object location_category - entity temporal_category - entity transport_category - entity top_level_element - entity itinerary_element - top_level_element attraction_candidate - location_category time_window - location_category transport_option - location_category special_request - location_category service - location_category location_priority_token - location_category optional_feature - location_category guide_option - location_category temporal_preference_token - temporal_category logistic_item - temporal_category attraction_attribute - temporal_category slot_a - transport_category slot_b - transport_category tour_block - transport_category day_type - itinerary_element visit_type - itinerary_element day - day_type day_section - day_type visit_plan - visit_type)
+
+  (:predicates
+    (itinerary_element_open ?itinerary_element - itinerary_element)
+    (itinerary_element_ready ?itinerary_element - itinerary_element)
+    (itinerary_element_has_candidate ?itinerary_element - itinerary_element)
+    (itinerary_element_confirmed ?itinerary_element - itinerary_element)
+    (itinerary_element_committed ?itinerary_element - itinerary_element)
+    (priority_assigned ?itinerary_element - itinerary_element)
+    (candidate_available ?attraction_candidate - attraction_candidate)
+    (assigned_candidate ?itinerary_element - itinerary_element ?attraction_candidate - attraction_candidate)
+    (time_window_available ?time_window - time_window)
+    (assigned_time_window ?itinerary_element - itinerary_element ?time_window - time_window)
+    (transport_available ?transport_option - transport_option)
+    (assigned_transport ?itinerary_element - itinerary_element ?transport_option - transport_option)
+    (temporal_preference_token_available ?preference_token - temporal_preference_token)
+    (day_temporal_preference_link ?day - day ?preference_token - temporal_preference_token)
+    (day_section_temporal_preference_link ?day_section - day_section ?preference_token - temporal_preference_token)
+    (day_slot_a_link ?day - day ?slot_a - slot_a)
+    (slot_a_marked ?slot_a - slot_a)
+    (slot_a_flagged ?slot_a - slot_a)
+    (day_slot_confirmed ?day - day)
+    (day_section_slot_b_link ?day_section - day_section ?slot_b - slot_b)
+    (slot_b_marked ?slot_b - slot_b)
+    (slot_b_flagged ?slot_b - slot_b)
+    (day_section_confirmed ?day_section - day_section)
+    (tour_block_available ?tour_block - tour_block)
+    (tour_block_selected ?tour_block - tour_block)
+    (tour_block_slot_a_link ?tour_block - tour_block ?slot_a - slot_a)
+    (tour_block_slot_b_link ?tour_block - tour_block ?slot_b - slot_b)
+    (tour_block_flag_a ?tour_block - tour_block)
+    (tour_block_flag_b ?tour_block - tour_block)
+    (tour_block_ready ?tour_block - tour_block)
+    (itinerary_element_assigned_day ?visit_plan - visit_plan ?day - day)
+    (itinerary_element_assigned_day_section ?visit_plan - visit_plan ?day_section - day_section)
+    (itinerary_element_in_tour_block ?visit_plan - visit_plan ?tour_block - tour_block)
+    (logistic_item_available ?logistic_item - logistic_item)
+    (itinerary_element_has_logistic ?visit_plan - visit_plan ?logistic_item - logistic_item)
+    (logistic_item_committed ?logistic_item - logistic_item)
+    (logistic_bound_to_tour_block ?logistic_item - logistic_item ?tour_block - tour_block)
+    (itinerary_element_logistics_committed ?visit_plan - visit_plan)
+    (itinerary_element_services_prepared ?visit_plan - visit_plan)
+    (itinerary_element_ready_for_confirmation ?visit_plan - visit_plan)
+    (itinerary_element_special_request_initialized ?visit_plan - visit_plan)
+    (itinerary_element_special_request_marked ?visit_plan - visit_plan)
+    (itinerary_element_optional_features_enabled ?visit_plan - visit_plan)
+    (itinerary_element_finalization_ready ?visit_plan - visit_plan)
+    (attraction_attribute_available ?attraction_attribute - attraction_attribute)
+    (itinerary_element_has_attraction_attribute ?visit_plan - visit_plan ?attraction_attribute - attraction_attribute)
+    (itinerary_element_special_request_confirmed ?visit_plan - visit_plan)
+    (itinerary_element_special_request_progressed ?visit_plan - visit_plan)
+    (itinerary_element_guide_booked ?visit_plan - visit_plan)
+    (special_request_available ?special_request - special_request)
+    (itinerary_element_special_request_link ?visit_plan - visit_plan ?special_request - special_request)
+    (service_available ?service - service)
+    (itinerary_element_service_attached ?visit_plan - visit_plan ?service - service)
+    (optional_feature_available ?optional_feature - optional_feature)
+    (itinerary_element_optional_feature_attached ?visit_plan - visit_plan ?optional_feature - optional_feature)
+    (guide_option_available ?guide_option - guide_option)
+    (itinerary_element_guide_option_attached ?visit_plan - visit_plan ?guide_option - guide_option)
+    (location_priority_token_available ?priority_token - location_priority_token)
+    (element_location_priority_link ?itinerary_element - itinerary_element ?priority_token - location_priority_token)
+    (day_slot_locked ?day - day)
+    (day_section_slot_locked ?day_section - day_section)
+    (itinerary_element_visit_plan_confirmed ?visit_plan - visit_plan)
+  )
+  (:action create_itinerary_element
+    :parameters (?itinerary_element - itinerary_element)
+    :precondition
+      (and
+        (not
+          (itinerary_element_open ?itinerary_element)
+        )
+        (not
+          (itinerary_element_confirmed ?itinerary_element)
+        )
+      )
+    :effect (itinerary_element_open ?itinerary_element)
+  )
+  (:action assign_attraction_to_element
+    :parameters (?itinerary_element - itinerary_element ?attraction_candidate - attraction_candidate)
+    :precondition
+      (and
+        (itinerary_element_open ?itinerary_element)
+        (not
+          (itinerary_element_has_candidate ?itinerary_element)
+        )
+        (candidate_available ?attraction_candidate)
+      )
+    :effect
+      (and
+        (itinerary_element_has_candidate ?itinerary_element)
+        (assigned_candidate ?itinerary_element ?attraction_candidate)
+        (not
+          (candidate_available ?attraction_candidate)
+        )
+      )
+  )
+  (:action reserve_time_window_for_element
+    :parameters (?itinerary_element - itinerary_element ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_open ?itinerary_element)
+        (itinerary_element_has_candidate ?itinerary_element)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (assigned_time_window ?itinerary_element ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_time_window_for_element
+    :parameters (?itinerary_element - itinerary_element ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_open ?itinerary_element)
+        (itinerary_element_has_candidate ?itinerary_element)
+        (assigned_time_window ?itinerary_element ?time_window)
+        (not
+          (itinerary_element_ready ?itinerary_element)
+        )
+      )
+    :effect (itinerary_element_ready ?itinerary_element)
+  )
+  (:action release_time_window_from_element
+    :parameters (?itinerary_element - itinerary_element ?time_window - time_window)
+    :precondition
+      (and
+        (assigned_time_window ?itinerary_element ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (assigned_time_window ?itinerary_element ?time_window)
+        )
+      )
+  )
+  (:action assign_transport_to_element
+    :parameters (?itinerary_element - itinerary_element ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_element_ready ?itinerary_element)
+        (transport_available ?transport_option)
+      )
+    :effect
+      (and
+        (assigned_transport ?itinerary_element ?transport_option)
+        (not
+          (transport_available ?transport_option)
+        )
+      )
+  )
+  (:action release_transport_from_element
+    :parameters (?itinerary_element - itinerary_element ?transport_option - transport_option)
+    :precondition
+      (and
+        (assigned_transport ?itinerary_element ?transport_option)
+      )
+    :effect
+      (and
+        (transport_available ?transport_option)
+        (not
+          (assigned_transport ?itinerary_element ?transport_option)
+        )
+      )
+  )
+  (:action attach_optional_feature_to_visit_plan
+    :parameters (?visit_plan - visit_plan ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (optional_feature_available ?optional_feature)
+      )
+    :effect
+      (and
+        (itinerary_element_optional_feature_attached ?visit_plan ?optional_feature)
+        (not
+          (optional_feature_available ?optional_feature)
+        )
+      )
+  )
+  (:action detach_optional_feature_from_visit_plan
+    :parameters (?visit_plan - visit_plan ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (itinerary_element_optional_feature_attached ?visit_plan ?optional_feature)
+      )
+    :effect
+      (and
+        (optional_feature_available ?optional_feature)
+        (not
+          (itinerary_element_optional_feature_attached ?visit_plan ?optional_feature)
+        )
+      )
+  )
+  (:action attach_guide_option_to_visit_plan
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (guide_option_available ?guide_option)
+      )
+    :effect
+      (and
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (not
+          (guide_option_available ?guide_option)
+        )
+      )
+  )
+  (:action detach_guide_option_from_visit_plan
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+      )
+    :effect
+      (and
+        (guide_option_available ?guide_option)
+        (not
+          (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        )
+      )
+  )
+  (:action reserve_slot_a_for_day
+    :parameters (?day - day ?slot_a - slot_a ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_ready ?day)
+        (assigned_time_window ?day ?time_window)
+        (day_slot_a_link ?day ?slot_a)
+        (not
+          (slot_a_marked ?slot_a)
+        )
+        (not
+          (slot_a_flagged ?slot_a)
+        )
+      )
+    :effect (slot_a_marked ?slot_a)
+  )
+  (:action finalize_day_slot_a_with_transport
+    :parameters (?day - day ?slot_a - slot_a ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_element_ready ?day)
+        (assigned_transport ?day ?transport_option)
+        (day_slot_a_link ?day ?slot_a)
+        (slot_a_marked ?slot_a)
+        (not
+          (day_slot_locked ?day)
+        )
+      )
+    :effect
+      (and
+        (day_slot_locked ?day)
+        (day_slot_confirmed ?day)
+      )
+  )
+  (:action assign_temporal_preference_to_day_slot_a
+    :parameters (?day - day ?slot_a - slot_a ?preference_token - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_ready ?day)
+        (day_slot_a_link ?day ?slot_a)
+        (temporal_preference_token_available ?preference_token)
+        (not
+          (day_slot_locked ?day)
+        )
+      )
+    :effect
+      (and
+        (slot_a_flagged ?slot_a)
+        (day_slot_locked ?day)
+        (day_temporal_preference_link ?day ?preference_token)
+        (not
+          (temporal_preference_token_available ?preference_token)
+        )
+      )
+  )
+  (:action transition_slot_a_to_confirmed
+    :parameters (?day - day ?slot_a - slot_a ?time_window - time_window ?preference_token - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_ready ?day)
+        (assigned_time_window ?day ?time_window)
+        (day_slot_a_link ?day ?slot_a)
+        (slot_a_flagged ?slot_a)
+        (day_temporal_preference_link ?day ?preference_token)
+        (not
+          (day_slot_confirmed ?day)
+        )
+      )
+    :effect
+      (and
+        (slot_a_marked ?slot_a)
+        (day_slot_confirmed ?day)
+        (temporal_preference_token_available ?preference_token)
+        (not
+          (day_temporal_preference_link ?day ?preference_token)
+        )
+      )
+  )
+  (:action reserve_slot_b_for_day_section
+    :parameters (?day_section - day_section ?slot_b - slot_b ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_ready ?day_section)
+        (assigned_time_window ?day_section ?time_window)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (not
+          (slot_b_marked ?slot_b)
+        )
+        (not
+          (slot_b_flagged ?slot_b)
+        )
+      )
+    :effect (slot_b_marked ?slot_b)
+  )
+  (:action confirm_day_section_with_transport
+    :parameters (?day_section - day_section ?slot_b - slot_b ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_element_ready ?day_section)
+        (assigned_transport ?day_section ?transport_option)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_b_marked ?slot_b)
+        (not
+          (day_section_slot_locked ?day_section)
+        )
+      )
+    :effect
+      (and
+        (day_section_slot_locked ?day_section)
+        (day_section_confirmed ?day_section)
+      )
+  )
+  (:action assign_temporal_preference_to_day_section
+    :parameters (?day_section - day_section ?slot_b - slot_b ?preference_token - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_ready ?day_section)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (temporal_preference_token_available ?preference_token)
+        (not
+          (day_section_slot_locked ?day_section)
+        )
+      )
+    :effect
+      (and
+        (slot_b_flagged ?slot_b)
+        (day_section_slot_locked ?day_section)
+        (day_section_temporal_preference_link ?day_section ?preference_token)
+        (not
+          (temporal_preference_token_available ?preference_token)
+        )
+      )
+  )
+  (:action transition_slot_b_to_confirmed
+    :parameters (?day_section - day_section ?slot_b - slot_b ?time_window - time_window ?preference_token - temporal_preference_token)
+    :precondition
+      (and
+        (itinerary_element_ready ?day_section)
+        (assigned_time_window ?day_section ?time_window)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_b_flagged ?slot_b)
+        (day_section_temporal_preference_link ?day_section ?preference_token)
+        (not
+          (day_section_confirmed ?day_section)
+        )
+      )
+    :effect
+      (and
+        (slot_b_marked ?slot_b)
+        (day_section_confirmed ?day_section)
+        (temporal_preference_token_available ?preference_token)
+        (not
+          (day_section_temporal_preference_link ?day_section ?preference_token)
+        )
+      )
+  )
+  (:action assemble_tour_block_from_slots
+    :parameters (?day - day ?day_section - day_section ?slot_a - slot_a ?slot_b - slot_b ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_slot_locked ?day)
+        (day_section_slot_locked ?day_section)
+        (day_slot_a_link ?day ?slot_a)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_a_marked ?slot_a)
+        (slot_b_marked ?slot_b)
+        (day_slot_confirmed ?day)
+        (day_section_confirmed ?day_section)
+        (tour_block_available ?tour_block)
+      )
+    :effect
+      (and
+        (tour_block_selected ?tour_block)
+        (tour_block_slot_a_link ?tour_block ?slot_a)
+        (tour_block_slot_b_link ?tour_block ?slot_b)
+        (not
+          (tour_block_available ?tour_block)
+        )
+      )
+  )
+  (:action assemble_tour_block_variant_a
+    :parameters (?day - day ?day_section - day_section ?slot_a - slot_a ?slot_b - slot_b ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_slot_locked ?day)
+        (day_section_slot_locked ?day_section)
+        (day_slot_a_link ?day ?slot_a)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_a_flagged ?slot_a)
+        (slot_b_marked ?slot_b)
+        (not
+          (day_slot_confirmed ?day)
+        )
+        (day_section_confirmed ?day_section)
+        (tour_block_available ?tour_block)
+      )
+    :effect
+      (and
+        (tour_block_selected ?tour_block)
+        (tour_block_slot_a_link ?tour_block ?slot_a)
+        (tour_block_slot_b_link ?tour_block ?slot_b)
+        (tour_block_flag_a ?tour_block)
+        (not
+          (tour_block_available ?tour_block)
+        )
+      )
+  )
+  (:action assemble_tour_block_variant_b
+    :parameters (?day - day ?day_section - day_section ?slot_a - slot_a ?slot_b - slot_b ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_slot_locked ?day)
+        (day_section_slot_locked ?day_section)
+        (day_slot_a_link ?day ?slot_a)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_a_marked ?slot_a)
+        (slot_b_flagged ?slot_b)
+        (day_slot_confirmed ?day)
+        (not
+          (day_section_confirmed ?day_section)
+        )
+        (tour_block_available ?tour_block)
+      )
+    :effect
+      (and
+        (tour_block_selected ?tour_block)
+        (tour_block_slot_a_link ?tour_block ?slot_a)
+        (tour_block_slot_b_link ?tour_block ?slot_b)
+        (tour_block_flag_b ?tour_block)
+        (not
+          (tour_block_available ?tour_block)
+        )
+      )
+  )
+  (:action assemble_tour_block_variant_ab
+    :parameters (?day - day ?day_section - day_section ?slot_a - slot_a ?slot_b - slot_b ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_slot_locked ?day)
+        (day_section_slot_locked ?day_section)
+        (day_slot_a_link ?day ?slot_a)
+        (day_section_slot_b_link ?day_section ?slot_b)
+        (slot_a_flagged ?slot_a)
+        (slot_b_flagged ?slot_b)
+        (not
+          (day_slot_confirmed ?day)
+        )
+        (not
+          (day_section_confirmed ?day_section)
+        )
+        (tour_block_available ?tour_block)
+      )
+    :effect
+      (and
+        (tour_block_selected ?tour_block)
+        (tour_block_slot_a_link ?tour_block ?slot_a)
+        (tour_block_slot_b_link ?tour_block ?slot_b)
+        (tour_block_flag_a ?tour_block)
+        (tour_block_flag_b ?tour_block)
+        (not
+          (tour_block_available ?tour_block)
+        )
+      )
+  )
+  (:action finalize_tour_block_with_day_time
+    :parameters (?tour_block - tour_block ?day - day ?time_window - time_window)
+    :precondition
+      (and
+        (tour_block_selected ?tour_block)
+        (day_slot_locked ?day)
+        (assigned_time_window ?day ?time_window)
+        (not
+          (tour_block_ready ?tour_block)
+        )
+      )
+    :effect (tour_block_ready ?tour_block)
+  )
+  (:action reserve_logistic_for_visit_plan
+    :parameters (?visit_plan - visit_plan ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (itinerary_element_in_tour_block ?visit_plan ?tour_block)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_item_available ?logistic_item)
+        (tour_block_selected ?tour_block)
+        (tour_block_ready ?tour_block)
+        (not
+          (logistic_item_committed ?logistic_item)
+        )
+      )
+    :effect
+      (and
+        (logistic_item_committed ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (not
+          (logistic_item_available ?logistic_item)
+        )
+      )
+  )
+  (:action finalize_logistic_binding_for_visit_plan
+    :parameters (?visit_plan - visit_plan ?logistic_item - logistic_item ?tour_block - tour_block ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_item_committed ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (assigned_time_window ?visit_plan ?time_window)
+        (not
+          (tour_block_flag_a ?tour_block)
+        )
+        (not
+          (itinerary_element_logistics_committed ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_logistics_committed ?visit_plan)
+  )
+  (:action assign_special_request_to_visit_plan
+    :parameters (?visit_plan - visit_plan ?special_request - special_request)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (special_request_available ?special_request)
+        (not
+          (itinerary_element_special_request_initialized ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_special_request_initialized ?visit_plan)
+        (itinerary_element_special_request_link ?visit_plan ?special_request)
+        (not
+          (special_request_available ?special_request)
+        )
+      )
+  )
+  (:action attach_special_request_and_finalize
+    :parameters (?visit_plan - visit_plan ?logistic_item - logistic_item ?tour_block - tour_block ?time_window - time_window ?special_request - special_request)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_item_committed ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (assigned_time_window ?visit_plan ?time_window)
+        (tour_block_flag_a ?tour_block)
+        (itinerary_element_special_request_initialized ?visit_plan)
+        (itinerary_element_special_request_link ?visit_plan ?special_request)
+        (not
+          (itinerary_element_logistics_committed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_logistics_committed ?visit_plan)
+        (itinerary_element_special_request_marked ?visit_plan)
+      )
+  )
+  (:action activate_optional_feature_with_transport_and_logistic
+    :parameters (?visit_plan - visit_plan ?optional_feature - optional_feature ?transport_option - transport_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_logistics_committed ?visit_plan)
+        (itinerary_element_optional_feature_attached ?visit_plan ?optional_feature)
+        (assigned_transport ?visit_plan ?transport_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (not
+          (tour_block_flag_b ?tour_block)
+        )
+        (not
+          (itinerary_element_services_prepared ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_services_prepared ?visit_plan)
+  )
+  (:action activate_optional_feature_with_transport_and_logistic_variant
+    :parameters (?visit_plan - visit_plan ?optional_feature - optional_feature ?transport_option - transport_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_logistics_committed ?visit_plan)
+        (itinerary_element_optional_feature_attached ?visit_plan ?optional_feature)
+        (assigned_transport ?visit_plan ?transport_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (tour_block_flag_b ?tour_block)
+        (not
+          (itinerary_element_services_prepared ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_services_prepared ?visit_plan)
+  )
+  (:action attach_guide_and_mark_visit_for_confirmation
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_services_prepared ?visit_plan)
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (not
+          (tour_block_flag_a ?tour_block)
+        )
+        (not
+          (tour_block_flag_b ?tour_block)
+        )
+        (not
+          (itinerary_element_ready_for_confirmation ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_ready_for_confirmation ?visit_plan)
+  )
+  (:action attach_guide_and_enable_optional_feature_flag
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_services_prepared ?visit_plan)
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (tour_block_flag_a ?tour_block)
+        (not
+          (tour_block_flag_b ?tour_block)
+        )
+        (not
+          (itinerary_element_ready_for_confirmation ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_optional_features_enabled ?visit_plan)
+      )
+  )
+  (:action attach_guide_and_enable_optional_features
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_services_prepared ?visit_plan)
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (not
+          (tour_block_flag_a ?tour_block)
+        )
+        (tour_block_flag_b ?tour_block)
+        (not
+          (itinerary_element_ready_for_confirmation ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_optional_features_enabled ?visit_plan)
+      )
+  )
+  (:action attach_guide_and_complete_feature_setup
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option ?logistic_item - logistic_item ?tour_block - tour_block)
+    :precondition
+      (and
+        (itinerary_element_services_prepared ?visit_plan)
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (itinerary_element_has_logistic ?visit_plan ?logistic_item)
+        (logistic_bound_to_tour_block ?logistic_item ?tour_block)
+        (tour_block_flag_a ?tour_block)
+        (tour_block_flag_b ?tour_block)
+        (not
+          (itinerary_element_ready_for_confirmation ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_optional_features_enabled ?visit_plan)
+      )
+  )
+  (:action mark_visit_plan_committable
+    :parameters (?visit_plan - visit_plan)
+    :precondition
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (not
+          (itinerary_element_optional_features_enabled ?visit_plan)
+        )
+        (not
+          (itinerary_element_visit_plan_confirmed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_visit_plan_confirmed ?visit_plan)
+        (itinerary_element_committed ?visit_plan)
+      )
+  )
+  (:action attach_service_to_visit_plan
+    :parameters (?visit_plan - visit_plan ?service - service)
+    :precondition
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_optional_features_enabled ?visit_plan)
+        (service_available ?service)
+      )
+    :effect
+      (and
+        (itinerary_element_service_attached ?visit_plan ?service)
+        (not
+          (service_available ?service)
+        )
+      )
+  )
+  (:action bind_services_and_confirm_visit_plan
+    :parameters (?visit_plan - visit_plan ?day - day ?day_section - day_section ?time_window - time_window ?service - service)
+    :precondition
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_optional_features_enabled ?visit_plan)
+        (itinerary_element_service_attached ?visit_plan ?service)
+        (itinerary_element_assigned_day ?visit_plan ?day)
+        (itinerary_element_assigned_day_section ?visit_plan ?day_section)
+        (day_slot_confirmed ?day)
+        (day_section_confirmed ?day_section)
+        (assigned_time_window ?visit_plan ?time_window)
+        (not
+          (itinerary_element_finalization_ready ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_finalization_ready ?visit_plan)
+  )
+  (:action confirm_visit_plan_and_mark_element
+    :parameters (?visit_plan - visit_plan)
+    :precondition
+      (and
+        (itinerary_element_ready_for_confirmation ?visit_plan)
+        (itinerary_element_finalization_ready ?visit_plan)
+        (not
+          (itinerary_element_visit_plan_confirmed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_visit_plan_confirmed ?visit_plan)
+        (itinerary_element_committed ?visit_plan)
+      )
+  )
+  (:action reserve_attraction_attribute_for_visit_plan
+    :parameters (?visit_plan - visit_plan ?attraction_attribute - attraction_attribute ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_ready ?visit_plan)
+        (assigned_time_window ?visit_plan ?time_window)
+        (attraction_attribute_available ?attraction_attribute)
+        (itinerary_element_has_attraction_attribute ?visit_plan ?attraction_attribute)
+        (not
+          (itinerary_element_special_request_confirmed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_special_request_confirmed ?visit_plan)
+        (not
+          (attraction_attribute_available ?attraction_attribute)
+        )
+      )
+  )
+  (:action progress_special_request_for_visit_plan
+    :parameters (?visit_plan - visit_plan ?transport_option - transport_option)
+    :precondition
+      (and
+        (itinerary_element_special_request_confirmed ?visit_plan)
+        (assigned_transport ?visit_plan ?transport_option)
+        (not
+          (itinerary_element_special_request_progressed ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_special_request_progressed ?visit_plan)
+  )
+  (:action attach_guide_option_post_special_request
+    :parameters (?visit_plan - visit_plan ?guide_option - guide_option)
+    :precondition
+      (and
+        (itinerary_element_special_request_progressed ?visit_plan)
+        (itinerary_element_guide_option_attached ?visit_plan ?guide_option)
+        (not
+          (itinerary_element_guide_booked ?visit_plan)
+        )
+      )
+    :effect (itinerary_element_guide_booked ?visit_plan)
+  )
+  (:action confirm_visit_plan_from_special_request
+    :parameters (?visit_plan - visit_plan)
+    :precondition
+      (and
+        (itinerary_element_guide_booked ?visit_plan)
+        (not
+          (itinerary_element_visit_plan_confirmed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_visit_plan_confirmed ?visit_plan)
+        (itinerary_element_committed ?visit_plan)
+      )
+  )
+  (:action confirm_day_based_on_tour_block
+    :parameters (?day - day ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_slot_locked ?day)
+        (day_slot_confirmed ?day)
+        (tour_block_selected ?tour_block)
+        (tour_block_ready ?tour_block)
+        (not
+          (itinerary_element_committed ?day)
+        )
+      )
+    :effect (itinerary_element_committed ?day)
+  )
+  (:action confirm_day_section_based_on_tour_block
+    :parameters (?day_section - day_section ?tour_block - tour_block)
+    :precondition
+      (and
+        (day_section_slot_locked ?day_section)
+        (day_section_confirmed ?day_section)
+        (tour_block_selected ?tour_block)
+        (tour_block_ready ?tour_block)
+        (not
+          (itinerary_element_committed ?day_section)
+        )
+      )
+    :effect (itinerary_element_committed ?day_section)
+  )
+  (:action assign_location_priority_to_itinerary_element
+    :parameters (?itinerary_element - itinerary_element ?priority_token - location_priority_token ?time_window - time_window)
+    :precondition
+      (and
+        (itinerary_element_committed ?itinerary_element)
+        (assigned_time_window ?itinerary_element ?time_window)
+        (location_priority_token_available ?priority_token)
+        (not
+          (priority_assigned ?itinerary_element)
+        )
+      )
+    :effect
+      (and
+        (priority_assigned ?itinerary_element)
+        (element_location_priority_link ?itinerary_element ?priority_token)
+        (not
+          (location_priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action finalize_day_and_release_candidate
+    :parameters (?day - day ?attraction_candidate - attraction_candidate ?priority_token - location_priority_token)
+    :precondition
+      (and
+        (priority_assigned ?day)
+        (assigned_candidate ?day ?attraction_candidate)
+        (element_location_priority_link ?day ?priority_token)
+        (not
+          (itinerary_element_confirmed ?day)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_confirmed ?day)
+        (candidate_available ?attraction_candidate)
+        (location_priority_token_available ?priority_token)
+      )
+  )
+  (:action finalize_day_section_and_release_candidate
+    :parameters (?day_section - day_section ?attraction_candidate - attraction_candidate ?priority_token - location_priority_token)
+    :precondition
+      (and
+        (priority_assigned ?day_section)
+        (assigned_candidate ?day_section ?attraction_candidate)
+        (element_location_priority_link ?day_section ?priority_token)
+        (not
+          (itinerary_element_confirmed ?day_section)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_confirmed ?day_section)
+        (candidate_available ?attraction_candidate)
+        (location_priority_token_available ?priority_token)
+      )
+  )
+  (:action finalize_visit_plan_and_release_candidate
+    :parameters (?visit_plan - visit_plan ?attraction_candidate - attraction_candidate ?priority_token - location_priority_token)
+    :precondition
+      (and
+        (priority_assigned ?visit_plan)
+        (assigned_candidate ?visit_plan ?attraction_candidate)
+        (element_location_priority_link ?visit_plan ?priority_token)
+        (not
+          (itinerary_element_confirmed ?visit_plan)
+        )
+      )
+    :effect
+      (and
+        (itinerary_element_confirmed ?visit_plan)
+        (candidate_available ?attraction_candidate)
+        (location_priority_token_available ?priority_token)
+      )
+  )
+)

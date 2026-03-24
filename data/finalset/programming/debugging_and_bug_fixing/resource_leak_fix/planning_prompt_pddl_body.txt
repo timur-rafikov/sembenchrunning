@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain resource_leak_fix_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types artifact - object evidence_artifact - object runtime_entity - object program_entity_type - object program_entity_instance - program_entity_type resource_identifier - artifact test_case - artifact engineer_account - artifact configuration - artifact review_token - artifact monitoring_probe - artifact static_analysis_tool - artifact ci_job - artifact resource_type - evidence_artifact diagnostic_log - evidence_artifact reporter - evidence_artifact allocation_site - runtime_entity execution_context - runtime_entity patch_candidate - runtime_entity program_entity_subtype_a - program_entity_instance program_entity_subtype_b - program_entity_instance service_instance - program_entity_subtype_a worker_instance - program_entity_subtype_a bug_case - program_entity_subtype_b)
+  (:predicates
+    (entity_bug_reported ?program_entity_instance - program_entity_instance)
+    (investigation_confirmed ?program_entity_instance - program_entity_instance)
+    (resource_bound_to_entity ?program_entity_instance - program_entity_instance)
+    (fix_applied ?program_entity_instance - program_entity_instance)
+    (verification_passed ?program_entity_instance - program_entity_instance)
+    (patch_finalized ?program_entity_instance - program_entity_instance)
+    (resource_identifier_available ?resource_identifier - resource_identifier)
+    (entity_has_resource ?program_entity_instance - program_entity_instance ?resource_identifier - resource_identifier)
+    (test_case_available ?test_case - test_case)
+    (entity_has_test ?program_entity_instance - program_entity_instance ?test_case - test_case)
+    (engineer_available ?engineer - engineer_account)
+    (engineer_assigned_to ?program_entity_instance - program_entity_instance ?engineer - engineer_account)
+    (resource_type_available ?resource_type - resource_type)
+    (service_has_resource_type ?service_instance - service_instance ?resource_type - resource_type)
+    (worker_has_resource_type ?worker_instance - worker_instance ?resource_type - resource_type)
+    (instance_allocation_site ?service_instance - service_instance ?allocation_site - allocation_site)
+    (allocation_site_identified ?allocation_site - allocation_site)
+    (allocation_site_tagged ?allocation_site - allocation_site)
+    (service_marked_for_patch ?service_instance - service_instance)
+    (worker_has_execution_context ?worker_instance - worker_instance ?execution_context - execution_context)
+    (execution_context_captured ?execution_context - execution_context)
+    (execution_context_tagged ?execution_context - execution_context)
+    (worker_marked_for_patch ?worker_instance - worker_instance)
+    (patch_candidate_available ?patch_candidate - patch_candidate)
+    (patch_candidate_assembled ?patch_candidate - patch_candidate)
+    (patch_candidate_targets_allocation_site ?patch_candidate - patch_candidate ?allocation_site - allocation_site)
+    (patch_candidate_targets_execution_context ?patch_candidate - patch_candidate ?execution_context - execution_context)
+    (patch_candidate_includes_diagnostic_log ?patch_candidate - patch_candidate)
+    (patch_candidate_includes_test_case ?patch_candidate - patch_candidate)
+    (patch_candidate_tested ?patch_candidate - patch_candidate)
+    (bug_case_affects_service ?bug_case - bug_case ?service_instance - service_instance)
+    (bug_case_affects_worker ?bug_case - bug_case ?worker_instance - worker_instance)
+    (bug_case_has_patch_candidate ?bug_case - bug_case ?patch_candidate - patch_candidate)
+    (diagnostic_log_available ?diagnostic_log - diagnostic_log)
+    (bug_case_has_diagnostic_log ?bug_case - bug_case ?diagnostic_log - diagnostic_log)
+    (diagnostic_log_ingested ?diagnostic_log - diagnostic_log)
+    (diagnostic_log_attached_to_patch_candidate ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    (bug_case_patch_prepared ?bug_case - bug_case)
+    (bug_case_patch_enriched ?bug_case - bug_case)
+    (bug_case_ready_for_verification ?bug_case - bug_case)
+    (bug_case_configuration_attached ?bug_case - bug_case)
+    (bug_case_configuration_integrated ?bug_case - bug_case)
+    (bug_case_ready_for_review ?bug_case - bug_case)
+    (bug_case_prepared_for_validation ?bug_case - bug_case)
+    (reporter_available ?reporter - reporter)
+    (bug_case_reporter ?bug_case - bug_case ?reporter - reporter)
+    (bug_case_report_acknowledged ?bug_case - bug_case)
+    (bug_case_review_requested ?bug_case - bug_case)
+    (bug_case_review_completed ?bug_case - bug_case)
+    (configuration_available ?configuration - configuration)
+    (bug_case_has_configuration ?bug_case - bug_case ?configuration - configuration)
+    (review_token_available ?review_token - review_token)
+    (bug_case_has_review_token ?bug_case - bug_case ?review_token - review_token)
+    (static_analysis_tool_available ?static_analysis_tool - static_analysis_tool)
+    (bug_case_static_analysis_result ?bug_case - bug_case ?static_analysis_tool - static_analysis_tool)
+    (ci_job_available ?ci_job - ci_job)
+    (bug_case_ci_job ?bug_case - bug_case ?ci_job - ci_job)
+    (monitoring_probe_available ?monitoring_probe - monitoring_probe)
+    (entity_monitored_by_probe ?program_entity_instance - program_entity_instance ?monitoring_probe - monitoring_probe)
+    (service_patch_ready ?service_instance - service_instance)
+    (worker_patch_ready ?worker_instance - worker_instance)
+    (bug_case_verification_recorded ?bug_case - bug_case)
+  )
+  (:action open_bug_case_for_entity
+    :parameters (?program_entity_instance - program_entity_instance)
+    :precondition
+      (and
+        (not
+          (entity_bug_reported ?program_entity_instance)
+        )
+        (not
+          (fix_applied ?program_entity_instance)
+        )
+      )
+    :effect (entity_bug_reported ?program_entity_instance)
+  )
+  (:action bind_resource_identifier
+    :parameters (?program_entity_instance - program_entity_instance ?resource_identifier - resource_identifier)
+    :precondition
+      (and
+        (entity_bug_reported ?program_entity_instance)
+        (not
+          (resource_bound_to_entity ?program_entity_instance)
+        )
+        (resource_identifier_available ?resource_identifier)
+      )
+    :effect
+      (and
+        (resource_bound_to_entity ?program_entity_instance)
+        (entity_has_resource ?program_entity_instance ?resource_identifier)
+        (not
+          (resource_identifier_available ?resource_identifier)
+        )
+      )
+  )
+  (:action attach_test_case_to_entity
+    :parameters (?program_entity_instance - program_entity_instance ?test_case - test_case)
+    :precondition
+      (and
+        (entity_bug_reported ?program_entity_instance)
+        (resource_bound_to_entity ?program_entity_instance)
+        (test_case_available ?test_case)
+      )
+    :effect
+      (and
+        (entity_has_test ?program_entity_instance ?test_case)
+        (not
+          (test_case_available ?test_case)
+        )
+      )
+  )
+  (:action confirm_investigation
+    :parameters (?program_entity_instance - program_entity_instance ?test_case - test_case)
+    :precondition
+      (and
+        (entity_bug_reported ?program_entity_instance)
+        (resource_bound_to_entity ?program_entity_instance)
+        (entity_has_test ?program_entity_instance ?test_case)
+        (not
+          (investigation_confirmed ?program_entity_instance)
+        )
+      )
+    :effect (investigation_confirmed ?program_entity_instance)
+  )
+  (:action detach_test_case_from_entity
+    :parameters (?program_entity_instance - program_entity_instance ?test_case - test_case)
+    :precondition
+      (and
+        (entity_has_test ?program_entity_instance ?test_case)
+      )
+    :effect
+      (and
+        (test_case_available ?test_case)
+        (not
+          (entity_has_test ?program_entity_instance ?test_case)
+        )
+      )
+  )
+  (:action assign_engineer_to_investigation
+    :parameters (?program_entity_instance - program_entity_instance ?engineer - engineer_account)
+    :precondition
+      (and
+        (investigation_confirmed ?program_entity_instance)
+        (engineer_available ?engineer)
+      )
+    :effect
+      (and
+        (engineer_assigned_to ?program_entity_instance ?engineer)
+        (not
+          (engineer_available ?engineer)
+        )
+      )
+  )
+  (:action unassign_engineer_from_investigation
+    :parameters (?program_entity_instance - program_entity_instance ?engineer - engineer_account)
+    :precondition
+      (and
+        (engineer_assigned_to ?program_entity_instance ?engineer)
+      )
+    :effect
+      (and
+        (engineer_available ?engineer)
+        (not
+          (engineer_assigned_to ?program_entity_instance ?engineer)
+        )
+      )
+  )
+  (:action record_static_analysis_result
+    :parameters (?bug_case - bug_case ?static_analysis_tool - static_analysis_tool)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (static_analysis_tool_available ?static_analysis_tool)
+      )
+    :effect
+      (and
+        (bug_case_static_analysis_result ?bug_case ?static_analysis_tool)
+        (not
+          (static_analysis_tool_available ?static_analysis_tool)
+        )
+      )
+  )
+  (:action remove_static_analysis_result
+    :parameters (?bug_case - bug_case ?static_analysis_tool - static_analysis_tool)
+    :precondition
+      (and
+        (bug_case_static_analysis_result ?bug_case ?static_analysis_tool)
+      )
+    :effect
+      (and
+        (static_analysis_tool_available ?static_analysis_tool)
+        (not
+          (bug_case_static_analysis_result ?bug_case ?static_analysis_tool)
+        )
+      )
+  )
+  (:action record_ci_job_result
+    :parameters (?bug_case - bug_case ?ci_job - ci_job)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (ci_job_available ?ci_job)
+      )
+    :effect
+      (and
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (not
+          (ci_job_available ?ci_job)
+        )
+      )
+  )
+  (:action remove_ci_job_result
+    :parameters (?bug_case - bug_case ?ci_job - ci_job)
+    :precondition
+      (and
+        (bug_case_ci_job ?bug_case ?ci_job)
+      )
+    :effect
+      (and
+        (ci_job_available ?ci_job)
+        (not
+          (bug_case_ci_job ?bug_case ?ci_job)
+        )
+      )
+  )
+  (:action identify_allocation_site
+    :parameters (?service_instance - service_instance ?allocation_site - allocation_site ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_confirmed ?service_instance)
+        (entity_has_test ?service_instance ?test_case)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (not
+          (allocation_site_identified ?allocation_site)
+        )
+        (not
+          (allocation_site_tagged ?allocation_site)
+        )
+      )
+    :effect (allocation_site_identified ?allocation_site)
+  )
+  (:action confirm_allocation_with_engineer
+    :parameters (?service_instance - service_instance ?allocation_site - allocation_site ?engineer - engineer_account)
+    :precondition
+      (and
+        (investigation_confirmed ?service_instance)
+        (engineer_assigned_to ?service_instance ?engineer)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (allocation_site_identified ?allocation_site)
+        (not
+          (service_patch_ready ?service_instance)
+        )
+      )
+    :effect
+      (and
+        (service_patch_ready ?service_instance)
+        (service_marked_for_patch ?service_instance)
+      )
+  )
+  (:action associate_resource_type_with_service
+    :parameters (?service_instance - service_instance ?allocation_site - allocation_site ?resource_type - resource_type)
+    :precondition
+      (and
+        (investigation_confirmed ?service_instance)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (resource_type_available ?resource_type)
+        (not
+          (service_patch_ready ?service_instance)
+        )
+      )
+    :effect
+      (and
+        (allocation_site_tagged ?allocation_site)
+        (service_patch_ready ?service_instance)
+        (service_has_resource_type ?service_instance ?resource_type)
+        (not
+          (resource_type_available ?resource_type)
+        )
+      )
+  )
+  (:action reconcile_resource_type_assignment
+    :parameters (?service_instance - service_instance ?allocation_site - allocation_site ?test_case - test_case ?resource_type - resource_type)
+    :precondition
+      (and
+        (investigation_confirmed ?service_instance)
+        (entity_has_test ?service_instance ?test_case)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (allocation_site_tagged ?allocation_site)
+        (service_has_resource_type ?service_instance ?resource_type)
+        (not
+          (service_marked_for_patch ?service_instance)
+        )
+      )
+    :effect
+      (and
+        (allocation_site_identified ?allocation_site)
+        (service_marked_for_patch ?service_instance)
+        (resource_type_available ?resource_type)
+        (not
+          (service_has_resource_type ?service_instance ?resource_type)
+        )
+      )
+  )
+  (:action capture_execution_context
+    :parameters (?worker_instance - worker_instance ?execution_context - execution_context ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_confirmed ?worker_instance)
+        (entity_has_test ?worker_instance ?test_case)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (not
+          (execution_context_captured ?execution_context)
+        )
+        (not
+          (execution_context_tagged ?execution_context)
+        )
+      )
+    :effect (execution_context_captured ?execution_context)
+  )
+  (:action confirm_execution_context_with_engineer
+    :parameters (?worker_instance - worker_instance ?execution_context - execution_context ?engineer - engineer_account)
+    :precondition
+      (and
+        (investigation_confirmed ?worker_instance)
+        (engineer_assigned_to ?worker_instance ?engineer)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (execution_context_captured ?execution_context)
+        (not
+          (worker_patch_ready ?worker_instance)
+        )
+      )
+    :effect
+      (and
+        (worker_patch_ready ?worker_instance)
+        (worker_marked_for_patch ?worker_instance)
+      )
+  )
+  (:action associate_resource_type_with_worker_context
+    :parameters (?worker_instance - worker_instance ?execution_context - execution_context ?resource_type - resource_type)
+    :precondition
+      (and
+        (investigation_confirmed ?worker_instance)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (resource_type_available ?resource_type)
+        (not
+          (worker_patch_ready ?worker_instance)
+        )
+      )
+    :effect
+      (and
+        (execution_context_tagged ?execution_context)
+        (worker_patch_ready ?worker_instance)
+        (worker_has_resource_type ?worker_instance ?resource_type)
+        (not
+          (resource_type_available ?resource_type)
+        )
+      )
+  )
+  (:action finalize_worker_context_correlation
+    :parameters (?worker_instance - worker_instance ?execution_context - execution_context ?test_case - test_case ?resource_type - resource_type)
+    :precondition
+      (and
+        (investigation_confirmed ?worker_instance)
+        (entity_has_test ?worker_instance ?test_case)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (execution_context_tagged ?execution_context)
+        (worker_has_resource_type ?worker_instance ?resource_type)
+        (not
+          (worker_marked_for_patch ?worker_instance)
+        )
+      )
+    :effect
+      (and
+        (execution_context_captured ?execution_context)
+        (worker_marked_for_patch ?worker_instance)
+        (resource_type_available ?resource_type)
+        (not
+          (worker_has_resource_type ?worker_instance ?resource_type)
+        )
+      )
+  )
+  (:action assemble_patch_candidate
+    :parameters (?service_instance - service_instance ?worker_instance - worker_instance ?allocation_site - allocation_site ?execution_context - execution_context ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (service_patch_ready ?service_instance)
+        (worker_patch_ready ?worker_instance)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (allocation_site_identified ?allocation_site)
+        (execution_context_captured ?execution_context)
+        (service_marked_for_patch ?service_instance)
+        (worker_marked_for_patch ?worker_instance)
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_targets_allocation_site ?patch_candidate ?allocation_site)
+        (patch_candidate_targets_execution_context ?patch_candidate ?execution_context)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action assemble_patch_candidate_with_allocation_tag
+    :parameters (?service_instance - service_instance ?worker_instance - worker_instance ?allocation_site - allocation_site ?execution_context - execution_context ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (service_patch_ready ?service_instance)
+        (worker_patch_ready ?worker_instance)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (allocation_site_tagged ?allocation_site)
+        (execution_context_captured ?execution_context)
+        (not
+          (service_marked_for_patch ?service_instance)
+        )
+        (worker_marked_for_patch ?worker_instance)
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_targets_allocation_site ?patch_candidate ?allocation_site)
+        (patch_candidate_targets_execution_context ?patch_candidate ?execution_context)
+        (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action assemble_patch_candidate_with_execution_tag
+    :parameters (?service_instance - service_instance ?worker_instance - worker_instance ?allocation_site - allocation_site ?execution_context - execution_context ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (service_patch_ready ?service_instance)
+        (worker_patch_ready ?worker_instance)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (allocation_site_identified ?allocation_site)
+        (execution_context_tagged ?execution_context)
+        (service_marked_for_patch ?service_instance)
+        (not
+          (worker_marked_for_patch ?worker_instance)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_targets_allocation_site ?patch_candidate ?allocation_site)
+        (patch_candidate_targets_execution_context ?patch_candidate ?execution_context)
+        (patch_candidate_includes_test_case ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action assemble_patch_candidate_with_both_tags
+    :parameters (?service_instance - service_instance ?worker_instance - worker_instance ?allocation_site - allocation_site ?execution_context - execution_context ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (service_patch_ready ?service_instance)
+        (worker_patch_ready ?worker_instance)
+        (instance_allocation_site ?service_instance ?allocation_site)
+        (worker_has_execution_context ?worker_instance ?execution_context)
+        (allocation_site_tagged ?allocation_site)
+        (execution_context_tagged ?execution_context)
+        (not
+          (service_marked_for_patch ?service_instance)
+        )
+        (not
+          (worker_marked_for_patch ?worker_instance)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_targets_allocation_site ?patch_candidate ?allocation_site)
+        (patch_candidate_targets_execution_context ?patch_candidate ?execution_context)
+        (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        (patch_candidate_includes_test_case ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action test_patch_candidate
+    :parameters (?patch_candidate - patch_candidate ?service_instance - service_instance ?test_case - test_case)
+    :precondition
+      (and
+        (patch_candidate_assembled ?patch_candidate)
+        (service_patch_ready ?service_instance)
+        (entity_has_test ?service_instance ?test_case)
+        (not
+          (patch_candidate_tested ?patch_candidate)
+        )
+      )
+    :effect (patch_candidate_tested ?patch_candidate)
+  )
+  (:action ingest_diagnostic_log_for_bug_case
+    :parameters (?bug_case - bug_case ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (bug_case_has_patch_candidate ?bug_case ?patch_candidate)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_available ?diagnostic_log)
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_tested ?patch_candidate)
+        (not
+          (diagnostic_log_ingested ?diagnostic_log)
+        )
+      )
+    :effect
+      (and
+        (diagnostic_log_ingested ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (not
+          (diagnostic_log_available ?diagnostic_log)
+        )
+      )
+  )
+  (:action prepare_patch_candidate_for_bug_case
+    :parameters (?bug_case - bug_case ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_ingested ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (entity_has_test ?bug_case ?test_case)
+        (not
+          (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        )
+        (not
+          (bug_case_patch_prepared ?bug_case)
+        )
+      )
+    :effect (bug_case_patch_prepared ?bug_case)
+  )
+  (:action attach_configuration
+    :parameters (?bug_case - bug_case ?configuration - configuration)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (configuration_available ?configuration)
+        (not
+          (bug_case_configuration_attached ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_configuration_attached ?bug_case)
+        (bug_case_has_configuration ?bug_case ?configuration)
+        (not
+          (configuration_available ?configuration)
+        )
+      )
+  )
+  (:action integrate_configuration_into_patch
+    :parameters (?bug_case - bug_case ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate ?test_case - test_case ?configuration - configuration)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_ingested ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (entity_has_test ?bug_case ?test_case)
+        (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        (bug_case_configuration_attached ?bug_case)
+        (bug_case_has_configuration ?bug_case ?configuration)
+        (not
+          (bug_case_patch_prepared ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_patch_prepared ?bug_case)
+        (bug_case_configuration_integrated ?bug_case)
+      )
+  )
+  (:action enrich_patch_with_static_analysis
+    :parameters (?bug_case - bug_case ?static_analysis_tool - static_analysis_tool ?engineer - engineer_account ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_prepared ?bug_case)
+        (bug_case_static_analysis_result ?bug_case ?static_analysis_tool)
+        (engineer_assigned_to ?bug_case ?engineer)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (not
+          (patch_candidate_includes_test_case ?patch_candidate)
+        )
+        (not
+          (bug_case_patch_enriched ?bug_case)
+        )
+      )
+    :effect (bug_case_patch_enriched ?bug_case)
+  )
+  (:action enrich_patch_with_static_analysis_variant
+    :parameters (?bug_case - bug_case ?static_analysis_tool - static_analysis_tool ?engineer - engineer_account ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_prepared ?bug_case)
+        (bug_case_static_analysis_result ?bug_case ?static_analysis_tool)
+        (engineer_assigned_to ?bug_case ?engineer)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (patch_candidate_includes_test_case ?patch_candidate)
+        (not
+          (bug_case_patch_enriched ?bug_case)
+        )
+      )
+    :effect (bug_case_patch_enriched ?bug_case)
+  )
+  (:action promote_patch_to_verification_ready
+    :parameters (?bug_case - bug_case ?ci_job - ci_job ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_enriched ?bug_case)
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (not
+          (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        )
+        (not
+          (patch_candidate_includes_test_case ?patch_candidate)
+        )
+        (not
+          (bug_case_ready_for_verification ?bug_case)
+        )
+      )
+    :effect (bug_case_ready_for_verification ?bug_case)
+  )
+  (:action promote_patch_and_mark_for_review
+    :parameters (?bug_case - bug_case ?ci_job - ci_job ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_enriched ?bug_case)
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        (not
+          (patch_candidate_includes_test_case ?patch_candidate)
+        )
+        (not
+          (bug_case_ready_for_verification ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_ready_for_review ?bug_case)
+      )
+  )
+  (:action promote_patch_with_variant_b
+    :parameters (?bug_case - bug_case ?ci_job - ci_job ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_enriched ?bug_case)
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (not
+          (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        )
+        (patch_candidate_includes_test_case ?patch_candidate)
+        (not
+          (bug_case_ready_for_verification ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_ready_for_review ?bug_case)
+      )
+  )
+  (:action promote_patch_with_variant_c
+    :parameters (?bug_case - bug_case ?ci_job - ci_job ?diagnostic_log - diagnostic_log ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (bug_case_patch_enriched ?bug_case)
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (bug_case_has_diagnostic_log ?bug_case ?diagnostic_log)
+        (diagnostic_log_attached_to_patch_candidate ?diagnostic_log ?patch_candidate)
+        (patch_candidate_includes_diagnostic_log ?patch_candidate)
+        (patch_candidate_includes_test_case ?patch_candidate)
+        (not
+          (bug_case_ready_for_verification ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_ready_for_review ?bug_case)
+      )
+  )
+  (:action record_verification_success
+    :parameters (?bug_case - bug_case)
+    :precondition
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (not
+          (bug_case_ready_for_review ?bug_case)
+        )
+        (not
+          (bug_case_verification_recorded ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_verification_recorded ?bug_case)
+        (verification_passed ?bug_case)
+      )
+  )
+  (:action attach_review_token
+    :parameters (?bug_case - bug_case ?review_token - review_token)
+    :precondition
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_ready_for_review ?bug_case)
+        (review_token_available ?review_token)
+      )
+    :effect
+      (and
+        (bug_case_has_review_token ?bug_case ?review_token)
+        (not
+          (review_token_available ?review_token)
+        )
+      )
+  )
+  (:action validate_patch_on_instances
+    :parameters (?bug_case - bug_case ?service_instance - service_instance ?worker_instance - worker_instance ?test_case - test_case ?review_token - review_token)
+    :precondition
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_ready_for_review ?bug_case)
+        (bug_case_has_review_token ?bug_case ?review_token)
+        (bug_case_affects_service ?bug_case ?service_instance)
+        (bug_case_affects_worker ?bug_case ?worker_instance)
+        (service_marked_for_patch ?service_instance)
+        (worker_marked_for_patch ?worker_instance)
+        (entity_has_test ?bug_case ?test_case)
+        (not
+          (bug_case_prepared_for_validation ?bug_case)
+        )
+      )
+    :effect (bug_case_prepared_for_validation ?bug_case)
+  )
+  (:action finalize_verification_and_mark_verified
+    :parameters (?bug_case - bug_case)
+    :precondition
+      (and
+        (bug_case_ready_for_verification ?bug_case)
+        (bug_case_prepared_for_validation ?bug_case)
+        (not
+          (bug_case_verification_recorded ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_verification_recorded ?bug_case)
+        (verification_passed ?bug_case)
+      )
+  )
+  (:action acknowledge_reporter
+    :parameters (?bug_case - bug_case ?reporter - reporter ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_confirmed ?bug_case)
+        (entity_has_test ?bug_case ?test_case)
+        (reporter_available ?reporter)
+        (bug_case_reporter ?bug_case ?reporter)
+        (not
+          (bug_case_report_acknowledged ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_report_acknowledged ?bug_case)
+        (not
+          (reporter_available ?reporter)
+        )
+      )
+  )
+  (:action request_review_for_bug_case
+    :parameters (?bug_case - bug_case ?engineer - engineer_account)
+    :precondition
+      (and
+        (bug_case_report_acknowledged ?bug_case)
+        (engineer_assigned_to ?bug_case ?engineer)
+        (not
+          (bug_case_review_requested ?bug_case)
+        )
+      )
+    :effect (bug_case_review_requested ?bug_case)
+  )
+  (:action complete_review
+    :parameters (?bug_case - bug_case ?ci_job - ci_job)
+    :precondition
+      (and
+        (bug_case_review_requested ?bug_case)
+        (bug_case_ci_job ?bug_case ?ci_job)
+        (not
+          (bug_case_review_completed ?bug_case)
+        )
+      )
+    :effect (bug_case_review_completed ?bug_case)
+  )
+  (:action record_verification_post_review
+    :parameters (?bug_case - bug_case)
+    :precondition
+      (and
+        (bug_case_review_completed ?bug_case)
+        (not
+          (bug_case_verification_recorded ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (bug_case_verification_recorded ?bug_case)
+        (verification_passed ?bug_case)
+      )
+  )
+  (:action mark_service_verified
+    :parameters (?service_instance - service_instance ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (service_patch_ready ?service_instance)
+        (service_marked_for_patch ?service_instance)
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_tested ?patch_candidate)
+        (not
+          (verification_passed ?service_instance)
+        )
+      )
+    :effect (verification_passed ?service_instance)
+  )
+  (:action mark_worker_verified
+    :parameters (?worker_instance - worker_instance ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (worker_patch_ready ?worker_instance)
+        (worker_marked_for_patch ?worker_instance)
+        (patch_candidate_assembled ?patch_candidate)
+        (patch_candidate_tested ?patch_candidate)
+        (not
+          (verification_passed ?worker_instance)
+        )
+      )
+    :effect (verification_passed ?worker_instance)
+  )
+  (:action finalize_patch_and_attach_monitoring_probe
+    :parameters (?program_entity_instance - program_entity_instance ?monitoring_probe - monitoring_probe ?test_case - test_case)
+    :precondition
+      (and
+        (verification_passed ?program_entity_instance)
+        (entity_has_test ?program_entity_instance ?test_case)
+        (monitoring_probe_available ?monitoring_probe)
+        (not
+          (patch_finalized ?program_entity_instance)
+        )
+      )
+    :effect
+      (and
+        (patch_finalized ?program_entity_instance)
+        (entity_monitored_by_probe ?program_entity_instance ?monitoring_probe)
+        (not
+          (monitoring_probe_available ?monitoring_probe)
+        )
+      )
+  )
+  (:action apply_patch_to_service_instance
+    :parameters (?service_instance - service_instance ?resource_identifier - resource_identifier ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (patch_finalized ?service_instance)
+        (entity_has_resource ?service_instance ?resource_identifier)
+        (entity_monitored_by_probe ?service_instance ?monitoring_probe)
+        (not
+          (fix_applied ?service_instance)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?service_instance)
+        (resource_identifier_available ?resource_identifier)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+  (:action apply_patch_to_worker_instance
+    :parameters (?worker_instance - worker_instance ?resource_identifier - resource_identifier ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (patch_finalized ?worker_instance)
+        (entity_has_resource ?worker_instance ?resource_identifier)
+        (entity_monitored_by_probe ?worker_instance ?monitoring_probe)
+        (not
+          (fix_applied ?worker_instance)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?worker_instance)
+        (resource_identifier_available ?resource_identifier)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+  (:action apply_patch_from_entity_to_resource
+    :parameters (?bug_case - bug_case ?resource_identifier - resource_identifier ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (patch_finalized ?bug_case)
+        (entity_has_resource ?bug_case ?resource_identifier)
+        (entity_monitored_by_probe ?bug_case ?monitoring_probe)
+        (not
+          (fix_applied ?bug_case)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?bug_case)
+        (resource_identifier_available ?resource_identifier)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem resource_leak_fix_problem)
+  (:domain resource_leak_fix_domain)
+  (:objects service_instance_1 - service_instance worker_instance_1 - worker_instance bug_case_1 - bug_case bug_case_2 - bug_case resource_identifier_1 - resource_identifier resource_identifier_2 - resource_identifier resource_identifier_3 - resource_identifier test_case_1 - test_case engineer_1 - engineer_account resource_type_memory - resource_type allocation_site_a - allocation_site execution_context_1 - execution_context patch_candidate_initial - patch_candidate diagnostic_log_1 - diagnostic_log diagnostic_log_2 - diagnostic_log configuration_a - configuration configuration_b - configuration review_token_1 - review_token review_token_2 - review_token monitoring_probe_1 - monitoring_probe static_analysis_tool_run_1 - static_analysis_tool reporter_user_1 - reporter reporter_user_2 - reporter ci_job_run_1 - ci_job)
+  (:init
+    (resource_identifier_available resource_identifier_1)
+    (resource_identifier_available resource_identifier_2)
+    (resource_identifier_available resource_identifier_3)
+    (test_case_available test_case_1)
+    (engineer_available engineer_1)
+    (resource_type_available resource_type_memory)
+    (instance_allocation_site service_instance_1 allocation_site_a)
+    (worker_has_execution_context worker_instance_1 execution_context_1)
+    (patch_candidate_available patch_candidate_initial)
+    (diagnostic_log_available diagnostic_log_1)
+    (diagnostic_log_available diagnostic_log_2)
+    (bug_case_affects_service bug_case_1 service_instance_1)
+    (bug_case_affects_service bug_case_2 service_instance_1)
+    (bug_case_affects_worker bug_case_1 worker_instance_1)
+    (bug_case_affects_worker bug_case_2 worker_instance_1)
+    (bug_case_has_patch_candidate bug_case_1 patch_candidate_initial)
+    (bug_case_has_patch_candidate bug_case_2 patch_candidate_initial)
+    (bug_case_has_diagnostic_log bug_case_1 diagnostic_log_1)
+    (bug_case_has_diagnostic_log bug_case_2 diagnostic_log_2)
+    (configuration_available configuration_a)
+    (configuration_available configuration_b)
+    (review_token_available review_token_1)
+    (review_token_available review_token_2)
+    (monitoring_probe_available monitoring_probe_1)
+    (static_analysis_tool_available static_analysis_tool_run_1)
+    (reporter_available reporter_user_1)
+    (bug_case_reporter bug_case_1 reporter_user_1)
+    (bug_case_reporter bug_case_2 reporter_user_2)
+    (ci_job_available ci_job_run_1)
+  )
+  (:goal
+    (and
+      (fix_applied service_instance_1)
+      (fix_applied worker_instance_1)
+      (fix_applied bug_case_1)
+      (fix_applied bug_case_2)
+    )
+  )
+)

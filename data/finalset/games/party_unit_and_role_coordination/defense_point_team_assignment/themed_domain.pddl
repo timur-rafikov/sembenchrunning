@@ -1,0 +1,937 @@
+(define (domain defense_point_team_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object team_grouping - base_object role_class_group - base_object position_family - base_object root_assignment_type - base_object assignment_entity - root_assignment_type role_token - team_grouping class_tag - team_grouping support_agent - team_grouping attachment_token - team_grouping secondary_resource - team_grouping objective_marker - team_grouping temporary_buff - team_grouping special_modifier - team_grouping consumable_item - role_class_group equipment_slot - role_class_group permanent_bonus - role_class_group position_node_a - position_family position_node_b - position_family assignment_token - position_family slot_family_a - assignment_entity slot_family_b - assignment_entity primary_defender_slot - slot_family_a secondary_defender_slot - slot_family_a operator_unit - slot_family_b)
+
+  (:predicates
+    (entity_registered ?assignment_entity - assignment_entity)
+    (entity_assigned ?assignment_entity - assignment_entity)
+    (entity_has_role_token ?assignment_entity - assignment_entity)
+    (assignment_locked ?assignment_entity - assignment_entity)
+    (ready_flag ?assignment_entity - assignment_entity)
+    (activated_for_objective ?assignment_entity - assignment_entity)
+    (role_token_released ?role_token - role_token)
+    (entity_role_token_bound ?assignment_entity - assignment_entity ?role_token - role_token)
+    (class_tag_available ?class_tag - class_tag)
+    (entity_has_class_tag ?assignment_entity - assignment_entity ?class_tag - class_tag)
+    (support_agent_available ?support_agent - support_agent)
+    (entity_has_support_agent ?assignment_entity - assignment_entity ?support_agent - support_agent)
+    (consumable_available ?consumable_item - consumable_item)
+    (primary_slot_has_consumable ?primary_defender_slot - primary_defender_slot ?consumable_item - consumable_item)
+    (secondary_slot_has_consumable ?secondary_defender_slot - secondary_defender_slot ?consumable_item - consumable_item)
+    (slot_link_position_a ?primary_defender_slot - primary_defender_slot ?position_node_a - position_node_a)
+    (position_a_claimed ?position_node_a - position_node_a)
+    (position_a_prepared ?position_node_a - position_node_a)
+    (primary_slot_claim_confirmed ?primary_defender_slot - primary_defender_slot)
+    (slot_link_position_b ?secondary_defender_slot - secondary_defender_slot ?position_node_b - position_node_b)
+    (position_b_claimed ?position_node_b - position_node_b)
+    (position_b_prepared ?position_node_b - position_node_b)
+    (secondary_slot_claim_confirmed ?secondary_defender_slot - secondary_defender_slot)
+    (assignment_token_available ?assignment_token - assignment_token)
+    (assignment_token_staged ?assignment_token - assignment_token)
+    (assignment_token_has_position_a ?assignment_token - assignment_token ?position_node_a - position_node_a)
+    (assignment_token_has_position_b ?assignment_token - assignment_token ?position_node_b - position_node_b)
+    (assignment_token_mode_a ?assignment_token - assignment_token)
+    (assignment_token_mode_b ?assignment_token - assignment_token)
+    (assignment_token_ready ?assignment_token - assignment_token)
+    (operator_link_primary_slot ?operator_unit - operator_unit ?primary_defender_slot - primary_defender_slot)
+    (operator_link_secondary_slot ?operator_unit - operator_unit ?secondary_defender_slot - secondary_defender_slot)
+    (operator_link_assignment_token ?operator_unit - operator_unit ?assignment_token - assignment_token)
+    (equipment_available ?equipment_slot - equipment_slot)
+    (operator_has_equipment ?operator_unit - operator_unit ?equipment_slot - equipment_slot)
+    (equipment_attached ?equipment_slot - equipment_slot)
+    (equipment_attached_to_assignment_token ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    (operator_stage_equipment_attached ?operator_unit - operator_unit)
+    (operator_stage_loadout_confirmed ?operator_unit - operator_unit)
+    (operator_stage_buffs_applied ?operator_unit - operator_unit)
+    (operator_attachment_reserved ?operator_unit - operator_unit)
+    (operator_attachment_applied ?operator_unit - operator_unit)
+    (operator_ready_verified ?operator_unit - operator_unit)
+    (operator_finalized_for_deployment ?operator_unit - operator_unit)
+    (permanent_bonus_available ?permanent_bonus - permanent_bonus)
+    (operator_has_permanent_bonus ?operator_unit - operator_unit ?permanent_bonus - permanent_bonus)
+    (operator_permanent_bonus_applied ?operator_unit - operator_unit)
+    (operator_attachment_configured ?operator_unit - operator_unit)
+    (operator_special_modifier_configured ?operator_unit - operator_unit)
+    (attachment_token_available ?attachment_token - attachment_token)
+    (operator_has_attachment_token ?operator_unit - operator_unit ?attachment_token - attachment_token)
+    (secondary_resource_available ?secondary_resource - secondary_resource)
+    (operator_has_secondary_resource ?operator_unit - operator_unit ?secondary_resource - secondary_resource)
+    (temporary_buff_available ?temporary_buff - temporary_buff)
+    (operator_has_temporary_buff ?operator_unit - operator_unit ?temporary_buff - temporary_buff)
+    (special_modifier_available ?special_modifier - special_modifier)
+    (operator_has_special_modifier ?operator_unit - operator_unit ?special_modifier - special_modifier)
+    (objective_marker_released ?objective_marker - objective_marker)
+    (entity_link_objective_marker ?assignment_entity - assignment_entity ?objective_marker - objective_marker)
+    (primary_slot_staged ?primary_defender_slot - primary_defender_slot)
+    (secondary_slot_staged ?secondary_defender_slot - secondary_defender_slot)
+    (operator_deployment_marked ?operator_unit - operator_unit)
+  )
+  (:action register_assignment_entity
+    :parameters (?assignment_entity - assignment_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?assignment_entity)
+        )
+        (not
+          (assignment_locked ?assignment_entity)
+        )
+      )
+    :effect (entity_registered ?assignment_entity)
+  )
+  (:action bind_role_token_to_entity
+    :parameters (?assignment_entity - assignment_entity ?role_token - role_token)
+    :precondition
+      (and
+        (entity_registered ?assignment_entity)
+        (not
+          (entity_has_role_token ?assignment_entity)
+        )
+        (role_token_released ?role_token)
+      )
+    :effect
+      (and
+        (entity_has_role_token ?assignment_entity)
+        (entity_role_token_bound ?assignment_entity ?role_token)
+        (not
+          (role_token_released ?role_token)
+        )
+      )
+  )
+  (:action bind_class_tag_to_entity
+    :parameters (?assignment_entity - assignment_entity ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_registered ?assignment_entity)
+        (entity_has_role_token ?assignment_entity)
+        (class_tag_available ?class_tag)
+      )
+    :effect
+      (and
+        (entity_has_class_tag ?assignment_entity ?class_tag)
+        (not
+          (class_tag_available ?class_tag)
+        )
+      )
+  )
+  (:action finalize_role_binding_for_entity
+    :parameters (?assignment_entity - assignment_entity ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_registered ?assignment_entity)
+        (entity_has_role_token ?assignment_entity)
+        (entity_has_class_tag ?assignment_entity ?class_tag)
+        (not
+          (entity_assigned ?assignment_entity)
+        )
+      )
+    :effect (entity_assigned ?assignment_entity)
+  )
+  (:action release_class_tag_from_entity
+    :parameters (?assignment_entity - assignment_entity ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_has_class_tag ?assignment_entity ?class_tag)
+      )
+    :effect
+      (and
+        (class_tag_available ?class_tag)
+        (not
+          (entity_has_class_tag ?assignment_entity ?class_tag)
+        )
+      )
+  )
+  (:action assign_support_agent_to_entity
+    :parameters (?assignment_entity - assignment_entity ?support_agent - support_agent)
+    :precondition
+      (and
+        (entity_assigned ?assignment_entity)
+        (support_agent_available ?support_agent)
+      )
+    :effect
+      (and
+        (entity_has_support_agent ?assignment_entity ?support_agent)
+        (not
+          (support_agent_available ?support_agent)
+        )
+      )
+  )
+  (:action remove_support_agent_from_entity
+    :parameters (?assignment_entity - assignment_entity ?support_agent - support_agent)
+    :precondition
+      (and
+        (entity_has_support_agent ?assignment_entity ?support_agent)
+      )
+    :effect
+      (and
+        (support_agent_available ?support_agent)
+        (not
+          (entity_has_support_agent ?assignment_entity ?support_agent)
+        )
+      )
+  )
+  (:action attach_temporary_buff_to_operator
+    :parameters (?operator_unit - operator_unit ?temporary_buff - temporary_buff)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (temporary_buff_available ?temporary_buff)
+      )
+    :effect
+      (and
+        (operator_has_temporary_buff ?operator_unit ?temporary_buff)
+        (not
+          (temporary_buff_available ?temporary_buff)
+        )
+      )
+  )
+  (:action remove_temporary_buff_from_operator
+    :parameters (?operator_unit - operator_unit ?temporary_buff - temporary_buff)
+    :precondition
+      (and
+        (operator_has_temporary_buff ?operator_unit ?temporary_buff)
+      )
+    :effect
+      (and
+        (temporary_buff_available ?temporary_buff)
+        (not
+          (operator_has_temporary_buff ?operator_unit ?temporary_buff)
+        )
+      )
+  )
+  (:action attach_special_modifier_to_operator
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (special_modifier_available ?special_modifier)
+      )
+    :effect
+      (and
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (not
+          (special_modifier_available ?special_modifier)
+        )
+      )
+  )
+  (:action remove_special_modifier_from_operator
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+      )
+    :effect
+      (and
+        (special_modifier_available ?special_modifier)
+        (not
+          (operator_has_special_modifier ?operator_unit ?special_modifier)
+        )
+      )
+  )
+  (:action claim_position_a_for_slot
+    :parameters (?primary_defender_slot - primary_defender_slot ?position_node_a - position_node_a ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_assigned ?primary_defender_slot)
+        (entity_has_class_tag ?primary_defender_slot ?class_tag)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (not
+          (position_a_claimed ?position_node_a)
+        )
+        (not
+          (position_a_prepared ?position_node_a)
+        )
+      )
+    :effect (position_a_claimed ?position_node_a)
+  )
+  (:action confirm_primary_slot_with_support_agent
+    :parameters (?primary_defender_slot - primary_defender_slot ?position_node_a - position_node_a ?support_agent - support_agent)
+    :precondition
+      (and
+        (entity_assigned ?primary_defender_slot)
+        (entity_has_support_agent ?primary_defender_slot ?support_agent)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (position_a_claimed ?position_node_a)
+        (not
+          (primary_slot_staged ?primary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+      )
+  )
+  (:action prepare_position_a_with_consumable
+    :parameters (?primary_defender_slot - primary_defender_slot ?position_node_a - position_node_a ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_assigned ?primary_defender_slot)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (consumable_available ?consumable_item)
+        (not
+          (primary_slot_staged ?primary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (position_a_prepared ?position_node_a)
+        (primary_slot_staged ?primary_defender_slot)
+        (primary_slot_has_consumable ?primary_defender_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_primary_slot_claim_with_consumable
+    :parameters (?primary_defender_slot - primary_defender_slot ?position_node_a - position_node_a ?class_tag - class_tag ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_assigned ?primary_defender_slot)
+        (entity_has_class_tag ?primary_defender_slot ?class_tag)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (position_a_prepared ?position_node_a)
+        (primary_slot_has_consumable ?primary_defender_slot ?consumable_item)
+        (not
+          (primary_slot_claim_confirmed ?primary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (position_a_claimed ?position_node_a)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (primary_slot_has_consumable ?primary_defender_slot ?consumable_item)
+        )
+      )
+  )
+  (:action claim_position_b_for_slot
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?position_node_b - position_node_b ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_assigned ?secondary_defender_slot)
+        (entity_has_class_tag ?secondary_defender_slot ?class_tag)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (not
+          (position_b_claimed ?position_node_b)
+        )
+        (not
+          (position_b_prepared ?position_node_b)
+        )
+      )
+    :effect (position_b_claimed ?position_node_b)
+  )
+  (:action confirm_secondary_slot_with_support_agent
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?position_node_b - position_node_b ?support_agent - support_agent)
+    :precondition
+      (and
+        (entity_assigned ?secondary_defender_slot)
+        (entity_has_support_agent ?secondary_defender_slot ?support_agent)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_b_claimed ?position_node_b)
+        (not
+          (secondary_slot_staged ?secondary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_staged ?secondary_defender_slot)
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+      )
+  )
+  (:action prepare_position_b_with_consumable
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?position_node_b - position_node_b ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_assigned ?secondary_defender_slot)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (consumable_available ?consumable_item)
+        (not
+          (secondary_slot_staged ?secondary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (position_b_prepared ?position_node_b)
+        (secondary_slot_staged ?secondary_defender_slot)
+        (secondary_slot_has_consumable ?secondary_defender_slot ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_claim_with_consumable
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?position_node_b - position_node_b ?class_tag - class_tag ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (entity_assigned ?secondary_defender_slot)
+        (entity_has_class_tag ?secondary_defender_slot ?class_tag)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_b_prepared ?position_node_b)
+        (secondary_slot_has_consumable ?secondary_defender_slot ?consumable_item)
+        (not
+          (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (position_b_claimed ?position_node_b)
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (secondary_slot_has_consumable ?secondary_defender_slot ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_assignment_token_from_claimed_slots
+    :parameters (?primary_defender_slot - primary_defender_slot ?secondary_defender_slot - secondary_defender_slot ?position_node_a - position_node_a ?position_node_b - position_node_b ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (secondary_slot_staged ?secondary_defender_slot)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_a_claimed ?position_node_a)
+        (position_b_claimed ?position_node_b)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        (assignment_token_available ?assignment_token)
+      )
+    :effect
+      (and
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_has_position_a ?assignment_token ?position_node_a)
+        (assignment_token_has_position_b ?assignment_token ?position_node_b)
+        (not
+          (assignment_token_available ?assignment_token)
+        )
+      )
+  )
+  (:action assemble_assignment_token_prepped_a_claimed_b
+    :parameters (?primary_defender_slot - primary_defender_slot ?secondary_defender_slot - secondary_defender_slot ?position_node_a - position_node_a ?position_node_b - position_node_b ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (secondary_slot_staged ?secondary_defender_slot)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_a_prepared ?position_node_a)
+        (position_b_claimed ?position_node_b)
+        (not
+          (primary_slot_claim_confirmed ?primary_defender_slot)
+        )
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        (assignment_token_available ?assignment_token)
+      )
+    :effect
+      (and
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_has_position_a ?assignment_token ?position_node_a)
+        (assignment_token_has_position_b ?assignment_token ?position_node_b)
+        (assignment_token_mode_a ?assignment_token)
+        (not
+          (assignment_token_available ?assignment_token)
+        )
+      )
+  )
+  (:action assemble_assignment_token_claimed_a_prepped_b
+    :parameters (?primary_defender_slot - primary_defender_slot ?secondary_defender_slot - secondary_defender_slot ?position_node_a - position_node_a ?position_node_b - position_node_b ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (secondary_slot_staged ?secondary_defender_slot)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_a_claimed ?position_node_a)
+        (position_b_prepared ?position_node_b)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+        (not
+          (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        )
+        (assignment_token_available ?assignment_token)
+      )
+    :effect
+      (and
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_has_position_a ?assignment_token ?position_node_a)
+        (assignment_token_has_position_b ?assignment_token ?position_node_b)
+        (assignment_token_mode_b ?assignment_token)
+        (not
+          (assignment_token_available ?assignment_token)
+        )
+      )
+  )
+  (:action assemble_assignment_token_from_prepped_positions
+    :parameters (?primary_defender_slot - primary_defender_slot ?secondary_defender_slot - secondary_defender_slot ?position_node_a - position_node_a ?position_node_b - position_node_b ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (secondary_slot_staged ?secondary_defender_slot)
+        (slot_link_position_a ?primary_defender_slot ?position_node_a)
+        (slot_link_position_b ?secondary_defender_slot ?position_node_b)
+        (position_a_prepared ?position_node_a)
+        (position_b_prepared ?position_node_b)
+        (not
+          (primary_slot_claim_confirmed ?primary_defender_slot)
+        )
+        (not
+          (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        )
+        (assignment_token_available ?assignment_token)
+      )
+    :effect
+      (and
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_has_position_a ?assignment_token ?position_node_a)
+        (assignment_token_has_position_b ?assignment_token ?position_node_b)
+        (assignment_token_mode_a ?assignment_token)
+        (assignment_token_mode_b ?assignment_token)
+        (not
+          (assignment_token_available ?assignment_token)
+        )
+      )
+  )
+  (:action finalize_assignment_token_activation
+    :parameters (?assignment_token - assignment_token ?primary_defender_slot - primary_defender_slot ?class_tag - class_tag)
+    :precondition
+      (and
+        (assignment_token_staged ?assignment_token)
+        (primary_slot_staged ?primary_defender_slot)
+        (entity_has_class_tag ?primary_defender_slot ?class_tag)
+        (not
+          (assignment_token_ready ?assignment_token)
+        )
+      )
+    :effect (assignment_token_ready ?assignment_token)
+  )
+  (:action attach_equipment_to_assignment_token
+    :parameters (?operator_unit - operator_unit ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (operator_link_assignment_token ?operator_unit ?assignment_token)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_available ?equipment_slot)
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_ready ?assignment_token)
+        (not
+          (equipment_attached ?equipment_slot)
+        )
+      )
+    :effect
+      (and
+        (equipment_attached ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (not
+          (equipment_available ?equipment_slot)
+        )
+      )
+  )
+  (:action stage_operator_after_equipment_attachment
+    :parameters (?operator_unit - operator_unit ?equipment_slot - equipment_slot ?assignment_token - assignment_token ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (entity_has_class_tag ?operator_unit ?class_tag)
+        (not
+          (assignment_token_mode_a ?assignment_token)
+        )
+        (not
+          (operator_stage_equipment_attached ?operator_unit)
+        )
+      )
+    :effect (operator_stage_equipment_attached ?operator_unit)
+  )
+  (:action reserve_attachment_token_for_operator
+    :parameters (?operator_unit - operator_unit ?attachment_token - attachment_token)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (attachment_token_available ?attachment_token)
+        (not
+          (operator_attachment_reserved ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_attachment_reserved ?operator_unit)
+        (operator_has_attachment_token ?operator_unit ?attachment_token)
+        (not
+          (attachment_token_available ?attachment_token)
+        )
+      )
+  )
+  (:action attach_attachment_token_and_stage_operator
+    :parameters (?operator_unit - operator_unit ?equipment_slot - equipment_slot ?assignment_token - assignment_token ?class_tag - class_tag ?attachment_token - attachment_token)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (entity_has_class_tag ?operator_unit ?class_tag)
+        (assignment_token_mode_a ?assignment_token)
+        (operator_attachment_reserved ?operator_unit)
+        (operator_has_attachment_token ?operator_unit ?attachment_token)
+        (not
+          (operator_stage_equipment_attached ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_stage_equipment_attached ?operator_unit)
+        (operator_attachment_applied ?operator_unit)
+      )
+  )
+  (:action confirm_operator_loadout_variant_mode_b_unset
+    :parameters (?operator_unit - operator_unit ?temporary_buff - temporary_buff ?support_agent - support_agent ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_equipment_attached ?operator_unit)
+        (operator_has_temporary_buff ?operator_unit ?temporary_buff)
+        (entity_has_support_agent ?operator_unit ?support_agent)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (not
+          (assignment_token_mode_b ?assignment_token)
+        )
+        (not
+          (operator_stage_loadout_confirmed ?operator_unit)
+        )
+      )
+    :effect (operator_stage_loadout_confirmed ?operator_unit)
+  )
+  (:action confirm_operator_loadout_variant_mode_b_set
+    :parameters (?operator_unit - operator_unit ?temporary_buff - temporary_buff ?support_agent - support_agent ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_equipment_attached ?operator_unit)
+        (operator_has_temporary_buff ?operator_unit ?temporary_buff)
+        (entity_has_support_agent ?operator_unit ?support_agent)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (assignment_token_mode_b ?assignment_token)
+        (not
+          (operator_stage_loadout_confirmed ?operator_unit)
+        )
+      )
+    :effect (operator_stage_loadout_confirmed ?operator_unit)
+  )
+  (:action apply_special_modifier_stage_variant_1
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_loadout_confirmed ?operator_unit)
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (not
+          (assignment_token_mode_a ?assignment_token)
+        )
+        (not
+          (assignment_token_mode_b ?assignment_token)
+        )
+        (not
+          (operator_stage_buffs_applied ?operator_unit)
+        )
+      )
+    :effect (operator_stage_buffs_applied ?operator_unit)
+  )
+  (:action apply_special_modifier_stage_variant_2
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_loadout_confirmed ?operator_unit)
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (assignment_token_mode_a ?assignment_token)
+        (not
+          (assignment_token_mode_b ?assignment_token)
+        )
+        (not
+          (operator_stage_buffs_applied ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_ready_verified ?operator_unit)
+      )
+  )
+  (:action apply_special_modifier_stage_variant_3
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_loadout_confirmed ?operator_unit)
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (not
+          (assignment_token_mode_a ?assignment_token)
+        )
+        (assignment_token_mode_b ?assignment_token)
+        (not
+          (operator_stage_buffs_applied ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_ready_verified ?operator_unit)
+      )
+  )
+  (:action apply_special_modifier_stage_variant_4
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier ?equipment_slot - equipment_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (operator_stage_loadout_confirmed ?operator_unit)
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (operator_has_equipment ?operator_unit ?equipment_slot)
+        (equipment_attached_to_assignment_token ?equipment_slot ?assignment_token)
+        (assignment_token_mode_a ?assignment_token)
+        (assignment_token_mode_b ?assignment_token)
+        (not
+          (operator_stage_buffs_applied ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_ready_verified ?operator_unit)
+      )
+  )
+  (:action mark_operator_ready_for_deployment
+    :parameters (?operator_unit - operator_unit)
+    :precondition
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (not
+          (operator_ready_verified ?operator_unit)
+        )
+        (not
+          (operator_deployment_marked ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_deployment_marked ?operator_unit)
+        (ready_flag ?operator_unit)
+      )
+  )
+  (:action assign_secondary_resource_to_operator
+    :parameters (?operator_unit - operator_unit ?secondary_resource - secondary_resource)
+    :precondition
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_ready_verified ?operator_unit)
+        (secondary_resource_available ?secondary_resource)
+      )
+    :effect
+      (and
+        (operator_has_secondary_resource ?operator_unit ?secondary_resource)
+        (not
+          (secondary_resource_available ?secondary_resource)
+        )
+      )
+  )
+  (:action finalize_operator_readiness_checks
+    :parameters (?operator_unit - operator_unit ?primary_defender_slot - primary_defender_slot ?secondary_defender_slot - secondary_defender_slot ?class_tag - class_tag ?secondary_resource - secondary_resource)
+    :precondition
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_ready_verified ?operator_unit)
+        (operator_has_secondary_resource ?operator_unit ?secondary_resource)
+        (operator_link_primary_slot ?operator_unit ?primary_defender_slot)
+        (operator_link_secondary_slot ?operator_unit ?secondary_defender_slot)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        (entity_has_class_tag ?operator_unit ?class_tag)
+        (not
+          (operator_finalized_for_deployment ?operator_unit)
+        )
+      )
+    :effect (operator_finalized_for_deployment ?operator_unit)
+  )
+  (:action confirm_operator_deployment_ready
+    :parameters (?operator_unit - operator_unit)
+    :precondition
+      (and
+        (operator_stage_buffs_applied ?operator_unit)
+        (operator_finalized_for_deployment ?operator_unit)
+        (not
+          (operator_deployment_marked ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_deployment_marked ?operator_unit)
+        (ready_flag ?operator_unit)
+      )
+  )
+  (:action apply_permanent_bonus_to_operator
+    :parameters (?operator_unit - operator_unit ?permanent_bonus - permanent_bonus ?class_tag - class_tag)
+    :precondition
+      (and
+        (entity_assigned ?operator_unit)
+        (entity_has_class_tag ?operator_unit ?class_tag)
+        (permanent_bonus_available ?permanent_bonus)
+        (operator_has_permanent_bonus ?operator_unit ?permanent_bonus)
+        (not
+          (operator_permanent_bonus_applied ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_permanent_bonus_applied ?operator_unit)
+        (not
+          (permanent_bonus_available ?permanent_bonus)
+        )
+      )
+  )
+  (:action configure_operator_attachment_with_support
+    :parameters (?operator_unit - operator_unit ?support_agent - support_agent)
+    :precondition
+      (and
+        (operator_permanent_bonus_applied ?operator_unit)
+        (entity_has_support_agent ?operator_unit ?support_agent)
+        (not
+          (operator_attachment_configured ?operator_unit)
+        )
+      )
+    :effect (operator_attachment_configured ?operator_unit)
+  )
+  (:action bind_special_modifier_after_attachment
+    :parameters (?operator_unit - operator_unit ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (operator_attachment_configured ?operator_unit)
+        (operator_has_special_modifier ?operator_unit ?special_modifier)
+        (not
+          (operator_special_modifier_configured ?operator_unit)
+        )
+      )
+    :effect (operator_special_modifier_configured ?operator_unit)
+  )
+  (:action deploy_operator_after_configuration
+    :parameters (?operator_unit - operator_unit)
+    :precondition
+      (and
+        (operator_special_modifier_configured ?operator_unit)
+        (not
+          (operator_deployment_marked ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (operator_deployment_marked ?operator_unit)
+        (ready_flag ?operator_unit)
+      )
+  )
+  (:action activate_primary_slot_with_token
+    :parameters (?primary_defender_slot - primary_defender_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (primary_slot_staged ?primary_defender_slot)
+        (primary_slot_claim_confirmed ?primary_defender_slot)
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_ready ?assignment_token)
+        (not
+          (ready_flag ?primary_defender_slot)
+        )
+      )
+    :effect (ready_flag ?primary_defender_slot)
+  )
+  (:action activate_secondary_slot_with_token
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?assignment_token - assignment_token)
+    :precondition
+      (and
+        (secondary_slot_staged ?secondary_defender_slot)
+        (secondary_slot_claim_confirmed ?secondary_defender_slot)
+        (assignment_token_staged ?assignment_token)
+        (assignment_token_ready ?assignment_token)
+        (not
+          (ready_flag ?secondary_defender_slot)
+        )
+      )
+    :effect (ready_flag ?secondary_defender_slot)
+  )
+  (:action assign_objective_to_entity
+    :parameters (?assignment_entity - assignment_entity ?objective_marker - objective_marker ?class_tag - class_tag)
+    :precondition
+      (and
+        (ready_flag ?assignment_entity)
+        (entity_has_class_tag ?assignment_entity ?class_tag)
+        (objective_marker_released ?objective_marker)
+        (not
+          (activated_for_objective ?assignment_entity)
+        )
+      )
+    :effect
+      (and
+        (activated_for_objective ?assignment_entity)
+        (entity_link_objective_marker ?assignment_entity ?objective_marker)
+        (not
+          (objective_marker_released ?objective_marker)
+        )
+      )
+  )
+  (:action lock_primary_slot_assignment
+    :parameters (?primary_defender_slot - primary_defender_slot ?role_token - role_token ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (activated_for_objective ?primary_defender_slot)
+        (entity_role_token_bound ?primary_defender_slot ?role_token)
+        (entity_link_objective_marker ?primary_defender_slot ?objective_marker)
+        (not
+          (assignment_locked ?primary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (assignment_locked ?primary_defender_slot)
+        (role_token_released ?role_token)
+        (objective_marker_released ?objective_marker)
+      )
+  )
+  (:action lock_secondary_slot_assignment
+    :parameters (?secondary_defender_slot - secondary_defender_slot ?role_token - role_token ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (activated_for_objective ?secondary_defender_slot)
+        (entity_role_token_bound ?secondary_defender_slot ?role_token)
+        (entity_link_objective_marker ?secondary_defender_slot ?objective_marker)
+        (not
+          (assignment_locked ?secondary_defender_slot)
+        )
+      )
+    :effect
+      (and
+        (assignment_locked ?secondary_defender_slot)
+        (role_token_released ?role_token)
+        (objective_marker_released ?objective_marker)
+      )
+  )
+  (:action lock_operator_assignment
+    :parameters (?operator_unit - operator_unit ?role_token - role_token ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (activated_for_objective ?operator_unit)
+        (entity_role_token_bound ?operator_unit ?role_token)
+        (entity_link_objective_marker ?operator_unit ?objective_marker)
+        (not
+          (assignment_locked ?operator_unit)
+        )
+      )
+    :effect
+      (and
+        (assignment_locked ?operator_unit)
+        (role_token_released ?role_token)
+        (objective_marker_released ?objective_marker)
+      )
+  )
+)

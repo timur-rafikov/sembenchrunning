@@ -139,6 +139,11 @@ class PipelineSmokeTests(unittest.TestCase):
             self.assertEqual(run_payload["id"], "finance__ops__sample_a")
             self.assertEqual(run_payload["nl2pddl_status"], "ok")
             self.assertIn("plan_pred_pddl", run_payload)
+            self.assertIn("openrouter_request", run_payload)
+            self.assertEqual(run_payload["openrouter_request"].get("model"), "fake/model")
+            self.assertEqual(run_payload["openrouter_request"].get("max_output_tokens"), 128)
+            self.assertEqual(run_payload["openrouter_request"].get("max_tokens"), 128)
+            self.assertIn("prompt_translator_signature", run_payload.get("sembench_translator_meta", {}))
 
             metrics_path = output_dir / "metrics.jsonl"
             self.assertTrue(metrics_path.exists())
@@ -147,6 +152,8 @@ class PipelineSmokeTests(unittest.TestCase):
             self.assertEqual(rows[0]["status"], "metrics_computed")
             self.assertTrue(rows[0]["executability"])
             self.assertTrue(rows[0]["reachability"])
+            self.assertIn("run_file", rows[0])
+            self.assertIn("sembench_translator_meta", rows[0])
 
 
 if __name__ == "__main__":

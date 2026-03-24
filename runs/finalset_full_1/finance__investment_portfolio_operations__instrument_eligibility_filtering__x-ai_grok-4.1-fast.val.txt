@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain instrument_eligibility_filtering_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types eligibility_artifact_supertype - object resource_supertype - object attribute_supertype - object instrument_root_type - object instrument_entity_supertype - instrument_root_type eligibility_token - eligibility_artifact_supertype market_data_feed - eligibility_artifact_supertype compliance_rule_template - eligibility_artifact_supertype client_restriction_tag - eligibility_artifact_supertype execution_profile - eligibility_artifact_supertype eligibility_evidence_token - eligibility_artifact_supertype trading_venue - eligibility_artifact_supertype regulatory_approval - eligibility_artifact_supertype soft_constraint - resource_supertype security_attribute - resource_supertype analyst_approval - resource_supertype exposure_dimension_a - attribute_supertype exposure_dimension_b - attribute_supertype trade_proposal - attribute_supertype instrument_context_marker - instrument_entity_supertype instrument_subtype_marker_alt - instrument_entity_supertype portfolio_context_primary - instrument_context_marker portfolio_context_secondary - instrument_context_marker security_entity - instrument_subtype_marker_alt)
+  (:predicates
+    (entity_ingested ?candidate_instrument - instrument_entity_supertype)
+    (canonical_mapping_assigned ?candidate_instrument - instrument_entity_supertype)
+    (eligibility_token_assigned ?candidate_instrument - instrument_entity_supertype)
+    (eligibility_finalized ?candidate_instrument - instrument_entity_supertype)
+    (eligibility_assigned ?candidate_instrument - instrument_entity_supertype)
+    (eligibility_confirmed ?candidate_instrument - instrument_entity_supertype)
+    (eligibility_token_available ?eligibility_token - eligibility_token)
+    (entity_token_assignment ?candidate_instrument - instrument_entity_supertype ?eligibility_token - eligibility_token)
+    (market_feed_available ?market_data_feed - market_data_feed)
+    (market_data_linked_to_entity ?candidate_instrument - instrument_entity_supertype ?market_data_feed - market_data_feed)
+    (compliance_rule_available ?compliance_rule_template - compliance_rule_template)
+    (entity_compliance_binding ?candidate_instrument - instrument_entity_supertype ?compliance_rule_template - compliance_rule_template)
+    (soft_constraint_available ?soft_constraint - soft_constraint)
+    (portfolio_soft_constraint_assignment ?portfolio_context_primary - portfolio_context_primary ?soft_constraint - soft_constraint)
+    (portfolio_secondary_soft_constraint_assignment ?portfolio_context_secondary - portfolio_context_secondary ?soft_constraint - soft_constraint)
+    (portfolio_exposure_a_assignment ?portfolio_context_primary - portfolio_context_primary ?exposure_dimension_a - exposure_dimension_a)
+    (exposure_a_flag ?exposure_dimension_a - exposure_dimension_a)
+    (exposure_a_soft_flag ?exposure_dimension_a - exposure_dimension_a)
+    (portfolio_primary_ready ?portfolio_context_primary - portfolio_context_primary)
+    (portfolio_exposure_b_assignment ?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_b - exposure_dimension_b)
+    (exposure_b_flag ?exposure_dimension_b - exposure_dimension_b)
+    (exposure_b_soft_flag ?exposure_dimension_b - exposure_dimension_b)
+    (portfolio_secondary_ready ?portfolio_context_secondary - portfolio_context_secondary)
+    (trade_proposal_available ?trade_proposal - trade_proposal)
+    (trade_proposal_active ?trade_proposal - trade_proposal)
+    (proposal_exposure_a_link ?trade_proposal - trade_proposal ?exposure_dimension_a - exposure_dimension_a)
+    (proposal_exposure_b_link ?trade_proposal - trade_proposal ?exposure_dimension_b - exposure_dimension_b)
+    (proposal_flag_primary_override ?trade_proposal - trade_proposal)
+    (proposal_flag_secondary_override ?trade_proposal - trade_proposal)
+    (trade_proposal_locked ?trade_proposal - trade_proposal)
+    (security_linked_to_portfolio_primary ?security_entity - security_entity ?portfolio_context_primary - portfolio_context_primary)
+    (security_linked_to_portfolio_secondary ?security_entity - security_entity ?portfolio_context_secondary - portfolio_context_secondary)
+    (security_linked_to_trade_proposal ?security_entity - security_entity ?trade_proposal - trade_proposal)
+    (attribute_available ?security_attribute - security_attribute)
+    (security_has_attribute ?security_entity - security_entity ?security_attribute - security_attribute)
+    (attribute_committed ?security_attribute - security_attribute)
+    (attribute_linked_to_proposal ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    (attribute_binding_complete_for_security ?security_entity - security_entity)
+    (venue_and_compliance_bound ?security_entity - security_entity)
+    (approvals_consolidated ?security_entity - security_entity)
+    (client_restriction_attached ?security_entity - security_entity)
+    (client_restriction_confirmed ?security_entity - security_entity)
+    (eligible_for_execution_profile_assignment ?security_entity - security_entity)
+    (final_selection_ready ?security_entity - security_entity)
+    (analyst_approval_available ?analyst_approval - analyst_approval)
+    (security_analyst_approval_assignment ?security_entity - security_entity ?analyst_approval - analyst_approval)
+    (analyst_approval_attached ?security_entity - security_entity)
+    (analyst_approval_verified ?security_entity - security_entity)
+    (final_approval_endorsement ?security_entity - security_entity)
+    (client_restriction_tag_available ?client_restriction_tag - client_restriction_tag)
+    (security_client_restriction_assignment ?security_entity - security_entity ?client_restriction_tag - client_restriction_tag)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (security_execution_profile_assignment ?security_entity - security_entity ?execution_profile - execution_profile)
+    (trading_venue_available ?trading_venue - trading_venue)
+    (security_trading_venue_assignment ?security_entity - security_entity ?trading_venue - trading_venue)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (security_regulatory_approval_assignment ?security_entity - security_entity ?regulatory_approval - regulatory_approval)
+    (eligibility_evidence_available ?eligibility_evidence_token - eligibility_evidence_token)
+    (entity_evidence_assignment ?candidate_instrument - instrument_entity_supertype ?eligibility_evidence_token - eligibility_evidence_token)
+    (portfolio_primary_ready_for_proposal ?portfolio_context_primary - portfolio_context_primary)
+    (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary - portfolio_context_secondary)
+    (eligibility_assignment_committed ?security_entity - security_entity)
+  )
+  (:action register_candidate_instrument
+    :parameters (?candidate_instrument - instrument_entity_supertype)
+    :precondition
+      (and
+        (not
+          (entity_ingested ?candidate_instrument)
+        )
+        (not
+          (eligibility_finalized ?candidate_instrument)
+        )
+      )
+    :effect (entity_ingested ?candidate_instrument)
+  )
+  (:action apply_eligibility_token_to_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?eligibility_token - eligibility_token)
+    :precondition
+      (and
+        (entity_ingested ?candidate_instrument)
+        (not
+          (eligibility_token_assigned ?candidate_instrument)
+        )
+        (eligibility_token_available ?eligibility_token)
+      )
+    :effect
+      (and
+        (eligibility_token_assigned ?candidate_instrument)
+        (entity_token_assignment ?candidate_instrument ?eligibility_token)
+        (not
+          (eligibility_token_available ?eligibility_token)
+        )
+      )
+  )
+  (:action bind_market_data_feed_to_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (entity_ingested ?candidate_instrument)
+        (eligibility_token_assigned ?candidate_instrument)
+        (market_feed_available ?market_data_feed)
+      )
+    :effect
+      (and
+        (market_data_linked_to_entity ?candidate_instrument ?market_data_feed)
+        (not
+          (market_feed_available ?market_data_feed)
+        )
+      )
+  )
+  (:action confirm_candidate_validation
+    :parameters (?candidate_instrument - instrument_entity_supertype ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (entity_ingested ?candidate_instrument)
+        (eligibility_token_assigned ?candidate_instrument)
+        (market_data_linked_to_entity ?candidate_instrument ?market_data_feed)
+        (not
+          (canonical_mapping_assigned ?candidate_instrument)
+        )
+      )
+    :effect (canonical_mapping_assigned ?candidate_instrument)
+  )
+  (:action unbind_market_data_feed_from_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (market_data_linked_to_entity ?candidate_instrument ?market_data_feed)
+      )
+    :effect
+      (and
+        (market_feed_available ?market_data_feed)
+        (not
+          (market_data_linked_to_entity ?candidate_instrument ?market_data_feed)
+        )
+      )
+  )
+  (:action apply_compliance_rule_to_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?compliance_rule_template - compliance_rule_template)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?candidate_instrument)
+        (compliance_rule_available ?compliance_rule_template)
+      )
+    :effect
+      (and
+        (entity_compliance_binding ?candidate_instrument ?compliance_rule_template)
+        (not
+          (compliance_rule_available ?compliance_rule_template)
+        )
+      )
+  )
+  (:action remove_compliance_rule_from_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?compliance_rule_template - compliance_rule_template)
+    :precondition
+      (and
+        (entity_compliance_binding ?candidate_instrument ?compliance_rule_template)
+      )
+    :effect
+      (and
+        (compliance_rule_available ?compliance_rule_template)
+        (not
+          (entity_compliance_binding ?candidate_instrument ?compliance_rule_template)
+        )
+      )
+  )
+  (:action apply_trading_venue_to_security_entity
+    :parameters (?security_entity - security_entity ?trading_venue - trading_venue)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (trading_venue_available ?trading_venue)
+      )
+    :effect
+      (and
+        (security_trading_venue_assignment ?security_entity ?trading_venue)
+        (not
+          (trading_venue_available ?trading_venue)
+        )
+      )
+  )
+  (:action remove_trading_venue_from_security_entity
+    :parameters (?security_entity - security_entity ?trading_venue - trading_venue)
+    :precondition
+      (and
+        (security_trading_venue_assignment ?security_entity ?trading_venue)
+      )
+    :effect
+      (and
+        (trading_venue_available ?trading_venue)
+        (not
+          (security_trading_venue_assignment ?security_entity ?trading_venue)
+        )
+      )
+  )
+  (:action apply_regulatory_approval_to_security
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action remove_regulatory_approval_from_security
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        )
+      )
+  )
+  (:action flag_exposure_a_for_portfolio
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?exposure_dimension_a - exposure_dimension_a ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_primary)
+        (market_data_linked_to_entity ?portfolio_context_primary ?market_data_feed)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (not
+          (exposure_a_flag ?exposure_dimension_a)
+        )
+        (not
+          (exposure_a_soft_flag ?exposure_dimension_a)
+        )
+      )
+    :effect (exposure_a_flag ?exposure_dimension_a)
+  )
+  (:action confirm_portfolio_primary_exposure
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?exposure_dimension_a - exposure_dimension_a ?compliance_rule_template - compliance_rule_template)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_primary)
+        (entity_compliance_binding ?portfolio_context_primary ?compliance_rule_template)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (exposure_a_flag ?exposure_dimension_a)
+        (not
+          (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        )
+      )
+    :effect
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_primary_ready ?portfolio_context_primary)
+      )
+  )
+  (:action assign_soft_constraint_to_portfolio_primary
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?exposure_dimension_a - exposure_dimension_a ?soft_constraint - soft_constraint)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_primary)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (soft_constraint_available ?soft_constraint)
+        (not
+          (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        )
+      )
+    :effect
+      (and
+        (exposure_a_soft_flag ?exposure_dimension_a)
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_soft_constraint_assignment ?portfolio_context_primary ?soft_constraint)
+        (not
+          (soft_constraint_available ?soft_constraint)
+        )
+      )
+  )
+  (:action finalize_soft_constraint_assignment_for_portfolio_primary
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?exposure_dimension_a - exposure_dimension_a ?market_data_feed - market_data_feed ?soft_constraint - soft_constraint)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_primary)
+        (market_data_linked_to_entity ?portfolio_context_primary ?market_data_feed)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (exposure_a_soft_flag ?exposure_dimension_a)
+        (portfolio_soft_constraint_assignment ?portfolio_context_primary ?soft_constraint)
+        (not
+          (portfolio_primary_ready ?portfolio_context_primary)
+        )
+      )
+    :effect
+      (and
+        (exposure_a_flag ?exposure_dimension_a)
+        (portfolio_primary_ready ?portfolio_context_primary)
+        (soft_constraint_available ?soft_constraint)
+        (not
+          (portfolio_soft_constraint_assignment ?portfolio_context_primary ?soft_constraint)
+        )
+      )
+  )
+  (:action flag_exposure_b_for_portfolio
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_b - exposure_dimension_b ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_secondary)
+        (market_data_linked_to_entity ?portfolio_context_secondary ?market_data_feed)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (not
+          (exposure_b_flag ?exposure_dimension_b)
+        )
+        (not
+          (exposure_b_soft_flag ?exposure_dimension_b)
+        )
+      )
+    :effect (exposure_b_flag ?exposure_dimension_b)
+  )
+  (:action confirm_portfolio_secondary_exposure
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_b - exposure_dimension_b ?compliance_rule_template - compliance_rule_template)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_secondary)
+        (entity_compliance_binding ?portfolio_context_secondary ?compliance_rule_template)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_b_flag ?exposure_dimension_b)
+        (not
+          (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        )
+      )
+    :effect
+      (and
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+      )
+  )
+  (:action assign_soft_constraint_to_portfolio_secondary
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_b - exposure_dimension_b ?soft_constraint - soft_constraint)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_secondary)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (soft_constraint_available ?soft_constraint)
+        (not
+          (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        )
+      )
+    :effect
+      (and
+        (exposure_b_soft_flag ?exposure_dimension_b)
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_secondary_soft_constraint_assignment ?portfolio_context_secondary ?soft_constraint)
+        (not
+          (soft_constraint_available ?soft_constraint)
+        )
+      )
+  )
+  (:action finalize_soft_constraint_assignment_for_portfolio_secondary
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_b - exposure_dimension_b ?market_data_feed - market_data_feed ?soft_constraint - soft_constraint)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?portfolio_context_secondary)
+        (market_data_linked_to_entity ?portfolio_context_secondary ?market_data_feed)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_b_soft_flag ?exposure_dimension_b)
+        (portfolio_secondary_soft_constraint_assignment ?portfolio_context_secondary ?soft_constraint)
+        (not
+          (portfolio_secondary_ready ?portfolio_context_secondary)
+        )
+      )
+    :effect
+      (and
+        (exposure_b_flag ?exposure_dimension_b)
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+        (soft_constraint_available ?soft_constraint)
+        (not
+          (portfolio_secondary_soft_constraint_assignment ?portfolio_context_secondary ?soft_constraint)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_strict
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_a - exposure_dimension_a ?exposure_dimension_b - exposure_dimension_b ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_a_flag ?exposure_dimension_a)
+        (exposure_b_flag ?exposure_dimension_b)
+        (portfolio_primary_ready ?portfolio_context_primary)
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_active ?trade_proposal)
+        (proposal_exposure_a_link ?trade_proposal ?exposure_dimension_a)
+        (proposal_exposure_b_link ?trade_proposal ?exposure_dimension_b)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_primary_softmatch
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_a - exposure_dimension_a ?exposure_dimension_b - exposure_dimension_b ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_a_soft_flag ?exposure_dimension_a)
+        (exposure_b_flag ?exposure_dimension_b)
+        (not
+          (portfolio_primary_ready ?portfolio_context_primary)
+        )
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_active ?trade_proposal)
+        (proposal_exposure_a_link ?trade_proposal ?exposure_dimension_a)
+        (proposal_exposure_b_link ?trade_proposal ?exposure_dimension_b)
+        (proposal_flag_primary_override ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_secondary_softmatch
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_a - exposure_dimension_a ?exposure_dimension_b - exposure_dimension_b ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_a_flag ?exposure_dimension_a)
+        (exposure_b_soft_flag ?exposure_dimension_b)
+        (portfolio_primary_ready ?portfolio_context_primary)
+        (not
+          (portfolio_secondary_ready ?portfolio_context_secondary)
+        )
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_active ?trade_proposal)
+        (proposal_exposure_a_link ?trade_proposal ?exposure_dimension_a)
+        (proposal_exposure_b_link ?trade_proposal ?exposure_dimension_b)
+        (proposal_flag_secondary_override ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action assemble_trade_proposal_both_softmatch
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?portfolio_context_secondary - portfolio_context_secondary ?exposure_dimension_a - exposure_dimension_a ?exposure_dimension_b - exposure_dimension_b ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_exposure_a_assignment ?portfolio_context_primary ?exposure_dimension_a)
+        (portfolio_exposure_b_assignment ?portfolio_context_secondary ?exposure_dimension_b)
+        (exposure_a_soft_flag ?exposure_dimension_a)
+        (exposure_b_soft_flag ?exposure_dimension_b)
+        (not
+          (portfolio_primary_ready ?portfolio_context_primary)
+        )
+        (not
+          (portfolio_secondary_ready ?portfolio_context_secondary)
+        )
+        (trade_proposal_available ?trade_proposal)
+      )
+    :effect
+      (and
+        (trade_proposal_active ?trade_proposal)
+        (proposal_exposure_a_link ?trade_proposal ?exposure_dimension_a)
+        (proposal_exposure_b_link ?trade_proposal ?exposure_dimension_b)
+        (proposal_flag_primary_override ?trade_proposal)
+        (proposal_flag_secondary_override ?trade_proposal)
+        (not
+          (trade_proposal_available ?trade_proposal)
+        )
+      )
+  )
+  (:action lock_trade_proposal
+    :parameters (?trade_proposal - trade_proposal ?portfolio_context_primary - portfolio_context_primary ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (trade_proposal_active ?trade_proposal)
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (market_data_linked_to_entity ?portfolio_context_primary ?market_data_feed)
+        (not
+          (trade_proposal_locked ?trade_proposal)
+        )
+      )
+    :effect (trade_proposal_locked ?trade_proposal)
+  )
+  (:action bind_attribute_to_trade_proposal_and_mark
+    :parameters (?security_entity - security_entity ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (security_linked_to_trade_proposal ?security_entity ?trade_proposal)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_available ?security_attribute)
+        (trade_proposal_active ?trade_proposal)
+        (trade_proposal_locked ?trade_proposal)
+        (not
+          (attribute_committed ?security_attribute)
+        )
+      )
+    :effect
+      (and
+        (attribute_committed ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (not
+          (attribute_available ?security_attribute)
+        )
+      )
+  )
+  (:action prepare_security_for_approvals
+    :parameters (?security_entity - security_entity ?security_attribute - security_attribute ?trade_proposal - trade_proposal ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_committed ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (market_data_linked_to_entity ?security_entity ?market_data_feed)
+        (not
+          (proposal_flag_primary_override ?trade_proposal)
+        )
+        (not
+          (attribute_binding_complete_for_security ?security_entity)
+        )
+      )
+    :effect (attribute_binding_complete_for_security ?security_entity)
+  )
+  (:action attach_client_restriction_to_security
+    :parameters (?security_entity - security_entity ?client_restriction_tag - client_restriction_tag)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (client_restriction_tag_available ?client_restriction_tag)
+        (not
+          (client_restriction_attached ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (client_restriction_attached ?security_entity)
+        (security_client_restriction_assignment ?security_entity ?client_restriction_tag)
+        (not
+          (client_restriction_tag_available ?client_restriction_tag)
+        )
+      )
+  )
+  (:action apply_client_restriction_and_confirm
+    :parameters (?security_entity - security_entity ?security_attribute - security_attribute ?trade_proposal - trade_proposal ?market_data_feed - market_data_feed ?client_restriction_tag - client_restriction_tag)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_committed ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (market_data_linked_to_entity ?security_entity ?market_data_feed)
+        (proposal_flag_primary_override ?trade_proposal)
+        (client_restriction_attached ?security_entity)
+        (security_client_restriction_assignment ?security_entity ?client_restriction_tag)
+        (not
+          (attribute_binding_complete_for_security ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (attribute_binding_complete_for_security ?security_entity)
+        (client_restriction_confirmed ?security_entity)
+      )
+  )
+  (:action advance_security_to_venue_compliance_pending
+    :parameters (?security_entity - security_entity ?trading_venue - trading_venue ?compliance_rule_template - compliance_rule_template ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (attribute_binding_complete_for_security ?security_entity)
+        (security_trading_venue_assignment ?security_entity ?trading_venue)
+        (entity_compliance_binding ?security_entity ?compliance_rule_template)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (not
+          (proposal_flag_secondary_override ?trade_proposal)
+        )
+        (not
+          (venue_and_compliance_bound ?security_entity)
+        )
+      )
+    :effect (venue_and_compliance_bound ?security_entity)
+  )
+  (:action advance_security_to_venue_compliance_pending_alternate
+    :parameters (?security_entity - security_entity ?trading_venue - trading_venue ?compliance_rule_template - compliance_rule_template ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (attribute_binding_complete_for_security ?security_entity)
+        (security_trading_venue_assignment ?security_entity ?trading_venue)
+        (entity_compliance_binding ?security_entity ?compliance_rule_template)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (proposal_flag_secondary_override ?trade_proposal)
+        (not
+          (venue_and_compliance_bound ?security_entity)
+        )
+      )
+    :effect (venue_and_compliance_bound ?security_entity)
+  )
+  (:action consolidate_approvals_with_regulatory
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (venue_and_compliance_bound ?security_entity)
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (not
+          (proposal_flag_primary_override ?trade_proposal)
+        )
+        (not
+          (proposal_flag_secondary_override ?trade_proposal)
+        )
+        (not
+          (approvals_consolidated ?security_entity)
+        )
+      )
+    :effect (approvals_consolidated ?security_entity)
+  )
+  (:action consolidate_approvals_and_enable_profile_assignment
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (venue_and_compliance_bound ?security_entity)
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (proposal_flag_primary_override ?trade_proposal)
+        (not
+          (proposal_flag_secondary_override ?trade_proposal)
+        )
+        (not
+          (approvals_consolidated ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (approvals_consolidated ?security_entity)
+        (eligible_for_execution_profile_assignment ?security_entity)
+      )
+  )
+  (:action consolidate_approvals_and_enable_profile_assignment_variant
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (venue_and_compliance_bound ?security_entity)
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (not
+          (proposal_flag_primary_override ?trade_proposal)
+        )
+        (proposal_flag_secondary_override ?trade_proposal)
+        (not
+          (approvals_consolidated ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (approvals_consolidated ?security_entity)
+        (eligible_for_execution_profile_assignment ?security_entity)
+      )
+  )
+  (:action consolidate_approvals_and_enable_profile_assignment_combined
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval ?security_attribute - security_attribute ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (venue_and_compliance_bound ?security_entity)
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (security_has_attribute ?security_entity ?security_attribute)
+        (attribute_linked_to_proposal ?security_attribute ?trade_proposal)
+        (proposal_flag_primary_override ?trade_proposal)
+        (proposal_flag_secondary_override ?trade_proposal)
+        (not
+          (approvals_consolidated ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (approvals_consolidated ?security_entity)
+        (eligible_for_execution_profile_assignment ?security_entity)
+      )
+  )
+  (:action finalize_security_eligibility
+    :parameters (?security_entity - security_entity)
+    :precondition
+      (and
+        (approvals_consolidated ?security_entity)
+        (not
+          (eligible_for_execution_profile_assignment ?security_entity)
+        )
+        (not
+          (eligibility_assignment_committed ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assignment_committed ?security_entity)
+        (eligibility_assigned ?security_entity)
+      )
+  )
+  (:action attach_execution_profile_to_security
+    :parameters (?security_entity - security_entity ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (approvals_consolidated ?security_entity)
+        (eligible_for_execution_profile_assignment ?security_entity)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (security_execution_profile_assignment ?security_entity ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action prepare_security_for_assignment
+    :parameters (?security_entity - security_entity ?portfolio_context_primary - portfolio_context_primary ?portfolio_context_secondary - portfolio_context_secondary ?market_data_feed - market_data_feed ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (approvals_consolidated ?security_entity)
+        (eligible_for_execution_profile_assignment ?security_entity)
+        (security_execution_profile_assignment ?security_entity ?execution_profile)
+        (security_linked_to_portfolio_primary ?security_entity ?portfolio_context_primary)
+        (security_linked_to_portfolio_secondary ?security_entity ?portfolio_context_secondary)
+        (portfolio_primary_ready ?portfolio_context_primary)
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+        (market_data_linked_to_entity ?security_entity ?market_data_feed)
+        (not
+          (final_selection_ready ?security_entity)
+        )
+      )
+    :effect (final_selection_ready ?security_entity)
+  )
+  (:action commit_security_eligibility
+    :parameters (?security_entity - security_entity)
+    :precondition
+      (and
+        (approvals_consolidated ?security_entity)
+        (final_selection_ready ?security_entity)
+        (not
+          (eligibility_assignment_committed ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assignment_committed ?security_entity)
+        (eligibility_assigned ?security_entity)
+      )
+  )
+  (:action bind_analyst_approval_to_security
+    :parameters (?security_entity - security_entity ?analyst_approval - analyst_approval ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (canonical_mapping_assigned ?security_entity)
+        (market_data_linked_to_entity ?security_entity ?market_data_feed)
+        (analyst_approval_available ?analyst_approval)
+        (security_analyst_approval_assignment ?security_entity ?analyst_approval)
+        (not
+          (analyst_approval_attached ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (analyst_approval_attached ?security_entity)
+        (not
+          (analyst_approval_available ?analyst_approval)
+        )
+      )
+  )
+  (:action verify_analyst_approval
+    :parameters (?security_entity - security_entity ?compliance_rule_template - compliance_rule_template)
+    :precondition
+      (and
+        (analyst_approval_attached ?security_entity)
+        (entity_compliance_binding ?security_entity ?compliance_rule_template)
+        (not
+          (analyst_approval_verified ?security_entity)
+        )
+      )
+    :effect (analyst_approval_verified ?security_entity)
+  )
+  (:action endorse_approval_post_verification
+    :parameters (?security_entity - security_entity ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (analyst_approval_verified ?security_entity)
+        (security_regulatory_approval_assignment ?security_entity ?regulatory_approval)
+        (not
+          (final_approval_endorsement ?security_entity)
+        )
+      )
+    :effect (final_approval_endorsement ?security_entity)
+  )
+  (:action finalize_security_with_approval
+    :parameters (?security_entity - security_entity)
+    :precondition
+      (and
+        (final_approval_endorsement ?security_entity)
+        (not
+          (eligibility_assignment_committed ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (eligibility_assignment_committed ?security_entity)
+        (eligibility_assigned ?security_entity)
+      )
+  )
+  (:action assign_proposal_to_portfolio_primary
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_primary_ready_for_proposal ?portfolio_context_primary)
+        (portfolio_primary_ready ?portfolio_context_primary)
+        (trade_proposal_active ?trade_proposal)
+        (trade_proposal_locked ?trade_proposal)
+        (not
+          (eligibility_assigned ?portfolio_context_primary)
+        )
+      )
+    :effect (eligibility_assigned ?portfolio_context_primary)
+  )
+  (:action assign_proposal_to_portfolio_secondary
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?trade_proposal - trade_proposal)
+    :precondition
+      (and
+        (portfolio_secondary_ready_for_proposal ?portfolio_context_secondary)
+        (portfolio_secondary_ready ?portfolio_context_secondary)
+        (trade_proposal_active ?trade_proposal)
+        (trade_proposal_locked ?trade_proposal)
+        (not
+          (eligibility_assigned ?portfolio_context_secondary)
+        )
+      )
+    :effect (eligibility_assigned ?portfolio_context_secondary)
+  )
+  (:action consume_evidence_and_confirm_candidate
+    :parameters (?candidate_instrument - instrument_entity_supertype ?eligibility_evidence_token - eligibility_evidence_token ?market_data_feed - market_data_feed)
+    :precondition
+      (and
+        (eligibility_assigned ?candidate_instrument)
+        (market_data_linked_to_entity ?candidate_instrument ?market_data_feed)
+        (eligibility_evidence_available ?eligibility_evidence_token)
+        (not
+          (eligibility_confirmed ?candidate_instrument)
+        )
+      )
+    :effect
+      (and
+        (eligibility_confirmed ?candidate_instrument)
+        (entity_evidence_assignment ?candidate_instrument ?eligibility_evidence_token)
+        (not
+          (eligibility_evidence_available ?eligibility_evidence_token)
+        )
+      )
+  )
+  (:action finalize_portfolio_eligibility_and_restore_resources
+    :parameters (?portfolio_context_primary - portfolio_context_primary ?eligibility_token - eligibility_token ?eligibility_evidence_token - eligibility_evidence_token)
+    :precondition
+      (and
+        (eligibility_confirmed ?portfolio_context_primary)
+        (entity_token_assignment ?portfolio_context_primary ?eligibility_token)
+        (entity_evidence_assignment ?portfolio_context_primary ?eligibility_evidence_token)
+        (not
+          (eligibility_finalized ?portfolio_context_primary)
+        )
+      )
+    :effect
+      (and
+        (eligibility_finalized ?portfolio_context_primary)
+        (eligibility_token_available ?eligibility_token)
+        (eligibility_evidence_available ?eligibility_evidence_token)
+      )
+  )
+  (:action finalize_secondary_portfolio_eligibility_and_restore_resources
+    :parameters (?portfolio_context_secondary - portfolio_context_secondary ?eligibility_token - eligibility_token ?eligibility_evidence_token - eligibility_evidence_token)
+    :precondition
+      (and
+        (eligibility_confirmed ?portfolio_context_secondary)
+        (entity_token_assignment ?portfolio_context_secondary ?eligibility_token)
+        (entity_evidence_assignment ?portfolio_context_secondary ?eligibility_evidence_token)
+        (not
+          (eligibility_finalized ?portfolio_context_secondary)
+        )
+      )
+    :effect
+      (and
+        (eligibility_finalized ?portfolio_context_secondary)
+        (eligibility_token_available ?eligibility_token)
+        (eligibility_evidence_available ?eligibility_evidence_token)
+      )
+  )
+  (:action finalize_security_eligibility_and_restore_resources
+    :parameters (?security_entity - security_entity ?eligibility_token - eligibility_token ?eligibility_evidence_token - eligibility_evidence_token)
+    :precondition
+      (and
+        (eligibility_confirmed ?security_entity)
+        (entity_token_assignment ?security_entity ?eligibility_token)
+        (entity_evidence_assignment ?security_entity ?eligibility_evidence_token)
+        (not
+          (eligibility_finalized ?security_entity)
+        )
+      )
+    :effect
+      (and
+        (eligibility_finalized ?security_entity)
+        (eligibility_token_available ?eligibility_token)
+        (eligibility_evidence_available ?eligibility_evidence_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem instrument_eligibility_filtering_scenario)
+  (:domain instrument_eligibility_filtering_domain)
+  (:objects portfolio_context_primary_1 - portfolio_context_primary portfolio_context_secondary_1 - portfolio_context_secondary security_entity_1 - security_entity security_entity_2 - security_entity eligibility_token_1 - eligibility_token eligibility_token_2 - eligibility_token eligibility_token_3 - eligibility_token market_data_feed_1 - market_data_feed compliance_rule_template_1 - compliance_rule_template soft_constraint_1 - soft_constraint exposure_dimension_a_1 - exposure_dimension_a exposure_dimension_b_1 - exposure_dimension_b trade_proposal_1 - trade_proposal security_attribute_1 - security_attribute security_attribute_2 - security_attribute client_restriction_tag_1 - client_restriction_tag client_restriction_tag_2 - client_restriction_tag execution_profile_1 - execution_profile execution_profile_2 - execution_profile eligibility_evidence_token_1 - eligibility_evidence_token trading_venue_1 - trading_venue analyst_approval_1 - analyst_approval analyst_approval_2 - analyst_approval regulatory_approval_1 - regulatory_approval)
+  (:init
+    (eligibility_token_available eligibility_token_1)
+    (eligibility_token_available eligibility_token_2)
+    (eligibility_token_available eligibility_token_3)
+    (market_feed_available market_data_feed_1)
+    (compliance_rule_available compliance_rule_template_1)
+    (soft_constraint_available soft_constraint_1)
+    (portfolio_exposure_a_assignment portfolio_context_primary_1 exposure_dimension_a_1)
+    (portfolio_exposure_b_assignment portfolio_context_secondary_1 exposure_dimension_b_1)
+    (trade_proposal_available trade_proposal_1)
+    (attribute_available security_attribute_1)
+    (attribute_available security_attribute_2)
+    (security_linked_to_portfolio_primary security_entity_1 portfolio_context_primary_1)
+    (security_linked_to_portfolio_primary security_entity_2 portfolio_context_primary_1)
+    (security_linked_to_portfolio_secondary security_entity_1 portfolio_context_secondary_1)
+    (security_linked_to_portfolio_secondary security_entity_2 portfolio_context_secondary_1)
+    (security_linked_to_trade_proposal security_entity_1 trade_proposal_1)
+    (security_linked_to_trade_proposal security_entity_2 trade_proposal_1)
+    (security_has_attribute security_entity_1 security_attribute_1)
+    (security_has_attribute security_entity_2 security_attribute_2)
+    (client_restriction_tag_available client_restriction_tag_1)
+    (client_restriction_tag_available client_restriction_tag_2)
+    (execution_profile_available execution_profile_1)
+    (execution_profile_available execution_profile_2)
+    (eligibility_evidence_available eligibility_evidence_token_1)
+    (trading_venue_available trading_venue_1)
+    (analyst_approval_available analyst_approval_1)
+    (security_analyst_approval_assignment security_entity_1 analyst_approval_1)
+    (security_analyst_approval_assignment security_entity_2 analyst_approval_2)
+    (regulatory_approval_available regulatory_approval_1)
+  )
+  (:goal
+    (and
+      (eligibility_finalized portfolio_context_primary_1)
+      (eligibility_finalized portfolio_context_secondary_1)
+      (eligibility_finalized security_entity_1)
+      (eligibility_finalized security_entity_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_candidate_instrument portfolio_context_primary_1)
+(register_candidate_instrument portfolio_context_secondary_1)
+(register_candidate_instrument security_entity_1)
+(register_candidate_instrument security_entity_2)
+(apply_eligibility_token_to_candidate portfolio_context_primary_1 eligibility_token_1)
+(bind_market_data_feed_to_candidate portfolio_context_primary_1 market_data_feed_1)
+(confirm_candidate_validation portfolio_context_primary_1 market_data_feed_1)
+(apply_compliance_rule_to_candidate portfolio_context_primary_1 compliance_rule_template_1)
+(flag_exposure_a portfolio_context_primary_1 exposure_dimension_a_1 market_data_feed_1)
+(confirm_portfolio_primary_exposure portfolio_context_primary_1 exposure_dimension_a_1 compliance_rule_template_1)
+(unbind_market_data_feed_from_candidate portfolio_context_primary_1 market_data_feed_1)
+(remove_compliance_rule_from_candidate portfolio_context_primary_1 compliance_rule_template_1)
+(apply_eligibility_token_to_candidate portfolio_context_secondary_1 eligibility_token_2)
+(bind_market_data_feed_to_candidate portfolio_context_secondary_1 market_data_feed_1)
+(confirm_candidate_validation portfolio_context_secondary_1 market_data_feed_1)
+(apply_compliance_rule_to_candidate portfolio_context_secondary_1 compliance_rule_template_1)
+(flag_exposure_b portfolio_context_secondary_1 exposure_dimension_b_1 market_data_feed_1)
+(confirm_portfolio_secondary_exposure portfolio_context_secondary_1 exposure_dimension_b_1 compliance_rule_template_1)
+(assemble_trade_proposal_strict portfolio_context_primary_1 portfolio_context_secondary_1 exposure_dimension_a_1 exposure_dimension_b_1 trade_proposal_1)
+(unbind_market_data_feed_from_candidate portfolio_context_secondary_1 market_data_feed_1)
+(bind_market_data_feed_to_candidate portfolio_context_primary_1 market_data_feed_1)
+(lock_trade_proposal trade_proposal_1 portfolio_context_primary_1 market_data_feed_1)
+(assign_proposal_to_portfolio_primary portfolio_context_primary_1 trade_proposal_1)
+(assign_proposal_to_portfolio_secondary portfolio_context_secondary_1 trade_proposal_1)
+(consume_evidence_and_confirm_candidate portfolio_context_primary_1 eligibility_evidence_token_1 market_data_feed_1)
+(finalize_portfolio_eligibility_and_restore_resources portfolio_context_primary_1 eligibility_token_1 eligibility_evidence_token_1)
+(unbind_market_data_feed_from_candidate portfolio_context_primary_1 market_data_feed_1)
+(bind_market_data_feed_to_candidate portfolio_context_secondary_1 market_data_feed_1)
+(consume_evidence_and_confirm_candidate portfolio_context_secondary_1 eligibility_evidence_token_1 market_data_feed_1)
+(finalize_secondary_portfolio_eligibility_and_restore_resources portfolio_context_secondary_1 eligibility_token_2 eligibility_evidence_token_1)
+(unbind_market_data_feed_from_candidate portfolio_context_secondary_1 market_data_feed_1)
+(apply_eligibility_token_to_candidate security_entity_1 eligibility_token_1)
+(bind_market_data_feed_to_candidate security_entity_1 market_data_feed_1)
+(confirm_candidate_validation security_entity_1 market_data_feed_1)
+(bind_attribute_to_trade_proposal_and_mark security_entity_1 security_attribute_1 trade_proposal_1)
+(prepare_security_for_approvals security_entity_1 security_attribute_1 trade_proposal_1 market_data_feed_1)
+(apply_trading_venue_to_security_entity security_entity_1 trading_venue_1)
+(remove_compliance_rule_from_candidate portfolio_context_secondary_1 compliance_rule_template_1)
+(apply_compliance_rule_to_candidate security_entity_1 compliance_rule_template_1)
+(advance_security_to_venue_compliance_pending security_entity_1 trading_venue_1 compliance_rule_template_1 security_attribute_1 trade_proposal_1)
+(apply_regulatory_approval_to_security security_entity_1 regulatory_approval_1)
+(consolidate_approvals_with_regulatory security_entity_1 regulatory_approval_1 security_attribute_1 trade_proposal_1)
+(finalize_security_eligibility security_entity_1)
+(consume_evidence_and_confirm_candidate security_entity_1 eligibility_evidence_token_1 market_data_feed_1)
+(finalize_security_eligibility_and_restore_resources security_entity_1 eligibility_token_1 eligibility_evidence_token_1)
+(apply_eligibility_token_to_candidate security_entity_2 eligibility_token_3)
+(unbind_market_data_feed_from_candidate security_entity_1 market_data_feed_1)
+(bind_market_data_feed_to_candidate security_entity_2 market_data_feed_1)
+(confirm_candidate_validation security_entity_2 market_data_feed_1)
+(bind_attribute_to_trade_proposal_and_mark security_entity_2 security_attribute_2 trade_proposal_1)
+(prepare_security_for_approvals security_entity_2 security_attribute_2 trade_proposal_1 market_data_feed_1)
+(remove_trading_venue_from_security_entity security_entity_1 trading_venue_1)
+(remove_compliance_rule_from_candidate security_entity_1 compliance_rule_template_1)
+(remove_regulatory_approval_from_security security_entity_1 regulatory_approval_1)
+(apply_trading_venue_to_security_entity security_entity_2 trading_venue_1)
+(apply_compliance_rule_to_candidate security_entity_2 compliance_rule_template_1)
+(apply_regulatory_approval_to_security security_entity_2 regulatory_approval_1)
+(advance_security_to_venue_compliance_pending security_entity_2 trading_venue_1 compliance_rule_template_1 security_attribute_2 trade_proposal_1)
+(consolidate_approvals_with_regulatory security_entity_2 regulatory_approval_1 security_attribute_2 trade_proposal_1)
+(finalize_security_eligibility security_entity_2)
+(consume_evidence_and_confirm_candidate security_entity_2 eligibility_evidence_token_1 market_data_feed_1)
+(finalize_security_eligibility_and_restore_resources security_entity_2 eligibility_token_3 eligibility_evidence_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_m4qwxrg2/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_m4qwxrg2/plan.pddl 
+
+
+--- stderr ---
+

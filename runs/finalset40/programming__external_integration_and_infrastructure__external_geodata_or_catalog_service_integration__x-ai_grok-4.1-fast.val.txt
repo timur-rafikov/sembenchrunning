@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain external_geodata_catalog_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types connector_type - object layer_type - object catalog_type - object integration_root - object integration_context - integration_root external_endpoint - connector_type query_specification - connector_type auth_credential - connector_type license_profile - connector_type quality_profile - connector_type deployment_environment - connector_type transform_plugin - connector_type policy_rule - connector_type enrichment_asset - layer_type asset_bundle - layer_type external_reference - layer_type source_layer - catalog_type target_layer - catalog_type catalog_record - catalog_type connector_instance - integration_context adapter_instance - integration_context source_connector - connector_instance destination_connector - connector_instance integration_adapter - adapter_instance)
+  (:predicates
+    (context_initialized ?integration_context - integration_context)
+    (context_ready ?integration_context - integration_context)
+    (context_endpoint_bound ?integration_context - integration_context)
+    (activated ?integration_context - integration_context)
+    (integration_completed ?integration_context - integration_context)
+    (context_deployed ?integration_context - integration_context)
+    (endpoint_available ?external_endpoint - external_endpoint)
+    (context_endpoint_binding ?integration_context - integration_context ?external_endpoint - external_endpoint)
+    (query_spec_available ?query_specification - query_specification)
+    (context_query_association ?integration_context - integration_context ?query_specification - query_specification)
+    (credential_available ?auth_credential - auth_credential)
+    (context_credential_binding ?integration_context - integration_context ?auth_credential - auth_credential)
+    (enrichment_asset_available ?enrichment_asset - enrichment_asset)
+    (source_connector_enrichment_association ?source_connector - source_connector ?enrichment_asset - enrichment_asset)
+    (destination_connector_enrichment_association ?destination_connector - destination_connector ?enrichment_asset - enrichment_asset)
+    (source_connector_layer_association ?source_connector - source_connector ?source_layer - source_layer)
+    (source_layer_prepared ?source_layer - source_layer)
+    (source_layer_enriched ?source_layer - source_layer)
+    (source_connector_ready_for_provisioning ?source_connector - source_connector)
+    (destination_connector_target_layer_association ?destination_connector - destination_connector ?target_layer - target_layer)
+    (target_layer_ready ?target_layer - target_layer)
+    (target_layer_enriched ?target_layer - target_layer)
+    (destination_connector_ready_for_provisioning ?destination_connector - destination_connector)
+    (catalog_record_pending ?catalog_record - catalog_record)
+    (catalog_record_provisioned ?catalog_record - catalog_record)
+    (catalog_record_source_layer_association ?catalog_record - catalog_record ?source_layer - source_layer)
+    (catalog_record_target_layer_association ?catalog_record - catalog_record ?target_layer - target_layer)
+    (catalog_record_ready_with_enrichment ?catalog_record - catalog_record)
+    (catalog_record_ready_with_primary_source ?catalog_record - catalog_record)
+    (catalog_record_ingestion_confirmed ?catalog_record - catalog_record)
+    (adapter_source_binding ?integration_adapter - integration_adapter ?source_connector - source_connector)
+    (adapter_target_binding ?integration_adapter - integration_adapter ?destination_connector - destination_connector)
+    (adapter_catalog_record_association ?integration_adapter - integration_adapter ?catalog_record - catalog_record)
+    (asset_bundle_available ?asset_bundle - asset_bundle)
+    (adapter_assetbundle_association ?integration_adapter - integration_adapter ?asset_bundle - asset_bundle)
+    (asset_bundle_validated ?asset_bundle - asset_bundle)
+    (asset_bundle_catalog_record_association ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    (adapter_prepared_for_verification ?integration_adapter - integration_adapter)
+    (adapter_assets_verified ?integration_adapter - integration_adapter)
+    (adapter_ready_to_finalize ?integration_adapter - integration_adapter)
+    (adapter_license_assigned ?integration_adapter - integration_adapter)
+    (adapter_license_confirmed ?integration_adapter - integration_adapter)
+    (adapter_enrichment_applied ?integration_adapter - integration_adapter)
+    (adapter_processing_complete ?integration_adapter - integration_adapter)
+    (external_reference_available ?external_reference - external_reference)
+    (adapter_external_reference_association ?integration_adapter - integration_adapter ?external_reference - external_reference)
+    (adapter_has_external_reference ?integration_adapter - integration_adapter)
+    (adapter_external_reference_attached ?integration_adapter - integration_adapter)
+    (adapter_policy_attached ?integration_adapter - integration_adapter)
+    (license_profile_available ?license_profile - license_profile)
+    (adapter_license_association ?integration_adapter - integration_adapter ?license_profile - license_profile)
+    (quality_profile_available ?quality_profile - quality_profile)
+    (adapter_quality_association ?integration_adapter - integration_adapter ?quality_profile - quality_profile)
+    (transform_plugin_available ?transform_plugin - transform_plugin)
+    (adapter_transform_association ?integration_adapter - integration_adapter ?transform_plugin - transform_plugin)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (adapter_policy_association ?integration_adapter - integration_adapter ?policy_rule - policy_rule)
+    (deployment_environment_available ?deployment_environment - deployment_environment)
+    (context_deployment_association ?integration_context - integration_context ?deployment_environment - deployment_environment)
+    (source_connector_provisioning_claimed ?source_connector - source_connector)
+    (destination_connector_provisioning_claimed ?destination_connector - destination_connector)
+    (adapter_finalized ?integration_adapter - integration_adapter)
+  )
+  (:action initialize_integration_context
+    :parameters (?integration_context - integration_context)
+    :precondition
+      (and
+        (not
+          (context_initialized ?integration_context)
+        )
+        (not
+          (activated ?integration_context)
+        )
+      )
+    :effect (context_initialized ?integration_context)
+  )
+  (:action bind_context_to_endpoint
+    :parameters (?integration_context - integration_context ?external_endpoint - external_endpoint)
+    :precondition
+      (and
+        (context_initialized ?integration_context)
+        (not
+          (context_endpoint_bound ?integration_context)
+        )
+        (endpoint_available ?external_endpoint)
+      )
+    :effect
+      (and
+        (context_endpoint_bound ?integration_context)
+        (context_endpoint_binding ?integration_context ?external_endpoint)
+        (not
+          (endpoint_available ?external_endpoint)
+        )
+      )
+  )
+  (:action attach_query_to_context
+    :parameters (?integration_context - integration_context ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_initialized ?integration_context)
+        (context_endpoint_bound ?integration_context)
+        (query_spec_available ?query_specification)
+      )
+    :effect
+      (and
+        (context_query_association ?integration_context ?query_specification)
+        (not
+          (query_spec_available ?query_specification)
+        )
+      )
+  )
+  (:action validate_context_query
+    :parameters (?integration_context - integration_context ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_initialized ?integration_context)
+        (context_endpoint_bound ?integration_context)
+        (context_query_association ?integration_context ?query_specification)
+        (not
+          (context_ready ?integration_context)
+        )
+      )
+    :effect (context_ready ?integration_context)
+  )
+  (:action release_query_specification
+    :parameters (?integration_context - integration_context ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_query_association ?integration_context ?query_specification)
+      )
+    :effect
+      (and
+        (query_spec_available ?query_specification)
+        (not
+          (context_query_association ?integration_context ?query_specification)
+        )
+      )
+  )
+  (:action attach_credential_to_context
+    :parameters (?integration_context - integration_context ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (context_ready ?integration_context)
+        (credential_available ?auth_credential)
+      )
+    :effect
+      (and
+        (context_credential_binding ?integration_context ?auth_credential)
+        (not
+          (credential_available ?auth_credential)
+        )
+      )
+  )
+  (:action detach_credential_from_context
+    :parameters (?integration_context - integration_context ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (context_credential_binding ?integration_context ?auth_credential)
+      )
+    :effect
+      (and
+        (credential_available ?auth_credential)
+        (not
+          (context_credential_binding ?integration_context ?auth_credential)
+        )
+      )
+  )
+  (:action attach_transform_plugin_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?transform_plugin - transform_plugin)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (transform_plugin_available ?transform_plugin)
+      )
+    :effect
+      (and
+        (adapter_transform_association ?integration_adapter ?transform_plugin)
+        (not
+          (transform_plugin_available ?transform_plugin)
+        )
+      )
+  )
+  (:action detach_transform_plugin_from_adapter
+    :parameters (?integration_adapter - integration_adapter ?transform_plugin - transform_plugin)
+    :precondition
+      (and
+        (adapter_transform_association ?integration_adapter ?transform_plugin)
+      )
+    :effect
+      (and
+        (transform_plugin_available ?transform_plugin)
+        (not
+          (adapter_transform_association ?integration_adapter ?transform_plugin)
+        )
+      )
+  )
+  (:action attach_policy_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (policy_rule_available ?policy_rule)
+      )
+    :effect
+      (and
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action detach_policy_from_adapter
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+      )
+    :effect
+      (and
+        (policy_rule_available ?policy_rule)
+        (not
+          (adapter_policy_association ?integration_adapter ?policy_rule)
+        )
+      )
+  )
+  (:action claim_source_layer_for_processing
+    :parameters (?source_connector - source_connector ?source_layer - source_layer ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_ready ?source_connector)
+        (context_query_association ?source_connector ?query_specification)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (not
+          (source_layer_prepared ?source_layer)
+        )
+        (not
+          (source_layer_enriched ?source_layer)
+        )
+      )
+    :effect (source_layer_prepared ?source_layer)
+  )
+  (:action prepare_source_connector_provisioning
+    :parameters (?source_connector - source_connector ?source_layer - source_layer ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (context_ready ?source_connector)
+        (context_credential_binding ?source_connector ?auth_credential)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (source_layer_prepared ?source_layer)
+        (not
+          (source_connector_provisioning_claimed ?source_connector)
+        )
+      )
+    :effect
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (source_connector_ready_for_provisioning ?source_connector)
+      )
+  )
+  (:action attach_enrichment_asset_to_connector
+    :parameters (?source_connector - source_connector ?source_layer - source_layer ?enrichment_asset - enrichment_asset)
+    :precondition
+      (and
+        (context_ready ?source_connector)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (enrichment_asset_available ?enrichment_asset)
+        (not
+          (source_connector_provisioning_claimed ?source_connector)
+        )
+      )
+    :effect
+      (and
+        (source_layer_enriched ?source_layer)
+        (source_connector_provisioning_claimed ?source_connector)
+        (source_connector_enrichment_association ?source_connector ?enrichment_asset)
+        (not
+          (enrichment_asset_available ?enrichment_asset)
+        )
+      )
+  )
+  (:action reconcile_source_layer_enrichment
+    :parameters (?source_connector - source_connector ?source_layer - source_layer ?query_specification - query_specification ?enrichment_asset - enrichment_asset)
+    :precondition
+      (and
+        (context_ready ?source_connector)
+        (context_query_association ?source_connector ?query_specification)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (source_layer_enriched ?source_layer)
+        (source_connector_enrichment_association ?source_connector ?enrichment_asset)
+        (not
+          (source_connector_ready_for_provisioning ?source_connector)
+        )
+      )
+    :effect
+      (and
+        (source_layer_prepared ?source_layer)
+        (source_connector_ready_for_provisioning ?source_connector)
+        (enrichment_asset_available ?enrichment_asset)
+        (not
+          (source_connector_enrichment_association ?source_connector ?enrichment_asset)
+        )
+      )
+  )
+  (:action claim_target_layer_for_processing
+    :parameters (?destination_connector - destination_connector ?target_layer - target_layer ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_ready ?destination_connector)
+        (context_query_association ?destination_connector ?query_specification)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (not
+          (target_layer_ready ?target_layer)
+        )
+        (not
+          (target_layer_enriched ?target_layer)
+        )
+      )
+    :effect (target_layer_ready ?target_layer)
+  )
+  (:action prepare_target_connector_provisioning
+    :parameters (?destination_connector - destination_connector ?target_layer - target_layer ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (context_ready ?destination_connector)
+        (context_credential_binding ?destination_connector ?auth_credential)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (target_layer_ready ?target_layer)
+        (not
+          (destination_connector_provisioning_claimed ?destination_connector)
+        )
+      )
+    :effect
+      (and
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (destination_connector_ready_for_provisioning ?destination_connector)
+      )
+  )
+  (:action attach_enrichment_asset_to_target_connector
+    :parameters (?destination_connector - destination_connector ?target_layer - target_layer ?enrichment_asset - enrichment_asset)
+    :precondition
+      (and
+        (context_ready ?destination_connector)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (enrichment_asset_available ?enrichment_asset)
+        (not
+          (destination_connector_provisioning_claimed ?destination_connector)
+        )
+      )
+    :effect
+      (and
+        (target_layer_enriched ?target_layer)
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (destination_connector_enrichment_association ?destination_connector ?enrichment_asset)
+        (not
+          (enrichment_asset_available ?enrichment_asset)
+        )
+      )
+  )
+  (:action reconcile_target_layer_enrichment
+    :parameters (?destination_connector - destination_connector ?target_layer - target_layer ?query_specification - query_specification ?enrichment_asset - enrichment_asset)
+    :precondition
+      (and
+        (context_ready ?destination_connector)
+        (context_query_association ?destination_connector ?query_specification)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (target_layer_enriched ?target_layer)
+        (destination_connector_enrichment_association ?destination_connector ?enrichment_asset)
+        (not
+          (destination_connector_ready_for_provisioning ?destination_connector)
+        )
+      )
+    :effect
+      (and
+        (target_layer_ready ?target_layer)
+        (destination_connector_ready_for_provisioning ?destination_connector)
+        (enrichment_asset_available ?enrichment_asset)
+        (not
+          (destination_connector_enrichment_association ?destination_connector ?enrichment_asset)
+        )
+      )
+  )
+  (:action provision_catalog_record_from_layers
+    :parameters (?source_connector - source_connector ?destination_connector - destination_connector ?source_layer - source_layer ?target_layer - target_layer ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (source_layer_prepared ?source_layer)
+        (target_layer_ready ?target_layer)
+        (source_connector_ready_for_provisioning ?source_connector)
+        (destination_connector_ready_for_provisioning ?destination_connector)
+        (catalog_record_pending ?catalog_record)
+      )
+    :effect
+      (and
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_source_layer_association ?catalog_record ?source_layer)
+        (catalog_record_target_layer_association ?catalog_record ?target_layer)
+        (not
+          (catalog_record_pending ?catalog_record)
+        )
+      )
+  )
+  (:action provision_catalog_record_with_enrichment
+    :parameters (?source_connector - source_connector ?destination_connector - destination_connector ?source_layer - source_layer ?target_layer - target_layer ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (source_layer_enriched ?source_layer)
+        (target_layer_ready ?target_layer)
+        (not
+          (source_connector_ready_for_provisioning ?source_connector)
+        )
+        (destination_connector_ready_for_provisioning ?destination_connector)
+        (catalog_record_pending ?catalog_record)
+      )
+    :effect
+      (and
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_source_layer_association ?catalog_record ?source_layer)
+        (catalog_record_target_layer_association ?catalog_record ?target_layer)
+        (catalog_record_ready_with_enrichment ?catalog_record)
+        (not
+          (catalog_record_pending ?catalog_record)
+        )
+      )
+  )
+  (:action provision_catalog_record_with_primary_source
+    :parameters (?source_connector - source_connector ?destination_connector - destination_connector ?source_layer - source_layer ?target_layer - target_layer ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (source_layer_prepared ?source_layer)
+        (target_layer_enriched ?target_layer)
+        (source_connector_ready_for_provisioning ?source_connector)
+        (not
+          (destination_connector_ready_for_provisioning ?destination_connector)
+        )
+        (catalog_record_pending ?catalog_record)
+      )
+    :effect
+      (and
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_source_layer_association ?catalog_record ?source_layer)
+        (catalog_record_target_layer_association ?catalog_record ?target_layer)
+        (catalog_record_ready_with_primary_source ?catalog_record)
+        (not
+          (catalog_record_pending ?catalog_record)
+        )
+      )
+  )
+  (:action provision_catalog_record_with_full_readiness
+    :parameters (?source_connector - source_connector ?destination_connector - destination_connector ?source_layer - source_layer ?target_layer - target_layer ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (source_connector_layer_association ?source_connector ?source_layer)
+        (destination_connector_target_layer_association ?destination_connector ?target_layer)
+        (source_layer_enriched ?source_layer)
+        (target_layer_enriched ?target_layer)
+        (not
+          (source_connector_ready_for_provisioning ?source_connector)
+        )
+        (not
+          (destination_connector_ready_for_provisioning ?destination_connector)
+        )
+        (catalog_record_pending ?catalog_record)
+      )
+    :effect
+      (and
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_source_layer_association ?catalog_record ?source_layer)
+        (catalog_record_target_layer_association ?catalog_record ?target_layer)
+        (catalog_record_ready_with_enrichment ?catalog_record)
+        (catalog_record_ready_with_primary_source ?catalog_record)
+        (not
+          (catalog_record_pending ?catalog_record)
+        )
+      )
+  )
+  (:action confirm_catalog_record_ingestion
+    :parameters (?catalog_record - catalog_record ?source_connector - source_connector ?query_specification - query_specification)
+    :precondition
+      (and
+        (catalog_record_provisioned ?catalog_record)
+        (source_connector_provisioning_claimed ?source_connector)
+        (context_query_association ?source_connector ?query_specification)
+        (not
+          (catalog_record_ingestion_confirmed ?catalog_record)
+        )
+      )
+    :effect (catalog_record_ingestion_confirmed ?catalog_record)
+  )
+  (:action associate_asset_bundle_with_record
+    :parameters (?integration_adapter - integration_adapter ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (adapter_catalog_record_association ?integration_adapter ?catalog_record)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_available ?asset_bundle)
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_ingestion_confirmed ?catalog_record)
+        (not
+          (asset_bundle_validated ?asset_bundle)
+        )
+      )
+    :effect
+      (and
+        (asset_bundle_validated ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (not
+          (asset_bundle_available ?asset_bundle)
+        )
+      )
+  )
+  (:action flag_adapter_prepared_for_verification
+    :parameters (?integration_adapter - integration_adapter ?asset_bundle - asset_bundle ?catalog_record - catalog_record ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_validated ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (context_query_association ?integration_adapter ?query_specification)
+        (not
+          (catalog_record_ready_with_enrichment ?catalog_record)
+        )
+        (not
+          (adapter_prepared_for_verification ?integration_adapter)
+        )
+      )
+    :effect (adapter_prepared_for_verification ?integration_adapter)
+  )
+  (:action assign_license_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?license_profile - license_profile)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (license_profile_available ?license_profile)
+        (not
+          (adapter_license_assigned ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_license_assigned ?integration_adapter)
+        (adapter_license_association ?integration_adapter ?license_profile)
+        (not
+          (license_profile_available ?license_profile)
+        )
+      )
+  )
+  (:action prepare_adapter_with_assets_and_license
+    :parameters (?integration_adapter - integration_adapter ?asset_bundle - asset_bundle ?catalog_record - catalog_record ?query_specification - query_specification ?license_profile - license_profile)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_validated ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (context_query_association ?integration_adapter ?query_specification)
+        (catalog_record_ready_with_enrichment ?catalog_record)
+        (adapter_license_assigned ?integration_adapter)
+        (adapter_license_association ?integration_adapter ?license_profile)
+        (not
+          (adapter_prepared_for_verification ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_prepared_for_verification ?integration_adapter)
+        (adapter_license_confirmed ?integration_adapter)
+      )
+  )
+  (:action verify_adapter_assets_stage1
+    :parameters (?integration_adapter - integration_adapter ?transform_plugin - transform_plugin ?auth_credential - auth_credential ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_prepared_for_verification ?integration_adapter)
+        (adapter_transform_association ?integration_adapter ?transform_plugin)
+        (context_credential_binding ?integration_adapter ?auth_credential)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (not
+          (catalog_record_ready_with_primary_source ?catalog_record)
+        )
+        (not
+          (adapter_assets_verified ?integration_adapter)
+        )
+      )
+    :effect (adapter_assets_verified ?integration_adapter)
+  )
+  (:action verify_adapter_assets_stage2
+    :parameters (?integration_adapter - integration_adapter ?transform_plugin - transform_plugin ?auth_credential - auth_credential ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_prepared_for_verification ?integration_adapter)
+        (adapter_transform_association ?integration_adapter ?transform_plugin)
+        (context_credential_binding ?integration_adapter ?auth_credential)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (catalog_record_ready_with_primary_source ?catalog_record)
+        (not
+          (adapter_assets_verified ?integration_adapter)
+        )
+      )
+    :effect (adapter_assets_verified ?integration_adapter)
+  )
+  (:action finalize_adapter_asset_verification
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_assets_verified ?integration_adapter)
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (not
+          (catalog_record_ready_with_enrichment ?catalog_record)
+        )
+        (not
+          (catalog_record_ready_with_primary_source ?catalog_record)
+        )
+        (not
+          (adapter_ready_to_finalize ?integration_adapter)
+        )
+      )
+    :effect (adapter_ready_to_finalize ?integration_adapter)
+  )
+  (:action finalize_adapter_asset_verification_with_enrichment
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_assets_verified ?integration_adapter)
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (catalog_record_ready_with_enrichment ?catalog_record)
+        (not
+          (catalog_record_ready_with_primary_source ?catalog_record)
+        )
+        (not
+          (adapter_ready_to_finalize ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_enrichment_applied ?integration_adapter)
+      )
+  )
+  (:action finalize_adapter_asset_verification_with_enrichment_variant
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_assets_verified ?integration_adapter)
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (not
+          (catalog_record_ready_with_enrichment ?catalog_record)
+        )
+        (catalog_record_ready_with_primary_source ?catalog_record)
+        (not
+          (adapter_ready_to_finalize ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_enrichment_applied ?integration_adapter)
+      )
+  )
+  (:action finalize_adapter_asset_verification_with_both_paths
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule ?asset_bundle - asset_bundle ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (adapter_assets_verified ?integration_adapter)
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (adapter_assetbundle_association ?integration_adapter ?asset_bundle)
+        (asset_bundle_catalog_record_association ?asset_bundle ?catalog_record)
+        (catalog_record_ready_with_enrichment ?catalog_record)
+        (catalog_record_ready_with_primary_source ?catalog_record)
+        (not
+          (adapter_ready_to_finalize ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_enrichment_applied ?integration_adapter)
+      )
+  )
+  (:action finalize_adapter_without_enrichment
+    :parameters (?integration_adapter - integration_adapter)
+    :precondition
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (not
+          (adapter_enrichment_applied ?integration_adapter)
+        )
+        (not
+          (adapter_finalized ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_finalized ?integration_adapter)
+        (integration_completed ?integration_adapter)
+      )
+  )
+  (:action attach_quality_profile_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?quality_profile - quality_profile)
+    :precondition
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_enrichment_applied ?integration_adapter)
+        (quality_profile_available ?quality_profile)
+      )
+    :effect
+      (and
+        (adapter_quality_association ?integration_adapter ?quality_profile)
+        (not
+          (quality_profile_available ?quality_profile)
+        )
+      )
+  )
+  (:action apply_quality_and_mark_adapter_processed
+    :parameters (?integration_adapter - integration_adapter ?source_connector - source_connector ?destination_connector - destination_connector ?query_specification - query_specification ?quality_profile - quality_profile)
+    :precondition
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_enrichment_applied ?integration_adapter)
+        (adapter_quality_association ?integration_adapter ?quality_profile)
+        (adapter_source_binding ?integration_adapter ?source_connector)
+        (adapter_target_binding ?integration_adapter ?destination_connector)
+        (source_connector_ready_for_provisioning ?source_connector)
+        (destination_connector_ready_for_provisioning ?destination_connector)
+        (context_query_association ?integration_adapter ?query_specification)
+        (not
+          (adapter_processing_complete ?integration_adapter)
+        )
+      )
+    :effect (adapter_processing_complete ?integration_adapter)
+  )
+  (:action finalize_adapter_after_processing
+    :parameters (?integration_adapter - integration_adapter)
+    :precondition
+      (and
+        (adapter_ready_to_finalize ?integration_adapter)
+        (adapter_processing_complete ?integration_adapter)
+        (not
+          (adapter_finalized ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_finalized ?integration_adapter)
+        (integration_completed ?integration_adapter)
+      )
+  )
+  (:action attach_external_reference_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?external_reference - external_reference ?query_specification - query_specification)
+    :precondition
+      (and
+        (context_ready ?integration_adapter)
+        (context_query_association ?integration_adapter ?query_specification)
+        (external_reference_available ?external_reference)
+        (adapter_external_reference_association ?integration_adapter ?external_reference)
+        (not
+          (adapter_has_external_reference ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_has_external_reference ?integration_adapter)
+        (not
+          (external_reference_available ?external_reference)
+        )
+      )
+  )
+  (:action mark_adapter_reference_attached
+    :parameters (?integration_adapter - integration_adapter ?auth_credential - auth_credential)
+    :precondition
+      (and
+        (adapter_has_external_reference ?integration_adapter)
+        (context_credential_binding ?integration_adapter ?auth_credential)
+        (not
+          (adapter_external_reference_attached ?integration_adapter)
+        )
+      )
+    :effect (adapter_external_reference_attached ?integration_adapter)
+  )
+  (:action apply_policy_to_adapter
+    :parameters (?integration_adapter - integration_adapter ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (adapter_external_reference_attached ?integration_adapter)
+        (adapter_policy_association ?integration_adapter ?policy_rule)
+        (not
+          (adapter_policy_attached ?integration_adapter)
+        )
+      )
+    :effect (adapter_policy_attached ?integration_adapter)
+  )
+  (:action finalize_adapter_with_policy
+    :parameters (?integration_adapter - integration_adapter)
+    :precondition
+      (and
+        (adapter_policy_attached ?integration_adapter)
+        (not
+          (adapter_finalized ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (adapter_finalized ?integration_adapter)
+        (integration_completed ?integration_adapter)
+      )
+  )
+  (:action mark_source_connector_synchronized
+    :parameters (?source_connector - source_connector ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (source_connector_provisioning_claimed ?source_connector)
+        (source_connector_ready_for_provisioning ?source_connector)
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_ingestion_confirmed ?catalog_record)
+        (not
+          (integration_completed ?source_connector)
+        )
+      )
+    :effect (integration_completed ?source_connector)
+  )
+  (:action mark_destination_connector_synchronized
+    :parameters (?destination_connector - destination_connector ?catalog_record - catalog_record)
+    :precondition
+      (and
+        (destination_connector_provisioning_claimed ?destination_connector)
+        (destination_connector_ready_for_provisioning ?destination_connector)
+        (catalog_record_provisioned ?catalog_record)
+        (catalog_record_ingestion_confirmed ?catalog_record)
+        (not
+          (integration_completed ?destination_connector)
+        )
+      )
+    :effect (integration_completed ?destination_connector)
+  )
+  (:action activate_integration_context
+    :parameters (?integration_context - integration_context ?deployment_environment - deployment_environment ?query_specification - query_specification)
+    :precondition
+      (and
+        (integration_completed ?integration_context)
+        (context_query_association ?integration_context ?query_specification)
+        (deployment_environment_available ?deployment_environment)
+        (not
+          (context_deployed ?integration_context)
+        )
+      )
+    :effect
+      (and
+        (context_deployed ?integration_context)
+        (context_deployment_association ?integration_context ?deployment_environment)
+        (not
+          (deployment_environment_available ?deployment_environment)
+        )
+      )
+  )
+  (:action bind_source_connector_to_endpoint
+    :parameters (?source_connector - source_connector ?external_endpoint - external_endpoint ?deployment_environment - deployment_environment)
+    :precondition
+      (and
+        (context_deployed ?source_connector)
+        (context_endpoint_binding ?source_connector ?external_endpoint)
+        (context_deployment_association ?source_connector ?deployment_environment)
+        (not
+          (activated ?source_connector)
+        )
+      )
+    :effect
+      (and
+        (activated ?source_connector)
+        (endpoint_available ?external_endpoint)
+        (deployment_environment_available ?deployment_environment)
+      )
+  )
+  (:action bind_destination_connector_to_endpoint
+    :parameters (?destination_connector - destination_connector ?external_endpoint - external_endpoint ?deployment_environment - deployment_environment)
+    :precondition
+      (and
+        (context_deployed ?destination_connector)
+        (context_endpoint_binding ?destination_connector ?external_endpoint)
+        (context_deployment_association ?destination_connector ?deployment_environment)
+        (not
+          (activated ?destination_connector)
+        )
+      )
+    :effect
+      (and
+        (activated ?destination_connector)
+        (endpoint_available ?external_endpoint)
+        (deployment_environment_available ?deployment_environment)
+      )
+  )
+  (:action bind_adapter_to_endpoint
+    :parameters (?integration_adapter - integration_adapter ?external_endpoint - external_endpoint ?deployment_environment - deployment_environment)
+    :precondition
+      (and
+        (context_deployed ?integration_adapter)
+        (context_endpoint_binding ?integration_adapter ?external_endpoint)
+        (context_deployment_association ?integration_adapter ?deployment_environment)
+        (not
+          (activated ?integration_adapter)
+        )
+      )
+    :effect
+      (and
+        (activated ?integration_adapter)
+        (endpoint_available ?external_endpoint)
+        (deployment_environment_available ?deployment_environment)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem synchronize_catalog_records)
+  (:domain external_geodata_catalog_integration)
+  (:objects source_connector_primary - source_connector destination_connector_primary - destination_connector adapter_ingest_1 - integration_adapter adapter_ingest_2 - integration_adapter external_endpoint_1 - external_endpoint external_endpoint_2 - external_endpoint external_endpoint_3 - external_endpoint query_spec_alpha - query_specification credential_service_account - auth_credential enrichment_asset_1 - enrichment_asset source_layer_1 - source_layer target_layer_1 - target_layer catalog_record_seed - catalog_record asset_bundle_1 - asset_bundle asset_bundle_2 - asset_bundle license_profile_default - license_profile license_profile_restrictive - license_profile quality_profile_basic - quality_profile quality_profile_strict - quality_profile deployment_environment_prod - deployment_environment transform_plugin_geojson_to_catalog - transform_plugin external_reference_1 - external_reference external_reference_2 - external_reference policy_rule_license_check - policy_rule)
+  (:init
+    (endpoint_available external_endpoint_1)
+    (endpoint_available external_endpoint_2)
+    (endpoint_available external_endpoint_3)
+    (query_spec_available query_spec_alpha)
+    (credential_available credential_service_account)
+    (enrichment_asset_available enrichment_asset_1)
+    (source_connector_layer_association source_connector_primary source_layer_1)
+    (destination_connector_target_layer_association destination_connector_primary target_layer_1)
+    (catalog_record_pending catalog_record_seed)
+    (asset_bundle_available asset_bundle_1)
+    (asset_bundle_available asset_bundle_2)
+    (adapter_source_binding adapter_ingest_1 source_connector_primary)
+    (adapter_source_binding adapter_ingest_2 source_connector_primary)
+    (adapter_target_binding adapter_ingest_1 destination_connector_primary)
+    (adapter_target_binding adapter_ingest_2 destination_connector_primary)
+    (adapter_catalog_record_association adapter_ingest_1 catalog_record_seed)
+    (adapter_catalog_record_association adapter_ingest_2 catalog_record_seed)
+    (adapter_assetbundle_association adapter_ingest_1 asset_bundle_1)
+    (adapter_assetbundle_association adapter_ingest_2 asset_bundle_2)
+    (license_profile_available license_profile_default)
+    (license_profile_available license_profile_restrictive)
+    (quality_profile_available quality_profile_basic)
+    (quality_profile_available quality_profile_strict)
+    (deployment_environment_available deployment_environment_prod)
+    (transform_plugin_available transform_plugin_geojson_to_catalog)
+    (external_reference_available external_reference_1)
+    (adapter_external_reference_association adapter_ingest_1 external_reference_1)
+    (adapter_external_reference_association adapter_ingest_2 external_reference_2)
+    (policy_rule_available policy_rule_license_check)
+  )
+  (:goal
+    (and
+      (activated source_connector_primary)
+      (activated destination_connector_primary)
+      (activated adapter_ingest_1)
+      (activated adapter_ingest_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_integration_context source_connector_primary)
+(bind_context_to_endpoint source_connector_primary external_endpoint_1)
+(attach_query_to_context source_connector_primary query_spec_alpha)
+(validate_context_query source_connector_primary query_spec_alpha)
+(claim_source_layer_for_processing source_connector_primary source_layer_1 query_spec_alpha)
+(release_query_specification source_connector_primary query_spec_alpha)
+(attach_credential_to_context source_connector_primary credential_service_account)
+(prepare_source_connector_provisioning source_connector_primary source_layer_1 credential_service_account)
+(detach_credential_from_context source_connector_primary credential_service_account)
+(initialize_integration_context destination_connector_primary)
+(bind_context_to_endpoint destination_connector_primary external_endpoint_2)
+(attach_query_to_context destination_connector_primary query_spec_alpha)
+(validate_context_query destination_connector_primary query_spec_alpha)
+(claim_target_layer_for_processing destination_connector_primary target_layer_1 query_spec_alpha)
+(release_query_specification destination_connector_primary query_spec_alpha)
+(attach_credential_to_context destination_connector_primary credential_service_account)
+(prepare_target_connector_provisioning destination_connector_primary target_layer_1 credential_service_account)
+(detach_credential_from_context destination_connector_primary credential_service_account)
+(provision_catalog_record_from_layers source_connector_primary destination_connector_primary source_layer_1 target_layer_1 catalog_record_seed)
+(attach_query_to_context source_connector_primary query_spec_alpha)
+(confirm_catalog_record_ingestion catalog_record_seed source_connector_primary query_spec_alpha)
+(mark_source_connector_synchronized source_connector_primary catalog_record_seed)
+(mark_destination_connector_synchronized destination_connector_primary catalog_record_seed)
+(activate_integration_context source_connector_primary deployment_environment_prod query_spec_alpha)
+(bind_source_connector_to_endpoint source_connector_primary external_endpoint_1 deployment_environment_prod)
+(release_query_specification source_connector_primary query_spec_alpha)
+(attach_query_to_context destination_connector_primary query_spec_alpha)
+(activate_integration_context destination_connector_primary deployment_environment_prod query_spec_alpha)
+(bind_destination_connector_to_endpoint destination_connector_primary external_endpoint_2 deployment_environment_prod)
+(release_query_specification destination_connector_primary query_spec_alpha)
+(initialize_integration_context adapter_ingest_1)
+(bind_context_to_endpoint adapter_ingest_1 external_endpoint_1)
+(attach_query_to_context adapter_ingest_1 query_spec_alpha)
+(validate_context_query adapter_ingest_1 query_spec_alpha)
+(associate_asset_bundle_with_record adapter_ingest_1 asset_bundle_1 catalog_record_seed)
+(flag_adapter_prepared_for_verification adapter_ingest_1 asset_bundle_1 catalog_record_seed query_spec_alpha)
+(attach_transform_plugin_to_adapter adapter_ingest_1 transform_plugin_geojson_to_catalog)
+(attach_credential_to_context adapter_ingest_1 credential_service_account)
+(verify_adapter_assets_stage1 adapter_ingest_1 transform_plugin_geojson_to_catalog credential_service_account asset_bundle_1 catalog_record_seed)
+(attach_policy_to_adapter adapter_ingest_1 policy_rule_license_check)
+(finalize_adapter_asset_verification adapter_ingest_1 policy_rule_license_check asset_bundle_1 catalog_record_seed)
+(finalize_adapter_without_enrichment adapter_ingest_1)
+(detach_transform_plugin_from_adapter adapter_ingest_1 transform_plugin_geojson_to_catalog)
+(detach_policy_from_adapter adapter_ingest_1 policy_rule_license_check)
+(detach_credential_from_context adapter_ingest_1 credential_service_account)
+(activate_integration_context adapter_ingest_1 deployment_environment_prod query_spec_alpha)
+(bind_adapter_to_endpoint adapter_ingest_1 external_endpoint_1 deployment_environment_prod)
+(release_query_specification adapter_ingest_1 query_spec_alpha)
+(initialize_integration_context adapter_ingest_2)
+(bind_context_to_endpoint adapter_ingest_2 external_endpoint_2)
+(attach_query_to_context adapter_ingest_2 query_spec_alpha)
+(validate_context_query adapter_ingest_2 query_spec_alpha)
+(associate_asset_bundle_with_record adapter_ingest_2 asset_bundle_2 catalog_record_seed)
+(flag_adapter_prepared_for_verification adapter_ingest_2 asset_bundle_2 catalog_record_seed query_spec_alpha)
+(attach_transform_plugin_to_adapter adapter_ingest_2 transform_plugin_geojson_to_catalog)
+(attach_credential_to_context adapter_ingest_2 credential_service_account)
+(verify_adapter_assets_stage1 adapter_ingest_2 transform_plugin_geojson_to_catalog credential_service_account asset_bundle_2 catalog_record_seed)
+(attach_policy_to_adapter adapter_ingest_2 policy_rule_license_check)
+(finalize_adapter_asset_verification adapter_ingest_2 policy_rule_license_check asset_bundle_2 catalog_record_seed)
+(finalize_adapter_without_enrichment adapter_ingest_2)
+(detach_transform_plugin_from_adapter adapter_ingest_2 transform_plugin_geojson_to_catalog)
+(detach_policy_from_adapter adapter_ingest_2 policy_rule_license_check)
+(detach_credential_from_context adapter_ingest_2 credential_service_account)
+(activate_integration_context adapter_ingest_2 deployment_environment_prod query_spec_alpha)
+(bind_adapter_to_endpoint adapter_ingest_2 external_endpoint_2 deployment_environment_prod)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_z5erppv2/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_z5erppv2/plan.pddl 65 
+
+
+
+--- stderr ---
+

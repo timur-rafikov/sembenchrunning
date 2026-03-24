@@ -1,0 +1,936 @@
+(define (domain near_finale_plan_repair)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object item_category - object option_category - object objective_root - object objective_element - objective_root equipment - resource_type tactic - resource_type specialist - resource_type enhancement - resource_type behavior_modifier - resource_type revival_token - resource_type gear_upgrade - resource_type contingency_asset - resource_type consumable_resource - item_category module - item_category intelligence_asset - item_category route_option - option_category approach_option - option_category replanned_strategy - option_category primary_role_slot - objective_element secondary_role_slot - objective_element primary_objective - primary_role_slot secondary_objective - primary_role_slot team_member - secondary_role_slot)
+  (:predicates
+    (mission_element_flagged_for_repair ?objective - objective_element)
+    (mission_element_prepared ?objective - objective_element)
+    (mission_element_equipment_allocated ?objective - objective_element)
+    (mission_element_recovered ?objective - objective_element)
+    (mission_element_committed_for_execution ?objective_element - objective_element)
+    (mission_element_revival_claimed ?objective - objective_element)
+    (equipment_available ?equipment - equipment)
+    (mission_element_has_equipment ?objective - objective_element ?equipment - equipment)
+    (tactic_available ?tactic - tactic)
+    (mission_element_has_tactic ?objective - objective_element ?tactic - tactic)
+    (specialist_available ?specialist - specialist)
+    (specialist_assigned ?objective - objective_element ?specialist - specialist)
+    (consumable_available ?consumable - consumable_resource)
+    (primary_has_consumable ?primary_objective - primary_objective ?consumable - consumable_resource)
+    (secondary_has_consumable ?secondary_objective - secondary_objective ?consumable - consumable_resource)
+    (primary_has_route ?primary_objective - primary_objective ?route_option - route_option)
+    (route_prevalidated ?route_option - route_option)
+    (route_enhanced ?route_option - route_option)
+    (primary_route_confirmed ?primary_objective - primary_objective)
+    (secondary_has_approach ?secondary_objective - secondary_objective ?approach_option - approach_option)
+    (approach_prevalidated ?approach_option - approach_option)
+    (approach_enhanced ?approach_option - approach_option)
+    (secondary_approach_confirmed ?secondary_objective - secondary_objective)
+    (strategy_blueprint_available ?strategy_blueprint - replanned_strategy)
+    (strategy_blueprint_claimed ?strategy_blueprint - replanned_strategy)
+    (strategy_has_route ?strategy_blueprint - replanned_strategy ?route_option - route_option)
+    (strategy_has_approach ?strategy_blueprint - replanned_strategy ?approach_option - approach_option)
+    (strategy_route_flag ?strategy_blueprint - replanned_strategy)
+    (strategy_approach_flag ?strategy_blueprint - replanned_strategy)
+    (strategy_finalized ?strategy_blueprint - replanned_strategy)
+    (member_assigned_primary_slot ?team_member - team_member ?primary_objective - primary_objective)
+    (member_assigned_secondary_slot ?team_member - team_member ?secondary_objective - secondary_objective)
+    (member_linked_to_strategy ?team_member - team_member ?strategy_blueprint - replanned_strategy)
+    (module_available ?module - module)
+    (member_module_slot ?team_member - team_member ?module - module)
+    (module_integrated ?module - module)
+    (module_assigned_to_strategy ?module - module ?strategy_blueprint - replanned_strategy)
+    (member_module_integration_stage ?team_member - team_member)
+    (member_gear_specialist_validated ?team_member - team_member)
+    (member_contingency_staged ?team_member - team_member)
+    (member_has_enhancement ?team_member - team_member)
+    (member_enhancement_stage ?team_member - team_member)
+    (member_ready_for_behavior ?team_member - team_member)
+    (member_final_configured ?team_member - team_member)
+    (intel_asset_available ?intel_asset - intelligence_asset)
+    (member_has_intel_asset ?team_member - team_member ?intel_asset - intelligence_asset)
+    (member_intel_applied ?team_member - team_member)
+    (member_post_intel_stage ?team_member - team_member)
+    (member_contingency_ready ?team_member - team_member)
+    (enhancement_available ?enhancement - enhancement)
+    (member_has_enhancement_bound ?team_member - team_member ?enhancement - enhancement)
+    (behavior_modifier_available ?behavior_modifier - behavior_modifier)
+    (member_has_behavior_modifier ?team_member - team_member ?behavior_modifier - behavior_modifier)
+    (gear_upgrade_available ?gear_upgrade - gear_upgrade)
+    (member_has_gear_upgrade ?team_member - team_member ?gear_upgrade - gear_upgrade)
+    (contingency_asset_available ?contingency_asset - contingency_asset)
+    (member_has_contingency ?team_member - team_member ?contingency_asset - contingency_asset)
+    (revival_token_available ?revival_token - revival_token)
+    (mission_element_has_revival_token ?objective - objective_element ?revival_token - revival_token)
+    (primary_ready_for_assembly ?primary_objective - primary_objective)
+    (secondary_ready_for_assembly ?secondary_objective - secondary_objective)
+    (member_committed_flag ?team_member - team_member)
+  )
+  (:action flag_objective_for_replanning
+    :parameters (?objective - objective_element)
+    :precondition
+      (and
+        (not
+          (mission_element_flagged_for_repair ?objective)
+        )
+        (not
+          (mission_element_recovered ?objective)
+        )
+      )
+    :effect (mission_element_flagged_for_repair ?objective)
+  )
+  (:action assign_equipment_to_objective
+    :parameters (?objective - objective_element ?equipment - equipment)
+    :precondition
+      (and
+        (mission_element_flagged_for_repair ?objective)
+        (not
+          (mission_element_equipment_allocated ?objective)
+        )
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (mission_element_equipment_allocated ?objective)
+        (mission_element_has_equipment ?objective ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action attach_tactic_to_objective
+    :parameters (?objective - objective_element ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_flagged_for_repair ?objective)
+        (mission_element_equipment_allocated ?objective)
+        (tactic_available ?tactic)
+      )
+    :effect
+      (and
+        (mission_element_has_tactic ?objective ?tactic)
+        (not
+          (tactic_available ?tactic)
+        )
+      )
+  )
+  (:action validate_tactic_attachment
+    :parameters (?objective - objective_element ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_flagged_for_repair ?objective)
+        (mission_element_equipment_allocated ?objective)
+        (mission_element_has_tactic ?objective ?tactic)
+        (not
+          (mission_element_prepared ?objective)
+        )
+      )
+    :effect (mission_element_prepared ?objective)
+  )
+  (:action rollback_tactic_attachment
+    :parameters (?objective - objective_element ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_has_tactic ?objective ?tactic)
+      )
+    :effect
+      (and
+        (tactic_available ?tactic)
+        (not
+          (mission_element_has_tactic ?objective ?tactic)
+        )
+      )
+  )
+  (:action assign_specialist_to_objective
+    :parameters (?objective - objective_element ?specialist - specialist)
+    :precondition
+      (and
+        (mission_element_prepared ?objective)
+        (specialist_available ?specialist)
+      )
+    :effect
+      (and
+        (specialist_assigned ?objective ?specialist)
+        (not
+          (specialist_available ?specialist)
+        )
+      )
+  )
+  (:action release_specialist_from_objective
+    :parameters (?objective - objective_element ?specialist - specialist)
+    :precondition
+      (and
+        (specialist_assigned ?objective ?specialist)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist)
+        (not
+          (specialist_assigned ?objective ?specialist)
+        )
+      )
+  )
+  (:action attach_gear_upgrade_to_member
+    :parameters (?team_member - team_member ?gear_upgrade - gear_upgrade)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (gear_upgrade_available ?gear_upgrade)
+      )
+    :effect
+      (and
+        (member_has_gear_upgrade ?team_member ?gear_upgrade)
+        (not
+          (gear_upgrade_available ?gear_upgrade)
+        )
+      )
+  )
+  (:action detach_gear_upgrade_from_member
+    :parameters (?team_member - team_member ?gear_upgrade - gear_upgrade)
+    :precondition
+      (and
+        (member_has_gear_upgrade ?team_member ?gear_upgrade)
+      )
+    :effect
+      (and
+        (gear_upgrade_available ?gear_upgrade)
+        (not
+          (member_has_gear_upgrade ?team_member ?gear_upgrade)
+        )
+      )
+  )
+  (:action attach_contingency_to_member
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (contingency_asset_available ?contingency_asset)
+      )
+    :effect
+      (and
+        (member_has_contingency ?team_member ?contingency_asset)
+        (not
+          (contingency_asset_available ?contingency_asset)
+        )
+      )
+  )
+  (:action detach_contingency_from_member
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (member_has_contingency ?team_member ?contingency_asset)
+      )
+    :effect
+      (and
+        (contingency_asset_available ?contingency_asset)
+        (not
+          (member_has_contingency ?team_member ?contingency_asset)
+        )
+      )
+  )
+  (:action prevalidate_route_for_primary
+    :parameters (?primary_objective - primary_objective ?route_option - route_option ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_prepared ?primary_objective)
+        (mission_element_has_tactic ?primary_objective ?tactic)
+        (primary_has_route ?primary_objective ?route_option)
+        (not
+          (route_prevalidated ?route_option)
+        )
+        (not
+          (route_enhanced ?route_option)
+        )
+      )
+    :effect (route_prevalidated ?route_option)
+  )
+  (:action confirm_route_with_specialist
+    :parameters (?primary_objective - primary_objective ?route_option - route_option ?specialist - specialist)
+    :precondition
+      (and
+        (mission_element_prepared ?primary_objective)
+        (specialist_assigned ?primary_objective ?specialist)
+        (primary_has_route ?primary_objective ?route_option)
+        (route_prevalidated ?route_option)
+        (not
+          (primary_ready_for_assembly ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (primary_route_confirmed ?primary_objective)
+      )
+  )
+  (:action attach_consumable_to_primary_route
+    :parameters (?primary_objective - primary_objective ?route_option - route_option ?consumable - consumable_resource)
+    :precondition
+      (and
+        (mission_element_prepared ?primary_objective)
+        (primary_has_route ?primary_objective ?route_option)
+        (consumable_available ?consumable)
+        (not
+          (primary_ready_for_assembly ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (route_enhanced ?route_option)
+        (primary_ready_for_assembly ?primary_objective)
+        (primary_has_consumable ?primary_objective ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_primary_route_selection
+    :parameters (?primary_objective - primary_objective ?route_option - route_option ?tactic - tactic ?consumable - consumable_resource)
+    :precondition
+      (and
+        (mission_element_prepared ?primary_objective)
+        (mission_element_has_tactic ?primary_objective ?tactic)
+        (primary_has_route ?primary_objective ?route_option)
+        (route_enhanced ?route_option)
+        (primary_has_consumable ?primary_objective ?consumable)
+        (not
+          (primary_route_confirmed ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (route_prevalidated ?route_option)
+        (primary_route_confirmed ?primary_objective)
+        (consumable_available ?consumable)
+        (not
+          (primary_has_consumable ?primary_objective ?consumable)
+        )
+      )
+  )
+  (:action prevalidate_approach_for_secondary
+    :parameters (?secondary_objective - secondary_objective ?approach_option - approach_option ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_prepared ?secondary_objective)
+        (mission_element_has_tactic ?secondary_objective ?tactic)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (not
+          (approach_prevalidated ?approach_option)
+        )
+        (not
+          (approach_enhanced ?approach_option)
+        )
+      )
+    :effect (approach_prevalidated ?approach_option)
+  )
+  (:action confirm_approach_with_specialist
+    :parameters (?secondary_objective - secondary_objective ?approach_option - approach_option ?specialist - specialist)
+    :precondition
+      (and
+        (mission_element_prepared ?secondary_objective)
+        (specialist_assigned ?secondary_objective ?specialist)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (approach_prevalidated ?approach_option)
+        (not
+          (secondary_ready_for_assembly ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready_for_assembly ?secondary_objective)
+        (secondary_approach_confirmed ?secondary_objective)
+      )
+  )
+  (:action attach_consumable_to_secondary_approach
+    :parameters (?secondary_objective - secondary_objective ?approach_option - approach_option ?consumable - consumable_resource)
+    :precondition
+      (and
+        (mission_element_prepared ?secondary_objective)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (consumable_available ?consumable)
+        (not
+          (secondary_ready_for_assembly ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (approach_enhanced ?approach_option)
+        (secondary_ready_for_assembly ?secondary_objective)
+        (secondary_has_consumable ?secondary_objective ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_secondary_approach_selection
+    :parameters (?secondary_objective - secondary_objective ?approach_option - approach_option ?tactic - tactic ?consumable - consumable_resource)
+    :precondition
+      (and
+        (mission_element_prepared ?secondary_objective)
+        (mission_element_has_tactic ?secondary_objective ?tactic)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (approach_enhanced ?approach_option)
+        (secondary_has_consumable ?secondary_objective ?consumable)
+        (not
+          (secondary_approach_confirmed ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (approach_prevalidated ?approach_option)
+        (secondary_approach_confirmed ?secondary_objective)
+        (consumable_available ?consumable)
+        (not
+          (secondary_has_consumable ?secondary_objective ?consumable)
+        )
+      )
+  )
+  (:action assemble_replanned_strategy_basic
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?route_option - route_option ?approach_option - approach_option ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (secondary_ready_for_assembly ?secondary_objective)
+        (primary_has_route ?primary_objective ?route_option)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (route_prevalidated ?route_option)
+        (approach_prevalidated ?approach_option)
+        (primary_route_confirmed ?primary_objective)
+        (secondary_approach_confirmed ?secondary_objective)
+        (strategy_blueprint_available ?strategy_blueprint)
+      )
+    :effect
+      (and
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_has_route ?strategy_blueprint ?route_option)
+        (strategy_has_approach ?strategy_blueprint ?approach_option)
+        (not
+          (strategy_blueprint_available ?strategy_blueprint)
+        )
+      )
+  )
+  (:action assemble_replanned_strategy_with_route_enhancement
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?route_option - route_option ?approach_option - approach_option ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (secondary_ready_for_assembly ?secondary_objective)
+        (primary_has_route ?primary_objective ?route_option)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (route_enhanced ?route_option)
+        (approach_prevalidated ?approach_option)
+        (not
+          (primary_route_confirmed ?primary_objective)
+        )
+        (secondary_approach_confirmed ?secondary_objective)
+        (strategy_blueprint_available ?strategy_blueprint)
+      )
+    :effect
+      (and
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_has_route ?strategy_blueprint ?route_option)
+        (strategy_has_approach ?strategy_blueprint ?approach_option)
+        (strategy_route_flag ?strategy_blueprint)
+        (not
+          (strategy_blueprint_available ?strategy_blueprint)
+        )
+      )
+  )
+  (:action assemble_replanned_strategy_with_approach_enhancement
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?route_option - route_option ?approach_option - approach_option ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (secondary_ready_for_assembly ?secondary_objective)
+        (primary_has_route ?primary_objective ?route_option)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (route_prevalidated ?route_option)
+        (approach_enhanced ?approach_option)
+        (primary_route_confirmed ?primary_objective)
+        (not
+          (secondary_approach_confirmed ?secondary_objective)
+        )
+        (strategy_blueprint_available ?strategy_blueprint)
+      )
+    :effect
+      (and
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_has_route ?strategy_blueprint ?route_option)
+        (strategy_has_approach ?strategy_blueprint ?approach_option)
+        (strategy_approach_flag ?strategy_blueprint)
+        (not
+          (strategy_blueprint_available ?strategy_blueprint)
+        )
+      )
+  )
+  (:action assemble_replanned_strategy_with_both_enhancements
+    :parameters (?primary_objective - primary_objective ?secondary_objective - secondary_objective ?route_option - route_option ?approach_option - approach_option ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (secondary_ready_for_assembly ?secondary_objective)
+        (primary_has_route ?primary_objective ?route_option)
+        (secondary_has_approach ?secondary_objective ?approach_option)
+        (route_enhanced ?route_option)
+        (approach_enhanced ?approach_option)
+        (not
+          (primary_route_confirmed ?primary_objective)
+        )
+        (not
+          (secondary_approach_confirmed ?secondary_objective)
+        )
+        (strategy_blueprint_available ?strategy_blueprint)
+      )
+    :effect
+      (and
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_has_route ?strategy_blueprint ?route_option)
+        (strategy_has_approach ?strategy_blueprint ?approach_option)
+        (strategy_route_flag ?strategy_blueprint)
+        (strategy_approach_flag ?strategy_blueprint)
+        (not
+          (strategy_blueprint_available ?strategy_blueprint)
+        )
+      )
+  )
+  (:action finalize_strategy_initial_status
+    :parameters (?strategy_blueprint - replanned_strategy ?primary_objective - primary_objective ?tactic - tactic)
+    :precondition
+      (and
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (primary_ready_for_assembly ?primary_objective)
+        (mission_element_has_tactic ?primary_objective ?tactic)
+        (not
+          (strategy_finalized ?strategy_blueprint)
+        )
+      )
+    :effect (strategy_finalized ?strategy_blueprint)
+  )
+  (:action integrate_module_into_strategy
+    :parameters (?team_member - team_member ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (member_linked_to_strategy ?team_member ?strategy_blueprint)
+        (member_module_slot ?team_member ?module)
+        (module_available ?module)
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_finalized ?strategy_blueprint)
+        (not
+          (module_integrated ?module)
+        )
+      )
+    :effect
+      (and
+        (module_integrated ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (not
+          (module_available ?module)
+        )
+      )
+  )
+  (:action advance_member_module_integration
+    :parameters (?team_member - team_member ?module - module ?strategy_blueprint - replanned_strategy ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (member_module_slot ?team_member ?module)
+        (module_integrated ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (mission_element_has_tactic ?team_member ?tactic)
+        (not
+          (strategy_route_flag ?strategy_blueprint)
+        )
+        (not
+          (member_module_integration_stage ?team_member)
+        )
+      )
+    :effect (member_module_integration_stage ?team_member)
+  )
+  (:action attach_enhancement_to_member
+    :parameters (?team_member - team_member ?enhancement - enhancement)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (enhancement_available ?enhancement)
+        (not
+          (member_has_enhancement ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_has_enhancement ?team_member)
+        (member_has_enhancement_bound ?team_member ?enhancement)
+        (not
+          (enhancement_available ?enhancement)
+        )
+      )
+  )
+  (:action stage_member_module_and_enhancement
+    :parameters (?team_member - team_member ?module - module ?strategy_blueprint - replanned_strategy ?tactic - tactic ?enhancement - enhancement)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (member_module_slot ?team_member ?module)
+        (module_integrated ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (mission_element_has_tactic ?team_member ?tactic)
+        (strategy_route_flag ?strategy_blueprint)
+        (member_has_enhancement ?team_member)
+        (member_has_enhancement_bound ?team_member ?enhancement)
+        (not
+          (member_module_integration_stage ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_module_integration_stage ?team_member)
+        (member_enhancement_stage ?team_member)
+      )
+  )
+  (:action validate_member_with_gear_and_specialist
+    :parameters (?team_member - team_member ?gear_upgrade - gear_upgrade ?specialist - specialist ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_module_integration_stage ?team_member)
+        (member_has_gear_upgrade ?team_member ?gear_upgrade)
+        (specialist_assigned ?team_member ?specialist)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (not
+          (strategy_approach_flag ?strategy_blueprint)
+        )
+        (not
+          (member_gear_specialist_validated ?team_member)
+        )
+      )
+    :effect (member_gear_specialist_validated ?team_member)
+  )
+  (:action validate_member_with_gear_and_specialist_alternate
+    :parameters (?team_member - team_member ?gear_upgrade - gear_upgrade ?specialist - specialist ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_module_integration_stage ?team_member)
+        (member_has_gear_upgrade ?team_member ?gear_upgrade)
+        (specialist_assigned ?team_member ?specialist)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (strategy_approach_flag ?strategy_blueprint)
+        (not
+          (member_gear_specialist_validated ?team_member)
+        )
+      )
+    :effect (member_gear_specialist_validated ?team_member)
+  )
+  (:action apply_contingency_and_stage_member
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_gear_specialist_validated ?team_member)
+        (member_has_contingency ?team_member ?contingency_asset)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (not
+          (strategy_route_flag ?strategy_blueprint)
+        )
+        (not
+          (strategy_approach_flag ?strategy_blueprint)
+        )
+        (not
+          (member_contingency_staged ?team_member)
+        )
+      )
+    :effect (member_contingency_staged ?team_member)
+  )
+  (:action apply_contingency_and_stage_member_with_route_flag
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_gear_specialist_validated ?team_member)
+        (member_has_contingency ?team_member ?contingency_asset)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (strategy_route_flag ?strategy_blueprint)
+        (not
+          (strategy_approach_flag ?strategy_blueprint)
+        )
+        (not
+          (member_contingency_staged ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_contingency_staged ?team_member)
+        (member_ready_for_behavior ?team_member)
+      )
+  )
+  (:action apply_contingency_and_stage_member_approach_flag
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_gear_specialist_validated ?team_member)
+        (member_has_contingency ?team_member ?contingency_asset)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (not
+          (strategy_route_flag ?strategy_blueprint)
+        )
+        (strategy_approach_flag ?strategy_blueprint)
+        (not
+          (member_contingency_staged ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_contingency_staged ?team_member)
+        (member_ready_for_behavior ?team_member)
+      )
+  )
+  (:action apply_contingency_and_stage_member_both_flags
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset ?module - module ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (member_gear_specialist_validated ?team_member)
+        (member_has_contingency ?team_member ?contingency_asset)
+        (member_module_slot ?team_member ?module)
+        (module_assigned_to_strategy ?module ?strategy_blueprint)
+        (strategy_route_flag ?strategy_blueprint)
+        (strategy_approach_flag ?strategy_blueprint)
+        (not
+          (member_contingency_staged ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_contingency_staged ?team_member)
+        (member_ready_for_behavior ?team_member)
+      )
+  )
+  (:action commit_member_validation
+    :parameters (?team_member - team_member)
+    :precondition
+      (and
+        (member_contingency_staged ?team_member)
+        (not
+          (member_ready_for_behavior ?team_member)
+        )
+        (not
+          (member_committed_flag ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_committed_flag ?team_member)
+        (mission_element_committed_for_execution ?team_member)
+      )
+  )
+  (:action attach_behavior_modifier_to_member
+    :parameters (?team_member - team_member ?behavior_modifier - behavior_modifier)
+    :precondition
+      (and
+        (member_contingency_staged ?team_member)
+        (member_ready_for_behavior ?team_member)
+        (behavior_modifier_available ?behavior_modifier)
+      )
+    :effect
+      (and
+        (member_has_behavior_modifier ?team_member ?behavior_modifier)
+        (not
+          (behavior_modifier_available ?behavior_modifier)
+        )
+      )
+  )
+  (:action perform_member_final_configuration_check
+    :parameters (?team_member - team_member ?primary_objective - primary_objective ?secondary_objective - secondary_objective ?tactic - tactic ?behavior_modifier - behavior_modifier)
+    :precondition
+      (and
+        (member_contingency_staged ?team_member)
+        (member_ready_for_behavior ?team_member)
+        (member_has_behavior_modifier ?team_member ?behavior_modifier)
+        (member_assigned_primary_slot ?team_member ?primary_objective)
+        (member_assigned_secondary_slot ?team_member ?secondary_objective)
+        (primary_route_confirmed ?primary_objective)
+        (secondary_approach_confirmed ?secondary_objective)
+        (mission_element_has_tactic ?team_member ?tactic)
+        (not
+          (member_final_configured ?team_member)
+        )
+      )
+    :effect (member_final_configured ?team_member)
+  )
+  (:action commit_member_ready_state
+    :parameters (?team_member - team_member)
+    :precondition
+      (and
+        (member_contingency_staged ?team_member)
+        (member_final_configured ?team_member)
+        (not
+          (member_committed_flag ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_committed_flag ?team_member)
+        (mission_element_committed_for_execution ?team_member)
+      )
+  )
+  (:action apply_intel_asset_to_member
+    :parameters (?team_member - team_member ?intel_asset - intelligence_asset ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_prepared ?team_member)
+        (mission_element_has_tactic ?team_member ?tactic)
+        (intel_asset_available ?intel_asset)
+        (member_has_intel_asset ?team_member ?intel_asset)
+        (not
+          (member_intel_applied ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_intel_applied ?team_member)
+        (not
+          (intel_asset_available ?intel_asset)
+        )
+      )
+  )
+  (:action stage_member_post_intel
+    :parameters (?team_member - team_member ?specialist - specialist)
+    :precondition
+      (and
+        (member_intel_applied ?team_member)
+        (specialist_assigned ?team_member ?specialist)
+        (not
+          (member_post_intel_stage ?team_member)
+        )
+      )
+    :effect (member_post_intel_stage ?team_member)
+  )
+  (:action attach_contingency_after_stage
+    :parameters (?team_member - team_member ?contingency_asset - contingency_asset)
+    :precondition
+      (and
+        (member_post_intel_stage ?team_member)
+        (member_has_contingency ?team_member ?contingency_asset)
+        (not
+          (member_contingency_ready ?team_member)
+        )
+      )
+    :effect (member_contingency_ready ?team_member)
+  )
+  (:action commit_member_after_contingency
+    :parameters (?team_member - team_member)
+    :precondition
+      (and
+        (member_contingency_ready ?team_member)
+        (not
+          (member_committed_flag ?team_member)
+        )
+      )
+    :effect
+      (and
+        (member_committed_flag ?team_member)
+        (mission_element_committed_for_execution ?team_member)
+      )
+  )
+  (:action commit_primary_objective
+    :parameters (?primary_objective - primary_objective ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (primary_ready_for_assembly ?primary_objective)
+        (primary_route_confirmed ?primary_objective)
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_finalized ?strategy_blueprint)
+        (not
+          (mission_element_committed_for_execution ?primary_objective)
+        )
+      )
+    :effect (mission_element_committed_for_execution ?primary_objective)
+  )
+  (:action commit_secondary_objective
+    :parameters (?secondary_objective - secondary_objective ?strategy_blueprint - replanned_strategy)
+    :precondition
+      (and
+        (secondary_ready_for_assembly ?secondary_objective)
+        (secondary_approach_confirmed ?secondary_objective)
+        (strategy_blueprint_claimed ?strategy_blueprint)
+        (strategy_finalized ?strategy_blueprint)
+        (not
+          (mission_element_committed_for_execution ?secondary_objective)
+        )
+      )
+    :effect (mission_element_committed_for_execution ?secondary_objective)
+  )
+  (:action apply_revival_token_to_objective
+    :parameters (?objective - objective_element ?revival_token - revival_token ?tactic - tactic)
+    :precondition
+      (and
+        (mission_element_committed_for_execution ?objective)
+        (mission_element_has_tactic ?objective ?tactic)
+        (revival_token_available ?revival_token)
+        (not
+          (mission_element_revival_claimed ?objective)
+        )
+      )
+    :effect
+      (and
+        (mission_element_revival_claimed ?objective)
+        (mission_element_has_revival_token ?objective ?revival_token)
+        (not
+          (revival_token_available ?revival_token)
+        )
+      )
+  )
+  (:action finalize_primary_objective_recovery_with_equipment
+    :parameters (?primary_objective - primary_objective ?equipment - equipment ?revival_token - revival_token)
+    :precondition
+      (and
+        (mission_element_revival_claimed ?primary_objective)
+        (mission_element_has_equipment ?primary_objective ?equipment)
+        (mission_element_has_revival_token ?primary_objective ?revival_token)
+        (not
+          (mission_element_recovered ?primary_objective)
+        )
+      )
+    :effect
+      (and
+        (mission_element_recovered ?primary_objective)
+        (equipment_available ?equipment)
+        (revival_token_available ?revival_token)
+      )
+  )
+  (:action finalize_secondary_objective_recovery_with_equipment
+    :parameters (?secondary_objective - secondary_objective ?equipment - equipment ?revival_token - revival_token)
+    :precondition
+      (and
+        (mission_element_revival_claimed ?secondary_objective)
+        (mission_element_has_equipment ?secondary_objective ?equipment)
+        (mission_element_has_revival_token ?secondary_objective ?revival_token)
+        (not
+          (mission_element_recovered ?secondary_objective)
+        )
+      )
+    :effect
+      (and
+        (mission_element_recovered ?secondary_objective)
+        (equipment_available ?equipment)
+        (revival_token_available ?revival_token)
+      )
+  )
+  (:action finalize_member_recovery_with_equipment
+    :parameters (?team_member - team_member ?equipment - equipment ?revival_token - revival_token)
+    :precondition
+      (and
+        (mission_element_revival_claimed ?team_member)
+        (mission_element_has_equipment ?team_member ?equipment)
+        (mission_element_has_revival_token ?team_member ?revival_token)
+        (not
+          (mission_element_recovered ?team_member)
+        )
+      )
+    :effect
+      (and
+        (mission_element_recovered ?team_member)
+        (equipment_available ?equipment)
+        (revival_token_available ?revival_token)
+      )
+  )
+)

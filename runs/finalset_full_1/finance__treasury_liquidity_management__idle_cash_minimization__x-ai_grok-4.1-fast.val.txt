@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain treasury_idle_cash_minimization)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types financial_resource_type - object policy_or_product_type - object endpoint_or_instruction_type - object organizational_entity - object legal_entity - organizational_entity bank_account - financial_resource_type placement_option - financial_resource_type authorized_approver - financial_resource_type approval_mandate - financial_resource_type allocation_profile - financial_resource_type settlement_instrument - financial_resource_type short_term_instrument - financial_resource_type credit_approval - financial_resource_type investment_product - policy_or_product_type liquidity_pool - policy_or_product_type external_mandate - policy_or_product_type source_endpoint - endpoint_or_instruction_type destination_endpoint - endpoint_or_instruction_type transfer_candidate - endpoint_or_instruction_type entity_operational_domain - legal_entity entity_central_domain - legal_entity operating_account - entity_operational_domain concentration_account - entity_operational_domain treasury_agent - entity_central_domain)
+  (:predicates
+    (entity_onboarded ?legal_entity - legal_entity)
+    (treasury_enabled ?legal_entity - legal_entity)
+    (entity_bank_relation_linked ?legal_entity - legal_entity)
+    (funding_associated ?legal_entity - legal_entity)
+    (settlement_confirmed ?legal_entity - legal_entity)
+    (investment_recorded ?legal_entity - legal_entity)
+    (bank_account_available ?bank_relation - bank_account)
+    (has_bank_account ?legal_entity - legal_entity ?bank_relation - bank_account)
+    (placement_option_available ?placement_option - placement_option)
+    (placement_option_matched ?legal_entity - legal_entity ?placement_option - placement_option)
+    (approver_available ?authorized_approver - authorized_approver)
+    (approver_assigned ?legal_entity - legal_entity ?authorized_approver - authorized_approver)
+    (investment_product_available ?investment_product - investment_product)
+    (account_allocated_investment_product ?operating_account - operating_account ?investment_product - investment_product)
+    (concentration_allocated_investment_product ?concentration_account - concentration_account ?investment_product - investment_product)
+    (operating_account_source_endpoint ?operating_account - operating_account ?source_endpoint - source_endpoint)
+    (source_endpoint_ready ?source_endpoint - source_endpoint)
+    (source_endpoint_allocated ?source_endpoint - source_endpoint)
+    (operating_account_marked_for_transfer ?operating_account - operating_account)
+    (concentration_account_destination_endpoint ?concentration_account - concentration_account ?destination_endpoint - destination_endpoint)
+    (destination_endpoint_ready ?destination_endpoint - destination_endpoint)
+    (destination_endpoint_allocated ?destination_endpoint - destination_endpoint)
+    (concentration_account_marked_for_transfer ?concentration_account - concentration_account)
+    (transfer_candidate_available ?transfer_candidate - transfer_candidate)
+    (transfer_candidate_assigned ?transfer_candidate - transfer_candidate)
+    (transfer_candidate_source_endpoint ?transfer_candidate - transfer_candidate ?source_endpoint - source_endpoint)
+    (transfer_candidate_destination_endpoint ?transfer_candidate - transfer_candidate ?destination_endpoint - destination_endpoint)
+    (transfer_requires_pool_assignment ?transfer_candidate - transfer_candidate)
+    (transfer_requires_additional_mandate ?transfer_candidate - transfer_candidate)
+    (transfer_candidate_scheduled ?transfer_candidate - transfer_candidate)
+    (agent_operating_account_link ?treasury_agent - treasury_agent ?operating_account - operating_account)
+    (agent_concentration_account_link ?treasury_agent - treasury_agent ?concentration_account - concentration_account)
+    (agent_has_transfer_candidate ?treasury_agent - treasury_agent ?transfer_candidate - transfer_candidate)
+    (liquidity_pool_available ?liquidity_pool - liquidity_pool)
+    (agent_liquidity_pool_link ?treasury_agent - treasury_agent ?liquidity_pool - liquidity_pool)
+    (liquidity_pool_assigned ?liquidity_pool - liquidity_pool)
+    (liquidity_pool_assigned_to_candidate ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    (agent_ready_for_processing ?treasury_agent - treasury_agent)
+    (agent_processing_initiated ?treasury_agent - treasury_agent)
+    (agent_approval_stage_completed ?treasury_agent - treasury_agent)
+    (agent_mandate_attached ?treasury_agent - treasury_agent)
+    (agent_mandate_registered ?treasury_agent - treasury_agent)
+    (agent_allocation_enabled ?treasury_agent - treasury_agent)
+    (agent_finalized ?treasury_agent - treasury_agent)
+    (external_mandate_available ?external_mandate - external_mandate)
+    (agent_external_mandate_link ?treasury_agent - treasury_agent ?external_mandate - external_mandate)
+    (agent_external_mandate_flagged ?treasury_agent - treasury_agent)
+    (agent_external_mandate_verified ?treasury_agent - treasury_agent)
+    (agent_external_mandate_approved ?treasury_agent - treasury_agent)
+    (approval_mandate_available ?approval_mandate - approval_mandate)
+    (agent_approval_mandate_link ?treasury_agent - treasury_agent ?approval_mandate - approval_mandate)
+    (allocation_profile_available ?allocation_profile - allocation_profile)
+    (agent_allocation_profile_link ?treasury_agent - treasury_agent ?allocation_profile - allocation_profile)
+    (short_term_instrument_available ?short_term_instrument - short_term_instrument)
+    (agent_short_term_instrument_link ?treasury_agent - treasury_agent ?short_term_instrument - short_term_instrument)
+    (credit_approval_available ?credit_approval - credit_approval)
+    (agent_credit_approval_link ?treasury_agent - treasury_agent ?credit_approval - credit_approval)
+    (settlement_instrument_available ?settlement_instrument - settlement_instrument)
+    (entity_settlement_instrument ?legal_entity - legal_entity ?settlement_instrument - settlement_instrument)
+    (operating_account_ready ?operating_account - operating_account)
+    (concentration_account_ready ?concentration_account - concentration_account)
+    (agent_marked_complete ?treasury_agent - treasury_agent)
+  )
+  (:action onboard_legal_entity
+    :parameters (?legal_entity - legal_entity)
+    :precondition
+      (and
+        (not
+          (entity_onboarded ?legal_entity)
+        )
+        (not
+          (funding_associated ?legal_entity)
+        )
+      )
+    :effect (entity_onboarded ?legal_entity)
+  )
+  (:action associate_entity_with_bank_relation
+    :parameters (?legal_entity - legal_entity ?bank_relation - bank_account)
+    :precondition
+      (and
+        (entity_onboarded ?legal_entity)
+        (not
+          (entity_bank_relation_linked ?legal_entity)
+        )
+        (bank_account_available ?bank_relation)
+      )
+    :effect
+      (and
+        (entity_bank_relation_linked ?legal_entity)
+        (has_bank_account ?legal_entity ?bank_relation)
+        (not
+          (bank_account_available ?bank_relation)
+        )
+      )
+  )
+  (:action match_entity_to_placement_option
+    :parameters (?legal_entity - legal_entity ?placement_option - placement_option)
+    :precondition
+      (and
+        (entity_onboarded ?legal_entity)
+        (entity_bank_relation_linked ?legal_entity)
+        (placement_option_available ?placement_option)
+      )
+    :effect
+      (and
+        (placement_option_matched ?legal_entity ?placement_option)
+        (not
+          (placement_option_available ?placement_option)
+        )
+      )
+  )
+  (:action confirm_placement_for_entity
+    :parameters (?legal_entity - legal_entity ?placement_option - placement_option)
+    :precondition
+      (and
+        (entity_onboarded ?legal_entity)
+        (entity_bank_relation_linked ?legal_entity)
+        (placement_option_matched ?legal_entity ?placement_option)
+        (not
+          (treasury_enabled ?legal_entity)
+        )
+      )
+    :effect (treasury_enabled ?legal_entity)
+  )
+  (:action release_placement_option
+    :parameters (?legal_entity - legal_entity ?placement_option - placement_option)
+    :precondition
+      (and
+        (placement_option_matched ?legal_entity ?placement_option)
+      )
+    :effect
+      (and
+        (placement_option_available ?placement_option)
+        (not
+          (placement_option_matched ?legal_entity ?placement_option)
+        )
+      )
+  )
+  (:action assign_approver_to_entity
+    :parameters (?legal_entity - legal_entity ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (treasury_enabled ?legal_entity)
+        (approver_available ?authorized_approver)
+      )
+    :effect
+      (and
+        (approver_assigned ?legal_entity ?authorized_approver)
+        (not
+          (approver_available ?authorized_approver)
+        )
+      )
+  )
+  (:action unassign_approver_from_entity
+    :parameters (?legal_entity - legal_entity ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (approver_assigned ?legal_entity ?authorized_approver)
+      )
+    :effect
+      (and
+        (approver_available ?authorized_approver)
+        (not
+          (approver_assigned ?legal_entity ?authorized_approver)
+        )
+      )
+  )
+  (:action assign_short_term_instrument_to_agent
+    :parameters (?treasury_agent - treasury_agent ?short_term_instrument - short_term_instrument)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (short_term_instrument_available ?short_term_instrument)
+      )
+    :effect
+      (and
+        (agent_short_term_instrument_link ?treasury_agent ?short_term_instrument)
+        (not
+          (short_term_instrument_available ?short_term_instrument)
+        )
+      )
+  )
+  (:action remove_short_term_instrument_from_agent
+    :parameters (?treasury_agent - treasury_agent ?short_term_instrument - short_term_instrument)
+    :precondition
+      (and
+        (agent_short_term_instrument_link ?treasury_agent ?short_term_instrument)
+      )
+    :effect
+      (and
+        (short_term_instrument_available ?short_term_instrument)
+        (not
+          (agent_short_term_instrument_link ?treasury_agent ?short_term_instrument)
+        )
+      )
+  )
+  (:action assign_credit_approval_to_agent
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (credit_approval_available ?credit_approval)
+      )
+    :effect
+      (and
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (not
+          (credit_approval_available ?credit_approval)
+        )
+      )
+  )
+  (:action revoke_credit_approval_from_agent
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval)
+    :precondition
+      (and
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+      )
+    :effect
+      (and
+        (credit_approval_available ?credit_approval)
+        (not
+          (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        )
+      )
+  )
+  (:action select_source_endpoint_for_account
+    :parameters (?operating_account - operating_account ?source_endpoint - source_endpoint ?placement_option - placement_option)
+    :precondition
+      (and
+        (treasury_enabled ?operating_account)
+        (placement_option_matched ?operating_account ?placement_option)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (not
+          (source_endpoint_ready ?source_endpoint)
+        )
+        (not
+          (source_endpoint_allocated ?source_endpoint)
+        )
+      )
+    :effect (source_endpoint_ready ?source_endpoint)
+  )
+  (:action assign_approver_and_mark_account_for_transfer
+    :parameters (?operating_account - operating_account ?source_endpoint - source_endpoint ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (treasury_enabled ?operating_account)
+        (approver_assigned ?operating_account ?authorized_approver)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (source_endpoint_ready ?source_endpoint)
+        (not
+          (operating_account_ready ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (operating_account_ready ?operating_account)
+        (operating_account_marked_for_transfer ?operating_account)
+      )
+  )
+  (:action allocate_investment_product_and_mark_account
+    :parameters (?operating_account - operating_account ?source_endpoint - source_endpoint ?investment_product - investment_product)
+    :precondition
+      (and
+        (treasury_enabled ?operating_account)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (investment_product_available ?investment_product)
+        (not
+          (operating_account_ready ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (source_endpoint_allocated ?source_endpoint)
+        (operating_account_ready ?operating_account)
+        (account_allocated_investment_product ?operating_account ?investment_product)
+        (not
+          (investment_product_available ?investment_product)
+        )
+      )
+  )
+  (:action finalize_account_allocation_and_mark
+    :parameters (?operating_account - operating_account ?source_endpoint - source_endpoint ?placement_option - placement_option ?investment_product - investment_product)
+    :precondition
+      (and
+        (treasury_enabled ?operating_account)
+        (placement_option_matched ?operating_account ?placement_option)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (source_endpoint_allocated ?source_endpoint)
+        (account_allocated_investment_product ?operating_account ?investment_product)
+        (not
+          (operating_account_marked_for_transfer ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (source_endpoint_ready ?source_endpoint)
+        (operating_account_marked_for_transfer ?operating_account)
+        (investment_product_available ?investment_product)
+        (not
+          (account_allocated_investment_product ?operating_account ?investment_product)
+        )
+      )
+  )
+  (:action select_destination_endpoint_for_concentration_account
+    :parameters (?concentration_account - concentration_account ?destination_endpoint - destination_endpoint ?placement_option - placement_option)
+    :precondition
+      (and
+        (treasury_enabled ?concentration_account)
+        (placement_option_matched ?concentration_account ?placement_option)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (not
+          (destination_endpoint_ready ?destination_endpoint)
+        )
+        (not
+          (destination_endpoint_allocated ?destination_endpoint)
+        )
+      )
+    :effect (destination_endpoint_ready ?destination_endpoint)
+  )
+  (:action assign_approver_and_mark_concentration_account
+    :parameters (?concentration_account - concentration_account ?destination_endpoint - destination_endpoint ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (treasury_enabled ?concentration_account)
+        (approver_assigned ?concentration_account ?authorized_approver)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (destination_endpoint_ready ?destination_endpoint)
+        (not
+          (concentration_account_ready ?concentration_account)
+        )
+      )
+    :effect
+      (and
+        (concentration_account_ready ?concentration_account)
+        (concentration_account_marked_for_transfer ?concentration_account)
+      )
+  )
+  (:action allocate_investment_product_to_concentration_account
+    :parameters (?concentration_account - concentration_account ?destination_endpoint - destination_endpoint ?investment_product - investment_product)
+    :precondition
+      (and
+        (treasury_enabled ?concentration_account)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (investment_product_available ?investment_product)
+        (not
+          (concentration_account_ready ?concentration_account)
+        )
+      )
+    :effect
+      (and
+        (destination_endpoint_allocated ?destination_endpoint)
+        (concentration_account_ready ?concentration_account)
+        (concentration_allocated_investment_product ?concentration_account ?investment_product)
+        (not
+          (investment_product_available ?investment_product)
+        )
+      )
+  )
+  (:action finalize_concentration_allocation_and_mark
+    :parameters (?concentration_account - concentration_account ?destination_endpoint - destination_endpoint ?placement_option - placement_option ?investment_product - investment_product)
+    :precondition
+      (and
+        (treasury_enabled ?concentration_account)
+        (placement_option_matched ?concentration_account ?placement_option)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (destination_endpoint_allocated ?destination_endpoint)
+        (concentration_allocated_investment_product ?concentration_account ?investment_product)
+        (not
+          (concentration_account_marked_for_transfer ?concentration_account)
+        )
+      )
+    :effect
+      (and
+        (destination_endpoint_ready ?destination_endpoint)
+        (concentration_account_marked_for_transfer ?concentration_account)
+        (investment_product_available ?investment_product)
+        (not
+          (concentration_allocated_investment_product ?concentration_account ?investment_product)
+        )
+      )
+  )
+  (:action build_transfer_batch_standard
+    :parameters (?operating_account - operating_account ?concentration_account - concentration_account ?source_endpoint - source_endpoint ?destination_endpoint - destination_endpoint ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (operating_account_ready ?operating_account)
+        (concentration_account_ready ?concentration_account)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (source_endpoint_ready ?source_endpoint)
+        (destination_endpoint_ready ?destination_endpoint)
+        (operating_account_marked_for_transfer ?operating_account)
+        (concentration_account_marked_for_transfer ?concentration_account)
+        (transfer_candidate_available ?transfer_candidate)
+      )
+    :effect
+      (and
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_source_endpoint ?transfer_candidate ?source_endpoint)
+        (transfer_candidate_destination_endpoint ?transfer_candidate ?destination_endpoint)
+        (not
+          (transfer_candidate_available ?transfer_candidate)
+        )
+      )
+  )
+  (:action build_transfer_batch_with_source_allocated
+    :parameters (?operating_account - operating_account ?concentration_account - concentration_account ?source_endpoint - source_endpoint ?destination_endpoint - destination_endpoint ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (operating_account_ready ?operating_account)
+        (concentration_account_ready ?concentration_account)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (source_endpoint_allocated ?source_endpoint)
+        (destination_endpoint_ready ?destination_endpoint)
+        (not
+          (operating_account_marked_for_transfer ?operating_account)
+        )
+        (concentration_account_marked_for_transfer ?concentration_account)
+        (transfer_candidate_available ?transfer_candidate)
+      )
+    :effect
+      (and
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_source_endpoint ?transfer_candidate ?source_endpoint)
+        (transfer_candidate_destination_endpoint ?transfer_candidate ?destination_endpoint)
+        (transfer_requires_pool_assignment ?transfer_candidate)
+        (not
+          (transfer_candidate_available ?transfer_candidate)
+        )
+      )
+  )
+  (:action build_transfer_batch_with_destination_allocated
+    :parameters (?operating_account - operating_account ?concentration_account - concentration_account ?source_endpoint - source_endpoint ?destination_endpoint - destination_endpoint ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (operating_account_ready ?operating_account)
+        (concentration_account_ready ?concentration_account)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (source_endpoint_ready ?source_endpoint)
+        (destination_endpoint_allocated ?destination_endpoint)
+        (operating_account_marked_for_transfer ?operating_account)
+        (not
+          (concentration_account_marked_for_transfer ?concentration_account)
+        )
+        (transfer_candidate_available ?transfer_candidate)
+      )
+    :effect
+      (and
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_source_endpoint ?transfer_candidate ?source_endpoint)
+        (transfer_candidate_destination_endpoint ?transfer_candidate ?destination_endpoint)
+        (transfer_requires_additional_mandate ?transfer_candidate)
+        (not
+          (transfer_candidate_available ?transfer_candidate)
+        )
+      )
+  )
+  (:action build_transfer_batch_with_both_allocated
+    :parameters (?operating_account - operating_account ?concentration_account - concentration_account ?source_endpoint - source_endpoint ?destination_endpoint - destination_endpoint ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (operating_account_ready ?operating_account)
+        (concentration_account_ready ?concentration_account)
+        (operating_account_source_endpoint ?operating_account ?source_endpoint)
+        (concentration_account_destination_endpoint ?concentration_account ?destination_endpoint)
+        (source_endpoint_allocated ?source_endpoint)
+        (destination_endpoint_allocated ?destination_endpoint)
+        (not
+          (operating_account_marked_for_transfer ?operating_account)
+        )
+        (not
+          (concentration_account_marked_for_transfer ?concentration_account)
+        )
+        (transfer_candidate_available ?transfer_candidate)
+      )
+    :effect
+      (and
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_source_endpoint ?transfer_candidate ?source_endpoint)
+        (transfer_candidate_destination_endpoint ?transfer_candidate ?destination_endpoint)
+        (transfer_requires_pool_assignment ?transfer_candidate)
+        (transfer_requires_additional_mandate ?transfer_candidate)
+        (not
+          (transfer_candidate_available ?transfer_candidate)
+        )
+      )
+  )
+  (:action schedule_transfer_candidate_for_settlement
+    :parameters (?transfer_candidate - transfer_candidate ?operating_account - operating_account ?placement_option - placement_option)
+    :precondition
+      (and
+        (transfer_candidate_assigned ?transfer_candidate)
+        (operating_account_ready ?operating_account)
+        (placement_option_matched ?operating_account ?placement_option)
+        (not
+          (transfer_candidate_scheduled ?transfer_candidate)
+        )
+      )
+    :effect (transfer_candidate_scheduled ?transfer_candidate)
+  )
+  (:action assign_liquidity_pool_to_candidate
+    :parameters (?treasury_agent - treasury_agent ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (agent_has_transfer_candidate ?treasury_agent ?transfer_candidate)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_available ?liquidity_pool)
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_scheduled ?transfer_candidate)
+        (not
+          (liquidity_pool_assigned ?liquidity_pool)
+        )
+      )
+    :effect
+      (and
+        (liquidity_pool_assigned ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (not
+          (liquidity_pool_available ?liquidity_pool)
+        )
+      )
+  )
+  (:action reserve_agent_for_candidate
+    :parameters (?treasury_agent - treasury_agent ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate ?placement_option - placement_option)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (placement_option_matched ?treasury_agent ?placement_option)
+        (not
+          (transfer_requires_pool_assignment ?transfer_candidate)
+        )
+        (not
+          (agent_ready_for_processing ?treasury_agent)
+        )
+      )
+    :effect (agent_ready_for_processing ?treasury_agent)
+  )
+  (:action attach_approval_mandate_to_agent
+    :parameters (?treasury_agent - treasury_agent ?approval_mandate - approval_mandate)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (approval_mandate_available ?approval_mandate)
+        (not
+          (agent_mandate_attached ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_mandate_attached ?treasury_agent)
+        (agent_approval_mandate_link ?treasury_agent ?approval_mandate)
+        (not
+          (approval_mandate_available ?approval_mandate)
+        )
+      )
+  )
+  (:action initiate_transfer_approval
+    :parameters (?treasury_agent - treasury_agent ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate ?placement_option - placement_option ?approval_mandate - approval_mandate)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (placement_option_matched ?treasury_agent ?placement_option)
+        (transfer_requires_pool_assignment ?transfer_candidate)
+        (agent_mandate_attached ?treasury_agent)
+        (agent_approval_mandate_link ?treasury_agent ?approval_mandate)
+        (not
+          (agent_ready_for_processing ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_ready_for_processing ?treasury_agent)
+        (agent_mandate_registered ?treasury_agent)
+      )
+  )
+  (:action initiate_agent_processing
+    :parameters (?treasury_agent - treasury_agent ?short_term_instrument - short_term_instrument ?authorized_approver - authorized_approver ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_ready_for_processing ?treasury_agent)
+        (agent_short_term_instrument_link ?treasury_agent ?short_term_instrument)
+        (approver_assigned ?treasury_agent ?authorized_approver)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (not
+          (transfer_requires_additional_mandate ?transfer_candidate)
+        )
+        (not
+          (agent_processing_initiated ?treasury_agent)
+        )
+      )
+    :effect (agent_processing_initiated ?treasury_agent)
+  )
+  (:action initiate_agent_processing_with_mandate
+    :parameters (?treasury_agent - treasury_agent ?short_term_instrument - short_term_instrument ?authorized_approver - authorized_approver ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_ready_for_processing ?treasury_agent)
+        (agent_short_term_instrument_link ?treasury_agent ?short_term_instrument)
+        (approver_assigned ?treasury_agent ?authorized_approver)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (transfer_requires_additional_mandate ?transfer_candidate)
+        (not
+          (agent_processing_initiated ?treasury_agent)
+        )
+      )
+    :effect (agent_processing_initiated ?treasury_agent)
+  )
+  (:action complete_approval_stage
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_processing_initiated ?treasury_agent)
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (not
+          (transfer_requires_pool_assignment ?transfer_candidate)
+        )
+        (not
+          (transfer_requires_additional_mandate ?transfer_candidate)
+        )
+        (not
+          (agent_approval_stage_completed ?treasury_agent)
+        )
+      )
+    :effect (agent_approval_stage_completed ?treasury_agent)
+  )
+  (:action complete_approval_with_pool_assignment
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_processing_initiated ?treasury_agent)
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (transfer_requires_pool_assignment ?transfer_candidate)
+        (not
+          (transfer_requires_additional_mandate ?transfer_candidate)
+        )
+        (not
+          (agent_approval_stage_completed ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_allocation_enabled ?treasury_agent)
+      )
+  )
+  (:action complete_approval_with_additional_mandate
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_processing_initiated ?treasury_agent)
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (not
+          (transfer_requires_pool_assignment ?transfer_candidate)
+        )
+        (transfer_requires_additional_mandate ?transfer_candidate)
+        (not
+          (agent_approval_stage_completed ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_allocation_enabled ?treasury_agent)
+      )
+  )
+  (:action complete_approval_with_all_requirements
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval ?liquidity_pool - liquidity_pool ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (agent_processing_initiated ?treasury_agent)
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (agent_liquidity_pool_link ?treasury_agent ?liquidity_pool)
+        (liquidity_pool_assigned_to_candidate ?liquidity_pool ?transfer_candidate)
+        (transfer_requires_pool_assignment ?transfer_candidate)
+        (transfer_requires_additional_mandate ?transfer_candidate)
+        (not
+          (agent_approval_stage_completed ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_allocation_enabled ?treasury_agent)
+      )
+  )
+  (:action finalize_transfer_for_execution
+    :parameters (?treasury_agent - treasury_agent)
+    :precondition
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (not
+          (agent_allocation_enabled ?treasury_agent)
+        )
+        (not
+          (agent_marked_complete ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_marked_complete ?treasury_agent)
+        (settlement_confirmed ?treasury_agent)
+      )
+  )
+  (:action assign_allocation_profile_to_agent
+    :parameters (?treasury_agent - treasury_agent ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_allocation_enabled ?treasury_agent)
+        (allocation_profile_available ?allocation_profile)
+      )
+    :effect
+      (and
+        (agent_allocation_profile_link ?treasury_agent ?allocation_profile)
+        (not
+          (allocation_profile_available ?allocation_profile)
+        )
+      )
+  )
+  (:action authorize_agent_execution
+    :parameters (?treasury_agent - treasury_agent ?operating_account - operating_account ?concentration_account - concentration_account ?placement_option - placement_option ?allocation_profile - allocation_profile)
+    :precondition
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_allocation_enabled ?treasury_agent)
+        (agent_allocation_profile_link ?treasury_agent ?allocation_profile)
+        (agent_operating_account_link ?treasury_agent ?operating_account)
+        (agent_concentration_account_link ?treasury_agent ?concentration_account)
+        (operating_account_marked_for_transfer ?operating_account)
+        (concentration_account_marked_for_transfer ?concentration_account)
+        (placement_option_matched ?treasury_agent ?placement_option)
+        (not
+          (agent_finalized ?treasury_agent)
+        )
+      )
+    :effect (agent_finalized ?treasury_agent)
+  )
+  (:action complete_agent_execution
+    :parameters (?treasury_agent - treasury_agent)
+    :precondition
+      (and
+        (agent_approval_stage_completed ?treasury_agent)
+        (agent_finalized ?treasury_agent)
+        (not
+          (agent_marked_complete ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_marked_complete ?treasury_agent)
+        (settlement_confirmed ?treasury_agent)
+      )
+  )
+  (:action flag_agent_for_external_mandate
+    :parameters (?treasury_agent - treasury_agent ?external_mandate - external_mandate ?placement_option - placement_option)
+    :precondition
+      (and
+        (treasury_enabled ?treasury_agent)
+        (placement_option_matched ?treasury_agent ?placement_option)
+        (external_mandate_available ?external_mandate)
+        (agent_external_mandate_link ?treasury_agent ?external_mandate)
+        (not
+          (agent_external_mandate_flagged ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_external_mandate_flagged ?treasury_agent)
+        (not
+          (external_mandate_available ?external_mandate)
+        )
+      )
+  )
+  (:action verify_agent_external_mandate
+    :parameters (?treasury_agent - treasury_agent ?authorized_approver - authorized_approver)
+    :precondition
+      (and
+        (agent_external_mandate_flagged ?treasury_agent)
+        (approver_assigned ?treasury_agent ?authorized_approver)
+        (not
+          (agent_external_mandate_verified ?treasury_agent)
+        )
+      )
+    :effect (agent_external_mandate_verified ?treasury_agent)
+  )
+  (:action apply_credit_approval_to_agent
+    :parameters (?treasury_agent - treasury_agent ?credit_approval - credit_approval)
+    :precondition
+      (and
+        (agent_external_mandate_verified ?treasury_agent)
+        (agent_credit_approval_link ?treasury_agent ?credit_approval)
+        (not
+          (agent_external_mandate_approved ?treasury_agent)
+        )
+      )
+    :effect (agent_external_mandate_approved ?treasury_agent)
+  )
+  (:action finalize_external_mandate_approval
+    :parameters (?treasury_agent - treasury_agent)
+    :precondition
+      (and
+        (agent_external_mandate_approved ?treasury_agent)
+        (not
+          (agent_marked_complete ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_marked_complete ?treasury_agent)
+        (settlement_confirmed ?treasury_agent)
+      )
+  )
+  (:action execute_and_settle_transfer_for_operating_account
+    :parameters (?operating_account - operating_account ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (operating_account_ready ?operating_account)
+        (operating_account_marked_for_transfer ?operating_account)
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_scheduled ?transfer_candidate)
+        (not
+          (settlement_confirmed ?operating_account)
+        )
+      )
+    :effect (settlement_confirmed ?operating_account)
+  )
+  (:action execute_and_settle_transfer_for_concentration_account
+    :parameters (?concentration_account - concentration_account ?transfer_candidate - transfer_candidate)
+    :precondition
+      (and
+        (concentration_account_ready ?concentration_account)
+        (concentration_account_marked_for_transfer ?concentration_account)
+        (transfer_candidate_assigned ?transfer_candidate)
+        (transfer_candidate_scheduled ?transfer_candidate)
+        (not
+          (settlement_confirmed ?concentration_account)
+        )
+      )
+    :effect (settlement_confirmed ?concentration_account)
+  )
+  (:action place_investment_and_record_settlement_instrument
+    :parameters (?legal_entity - legal_entity ?settlement_instrument - settlement_instrument ?placement_option - placement_option)
+    :precondition
+      (and
+        (settlement_confirmed ?legal_entity)
+        (placement_option_matched ?legal_entity ?placement_option)
+        (settlement_instrument_available ?settlement_instrument)
+        (not
+          (investment_recorded ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (investment_recorded ?legal_entity)
+        (entity_settlement_instrument ?legal_entity ?settlement_instrument)
+        (not
+          (settlement_instrument_available ?settlement_instrument)
+        )
+      )
+  )
+  (:action confirm_account_funding_association
+    :parameters (?operating_account - operating_account ?bank_relation - bank_account ?settlement_instrument - settlement_instrument)
+    :precondition
+      (and
+        (investment_recorded ?operating_account)
+        (has_bank_account ?operating_account ?bank_relation)
+        (entity_settlement_instrument ?operating_account ?settlement_instrument)
+        (not
+          (funding_associated ?operating_account)
+        )
+      )
+    :effect
+      (and
+        (funding_associated ?operating_account)
+        (bank_account_available ?bank_relation)
+        (settlement_instrument_available ?settlement_instrument)
+      )
+  )
+  (:action confirm_concentration_funding_association
+    :parameters (?concentration_account - concentration_account ?bank_relation - bank_account ?settlement_instrument - settlement_instrument)
+    :precondition
+      (and
+        (investment_recorded ?concentration_account)
+        (has_bank_account ?concentration_account ?bank_relation)
+        (entity_settlement_instrument ?concentration_account ?settlement_instrument)
+        (not
+          (funding_associated ?concentration_account)
+        )
+      )
+    :effect
+      (and
+        (funding_associated ?concentration_account)
+        (bank_account_available ?bank_relation)
+        (settlement_instrument_available ?settlement_instrument)
+      )
+  )
+  (:action confirm_agent_funding_association
+    :parameters (?treasury_agent - treasury_agent ?bank_relation - bank_account ?settlement_instrument - settlement_instrument)
+    :precondition
+      (and
+        (investment_recorded ?treasury_agent)
+        (has_bank_account ?treasury_agent ?bank_relation)
+        (entity_settlement_instrument ?treasury_agent ?settlement_instrument)
+        (not
+          (funding_associated ?treasury_agent)
+        )
+      )
+    :effect
+      (and
+        (funding_associated ?treasury_agent)
+        (bank_account_available ?bank_relation)
+        (settlement_instrument_available ?settlement_instrument)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem idle_cash_minimization_problem)
+  (:domain treasury_idle_cash_minimization)
+  (:objects operating_account_1 - operating_account concentration_account_1 - concentration_account treasury_agent_1 - treasury_agent treasury_agent_2 - treasury_agent bank_relation_1 - bank_account bank_relation_2 - bank_account bank_relation_3 - bank_account placement_option_1 - placement_option authorized_approver_1 - authorized_approver investment_product_mmf - investment_product source_endpoint_operating - source_endpoint destination_endpoint_1 - destination_endpoint transfer_candidate_1 - transfer_candidate liquidity_pool_1 - liquidity_pool liquidity_pool_2 - liquidity_pool approval_mandate_1 - approval_mandate approval_mandate_2 - approval_mandate allocation_profile_primary - allocation_profile allocation_profile_secondary - allocation_profile settlement_instrument_1 - settlement_instrument short_term_instrument_1 - short_term_instrument external_mandate_1 - external_mandate external_mandate_2 - external_mandate credit_approval_1 - credit_approval)
+  (:init
+    (bank_account_available bank_relation_1)
+    (bank_account_available bank_relation_2)
+    (bank_account_available bank_relation_3)
+    (placement_option_available placement_option_1)
+    (approver_available authorized_approver_1)
+    (investment_product_available investment_product_mmf)
+    (operating_account_source_endpoint operating_account_1 source_endpoint_operating)
+    (concentration_account_destination_endpoint concentration_account_1 destination_endpoint_1)
+    (transfer_candidate_available transfer_candidate_1)
+    (liquidity_pool_available liquidity_pool_1)
+    (liquidity_pool_available liquidity_pool_2)
+    (agent_operating_account_link treasury_agent_1 operating_account_1)
+    (agent_operating_account_link treasury_agent_2 operating_account_1)
+    (agent_concentration_account_link treasury_agent_1 concentration_account_1)
+    (agent_concentration_account_link treasury_agent_2 concentration_account_1)
+    (agent_has_transfer_candidate treasury_agent_1 transfer_candidate_1)
+    (agent_has_transfer_candidate treasury_agent_2 transfer_candidate_1)
+    (agent_liquidity_pool_link treasury_agent_1 liquidity_pool_1)
+    (agent_liquidity_pool_link treasury_agent_2 liquidity_pool_2)
+    (approval_mandate_available approval_mandate_1)
+    (approval_mandate_available approval_mandate_2)
+    (allocation_profile_available allocation_profile_primary)
+    (allocation_profile_available allocation_profile_secondary)
+    (settlement_instrument_available settlement_instrument_1)
+    (short_term_instrument_available short_term_instrument_1)
+    (external_mandate_available external_mandate_1)
+    (agent_external_mandate_link treasury_agent_1 external_mandate_1)
+    (agent_external_mandate_link treasury_agent_2 external_mandate_2)
+    (credit_approval_available credit_approval_1)
+  )
+  (:goal
+    (and
+      (funding_associated operating_account_1)
+      (funding_associated concentration_account_1)
+      (funding_associated treasury_agent_1)
+      (funding_associated treasury_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(onboard_legal_entity operating_account_1)
+(onboard_legal_entity concentration_account_1)
+(onboard_legal_entity treasury_agent_1)
+(onboard_legal_entity treasury_agent_2)
+(associate_entity_with_bank_relation operating_account_1 bank_relation_1)
+(match_entity_to_placement_option operating_account_1 placement_option_1)
+(confirm_placement_for_entity operating_account_1 placement_option_1)
+(assign_approver_to_entity operating_account_1 authorized_approver_1)
+(select_source_endpoint_for_account operating_account_1 source_endpoint_operating placement_option_1)
+(assign_approver_and_mark_account_for_transfer operating_account_1 source_endpoint_operating authorized_approver_1)
+(associate_entity_with_bank_relation concentration_account_1 bank_relation_2)
+(unassign_approver_from_entity operating_account_1 authorized_approver_1)
+(release_placement_option operating_account_1 placement_option_1)
+(match_entity_to_placement_option concentration_account_1 placement_option_1)
+(confirm_placement_for_entity concentration_account_1 placement_option_1)
+(assign_approver_to_entity concentration_account_1 authorized_approver_1)
+(select_destination_endpoint_for_concentration_account concentration_account_1 destination_endpoint_1 placement_option_1)
+(assign_approver_and_mark_concentration_account concentration_account_1 destination_endpoint_1 authorized_approver_1)
+(build_transfer_batch_standard operating_account_1 concentration_account_1 source_endpoint_operating destination_endpoint_1 transfer_candidate_1)
+(unassign_approver_from_entity concentration_account_1 authorized_approver_1)
+(release_placement_option concentration_account_1 placement_option_1)
+(match_entity_to_placement_option operating_account_1 placement_option_1)
+(schedule_transfer_candidate_for_settlement transfer_candidate_1 operating_account_1 placement_option_1)
+(release_placement_option operating_account_1 placement_option_1)
+(associate_entity_with_bank_relation treasury_agent_1 bank_relation_3)
+(match_entity_to_placement_option treasury_agent_1 placement_option_1)
+(confirm_placement_for_entity treasury_agent_1 placement_option_1)
+(assign_credit_approval_to_agent treasury_agent_1 credit_approval_1)
+(assign_short_term_instrument_to_agent treasury_agent_1 short_term_instrument_1)
+(assign_approver_to_entity treasury_agent_1 authorized_approver_1)
+(assign_liquidity_pool_to_candidate treasury_agent_1 liquidity_pool_1 transfer_candidate_1)
+(reserve_agent_for_candidate treasury_agent_1 liquidity_pool_1 transfer_candidate_1 placement_option_1)
+(initiate_agent_processing treasury_agent_1 short_term_instrument_1 authorized_approver_1 liquidity_pool_1 transfer_candidate_1)
+(complete_approval_stage treasury_agent_1 credit_approval_1 liquidity_pool_1 transfer_candidate_1)
+(finalize_transfer_for_execution treasury_agent_1)
+(execute_and_settle_transfer_for_operating_account operating_account_1 transfer_candidate_1)
+(execute_and_settle_transfer_for_concentration_account concentration_account_1 transfer_candidate_1)
+(place_investment_and_record_settlement_instrument treasury_agent_1 settlement_instrument_1 placement_option_1)
+(confirm_agent_funding_association treasury_agent_1 bank_relation_3 settlement_instrument_1)
+(release_placement_option treasury_agent_1 placement_option_1)
+(unassign_approver_from_entity treasury_agent_1 authorized_approver_1)
+(remove_short_term_instrument_from_agent treasury_agent_1 short_term_instrument_1)
+(revoke_credit_approval_from_agent treasury_agent_1 credit_approval_1)
+(match_entity_to_placement_option operating_account_1 placement_option_1)
+(place_investment_and_record_settlement_instrument operating_account_1 settlement_instrument_1 placement_option_1)
+(confirm_account_funding_association operating_account_1 bank_relation_1 settlement_instrument_1)
+(release_placement_option operating_account_1 placement_option_1)
+(match_entity_to_placement_option concentration_account_1 placement_option_1)
+(place_investment_and_record_settlement_instrument concentration_account_1 settlement_instrument_1 placement_option_1)
+(confirm_concentration_funding_association concentration_account_1 bank_relation_2 settlement_instrument_1)
+(release_placement_option concentration_account_1 placement_option_1)
+(associate_entity_with_bank_relation treasury_agent_2 bank_relation_1)
+(match_entity_to_placement_option treasury_agent_2 placement_option_1)
+(confirm_placement_for_entity treasury_agent_2 placement_option_1)
+(assign_credit_approval_to_agent treasury_agent_2 credit_approval_1)
+(assign_short_term_instrument_to_agent treasury_agent_2 short_term_instrument_1)
+(assign_approver_to_entity treasury_agent_2 authorized_approver_1)
+(assign_liquidity_pool_to_candidate treasury_agent_2 liquidity_pool_2 transfer_candidate_1)
+(reserve_agent_for_candidate treasury_agent_2 liquidity_pool_2 transfer_candidate_1 placement_option_1)
+(initiate_agent_processing treasury_agent_2 short_term_instrument_1 authorized_approver_1 liquidity_pool_2 transfer_candidate_1)
+(complete_approval_stage treasury_agent_2 credit_approval_1 liquidity_pool_2 transfer_candidate_1)
+(finalize_transfer_for_execution treasury_agent_2)
+(place_investment_and_record_settlement_instrument treasury_agent_2 settlement_instrument_1 placement_option_1)
+(confirm_agent_funding_association treasury_agent_2 bank_relation_1 settlement_instrument_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_j0w00t6o/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_j0w00t6o/plan.pddl 64 
+
+
+
+--- stderr ---
+

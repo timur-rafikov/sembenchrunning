@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain dependency_cycle_detection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_supertype - object marker_supertype - object bucket_supertype - object vertex_supertype - object vertex - vertex_supertype edge_identifier - resource_supertype visit_token - resource_supertype worker - resource_supertype feature_flag - resource_supertype priority_label - resource_supertype evidence_token - resource_supertype attribute_a - resource_supertype attribute_c - resource_supertype dependency_tag - marker_supertype resource_bucket - marker_supertype attribute_b - marker_supertype neighbor_bucket_left - bucket_supertype neighbor_bucket_right - bucket_supertype merge_candidate - bucket_supertype graph_node_supertype - vertex analysis_node_supertype - vertex source_node - graph_node_supertype target_node - graph_node_supertype analysis_unit - analysis_node_supertype)
+  (:predicates
+    (discovered ?vertex - vertex)
+    (marked_for_analysis ?vertex - vertex)
+    (edge_allocated ?vertex - vertex)
+    (node_reset ?vertex - vertex)
+    (finalized_entity ?vertex - vertex)
+    (evidence_assigned ?vertex - vertex)
+    (edge_available ?edge_identifier - edge_identifier)
+    (edge_reserved ?vertex - vertex ?edge_identifier - edge_identifier)
+    (visit_token_available ?visit_token - visit_token)
+    (visit_assigned ?vertex - vertex ?visit_token - visit_token)
+    (worker_available ?worker - worker)
+    (worker_assigned ?vertex - vertex ?worker - worker)
+    (dependency_tag_available ?dependency_tag - dependency_tag)
+    (source_tag_assigned ?source_node - source_node ?dependency_tag - dependency_tag)
+    (target_tag_assigned ?target_node - target_node ?dependency_tag - dependency_tag)
+    (source_has_left_bucket ?source_node - source_node ?neighbor_bucket_left - neighbor_bucket_left)
+    (left_bucket_ready ?neighbor_bucket_left - neighbor_bucket_left)
+    (left_bucket_marked ?neighbor_bucket_left - neighbor_bucket_left)
+    (source_processed ?source_node - source_node)
+    (target_has_right_bucket ?target_node - target_node ?neighbor_bucket_right - neighbor_bucket_right)
+    (right_bucket_ready ?neighbor_bucket_right - neighbor_bucket_right)
+    (right_bucket_marked ?neighbor_bucket_right - neighbor_bucket_right)
+    (target_processed ?target_node - target_node)
+    (candidate_slot_available ?merge_candidate - merge_candidate)
+    (candidate_reserved ?merge_candidate - merge_candidate)
+    (candidate_left_bucket ?merge_candidate - merge_candidate ?neighbor_bucket_left - neighbor_bucket_left)
+    (candidate_right_bucket ?merge_candidate - merge_candidate ?neighbor_bucket_right - neighbor_bucket_right)
+    (candidate_flag_x ?merge_candidate - merge_candidate)
+    (candidate_flag_y ?merge_candidate - merge_candidate)
+    (candidate_ready ?merge_candidate - merge_candidate)
+    (unit_has_source ?analysis_unit - analysis_unit ?source_node - source_node)
+    (unit_has_target ?analysis_unit - analysis_unit ?target_node - target_node)
+    (unit_has_candidate ?analysis_unit - analysis_unit ?merge_candidate - merge_candidate)
+    (resource_bucket_available ?resource_bucket - resource_bucket)
+    (unit_has_bucket ?analysis_unit - analysis_unit ?resource_bucket - resource_bucket)
+    (bucket_reserved ?resource_bucket - resource_bucket)
+    (bucket_holds_candidate ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    (unit_evaluation_started ?analysis_unit - analysis_unit)
+    (unit_evaluation_ready ?analysis_unit - analysis_unit)
+    (unit_ready_for_finalization ?analysis_unit - analysis_unit)
+    (feature_flag_enabled ?analysis_unit - analysis_unit)
+    (feature_consumed ?analysis_unit - analysis_unit)
+    (unit_priority_enabled ?analysis_unit - analysis_unit)
+    (unit_commit_flag ?analysis_unit - analysis_unit)
+    (attribute_b_available ?attribute_b - attribute_b)
+    (unit_has_attribute_b ?analysis_unit - analysis_unit ?attribute_b - attribute_b)
+    (unit_feature_engaged ?analysis_unit - analysis_unit)
+    (unit_feature_step ?analysis_unit - analysis_unit)
+    (unit_feature_ready_to_finalize ?analysis_unit - analysis_unit)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (unit_feature_assigned ?analysis_unit - analysis_unit ?feature_flag - feature_flag)
+    (priority_label_available ?priority_label - priority_label)
+    (unit_priority_assigned ?analysis_unit - analysis_unit ?priority_label - priority_label)
+    (attribute_a_available ?attribute_a - attribute_a)
+    (unit_has_attribute_a ?analysis_unit - analysis_unit ?attribute_a - attribute_a)
+    (attribute_c_available ?attribute_c - attribute_c)
+    (unit_has_attribute_c ?analysis_unit - analysis_unit ?attribute_c - attribute_c)
+    (evidence_token_available ?evidence_token - evidence_token)
+    (vertex_has_evidence ?vertex - vertex ?evidence_token - evidence_token)
+    (source_ready ?source_node - source_node)
+    (target_ready ?target_node - target_node)
+    (unit_committed ?analysis_unit - analysis_unit)
+  )
+  (:action discover_vertex
+    :parameters (?vertex - vertex)
+    :precondition
+      (and
+        (not
+          (discovered ?vertex)
+        )
+        (not
+          (node_reset ?vertex)
+        )
+      )
+    :effect (discovered ?vertex)
+  )
+  (:action reserve_edge_for_vertex
+    :parameters (?vertex - vertex ?edge_identifier - edge_identifier)
+    :precondition
+      (and
+        (discovered ?vertex)
+        (not
+          (edge_allocated ?vertex)
+        )
+        (edge_available ?edge_identifier)
+      )
+    :effect
+      (and
+        (edge_allocated ?vertex)
+        (edge_reserved ?vertex ?edge_identifier)
+        (not
+          (edge_available ?edge_identifier)
+        )
+      )
+  )
+  (:action assign_visit_token_to_vertex
+    :parameters (?vertex - vertex ?visit_token - visit_token)
+    :precondition
+      (and
+        (discovered ?vertex)
+        (edge_allocated ?vertex)
+        (visit_token_available ?visit_token)
+      )
+    :effect
+      (and
+        (visit_assigned ?vertex ?visit_token)
+        (not
+          (visit_token_available ?visit_token)
+        )
+      )
+  )
+  (:action finalize_discovery
+    :parameters (?vertex - vertex ?visit_token - visit_token)
+    :precondition
+      (and
+        (discovered ?vertex)
+        (edge_allocated ?vertex)
+        (visit_assigned ?vertex ?visit_token)
+        (not
+          (marked_for_analysis ?vertex)
+        )
+      )
+    :effect (marked_for_analysis ?vertex)
+  )
+  (:action release_visit_token
+    :parameters (?vertex - vertex ?visit_token - visit_token)
+    :precondition
+      (and
+        (visit_assigned ?vertex ?visit_token)
+      )
+    :effect
+      (and
+        (visit_token_available ?visit_token)
+        (not
+          (visit_assigned ?vertex ?visit_token)
+        )
+      )
+  )
+  (:action assign_worker_to_vertex
+    :parameters (?vertex - vertex ?worker - worker)
+    :precondition
+      (and
+        (marked_for_analysis ?vertex)
+        (worker_available ?worker)
+      )
+    :effect
+      (and
+        (worker_assigned ?vertex ?worker)
+        (not
+          (worker_available ?worker)
+        )
+      )
+  )
+  (:action release_worker_from_vertex
+    :parameters (?vertex - vertex ?worker - worker)
+    :precondition
+      (and
+        (worker_assigned ?vertex ?worker)
+      )
+    :effect
+      (and
+        (worker_available ?worker)
+        (not
+          (worker_assigned ?vertex ?worker)
+        )
+      )
+  )
+  (:action bind_attribute_a_to_unit
+    :parameters (?analysis_unit - analysis_unit ?attribute_a - attribute_a)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (attribute_a_available ?attribute_a)
+      )
+    :effect
+      (and
+        (unit_has_attribute_a ?analysis_unit ?attribute_a)
+        (not
+          (attribute_a_available ?attribute_a)
+        )
+      )
+  )
+  (:action unbind_attribute_a_from_unit
+    :parameters (?analysis_unit - analysis_unit ?attribute_a - attribute_a)
+    :precondition
+      (and
+        (unit_has_attribute_a ?analysis_unit ?attribute_a)
+      )
+    :effect
+      (and
+        (attribute_a_available ?attribute_a)
+        (not
+          (unit_has_attribute_a ?analysis_unit ?attribute_a)
+        )
+      )
+  )
+  (:action bind_attribute_c_to_unit
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (attribute_c_available ?attribute_c)
+      )
+    :effect
+      (and
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (not
+          (attribute_c_available ?attribute_c)
+        )
+      )
+  )
+  (:action unbind_attribute_c_from_unit
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c)
+    :precondition
+      (and
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+      )
+    :effect
+      (and
+        (attribute_c_available ?attribute_c)
+        (not
+          (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        )
+      )
+  )
+  (:action signal_left_bucket_ready
+    :parameters (?source_node - source_node ?neighbor_bucket_left - neighbor_bucket_left ?visit_token - visit_token)
+    :precondition
+      (and
+        (marked_for_analysis ?source_node)
+        (visit_assigned ?source_node ?visit_token)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (not
+          (left_bucket_ready ?neighbor_bucket_left)
+        )
+        (not
+          (left_bucket_marked ?neighbor_bucket_left)
+        )
+      )
+    :effect (left_bucket_ready ?neighbor_bucket_left)
+  )
+  (:action confirm_left_and_mark_source
+    :parameters (?source_node - source_node ?neighbor_bucket_left - neighbor_bucket_left ?worker - worker)
+    :precondition
+      (and
+        (marked_for_analysis ?source_node)
+        (worker_assigned ?source_node ?worker)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (left_bucket_ready ?neighbor_bucket_left)
+        (not
+          (source_ready ?source_node)
+        )
+      )
+    :effect
+      (and
+        (source_ready ?source_node)
+        (source_processed ?source_node)
+      )
+  )
+  (:action prepare_left_and_attach_tag
+    :parameters (?source_node - source_node ?neighbor_bucket_left - neighbor_bucket_left ?dependency_tag - dependency_tag)
+    :precondition
+      (and
+        (marked_for_analysis ?source_node)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (dependency_tag_available ?dependency_tag)
+        (not
+          (source_ready ?source_node)
+        )
+      )
+    :effect
+      (and
+        (left_bucket_marked ?neighbor_bucket_left)
+        (source_ready ?source_node)
+        (source_tag_assigned ?source_node ?dependency_tag)
+        (not
+          (dependency_tag_available ?dependency_tag)
+        )
+      )
+  )
+  (:action consume_left_and_restore_tag
+    :parameters (?source_node - source_node ?neighbor_bucket_left - neighbor_bucket_left ?visit_token - visit_token ?dependency_tag - dependency_tag)
+    :precondition
+      (and
+        (marked_for_analysis ?source_node)
+        (visit_assigned ?source_node ?visit_token)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (left_bucket_marked ?neighbor_bucket_left)
+        (source_tag_assigned ?source_node ?dependency_tag)
+        (not
+          (source_processed ?source_node)
+        )
+      )
+    :effect
+      (and
+        (left_bucket_ready ?neighbor_bucket_left)
+        (source_processed ?source_node)
+        (dependency_tag_available ?dependency_tag)
+        (not
+          (source_tag_assigned ?source_node ?dependency_tag)
+        )
+      )
+  )
+  (:action signal_right_bucket_ready
+    :parameters (?target_node - target_node ?neighbor_bucket_right - neighbor_bucket_right ?visit_token - visit_token)
+    :precondition
+      (and
+        (marked_for_analysis ?target_node)
+        (visit_assigned ?target_node ?visit_token)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (not
+          (right_bucket_ready ?neighbor_bucket_right)
+        )
+        (not
+          (right_bucket_marked ?neighbor_bucket_right)
+        )
+      )
+    :effect (right_bucket_ready ?neighbor_bucket_right)
+  )
+  (:action confirm_right_and_mark_target
+    :parameters (?target_node - target_node ?neighbor_bucket_right - neighbor_bucket_right ?worker - worker)
+    :precondition
+      (and
+        (marked_for_analysis ?target_node)
+        (worker_assigned ?target_node ?worker)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (right_bucket_ready ?neighbor_bucket_right)
+        (not
+          (target_ready ?target_node)
+        )
+      )
+    :effect
+      (and
+        (target_ready ?target_node)
+        (target_processed ?target_node)
+      )
+  )
+  (:action prepare_right_and_attach_tag
+    :parameters (?target_node - target_node ?neighbor_bucket_right - neighbor_bucket_right ?dependency_tag - dependency_tag)
+    :precondition
+      (and
+        (marked_for_analysis ?target_node)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (dependency_tag_available ?dependency_tag)
+        (not
+          (target_ready ?target_node)
+        )
+      )
+    :effect
+      (and
+        (right_bucket_marked ?neighbor_bucket_right)
+        (target_ready ?target_node)
+        (target_tag_assigned ?target_node ?dependency_tag)
+        (not
+          (dependency_tag_available ?dependency_tag)
+        )
+      )
+  )
+  (:action consume_right_and_restore_tag
+    :parameters (?target_node - target_node ?neighbor_bucket_right - neighbor_bucket_right ?visit_token - visit_token ?dependency_tag - dependency_tag)
+    :precondition
+      (and
+        (marked_for_analysis ?target_node)
+        (visit_assigned ?target_node ?visit_token)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (right_bucket_marked ?neighbor_bucket_right)
+        (target_tag_assigned ?target_node ?dependency_tag)
+        (not
+          (target_processed ?target_node)
+        )
+      )
+    :effect
+      (and
+        (right_bucket_ready ?neighbor_bucket_right)
+        (target_processed ?target_node)
+        (dependency_tag_available ?dependency_tag)
+        (not
+          (target_tag_assigned ?target_node ?dependency_tag)
+        )
+      )
+  )
+  (:action assemble_candidate_no_flags
+    :parameters (?source_node - source_node ?target_node - target_node ?neighbor_bucket_left - neighbor_bucket_left ?neighbor_bucket_right - neighbor_bucket_right ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (source_ready ?source_node)
+        (target_ready ?target_node)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (left_bucket_ready ?neighbor_bucket_left)
+        (right_bucket_ready ?neighbor_bucket_right)
+        (source_processed ?source_node)
+        (target_processed ?target_node)
+        (candidate_slot_available ?merge_candidate)
+      )
+    :effect
+      (and
+        (candidate_reserved ?merge_candidate)
+        (candidate_left_bucket ?merge_candidate ?neighbor_bucket_left)
+        (candidate_right_bucket ?merge_candidate ?neighbor_bucket_right)
+        (not
+          (candidate_slot_available ?merge_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_left_flag
+    :parameters (?source_node - source_node ?target_node - target_node ?neighbor_bucket_left - neighbor_bucket_left ?neighbor_bucket_right - neighbor_bucket_right ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (source_ready ?source_node)
+        (target_ready ?target_node)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (left_bucket_marked ?neighbor_bucket_left)
+        (right_bucket_ready ?neighbor_bucket_right)
+        (not
+          (source_processed ?source_node)
+        )
+        (target_processed ?target_node)
+        (candidate_slot_available ?merge_candidate)
+      )
+    :effect
+      (and
+        (candidate_reserved ?merge_candidate)
+        (candidate_left_bucket ?merge_candidate ?neighbor_bucket_left)
+        (candidate_right_bucket ?merge_candidate ?neighbor_bucket_right)
+        (candidate_flag_x ?merge_candidate)
+        (not
+          (candidate_slot_available ?merge_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_right_flag
+    :parameters (?source_node - source_node ?target_node - target_node ?neighbor_bucket_left - neighbor_bucket_left ?neighbor_bucket_right - neighbor_bucket_right ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (source_ready ?source_node)
+        (target_ready ?target_node)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (left_bucket_ready ?neighbor_bucket_left)
+        (right_bucket_marked ?neighbor_bucket_right)
+        (source_processed ?source_node)
+        (not
+          (target_processed ?target_node)
+        )
+        (candidate_slot_available ?merge_candidate)
+      )
+    :effect
+      (and
+        (candidate_reserved ?merge_candidate)
+        (candidate_left_bucket ?merge_candidate ?neighbor_bucket_left)
+        (candidate_right_bucket ?merge_candidate ?neighbor_bucket_right)
+        (candidate_flag_y ?merge_candidate)
+        (not
+          (candidate_slot_available ?merge_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_both_flags
+    :parameters (?source_node - source_node ?target_node - target_node ?neighbor_bucket_left - neighbor_bucket_left ?neighbor_bucket_right - neighbor_bucket_right ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (source_ready ?source_node)
+        (target_ready ?target_node)
+        (source_has_left_bucket ?source_node ?neighbor_bucket_left)
+        (target_has_right_bucket ?target_node ?neighbor_bucket_right)
+        (left_bucket_marked ?neighbor_bucket_left)
+        (right_bucket_marked ?neighbor_bucket_right)
+        (not
+          (source_processed ?source_node)
+        )
+        (not
+          (target_processed ?target_node)
+        )
+        (candidate_slot_available ?merge_candidate)
+      )
+    :effect
+      (and
+        (candidate_reserved ?merge_candidate)
+        (candidate_left_bucket ?merge_candidate ?neighbor_bucket_left)
+        (candidate_right_bucket ?merge_candidate ?neighbor_bucket_right)
+        (candidate_flag_x ?merge_candidate)
+        (candidate_flag_y ?merge_candidate)
+        (not
+          (candidate_slot_available ?merge_candidate)
+        )
+      )
+  )
+  (:action stage_candidate
+    :parameters (?merge_candidate - merge_candidate ?source_node - source_node ?visit_token - visit_token)
+    :precondition
+      (and
+        (candidate_reserved ?merge_candidate)
+        (source_ready ?source_node)
+        (visit_assigned ?source_node ?visit_token)
+        (not
+          (candidate_ready ?merge_candidate)
+        )
+      )
+    :effect (candidate_ready ?merge_candidate)
+  )
+  (:action reserve_resource_bucket
+    :parameters (?analysis_unit - analysis_unit ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (unit_has_candidate ?analysis_unit ?merge_candidate)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (resource_bucket_available ?resource_bucket)
+        (candidate_reserved ?merge_candidate)
+        (candidate_ready ?merge_candidate)
+        (not
+          (bucket_reserved ?resource_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_reserved ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (not
+          (resource_bucket_available ?resource_bucket)
+        )
+      )
+  )
+  (:action start_unit_evaluation
+    :parameters (?analysis_unit - analysis_unit ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate ?visit_token - visit_token)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_reserved ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (visit_assigned ?analysis_unit ?visit_token)
+        (not
+          (candidate_flag_x ?merge_candidate)
+        )
+        (not
+          (unit_evaluation_started ?analysis_unit)
+        )
+      )
+    :effect (unit_evaluation_started ?analysis_unit)
+  )
+  (:action assign_feature_flag
+    :parameters (?analysis_unit - analysis_unit ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (feature_flag_available ?feature_flag)
+        (not
+          (feature_flag_enabled ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (feature_flag_enabled ?analysis_unit)
+        (unit_feature_assigned ?analysis_unit ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action apply_feature_and_start_evaluation
+    :parameters (?analysis_unit - analysis_unit ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate ?visit_token - visit_token ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_reserved ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (visit_assigned ?analysis_unit ?visit_token)
+        (candidate_flag_x ?merge_candidate)
+        (feature_flag_enabled ?analysis_unit)
+        (unit_feature_assigned ?analysis_unit ?feature_flag)
+        (not
+          (unit_evaluation_started ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_evaluation_started ?analysis_unit)
+        (feature_consumed ?analysis_unit)
+      )
+  )
+  (:action advance_unit_evaluation_stage1
+    :parameters (?analysis_unit - analysis_unit ?attribute_a - attribute_a ?worker - worker ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_started ?analysis_unit)
+        (unit_has_attribute_a ?analysis_unit ?attribute_a)
+        (worker_assigned ?analysis_unit ?worker)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (not
+          (candidate_flag_y ?merge_candidate)
+        )
+        (not
+          (unit_evaluation_ready ?analysis_unit)
+        )
+      )
+    :effect (unit_evaluation_ready ?analysis_unit)
+  )
+  (:action advance_unit_evaluation_stage1_alternate
+    :parameters (?analysis_unit - analysis_unit ?attribute_a - attribute_a ?worker - worker ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_started ?analysis_unit)
+        (unit_has_attribute_a ?analysis_unit ?attribute_a)
+        (worker_assigned ?analysis_unit ?worker)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (candidate_flag_y ?merge_candidate)
+        (not
+          (unit_evaluation_ready ?analysis_unit)
+        )
+      )
+    :effect (unit_evaluation_ready ?analysis_unit)
+  )
+  (:action evaluate_candidate_and_set_ready
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_ready ?analysis_unit)
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (not
+          (candidate_flag_x ?merge_candidate)
+        )
+        (not
+          (candidate_flag_y ?merge_candidate)
+        )
+        (not
+          (unit_ready_for_finalization ?analysis_unit)
+        )
+      )
+    :effect (unit_ready_for_finalization ?analysis_unit)
+  )
+  (:action evaluate_candidate_and_set_ready_with_priority
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_ready ?analysis_unit)
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (candidate_flag_x ?merge_candidate)
+        (not
+          (candidate_flag_y ?merge_candidate)
+        )
+        (not
+          (unit_ready_for_finalization ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_priority_enabled ?analysis_unit)
+      )
+  )
+  (:action evaluate_candidate_and_set_ready_alternate
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_ready ?analysis_unit)
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (not
+          (candidate_flag_x ?merge_candidate)
+        )
+        (candidate_flag_y ?merge_candidate)
+        (not
+          (unit_ready_for_finalization ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_priority_enabled ?analysis_unit)
+      )
+  )
+  (:action evaluate_candidate_and_set_ready_all_flags
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c ?resource_bucket - resource_bucket ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (unit_evaluation_ready ?analysis_unit)
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (unit_has_bucket ?analysis_unit ?resource_bucket)
+        (bucket_holds_candidate ?resource_bucket ?merge_candidate)
+        (candidate_flag_x ?merge_candidate)
+        (candidate_flag_y ?merge_candidate)
+        (not
+          (unit_ready_for_finalization ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_priority_enabled ?analysis_unit)
+      )
+  )
+  (:action commit_unit
+    :parameters (?analysis_unit - analysis_unit)
+    :precondition
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (not
+          (unit_priority_enabled ?analysis_unit)
+        )
+        (not
+          (unit_committed ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?analysis_unit)
+        (finalized_entity ?analysis_unit)
+      )
+  )
+  (:action assign_priority_label
+    :parameters (?analysis_unit - analysis_unit ?priority_label - priority_label)
+    :precondition
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_priority_enabled ?analysis_unit)
+        (priority_label_available ?priority_label)
+      )
+    :effect
+      (and
+        (unit_priority_assigned ?analysis_unit ?priority_label)
+        (not
+          (priority_label_available ?priority_label)
+        )
+      )
+  )
+  (:action prepare_unit_for_commit
+    :parameters (?analysis_unit - analysis_unit ?source_node - source_node ?target_node - target_node ?visit_token - visit_token ?priority_label - priority_label)
+    :precondition
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_priority_enabled ?analysis_unit)
+        (unit_priority_assigned ?analysis_unit ?priority_label)
+        (unit_has_source ?analysis_unit ?source_node)
+        (unit_has_target ?analysis_unit ?target_node)
+        (source_processed ?source_node)
+        (target_processed ?target_node)
+        (visit_assigned ?analysis_unit ?visit_token)
+        (not
+          (unit_commit_flag ?analysis_unit)
+        )
+      )
+    :effect (unit_commit_flag ?analysis_unit)
+  )
+  (:action commit_unit_with_prepared_flag
+    :parameters (?analysis_unit - analysis_unit)
+    :precondition
+      (and
+        (unit_ready_for_finalization ?analysis_unit)
+        (unit_commit_flag ?analysis_unit)
+        (not
+          (unit_committed ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?analysis_unit)
+        (finalized_entity ?analysis_unit)
+      )
+  )
+  (:action bind_attribute_b
+    :parameters (?analysis_unit - analysis_unit ?attribute_b - attribute_b ?visit_token - visit_token)
+    :precondition
+      (and
+        (marked_for_analysis ?analysis_unit)
+        (visit_assigned ?analysis_unit ?visit_token)
+        (attribute_b_available ?attribute_b)
+        (unit_has_attribute_b ?analysis_unit ?attribute_b)
+        (not
+          (unit_feature_engaged ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_feature_engaged ?analysis_unit)
+        (not
+          (attribute_b_available ?attribute_b)
+        )
+      )
+  )
+  (:action activate_feature_step
+    :parameters (?analysis_unit - analysis_unit ?worker - worker)
+    :precondition
+      (and
+        (unit_feature_engaged ?analysis_unit)
+        (worker_assigned ?analysis_unit ?worker)
+        (not
+          (unit_feature_step ?analysis_unit)
+        )
+      )
+    :effect (unit_feature_step ?analysis_unit)
+  )
+  (:action apply_attribute_c_for_feature
+    :parameters (?analysis_unit - analysis_unit ?attribute_c - attribute_c)
+    :precondition
+      (and
+        (unit_feature_step ?analysis_unit)
+        (unit_has_attribute_c ?analysis_unit ?attribute_c)
+        (not
+          (unit_feature_ready_to_finalize ?analysis_unit)
+        )
+      )
+    :effect (unit_feature_ready_to_finalize ?analysis_unit)
+  )
+  (:action commit_unit_after_feature
+    :parameters (?analysis_unit - analysis_unit)
+    :precondition
+      (and
+        (unit_feature_ready_to_finalize ?analysis_unit)
+        (not
+          (unit_committed ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_committed ?analysis_unit)
+        (finalized_entity ?analysis_unit)
+      )
+  )
+  (:action commit_source_node
+    :parameters (?source_node - source_node ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (source_ready ?source_node)
+        (source_processed ?source_node)
+        (candidate_reserved ?merge_candidate)
+        (candidate_ready ?merge_candidate)
+        (not
+          (finalized_entity ?source_node)
+        )
+      )
+    :effect (finalized_entity ?source_node)
+  )
+  (:action commit_target_node
+    :parameters (?target_node - target_node ?merge_candidate - merge_candidate)
+    :precondition
+      (and
+        (target_ready ?target_node)
+        (target_processed ?target_node)
+        (candidate_reserved ?merge_candidate)
+        (candidate_ready ?merge_candidate)
+        (not
+          (finalized_entity ?target_node)
+        )
+      )
+    :effect (finalized_entity ?target_node)
+  )
+  (:action assign_evidence_to_vertex
+    :parameters (?vertex - vertex ?evidence_token - evidence_token ?visit_token - visit_token)
+    :precondition
+      (and
+        (finalized_entity ?vertex)
+        (visit_assigned ?vertex ?visit_token)
+        (evidence_token_available ?evidence_token)
+        (not
+          (evidence_assigned ?vertex)
+        )
+      )
+    :effect
+      (and
+        (evidence_assigned ?vertex)
+        (vertex_has_evidence ?vertex ?evidence_token)
+        (not
+          (evidence_token_available ?evidence_token)
+        )
+      )
+  )
+  (:action apply_evidence_and_reset_source
+    :parameters (?source_node - source_node ?edge_identifier - edge_identifier ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_assigned ?source_node)
+        (edge_reserved ?source_node ?edge_identifier)
+        (vertex_has_evidence ?source_node ?evidence_token)
+        (not
+          (node_reset ?source_node)
+        )
+      )
+    :effect
+      (and
+        (node_reset ?source_node)
+        (edge_available ?edge_identifier)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+  (:action apply_evidence_and_reset_target
+    :parameters (?target_node - target_node ?edge_identifier - edge_identifier ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_assigned ?target_node)
+        (edge_reserved ?target_node ?edge_identifier)
+        (vertex_has_evidence ?target_node ?evidence_token)
+        (not
+          (node_reset ?target_node)
+        )
+      )
+    :effect
+      (and
+        (node_reset ?target_node)
+        (edge_available ?edge_identifier)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+  (:action apply_evidence_and_reset_unit
+    :parameters (?analysis_unit - analysis_unit ?edge_identifier - edge_identifier ?evidence_token - evidence_token)
+    :precondition
+      (and
+        (evidence_assigned ?analysis_unit)
+        (edge_reserved ?analysis_unit ?edge_identifier)
+        (vertex_has_evidence ?analysis_unit ?evidence_token)
+        (not
+          (node_reset ?analysis_unit)
+        )
+      )
+    :effect
+      (and
+        (node_reset ?analysis_unit)
+        (edge_available ?edge_identifier)
+        (evidence_token_available ?evidence_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem detect_cycles_in_dependency_graph)
+  (:domain dependency_cycle_detection)
+  (:objects source_node_1 - source_node target_node_1 - target_node analysis_unit_1 - analysis_unit analysis_unit_2 - analysis_unit edge_slot_1 - edge_identifier edge_slot_2 - edge_identifier edge_slot_3 - edge_identifier visit_token_1 - visit_token worker_1 - worker dependency_tag_1 - dependency_tag neighbor_bucket_left_1 - neighbor_bucket_left neighbor_bucket_right_1 - neighbor_bucket_right merge_candidate_slot_1 - merge_candidate resource_bucket_1 - resource_bucket resource_bucket_2 - resource_bucket feature_flag_1 - feature_flag feature_flag_2 - feature_flag priority_label_1 - priority_label priority_label_2 - priority_label evidence_token_1 - evidence_token attribute_a_1 - attribute_a attribute_b_1 - attribute_b attribute_b_2 - attribute_b attribute_c_1 - attribute_c)
+  (:init
+    (edge_available edge_slot_1)
+    (edge_available edge_slot_2)
+    (edge_available edge_slot_3)
+    (visit_token_available visit_token_1)
+    (worker_available worker_1)
+    (dependency_tag_available dependency_tag_1)
+    (source_has_left_bucket source_node_1 neighbor_bucket_left_1)
+    (target_has_right_bucket target_node_1 neighbor_bucket_right_1)
+    (candidate_slot_available merge_candidate_slot_1)
+    (resource_bucket_available resource_bucket_1)
+    (resource_bucket_available resource_bucket_2)
+    (unit_has_source analysis_unit_1 source_node_1)
+    (unit_has_source analysis_unit_2 source_node_1)
+    (unit_has_target analysis_unit_1 target_node_1)
+    (unit_has_target analysis_unit_2 target_node_1)
+    (unit_has_candidate analysis_unit_1 merge_candidate_slot_1)
+    (unit_has_candidate analysis_unit_2 merge_candidate_slot_1)
+    (unit_has_bucket analysis_unit_1 resource_bucket_1)
+    (unit_has_bucket analysis_unit_2 resource_bucket_2)
+    (feature_flag_available feature_flag_1)
+    (feature_flag_available feature_flag_2)
+    (priority_label_available priority_label_1)
+    (priority_label_available priority_label_2)
+    (evidence_token_available evidence_token_1)
+    (attribute_a_available attribute_a_1)
+    (attribute_b_available attribute_b_1)
+    (unit_has_attribute_b analysis_unit_1 attribute_b_1)
+    (unit_has_attribute_b analysis_unit_2 attribute_b_2)
+    (attribute_c_available attribute_c_1)
+  )
+  (:goal
+    (and
+      (node_reset source_node_1)
+      (node_reset target_node_1)
+      (node_reset analysis_unit_1)
+      (node_reset analysis_unit_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_vertex source_node_1)
+(reserve_edge_for_vertex source_node_1 edge_slot_1)
+(assign_visit_token_to_vertex source_node_1 visit_token_1)
+(finalize_discovery source_node_1 visit_token_1)
+(assign_worker_to_vertex source_node_1 worker_1)
+(signal_left_bucket_ready source_node_1 neighbor_bucket_left_1 visit_token_1)
+(confirm_left_and_mark_source source_node_1 neighbor_bucket_left_1 worker_1)
+(release_worker_from_vertex source_node_1 worker_1)
+(release_visit_token source_node_1 visit_token_1)
+(discover_vertex target_node_1)
+(reserve_edge_for_vertex target_node_1 edge_slot_2)
+(assign_visit_token_to_vertex target_node_1 visit_token_1)
+(finalize_discovery target_node_1 visit_token_1)
+(assign_worker_to_vertex target_node_1 worker_1)
+(signal_right_bucket_ready target_node_1 neighbor_bucket_right_1 visit_token_1)
+(confirm_right_and_mark_target target_node_1 neighbor_bucket_right_1 worker_1)
+(release_worker_from_vertex target_node_1 worker_1)
+(release_visit_token target_node_1 visit_token_1)
+(assemble_candidate_no_flags source_node_1 target_node_1 neighbor_bucket_left_1 neighbor_bucket_right_1 merge_candidate_slot_1)
+(assign_visit_token_to_vertex source_node_1 visit_token_1)
+(stage_candidate merge_candidate_slot_1 source_node_1 visit_token_1)
+(release_visit_token source_node_1 visit_token_1)
+(commit_source_node source_node_1 merge_candidate_slot_1)
+(commit_target_node target_node_1 merge_candidate_slot_1)
+(assign_visit_token_to_vertex source_node_1 visit_token_1)
+(assign_evidence_to_vertex source_node_1 evidence_token_1 visit_token_1)
+(apply_evidence_and_reset_source source_node_1 edge_slot_1 evidence_token_1)
+(assign_visit_token_to_vertex target_node_1 visit_token_1)
+(assign_evidence_to_vertex target_node_1 evidence_token_1 visit_token_1)
+(apply_evidence_and_reset_target target_node_1 edge_slot_2 evidence_token_1)
+(discover_vertex analysis_unit_1)
+(reserve_edge_for_vertex analysis_unit_1 edge_slot_1)
+(assign_visit_token_to_vertex analysis_unit_1 visit_token_1)
+(finalize_discovery analysis_unit_1 visit_token_1)
+(bind_attribute_a_to_unit analysis_unit_1 attribute_a_1)
+(bind_attribute_c_to_unit analysis_unit_1 attribute_c_1)
+(assign_worker_to_vertex analysis_unit_1 worker_1)
+(reserve_resource_bucket analysis_unit_1 resource_bucket_1 merge_candidate_slot_1)
+(start_unit_evaluation analysis_unit_1 resource_bucket_1 merge_candidate_slot_1 visit_token_1)
+(advance_unit_evaluation_stage1 analysis_unit_1 attribute_a_1 worker_1 resource_bucket_1 merge_candidate_slot_1)
+(evaluate_candidate_and_set_ready analysis_unit_1 attribute_c_1 resource_bucket_1 merge_candidate_slot_1)
+(commit_unit analysis_unit_1)
+(unbind_attribute_a_from_unit analysis_unit_1 attribute_a_1)
+(unbind_attribute_c_from_unit analysis_unit_1 attribute_c_1)
+(discover_vertex analysis_unit_2)
+(reserve_edge_for_vertex analysis_unit_2 edge_slot_2)
+(assign_visit_token_to_vertex analysis_unit_2 visit_token_1)
+(finalize_discovery analysis_unit_2 visit_token_1)
+(bind_attribute_a_to_unit analysis_unit_2 attribute_a_1)
+(bind_attribute_c_to_unit analysis_unit_2 attribute_c_1)
+(assign_worker_to_vertex analysis_unit_2 worker_1)
+(reserve_resource_bucket analysis_unit_2 resource_bucket_2 merge_candidate_slot_1)
+(start_unit_evaluation analysis_unit_2 resource_bucket_2 merge_candidate_slot_1 visit_token_1)
+(advance_unit_evaluation_stage1 analysis_unit_2 attribute_a_1 worker_1 resource_bucket_2 merge_candidate_slot_1)
+(evaluate_candidate_and_set_ready analysis_unit_2 attribute_c_1 resource_bucket_2 merge_candidate_slot_1)
+(commit_unit analysis_unit_2)
+(release_worker_from_vertex analysis_unit_2 worker_1)
+(release_visit_token analysis_unit_2 visit_token_1)
+(assign_visit_token_to_vertex analysis_unit_1 visit_token_1)
+(assign_evidence_to_vertex analysis_unit_1 evidence_token_1 visit_token_1)
+(apply_evidence_and_reset_unit analysis_unit_1 edge_slot_1 evidence_token_1)
+(assign_visit_token_to_vertex analysis_unit_2 visit_token_1)
+(assign_evidence_to_vertex analysis_unit_2 evidence_token_1 visit_token_1)
+(apply_evidence_and_reset_unit analysis_unit_2 edge_slot_2 evidence_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_e27v2msy/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_e27v2msy/plan.pddl 
+
+
+--- stderr ---
+

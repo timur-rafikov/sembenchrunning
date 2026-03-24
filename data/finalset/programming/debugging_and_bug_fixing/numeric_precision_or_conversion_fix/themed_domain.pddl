@@ -1,0 +1,936 @@
+(define (domain numeric_precision_fix_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource_category - object auxiliary_resource_category - object runtime_artifact_category - object case_container - object test_case - case_container diagnostic_tool - actor_or_resource_category reproduction_input - actor_or_resource_category reviewer - actor_or_resource_category static_check - actor_or_resource_category numeric_metric - actor_or_resource_category root_cause_hypothesis - actor_or_resource_category environment_config - actor_or_resource_category verification_script - actor_or_resource_category patch_candidate - auxiliary_resource_category input_dataset - auxiliary_resource_category stakeholder_report - auxiliary_resource_category fault_signature - runtime_artifact_category execution_context - runtime_artifact_category test_run - runtime_artifact_category variant_group - test_case actor_group - test_case implementation_variant - variant_group reference_variant - variant_group engineer - actor_group)
+  (:predicates
+    (test_reported ?test_case - test_case)
+    (reproduction_confirmed_for_subject ?test_case - test_case)
+    (diagnostic_assigned ?test_case - test_case)
+    (fix_applied_to_subject ?test_case - test_case)
+    (validation_complete_for_subject ?test_case - test_case)
+    (root_cause_linked ?test_case - test_case)
+    (tool_available ?diagnostic_tool - diagnostic_tool)
+    (assigned_tool_to_subject ?test_case - test_case ?diagnostic_tool - diagnostic_tool)
+    (repro_input_available ?reproduction_input - reproduction_input)
+    (attached_repro_input_to_subject ?test_case - test_case ?reproduction_input - reproduction_input)
+    (reviewer_available ?reviewer - reviewer)
+    (assigned_reviewer_for_subject ?test_case - test_case ?reviewer - reviewer)
+    (patch_candidate_available ?patch_candidate - patch_candidate)
+    (implementation_patch_candidate ?implementation_variant - implementation_variant ?patch_candidate - patch_candidate)
+    (reference_patch_candidate ?reference_variant - reference_variant ?patch_candidate - patch_candidate)
+    (variant_fault_signature ?implementation_variant - implementation_variant ?fault_signature - fault_signature)
+    (signature_confirmed ?fault_signature - fault_signature)
+    (signature_flagged ?fault_signature - fault_signature)
+    (variant_verified ?implementation_variant - implementation_variant)
+    (reference_execution_context ?reference_variant - reference_variant ?execution_context - execution_context)
+    (context_confirmed ?execution_context - execution_context)
+    (context_flagged ?execution_context - execution_context)
+    (reference_verified ?reference_variant - reference_variant)
+    (test_run_ready ?test_run - test_run)
+    (test_run_produced ?test_run - test_run)
+    (test_run_fault_signature ?test_run - test_run ?fault_signature - fault_signature)
+    (test_run_execution_context ?test_run - test_run ?execution_context - execution_context)
+    (test_run_signature_verified ?test_run - test_run)
+    (test_run_context_verified ?test_run - test_run)
+    (test_run_finalized ?test_run - test_run)
+    (engineer_assigned_to_variant ?engineer - engineer ?implementation_variant - implementation_variant)
+    (engineer_assigned_to_reference ?engineer - engineer ?reference_variant - reference_variant)
+    (engineer_has_test_run ?engineer - engineer ?test_run - test_run)
+    (dataset_available ?input_dataset - input_dataset)
+    (engineer_has_dataset ?engineer - engineer ?input_dataset - input_dataset)
+    (dataset_registered ?input_dataset - input_dataset)
+    (dataset_used_by_test_run ?input_dataset - input_dataset ?test_run - test_run)
+    (engineer_prepared ?engineer - engineer)
+    (engineer_has_provisional_result ?engineer - engineer)
+    (engineer_verified_changes ?engineer - engineer)
+    (static_check_assigned_to_engineer ?engineer - engineer)
+    (engineer_additional_flag ?engineer - engineer)
+    (engineer_metric_ready ?engineer - engineer)
+    (engineer_work_complete ?engineer - engineer)
+    (stakeholder_report_available ?stakeholder_report - stakeholder_report)
+    (engineer_has_stakeholder_report ?engineer - engineer ?stakeholder_report - stakeholder_report)
+    (engineer_acknowledged_report ?engineer - engineer)
+    (engineer_started_verification ?engineer - engineer)
+    (engineer_verification_passed ?engineer - engineer)
+    (static_check_available ?static_check - static_check)
+    (engineer_has_static_check ?engineer - engineer ?static_check - static_check)
+    (metric_available ?numeric_metric - numeric_metric)
+    (engineer_has_metric ?engineer - engineer ?numeric_metric - numeric_metric)
+    (env_config_available ?environment_config - environment_config)
+    (engineer_has_env_config ?engineer - engineer ?environment_config - environment_config)
+    (verification_script_available ?verification_script - verification_script)
+    (engineer_has_verification_script ?engineer - engineer ?verification_script - verification_script)
+    (hypothesis_available ?root_cause_hypothesis - root_cause_hypothesis)
+    (test_case_has_hypothesis ?test_case - test_case ?root_cause_hypothesis - root_cause_hypothesis)
+    (variant_ready ?implementation_variant - implementation_variant)
+    (reference_ready ?reference_variant - reference_variant)
+    (engineer_marked_done ?engineer - engineer)
+  )
+  (:action register_test_case
+    :parameters (?test_case - test_case)
+    :precondition
+      (and
+        (not
+          (test_reported ?test_case)
+        )
+        (not
+          (fix_applied_to_subject ?test_case)
+        )
+      )
+    :effect (test_reported ?test_case)
+  )
+  (:action assign_diagnostic_tool_to_test
+    :parameters (?test_case - test_case ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (test_reported ?test_case)
+        (not
+          (diagnostic_assigned ?test_case)
+        )
+        (tool_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_assigned ?test_case)
+        (assigned_tool_to_subject ?test_case ?diagnostic_tool)
+        (not
+          (tool_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action attach_reproduction_input_to_test
+    :parameters (?test_case - test_case ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (test_reported ?test_case)
+        (diagnostic_assigned ?test_case)
+        (repro_input_available ?reproduction_input)
+      )
+    :effect
+      (and
+        (attached_repro_input_to_subject ?test_case ?reproduction_input)
+        (not
+          (repro_input_available ?reproduction_input)
+        )
+      )
+  )
+  (:action confirm_reproduction
+    :parameters (?test_case - test_case ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (test_reported ?test_case)
+        (diagnostic_assigned ?test_case)
+        (attached_repro_input_to_subject ?test_case ?reproduction_input)
+        (not
+          (reproduction_confirmed_for_subject ?test_case)
+        )
+      )
+    :effect (reproduction_confirmed_for_subject ?test_case)
+  )
+  (:action detach_reproduction_input
+    :parameters (?test_case - test_case ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (attached_repro_input_to_subject ?test_case ?reproduction_input)
+      )
+    :effect
+      (and
+        (repro_input_available ?reproduction_input)
+        (not
+          (attached_repro_input_to_subject ?test_case ?reproduction_input)
+        )
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?test_case - test_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?test_case)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (assigned_reviewer_for_subject ?test_case ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer
+    :parameters (?test_case - test_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (assigned_reviewer_for_subject ?test_case ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (assigned_reviewer_for_subject ?test_case ?reviewer)
+        )
+      )
+  )
+  (:action assign_env_config_to_engineer
+    :parameters (?engineer - engineer ?environment_config - environment_config)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (env_config_available ?environment_config)
+      )
+    :effect
+      (and
+        (engineer_has_env_config ?engineer ?environment_config)
+        (not
+          (env_config_available ?environment_config)
+        )
+      )
+  )
+  (:action unassign_env_config_from_engineer
+    :parameters (?engineer - engineer ?environment_config - environment_config)
+    :precondition
+      (and
+        (engineer_has_env_config ?engineer ?environment_config)
+      )
+    :effect
+      (and
+        (env_config_available ?environment_config)
+        (not
+          (engineer_has_env_config ?engineer ?environment_config)
+        )
+      )
+  )
+  (:action assign_verification_script_to_engineer
+    :parameters (?engineer - engineer ?verification_script - verification_script)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (verification_script_available ?verification_script)
+      )
+    :effect
+      (and
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (not
+          (verification_script_available ?verification_script)
+        )
+      )
+  )
+  (:action unassign_verification_script_from_engineer
+    :parameters (?engineer - engineer ?verification_script - verification_script)
+    :precondition
+      (and
+        (engineer_has_verification_script ?engineer ?verification_script)
+      )
+    :effect
+      (and
+        (verification_script_available ?verification_script)
+        (not
+          (engineer_has_verification_script ?engineer ?verification_script)
+        )
+      )
+  )
+  (:action confirm_fault_signature_for_variant
+    :parameters (?implementation_variant - implementation_variant ?fault_signature - fault_signature ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?implementation_variant)
+        (attached_repro_input_to_subject ?implementation_variant ?reproduction_input)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (not
+          (signature_confirmed ?fault_signature)
+        )
+        (not
+          (signature_flagged ?fault_signature)
+        )
+      )
+    :effect (signature_confirmed ?fault_signature)
+  )
+  (:action validate_variant_with_reviewer
+    :parameters (?implementation_variant - implementation_variant ?fault_signature - fault_signature ?reviewer - reviewer)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?implementation_variant)
+        (assigned_reviewer_for_subject ?implementation_variant ?reviewer)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (signature_confirmed ?fault_signature)
+        (not
+          (variant_ready ?implementation_variant)
+        )
+      )
+    :effect
+      (and
+        (variant_ready ?implementation_variant)
+        (variant_verified ?implementation_variant)
+      )
+  )
+  (:action propose_patch_for_variant
+    :parameters (?implementation_variant - implementation_variant ?fault_signature - fault_signature ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?implementation_variant)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (patch_candidate_available ?patch_candidate)
+        (not
+          (variant_ready ?implementation_variant)
+        )
+      )
+    :effect
+      (and
+        (signature_flagged ?fault_signature)
+        (variant_ready ?implementation_variant)
+        (implementation_patch_candidate ?implementation_variant ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action evaluate_and_confirm_patch_for_variant
+    :parameters (?implementation_variant - implementation_variant ?fault_signature - fault_signature ?reproduction_input - reproduction_input ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?implementation_variant)
+        (attached_repro_input_to_subject ?implementation_variant ?reproduction_input)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (signature_flagged ?fault_signature)
+        (implementation_patch_candidate ?implementation_variant ?patch_candidate)
+        (not
+          (variant_verified ?implementation_variant)
+        )
+      )
+    :effect
+      (and
+        (signature_confirmed ?fault_signature)
+        (variant_verified ?implementation_variant)
+        (patch_candidate_available ?patch_candidate)
+        (not
+          (implementation_patch_candidate ?implementation_variant ?patch_candidate)
+        )
+      )
+  )
+  (:action confirm_fault_signature_for_reference
+    :parameters (?reference_variant - reference_variant ?execution_context - execution_context ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?reference_variant)
+        (attached_repro_input_to_subject ?reference_variant ?reproduction_input)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (not
+          (context_confirmed ?execution_context)
+        )
+        (not
+          (context_flagged ?execution_context)
+        )
+      )
+    :effect (context_confirmed ?execution_context)
+  )
+  (:action validate_reference_with_reviewer
+    :parameters (?reference_variant - reference_variant ?execution_context - execution_context ?reviewer - reviewer)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?reference_variant)
+        (assigned_reviewer_for_subject ?reference_variant ?reviewer)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (context_confirmed ?execution_context)
+        (not
+          (reference_ready ?reference_variant)
+        )
+      )
+    :effect
+      (and
+        (reference_ready ?reference_variant)
+        (reference_verified ?reference_variant)
+      )
+  )
+  (:action propose_patch_for_reference
+    :parameters (?reference_variant - reference_variant ?execution_context - execution_context ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?reference_variant)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (patch_candidate_available ?patch_candidate)
+        (not
+          (reference_ready ?reference_variant)
+        )
+      )
+    :effect
+      (and
+        (context_flagged ?execution_context)
+        (reference_ready ?reference_variant)
+        (reference_patch_candidate ?reference_variant ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action evaluate_and_confirm_patch_for_reference
+    :parameters (?reference_variant - reference_variant ?execution_context - execution_context ?reproduction_input - reproduction_input ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?reference_variant)
+        (attached_repro_input_to_subject ?reference_variant ?reproduction_input)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (context_flagged ?execution_context)
+        (reference_patch_candidate ?reference_variant ?patch_candidate)
+        (not
+          (reference_verified ?reference_variant)
+        )
+      )
+    :effect
+      (and
+        (context_confirmed ?execution_context)
+        (reference_verified ?reference_variant)
+        (patch_candidate_available ?patch_candidate)
+        (not
+          (reference_patch_candidate ?reference_variant ?patch_candidate)
+        )
+      )
+  )
+  (:action orchestrate_test_run_signature_context_confirmed
+    :parameters (?implementation_variant - implementation_variant ?reference_variant - reference_variant ?fault_signature - fault_signature ?execution_context - execution_context ?test_run - test_run)
+    :precondition
+      (and
+        (variant_ready ?implementation_variant)
+        (reference_ready ?reference_variant)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (signature_confirmed ?fault_signature)
+        (context_confirmed ?execution_context)
+        (variant_verified ?implementation_variant)
+        (reference_verified ?reference_variant)
+        (test_run_ready ?test_run)
+      )
+    :effect
+      (and
+        (test_run_produced ?test_run)
+        (test_run_fault_signature ?test_run ?fault_signature)
+        (test_run_execution_context ?test_run ?execution_context)
+        (not
+          (test_run_ready ?test_run)
+        )
+      )
+  )
+  (:action orchestrate_test_run_signature_flagged
+    :parameters (?implementation_variant - implementation_variant ?reference_variant - reference_variant ?fault_signature - fault_signature ?execution_context - execution_context ?test_run - test_run)
+    :precondition
+      (and
+        (variant_ready ?implementation_variant)
+        (reference_ready ?reference_variant)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (signature_flagged ?fault_signature)
+        (context_confirmed ?execution_context)
+        (not
+          (variant_verified ?implementation_variant)
+        )
+        (reference_verified ?reference_variant)
+        (test_run_ready ?test_run)
+      )
+    :effect
+      (and
+        (test_run_produced ?test_run)
+        (test_run_fault_signature ?test_run ?fault_signature)
+        (test_run_execution_context ?test_run ?execution_context)
+        (test_run_signature_verified ?test_run)
+        (not
+          (test_run_ready ?test_run)
+        )
+      )
+  )
+  (:action orchestrate_test_run_signature_confirmed_context_flagged
+    :parameters (?implementation_variant - implementation_variant ?reference_variant - reference_variant ?fault_signature - fault_signature ?execution_context - execution_context ?test_run - test_run)
+    :precondition
+      (and
+        (variant_ready ?implementation_variant)
+        (reference_ready ?reference_variant)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (signature_confirmed ?fault_signature)
+        (context_flagged ?execution_context)
+        (variant_verified ?implementation_variant)
+        (not
+          (reference_verified ?reference_variant)
+        )
+        (test_run_ready ?test_run)
+      )
+    :effect
+      (and
+        (test_run_produced ?test_run)
+        (test_run_fault_signature ?test_run ?fault_signature)
+        (test_run_execution_context ?test_run ?execution_context)
+        (test_run_context_verified ?test_run)
+        (not
+          (test_run_ready ?test_run)
+        )
+      )
+  )
+  (:action orchestrate_test_run_signature_flagged_context_flagged
+    :parameters (?implementation_variant - implementation_variant ?reference_variant - reference_variant ?fault_signature - fault_signature ?execution_context - execution_context ?test_run - test_run)
+    :precondition
+      (and
+        (variant_ready ?implementation_variant)
+        (reference_ready ?reference_variant)
+        (variant_fault_signature ?implementation_variant ?fault_signature)
+        (reference_execution_context ?reference_variant ?execution_context)
+        (signature_flagged ?fault_signature)
+        (context_flagged ?execution_context)
+        (not
+          (variant_verified ?implementation_variant)
+        )
+        (not
+          (reference_verified ?reference_variant)
+        )
+        (test_run_ready ?test_run)
+      )
+    :effect
+      (and
+        (test_run_produced ?test_run)
+        (test_run_fault_signature ?test_run ?fault_signature)
+        (test_run_execution_context ?test_run ?execution_context)
+        (test_run_signature_verified ?test_run)
+        (test_run_context_verified ?test_run)
+        (not
+          (test_run_ready ?test_run)
+        )
+      )
+  )
+  (:action finalize_test_run
+    :parameters (?test_run - test_run ?implementation_variant - implementation_variant ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (test_run_produced ?test_run)
+        (variant_ready ?implementation_variant)
+        (attached_repro_input_to_subject ?implementation_variant ?reproduction_input)
+        (not
+          (test_run_finalized ?test_run)
+        )
+      )
+    :effect (test_run_finalized ?test_run)
+  )
+  (:action attach_dataset_to_test_run
+    :parameters (?engineer - engineer ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (engineer_has_test_run ?engineer ?test_run)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_available ?input_dataset)
+        (test_run_produced ?test_run)
+        (test_run_finalized ?test_run)
+        (not
+          (dataset_registered ?input_dataset)
+        )
+      )
+    :effect
+      (and
+        (dataset_registered ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (not
+          (dataset_available ?input_dataset)
+        )
+      )
+  )
+  (:action prepare_engineer_with_dataset_for_test_run
+    :parameters (?engineer - engineer ?input_dataset - input_dataset ?test_run - test_run ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_registered ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (attached_repro_input_to_subject ?engineer ?reproduction_input)
+        (not
+          (test_run_signature_verified ?test_run)
+        )
+        (not
+          (engineer_prepared ?engineer)
+        )
+      )
+    :effect (engineer_prepared ?engineer)
+  )
+  (:action assign_static_check_to_engineer
+    :parameters (?engineer - engineer ?static_check - static_check)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (static_check_available ?static_check)
+        (not
+          (static_check_assigned_to_engineer ?engineer)
+        )
+      )
+    :effect
+      (and
+        (static_check_assigned_to_engineer ?engineer)
+        (engineer_has_static_check ?engineer ?static_check)
+        (not
+          (static_check_available ?static_check)
+        )
+      )
+  )
+  (:action associate_dataset_check_with_engineer_and_test_run
+    :parameters (?engineer - engineer ?input_dataset - input_dataset ?test_run - test_run ?reproduction_input - reproduction_input ?static_check - static_check)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_registered ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (attached_repro_input_to_subject ?engineer ?reproduction_input)
+        (test_run_signature_verified ?test_run)
+        (static_check_assigned_to_engineer ?engineer)
+        (engineer_has_static_check ?engineer ?static_check)
+        (not
+          (engineer_prepared ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_prepared ?engineer)
+        (engineer_additional_flag ?engineer)
+      )
+  )
+  (:action run_verification_with_env_and_reviewer
+    :parameters (?engineer - engineer ?environment_config - environment_config ?reviewer - reviewer ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_prepared ?engineer)
+        (engineer_has_env_config ?engineer ?environment_config)
+        (assigned_reviewer_for_subject ?engineer ?reviewer)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (not
+          (test_run_context_verified ?test_run)
+        )
+        (not
+          (engineer_has_provisional_result ?engineer)
+        )
+      )
+    :effect (engineer_has_provisional_result ?engineer)
+  )
+  (:action run_verification_with_env_and_reviewer_confirmed
+    :parameters (?engineer - engineer ?environment_config - environment_config ?reviewer - reviewer ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_prepared ?engineer)
+        (engineer_has_env_config ?engineer ?environment_config)
+        (assigned_reviewer_for_subject ?engineer ?reviewer)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (test_run_context_verified ?test_run)
+        (not
+          (engineer_has_provisional_result ?engineer)
+        )
+      )
+    :effect (engineer_has_provisional_result ?engineer)
+  )
+  (:action complete_engineer_verification_stage_a
+    :parameters (?engineer - engineer ?verification_script - verification_script ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_has_provisional_result ?engineer)
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (not
+          (test_run_signature_verified ?test_run)
+        )
+        (not
+          (test_run_context_verified ?test_run)
+        )
+        (not
+          (engineer_verified_changes ?engineer)
+        )
+      )
+    :effect (engineer_verified_changes ?engineer)
+  )
+  (:action complete_engineer_verification_stage_b
+    :parameters (?engineer - engineer ?verification_script - verification_script ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_has_provisional_result ?engineer)
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (test_run_signature_verified ?test_run)
+        (not
+          (test_run_context_verified ?test_run)
+        )
+        (not
+          (engineer_verified_changes ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_metric_ready ?engineer)
+      )
+  )
+  (:action complete_engineer_verification_stage_c
+    :parameters (?engineer - engineer ?verification_script - verification_script ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_has_provisional_result ?engineer)
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (not
+          (test_run_signature_verified ?test_run)
+        )
+        (test_run_context_verified ?test_run)
+        (not
+          (engineer_verified_changes ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_metric_ready ?engineer)
+      )
+  )
+  (:action complete_engineer_verification_stage_d
+    :parameters (?engineer - engineer ?verification_script - verification_script ?input_dataset - input_dataset ?test_run - test_run)
+    :precondition
+      (and
+        (engineer_has_provisional_result ?engineer)
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (engineer_has_dataset ?engineer ?input_dataset)
+        (dataset_used_by_test_run ?input_dataset ?test_run)
+        (test_run_signature_verified ?test_run)
+        (test_run_context_verified ?test_run)
+        (not
+          (engineer_verified_changes ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_metric_ready ?engineer)
+      )
+  )
+  (:action record_engineer_completion
+    :parameters (?engineer - engineer)
+    :precondition
+      (and
+        (engineer_verified_changes ?engineer)
+        (not
+          (engineer_metric_ready ?engineer)
+        )
+        (not
+          (engineer_marked_done ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_marked_done ?engineer)
+        (validation_complete_for_subject ?engineer)
+      )
+  )
+  (:action attach_metric_to_engineer
+    :parameters (?engineer - engineer ?numeric_metric - numeric_metric)
+    :precondition
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_metric_ready ?engineer)
+        (metric_available ?numeric_metric)
+      )
+    :effect
+      (and
+        (engineer_has_metric ?engineer ?numeric_metric)
+        (not
+          (metric_available ?numeric_metric)
+        )
+      )
+  )
+  (:action coordinate_engineer_validation
+    :parameters (?engineer - engineer ?implementation_variant - implementation_variant ?reference_variant - reference_variant ?reproduction_input - reproduction_input ?numeric_metric - numeric_metric)
+    :precondition
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_metric_ready ?engineer)
+        (engineer_has_metric ?engineer ?numeric_metric)
+        (engineer_assigned_to_variant ?engineer ?implementation_variant)
+        (engineer_assigned_to_reference ?engineer ?reference_variant)
+        (variant_verified ?implementation_variant)
+        (reference_verified ?reference_variant)
+        (attached_repro_input_to_subject ?engineer ?reproduction_input)
+        (not
+          (engineer_work_complete ?engineer)
+        )
+      )
+    :effect (engineer_work_complete ?engineer)
+  )
+  (:action finalize_engineer_work
+    :parameters (?engineer - engineer)
+    :precondition
+      (and
+        (engineer_verified_changes ?engineer)
+        (engineer_work_complete ?engineer)
+        (not
+          (engineer_marked_done ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_marked_done ?engineer)
+        (validation_complete_for_subject ?engineer)
+      )
+  )
+  (:action acknowledge_stakeholder_report
+    :parameters (?engineer - engineer ?stakeholder_report - stakeholder_report ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (reproduction_confirmed_for_subject ?engineer)
+        (attached_repro_input_to_subject ?engineer ?reproduction_input)
+        (stakeholder_report_available ?stakeholder_report)
+        (engineer_has_stakeholder_report ?engineer ?stakeholder_report)
+        (not
+          (engineer_acknowledged_report ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_acknowledged_report ?engineer)
+        (not
+          (stakeholder_report_available ?stakeholder_report)
+        )
+      )
+  )
+  (:action start_review_by_reviewer
+    :parameters (?engineer - engineer ?reviewer - reviewer)
+    :precondition
+      (and
+        (engineer_acknowledged_report ?engineer)
+        (assigned_reviewer_for_subject ?engineer ?reviewer)
+        (not
+          (engineer_started_verification ?engineer)
+        )
+      )
+    :effect (engineer_started_verification ?engineer)
+  )
+  (:action run_verification_script
+    :parameters (?engineer - engineer ?verification_script - verification_script)
+    :precondition
+      (and
+        (engineer_started_verification ?engineer)
+        (engineer_has_verification_script ?engineer ?verification_script)
+        (not
+          (engineer_verification_passed ?engineer)
+        )
+      )
+    :effect (engineer_verification_passed ?engineer)
+  )
+  (:action complete_review_and_mark_engineer
+    :parameters (?engineer - engineer)
+    :precondition
+      (and
+        (engineer_verification_passed ?engineer)
+        (not
+          (engineer_marked_done ?engineer)
+        )
+      )
+    :effect
+      (and
+        (engineer_marked_done ?engineer)
+        (validation_complete_for_subject ?engineer)
+      )
+  )
+  (:action finalize_variant_validation
+    :parameters (?implementation_variant - implementation_variant ?test_run - test_run)
+    :precondition
+      (and
+        (variant_ready ?implementation_variant)
+        (variant_verified ?implementation_variant)
+        (test_run_produced ?test_run)
+        (test_run_finalized ?test_run)
+        (not
+          (validation_complete_for_subject ?implementation_variant)
+        )
+      )
+    :effect (validation_complete_for_subject ?implementation_variant)
+  )
+  (:action finalize_reference_validation
+    :parameters (?reference_variant - reference_variant ?test_run - test_run)
+    :precondition
+      (and
+        (reference_ready ?reference_variant)
+        (reference_verified ?reference_variant)
+        (test_run_produced ?test_run)
+        (test_run_finalized ?test_run)
+        (not
+          (validation_complete_for_subject ?reference_variant)
+        )
+      )
+    :effect (validation_complete_for_subject ?reference_variant)
+  )
+  (:action assign_root_cause_to_test
+    :parameters (?test_case - test_case ?root_cause_hypothesis - root_cause_hypothesis ?reproduction_input - reproduction_input)
+    :precondition
+      (and
+        (validation_complete_for_subject ?test_case)
+        (attached_repro_input_to_subject ?test_case ?reproduction_input)
+        (hypothesis_available ?root_cause_hypothesis)
+        (not
+          (root_cause_linked ?test_case)
+        )
+      )
+    :effect
+      (and
+        (root_cause_linked ?test_case)
+        (test_case_has_hypothesis ?test_case ?root_cause_hypothesis)
+        (not
+          (hypothesis_available ?root_cause_hypothesis)
+        )
+      )
+  )
+  (:action apply_and_propagate_fix_to_variant
+    :parameters (?implementation_variant - implementation_variant ?diagnostic_tool - diagnostic_tool ?root_cause_hypothesis - root_cause_hypothesis)
+    :precondition
+      (and
+        (root_cause_linked ?implementation_variant)
+        (assigned_tool_to_subject ?implementation_variant ?diagnostic_tool)
+        (test_case_has_hypothesis ?implementation_variant ?root_cause_hypothesis)
+        (not
+          (fix_applied_to_subject ?implementation_variant)
+        )
+      )
+    :effect
+      (and
+        (fix_applied_to_subject ?implementation_variant)
+        (tool_available ?diagnostic_tool)
+        (hypothesis_available ?root_cause_hypothesis)
+      )
+  )
+  (:action apply_and_propagate_fix_to_reference
+    :parameters (?reference_variant - reference_variant ?diagnostic_tool - diagnostic_tool ?root_cause_hypothesis - root_cause_hypothesis)
+    :precondition
+      (and
+        (root_cause_linked ?reference_variant)
+        (assigned_tool_to_subject ?reference_variant ?diagnostic_tool)
+        (test_case_has_hypothesis ?reference_variant ?root_cause_hypothesis)
+        (not
+          (fix_applied_to_subject ?reference_variant)
+        )
+      )
+    :effect
+      (and
+        (fix_applied_to_subject ?reference_variant)
+        (tool_available ?diagnostic_tool)
+        (hypothesis_available ?root_cause_hypothesis)
+      )
+  )
+  (:action apply_and_propagate_fix_to_engineer
+    :parameters (?engineer - engineer ?diagnostic_tool - diagnostic_tool ?root_cause_hypothesis - root_cause_hypothesis)
+    :precondition
+      (and
+        (root_cause_linked ?engineer)
+        (assigned_tool_to_subject ?engineer ?diagnostic_tool)
+        (test_case_has_hypothesis ?engineer ?root_cause_hypothesis)
+        (not
+          (fix_applied_to_subject ?engineer)
+        )
+      )
+    :effect
+      (and
+        (fix_applied_to_subject ?engineer)
+        (tool_available ?diagnostic_tool)
+        (hypothesis_available ?root_cause_hypothesis)
+      )
+  )
+)

@@ -1,0 +1,1076 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_payments_settlement_duplicate_payment_prevention)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_group - object settlement_support_artifact_group - object settlement_channel_group - object payment_instruction_root - object payment_instruction - payment_instruction_root settlement_route_option - operational_resource_group compliance_screening_service - operational_resource_group funding_source - operational_resource_group service_parameter - operational_resource_group authorization_token - operational_resource_group duplicate_check_record - operational_resource_group configuration_parameter - operational_resource_group escalation_policy - operational_resource_group remediation_resource - settlement_support_artifact_group settlement_file - settlement_support_artifact_group external_reference - settlement_support_artifact_group origin_channel - settlement_channel_group destination_channel - settlement_channel_group settlement_message - settlement_channel_group bank_agent_role_group - payment_instruction settlement_processor_role_group - payment_instruction originating_agent - bank_agent_role_group beneficiary_agent - bank_agent_role_group settlement_processor - settlement_processor_role_group)
+  (:predicates
+    (instruction_submitted ?payment_instruction_var - payment_instruction)
+    (ready_for_processing ?payment_instruction_var - payment_instruction)
+    (routing_option_selected ?payment_instruction_var - payment_instruction)
+    (settlement_completed ?payment_instruction_var - payment_instruction)
+    (entity_settlement_released ?payment_instruction_var - payment_instruction)
+    (duplicate_control_applied ?payment_instruction_var - payment_instruction)
+    (routing_option_available ?settlement_route_option_var - settlement_route_option)
+    (bound_to_routing_option ?payment_instruction_var - payment_instruction ?settlement_route_option_var - settlement_route_option)
+    (screening_service_available ?compliance_screening_service_var - compliance_screening_service)
+    (screening_service_assigned ?payment_instruction_var - payment_instruction ?compliance_screening_service_var - compliance_screening_service)
+    (funding_source_available ?funding_source_var - funding_source)
+    (bound_to_funding_source ?payment_instruction_var - payment_instruction ?funding_source_var - funding_source)
+    (remediation_resource_available ?remediation_resource_var - remediation_resource)
+    (origin_remediation_assigned ?originating_agent_var - originating_agent ?remediation_resource_var - remediation_resource)
+    (beneficiary_remediation_assigned ?beneficiary_agent_var - beneficiary_agent ?remediation_resource_var - remediation_resource)
+    (origin_channel_assigned ?originating_agent_var - originating_agent ?origin_channel_var - origin_channel)
+    (origin_channel_ready ?origin_channel_var - origin_channel)
+    (origin_channel_on_hold ?origin_channel_var - origin_channel)
+    (origin_agent_ready ?originating_agent_var - originating_agent)
+    (destination_channel_assigned ?beneficiary_agent_var - beneficiary_agent ?destination_channel_var - destination_channel)
+    (destination_channel_ready ?destination_channel_var - destination_channel)
+    (destination_channel_on_hold ?destination_channel_var - destination_channel)
+    (beneficiary_agent_ready ?beneficiary_agent_var - beneficiary_agent)
+    (settlement_message_available ?settlement_message_var - settlement_message)
+    (settlement_message_composed ?settlement_message_var - settlement_message)
+    (message_bound_to_origin_channel ?settlement_message_var - settlement_message ?origin_channel_var - origin_channel)
+    (message_bound_to_destination_channel ?settlement_message_var - settlement_message ?destination_channel_var - destination_channel)
+    (settlement_message_origin_exception_flagged ?settlement_message_var - settlement_message)
+    (settlement_message_destination_exception_flagged ?settlement_message_var - settlement_message)
+    (settlement_message_authorized ?settlement_message_var - settlement_message)
+    (processor_bound_to_origin_agent ?settlement_processor_var - settlement_processor ?originating_agent_var - originating_agent)
+    (processor_bound_to_beneficiary_agent ?settlement_processor_var - settlement_processor ?beneficiary_agent_var - beneficiary_agent)
+    (processor_bound_to_settlement_message ?settlement_processor_var - settlement_processor ?settlement_message_var - settlement_message)
+    (settlement_file_available ?settlement_file_var - settlement_file)
+    (processor_bound_to_settlement_file ?settlement_processor_var - settlement_processor ?settlement_file_var - settlement_file)
+    (settlement_file_staged ?settlement_file_var - settlement_file)
+    (settlement_file_contains_message ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    (processor_work_started ?settlement_processor_var - settlement_processor)
+    (reconciliation_ready ?settlement_processor_var - settlement_processor)
+    (reconciliation_completed ?settlement_processor_var - settlement_processor)
+    (service_parameter_bound ?settlement_processor_var - settlement_processor)
+    (processor_configuration_validated ?settlement_processor_var - settlement_processor)
+    (exception_review_pending ?settlement_processor_var - settlement_processor)
+    (release_package_prepared ?settlement_processor_var - settlement_processor)
+    (external_reference_available ?external_reference_var - external_reference)
+    (processor_bound_to_external_reference ?settlement_processor_var - settlement_processor ?external_reference_var - external_reference)
+    (external_reference_registered ?settlement_processor_var - settlement_processor)
+    (external_reference_acknowledged ?settlement_processor_var - settlement_processor)
+    (clearance_approved ?settlement_processor_var - settlement_processor)
+    (service_parameter_available ?service_parameter_var - service_parameter)
+    (processor_bound_to_service_parameter ?settlement_processor_var - settlement_processor ?service_parameter_var - service_parameter)
+    (authorization_token_available ?authorization_token_var - authorization_token)
+    (processor_bound_to_authorization_token ?settlement_processor_var - settlement_processor ?authorization_token_var - authorization_token)
+    (configuration_parameter_available ?configuration_parameter_var - configuration_parameter)
+    (processor_bound_to_configuration_parameter ?settlement_processor_var - settlement_processor ?configuration_parameter_var - configuration_parameter)
+    (escalation_policy_available ?escalation_policy_var - escalation_policy)
+    (processor_bound_to_escalation_policy ?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy)
+    (duplicate_check_record_available ?duplicate_check_record_var - duplicate_check_record)
+    (bound_to_duplicate_check_record ?payment_instruction_var - payment_instruction ?duplicate_check_record_var - duplicate_check_record)
+    (origin_context_locked ?originating_agent_var - originating_agent)
+    (beneficiary_context_locked ?beneficiary_agent_var - beneficiary_agent)
+    (processor_closed ?settlement_processor_var - settlement_processor)
+  )
+  (:action submit_payment_instruction
+    :parameters (?payment_instruction_var - payment_instruction)
+    :precondition
+      (and
+        (not
+          (instruction_submitted ?payment_instruction_var)
+        )
+        (not
+          (settlement_completed ?payment_instruction_var)
+        )
+      )
+    :effect (instruction_submitted ?payment_instruction_var)
+  )
+  (:action allocate_settlement_route_to_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?settlement_route_option_var - settlement_route_option)
+    :precondition
+      (and
+        (instruction_submitted ?payment_instruction_var)
+        (not
+          (routing_option_selected ?payment_instruction_var)
+        )
+        (routing_option_available ?settlement_route_option_var)
+      )
+    :effect
+      (and
+        (routing_option_selected ?payment_instruction_var)
+        (bound_to_routing_option ?payment_instruction_var ?settlement_route_option_var)
+        (not
+          (routing_option_available ?settlement_route_option_var)
+        )
+      )
+  )
+  (:action assign_screening_service_to_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (instruction_submitted ?payment_instruction_var)
+        (routing_option_selected ?payment_instruction_var)
+        (screening_service_available ?compliance_screening_service_var)
+      )
+    :effect
+      (and
+        (screening_service_assigned ?payment_instruction_var ?compliance_screening_service_var)
+        (not
+          (screening_service_available ?compliance_screening_service_var)
+        )
+      )
+  )
+  (:action approve_payment_instruction_for_processing
+    :parameters (?payment_instruction_var - payment_instruction ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (instruction_submitted ?payment_instruction_var)
+        (routing_option_selected ?payment_instruction_var)
+        (screening_service_assigned ?payment_instruction_var ?compliance_screening_service_var)
+        (not
+          (ready_for_processing ?payment_instruction_var)
+        )
+      )
+    :effect (ready_for_processing ?payment_instruction_var)
+  )
+  (:action release_screening_service_from_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (screening_service_assigned ?payment_instruction_var ?compliance_screening_service_var)
+      )
+    :effect
+      (and
+        (screening_service_available ?compliance_screening_service_var)
+        (not
+          (screening_service_assigned ?payment_instruction_var ?compliance_screening_service_var)
+        )
+      )
+  )
+  (:action bind_funding_source_to_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?funding_source_var - funding_source)
+    :precondition
+      (and
+        (ready_for_processing ?payment_instruction_var)
+        (funding_source_available ?funding_source_var)
+      )
+    :effect
+      (and
+        (bound_to_funding_source ?payment_instruction_var ?funding_source_var)
+        (not
+          (funding_source_available ?funding_source_var)
+        )
+      )
+  )
+  (:action release_funding_source_from_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?funding_source_var - funding_source)
+    :precondition
+      (and
+        (bound_to_funding_source ?payment_instruction_var ?funding_source_var)
+      )
+    :effect
+      (and
+        (funding_source_available ?funding_source_var)
+        (not
+          (bound_to_funding_source ?payment_instruction_var ?funding_source_var)
+        )
+      )
+  )
+  (:action assign_configuration_parameter_to_processor
+    :parameters (?settlement_processor_var - settlement_processor ?configuration_parameter_var - configuration_parameter)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (configuration_parameter_available ?configuration_parameter_var)
+      )
+    :effect
+      (and
+        (processor_bound_to_configuration_parameter ?settlement_processor_var ?configuration_parameter_var)
+        (not
+          (configuration_parameter_available ?configuration_parameter_var)
+        )
+      )
+  )
+  (:action release_configuration_parameter_from_processor
+    :parameters (?settlement_processor_var - settlement_processor ?configuration_parameter_var - configuration_parameter)
+    :precondition
+      (and
+        (processor_bound_to_configuration_parameter ?settlement_processor_var ?configuration_parameter_var)
+      )
+    :effect
+      (and
+        (configuration_parameter_available ?configuration_parameter_var)
+        (not
+          (processor_bound_to_configuration_parameter ?settlement_processor_var ?configuration_parameter_var)
+        )
+      )
+  )
+  (:action assign_escalation_policy_to_processor
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (escalation_policy_available ?escalation_policy_var)
+      )
+    :effect
+      (and
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (not
+          (escalation_policy_available ?escalation_policy_var)
+        )
+      )
+  )
+  (:action release_escalation_policy_from_processor
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy)
+    :precondition
+      (and
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+      )
+    :effect
+      (and
+        (escalation_policy_available ?escalation_policy_var)
+        (not
+          (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        )
+      )
+  )
+  (:action reserve_origin_channel_for_instruction
+    :parameters (?originating_agent_var - originating_agent ?origin_channel_var - origin_channel ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (ready_for_processing ?originating_agent_var)
+        (screening_service_assigned ?originating_agent_var ?compliance_screening_service_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (not
+          (origin_channel_ready ?origin_channel_var)
+        )
+        (not
+          (origin_channel_on_hold ?origin_channel_var)
+        )
+      )
+    :effect (origin_channel_ready ?origin_channel_var)
+  )
+  (:action commit_origin_settlement_context
+    :parameters (?originating_agent_var - originating_agent ?origin_channel_var - origin_channel ?funding_source_var - funding_source)
+    :precondition
+      (and
+        (ready_for_processing ?originating_agent_var)
+        (bound_to_funding_source ?originating_agent_var ?funding_source_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (origin_channel_ready ?origin_channel_var)
+        (not
+          (origin_context_locked ?originating_agent_var)
+        )
+      )
+    :effect
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (origin_agent_ready ?originating_agent_var)
+      )
+  )
+  (:action place_origin_channel_on_hold
+    :parameters (?originating_agent_var - originating_agent ?origin_channel_var - origin_channel ?remediation_resource_var - remediation_resource)
+    :precondition
+      (and
+        (ready_for_processing ?originating_agent_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (remediation_resource_available ?remediation_resource_var)
+        (not
+          (origin_context_locked ?originating_agent_var)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_on_hold ?origin_channel_var)
+        (origin_context_locked ?originating_agent_var)
+        (origin_remediation_assigned ?originating_agent_var ?remediation_resource_var)
+        (not
+          (remediation_resource_available ?remediation_resource_var)
+        )
+      )
+  )
+  (:action resolve_origin_channel_hold
+    :parameters (?originating_agent_var - originating_agent ?origin_channel_var - origin_channel ?compliance_screening_service_var - compliance_screening_service ?remediation_resource_var - remediation_resource)
+    :precondition
+      (and
+        (ready_for_processing ?originating_agent_var)
+        (screening_service_assigned ?originating_agent_var ?compliance_screening_service_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (origin_channel_on_hold ?origin_channel_var)
+        (origin_remediation_assigned ?originating_agent_var ?remediation_resource_var)
+        (not
+          (origin_agent_ready ?originating_agent_var)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_ready ?origin_channel_var)
+        (origin_agent_ready ?originating_agent_var)
+        (remediation_resource_available ?remediation_resource_var)
+        (not
+          (origin_remediation_assigned ?originating_agent_var ?remediation_resource_var)
+        )
+      )
+  )
+  (:action reserve_destination_channel_for_instruction
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?destination_channel_var - destination_channel ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (ready_for_processing ?beneficiary_agent_var)
+        (screening_service_assigned ?beneficiary_agent_var ?compliance_screening_service_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (not
+          (destination_channel_ready ?destination_channel_var)
+        )
+        (not
+          (destination_channel_on_hold ?destination_channel_var)
+        )
+      )
+    :effect (destination_channel_ready ?destination_channel_var)
+  )
+  (:action commit_destination_settlement_context
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?destination_channel_var - destination_channel ?funding_source_var - funding_source)
+    :precondition
+      (and
+        (ready_for_processing ?beneficiary_agent_var)
+        (bound_to_funding_source ?beneficiary_agent_var ?funding_source_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (destination_channel_ready ?destination_channel_var)
+        (not
+          (beneficiary_context_locked ?beneficiary_agent_var)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+      )
+  )
+  (:action place_destination_channel_on_hold
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?destination_channel_var - destination_channel ?remediation_resource_var - remediation_resource)
+    :precondition
+      (and
+        (ready_for_processing ?beneficiary_agent_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (remediation_resource_available ?remediation_resource_var)
+        (not
+          (beneficiary_context_locked ?beneficiary_agent_var)
+        )
+      )
+    :effect
+      (and
+        (destination_channel_on_hold ?destination_channel_var)
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (beneficiary_remediation_assigned ?beneficiary_agent_var ?remediation_resource_var)
+        (not
+          (remediation_resource_available ?remediation_resource_var)
+        )
+      )
+  )
+  (:action resolve_destination_channel_hold
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?destination_channel_var - destination_channel ?compliance_screening_service_var - compliance_screening_service ?remediation_resource_var - remediation_resource)
+    :precondition
+      (and
+        (ready_for_processing ?beneficiary_agent_var)
+        (screening_service_assigned ?beneficiary_agent_var ?compliance_screening_service_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (destination_channel_on_hold ?destination_channel_var)
+        (beneficiary_remediation_assigned ?beneficiary_agent_var ?remediation_resource_var)
+        (not
+          (beneficiary_agent_ready ?beneficiary_agent_var)
+        )
+      )
+    :effect
+      (and
+        (destination_channel_ready ?destination_channel_var)
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+        (remediation_resource_available ?remediation_resource_var)
+        (not
+          (beneficiary_remediation_assigned ?beneficiary_agent_var ?remediation_resource_var)
+        )
+      )
+  )
+  (:action compose_settlement_message
+    :parameters (?originating_agent_var - originating_agent ?beneficiary_agent_var - beneficiary_agent ?origin_channel_var - origin_channel ?destination_channel_var - destination_channel ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (origin_channel_ready ?origin_channel_var)
+        (destination_channel_ready ?destination_channel_var)
+        (origin_agent_ready ?originating_agent_var)
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+        (settlement_message_available ?settlement_message_var)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message_var)
+        (message_bound_to_origin_channel ?settlement_message_var ?origin_channel_var)
+        (message_bound_to_destination_channel ?settlement_message_var ?destination_channel_var)
+        (not
+          (settlement_message_available ?settlement_message_var)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_origin_hold
+    :parameters (?originating_agent_var - originating_agent ?beneficiary_agent_var - beneficiary_agent ?origin_channel_var - origin_channel ?destination_channel_var - destination_channel ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (origin_channel_on_hold ?origin_channel_var)
+        (destination_channel_ready ?destination_channel_var)
+        (not
+          (origin_agent_ready ?originating_agent_var)
+        )
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+        (settlement_message_available ?settlement_message_var)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message_var)
+        (message_bound_to_origin_channel ?settlement_message_var ?origin_channel_var)
+        (message_bound_to_destination_channel ?settlement_message_var ?destination_channel_var)
+        (settlement_message_origin_exception_flagged ?settlement_message_var)
+        (not
+          (settlement_message_available ?settlement_message_var)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_destination_hold
+    :parameters (?originating_agent_var - originating_agent ?beneficiary_agent_var - beneficiary_agent ?origin_channel_var - origin_channel ?destination_channel_var - destination_channel ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (origin_channel_ready ?origin_channel_var)
+        (destination_channel_on_hold ?destination_channel_var)
+        (origin_agent_ready ?originating_agent_var)
+        (not
+          (beneficiary_agent_ready ?beneficiary_agent_var)
+        )
+        (settlement_message_available ?settlement_message_var)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message_var)
+        (message_bound_to_origin_channel ?settlement_message_var ?origin_channel_var)
+        (message_bound_to_destination_channel ?settlement_message_var ?destination_channel_var)
+        (settlement_message_destination_exception_flagged ?settlement_message_var)
+        (not
+          (settlement_message_available ?settlement_message_var)
+        )
+      )
+  )
+  (:action compose_settlement_message_with_both_holds
+    :parameters (?originating_agent_var - originating_agent ?beneficiary_agent_var - beneficiary_agent ?origin_channel_var - origin_channel ?destination_channel_var - destination_channel ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (origin_channel_assigned ?originating_agent_var ?origin_channel_var)
+        (destination_channel_assigned ?beneficiary_agent_var ?destination_channel_var)
+        (origin_channel_on_hold ?origin_channel_var)
+        (destination_channel_on_hold ?destination_channel_var)
+        (not
+          (origin_agent_ready ?originating_agent_var)
+        )
+        (not
+          (beneficiary_agent_ready ?beneficiary_agent_var)
+        )
+        (settlement_message_available ?settlement_message_var)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message_var)
+        (message_bound_to_origin_channel ?settlement_message_var ?origin_channel_var)
+        (message_bound_to_destination_channel ?settlement_message_var ?destination_channel_var)
+        (settlement_message_origin_exception_flagged ?settlement_message_var)
+        (settlement_message_destination_exception_flagged ?settlement_message_var)
+        (not
+          (settlement_message_available ?settlement_message_var)
+        )
+      )
+  )
+  (:action authorize_settlement_message
+    :parameters (?settlement_message_var - settlement_message ?originating_agent_var - originating_agent ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (settlement_message_composed ?settlement_message_var)
+        (origin_context_locked ?originating_agent_var)
+        (screening_service_assigned ?originating_agent_var ?compliance_screening_service_var)
+        (not
+          (settlement_message_authorized ?settlement_message_var)
+        )
+      )
+    :effect (settlement_message_authorized ?settlement_message_var)
+  )
+  (:action stage_settlement_file
+    :parameters (?settlement_processor_var - settlement_processor ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (processor_bound_to_settlement_message ?settlement_processor_var ?settlement_message_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_available ?settlement_file_var)
+        (settlement_message_composed ?settlement_message_var)
+        (settlement_message_authorized ?settlement_message_var)
+        (not
+          (settlement_file_staged ?settlement_file_var)
+        )
+      )
+    :effect
+      (and
+        (settlement_file_staged ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (not
+          (settlement_file_available ?settlement_file_var)
+        )
+      )
+  )
+  (:action validate_settlement_file
+    :parameters (?settlement_processor_var - settlement_processor ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_staged ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (screening_service_assigned ?settlement_processor_var ?compliance_screening_service_var)
+        (not
+          (settlement_message_origin_exception_flagged ?settlement_message_var)
+        )
+        (not
+          (processor_work_started ?settlement_processor_var)
+        )
+      )
+    :effect (processor_work_started ?settlement_processor_var)
+  )
+  (:action assign_service_parameter_to_processor
+    :parameters (?settlement_processor_var - settlement_processor ?service_parameter_var - service_parameter)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (service_parameter_available ?service_parameter_var)
+        (not
+          (service_parameter_bound ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (service_parameter_bound ?settlement_processor_var)
+        (processor_bound_to_service_parameter ?settlement_processor_var ?service_parameter_var)
+        (not
+          (service_parameter_available ?service_parameter_var)
+        )
+      )
+  )
+  (:action validate_processor_configuration
+    :parameters (?settlement_processor_var - settlement_processor ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message ?compliance_screening_service_var - compliance_screening_service ?service_parameter_var - service_parameter)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_staged ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (screening_service_assigned ?settlement_processor_var ?compliance_screening_service_var)
+        (settlement_message_origin_exception_flagged ?settlement_message_var)
+        (service_parameter_bound ?settlement_processor_var)
+        (processor_bound_to_service_parameter ?settlement_processor_var ?service_parameter_var)
+        (not
+          (processor_work_started ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (processor_work_started ?settlement_processor_var)
+        (processor_configuration_validated ?settlement_processor_var)
+      )
+  )
+  (:action progress_reconciliation_without_destination_exception
+    :parameters (?settlement_processor_var - settlement_processor ?configuration_parameter_var - configuration_parameter ?funding_source_var - funding_source ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (processor_work_started ?settlement_processor_var)
+        (processor_bound_to_configuration_parameter ?settlement_processor_var ?configuration_parameter_var)
+        (bound_to_funding_source ?settlement_processor_var ?funding_source_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (not
+          (settlement_message_destination_exception_flagged ?settlement_message_var)
+        )
+        (not
+          (reconciliation_ready ?settlement_processor_var)
+        )
+      )
+    :effect (reconciliation_ready ?settlement_processor_var)
+  )
+  (:action progress_reconciliation_with_destination_exception
+    :parameters (?settlement_processor_var - settlement_processor ?configuration_parameter_var - configuration_parameter ?funding_source_var - funding_source ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (processor_work_started ?settlement_processor_var)
+        (processor_bound_to_configuration_parameter ?settlement_processor_var ?configuration_parameter_var)
+        (bound_to_funding_source ?settlement_processor_var ?funding_source_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (settlement_message_destination_exception_flagged ?settlement_message_var)
+        (not
+          (reconciliation_ready ?settlement_processor_var)
+        )
+      )
+    :effect (reconciliation_ready ?settlement_processor_var)
+  )
+  (:action advance_exception_review_without_flagged_exceptions
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (reconciliation_ready ?settlement_processor_var)
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (not
+          (settlement_message_origin_exception_flagged ?settlement_message_var)
+        )
+        (not
+          (settlement_message_destination_exception_flagged ?settlement_message_var)
+        )
+        (not
+          (reconciliation_completed ?settlement_processor_var)
+        )
+      )
+    :effect (reconciliation_completed ?settlement_processor_var)
+  )
+  (:action advance_exception_review_with_origin_exception
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (reconciliation_ready ?settlement_processor_var)
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (settlement_message_origin_exception_flagged ?settlement_message_var)
+        (not
+          (settlement_message_destination_exception_flagged ?settlement_message_var)
+        )
+        (not
+          (reconciliation_completed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (exception_review_pending ?settlement_processor_var)
+      )
+  )
+  (:action advance_exception_review_with_destination_exception
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (reconciliation_ready ?settlement_processor_var)
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (not
+          (settlement_message_origin_exception_flagged ?settlement_message_var)
+        )
+        (settlement_message_destination_exception_flagged ?settlement_message_var)
+        (not
+          (reconciliation_completed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (exception_review_pending ?settlement_processor_var)
+      )
+  )
+  (:action advance_exception_review_with_both_exceptions
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy ?settlement_file_var - settlement_file ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (reconciliation_ready ?settlement_processor_var)
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (processor_bound_to_settlement_file ?settlement_processor_var ?settlement_file_var)
+        (settlement_file_contains_message ?settlement_file_var ?settlement_message_var)
+        (settlement_message_origin_exception_flagged ?settlement_message_var)
+        (settlement_message_destination_exception_flagged ?settlement_message_var)
+        (not
+          (reconciliation_completed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (exception_review_pending ?settlement_processor_var)
+      )
+  )
+  (:action close_processor_work_item
+    :parameters (?settlement_processor_var - settlement_processor)
+    :precondition
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (not
+          (exception_review_pending ?settlement_processor_var)
+        )
+        (not
+          (processor_closed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (processor_closed ?settlement_processor_var)
+        (entity_settlement_released ?settlement_processor_var)
+      )
+  )
+  (:action apply_authorization_token_to_processor
+    :parameters (?settlement_processor_var - settlement_processor ?authorization_token_var - authorization_token)
+    :precondition
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (exception_review_pending ?settlement_processor_var)
+        (authorization_token_available ?authorization_token_var)
+      )
+    :effect
+      (and
+        (processor_bound_to_authorization_token ?settlement_processor_var ?authorization_token_var)
+        (not
+          (authorization_token_available ?authorization_token_var)
+        )
+      )
+  )
+  (:action prepare_release_package
+    :parameters (?settlement_processor_var - settlement_processor ?originating_agent_var - originating_agent ?beneficiary_agent_var - beneficiary_agent ?compliance_screening_service_var - compliance_screening_service ?authorization_token_var - authorization_token)
+    :precondition
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (exception_review_pending ?settlement_processor_var)
+        (processor_bound_to_authorization_token ?settlement_processor_var ?authorization_token_var)
+        (processor_bound_to_origin_agent ?settlement_processor_var ?originating_agent_var)
+        (processor_bound_to_beneficiary_agent ?settlement_processor_var ?beneficiary_agent_var)
+        (origin_agent_ready ?originating_agent_var)
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+        (screening_service_assigned ?settlement_processor_var ?compliance_screening_service_var)
+        (not
+          (release_package_prepared ?settlement_processor_var)
+        )
+      )
+    :effect (release_package_prepared ?settlement_processor_var)
+  )
+  (:action close_processor_after_release_package
+    :parameters (?settlement_processor_var - settlement_processor)
+    :precondition
+      (and
+        (reconciliation_completed ?settlement_processor_var)
+        (release_package_prepared ?settlement_processor_var)
+        (not
+          (processor_closed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (processor_closed ?settlement_processor_var)
+        (entity_settlement_released ?settlement_processor_var)
+      )
+  )
+  (:action register_external_reference
+    :parameters (?settlement_processor_var - settlement_processor ?external_reference_var - external_reference ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (ready_for_processing ?settlement_processor_var)
+        (screening_service_assigned ?settlement_processor_var ?compliance_screening_service_var)
+        (external_reference_available ?external_reference_var)
+        (processor_bound_to_external_reference ?settlement_processor_var ?external_reference_var)
+        (not
+          (external_reference_registered ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (external_reference_registered ?settlement_processor_var)
+        (not
+          (external_reference_available ?external_reference_var)
+        )
+      )
+  )
+  (:action acknowledge_settlement_reference
+    :parameters (?settlement_processor_var - settlement_processor ?funding_source_var - funding_source)
+    :precondition
+      (and
+        (external_reference_registered ?settlement_processor_var)
+        (bound_to_funding_source ?settlement_processor_var ?funding_source_var)
+        (not
+          (external_reference_acknowledged ?settlement_processor_var)
+        )
+      )
+    :effect (external_reference_acknowledged ?settlement_processor_var)
+  )
+  (:action approve_escalation_review
+    :parameters (?settlement_processor_var - settlement_processor ?escalation_policy_var - escalation_policy)
+    :precondition
+      (and
+        (external_reference_acknowledged ?settlement_processor_var)
+        (processor_bound_to_escalation_policy ?settlement_processor_var ?escalation_policy_var)
+        (not
+          (clearance_approved ?settlement_processor_var)
+        )
+      )
+    :effect (clearance_approved ?settlement_processor_var)
+  )
+  (:action complete_processor_clearance
+    :parameters (?settlement_processor_var - settlement_processor)
+    :precondition
+      (and
+        (clearance_approved ?settlement_processor_var)
+        (not
+          (processor_closed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (processor_closed ?settlement_processor_var)
+        (entity_settlement_released ?settlement_processor_var)
+      )
+  )
+  (:action release_originating_agent
+    :parameters (?originating_agent_var - originating_agent ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (origin_context_locked ?originating_agent_var)
+        (origin_agent_ready ?originating_agent_var)
+        (settlement_message_composed ?settlement_message_var)
+        (settlement_message_authorized ?settlement_message_var)
+        (not
+          (entity_settlement_released ?originating_agent_var)
+        )
+      )
+    :effect (entity_settlement_released ?originating_agent_var)
+  )
+  (:action release_beneficiary_agent
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?settlement_message_var - settlement_message)
+    :precondition
+      (and
+        (beneficiary_context_locked ?beneficiary_agent_var)
+        (beneficiary_agent_ready ?beneficiary_agent_var)
+        (settlement_message_composed ?settlement_message_var)
+        (settlement_message_authorized ?settlement_message_var)
+        (not
+          (entity_settlement_released ?beneficiary_agent_var)
+        )
+      )
+    :effect (entity_settlement_released ?beneficiary_agent_var)
+  )
+  (:action attach_duplicate_check_record_to_instruction
+    :parameters (?payment_instruction_var - payment_instruction ?duplicate_check_record_var - duplicate_check_record ?compliance_screening_service_var - compliance_screening_service)
+    :precondition
+      (and
+        (entity_settlement_released ?payment_instruction_var)
+        (screening_service_assigned ?payment_instruction_var ?compliance_screening_service_var)
+        (duplicate_check_record_available ?duplicate_check_record_var)
+        (not
+          (duplicate_control_applied ?payment_instruction_var)
+        )
+      )
+    :effect
+      (and
+        (duplicate_control_applied ?payment_instruction_var)
+        (bound_to_duplicate_check_record ?payment_instruction_var ?duplicate_check_record_var)
+        (not
+          (duplicate_check_record_available ?duplicate_check_record_var)
+        )
+      )
+  )
+  (:action complete_originating_settlement
+    :parameters (?originating_agent_var - originating_agent ?settlement_route_option_var - settlement_route_option ?duplicate_check_record_var - duplicate_check_record)
+    :precondition
+      (and
+        (duplicate_control_applied ?originating_agent_var)
+        (bound_to_routing_option ?originating_agent_var ?settlement_route_option_var)
+        (bound_to_duplicate_check_record ?originating_agent_var ?duplicate_check_record_var)
+        (not
+          (settlement_completed ?originating_agent_var)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?originating_agent_var)
+        (routing_option_available ?settlement_route_option_var)
+        (duplicate_check_record_available ?duplicate_check_record_var)
+      )
+  )
+  (:action complete_beneficiary_settlement
+    :parameters (?beneficiary_agent_var - beneficiary_agent ?settlement_route_option_var - settlement_route_option ?duplicate_check_record_var - duplicate_check_record)
+    :precondition
+      (and
+        (duplicate_control_applied ?beneficiary_agent_var)
+        (bound_to_routing_option ?beneficiary_agent_var ?settlement_route_option_var)
+        (bound_to_duplicate_check_record ?beneficiary_agent_var ?duplicate_check_record_var)
+        (not
+          (settlement_completed ?beneficiary_agent_var)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?beneficiary_agent_var)
+        (routing_option_available ?settlement_route_option_var)
+        (duplicate_check_record_available ?duplicate_check_record_var)
+      )
+  )
+  (:action complete_processor_settlement
+    :parameters (?settlement_processor_var - settlement_processor ?settlement_route_option_var - settlement_route_option ?duplicate_check_record_var - duplicate_check_record)
+    :precondition
+      (and
+        (duplicate_control_applied ?settlement_processor_var)
+        (bound_to_routing_option ?settlement_processor_var ?settlement_route_option_var)
+        (bound_to_duplicate_check_record ?settlement_processor_var ?duplicate_check_record_var)
+        (not
+          (settlement_completed ?settlement_processor_var)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?settlement_processor_var)
+        (routing_option_available ?settlement_route_option_var)
+        (duplicate_check_record_available ?duplicate_check_record_var)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem duplicate_payment_prevention_problem)
+  (:domain finance_payments_settlement_duplicate_payment_prevention)
+  (:objects originating_agent_instance - originating_agent beneficiary_agent_instance - beneficiary_agent settlement_processor_primary_instance - settlement_processor settlement_processor_secondary_instance - settlement_processor primary_settlement_route_instance - settlement_route_option secondary_settlement_route_instance - settlement_route_option fallback_settlement_route_instance - settlement_route_option compliance_screening_service_instance - compliance_screening_service funding_source_instance - funding_source remediation_resource_instance - remediation_resource origin_channel_instance - origin_channel destination_channel_instance - destination_channel settlement_message_instance - settlement_message settlement_file_primary_instance - settlement_file settlement_file_secondary_instance - settlement_file service_parameter_primary_instance - service_parameter service_parameter_secondary_instance - service_parameter authorization_token_primary_instance - authorization_token authorization_token_secondary_instance - authorization_token duplicate_check_record_instance - duplicate_check_record configuration_parameter_instance - configuration_parameter external_reference_primary_instance - external_reference external_reference_secondary_instance - external_reference escalation_policy_instance - escalation_policy)
+  (:init
+    (routing_option_available primary_settlement_route_instance)
+    (routing_option_available secondary_settlement_route_instance)
+    (routing_option_available fallback_settlement_route_instance)
+    (screening_service_available compliance_screening_service_instance)
+    (funding_source_available funding_source_instance)
+    (remediation_resource_available remediation_resource_instance)
+    (origin_channel_assigned originating_agent_instance origin_channel_instance)
+    (destination_channel_assigned beneficiary_agent_instance destination_channel_instance)
+    (settlement_message_available settlement_message_instance)
+    (settlement_file_available settlement_file_primary_instance)
+    (settlement_file_available settlement_file_secondary_instance)
+    (processor_bound_to_origin_agent settlement_processor_primary_instance originating_agent_instance)
+    (processor_bound_to_origin_agent settlement_processor_secondary_instance originating_agent_instance)
+    (processor_bound_to_beneficiary_agent settlement_processor_primary_instance beneficiary_agent_instance)
+    (processor_bound_to_beneficiary_agent settlement_processor_secondary_instance beneficiary_agent_instance)
+    (processor_bound_to_settlement_message settlement_processor_primary_instance settlement_message_instance)
+    (processor_bound_to_settlement_message settlement_processor_secondary_instance settlement_message_instance)
+    (processor_bound_to_settlement_file settlement_processor_primary_instance settlement_file_primary_instance)
+    (processor_bound_to_settlement_file settlement_processor_secondary_instance settlement_file_secondary_instance)
+    (service_parameter_available service_parameter_primary_instance)
+    (service_parameter_available service_parameter_secondary_instance)
+    (authorization_token_available authorization_token_primary_instance)
+    (authorization_token_available authorization_token_secondary_instance)
+    (duplicate_check_record_available duplicate_check_record_instance)
+    (configuration_parameter_available configuration_parameter_instance)
+    (external_reference_available external_reference_primary_instance)
+    (processor_bound_to_external_reference settlement_processor_primary_instance external_reference_primary_instance)
+    (processor_bound_to_external_reference settlement_processor_secondary_instance external_reference_secondary_instance)
+    (escalation_policy_available escalation_policy_instance)
+  )
+  (:goal
+    (and
+      (settlement_completed originating_agent_instance)
+      (settlement_completed beneficiary_agent_instance)
+      (settlement_completed settlement_processor_primary_instance)
+      (settlement_completed settlement_processor_secondary_instance)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(submit_payment_instruction originating_agent_instance)
+(allocate_settlement_route_to_instruction originating_agent_instance primary_settlement_route_instance)
+(assign_screening_service_to_instruction originating_agent_instance compliance_screening_service_instance)
+(approve_payment_instruction_for_processing originating_agent_instance compliance_screening_service_instance)
+(reserve_origin_channel_for_instruction originating_agent_instance origin_channel_instance compliance_screening_service_instance)
+(bind_funding_source_to_instruction originating_agent_instance funding_source_instance)
+(commit_origin_settlement_context originating_agent_instance origin_channel_instance funding_source_instance)
+(release_screening_service_from_instruction originating_agent_instance compliance_screening_service_instance)
+(release_funding_source_from_instruction originating_agent_instance funding_source_instance)
+(submit_payment_instruction beneficiary_agent_instance)
+(allocate_settlement_route_to_instruction beneficiary_agent_instance secondary_settlement_route_instance)
+(assign_screening_service_to_instruction beneficiary_agent_instance compliance_screening_service_instance)
+(approve_payment_instruction_for_processing beneficiary_agent_instance compliance_screening_service_instance)
+(reserve_destination_channel_for_instruction beneficiary_agent_instance destination_channel_instance compliance_screening_service_instance)
+(bind_funding_source_to_instruction beneficiary_agent_instance funding_source_instance)
+(commit_destination_settlement_context beneficiary_agent_instance destination_channel_instance funding_source_instance)
+(release_screening_service_from_instruction beneficiary_agent_instance compliance_screening_service_instance)
+(compose_settlement_message originating_agent_instance beneficiary_agent_instance origin_channel_instance destination_channel_instance settlement_message_instance)
+(assign_screening_service_to_instruction originating_agent_instance compliance_screening_service_instance)
+(authorize_settlement_message settlement_message_instance originating_agent_instance compliance_screening_service_instance)
+(release_originating_agent originating_agent_instance settlement_message_instance)
+(release_beneficiary_agent beneficiary_agent_instance settlement_message_instance)
+(release_screening_service_from_instruction originating_agent_instance compliance_screening_service_instance)
+(release_funding_source_from_instruction beneficiary_agent_instance funding_source_instance)
+(submit_payment_instruction settlement_processor_primary_instance)
+(allocate_settlement_route_to_instruction settlement_processor_primary_instance fallback_settlement_route_instance)
+(assign_screening_service_to_instruction settlement_processor_primary_instance compliance_screening_service_instance)
+(approve_payment_instruction_for_processing settlement_processor_primary_instance compliance_screening_service_instance)
+(stage_settlement_file settlement_processor_primary_instance settlement_file_primary_instance settlement_message_instance)
+(validate_settlement_file settlement_processor_primary_instance settlement_file_primary_instance settlement_message_instance compliance_screening_service_instance)
+(assign_configuration_parameter_to_processor settlement_processor_primary_instance configuration_parameter_instance)
+(bind_funding_source_to_instruction settlement_processor_primary_instance funding_source_instance)
+(progress_reconciliation_without_destination_exception settlement_processor_primary_instance configuration_parameter_instance funding_source_instance settlement_file_primary_instance settlement_message_instance)
+(assign_escalation_policy_to_processor settlement_processor_primary_instance escalation_policy_instance)
+(advance_exception_review_without_flagged_exceptions settlement_processor_primary_instance escalation_policy_instance settlement_file_primary_instance settlement_message_instance)
+(close_processor_work_item settlement_processor_primary_instance)
+(release_screening_service_from_instruction settlement_processor_primary_instance compliance_screening_service_instance)
+(release_configuration_parameter_from_processor settlement_processor_primary_instance configuration_parameter_instance)
+(release_escalation_policy_from_processor settlement_processor_primary_instance escalation_policy_instance)
+(release_funding_source_from_instruction settlement_processor_primary_instance funding_source_instance)
+(assign_screening_service_to_instruction settlement_processor_primary_instance compliance_screening_service_instance)
+(attach_duplicate_check_record_to_instruction settlement_processor_primary_instance duplicate_check_record_instance compliance_screening_service_instance)
+(complete_processor_settlement settlement_processor_primary_instance fallback_settlement_route_instance duplicate_check_record_instance)
+(release_screening_service_from_instruction settlement_processor_primary_instance compliance_screening_service_instance)
+(submit_payment_instruction settlement_processor_secondary_instance)
+(allocate_settlement_route_to_instruction settlement_processor_secondary_instance fallback_settlement_route_instance)
+(assign_screening_service_to_instruction settlement_processor_secondary_instance compliance_screening_service_instance)
+(approve_payment_instruction_for_processing settlement_processor_secondary_instance compliance_screening_service_instance)
+(stage_settlement_file settlement_processor_secondary_instance settlement_file_secondary_instance settlement_message_instance)
+(validate_settlement_file settlement_processor_secondary_instance settlement_file_secondary_instance settlement_message_instance compliance_screening_service_instance)
+(assign_configuration_parameter_to_processor settlement_processor_secondary_instance configuration_parameter_instance)
+(bind_funding_source_to_instruction settlement_processor_secondary_instance funding_source_instance)
+(progress_reconciliation_without_destination_exception settlement_processor_secondary_instance configuration_parameter_instance funding_source_instance settlement_file_secondary_instance settlement_message_instance)
+(assign_escalation_policy_to_processor settlement_processor_secondary_instance escalation_policy_instance)
+(advance_exception_review_without_flagged_exceptions settlement_processor_secondary_instance escalation_policy_instance settlement_file_secondary_instance settlement_message_instance)
+(close_processor_work_item settlement_processor_secondary_instance)
+(release_screening_service_from_instruction settlement_processor_secondary_instance compliance_screening_service_instance)
+(release_configuration_parameter_from_processor settlement_processor_secondary_instance configuration_parameter_instance)
+(release_escalation_policy_from_processor settlement_processor_secondary_instance escalation_policy_instance)
+(release_funding_source_from_instruction settlement_processor_secondary_instance funding_source_instance)
+(assign_screening_service_to_instruction settlement_processor_secondary_instance compliance_screening_service_instance)
+(attach_duplicate_check_record_to_instruction settlement_processor_secondary_instance duplicate_check_record_instance compliance_screening_service_instance)
+(complete_processor_settlement settlement_processor_secondary_instance fallback_settlement_route_instance duplicate_check_record_instance)
+(release_screening_service_from_instruction settlement_processor_secondary_instance compliance_screening_service_instance)
+(assign_screening_service_to_instruction originating_agent_instance compliance_screening_service_instance)
+(attach_duplicate_check_record_to_instruction originating_agent_instance duplicate_check_record_instance compliance_screening_service_instance)
+(complete_originating_settlement originating_agent_instance primary_settlement_route_instance duplicate_check_record_instance)
+(release_screening_service_from_instruction originating_agent_instance compliance_screening_service_instance)
+(assign_screening_service_to_instruction beneficiary_agent_instance compliance_screening_service_instance)
+(attach_duplicate_check_record_to_instruction beneficiary_agent_instance duplicate_check_record_instance compliance_screening_service_instance)
+(complete_beneficiary_settlement beneficiary_agent_instance secondary_settlement_route_instance duplicate_check_record_instance)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_r79ux5po/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 71 
+
+Successful plans:
+Value: 71
+ /tmp/val_r79ux5po/plan.pddl 71 
+
+
+
+--- stderr ---
+

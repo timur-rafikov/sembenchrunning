@@ -37,6 +37,31 @@ class InsufficientBalanceError(OpenRouterAPIError):
   """Недостаточно средств / кредитов на OpenRouter (HTTP 402)."""
 
 
+def extract_openrouter_usage_from_error_body(error_body: Any) -> Optional[Dict[str, Any]]:
+  """
+  Пытается извлечь объект usage из тела ошибки OpenRouter (иногда usage всё же приходит).
+  Рекурсивно смотрит верхний уровень, error.usage, вложенные data/response.
+  """
+  if error_body is None:
+    return None
+  if isinstance(error_body, dict):
+    u = error_body.get("usage")
+    if isinstance(u, dict) and u:
+      return dict(u)
+    err = error_body.get("error")
+    if isinstance(err, dict):
+      u2 = err.get("usage")
+      if isinstance(u2, dict) and u2:
+        return dict(u2)
+    for k in ("data", "response", "body"):
+      sub = error_body.get(k)
+      if isinstance(sub, dict):
+        got = extract_openrouter_usage_from_error_body(sub)
+        if got:
+          return got
+  return None
+
+
 def _extract_choice_error_info(response_json: Any) -> Optional[Dict[str, Any]]:
   """Извлекает ошибку провайдера из envelope OpenRouter choices[0].error."""
   if not isinstance(response_json, dict):
@@ -96,6 +121,37 @@ def load_openrouter_settings(cfg: Dict[str, Any]) -> OpenRouterSettings:
     max_retries=int(o.get("max_retries", 3)),
     retry_backoff_seconds=float(o.get("retry_backoff_seconds", 2.0)),
   )
+
+
+def chat_completion_body_model_fields(model_cfg: Dict[str, Any]) -> Dict[str, Any]:
+  """
+  Поля тела chat/completions из model_cfg (без messages) — то же, что уходит в HTTP из generate_plan.
+  Используется и для запроса, и для openrouter_request в логах.
+  """
+  out: Dict[str, Any] = {"model": model_cfg["model"]}
+  max_tokens = model_cfg.get("max_output_tokens")
+  if max_tokens is not None:
+    mt = int(max_tokens)
+    out["max_tokens"] = mt
+    out["max_output_tokens"] = mt
+  temperature = model_cfg.get("temperature")
+  if temperature is not None:
+    out["temperature"] = float(temperature)
+  reasoning = model_cfg.get("reasoning")
+  if reasoning is not None:
+    if isinstance(reasoning, str):
+      out["reasoning"] = {"effort": reasoning}
+    else:
+      out["reasoning"] = reasoning
+  return out
+
+
+def openrouter_request_snapshot_from_model_cfg(model_cfg: Dict[str, Any]) -> Dict[str, Any]:
+  """
+  Сериализуемый снимок параметров, уходящих в тело chat/completions (для логов run JSON).
+  Совпадает с фактическим телом запроса (кроме messages и extra_params). Без секретов.
+  """
+  return dict(chat_completion_body_model_fields(model_cfg))
 
 
 def get_model_config(cfg: Dict[str, Any], model_name: str) -> Dict[str, Any]:
@@ -164,7 +220,6 @@ class OpenRouterClient:
     и возвращает JSON‑ответ OpenRouter.
     """
     body: Dict[str, Any] = {
-      "model": model_cfg["model"],
       "messages": [
         {
           "role": "user",
@@ -172,26 +227,7 @@ class OpenRouterClient:
         }
       ],
     }
-
-    # OpenRouter supports OpenAI-style Chat Completions (max_tokens) but some providers/models
-    # use the newer Responses-style naming (max_output_tokens). We send both for compatibility.
-    max_tokens = model_cfg.get("max_output_tokens")
-    if max_tokens is not None:
-      body["max_tokens"] = int(max_tokens)
-      body["max_output_tokens"] = int(max_tokens)
-
-    temperature = model_cfg.get("temperature")
-    if temperature is not None:
-      body["temperature"] = float(temperature)
-
-    reasoning = model_cfg.get("reasoning")
-    if reasoning is not None:
-      # OpenRouter expects an object for reasoning (e.g., {"effort": "high"}).
-      # Allow legacy shorthand strings like "high".
-      if isinstance(reasoning, str):
-        body["reasoning"] = {"effort": reasoning}
-      else:
-        body["reasoning"] = reasoning
+    body.update(chat_completion_body_model_fields(model_cfg))
 
     if extra_params:
       body.update(extra_params)

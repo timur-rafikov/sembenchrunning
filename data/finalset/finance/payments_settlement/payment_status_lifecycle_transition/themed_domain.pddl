@@ -1,0 +1,936 @@
+(define (domain finance_payments_settlement_lifecycle)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_category - object resource_category - object infrastructure_category - object payment_instruction_root - object payment_instruction - payment_instruction_root settlement_channel - actor_category validation_check - actor_category operator_role - actor_category clearing_preference - actor_category finalization_policy - actor_category approval_token - actor_category liquidity_resource - actor_category compliance_resource - actor_category exception_case - resource_category enrichment_artifact - resource_category external_approval - resource_category debtor_route - infrastructure_category creditor_route - infrastructure_category settlement_message - infrastructure_category initiating_instruction - payment_instruction instructing_instruction - payment_instruction originating_leg - initiating_instruction receiving_leg - initiating_instruction processing_unit - instructing_instruction)
+  (:predicates
+    (component_registered ?payment_instruction - payment_instruction)
+    (component_validated ?payment_instruction - payment_instruction)
+    (component_channel_reserved ?payment_instruction - payment_instruction)
+    (component_settlement_executed ?payment_instruction - payment_instruction)
+    (component_final_outcome_recorded ?payment_instruction - payment_instruction)
+    (component_authorized ?payment_instruction - payment_instruction)
+    (channel_available ?settlement_channel - settlement_channel)
+    (component_assigned_channel ?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    (validation_check_available ?validation_check - validation_check)
+    (component_assigned_validation ?payment_instruction - payment_instruction ?validation_check - validation_check)
+    (operator_available ?operator_role - operator_role)
+    (component_assigned_operator ?payment_instruction - payment_instruction ?operator_role - operator_role)
+    (exception_case_available ?exception_case - exception_case)
+    (originating_leg_assigned_exception_case ?originating_leg - originating_leg ?exception_case - exception_case)
+    (receiving_leg_assigned_exception_case ?receiving_leg - receiving_leg ?exception_case - exception_case)
+    (originating_leg_debtor_route_binding ?originating_leg - originating_leg ?debtor_route - debtor_route)
+    (debtor_route_ready ?debtor_route - debtor_route)
+    (debtor_route_exception_flag ?debtor_route - debtor_route)
+    (originating_leg_routing_confirmed ?originating_leg - originating_leg)
+    (receiving_leg_creditor_route_binding ?receiving_leg - receiving_leg ?creditor_route - creditor_route)
+    (creditor_route_ready ?creditor_route - creditor_route)
+    (creditor_route_exception_flag ?creditor_route - creditor_route)
+    (receiving_leg_routing_confirmed ?receiving_leg - receiving_leg)
+    (settlement_message_template_available ?settlement_message - settlement_message)
+    (settlement_message_assembled ?settlement_message - settlement_message)
+    (message_bound_to_debtor_route ?settlement_message - settlement_message ?debtor_route - debtor_route)
+    (message_bound_to_creditor_route ?settlement_message - settlement_message ?creditor_route - creditor_route)
+    (settlement_message_debtor_confirmation_required ?settlement_message - settlement_message)
+    (settlement_message_creditor_confirmation_required ?settlement_message - settlement_message)
+    (settlement_message_dispatched ?settlement_message - settlement_message)
+    (processing_unit_includes_originating_leg ?processing_unit - processing_unit ?originating_leg - originating_leg)
+    (processing_unit_includes_receiving_leg ?processing_unit - processing_unit ?receiving_leg - receiving_leg)
+    (processing_unit_has_message ?processing_unit - processing_unit ?settlement_message - settlement_message)
+    (enrichment_artifact_available ?enrichment_artifact - enrichment_artifact)
+    (processing_unit_has_enrichment_artifact ?processing_unit - processing_unit ?enrichment_artifact - enrichment_artifact)
+    (enrichment_artifact_consumed ?enrichment_artifact - enrichment_artifact)
+    (enrichment_artifact_attached_to_message ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    (processing_unit_enrichment_committed ?processing_unit - processing_unit)
+    (processing_unit_liquidity_bound ?processing_unit - processing_unit)
+    (processing_unit_ready_for_finalization ?processing_unit - processing_unit)
+    (processing_unit_clearing_preference_reserved ?processing_unit - processing_unit)
+    (processing_unit_clearing_preference_applied ?processing_unit - processing_unit)
+    (processing_unit_external_approval_attached ?processing_unit - processing_unit)
+    (processing_unit_final_checks_passed ?processing_unit - processing_unit)
+    (external_approval_available ?external_approval - external_approval)
+    (processing_unit_has_external_approval ?processing_unit - processing_unit ?external_approval - external_approval)
+    (processing_unit_external_approval_requested ?processing_unit - processing_unit)
+    (processing_unit_external_approval_in_progress ?processing_unit - processing_unit)
+    (processing_unit_compliance_attested ?processing_unit - processing_unit)
+    (clearing_preference_available ?clearing_preference - clearing_preference)
+    (processing_unit_has_clearing_preference ?processing_unit - processing_unit ?clearing_preference - clearing_preference)
+    (finalization_policy_available ?finalization_policy - finalization_policy)
+    (processing_unit_has_finalization_policy ?processing_unit - processing_unit ?finalization_policy - finalization_policy)
+    (liquidity_resource_available ?liquidity_resource - liquidity_resource)
+    (processing_unit_assigned_liquidity ?processing_unit - processing_unit ?liquidity_resource - liquidity_resource)
+    (compliance_resource_available ?compliance_resource - compliance_resource)
+    (processing_unit_assigned_compliance_resource ?processing_unit - processing_unit ?compliance_resource - compliance_resource)
+    (approval_token_available ?approval_token - approval_token)
+    (component_assigned_approval_token ?payment_instruction - payment_instruction ?approval_token - approval_token)
+    (originating_leg_ready ?originating_leg - originating_leg)
+    (receiving_leg_ready ?receiving_leg - receiving_leg)
+    (processing_unit_finalized_marker ?processing_unit - processing_unit)
+  )
+  (:action register_payment_instruction
+    :parameters (?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (component_registered ?payment_instruction)
+        )
+        (not
+          (component_settlement_executed ?payment_instruction)
+        )
+      )
+    :effect (component_registered ?payment_instruction)
+  )
+  (:action reserve_settlement_channel_for_instruction
+    :parameters (?payment_instruction - payment_instruction ?settlement_channel - settlement_channel)
+    :precondition
+      (and
+        (component_registered ?payment_instruction)
+        (not
+          (component_channel_reserved ?payment_instruction)
+        )
+        (channel_available ?settlement_channel)
+      )
+    :effect
+      (and
+        (component_channel_reserved ?payment_instruction)
+        (component_assigned_channel ?payment_instruction ?settlement_channel)
+        (not
+          (channel_available ?settlement_channel)
+        )
+      )
+  )
+  (:action assign_validation_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_registered ?payment_instruction)
+        (component_channel_reserved ?payment_instruction)
+        (validation_check_available ?validation_check)
+      )
+    :effect
+      (and
+        (component_assigned_validation ?payment_instruction ?validation_check)
+        (not
+          (validation_check_available ?validation_check)
+        )
+      )
+  )
+  (:action mark_instruction_validated
+    :parameters (?payment_instruction - payment_instruction ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_registered ?payment_instruction)
+        (component_channel_reserved ?payment_instruction)
+        (component_assigned_validation ?payment_instruction ?validation_check)
+        (not
+          (component_validated ?payment_instruction)
+        )
+      )
+    :effect (component_validated ?payment_instruction)
+  )
+  (:action release_validation_from_instruction
+    :parameters (?payment_instruction - payment_instruction ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_assigned_validation ?payment_instruction ?validation_check)
+      )
+    :effect
+      (and
+        (validation_check_available ?validation_check)
+        (not
+          (component_assigned_validation ?payment_instruction ?validation_check)
+        )
+      )
+  )
+  (:action assign_operator_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?operator_role - operator_role)
+    :precondition
+      (and
+        (component_validated ?payment_instruction)
+        (operator_available ?operator_role)
+      )
+    :effect
+      (and
+        (component_assigned_operator ?payment_instruction ?operator_role)
+        (not
+          (operator_available ?operator_role)
+        )
+      )
+  )
+  (:action release_operator_from_instruction
+    :parameters (?payment_instruction - payment_instruction ?operator_role - operator_role)
+    :precondition
+      (and
+        (component_assigned_operator ?payment_instruction ?operator_role)
+      )
+    :effect
+      (and
+        (operator_available ?operator_role)
+        (not
+          (component_assigned_operator ?payment_instruction ?operator_role)
+        )
+      )
+  )
+  (:action assign_liquidity_to_processing_unit
+    :parameters (?processing_unit - processing_unit ?liquidity_resource - liquidity_resource)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (liquidity_resource_available ?liquidity_resource)
+      )
+    :effect
+      (and
+        (processing_unit_assigned_liquidity ?processing_unit ?liquidity_resource)
+        (not
+          (liquidity_resource_available ?liquidity_resource)
+        )
+      )
+  )
+  (:action release_liquidity_from_processing_unit
+    :parameters (?processing_unit - processing_unit ?liquidity_resource - liquidity_resource)
+    :precondition
+      (and
+        (processing_unit_assigned_liquidity ?processing_unit ?liquidity_resource)
+      )
+    :effect
+      (and
+        (liquidity_resource_available ?liquidity_resource)
+        (not
+          (processing_unit_assigned_liquidity ?processing_unit ?liquidity_resource)
+        )
+      )
+  )
+  (:action assign_compliance_resource_to_processing_unit
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (compliance_resource_available ?compliance_resource)
+      )
+    :effect
+      (and
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (not
+          (compliance_resource_available ?compliance_resource)
+        )
+      )
+  )
+  (:action release_compliance_resource_from_processing_unit
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource)
+    :precondition
+      (and
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+      )
+    :effect
+      (and
+        (compliance_resource_available ?compliance_resource)
+        (not
+          (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        )
+      )
+  )
+  (:action confirm_debtor_route_for_originating_leg
+    :parameters (?originating_leg - originating_leg ?debtor_route - debtor_route ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_validated ?originating_leg)
+        (component_assigned_validation ?originating_leg ?validation_check)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (not
+          (debtor_route_ready ?debtor_route)
+        )
+        (not
+          (debtor_route_exception_flag ?debtor_route)
+        )
+      )
+    :effect (debtor_route_ready ?debtor_route)
+  )
+  (:action reserve_originating_leg_route_with_operator
+    :parameters (?originating_leg - originating_leg ?debtor_route - debtor_route ?operator_role - operator_role)
+    :precondition
+      (and
+        (component_validated ?originating_leg)
+        (component_assigned_operator ?originating_leg ?operator_role)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (debtor_route_ready ?debtor_route)
+        (not
+          (originating_leg_ready ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (originating_leg_ready ?originating_leg)
+        (originating_leg_routing_confirmed ?originating_leg)
+      )
+  )
+  (:action assign_exception_case_to_originating_leg
+    :parameters (?originating_leg - originating_leg ?debtor_route - debtor_route ?exception_case - exception_case)
+    :precondition
+      (and
+        (component_validated ?originating_leg)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (exception_case_available ?exception_case)
+        (not
+          (originating_leg_ready ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (debtor_route_exception_flag ?debtor_route)
+        (originating_leg_ready ?originating_leg)
+        (originating_leg_assigned_exception_case ?originating_leg ?exception_case)
+        (not
+          (exception_case_available ?exception_case)
+        )
+      )
+  )
+  (:action resolve_originating_leg_exception
+    :parameters (?originating_leg - originating_leg ?debtor_route - debtor_route ?validation_check - validation_check ?exception_case - exception_case)
+    :precondition
+      (and
+        (component_validated ?originating_leg)
+        (component_assigned_validation ?originating_leg ?validation_check)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (debtor_route_exception_flag ?debtor_route)
+        (originating_leg_assigned_exception_case ?originating_leg ?exception_case)
+        (not
+          (originating_leg_routing_confirmed ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (debtor_route_ready ?debtor_route)
+        (originating_leg_routing_confirmed ?originating_leg)
+        (exception_case_available ?exception_case)
+        (not
+          (originating_leg_assigned_exception_case ?originating_leg ?exception_case)
+        )
+      )
+  )
+  (:action confirm_creditor_route_for_receiving_leg
+    :parameters (?receiving_leg - receiving_leg ?creditor_route - creditor_route ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_validated ?receiving_leg)
+        (component_assigned_validation ?receiving_leg ?validation_check)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (not
+          (creditor_route_ready ?creditor_route)
+        )
+        (not
+          (creditor_route_exception_flag ?creditor_route)
+        )
+      )
+    :effect (creditor_route_ready ?creditor_route)
+  )
+  (:action reserve_receiving_leg_route_with_operator
+    :parameters (?receiving_leg - receiving_leg ?creditor_route - creditor_route ?operator_role - operator_role)
+    :precondition
+      (and
+        (component_validated ?receiving_leg)
+        (component_assigned_operator ?receiving_leg ?operator_role)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (creditor_route_ready ?creditor_route)
+        (not
+          (receiving_leg_ready ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (receiving_leg_ready ?receiving_leg)
+        (receiving_leg_routing_confirmed ?receiving_leg)
+      )
+  )
+  (:action assign_exception_case_to_receiving_leg
+    :parameters (?receiving_leg - receiving_leg ?creditor_route - creditor_route ?exception_case - exception_case)
+    :precondition
+      (and
+        (component_validated ?receiving_leg)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (exception_case_available ?exception_case)
+        (not
+          (receiving_leg_ready ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (creditor_route_exception_flag ?creditor_route)
+        (receiving_leg_ready ?receiving_leg)
+        (receiving_leg_assigned_exception_case ?receiving_leg ?exception_case)
+        (not
+          (exception_case_available ?exception_case)
+        )
+      )
+  )
+  (:action resolve_receiving_leg_exception
+    :parameters (?receiving_leg - receiving_leg ?creditor_route - creditor_route ?validation_check - validation_check ?exception_case - exception_case)
+    :precondition
+      (and
+        (component_validated ?receiving_leg)
+        (component_assigned_validation ?receiving_leg ?validation_check)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (creditor_route_exception_flag ?creditor_route)
+        (receiving_leg_assigned_exception_case ?receiving_leg ?exception_case)
+        (not
+          (receiving_leg_routing_confirmed ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (creditor_route_ready ?creditor_route)
+        (receiving_leg_routing_confirmed ?receiving_leg)
+        (exception_case_available ?exception_case)
+        (not
+          (receiving_leg_assigned_exception_case ?receiving_leg ?exception_case)
+        )
+      )
+  )
+  (:action assemble_settlement_message_standard
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?debtor_route - debtor_route ?creditor_route - creditor_route ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_leg_ready ?originating_leg)
+        (receiving_leg_ready ?receiving_leg)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (debtor_route_ready ?debtor_route)
+        (creditor_route_ready ?creditor_route)
+        (originating_leg_routing_confirmed ?originating_leg)
+        (receiving_leg_routing_confirmed ?receiving_leg)
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_assembled ?settlement_message)
+        (message_bound_to_debtor_route ?settlement_message ?debtor_route)
+        (message_bound_to_creditor_route ?settlement_message ?creditor_route)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_debtor_confirmation
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?debtor_route - debtor_route ?creditor_route - creditor_route ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_leg_ready ?originating_leg)
+        (receiving_leg_ready ?receiving_leg)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (debtor_route_exception_flag ?debtor_route)
+        (creditor_route_ready ?creditor_route)
+        (not
+          (originating_leg_routing_confirmed ?originating_leg)
+        )
+        (receiving_leg_routing_confirmed ?receiving_leg)
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_assembled ?settlement_message)
+        (message_bound_to_debtor_route ?settlement_message ?debtor_route)
+        (message_bound_to_creditor_route ?settlement_message ?creditor_route)
+        (settlement_message_debtor_confirmation_required ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_creditor_confirmation
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?debtor_route - debtor_route ?creditor_route - creditor_route ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_leg_ready ?originating_leg)
+        (receiving_leg_ready ?receiving_leg)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (debtor_route_ready ?debtor_route)
+        (creditor_route_exception_flag ?creditor_route)
+        (originating_leg_routing_confirmed ?originating_leg)
+        (not
+          (receiving_leg_routing_confirmed ?receiving_leg)
+        )
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_assembled ?settlement_message)
+        (message_bound_to_debtor_route ?settlement_message ?debtor_route)
+        (message_bound_to_creditor_route ?settlement_message ?creditor_route)
+        (settlement_message_creditor_confirmation_required ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_both_confirmations
+    :parameters (?originating_leg - originating_leg ?receiving_leg - receiving_leg ?debtor_route - debtor_route ?creditor_route - creditor_route ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_leg_ready ?originating_leg)
+        (receiving_leg_ready ?receiving_leg)
+        (originating_leg_debtor_route_binding ?originating_leg ?debtor_route)
+        (receiving_leg_creditor_route_binding ?receiving_leg ?creditor_route)
+        (debtor_route_exception_flag ?debtor_route)
+        (creditor_route_exception_flag ?creditor_route)
+        (not
+          (originating_leg_routing_confirmed ?originating_leg)
+        )
+        (not
+          (receiving_leg_routing_confirmed ?receiving_leg)
+        )
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_assembled ?settlement_message)
+        (message_bound_to_debtor_route ?settlement_message ?debtor_route)
+        (message_bound_to_creditor_route ?settlement_message ?creditor_route)
+        (settlement_message_debtor_confirmation_required ?settlement_message)
+        (settlement_message_creditor_confirmation_required ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action mark_settlement_message_dispatched
+    :parameters (?settlement_message - settlement_message ?originating_leg - originating_leg ?validation_check - validation_check)
+    :precondition
+      (and
+        (settlement_message_assembled ?settlement_message)
+        (originating_leg_ready ?originating_leg)
+        (component_assigned_validation ?originating_leg ?validation_check)
+        (not
+          (settlement_message_dispatched ?settlement_message)
+        )
+      )
+    :effect (settlement_message_dispatched ?settlement_message)
+  )
+  (:action attach_enrichment_artifact_to_message
+    :parameters (?processing_unit - processing_unit ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (processing_unit_has_message ?processing_unit ?settlement_message)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_available ?enrichment_artifact)
+        (settlement_message_assembled ?settlement_message)
+        (settlement_message_dispatched ?settlement_message)
+        (not
+          (enrichment_artifact_consumed ?enrichment_artifact)
+        )
+      )
+    :effect
+      (and
+        (enrichment_artifact_consumed ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (not
+          (enrichment_artifact_available ?enrichment_artifact)
+        )
+      )
+  )
+  (:action commit_enrichment_to_processing_unit
+    :parameters (?processing_unit - processing_unit ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_consumed ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (component_assigned_validation ?processing_unit ?validation_check)
+        (not
+          (settlement_message_debtor_confirmation_required ?settlement_message)
+        )
+        (not
+          (processing_unit_enrichment_committed ?processing_unit)
+        )
+      )
+    :effect (processing_unit_enrichment_committed ?processing_unit)
+  )
+  (:action reserve_clearing_preference_for_processing_unit
+    :parameters (?processing_unit - processing_unit ?clearing_preference - clearing_preference)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (clearing_preference_available ?clearing_preference)
+        (not
+          (processing_unit_clearing_preference_reserved ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_clearing_preference_reserved ?processing_unit)
+        (processing_unit_has_clearing_preference ?processing_unit ?clearing_preference)
+        (not
+          (clearing_preference_available ?clearing_preference)
+        )
+      )
+  )
+  (:action apply_clearing_preference_during_enrichment
+    :parameters (?processing_unit - processing_unit ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message ?validation_check - validation_check ?clearing_preference - clearing_preference)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_consumed ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (component_assigned_validation ?processing_unit ?validation_check)
+        (settlement_message_debtor_confirmation_required ?settlement_message)
+        (processing_unit_clearing_preference_reserved ?processing_unit)
+        (processing_unit_has_clearing_preference ?processing_unit ?clearing_preference)
+        (not
+          (processing_unit_enrichment_committed ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_enrichment_committed ?processing_unit)
+        (processing_unit_clearing_preference_applied ?processing_unit)
+      )
+  )
+  (:action assign_liquidity_and_mark_processing_unit
+    :parameters (?processing_unit - processing_unit ?liquidity_resource - liquidity_resource ?operator_role - operator_role ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_enrichment_committed ?processing_unit)
+        (processing_unit_assigned_liquidity ?processing_unit ?liquidity_resource)
+        (component_assigned_operator ?processing_unit ?operator_role)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (not
+          (settlement_message_creditor_confirmation_required ?settlement_message)
+        )
+        (not
+          (processing_unit_liquidity_bound ?processing_unit)
+        )
+      )
+    :effect (processing_unit_liquidity_bound ?processing_unit)
+  )
+  (:action assign_liquidity_and_mark_processing_unit_confirmed
+    :parameters (?processing_unit - processing_unit ?liquidity_resource - liquidity_resource ?operator_role - operator_role ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_enrichment_committed ?processing_unit)
+        (processing_unit_assigned_liquidity ?processing_unit ?liquidity_resource)
+        (component_assigned_operator ?processing_unit ?operator_role)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (settlement_message_creditor_confirmation_required ?settlement_message)
+        (not
+          (processing_unit_liquidity_bound ?processing_unit)
+        )
+      )
+    :effect (processing_unit_liquidity_bound ?processing_unit)
+  )
+  (:action finalize_compliance_step_on_processing_unit
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_liquidity_bound ?processing_unit)
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (not
+          (settlement_message_debtor_confirmation_required ?settlement_message)
+        )
+        (not
+          (settlement_message_creditor_confirmation_required ?settlement_message)
+        )
+        (not
+          (processing_unit_ready_for_finalization ?processing_unit)
+        )
+      )
+    :effect (processing_unit_ready_for_finalization ?processing_unit)
+  )
+  (:action finalize_compliance_and_attach_external_approval
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_liquidity_bound ?processing_unit)
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (settlement_message_debtor_confirmation_required ?settlement_message)
+        (not
+          (settlement_message_creditor_confirmation_required ?settlement_message)
+        )
+        (not
+          (processing_unit_ready_for_finalization ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_external_approval_attached ?processing_unit)
+      )
+  )
+  (:action finalize_compliance_and_attach_external_approval_variant
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_liquidity_bound ?processing_unit)
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (not
+          (settlement_message_debtor_confirmation_required ?settlement_message)
+        )
+        (settlement_message_creditor_confirmation_required ?settlement_message)
+        (not
+          (processing_unit_ready_for_finalization ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_external_approval_attached ?processing_unit)
+      )
+  )
+  (:action finalize_compliance_and_attach_external_approval_all
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource ?enrichment_artifact - enrichment_artifact ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (processing_unit_liquidity_bound ?processing_unit)
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (processing_unit_has_enrichment_artifact ?processing_unit ?enrichment_artifact)
+        (enrichment_artifact_attached_to_message ?enrichment_artifact ?settlement_message)
+        (settlement_message_debtor_confirmation_required ?settlement_message)
+        (settlement_message_creditor_confirmation_required ?settlement_message)
+        (not
+          (processing_unit_ready_for_finalization ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_external_approval_attached ?processing_unit)
+      )
+  )
+  (:action finalize_processing_unit_minimal
+    :parameters (?processing_unit - processing_unit)
+    :precondition
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (not
+          (processing_unit_external_approval_attached ?processing_unit)
+        )
+        (not
+          (processing_unit_finalized_marker ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_finalized_marker ?processing_unit)
+        (component_final_outcome_recorded ?processing_unit)
+      )
+  )
+  (:action attach_finalization_policy_to_processing_unit
+    :parameters (?processing_unit - processing_unit ?finalization_policy - finalization_policy)
+    :precondition
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_external_approval_attached ?processing_unit)
+        (finalization_policy_available ?finalization_policy)
+      )
+    :effect
+      (and
+        (processing_unit_has_finalization_policy ?processing_unit ?finalization_policy)
+        (not
+          (finalization_policy_available ?finalization_policy)
+        )
+      )
+  )
+  (:action execute_final_checks_on_processing_unit
+    :parameters (?processing_unit - processing_unit ?originating_leg - originating_leg ?receiving_leg - receiving_leg ?validation_check - validation_check ?finalization_policy - finalization_policy)
+    :precondition
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_external_approval_attached ?processing_unit)
+        (processing_unit_has_finalization_policy ?processing_unit ?finalization_policy)
+        (processing_unit_includes_originating_leg ?processing_unit ?originating_leg)
+        (processing_unit_includes_receiving_leg ?processing_unit ?receiving_leg)
+        (originating_leg_routing_confirmed ?originating_leg)
+        (receiving_leg_routing_confirmed ?receiving_leg)
+        (component_assigned_validation ?processing_unit ?validation_check)
+        (not
+          (processing_unit_final_checks_passed ?processing_unit)
+        )
+      )
+    :effect (processing_unit_final_checks_passed ?processing_unit)
+  )
+  (:action finalize_processing_unit_after_checks
+    :parameters (?processing_unit - processing_unit)
+    :precondition
+      (and
+        (processing_unit_ready_for_finalization ?processing_unit)
+        (processing_unit_final_checks_passed ?processing_unit)
+        (not
+          (processing_unit_finalized_marker ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_finalized_marker ?processing_unit)
+        (component_final_outcome_recorded ?processing_unit)
+      )
+  )
+  (:action request_external_approval_for_processing_unit
+    :parameters (?processing_unit - processing_unit ?external_approval - external_approval ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_validated ?processing_unit)
+        (component_assigned_validation ?processing_unit ?validation_check)
+        (external_approval_available ?external_approval)
+        (processing_unit_has_external_approval ?processing_unit ?external_approval)
+        (not
+          (processing_unit_external_approval_requested ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_external_approval_requested ?processing_unit)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action process_external_approval_and_allocate_operator
+    :parameters (?processing_unit - processing_unit ?operator_role - operator_role)
+    :precondition
+      (and
+        (processing_unit_external_approval_requested ?processing_unit)
+        (component_assigned_operator ?processing_unit ?operator_role)
+        (not
+          (processing_unit_external_approval_in_progress ?processing_unit)
+        )
+      )
+    :effect (processing_unit_external_approval_in_progress ?processing_unit)
+  )
+  (:action acknowledge_external_approval_with_compliance
+    :parameters (?processing_unit - processing_unit ?compliance_resource - compliance_resource)
+    :precondition
+      (and
+        (processing_unit_external_approval_in_progress ?processing_unit)
+        (processing_unit_assigned_compliance_resource ?processing_unit ?compliance_resource)
+        (not
+          (processing_unit_compliance_attested ?processing_unit)
+        )
+      )
+    :effect (processing_unit_compliance_attested ?processing_unit)
+  )
+  (:action finalize_processing_unit_via_external_approval
+    :parameters (?processing_unit - processing_unit)
+    :precondition
+      (and
+        (processing_unit_compliance_attested ?processing_unit)
+        (not
+          (processing_unit_finalized_marker ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (processing_unit_finalized_marker ?processing_unit)
+        (component_final_outcome_recorded ?processing_unit)
+      )
+  )
+  (:action record_settlement_on_originating_leg
+    :parameters (?originating_leg - originating_leg ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (originating_leg_ready ?originating_leg)
+        (originating_leg_routing_confirmed ?originating_leg)
+        (settlement_message_assembled ?settlement_message)
+        (settlement_message_dispatched ?settlement_message)
+        (not
+          (component_final_outcome_recorded ?originating_leg)
+        )
+      )
+    :effect (component_final_outcome_recorded ?originating_leg)
+  )
+  (:action record_settlement_on_receiving_leg
+    :parameters (?receiving_leg - receiving_leg ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (receiving_leg_ready ?receiving_leg)
+        (receiving_leg_routing_confirmed ?receiving_leg)
+        (settlement_message_assembled ?settlement_message)
+        (settlement_message_dispatched ?settlement_message)
+        (not
+          (component_final_outcome_recorded ?receiving_leg)
+        )
+      )
+    :effect (component_final_outcome_recorded ?receiving_leg)
+  )
+  (:action apply_final_approval_token_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?approval_token - approval_token ?validation_check - validation_check)
+    :precondition
+      (and
+        (component_final_outcome_recorded ?payment_instruction)
+        (component_assigned_validation ?payment_instruction ?validation_check)
+        (approval_token_available ?approval_token)
+        (not
+          (component_authorized ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (component_authorized ?payment_instruction)
+        (component_assigned_approval_token ?payment_instruction ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action execute_settlement_on_originating_leg_and_release_resources
+    :parameters (?originating_leg - originating_leg ?settlement_channel - settlement_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_authorized ?originating_leg)
+        (component_assigned_channel ?originating_leg ?settlement_channel)
+        (component_assigned_approval_token ?originating_leg ?approval_token)
+        (not
+          (component_settlement_executed ?originating_leg)
+        )
+      )
+    :effect
+      (and
+        (component_settlement_executed ?originating_leg)
+        (channel_available ?settlement_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+  (:action execute_settlement_on_receiving_leg_and_release_resources
+    :parameters (?receiving_leg - receiving_leg ?settlement_channel - settlement_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_authorized ?receiving_leg)
+        (component_assigned_channel ?receiving_leg ?settlement_channel)
+        (component_assigned_approval_token ?receiving_leg ?approval_token)
+        (not
+          (component_settlement_executed ?receiving_leg)
+        )
+      )
+    :effect
+      (and
+        (component_settlement_executed ?receiving_leg)
+        (channel_available ?settlement_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+  (:action execute_settlement_on_processing_unit_and_release_resources
+    :parameters (?processing_unit - processing_unit ?settlement_channel - settlement_channel ?approval_token - approval_token)
+    :precondition
+      (and
+        (component_authorized ?processing_unit)
+        (component_assigned_channel ?processing_unit ?settlement_channel)
+        (component_assigned_approval_token ?processing_unit ?approval_token)
+        (not
+          (component_settlement_executed ?processing_unit)
+        )
+      )
+    :effect
+      (and
+        (component_settlement_executed ?processing_unit)
+        (channel_available ?settlement_channel)
+        (approval_token_available ?approval_token)
+      )
+  )
+)

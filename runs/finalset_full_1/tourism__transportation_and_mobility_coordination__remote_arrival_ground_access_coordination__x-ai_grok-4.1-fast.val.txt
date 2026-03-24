@@ -1,0 +1,1079 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain remote_arrival_ground_access_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object mobility_infrastructure - entity infrastructure_component - entity operational_asset - entity arrival_container - entity arrival_event - arrival_container operator_slot - mobility_infrastructure transport_mode_candidate - mobility_infrastructure local_provider - mobility_infrastructure preference_profile - mobility_infrastructure service_option - mobility_infrastructure timing_buffer - mobility_infrastructure vehicle_feature - mobility_infrastructure staff_assignment - mobility_infrastructure access_token - infrastructure_component boarding_area - infrastructure_component amenity_request - infrastructure_component pickup_location - operational_asset dropoff_location - operational_asset vehicle - operational_asset segment_base - arrival_event itinerary_base - arrival_event arrival_segment - segment_base onward_segment - segment_base guest_itinerary - itinerary_base)
+
+  (:predicates
+    (arrival_registered ?arrival_event - arrival_event)
+    (mode_confirmed ?arrival_event - arrival_event)
+    (operator_slot_reserved ?arrival_event - arrival_event)
+    (access_allocated_to_entity ?arrival_event - arrival_event)
+    (handoff_ready ?arrival_event - arrival_event)
+    (timing_buffer_reserved ?arrival_event - arrival_event)
+    (operator_slot_available ?operator_slot - operator_slot)
+    (operator_slot_assigned ?arrival_event - arrival_event ?operator_slot - operator_slot)
+    (mode_candidate_available ?transport_mode_candidate - transport_mode_candidate)
+    (assigned_mode_candidate ?arrival_event - arrival_event ?transport_mode_candidate - transport_mode_candidate)
+    (local_provider_available ?local_provider - local_provider)
+    (provider_assigned_to_event ?arrival_event - arrival_event ?local_provider - local_provider)
+    (access_token_available ?access_token - access_token)
+    (access_token_assigned_to_arrival_segment ?arrival_segment - arrival_segment ?access_token - access_token)
+    (access_token_assigned_to_onward_segment ?onward_segment - onward_segment ?access_token - access_token)
+    (segment_has_pickup_location ?arrival_segment - arrival_segment ?pickup_location - pickup_location)
+    (pickup_location_marked_ready ?pickup_location - pickup_location)
+    (pickup_location_reserved ?pickup_location - pickup_location)
+    (arrival_segment_pickup_confirmed ?arrival_segment - arrival_segment)
+    (onward_has_dropoff_location ?onward_segment - onward_segment ?dropoff_location - dropoff_location)
+    (dropoff_location_marked_ready ?dropoff_location - dropoff_location)
+    (dropoff_location_reserved ?dropoff_location - dropoff_location)
+    (onward_segment_ready ?onward_segment - onward_segment)
+    (vehicle_available ?vehicle - vehicle)
+    (vehicle_reserved ?vehicle - vehicle)
+    (vehicle_assigned_to_pickup_location ?vehicle - vehicle ?pickup_location - pickup_location)
+    (vehicle_assigned_to_dropoff_location ?vehicle - vehicle ?dropoff_location - dropoff_location)
+    (vehicle_ready_for_pickup ?vehicle - vehicle)
+    (vehicle_ready_for_dropoff ?vehicle - vehicle)
+    (vehicle_activated_for_transfer ?vehicle - vehicle)
+    (itinerary_linked_to_arrival_segment ?guest_itinerary - guest_itinerary ?arrival_segment - arrival_segment)
+    (itinerary_linked_to_onward_segment ?guest_itinerary - guest_itinerary ?onward_segment - onward_segment)
+    (itinerary_assigned_vehicle ?guest_itinerary - guest_itinerary ?vehicle - vehicle)
+    (boarding_area_available ?boarding_area - boarding_area)
+    (itinerary_assigned_boarding_area ?guest_itinerary - guest_itinerary ?boarding_area - boarding_area)
+    (boarding_area_reserved ?boarding_area - boarding_area)
+    (boarding_area_assigned_to_vehicle ?boarding_area - boarding_area ?vehicle - vehicle)
+    (itinerary_boarding_area_staged ?guest_itinerary - guest_itinerary)
+    (itinerary_boarding_checks_started ?guest_itinerary - guest_itinerary)
+    (boarding_checks_passed ?guest_itinerary - guest_itinerary)
+    (itinerary_preference_attached ?guest_itinerary - guest_itinerary)
+    (itinerary_preference_confirmed ?guest_itinerary - guest_itinerary)
+    (itinerary_checks_stage2_passed ?guest_itinerary - guest_itinerary)
+    (final_stage_checks_completed ?guest_itinerary - guest_itinerary)
+    (amenity_request_available ?amenity_request - amenity_request)
+    (itinerary_amenity_assigned ?guest_itinerary - guest_itinerary ?amenity_request - amenity_request)
+    (amenity_attached_to_itinerary ?guest_itinerary - guest_itinerary)
+    (amenity_provider_confirmed ?guest_itinerary - guest_itinerary)
+    (amenity_staff_verified ?guest_itinerary - guest_itinerary)
+    (preference_profile_available ?preference_profile - preference_profile)
+    (itinerary_assigned_preference_profile ?guest_itinerary - guest_itinerary ?preference_profile - preference_profile)
+    (service_option_available ?service_option - service_option)
+    (itinerary_assigned_service_option ?guest_itinerary - guest_itinerary ?service_option - service_option)
+    (vehicle_feature_available ?vehicle_feature - vehicle_feature)
+    (itinerary_assigned_vehicle_feature ?guest_itinerary - guest_itinerary ?vehicle_feature - vehicle_feature)
+    (staff_assignment_available ?staff_assignment - staff_assignment)
+    (itinerary_staff_assigned ?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment)
+    (timing_buffer_available ?timing_buffer - timing_buffer)
+    (assigned_timing_buffer ?arrival_event - arrival_event ?timing_buffer - timing_buffer)
+    (arrival_segment_prepared ?arrival_segment - arrival_segment)
+    (onward_segment_prepared ?onward_segment - onward_segment)
+    (boarding_authorized ?guest_itinerary - guest_itinerary)
+  )
+  (:action register_arrival_event
+    :parameters (?arrival_event - arrival_event)
+    :precondition
+      (and
+        (not
+          (arrival_registered ?arrival_event)
+        )
+        (not
+          (access_allocated_to_entity ?arrival_event)
+        )
+      )
+    :effect (arrival_registered ?arrival_event)
+  )
+  (:action reserve_operator_slot_for_arrival
+    :parameters (?arrival_event - arrival_event ?operator_slot - operator_slot)
+    :precondition
+      (and
+        (arrival_registered ?arrival_event)
+        (not
+          (operator_slot_reserved ?arrival_event)
+        )
+        (operator_slot_available ?operator_slot)
+      )
+    :effect
+      (and
+        (operator_slot_reserved ?arrival_event)
+        (operator_slot_assigned ?arrival_event ?operator_slot)
+        (not
+          (operator_slot_available ?operator_slot)
+        )
+      )
+  )
+  (:action propose_mode_candidate_for_arrival
+    :parameters (?arrival_event - arrival_event ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (arrival_registered ?arrival_event)
+        (operator_slot_reserved ?arrival_event)
+        (mode_candidate_available ?transport_mode_candidate)
+      )
+    :effect
+      (and
+        (assigned_mode_candidate ?arrival_event ?transport_mode_candidate)
+        (not
+          (mode_candidate_available ?transport_mode_candidate)
+        )
+      )
+  )
+  (:action confirm_mode_for_arrival
+    :parameters (?arrival_event - arrival_event ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (arrival_registered ?arrival_event)
+        (operator_slot_reserved ?arrival_event)
+        (assigned_mode_candidate ?arrival_event ?transport_mode_candidate)
+        (not
+          (mode_confirmed ?arrival_event)
+        )
+      )
+    :effect (mode_confirmed ?arrival_event)
+  )
+  (:action release_mode_candidate
+    :parameters (?arrival_event - arrival_event ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (assigned_mode_candidate ?arrival_event ?transport_mode_candidate)
+      )
+    :effect
+      (and
+        (mode_candidate_available ?transport_mode_candidate)
+        (not
+          (assigned_mode_candidate ?arrival_event ?transport_mode_candidate)
+        )
+      )
+  )
+  (:action assign_local_provider_to_arrival
+    :parameters (?arrival_event - arrival_event ?local_provider - local_provider)
+    :precondition
+      (and
+        (mode_confirmed ?arrival_event)
+        (local_provider_available ?local_provider)
+      )
+    :effect
+      (and
+        (provider_assigned_to_event ?arrival_event ?local_provider)
+        (not
+          (local_provider_available ?local_provider)
+        )
+      )
+  )
+  (:action release_local_provider_from_arrival
+    :parameters (?arrival_event - arrival_event ?local_provider - local_provider)
+    :precondition
+      (and
+        (provider_assigned_to_event ?arrival_event ?local_provider)
+      )
+    :effect
+      (and
+        (local_provider_available ?local_provider)
+        (not
+          (provider_assigned_to_event ?arrival_event ?local_provider)
+        )
+      )
+  )
+  (:action reserve_vehicle_feature_for_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (vehicle_feature_available ?vehicle_feature)
+      )
+    :effect
+      (and
+        (itinerary_assigned_vehicle_feature ?guest_itinerary ?vehicle_feature)
+        (not
+          (vehicle_feature_available ?vehicle_feature)
+        )
+      )
+  )
+  (:action release_reserved_vehicle_feature
+    :parameters (?guest_itinerary - guest_itinerary ?vehicle_feature - vehicle_feature)
+    :precondition
+      (and
+        (itinerary_assigned_vehicle_feature ?guest_itinerary ?vehicle_feature)
+      )
+    :effect
+      (and
+        (vehicle_feature_available ?vehicle_feature)
+        (not
+          (itinerary_assigned_vehicle_feature ?guest_itinerary ?vehicle_feature)
+        )
+      )
+  )
+  (:action reserve_staff_assignment_for_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (staff_assignment_available ?staff_assignment)
+      )
+    :effect
+      (and
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (not
+          (staff_assignment_available ?staff_assignment)
+        )
+      )
+  )
+  (:action release_staff_assignment_from_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+      )
+    :effect
+      (and
+        (staff_assignment_available ?staff_assignment)
+        (not
+          (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        )
+      )
+  )
+  (:action prepare_pickup_location_for_arrival
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (mode_confirmed ?arrival_segment)
+        (assigned_mode_candidate ?arrival_segment ?transport_mode_candidate)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (not
+          (pickup_location_marked_ready ?pickup_location)
+        )
+        (not
+          (pickup_location_reserved ?pickup_location)
+        )
+      )
+    :effect (pickup_location_marked_ready ?pickup_location)
+  )
+  (:action confirm_pickup_with_provider
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?local_provider - local_provider)
+    :precondition
+      (and
+        (mode_confirmed ?arrival_segment)
+        (provider_assigned_to_event ?arrival_segment ?local_provider)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (pickup_location_marked_ready ?pickup_location)
+        (not
+          (arrival_segment_prepared ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+      )
+  )
+  (:action reserve_access_token_for_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?access_token - access_token)
+    :precondition
+      (and
+        (mode_confirmed ?arrival_segment)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (access_token_available ?access_token)
+        (not
+          (arrival_segment_prepared ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_location_reserved ?pickup_location)
+        (arrival_segment_prepared ?arrival_segment)
+        (access_token_assigned_to_arrival_segment ?arrival_segment ?access_token)
+        (not
+          (access_token_available ?access_token)
+        )
+      )
+  )
+  (:action finalize_pickup_and_release_token
+    :parameters (?arrival_segment - arrival_segment ?pickup_location - pickup_location ?transport_mode_candidate - transport_mode_candidate ?access_token - access_token)
+    :precondition
+      (and
+        (mode_confirmed ?arrival_segment)
+        (assigned_mode_candidate ?arrival_segment ?transport_mode_candidate)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (pickup_location_reserved ?pickup_location)
+        (access_token_assigned_to_arrival_segment ?arrival_segment ?access_token)
+        (not
+          (arrival_segment_pickup_confirmed ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (pickup_location_marked_ready ?pickup_location)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+        (access_token_available ?access_token)
+        (not
+          (access_token_assigned_to_arrival_segment ?arrival_segment ?access_token)
+        )
+      )
+  )
+  (:action prepare_dropoff_location_for_onward_segment
+    :parameters (?onward_segment - onward_segment ?dropoff_location - dropoff_location ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (mode_confirmed ?onward_segment)
+        (assigned_mode_candidate ?onward_segment ?transport_mode_candidate)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (not
+          (dropoff_location_marked_ready ?dropoff_location)
+        )
+        (not
+          (dropoff_location_reserved ?dropoff_location)
+        )
+      )
+    :effect (dropoff_location_marked_ready ?dropoff_location)
+  )
+  (:action confirm_dropoff_with_provider
+    :parameters (?onward_segment - onward_segment ?dropoff_location - dropoff_location ?local_provider - local_provider)
+    :precondition
+      (and
+        (mode_confirmed ?onward_segment)
+        (provider_assigned_to_event ?onward_segment ?local_provider)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (dropoff_location_marked_ready ?dropoff_location)
+        (not
+          (onward_segment_prepared ?onward_segment)
+        )
+      )
+    :effect
+      (and
+        (onward_segment_prepared ?onward_segment)
+        (onward_segment_ready ?onward_segment)
+      )
+  )
+  (:action reserve_access_token_for_onward_segment
+    :parameters (?onward_segment - onward_segment ?dropoff_location - dropoff_location ?access_token - access_token)
+    :precondition
+      (and
+        (mode_confirmed ?onward_segment)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (access_token_available ?access_token)
+        (not
+          (onward_segment_prepared ?onward_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_location_reserved ?dropoff_location)
+        (onward_segment_prepared ?onward_segment)
+        (access_token_assigned_to_onward_segment ?onward_segment ?access_token)
+        (not
+          (access_token_available ?access_token)
+        )
+      )
+  )
+  (:action finalize_dropoff_and_release_token
+    :parameters (?onward_segment - onward_segment ?dropoff_location - dropoff_location ?transport_mode_candidate - transport_mode_candidate ?access_token - access_token)
+    :precondition
+      (and
+        (mode_confirmed ?onward_segment)
+        (assigned_mode_candidate ?onward_segment ?transport_mode_candidate)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (dropoff_location_reserved ?dropoff_location)
+        (access_token_assigned_to_onward_segment ?onward_segment ?access_token)
+        (not
+          (onward_segment_ready ?onward_segment)
+        )
+      )
+    :effect
+      (and
+        (dropoff_location_marked_ready ?dropoff_location)
+        (onward_segment_ready ?onward_segment)
+        (access_token_available ?access_token)
+        (not
+          (access_token_assigned_to_onward_segment ?onward_segment ?access_token)
+        )
+      )
+  )
+  (:action select_and_reserve_vehicle_standard
+    :parameters (?arrival_segment - arrival_segment ?onward_segment - onward_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle - vehicle)
+    :precondition
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (onward_segment_prepared ?onward_segment)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (pickup_location_marked_ready ?pickup_location)
+        (dropoff_location_marked_ready ?dropoff_location)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+        (onward_segment_ready ?onward_segment)
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle)
+        (vehicle_assigned_to_pickup_location ?vehicle ?pickup_location)
+        (vehicle_assigned_to_dropoff_location ?vehicle ?dropoff_location)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action select_and_reserve_vehicle_pickup_reserved
+    :parameters (?arrival_segment - arrival_segment ?onward_segment - onward_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle - vehicle)
+    :precondition
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (onward_segment_prepared ?onward_segment)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (pickup_location_reserved ?pickup_location)
+        (dropoff_location_marked_ready ?dropoff_location)
+        (not
+          (arrival_segment_pickup_confirmed ?arrival_segment)
+        )
+        (onward_segment_ready ?onward_segment)
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle)
+        (vehicle_assigned_to_pickup_location ?vehicle ?pickup_location)
+        (vehicle_assigned_to_dropoff_location ?vehicle ?dropoff_location)
+        (vehicle_ready_for_pickup ?vehicle)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action select_and_reserve_vehicle_dropoff_reserved
+    :parameters (?arrival_segment - arrival_segment ?onward_segment - onward_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle - vehicle)
+    :precondition
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (onward_segment_prepared ?onward_segment)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (pickup_location_marked_ready ?pickup_location)
+        (dropoff_location_reserved ?dropoff_location)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+        (not
+          (onward_segment_ready ?onward_segment)
+        )
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle)
+        (vehicle_assigned_to_pickup_location ?vehicle ?pickup_location)
+        (vehicle_assigned_to_dropoff_location ?vehicle ?dropoff_location)
+        (vehicle_ready_for_dropoff ?vehicle)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action select_and_reserve_vehicle_both_reserved
+    :parameters (?arrival_segment - arrival_segment ?onward_segment - onward_segment ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?vehicle - vehicle)
+    :precondition
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (onward_segment_prepared ?onward_segment)
+        (segment_has_pickup_location ?arrival_segment ?pickup_location)
+        (onward_has_dropoff_location ?onward_segment ?dropoff_location)
+        (pickup_location_reserved ?pickup_location)
+        (dropoff_location_reserved ?dropoff_location)
+        (not
+          (arrival_segment_pickup_confirmed ?arrival_segment)
+        )
+        (not
+          (onward_segment_ready ?onward_segment)
+        )
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle)
+        (vehicle_assigned_to_pickup_location ?vehicle ?pickup_location)
+        (vehicle_assigned_to_dropoff_location ?vehicle ?dropoff_location)
+        (vehicle_ready_for_pickup ?vehicle)
+        (vehicle_ready_for_dropoff ?vehicle)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action confirm_vehicle_activation
+    :parameters (?vehicle - vehicle ?arrival_segment - arrival_segment ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (vehicle_reserved ?vehicle)
+        (arrival_segment_prepared ?arrival_segment)
+        (assigned_mode_candidate ?arrival_segment ?transport_mode_candidate)
+        (not
+          (vehicle_activated_for_transfer ?vehicle)
+        )
+      )
+    :effect (vehicle_activated_for_transfer ?vehicle)
+  )
+  (:action allocate_boarding_area_and_bind_vehicle
+    :parameters (?guest_itinerary - guest_itinerary ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (itinerary_assigned_vehicle ?guest_itinerary ?vehicle)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_available ?boarding_area)
+        (vehicle_reserved ?vehicle)
+        (vehicle_activated_for_transfer ?vehicle)
+        (not
+          (boarding_area_reserved ?boarding_area)
+        )
+      )
+    :effect
+      (and
+        (boarding_area_reserved ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (not
+          (boarding_area_available ?boarding_area)
+        )
+      )
+  )
+  (:action stage_boarding_area_for_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?boarding_area - boarding_area ?vehicle - vehicle ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_reserved ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (assigned_mode_candidate ?guest_itinerary ?transport_mode_candidate)
+        (not
+          (vehicle_ready_for_pickup ?vehicle)
+        )
+        (not
+          (itinerary_boarding_area_staged ?guest_itinerary)
+        )
+      )
+    :effect (itinerary_boarding_area_staged ?guest_itinerary)
+  )
+  (:action attach_preference_profile_to_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?preference_profile - preference_profile)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (preference_profile_available ?preference_profile)
+        (not
+          (itinerary_preference_attached ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_preference_attached ?guest_itinerary)
+        (itinerary_assigned_preference_profile ?guest_itinerary ?preference_profile)
+        (not
+          (preference_profile_available ?preference_profile)
+        )
+      )
+  )
+  (:action finalize_boarding_area_and_preference_binding
+    :parameters (?guest_itinerary - guest_itinerary ?boarding_area - boarding_area ?vehicle - vehicle ?transport_mode_candidate - transport_mode_candidate ?preference_profile - preference_profile)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_reserved ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (assigned_mode_candidate ?guest_itinerary ?transport_mode_candidate)
+        (vehicle_ready_for_pickup ?vehicle)
+        (itinerary_preference_attached ?guest_itinerary)
+        (itinerary_assigned_preference_profile ?guest_itinerary ?preference_profile)
+        (not
+          (itinerary_boarding_area_staged ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_boarding_area_staged ?guest_itinerary)
+        (itinerary_preference_confirmed ?guest_itinerary)
+      )
+  )
+  (:action initiate_boarding_checks_with_features_provider
+    :parameters (?guest_itinerary - guest_itinerary ?vehicle_feature - vehicle_feature ?local_provider - local_provider ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_area_staged ?guest_itinerary)
+        (itinerary_assigned_vehicle_feature ?guest_itinerary ?vehicle_feature)
+        (provider_assigned_to_event ?guest_itinerary ?local_provider)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (not
+          (vehicle_ready_for_dropoff ?vehicle)
+        )
+        (not
+          (itinerary_boarding_checks_started ?guest_itinerary)
+        )
+      )
+    :effect (itinerary_boarding_checks_started ?guest_itinerary)
+  )
+  (:action initiate_boarding_checks_with_features_ready
+    :parameters (?guest_itinerary - guest_itinerary ?vehicle_feature - vehicle_feature ?local_provider - local_provider ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_area_staged ?guest_itinerary)
+        (itinerary_assigned_vehicle_feature ?guest_itinerary ?vehicle_feature)
+        (provider_assigned_to_event ?guest_itinerary ?local_provider)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (vehicle_ready_for_dropoff ?vehicle)
+        (not
+          (itinerary_boarding_checks_started ?guest_itinerary)
+        )
+      )
+    :effect (itinerary_boarding_checks_started ?guest_itinerary)
+  )
+  (:action boarding_checks_phase_1_authorize
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_checks_started ?guest_itinerary)
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (not
+          (vehicle_ready_for_pickup ?vehicle)
+        )
+        (not
+          (vehicle_ready_for_dropoff ?vehicle)
+        )
+        (not
+          (boarding_checks_passed ?guest_itinerary)
+        )
+      )
+    :effect (boarding_checks_passed ?guest_itinerary)
+  )
+  (:action boarding_checks_phase_1_authorize_with_vehicle_ready
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_checks_started ?guest_itinerary)
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (vehicle_ready_for_pickup ?vehicle)
+        (not
+          (vehicle_ready_for_dropoff ?vehicle)
+        )
+        (not
+          (boarding_checks_passed ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (itinerary_checks_stage2_passed ?guest_itinerary)
+      )
+  )
+  (:action boarding_checks_phase_2_authorize_variant_1
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_checks_started ?guest_itinerary)
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (not
+          (vehicle_ready_for_pickup ?vehicle)
+        )
+        (vehicle_ready_for_dropoff ?vehicle)
+        (not
+          (boarding_checks_passed ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (itinerary_checks_stage2_passed ?guest_itinerary)
+      )
+  )
+  (:action boarding_checks_phase_2_authorize_variant_2
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment ?boarding_area - boarding_area ?vehicle - vehicle)
+    :precondition
+      (and
+        (itinerary_boarding_checks_started ?guest_itinerary)
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (itinerary_assigned_boarding_area ?guest_itinerary ?boarding_area)
+        (boarding_area_assigned_to_vehicle ?boarding_area ?vehicle)
+        (vehicle_ready_for_pickup ?vehicle)
+        (vehicle_ready_for_dropoff ?vehicle)
+        (not
+          (boarding_checks_passed ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (itinerary_checks_stage2_passed ?guest_itinerary)
+      )
+  )
+  (:action finalize_boarding_authorization
+    :parameters (?guest_itinerary - guest_itinerary)
+    :precondition
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (not
+          (itinerary_checks_stage2_passed ?guest_itinerary)
+        )
+        (not
+          (boarding_authorized ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_authorized ?guest_itinerary)
+        (handoff_ready ?guest_itinerary)
+      )
+  )
+  (:action attach_service_option_to_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?service_option - service_option)
+    :precondition
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (itinerary_checks_stage2_passed ?guest_itinerary)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (itinerary_assigned_service_option ?guest_itinerary ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action finalize_boarding_with_service_and_segments
+    :parameters (?guest_itinerary - guest_itinerary ?arrival_segment - arrival_segment ?onward_segment - onward_segment ?transport_mode_candidate - transport_mode_candidate ?service_option - service_option)
+    :precondition
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (itinerary_checks_stage2_passed ?guest_itinerary)
+        (itinerary_assigned_service_option ?guest_itinerary ?service_option)
+        (itinerary_linked_to_arrival_segment ?guest_itinerary ?arrival_segment)
+        (itinerary_linked_to_onward_segment ?guest_itinerary ?onward_segment)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+        (onward_segment_ready ?onward_segment)
+        (assigned_mode_candidate ?guest_itinerary ?transport_mode_candidate)
+        (not
+          (final_stage_checks_completed ?guest_itinerary)
+        )
+      )
+    :effect (final_stage_checks_completed ?guest_itinerary)
+  )
+  (:action final_boarding_authorization_post_checks
+    :parameters (?guest_itinerary - guest_itinerary)
+    :precondition
+      (and
+        (boarding_checks_passed ?guest_itinerary)
+        (final_stage_checks_completed ?guest_itinerary)
+        (not
+          (boarding_authorized ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_authorized ?guest_itinerary)
+        (handoff_ready ?guest_itinerary)
+      )
+  )
+  (:action attach_amenity_request_to_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?amenity_request - amenity_request ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (mode_confirmed ?guest_itinerary)
+        (assigned_mode_candidate ?guest_itinerary ?transport_mode_candidate)
+        (amenity_request_available ?amenity_request)
+        (itinerary_amenity_assigned ?guest_itinerary ?amenity_request)
+        (not
+          (amenity_attached_to_itinerary ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (amenity_attached_to_itinerary ?guest_itinerary)
+        (not
+          (amenity_request_available ?amenity_request)
+        )
+      )
+  )
+  (:action confirm_amenity_provider
+    :parameters (?guest_itinerary - guest_itinerary ?local_provider - local_provider)
+    :precondition
+      (and
+        (amenity_attached_to_itinerary ?guest_itinerary)
+        (provider_assigned_to_event ?guest_itinerary ?local_provider)
+        (not
+          (amenity_provider_confirmed ?guest_itinerary)
+        )
+      )
+    :effect (amenity_provider_confirmed ?guest_itinerary)
+  )
+  (:action verify_amenity_staff
+    :parameters (?guest_itinerary - guest_itinerary ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (amenity_provider_confirmed ?guest_itinerary)
+        (itinerary_staff_assigned ?guest_itinerary ?staff_assignment)
+        (not
+          (amenity_staff_verified ?guest_itinerary)
+        )
+      )
+    :effect (amenity_staff_verified ?guest_itinerary)
+  )
+  (:action authorize_amenity_and_finalize_boarding
+    :parameters (?guest_itinerary - guest_itinerary)
+    :precondition
+      (and
+        (amenity_staff_verified ?guest_itinerary)
+        (not
+          (boarding_authorized ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (boarding_authorized ?guest_itinerary)
+        (handoff_ready ?guest_itinerary)
+      )
+  )
+  (:action mark_arrival_segment_handoff_ready
+    :parameters (?arrival_segment - arrival_segment ?vehicle - vehicle)
+    :precondition
+      (and
+        (arrival_segment_prepared ?arrival_segment)
+        (arrival_segment_pickup_confirmed ?arrival_segment)
+        (vehicle_reserved ?vehicle)
+        (vehicle_activated_for_transfer ?vehicle)
+        (not
+          (handoff_ready ?arrival_segment)
+        )
+      )
+    :effect (handoff_ready ?arrival_segment)
+  )
+  (:action mark_onward_segment_handoff_ready
+    :parameters (?onward_segment - onward_segment ?vehicle - vehicle)
+    :precondition
+      (and
+        (onward_segment_prepared ?onward_segment)
+        (onward_segment_ready ?onward_segment)
+        (vehicle_reserved ?vehicle)
+        (vehicle_activated_for_transfer ?vehicle)
+        (not
+          (handoff_ready ?onward_segment)
+        )
+      )
+    :effect (handoff_ready ?onward_segment)
+  )
+  (:action reserve_timing_buffer_for_event
+    :parameters (?arrival_event - arrival_event ?timing_buffer - timing_buffer ?transport_mode_candidate - transport_mode_candidate)
+    :precondition
+      (and
+        (handoff_ready ?arrival_event)
+        (assigned_mode_candidate ?arrival_event ?transport_mode_candidate)
+        (timing_buffer_available ?timing_buffer)
+        (not
+          (timing_buffer_reserved ?arrival_event)
+        )
+      )
+    :effect
+      (and
+        (timing_buffer_reserved ?arrival_event)
+        (assigned_timing_buffer ?arrival_event ?timing_buffer)
+        (not
+          (timing_buffer_available ?timing_buffer)
+        )
+      )
+  )
+  (:action assign_operator_slot_to_arrival_segment
+    :parameters (?arrival_segment - arrival_segment ?operator_slot - operator_slot ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (timing_buffer_reserved ?arrival_segment)
+        (operator_slot_assigned ?arrival_segment ?operator_slot)
+        (assigned_timing_buffer ?arrival_segment ?timing_buffer)
+        (not
+          (access_allocated_to_entity ?arrival_segment)
+        )
+      )
+    :effect
+      (and
+        (access_allocated_to_entity ?arrival_segment)
+        (operator_slot_available ?operator_slot)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action assign_operator_slot_to_onward_segment
+    :parameters (?onward_segment - onward_segment ?operator_slot - operator_slot ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (timing_buffer_reserved ?onward_segment)
+        (operator_slot_assigned ?onward_segment ?operator_slot)
+        (assigned_timing_buffer ?onward_segment ?timing_buffer)
+        (not
+          (access_allocated_to_entity ?onward_segment)
+        )
+      )
+    :effect
+      (and
+        (access_allocated_to_entity ?onward_segment)
+        (operator_slot_available ?operator_slot)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+  (:action assign_operator_slot_to_itinerary
+    :parameters (?guest_itinerary - guest_itinerary ?operator_slot - operator_slot ?timing_buffer - timing_buffer)
+    :precondition
+      (and
+        (timing_buffer_reserved ?guest_itinerary)
+        (operator_slot_assigned ?guest_itinerary ?operator_slot)
+        (assigned_timing_buffer ?guest_itinerary ?timing_buffer)
+        (not
+          (access_allocated_to_entity ?guest_itinerary)
+        )
+      )
+    :effect
+      (and
+        (access_allocated_to_entity ?guest_itinerary)
+        (operator_slot_available ?operator_slot)
+        (timing_buffer_available ?timing_buffer)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem remote_arrival_handoff_problem)
+  (:domain remote_arrival_ground_access_coordination)
+  (:objects arrival_segment_1 - arrival_segment onward_segment_1 - onward_segment guest_itinerary_1 - guest_itinerary guest_itinerary_2 - guest_itinerary operator_slot_1 - operator_slot operator_slot_2 - operator_slot operator_slot_3 - operator_slot mode_candidate_shuttle - transport_mode_candidate local_provider_1 - local_provider access_token_1 - access_token pickup_zone_gate_a - pickup_location dropoff_zone_gate_a - dropoff_location vehicle_1 - vehicle boarding_area_1 - boarding_area boarding_area_2 - boarding_area preference_profile_standard - preference_profile preference_profile_family - preference_profile service_option_priority_boarding - service_option service_option_luggage_assist - service_option timing_buffer_standard - timing_buffer vehicle_feature_wheelchair_access - vehicle_feature amenity_request_wifi - amenity_request amenity_request_meal - amenity_request staff_assignment_driver_1 - staff_assignment)
+  (:init
+    (operator_slot_available operator_slot_1)
+    (operator_slot_available operator_slot_2)
+    (operator_slot_available operator_slot_3)
+    (mode_candidate_available mode_candidate_shuttle)
+    (local_provider_available local_provider_1)
+    (access_token_available access_token_1)
+    (segment_has_pickup_location arrival_segment_1 pickup_zone_gate_a)
+    (onward_has_dropoff_location onward_segment_1 dropoff_zone_gate_a)
+    (vehicle_available vehicle_1)
+    (boarding_area_available boarding_area_1)
+    (boarding_area_available boarding_area_2)
+    (itinerary_linked_to_arrival_segment guest_itinerary_1 arrival_segment_1)
+    (itinerary_linked_to_arrival_segment guest_itinerary_2 arrival_segment_1)
+    (itinerary_linked_to_onward_segment guest_itinerary_1 onward_segment_1)
+    (itinerary_linked_to_onward_segment guest_itinerary_2 onward_segment_1)
+    (itinerary_assigned_vehicle guest_itinerary_1 vehicle_1)
+    (itinerary_assigned_vehicle guest_itinerary_2 vehicle_1)
+    (itinerary_assigned_boarding_area guest_itinerary_1 boarding_area_1)
+    (itinerary_assigned_boarding_area guest_itinerary_2 boarding_area_2)
+    (preference_profile_available preference_profile_standard)
+    (preference_profile_available preference_profile_family)
+    (service_option_available service_option_priority_boarding)
+    (service_option_available service_option_luggage_assist)
+    (timing_buffer_available timing_buffer_standard)
+    (vehicle_feature_available vehicle_feature_wheelchair_access)
+    (amenity_request_available amenity_request_wifi)
+    (itinerary_amenity_assigned guest_itinerary_1 amenity_request_wifi)
+    (itinerary_amenity_assigned guest_itinerary_2 amenity_request_meal)
+    (staff_assignment_available staff_assignment_driver_1)
+  )
+  (:goal
+    (and
+      (access_allocated_to_entity arrival_segment_1)
+      (access_allocated_to_entity onward_segment_1)
+      (access_allocated_to_entity guest_itinerary_1)
+      (access_allocated_to_entity guest_itinerary_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_arrival_event arrival_segment_1)
+(reserve_operator_slot_for_arrival arrival_segment_1 operator_slot_1)
+(register_arrival_event guest_itinerary_1)
+(reserve_operator_slot_for_arrival guest_itinerary_1 operator_slot_3)
+(propose_mode_candidate_for_arrival arrival_segment_1 mode_candidate_shuttle)
+(confirm_mode_for_arrival arrival_segment_1 mode_candidate_shuttle)
+(assign_local_provider_to_arrival arrival_segment_1 local_provider_1)
+(prepare_pickup_location_for_arrival arrival_segment_1 pickup_zone_gate_a mode_candidate_shuttle)
+(confirm_pickup_with_provider arrival_segment_1 pickup_zone_gate_a local_provider_1)
+(release_local_provider_from_arrival arrival_segment_1 local_provider_1)
+(release_mode_candidate arrival_segment_1 mode_candidate_shuttle)
+(register_arrival_event onward_segment_1)
+(reserve_operator_slot_for_arrival onward_segment_1 operator_slot_2)
+(register_arrival_event guest_itinerary_2)
+(propose_mode_candidate_for_arrival onward_segment_1 mode_candidate_shuttle)
+(confirm_mode_for_arrival onward_segment_1 mode_candidate_shuttle)
+(assign_local_provider_to_arrival onward_segment_1 local_provider_1)
+(prepare_dropoff_location_for_onward_segment onward_segment_1 dropoff_zone_gate_a mode_candidate_shuttle)
+(confirm_dropoff_with_provider onward_segment_1 dropoff_zone_gate_a local_provider_1)
+(release_local_provider_from_arrival onward_segment_1 local_provider_1)
+(release_mode_candidate onward_segment_1 mode_candidate_shuttle)
+(select_and_reserve_vehicle_standard arrival_segment_1 onward_segment_1 pickup_zone_gate_a dropoff_zone_gate_a vehicle_1)
+(propose_mode_candidate_for_arrival arrival_segment_1 mode_candidate_shuttle)
+(confirm_vehicle_activation vehicle_1 arrival_segment_1 mode_candidate_shuttle)
+(mark_arrival_segment_handoff_ready arrival_segment_1 vehicle_1)
+(mark_onward_segment_handoff_ready onward_segment_1 vehicle_1)
+(release_mode_candidate arrival_segment_1 mode_candidate_shuttle)
+(propose_mode_candidate_for_arrival arrival_segment_1 mode_candidate_shuttle)
+(reserve_timing_buffer_for_event arrival_segment_1 timing_buffer_standard mode_candidate_shuttle)
+(assign_operator_slot_to_arrival_segment arrival_segment_1 operator_slot_1 timing_buffer_standard)
+(release_mode_candidate arrival_segment_1 mode_candidate_shuttle)
+(reserve_operator_slot_for_arrival guest_itinerary_2 operator_slot_1)
+(propose_mode_candidate_for_arrival guest_itinerary_1 mode_candidate_shuttle)
+(confirm_mode_for_arrival guest_itinerary_1 mode_candidate_shuttle)
+(attach_preference_profile_to_itinerary guest_itinerary_1 preference_profile_standard)
+(reserve_vehicle_feature_for_itinerary guest_itinerary_1 vehicle_feature_wheelchair_access)
+(reserve_staff_assignment_for_itinerary guest_itinerary_1 staff_assignment_driver_1)
+(assign_local_provider_to_arrival guest_itinerary_1 local_provider_1)
+(allocate_boarding_area_and_bind_vehicle guest_itinerary_1 boarding_area_1 vehicle_1)
+(stage_boarding_area_for_itinerary guest_itinerary_1 boarding_area_1 vehicle_1 mode_candidate_shuttle)
+(initiate_boarding_checks_with_features_provider guest_itinerary_1 vehicle_feature_wheelchair_access local_provider_1 boarding_area_1 vehicle_1)
+(release_local_provider_from_arrival guest_itinerary_1 local_provider_1)
+(release_reserved_vehicle_feature guest_itinerary_1 vehicle_feature_wheelchair_access)
+(boarding_checks_phase_1_authorize guest_itinerary_1 staff_assignment_driver_1 boarding_area_1 vehicle_1)
+(release_staff_assignment_from_itinerary guest_itinerary_1 staff_assignment_driver_1)
+(finalize_boarding_authorization guest_itinerary_1)
+(release_mode_candidate guest_itinerary_1 mode_candidate_shuttle)
+(propose_mode_candidate_for_arrival guest_itinerary_2 mode_candidate_shuttle)
+(confirm_mode_for_arrival guest_itinerary_2 mode_candidate_shuttle)
+(attach_preference_profile_to_itinerary guest_itinerary_2 preference_profile_family)
+(reserve_vehicle_feature_for_itinerary guest_itinerary_2 vehicle_feature_wheelchair_access)
+(reserve_staff_assignment_for_itinerary guest_itinerary_2 staff_assignment_driver_1)
+(assign_local_provider_to_arrival guest_itinerary_2 local_provider_1)
+(allocate_boarding_area_and_bind_vehicle guest_itinerary_2 boarding_area_2 vehicle_1)
+(stage_boarding_area_for_itinerary guest_itinerary_2 boarding_area_2 vehicle_1 mode_candidate_shuttle)
+(initiate_boarding_checks_with_features_provider guest_itinerary_2 vehicle_feature_wheelchair_access local_provider_1 boarding_area_2 vehicle_1)
+(release_local_provider_from_arrival guest_itinerary_2 local_provider_1)
+(release_reserved_vehicle_feature guest_itinerary_2 vehicle_feature_wheelchair_access)
+(boarding_checks_phase_1_authorize guest_itinerary_2 staff_assignment_driver_1 boarding_area_2 vehicle_1)
+(release_staff_assignment_from_itinerary guest_itinerary_2 staff_assignment_driver_1)
+(finalize_boarding_authorization guest_itinerary_2)
+(release_mode_candidate guest_itinerary_2 mode_candidate_shuttle)
+(propose_mode_candidate_for_arrival onward_segment_1 mode_candidate_shuttle)
+(reserve_timing_buffer_for_event onward_segment_1 timing_buffer_standard mode_candidate_shuttle)
+(assign_operator_slot_to_onward_segment onward_segment_1 operator_slot_2 timing_buffer_standard)
+(release_mode_candidate onward_segment_1 mode_candidate_shuttle)
+(propose_mode_candidate_for_arrival guest_itinerary_1 mode_candidate_shuttle)
+(reserve_timing_buffer_for_event guest_itinerary_1 timing_buffer_standard mode_candidate_shuttle)
+(assign_operator_slot_to_itinerary guest_itinerary_1 operator_slot_3 timing_buffer_standard)
+(release_mode_candidate guest_itinerary_1 mode_candidate_shuttle)
+(propose_mode_candidate_for_arrival guest_itinerary_2 mode_candidate_shuttle)
+(reserve_timing_buffer_for_event guest_itinerary_2 timing_buffer_standard mode_candidate_shuttle)
+(assign_operator_slot_to_itinerary guest_itinerary_2 operator_slot_1 timing_buffer_standard)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__nob0qm1/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 73 
+
+Successful plans:
+Value: 73
+ /tmp/val__nob0qm1/plan.pddl 73 
+
+
+
+--- stderr ---
+

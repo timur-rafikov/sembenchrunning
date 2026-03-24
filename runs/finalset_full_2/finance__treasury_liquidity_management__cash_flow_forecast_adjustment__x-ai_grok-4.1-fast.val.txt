@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain cash_flow_adjustment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object organizational_unit - domain_object instrument_type - domain_object legal_entity - domain_object domain_category - domain_object adjustment_case - domain_category funding_source_candidate - organizational_unit time_period_bucket - organizational_unit business_reviewer - organizational_unit policy_rule - organizational_unit execution_profile - organizational_unit supporting_document - organizational_unit funding_product - organizational_unit settlement_method - organizational_unit adjustment_reason_tag - instrument_type settlement_window - instrument_type authority_credential - instrument_type liquidity_pool - legal_entity counterparty_pool - legal_entity transfer_instruction - legal_entity account_role - adjustment_case account_role_variant - adjustment_case source_account - account_role destination_account - account_role treasury_operator - account_role_variant)
+
+  (:predicates
+    (case_registered ?adjustment_case - adjustment_case)
+    (entity_processing_enabled ?adjustment_case - adjustment_case)
+    (has_funding_candidate ?adjustment_case - adjustment_case)
+    (routing_assigned ?adjustment_case - adjustment_case)
+    (entity_ready_for_execution ?adjustment_case - adjustment_case)
+    (entity_documentation_registered ?adjustment_case - adjustment_case)
+    (candidate_available ?funding_source_candidate - funding_source_candidate)
+    (entity_funding_candidate_link ?adjustment_case - adjustment_case ?funding_source_candidate - funding_source_candidate)
+    (time_bucket_available ?time_period_bucket - time_period_bucket)
+    (entity_time_bucket_association ?adjustment_case - adjustment_case ?time_period_bucket - time_period_bucket)
+    (reviewer_available ?business_reviewer - business_reviewer)
+    (entity_reviewer_assignment ?adjustment_case - adjustment_case ?business_reviewer - business_reviewer)
+    (reason_tag_available ?adjustment_reason_tag - adjustment_reason_tag)
+    (account_reason_tag_association ?source_account - source_account ?adjustment_reason_tag - adjustment_reason_tag)
+    (destination_reason_tag_association ?destination_account - destination_account ?adjustment_reason_tag - adjustment_reason_tag)
+    (account_liquidity_pool ?source_account - source_account ?liquidity_pool - liquidity_pool)
+    (pool_primary_flag ?liquidity_pool - liquidity_pool)
+    (pool_secondary_flag ?liquidity_pool - liquidity_pool)
+    (pool_selection_confirmed ?source_account - source_account)
+    (destination_counterparty_pool ?destination_account - destination_account ?counterparty_pool - counterparty_pool)
+    (counterparty_pool_primary_flag ?counterparty_pool - counterparty_pool)
+    (counterparty_pool_secondary_flag ?counterparty_pool - counterparty_pool)
+    (destination_pool_selection_confirmed ?destination_account - destination_account)
+    (instruction_pending ?transfer_instruction - transfer_instruction)
+    (instruction_scheduled ?transfer_instruction - transfer_instruction)
+    (instruction_liquidity_pool ?transfer_instruction - transfer_instruction ?liquidity_pool - liquidity_pool)
+    (instruction_counterparty_pool ?transfer_instruction - transfer_instruction ?counterparty_pool - counterparty_pool)
+    (instruction_policy_flag ?transfer_instruction - transfer_instruction)
+    (instruction_product_flag ?transfer_instruction - transfer_instruction)
+    (instruction_slot_confirmed ?transfer_instruction - transfer_instruction)
+    (operator_source_account_association ?treasury_operator - treasury_operator ?source_account - source_account)
+    (operator_destination_account_association ?treasury_operator - treasury_operator ?destination_account - destination_account)
+    (operator_instruction_association ?treasury_operator - treasury_operator ?transfer_instruction - transfer_instruction)
+    (settlement_window_available ?settlement_window - settlement_window)
+    (operator_settlement_window_association ?treasury_operator - treasury_operator ?settlement_window - settlement_window)
+    (settlement_window_locked ?settlement_window - settlement_window)
+    (window_instruction_assignment ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    (operator_profile_bound ?treasury_operator - treasury_operator)
+    (operator_product_bound ?treasury_operator - treasury_operator)
+    (operator_ready_for_validation ?treasury_operator - treasury_operator)
+    (operator_policy_bound ?treasury_operator - treasury_operator)
+    (operator_policy_validated ?treasury_operator - treasury_operator)
+    (operator_profile_verified ?treasury_operator - treasury_operator)
+    (operator_orchestration_ready ?treasury_operator - treasury_operator)
+    (authority_credential_available ?authority_credential - authority_credential)
+    (operator_credential_binding ?treasury_operator - treasury_operator ?authority_credential - authority_credential)
+    (authority_engaged ?treasury_operator - treasury_operator)
+    (authority_check_passed ?treasury_operator - treasury_operator)
+    (authority_approved ?treasury_operator - treasury_operator)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (operator_policy_association ?treasury_operator - treasury_operator ?policy_rule - policy_rule)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (operator_execution_profile_bound ?treasury_operator - treasury_operator ?execution_profile - execution_profile)
+    (funding_product_available ?funding_product - funding_product)
+    (operator_funding_product_association ?treasury_operator - treasury_operator ?funding_product - funding_product)
+    (settlement_method_available ?settlement_method - settlement_method)
+    (operator_settlement_method_association ?treasury_operator - treasury_operator ?settlement_method - settlement_method)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (entity_document_association ?adjustment_case - adjustment_case ?supporting_document - supporting_document)
+    (account_evaluation_locked ?source_account - source_account)
+    (destination_account_evaluation_locked ?destination_account - destination_account)
+    (operator_context_locked ?treasury_operator - treasury_operator)
+  )
+  (:action register_adjustment_case
+    :parameters (?adjustment_case - adjustment_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?adjustment_case)
+        )
+        (not
+          (routing_assigned ?adjustment_case)
+        )
+      )
+    :effect (case_registered ?adjustment_case)
+  )
+  (:action associate_funding_candidate
+    :parameters (?adjustment_case - adjustment_case ?funding_source_candidate - funding_source_candidate)
+    :precondition
+      (and
+        (case_registered ?adjustment_case)
+        (not
+          (has_funding_candidate ?adjustment_case)
+        )
+        (candidate_available ?funding_source_candidate)
+      )
+    :effect
+      (and
+        (has_funding_candidate ?adjustment_case)
+        (entity_funding_candidate_link ?adjustment_case ?funding_source_candidate)
+        (not
+          (candidate_available ?funding_source_candidate)
+        )
+      )
+  )
+  (:action reserve_time_bucket_for_case
+    :parameters (?adjustment_case - adjustment_case ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (case_registered ?adjustment_case)
+        (has_funding_candidate ?adjustment_case)
+        (time_bucket_available ?time_period_bucket)
+      )
+    :effect
+      (and
+        (entity_time_bucket_association ?adjustment_case ?time_period_bucket)
+        (not
+          (time_bucket_available ?time_period_bucket)
+        )
+      )
+  )
+  (:action mark_case_review_ready
+    :parameters (?adjustment_case - adjustment_case ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (case_registered ?adjustment_case)
+        (has_funding_candidate ?adjustment_case)
+        (entity_time_bucket_association ?adjustment_case ?time_period_bucket)
+        (not
+          (entity_processing_enabled ?adjustment_case)
+        )
+      )
+    :effect (entity_processing_enabled ?adjustment_case)
+  )
+  (:action release_time_bucket_assignment
+    :parameters (?adjustment_case - adjustment_case ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_time_bucket_association ?adjustment_case ?time_period_bucket)
+      )
+    :effect
+      (and
+        (time_bucket_available ?time_period_bucket)
+        (not
+          (entity_time_bucket_association ?adjustment_case ?time_period_bucket)
+        )
+      )
+  )
+  (:action assign_reviewer_to_case
+    :parameters (?adjustment_case - adjustment_case ?business_reviewer - business_reviewer)
+    :precondition
+      (and
+        (entity_processing_enabled ?adjustment_case)
+        (reviewer_available ?business_reviewer)
+      )
+    :effect
+      (and
+        (entity_reviewer_assignment ?adjustment_case ?business_reviewer)
+        (not
+          (reviewer_available ?business_reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_case
+    :parameters (?adjustment_case - adjustment_case ?business_reviewer - business_reviewer)
+    :precondition
+      (and
+        (entity_reviewer_assignment ?adjustment_case ?business_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?business_reviewer)
+        (not
+          (entity_reviewer_assignment ?adjustment_case ?business_reviewer)
+        )
+      )
+  )
+  (:action bind_funding_product_to_operator
+    :parameters (?treasury_operator - treasury_operator ?funding_product - funding_product)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (funding_product_available ?funding_product)
+      )
+    :effect
+      (and
+        (operator_funding_product_association ?treasury_operator ?funding_product)
+        (not
+          (funding_product_available ?funding_product)
+        )
+      )
+  )
+  (:action unbind_funding_product_from_operator
+    :parameters (?treasury_operator - treasury_operator ?funding_product - funding_product)
+    :precondition
+      (and
+        (operator_funding_product_association ?treasury_operator ?funding_product)
+      )
+    :effect
+      (and
+        (funding_product_available ?funding_product)
+        (not
+          (operator_funding_product_association ?treasury_operator ?funding_product)
+        )
+      )
+  )
+  (:action bind_settlement_method_to_operator
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (settlement_method_available ?settlement_method)
+      )
+    :effect
+      (and
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (not
+          (settlement_method_available ?settlement_method)
+        )
+      )
+  )
+  (:action unbind_settlement_method_from_operator
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method)
+    :precondition
+      (and
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+      )
+    :effect
+      (and
+        (settlement_method_available ?settlement_method)
+        (not
+          (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        )
+      )
+  )
+  (:action select_primary_liquidity_pool
+    :parameters (?source_account - source_account ?liquidity_pool - liquidity_pool ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_processing_enabled ?source_account)
+        (entity_time_bucket_association ?source_account ?time_period_bucket)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (not
+          (pool_primary_flag ?liquidity_pool)
+        )
+        (not
+          (pool_secondary_flag ?liquidity_pool)
+        )
+      )
+    :effect (pool_primary_flag ?liquidity_pool)
+  )
+  (:action lock_account_pool_and_confirm
+    :parameters (?source_account - source_account ?liquidity_pool - liquidity_pool ?business_reviewer - business_reviewer)
+    :precondition
+      (and
+        (entity_processing_enabled ?source_account)
+        (entity_reviewer_assignment ?source_account ?business_reviewer)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (pool_primary_flag ?liquidity_pool)
+        (not
+          (account_evaluation_locked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (account_evaluation_locked ?source_account)
+        (pool_selection_confirmed ?source_account)
+      )
+  )
+  (:action apply_reason_tag_to_account
+    :parameters (?source_account - source_account ?liquidity_pool - liquidity_pool ?adjustment_reason_tag - adjustment_reason_tag)
+    :precondition
+      (and
+        (entity_processing_enabled ?source_account)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (reason_tag_available ?adjustment_reason_tag)
+        (not
+          (account_evaluation_locked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (pool_secondary_flag ?liquidity_pool)
+        (account_evaluation_locked ?source_account)
+        (account_reason_tag_association ?source_account ?adjustment_reason_tag)
+        (not
+          (reason_tag_available ?adjustment_reason_tag)
+        )
+      )
+  )
+  (:action confirm_pool_selection_with_tag
+    :parameters (?source_account - source_account ?liquidity_pool - liquidity_pool ?time_period_bucket - time_period_bucket ?adjustment_reason_tag - adjustment_reason_tag)
+    :precondition
+      (and
+        (entity_processing_enabled ?source_account)
+        (entity_time_bucket_association ?source_account ?time_period_bucket)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (pool_secondary_flag ?liquidity_pool)
+        (account_reason_tag_association ?source_account ?adjustment_reason_tag)
+        (not
+          (pool_selection_confirmed ?source_account)
+        )
+      )
+    :effect
+      (and
+        (pool_primary_flag ?liquidity_pool)
+        (pool_selection_confirmed ?source_account)
+        (reason_tag_available ?adjustment_reason_tag)
+        (not
+          (account_reason_tag_association ?source_account ?adjustment_reason_tag)
+        )
+      )
+  )
+  (:action select_primary_counterparty_pool
+    :parameters (?destination_account - destination_account ?counterparty_pool - counterparty_pool ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_processing_enabled ?destination_account)
+        (entity_time_bucket_association ?destination_account ?time_period_bucket)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (not
+          (counterparty_pool_primary_flag ?counterparty_pool)
+        )
+        (not
+          (counterparty_pool_secondary_flag ?counterparty_pool)
+        )
+      )
+    :effect (counterparty_pool_primary_flag ?counterparty_pool)
+  )
+  (:action lock_destination_pool_and_confirm
+    :parameters (?destination_account - destination_account ?counterparty_pool - counterparty_pool ?business_reviewer - business_reviewer)
+    :precondition
+      (and
+        (entity_processing_enabled ?destination_account)
+        (entity_reviewer_assignment ?destination_account ?business_reviewer)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (counterparty_pool_primary_flag ?counterparty_pool)
+        (not
+          (destination_account_evaluation_locked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (destination_account_evaluation_locked ?destination_account)
+        (destination_pool_selection_confirmed ?destination_account)
+      )
+  )
+  (:action apply_reason_tag_to_destination
+    :parameters (?destination_account - destination_account ?counterparty_pool - counterparty_pool ?adjustment_reason_tag - adjustment_reason_tag)
+    :precondition
+      (and
+        (entity_processing_enabled ?destination_account)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (reason_tag_available ?adjustment_reason_tag)
+        (not
+          (destination_account_evaluation_locked ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (counterparty_pool_secondary_flag ?counterparty_pool)
+        (destination_account_evaluation_locked ?destination_account)
+        (destination_reason_tag_association ?destination_account ?adjustment_reason_tag)
+        (not
+          (reason_tag_available ?adjustment_reason_tag)
+        )
+      )
+  )
+  (:action confirm_destination_pool_selection_with_tag
+    :parameters (?destination_account - destination_account ?counterparty_pool - counterparty_pool ?time_period_bucket - time_period_bucket ?adjustment_reason_tag - adjustment_reason_tag)
+    :precondition
+      (and
+        (entity_processing_enabled ?destination_account)
+        (entity_time_bucket_association ?destination_account ?time_period_bucket)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (counterparty_pool_secondary_flag ?counterparty_pool)
+        (destination_reason_tag_association ?destination_account ?adjustment_reason_tag)
+        (not
+          (destination_pool_selection_confirmed ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (counterparty_pool_primary_flag ?counterparty_pool)
+        (destination_pool_selection_confirmed ?destination_account)
+        (reason_tag_available ?adjustment_reason_tag)
+        (not
+          (destination_reason_tag_association ?destination_account ?adjustment_reason_tag)
+        )
+      )
+  )
+  (:action assemble_transfer_instruction
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_pool - liquidity_pool ?counterparty_pool - counterparty_pool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (account_evaluation_locked ?source_account)
+        (destination_account_evaluation_locked ?destination_account)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (pool_primary_flag ?liquidity_pool)
+        (counterparty_pool_primary_flag ?counterparty_pool)
+        (pool_selection_confirmed ?source_account)
+        (destination_pool_selection_confirmed ?destination_account)
+        (instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_liquidity_pool ?transfer_instruction ?liquidity_pool)
+        (instruction_counterparty_pool ?transfer_instruction ?counterparty_pool)
+        (not
+          (instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action assemble_transfer_instruction_mark_policy_required
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_pool - liquidity_pool ?counterparty_pool - counterparty_pool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (account_evaluation_locked ?source_account)
+        (destination_account_evaluation_locked ?destination_account)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (pool_secondary_flag ?liquidity_pool)
+        (counterparty_pool_primary_flag ?counterparty_pool)
+        (not
+          (pool_selection_confirmed ?source_account)
+        )
+        (destination_pool_selection_confirmed ?destination_account)
+        (instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_liquidity_pool ?transfer_instruction ?liquidity_pool)
+        (instruction_counterparty_pool ?transfer_instruction ?counterparty_pool)
+        (instruction_policy_flag ?transfer_instruction)
+        (not
+          (instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action assemble_transfer_instruction_mark_product_required
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_pool - liquidity_pool ?counterparty_pool - counterparty_pool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (account_evaluation_locked ?source_account)
+        (destination_account_evaluation_locked ?destination_account)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (pool_primary_flag ?liquidity_pool)
+        (counterparty_pool_secondary_flag ?counterparty_pool)
+        (pool_selection_confirmed ?source_account)
+        (not
+          (destination_pool_selection_confirmed ?destination_account)
+        )
+        (instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_liquidity_pool ?transfer_instruction ?liquidity_pool)
+        (instruction_counterparty_pool ?transfer_instruction ?counterparty_pool)
+        (instruction_product_flag ?transfer_instruction)
+        (not
+          (instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action assemble_transfer_instruction_mark_policy_and_product_required
+    :parameters (?source_account - source_account ?destination_account - destination_account ?liquidity_pool - liquidity_pool ?counterparty_pool - counterparty_pool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (account_evaluation_locked ?source_account)
+        (destination_account_evaluation_locked ?destination_account)
+        (account_liquidity_pool ?source_account ?liquidity_pool)
+        (destination_counterparty_pool ?destination_account ?counterparty_pool)
+        (pool_secondary_flag ?liquidity_pool)
+        (counterparty_pool_secondary_flag ?counterparty_pool)
+        (not
+          (pool_selection_confirmed ?source_account)
+        )
+        (not
+          (destination_pool_selection_confirmed ?destination_account)
+        )
+        (instruction_pending ?transfer_instruction)
+      )
+    :effect
+      (and
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_liquidity_pool ?transfer_instruction ?liquidity_pool)
+        (instruction_counterparty_pool ?transfer_instruction ?counterparty_pool)
+        (instruction_policy_flag ?transfer_instruction)
+        (instruction_product_flag ?transfer_instruction)
+        (not
+          (instruction_pending ?transfer_instruction)
+        )
+      )
+  )
+  (:action confirm_instruction_ready_for_settlement_slot
+    :parameters (?transfer_instruction - transfer_instruction ?source_account - source_account ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (instruction_scheduled ?transfer_instruction)
+        (account_evaluation_locked ?source_account)
+        (entity_time_bucket_association ?source_account ?time_period_bucket)
+        (not
+          (instruction_slot_confirmed ?transfer_instruction)
+        )
+      )
+    :effect (instruction_slot_confirmed ?transfer_instruction)
+  )
+  (:action reserve_settlement_window_slot
+    :parameters (?treasury_operator - treasury_operator ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (operator_instruction_association ?treasury_operator ?transfer_instruction)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (settlement_window_available ?settlement_window)
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_slot_confirmed ?transfer_instruction)
+        (not
+          (settlement_window_locked ?settlement_window)
+        )
+      )
+    :effect
+      (and
+        (settlement_window_locked ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (not
+          (settlement_window_available ?settlement_window)
+        )
+      )
+  )
+  (:action assign_operator_context_for_instruction
+    :parameters (?treasury_operator - treasury_operator ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (settlement_window_locked ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (entity_time_bucket_association ?treasury_operator ?time_period_bucket)
+        (not
+          (instruction_policy_flag ?transfer_instruction)
+        )
+        (not
+          (operator_profile_bound ?treasury_operator)
+        )
+      )
+    :effect (operator_profile_bound ?treasury_operator)
+  )
+  (:action bind_policy_rule_to_operator
+    :parameters (?treasury_operator - treasury_operator ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (policy_rule_available ?policy_rule)
+        (not
+          (operator_policy_bound ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_policy_bound ?treasury_operator)
+        (operator_policy_association ?treasury_operator ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action finalize_operator_policy_and_window
+    :parameters (?treasury_operator - treasury_operator ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction ?time_period_bucket - time_period_bucket ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (settlement_window_locked ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (entity_time_bucket_association ?treasury_operator ?time_period_bucket)
+        (instruction_policy_flag ?transfer_instruction)
+        (operator_policy_bound ?treasury_operator)
+        (operator_policy_association ?treasury_operator ?policy_rule)
+        (not
+          (operator_profile_bound ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_profile_bound ?treasury_operator)
+        (operator_policy_validated ?treasury_operator)
+      )
+  )
+  (:action authorize_operator_with_product
+    :parameters (?treasury_operator - treasury_operator ?funding_product - funding_product ?business_reviewer - business_reviewer ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_profile_bound ?treasury_operator)
+        (operator_funding_product_association ?treasury_operator ?funding_product)
+        (entity_reviewer_assignment ?treasury_operator ?business_reviewer)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (not
+          (instruction_product_flag ?transfer_instruction)
+        )
+        (not
+          (operator_product_bound ?treasury_operator)
+        )
+      )
+    :effect (operator_product_bound ?treasury_operator)
+  )
+  (:action authorize_operator_with_product_and_flag
+    :parameters (?treasury_operator - treasury_operator ?funding_product - funding_product ?business_reviewer - business_reviewer ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_profile_bound ?treasury_operator)
+        (operator_funding_product_association ?treasury_operator ?funding_product)
+        (entity_reviewer_assignment ?treasury_operator ?business_reviewer)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (instruction_product_flag ?transfer_instruction)
+        (not
+          (operator_product_bound ?treasury_operator)
+        )
+      )
+    :effect (operator_product_bound ?treasury_operator)
+  )
+  (:action bind_settlement_method_to_operator_primary
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_product_bound ?treasury_operator)
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (not
+          (instruction_policy_flag ?transfer_instruction)
+        )
+        (not
+          (instruction_product_flag ?transfer_instruction)
+        )
+        (not
+          (operator_ready_for_validation ?treasury_operator)
+        )
+      )
+    :effect (operator_ready_for_validation ?treasury_operator)
+  )
+  (:action bind_settlement_method_to_operator_with_window
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_product_bound ?treasury_operator)
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (instruction_policy_flag ?transfer_instruction)
+        (not
+          (instruction_product_flag ?transfer_instruction)
+        )
+        (not
+          (operator_ready_for_validation ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_profile_verified ?treasury_operator)
+      )
+  )
+  (:action bind_settlement_method_to_operator_with_alternate_window
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_product_bound ?treasury_operator)
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (not
+          (instruction_policy_flag ?transfer_instruction)
+        )
+        (instruction_product_flag ?transfer_instruction)
+        (not
+          (operator_ready_for_validation ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_profile_verified ?treasury_operator)
+      )
+  )
+  (:action bind_settlement_method_to_operator_complete
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method ?settlement_window - settlement_window ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operator_product_bound ?treasury_operator)
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (operator_settlement_window_association ?treasury_operator ?settlement_window)
+        (window_instruction_assignment ?settlement_window ?transfer_instruction)
+        (instruction_policy_flag ?transfer_instruction)
+        (instruction_product_flag ?transfer_instruction)
+        (not
+          (operator_ready_for_validation ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_profile_verified ?treasury_operator)
+      )
+  )
+  (:action finalize_operator_validation
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (not
+          (operator_profile_verified ?treasury_operator)
+        )
+        (not
+          (operator_context_locked ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_context_locked ?treasury_operator)
+        (entity_ready_for_execution ?treasury_operator)
+      )
+  )
+  (:action bind_execution_profile_to_operator
+    :parameters (?treasury_operator - treasury_operator ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_profile_verified ?treasury_operator)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (operator_execution_profile_bound ?treasury_operator ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action aggregate_execution_parameters_for_operator
+    :parameters (?treasury_operator - treasury_operator ?source_account - source_account ?destination_account - destination_account ?time_period_bucket - time_period_bucket ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_profile_verified ?treasury_operator)
+        (operator_execution_profile_bound ?treasury_operator ?execution_profile)
+        (operator_source_account_association ?treasury_operator ?source_account)
+        (operator_destination_account_association ?treasury_operator ?destination_account)
+        (pool_selection_confirmed ?source_account)
+        (destination_pool_selection_confirmed ?destination_account)
+        (entity_time_bucket_association ?treasury_operator ?time_period_bucket)
+        (not
+          (operator_orchestration_ready ?treasury_operator)
+        )
+      )
+    :effect (operator_orchestration_ready ?treasury_operator)
+  )
+  (:action seal_operator_context_after_orchestration
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (operator_ready_for_validation ?treasury_operator)
+        (operator_orchestration_ready ?treasury_operator)
+        (not
+          (operator_context_locked ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_context_locked ?treasury_operator)
+        (entity_ready_for_execution ?treasury_operator)
+      )
+  )
+  (:action engage_authority_credential
+    :parameters (?treasury_operator - treasury_operator ?authority_credential - authority_credential ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_processing_enabled ?treasury_operator)
+        (entity_time_bucket_association ?treasury_operator ?time_period_bucket)
+        (authority_credential_available ?authority_credential)
+        (operator_credential_binding ?treasury_operator ?authority_credential)
+        (not
+          (authority_engaged ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (authority_engaged ?treasury_operator)
+        (not
+          (authority_credential_available ?authority_credential)
+        )
+      )
+  )
+  (:action run_reviewer_policy_check
+    :parameters (?treasury_operator - treasury_operator ?business_reviewer - business_reviewer)
+    :precondition
+      (and
+        (authority_engaged ?treasury_operator)
+        (entity_reviewer_assignment ?treasury_operator ?business_reviewer)
+        (not
+          (authority_check_passed ?treasury_operator)
+        )
+      )
+    :effect (authority_check_passed ?treasury_operator)
+  )
+  (:action confirm_authority_approval
+    :parameters (?treasury_operator - treasury_operator ?settlement_method - settlement_method)
+    :precondition
+      (and
+        (authority_check_passed ?treasury_operator)
+        (operator_settlement_method_association ?treasury_operator ?settlement_method)
+        (not
+          (authority_approved ?treasury_operator)
+        )
+      )
+    :effect (authority_approved ?treasury_operator)
+  )
+  (:action finalize_authority_approval_for_operator
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (authority_approved ?treasury_operator)
+        (not
+          (operator_context_locked ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_context_locked ?treasury_operator)
+        (entity_ready_for_execution ?treasury_operator)
+      )
+  )
+  (:action authorize_source_account_for_execution
+    :parameters (?source_account - source_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (account_evaluation_locked ?source_account)
+        (pool_selection_confirmed ?source_account)
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_slot_confirmed ?transfer_instruction)
+        (not
+          (entity_ready_for_execution ?source_account)
+        )
+      )
+    :effect (entity_ready_for_execution ?source_account)
+  )
+  (:action authorize_destination_account_for_execution
+    :parameters (?destination_account - destination_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (destination_account_evaluation_locked ?destination_account)
+        (destination_pool_selection_confirmed ?destination_account)
+        (instruction_scheduled ?transfer_instruction)
+        (instruction_slot_confirmed ?transfer_instruction)
+        (not
+          (entity_ready_for_execution ?destination_account)
+        )
+      )
+    :effect (entity_ready_for_execution ?destination_account)
+  )
+  (:action attach_supporting_document_to_case
+    :parameters (?adjustment_case - adjustment_case ?supporting_document - supporting_document ?time_period_bucket - time_period_bucket)
+    :precondition
+      (and
+        (entity_ready_for_execution ?adjustment_case)
+        (entity_time_bucket_association ?adjustment_case ?time_period_bucket)
+        (supporting_document_available ?supporting_document)
+        (not
+          (entity_documentation_registered ?adjustment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_documentation_registered ?adjustment_case)
+        (entity_document_association ?adjustment_case ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action assign_final_routing_to_source_account
+    :parameters (?source_account - source_account ?funding_source_candidate - funding_source_candidate ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_documentation_registered ?source_account)
+        (entity_funding_candidate_link ?source_account ?funding_source_candidate)
+        (entity_document_association ?source_account ?supporting_document)
+        (not
+          (routing_assigned ?source_account)
+        )
+      )
+    :effect
+      (and
+        (routing_assigned ?source_account)
+        (candidate_available ?funding_source_candidate)
+        (supporting_document_available ?supporting_document)
+      )
+  )
+  (:action assign_final_routing_to_destination_account
+    :parameters (?destination_account - destination_account ?funding_source_candidate - funding_source_candidate ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_documentation_registered ?destination_account)
+        (entity_funding_candidate_link ?destination_account ?funding_source_candidate)
+        (entity_document_association ?destination_account ?supporting_document)
+        (not
+          (routing_assigned ?destination_account)
+        )
+      )
+    :effect
+      (and
+        (routing_assigned ?destination_account)
+        (candidate_available ?funding_source_candidate)
+        (supporting_document_available ?supporting_document)
+      )
+  )
+  (:action assign_final_routing_to_operator
+    :parameters (?treasury_operator - treasury_operator ?funding_source_candidate - funding_source_candidate ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_documentation_registered ?treasury_operator)
+        (entity_funding_candidate_link ?treasury_operator ?funding_source_candidate)
+        (entity_document_association ?treasury_operator ?supporting_document)
+        (not
+          (routing_assigned ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (routing_assigned ?treasury_operator)
+        (candidate_available ?funding_source_candidate)
+        (supporting_document_available ?supporting_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem cash_flow_adjustment_scenario)
+  (:domain cash_flow_adjustment)
+  (:objects source_account_1 - source_account destination_account_1 - destination_account treasury_operator_1 - treasury_operator treasury_operator_2 - treasury_operator funding_candidate_1 - funding_source_candidate funding_candidate_2 - funding_source_candidate funding_candidate_3 - funding_source_candidate time_bucket_1 - time_period_bucket business_reviewer_1 - business_reviewer adjustment_reason_tag_1 - adjustment_reason_tag liquidity_pool_1 - liquidity_pool counterparty_pool_1 - counterparty_pool transfer_instruction_1 - transfer_instruction settlement_window_1 - settlement_window settlement_window_2 - settlement_window policy_rule_1 - policy_rule policy_rule_2 - policy_rule execution_profile_1 - execution_profile execution_profile_2 - execution_profile supporting_document_1 - supporting_document funding_product_1 - funding_product authority_credential_1 - authority_credential authority_credential_2 - authority_credential settlement_method_1 - settlement_method)
+  (:init
+    (candidate_available funding_candidate_1)
+    (candidate_available funding_candidate_2)
+    (candidate_available funding_candidate_3)
+    (time_bucket_available time_bucket_1)
+    (reviewer_available business_reviewer_1)
+    (reason_tag_available adjustment_reason_tag_1)
+    (account_liquidity_pool source_account_1 liquidity_pool_1)
+    (destination_counterparty_pool destination_account_1 counterparty_pool_1)
+    (instruction_pending transfer_instruction_1)
+    (settlement_window_available settlement_window_1)
+    (settlement_window_available settlement_window_2)
+    (operator_source_account_association treasury_operator_1 source_account_1)
+    (operator_source_account_association treasury_operator_2 source_account_1)
+    (operator_destination_account_association treasury_operator_1 destination_account_1)
+    (operator_destination_account_association treasury_operator_2 destination_account_1)
+    (operator_instruction_association treasury_operator_1 transfer_instruction_1)
+    (operator_instruction_association treasury_operator_2 transfer_instruction_1)
+    (operator_settlement_window_association treasury_operator_1 settlement_window_1)
+    (operator_settlement_window_association treasury_operator_2 settlement_window_2)
+    (policy_rule_available policy_rule_1)
+    (policy_rule_available policy_rule_2)
+    (execution_profile_available execution_profile_1)
+    (execution_profile_available execution_profile_2)
+    (supporting_document_available supporting_document_1)
+    (funding_product_available funding_product_1)
+    (authority_credential_available authority_credential_1)
+    (operator_credential_binding treasury_operator_1 authority_credential_1)
+    (operator_credential_binding treasury_operator_2 authority_credential_2)
+    (settlement_method_available settlement_method_1)
+  )
+  (:goal
+    (and
+      (routing_assigned source_account_1)
+      (routing_assigned destination_account_1)
+      (routing_assigned treasury_operator_1)
+      (routing_assigned treasury_operator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_adjustment_case source_account_1)
+(associate_funding_candidate source_account_1 funding_candidate_1)
+(reserve_time_bucket_for_case source_account_1 time_bucket_1)
+(mark_case_review_ready source_account_1 time_bucket_1)
+(apply_reason_tag_to_account source_account_1 liquidity_pool_1 adjustment_reason_tag_1)
+(confirm_pool_selection_with_tag source_account_1 liquidity_pool_1 time_bucket_1 adjustment_reason_tag_1)
+(release_time_bucket_assignment source_account_1 time_bucket_1)
+(register_adjustment_case destination_account_1)
+(associate_funding_candidate destination_account_1 funding_candidate_2)
+(reserve_time_bucket_for_case destination_account_1 time_bucket_1)
+(mark_case_review_ready destination_account_1 time_bucket_1)
+(apply_reason_tag_to_destination destination_account_1 counterparty_pool_1 adjustment_reason_tag_1)
+(confirm_destination_pool_selection_with_tag destination_account_1 counterparty_pool_1 time_bucket_1 adjustment_reason_tag_1)
+(assemble_transfer_instruction source_account_1 destination_account_1 liquidity_pool_1 counterparty_pool_1 transfer_instruction_1)
+(release_time_bucket_assignment destination_account_1 time_bucket_1)
+(reserve_time_bucket_for_case source_account_1 time_bucket_1)
+(confirm_instruction_ready_for_settlement_slot transfer_instruction_1 source_account_1 time_bucket_1)
+(authorize_source_account_for_execution source_account_1 transfer_instruction_1)
+(authorize_destination_account_for_execution destination_account_1 transfer_instruction_1)
+(attach_supporting_document_to_case source_account_1 supporting_document_1 time_bucket_1)
+(assign_final_routing_to_source_account source_account_1 funding_candidate_1 supporting_document_1)
+(release_time_bucket_assignment source_account_1 time_bucket_1)
+(reserve_time_bucket_for_case destination_account_1 time_bucket_1)
+(attach_supporting_document_to_case destination_account_1 supporting_document_1 time_bucket_1)
+(assign_final_routing_to_destination_account destination_account_1 funding_candidate_2 supporting_document_1)
+(release_time_bucket_assignment destination_account_1 time_bucket_1)
+(register_adjustment_case treasury_operator_1)
+(associate_funding_candidate treasury_operator_1 funding_candidate_1)
+(reserve_time_bucket_for_case treasury_operator_1 time_bucket_1)
+(mark_case_review_ready treasury_operator_1 time_bucket_1)
+(bind_funding_product_to_operator treasury_operator_1 funding_product_1)
+(bind_settlement_method_to_operator treasury_operator_1 settlement_method_1)
+(reserve_settlement_window_slot treasury_operator_1 settlement_window_1 transfer_instruction_1)
+(assign_reviewer_to_case treasury_operator_1 business_reviewer_1)
+(assign_operator_context_for_instruction treasury_operator_1 settlement_window_1 transfer_instruction_1 time_bucket_1)
+(authorize_operator_with_product treasury_operator_1 funding_product_1 business_reviewer_1 settlement_window_1 transfer_instruction_1)
+(bind_settlement_method_to_operator_primary treasury_operator_1 settlement_method_1 settlement_window_1 transfer_instruction_1)
+(finalize_operator_validation treasury_operator_1)
+(attach_supporting_document_to_case treasury_operator_1 supporting_document_1 time_bucket_1)
+(assign_final_routing_to_operator treasury_operator_1 funding_candidate_1 supporting_document_1)
+(unassign_reviewer_from_case treasury_operator_1 business_reviewer_1)
+(release_time_bucket_assignment treasury_operator_1 time_bucket_1)
+(unbind_funding_product_from_operator treasury_operator_1 funding_product_1)
+(unbind_settlement_method_from_operator treasury_operator_1 settlement_method_1)
+(register_adjustment_case treasury_operator_2)
+(associate_funding_candidate treasury_operator_2 funding_candidate_3)
+(reserve_time_bucket_for_case treasury_operator_2 time_bucket_1)
+(mark_case_review_ready treasury_operator_2 time_bucket_1)
+(bind_funding_product_to_operator treasury_operator_2 funding_product_1)
+(bind_settlement_method_to_operator treasury_operator_2 settlement_method_1)
+(reserve_settlement_window_slot treasury_operator_2 settlement_window_2 transfer_instruction_1)
+(assign_reviewer_to_case treasury_operator_2 business_reviewer_1)
+(assign_operator_context_for_instruction treasury_operator_2 settlement_window_2 transfer_instruction_1 time_bucket_1)
+(authorize_operator_with_product treasury_operator_2 funding_product_1 business_reviewer_1 settlement_window_2 transfer_instruction_1)
+(bind_settlement_method_to_operator_primary treasury_operator_2 settlement_method_1 settlement_window_2 transfer_instruction_1)
+(finalize_operator_validation treasury_operator_2)
+(attach_supporting_document_to_case treasury_operator_2 supporting_document_1 time_bucket_1)
+(assign_final_routing_to_operator treasury_operator_2 funding_candidate_3 supporting_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_y9ouxsdo/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_y9ouxsdo/plan.pddl 58 
+
+
+
+--- stderr ---
+

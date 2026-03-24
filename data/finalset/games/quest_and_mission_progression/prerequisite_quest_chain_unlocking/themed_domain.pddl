@@ -1,0 +1,937 @@
+(define (domain quest_chain_unlocking)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object gameplay_entity_meta - entity resource_entity_meta - entity flag_entity_meta - entity domain_root - entity quest_node - domain_root unlock_token - gameplay_entity_meta requirement - gameplay_entity_meta npc_agent - gameplay_entity_meta credential_token - gameplay_entity_meta consumable_permit - gameplay_entity_meta progression_marker - gameplay_entity_meta reward_variant - gameplay_entity_meta special_modifier - gameplay_entity_meta collectible_item - resource_entity_meta collection_subobjective - resource_entity_meta unique_artifact - resource_entity_meta checkpoint_flag_a - flag_entity_meta checkpoint_flag_b - flag_entity_meta unlockable_package - flag_entity_meta quest_branch - quest_node quest_group - quest_node mainline_node - quest_branch sidechain_node - quest_branch quest_line - quest_group)
+
+  (:predicates
+    (quest_offered ?quest_node - quest_node)
+    (quest_activated ?quest_node - quest_node)
+    (prerequisite_attached ?quest_node - quest_node)
+    (quest_unlocked ?quest_node - quest_node)
+    (quest_component_completed ?quest_node - quest_node)
+    (progression_marker_assigned ?quest_node - quest_node)
+    (unlock_token_available ?unlock_token - unlock_token)
+    (unlock_token_bound_to_quest ?quest_node - quest_node ?unlock_token - unlock_token)
+    (requirement_available ?requirement - requirement)
+    (node_requirement_assigned ?quest_node - quest_node ?requirement - requirement)
+    (npc_available ?npc_agent - npc_agent)
+    (npc_bound_to_node ?quest_node - quest_node ?npc_agent - npc_agent)
+    (collectible_available ?collectible_item - collectible_item)
+    (mainline_item_assigned ?mainline_node - mainline_node ?collectible_item - collectible_item)
+    (sidechain_item_assigned ?sidechain_node - sidechain_node ?collectible_item - collectible_item)
+    (node_flag_a_binding ?mainline_node - mainline_node ?checkpoint_flag_a - checkpoint_flag_a)
+    (checkpoint_a_active ?checkpoint_flag_a - checkpoint_flag_a)
+    (checkpoint_a_pending ?checkpoint_flag_a - checkpoint_flag_a)
+    (mainline_stage_completed ?mainline_node - mainline_node)
+    (node_flag_b_binding ?sidechain_node - sidechain_node ?checkpoint_flag_b - checkpoint_flag_b)
+    (checkpoint_b_active ?checkpoint_flag_b - checkpoint_flag_b)
+    (checkpoint_b_pending ?checkpoint_flag_b - checkpoint_flag_b)
+    (sidechain_stage_completed ?sidechain_node - sidechain_node)
+    (unlockable_candidate ?unlockable_package - unlockable_package)
+    (unlockable_created ?unlockable_package - unlockable_package)
+    (unlockable_flag_a_link ?unlockable_package - unlockable_package ?checkpoint_flag_a - checkpoint_flag_a)
+    (unlockable_flag_b_link ?unlockable_package - unlockable_package ?checkpoint_flag_b - checkpoint_flag_b)
+    (unlockable_variant_tag_a ?unlockable_package - unlockable_package)
+    (unlockable_variant_tag_b ?unlockable_package - unlockable_package)
+    (unlockable_finalized ?unlockable_package - unlockable_package)
+    (quest_line_includes_mainline ?quest_line - quest_line ?mainline_node - mainline_node)
+    (quest_line_includes_sidechain ?quest_line - quest_line ?sidechain_node - sidechain_node)
+    (quest_line_includes_unlockable ?quest_line - quest_line ?unlockable_package - unlockable_package)
+    (subobjective_available ?collection_subobjective - collection_subobjective)
+    (quest_line_has_subobjective ?quest_line - quest_line ?collection_subobjective - collection_subobjective)
+    (subobjective_completed ?collection_subobjective - collection_subobjective)
+    (subobjective_link_to_unlockable ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    (quest_line_collection_ready ?quest_line - quest_line)
+    (collection_phase_one_complete ?quest_line - quest_line)
+    (ready_for_finalization ?quest_line - quest_line)
+    (credential_bound_to_line ?quest_line - quest_line)
+    (credential_phase_applied ?quest_line - quest_line)
+    (permit_slot_open ?quest_line - quest_line)
+    (ready_for_completion ?quest_line - quest_line)
+    (artifact_available ?unique_artifact - unique_artifact)
+    (line_bound_to_artifact ?quest_line - quest_line ?unique_artifact - unique_artifact)
+    (artifact_attached_to_line ?quest_line - quest_line)
+    (artifact_phase_registered ?quest_line - quest_line)
+    (artifact_completion_ready ?quest_line - quest_line)
+    (credential_available ?credential_token - credential_token)
+    (line_bound_to_credential ?quest_line - quest_line ?credential_token - credential_token)
+    (permit_available ?consumable_permit - consumable_permit)
+    (line_has_permit ?quest_line - quest_line ?consumable_permit - consumable_permit)
+    (reward_variant_available ?reward_variant - reward_variant)
+    (line_reward_variant_assigned ?quest_line - quest_line ?reward_variant - reward_variant)
+    (special_modifier_available ?special_modifier - special_modifier)
+    (line_special_modifier_assigned ?quest_line - quest_line ?special_modifier - special_modifier)
+    (progression_marker_available ?progression_marker - progression_marker)
+    (node_progression_marker_link ?quest_node - quest_node ?progression_marker - progression_marker)
+    (mainline_ready_flag ?mainline_node - mainline_node)
+    (sidechain_ready_flag ?sidechain_node - sidechain_node)
+    (quest_line_completed ?quest_line - quest_line)
+  )
+  (:action offer_quest_node
+    :parameters (?quest_node - quest_node)
+    :precondition
+      (and
+        (not
+          (quest_offered ?quest_node)
+        )
+        (not
+          (quest_unlocked ?quest_node)
+        )
+      )
+    :effect (quest_offered ?quest_node)
+  )
+  (:action bind_unlock_token_to_node
+    :parameters (?quest_node - quest_node ?unlock_token - unlock_token)
+    :precondition
+      (and
+        (quest_offered ?quest_node)
+        (not
+          (prerequisite_attached ?quest_node)
+        )
+        (unlock_token_available ?unlock_token)
+      )
+    :effect
+      (and
+        (prerequisite_attached ?quest_node)
+        (unlock_token_bound_to_quest ?quest_node ?unlock_token)
+        (not
+          (unlock_token_available ?unlock_token)
+        )
+      )
+  )
+  (:action assign_requirement_to_node
+    :parameters (?quest_node - quest_node ?requirement - requirement)
+    :precondition
+      (and
+        (quest_offered ?quest_node)
+        (prerequisite_attached ?quest_node)
+        (requirement_available ?requirement)
+      )
+    :effect
+      (and
+        (node_requirement_assigned ?quest_node ?requirement)
+        (not
+          (requirement_available ?requirement)
+        )
+      )
+  )
+  (:action activate_quest_node
+    :parameters (?quest_node - quest_node ?requirement - requirement)
+    :precondition
+      (and
+        (quest_offered ?quest_node)
+        (prerequisite_attached ?quest_node)
+        (node_requirement_assigned ?quest_node ?requirement)
+        (not
+          (quest_activated ?quest_node)
+        )
+      )
+    :effect (quest_activated ?quest_node)
+  )
+  (:action release_requirement_from_node
+    :parameters (?quest_node - quest_node ?requirement - requirement)
+    :precondition
+      (and
+        (node_requirement_assigned ?quest_node ?requirement)
+      )
+    :effect
+      (and
+        (requirement_available ?requirement)
+        (not
+          (node_requirement_assigned ?quest_node ?requirement)
+        )
+      )
+  )
+  (:action attach_npc_to_node
+    :parameters (?quest_node - quest_node ?npc_agent - npc_agent)
+    :precondition
+      (and
+        (quest_activated ?quest_node)
+        (npc_available ?npc_agent)
+      )
+    :effect
+      (and
+        (npc_bound_to_node ?quest_node ?npc_agent)
+        (not
+          (npc_available ?npc_agent)
+        )
+      )
+  )
+  (:action detach_npc_from_node
+    :parameters (?quest_node - quest_node ?npc_agent - npc_agent)
+    :precondition
+      (and
+        (npc_bound_to_node ?quest_node ?npc_agent)
+      )
+    :effect
+      (and
+        (npc_available ?npc_agent)
+        (not
+          (npc_bound_to_node ?quest_node ?npc_agent)
+        )
+      )
+  )
+  (:action assign_reward_variant_to_line
+    :parameters (?quest_line - quest_line ?reward_variant - reward_variant)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (reward_variant_available ?reward_variant)
+      )
+    :effect
+      (and
+        (line_reward_variant_assigned ?quest_line ?reward_variant)
+        (not
+          (reward_variant_available ?reward_variant)
+        )
+      )
+  )
+  (:action revoke_reward_variant_from_line
+    :parameters (?quest_line - quest_line ?reward_variant - reward_variant)
+    :precondition
+      (and
+        (line_reward_variant_assigned ?quest_line ?reward_variant)
+      )
+    :effect
+      (and
+        (reward_variant_available ?reward_variant)
+        (not
+          (line_reward_variant_assigned ?quest_line ?reward_variant)
+        )
+      )
+  )
+  (:action assign_special_modifier_to_line
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (special_modifier_available ?special_modifier)
+      )
+    :effect
+      (and
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (not
+          (special_modifier_available ?special_modifier)
+        )
+      )
+  )
+  (:action revoke_special_modifier_from_line
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+      )
+    :effect
+      (and
+        (special_modifier_available ?special_modifier)
+        (not
+          (line_special_modifier_assigned ?quest_line ?special_modifier)
+        )
+      )
+  )
+  (:action activate_mainline_checkpoint
+    :parameters (?mainline_node - mainline_node ?checkpoint_flag_a - checkpoint_flag_a ?requirement - requirement)
+    :precondition
+      (and
+        (quest_activated ?mainline_node)
+        (node_requirement_assigned ?mainline_node ?requirement)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (not
+          (checkpoint_a_active ?checkpoint_flag_a)
+        )
+        (not
+          (checkpoint_a_pending ?checkpoint_flag_a)
+        )
+      )
+    :effect (checkpoint_a_active ?checkpoint_flag_a)
+  )
+  (:action complete_mainline_checkpoint_via_npc
+    :parameters (?mainline_node - mainline_node ?checkpoint_flag_a - checkpoint_flag_a ?npc_agent - npc_agent)
+    :precondition
+      (and
+        (quest_activated ?mainline_node)
+        (npc_bound_to_node ?mainline_node ?npc_agent)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (checkpoint_a_active ?checkpoint_flag_a)
+        (not
+          (mainline_ready_flag ?mainline_node)
+        )
+      )
+    :effect
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (mainline_stage_completed ?mainline_node)
+      )
+  )
+  (:action consume_collectible_for_mainline
+    :parameters (?mainline_node - mainline_node ?checkpoint_flag_a - checkpoint_flag_a ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (quest_activated ?mainline_node)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (collectible_available ?collectible_item)
+        (not
+          (mainline_ready_flag ?mainline_node)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_a_pending ?checkpoint_flag_a)
+        (mainline_ready_flag ?mainline_node)
+        (mainline_item_assigned ?mainline_node ?collectible_item)
+        (not
+          (collectible_available ?collectible_item)
+        )
+      )
+  )
+  (:action finalize_mainline_checkpoint
+    :parameters (?mainline_node - mainline_node ?checkpoint_flag_a - checkpoint_flag_a ?requirement - requirement ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (quest_activated ?mainline_node)
+        (node_requirement_assigned ?mainline_node ?requirement)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (checkpoint_a_pending ?checkpoint_flag_a)
+        (mainline_item_assigned ?mainline_node ?collectible_item)
+        (not
+          (mainline_stage_completed ?mainline_node)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_a_active ?checkpoint_flag_a)
+        (mainline_stage_completed ?mainline_node)
+        (collectible_available ?collectible_item)
+        (not
+          (mainline_item_assigned ?mainline_node ?collectible_item)
+        )
+      )
+  )
+  (:action activate_sidechain_checkpoint
+    :parameters (?sidechain_node - sidechain_node ?checkpoint_flag_b - checkpoint_flag_b ?requirement - requirement)
+    :precondition
+      (and
+        (quest_activated ?sidechain_node)
+        (node_requirement_assigned ?sidechain_node ?requirement)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (not
+          (checkpoint_b_active ?checkpoint_flag_b)
+        )
+        (not
+          (checkpoint_b_pending ?checkpoint_flag_b)
+        )
+      )
+    :effect (checkpoint_b_active ?checkpoint_flag_b)
+  )
+  (:action complete_sidechain_checkpoint_via_npc
+    :parameters (?sidechain_node - sidechain_node ?checkpoint_flag_b - checkpoint_flag_b ?npc_agent - npc_agent)
+    :precondition
+      (and
+        (quest_activated ?sidechain_node)
+        (npc_bound_to_node ?sidechain_node ?npc_agent)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_b_active ?checkpoint_flag_b)
+        (not
+          (sidechain_ready_flag ?sidechain_node)
+        )
+      )
+    :effect
+      (and
+        (sidechain_ready_flag ?sidechain_node)
+        (sidechain_stage_completed ?sidechain_node)
+      )
+  )
+  (:action consume_collectible_for_sidechain
+    :parameters (?sidechain_node - sidechain_node ?checkpoint_flag_b - checkpoint_flag_b ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (quest_activated ?sidechain_node)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (collectible_available ?collectible_item)
+        (not
+          (sidechain_ready_flag ?sidechain_node)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_b_pending ?checkpoint_flag_b)
+        (sidechain_ready_flag ?sidechain_node)
+        (sidechain_item_assigned ?sidechain_node ?collectible_item)
+        (not
+          (collectible_available ?collectible_item)
+        )
+      )
+  )
+  (:action finalize_sidechain_checkpoint
+    :parameters (?sidechain_node - sidechain_node ?checkpoint_flag_b - checkpoint_flag_b ?requirement - requirement ?collectible_item - collectible_item)
+    :precondition
+      (and
+        (quest_activated ?sidechain_node)
+        (node_requirement_assigned ?sidechain_node ?requirement)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_b_pending ?checkpoint_flag_b)
+        (sidechain_item_assigned ?sidechain_node ?collectible_item)
+        (not
+          (sidechain_stage_completed ?sidechain_node)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_b_active ?checkpoint_flag_b)
+        (sidechain_stage_completed ?sidechain_node)
+        (collectible_available ?collectible_item)
+        (not
+          (sidechain_item_assigned ?sidechain_node ?collectible_item)
+        )
+      )
+  )
+  (:action assemble_unlockable_package_default
+    :parameters (?mainline_node - mainline_node ?sidechain_node - sidechain_node ?checkpoint_flag_a - checkpoint_flag_a ?checkpoint_flag_b - checkpoint_flag_b ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (sidechain_ready_flag ?sidechain_node)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_a_active ?checkpoint_flag_a)
+        (checkpoint_b_active ?checkpoint_flag_b)
+        (mainline_stage_completed ?mainline_node)
+        (sidechain_stage_completed ?sidechain_node)
+        (unlockable_candidate ?unlockable_package)
+      )
+    :effect
+      (and
+        (unlockable_created ?unlockable_package)
+        (unlockable_flag_a_link ?unlockable_package ?checkpoint_flag_a)
+        (unlockable_flag_b_link ?unlockable_package ?checkpoint_flag_b)
+        (not
+          (unlockable_candidate ?unlockable_package)
+        )
+      )
+  )
+  (:action assemble_unlockable_package_set_variant_a
+    :parameters (?mainline_node - mainline_node ?sidechain_node - sidechain_node ?checkpoint_flag_a - checkpoint_flag_a ?checkpoint_flag_b - checkpoint_flag_b ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (sidechain_ready_flag ?sidechain_node)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_a_pending ?checkpoint_flag_a)
+        (checkpoint_b_active ?checkpoint_flag_b)
+        (not
+          (mainline_stage_completed ?mainline_node)
+        )
+        (sidechain_stage_completed ?sidechain_node)
+        (unlockable_candidate ?unlockable_package)
+      )
+    :effect
+      (and
+        (unlockable_created ?unlockable_package)
+        (unlockable_flag_a_link ?unlockable_package ?checkpoint_flag_a)
+        (unlockable_flag_b_link ?unlockable_package ?checkpoint_flag_b)
+        (unlockable_variant_tag_a ?unlockable_package)
+        (not
+          (unlockable_candidate ?unlockable_package)
+        )
+      )
+  )
+  (:action assemble_unlockable_package_set_variant_b
+    :parameters (?mainline_node - mainline_node ?sidechain_node - sidechain_node ?checkpoint_flag_a - checkpoint_flag_a ?checkpoint_flag_b - checkpoint_flag_b ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (sidechain_ready_flag ?sidechain_node)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_a_active ?checkpoint_flag_a)
+        (checkpoint_b_pending ?checkpoint_flag_b)
+        (mainline_stage_completed ?mainline_node)
+        (not
+          (sidechain_stage_completed ?sidechain_node)
+        )
+        (unlockable_candidate ?unlockable_package)
+      )
+    :effect
+      (and
+        (unlockable_created ?unlockable_package)
+        (unlockable_flag_a_link ?unlockable_package ?checkpoint_flag_a)
+        (unlockable_flag_b_link ?unlockable_package ?checkpoint_flag_b)
+        (unlockable_variant_tag_b ?unlockable_package)
+        (not
+          (unlockable_candidate ?unlockable_package)
+        )
+      )
+  )
+  (:action assemble_unlockable_package_set_variants_ab
+    :parameters (?mainline_node - mainline_node ?sidechain_node - sidechain_node ?checkpoint_flag_a - checkpoint_flag_a ?checkpoint_flag_b - checkpoint_flag_b ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (sidechain_ready_flag ?sidechain_node)
+        (node_flag_a_binding ?mainline_node ?checkpoint_flag_a)
+        (node_flag_b_binding ?sidechain_node ?checkpoint_flag_b)
+        (checkpoint_a_pending ?checkpoint_flag_a)
+        (checkpoint_b_pending ?checkpoint_flag_b)
+        (not
+          (mainline_stage_completed ?mainline_node)
+        )
+        (not
+          (sidechain_stage_completed ?sidechain_node)
+        )
+        (unlockable_candidate ?unlockable_package)
+      )
+    :effect
+      (and
+        (unlockable_created ?unlockable_package)
+        (unlockable_flag_a_link ?unlockable_package ?checkpoint_flag_a)
+        (unlockable_flag_b_link ?unlockable_package ?checkpoint_flag_b)
+        (unlockable_variant_tag_a ?unlockable_package)
+        (unlockable_variant_tag_b ?unlockable_package)
+        (not
+          (unlockable_candidate ?unlockable_package)
+        )
+      )
+  )
+  (:action finalize_unlockable_package
+    :parameters (?unlockable_package - unlockable_package ?mainline_node - mainline_node ?requirement - requirement)
+    :precondition
+      (and
+        (unlockable_created ?unlockable_package)
+        (mainline_ready_flag ?mainline_node)
+        (node_requirement_assigned ?mainline_node ?requirement)
+        (not
+          (unlockable_finalized ?unlockable_package)
+        )
+      )
+    :effect (unlockable_finalized ?unlockable_package)
+  )
+  (:action complete_subobjective
+    :parameters (?quest_line - quest_line ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (quest_line_includes_unlockable ?quest_line ?unlockable_package)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_available ?collection_subobjective)
+        (unlockable_created ?unlockable_package)
+        (unlockable_finalized ?unlockable_package)
+        (not
+          (subobjective_completed ?collection_subobjective)
+        )
+      )
+    :effect
+      (and
+        (subobjective_completed ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (not
+          (subobjective_available ?collection_subobjective)
+        )
+      )
+  )
+  (:action prepare_collection_on_line
+    :parameters (?quest_line - quest_line ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package ?requirement - requirement)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_completed ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (node_requirement_assigned ?quest_line ?requirement)
+        (not
+          (unlockable_variant_tag_a ?unlockable_package)
+        )
+        (not
+          (quest_line_collection_ready ?quest_line)
+        )
+      )
+    :effect (quest_line_collection_ready ?quest_line)
+  )
+  (:action attach_credential_to_line
+    :parameters (?quest_line - quest_line ?credential_token - credential_token)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (credential_available ?credential_token)
+        (not
+          (credential_bound_to_line ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (credential_bound_to_line ?quest_line)
+        (line_bound_to_credential ?quest_line ?credential_token)
+        (not
+          (credential_available ?credential_token)
+        )
+      )
+  )
+  (:action apply_credential_and_prepare_collection
+    :parameters (?quest_line - quest_line ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package ?requirement - requirement ?credential_token - credential_token)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_completed ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (node_requirement_assigned ?quest_line ?requirement)
+        (unlockable_variant_tag_a ?unlockable_package)
+        (credential_bound_to_line ?quest_line)
+        (line_bound_to_credential ?quest_line ?credential_token)
+        (not
+          (quest_line_collection_ready ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (quest_line_collection_ready ?quest_line)
+        (credential_phase_applied ?quest_line)
+      )
+  )
+  (:action mark_collection_phase_one_ready
+    :parameters (?quest_line - quest_line ?reward_variant - reward_variant ?npc_agent - npc_agent ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (quest_line_collection_ready ?quest_line)
+        (line_reward_variant_assigned ?quest_line ?reward_variant)
+        (npc_bound_to_node ?quest_line ?npc_agent)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (not
+          (unlockable_variant_tag_b ?unlockable_package)
+        )
+        (not
+          (collection_phase_one_complete ?quest_line)
+        )
+      )
+    :effect (collection_phase_one_complete ?quest_line)
+  )
+  (:action confirm_collection_phase_one_ready
+    :parameters (?quest_line - quest_line ?reward_variant - reward_variant ?npc_agent - npc_agent ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (quest_line_collection_ready ?quest_line)
+        (line_reward_variant_assigned ?quest_line ?reward_variant)
+        (npc_bound_to_node ?quest_line ?npc_agent)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (unlockable_variant_tag_b ?unlockable_package)
+        (not
+          (collection_phase_one_complete ?quest_line)
+        )
+      )
+    :effect (collection_phase_one_complete ?quest_line)
+  )
+  (:action activate_finalization_slot
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (collection_phase_one_complete ?quest_line)
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (not
+          (unlockable_variant_tag_a ?unlockable_package)
+        )
+        (not
+          (unlockable_variant_tag_b ?unlockable_package)
+        )
+        (not
+          (ready_for_finalization ?quest_line)
+        )
+      )
+    :effect (ready_for_finalization ?quest_line)
+  )
+  (:action activate_finalization_slot_with_permit_slot
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (collection_phase_one_complete ?quest_line)
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (unlockable_variant_tag_a ?unlockable_package)
+        (not
+          (unlockable_variant_tag_b ?unlockable_package)
+        )
+        (not
+          (ready_for_finalization ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (ready_for_finalization ?quest_line)
+        (permit_slot_open ?quest_line)
+      )
+  )
+  (:action activate_finalization_slot_with_permit_slot_variant
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (collection_phase_one_complete ?quest_line)
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (not
+          (unlockable_variant_tag_a ?unlockable_package)
+        )
+        (unlockable_variant_tag_b ?unlockable_package)
+        (not
+          (ready_for_finalization ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (ready_for_finalization ?quest_line)
+        (permit_slot_open ?quest_line)
+      )
+  )
+  (:action activate_finalization_slot_with_permit_slot_all
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier ?collection_subobjective - collection_subobjective ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (collection_phase_one_complete ?quest_line)
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (quest_line_has_subobjective ?quest_line ?collection_subobjective)
+        (subobjective_link_to_unlockable ?collection_subobjective ?unlockable_package)
+        (unlockable_variant_tag_a ?unlockable_package)
+        (unlockable_variant_tag_b ?unlockable_package)
+        (not
+          (ready_for_finalization ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (ready_for_finalization ?quest_line)
+        (permit_slot_open ?quest_line)
+      )
+  )
+  (:action finalize_quest_line_stage
+    :parameters (?quest_line - quest_line)
+    :precondition
+      (and
+        (ready_for_finalization ?quest_line)
+        (not
+          (permit_slot_open ?quest_line)
+        )
+        (not
+          (quest_line_completed ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (quest_line_completed ?quest_line)
+        (quest_component_completed ?quest_line)
+      )
+  )
+  (:action assign_permit_to_line
+    :parameters (?quest_line - quest_line ?consumable_permit - consumable_permit)
+    :precondition
+      (and
+        (ready_for_finalization ?quest_line)
+        (permit_slot_open ?quest_line)
+        (permit_available ?consumable_permit)
+      )
+    :effect
+      (and
+        (line_has_permit ?quest_line ?consumable_permit)
+        (not
+          (permit_available ?consumable_permit)
+        )
+      )
+  )
+  (:action validate_and_mark_line_ready
+    :parameters (?quest_line - quest_line ?mainline_node - mainline_node ?sidechain_node - sidechain_node ?requirement - requirement ?consumable_permit - consumable_permit)
+    :precondition
+      (and
+        (ready_for_finalization ?quest_line)
+        (permit_slot_open ?quest_line)
+        (line_has_permit ?quest_line ?consumable_permit)
+        (quest_line_includes_mainline ?quest_line ?mainline_node)
+        (quest_line_includes_sidechain ?quest_line ?sidechain_node)
+        (mainline_stage_completed ?mainline_node)
+        (sidechain_stage_completed ?sidechain_node)
+        (node_requirement_assigned ?quest_line ?requirement)
+        (not
+          (ready_for_completion ?quest_line)
+        )
+      )
+    :effect (ready_for_completion ?quest_line)
+  )
+  (:action finalize_quest_line_postvalidation
+    :parameters (?quest_line - quest_line)
+    :precondition
+      (and
+        (ready_for_finalization ?quest_line)
+        (ready_for_completion ?quest_line)
+        (not
+          (quest_line_completed ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (quest_line_completed ?quest_line)
+        (quest_component_completed ?quest_line)
+      )
+  )
+  (:action attach_artifact_to_line
+    :parameters (?quest_line - quest_line ?unique_artifact - unique_artifact ?requirement - requirement)
+    :precondition
+      (and
+        (quest_activated ?quest_line)
+        (node_requirement_assigned ?quest_line ?requirement)
+        (artifact_available ?unique_artifact)
+        (line_bound_to_artifact ?quest_line ?unique_artifact)
+        (not
+          (artifact_attached_to_line ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (artifact_attached_to_line ?quest_line)
+        (not
+          (artifact_available ?unique_artifact)
+        )
+      )
+  )
+  (:action prepare_artifact_for_line
+    :parameters (?quest_line - quest_line ?npc_agent - npc_agent)
+    :precondition
+      (and
+        (artifact_attached_to_line ?quest_line)
+        (npc_bound_to_node ?quest_line ?npc_agent)
+        (not
+          (artifact_phase_registered ?quest_line)
+        )
+      )
+    :effect (artifact_phase_registered ?quest_line)
+  )
+  (:action activate_artifact_for_completion
+    :parameters (?quest_line - quest_line ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (artifact_phase_registered ?quest_line)
+        (line_special_modifier_assigned ?quest_line ?special_modifier)
+        (not
+          (artifact_completion_ready ?quest_line)
+        )
+      )
+    :effect (artifact_completion_ready ?quest_line)
+  )
+  (:action finalize_line_with_artifact
+    :parameters (?quest_line - quest_line)
+    :precondition
+      (and
+        (artifact_completion_ready ?quest_line)
+        (not
+          (quest_line_completed ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (quest_line_completed ?quest_line)
+        (quest_component_completed ?quest_line)
+      )
+  )
+  (:action grant_completion_to_mainline_node
+    :parameters (?mainline_node - mainline_node ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (mainline_ready_flag ?mainline_node)
+        (mainline_stage_completed ?mainline_node)
+        (unlockable_created ?unlockable_package)
+        (unlockable_finalized ?unlockable_package)
+        (not
+          (quest_component_completed ?mainline_node)
+        )
+      )
+    :effect (quest_component_completed ?mainline_node)
+  )
+  (:action grant_completion_to_sidechain_node
+    :parameters (?sidechain_node - sidechain_node ?unlockable_package - unlockable_package)
+    :precondition
+      (and
+        (sidechain_ready_flag ?sidechain_node)
+        (sidechain_stage_completed ?sidechain_node)
+        (unlockable_created ?unlockable_package)
+        (unlockable_finalized ?unlockable_package)
+        (not
+          (quest_component_completed ?sidechain_node)
+        )
+      )
+    :effect (quest_component_completed ?sidechain_node)
+  )
+  (:action issue_progression_marker
+    :parameters (?quest_node - quest_node ?progression_marker - progression_marker ?requirement - requirement)
+    :precondition
+      (and
+        (quest_component_completed ?quest_node)
+        (node_requirement_assigned ?quest_node ?requirement)
+        (progression_marker_available ?progression_marker)
+        (not
+          (progression_marker_assigned ?quest_node)
+        )
+      )
+    :effect
+      (and
+        (progression_marker_assigned ?quest_node)
+        (node_progression_marker_link ?quest_node ?progression_marker)
+        (not
+          (progression_marker_available ?progression_marker)
+        )
+      )
+  )
+  (:action finalize_node_unlock_mainline
+    :parameters (?mainline_node - mainline_node ?unlock_token - unlock_token ?progression_marker - progression_marker)
+    :precondition
+      (and
+        (progression_marker_assigned ?mainline_node)
+        (unlock_token_bound_to_quest ?mainline_node ?unlock_token)
+        (node_progression_marker_link ?mainline_node ?progression_marker)
+        (not
+          (quest_unlocked ?mainline_node)
+        )
+      )
+    :effect
+      (and
+        (quest_unlocked ?mainline_node)
+        (unlock_token_available ?unlock_token)
+        (progression_marker_available ?progression_marker)
+      )
+  )
+  (:action finalize_node_unlock_sidechain
+    :parameters (?sidechain_node - sidechain_node ?unlock_token - unlock_token ?progression_marker - progression_marker)
+    :precondition
+      (and
+        (progression_marker_assigned ?sidechain_node)
+        (unlock_token_bound_to_quest ?sidechain_node ?unlock_token)
+        (node_progression_marker_link ?sidechain_node ?progression_marker)
+        (not
+          (quest_unlocked ?sidechain_node)
+        )
+      )
+    :effect
+      (and
+        (quest_unlocked ?sidechain_node)
+        (unlock_token_available ?unlock_token)
+        (progression_marker_available ?progression_marker)
+      )
+  )
+  (:action finalize_node_unlock_line
+    :parameters (?quest_line - quest_line ?unlock_token - unlock_token ?progression_marker - progression_marker)
+    :precondition
+      (and
+        (progression_marker_assigned ?quest_line)
+        (unlock_token_bound_to_quest ?quest_line ?unlock_token)
+        (node_progression_marker_link ?quest_line ?progression_marker)
+        (not
+          (quest_unlocked ?quest_line)
+        )
+      )
+    :effect
+      (and
+        (quest_unlocked ?quest_line)
+        (unlock_token_available ?unlock_token)
+        (progression_marker_available ?progression_marker)
+      )
+  )
+)

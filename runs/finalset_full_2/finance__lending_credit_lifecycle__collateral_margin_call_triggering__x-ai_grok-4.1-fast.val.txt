@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain collateral_margin_call_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object case_resource_category - object metric_and_bundle_category - object case_root - object credit_case - case_root collateral_asset - resource_category valuation_feed - resource_category agent - resource_category supporting_document - resource_category remedy_option - resource_category triggering_event - resource_category pricing_model - resource_category escalation_contact - resource_category collateral_allocation_unit - case_resource_category collateral_item - case_resource_category legal_policy_record - case_resource_category borrower_exposure_metric - metric_and_bundle_category counterparty_exposure_metric - metric_and_bundle_category margin_call_bundle - metric_and_bundle_category exposure_subclass - credit_case process_subclass - credit_case borrower_exposure - exposure_subclass counterparty_exposure - exposure_subclass margin_process - process_subclass)
+  (:predicates
+    (case_registered ?credit_case - credit_case)
+    (onboarded ?credit_case - credit_case)
+    (collateral_attached ?credit_case - credit_case)
+    (triggered ?credit_case - credit_case)
+    (ready_for_execution ?credit_case - credit_case)
+    (trigger_created ?credit_case - credit_case)
+    (collateral_available ?collateral_asset - collateral_asset)
+    (collateral_link ?credit_case - credit_case ?collateral_asset - collateral_asset)
+    (valuation_feed_available ?valuation_feed - valuation_feed)
+    (valuation_binding ?credit_case - credit_case ?valuation_feed - valuation_feed)
+    (agent_available ?assigned_agent - agent)
+    (agent_assignment ?credit_case - credit_case ?assigned_agent - agent)
+    (allocation_unit_available ?collateral_allocation_unit - collateral_allocation_unit)
+    (borrower_allocation_to_unit ?borrower_exposure - borrower_exposure ?collateral_allocation_unit - collateral_allocation_unit)
+    (counterparty_allocation_to_unit ?counterparty_exposure - counterparty_exposure ?collateral_allocation_unit - collateral_allocation_unit)
+    (borrower_exposure_metric_binding ?borrower_exposure - borrower_exposure ?borrower_exposure_metric - borrower_exposure_metric)
+    (metric_marked ?borrower_exposure_metric - borrower_exposure_metric)
+    (metric_allocated ?borrower_exposure_metric - borrower_exposure_metric)
+    (allocation_confirmed ?borrower_exposure - borrower_exposure)
+    (counterparty_exposure_metric_binding ?counterparty_exposure - counterparty_exposure ?counterparty_exposure_metric - counterparty_exposure_metric)
+    (counterparty_metric_marked ?counterparty_exposure_metric - counterparty_exposure_metric)
+    (counterparty_metric_allocated ?counterparty_exposure_metric - counterparty_exposure_metric)
+    (counterparty_allocation_confirmed ?counterparty_exposure - counterparty_exposure)
+    (bundle_staged ?margin_call_bundle - margin_call_bundle)
+    (bundle_assembled ?margin_call_bundle - margin_call_bundle)
+    (bundle_borrower_metric_link ?margin_call_bundle - margin_call_bundle ?borrower_exposure_metric - borrower_exposure_metric)
+    (bundle_counterparty_metric_link ?margin_call_bundle - margin_call_bundle ?counterparty_exposure_metric - counterparty_exposure_metric)
+    (bundle_requires_documentation ?margin_call_bundle - margin_call_bundle)
+    (bundle_requires_escalation ?margin_call_bundle - margin_call_bundle)
+    (bundle_locked ?margin_call_bundle - margin_call_bundle)
+    (process_borrower_link ?margin_process - margin_process ?borrower_exposure - borrower_exposure)
+    (process_counterparty_link ?margin_process - margin_process ?counterparty_exposure - counterparty_exposure)
+    (process_bundle_link ?margin_process - margin_process ?margin_call_bundle - margin_call_bundle)
+    (item_available ?collateral_item - collateral_item)
+    (process_item_link ?margin_process - margin_process ?collateral_item - collateral_item)
+    (item_locked ?collateral_item - collateral_item)
+    (item_locked_to_bundle ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    (process_ready_for_approval ?margin_process - margin_process)
+    (process_approval_in_progress ?margin_process - margin_process)
+    (process_approval_complete ?margin_process - margin_process)
+    (document_attached ?margin_process - margin_process)
+    (document_verified ?margin_process - margin_process)
+    (remedy_selection_open ?margin_process - margin_process)
+    (execution_ready ?margin_process - margin_process)
+    (policy_available ?legal_policy_record - legal_policy_record)
+    (process_policy_link ?margin_process - margin_process ?legal_policy_record - legal_policy_record)
+    (policy_attached ?margin_process - margin_process)
+    (policy_reviewed ?margin_process - margin_process)
+    (policy_approval_complete ?margin_process - margin_process)
+    (document_available ?supporting_document - supporting_document)
+    (process_document_link ?margin_process - margin_process ?supporting_document - supporting_document)
+    (remedy_option_available ?remedy_option - remedy_option)
+    (process_remedy_option_link ?margin_process - margin_process ?remedy_option - remedy_option)
+    (pricing_model_available ?pricing_model - pricing_model)
+    (process_pricing_model_link ?margin_process - margin_process ?pricing_model - pricing_model)
+    (escalation_contact_available ?escalation_contact - escalation_contact)
+    (process_escalation_contact_link ?margin_process - margin_process ?escalation_contact - escalation_contact)
+    (triggering_event_available ?triggering_event - triggering_event)
+    (triggering_event_link ?credit_case - credit_case ?triggering_event - triggering_event)
+    (borrower_allocation_flagged ?borrower_exposure - borrower_exposure)
+    (counterparty_allocation_flagged ?counterparty_exposure - counterparty_exposure)
+    (process_completed ?margin_process - margin_process)
+  )
+  (:action register_credit_case
+    :parameters (?credit_case - credit_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?credit_case)
+        )
+        (not
+          (triggered ?credit_case)
+        )
+      )
+    :effect (case_registered ?credit_case)
+  )
+  (:action attach_collateral_asset_to_case
+    :parameters (?credit_case - credit_case ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (case_registered ?credit_case)
+        (not
+          (collateral_attached ?credit_case)
+        )
+        (collateral_available ?collateral_asset)
+      )
+    :effect
+      (and
+        (collateral_attached ?credit_case)
+        (collateral_link ?credit_case ?collateral_asset)
+        (not
+          (collateral_available ?collateral_asset)
+        )
+      )
+  )
+  (:action attach_valuation_feed_to_case
+    :parameters (?credit_case - credit_case ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (case_registered ?credit_case)
+        (collateral_attached ?credit_case)
+        (valuation_feed_available ?valuation_feed)
+      )
+    :effect
+      (and
+        (valuation_binding ?credit_case ?valuation_feed)
+        (not
+          (valuation_feed_available ?valuation_feed)
+        )
+      )
+  )
+  (:action finalize_case_onboarding
+    :parameters (?credit_case - credit_case ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (case_registered ?credit_case)
+        (collateral_attached ?credit_case)
+        (valuation_binding ?credit_case ?valuation_feed)
+        (not
+          (onboarded ?credit_case)
+        )
+      )
+    :effect (onboarded ?credit_case)
+  )
+  (:action detach_valuation_feed_from_case
+    :parameters (?credit_case - credit_case ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (valuation_binding ?credit_case ?valuation_feed)
+      )
+    :effect
+      (and
+        (valuation_feed_available ?valuation_feed)
+        (not
+          (valuation_binding ?credit_case ?valuation_feed)
+        )
+      )
+  )
+  (:action assign_agent_to_case
+    :parameters (?credit_case - credit_case ?assigned_agent - agent)
+    :precondition
+      (and
+        (onboarded ?credit_case)
+        (agent_available ?assigned_agent)
+      )
+    :effect
+      (and
+        (agent_assignment ?credit_case ?assigned_agent)
+        (not
+          (agent_available ?assigned_agent)
+        )
+      )
+  )
+  (:action unassign_agent_from_case
+    :parameters (?credit_case - credit_case ?assigned_agent - agent)
+    :precondition
+      (and
+        (agent_assignment ?credit_case ?assigned_agent)
+      )
+    :effect
+      (and
+        (agent_available ?assigned_agent)
+        (not
+          (agent_assignment ?credit_case ?assigned_agent)
+        )
+      )
+  )
+  (:action bind_pricing_model_to_process
+    :parameters (?margin_process - margin_process ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (pricing_model_available ?pricing_model)
+      )
+    :effect
+      (and
+        (process_pricing_model_link ?margin_process ?pricing_model)
+        (not
+          (pricing_model_available ?pricing_model)
+        )
+      )
+  )
+  (:action unbind_pricing_model_from_process
+    :parameters (?margin_process - margin_process ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (process_pricing_model_link ?margin_process ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_available ?pricing_model)
+        (not
+          (process_pricing_model_link ?margin_process ?pricing_model)
+        )
+      )
+  )
+  (:action bind_escalation_contact_to_process
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (escalation_contact_available ?escalation_contact)
+      )
+    :effect
+      (and
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (not
+          (escalation_contact_available ?escalation_contact)
+        )
+      )
+  )
+  (:action unbind_escalation_contact_from_process
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+      )
+    :effect
+      (and
+        (escalation_contact_available ?escalation_contact)
+        (not
+          (process_escalation_contact_link ?margin_process ?escalation_contact)
+        )
+      )
+  )
+  (:action evaluate_borrower_metric_and_flag
+    :parameters (?borrower_exposure - borrower_exposure ?borrower_exposure_metric - borrower_exposure_metric ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (onboarded ?borrower_exposure)
+        (valuation_binding ?borrower_exposure ?valuation_feed)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (not
+          (metric_marked ?borrower_exposure_metric)
+        )
+        (not
+          (metric_allocated ?borrower_exposure_metric)
+        )
+      )
+    :effect (metric_marked ?borrower_exposure_metric)
+  )
+  (:action approve_borrower_allocation
+    :parameters (?borrower_exposure - borrower_exposure ?borrower_exposure_metric - borrower_exposure_metric ?assigned_agent - agent)
+    :precondition
+      (and
+        (onboarded ?borrower_exposure)
+        (agent_assignment ?borrower_exposure ?assigned_agent)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (metric_marked ?borrower_exposure_metric)
+        (not
+          (borrower_allocation_flagged ?borrower_exposure)
+        )
+      )
+    :effect
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (allocation_confirmed ?borrower_exposure)
+      )
+  )
+  (:action propose_borrower_allocation
+    :parameters (?borrower_exposure - borrower_exposure ?borrower_exposure_metric - borrower_exposure_metric ?collateral_allocation_unit - collateral_allocation_unit)
+    :precondition
+      (and
+        (onboarded ?borrower_exposure)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (allocation_unit_available ?collateral_allocation_unit)
+        (not
+          (borrower_allocation_flagged ?borrower_exposure)
+        )
+      )
+    :effect
+      (and
+        (metric_allocated ?borrower_exposure_metric)
+        (borrower_allocation_flagged ?borrower_exposure)
+        (borrower_allocation_to_unit ?borrower_exposure ?collateral_allocation_unit)
+        (not
+          (allocation_unit_available ?collateral_allocation_unit)
+        )
+      )
+  )
+  (:action confirm_borrower_allocation
+    :parameters (?borrower_exposure - borrower_exposure ?borrower_exposure_metric - borrower_exposure_metric ?valuation_feed - valuation_feed ?collateral_allocation_unit - collateral_allocation_unit)
+    :precondition
+      (and
+        (onboarded ?borrower_exposure)
+        (valuation_binding ?borrower_exposure ?valuation_feed)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (metric_allocated ?borrower_exposure_metric)
+        (borrower_allocation_to_unit ?borrower_exposure ?collateral_allocation_unit)
+        (not
+          (allocation_confirmed ?borrower_exposure)
+        )
+      )
+    :effect
+      (and
+        (metric_marked ?borrower_exposure_metric)
+        (allocation_confirmed ?borrower_exposure)
+        (allocation_unit_available ?collateral_allocation_unit)
+        (not
+          (borrower_allocation_to_unit ?borrower_exposure ?collateral_allocation_unit)
+        )
+      )
+  )
+  (:action evaluate_counterparty_metric_and_flag
+    :parameters (?counterparty_exposure - counterparty_exposure ?counterparty_exposure_metric - counterparty_exposure_metric ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (onboarded ?counterparty_exposure)
+        (valuation_binding ?counterparty_exposure ?valuation_feed)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (not
+          (counterparty_metric_marked ?counterparty_exposure_metric)
+        )
+        (not
+          (counterparty_metric_allocated ?counterparty_exposure_metric)
+        )
+      )
+    :effect (counterparty_metric_marked ?counterparty_exposure_metric)
+  )
+  (:action approve_counterparty_allocation
+    :parameters (?counterparty_exposure - counterparty_exposure ?counterparty_exposure_metric - counterparty_exposure_metric ?assigned_agent - agent)
+    :precondition
+      (and
+        (onboarded ?counterparty_exposure)
+        (agent_assignment ?counterparty_exposure ?assigned_agent)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (counterparty_metric_marked ?counterparty_exposure_metric)
+        (not
+          (counterparty_allocation_flagged ?counterparty_exposure)
+        )
+      )
+    :effect
+      (and
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+      )
+  )
+  (:action propose_counterparty_allocation
+    :parameters (?counterparty_exposure - counterparty_exposure ?counterparty_exposure_metric - counterparty_exposure_metric ?collateral_allocation_unit - collateral_allocation_unit)
+    :precondition
+      (and
+        (onboarded ?counterparty_exposure)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (allocation_unit_available ?collateral_allocation_unit)
+        (not
+          (counterparty_allocation_flagged ?counterparty_exposure)
+        )
+      )
+    :effect
+      (and
+        (counterparty_metric_allocated ?counterparty_exposure_metric)
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (counterparty_allocation_to_unit ?counterparty_exposure ?collateral_allocation_unit)
+        (not
+          (allocation_unit_available ?collateral_allocation_unit)
+        )
+      )
+  )
+  (:action confirm_counterparty_allocation
+    :parameters (?counterparty_exposure - counterparty_exposure ?counterparty_exposure_metric - counterparty_exposure_metric ?valuation_feed - valuation_feed ?collateral_allocation_unit - collateral_allocation_unit)
+    :precondition
+      (and
+        (onboarded ?counterparty_exposure)
+        (valuation_binding ?counterparty_exposure ?valuation_feed)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (counterparty_metric_allocated ?counterparty_exposure_metric)
+        (counterparty_allocation_to_unit ?counterparty_exposure ?collateral_allocation_unit)
+        (not
+          (counterparty_allocation_confirmed ?counterparty_exposure)
+        )
+      )
+    :effect
+      (and
+        (counterparty_metric_marked ?counterparty_exposure_metric)
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+        (allocation_unit_available ?collateral_allocation_unit)
+        (not
+          (counterparty_allocation_to_unit ?counterparty_exposure ?collateral_allocation_unit)
+        )
+      )
+  )
+  (:action assemble_margin_call_bundle
+    :parameters (?borrower_exposure - borrower_exposure ?counterparty_exposure - counterparty_exposure ?borrower_exposure_metric - borrower_exposure_metric ?counterparty_exposure_metric - counterparty_exposure_metric ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (metric_marked ?borrower_exposure_metric)
+        (counterparty_metric_marked ?counterparty_exposure_metric)
+        (allocation_confirmed ?borrower_exposure)
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+        (bundle_staged ?margin_call_bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_borrower_metric_link ?margin_call_bundle ?borrower_exposure_metric)
+        (bundle_counterparty_metric_link ?margin_call_bundle ?counterparty_exposure_metric)
+        (not
+          (bundle_staged ?margin_call_bundle)
+        )
+      )
+  )
+  (:action assemble_margin_call_bundle_with_borrower_flag
+    :parameters (?borrower_exposure - borrower_exposure ?counterparty_exposure - counterparty_exposure ?borrower_exposure_metric - borrower_exposure_metric ?counterparty_exposure_metric - counterparty_exposure_metric ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (metric_allocated ?borrower_exposure_metric)
+        (counterparty_metric_marked ?counterparty_exposure_metric)
+        (not
+          (allocation_confirmed ?borrower_exposure)
+        )
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+        (bundle_staged ?margin_call_bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_borrower_metric_link ?margin_call_bundle ?borrower_exposure_metric)
+        (bundle_counterparty_metric_link ?margin_call_bundle ?counterparty_exposure_metric)
+        (bundle_requires_documentation ?margin_call_bundle)
+        (not
+          (bundle_staged ?margin_call_bundle)
+        )
+      )
+  )
+  (:action assemble_margin_call_bundle_with_counterparty_flag
+    :parameters (?borrower_exposure - borrower_exposure ?counterparty_exposure - counterparty_exposure ?borrower_exposure_metric - borrower_exposure_metric ?counterparty_exposure_metric - counterparty_exposure_metric ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (metric_marked ?borrower_exposure_metric)
+        (counterparty_metric_allocated ?counterparty_exposure_metric)
+        (allocation_confirmed ?borrower_exposure)
+        (not
+          (counterparty_allocation_confirmed ?counterparty_exposure)
+        )
+        (bundle_staged ?margin_call_bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_borrower_metric_link ?margin_call_bundle ?borrower_exposure_metric)
+        (bundle_counterparty_metric_link ?margin_call_bundle ?counterparty_exposure_metric)
+        (bundle_requires_escalation ?margin_call_bundle)
+        (not
+          (bundle_staged ?margin_call_bundle)
+        )
+      )
+  )
+  (:action assemble_margin_call_bundle_with_both_flags
+    :parameters (?borrower_exposure - borrower_exposure ?counterparty_exposure - counterparty_exposure ?borrower_exposure_metric - borrower_exposure_metric ?counterparty_exposure_metric - counterparty_exposure_metric ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (borrower_exposure_metric_binding ?borrower_exposure ?borrower_exposure_metric)
+        (counterparty_exposure_metric_binding ?counterparty_exposure ?counterparty_exposure_metric)
+        (metric_allocated ?borrower_exposure_metric)
+        (counterparty_metric_allocated ?counterparty_exposure_metric)
+        (not
+          (allocation_confirmed ?borrower_exposure)
+        )
+        (not
+          (counterparty_allocation_confirmed ?counterparty_exposure)
+        )
+        (bundle_staged ?margin_call_bundle)
+      )
+    :effect
+      (and
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_borrower_metric_link ?margin_call_bundle ?borrower_exposure_metric)
+        (bundle_counterparty_metric_link ?margin_call_bundle ?counterparty_exposure_metric)
+        (bundle_requires_documentation ?margin_call_bundle)
+        (bundle_requires_escalation ?margin_call_bundle)
+        (not
+          (bundle_staged ?margin_call_bundle)
+        )
+      )
+  )
+  (:action stage_margin_call_bundle
+    :parameters (?margin_call_bundle - margin_call_bundle ?borrower_exposure - borrower_exposure ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (bundle_assembled ?margin_call_bundle)
+        (borrower_allocation_flagged ?borrower_exposure)
+        (valuation_binding ?borrower_exposure ?valuation_feed)
+        (not
+          (bundle_locked ?margin_call_bundle)
+        )
+      )
+    :effect (bundle_locked ?margin_call_bundle)
+  )
+  (:action lock_collateral_item_to_bundle
+    :parameters (?margin_process - margin_process ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (process_bundle_link ?margin_process ?margin_call_bundle)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_available ?collateral_item)
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_locked ?margin_call_bundle)
+        (not
+          (item_locked ?collateral_item)
+        )
+      )
+    :effect
+      (and
+        (item_locked ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (not
+          (item_available ?collateral_item)
+        )
+      )
+  )
+  (:action prepare_process_for_execution
+    :parameters (?margin_process - margin_process ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (valuation_binding ?margin_process ?valuation_feed)
+        (not
+          (bundle_requires_documentation ?margin_call_bundle)
+        )
+        (not
+          (process_ready_for_approval ?margin_process)
+        )
+      )
+    :effect (process_ready_for_approval ?margin_process)
+  )
+  (:action attach_supporting_document_to_process
+    :parameters (?margin_process - margin_process ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (document_available ?supporting_document)
+        (not
+          (document_attached ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (document_attached ?margin_process)
+        (process_document_link ?margin_process ?supporting_document)
+        (not
+          (document_available ?supporting_document)
+        )
+      )
+  )
+  (:action verify_documents_and_advance_process
+    :parameters (?margin_process - margin_process ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle ?valuation_feed - valuation_feed ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (valuation_binding ?margin_process ?valuation_feed)
+        (bundle_requires_documentation ?margin_call_bundle)
+        (document_attached ?margin_process)
+        (process_document_link ?margin_process ?supporting_document)
+        (not
+          (process_ready_for_approval ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_ready_for_approval ?margin_process)
+        (document_verified ?margin_process)
+      )
+  )
+  (:action start_process_approval_review
+    :parameters (?margin_process - margin_process ?pricing_model - pricing_model ?assigned_agent - agent ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_ready_for_approval ?margin_process)
+        (process_pricing_model_link ?margin_process ?pricing_model)
+        (agent_assignment ?margin_process ?assigned_agent)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (not
+          (bundle_requires_escalation ?margin_call_bundle)
+        )
+        (not
+          (process_approval_in_progress ?margin_process)
+        )
+      )
+    :effect (process_approval_in_progress ?margin_process)
+  )
+  (:action continue_process_approval_review
+    :parameters (?margin_process - margin_process ?pricing_model - pricing_model ?assigned_agent - agent ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_ready_for_approval ?margin_process)
+        (process_pricing_model_link ?margin_process ?pricing_model)
+        (agent_assignment ?margin_process ?assigned_agent)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (bundle_requires_escalation ?margin_call_bundle)
+        (not
+          (process_approval_in_progress ?margin_process)
+        )
+      )
+    :effect (process_approval_in_progress ?margin_process)
+  )
+  (:action finalize_process_approval
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_approval_in_progress ?margin_process)
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (not
+          (bundle_requires_documentation ?margin_call_bundle)
+        )
+        (not
+          (bundle_requires_escalation ?margin_call_bundle)
+        )
+        (not
+          (process_approval_complete ?margin_process)
+        )
+      )
+    :effect (process_approval_complete ?margin_process)
+  )
+  (:action finalize_process_approval_and_open_remedy
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_approval_in_progress ?margin_process)
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (bundle_requires_documentation ?margin_call_bundle)
+        (not
+          (bundle_requires_escalation ?margin_call_bundle)
+        )
+        (not
+          (process_approval_complete ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_approval_complete ?margin_process)
+        (remedy_selection_open ?margin_process)
+      )
+  )
+  (:action finalize_process_approval_open_remedy_variant
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_approval_in_progress ?margin_process)
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (not
+          (bundle_requires_documentation ?margin_call_bundle)
+        )
+        (bundle_requires_escalation ?margin_call_bundle)
+        (not
+          (process_approval_complete ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_approval_complete ?margin_process)
+        (remedy_selection_open ?margin_process)
+      )
+  )
+  (:action finalize_process_approval_open_remedy_both
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact ?collateral_item - collateral_item ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (process_approval_in_progress ?margin_process)
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (process_item_link ?margin_process ?collateral_item)
+        (item_locked_to_bundle ?collateral_item ?margin_call_bundle)
+        (bundle_requires_documentation ?margin_call_bundle)
+        (bundle_requires_escalation ?margin_call_bundle)
+        (not
+          (process_approval_complete ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_approval_complete ?margin_process)
+        (remedy_selection_open ?margin_process)
+      )
+  )
+  (:action complete_process_and_mark_ready
+    :parameters (?margin_process - margin_process)
+    :precondition
+      (and
+        (process_approval_complete ?margin_process)
+        (not
+          (remedy_selection_open ?margin_process)
+        )
+        (not
+          (process_completed ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_completed ?margin_process)
+        (ready_for_execution ?margin_process)
+      )
+  )
+  (:action attach_remedy_option_to_process
+    :parameters (?margin_process - margin_process ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (process_approval_complete ?margin_process)
+        (remedy_selection_open ?margin_process)
+        (remedy_option_available ?remedy_option)
+      )
+    :effect
+      (and
+        (process_remedy_option_link ?margin_process ?remedy_option)
+        (not
+          (remedy_option_available ?remedy_option)
+        )
+      )
+  )
+  (:action execute_remediation_and_settle
+    :parameters (?margin_process - margin_process ?borrower_exposure - borrower_exposure ?counterparty_exposure - counterparty_exposure ?valuation_feed - valuation_feed ?remedy_option - remedy_option)
+    :precondition
+      (and
+        (process_approval_complete ?margin_process)
+        (remedy_selection_open ?margin_process)
+        (process_remedy_option_link ?margin_process ?remedy_option)
+        (process_borrower_link ?margin_process ?borrower_exposure)
+        (process_counterparty_link ?margin_process ?counterparty_exposure)
+        (allocation_confirmed ?borrower_exposure)
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+        (valuation_binding ?margin_process ?valuation_feed)
+        (not
+          (execution_ready ?margin_process)
+        )
+      )
+    :effect (execution_ready ?margin_process)
+  )
+  (:action finalize_execution
+    :parameters (?margin_process - margin_process)
+    :precondition
+      (and
+        (process_approval_complete ?margin_process)
+        (execution_ready ?margin_process)
+        (not
+          (process_completed ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_completed ?margin_process)
+        (ready_for_execution ?margin_process)
+      )
+  )
+  (:action apply_legal_policy_to_process
+    :parameters (?margin_process - margin_process ?legal_policy_record - legal_policy_record ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (onboarded ?margin_process)
+        (valuation_binding ?margin_process ?valuation_feed)
+        (policy_available ?legal_policy_record)
+        (process_policy_link ?margin_process ?legal_policy_record)
+        (not
+          (policy_attached ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (policy_attached ?margin_process)
+        (not
+          (policy_available ?legal_policy_record)
+        )
+      )
+  )
+  (:action validate_policy_for_process
+    :parameters (?margin_process - margin_process ?assigned_agent - agent)
+    :precondition
+      (and
+        (policy_attached ?margin_process)
+        (agent_assignment ?margin_process ?assigned_agent)
+        (not
+          (policy_reviewed ?margin_process)
+        )
+      )
+    :effect (policy_reviewed ?margin_process)
+  )
+  (:action authorize_policy_approval
+    :parameters (?margin_process - margin_process ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (policy_reviewed ?margin_process)
+        (process_escalation_contact_link ?margin_process ?escalation_contact)
+        (not
+          (policy_approval_complete ?margin_process)
+        )
+      )
+    :effect (policy_approval_complete ?margin_process)
+  )
+  (:action finalize_policy_approval
+    :parameters (?margin_process - margin_process)
+    :precondition
+      (and
+        (policy_approval_complete ?margin_process)
+        (not
+          (process_completed ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (process_completed ?margin_process)
+        (ready_for_execution ?margin_process)
+      )
+  )
+  (:action settle_borrower_exposure
+    :parameters (?borrower_exposure - borrower_exposure ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (borrower_allocation_flagged ?borrower_exposure)
+        (allocation_confirmed ?borrower_exposure)
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_locked ?margin_call_bundle)
+        (not
+          (ready_for_execution ?borrower_exposure)
+        )
+      )
+    :effect (ready_for_execution ?borrower_exposure)
+  )
+  (:action settle_counterparty_exposure
+    :parameters (?counterparty_exposure - counterparty_exposure ?margin_call_bundle - margin_call_bundle)
+    :precondition
+      (and
+        (counterparty_allocation_flagged ?counterparty_exposure)
+        (counterparty_allocation_confirmed ?counterparty_exposure)
+        (bundle_assembled ?margin_call_bundle)
+        (bundle_locked ?margin_call_bundle)
+        (not
+          (ready_for_execution ?counterparty_exposure)
+        )
+      )
+    :effect (ready_for_execution ?counterparty_exposure)
+  )
+  (:action create_case_trigger
+    :parameters (?credit_case - credit_case ?triggering_event - triggering_event ?valuation_feed - valuation_feed)
+    :precondition
+      (and
+        (ready_for_execution ?credit_case)
+        (valuation_binding ?credit_case ?valuation_feed)
+        (triggering_event_available ?triggering_event)
+        (not
+          (trigger_created ?credit_case)
+        )
+      )
+    :effect
+      (and
+        (trigger_created ?credit_case)
+        (triggering_event_link ?credit_case ?triggering_event)
+        (not
+          (triggering_event_available ?triggering_event)
+        )
+      )
+  )
+  (:action distribute_trigger_to_borrower_exposure
+    :parameters (?borrower_exposure - borrower_exposure ?collateral_asset - collateral_asset ?triggering_event - triggering_event)
+    :precondition
+      (and
+        (trigger_created ?borrower_exposure)
+        (collateral_link ?borrower_exposure ?collateral_asset)
+        (triggering_event_link ?borrower_exposure ?triggering_event)
+        (not
+          (triggered ?borrower_exposure)
+        )
+      )
+    :effect
+      (and
+        (triggered ?borrower_exposure)
+        (collateral_available ?collateral_asset)
+        (triggering_event_available ?triggering_event)
+      )
+  )
+  (:action distribute_trigger_to_counterparty_exposure
+    :parameters (?counterparty_exposure - counterparty_exposure ?collateral_asset - collateral_asset ?triggering_event - triggering_event)
+    :precondition
+      (and
+        (trigger_created ?counterparty_exposure)
+        (collateral_link ?counterparty_exposure ?collateral_asset)
+        (triggering_event_link ?counterparty_exposure ?triggering_event)
+        (not
+          (triggered ?counterparty_exposure)
+        )
+      )
+    :effect
+      (and
+        (triggered ?counterparty_exposure)
+        (collateral_available ?collateral_asset)
+        (triggering_event_available ?triggering_event)
+      )
+  )
+  (:action distribute_trigger_to_margin_process
+    :parameters (?margin_process - margin_process ?collateral_asset - collateral_asset ?triggering_event - triggering_event)
+    :precondition
+      (and
+        (trigger_created ?margin_process)
+        (collateral_link ?margin_process ?collateral_asset)
+        (triggering_event_link ?margin_process ?triggering_event)
+        (not
+          (triggered ?margin_process)
+        )
+      )
+    :effect
+      (and
+        (triggered ?margin_process)
+        (collateral_available ?collateral_asset)
+        (triggering_event_available ?triggering_event)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem collateral_margin_call_scenario)
+  (:domain collateral_margin_call_domain)
+  (:objects borrower_exposure_1 - borrower_exposure counterparty_exposure_1 - counterparty_exposure margin_process_1 - margin_process margin_process_2 - margin_process collateral_asset_1 - collateral_asset collateral_asset_2 - collateral_asset collateral_asset_3 - collateral_asset valuation_feed_1 - valuation_feed agent_1 - agent allocation_unit_1 - collateral_allocation_unit borrower_metric_1 - borrower_exposure_metric counterparty_metric_1 - counterparty_exposure_metric margin_call_bundle_1 - margin_call_bundle collateral_item_1 - collateral_item collateral_item_2 - collateral_item supporting_document_1 - supporting_document supporting_document_2 - supporting_document remedy_option_1 - remedy_option remedy_option_2 - remedy_option triggering_event_1 - triggering_event pricing_model_1 - pricing_model legal_policy_record_1 - legal_policy_record legal_policy_record_2 - legal_policy_record escalation_contact_1 - escalation_contact)
+  (:init
+    (collateral_available collateral_asset_1)
+    (collateral_available collateral_asset_2)
+    (collateral_available collateral_asset_3)
+    (valuation_feed_available valuation_feed_1)
+    (agent_available agent_1)
+    (allocation_unit_available allocation_unit_1)
+    (borrower_exposure_metric_binding borrower_exposure_1 borrower_metric_1)
+    (counterparty_exposure_metric_binding counterparty_exposure_1 counterparty_metric_1)
+    (bundle_staged margin_call_bundle_1)
+    (item_available collateral_item_1)
+    (item_available collateral_item_2)
+    (process_borrower_link margin_process_1 borrower_exposure_1)
+    (process_borrower_link margin_process_2 borrower_exposure_1)
+    (process_counterparty_link margin_process_1 counterparty_exposure_1)
+    (process_counterparty_link margin_process_2 counterparty_exposure_1)
+    (process_bundle_link margin_process_1 margin_call_bundle_1)
+    (process_bundle_link margin_process_2 margin_call_bundle_1)
+    (process_item_link margin_process_1 collateral_item_1)
+    (process_item_link margin_process_2 collateral_item_2)
+    (document_available supporting_document_1)
+    (document_available supporting_document_2)
+    (remedy_option_available remedy_option_1)
+    (remedy_option_available remedy_option_2)
+    (triggering_event_available triggering_event_1)
+    (pricing_model_available pricing_model_1)
+    (policy_available legal_policy_record_1)
+    (process_policy_link margin_process_1 legal_policy_record_1)
+    (process_policy_link margin_process_2 legal_policy_record_2)
+    (escalation_contact_available escalation_contact_1)
+  )
+  (:goal
+    (and
+      (triggered borrower_exposure_1)
+      (triggered counterparty_exposure_1)
+      (triggered margin_process_1)
+      (triggered margin_process_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_credit_case margin_process_1)
+(register_credit_case borrower_exposure_1)
+(register_credit_case counterparty_exposure_1)
+(register_credit_case margin_process_2)
+(attach_collateral_asset_to_case margin_process_1 collateral_asset_1)
+(attach_valuation_feed_to_case margin_process_1 valuation_feed_1)
+(finalize_case_onboarding margin_process_1 valuation_feed_1)
+(assign_agent_to_case margin_process_1 agent_1)
+(bind_escalation_contact_to_process margin_process_1 escalation_contact_1)
+(apply_legal_policy_to_process margin_process_1 legal_policy_record_1 valuation_feed_1)
+(validate_policy_for_process margin_process_1 agent_1)
+(authorize_policy_approval margin_process_1 escalation_contact_1)
+(finalize_policy_approval margin_process_1)
+(unbind_escalation_contact_from_process margin_process_1 escalation_contact_1)
+(unassign_agent_from_case margin_process_1 agent_1)
+(create_case_trigger margin_process_1 triggering_event_1 valuation_feed_1)
+(distribute_trigger_to_margin_process margin_process_1 collateral_asset_1 triggering_event_1)
+(detach_valuation_feed_from_case margin_process_1 valuation_feed_1)
+(attach_collateral_asset_to_case borrower_exposure_1 collateral_asset_1)
+(attach_valuation_feed_to_case borrower_exposure_1 valuation_feed_1)
+(finalize_case_onboarding borrower_exposure_1 valuation_feed_1)
+(detach_valuation_feed_from_case borrower_exposure_1 valuation_feed_1)
+(attach_collateral_asset_to_case counterparty_exposure_1 collateral_asset_2)
+(attach_valuation_feed_to_case counterparty_exposure_1 valuation_feed_1)
+(finalize_case_onboarding counterparty_exposure_1 valuation_feed_1)
+(detach_valuation_feed_from_case counterparty_exposure_1 valuation_feed_1)
+(attach_collateral_asset_to_case margin_process_2 collateral_asset_3)
+(attach_valuation_feed_to_case margin_process_2 valuation_feed_1)
+(finalize_case_onboarding margin_process_2 valuation_feed_1)
+(detach_valuation_feed_from_case margin_process_2 valuation_feed_1)
+(attach_valuation_feed_to_case borrower_exposure_1 valuation_feed_1)
+(evaluate_borrower_metric_and_flag borrower_exposure_1 borrower_metric_1 valuation_feed_1)
+(detach_valuation_feed_from_case borrower_exposure_1 valuation_feed_1)
+(assign_agent_to_case borrower_exposure_1 agent_1)
+(approve_borrower_allocation borrower_exposure_1 borrower_metric_1 agent_1)
+(unassign_agent_from_case borrower_exposure_1 agent_1)
+(attach_valuation_feed_to_case counterparty_exposure_1 valuation_feed_1)
+(evaluate_counterparty_metric_and_flag counterparty_exposure_1 counterparty_metric_1 valuation_feed_1)
+(detach_valuation_feed_from_case counterparty_exposure_1 valuation_feed_1)
+(assign_agent_to_case counterparty_exposure_1 agent_1)
+(approve_counterparty_allocation counterparty_exposure_1 counterparty_metric_1 agent_1)
+(unassign_agent_from_case counterparty_exposure_1 agent_1)
+(assemble_margin_call_bundle borrower_exposure_1 counterparty_exposure_1 borrower_metric_1 counterparty_metric_1 margin_call_bundle_1)
+(attach_valuation_feed_to_case borrower_exposure_1 valuation_feed_1)
+(stage_margin_call_bundle margin_call_bundle_1 borrower_exposure_1 valuation_feed_1)
+(detach_valuation_feed_from_case borrower_exposure_1 valuation_feed_1)
+(settle_borrower_exposure borrower_exposure_1 margin_call_bundle_1)
+(settle_counterparty_exposure counterparty_exposure_1 margin_call_bundle_1)
+(lock_collateral_item_to_bundle margin_process_2 collateral_item_2 margin_call_bundle_1)
+(bind_pricing_model_to_process margin_process_2 pricing_model_1)
+(bind_escalation_contact_to_process margin_process_2 escalation_contact_1)
+(attach_valuation_feed_to_case margin_process_2 valuation_feed_1)
+(prepare_process_for_execution margin_process_2 collateral_item_2 margin_call_bundle_1 valuation_feed_1)
+(assign_agent_to_case margin_process_2 agent_1)
+(start_process_approval_review margin_process_2 pricing_model_1 agent_1 collateral_item_2 margin_call_bundle_1)
+(finalize_process_approval margin_process_2 escalation_contact_1 collateral_item_2 margin_call_bundle_1)
+(complete_process_and_mark_ready margin_process_2)
+(detach_valuation_feed_from_case margin_process_2 valuation_feed_1)
+(unassign_agent_from_case margin_process_2 agent_1)
+(attach_valuation_feed_to_case borrower_exposure_1 valuation_feed_1)
+(create_case_trigger borrower_exposure_1 triggering_event_1 valuation_feed_1)
+(distribute_trigger_to_borrower_exposure borrower_exposure_1 collateral_asset_1 triggering_event_1)
+(detach_valuation_feed_from_case borrower_exposure_1 valuation_feed_1)
+(attach_valuation_feed_to_case counterparty_exposure_1 valuation_feed_1)
+(create_case_trigger counterparty_exposure_1 triggering_event_1 valuation_feed_1)
+(distribute_trigger_to_counterparty_exposure counterparty_exposure_1 collateral_asset_2 triggering_event_1)
+(detach_valuation_feed_from_case counterparty_exposure_1 valuation_feed_1)
+(attach_valuation_feed_to_case margin_process_2 valuation_feed_1)
+(create_case_trigger margin_process_2 triggering_event_1 valuation_feed_1)
+(distribute_trigger_to_margin_process margin_process_2 collateral_asset_3 triggering_event_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_v4z1_79x/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 70 
+
+Successful plans:
+Value: 70
+ /tmp/val_v4z1_79x/plan.pddl 70 
+
+
+
+--- stderr ---
+

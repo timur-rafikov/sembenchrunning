@@ -1,0 +1,1061 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmacy_allergy_interaction_alert_resolution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object catalog_resource_category - entity template_category - entity packaging_label_category - entity clinical_artifact - entity prescription_order - clinical_artifact medication_option - catalog_resource_category clinical_alert_rule - catalog_resource_category pharmacy_staff - catalog_resource_category auxiliary_instruction_template - catalog_resource_category patient_instruction_template - catalog_resource_category counseling_script - catalog_resource_category clinical_reason_code - catalog_resource_category authorization_reason - catalog_resource_category substitution_proposal - template_category label_template - template_category authorization_template - template_category packaging_choice - packaging_label_category label_choice - packaging_label_category package_unit - packaging_label_category order_item_group - prescription_order packaging_group - prescription_order dispensing_line_item - order_item_group verification_line_item - order_item_group prescription_processing_record - packaging_group)
+
+  (:predicates
+    (prescription_screened ?prescription_order - prescription_order)
+    (work_item_in_review ?prescription_order - prescription_order)
+    (formulary_check_completed ?prescription_order - prescription_order)
+    (work_item_alert_resolved ?prescription_order - prescription_order)
+    (work_item_ready_for_dispense ?prescription_order - prescription_order)
+    (work_item_clinical_review_completed ?prescription_order - prescription_order)
+    (medication_option_available ?medication_option - medication_option)
+    (work_item_selected_medication ?prescription_order - prescription_order ?medication_option - medication_option)
+    (alert_rule_available ?clinical_alert_rule - clinical_alert_rule)
+    (work_item_has_alert_rule ?prescription_order - prescription_order ?clinical_alert_rule - clinical_alert_rule)
+    (staff_available ?pharmacy_staff - pharmacy_staff)
+    (staff_assigned_to_work_item ?prescription_order - prescription_order ?pharmacy_staff - pharmacy_staff)
+    (substitution_proposal_available ?substitution_proposal - substitution_proposal)
+    (line_item_selected_substitution ?dispensing_line_item - dispensing_line_item ?substitution_proposal - substitution_proposal)
+    (verification_selected_substitution ?verification_line_item - verification_line_item ?substitution_proposal - substitution_proposal)
+    (line_item_packaging_compatible ?dispensing_line_item - dispensing_line_item ?packaging_choice - packaging_choice)
+    (packaging_choice_reserved ?packaging_choice - packaging_choice)
+    (packaging_choice_requires_substitution ?packaging_choice - packaging_choice)
+    (line_item_packaging_confirmed ?dispensing_line_item - dispensing_line_item)
+    (verification_label_compatible ?verification_line_item - verification_line_item ?label_choice - label_choice)
+    (label_choice_reserved ?label_choice - label_choice)
+    (label_choice_requires_template_change ?label_choice - label_choice)
+    (verification_confirms_selection ?verification_line_item - verification_line_item)
+    (package_unit_available ?package_unit - package_unit)
+    (package_unit_reserved ?package_unit - package_unit)
+    (package_has_packaging_choice ?package_unit - package_unit ?packaging_choice - packaging_choice)
+    (package_has_label_choice ?package_unit - package_unit ?label_choice - label_choice)
+    (package_requires_additional_labeling ?package_unit - package_unit)
+    (package_requires_auxiliary_materials ?package_unit - package_unit)
+    (package_ready_for_label_application ?package_unit - package_unit)
+    (processing_record_has_dispensing_line_item ?prescription_processing_record - prescription_processing_record ?dispensing_line_item - dispensing_line_item)
+    (processing_record_has_verification_line_item ?prescription_processing_record - prescription_processing_record ?verification_line_item - verification_line_item)
+    (processing_record_has_reserved_package_unit ?prescription_processing_record - prescription_processing_record ?package_unit - package_unit)
+    (label_template_available ?label_template - label_template)
+    (processing_record_references_label_template ?prescription_processing_record - prescription_processing_record ?label_template - label_template)
+    (label_template_selected ?label_template - label_template)
+    (label_template_applied_to_package_unit ?label_template - label_template ?package_unit - package_unit)
+    (processing_record_authorized_for_packaging ?prescription_processing_record - prescription_processing_record)
+    (processing_record_packaging_ready ?prescription_processing_record - prescription_processing_record)
+    (processing_record_clinical_cleared ?prescription_processing_record - prescription_processing_record)
+    (processing_record_auxiliary_instruction_assigned ?prescription_processing_record - prescription_processing_record)
+    (auxiliary_instruction_flagged ?prescription_processing_record - prescription_processing_record)
+    (processing_record_patient_instructions_attached ?prescription_processing_record - prescription_processing_record)
+    (processing_record_packaging_finalized ?prescription_processing_record - prescription_processing_record)
+    (authorization_template_available ?authorization_template - authorization_template)
+    (processing_record_linked_to_authorization_template ?prescription_processing_record - prescription_processing_record ?authorization_template - authorization_template)
+    (authorization_request_created ?prescription_processing_record - prescription_processing_record)
+    (authorization_approved ?prescription_processing_record - prescription_processing_record)
+    (authorization_recorded_for_audit ?prescription_processing_record - prescription_processing_record)
+    (auxiliary_instruction_template_available ?auxiliary_instruction_template - auxiliary_instruction_template)
+    (processing_record_references_auxiliary_instruction_template ?prescription_processing_record - prescription_processing_record ?auxiliary_instruction_template - auxiliary_instruction_template)
+    (patient_instruction_template_available ?patient_instruction_template - patient_instruction_template)
+    (processing_record_references_patient_instruction_template ?prescription_processing_record - prescription_processing_record ?patient_instruction_template - patient_instruction_template)
+    (clinical_reason_code_available ?clinical_reason_code - clinical_reason_code)
+    (processing_record_linked_to_clinical_reason_code ?prescription_processing_record - prescription_processing_record ?clinical_reason_code - clinical_reason_code)
+    (authorization_reason_available ?authorization_reason - authorization_reason)
+    (processing_record_linked_to_authorization_reason ?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason)
+    (counseling_script_available ?counseling_script - counseling_script)
+    (prescription_linked_to_counseling_script ?prescription_order - prescription_order ?counseling_script - counseling_script)
+    (line_item_packaging_asserted ?dispensing_line_item - dispensing_line_item)
+    (verification_line_item_packaging_asserted ?verification_line_item - verification_line_item)
+    (processing_record_finalized ?prescription_processing_record - prescription_processing_record)
+  )
+  (:action mark_prescription_screened
+    :parameters (?prescription_order - prescription_order)
+    :precondition
+      (and
+        (not
+          (prescription_screened ?prescription_order)
+        )
+        (not
+          (work_item_alert_resolved ?prescription_order)
+        )
+      )
+    :effect (prescription_screened ?prescription_order)
+  )
+  (:action select_medication_option_for_prescription
+    :parameters (?prescription_order - prescription_order ?medication_option - medication_option)
+    :precondition
+      (and
+        (prescription_screened ?prescription_order)
+        (not
+          (formulary_check_completed ?prescription_order)
+        )
+        (medication_option_available ?medication_option)
+      )
+    :effect
+      (and
+        (formulary_check_completed ?prescription_order)
+        (work_item_selected_medication ?prescription_order ?medication_option)
+        (not
+          (medication_option_available ?medication_option)
+        )
+      )
+  )
+  (:action assign_alert_rule_to_prescription
+    :parameters (?prescription_order - prescription_order ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (prescription_screened ?prescription_order)
+        (formulary_check_completed ?prescription_order)
+        (alert_rule_available ?clinical_alert_rule)
+      )
+    :effect
+      (and
+        (work_item_has_alert_rule ?prescription_order ?clinical_alert_rule)
+        (not
+          (alert_rule_available ?clinical_alert_rule)
+        )
+      )
+  )
+  (:action flag_prescription_for_clinical_review
+    :parameters (?prescription_order - prescription_order ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (prescription_screened ?prescription_order)
+        (formulary_check_completed ?prescription_order)
+        (work_item_has_alert_rule ?prescription_order ?clinical_alert_rule)
+        (not
+          (work_item_in_review ?prescription_order)
+        )
+      )
+    :effect (work_item_in_review ?prescription_order)
+  )
+  (:action unassign_alert_rule_from_prescription
+    :parameters (?prescription_order - prescription_order ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_has_alert_rule ?prescription_order ?clinical_alert_rule)
+      )
+    :effect
+      (and
+        (alert_rule_available ?clinical_alert_rule)
+        (not
+          (work_item_has_alert_rule ?prescription_order ?clinical_alert_rule)
+        )
+      )
+  )
+  (:action assign_staff_to_prescription
+    :parameters (?prescription_order - prescription_order ?pharmacy_staff - pharmacy_staff)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_order)
+        (staff_available ?pharmacy_staff)
+      )
+    :effect
+      (and
+        (staff_assigned_to_work_item ?prescription_order ?pharmacy_staff)
+        (not
+          (staff_available ?pharmacy_staff)
+        )
+      )
+  )
+  (:action unassign_staff_from_prescription
+    :parameters (?prescription_order - prescription_order ?pharmacy_staff - pharmacy_staff)
+    :precondition
+      (and
+        (staff_assigned_to_work_item ?prescription_order ?pharmacy_staff)
+      )
+    :effect
+      (and
+        (staff_available ?pharmacy_staff)
+        (not
+          (staff_assigned_to_work_item ?prescription_order ?pharmacy_staff)
+        )
+      )
+  )
+  (:action link_clinical_reason_code_to_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?clinical_reason_code - clinical_reason_code)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (clinical_reason_code_available ?clinical_reason_code)
+      )
+    :effect
+      (and
+        (processing_record_linked_to_clinical_reason_code ?prescription_processing_record ?clinical_reason_code)
+        (not
+          (clinical_reason_code_available ?clinical_reason_code)
+        )
+      )
+  )
+  (:action unlink_clinical_reason_code_from_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?clinical_reason_code - clinical_reason_code)
+    :precondition
+      (and
+        (processing_record_linked_to_clinical_reason_code ?prescription_processing_record ?clinical_reason_code)
+      )
+    :effect
+      (and
+        (clinical_reason_code_available ?clinical_reason_code)
+        (not
+          (processing_record_linked_to_clinical_reason_code ?prescription_processing_record ?clinical_reason_code)
+        )
+      )
+  )
+  (:action link_authorization_reason_to_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (authorization_reason_available ?authorization_reason)
+      )
+    :effect
+      (and
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (not
+          (authorization_reason_available ?authorization_reason)
+        )
+      )
+  )
+  (:action unlink_authorization_reason_from_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason)
+    :precondition
+      (and
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+      )
+    :effect
+      (and
+        (authorization_reason_available ?authorization_reason)
+        (not
+          (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        )
+      )
+  )
+  (:action reserve_packaging_choice_for_line_item
+    :parameters (?dispensing_line_item - dispensing_line_item ?packaging_choice - packaging_choice ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_in_review ?dispensing_line_item)
+        (work_item_has_alert_rule ?dispensing_line_item ?clinical_alert_rule)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (not
+          (packaging_choice_reserved ?packaging_choice)
+        )
+        (not
+          (packaging_choice_requires_substitution ?packaging_choice)
+        )
+      )
+    :effect (packaging_choice_reserved ?packaging_choice)
+  )
+  (:action staff_confirm_packaging_for_line_item
+    :parameters (?dispensing_line_item - dispensing_line_item ?packaging_choice - packaging_choice ?pharmacy_staff - pharmacy_staff)
+    :precondition
+      (and
+        (work_item_in_review ?dispensing_line_item)
+        (staff_assigned_to_work_item ?dispensing_line_item ?pharmacy_staff)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (packaging_choice_reserved ?packaging_choice)
+        (not
+          (line_item_packaging_asserted ?dispensing_line_item)
+        )
+      )
+    :effect
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+      )
+  )
+  (:action propose_substitution_and_reserve_packaging_for_line_item
+    :parameters (?dispensing_line_item - dispensing_line_item ?packaging_choice - packaging_choice ?substitution_proposal - substitution_proposal)
+    :precondition
+      (and
+        (work_item_in_review ?dispensing_line_item)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (substitution_proposal_available ?substitution_proposal)
+        (not
+          (line_item_packaging_asserted ?dispensing_line_item)
+        )
+      )
+    :effect
+      (and
+        (packaging_choice_requires_substitution ?packaging_choice)
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (line_item_selected_substitution ?dispensing_line_item ?substitution_proposal)
+        (not
+          (substitution_proposal_available ?substitution_proposal)
+        )
+      )
+  )
+  (:action accept_substitution_and_confirm_packaging_for_line_item
+    :parameters (?dispensing_line_item - dispensing_line_item ?packaging_choice - packaging_choice ?clinical_alert_rule - clinical_alert_rule ?substitution_proposal - substitution_proposal)
+    :precondition
+      (and
+        (work_item_in_review ?dispensing_line_item)
+        (work_item_has_alert_rule ?dispensing_line_item ?clinical_alert_rule)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (packaging_choice_requires_substitution ?packaging_choice)
+        (line_item_selected_substitution ?dispensing_line_item ?substitution_proposal)
+        (not
+          (line_item_packaging_confirmed ?dispensing_line_item)
+        )
+      )
+    :effect
+      (and
+        (packaging_choice_reserved ?packaging_choice)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+        (substitution_proposal_available ?substitution_proposal)
+        (not
+          (line_item_selected_substitution ?dispensing_line_item ?substitution_proposal)
+        )
+      )
+  )
+  (:action reserve_label_choice_for_verification_line_item
+    :parameters (?verification_line_item - verification_line_item ?label_choice - label_choice ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_in_review ?verification_line_item)
+        (work_item_has_alert_rule ?verification_line_item ?clinical_alert_rule)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (not
+          (label_choice_reserved ?label_choice)
+        )
+        (not
+          (label_choice_requires_template_change ?label_choice)
+        )
+      )
+    :effect (label_choice_reserved ?label_choice)
+  )
+  (:action staff_confirm_label_for_verification_line_item
+    :parameters (?verification_line_item - verification_line_item ?label_choice - label_choice ?pharmacy_staff - pharmacy_staff)
+    :precondition
+      (and
+        (work_item_in_review ?verification_line_item)
+        (staff_assigned_to_work_item ?verification_line_item ?pharmacy_staff)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (label_choice_reserved ?label_choice)
+        (not
+          (verification_line_item_packaging_asserted ?verification_line_item)
+        )
+      )
+    :effect
+      (and
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (verification_confirms_selection ?verification_line_item)
+      )
+  )
+  (:action propose_label_substitution_for_verification_line_item
+    :parameters (?verification_line_item - verification_line_item ?label_choice - label_choice ?substitution_proposal - substitution_proposal)
+    :precondition
+      (and
+        (work_item_in_review ?verification_line_item)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (substitution_proposal_available ?substitution_proposal)
+        (not
+          (verification_line_item_packaging_asserted ?verification_line_item)
+        )
+      )
+    :effect
+      (and
+        (label_choice_requires_template_change ?label_choice)
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (verification_selected_substitution ?verification_line_item ?substitution_proposal)
+        (not
+          (substitution_proposal_available ?substitution_proposal)
+        )
+      )
+  )
+  (:action accept_label_substitution_and_confirm_verification_line_item
+    :parameters (?verification_line_item - verification_line_item ?label_choice - label_choice ?clinical_alert_rule - clinical_alert_rule ?substitution_proposal - substitution_proposal)
+    :precondition
+      (and
+        (work_item_in_review ?verification_line_item)
+        (work_item_has_alert_rule ?verification_line_item ?clinical_alert_rule)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (label_choice_requires_template_change ?label_choice)
+        (verification_selected_substitution ?verification_line_item ?substitution_proposal)
+        (not
+          (verification_confirms_selection ?verification_line_item)
+        )
+      )
+    :effect
+      (and
+        (label_choice_reserved ?label_choice)
+        (verification_confirms_selection ?verification_line_item)
+        (substitution_proposal_available ?substitution_proposal)
+        (not
+          (verification_selected_substitution ?verification_line_item ?substitution_proposal)
+        )
+      )
+  )
+  (:action reserve_package_and_assign_packaging_and_label
+    :parameters (?dispensing_line_item - dispensing_line_item ?verification_line_item - verification_line_item ?packaging_choice - packaging_choice ?label_choice - label_choice ?package_unit - package_unit)
+    :precondition
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (packaging_choice_reserved ?packaging_choice)
+        (label_choice_reserved ?label_choice)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+        (verification_confirms_selection ?verification_line_item)
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_reserved ?package_unit)
+        (package_has_packaging_choice ?package_unit ?packaging_choice)
+        (package_has_label_choice ?package_unit ?label_choice)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action reserve_package_with_additional_labeling_required
+    :parameters (?dispensing_line_item - dispensing_line_item ?verification_line_item - verification_line_item ?packaging_choice - packaging_choice ?label_choice - label_choice ?package_unit - package_unit)
+    :precondition
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (packaging_choice_requires_substitution ?packaging_choice)
+        (label_choice_reserved ?label_choice)
+        (not
+          (line_item_packaging_confirmed ?dispensing_line_item)
+        )
+        (verification_confirms_selection ?verification_line_item)
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_reserved ?package_unit)
+        (package_has_packaging_choice ?package_unit ?packaging_choice)
+        (package_has_label_choice ?package_unit ?label_choice)
+        (package_requires_additional_labeling ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action reserve_package_with_auxiliary_instructions_required
+    :parameters (?dispensing_line_item - dispensing_line_item ?verification_line_item - verification_line_item ?packaging_choice - packaging_choice ?label_choice - label_choice ?package_unit - package_unit)
+    :precondition
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (packaging_choice_reserved ?packaging_choice)
+        (label_choice_requires_template_change ?label_choice)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+        (not
+          (verification_confirms_selection ?verification_line_item)
+        )
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_reserved ?package_unit)
+        (package_has_packaging_choice ?package_unit ?packaging_choice)
+        (package_has_label_choice ?package_unit ?label_choice)
+        (package_requires_auxiliary_materials ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action reserve_package_with_labeling_and_auxiliary_required
+    :parameters (?dispensing_line_item - dispensing_line_item ?verification_line_item - verification_line_item ?packaging_choice - packaging_choice ?label_choice - label_choice ?package_unit - package_unit)
+    :precondition
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (line_item_packaging_compatible ?dispensing_line_item ?packaging_choice)
+        (verification_label_compatible ?verification_line_item ?label_choice)
+        (packaging_choice_requires_substitution ?packaging_choice)
+        (label_choice_requires_template_change ?label_choice)
+        (not
+          (line_item_packaging_confirmed ?dispensing_line_item)
+        )
+        (not
+          (verification_confirms_selection ?verification_line_item)
+        )
+        (package_unit_available ?package_unit)
+      )
+    :effect
+      (and
+        (package_unit_reserved ?package_unit)
+        (package_has_packaging_choice ?package_unit ?packaging_choice)
+        (package_has_label_choice ?package_unit ?label_choice)
+        (package_requires_additional_labeling ?package_unit)
+        (package_requires_auxiliary_materials ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action mark_package_ready_for_label_application
+    :parameters (?package_unit - package_unit ?dispensing_line_item - dispensing_line_item ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (package_unit_reserved ?package_unit)
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (work_item_has_alert_rule ?dispensing_line_item ?clinical_alert_rule)
+        (not
+          (package_ready_for_label_application ?package_unit)
+        )
+      )
+    :effect (package_ready_for_label_application ?package_unit)
+  )
+  (:action select_label_template_and_apply_to_package
+    :parameters (?prescription_processing_record - prescription_processing_record ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (processing_record_has_reserved_package_unit ?prescription_processing_record ?package_unit)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_available ?label_template)
+        (package_unit_reserved ?package_unit)
+        (package_ready_for_label_application ?package_unit)
+        (not
+          (label_template_selected ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_selected ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action authorize_processing_record_for_packaging_operations
+    :parameters (?prescription_processing_record - prescription_processing_record ?label_template - label_template ?package_unit - package_unit ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_selected ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (work_item_has_alert_rule ?prescription_processing_record ?clinical_alert_rule)
+        (not
+          (package_requires_additional_labeling ?package_unit)
+        )
+        (not
+          (processing_record_authorized_for_packaging ?prescription_processing_record)
+        )
+      )
+    :effect (processing_record_authorized_for_packaging ?prescription_processing_record)
+  )
+  (:action assign_auxiliary_instruction_template_to_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?auxiliary_instruction_template - auxiliary_instruction_template)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (auxiliary_instruction_template_available ?auxiliary_instruction_template)
+        (not
+          (processing_record_auxiliary_instruction_assigned ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_auxiliary_instruction_assigned ?prescription_processing_record)
+        (processing_record_references_auxiliary_instruction_template ?prescription_processing_record ?auxiliary_instruction_template)
+        (not
+          (auxiliary_instruction_template_available ?auxiliary_instruction_template)
+        )
+      )
+  )
+  (:action authorize_packaging_and_flag_auxiliary_instruction
+    :parameters (?prescription_processing_record - prescription_processing_record ?label_template - label_template ?package_unit - package_unit ?clinical_alert_rule - clinical_alert_rule ?auxiliary_instruction_template - auxiliary_instruction_template)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_selected ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (work_item_has_alert_rule ?prescription_processing_record ?clinical_alert_rule)
+        (package_requires_additional_labeling ?package_unit)
+        (processing_record_auxiliary_instruction_assigned ?prescription_processing_record)
+        (processing_record_references_auxiliary_instruction_template ?prescription_processing_record ?auxiliary_instruction_template)
+        (not
+          (processing_record_authorized_for_packaging ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_authorized_for_packaging ?prescription_processing_record)
+        (auxiliary_instruction_flagged ?prescription_processing_record)
+      )
+  )
+  (:action mark_processing_record_packaging_ready
+    :parameters (?prescription_processing_record - prescription_processing_record ?clinical_reason_code - clinical_reason_code ?pharmacy_staff - pharmacy_staff ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_authorized_for_packaging ?prescription_processing_record)
+        (processing_record_linked_to_clinical_reason_code ?prescription_processing_record ?clinical_reason_code)
+        (staff_assigned_to_work_item ?prescription_processing_record ?pharmacy_staff)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_requires_auxiliary_materials ?package_unit)
+        )
+        (not
+          (processing_record_packaging_ready ?prescription_processing_record)
+        )
+      )
+    :effect (processing_record_packaging_ready ?prescription_processing_record)
+  )
+  (:action mark_processing_record_packaging_ready_with_auxiliary
+    :parameters (?prescription_processing_record - prescription_processing_record ?clinical_reason_code - clinical_reason_code ?pharmacy_staff - pharmacy_staff ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_authorized_for_packaging ?prescription_processing_record)
+        (processing_record_linked_to_clinical_reason_code ?prescription_processing_record ?clinical_reason_code)
+        (staff_assigned_to_work_item ?prescription_processing_record ?pharmacy_staff)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (package_requires_auxiliary_materials ?package_unit)
+        (not
+          (processing_record_packaging_ready ?prescription_processing_record)
+        )
+      )
+    :effect (processing_record_packaging_ready ?prescription_processing_record)
+  )
+  (:action complete_clinical_checks_without_patient_materials
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_packaging_ready ?prescription_processing_record)
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_requires_additional_labeling ?package_unit)
+        )
+        (not
+          (package_requires_auxiliary_materials ?package_unit)
+        )
+        (not
+          (processing_record_clinical_cleared ?prescription_processing_record)
+        )
+      )
+    :effect (processing_record_clinical_cleared ?prescription_processing_record)
+  )
+  (:action complete_clinical_checks_with_additional_labeling
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_packaging_ready ?prescription_processing_record)
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (package_requires_additional_labeling ?package_unit)
+        (not
+          (package_requires_auxiliary_materials ?package_unit)
+        )
+        (not
+          (processing_record_clinical_cleared ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_patient_instructions_attached ?prescription_processing_record)
+      )
+  )
+  (:action complete_clinical_checks_with_auxiliary_materials
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_packaging_ready ?prescription_processing_record)
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (not
+          (package_requires_additional_labeling ?package_unit)
+        )
+        (package_requires_auxiliary_materials ?package_unit)
+        (not
+          (processing_record_clinical_cleared ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_patient_instructions_attached ?prescription_processing_record)
+      )
+  )
+  (:action complete_clinical_checks_with_labeling_and_auxiliary_materials
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason ?label_template - label_template ?package_unit - package_unit)
+    :precondition
+      (and
+        (processing_record_packaging_ready ?prescription_processing_record)
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (processing_record_references_label_template ?prescription_processing_record ?label_template)
+        (label_template_applied_to_package_unit ?label_template ?package_unit)
+        (package_requires_additional_labeling ?package_unit)
+        (package_requires_auxiliary_materials ?package_unit)
+        (not
+          (processing_record_clinical_cleared ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_patient_instructions_attached ?prescription_processing_record)
+      )
+  )
+  (:action finalize_processing_record_ready_for_dispense
+    :parameters (?prescription_processing_record - prescription_processing_record)
+    :precondition
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (not
+          (processing_record_patient_instructions_attached ?prescription_processing_record)
+        )
+        (not
+          (processing_record_finalized ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_finalized ?prescription_processing_record)
+        (work_item_ready_for_dispense ?prescription_processing_record)
+      )
+  )
+  (:action attach_patient_instruction_template_to_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_patient_instructions_attached ?prescription_processing_record)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+    :effect
+      (and
+        (processing_record_references_patient_instruction_template ?prescription_processing_record ?patient_instruction_template)
+        (not
+          (patient_instruction_template_available ?patient_instruction_template)
+        )
+      )
+  )
+  (:action finalize_packaging_for_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?dispensing_line_item - dispensing_line_item ?verification_line_item - verification_line_item ?clinical_alert_rule - clinical_alert_rule ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_patient_instructions_attached ?prescription_processing_record)
+        (processing_record_references_patient_instruction_template ?prescription_processing_record ?patient_instruction_template)
+        (processing_record_has_dispensing_line_item ?prescription_processing_record ?dispensing_line_item)
+        (processing_record_has_verification_line_item ?prescription_processing_record ?verification_line_item)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+        (verification_confirms_selection ?verification_line_item)
+        (work_item_has_alert_rule ?prescription_processing_record ?clinical_alert_rule)
+        (not
+          (processing_record_packaging_finalized ?prescription_processing_record)
+        )
+      )
+    :effect (processing_record_packaging_finalized ?prescription_processing_record)
+  )
+  (:action finalize_processing_record_after_packaging
+    :parameters (?prescription_processing_record - prescription_processing_record)
+    :precondition
+      (and
+        (processing_record_clinical_cleared ?prescription_processing_record)
+        (processing_record_packaging_finalized ?prescription_processing_record)
+        (not
+          (processing_record_finalized ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_finalized ?prescription_processing_record)
+        (work_item_ready_for_dispense ?prescription_processing_record)
+      )
+  )
+  (:action create_authorization_request_for_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_template - authorization_template ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_in_review ?prescription_processing_record)
+        (work_item_has_alert_rule ?prescription_processing_record ?clinical_alert_rule)
+        (authorization_template_available ?authorization_template)
+        (processing_record_linked_to_authorization_template ?prescription_processing_record ?authorization_template)
+        (not
+          (authorization_request_created ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (authorization_request_created ?prescription_processing_record)
+        (not
+          (authorization_template_available ?authorization_template)
+        )
+      )
+  )
+  (:action acknowledge_authorization_in_processing_record
+    :parameters (?prescription_processing_record - prescription_processing_record ?pharmacy_staff - pharmacy_staff)
+    :precondition
+      (and
+        (authorization_request_created ?prescription_processing_record)
+        (staff_assigned_to_work_item ?prescription_processing_record ?pharmacy_staff)
+        (not
+          (authorization_approved ?prescription_processing_record)
+        )
+      )
+    :effect (authorization_approved ?prescription_processing_record)
+  )
+  (:action record_authorization_for_audit
+    :parameters (?prescription_processing_record - prescription_processing_record ?authorization_reason - authorization_reason)
+    :precondition
+      (and
+        (authorization_approved ?prescription_processing_record)
+        (processing_record_linked_to_authorization_reason ?prescription_processing_record ?authorization_reason)
+        (not
+          (authorization_recorded_for_audit ?prescription_processing_record)
+        )
+      )
+    :effect (authorization_recorded_for_audit ?prescription_processing_record)
+  )
+  (:action finalize_processing_record_after_authorization
+    :parameters (?prescription_processing_record - prescription_processing_record)
+    :precondition
+      (and
+        (authorization_recorded_for_audit ?prescription_processing_record)
+        (not
+          (processing_record_finalized ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (processing_record_finalized ?prescription_processing_record)
+        (work_item_ready_for_dispense ?prescription_processing_record)
+      )
+  )
+  (:action mark_dispensing_line_item_ready_for_dispense
+    :parameters (?dispensing_line_item - dispensing_line_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (line_item_packaging_asserted ?dispensing_line_item)
+        (line_item_packaging_confirmed ?dispensing_line_item)
+        (package_unit_reserved ?package_unit)
+        (package_ready_for_label_application ?package_unit)
+        (not
+          (work_item_ready_for_dispense ?dispensing_line_item)
+        )
+      )
+    :effect (work_item_ready_for_dispense ?dispensing_line_item)
+  )
+  (:action mark_verification_line_item_ready_for_dispense
+    :parameters (?verification_line_item - verification_line_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (verification_line_item_packaging_asserted ?verification_line_item)
+        (verification_confirms_selection ?verification_line_item)
+        (package_unit_reserved ?package_unit)
+        (package_ready_for_label_application ?package_unit)
+        (not
+          (work_item_ready_for_dispense ?verification_line_item)
+        )
+      )
+    :effect (work_item_ready_for_dispense ?verification_line_item)
+  )
+  (:action assign_counseling_script_and_mark_clinical_action
+    :parameters (?prescription_order - prescription_order ?counseling_script - counseling_script ?clinical_alert_rule - clinical_alert_rule)
+    :precondition
+      (and
+        (work_item_ready_for_dispense ?prescription_order)
+        (work_item_has_alert_rule ?prescription_order ?clinical_alert_rule)
+        (counseling_script_available ?counseling_script)
+        (not
+          (work_item_clinical_review_completed ?prescription_order)
+        )
+      )
+    :effect
+      (and
+        (work_item_clinical_review_completed ?prescription_order)
+        (prescription_linked_to_counseling_script ?prescription_order ?counseling_script)
+        (not
+          (counseling_script_available ?counseling_script)
+        )
+      )
+  )
+  (:action finalize_resolution_for_dispensing_line_item_with_medication_option
+    :parameters (?dispensing_line_item - dispensing_line_item ?medication_option - medication_option ?counseling_script - counseling_script)
+    :precondition
+      (and
+        (work_item_clinical_review_completed ?dispensing_line_item)
+        (work_item_selected_medication ?dispensing_line_item ?medication_option)
+        (prescription_linked_to_counseling_script ?dispensing_line_item ?counseling_script)
+        (not
+          (work_item_alert_resolved ?dispensing_line_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_alert_resolved ?dispensing_line_item)
+        (medication_option_available ?medication_option)
+        (counseling_script_available ?counseling_script)
+      )
+  )
+  (:action finalize_resolution_for_verification_line_item_with_medication_option
+    :parameters (?verification_line_item - verification_line_item ?medication_option - medication_option ?counseling_script - counseling_script)
+    :precondition
+      (and
+        (work_item_clinical_review_completed ?verification_line_item)
+        (work_item_selected_medication ?verification_line_item ?medication_option)
+        (prescription_linked_to_counseling_script ?verification_line_item ?counseling_script)
+        (not
+          (work_item_alert_resolved ?verification_line_item)
+        )
+      )
+    :effect
+      (and
+        (work_item_alert_resolved ?verification_line_item)
+        (medication_option_available ?medication_option)
+        (counseling_script_available ?counseling_script)
+      )
+  )
+  (:action finalize_resolution_for_processing_record_with_medication_option
+    :parameters (?prescription_processing_record - prescription_processing_record ?medication_option - medication_option ?counseling_script - counseling_script)
+    :precondition
+      (and
+        (work_item_clinical_review_completed ?prescription_processing_record)
+        (work_item_selected_medication ?prescription_processing_record ?medication_option)
+        (prescription_linked_to_counseling_script ?prescription_processing_record ?counseling_script)
+        (not
+          (work_item_alert_resolved ?prescription_processing_record)
+        )
+      )
+    :effect
+      (and
+        (work_item_alert_resolved ?prescription_processing_record)
+        (medication_option_available ?medication_option)
+        (counseling_script_available ?counseling_script)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem allergy_interaction_alert_resolution_case)
+  (:domain pharmacy_allergy_interaction_alert_resolution)
+  (:objects dispensing_line_item_instance - dispensing_line_item verification_line_item_instance - verification_line_item prescription_processing_record_instance_1 - prescription_processing_record prescription_processing_record_instance_2 - prescription_processing_record medication_option_instance_1 - medication_option medication_option_instance_2 - medication_option medication_option_instance_3 - medication_option clinical_alert_rule_instance - clinical_alert_rule pharmacy_staff_instance - pharmacy_staff substitution_proposal_instance - substitution_proposal packaging_choice_instance - packaging_choice label_choice_instance - label_choice package_unit_instance - package_unit label_template_instance_1 - label_template label_template_instance_2 - label_template auxiliary_instruction_template_instance_1 - auxiliary_instruction_template auxiliary_instruction_template_instance_2 - auxiliary_instruction_template patient_instruction_template_instance_1 - patient_instruction_template patient_instruction_template_instance_2 - patient_instruction_template counseling_script_instance - counseling_script clinical_reason_code_instance - clinical_reason_code authorization_template_instance_1 - authorization_template authorization_template_instance_2 - authorization_template authorization_reason_instance - authorization_reason)
+  (:init
+    (medication_option_available medication_option_instance_1)
+    (medication_option_available medication_option_instance_2)
+    (medication_option_available medication_option_instance_3)
+    (alert_rule_available clinical_alert_rule_instance)
+    (staff_available pharmacy_staff_instance)
+    (substitution_proposal_available substitution_proposal_instance)
+    (line_item_packaging_compatible dispensing_line_item_instance packaging_choice_instance)
+    (verification_label_compatible verification_line_item_instance label_choice_instance)
+    (package_unit_available package_unit_instance)
+    (label_template_available label_template_instance_1)
+    (label_template_available label_template_instance_2)
+    (processing_record_has_dispensing_line_item prescription_processing_record_instance_1 dispensing_line_item_instance)
+    (processing_record_has_dispensing_line_item prescription_processing_record_instance_2 dispensing_line_item_instance)
+    (processing_record_has_verification_line_item prescription_processing_record_instance_1 verification_line_item_instance)
+    (processing_record_has_verification_line_item prescription_processing_record_instance_2 verification_line_item_instance)
+    (processing_record_has_reserved_package_unit prescription_processing_record_instance_1 package_unit_instance)
+    (processing_record_has_reserved_package_unit prescription_processing_record_instance_2 package_unit_instance)
+    (processing_record_references_label_template prescription_processing_record_instance_1 label_template_instance_1)
+    (processing_record_references_label_template prescription_processing_record_instance_2 label_template_instance_2)
+    (auxiliary_instruction_template_available auxiliary_instruction_template_instance_1)
+    (auxiliary_instruction_template_available auxiliary_instruction_template_instance_2)
+    (patient_instruction_template_available patient_instruction_template_instance_1)
+    (patient_instruction_template_available patient_instruction_template_instance_2)
+    (counseling_script_available counseling_script_instance)
+    (clinical_reason_code_available clinical_reason_code_instance)
+    (authorization_template_available authorization_template_instance_1)
+    (processing_record_linked_to_authorization_template prescription_processing_record_instance_1 authorization_template_instance_1)
+    (processing_record_linked_to_authorization_template prescription_processing_record_instance_2 authorization_template_instance_2)
+    (authorization_reason_available authorization_reason_instance)
+  )
+  (:goal
+    (and
+      (work_item_alert_resolved dispensing_line_item_instance)
+      (work_item_alert_resolved verification_line_item_instance)
+      (work_item_alert_resolved prescription_processing_record_instance_1)
+      (work_item_alert_resolved prescription_processing_record_instance_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(mark_prescription_screened dispensing_line_item_instance)
+(select_medication_option_for_prescription dispensing_line_item_instance medication_option_instance_1)
+(assign_alert_rule_to_prescription dispensing_line_item_instance clinical_alert_rule_instance)
+(flag_prescription_for_clinical_review dispensing_line_item_instance clinical_alert_rule_instance)
+(reserve_packaging_choice_for_line_item dispensing_line_item_instance packaging_choice_instance clinical_alert_rule_instance)
+(unassign_alert_rule_from_prescription dispensing_line_item_instance clinical_alert_rule_instance)
+(mark_prescription_screened verification_line_item_instance)
+(select_medication_option_for_prescription verification_line_item_instance medication_option_instance_2)
+(assign_alert_rule_to_prescription verification_line_item_instance clinical_alert_rule_instance)
+(flag_prescription_for_clinical_review verification_line_item_instance clinical_alert_rule_instance)
+(reserve_label_choice_for_verification_line_item verification_line_item_instance label_choice_instance clinical_alert_rule_instance)
+(unassign_alert_rule_from_prescription verification_line_item_instance clinical_alert_rule_instance)
+(assign_staff_to_work_item dispensing_line_item_instance pharmacy_staff_instance)
+(staff_confirm_packaging_for_line_item dispensing_line_item_instance packaging_choice_instance pharmacy_staff_instance)
+(unassign_staff_from_prescription dispensing_line_item_instance pharmacy_staff_instance)
+(assign_staff_to_work_item verification_line_item_instance pharmacy_staff_instance)
+(staff_confirm_label_for_verification_line_item verification_line_item_instance label_choice_instance pharmacy_staff_instance)
+(unassign_staff_from_prescription verification_line_item_instance pharmacy_staff_instance)
+(reserve_package_and_assign_packaging_and_label dispensing_line_item_instance verification_line_item_instance packaging_choice_instance label_choice_instance package_unit_instance)
+(assign_alert_rule_to_prescription dispensing_line_item_instance clinical_alert_rule_instance)
+(mark_package_ready_for_label_application package_unit_instance dispensing_line_item_instance clinical_alert_rule_instance)
+(mark_dispensing_line_item_ready_for_dispense dispensing_line_item_instance package_unit_instance)
+(mark_verification_line_item_ready_for_dispense verification_line_item_instance package_unit_instance)
+(assign_counseling_script_and_mark_clinical_action dispensing_line_item_instance counseling_script_instance clinical_alert_rule_instance)
+(finalize_resolution_for_dispensing_line_item_with_medication_option dispensing_line_item_instance medication_option_instance_1 counseling_script_instance)
+(unassign_alert_rule_from_prescription dispensing_line_item_instance clinical_alert_rule_instance)
+(assign_alert_rule_to_prescription verification_line_item_instance clinical_alert_rule_instance)
+(assign_counseling_script_and_mark_clinical_action verification_line_item_instance counseling_script_instance clinical_alert_rule_instance)
+(finalize_resolution_for_verification_line_item_with_medication_option verification_line_item_instance medication_option_instance_2 counseling_script_instance)
+(unassign_alert_rule_from_prescription verification_line_item_instance clinical_alert_rule_instance)
+(mark_prescription_screened prescription_processing_record_instance_1)
+(select_medication_option_for_prescription prescription_processing_record_instance_1 medication_option_instance_3)
+(assign_alert_rule_to_prescription prescription_processing_record_instance_1 clinical_alert_rule_instance)
+(flag_prescription_for_clinical_review prescription_processing_record_instance_1 clinical_alert_rule_instance)
+(create_authorization_request_for_processing_record prescription_processing_record_instance_1 authorization_template_instance_1 clinical_alert_rule_instance)
+(assign_staff_to_work_item prescription_processing_record_instance_1 pharmacy_staff_instance)
+(acknowledge_authorization_in_processing_record prescription_processing_record_instance_1 pharmacy_staff_instance)
+(unassign_staff_from_prescription prescription_processing_record_instance_1 pharmacy_staff_instance)
+(link_authorization_reason_to_processing_record prescription_processing_record_instance_1 authorization_reason_instance)
+(record_authorization_for_audit prescription_processing_record_instance_1 authorization_reason_instance)
+(finalize_processing_record_after_authorization prescription_processing_record_instance_1)
+(assign_counseling_script_and_mark_clinical_action prescription_processing_record_instance_1 counseling_script_instance clinical_alert_rule_instance)
+(finalize_resolution_for_processing_record_with_medication_option prescription_processing_record_instance_1 medication_option_instance_3 counseling_script_instance)
+(unassign_alert_rule_from_prescription prescription_processing_record_instance_1 clinical_alert_rule_instance)
+(unlink_authorization_reason_from_processing_record prescription_processing_record_instance_1 authorization_reason_instance)
+(mark_prescription_screened prescription_processing_record_instance_2)
+(select_medication_option_for_prescription prescription_processing_record_instance_2 medication_option_instance_1)
+(assign_alert_rule_to_prescription prescription_processing_record_instance_2 clinical_alert_rule_instance)
+(flag_prescription_for_clinical_review prescription_processing_record_instance_2 clinical_alert_rule_instance)
+(create_authorization_request_for_processing_record prescription_processing_record_instance_2 authorization_template_instance_2 clinical_alert_rule_instance)
+(assign_staff_to_work_item prescription_processing_record_instance_2 pharmacy_staff_instance)
+(acknowledge_authorization_in_processing_record prescription_processing_record_instance_2 pharmacy_staff_instance)
+(unassign_staff_from_prescription prescription_processing_record_instance_2 pharmacy_staff_instance)
+(link_authorization_reason_to_processing_record prescription_processing_record_instance_2 authorization_reason_instance)
+(record_authorization_for_audit prescription_processing_record_instance_2 authorization_reason_instance)
+(finalize_processing_record_after_authorization prescription_processing_record_instance_2)
+(assign_counseling_script_and_mark_clinical_action prescription_processing_record_instance_2 counseling_script_instance clinical_alert_rule_instance)
+(finalize_resolution_for_processing_record_with_medication_option prescription_processing_record_instance_2 medication_option_instance_1 counseling_script_instance)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_9hijqfmq/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_9hijqfmq/plan.pddl 
+
+
+--- stderr ---
+

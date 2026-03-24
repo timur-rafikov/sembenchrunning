@@ -1,0 +1,937 @@
+(define (domain fleet_type_matching_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object fleet_feature_type - entity load_item_type - entity network_element - entity transport_operation - entity route_profile - transport_operation fleet_type - fleet_feature_type time_window - fleet_feature_type depot - fleet_feature_type vehicle_model - fleet_feature_type service_option - fleet_feature_type route_requirement_tag - fleet_feature_type vehicle_equipment - fleet_feature_type vehicle_availability_constraint - fleet_feature_type cargo_unit - load_item_type container_unit - load_item_type operator_qualification - load_item_type origin_node - network_element destination_node - network_element transport_leg - network_element leg_profile_group - route_profile operational_unit_group - route_profile origin_leg_profile - leg_profile_group destination_leg_profile - leg_profile_group vehicle_unit - operational_unit_group)
+
+  (:predicates
+    (profile_created ?route_profile - route_profile)
+    (profile_validated ?route_profile - route_profile)
+    (profile_fleet_type_reserved ?route_profile - route_profile)
+    (resource_bound ?route_profile - route_profile)
+    (ready_for_dispatch ?route_profile - route_profile)
+    (profile_requirements_attached ?route_profile - route_profile)
+    (fleet_type_available ?fleet_type - fleet_type)
+    (profile_assigned_fleet_type ?route_profile - route_profile ?fleet_type - fleet_type)
+    (time_window_available ?time_window - time_window)
+    (profile_time_window_assignment ?route_profile - route_profile ?time_window - time_window)
+    (depot_available ?depot - depot)
+    (profile_depot_assignment ?route_profile - route_profile ?depot - depot)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (origin_leg_profile_cargo_assigned ?origin_leg_profile - origin_leg_profile ?cargo_unit - cargo_unit)
+    (destination_leg_profile_cargo_assigned ?destination_leg_profile - destination_leg_profile ?cargo_unit - cargo_unit)
+    (origin_leg_profile_at_origin_node ?origin_leg_profile - origin_leg_profile ?origin_node - origin_node)
+    (origin_node_ready ?origin_node - origin_node)
+    (origin_node_reserved ?origin_node - origin_node)
+    (origin_leg_profile_ready ?origin_leg_profile - origin_leg_profile)
+    (destination_leg_profile_at_node ?destination_leg_profile - destination_leg_profile ?destination_node - destination_node)
+    (destination_node_ready ?destination_node - destination_node)
+    (destination_node_reserved ?destination_node - destination_node)
+    (destination_leg_profile_ready ?destination_leg_profile - destination_leg_profile)
+    (transport_leg_unassigned ?transport_leg - transport_leg)
+    (transport_leg_instantiated ?transport_leg - transport_leg)
+    (transport_leg_origin_node_link ?transport_leg - transport_leg ?origin_node - origin_node)
+    (transport_leg_destination_node_link ?transport_leg - transport_leg ?destination_node - destination_node)
+    (transport_leg_origin_special_handling ?transport_leg - transport_leg)
+    (transport_leg_destination_special_handling ?transport_leg - transport_leg)
+    (transport_leg_activated_for_loading ?transport_leg - transport_leg)
+    (vehicle_origin_leg_compatibility ?vehicle_unit - vehicle_unit ?origin_leg_profile - origin_leg_profile)
+    (vehicle_destination_leg_compatibility ?vehicle_unit - vehicle_unit ?destination_leg_profile - destination_leg_profile)
+    (vehicle_assigned_to_transport_leg ?vehicle_unit - vehicle_unit ?transport_leg - transport_leg)
+    (container_available ?container_unit - container_unit)
+    (vehicle_container_compatible ?vehicle_unit - vehicle_unit ?container_unit - container_unit)
+    (container_locked ?container_unit - container_unit)
+    (container_assigned_to_transport_leg ?container_unit - container_unit ?transport_leg - transport_leg)
+    (vehicle_capability_stage_1 ?vehicle_unit - vehicle_unit)
+    (vehicle_capability_stage_2 ?vehicle_unit - vehicle_unit)
+    (vehicle_capability_stage_3 ?vehicle_unit - vehicle_unit)
+    (vehicle_model_assigned ?vehicle_unit - vehicle_unit)
+    (vehicle_model_confirmed ?vehicle_unit - vehicle_unit)
+    (vehicle_service_option_assigned ?vehicle_unit - vehicle_unit)
+    (vehicle_pretrip_sequenced ?vehicle_unit - vehicle_unit)
+    (operator_qualification_available ?operator_qualification - operator_qualification)
+    (vehicle_has_operator_qualification ?vehicle_unit - vehicle_unit ?operator_qualification - operator_qualification)
+    (vehicle_permit_assigned ?vehicle_unit - vehicle_unit)
+    (vehicle_permit_verified ?vehicle_unit - vehicle_unit)
+    (vehicle_permit_approved ?vehicle_unit - vehicle_unit)
+    (vehicle_model_available ?vehicle_model - vehicle_model)
+    (vehicle_assigned_model ?vehicle_unit - vehicle_unit ?vehicle_model - vehicle_model)
+    (service_option_available ?service_option - service_option)
+    (vehicle_assigned_service_option ?vehicle_unit - vehicle_unit ?service_option - service_option)
+    (vehicle_equipment_available ?vehicle_equipment - vehicle_equipment)
+    (vehicle_has_equipment ?vehicle_unit - vehicle_unit ?vehicle_equipment - vehicle_equipment)
+    (vehicle_availability_constraint_available ?vehicle_availability_constraint - vehicle_availability_constraint)
+    (vehicle_availability_constraint_assigned ?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint)
+    (route_requirement_tag_available ?route_requirement_tag - route_requirement_tag)
+    (profile_requirement_tag_assignment ?route_profile - route_profile ?route_requirement_tag - route_requirement_tag)
+    (origin_leg_profile_ready_for_assembly ?origin_leg_profile - origin_leg_profile)
+    (destination_leg_profile_ready_for_assembly ?destination_leg_profile - destination_leg_profile)
+    (vehicle_pretrip_flag ?vehicle_unit - vehicle_unit)
+  )
+  (:action create_route_profile
+    :parameters (?route_profile - route_profile)
+    :precondition
+      (and
+        (not
+          (profile_created ?route_profile)
+        )
+        (not
+          (resource_bound ?route_profile)
+        )
+      )
+    :effect (profile_created ?route_profile)
+  )
+  (:action match_route_profile_to_fleet_type
+    :parameters (?route_profile - route_profile ?fleet_type - fleet_type)
+    :precondition
+      (and
+        (profile_created ?route_profile)
+        (not
+          (profile_fleet_type_reserved ?route_profile)
+        )
+        (fleet_type_available ?fleet_type)
+      )
+    :effect
+      (and
+        (profile_fleet_type_reserved ?route_profile)
+        (profile_assigned_fleet_type ?route_profile ?fleet_type)
+        (not
+          (fleet_type_available ?fleet_type)
+        )
+      )
+  )
+  (:action assign_time_window_to_route_profile
+    :parameters (?route_profile - route_profile ?time_window - time_window)
+    :precondition
+      (and
+        (profile_created ?route_profile)
+        (profile_fleet_type_reserved ?route_profile)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (profile_time_window_assignment ?route_profile ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action finalize_route_profile_validation
+    :parameters (?route_profile - route_profile ?time_window - time_window)
+    :precondition
+      (and
+        (profile_created ?route_profile)
+        (profile_fleet_type_reserved ?route_profile)
+        (profile_time_window_assignment ?route_profile ?time_window)
+        (not
+          (profile_validated ?route_profile)
+        )
+      )
+    :effect (profile_validated ?route_profile)
+  )
+  (:action release_time_window_from_route_profile
+    :parameters (?route_profile - route_profile ?time_window - time_window)
+    :precondition
+      (and
+        (profile_time_window_assignment ?route_profile ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (profile_time_window_assignment ?route_profile ?time_window)
+        )
+      )
+  )
+  (:action assign_depot_to_route_profile
+    :parameters (?route_profile - route_profile ?depot - depot)
+    :precondition
+      (and
+        (profile_validated ?route_profile)
+        (depot_available ?depot)
+      )
+    :effect
+      (and
+        (profile_depot_assignment ?route_profile ?depot)
+        (not
+          (depot_available ?depot)
+        )
+      )
+  )
+  (:action release_depot_from_route_profile
+    :parameters (?route_profile - route_profile ?depot - depot)
+    :precondition
+      (and
+        (profile_depot_assignment ?route_profile ?depot)
+      )
+    :effect
+      (and
+        (depot_available ?depot)
+        (not
+          (profile_depot_assignment ?route_profile ?depot)
+        )
+      )
+  )
+  (:action register_vehicle_equipment
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_equipment - vehicle_equipment)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_equipment_available ?vehicle_equipment)
+      )
+    :effect
+      (and
+        (vehicle_has_equipment ?vehicle_unit ?vehicle_equipment)
+        (not
+          (vehicle_equipment_available ?vehicle_equipment)
+        )
+      )
+  )
+  (:action unregister_vehicle_equipment
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_equipment - vehicle_equipment)
+    :precondition
+      (and
+        (vehicle_has_equipment ?vehicle_unit ?vehicle_equipment)
+      )
+    :effect
+      (and
+        (vehicle_equipment_available ?vehicle_equipment)
+        (not
+          (vehicle_has_equipment ?vehicle_unit ?vehicle_equipment)
+        )
+      )
+  )
+  (:action assign_vehicle_availability_constraint
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_availability_constraint_available ?vehicle_availability_constraint)
+      )
+    :effect
+      (and
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (not
+          (vehicle_availability_constraint_available ?vehicle_availability_constraint)
+        )
+      )
+  )
+  (:action remove_vehicle_availability_constraint
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint)
+    :precondition
+      (and
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+      )
+    :effect
+      (and
+        (vehicle_availability_constraint_available ?vehicle_availability_constraint)
+        (not
+          (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        )
+      )
+  )
+  (:action prepare_origin_node_readiness
+    :parameters (?origin_leg_profile - origin_leg_profile ?origin_node - origin_node ?time_window - time_window)
+    :precondition
+      (and
+        (profile_validated ?origin_leg_profile)
+        (profile_time_window_assignment ?origin_leg_profile ?time_window)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (not
+          (origin_node_ready ?origin_node)
+        )
+        (not
+          (origin_node_reserved ?origin_node)
+        )
+      )
+    :effect (origin_node_ready ?origin_node)
+  )
+  (:action bind_depot_and_mark_origin_leg_ready
+    :parameters (?origin_leg_profile - origin_leg_profile ?origin_node - origin_node ?depot - depot)
+    :precondition
+      (and
+        (profile_validated ?origin_leg_profile)
+        (profile_depot_assignment ?origin_leg_profile ?depot)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (origin_node_ready ?origin_node)
+        (not
+          (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (origin_leg_profile_ready ?origin_leg_profile)
+      )
+  )
+  (:action reserve_cargo_for_origin_leg
+    :parameters (?origin_leg_profile - origin_leg_profile ?origin_node - origin_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (profile_validated ?origin_leg_profile)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (origin_node_reserved ?origin_node)
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (origin_leg_profile_cargo_assigned ?origin_leg_profile ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_origin_leg_readiness
+    :parameters (?origin_leg_profile - origin_leg_profile ?origin_node - origin_node ?time_window - time_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (profile_validated ?origin_leg_profile)
+        (profile_time_window_assignment ?origin_leg_profile ?time_window)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (origin_node_reserved ?origin_node)
+        (origin_leg_profile_cargo_assigned ?origin_leg_profile ?cargo_unit)
+        (not
+          (origin_leg_profile_ready ?origin_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (origin_node_ready ?origin_node)
+        (origin_leg_profile_ready ?origin_leg_profile)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_leg_profile_cargo_assigned ?origin_leg_profile ?cargo_unit)
+        )
+      )
+  )
+  (:action prepare_destination_node_readiness
+    :parameters (?destination_leg_profile - destination_leg_profile ?destination_node - destination_node ?time_window - time_window)
+    :precondition
+      (and
+        (profile_validated ?destination_leg_profile)
+        (profile_time_window_assignment ?destination_leg_profile ?time_window)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (not
+          (destination_node_ready ?destination_node)
+        )
+        (not
+          (destination_node_reserved ?destination_node)
+        )
+      )
+    :effect (destination_node_ready ?destination_node)
+  )
+  (:action bind_depot_and_mark_destination_leg_ready
+    :parameters (?destination_leg_profile - destination_leg_profile ?destination_node - destination_node ?depot - depot)
+    :precondition
+      (and
+        (profile_validated ?destination_leg_profile)
+        (profile_depot_assignment ?destination_leg_profile ?depot)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (destination_node_ready ?destination_node)
+        (not
+          (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (destination_leg_profile_ready ?destination_leg_profile)
+      )
+  )
+  (:action reserve_cargo_for_destination_leg
+    :parameters (?destination_leg_profile - destination_leg_profile ?destination_node - destination_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (profile_validated ?destination_leg_profile)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (destination_node_reserved ?destination_node)
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (destination_leg_profile_cargo_assigned ?destination_leg_profile ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_destination_leg_readiness
+    :parameters (?destination_leg_profile - destination_leg_profile ?destination_node - destination_node ?time_window - time_window ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (profile_validated ?destination_leg_profile)
+        (profile_time_window_assignment ?destination_leg_profile ?time_window)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (destination_node_reserved ?destination_node)
+        (destination_leg_profile_cargo_assigned ?destination_leg_profile ?cargo_unit)
+        (not
+          (destination_leg_profile_ready ?destination_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (destination_node_ready ?destination_node)
+        (destination_leg_profile_ready ?destination_leg_profile)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_leg_profile_cargo_assigned ?destination_leg_profile ?cargo_unit)
+        )
+      )
+  )
+  (:action assemble_transport_leg
+    :parameters (?origin_leg_profile - origin_leg_profile ?destination_leg_profile - destination_leg_profile ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (origin_node_ready ?origin_node)
+        (destination_node_ready ?destination_node)
+        (origin_leg_profile_ready ?origin_leg_profile)
+        (destination_leg_profile_ready ?destination_leg_profile)
+        (transport_leg_unassigned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_origin_node_link ?transport_leg ?origin_node)
+        (transport_leg_destination_node_link ?transport_leg ?destination_node)
+        (not
+          (transport_leg_unassigned ?transport_leg)
+        )
+      )
+  )
+  (:action assemble_transport_leg_with_origin_special_handling
+    :parameters (?origin_leg_profile - origin_leg_profile ?destination_leg_profile - destination_leg_profile ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_ready ?destination_node)
+        (not
+          (origin_leg_profile_ready ?origin_leg_profile)
+        )
+        (destination_leg_profile_ready ?destination_leg_profile)
+        (transport_leg_unassigned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_origin_node_link ?transport_leg ?origin_node)
+        (transport_leg_destination_node_link ?transport_leg ?destination_node)
+        (transport_leg_origin_special_handling ?transport_leg)
+        (not
+          (transport_leg_unassigned ?transport_leg)
+        )
+      )
+  )
+  (:action assemble_transport_leg_with_destination_special_handling
+    :parameters (?origin_leg_profile - origin_leg_profile ?destination_leg_profile - destination_leg_profile ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (origin_node_ready ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (origin_leg_profile_ready ?origin_leg_profile)
+        (not
+          (destination_leg_profile_ready ?destination_leg_profile)
+        )
+        (transport_leg_unassigned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_origin_node_link ?transport_leg ?origin_node)
+        (transport_leg_destination_node_link ?transport_leg ?destination_node)
+        (transport_leg_destination_special_handling ?transport_leg)
+        (not
+          (transport_leg_unassigned ?transport_leg)
+        )
+      )
+  )
+  (:action assemble_transport_leg_with_both_special_handling
+    :parameters (?origin_leg_profile - origin_leg_profile ?destination_leg_profile - destination_leg_profile ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (origin_leg_profile_at_origin_node ?origin_leg_profile ?origin_node)
+        (destination_leg_profile_at_node ?destination_leg_profile ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (origin_leg_profile_ready ?origin_leg_profile)
+        )
+        (not
+          (destination_leg_profile_ready ?destination_leg_profile)
+        )
+        (transport_leg_unassigned ?transport_leg)
+      )
+    :effect
+      (and
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_origin_node_link ?transport_leg ?origin_node)
+        (transport_leg_destination_node_link ?transport_leg ?destination_node)
+        (transport_leg_origin_special_handling ?transport_leg)
+        (transport_leg_destination_special_handling ?transport_leg)
+        (not
+          (transport_leg_unassigned ?transport_leg)
+        )
+      )
+  )
+  (:action activate_transport_leg_for_loading
+    :parameters (?transport_leg - transport_leg ?origin_leg_profile - origin_leg_profile ?time_window - time_window)
+    :precondition
+      (and
+        (transport_leg_instantiated ?transport_leg)
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (profile_time_window_assignment ?origin_leg_profile ?time_window)
+        (not
+          (transport_leg_activated_for_loading ?transport_leg)
+        )
+      )
+    :effect (transport_leg_activated_for_loading ?transport_leg)
+  )
+  (:action assign_container_to_transport_leg
+    :parameters (?vehicle_unit - vehicle_unit ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_assigned_to_transport_leg ?vehicle_unit ?transport_leg)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_available ?container_unit)
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_activated_for_loading ?transport_leg)
+        (not
+          (container_locked ?container_unit)
+        )
+      )
+    :effect
+      (and
+        (container_locked ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action prepare_container_assignment_on_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?container_unit - container_unit ?transport_leg - transport_leg ?time_window - time_window)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_locked ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (profile_time_window_assignment ?vehicle_unit ?time_window)
+        (not
+          (transport_leg_origin_special_handling ?transport_leg)
+        )
+        (not
+          (vehicle_capability_stage_1 ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_capability_stage_1 ?vehicle_unit)
+  )
+  (:action assign_vehicle_model
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_model - vehicle_model)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_model_available ?vehicle_model)
+        (not
+          (vehicle_model_assigned ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_model_assigned ?vehicle_unit)
+        (vehicle_assigned_model ?vehicle_unit ?vehicle_model)
+        (not
+          (vehicle_model_available ?vehicle_model)
+        )
+      )
+  )
+  (:action verify_vehicle_model_and_container
+    :parameters (?vehicle_unit - vehicle_unit ?container_unit - container_unit ?transport_leg - transport_leg ?time_window - time_window ?vehicle_model - vehicle_model)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_locked ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (profile_time_window_assignment ?vehicle_unit ?time_window)
+        (transport_leg_origin_special_handling ?transport_leg)
+        (vehicle_model_assigned ?vehicle_unit)
+        (vehicle_assigned_model ?vehicle_unit ?vehicle_model)
+        (not
+          (vehicle_capability_stage_1 ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_capability_stage_1 ?vehicle_unit)
+        (vehicle_model_confirmed ?vehicle_unit)
+      )
+  )
+  (:action vehicle_capability_register_stage2_primary
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_equipment - vehicle_equipment ?depot - depot ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_1 ?vehicle_unit)
+        (vehicle_has_equipment ?vehicle_unit ?vehicle_equipment)
+        (profile_depot_assignment ?vehicle_unit ?depot)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (not
+          (transport_leg_destination_special_handling ?transport_leg)
+        )
+        (not
+          (vehicle_capability_stage_2 ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_capability_stage_2 ?vehicle_unit)
+  )
+  (:action vehicle_capability_register_stage2_secondary
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_equipment - vehicle_equipment ?depot - depot ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_1 ?vehicle_unit)
+        (vehicle_has_equipment ?vehicle_unit ?vehicle_equipment)
+        (profile_depot_assignment ?vehicle_unit ?depot)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (transport_leg_destination_special_handling ?transport_leg)
+        (not
+          (vehicle_capability_stage_2 ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_capability_stage_2 ?vehicle_unit)
+  )
+  (:action vehicle_capability_register_stage3_primary
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_2 ?vehicle_unit)
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (not
+          (transport_leg_origin_special_handling ?transport_leg)
+        )
+        (not
+          (transport_leg_destination_special_handling ?transport_leg)
+        )
+        (not
+          (vehicle_capability_stage_3 ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_capability_stage_3 ?vehicle_unit)
+  )
+  (:action vehicle_capability_register_stage3_secondary
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_2 ?vehicle_unit)
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (transport_leg_origin_special_handling ?transport_leg)
+        (not
+          (transport_leg_destination_special_handling ?transport_leg)
+        )
+        (not
+          (vehicle_capability_stage_3 ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_service_option_assigned ?vehicle_unit)
+      )
+  )
+  (:action vehicle_capability_register_stage3_alternate
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_2 ?vehicle_unit)
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (not
+          (transport_leg_origin_special_handling ?transport_leg)
+        )
+        (transport_leg_destination_special_handling ?transport_leg)
+        (not
+          (vehicle_capability_stage_3 ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_service_option_assigned ?vehicle_unit)
+      )
+  )
+  (:action vehicle_capability_register_stage3_final
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint ?container_unit - container_unit ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_capability_stage_2 ?vehicle_unit)
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (vehicle_container_compatible ?vehicle_unit ?container_unit)
+        (container_assigned_to_transport_leg ?container_unit ?transport_leg)
+        (transport_leg_origin_special_handling ?transport_leg)
+        (transport_leg_destination_special_handling ?transport_leg)
+        (not
+          (vehicle_capability_stage_3 ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_service_option_assigned ?vehicle_unit)
+      )
+  )
+  (:action finalize_vehicle_pretrip
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (not
+          (vehicle_service_option_assigned ?vehicle_unit)
+        )
+        (not
+          (vehicle_pretrip_flag ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_pretrip_flag ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action assign_service_option_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?service_option - service_option)
+    :precondition
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_service_option_assigned ?vehicle_unit)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (vehicle_assigned_service_option ?vehicle_unit ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action validate_and_sequence_vehicle_pretrip
+    :parameters (?vehicle_unit - vehicle_unit ?origin_leg_profile - origin_leg_profile ?destination_leg_profile - destination_leg_profile ?time_window - time_window ?service_option - service_option)
+    :precondition
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_service_option_assigned ?vehicle_unit)
+        (vehicle_assigned_service_option ?vehicle_unit ?service_option)
+        (vehicle_origin_leg_compatibility ?vehicle_unit ?origin_leg_profile)
+        (vehicle_destination_leg_compatibility ?vehicle_unit ?destination_leg_profile)
+        (origin_leg_profile_ready ?origin_leg_profile)
+        (destination_leg_profile_ready ?destination_leg_profile)
+        (profile_time_window_assignment ?vehicle_unit ?time_window)
+        (not
+          (vehicle_pretrip_sequenced ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_pretrip_sequenced ?vehicle_unit)
+  )
+  (:action finalize_vehicle_pretrip_after_checks
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_capability_stage_3 ?vehicle_unit)
+        (vehicle_pretrip_sequenced ?vehicle_unit)
+        (not
+          (vehicle_pretrip_flag ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_pretrip_flag ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action reserve_permit_for_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?operator_qualification - operator_qualification ?time_window - time_window)
+    :precondition
+      (and
+        (profile_validated ?vehicle_unit)
+        (profile_time_window_assignment ?vehicle_unit ?time_window)
+        (operator_qualification_available ?operator_qualification)
+        (vehicle_has_operator_qualification ?vehicle_unit ?operator_qualification)
+        (not
+          (vehicle_permit_assigned ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_permit_assigned ?vehicle_unit)
+        (not
+          (operator_qualification_available ?operator_qualification)
+        )
+      )
+  )
+  (:action verify_permit_and_bind_depot
+    :parameters (?vehicle_unit - vehicle_unit ?depot - depot)
+    :precondition
+      (and
+        (vehicle_permit_assigned ?vehicle_unit)
+        (profile_depot_assignment ?vehicle_unit ?depot)
+        (not
+          (vehicle_permit_verified ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_permit_verified ?vehicle_unit)
+  )
+  (:action check_permit_constraints
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_availability_constraint - vehicle_availability_constraint)
+    :precondition
+      (and
+        (vehicle_permit_verified ?vehicle_unit)
+        (vehicle_availability_constraint_assigned ?vehicle_unit ?vehicle_availability_constraint)
+        (not
+          (vehicle_permit_approved ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_permit_approved ?vehicle_unit)
+  )
+  (:action approve_permit_and_mark_vehicle_ready
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (vehicle_permit_approved ?vehicle_unit)
+        (not
+          (vehicle_pretrip_flag ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_pretrip_flag ?vehicle_unit)
+        (ready_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action dispatch_origin_leg
+    :parameters (?origin_leg_profile - origin_leg_profile ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (origin_leg_profile_ready_for_assembly ?origin_leg_profile)
+        (origin_leg_profile_ready ?origin_leg_profile)
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_activated_for_loading ?transport_leg)
+        (not
+          (ready_for_dispatch ?origin_leg_profile)
+        )
+      )
+    :effect (ready_for_dispatch ?origin_leg_profile)
+  )
+  (:action dispatch_destination_leg
+    :parameters (?destination_leg_profile - destination_leg_profile ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (destination_leg_profile_ready_for_assembly ?destination_leg_profile)
+        (destination_leg_profile_ready ?destination_leg_profile)
+        (transport_leg_instantiated ?transport_leg)
+        (transport_leg_activated_for_loading ?transport_leg)
+        (not
+          (ready_for_dispatch ?destination_leg_profile)
+        )
+      )
+    :effect (ready_for_dispatch ?destination_leg_profile)
+  )
+  (:action attach_route_requirement_tag_to_profile
+    :parameters (?route_profile - route_profile ?route_requirement_tag - route_requirement_tag ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_dispatch ?route_profile)
+        (profile_time_window_assignment ?route_profile ?time_window)
+        (route_requirement_tag_available ?route_requirement_tag)
+        (not
+          (profile_requirements_attached ?route_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_requirements_attached ?route_profile)
+        (profile_requirement_tag_assignment ?route_profile ?route_requirement_tag)
+        (not
+          (route_requirement_tag_available ?route_requirement_tag)
+        )
+      )
+  )
+  (:action bind_fleet_type_and_mark_origin_leg_assigned
+    :parameters (?origin_leg_profile - origin_leg_profile ?fleet_type - fleet_type ?route_requirement_tag - route_requirement_tag)
+    :precondition
+      (and
+        (profile_requirements_attached ?origin_leg_profile)
+        (profile_assigned_fleet_type ?origin_leg_profile ?fleet_type)
+        (profile_requirement_tag_assignment ?origin_leg_profile ?route_requirement_tag)
+        (not
+          (resource_bound ?origin_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (resource_bound ?origin_leg_profile)
+        (fleet_type_available ?fleet_type)
+        (route_requirement_tag_available ?route_requirement_tag)
+      )
+  )
+  (:action bind_fleet_type_and_mark_destination_leg_assigned
+    :parameters (?destination_leg_profile - destination_leg_profile ?fleet_type - fleet_type ?route_requirement_tag - route_requirement_tag)
+    :precondition
+      (and
+        (profile_requirements_attached ?destination_leg_profile)
+        (profile_assigned_fleet_type ?destination_leg_profile ?fleet_type)
+        (profile_requirement_tag_assignment ?destination_leg_profile ?route_requirement_tag)
+        (not
+          (resource_bound ?destination_leg_profile)
+        )
+      )
+    :effect
+      (and
+        (resource_bound ?destination_leg_profile)
+        (fleet_type_available ?fleet_type)
+        (route_requirement_tag_available ?route_requirement_tag)
+      )
+  )
+  (:action bind_fleet_type_and_mark_vehicle_assigned
+    :parameters (?vehicle_unit - vehicle_unit ?fleet_type - fleet_type ?route_requirement_tag - route_requirement_tag)
+    :precondition
+      (and
+        (profile_requirements_attached ?vehicle_unit)
+        (profile_assigned_fleet_type ?vehicle_unit ?fleet_type)
+        (profile_requirement_tag_assignment ?vehicle_unit ?route_requirement_tag)
+        (not
+          (resource_bound ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (resource_bound ?vehicle_unit)
+        (fleet_type_available ?fleet_type)
+        (route_requirement_tag_available ?route_requirement_tag)
+      )
+  )
+)

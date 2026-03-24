@@ -1,0 +1,936 @@
+(define (domain central_vs_local_treasury_allocation_decision)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types treasury_resource - object instrument_or_metric - object allocation_entity_group - object actor - object entity - actor funding_source - treasury_resource cash_forecast - treasury_resource approver_role - treasury_resource rate_scenario - treasury_resource treasury_strategy - treasury_resource funding_request_token - treasury_resource settlement_instruction - treasury_resource executive_approval - treasury_resource transfer_order - instrument_or_metric liquidity_metric - instrument_or_metric policy_document - instrument_or_metric liquidity_bucket - allocation_entity_group maturity_bucket - allocation_entity_group allocation_record - allocation_entity_group treasury_node - entity treasury_account - entity local_treasury - treasury_node local_business_unit - treasury_node central_treasury - treasury_account)
+  (:predicates
+    (entity_registered ?entity - entity)
+    (allocation_ready ?entity - entity)
+    (funding_source_bound ?entity - entity)
+    (allocation_settled ?entity - entity)
+    (execution_authorized ?entity - entity)
+    (funding_request_issued ?entity - entity)
+    (funding_source_available ?funding_source - funding_source)
+    (entity_links_funding_source ?entity - entity ?funding_source - funding_source)
+    (cash_forecast_available ?cash_forecast - cash_forecast)
+    (entity_links_cash_forecast ?entity - entity ?cash_forecast - cash_forecast)
+    (approver_role_available ?approver_role - approver_role)
+    (entity_links_approver_role ?entity - entity ?approver_role - approver_role)
+    (transfer_order_available ?transfer_order - transfer_order)
+    (local_treasury_links_transfer_order ?local_treasury - local_treasury ?transfer_order - transfer_order)
+    (business_unit_links_transfer_order ?business_unit - local_business_unit ?transfer_order - transfer_order)
+    (local_treasury_links_liquidity_bucket ?local_treasury - local_treasury ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_selected ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_reserved ?liquidity_bucket - liquidity_bucket)
+    (local_treasury_buffer_confirmed ?local_treasury - local_treasury)
+    (business_unit_links_maturity_bucket ?business_unit - local_business_unit ?maturity_bucket - maturity_bucket)
+    (maturity_bucket_selected ?maturity_bucket - maturity_bucket)
+    (maturity_bucket_reserved ?maturity_bucket - maturity_bucket)
+    (business_unit_buffer_confirmed ?business_unit - local_business_unit)
+    (allocation_record_available ?allocation_record - allocation_record)
+    (allocation_proposal_ready ?allocation_record - allocation_record)
+    (proposal_links_liquidity_bucket ?allocation_record - allocation_record ?liquidity_bucket - liquidity_bucket)
+    (proposal_links_maturity_bucket ?allocation_record - allocation_record ?maturity_bucket - maturity_bucket)
+    (liquidity_validation_passed ?allocation_record - allocation_record)
+    (maturity_validation_passed ?allocation_record - allocation_record)
+    (scenario_applied ?allocation_record - allocation_record)
+    (central_treasury_links_local_treasury ?central_treasury - central_treasury ?local_treasury - local_treasury)
+    (central_treasury_links_business_unit ?central_treasury - central_treasury ?business_unit - local_business_unit)
+    (central_treasury_links_allocation_record ?central_treasury - central_treasury ?allocation_record - allocation_record)
+    (liquidity_metric_available ?liquidity_metric - liquidity_metric)
+    (central_treasury_links_liquidity_metric ?central_treasury - central_treasury ?liquidity_metric - liquidity_metric)
+    (liquidity_metric_consumed ?liquidity_metric - liquidity_metric)
+    (liquidity_metric_links_allocation_record ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    (central_review_started ?central_treasury - central_treasury)
+    (central_authorization_requested ?central_treasury - central_treasury)
+    (central_review_complete ?central_treasury - central_treasury)
+    (rate_scenario_loaded ?central_treasury - central_treasury)
+    (central_conditions_cleared ?central_treasury - central_treasury)
+    (release_authorized ?central_treasury - central_treasury)
+    (execution_packet_ready ?central_treasury - central_treasury)
+    (policy_document_available ?policy_document - policy_document)
+    (central_treasury_links_policy_document ?central_treasury - central_treasury ?policy_document - policy_document)
+    (policy_applied ?central_treasury - central_treasury)
+    (policy_acknowledged ?central_treasury - central_treasury)
+    (executive_signoff_recorded ?central_treasury - central_treasury)
+    (rate_scenario_available ?rate_scenario - rate_scenario)
+    (central_treasury_links_rate_scenario ?central_treasury - central_treasury ?rate_scenario - rate_scenario)
+    (treasury_strategy_available ?treasury_strategy - treasury_strategy)
+    (central_treasury_links_treasury_strategy ?central_treasury - central_treasury ?treasury_strategy - treasury_strategy)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (central_treasury_links_settlement_instruction ?central_treasury - central_treasury ?settlement_instruction - settlement_instruction)
+    (executive_approval_available ?executive_approval - executive_approval)
+    (central_treasury_links_executive_approval ?central_treasury - central_treasury ?executive_approval - executive_approval)
+    (funding_request_available ?funding_request_token - funding_request_token)
+    (entity_links_funding_request_token ?entity - entity ?funding_request_token - funding_request_token)
+    (local_treasury_ready ?local_treasury - local_treasury)
+    (business_unit_ready ?business_unit - local_business_unit)
+    (finalization_complete ?central_treasury - central_treasury)
+  )
+  (:action register_entity
+    :parameters (?entity - entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?entity)
+        )
+        (not
+          (allocation_settled ?entity)
+        )
+      )
+    :effect (entity_registered ?entity)
+  )
+  (:action link_funding_source
+    :parameters (?entity - entity ?funding_source - funding_source)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (not
+          (funding_source_bound ?entity)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (funding_source_bound ?entity)
+        (entity_links_funding_source ?entity ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action attach_cash_forecast
+    :parameters (?entity - entity ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (funding_source_bound ?entity)
+        (cash_forecast_available ?cash_forecast)
+      )
+    :effect
+      (and
+        (entity_links_cash_forecast ?entity ?cash_forecast)
+        (not
+          (cash_forecast_available ?cash_forecast)
+        )
+      )
+  )
+  (:action enable_allocation_readiness
+    :parameters (?entity - entity ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (funding_source_bound ?entity)
+        (entity_links_cash_forecast ?entity ?cash_forecast)
+        (not
+          (allocation_ready ?entity)
+        )
+      )
+    :effect (allocation_ready ?entity)
+  )
+  (:action detach_cash_forecast
+    :parameters (?entity - entity ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (entity_links_cash_forecast ?entity ?cash_forecast)
+      )
+    :effect
+      (and
+        (cash_forecast_available ?cash_forecast)
+        (not
+          (entity_links_cash_forecast ?entity ?cash_forecast)
+        )
+      )
+  )
+  (:action assign_approver_role
+    :parameters (?entity - entity ?approver_role - approver_role)
+    :precondition
+      (and
+        (allocation_ready ?entity)
+        (approver_role_available ?approver_role)
+      )
+    :effect
+      (and
+        (entity_links_approver_role ?entity ?approver_role)
+        (not
+          (approver_role_available ?approver_role)
+        )
+      )
+  )
+  (:action release_approver_role
+    :parameters (?entity - entity ?approver_role - approver_role)
+    :precondition
+      (and
+        (entity_links_approver_role ?entity ?approver_role)
+      )
+    :effect
+      (and
+        (approver_role_available ?approver_role)
+        (not
+          (entity_links_approver_role ?entity ?approver_role)
+        )
+      )
+  )
+  (:action attach_settlement_instruction
+    :parameters (?central_treasury - central_treasury ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (central_treasury_links_settlement_instruction ?central_treasury ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action release_settlement_instruction
+    :parameters (?central_treasury - central_treasury ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (central_treasury_links_settlement_instruction ?central_treasury ?settlement_instruction)
+      )
+    :effect
+      (and
+        (settlement_instruction_available ?settlement_instruction)
+        (not
+          (central_treasury_links_settlement_instruction ?central_treasury ?settlement_instruction)
+        )
+      )
+  )
+  (:action attach_executive_approval
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (executive_approval_available ?executive_approval)
+      )
+    :effect
+      (and
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (not
+          (executive_approval_available ?executive_approval)
+        )
+      )
+  )
+  (:action release_executive_approval
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+      )
+    :effect
+      (and
+        (executive_approval_available ?executive_approval)
+        (not
+          (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        )
+      )
+  )
+  (:action select_liquidity_bucket
+    :parameters (?local_treasury - local_treasury ?liquidity_bucket - liquidity_bucket ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (allocation_ready ?local_treasury)
+        (entity_links_cash_forecast ?local_treasury ?cash_forecast)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (not
+          (liquidity_bucket_selected ?liquidity_bucket)
+        )
+        (not
+          (liquidity_bucket_reserved ?liquidity_bucket)
+        )
+      )
+    :effect (liquidity_bucket_selected ?liquidity_bucket)
+  )
+  (:action confirm_local_treasury_buffer
+    :parameters (?local_treasury - local_treasury ?liquidity_bucket - liquidity_bucket ?approver_role - approver_role)
+    :precondition
+      (and
+        (allocation_ready ?local_treasury)
+        (entity_links_approver_role ?local_treasury ?approver_role)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (liquidity_bucket_selected ?liquidity_bucket)
+        (not
+          (local_treasury_ready ?local_treasury)
+        )
+      )
+    :effect
+      (and
+        (local_treasury_ready ?local_treasury)
+        (local_treasury_buffer_confirmed ?local_treasury)
+      )
+  )
+  (:action reserve_liquidity_transfer
+    :parameters (?local_treasury - local_treasury ?liquidity_bucket - liquidity_bucket ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (allocation_ready ?local_treasury)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (transfer_order_available ?transfer_order)
+        (not
+          (local_treasury_ready ?local_treasury)
+        )
+      )
+    :effect
+      (and
+        (liquidity_bucket_reserved ?liquidity_bucket)
+        (local_treasury_ready ?local_treasury)
+        (local_treasury_links_transfer_order ?local_treasury ?transfer_order)
+        (not
+          (transfer_order_available ?transfer_order)
+        )
+      )
+  )
+  (:action release_liquidity_transfer
+    :parameters (?local_treasury - local_treasury ?liquidity_bucket - liquidity_bucket ?cash_forecast - cash_forecast ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (allocation_ready ?local_treasury)
+        (entity_links_cash_forecast ?local_treasury ?cash_forecast)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (liquidity_bucket_reserved ?liquidity_bucket)
+        (local_treasury_links_transfer_order ?local_treasury ?transfer_order)
+        (not
+          (local_treasury_buffer_confirmed ?local_treasury)
+        )
+      )
+    :effect
+      (and
+        (liquidity_bucket_selected ?liquidity_bucket)
+        (local_treasury_buffer_confirmed ?local_treasury)
+        (transfer_order_available ?transfer_order)
+        (not
+          (local_treasury_links_transfer_order ?local_treasury ?transfer_order)
+        )
+      )
+  )
+  (:action select_maturity_bucket
+    :parameters (?business_unit - local_business_unit ?maturity_bucket - maturity_bucket ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (allocation_ready ?business_unit)
+        (entity_links_cash_forecast ?business_unit ?cash_forecast)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (not
+          (maturity_bucket_selected ?maturity_bucket)
+        )
+        (not
+          (maturity_bucket_reserved ?maturity_bucket)
+        )
+      )
+    :effect (maturity_bucket_selected ?maturity_bucket)
+  )
+  (:action confirm_business_unit_buffer
+    :parameters (?business_unit - local_business_unit ?maturity_bucket - maturity_bucket ?approver_role - approver_role)
+    :precondition
+      (and
+        (allocation_ready ?business_unit)
+        (entity_links_approver_role ?business_unit ?approver_role)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (maturity_bucket_selected ?maturity_bucket)
+        (not
+          (business_unit_ready ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (business_unit_ready ?business_unit)
+        (business_unit_buffer_confirmed ?business_unit)
+      )
+  )
+  (:action reserve_maturity_transfer
+    :parameters (?business_unit - local_business_unit ?maturity_bucket - maturity_bucket ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (allocation_ready ?business_unit)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (transfer_order_available ?transfer_order)
+        (not
+          (business_unit_ready ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (maturity_bucket_reserved ?maturity_bucket)
+        (business_unit_ready ?business_unit)
+        (business_unit_links_transfer_order ?business_unit ?transfer_order)
+        (not
+          (transfer_order_available ?transfer_order)
+        )
+      )
+  )
+  (:action release_maturity_transfer
+    :parameters (?business_unit - local_business_unit ?maturity_bucket - maturity_bucket ?cash_forecast - cash_forecast ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (allocation_ready ?business_unit)
+        (entity_links_cash_forecast ?business_unit ?cash_forecast)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (maturity_bucket_reserved ?maturity_bucket)
+        (business_unit_links_transfer_order ?business_unit ?transfer_order)
+        (not
+          (business_unit_buffer_confirmed ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (maturity_bucket_selected ?maturity_bucket)
+        (business_unit_buffer_confirmed ?business_unit)
+        (transfer_order_available ?transfer_order)
+        (not
+          (business_unit_links_transfer_order ?business_unit ?transfer_order)
+        )
+      )
+  )
+  (:action draft_allocation_proposal
+    :parameters (?local_treasury - local_treasury ?business_unit - local_business_unit ?liquidity_bucket - liquidity_bucket ?maturity_bucket - maturity_bucket ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (local_treasury_ready ?local_treasury)
+        (business_unit_ready ?business_unit)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (liquidity_bucket_selected ?liquidity_bucket)
+        (maturity_bucket_selected ?maturity_bucket)
+        (local_treasury_buffer_confirmed ?local_treasury)
+        (business_unit_buffer_confirmed ?business_unit)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_proposal_ready ?allocation_record)
+        (proposal_links_liquidity_bucket ?allocation_record ?liquidity_bucket)
+        (proposal_links_maturity_bucket ?allocation_record ?maturity_bucket)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action draft_allocation_proposal_with_liquidity_buffer
+    :parameters (?local_treasury - local_treasury ?business_unit - local_business_unit ?liquidity_bucket - liquidity_bucket ?maturity_bucket - maturity_bucket ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (local_treasury_ready ?local_treasury)
+        (business_unit_ready ?business_unit)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (liquidity_bucket_reserved ?liquidity_bucket)
+        (maturity_bucket_selected ?maturity_bucket)
+        (not
+          (local_treasury_buffer_confirmed ?local_treasury)
+        )
+        (business_unit_buffer_confirmed ?business_unit)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_proposal_ready ?allocation_record)
+        (proposal_links_liquidity_bucket ?allocation_record ?liquidity_bucket)
+        (proposal_links_maturity_bucket ?allocation_record ?maturity_bucket)
+        (liquidity_validation_passed ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action draft_allocation_proposal_with_maturity_buffer
+    :parameters (?local_treasury - local_treasury ?business_unit - local_business_unit ?liquidity_bucket - liquidity_bucket ?maturity_bucket - maturity_bucket ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (local_treasury_ready ?local_treasury)
+        (business_unit_ready ?business_unit)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (liquidity_bucket_selected ?liquidity_bucket)
+        (maturity_bucket_reserved ?maturity_bucket)
+        (local_treasury_buffer_confirmed ?local_treasury)
+        (not
+          (business_unit_buffer_confirmed ?business_unit)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_proposal_ready ?allocation_record)
+        (proposal_links_liquidity_bucket ?allocation_record ?liquidity_bucket)
+        (proposal_links_maturity_bucket ?allocation_record ?maturity_bucket)
+        (maturity_validation_passed ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action draft_allocation_proposal_with_dual_buffers
+    :parameters (?local_treasury - local_treasury ?business_unit - local_business_unit ?liquidity_bucket - liquidity_bucket ?maturity_bucket - maturity_bucket ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (local_treasury_ready ?local_treasury)
+        (business_unit_ready ?business_unit)
+        (local_treasury_links_liquidity_bucket ?local_treasury ?liquidity_bucket)
+        (business_unit_links_maturity_bucket ?business_unit ?maturity_bucket)
+        (liquidity_bucket_reserved ?liquidity_bucket)
+        (maturity_bucket_reserved ?maturity_bucket)
+        (not
+          (local_treasury_buffer_confirmed ?local_treasury)
+        )
+        (not
+          (business_unit_buffer_confirmed ?business_unit)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_proposal_ready ?allocation_record)
+        (proposal_links_liquidity_bucket ?allocation_record ?liquidity_bucket)
+        (proposal_links_maturity_bucket ?allocation_record ?maturity_bucket)
+        (liquidity_validation_passed ?allocation_record)
+        (maturity_validation_passed ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action apply_allocation_scenario
+    :parameters (?allocation_record - allocation_record ?local_treasury - local_treasury ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (allocation_proposal_ready ?allocation_record)
+        (local_treasury_ready ?local_treasury)
+        (entity_links_cash_forecast ?local_treasury ?cash_forecast)
+        (not
+          (scenario_applied ?allocation_record)
+        )
+      )
+    :effect (scenario_applied ?allocation_record)
+  )
+  (:action prepare_liquidity_metric_review
+    :parameters (?central_treasury - central_treasury ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (central_treasury_links_allocation_record ?central_treasury ?allocation_record)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_available ?liquidity_metric)
+        (allocation_proposal_ready ?allocation_record)
+        (scenario_applied ?allocation_record)
+        (not
+          (liquidity_metric_consumed ?liquidity_metric)
+        )
+      )
+    :effect
+      (and
+        (liquidity_metric_consumed ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (not
+          (liquidity_metric_available ?liquidity_metric)
+        )
+      )
+  )
+  (:action start_central_review
+    :parameters (?central_treasury - central_treasury ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_consumed ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (entity_links_cash_forecast ?central_treasury ?cash_forecast)
+        (not
+          (liquidity_validation_passed ?allocation_record)
+        )
+        (not
+          (central_review_started ?central_treasury)
+        )
+      )
+    :effect (central_review_started ?central_treasury)
+  )
+  (:action load_rate_scenario
+    :parameters (?central_treasury - central_treasury ?rate_scenario - rate_scenario)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (rate_scenario_available ?rate_scenario)
+        (not
+          (rate_scenario_loaded ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (rate_scenario_loaded ?central_treasury)
+        (central_treasury_links_rate_scenario ?central_treasury ?rate_scenario)
+        (not
+          (rate_scenario_available ?rate_scenario)
+        )
+      )
+  )
+  (:action clear_central_conditions
+    :parameters (?central_treasury - central_treasury ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record ?cash_forecast - cash_forecast ?rate_scenario - rate_scenario)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_consumed ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (entity_links_cash_forecast ?central_treasury ?cash_forecast)
+        (liquidity_validation_passed ?allocation_record)
+        (rate_scenario_loaded ?central_treasury)
+        (central_treasury_links_rate_scenario ?central_treasury ?rate_scenario)
+        (not
+          (central_review_started ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (central_review_started ?central_treasury)
+        (central_conditions_cleared ?central_treasury)
+      )
+  )
+  (:action request_central_authorization
+    :parameters (?central_treasury - central_treasury ?settlement_instruction - settlement_instruction ?approver_role - approver_role ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_review_started ?central_treasury)
+        (central_treasury_links_settlement_instruction ?central_treasury ?settlement_instruction)
+        (entity_links_approver_role ?central_treasury ?approver_role)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (not
+          (maturity_validation_passed ?allocation_record)
+        )
+        (not
+          (central_authorization_requested ?central_treasury)
+        )
+      )
+    :effect (central_authorization_requested ?central_treasury)
+  )
+  (:action request_central_authorization_with_override
+    :parameters (?central_treasury - central_treasury ?settlement_instruction - settlement_instruction ?approver_role - approver_role ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_review_started ?central_treasury)
+        (central_treasury_links_settlement_instruction ?central_treasury ?settlement_instruction)
+        (entity_links_approver_role ?central_treasury ?approver_role)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (maturity_validation_passed ?allocation_record)
+        (not
+          (central_authorization_requested ?central_treasury)
+        )
+      )
+    :effect (central_authorization_requested ?central_treasury)
+  )
+  (:action complete_central_review
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_authorization_requested ?central_treasury)
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (not
+          (liquidity_validation_passed ?allocation_record)
+        )
+        (not
+          (maturity_validation_passed ?allocation_record)
+        )
+        (not
+          (central_review_complete ?central_treasury)
+        )
+      )
+    :effect (central_review_complete ?central_treasury)
+  )
+  (:action complete_central_review_with_liquidity_condition
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_authorization_requested ?central_treasury)
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (liquidity_validation_passed ?allocation_record)
+        (not
+          (maturity_validation_passed ?allocation_record)
+        )
+        (not
+          (central_review_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (central_review_complete ?central_treasury)
+        (release_authorized ?central_treasury)
+      )
+  )
+  (:action complete_central_review_with_maturity_condition
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_authorization_requested ?central_treasury)
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (not
+          (liquidity_validation_passed ?allocation_record)
+        )
+        (maturity_validation_passed ?allocation_record)
+        (not
+          (central_review_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (central_review_complete ?central_treasury)
+        (release_authorized ?central_treasury)
+      )
+  )
+  (:action complete_central_review_with_dual_condition
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval ?liquidity_metric - liquidity_metric ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (central_authorization_requested ?central_treasury)
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (central_treasury_links_liquidity_metric ?central_treasury ?liquidity_metric)
+        (liquidity_metric_links_allocation_record ?liquidity_metric ?allocation_record)
+        (liquidity_validation_passed ?allocation_record)
+        (maturity_validation_passed ?allocation_record)
+        (not
+          (central_review_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (central_review_complete ?central_treasury)
+        (release_authorized ?central_treasury)
+      )
+  )
+  (:action finalize_allocation_authorization
+    :parameters (?central_treasury - central_treasury)
+    :precondition
+      (and
+        (central_review_complete ?central_treasury)
+        (not
+          (release_authorized ?central_treasury)
+        )
+        (not
+          (finalization_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (finalization_complete ?central_treasury)
+        (execution_authorized ?central_treasury)
+      )
+  )
+  (:action bind_treasury_strategy
+    :parameters (?central_treasury - central_treasury ?treasury_strategy - treasury_strategy)
+    :precondition
+      (and
+        (central_review_complete ?central_treasury)
+        (release_authorized ?central_treasury)
+        (treasury_strategy_available ?treasury_strategy)
+      )
+    :effect
+      (and
+        (central_treasury_links_treasury_strategy ?central_treasury ?treasury_strategy)
+        (not
+          (treasury_strategy_available ?treasury_strategy)
+        )
+      )
+  )
+  (:action assemble_execution_packet
+    :parameters (?central_treasury - central_treasury ?local_treasury - local_treasury ?business_unit - local_business_unit ?cash_forecast - cash_forecast ?treasury_strategy - treasury_strategy)
+    :precondition
+      (and
+        (central_review_complete ?central_treasury)
+        (release_authorized ?central_treasury)
+        (central_treasury_links_treasury_strategy ?central_treasury ?treasury_strategy)
+        (central_treasury_links_local_treasury ?central_treasury ?local_treasury)
+        (central_treasury_links_business_unit ?central_treasury ?business_unit)
+        (local_treasury_buffer_confirmed ?local_treasury)
+        (business_unit_buffer_confirmed ?business_unit)
+        (entity_links_cash_forecast ?central_treasury ?cash_forecast)
+        (not
+          (execution_packet_ready ?central_treasury)
+        )
+      )
+    :effect (execution_packet_ready ?central_treasury)
+  )
+  (:action finalize_allocation_authorization_from_packet
+    :parameters (?central_treasury - central_treasury)
+    :precondition
+      (and
+        (central_review_complete ?central_treasury)
+        (execution_packet_ready ?central_treasury)
+        (not
+          (finalization_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (finalization_complete ?central_treasury)
+        (execution_authorized ?central_treasury)
+      )
+  )
+  (:action apply_policy_document
+    :parameters (?central_treasury - central_treasury ?policy_document - policy_document ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (allocation_ready ?central_treasury)
+        (entity_links_cash_forecast ?central_treasury ?cash_forecast)
+        (policy_document_available ?policy_document)
+        (central_treasury_links_policy_document ?central_treasury ?policy_document)
+        (not
+          (policy_applied ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (policy_applied ?central_treasury)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action confirm_policy_alignment
+    :parameters (?central_treasury - central_treasury ?approver_role - approver_role)
+    :precondition
+      (and
+        (policy_applied ?central_treasury)
+        (entity_links_approver_role ?central_treasury ?approver_role)
+        (not
+          (policy_acknowledged ?central_treasury)
+        )
+      )
+    :effect (policy_acknowledged ?central_treasury)
+  )
+  (:action record_executive_approval
+    :parameters (?central_treasury - central_treasury ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (policy_acknowledged ?central_treasury)
+        (central_treasury_links_executive_approval ?central_treasury ?executive_approval)
+        (not
+          (executive_signoff_recorded ?central_treasury)
+        )
+      )
+    :effect (executive_signoff_recorded ?central_treasury)
+  )
+  (:action close_final_signoff
+    :parameters (?central_treasury - central_treasury)
+    :precondition
+      (and
+        (executive_signoff_recorded ?central_treasury)
+        (not
+          (finalization_complete ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (finalization_complete ?central_treasury)
+        (execution_authorized ?central_treasury)
+      )
+  )
+  (:action authorize_local_treasury_execution
+    :parameters (?local_treasury - local_treasury ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (local_treasury_ready ?local_treasury)
+        (local_treasury_buffer_confirmed ?local_treasury)
+        (allocation_proposal_ready ?allocation_record)
+        (scenario_applied ?allocation_record)
+        (not
+          (execution_authorized ?local_treasury)
+        )
+      )
+    :effect (execution_authorized ?local_treasury)
+  )
+  (:action authorize_business_unit_execution
+    :parameters (?business_unit - local_business_unit ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (business_unit_ready ?business_unit)
+        (business_unit_buffer_confirmed ?business_unit)
+        (allocation_proposal_ready ?allocation_record)
+        (scenario_applied ?allocation_record)
+        (not
+          (execution_authorized ?business_unit)
+        )
+      )
+    :effect (execution_authorized ?business_unit)
+  )
+  (:action issue_funding_request_token
+    :parameters (?entity - entity ?funding_request_token - funding_request_token ?cash_forecast - cash_forecast)
+    :precondition
+      (and
+        (execution_authorized ?entity)
+        (entity_links_cash_forecast ?entity ?cash_forecast)
+        (funding_request_available ?funding_request_token)
+        (not
+          (funding_request_issued ?entity)
+        )
+      )
+    :effect
+      (and
+        (funding_request_issued ?entity)
+        (entity_links_funding_request_token ?entity ?funding_request_token)
+        (not
+          (funding_request_available ?funding_request_token)
+        )
+      )
+  )
+  (:action settle_local_treasury_transfer
+    :parameters (?local_treasury - local_treasury ?funding_source - funding_source ?funding_request_token - funding_request_token)
+    :precondition
+      (and
+        (funding_request_issued ?local_treasury)
+        (entity_links_funding_source ?local_treasury ?funding_source)
+        (entity_links_funding_request_token ?local_treasury ?funding_request_token)
+        (not
+          (allocation_settled ?local_treasury)
+        )
+      )
+    :effect
+      (and
+        (allocation_settled ?local_treasury)
+        (funding_source_available ?funding_source)
+        (funding_request_available ?funding_request_token)
+      )
+  )
+  (:action settle_business_unit_transfer
+    :parameters (?business_unit - local_business_unit ?funding_source - funding_source ?funding_request_token - funding_request_token)
+    :precondition
+      (and
+        (funding_request_issued ?business_unit)
+        (entity_links_funding_source ?business_unit ?funding_source)
+        (entity_links_funding_request_token ?business_unit ?funding_request_token)
+        (not
+          (allocation_settled ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_settled ?business_unit)
+        (funding_source_available ?funding_source)
+        (funding_request_available ?funding_request_token)
+      )
+  )
+  (:action settle_central_treasury_transfer
+    :parameters (?central_treasury - central_treasury ?funding_source - funding_source ?funding_request_token - funding_request_token)
+    :precondition
+      (and
+        (funding_request_issued ?central_treasury)
+        (entity_links_funding_source ?central_treasury ?funding_source)
+        (entity_links_funding_request_token ?central_treasury ?funding_request_token)
+        (not
+          (allocation_settled ?central_treasury)
+        )
+      )
+    :effect
+      (and
+        (allocation_settled ?central_treasury)
+        (funding_source_available ?funding_source)
+        (funding_request_available ?funding_request_token)
+      )
+  )
+)

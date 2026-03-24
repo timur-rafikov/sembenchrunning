@@ -1,0 +1,936 @@
+(define (domain treasury_liquidity_buffer_threshold_breach_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types treasury_resource_category - object instrument_category - object account_category - object domain_entity - object cash_entity - domain_entity funding_source - treasury_resource_category liquidity_instrument - treasury_resource_category approver_group - treasury_resource_category policy_rule - treasury_resource_category approval_token - treasury_resource_category liquidity_event - treasury_resource_category settlement_facility - treasury_resource_category workflow_template - treasury_resource_category payment_method - instrument_category liquidity_bucket - instrument_category notification_channel - instrument_category source_account - account_category destination_account - account_category transfer_instruction - account_category legal_entity - cash_entity organizational_unit - cash_entity operating_entity_account - legal_entity business_unit_account - legal_entity treasury_desk - organizational_unit)
+  (:predicates
+    (buffer_breach_detected ?cash_entity - cash_entity)
+    (remediation_configured ?cash_entity - cash_entity)
+    (funding_assigned ?cash_entity - cash_entity)
+    (buffer_restored ?cash_entity - cash_entity)
+    (execution_recorded ?cash_entity - cash_entity)
+    (liquidity_event_recorded ?cash_entity - cash_entity)
+    (funding_source_available ?funding_source - funding_source)
+    (assigned_funding_source_to_entity ?cash_entity - cash_entity ?funding_source - funding_source)
+    (liquidity_instrument_available ?liquidity_instrument - liquidity_instrument)
+    (assigned_liquidity_instrument_to_entity ?cash_entity - cash_entity ?liquidity_instrument - liquidity_instrument)
+    (approver_group_available ?approver_group - approver_group)
+    (assigned_approver_group ?cash_entity - cash_entity ?approver_group - approver_group)
+    (payment_method_available ?payment_method - payment_method)
+    (operating_account_attached_payment_method ?operating_entity_account - operating_entity_account ?payment_method - payment_method)
+    (business_unit_account_attached_payment_method ?business_unit_account - business_unit_account ?payment_method - payment_method)
+    (has_source_account ?operating_entity_account - operating_entity_account ?source_account - source_account)
+    (source_account_validated ?source_account - source_account)
+    (source_account_reserved ?source_account - source_account)
+    (operating_account_source_confirmed ?operating_entity_account - operating_entity_account)
+    (business_unit_has_destination_account ?business_unit_account - business_unit_account ?destination_account - destination_account)
+    (destination_account_validated ?destination_account - destination_account)
+    (destination_account_reserved ?destination_account - destination_account)
+    (business_unit_destination_confirmed ?business_unit_account - business_unit_account)
+    (transfer_instruction_available ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_composed ?transfer_instruction - transfer_instruction)
+    (instruction_has_source_account ?transfer_instruction - transfer_instruction ?source_account - source_account)
+    (instruction_has_destination_account ?transfer_instruction - transfer_instruction ?destination_account - destination_account)
+    (instruction_requires_policy_attachment ?transfer_instruction - transfer_instruction)
+    (instruction_requires_additional_approval ?transfer_instruction - transfer_instruction)
+    (instruction_locked_for_execution ?transfer_instruction - transfer_instruction)
+    (desk_assigned_operating_account ?treasury_desk - treasury_desk ?operating_entity_account - operating_entity_account)
+    (desk_assigned_business_unit_account ?treasury_desk - treasury_desk ?business_unit_account - business_unit_account)
+    (desk_linked_transfer_instruction ?treasury_desk - treasury_desk ?transfer_instruction - transfer_instruction)
+    (liquidity_bucket_available ?liquidity_bucket - liquidity_bucket)
+    (desk_has_liquidity_bucket ?treasury_desk - treasury_desk ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_allocated ?liquidity_bucket - liquidity_bucket)
+    (liquidity_bucket_attached_to_instruction ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    (desk_assigned_to_instruction ?treasury_desk - treasury_desk)
+    (desk_resources_reserved ?treasury_desk - treasury_desk)
+    (desk_validation_complete ?treasury_desk - treasury_desk)
+    (desk_policy_attached ?treasury_desk - treasury_desk)
+    (desk_policy_binding_confirmed ?treasury_desk - treasury_desk)
+    (desk_approval_requested ?treasury_desk - treasury_desk)
+    (desk_execution_tools_prepared ?treasury_desk - treasury_desk)
+    (notification_channel_available ?notification_channel - notification_channel)
+    (desk_has_notification_channel ?treasury_desk - treasury_desk ?notification_channel - notification_channel)
+    (policy_rule_engaged ?treasury_desk - treasury_desk)
+    (policy_acknowledged ?treasury_desk - treasury_desk)
+    (workflow_bound ?treasury_desk - treasury_desk)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (desk_attached_policy_rule ?treasury_desk - treasury_desk ?policy_rule - policy_rule)
+    (approval_token_available ?approval_token - approval_token)
+    (desk_attached_approval_token ?treasury_desk - treasury_desk ?approval_token - approval_token)
+    (settlement_facility_available ?settlement_facility - settlement_facility)
+    (desk_attached_settlement_facility ?treasury_desk - treasury_desk ?settlement_facility - settlement_facility)
+    (workflow_template_available ?workflow_template - workflow_template)
+    (desk_attached_workflow_template ?treasury_desk - treasury_desk ?workflow_template - workflow_template)
+    (liquidity_event_available ?liquidity_event - liquidity_event)
+    (entity_associated_liquidity_event ?cash_entity - cash_entity ?liquidity_event - liquidity_event)
+    (operating_account_triaged ?operating_entity_account - operating_entity_account)
+    (business_unit_account_triaged ?business_unit_account - business_unit_account)
+    (desk_marked_ready_for_execution ?treasury_desk - treasury_desk)
+  )
+  (:action detect_buffer_breach
+    :parameters (?cash_entity - cash_entity)
+    :precondition
+      (and
+        (not
+          (buffer_breach_detected ?cash_entity)
+        )
+        (not
+          (buffer_restored ?cash_entity)
+        )
+      )
+    :effect (buffer_breach_detected ?cash_entity)
+  )
+  (:action assign_funding_source
+    :parameters (?cash_entity - cash_entity ?funding_source - funding_source)
+    :precondition
+      (and
+        (buffer_breach_detected ?cash_entity)
+        (not
+          (funding_assigned ?cash_entity)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (funding_assigned ?cash_entity)
+        (assigned_funding_source_to_entity ?cash_entity ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action assign_liquidity_instrument
+    :parameters (?cash_entity - cash_entity ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (buffer_breach_detected ?cash_entity)
+        (funding_assigned ?cash_entity)
+        (liquidity_instrument_available ?liquidity_instrument)
+      )
+    :effect
+      (and
+        (assigned_liquidity_instrument_to_entity ?cash_entity ?liquidity_instrument)
+        (not
+          (liquidity_instrument_available ?liquidity_instrument)
+        )
+      )
+  )
+  (:action finalize_instrument_selection
+    :parameters (?cash_entity - cash_entity ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (buffer_breach_detected ?cash_entity)
+        (funding_assigned ?cash_entity)
+        (assigned_liquidity_instrument_to_entity ?cash_entity ?liquidity_instrument)
+        (not
+          (remediation_configured ?cash_entity)
+        )
+      )
+    :effect (remediation_configured ?cash_entity)
+  )
+  (:action release_liquidity_instrument
+    :parameters (?cash_entity - cash_entity ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (assigned_liquidity_instrument_to_entity ?cash_entity ?liquidity_instrument)
+      )
+    :effect
+      (and
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (assigned_liquidity_instrument_to_entity ?cash_entity ?liquidity_instrument)
+        )
+      )
+  )
+  (:action assign_approver_group
+    :parameters (?cash_entity - cash_entity ?approver_group - approver_group)
+    :precondition
+      (and
+        (remediation_configured ?cash_entity)
+        (approver_group_available ?approver_group)
+      )
+    :effect
+      (and
+        (assigned_approver_group ?cash_entity ?approver_group)
+        (not
+          (approver_group_available ?approver_group)
+        )
+      )
+  )
+  (:action release_approver_group_assignment
+    :parameters (?cash_entity - cash_entity ?approver_group - approver_group)
+    :precondition
+      (and
+        (assigned_approver_group ?cash_entity ?approver_group)
+      )
+    :effect
+      (and
+        (approver_group_available ?approver_group)
+        (not
+          (assigned_approver_group ?cash_entity ?approver_group)
+        )
+      )
+  )
+  (:action attach_settlement_facility_to_desk
+    :parameters (?treasury_desk - treasury_desk ?settlement_facility - settlement_facility)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (settlement_facility_available ?settlement_facility)
+      )
+    :effect
+      (and
+        (desk_attached_settlement_facility ?treasury_desk ?settlement_facility)
+        (not
+          (settlement_facility_available ?settlement_facility)
+        )
+      )
+  )
+  (:action release_settlement_facility_from_desk
+    :parameters (?treasury_desk - treasury_desk ?settlement_facility - settlement_facility)
+    :precondition
+      (and
+        (desk_attached_settlement_facility ?treasury_desk ?settlement_facility)
+      )
+    :effect
+      (and
+        (settlement_facility_available ?settlement_facility)
+        (not
+          (desk_attached_settlement_facility ?treasury_desk ?settlement_facility)
+        )
+      )
+  )
+  (:action attach_workflow_template_to_desk
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (workflow_template_available ?workflow_template)
+      )
+    :effect
+      (and
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (not
+          (workflow_template_available ?workflow_template)
+        )
+      )
+  )
+  (:action release_workflow_template_from_desk
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template)
+    :precondition
+      (and
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+      )
+    :effect
+      (and
+        (workflow_template_available ?workflow_template)
+        (not
+          (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        )
+      )
+  )
+  (:action validate_candidate_source_account
+    :parameters (?operating_entity_account - operating_entity_account ?source_account - source_account ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (remediation_configured ?operating_entity_account)
+        (assigned_liquidity_instrument_to_entity ?operating_entity_account ?liquidity_instrument)
+        (has_source_account ?operating_entity_account ?source_account)
+        (not
+          (source_account_validated ?source_account)
+        )
+        (not
+          (source_account_reserved ?source_account)
+        )
+      )
+    :effect (source_account_validated ?source_account)
+  )
+  (:action escalate_source_to_approver_team
+    :parameters (?operating_entity_account - operating_entity_account ?source_account - source_account ?approver_group - approver_group)
+    :precondition
+      (and
+        (remediation_configured ?operating_entity_account)
+        (assigned_approver_group ?operating_entity_account ?approver_group)
+        (has_source_account ?operating_entity_account ?source_account)
+        (source_account_validated ?source_account)
+        (not
+          (operating_account_triaged ?operating_entity_account)
+        )
+      )
+    :effect
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+      )
+  )
+  (:action attach_payment_method_to_source
+    :parameters (?operating_entity_account - operating_entity_account ?source_account - source_account ?payment_method - payment_method)
+    :precondition
+      (and
+        (remediation_configured ?operating_entity_account)
+        (has_source_account ?operating_entity_account ?source_account)
+        (payment_method_available ?payment_method)
+        (not
+          (operating_account_triaged ?operating_entity_account)
+        )
+      )
+    :effect
+      (and
+        (source_account_reserved ?source_account)
+        (operating_account_triaged ?operating_entity_account)
+        (operating_account_attached_payment_method ?operating_entity_account ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action finalize_source_account_validation
+    :parameters (?operating_entity_account - operating_entity_account ?source_account - source_account ?liquidity_instrument - liquidity_instrument ?payment_method - payment_method)
+    :precondition
+      (and
+        (remediation_configured ?operating_entity_account)
+        (assigned_liquidity_instrument_to_entity ?operating_entity_account ?liquidity_instrument)
+        (has_source_account ?operating_entity_account ?source_account)
+        (source_account_reserved ?source_account)
+        (operating_account_attached_payment_method ?operating_entity_account ?payment_method)
+        (not
+          (operating_account_source_confirmed ?operating_entity_account)
+        )
+      )
+    :effect
+      (and
+        (source_account_validated ?source_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+        (payment_method_available ?payment_method)
+        (not
+          (operating_account_attached_payment_method ?operating_entity_account ?payment_method)
+        )
+      )
+  )
+  (:action validate_candidate_destination_account
+    :parameters (?business_unit_account - business_unit_account ?destination_account - destination_account ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (remediation_configured ?business_unit_account)
+        (assigned_liquidity_instrument_to_entity ?business_unit_account ?liquidity_instrument)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (not
+          (destination_account_validated ?destination_account)
+        )
+        (not
+          (destination_account_reserved ?destination_account)
+        )
+      )
+    :effect (destination_account_validated ?destination_account)
+  )
+  (:action escalate_destination_to_approver_team
+    :parameters (?business_unit_account - business_unit_account ?destination_account - destination_account ?approver_group - approver_group)
+    :precondition
+      (and
+        (remediation_configured ?business_unit_account)
+        (assigned_approver_group ?business_unit_account ?approver_group)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (destination_account_validated ?destination_account)
+        (not
+          (business_unit_account_triaged ?business_unit_account)
+        )
+      )
+    :effect
+      (and
+        (business_unit_account_triaged ?business_unit_account)
+        (business_unit_destination_confirmed ?business_unit_account)
+      )
+  )
+  (:action attach_payment_method_to_destination
+    :parameters (?business_unit_account - business_unit_account ?destination_account - destination_account ?payment_method - payment_method)
+    :precondition
+      (and
+        (remediation_configured ?business_unit_account)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (payment_method_available ?payment_method)
+        (not
+          (business_unit_account_triaged ?business_unit_account)
+        )
+      )
+    :effect
+      (and
+        (destination_account_reserved ?destination_account)
+        (business_unit_account_triaged ?business_unit_account)
+        (business_unit_account_attached_payment_method ?business_unit_account ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action finalize_destination_account_validation
+    :parameters (?business_unit_account - business_unit_account ?destination_account - destination_account ?liquidity_instrument - liquidity_instrument ?payment_method - payment_method)
+    :precondition
+      (and
+        (remediation_configured ?business_unit_account)
+        (assigned_liquidity_instrument_to_entity ?business_unit_account ?liquidity_instrument)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (destination_account_reserved ?destination_account)
+        (business_unit_account_attached_payment_method ?business_unit_account ?payment_method)
+        (not
+          (business_unit_destination_confirmed ?business_unit_account)
+        )
+      )
+    :effect
+      (and
+        (destination_account_validated ?destination_account)
+        (business_unit_destination_confirmed ?business_unit_account)
+        (payment_method_available ?payment_method)
+        (not
+          (business_unit_account_attached_payment_method ?business_unit_account ?payment_method)
+        )
+      )
+  )
+  (:action compose_transfer_instruction
+    :parameters (?operating_entity_account - operating_entity_account ?business_unit_account - business_unit_account ?source_account - source_account ?destination_account - destination_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (business_unit_account_triaged ?business_unit_account)
+        (has_source_account ?operating_entity_account ?source_account)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (source_account_validated ?source_account)
+        (destination_account_validated ?destination_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+        (business_unit_destination_confirmed ?business_unit_account)
+        (transfer_instruction_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_has_source_account ?transfer_instruction ?source_account)
+        (instruction_has_destination_account ?transfer_instruction ?destination_account)
+        (not
+          (transfer_instruction_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action compose_transfer_instruction_with_policy_requirement
+    :parameters (?operating_entity_account - operating_entity_account ?business_unit_account - business_unit_account ?source_account - source_account ?destination_account - destination_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (business_unit_account_triaged ?business_unit_account)
+        (has_source_account ?operating_entity_account ?source_account)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (source_account_reserved ?source_account)
+        (destination_account_validated ?destination_account)
+        (not
+          (operating_account_source_confirmed ?operating_entity_account)
+        )
+        (business_unit_destination_confirmed ?business_unit_account)
+        (transfer_instruction_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_has_source_account ?transfer_instruction ?source_account)
+        (instruction_has_destination_account ?transfer_instruction ?destination_account)
+        (instruction_requires_policy_attachment ?transfer_instruction)
+        (not
+          (transfer_instruction_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action compose_transfer_instruction_requires_additional_approval
+    :parameters (?operating_entity_account - operating_entity_account ?business_unit_account - business_unit_account ?source_account - source_account ?destination_account - destination_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (business_unit_account_triaged ?business_unit_account)
+        (has_source_account ?operating_entity_account ?source_account)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (source_account_validated ?source_account)
+        (destination_account_reserved ?destination_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+        (not
+          (business_unit_destination_confirmed ?business_unit_account)
+        )
+        (transfer_instruction_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_has_source_account ?transfer_instruction ?source_account)
+        (instruction_has_destination_account ?transfer_instruction ?destination_account)
+        (instruction_requires_additional_approval ?transfer_instruction)
+        (not
+          (transfer_instruction_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action compose_transfer_instruction_with_policy_and_additional_approval
+    :parameters (?operating_entity_account - operating_entity_account ?business_unit_account - business_unit_account ?source_account - source_account ?destination_account - destination_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (business_unit_account_triaged ?business_unit_account)
+        (has_source_account ?operating_entity_account ?source_account)
+        (business_unit_has_destination_account ?business_unit_account ?destination_account)
+        (source_account_reserved ?source_account)
+        (destination_account_reserved ?destination_account)
+        (not
+          (operating_account_source_confirmed ?operating_entity_account)
+        )
+        (not
+          (business_unit_destination_confirmed ?business_unit_account)
+        )
+        (transfer_instruction_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_has_source_account ?transfer_instruction ?source_account)
+        (instruction_has_destination_account ?transfer_instruction ?destination_account)
+        (instruction_requires_policy_attachment ?transfer_instruction)
+        (instruction_requires_additional_approval ?transfer_instruction)
+        (not
+          (transfer_instruction_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action lock_transfer_instruction_for_execution
+    :parameters (?transfer_instruction - transfer_instruction ?operating_entity_account - operating_entity_account ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (transfer_instruction_composed ?transfer_instruction)
+        (operating_account_triaged ?operating_entity_account)
+        (assigned_liquidity_instrument_to_entity ?operating_entity_account ?liquidity_instrument)
+        (not
+          (instruction_locked_for_execution ?transfer_instruction)
+        )
+      )
+    :effect (instruction_locked_for_execution ?transfer_instruction)
+  )
+  (:action allocate_liquidity_bucket_to_instruction
+    :parameters (?treasury_desk - treasury_desk ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (desk_linked_transfer_instruction ?treasury_desk ?transfer_instruction)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_available ?liquidity_bucket)
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_locked_for_execution ?transfer_instruction)
+        (not
+          (liquidity_bucket_allocated ?liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (liquidity_bucket_allocated ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (not
+          (liquidity_bucket_available ?liquidity_bucket)
+        )
+      )
+  )
+  (:action reserve_bucket_for_instruction
+    :parameters (?treasury_desk - treasury_desk ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_allocated ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (assigned_liquidity_instrument_to_entity ?treasury_desk ?liquidity_instrument)
+        (not
+          (instruction_requires_policy_attachment ?transfer_instruction)
+        )
+        (not
+          (desk_assigned_to_instruction ?treasury_desk)
+        )
+      )
+    :effect (desk_assigned_to_instruction ?treasury_desk)
+  )
+  (:action attach_policy_rule_to_desk
+    :parameters (?treasury_desk - treasury_desk ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (policy_rule_available ?policy_rule)
+        (not
+          (desk_policy_attached ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_policy_attached ?treasury_desk)
+        (desk_attached_policy_rule ?treasury_desk ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action assign_desk_with_policy_and_bucket
+    :parameters (?treasury_desk - treasury_desk ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction ?liquidity_instrument - liquidity_instrument ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_allocated ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (assigned_liquidity_instrument_to_entity ?treasury_desk ?liquidity_instrument)
+        (instruction_requires_policy_attachment ?transfer_instruction)
+        (desk_policy_attached ?treasury_desk)
+        (desk_attached_policy_rule ?treasury_desk ?policy_rule)
+        (not
+          (desk_assigned_to_instruction ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_assigned_to_instruction ?treasury_desk)
+        (desk_policy_binding_confirmed ?treasury_desk)
+      )
+  )
+  (:action prepare_desk_with_settlement_facility
+    :parameters (?treasury_desk - treasury_desk ?settlement_facility - settlement_facility ?approver_group - approver_group ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_assigned_to_instruction ?treasury_desk)
+        (desk_attached_settlement_facility ?treasury_desk ?settlement_facility)
+        (assigned_approver_group ?treasury_desk ?approver_group)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (not
+          (instruction_requires_additional_approval ?transfer_instruction)
+        )
+        (not
+          (desk_resources_reserved ?treasury_desk)
+        )
+      )
+    :effect (desk_resources_reserved ?treasury_desk)
+  )
+  (:action confirm_settlement_facility_for_desk
+    :parameters (?treasury_desk - treasury_desk ?settlement_facility - settlement_facility ?approver_group - approver_group ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_assigned_to_instruction ?treasury_desk)
+        (desk_attached_settlement_facility ?treasury_desk ?settlement_facility)
+        (assigned_approver_group ?treasury_desk ?approver_group)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (instruction_requires_additional_approval ?transfer_instruction)
+        (not
+          (desk_resources_reserved ?treasury_desk)
+        )
+      )
+    :effect (desk_resources_reserved ?treasury_desk)
+  )
+  (:action complete_desk_validation
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_resources_reserved ?treasury_desk)
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (not
+          (instruction_requires_policy_attachment ?transfer_instruction)
+        )
+        (not
+          (instruction_requires_additional_approval ?transfer_instruction)
+        )
+        (not
+          (desk_validation_complete ?treasury_desk)
+        )
+      )
+    :effect (desk_validation_complete ?treasury_desk)
+  )
+  (:action complete_desk_validation_and_request_approval
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_resources_reserved ?treasury_desk)
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (instruction_requires_policy_attachment ?transfer_instruction)
+        (not
+          (instruction_requires_additional_approval ?transfer_instruction)
+        )
+        (not
+          (desk_validation_complete ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_approval_requested ?treasury_desk)
+      )
+  )
+  (:action complete_desk_validation_and_request_approval_variant_a
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_resources_reserved ?treasury_desk)
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (not
+          (instruction_requires_policy_attachment ?transfer_instruction)
+        )
+        (instruction_requires_additional_approval ?transfer_instruction)
+        (not
+          (desk_validation_complete ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_approval_requested ?treasury_desk)
+      )
+  )
+  (:action complete_desk_validation_and_request_approval_variant_b
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template ?liquidity_bucket - liquidity_bucket ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (desk_resources_reserved ?treasury_desk)
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (desk_has_liquidity_bucket ?treasury_desk ?liquidity_bucket)
+        (liquidity_bucket_attached_to_instruction ?liquidity_bucket ?transfer_instruction)
+        (instruction_requires_policy_attachment ?transfer_instruction)
+        (instruction_requires_additional_approval ?transfer_instruction)
+        (not
+          (desk_validation_complete ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_approval_requested ?treasury_desk)
+      )
+  )
+  (:action finalize_desk_readiness_without_approval
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (not
+          (desk_approval_requested ?treasury_desk)
+        )
+        (not
+          (desk_marked_ready_for_execution ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_marked_ready_for_execution ?treasury_desk)
+        (execution_recorded ?treasury_desk)
+      )
+  )
+  (:action attach_approval_token_to_desk
+    :parameters (?treasury_desk - treasury_desk ?approval_token - approval_token)
+    :precondition
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_approval_requested ?treasury_desk)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (desk_attached_approval_token ?treasury_desk ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action prepare_execution_tools_for_desk
+    :parameters (?treasury_desk - treasury_desk ?operating_entity_account - operating_entity_account ?business_unit_account - business_unit_account ?liquidity_instrument - liquidity_instrument ?approval_token - approval_token)
+    :precondition
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_approval_requested ?treasury_desk)
+        (desk_attached_approval_token ?treasury_desk ?approval_token)
+        (desk_assigned_operating_account ?treasury_desk ?operating_entity_account)
+        (desk_assigned_business_unit_account ?treasury_desk ?business_unit_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+        (business_unit_destination_confirmed ?business_unit_account)
+        (assigned_liquidity_instrument_to_entity ?treasury_desk ?liquidity_instrument)
+        (not
+          (desk_execution_tools_prepared ?treasury_desk)
+        )
+      )
+    :effect (desk_execution_tools_prepared ?treasury_desk)
+  )
+  (:action finalize_desk_readiness_with_tools
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (desk_validation_complete ?treasury_desk)
+        (desk_execution_tools_prepared ?treasury_desk)
+        (not
+          (desk_marked_ready_for_execution ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_marked_ready_for_execution ?treasury_desk)
+        (execution_recorded ?treasury_desk)
+      )
+  )
+  (:action trigger_policy_for_desk
+    :parameters (?treasury_desk - treasury_desk ?notification_channel - notification_channel ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (remediation_configured ?treasury_desk)
+        (assigned_liquidity_instrument_to_entity ?treasury_desk ?liquidity_instrument)
+        (notification_channel_available ?notification_channel)
+        (desk_has_notification_channel ?treasury_desk ?notification_channel)
+        (not
+          (policy_rule_engaged ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (policy_rule_engaged ?treasury_desk)
+        (not
+          (notification_channel_available ?notification_channel)
+        )
+      )
+  )
+  (:action acknowledge_policy_application
+    :parameters (?treasury_desk - treasury_desk ?approver_group - approver_group)
+    :precondition
+      (and
+        (policy_rule_engaged ?treasury_desk)
+        (assigned_approver_group ?treasury_desk ?approver_group)
+        (not
+          (policy_acknowledged ?treasury_desk)
+        )
+      )
+    :effect (policy_acknowledged ?treasury_desk)
+  )
+  (:action bind_workflow_after_policy_acknowledgement
+    :parameters (?treasury_desk - treasury_desk ?workflow_template - workflow_template)
+    :precondition
+      (and
+        (policy_acknowledged ?treasury_desk)
+        (desk_attached_workflow_template ?treasury_desk ?workflow_template)
+        (not
+          (workflow_bound ?treasury_desk)
+        )
+      )
+    :effect (workflow_bound ?treasury_desk)
+  )
+  (:action finalize_policy_and_mark_ready
+    :parameters (?treasury_desk - treasury_desk)
+    :precondition
+      (and
+        (workflow_bound ?treasury_desk)
+        (not
+          (desk_marked_ready_for_execution ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (desk_marked_ready_for_execution ?treasury_desk)
+        (execution_recorded ?treasury_desk)
+      )
+  )
+  (:action execute_transfer_from_operating_account
+    :parameters (?operating_entity_account - operating_entity_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (operating_account_triaged ?operating_entity_account)
+        (operating_account_source_confirmed ?operating_entity_account)
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_locked_for_execution ?transfer_instruction)
+        (not
+          (execution_recorded ?operating_entity_account)
+        )
+      )
+    :effect (execution_recorded ?operating_entity_account)
+  )
+  (:action execute_transfer_from_business_unit_account
+    :parameters (?business_unit_account - business_unit_account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (business_unit_account_triaged ?business_unit_account)
+        (business_unit_destination_confirmed ?business_unit_account)
+        (transfer_instruction_composed ?transfer_instruction)
+        (instruction_locked_for_execution ?transfer_instruction)
+        (not
+          (execution_recorded ?business_unit_account)
+        )
+      )
+    :effect (execution_recorded ?business_unit_account)
+  )
+  (:action record_liquidity_event
+    :parameters (?cash_entity - cash_entity ?liquidity_event - liquidity_event ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (execution_recorded ?cash_entity)
+        (assigned_liquidity_instrument_to_entity ?cash_entity ?liquidity_instrument)
+        (liquidity_event_available ?liquidity_event)
+        (not
+          (liquidity_event_recorded ?cash_entity)
+        )
+      )
+    :effect
+      (and
+        (liquidity_event_recorded ?cash_entity)
+        (entity_associated_liquidity_event ?cash_entity ?liquidity_event)
+        (not
+          (liquidity_event_available ?liquidity_event)
+        )
+      )
+  )
+  (:action allocate_funding_and_restore_buffer
+    :parameters (?operating_entity_account - operating_entity_account ?funding_source - funding_source ?liquidity_event - liquidity_event)
+    :precondition
+      (and
+        (liquidity_event_recorded ?operating_entity_account)
+        (assigned_funding_source_to_entity ?operating_entity_account ?funding_source)
+        (entity_associated_liquidity_event ?operating_entity_account ?liquidity_event)
+        (not
+          (buffer_restored ?operating_entity_account)
+        )
+      )
+    :effect
+      (and
+        (buffer_restored ?operating_entity_account)
+        (funding_source_available ?funding_source)
+        (liquidity_event_available ?liquidity_event)
+      )
+  )
+  (:action allocate_funding_and_restore_buffer_for_business_unit
+    :parameters (?business_unit_account - business_unit_account ?funding_source - funding_source ?liquidity_event - liquidity_event)
+    :precondition
+      (and
+        (liquidity_event_recorded ?business_unit_account)
+        (assigned_funding_source_to_entity ?business_unit_account ?funding_source)
+        (entity_associated_liquidity_event ?business_unit_account ?liquidity_event)
+        (not
+          (buffer_restored ?business_unit_account)
+        )
+      )
+    :effect
+      (and
+        (buffer_restored ?business_unit_account)
+        (funding_source_available ?funding_source)
+        (liquidity_event_available ?liquidity_event)
+      )
+  )
+  (:action allocate_funding_and_restore_buffer_by_desk
+    :parameters (?treasury_desk - treasury_desk ?funding_source - funding_source ?liquidity_event - liquidity_event)
+    :precondition
+      (and
+        (liquidity_event_recorded ?treasury_desk)
+        (assigned_funding_source_to_entity ?treasury_desk ?funding_source)
+        (entity_associated_liquidity_event ?treasury_desk ?liquidity_event)
+        (not
+          (buffer_restored ?treasury_desk)
+        )
+      )
+    :effect
+      (and
+        (buffer_restored ?treasury_desk)
+        (funding_source_available ?funding_source)
+        (liquidity_event_available ?liquidity_event)
+      )
+  )
+)

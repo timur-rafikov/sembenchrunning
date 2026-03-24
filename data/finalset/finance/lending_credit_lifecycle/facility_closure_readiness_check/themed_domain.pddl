@@ -1,0 +1,936 @@
+(define (domain facility_closure_readiness_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types facility_element_group - object document_category - object approval_category - object facility_root - object facility_component - facility_root closure_agent - facility_element_group evidence_item - facility_element_group operational_owner - facility_element_group legal_approval_token - facility_element_group operational_checklist - facility_element_group signature_token - facility_element_group pricing_decision - facility_element_group regulatory_approval - facility_element_group evidence_template - document_category supporting_document - document_category waiver_record - document_category compliance_check - approval_category credit_risk_check - approval_category closure_package - approval_category lender_record_group - facility_component closure_case_group - facility_component lender_record - lender_record_group borrower_record - lender_record_group closure_case - closure_case_group)
+  (:predicates
+    (element_registered ?facility_component - facility_component)
+    (element_ready ?facility_component - facility_component)
+    (element_has_assignee ?facility_component - facility_component)
+    (closure_confirmed ?facility_component - facility_component)
+    (element_readiness_flag ?facility_component - facility_component)
+    (element_signed_off ?facility_component - facility_component)
+    (agent_available ?closure_agent - closure_agent)
+    (element_assigned_agent ?facility_component - facility_component ?closure_agent - closure_agent)
+    (evidence_available ?evidence_item - evidence_item)
+    (element_has_evidence ?facility_component - facility_component ?evidence_item - evidence_item)
+    (operational_owner_available ?operational_owner - operational_owner)
+    (element_operational_owner ?facility_component - facility_component ?operational_owner - operational_owner)
+    (evidence_template_available ?evidence_template - evidence_template)
+    (lender_record_has_template ?lender_record - lender_record ?evidence_template - evidence_template)
+    (borrower_record_has_template ?borrower_record - borrower_record ?evidence_template - evidence_template)
+    (lender_has_compliance_check ?lender_record - lender_record ?compliance_check - compliance_check)
+    (compliance_check_passed ?compliance_check - compliance_check)
+    (compliance_check_requires_evidence ?compliance_check - compliance_check)
+    (lender_compliance_resolved ?lender_record - lender_record)
+    (borrower_has_credit_risk_check ?borrower_record - borrower_record ?credit_risk_check - credit_risk_check)
+    (credit_risk_check_passed ?credit_risk_check - credit_risk_check)
+    (credit_risk_check_requires_evidence ?credit_risk_check - credit_risk_check)
+    (borrower_compliance_resolved ?borrower_record - borrower_record)
+    (closure_package_template_available ?closure_package - closure_package)
+    (closure_package_created ?closure_package - closure_package)
+    (package_includes_compliance_check ?closure_package - closure_package ?compliance_check - compliance_check)
+    (package_includes_credit_risk_check ?closure_package - closure_package ?credit_risk_check - credit_risk_check)
+    (package_requires_legal_approval ?closure_package - closure_package)
+    (package_requires_pricing_decision ?closure_package - closure_package)
+    (package_ready_for_document_binding ?closure_package - closure_package)
+    (case_has_lender_record ?closure_case - closure_case ?lender_record - lender_record)
+    (case_has_borrower_record ?closure_case - closure_case ?borrower_record - borrower_record)
+    (case_has_package ?closure_case - closure_case ?closure_package - closure_package)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (case_has_supporting_document ?closure_case - closure_case ?supporting_document - supporting_document)
+    (supporting_document_locked ?supporting_document - supporting_document)
+    (document_bound_to_package ?supporting_document - supporting_document ?closure_package - closure_package)
+    (case_document_bound ?closure_case - closure_case)
+    (case_pricing_attached ?closure_case - closure_case)
+    (case_regulatory_attached ?closure_case - closure_case)
+    (case_legal_token_present ?closure_case - closure_case)
+    (case_legal_binding_confirmed ?closure_case - closure_case)
+    (case_approvals_aggregated ?closure_case - closure_case)
+    (case_review_complete ?closure_case - closure_case)
+    (waiver_available ?waiver_record - waiver_record)
+    (case_has_waiver_record ?closure_case - closure_case ?waiver_record - waiver_record)
+    (case_waiver_applied ?closure_case - closure_case)
+    (case_waiver_owner_verified ?closure_case - closure_case)
+    (case_regulatory_clearance ?closure_case - closure_case)
+    (legal_approval_token_available ?legal_approval_token - legal_approval_token)
+    (case_has_legal_token ?closure_case - closure_case ?legal_approval_token - legal_approval_token)
+    (operational_checklist_available ?operational_checklist - operational_checklist)
+    (case_has_operational_checklist ?closure_case - closure_case ?operational_checklist - operational_checklist)
+    (pricing_decision_available ?pricing_decision - pricing_decision)
+    (case_has_pricing_decision ?closure_case - closure_case ?pricing_decision - pricing_decision)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (case_has_regulatory_approval ?closure_case - closure_case ?regulatory_approval - regulatory_approval)
+    (signature_token_available ?signature_token - signature_token)
+    (element_has_signature_token ?facility_component - facility_component ?signature_token - signature_token)
+    (lender_packaging_ready ?lender_record - lender_record)
+    (borrower_packaging_ready ?borrower_record - borrower_record)
+    (case_finalized ?closure_case - closure_case)
+  )
+  (:action register_facility_component
+    :parameters (?facility_component - facility_component)
+    :precondition
+      (and
+        (not
+          (element_registered ?facility_component)
+        )
+        (not
+          (closure_confirmed ?facility_component)
+        )
+      )
+    :effect (element_registered ?facility_component)
+  )
+  (:action assign_closure_agent_to_component
+    :parameters (?facility_component - facility_component ?closure_agent - closure_agent)
+    :precondition
+      (and
+        (element_registered ?facility_component)
+        (not
+          (element_has_assignee ?facility_component)
+        )
+        (agent_available ?closure_agent)
+      )
+    :effect
+      (and
+        (element_has_assignee ?facility_component)
+        (element_assigned_agent ?facility_component ?closure_agent)
+        (not
+          (agent_available ?closure_agent)
+        )
+      )
+  )
+  (:action attach_evidence_to_component
+    :parameters (?facility_component - facility_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_registered ?facility_component)
+        (element_has_assignee ?facility_component)
+        (evidence_available ?evidence_item)
+      )
+    :effect
+      (and
+        (element_has_evidence ?facility_component ?evidence_item)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action validate_component_with_evidence
+    :parameters (?facility_component - facility_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_registered ?facility_component)
+        (element_has_assignee ?facility_component)
+        (element_has_evidence ?facility_component ?evidence_item)
+        (not
+          (element_ready ?facility_component)
+        )
+      )
+    :effect (element_ready ?facility_component)
+  )
+  (:action release_evidence_from_component
+    :parameters (?facility_component - facility_component ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_has_evidence ?facility_component ?evidence_item)
+      )
+    :effect
+      (and
+        (evidence_available ?evidence_item)
+        (not
+          (element_has_evidence ?facility_component ?evidence_item)
+        )
+      )
+  )
+  (:action assign_operational_owner
+    :parameters (?facility_component - facility_component ?operational_owner - operational_owner)
+    :precondition
+      (and
+        (element_ready ?facility_component)
+        (operational_owner_available ?operational_owner)
+      )
+    :effect
+      (and
+        (element_operational_owner ?facility_component ?operational_owner)
+        (not
+          (operational_owner_available ?operational_owner)
+        )
+      )
+  )
+  (:action release_operational_owner_from_component
+    :parameters (?facility_component - facility_component ?operational_owner - operational_owner)
+    :precondition
+      (and
+        (element_operational_owner ?facility_component ?operational_owner)
+      )
+    :effect
+      (and
+        (operational_owner_available ?operational_owner)
+        (not
+          (element_operational_owner ?facility_component ?operational_owner)
+        )
+      )
+  )
+  (:action attach_pricing_decision_to_case
+    :parameters (?closure_case - closure_case ?pricing_decision - pricing_decision)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (pricing_decision_available ?pricing_decision)
+      )
+    :effect
+      (and
+        (case_has_pricing_decision ?closure_case ?pricing_decision)
+        (not
+          (pricing_decision_available ?pricing_decision)
+        )
+      )
+  )
+  (:action detach_pricing_decision_from_case
+    :parameters (?closure_case - closure_case ?pricing_decision - pricing_decision)
+    :precondition
+      (and
+        (case_has_pricing_decision ?closure_case ?pricing_decision)
+      )
+    :effect
+      (and
+        (pricing_decision_available ?pricing_decision)
+        (not
+          (case_has_pricing_decision ?closure_case ?pricing_decision)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_case
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action detach_regulatory_approval_from_case
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        )
+      )
+  )
+  (:action mark_lender_compliance_check_passed
+    :parameters (?lender_record - lender_record ?compliance_check - compliance_check ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_ready ?lender_record)
+        (element_has_evidence ?lender_record ?evidence_item)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (not
+          (compliance_check_passed ?compliance_check)
+        )
+        (not
+          (compliance_check_requires_evidence ?compliance_check)
+        )
+      )
+    :effect (compliance_check_passed ?compliance_check)
+  )
+  (:action finalize_lender_compliance_check
+    :parameters (?lender_record - lender_record ?compliance_check - compliance_check ?operational_owner - operational_owner)
+    :precondition
+      (and
+        (element_ready ?lender_record)
+        (element_operational_owner ?lender_record ?operational_owner)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (compliance_check_passed ?compliance_check)
+        (not
+          (lender_packaging_ready ?lender_record)
+        )
+      )
+    :effect
+      (and
+        (lender_packaging_ready ?lender_record)
+        (lender_compliance_resolved ?lender_record)
+      )
+  )
+  (:action use_evidence_template_for_lender_compliance
+    :parameters (?lender_record - lender_record ?compliance_check - compliance_check ?evidence_template - evidence_template)
+    :precondition
+      (and
+        (element_ready ?lender_record)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (evidence_template_available ?evidence_template)
+        (not
+          (lender_packaging_ready ?lender_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_check_requires_evidence ?compliance_check)
+        (lender_packaging_ready ?lender_record)
+        (lender_record_has_template ?lender_record ?evidence_template)
+        (not
+          (evidence_template_available ?evidence_template)
+        )
+      )
+  )
+  (:action resolve_lender_compliance_with_evidence
+    :parameters (?lender_record - lender_record ?compliance_check - compliance_check ?evidence_item - evidence_item ?evidence_template - evidence_template)
+    :precondition
+      (and
+        (element_ready ?lender_record)
+        (element_has_evidence ?lender_record ?evidence_item)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (compliance_check_requires_evidence ?compliance_check)
+        (lender_record_has_template ?lender_record ?evidence_template)
+        (not
+          (lender_compliance_resolved ?lender_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_check_passed ?compliance_check)
+        (lender_compliance_resolved ?lender_record)
+        (evidence_template_available ?evidence_template)
+        (not
+          (lender_record_has_template ?lender_record ?evidence_template)
+        )
+      )
+  )
+  (:action mark_credit_risk_check_passed_for_borrower
+    :parameters (?borrower_record - borrower_record ?credit_risk_check - credit_risk_check ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_ready ?borrower_record)
+        (element_has_evidence ?borrower_record ?evidence_item)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (not
+          (credit_risk_check_passed ?credit_risk_check)
+        )
+        (not
+          (credit_risk_check_requires_evidence ?credit_risk_check)
+        )
+      )
+    :effect (credit_risk_check_passed ?credit_risk_check)
+  )
+  (:action finalize_borrower_credit_check
+    :parameters (?borrower_record - borrower_record ?credit_risk_check - credit_risk_check ?operational_owner - operational_owner)
+    :precondition
+      (and
+        (element_ready ?borrower_record)
+        (element_operational_owner ?borrower_record ?operational_owner)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (credit_risk_check_passed ?credit_risk_check)
+        (not
+          (borrower_packaging_ready ?borrower_record)
+        )
+      )
+    :effect
+      (and
+        (borrower_packaging_ready ?borrower_record)
+        (borrower_compliance_resolved ?borrower_record)
+      )
+  )
+  (:action use_evidence_template_for_borrower_credit_check
+    :parameters (?borrower_record - borrower_record ?credit_risk_check - credit_risk_check ?evidence_template - evidence_template)
+    :precondition
+      (and
+        (element_ready ?borrower_record)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (evidence_template_available ?evidence_template)
+        (not
+          (borrower_packaging_ready ?borrower_record)
+        )
+      )
+    :effect
+      (and
+        (credit_risk_check_requires_evidence ?credit_risk_check)
+        (borrower_packaging_ready ?borrower_record)
+        (borrower_record_has_template ?borrower_record ?evidence_template)
+        (not
+          (evidence_template_available ?evidence_template)
+        )
+      )
+  )
+  (:action resolve_borrower_credit_with_evidence
+    :parameters (?borrower_record - borrower_record ?credit_risk_check - credit_risk_check ?evidence_item - evidence_item ?evidence_template - evidence_template)
+    :precondition
+      (and
+        (element_ready ?borrower_record)
+        (element_has_evidence ?borrower_record ?evidence_item)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (credit_risk_check_requires_evidence ?credit_risk_check)
+        (borrower_record_has_template ?borrower_record ?evidence_template)
+        (not
+          (borrower_compliance_resolved ?borrower_record)
+        )
+      )
+    :effect
+      (and
+        (credit_risk_check_passed ?credit_risk_check)
+        (borrower_compliance_resolved ?borrower_record)
+        (evidence_template_available ?evidence_template)
+        (not
+          (borrower_record_has_template ?borrower_record ?evidence_template)
+        )
+      )
+  )
+  (:action assemble_closure_package
+    :parameters (?lender_record - lender_record ?borrower_record - borrower_record ?compliance_check - compliance_check ?credit_risk_check - credit_risk_check ?closure_package - closure_package)
+    :precondition
+      (and
+        (lender_packaging_ready ?lender_record)
+        (borrower_packaging_ready ?borrower_record)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (compliance_check_passed ?compliance_check)
+        (credit_risk_check_passed ?credit_risk_check)
+        (lender_compliance_resolved ?lender_record)
+        (borrower_compliance_resolved ?borrower_record)
+        (closure_package_template_available ?closure_package)
+      )
+    :effect
+      (and
+        (closure_package_created ?closure_package)
+        (package_includes_compliance_check ?closure_package ?compliance_check)
+        (package_includes_credit_risk_check ?closure_package ?credit_risk_check)
+        (not
+          (closure_package_template_available ?closure_package)
+        )
+      )
+  )
+  (:action assemble_closure_package_with_legal_requirement
+    :parameters (?lender_record - lender_record ?borrower_record - borrower_record ?compliance_check - compliance_check ?credit_risk_check - credit_risk_check ?closure_package - closure_package)
+    :precondition
+      (and
+        (lender_packaging_ready ?lender_record)
+        (borrower_packaging_ready ?borrower_record)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (compliance_check_requires_evidence ?compliance_check)
+        (credit_risk_check_passed ?credit_risk_check)
+        (not
+          (lender_compliance_resolved ?lender_record)
+        )
+        (borrower_compliance_resolved ?borrower_record)
+        (closure_package_template_available ?closure_package)
+      )
+    :effect
+      (and
+        (closure_package_created ?closure_package)
+        (package_includes_compliance_check ?closure_package ?compliance_check)
+        (package_includes_credit_risk_check ?closure_package ?credit_risk_check)
+        (package_requires_legal_approval ?closure_package)
+        (not
+          (closure_package_template_available ?closure_package)
+        )
+      )
+  )
+  (:action assemble_closure_package_with_pricing_requirement
+    :parameters (?lender_record - lender_record ?borrower_record - borrower_record ?compliance_check - compliance_check ?credit_risk_check - credit_risk_check ?closure_package - closure_package)
+    :precondition
+      (and
+        (lender_packaging_ready ?lender_record)
+        (borrower_packaging_ready ?borrower_record)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (compliance_check_passed ?compliance_check)
+        (credit_risk_check_requires_evidence ?credit_risk_check)
+        (lender_compliance_resolved ?lender_record)
+        (not
+          (borrower_compliance_resolved ?borrower_record)
+        )
+        (closure_package_template_available ?closure_package)
+      )
+    :effect
+      (and
+        (closure_package_created ?closure_package)
+        (package_includes_compliance_check ?closure_package ?compliance_check)
+        (package_includes_credit_risk_check ?closure_package ?credit_risk_check)
+        (package_requires_pricing_decision ?closure_package)
+        (not
+          (closure_package_template_available ?closure_package)
+        )
+      )
+  )
+  (:action assemble_closure_package_with_legal_and_pricing_requirements
+    :parameters (?lender_record - lender_record ?borrower_record - borrower_record ?compliance_check - compliance_check ?credit_risk_check - credit_risk_check ?closure_package - closure_package)
+    :precondition
+      (and
+        (lender_packaging_ready ?lender_record)
+        (borrower_packaging_ready ?borrower_record)
+        (lender_has_compliance_check ?lender_record ?compliance_check)
+        (borrower_has_credit_risk_check ?borrower_record ?credit_risk_check)
+        (compliance_check_requires_evidence ?compliance_check)
+        (credit_risk_check_requires_evidence ?credit_risk_check)
+        (not
+          (lender_compliance_resolved ?lender_record)
+        )
+        (not
+          (borrower_compliance_resolved ?borrower_record)
+        )
+        (closure_package_template_available ?closure_package)
+      )
+    :effect
+      (and
+        (closure_package_created ?closure_package)
+        (package_includes_compliance_check ?closure_package ?compliance_check)
+        (package_includes_credit_risk_check ?closure_package ?credit_risk_check)
+        (package_requires_legal_approval ?closure_package)
+        (package_requires_pricing_decision ?closure_package)
+        (not
+          (closure_package_template_available ?closure_package)
+        )
+      )
+  )
+  (:action mark_package_ready_for_binding
+    :parameters (?closure_package - closure_package ?lender_record - lender_record ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (closure_package_created ?closure_package)
+        (lender_packaging_ready ?lender_record)
+        (element_has_evidence ?lender_record ?evidence_item)
+        (not
+          (package_ready_for_document_binding ?closure_package)
+        )
+      )
+    :effect (package_ready_for_document_binding ?closure_package)
+  )
+  (:action lock_supporting_document_into_package
+    :parameters (?closure_case - closure_case ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (case_has_package ?closure_case ?closure_package)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (closure_package_created ?closure_package)
+        (package_ready_for_document_binding ?closure_package)
+        (not
+          (supporting_document_locked ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_locked ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action bind_document_to_case
+    :parameters (?closure_case - closure_case ?supporting_document - supporting_document ?closure_package - closure_package ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (supporting_document_locked ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (element_has_evidence ?closure_case ?evidence_item)
+        (not
+          (package_requires_legal_approval ?closure_package)
+        )
+        (not
+          (case_document_bound ?closure_case)
+        )
+      )
+    :effect (case_document_bound ?closure_case)
+  )
+  (:action attach_legal_approval_token_to_case
+    :parameters (?closure_case - closure_case ?legal_approval_token - legal_approval_token)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (legal_approval_token_available ?legal_approval_token)
+        (not
+          (case_legal_token_present ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_legal_token_present ?closure_case)
+        (case_has_legal_token ?closure_case ?legal_approval_token)
+        (not
+          (legal_approval_token_available ?legal_approval_token)
+        )
+      )
+  )
+  (:action confirm_legal_binding_for_case
+    :parameters (?closure_case - closure_case ?supporting_document - supporting_document ?closure_package - closure_package ?evidence_item - evidence_item ?legal_approval_token - legal_approval_token)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (supporting_document_locked ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (element_has_evidence ?closure_case ?evidence_item)
+        (package_requires_legal_approval ?closure_package)
+        (case_legal_token_present ?closure_case)
+        (case_has_legal_token ?closure_case ?legal_approval_token)
+        (not
+          (case_document_bound ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_document_bound ?closure_case)
+        (case_legal_binding_confirmed ?closure_case)
+      )
+  )
+  (:action attach_pricing_to_case_without_pricing_requirement
+    :parameters (?closure_case - closure_case ?pricing_decision - pricing_decision ?operational_owner - operational_owner ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_document_bound ?closure_case)
+        (case_has_pricing_decision ?closure_case ?pricing_decision)
+        (element_operational_owner ?closure_case ?operational_owner)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (not
+          (package_requires_pricing_decision ?closure_package)
+        )
+        (not
+          (case_pricing_attached ?closure_case)
+        )
+      )
+    :effect (case_pricing_attached ?closure_case)
+  )
+  (:action attach_pricing_to_case_with_pricing_requirement
+    :parameters (?closure_case - closure_case ?pricing_decision - pricing_decision ?operational_owner - operational_owner ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_document_bound ?closure_case)
+        (case_has_pricing_decision ?closure_case ?pricing_decision)
+        (element_operational_owner ?closure_case ?operational_owner)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (package_requires_pricing_decision ?closure_package)
+        (not
+          (case_pricing_attached ?closure_case)
+        )
+      )
+    :effect (case_pricing_attached ?closure_case)
+  )
+  (:action apply_regulatory_approval_to_case_simple
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_pricing_attached ?closure_case)
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (not
+          (package_requires_legal_approval ?closure_package)
+        )
+        (not
+          (package_requires_pricing_decision ?closure_package)
+        )
+        (not
+          (case_regulatory_attached ?closure_case)
+        )
+      )
+    :effect (case_regulatory_attached ?closure_case)
+  )
+  (:action apply_regulatory_approval_to_case_with_flag28
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_pricing_attached ?closure_case)
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (package_requires_legal_approval ?closure_package)
+        (not
+          (package_requires_pricing_decision ?closure_package)
+        )
+        (not
+          (case_regulatory_attached ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_approvals_aggregated ?closure_case)
+      )
+  )
+  (:action apply_regulatory_approval_to_case_with_flag29
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_pricing_attached ?closure_case)
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (not
+          (package_requires_legal_approval ?closure_package)
+        )
+        (package_requires_pricing_decision ?closure_package)
+        (not
+          (case_regulatory_attached ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_approvals_aggregated ?closure_case)
+      )
+  )
+  (:action apply_regulatory_approval_to_case_with_flags28_and_29
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval ?supporting_document - supporting_document ?closure_package - closure_package)
+    :precondition
+      (and
+        (case_pricing_attached ?closure_case)
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (case_has_supporting_document ?closure_case ?supporting_document)
+        (document_bound_to_package ?supporting_document ?closure_package)
+        (package_requires_legal_approval ?closure_package)
+        (package_requires_pricing_decision ?closure_package)
+        (not
+          (case_regulatory_attached ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_approvals_aggregated ?closure_case)
+      )
+  )
+  (:action finalize_case_review_without_aggregated_approvals
+    :parameters (?closure_case - closure_case)
+    :precondition
+      (and
+        (case_regulatory_attached ?closure_case)
+        (not
+          (case_approvals_aggregated ?closure_case)
+        )
+        (not
+          (case_finalized ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?closure_case)
+        (element_readiness_flag ?closure_case)
+      )
+  )
+  (:action attach_operational_checklist_to_case
+    :parameters (?closure_case - closure_case ?operational_checklist - operational_checklist)
+    :precondition
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_approvals_aggregated ?closure_case)
+        (operational_checklist_available ?operational_checklist)
+      )
+    :effect
+      (and
+        (case_has_operational_checklist ?closure_case ?operational_checklist)
+        (not
+          (operational_checklist_available ?operational_checklist)
+        )
+      )
+  )
+  (:action complete_case_level_review
+    :parameters (?closure_case - closure_case ?lender_record - lender_record ?borrower_record - borrower_record ?evidence_item - evidence_item ?operational_checklist - operational_checklist)
+    :precondition
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_approvals_aggregated ?closure_case)
+        (case_has_operational_checklist ?closure_case ?operational_checklist)
+        (case_has_lender_record ?closure_case ?lender_record)
+        (case_has_borrower_record ?closure_case ?borrower_record)
+        (lender_compliance_resolved ?lender_record)
+        (borrower_compliance_resolved ?borrower_record)
+        (element_has_evidence ?closure_case ?evidence_item)
+        (not
+          (case_review_complete ?closure_case)
+        )
+      )
+    :effect (case_review_complete ?closure_case)
+  )
+  (:action finalize_case_review_with_aggregated_approvals
+    :parameters (?closure_case - closure_case)
+    :precondition
+      (and
+        (case_regulatory_attached ?closure_case)
+        (case_review_complete ?closure_case)
+        (not
+          (case_finalized ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?closure_case)
+        (element_readiness_flag ?closure_case)
+      )
+  )
+  (:action apply_waiver_to_case
+    :parameters (?closure_case - closure_case ?waiver_record - waiver_record ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_ready ?closure_case)
+        (element_has_evidence ?closure_case ?evidence_item)
+        (waiver_available ?waiver_record)
+        (case_has_waiver_record ?closure_case ?waiver_record)
+        (not
+          (case_waiver_applied ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_waiver_applied ?closure_case)
+        (not
+          (waiver_available ?waiver_record)
+        )
+      )
+  )
+  (:action verify_waiver_owner_for_case
+    :parameters (?closure_case - closure_case ?operational_owner - operational_owner)
+    :precondition
+      (and
+        (case_waiver_applied ?closure_case)
+        (element_operational_owner ?closure_case ?operational_owner)
+        (not
+          (case_waiver_owner_verified ?closure_case)
+        )
+      )
+    :effect (case_waiver_owner_verified ?closure_case)
+  )
+  (:action record_regulatory_clearance_for_case
+    :parameters (?closure_case - closure_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (case_waiver_owner_verified ?closure_case)
+        (case_has_regulatory_approval ?closure_case ?regulatory_approval)
+        (not
+          (case_regulatory_clearance ?closure_case)
+        )
+      )
+    :effect (case_regulatory_clearance ?closure_case)
+  )
+  (:action finalize_case_with_waiver_and_clearance
+    :parameters (?closure_case - closure_case)
+    :precondition
+      (and
+        (case_regulatory_clearance ?closure_case)
+        (not
+          (case_finalized ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?closure_case)
+        (element_readiness_flag ?closure_case)
+      )
+  )
+  (:action set_readiness_flag_on_lender_record
+    :parameters (?lender_record - lender_record ?closure_package - closure_package)
+    :precondition
+      (and
+        (lender_packaging_ready ?lender_record)
+        (lender_compliance_resolved ?lender_record)
+        (closure_package_created ?closure_package)
+        (package_ready_for_document_binding ?closure_package)
+        (not
+          (element_readiness_flag ?lender_record)
+        )
+      )
+    :effect (element_readiness_flag ?lender_record)
+  )
+  (:action set_readiness_flag_on_borrower_record
+    :parameters (?borrower_record - borrower_record ?closure_package - closure_package)
+    :precondition
+      (and
+        (borrower_packaging_ready ?borrower_record)
+        (borrower_compliance_resolved ?borrower_record)
+        (closure_package_created ?closure_package)
+        (package_ready_for_document_binding ?closure_package)
+        (not
+          (element_readiness_flag ?borrower_record)
+        )
+      )
+    :effect (element_readiness_flag ?borrower_record)
+  )
+  (:action apply_signature_to_component
+    :parameters (?facility_component - facility_component ?signature_token - signature_token ?evidence_item - evidence_item)
+    :precondition
+      (and
+        (element_readiness_flag ?facility_component)
+        (element_has_evidence ?facility_component ?evidence_item)
+        (signature_token_available ?signature_token)
+        (not
+          (element_signed_off ?facility_component)
+        )
+      )
+    :effect
+      (and
+        (element_signed_off ?facility_component)
+        (element_has_signature_token ?facility_component ?signature_token)
+        (not
+          (signature_token_available ?signature_token)
+        )
+      )
+  )
+  (:action confirm_closure_for_lender_record
+    :parameters (?lender_record - lender_record ?closure_agent - closure_agent ?signature_token - signature_token)
+    :precondition
+      (and
+        (element_signed_off ?lender_record)
+        (element_assigned_agent ?lender_record ?closure_agent)
+        (element_has_signature_token ?lender_record ?signature_token)
+        (not
+          (closure_confirmed ?lender_record)
+        )
+      )
+    :effect
+      (and
+        (closure_confirmed ?lender_record)
+        (agent_available ?closure_agent)
+        (signature_token_available ?signature_token)
+      )
+  )
+  (:action confirm_closure_for_borrower_record
+    :parameters (?borrower_record - borrower_record ?closure_agent - closure_agent ?signature_token - signature_token)
+    :precondition
+      (and
+        (element_signed_off ?borrower_record)
+        (element_assigned_agent ?borrower_record ?closure_agent)
+        (element_has_signature_token ?borrower_record ?signature_token)
+        (not
+          (closure_confirmed ?borrower_record)
+        )
+      )
+    :effect
+      (and
+        (closure_confirmed ?borrower_record)
+        (agent_available ?closure_agent)
+        (signature_token_available ?signature_token)
+      )
+  )
+  (:action confirm_closure_for_case
+    :parameters (?closure_case - closure_case ?closure_agent - closure_agent ?signature_token - signature_token)
+    :precondition
+      (and
+        (element_signed_off ?closure_case)
+        (element_assigned_agent ?closure_case ?closure_agent)
+        (element_has_signature_token ?closure_case ?signature_token)
+        (not
+          (closure_confirmed ?closure_case)
+        )
+      )
+    :effect
+      (and
+        (closure_confirmed ?closure_case)
+        (agent_available ?closure_agent)
+        (signature_token_available ?signature_token)
+      )
+  )
+)

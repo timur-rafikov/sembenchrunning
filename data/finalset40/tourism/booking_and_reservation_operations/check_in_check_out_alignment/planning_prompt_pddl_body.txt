@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain tourism_booking_check_in_check_out)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types booking_resource - object option_category - object resource_class - object booking_session - object booking_request - booking_session service_offer - booking_resource traveler_profile - booking_resource agent - booking_resource rate_plan - booking_resource payment_instrument - booking_resource check_in_token - booking_resource room_preference - booking_resource access_credential - booking_resource addon_service - option_category attachment_bundle - option_category loyalty_program - option_category room_option - resource_class seat_option - resource_class confirmation_document - resource_class segment_booking - booking_request itinerary_base - booking_request hotel_segment - segment_booking transport_segment - segment_booking consolidated_itinerary - itinerary_base)
+  (:predicates
+    (reservation_provisional ?booking_request - booking_request)
+    (reservation_confirmed ?booking_request - booking_request)
+    (reservation_has_hold ?booking_request - booking_request)
+    (reservation_finalized ?booking_request - booking_request)
+    (ready_for_finalization ?booking_request - booking_request)
+    (check_in_registered ?booking_request - booking_request)
+    (service_offer_available ?service_offer - service_offer)
+    (reservation_holds_offer ?booking_request - booking_request ?service_offer - service_offer)
+    (traveler_profile_available ?traveler_profile - traveler_profile)
+    (reservation_assigned_profile ?booking_request - booking_request ?traveler_profile - traveler_profile)
+    (agent_available ?agent - agent)
+    (reservation_assigned_agent ?booking_request - booking_request ?agent - agent)
+    (addon_available ?addon_service - addon_service)
+    (hotel_segment_has_addon ?hotel_segment - hotel_segment ?addon_service - addon_service)
+    (transport_segment_has_addon ?transport_segment - transport_segment ?addon_service - addon_service)
+    (hotel_segment_room_option ?hotel_segment - hotel_segment ?room_option - room_option)
+    (room_option_allocated ?room_option - room_option)
+    (room_option_pending_addon ?room_option - room_option)
+    (hotel_segment_ready ?hotel_segment - hotel_segment)
+    (transport_segment_seat_option ?transport_segment - transport_segment ?seat_option - seat_option)
+    (seat_option_allocated ?seat_option - seat_option)
+    (seat_option_pending_addon ?seat_option - seat_option)
+    (transport_segment_ready ?transport_segment - transport_segment)
+    (confirmation_document_available ?confirmation_document - confirmation_document)
+    (confirmation_document_issued ?confirmation_document - confirmation_document)
+    (document_includes_room_option ?confirmation_document - confirmation_document ?room_option - room_option)
+    (document_includes_seat_option ?confirmation_document - confirmation_document ?seat_option - seat_option)
+    (document_room_addon_flag ?confirmation_document - confirmation_document)
+    (document_seat_addon_flag ?confirmation_document - confirmation_document)
+    (confirmation_document_finalized ?confirmation_document - confirmation_document)
+    (itinerary_includes_hotel_segment ?consolidated_itinerary - consolidated_itinerary ?hotel_segment - hotel_segment)
+    (itinerary_includes_transport_segment ?consolidated_itinerary - consolidated_itinerary ?transport_segment - transport_segment)
+    (itinerary_has_confirmation_document ?consolidated_itinerary - consolidated_itinerary ?confirmation_document - confirmation_document)
+    (attachment_bundle_available ?attachment_bundle - attachment_bundle)
+    (itinerary_has_attachment_bundle ?consolidated_itinerary - consolidated_itinerary ?attachment_bundle - attachment_bundle)
+    (attachment_bundle_attached ?attachment_bundle - attachment_bundle)
+    (bundle_attached_to_document ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    (itinerary_prepared ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_preference_applied ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_ready_for_validation ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_rate_plan_assigned ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_rate_plan_applied ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_additional_flags ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_checks_completed ?consolidated_itinerary - consolidated_itinerary)
+    (loyalty_program_available ?loyalty_program - loyalty_program)
+    (itinerary_has_loyalty_program ?consolidated_itinerary - consolidated_itinerary ?loyalty_program - loyalty_program)
+    (itinerary_loyalty_applied ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_loyalty_assignment_flag ?consolidated_itinerary - consolidated_itinerary)
+    (itinerary_loyalty_assignment_complete ?consolidated_itinerary - consolidated_itinerary)
+    (rate_plan_available ?rate_plan - rate_plan)
+    (itinerary_has_rate_plan ?consolidated_itinerary - consolidated_itinerary ?rate_plan - rate_plan)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (itinerary_assigned_payment_instrument ?consolidated_itinerary - consolidated_itinerary ?payment_instrument - payment_instrument)
+    (room_preference_available ?room_preference - room_preference)
+    (itinerary_has_room_preference ?consolidated_itinerary - consolidated_itinerary ?room_preference - room_preference)
+    (access_credential_available ?access_credential - access_credential)
+    (itinerary_has_access_credential ?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential)
+    (check_in_token_available ?check_in_token - check_in_token)
+    (reservation_has_checkin_token ?booking_request - booking_request ?check_in_token - check_in_token)
+    (hotel_segment_processing ?hotel_segment - hotel_segment)
+    (transport_segment_processing ?transport_segment - transport_segment)
+    (itinerary_finalized ?consolidated_itinerary - consolidated_itinerary)
+  )
+  (:action create_provisional_booking
+    :parameters (?booking_request - booking_request)
+    :precondition
+      (and
+        (not
+          (reservation_provisional ?booking_request)
+        )
+        (not
+          (reservation_finalized ?booking_request)
+        )
+      )
+    :effect (reservation_provisional ?booking_request)
+  )
+  (:action allocate_offer_to_booking
+    :parameters (?booking_request - booking_request ?service_offer - service_offer)
+    :precondition
+      (and
+        (reservation_provisional ?booking_request)
+        (not
+          (reservation_has_hold ?booking_request)
+        )
+        (service_offer_available ?service_offer)
+      )
+    :effect
+      (and
+        (reservation_has_hold ?booking_request)
+        (reservation_holds_offer ?booking_request ?service_offer)
+        (not
+          (service_offer_available ?service_offer)
+        )
+      )
+  )
+  (:action assign_traveler_profile_to_booking
+    :parameters (?booking_request - booking_request ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_provisional ?booking_request)
+        (reservation_has_hold ?booking_request)
+        (traveler_profile_available ?traveler_profile)
+      )
+    :effect
+      (and
+        (reservation_assigned_profile ?booking_request ?traveler_profile)
+        (not
+          (traveler_profile_available ?traveler_profile)
+        )
+      )
+  )
+  (:action confirm_booking_request
+    :parameters (?booking_request - booking_request ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_provisional ?booking_request)
+        (reservation_has_hold ?booking_request)
+        (reservation_assigned_profile ?booking_request ?traveler_profile)
+        (not
+          (reservation_confirmed ?booking_request)
+        )
+      )
+    :effect (reservation_confirmed ?booking_request)
+  )
+  (:action release_traveler_profile_from_booking
+    :parameters (?booking_request - booking_request ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_assigned_profile ?booking_request ?traveler_profile)
+      )
+    :effect
+      (and
+        (traveler_profile_available ?traveler_profile)
+        (not
+          (reservation_assigned_profile ?booking_request ?traveler_profile)
+        )
+      )
+  )
+  (:action assign_agent_to_booking
+    :parameters (?booking_request - booking_request ?agent - agent)
+    :precondition
+      (and
+        (reservation_confirmed ?booking_request)
+        (agent_available ?agent)
+      )
+    :effect
+      (and
+        (reservation_assigned_agent ?booking_request ?agent)
+        (not
+          (agent_available ?agent)
+        )
+      )
+  )
+  (:action unassign_agent_from_booking
+    :parameters (?booking_request - booking_request ?agent - agent)
+    :precondition
+      (and
+        (reservation_assigned_agent ?booking_request ?agent)
+      )
+    :effect
+      (and
+        (agent_available ?agent)
+        (not
+          (reservation_assigned_agent ?booking_request ?agent)
+        )
+      )
+  )
+  (:action assign_room_preference_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?room_preference - room_preference)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (room_preference_available ?room_preference)
+      )
+    :effect
+      (and
+        (itinerary_has_room_preference ?consolidated_itinerary ?room_preference)
+        (not
+          (room_preference_available ?room_preference)
+        )
+      )
+  )
+  (:action remove_room_preference_from_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?room_preference - room_preference)
+    :precondition
+      (and
+        (itinerary_has_room_preference ?consolidated_itinerary ?room_preference)
+      )
+    :effect
+      (and
+        (room_preference_available ?room_preference)
+        (not
+          (itinerary_has_room_preference ?consolidated_itinerary ?room_preference)
+        )
+      )
+  )
+  (:action assign_access_credential_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (access_credential_available ?access_credential)
+      )
+    :effect
+      (and
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (not
+          (access_credential_available ?access_credential)
+        )
+      )
+  )
+  (:action remove_access_credential_from_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential)
+    :precondition
+      (and
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+      )
+    :effect
+      (and
+        (access_credential_available ?access_credential)
+        (not
+          (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        )
+      )
+  )
+  (:action allocate_room_option_to_hotel_segment
+    :parameters (?hotel_segment - hotel_segment ?room_option - room_option ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_confirmed ?hotel_segment)
+        (reservation_assigned_profile ?hotel_segment ?traveler_profile)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (not
+          (room_option_allocated ?room_option)
+        )
+        (not
+          (room_option_pending_addon ?room_option)
+        )
+      )
+    :effect (room_option_allocated ?room_option)
+  )
+  (:action confirm_hotel_segment_readiness_by_agent
+    :parameters (?hotel_segment - hotel_segment ?room_option - room_option ?agent - agent)
+    :precondition
+      (and
+        (reservation_confirmed ?hotel_segment)
+        (reservation_assigned_agent ?hotel_segment ?agent)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (room_option_allocated ?room_option)
+        (not
+          (hotel_segment_processing ?hotel_segment)
+        )
+      )
+    :effect
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (hotel_segment_ready ?hotel_segment)
+      )
+  )
+  (:action attach_addon_to_hotel_segment
+    :parameters (?hotel_segment - hotel_segment ?room_option - room_option ?addon_service - addon_service)
+    :precondition
+      (and
+        (reservation_confirmed ?hotel_segment)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (addon_available ?addon_service)
+        (not
+          (hotel_segment_processing ?hotel_segment)
+        )
+      )
+    :effect
+      (and
+        (room_option_pending_addon ?room_option)
+        (hotel_segment_processing ?hotel_segment)
+        (hotel_segment_has_addon ?hotel_segment ?addon_service)
+        (not
+          (addon_available ?addon_service)
+        )
+      )
+  )
+  (:action apply_addon_to_hotel_segment
+    :parameters (?hotel_segment - hotel_segment ?room_option - room_option ?traveler_profile - traveler_profile ?addon_service - addon_service)
+    :precondition
+      (and
+        (reservation_confirmed ?hotel_segment)
+        (reservation_assigned_profile ?hotel_segment ?traveler_profile)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (room_option_pending_addon ?room_option)
+        (hotel_segment_has_addon ?hotel_segment ?addon_service)
+        (not
+          (hotel_segment_ready ?hotel_segment)
+        )
+      )
+    :effect
+      (and
+        (room_option_allocated ?room_option)
+        (hotel_segment_ready ?hotel_segment)
+        (addon_available ?addon_service)
+        (not
+          (hotel_segment_has_addon ?hotel_segment ?addon_service)
+        )
+      )
+  )
+  (:action allocate_seat_option_to_transport_segment
+    :parameters (?transport_segment - transport_segment ?seat_option - seat_option ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_confirmed ?transport_segment)
+        (reservation_assigned_profile ?transport_segment ?traveler_profile)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (not
+          (seat_option_allocated ?seat_option)
+        )
+        (not
+          (seat_option_pending_addon ?seat_option)
+        )
+      )
+    :effect (seat_option_allocated ?seat_option)
+  )
+  (:action confirm_transport_segment_readiness_by_agent
+    :parameters (?transport_segment - transport_segment ?seat_option - seat_option ?agent - agent)
+    :precondition
+      (and
+        (reservation_confirmed ?transport_segment)
+        (reservation_assigned_agent ?transport_segment ?agent)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (seat_option_allocated ?seat_option)
+        (not
+          (transport_segment_processing ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (transport_segment_processing ?transport_segment)
+        (transport_segment_ready ?transport_segment)
+      )
+  )
+  (:action attach_addon_to_transport_segment
+    :parameters (?transport_segment - transport_segment ?seat_option - seat_option ?addon_service - addon_service)
+    :precondition
+      (and
+        (reservation_confirmed ?transport_segment)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (addon_available ?addon_service)
+        (not
+          (transport_segment_processing ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (seat_option_pending_addon ?seat_option)
+        (transport_segment_processing ?transport_segment)
+        (transport_segment_has_addon ?transport_segment ?addon_service)
+        (not
+          (addon_available ?addon_service)
+        )
+      )
+  )
+  (:action apply_addon_to_transport_segment
+    :parameters (?transport_segment - transport_segment ?seat_option - seat_option ?traveler_profile - traveler_profile ?addon_service - addon_service)
+    :precondition
+      (and
+        (reservation_confirmed ?transport_segment)
+        (reservation_assigned_profile ?transport_segment ?traveler_profile)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (seat_option_pending_addon ?seat_option)
+        (transport_segment_has_addon ?transport_segment ?addon_service)
+        (not
+          (transport_segment_ready ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (seat_option_allocated ?seat_option)
+        (transport_segment_ready ?transport_segment)
+        (addon_available ?addon_service)
+        (not
+          (transport_segment_has_addon ?transport_segment ?addon_service)
+        )
+      )
+  )
+  (:action issue_confirmation_document
+    :parameters (?hotel_segment - hotel_segment ?transport_segment - transport_segment ?room_option - room_option ?seat_option - seat_option ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (transport_segment_processing ?transport_segment)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (room_option_allocated ?room_option)
+        (seat_option_allocated ?seat_option)
+        (hotel_segment_ready ?hotel_segment)
+        (transport_segment_ready ?transport_segment)
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_issued ?confirmation_document)
+        (document_includes_room_option ?confirmation_document ?room_option)
+        (document_includes_seat_option ?confirmation_document ?seat_option)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action issue_confirmation_document_with_room_addon
+    :parameters (?hotel_segment - hotel_segment ?transport_segment - transport_segment ?room_option - room_option ?seat_option - seat_option ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (transport_segment_processing ?transport_segment)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (room_option_pending_addon ?room_option)
+        (seat_option_allocated ?seat_option)
+        (not
+          (hotel_segment_ready ?hotel_segment)
+        )
+        (transport_segment_ready ?transport_segment)
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_issued ?confirmation_document)
+        (document_includes_room_option ?confirmation_document ?room_option)
+        (document_includes_seat_option ?confirmation_document ?seat_option)
+        (document_room_addon_flag ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action issue_confirmation_document_with_seat_addon
+    :parameters (?hotel_segment - hotel_segment ?transport_segment - transport_segment ?room_option - room_option ?seat_option - seat_option ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (transport_segment_processing ?transport_segment)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (room_option_allocated ?room_option)
+        (seat_option_pending_addon ?seat_option)
+        (hotel_segment_ready ?hotel_segment)
+        (not
+          (transport_segment_ready ?transport_segment)
+        )
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_issued ?confirmation_document)
+        (document_includes_room_option ?confirmation_document ?room_option)
+        (document_includes_seat_option ?confirmation_document ?seat_option)
+        (document_seat_addon_flag ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action issue_confirmation_document_with_room_and_seat_addons
+    :parameters (?hotel_segment - hotel_segment ?transport_segment - transport_segment ?room_option - room_option ?seat_option - seat_option ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (transport_segment_processing ?transport_segment)
+        (hotel_segment_room_option ?hotel_segment ?room_option)
+        (transport_segment_seat_option ?transport_segment ?seat_option)
+        (room_option_pending_addon ?room_option)
+        (seat_option_pending_addon ?seat_option)
+        (not
+          (hotel_segment_ready ?hotel_segment)
+        )
+        (not
+          (transport_segment_ready ?transport_segment)
+        )
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_issued ?confirmation_document)
+        (document_includes_room_option ?confirmation_document ?room_option)
+        (document_includes_seat_option ?confirmation_document ?seat_option)
+        (document_room_addon_flag ?confirmation_document)
+        (document_seat_addon_flag ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action finalize_confirmation_document_for_hotel_segment
+    :parameters (?confirmation_document - confirmation_document ?hotel_segment - hotel_segment ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (confirmation_document_issued ?confirmation_document)
+        (hotel_segment_processing ?hotel_segment)
+        (reservation_assigned_profile ?hotel_segment ?traveler_profile)
+        (not
+          (confirmation_document_finalized ?confirmation_document)
+        )
+      )
+    :effect (confirmation_document_finalized ?confirmation_document)
+  )
+  (:action attach_bundle_to_itinerary_document
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (itinerary_has_confirmation_document ?consolidated_itinerary ?confirmation_document)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (attachment_bundle_available ?attachment_bundle)
+        (confirmation_document_issued ?confirmation_document)
+        (confirmation_document_finalized ?confirmation_document)
+        (not
+          (attachment_bundle_attached ?attachment_bundle)
+        )
+      )
+    :effect
+      (and
+        (attachment_bundle_attached ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (not
+          (attachment_bundle_available ?attachment_bundle)
+        )
+      )
+  )
+  (:action prepare_itinerary_for_attachments
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (attachment_bundle_attached ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (reservation_assigned_profile ?consolidated_itinerary ?traveler_profile)
+        (not
+          (document_room_addon_flag ?confirmation_document)
+        )
+        (not
+          (itinerary_prepared ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_prepared ?consolidated_itinerary)
+  )
+  (:action assign_rate_plan_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (rate_plan_available ?rate_plan)
+        (not
+          (itinerary_rate_plan_assigned ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_rate_plan_assigned ?consolidated_itinerary)
+        (itinerary_has_rate_plan ?consolidated_itinerary ?rate_plan)
+        (not
+          (rate_plan_available ?rate_plan)
+        )
+      )
+  )
+  (:action apply_rate_plan_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document ?traveler_profile - traveler_profile ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (attachment_bundle_attached ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (reservation_assigned_profile ?consolidated_itinerary ?traveler_profile)
+        (document_room_addon_flag ?confirmation_document)
+        (itinerary_rate_plan_assigned ?consolidated_itinerary)
+        (itinerary_has_rate_plan ?consolidated_itinerary ?rate_plan)
+        (not
+          (itinerary_prepared ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_prepared ?consolidated_itinerary)
+        (itinerary_rate_plan_applied ?consolidated_itinerary)
+      )
+  )
+  (:action apply_room_preference_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?room_preference - room_preference ?agent - agent ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_prepared ?consolidated_itinerary)
+        (itinerary_has_room_preference ?consolidated_itinerary ?room_preference)
+        (reservation_assigned_agent ?consolidated_itinerary ?agent)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (not
+          (document_seat_addon_flag ?confirmation_document)
+        )
+        (not
+          (itinerary_preference_applied ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_preference_applied ?consolidated_itinerary)
+  )
+  (:action apply_room_preference_to_itinerary_variant
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?room_preference - room_preference ?agent - agent ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_prepared ?consolidated_itinerary)
+        (itinerary_has_room_preference ?consolidated_itinerary ?room_preference)
+        (reservation_assigned_agent ?consolidated_itinerary ?agent)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (document_seat_addon_flag ?confirmation_document)
+        (not
+          (itinerary_preference_applied ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_preference_applied ?consolidated_itinerary)
+  )
+  (:action attach_access_credential_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_preference_applied ?consolidated_itinerary)
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (not
+          (document_room_addon_flag ?confirmation_document)
+        )
+        (not
+          (document_seat_addon_flag ?confirmation_document)
+        )
+        (not
+          (itinerary_ready_for_validation ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_ready_for_validation ?consolidated_itinerary)
+  )
+  (:action attach_access_credential_and_mark_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_preference_applied ?consolidated_itinerary)
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (document_room_addon_flag ?confirmation_document)
+        (not
+          (document_seat_addon_flag ?confirmation_document)
+        )
+        (not
+          (itinerary_ready_for_validation ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_additional_flags ?consolidated_itinerary)
+      )
+  )
+  (:action attach_access_credential_and_mark_itinerary_variant
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_preference_applied ?consolidated_itinerary)
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (not
+          (document_room_addon_flag ?confirmation_document)
+        )
+        (document_seat_addon_flag ?confirmation_document)
+        (not
+          (itinerary_ready_for_validation ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_additional_flags ?consolidated_itinerary)
+      )
+  )
+  (:action attach_access_credential_and_mark_itinerary_alternate
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential ?attachment_bundle - attachment_bundle ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (itinerary_preference_applied ?consolidated_itinerary)
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (itinerary_has_attachment_bundle ?consolidated_itinerary ?attachment_bundle)
+        (bundle_attached_to_document ?attachment_bundle ?confirmation_document)
+        (document_room_addon_flag ?confirmation_document)
+        (document_seat_addon_flag ?confirmation_document)
+        (not
+          (itinerary_ready_for_validation ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_additional_flags ?consolidated_itinerary)
+      )
+  )
+  (:action validate_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary)
+    :precondition
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (not
+          (itinerary_additional_flags ?consolidated_itinerary)
+        )
+        (not
+          (itinerary_finalized ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?consolidated_itinerary)
+        (ready_for_finalization ?consolidated_itinerary)
+      )
+  )
+  (:action attach_payment_instrument_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_additional_flags ?consolidated_itinerary)
+        (payment_instrument_available ?payment_instrument)
+      )
+    :effect
+      (and
+        (itinerary_assigned_payment_instrument ?consolidated_itinerary ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action perform_itinerary_final_checks
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?hotel_segment - hotel_segment ?transport_segment - transport_segment ?traveler_profile - traveler_profile ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_additional_flags ?consolidated_itinerary)
+        (itinerary_assigned_payment_instrument ?consolidated_itinerary ?payment_instrument)
+        (itinerary_includes_hotel_segment ?consolidated_itinerary ?hotel_segment)
+        (itinerary_includes_transport_segment ?consolidated_itinerary ?transport_segment)
+        (hotel_segment_ready ?hotel_segment)
+        (transport_segment_ready ?transport_segment)
+        (reservation_assigned_profile ?consolidated_itinerary ?traveler_profile)
+        (not
+          (itinerary_checks_completed ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_checks_completed ?consolidated_itinerary)
+  )
+  (:action finalize_itinerary_after_checks
+    :parameters (?consolidated_itinerary - consolidated_itinerary)
+    :precondition
+      (and
+        (itinerary_ready_for_validation ?consolidated_itinerary)
+        (itinerary_checks_completed ?consolidated_itinerary)
+        (not
+          (itinerary_finalized ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?consolidated_itinerary)
+        (ready_for_finalization ?consolidated_itinerary)
+      )
+  )
+  (:action apply_loyalty_program_to_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?loyalty_program - loyalty_program ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (reservation_confirmed ?consolidated_itinerary)
+        (reservation_assigned_profile ?consolidated_itinerary ?traveler_profile)
+        (loyalty_program_available ?loyalty_program)
+        (itinerary_has_loyalty_program ?consolidated_itinerary ?loyalty_program)
+        (not
+          (itinerary_loyalty_applied ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_loyalty_applied ?consolidated_itinerary)
+        (not
+          (loyalty_program_available ?loyalty_program)
+        )
+      )
+  )
+  (:action begin_loyalty_assignment
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?agent - agent)
+    :precondition
+      (and
+        (itinerary_loyalty_applied ?consolidated_itinerary)
+        (reservation_assigned_agent ?consolidated_itinerary ?agent)
+        (not
+          (itinerary_loyalty_assignment_flag ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_loyalty_assignment_flag ?consolidated_itinerary)
+  )
+  (:action assign_access_credential_after_loyalty
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?access_credential - access_credential)
+    :precondition
+      (and
+        (itinerary_loyalty_assignment_flag ?consolidated_itinerary)
+        (itinerary_has_access_credential ?consolidated_itinerary ?access_credential)
+        (not
+          (itinerary_loyalty_assignment_complete ?consolidated_itinerary)
+        )
+      )
+    :effect (itinerary_loyalty_assignment_complete ?consolidated_itinerary)
+  )
+  (:action finalize_itinerary_post_loyalty
+    :parameters (?consolidated_itinerary - consolidated_itinerary)
+    :precondition
+      (and
+        (itinerary_loyalty_assignment_complete ?consolidated_itinerary)
+        (not
+          (itinerary_finalized ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (itinerary_finalized ?consolidated_itinerary)
+        (ready_for_finalization ?consolidated_itinerary)
+      )
+  )
+  (:action fulfill_hotel_segment
+    :parameters (?hotel_segment - hotel_segment ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (hotel_segment_processing ?hotel_segment)
+        (hotel_segment_ready ?hotel_segment)
+        (confirmation_document_issued ?confirmation_document)
+        (confirmation_document_finalized ?confirmation_document)
+        (not
+          (ready_for_finalization ?hotel_segment)
+        )
+      )
+    :effect (ready_for_finalization ?hotel_segment)
+  )
+  (:action fulfill_transport_segment
+    :parameters (?transport_segment - transport_segment ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (transport_segment_processing ?transport_segment)
+        (transport_segment_ready ?transport_segment)
+        (confirmation_document_issued ?confirmation_document)
+        (confirmation_document_finalized ?confirmation_document)
+        (not
+          (ready_for_finalization ?transport_segment)
+        )
+      )
+    :effect (ready_for_finalization ?transport_segment)
+  )
+  (:action apply_checkin_token_to_booking
+    :parameters (?booking_request - booking_request ?check_in_token - check_in_token ?traveler_profile - traveler_profile)
+    :precondition
+      (and
+        (ready_for_finalization ?booking_request)
+        (reservation_assigned_profile ?booking_request ?traveler_profile)
+        (check_in_token_available ?check_in_token)
+        (not
+          (check_in_registered ?booking_request)
+        )
+      )
+    :effect
+      (and
+        (check_in_registered ?booking_request)
+        (reservation_has_checkin_token ?booking_request ?check_in_token)
+        (not
+          (check_in_token_available ?check_in_token)
+        )
+      )
+  )
+  (:action synchronize_checkin_and_commit_hotel_segment
+    :parameters (?hotel_segment - hotel_segment ?service_offer - service_offer ?check_in_token - check_in_token)
+    :precondition
+      (and
+        (check_in_registered ?hotel_segment)
+        (reservation_holds_offer ?hotel_segment ?service_offer)
+        (reservation_has_checkin_token ?hotel_segment ?check_in_token)
+        (not
+          (reservation_finalized ?hotel_segment)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?hotel_segment)
+        (service_offer_available ?service_offer)
+        (check_in_token_available ?check_in_token)
+      )
+  )
+  (:action synchronize_checkin_and_commit_transport_segment
+    :parameters (?transport_segment - transport_segment ?service_offer - service_offer ?check_in_token - check_in_token)
+    :precondition
+      (and
+        (check_in_registered ?transport_segment)
+        (reservation_holds_offer ?transport_segment ?service_offer)
+        (reservation_has_checkin_token ?transport_segment ?check_in_token)
+        (not
+          (reservation_finalized ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?transport_segment)
+        (service_offer_available ?service_offer)
+        (check_in_token_available ?check_in_token)
+      )
+  )
+  (:action synchronize_checkin_and_commit_itinerary
+    :parameters (?consolidated_itinerary - consolidated_itinerary ?service_offer - service_offer ?check_in_token - check_in_token)
+    :precondition
+      (and
+        (check_in_registered ?consolidated_itinerary)
+        (reservation_holds_offer ?consolidated_itinerary ?service_offer)
+        (reservation_has_checkin_token ?consolidated_itinerary ?check_in_token)
+        (not
+          (reservation_finalized ?consolidated_itinerary)
+        )
+      )
+    :effect
+      (and
+        (reservation_finalized ?consolidated_itinerary)
+        (service_offer_available ?service_offer)
+        (check_in_token_available ?check_in_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem check_in_check_out_alignment_problem)
+  (:domain tourism_booking_check_in_check_out)
+  (:objects hotel_segment_1 - hotel_segment transport_segment_1 - transport_segment consolidated_itinerary_1 - consolidated_itinerary consolidated_itinerary_2 - consolidated_itinerary service_offer_1 - service_offer service_offer_2 - service_offer service_offer_3 - service_offer traveler_profile_1 - traveler_profile agent_1 - agent addon_service_1 - addon_service room_option_1 - room_option seat_option_1 - seat_option confirmation_document_template_1 - confirmation_document attachment_bundle_1 - attachment_bundle attachment_bundle_2 - attachment_bundle rate_plan_1 - rate_plan rate_plan_2 - rate_plan payment_instrument_1 - payment_instrument payment_instrument_2 - payment_instrument check_in_token_1 - check_in_token room_preference_1 - room_preference loyalty_program_1 - loyalty_program loyalty_program_2 - loyalty_program access_credential_1 - access_credential)
+  (:init
+    (service_offer_available service_offer_1)
+    (service_offer_available service_offer_2)
+    (service_offer_available service_offer_3)
+    (traveler_profile_available traveler_profile_1)
+    (agent_available agent_1)
+    (addon_available addon_service_1)
+    (hotel_segment_room_option hotel_segment_1 room_option_1)
+    (transport_segment_seat_option transport_segment_1 seat_option_1)
+    (confirmation_document_available confirmation_document_template_1)
+    (attachment_bundle_available attachment_bundle_1)
+    (attachment_bundle_available attachment_bundle_2)
+    (itinerary_includes_hotel_segment consolidated_itinerary_1 hotel_segment_1)
+    (itinerary_includes_hotel_segment consolidated_itinerary_2 hotel_segment_1)
+    (itinerary_includes_transport_segment consolidated_itinerary_1 transport_segment_1)
+    (itinerary_includes_transport_segment consolidated_itinerary_2 transport_segment_1)
+    (itinerary_has_confirmation_document consolidated_itinerary_1 confirmation_document_template_1)
+    (itinerary_has_confirmation_document consolidated_itinerary_2 confirmation_document_template_1)
+    (itinerary_has_attachment_bundle consolidated_itinerary_1 attachment_bundle_1)
+    (itinerary_has_attachment_bundle consolidated_itinerary_2 attachment_bundle_2)
+    (rate_plan_available rate_plan_1)
+    (rate_plan_available rate_plan_2)
+    (payment_instrument_available payment_instrument_1)
+    (payment_instrument_available payment_instrument_2)
+    (check_in_token_available check_in_token_1)
+    (room_preference_available room_preference_1)
+    (loyalty_program_available loyalty_program_1)
+    (itinerary_has_loyalty_program consolidated_itinerary_1 loyalty_program_1)
+    (itinerary_has_loyalty_program consolidated_itinerary_2 loyalty_program_2)
+    (access_credential_available access_credential_1)
+  )
+  (:goal
+    (and
+      (reservation_finalized hotel_segment_1)
+      (reservation_finalized transport_segment_1)
+      (reservation_finalized consolidated_itinerary_1)
+      (reservation_finalized consolidated_itinerary_2)
+    )
+  )
+)

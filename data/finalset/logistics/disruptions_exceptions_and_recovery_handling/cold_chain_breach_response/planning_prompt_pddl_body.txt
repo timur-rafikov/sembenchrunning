@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cold_chain_breach_response_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_class - object infrastructure_component - object organizational_unit - object incidentable_object - object cold_chain_entity - incidentable_object responder_unit - operational_resource_class field_inspector - operational_resource_class on_site_team - operational_resource_class regulatory_approval - operational_resource_class authorization_token - operational_resource_class claim_resource - operational_resource_class quality_verifier - operational_resource_class technical_signoff - operational_resource_class consumable_resource - infrastructure_component document_package - infrastructure_component third_party_approval - infrastructure_component alt_route_node_origin - organizational_unit alt_route_node_destination - organizational_unit recovery_order - organizational_unit entity_segment_supertype - cold_chain_entity case_record_supertype - cold_chain_entity origin_transit_segment - entity_segment_supertype destination_transit_segment - entity_segment_supertype response_case_record - case_record_supertype)
+  (:predicates
+    (incident_logged ?cold_chain_entity - cold_chain_entity)
+    (entity_triaged ?cold_chain_entity - cold_chain_entity)
+    (entity_has_responder ?cold_chain_entity - cold_chain_entity)
+    (service_restored ?cold_chain_entity - cold_chain_entity)
+    (ready_for_reinstatement ?cold_chain_entity - cold_chain_entity)
+    (execution_authorized ?cold_chain_entity - cold_chain_entity)
+    (responder_available ?responder_unit - responder_unit)
+    (entity_link_responder ?cold_chain_entity - cold_chain_entity ?responder_unit - responder_unit)
+    (inspector_available ?field_inspector - field_inspector)
+    (inspector_assigned ?cold_chain_entity - cold_chain_entity ?field_inspector - field_inspector)
+    (on_site_team_available ?on_site_team - on_site_team)
+    (on_site_team_assigned ?cold_chain_entity - cold_chain_entity ?on_site_team - on_site_team)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (allocated_consumable_to_origin_segment ?origin_segment - origin_transit_segment ?consumable_resource - consumable_resource)
+    (allocated_consumable_to_destination_segment ?destination_segment - destination_transit_segment ?consumable_resource - consumable_resource)
+    (segment_link_alt_route_origin ?origin_segment - origin_transit_segment ?alt_route_node_origin - alt_route_node_origin)
+    (alt_route_origin_reserved ?alt_route_node_origin - alt_route_node_origin)
+    (alt_route_origin_activated ?alt_route_node_origin - alt_route_node_origin)
+    (origin_segment_preserved ?origin_segment - origin_transit_segment)
+    (segment_link_alt_route_destination ?destination_segment - destination_transit_segment ?alt_route_node_destination - alt_route_node_destination)
+    (alt_route_destination_reserved ?alt_route_node_destination - alt_route_node_destination)
+    (alt_route_destination_activated ?alt_route_node_destination - alt_route_node_destination)
+    (destination_segment_preserved ?destination_segment - destination_transit_segment)
+    (recovery_order_available ?recovery_order - recovery_order)
+    (recovery_order_selected ?recovery_order - recovery_order)
+    (recovery_order_bind_alt_origin ?recovery_order - recovery_order ?alt_route_node_origin - alt_route_node_origin)
+    (recovery_order_bind_alt_destination ?recovery_order - recovery_order ?alt_route_node_destination - alt_route_node_destination)
+    (recovery_order_validated_for_alt_origin ?recovery_order - recovery_order)
+    (recovery_order_validated_for_alt_destination ?recovery_order - recovery_order)
+    (recovery_order_dispatch_confirmed ?recovery_order - recovery_order)
+    (case_link_origin_segment ?case_record - response_case_record ?origin_segment - origin_transit_segment)
+    (case_link_destination_segment ?case_record - response_case_record ?destination_segment - destination_transit_segment)
+    (case_link_recovery_order ?case_record - response_case_record ?recovery_order - recovery_order)
+    (document_available ?document_package - document_package)
+    (case_has_document ?case_record - response_case_record ?document_package - document_package)
+    (document_validated ?document_package - document_package)
+    (document_linked_to_order ?document_package - document_package ?recovery_order - recovery_order)
+    (case_documentation_ready ?case_record - response_case_record)
+    (case_quality_verified ?case_record - response_case_record)
+    (case_technical_ready ?case_record - response_case_record)
+    (regulatory_assigned ?case_record - response_case_record)
+    (regulatory_verified ?case_record - response_case_record)
+    (authorization_requested ?case_record - response_case_record)
+    (case_ready_for_execution ?case_record - response_case_record)
+    (third_party_approval_available ?third_party_approval - third_party_approval)
+    (case_link_third_party_approval ?case_record - response_case_record ?third_party_approval - third_party_approval)
+    (third_party_approval_applied ?case_record - response_case_record)
+    (regulatory_action_confirmed ?case_record - response_case_record)
+    (technical_signoff_confirmed ?case_record - response_case_record)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (case_link_regulatory_approval ?case_record - response_case_record ?regulatory_approval - regulatory_approval)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (case_link_authorization_token ?case_record - response_case_record ?authorization_token - authorization_token)
+    (quality_verifier_available ?quality_verifier - quality_verifier)
+    (case_link_quality_verifier ?case_record - response_case_record ?quality_verifier - quality_verifier)
+    (technical_signoff_available ?technical_signoff - technical_signoff)
+    (case_link_technical_signoff ?case_record - response_case_record ?technical_signoff - technical_signoff)
+    (claim_resource_available ?claim_resource - claim_resource)
+    (claim_resource_assigned ?cold_chain_entity - cold_chain_entity ?claim_resource - claim_resource)
+    (origin_segment_containment_complete ?origin_segment - origin_transit_segment)
+    (destination_segment_containment_complete ?destination_segment - destination_transit_segment)
+    (case_execution_initiated ?case_record - response_case_record)
+  )
+  (:action log_breach_detection
+    :parameters (?cold_chain_entity - cold_chain_entity)
+    :precondition
+      (and
+        (not
+          (incident_logged ?cold_chain_entity)
+        )
+        (not
+          (service_restored ?cold_chain_entity)
+        )
+      )
+    :effect (incident_logged ?cold_chain_entity)
+  )
+  (:action assign_responder_unit
+    :parameters (?cold_chain_entity - cold_chain_entity ?responder_unit - responder_unit)
+    :precondition
+      (and
+        (incident_logged ?cold_chain_entity)
+        (not
+          (entity_has_responder ?cold_chain_entity)
+        )
+        (responder_available ?responder_unit)
+      )
+    :effect
+      (and
+        (entity_has_responder ?cold_chain_entity)
+        (entity_link_responder ?cold_chain_entity ?responder_unit)
+        (not
+          (responder_available ?responder_unit)
+        )
+      )
+  )
+  (:action dispatch_field_inspector
+    :parameters (?cold_chain_entity - cold_chain_entity ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (incident_logged ?cold_chain_entity)
+        (entity_has_responder ?cold_chain_entity)
+        (inspector_available ?field_inspector)
+      )
+    :effect
+      (and
+        (inspector_assigned ?cold_chain_entity ?field_inspector)
+        (not
+          (inspector_available ?field_inspector)
+        )
+      )
+  )
+  (:action confirm_triage
+    :parameters (?cold_chain_entity - cold_chain_entity ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (incident_logged ?cold_chain_entity)
+        (entity_has_responder ?cold_chain_entity)
+        (inspector_assigned ?cold_chain_entity ?field_inspector)
+        (not
+          (entity_triaged ?cold_chain_entity)
+        )
+      )
+    :effect (entity_triaged ?cold_chain_entity)
+  )
+  (:action release_field_inspector
+    :parameters (?cold_chain_entity - cold_chain_entity ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (inspector_assigned ?cold_chain_entity ?field_inspector)
+      )
+    :effect
+      (and
+        (inspector_available ?field_inspector)
+        (not
+          (inspector_assigned ?cold_chain_entity ?field_inspector)
+        )
+      )
+  )
+  (:action assign_on_site_team
+    :parameters (?cold_chain_entity - cold_chain_entity ?on_site_team - on_site_team)
+    :precondition
+      (and
+        (entity_triaged ?cold_chain_entity)
+        (on_site_team_available ?on_site_team)
+      )
+    :effect
+      (and
+        (on_site_team_assigned ?cold_chain_entity ?on_site_team)
+        (not
+          (on_site_team_available ?on_site_team)
+        )
+      )
+  )
+  (:action release_on_site_team
+    :parameters (?cold_chain_entity - cold_chain_entity ?on_site_team - on_site_team)
+    :precondition
+      (and
+        (on_site_team_assigned ?cold_chain_entity ?on_site_team)
+      )
+    :effect
+      (and
+        (on_site_team_available ?on_site_team)
+        (not
+          (on_site_team_assigned ?cold_chain_entity ?on_site_team)
+        )
+      )
+  )
+  (:action engage_quality_verifier
+    :parameters (?case_record - response_case_record ?quality_verifier - quality_verifier)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (quality_verifier_available ?quality_verifier)
+      )
+    :effect
+      (and
+        (case_link_quality_verifier ?case_record ?quality_verifier)
+        (not
+          (quality_verifier_available ?quality_verifier)
+        )
+      )
+  )
+  (:action release_quality_verifier
+    :parameters (?case_record - response_case_record ?quality_verifier - quality_verifier)
+    :precondition
+      (and
+        (case_link_quality_verifier ?case_record ?quality_verifier)
+      )
+    :effect
+      (and
+        (quality_verifier_available ?quality_verifier)
+        (not
+          (case_link_quality_verifier ?case_record ?quality_verifier)
+        )
+      )
+  )
+  (:action engage_technical_signoff
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (technical_signoff_available ?technical_signoff)
+      )
+    :effect
+      (and
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (not
+          (technical_signoff_available ?technical_signoff)
+        )
+      )
+  )
+  (:action release_technical_signoff
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff)
+    :precondition
+      (and
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+      )
+    :effect
+      (and
+        (technical_signoff_available ?technical_signoff)
+        (not
+          (case_link_technical_signoff ?case_record ?technical_signoff)
+        )
+      )
+  )
+  (:action prepare_alt_route_origin
+    :parameters (?origin_segment - origin_transit_segment ?alt_route_node_origin - alt_route_node_origin ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (entity_triaged ?origin_segment)
+        (inspector_assigned ?origin_segment ?field_inspector)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (not
+          (alt_route_origin_reserved ?alt_route_node_origin)
+        )
+        (not
+          (alt_route_origin_activated ?alt_route_node_origin)
+        )
+      )
+    :effect (alt_route_origin_reserved ?alt_route_node_origin)
+  )
+  (:action deploy_on_site_containment_origin
+    :parameters (?origin_segment - origin_transit_segment ?alt_route_node_origin - alt_route_node_origin ?on_site_team - on_site_team)
+    :precondition
+      (and
+        (entity_triaged ?origin_segment)
+        (on_site_team_assigned ?origin_segment ?on_site_team)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (alt_route_origin_reserved ?alt_route_node_origin)
+        (not
+          (origin_segment_containment_complete ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (origin_segment_preserved ?origin_segment)
+      )
+  )
+  (:action apply_consumable_to_origin
+    :parameters (?origin_segment - origin_transit_segment ?alt_route_node_origin - alt_route_node_origin ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_triaged ?origin_segment)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (consumable_available ?consumable_resource)
+        (not
+          (origin_segment_containment_complete ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (alt_route_origin_activated ?alt_route_node_origin)
+        (origin_segment_containment_complete ?origin_segment)
+        (allocated_consumable_to_origin_segment ?origin_segment ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_origin_containment
+    :parameters (?origin_segment - origin_transit_segment ?alt_route_node_origin - alt_route_node_origin ?field_inspector - field_inspector ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_triaged ?origin_segment)
+        (inspector_assigned ?origin_segment ?field_inspector)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (alt_route_origin_activated ?alt_route_node_origin)
+        (allocated_consumable_to_origin_segment ?origin_segment ?consumable_resource)
+        (not
+          (origin_segment_preserved ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (alt_route_origin_reserved ?alt_route_node_origin)
+        (origin_segment_preserved ?origin_segment)
+        (consumable_available ?consumable_resource)
+        (not
+          (allocated_consumable_to_origin_segment ?origin_segment ?consumable_resource)
+        )
+      )
+  )
+  (:action prepare_alt_route_destination
+    :parameters (?destination_segment - destination_transit_segment ?alt_route_node_destination - alt_route_node_destination ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (entity_triaged ?destination_segment)
+        (inspector_assigned ?destination_segment ?field_inspector)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (not
+          (alt_route_destination_reserved ?alt_route_node_destination)
+        )
+        (not
+          (alt_route_destination_activated ?alt_route_node_destination)
+        )
+      )
+    :effect (alt_route_destination_reserved ?alt_route_node_destination)
+  )
+  (:action deploy_on_site_containment_destination
+    :parameters (?destination_segment - destination_transit_segment ?alt_route_node_destination - alt_route_node_destination ?on_site_team - on_site_team)
+    :precondition
+      (and
+        (entity_triaged ?destination_segment)
+        (on_site_team_assigned ?destination_segment ?on_site_team)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_destination_reserved ?alt_route_node_destination)
+        (not
+          (destination_segment_containment_complete ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_containment_complete ?destination_segment)
+        (destination_segment_preserved ?destination_segment)
+      )
+  )
+  (:action apply_consumable_to_destination
+    :parameters (?destination_segment - destination_transit_segment ?alt_route_node_destination - alt_route_node_destination ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_triaged ?destination_segment)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (consumable_available ?consumable_resource)
+        (not
+          (destination_segment_containment_complete ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alt_route_destination_activated ?alt_route_node_destination)
+        (destination_segment_containment_complete ?destination_segment)
+        (allocated_consumable_to_destination_segment ?destination_segment ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_destination_containment
+    :parameters (?destination_segment - destination_transit_segment ?alt_route_node_destination - alt_route_node_destination ?field_inspector - field_inspector ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_triaged ?destination_segment)
+        (inspector_assigned ?destination_segment ?field_inspector)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_destination_activated ?alt_route_node_destination)
+        (allocated_consumable_to_destination_segment ?destination_segment ?consumable_resource)
+        (not
+          (destination_segment_preserved ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alt_route_destination_reserved ?alt_route_node_destination)
+        (destination_segment_preserved ?destination_segment)
+        (consumable_available ?consumable_resource)
+        (not
+          (allocated_consumable_to_destination_segment ?destination_segment ?consumable_resource)
+        )
+      )
+  )
+  (:action select_recovery_order
+    :parameters (?origin_segment - origin_transit_segment ?destination_segment - destination_transit_segment ?alt_route_node_origin - alt_route_node_origin ?alt_route_node_destination - alt_route_node_destination ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (destination_segment_containment_complete ?destination_segment)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_origin_reserved ?alt_route_node_origin)
+        (alt_route_destination_reserved ?alt_route_node_destination)
+        (origin_segment_preserved ?origin_segment)
+        (destination_segment_preserved ?destination_segment)
+        (recovery_order_available ?recovery_order)
+      )
+    :effect
+      (and
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_bind_alt_origin ?recovery_order ?alt_route_node_origin)
+        (recovery_order_bind_alt_destination ?recovery_order ?alt_route_node_destination)
+        (not
+          (recovery_order_available ?recovery_order)
+        )
+      )
+  )
+  (:action select_recovery_order_with_alt_origin_activation
+    :parameters (?origin_segment - origin_transit_segment ?destination_segment - destination_transit_segment ?alt_route_node_origin - alt_route_node_origin ?alt_route_node_destination - alt_route_node_destination ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (destination_segment_containment_complete ?destination_segment)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_origin_activated ?alt_route_node_origin)
+        (alt_route_destination_reserved ?alt_route_node_destination)
+        (not
+          (origin_segment_preserved ?origin_segment)
+        )
+        (destination_segment_preserved ?destination_segment)
+        (recovery_order_available ?recovery_order)
+      )
+    :effect
+      (and
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_bind_alt_origin ?recovery_order ?alt_route_node_origin)
+        (recovery_order_bind_alt_destination ?recovery_order ?alt_route_node_destination)
+        (recovery_order_validated_for_alt_origin ?recovery_order)
+        (not
+          (recovery_order_available ?recovery_order)
+        )
+      )
+  )
+  (:action select_recovery_order_with_alt_destination_activation
+    :parameters (?origin_segment - origin_transit_segment ?destination_segment - destination_transit_segment ?alt_route_node_origin - alt_route_node_origin ?alt_route_node_destination - alt_route_node_destination ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (destination_segment_containment_complete ?destination_segment)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_origin_reserved ?alt_route_node_origin)
+        (alt_route_destination_activated ?alt_route_node_destination)
+        (origin_segment_preserved ?origin_segment)
+        (not
+          (destination_segment_preserved ?destination_segment)
+        )
+        (recovery_order_available ?recovery_order)
+      )
+    :effect
+      (and
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_bind_alt_origin ?recovery_order ?alt_route_node_origin)
+        (recovery_order_bind_alt_destination ?recovery_order ?alt_route_node_destination)
+        (recovery_order_validated_for_alt_destination ?recovery_order)
+        (not
+          (recovery_order_available ?recovery_order)
+        )
+      )
+  )
+  (:action select_recovery_order_with_both_alts
+    :parameters (?origin_segment - origin_transit_segment ?destination_segment - destination_transit_segment ?alt_route_node_origin - alt_route_node_origin ?alt_route_node_destination - alt_route_node_destination ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (destination_segment_containment_complete ?destination_segment)
+        (segment_link_alt_route_origin ?origin_segment ?alt_route_node_origin)
+        (segment_link_alt_route_destination ?destination_segment ?alt_route_node_destination)
+        (alt_route_origin_activated ?alt_route_node_origin)
+        (alt_route_destination_activated ?alt_route_node_destination)
+        (not
+          (origin_segment_preserved ?origin_segment)
+        )
+        (not
+          (destination_segment_preserved ?destination_segment)
+        )
+        (recovery_order_available ?recovery_order)
+      )
+    :effect
+      (and
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_bind_alt_origin ?recovery_order ?alt_route_node_origin)
+        (recovery_order_bind_alt_destination ?recovery_order ?alt_route_node_destination)
+        (recovery_order_validated_for_alt_origin ?recovery_order)
+        (recovery_order_validated_for_alt_destination ?recovery_order)
+        (not
+          (recovery_order_available ?recovery_order)
+        )
+      )
+  )
+  (:action confirm_recovery_order_dispatch
+    :parameters (?recovery_order - recovery_order ?origin_segment - origin_transit_segment ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (recovery_order_selected ?recovery_order)
+        (origin_segment_containment_complete ?origin_segment)
+        (inspector_assigned ?origin_segment ?field_inspector)
+        (not
+          (recovery_order_dispatch_confirmed ?recovery_order)
+        )
+      )
+    :effect (recovery_order_dispatch_confirmed ?recovery_order)
+  )
+  (:action validate_and_attach_document_to_order
+    :parameters (?case_record - response_case_record ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (case_link_recovery_order ?case_record ?recovery_order)
+        (case_has_document ?case_record ?document_package)
+        (document_available ?document_package)
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_dispatch_confirmed ?recovery_order)
+        (not
+          (document_validated ?document_package)
+        )
+      )
+    :effect
+      (and
+        (document_validated ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (not
+          (document_available ?document_package)
+        )
+      )
+  )
+  (:action prepare_case_for_verification
+    :parameters (?case_record - response_case_record ?document_package - document_package ?recovery_order - recovery_order ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (case_has_document ?case_record ?document_package)
+        (document_validated ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (inspector_assigned ?case_record ?field_inspector)
+        (not
+          (recovery_order_validated_for_alt_origin ?recovery_order)
+        )
+        (not
+          (case_documentation_ready ?case_record)
+        )
+      )
+    :effect (case_documentation_ready ?case_record)
+  )
+  (:action assign_regulatory_approval_to_case
+    :parameters (?case_record - response_case_record ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (regulatory_assigned ?case_record)
+        )
+      )
+    :effect
+      (and
+        (regulatory_assigned ?case_record)
+        (case_link_regulatory_approval ?case_record ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action link_regulatory_and_document_validations
+    :parameters (?case_record - response_case_record ?document_package - document_package ?recovery_order - recovery_order ?field_inspector - field_inspector ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (case_has_document ?case_record ?document_package)
+        (document_validated ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (inspector_assigned ?case_record ?field_inspector)
+        (recovery_order_validated_for_alt_origin ?recovery_order)
+        (regulatory_assigned ?case_record)
+        (case_link_regulatory_approval ?case_record ?regulatory_approval)
+        (not
+          (case_documentation_ready ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_documentation_ready ?case_record)
+        (regulatory_verified ?case_record)
+      )
+  )
+  (:action bind_quality_team_and_documents
+    :parameters (?case_record - response_case_record ?quality_verifier - quality_verifier ?on_site_team - on_site_team ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_documentation_ready ?case_record)
+        (case_link_quality_verifier ?case_record ?quality_verifier)
+        (on_site_team_assigned ?case_record ?on_site_team)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (not
+          (recovery_order_validated_for_alt_destination ?recovery_order)
+        )
+        (not
+          (case_quality_verified ?case_record)
+        )
+      )
+    :effect (case_quality_verified ?case_record)
+  )
+  (:action bind_quality_team_and_documents_secondary
+    :parameters (?case_record - response_case_record ?quality_verifier - quality_verifier ?on_site_team - on_site_team ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_documentation_ready ?case_record)
+        (case_link_quality_verifier ?case_record ?quality_verifier)
+        (on_site_team_assigned ?case_record ?on_site_team)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (recovery_order_validated_for_alt_destination ?recovery_order)
+        (not
+          (case_quality_verified ?case_record)
+        )
+      )
+    :effect (case_quality_verified ?case_record)
+  )
+  (:action bind_technical_and_prepare_case_variant
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_quality_verified ?case_record)
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (not
+          (recovery_order_validated_for_alt_origin ?recovery_order)
+        )
+        (not
+          (recovery_order_validated_for_alt_destination ?recovery_order)
+        )
+        (not
+          (case_technical_ready ?case_record)
+        )
+      )
+    :effect (case_technical_ready ?case_record)
+  )
+  (:action bind_technical_and_prepare_case_variant_alt
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_quality_verified ?case_record)
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (recovery_order_validated_for_alt_origin ?recovery_order)
+        (not
+          (recovery_order_validated_for_alt_destination ?recovery_order)
+        )
+        (not
+          (case_technical_ready ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_technical_ready ?case_record)
+        (authorization_requested ?case_record)
+      )
+  )
+  (:action bind_technical_and_prepare_case_variant_alt2
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_quality_verified ?case_record)
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (not
+          (recovery_order_validated_for_alt_origin ?recovery_order)
+        )
+        (recovery_order_validated_for_alt_destination ?recovery_order)
+        (not
+          (case_technical_ready ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_technical_ready ?case_record)
+        (authorization_requested ?case_record)
+      )
+  )
+  (:action bind_technical_and_prepare_case_variant_alt3
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff ?document_package - document_package ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (case_quality_verified ?case_record)
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (case_has_document ?case_record ?document_package)
+        (document_linked_to_order ?document_package ?recovery_order)
+        (recovery_order_validated_for_alt_origin ?recovery_order)
+        (recovery_order_validated_for_alt_destination ?recovery_order)
+        (not
+          (case_technical_ready ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_technical_ready ?case_record)
+        (authorization_requested ?case_record)
+      )
+  )
+  (:action authorize_case_and_mark_ready
+    :parameters (?case_record - response_case_record)
+    :precondition
+      (and
+        (case_technical_ready ?case_record)
+        (not
+          (authorization_requested ?case_record)
+        )
+        (not
+          (case_execution_initiated ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_execution_initiated ?case_record)
+        (ready_for_reinstatement ?case_record)
+      )
+  )
+  (:action attach_authorization_to_case
+    :parameters (?case_record - response_case_record ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (case_technical_ready ?case_record)
+        (authorization_requested ?case_record)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (case_link_authorization_token ?case_record ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action authorize_execution_with_staff_and_tokens
+    :parameters (?case_record - response_case_record ?origin_segment - origin_transit_segment ?destination_segment - destination_transit_segment ?field_inspector - field_inspector ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (case_technical_ready ?case_record)
+        (authorization_requested ?case_record)
+        (case_link_authorization_token ?case_record ?authorization_token)
+        (case_link_origin_segment ?case_record ?origin_segment)
+        (case_link_destination_segment ?case_record ?destination_segment)
+        (origin_segment_preserved ?origin_segment)
+        (destination_segment_preserved ?destination_segment)
+        (inspector_assigned ?case_record ?field_inspector)
+        (not
+          (case_ready_for_execution ?case_record)
+        )
+      )
+    :effect (case_ready_for_execution ?case_record)
+  )
+  (:action finalize_authorization_and_mark_case_ready
+    :parameters (?case_record - response_case_record)
+    :precondition
+      (and
+        (case_technical_ready ?case_record)
+        (case_ready_for_execution ?case_record)
+        (not
+          (case_execution_initiated ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_execution_initiated ?case_record)
+        (ready_for_reinstatement ?case_record)
+      )
+  )
+  (:action apply_third_party_approval_to_case
+    :parameters (?case_record - response_case_record ?third_party_approval - third_party_approval ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (entity_triaged ?case_record)
+        (inspector_assigned ?case_record ?field_inspector)
+        (third_party_approval_available ?third_party_approval)
+        (case_link_third_party_approval ?case_record ?third_party_approval)
+        (not
+          (third_party_approval_applied ?case_record)
+        )
+      )
+    :effect
+      (and
+        (third_party_approval_applied ?case_record)
+        (not
+          (third_party_approval_available ?third_party_approval)
+        )
+      )
+  )
+  (:action confirm_regulatory_action
+    :parameters (?case_record - response_case_record ?on_site_team - on_site_team)
+    :precondition
+      (and
+        (third_party_approval_applied ?case_record)
+        (on_site_team_assigned ?case_record ?on_site_team)
+        (not
+          (regulatory_action_confirmed ?case_record)
+        )
+      )
+    :effect (regulatory_action_confirmed ?case_record)
+  )
+  (:action apply_technical_signoff_to_case
+    :parameters (?case_record - response_case_record ?technical_signoff - technical_signoff)
+    :precondition
+      (and
+        (regulatory_action_confirmed ?case_record)
+        (case_link_technical_signoff ?case_record ?technical_signoff)
+        (not
+          (technical_signoff_confirmed ?case_record)
+        )
+      )
+    :effect (technical_signoff_confirmed ?case_record)
+  )
+  (:action finalize_third_party_authorization
+    :parameters (?case_record - response_case_record)
+    :precondition
+      (and
+        (technical_signoff_confirmed ?case_record)
+        (not
+          (case_execution_initiated ?case_record)
+        )
+      )
+    :effect
+      (and
+        (case_execution_initiated ?case_record)
+        (ready_for_reinstatement ?case_record)
+      )
+  )
+  (:action reinstate_origin_segment
+    :parameters (?origin_segment - origin_transit_segment ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (origin_segment_containment_complete ?origin_segment)
+        (origin_segment_preserved ?origin_segment)
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_dispatch_confirmed ?recovery_order)
+        (not
+          (ready_for_reinstatement ?origin_segment)
+        )
+      )
+    :effect (ready_for_reinstatement ?origin_segment)
+  )
+  (:action reinstate_destination_segment
+    :parameters (?destination_segment - destination_transit_segment ?recovery_order - recovery_order)
+    :precondition
+      (and
+        (destination_segment_containment_complete ?destination_segment)
+        (destination_segment_preserved ?destination_segment)
+        (recovery_order_selected ?recovery_order)
+        (recovery_order_dispatch_confirmed ?recovery_order)
+        (not
+          (ready_for_reinstatement ?destination_segment)
+        )
+      )
+    :effect (ready_for_reinstatement ?destination_segment)
+  )
+  (:action initiate_claim_and_authorize
+    :parameters (?cold_chain_entity - cold_chain_entity ?claim_resource - claim_resource ?field_inspector - field_inspector)
+    :precondition
+      (and
+        (ready_for_reinstatement ?cold_chain_entity)
+        (inspector_assigned ?cold_chain_entity ?field_inspector)
+        (claim_resource_available ?claim_resource)
+        (not
+          (execution_authorized ?cold_chain_entity)
+        )
+      )
+    :effect
+      (and
+        (execution_authorized ?cold_chain_entity)
+        (claim_resource_assigned ?cold_chain_entity ?claim_resource)
+        (not
+          (claim_resource_available ?claim_resource)
+        )
+      )
+  )
+  (:action dispatch_responder_to_origin
+    :parameters (?origin_segment - origin_transit_segment ?responder_unit - responder_unit ?claim_resource - claim_resource)
+    :precondition
+      (and
+        (execution_authorized ?origin_segment)
+        (entity_link_responder ?origin_segment ?responder_unit)
+        (claim_resource_assigned ?origin_segment ?claim_resource)
+        (not
+          (service_restored ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?origin_segment)
+        (responder_available ?responder_unit)
+        (claim_resource_available ?claim_resource)
+      )
+  )
+  (:action dispatch_responder_to_destination
+    :parameters (?destination_segment - destination_transit_segment ?responder_unit - responder_unit ?claim_resource - claim_resource)
+    :precondition
+      (and
+        (execution_authorized ?destination_segment)
+        (entity_link_responder ?destination_segment ?responder_unit)
+        (claim_resource_assigned ?destination_segment ?claim_resource)
+        (not
+          (service_restored ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?destination_segment)
+        (responder_available ?responder_unit)
+        (claim_resource_available ?claim_resource)
+      )
+  )
+  (:action dispatch_responder_to_case_record
+    :parameters (?case_record - response_case_record ?responder_unit - responder_unit ?claim_resource - claim_resource)
+    :precondition
+      (and
+        (execution_authorized ?case_record)
+        (entity_link_responder ?case_record ?responder_unit)
+        (claim_resource_assigned ?case_record ?claim_resource)
+        (not
+          (service_restored ?case_record)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?case_record)
+        (responder_available ?responder_unit)
+        (claim_resource_available ?claim_resource)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem cold_chain_breach_case)
+  (:domain cold_chain_breach_response_domain)
+  (:objects origin_segment_1 - origin_transit_segment destination_segment_1 - destination_transit_segment case_record_alpha - response_case_record case_record_beta - response_case_record responder_unit_1 - responder_unit responder_unit_2 - responder_unit responder_unit_3 - responder_unit field_inspector_1 - field_inspector on_site_team_1 - on_site_team consumable_pack_1 - consumable_resource alt_route_node_origin_1 - alt_route_node_origin alt_route_node_destination_1 - alt_route_node_destination recovery_order_1 - recovery_order document_package_1 - document_package document_package_2 - document_package regulatory_approval_1 - regulatory_approval regulatory_approval_2 - regulatory_approval authorization_token_1 - authorization_token authorization_token_2 - authorization_token claim_resource_1 - claim_resource quality_verifier_1 - quality_verifier third_party_approval_1 - third_party_approval third_party_approval_2 - third_party_approval technical_signoff_1 - technical_signoff)
+  (:init
+    (responder_available responder_unit_1)
+    (responder_available responder_unit_2)
+    (responder_available responder_unit_3)
+    (inspector_available field_inspector_1)
+    (on_site_team_available on_site_team_1)
+    (consumable_available consumable_pack_1)
+    (segment_link_alt_route_origin origin_segment_1 alt_route_node_origin_1)
+    (segment_link_alt_route_destination destination_segment_1 alt_route_node_destination_1)
+    (recovery_order_available recovery_order_1)
+    (document_available document_package_1)
+    (document_available document_package_2)
+    (case_link_origin_segment case_record_alpha origin_segment_1)
+    (case_link_origin_segment case_record_beta origin_segment_1)
+    (case_link_destination_segment case_record_alpha destination_segment_1)
+    (case_link_destination_segment case_record_beta destination_segment_1)
+    (case_link_recovery_order case_record_alpha recovery_order_1)
+    (case_link_recovery_order case_record_beta recovery_order_1)
+    (case_has_document case_record_alpha document_package_1)
+    (case_has_document case_record_beta document_package_2)
+    (regulatory_approval_available regulatory_approval_1)
+    (regulatory_approval_available regulatory_approval_2)
+    (authorization_token_available authorization_token_1)
+    (authorization_token_available authorization_token_2)
+    (claim_resource_available claim_resource_1)
+    (quality_verifier_available quality_verifier_1)
+    (third_party_approval_available third_party_approval_1)
+    (case_link_third_party_approval case_record_alpha third_party_approval_1)
+    (case_link_third_party_approval case_record_beta third_party_approval_2)
+    (technical_signoff_available technical_signoff_1)
+  )
+  (:goal
+    (and
+      (service_restored origin_segment_1)
+      (service_restored destination_segment_1)
+      (service_restored case_record_alpha)
+      (service_restored case_record_beta)
+    )
+  )
+)

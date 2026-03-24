@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain pharmaceutics_administration_time_aligned_dispensing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object operational_resource_group - domain_object material_and_template_group - domain_object package_and_timeslot_group - domain_object prescription_category - domain_object pharmacy_order - prescription_category formulary_product_option - operational_resource_group clinical_check_record - operational_resource_group authorizing_pharmacist - operational_resource_group auxiliary_device - operational_resource_group patient_instruction_template - operational_resource_group patient_specific_instruction - operational_resource_group special_handling_requirement - operational_resource_group clinical_exception_note - operational_resource_group packaging_component - material_and_template_group label_template - material_and_template_group prior_authorization_document - material_and_template_group administration_time_window_primary - package_and_timeslot_group administration_time_window_secondary - package_and_timeslot_group medication_package_unit - package_and_timeslot_group order_line_group - pharmacy_order dispense_job_group - pharmacy_order inpatient_order_line - order_line_group outpatient_order_line - order_line_group dispense_job - dispense_job_group)
+
+  (:predicates
+    (order_registered ?prescription_order - pharmacy_order)
+    (order_authorized ?prescription_order - pharmacy_order)
+    (product_choice_confirmed ?prescription_order - pharmacy_order)
+    (dispense_released ?prescription_order - pharmacy_order)
+    (ready_for_release ?prescription_order - pharmacy_order)
+    (patient_instruction_assigned ?prescription_order - pharmacy_order)
+    (formulary_option_available ?formulary_option - formulary_product_option)
+    (order_has_formulary_option ?prescription_order - pharmacy_order ?formulary_option - formulary_product_option)
+    (clinical_check_available ?clinical_check - clinical_check_record)
+    (order_has_clinical_check ?prescription_order - pharmacy_order ?clinical_check - clinical_check_record)
+    (pharmacist_available ?authorizing_pharmacist - authorizing_pharmacist)
+    (order_assigned_pharmacist ?prescription_order - pharmacy_order ?authorizing_pharmacist - authorizing_pharmacist)
+    (packaging_component_available ?packaging_component - packaging_component)
+    (inpatient_line_assigned_component ?inpatient_order_line - inpatient_order_line ?packaging_component - packaging_component)
+    (outpatient_line_assigned_component ?outpatient_order_line - outpatient_order_line ?packaging_component - packaging_component)
+    (order_line_assigned_primary_time_window ?inpatient_order_line - inpatient_order_line ?admin_time_primary - administration_time_window_primary)
+    (primary_time_window_ready_for_assembly ?admin_time_primary - administration_time_window_primary)
+    (primary_time_window_component_reserved ?admin_time_primary - administration_time_window_primary)
+    (inpatient_line_ready_for_packaging ?inpatient_order_line - inpatient_order_line)
+    (order_line_assigned_secondary_time_window ?outpatient_order_line - outpatient_order_line ?admin_time_secondary - administration_time_window_secondary)
+    (secondary_time_window_ready_for_assembly ?admin_time_secondary - administration_time_window_secondary)
+    (secondary_time_window_component_reserved ?admin_time_secondary - administration_time_window_secondary)
+    (outpatient_line_ready_for_packaging ?outpatient_order_line - outpatient_order_line)
+    (medication_package_unit_available ?medication_package_unit - medication_package_unit)
+    (medication_package_unit_reserved ?medication_package_unit - medication_package_unit)
+    (medication_package_unit_assigned_primary_time_window ?medication_package_unit - medication_package_unit ?admin_time_primary - administration_time_window_primary)
+    (medication_package_unit_assigned_secondary_time_window ?medication_package_unit - medication_package_unit ?admin_time_secondary - administration_time_window_secondary)
+    (medication_package_unit_primary_component_indicator ?medication_package_unit - medication_package_unit)
+    (medication_package_unit_secondary_component_indicator ?medication_package_unit - medication_package_unit)
+    (medication_package_unit_ready_for_labeling ?medication_package_unit - medication_package_unit)
+    (dispense_job_includes_inpatient_line ?dispense_job - dispense_job ?inpatient_order_line - inpatient_order_line)
+    (dispense_job_includes_outpatient_line ?dispense_job - dispense_job ?outpatient_order_line - outpatient_order_line)
+    (dispense_job_assigned_medication_package ?dispense_job - dispense_job ?medication_package_unit - medication_package_unit)
+    (label_template_available ?label_template - label_template)
+    (dispense_job_linked_label_template ?dispense_job - dispense_job ?label_template - label_template)
+    (label_template_consumed ?label_template - label_template)
+    (label_template_applied_to_package ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    (dispense_job_labeling_prepared ?dispense_job - dispense_job)
+    (dispense_job_special_handling_confirmed ?dispense_job - dispense_job)
+    (dispense_job_clinical_exception_attached ?dispense_job - dispense_job)
+    (dispense_job_aux_device_attached ?dispense_job - dispense_job)
+    (dispense_job_auxiliary_device_processed ?dispense_job - dispense_job)
+    (patient_instruction_templates_attached ?dispense_job - dispense_job)
+    (dispense_job_content_composed ?dispense_job - dispense_job)
+    (prior_auth_document_available ?prior_authorization_document - prior_authorization_document)
+    (dispense_job_has_prior_authorization ?dispense_job - dispense_job ?prior_authorization_document - prior_authorization_document)
+    (dispense_job_prior_authorization_acknowledged ?dispense_job - dispense_job)
+    (dispense_job_prior_authorization_verified ?dispense_job - dispense_job)
+    (dispense_job_exception_resolved ?dispense_job - dispense_job)
+    (auxiliary_device_available ?auxiliary_device - auxiliary_device)
+    (dispense_job_attached_auxiliary_device ?dispense_job - dispense_job ?auxiliary_device - auxiliary_device)
+    (patient_instruction_template_available ?patient_instruction_template - patient_instruction_template)
+    (dispense_job_has_patient_instruction_template ?dispense_job - dispense_job ?patient_instruction_template - patient_instruction_template)
+    (special_handling_requirement_available ?special_handling_requirement - special_handling_requirement)
+    (dispense_job_has_special_handling_requirement ?dispense_job - dispense_job ?special_handling_requirement - special_handling_requirement)
+    (clinical_exception_note_available ?clinical_exception_note - clinical_exception_note)
+    (dispense_job_has_clinical_exception_note ?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note)
+    (patient_specific_instruction_available ?patient_specific_instruction - patient_specific_instruction)
+    (order_has_patient_specific_instruction ?prescription_order - pharmacy_order ?patient_specific_instruction - patient_specific_instruction)
+    (inpatient_line_locked ?inpatient_order_line - inpatient_order_line)
+    (outpatient_line_locked ?outpatient_order_line - outpatient_order_line)
+    (dispense_job_authorized_for_release ?dispense_job - dispense_job)
+  )
+  (:action record_order_intake
+    :parameters (?prescription_order - pharmacy_order)
+    :precondition
+      (and
+        (not
+          (order_registered ?prescription_order)
+        )
+        (not
+          (dispense_released ?prescription_order)
+        )
+      )
+    :effect (order_registered ?prescription_order)
+  )
+  (:action assign_formulary_option_to_order
+    :parameters (?prescription_order - pharmacy_order ?formulary_option - formulary_product_option)
+    :precondition
+      (and
+        (order_registered ?prescription_order)
+        (not
+          (product_choice_confirmed ?prescription_order)
+        )
+        (formulary_option_available ?formulary_option)
+      )
+    :effect
+      (and
+        (product_choice_confirmed ?prescription_order)
+        (order_has_formulary_option ?prescription_order ?formulary_option)
+        (not
+          (formulary_option_available ?formulary_option)
+        )
+      )
+  )
+  (:action assign_clinical_check_to_order
+    :parameters (?prescription_order - pharmacy_order ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_registered ?prescription_order)
+        (product_choice_confirmed ?prescription_order)
+        (clinical_check_available ?clinical_check)
+      )
+    :effect
+      (and
+        (order_has_clinical_check ?prescription_order ?clinical_check)
+        (not
+          (clinical_check_available ?clinical_check)
+        )
+      )
+  )
+  (:action authorize_order
+    :parameters (?prescription_order - pharmacy_order ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_registered ?prescription_order)
+        (product_choice_confirmed ?prescription_order)
+        (order_has_clinical_check ?prescription_order ?clinical_check)
+        (not
+          (order_authorized ?prescription_order)
+        )
+      )
+    :effect (order_authorized ?prescription_order)
+  )
+  (:action unassign_clinical_check_from_order
+    :parameters (?prescription_order - pharmacy_order ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_has_clinical_check ?prescription_order ?clinical_check)
+      )
+    :effect
+      (and
+        (clinical_check_available ?clinical_check)
+        (not
+          (order_has_clinical_check ?prescription_order ?clinical_check)
+        )
+      )
+  )
+  (:action assign_pharmacist_to_order
+    :parameters (?prescription_order - pharmacy_order ?authorizing_pharmacist - authorizing_pharmacist)
+    :precondition
+      (and
+        (order_authorized ?prescription_order)
+        (pharmacist_available ?authorizing_pharmacist)
+      )
+    :effect
+      (and
+        (order_assigned_pharmacist ?prescription_order ?authorizing_pharmacist)
+        (not
+          (pharmacist_available ?authorizing_pharmacist)
+        )
+      )
+  )
+  (:action unassign_pharmacist_from_order
+    :parameters (?prescription_order - pharmacy_order ?authorizing_pharmacist - authorizing_pharmacist)
+    :precondition
+      (and
+        (order_assigned_pharmacist ?prescription_order ?authorizing_pharmacist)
+      )
+    :effect
+      (and
+        (pharmacist_available ?authorizing_pharmacist)
+        (not
+          (order_assigned_pharmacist ?prescription_order ?authorizing_pharmacist)
+        )
+      )
+  )
+  (:action attach_special_handling_to_job
+    :parameters (?dispense_job - dispense_job ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (special_handling_requirement_available ?special_handling_requirement)
+      )
+    :effect
+      (and
+        (dispense_job_has_special_handling_requirement ?dispense_job ?special_handling_requirement)
+        (not
+          (special_handling_requirement_available ?special_handling_requirement)
+        )
+      )
+  )
+  (:action detach_special_handling_from_job
+    :parameters (?dispense_job - dispense_job ?special_handling_requirement - special_handling_requirement)
+    :precondition
+      (and
+        (dispense_job_has_special_handling_requirement ?dispense_job ?special_handling_requirement)
+      )
+    :effect
+      (and
+        (special_handling_requirement_available ?special_handling_requirement)
+        (not
+          (dispense_job_has_special_handling_requirement ?dispense_job ?special_handling_requirement)
+        )
+      )
+  )
+  (:action attach_clinical_exception_to_job
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (clinical_exception_note_available ?clinical_exception_note)
+      )
+    :effect
+      (and
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (not
+          (clinical_exception_note_available ?clinical_exception_note)
+        )
+      )
+  )
+  (:action detach_clinical_exception_from_job
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note)
+    :precondition
+      (and
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+      )
+    :effect
+      (and
+        (clinical_exception_note_available ?clinical_exception_note)
+        (not
+          (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        )
+      )
+  )
+  (:action mark_primary_time_window_ready
+    :parameters (?inpatient_order_line - inpatient_order_line ?admin_time_primary - administration_time_window_primary ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_authorized ?inpatient_order_line)
+        (order_has_clinical_check ?inpatient_order_line ?clinical_check)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (not
+          (primary_time_window_ready_for_assembly ?admin_time_primary)
+        )
+        (not
+          (primary_time_window_component_reserved ?admin_time_primary)
+        )
+      )
+    :effect (primary_time_window_ready_for_assembly ?admin_time_primary)
+  )
+  (:action assign_inpatient_line_for_primary_window
+    :parameters (?inpatient_order_line - inpatient_order_line ?admin_time_primary - administration_time_window_primary ?authorizing_pharmacist - authorizing_pharmacist)
+    :precondition
+      (and
+        (order_authorized ?inpatient_order_line)
+        (order_assigned_pharmacist ?inpatient_order_line ?authorizing_pharmacist)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (primary_time_window_ready_for_assembly ?admin_time_primary)
+        (not
+          (inpatient_line_locked ?inpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+      )
+  )
+  (:action assign_packaging_component_to_inpatient_line
+    :parameters (?inpatient_order_line - inpatient_order_line ?admin_time_primary - administration_time_window_primary ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (order_authorized ?inpatient_order_line)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (packaging_component_available ?packaging_component)
+        (not
+          (inpatient_line_locked ?inpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (primary_time_window_component_reserved ?admin_time_primary)
+        (inpatient_line_locked ?inpatient_order_line)
+        (inpatient_line_assigned_component ?inpatient_order_line ?packaging_component)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_inpatient_line_primary_window
+    :parameters (?inpatient_order_line - inpatient_order_line ?admin_time_primary - administration_time_window_primary ?clinical_check - clinical_check_record ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (order_authorized ?inpatient_order_line)
+        (order_has_clinical_check ?inpatient_order_line ?clinical_check)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (primary_time_window_component_reserved ?admin_time_primary)
+        (inpatient_line_assigned_component ?inpatient_order_line ?packaging_component)
+        (not
+          (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (primary_time_window_ready_for_assembly ?admin_time_primary)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        (packaging_component_available ?packaging_component)
+        (not
+          (inpatient_line_assigned_component ?inpatient_order_line ?packaging_component)
+        )
+      )
+  )
+  (:action mark_secondary_time_window_ready
+    :parameters (?outpatient_order_line - outpatient_order_line ?admin_time_secondary - administration_time_window_secondary ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_authorized ?outpatient_order_line)
+        (order_has_clinical_check ?outpatient_order_line ?clinical_check)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (not
+          (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+        )
+        (not
+          (secondary_time_window_component_reserved ?admin_time_secondary)
+        )
+      )
+    :effect (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+  )
+  (:action assign_outpatient_line_for_secondary_window
+    :parameters (?outpatient_order_line - outpatient_order_line ?admin_time_secondary - administration_time_window_secondary ?authorizing_pharmacist - authorizing_pharmacist)
+    :precondition
+      (and
+        (order_authorized ?outpatient_order_line)
+        (order_assigned_pharmacist ?outpatient_order_line ?authorizing_pharmacist)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+        (not
+          (outpatient_line_locked ?outpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (outpatient_line_locked ?outpatient_order_line)
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+      )
+  )
+  (:action assign_packaging_component_to_outpatient_line
+    :parameters (?outpatient_order_line - outpatient_order_line ?admin_time_secondary - administration_time_window_secondary ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (order_authorized ?outpatient_order_line)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (packaging_component_available ?packaging_component)
+        (not
+          (outpatient_line_locked ?outpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (secondary_time_window_component_reserved ?admin_time_secondary)
+        (outpatient_line_locked ?outpatient_order_line)
+        (outpatient_line_assigned_component ?outpatient_order_line ?packaging_component)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action finalize_outpatient_line_secondary_window
+    :parameters (?outpatient_order_line - outpatient_order_line ?admin_time_secondary - administration_time_window_secondary ?clinical_check - clinical_check_record ?packaging_component - packaging_component)
+    :precondition
+      (and
+        (order_authorized ?outpatient_order_line)
+        (order_has_clinical_check ?outpatient_order_line ?clinical_check)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (secondary_time_window_component_reserved ?admin_time_secondary)
+        (outpatient_line_assigned_component ?outpatient_order_line ?packaging_component)
+        (not
+          (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        (packaging_component_available ?packaging_component)
+        (not
+          (outpatient_line_assigned_component ?outpatient_order_line ?packaging_component)
+        )
+      )
+  )
+  (:action assemble_medication_package_unit
+    :parameters (?inpatient_order_line - inpatient_order_line ?outpatient_order_line - outpatient_order_line ?admin_time_primary - administration_time_window_primary ?admin_time_secondary - administration_time_window_secondary ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (outpatient_line_locked ?outpatient_order_line)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (primary_time_window_ready_for_assembly ?admin_time_primary)
+        (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        (medication_package_unit_available ?medication_package_unit)
+      )
+    :effect
+      (and
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_assigned_primary_time_window ?medication_package_unit ?admin_time_primary)
+        (medication_package_unit_assigned_secondary_time_window ?medication_package_unit ?admin_time_secondary)
+        (not
+          (medication_package_unit_available ?medication_package_unit)
+        )
+      )
+  )
+  (:action assemble_package_with_primary_component
+    :parameters (?inpatient_order_line - inpatient_order_line ?outpatient_order_line - outpatient_order_line ?admin_time_primary - administration_time_window_primary ?admin_time_secondary - administration_time_window_secondary ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (outpatient_line_locked ?outpatient_order_line)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (primary_time_window_component_reserved ?admin_time_primary)
+        (secondary_time_window_ready_for_assembly ?admin_time_secondary)
+        (not
+          (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        )
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        (medication_package_unit_available ?medication_package_unit)
+      )
+    :effect
+      (and
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_assigned_primary_time_window ?medication_package_unit ?admin_time_primary)
+        (medication_package_unit_assigned_secondary_time_window ?medication_package_unit ?admin_time_secondary)
+        (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        (not
+          (medication_package_unit_available ?medication_package_unit)
+        )
+      )
+  )
+  (:action assemble_package_with_secondary_component
+    :parameters (?inpatient_order_line - inpatient_order_line ?outpatient_order_line - outpatient_order_line ?admin_time_primary - administration_time_window_primary ?admin_time_secondary - administration_time_window_secondary ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (outpatient_line_locked ?outpatient_order_line)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (primary_time_window_ready_for_assembly ?admin_time_primary)
+        (secondary_time_window_component_reserved ?admin_time_secondary)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        (not
+          (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        )
+        (medication_package_unit_available ?medication_package_unit)
+      )
+    :effect
+      (and
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_assigned_primary_time_window ?medication_package_unit ?admin_time_primary)
+        (medication_package_unit_assigned_secondary_time_window ?medication_package_unit ?admin_time_secondary)
+        (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        (not
+          (medication_package_unit_available ?medication_package_unit)
+        )
+      )
+  )
+  (:action assemble_package_with_both_components
+    :parameters (?inpatient_order_line - inpatient_order_line ?outpatient_order_line - outpatient_order_line ?admin_time_primary - administration_time_window_primary ?admin_time_secondary - administration_time_window_secondary ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (outpatient_line_locked ?outpatient_order_line)
+        (order_line_assigned_primary_time_window ?inpatient_order_line ?admin_time_primary)
+        (order_line_assigned_secondary_time_window ?outpatient_order_line ?admin_time_secondary)
+        (primary_time_window_component_reserved ?admin_time_primary)
+        (secondary_time_window_component_reserved ?admin_time_secondary)
+        (not
+          (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        )
+        (not
+          (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        )
+        (medication_package_unit_available ?medication_package_unit)
+      )
+    :effect
+      (and
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_assigned_primary_time_window ?medication_package_unit ?admin_time_primary)
+        (medication_package_unit_assigned_secondary_time_window ?medication_package_unit ?admin_time_secondary)
+        (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        (not
+          (medication_package_unit_available ?medication_package_unit)
+        )
+      )
+  )
+  (:action mark_package_ready_for_labeling
+    :parameters (?medication_package_unit - medication_package_unit ?inpatient_order_line - inpatient_order_line ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (medication_package_unit_reserved ?medication_package_unit)
+        (inpatient_line_locked ?inpatient_order_line)
+        (order_has_clinical_check ?inpatient_order_line ?clinical_check)
+        (not
+          (medication_package_unit_ready_for_labeling ?medication_package_unit)
+        )
+      )
+    :effect (medication_package_unit_ready_for_labeling ?medication_package_unit)
+  )
+  (:action apply_label_template_to_package
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (dispense_job_assigned_medication_package ?dispense_job ?medication_package_unit)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_available ?label_template)
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_ready_for_labeling ?medication_package_unit)
+        (not
+          (label_template_consumed ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_consumed ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action flag_job_labeling_prepared
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?medication_package_unit - medication_package_unit ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_consumed ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (order_has_clinical_check ?dispense_job ?clinical_check)
+        (not
+          (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        )
+        (not
+          (dispense_job_labeling_prepared ?dispense_job)
+        )
+      )
+    :effect (dispense_job_labeling_prepared ?dispense_job)
+  )
+  (:action attach_auxiliary_device_to_job
+    :parameters (?dispense_job - dispense_job ?auxiliary_device - auxiliary_device)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (auxiliary_device_available ?auxiliary_device)
+        (not
+          (dispense_job_aux_device_attached ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_aux_device_attached ?dispense_job)
+        (dispense_job_attached_auxiliary_device ?dispense_job ?auxiliary_device)
+        (not
+          (auxiliary_device_available ?auxiliary_device)
+        )
+      )
+  )
+  (:action process_auxiliary_device_for_job
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?medication_package_unit - medication_package_unit ?clinical_check - clinical_check_record ?auxiliary_device - auxiliary_device)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_consumed ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (order_has_clinical_check ?dispense_job ?clinical_check)
+        (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        (dispense_job_aux_device_attached ?dispense_job)
+        (dispense_job_attached_auxiliary_device ?dispense_job ?auxiliary_device)
+        (not
+          (dispense_job_labeling_prepared ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_labeling_prepared ?dispense_job)
+        (dispense_job_auxiliary_device_processed ?dispense_job)
+      )
+  )
+  (:action attach_special_handling_and_mark_job
+    :parameters (?dispense_job - dispense_job ?special_handling_requirement - special_handling_requirement ?authorizing_pharmacist - authorizing_pharmacist ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_labeling_prepared ?dispense_job)
+        (dispense_job_has_special_handling_requirement ?dispense_job ?special_handling_requirement)
+        (order_assigned_pharmacist ?dispense_job ?authorizing_pharmacist)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (not
+          (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        )
+        (not
+          (dispense_job_special_handling_confirmed ?dispense_job)
+        )
+      )
+    :effect (dispense_job_special_handling_confirmed ?dispense_job)
+  )
+  (:action attach_special_handling_and_mark_job_existing_package
+    :parameters (?dispense_job - dispense_job ?special_handling_requirement - special_handling_requirement ?authorizing_pharmacist - authorizing_pharmacist ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_labeling_prepared ?dispense_job)
+        (dispense_job_has_special_handling_requirement ?dispense_job ?special_handling_requirement)
+        (order_assigned_pharmacist ?dispense_job ?authorizing_pharmacist)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        (not
+          (dispense_job_special_handling_confirmed ?dispense_job)
+        )
+      )
+    :effect (dispense_job_special_handling_confirmed ?dispense_job)
+  )
+  (:action attach_clinical_exception_note_to_job
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_special_handling_confirmed ?dispense_job)
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (not
+          (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        )
+        (not
+          (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        )
+        (not
+          (dispense_job_clinical_exception_attached ?dispense_job)
+        )
+      )
+    :effect (dispense_job_clinical_exception_attached ?dispense_job)
+  )
+  (:action apply_clinical_exception_with_primary_package_flag
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_special_handling_confirmed ?dispense_job)
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        (not
+          (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        )
+        (not
+          (dispense_job_clinical_exception_attached ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (patient_instruction_templates_attached ?dispense_job)
+      )
+  )
+  (:action apply_clinical_exception_with_secondary_package_flag
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_special_handling_confirmed ?dispense_job)
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (not
+          (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        )
+        (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        (not
+          (dispense_job_clinical_exception_attached ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (patient_instruction_templates_attached ?dispense_job)
+      )
+  )
+  (:action apply_clinical_exception_with_both_package_flags
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note ?label_template - label_template ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (dispense_job_special_handling_confirmed ?dispense_job)
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (dispense_job_linked_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?medication_package_unit)
+        (medication_package_unit_primary_component_indicator ?medication_package_unit)
+        (medication_package_unit_secondary_component_indicator ?medication_package_unit)
+        (not
+          (dispense_job_clinical_exception_attached ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (patient_instruction_templates_attached ?dispense_job)
+      )
+  )
+  (:action finalize_job_without_additional_templates
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (not
+          (patient_instruction_templates_attached ?dispense_job)
+        )
+        (not
+          (dispense_job_authorized_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_authorized_for_release ?dispense_job)
+        (ready_for_release ?dispense_job)
+      )
+  )
+  (:action attach_patient_instruction_template_to_job
+    :parameters (?dispense_job - dispense_job ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (patient_instruction_templates_attached ?dispense_job)
+        (patient_instruction_template_available ?patient_instruction_template)
+      )
+    :effect
+      (and
+        (dispense_job_has_patient_instruction_template ?dispense_job ?patient_instruction_template)
+        (not
+          (patient_instruction_template_available ?patient_instruction_template)
+        )
+      )
+  )
+  (:action compose_final_package_content
+    :parameters (?dispense_job - dispense_job ?inpatient_order_line - inpatient_order_line ?outpatient_order_line - outpatient_order_line ?clinical_check - clinical_check_record ?patient_instruction_template - patient_instruction_template)
+    :precondition
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (patient_instruction_templates_attached ?dispense_job)
+        (dispense_job_has_patient_instruction_template ?dispense_job ?patient_instruction_template)
+        (dispense_job_includes_inpatient_line ?dispense_job ?inpatient_order_line)
+        (dispense_job_includes_outpatient_line ?dispense_job ?outpatient_order_line)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        (order_has_clinical_check ?dispense_job ?clinical_check)
+        (not
+          (dispense_job_content_composed ?dispense_job)
+        )
+      )
+    :effect (dispense_job_content_composed ?dispense_job)
+  )
+  (:action finalize_job_with_content_composition
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (dispense_job_clinical_exception_attached ?dispense_job)
+        (dispense_job_content_composed ?dispense_job)
+        (not
+          (dispense_job_authorized_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_authorized_for_release ?dispense_job)
+        (ready_for_release ?dispense_job)
+      )
+  )
+  (:action attach_prior_authorization_document_to_job
+    :parameters (?dispense_job - dispense_job ?prior_authorization_document - prior_authorization_document ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (order_authorized ?dispense_job)
+        (order_has_clinical_check ?dispense_job ?clinical_check)
+        (prior_auth_document_available ?prior_authorization_document)
+        (dispense_job_has_prior_authorization ?dispense_job ?prior_authorization_document)
+        (not
+          (dispense_job_prior_authorization_acknowledged ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_prior_authorization_acknowledged ?dispense_job)
+        (not
+          (prior_auth_document_available ?prior_authorization_document)
+        )
+      )
+  )
+  (:action verify_prior_authorization_with_pharmacist
+    :parameters (?dispense_job - dispense_job ?authorizing_pharmacist - authorizing_pharmacist)
+    :precondition
+      (and
+        (dispense_job_prior_authorization_acknowledged ?dispense_job)
+        (order_assigned_pharmacist ?dispense_job ?authorizing_pharmacist)
+        (not
+          (dispense_job_prior_authorization_verified ?dispense_job)
+        )
+      )
+    :effect (dispense_job_prior_authorization_verified ?dispense_job)
+  )
+  (:action attach_clinical_exception_note_after_verification
+    :parameters (?dispense_job - dispense_job ?clinical_exception_note - clinical_exception_note)
+    :precondition
+      (and
+        (dispense_job_prior_authorization_verified ?dispense_job)
+        (dispense_job_has_clinical_exception_note ?dispense_job ?clinical_exception_note)
+        (not
+          (dispense_job_exception_resolved ?dispense_job)
+        )
+      )
+    :effect (dispense_job_exception_resolved ?dispense_job)
+  )
+  (:action finalize_job_after_exception_resolution
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (dispense_job_exception_resolved ?dispense_job)
+        (not
+          (dispense_job_authorized_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_authorized_for_release ?dispense_job)
+        (ready_for_release ?dispense_job)
+      )
+  )
+  (:action finalize_inpatient_order_line_release
+    :parameters (?inpatient_order_line - inpatient_order_line ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (inpatient_line_locked ?inpatient_order_line)
+        (inpatient_line_ready_for_packaging ?inpatient_order_line)
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_ready_for_labeling ?medication_package_unit)
+        (not
+          (ready_for_release ?inpatient_order_line)
+        )
+      )
+    :effect (ready_for_release ?inpatient_order_line)
+  )
+  (:action finalize_outpatient_order_line_release
+    :parameters (?outpatient_order_line - outpatient_order_line ?medication_package_unit - medication_package_unit)
+    :precondition
+      (and
+        (outpatient_line_locked ?outpatient_order_line)
+        (outpatient_line_ready_for_packaging ?outpatient_order_line)
+        (medication_package_unit_reserved ?medication_package_unit)
+        (medication_package_unit_ready_for_labeling ?medication_package_unit)
+        (not
+          (ready_for_release ?outpatient_order_line)
+        )
+      )
+    :effect (ready_for_release ?outpatient_order_line)
+  )
+  (:action assign_patient_specific_instruction_to_order
+    :parameters (?prescription_order - pharmacy_order ?patient_specific_instruction - patient_specific_instruction ?clinical_check - clinical_check_record)
+    :precondition
+      (and
+        (ready_for_release ?prescription_order)
+        (order_has_clinical_check ?prescription_order ?clinical_check)
+        (patient_specific_instruction_available ?patient_specific_instruction)
+        (not
+          (patient_instruction_assigned ?prescription_order)
+        )
+      )
+    :effect
+      (and
+        (patient_instruction_assigned ?prescription_order)
+        (order_has_patient_specific_instruction ?prescription_order ?patient_specific_instruction)
+        (not
+          (patient_specific_instruction_available ?patient_specific_instruction)
+        )
+      )
+  )
+  (:action release_inpatient_order_line
+    :parameters (?inpatient_order_line - inpatient_order_line ?formulary_option - formulary_product_option ?patient_specific_instruction - patient_specific_instruction)
+    :precondition
+      (and
+        (patient_instruction_assigned ?inpatient_order_line)
+        (order_has_formulary_option ?inpatient_order_line ?formulary_option)
+        (order_has_patient_specific_instruction ?inpatient_order_line ?patient_specific_instruction)
+        (not
+          (dispense_released ?inpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (dispense_released ?inpatient_order_line)
+        (formulary_option_available ?formulary_option)
+        (patient_specific_instruction_available ?patient_specific_instruction)
+      )
+  )
+  (:action release_outpatient_order_line
+    :parameters (?outpatient_order_line - outpatient_order_line ?formulary_option - formulary_product_option ?patient_specific_instruction - patient_specific_instruction)
+    :precondition
+      (and
+        (patient_instruction_assigned ?outpatient_order_line)
+        (order_has_formulary_option ?outpatient_order_line ?formulary_option)
+        (order_has_patient_specific_instruction ?outpatient_order_line ?patient_specific_instruction)
+        (not
+          (dispense_released ?outpatient_order_line)
+        )
+      )
+    :effect
+      (and
+        (dispense_released ?outpatient_order_line)
+        (formulary_option_available ?formulary_option)
+        (patient_specific_instruction_available ?patient_specific_instruction)
+      )
+  )
+  (:action release_dispense_job
+    :parameters (?dispense_job - dispense_job ?formulary_option - formulary_product_option ?patient_specific_instruction - patient_specific_instruction)
+    :precondition
+      (and
+        (patient_instruction_assigned ?dispense_job)
+        (order_has_formulary_option ?dispense_job ?formulary_option)
+        (order_has_patient_specific_instruction ?dispense_job ?patient_specific_instruction)
+        (not
+          (dispense_released ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_released ?dispense_job)
+        (formulary_option_available ?formulary_option)
+        (patient_specific_instruction_available ?patient_specific_instruction)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem administration_time_aligned_dispensing_case)
+  (:domain pharmaceutics_administration_time_aligned_dispensing)
+  (:objects inpatient_order_line_1 - inpatient_order_line outpatient_order_line_1 - outpatient_order_line dispense_job_1 - dispense_job dispense_job_2 - dispense_job formulary_option_a - formulary_product_option formulary_option_b - formulary_product_option formulary_option_c - formulary_product_option clinical_check_record_1 - clinical_check_record pharmacist_1 - authorizing_pharmacist packaging_component_1 - packaging_component admin_time_window_primary_morning - administration_time_window_primary admin_time_window_secondary_evening - administration_time_window_secondary medication_package_unit_1 - medication_package_unit label_template_1 - label_template label_template_2 - label_template auxiliary_device_1 - auxiliary_device auxiliary_device_2 - auxiliary_device patient_instruction_template_1 - patient_instruction_template patient_instruction_template_2 - patient_instruction_template patient_specific_instruction_1 - patient_specific_instruction special_handling_requirement_1 - special_handling_requirement prior_auth_document_1 - prior_authorization_document prior_auth_document_2 - prior_authorization_document clinical_exception_note_1 - clinical_exception_note)
+  (:init
+    (formulary_option_available formulary_option_a)
+    (formulary_option_available formulary_option_b)
+    (formulary_option_available formulary_option_c)
+    (clinical_check_available clinical_check_record_1)
+    (pharmacist_available pharmacist_1)
+    (packaging_component_available packaging_component_1)
+    (order_line_assigned_primary_time_window inpatient_order_line_1 admin_time_window_primary_morning)
+    (order_line_assigned_secondary_time_window outpatient_order_line_1 admin_time_window_secondary_evening)
+    (medication_package_unit_available medication_package_unit_1)
+    (label_template_available label_template_1)
+    (label_template_available label_template_2)
+    (dispense_job_includes_inpatient_line dispense_job_1 inpatient_order_line_1)
+    (dispense_job_includes_inpatient_line dispense_job_2 inpatient_order_line_1)
+    (dispense_job_includes_outpatient_line dispense_job_1 outpatient_order_line_1)
+    (dispense_job_includes_outpatient_line dispense_job_2 outpatient_order_line_1)
+    (dispense_job_assigned_medication_package dispense_job_1 medication_package_unit_1)
+    (dispense_job_assigned_medication_package dispense_job_2 medication_package_unit_1)
+    (dispense_job_linked_label_template dispense_job_1 label_template_1)
+    (dispense_job_linked_label_template dispense_job_2 label_template_2)
+    (auxiliary_device_available auxiliary_device_1)
+    (auxiliary_device_available auxiliary_device_2)
+    (patient_instruction_template_available patient_instruction_template_1)
+    (patient_instruction_template_available patient_instruction_template_2)
+    (patient_specific_instruction_available patient_specific_instruction_1)
+    (special_handling_requirement_available special_handling_requirement_1)
+    (prior_auth_document_available prior_auth_document_1)
+    (dispense_job_has_prior_authorization dispense_job_1 prior_auth_document_1)
+    (dispense_job_has_prior_authorization dispense_job_2 prior_auth_document_2)
+    (clinical_exception_note_available clinical_exception_note_1)
+  )
+  (:goal
+    (and
+      (dispense_released inpatient_order_line_1)
+      (dispense_released outpatient_order_line_1)
+      (dispense_released dispense_job_1)
+      (dispense_released dispense_job_2)
+    )
+  )
+)

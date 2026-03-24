@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain race_condition_resolution_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object software_entity - entity artifact - entity resource - entity incident_report - entity investigation_target - incident_report engineer - software_entity reproducer_test - software_entity fix_template - software_entity external_dependency - software_entity reviewer - software_entity validation_token - software_entity analysis_tool - software_entity monitoring_alert - software_entity lock_token - artifact test_artifact - artifact configuration_option - artifact shared_memory_location_x - resource shared_memory_location_y - resource ci_test_job - resource execution_context_group - investigation_target repository_group - investigation_target execution_context_a - execution_context_group execution_context_b - execution_context_group code_repository - repository_group)
+
+  (:predicates
+    (target_open ?report - investigation_target)
+    (target_under_investigation ?report - investigation_target)
+    (triaged ?report - investigation_target)
+    (fixed ?report - investigation_target)
+    (target_ready_for_validation ?report - investigation_target)
+    (target_validation_attested ?report - investigation_target)
+    (engineer_available ?engineer - engineer)
+    (target_assigned_engineer ?report - investigation_target ?engineer - engineer)
+    (reproducer_available ?reproducer_test - reproducer_test)
+    (reproducer_attached ?report - investigation_target ?reproducer_test - reproducer_test)
+    (fix_template_available ?fix_template - fix_template)
+    (fix_template_attached ?report - investigation_target ?fix_template - fix_template)
+    (lock_token_available ?lock_token - lock_token)
+    (context_a_lock_held ?execution_context_a - execution_context_a ?lock_token - lock_token)
+    (context_b_lock_held ?execution_context_b - execution_context_b ?lock_token - lock_token)
+    (context_a_accesses_shared_x ?execution_context_a - execution_context_a ?shared_memory_location_x - shared_memory_location_x)
+    (shared_x_race_flagged ?shared_memory_location_x - shared_memory_location_x)
+    (shared_x_lock_held ?shared_memory_location_x - shared_memory_location_x)
+    (context_a_synchronized ?execution_context_a - execution_context_a)
+    (context_b_accesses_shared_y ?execution_context_b - execution_context_b ?shared_memory_location_y - shared_memory_location_y)
+    (shared_y_race_flagged ?shared_memory_location_y - shared_memory_location_y)
+    (shared_y_lock_held ?shared_memory_location_y - shared_memory_location_y)
+    (context_b_synchronized ?execution_context_b - execution_context_b)
+    (ci_job_pending ?ci_test_job - ci_test_job)
+    (ci_job_created ?ci_test_job - ci_test_job)
+    (ci_job_targets_shared_x ?ci_test_job - ci_test_job ?shared_memory_location_x - shared_memory_location_x)
+    (ci_job_targets_shared_y ?ci_test_job - ci_test_job ?shared_memory_location_y - shared_memory_location_y)
+    (ci_job_variant_a_ready ?ci_test_job - ci_test_job)
+    (ci_job_variant_b_ready ?ci_test_job - ci_test_job)
+    (ci_job_executed ?ci_test_job - ci_test_job)
+    (repository_links_context_a ?repository - code_repository ?execution_context_a - execution_context_a)
+    (repository_links_context_b ?repository - code_repository ?execution_context_b - execution_context_b)
+    (repository_links_ci_job ?repository - code_repository ?ci_test_job - ci_test_job)
+    (test_artifact_available ?test_artifact - test_artifact)
+    (repository_links_test_artifact ?repository - code_repository ?test_artifact - test_artifact)
+    (test_artifact_promoted ?test_artifact - test_artifact)
+    (test_artifact_linked_to_job ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    (repository_candidate_ready ?repository - code_repository)
+    (repository_review_drafted ?repository - code_repository)
+    (repository_review_in_progress ?repository - code_repository)
+    (repository_dependency_registered ?repository - code_repository)
+    (repository_dependency_reviewed ?repository - code_repository)
+    (manual_review_required ?repository - code_repository)
+    (repository_cross_validated ?repository - code_repository)
+    (configuration_option_available ?configuration_option - configuration_option)
+    (repository_links_configuration_option ?repository - code_repository ?configuration_option - configuration_option)
+    (configuration_applied ?repository - code_repository)
+    (configuration_verified ?repository - code_repository)
+    (configuration_confirmed ?repository - code_repository)
+    (external_dependency_available ?external_dependency - external_dependency)
+    (repository_links_external_dependency ?repository - code_repository ?external_dependency - external_dependency)
+    (reviewer_available ?reviewer - reviewer)
+    (repository_links_reviewer ?repository - code_repository ?reviewer - reviewer)
+    (analysis_tool_available ?analysis_tool - analysis_tool)
+    (repository_links_analysis_tool ?repository - code_repository ?analysis_tool - analysis_tool)
+    (monitoring_alert_available ?monitoring_alert - monitoring_alert)
+    (repository_links_monitoring_alert ?repository - code_repository ?monitoring_alert - monitoring_alert)
+    (validation_token_available ?validation_token - validation_token)
+    (target_links_validation_token ?report - investigation_target ?validation_token - validation_token)
+    (context_a_instrumented ?execution_context_a - execution_context_a)
+    (context_b_instrumented ?execution_context_b - execution_context_b)
+    (repository_ready_for_validation ?repository - code_repository)
+  )
+  (:action open_bug_report
+    :parameters (?report - investigation_target)
+    :precondition
+      (and
+        (not
+          (target_open ?report)
+        )
+        (not
+          (fixed ?report)
+        )
+      )
+    :effect (target_open ?report)
+  )
+  (:action triage_bug_report
+    :parameters (?report - investigation_target ?engineer - engineer)
+    :precondition
+      (and
+        (target_open ?report)
+        (not
+          (triaged ?report)
+        )
+        (engineer_available ?engineer)
+      )
+    :effect
+      (and
+        (triaged ?report)
+        (target_assigned_engineer ?report ?engineer)
+        (not
+          (engineer_available ?engineer)
+        )
+      )
+  )
+  (:action attach_reproducer_test
+    :parameters (?report - investigation_target ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_open ?report)
+        (triaged ?report)
+        (reproducer_available ?reproducer_test)
+      )
+    :effect
+      (and
+        (reproducer_attached ?report ?reproducer_test)
+        (not
+          (reproducer_available ?reproducer_test)
+        )
+      )
+  )
+  (:action begin_investigation
+    :parameters (?report - investigation_target ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_open ?report)
+        (triaged ?report)
+        (reproducer_attached ?report ?reproducer_test)
+        (not
+          (target_under_investigation ?report)
+        )
+      )
+    :effect (target_under_investigation ?report)
+  )
+  (:action detach_reproducer_test
+    :parameters (?report - investigation_target ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (reproducer_attached ?report ?reproducer_test)
+      )
+    :effect
+      (and
+        (reproducer_available ?reproducer_test)
+        (not
+          (reproducer_attached ?report ?reproducer_test)
+        )
+      )
+  )
+  (:action attach_fix_template
+    :parameters (?report - investigation_target ?fix_template - fix_template)
+    :precondition
+      (and
+        (target_under_investigation ?report)
+        (fix_template_available ?fix_template)
+      )
+    :effect
+      (and
+        (fix_template_attached ?report ?fix_template)
+        (not
+          (fix_template_available ?fix_template)
+        )
+      )
+  )
+  (:action detach_fix_template
+    :parameters (?report - investigation_target ?fix_template - fix_template)
+    :precondition
+      (and
+        (fix_template_attached ?report ?fix_template)
+      )
+    :effect
+      (and
+        (fix_template_available ?fix_template)
+        (not
+          (fix_template_attached ?report ?fix_template)
+        )
+      )
+  )
+  (:action attach_analysis_tool
+    :parameters (?repository - code_repository ?analysis_tool - analysis_tool)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (analysis_tool_available ?analysis_tool)
+      )
+    :effect
+      (and
+        (repository_links_analysis_tool ?repository ?analysis_tool)
+        (not
+          (analysis_tool_available ?analysis_tool)
+        )
+      )
+  )
+  (:action detach_analysis_tool
+    :parameters (?repository - code_repository ?analysis_tool - analysis_tool)
+    :precondition
+      (and
+        (repository_links_analysis_tool ?repository ?analysis_tool)
+      )
+    :effect
+      (and
+        (analysis_tool_available ?analysis_tool)
+        (not
+          (repository_links_analysis_tool ?repository ?analysis_tool)
+        )
+      )
+  )
+  (:action attach_monitoring_alert
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (monitoring_alert_available ?monitoring_alert)
+      )
+    :effect
+      (and
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (not
+          (monitoring_alert_available ?monitoring_alert)
+        )
+      )
+  )
+  (:action detach_monitoring_alert
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert)
+    :precondition
+      (and
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+      )
+    :effect
+      (and
+        (monitoring_alert_available ?monitoring_alert)
+        (not
+          (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        )
+      )
+  )
+  (:action detect_shared_x_race
+    :parameters (?execution_context_a - execution_context_a ?shared_memory_location_x - shared_memory_location_x ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_a)
+        (reproducer_attached ?execution_context_a ?reproducer_test)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (not
+          (shared_x_race_flagged ?shared_memory_location_x)
+        )
+        (not
+          (shared_x_lock_held ?shared_memory_location_x)
+        )
+      )
+    :effect (shared_x_race_flagged ?shared_memory_location_x)
+  )
+  (:action instrument_context_a
+    :parameters (?execution_context_a - execution_context_a ?shared_memory_location_x - shared_memory_location_x ?fix_template - fix_template)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_a)
+        (fix_template_attached ?execution_context_a ?fix_template)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (shared_x_race_flagged ?shared_memory_location_x)
+        (not
+          (context_a_instrumented ?execution_context_a)
+        )
+      )
+    :effect
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_a_synchronized ?execution_context_a)
+      )
+  )
+  (:action acquire_context_a_lock
+    :parameters (?execution_context_a - execution_context_a ?shared_memory_location_x - shared_memory_location_x ?lock_token - lock_token)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_a)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (lock_token_available ?lock_token)
+        (not
+          (context_a_instrumented ?execution_context_a)
+        )
+      )
+    :effect
+      (and
+        (shared_x_lock_held ?shared_memory_location_x)
+        (context_a_instrumented ?execution_context_a)
+        (context_a_lock_held ?execution_context_a ?lock_token)
+        (not
+          (lock_token_available ?lock_token)
+        )
+      )
+  )
+  (:action release_context_a_lock
+    :parameters (?execution_context_a - execution_context_a ?shared_memory_location_x - shared_memory_location_x ?reproducer_test - reproducer_test ?lock_token - lock_token)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_a)
+        (reproducer_attached ?execution_context_a ?reproducer_test)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (shared_x_lock_held ?shared_memory_location_x)
+        (context_a_lock_held ?execution_context_a ?lock_token)
+        (not
+          (context_a_synchronized ?execution_context_a)
+        )
+      )
+    :effect
+      (and
+        (shared_x_race_flagged ?shared_memory_location_x)
+        (context_a_synchronized ?execution_context_a)
+        (lock_token_available ?lock_token)
+        (not
+          (context_a_lock_held ?execution_context_a ?lock_token)
+        )
+      )
+  )
+  (:action detect_shared_y_race
+    :parameters (?execution_context_b - execution_context_b ?shared_memory_location_y - shared_memory_location_y ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_b)
+        (reproducer_attached ?execution_context_b ?reproducer_test)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (not
+          (shared_y_race_flagged ?shared_memory_location_y)
+        )
+        (not
+          (shared_y_lock_held ?shared_memory_location_y)
+        )
+      )
+    :effect (shared_y_race_flagged ?shared_memory_location_y)
+  )
+  (:action instrument_context_b
+    :parameters (?execution_context_b - execution_context_b ?shared_memory_location_y - shared_memory_location_y ?fix_template - fix_template)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_b)
+        (fix_template_attached ?execution_context_b ?fix_template)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_y_race_flagged ?shared_memory_location_y)
+        (not
+          (context_b_instrumented ?execution_context_b)
+        )
+      )
+    :effect
+      (and
+        (context_b_instrumented ?execution_context_b)
+        (context_b_synchronized ?execution_context_b)
+      )
+  )
+  (:action acquire_context_b_lock
+    :parameters (?execution_context_b - execution_context_b ?shared_memory_location_y - shared_memory_location_y ?lock_token - lock_token)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_b)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (lock_token_available ?lock_token)
+        (not
+          (context_b_instrumented ?execution_context_b)
+        )
+      )
+    :effect
+      (and
+        (shared_y_lock_held ?shared_memory_location_y)
+        (context_b_instrumented ?execution_context_b)
+        (context_b_lock_held ?execution_context_b ?lock_token)
+        (not
+          (lock_token_available ?lock_token)
+        )
+      )
+  )
+  (:action release_context_b_lock
+    :parameters (?execution_context_b - execution_context_b ?shared_memory_location_y - shared_memory_location_y ?reproducer_test - reproducer_test ?lock_token - lock_token)
+    :precondition
+      (and
+        (target_under_investigation ?execution_context_b)
+        (reproducer_attached ?execution_context_b ?reproducer_test)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_y_lock_held ?shared_memory_location_y)
+        (context_b_lock_held ?execution_context_b ?lock_token)
+        (not
+          (context_b_synchronized ?execution_context_b)
+        )
+      )
+    :effect
+      (and
+        (shared_y_race_flagged ?shared_memory_location_y)
+        (context_b_synchronized ?execution_context_b)
+        (lock_token_available ?lock_token)
+        (not
+          (context_b_lock_held ?execution_context_b ?lock_token)
+        )
+      )
+  )
+  (:action create_ci_race_job
+    :parameters (?execution_context_a - execution_context_a ?execution_context_b - execution_context_b ?shared_memory_location_x - shared_memory_location_x ?shared_memory_location_y - shared_memory_location_y ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_b_instrumented ?execution_context_b)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_x_race_flagged ?shared_memory_location_x)
+        (shared_y_race_flagged ?shared_memory_location_y)
+        (context_a_synchronized ?execution_context_a)
+        (context_b_synchronized ?execution_context_b)
+        (ci_job_pending ?ci_test_job)
+      )
+    :effect
+      (and
+        (ci_job_created ?ci_test_job)
+        (ci_job_targets_shared_x ?ci_test_job ?shared_memory_location_x)
+        (ci_job_targets_shared_y ?ci_test_job ?shared_memory_location_y)
+        (not
+          (ci_job_pending ?ci_test_job)
+        )
+      )
+  )
+  (:action create_ci_race_job_variant_a
+    :parameters (?execution_context_a - execution_context_a ?execution_context_b - execution_context_b ?shared_memory_location_x - shared_memory_location_x ?shared_memory_location_y - shared_memory_location_y ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_b_instrumented ?execution_context_b)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_x_lock_held ?shared_memory_location_x)
+        (shared_y_race_flagged ?shared_memory_location_y)
+        (not
+          (context_a_synchronized ?execution_context_a)
+        )
+        (context_b_synchronized ?execution_context_b)
+        (ci_job_pending ?ci_test_job)
+      )
+    :effect
+      (and
+        (ci_job_created ?ci_test_job)
+        (ci_job_targets_shared_x ?ci_test_job ?shared_memory_location_x)
+        (ci_job_targets_shared_y ?ci_test_job ?shared_memory_location_y)
+        (ci_job_variant_a_ready ?ci_test_job)
+        (not
+          (ci_job_pending ?ci_test_job)
+        )
+      )
+  )
+  (:action create_ci_race_job_variant_b
+    :parameters (?execution_context_a - execution_context_a ?execution_context_b - execution_context_b ?shared_memory_location_x - shared_memory_location_x ?shared_memory_location_y - shared_memory_location_y ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_b_instrumented ?execution_context_b)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_x_race_flagged ?shared_memory_location_x)
+        (shared_y_lock_held ?shared_memory_location_y)
+        (context_a_synchronized ?execution_context_a)
+        (not
+          (context_b_synchronized ?execution_context_b)
+        )
+        (ci_job_pending ?ci_test_job)
+      )
+    :effect
+      (and
+        (ci_job_created ?ci_test_job)
+        (ci_job_targets_shared_x ?ci_test_job ?shared_memory_location_x)
+        (ci_job_targets_shared_y ?ci_test_job ?shared_memory_location_y)
+        (ci_job_variant_b_ready ?ci_test_job)
+        (not
+          (ci_job_pending ?ci_test_job)
+        )
+      )
+  )
+  (:action create_ci_race_job_variant_ab
+    :parameters (?execution_context_a - execution_context_a ?execution_context_b - execution_context_b ?shared_memory_location_x - shared_memory_location_x ?shared_memory_location_y - shared_memory_location_y ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_b_instrumented ?execution_context_b)
+        (context_a_accesses_shared_x ?execution_context_a ?shared_memory_location_x)
+        (context_b_accesses_shared_y ?execution_context_b ?shared_memory_location_y)
+        (shared_x_lock_held ?shared_memory_location_x)
+        (shared_y_lock_held ?shared_memory_location_y)
+        (not
+          (context_a_synchronized ?execution_context_a)
+        )
+        (not
+          (context_b_synchronized ?execution_context_b)
+        )
+        (ci_job_pending ?ci_test_job)
+      )
+    :effect
+      (and
+        (ci_job_created ?ci_test_job)
+        (ci_job_targets_shared_x ?ci_test_job ?shared_memory_location_x)
+        (ci_job_targets_shared_y ?ci_test_job ?shared_memory_location_y)
+        (ci_job_variant_a_ready ?ci_test_job)
+        (ci_job_variant_b_ready ?ci_test_job)
+        (not
+          (ci_job_pending ?ci_test_job)
+        )
+      )
+  )
+  (:action execute_ci_race_job
+    :parameters (?ci_test_job - ci_test_job ?execution_context_a - execution_context_a ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (ci_job_created ?ci_test_job)
+        (context_a_instrumented ?execution_context_a)
+        (reproducer_attached ?execution_context_a ?reproducer_test)
+        (not
+          (ci_job_executed ?ci_test_job)
+        )
+      )
+    :effect (ci_job_executed ?ci_test_job)
+  )
+  (:action collect_test_artifact
+    :parameters (?repository - code_repository ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (repository_links_ci_job ?repository ?ci_test_job)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_available ?test_artifact)
+        (ci_job_created ?ci_test_job)
+        (ci_job_executed ?ci_test_job)
+        (not
+          (test_artifact_promoted ?test_artifact)
+        )
+      )
+    :effect
+      (and
+        (test_artifact_promoted ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (not
+          (test_artifact_available ?test_artifact)
+        )
+      )
+  )
+  (:action promote_test_artifact
+    :parameters (?repository - code_repository ?test_artifact - test_artifact ?ci_test_job - ci_test_job ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_promoted ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (reproducer_attached ?repository ?reproducer_test)
+        (not
+          (ci_job_variant_a_ready ?ci_test_job)
+        )
+        (not
+          (repository_candidate_ready ?repository)
+        )
+      )
+    :effect (repository_candidate_ready ?repository)
+  )
+  (:action register_external_dependency
+    :parameters (?repository - code_repository ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (external_dependency_available ?external_dependency)
+        (not
+          (repository_dependency_registered ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_dependency_registered ?repository)
+        (repository_links_external_dependency ?repository ?external_dependency)
+        (not
+          (external_dependency_available ?external_dependency)
+        )
+      )
+  )
+  (:action prepare_dependency_review_candidate
+    :parameters (?repository - code_repository ?test_artifact - test_artifact ?ci_test_job - ci_test_job ?reproducer_test - reproducer_test ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_promoted ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (reproducer_attached ?repository ?reproducer_test)
+        (ci_job_variant_a_ready ?ci_test_job)
+        (repository_dependency_registered ?repository)
+        (repository_links_external_dependency ?repository ?external_dependency)
+        (not
+          (repository_candidate_ready ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_candidate_ready ?repository)
+        (repository_dependency_reviewed ?repository)
+      )
+  )
+  (:action draft_repository_review
+    :parameters (?repository - code_repository ?analysis_tool - analysis_tool ?fix_template - fix_template ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_candidate_ready ?repository)
+        (repository_links_analysis_tool ?repository ?analysis_tool)
+        (fix_template_attached ?repository ?fix_template)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (not
+          (ci_job_variant_b_ready ?ci_test_job)
+        )
+        (not
+          (repository_review_drafted ?repository)
+        )
+      )
+    :effect (repository_review_drafted ?repository)
+  )
+  (:action draft_repository_review_variant_b
+    :parameters (?repository - code_repository ?analysis_tool - analysis_tool ?fix_template - fix_template ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_candidate_ready ?repository)
+        (repository_links_analysis_tool ?repository ?analysis_tool)
+        (fix_template_attached ?repository ?fix_template)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (ci_job_variant_b_ready ?ci_test_job)
+        (not
+          (repository_review_drafted ?repository)
+        )
+      )
+    :effect (repository_review_drafted ?repository)
+  )
+  (:action advance_review_checkpoint_a
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_review_drafted ?repository)
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (not
+          (ci_job_variant_a_ready ?ci_test_job)
+        )
+        (not
+          (ci_job_variant_b_ready ?ci_test_job)
+        )
+        (not
+          (repository_review_in_progress ?repository)
+        )
+      )
+    :effect (repository_review_in_progress ?repository)
+  )
+  (:action advance_review_checkpoint_b
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_review_drafted ?repository)
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (ci_job_variant_a_ready ?ci_test_job)
+        (not
+          (ci_job_variant_b_ready ?ci_test_job)
+        )
+        (not
+          (repository_review_in_progress ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_review_in_progress ?repository)
+        (manual_review_required ?repository)
+      )
+  )
+  (:action advance_review_checkpoint_c
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_review_drafted ?repository)
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (not
+          (ci_job_variant_a_ready ?ci_test_job)
+        )
+        (ci_job_variant_b_ready ?ci_test_job)
+        (not
+          (repository_review_in_progress ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_review_in_progress ?repository)
+        (manual_review_required ?repository)
+      )
+  )
+  (:action advance_review_checkpoint_d
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert ?test_artifact - test_artifact ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (repository_review_drafted ?repository)
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (repository_links_test_artifact ?repository ?test_artifact)
+        (test_artifact_linked_to_job ?test_artifact ?ci_test_job)
+        (ci_job_variant_a_ready ?ci_test_job)
+        (ci_job_variant_b_ready ?ci_test_job)
+        (not
+          (repository_review_in_progress ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_review_in_progress ?repository)
+        (manual_review_required ?repository)
+      )
+  )
+  (:action mark_repository_ready_for_validation
+    :parameters (?repository - code_repository)
+    :precondition
+      (and
+        (repository_review_in_progress ?repository)
+        (not
+          (manual_review_required ?repository)
+        )
+        (not
+          (repository_ready_for_validation ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_ready_for_validation ?repository)
+        (target_ready_for_validation ?repository)
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?repository - code_repository ?reviewer - reviewer)
+    :precondition
+      (and
+        (repository_review_in_progress ?repository)
+        (manual_review_required ?repository)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (repository_links_reviewer ?repository ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action cross_validate_repository
+    :parameters (?repository - code_repository ?execution_context_a - execution_context_a ?execution_context_b - execution_context_b ?reproducer_test - reproducer_test ?reviewer - reviewer)
+    :precondition
+      (and
+        (repository_review_in_progress ?repository)
+        (manual_review_required ?repository)
+        (repository_links_reviewer ?repository ?reviewer)
+        (repository_links_context_a ?repository ?execution_context_a)
+        (repository_links_context_b ?repository ?execution_context_b)
+        (context_a_synchronized ?execution_context_a)
+        (context_b_synchronized ?execution_context_b)
+        (reproducer_attached ?repository ?reproducer_test)
+        (not
+          (repository_cross_validated ?repository)
+        )
+      )
+    :effect (repository_cross_validated ?repository)
+  )
+  (:action confirm_repository_ready_for_validation
+    :parameters (?repository - code_repository)
+    :precondition
+      (and
+        (repository_review_in_progress ?repository)
+        (repository_cross_validated ?repository)
+        (not
+          (repository_ready_for_validation ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_ready_for_validation ?repository)
+        (target_ready_for_validation ?repository)
+      )
+  )
+  (:action apply_configuration_option
+    :parameters (?repository - code_repository ?configuration_option - configuration_option ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_under_investigation ?repository)
+        (reproducer_attached ?repository ?reproducer_test)
+        (configuration_option_available ?configuration_option)
+        (repository_links_configuration_option ?repository ?configuration_option)
+        (not
+          (configuration_applied ?repository)
+        )
+      )
+    :effect
+      (and
+        (configuration_applied ?repository)
+        (not
+          (configuration_option_available ?configuration_option)
+        )
+      )
+  )
+  (:action attach_fix_template_after_configuration
+    :parameters (?repository - code_repository ?fix_template - fix_template)
+    :precondition
+      (and
+        (configuration_applied ?repository)
+        (fix_template_attached ?repository ?fix_template)
+        (not
+          (configuration_verified ?repository)
+        )
+      )
+    :effect (configuration_verified ?repository)
+  )
+  (:action record_review_checkpoint
+    :parameters (?repository - code_repository ?monitoring_alert - monitoring_alert)
+    :precondition
+      (and
+        (configuration_verified ?repository)
+        (repository_links_monitoring_alert ?repository ?monitoring_alert)
+        (not
+          (configuration_confirmed ?repository)
+        )
+      )
+    :effect (configuration_confirmed ?repository)
+  )
+  (:action confirm_repository_validation_ready
+    :parameters (?repository - code_repository)
+    :precondition
+      (and
+        (configuration_confirmed ?repository)
+        (not
+          (repository_ready_for_validation ?repository)
+        )
+      )
+    :effect
+      (and
+        (repository_ready_for_validation ?repository)
+        (target_ready_for_validation ?repository)
+      )
+  )
+  (:action mark_context_a_ready_for_validation
+    :parameters (?execution_context_a - execution_context_a ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_a_instrumented ?execution_context_a)
+        (context_a_synchronized ?execution_context_a)
+        (ci_job_created ?ci_test_job)
+        (ci_job_executed ?ci_test_job)
+        (not
+          (target_ready_for_validation ?execution_context_a)
+        )
+      )
+    :effect (target_ready_for_validation ?execution_context_a)
+  )
+  (:action mark_context_b_ready_for_validation
+    :parameters (?execution_context_b - execution_context_b ?ci_test_job - ci_test_job)
+    :precondition
+      (and
+        (context_b_instrumented ?execution_context_b)
+        (context_b_synchronized ?execution_context_b)
+        (ci_job_created ?ci_test_job)
+        (ci_job_executed ?ci_test_job)
+        (not
+          (target_ready_for_validation ?execution_context_b)
+        )
+      )
+    :effect (target_ready_for_validation ?execution_context_b)
+  )
+  (:action record_validation_attestation
+    :parameters (?report - investigation_target ?validation_token - validation_token ?reproducer_test - reproducer_test)
+    :precondition
+      (and
+        (target_ready_for_validation ?report)
+        (reproducer_attached ?report ?reproducer_test)
+        (validation_token_available ?validation_token)
+        (not
+          (target_validation_attested ?report)
+        )
+      )
+    :effect
+      (and
+        (target_validation_attested ?report)
+        (target_links_validation_token ?report ?validation_token)
+        (not
+          (validation_token_available ?validation_token)
+        )
+      )
+  )
+  (:action finalize_context_a_resolution
+    :parameters (?execution_context_a - execution_context_a ?engineer - engineer ?validation_token - validation_token)
+    :precondition
+      (and
+        (target_validation_attested ?execution_context_a)
+        (target_assigned_engineer ?execution_context_a ?engineer)
+        (target_links_validation_token ?execution_context_a ?validation_token)
+        (not
+          (fixed ?execution_context_a)
+        )
+      )
+    :effect
+      (and
+        (fixed ?execution_context_a)
+        (engineer_available ?engineer)
+        (validation_token_available ?validation_token)
+      )
+  )
+  (:action finalize_context_b_resolution
+    :parameters (?execution_context_b - execution_context_b ?engineer - engineer ?validation_token - validation_token)
+    :precondition
+      (and
+        (target_validation_attested ?execution_context_b)
+        (target_assigned_engineer ?execution_context_b ?engineer)
+        (target_links_validation_token ?execution_context_b ?validation_token)
+        (not
+          (fixed ?execution_context_b)
+        )
+      )
+    :effect
+      (and
+        (fixed ?execution_context_b)
+        (engineer_available ?engineer)
+        (validation_token_available ?validation_token)
+      )
+  )
+  (:action finalize_repository_resolution
+    :parameters (?repository - code_repository ?engineer - engineer ?validation_token - validation_token)
+    :precondition
+      (and
+        (target_validation_attested ?repository)
+        (target_assigned_engineer ?repository ?engineer)
+        (target_links_validation_token ?repository ?validation_token)
+        (not
+          (fixed ?repository)
+        )
+      )
+    :effect
+      (and
+        (fixed ?repository)
+        (engineer_available ?engineer)
+        (validation_token_available ?validation_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem race_condition_resolution_problem)
+  (:domain race_condition_resolution_domain)
+  (:objects execution_context_a_instance - execution_context_a execution_context_b_instance - execution_context_b repository_primary - code_repository repository_secondary - code_repository engineer_primary - engineer engineer_secondary - engineer engineer_backup - engineer race_reproducer_test - reproducer_test fix_proposal_template_instance - fix_template mutex_token - lock_token shared_memory_location_x_instance - shared_memory_location_x shared_memory_location_y_instance - shared_memory_location_y ci_race_job - ci_test_job test_artifact_primary - test_artifact test_artifact_secondary - test_artifact external_dependency_alpha - external_dependency external_dependency_beta - external_dependency reviewer_primary - reviewer reviewer_secondary - reviewer validation_token_primary - validation_token race_analysis_tool - analysis_tool config_option_a - configuration_option config_option_b - configuration_option monitoring_alert_primary - monitoring_alert)
+  (:init
+    (engineer_available engineer_primary)
+    (engineer_available engineer_secondary)
+    (engineer_available engineer_backup)
+    (reproducer_available race_reproducer_test)
+    (fix_template_available fix_proposal_template_instance)
+    (lock_token_available mutex_token)
+    (context_a_accesses_shared_x execution_context_a_instance shared_memory_location_x_instance)
+    (context_b_accesses_shared_y execution_context_b_instance shared_memory_location_y_instance)
+    (ci_job_pending ci_race_job)
+    (test_artifact_available test_artifact_primary)
+    (test_artifact_available test_artifact_secondary)
+    (repository_links_context_a repository_primary execution_context_a_instance)
+    (repository_links_context_a repository_secondary execution_context_a_instance)
+    (repository_links_context_b repository_primary execution_context_b_instance)
+    (repository_links_context_b repository_secondary execution_context_b_instance)
+    (repository_links_ci_job repository_primary ci_race_job)
+    (repository_links_ci_job repository_secondary ci_race_job)
+    (repository_links_test_artifact repository_primary test_artifact_primary)
+    (repository_links_test_artifact repository_secondary test_artifact_secondary)
+    (external_dependency_available external_dependency_alpha)
+    (external_dependency_available external_dependency_beta)
+    (reviewer_available reviewer_primary)
+    (reviewer_available reviewer_secondary)
+    (validation_token_available validation_token_primary)
+    (analysis_tool_available race_analysis_tool)
+    (configuration_option_available config_option_a)
+    (repository_links_configuration_option repository_primary config_option_a)
+    (repository_links_configuration_option repository_secondary config_option_b)
+    (monitoring_alert_available monitoring_alert_primary)
+  )
+  (:goal
+    (and
+      (fixed execution_context_a_instance)
+      (fixed execution_context_b_instance)
+      (fixed repository_primary)
+      (fixed repository_secondary)
+    )
+  )
+)

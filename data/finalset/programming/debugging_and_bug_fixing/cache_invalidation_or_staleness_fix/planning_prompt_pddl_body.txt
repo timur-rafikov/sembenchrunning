@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cache_invalidation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object artifact - object identifier_group - object domain_entity - object application_component - domain_entity invalidation_worker - resource diagnostic_artifact - resource operator_role - resource approval_token - resource deployment_config - resource verification_artifact - resource test_case - resource credential - resource repair_patch - artifact data_partition - artifact audit_record - artifact dependency_key - identifier_group dependency_key_secondary - identifier_group invalidation_job - identifier_group cache_host - application_component agent_group - application_component primary_cache_instance - cache_host secondary_cache_instance - cache_host remediation_agent - agent_group)
+  (:predicates
+    (incident_reported ?component - application_component)
+    (remediation_plan_created ?component - application_component)
+    (worker_allocated ?component - application_component)
+    (remediation_completed ?component - application_component)
+    (entity_ready_for_invalidation ?component - application_component)
+    (invalidation_executed ?component - application_component)
+    (worker_available ?worker - invalidation_worker)
+    (assigned_worker ?component - application_component ?worker - invalidation_worker)
+    (diagnostic_available ?diagnostic_artifact - diagnostic_artifact)
+    (diagnostic_attached ?component - application_component ?diagnostic_artifact - diagnostic_artifact)
+    (operator_available ?operator - operator_role)
+    (operator_assigned_to_entity ?component - application_component ?operator - operator_role)
+    (repair_patch_available ?repair_patch - repair_patch)
+    (primary_assigned_patch ?primary_cache - primary_cache_instance ?repair_patch - repair_patch)
+    (secondary_assigned_patch ?secondary_cache - secondary_cache_instance ?repair_patch - repair_patch)
+    (primary_dependency_key ?primary_cache - primary_cache_instance ?dependency_key - dependency_key)
+    (dependency_primary_verified ?dependency_key - dependency_key)
+    (primary_dependency_patch_available ?dependency_key - dependency_key)
+    (primary_claimed_for_job ?primary_cache - primary_cache_instance)
+    (secondary_dependency_key ?secondary_cache - secondary_cache_instance ?dependency_key_secondary - dependency_key_secondary)
+    (dependency_secondary_verified ?dependency_key_secondary - dependency_key_secondary)
+    (secondary_dependency_patch_available ?dependency_key_secondary - dependency_key_secondary)
+    (secondary_claimed_for_job ?secondary_cache - secondary_cache_instance)
+    (job_pending ?invalidation_job - invalidation_job)
+    (job_prepared ?invalidation_job - invalidation_job)
+    (job_includes_dependency_key ?invalidation_job - invalidation_job ?dependency_key - dependency_key)
+    (job_includes_target_key ?invalidation_job - invalidation_job ?dependency_key_secondary - dependency_key_secondary)
+    (job_primary_ready ?invalidation_job - invalidation_job)
+    (job_secondary_ready ?invalidation_job - invalidation_job)
+    (job_locked_for_assignment ?invalidation_job - invalidation_job)
+    (agent_manages_primary_cache ?agent - remediation_agent ?primary_cache - primary_cache_instance)
+    (agent_manages_secondary_cache ?agent - remediation_agent ?secondary_cache - secondary_cache_instance)
+    (agent_has_job ?agent - remediation_agent ?invalidation_job - invalidation_job)
+    (partition_available ?data_partition - data_partition)
+    (agent_claims_partition ?agent - remediation_agent ?data_partition - data_partition)
+    (partition_claimed ?data_partition - data_partition)
+    (partition_assigned_to_job ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    (agent_partition_prepared ?agent - remediation_agent)
+    (agent_execution_reserved ?agent - remediation_agent)
+    (tests_executed ?agent - remediation_agent)
+    (approval_attached ?agent - remediation_agent)
+    (agent_approval_stage_marked ?agent - remediation_agent)
+    (tests_verified ?agent - remediation_agent)
+    (pre_execution_checks_passed ?agent - remediation_agent)
+    (audit_record_available ?audit_record - audit_record)
+    (agent_has_audit_record ?agent - remediation_agent ?audit_record - audit_record)
+    (audit_attached_flag ?agent - remediation_agent)
+    (audit_stage_claimed ?agent - remediation_agent)
+    (audit_verified ?agent - remediation_agent)
+    (approval_token_available ?approval_token - approval_token)
+    (agent_has_approval_token ?agent - remediation_agent ?approval_token - approval_token)
+    (deployment_config_available ?deployment_config - deployment_config)
+    (agent_has_deployment_config ?agent - remediation_agent ?deployment_config - deployment_config)
+    (test_case_available ?test_case - test_case)
+    (agent_has_test_case ?agent - remediation_agent ?test_case - test_case)
+    (credential_available ?credential - credential)
+    (agent_has_credential ?agent - remediation_agent ?credential - credential)
+    (verification_artifact_available ?verification_artifact - verification_artifact)
+    (component_has_verification_artifact ?component - application_component ?verification_artifact - verification_artifact)
+    (primary_ready_signal ?primary_cache - primary_cache_instance)
+    (secondary_ready_signal ?secondary_cache - secondary_cache_instance)
+    (agent_execution_committed ?agent - remediation_agent)
+  )
+  (:action report_incident
+    :parameters (?component - application_component)
+    :precondition
+      (and
+        (not
+          (incident_reported ?component)
+        )
+        (not
+          (remediation_completed ?component)
+        )
+      )
+    :effect (incident_reported ?component)
+  )
+  (:action allocate_invalidation_worker
+    :parameters (?component - application_component ?worker - invalidation_worker)
+    :precondition
+      (and
+        (incident_reported ?component)
+        (not
+          (worker_allocated ?component)
+        )
+        (worker_available ?worker)
+      )
+    :effect
+      (and
+        (worker_allocated ?component)
+        (assigned_worker ?component ?worker)
+        (not
+          (worker_available ?worker)
+        )
+      )
+  )
+  (:action attach_diagnostic_artifact
+    :parameters (?component - application_component ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (incident_reported ?component)
+        (worker_allocated ?component)
+        (diagnostic_available ?diagnostic_artifact)
+      )
+    :effect
+      (and
+        (diagnostic_attached ?component ?diagnostic_artifact)
+        (not
+          (diagnostic_available ?diagnostic_artifact)
+        )
+      )
+  )
+  (:action finalize_incident
+    :parameters (?component - application_component ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (incident_reported ?component)
+        (worker_allocated ?component)
+        (diagnostic_attached ?component ?diagnostic_artifact)
+        (not
+          (remediation_plan_created ?component)
+        )
+      )
+    :effect (remediation_plan_created ?component)
+  )
+  (:action release_diagnostic_artifact
+    :parameters (?component - application_component ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (diagnostic_attached ?component ?diagnostic_artifact)
+      )
+    :effect
+      (and
+        (diagnostic_available ?diagnostic_artifact)
+        (not
+          (diagnostic_attached ?component ?diagnostic_artifact)
+        )
+      )
+  )
+  (:action assign_operator_to_component
+    :parameters (?component - application_component ?operator - operator_role)
+    :precondition
+      (and
+        (remediation_plan_created ?component)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_entity ?component ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_component
+    :parameters (?component - application_component ?operator - operator_role)
+    :precondition
+      (and
+        (operator_assigned_to_entity ?component ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned_to_entity ?component ?operator)
+        )
+      )
+  )
+  (:action attach_test_case_to_agent
+    :parameters (?agent - remediation_agent ?test_case - test_case)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (test_case_available ?test_case)
+      )
+    :effect
+      (and
+        (agent_has_test_case ?agent ?test_case)
+        (not
+          (test_case_available ?test_case)
+        )
+      )
+  )
+  (:action detach_test_case_from_agent
+    :parameters (?agent - remediation_agent ?test_case - test_case)
+    :precondition
+      (and
+        (agent_has_test_case ?agent ?test_case)
+      )
+    :effect
+      (and
+        (test_case_available ?test_case)
+        (not
+          (agent_has_test_case ?agent ?test_case)
+        )
+      )
+  )
+  (:action attach_credential_to_agent
+    :parameters (?agent - remediation_agent ?credential - credential)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (agent_has_credential ?agent ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action detach_credential_from_agent
+    :parameters (?agent - remediation_agent ?credential - credential)
+    :precondition
+      (and
+        (agent_has_credential ?agent ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (agent_has_credential ?agent ?credential)
+        )
+      )
+  )
+  (:action discover_primary_dependency
+    :parameters (?primary_cache - primary_cache_instance ?dependency_key - dependency_key ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (remediation_plan_created ?primary_cache)
+        (diagnostic_attached ?primary_cache ?diagnostic_artifact)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (not
+          (dependency_primary_verified ?dependency_key)
+        )
+        (not
+          (primary_dependency_patch_available ?dependency_key)
+        )
+      )
+    :effect (dependency_primary_verified ?dependency_key)
+  )
+  (:action assign_operator_to_primary_cache
+    :parameters (?primary_cache - primary_cache_instance ?dependency_key - dependency_key ?operator - operator_role)
+    :precondition
+      (and
+        (remediation_plan_created ?primary_cache)
+        (operator_assigned_to_entity ?primary_cache ?operator)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (dependency_primary_verified ?dependency_key)
+        (not
+          (primary_ready_signal ?primary_cache)
+        )
+      )
+    :effect
+      (and
+        (primary_ready_signal ?primary_cache)
+        (primary_claimed_for_job ?primary_cache)
+      )
+  )
+  (:action assign_patch_to_primary_cache
+    :parameters (?primary_cache - primary_cache_instance ?dependency_key - dependency_key ?repair_patch - repair_patch)
+    :precondition
+      (and
+        (remediation_plan_created ?primary_cache)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (repair_patch_available ?repair_patch)
+        (not
+          (primary_ready_signal ?primary_cache)
+        )
+      )
+    :effect
+      (and
+        (primary_dependency_patch_available ?dependency_key)
+        (primary_ready_signal ?primary_cache)
+        (primary_assigned_patch ?primary_cache ?repair_patch)
+        (not
+          (repair_patch_available ?repair_patch)
+        )
+      )
+  )
+  (:action finalize_primary_patch_assignment
+    :parameters (?primary_cache - primary_cache_instance ?dependency_key - dependency_key ?diagnostic_artifact - diagnostic_artifact ?repair_patch - repair_patch)
+    :precondition
+      (and
+        (remediation_plan_created ?primary_cache)
+        (diagnostic_attached ?primary_cache ?diagnostic_artifact)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (primary_dependency_patch_available ?dependency_key)
+        (primary_assigned_patch ?primary_cache ?repair_patch)
+        (not
+          (primary_claimed_for_job ?primary_cache)
+        )
+      )
+    :effect
+      (and
+        (dependency_primary_verified ?dependency_key)
+        (primary_claimed_for_job ?primary_cache)
+        (repair_patch_available ?repair_patch)
+        (not
+          (primary_assigned_patch ?primary_cache ?repair_patch)
+        )
+      )
+  )
+  (:action discover_secondary_dependency
+    :parameters (?secondary_cache - secondary_cache_instance ?dependency_key_secondary - dependency_key_secondary ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (remediation_plan_created ?secondary_cache)
+        (diagnostic_attached ?secondary_cache ?diagnostic_artifact)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (not
+          (dependency_secondary_verified ?dependency_key_secondary)
+        )
+        (not
+          (secondary_dependency_patch_available ?dependency_key_secondary)
+        )
+      )
+    :effect (dependency_secondary_verified ?dependency_key_secondary)
+  )
+  (:action assign_operator_to_secondary_cache
+    :parameters (?secondary_cache - secondary_cache_instance ?dependency_key_secondary - dependency_key_secondary ?operator - operator_role)
+    :precondition
+      (and
+        (remediation_plan_created ?secondary_cache)
+        (operator_assigned_to_entity ?secondary_cache ?operator)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (dependency_secondary_verified ?dependency_key_secondary)
+        (not
+          (secondary_ready_signal ?secondary_cache)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready_signal ?secondary_cache)
+        (secondary_claimed_for_job ?secondary_cache)
+      )
+  )
+  (:action assign_patch_to_secondary_cache
+    :parameters (?secondary_cache - secondary_cache_instance ?dependency_key_secondary - dependency_key_secondary ?repair_patch - repair_patch)
+    :precondition
+      (and
+        (remediation_plan_created ?secondary_cache)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (repair_patch_available ?repair_patch)
+        (not
+          (secondary_ready_signal ?secondary_cache)
+        )
+      )
+    :effect
+      (and
+        (secondary_dependency_patch_available ?dependency_key_secondary)
+        (secondary_ready_signal ?secondary_cache)
+        (secondary_assigned_patch ?secondary_cache ?repair_patch)
+        (not
+          (repair_patch_available ?repair_patch)
+        )
+      )
+  )
+  (:action finalize_secondary_patch_assignment
+    :parameters (?secondary_cache - secondary_cache_instance ?dependency_key_secondary - dependency_key_secondary ?diagnostic_artifact - diagnostic_artifact ?repair_patch - repair_patch)
+    :precondition
+      (and
+        (remediation_plan_created ?secondary_cache)
+        (diagnostic_attached ?secondary_cache ?diagnostic_artifact)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (secondary_dependency_patch_available ?dependency_key_secondary)
+        (secondary_assigned_patch ?secondary_cache ?repair_patch)
+        (not
+          (secondary_claimed_for_job ?secondary_cache)
+        )
+      )
+    :effect
+      (and
+        (dependency_secondary_verified ?dependency_key_secondary)
+        (secondary_claimed_for_job ?secondary_cache)
+        (repair_patch_available ?repair_patch)
+        (not
+          (secondary_assigned_patch ?secondary_cache ?repair_patch)
+        )
+      )
+  )
+  (:action assemble_invalidation_job
+    :parameters (?primary_cache - primary_cache_instance ?secondary_cache - secondary_cache_instance ?dependency_key - dependency_key ?dependency_key_secondary - dependency_key_secondary ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (primary_ready_signal ?primary_cache)
+        (secondary_ready_signal ?secondary_cache)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (dependency_primary_verified ?dependency_key)
+        (dependency_secondary_verified ?dependency_key_secondary)
+        (primary_claimed_for_job ?primary_cache)
+        (secondary_claimed_for_job ?secondary_cache)
+        (job_pending ?invalidation_job)
+      )
+    :effect
+      (and
+        (job_prepared ?invalidation_job)
+        (job_includes_dependency_key ?invalidation_job ?dependency_key)
+        (job_includes_target_key ?invalidation_job ?dependency_key_secondary)
+        (not
+          (job_pending ?invalidation_job)
+        )
+      )
+  )
+  (:action assemble_invalidation_job_with_primary_ready
+    :parameters (?primary_cache - primary_cache_instance ?secondary_cache - secondary_cache_instance ?dependency_key - dependency_key ?dependency_key_secondary - dependency_key_secondary ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (primary_ready_signal ?primary_cache)
+        (secondary_ready_signal ?secondary_cache)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (primary_dependency_patch_available ?dependency_key)
+        (dependency_secondary_verified ?dependency_key_secondary)
+        (not
+          (primary_claimed_for_job ?primary_cache)
+        )
+        (secondary_claimed_for_job ?secondary_cache)
+        (job_pending ?invalidation_job)
+      )
+    :effect
+      (and
+        (job_prepared ?invalidation_job)
+        (job_includes_dependency_key ?invalidation_job ?dependency_key)
+        (job_includes_target_key ?invalidation_job ?dependency_key_secondary)
+        (job_primary_ready ?invalidation_job)
+        (not
+          (job_pending ?invalidation_job)
+        )
+      )
+  )
+  (:action assemble_invalidation_job_with_secondary_ready
+    :parameters (?primary_cache - primary_cache_instance ?secondary_cache - secondary_cache_instance ?dependency_key - dependency_key ?dependency_key_secondary - dependency_key_secondary ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (primary_ready_signal ?primary_cache)
+        (secondary_ready_signal ?secondary_cache)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (dependency_primary_verified ?dependency_key)
+        (secondary_dependency_patch_available ?dependency_key_secondary)
+        (primary_claimed_for_job ?primary_cache)
+        (not
+          (secondary_claimed_for_job ?secondary_cache)
+        )
+        (job_pending ?invalidation_job)
+      )
+    :effect
+      (and
+        (job_prepared ?invalidation_job)
+        (job_includes_dependency_key ?invalidation_job ?dependency_key)
+        (job_includes_target_key ?invalidation_job ?dependency_key_secondary)
+        (job_secondary_ready ?invalidation_job)
+        (not
+          (job_pending ?invalidation_job)
+        )
+      )
+  )
+  (:action assemble_invalidation_job_with_both_ready
+    :parameters (?primary_cache - primary_cache_instance ?secondary_cache - secondary_cache_instance ?dependency_key - dependency_key ?dependency_key_secondary - dependency_key_secondary ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (primary_ready_signal ?primary_cache)
+        (secondary_ready_signal ?secondary_cache)
+        (primary_dependency_key ?primary_cache ?dependency_key)
+        (secondary_dependency_key ?secondary_cache ?dependency_key_secondary)
+        (primary_dependency_patch_available ?dependency_key)
+        (secondary_dependency_patch_available ?dependency_key_secondary)
+        (not
+          (primary_claimed_for_job ?primary_cache)
+        )
+        (not
+          (secondary_claimed_for_job ?secondary_cache)
+        )
+        (job_pending ?invalidation_job)
+      )
+    :effect
+      (and
+        (job_prepared ?invalidation_job)
+        (job_includes_dependency_key ?invalidation_job ?dependency_key)
+        (job_includes_target_key ?invalidation_job ?dependency_key_secondary)
+        (job_primary_ready ?invalidation_job)
+        (job_secondary_ready ?invalidation_job)
+        (not
+          (job_pending ?invalidation_job)
+        )
+      )
+  )
+  (:action lock_job_for_partition_assignment
+    :parameters (?invalidation_job - invalidation_job ?primary_cache - primary_cache_instance ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (job_prepared ?invalidation_job)
+        (primary_ready_signal ?primary_cache)
+        (diagnostic_attached ?primary_cache ?diagnostic_artifact)
+        (not
+          (job_locked_for_assignment ?invalidation_job)
+        )
+      )
+    :effect (job_locked_for_assignment ?invalidation_job)
+  )
+  (:action assign_partition_to_job
+    :parameters (?agent - remediation_agent ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (agent_has_job ?agent ?invalidation_job)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_available ?data_partition)
+        (job_prepared ?invalidation_job)
+        (job_locked_for_assignment ?invalidation_job)
+        (not
+          (partition_claimed ?data_partition)
+        )
+      )
+    :effect
+      (and
+        (partition_claimed ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (not
+          (partition_available ?data_partition)
+        )
+      )
+  )
+  (:action prepare_agent_for_partition_assignment
+    :parameters (?agent - remediation_agent ?data_partition - data_partition ?invalidation_job - invalidation_job ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_claimed ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (diagnostic_attached ?agent ?diagnostic_artifact)
+        (not
+          (job_primary_ready ?invalidation_job)
+        )
+        (not
+          (agent_partition_prepared ?agent)
+        )
+      )
+    :effect (agent_partition_prepared ?agent)
+  )
+  (:action attach_approval_to_agent
+    :parameters (?agent - remediation_agent ?approval_token - approval_token)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (approval_token_available ?approval_token)
+        (not
+          (approval_attached ?agent)
+        )
+      )
+    :effect
+      (and
+        (approval_attached ?agent)
+        (agent_has_approval_token ?agent ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action finalize_agent_partition_with_approval
+    :parameters (?agent - remediation_agent ?data_partition - data_partition ?invalidation_job - invalidation_job ?diagnostic_artifact - diagnostic_artifact ?approval_token - approval_token)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_claimed ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (diagnostic_attached ?agent ?diagnostic_artifact)
+        (job_primary_ready ?invalidation_job)
+        (approval_attached ?agent)
+        (agent_has_approval_token ?agent ?approval_token)
+        (not
+          (agent_partition_prepared ?agent)
+        )
+      )
+    :effect
+      (and
+        (agent_partition_prepared ?agent)
+        (agent_approval_stage_marked ?agent)
+      )
+  )
+  (:action reserve_agent_execution_slot_stage1
+    :parameters (?agent - remediation_agent ?test_case - test_case ?operator - operator_role ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_partition_prepared ?agent)
+        (agent_has_test_case ?agent ?test_case)
+        (operator_assigned_to_entity ?agent ?operator)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (not
+          (job_secondary_ready ?invalidation_job)
+        )
+        (not
+          (agent_execution_reserved ?agent)
+        )
+      )
+    :effect (agent_execution_reserved ?agent)
+  )
+  (:action reserve_agent_execution_slot_stage2
+    :parameters (?agent - remediation_agent ?test_case - test_case ?operator - operator_role ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_partition_prepared ?agent)
+        (agent_has_test_case ?agent ?test_case)
+        (operator_assigned_to_entity ?agent ?operator)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (job_secondary_ready ?invalidation_job)
+        (not
+          (agent_execution_reserved ?agent)
+        )
+      )
+    :effect (agent_execution_reserved ?agent)
+  )
+  (:action schedule_agent_test_execution
+    :parameters (?agent - remediation_agent ?credential - credential ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_execution_reserved ?agent)
+        (agent_has_credential ?agent ?credential)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (not
+          (job_primary_ready ?invalidation_job)
+        )
+        (not
+          (job_secondary_ready ?invalidation_job)
+        )
+        (not
+          (tests_executed ?agent)
+        )
+      )
+    :effect (tests_executed ?agent)
+  )
+  (:action schedule_agent_test_execution_with_primary_ready
+    :parameters (?agent - remediation_agent ?credential - credential ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_execution_reserved ?agent)
+        (agent_has_credential ?agent ?credential)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (job_primary_ready ?invalidation_job)
+        (not
+          (job_secondary_ready ?invalidation_job)
+        )
+        (not
+          (tests_executed ?agent)
+        )
+      )
+    :effect
+      (and
+        (tests_executed ?agent)
+        (tests_verified ?agent)
+      )
+  )
+  (:action schedule_agent_test_execution_with_secondary_ready
+    :parameters (?agent - remediation_agent ?credential - credential ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_execution_reserved ?agent)
+        (agent_has_credential ?agent ?credential)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (not
+          (job_primary_ready ?invalidation_job)
+        )
+        (job_secondary_ready ?invalidation_job)
+        (not
+          (tests_executed ?agent)
+        )
+      )
+    :effect
+      (and
+        (tests_executed ?agent)
+        (tests_verified ?agent)
+      )
+  )
+  (:action schedule_agent_test_execution_with_both_ready
+    :parameters (?agent - remediation_agent ?credential - credential ?data_partition - data_partition ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (agent_execution_reserved ?agent)
+        (agent_has_credential ?agent ?credential)
+        (agent_claims_partition ?agent ?data_partition)
+        (partition_assigned_to_job ?data_partition ?invalidation_job)
+        (job_primary_ready ?invalidation_job)
+        (job_secondary_ready ?invalidation_job)
+        (not
+          (tests_executed ?agent)
+        )
+      )
+    :effect
+      (and
+        (tests_executed ?agent)
+        (tests_verified ?agent)
+      )
+  )
+  (:action commit_agent_execution
+    :parameters (?agent - remediation_agent)
+    :precondition
+      (and
+        (tests_executed ?agent)
+        (not
+          (tests_verified ?agent)
+        )
+        (not
+          (agent_execution_committed ?agent)
+        )
+      )
+    :effect
+      (and
+        (agent_execution_committed ?agent)
+        (entity_ready_for_invalidation ?agent)
+      )
+  )
+  (:action attach_deployment_config_to_agent
+    :parameters (?agent - remediation_agent ?deployment_config - deployment_config)
+    :precondition
+      (and
+        (tests_executed ?agent)
+        (tests_verified ?agent)
+        (deployment_config_available ?deployment_config)
+      )
+    :effect
+      (and
+        (agent_has_deployment_config ?agent ?deployment_config)
+        (not
+          (deployment_config_available ?deployment_config)
+        )
+      )
+  )
+  (:action perform_pre_execution_checks
+    :parameters (?agent - remediation_agent ?primary_cache - primary_cache_instance ?secondary_cache - secondary_cache_instance ?diagnostic_artifact - diagnostic_artifact ?deployment_config - deployment_config)
+    :precondition
+      (and
+        (tests_executed ?agent)
+        (tests_verified ?agent)
+        (agent_has_deployment_config ?agent ?deployment_config)
+        (agent_manages_primary_cache ?agent ?primary_cache)
+        (agent_manages_secondary_cache ?agent ?secondary_cache)
+        (primary_claimed_for_job ?primary_cache)
+        (secondary_claimed_for_job ?secondary_cache)
+        (diagnostic_attached ?agent ?diagnostic_artifact)
+        (not
+          (pre_execution_checks_passed ?agent)
+        )
+      )
+    :effect (pre_execution_checks_passed ?agent)
+  )
+  (:action finalize_pre_execution_checks
+    :parameters (?agent - remediation_agent)
+    :precondition
+      (and
+        (tests_executed ?agent)
+        (pre_execution_checks_passed ?agent)
+        (not
+          (agent_execution_committed ?agent)
+        )
+      )
+    :effect
+      (and
+        (agent_execution_committed ?agent)
+        (entity_ready_for_invalidation ?agent)
+      )
+  )
+  (:action attach_audit_record_to_agent
+    :parameters (?agent - remediation_agent ?audit_record - audit_record ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (remediation_plan_created ?agent)
+        (diagnostic_attached ?agent ?diagnostic_artifact)
+        (audit_record_available ?audit_record)
+        (agent_has_audit_record ?agent ?audit_record)
+        (not
+          (audit_attached_flag ?agent)
+        )
+      )
+    :effect
+      (and
+        (audit_attached_flag ?agent)
+        (not
+          (audit_record_available ?audit_record)
+        )
+      )
+  )
+  (:action start_agent_audit_stage
+    :parameters (?agent - remediation_agent ?operator - operator_role)
+    :precondition
+      (and
+        (audit_attached_flag ?agent)
+        (operator_assigned_to_entity ?agent ?operator)
+        (not
+          (audit_stage_claimed ?agent)
+        )
+      )
+    :effect (audit_stage_claimed ?agent)
+  )
+  (:action verify_agent_audit_with_credential
+    :parameters (?agent - remediation_agent ?credential - credential)
+    :precondition
+      (and
+        (audit_stage_claimed ?agent)
+        (agent_has_credential ?agent ?credential)
+        (not
+          (audit_verified ?agent)
+        )
+      )
+    :effect (audit_verified ?agent)
+  )
+  (:action complete_agent_audit
+    :parameters (?agent - remediation_agent)
+    :precondition
+      (and
+        (audit_verified ?agent)
+        (not
+          (agent_execution_committed ?agent)
+        )
+      )
+    :effect
+      (and
+        (agent_execution_committed ?agent)
+        (entity_ready_for_invalidation ?agent)
+      )
+  )
+  (:action mark_primary_ready_for_invalidation
+    :parameters (?primary_cache - primary_cache_instance ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (primary_ready_signal ?primary_cache)
+        (primary_claimed_for_job ?primary_cache)
+        (job_prepared ?invalidation_job)
+        (job_locked_for_assignment ?invalidation_job)
+        (not
+          (entity_ready_for_invalidation ?primary_cache)
+        )
+      )
+    :effect (entity_ready_for_invalidation ?primary_cache)
+  )
+  (:action mark_secondary_ready_for_invalidation
+    :parameters (?secondary_cache - secondary_cache_instance ?invalidation_job - invalidation_job)
+    :precondition
+      (and
+        (secondary_ready_signal ?secondary_cache)
+        (secondary_claimed_for_job ?secondary_cache)
+        (job_prepared ?invalidation_job)
+        (job_locked_for_assignment ?invalidation_job)
+        (not
+          (entity_ready_for_invalidation ?secondary_cache)
+        )
+      )
+    :effect (entity_ready_for_invalidation ?secondary_cache)
+  )
+  (:action execute_invalidation_on_component
+    :parameters (?component - application_component ?verification_artifact - verification_artifact ?diagnostic_artifact - diagnostic_artifact)
+    :precondition
+      (and
+        (entity_ready_for_invalidation ?component)
+        (diagnostic_attached ?component ?diagnostic_artifact)
+        (verification_artifact_available ?verification_artifact)
+        (not
+          (invalidation_executed ?component)
+        )
+      )
+    :effect
+      (and
+        (invalidation_executed ?component)
+        (component_has_verification_artifact ?component ?verification_artifact)
+        (not
+          (verification_artifact_available ?verification_artifact)
+        )
+      )
+  )
+  (:action finalize_invalidation_on_primary_instance
+    :parameters (?primary_cache - primary_cache_instance ?worker - invalidation_worker ?verification_artifact - verification_artifact)
+    :precondition
+      (and
+        (invalidation_executed ?primary_cache)
+        (assigned_worker ?primary_cache ?worker)
+        (component_has_verification_artifact ?primary_cache ?verification_artifact)
+        (not
+          (remediation_completed ?primary_cache)
+        )
+      )
+    :effect
+      (and
+        (remediation_completed ?primary_cache)
+        (worker_available ?worker)
+        (verification_artifact_available ?verification_artifact)
+      )
+  )
+  (:action finalize_invalidation_on_secondary_instance
+    :parameters (?secondary_cache - secondary_cache_instance ?worker - invalidation_worker ?verification_artifact - verification_artifact)
+    :precondition
+      (and
+        (invalidation_executed ?secondary_cache)
+        (assigned_worker ?secondary_cache ?worker)
+        (component_has_verification_artifact ?secondary_cache ?verification_artifact)
+        (not
+          (remediation_completed ?secondary_cache)
+        )
+      )
+    :effect
+      (and
+        (remediation_completed ?secondary_cache)
+        (worker_available ?worker)
+        (verification_artifact_available ?verification_artifact)
+      )
+  )
+  (:action finalize_invalidation_on_agent
+    :parameters (?agent - remediation_agent ?worker - invalidation_worker ?verification_artifact - verification_artifact)
+    :precondition
+      (and
+        (invalidation_executed ?agent)
+        (assigned_worker ?agent ?worker)
+        (component_has_verification_artifact ?agent ?verification_artifact)
+        (not
+          (remediation_completed ?agent)
+        )
+      )
+    :effect
+      (and
+        (remediation_completed ?agent)
+        (worker_available ?worker)
+        (verification_artifact_available ?verification_artifact)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem cache_staleness_remediation_problem)
+  (:domain cache_invalidation_domain)
+  (:objects primary_cache_1 - primary_cache_instance secondary_cache_1 - secondary_cache_instance remediation_agent_1 - remediation_agent remediation_agent_2 - remediation_agent worker_1 - invalidation_worker worker_2 - invalidation_worker worker_3 - invalidation_worker diagnostic_1 - diagnostic_artifact operator_1 - operator_role patch_1 - repair_patch dependency_key_1 - dependency_key target_key_1 - dependency_key_secondary invalidation_job_1 - invalidation_job data_partition_1 - data_partition data_partition_2 - data_partition approval_token_1 - approval_token approval_token_2 - approval_token deployment_config_1 - deployment_config deployment_config_2 - deployment_config verification_artifact_1 - verification_artifact test_case_1 - test_case audit_record_1 - audit_record audit_record_2 - audit_record credential_1 - credential)
+  (:init
+    (worker_available worker_1)
+    (worker_available worker_2)
+    (worker_available worker_3)
+    (diagnostic_available diagnostic_1)
+    (operator_available operator_1)
+    (repair_patch_available patch_1)
+    (primary_dependency_key primary_cache_1 dependency_key_1)
+    (secondary_dependency_key secondary_cache_1 target_key_1)
+    (job_pending invalidation_job_1)
+    (partition_available data_partition_1)
+    (partition_available data_partition_2)
+    (agent_manages_primary_cache remediation_agent_1 primary_cache_1)
+    (agent_manages_primary_cache remediation_agent_2 primary_cache_1)
+    (agent_manages_secondary_cache remediation_agent_1 secondary_cache_1)
+    (agent_manages_secondary_cache remediation_agent_2 secondary_cache_1)
+    (agent_has_job remediation_agent_1 invalidation_job_1)
+    (agent_has_job remediation_agent_2 invalidation_job_1)
+    (agent_claims_partition remediation_agent_1 data_partition_1)
+    (agent_claims_partition remediation_agent_2 data_partition_2)
+    (approval_token_available approval_token_1)
+    (approval_token_available approval_token_2)
+    (deployment_config_available deployment_config_1)
+    (deployment_config_available deployment_config_2)
+    (verification_artifact_available verification_artifact_1)
+    (test_case_available test_case_1)
+    (audit_record_available audit_record_1)
+    (agent_has_audit_record remediation_agent_1 audit_record_1)
+    (agent_has_audit_record remediation_agent_2 audit_record_2)
+    (credential_available credential_1)
+  )
+  (:goal
+    (and
+      (remediation_completed primary_cache_1)
+      (remediation_completed secondary_cache_1)
+      (remediation_completed remediation_agent_1)
+      (remediation_completed remediation_agent_2)
+    )
+  )
+)

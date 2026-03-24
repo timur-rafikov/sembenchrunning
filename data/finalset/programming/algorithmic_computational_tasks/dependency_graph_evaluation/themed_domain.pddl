@@ -1,0 +1,936 @@
+(define (domain dependency_graph_evaluation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types runtime_entity - object resource_class - object artifact_container_class - object node_class - object graph_node - node_class executor_slot - runtime_entity resource_token - runtime_entity dependency_handler - runtime_entity configuration_option - runtime_entity priority_tag - runtime_entity allocation_label - runtime_entity special_resource - runtime_entity auth_token - runtime_entity data_item - resource_class artifact - resource_class policy_token - resource_class communication_channel_a - artifact_container_class communication_channel_b - artifact_container_class result_container - artifact_container_class node_actor_class - graph_node consumer_class - graph_node producer_node - node_actor_class consumer_node - node_actor_class computation_component - consumer_class)
+  (:predicates
+    (entity_discovered ?node - graph_node)
+    (entity_ready ?node - graph_node)
+    (node_executor_claimed ?node - graph_node)
+    (entity_completed ?node - graph_node)
+    (entity_output_ready ?node - graph_node)
+    (entity_committed ?node - graph_node)
+    (executor_available ?executor_slot - executor_slot)
+    (entity_executor_bound ?node - graph_node ?executor_slot - executor_slot)
+    (resource_available ?resource_token - resource_token)
+    (entity_acquired_resource ?node - graph_node ?resource_token - resource_token)
+    (handler_available ?dependency_handler - dependency_handler)
+    (entity_handler_bound ?node - graph_node ?dependency_handler - dependency_handler)
+    (data_item_available ?data_item - data_item)
+    (producer_attached_data ?producer_node - producer_node ?data_item - data_item)
+    (consumer_attached_data ?consumer_node - consumer_node ?data_item - data_item)
+    (producer_bound_channel_a ?producer_node - producer_node ?channel_a - communication_channel_a)
+    (channel_a_ready ?channel_a - communication_channel_a)
+    (channel_a_buffered ?channel_a - communication_channel_a)
+    (producer_ready_for_container ?producer_node - producer_node)
+    (consumer_bound_channel_b ?consumer_node - consumer_node ?channel_b - communication_channel_b)
+    (channel_b_ready ?channel_b - communication_channel_b)
+    (channel_b_buffered ?channel_b - communication_channel_b)
+    (consumer_ready_for_container ?consumer_node - consumer_node)
+    (result_container_available ?result_container - result_container)
+    (result_container_allocated ?result_container - result_container)
+    (result_container_bound_channel_a ?result_container - result_container ?channel_a - communication_channel_a)
+    (result_container_bound_channel_b ?result_container - result_container ?channel_b - communication_channel_b)
+    (result_container_producer_tag ?result_container - result_container)
+    (result_container_consumer_tag ?result_container - result_container)
+    (result_container_initialized ?result_container - result_container)
+    (component_linked_producer ?component - computation_component ?producer_node - producer_node)
+    (component_linked_consumer ?component - computation_component ?consumer_node - consumer_node)
+    (component_assigned_container ?component - computation_component ?result_container - result_container)
+    (artifact_available ?artifact - artifact)
+    (component_bound_artifact ?component - computation_component ?artifact - artifact)
+    (artifact_attached ?artifact - artifact)
+    (artifact_bound_to_container ?artifact - artifact ?result_container - result_container)
+    (component_stage_one_ready ?component - computation_component)
+    (component_stage_two_ready ?component - computation_component)
+    (component_stage_three_ready ?component - computation_component)
+    (component_option_claimed ?component - computation_component)
+    (component_option_applied ?component - computation_component)
+    (component_priority_attached ?component - computation_component)
+    (component_evaluated ?component - computation_component)
+    (policy_token_available ?policy_token - policy_token)
+    (component_bound_policy ?component - computation_component ?policy_token - policy_token)
+    (component_policy_reserved ?component - computation_component)
+    (component_policy_option_applied ?component - computation_component)
+    (component_policy_finalized ?component - computation_component)
+    (config_option_available ?configuration_option - configuration_option)
+    (component_bound_option ?component - computation_component ?configuration_option - configuration_option)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (component_bound_priority ?component - computation_component ?priority_tag - priority_tag)
+    (special_resource_available ?special_resource - special_resource)
+    (component_bound_special_resource ?component - computation_component ?special_resource - special_resource)
+    (auth_token_available ?auth_token - auth_token)
+    (component_bound_auth ?component - computation_component ?auth_token - auth_token)
+    (allocation_label_available ?allocation_label - allocation_label)
+    (entity_allocation_label ?node - graph_node ?allocation_label - allocation_label)
+    (producer_engaged ?producer_node - producer_node)
+    (consumer_engaged ?consumer_node - consumer_node)
+    (component_finalized ?component - computation_component)
+  )
+  (:action discover_node
+    :parameters (?node - graph_node)
+    :precondition
+      (and
+        (not
+          (entity_discovered ?node)
+        )
+        (not
+          (entity_completed ?node)
+        )
+      )
+    :effect (entity_discovered ?node)
+  )
+  (:action assign_executor_to_node
+    :parameters (?node - graph_node ?executor_slot - executor_slot)
+    :precondition
+      (and
+        (entity_discovered ?node)
+        (not
+          (node_executor_claimed ?node)
+        )
+        (executor_available ?executor_slot)
+      )
+    :effect
+      (and
+        (node_executor_claimed ?node)
+        (entity_executor_bound ?node ?executor_slot)
+        (not
+          (executor_available ?executor_slot)
+        )
+      )
+  )
+  (:action acquire_resource_for_node
+    :parameters (?node - graph_node ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_discovered ?node)
+        (node_executor_claimed ?node)
+        (resource_available ?resource_token)
+      )
+    :effect
+      (and
+        (entity_acquired_resource ?node ?resource_token)
+        (not
+          (resource_available ?resource_token)
+        )
+      )
+  )
+  (:action mark_node_ready
+    :parameters (?node - graph_node ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_discovered ?node)
+        (node_executor_claimed ?node)
+        (entity_acquired_resource ?node ?resource_token)
+        (not
+          (entity_ready ?node)
+        )
+      )
+    :effect (entity_ready ?node)
+  )
+  (:action release_resource_from_node
+    :parameters (?node - graph_node ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_acquired_resource ?node ?resource_token)
+      )
+    :effect
+      (and
+        (resource_available ?resource_token)
+        (not
+          (entity_acquired_resource ?node ?resource_token)
+        )
+      )
+  )
+  (:action bind_dependency_handler_to_node
+    :parameters (?node - graph_node ?dependency_handler - dependency_handler)
+    :precondition
+      (and
+        (entity_ready ?node)
+        (handler_available ?dependency_handler)
+      )
+    :effect
+      (and
+        (entity_handler_bound ?node ?dependency_handler)
+        (not
+          (handler_available ?dependency_handler)
+        )
+      )
+  )
+  (:action unbind_dependency_handler_from_node
+    :parameters (?node - graph_node ?dependency_handler - dependency_handler)
+    :precondition
+      (and
+        (entity_handler_bound ?node ?dependency_handler)
+      )
+    :effect
+      (and
+        (handler_available ?dependency_handler)
+        (not
+          (entity_handler_bound ?node ?dependency_handler)
+        )
+      )
+  )
+  (:action attach_special_resource_to_component
+    :parameters (?component - computation_component ?special_resource - special_resource)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (special_resource_available ?special_resource)
+      )
+    :effect
+      (and
+        (component_bound_special_resource ?component ?special_resource)
+        (not
+          (special_resource_available ?special_resource)
+        )
+      )
+  )
+  (:action detach_special_resource_from_component
+    :parameters (?component - computation_component ?special_resource - special_resource)
+    :precondition
+      (and
+        (component_bound_special_resource ?component ?special_resource)
+      )
+    :effect
+      (and
+        (special_resource_available ?special_resource)
+        (not
+          (component_bound_special_resource ?component ?special_resource)
+        )
+      )
+  )
+  (:action attach_auth_token_to_component
+    :parameters (?component - computation_component ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (auth_token_available ?auth_token)
+      )
+    :effect
+      (and
+        (component_bound_auth ?component ?auth_token)
+        (not
+          (auth_token_available ?auth_token)
+        )
+      )
+  )
+  (:action detach_auth_token_from_component
+    :parameters (?component - computation_component ?auth_token - auth_token)
+    :precondition
+      (and
+        (component_bound_auth ?component ?auth_token)
+      )
+    :effect
+      (and
+        (auth_token_available ?auth_token)
+        (not
+          (component_bound_auth ?component ?auth_token)
+        )
+      )
+  )
+  (:action producer_advertise_channel_a
+    :parameters (?producer_node - producer_node ?channel_a - communication_channel_a ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_ready ?producer_node)
+        (entity_acquired_resource ?producer_node ?resource_token)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (not
+          (channel_a_ready ?channel_a)
+        )
+        (not
+          (channel_a_buffered ?channel_a)
+        )
+      )
+    :effect (channel_a_ready ?channel_a)
+  )
+  (:action producer_confirm_channel_a
+    :parameters (?producer_node - producer_node ?channel_a - communication_channel_a ?dependency_handler - dependency_handler)
+    :precondition
+      (and
+        (entity_ready ?producer_node)
+        (entity_handler_bound ?producer_node ?dependency_handler)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (channel_a_ready ?channel_a)
+        (not
+          (producer_engaged ?producer_node)
+        )
+      )
+    :effect
+      (and
+        (producer_engaged ?producer_node)
+        (producer_ready_for_container ?producer_node)
+      )
+  )
+  (:action producer_publish_data_on_channel_a
+    :parameters (?producer_node - producer_node ?channel_a - communication_channel_a ?data_item - data_item)
+    :precondition
+      (and
+        (entity_ready ?producer_node)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (data_item_available ?data_item)
+        (not
+          (producer_engaged ?producer_node)
+        )
+      )
+    :effect
+      (and
+        (channel_a_buffered ?channel_a)
+        (producer_engaged ?producer_node)
+        (producer_attached_data ?producer_node ?data_item)
+        (not
+          (data_item_available ?data_item)
+        )
+      )
+  )
+  (:action producer_finalize_channel_a_advertisement
+    :parameters (?producer_node - producer_node ?channel_a - communication_channel_a ?resource_token - resource_token ?data_item - data_item)
+    :precondition
+      (and
+        (entity_ready ?producer_node)
+        (entity_acquired_resource ?producer_node ?resource_token)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (channel_a_buffered ?channel_a)
+        (producer_attached_data ?producer_node ?data_item)
+        (not
+          (producer_ready_for_container ?producer_node)
+        )
+      )
+    :effect
+      (and
+        (channel_a_ready ?channel_a)
+        (producer_ready_for_container ?producer_node)
+        (data_item_available ?data_item)
+        (not
+          (producer_attached_data ?producer_node ?data_item)
+        )
+      )
+  )
+  (:action consumer_advertise_channel_b
+    :parameters (?consumer_node - consumer_node ?channel_b - communication_channel_b ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_ready ?consumer_node)
+        (entity_acquired_resource ?consumer_node ?resource_token)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (not
+          (channel_b_ready ?channel_b)
+        )
+        (not
+          (channel_b_buffered ?channel_b)
+        )
+      )
+    :effect (channel_b_ready ?channel_b)
+  )
+  (:action consumer_confirm_channel_b
+    :parameters (?consumer_node - consumer_node ?channel_b - communication_channel_b ?dependency_handler - dependency_handler)
+    :precondition
+      (and
+        (entity_ready ?consumer_node)
+        (entity_handler_bound ?consumer_node ?dependency_handler)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_b_ready ?channel_b)
+        (not
+          (consumer_engaged ?consumer_node)
+        )
+      )
+    :effect
+      (and
+        (consumer_engaged ?consumer_node)
+        (consumer_ready_for_container ?consumer_node)
+      )
+  )
+  (:action consumer_publish_data_on_channel_b
+    :parameters (?consumer_node - consumer_node ?channel_b - communication_channel_b ?data_item - data_item)
+    :precondition
+      (and
+        (entity_ready ?consumer_node)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (data_item_available ?data_item)
+        (not
+          (consumer_engaged ?consumer_node)
+        )
+      )
+    :effect
+      (and
+        (channel_b_buffered ?channel_b)
+        (consumer_engaged ?consumer_node)
+        (consumer_attached_data ?consumer_node ?data_item)
+        (not
+          (data_item_available ?data_item)
+        )
+      )
+  )
+  (:action consumer_finalize_channel_b_advertisement
+    :parameters (?consumer_node - consumer_node ?channel_b - communication_channel_b ?resource_token - resource_token ?data_item - data_item)
+    :precondition
+      (and
+        (entity_ready ?consumer_node)
+        (entity_acquired_resource ?consumer_node ?resource_token)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_b_buffered ?channel_b)
+        (consumer_attached_data ?consumer_node ?data_item)
+        (not
+          (consumer_ready_for_container ?consumer_node)
+        )
+      )
+    :effect
+      (and
+        (channel_b_ready ?channel_b)
+        (consumer_ready_for_container ?consumer_node)
+        (data_item_available ?data_item)
+        (not
+          (consumer_attached_data ?consumer_node ?data_item)
+        )
+      )
+  )
+  (:action allocate_result_container
+    :parameters (?producer_node - producer_node ?consumer_node - consumer_node ?channel_a - communication_channel_a ?channel_b - communication_channel_b ?result_container - result_container)
+    :precondition
+      (and
+        (producer_engaged ?producer_node)
+        (consumer_engaged ?consumer_node)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_a_ready ?channel_a)
+        (channel_b_ready ?channel_b)
+        (producer_ready_for_container ?producer_node)
+        (consumer_ready_for_container ?consumer_node)
+        (result_container_available ?result_container)
+      )
+    :effect
+      (and
+        (result_container_allocated ?result_container)
+        (result_container_bound_channel_a ?result_container ?channel_a)
+        (result_container_bound_channel_b ?result_container ?channel_b)
+        (not
+          (result_container_available ?result_container)
+        )
+      )
+  )
+  (:action allocate_result_container_with_producer_tag
+    :parameters (?producer_node - producer_node ?consumer_node - consumer_node ?channel_a - communication_channel_a ?channel_b - communication_channel_b ?result_container - result_container)
+    :precondition
+      (and
+        (producer_engaged ?producer_node)
+        (consumer_engaged ?consumer_node)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_a_buffered ?channel_a)
+        (channel_b_ready ?channel_b)
+        (not
+          (producer_ready_for_container ?producer_node)
+        )
+        (consumer_ready_for_container ?consumer_node)
+        (result_container_available ?result_container)
+      )
+    :effect
+      (and
+        (result_container_allocated ?result_container)
+        (result_container_bound_channel_a ?result_container ?channel_a)
+        (result_container_bound_channel_b ?result_container ?channel_b)
+        (result_container_producer_tag ?result_container)
+        (not
+          (result_container_available ?result_container)
+        )
+      )
+  )
+  (:action allocate_result_container_with_consumer_tag
+    :parameters (?producer_node - producer_node ?consumer_node - consumer_node ?channel_a - communication_channel_a ?channel_b - communication_channel_b ?result_container - result_container)
+    :precondition
+      (and
+        (producer_engaged ?producer_node)
+        (consumer_engaged ?consumer_node)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_a_ready ?channel_a)
+        (channel_b_buffered ?channel_b)
+        (producer_ready_for_container ?producer_node)
+        (not
+          (consumer_ready_for_container ?consumer_node)
+        )
+        (result_container_available ?result_container)
+      )
+    :effect
+      (and
+        (result_container_allocated ?result_container)
+        (result_container_bound_channel_a ?result_container ?channel_a)
+        (result_container_bound_channel_b ?result_container ?channel_b)
+        (result_container_consumer_tag ?result_container)
+        (not
+          (result_container_available ?result_container)
+        )
+      )
+  )
+  (:action allocate_result_container_with_both_tags
+    :parameters (?producer_node - producer_node ?consumer_node - consumer_node ?channel_a - communication_channel_a ?channel_b - communication_channel_b ?result_container - result_container)
+    :precondition
+      (and
+        (producer_engaged ?producer_node)
+        (consumer_engaged ?consumer_node)
+        (producer_bound_channel_a ?producer_node ?channel_a)
+        (consumer_bound_channel_b ?consumer_node ?channel_b)
+        (channel_a_buffered ?channel_a)
+        (channel_b_buffered ?channel_b)
+        (not
+          (producer_ready_for_container ?producer_node)
+        )
+        (not
+          (consumer_ready_for_container ?consumer_node)
+        )
+        (result_container_available ?result_container)
+      )
+    :effect
+      (and
+        (result_container_allocated ?result_container)
+        (result_container_bound_channel_a ?result_container ?channel_a)
+        (result_container_bound_channel_b ?result_container ?channel_b)
+        (result_container_producer_tag ?result_container)
+        (result_container_consumer_tag ?result_container)
+        (not
+          (result_container_available ?result_container)
+        )
+      )
+  )
+  (:action initialize_container_for_production
+    :parameters (?result_container - result_container ?producer_node - producer_node ?resource_token - resource_token)
+    :precondition
+      (and
+        (result_container_allocated ?result_container)
+        (producer_engaged ?producer_node)
+        (entity_acquired_resource ?producer_node ?resource_token)
+        (not
+          (result_container_initialized ?result_container)
+        )
+      )
+    :effect (result_container_initialized ?result_container)
+  )
+  (:action attach_artifact_to_component
+    :parameters (?component - computation_component ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (component_assigned_container ?component ?result_container)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_available ?artifact)
+        (result_container_allocated ?result_container)
+        (result_container_initialized ?result_container)
+        (not
+          (artifact_attached ?artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_attached ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action prepare_component_for_evaluation
+    :parameters (?component - computation_component ?artifact - artifact ?result_container - result_container ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_attached ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (entity_acquired_resource ?component ?resource_token)
+        (not
+          (result_container_producer_tag ?result_container)
+        )
+        (not
+          (component_stage_one_ready ?component)
+        )
+      )
+    :effect (component_stage_one_ready ?component)
+  )
+  (:action reserve_configuration_option_for_component
+    :parameters (?component - computation_component ?configuration_option - configuration_option)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (config_option_available ?configuration_option)
+        (not
+          (component_option_claimed ?component)
+        )
+      )
+    :effect
+      (and
+        (component_option_claimed ?component)
+        (component_bound_option ?component ?configuration_option)
+        (not
+          (config_option_available ?configuration_option)
+        )
+      )
+  )
+  (:action apply_configuration_and_prepare_component
+    :parameters (?component - computation_component ?artifact - artifact ?result_container - result_container ?resource_token - resource_token ?configuration_option - configuration_option)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_attached ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (entity_acquired_resource ?component ?resource_token)
+        (result_container_producer_tag ?result_container)
+        (component_option_claimed ?component)
+        (component_bound_option ?component ?configuration_option)
+        (not
+          (component_stage_one_ready ?component)
+        )
+      )
+    :effect
+      (and
+        (component_stage_one_ready ?component)
+        (component_option_applied ?component)
+      )
+  )
+  (:action start_component_evaluation_with_special_resource
+    :parameters (?component - computation_component ?special_resource - special_resource ?dependency_handler - dependency_handler ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_one_ready ?component)
+        (component_bound_special_resource ?component ?special_resource)
+        (entity_handler_bound ?component ?dependency_handler)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (not
+          (result_container_consumer_tag ?result_container)
+        )
+        (not
+          (component_stage_two_ready ?component)
+        )
+      )
+    :effect (component_stage_two_ready ?component)
+  )
+  (:action continue_component_evaluation_with_special_resource
+    :parameters (?component - computation_component ?special_resource - special_resource ?dependency_handler - dependency_handler ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_one_ready ?component)
+        (component_bound_special_resource ?component ?special_resource)
+        (entity_handler_bound ?component ?dependency_handler)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (result_container_consumer_tag ?result_container)
+        (not
+          (component_stage_two_ready ?component)
+        )
+      )
+    :effect (component_stage_two_ready ?component)
+  )
+  (:action promote_component_evaluation_stage
+    :parameters (?component - computation_component ?auth_token - auth_token ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_two_ready ?component)
+        (component_bound_auth ?component ?auth_token)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (not
+          (result_container_producer_tag ?result_container)
+        )
+        (not
+          (result_container_consumer_tag ?result_container)
+        )
+        (not
+          (component_stage_three_ready ?component)
+        )
+      )
+    :effect (component_stage_three_ready ?component)
+  )
+  (:action promote_component_evaluation_with_option
+    :parameters (?component - computation_component ?auth_token - auth_token ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_two_ready ?component)
+        (component_bound_auth ?component ?auth_token)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (result_container_producer_tag ?result_container)
+        (not
+          (result_container_consumer_tag ?result_container)
+        )
+        (not
+          (component_stage_three_ready ?component)
+        )
+      )
+    :effect
+      (and
+        (component_stage_three_ready ?component)
+        (component_priority_attached ?component)
+      )
+  )
+  (:action promote_component_evaluation_with_option_alternate
+    :parameters (?component - computation_component ?auth_token - auth_token ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_two_ready ?component)
+        (component_bound_auth ?component ?auth_token)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (not
+          (result_container_producer_tag ?result_container)
+        )
+        (result_container_consumer_tag ?result_container)
+        (not
+          (component_stage_three_ready ?component)
+        )
+      )
+    :effect
+      (and
+        (component_stage_three_ready ?component)
+        (component_priority_attached ?component)
+      )
+  )
+  (:action promote_component_evaluation_with_full_flags
+    :parameters (?component - computation_component ?auth_token - auth_token ?artifact - artifact ?result_container - result_container)
+    :precondition
+      (and
+        (component_stage_two_ready ?component)
+        (component_bound_auth ?component ?auth_token)
+        (component_bound_artifact ?component ?artifact)
+        (artifact_bound_to_container ?artifact ?result_container)
+        (result_container_producer_tag ?result_container)
+        (result_container_consumer_tag ?result_container)
+        (not
+          (component_stage_three_ready ?component)
+        )
+      )
+    :effect
+      (and
+        (component_stage_three_ready ?component)
+        (component_priority_attached ?component)
+      )
+  )
+  (:action finalize_component_evaluation
+    :parameters (?component - computation_component)
+    :precondition
+      (and
+        (component_stage_three_ready ?component)
+        (not
+          (component_priority_attached ?component)
+        )
+        (not
+          (component_finalized ?component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?component)
+        (entity_output_ready ?component)
+      )
+  )
+  (:action attach_priority_to_component
+    :parameters (?component - computation_component ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (component_stage_three_ready ?component)
+        (component_priority_attached ?component)
+        (priority_tag_available ?priority_tag)
+      )
+    :effect
+      (and
+        (component_bound_priority ?component ?priority_tag)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action run_component_evaluation_checks
+    :parameters (?component - computation_component ?producer_node - producer_node ?consumer_node - consumer_node ?resource_token - resource_token ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (component_stage_three_ready ?component)
+        (component_priority_attached ?component)
+        (component_bound_priority ?component ?priority_tag)
+        (component_linked_producer ?component ?producer_node)
+        (component_linked_consumer ?component ?consumer_node)
+        (producer_ready_for_container ?producer_node)
+        (consumer_ready_for_container ?consumer_node)
+        (entity_acquired_resource ?component ?resource_token)
+        (not
+          (component_evaluated ?component)
+        )
+      )
+    :effect (component_evaluated ?component)
+  )
+  (:action complete_component_evaluation
+    :parameters (?component - computation_component)
+    :precondition
+      (and
+        (component_stage_three_ready ?component)
+        (component_evaluated ?component)
+        (not
+          (component_finalized ?component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?component)
+        (entity_output_ready ?component)
+      )
+  )
+  (:action reserve_policy_for_component
+    :parameters (?component - computation_component ?policy_token - policy_token ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_ready ?component)
+        (entity_acquired_resource ?component ?resource_token)
+        (policy_token_available ?policy_token)
+        (component_bound_policy ?component ?policy_token)
+        (not
+          (component_policy_reserved ?component)
+        )
+      )
+    :effect
+      (and
+        (component_policy_reserved ?component)
+        (not
+          (policy_token_available ?policy_token)
+        )
+      )
+  )
+  (:action apply_policy_via_handler
+    :parameters (?component - computation_component ?dependency_handler - dependency_handler)
+    :precondition
+      (and
+        (component_policy_reserved ?component)
+        (entity_handler_bound ?component ?dependency_handler)
+        (not
+          (component_policy_option_applied ?component)
+        )
+      )
+    :effect (component_policy_option_applied ?component)
+  )
+  (:action authorize_policy_for_component
+    :parameters (?component - computation_component ?auth_token - auth_token)
+    :precondition
+      (and
+        (component_policy_option_applied ?component)
+        (component_bound_auth ?component ?auth_token)
+        (not
+          (component_policy_finalized ?component)
+        )
+      )
+    :effect (component_policy_finalized ?component)
+  )
+  (:action finalize_component_after_policy
+    :parameters (?component - computation_component)
+    :precondition
+      (and
+        (component_policy_finalized ?component)
+        (not
+          (component_finalized ?component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?component)
+        (entity_output_ready ?component)
+      )
+  )
+  (:action commit_producer_result
+    :parameters (?producer_node - producer_node ?result_container - result_container)
+    :precondition
+      (and
+        (producer_engaged ?producer_node)
+        (producer_ready_for_container ?producer_node)
+        (result_container_allocated ?result_container)
+        (result_container_initialized ?result_container)
+        (not
+          (entity_output_ready ?producer_node)
+        )
+      )
+    :effect (entity_output_ready ?producer_node)
+  )
+  (:action commit_consumer_result
+    :parameters (?consumer_node - consumer_node ?result_container - result_container)
+    :precondition
+      (and
+        (consumer_engaged ?consumer_node)
+        (consumer_ready_for_container ?consumer_node)
+        (result_container_allocated ?result_container)
+        (result_container_initialized ?result_container)
+        (not
+          (entity_output_ready ?consumer_node)
+        )
+      )
+    :effect (entity_output_ready ?consumer_node)
+  )
+  (:action attach_allocation_label_to_node
+    :parameters (?node - graph_node ?allocation_label - allocation_label ?resource_token - resource_token)
+    :precondition
+      (and
+        (entity_output_ready ?node)
+        (entity_acquired_resource ?node ?resource_token)
+        (allocation_label_available ?allocation_label)
+        (not
+          (entity_committed ?node)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?node)
+        (entity_allocation_label ?node ?allocation_label)
+        (not
+          (allocation_label_available ?allocation_label)
+        )
+      )
+  )
+  (:action finalize_producer_node_allocation
+    :parameters (?producer_node - producer_node ?executor_slot - executor_slot ?allocation_label - allocation_label)
+    :precondition
+      (and
+        (entity_committed ?producer_node)
+        (entity_executor_bound ?producer_node ?executor_slot)
+        (entity_allocation_label ?producer_node ?allocation_label)
+        (not
+          (entity_completed ?producer_node)
+        )
+      )
+    :effect
+      (and
+        (entity_completed ?producer_node)
+        (executor_available ?executor_slot)
+        (allocation_label_available ?allocation_label)
+      )
+  )
+  (:action finalize_consumer_node_allocation
+    :parameters (?consumer_node - consumer_node ?executor_slot - executor_slot ?allocation_label - allocation_label)
+    :precondition
+      (and
+        (entity_committed ?consumer_node)
+        (entity_executor_bound ?consumer_node ?executor_slot)
+        (entity_allocation_label ?consumer_node ?allocation_label)
+        (not
+          (entity_completed ?consumer_node)
+        )
+      )
+    :effect
+      (and
+        (entity_completed ?consumer_node)
+        (executor_available ?executor_slot)
+        (allocation_label_available ?allocation_label)
+      )
+  )
+  (:action finalize_component_allocation
+    :parameters (?component - computation_component ?executor_slot - executor_slot ?allocation_label - allocation_label)
+    :precondition
+      (and
+        (entity_committed ?component)
+        (entity_executor_bound ?component ?executor_slot)
+        (entity_allocation_label ?component ?allocation_label)
+        (not
+          (entity_completed ?component)
+        )
+      )
+    :effect
+      (and
+        (entity_completed ?component)
+        (executor_available ?executor_slot)
+        (allocation_label_available ?allocation_label)
+      )
+  )
+)

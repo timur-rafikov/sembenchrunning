@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_adverse_event_case_triage_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object support_entity_type - entity asset_category - entity organization_entity_type - entity case_root_type - entity adverse_event_case - case_root_type response_resource - support_entity_type report_document - support_entity_type responder - support_entity_type regulatory_document - support_entity_type supplier - support_entity_type notification_template - support_entity_type technical_resource - support_entity_type external_expert - support_entity_type mitigation_resource - asset_category laboratory_sample - asset_category regulatory_authority - asset_category manufacturing_site_unit - organization_entity_type distribution_node - organization_entity_type remediation_order - organization_entity_type site_case_group - adverse_event_case workflow_case_group - adverse_event_case manufacturing_site_case - site_case_group distribution_site_case - site_case_group investigation_workstream - workflow_case_group)
+
+  (:predicates
+    (case_intake_recorded ?adverse_event_case - adverse_event_case)
+    (case_under_investigation ?adverse_event_case - adverse_event_case)
+    (case_triaged ?adverse_event_case - adverse_event_case)
+    (case_closed ?adverse_event_case - adverse_event_case)
+    (case_recovered ?adverse_event_case - adverse_event_case)
+    (case_notified ?adverse_event_case - adverse_event_case)
+    (response_resource_available ?response_resource - response_resource)
+    (case_assigned_response_resource ?adverse_event_case - adverse_event_case ?response_resource - response_resource)
+    (report_document_available ?report_document - report_document)
+    (case_has_report_document ?adverse_event_case - adverse_event_case ?report_document - report_document)
+    (responder_available ?responder - responder)
+    (case_assigned_responder ?adverse_event_case - adverse_event_case ?responder - responder)
+    (mitigation_resource_available ?mitigation_resource - mitigation_resource)
+    (manufacturing_case_assigned_mitigation_resource ?manufacturing_site_case - manufacturing_site_case ?mitigation_resource - mitigation_resource)
+    (distribution_case_assigned_mitigation_resource ?distribution_site_case - distribution_site_case ?mitigation_resource - mitigation_resource)
+    (manufacturing_case_assigned_site_unit ?manufacturing_site_case - manufacturing_site_case ?manufacturing_site_unit - manufacturing_site_unit)
+    (site_unit_flagged_for_quarantine ?manufacturing_site_unit - manufacturing_site_unit)
+    (site_unit_quarantined ?manufacturing_site_unit - manufacturing_site_unit)
+    (manufacturing_containment_verified ?manufacturing_site_case - manufacturing_site_case)
+    (distribution_case_assigned_distribution_node ?distribution_site_case - distribution_site_case ?distribution_node - distribution_node)
+    (distribution_node_flagged_for_quarantine ?distribution_node - distribution_node)
+    (distribution_node_quarantined ?distribution_node - distribution_node)
+    (distribution_containment_verified ?distribution_site_case - distribution_site_case)
+    (remediation_order_planned ?remediation_action - remediation_order)
+    (remediation_order_prepared ?remediation_action - remediation_order)
+    (remediation_order_linked_to_site_unit ?remediation_action - remediation_order ?manufacturing_site_unit - manufacturing_site_unit)
+    (remediation_order_linked_to_distribution_node ?remediation_action - remediation_order ?distribution_node - distribution_node)
+    (manufacturing_scope_confirmed ?remediation_action - remediation_order)
+    (distribution_scope_confirmed ?remediation_action - remediation_order)
+    (remediation_order_issued ?remediation_action - remediation_order)
+    (workstream_scoped_to_manufacturing_site_case ?investigation_workstream - investigation_workstream ?manufacturing_site_case - manufacturing_site_case)
+    (workstream_scoped_to_distribution_site_case ?investigation_workstream - investigation_workstream ?distribution_site_case - distribution_site_case)
+    (workstream_linked_to_remediation_order ?investigation_workstream - investigation_workstream ?remediation_action - remediation_order)
+    (laboratory_sample_available ?laboratory_sample - laboratory_sample)
+    (workstream_has_laboratory_sample ?investigation_workstream - investigation_workstream ?laboratory_sample - laboratory_sample)
+    (laboratory_sample_collected ?laboratory_sample - laboratory_sample)
+    (sample_linked_to_remediation_order ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    (sample_assessment_in_progress ?investigation_workstream - investigation_workstream)
+    (technical_review_complete ?investigation_workstream - investigation_workstream)
+    (specialist_review_complete ?investigation_workstream - investigation_workstream)
+    (regulatory_document_assigned ?investigation_workstream - investigation_workstream)
+    (regulatory_package_submitted ?investigation_workstream - investigation_workstream)
+    (specialist_clearance_granted ?investigation_workstream - investigation_workstream)
+    (closure_review_complete ?investigation_workstream - investigation_workstream)
+    (regulatory_authority_available ?regulatory_authority - regulatory_authority)
+    (workstream_assigned_regulatory_authority ?investigation_workstream - investigation_workstream ?regulatory_authority - regulatory_authority)
+    (authority_engaged ?investigation_workstream - investigation_workstream)
+    (authority_acknowledged ?investigation_workstream - investigation_workstream)
+    (authority_clearance_granted ?investigation_workstream - investigation_workstream)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (workstream_assigned_regulatory_document ?investigation_workstream - investigation_workstream ?regulatory_document - regulatory_document)
+    (supplier_available ?supplier - supplier)
+    (workstream_assigned_supplier ?investigation_workstream - investigation_workstream ?supplier - supplier)
+    (technical_resource_available ?technical_resource - technical_resource)
+    (workstream_assigned_technical_resource ?investigation_workstream - investigation_workstream ?technical_resource - technical_resource)
+    (external_expert_available ?external_expert - external_expert)
+    (workstream_assigned_external_expert ?investigation_workstream - investigation_workstream ?external_expert - external_expert)
+    (notification_template_available ?notification_template - notification_template)
+    (case_notification_template_assigned ?adverse_event_case - adverse_event_case ?notification_template - notification_template)
+    (manufacturing_containment_active ?manufacturing_site_case - manufacturing_site_case)
+    (distribution_containment_active ?distribution_site_case - distribution_site_case)
+    (recovery_finalized ?investigation_workstream - investigation_workstream)
+  )
+  (:action record_adverse_event_case_intake
+    :parameters (?adverse_event_case - adverse_event_case)
+    :precondition
+      (and
+        (not
+          (case_intake_recorded ?adverse_event_case)
+        )
+        (not
+          (case_closed ?adverse_event_case)
+        )
+      )
+    :effect (case_intake_recorded ?adverse_event_case)
+  )
+  (:action triage_case_with_response_resource
+    :parameters (?adverse_event_case - adverse_event_case ?response_resource - response_resource)
+    :precondition
+      (and
+        (case_intake_recorded ?adverse_event_case)
+        (not
+          (case_triaged ?adverse_event_case)
+        )
+        (response_resource_available ?response_resource)
+      )
+    :effect
+      (and
+        (case_triaged ?adverse_event_case)
+        (case_assigned_response_resource ?adverse_event_case ?response_resource)
+        (not
+          (response_resource_available ?response_resource)
+        )
+      )
+  )
+  (:action attach_report_document_to_case
+    :parameters (?adverse_event_case - adverse_event_case ?report_document - report_document)
+    :precondition
+      (and
+        (case_intake_recorded ?adverse_event_case)
+        (case_triaged ?adverse_event_case)
+        (report_document_available ?report_document)
+      )
+    :effect
+      (and
+        (case_has_report_document ?adverse_event_case ?report_document)
+        (not
+          (report_document_available ?report_document)
+        )
+      )
+  )
+  (:action escalate_case_to_investigation
+    :parameters (?adverse_event_case - adverse_event_case ?report_document - report_document)
+    :precondition
+      (and
+        (case_intake_recorded ?adverse_event_case)
+        (case_triaged ?adverse_event_case)
+        (case_has_report_document ?adverse_event_case ?report_document)
+        (not
+          (case_under_investigation ?adverse_event_case)
+        )
+      )
+    :effect (case_under_investigation ?adverse_event_case)
+  )
+  (:action detach_report_document_from_case
+    :parameters (?adverse_event_case - adverse_event_case ?report_document - report_document)
+    :precondition
+      (and
+        (case_has_report_document ?adverse_event_case ?report_document)
+      )
+    :effect
+      (and
+        (report_document_available ?report_document)
+        (not
+          (case_has_report_document ?adverse_event_case ?report_document)
+        )
+      )
+  )
+  (:action assign_responder_to_case
+    :parameters (?adverse_event_case - adverse_event_case ?responder - responder)
+    :precondition
+      (and
+        (case_under_investigation ?adverse_event_case)
+        (responder_available ?responder)
+      )
+    :effect
+      (and
+        (case_assigned_responder ?adverse_event_case ?responder)
+        (not
+          (responder_available ?responder)
+        )
+      )
+  )
+  (:action release_responder_from_case
+    :parameters (?adverse_event_case - adverse_event_case ?responder - responder)
+    :precondition
+      (and
+        (case_assigned_responder ?adverse_event_case ?responder)
+      )
+    :effect
+      (and
+        (responder_available ?responder)
+        (not
+          (case_assigned_responder ?adverse_event_case ?responder)
+        )
+      )
+  )
+  (:action assign_technical_resource_to_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?technical_resource - technical_resource)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (technical_resource_available ?technical_resource)
+      )
+    :effect
+      (and
+        (workstream_assigned_technical_resource ?investigation_workstream ?technical_resource)
+        (not
+          (technical_resource_available ?technical_resource)
+        )
+      )
+  )
+  (:action release_technical_resource_from_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?technical_resource - technical_resource)
+    :precondition
+      (and
+        (workstream_assigned_technical_resource ?investigation_workstream ?technical_resource)
+      )
+    :effect
+      (and
+        (technical_resource_available ?technical_resource)
+        (not
+          (workstream_assigned_technical_resource ?investigation_workstream ?technical_resource)
+        )
+      )
+  )
+  (:action assign_external_expert_to_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (external_expert_available ?external_expert)
+      )
+    :effect
+      (and
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (not
+          (external_expert_available ?external_expert)
+        )
+      )
+  )
+  (:action release_external_expert_from_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert)
+    :precondition
+      (and
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+      )
+    :effect
+      (and
+        (external_expert_available ?external_expert)
+        (not
+          (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        )
+      )
+  )
+  (:action flag_manufacturing_site_unit_for_quarantine
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?manufacturing_site_unit - manufacturing_site_unit ?report_document - report_document)
+    :precondition
+      (and
+        (case_under_investigation ?manufacturing_site_case)
+        (case_has_report_document ?manufacturing_site_case ?report_document)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (not
+          (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+        )
+        (not
+          (site_unit_quarantined ?manufacturing_site_unit)
+        )
+      )
+    :effect (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+  )
+  (:action activate_manufacturing_containment
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?manufacturing_site_unit - manufacturing_site_unit ?responder - responder)
+    :precondition
+      (and
+        (case_under_investigation ?manufacturing_site_case)
+        (case_assigned_responder ?manufacturing_site_case ?responder)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+        (not
+          (manufacturing_containment_active ?manufacturing_site_case)
+        )
+      )
+    :effect
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+      )
+  )
+  (:action apply_manufacturing_quarantine
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?manufacturing_site_unit - manufacturing_site_unit ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (case_under_investigation ?manufacturing_site_case)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (manufacturing_containment_active ?manufacturing_site_case)
+        )
+      )
+    :effect
+      (and
+        (site_unit_quarantined ?manufacturing_site_unit)
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (manufacturing_case_assigned_mitigation_resource ?manufacturing_site_case ?mitigation_resource)
+        (not
+          (mitigation_resource_available ?mitigation_resource)
+        )
+      )
+  )
+  (:action complete_manufacturing_mitigation
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?manufacturing_site_unit - manufacturing_site_unit ?report_document - report_document ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (case_under_investigation ?manufacturing_site_case)
+        (case_has_report_document ?manufacturing_site_case ?report_document)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (site_unit_quarantined ?manufacturing_site_unit)
+        (manufacturing_case_assigned_mitigation_resource ?manufacturing_site_case ?mitigation_resource)
+        (not
+          (manufacturing_containment_verified ?manufacturing_site_case)
+        )
+      )
+    :effect
+      (and
+        (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (manufacturing_case_assigned_mitigation_resource ?manufacturing_site_case ?mitigation_resource)
+        )
+      )
+  )
+  (:action flag_distribution_node_for_quarantine
+    :parameters (?distribution_site_case - distribution_site_case ?distribution_node - distribution_node ?report_document - report_document)
+    :precondition
+      (and
+        (case_under_investigation ?distribution_site_case)
+        (case_has_report_document ?distribution_site_case ?report_document)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (not
+          (distribution_node_flagged_for_quarantine ?distribution_node)
+        )
+        (not
+          (distribution_node_quarantined ?distribution_node)
+        )
+      )
+    :effect (distribution_node_flagged_for_quarantine ?distribution_node)
+  )
+  (:action activate_distribution_containment
+    :parameters (?distribution_site_case - distribution_site_case ?distribution_node - distribution_node ?responder - responder)
+    :precondition
+      (and
+        (case_under_investigation ?distribution_site_case)
+        (case_assigned_responder ?distribution_site_case ?responder)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (distribution_node_flagged_for_quarantine ?distribution_node)
+        (not
+          (distribution_containment_active ?distribution_site_case)
+        )
+      )
+    :effect
+      (and
+        (distribution_containment_active ?distribution_site_case)
+        (distribution_containment_verified ?distribution_site_case)
+      )
+  )
+  (:action apply_distribution_quarantine
+    :parameters (?distribution_site_case - distribution_site_case ?distribution_node - distribution_node ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (case_under_investigation ?distribution_site_case)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (distribution_containment_active ?distribution_site_case)
+        )
+      )
+    :effect
+      (and
+        (distribution_node_quarantined ?distribution_node)
+        (distribution_containment_active ?distribution_site_case)
+        (distribution_case_assigned_mitigation_resource ?distribution_site_case ?mitigation_resource)
+        (not
+          (mitigation_resource_available ?mitigation_resource)
+        )
+      )
+  )
+  (:action complete_distribution_mitigation
+    :parameters (?distribution_site_case - distribution_site_case ?distribution_node - distribution_node ?report_document - report_document ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (case_under_investigation ?distribution_site_case)
+        (case_has_report_document ?distribution_site_case ?report_document)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (distribution_node_quarantined ?distribution_node)
+        (distribution_case_assigned_mitigation_resource ?distribution_site_case ?mitigation_resource)
+        (not
+          (distribution_containment_verified ?distribution_site_case)
+        )
+      )
+    :effect
+      (and
+        (distribution_node_flagged_for_quarantine ?distribution_node)
+        (distribution_containment_verified ?distribution_site_case)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (distribution_case_assigned_mitigation_resource ?distribution_site_case ?mitigation_resource)
+        )
+      )
+  )
+  (:action prepare_combined_remediation_order
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?distribution_site_case - distribution_site_case ?manufacturing_site_unit - manufacturing_site_unit ?distribution_node - distribution_node ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (distribution_containment_active ?distribution_site_case)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+        (distribution_node_flagged_for_quarantine ?distribution_node)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+        (distribution_containment_verified ?distribution_site_case)
+        (remediation_order_planned ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_linked_to_site_unit ?remediation_action ?manufacturing_site_unit)
+        (remediation_order_linked_to_distribution_node ?remediation_action ?distribution_node)
+        (not
+          (remediation_order_planned ?remediation_action)
+        )
+      )
+  )
+  (:action prepare_manufacturing_remediation_order
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?distribution_site_case - distribution_site_case ?manufacturing_site_unit - manufacturing_site_unit ?distribution_node - distribution_node ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (distribution_containment_active ?distribution_site_case)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (site_unit_quarantined ?manufacturing_site_unit)
+        (distribution_node_flagged_for_quarantine ?distribution_node)
+        (not
+          (manufacturing_containment_verified ?manufacturing_site_case)
+        )
+        (distribution_containment_verified ?distribution_site_case)
+        (remediation_order_planned ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_linked_to_site_unit ?remediation_action ?manufacturing_site_unit)
+        (remediation_order_linked_to_distribution_node ?remediation_action ?distribution_node)
+        (manufacturing_scope_confirmed ?remediation_action)
+        (not
+          (remediation_order_planned ?remediation_action)
+        )
+      )
+  )
+  (:action prepare_distribution_remediation_order
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?distribution_site_case - distribution_site_case ?manufacturing_site_unit - manufacturing_site_unit ?distribution_node - distribution_node ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (distribution_containment_active ?distribution_site_case)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (site_unit_flagged_for_quarantine ?manufacturing_site_unit)
+        (distribution_node_quarantined ?distribution_node)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+        (not
+          (distribution_containment_verified ?distribution_site_case)
+        )
+        (remediation_order_planned ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_linked_to_site_unit ?remediation_action ?manufacturing_site_unit)
+        (remediation_order_linked_to_distribution_node ?remediation_action ?distribution_node)
+        (distribution_scope_confirmed ?remediation_action)
+        (not
+          (remediation_order_planned ?remediation_action)
+        )
+      )
+  )
+  (:action prepare_full_scope_remediation_order
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?distribution_site_case - distribution_site_case ?manufacturing_site_unit - manufacturing_site_unit ?distribution_node - distribution_node ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (distribution_containment_active ?distribution_site_case)
+        (manufacturing_case_assigned_site_unit ?manufacturing_site_case ?manufacturing_site_unit)
+        (distribution_case_assigned_distribution_node ?distribution_site_case ?distribution_node)
+        (site_unit_quarantined ?manufacturing_site_unit)
+        (distribution_node_quarantined ?distribution_node)
+        (not
+          (manufacturing_containment_verified ?manufacturing_site_case)
+        )
+        (not
+          (distribution_containment_verified ?distribution_site_case)
+        )
+        (remediation_order_planned ?remediation_action)
+      )
+    :effect
+      (and
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_linked_to_site_unit ?remediation_action ?manufacturing_site_unit)
+        (remediation_order_linked_to_distribution_node ?remediation_action ?distribution_node)
+        (manufacturing_scope_confirmed ?remediation_action)
+        (distribution_scope_confirmed ?remediation_action)
+        (not
+          (remediation_order_planned ?remediation_action)
+        )
+      )
+  )
+  (:action issue_remediation_order
+    :parameters (?remediation_action - remediation_order ?manufacturing_site_case - manufacturing_site_case ?report_document - report_document)
+    :precondition
+      (and
+        (remediation_order_prepared ?remediation_action)
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (case_has_report_document ?manufacturing_site_case ?report_document)
+        (not
+          (remediation_order_issued ?remediation_action)
+        )
+      )
+    :effect (remediation_order_issued ?remediation_action)
+  )
+  (:action collect_laboratory_sample
+    :parameters (?investigation_workstream - investigation_workstream ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (workstream_linked_to_remediation_order ?investigation_workstream ?remediation_action)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (laboratory_sample_available ?laboratory_sample)
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_issued ?remediation_action)
+        (not
+          (laboratory_sample_collected ?laboratory_sample)
+        )
+      )
+    :effect
+      (and
+        (laboratory_sample_collected ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (not
+          (laboratory_sample_available ?laboratory_sample)
+        )
+      )
+  )
+  (:action advance_laboratory_sample_assessment
+    :parameters (?investigation_workstream - investigation_workstream ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order ?report_document - report_document)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (laboratory_sample_collected ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (case_has_report_document ?investigation_workstream ?report_document)
+        (not
+          (manufacturing_scope_confirmed ?remediation_action)
+        )
+        (not
+          (sample_assessment_in_progress ?investigation_workstream)
+        )
+      )
+    :effect (sample_assessment_in_progress ?investigation_workstream)
+  )
+  (:action assign_regulatory_document_to_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (regulatory_document_assigned ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (regulatory_document_assigned ?investigation_workstream)
+        (workstream_assigned_regulatory_document ?investigation_workstream ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action submit_regulatory_package
+    :parameters (?investigation_workstream - investigation_workstream ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order ?report_document - report_document ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (laboratory_sample_collected ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (case_has_report_document ?investigation_workstream ?report_document)
+        (manufacturing_scope_confirmed ?remediation_action)
+        (regulatory_document_assigned ?investigation_workstream)
+        (workstream_assigned_regulatory_document ?investigation_workstream ?regulatory_document)
+        (not
+          (sample_assessment_in_progress ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (sample_assessment_in_progress ?investigation_workstream)
+        (regulatory_package_submitted ?investigation_workstream)
+      )
+  )
+  (:action conduct_technical_review
+    :parameters (?investigation_workstream - investigation_workstream ?technical_resource - technical_resource ?responder - responder ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (sample_assessment_in_progress ?investigation_workstream)
+        (workstream_assigned_technical_resource ?investigation_workstream ?technical_resource)
+        (case_assigned_responder ?investigation_workstream ?responder)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (not
+          (distribution_scope_confirmed ?remediation_action)
+        )
+        (not
+          (technical_review_complete ?investigation_workstream)
+        )
+      )
+    :effect (technical_review_complete ?investigation_workstream)
+  )
+  (:action conduct_technical_review_with_distribution_scope
+    :parameters (?investigation_workstream - investigation_workstream ?technical_resource - technical_resource ?responder - responder ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (sample_assessment_in_progress ?investigation_workstream)
+        (workstream_assigned_technical_resource ?investigation_workstream ?technical_resource)
+        (case_assigned_responder ?investigation_workstream ?responder)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (distribution_scope_confirmed ?remediation_action)
+        (not
+          (technical_review_complete ?investigation_workstream)
+        )
+      )
+    :effect (technical_review_complete ?investigation_workstream)
+  )
+  (:action complete_specialist_review
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (technical_review_complete ?investigation_workstream)
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (not
+          (manufacturing_scope_confirmed ?remediation_action)
+        )
+        (not
+          (distribution_scope_confirmed ?remediation_action)
+        )
+        (not
+          (specialist_review_complete ?investigation_workstream)
+        )
+      )
+    :effect (specialist_review_complete ?investigation_workstream)
+  )
+  (:action complete_specialist_review_with_manufacturing_scope
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (technical_review_complete ?investigation_workstream)
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (manufacturing_scope_confirmed ?remediation_action)
+        (not
+          (distribution_scope_confirmed ?remediation_action)
+        )
+        (not
+          (specialist_review_complete ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (specialist_clearance_granted ?investigation_workstream)
+      )
+  )
+  (:action complete_specialist_review_with_distribution_scope
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (technical_review_complete ?investigation_workstream)
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (not
+          (manufacturing_scope_confirmed ?remediation_action)
+        )
+        (distribution_scope_confirmed ?remediation_action)
+        (not
+          (specialist_review_complete ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (specialist_clearance_granted ?investigation_workstream)
+      )
+  )
+  (:action complete_specialist_review_with_full_scope
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert ?laboratory_sample - laboratory_sample ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (technical_review_complete ?investigation_workstream)
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (workstream_has_laboratory_sample ?investigation_workstream ?laboratory_sample)
+        (sample_linked_to_remediation_order ?laboratory_sample ?remediation_action)
+        (manufacturing_scope_confirmed ?remediation_action)
+        (distribution_scope_confirmed ?remediation_action)
+        (not
+          (specialist_review_complete ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (specialist_clearance_granted ?investigation_workstream)
+      )
+  )
+  (:action finalize_workstream_recovery
+    :parameters (?investigation_workstream - investigation_workstream)
+    :precondition
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (not
+          (specialist_clearance_granted ?investigation_workstream)
+        )
+        (not
+          (recovery_finalized ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?investigation_workstream)
+        (case_recovered ?investigation_workstream)
+      )
+  )
+  (:action assign_supplier_support_to_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?supplier - supplier)
+    :precondition
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (specialist_clearance_granted ?investigation_workstream)
+        (supplier_available ?supplier)
+      )
+    :effect
+      (and
+        (workstream_assigned_supplier ?investigation_workstream ?supplier)
+        (not
+          (supplier_available ?supplier)
+        )
+      )
+  )
+  (:action confirm_supply_traceability
+    :parameters (?investigation_workstream - investigation_workstream ?manufacturing_site_case - manufacturing_site_case ?distribution_site_case - distribution_site_case ?report_document - report_document ?supplier - supplier)
+    :precondition
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (specialist_clearance_granted ?investigation_workstream)
+        (workstream_assigned_supplier ?investigation_workstream ?supplier)
+        (workstream_scoped_to_manufacturing_site_case ?investigation_workstream ?manufacturing_site_case)
+        (workstream_scoped_to_distribution_site_case ?investigation_workstream ?distribution_site_case)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+        (distribution_containment_verified ?distribution_site_case)
+        (case_has_report_document ?investigation_workstream ?report_document)
+        (not
+          (closure_review_complete ?investigation_workstream)
+        )
+      )
+    :effect (closure_review_complete ?investigation_workstream)
+  )
+  (:action confirm_workstream_recovery
+    :parameters (?investigation_workstream - investigation_workstream)
+    :precondition
+      (and
+        (specialist_review_complete ?investigation_workstream)
+        (closure_review_complete ?investigation_workstream)
+        (not
+          (recovery_finalized ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?investigation_workstream)
+        (case_recovered ?investigation_workstream)
+      )
+  )
+  (:action engage_regulatory_authority
+    :parameters (?investigation_workstream - investigation_workstream ?regulatory_authority - regulatory_authority ?report_document - report_document)
+    :precondition
+      (and
+        (case_under_investigation ?investigation_workstream)
+        (case_has_report_document ?investigation_workstream ?report_document)
+        (regulatory_authority_available ?regulatory_authority)
+        (workstream_assigned_regulatory_authority ?investigation_workstream ?regulatory_authority)
+        (not
+          (authority_engaged ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (authority_engaged ?investigation_workstream)
+        (not
+          (regulatory_authority_available ?regulatory_authority)
+        )
+      )
+  )
+  (:action record_regulatory_acknowledgement
+    :parameters (?investigation_workstream - investigation_workstream ?responder - responder)
+    :precondition
+      (and
+        (authority_engaged ?investigation_workstream)
+        (case_assigned_responder ?investigation_workstream ?responder)
+        (not
+          (authority_acknowledged ?investigation_workstream)
+        )
+      )
+    :effect (authority_acknowledged ?investigation_workstream)
+  )
+  (:action obtain_external_expert_opinion
+    :parameters (?investigation_workstream - investigation_workstream ?external_expert - external_expert)
+    :precondition
+      (and
+        (authority_acknowledged ?investigation_workstream)
+        (workstream_assigned_external_expert ?investigation_workstream ?external_expert)
+        (not
+          (authority_clearance_granted ?investigation_workstream)
+        )
+      )
+    :effect (authority_clearance_granted ?investigation_workstream)
+  )
+  (:action finalize_regulatory_recovery
+    :parameters (?investigation_workstream - investigation_workstream)
+    :precondition
+      (and
+        (authority_clearance_granted ?investigation_workstream)
+        (not
+          (recovery_finalized ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?investigation_workstream)
+        (case_recovered ?investigation_workstream)
+      )
+  )
+  (:action recover_manufacturing_site_case
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (manufacturing_containment_active ?manufacturing_site_case)
+        (manufacturing_containment_verified ?manufacturing_site_case)
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_issued ?remediation_action)
+        (not
+          (case_recovered ?manufacturing_site_case)
+        )
+      )
+    :effect (case_recovered ?manufacturing_site_case)
+  )
+  (:action recover_distribution_site_case
+    :parameters (?distribution_site_case - distribution_site_case ?remediation_action - remediation_order)
+    :precondition
+      (and
+        (distribution_containment_active ?distribution_site_case)
+        (distribution_containment_verified ?distribution_site_case)
+        (remediation_order_prepared ?remediation_action)
+        (remediation_order_issued ?remediation_action)
+        (not
+          (case_recovered ?distribution_site_case)
+        )
+      )
+    :effect (case_recovered ?distribution_site_case)
+  )
+  (:action send_stakeholder_notification
+    :parameters (?adverse_event_case - adverse_event_case ?notification_template - notification_template ?report_document - report_document)
+    :precondition
+      (and
+        (case_recovered ?adverse_event_case)
+        (case_has_report_document ?adverse_event_case ?report_document)
+        (notification_template_available ?notification_template)
+        (not
+          (case_notified ?adverse_event_case)
+        )
+      )
+    :effect
+      (and
+        (case_notified ?adverse_event_case)
+        (case_notification_template_assigned ?adverse_event_case ?notification_template)
+        (not
+          (notification_template_available ?notification_template)
+        )
+      )
+  )
+  (:action close_manufacturing_site_case
+    :parameters (?manufacturing_site_case - manufacturing_site_case ?response_resource - response_resource ?notification_template - notification_template)
+    :precondition
+      (and
+        (case_notified ?manufacturing_site_case)
+        (case_assigned_response_resource ?manufacturing_site_case ?response_resource)
+        (case_notification_template_assigned ?manufacturing_site_case ?notification_template)
+        (not
+          (case_closed ?manufacturing_site_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?manufacturing_site_case)
+        (response_resource_available ?response_resource)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action close_distribution_site_case
+    :parameters (?distribution_site_case - distribution_site_case ?response_resource - response_resource ?notification_template - notification_template)
+    :precondition
+      (and
+        (case_notified ?distribution_site_case)
+        (case_assigned_response_resource ?distribution_site_case ?response_resource)
+        (case_notification_template_assigned ?distribution_site_case ?notification_template)
+        (not
+          (case_closed ?distribution_site_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?distribution_site_case)
+        (response_resource_available ?response_resource)
+        (notification_template_available ?notification_template)
+      )
+  )
+  (:action close_investigation_workstream
+    :parameters (?investigation_workstream - investigation_workstream ?response_resource - response_resource ?notification_template - notification_template)
+    :precondition
+      (and
+        (case_notified ?investigation_workstream)
+        (case_assigned_response_resource ?investigation_workstream ?response_resource)
+        (case_notification_template_assigned ?investigation_workstream ?notification_template)
+        (not
+          (case_closed ?investigation_workstream)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?investigation_workstream)
+        (response_resource_available ?response_resource)
+        (notification_template_available ?notification_template)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem pharmaceutics_adverse_event_case_triage_problem)
+  (:domain pharmaceutics_adverse_event_case_triage_domain)
+  (:objects manufacturing_site_case_alpha - manufacturing_site_case distribution_site_case_alpha - distribution_site_case primary_investigation_workstream - investigation_workstream secondary_investigation_workstream - investigation_workstream response_resource_alpha - response_resource response_resource_beta - response_resource response_resource_gamma - response_resource adverse_event_report - report_document triage_responder - responder mitigation_kit - mitigation_resource manufacturing_site_unit_alpha - manufacturing_site_unit distribution_node_alpha - distribution_node recall_order - remediation_order laboratory_sample_alpha - laboratory_sample laboratory_sample_beta - laboratory_sample regulatory_document_alpha - regulatory_document regulatory_document_beta - regulatory_document supplier_alpha - supplier supplier_beta - supplier notification_template_alpha - notification_template technical_resource_alpha - technical_resource regulatory_authority_primary - regulatory_authority regulatory_authority_secondary - regulatory_authority external_expert_primary - external_expert)
+  (:init
+    (response_resource_available response_resource_alpha)
+    (response_resource_available response_resource_beta)
+    (response_resource_available response_resource_gamma)
+    (report_document_available adverse_event_report)
+    (responder_available triage_responder)
+    (mitigation_resource_available mitigation_kit)
+    (manufacturing_case_assigned_site_unit manufacturing_site_case_alpha manufacturing_site_unit_alpha)
+    (distribution_case_assigned_distribution_node distribution_site_case_alpha distribution_node_alpha)
+    (remediation_order_planned recall_order)
+    (laboratory_sample_available laboratory_sample_alpha)
+    (laboratory_sample_available laboratory_sample_beta)
+    (workstream_scoped_to_manufacturing_site_case primary_investigation_workstream manufacturing_site_case_alpha)
+    (workstream_scoped_to_manufacturing_site_case secondary_investigation_workstream manufacturing_site_case_alpha)
+    (workstream_scoped_to_distribution_site_case primary_investigation_workstream distribution_site_case_alpha)
+    (workstream_scoped_to_distribution_site_case secondary_investigation_workstream distribution_site_case_alpha)
+    (workstream_linked_to_remediation_order primary_investigation_workstream recall_order)
+    (workstream_linked_to_remediation_order secondary_investigation_workstream recall_order)
+    (workstream_has_laboratory_sample primary_investigation_workstream laboratory_sample_alpha)
+    (workstream_has_laboratory_sample secondary_investigation_workstream laboratory_sample_beta)
+    (regulatory_document_available regulatory_document_alpha)
+    (regulatory_document_available regulatory_document_beta)
+    (supplier_available supplier_alpha)
+    (supplier_available supplier_beta)
+    (notification_template_available notification_template_alpha)
+    (technical_resource_available technical_resource_alpha)
+    (regulatory_authority_available regulatory_authority_primary)
+    (workstream_assigned_regulatory_authority primary_investigation_workstream regulatory_authority_primary)
+    (workstream_assigned_regulatory_authority secondary_investigation_workstream regulatory_authority_secondary)
+    (external_expert_available external_expert_primary)
+  )
+  (:goal
+    (and
+      (case_closed manufacturing_site_case_alpha)
+      (case_closed distribution_site_case_alpha)
+      (case_closed primary_investigation_workstream)
+      (case_closed secondary_investigation_workstream)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(record_adverse_event_case_intake manufacturing_site_case_alpha)
+(record_adverse_event_case_intake distribution_site_case_alpha)
+(record_adverse_event_case_intake primary_investigation_workstream)
+(record_adverse_event_case_intake secondary_investigation_workstream)
+(triage_case_with_response_resource manufacturing_site_case_alpha response_resource_alpha)
+(triage_case_with_response_resource distribution_site_case_alpha response_resource_beta)
+(triage_case_with_response_resource primary_investigation_workstream response_resource_gamma)
+(attach_report_document_to_case manufacturing_site_case_alpha adverse_event_report)
+(escalate_case_to_investigation manufacturing_site_case_alpha adverse_event_report)
+(assign_responder_to_case manufacturing_site_case_alpha triage_responder)
+(flag_manufacturing_site_unit_for_quarantine manufacturing_site_case_alpha manufacturing_site_unit_alpha adverse_event_report)
+(activate_manufacturing_containment manufacturing_site_case_alpha manufacturing_site_unit_alpha triage_responder)
+(release_responder_from_case manufacturing_site_case_alpha triage_responder)
+(detach_report_document_from_case manufacturing_site_case_alpha adverse_event_report)
+(attach_report_document_to_case distribution_site_case_alpha adverse_event_report)
+(escalate_case_to_investigation distribution_site_case_alpha adverse_event_report)
+(assign_responder_to_case distribution_site_case_alpha triage_responder)
+(flag_distribution_node_for_quarantine distribution_site_case_alpha distribution_node_alpha adverse_event_report)
+(activate_distribution_containment distribution_site_case_alpha distribution_node_alpha triage_responder)
+(release_responder_from_case distribution_site_case_alpha triage_responder)
+(detach_report_document_from_case distribution_site_case_alpha adverse_event_report)
+(attach_report_document_to_case manufacturing_site_case_alpha adverse_event_report)
+(prepare_combined_remediation_order manufacturing_site_case_alpha distribution_site_case_alpha manufacturing_site_unit_alpha distribution_node_alpha recall_order)
+(issue_remediation_order recall_order manufacturing_site_case_alpha adverse_event_report)
+(recover_manufacturing_site_case manufacturing_site_case_alpha recall_order)
+(recover_distribution_site_case distribution_site_case_alpha recall_order)
+(detach_report_document_from_case manufacturing_site_case_alpha adverse_event_report)
+(attach_report_document_to_case primary_investigation_workstream adverse_event_report)
+(escalate_case_to_investigation primary_investigation_workstream adverse_event_report)
+(assign_responder_to_case primary_investigation_workstream triage_responder)
+(collect_laboratory_sample primary_investigation_workstream laboratory_sample_alpha recall_order)
+(advance_laboratory_sample_assessment primary_investigation_workstream laboratory_sample_alpha recall_order adverse_event_report)
+(assign_technical_resource_to_workstream primary_investigation_workstream technical_resource_alpha)
+(conduct_technical_review primary_investigation_workstream technical_resource_alpha triage_responder laboratory_sample_alpha recall_order)
+(release_technical_resource_from_workstream primary_investigation_workstream technical_resource_alpha)
+(assign_external_expert_to_workstream primary_investigation_workstream external_expert_primary)
+(complete_specialist_review primary_investigation_workstream external_expert_primary laboratory_sample_alpha recall_order)
+(release_external_expert_from_workstream primary_investigation_workstream external_expert_primary)
+(finalize_workstream_recovery primary_investigation_workstream)
+(send_stakeholder_notification primary_investigation_workstream notification_template_alpha adverse_event_report)
+(close_investigation_workstream primary_investigation_workstream response_resource_gamma notification_template_alpha)
+(release_responder_from_case primary_investigation_workstream triage_responder)
+(detach_report_document_from_case primary_investigation_workstream adverse_event_report)
+(triage_case_with_response_resource secondary_investigation_workstream response_resource_gamma)
+(attach_report_document_to_case secondary_investigation_workstream adverse_event_report)
+(escalate_case_to_investigation secondary_investigation_workstream adverse_event_report)
+(assign_responder_to_case secondary_investigation_workstream triage_responder)
+(collect_laboratory_sample secondary_investigation_workstream laboratory_sample_beta recall_order)
+(advance_laboratory_sample_assessment secondary_investigation_workstream laboratory_sample_beta recall_order adverse_event_report)
+(assign_technical_resource_to_workstream secondary_investigation_workstream technical_resource_alpha)
+(conduct_technical_review secondary_investigation_workstream technical_resource_alpha triage_responder laboratory_sample_beta recall_order)
+(release_technical_resource_from_workstream secondary_investigation_workstream technical_resource_alpha)
+(assign_external_expert_to_workstream secondary_investigation_workstream external_expert_primary)
+(complete_specialist_review secondary_investigation_workstream external_expert_primary laboratory_sample_beta recall_order)
+(release_external_expert_from_workstream secondary_investigation_workstream external_expert_primary)
+(finalize_workstream_recovery secondary_investigation_workstream)
+(send_stakeholder_notification secondary_investigation_workstream notification_template_alpha adverse_event_report)
+(close_investigation_workstream secondary_investigation_workstream response_resource_gamma notification_template_alpha)
+(release_responder_from_case secondary_investigation_workstream triage_responder)
+(detach_report_document_from_case secondary_investigation_workstream adverse_event_report)
+(attach_report_document_to_case manufacturing_site_case_alpha adverse_event_report)
+(send_stakeholder_notification manufacturing_site_case_alpha notification_template_alpha adverse_event_report)
+(close_manufacturing_site_case manufacturing_site_case_alpha response_resource_alpha notification_template_alpha)
+(detach_report_document_from_case manufacturing_site_case_alpha adverse_event_report)
+(attach_report_document_to_case distribution_site_case_alpha adverse_event_report)
+(send_stakeholder_notification distribution_site_case_alpha notification_template_alpha adverse_event_report)
+(close_distribution_site_case distribution_site_case_alpha response_resource_beta notification_template_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_nhmhaapt/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_nhmhaapt/plan.pddl 67 
+
+
+
+--- stderr ---
+

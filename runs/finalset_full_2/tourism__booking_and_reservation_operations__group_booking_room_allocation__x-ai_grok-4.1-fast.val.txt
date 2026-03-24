@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain group_booking_room_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types inventory_domain - object auxiliary_resource_domain - object classification_domain - object booking_entity_root - object group_booking - booking_entity_root room_unit - inventory_domain rate_plan_option - inventory_domain allocation_agent - inventory_domain payment_instrument - inventory_domain billing_account - inventory_domain confirmation_token - inventory_domain supplier_confirmation - inventory_domain insurance_option - inventory_domain amenity_package - auxiliary_resource_domain guest_profile - auxiliary_resource_domain voucher_or_promo - auxiliary_resource_domain room_type - classification_domain room_grouping - classification_domain proposal_package - classification_domain lead_booking - group_booking sub_booking_unit - group_booking primary_room_request - lead_booking secondary_room_request - lead_booking room_assignment_record - sub_booking_unit)
+  (:predicates
+    (group_booking_initiated ?group_booking - group_booking)
+    (booking_confirmed ?group_booking - group_booking)
+    (provisional_allocation ?group_booking - group_booking)
+    (committed ?group_booking - group_booking)
+    (ready_for_enrichment ?group_booking - group_booking)
+    (enriched_with_confirmation ?group_booking - group_booking)
+    (room_unit_available ?room_unit - room_unit)
+    (holds_room_unit ?group_booking - group_booking ?room_unit - room_unit)
+    (rate_option_available ?rate_plan_option - rate_plan_option)
+    (has_rate_option ?group_booking - group_booking ?rate_plan_option - rate_plan_option)
+    (allocation_agent_available ?allocation_agent - allocation_agent)
+    (assigned_allocation_agent ?group_booking - group_booking ?allocation_agent - allocation_agent)
+    (amenity_package_available ?amenity_package - amenity_package)
+    (primary_request_has_amenity ?primary_room_request - primary_room_request ?amenity_package - amenity_package)
+    (secondary_request_has_amenity ?secondary_room_request - secondary_room_request ?amenity_package - amenity_package)
+    (primary_request_prefers_room_type ?primary_room_request - primary_room_request ?room_type - room_type)
+    (room_type_hold_primary ?room_type - room_type)
+    (room_type_hold_auxiliary ?room_type - room_type)
+    (primary_request_ready_for_package ?primary_room_request - primary_room_request)
+    (secondary_request_prefers_room_group ?secondary_room_request - secondary_room_request ?room_grouping - room_grouping)
+    (room_group_hold_primary ?room_grouping - room_grouping)
+    (room_group_hold_auxiliary ?room_grouping - room_grouping)
+    (secondary_request_ready_for_package ?secondary_room_request - secondary_room_request)
+    (proposal_package_proposed ?proposal_package - proposal_package)
+    (proposal_package_assembled ?proposal_package - proposal_package)
+    (proposal_includes_room_type ?proposal_package - proposal_package ?room_type - room_type)
+    (proposal_includes_room_group ?proposal_package - proposal_package ?room_grouping - room_grouping)
+    (proposal_locked_for_assignment ?proposal_package - proposal_package)
+    (proposal_locked_for_supplier_confirmation ?proposal_package - proposal_package)
+    (proposal_profiles_ready ?proposal_package - proposal_package)
+    (assignment_links_primary_request ?room_assignment_record - room_assignment_record ?primary_room_request - primary_room_request)
+    (assignment_links_secondary_request ?room_assignment_record - room_assignment_record ?secondary_room_request - secondary_room_request)
+    (assignment_part_of_proposal ?room_assignment_record - room_assignment_record ?proposal_package - proposal_package)
+    (guest_profile_available ?guest_profile - guest_profile)
+    (assignment_has_guest_profile ?room_assignment_record - room_assignment_record ?guest_profile - guest_profile)
+    (guest_profile_in_use ?guest_profile - guest_profile)
+    (guest_profile_attached_to_proposal ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    (assignment_profile_locked ?room_assignment_record - room_assignment_record)
+    (assignment_supplier_attached ?room_assignment_record - room_assignment_record)
+    (assignment_ready_for_finalization ?room_assignment_record - room_assignment_record)
+    (assignment_payment_instrument_attached_flag ?room_assignment_record - room_assignment_record)
+    (assignment_package_enriched ?room_assignment_record - room_assignment_record)
+    (assignment_needs_billing_account ?room_assignment_record - room_assignment_record)
+    (assignment_prepared_for_finalization ?room_assignment_record - room_assignment_record)
+    (voucher_available ?voucher_or_promo - voucher_or_promo)
+    (assignment_link_voucher ?room_assignment_record - room_assignment_record ?voucher_or_promo - voucher_or_promo)
+    (assignment_voucher_staged ?room_assignment_record - room_assignment_record)
+    (assignment_voucher_authorized ?room_assignment_record - room_assignment_record)
+    (assignment_voucher_approved ?room_assignment_record - room_assignment_record)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (assignment_attached_payment_instrument ?room_assignment_record - room_assignment_record ?payment_instrument - payment_instrument)
+    (billing_account_available ?billing_account - billing_account)
+    (assignment_attached_billing_account ?room_assignment_record - room_assignment_record ?billing_account - billing_account)
+    (supplier_confirmation_available ?supplier_confirmation - supplier_confirmation)
+    (assignment_has_supplier_confirmation ?room_assignment_record - room_assignment_record ?supplier_confirmation - supplier_confirmation)
+    (insurance_option_available ?insurance_option - insurance_option)
+    (assignment_has_insurance_option ?room_assignment_record - room_assignment_record ?insurance_option - insurance_option)
+    (confirmation_token_available ?confirmation_token - confirmation_token)
+    (has_confirmation_token ?group_booking - group_booking ?confirmation_token - confirmation_token)
+    (primary_request_optioned ?primary_room_request - primary_room_request)
+    (secondary_request_optioned ?secondary_room_request - secondary_room_request)
+    (assignment_finalized ?room_assignment_record - room_assignment_record)
+  )
+  (:action initiate_group_booking
+    :parameters (?group_booking - group_booking)
+    :precondition
+      (and
+        (not
+          (group_booking_initiated ?group_booking)
+        )
+        (not
+          (committed ?group_booking)
+        )
+      )
+    :effect (group_booking_initiated ?group_booking)
+  )
+  (:action hold_room_unit_for_booking
+    :parameters (?group_booking - group_booking ?room_unit - room_unit)
+    :precondition
+      (and
+        (group_booking_initiated ?group_booking)
+        (not
+          (provisional_allocation ?group_booking)
+        )
+        (room_unit_available ?room_unit)
+      )
+    :effect
+      (and
+        (provisional_allocation ?group_booking)
+        (holds_room_unit ?group_booking ?room_unit)
+        (not
+          (room_unit_available ?room_unit)
+        )
+      )
+  )
+  (:action attach_rate_option_to_booking
+    :parameters (?group_booking - group_booking ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (group_booking_initiated ?group_booking)
+        (provisional_allocation ?group_booking)
+        (rate_option_available ?rate_plan_option)
+      )
+    :effect
+      (and
+        (has_rate_option ?group_booking ?rate_plan_option)
+        (not
+          (rate_option_available ?rate_plan_option)
+        )
+      )
+  )
+  (:action confirm_group_booking
+    :parameters (?group_booking - group_booking ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (group_booking_initiated ?group_booking)
+        (provisional_allocation ?group_booking)
+        (has_rate_option ?group_booking ?rate_plan_option)
+        (not
+          (booking_confirmed ?group_booking)
+        )
+      )
+    :effect (booking_confirmed ?group_booking)
+  )
+  (:action release_rate_option_from_booking
+    :parameters (?group_booking - group_booking ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (has_rate_option ?group_booking ?rate_plan_option)
+      )
+    :effect
+      (and
+        (rate_option_available ?rate_plan_option)
+        (not
+          (has_rate_option ?group_booking ?rate_plan_option)
+        )
+      )
+  )
+  (:action assign_allocation_agent_to_booking
+    :parameters (?group_booking - group_booking ?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (booking_confirmed ?group_booking)
+        (allocation_agent_available ?allocation_agent)
+      )
+    :effect
+      (and
+        (assigned_allocation_agent ?group_booking ?allocation_agent)
+        (not
+          (allocation_agent_available ?allocation_agent)
+        )
+      )
+  )
+  (:action unassign_allocation_agent_from_booking
+    :parameters (?group_booking - group_booking ?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (assigned_allocation_agent ?group_booking ?allocation_agent)
+      )
+    :effect
+      (and
+        (allocation_agent_available ?allocation_agent)
+        (not
+          (assigned_allocation_agent ?group_booking ?allocation_agent)
+        )
+      )
+  )
+  (:action attach_supplier_confirmation_to_assignment_record
+    :parameters (?room_assignment_record - room_assignment_record ?supplier_confirmation - supplier_confirmation)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (supplier_confirmation_available ?supplier_confirmation)
+      )
+    :effect
+      (and
+        (assignment_has_supplier_confirmation ?room_assignment_record ?supplier_confirmation)
+        (not
+          (supplier_confirmation_available ?supplier_confirmation)
+        )
+      )
+  )
+  (:action detach_supplier_confirmation_from_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?supplier_confirmation - supplier_confirmation)
+    :precondition
+      (and
+        (assignment_has_supplier_confirmation ?room_assignment_record ?supplier_confirmation)
+      )
+    :effect
+      (and
+        (supplier_confirmation_available ?supplier_confirmation)
+        (not
+          (assignment_has_supplier_confirmation ?room_assignment_record ?supplier_confirmation)
+        )
+      )
+  )
+  (:action attach_insurance_option_to_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (insurance_option_available ?insurance_option)
+      )
+    :effect
+      (and
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (not
+          (insurance_option_available ?insurance_option)
+        )
+      )
+  )
+  (:action detach_insurance_option_from_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option)
+    :precondition
+      (and
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+      )
+    :effect
+      (and
+        (insurance_option_available ?insurance_option)
+        (not
+          (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        )
+      )
+  )
+  (:action place_primary_hold_on_room_type
+    :parameters (?primary_room_request - primary_room_request ?room_type - room_type ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (booking_confirmed ?primary_room_request)
+        (has_rate_option ?primary_room_request ?rate_plan_option)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (not
+          (room_type_hold_primary ?room_type)
+        )
+        (not
+          (room_type_hold_auxiliary ?room_type)
+        )
+      )
+    :effect (room_type_hold_primary ?room_type)
+  )
+  (:action finalize_primary_hold_with_agent
+    :parameters (?primary_room_request - primary_room_request ?room_type - room_type ?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (booking_confirmed ?primary_room_request)
+        (assigned_allocation_agent ?primary_room_request ?allocation_agent)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (room_type_hold_primary ?room_type)
+        (not
+          (primary_request_optioned ?primary_room_request)
+        )
+      )
+    :effect
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (primary_request_ready_for_package ?primary_room_request)
+      )
+  )
+  (:action attach_amenity_and_option_to_primary_request
+    :parameters (?primary_room_request - primary_room_request ?room_type - room_type ?amenity_package - amenity_package)
+    :precondition
+      (and
+        (booking_confirmed ?primary_room_request)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (amenity_package_available ?amenity_package)
+        (not
+          (primary_request_optioned ?primary_room_request)
+        )
+      )
+    :effect
+      (and
+        (room_type_hold_auxiliary ?room_type)
+        (primary_request_optioned ?primary_room_request)
+        (primary_request_has_amenity ?primary_room_request ?amenity_package)
+        (not
+          (amenity_package_available ?amenity_package)
+        )
+      )
+  )
+  (:action promote_primary_option_to_hold
+    :parameters (?primary_room_request - primary_room_request ?room_type - room_type ?rate_plan_option - rate_plan_option ?amenity_package - amenity_package)
+    :precondition
+      (and
+        (booking_confirmed ?primary_room_request)
+        (has_rate_option ?primary_room_request ?rate_plan_option)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (room_type_hold_auxiliary ?room_type)
+        (primary_request_has_amenity ?primary_room_request ?amenity_package)
+        (not
+          (primary_request_ready_for_package ?primary_room_request)
+        )
+      )
+    :effect
+      (and
+        (room_type_hold_primary ?room_type)
+        (primary_request_ready_for_package ?primary_room_request)
+        (amenity_package_available ?amenity_package)
+        (not
+          (primary_request_has_amenity ?primary_room_request ?amenity_package)
+        )
+      )
+  )
+  (:action place_secondary_hold_on_room_group
+    :parameters (?secondary_room_request - secondary_room_request ?room_grouping - room_grouping ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (booking_confirmed ?secondary_room_request)
+        (has_rate_option ?secondary_room_request ?rate_plan_option)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (not
+          (room_group_hold_primary ?room_grouping)
+        )
+        (not
+          (room_group_hold_auxiliary ?room_grouping)
+        )
+      )
+    :effect (room_group_hold_primary ?room_grouping)
+  )
+  (:action finalize_secondary_hold_with_agent
+    :parameters (?secondary_room_request - secondary_room_request ?room_grouping - room_grouping ?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (booking_confirmed ?secondary_room_request)
+        (assigned_allocation_agent ?secondary_room_request ?allocation_agent)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_group_hold_primary ?room_grouping)
+        (not
+          (secondary_request_optioned ?secondary_room_request)
+        )
+      )
+    :effect
+      (and
+        (secondary_request_optioned ?secondary_room_request)
+        (secondary_request_ready_for_package ?secondary_room_request)
+      )
+  )
+  (:action attach_amenity_to_secondary_request
+    :parameters (?secondary_room_request - secondary_room_request ?room_grouping - room_grouping ?amenity_package - amenity_package)
+    :precondition
+      (and
+        (booking_confirmed ?secondary_room_request)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (amenity_package_available ?amenity_package)
+        (not
+          (secondary_request_optioned ?secondary_room_request)
+        )
+      )
+    :effect
+      (and
+        (room_group_hold_auxiliary ?room_grouping)
+        (secondary_request_optioned ?secondary_room_request)
+        (secondary_request_has_amenity ?secondary_room_request ?amenity_package)
+        (not
+          (amenity_package_available ?amenity_package)
+        )
+      )
+  )
+  (:action promote_secondary_option_to_hold
+    :parameters (?secondary_room_request - secondary_room_request ?room_grouping - room_grouping ?rate_plan_option - rate_plan_option ?amenity_package - amenity_package)
+    :precondition
+      (and
+        (booking_confirmed ?secondary_room_request)
+        (has_rate_option ?secondary_room_request ?rate_plan_option)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_group_hold_auxiliary ?room_grouping)
+        (secondary_request_has_amenity ?secondary_room_request ?amenity_package)
+        (not
+          (secondary_request_ready_for_package ?secondary_room_request)
+        )
+      )
+    :effect
+      (and
+        (room_group_hold_primary ?room_grouping)
+        (secondary_request_ready_for_package ?secondary_room_request)
+        (amenity_package_available ?amenity_package)
+        (not
+          (secondary_request_has_amenity ?secondary_room_request ?amenity_package)
+        )
+      )
+  )
+  (:action assemble_proposal_package
+    :parameters (?primary_room_request - primary_room_request ?secondary_room_request - secondary_room_request ?room_type - room_type ?room_grouping - room_grouping ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (secondary_request_optioned ?secondary_room_request)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_type_hold_primary ?room_type)
+        (room_group_hold_primary ?room_grouping)
+        (primary_request_ready_for_package ?primary_room_request)
+        (secondary_request_ready_for_package ?secondary_room_request)
+        (proposal_package_proposed ?proposal_package)
+      )
+    :effect
+      (and
+        (proposal_package_assembled ?proposal_package)
+        (proposal_includes_room_type ?proposal_package ?room_type)
+        (proposal_includes_room_group ?proposal_package ?room_grouping)
+        (not
+          (proposal_package_proposed ?proposal_package)
+        )
+      )
+  )
+  (:action assemble_and_lock_proposal_package
+    :parameters (?primary_room_request - primary_room_request ?secondary_room_request - secondary_room_request ?room_type - room_type ?room_grouping - room_grouping ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (secondary_request_optioned ?secondary_room_request)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_type_hold_auxiliary ?room_type)
+        (room_group_hold_primary ?room_grouping)
+        (not
+          (primary_request_ready_for_package ?primary_room_request)
+        )
+        (secondary_request_ready_for_package ?secondary_room_request)
+        (proposal_package_proposed ?proposal_package)
+      )
+    :effect
+      (and
+        (proposal_package_assembled ?proposal_package)
+        (proposal_includes_room_type ?proposal_package ?room_type)
+        (proposal_includes_room_group ?proposal_package ?room_grouping)
+        (proposal_locked_for_assignment ?proposal_package)
+        (not
+          (proposal_package_proposed ?proposal_package)
+        )
+      )
+  )
+  (:action assemble_and_lock_proposal_package_supplier_variant
+    :parameters (?primary_room_request - primary_room_request ?secondary_room_request - secondary_room_request ?room_type - room_type ?room_grouping - room_grouping ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (secondary_request_optioned ?secondary_room_request)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_type_hold_primary ?room_type)
+        (room_group_hold_auxiliary ?room_grouping)
+        (primary_request_ready_for_package ?primary_room_request)
+        (not
+          (secondary_request_ready_for_package ?secondary_room_request)
+        )
+        (proposal_package_proposed ?proposal_package)
+      )
+    :effect
+      (and
+        (proposal_package_assembled ?proposal_package)
+        (proposal_includes_room_type ?proposal_package ?room_type)
+        (proposal_includes_room_group ?proposal_package ?room_grouping)
+        (proposal_locked_for_supplier_confirmation ?proposal_package)
+        (not
+          (proposal_package_proposed ?proposal_package)
+        )
+      )
+  )
+  (:action assemble_and_lock_proposal_package_fully
+    :parameters (?primary_room_request - primary_room_request ?secondary_room_request - secondary_room_request ?room_type - room_type ?room_grouping - room_grouping ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (secondary_request_optioned ?secondary_room_request)
+        (primary_request_prefers_room_type ?primary_room_request ?room_type)
+        (secondary_request_prefers_room_group ?secondary_room_request ?room_grouping)
+        (room_type_hold_auxiliary ?room_type)
+        (room_group_hold_auxiliary ?room_grouping)
+        (not
+          (primary_request_ready_for_package ?primary_room_request)
+        )
+        (not
+          (secondary_request_ready_for_package ?secondary_room_request)
+        )
+        (proposal_package_proposed ?proposal_package)
+      )
+    :effect
+      (and
+        (proposal_package_assembled ?proposal_package)
+        (proposal_includes_room_type ?proposal_package ?room_type)
+        (proposal_includes_room_group ?proposal_package ?room_grouping)
+        (proposal_locked_for_assignment ?proposal_package)
+        (proposal_locked_for_supplier_confirmation ?proposal_package)
+        (not
+          (proposal_package_proposed ?proposal_package)
+        )
+      )
+  )
+  (:action prepare_proposal_profiles
+    :parameters (?proposal_package - proposal_package ?primary_room_request - primary_room_request ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (proposal_package_assembled ?proposal_package)
+        (primary_request_optioned ?primary_room_request)
+        (has_rate_option ?primary_room_request ?rate_plan_option)
+        (not
+          (proposal_profiles_ready ?proposal_package)
+        )
+      )
+    :effect (proposal_profiles_ready ?proposal_package)
+  )
+  (:action attach_guest_profile_to_assignment_from_proposal
+    :parameters (?room_assignment_record - room_assignment_record ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (assignment_part_of_proposal ?room_assignment_record ?proposal_package)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_available ?guest_profile)
+        (proposal_package_assembled ?proposal_package)
+        (proposal_profiles_ready ?proposal_package)
+        (not
+          (guest_profile_in_use ?guest_profile)
+        )
+      )
+    :effect
+      (and
+        (guest_profile_in_use ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (not
+          (guest_profile_available ?guest_profile)
+        )
+      )
+  )
+  (:action lock_assignment_profile
+    :parameters (?room_assignment_record - room_assignment_record ?guest_profile - guest_profile ?proposal_package - proposal_package ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_in_use ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (has_rate_option ?room_assignment_record ?rate_plan_option)
+        (not
+          (proposal_locked_for_assignment ?proposal_package)
+        )
+        (not
+          (assignment_profile_locked ?room_assignment_record)
+        )
+      )
+    :effect (assignment_profile_locked ?room_assignment_record)
+  )
+  (:action attach_payment_instrument_to_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (assignment_payment_instrument_attached_flag ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_payment_instrument_attached_flag ?room_assignment_record)
+        (assignment_attached_payment_instrument ?room_assignment_record ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action enrich_assignment_with_package_and_payment
+    :parameters (?room_assignment_record - room_assignment_record ?guest_profile - guest_profile ?proposal_package - proposal_package ?rate_plan_option - rate_plan_option ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_in_use ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (has_rate_option ?room_assignment_record ?rate_plan_option)
+        (proposal_locked_for_assignment ?proposal_package)
+        (assignment_payment_instrument_attached_flag ?room_assignment_record)
+        (assignment_attached_payment_instrument ?room_assignment_record ?payment_instrument)
+        (not
+          (assignment_profile_locked ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_profile_locked ?room_assignment_record)
+        (assignment_package_enriched ?room_assignment_record)
+      )
+  )
+  (:action stage_assignment_for_supplier_confirmation
+    :parameters (?room_assignment_record - room_assignment_record ?supplier_confirmation - supplier_confirmation ?allocation_agent - allocation_agent ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_profile_locked ?room_assignment_record)
+        (assignment_has_supplier_confirmation ?room_assignment_record ?supplier_confirmation)
+        (assigned_allocation_agent ?room_assignment_record ?allocation_agent)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (not
+          (proposal_locked_for_supplier_confirmation ?proposal_package)
+        )
+        (not
+          (assignment_supplier_attached ?room_assignment_record)
+        )
+      )
+    :effect (assignment_supplier_attached ?room_assignment_record)
+  )
+  (:action activate_assignment_with_supplier_confirmation
+    :parameters (?room_assignment_record - room_assignment_record ?supplier_confirmation - supplier_confirmation ?allocation_agent - allocation_agent ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_profile_locked ?room_assignment_record)
+        (assignment_has_supplier_confirmation ?room_assignment_record ?supplier_confirmation)
+        (assigned_allocation_agent ?room_assignment_record ?allocation_agent)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (proposal_locked_for_supplier_confirmation ?proposal_package)
+        (not
+          (assignment_supplier_attached ?room_assignment_record)
+        )
+      )
+    :effect (assignment_supplier_attached ?room_assignment_record)
+  )
+  (:action enable_assignment_for_finalization
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_supplier_attached ?room_assignment_record)
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (not
+          (proposal_locked_for_assignment ?proposal_package)
+        )
+        (not
+          (proposal_locked_for_supplier_confirmation ?proposal_package)
+        )
+        (not
+          (assignment_ready_for_finalization ?room_assignment_record)
+        )
+      )
+    :effect (assignment_ready_for_finalization ?room_assignment_record)
+  )
+  (:action enable_assignment_and_require_billing
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_supplier_attached ?room_assignment_record)
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (proposal_locked_for_assignment ?proposal_package)
+        (not
+          (proposal_locked_for_supplier_confirmation ?proposal_package)
+        )
+        (not
+          (assignment_ready_for_finalization ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_needs_billing_account ?room_assignment_record)
+      )
+  )
+  (:action enable_assignment_and_require_billing_alternate
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_supplier_attached ?room_assignment_record)
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (not
+          (proposal_locked_for_assignment ?proposal_package)
+        )
+        (proposal_locked_for_supplier_confirmation ?proposal_package)
+        (not
+          (assignment_ready_for_finalization ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_needs_billing_account ?room_assignment_record)
+      )
+  )
+  (:action enable_assignment_and_require_billing_fully
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option ?guest_profile - guest_profile ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (assignment_supplier_attached ?room_assignment_record)
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (assignment_has_guest_profile ?room_assignment_record ?guest_profile)
+        (guest_profile_attached_to_proposal ?guest_profile ?proposal_package)
+        (proposal_locked_for_assignment ?proposal_package)
+        (proposal_locked_for_supplier_confirmation ?proposal_package)
+        (not
+          (assignment_ready_for_finalization ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_needs_billing_account ?room_assignment_record)
+      )
+  )
+  (:action finalize_assignment_record
+    :parameters (?room_assignment_record - room_assignment_record)
+    :precondition
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (not
+          (assignment_needs_billing_account ?room_assignment_record)
+        )
+        (not
+          (assignment_finalized ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?room_assignment_record)
+        (ready_for_enrichment ?room_assignment_record)
+      )
+  )
+  (:action attach_billing_account_to_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?billing_account - billing_account)
+    :precondition
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_needs_billing_account ?room_assignment_record)
+        (billing_account_available ?billing_account)
+      )
+    :effect
+      (and
+        (assignment_attached_billing_account ?room_assignment_record ?billing_account)
+        (not
+          (billing_account_available ?billing_account)
+        )
+      )
+  )
+  (:action validate_assignment_for_commit
+    :parameters (?room_assignment_record - room_assignment_record ?primary_room_request - primary_room_request ?secondary_room_request - secondary_room_request ?rate_plan_option - rate_plan_option ?billing_account - billing_account)
+    :precondition
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_needs_billing_account ?room_assignment_record)
+        (assignment_attached_billing_account ?room_assignment_record ?billing_account)
+        (assignment_links_primary_request ?room_assignment_record ?primary_room_request)
+        (assignment_links_secondary_request ?room_assignment_record ?secondary_room_request)
+        (primary_request_ready_for_package ?primary_room_request)
+        (secondary_request_ready_for_package ?secondary_room_request)
+        (has_rate_option ?room_assignment_record ?rate_plan_option)
+        (not
+          (assignment_prepared_for_finalization ?room_assignment_record)
+        )
+      )
+    :effect (assignment_prepared_for_finalization ?room_assignment_record)
+  )
+  (:action commit_assignment_record
+    :parameters (?room_assignment_record - room_assignment_record)
+    :precondition
+      (and
+        (assignment_ready_for_finalization ?room_assignment_record)
+        (assignment_prepared_for_finalization ?room_assignment_record)
+        (not
+          (assignment_finalized ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?room_assignment_record)
+        (ready_for_enrichment ?room_assignment_record)
+      )
+  )
+  (:action apply_voucher_to_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?voucher_or_promo - voucher_or_promo ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (booking_confirmed ?room_assignment_record)
+        (has_rate_option ?room_assignment_record ?rate_plan_option)
+        (voucher_available ?voucher_or_promo)
+        (assignment_link_voucher ?room_assignment_record ?voucher_or_promo)
+        (not
+          (assignment_voucher_staged ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_voucher_staged ?room_assignment_record)
+        (not
+          (voucher_available ?voucher_or_promo)
+        )
+      )
+  )
+  (:action authorize_voucher_for_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?allocation_agent - allocation_agent)
+    :precondition
+      (and
+        (assignment_voucher_staged ?room_assignment_record)
+        (assigned_allocation_agent ?room_assignment_record ?allocation_agent)
+        (not
+          (assignment_voucher_authorized ?room_assignment_record)
+        )
+      )
+    :effect (assignment_voucher_authorized ?room_assignment_record)
+  )
+  (:action approve_voucher_for_assignment
+    :parameters (?room_assignment_record - room_assignment_record ?insurance_option - insurance_option)
+    :precondition
+      (and
+        (assignment_voucher_authorized ?room_assignment_record)
+        (assignment_has_insurance_option ?room_assignment_record ?insurance_option)
+        (not
+          (assignment_voucher_approved ?room_assignment_record)
+        )
+      )
+    :effect (assignment_voucher_approved ?room_assignment_record)
+  )
+  (:action finalize_assignment_after_voucher
+    :parameters (?room_assignment_record - room_assignment_record)
+    :precondition
+      (and
+        (assignment_voucher_approved ?room_assignment_record)
+        (not
+          (assignment_finalized ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?room_assignment_record)
+        (ready_for_enrichment ?room_assignment_record)
+      )
+  )
+  (:action finalize_primary_request
+    :parameters (?primary_room_request - primary_room_request ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (primary_request_optioned ?primary_room_request)
+        (primary_request_ready_for_package ?primary_room_request)
+        (proposal_package_assembled ?proposal_package)
+        (proposal_profiles_ready ?proposal_package)
+        (not
+          (ready_for_enrichment ?primary_room_request)
+        )
+      )
+    :effect (ready_for_enrichment ?primary_room_request)
+  )
+  (:action finalize_secondary_request
+    :parameters (?secondary_room_request - secondary_room_request ?proposal_package - proposal_package)
+    :precondition
+      (and
+        (secondary_request_optioned ?secondary_room_request)
+        (secondary_request_ready_for_package ?secondary_room_request)
+        (proposal_package_assembled ?proposal_package)
+        (proposal_profiles_ready ?proposal_package)
+        (not
+          (ready_for_enrichment ?secondary_room_request)
+        )
+      )
+    :effect (ready_for_enrichment ?secondary_room_request)
+  )
+  (:action attach_confirmation_token_to_booking
+    :parameters (?group_booking - group_booking ?confirmation_token - confirmation_token ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (ready_for_enrichment ?group_booking)
+        (has_rate_option ?group_booking ?rate_plan_option)
+        (confirmation_token_available ?confirmation_token)
+        (not
+          (enriched_with_confirmation ?group_booking)
+        )
+      )
+    :effect
+      (and
+        (enriched_with_confirmation ?group_booking)
+        (has_confirmation_token ?group_booking ?confirmation_token)
+        (not
+          (confirmation_token_available ?confirmation_token)
+        )
+      )
+  )
+  (:action commit_primary_request_to_inventory
+    :parameters (?primary_room_request - primary_room_request ?room_unit - room_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (enriched_with_confirmation ?primary_room_request)
+        (holds_room_unit ?primary_room_request ?room_unit)
+        (has_confirmation_token ?primary_room_request ?confirmation_token)
+        (not
+          (committed ?primary_room_request)
+        )
+      )
+    :effect
+      (and
+        (committed ?primary_room_request)
+        (room_unit_available ?room_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action commit_secondary_request_to_inventory
+    :parameters (?secondary_room_request - secondary_room_request ?room_unit - room_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (enriched_with_confirmation ?secondary_room_request)
+        (holds_room_unit ?secondary_room_request ?room_unit)
+        (has_confirmation_token ?secondary_room_request ?confirmation_token)
+        (not
+          (committed ?secondary_room_request)
+        )
+      )
+    :effect
+      (and
+        (committed ?secondary_room_request)
+        (room_unit_available ?room_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+  (:action commit_assignment_to_inventory
+    :parameters (?room_assignment_record - room_assignment_record ?room_unit - room_unit ?confirmation_token - confirmation_token)
+    :precondition
+      (and
+        (enriched_with_confirmation ?room_assignment_record)
+        (holds_room_unit ?room_assignment_record ?room_unit)
+        (has_confirmation_token ?room_assignment_record ?confirmation_token)
+        (not
+          (committed ?room_assignment_record)
+        )
+      )
+    :effect
+      (and
+        (committed ?room_assignment_record)
+        (room_unit_available ?room_unit)
+        (confirmation_token_available ?confirmation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem group_booking_allocation_problem)
+  (:domain group_booking_room_allocation)
+  (:objects primary_request_01 - primary_room_request secondary_request_01 - secondary_room_request assignment_record_01 - room_assignment_record assignment_record_02 - room_assignment_record room_unit_101 - room_unit room_unit_102 - room_unit room_unit_103 - room_unit rate_plan_standard - rate_plan_option allocation_agent_01 - allocation_agent amenity_breakfast_package - amenity_package room_type_deluxe - room_type room_grouping_suite - room_grouping proposal_package_a - proposal_package guest_profile_01 - guest_profile guest_profile_02 - guest_profile payment_card_ending_1234 - payment_instrument payment_card_ending_5678 - payment_instrument billing_account_org_001 - billing_account billing_account_org_002 - billing_account confirmation_token_alpha - confirmation_token supplier_confirmation_hotel - supplier_confirmation voucher_promo_01 - voucher_or_promo voucher_promo_02 - voucher_or_promo insurance_option_travel - insurance_option)
+  (:init
+    (room_unit_available room_unit_101)
+    (room_unit_available room_unit_102)
+    (room_unit_available room_unit_103)
+    (rate_option_available rate_plan_standard)
+    (allocation_agent_available allocation_agent_01)
+    (amenity_package_available amenity_breakfast_package)
+    (primary_request_prefers_room_type primary_request_01 room_type_deluxe)
+    (secondary_request_prefers_room_group secondary_request_01 room_grouping_suite)
+    (proposal_package_proposed proposal_package_a)
+    (guest_profile_available guest_profile_01)
+    (guest_profile_available guest_profile_02)
+    (assignment_links_primary_request assignment_record_01 primary_request_01)
+    (assignment_links_primary_request assignment_record_02 primary_request_01)
+    (assignment_links_secondary_request assignment_record_01 secondary_request_01)
+    (assignment_links_secondary_request assignment_record_02 secondary_request_01)
+    (assignment_part_of_proposal assignment_record_01 proposal_package_a)
+    (assignment_part_of_proposal assignment_record_02 proposal_package_a)
+    (assignment_has_guest_profile assignment_record_01 guest_profile_01)
+    (assignment_has_guest_profile assignment_record_02 guest_profile_02)
+    (payment_instrument_available payment_card_ending_1234)
+    (payment_instrument_available payment_card_ending_5678)
+    (billing_account_available billing_account_org_001)
+    (billing_account_available billing_account_org_002)
+    (confirmation_token_available confirmation_token_alpha)
+    (supplier_confirmation_available supplier_confirmation_hotel)
+    (voucher_available voucher_promo_01)
+    (assignment_link_voucher assignment_record_01 voucher_promo_01)
+    (assignment_link_voucher assignment_record_02 voucher_promo_02)
+    (insurance_option_available insurance_option_travel)
+  )
+  (:goal
+    (and
+      (committed primary_request_01)
+      (committed secondary_request_01)
+      (committed assignment_record_01)
+      (committed assignment_record_02)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_group_booking primary_request_01)
+(hold_room_unit_for_booking primary_request_01 room_unit_101)
+(attach_rate_option_to_booking primary_request_01 rate_plan_standard)
+(confirm_group_booking primary_request_01 rate_plan_standard)
+(assign_allocation_agent_to_booking primary_request_01 allocation_agent_01)
+(place_primary_hold_on_room_type primary_request_01 room_type_deluxe rate_plan_standard)
+(finalize_primary_hold_with_agent primary_request_01 room_type_deluxe allocation_agent_01)
+(unassign_allocation_agent_from_booking primary_request_01 allocation_agent_01)
+(initiate_group_booking secondary_request_01)
+(hold_room_unit_for_booking secondary_request_01 room_unit_102)
+(release_rate_option_from_booking primary_request_01 rate_plan_standard)
+(attach_rate_option_to_booking secondary_request_01 rate_plan_standard)
+(confirm_group_booking secondary_request_01 rate_plan_standard)
+(assign_allocation_agent_to_booking secondary_request_01 allocation_agent_01)
+(place_secondary_hold_on_room_group secondary_request_01 room_grouping_suite rate_plan_standard)
+(finalize_secondary_hold_with_agent secondary_request_01 room_grouping_suite allocation_agent_01)
+(unassign_allocation_agent_from_booking secondary_request_01 allocation_agent_01)
+(assemble_proposal_package primary_request_01 secondary_request_01 room_type_deluxe room_grouping_suite proposal_package_a)
+(release_rate_option_from_booking secondary_request_01 rate_plan_standard)
+(attach_rate_option_to_booking primary_request_01 rate_plan_standard)
+(prepare_proposal_profiles proposal_package_a primary_request_01 rate_plan_standard)
+(finalize_primary_request primary_request_01 proposal_package_a)
+(finalize_secondary_request secondary_request_01 proposal_package_a)
+(attach_confirmation_token_to_booking primary_request_01 confirmation_token_alpha rate_plan_standard)
+(commit_primary_request_to_inventory primary_request_01 room_unit_101 confirmation_token_alpha)
+(release_rate_option_from_booking primary_request_01 rate_plan_standard)
+(attach_rate_option_to_booking secondary_request_01 rate_plan_standard)
+(attach_confirmation_token_to_booking secondary_request_01 confirmation_token_alpha rate_plan_standard)
+(commit_secondary_request_to_inventory secondary_request_01 room_unit_102 confirmation_token_alpha)
+(release_rate_option_from_booking secondary_request_01 rate_plan_standard)
+(initiate_group_booking assignment_record_01)
+(hold_room_unit_for_booking assignment_record_01 room_unit_101)
+(attach_rate_option_to_booking assignment_record_01 rate_plan_standard)
+(confirm_group_booking assignment_record_01 rate_plan_standard)
+(attach_guest_profile_to_assignment_from_proposal assignment_record_01 guest_profile_01 proposal_package_a)
+(assign_allocation_agent_to_booking assignment_record_01 allocation_agent_01)
+(lock_assignment_profile assignment_record_01 guest_profile_01 proposal_package_a rate_plan_standard)
+(attach_supplier_confirmation_to_assignment_record assignment_record_01 supplier_confirmation_hotel)
+(stage_assignment_for_supplier_confirmation assignment_record_01 supplier_confirmation_hotel allocation_agent_01 guest_profile_01 proposal_package_a)
+(detach_supplier_confirmation_from_assignment assignment_record_01 supplier_confirmation_hotel)
+(attach_insurance_option_to_assignment assignment_record_01 insurance_option_travel)
+(enable_assignment_for_finalization assignment_record_01 insurance_option_travel guest_profile_01 proposal_package_a)
+(finalize_assignment_record assignment_record_01)
+(attach_confirmation_token_to_booking assignment_record_01 confirmation_token_alpha rate_plan_standard)
+(commit_assignment_to_inventory assignment_record_01 room_unit_101 confirmation_token_alpha)
+(unassign_allocation_agent_from_booking assignment_record_01 allocation_agent_01)
+(detach_insurance_option_from_assignment assignment_record_01 insurance_option_travel)
+(release_rate_option_from_booking assignment_record_01 rate_plan_standard)
+(initiate_group_booking assignment_record_02)
+(hold_room_unit_for_booking assignment_record_02 room_unit_102)
+(attach_rate_option_to_booking assignment_record_02 rate_plan_standard)
+(confirm_group_booking assignment_record_02 rate_plan_standard)
+(attach_guest_profile_to_assignment_from_proposal assignment_record_02 guest_profile_02 proposal_package_a)
+(assign_allocation_agent_to_booking assignment_record_02 allocation_agent_01)
+(lock_assignment_profile assignment_record_02 guest_profile_02 proposal_package_a rate_plan_standard)
+(attach_supplier_confirmation_to_assignment_record assignment_record_02 supplier_confirmation_hotel)
+(stage_assignment_for_supplier_confirmation assignment_record_02 supplier_confirmation_hotel allocation_agent_01 guest_profile_02 proposal_package_a)
+(detach_supplier_confirmation_from_assignment assignment_record_02 supplier_confirmation_hotel)
+(attach_insurance_option_to_assignment assignment_record_02 insurance_option_travel)
+(enable_assignment_for_finalization assignment_record_02 insurance_option_travel guest_profile_02 proposal_package_a)
+(finalize_assignment_record assignment_record_02)
+(attach_confirmation_token_to_booking assignment_record_02 confirmation_token_alpha rate_plan_standard)
+(commit_assignment_to_inventory assignment_record_02 room_unit_102 confirmation_token_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_nbbh7n_4/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_nbbh7n_4/plan.pddl 63 
+
+
+
+--- stderr ---
+

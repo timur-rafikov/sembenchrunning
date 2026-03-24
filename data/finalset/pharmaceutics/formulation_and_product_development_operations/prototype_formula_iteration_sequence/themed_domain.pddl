@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_prototype_formula_iteration_sequence)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types formulation_subtype_group - object resource_category - object organizational_role - object formulation_family - object prototype_formula - formulation_family allocation_slot - formulation_subtype_group analytical_method - formulation_subtype_group process_expert - formulation_subtype_group regulatory_input - formulation_subtype_group manufacturing_specification - formulation_subtype_group evidence_artifact - formulation_subtype_group equipment_configuration - formulation_subtype_group scale_up_study_protocol - formulation_subtype_group stability_protocol - resource_category characterization_dataset - resource_category external_reviewer - resource_category process_condition_a - organizational_role process_condition_b - organizational_role scale_up_dossier - organizational_role project_phase - prototype_formula subphase - prototype_formula lab_batch_source_a - project_phase lab_batch_source_b - project_phase formulation_project_task - subphase)
+  (:predicates
+    (registered ?prototype_formula - prototype_formula)
+    (analytically_qualified ?prototype_formula - prototype_formula)
+    (has_allocation ?prototype_formula - prototype_formula)
+    (released ?prototype_formula - prototype_formula)
+    (approved ?prototype_formula - prototype_formula)
+    (authorized ?prototype_formula - prototype_formula)
+    (allocation_slot_available ?allocation_slot - allocation_slot)
+    (assigned_to_slot ?prototype_formula - prototype_formula ?allocation_slot - allocation_slot)
+    (analytical_method_available ?analytical_method - analytical_method)
+    (tested_by_method ?prototype_formula - prototype_formula ?analytical_method - analytical_method)
+    (process_expert_available ?process_expert - process_expert)
+    (assigned_process_expert ?prototype_formula - prototype_formula ?process_expert - process_expert)
+    (stability_protocol_available ?stability_protocol - stability_protocol)
+    (lab_batch_a_assigned_stability_protocol ?lab_batch_source_a - lab_batch_source_a ?stability_protocol - stability_protocol)
+    (lab_batch_b_assigned_stability_protocol ?lab_batch_source_b - lab_batch_source_b ?stability_protocol - stability_protocol)
+    (lab_batch_linked_process_condition_a ?lab_batch_source_a - lab_batch_source_a ?process_condition_a - process_condition_a)
+    (process_condition_a_ready ?process_condition_a - process_condition_a)
+    (process_condition_a_stability_assigned ?process_condition_a - process_condition_a)
+    (lab_batch_a_process_fit_confirmed ?lab_batch_source_a - lab_batch_source_a)
+    (lab_batch_linked_process_condition_b ?lab_batch_source_b - lab_batch_source_b ?process_condition_b - process_condition_b)
+    (process_condition_b_ready ?process_condition_b - process_condition_b)
+    (process_condition_b_stability_assigned ?process_condition_b - process_condition_b)
+    (lab_batch_b_process_fit_confirmed ?lab_batch_source_b - lab_batch_source_b)
+    (scale_up_dossier_open ?scale_up_dossier - scale_up_dossier)
+    (scale_up_dossier_populated ?scale_up_dossier - scale_up_dossier)
+    (scale_up_dossier_includes_process_condition_a ?scale_up_dossier - scale_up_dossier ?process_condition_a - process_condition_a)
+    (scale_up_dossier_includes_process_condition_b ?scale_up_dossier - scale_up_dossier ?process_condition_b - process_condition_b)
+    (scale_up_dossier_condition_a_ready ?scale_up_dossier - scale_up_dossier)
+    (scale_up_dossier_condition_b_ready ?scale_up_dossier - scale_up_dossier)
+    (scale_up_dossier_analytically_exercised ?scale_up_dossier - scale_up_dossier)
+    (task_linked_lab_batch_a ?formulation_project_task - formulation_project_task ?lab_batch_source_a - lab_batch_source_a)
+    (task_linked_lab_batch_b ?formulation_project_task - formulation_project_task ?lab_batch_source_b - lab_batch_source_b)
+    (task_linked_scale_up_dossier ?formulation_project_task - formulation_project_task ?scale_up_dossier - scale_up_dossier)
+    (characterization_dataset_available ?characterization_dataset - characterization_dataset)
+    (task_has_characterization_dataset ?formulation_project_task - formulation_project_task ?characterization_dataset - characterization_dataset)
+    (characterization_dataset_finalized ?characterization_dataset - characterization_dataset)
+    (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    (task_has_required_datasets ?formulation_project_task - formulation_project_task)
+    (task_ready_for_equipment_assignment ?formulation_project_task - formulation_project_task)
+    (task_equipment_assigned ?formulation_project_task - formulation_project_task)
+    (task_regulatory_input_applied ?formulation_project_task - formulation_project_task)
+    (task_regulatory_review_completed ?formulation_project_task - formulation_project_task)
+    (task_ready_for_spec_attachment ?formulation_project_task - formulation_project_task)
+    (task_integration_complete ?formulation_project_task - formulation_project_task)
+    (external_reviewer_available ?external_reviewer - external_reviewer)
+    (task_assigned_external_reviewer ?formulation_project_task - formulation_project_task ?external_reviewer - external_reviewer)
+    (task_external_review_assigned ?formulation_project_task - formulation_project_task)
+    (task_external_review_initiated ?formulation_project_task - formulation_project_task)
+    (task_external_review_completed ?formulation_project_task - formulation_project_task)
+    (regulatory_input_available ?regulatory_input - regulatory_input)
+    (task_assigned_regulatory_input ?formulation_project_task - formulation_project_task ?regulatory_input - regulatory_input)
+    (manufacturing_spec_available ?manufacturing_specification - manufacturing_specification)
+    (task_assigned_manufacturing_spec ?formulation_project_task - formulation_project_task ?manufacturing_specification - manufacturing_specification)
+    (equipment_configuration_available ?equipment_configuration - equipment_configuration)
+    (task_assigned_equipment_configuration ?formulation_project_task - formulation_project_task ?equipment_configuration - equipment_configuration)
+    (scale_up_study_protocol_available ?scale_up_study_protocol - scale_up_study_protocol)
+    (task_assigned_scale_up_study_protocol ?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (linked_evidence_artifact ?prototype_formula - prototype_formula ?evidence_artifact - evidence_artifact)
+    (lab_batch_a_ready_flag ?lab_batch_source_a - lab_batch_source_a)
+    (lab_batch_b_ready_flag ?lab_batch_source_b - lab_batch_source_b)
+    (task_final_approved_flag ?formulation_project_task - formulation_project_task)
+  )
+  (:action register_prototype_formula
+    :parameters (?prototype_formula - prototype_formula)
+    :precondition
+      (and
+        (not
+          (registered ?prototype_formula)
+        )
+        (not
+          (released ?prototype_formula)
+        )
+      )
+    :effect (registered ?prototype_formula)
+  )
+  (:action assign_allocation_slot_to_prototype
+    :parameters (?prototype_formula - prototype_formula ?allocation_slot - allocation_slot)
+    :precondition
+      (and
+        (registered ?prototype_formula)
+        (not
+          (has_allocation ?prototype_formula)
+        )
+        (allocation_slot_available ?allocation_slot)
+      )
+    :effect
+      (and
+        (has_allocation ?prototype_formula)
+        (assigned_to_slot ?prototype_formula ?allocation_slot)
+        (not
+          (allocation_slot_available ?allocation_slot)
+        )
+      )
+  )
+  (:action request_analytical_test
+    :parameters (?prototype_formula - prototype_formula ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (registered ?prototype_formula)
+        (has_allocation ?prototype_formula)
+        (analytical_method_available ?analytical_method)
+      )
+    :effect
+      (and
+        (tested_by_method ?prototype_formula ?analytical_method)
+        (not
+          (analytical_method_available ?analytical_method)
+        )
+      )
+  )
+  (:action record_analytical_result
+    :parameters (?prototype_formula - prototype_formula ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (registered ?prototype_formula)
+        (has_allocation ?prototype_formula)
+        (tested_by_method ?prototype_formula ?analytical_method)
+        (not
+          (analytically_qualified ?prototype_formula)
+        )
+      )
+    :effect (analytically_qualified ?prototype_formula)
+  )
+  (:action release_analytical_method
+    :parameters (?prototype_formula - prototype_formula ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (tested_by_method ?prototype_formula ?analytical_method)
+      )
+    :effect
+      (and
+        (analytical_method_available ?analytical_method)
+        (not
+          (tested_by_method ?prototype_formula ?analytical_method)
+        )
+      )
+  )
+  (:action assign_process_expert_to_prototype
+    :parameters (?prototype_formula - prototype_formula ?process_expert - process_expert)
+    :precondition
+      (and
+        (analytically_qualified ?prototype_formula)
+        (process_expert_available ?process_expert)
+      )
+    :effect
+      (and
+        (assigned_process_expert ?prototype_formula ?process_expert)
+        (not
+          (process_expert_available ?process_expert)
+        )
+      )
+  )
+  (:action unassign_process_expert_from_prototype
+    :parameters (?prototype_formula - prototype_formula ?process_expert - process_expert)
+    :precondition
+      (and
+        (assigned_process_expert ?prototype_formula ?process_expert)
+      )
+    :effect
+      (and
+        (process_expert_available ?process_expert)
+        (not
+          (assigned_process_expert ?prototype_formula ?process_expert)
+        )
+      )
+  )
+  (:action assign_task_equipment_configuration
+    :parameters (?formulation_project_task - formulation_project_task ?equipment_configuration - equipment_configuration)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (equipment_configuration_available ?equipment_configuration)
+      )
+    :effect
+      (and
+        (task_assigned_equipment_configuration ?formulation_project_task ?equipment_configuration)
+        (not
+          (equipment_configuration_available ?equipment_configuration)
+        )
+      )
+  )
+  (:action release_equipment_configuration_from_task
+    :parameters (?formulation_project_task - formulation_project_task ?equipment_configuration - equipment_configuration)
+    :precondition
+      (and
+        (task_assigned_equipment_configuration ?formulation_project_task ?equipment_configuration)
+      )
+    :effect
+      (and
+        (equipment_configuration_available ?equipment_configuration)
+        (not
+          (task_assigned_equipment_configuration ?formulation_project_task ?equipment_configuration)
+        )
+      )
+  )
+  (:action assign_scale_up_study_protocol_to_task
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (scale_up_study_protocol_available ?scale_up_study_protocol)
+      )
+    :effect
+      (and
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (not
+          (scale_up_study_protocol_available ?scale_up_study_protocol)
+        )
+      )
+  )
+  (:action withdraw_scale_up_study_protocol_from_task
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol)
+    :precondition
+      (and
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+      )
+    :effect
+      (and
+        (scale_up_study_protocol_available ?scale_up_study_protocol)
+        (not
+          (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        )
+      )
+  )
+  (:action flag_process_condition_a_for_batch
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?process_condition_a - process_condition_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_a)
+        (tested_by_method ?lab_batch_source_a ?analytical_method)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (not
+          (process_condition_a_ready ?process_condition_a)
+        )
+        (not
+          (process_condition_a_stability_assigned ?process_condition_a)
+        )
+      )
+    :effect (process_condition_a_ready ?process_condition_a)
+  )
+  (:action confirm_lab_batch_a_process_fit
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?process_condition_a - process_condition_a ?process_expert - process_expert)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_a)
+        (assigned_process_expert ?lab_batch_source_a ?process_expert)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (process_condition_a_ready ?process_condition_a)
+        (not
+          (lab_batch_a_ready_flag ?lab_batch_source_a)
+        )
+      )
+    :effect
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+      )
+  )
+  (:action assign_stability_protocol_to_lab_batch
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?process_condition_a - process_condition_a ?stability_protocol - stability_protocol)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_a)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (stability_protocol_available ?stability_protocol)
+        (not
+          (lab_batch_a_ready_flag ?lab_batch_source_a)
+        )
+      )
+    :effect
+      (and
+        (process_condition_a_stability_assigned ?process_condition_a)
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_a_assigned_stability_protocol ?lab_batch_source_a ?stability_protocol)
+        (not
+          (stability_protocol_available ?stability_protocol)
+        )
+      )
+  )
+  (:action update_process_condition_a_with_stability_protocol
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?process_condition_a - process_condition_a ?analytical_method - analytical_method ?stability_protocol - stability_protocol)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_a)
+        (tested_by_method ?lab_batch_source_a ?analytical_method)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (process_condition_a_stability_assigned ?process_condition_a)
+        (lab_batch_a_assigned_stability_protocol ?lab_batch_source_a ?stability_protocol)
+        (not
+          (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        )
+      )
+    :effect
+      (and
+        (process_condition_a_ready ?process_condition_a)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        (stability_protocol_available ?stability_protocol)
+        (not
+          (lab_batch_a_assigned_stability_protocol ?lab_batch_source_a ?stability_protocol)
+        )
+      )
+  )
+  (:action flag_process_condition_b_for_batch
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?process_condition_b - process_condition_b ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_b)
+        (tested_by_method ?lab_batch_source_b ?analytical_method)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (not
+          (process_condition_b_ready ?process_condition_b)
+        )
+        (not
+          (process_condition_b_stability_assigned ?process_condition_b)
+        )
+      )
+    :effect (process_condition_b_ready ?process_condition_b)
+  )
+  (:action confirm_lab_batch_b_process_fit
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?process_condition_b - process_condition_b ?process_expert - process_expert)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_b)
+        (assigned_process_expert ?lab_batch_source_b ?process_expert)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_b_ready ?process_condition_b)
+        (not
+          (lab_batch_b_ready_flag ?lab_batch_source_b)
+        )
+      )
+    :effect
+      (and
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+      )
+  )
+  (:action assign_stability_protocol_to_lab_batch_b
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?process_condition_b - process_condition_b ?stability_protocol - stability_protocol)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_b)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (stability_protocol_available ?stability_protocol)
+        (not
+          (lab_batch_b_ready_flag ?lab_batch_source_b)
+        )
+      )
+    :effect
+      (and
+        (process_condition_b_stability_assigned ?process_condition_b)
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_b_assigned_stability_protocol ?lab_batch_source_b ?stability_protocol)
+        (not
+          (stability_protocol_available ?stability_protocol)
+        )
+      )
+  )
+  (:action update_process_condition_b_with_stability_protocol
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?process_condition_b - process_condition_b ?analytical_method - analytical_method ?stability_protocol - stability_protocol)
+    :precondition
+      (and
+        (analytically_qualified ?lab_batch_source_b)
+        (tested_by_method ?lab_batch_source_b ?analytical_method)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_b_stability_assigned ?process_condition_b)
+        (lab_batch_b_assigned_stability_protocol ?lab_batch_source_b ?stability_protocol)
+        (not
+          (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        )
+      )
+    :effect
+      (and
+        (process_condition_b_ready ?process_condition_b)
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        (stability_protocol_available ?stability_protocol)
+        (not
+          (lab_batch_b_assigned_stability_protocol ?lab_batch_source_b ?stability_protocol)
+        )
+      )
+  )
+  (:action assemble_scale_up_dossier
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?lab_batch_source_b - lab_batch_source_b ?process_condition_a - process_condition_a ?process_condition_b - process_condition_b ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_a_ready ?process_condition_a)
+        (process_condition_b_ready ?process_condition_b)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        (scale_up_dossier_open ?scale_up_dossier)
+      )
+    :effect
+      (and
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_includes_process_condition_a ?scale_up_dossier ?process_condition_a)
+        (scale_up_dossier_includes_process_condition_b ?scale_up_dossier ?process_condition_b)
+        (not
+          (scale_up_dossier_open ?scale_up_dossier)
+        )
+      )
+  )
+  (:action assemble_scale_up_dossier_with_condition_a
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?lab_batch_source_b - lab_batch_source_b ?process_condition_a - process_condition_a ?process_condition_b - process_condition_b ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_a_stability_assigned ?process_condition_a)
+        (process_condition_b_ready ?process_condition_b)
+        (not
+          (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        )
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        (scale_up_dossier_open ?scale_up_dossier)
+      )
+    :effect
+      (and
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_includes_process_condition_a ?scale_up_dossier ?process_condition_a)
+        (scale_up_dossier_includes_process_condition_b ?scale_up_dossier ?process_condition_b)
+        (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        (not
+          (scale_up_dossier_open ?scale_up_dossier)
+        )
+      )
+  )
+  (:action assemble_scale_up_dossier_with_condition_b
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?lab_batch_source_b - lab_batch_source_b ?process_condition_a - process_condition_a ?process_condition_b - process_condition_b ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_a_ready ?process_condition_a)
+        (process_condition_b_stability_assigned ?process_condition_b)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        (not
+          (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        )
+        (scale_up_dossier_open ?scale_up_dossier)
+      )
+    :effect
+      (and
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_includes_process_condition_a ?scale_up_dossier ?process_condition_a)
+        (scale_up_dossier_includes_process_condition_b ?scale_up_dossier ?process_condition_b)
+        (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        (not
+          (scale_up_dossier_open ?scale_up_dossier)
+        )
+      )
+  )
+  (:action assemble_scale_up_dossier_with_both_conditions
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?lab_batch_source_b - lab_batch_source_b ?process_condition_a - process_condition_a ?process_condition_b - process_condition_b ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_linked_process_condition_a ?lab_batch_source_a ?process_condition_a)
+        (lab_batch_linked_process_condition_b ?lab_batch_source_b ?process_condition_b)
+        (process_condition_a_stability_assigned ?process_condition_a)
+        (process_condition_b_stability_assigned ?process_condition_b)
+        (not
+          (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        )
+        (not
+          (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        )
+        (scale_up_dossier_open ?scale_up_dossier)
+      )
+    :effect
+      (and
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_includes_process_condition_a ?scale_up_dossier ?process_condition_a)
+        (scale_up_dossier_includes_process_condition_b ?scale_up_dossier ?process_condition_b)
+        (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        (not
+          (scale_up_dossier_open ?scale_up_dossier)
+        )
+      )
+  )
+  (:action mark_scale_up_dossier_analytically_exercised
+    :parameters (?scale_up_dossier - scale_up_dossier ?lab_batch_source_a - lab_batch_source_a ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (tested_by_method ?lab_batch_source_a ?analytical_method)
+        (not
+          (scale_up_dossier_analytically_exercised ?scale_up_dossier)
+        )
+      )
+    :effect (scale_up_dossier_analytically_exercised ?scale_up_dossier)
+  )
+  (:action finalize_and_attach_characterization_dataset
+    :parameters (?formulation_project_task - formulation_project_task ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (task_linked_scale_up_dossier ?formulation_project_task ?scale_up_dossier)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_available ?characterization_dataset)
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_analytically_exercised ?scale_up_dossier)
+        (not
+          (characterization_dataset_finalized ?characterization_dataset)
+        )
+      )
+    :effect
+      (and
+        (characterization_dataset_finalized ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (not
+          (characterization_dataset_available ?characterization_dataset)
+        )
+      )
+  )
+  (:action validate_dataset_and_mark_task_ready
+    :parameters (?formulation_project_task - formulation_project_task ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_finalized ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (tested_by_method ?formulation_project_task ?analytical_method)
+        (not
+          (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        )
+        (not
+          (task_has_required_datasets ?formulation_project_task)
+        )
+      )
+    :effect (task_has_required_datasets ?formulation_project_task)
+  )
+  (:action assign_regulatory_input_to_task
+    :parameters (?formulation_project_task - formulation_project_task ?regulatory_input - regulatory_input)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (regulatory_input_available ?regulatory_input)
+        (not
+          (task_regulatory_input_applied ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_regulatory_input_applied ?formulation_project_task)
+        (task_assigned_regulatory_input ?formulation_project_task ?regulatory_input)
+        (not
+          (regulatory_input_available ?regulatory_input)
+        )
+      )
+  )
+  (:action process_regulatory_review_outcome
+    :parameters (?formulation_project_task - formulation_project_task ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier ?analytical_method - analytical_method ?regulatory_input - regulatory_input)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_finalized ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (tested_by_method ?formulation_project_task ?analytical_method)
+        (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        (task_regulatory_input_applied ?formulation_project_task)
+        (task_assigned_regulatory_input ?formulation_project_task ?regulatory_input)
+        (not
+          (task_has_required_datasets ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_has_required_datasets ?formulation_project_task)
+        (task_regulatory_review_completed ?formulation_project_task)
+      )
+  )
+  (:action assign_equipment_configuration_to_task
+    :parameters (?formulation_project_task - formulation_project_task ?equipment_configuration - equipment_configuration ?process_expert - process_expert ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_has_required_datasets ?formulation_project_task)
+        (task_assigned_equipment_configuration ?formulation_project_task ?equipment_configuration)
+        (assigned_process_expert ?formulation_project_task ?process_expert)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (not
+          (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        )
+        (not
+          (task_ready_for_equipment_assignment ?formulation_project_task)
+        )
+      )
+    :effect (task_ready_for_equipment_assignment ?formulation_project_task)
+  )
+  (:action assign_equipment_configuration_to_task_alternate
+    :parameters (?formulation_project_task - formulation_project_task ?equipment_configuration - equipment_configuration ?process_expert - process_expert ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_has_required_datasets ?formulation_project_task)
+        (task_assigned_equipment_configuration ?formulation_project_task ?equipment_configuration)
+        (assigned_process_expert ?formulation_project_task ?process_expert)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        (not
+          (task_ready_for_equipment_assignment ?formulation_project_task)
+        )
+      )
+    :effect (task_ready_for_equipment_assignment ?formulation_project_task)
+  )
+  (:action assign_study_protocol_and_mark_equipment_assigned
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_ready_for_equipment_assignment ?formulation_project_task)
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (not
+          (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        )
+        (not
+          (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        )
+        (not
+          (task_equipment_assigned ?formulation_project_task)
+        )
+      )
+    :effect (task_equipment_assigned ?formulation_project_task)
+  )
+  (:action assign_study_protocol_and_mark_spec_attachment_ready
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_ready_for_equipment_assignment ?formulation_project_task)
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        (not
+          (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        )
+        (not
+          (task_equipment_assigned ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_ready_for_spec_attachment ?formulation_project_task)
+      )
+  )
+  (:action assign_study_protocol_and_mark_equipment_and_evidence
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_ready_for_equipment_assignment ?formulation_project_task)
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (not
+          (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        )
+        (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        (not
+          (task_equipment_assigned ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_ready_for_spec_attachment ?formulation_project_task)
+      )
+  )
+  (:action assign_study_protocol_and_mark_equipment_and_evidence_alternate
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol ?characterization_dataset - characterization_dataset ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (task_ready_for_equipment_assignment ?formulation_project_task)
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (task_has_characterization_dataset ?formulation_project_task ?characterization_dataset)
+        (characterization_dataset_attached_to_scale_up_dossier ?characterization_dataset ?scale_up_dossier)
+        (scale_up_dossier_condition_a_ready ?scale_up_dossier)
+        (scale_up_dossier_condition_b_ready ?scale_up_dossier)
+        (not
+          (task_equipment_assigned ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_ready_for_spec_attachment ?formulation_project_task)
+      )
+  )
+  (:action record_task_approval
+    :parameters (?formulation_project_task - formulation_project_task)
+    :precondition
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (not
+          (task_ready_for_spec_attachment ?formulation_project_task)
+        )
+        (not
+          (task_final_approved_flag ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_final_approved_flag ?formulation_project_task)
+        (approved ?formulation_project_task)
+      )
+  )
+  (:action attach_manufacturing_spec_to_task
+    :parameters (?formulation_project_task - formulation_project_task ?manufacturing_specification - manufacturing_specification)
+    :precondition
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_ready_for_spec_attachment ?formulation_project_task)
+        (manufacturing_spec_available ?manufacturing_specification)
+      )
+    :effect
+      (and
+        (task_assigned_manufacturing_spec ?formulation_project_task ?manufacturing_specification)
+        (not
+          (manufacturing_spec_available ?manufacturing_specification)
+        )
+      )
+  )
+  (:action integrate_task_and_mark_integration_complete
+    :parameters (?formulation_project_task - formulation_project_task ?lab_batch_source_a - lab_batch_source_a ?lab_batch_source_b - lab_batch_source_b ?analytical_method - analytical_method ?manufacturing_specification - manufacturing_specification)
+    :precondition
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_ready_for_spec_attachment ?formulation_project_task)
+        (task_assigned_manufacturing_spec ?formulation_project_task ?manufacturing_specification)
+        (task_linked_lab_batch_a ?formulation_project_task ?lab_batch_source_a)
+        (task_linked_lab_batch_b ?formulation_project_task ?lab_batch_source_b)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        (tested_by_method ?formulation_project_task ?analytical_method)
+        (not
+          (task_integration_complete ?formulation_project_task)
+        )
+      )
+    :effect (task_integration_complete ?formulation_project_task)
+  )
+  (:action finalize_task_approval
+    :parameters (?formulation_project_task - formulation_project_task)
+    :precondition
+      (and
+        (task_equipment_assigned ?formulation_project_task)
+        (task_integration_complete ?formulation_project_task)
+        (not
+          (task_final_approved_flag ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_final_approved_flag ?formulation_project_task)
+        (approved ?formulation_project_task)
+      )
+  )
+  (:action assign_external_reviewer_to_task
+    :parameters (?formulation_project_task - formulation_project_task ?external_reviewer - external_reviewer ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (analytically_qualified ?formulation_project_task)
+        (tested_by_method ?formulation_project_task ?analytical_method)
+        (external_reviewer_available ?external_reviewer)
+        (task_assigned_external_reviewer ?formulation_project_task ?external_reviewer)
+        (not
+          (task_external_review_assigned ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_external_review_assigned ?formulation_project_task)
+        (not
+          (external_reviewer_available ?external_reviewer)
+        )
+      )
+  )
+  (:action initiate_external_review_for_task
+    :parameters (?formulation_project_task - formulation_project_task ?process_expert - process_expert)
+    :precondition
+      (and
+        (task_external_review_assigned ?formulation_project_task)
+        (assigned_process_expert ?formulation_project_task ?process_expert)
+        (not
+          (task_external_review_initiated ?formulation_project_task)
+        )
+      )
+    :effect (task_external_review_initiated ?formulation_project_task)
+  )
+  (:action complete_external_review_for_task
+    :parameters (?formulation_project_task - formulation_project_task ?scale_up_study_protocol - scale_up_study_protocol)
+    :precondition
+      (and
+        (task_external_review_initiated ?formulation_project_task)
+        (task_assigned_scale_up_study_protocol ?formulation_project_task ?scale_up_study_protocol)
+        (not
+          (task_external_review_completed ?formulation_project_task)
+        )
+      )
+    :effect (task_external_review_completed ?formulation_project_task)
+  )
+  (:action approve_task_after_external_review
+    :parameters (?formulation_project_task - formulation_project_task)
+    :precondition
+      (and
+        (task_external_review_completed ?formulation_project_task)
+        (not
+          (task_final_approved_flag ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (task_final_approved_flag ?formulation_project_task)
+        (approved ?formulation_project_task)
+      )
+  )
+  (:action approve_lab_batch_a
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_a_ready_flag ?lab_batch_source_a)
+        (lab_batch_a_process_fit_confirmed ?lab_batch_source_a)
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_analytically_exercised ?scale_up_dossier)
+        (not
+          (approved ?lab_batch_source_a)
+        )
+      )
+    :effect (approved ?lab_batch_source_a)
+  )
+  (:action approve_lab_batch_b
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?scale_up_dossier - scale_up_dossier)
+    :precondition
+      (and
+        (lab_batch_b_ready_flag ?lab_batch_source_b)
+        (lab_batch_b_process_fit_confirmed ?lab_batch_source_b)
+        (scale_up_dossier_populated ?scale_up_dossier)
+        (scale_up_dossier_analytically_exercised ?scale_up_dossier)
+        (not
+          (approved ?lab_batch_source_b)
+        )
+      )
+    :effect (approved ?lab_batch_source_b)
+  )
+  (:action authorize_prototype_with_evidence
+    :parameters (?prototype_formula - prototype_formula ?evidence_artifact - evidence_artifact ?analytical_method - analytical_method)
+    :precondition
+      (and
+        (approved ?prototype_formula)
+        (tested_by_method ?prototype_formula ?analytical_method)
+        (evidence_artifact_available ?evidence_artifact)
+        (not
+          (authorized ?prototype_formula)
+        )
+      )
+    :effect
+      (and
+        (authorized ?prototype_formula)
+        (linked_evidence_artifact ?prototype_formula ?evidence_artifact)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action release_lab_batch_a_and_allocate_slot
+    :parameters (?lab_batch_source_a - lab_batch_source_a ?allocation_slot - allocation_slot ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (authorized ?lab_batch_source_a)
+        (assigned_to_slot ?lab_batch_source_a ?allocation_slot)
+        (linked_evidence_artifact ?lab_batch_source_a ?evidence_artifact)
+        (not
+          (released ?lab_batch_source_a)
+        )
+      )
+    :effect
+      (and
+        (released ?lab_batch_source_a)
+        (allocation_slot_available ?allocation_slot)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+  (:action release_lab_batch_b_and_allocate_slot
+    :parameters (?lab_batch_source_b - lab_batch_source_b ?allocation_slot - allocation_slot ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (authorized ?lab_batch_source_b)
+        (assigned_to_slot ?lab_batch_source_b ?allocation_slot)
+        (linked_evidence_artifact ?lab_batch_source_b ?evidence_artifact)
+        (not
+          (released ?lab_batch_source_b)
+        )
+      )
+    :effect
+      (and
+        (released ?lab_batch_source_b)
+        (allocation_slot_available ?allocation_slot)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+  (:action release_task_and_allocate_slot
+    :parameters (?formulation_project_task - formulation_project_task ?allocation_slot - allocation_slot ?evidence_artifact - evidence_artifact)
+    :precondition
+      (and
+        (authorized ?formulation_project_task)
+        (assigned_to_slot ?formulation_project_task ?allocation_slot)
+        (linked_evidence_artifact ?formulation_project_task ?evidence_artifact)
+        (not
+          (released ?formulation_project_task)
+        )
+      )
+    :effect
+      (and
+        (released ?formulation_project_task)
+        (allocation_slot_available ?allocation_slot)
+        (evidence_artifact_available ?evidence_artifact)
+      )
+  )
+)

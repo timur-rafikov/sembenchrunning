@@ -1,0 +1,936 @@
+(define (domain pharmacy_discharge_medication_pickup_alignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types pharmacy_entity_root - object inventory_entity_root - object packaging_entity_root - object prescription_entity_root - object discharge_prescription - prescription_entity_root dispensing_site - pharmacy_entity_root formulary_product_candidate - pharmacy_entity_root authorization_approver - pharmacy_entity_root auxiliary_label_spec - pharmacy_entity_root patient_instruction_leaflet - pharmacy_entity_root patient_pickup_slot - pharmacy_entity_root product_component - pharmacy_entity_root clinical_verification_flag - pharmacy_entity_root substitution_option - inventory_entity_root packaging_component - inventory_entity_root special_handling_flag - inventory_entity_root inventory_lot_primary - packaging_entity_root inventory_lot_secondary - packaging_entity_root dispense_package - packaging_entity_root prescription_processing_stream - discharge_prescription dispensing_processing_stream - discharge_prescription inpatient_pharmacist_assignment - prescription_processing_stream outpatient_pharmacy_technician_assignment - prescription_processing_stream dispensing_task_operation - dispensing_processing_stream)
+  (:predicates
+    (dispense_item_registered ?discharge_prescription - discharge_prescription)
+    (ready_for_fulfillment ?discharge_prescription - discharge_prescription)
+    (provisionally_assigned ?discharge_prescription - discharge_prescription)
+    (fulfillment_confirmed ?discharge_prescription - discharge_prescription)
+    (ready_for_pickup ?discharge_prescription - discharge_prescription)
+    (pickup_scheduled ?discharge_prescription - discharge_prescription)
+    (dispensing_site_available ?dispensing_site - dispensing_site)
+    (allocated_to_site ?discharge_prescription - discharge_prescription ?dispensing_site - dispensing_site)
+    (product_candidate_available ?formulary_product_candidate - formulary_product_candidate)
+    (selected_product_candidate ?discharge_prescription - discharge_prescription ?formulary_product_candidate - formulary_product_candidate)
+    (authorization_approver_available ?authorization_approver - authorization_approver)
+    (authorization_assigned_to_approver ?discharge_prescription - discharge_prescription ?authorization_approver - authorization_approver)
+    (substitution_option_available ?substitution_option - substitution_option)
+    (pharmacist_reserved_substitution_option ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?substitution_option - substitution_option)
+    (technician_reserved_substitution_option ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?substitution_option - substitution_option)
+    (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?inventory_lot_primary - inventory_lot_primary)
+    (inventory_lot_reservation_confirmed ?inventory_lot_primary - inventory_lot_primary)
+    (inventory_lot_marked_for_substitution ?inventory_lot_primary - inventory_lot_primary)
+    (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment)
+    (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_secondary - inventory_lot_secondary)
+    (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary - inventory_lot_secondary)
+    (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary - inventory_lot_secondary)
+    (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment)
+    (package_placeholder_available ?dispense_package - dispense_package)
+    (dispense_package_created ?dispense_package - dispense_package)
+    (package_contains_inventory_lot_primary ?dispense_package - dispense_package ?inventory_lot_primary - inventory_lot_primary)
+    (package_contains_inventory_lot_secondary ?dispense_package - dispense_package ?inventory_lot_secondary - inventory_lot_secondary)
+    (package_requires_auxiliary_label ?dispense_package - dispense_package)
+    (package_requires_patient_leaflet ?dispense_package - dispense_package)
+    (dispense_package_finalized ?dispense_package - dispense_package)
+    (task_assigned_to_pharmacist ?dispensing_task_operation - dispensing_task_operation ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment)
+    (task_assigned_to_technician ?dispensing_task_operation - dispensing_task_operation ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment)
+    (task_linked_to_package ?dispensing_task_operation - dispensing_task_operation ?dispense_package - dispense_package)
+    (packaging_component_available ?packaging_component - packaging_component)
+    (task_linked_to_packaging_component ?dispensing_task_operation - dispensing_task_operation ?packaging_component - packaging_component)
+    (packaging_component_allocated ?packaging_component - packaging_component)
+    (packaging_component_attached_to_package ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    (task_packaging_components_staged ?dispensing_task_operation - dispensing_task_operation)
+    (task_components_assembled ?dispensing_task_operation - dispensing_task_operation)
+    (task_verification_completed ?dispensing_task_operation - dispensing_task_operation)
+    (aux_label_assigned_to_task ?dispensing_task_operation - dispensing_task_operation)
+    (aux_label_applied_to_task ?dispensing_task_operation - dispensing_task_operation)
+    (task_labeling_completed ?dispensing_task_operation - dispensing_task_operation)
+    (task_assembly_verified ?dispensing_task_operation - dispensing_task_operation)
+    (special_handling_flag_available ?special_handling_flag - special_handling_flag)
+    (task_linked_to_special_handling_flag ?dispensing_task_operation - dispensing_task_operation ?special_handling_flag - special_handling_flag)
+    (task_special_handling_acknowledged ?dispensing_task_operation - dispensing_task_operation)
+    (task_special_handling_authorized ?dispensing_task_operation - dispensing_task_operation)
+    (task_special_handling_verified ?dispensing_task_operation - dispensing_task_operation)
+    (auxiliary_label_spec_available ?auxiliary_label_spec - auxiliary_label_spec)
+    (task_linked_to_auxiliary_label_spec ?dispensing_task_operation - dispensing_task_operation ?auxiliary_label_spec - auxiliary_label_spec)
+    (patient_leaflet_available ?patient_instruction_leaflet - patient_instruction_leaflet)
+    (task_linked_to_patient_leaflet ?dispensing_task_operation - dispensing_task_operation ?patient_instruction_leaflet - patient_instruction_leaflet)
+    (product_component_available ?product_component - product_component)
+    (task_linked_to_product_component ?dispensing_task_operation - dispensing_task_operation ?product_component - product_component)
+    (clinical_verification_flag_available ?clinical_verification_flag - clinical_verification_flag)
+    (task_linked_to_clinical_verification_flag ?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag)
+    (pickup_slot_available ?patient_pickup_slot - patient_pickup_slot)
+    (linked_to_pickup_slot ?discharge_prescription - discharge_prescription ?patient_pickup_slot - patient_pickup_slot)
+    (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment)
+    (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment)
+    (dispensing_task_released_flag ?dispensing_task_operation - dispensing_task_operation)
+  )
+  (:action register_prescription_intake
+    :parameters (?discharge_prescription - discharge_prescription)
+    :precondition
+      (and
+        (not
+          (dispense_item_registered ?discharge_prescription)
+        )
+        (not
+          (fulfillment_confirmed ?discharge_prescription)
+        )
+      )
+    :effect (dispense_item_registered ?discharge_prescription)
+  )
+  (:action provisionally_assign_dispensing_site
+    :parameters (?discharge_prescription - discharge_prescription ?dispensing_site - dispensing_site)
+    :precondition
+      (and
+        (dispense_item_registered ?discharge_prescription)
+        (not
+          (provisionally_assigned ?discharge_prescription)
+        )
+        (dispensing_site_available ?dispensing_site)
+      )
+    :effect
+      (and
+        (provisionally_assigned ?discharge_prescription)
+        (allocated_to_site ?discharge_prescription ?dispensing_site)
+        (not
+          (dispensing_site_available ?dispensing_site)
+        )
+      )
+  )
+  (:action select_formulary_product_candidate
+    :parameters (?discharge_prescription - discharge_prescription ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (dispense_item_registered ?discharge_prescription)
+        (provisionally_assigned ?discharge_prescription)
+        (product_candidate_available ?formulary_product_candidate)
+      )
+    :effect
+      (and
+        (selected_product_candidate ?discharge_prescription ?formulary_product_candidate)
+        (not
+          (product_candidate_available ?formulary_product_candidate)
+        )
+      )
+  )
+  (:action finalize_product_candidate_selection
+    :parameters (?discharge_prescription - discharge_prescription ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (dispense_item_registered ?discharge_prescription)
+        (provisionally_assigned ?discharge_prescription)
+        (selected_product_candidate ?discharge_prescription ?formulary_product_candidate)
+        (not
+          (ready_for_fulfillment ?discharge_prescription)
+        )
+      )
+    :effect (ready_for_fulfillment ?discharge_prescription)
+  )
+  (:action release_formulary_product_candidate
+    :parameters (?discharge_prescription - discharge_prescription ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (selected_product_candidate ?discharge_prescription ?formulary_product_candidate)
+      )
+    :effect
+      (and
+        (product_candidate_available ?formulary_product_candidate)
+        (not
+          (selected_product_candidate ?discharge_prescription ?formulary_product_candidate)
+        )
+      )
+  )
+  (:action route_prescription_for_authorization
+    :parameters (?discharge_prescription - discharge_prescription ?authorization_approver - authorization_approver)
+    :precondition
+      (and
+        (ready_for_fulfillment ?discharge_prescription)
+        (authorization_approver_available ?authorization_approver)
+      )
+    :effect
+      (and
+        (authorization_assigned_to_approver ?discharge_prescription ?authorization_approver)
+        (not
+          (authorization_approver_available ?authorization_approver)
+        )
+      )
+  )
+  (:action release_authorization_approver
+    :parameters (?discharge_prescription - discharge_prescription ?authorization_approver - authorization_approver)
+    :precondition
+      (and
+        (authorization_assigned_to_approver ?discharge_prescription ?authorization_approver)
+      )
+    :effect
+      (and
+        (authorization_approver_available ?authorization_approver)
+        (not
+          (authorization_assigned_to_approver ?discharge_prescription ?authorization_approver)
+        )
+      )
+  )
+  (:action assign_product_component_to_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?product_component - product_component)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (product_component_available ?product_component)
+      )
+    :effect
+      (and
+        (task_linked_to_product_component ?dispensing_task_operation ?product_component)
+        (not
+          (product_component_available ?product_component)
+        )
+      )
+  )
+  (:action release_product_component_from_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?product_component - product_component)
+    :precondition
+      (and
+        (task_linked_to_product_component ?dispensing_task_operation ?product_component)
+      )
+    :effect
+      (and
+        (product_component_available ?product_component)
+        (not
+          (task_linked_to_product_component ?dispensing_task_operation ?product_component)
+        )
+      )
+  )
+  (:action assign_clinical_verification_to_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (clinical_verification_flag_available ?clinical_verification_flag)
+      )
+    :effect
+      (and
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (not
+          (clinical_verification_flag_available ?clinical_verification_flag)
+        )
+      )
+  )
+  (:action release_clinical_verification_from_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag)
+    :precondition
+      (and
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+      )
+    :effect
+      (and
+        (clinical_verification_flag_available ?clinical_verification_flag)
+        (not
+          (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        )
+      )
+  )
+  (:action reserve_primary_inventory_lot
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?inventory_lot_primary - inventory_lot_primary ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (ready_for_fulfillment ?inpatient_pharmacist_assignment)
+        (selected_product_candidate ?inpatient_pharmacist_assignment ?formulary_product_candidate)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (not
+          (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+        )
+        (not
+          (inventory_lot_marked_for_substitution ?inventory_lot_primary)
+        )
+      )
+    :effect (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+  )
+  (:action confirm_pharmacist_allocation
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?inventory_lot_primary - inventory_lot_primary ?authorization_approver - authorization_approver)
+    :precondition
+      (and
+        (ready_for_fulfillment ?inpatient_pharmacist_assignment)
+        (authorization_assigned_to_approver ?inpatient_pharmacist_assignment ?authorization_approver)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+        (not
+          (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        )
+      )
+    :effect
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+      )
+  )
+  (:action reserve_substitution_option_for_pharmacist
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?inventory_lot_primary - inventory_lot_primary ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (ready_for_fulfillment ?inpatient_pharmacist_assignment)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (substitution_option_available ?substitution_option)
+        (not
+          (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        )
+      )
+    :effect
+      (and
+        (inventory_lot_marked_for_substitution ?inventory_lot_primary)
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (pharmacist_reserved_substitution_option ?inpatient_pharmacist_assignment ?substitution_option)
+        (not
+          (substitution_option_available ?substitution_option)
+        )
+      )
+  )
+  (:action apply_substitution_for_pharmacist_assignment
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?inventory_lot_primary - inventory_lot_primary ?formulary_product_candidate - formulary_product_candidate ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (ready_for_fulfillment ?inpatient_pharmacist_assignment)
+        (selected_product_candidate ?inpatient_pharmacist_assignment ?formulary_product_candidate)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (inventory_lot_marked_for_substitution ?inventory_lot_primary)
+        (pharmacist_reserved_substitution_option ?inpatient_pharmacist_assignment ?substitution_option)
+        (not
+          (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        )
+      )
+    :effect
+      (and
+        (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        (substitution_option_available ?substitution_option)
+        (not
+          (pharmacist_reserved_substitution_option ?inpatient_pharmacist_assignment ?substitution_option)
+        )
+      )
+  )
+  (:action reserve_secondary_inventory_lot_for_technician
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_secondary - inventory_lot_secondary ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (ready_for_fulfillment ?outpatient_pharmacy_technician_assignment)
+        (selected_product_candidate ?outpatient_pharmacy_technician_assignment ?formulary_product_candidate)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (not
+          (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+        )
+        (not
+          (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary)
+        )
+      )
+    :effect (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+  )
+  (:action confirm_technician_allocation
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_secondary - inventory_lot_secondary ?authorization_approver - authorization_approver)
+    :precondition
+      (and
+        (ready_for_fulfillment ?outpatient_pharmacy_technician_assignment)
+        (authorization_assigned_to_approver ?outpatient_pharmacy_technician_assignment ?authorization_approver)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+        (not
+          (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        )
+      )
+    :effect
+      (and
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+      )
+  )
+  (:action reserve_substitution_for_technician
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_secondary - inventory_lot_secondary ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (ready_for_fulfillment ?outpatient_pharmacy_technician_assignment)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (substitution_option_available ?substitution_option)
+        (not
+          (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        )
+      )
+    :effect
+      (and
+        (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary)
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (technician_reserved_substitution_option ?outpatient_pharmacy_technician_assignment ?substitution_option)
+        (not
+          (substitution_option_available ?substitution_option)
+        )
+      )
+  )
+  (:action apply_substitution_for_technician
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_secondary - inventory_lot_secondary ?formulary_product_candidate - formulary_product_candidate ?substitution_option - substitution_option)
+    :precondition
+      (and
+        (ready_for_fulfillment ?outpatient_pharmacy_technician_assignment)
+        (selected_product_candidate ?outpatient_pharmacy_technician_assignment ?formulary_product_candidate)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary)
+        (technician_reserved_substitution_option ?outpatient_pharmacy_technician_assignment ?substitution_option)
+        (not
+          (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        )
+      )
+    :effect
+      (and
+        (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        (substitution_option_available ?substitution_option)
+        (not
+          (technician_reserved_substitution_option ?outpatient_pharmacy_technician_assignment ?substitution_option)
+        )
+      )
+  )
+  (:action create_dispense_package_standard
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_primary - inventory_lot_primary ?inventory_lot_secondary - inventory_lot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+        (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        (package_placeholder_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_created ?dispense_package)
+        (package_contains_inventory_lot_primary ?dispense_package ?inventory_lot_primary)
+        (package_contains_inventory_lot_secondary ?dispense_package ?inventory_lot_secondary)
+        (not
+          (package_placeholder_available ?dispense_package)
+        )
+      )
+  )
+  (:action create_dispense_package_with_auxiliary_label
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_primary - inventory_lot_primary ?inventory_lot_secondary - inventory_lot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_marked_for_substitution ?inventory_lot_primary)
+        (inventory_lot_secondary_reservation_confirmed ?inventory_lot_secondary)
+        (not
+          (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        )
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        (package_placeholder_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_created ?dispense_package)
+        (package_contains_inventory_lot_primary ?dispense_package ?inventory_lot_primary)
+        (package_contains_inventory_lot_secondary ?dispense_package ?inventory_lot_secondary)
+        (package_requires_auxiliary_label ?dispense_package)
+        (not
+          (package_placeholder_available ?dispense_package)
+        )
+      )
+  )
+  (:action create_dispense_package_with_patient_leaflet
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_primary - inventory_lot_primary ?inventory_lot_secondary - inventory_lot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_reservation_confirmed ?inventory_lot_primary)
+        (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        (not
+          (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        )
+        (package_placeholder_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_created ?dispense_package)
+        (package_contains_inventory_lot_primary ?dispense_package ?inventory_lot_primary)
+        (package_contains_inventory_lot_secondary ?dispense_package ?inventory_lot_secondary)
+        (package_requires_patient_leaflet ?dispense_package)
+        (not
+          (package_placeholder_available ?dispense_package)
+        )
+      )
+  )
+  (:action create_dispense_package_with_auxiliary_label_and_leaflet
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?inventory_lot_primary - inventory_lot_primary ?inventory_lot_secondary - inventory_lot_secondary ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (pharmacist_inventory_lot_primary_linked ?inpatient_pharmacist_assignment ?inventory_lot_primary)
+        (technician_inventory_lot_secondary_linked ?outpatient_pharmacy_technician_assignment ?inventory_lot_secondary)
+        (inventory_lot_marked_for_substitution ?inventory_lot_primary)
+        (inventory_lot_secondary_marked_for_substitution ?inventory_lot_secondary)
+        (not
+          (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        )
+        (not
+          (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        )
+        (package_placeholder_available ?dispense_package)
+      )
+    :effect
+      (and
+        (dispense_package_created ?dispense_package)
+        (package_contains_inventory_lot_primary ?dispense_package ?inventory_lot_primary)
+        (package_contains_inventory_lot_secondary ?dispense_package ?inventory_lot_secondary)
+        (package_requires_auxiliary_label ?dispense_package)
+        (package_requires_patient_leaflet ?dispense_package)
+        (not
+          (package_placeholder_available ?dispense_package)
+        )
+      )
+  )
+  (:action finalize_dispense_package
+    :parameters (?dispense_package - dispense_package ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (dispense_package_created ?dispense_package)
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (selected_product_candidate ?inpatient_pharmacist_assignment ?formulary_product_candidate)
+        (not
+          (dispense_package_finalized ?dispense_package)
+        )
+      )
+    :effect (dispense_package_finalized ?dispense_package)
+  )
+  (:action reserve_and_attach_packaging_component
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (task_linked_to_package ?dispensing_task_operation ?dispense_package)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_available ?packaging_component)
+        (dispense_package_created ?dispense_package)
+        (dispense_package_finalized ?dispense_package)
+        (not
+          (packaging_component_allocated ?packaging_component)
+        )
+      )
+    :effect
+      (and
+        (packaging_component_allocated ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action stage_packaging_components_for_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?packaging_component - packaging_component ?dispense_package - dispense_package ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_allocated ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (selected_product_candidate ?dispensing_task_operation ?formulary_product_candidate)
+        (not
+          (package_requires_auxiliary_label ?dispense_package)
+        )
+        (not
+          (task_packaging_components_staged ?dispensing_task_operation)
+        )
+      )
+    :effect (task_packaging_components_staged ?dispensing_task_operation)
+  )
+  (:action assign_auxiliary_label_spec_to_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?auxiliary_label_spec - auxiliary_label_spec)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (auxiliary_label_spec_available ?auxiliary_label_spec)
+        (not
+          (aux_label_assigned_to_task ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (aux_label_assigned_to_task ?dispensing_task_operation)
+        (task_linked_to_auxiliary_label_spec ?dispensing_task_operation ?auxiliary_label_spec)
+        (not
+          (auxiliary_label_spec_available ?auxiliary_label_spec)
+        )
+      )
+  )
+  (:action apply_auxiliary_label_and_stage_components
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?packaging_component - packaging_component ?dispense_package - dispense_package ?formulary_product_candidate - formulary_product_candidate ?auxiliary_label_spec - auxiliary_label_spec)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_allocated ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (selected_product_candidate ?dispensing_task_operation ?formulary_product_candidate)
+        (package_requires_auxiliary_label ?dispense_package)
+        (aux_label_assigned_to_task ?dispensing_task_operation)
+        (task_linked_to_auxiliary_label_spec ?dispensing_task_operation ?auxiliary_label_spec)
+        (not
+          (task_packaging_components_staged ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (task_packaging_components_staged ?dispensing_task_operation)
+        (aux_label_applied_to_task ?dispensing_task_operation)
+      )
+  )
+  (:action assemble_components_and_mark_components_attached
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?product_component - product_component ?authorization_approver - authorization_approver ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_packaging_components_staged ?dispensing_task_operation)
+        (task_linked_to_product_component ?dispensing_task_operation ?product_component)
+        (authorization_assigned_to_approver ?dispensing_task_operation ?authorization_approver)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (not
+          (package_requires_patient_leaflet ?dispense_package)
+        )
+        (not
+          (task_components_assembled ?dispensing_task_operation)
+        )
+      )
+    :effect (task_components_assembled ?dispensing_task_operation)
+  )
+  (:action assemble_components_and_mark_components_attached_alternate
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?product_component - product_component ?authorization_approver - authorization_approver ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_packaging_components_staged ?dispensing_task_operation)
+        (task_linked_to_product_component ?dispensing_task_operation ?product_component)
+        (authorization_assigned_to_approver ?dispensing_task_operation ?authorization_approver)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (package_requires_patient_leaflet ?dispense_package)
+        (not
+          (task_components_assembled ?dispensing_task_operation)
+        )
+      )
+    :effect (task_components_assembled ?dispensing_task_operation)
+  )
+  (:action perform_clinical_verification_a
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_components_assembled ?dispensing_task_operation)
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (not
+          (package_requires_auxiliary_label ?dispense_package)
+        )
+        (not
+          (package_requires_patient_leaflet ?dispense_package)
+        )
+        (not
+          (task_verification_completed ?dispensing_task_operation)
+        )
+      )
+    :effect (task_verification_completed ?dispensing_task_operation)
+  )
+  (:action perform_clinical_verification_b
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_components_assembled ?dispensing_task_operation)
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (package_requires_auxiliary_label ?dispense_package)
+        (not
+          (package_requires_patient_leaflet ?dispense_package)
+        )
+        (not
+          (task_verification_completed ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_labeling_completed ?dispensing_task_operation)
+      )
+  )
+  (:action perform_clinical_verification_c
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_components_assembled ?dispensing_task_operation)
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (not
+          (package_requires_auxiliary_label ?dispense_package)
+        )
+        (package_requires_patient_leaflet ?dispense_package)
+        (not
+          (task_verification_completed ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_labeling_completed ?dispensing_task_operation)
+      )
+  )
+  (:action perform_clinical_verification_d
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag ?packaging_component - packaging_component ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (task_components_assembled ?dispensing_task_operation)
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (task_linked_to_packaging_component ?dispensing_task_operation ?packaging_component)
+        (packaging_component_attached_to_package ?packaging_component ?dispense_package)
+        (package_requires_auxiliary_label ?dispense_package)
+        (package_requires_patient_leaflet ?dispense_package)
+        (not
+          (task_verification_completed ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_labeling_completed ?dispensing_task_operation)
+      )
+  )
+  (:action finalize_dispensing_task_without_additional_labeling
+    :parameters (?dispensing_task_operation - dispensing_task_operation)
+    :precondition
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (not
+          (task_labeling_completed ?dispensing_task_operation)
+        )
+        (not
+          (dispensing_task_released_flag ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (dispensing_task_released_flag ?dispensing_task_operation)
+        (ready_for_pickup ?dispensing_task_operation)
+      )
+  )
+  (:action attach_patient_leaflet_to_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?patient_instruction_leaflet - patient_instruction_leaflet)
+    :precondition
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_labeling_completed ?dispensing_task_operation)
+        (patient_leaflet_available ?patient_instruction_leaflet)
+      )
+    :effect
+      (and
+        (task_linked_to_patient_leaflet ?dispensing_task_operation ?patient_instruction_leaflet)
+        (not
+          (patient_leaflet_available ?patient_instruction_leaflet)
+        )
+      )
+  )
+  (:action complete_final_assembly_and_verification
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?formulary_product_candidate - formulary_product_candidate ?patient_instruction_leaflet - patient_instruction_leaflet)
+    :precondition
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_labeling_completed ?dispensing_task_operation)
+        (task_linked_to_patient_leaflet ?dispensing_task_operation ?patient_instruction_leaflet)
+        (task_assigned_to_pharmacist ?dispensing_task_operation ?inpatient_pharmacist_assignment)
+        (task_assigned_to_technician ?dispensing_task_operation ?outpatient_pharmacy_technician_assignment)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        (selected_product_candidate ?dispensing_task_operation ?formulary_product_candidate)
+        (not
+          (task_assembly_verified ?dispensing_task_operation)
+        )
+      )
+    :effect (task_assembly_verified ?dispensing_task_operation)
+  )
+  (:action finalize_dispensing_task_after_verification
+    :parameters (?dispensing_task_operation - dispensing_task_operation)
+    :precondition
+      (and
+        (task_verification_completed ?dispensing_task_operation)
+        (task_assembly_verified ?dispensing_task_operation)
+        (not
+          (dispensing_task_released_flag ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (dispensing_task_released_flag ?dispensing_task_operation)
+        (ready_for_pickup ?dispensing_task_operation)
+      )
+  )
+  (:action assign_special_handling_flag_to_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?special_handling_flag - special_handling_flag ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (ready_for_fulfillment ?dispensing_task_operation)
+        (selected_product_candidate ?dispensing_task_operation ?formulary_product_candidate)
+        (special_handling_flag_available ?special_handling_flag)
+        (task_linked_to_special_handling_flag ?dispensing_task_operation ?special_handling_flag)
+        (not
+          (task_special_handling_acknowledged ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (task_special_handling_acknowledged ?dispensing_task_operation)
+        (not
+          (special_handling_flag_available ?special_handling_flag)
+        )
+      )
+  )
+  (:action authorize_special_handling_by_approver
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?authorization_approver - authorization_approver)
+    :precondition
+      (and
+        (task_special_handling_acknowledged ?dispensing_task_operation)
+        (authorization_assigned_to_approver ?dispensing_task_operation ?authorization_approver)
+        (not
+          (task_special_handling_authorized ?dispensing_task_operation)
+        )
+      )
+    :effect (task_special_handling_authorized ?dispensing_task_operation)
+  )
+  (:action perform_special_handling_clinical_verification
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?clinical_verification_flag - clinical_verification_flag)
+    :precondition
+      (and
+        (task_special_handling_authorized ?dispensing_task_operation)
+        (task_linked_to_clinical_verification_flag ?dispensing_task_operation ?clinical_verification_flag)
+        (not
+          (task_special_handling_verified ?dispensing_task_operation)
+        )
+      )
+    :effect (task_special_handling_verified ?dispensing_task_operation)
+  )
+  (:action finalize_task_after_special_handling_verification
+    :parameters (?dispensing_task_operation - dispensing_task_operation)
+    :precondition
+      (and
+        (task_special_handling_verified ?dispensing_task_operation)
+        (not
+          (dispensing_task_released_flag ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (dispensing_task_released_flag ?dispensing_task_operation)
+        (ready_for_pickup ?dispensing_task_operation)
+      )
+  )
+  (:action mark_pharmacist_assignment_ready_for_pickup
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (pharmacist_allocation_flag_set ?inpatient_pharmacist_assignment)
+        (pharmacist_allocation_confirmed ?inpatient_pharmacist_assignment)
+        (dispense_package_created ?dispense_package)
+        (dispense_package_finalized ?dispense_package)
+        (not
+          (ready_for_pickup ?inpatient_pharmacist_assignment)
+        )
+      )
+    :effect (ready_for_pickup ?inpatient_pharmacist_assignment)
+  )
+  (:action mark_technician_assignment_ready_for_pickup
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?dispense_package - dispense_package)
+    :precondition
+      (and
+        (technician_allocation_flag_set ?outpatient_pharmacy_technician_assignment)
+        (technician_allocation_confirmed ?outpatient_pharmacy_technician_assignment)
+        (dispense_package_created ?dispense_package)
+        (dispense_package_finalized ?dispense_package)
+        (not
+          (ready_for_pickup ?outpatient_pharmacy_technician_assignment)
+        )
+      )
+    :effect (ready_for_pickup ?outpatient_pharmacy_technician_assignment)
+  )
+  (:action schedule_prescription_pickup_slot
+    :parameters (?discharge_prescription - discharge_prescription ?patient_pickup_slot - patient_pickup_slot ?formulary_product_candidate - formulary_product_candidate)
+    :precondition
+      (and
+        (ready_for_pickup ?discharge_prescription)
+        (selected_product_candidate ?discharge_prescription ?formulary_product_candidate)
+        (pickup_slot_available ?patient_pickup_slot)
+        (not
+          (pickup_scheduled ?discharge_prescription)
+        )
+      )
+    :effect
+      (and
+        (pickup_scheduled ?discharge_prescription)
+        (linked_to_pickup_slot ?discharge_prescription ?patient_pickup_slot)
+        (not
+          (pickup_slot_available ?patient_pickup_slot)
+        )
+      )
+  )
+  (:action finalize_substitution_and_confirm_site_allocation_pharmacist
+    :parameters (?inpatient_pharmacist_assignment - inpatient_pharmacist_assignment ?dispensing_site - dispensing_site ?patient_pickup_slot - patient_pickup_slot)
+    :precondition
+      (and
+        (pickup_scheduled ?inpatient_pharmacist_assignment)
+        (allocated_to_site ?inpatient_pharmacist_assignment ?dispensing_site)
+        (linked_to_pickup_slot ?inpatient_pharmacist_assignment ?patient_pickup_slot)
+        (not
+          (fulfillment_confirmed ?inpatient_pharmacist_assignment)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_confirmed ?inpatient_pharmacist_assignment)
+        (dispensing_site_available ?dispensing_site)
+        (pickup_slot_available ?patient_pickup_slot)
+      )
+  )
+  (:action finalize_substitution_and_confirm_site_allocation_technician
+    :parameters (?outpatient_pharmacy_technician_assignment - outpatient_pharmacy_technician_assignment ?dispensing_site - dispensing_site ?patient_pickup_slot - patient_pickup_slot)
+    :precondition
+      (and
+        (pickup_scheduled ?outpatient_pharmacy_technician_assignment)
+        (allocated_to_site ?outpatient_pharmacy_technician_assignment ?dispensing_site)
+        (linked_to_pickup_slot ?outpatient_pharmacy_technician_assignment ?patient_pickup_slot)
+        (not
+          (fulfillment_confirmed ?outpatient_pharmacy_technician_assignment)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_confirmed ?outpatient_pharmacy_technician_assignment)
+        (dispensing_site_available ?dispensing_site)
+        (pickup_slot_available ?patient_pickup_slot)
+      )
+  )
+  (:action finalize_substitution_and_confirm_site_allocation_task
+    :parameters (?dispensing_task_operation - dispensing_task_operation ?dispensing_site - dispensing_site ?patient_pickup_slot - patient_pickup_slot)
+    :precondition
+      (and
+        (pickup_scheduled ?dispensing_task_operation)
+        (allocated_to_site ?dispensing_task_operation ?dispensing_site)
+        (linked_to_pickup_slot ?dispensing_task_operation ?patient_pickup_slot)
+        (not
+          (fulfillment_confirmed ?dispensing_task_operation)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_confirmed ?dispensing_task_operation)
+        (dispensing_site_available ?dispensing_site)
+        (pickup_slot_available ?patient_pickup_slot)
+      )
+  )
+)

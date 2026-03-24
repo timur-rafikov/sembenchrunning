@@ -1,0 +1,937 @@
+(define (domain return_path_minimization_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types game_object - object zone_type - game_object edge_type - game_object resource_type - game_object entity_type - game_object objective_site - entity_type anchor_point - zone_type scout_tool - zone_type access_token - zone_type special_marker - zone_type validation_token - zone_type return_anchor - zone_type module_unit - zone_type special_item - zone_type consumable_resource - edge_type scan_sector - edge_type objective_marker - edge_type edge_segment_a - resource_type edge_segment_b - resource_type path_candidate - resource_type zone_type_a - objective_site zone_type_b - objective_site zone_node_a - zone_type_a zone_node_b - zone_type_a traversal_agent - zone_type_b)
+
+  (:predicates
+    (entity_registered ?objective_site - objective_site)
+    (entity_completed ?objective_site - objective_site)
+    (entity_bound ?objective_site - objective_site)
+    (return_committed_entity ?objective_site - objective_site)
+    (ready_for_return_entity ?objective_site - objective_site)
+    (return_assigned ?objective_site - objective_site)
+    (anchor_available ?anchor_point - anchor_point)
+    (entity_anchor_link ?objective_site - objective_site ?anchor_point - anchor_point)
+    (scout_tool_available ?scout_tool - scout_tool)
+    (entity_scout_assigned ?objective_site - objective_site ?scout_tool - scout_tool)
+    (access_token_available ?access_token - access_token)
+    (access_token_bound ?objective_site - objective_site ?access_token - access_token)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (zone_a_consumable_link ?zone_node_a - zone_node_a ?consumable_resource - consumable_resource)
+    (zone_b_consumable_link ?zone_node_b - zone_node_b ?consumable_resource - consumable_resource)
+    (zone_a_edge_link ?zone_node_a - zone_node_a ?edge_segment_a - edge_segment_a)
+    (edge_a_discovered ?edge_segment_a - edge_segment_a)
+    (edge_a_flagged ?edge_segment_a - edge_segment_a)
+    (zone_a_ready ?zone_node_a - zone_node_a)
+    (zone_b_edge_link ?zone_node_b - zone_node_b ?edge_segment_b - edge_segment_b)
+    (edge_b_discovered ?edge_segment_b - edge_segment_b)
+    (edge_b_flagged ?edge_segment_b - edge_segment_b)
+    (zone_b_ready ?zone_node_b - zone_node_b)
+    (path_candidate_slot ?path_candidate - path_candidate)
+    (path_candidate_created ?path_candidate - path_candidate)
+    (path_candidate_edge_a_link ?path_candidate - path_candidate ?edge_segment_a - edge_segment_a)
+    (path_candidate_edge_b_link ?path_candidate - path_candidate ?edge_segment_b - edge_segment_b)
+    (path_candidate_valid_stage1 ?path_candidate - path_candidate)
+    (path_candidate_valid_stage2 ?path_candidate - path_candidate)
+    (path_candidate_scanned ?path_candidate - path_candidate)
+    (agent_zone_a_link ?traversal_agent - traversal_agent ?zone_node_a - zone_node_a)
+    (agent_zone_b_link ?traversal_agent - traversal_agent ?zone_node_b - zone_node_b)
+    (agent_candidate_link ?traversal_agent - traversal_agent ?path_candidate - path_candidate)
+    (scan_sector_available ?scan_sector - scan_sector)
+    (agent_sector_link ?traversal_agent - traversal_agent ?scan_sector - scan_sector)
+    (scan_sector_scanned ?scan_sector - scan_sector)
+    (sector_candidate_link ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    (agent_ready_for_validation ?traversal_agent - traversal_agent)
+    (agent_validation_ready ?traversal_agent - traversal_agent)
+    (agent_validation_passed ?traversal_agent - traversal_agent)
+    (agent_special_marker_flag ?traversal_agent - traversal_agent)
+    (agent_marker_applied ?traversal_agent - traversal_agent)
+    (agent_has_validation_token ?traversal_agent - traversal_agent)
+    (agent_final_checks_done ?traversal_agent - traversal_agent)
+    (entity_marker_available ?objective_marker - objective_marker)
+    (agent_marker_link ?traversal_agent - traversal_agent ?objective_marker - objective_marker)
+    (agent_marker_bound ?traversal_agent - traversal_agent)
+    (agent_access_enabled ?traversal_agent - traversal_agent)
+    (agent_access_confirmed ?traversal_agent - traversal_agent)
+    (special_marker_available ?special_marker - special_marker)
+    (agent_special_marker_link ?traversal_agent - traversal_agent ?special_marker - special_marker)
+    (validation_token_available ?validation_token - validation_token)
+    (agent_validation_token_link ?traversal_agent - traversal_agent ?validation_token - validation_token)
+    (module_unit_available ?module_unit - module_unit)
+    (agent_module_attached ?traversal_agent - traversal_agent ?module_unit - module_unit)
+    (special_item_available ?special_item - special_item)
+    (agent_special_item_attached ?traversal_agent - traversal_agent ?special_item - special_item)
+    (return_anchor_available ?return_anchor - return_anchor)
+    (entity_return_anchor_link ?objective_site - objective_site ?return_anchor - return_anchor)
+    (zone_a_processed ?zone_node_a - zone_node_a)
+    (zone_b_processed ?zone_node_b - zone_node_b)
+    (agent_committed_return ?traversal_agent - traversal_agent)
+  )
+  (:action register_objective_site
+    :parameters (?objective_site - objective_site)
+    :precondition
+      (and
+        (not
+          (entity_registered ?objective_site)
+        )
+        (not
+          (return_committed_entity ?objective_site)
+        )
+      )
+    :effect (entity_registered ?objective_site)
+  )
+  (:action bind_objective_to_anchor
+    :parameters (?objective_site - objective_site ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (entity_registered ?objective_site)
+        (not
+          (entity_bound ?objective_site)
+        )
+        (anchor_available ?anchor_point)
+      )
+    :effect
+      (and
+        (entity_bound ?objective_site)
+        (entity_anchor_link ?objective_site ?anchor_point)
+        (not
+          (anchor_available ?anchor_point)
+        )
+      )
+  )
+  (:action assign_scout_tool_to_objective
+    :parameters (?objective_site - objective_site ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_registered ?objective_site)
+        (entity_bound ?objective_site)
+        (scout_tool_available ?scout_tool)
+      )
+    :effect
+      (and
+        (entity_scout_assigned ?objective_site ?scout_tool)
+        (not
+          (scout_tool_available ?scout_tool)
+        )
+      )
+  )
+  (:action mark_objective_completed
+    :parameters (?objective_site - objective_site ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_registered ?objective_site)
+        (entity_bound ?objective_site)
+        (entity_scout_assigned ?objective_site ?scout_tool)
+        (not
+          (entity_completed ?objective_site)
+        )
+      )
+    :effect (entity_completed ?objective_site)
+  )
+  (:action release_scout_tool
+    :parameters (?objective_site - objective_site ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_scout_assigned ?objective_site ?scout_tool)
+      )
+    :effect
+      (and
+        (scout_tool_available ?scout_tool)
+        (not
+          (entity_scout_assigned ?objective_site ?scout_tool)
+        )
+      )
+  )
+  (:action apply_access_token_to_objective
+    :parameters (?objective_site - objective_site ?access_token - access_token)
+    :precondition
+      (and
+        (entity_completed ?objective_site)
+        (access_token_available ?access_token)
+      )
+    :effect
+      (and
+        (access_token_bound ?objective_site ?access_token)
+        (not
+          (access_token_available ?access_token)
+        )
+      )
+  )
+  (:action release_access_token_from_objective
+    :parameters (?objective_site - objective_site ?access_token - access_token)
+    :precondition
+      (and
+        (access_token_bound ?objective_site ?access_token)
+      )
+    :effect
+      (and
+        (access_token_available ?access_token)
+        (not
+          (access_token_bound ?objective_site ?access_token)
+        )
+      )
+  )
+  (:action attach_module_to_agent
+    :parameters (?traversal_agent - traversal_agent ?module_unit - module_unit)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (module_unit_available ?module_unit)
+      )
+    :effect
+      (and
+        (agent_module_attached ?traversal_agent ?module_unit)
+        (not
+          (module_unit_available ?module_unit)
+        )
+      )
+  )
+  (:action detach_module_from_agent
+    :parameters (?traversal_agent - traversal_agent ?module_unit - module_unit)
+    :precondition
+      (and
+        (agent_module_attached ?traversal_agent ?module_unit)
+      )
+    :effect
+      (and
+        (module_unit_available ?module_unit)
+        (not
+          (agent_module_attached ?traversal_agent ?module_unit)
+        )
+      )
+  )
+  (:action attach_special_item_to_agent
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (special_item_available ?special_item)
+      )
+    :effect
+      (and
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (not
+          (special_item_available ?special_item)
+        )
+      )
+  )
+  (:action detach_special_item_from_agent
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item)
+    :precondition
+      (and
+        (agent_special_item_attached ?traversal_agent ?special_item)
+      )
+    :effect
+      (and
+        (special_item_available ?special_item)
+        (not
+          (agent_special_item_attached ?traversal_agent ?special_item)
+        )
+      )
+  )
+  (:action probe_edge_segment_a
+    :parameters (?zone_node_a - zone_node_a ?edge_segment_a - edge_segment_a ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_completed ?zone_node_a)
+        (entity_scout_assigned ?zone_node_a ?scout_tool)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (not
+          (edge_a_discovered ?edge_segment_a)
+        )
+        (not
+          (edge_a_flagged ?edge_segment_a)
+        )
+      )
+    :effect (edge_a_discovered ?edge_segment_a)
+  )
+  (:action use_access_token_on_zone_a
+    :parameters (?zone_node_a - zone_node_a ?edge_segment_a - edge_segment_a ?access_token - access_token)
+    :precondition
+      (and
+        (entity_completed ?zone_node_a)
+        (access_token_bound ?zone_node_a ?access_token)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (edge_a_discovered ?edge_segment_a)
+        (not
+          (zone_a_processed ?zone_node_a)
+        )
+      )
+    :effect
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_a_ready ?zone_node_a)
+      )
+  )
+  (:action apply_consumable_on_edge_zone_a
+    :parameters (?zone_node_a - zone_node_a ?edge_segment_a - edge_segment_a ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_completed ?zone_node_a)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (consumable_available ?consumable_resource)
+        (not
+          (zone_a_processed ?zone_node_a)
+        )
+      )
+    :effect
+      (and
+        (edge_a_flagged ?edge_segment_a)
+        (zone_a_processed ?zone_node_a)
+        (zone_a_consumable_link ?zone_node_a ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_edge_assessment_zone_a
+    :parameters (?zone_node_a - zone_node_a ?edge_segment_a - edge_segment_a ?scout_tool - scout_tool ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_completed ?zone_node_a)
+        (entity_scout_assigned ?zone_node_a ?scout_tool)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (edge_a_flagged ?edge_segment_a)
+        (zone_a_consumable_link ?zone_node_a ?consumable_resource)
+        (not
+          (zone_a_ready ?zone_node_a)
+        )
+      )
+    :effect
+      (and
+        (edge_a_discovered ?edge_segment_a)
+        (zone_a_ready ?zone_node_a)
+        (consumable_available ?consumable_resource)
+        (not
+          (zone_a_consumable_link ?zone_node_a ?consumable_resource)
+        )
+      )
+  )
+  (:action probe_edge_segment_b
+    :parameters (?zone_node_b - zone_node_b ?edge_segment_b - edge_segment_b ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_completed ?zone_node_b)
+        (entity_scout_assigned ?zone_node_b ?scout_tool)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (not
+          (edge_b_discovered ?edge_segment_b)
+        )
+        (not
+          (edge_b_flagged ?edge_segment_b)
+        )
+      )
+    :effect (edge_b_discovered ?edge_segment_b)
+  )
+  (:action use_access_token_on_zone_b
+    :parameters (?zone_node_b - zone_node_b ?edge_segment_b - edge_segment_b ?access_token - access_token)
+    :precondition
+      (and
+        (entity_completed ?zone_node_b)
+        (access_token_bound ?zone_node_b ?access_token)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_b_discovered ?edge_segment_b)
+        (not
+          (zone_b_processed ?zone_node_b)
+        )
+      )
+    :effect
+      (and
+        (zone_b_processed ?zone_node_b)
+        (zone_b_ready ?zone_node_b)
+      )
+  )
+  (:action apply_consumable_on_edge_zone_b
+    :parameters (?zone_node_b - zone_node_b ?edge_segment_b - edge_segment_b ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_completed ?zone_node_b)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (consumable_available ?consumable_resource)
+        (not
+          (zone_b_processed ?zone_node_b)
+        )
+      )
+    :effect
+      (and
+        (edge_b_flagged ?edge_segment_b)
+        (zone_b_processed ?zone_node_b)
+        (zone_b_consumable_link ?zone_node_b ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_edge_assessment_zone_b
+    :parameters (?zone_node_b - zone_node_b ?edge_segment_b - edge_segment_b ?scout_tool - scout_tool ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_completed ?zone_node_b)
+        (entity_scout_assigned ?zone_node_b ?scout_tool)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_b_flagged ?edge_segment_b)
+        (zone_b_consumable_link ?zone_node_b ?consumable_resource)
+        (not
+          (zone_b_ready ?zone_node_b)
+        )
+      )
+    :effect
+      (and
+        (edge_b_discovered ?edge_segment_b)
+        (zone_b_ready ?zone_node_b)
+        (consumable_available ?consumable_resource)
+        (not
+          (zone_b_consumable_link ?zone_node_b ?consumable_resource)
+        )
+      )
+  )
+  (:action assemble_path_candidate_basic
+    :parameters (?zone_node_a - zone_node_a ?zone_node_b - zone_node_b ?edge_segment_a - edge_segment_a ?edge_segment_b - edge_segment_b ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_b_processed ?zone_node_b)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_a_discovered ?edge_segment_a)
+        (edge_b_discovered ?edge_segment_b)
+        (zone_a_ready ?zone_node_a)
+        (zone_b_ready ?zone_node_b)
+        (path_candidate_slot ?path_candidate)
+      )
+    :effect
+      (and
+        (path_candidate_created ?path_candidate)
+        (path_candidate_edge_a_link ?path_candidate ?edge_segment_a)
+        (path_candidate_edge_b_link ?path_candidate ?edge_segment_b)
+        (not
+          (path_candidate_slot ?path_candidate)
+        )
+      )
+  )
+  (:action assemble_path_candidate_stage1
+    :parameters (?zone_node_a - zone_node_a ?zone_node_b - zone_node_b ?edge_segment_a - edge_segment_a ?edge_segment_b - edge_segment_b ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_b_processed ?zone_node_b)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_a_flagged ?edge_segment_a)
+        (edge_b_discovered ?edge_segment_b)
+        (not
+          (zone_a_ready ?zone_node_a)
+        )
+        (zone_b_ready ?zone_node_b)
+        (path_candidate_slot ?path_candidate)
+      )
+    :effect
+      (and
+        (path_candidate_created ?path_candidate)
+        (path_candidate_edge_a_link ?path_candidate ?edge_segment_a)
+        (path_candidate_edge_b_link ?path_candidate ?edge_segment_b)
+        (path_candidate_valid_stage1 ?path_candidate)
+        (not
+          (path_candidate_slot ?path_candidate)
+        )
+      )
+  )
+  (:action assemble_path_candidate_stage2
+    :parameters (?zone_node_a - zone_node_a ?zone_node_b - zone_node_b ?edge_segment_a - edge_segment_a ?edge_segment_b - edge_segment_b ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_b_processed ?zone_node_b)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_a_discovered ?edge_segment_a)
+        (edge_b_flagged ?edge_segment_b)
+        (zone_a_ready ?zone_node_a)
+        (not
+          (zone_b_ready ?zone_node_b)
+        )
+        (path_candidate_slot ?path_candidate)
+      )
+    :effect
+      (and
+        (path_candidate_created ?path_candidate)
+        (path_candidate_edge_a_link ?path_candidate ?edge_segment_a)
+        (path_candidate_edge_b_link ?path_candidate ?edge_segment_b)
+        (path_candidate_valid_stage2 ?path_candidate)
+        (not
+          (path_candidate_slot ?path_candidate)
+        )
+      )
+  )
+  (:action assemble_path_candidate_stage1_and_2
+    :parameters (?zone_node_a - zone_node_a ?zone_node_b - zone_node_b ?edge_segment_a - edge_segment_a ?edge_segment_b - edge_segment_b ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_b_processed ?zone_node_b)
+        (zone_a_edge_link ?zone_node_a ?edge_segment_a)
+        (zone_b_edge_link ?zone_node_b ?edge_segment_b)
+        (edge_a_flagged ?edge_segment_a)
+        (edge_b_flagged ?edge_segment_b)
+        (not
+          (zone_a_ready ?zone_node_a)
+        )
+        (not
+          (zone_b_ready ?zone_node_b)
+        )
+        (path_candidate_slot ?path_candidate)
+      )
+    :effect
+      (and
+        (path_candidate_created ?path_candidate)
+        (path_candidate_edge_a_link ?path_candidate ?edge_segment_a)
+        (path_candidate_edge_b_link ?path_candidate ?edge_segment_b)
+        (path_candidate_valid_stage1 ?path_candidate)
+        (path_candidate_valid_stage2 ?path_candidate)
+        (not
+          (path_candidate_slot ?path_candidate)
+        )
+      )
+  )
+  (:action scan_path_candidate
+    :parameters (?path_candidate - path_candidate ?zone_node_a - zone_node_a ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (path_candidate_created ?path_candidate)
+        (zone_a_processed ?zone_node_a)
+        (entity_scout_assigned ?zone_node_a ?scout_tool)
+        (not
+          (path_candidate_scanned ?path_candidate)
+        )
+      )
+    :effect (path_candidate_scanned ?path_candidate)
+  )
+  (:action apply_sector_scan_to_candidate
+    :parameters (?traversal_agent - traversal_agent ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (agent_candidate_link ?traversal_agent ?path_candidate)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (scan_sector_available ?scan_sector)
+        (path_candidate_created ?path_candidate)
+        (path_candidate_scanned ?path_candidate)
+        (not
+          (scan_sector_scanned ?scan_sector)
+        )
+      )
+    :effect
+      (and
+        (scan_sector_scanned ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (not
+          (scan_sector_available ?scan_sector)
+        )
+      )
+  )
+  (:action prepare_agent_for_validation
+    :parameters (?traversal_agent - traversal_agent ?scan_sector - scan_sector ?path_candidate - path_candidate ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (scan_sector_scanned ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (entity_scout_assigned ?traversal_agent ?scout_tool)
+        (not
+          (path_candidate_valid_stage1 ?path_candidate)
+        )
+        (not
+          (agent_ready_for_validation ?traversal_agent)
+        )
+      )
+    :effect (agent_ready_for_validation ?traversal_agent)
+  )
+  (:action assign_special_marker_to_agent
+    :parameters (?traversal_agent - traversal_agent ?special_marker - special_marker)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (special_marker_available ?special_marker)
+        (not
+          (agent_special_marker_flag ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_special_marker_flag ?traversal_agent)
+        (agent_special_marker_link ?traversal_agent ?special_marker)
+        (not
+          (special_marker_available ?special_marker)
+        )
+      )
+  )
+  (:action prepare_agent_with_marker_for_candidate
+    :parameters (?traversal_agent - traversal_agent ?scan_sector - scan_sector ?path_candidate - path_candidate ?scout_tool - scout_tool ?special_marker - special_marker)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (scan_sector_scanned ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (entity_scout_assigned ?traversal_agent ?scout_tool)
+        (path_candidate_valid_stage1 ?path_candidate)
+        (agent_special_marker_flag ?traversal_agent)
+        (agent_special_marker_link ?traversal_agent ?special_marker)
+        (not
+          (agent_ready_for_validation ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_ready_for_validation ?traversal_agent)
+        (agent_marker_applied ?traversal_agent)
+      )
+  )
+  (:action attempt_agent_module_validation_phase1
+    :parameters (?traversal_agent - traversal_agent ?module_unit - module_unit ?access_token - access_token ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_ready_for_validation ?traversal_agent)
+        (agent_module_attached ?traversal_agent ?module_unit)
+        (access_token_bound ?traversal_agent ?access_token)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (not
+          (path_candidate_valid_stage2 ?path_candidate)
+        )
+        (not
+          (agent_validation_ready ?traversal_agent)
+        )
+      )
+    :effect (agent_validation_ready ?traversal_agent)
+  )
+  (:action confirm_agent_module_validation_phase1
+    :parameters (?traversal_agent - traversal_agent ?module_unit - module_unit ?access_token - access_token ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_ready_for_validation ?traversal_agent)
+        (agent_module_attached ?traversal_agent ?module_unit)
+        (access_token_bound ?traversal_agent ?access_token)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (path_candidate_valid_stage2 ?path_candidate)
+        (not
+          (agent_validation_ready ?traversal_agent)
+        )
+      )
+    :effect (agent_validation_ready ?traversal_agent)
+  )
+  (:action prepare_agent_for_final_validation
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_validation_ready ?traversal_agent)
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (not
+          (path_candidate_valid_stage1 ?path_candidate)
+        )
+        (not
+          (path_candidate_valid_stage2 ?path_candidate)
+        )
+        (not
+          (agent_validation_passed ?traversal_agent)
+        )
+      )
+    :effect (agent_validation_passed ?traversal_agent)
+  )
+  (:action grant_validation_token_to_agent
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_validation_ready ?traversal_agent)
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (path_candidate_valid_stage1 ?path_candidate)
+        (not
+          (path_candidate_valid_stage2 ?path_candidate)
+        )
+        (not
+          (agent_validation_passed ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_has_validation_token ?traversal_agent)
+      )
+  )
+  (:action confirm_agent_special_item_validation_variant2
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_validation_ready ?traversal_agent)
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (not
+          (path_candidate_valid_stage1 ?path_candidate)
+        )
+        (path_candidate_valid_stage2 ?path_candidate)
+        (not
+          (agent_validation_passed ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_has_validation_token ?traversal_agent)
+      )
+  )
+  (:action confirm_agent_special_item_validation_variant3
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item ?scan_sector - scan_sector ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (agent_validation_ready ?traversal_agent)
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (agent_sector_link ?traversal_agent ?scan_sector)
+        (sector_candidate_link ?scan_sector ?path_candidate)
+        (path_candidate_valid_stage1 ?path_candidate)
+        (path_candidate_valid_stage2 ?path_candidate)
+        (not
+          (agent_validation_passed ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_has_validation_token ?traversal_agent)
+      )
+  )
+  (:action finalize_agent_validation_readiness
+    :parameters (?traversal_agent - traversal_agent)
+    :precondition
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (not
+          (agent_has_validation_token ?traversal_agent)
+        )
+        (not
+          (agent_committed_return ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_committed_return ?traversal_agent)
+        (ready_for_return_entity ?traversal_agent)
+      )
+  )
+  (:action attach_validation_token_to_agent
+    :parameters (?traversal_agent - traversal_agent ?validation_token - validation_token)
+    :precondition
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_has_validation_token ?traversal_agent)
+        (validation_token_available ?validation_token)
+      )
+    :effect
+      (and
+        (agent_validation_token_link ?traversal_agent ?validation_token)
+        (not
+          (validation_token_available ?validation_token)
+        )
+      )
+  )
+  (:action run_agent_final_checks
+    :parameters (?traversal_agent - traversal_agent ?zone_node_a - zone_node_a ?zone_node_b - zone_node_b ?scout_tool - scout_tool ?validation_token - validation_token)
+    :precondition
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_has_validation_token ?traversal_agent)
+        (agent_validation_token_link ?traversal_agent ?validation_token)
+        (agent_zone_a_link ?traversal_agent ?zone_node_a)
+        (agent_zone_b_link ?traversal_agent ?zone_node_b)
+        (zone_a_ready ?zone_node_a)
+        (zone_b_ready ?zone_node_b)
+        (entity_scout_assigned ?traversal_agent ?scout_tool)
+        (not
+          (agent_final_checks_done ?traversal_agent)
+        )
+      )
+    :effect (agent_final_checks_done ?traversal_agent)
+  )
+  (:action confirm_agent_ready_for_return
+    :parameters (?traversal_agent - traversal_agent)
+    :precondition
+      (and
+        (agent_validation_passed ?traversal_agent)
+        (agent_final_checks_done ?traversal_agent)
+        (not
+          (agent_committed_return ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_committed_return ?traversal_agent)
+        (ready_for_return_entity ?traversal_agent)
+      )
+  )
+  (:action apply_objective_marker_to_agent
+    :parameters (?traversal_agent - traversal_agent ?objective_marker - objective_marker ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (entity_completed ?traversal_agent)
+        (entity_scout_assigned ?traversal_agent ?scout_tool)
+        (entity_marker_available ?objective_marker)
+        (agent_marker_link ?traversal_agent ?objective_marker)
+        (not
+          (agent_marker_bound ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_marker_bound ?traversal_agent)
+        (not
+          (entity_marker_available ?objective_marker)
+        )
+      )
+  )
+  (:action enable_agent_access
+    :parameters (?traversal_agent - traversal_agent ?access_token - access_token)
+    :precondition
+      (and
+        (agent_marker_bound ?traversal_agent)
+        (access_token_bound ?traversal_agent ?access_token)
+        (not
+          (agent_access_enabled ?traversal_agent)
+        )
+      )
+    :effect (agent_access_enabled ?traversal_agent)
+  )
+  (:action confirm_agent_access
+    :parameters (?traversal_agent - traversal_agent ?special_item - special_item)
+    :precondition
+      (and
+        (agent_access_enabled ?traversal_agent)
+        (agent_special_item_attached ?traversal_agent ?special_item)
+        (not
+          (agent_access_confirmed ?traversal_agent)
+        )
+      )
+    :effect (agent_access_confirmed ?traversal_agent)
+  )
+  (:action finalize_agent_access_readiness
+    :parameters (?traversal_agent - traversal_agent)
+    :precondition
+      (and
+        (agent_access_confirmed ?traversal_agent)
+        (not
+          (agent_committed_return ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_committed_return ?traversal_agent)
+        (ready_for_return_entity ?traversal_agent)
+      )
+  )
+  (:action flag_zone_a_ready_for_return
+    :parameters (?zone_node_a - zone_node_a ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_a_processed ?zone_node_a)
+        (zone_a_ready ?zone_node_a)
+        (path_candidate_created ?path_candidate)
+        (path_candidate_scanned ?path_candidate)
+        (not
+          (ready_for_return_entity ?zone_node_a)
+        )
+      )
+    :effect (ready_for_return_entity ?zone_node_a)
+  )
+  (:action flag_zone_b_ready_for_return
+    :parameters (?zone_node_b - zone_node_b ?path_candidate - path_candidate)
+    :precondition
+      (and
+        (zone_b_processed ?zone_node_b)
+        (zone_b_ready ?zone_node_b)
+        (path_candidate_created ?path_candidate)
+        (path_candidate_scanned ?path_candidate)
+        (not
+          (ready_for_return_entity ?zone_node_b)
+        )
+      )
+    :effect (ready_for_return_entity ?zone_node_b)
+  )
+  (:action assign_return_anchor_to_objective
+    :parameters (?objective_site - objective_site ?return_anchor - return_anchor ?scout_tool - scout_tool)
+    :precondition
+      (and
+        (ready_for_return_entity ?objective_site)
+        (entity_scout_assigned ?objective_site ?scout_tool)
+        (return_anchor_available ?return_anchor)
+        (not
+          (return_assigned ?objective_site)
+        )
+      )
+    :effect
+      (and
+        (return_assigned ?objective_site)
+        (entity_return_anchor_link ?objective_site ?return_anchor)
+        (not
+          (return_anchor_available ?return_anchor)
+        )
+      )
+  )
+  (:action commit_return_for_zone_a
+    :parameters (?zone_node_a - zone_node_a ?anchor_point - anchor_point ?return_anchor - return_anchor)
+    :precondition
+      (and
+        (return_assigned ?zone_node_a)
+        (entity_anchor_link ?zone_node_a ?anchor_point)
+        (entity_return_anchor_link ?zone_node_a ?return_anchor)
+        (not
+          (return_committed_entity ?zone_node_a)
+        )
+      )
+    :effect
+      (and
+        (return_committed_entity ?zone_node_a)
+        (anchor_available ?anchor_point)
+        (return_anchor_available ?return_anchor)
+      )
+  )
+  (:action commit_return_for_zone_b
+    :parameters (?zone_node_b - zone_node_b ?anchor_point - anchor_point ?return_anchor - return_anchor)
+    :precondition
+      (and
+        (return_assigned ?zone_node_b)
+        (entity_anchor_link ?zone_node_b ?anchor_point)
+        (entity_return_anchor_link ?zone_node_b ?return_anchor)
+        (not
+          (return_committed_entity ?zone_node_b)
+        )
+      )
+    :effect
+      (and
+        (return_committed_entity ?zone_node_b)
+        (anchor_available ?anchor_point)
+        (return_anchor_available ?return_anchor)
+      )
+  )
+  (:action commit_return_for_agent
+    :parameters (?traversal_agent - traversal_agent ?anchor_point - anchor_point ?return_anchor - return_anchor)
+    :precondition
+      (and
+        (return_assigned ?traversal_agent)
+        (entity_anchor_link ?traversal_agent ?anchor_point)
+        (entity_return_anchor_link ?traversal_agent ?return_anchor)
+        (not
+          (return_committed_entity ?traversal_agent)
+        )
+      )
+    :effect
+      (and
+        (return_committed_entity ?traversal_agent)
+        (anchor_available ?anchor_point)
+        (return_anchor_available ?return_anchor)
+      )
+  )
+)

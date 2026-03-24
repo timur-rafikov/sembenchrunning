@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain external_data_import_pipeline)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object artifact_category - object partition_category - object domain_entity - object external_source - domain_entity connector_instance - resource_category auth_token - resource_category credential_profile - resource_category policy_rule - resource_category output_target - resource_category destination_shard - resource_category transformer_plugin - resource_category validator_module - resource_category enrichment_artifact - artifact_category transform_spec - artifact_category monitoring_hook - artifact_category source_partition - partition_category transform_partition - partition_category data_batch - partition_category source_instance_group - external_source pipeline_instance_group - external_source ingest_worker - source_instance_group transform_worker - source_instance_group pipeline_controller - pipeline_instance_group)
+  (:predicates
+    (source_registered ?source - external_source)
+    (entity_ready ?source - external_source)
+    (source_has_connector ?source - external_source)
+    (commit_finalized ?source - external_source)
+    (ready_for_commit ?source - external_source)
+    (authorized_for_commit ?source - external_source)
+    (connector_available ?connector - connector_instance)
+    (bound_to_connector ?source - external_source ?connector - connector_instance)
+    (auth_token_available ?auth_token - auth_token)
+    (entity_has_auth_token ?source - external_source ?auth_token - auth_token)
+    (credential_profile_available ?credential_profile - credential_profile)
+    (entity_bound_to_credential ?source - external_source ?credential_profile - credential_profile)
+    (enrichment_artifact_available ?enrichment_artifact - enrichment_artifact)
+    (ingest_worker_has_enrichment ?ingest_worker - ingest_worker ?enrichment_artifact - enrichment_artifact)
+    (transform_worker_has_enrichment ?transform_worker - transform_worker ?enrichment_artifact - enrichment_artifact)
+    (worker_assigned_source_partition ?ingest_worker - ingest_worker ?source_partition - source_partition)
+    (source_partition_reserved ?source_partition - source_partition)
+    (source_partition_has_enrichment ?source_partition - source_partition)
+    (ingest_worker_has_partition ?ingest_worker - ingest_worker)
+    (worker_assigned_transform_partition ?transform_worker - transform_worker ?transform_partition - transform_partition)
+    (transform_partition_reserved ?transform_partition - transform_partition)
+    (transform_partition_has_enrichment ?transform_partition - transform_partition)
+    (transform_worker_has_partition ?transform_worker - transform_worker)
+    (batch_pending ?data_batch - data_batch)
+    (batch_staged ?data_batch - data_batch)
+    (batch_assigned_source_partition ?data_batch - data_batch ?source_partition - source_partition)
+    (batch_assigned_transform_partition ?data_batch - data_batch ?transform_partition - transform_partition)
+    (batch_has_metadata ?data_batch - data_batch)
+    (batch_has_checksum ?data_batch - data_batch)
+    (batch_preprocessed ?data_batch - data_batch)
+    (controller_assigned_ingest_worker ?controller - pipeline_controller ?ingest_worker - ingest_worker)
+    (controller_assigned_transform_worker ?controller - pipeline_controller ?transform_worker - transform_worker)
+    (controller_has_batch ?controller - pipeline_controller ?data_batch - data_batch)
+    (transform_spec_available ?transform_spec - transform_spec)
+    (controller_has_transform_spec ?controller - pipeline_controller ?transform_spec - transform_spec)
+    (transform_spec_attached ?transform_spec - transform_spec)
+    (transform_spec_applied_to_batch ?transform_spec - transform_spec ?data_batch - data_batch)
+    (controller_prepared ?controller - pipeline_controller)
+    (controller_plugins_registered ?controller - pipeline_controller)
+    (controller_checks_passed ?controller - pipeline_controller)
+    (controller_policy_marked ?controller - pipeline_controller)
+    (controller_policy_registered ?controller - pipeline_controller)
+    (controller_ready_for_output_target ?controller - pipeline_controller)
+    (controller_execution_in_progress ?controller - pipeline_controller)
+    (monitoring_hook_available ?monitoring_hook - monitoring_hook)
+    (controller_has_monitoring_hook ?controller - pipeline_controller ?monitoring_hook - monitoring_hook)
+    (controller_monitoring_enabled ?controller - pipeline_controller)
+    (controller_validation_started ?controller - pipeline_controller)
+    (controller_validation_passed ?controller - pipeline_controller)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (controller_bound_to_policy_rule ?controller - pipeline_controller ?policy_rule - policy_rule)
+    (output_target_available ?output_target - output_target)
+    (controller_bound_to_output_target ?controller - pipeline_controller ?output_target - output_target)
+    (transformer_plugin_available ?transformer_plugin - transformer_plugin)
+    (controller_bound_to_plugin ?controller - pipeline_controller ?transformer_plugin - transformer_plugin)
+    (validator_module_available ?validator_module - validator_module)
+    (controller_bound_to_validator ?controller - pipeline_controller ?validator_module - validator_module)
+    (destination_shard_available ?destination_shard - destination_shard)
+    (assigned_destination_shard ?source - external_source ?destination_shard - destination_shard)
+    (ingest_worker_ready ?ingest_worker - ingest_worker)
+    (transform_worker_ready ?transform_worker - transform_worker)
+    (controller_commit_marked ?controller - pipeline_controller)
+  )
+  (:action register_external_source
+    :parameters (?source - external_source)
+    :precondition
+      (and
+        (not
+          (source_registered ?source)
+        )
+        (not
+          (commit_finalized ?source)
+        )
+      )
+    :effect (source_registered ?source)
+  )
+  (:action bind_connector_to_source
+    :parameters (?source - external_source ?connector - connector_instance)
+    :precondition
+      (and
+        (source_registered ?source)
+        (not
+          (source_has_connector ?source)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (source_has_connector ?source)
+        (bound_to_connector ?source ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action allocate_auth_token
+    :parameters (?source - external_source ?auth_token - auth_token)
+    :precondition
+      (and
+        (source_registered ?source)
+        (source_has_connector ?source)
+        (auth_token_available ?auth_token)
+      )
+    :effect
+      (and
+        (entity_has_auth_token ?source ?auth_token)
+        (not
+          (auth_token_available ?auth_token)
+        )
+      )
+  )
+  (:action confirm_source_authentication
+    :parameters (?source - external_source ?auth_token - auth_token)
+    :precondition
+      (and
+        (source_registered ?source)
+        (source_has_connector ?source)
+        (entity_has_auth_token ?source ?auth_token)
+        (not
+          (entity_ready ?source)
+        )
+      )
+    :effect (entity_ready ?source)
+  )
+  (:action release_auth_token
+    :parameters (?source - external_source ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_has_auth_token ?source ?auth_token)
+      )
+    :effect
+      (and
+        (auth_token_available ?auth_token)
+        (not
+          (entity_has_auth_token ?source ?auth_token)
+        )
+      )
+  )
+  (:action bind_credential_profile_to_source
+    :parameters (?source - external_source ?credential_profile - credential_profile)
+    :precondition
+      (and
+        (entity_ready ?source)
+        (credential_profile_available ?credential_profile)
+      )
+    :effect
+      (and
+        (entity_bound_to_credential ?source ?credential_profile)
+        (not
+          (credential_profile_available ?credential_profile)
+        )
+      )
+  )
+  (:action unbind_credential_profile_from_source
+    :parameters (?source - external_source ?credential_profile - credential_profile)
+    :precondition
+      (and
+        (entity_bound_to_credential ?source ?credential_profile)
+      )
+    :effect
+      (and
+        (credential_profile_available ?credential_profile)
+        (not
+          (entity_bound_to_credential ?source ?credential_profile)
+        )
+      )
+  )
+  (:action register_transformer_plugin
+    :parameters (?controller - pipeline_controller ?transformer_plugin - transformer_plugin)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (transformer_plugin_available ?transformer_plugin)
+      )
+    :effect
+      (and
+        (controller_bound_to_plugin ?controller ?transformer_plugin)
+        (not
+          (transformer_plugin_available ?transformer_plugin)
+        )
+      )
+  )
+  (:action unregister_transformer_plugin
+    :parameters (?controller - pipeline_controller ?transformer_plugin - transformer_plugin)
+    :precondition
+      (and
+        (controller_bound_to_plugin ?controller ?transformer_plugin)
+      )
+    :effect
+      (and
+        (transformer_plugin_available ?transformer_plugin)
+        (not
+          (controller_bound_to_plugin ?controller ?transformer_plugin)
+        )
+      )
+  )
+  (:action register_validator_module
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (validator_module_available ?validator_module)
+      )
+    :effect
+      (and
+        (controller_bound_to_validator ?controller ?validator_module)
+        (not
+          (validator_module_available ?validator_module)
+        )
+      )
+  )
+  (:action unregister_validator_module
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module)
+    :precondition
+      (and
+        (controller_bound_to_validator ?controller ?validator_module)
+      )
+    :effect
+      (and
+        (validator_module_available ?validator_module)
+        (not
+          (controller_bound_to_validator ?controller ?validator_module)
+        )
+      )
+  )
+  (:action reserve_source_partition
+    :parameters (?ingest_worker - ingest_worker ?source_partition - source_partition ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_ready ?ingest_worker)
+        (entity_has_auth_token ?ingest_worker ?auth_token)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (not
+          (source_partition_reserved ?source_partition)
+        )
+        (not
+          (source_partition_has_enrichment ?source_partition)
+        )
+      )
+    :effect (source_partition_reserved ?source_partition)
+  )
+  (:action claim_partition_for_worker
+    :parameters (?ingest_worker - ingest_worker ?source_partition - source_partition ?credential_profile - credential_profile)
+    :precondition
+      (and
+        (entity_ready ?ingest_worker)
+        (entity_bound_to_credential ?ingest_worker ?credential_profile)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (source_partition_reserved ?source_partition)
+        (not
+          (ingest_worker_ready ?ingest_worker)
+        )
+      )
+    :effect
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (ingest_worker_has_partition ?ingest_worker)
+      )
+  )
+  (:action attach_enrichment_artifact_to_partition
+    :parameters (?ingest_worker - ingest_worker ?source_partition - source_partition ?enrichment_artifact - enrichment_artifact)
+    :precondition
+      (and
+        (entity_ready ?ingest_worker)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (enrichment_artifact_available ?enrichment_artifact)
+        (not
+          (ingest_worker_ready ?ingest_worker)
+        )
+      )
+    :effect
+      (and
+        (source_partition_has_enrichment ?source_partition)
+        (ingest_worker_ready ?ingest_worker)
+        (ingest_worker_has_enrichment ?ingest_worker ?enrichment_artifact)
+        (not
+          (enrichment_artifact_available ?enrichment_artifact)
+        )
+      )
+  )
+  (:action complete_partition_preparation
+    :parameters (?ingest_worker - ingest_worker ?source_partition - source_partition ?auth_token - auth_token ?enrichment_artifact - enrichment_artifact)
+    :precondition
+      (and
+        (entity_ready ?ingest_worker)
+        (entity_has_auth_token ?ingest_worker ?auth_token)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (source_partition_has_enrichment ?source_partition)
+        (ingest_worker_has_enrichment ?ingest_worker ?enrichment_artifact)
+        (not
+          (ingest_worker_has_partition ?ingest_worker)
+        )
+      )
+    :effect
+      (and
+        (source_partition_reserved ?source_partition)
+        (ingest_worker_has_partition ?ingest_worker)
+        (enrichment_artifact_available ?enrichment_artifact)
+        (not
+          (ingest_worker_has_enrichment ?ingest_worker ?enrichment_artifact)
+        )
+      )
+  )
+  (:action reserve_transform_partition
+    :parameters (?transform_worker - transform_worker ?transform_partition - transform_partition ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_ready ?transform_worker)
+        (entity_has_auth_token ?transform_worker ?auth_token)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (not
+          (transform_partition_reserved ?transform_partition)
+        )
+        (not
+          (transform_partition_has_enrichment ?transform_partition)
+        )
+      )
+    :effect (transform_partition_reserved ?transform_partition)
+  )
+  (:action claim_transform_partition_for_worker
+    :parameters (?transform_worker - transform_worker ?transform_partition - transform_partition ?credential_profile - credential_profile)
+    :precondition
+      (and
+        (entity_ready ?transform_worker)
+        (entity_bound_to_credential ?transform_worker ?credential_profile)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (transform_partition_reserved ?transform_partition)
+        (not
+          (transform_worker_ready ?transform_worker)
+        )
+      )
+    :effect
+      (and
+        (transform_worker_ready ?transform_worker)
+        (transform_worker_has_partition ?transform_worker)
+      )
+  )
+  (:action attach_enrichment_artifact_to_transform_partition
+    :parameters (?transform_worker - transform_worker ?transform_partition - transform_partition ?enrichment_artifact - enrichment_artifact)
+    :precondition
+      (and
+        (entity_ready ?transform_worker)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (enrichment_artifact_available ?enrichment_artifact)
+        (not
+          (transform_worker_ready ?transform_worker)
+        )
+      )
+    :effect
+      (and
+        (transform_partition_has_enrichment ?transform_partition)
+        (transform_worker_ready ?transform_worker)
+        (transform_worker_has_enrichment ?transform_worker ?enrichment_artifact)
+        (not
+          (enrichment_artifact_available ?enrichment_artifact)
+        )
+      )
+  )
+  (:action complete_transform_partition_preparation
+    :parameters (?transform_worker - transform_worker ?transform_partition - transform_partition ?auth_token - auth_token ?enrichment_artifact - enrichment_artifact)
+    :precondition
+      (and
+        (entity_ready ?transform_worker)
+        (entity_has_auth_token ?transform_worker ?auth_token)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (transform_partition_has_enrichment ?transform_partition)
+        (transform_worker_has_enrichment ?transform_worker ?enrichment_artifact)
+        (not
+          (transform_worker_has_partition ?transform_worker)
+        )
+      )
+    :effect
+      (and
+        (transform_partition_reserved ?transform_partition)
+        (transform_worker_has_partition ?transform_worker)
+        (enrichment_artifact_available ?enrichment_artifact)
+        (not
+          (transform_worker_has_enrichment ?transform_worker ?enrichment_artifact)
+        )
+      )
+  )
+  (:action stage_data_batch
+    :parameters (?ingest_worker - ingest_worker ?transform_worker - transform_worker ?source_partition - source_partition ?transform_partition - transform_partition ?data_batch - data_batch)
+    :precondition
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (transform_worker_ready ?transform_worker)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (source_partition_reserved ?source_partition)
+        (transform_partition_reserved ?transform_partition)
+        (ingest_worker_has_partition ?ingest_worker)
+        (transform_worker_has_partition ?transform_worker)
+        (batch_pending ?data_batch)
+      )
+    :effect
+      (and
+        (batch_staged ?data_batch)
+        (batch_assigned_source_partition ?data_batch ?source_partition)
+        (batch_assigned_transform_partition ?data_batch ?transform_partition)
+        (not
+          (batch_pending ?data_batch)
+        )
+      )
+  )
+  (:action stage_data_batch_with_metadata
+    :parameters (?ingest_worker - ingest_worker ?transform_worker - transform_worker ?source_partition - source_partition ?transform_partition - transform_partition ?data_batch - data_batch)
+    :precondition
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (transform_worker_ready ?transform_worker)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (source_partition_has_enrichment ?source_partition)
+        (transform_partition_reserved ?transform_partition)
+        (not
+          (ingest_worker_has_partition ?ingest_worker)
+        )
+        (transform_worker_has_partition ?transform_worker)
+        (batch_pending ?data_batch)
+      )
+    :effect
+      (and
+        (batch_staged ?data_batch)
+        (batch_assigned_source_partition ?data_batch ?source_partition)
+        (batch_assigned_transform_partition ?data_batch ?transform_partition)
+        (batch_has_metadata ?data_batch)
+        (not
+          (batch_pending ?data_batch)
+        )
+      )
+  )
+  (:action stage_data_batch_with_checksum
+    :parameters (?ingest_worker - ingest_worker ?transform_worker - transform_worker ?source_partition - source_partition ?transform_partition - transform_partition ?data_batch - data_batch)
+    :precondition
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (transform_worker_ready ?transform_worker)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (source_partition_reserved ?source_partition)
+        (transform_partition_has_enrichment ?transform_partition)
+        (ingest_worker_has_partition ?ingest_worker)
+        (not
+          (transform_worker_has_partition ?transform_worker)
+        )
+        (batch_pending ?data_batch)
+      )
+    :effect
+      (and
+        (batch_staged ?data_batch)
+        (batch_assigned_source_partition ?data_batch ?source_partition)
+        (batch_assigned_transform_partition ?data_batch ?transform_partition)
+        (batch_has_checksum ?data_batch)
+        (not
+          (batch_pending ?data_batch)
+        )
+      )
+  )
+  (:action stage_data_batch_with_metadata_and_checksum
+    :parameters (?ingest_worker - ingest_worker ?transform_worker - transform_worker ?source_partition - source_partition ?transform_partition - transform_partition ?data_batch - data_batch)
+    :precondition
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (transform_worker_ready ?transform_worker)
+        (worker_assigned_source_partition ?ingest_worker ?source_partition)
+        (worker_assigned_transform_partition ?transform_worker ?transform_partition)
+        (source_partition_has_enrichment ?source_partition)
+        (transform_partition_has_enrichment ?transform_partition)
+        (not
+          (ingest_worker_has_partition ?ingest_worker)
+        )
+        (not
+          (transform_worker_has_partition ?transform_worker)
+        )
+        (batch_pending ?data_batch)
+      )
+    :effect
+      (and
+        (batch_staged ?data_batch)
+        (batch_assigned_source_partition ?data_batch ?source_partition)
+        (batch_assigned_transform_partition ?data_batch ?transform_partition)
+        (batch_has_metadata ?data_batch)
+        (batch_has_checksum ?data_batch)
+        (not
+          (batch_pending ?data_batch)
+        )
+      )
+  )
+  (:action mark_data_batch_preprocessed
+    :parameters (?data_batch - data_batch ?ingest_worker - ingest_worker ?auth_token - auth_token)
+    :precondition
+      (and
+        (batch_staged ?data_batch)
+        (ingest_worker_ready ?ingest_worker)
+        (entity_has_auth_token ?ingest_worker ?auth_token)
+        (not
+          (batch_preprocessed ?data_batch)
+        )
+      )
+    :effect (batch_preprocessed ?data_batch)
+  )
+  (:action attach_transform_spec_to_batch
+    :parameters (?controller - pipeline_controller ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (controller_has_batch ?controller ?data_batch)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_available ?transform_spec)
+        (batch_staged ?data_batch)
+        (batch_preprocessed ?data_batch)
+        (not
+          (transform_spec_attached ?transform_spec)
+        )
+      )
+    :effect
+      (and
+        (transform_spec_attached ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (not
+          (transform_spec_available ?transform_spec)
+        )
+      )
+  )
+  (:action prepare_controller_for_execution
+    :parameters (?controller - pipeline_controller ?transform_spec - transform_spec ?data_batch - data_batch ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_attached ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (entity_has_auth_token ?controller ?auth_token)
+        (not
+          (batch_has_metadata ?data_batch)
+        )
+        (not
+          (controller_prepared ?controller)
+        )
+      )
+    :effect (controller_prepared ?controller)
+  )
+  (:action attach_policy_rule_to_controller
+    :parameters (?controller - pipeline_controller ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (policy_rule_available ?policy_rule)
+        (not
+          (controller_policy_marked ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_policy_marked ?controller)
+        (controller_bound_to_policy_rule ?controller ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action prepare_controller_with_spec_and_policy
+    :parameters (?controller - pipeline_controller ?transform_spec - transform_spec ?data_batch - data_batch ?auth_token - auth_token ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_attached ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (entity_has_auth_token ?controller ?auth_token)
+        (batch_has_metadata ?data_batch)
+        (controller_policy_marked ?controller)
+        (controller_bound_to_policy_rule ?controller ?policy_rule)
+        (not
+          (controller_prepared ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_prepared ?controller)
+        (controller_policy_registered ?controller)
+      )
+  )
+  (:action register_plugin_with_controller
+    :parameters (?controller - pipeline_controller ?transformer_plugin - transformer_plugin ?credential_profile - credential_profile ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_prepared ?controller)
+        (controller_bound_to_plugin ?controller ?transformer_plugin)
+        (entity_bound_to_credential ?controller ?credential_profile)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (not
+          (batch_has_checksum ?data_batch)
+        )
+        (not
+          (controller_plugins_registered ?controller)
+        )
+      )
+    :effect (controller_plugins_registered ?controller)
+  )
+  (:action register_plugin_with_controller_variant
+    :parameters (?controller - pipeline_controller ?transformer_plugin - transformer_plugin ?credential_profile - credential_profile ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_prepared ?controller)
+        (controller_bound_to_plugin ?controller ?transformer_plugin)
+        (entity_bound_to_credential ?controller ?credential_profile)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (batch_has_checksum ?data_batch)
+        (not
+          (controller_plugins_registered ?controller)
+        )
+      )
+    :effect (controller_plugins_registered ?controller)
+  )
+  (:action apply_validator_to_controller
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_plugins_registered ?controller)
+        (controller_bound_to_validator ?controller ?validator_module)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (not
+          (batch_has_metadata ?data_batch)
+        )
+        (not
+          (batch_has_checksum ?data_batch)
+        )
+        (not
+          (controller_checks_passed ?controller)
+        )
+      )
+    :effect (controller_checks_passed ?controller)
+  )
+  (:action apply_validator_and_enable_hook
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_plugins_registered ?controller)
+        (controller_bound_to_validator ?controller ?validator_module)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (batch_has_metadata ?data_batch)
+        (not
+          (batch_has_checksum ?data_batch)
+        )
+        (not
+          (controller_checks_passed ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_checks_passed ?controller)
+        (controller_ready_for_output_target ?controller)
+      )
+  )
+  (:action apply_validator_and_enable_hook_variant
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_plugins_registered ?controller)
+        (controller_bound_to_validator ?controller ?validator_module)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (not
+          (batch_has_metadata ?data_batch)
+        )
+        (batch_has_checksum ?data_batch)
+        (not
+          (controller_checks_passed ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_checks_passed ?controller)
+        (controller_ready_for_output_target ?controller)
+      )
+  )
+  (:action apply_validator_and_enable_hook_full
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module ?transform_spec - transform_spec ?data_batch - data_batch)
+    :precondition
+      (and
+        (controller_plugins_registered ?controller)
+        (controller_bound_to_validator ?controller ?validator_module)
+        (controller_has_transform_spec ?controller ?transform_spec)
+        (transform_spec_applied_to_batch ?transform_spec ?data_batch)
+        (batch_has_metadata ?data_batch)
+        (batch_has_checksum ?data_batch)
+        (not
+          (controller_checks_passed ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_checks_passed ?controller)
+        (controller_ready_for_output_target ?controller)
+      )
+  )
+  (:action mark_controller_commit_ready
+    :parameters (?controller - pipeline_controller)
+    :precondition
+      (and
+        (controller_checks_passed ?controller)
+        (not
+          (controller_ready_for_output_target ?controller)
+        )
+        (not
+          (controller_commit_marked ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_commit_marked ?controller)
+        (ready_for_commit ?controller)
+      )
+  )
+  (:action attach_output_target_to_controller
+    :parameters (?controller - pipeline_controller ?output_target - output_target)
+    :precondition
+      (and
+        (controller_checks_passed ?controller)
+        (controller_ready_for_output_target ?controller)
+        (output_target_available ?output_target)
+      )
+    :effect
+      (and
+        (controller_bound_to_output_target ?controller ?output_target)
+        (not
+          (output_target_available ?output_target)
+        )
+      )
+  )
+  (:action start_pipeline_execution
+    :parameters (?controller - pipeline_controller ?ingest_worker - ingest_worker ?transform_worker - transform_worker ?auth_token - auth_token ?output_target - output_target)
+    :precondition
+      (and
+        (controller_checks_passed ?controller)
+        (controller_ready_for_output_target ?controller)
+        (controller_bound_to_output_target ?controller ?output_target)
+        (controller_assigned_ingest_worker ?controller ?ingest_worker)
+        (controller_assigned_transform_worker ?controller ?transform_worker)
+        (ingest_worker_has_partition ?ingest_worker)
+        (transform_worker_has_partition ?transform_worker)
+        (entity_has_auth_token ?controller ?auth_token)
+        (not
+          (controller_execution_in_progress ?controller)
+        )
+      )
+    :effect (controller_execution_in_progress ?controller)
+  )
+  (:action finalize_controller_for_commit
+    :parameters (?controller - pipeline_controller)
+    :precondition
+      (and
+        (controller_checks_passed ?controller)
+        (controller_execution_in_progress ?controller)
+        (not
+          (controller_commit_marked ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_commit_marked ?controller)
+        (ready_for_commit ?controller)
+      )
+  )
+  (:action enable_controller_monitoring_hook
+    :parameters (?controller - pipeline_controller ?monitoring_hook - monitoring_hook ?auth_token - auth_token)
+    :precondition
+      (and
+        (entity_ready ?controller)
+        (entity_has_auth_token ?controller ?auth_token)
+        (monitoring_hook_available ?monitoring_hook)
+        (controller_has_monitoring_hook ?controller ?monitoring_hook)
+        (not
+          (controller_monitoring_enabled ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_monitoring_enabled ?controller)
+        (not
+          (monitoring_hook_available ?monitoring_hook)
+        )
+      )
+  )
+  (:action verify_controller_with_credential
+    :parameters (?controller - pipeline_controller ?credential_profile - credential_profile)
+    :precondition
+      (and
+        (controller_monitoring_enabled ?controller)
+        (entity_bound_to_credential ?controller ?credential_profile)
+        (not
+          (controller_validation_started ?controller)
+        )
+      )
+    :effect (controller_validation_started ?controller)
+  )
+  (:action bind_validator_on_controller
+    :parameters (?controller - pipeline_controller ?validator_module - validator_module)
+    :precondition
+      (and
+        (controller_validation_started ?controller)
+        (controller_bound_to_validator ?controller ?validator_module)
+        (not
+          (controller_validation_passed ?controller)
+        )
+      )
+    :effect (controller_validation_passed ?controller)
+  )
+  (:action mark_controller_commit_ready_via_policy
+    :parameters (?controller - pipeline_controller)
+    :precondition
+      (and
+        (controller_validation_passed ?controller)
+        (not
+          (controller_commit_marked ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_commit_marked ?controller)
+        (ready_for_commit ?controller)
+      )
+  )
+  (:action finalize_ingest_worker_commit
+    :parameters (?ingest_worker - ingest_worker ?data_batch - data_batch)
+    :precondition
+      (and
+        (ingest_worker_ready ?ingest_worker)
+        (ingest_worker_has_partition ?ingest_worker)
+        (batch_staged ?data_batch)
+        (batch_preprocessed ?data_batch)
+        (not
+          (ready_for_commit ?ingest_worker)
+        )
+      )
+    :effect (ready_for_commit ?ingest_worker)
+  )
+  (:action finalize_transform_worker_commit
+    :parameters (?transform_worker - transform_worker ?data_batch - data_batch)
+    :precondition
+      (and
+        (transform_worker_ready ?transform_worker)
+        (transform_worker_has_partition ?transform_worker)
+        (batch_staged ?data_batch)
+        (batch_preprocessed ?data_batch)
+        (not
+          (ready_for_commit ?transform_worker)
+        )
+      )
+    :effect (ready_for_commit ?transform_worker)
+  )
+  (:action authorize_source_commit
+    :parameters (?source - external_source ?destination_shard - destination_shard ?auth_token - auth_token)
+    :precondition
+      (and
+        (ready_for_commit ?source)
+        (entity_has_auth_token ?source ?auth_token)
+        (destination_shard_available ?destination_shard)
+        (not
+          (authorized_for_commit ?source)
+        )
+      )
+    :effect
+      (and
+        (authorized_for_commit ?source)
+        (assigned_destination_shard ?source ?destination_shard)
+        (not
+          (destination_shard_available ?destination_shard)
+        )
+      )
+  )
+  (:action finalize_commit_and_release_connector_for_ingest_worker
+    :parameters (?ingest_worker - ingest_worker ?connector - connector_instance ?destination_shard - destination_shard)
+    :precondition
+      (and
+        (authorized_for_commit ?ingest_worker)
+        (bound_to_connector ?ingest_worker ?connector)
+        (assigned_destination_shard ?ingest_worker ?destination_shard)
+        (not
+          (commit_finalized ?ingest_worker)
+        )
+      )
+    :effect
+      (and
+        (commit_finalized ?ingest_worker)
+        (connector_available ?connector)
+        (destination_shard_available ?destination_shard)
+      )
+  )
+  (:action finalize_commit_and_release_connector_for_transform_worker
+    :parameters (?transform_worker - transform_worker ?connector - connector_instance ?destination_shard - destination_shard)
+    :precondition
+      (and
+        (authorized_for_commit ?transform_worker)
+        (bound_to_connector ?transform_worker ?connector)
+        (assigned_destination_shard ?transform_worker ?destination_shard)
+        (not
+          (commit_finalized ?transform_worker)
+        )
+      )
+    :effect
+      (and
+        (commit_finalized ?transform_worker)
+        (connector_available ?connector)
+        (destination_shard_available ?destination_shard)
+      )
+  )
+  (:action finalize_commit_and_release_connector_for_controller
+    :parameters (?controller - pipeline_controller ?connector - connector_instance ?destination_shard - destination_shard)
+    :precondition
+      (and
+        (authorized_for_commit ?controller)
+        (bound_to_connector ?controller ?connector)
+        (assigned_destination_shard ?controller ?destination_shard)
+        (not
+          (commit_finalized ?controller)
+        )
+      )
+    :effect
+      (and
+        (commit_finalized ?controller)
+        (connector_available ?connector)
+        (destination_shard_available ?destination_shard)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem import_pipeline_instance)
+  (:domain external_data_import_pipeline)
+  (:objects ingest_worker_1 - ingest_worker transform_worker_1 - transform_worker pipeline_controller_alpha - pipeline_controller pipeline_controller_beta - pipeline_controller connector_a - connector_instance connector_b - connector_instance connector_c - connector_instance auth_token_1 - auth_token credential_profile_1 - credential_profile enrichment_artifact_1 - enrichment_artifact source_partition_1 - source_partition transform_partition_1 - transform_partition data_batch_1 - data_batch transform_spec_v1 - transform_spec transform_spec_v2 - transform_spec policy_rule_1 - policy_rule policy_rule_2 - policy_rule output_target_1 - output_target output_target_2 - output_target destination_shard_1 - destination_shard transformer_plugin_1 - transformer_plugin monitoring_hook_1 - monitoring_hook monitoring_hook_2 - monitoring_hook validator_module_1 - validator_module)
+  (:init
+    (connector_available connector_a)
+    (connector_available connector_b)
+    (connector_available connector_c)
+    (auth_token_available auth_token_1)
+    (credential_profile_available credential_profile_1)
+    (enrichment_artifact_available enrichment_artifact_1)
+    (worker_assigned_source_partition ingest_worker_1 source_partition_1)
+    (worker_assigned_transform_partition transform_worker_1 transform_partition_1)
+    (batch_pending data_batch_1)
+    (transform_spec_available transform_spec_v1)
+    (transform_spec_available transform_spec_v2)
+    (controller_assigned_ingest_worker pipeline_controller_alpha ingest_worker_1)
+    (controller_assigned_ingest_worker pipeline_controller_beta ingest_worker_1)
+    (controller_assigned_transform_worker pipeline_controller_alpha transform_worker_1)
+    (controller_assigned_transform_worker pipeline_controller_beta transform_worker_1)
+    (controller_has_batch pipeline_controller_alpha data_batch_1)
+    (controller_has_batch pipeline_controller_beta data_batch_1)
+    (controller_has_transform_spec pipeline_controller_alpha transform_spec_v1)
+    (controller_has_transform_spec pipeline_controller_beta transform_spec_v2)
+    (policy_rule_available policy_rule_1)
+    (policy_rule_available policy_rule_2)
+    (output_target_available output_target_1)
+    (output_target_available output_target_2)
+    (destination_shard_available destination_shard_1)
+    (transformer_plugin_available transformer_plugin_1)
+    (monitoring_hook_available monitoring_hook_1)
+    (controller_has_monitoring_hook pipeline_controller_alpha monitoring_hook_1)
+    (controller_has_monitoring_hook pipeline_controller_beta monitoring_hook_2)
+    (validator_module_available validator_module_1)
+  )
+  (:goal
+    (and
+      (commit_finalized ingest_worker_1)
+      (commit_finalized transform_worker_1)
+      (commit_finalized pipeline_controller_alpha)
+      (commit_finalized pipeline_controller_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_external_source ingest_worker_1)
+(register_external_source transform_worker_1)
+(register_external_source pipeline_controller_alpha)
+(register_external_source pipeline_controller_beta)
+(bind_connector_to_source ingest_worker_1 connector_a)
+(bind_connector_to_source transform_worker_1 connector_b)
+(allocate_auth_token ingest_worker_1 auth_token_1)
+(confirm_source_authentication ingest_worker_1 auth_token_1)
+(attach_enrichment_artifact_to_partition ingest_worker_1 source_partition_1 enrichment_artifact_1)
+(complete_partition_preparation ingest_worker_1 source_partition_1 auth_token_1 enrichment_artifact_1)
+(release_auth_token ingest_worker_1 auth_token_1)
+(allocate_auth_token transform_worker_1 auth_token_1)
+(confirm_source_authentication transform_worker_1 auth_token_1)
+(attach_enrichment_artifact_to_partition transform_worker_1 transform_partition_1 enrichment_artifact_1)
+(complete_transform_partition_preparation transform_worker_1 transform_partition_1 auth_token_1 enrichment_artifact_1)
+(release_auth_token transform_worker_1 auth_token_1)
+(stage_data_batch ingest_worker_1 transform_worker_1 source_partition_1 transform_partition_1 data_batch_1)
+(allocate_auth_token ingest_worker_1 auth_token_1)
+(mark_data_batch_preprocessed data_batch_1 ingest_worker_1 auth_token_1)
+(release_auth_token ingest_worker_1 auth_token_1)
+(bind_connector_to_source pipeline_controller_alpha connector_c)
+(allocate_auth_token pipeline_controller_alpha auth_token_1)
+(confirm_source_authentication pipeline_controller_alpha auth_token_1)
+(register_transformer_plugin pipeline_controller_alpha transformer_plugin_1)
+(register_validator_module pipeline_controller_alpha validator_module_1)
+(bind_credential_profile_to_source pipeline_controller_alpha credential_profile_1)
+(attach_transform_spec_to_batch pipeline_controller_alpha transform_spec_v1 data_batch_1)
+(prepare_controller_for_execution pipeline_controller_alpha transform_spec_v1 data_batch_1 auth_token_1)
+(register_plugin_with_controller pipeline_controller_alpha transformer_plugin_1 credential_profile_1 transform_spec_v1 data_batch_1)
+(apply_validator_to_controller pipeline_controller_alpha validator_module_1 transform_spec_v1 data_batch_1)
+(mark_controller_commit_ready pipeline_controller_alpha)
+(authorize_source_commit pipeline_controller_alpha destination_shard_1 auth_token_1)
+(finalize_commit_and_release_connector_for_controller pipeline_controller_alpha connector_c destination_shard_1)
+(release_auth_token pipeline_controller_alpha auth_token_1)
+(unbind_credential_profile_from_source pipeline_controller_alpha credential_profile_1)
+(unregister_transformer_plugin pipeline_controller_alpha transformer_plugin_1)
+(unregister_validator_module pipeline_controller_alpha validator_module_1)
+(bind_connector_to_source pipeline_controller_beta connector_c)
+(allocate_auth_token pipeline_controller_beta auth_token_1)
+(confirm_source_authentication pipeline_controller_beta auth_token_1)
+(register_transformer_plugin pipeline_controller_beta transformer_plugin_1)
+(register_validator_module pipeline_controller_beta validator_module_1)
+(bind_credential_profile_to_source pipeline_controller_beta credential_profile_1)
+(attach_transform_spec_to_batch pipeline_controller_beta transform_spec_v2 data_batch_1)
+(prepare_controller_for_execution pipeline_controller_beta transform_spec_v2 data_batch_1 auth_token_1)
+(register_plugin_with_controller pipeline_controller_beta transformer_plugin_1 credential_profile_1 transform_spec_v2 data_batch_1)
+(apply_validator_to_controller pipeline_controller_beta validator_module_1 transform_spec_v2 data_batch_1)
+(mark_controller_commit_ready pipeline_controller_beta)
+(authorize_source_commit pipeline_controller_beta destination_shard_1 auth_token_1)
+(finalize_commit_and_release_connector_for_controller pipeline_controller_beta connector_c destination_shard_1)
+(release_auth_token pipeline_controller_beta auth_token_1)
+(unbind_credential_profile_from_source pipeline_controller_beta credential_profile_1)
+(unregister_transformer_plugin pipeline_controller_beta transformer_plugin_1)
+(unregister_validator_module pipeline_controller_beta validator_module_1)
+(finalize_ingest_worker_commit ingest_worker_1 data_batch_1)
+(finalize_transform_worker_commit transform_worker_1 data_batch_1)
+(allocate_auth_token ingest_worker_1 auth_token_1)
+(authorize_source_commit ingest_worker_1 destination_shard_1 auth_token_1)
+(finalize_commit_and_release_connector_for_ingest_worker ingest_worker_1 connector_a destination_shard_1)
+(release_auth_token ingest_worker_1 auth_token_1)
+(allocate_auth_token transform_worker_1 auth_token_1)
+(authorize_source_commit transform_worker_1 destination_shard_1 auth_token_1)
+(finalize_commit_and_release_connector_for_transform_worker transform_worker_1 connector_b destination_shard_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_9pg2lr93/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_9pg2lr93/plan.pddl 
+
+
+--- stderr ---
+

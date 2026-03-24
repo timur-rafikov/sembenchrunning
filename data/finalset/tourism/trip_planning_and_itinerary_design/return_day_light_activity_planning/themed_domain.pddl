@@ -1,0 +1,937 @@
+(define (domain return_day_light_activity_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category - entity experience_category - entity time_or_booking_category - entity plan_container - entity day_plan - plan_container transport_option - resource_category activity_option - resource_category venue_or_service - resource_category scenic_feature - resource_category service_addon - resource_category time_constraint - resource_category logistics_option - resource_category special_requirement - resource_category optional_experience - experience_category sub_activity_option - experience_category promotional_offer - experience_category daylight_window_primary - time_or_booking_category daylight_window_secondary - time_or_booking_category activity_bundle_reservation - time_or_booking_category return_leg_group - day_plan segment_group - day_plan return_leg_primary - return_leg_group return_leg_secondary - return_leg_group itinerary_proposal - segment_group)
+
+  (:predicates
+    (day_plan_initialized ?day_plan - day_plan)
+    (activity_confirmed ?day_plan - day_plan)
+    (day_plan_transport_allocated ?day_plan - day_plan)
+    (confirmed ?day_plan - day_plan)
+    (ready_for_confirmation ?day_plan - day_plan)
+    (entity_time_constraint_applied ?day_plan - day_plan)
+    (transport_option_available ?transport_option - transport_option)
+    (assigned_transport ?day_plan - day_plan ?transport_option - transport_option)
+    (activity_option_available ?activity_option - activity_option)
+    (proposed_activity ?day_plan - day_plan ?activity_option - activity_option)
+    (venue_available ?venue_or_service - venue_or_service)
+    (venue_reserved ?day_plan - day_plan ?venue_or_service - venue_or_service)
+    (optional_experience_available ?optional_experience - optional_experience)
+    (primary_leg_optional_attached ?return_leg_primary - return_leg_primary ?optional_experience - optional_experience)
+    (secondary_leg_optional_attached ?return_leg_secondary - return_leg_secondary ?optional_experience - optional_experience)
+    (primary_leg_daylight_window_link ?return_leg_primary - return_leg_primary ?daylight_window_primary - daylight_window_primary)
+    (daylight_window_primary_selected ?daylight_window_primary - daylight_window_primary)
+    (daylight_window_primary_reserved ?daylight_window_primary - daylight_window_primary)
+    (primary_leg_window_finalized ?return_leg_primary - return_leg_primary)
+    (secondary_leg_daylight_window_link ?return_leg_secondary - return_leg_secondary ?daylight_window_secondary - daylight_window_secondary)
+    (daylight_window_secondary_selected ?daylight_window_secondary - daylight_window_secondary)
+    (daylight_window_secondary_reserved ?daylight_window_secondary - daylight_window_secondary)
+    (secondary_leg_window_finalized ?return_leg_secondary - return_leg_secondary)
+    (bundle_slot_available ?activity_bundle_reservation - activity_bundle_reservation)
+    (activity_bundle_created ?activity_bundle_reservation - activity_bundle_reservation)
+    (bundle_primary_window_link ?activity_bundle_reservation - activity_bundle_reservation ?daylight_window_primary - daylight_window_primary)
+    (bundle_secondary_window_link ?activity_bundle_reservation - activity_bundle_reservation ?daylight_window_secondary - daylight_window_secondary)
+    (bundle_has_primary_window ?activity_bundle_reservation - activity_bundle_reservation)
+    (bundle_has_secondary_window ?activity_bundle_reservation - activity_bundle_reservation)
+    (bundle_confirmed ?activity_bundle_reservation - activity_bundle_reservation)
+    (proposal_primary_leg_link ?itinerary_proposal - itinerary_proposal ?return_leg_primary - return_leg_primary)
+    (proposal_secondary_leg_link ?itinerary_proposal - itinerary_proposal ?return_leg_secondary - return_leg_secondary)
+    (proposal_bundle_link ?itinerary_proposal - itinerary_proposal ?activity_bundle_reservation - activity_bundle_reservation)
+    (sub_activity_available ?sub_activity_option - sub_activity_option)
+    (proposal_sub_activity_link ?itinerary_proposal - itinerary_proposal ?sub_activity_option - sub_activity_option)
+    (sub_activity_selected ?sub_activity_option - sub_activity_option)
+    (sub_activity_linked_to_bundle ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    (proposal_subactivity_validated ?itinerary_proposal - itinerary_proposal)
+    (proposal_logistics_assigned ?itinerary_proposal - itinerary_proposal)
+    (proposal_stage_ready ?itinerary_proposal - itinerary_proposal)
+    (proposal_offer_flag ?itinerary_proposal - itinerary_proposal)
+    (proposal_offer_applied ?itinerary_proposal - itinerary_proposal)
+    (proposal_addon_enabled ?itinerary_proposal - itinerary_proposal)
+    (proposal_confirmation_checks_passed ?itinerary_proposal - itinerary_proposal)
+    (promotional_offer_available ?promotional_offer - promotional_offer)
+    (proposal_promotional_offer_link ?itinerary_proposal - itinerary_proposal ?promotional_offer - promotional_offer)
+    (offer_attached_to_proposal ?itinerary_proposal - itinerary_proposal)
+    (offer_terms_confirmed ?itinerary_proposal - itinerary_proposal)
+    (offer_finalized ?itinerary_proposal - itinerary_proposal)
+    (scenic_feature_available ?scenic_feature - scenic_feature)
+    (proposal_scenic_feature_link ?itinerary_proposal - itinerary_proposal ?scenic_feature - scenic_feature)
+    (service_addon_available ?service_addon - service_addon)
+    (proposal_service_addon_link ?itinerary_proposal - itinerary_proposal ?service_addon - service_addon)
+    (logistics_option_available ?logistics_option - logistics_option)
+    (proposal_logistics_option_link ?itinerary_proposal - itinerary_proposal ?logistics_option - logistics_option)
+    (special_requirement_available ?special_requirement - special_requirement)
+    (proposal_special_requirement_link ?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement)
+    (time_constraint_available ?time_constraint - time_constraint)
+    (entity_time_constraint_link ?day_plan - day_plan ?time_constraint - time_constraint)
+    (primary_leg_slot_locked ?return_leg_primary - return_leg_primary)
+    (secondary_leg_slot_locked ?return_leg_secondary - return_leg_secondary)
+    (itinerary_proposal_finalized ?itinerary_proposal - itinerary_proposal)
+  )
+  (:action initialize_day_plan
+    :parameters (?day_plan - day_plan)
+    :precondition
+      (and
+        (not
+          (day_plan_initialized ?day_plan)
+        )
+        (not
+          (confirmed ?day_plan)
+        )
+      )
+    :effect (day_plan_initialized ?day_plan)
+  )
+  (:action assign_transport_to_day_plan
+    :parameters (?day_plan - day_plan ?transport_option - transport_option)
+    :precondition
+      (and
+        (day_plan_initialized ?day_plan)
+        (not
+          (day_plan_transport_allocated ?day_plan)
+        )
+        (transport_option_available ?transport_option)
+      )
+    :effect
+      (and
+        (day_plan_transport_allocated ?day_plan)
+        (assigned_transport ?day_plan ?transport_option)
+        (not
+          (transport_option_available ?transport_option)
+        )
+      )
+  )
+  (:action propose_activity_for_day_plan
+    :parameters (?day_plan - day_plan ?activity_option - activity_option)
+    :precondition
+      (and
+        (day_plan_initialized ?day_plan)
+        (day_plan_transport_allocated ?day_plan)
+        (activity_option_available ?activity_option)
+      )
+    :effect
+      (and
+        (proposed_activity ?day_plan ?activity_option)
+        (not
+          (activity_option_available ?activity_option)
+        )
+      )
+  )
+  (:action confirm_activity_proposal
+    :parameters (?day_plan - day_plan ?activity_option - activity_option)
+    :precondition
+      (and
+        (day_plan_initialized ?day_plan)
+        (day_plan_transport_allocated ?day_plan)
+        (proposed_activity ?day_plan ?activity_option)
+        (not
+          (activity_confirmed ?day_plan)
+        )
+      )
+    :effect (activity_confirmed ?day_plan)
+  )
+  (:action release_activity_proposal
+    :parameters (?day_plan - day_plan ?activity_option - activity_option)
+    :precondition
+      (and
+        (proposed_activity ?day_plan ?activity_option)
+      )
+    :effect
+      (and
+        (activity_option_available ?activity_option)
+        (not
+          (proposed_activity ?day_plan ?activity_option)
+        )
+      )
+  )
+  (:action reserve_venue_for_plan
+    :parameters (?day_plan - day_plan ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (activity_confirmed ?day_plan)
+        (venue_available ?venue_or_service)
+      )
+    :effect
+      (and
+        (venue_reserved ?day_plan ?venue_or_service)
+        (not
+          (venue_available ?venue_or_service)
+        )
+      )
+  )
+  (:action release_venue_reservation
+    :parameters (?day_plan - day_plan ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (venue_reserved ?day_plan ?venue_or_service)
+      )
+    :effect
+      (and
+        (venue_available ?venue_or_service)
+        (not
+          (venue_reserved ?day_plan ?venue_or_service)
+        )
+      )
+  )
+  (:action reserve_logistics_for_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?logistics_option - logistics_option)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (logistics_option_available ?logistics_option)
+      )
+    :effect
+      (and
+        (proposal_logistics_option_link ?itinerary_proposal ?logistics_option)
+        (not
+          (logistics_option_available ?logistics_option)
+        )
+      )
+  )
+  (:action release_logistics_for_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?logistics_option - logistics_option)
+    :precondition
+      (and
+        (proposal_logistics_option_link ?itinerary_proposal ?logistics_option)
+      )
+    :effect
+      (and
+        (logistics_option_available ?logistics_option)
+        (not
+          (proposal_logistics_option_link ?itinerary_proposal ?logistics_option)
+        )
+      )
+  )
+  (:action reserve_special_requirement_for_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (special_requirement_available ?special_requirement)
+      )
+    :effect
+      (and
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (not
+          (special_requirement_available ?special_requirement)
+        )
+      )
+  )
+  (:action release_special_requirement_for_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement)
+    :precondition
+      (and
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+      )
+    :effect
+      (and
+        (special_requirement_available ?special_requirement)
+        (not
+          (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        )
+      )
+  )
+  (:action select_primary_daylight_window
+    :parameters (?return_leg_primary - return_leg_primary ?daylight_window_primary - daylight_window_primary ?activity_option - activity_option)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_primary)
+        (proposed_activity ?return_leg_primary ?activity_option)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (not
+          (daylight_window_primary_selected ?daylight_window_primary)
+        )
+        (not
+          (daylight_window_primary_reserved ?daylight_window_primary)
+        )
+      )
+    :effect (daylight_window_primary_selected ?daylight_window_primary)
+  )
+  (:action lock_primary_daylight_slot
+    :parameters (?return_leg_primary - return_leg_primary ?daylight_window_primary - daylight_window_primary ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_primary)
+        (venue_reserved ?return_leg_primary ?venue_or_service)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (daylight_window_primary_selected ?daylight_window_primary)
+        (not
+          (primary_leg_slot_locked ?return_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (primary_leg_window_finalized ?return_leg_primary)
+      )
+  )
+  (:action attach_optional_experience_primary
+    :parameters (?return_leg_primary - return_leg_primary ?daylight_window_primary - daylight_window_primary ?optional_experience - optional_experience)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_primary)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (optional_experience_available ?optional_experience)
+        (not
+          (primary_leg_slot_locked ?return_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (daylight_window_primary_reserved ?daylight_window_primary)
+        (primary_leg_slot_locked ?return_leg_primary)
+        (primary_leg_optional_attached ?return_leg_primary ?optional_experience)
+        (not
+          (optional_experience_available ?optional_experience)
+        )
+      )
+  )
+  (:action confirm_primary_daylight_slot
+    :parameters (?return_leg_primary - return_leg_primary ?daylight_window_primary - daylight_window_primary ?activity_option - activity_option ?optional_experience - optional_experience)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_primary)
+        (proposed_activity ?return_leg_primary ?activity_option)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (daylight_window_primary_reserved ?daylight_window_primary)
+        (primary_leg_optional_attached ?return_leg_primary ?optional_experience)
+        (not
+          (primary_leg_window_finalized ?return_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (daylight_window_primary_selected ?daylight_window_primary)
+        (primary_leg_window_finalized ?return_leg_primary)
+        (optional_experience_available ?optional_experience)
+        (not
+          (primary_leg_optional_attached ?return_leg_primary ?optional_experience)
+        )
+      )
+  )
+  (:action select_secondary_daylight_window
+    :parameters (?return_leg_secondary - return_leg_secondary ?daylight_window_secondary - daylight_window_secondary ?activity_option - activity_option)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_secondary)
+        (proposed_activity ?return_leg_secondary ?activity_option)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (not
+          (daylight_window_secondary_selected ?daylight_window_secondary)
+        )
+        (not
+          (daylight_window_secondary_reserved ?daylight_window_secondary)
+        )
+      )
+    :effect (daylight_window_secondary_selected ?daylight_window_secondary)
+  )
+  (:action lock_secondary_daylight_slot
+    :parameters (?return_leg_secondary - return_leg_secondary ?daylight_window_secondary - daylight_window_secondary ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_secondary)
+        (venue_reserved ?return_leg_secondary ?venue_or_service)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_secondary_selected ?daylight_window_secondary)
+        (not
+          (secondary_leg_slot_locked ?return_leg_secondary)
+        )
+      )
+    :effect
+      (and
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (secondary_leg_window_finalized ?return_leg_secondary)
+      )
+  )
+  (:action attach_optional_experience_secondary
+    :parameters (?return_leg_secondary - return_leg_secondary ?daylight_window_secondary - daylight_window_secondary ?optional_experience - optional_experience)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_secondary)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (optional_experience_available ?optional_experience)
+        (not
+          (secondary_leg_slot_locked ?return_leg_secondary)
+        )
+      )
+    :effect
+      (and
+        (daylight_window_secondary_reserved ?daylight_window_secondary)
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (secondary_leg_optional_attached ?return_leg_secondary ?optional_experience)
+        (not
+          (optional_experience_available ?optional_experience)
+        )
+      )
+  )
+  (:action confirm_secondary_daylight_slot
+    :parameters (?return_leg_secondary - return_leg_secondary ?daylight_window_secondary - daylight_window_secondary ?activity_option - activity_option ?optional_experience - optional_experience)
+    :precondition
+      (and
+        (activity_confirmed ?return_leg_secondary)
+        (proposed_activity ?return_leg_secondary ?activity_option)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_secondary_reserved ?daylight_window_secondary)
+        (secondary_leg_optional_attached ?return_leg_secondary ?optional_experience)
+        (not
+          (secondary_leg_window_finalized ?return_leg_secondary)
+        )
+      )
+    :effect
+      (and
+        (daylight_window_secondary_selected ?daylight_window_secondary)
+        (secondary_leg_window_finalized ?return_leg_secondary)
+        (optional_experience_available ?optional_experience)
+        (not
+          (secondary_leg_optional_attached ?return_leg_secondary ?optional_experience)
+        )
+      )
+  )
+  (:action create_activity_bundle_reservation
+    :parameters (?return_leg_primary - return_leg_primary ?return_leg_secondary - return_leg_secondary ?daylight_window_primary - daylight_window_primary ?daylight_window_secondary - daylight_window_secondary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_primary_selected ?daylight_window_primary)
+        (daylight_window_secondary_selected ?daylight_window_secondary)
+        (primary_leg_window_finalized ?return_leg_primary)
+        (secondary_leg_window_finalized ?return_leg_secondary)
+        (bundle_slot_available ?activity_bundle_reservation)
+      )
+    :effect
+      (and
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_primary_window_link ?activity_bundle_reservation ?daylight_window_primary)
+        (bundle_secondary_window_link ?activity_bundle_reservation ?daylight_window_secondary)
+        (not
+          (bundle_slot_available ?activity_bundle_reservation)
+        )
+      )
+  )
+  (:action create_activity_bundle_reservation_with_primary_optional
+    :parameters (?return_leg_primary - return_leg_primary ?return_leg_secondary - return_leg_secondary ?daylight_window_primary - daylight_window_primary ?daylight_window_secondary - daylight_window_secondary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_primary_reserved ?daylight_window_primary)
+        (daylight_window_secondary_selected ?daylight_window_secondary)
+        (not
+          (primary_leg_window_finalized ?return_leg_primary)
+        )
+        (secondary_leg_window_finalized ?return_leg_secondary)
+        (bundle_slot_available ?activity_bundle_reservation)
+      )
+    :effect
+      (and
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_primary_window_link ?activity_bundle_reservation ?daylight_window_primary)
+        (bundle_secondary_window_link ?activity_bundle_reservation ?daylight_window_secondary)
+        (bundle_has_primary_window ?activity_bundle_reservation)
+        (not
+          (bundle_slot_available ?activity_bundle_reservation)
+        )
+      )
+  )
+  (:action create_activity_bundle_reservation_with_secondary_optional
+    :parameters (?return_leg_primary - return_leg_primary ?return_leg_secondary - return_leg_secondary ?daylight_window_primary - daylight_window_primary ?daylight_window_secondary - daylight_window_secondary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_primary_selected ?daylight_window_primary)
+        (daylight_window_secondary_reserved ?daylight_window_secondary)
+        (primary_leg_window_finalized ?return_leg_primary)
+        (not
+          (secondary_leg_window_finalized ?return_leg_secondary)
+        )
+        (bundle_slot_available ?activity_bundle_reservation)
+      )
+    :effect
+      (and
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_primary_window_link ?activity_bundle_reservation ?daylight_window_primary)
+        (bundle_secondary_window_link ?activity_bundle_reservation ?daylight_window_secondary)
+        (bundle_has_secondary_window ?activity_bundle_reservation)
+        (not
+          (bundle_slot_available ?activity_bundle_reservation)
+        )
+      )
+  )
+  (:action create_activity_bundle_reservation_with_both_windows
+    :parameters (?return_leg_primary - return_leg_primary ?return_leg_secondary - return_leg_secondary ?daylight_window_primary - daylight_window_primary ?daylight_window_secondary - daylight_window_secondary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (primary_leg_daylight_window_link ?return_leg_primary ?daylight_window_primary)
+        (secondary_leg_daylight_window_link ?return_leg_secondary ?daylight_window_secondary)
+        (daylight_window_primary_reserved ?daylight_window_primary)
+        (daylight_window_secondary_reserved ?daylight_window_secondary)
+        (not
+          (primary_leg_window_finalized ?return_leg_primary)
+        )
+        (not
+          (secondary_leg_window_finalized ?return_leg_secondary)
+        )
+        (bundle_slot_available ?activity_bundle_reservation)
+      )
+    :effect
+      (and
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_primary_window_link ?activity_bundle_reservation ?daylight_window_primary)
+        (bundle_secondary_window_link ?activity_bundle_reservation ?daylight_window_secondary)
+        (bundle_has_primary_window ?activity_bundle_reservation)
+        (bundle_has_secondary_window ?activity_bundle_reservation)
+        (not
+          (bundle_slot_available ?activity_bundle_reservation)
+        )
+      )
+  )
+  (:action confirm_activity_bundle
+    :parameters (?activity_bundle_reservation - activity_bundle_reservation ?return_leg_primary - return_leg_primary ?activity_option - activity_option)
+    :precondition
+      (and
+        (activity_bundle_created ?activity_bundle_reservation)
+        (primary_leg_slot_locked ?return_leg_primary)
+        (proposed_activity ?return_leg_primary ?activity_option)
+        (not
+          (bundle_confirmed ?activity_bundle_reservation)
+        )
+      )
+    :effect (bundle_confirmed ?activity_bundle_reservation)
+  )
+  (:action reserve_sub_activity_option
+    :parameters (?itinerary_proposal - itinerary_proposal ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (proposal_bundle_link ?itinerary_proposal ?activity_bundle_reservation)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_available ?sub_activity_option)
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_confirmed ?activity_bundle_reservation)
+        (not
+          (sub_activity_selected ?sub_activity_option)
+        )
+      )
+    :effect
+      (and
+        (sub_activity_selected ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (not
+          (sub_activity_available ?sub_activity_option)
+        )
+      )
+  )
+  (:action validate_sub_activity_for_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation ?activity_option - activity_option)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_selected ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (proposed_activity ?itinerary_proposal ?activity_option)
+        (not
+          (bundle_has_primary_window ?activity_bundle_reservation)
+        )
+        (not
+          (proposal_subactivity_validated ?itinerary_proposal)
+        )
+      )
+    :effect (proposal_subactivity_validated ?itinerary_proposal)
+  )
+  (:action attach_scenic_feature_to_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?scenic_feature - scenic_feature)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (scenic_feature_available ?scenic_feature)
+        (not
+          (proposal_offer_flag ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (proposal_offer_flag ?itinerary_proposal)
+        (proposal_scenic_feature_link ?itinerary_proposal ?scenic_feature)
+        (not
+          (scenic_feature_available ?scenic_feature)
+        )
+      )
+  )
+  (:action apply_subactivity_and_feature_validation
+    :parameters (?itinerary_proposal - itinerary_proposal ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation ?activity_option - activity_option ?scenic_feature - scenic_feature)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_selected ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (proposed_activity ?itinerary_proposal ?activity_option)
+        (bundle_has_primary_window ?activity_bundle_reservation)
+        (proposal_offer_flag ?itinerary_proposal)
+        (proposal_scenic_feature_link ?itinerary_proposal ?scenic_feature)
+        (not
+          (proposal_subactivity_validated ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (proposal_subactivity_validated ?itinerary_proposal)
+        (proposal_offer_applied ?itinerary_proposal)
+      )
+  )
+  (:action allocate_logistics_and_stage_proposal_part_a
+    :parameters (?itinerary_proposal - itinerary_proposal ?logistics_option - logistics_option ?venue_or_service - venue_or_service ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_subactivity_validated ?itinerary_proposal)
+        (proposal_logistics_option_link ?itinerary_proposal ?logistics_option)
+        (venue_reserved ?itinerary_proposal ?venue_or_service)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (not
+          (bundle_has_secondary_window ?activity_bundle_reservation)
+        )
+        (not
+          (proposal_logistics_assigned ?itinerary_proposal)
+        )
+      )
+    :effect (proposal_logistics_assigned ?itinerary_proposal)
+  )
+  (:action allocate_logistics_and_stage_proposal_part_b
+    :parameters (?itinerary_proposal - itinerary_proposal ?logistics_option - logistics_option ?venue_or_service - venue_or_service ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_subactivity_validated ?itinerary_proposal)
+        (proposal_logistics_option_link ?itinerary_proposal ?logistics_option)
+        (venue_reserved ?itinerary_proposal ?venue_or_service)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (bundle_has_secondary_window ?activity_bundle_reservation)
+        (not
+          (proposal_logistics_assigned ?itinerary_proposal)
+        )
+      )
+    :effect (proposal_logistics_assigned ?itinerary_proposal)
+  )
+  (:action stage_proposal_for_finalization
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_logistics_assigned ?itinerary_proposal)
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (not
+          (bundle_has_primary_window ?activity_bundle_reservation)
+        )
+        (not
+          (bundle_has_secondary_window ?activity_bundle_reservation)
+        )
+        (not
+          (proposal_stage_ready ?itinerary_proposal)
+        )
+      )
+    :effect (proposal_stage_ready ?itinerary_proposal)
+  )
+  (:action stage_proposal_with_addons
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_logistics_assigned ?itinerary_proposal)
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (bundle_has_primary_window ?activity_bundle_reservation)
+        (not
+          (bundle_has_secondary_window ?activity_bundle_reservation)
+        )
+        (not
+          (proposal_stage_ready ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_addon_enabled ?itinerary_proposal)
+      )
+  )
+  (:action stage_proposal_with_addons_alt1
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_logistics_assigned ?itinerary_proposal)
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (not
+          (bundle_has_primary_window ?activity_bundle_reservation)
+        )
+        (bundle_has_secondary_window ?activity_bundle_reservation)
+        (not
+          (proposal_stage_ready ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_addon_enabled ?itinerary_proposal)
+      )
+  )
+  (:action stage_proposal_with_addons_alt2
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement ?sub_activity_option - sub_activity_option ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (proposal_logistics_assigned ?itinerary_proposal)
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (proposal_sub_activity_link ?itinerary_proposal ?sub_activity_option)
+        (sub_activity_linked_to_bundle ?sub_activity_option ?activity_bundle_reservation)
+        (bundle_has_primary_window ?activity_bundle_reservation)
+        (bundle_has_secondary_window ?activity_bundle_reservation)
+        (not
+          (proposal_stage_ready ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_addon_enabled ?itinerary_proposal)
+      )
+  )
+  (:action finalize_itinerary_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (not
+          (proposal_addon_enabled ?itinerary_proposal)
+        )
+        (not
+          (itinerary_proposal_finalized ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (itinerary_proposal_finalized ?itinerary_proposal)
+        (ready_for_confirmation ?itinerary_proposal)
+      )
+  )
+  (:action attach_service_addon_to_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?service_addon - service_addon)
+    :precondition
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_addon_enabled ?itinerary_proposal)
+        (service_addon_available ?service_addon)
+      )
+    :effect
+      (and
+        (proposal_service_addon_link ?itinerary_proposal ?service_addon)
+        (not
+          (service_addon_available ?service_addon)
+        )
+      )
+  )
+  (:action perform_proposal_confirmation_checks
+    :parameters (?itinerary_proposal - itinerary_proposal ?return_leg_primary - return_leg_primary ?return_leg_secondary - return_leg_secondary ?activity_option - activity_option ?service_addon - service_addon)
+    :precondition
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_addon_enabled ?itinerary_proposal)
+        (proposal_service_addon_link ?itinerary_proposal ?service_addon)
+        (proposal_primary_leg_link ?itinerary_proposal ?return_leg_primary)
+        (proposal_secondary_leg_link ?itinerary_proposal ?return_leg_secondary)
+        (primary_leg_window_finalized ?return_leg_primary)
+        (secondary_leg_window_finalized ?return_leg_secondary)
+        (proposed_activity ?itinerary_proposal ?activity_option)
+        (not
+          (proposal_confirmation_checks_passed ?itinerary_proposal)
+        )
+      )
+    :effect (proposal_confirmation_checks_passed ?itinerary_proposal)
+  )
+  (:action enable_proposal_confirmation
+    :parameters (?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (proposal_stage_ready ?itinerary_proposal)
+        (proposal_confirmation_checks_passed ?itinerary_proposal)
+        (not
+          (itinerary_proposal_finalized ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (itinerary_proposal_finalized ?itinerary_proposal)
+        (ready_for_confirmation ?itinerary_proposal)
+      )
+  )
+  (:action attach_promotional_offer_to_proposal
+    :parameters (?itinerary_proposal - itinerary_proposal ?promotional_offer - promotional_offer ?activity_option - activity_option)
+    :precondition
+      (and
+        (activity_confirmed ?itinerary_proposal)
+        (proposed_activity ?itinerary_proposal ?activity_option)
+        (promotional_offer_available ?promotional_offer)
+        (proposal_promotional_offer_link ?itinerary_proposal ?promotional_offer)
+        (not
+          (offer_attached_to_proposal ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (offer_attached_to_proposal ?itinerary_proposal)
+        (not
+          (promotional_offer_available ?promotional_offer)
+        )
+      )
+  )
+  (:action confirm_offer_terms
+    :parameters (?itinerary_proposal - itinerary_proposal ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (offer_attached_to_proposal ?itinerary_proposal)
+        (venue_reserved ?itinerary_proposal ?venue_or_service)
+        (not
+          (offer_terms_confirmed ?itinerary_proposal)
+        )
+      )
+    :effect (offer_terms_confirmed ?itinerary_proposal)
+  )
+  (:action finalize_offer_with_special_requirement
+    :parameters (?itinerary_proposal - itinerary_proposal ?special_requirement - special_requirement)
+    :precondition
+      (and
+        (offer_terms_confirmed ?itinerary_proposal)
+        (proposal_special_requirement_link ?itinerary_proposal ?special_requirement)
+        (not
+          (offer_finalized ?itinerary_proposal)
+        )
+      )
+    :effect (offer_finalized ?itinerary_proposal)
+  )
+  (:action finalize_proposal_offer_confirmation
+    :parameters (?itinerary_proposal - itinerary_proposal)
+    :precondition
+      (and
+        (offer_finalized ?itinerary_proposal)
+        (not
+          (itinerary_proposal_finalized ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (itinerary_proposal_finalized ?itinerary_proposal)
+        (ready_for_confirmation ?itinerary_proposal)
+      )
+  )
+  (:action confirm_primary_leg
+    :parameters (?return_leg_primary - return_leg_primary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (primary_leg_slot_locked ?return_leg_primary)
+        (primary_leg_window_finalized ?return_leg_primary)
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_confirmed ?activity_bundle_reservation)
+        (not
+          (ready_for_confirmation ?return_leg_primary)
+        )
+      )
+    :effect (ready_for_confirmation ?return_leg_primary)
+  )
+  (:action confirm_secondary_leg
+    :parameters (?return_leg_secondary - return_leg_secondary ?activity_bundle_reservation - activity_bundle_reservation)
+    :precondition
+      (and
+        (secondary_leg_slot_locked ?return_leg_secondary)
+        (secondary_leg_window_finalized ?return_leg_secondary)
+        (activity_bundle_created ?activity_bundle_reservation)
+        (bundle_confirmed ?activity_bundle_reservation)
+        (not
+          (ready_for_confirmation ?return_leg_secondary)
+        )
+      )
+    :effect (ready_for_confirmation ?return_leg_secondary)
+  )
+  (:action bind_time_constraint_to_day_plan
+    :parameters (?day_plan - day_plan ?time_constraint - time_constraint ?activity_option - activity_option)
+    :precondition
+      (and
+        (ready_for_confirmation ?day_plan)
+        (proposed_activity ?day_plan ?activity_option)
+        (time_constraint_available ?time_constraint)
+        (not
+          (entity_time_constraint_applied ?day_plan)
+        )
+      )
+    :effect
+      (and
+        (entity_time_constraint_applied ?day_plan)
+        (entity_time_constraint_link ?day_plan ?time_constraint)
+        (not
+          (time_constraint_available ?time_constraint)
+        )
+      )
+  )
+  (:action finalize_primary_leg_with_transport
+    :parameters (?return_leg_primary - return_leg_primary ?transport_option - transport_option ?time_constraint - time_constraint)
+    :precondition
+      (and
+        (entity_time_constraint_applied ?return_leg_primary)
+        (assigned_transport ?return_leg_primary ?transport_option)
+        (entity_time_constraint_link ?return_leg_primary ?time_constraint)
+        (not
+          (confirmed ?return_leg_primary)
+        )
+      )
+    :effect
+      (and
+        (confirmed ?return_leg_primary)
+        (transport_option_available ?transport_option)
+        (time_constraint_available ?time_constraint)
+      )
+  )
+  (:action finalize_secondary_leg_with_transport
+    :parameters (?return_leg_secondary - return_leg_secondary ?transport_option - transport_option ?time_constraint - time_constraint)
+    :precondition
+      (and
+        (entity_time_constraint_applied ?return_leg_secondary)
+        (assigned_transport ?return_leg_secondary ?transport_option)
+        (entity_time_constraint_link ?return_leg_secondary ?time_constraint)
+        (not
+          (confirmed ?return_leg_secondary)
+        )
+      )
+    :effect
+      (and
+        (confirmed ?return_leg_secondary)
+        (transport_option_available ?transport_option)
+        (time_constraint_available ?time_constraint)
+      )
+  )
+  (:action finalize_proposal_with_transport
+    :parameters (?itinerary_proposal - itinerary_proposal ?transport_option - transport_option ?time_constraint - time_constraint)
+    :precondition
+      (and
+        (entity_time_constraint_applied ?itinerary_proposal)
+        (assigned_transport ?itinerary_proposal ?transport_option)
+        (entity_time_constraint_link ?itinerary_proposal ?time_constraint)
+        (not
+          (confirmed ?itinerary_proposal)
+        )
+      )
+    :effect
+      (and
+        (confirmed ?itinerary_proposal)
+        (transport_option_available ?transport_option)
+        (time_constraint_available ?time_constraint)
+      )
+  )
+)

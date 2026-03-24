@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain logistics_customer_delivery_window_alignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object temporal_category - object option_category - object order_entity - object order - order_entity transport_resource - resource_category customer_time_window - resource_category loading_dock - resource_category vehicle_type - resource_category service_level_profile - resource_category delivery_time_slot - resource_category handling_requirement - resource_category carrier_shift - resource_category order_line - temporal_category pallet - temporal_category regulatory_clearance - temporal_category route_slot - option_category shipment_option - option_category shipment_unit - option_category fulfillment_group - order bundle_group - order fulfillment_unit - fulfillment_group order_segment - fulfillment_group shipment_plan - bundle_group)
+  (:predicates
+    (order_released_entity ?order - order)
+    (entity_confirmed_for_shipment ?order - order)
+    (resource_assigned_entity ?order - order)
+    (ready_for_dispatch_entity ?order - order)
+    (eligible_for_booking_entity ?order - order)
+    (entity_delivery_slot_booked ?order - order)
+    (transport_resource_available ?transport_resource - transport_resource)
+    (assigned_to_transport_resource_entity ?order - order ?transport_resource - transport_resource)
+    (customer_time_window_available ?customer_time_window - customer_time_window)
+    (reserved_customer_window_entity ?order - order ?customer_time_window - customer_time_window)
+    (dock_available ?loading_dock - loading_dock)
+    (allocated_to_loading_dock_entity ?order - order ?loading_dock - loading_dock)
+    (order_line_available ?order_line - order_line)
+    (assigned_line_to_fulfillment_unit ?fulfillment_unit - fulfillment_unit ?order_line - order_line)
+    (assigned_line_to_order_segment ?order_segment - order_segment ?order_line - order_line)
+    (fulfillment_unit_route_slot_candidate ?fulfillment_unit - fulfillment_unit ?route_slot - route_slot)
+    (route_slot_confirmed ?route_slot - route_slot)
+    (route_slot_pending ?route_slot - route_slot)
+    (ready_for_consolidation ?fulfillment_unit - fulfillment_unit)
+    (segment_option_candidate ?order_segment - order_segment ?shipment_option - shipment_option)
+    (shipment_option_confirmed ?shipment_option - shipment_option)
+    (shipment_option_pending ?shipment_option - shipment_option)
+    (segment_ready_for_consolidation ?order_segment - order_segment)
+    (shipment_unit_available ?shipment_unit - shipment_unit)
+    (shipment_unit_prepared ?shipment_unit - shipment_unit)
+    (assigned_route_slot_to_shipment_unit ?shipment_unit - shipment_unit ?route_slot - route_slot)
+    (assigned_shipment_option_to_shipment_unit ?shipment_unit - shipment_unit ?shipment_option - shipment_option)
+    (shipment_unit_requires_vehicle_assignment ?shipment_unit - shipment_unit)
+    (shipment_unit_requires_pallet_assignment ?shipment_unit - shipment_unit)
+    (shipment_unit_ready_for_load_build ?shipment_unit - shipment_unit)
+    (shipment_plan_includes_fulfillment_unit ?shipment_plan - shipment_plan ?fulfillment_unit - fulfillment_unit)
+    (shipment_plan_includes_order_segment ?shipment_plan - shipment_plan ?order_segment - order_segment)
+    (shipment_plan_assigned_to_shipment_unit ?shipment_plan - shipment_plan ?shipment_unit - shipment_unit)
+    (pallet_available ?pallet - pallet)
+    (assigned_pallet_to_shipment_plan ?shipment_plan - shipment_plan ?pallet - pallet)
+    (pallet_in_use ?pallet - pallet)
+    (pallet_assigned_to_shipment_unit ?pallet - pallet ?shipment_unit - shipment_unit)
+    (load_build_confirmed ?shipment_plan - shipment_plan)
+    (handling_assigned ?shipment_plan - shipment_plan)
+    (carrier_shift_allocated ?shipment_plan - shipment_plan)
+    (vehicle_type_assigned_flag ?shipment_plan - shipment_plan)
+    (vehicle_assignment_confirmed ?shipment_plan - shipment_plan)
+    (ready_for_service_assignment ?shipment_plan - shipment_plan)
+    (dispatch_conditions_met ?shipment_plan - shipment_plan)
+    (regulatory_clearance_available ?regulatory_clearance - regulatory_clearance)
+    (assigned_regulatory_clearance_to_plan ?shipment_plan - shipment_plan ?regulatory_clearance - regulatory_clearance)
+    (regulatory_clearance_applied_to_plan ?shipment_plan - shipment_plan)
+    (plan_dock_verified ?shipment_plan - shipment_plan)
+    (carrier_shift_confirmed ?shipment_plan - shipment_plan)
+    (vehicle_type_available ?vehicle_type - vehicle_type)
+    (plan_assigned_vehicle_type ?shipment_plan - shipment_plan ?vehicle_type - vehicle_type)
+    (service_level_profile_available ?service_level_profile - service_level_profile)
+    (plan_assigned_service_profile ?shipment_plan - shipment_plan ?service_level_profile - service_level_profile)
+    (handling_requirement_available ?handling_requirement - handling_requirement)
+    (plan_assigned_handling_requirement ?shipment_plan - shipment_plan ?handling_requirement - handling_requirement)
+    (carrier_shift_available ?carrier_shift - carrier_shift)
+    (assigned_carrier_shift_to_plan ?shipment_plan - shipment_plan ?carrier_shift - carrier_shift)
+    (delivery_time_slot_available ?delivery_time_slot - delivery_time_slot)
+    (entity_booked_delivery_time_slot ?order - order ?delivery_time_slot - delivery_time_slot)
+    (fulfillment_unit_prepared ?fulfillment_unit - fulfillment_unit)
+    (order_segment_prepared ?order_segment - order_segment)
+    (shipment_plan_validated ?shipment_plan - shipment_plan)
+  )
+  (:action release_order
+    :parameters (?order - order)
+    :precondition
+      (and
+        (not
+          (order_released_entity ?order)
+        )
+        (not
+          (ready_for_dispatch_entity ?order)
+        )
+      )
+    :effect (order_released_entity ?order)
+  )
+  (:action assign_transport_resource_to_order
+    :parameters (?order - order ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (order_released_entity ?order)
+        (not
+          (resource_assigned_entity ?order)
+        )
+        (transport_resource_available ?transport_resource)
+      )
+    :effect
+      (and
+        (resource_assigned_entity ?order)
+        (assigned_to_transport_resource_entity ?order ?transport_resource)
+        (not
+          (transport_resource_available ?transport_resource)
+        )
+      )
+  )
+  (:action reserve_customer_time_window_for_order
+    :parameters (?order - order ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (order_released_entity ?order)
+        (resource_assigned_entity ?order)
+        (customer_time_window_available ?customer_time_window)
+      )
+    :effect
+      (and
+        (reserved_customer_window_entity ?order ?customer_time_window)
+        (not
+          (customer_time_window_available ?customer_time_window)
+        )
+      )
+  )
+  (:action confirm_customer_time_window_reservation_for_order
+    :parameters (?order - order ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (order_released_entity ?order)
+        (resource_assigned_entity ?order)
+        (reserved_customer_window_entity ?order ?customer_time_window)
+        (not
+          (entity_confirmed_for_shipment ?order)
+        )
+      )
+    :effect (entity_confirmed_for_shipment ?order)
+  )
+  (:action rollback_customer_time_window_reservation_for_order
+    :parameters (?order - order ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (reserved_customer_window_entity ?order ?customer_time_window)
+      )
+    :effect
+      (and
+        (customer_time_window_available ?customer_time_window)
+        (not
+          (reserved_customer_window_entity ?order ?customer_time_window)
+        )
+      )
+  )
+  (:action allocate_loading_dock_to_order
+    :parameters (?order - order ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?order)
+        (dock_available ?loading_dock)
+      )
+    :effect
+      (and
+        (allocated_to_loading_dock_entity ?order ?loading_dock)
+        (not
+          (dock_available ?loading_dock)
+        )
+      )
+  )
+  (:action release_loading_dock_from_order
+    :parameters (?order - order ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (allocated_to_loading_dock_entity ?order ?loading_dock)
+      )
+    :effect
+      (and
+        (dock_available ?loading_dock)
+        (not
+          (allocated_to_loading_dock_entity ?order ?loading_dock)
+        )
+      )
+  )
+  (:action assign_handling_requirement_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (handling_requirement_available ?handling_requirement)
+      )
+    :effect
+      (and
+        (plan_assigned_handling_requirement ?shipment_plan ?handling_requirement)
+        (not
+          (handling_requirement_available ?handling_requirement)
+        )
+      )
+  )
+  (:action unassign_handling_requirement_from_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?handling_requirement - handling_requirement)
+    :precondition
+      (and
+        (plan_assigned_handling_requirement ?shipment_plan ?handling_requirement)
+      )
+    :effect
+      (and
+        (handling_requirement_available ?handling_requirement)
+        (not
+          (plan_assigned_handling_requirement ?shipment_plan ?handling_requirement)
+        )
+      )
+  )
+  (:action assign_carrier_shift_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (carrier_shift_available ?carrier_shift)
+      )
+    :effect
+      (and
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (not
+          (carrier_shift_available ?carrier_shift)
+        )
+      )
+  )
+  (:action unassign_carrier_shift_from_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift)
+    :precondition
+      (and
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+      )
+    :effect
+      (and
+        (carrier_shift_available ?carrier_shift)
+        (not
+          (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        )
+      )
+  )
+  (:action reserve_route_slot_for_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?route_slot - route_slot ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?fulfillment_unit)
+        (reserved_customer_window_entity ?fulfillment_unit ?customer_time_window)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (not
+          (route_slot_confirmed ?route_slot)
+        )
+        (not
+          (route_slot_pending ?route_slot)
+        )
+      )
+    :effect (route_slot_confirmed ?route_slot)
+  )
+  (:action allocate_dock_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?route_slot - route_slot ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?fulfillment_unit)
+        (allocated_to_loading_dock_entity ?fulfillment_unit ?loading_dock)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (route_slot_confirmed ?route_slot)
+        (not
+          (fulfillment_unit_prepared ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (ready_for_consolidation ?fulfillment_unit)
+      )
+  )
+  (:action assign_order_line_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?route_slot - route_slot ?order_line - order_line)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?fulfillment_unit)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (order_line_available ?order_line)
+        (not
+          (fulfillment_unit_prepared ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (route_slot_pending ?route_slot)
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (assigned_line_to_fulfillment_unit ?fulfillment_unit ?order_line)
+        (not
+          (order_line_available ?order_line)
+        )
+      )
+  )
+  (:action finalize_line_assignment_and_confirm_route_slot_for_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?route_slot - route_slot ?customer_time_window - customer_time_window ?order_line - order_line)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?fulfillment_unit)
+        (reserved_customer_window_entity ?fulfillment_unit ?customer_time_window)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (route_slot_pending ?route_slot)
+        (assigned_line_to_fulfillment_unit ?fulfillment_unit ?order_line)
+        (not
+          (ready_for_consolidation ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (route_slot_confirmed ?route_slot)
+        (ready_for_consolidation ?fulfillment_unit)
+        (order_line_available ?order_line)
+        (not
+          (assigned_line_to_fulfillment_unit ?fulfillment_unit ?order_line)
+        )
+      )
+  )
+  (:action reserve_shipment_option_for_order_segment
+    :parameters (?order_segment - order_segment ?shipment_option - shipment_option ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?order_segment)
+        (reserved_customer_window_entity ?order_segment ?customer_time_window)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (not
+          (shipment_option_confirmed ?shipment_option)
+        )
+        (not
+          (shipment_option_pending ?shipment_option)
+        )
+      )
+    :effect (shipment_option_confirmed ?shipment_option)
+  )
+  (:action allocate_dock_to_order_segment
+    :parameters (?order_segment - order_segment ?shipment_option - shipment_option ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?order_segment)
+        (allocated_to_loading_dock_entity ?order_segment ?loading_dock)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (shipment_option_confirmed ?shipment_option)
+        (not
+          (order_segment_prepared ?order_segment)
+        )
+      )
+    :effect
+      (and
+        (order_segment_prepared ?order_segment)
+        (segment_ready_for_consolidation ?order_segment)
+      )
+  )
+  (:action assign_order_line_to_order_segment
+    :parameters (?order_segment - order_segment ?shipment_option - shipment_option ?order_line - order_line)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?order_segment)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (order_line_available ?order_line)
+        (not
+          (order_segment_prepared ?order_segment)
+        )
+      )
+    :effect
+      (and
+        (shipment_option_pending ?shipment_option)
+        (order_segment_prepared ?order_segment)
+        (assigned_line_to_order_segment ?order_segment ?order_line)
+        (not
+          (order_line_available ?order_line)
+        )
+      )
+  )
+  (:action finalize_segment_line_assignment_and_confirm_option
+    :parameters (?order_segment - order_segment ?shipment_option - shipment_option ?customer_time_window - customer_time_window ?order_line - order_line)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?order_segment)
+        (reserved_customer_window_entity ?order_segment ?customer_time_window)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (shipment_option_pending ?shipment_option)
+        (assigned_line_to_order_segment ?order_segment ?order_line)
+        (not
+          (segment_ready_for_consolidation ?order_segment)
+        )
+      )
+    :effect
+      (and
+        (shipment_option_confirmed ?shipment_option)
+        (segment_ready_for_consolidation ?order_segment)
+        (order_line_available ?order_line)
+        (not
+          (assigned_line_to_order_segment ?order_segment ?order_line)
+        )
+      )
+  )
+  (:action consolidate_into_shipment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?order_segment - order_segment ?route_slot - route_slot ?shipment_option - shipment_option ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (order_segment_prepared ?order_segment)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (route_slot_confirmed ?route_slot)
+        (shipment_option_confirmed ?shipment_option)
+        (ready_for_consolidation ?fulfillment_unit)
+        (segment_ready_for_consolidation ?order_segment)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_prepared ?shipment_unit)
+        (assigned_route_slot_to_shipment_unit ?shipment_unit ?route_slot)
+        (assigned_shipment_option_to_shipment_unit ?shipment_unit ?shipment_option)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action consolidate_into_shipment_unit_with_vehicle_requirement
+    :parameters (?fulfillment_unit - fulfillment_unit ?order_segment - order_segment ?route_slot - route_slot ?shipment_option - shipment_option ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (order_segment_prepared ?order_segment)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (route_slot_pending ?route_slot)
+        (shipment_option_confirmed ?shipment_option)
+        (not
+          (ready_for_consolidation ?fulfillment_unit)
+        )
+        (segment_ready_for_consolidation ?order_segment)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_prepared ?shipment_unit)
+        (assigned_route_slot_to_shipment_unit ?shipment_unit ?route_slot)
+        (assigned_shipment_option_to_shipment_unit ?shipment_unit ?shipment_option)
+        (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action consolidate_into_shipment_unit_with_pallet_requirement
+    :parameters (?fulfillment_unit - fulfillment_unit ?order_segment - order_segment ?route_slot - route_slot ?shipment_option - shipment_option ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (order_segment_prepared ?order_segment)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (route_slot_confirmed ?route_slot)
+        (shipment_option_pending ?shipment_option)
+        (ready_for_consolidation ?fulfillment_unit)
+        (not
+          (segment_ready_for_consolidation ?order_segment)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_prepared ?shipment_unit)
+        (assigned_route_slot_to_shipment_unit ?shipment_unit ?route_slot)
+        (assigned_shipment_option_to_shipment_unit ?shipment_unit ?shipment_option)
+        (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action consolidate_into_shipment_unit_with_vehicle_and_pallet_requirements
+    :parameters (?fulfillment_unit - fulfillment_unit ?order_segment - order_segment ?route_slot - route_slot ?shipment_option - shipment_option ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (order_segment_prepared ?order_segment)
+        (fulfillment_unit_route_slot_candidate ?fulfillment_unit ?route_slot)
+        (segment_option_candidate ?order_segment ?shipment_option)
+        (route_slot_pending ?route_slot)
+        (shipment_option_pending ?shipment_option)
+        (not
+          (ready_for_consolidation ?fulfillment_unit)
+        )
+        (not
+          (segment_ready_for_consolidation ?order_segment)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_prepared ?shipment_unit)
+        (assigned_route_slot_to_shipment_unit ?shipment_unit ?route_slot)
+        (assigned_shipment_option_to_shipment_unit ?shipment_unit ?shipment_option)
+        (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action flag_shipment_unit_ready_for_load_build
+    :parameters (?shipment_unit - shipment_unit ?fulfillment_unit - fulfillment_unit ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (shipment_unit_prepared ?shipment_unit)
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (reserved_customer_window_entity ?fulfillment_unit ?customer_time_window)
+        (not
+          (shipment_unit_ready_for_load_build ?shipment_unit)
+        )
+      )
+    :effect (shipment_unit_ready_for_load_build ?shipment_unit)
+  )
+  (:action assign_pallet_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (shipment_plan_assigned_to_shipment_unit ?shipment_plan ?shipment_unit)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_available ?pallet)
+        (shipment_unit_prepared ?shipment_unit)
+        (shipment_unit_ready_for_load_build ?shipment_unit)
+        (not
+          (pallet_in_use ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_in_use ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (not
+          (pallet_available ?pallet)
+        )
+      )
+  )
+  (:action confirm_pallet_load_for_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?pallet - pallet ?shipment_unit - shipment_unit ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_in_use ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (reserved_customer_window_entity ?shipment_plan ?customer_time_window)
+        (not
+          (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        )
+        (not
+          (load_build_confirmed ?shipment_plan)
+        )
+      )
+    :effect (load_build_confirmed ?shipment_plan)
+  )
+  (:action assign_vehicle_type_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?vehicle_type - vehicle_type)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (vehicle_type_available ?vehicle_type)
+        (not
+          (vehicle_type_assigned_flag ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (vehicle_type_assigned_flag ?shipment_plan)
+        (plan_assigned_vehicle_type ?shipment_plan ?vehicle_type)
+        (not
+          (vehicle_type_available ?vehicle_type)
+        )
+      )
+  )
+  (:action complete_vehicle_assignment_for_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?pallet - pallet ?shipment_unit - shipment_unit ?customer_time_window - customer_time_window ?vehicle_type - vehicle_type)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_in_use ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (reserved_customer_window_entity ?shipment_plan ?customer_time_window)
+        (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        (vehicle_type_assigned_flag ?shipment_plan)
+        (plan_assigned_vehicle_type ?shipment_plan ?vehicle_type)
+        (not
+          (load_build_confirmed ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (load_build_confirmed ?shipment_plan)
+        (vehicle_assignment_confirmed ?shipment_plan)
+      )
+  )
+  (:action assign_handling_and_prepare_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?handling_requirement - handling_requirement ?loading_dock - loading_dock ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (load_build_confirmed ?shipment_plan)
+        (plan_assigned_handling_requirement ?shipment_plan ?handling_requirement)
+        (allocated_to_loading_dock_entity ?shipment_plan ?loading_dock)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (not
+          (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        )
+        (not
+          (handling_assigned ?shipment_plan)
+        )
+      )
+    :effect (handling_assigned ?shipment_plan)
+  )
+  (:action assign_handling_and_prepare_shipment_plan_with_pallet_flag
+    :parameters (?shipment_plan - shipment_plan ?handling_requirement - handling_requirement ?loading_dock - loading_dock ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (load_build_confirmed ?shipment_plan)
+        (plan_assigned_handling_requirement ?shipment_plan ?handling_requirement)
+        (allocated_to_loading_dock_entity ?shipment_plan ?loading_dock)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        (not
+          (handling_assigned ?shipment_plan)
+        )
+      )
+    :effect (handling_assigned ?shipment_plan)
+  )
+  (:action allocate_carrier_shift_and_validate_plan
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (handling_assigned ?shipment_plan)
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (not
+          (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        )
+        (not
+          (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        )
+        (not
+          (carrier_shift_allocated ?shipment_plan)
+        )
+      )
+    :effect (carrier_shift_allocated ?shipment_plan)
+  )
+  (:action allocate_carrier_shift_and_prepare_service_assignment
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (handling_assigned ?shipment_plan)
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        (not
+          (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        )
+        (not
+          (carrier_shift_allocated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (ready_for_service_assignment ?shipment_plan)
+      )
+  )
+  (:action allocate_carrier_shift_and_prepare_service_assignment_with_pallet
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (handling_assigned ?shipment_plan)
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (not
+          (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        )
+        (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        (not
+          (carrier_shift_allocated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (ready_for_service_assignment ?shipment_plan)
+      )
+  )
+  (:action allocate_carrier_shift_and_prepare_service_assignment_with_vehicle_and_pallet
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift ?pallet - pallet ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (handling_assigned ?shipment_plan)
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (assigned_pallet_to_shipment_plan ?shipment_plan ?pallet)
+        (pallet_assigned_to_shipment_unit ?pallet ?shipment_unit)
+        (shipment_unit_requires_vehicle_assignment ?shipment_unit)
+        (shipment_unit_requires_pallet_assignment ?shipment_unit)
+        (not
+          (carrier_shift_allocated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (ready_for_service_assignment ?shipment_plan)
+      )
+  )
+  (:action finalize_shipment_plan_validation
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (not
+          (ready_for_service_assignment ?shipment_plan)
+        )
+        (not
+          (shipment_plan_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_validated ?shipment_plan)
+        (eligible_for_booking_entity ?shipment_plan)
+      )
+  )
+  (:action attach_service_level_profile_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (ready_for_service_assignment ?shipment_plan)
+        (service_level_profile_available ?service_level_profile)
+      )
+    :effect
+      (and
+        (plan_assigned_service_profile ?shipment_plan ?service_level_profile)
+        (not
+          (service_level_profile_available ?service_level_profile)
+        )
+      )
+  )
+  (:action perform_shipment_plan_readiness_checks
+    :parameters (?shipment_plan - shipment_plan ?fulfillment_unit - fulfillment_unit ?order_segment - order_segment ?customer_time_window - customer_time_window ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (ready_for_service_assignment ?shipment_plan)
+        (plan_assigned_service_profile ?shipment_plan ?service_level_profile)
+        (shipment_plan_includes_fulfillment_unit ?shipment_plan ?fulfillment_unit)
+        (shipment_plan_includes_order_segment ?shipment_plan ?order_segment)
+        (ready_for_consolidation ?fulfillment_unit)
+        (segment_ready_for_consolidation ?order_segment)
+        (reserved_customer_window_entity ?shipment_plan ?customer_time_window)
+        (not
+          (dispatch_conditions_met ?shipment_plan)
+        )
+      )
+    :effect (dispatch_conditions_met ?shipment_plan)
+  )
+  (:action confirm_shipment_plan_ready_for_dispatch
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (carrier_shift_allocated ?shipment_plan)
+        (dispatch_conditions_met ?shipment_plan)
+        (not
+          (shipment_plan_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_validated ?shipment_plan)
+        (eligible_for_booking_entity ?shipment_plan)
+      )
+  )
+  (:action apply_regulatory_clearance_to_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?regulatory_clearance - regulatory_clearance ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (entity_confirmed_for_shipment ?shipment_plan)
+        (reserved_customer_window_entity ?shipment_plan ?customer_time_window)
+        (regulatory_clearance_available ?regulatory_clearance)
+        (assigned_regulatory_clearance_to_plan ?shipment_plan ?regulatory_clearance)
+        (not
+          (regulatory_clearance_applied_to_plan ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (regulatory_clearance_applied_to_plan ?shipment_plan)
+        (not
+          (regulatory_clearance_available ?regulatory_clearance)
+        )
+      )
+  )
+  (:action verify_plan_dock_compatibility
+    :parameters (?shipment_plan - shipment_plan ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (regulatory_clearance_applied_to_plan ?shipment_plan)
+        (allocated_to_loading_dock_entity ?shipment_plan ?loading_dock)
+        (not
+          (plan_dock_verified ?shipment_plan)
+        )
+      )
+    :effect (plan_dock_verified ?shipment_plan)
+  )
+  (:action confirm_carrier_shift_assignment_for_shipment_plan
+    :parameters (?shipment_plan - shipment_plan ?carrier_shift - carrier_shift)
+    :precondition
+      (and
+        (plan_dock_verified ?shipment_plan)
+        (assigned_carrier_shift_to_plan ?shipment_plan ?carrier_shift)
+        (not
+          (carrier_shift_confirmed ?shipment_plan)
+        )
+      )
+    :effect (carrier_shift_confirmed ?shipment_plan)
+  )
+  (:action mark_shipment_plan_dispatch_eligible
+    :parameters (?shipment_plan - shipment_plan)
+    :precondition
+      (and
+        (carrier_shift_confirmed ?shipment_plan)
+        (not
+          (shipment_plan_validated ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (shipment_plan_validated ?shipment_plan)
+        (eligible_for_booking_entity ?shipment_plan)
+      )
+  )
+  (:action propagate_dispatch_flag_to_fulfillment_unit
+    :parameters (?fulfillment_unit - fulfillment_unit ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (fulfillment_unit_prepared ?fulfillment_unit)
+        (ready_for_consolidation ?fulfillment_unit)
+        (shipment_unit_prepared ?shipment_unit)
+        (shipment_unit_ready_for_load_build ?shipment_unit)
+        (not
+          (eligible_for_booking_entity ?fulfillment_unit)
+        )
+      )
+    :effect (eligible_for_booking_entity ?fulfillment_unit)
+  )
+  (:action propagate_dispatch_flag_to_order_segment
+    :parameters (?order_segment - order_segment ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?order_segment)
+        (segment_ready_for_consolidation ?order_segment)
+        (shipment_unit_prepared ?shipment_unit)
+        (shipment_unit_ready_for_load_build ?shipment_unit)
+        (not
+          (eligible_for_booking_entity ?order_segment)
+        )
+      )
+    :effect (eligible_for_booking_entity ?order_segment)
+  )
+  (:action book_delivery_time_slot_for_order
+    :parameters (?order - order ?delivery_time_slot - delivery_time_slot ?customer_time_window - customer_time_window)
+    :precondition
+      (and
+        (eligible_for_booking_entity ?order)
+        (reserved_customer_window_entity ?order ?customer_time_window)
+        (delivery_time_slot_available ?delivery_time_slot)
+        (not
+          (entity_delivery_slot_booked ?order)
+        )
+      )
+    :effect
+      (and
+        (entity_delivery_slot_booked ?order)
+        (entity_booked_delivery_time_slot ?order ?delivery_time_slot)
+        (not
+          (delivery_time_slot_available ?delivery_time_slot)
+        )
+      )
+  )
+  (:action align_fulfillment_unit_to_delivery_slot_and_allocate_resource
+    :parameters (?fulfillment_unit - fulfillment_unit ?transport_resource - transport_resource ?delivery_time_slot - delivery_time_slot)
+    :precondition
+      (and
+        (entity_delivery_slot_booked ?fulfillment_unit)
+        (assigned_to_transport_resource_entity ?fulfillment_unit ?transport_resource)
+        (entity_booked_delivery_time_slot ?fulfillment_unit ?delivery_time_slot)
+        (not
+          (ready_for_dispatch_entity ?fulfillment_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch_entity ?fulfillment_unit)
+        (transport_resource_available ?transport_resource)
+        (delivery_time_slot_available ?delivery_time_slot)
+      )
+  )
+  (:action align_order_segment_to_delivery_slot_and_allocate_resource
+    :parameters (?order_segment - order_segment ?transport_resource - transport_resource ?delivery_time_slot - delivery_time_slot)
+    :precondition
+      (and
+        (entity_delivery_slot_booked ?order_segment)
+        (assigned_to_transport_resource_entity ?order_segment ?transport_resource)
+        (entity_booked_delivery_time_slot ?order_segment ?delivery_time_slot)
+        (not
+          (ready_for_dispatch_entity ?order_segment)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch_entity ?order_segment)
+        (transport_resource_available ?transport_resource)
+        (delivery_time_slot_available ?delivery_time_slot)
+      )
+  )
+  (:action align_shipment_plan_to_delivery_slot_and_allocate_resource
+    :parameters (?shipment_plan - shipment_plan ?transport_resource - transport_resource ?delivery_time_slot - delivery_time_slot)
+    :precondition
+      (and
+        (entity_delivery_slot_booked ?shipment_plan)
+        (assigned_to_transport_resource_entity ?shipment_plan ?transport_resource)
+        (entity_booked_delivery_time_slot ?shipment_plan ?delivery_time_slot)
+        (not
+          (ready_for_dispatch_entity ?shipment_plan)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispatch_entity ?shipment_plan)
+        (transport_resource_available ?transport_resource)
+        (delivery_time_slot_available ?delivery_time_slot)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem customer_delivery_window_alignment_problem)
+  (:domain logistics_customer_delivery_window_alignment)
+  (:objects fulfillment_unit_1 - fulfillment_unit order_segment_1 - order_segment shipment_plan_1 - shipment_plan shipment_plan_2 - shipment_plan transport_resource_1 - transport_resource transport_resource_2 - transport_resource transport_resource_3 - transport_resource customer_time_window_1 - customer_time_window loading_dock_1 - loading_dock order_line_1 - order_line route_slot_1 - route_slot shipment_option_1 - shipment_option shipment_unit_1 - shipment_unit pallet_1 - pallet pallet_2 - pallet vehicle_type_1 - vehicle_type vehicle_type_2 - vehicle_type service_profile_standard - service_level_profile service_profile_expedited - service_level_profile delivery_time_slot_1 - delivery_time_slot handling_requirement_refrigeration - handling_requirement regulatory_clearance_1 - regulatory_clearance regulatory_clearance_2 - regulatory_clearance carrier_shift_1 - carrier_shift)
+  (:init
+    (transport_resource_available transport_resource_1)
+    (transport_resource_available transport_resource_2)
+    (transport_resource_available transport_resource_3)
+    (customer_time_window_available customer_time_window_1)
+    (dock_available loading_dock_1)
+    (order_line_available order_line_1)
+    (fulfillment_unit_route_slot_candidate fulfillment_unit_1 route_slot_1)
+    (segment_option_candidate order_segment_1 shipment_option_1)
+    (shipment_unit_available shipment_unit_1)
+    (pallet_available pallet_1)
+    (pallet_available pallet_2)
+    (shipment_plan_includes_fulfillment_unit shipment_plan_1 fulfillment_unit_1)
+    (shipment_plan_includes_fulfillment_unit shipment_plan_2 fulfillment_unit_1)
+    (shipment_plan_includes_order_segment shipment_plan_1 order_segment_1)
+    (shipment_plan_includes_order_segment shipment_plan_2 order_segment_1)
+    (shipment_plan_assigned_to_shipment_unit shipment_plan_1 shipment_unit_1)
+    (shipment_plan_assigned_to_shipment_unit shipment_plan_2 shipment_unit_1)
+    (assigned_pallet_to_shipment_plan shipment_plan_1 pallet_1)
+    (assigned_pallet_to_shipment_plan shipment_plan_2 pallet_2)
+    (vehicle_type_available vehicle_type_1)
+    (vehicle_type_available vehicle_type_2)
+    (service_level_profile_available service_profile_standard)
+    (service_level_profile_available service_profile_expedited)
+    (delivery_time_slot_available delivery_time_slot_1)
+    (handling_requirement_available handling_requirement_refrigeration)
+    (regulatory_clearance_available regulatory_clearance_1)
+    (assigned_regulatory_clearance_to_plan shipment_plan_1 regulatory_clearance_1)
+    (assigned_regulatory_clearance_to_plan shipment_plan_2 regulatory_clearance_2)
+    (carrier_shift_available carrier_shift_1)
+  )
+  (:goal
+    (and
+      (ready_for_dispatch_entity fulfillment_unit_1)
+      (ready_for_dispatch_entity order_segment_1)
+      (ready_for_dispatch_entity shipment_plan_1)
+      (ready_for_dispatch_entity shipment_plan_2)
+    )
+  )
+)

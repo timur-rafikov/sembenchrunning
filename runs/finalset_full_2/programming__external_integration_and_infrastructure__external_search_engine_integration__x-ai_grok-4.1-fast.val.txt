@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain external_search_engine_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types engine_node - object shared_resource - object data_entity_super - object integration_domain - object integration_participant - integration_domain search_endpoint - engine_node schema_definition - engine_node operator_credential - engine_node index_plugin - engine_node ranking_profile - engine_node trace_token - engine_node compute_resource - engine_node build_artifact - engine_node document_batch - shared_resource document - shared_resource environment_tag - shared_resource source_shard - data_entity_super target_shard - data_entity_super external_index - data_entity_super worker_role - integration_participant deployment_unit - integration_participant indexing_worker - worker_role query_worker - worker_role pipeline_instance - deployment_unit)
+  (:predicates
+    (participant_registered ?integration_participant - integration_participant)
+    (participant_ready ?integration_participant - integration_participant)
+    (participant_endpoint_configured ?integration_participant - integration_participant)
+    (integration_activated ?integration_participant - integration_participant)
+    (observability_ready ?integration_participant - integration_participant)
+    (trace_attached ?integration_participant - integration_participant)
+    (endpoint_available ?search_endpoint - search_endpoint)
+    (participant_endpoint_binding ?integration_participant - integration_participant ?search_endpoint - search_endpoint)
+    (schema_available ?schema_definition - schema_definition)
+    (participant_schema_binding ?integration_participant - integration_participant ?schema_definition - schema_definition)
+    (credential_available ?operator_credential - operator_credential)
+    (participant_credential_binding ?integration_participant - integration_participant ?operator_credential - operator_credential)
+    (batch_available ?document_batch - document_batch)
+    (indexing_worker_batch_assignment ?indexing_worker - indexing_worker ?document_batch - document_batch)
+    (query_worker_batch_assignment ?query_worker - query_worker ?document_batch - document_batch)
+    (worker_assigned_source_shard ?indexing_worker - indexing_worker ?source_shard - source_shard)
+    (source_shard_ready ?source_shard - source_shard)
+    (source_shard_reserved ?source_shard - source_shard)
+    (indexing_worker_shard_claimed ?indexing_worker - indexing_worker)
+    (worker_assigned_target_shard ?query_worker - query_worker ?target_shard - target_shard)
+    (target_shard_ready ?target_shard - target_shard)
+    (target_shard_reserved ?target_shard - target_shard)
+    (query_worker_shard_claimed ?query_worker - query_worker)
+    (index_needs_provisioning ?external_index - external_index)
+    (index_provisioned ?external_index - external_index)
+    (index_assigned_source_shard ?external_index - external_index ?source_shard - source_shard)
+    (index_assigned_target_shard ?external_index - external_index ?target_shard - target_shard)
+    (index_allocation_flag_a ?external_index - external_index)
+    (index_allocation_flag_b ?external_index - external_index)
+    (index_commit_ready ?external_index - external_index)
+    (pipeline_assigned_indexing_worker ?pipeline_instance - pipeline_instance ?indexing_worker - indexing_worker)
+    (pipeline_assigned_query_worker ?pipeline_instance - pipeline_instance ?query_worker - query_worker)
+    (pipeline_bound_to_index ?pipeline_instance - pipeline_instance ?external_index - external_index)
+    (document_available ?document - document)
+    (pipeline_has_document ?pipeline_instance - pipeline_instance ?document - document)
+    (document_validated ?document - document)
+    (document_index_assignment ?document - document ?external_index - external_index)
+    (pipeline_stage_ready ?pipeline_instance - pipeline_instance)
+    (pipeline_compute_allocated ?pipeline_instance - pipeline_instance)
+    (pipeline_build_ready ?pipeline_instance - pipeline_instance)
+    (pipeline_plugin_staged ?pipeline_instance - pipeline_instance)
+    (pipeline_plugin_promoted ?pipeline_instance - pipeline_instance)
+    (pipeline_ready_for_activation ?pipeline_instance - pipeline_instance)
+    (pipeline_activated ?pipeline_instance - pipeline_instance)
+    (environment_tag_available ?environment_tag - environment_tag)
+    (pipeline_tagged_environment ?pipeline_instance - pipeline_instance ?environment_tag - environment_tag)
+    (pipeline_environment_bound ?pipeline_instance - pipeline_instance)
+    (pipeline_prepared_for_build ?pipeline_instance - pipeline_instance)
+    (pipeline_built ?pipeline_instance - pipeline_instance)
+    (plugin_available ?index_plugin - index_plugin)
+    (pipeline_plugin_attached ?pipeline_instance - pipeline_instance ?index_plugin - index_plugin)
+    (ranking_profile_available ?ranking_profile - ranking_profile)
+    (pipeline_ranking_attached ?pipeline_instance - pipeline_instance ?ranking_profile - ranking_profile)
+    (compute_resource_available ?compute_resource - compute_resource)
+    (pipeline_compute_attached ?pipeline_instance - pipeline_instance ?compute_resource - compute_resource)
+    (build_artifact_available ?build_artifact - build_artifact)
+    (pipeline_build_attached ?pipeline_instance - pipeline_instance ?build_artifact - build_artifact)
+    (trace_token_available ?trace_token - trace_token)
+    (participant_trace_binding ?integration_participant - integration_participant ?trace_token - trace_token)
+    (indexing_worker_ready ?indexing_worker - indexing_worker)
+    (query_worker_ready ?query_worker - query_worker)
+    (pipeline_finalized ?pipeline_instance - pipeline_instance)
+  )
+  (:action register_participant
+    :parameters (?integration_participant - integration_participant)
+    :precondition
+      (and
+        (not
+          (participant_registered ?integration_participant)
+        )
+        (not
+          (integration_activated ?integration_participant)
+        )
+      )
+    :effect (participant_registered ?integration_participant)
+  )
+  (:action bind_participant_to_endpoint
+    :parameters (?integration_participant - integration_participant ?search_endpoint - search_endpoint)
+    :precondition
+      (and
+        (participant_registered ?integration_participant)
+        (not
+          (participant_endpoint_configured ?integration_participant)
+        )
+        (endpoint_available ?search_endpoint)
+      )
+    :effect
+      (and
+        (participant_endpoint_configured ?integration_participant)
+        (participant_endpoint_binding ?integration_participant ?search_endpoint)
+        (not
+          (endpoint_available ?search_endpoint)
+        )
+      )
+  )
+  (:action attach_schema_to_participant
+    :parameters (?integration_participant - integration_participant ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_registered ?integration_participant)
+        (participant_endpoint_configured ?integration_participant)
+        (schema_available ?schema_definition)
+      )
+    :effect
+      (and
+        (participant_schema_binding ?integration_participant ?schema_definition)
+        (not
+          (schema_available ?schema_definition)
+        )
+      )
+  )
+  (:action finalize_participant_registration
+    :parameters (?integration_participant - integration_participant ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_registered ?integration_participant)
+        (participant_endpoint_configured ?integration_participant)
+        (participant_schema_binding ?integration_participant ?schema_definition)
+        (not
+          (participant_ready ?integration_participant)
+        )
+      )
+    :effect (participant_ready ?integration_participant)
+  )
+  (:action detach_schema_from_participant
+    :parameters (?integration_participant - integration_participant ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_schema_binding ?integration_participant ?schema_definition)
+      )
+    :effect
+      (and
+        (schema_available ?schema_definition)
+        (not
+          (participant_schema_binding ?integration_participant ?schema_definition)
+        )
+      )
+  )
+  (:action attach_credential_to_participant
+    :parameters (?integration_participant - integration_participant ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (participant_ready ?integration_participant)
+        (credential_available ?operator_credential)
+      )
+    :effect
+      (and
+        (participant_credential_binding ?integration_participant ?operator_credential)
+        (not
+          (credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action detach_credential_from_participant
+    :parameters (?integration_participant - integration_participant ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (participant_credential_binding ?integration_participant ?operator_credential)
+      )
+    :effect
+      (and
+        (credential_available ?operator_credential)
+        (not
+          (participant_credential_binding ?integration_participant ?operator_credential)
+        )
+      )
+  )
+  (:action allocate_compute_to_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?compute_resource - compute_resource)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (compute_resource_available ?compute_resource)
+      )
+    :effect
+      (and
+        (pipeline_compute_attached ?pipeline_instance ?compute_resource)
+        (not
+          (compute_resource_available ?compute_resource)
+        )
+      )
+  )
+  (:action release_compute_from_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?compute_resource - compute_resource)
+    :precondition
+      (and
+        (pipeline_compute_attached ?pipeline_instance ?compute_resource)
+      )
+    :effect
+      (and
+        (compute_resource_available ?compute_resource)
+        (not
+          (pipeline_compute_attached ?pipeline_instance ?compute_resource)
+        )
+      )
+  )
+  (:action attach_build_artifact_to_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action detach_build_artifact_from_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_available ?build_artifact)
+        (not
+          (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        )
+      )
+  )
+  (:action validate_source_shard_for_indexer
+    :parameters (?indexing_worker - indexing_worker ?source_shard - source_shard ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_ready ?indexing_worker)
+        (participant_schema_binding ?indexing_worker ?schema_definition)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (not
+          (source_shard_ready ?source_shard)
+        )
+        (not
+          (source_shard_reserved ?source_shard)
+        )
+      )
+    :effect (source_shard_ready ?source_shard)
+  )
+  (:action claim_indexer_for_shard
+    :parameters (?indexing_worker - indexing_worker ?source_shard - source_shard ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (participant_ready ?indexing_worker)
+        (participant_credential_binding ?indexing_worker ?operator_credential)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (source_shard_ready ?source_shard)
+        (not
+          (indexing_worker_ready ?indexing_worker)
+        )
+      )
+    :effect
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (indexing_worker_shard_claimed ?indexing_worker)
+      )
+  )
+  (:action reserve_batch_for_indexer
+    :parameters (?indexing_worker - indexing_worker ?source_shard - source_shard ?document_batch - document_batch)
+    :precondition
+      (and
+        (participant_ready ?indexing_worker)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (batch_available ?document_batch)
+        (not
+          (indexing_worker_ready ?indexing_worker)
+        )
+      )
+    :effect
+      (and
+        (source_shard_reserved ?source_shard)
+        (indexing_worker_ready ?indexing_worker)
+        (indexing_worker_batch_assignment ?indexing_worker ?document_batch)
+        (not
+          (batch_available ?document_batch)
+        )
+      )
+  )
+  (:action finalize_batch_assignment_for_indexer
+    :parameters (?indexing_worker - indexing_worker ?source_shard - source_shard ?schema_definition - schema_definition ?document_batch - document_batch)
+    :precondition
+      (and
+        (participant_ready ?indexing_worker)
+        (participant_schema_binding ?indexing_worker ?schema_definition)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (source_shard_reserved ?source_shard)
+        (indexing_worker_batch_assignment ?indexing_worker ?document_batch)
+        (not
+          (indexing_worker_shard_claimed ?indexing_worker)
+        )
+      )
+    :effect
+      (and
+        (source_shard_ready ?source_shard)
+        (indexing_worker_shard_claimed ?indexing_worker)
+        (batch_available ?document_batch)
+        (not
+          (indexing_worker_batch_assignment ?indexing_worker ?document_batch)
+        )
+      )
+  )
+  (:action prepare_target_shard_for_query_worker
+    :parameters (?query_worker - query_worker ?target_shard - target_shard ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_ready ?query_worker)
+        (participant_schema_binding ?query_worker ?schema_definition)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (not
+          (target_shard_ready ?target_shard)
+        )
+        (not
+          (target_shard_reserved ?target_shard)
+        )
+      )
+    :effect (target_shard_ready ?target_shard)
+  )
+  (:action claim_query_worker_for_shard
+    :parameters (?query_worker - query_worker ?target_shard - target_shard ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (participant_ready ?query_worker)
+        (participant_credential_binding ?query_worker ?operator_credential)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (target_shard_ready ?target_shard)
+        (not
+          (query_worker_ready ?query_worker)
+        )
+      )
+    :effect
+      (and
+        (query_worker_ready ?query_worker)
+        (query_worker_shard_claimed ?query_worker)
+      )
+  )
+  (:action assign_batch_to_query_worker
+    :parameters (?query_worker - query_worker ?target_shard - target_shard ?document_batch - document_batch)
+    :precondition
+      (and
+        (participant_ready ?query_worker)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (batch_available ?document_batch)
+        (not
+          (query_worker_ready ?query_worker)
+        )
+      )
+    :effect
+      (and
+        (target_shard_reserved ?target_shard)
+        (query_worker_ready ?query_worker)
+        (query_worker_batch_assignment ?query_worker ?document_batch)
+        (not
+          (batch_available ?document_batch)
+        )
+      )
+  )
+  (:action finalize_batch_assignment_for_query_worker
+    :parameters (?query_worker - query_worker ?target_shard - target_shard ?schema_definition - schema_definition ?document_batch - document_batch)
+    :precondition
+      (and
+        (participant_ready ?query_worker)
+        (participant_schema_binding ?query_worker ?schema_definition)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (target_shard_reserved ?target_shard)
+        (query_worker_batch_assignment ?query_worker ?document_batch)
+        (not
+          (query_worker_shard_claimed ?query_worker)
+        )
+      )
+    :effect
+      (and
+        (target_shard_ready ?target_shard)
+        (query_worker_shard_claimed ?query_worker)
+        (batch_available ?document_batch)
+        (not
+          (query_worker_batch_assignment ?query_worker ?document_batch)
+        )
+      )
+  )
+  (:action provision_external_index
+    :parameters (?indexing_worker - indexing_worker ?query_worker - query_worker ?source_shard - source_shard ?target_shard - target_shard ?external_index - external_index)
+    :precondition
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (query_worker_ready ?query_worker)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (source_shard_ready ?source_shard)
+        (target_shard_ready ?target_shard)
+        (indexing_worker_shard_claimed ?indexing_worker)
+        (query_worker_shard_claimed ?query_worker)
+        (index_needs_provisioning ?external_index)
+      )
+    :effect
+      (and
+        (index_provisioned ?external_index)
+        (index_assigned_source_shard ?external_index ?source_shard)
+        (index_assigned_target_shard ?external_index ?target_shard)
+        (not
+          (index_needs_provisioning ?external_index)
+        )
+      )
+  )
+  (:action provision_external_index_with_source_allocation
+    :parameters (?indexing_worker - indexing_worker ?query_worker - query_worker ?source_shard - source_shard ?target_shard - target_shard ?external_index - external_index)
+    :precondition
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (query_worker_ready ?query_worker)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (source_shard_reserved ?source_shard)
+        (target_shard_ready ?target_shard)
+        (not
+          (indexing_worker_shard_claimed ?indexing_worker)
+        )
+        (query_worker_shard_claimed ?query_worker)
+        (index_needs_provisioning ?external_index)
+      )
+    :effect
+      (and
+        (index_provisioned ?external_index)
+        (index_assigned_source_shard ?external_index ?source_shard)
+        (index_assigned_target_shard ?external_index ?target_shard)
+        (index_allocation_flag_a ?external_index)
+        (not
+          (index_needs_provisioning ?external_index)
+        )
+      )
+  )
+  (:action provision_external_index_with_target_allocation
+    :parameters (?indexing_worker - indexing_worker ?query_worker - query_worker ?source_shard - source_shard ?target_shard - target_shard ?external_index - external_index)
+    :precondition
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (query_worker_ready ?query_worker)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (source_shard_ready ?source_shard)
+        (target_shard_reserved ?target_shard)
+        (indexing_worker_shard_claimed ?indexing_worker)
+        (not
+          (query_worker_shard_claimed ?query_worker)
+        )
+        (index_needs_provisioning ?external_index)
+      )
+    :effect
+      (and
+        (index_provisioned ?external_index)
+        (index_assigned_source_shard ?external_index ?source_shard)
+        (index_assigned_target_shard ?external_index ?target_shard)
+        (index_allocation_flag_b ?external_index)
+        (not
+          (index_needs_provisioning ?external_index)
+        )
+      )
+  )
+  (:action provision_external_index_full_allocation
+    :parameters (?indexing_worker - indexing_worker ?query_worker - query_worker ?source_shard - source_shard ?target_shard - target_shard ?external_index - external_index)
+    :precondition
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (query_worker_ready ?query_worker)
+        (worker_assigned_source_shard ?indexing_worker ?source_shard)
+        (worker_assigned_target_shard ?query_worker ?target_shard)
+        (source_shard_reserved ?source_shard)
+        (target_shard_reserved ?target_shard)
+        (not
+          (indexing_worker_shard_claimed ?indexing_worker)
+        )
+        (not
+          (query_worker_shard_claimed ?query_worker)
+        )
+        (index_needs_provisioning ?external_index)
+      )
+    :effect
+      (and
+        (index_provisioned ?external_index)
+        (index_assigned_source_shard ?external_index ?source_shard)
+        (index_assigned_target_shard ?external_index ?target_shard)
+        (index_allocation_flag_a ?external_index)
+        (index_allocation_flag_b ?external_index)
+        (not
+          (index_needs_provisioning ?external_index)
+        )
+      )
+  )
+  (:action validate_index_with_indexer
+    :parameters (?external_index - external_index ?indexing_worker - indexing_worker ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (index_provisioned ?external_index)
+        (indexing_worker_ready ?indexing_worker)
+        (participant_schema_binding ?indexing_worker ?schema_definition)
+        (not
+          (index_commit_ready ?external_index)
+        )
+      )
+    :effect (index_commit_ready ?external_index)
+  )
+  (:action stage_document_for_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (pipeline_bound_to_index ?pipeline_instance ?external_index)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_available ?document)
+        (index_provisioned ?external_index)
+        (index_commit_ready ?external_index)
+        (not
+          (document_validated ?document)
+        )
+      )
+    :effect
+      (and
+        (document_validated ?document)
+        (document_index_assignment ?document ?external_index)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action start_pipeline_document_processing
+    :parameters (?pipeline_instance - pipeline_instance ?document - document ?external_index - external_index ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_validated ?document)
+        (document_index_assignment ?document ?external_index)
+        (participant_schema_binding ?pipeline_instance ?schema_definition)
+        (not
+          (index_allocation_flag_a ?external_index)
+        )
+        (not
+          (pipeline_stage_ready ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_stage_ready ?pipeline_instance)
+  )
+  (:action attach_plugin_to_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?index_plugin - index_plugin)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (plugin_available ?index_plugin)
+        (not
+          (pipeline_plugin_staged ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_plugin_staged ?pipeline_instance)
+        (pipeline_plugin_attached ?pipeline_instance ?index_plugin)
+        (not
+          (plugin_available ?index_plugin)
+        )
+      )
+  )
+  (:action promote_plugin_and_prepare_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?document - document ?external_index - external_index ?schema_definition - schema_definition ?index_plugin - index_plugin)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_validated ?document)
+        (document_index_assignment ?document ?external_index)
+        (participant_schema_binding ?pipeline_instance ?schema_definition)
+        (index_allocation_flag_a ?external_index)
+        (pipeline_plugin_staged ?pipeline_instance)
+        (pipeline_plugin_attached ?pipeline_instance ?index_plugin)
+        (not
+          (pipeline_stage_ready ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_stage_ready ?pipeline_instance)
+        (pipeline_plugin_promoted ?pipeline_instance)
+      )
+  )
+  (:action allocate_compute_and_start_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?compute_resource - compute_resource ?operator_credential - operator_credential ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_stage_ready ?pipeline_instance)
+        (pipeline_compute_attached ?pipeline_instance ?compute_resource)
+        (participant_credential_binding ?pipeline_instance ?operator_credential)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (not
+          (index_allocation_flag_b ?external_index)
+        )
+        (not
+          (pipeline_compute_allocated ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_compute_allocated ?pipeline_instance)
+  )
+  (:action resume_pipeline_compute_allocation
+    :parameters (?pipeline_instance - pipeline_instance ?compute_resource - compute_resource ?operator_credential - operator_credential ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_stage_ready ?pipeline_instance)
+        (pipeline_compute_attached ?pipeline_instance ?compute_resource)
+        (participant_credential_binding ?pipeline_instance ?operator_credential)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (index_allocation_flag_b ?external_index)
+        (not
+          (pipeline_compute_allocated ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_compute_allocated ?pipeline_instance)
+  )
+  (:action attach_build_artifact_and_prepare_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_compute_allocated ?pipeline_instance)
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (not
+          (index_allocation_flag_a ?external_index)
+        )
+        (not
+          (index_allocation_flag_b ?external_index)
+        )
+        (not
+          (pipeline_build_ready ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_build_ready ?pipeline_instance)
+  )
+  (:action attach_build_artifact_and_promote_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_compute_allocated ?pipeline_instance)
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (index_allocation_flag_a ?external_index)
+        (not
+          (index_allocation_flag_b ?external_index)
+        )
+        (not
+          (pipeline_build_ready ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_ready_for_activation ?pipeline_instance)
+      )
+  )
+  (:action promote_pipeline_build_variant
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_compute_allocated ?pipeline_instance)
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (not
+          (index_allocation_flag_a ?external_index)
+        )
+        (index_allocation_flag_b ?external_index)
+        (not
+          (pipeline_build_ready ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_ready_for_activation ?pipeline_instance)
+      )
+  )
+  (:action activate_pipeline_build_variant
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact ?document - document ?external_index - external_index)
+    :precondition
+      (and
+        (pipeline_compute_allocated ?pipeline_instance)
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (pipeline_has_document ?pipeline_instance ?document)
+        (document_index_assignment ?document ?external_index)
+        (index_allocation_flag_a ?external_index)
+        (index_allocation_flag_b ?external_index)
+        (not
+          (pipeline_build_ready ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_ready_for_activation ?pipeline_instance)
+      )
+  )
+  (:action finalize_pipeline_staging
+    :parameters (?pipeline_instance - pipeline_instance)
+    :precondition
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (not
+          (pipeline_ready_for_activation ?pipeline_instance)
+        )
+        (not
+          (pipeline_finalized ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?pipeline_instance)
+        (observability_ready ?pipeline_instance)
+      )
+  )
+  (:action attach_ranking_profile_to_pipeline
+    :parameters (?pipeline_instance - pipeline_instance ?ranking_profile - ranking_profile)
+    :precondition
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_ready_for_activation ?pipeline_instance)
+        (ranking_profile_available ?ranking_profile)
+      )
+    :effect
+      (and
+        (pipeline_ranking_attached ?pipeline_instance ?ranking_profile)
+        (not
+          (ranking_profile_available ?ranking_profile)
+        )
+      )
+  )
+  (:action activate_pipeline_on_compute
+    :parameters (?pipeline_instance - pipeline_instance ?indexing_worker - indexing_worker ?query_worker - query_worker ?schema_definition - schema_definition ?ranking_profile - ranking_profile)
+    :precondition
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_ready_for_activation ?pipeline_instance)
+        (pipeline_ranking_attached ?pipeline_instance ?ranking_profile)
+        (pipeline_assigned_indexing_worker ?pipeline_instance ?indexing_worker)
+        (pipeline_assigned_query_worker ?pipeline_instance ?query_worker)
+        (indexing_worker_shard_claimed ?indexing_worker)
+        (query_worker_shard_claimed ?query_worker)
+        (participant_schema_binding ?pipeline_instance ?schema_definition)
+        (not
+          (pipeline_activated ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_activated ?pipeline_instance)
+  )
+  (:action finalize_pipeline_activation
+    :parameters (?pipeline_instance - pipeline_instance)
+    :precondition
+      (and
+        (pipeline_build_ready ?pipeline_instance)
+        (pipeline_activated ?pipeline_instance)
+        (not
+          (pipeline_finalized ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?pipeline_instance)
+        (observability_ready ?pipeline_instance)
+      )
+  )
+  (:action stage_pipeline_with_environment
+    :parameters (?pipeline_instance - pipeline_instance ?environment_tag - environment_tag ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (participant_ready ?pipeline_instance)
+        (participant_schema_binding ?pipeline_instance ?schema_definition)
+        (environment_tag_available ?environment_tag)
+        (pipeline_tagged_environment ?pipeline_instance ?environment_tag)
+        (not
+          (pipeline_environment_bound ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_environment_bound ?pipeline_instance)
+        (not
+          (environment_tag_available ?environment_tag)
+        )
+      )
+  )
+  (:action prepare_pipeline_for_build
+    :parameters (?pipeline_instance - pipeline_instance ?operator_credential - operator_credential)
+    :precondition
+      (and
+        (pipeline_environment_bound ?pipeline_instance)
+        (participant_credential_binding ?pipeline_instance ?operator_credential)
+        (not
+          (pipeline_prepared_for_build ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_prepared_for_build ?pipeline_instance)
+  )
+  (:action complete_pipeline_build
+    :parameters (?pipeline_instance - pipeline_instance ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (pipeline_prepared_for_build ?pipeline_instance)
+        (pipeline_build_attached ?pipeline_instance ?build_artifact)
+        (not
+          (pipeline_built ?pipeline_instance)
+        )
+      )
+    :effect (pipeline_built ?pipeline_instance)
+  )
+  (:action finalize_pipeline_build
+    :parameters (?pipeline_instance - pipeline_instance)
+    :precondition
+      (and
+        (pipeline_built ?pipeline_instance)
+        (not
+          (pipeline_finalized ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (pipeline_finalized ?pipeline_instance)
+        (observability_ready ?pipeline_instance)
+      )
+  )
+  (:action activate_indexing_worker_for_index
+    :parameters (?indexing_worker - indexing_worker ?external_index - external_index)
+    :precondition
+      (and
+        (indexing_worker_ready ?indexing_worker)
+        (indexing_worker_shard_claimed ?indexing_worker)
+        (index_provisioned ?external_index)
+        (index_commit_ready ?external_index)
+        (not
+          (observability_ready ?indexing_worker)
+        )
+      )
+    :effect (observability_ready ?indexing_worker)
+  )
+  (:action activate_query_worker_for_index
+    :parameters (?query_worker - query_worker ?external_index - external_index)
+    :precondition
+      (and
+        (query_worker_ready ?query_worker)
+        (query_worker_shard_claimed ?query_worker)
+        (index_provisioned ?external_index)
+        (index_commit_ready ?external_index)
+        (not
+          (observability_ready ?query_worker)
+        )
+      )
+    :effect (observability_ready ?query_worker)
+  )
+  (:action attach_trace_to_participant
+    :parameters (?integration_participant - integration_participant ?trace_token - trace_token ?schema_definition - schema_definition)
+    :precondition
+      (and
+        (observability_ready ?integration_participant)
+        (participant_schema_binding ?integration_participant ?schema_definition)
+        (trace_token_available ?trace_token)
+        (not
+          (trace_attached ?integration_participant)
+        )
+      )
+    :effect
+      (and
+        (trace_attached ?integration_participant)
+        (participant_trace_binding ?integration_participant ?trace_token)
+        (not
+          (trace_token_available ?trace_token)
+        )
+      )
+  )
+  (:action activate_indexer_and_release_endpoint
+    :parameters (?indexing_worker - indexing_worker ?search_endpoint - search_endpoint ?trace_token - trace_token)
+    :precondition
+      (and
+        (trace_attached ?indexing_worker)
+        (participant_endpoint_binding ?indexing_worker ?search_endpoint)
+        (participant_trace_binding ?indexing_worker ?trace_token)
+        (not
+          (integration_activated ?indexing_worker)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?indexing_worker)
+        (endpoint_available ?search_endpoint)
+        (trace_token_available ?trace_token)
+      )
+  )
+  (:action activate_query_worker_and_release_endpoint
+    :parameters (?query_worker - query_worker ?search_endpoint - search_endpoint ?trace_token - trace_token)
+    :precondition
+      (and
+        (trace_attached ?query_worker)
+        (participant_endpoint_binding ?query_worker ?search_endpoint)
+        (participant_trace_binding ?query_worker ?trace_token)
+        (not
+          (integration_activated ?query_worker)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?query_worker)
+        (endpoint_available ?search_endpoint)
+        (trace_token_available ?trace_token)
+      )
+  )
+  (:action activate_participant_and_release_endpoint
+    :parameters (?pipeline_instance - pipeline_instance ?search_endpoint - search_endpoint ?trace_token - trace_token)
+    :precondition
+      (and
+        (trace_attached ?pipeline_instance)
+        (participant_endpoint_binding ?pipeline_instance ?search_endpoint)
+        (participant_trace_binding ?pipeline_instance ?trace_token)
+        (not
+          (integration_activated ?pipeline_instance)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?pipeline_instance)
+        (endpoint_available ?search_endpoint)
+        (trace_token_available ?trace_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem external_search_integration_scenario)
+  (:domain external_search_engine_integration)
+  (:objects indexing_worker_1 - indexing_worker query_worker_1 - query_worker pipeline_ingest_v1 - pipeline_instance pipeline_sync_v1 - pipeline_instance search_endpoint_1 - search_endpoint search_endpoint_2 - search_endpoint search_endpoint_3 - search_endpoint schema_v1 - schema_definition operator_credential_1 - operator_credential document_batch_1 - document_batch source_shard_a - source_shard target_shard_a - target_shard external_index_primary - external_index document_1 - document document_2 - document plugin_analyzer_1 - index_plugin plugin_tokenizer_1 - index_plugin ranking_profile_default - ranking_profile ranking_profile_custom - ranking_profile trace_token_1 - trace_token compute_resource_slot_1 - compute_resource env_staging - environment_tag env_production - environment_tag build_artifact_v1 - build_artifact)
+  (:init
+    (endpoint_available search_endpoint_1)
+    (endpoint_available search_endpoint_2)
+    (endpoint_available search_endpoint_3)
+    (schema_available schema_v1)
+    (credential_available operator_credential_1)
+    (batch_available document_batch_1)
+    (worker_assigned_source_shard indexing_worker_1 source_shard_a)
+    (worker_assigned_target_shard query_worker_1 target_shard_a)
+    (index_needs_provisioning external_index_primary)
+    (document_available document_1)
+    (document_available document_2)
+    (pipeline_assigned_indexing_worker pipeline_ingest_v1 indexing_worker_1)
+    (pipeline_assigned_indexing_worker pipeline_sync_v1 indexing_worker_1)
+    (pipeline_assigned_query_worker pipeline_ingest_v1 query_worker_1)
+    (pipeline_assigned_query_worker pipeline_sync_v1 query_worker_1)
+    (pipeline_bound_to_index pipeline_ingest_v1 external_index_primary)
+    (pipeline_bound_to_index pipeline_sync_v1 external_index_primary)
+    (pipeline_has_document pipeline_ingest_v1 document_1)
+    (pipeline_has_document pipeline_sync_v1 document_2)
+    (plugin_available plugin_analyzer_1)
+    (plugin_available plugin_tokenizer_1)
+    (ranking_profile_available ranking_profile_default)
+    (ranking_profile_available ranking_profile_custom)
+    (trace_token_available trace_token_1)
+    (compute_resource_available compute_resource_slot_1)
+    (environment_tag_available env_staging)
+    (pipeline_tagged_environment pipeline_ingest_v1 env_staging)
+    (pipeline_tagged_environment pipeline_sync_v1 env_production)
+    (build_artifact_available build_artifact_v1)
+  )
+  (:goal
+    (and
+      (integration_activated indexing_worker_1)
+      (integration_activated query_worker_1)
+      (integration_activated pipeline_ingest_v1)
+      (integration_activated pipeline_sync_v1)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_participant indexing_worker_1)
+(bind_participant_to_endpoint indexing_worker_1 search_endpoint_1)
+(attach_schema_to_participant indexing_worker_1 schema_v1)
+(finalize_participant_registration indexing_worker_1 schema_v1)
+(validate_source_shard_for_indexer indexing_worker_1 source_shard_a schema_v1)
+(detach_schema_from_participant indexing_worker_1 schema_v1)
+(register_participant query_worker_1)
+(bind_participant_to_endpoint query_worker_1 search_endpoint_2)
+(attach_schema_to_participant query_worker_1 schema_v1)
+(finalize_participant_registration query_worker_1 schema_v1)
+(prepare_target_shard_for_query_worker query_worker_1 target_shard_a schema_v1)
+(attach_credential_to_participant query_worker_1 operator_credential_1)
+(claim_query_worker_for_shard query_worker_1 target_shard_a operator_credential_1)
+(detach_credential_from_participant query_worker_1 operator_credential_1)
+(attach_credential_to_participant indexing_worker_1 operator_credential_1)
+(claim_indexer_for_shard indexing_worker_1 source_shard_a operator_credential_1)
+(provision_external_index indexing_worker_1 query_worker_1 source_shard_a target_shard_a external_index_primary)
+(detach_schema_from_participant query_worker_1 schema_v1)
+(attach_schema_to_participant indexing_worker_1 schema_v1)
+(validate_index_with_indexer external_index_primary indexing_worker_1 schema_v1)
+(activate_indexing_worker_for_index indexing_worker_1 external_index_primary)
+(activate_query_worker_for_index query_worker_1 external_index_primary)
+(attach_trace_to_participant indexing_worker_1 trace_token_1 schema_v1)
+(activate_indexer_and_release_endpoint indexing_worker_1 search_endpoint_1 trace_token_1)
+(detach_schema_from_participant indexing_worker_1 schema_v1)
+(attach_schema_to_participant query_worker_1 schema_v1)
+(attach_trace_to_participant query_worker_1 trace_token_1 schema_v1)
+(activate_query_worker_and_release_endpoint query_worker_1 search_endpoint_2 trace_token_1)
+(detach_schema_from_participant query_worker_1 schema_v1)
+(detach_credential_from_participant indexing_worker_1 operator_credential_1)
+(register_participant pipeline_ingest_v1)
+(bind_participant_to_endpoint pipeline_ingest_v1 search_endpoint_1)
+(attach_schema_to_participant pipeline_ingest_v1 schema_v1)
+(finalize_participant_registration pipeline_ingest_v1 schema_v1)
+(stage_document_for_pipeline pipeline_ingest_v1 document_1 external_index_primary)
+(start_pipeline_document_processing pipeline_ingest_v1 document_1 external_index_primary schema_v1)
+(allocate_compute_to_pipeline pipeline_ingest_v1 compute_resource_slot_1)
+(attach_credential_to_participant pipeline_ingest_v1 operator_credential_1)
+(allocate_compute_and_start_pipeline pipeline_ingest_v1 compute_resource_slot_1 operator_credential_1 document_1 external_index_primary)
+(attach_build_artifact_to_pipeline pipeline_ingest_v1 build_artifact_v1)
+(attach_build_artifact_and_prepare_pipeline pipeline_ingest_v1 build_artifact_v1 document_1 external_index_primary)
+(finalize_pipeline_staging pipeline_ingest_v1)
+(attach_trace_to_participant pipeline_ingest_v1 trace_token_1 schema_v1)
+(activate_participant_and_release_endpoint pipeline_ingest_v1 search_endpoint_1 trace_token_1)
+(detach_credential_from_participant pipeline_ingest_v1 operator_credential_1)
+(detach_schema_from_participant pipeline_ingest_v1 schema_v1)
+(release_compute_from_pipeline pipeline_ingest_v1 compute_resource_slot_1)
+(detach_build_artifact_from_pipeline pipeline_ingest_v1 build_artifact_v1)
+(register_participant pipeline_sync_v1)
+(bind_participant_to_endpoint pipeline_sync_v1 search_endpoint_3)
+(attach_schema_to_participant pipeline_sync_v1 schema_v1)
+(finalize_participant_registration pipeline_sync_v1 schema_v1)
+(stage_document_for_pipeline pipeline_sync_v1 document_2 external_index_primary)
+(start_pipeline_document_processing pipeline_sync_v1 document_2 external_index_primary schema_v1)
+(allocate_compute_to_pipeline pipeline_sync_v1 compute_resource_slot_1)
+(attach_credential_to_participant pipeline_sync_v1 operator_credential_1)
+(allocate_compute_and_start_pipeline pipeline_sync_v1 compute_resource_slot_1 operator_credential_1 document_2 external_index_primary)
+(attach_build_artifact_to_pipeline pipeline_sync_v1 build_artifact_v1)
+(attach_build_artifact_and_prepare_pipeline pipeline_sync_v1 build_artifact_v1 document_2 external_index_primary)
+(finalize_pipeline_staging pipeline_sync_v1)
+(attach_trace_to_participant pipeline_sync_v1 trace_token_1 schema_v1)
+(activate_participant_and_release_endpoint pipeline_sync_v1 search_endpoint_3 trace_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_0u7iiar6/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_0u7iiar6/plan.pddl 62 
+
+
+
+--- stderr ---
+

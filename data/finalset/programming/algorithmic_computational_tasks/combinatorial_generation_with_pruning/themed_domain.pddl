@@ -1,0 +1,936 @@
+(define (domain combinatorial_generation_with_pruning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_pool - object constraint_pool - object aux_pool - object assignment_root - object assignment_target - assignment_root label_token - resource_pool candidate_value - resource_pool guard_token - resource_pool feature_option - resource_pool strategy_option - resource_pool finalizer_token - resource_pool attribute_type - resource_pool validator - resource_pool ephemeral_marker - constraint_pool component - constraint_pool selector - constraint_pool left_index - aux_pool right_index - aux_pool partial_solution - aux_pool left_partition_abstract - assignment_target right_partition_abstract - assignment_target left_partition_node - left_partition_abstract right_partition_node - left_partition_abstract search_node - right_partition_abstract)
+  (:predicates
+    (target_opened ?target - assignment_target)
+    (target_prechecked ?target - assignment_target)
+    (target_labeled ?target - assignment_target)
+    (target_committed ?target - assignment_target)
+    (target_ready_for_commit ?target - assignment_target)
+    (target_finalizer_assigned ?target - assignment_target)
+    (label_token_available ?label - label_token)
+    (target_label_binding ?target - assignment_target ?label - label_token)
+    (candidate_value_available ?candidate - candidate_value)
+    (target_value_binding ?target - assignment_target ?candidate - candidate_value)
+    (guard_token_available ?guard - guard_token)
+    (target_guard_binding ?target - assignment_target ?guard - guard_token)
+    (ephemeral_marker_available ?marker - ephemeral_marker)
+    (left_node_marker_binding ?left_node - left_partition_node ?marker - ephemeral_marker)
+    (right_node_marker_binding ?right_node - right_partition_node ?marker - ephemeral_marker)
+    (left_node_index_binding ?left_node - left_partition_node ?left_index - left_index)
+    (left_index_reserved ?left_index - left_index)
+    (left_index_marked ?left_index - left_index)
+    (left_node_processed ?left_node - left_partition_node)
+    (right_node_index_binding ?right_node - right_partition_node ?right_index - right_index)
+    (right_index_reserved ?right_index - right_index)
+    (right_index_marked ?right_index - right_index)
+    (right_node_processed ?right_node - right_partition_node)
+    (partial_solution_slot_available ?partial_solution - partial_solution)
+    (partial_solution_allocated ?partial_solution - partial_solution)
+    (partial_solution_left_index_binding ?partial_solution - partial_solution ?left_index - left_index)
+    (partial_solution_right_index_binding ?partial_solution - partial_solution ?right_index - right_index)
+    (partial_solution_left_ready ?partial_solution - partial_solution)
+    (partial_solution_right_ready ?partial_solution - partial_solution)
+    (partial_solution_ready ?partial_solution - partial_solution)
+    (search_node_left_link ?search_node - search_node ?left_node - left_partition_node)
+    (search_node_right_link ?search_node - search_node ?right_node - right_partition_node)
+    (search_node_partial_solution_link ?search_node - search_node ?partial_solution - partial_solution)
+    (component_available ?component - component)
+    (search_node_component_binding ?search_node - search_node ?component - component)
+    (component_consumed ?component - component)
+    (component_attached_to_partial ?component - component ?partial_solution - partial_solution)
+    (target_components_locked ?search_node - search_node)
+    (target_component_stage_done ?search_node - search_node)
+    (target_validated ?search_node - search_node)
+    (search_node_feature_selected ?search_node - search_node)
+    (search_node_feature_attached ?search_node - search_node)
+    (target_configured ?search_node - search_node)
+    (target_precommit_flag ?search_node - search_node)
+    (selector_available ?selector - selector)
+    (search_node_selector_binding ?search_node - search_node ?selector - selector)
+    (search_node_feature_chosen ?search_node - search_node)
+    (search_node_feature_enabled ?search_node - search_node)
+    (search_node_feature_verified ?search_node - search_node)
+    (feature_option_available ?feature - feature_option)
+    (search_node_feature_binding ?search_node - search_node ?feature - feature_option)
+    (strategy_option_available ?strategy - strategy_option)
+    (search_node_strategy_binding ?search_node - search_node ?strategy - strategy_option)
+    (attribute_type_available ?attribute - attribute_type)
+    (search_node_attribute_bound ?search_node - search_node ?attribute - attribute_type)
+    (validator_available ?validator - validator)
+    (search_node_validator_assigned ?search_node - search_node ?validator - validator)
+    (finalizer_token_available ?finalizer - finalizer_token)
+    (target_finalizer_binding ?target - assignment_target ?finalizer - finalizer_token)
+    (left_node_ready ?left_node - left_partition_node)
+    (right_node_ready ?right_node - right_partition_node)
+    (target_commit_marker ?search_node - search_node)
+  )
+  (:action open_target
+    :parameters (?target - assignment_target)
+    :precondition
+      (and
+        (not
+          (target_opened ?target)
+        )
+        (not
+          (target_committed ?target)
+        )
+      )
+    :effect (target_opened ?target)
+  )
+  (:action assign_label_to_target
+    :parameters (?target - assignment_target ?label - label_token)
+    :precondition
+      (and
+        (target_opened ?target)
+        (not
+          (target_labeled ?target)
+        )
+        (label_token_available ?label)
+      )
+    :effect
+      (and
+        (target_labeled ?target)
+        (target_label_binding ?target ?label)
+        (not
+          (label_token_available ?label)
+        )
+      )
+  )
+  (:action bind_candidate_to_target
+    :parameters (?target - assignment_target ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_opened ?target)
+        (target_labeled ?target)
+        (candidate_value_available ?candidate)
+      )
+    :effect
+      (and
+        (target_value_binding ?target ?candidate)
+        (not
+          (candidate_value_available ?candidate)
+        )
+      )
+  )
+  (:action apply_target_precheck
+    :parameters (?target - assignment_target ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_opened ?target)
+        (target_labeled ?target)
+        (target_value_binding ?target ?candidate)
+        (not
+          (target_prechecked ?target)
+        )
+      )
+    :effect (target_prechecked ?target)
+  )
+  (:action unbind_candidate_from_target
+    :parameters (?target - assignment_target ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_value_binding ?target ?candidate)
+      )
+    :effect
+      (and
+        (candidate_value_available ?candidate)
+        (not
+          (target_value_binding ?target ?candidate)
+        )
+      )
+  )
+  (:action assign_guard_to_target
+    :parameters (?target - assignment_target ?guard - guard_token)
+    :precondition
+      (and
+        (target_prechecked ?target)
+        (guard_token_available ?guard)
+      )
+    :effect
+      (and
+        (target_guard_binding ?target ?guard)
+        (not
+          (guard_token_available ?guard)
+        )
+      )
+  )
+  (:action release_guard_from_target
+    :parameters (?target - assignment_target ?guard - guard_token)
+    :precondition
+      (and
+        (target_guard_binding ?target ?guard)
+      )
+    :effect
+      (and
+        (guard_token_available ?guard)
+        (not
+          (target_guard_binding ?target ?guard)
+        )
+      )
+  )
+  (:action bind_attribute_to_search_node
+    :parameters (?search_node - search_node ?attribute - attribute_type)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (attribute_type_available ?attribute)
+      )
+    :effect
+      (and
+        (search_node_attribute_bound ?search_node ?attribute)
+        (not
+          (attribute_type_available ?attribute)
+        )
+      )
+  )
+  (:action unbind_attribute_from_search_node
+    :parameters (?search_node - search_node ?attribute - attribute_type)
+    :precondition
+      (and
+        (search_node_attribute_bound ?search_node ?attribute)
+      )
+    :effect
+      (and
+        (attribute_type_available ?attribute)
+        (not
+          (search_node_attribute_bound ?search_node ?attribute)
+        )
+      )
+  )
+  (:action bind_validator_to_search_node
+    :parameters (?search_node - search_node ?validator - validator)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (validator_available ?validator)
+      )
+    :effect
+      (and
+        (search_node_validator_assigned ?search_node ?validator)
+        (not
+          (validator_available ?validator)
+        )
+      )
+  )
+  (:action release_validator_from_search_node
+    :parameters (?search_node - search_node ?validator - validator)
+    :precondition
+      (and
+        (search_node_validator_assigned ?search_node ?validator)
+      )
+    :effect
+      (and
+        (validator_available ?validator)
+        (not
+          (search_node_validator_assigned ?search_node ?validator)
+        )
+      )
+  )
+  (:action reserve_left_index_for_node
+    :parameters (?left_node - left_partition_node ?left_index - left_index ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_prechecked ?left_node)
+        (target_value_binding ?left_node ?candidate)
+        (left_node_index_binding ?left_node ?left_index)
+        (not
+          (left_index_reserved ?left_index)
+        )
+        (not
+          (left_index_marked ?left_index)
+        )
+      )
+    :effect (left_index_reserved ?left_index)
+  )
+  (:action apply_left_guard_and_mark_processed
+    :parameters (?left_node - left_partition_node ?left_index - left_index ?guard - guard_token)
+    :precondition
+      (and
+        (target_prechecked ?left_node)
+        (target_guard_binding ?left_node ?guard)
+        (left_node_index_binding ?left_node ?left_index)
+        (left_index_reserved ?left_index)
+        (not
+          (left_node_ready ?left_node)
+        )
+      )
+    :effect
+      (and
+        (left_node_ready ?left_node)
+        (left_node_processed ?left_node)
+      )
+  )
+  (:action attach_ephemeral_marker_to_left_node
+    :parameters (?left_node - left_partition_node ?left_index - left_index ?marker - ephemeral_marker)
+    :precondition
+      (and
+        (target_prechecked ?left_node)
+        (left_node_index_binding ?left_node ?left_index)
+        (ephemeral_marker_available ?marker)
+        (not
+          (left_node_ready ?left_node)
+        )
+      )
+    :effect
+      (and
+        (left_index_marked ?left_index)
+        (left_node_ready ?left_node)
+        (left_node_marker_binding ?left_node ?marker)
+        (not
+          (ephemeral_marker_available ?marker)
+        )
+      )
+  )
+  (:action finalize_left_marker_and_restore_ephemeral
+    :parameters (?left_node - left_partition_node ?left_index - left_index ?candidate - candidate_value ?marker - ephemeral_marker)
+    :precondition
+      (and
+        (target_prechecked ?left_node)
+        (target_value_binding ?left_node ?candidate)
+        (left_node_index_binding ?left_node ?left_index)
+        (left_index_marked ?left_index)
+        (left_node_marker_binding ?left_node ?marker)
+        (not
+          (left_node_processed ?left_node)
+        )
+      )
+    :effect
+      (and
+        (left_index_reserved ?left_index)
+        (left_node_processed ?left_node)
+        (ephemeral_marker_available ?marker)
+        (not
+          (left_node_marker_binding ?left_node ?marker)
+        )
+      )
+  )
+  (:action reserve_right_index_for_node
+    :parameters (?right_node - right_partition_node ?right_index - right_index ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_prechecked ?right_node)
+        (target_value_binding ?right_node ?candidate)
+        (right_node_index_binding ?right_node ?right_index)
+        (not
+          (right_index_reserved ?right_index)
+        )
+        (not
+          (right_index_marked ?right_index)
+        )
+      )
+    :effect (right_index_reserved ?right_index)
+  )
+  (:action apply_right_guard_and_mark_processed
+    :parameters (?right_node - right_partition_node ?right_index - right_index ?guard - guard_token)
+    :precondition
+      (and
+        (target_prechecked ?right_node)
+        (target_guard_binding ?right_node ?guard)
+        (right_node_index_binding ?right_node ?right_index)
+        (right_index_reserved ?right_index)
+        (not
+          (right_node_ready ?right_node)
+        )
+      )
+    :effect
+      (and
+        (right_node_ready ?right_node)
+        (right_node_processed ?right_node)
+      )
+  )
+  (:action attach_ephemeral_marker_to_right_node
+    :parameters (?right_node - right_partition_node ?right_index - right_index ?marker - ephemeral_marker)
+    :precondition
+      (and
+        (target_prechecked ?right_node)
+        (right_node_index_binding ?right_node ?right_index)
+        (ephemeral_marker_available ?marker)
+        (not
+          (right_node_ready ?right_node)
+        )
+      )
+    :effect
+      (and
+        (right_index_marked ?right_index)
+        (right_node_ready ?right_node)
+        (right_node_marker_binding ?right_node ?marker)
+        (not
+          (ephemeral_marker_available ?marker)
+        )
+      )
+  )
+  (:action finalize_right_marker_and_restore_ephemeral
+    :parameters (?right_node - right_partition_node ?right_index - right_index ?candidate - candidate_value ?marker - ephemeral_marker)
+    :precondition
+      (and
+        (target_prechecked ?right_node)
+        (target_value_binding ?right_node ?candidate)
+        (right_node_index_binding ?right_node ?right_index)
+        (right_index_marked ?right_index)
+        (right_node_marker_binding ?right_node ?marker)
+        (not
+          (right_node_processed ?right_node)
+        )
+      )
+    :effect
+      (and
+        (right_index_reserved ?right_index)
+        (right_node_processed ?right_node)
+        (ephemeral_marker_available ?marker)
+        (not
+          (right_node_marker_binding ?right_node ?marker)
+        )
+      )
+  )
+  (:action allocate_partial_solution
+    :parameters (?left_node - left_partition_node ?right_node - right_partition_node ?left_index - left_index ?right_index - right_index ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (left_node_ready ?left_node)
+        (right_node_ready ?right_node)
+        (left_node_index_binding ?left_node ?left_index)
+        (right_node_index_binding ?right_node ?right_index)
+        (left_index_reserved ?left_index)
+        (right_index_reserved ?right_index)
+        (left_node_processed ?left_node)
+        (right_node_processed ?right_node)
+        (partial_solution_slot_available ?partial_solution)
+      )
+    :effect
+      (and
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_left_index_binding ?partial_solution ?left_index)
+        (partial_solution_right_index_binding ?partial_solution ?right_index)
+        (not
+          (partial_solution_slot_available ?partial_solution)
+        )
+      )
+  )
+  (:action allocate_partial_solution_left_ready
+    :parameters (?left_node - left_partition_node ?right_node - right_partition_node ?left_index - left_index ?right_index - right_index ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (left_node_ready ?left_node)
+        (right_node_ready ?right_node)
+        (left_node_index_binding ?left_node ?left_index)
+        (right_node_index_binding ?right_node ?right_index)
+        (left_index_marked ?left_index)
+        (right_index_reserved ?right_index)
+        (not
+          (left_node_processed ?left_node)
+        )
+        (right_node_processed ?right_node)
+        (partial_solution_slot_available ?partial_solution)
+      )
+    :effect
+      (and
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_left_index_binding ?partial_solution ?left_index)
+        (partial_solution_right_index_binding ?partial_solution ?right_index)
+        (partial_solution_left_ready ?partial_solution)
+        (not
+          (partial_solution_slot_available ?partial_solution)
+        )
+      )
+  )
+  (:action allocate_partial_solution_right_ready
+    :parameters (?left_node - left_partition_node ?right_node - right_partition_node ?left_index - left_index ?right_index - right_index ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (left_node_ready ?left_node)
+        (right_node_ready ?right_node)
+        (left_node_index_binding ?left_node ?left_index)
+        (right_node_index_binding ?right_node ?right_index)
+        (left_index_reserved ?left_index)
+        (right_index_marked ?right_index)
+        (left_node_processed ?left_node)
+        (not
+          (right_node_processed ?right_node)
+        )
+        (partial_solution_slot_available ?partial_solution)
+      )
+    :effect
+      (and
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_left_index_binding ?partial_solution ?left_index)
+        (partial_solution_right_index_binding ?partial_solution ?right_index)
+        (partial_solution_right_ready ?partial_solution)
+        (not
+          (partial_solution_slot_available ?partial_solution)
+        )
+      )
+  )
+  (:action allocate_partial_solution_both_ready
+    :parameters (?left_node - left_partition_node ?right_node - right_partition_node ?left_index - left_index ?right_index - right_index ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (left_node_ready ?left_node)
+        (right_node_ready ?right_node)
+        (left_node_index_binding ?left_node ?left_index)
+        (right_node_index_binding ?right_node ?right_index)
+        (left_index_marked ?left_index)
+        (right_index_marked ?right_index)
+        (not
+          (left_node_processed ?left_node)
+        )
+        (not
+          (right_node_processed ?right_node)
+        )
+        (partial_solution_slot_available ?partial_solution)
+      )
+    :effect
+      (and
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_left_index_binding ?partial_solution ?left_index)
+        (partial_solution_right_index_binding ?partial_solution ?right_index)
+        (partial_solution_left_ready ?partial_solution)
+        (partial_solution_right_ready ?partial_solution)
+        (not
+          (partial_solution_slot_available ?partial_solution)
+        )
+      )
+  )
+  (:action flag_partial_solution_ready_for_components
+    :parameters (?partial_solution - partial_solution ?left_node - left_partition_node ?candidate - candidate_value)
+    :precondition
+      (and
+        (partial_solution_allocated ?partial_solution)
+        (left_node_ready ?left_node)
+        (target_value_binding ?left_node ?candidate)
+        (not
+          (partial_solution_ready ?partial_solution)
+        )
+      )
+    :effect (partial_solution_ready ?partial_solution)
+  )
+  (:action attach_component_to_partial_solution
+    :parameters (?search_node - search_node ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (search_node_partial_solution_link ?search_node ?partial_solution)
+        (search_node_component_binding ?search_node ?component)
+        (component_available ?component)
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_ready ?partial_solution)
+        (not
+          (component_consumed ?component)
+        )
+      )
+    :effect
+      (and
+        (component_consumed ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action advance_search_node_component_stage
+    :parameters (?search_node - search_node ?component - component ?partial_solution - partial_solution ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (search_node_component_binding ?search_node ?component)
+        (component_consumed ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (target_value_binding ?search_node ?candidate)
+        (not
+          (partial_solution_left_ready ?partial_solution)
+        )
+        (not
+          (target_components_locked ?search_node)
+        )
+      )
+    :effect (target_components_locked ?search_node)
+  )
+  (:action select_feature_for_search_node
+    :parameters (?search_node - search_node ?feature - feature_option)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (feature_option_available ?feature)
+        (not
+          (search_node_feature_selected ?search_node)
+        )
+      )
+    :effect
+      (and
+        (search_node_feature_selected ?search_node)
+        (search_node_feature_binding ?search_node ?feature)
+        (not
+          (feature_option_available ?feature)
+        )
+      )
+  )
+  (:action apply_feature_and_advance_node
+    :parameters (?search_node - search_node ?component - component ?partial_solution - partial_solution ?candidate - candidate_value ?feature - feature_option)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (search_node_component_binding ?search_node ?component)
+        (component_consumed ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (target_value_binding ?search_node ?candidate)
+        (partial_solution_left_ready ?partial_solution)
+        (search_node_feature_selected ?search_node)
+        (search_node_feature_binding ?search_node ?feature)
+        (not
+          (target_components_locked ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_components_locked ?search_node)
+        (search_node_feature_attached ?search_node)
+      )
+  )
+  (:action attach_attribute_node_no_right_ready
+    :parameters (?search_node - search_node ?attribute - attribute_type ?guard - guard_token ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_components_locked ?search_node)
+        (search_node_attribute_bound ?search_node ?attribute)
+        (target_guard_binding ?search_node ?guard)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (not
+          (partial_solution_right_ready ?partial_solution)
+        )
+        (not
+          (target_component_stage_done ?search_node)
+        )
+      )
+    :effect (target_component_stage_done ?search_node)
+  )
+  (:action attach_attribute_node_with_right_ready
+    :parameters (?search_node - search_node ?attribute - attribute_type ?guard - guard_token ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_components_locked ?search_node)
+        (search_node_attribute_bound ?search_node ?attribute)
+        (target_guard_binding ?search_node ?guard)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (partial_solution_right_ready ?partial_solution)
+        (not
+          (target_component_stage_done ?search_node)
+        )
+      )
+    :effect (target_component_stage_done ?search_node)
+  )
+  (:action complete_node_validation_stage_variant1
+    :parameters (?search_node - search_node ?validator - validator ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_component_stage_done ?search_node)
+        (search_node_validator_assigned ?search_node ?validator)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (not
+          (partial_solution_left_ready ?partial_solution)
+        )
+        (not
+          (partial_solution_right_ready ?partial_solution)
+        )
+        (not
+          (target_validated ?search_node)
+        )
+      )
+    :effect (target_validated ?search_node)
+  )
+  (:action complete_node_validation_stage_variant2
+    :parameters (?search_node - search_node ?validator - validator ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_component_stage_done ?search_node)
+        (search_node_validator_assigned ?search_node ?validator)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (partial_solution_left_ready ?partial_solution)
+        (not
+          (partial_solution_right_ready ?partial_solution)
+        )
+        (not
+          (target_validated ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_validated ?search_node)
+        (target_configured ?search_node)
+      )
+  )
+  (:action complete_node_validation_stage_variant3
+    :parameters (?search_node - search_node ?validator - validator ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_component_stage_done ?search_node)
+        (search_node_validator_assigned ?search_node ?validator)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (not
+          (partial_solution_left_ready ?partial_solution)
+        )
+        (partial_solution_right_ready ?partial_solution)
+        (not
+          (target_validated ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_validated ?search_node)
+        (target_configured ?search_node)
+      )
+  )
+  (:action complete_node_validation_stage_variant4
+    :parameters (?search_node - search_node ?validator - validator ?component - component ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (target_component_stage_done ?search_node)
+        (search_node_validator_assigned ?search_node ?validator)
+        (search_node_component_binding ?search_node ?component)
+        (component_attached_to_partial ?component ?partial_solution)
+        (partial_solution_left_ready ?partial_solution)
+        (partial_solution_right_ready ?partial_solution)
+        (not
+          (target_validated ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_validated ?search_node)
+        (target_configured ?search_node)
+      )
+  )
+  (:action finalize_search_node
+    :parameters (?search_node - search_node)
+    :precondition
+      (and
+        (target_validated ?search_node)
+        (not
+          (target_configured ?search_node)
+        )
+        (not
+          (target_commit_marker ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_commit_marker ?search_node)
+        (target_ready_for_commit ?search_node)
+      )
+  )
+  (:action assign_strategy_to_search_node
+    :parameters (?search_node - search_node ?strategy - strategy_option)
+    :precondition
+      (and
+        (target_validated ?search_node)
+        (target_configured ?search_node)
+        (strategy_option_available ?strategy)
+      )
+    :effect
+      (and
+        (search_node_strategy_binding ?search_node ?strategy)
+        (not
+          (strategy_option_available ?strategy)
+        )
+      )
+  )
+  (:action prepare_search_node_for_commit
+    :parameters (?search_node - search_node ?left_node - left_partition_node ?right_node - right_partition_node ?candidate - candidate_value ?strategy - strategy_option)
+    :precondition
+      (and
+        (target_validated ?search_node)
+        (target_configured ?search_node)
+        (search_node_strategy_binding ?search_node ?strategy)
+        (search_node_left_link ?search_node ?left_node)
+        (search_node_right_link ?search_node ?right_node)
+        (left_node_processed ?left_node)
+        (right_node_processed ?right_node)
+        (target_value_binding ?search_node ?candidate)
+        (not
+          (target_precommit_flag ?search_node)
+        )
+      )
+    :effect (target_precommit_flag ?search_node)
+  )
+  (:action finalize_search_node_from_precommit
+    :parameters (?search_node - search_node)
+    :precondition
+      (and
+        (target_validated ?search_node)
+        (target_precommit_flag ?search_node)
+        (not
+          (target_commit_marker ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_commit_marker ?search_node)
+        (target_ready_for_commit ?search_node)
+      )
+  )
+  (:action apply_selector_to_search_node
+    :parameters (?search_node - search_node ?selector - selector ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_prechecked ?search_node)
+        (target_value_binding ?search_node ?candidate)
+        (selector_available ?selector)
+        (search_node_selector_binding ?search_node ?selector)
+        (not
+          (search_node_feature_chosen ?search_node)
+        )
+      )
+    :effect
+      (and
+        (search_node_feature_chosen ?search_node)
+        (not
+          (selector_available ?selector)
+        )
+      )
+  )
+  (:action enable_selected_feature_on_search_node
+    :parameters (?search_node - search_node ?guard - guard_token)
+    :precondition
+      (and
+        (search_node_feature_chosen ?search_node)
+        (target_guard_binding ?search_node ?guard)
+        (not
+          (search_node_feature_enabled ?search_node)
+        )
+      )
+    :effect (search_node_feature_enabled ?search_node)
+  )
+  (:action verify_node_feature_with_validator
+    :parameters (?search_node - search_node ?validator - validator)
+    :precondition
+      (and
+        (search_node_feature_enabled ?search_node)
+        (search_node_validator_assigned ?search_node ?validator)
+        (not
+          (search_node_feature_verified ?search_node)
+        )
+      )
+    :effect (search_node_feature_verified ?search_node)
+  )
+  (:action finalize_search_node_feature_verified
+    :parameters (?search_node - search_node)
+    :precondition
+      (and
+        (search_node_feature_verified ?search_node)
+        (not
+          (target_commit_marker ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_commit_marker ?search_node)
+        (target_ready_for_commit ?search_node)
+      )
+  )
+  (:action commit_left_node_from_partial_solution
+    :parameters (?left_node - left_partition_node ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (left_node_ready ?left_node)
+        (left_node_processed ?left_node)
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_ready ?partial_solution)
+        (not
+          (target_ready_for_commit ?left_node)
+        )
+      )
+    :effect (target_ready_for_commit ?left_node)
+  )
+  (:action commit_right_node_from_partial_solution
+    :parameters (?right_node - right_partition_node ?partial_solution - partial_solution)
+    :precondition
+      (and
+        (right_node_ready ?right_node)
+        (right_node_processed ?right_node)
+        (partial_solution_allocated ?partial_solution)
+        (partial_solution_ready ?partial_solution)
+        (not
+          (target_ready_for_commit ?right_node)
+        )
+      )
+    :effect (target_ready_for_commit ?right_node)
+  )
+  (:action assign_finalizer_to_target
+    :parameters (?target - assignment_target ?finalizer - finalizer_token ?candidate - candidate_value)
+    :precondition
+      (and
+        (target_ready_for_commit ?target)
+        (target_value_binding ?target ?candidate)
+        (finalizer_token_available ?finalizer)
+        (not
+          (target_finalizer_assigned ?target)
+        )
+      )
+    :effect
+      (and
+        (target_finalizer_assigned ?target)
+        (target_finalizer_binding ?target ?finalizer)
+        (not
+          (finalizer_token_available ?finalizer)
+        )
+      )
+  )
+  (:action commit_left_node_and_release_resources
+    :parameters (?left_node - left_partition_node ?label - label_token ?finalizer - finalizer_token)
+    :precondition
+      (and
+        (target_finalizer_assigned ?left_node)
+        (target_label_binding ?left_node ?label)
+        (target_finalizer_binding ?left_node ?finalizer)
+        (not
+          (target_committed ?left_node)
+        )
+      )
+    :effect
+      (and
+        (target_committed ?left_node)
+        (label_token_available ?label)
+        (finalizer_token_available ?finalizer)
+      )
+  )
+  (:action commit_right_node_and_release_resources
+    :parameters (?right_node - right_partition_node ?label - label_token ?finalizer - finalizer_token)
+    :precondition
+      (and
+        (target_finalizer_assigned ?right_node)
+        (target_label_binding ?right_node ?label)
+        (target_finalizer_binding ?right_node ?finalizer)
+        (not
+          (target_committed ?right_node)
+        )
+      )
+    :effect
+      (and
+        (target_committed ?right_node)
+        (label_token_available ?label)
+        (finalizer_token_available ?finalizer)
+      )
+  )
+  (:action commit_search_node_and_release_resources
+    :parameters (?search_node - search_node ?label - label_token ?finalizer - finalizer_token)
+    :precondition
+      (and
+        (target_finalizer_assigned ?search_node)
+        (target_label_binding ?search_node ?label)
+        (target_finalizer_binding ?search_node ?finalizer)
+        (not
+          (target_committed ?search_node)
+        )
+      )
+    :effect
+      (and
+        (target_committed ?search_node)
+        (label_token_available ?label)
+        (finalizer_token_available ?finalizer)
+      )
+  )
+)

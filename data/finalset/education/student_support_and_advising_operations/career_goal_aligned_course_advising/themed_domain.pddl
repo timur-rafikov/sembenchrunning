@@ -1,0 +1,936 @@
+(define (domain career_goal_aligned_advising)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types institutional_actor - object service_resource - object artifact - object case_entity_supertype - object case_entity - case_entity_supertype appointment_slot - institutional_actor assessment_resource - institutional_actor service_provider - institutional_actor authorization_document - institutional_actor external_service - institutional_actor accommodation_request - institutional_actor assessment_tool - institutional_actor external_partner - institutional_actor support_resource - service_resource recommendation_item - service_resource career_interest_record - service_resource career_goal - artifact academic_goal - artifact advising_plan - artifact student_subtype_marker - case_entity advisor_subtype_marker - case_entity student_record - student_subtype_marker student_record_alt - student_subtype_marker advisor_record - advisor_subtype_marker)
+  (:predicates
+    (intake_opened ?case - case_entity)
+    (assessment_completed_for_actor ?case - case_entity)
+    (appointment_scheduled ?case - case_entity)
+    (case_closed_for_actor ?case - case_entity)
+    (implementation_active_for_actor ?case - case_entity)
+    (accommodation_confirmed_for_actor ?case - case_entity)
+    (appointment_slot_available ?slot - appointment_slot)
+    (appointment_assigned ?case - case_entity ?slot - appointment_slot)
+    (assessment_available ?assessment - assessment_resource)
+    (assessment_allocated ?case - case_entity ?assessment - assessment_resource)
+    (provider_available ?provider - service_provider)
+    (provider_assigned ?case - case_entity ?provider - service_provider)
+    (support_resource_available ?resource - support_resource)
+    (support_assigned_to_student ?student - student_record ?resource - support_resource)
+    (support_assigned_to_student_alt ?student_alt - student_record_alt ?resource - support_resource)
+    (student_has_career_goal ?student - student_record ?career_goal - career_goal)
+    (career_goal_flagged ?career_goal - career_goal)
+    (career_goal_support_assigned ?career_goal - career_goal)
+    (student_eligible_for_plan ?student - student_record)
+    (student_has_academic_goal ?student_alt - student_record_alt ?academic_goal - academic_goal)
+    (academic_goal_flagged ?academic_goal - academic_goal)
+    (academic_goal_support_assigned ?academic_goal - academic_goal)
+    (student_alt_eligible_for_plan ?student_alt - student_record_alt)
+    (plan_ready_for_creation ?plan - advising_plan)
+    (plan_draft_created ?plan - advising_plan)
+    (plan_linked_to_career_goal ?plan - advising_plan ?career_goal - career_goal)
+    (plan_linked_to_academic_goal ?plan - advising_plan ?academic_goal - academic_goal)
+    (plan_has_authorization_component ?plan - advising_plan)
+    (plan_has_partner_component ?plan - advising_plan)
+    (plan_ready_for_attachment ?plan - advising_plan)
+    (advisor_assigned_to_student ?advisor - advisor_record ?student - student_record)
+    (advisor_assigned_to_student_alt ?advisor - advisor_record ?student_alt - student_record_alt)
+    (advisor_assigned_to_plan ?advisor - advisor_record ?plan - advising_plan)
+    (recommendation_item_available ?item - recommendation_item)
+    (advisor_has_recommendation_item ?advisor - advisor_record ?item - recommendation_item)
+    (recommendation_item_attached ?item - recommendation_item)
+    (recommendation_item_linked_to_plan ?item - recommendation_item ?plan - advising_plan)
+    (advisor_reviewed_item ?advisor - advisor_record)
+    (advisor_review_queued_for_signoff ?advisor - advisor_record)
+    (advisor_ready_for_finalization ?advisor - advisor_record)
+    (advisor_authorized ?advisor - advisor_record)
+    (advisor_secondary_review_complete ?advisor - advisor_record)
+    (advisor_signoff_requested ?advisor - advisor_record)
+    (advisor_final_review_complete ?advisor - advisor_record)
+    (career_interest_available ?career_interest - career_interest_record)
+    (advisor_linked_to_career_interest ?advisor - advisor_record ?career_interest - career_interest_record)
+    (advisor_career_interest_flagged ?advisor - advisor_record)
+    (advisor_partner_authorization_requested ?advisor - advisor_record)
+    (advisor_partner_authorized ?advisor - advisor_record)
+    (authorization_document_available ?auth_doc - authorization_document)
+    (authorization_attached_to_advisor ?advisor - advisor_record ?auth_doc - authorization_document)
+    (external_service_available ?external_service - external_service)
+    (advisor_associated_with_external_service ?advisor - advisor_record ?external_service - external_service)
+    (assessment_tool_available ?assessment_tool - assessment_tool)
+    (advisor_has_assessment_tool ?advisor - advisor_record ?assessment_tool - assessment_tool)
+    (external_partner_available ?partner - external_partner)
+    (advisor_linked_to_external_partner ?advisor - advisor_record ?partner - external_partner)
+    (accommodation_request_available ?accommodation - accommodation_request)
+    (accommodation_assigned_to_actor ?case - case_entity ?accommodation - accommodation_request)
+    (student_referral_recorded ?student - student_record)
+    (student_alt_referral_recorded ?student_alt - student_record_alt)
+    (advisor_signoff_captured ?advisor - advisor_record)
+  )
+  (:action create_case_intake
+    :parameters (?case - case_entity)
+    :precondition
+      (and
+        (not
+          (intake_opened ?case)
+        )
+        (not
+          (case_closed_for_actor ?case)
+        )
+      )
+    :effect (intake_opened ?case)
+  )
+  (:action book_appointment_slot
+    :parameters (?case - case_entity ?slot - appointment_slot)
+    :precondition
+      (and
+        (intake_opened ?case)
+        (not
+          (appointment_scheduled ?case)
+        )
+        (appointment_slot_available ?slot)
+      )
+    :effect
+      (and
+        (appointment_scheduled ?case)
+        (appointment_assigned ?case ?slot)
+        (not
+          (appointment_slot_available ?slot)
+        )
+      )
+  )
+  (:action assign_assessment_to_case
+    :parameters (?case - case_entity ?assessment - assessment_resource)
+    :precondition
+      (and
+        (intake_opened ?case)
+        (appointment_scheduled ?case)
+        (assessment_available ?assessment)
+      )
+    :effect
+      (and
+        (assessment_allocated ?case ?assessment)
+        (not
+          (assessment_available ?assessment)
+        )
+      )
+  )
+  (:action record_assessment_completion
+    :parameters (?case - case_entity ?assessment - assessment_resource)
+    :precondition
+      (and
+        (intake_opened ?case)
+        (appointment_scheduled ?case)
+        (assessment_allocated ?case ?assessment)
+        (not
+          (assessment_completed_for_actor ?case)
+        )
+      )
+    :effect (assessment_completed_for_actor ?case)
+  )
+  (:action release_assessment_resource
+    :parameters (?case - case_entity ?assessment - assessment_resource)
+    :precondition
+      (and
+        (assessment_allocated ?case ?assessment)
+      )
+    :effect
+      (and
+        (assessment_available ?assessment)
+        (not
+          (assessment_allocated ?case ?assessment)
+        )
+      )
+  )
+  (:action assign_provider_referral
+    :parameters (?case - case_entity ?provider - service_provider)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?case)
+        (provider_available ?provider)
+      )
+    :effect
+      (and
+        (provider_assigned ?case ?provider)
+        (not
+          (provider_available ?provider)
+        )
+      )
+  )
+  (:action revoke_provider_referral
+    :parameters (?case - case_entity ?provider - service_provider)
+    :precondition
+      (and
+        (provider_assigned ?case ?provider)
+      )
+    :effect
+      (and
+        (provider_available ?provider)
+        (not
+          (provider_assigned ?case ?provider)
+        )
+      )
+  )
+  (:action assign_assessment_tool_to_advisor
+    :parameters (?advisor - advisor_record ?assessment_tool - assessment_tool)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (assessment_tool_available ?assessment_tool)
+      )
+    :effect
+      (and
+        (advisor_has_assessment_tool ?advisor ?assessment_tool)
+        (not
+          (assessment_tool_available ?assessment_tool)
+        )
+      )
+  )
+  (:action release_assessment_tool_from_advisor
+    :parameters (?advisor - advisor_record ?assessment_tool - assessment_tool)
+    :precondition
+      (and
+        (advisor_has_assessment_tool ?advisor ?assessment_tool)
+      )
+    :effect
+      (and
+        (assessment_tool_available ?assessment_tool)
+        (not
+          (advisor_has_assessment_tool ?advisor ?assessment_tool)
+        )
+      )
+  )
+  (:action assign_external_partner_to_advisor
+    :parameters (?advisor - advisor_record ?partner - external_partner)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (external_partner_available ?partner)
+      )
+    :effect
+      (and
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (not
+          (external_partner_available ?partner)
+        )
+      )
+  )
+  (:action release_external_partner_from_advisor
+    :parameters (?advisor - advisor_record ?partner - external_partner)
+    :precondition
+      (and
+        (advisor_linked_to_external_partner ?advisor ?partner)
+      )
+    :effect
+      (and
+        (external_partner_available ?partner)
+        (not
+          (advisor_linked_to_external_partner ?advisor ?partner)
+        )
+      )
+  )
+  (:action flag_career_goal_for_student
+    :parameters (?student - student_record ?career_goal - career_goal ?assessment - assessment_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student)
+        (assessment_allocated ?student ?assessment)
+        (student_has_career_goal ?student ?career_goal)
+        (not
+          (career_goal_flagged ?career_goal)
+        )
+        (not
+          (career_goal_support_assigned ?career_goal)
+        )
+      )
+    :effect (career_goal_flagged ?career_goal)
+  )
+  (:action create_provider_referral_for_student
+    :parameters (?student - student_record ?career_goal - career_goal ?provider - service_provider)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student)
+        (provider_assigned ?student ?provider)
+        (student_has_career_goal ?student ?career_goal)
+        (career_goal_flagged ?career_goal)
+        (not
+          (student_referral_recorded ?student)
+        )
+      )
+    :effect
+      (and
+        (student_referral_recorded ?student)
+        (student_eligible_for_plan ?student)
+      )
+  )
+  (:action assign_support_resource_and_enable_monitoring
+    :parameters (?student - student_record ?career_goal - career_goal ?resource - support_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student)
+        (student_has_career_goal ?student ?career_goal)
+        (support_resource_available ?resource)
+        (not
+          (student_referral_recorded ?student)
+        )
+      )
+    :effect
+      (and
+        (career_goal_support_assigned ?career_goal)
+        (student_referral_recorded ?student)
+        (support_assigned_to_student ?student ?resource)
+        (not
+          (support_resource_available ?resource)
+        )
+      )
+  )
+  (:action confirm_support_resource_completion
+    :parameters (?student - student_record ?career_goal - career_goal ?assessment - assessment_resource ?resource - support_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student)
+        (assessment_allocated ?student ?assessment)
+        (student_has_career_goal ?student ?career_goal)
+        (career_goal_support_assigned ?career_goal)
+        (support_assigned_to_student ?student ?resource)
+        (not
+          (student_eligible_for_plan ?student)
+        )
+      )
+    :effect
+      (and
+        (career_goal_flagged ?career_goal)
+        (student_eligible_for_plan ?student)
+        (support_resource_available ?resource)
+        (not
+          (support_assigned_to_student ?student ?resource)
+        )
+      )
+  )
+  (:action flag_academic_goal_for_student_alt
+    :parameters (?student_alt - student_record_alt ?academic_goal - academic_goal ?assessment - assessment_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student_alt)
+        (assessment_allocated ?student_alt ?assessment)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (not
+          (academic_goal_flagged ?academic_goal)
+        )
+        (not
+          (academic_goal_support_assigned ?academic_goal)
+        )
+      )
+    :effect (academic_goal_flagged ?academic_goal)
+  )
+  (:action create_provider_referral_for_student_alt
+    :parameters (?student_alt - student_record_alt ?academic_goal - academic_goal ?provider - service_provider)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student_alt)
+        (provider_assigned ?student_alt ?provider)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (academic_goal_flagged ?academic_goal)
+        (not
+          (student_alt_referral_recorded ?student_alt)
+        )
+      )
+    :effect
+      (and
+        (student_alt_referral_recorded ?student_alt)
+        (student_alt_eligible_for_plan ?student_alt)
+      )
+  )
+  (:action assign_support_resource_and_enable_monitoring_alt
+    :parameters (?student_alt - student_record_alt ?academic_goal - academic_goal ?resource - support_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student_alt)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (support_resource_available ?resource)
+        (not
+          (student_alt_referral_recorded ?student_alt)
+        )
+      )
+    :effect
+      (and
+        (academic_goal_support_assigned ?academic_goal)
+        (student_alt_referral_recorded ?student_alt)
+        (support_assigned_to_student_alt ?student_alt ?resource)
+        (not
+          (support_resource_available ?resource)
+        )
+      )
+  )
+  (:action confirm_support_resource_completion_alt
+    :parameters (?student_alt - student_record_alt ?academic_goal - academic_goal ?assessment - assessment_resource ?resource - support_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?student_alt)
+        (assessment_allocated ?student_alt ?assessment)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (academic_goal_support_assigned ?academic_goal)
+        (support_assigned_to_student_alt ?student_alt ?resource)
+        (not
+          (student_alt_eligible_for_plan ?student_alt)
+        )
+      )
+    :effect
+      (and
+        (academic_goal_flagged ?academic_goal)
+        (student_alt_eligible_for_plan ?student_alt)
+        (support_resource_available ?resource)
+        (not
+          (support_assigned_to_student_alt ?student_alt ?resource)
+        )
+      )
+  )
+  (:action create_advising_plan
+    :parameters (?student - student_record ?student_alt - student_record_alt ?career_goal - career_goal ?academic_goal - academic_goal ?plan - advising_plan)
+    :precondition
+      (and
+        (student_referral_recorded ?student)
+        (student_alt_referral_recorded ?student_alt)
+        (student_has_career_goal ?student ?career_goal)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (career_goal_flagged ?career_goal)
+        (academic_goal_flagged ?academic_goal)
+        (student_eligible_for_plan ?student)
+        (student_alt_eligible_for_plan ?student_alt)
+        (plan_ready_for_creation ?plan)
+      )
+    :effect
+      (and
+        (plan_draft_created ?plan)
+        (plan_linked_to_career_goal ?plan ?career_goal)
+        (plan_linked_to_academic_goal ?plan ?academic_goal)
+        (not
+          (plan_ready_for_creation ?plan)
+        )
+      )
+  )
+  (:action create_advising_plan_with_authorization
+    :parameters (?student - student_record ?student_alt - student_record_alt ?career_goal - career_goal ?academic_goal - academic_goal ?plan - advising_plan)
+    :precondition
+      (and
+        (student_referral_recorded ?student)
+        (student_alt_referral_recorded ?student_alt)
+        (student_has_career_goal ?student ?career_goal)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (career_goal_support_assigned ?career_goal)
+        (academic_goal_flagged ?academic_goal)
+        (not
+          (student_eligible_for_plan ?student)
+        )
+        (student_alt_eligible_for_plan ?student_alt)
+        (plan_ready_for_creation ?plan)
+      )
+    :effect
+      (and
+        (plan_draft_created ?plan)
+        (plan_linked_to_career_goal ?plan ?career_goal)
+        (plan_linked_to_academic_goal ?plan ?academic_goal)
+        (plan_has_authorization_component ?plan)
+        (not
+          (plan_ready_for_creation ?plan)
+        )
+      )
+  )
+  (:action create_advising_plan_with_partner_components
+    :parameters (?student - student_record ?student_alt - student_record_alt ?career_goal - career_goal ?academic_goal - academic_goal ?plan - advising_plan)
+    :precondition
+      (and
+        (student_referral_recorded ?student)
+        (student_alt_referral_recorded ?student_alt)
+        (student_has_career_goal ?student ?career_goal)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (career_goal_flagged ?career_goal)
+        (academic_goal_support_assigned ?academic_goal)
+        (student_eligible_for_plan ?student)
+        (not
+          (student_alt_eligible_for_plan ?student_alt)
+        )
+        (plan_ready_for_creation ?plan)
+      )
+    :effect
+      (and
+        (plan_draft_created ?plan)
+        (plan_linked_to_career_goal ?plan ?career_goal)
+        (plan_linked_to_academic_goal ?plan ?academic_goal)
+        (plan_has_partner_component ?plan)
+        (not
+          (plan_ready_for_creation ?plan)
+        )
+      )
+  )
+  (:action create_comprehensive_advising_plan
+    :parameters (?student - student_record ?student_alt - student_record_alt ?career_goal - career_goal ?academic_goal - academic_goal ?plan - advising_plan)
+    :precondition
+      (and
+        (student_referral_recorded ?student)
+        (student_alt_referral_recorded ?student_alt)
+        (student_has_career_goal ?student ?career_goal)
+        (student_has_academic_goal ?student_alt ?academic_goal)
+        (career_goal_support_assigned ?career_goal)
+        (academic_goal_support_assigned ?academic_goal)
+        (not
+          (student_eligible_for_plan ?student)
+        )
+        (not
+          (student_alt_eligible_for_plan ?student_alt)
+        )
+        (plan_ready_for_creation ?plan)
+      )
+    :effect
+      (and
+        (plan_draft_created ?plan)
+        (plan_linked_to_career_goal ?plan ?career_goal)
+        (plan_linked_to_academic_goal ?plan ?academic_goal)
+        (plan_has_authorization_component ?plan)
+        (plan_has_partner_component ?plan)
+        (not
+          (plan_ready_for_creation ?plan)
+        )
+      )
+  )
+  (:action mark_plan_ready_for_attachment
+    :parameters (?plan - advising_plan ?student - student_record ?assessment - assessment_resource)
+    :precondition
+      (and
+        (plan_draft_created ?plan)
+        (student_referral_recorded ?student)
+        (assessment_allocated ?student ?assessment)
+        (not
+          (plan_ready_for_attachment ?plan)
+        )
+      )
+    :effect (plan_ready_for_attachment ?plan)
+  )
+  (:action attach_recommendation_item_to_plan
+    :parameters (?advisor - advisor_record ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (advisor_assigned_to_plan ?advisor ?plan)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_available ?item)
+        (plan_draft_created ?plan)
+        (plan_ready_for_attachment ?plan)
+        (not
+          (recommendation_item_attached ?item)
+        )
+      )
+    :effect
+      (and
+        (recommendation_item_attached ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (not
+          (recommendation_item_available ?item)
+        )
+      )
+  )
+  (:action route_item_for_advisor_review
+    :parameters (?advisor - advisor_record ?item - recommendation_item ?plan - advising_plan ?assessment - assessment_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_attached ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (assessment_allocated ?advisor ?assessment)
+        (not
+          (plan_has_authorization_component ?plan)
+        )
+        (not
+          (advisor_reviewed_item ?advisor)
+        )
+      )
+    :effect (advisor_reviewed_item ?advisor)
+  )
+  (:action assign_authorization_document_to_advisor
+    :parameters (?advisor - advisor_record ?auth_doc - authorization_document)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (authorization_document_available ?auth_doc)
+        (not
+          (advisor_authorized ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_authorized ?advisor)
+        (authorization_attached_to_advisor ?advisor ?auth_doc)
+        (not
+          (authorization_document_available ?auth_doc)
+        )
+      )
+  )
+  (:action route_item_with_authorization_for_review
+    :parameters (?advisor - advisor_record ?item - recommendation_item ?plan - advising_plan ?assessment - assessment_resource ?auth_doc - authorization_document)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_attached ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (assessment_allocated ?advisor ?assessment)
+        (plan_has_authorization_component ?plan)
+        (advisor_authorized ?advisor)
+        (authorization_attached_to_advisor ?advisor ?auth_doc)
+        (not
+          (advisor_reviewed_item ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_reviewed_item ?advisor)
+        (advisor_secondary_review_complete ?advisor)
+      )
+  )
+  (:action advisor_review_item_and_queue
+    :parameters (?advisor - advisor_record ?assessment_tool - assessment_tool ?provider - service_provider ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_reviewed_item ?advisor)
+        (advisor_has_assessment_tool ?advisor ?assessment_tool)
+        (provider_assigned ?advisor ?provider)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (not
+          (plan_has_partner_component ?plan)
+        )
+        (not
+          (advisor_review_queued_for_signoff ?advisor)
+        )
+      )
+    :effect (advisor_review_queued_for_signoff ?advisor)
+  )
+  (:action advisor_review_item_and_queue_with_partner_component
+    :parameters (?advisor - advisor_record ?assessment_tool - assessment_tool ?provider - service_provider ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_reviewed_item ?advisor)
+        (advisor_has_assessment_tool ?advisor ?assessment_tool)
+        (provider_assigned ?advisor ?provider)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (plan_has_partner_component ?plan)
+        (not
+          (advisor_review_queued_for_signoff ?advisor)
+        )
+      )
+    :effect (advisor_review_queued_for_signoff ?advisor)
+  )
+  (:action advisor_initiate_partner_review
+    :parameters (?advisor - advisor_record ?partner - external_partner ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_review_queued_for_signoff ?advisor)
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (not
+          (plan_has_authorization_component ?plan)
+        )
+        (not
+          (plan_has_partner_component ?plan)
+        )
+        (not
+          (advisor_ready_for_finalization ?advisor)
+        )
+      )
+    :effect (advisor_ready_for_finalization ?advisor)
+  )
+  (:action advisor_initiate_partner_review_and_flag
+    :parameters (?advisor - advisor_record ?partner - external_partner ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_review_queued_for_signoff ?advisor)
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (plan_has_authorization_component ?plan)
+        (not
+          (plan_has_partner_component ?plan)
+        )
+        (not
+          (advisor_ready_for_finalization ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_signoff_requested ?advisor)
+      )
+  )
+  (:action advisor_initiate_partner_review_and_flag_alt
+    :parameters (?advisor - advisor_record ?partner - external_partner ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_review_queued_for_signoff ?advisor)
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (not
+          (plan_has_authorization_component ?plan)
+        )
+        (plan_has_partner_component ?plan)
+        (not
+          (advisor_ready_for_finalization ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_signoff_requested ?advisor)
+      )
+  )
+  (:action advisor_initiate_partner_review_and_flag_all
+    :parameters (?advisor - advisor_record ?partner - external_partner ?item - recommendation_item ?plan - advising_plan)
+    :precondition
+      (and
+        (advisor_review_queued_for_signoff ?advisor)
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (advisor_has_recommendation_item ?advisor ?item)
+        (recommendation_item_linked_to_plan ?item ?plan)
+        (plan_has_authorization_component ?plan)
+        (plan_has_partner_component ?plan)
+        (not
+          (advisor_ready_for_finalization ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_signoff_requested ?advisor)
+      )
+  )
+  (:action advisor_initiate_finalization
+    :parameters (?advisor - advisor_record)
+    :precondition
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (not
+          (advisor_signoff_requested ?advisor)
+        )
+        (not
+          (advisor_signoff_captured ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_signoff_captured ?advisor)
+        (implementation_active_for_actor ?advisor)
+      )
+  )
+  (:action attach_external_service_to_advisor
+    :parameters (?advisor - advisor_record ?external_service - external_service)
+    :precondition
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_signoff_requested ?advisor)
+        (external_service_available ?external_service)
+      )
+    :effect
+      (and
+        (advisor_associated_with_external_service ?advisor ?external_service)
+        (not
+          (external_service_available ?external_service)
+        )
+      )
+  )
+  (:action advisor_complete_final_review
+    :parameters (?advisor - advisor_record ?student - student_record ?student_alt - student_record_alt ?assessment - assessment_resource ?external_service - external_service)
+    :precondition
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_signoff_requested ?advisor)
+        (advisor_associated_with_external_service ?advisor ?external_service)
+        (advisor_assigned_to_student ?advisor ?student)
+        (advisor_assigned_to_student_alt ?advisor ?student_alt)
+        (student_eligible_for_plan ?student)
+        (student_alt_eligible_for_plan ?student_alt)
+        (assessment_allocated ?advisor ?assessment)
+        (not
+          (advisor_final_review_complete ?advisor)
+        )
+      )
+    :effect (advisor_final_review_complete ?advisor)
+  )
+  (:action complete_advisor_signoff
+    :parameters (?advisor - advisor_record)
+    :precondition
+      (and
+        (advisor_ready_for_finalization ?advisor)
+        (advisor_final_review_complete ?advisor)
+        (not
+          (advisor_signoff_captured ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_signoff_captured ?advisor)
+        (implementation_active_for_actor ?advisor)
+      )
+  )
+  (:action associate_career_interest_with_advisor
+    :parameters (?advisor - advisor_record ?career_interest - career_interest_record ?assessment - assessment_resource)
+    :precondition
+      (and
+        (assessment_completed_for_actor ?advisor)
+        (assessment_allocated ?advisor ?assessment)
+        (career_interest_available ?career_interest)
+        (advisor_linked_to_career_interest ?advisor ?career_interest)
+        (not
+          (advisor_career_interest_flagged ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_career_interest_flagged ?advisor)
+        (not
+          (career_interest_available ?career_interest)
+        )
+      )
+  )
+  (:action request_partner_authorization_for_advisor
+    :parameters (?advisor - advisor_record ?provider - service_provider)
+    :precondition
+      (and
+        (advisor_career_interest_flagged ?advisor)
+        (provider_assigned ?advisor ?provider)
+        (not
+          (advisor_partner_authorization_requested ?advisor)
+        )
+      )
+    :effect (advisor_partner_authorization_requested ?advisor)
+  )
+  (:action confirm_partner_authorization
+    :parameters (?advisor - advisor_record ?partner - external_partner)
+    :precondition
+      (and
+        (advisor_partner_authorization_requested ?advisor)
+        (advisor_linked_to_external_partner ?advisor ?partner)
+        (not
+          (advisor_partner_authorized ?advisor)
+        )
+      )
+    :effect (advisor_partner_authorized ?advisor)
+  )
+  (:action capture_partner_signoff
+    :parameters (?advisor - advisor_record)
+    :precondition
+      (and
+        (advisor_partner_authorized ?advisor)
+        (not
+          (advisor_signoff_captured ?advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_signoff_captured ?advisor)
+        (implementation_active_for_actor ?advisor)
+      )
+  )
+  (:action activate_student_implementation
+    :parameters (?student - student_record ?plan - advising_plan)
+    :precondition
+      (and
+        (student_referral_recorded ?student)
+        (student_eligible_for_plan ?student)
+        (plan_draft_created ?plan)
+        (plan_ready_for_attachment ?plan)
+        (not
+          (implementation_active_for_actor ?student)
+        )
+      )
+    :effect (implementation_active_for_actor ?student)
+  )
+  (:action activate_student_alt_implementation
+    :parameters (?student_alt - student_record_alt ?plan - advising_plan)
+    :precondition
+      (and
+        (student_alt_referral_recorded ?student_alt)
+        (student_alt_eligible_for_plan ?student_alt)
+        (plan_draft_created ?plan)
+        (plan_ready_for_attachment ?plan)
+        (not
+          (implementation_active_for_actor ?student_alt)
+        )
+      )
+    :effect (implementation_active_for_actor ?student_alt)
+  )
+  (:action record_accommodation_assignment
+    :parameters (?case - case_entity ?accommodation - accommodation_request ?assessment - assessment_resource)
+    :precondition
+      (and
+        (implementation_active_for_actor ?case)
+        (assessment_allocated ?case ?assessment)
+        (accommodation_request_available ?accommodation)
+        (not
+          (accommodation_confirmed_for_actor ?case)
+        )
+      )
+    :effect
+      (and
+        (accommodation_confirmed_for_actor ?case)
+        (accommodation_assigned_to_actor ?case ?accommodation)
+        (not
+          (accommodation_request_available ?accommodation)
+        )
+      )
+  )
+  (:action apply_accommodation_and_close_case
+    :parameters (?student - student_record ?slot - appointment_slot ?accommodation - accommodation_request)
+    :precondition
+      (and
+        (accommodation_confirmed_for_actor ?student)
+        (appointment_assigned ?student ?slot)
+        (accommodation_assigned_to_actor ?student ?accommodation)
+        (not
+          (case_closed_for_actor ?student)
+        )
+      )
+    :effect
+      (and
+        (case_closed_for_actor ?student)
+        (appointment_slot_available ?slot)
+        (accommodation_request_available ?accommodation)
+      )
+  )
+  (:action apply_accommodation_and_close_case_alt
+    :parameters (?student_alt - student_record_alt ?slot - appointment_slot ?accommodation - accommodation_request)
+    :precondition
+      (and
+        (accommodation_confirmed_for_actor ?student_alt)
+        (appointment_assigned ?student_alt ?slot)
+        (accommodation_assigned_to_actor ?student_alt ?accommodation)
+        (not
+          (case_closed_for_actor ?student_alt)
+        )
+      )
+    :effect
+      (and
+        (case_closed_for_actor ?student_alt)
+        (appointment_slot_available ?slot)
+        (accommodation_request_available ?accommodation)
+      )
+  )
+  (:action apply_accommodation_and_close_for_advisor
+    :parameters (?advisor - advisor_record ?slot - appointment_slot ?accommodation - accommodation_request)
+    :precondition
+      (and
+        (accommodation_confirmed_for_actor ?advisor)
+        (appointment_assigned ?advisor ?slot)
+        (accommodation_assigned_to_actor ?advisor ?accommodation)
+        (not
+          (case_closed_for_actor ?advisor)
+        )
+      )
+    :effect
+      (and
+        (case_closed_for_actor ?advisor)
+        (appointment_slot_available ?slot)
+        (accommodation_request_available ?accommodation)
+      )
+  )
+)

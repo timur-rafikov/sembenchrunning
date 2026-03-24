@@ -40,11 +40,12 @@ def main():
     print("3) plan_ref: steps =", len(ref_steps), ", file =", plan_ref_path)
 
     # 4) Ratio and first deviation relative to the reference plan
-    opt_ratio = len(pred_steps) / len(ref_steps) if ref_steps else -1
-    first_err = first_deviation_step(pred_steps, ref_steps)
-    print("4) optimality_ratio =", round(opt_ratio, 4), ", first_error_step =", first_err)
-    assert abs(opt_ratio - 1.125) < 0.01, f"Expected opt_ratio ~1.125 got {opt_ratio}"
-    assert first_err == 2, f"Expected first_error_step=2 got {first_err}"
+    # optimality_ratio = opt_len / pred_len: 1.0 = matches reference, < 1.0 = suboptimal.
+    opt_ratio = len(ref_steps) / len(pred_steps) if (ref_steps and pred_steps) else -1
+    first_dev = first_deviation_step(pred_steps, ref_steps)
+    print("4) optimality_ratio =", round(opt_ratio, 4), ", first_ref_deviation_step =", first_dev)
+    assert abs(opt_ratio - (1.0 / 1.125)) < 0.01, f"Expected opt_ratio ~{1.0/1.125:.4f} got {opt_ratio}"
+    assert first_dev == 2, f"Expected first_ref_deviation_step=2 got {first_dev}"
     print("OK: extraction and metrics consistent.")
 
 

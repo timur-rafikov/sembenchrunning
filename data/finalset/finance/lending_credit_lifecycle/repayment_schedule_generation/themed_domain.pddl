@@ -1,0 +1,936 @@
+(define (domain repayment_schedule_generation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_group - object adjustment_component_root - object schedule_component_root - object case_root - object credit_case - case_root rate_template - operational_resource_group pricing_model - operational_resource_group servicing_policy - operational_resource_group document_template - operational_resource_group presentation_profile - operational_resource_group execution_context - operational_resource_group collateral_profile - operational_resource_group regulatory_flag - operational_resource_group adjustment_profile - adjustment_component_root amendment_record - adjustment_component_root manual_override_token - adjustment_component_root principal_leg_profile - schedule_component_root interest_leg_profile - schedule_component_root repayment_schedule_template - schedule_component_root loan_entity_group - credit_case schedule_workflow_group - credit_case primary_loan_account - loan_entity_group secondary_loan_account - loan_entity_group schedule_generation_job - schedule_workflow_group)
+  (:predicates
+    (entity_admitted ?credit_case - credit_case)
+    (entity_configured ?credit_case - credit_case)
+    (rate_assigned ?credit_case - credit_case)
+    (schedule_published ?credit_case - credit_case)
+    (entity_approval_granted ?credit_case - credit_case)
+    (execution_context_bound_flag ?credit_case - credit_case)
+    (rate_template_available ?rate_template - rate_template)
+    (bound_rate_template_for ?credit_case - credit_case ?rate_template - rate_template)
+    (pricing_model_available ?pricing_model - pricing_model)
+    (bound_pricing_model_for ?credit_case - credit_case ?pricing_model - pricing_model)
+    (servicing_policy_available ?servicing_policy - servicing_policy)
+    (bound_servicing_policy_for ?credit_case - credit_case ?servicing_policy - servicing_policy)
+    (adjustment_profile_available ?adjustment_profile - adjustment_profile)
+    (primary_loan_has_adjustment_profile ?primary_loan_account - primary_loan_account ?adjustment_profile - adjustment_profile)
+    (secondary_loan_has_adjustment_profile ?secondary_loan_account - secondary_loan_account ?adjustment_profile - adjustment_profile)
+    (loan_has_principal_leg_profile ?primary_loan_account - primary_loan_account ?principal_leg_profile - principal_leg_profile)
+    (principal_leg_marked_ready ?principal_leg_profile - principal_leg_profile)
+    (principal_leg_assigned_adjustment ?principal_leg_profile - principal_leg_profile)
+    (primary_loan_ready_for_composition ?primary_loan_account - primary_loan_account)
+    (loan_has_interest_leg_profile ?secondary_loan_account - secondary_loan_account ?interest_leg_profile - interest_leg_profile)
+    (interest_leg_marked_ready ?interest_leg_profile - interest_leg_profile)
+    (interest_leg_assigned_adjustment ?interest_leg_profile - interest_leg_profile)
+    (secondary_loan_ready_for_composition ?secondary_loan_account - secondary_loan_account)
+    (schedule_template_available ?repayment_schedule_template - repayment_schedule_template)
+    (schedule_template_generated ?repayment_schedule_template - repayment_schedule_template)
+    (template_bound_principal_leg ?repayment_schedule_template - repayment_schedule_template ?principal_leg_profile - principal_leg_profile)
+    (template_bound_interest_leg ?repayment_schedule_template - repayment_schedule_template ?interest_leg_profile - interest_leg_profile)
+    (template_flag_principal_adjustment_applied ?repayment_schedule_template - repayment_schedule_template)
+    (template_flag_interest_adjustment_applied ?repayment_schedule_template - repayment_schedule_template)
+    (template_priced ?repayment_schedule_template - repayment_schedule_template)
+    (job_includes_primary_loan ?schedule_generation_job - schedule_generation_job ?primary_loan_account - primary_loan_account)
+    (job_includes_secondary_loan ?schedule_generation_job - schedule_generation_job ?secondary_loan_account - secondary_loan_account)
+    (job_bound_template ?schedule_generation_job - schedule_generation_job ?repayment_schedule_template - repayment_schedule_template)
+    (amendment_record_available ?amendment_record - amendment_record)
+    (job_bound_amendment ?schedule_generation_job - schedule_generation_job ?amendment_record - amendment_record)
+    (amendment_applied ?amendment_record - amendment_record)
+    (amendment_applied_to_template ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    (job_ready_for_augmentation ?schedule_generation_job - schedule_generation_job)
+    (job_augmented ?schedule_generation_job - schedule_generation_job)
+    (job_ready_for_approval ?schedule_generation_job - schedule_generation_job)
+    (job_document_attached ?schedule_generation_job - schedule_generation_job)
+    (job_document_included_flag ?schedule_generation_job - schedule_generation_job)
+    (presentation_profile_attached ?schedule_generation_job - schedule_generation_job)
+    (job_final_validation_passed ?schedule_generation_job - schedule_generation_job)
+    (manual_override_token_available ?manual_override_token - manual_override_token)
+    (job_bound_manual_override ?schedule_generation_job - schedule_generation_job ?manual_override_token - manual_override_token)
+    (manual_override_applied ?schedule_generation_job - schedule_generation_job)
+    (manual_override_acknowledged ?schedule_generation_job - schedule_generation_job)
+    (manual_override_approved ?schedule_generation_job - schedule_generation_job)
+    (document_template_available ?document_template - document_template)
+    (job_bound_document_template ?schedule_generation_job - schedule_generation_job ?document_template - document_template)
+    (presentation_profile_available ?presentation_profile - presentation_profile)
+    (job_bound_presentation_profile ?schedule_generation_job - schedule_generation_job ?presentation_profile - presentation_profile)
+    (collateral_profile_available ?collateral_profile - collateral_profile)
+    (job_bound_collateral_profile ?schedule_generation_job - schedule_generation_job ?collateral_profile - collateral_profile)
+    (regulatory_flag_available ?regulatory_flag - regulatory_flag)
+    (job_bound_regulatory_flag ?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag)
+    (execution_context_available ?execution_context - execution_context)
+    (bound_execution_context_for ?credit_case - credit_case ?execution_context - execution_context)
+    (primary_loan_exposure_recorded ?primary_loan_account - primary_loan_account)
+    (secondary_loan_exposure_recorded ?secondary_loan_account - secondary_loan_account)
+    (publish_committed ?schedule_generation_job - schedule_generation_job)
+  )
+  (:action admit_credit_case
+    :parameters (?credit_case - credit_case)
+    :precondition
+      (and
+        (not
+          (entity_admitted ?credit_case)
+        )
+        (not
+          (schedule_published ?credit_case)
+        )
+      )
+    :effect (entity_admitted ?credit_case)
+  )
+  (:action assign_rate_template_to_case
+    :parameters (?credit_case - credit_case ?rate_template - rate_template)
+    :precondition
+      (and
+        (entity_admitted ?credit_case)
+        (not
+          (rate_assigned ?credit_case)
+        )
+        (rate_template_available ?rate_template)
+      )
+    :effect
+      (and
+        (rate_assigned ?credit_case)
+        (bound_rate_template_for ?credit_case ?rate_template)
+        (not
+          (rate_template_available ?rate_template)
+        )
+      )
+  )
+  (:action assign_pricing_model_to_case
+    :parameters (?credit_case - credit_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_admitted ?credit_case)
+        (rate_assigned ?credit_case)
+        (pricing_model_available ?pricing_model)
+      )
+    :effect
+      (and
+        (bound_pricing_model_for ?credit_case ?pricing_model)
+        (not
+          (pricing_model_available ?pricing_model)
+        )
+      )
+  )
+  (:action finalize_case_configuration
+    :parameters (?credit_case - credit_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_admitted ?credit_case)
+        (rate_assigned ?credit_case)
+        (bound_pricing_model_for ?credit_case ?pricing_model)
+        (not
+          (entity_configured ?credit_case)
+        )
+      )
+    :effect (entity_configured ?credit_case)
+  )
+  (:action release_pricing_model_from_case
+    :parameters (?credit_case - credit_case ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (bound_pricing_model_for ?credit_case ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_available ?pricing_model)
+        (not
+          (bound_pricing_model_for ?credit_case ?pricing_model)
+        )
+      )
+  )
+  (:action assign_servicing_policy_to_case
+    :parameters (?credit_case - credit_case ?servicing_policy - servicing_policy)
+    :precondition
+      (and
+        (entity_configured ?credit_case)
+        (servicing_policy_available ?servicing_policy)
+      )
+    :effect
+      (and
+        (bound_servicing_policy_for ?credit_case ?servicing_policy)
+        (not
+          (servicing_policy_available ?servicing_policy)
+        )
+      )
+  )
+  (:action release_servicing_policy_from_case
+    :parameters (?credit_case - credit_case ?servicing_policy - servicing_policy)
+    :precondition
+      (and
+        (bound_servicing_policy_for ?credit_case ?servicing_policy)
+      )
+    :effect
+      (and
+        (servicing_policy_available ?servicing_policy)
+        (not
+          (bound_servicing_policy_for ?credit_case ?servicing_policy)
+        )
+      )
+  )
+  (:action attach_collateral_profile_to_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?collateral_profile - collateral_profile)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (collateral_profile_available ?collateral_profile)
+      )
+    :effect
+      (and
+        (job_bound_collateral_profile ?schedule_generation_job ?collateral_profile)
+        (not
+          (collateral_profile_available ?collateral_profile)
+        )
+      )
+  )
+  (:action detach_collateral_profile_from_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?collateral_profile - collateral_profile)
+    :precondition
+      (and
+        (job_bound_collateral_profile ?schedule_generation_job ?collateral_profile)
+      )
+    :effect
+      (and
+        (collateral_profile_available ?collateral_profile)
+        (not
+          (job_bound_collateral_profile ?schedule_generation_job ?collateral_profile)
+        )
+      )
+  )
+  (:action attach_regulatory_flag_to_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (regulatory_flag_available ?regulatory_flag)
+      )
+    :effect
+      (and
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (not
+          (regulatory_flag_available ?regulatory_flag)
+        )
+      )
+  )
+  (:action detach_regulatory_flag_from_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag)
+    :precondition
+      (and
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+      )
+    :effect
+      (and
+        (regulatory_flag_available ?regulatory_flag)
+        (not
+          (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        )
+      )
+  )
+  (:action mark_principal_leg_ready
+    :parameters (?primary_loan_account - primary_loan_account ?principal_leg_profile - principal_leg_profile ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_configured ?primary_loan_account)
+        (bound_pricing_model_for ?primary_loan_account ?pricing_model)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (not
+          (principal_leg_marked_ready ?principal_leg_profile)
+        )
+        (not
+          (principal_leg_assigned_adjustment ?principal_leg_profile)
+        )
+      )
+    :effect (principal_leg_marked_ready ?principal_leg_profile)
+  )
+  (:action record_primary_loan_readiness
+    :parameters (?primary_loan_account - primary_loan_account ?principal_leg_profile - principal_leg_profile ?servicing_policy - servicing_policy)
+    :precondition
+      (and
+        (entity_configured ?primary_loan_account)
+        (bound_servicing_policy_for ?primary_loan_account ?servicing_policy)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (principal_leg_marked_ready ?principal_leg_profile)
+        (not
+          (primary_loan_exposure_recorded ?primary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+      )
+  )
+  (:action apply_adjustment_to_primary_leg
+    :parameters (?primary_loan_account - primary_loan_account ?principal_leg_profile - principal_leg_profile ?adjustment_profile - adjustment_profile)
+    :precondition
+      (and
+        (entity_configured ?primary_loan_account)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (adjustment_profile_available ?adjustment_profile)
+        (not
+          (primary_loan_exposure_recorded ?primary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (principal_leg_assigned_adjustment ?principal_leg_profile)
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (primary_loan_has_adjustment_profile ?primary_loan_account ?adjustment_profile)
+        (not
+          (adjustment_profile_available ?adjustment_profile)
+        )
+      )
+  )
+  (:action resolve_primary_leg_adjustment
+    :parameters (?primary_loan_account - primary_loan_account ?principal_leg_profile - principal_leg_profile ?pricing_model - pricing_model ?adjustment_profile - adjustment_profile)
+    :precondition
+      (and
+        (entity_configured ?primary_loan_account)
+        (bound_pricing_model_for ?primary_loan_account ?pricing_model)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (principal_leg_assigned_adjustment ?principal_leg_profile)
+        (primary_loan_has_adjustment_profile ?primary_loan_account ?adjustment_profile)
+        (not
+          (primary_loan_ready_for_composition ?primary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (principal_leg_marked_ready ?principal_leg_profile)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+        (adjustment_profile_available ?adjustment_profile)
+        (not
+          (primary_loan_has_adjustment_profile ?primary_loan_account ?adjustment_profile)
+        )
+      )
+  )
+  (:action mark_interest_leg_ready
+    :parameters (?secondary_loan_account - secondary_loan_account ?interest_leg_profile - interest_leg_profile ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_configured ?secondary_loan_account)
+        (bound_pricing_model_for ?secondary_loan_account ?pricing_model)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (not
+          (interest_leg_marked_ready ?interest_leg_profile)
+        )
+        (not
+          (interest_leg_assigned_adjustment ?interest_leg_profile)
+        )
+      )
+    :effect (interest_leg_marked_ready ?interest_leg_profile)
+  )
+  (:action record_secondary_loan_readiness
+    :parameters (?secondary_loan_account - secondary_loan_account ?interest_leg_profile - interest_leg_profile ?servicing_policy - servicing_policy)
+    :precondition
+      (and
+        (entity_configured ?secondary_loan_account)
+        (bound_servicing_policy_for ?secondary_loan_account ?servicing_policy)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (interest_leg_marked_ready ?interest_leg_profile)
+        (not
+          (secondary_loan_exposure_recorded ?secondary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+      )
+  )
+  (:action apply_adjustment_to_secondary_leg
+    :parameters (?secondary_loan_account - secondary_loan_account ?interest_leg_profile - interest_leg_profile ?adjustment_profile - adjustment_profile)
+    :precondition
+      (and
+        (entity_configured ?secondary_loan_account)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (adjustment_profile_available ?adjustment_profile)
+        (not
+          (secondary_loan_exposure_recorded ?secondary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (interest_leg_assigned_adjustment ?interest_leg_profile)
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (secondary_loan_has_adjustment_profile ?secondary_loan_account ?adjustment_profile)
+        (not
+          (adjustment_profile_available ?adjustment_profile)
+        )
+      )
+  )
+  (:action resolve_secondary_leg_adjustment
+    :parameters (?secondary_loan_account - secondary_loan_account ?interest_leg_profile - interest_leg_profile ?pricing_model - pricing_model ?adjustment_profile - adjustment_profile)
+    :precondition
+      (and
+        (entity_configured ?secondary_loan_account)
+        (bound_pricing_model_for ?secondary_loan_account ?pricing_model)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (interest_leg_assigned_adjustment ?interest_leg_profile)
+        (secondary_loan_has_adjustment_profile ?secondary_loan_account ?adjustment_profile)
+        (not
+          (secondary_loan_ready_for_composition ?secondary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (interest_leg_marked_ready ?interest_leg_profile)
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+        (adjustment_profile_available ?adjustment_profile)
+        (not
+          (secondary_loan_has_adjustment_profile ?secondary_loan_account ?adjustment_profile)
+        )
+      )
+  )
+  (:action compose_schedule_template
+    :parameters (?primary_loan_account - primary_loan_account ?secondary_loan_account - secondary_loan_account ?principal_leg_profile - principal_leg_profile ?interest_leg_profile - interest_leg_profile ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (principal_leg_marked_ready ?principal_leg_profile)
+        (interest_leg_marked_ready ?interest_leg_profile)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+        (schedule_template_available ?repayment_schedule_template)
+      )
+    :effect
+      (and
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_bound_principal_leg ?repayment_schedule_template ?principal_leg_profile)
+        (template_bound_interest_leg ?repayment_schedule_template ?interest_leg_profile)
+        (not
+          (schedule_template_available ?repayment_schedule_template)
+        )
+      )
+  )
+  (:action compose_schedule_template_with_principal_adjustment
+    :parameters (?primary_loan_account - primary_loan_account ?secondary_loan_account - secondary_loan_account ?principal_leg_profile - principal_leg_profile ?interest_leg_profile - interest_leg_profile ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (principal_leg_assigned_adjustment ?principal_leg_profile)
+        (interest_leg_marked_ready ?interest_leg_profile)
+        (not
+          (primary_loan_ready_for_composition ?primary_loan_account)
+        )
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+        (schedule_template_available ?repayment_schedule_template)
+      )
+    :effect
+      (and
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_bound_principal_leg ?repayment_schedule_template ?principal_leg_profile)
+        (template_bound_interest_leg ?repayment_schedule_template ?interest_leg_profile)
+        (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        (not
+          (schedule_template_available ?repayment_schedule_template)
+        )
+      )
+  )
+  (:action compose_schedule_template_with_interest_adjustment
+    :parameters (?primary_loan_account - primary_loan_account ?secondary_loan_account - secondary_loan_account ?principal_leg_profile - principal_leg_profile ?interest_leg_profile - interest_leg_profile ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (principal_leg_marked_ready ?principal_leg_profile)
+        (interest_leg_assigned_adjustment ?interest_leg_profile)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+        (not
+          (secondary_loan_ready_for_composition ?secondary_loan_account)
+        )
+        (schedule_template_available ?repayment_schedule_template)
+      )
+    :effect
+      (and
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_bound_principal_leg ?repayment_schedule_template ?principal_leg_profile)
+        (template_bound_interest_leg ?repayment_schedule_template ?interest_leg_profile)
+        (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        (not
+          (schedule_template_available ?repayment_schedule_template)
+        )
+      )
+  )
+  (:action compose_schedule_template_with_both_adjustments
+    :parameters (?primary_loan_account - primary_loan_account ?secondary_loan_account - secondary_loan_account ?principal_leg_profile - principal_leg_profile ?interest_leg_profile - interest_leg_profile ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (loan_has_principal_leg_profile ?primary_loan_account ?principal_leg_profile)
+        (loan_has_interest_leg_profile ?secondary_loan_account ?interest_leg_profile)
+        (principal_leg_assigned_adjustment ?principal_leg_profile)
+        (interest_leg_assigned_adjustment ?interest_leg_profile)
+        (not
+          (primary_loan_ready_for_composition ?primary_loan_account)
+        )
+        (not
+          (secondary_loan_ready_for_composition ?secondary_loan_account)
+        )
+        (schedule_template_available ?repayment_schedule_template)
+      )
+    :effect
+      (and
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_bound_principal_leg ?repayment_schedule_template ?principal_leg_profile)
+        (template_bound_interest_leg ?repayment_schedule_template ?interest_leg_profile)
+        (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        (not
+          (schedule_template_available ?repayment_schedule_template)
+        )
+      )
+  )
+  (:action price_schedule_template
+    :parameters (?repayment_schedule_template - repayment_schedule_template ?primary_loan_account - primary_loan_account ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (schedule_template_generated ?repayment_schedule_template)
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (bound_pricing_model_for ?primary_loan_account ?pricing_model)
+        (not
+          (template_priced ?repayment_schedule_template)
+        )
+      )
+    :effect (template_priced ?repayment_schedule_template)
+  )
+  (:action attach_amendment_to_template
+    :parameters (?schedule_generation_job - schedule_generation_job ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (job_bound_template ?schedule_generation_job ?repayment_schedule_template)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_record_available ?amendment_record)
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_priced ?repayment_schedule_template)
+        (not
+          (amendment_applied ?amendment_record)
+        )
+      )
+    :effect
+      (and
+        (amendment_applied ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (not
+          (amendment_record_available ?amendment_record)
+        )
+      )
+  )
+  (:action prepare_job_for_augmentation
+    :parameters (?schedule_generation_job - schedule_generation_job ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (bound_pricing_model_for ?schedule_generation_job ?pricing_model)
+        (not
+          (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        )
+        (not
+          (job_ready_for_augmentation ?schedule_generation_job)
+        )
+      )
+    :effect (job_ready_for_augmentation ?schedule_generation_job)
+  )
+  (:action attach_document_template_to_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?document_template - document_template)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (document_template_available ?document_template)
+        (not
+          (job_document_attached ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (job_document_attached ?schedule_generation_job)
+        (job_bound_document_template ?schedule_generation_job ?document_template)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action bind_document_to_job_template
+    :parameters (?schedule_generation_job - schedule_generation_job ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template ?pricing_model - pricing_model ?document_template - document_template)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (bound_pricing_model_for ?schedule_generation_job ?pricing_model)
+        (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        (job_document_attached ?schedule_generation_job)
+        (job_bound_document_template ?schedule_generation_job ?document_template)
+        (not
+          (job_ready_for_augmentation ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_augmentation ?schedule_generation_job)
+        (job_document_included_flag ?schedule_generation_job)
+      )
+  )
+  (:action attach_collateral_and_mark_augmented
+    :parameters (?schedule_generation_job - schedule_generation_job ?collateral_profile - collateral_profile ?servicing_policy - servicing_policy ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_ready_for_augmentation ?schedule_generation_job)
+        (job_bound_collateral_profile ?schedule_generation_job ?collateral_profile)
+        (bound_servicing_policy_for ?schedule_generation_job ?servicing_policy)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (not
+          (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        )
+        (not
+          (job_augmented ?schedule_generation_job)
+        )
+      )
+    :effect (job_augmented ?schedule_generation_job)
+  )
+  (:action attach_collateral_and_mark_augmented_with_interest_adjustment
+    :parameters (?schedule_generation_job - schedule_generation_job ?collateral_profile - collateral_profile ?servicing_policy - servicing_policy ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_ready_for_augmentation ?schedule_generation_job)
+        (job_bound_collateral_profile ?schedule_generation_job ?collateral_profile)
+        (bound_servicing_policy_for ?schedule_generation_job ?servicing_policy)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        (not
+          (job_augmented ?schedule_generation_job)
+        )
+      )
+    :effect (job_augmented ?schedule_generation_job)
+  )
+  (:action flag_job_ready_for_approval_no_adjustments
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_augmented ?schedule_generation_job)
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (not
+          (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        )
+        (not
+          (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        )
+        (not
+          (job_ready_for_approval ?schedule_generation_job)
+        )
+      )
+    :effect (job_ready_for_approval ?schedule_generation_job)
+  )
+  (:action flag_job_ready_for_approval_with_principal_adjustment
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_augmented ?schedule_generation_job)
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        (not
+          (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        )
+        (not
+          (job_ready_for_approval ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (presentation_profile_attached ?schedule_generation_job)
+      )
+  )
+  (:action flag_job_ready_for_approval_with_interest_adjustment
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_augmented ?schedule_generation_job)
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (not
+          (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        )
+        (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        (not
+          (job_ready_for_approval ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (presentation_profile_attached ?schedule_generation_job)
+      )
+  )
+  (:action flag_job_ready_for_approval_with_both_adjustments
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag ?amendment_record - amendment_record ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (job_augmented ?schedule_generation_job)
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (job_bound_amendment ?schedule_generation_job ?amendment_record)
+        (amendment_applied_to_template ?amendment_record ?repayment_schedule_template)
+        (template_flag_principal_adjustment_applied ?repayment_schedule_template)
+        (template_flag_interest_adjustment_applied ?repayment_schedule_template)
+        (not
+          (job_ready_for_approval ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (presentation_profile_attached ?schedule_generation_job)
+      )
+  )
+  (:action approve_and_publish_job
+    :parameters (?schedule_generation_job - schedule_generation_job)
+    :precondition
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (not
+          (presentation_profile_attached ?schedule_generation_job)
+        )
+        (not
+          (publish_committed ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (publish_committed ?schedule_generation_job)
+        (entity_approval_granted ?schedule_generation_job)
+      )
+  )
+  (:action bind_presentation_profile_to_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?presentation_profile - presentation_profile)
+    :precondition
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (presentation_profile_attached ?schedule_generation_job)
+        (presentation_profile_available ?presentation_profile)
+      )
+    :effect
+      (and
+        (job_bound_presentation_profile ?schedule_generation_job ?presentation_profile)
+        (not
+          (presentation_profile_available ?presentation_profile)
+        )
+      )
+  )
+  (:action perform_final_job_validation
+    :parameters (?schedule_generation_job - schedule_generation_job ?primary_loan_account - primary_loan_account ?secondary_loan_account - secondary_loan_account ?pricing_model - pricing_model ?presentation_profile - presentation_profile)
+    :precondition
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (presentation_profile_attached ?schedule_generation_job)
+        (job_bound_presentation_profile ?schedule_generation_job ?presentation_profile)
+        (job_includes_primary_loan ?schedule_generation_job ?primary_loan_account)
+        (job_includes_secondary_loan ?schedule_generation_job ?secondary_loan_account)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+        (bound_pricing_model_for ?schedule_generation_job ?pricing_model)
+        (not
+          (job_final_validation_passed ?schedule_generation_job)
+        )
+      )
+    :effect (job_final_validation_passed ?schedule_generation_job)
+  )
+  (:action approve_and_publish_job_after_validation
+    :parameters (?schedule_generation_job - schedule_generation_job)
+    :precondition
+      (and
+        (job_ready_for_approval ?schedule_generation_job)
+        (job_final_validation_passed ?schedule_generation_job)
+        (not
+          (publish_committed ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (publish_committed ?schedule_generation_job)
+        (entity_approval_granted ?schedule_generation_job)
+      )
+  )
+  (:action apply_manual_override_to_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?manual_override_token - manual_override_token ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_configured ?schedule_generation_job)
+        (bound_pricing_model_for ?schedule_generation_job ?pricing_model)
+        (manual_override_token_available ?manual_override_token)
+        (job_bound_manual_override ?schedule_generation_job ?manual_override_token)
+        (not
+          (manual_override_applied ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (manual_override_applied ?schedule_generation_job)
+        (not
+          (manual_override_token_available ?manual_override_token)
+        )
+      )
+  )
+  (:action acknowledge_manual_override
+    :parameters (?schedule_generation_job - schedule_generation_job ?servicing_policy - servicing_policy)
+    :precondition
+      (and
+        (manual_override_applied ?schedule_generation_job)
+        (bound_servicing_policy_for ?schedule_generation_job ?servicing_policy)
+        (not
+          (manual_override_acknowledged ?schedule_generation_job)
+        )
+      )
+    :effect (manual_override_acknowledged ?schedule_generation_job)
+  )
+  (:action approve_manual_override
+    :parameters (?schedule_generation_job - schedule_generation_job ?regulatory_flag - regulatory_flag)
+    :precondition
+      (and
+        (manual_override_acknowledged ?schedule_generation_job)
+        (job_bound_regulatory_flag ?schedule_generation_job ?regulatory_flag)
+        (not
+          (manual_override_approved ?schedule_generation_job)
+        )
+      )
+    :effect (manual_override_approved ?schedule_generation_job)
+  )
+  (:action publish_job_after_manual_override
+    :parameters (?schedule_generation_job - schedule_generation_job)
+    :precondition
+      (and
+        (manual_override_approved ?schedule_generation_job)
+        (not
+          (publish_committed ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (publish_committed ?schedule_generation_job)
+        (entity_approval_granted ?schedule_generation_job)
+      )
+  )
+  (:action finalize_primary_loan_schedule
+    :parameters (?primary_loan_account - primary_loan_account ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (primary_loan_exposure_recorded ?primary_loan_account)
+        (primary_loan_ready_for_composition ?primary_loan_account)
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_priced ?repayment_schedule_template)
+        (not
+          (entity_approval_granted ?primary_loan_account)
+        )
+      )
+    :effect (entity_approval_granted ?primary_loan_account)
+  )
+  (:action finalize_secondary_loan_schedule
+    :parameters (?secondary_loan_account - secondary_loan_account ?repayment_schedule_template - repayment_schedule_template)
+    :precondition
+      (and
+        (secondary_loan_exposure_recorded ?secondary_loan_account)
+        (secondary_loan_ready_for_composition ?secondary_loan_account)
+        (schedule_template_generated ?repayment_schedule_template)
+        (template_priced ?repayment_schedule_template)
+        (not
+          (entity_approval_granted ?secondary_loan_account)
+        )
+      )
+    :effect (entity_approval_granted ?secondary_loan_account)
+  )
+  (:action assign_execution_context_to_case
+    :parameters (?credit_case - credit_case ?execution_context - execution_context ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (entity_approval_granted ?credit_case)
+        (bound_pricing_model_for ?credit_case ?pricing_model)
+        (execution_context_available ?execution_context)
+        (not
+          (execution_context_bound_flag ?credit_case)
+        )
+      )
+    :effect
+      (and
+        (execution_context_bound_flag ?credit_case)
+        (bound_execution_context_for ?credit_case ?execution_context)
+        (not
+          (execution_context_available ?execution_context)
+        )
+      )
+  )
+  (:action publish_schedule_for_primary_loan
+    :parameters (?primary_loan_account - primary_loan_account ?rate_template - rate_template ?execution_context - execution_context)
+    :precondition
+      (and
+        (execution_context_bound_flag ?primary_loan_account)
+        (bound_rate_template_for ?primary_loan_account ?rate_template)
+        (bound_execution_context_for ?primary_loan_account ?execution_context)
+        (not
+          (schedule_published ?primary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (schedule_published ?primary_loan_account)
+        (rate_template_available ?rate_template)
+        (execution_context_available ?execution_context)
+      )
+  )
+  (:action publish_schedule_for_secondary_loan
+    :parameters (?secondary_loan_account - secondary_loan_account ?rate_template - rate_template ?execution_context - execution_context)
+    :precondition
+      (and
+        (execution_context_bound_flag ?secondary_loan_account)
+        (bound_rate_template_for ?secondary_loan_account ?rate_template)
+        (bound_execution_context_for ?secondary_loan_account ?execution_context)
+        (not
+          (schedule_published ?secondary_loan_account)
+        )
+      )
+    :effect
+      (and
+        (schedule_published ?secondary_loan_account)
+        (rate_template_available ?rate_template)
+        (execution_context_available ?execution_context)
+      )
+  )
+  (:action publish_schedule_for_job
+    :parameters (?schedule_generation_job - schedule_generation_job ?rate_template - rate_template ?execution_context - execution_context)
+    :precondition
+      (and
+        (execution_context_bound_flag ?schedule_generation_job)
+        (bound_rate_template_for ?schedule_generation_job ?rate_template)
+        (bound_execution_context_for ?schedule_generation_job ?execution_context)
+        (not
+          (schedule_published ?schedule_generation_job)
+        )
+      )
+    :effect
+      (and
+        (schedule_published ?schedule_generation_job)
+        (rate_template_available ?rate_template)
+        (execution_context_available ?execution_context)
+      )
+  )
+)

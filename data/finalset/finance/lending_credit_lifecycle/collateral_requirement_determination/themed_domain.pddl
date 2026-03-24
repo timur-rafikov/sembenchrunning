@@ -1,0 +1,936 @@
+(define (domain collateral_requirement_determination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types party_or_resource - object asset_or_info - object document_or_reference - object application_supertype - object loan_application - application_supertype collateral_asset_proposal - party_or_resource valuation_report - party_or_resource external_party - party_or_resource legal_reference - party_or_resource policy_override - party_or_resource collateral_type - party_or_resource valuation_method - party_or_resource regulatory_constraint - party_or_resource supporting_document - asset_or_info collateral_item - asset_or_info credit_bureau_record - asset_or_info risk_factor - document_or_reference stress_scenario - document_or_reference collateral_recommendation - document_or_reference loan_application_borrower_role - loan_application coborrower_role - loan_application borrower_profile - loan_application_borrower_role coborrower_profile - loan_application_borrower_role collateral_assessment_case - coborrower_role)
+  (:predicates
+    (entity_registered ?loan_application - loan_application)
+    (underwriting_completed_for_entity ?loan_application - loan_application)
+    (collateral_proposal_attached ?loan_application - loan_application)
+    (entity_collateralized ?loan_application - loan_application)
+    (entity_assessment_complete ?loan_application - loan_application)
+    (approval_granted ?loan_application - loan_application)
+    (asset_proposal_available ?collateral_asset_proposal - collateral_asset_proposal)
+    (asset_assignment ?loan_application - loan_application ?collateral_asset_proposal - collateral_asset_proposal)
+    (valuation_report_available ?valuation_report - valuation_report)
+    (valuation_report_link ?loan_application - loan_application ?valuation_report - valuation_report)
+    (external_party_available ?external_party - external_party)
+    (external_party_link ?loan_application - loan_application ?external_party - external_party)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (borrower_supporting_document_link ?borrower_profile - borrower_profile ?supporting_document - supporting_document)
+    (coborrower_supporting_document_link ?coborrower_profile - coborrower_profile ?supporting_document - supporting_document)
+    (borrower_risk_association ?borrower_profile - borrower_profile ?risk_factor - risk_factor)
+    (risk_factor_confirmed ?risk_factor - risk_factor)
+    (risk_mitigation_requested ?risk_factor - risk_factor)
+    (borrower_risk_evaluation_completed ?borrower_profile - borrower_profile)
+    (coborrower_scenario_association ?coborrower_profile - coborrower_profile ?stress_scenario - stress_scenario)
+    (scenario_applies ?stress_scenario - stress_scenario)
+    (scenario_mitigation_requested ?stress_scenario - stress_scenario)
+    (coborrower_risk_evaluation_completed ?coborrower_profile - coborrower_profile)
+    (recommendation_draft_created ?collateral_recommendation - collateral_recommendation)
+    (recommendation_locked ?collateral_recommendation - collateral_recommendation)
+    (recommendation_risk_link ?collateral_recommendation - collateral_recommendation ?risk_factor - risk_factor)
+    (recommendation_scenario_link ?collateral_recommendation - collateral_recommendation ?stress_scenario - stress_scenario)
+    (recommendation_adjustment_eligible ?collateral_recommendation - collateral_recommendation)
+    (recommendation_alternative_adjustment_eligible ?collateral_recommendation - collateral_recommendation)
+    (recommendation_validated ?collateral_recommendation - collateral_recommendation)
+    (case_borrower_link ?collateral_assessment_case - collateral_assessment_case ?borrower_profile - borrower_profile)
+    (case_coborrower_link ?collateral_assessment_case - collateral_assessment_case ?coborrower_profile - coborrower_profile)
+    (case_recommendation_link ?collateral_assessment_case - collateral_assessment_case ?collateral_recommendation - collateral_recommendation)
+    (item_template_available ?collateral_item - collateral_item)
+    (case_item_template_association ?collateral_assessment_case - collateral_assessment_case ?collateral_item - collateral_item)
+    (collateral_item_instantiated ?collateral_item - collateral_item)
+    (item_recommendation_link ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    (case_review_initiated ?collateral_assessment_case - collateral_assessment_case)
+    (case_regulatory_validation_passed ?collateral_assessment_case - collateral_assessment_case)
+    (case_reviewer_assignment ?collateral_assessment_case - collateral_assessment_case)
+    (case_has_legal_reference ?collateral_assessment_case - collateral_assessment_case)
+    (case_legal_reference_confirmed ?collateral_assessment_case - collateral_assessment_case)
+    (case_governance_check_completed ?collateral_assessment_case - collateral_assessment_case)
+    (case_review_in_progress ?collateral_assessment_case - collateral_assessment_case)
+    (credit_bureau_record_available ?credit_bureau_record - credit_bureau_record)
+    (case_credit_bureau_link ?collateral_assessment_case - collateral_assessment_case ?credit_bureau_record - credit_bureau_record)
+    (case_credit_bureau_attached ?collateral_assessment_case - collateral_assessment_case)
+    (case_regulatory_check_requested ?collateral_assessment_case - collateral_assessment_case)
+    (case_regulatory_check_passed ?collateral_assessment_case - collateral_assessment_case)
+    (legal_reference_available ?legal_reference - legal_reference)
+    (case_legal_reference_link ?collateral_assessment_case - collateral_assessment_case ?legal_reference - legal_reference)
+    (policy_override_available ?policy_override - policy_override)
+    (case_policy_override_link ?collateral_assessment_case - collateral_assessment_case ?policy_override - policy_override)
+    (valuation_method_available ?valuation_method - valuation_method)
+    (case_valuation_method_link ?collateral_assessment_case - collateral_assessment_case ?valuation_method - valuation_method)
+    (regulatory_constraint_available ?regulatory_constraint - regulatory_constraint)
+    (case_regulatory_constraint_link ?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint)
+    (collateral_type_available ?collateral_type - collateral_type)
+    (collateral_type_link ?loan_application - loan_application ?collateral_type - collateral_type)
+    (borrower_ready_for_recommendation ?borrower_profile - borrower_profile)
+    (coborrower_ready_for_recommendation ?coborrower_profile - coborrower_profile)
+    (case_closed ?collateral_assessment_case - collateral_assessment_case)
+  )
+  (:action register_loan_application
+    :parameters (?loan_application - loan_application)
+    :precondition
+      (and
+        (not
+          (entity_registered ?loan_application)
+        )
+        (not
+          (entity_collateralized ?loan_application)
+        )
+      )
+    :effect (entity_registered ?loan_application)
+  )
+  (:action attach_collateral_asset_proposal
+    :parameters (?loan_application - loan_application ?collateral_asset_proposal - collateral_asset_proposal)
+    :precondition
+      (and
+        (entity_registered ?loan_application)
+        (not
+          (collateral_proposal_attached ?loan_application)
+        )
+        (asset_proposal_available ?collateral_asset_proposal)
+      )
+    :effect
+      (and
+        (collateral_proposal_attached ?loan_application)
+        (asset_assignment ?loan_application ?collateral_asset_proposal)
+        (not
+          (asset_proposal_available ?collateral_asset_proposal)
+        )
+      )
+  )
+  (:action link_valuation_report_to_application
+    :parameters (?loan_application - loan_application ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_registered ?loan_application)
+        (collateral_proposal_attached ?loan_application)
+        (valuation_report_available ?valuation_report)
+      )
+    :effect
+      (and
+        (valuation_report_link ?loan_application ?valuation_report)
+        (not
+          (valuation_report_available ?valuation_report)
+        )
+      )
+  )
+  (:action confirm_valuation_link
+    :parameters (?loan_application - loan_application ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_registered ?loan_application)
+        (collateral_proposal_attached ?loan_application)
+        (valuation_report_link ?loan_application ?valuation_report)
+        (not
+          (underwriting_completed_for_entity ?loan_application)
+        )
+      )
+    :effect (underwriting_completed_for_entity ?loan_application)
+  )
+  (:action release_valuation_report
+    :parameters (?loan_application - loan_application ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (valuation_report_link ?loan_application ?valuation_report)
+      )
+    :effect
+      (and
+        (valuation_report_available ?valuation_report)
+        (not
+          (valuation_report_link ?loan_application ?valuation_report)
+        )
+      )
+  )
+  (:action link_external_party_to_application
+    :parameters (?loan_application - loan_application ?external_party - external_party)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?loan_application)
+        (external_party_available ?external_party)
+      )
+    :effect
+      (and
+        (external_party_link ?loan_application ?external_party)
+        (not
+          (external_party_available ?external_party)
+        )
+      )
+  )
+  (:action unlink_external_party_from_application
+    :parameters (?loan_application - loan_application ?external_party - external_party)
+    :precondition
+      (and
+        (external_party_link ?loan_application ?external_party)
+      )
+    :effect
+      (and
+        (external_party_available ?external_party)
+        (not
+          (external_party_link ?loan_application ?external_party)
+        )
+      )
+  )
+  (:action attach_valuation_method_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?valuation_method - valuation_method)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (valuation_method_available ?valuation_method)
+      )
+    :effect
+      (and
+        (case_valuation_method_link ?collateral_assessment_case ?valuation_method)
+        (not
+          (valuation_method_available ?valuation_method)
+        )
+      )
+  )
+  (:action detach_valuation_method_from_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?valuation_method - valuation_method)
+    :precondition
+      (and
+        (case_valuation_method_link ?collateral_assessment_case ?valuation_method)
+      )
+    :effect
+      (and
+        (valuation_method_available ?valuation_method)
+        (not
+          (case_valuation_method_link ?collateral_assessment_case ?valuation_method)
+        )
+      )
+  )
+  (:action attach_regulatory_constraint_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (regulatory_constraint_available ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (not
+          (regulatory_constraint_available ?regulatory_constraint)
+        )
+      )
+  )
+  (:action detach_regulatory_constraint_from_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+      )
+    :effect
+      (and
+        (regulatory_constraint_available ?regulatory_constraint)
+        (not
+          (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        )
+      )
+  )
+  (:action confirm_risk_indicator_for_borrower
+    :parameters (?borrower_profile - borrower_profile ?risk_factor - risk_factor ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?borrower_profile)
+        (valuation_report_link ?borrower_profile ?valuation_report)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (not
+          (risk_factor_confirmed ?risk_factor)
+        )
+        (not
+          (risk_mitigation_requested ?risk_factor)
+        )
+      )
+    :effect (risk_factor_confirmed ?risk_factor)
+  )
+  (:action finalize_borrower_risk_evaluation
+    :parameters (?borrower_profile - borrower_profile ?risk_factor - risk_factor ?external_party - external_party)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?borrower_profile)
+        (external_party_link ?borrower_profile ?external_party)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (risk_factor_confirmed ?risk_factor)
+        (not
+          (borrower_ready_for_recommendation ?borrower_profile)
+        )
+      )
+    :effect
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+      )
+  )
+  (:action request_borrower_risk_mitigation
+    :parameters (?borrower_profile - borrower_profile ?risk_factor - risk_factor ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?borrower_profile)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (supporting_document_available ?supporting_document)
+        (not
+          (borrower_ready_for_recommendation ?borrower_profile)
+        )
+      )
+    :effect
+      (and
+        (risk_mitigation_requested ?risk_factor)
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (borrower_supporting_document_link ?borrower_profile ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_borrower_risk_mitigation
+    :parameters (?borrower_profile - borrower_profile ?risk_factor - risk_factor ?valuation_report - valuation_report ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?borrower_profile)
+        (valuation_report_link ?borrower_profile ?valuation_report)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (risk_mitigation_requested ?risk_factor)
+        (borrower_supporting_document_link ?borrower_profile ?supporting_document)
+        (not
+          (borrower_risk_evaluation_completed ?borrower_profile)
+        )
+      )
+    :effect
+      (and
+        (risk_factor_confirmed ?risk_factor)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+        (supporting_document_available ?supporting_document)
+        (not
+          (borrower_supporting_document_link ?borrower_profile ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_stress_scenario_for_coborrower
+    :parameters (?coborrower_profile - coborrower_profile ?stress_scenario - stress_scenario ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?coborrower_profile)
+        (valuation_report_link ?coborrower_profile ?valuation_report)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (not
+          (scenario_applies ?stress_scenario)
+        )
+        (not
+          (scenario_mitigation_requested ?stress_scenario)
+        )
+      )
+    :effect (scenario_applies ?stress_scenario)
+  )
+  (:action finalize_coborrower_risk_evaluation
+    :parameters (?coborrower_profile - coborrower_profile ?stress_scenario - stress_scenario ?external_party - external_party)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?coborrower_profile)
+        (external_party_link ?coborrower_profile ?external_party)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (scenario_applies ?stress_scenario)
+        (not
+          (coborrower_ready_for_recommendation ?coborrower_profile)
+        )
+      )
+    :effect
+      (and
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+      )
+  )
+  (:action request_coborrower_scenario_mitigation
+    :parameters (?coborrower_profile - coborrower_profile ?stress_scenario - stress_scenario ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?coborrower_profile)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (supporting_document_available ?supporting_document)
+        (not
+          (coborrower_ready_for_recommendation ?coborrower_profile)
+        )
+      )
+    :effect
+      (and
+        (scenario_mitigation_requested ?stress_scenario)
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (coborrower_supporting_document_link ?coborrower_profile ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action confirm_coborrower_scenario_mitigation
+    :parameters (?coborrower_profile - coborrower_profile ?stress_scenario - stress_scenario ?valuation_report - valuation_report ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?coborrower_profile)
+        (valuation_report_link ?coborrower_profile ?valuation_report)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (scenario_mitigation_requested ?stress_scenario)
+        (coborrower_supporting_document_link ?coborrower_profile ?supporting_document)
+        (not
+          (coborrower_risk_evaluation_completed ?coborrower_profile)
+        )
+      )
+    :effect
+      (and
+        (scenario_applies ?stress_scenario)
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+        (supporting_document_available ?supporting_document)
+        (not
+          (coborrower_supporting_document_link ?coborrower_profile ?supporting_document)
+        )
+      )
+  )
+  (:action generate_collateral_recommendation_standard
+    :parameters (?borrower_profile - borrower_profile ?coborrower_profile - coborrower_profile ?risk_factor - risk_factor ?stress_scenario - stress_scenario ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (risk_factor_confirmed ?risk_factor)
+        (scenario_applies ?stress_scenario)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+        (recommendation_draft_created ?collateral_recommendation)
+      )
+    :effect
+      (and
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_risk_link ?collateral_recommendation ?risk_factor)
+        (recommendation_scenario_link ?collateral_recommendation ?stress_scenario)
+        (not
+          (recommendation_draft_created ?collateral_recommendation)
+        )
+      )
+  )
+  (:action generate_collateral_recommendation_path_a
+    :parameters (?borrower_profile - borrower_profile ?coborrower_profile - coborrower_profile ?risk_factor - risk_factor ?stress_scenario - stress_scenario ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (risk_mitigation_requested ?risk_factor)
+        (scenario_applies ?stress_scenario)
+        (not
+          (borrower_risk_evaluation_completed ?borrower_profile)
+        )
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+        (recommendation_draft_created ?collateral_recommendation)
+      )
+    :effect
+      (and
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_risk_link ?collateral_recommendation ?risk_factor)
+        (recommendation_scenario_link ?collateral_recommendation ?stress_scenario)
+        (recommendation_adjustment_eligible ?collateral_recommendation)
+        (not
+          (recommendation_draft_created ?collateral_recommendation)
+        )
+      )
+  )
+  (:action generate_collateral_recommendation_path_b
+    :parameters (?borrower_profile - borrower_profile ?coborrower_profile - coborrower_profile ?risk_factor - risk_factor ?stress_scenario - stress_scenario ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (risk_factor_confirmed ?risk_factor)
+        (scenario_mitigation_requested ?stress_scenario)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+        (not
+          (coborrower_risk_evaluation_completed ?coborrower_profile)
+        )
+        (recommendation_draft_created ?collateral_recommendation)
+      )
+    :effect
+      (and
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_risk_link ?collateral_recommendation ?risk_factor)
+        (recommendation_scenario_link ?collateral_recommendation ?stress_scenario)
+        (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        (not
+          (recommendation_draft_created ?collateral_recommendation)
+        )
+      )
+  )
+  (:action generate_collateral_recommendation_combined
+    :parameters (?borrower_profile - borrower_profile ?coborrower_profile - coborrower_profile ?risk_factor - risk_factor ?stress_scenario - stress_scenario ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (borrower_risk_association ?borrower_profile ?risk_factor)
+        (coborrower_scenario_association ?coborrower_profile ?stress_scenario)
+        (risk_mitigation_requested ?risk_factor)
+        (scenario_mitigation_requested ?stress_scenario)
+        (not
+          (borrower_risk_evaluation_completed ?borrower_profile)
+        )
+        (not
+          (coborrower_risk_evaluation_completed ?coborrower_profile)
+        )
+        (recommendation_draft_created ?collateral_recommendation)
+      )
+    :effect
+      (and
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_risk_link ?collateral_recommendation ?risk_factor)
+        (recommendation_scenario_link ?collateral_recommendation ?stress_scenario)
+        (recommendation_adjustment_eligible ?collateral_recommendation)
+        (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        (not
+          (recommendation_draft_created ?collateral_recommendation)
+        )
+      )
+  )
+  (:action validate_recommendation_for_itemization
+    :parameters (?collateral_recommendation - collateral_recommendation ?borrower_profile - borrower_profile ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (recommendation_locked ?collateral_recommendation)
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (valuation_report_link ?borrower_profile ?valuation_report)
+        (not
+          (recommendation_validated ?collateral_recommendation)
+        )
+      )
+    :effect (recommendation_validated ?collateral_recommendation)
+  )
+  (:action create_and_associate_collateral_item
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (case_recommendation_link ?collateral_assessment_case ?collateral_recommendation)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_template_available ?collateral_item)
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_validated ?collateral_recommendation)
+        (not
+          (collateral_item_instantiated ?collateral_item)
+        )
+      )
+    :effect
+      (and
+        (collateral_item_instantiated ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (not
+          (item_template_available ?collateral_item)
+        )
+      )
+  )
+  (:action start_initial_review_for_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (collateral_item_instantiated ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (valuation_report_link ?collateral_assessment_case ?valuation_report)
+        (not
+          (recommendation_adjustment_eligible ?collateral_recommendation)
+        )
+        (not
+          (case_review_initiated ?collateral_assessment_case)
+        )
+      )
+    :effect (case_review_initiated ?collateral_assessment_case)
+  )
+  (:action attach_legal_reference_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?legal_reference - legal_reference)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (legal_reference_available ?legal_reference)
+        (not
+          (case_has_legal_reference ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_legal_reference ?collateral_assessment_case)
+        (case_legal_reference_link ?collateral_assessment_case ?legal_reference)
+        (not
+          (legal_reference_available ?legal_reference)
+        )
+      )
+  )
+  (:action confirm_legal_reference_and_initiate_review
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation ?valuation_report - valuation_report ?legal_reference - legal_reference)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (collateral_item_instantiated ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (valuation_report_link ?collateral_assessment_case ?valuation_report)
+        (recommendation_adjustment_eligible ?collateral_recommendation)
+        (case_has_legal_reference ?collateral_assessment_case)
+        (case_legal_reference_link ?collateral_assessment_case ?legal_reference)
+        (not
+          (case_review_initiated ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_review_initiated ?collateral_assessment_case)
+        (case_legal_reference_confirmed ?collateral_assessment_case)
+      )
+  )
+  (:action perform_regulatory_validation_for_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?valuation_method - valuation_method ?external_party - external_party ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_review_initiated ?collateral_assessment_case)
+        (case_valuation_method_link ?collateral_assessment_case ?valuation_method)
+        (external_party_link ?collateral_assessment_case ?external_party)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (not
+          (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        )
+        (not
+          (case_regulatory_validation_passed ?collateral_assessment_case)
+        )
+      )
+    :effect (case_regulatory_validation_passed ?collateral_assessment_case)
+  )
+  (:action perform_regulatory_validation_alternative
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?valuation_method - valuation_method ?external_party - external_party ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_review_initiated ?collateral_assessment_case)
+        (case_valuation_method_link ?collateral_assessment_case ?valuation_method)
+        (external_party_link ?collateral_assessment_case ?external_party)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        (not
+          (case_regulatory_validation_passed ?collateral_assessment_case)
+        )
+      )
+    :effect (case_regulatory_validation_passed ?collateral_assessment_case)
+  )
+  (:action assign_reviewer_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_regulatory_validation_passed ?collateral_assessment_case)
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (not
+          (recommendation_adjustment_eligible ?collateral_recommendation)
+        )
+        (not
+          (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        )
+        (not
+          (case_reviewer_assignment ?collateral_assessment_case)
+        )
+      )
+    :effect (case_reviewer_assignment ?collateral_assessment_case)
+  )
+  (:action assign_reviewer_and_mark_governance_check
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_regulatory_validation_passed ?collateral_assessment_case)
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (recommendation_adjustment_eligible ?collateral_recommendation)
+        (not
+          (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        )
+        (not
+          (case_reviewer_assignment ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_governance_check_completed ?collateral_assessment_case)
+      )
+  )
+  (:action assign_reviewer_and_mark_governance_check_alternative
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_regulatory_validation_passed ?collateral_assessment_case)
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (not
+          (recommendation_adjustment_eligible ?collateral_recommendation)
+        )
+        (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        (not
+          (case_reviewer_assignment ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_governance_check_completed ?collateral_assessment_case)
+      )
+  )
+  (:action assign_reviewer_and_mark_governance_check_additional
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint ?collateral_item - collateral_item ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (case_regulatory_validation_passed ?collateral_assessment_case)
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (case_item_template_association ?collateral_assessment_case ?collateral_item)
+        (item_recommendation_link ?collateral_item ?collateral_recommendation)
+        (recommendation_adjustment_eligible ?collateral_recommendation)
+        (recommendation_alternative_adjustment_eligible ?collateral_recommendation)
+        (not
+          (case_reviewer_assignment ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_governance_check_completed ?collateral_assessment_case)
+      )
+  )
+  (:action complete_case_assessment_and_signoff
+    :parameters (?collateral_assessment_case - collateral_assessment_case)
+    :precondition
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (not
+          (case_governance_check_completed ?collateral_assessment_case)
+        )
+        (not
+          (case_closed ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?collateral_assessment_case)
+        (entity_assessment_complete ?collateral_assessment_case)
+      )
+  )
+  (:action apply_policy_override_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?policy_override - policy_override)
+    :precondition
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_governance_check_completed ?collateral_assessment_case)
+        (policy_override_available ?policy_override)
+      )
+    :effect
+      (and
+        (case_policy_override_link ?collateral_assessment_case ?policy_override)
+        (not
+          (policy_override_available ?policy_override)
+        )
+      )
+  )
+  (:action start_case_review_in_progress
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?borrower_profile - borrower_profile ?coborrower_profile - coborrower_profile ?valuation_report - valuation_report ?policy_override - policy_override)
+    :precondition
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_governance_check_completed ?collateral_assessment_case)
+        (case_policy_override_link ?collateral_assessment_case ?policy_override)
+        (case_borrower_link ?collateral_assessment_case ?borrower_profile)
+        (case_coborrower_link ?collateral_assessment_case ?coborrower_profile)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+        (valuation_report_link ?collateral_assessment_case ?valuation_report)
+        (not
+          (case_review_in_progress ?collateral_assessment_case)
+        )
+      )
+    :effect (case_review_in_progress ?collateral_assessment_case)
+  )
+  (:action finalize_case_and_record_signoff
+    :parameters (?collateral_assessment_case - collateral_assessment_case)
+    :precondition
+      (and
+        (case_reviewer_assignment ?collateral_assessment_case)
+        (case_review_in_progress ?collateral_assessment_case)
+        (not
+          (case_closed ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?collateral_assessment_case)
+        (entity_assessment_complete ?collateral_assessment_case)
+      )
+  )
+  (:action attach_credit_bureau_record_to_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?credit_bureau_record - credit_bureau_record ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (underwriting_completed_for_entity ?collateral_assessment_case)
+        (valuation_report_link ?collateral_assessment_case ?valuation_report)
+        (credit_bureau_record_available ?credit_bureau_record)
+        (case_credit_bureau_link ?collateral_assessment_case ?credit_bureau_record)
+        (not
+          (case_credit_bureau_attached ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_credit_bureau_attached ?collateral_assessment_case)
+        (not
+          (credit_bureau_record_available ?credit_bureau_record)
+        )
+      )
+  )
+  (:action request_regulatory_check_for_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?external_party - external_party)
+    :precondition
+      (and
+        (case_credit_bureau_attached ?collateral_assessment_case)
+        (external_party_link ?collateral_assessment_case ?external_party)
+        (not
+          (case_regulatory_check_requested ?collateral_assessment_case)
+        )
+      )
+    :effect (case_regulatory_check_requested ?collateral_assessment_case)
+  )
+  (:action perform_regulatory_check_for_case
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?regulatory_constraint - regulatory_constraint)
+    :precondition
+      (and
+        (case_regulatory_check_requested ?collateral_assessment_case)
+        (case_regulatory_constraint_link ?collateral_assessment_case ?regulatory_constraint)
+        (not
+          (case_regulatory_check_passed ?collateral_assessment_case)
+        )
+      )
+    :effect (case_regulatory_check_passed ?collateral_assessment_case)
+  )
+  (:action finalize_case_after_regulatory_check
+    :parameters (?collateral_assessment_case - collateral_assessment_case)
+    :precondition
+      (and
+        (case_regulatory_check_passed ?collateral_assessment_case)
+        (not
+          (case_closed ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?collateral_assessment_case)
+        (entity_assessment_complete ?collateral_assessment_case)
+      )
+  )
+  (:action execute_collateralization_for_borrower
+    :parameters (?borrower_profile - borrower_profile ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (borrower_ready_for_recommendation ?borrower_profile)
+        (borrower_risk_evaluation_completed ?borrower_profile)
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_validated ?collateral_recommendation)
+        (not
+          (entity_assessment_complete ?borrower_profile)
+        )
+      )
+    :effect (entity_assessment_complete ?borrower_profile)
+  )
+  (:action execute_collateralization_for_coborrower
+    :parameters (?coborrower_profile - coborrower_profile ?collateral_recommendation - collateral_recommendation)
+    :precondition
+      (and
+        (coborrower_ready_for_recommendation ?coborrower_profile)
+        (coborrower_risk_evaluation_completed ?coborrower_profile)
+        (recommendation_locked ?collateral_recommendation)
+        (recommendation_validated ?collateral_recommendation)
+        (not
+          (entity_assessment_complete ?coborrower_profile)
+        )
+      )
+    :effect (entity_assessment_complete ?coborrower_profile)
+  )
+  (:action assign_collateral_type_and_approve
+    :parameters (?loan_application - loan_application ?collateral_type - collateral_type ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_assessment_complete ?loan_application)
+        (valuation_report_link ?loan_application ?valuation_report)
+        (collateral_type_available ?collateral_type)
+        (not
+          (approval_granted ?loan_application)
+        )
+      )
+    :effect
+      (and
+        (approval_granted ?loan_application)
+        (collateral_type_link ?loan_application ?collateral_type)
+        (not
+          (collateral_type_available ?collateral_type)
+        )
+      )
+  )
+  (:action assign_asset_proposal_to_borrower_and_mark_collateralized
+    :parameters (?borrower_profile - borrower_profile ?collateral_asset_proposal - collateral_asset_proposal ?collateral_type - collateral_type)
+    :precondition
+      (and
+        (approval_granted ?borrower_profile)
+        (asset_assignment ?borrower_profile ?collateral_asset_proposal)
+        (collateral_type_link ?borrower_profile ?collateral_type)
+        (not
+          (entity_collateralized ?borrower_profile)
+        )
+      )
+    :effect
+      (and
+        (entity_collateralized ?borrower_profile)
+        (asset_proposal_available ?collateral_asset_proposal)
+        (collateral_type_available ?collateral_type)
+      )
+  )
+  (:action assign_asset_proposal_to_coborrower_and_mark_collateralized
+    :parameters (?coborrower_profile - coborrower_profile ?collateral_asset_proposal - collateral_asset_proposal ?collateral_type - collateral_type)
+    :precondition
+      (and
+        (approval_granted ?coborrower_profile)
+        (asset_assignment ?coborrower_profile ?collateral_asset_proposal)
+        (collateral_type_link ?coborrower_profile ?collateral_type)
+        (not
+          (entity_collateralized ?coborrower_profile)
+        )
+      )
+    :effect
+      (and
+        (entity_collateralized ?coborrower_profile)
+        (asset_proposal_available ?collateral_asset_proposal)
+        (collateral_type_available ?collateral_type)
+      )
+  )
+  (:action assign_asset_proposal_to_case_and_mark_collateralized
+    :parameters (?collateral_assessment_case - collateral_assessment_case ?collateral_asset_proposal - collateral_asset_proposal ?collateral_type - collateral_type)
+    :precondition
+      (and
+        (approval_granted ?collateral_assessment_case)
+        (asset_assignment ?collateral_assessment_case ?collateral_asset_proposal)
+        (collateral_type_link ?collateral_assessment_case ?collateral_type)
+        (not
+          (entity_collateralized ?collateral_assessment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_collateralized ?collateral_assessment_case)
+        (asset_proposal_available ?collateral_asset_proposal)
+        (collateral_type_available ?collateral_type)
+      )
+  )
+)

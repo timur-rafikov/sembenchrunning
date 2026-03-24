@@ -1,0 +1,1011 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain timetable_recovery_after_section_closure)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object operational_resource_type - generic_object scheduling_resource_type - generic_object location_resource_type - generic_object case_container_type - generic_object affected_section_case - case_container_type case_handler - operational_resource_type time_slot_proposal - operational_resource_type instructor - operational_resource_type faculty_constraint - operational_resource_type funding_adjustment - operational_resource_type requirement_salvage_item - operational_resource_type room_reservation - operational_resource_type regulatory_approval - operational_resource_type support_document - scheduling_resource_type allocation_ticket - scheduling_resource_type external_approver - scheduling_resource_type alternative_session_template - location_resource_type alternative_timewindow_or_venue - location_resource_type recovery_session_offer - location_resource_type subcase_type_cohort - affected_section_case subcase_type_individual - affected_section_case student_cohort - subcase_type_cohort individual_student - subcase_type_cohort recovery_case - subcase_type_individual)
+
+  (:predicates
+    (record_created ?affected_section_case - affected_section_case)
+    (record_validated ?affected_section_case - affected_section_case)
+    (record_handler_assigned ?affected_section_case - affected_section_case)
+    (resolution_finalised ?affected_section_case - affected_section_case)
+    (entity_published ?affected_section_case - affected_section_case)
+    (salvage_recorded ?affected_section_case - affected_section_case)
+    (handler_available ?case_handler - case_handler)
+    (record_assigned_to_handler ?affected_section_case - affected_section_case ?case_handler - case_handler)
+    (time_slot_proposal_available ?time_slot_proposal - time_slot_proposal)
+    (record_has_time_slot_proposal ?affected_section_case - affected_section_case ?time_slot_proposal - time_slot_proposal)
+    (instructor_available ?instructor - instructor)
+    (record_instructor_assigned ?affected_section_case - affected_section_case ?instructor - instructor)
+    (support_document_available ?support_document - support_document)
+    (cohort_support_doc_attached ?student_cohort - student_cohort ?support_document - support_document)
+    (individual_support_doc_attached ?individual_student - individual_student ?support_document - support_document)
+    (cohort_has_session_template ?student_cohort - student_cohort ?alternative_session_template - alternative_session_template)
+    (session_template_reserved ?alternative_session_template - alternative_session_template)
+    (session_template_tentative_lock ?alternative_session_template - alternative_session_template)
+    (cohort_confirmation ?student_cohort - student_cohort)
+    (individual_has_timewindow ?individual_student - individual_student ?alternative_timewindow_or_venue - alternative_timewindow_or_venue)
+    (timewindow_reserved ?alternative_timewindow_or_venue - alternative_timewindow_or_venue)
+    (timewindow_tentative ?alternative_timewindow_or_venue - alternative_timewindow_or_venue)
+    (individual_confirmation ?individual_student - individual_student)
+    (recovery_offer_available ?recovery_session_offer - recovery_session_offer)
+    (recovery_offer_selected ?recovery_session_offer - recovery_session_offer)
+    (offer_includes_session_template ?recovery_session_offer - recovery_session_offer ?alternative_session_template - alternative_session_template)
+    (offer_includes_timewindow ?recovery_session_offer - recovery_session_offer ?alternative_timewindow_or_venue - alternative_timewindow_or_venue)
+    (offer_requires_room_reservation ?recovery_session_offer - recovery_session_offer)
+    (offer_requires_external_approval ?recovery_session_offer - recovery_session_offer)
+    (recovery_offer_confirmed ?recovery_session_offer - recovery_session_offer)
+    (plan_for_cohort ?recovery_plan - recovery_case ?student_cohort - student_cohort)
+    (plan_for_individual ?recovery_plan - recovery_case ?individual_student - individual_student)
+    (plan_includes_offer ?recovery_plan - recovery_case ?recovery_session_offer - recovery_session_offer)
+    (allocation_ticket_available ?allocation_ticket - allocation_ticket)
+    (plan_has_allocation_ticket ?recovery_plan - recovery_case ?allocation_ticket - allocation_ticket)
+    (allocation_ticket_confirmed ?allocation_ticket - allocation_ticket)
+    (allocation_ticket_linked_to_offer ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    (plan_has_reservation ?recovery_plan - recovery_case)
+    (plan_has_allocations ?recovery_plan - recovery_case)
+    (plan_ready_for_publication ?recovery_plan - recovery_case)
+    (plan_has_faculty_constraint ?recovery_plan - recovery_case)
+    (plan_faculty_constraint_applied ?recovery_plan - recovery_case)
+    (plan_has_funding_adjustment ?recovery_plan - recovery_case)
+    (plan_final_checks_passed ?recovery_plan - recovery_case)
+    (external_approver_available ?external_approver - external_approver)
+    (plan_has_external_approver ?recovery_plan - recovery_case ?external_approver - external_approver)
+    (external_approval_recorded ?recovery_plan - recovery_case)
+    (external_approval_in_progress ?recovery_plan - recovery_case)
+    (external_approval_confirmed ?recovery_plan - recovery_case)
+    (faculty_constraint_available ?faculty_constraint - faculty_constraint)
+    (plan_applied_faculty_constraint ?recovery_plan - recovery_case ?faculty_constraint - faculty_constraint)
+    (funding_adjustment_available ?funding_adjustment - funding_adjustment)
+    (plan_applied_funding_adjustment ?recovery_plan - recovery_case ?funding_adjustment - funding_adjustment)
+    (room_reservation_available ?room_reservation - room_reservation)
+    (plan_has_room_reservation ?recovery_plan - recovery_case ?room_reservation - room_reservation)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (plan_has_regulatory_approval ?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval)
+    (requirement_salvage_item_available ?requirement_salvage_item - requirement_salvage_item)
+    (record_has_salvage_item ?affected_section_case - affected_section_case ?requirement_salvage_item - requirement_salvage_item)
+    (cohort_ready ?student_cohort - student_cohort)
+    (individual_ready ?individual_student - individual_student)
+    (plan_published ?recovery_plan - recovery_case)
+  )
+  (:action open_affected_section_case
+    :parameters (?affected_section_case - affected_section_case)
+    :precondition
+      (and
+        (not
+          (record_created ?affected_section_case)
+        )
+        (not
+          (resolution_finalised ?affected_section_case)
+        )
+      )
+    :effect (record_created ?affected_section_case)
+  )
+  (:action assign_handler_to_case
+    :parameters (?affected_section_case - affected_section_case ?case_handler - case_handler)
+    :precondition
+      (and
+        (record_created ?affected_section_case)
+        (not
+          (record_handler_assigned ?affected_section_case)
+        )
+        (handler_available ?case_handler)
+      )
+    :effect
+      (and
+        (record_handler_assigned ?affected_section_case)
+        (record_assigned_to_handler ?affected_section_case ?case_handler)
+        (not
+          (handler_available ?case_handler)
+        )
+      )
+  )
+  (:action propose_time_slot_for_case
+    :parameters (?affected_section_case - affected_section_case ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_created ?affected_section_case)
+        (record_handler_assigned ?affected_section_case)
+        (time_slot_proposal_available ?time_slot_proposal)
+      )
+    :effect
+      (and
+        (record_has_time_slot_proposal ?affected_section_case ?time_slot_proposal)
+        (not
+          (time_slot_proposal_available ?time_slot_proposal)
+        )
+      )
+  )
+  (:action validate_case_proposal
+    :parameters (?affected_section_case - affected_section_case ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_created ?affected_section_case)
+        (record_handler_assigned ?affected_section_case)
+        (record_has_time_slot_proposal ?affected_section_case ?time_slot_proposal)
+        (not
+          (record_validated ?affected_section_case)
+        )
+      )
+    :effect (record_validated ?affected_section_case)
+  )
+  (:action release_time_slot_proposal
+    :parameters (?affected_section_case - affected_section_case ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_has_time_slot_proposal ?affected_section_case ?time_slot_proposal)
+      )
+    :effect
+      (and
+        (time_slot_proposal_available ?time_slot_proposal)
+        (not
+          (record_has_time_slot_proposal ?affected_section_case ?time_slot_proposal)
+        )
+      )
+  )
+  (:action assign_instructor_to_case
+    :parameters (?affected_section_case - affected_section_case ?instructor - instructor)
+    :precondition
+      (and
+        (record_validated ?affected_section_case)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (record_instructor_assigned ?affected_section_case ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action release_instructor_assignment
+    :parameters (?affected_section_case - affected_section_case ?instructor - instructor)
+    :precondition
+      (and
+        (record_instructor_assigned ?affected_section_case ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (record_instructor_assigned ?affected_section_case ?instructor)
+        )
+      )
+  )
+  (:action attach_room_reservation_to_plan
+    :parameters (?recovery_plan - recovery_case ?room_reservation - room_reservation)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (room_reservation_available ?room_reservation)
+      )
+    :effect
+      (and
+        (plan_has_room_reservation ?recovery_plan ?room_reservation)
+        (not
+          (room_reservation_available ?room_reservation)
+        )
+      )
+  )
+  (:action release_room_reservation_from_plan
+    :parameters (?recovery_plan - recovery_case ?room_reservation - room_reservation)
+    :precondition
+      (and
+        (plan_has_room_reservation ?recovery_plan ?room_reservation)
+      )
+    :effect
+      (and
+        (room_reservation_available ?room_reservation)
+        (not
+          (plan_has_room_reservation ?recovery_plan ?room_reservation)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_plan
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action release_regulatory_approval_from_plan
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        )
+      )
+  )
+  (:action reserve_session_template_for_cohort
+    :parameters (?student_cohort - student_cohort ?alternative_session_template - alternative_session_template ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_validated ?student_cohort)
+        (record_has_time_slot_proposal ?student_cohort ?time_slot_proposal)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (not
+          (session_template_reserved ?alternative_session_template)
+        )
+        (not
+          (session_template_tentative_lock ?alternative_session_template)
+        )
+      )
+    :effect (session_template_reserved ?alternative_session_template)
+  )
+  (:action confirm_cohort_template_assignment
+    :parameters (?student_cohort - student_cohort ?alternative_session_template - alternative_session_template ?instructor - instructor)
+    :precondition
+      (and
+        (record_validated ?student_cohort)
+        (record_instructor_assigned ?student_cohort ?instructor)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (session_template_reserved ?alternative_session_template)
+        (not
+          (cohort_ready ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (cohort_ready ?student_cohort)
+        (cohort_confirmation ?student_cohort)
+      )
+  )
+  (:action attach_support_doc_and_lock_template_for_cohort
+    :parameters (?student_cohort - student_cohort ?alternative_session_template - alternative_session_template ?support_document - support_document)
+    :precondition
+      (and
+        (record_validated ?student_cohort)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (support_document_available ?support_document)
+        (not
+          (cohort_ready ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (session_template_tentative_lock ?alternative_session_template)
+        (cohort_ready ?student_cohort)
+        (cohort_support_doc_attached ?student_cohort ?support_document)
+        (not
+          (support_document_available ?support_document)
+        )
+      )
+  )
+  (:action finalize_cohort_reservation
+    :parameters (?student_cohort - student_cohort ?alternative_session_template - alternative_session_template ?time_slot_proposal - time_slot_proposal ?support_document - support_document)
+    :precondition
+      (and
+        (record_validated ?student_cohort)
+        (record_has_time_slot_proposal ?student_cohort ?time_slot_proposal)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (session_template_tentative_lock ?alternative_session_template)
+        (cohort_support_doc_attached ?student_cohort ?support_document)
+        (not
+          (cohort_confirmation ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (session_template_reserved ?alternative_session_template)
+        (cohort_confirmation ?student_cohort)
+        (support_document_available ?support_document)
+        (not
+          (cohort_support_doc_attached ?student_cohort ?support_document)
+        )
+      )
+  )
+  (:action reserve_timewindow_for_individual
+    :parameters (?individual_student - individual_student ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_validated ?individual_student)
+        (record_has_time_slot_proposal ?individual_student ?time_slot_proposal)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (not
+          (timewindow_reserved ?alternative_timewindow_or_venue)
+        )
+        (not
+          (timewindow_tentative ?alternative_timewindow_or_venue)
+        )
+      )
+    :effect (timewindow_reserved ?alternative_timewindow_or_venue)
+  )
+  (:action confirm_individual_timewindow_assignment
+    :parameters (?individual_student - individual_student ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?instructor - instructor)
+    :precondition
+      (and
+        (record_validated ?individual_student)
+        (record_instructor_assigned ?individual_student ?instructor)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (timewindow_reserved ?alternative_timewindow_or_venue)
+        (not
+          (individual_ready ?individual_student)
+        )
+      )
+    :effect
+      (and
+        (individual_ready ?individual_student)
+        (individual_confirmation ?individual_student)
+      )
+  )
+  (:action attach_support_doc_and_lock_timewindow_for_individual
+    :parameters (?individual_student - individual_student ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?support_document - support_document)
+    :precondition
+      (and
+        (record_validated ?individual_student)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (support_document_available ?support_document)
+        (not
+          (individual_ready ?individual_student)
+        )
+      )
+    :effect
+      (and
+        (timewindow_tentative ?alternative_timewindow_or_venue)
+        (individual_ready ?individual_student)
+        (individual_support_doc_attached ?individual_student ?support_document)
+        (not
+          (support_document_available ?support_document)
+        )
+      )
+  )
+  (:action finalize_individual_reservation
+    :parameters (?individual_student - individual_student ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?time_slot_proposal - time_slot_proposal ?support_document - support_document)
+    :precondition
+      (and
+        (record_validated ?individual_student)
+        (record_has_time_slot_proposal ?individual_student ?time_slot_proposal)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (timewindow_tentative ?alternative_timewindow_or_venue)
+        (individual_support_doc_attached ?individual_student ?support_document)
+        (not
+          (individual_confirmation ?individual_student)
+        )
+      )
+    :effect
+      (and
+        (timewindow_reserved ?alternative_timewindow_or_venue)
+        (individual_confirmation ?individual_student)
+        (support_document_available ?support_document)
+        (not
+          (individual_support_doc_attached ?individual_student ?support_document)
+        )
+      )
+  )
+  (:action compose_recovery_offer
+    :parameters (?student_cohort - student_cohort ?individual_student - individual_student ?alternative_session_template - alternative_session_template ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (cohort_ready ?student_cohort)
+        (individual_ready ?individual_student)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (session_template_reserved ?alternative_session_template)
+        (timewindow_reserved ?alternative_timewindow_or_venue)
+        (cohort_confirmation ?student_cohort)
+        (individual_confirmation ?individual_student)
+        (recovery_offer_available ?recovery_session_offer)
+      )
+    :effect
+      (and
+        (recovery_offer_selected ?recovery_session_offer)
+        (offer_includes_session_template ?recovery_session_offer ?alternative_session_template)
+        (offer_includes_timewindow ?recovery_session_offer ?alternative_timewindow_or_venue)
+        (not
+          (recovery_offer_available ?recovery_session_offer)
+        )
+      )
+  )
+  (:action compose_recovery_offer_variant_a
+    :parameters (?student_cohort - student_cohort ?individual_student - individual_student ?alternative_session_template - alternative_session_template ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (cohort_ready ?student_cohort)
+        (individual_ready ?individual_student)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (session_template_tentative_lock ?alternative_session_template)
+        (timewindow_reserved ?alternative_timewindow_or_venue)
+        (not
+          (cohort_confirmation ?student_cohort)
+        )
+        (individual_confirmation ?individual_student)
+        (recovery_offer_available ?recovery_session_offer)
+      )
+    :effect
+      (and
+        (recovery_offer_selected ?recovery_session_offer)
+        (offer_includes_session_template ?recovery_session_offer ?alternative_session_template)
+        (offer_includes_timewindow ?recovery_session_offer ?alternative_timewindow_or_venue)
+        (offer_requires_room_reservation ?recovery_session_offer)
+        (not
+          (recovery_offer_available ?recovery_session_offer)
+        )
+      )
+  )
+  (:action compose_recovery_offer_variant_b
+    :parameters (?student_cohort - student_cohort ?individual_student - individual_student ?alternative_session_template - alternative_session_template ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (cohort_ready ?student_cohort)
+        (individual_ready ?individual_student)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (session_template_reserved ?alternative_session_template)
+        (timewindow_tentative ?alternative_timewindow_or_venue)
+        (cohort_confirmation ?student_cohort)
+        (not
+          (individual_confirmation ?individual_student)
+        )
+        (recovery_offer_available ?recovery_session_offer)
+      )
+    :effect
+      (and
+        (recovery_offer_selected ?recovery_session_offer)
+        (offer_includes_session_template ?recovery_session_offer ?alternative_session_template)
+        (offer_includes_timewindow ?recovery_session_offer ?alternative_timewindow_or_venue)
+        (offer_requires_external_approval ?recovery_session_offer)
+        (not
+          (recovery_offer_available ?recovery_session_offer)
+        )
+      )
+  )
+  (:action compose_recovery_offer_combined_variants
+    :parameters (?student_cohort - student_cohort ?individual_student - individual_student ?alternative_session_template - alternative_session_template ?alternative_timewindow_or_venue - alternative_timewindow_or_venue ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (cohort_ready ?student_cohort)
+        (individual_ready ?individual_student)
+        (cohort_has_session_template ?student_cohort ?alternative_session_template)
+        (individual_has_timewindow ?individual_student ?alternative_timewindow_or_venue)
+        (session_template_tentative_lock ?alternative_session_template)
+        (timewindow_tentative ?alternative_timewindow_or_venue)
+        (not
+          (cohort_confirmation ?student_cohort)
+        )
+        (not
+          (individual_confirmation ?individual_student)
+        )
+        (recovery_offer_available ?recovery_session_offer)
+      )
+    :effect
+      (and
+        (recovery_offer_selected ?recovery_session_offer)
+        (offer_includes_session_template ?recovery_session_offer ?alternative_session_template)
+        (offer_includes_timewindow ?recovery_session_offer ?alternative_timewindow_or_venue)
+        (offer_requires_room_reservation ?recovery_session_offer)
+        (offer_requires_external_approval ?recovery_session_offer)
+        (not
+          (recovery_offer_available ?recovery_session_offer)
+        )
+      )
+  )
+  (:action confirm_recovery_offer_for_cohort
+    :parameters (?recovery_session_offer - recovery_session_offer ?student_cohort - student_cohort ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (recovery_offer_selected ?recovery_session_offer)
+        (cohort_ready ?student_cohort)
+        (record_has_time_slot_proposal ?student_cohort ?time_slot_proposal)
+        (not
+          (recovery_offer_confirmed ?recovery_session_offer)
+        )
+      )
+    :effect (recovery_offer_confirmed ?recovery_session_offer)
+  )
+  (:action issue_allocation_ticket
+    :parameters (?recovery_plan - recovery_case ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (plan_includes_offer ?recovery_plan ?recovery_session_offer)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_available ?allocation_ticket)
+        (recovery_offer_selected ?recovery_session_offer)
+        (recovery_offer_confirmed ?recovery_session_offer)
+        (not
+          (allocation_ticket_confirmed ?allocation_ticket)
+        )
+      )
+    :effect
+      (and
+        (allocation_ticket_confirmed ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (not
+          (allocation_ticket_available ?allocation_ticket)
+        )
+      )
+  )
+  (:action confirm_plan_reservation
+    :parameters (?recovery_plan - recovery_case ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_confirmed ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (record_has_time_slot_proposal ?recovery_plan ?time_slot_proposal)
+        (not
+          (offer_requires_room_reservation ?recovery_session_offer)
+        )
+        (not
+          (plan_has_reservation ?recovery_plan)
+        )
+      )
+    :effect (plan_has_reservation ?recovery_plan)
+  )
+  (:action apply_faculty_constraint_to_plan
+    :parameters (?recovery_plan - recovery_case ?faculty_constraint - faculty_constraint)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (faculty_constraint_available ?faculty_constraint)
+        (not
+          (plan_has_faculty_constraint ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_faculty_constraint ?recovery_plan)
+        (plan_applied_faculty_constraint ?recovery_plan ?faculty_constraint)
+        (not
+          (faculty_constraint_available ?faculty_constraint)
+        )
+      )
+  )
+  (:action finalise_plan_with_faculty_constraint
+    :parameters (?recovery_plan - recovery_case ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer ?time_slot_proposal - time_slot_proposal ?faculty_constraint - faculty_constraint)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_confirmed ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (record_has_time_slot_proposal ?recovery_plan ?time_slot_proposal)
+        (offer_requires_room_reservation ?recovery_session_offer)
+        (plan_has_faculty_constraint ?recovery_plan)
+        (plan_applied_faculty_constraint ?recovery_plan ?faculty_constraint)
+        (not
+          (plan_has_reservation ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_reservation ?recovery_plan)
+        (plan_faculty_constraint_applied ?recovery_plan)
+      )
+  )
+  (:action allocate_room_and_update_plan
+    :parameters (?recovery_plan - recovery_case ?room_reservation - room_reservation ?instructor - instructor ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_reservation ?recovery_plan)
+        (plan_has_room_reservation ?recovery_plan ?room_reservation)
+        (record_instructor_assigned ?recovery_plan ?instructor)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (not
+          (offer_requires_external_approval ?recovery_session_offer)
+        )
+        (not
+          (plan_has_allocations ?recovery_plan)
+        )
+      )
+    :effect (plan_has_allocations ?recovery_plan)
+  )
+  (:action allocate_room_and_lock_plan_variant_b
+    :parameters (?recovery_plan - recovery_case ?room_reservation - room_reservation ?instructor - instructor ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_reservation ?recovery_plan)
+        (plan_has_room_reservation ?recovery_plan ?room_reservation)
+        (record_instructor_assigned ?recovery_plan ?instructor)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (offer_requires_external_approval ?recovery_session_offer)
+        (not
+          (plan_has_allocations ?recovery_plan)
+        )
+      )
+    :effect (plan_has_allocations ?recovery_plan)
+  )
+  (:action finalise_plan_with_regulatory_approval
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_allocations ?recovery_plan)
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (not
+          (offer_requires_room_reservation ?recovery_session_offer)
+        )
+        (not
+          (offer_requires_external_approval ?recovery_session_offer)
+        )
+        (not
+          (plan_ready_for_publication ?recovery_plan)
+        )
+      )
+    :effect (plan_ready_for_publication ?recovery_plan)
+  )
+  (:action finalise_plan_and_flag_funding_adjustment
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_allocations ?recovery_plan)
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (offer_requires_room_reservation ?recovery_session_offer)
+        (not
+          (offer_requires_external_approval ?recovery_session_offer)
+        )
+        (not
+          (plan_ready_for_publication ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_has_funding_adjustment ?recovery_plan)
+      )
+  )
+  (:action finalise_plan_and_flag_funding_adjustment_variant
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_allocations ?recovery_plan)
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (not
+          (offer_requires_room_reservation ?recovery_session_offer)
+        )
+        (offer_requires_external_approval ?recovery_session_offer)
+        (not
+          (plan_ready_for_publication ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_has_funding_adjustment ?recovery_plan)
+      )
+  )
+  (:action finalise_plan_and_flag_funding_adjustment_variant_b
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval ?allocation_ticket - allocation_ticket ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (plan_has_allocations ?recovery_plan)
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (plan_has_allocation_ticket ?recovery_plan ?allocation_ticket)
+        (allocation_ticket_linked_to_offer ?allocation_ticket ?recovery_session_offer)
+        (offer_requires_room_reservation ?recovery_session_offer)
+        (offer_requires_external_approval ?recovery_session_offer)
+        (not
+          (plan_ready_for_publication ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_has_funding_adjustment ?recovery_plan)
+      )
+  )
+  (:action publish_recovery_plan
+    :parameters (?recovery_plan - recovery_case)
+    :precondition
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (not
+          (plan_has_funding_adjustment ?recovery_plan)
+        )
+        (not
+          (plan_published ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_published ?recovery_plan)
+        (entity_published ?recovery_plan)
+      )
+  )
+  (:action apply_funding_adjustment_to_plan
+    :parameters (?recovery_plan - recovery_case ?funding_adjustment - funding_adjustment)
+    :precondition
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_has_funding_adjustment ?recovery_plan)
+        (funding_adjustment_available ?funding_adjustment)
+      )
+    :effect
+      (and
+        (plan_applied_funding_adjustment ?recovery_plan ?funding_adjustment)
+        (not
+          (funding_adjustment_available ?funding_adjustment)
+        )
+      )
+  )
+  (:action perform_final_checks_on_plan
+    :parameters (?recovery_plan - recovery_case ?student_cohort - student_cohort ?individual_student - individual_student ?time_slot_proposal - time_slot_proposal ?funding_adjustment - funding_adjustment)
+    :precondition
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_has_funding_adjustment ?recovery_plan)
+        (plan_applied_funding_adjustment ?recovery_plan ?funding_adjustment)
+        (plan_for_cohort ?recovery_plan ?student_cohort)
+        (plan_for_individual ?recovery_plan ?individual_student)
+        (cohort_confirmation ?student_cohort)
+        (individual_confirmation ?individual_student)
+        (record_has_time_slot_proposal ?recovery_plan ?time_slot_proposal)
+        (not
+          (plan_final_checks_passed ?recovery_plan)
+        )
+      )
+    :effect (plan_final_checks_passed ?recovery_plan)
+  )
+  (:action publish_recovery_plan_after_checks
+    :parameters (?recovery_plan - recovery_case)
+    :precondition
+      (and
+        (plan_ready_for_publication ?recovery_plan)
+        (plan_final_checks_passed ?recovery_plan)
+        (not
+          (plan_published ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_published ?recovery_plan)
+        (entity_published ?recovery_plan)
+      )
+  )
+  (:action assign_external_approver_to_plan
+    :parameters (?recovery_plan - recovery_case ?external_approver - external_approver ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (record_validated ?recovery_plan)
+        (record_has_time_slot_proposal ?recovery_plan ?time_slot_proposal)
+        (external_approver_available ?external_approver)
+        (plan_has_external_approver ?recovery_plan ?external_approver)
+        (not
+          (external_approval_recorded ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (external_approval_recorded ?recovery_plan)
+        (not
+          (external_approver_available ?external_approver)
+        )
+      )
+  )
+  (:action initiate_external_approval_process
+    :parameters (?recovery_plan - recovery_case ?instructor - instructor)
+    :precondition
+      (and
+        (external_approval_recorded ?recovery_plan)
+        (record_instructor_assigned ?recovery_plan ?instructor)
+        (not
+          (external_approval_in_progress ?recovery_plan)
+        )
+      )
+    :effect (external_approval_in_progress ?recovery_plan)
+  )
+  (:action confirm_external_approval
+    :parameters (?recovery_plan - recovery_case ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (external_approval_in_progress ?recovery_plan)
+        (plan_has_regulatory_approval ?recovery_plan ?regulatory_approval)
+        (not
+          (external_approval_confirmed ?recovery_plan)
+        )
+      )
+    :effect (external_approval_confirmed ?recovery_plan)
+  )
+  (:action publish_plan_after_external_approval
+    :parameters (?recovery_plan - recovery_case)
+    :precondition
+      (and
+        (external_approval_confirmed ?recovery_plan)
+        (not
+          (plan_published ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_published ?recovery_plan)
+        (entity_published ?recovery_plan)
+      )
+  )
+  (:action publish_cohort_update
+    :parameters (?student_cohort - student_cohort ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (cohort_ready ?student_cohort)
+        (cohort_confirmation ?student_cohort)
+        (recovery_offer_selected ?recovery_session_offer)
+        (recovery_offer_confirmed ?recovery_session_offer)
+        (not
+          (entity_published ?student_cohort)
+        )
+      )
+    :effect (entity_published ?student_cohort)
+  )
+  (:action publish_individual_update
+    :parameters (?individual_student - individual_student ?recovery_session_offer - recovery_session_offer)
+    :precondition
+      (and
+        (individual_ready ?individual_student)
+        (individual_confirmation ?individual_student)
+        (recovery_offer_selected ?recovery_session_offer)
+        (recovery_offer_confirmed ?recovery_session_offer)
+        (not
+          (entity_published ?individual_student)
+        )
+      )
+    :effect (entity_published ?individual_student)
+  )
+  (:action attach_salvage_item_to_case
+    :parameters (?affected_section_case - affected_section_case ?requirement_salvage_item - requirement_salvage_item ?time_slot_proposal - time_slot_proposal)
+    :precondition
+      (and
+        (entity_published ?affected_section_case)
+        (record_has_time_slot_proposal ?affected_section_case ?time_slot_proposal)
+        (requirement_salvage_item_available ?requirement_salvage_item)
+        (not
+          (salvage_recorded ?affected_section_case)
+        )
+      )
+    :effect
+      (and
+        (salvage_recorded ?affected_section_case)
+        (record_has_salvage_item ?affected_section_case ?requirement_salvage_item)
+        (not
+          (requirement_salvage_item_available ?requirement_salvage_item)
+        )
+      )
+  )
+  (:action assign_handler_and_mark_subcase_assigned
+    :parameters (?student_cohort - student_cohort ?case_handler - case_handler ?requirement_salvage_item - requirement_salvage_item)
+    :precondition
+      (and
+        (salvage_recorded ?student_cohort)
+        (record_assigned_to_handler ?student_cohort ?case_handler)
+        (record_has_salvage_item ?student_cohort ?requirement_salvage_item)
+        (not
+          (resolution_finalised ?student_cohort)
+        )
+      )
+    :effect
+      (and
+        (resolution_finalised ?student_cohort)
+        (handler_available ?case_handler)
+        (requirement_salvage_item_available ?requirement_salvage_item)
+      )
+  )
+  (:action assign_handler_and_mark_individual_subcase_assigned
+    :parameters (?individual_student - individual_student ?case_handler - case_handler ?requirement_salvage_item - requirement_salvage_item)
+    :precondition
+      (and
+        (salvage_recorded ?individual_student)
+        (record_assigned_to_handler ?individual_student ?case_handler)
+        (record_has_salvage_item ?individual_student ?requirement_salvage_item)
+        (not
+          (resolution_finalised ?individual_student)
+        )
+      )
+    :effect
+      (and
+        (resolution_finalised ?individual_student)
+        (handler_available ?case_handler)
+        (requirement_salvage_item_available ?requirement_salvage_item)
+      )
+  )
+  (:action assign_handler_to_recovery_plan
+    :parameters (?recovery_plan - recovery_case ?case_handler - case_handler ?requirement_salvage_item - requirement_salvage_item)
+    :precondition
+      (and
+        (salvage_recorded ?recovery_plan)
+        (record_assigned_to_handler ?recovery_plan ?case_handler)
+        (record_has_salvage_item ?recovery_plan ?requirement_salvage_item)
+        (not
+          (resolution_finalised ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (resolution_finalised ?recovery_plan)
+        (handler_available ?case_handler)
+        (requirement_salvage_item_available ?requirement_salvage_item)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem timetable_breakdown_case_instance)
+  (:domain timetable_recovery_after_section_closure)
+  (:objects cohort_affected_1 - student_cohort student_individual_1 - individual_student recovery_plan_1 - recovery_case recovery_plan_2 - recovery_case handler_smith - case_handler handler_jones - case_handler handler_lee - case_handler timeslot_proposal_1 - time_slot_proposal instructor_brown - instructor support_doc_form_a - support_document alt_session_template_standard - alternative_session_template timewindow_room_101_morning - alternative_timewindow_or_venue recovery_offer_1 - recovery_session_offer allocation_ticket_a - allocation_ticket allocation_ticket_b - allocation_ticket faculty_constraint_department - faculty_constraint faculty_constraint_course_lead - faculty_constraint funding_adjustment_grant - funding_adjustment funding_adjustment_bursary - funding_adjustment salvage_item_credit_transfer - requirement_salvage_item room_reservation_101 - room_reservation external_approver_accreditor - external_approver external_approver_partner - external_approver regulatory_approval_document - regulatory_approval)
+  (:init
+    (handler_available handler_smith)
+    (handler_available handler_jones)
+    (handler_available handler_lee)
+    (time_slot_proposal_available timeslot_proposal_1)
+    (instructor_available instructor_brown)
+    (support_document_available support_doc_form_a)
+    (cohort_has_session_template cohort_affected_1 alt_session_template_standard)
+    (individual_has_timewindow student_individual_1 timewindow_room_101_morning)
+    (recovery_offer_available recovery_offer_1)
+    (allocation_ticket_available allocation_ticket_a)
+    (allocation_ticket_available allocation_ticket_b)
+    (plan_for_cohort recovery_plan_1 cohort_affected_1)
+    (plan_for_cohort recovery_plan_2 cohort_affected_1)
+    (plan_for_individual recovery_plan_1 student_individual_1)
+    (plan_for_individual recovery_plan_2 student_individual_1)
+    (plan_includes_offer recovery_plan_1 recovery_offer_1)
+    (plan_includes_offer recovery_plan_2 recovery_offer_1)
+    (plan_has_allocation_ticket recovery_plan_1 allocation_ticket_a)
+    (plan_has_allocation_ticket recovery_plan_2 allocation_ticket_b)
+    (faculty_constraint_available faculty_constraint_department)
+    (faculty_constraint_available faculty_constraint_course_lead)
+    (funding_adjustment_available funding_adjustment_grant)
+    (funding_adjustment_available funding_adjustment_bursary)
+    (requirement_salvage_item_available salvage_item_credit_transfer)
+    (room_reservation_available room_reservation_101)
+    (external_approver_available external_approver_accreditor)
+    (plan_has_external_approver recovery_plan_1 external_approver_accreditor)
+    (plan_has_external_approver recovery_plan_2 external_approver_partner)
+    (regulatory_approval_available regulatory_approval_document)
+  )
+  (:goal
+    (and
+      (resolution_finalised cohort_affected_1)
+      (resolution_finalised student_individual_1)
+      (resolution_finalised recovery_plan_1)
+      (resolution_finalised recovery_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_affected_section_case cohort_affected_1)
+(open_affected_section_case student_individual_1)
+(open_affected_section_case recovery_plan_1)
+(open_affected_section_case recovery_plan_2)
+(assign_handler_to_case cohort_affected_1 handler_smith)
+(propose_time_slot_for_case cohort_affected_1 timeslot_proposal_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_yanykepi/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_yanykepi/plan.pddl 
+
+
+--- stderr ---
+

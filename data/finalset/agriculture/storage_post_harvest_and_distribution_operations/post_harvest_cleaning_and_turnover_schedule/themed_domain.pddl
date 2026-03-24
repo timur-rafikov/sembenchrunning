@@ -1,0 +1,936 @@
+(define (domain post_harvest_cleaning_and_turnover_schedule_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types facility_resource - object consumable_type - object channel_type - object lot_supertype - object lot - lot_supertype receiving_slot - facility_resource processing_unit - facility_resource operator - facility_resource label_template - facility_resource manifest_template - facility_resource delivery_slot - facility_resource special_equipment - facility_resource inspection_credential - facility_resource treatment_chemical - consumable_type inspection_tag - consumable_type packing_seal - consumable_type storage_zone - channel_type outbound_channel - channel_type transport_container - channel_type storage_lot_type - lot outbound_lot_type - lot storage_lot - storage_lot_type outbound_lot - storage_lot_type pallet - outbound_lot_type)
+  (:predicates
+    (item_received ?lot - lot)
+    (item_conditioned ?lot - lot)
+    (item_staged ?lot - lot)
+    (item_released_for_transport ?lot - lot)
+    (item_loaded_into_container ?lot - lot)
+    (item_scheduled_for_delivery ?lot - lot)
+    (receiving_slot_available ?receiving_slot - receiving_slot)
+    (item_in_receiving_slot ?lot - lot ?receiving_slot - receiving_slot)
+    (processing_unit_available ?processing_unit - processing_unit)
+    (item_assigned_to_processing_unit ?lot - lot ?processing_unit - processing_unit)
+    (operator_available ?operator - operator)
+    (item_assigned_operator ?lot - lot ?operator - operator)
+    (treatment_chemical_available ?treatment_chemical - treatment_chemical)
+    (storage_lot_treatment_applied ?storage_lot - storage_lot ?treatment_chemical - treatment_chemical)
+    (outbound_lot_treatment_applied ?outbound_lot - outbound_lot ?treatment_chemical - treatment_chemical)
+    (storage_lot_assigned_to_zone ?storage_lot - storage_lot ?storage_zone - storage_zone)
+    (storage_zone_prepared ?storage_zone - storage_zone)
+    (storage_zone_treated ?storage_zone - storage_zone)
+    (storage_lot_ready_for_placement ?storage_lot - storage_lot)
+    (outbound_lot_assigned_to_channel ?outbound_lot - outbound_lot ?outbound_channel - outbound_channel)
+    (outbound_channel_prepared ?outbound_channel - outbound_channel)
+    (outbound_channel_treated ?outbound_channel - outbound_channel)
+    (outbound_lot_ready_for_placement ?outbound_lot - outbound_lot)
+    (transport_container_available ?transport_container - transport_container)
+    (transport_container_allocated ?transport_container - transport_container)
+    (container_assigned_storage_zone ?transport_container - transport_container ?storage_zone - storage_zone)
+    (container_assigned_outbound_channel ?transport_container - transport_container ?outbound_channel - outbound_channel)
+    (container_label_applied ?transport_container - transport_container)
+    (container_manifest_applied ?transport_container - transport_container)
+    (container_ready_for_tagging ?transport_container - transport_container)
+    (pallet_contains_storage_lot ?pallet - pallet ?storage_lot - storage_lot)
+    (pallet_contains_outbound_lot ?pallet - pallet ?outbound_lot - outbound_lot)
+    (pallet_assigned_to_container ?pallet - pallet ?transport_container - transport_container)
+    (inspection_tag_available ?inspection_tag - inspection_tag)
+    (pallet_assigned_inspection_tag ?pallet - pallet ?inspection_tag - inspection_tag)
+    (inspection_tag_issued ?inspection_tag - inspection_tag)
+    (inspection_tag_attached_to_container ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    (pallet_ready_for_finalization ?pallet - pallet)
+    (pallet_inspection_performed ?pallet - pallet)
+    (pallet_inspection_signed_off ?pallet - pallet)
+    (pallet_label_assigned ?pallet - pallet)
+    (pallet_label_applied ?pallet - pallet)
+    (pallet_documentation_present ?pallet - pallet)
+    (pallet_sealed ?pallet - pallet)
+    (packing_seal_available ?packing_seal - packing_seal)
+    (pallet_packing_seal_reserved ?pallet - pallet ?packing_seal - packing_seal)
+    (pallet_packing_seal_assigned ?pallet - pallet)
+    (pallet_seal_applied ?pallet - pallet)
+    (pallet_seal_verified ?pallet - pallet)
+    (label_template_available ?label_template - label_template)
+    (pallet_assigned_label_template ?pallet - pallet ?label_template - label_template)
+    (manifest_template_available ?manifest_template - manifest_template)
+    (pallet_assigned_manifest_template ?pallet - pallet ?manifest_template - manifest_template)
+    (special_equipment_available ?special_equipment - special_equipment)
+    (pallet_allocated_special_equipment ?pallet - pallet ?special_equipment - special_equipment)
+    (inspection_credential_available ?inspection_credential - inspection_credential)
+    (pallet_assigned_inspection_credential ?pallet - pallet ?inspection_credential - inspection_credential)
+    (delivery_slot_available ?delivery_slot - delivery_slot)
+    (item_assigned_delivery_slot ?lot - lot ?delivery_slot - delivery_slot)
+    (storage_lot_prepared ?storage_lot - storage_lot)
+    (outbound_lot_prepared ?outbound_lot - outbound_lot)
+    (pallet_staged ?pallet - pallet)
+  )
+  (:action receive_lot
+    :parameters (?lot - lot)
+    :precondition
+      (and
+        (not
+          (item_received ?lot)
+        )
+        (not
+          (item_released_for_transport ?lot)
+        )
+      )
+    :effect (item_received ?lot)
+  )
+  (:action assign_lot_to_receiving_slot
+    :parameters (?lot - lot ?receiving_slot - receiving_slot)
+    :precondition
+      (and
+        (item_received ?lot)
+        (not
+          (item_staged ?lot)
+        )
+        (receiving_slot_available ?receiving_slot)
+      )
+    :effect
+      (and
+        (item_staged ?lot)
+        (item_in_receiving_slot ?lot ?receiving_slot)
+        (not
+          (receiving_slot_available ?receiving_slot)
+        )
+      )
+  )
+  (:action assign_lot_to_processing_unit
+    :parameters (?lot - lot ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_received ?lot)
+        (item_staged ?lot)
+        (processing_unit_available ?processing_unit)
+      )
+    :effect
+      (and
+        (item_assigned_to_processing_unit ?lot ?processing_unit)
+        (not
+          (processing_unit_available ?processing_unit)
+        )
+      )
+  )
+  (:action complete_processing
+    :parameters (?lot - lot ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_received ?lot)
+        (item_staged ?lot)
+        (item_assigned_to_processing_unit ?lot ?processing_unit)
+        (not
+          (item_conditioned ?lot)
+        )
+      )
+    :effect (item_conditioned ?lot)
+  )
+  (:action release_processing_unit
+    :parameters (?lot - lot ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_assigned_to_processing_unit ?lot ?processing_unit)
+      )
+    :effect
+      (and
+        (processing_unit_available ?processing_unit)
+        (not
+          (item_assigned_to_processing_unit ?lot ?processing_unit)
+        )
+      )
+  )
+  (:action assign_operator_to_lot
+    :parameters (?lot - lot ?operator - operator)
+    :precondition
+      (and
+        (item_conditioned ?lot)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (item_assigned_operator ?lot ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_lot
+    :parameters (?lot - lot ?operator - operator)
+    :precondition
+      (and
+        (item_assigned_operator ?lot ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (item_assigned_operator ?lot ?operator)
+        )
+      )
+  )
+  (:action allocate_special_equipment_to_pallet
+    :parameters (?pallet - pallet ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (special_equipment_available ?special_equipment)
+      )
+    :effect
+      (and
+        (pallet_allocated_special_equipment ?pallet ?special_equipment)
+        (not
+          (special_equipment_available ?special_equipment)
+        )
+      )
+  )
+  (:action release_special_equipment_from_pallet
+    :parameters (?pallet - pallet ?special_equipment - special_equipment)
+    :precondition
+      (and
+        (pallet_allocated_special_equipment ?pallet ?special_equipment)
+      )
+    :effect
+      (and
+        (special_equipment_available ?special_equipment)
+        (not
+          (pallet_allocated_special_equipment ?pallet ?special_equipment)
+        )
+      )
+  )
+  (:action assign_inspection_credential_to_pallet
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (inspection_credential_available ?inspection_credential)
+      )
+    :effect
+      (and
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (not
+          (inspection_credential_available ?inspection_credential)
+        )
+      )
+  )
+  (:action release_inspection_credential_from_pallet
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential)
+    :precondition
+      (and
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+      )
+    :effect
+      (and
+        (inspection_credential_available ?inspection_credential)
+        (not
+          (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        )
+      )
+  )
+  (:action reserve_storage_zone_for_lot
+    :parameters (?storage_lot - storage_lot ?storage_zone - storage_zone ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_conditioned ?storage_lot)
+        (item_assigned_to_processing_unit ?storage_lot ?processing_unit)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (not
+          (storage_zone_prepared ?storage_zone)
+        )
+        (not
+          (storage_zone_treated ?storage_zone)
+        )
+      )
+    :effect (storage_zone_prepared ?storage_zone)
+  )
+  (:action operator_finalize_storage_zone_preparation
+    :parameters (?storage_lot - storage_lot ?storage_zone - storage_zone ?operator - operator)
+    :precondition
+      (and
+        (item_conditioned ?storage_lot)
+        (item_assigned_operator ?storage_lot ?operator)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (storage_zone_prepared ?storage_zone)
+        (not
+          (storage_lot_prepared ?storage_lot)
+        )
+      )
+    :effect
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (storage_lot_ready_for_placement ?storage_lot)
+      )
+  )
+  (:action apply_treatment_to_storage_lot
+    :parameters (?storage_lot - storage_lot ?storage_zone - storage_zone ?treatment_chemical - treatment_chemical)
+    :precondition
+      (and
+        (item_conditioned ?storage_lot)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (treatment_chemical_available ?treatment_chemical)
+        (not
+          (storage_lot_prepared ?storage_lot)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_treated ?storage_zone)
+        (storage_lot_prepared ?storage_lot)
+        (storage_lot_treatment_applied ?storage_lot ?treatment_chemical)
+        (not
+          (treatment_chemical_available ?treatment_chemical)
+        )
+      )
+  )
+  (:action complete_storage_lot_treatment
+    :parameters (?storage_lot - storage_lot ?storage_zone - storage_zone ?processing_unit - processing_unit ?treatment_chemical - treatment_chemical)
+    :precondition
+      (and
+        (item_conditioned ?storage_lot)
+        (item_assigned_to_processing_unit ?storage_lot ?processing_unit)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (storage_zone_treated ?storage_zone)
+        (storage_lot_treatment_applied ?storage_lot ?treatment_chemical)
+        (not
+          (storage_lot_ready_for_placement ?storage_lot)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_prepared ?storage_zone)
+        (storage_lot_ready_for_placement ?storage_lot)
+        (treatment_chemical_available ?treatment_chemical)
+        (not
+          (storage_lot_treatment_applied ?storage_lot ?treatment_chemical)
+        )
+      )
+  )
+  (:action reserve_outbound_channel
+    :parameters (?outbound_lot - outbound_lot ?outbound_channel - outbound_channel ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_conditioned ?outbound_lot)
+        (item_assigned_to_processing_unit ?outbound_lot ?processing_unit)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (not
+          (outbound_channel_prepared ?outbound_channel)
+        )
+        (not
+          (outbound_channel_treated ?outbound_channel)
+        )
+      )
+    :effect (outbound_channel_prepared ?outbound_channel)
+  )
+  (:action operator_finalize_outbound_channel_preparation
+    :parameters (?outbound_lot - outbound_lot ?outbound_channel - outbound_channel ?operator - operator)
+    :precondition
+      (and
+        (item_conditioned ?outbound_lot)
+        (item_assigned_operator ?outbound_lot ?operator)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (outbound_channel_prepared ?outbound_channel)
+        (not
+          (outbound_lot_prepared ?outbound_lot)
+        )
+      )
+    :effect
+      (and
+        (outbound_lot_prepared ?outbound_lot)
+        (outbound_lot_ready_for_placement ?outbound_lot)
+      )
+  )
+  (:action apply_treatment_to_outbound_lot
+    :parameters (?outbound_lot - outbound_lot ?outbound_channel - outbound_channel ?treatment_chemical - treatment_chemical)
+    :precondition
+      (and
+        (item_conditioned ?outbound_lot)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (treatment_chemical_available ?treatment_chemical)
+        (not
+          (outbound_lot_prepared ?outbound_lot)
+        )
+      )
+    :effect
+      (and
+        (outbound_channel_treated ?outbound_channel)
+        (outbound_lot_prepared ?outbound_lot)
+        (outbound_lot_treatment_applied ?outbound_lot ?treatment_chemical)
+        (not
+          (treatment_chemical_available ?treatment_chemical)
+        )
+      )
+  )
+  (:action complete_outbound_lot_treatment
+    :parameters (?outbound_lot - outbound_lot ?outbound_channel - outbound_channel ?processing_unit - processing_unit ?treatment_chemical - treatment_chemical)
+    :precondition
+      (and
+        (item_conditioned ?outbound_lot)
+        (item_assigned_to_processing_unit ?outbound_lot ?processing_unit)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (outbound_channel_treated ?outbound_channel)
+        (outbound_lot_treatment_applied ?outbound_lot ?treatment_chemical)
+        (not
+          (outbound_lot_ready_for_placement ?outbound_lot)
+        )
+      )
+    :effect
+      (and
+        (outbound_channel_prepared ?outbound_channel)
+        (outbound_lot_ready_for_placement ?outbound_lot)
+        (treatment_chemical_available ?treatment_chemical)
+        (not
+          (outbound_lot_treatment_applied ?outbound_lot ?treatment_chemical)
+        )
+      )
+  )
+  (:action assemble_transport_container
+    :parameters (?storage_lot - storage_lot ?outbound_lot - outbound_lot ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?transport_container - transport_container)
+    :precondition
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (outbound_lot_prepared ?outbound_lot)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (storage_zone_prepared ?storage_zone)
+        (outbound_channel_prepared ?outbound_channel)
+        (storage_lot_ready_for_placement ?storage_lot)
+        (outbound_lot_ready_for_placement ?outbound_lot)
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_allocated ?transport_container)
+        (container_assigned_storage_zone ?transport_container ?storage_zone)
+        (container_assigned_outbound_channel ?transport_container ?outbound_channel)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action assemble_container_with_label
+    :parameters (?storage_lot - storage_lot ?outbound_lot - outbound_lot ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?transport_container - transport_container)
+    :precondition
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (outbound_lot_prepared ?outbound_lot)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (storage_zone_treated ?storage_zone)
+        (outbound_channel_prepared ?outbound_channel)
+        (not
+          (storage_lot_ready_for_placement ?storage_lot)
+        )
+        (outbound_lot_ready_for_placement ?outbound_lot)
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_allocated ?transport_container)
+        (container_assigned_storage_zone ?transport_container ?storage_zone)
+        (container_assigned_outbound_channel ?transport_container ?outbound_channel)
+        (container_label_applied ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action assemble_container_with_manifest
+    :parameters (?storage_lot - storage_lot ?outbound_lot - outbound_lot ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?transport_container - transport_container)
+    :precondition
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (outbound_lot_prepared ?outbound_lot)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (storage_zone_prepared ?storage_zone)
+        (outbound_channel_treated ?outbound_channel)
+        (storage_lot_ready_for_placement ?storage_lot)
+        (not
+          (outbound_lot_ready_for_placement ?outbound_lot)
+        )
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_allocated ?transport_container)
+        (container_assigned_storage_zone ?transport_container ?storage_zone)
+        (container_assigned_outbound_channel ?transport_container ?outbound_channel)
+        (container_manifest_applied ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action assemble_container_with_label_and_manifest
+    :parameters (?storage_lot - storage_lot ?outbound_lot - outbound_lot ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?transport_container - transport_container)
+    :precondition
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (outbound_lot_prepared ?outbound_lot)
+        (storage_lot_assigned_to_zone ?storage_lot ?storage_zone)
+        (outbound_lot_assigned_to_channel ?outbound_lot ?outbound_channel)
+        (storage_zone_treated ?storage_zone)
+        (outbound_channel_treated ?outbound_channel)
+        (not
+          (storage_lot_ready_for_placement ?storage_lot)
+        )
+        (not
+          (outbound_lot_ready_for_placement ?outbound_lot)
+        )
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_allocated ?transport_container)
+        (container_assigned_storage_zone ?transport_container ?storage_zone)
+        (container_assigned_outbound_channel ?transport_container ?outbound_channel)
+        (container_label_applied ?transport_container)
+        (container_manifest_applied ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action stage_container_for_tagging
+    :parameters (?transport_container - transport_container ?storage_lot - storage_lot ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (transport_container_allocated ?transport_container)
+        (storage_lot_prepared ?storage_lot)
+        (item_assigned_to_processing_unit ?storage_lot ?processing_unit)
+        (not
+          (container_ready_for_tagging ?transport_container)
+        )
+      )
+    :effect (container_ready_for_tagging ?transport_container)
+  )
+  (:action affix_inspection_tag_to_container
+    :parameters (?pallet - pallet ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (pallet_assigned_to_container ?pallet ?transport_container)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_available ?inspection_tag)
+        (transport_container_allocated ?transport_container)
+        (container_ready_for_tagging ?transport_container)
+        (not
+          (inspection_tag_issued ?inspection_tag)
+        )
+      )
+    :effect
+      (and
+        (inspection_tag_issued ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (not
+          (inspection_tag_available ?inspection_tag)
+        )
+      )
+  )
+  (:action validate_tag_and_mark_pallet
+    :parameters (?pallet - pallet ?inspection_tag - inspection_tag ?transport_container - transport_container ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_issued ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (item_assigned_to_processing_unit ?pallet ?processing_unit)
+        (not
+          (container_label_applied ?transport_container)
+        )
+        (not
+          (pallet_ready_for_finalization ?pallet)
+        )
+      )
+    :effect (pallet_ready_for_finalization ?pallet)
+  )
+  (:action assign_label_template_to_pallet
+    :parameters (?pallet - pallet ?label_template - label_template)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (label_template_available ?label_template)
+        (not
+          (pallet_label_assigned ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_label_assigned ?pallet)
+        (pallet_assigned_label_template ?pallet ?label_template)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action apply_label_to_pallet
+    :parameters (?pallet - pallet ?inspection_tag - inspection_tag ?transport_container - transport_container ?processing_unit - processing_unit ?label_template - label_template)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_issued ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (item_assigned_to_processing_unit ?pallet ?processing_unit)
+        (container_label_applied ?transport_container)
+        (pallet_label_assigned ?pallet)
+        (pallet_assigned_label_template ?pallet ?label_template)
+        (not
+          (pallet_ready_for_finalization ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_ready_for_finalization ?pallet)
+        (pallet_label_applied ?pallet)
+      )
+  )
+  (:action perform_inspection_with_equipment
+    :parameters (?pallet - pallet ?special_equipment - special_equipment ?operator - operator ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_ready_for_finalization ?pallet)
+        (pallet_allocated_special_equipment ?pallet ?special_equipment)
+        (item_assigned_operator ?pallet ?operator)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (not
+          (container_manifest_applied ?transport_container)
+        )
+        (not
+          (pallet_inspection_performed ?pallet)
+        )
+      )
+    :effect (pallet_inspection_performed ?pallet)
+  )
+  (:action perform_secondary_inspection
+    :parameters (?pallet - pallet ?special_equipment - special_equipment ?operator - operator ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_ready_for_finalization ?pallet)
+        (pallet_allocated_special_equipment ?pallet ?special_equipment)
+        (item_assigned_operator ?pallet ?operator)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (container_manifest_applied ?transport_container)
+        (not
+          (pallet_inspection_performed ?pallet)
+        )
+      )
+    :effect (pallet_inspection_performed ?pallet)
+  )
+  (:action finalize_inspection_without_container_documentation
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_inspection_performed ?pallet)
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (not
+          (container_label_applied ?transport_container)
+        )
+        (not
+          (container_manifest_applied ?transport_container)
+        )
+        (not
+          (pallet_inspection_signed_off ?pallet)
+        )
+      )
+    :effect (pallet_inspection_signed_off ?pallet)
+  )
+  (:action finalize_inspection_with_label
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_inspection_performed ?pallet)
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (container_label_applied ?transport_container)
+        (not
+          (container_manifest_applied ?transport_container)
+        )
+        (not
+          (pallet_inspection_signed_off ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_documentation_present ?pallet)
+      )
+  )
+  (:action finalize_inspection_with_manifest
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_inspection_performed ?pallet)
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (not
+          (container_label_applied ?transport_container)
+        )
+        (container_manifest_applied ?transport_container)
+        (not
+          (pallet_inspection_signed_off ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_documentation_present ?pallet)
+      )
+  )
+  (:action finalize_inspection_with_label_and_manifest
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential ?inspection_tag - inspection_tag ?transport_container - transport_container)
+    :precondition
+      (and
+        (pallet_inspection_performed ?pallet)
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (pallet_assigned_inspection_tag ?pallet ?inspection_tag)
+        (inspection_tag_attached_to_container ?inspection_tag ?transport_container)
+        (container_label_applied ?transport_container)
+        (container_manifest_applied ?transport_container)
+        (not
+          (pallet_inspection_signed_off ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_documentation_present ?pallet)
+      )
+  )
+  (:action stage_pallet_without_documentation
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (not
+          (pallet_documentation_present ?pallet)
+        )
+        (not
+          (pallet_staged ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_staged ?pallet)
+        (item_loaded_into_container ?pallet)
+      )
+  )
+  (:action assign_manifest_to_pallet
+    :parameters (?pallet - pallet ?manifest_template - manifest_template)
+    :precondition
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_documentation_present ?pallet)
+        (manifest_template_available ?manifest_template)
+      )
+    :effect
+      (and
+        (pallet_assigned_manifest_template ?pallet ?manifest_template)
+        (not
+          (manifest_template_available ?manifest_template)
+        )
+      )
+  )
+  (:action seal_pallet_for_dispatch
+    :parameters (?pallet - pallet ?storage_lot - storage_lot ?outbound_lot - outbound_lot ?processing_unit - processing_unit ?manifest_template - manifest_template)
+    :precondition
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_documentation_present ?pallet)
+        (pallet_assigned_manifest_template ?pallet ?manifest_template)
+        (pallet_contains_storage_lot ?pallet ?storage_lot)
+        (pallet_contains_outbound_lot ?pallet ?outbound_lot)
+        (storage_lot_ready_for_placement ?storage_lot)
+        (outbound_lot_ready_for_placement ?outbound_lot)
+        (item_assigned_to_processing_unit ?pallet ?processing_unit)
+        (not
+          (pallet_sealed ?pallet)
+        )
+      )
+    :effect (pallet_sealed ?pallet)
+  )
+  (:action stage_sealed_pallet
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_inspection_signed_off ?pallet)
+        (pallet_sealed ?pallet)
+        (not
+          (pallet_staged ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_staged ?pallet)
+        (item_loaded_into_container ?pallet)
+      )
+  )
+  (:action assign_packing_seal_to_pallet
+    :parameters (?pallet - pallet ?packing_seal - packing_seal ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_conditioned ?pallet)
+        (item_assigned_to_processing_unit ?pallet ?processing_unit)
+        (packing_seal_available ?packing_seal)
+        (pallet_packing_seal_reserved ?pallet ?packing_seal)
+        (not
+          (pallet_packing_seal_assigned ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_packing_seal_assigned ?pallet)
+        (not
+          (packing_seal_available ?packing_seal)
+        )
+      )
+  )
+  (:action apply_seal_to_pallet
+    :parameters (?pallet - pallet ?operator - operator)
+    :precondition
+      (and
+        (pallet_packing_seal_assigned ?pallet)
+        (item_assigned_operator ?pallet ?operator)
+        (not
+          (pallet_seal_applied ?pallet)
+        )
+      )
+    :effect (pallet_seal_applied ?pallet)
+  )
+  (:action verify_pallet_seal_with_credential
+    :parameters (?pallet - pallet ?inspection_credential - inspection_credential)
+    :precondition
+      (and
+        (pallet_seal_applied ?pallet)
+        (pallet_assigned_inspection_credential ?pallet ?inspection_credential)
+        (not
+          (pallet_seal_verified ?pallet)
+        )
+      )
+    :effect (pallet_seal_verified ?pallet)
+  )
+  (:action stage_pallet_after_seal_verification
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_seal_verified ?pallet)
+        (not
+          (pallet_staged ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_staged ?pallet)
+        (item_loaded_into_container ?pallet)
+      )
+  )
+  (:action mark_storage_lot_loaded_into_container
+    :parameters (?storage_lot - storage_lot ?transport_container - transport_container)
+    :precondition
+      (and
+        (storage_lot_prepared ?storage_lot)
+        (storage_lot_ready_for_placement ?storage_lot)
+        (transport_container_allocated ?transport_container)
+        (container_ready_for_tagging ?transport_container)
+        (not
+          (item_loaded_into_container ?storage_lot)
+        )
+      )
+    :effect (item_loaded_into_container ?storage_lot)
+  )
+  (:action mark_outbound_lot_loaded_into_container
+    :parameters (?outbound_lot - outbound_lot ?transport_container - transport_container)
+    :precondition
+      (and
+        (outbound_lot_prepared ?outbound_lot)
+        (outbound_lot_ready_for_placement ?outbound_lot)
+        (transport_container_allocated ?transport_container)
+        (container_ready_for_tagging ?transport_container)
+        (not
+          (item_loaded_into_container ?outbound_lot)
+        )
+      )
+    :effect (item_loaded_into_container ?outbound_lot)
+  )
+  (:action assign_delivery_slot_to_lot
+    :parameters (?lot - lot ?delivery_slot - delivery_slot ?processing_unit - processing_unit)
+    :precondition
+      (and
+        (item_loaded_into_container ?lot)
+        (item_assigned_to_processing_unit ?lot ?processing_unit)
+        (delivery_slot_available ?delivery_slot)
+        (not
+          (item_scheduled_for_delivery ?lot)
+        )
+      )
+    :effect
+      (and
+        (item_scheduled_for_delivery ?lot)
+        (item_assigned_delivery_slot ?lot ?delivery_slot)
+        (not
+          (delivery_slot_available ?delivery_slot)
+        )
+      )
+  )
+  (:action release_storage_lot_for_transport
+    :parameters (?storage_lot - storage_lot ?receiving_slot - receiving_slot ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (item_scheduled_for_delivery ?storage_lot)
+        (item_in_receiving_slot ?storage_lot ?receiving_slot)
+        (item_assigned_delivery_slot ?storage_lot ?delivery_slot)
+        (not
+          (item_released_for_transport ?storage_lot)
+        )
+      )
+    :effect
+      (and
+        (item_released_for_transport ?storage_lot)
+        (receiving_slot_available ?receiving_slot)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action release_outbound_lot_for_transport
+    :parameters (?outbound_lot - outbound_lot ?receiving_slot - receiving_slot ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (item_scheduled_for_delivery ?outbound_lot)
+        (item_in_receiving_slot ?outbound_lot ?receiving_slot)
+        (item_assigned_delivery_slot ?outbound_lot ?delivery_slot)
+        (not
+          (item_released_for_transport ?outbound_lot)
+        )
+      )
+    :effect
+      (and
+        (item_released_for_transport ?outbound_lot)
+        (receiving_slot_available ?receiving_slot)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action release_pallet_for_transport
+    :parameters (?pallet - pallet ?receiving_slot - receiving_slot ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (item_scheduled_for_delivery ?pallet)
+        (item_in_receiving_slot ?pallet ?receiving_slot)
+        (item_assigned_delivery_slot ?pallet ?delivery_slot)
+        (not
+          (item_released_for_transport ?pallet)
+        )
+      )
+    :effect
+      (and
+        (item_released_for_transport ?pallet)
+        (receiving_slot_available ?receiving_slot)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+)

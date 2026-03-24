@@ -1,0 +1,937 @@
+(define (domain grade_component_reweighting_after_exemption)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object actor_or_artifact - entity auxiliary_resource_group - entity transaction_group - entity assessment_entity_superclass - entity assessable_entity - assessment_entity_superclass reweight_template - actor_or_artifact assessment_session - actor_or_artifact assessor - actor_or_artifact policy_override_document - actor_or_artifact administrative_token - actor_or_artifact appeal_document - actor_or_artifact supporting_evidence - actor_or_artifact override_evidence - actor_or_artifact remedial_activity - auxiliary_resource_group assessment_component - auxiliary_resource_group external_approval - auxiliary_resource_group remediation_path_enrollment - transaction_group remediation_path_section - transaction_group reweight_transaction - transaction_group enrollment_record_supertype - assessable_entity course_record_supertype - assessable_entity student_enrollment - enrollment_record_supertype section_enrollment - enrollment_record_supertype course_instance - course_record_supertype)
+
+  (:predicates
+    (assessable_entity_exemption_initiated ?assessment_unit - assessable_entity)
+    (supporting_records_prepared ?assessment_unit - assessable_entity)
+    (exemption_request_created ?assessment_unit - assessable_entity)
+    (reweighting_committed ?assessment_unit - assessable_entity)
+    (approval_ready ?assessment_unit - assessable_entity)
+    (final_grade_pending ?assessment_unit - assessable_entity)
+    (reweight_template_available ?reweight_template - reweight_template)
+    (assessable_entity_reserved_reweight_template ?assessment_unit - assessable_entity ?reweight_template - reweight_template)
+    (assessment_session_available ?assessment_session - assessment_session)
+    (assessable_entity_booked_session ?assessment_unit - assessable_entity ?assessment_session - assessment_session)
+    (assessor_available ?assessor - assessor)
+    (assessable_entity_assigned_assessor ?assessment_unit - assessable_entity ?assessor - assessor)
+    (remedial_activity_available ?remedial_activity - remedial_activity)
+    (enrollment_assigned_remedial_activity ?student_enrollment - student_enrollment ?remedial_activity - remedial_activity)
+    (section_enrollment_assigned_remedial_activity ?section_enrollment - section_enrollment ?remedial_activity - remedial_activity)
+    (enrollment_linked_remediation_path ?student_enrollment - student_enrollment ?remediation_path_enrollment - remediation_path_enrollment)
+    (remediation_path_enrollment_milestone ?remediation_path_enrollment - remediation_path_enrollment)
+    (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment - remediation_path_enrollment)
+    (enrollment_remediation_progress_ready ?student_enrollment - student_enrollment)
+    (section_enrollment_linked_remediation_path ?section_enrollment - section_enrollment ?remediation_path_section - remediation_path_section)
+    (remediation_path_section_milestone ?remediation_path_section - remediation_path_section)
+    (remediation_path_section_alternate_milestone ?remediation_path_section - remediation_path_section)
+    (section_enrollment_remediation_progress_ready ?section_enrollment - section_enrollment)
+    (reweight_transaction_slot_available ?reweight_transaction - reweight_transaction)
+    (reweight_transaction_committed ?reweight_transaction - reweight_transaction)
+    (reweight_transaction_linked_remediation_enrollment ?reweight_transaction - reweight_transaction ?remediation_path_enrollment - remediation_path_enrollment)
+    (reweight_transaction_linked_remediation_section ?reweight_transaction - reweight_transaction ?remediation_path_section - remediation_path_section)
+    (transaction_enrollment_milestone_satisfied ?reweight_transaction - reweight_transaction)
+    (transaction_section_milestone_satisfied ?reweight_transaction - reweight_transaction)
+    (reweight_transaction_validation_recorded ?reweight_transaction - reweight_transaction)
+    (course_instance_has_student_enrollment ?course_instance - course_instance ?student_enrollment - student_enrollment)
+    (course_instance_has_section_enrollment ?course_instance - course_instance ?section_enrollment - section_enrollment)
+    (course_instance_has_active_reweight_transaction ?course_instance - course_instance ?reweight_transaction - reweight_transaction)
+    (assessment_component_available ?assessment_component - assessment_component)
+    (course_instance_includes_component ?course_instance - course_instance ?assessment_component - assessment_component)
+    (assessment_component_validated ?assessment_component - assessment_component)
+    (validated_component_linked_reweight_transaction ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    (course_instance_component_validation_progressed ?course_instance - course_instance)
+    (course_instance_intermediate_approval ?course_instance - course_instance)
+    (course_instance_evidence_collection_complete ?course_instance - course_instance)
+    (course_policy_override_available ?course_instance - course_instance)
+    (course_policy_override_consumed ?course_instance - course_instance)
+    (course_instance_external_approval_marker ?course_instance - course_instance)
+    (course_instance_final_aggregation_ready ?course_instance - course_instance)
+    (external_approval_available ?external_approval - external_approval)
+    (course_instance_linked_external_approval ?course_instance - course_instance ?external_approval - external_approval)
+    (course_instance_external_approval_registered ?course_instance - course_instance)
+    (course_instance_external_approval_gate_satisfied ?course_instance - course_instance)
+    (course_instance_external_approval_evidence_processed ?course_instance - course_instance)
+    (policy_override_document_available ?policy_override_document - policy_override_document)
+    (course_instance_linked_policy_override_document ?course_instance - course_instance ?policy_override_document - policy_override_document)
+    (administrative_token_available ?administrative_token - administrative_token)
+    (course_instance_linked_administrative_token ?course_instance - course_instance ?administrative_token - administrative_token)
+    (supporting_evidence_available ?supporting_evidence - supporting_evidence)
+    (course_instance_linked_supporting_evidence ?course_instance - course_instance ?supporting_evidence - supporting_evidence)
+    (override_evidence_available ?override_evidence - override_evidence)
+    (course_instance_linked_override_evidence ?course_instance - course_instance ?override_evidence - override_evidence)
+    (appeal_document_available ?appeal_document - appeal_document)
+    (assessable_entity_linked_appeal_document ?assessment_unit - assessable_entity ?appeal_document - appeal_document)
+    (student_enrollment_readiness_marker ?student_enrollment - student_enrollment)
+    (section_enrollment_readiness_marker ?section_enrollment - section_enrollment)
+    (course_instance_finalization_guard ?course_instance - course_instance)
+  )
+  (:action initiate_exemption_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity)
+    :precondition
+      (and
+        (not
+          (assessable_entity_exemption_initiated ?assessment_unit)
+        )
+        (not
+          (reweighting_committed ?assessment_unit)
+        )
+      )
+    :effect (assessable_entity_exemption_initiated ?assessment_unit)
+  )
+  (:action create_exemption_request_and_reserve_reweight_template_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?reweight_template - reweight_template)
+    :precondition
+      (and
+        (assessable_entity_exemption_initiated ?assessment_unit)
+        (not
+          (exemption_request_created ?assessment_unit)
+        )
+        (reweight_template_available ?reweight_template)
+      )
+    :effect
+      (and
+        (exemption_request_created ?assessment_unit)
+        (assessable_entity_reserved_reweight_template ?assessment_unit ?reweight_template)
+        (not
+          (reweight_template_available ?reweight_template)
+        )
+      )
+  )
+  (:action reserve_assessment_session_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (assessable_entity_exemption_initiated ?assessment_unit)
+        (exemption_request_created ?assessment_unit)
+        (assessment_session_available ?assessment_session)
+      )
+    :effect
+      (and
+        (assessable_entity_booked_session ?assessment_unit ?assessment_session)
+        (not
+          (assessment_session_available ?assessment_session)
+        )
+      )
+  )
+  (:action record_assessment_session_result_and_mark_records_ready_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (assessable_entity_exemption_initiated ?assessment_unit)
+        (exemption_request_created ?assessment_unit)
+        (assessable_entity_booked_session ?assessment_unit ?assessment_session)
+        (not
+          (supporting_records_prepared ?assessment_unit)
+        )
+      )
+    :effect (supporting_records_prepared ?assessment_unit)
+  )
+  (:action release_assessment_session_reservation_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (assessable_entity_booked_session ?assessment_unit ?assessment_session)
+      )
+    :effect
+      (and
+        (assessment_session_available ?assessment_session)
+        (not
+          (assessable_entity_booked_session ?assessment_unit ?assessment_session)
+        )
+      )
+  )
+  (:action assign_assessor_to_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?assessor - assessor)
+    :precondition
+      (and
+        (supporting_records_prepared ?assessment_unit)
+        (assessor_available ?assessor)
+      )
+    :effect
+      (and
+        (assessable_entity_assigned_assessor ?assessment_unit ?assessor)
+        (not
+          (assessor_available ?assessor)
+        )
+      )
+  )
+  (:action unassign_assessor_from_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?assessor - assessor)
+    :precondition
+      (and
+        (assessable_entity_assigned_assessor ?assessment_unit ?assessor)
+      )
+    :effect
+      (and
+        (assessor_available ?assessor)
+        (not
+          (assessable_entity_assigned_assessor ?assessment_unit ?assessor)
+        )
+      )
+  )
+  (:action attach_supporting_evidence_to_course_instance
+    :parameters (?course_instance - course_instance ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (supporting_evidence_available ?supporting_evidence)
+      )
+    :effect
+      (and
+        (course_instance_linked_supporting_evidence ?course_instance ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action detach_supporting_evidence_from_course_instance
+    :parameters (?course_instance - course_instance ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (course_instance_linked_supporting_evidence ?course_instance ?supporting_evidence)
+      )
+    :effect
+      (and
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (course_instance_linked_supporting_evidence ?course_instance ?supporting_evidence)
+        )
+      )
+  )
+  (:action attach_override_evidence_to_course_instance
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (override_evidence_available ?override_evidence)
+      )
+    :effect
+      (and
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (not
+          (override_evidence_available ?override_evidence)
+        )
+      )
+  )
+  (:action detach_override_evidence_from_course_instance
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence)
+    :precondition
+      (and
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+      )
+    :effect
+      (and
+        (override_evidence_available ?override_evidence)
+        (not
+          (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        )
+      )
+  )
+  (:action mark_remediation_enrollment_milestone
+    :parameters (?student_enrollment - student_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (supporting_records_prepared ?student_enrollment)
+        (assessable_entity_booked_session ?student_enrollment ?assessment_session)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (not
+          (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+        )
+        (not
+          (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment)
+        )
+      )
+    :effect (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+  )
+  (:action mark_enrollment_remediation_progress_ready_with_assessor
+    :parameters (?student_enrollment - student_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?assessor - assessor)
+    :precondition
+      (and
+        (supporting_records_prepared ?student_enrollment)
+        (assessable_entity_assigned_assessor ?student_enrollment ?assessor)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+        (not
+          (student_enrollment_readiness_marker ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+      )
+  )
+  (:action assign_remedial_activity_to_enrollment_and_mark_progress
+    :parameters (?student_enrollment - student_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?remedial_activity - remedial_activity)
+    :precondition
+      (and
+        (supporting_records_prepared ?student_enrollment)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (remedial_activity_available ?remedial_activity)
+        (not
+          (student_enrollment_readiness_marker ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment)
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (enrollment_assigned_remedial_activity ?student_enrollment ?remedial_activity)
+        (not
+          (remedial_activity_available ?remedial_activity)
+        )
+      )
+  )
+  (:action apply_remedial_activity_completion_for_enrollment
+    :parameters (?student_enrollment - student_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?assessment_session - assessment_session ?remedial_activity - remedial_activity)
+    :precondition
+      (and
+        (supporting_records_prepared ?student_enrollment)
+        (assessable_entity_booked_session ?student_enrollment ?assessment_session)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment)
+        (enrollment_assigned_remedial_activity ?student_enrollment ?remedial_activity)
+        (not
+          (enrollment_remediation_progress_ready ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+        (remedial_activity_available ?remedial_activity)
+        (not
+          (enrollment_assigned_remedial_activity ?student_enrollment ?remedial_activity)
+        )
+      )
+  )
+  (:action mark_remediation_section_milestone_on_session_reservation
+    :parameters (?section_enrollment - section_enrollment ?remediation_path_section - remediation_path_section ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (supporting_records_prepared ?section_enrollment)
+        (assessable_entity_booked_session ?section_enrollment ?assessment_session)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (not
+          (remediation_path_section_milestone ?remediation_path_section)
+        )
+        (not
+          (remediation_path_section_alternate_milestone ?remediation_path_section)
+        )
+      )
+    :effect (remediation_path_section_milestone ?remediation_path_section)
+  )
+  (:action mark_section_enrollment_remediation_progress_ready_with_assessor
+    :parameters (?section_enrollment - section_enrollment ?remediation_path_section - remediation_path_section ?assessor - assessor)
+    :precondition
+      (and
+        (supporting_records_prepared ?section_enrollment)
+        (assessable_entity_assigned_assessor ?section_enrollment ?assessor)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_section_milestone ?remediation_path_section)
+        (not
+          (section_enrollment_readiness_marker ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+      )
+  )
+  (:action assign_remedial_activity_to_section_and_mark_progress
+    :parameters (?section_enrollment - section_enrollment ?remediation_path_section - remediation_path_section ?remedial_activity - remedial_activity)
+    :precondition
+      (and
+        (supporting_records_prepared ?section_enrollment)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remedial_activity_available ?remedial_activity)
+        (not
+          (section_enrollment_readiness_marker ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (remediation_path_section_alternate_milestone ?remediation_path_section)
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (section_enrollment_assigned_remedial_activity ?section_enrollment ?remedial_activity)
+        (not
+          (remedial_activity_available ?remedial_activity)
+        )
+      )
+  )
+  (:action apply_remedial_activity_completion_for_section_enrollment
+    :parameters (?section_enrollment - section_enrollment ?remediation_path_section - remediation_path_section ?assessment_session - assessment_session ?remedial_activity - remedial_activity)
+    :precondition
+      (and
+        (supporting_records_prepared ?section_enrollment)
+        (assessable_entity_booked_session ?section_enrollment ?assessment_session)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_section_alternate_milestone ?remediation_path_section)
+        (section_enrollment_assigned_remedial_activity ?section_enrollment ?remedial_activity)
+        (not
+          (section_enrollment_remediation_progress_ready ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (remediation_path_section_milestone ?remediation_path_section)
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+        (remedial_activity_available ?remedial_activity)
+        (not
+          (section_enrollment_assigned_remedial_activity ?section_enrollment ?remedial_activity)
+        )
+      )
+  )
+  (:action create_reweight_transaction_and_link_remediation_paths
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?remediation_path_section - remediation_path_section ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+        (remediation_path_section_milestone ?remediation_path_section)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+        (reweight_transaction_slot_available ?reweight_transaction)
+      )
+    :effect
+      (and
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_linked_remediation_enrollment ?reweight_transaction ?remediation_path_enrollment)
+        (reweight_transaction_linked_remediation_section ?reweight_transaction ?remediation_path_section)
+        (not
+          (reweight_transaction_slot_available ?reweight_transaction)
+        )
+      )
+  )
+  (:action create_reweight_transaction_mark_enrollment_side_milestone
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?remediation_path_section - remediation_path_section ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment)
+        (remediation_path_section_milestone ?remediation_path_section)
+        (not
+          (enrollment_remediation_progress_ready ?student_enrollment)
+        )
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+        (reweight_transaction_slot_available ?reweight_transaction)
+      )
+    :effect
+      (and
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_linked_remediation_enrollment ?reweight_transaction ?remediation_path_enrollment)
+        (reweight_transaction_linked_remediation_section ?reweight_transaction ?remediation_path_section)
+        (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        (not
+          (reweight_transaction_slot_available ?reweight_transaction)
+        )
+      )
+  )
+  (:action create_reweight_transaction_mark_section_side_milestone
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?remediation_path_section - remediation_path_section ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_enrollment_milestone ?remediation_path_enrollment)
+        (remediation_path_section_alternate_milestone ?remediation_path_section)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+        (not
+          (section_enrollment_remediation_progress_ready ?section_enrollment)
+        )
+        (reweight_transaction_slot_available ?reweight_transaction)
+      )
+    :effect
+      (and
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_linked_remediation_enrollment ?reweight_transaction ?remediation_path_enrollment)
+        (reweight_transaction_linked_remediation_section ?reweight_transaction ?remediation_path_section)
+        (transaction_section_milestone_satisfied ?reweight_transaction)
+        (not
+          (reweight_transaction_slot_available ?reweight_transaction)
+        )
+      )
+  )
+  (:action create_reweight_transaction_mark_both_sides_milestones
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?remediation_path_enrollment - remediation_path_enrollment ?remediation_path_section - remediation_path_section ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (enrollment_linked_remediation_path ?student_enrollment ?remediation_path_enrollment)
+        (section_enrollment_linked_remediation_path ?section_enrollment ?remediation_path_section)
+        (remediation_path_enrollment_alternate_milestone ?remediation_path_enrollment)
+        (remediation_path_section_alternate_milestone ?remediation_path_section)
+        (not
+          (enrollment_remediation_progress_ready ?student_enrollment)
+        )
+        (not
+          (section_enrollment_remediation_progress_ready ?section_enrollment)
+        )
+        (reweight_transaction_slot_available ?reweight_transaction)
+      )
+    :effect
+      (and
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_linked_remediation_enrollment ?reweight_transaction ?remediation_path_enrollment)
+        (reweight_transaction_linked_remediation_section ?reweight_transaction ?remediation_path_section)
+        (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        (transaction_section_milestone_satisfied ?reweight_transaction)
+        (not
+          (reweight_transaction_slot_available ?reweight_transaction)
+        )
+      )
+  )
+  (:action record_transaction_assessment_result_for_validation
+    :parameters (?reweight_transaction - reweight_transaction ?student_enrollment - student_enrollment ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (reweight_transaction_committed ?reweight_transaction)
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (assessable_entity_booked_session ?student_enrollment ?assessment_session)
+        (not
+          (reweight_transaction_validation_recorded ?reweight_transaction)
+        )
+      )
+    :effect (reweight_transaction_validation_recorded ?reweight_transaction)
+  )
+  (:action validate_component_and_link_to_reweight_transaction
+    :parameters (?course_instance - course_instance ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (course_instance_has_active_reweight_transaction ?course_instance ?reweight_transaction)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (assessment_component_available ?assessment_component)
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_validation_recorded ?reweight_transaction)
+        (not
+          (assessment_component_validated ?assessment_component)
+        )
+      )
+    :effect
+      (and
+        (assessment_component_validated ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (not
+          (assessment_component_available ?assessment_component)
+        )
+      )
+  )
+  (:action advance_course_component_validation_readiness
+    :parameters (?course_instance - course_instance ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (assessment_component_validated ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (assessable_entity_booked_session ?course_instance ?assessment_session)
+        (not
+          (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        )
+        (not
+          (course_instance_component_validation_progressed ?course_instance)
+        )
+      )
+    :effect (course_instance_component_validation_progressed ?course_instance)
+  )
+  (:action attach_policy_override_to_course_instance
+    :parameters (?course_instance - course_instance ?policy_override_document - policy_override_document)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (policy_override_document_available ?policy_override_document)
+        (not
+          (course_policy_override_available ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_policy_override_available ?course_instance)
+        (course_instance_linked_policy_override_document ?course_instance ?policy_override_document)
+        (not
+          (policy_override_document_available ?policy_override_document)
+        )
+      )
+  )
+  (:action consume_policy_override_and_progress_course_aggregation
+    :parameters (?course_instance - course_instance ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction ?assessment_session - assessment_session ?policy_override_document - policy_override_document)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (assessment_component_validated ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (assessable_entity_booked_session ?course_instance ?assessment_session)
+        (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        (course_policy_override_available ?course_instance)
+        (course_instance_linked_policy_override_document ?course_instance ?policy_override_document)
+        (not
+          (course_instance_component_validation_progressed ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_component_validation_progressed ?course_instance)
+        (course_policy_override_consumed ?course_instance)
+      )
+  )
+  (:action collect_supporting_evidence_and_mark_intermediate_approval
+    :parameters (?course_instance - course_instance ?supporting_evidence - supporting_evidence ?assessor - assessor ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_component_validation_progressed ?course_instance)
+        (course_instance_linked_supporting_evidence ?course_instance ?supporting_evidence)
+        (assessable_entity_assigned_assessor ?course_instance ?assessor)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (not
+          (transaction_section_milestone_satisfied ?reweight_transaction)
+        )
+        (not
+          (course_instance_intermediate_approval ?course_instance)
+        )
+      )
+    :effect (course_instance_intermediate_approval ?course_instance)
+  )
+  (:action collect_supporting_evidence_after_section_milestone_and_mark_intermediate_approval
+    :parameters (?course_instance - course_instance ?supporting_evidence - supporting_evidence ?assessor - assessor ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_component_validation_progressed ?course_instance)
+        (course_instance_linked_supporting_evidence ?course_instance ?supporting_evidence)
+        (assessable_entity_assigned_assessor ?course_instance ?assessor)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (transaction_section_milestone_satisfied ?reweight_transaction)
+        (not
+          (course_instance_intermediate_approval ?course_instance)
+        )
+      )
+    :effect (course_instance_intermediate_approval ?course_instance)
+  )
+  (:action process_override_evidence_and_mark_evidence_collection_complete
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_intermediate_approval ?course_instance)
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (not
+          (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        )
+        (not
+          (transaction_section_milestone_satisfied ?reweight_transaction)
+        )
+        (not
+          (course_instance_evidence_collection_complete ?course_instance)
+        )
+      )
+    :effect (course_instance_evidence_collection_complete ?course_instance)
+  )
+  (:action process_override_evidence_and_attach_external_approval_marker_with_enrollment_milestone
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_intermediate_approval ?course_instance)
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        (not
+          (transaction_section_milestone_satisfied ?reweight_transaction)
+        )
+        (not
+          (course_instance_evidence_collection_complete ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_external_approval_marker ?course_instance)
+      )
+  )
+  (:action process_override_evidence_and_attach_external_approval_marker_with_section_milestone
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_intermediate_approval ?course_instance)
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (not
+          (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        )
+        (transaction_section_milestone_satisfied ?reweight_transaction)
+        (not
+          (course_instance_evidence_collection_complete ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_external_approval_marker ?course_instance)
+      )
+  )
+  (:action process_override_evidence_and_attach_external_approval_marker_with_both_milestones
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence ?assessment_component - assessment_component ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (course_instance_intermediate_approval ?course_instance)
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (course_instance_includes_component ?course_instance ?assessment_component)
+        (validated_component_linked_reweight_transaction ?assessment_component ?reweight_transaction)
+        (transaction_enrollment_milestone_satisfied ?reweight_transaction)
+        (transaction_section_milestone_satisfied ?reweight_transaction)
+        (not
+          (course_instance_evidence_collection_complete ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_external_approval_marker ?course_instance)
+      )
+  )
+  (:action finalize_course_evidence_and_mark_approval_ready
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (not
+          (course_instance_external_approval_marker ?course_instance)
+        )
+        (not
+          (course_instance_finalization_guard ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_finalization_guard ?course_instance)
+        (approval_ready ?course_instance)
+      )
+  )
+  (:action consume_administrative_token_for_course_approval
+    :parameters (?course_instance - course_instance ?administrative_token - administrative_token)
+    :precondition
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_external_approval_marker ?course_instance)
+        (administrative_token_available ?administrative_token)
+      )
+    :effect
+      (and
+        (course_instance_linked_administrative_token ?course_instance ?administrative_token)
+        (not
+          (administrative_token_available ?administrative_token)
+        )
+      )
+  )
+  (:action aggregate_course_component_approvals_and_mark_finalization_readiness
+    :parameters (?course_instance - course_instance ?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_session - assessment_session ?administrative_token - administrative_token)
+    :precondition
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_external_approval_marker ?course_instance)
+        (course_instance_linked_administrative_token ?course_instance ?administrative_token)
+        (course_instance_has_student_enrollment ?course_instance ?student_enrollment)
+        (course_instance_has_section_enrollment ?course_instance ?section_enrollment)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+        (assessable_entity_booked_session ?course_instance ?assessment_session)
+        (not
+          (course_instance_final_aggregation_ready ?course_instance)
+        )
+      )
+    :effect (course_instance_final_aggregation_ready ?course_instance)
+  )
+  (:action complete_course_finalization_and_mark_approval_ready
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (course_instance_evidence_collection_complete ?course_instance)
+        (course_instance_final_aggregation_ready ?course_instance)
+        (not
+          (course_instance_finalization_guard ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_finalization_guard ?course_instance)
+        (approval_ready ?course_instance)
+      )
+  )
+  (:action register_external_approval_for_course_instance
+    :parameters (?course_instance - course_instance ?external_approval - external_approval ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (supporting_records_prepared ?course_instance)
+        (assessable_entity_booked_session ?course_instance ?assessment_session)
+        (external_approval_available ?external_approval)
+        (course_instance_linked_external_approval ?course_instance ?external_approval)
+        (not
+          (course_instance_external_approval_registered ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_external_approval_registered ?course_instance)
+        (not
+          (external_approval_available ?external_approval)
+        )
+      )
+  )
+  (:action satisfy_course_external_approval_gate
+    :parameters (?course_instance - course_instance ?assessor - assessor)
+    :precondition
+      (and
+        (course_instance_external_approval_registered ?course_instance)
+        (assessable_entity_assigned_assessor ?course_instance ?assessor)
+        (not
+          (course_instance_external_approval_gate_satisfied ?course_instance)
+        )
+      )
+    :effect (course_instance_external_approval_gate_satisfied ?course_instance)
+  )
+  (:action process_external_approval_evidence_for_course
+    :parameters (?course_instance - course_instance ?override_evidence - override_evidence)
+    :precondition
+      (and
+        (course_instance_external_approval_gate_satisfied ?course_instance)
+        (course_instance_linked_override_evidence ?course_instance ?override_evidence)
+        (not
+          (course_instance_external_approval_evidence_processed ?course_instance)
+        )
+      )
+    :effect (course_instance_external_approval_evidence_processed ?course_instance)
+  )
+  (:action finalize_external_approval_and_mark_course_approval_ready
+    :parameters (?course_instance - course_instance)
+    :precondition
+      (and
+        (course_instance_external_approval_evidence_processed ?course_instance)
+        (not
+          (course_instance_finalization_guard ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (course_instance_finalization_guard ?course_instance)
+        (approval_ready ?course_instance)
+      )
+  )
+  (:action apply_reweight_transaction_to_student_enrollment
+    :parameters (?student_enrollment - student_enrollment ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (student_enrollment_readiness_marker ?student_enrollment)
+        (enrollment_remediation_progress_ready ?student_enrollment)
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_validation_recorded ?reweight_transaction)
+        (not
+          (approval_ready ?student_enrollment)
+        )
+      )
+    :effect (approval_ready ?student_enrollment)
+  )
+  (:action apply_reweight_transaction_to_section_enrollment
+    :parameters (?section_enrollment - section_enrollment ?reweight_transaction - reweight_transaction)
+    :precondition
+      (and
+        (section_enrollment_readiness_marker ?section_enrollment)
+        (section_enrollment_remediation_progress_ready ?section_enrollment)
+        (reweight_transaction_committed ?reweight_transaction)
+        (reweight_transaction_validation_recorded ?reweight_transaction)
+        (not
+          (approval_ready ?section_enrollment)
+        )
+      )
+    :effect (approval_ready ?section_enrollment)
+  )
+  (:action attach_appeal_document_and_queue_final_grade_update_for_assessable_entity
+    :parameters (?assessment_unit - assessable_entity ?appeal_document - appeal_document ?assessment_session - assessment_session)
+    :precondition
+      (and
+        (approval_ready ?assessment_unit)
+        (assessable_entity_booked_session ?assessment_unit ?assessment_session)
+        (appeal_document_available ?appeal_document)
+        (not
+          (final_grade_pending ?assessment_unit)
+        )
+      )
+    :effect
+      (and
+        (final_grade_pending ?assessment_unit)
+        (assessable_entity_linked_appeal_document ?assessment_unit ?appeal_document)
+        (not
+          (appeal_document_available ?appeal_document)
+        )
+      )
+  )
+  (:action commit_reweight_transaction_on_student_enrollment_and_restore_template_availability
+    :parameters (?student_enrollment - student_enrollment ?reweight_template - reweight_template ?appeal_document - appeal_document)
+    :precondition
+      (and
+        (final_grade_pending ?student_enrollment)
+        (assessable_entity_reserved_reweight_template ?student_enrollment ?reweight_template)
+        (assessable_entity_linked_appeal_document ?student_enrollment ?appeal_document)
+        (not
+          (reweighting_committed ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (reweighting_committed ?student_enrollment)
+        (reweight_template_available ?reweight_template)
+        (appeal_document_available ?appeal_document)
+      )
+  )
+  (:action commit_reweight_transaction_on_section_enrollment_and_restore_template_availability
+    :parameters (?section_enrollment - section_enrollment ?reweight_template - reweight_template ?appeal_document - appeal_document)
+    :precondition
+      (and
+        (final_grade_pending ?section_enrollment)
+        (assessable_entity_reserved_reweight_template ?section_enrollment ?reweight_template)
+        (assessable_entity_linked_appeal_document ?section_enrollment ?appeal_document)
+        (not
+          (reweighting_committed ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (reweighting_committed ?section_enrollment)
+        (reweight_template_available ?reweight_template)
+        (appeal_document_available ?appeal_document)
+      )
+  )
+  (:action commit_reweight_transaction_on_course_instance_and_restore_template_availability
+    :parameters (?course_instance - course_instance ?reweight_template - reweight_template ?appeal_document - appeal_document)
+    :precondition
+      (and
+        (final_grade_pending ?course_instance)
+        (assessable_entity_reserved_reweight_template ?course_instance ?reweight_template)
+        (assessable_entity_linked_appeal_document ?course_instance ?appeal_document)
+        (not
+          (reweighting_committed ?course_instance)
+        )
+      )
+    :effect
+      (and
+        (reweighting_committed ?course_instance)
+        (reweight_template_available ?reweight_template)
+        (appeal_document_available ?appeal_document)
+      )
+  )
+)

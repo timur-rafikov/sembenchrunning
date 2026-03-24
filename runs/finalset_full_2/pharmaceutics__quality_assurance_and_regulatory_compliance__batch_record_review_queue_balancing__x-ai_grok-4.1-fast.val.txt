@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain batch_record_review_queue_balancing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_token_group - object document_resource_group - object assignment_token_group - object record_container - object batch_record_document - record_container reviewer_capacity_slot - resource_token_group review_stage - resource_token_group functional_reviewer_role - resource_token_group regulatory_notice - resource_token_group approver_capability_token - resource_token_group redistribution_token - resource_token_group validation_activity - resource_token_group external_escalation_flag - resource_token_group supporting_document - document_resource_group specialist_checklist - document_resource_group inspection_trigger - document_resource_group lane_assignment_token - assignment_token_group partner_lane_token - assignment_token_group routing_ticket - assignment_token_group batch_subgroup - batch_record_document review_package_group - batch_record_document production_batch_instance - batch_subgroup parallel_batch_lane - batch_subgroup review_work_item - review_package_group)
+  (:predicates
+    (batch_in_intake_queue ?batch_record - batch_record_document)
+    (assignment_ready ?batch_record - batch_record_document)
+    (reviewer_slot_allocated ?batch_record - batch_record_document)
+    (assignment_confirmed ?batch_record - batch_record_document)
+    (ready_for_approval ?batch_record - batch_record_document)
+    (approval_assigned ?batch_record - batch_record_document)
+    (reviewer_slot_available ?reviewer_slot - reviewer_capacity_slot)
+    (batch_assigned_to_slot ?batch_record - batch_record_document ?reviewer_slot - reviewer_capacity_slot)
+    (review_stage_available ?review_stage - review_stage)
+    (batch_assigned_to_stage ?batch_record - batch_record_document ?review_stage - review_stage)
+    (functional_role_available ?functional_role - functional_reviewer_role)
+    (batch_bound_to_role ?batch_record - batch_record_document ?functional_role - functional_reviewer_role)
+    (supporting_doc_available ?supporting_doc - supporting_document)
+    (batch_instance_has_supporting_doc ?batch_instance - production_batch_instance ?supporting_doc - supporting_document)
+    (lane_has_supporting_doc ?batch_lane - parallel_batch_lane ?supporting_doc - supporting_document)
+    (batch_instance_has_lane_token ?batch_instance - production_batch_instance ?lane_token - lane_assignment_token)
+    (lane_ready_for_routing ?lane_token - lane_assignment_token)
+    (lane_has_attached_doc ?lane_token - lane_assignment_token)
+    (batch_instance_ready_for_ticket ?batch_instance - production_batch_instance)
+    (lane_linked_to_partner ?batch_lane - parallel_batch_lane ?partner_lane_token - partner_lane_token)
+    (partner_lane_ready ?partner_lane_token - partner_lane_token)
+    (partner_lane_has_attached_doc ?partner_lane_token - partner_lane_token)
+    (lane_processing_completed ?batch_lane - parallel_batch_lane)
+    (routing_ticket_available ?routing_ticket - routing_ticket)
+    (routing_ticket_initialized ?routing_ticket - routing_ticket)
+    (ticket_includes_lane_token ?routing_ticket - routing_ticket ?lane_token - lane_assignment_token)
+    (ticket_includes_partner_token ?routing_ticket - routing_ticket ?partner_lane_token - partner_lane_token)
+    (routing_ticket_requires_specialist_check ?routing_ticket - routing_ticket)
+    (routing_ticket_requires_partner_check ?routing_ticket - routing_ticket)
+    (routing_ticket_stage_completed ?routing_ticket - routing_ticket)
+    (work_item_for_batch_instance ?work_item - review_work_item ?batch_instance - production_batch_instance)
+    (work_item_in_lane ?work_item - review_work_item ?batch_lane - parallel_batch_lane)
+    (work_item_bound_to_ticket ?work_item - review_work_item ?routing_ticket - routing_ticket)
+    (specialist_checklist_available ?specialist_checklist - specialist_checklist)
+    (work_item_attached_checklist ?work_item - review_work_item ?specialist_checklist - specialist_checklist)
+    (specialist_checklist_locked ?specialist_checklist - specialist_checklist)
+    (checklist_linked_to_ticket ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    (package_prepared ?work_item - review_work_item)
+    (package_checks_passed ?work_item - review_work_item)
+    (package_ready_for_signoff ?work_item - review_work_item)
+    (regulatory_notice_attached ?work_item - review_work_item)
+    (regulatory_notice_acknowledged ?work_item - review_work_item)
+    (awaiting_approver_assignment ?work_item - review_work_item)
+    (final_checks_completed ?work_item - review_work_item)
+    (inspection_trigger_available ?inspection_trigger - inspection_trigger)
+    (work_item_linked_to_inspection_trigger ?work_item - review_work_item ?inspection_trigger - inspection_trigger)
+    (inspection_trigger_acknowledged ?work_item - review_work_item)
+    (inspection_assignment_ready ?work_item - review_work_item)
+    (inspection_completed ?work_item - review_work_item)
+    (regulatory_notice_available ?regulatory_notice - regulatory_notice)
+    (work_item_has_regulatory_notice ?work_item - review_work_item ?regulatory_notice - regulatory_notice)
+    (approver_capability_available ?approver_capability - approver_capability_token)
+    (work_item_bound_to_approver_capability ?work_item - review_work_item ?approver_capability - approver_capability_token)
+    (validation_activity_available ?validation_activity - validation_activity)
+    (work_item_assigned_validation_activity ?work_item - review_work_item ?validation_activity - validation_activity)
+    (external_escalation_flag_available ?escalation_flag - external_escalation_flag)
+    (work_item_has_external_escalation_flag ?work_item - review_work_item ?escalation_flag - external_escalation_flag)
+    (redistribution_token_available ?redistribution_token - redistribution_token)
+    (linked_to_redistribution_token ?batch_record - batch_record_document ?redistribution_token - redistribution_token)
+    (batch_instance_locked_for_routing ?batch_instance - production_batch_instance)
+    (lane_locked_for_routing ?batch_lane - parallel_batch_lane)
+    (final_approval_recorded ?work_item - review_work_item)
+  )
+  (:action enqueue_batch_record
+    :parameters (?batch_record - batch_record_document)
+    :precondition
+      (and
+        (not
+          (batch_in_intake_queue ?batch_record)
+        )
+        (not
+          (assignment_confirmed ?batch_record)
+        )
+      )
+    :effect (batch_in_intake_queue ?batch_record)
+  )
+  (:action assign_reviewer_slot_to_batch
+    :parameters (?batch_record - batch_record_document ?reviewer_slot - reviewer_capacity_slot)
+    :precondition
+      (and
+        (batch_in_intake_queue ?batch_record)
+        (not
+          (reviewer_slot_allocated ?batch_record)
+        )
+        (reviewer_slot_available ?reviewer_slot)
+      )
+    :effect
+      (and
+        (reviewer_slot_allocated ?batch_record)
+        (batch_assigned_to_slot ?batch_record ?reviewer_slot)
+        (not
+          (reviewer_slot_available ?reviewer_slot)
+        )
+      )
+  )
+  (:action assign_review_stage_to_batch
+    :parameters (?batch_record - batch_record_document ?review_stage - review_stage)
+    :precondition
+      (and
+        (batch_in_intake_queue ?batch_record)
+        (reviewer_slot_allocated ?batch_record)
+        (review_stage_available ?review_stage)
+      )
+    :effect
+      (and
+        (batch_assigned_to_stage ?batch_record ?review_stage)
+        (not
+          (review_stage_available ?review_stage)
+        )
+      )
+  )
+  (:action record_review_stage_completion
+    :parameters (?batch_record - batch_record_document ?review_stage - review_stage)
+    :precondition
+      (and
+        (batch_in_intake_queue ?batch_record)
+        (reviewer_slot_allocated ?batch_record)
+        (batch_assigned_to_stage ?batch_record ?review_stage)
+        (not
+          (assignment_ready ?batch_record)
+        )
+      )
+    :effect (assignment_ready ?batch_record)
+  )
+  (:action release_review_stage_from_batch
+    :parameters (?batch_record - batch_record_document ?review_stage - review_stage)
+    :precondition
+      (and
+        (batch_assigned_to_stage ?batch_record ?review_stage)
+      )
+    :effect
+      (and
+        (review_stage_available ?review_stage)
+        (not
+          (batch_assigned_to_stage ?batch_record ?review_stage)
+        )
+      )
+  )
+  (:action bind_reviewer_role_to_batch
+    :parameters (?batch_record - batch_record_document ?functional_role - functional_reviewer_role)
+    :precondition
+      (and
+        (assignment_ready ?batch_record)
+        (functional_role_available ?functional_role)
+      )
+    :effect
+      (and
+        (batch_bound_to_role ?batch_record ?functional_role)
+        (not
+          (functional_role_available ?functional_role)
+        )
+      )
+  )
+  (:action unbind_reviewer_role_from_batch
+    :parameters (?batch_record - batch_record_document ?functional_role - functional_reviewer_role)
+    :precondition
+      (and
+        (batch_bound_to_role ?batch_record ?functional_role)
+      )
+    :effect
+      (and
+        (functional_role_available ?functional_role)
+        (not
+          (batch_bound_to_role ?batch_record ?functional_role)
+        )
+      )
+  )
+  (:action assign_validation_activity_to_work_item
+    :parameters (?work_item - review_work_item ?validation_activity - validation_activity)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (validation_activity_available ?validation_activity)
+      )
+    :effect
+      (and
+        (work_item_assigned_validation_activity ?work_item ?validation_activity)
+        (not
+          (validation_activity_available ?validation_activity)
+        )
+      )
+  )
+  (:action release_validation_activity_from_work_item
+    :parameters (?work_item - review_work_item ?validation_activity - validation_activity)
+    :precondition
+      (and
+        (work_item_assigned_validation_activity ?work_item ?validation_activity)
+      )
+    :effect
+      (and
+        (validation_activity_available ?validation_activity)
+        (not
+          (work_item_assigned_validation_activity ?work_item ?validation_activity)
+        )
+      )
+  )
+  (:action attach_external_escalation_flag_to_work_item
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (external_escalation_flag_available ?escalation_flag)
+      )
+    :effect
+      (and
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (not
+          (external_escalation_flag_available ?escalation_flag)
+        )
+      )
+  )
+  (:action release_external_escalation_flag_from_work_item
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag)
+    :precondition
+      (and
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+      )
+    :effect
+      (and
+        (external_escalation_flag_available ?escalation_flag)
+        (not
+          (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        )
+      )
+  )
+  (:action mark_lane_token_ready_for_instance
+    :parameters (?batch_instance - production_batch_instance ?lane_token - lane_assignment_token ?review_stage - review_stage)
+    :precondition
+      (and
+        (assignment_ready ?batch_instance)
+        (batch_assigned_to_stage ?batch_instance ?review_stage)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (not
+          (lane_ready_for_routing ?lane_token)
+        )
+        (not
+          (lane_has_attached_doc ?lane_token)
+        )
+      )
+    :effect (lane_ready_for_routing ?lane_token)
+  )
+  (:action assign_role_and_lock_batch_instance_for_routing
+    :parameters (?batch_instance - production_batch_instance ?lane_token - lane_assignment_token ?functional_role - functional_reviewer_role)
+    :precondition
+      (and
+        (assignment_ready ?batch_instance)
+        (batch_bound_to_role ?batch_instance ?functional_role)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_ready_for_routing ?lane_token)
+        (not
+          (batch_instance_locked_for_routing ?batch_instance)
+        )
+      )
+    :effect
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (batch_instance_ready_for_ticket ?batch_instance)
+      )
+  )
+  (:action attach_supporting_document_to_batch_instance
+    :parameters (?batch_instance - production_batch_instance ?lane_token - lane_assignment_token ?supporting_doc - supporting_document)
+    :precondition
+      (and
+        (assignment_ready ?batch_instance)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (supporting_doc_available ?supporting_doc)
+        (not
+          (batch_instance_locked_for_routing ?batch_instance)
+        )
+      )
+    :effect
+      (and
+        (lane_has_attached_doc ?lane_token)
+        (batch_instance_locked_for_routing ?batch_instance)
+        (batch_instance_has_supporting_doc ?batch_instance ?supporting_doc)
+        (not
+          (supporting_doc_available ?supporting_doc)
+        )
+      )
+  )
+  (:action finalize_supporting_document_processing_for_batch_instance
+    :parameters (?batch_instance - production_batch_instance ?lane_token - lane_assignment_token ?review_stage - review_stage ?supporting_doc - supporting_document)
+    :precondition
+      (and
+        (assignment_ready ?batch_instance)
+        (batch_assigned_to_stage ?batch_instance ?review_stage)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_has_attached_doc ?lane_token)
+        (batch_instance_has_supporting_doc ?batch_instance ?supporting_doc)
+        (not
+          (batch_instance_ready_for_ticket ?batch_instance)
+        )
+      )
+    :effect
+      (and
+        (lane_ready_for_routing ?lane_token)
+        (batch_instance_ready_for_ticket ?batch_instance)
+        (supporting_doc_available ?supporting_doc)
+        (not
+          (batch_instance_has_supporting_doc ?batch_instance ?supporting_doc)
+        )
+      )
+  )
+  (:action mark_partner_lane_token_ready
+    :parameters (?batch_lane - parallel_batch_lane ?partner_lane_token - partner_lane_token ?review_stage - review_stage)
+    :precondition
+      (and
+        (assignment_ready ?batch_lane)
+        (batch_assigned_to_stage ?batch_lane ?review_stage)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (not
+          (partner_lane_ready ?partner_lane_token)
+        )
+        (not
+          (partner_lane_has_attached_doc ?partner_lane_token)
+        )
+      )
+    :effect (partner_lane_ready ?partner_lane_token)
+  )
+  (:action assign_role_and_lock_lane_for_routing
+    :parameters (?batch_lane - parallel_batch_lane ?partner_lane_token - partner_lane_token ?functional_role - functional_reviewer_role)
+    :precondition
+      (and
+        (assignment_ready ?batch_lane)
+        (batch_bound_to_role ?batch_lane ?functional_role)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (partner_lane_ready ?partner_lane_token)
+        (not
+          (lane_locked_for_routing ?batch_lane)
+        )
+      )
+    :effect
+      (and
+        (lane_locked_for_routing ?batch_lane)
+        (lane_processing_completed ?batch_lane)
+      )
+  )
+  (:action attach_supporting_document_to_lane
+    :parameters (?batch_lane - parallel_batch_lane ?partner_lane_token - partner_lane_token ?supporting_doc - supporting_document)
+    :precondition
+      (and
+        (assignment_ready ?batch_lane)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (supporting_doc_available ?supporting_doc)
+        (not
+          (lane_locked_for_routing ?batch_lane)
+        )
+      )
+    :effect
+      (and
+        (partner_lane_has_attached_doc ?partner_lane_token)
+        (lane_locked_for_routing ?batch_lane)
+        (lane_has_supporting_doc ?batch_lane ?supporting_doc)
+        (not
+          (supporting_doc_available ?supporting_doc)
+        )
+      )
+  )
+  (:action finalize_supporting_document_processing_for_lane
+    :parameters (?batch_lane - parallel_batch_lane ?partner_lane_token - partner_lane_token ?review_stage - review_stage ?supporting_doc - supporting_document)
+    :precondition
+      (and
+        (assignment_ready ?batch_lane)
+        (batch_assigned_to_stage ?batch_lane ?review_stage)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (partner_lane_has_attached_doc ?partner_lane_token)
+        (lane_has_supporting_doc ?batch_lane ?supporting_doc)
+        (not
+          (lane_processing_completed ?batch_lane)
+        )
+      )
+    :effect
+      (and
+        (partner_lane_ready ?partner_lane_token)
+        (lane_processing_completed ?batch_lane)
+        (supporting_doc_available ?supporting_doc)
+        (not
+          (lane_has_supporting_doc ?batch_lane ?supporting_doc)
+        )
+      )
+  )
+  (:action create_routing_ticket
+    :parameters (?batch_instance - production_batch_instance ?batch_lane - parallel_batch_lane ?lane_token - lane_assignment_token ?partner_lane_token - partner_lane_token ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (lane_locked_for_routing ?batch_lane)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (lane_ready_for_routing ?lane_token)
+        (partner_lane_ready ?partner_lane_token)
+        (batch_instance_ready_for_ticket ?batch_instance)
+        (lane_processing_completed ?batch_lane)
+        (routing_ticket_available ?routing_ticket)
+      )
+    :effect
+      (and
+        (routing_ticket_initialized ?routing_ticket)
+        (ticket_includes_lane_token ?routing_ticket ?lane_token)
+        (ticket_includes_partner_token ?routing_ticket ?partner_lane_token)
+        (not
+          (routing_ticket_available ?routing_ticket)
+        )
+      )
+  )
+  (:action create_routing_ticket_for_documented_lane
+    :parameters (?batch_instance - production_batch_instance ?batch_lane - parallel_batch_lane ?lane_token - lane_assignment_token ?partner_lane_token - partner_lane_token ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (lane_locked_for_routing ?batch_lane)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (lane_has_attached_doc ?lane_token)
+        (partner_lane_ready ?partner_lane_token)
+        (not
+          (batch_instance_ready_for_ticket ?batch_instance)
+        )
+        (lane_processing_completed ?batch_lane)
+        (routing_ticket_available ?routing_ticket)
+      )
+    :effect
+      (and
+        (routing_ticket_initialized ?routing_ticket)
+        (ticket_includes_lane_token ?routing_ticket ?lane_token)
+        (ticket_includes_partner_token ?routing_ticket ?partner_lane_token)
+        (routing_ticket_requires_specialist_check ?routing_ticket)
+        (not
+          (routing_ticket_available ?routing_ticket)
+        )
+      )
+  )
+  (:action create_routing_ticket_for_partner_lane
+    :parameters (?batch_instance - production_batch_instance ?batch_lane - parallel_batch_lane ?lane_token - lane_assignment_token ?partner_lane_token - partner_lane_token ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (lane_locked_for_routing ?batch_lane)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (lane_ready_for_routing ?lane_token)
+        (partner_lane_has_attached_doc ?partner_lane_token)
+        (batch_instance_ready_for_ticket ?batch_instance)
+        (not
+          (lane_processing_completed ?batch_lane)
+        )
+        (routing_ticket_available ?routing_ticket)
+      )
+    :effect
+      (and
+        (routing_ticket_initialized ?routing_ticket)
+        (ticket_includes_lane_token ?routing_ticket ?lane_token)
+        (ticket_includes_partner_token ?routing_ticket ?partner_lane_token)
+        (routing_ticket_requires_partner_check ?routing_ticket)
+        (not
+          (routing_ticket_available ?routing_ticket)
+        )
+      )
+  )
+  (:action create_routing_ticket_for_documented_partner_lane
+    :parameters (?batch_instance - production_batch_instance ?batch_lane - parallel_batch_lane ?lane_token - lane_assignment_token ?partner_lane_token - partner_lane_token ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (lane_locked_for_routing ?batch_lane)
+        (batch_instance_has_lane_token ?batch_instance ?lane_token)
+        (lane_linked_to_partner ?batch_lane ?partner_lane_token)
+        (lane_has_attached_doc ?lane_token)
+        (partner_lane_has_attached_doc ?partner_lane_token)
+        (not
+          (batch_instance_ready_for_ticket ?batch_instance)
+        )
+        (not
+          (lane_processing_completed ?batch_lane)
+        )
+        (routing_ticket_available ?routing_ticket)
+      )
+    :effect
+      (and
+        (routing_ticket_initialized ?routing_ticket)
+        (ticket_includes_lane_token ?routing_ticket ?lane_token)
+        (ticket_includes_partner_token ?routing_ticket ?partner_lane_token)
+        (routing_ticket_requires_specialist_check ?routing_ticket)
+        (routing_ticket_requires_partner_check ?routing_ticket)
+        (not
+          (routing_ticket_available ?routing_ticket)
+        )
+      )
+  )
+  (:action mark_routing_ticket_stage_processed
+    :parameters (?routing_ticket - routing_ticket ?batch_instance - production_batch_instance ?review_stage - review_stage)
+    :precondition
+      (and
+        (routing_ticket_initialized ?routing_ticket)
+        (batch_instance_locked_for_routing ?batch_instance)
+        (batch_assigned_to_stage ?batch_instance ?review_stage)
+        (not
+          (routing_ticket_stage_completed ?routing_ticket)
+        )
+      )
+    :effect (routing_ticket_stage_completed ?routing_ticket)
+  )
+  (:action attach_checklist_to_ticket_for_work_item
+    :parameters (?work_item - review_work_item ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (work_item_bound_to_ticket ?work_item ?routing_ticket)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (specialist_checklist_available ?specialist_checklist)
+        (routing_ticket_initialized ?routing_ticket)
+        (routing_ticket_stage_completed ?routing_ticket)
+        (not
+          (specialist_checklist_locked ?specialist_checklist)
+        )
+      )
+    :effect
+      (and
+        (specialist_checklist_locked ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (not
+          (specialist_checklist_available ?specialist_checklist)
+        )
+      )
+  )
+  (:action mark_work_item_package_ready
+    :parameters (?work_item - review_work_item ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket ?review_stage - review_stage)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (specialist_checklist_locked ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (batch_assigned_to_stage ?work_item ?review_stage)
+        (not
+          (routing_ticket_requires_specialist_check ?routing_ticket)
+        )
+        (not
+          (package_prepared ?work_item)
+        )
+      )
+    :effect (package_prepared ?work_item)
+  )
+  (:action attach_regulatory_notice_to_work_item
+    :parameters (?work_item - review_work_item ?regulatory_notice - regulatory_notice)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (regulatory_notice_available ?regulatory_notice)
+        (not
+          (regulatory_notice_attached ?work_item)
+        )
+      )
+    :effect
+      (and
+        (regulatory_notice_attached ?work_item)
+        (work_item_has_regulatory_notice ?work_item ?regulatory_notice)
+        (not
+          (regulatory_notice_available ?regulatory_notice)
+        )
+      )
+  )
+  (:action process_regulatory_notice_for_work_item
+    :parameters (?work_item - review_work_item ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket ?review_stage - review_stage ?regulatory_notice - regulatory_notice)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (specialist_checklist_locked ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (batch_assigned_to_stage ?work_item ?review_stage)
+        (routing_ticket_requires_specialist_check ?routing_ticket)
+        (regulatory_notice_attached ?work_item)
+        (work_item_has_regulatory_notice ?work_item ?regulatory_notice)
+        (not
+          (package_prepared ?work_item)
+        )
+      )
+    :effect
+      (and
+        (package_prepared ?work_item)
+        (regulatory_notice_acknowledged ?work_item)
+      )
+  )
+  (:action complete_validation_and_mark_checks_passed
+    :parameters (?work_item - review_work_item ?validation_activity - validation_activity ?functional_role - functional_reviewer_role ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_prepared ?work_item)
+        (work_item_assigned_validation_activity ?work_item ?validation_activity)
+        (batch_bound_to_role ?work_item ?functional_role)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (not
+          (routing_ticket_requires_partner_check ?routing_ticket)
+        )
+        (not
+          (package_checks_passed ?work_item)
+        )
+      )
+    :effect (package_checks_passed ?work_item)
+  )
+  (:action complete_validation_and_mark_checks_passed_partner_flagged
+    :parameters (?work_item - review_work_item ?validation_activity - validation_activity ?functional_role - functional_reviewer_role ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_prepared ?work_item)
+        (work_item_assigned_validation_activity ?work_item ?validation_activity)
+        (batch_bound_to_role ?work_item ?functional_role)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (routing_ticket_requires_partner_check ?routing_ticket)
+        (not
+          (package_checks_passed ?work_item)
+        )
+      )
+    :effect (package_checks_passed ?work_item)
+  )
+  (:action promote_package_to_final_review
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_checks_passed ?work_item)
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (not
+          (routing_ticket_requires_specialist_check ?routing_ticket)
+        )
+        (not
+          (routing_ticket_requires_partner_check ?routing_ticket)
+        )
+        (not
+          (package_ready_for_signoff ?work_item)
+        )
+      )
+    :effect (package_ready_for_signoff ?work_item)
+  )
+  (:action promote_package_to_final_review_with_approver_requirement
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_checks_passed ?work_item)
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (routing_ticket_requires_specialist_check ?routing_ticket)
+        (not
+          (routing_ticket_requires_partner_check ?routing_ticket)
+        )
+        (not
+          (package_ready_for_signoff ?work_item)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_signoff ?work_item)
+        (awaiting_approver_assignment ?work_item)
+      )
+  )
+  (:action promote_package_to_final_review_with_alternative_approver_requirement
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_checks_passed ?work_item)
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (not
+          (routing_ticket_requires_specialist_check ?routing_ticket)
+        )
+        (routing_ticket_requires_partner_check ?routing_ticket)
+        (not
+          (package_ready_for_signoff ?work_item)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_signoff ?work_item)
+        (awaiting_approver_assignment ?work_item)
+      )
+  )
+  (:action promote_package_to_final_review_with_all_approvals_required
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag ?specialist_checklist - specialist_checklist ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (package_checks_passed ?work_item)
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (work_item_attached_checklist ?work_item ?specialist_checklist)
+        (checklist_linked_to_ticket ?specialist_checklist ?routing_ticket)
+        (routing_ticket_requires_specialist_check ?routing_ticket)
+        (routing_ticket_requires_partner_check ?routing_ticket)
+        (not
+          (package_ready_for_signoff ?work_item)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_signoff ?work_item)
+        (awaiting_approver_assignment ?work_item)
+      )
+  )
+  (:action record_final_approval_on_work_item
+    :parameters (?work_item - review_work_item)
+    :precondition
+      (and
+        (package_ready_for_signoff ?work_item)
+        (not
+          (awaiting_approver_assignment ?work_item)
+        )
+        (not
+          (final_approval_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?work_item)
+        (ready_for_approval ?work_item)
+      )
+  )
+  (:action assign_approver_capability_to_work_item
+    :parameters (?work_item - review_work_item ?approver_capability - approver_capability_token)
+    :precondition
+      (and
+        (package_ready_for_signoff ?work_item)
+        (awaiting_approver_assignment ?work_item)
+        (approver_capability_available ?approver_capability)
+      )
+    :effect
+      (and
+        (work_item_bound_to_approver_capability ?work_item ?approver_capability)
+        (not
+          (approver_capability_available ?approver_capability)
+        )
+      )
+  )
+  (:action perform_final_review_checks
+    :parameters (?work_item - review_work_item ?batch_instance - production_batch_instance ?batch_lane - parallel_batch_lane ?review_stage - review_stage ?approver_capability - approver_capability_token)
+    :precondition
+      (and
+        (package_ready_for_signoff ?work_item)
+        (awaiting_approver_assignment ?work_item)
+        (work_item_bound_to_approver_capability ?work_item ?approver_capability)
+        (work_item_for_batch_instance ?work_item ?batch_instance)
+        (work_item_in_lane ?work_item ?batch_lane)
+        (batch_instance_ready_for_ticket ?batch_instance)
+        (lane_processing_completed ?batch_lane)
+        (batch_assigned_to_stage ?work_item ?review_stage)
+        (not
+          (final_checks_completed ?work_item)
+        )
+      )
+    :effect (final_checks_completed ?work_item)
+  )
+  (:action record_final_approval_after_checks
+    :parameters (?work_item - review_work_item)
+    :precondition
+      (and
+        (package_ready_for_signoff ?work_item)
+        (final_checks_completed ?work_item)
+        (not
+          (final_approval_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?work_item)
+        (ready_for_approval ?work_item)
+      )
+  )
+  (:action acknowledge_inspection_trigger_on_work_item
+    :parameters (?work_item - review_work_item ?inspection_trigger - inspection_trigger ?review_stage - review_stage)
+    :precondition
+      (and
+        (assignment_ready ?work_item)
+        (batch_assigned_to_stage ?work_item ?review_stage)
+        (inspection_trigger_available ?inspection_trigger)
+        (work_item_linked_to_inspection_trigger ?work_item ?inspection_trigger)
+        (not
+          (inspection_trigger_acknowledged ?work_item)
+        )
+      )
+    :effect
+      (and
+        (inspection_trigger_acknowledged ?work_item)
+        (not
+          (inspection_trigger_available ?inspection_trigger)
+        )
+      )
+  )
+  (:action prepare_inspection_assignment_for_work_item
+    :parameters (?work_item - review_work_item ?functional_role - functional_reviewer_role)
+    :precondition
+      (and
+        (inspection_trigger_acknowledged ?work_item)
+        (batch_bound_to_role ?work_item ?functional_role)
+        (not
+          (inspection_assignment_ready ?work_item)
+        )
+      )
+    :effect (inspection_assignment_ready ?work_item)
+  )
+  (:action record_inspection_completion_for_work_item
+    :parameters (?work_item - review_work_item ?escalation_flag - external_escalation_flag)
+    :precondition
+      (and
+        (inspection_assignment_ready ?work_item)
+        (work_item_has_external_escalation_flag ?work_item ?escalation_flag)
+        (not
+          (inspection_completed ?work_item)
+        )
+      )
+    :effect (inspection_completed ?work_item)
+  )
+  (:action record_final_approval_after_inspection
+    :parameters (?work_item - review_work_item)
+    :precondition
+      (and
+        (inspection_completed ?work_item)
+        (not
+          (final_approval_recorded ?work_item)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?work_item)
+        (ready_for_approval ?work_item)
+      )
+  )
+  (:action record_batch_instance_approval
+    :parameters (?batch_instance - production_batch_instance ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (batch_instance_locked_for_routing ?batch_instance)
+        (batch_instance_ready_for_ticket ?batch_instance)
+        (routing_ticket_initialized ?routing_ticket)
+        (routing_ticket_stage_completed ?routing_ticket)
+        (not
+          (ready_for_approval ?batch_instance)
+        )
+      )
+    :effect (ready_for_approval ?batch_instance)
+  )
+  (:action record_batch_lane_approval
+    :parameters (?batch_lane - parallel_batch_lane ?routing_ticket - routing_ticket)
+    :precondition
+      (and
+        (lane_locked_for_routing ?batch_lane)
+        (lane_processing_completed ?batch_lane)
+        (routing_ticket_initialized ?routing_ticket)
+        (routing_ticket_stage_completed ?routing_ticket)
+        (not
+          (ready_for_approval ?batch_lane)
+        )
+      )
+    :effect (ready_for_approval ?batch_lane)
+  )
+  (:action assign_approval_and_allocate_redistribution_token
+    :parameters (?batch_record - batch_record_document ?redistribution_token - redistribution_token ?review_stage - review_stage)
+    :precondition
+      (and
+        (ready_for_approval ?batch_record)
+        (batch_assigned_to_stage ?batch_record ?review_stage)
+        (redistribution_token_available ?redistribution_token)
+        (not
+          (approval_assigned ?batch_record)
+        )
+      )
+    :effect
+      (and
+        (approval_assigned ?batch_record)
+        (linked_to_redistribution_token ?batch_record ?redistribution_token)
+        (not
+          (redistribution_token_available ?redistribution_token)
+        )
+      )
+  )
+  (:action allocate_reviewer_slot_from_redistribution_to_batch_instance
+    :parameters (?batch_instance - production_batch_instance ?reviewer_slot - reviewer_capacity_slot ?redistribution_token - redistribution_token)
+    :precondition
+      (and
+        (approval_assigned ?batch_instance)
+        (batch_assigned_to_slot ?batch_instance ?reviewer_slot)
+        (linked_to_redistribution_token ?batch_instance ?redistribution_token)
+        (not
+          (assignment_confirmed ?batch_instance)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?batch_instance)
+        (reviewer_slot_available ?reviewer_slot)
+        (redistribution_token_available ?redistribution_token)
+      )
+  )
+  (:action allocate_reviewer_slot_from_redistribution_to_lane
+    :parameters (?batch_lane - parallel_batch_lane ?reviewer_slot - reviewer_capacity_slot ?redistribution_token - redistribution_token)
+    :precondition
+      (and
+        (approval_assigned ?batch_lane)
+        (batch_assigned_to_slot ?batch_lane ?reviewer_slot)
+        (linked_to_redistribution_token ?batch_lane ?redistribution_token)
+        (not
+          (assignment_confirmed ?batch_lane)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?batch_lane)
+        (reviewer_slot_available ?reviewer_slot)
+        (redistribution_token_available ?redistribution_token)
+      )
+  )
+  (:action allocate_reviewer_slot_from_redistribution_to_work_item
+    :parameters (?work_item - review_work_item ?reviewer_slot - reviewer_capacity_slot ?redistribution_token - redistribution_token)
+    :precondition
+      (and
+        (approval_assigned ?work_item)
+        (batch_assigned_to_slot ?work_item ?reviewer_slot)
+        (linked_to_redistribution_token ?work_item ?redistribution_token)
+        (not
+          (assignment_confirmed ?work_item)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?work_item)
+        (reviewer_slot_available ?reviewer_slot)
+        (redistribution_token_available ?redistribution_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem batch_review_balancing_problem)
+  (:domain batch_record_review_queue_balancing_domain)
+  (:objects batch_instance_01 - production_batch_instance batch_lane_01 - parallel_batch_lane work_item_01 - review_work_item work_item_02 - review_work_item reviewer_slot_01 - reviewer_capacity_slot reviewer_slot_02 - reviewer_capacity_slot reviewer_slot_03 - reviewer_capacity_slot stage_data_reconciliation - review_stage role_quality_reviewer - functional_reviewer_role doc_coa_01 - supporting_document lane_token_01 - lane_assignment_token partner_lane_token_01 - partner_lane_token routing_ticket_01 - routing_ticket specialist_checklist_01 - specialist_checklist specialist_checklist_02 - specialist_checklist regulatory_notice_01 - regulatory_notice regulatory_notice_02 - regulatory_notice approver_capability_01 - approver_capability_token approver_capability_02 - approver_capability_token redistribution_token_01 - redistribution_token validation_activity_01 - validation_activity inspection_trigger_01 - inspection_trigger inspection_trigger_02 - inspection_trigger external_escalation_flag_01 - external_escalation_flag)
+  (:init
+    (reviewer_slot_available reviewer_slot_01)
+    (reviewer_slot_available reviewer_slot_02)
+    (reviewer_slot_available reviewer_slot_03)
+    (review_stage_available stage_data_reconciliation)
+    (functional_role_available role_quality_reviewer)
+    (supporting_doc_available doc_coa_01)
+    (batch_instance_has_lane_token batch_instance_01 lane_token_01)
+    (lane_linked_to_partner batch_lane_01 partner_lane_token_01)
+    (routing_ticket_available routing_ticket_01)
+    (specialist_checklist_available specialist_checklist_01)
+    (specialist_checklist_available specialist_checklist_02)
+    (work_item_for_batch_instance work_item_01 batch_instance_01)
+    (work_item_for_batch_instance work_item_02 batch_instance_01)
+    (work_item_in_lane work_item_01 batch_lane_01)
+    (work_item_in_lane work_item_02 batch_lane_01)
+    (work_item_bound_to_ticket work_item_01 routing_ticket_01)
+    (work_item_bound_to_ticket work_item_02 routing_ticket_01)
+    (work_item_attached_checklist work_item_01 specialist_checklist_01)
+    (work_item_attached_checklist work_item_02 specialist_checklist_02)
+    (regulatory_notice_available regulatory_notice_01)
+    (regulatory_notice_available regulatory_notice_02)
+    (approver_capability_available approver_capability_01)
+    (approver_capability_available approver_capability_02)
+    (redistribution_token_available redistribution_token_01)
+    (validation_activity_available validation_activity_01)
+    (inspection_trigger_available inspection_trigger_01)
+    (work_item_linked_to_inspection_trigger work_item_01 inspection_trigger_01)
+    (work_item_linked_to_inspection_trigger work_item_02 inspection_trigger_02)
+    (external_escalation_flag_available external_escalation_flag_01)
+  )
+  (:goal
+    (and
+      (assignment_confirmed batch_instance_01)
+      (assignment_confirmed batch_lane_01)
+      (assignment_confirmed work_item_01)
+      (assignment_confirmed work_item_02)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(enqueue_batch_record batch_lane_01)
+(assign_reviewer_slot_to_batch batch_lane_01 reviewer_slot_02)
+(assign_review_stage_to_batch batch_lane_01 stage_data_reconciliation)
+(record_review_stage_completion batch_lane_01 stage_data_reconciliation)
+(mark_partner_lane_token_ready batch_lane_01 partner_lane_token_01 stage_data_reconciliation)
+(bind_reviewer_role_to_batch batch_lane_01 role_quality_reviewer)
+(assign_role_and_lock_lane_for_routing batch_lane_01 partner_lane_token_01 role_quality_reviewer)
+(release_review_stage_from_batch batch_lane_01 stage_data_reconciliation)
+(unbind_reviewer_role_from_batch batch_lane_01 role_quality_reviewer)
+(enqueue_batch_record batch_instance_01)
+(assign_reviewer_slot_to_batch batch_instance_01 reviewer_slot_01)
+(assign_review_stage_to_batch batch_instance_01 stage_data_reconciliation)
+(record_review_stage_completion batch_instance_01 stage_data_reconciliation)
+(mark_lane_token_ready_for_instance batch_instance_01 lane_token_01 stage_data_reconciliation)
+(bind_reviewer_role_to_batch batch_instance_01 role_quality_reviewer)
+(assign_role_and_lock_batch_instance_for_routing batch_instance_01 lane_token_01 role_quality_reviewer)
+(create_routing_ticket batch_instance_01 batch_lane_01 lane_token_01 partner_lane_token_01 routing_ticket_01)
+(mark_routing_ticket_stage_processed routing_ticket_01 batch_instance_01 stage_data_reconciliation)
+(record_batch_instance_approval batch_instance_01 routing_ticket_01)
+(record_batch_lane_approval batch_lane_01 routing_ticket_01)
+(release_review_stage_from_batch batch_instance_01 stage_data_reconciliation)
+(unbind_reviewer_role_from_batch batch_instance_01 role_quality_reviewer)
+(enqueue_batch_record work_item_01)
+(assign_reviewer_slot_to_batch work_item_01 reviewer_slot_03)
+(assign_review_stage_to_batch work_item_01 stage_data_reconciliation)
+(record_review_stage_completion work_item_01 stage_data_reconciliation)
+(attach_external_escalation_flag_to_work_item work_item_01 external_escalation_flag_01)
+(bind_reviewer_role_to_batch work_item_01 role_quality_reviewer)
+(acknowledge_inspection_trigger_on_work_item work_item_01 inspection_trigger_01 stage_data_reconciliation)
+(prepare_inspection_assignment_for_work_item work_item_01 role_quality_reviewer)
+(record_inspection_completion_for_work_item work_item_01 external_escalation_flag_01)
+(record_final_approval_after_inspection work_item_01)
+(release_external_escalation_flag_from_work_item work_item_01 external_escalation_flag_01)
+(unbind_reviewer_role_from_batch work_item_01 role_quality_reviewer)
+(assign_approval_and_allocate_redistribution_token work_item_01 redistribution_token_01 stage_data_reconciliation)
+(release_review_stage_from_batch work_item_01 stage_data_reconciliation)
+(allocate_reviewer_slot_from_redistribution_to_work_item work_item_01 reviewer_slot_03 redistribution_token_01)
+(enqueue_batch_record work_item_02)
+(assign_reviewer_slot_to_batch work_item_02 reviewer_slot_03)
+(assign_review_stage_to_batch work_item_02 stage_data_reconciliation)
+(record_review_stage_completion work_item_02 stage_data_reconciliation)
+(assign_validation_activity_to_work_item work_item_02 validation_activity_01)
+(attach_external_escalation_flag_to_work_item work_item_02 external_escalation_flag_01)
+(bind_reviewer_role_to_batch work_item_02 role_quality_reviewer)
+(attach_checklist_to_ticket_for_work_item work_item_02 specialist_checklist_02 routing_ticket_01)
+(mark_work_item_package_ready work_item_02 specialist_checklist_02 routing_ticket_01 stage_data_reconciliation)
+(complete_validation_and_mark_checks_passed work_item_02 validation_activity_01 role_quality_reviewer specialist_checklist_02 routing_ticket_01)
+(promote_package_to_final_review work_item_02 external_escalation_flag_01 specialist_checklist_02 routing_ticket_01)
+(record_final_approval_on_work_item work_item_02)
+(assign_approval_and_allocate_redistribution_token work_item_02 redistribution_token_01 stage_data_reconciliation)
+(release_review_stage_from_batch work_item_02 stage_data_reconciliation)
+(allocate_reviewer_slot_from_redistribution_to_work_item work_item_02 reviewer_slot_03 redistribution_token_01)
+(assign_review_stage_to_batch batch_instance_01 stage_data_reconciliation)
+(assign_approval_and_allocate_redistribution_token batch_instance_01 redistribution_token_01 stage_data_reconciliation)
+(allocate_reviewer_slot_from_redistribution_to_batch_instance batch_instance_01 reviewer_slot_01 redistribution_token_01)
+(release_review_stage_from_batch batch_instance_01 stage_data_reconciliation)
+(assign_review_stage_to_batch batch_lane_01 stage_data_reconciliation)
+(assign_approval_and_allocate_redistribution_token batch_lane_01 redistribution_token_01 stage_data_reconciliation)
+(allocate_reviewer_slot_from_redistribution_to_lane batch_lane_01 reviewer_slot_02 redistribution_token_01)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__gq5rgls/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 59 
+
+Successful plans:
+Value: 59
+ /tmp/val__gq5rgls/plan.pddl 59 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain logistics_customs_clearance_delay_contingency_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity - object document_or_report_entity - object location_or_unit_entity - object case_entity - object shipment_case - case_entity alternate_route - resource_entity customs_task - resource_entity local_customs_agent - resource_entity special_clearance_certificate - resource_entity claim_account - resource_entity evidence_package - resource_entity inspection_team - resource_entity legal_advisor - resource_entity supporting_document - document_or_report_entity inspection_report - document_or_report_entity customs_authority_contact - document_or_report_entity origin_facility - location_or_unit_entity destination_facility - location_or_unit_entity transport_unit - location_or_unit_entity movement_leg_group - shipment_case plan_executor_group - shipment_case origin_leg - movement_leg_group destination_leg - movement_leg_group contingency_plan_instance - plan_executor_group)
+  (:predicates
+    (shipment_case_opened ?shipment_case - shipment_case)
+    (case_confirmed ?shipment_case - shipment_case)
+    (case_has_assigned_alternate_route ?shipment_case - shipment_case)
+    (service_restored ?shipment_case - shipment_case)
+    (case_resolved ?shipment_case - shipment_case)
+    (claim_initiated ?shipment_case - shipment_case)
+    (alternate_route_available ?alternate_route - alternate_route)
+    (shipment_case_assigned_alternate_route ?shipment_case - shipment_case ?alternate_route - alternate_route)
+    (customs_task_available ?customs_task - customs_task)
+    (customs_task_assigned_to_case ?shipment_case - shipment_case ?customs_task - customs_task)
+    (local_customs_agent_available ?local_customs_agent - local_customs_agent)
+    (local_customs_agent_assigned_to_case ?shipment_case - shipment_case ?local_customs_agent - local_customs_agent)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (origin_leg_has_document ?origin_leg - origin_leg ?supporting_document - supporting_document)
+    (destination_leg_has_document ?destination_leg - destination_leg ?supporting_document - supporting_document)
+    (origin_leg_linked_to_facility ?origin_leg - origin_leg ?origin_facility - origin_facility)
+    (origin_facility_inspection_requested ?origin_facility - origin_facility)
+    (origin_facility_document_received ?origin_facility - origin_facility)
+    (origin_leg_cleared ?origin_leg - origin_leg)
+    (destination_leg_linked_to_facility ?destination_leg - destination_leg ?destination_facility - destination_facility)
+    (destination_facility_inspection_requested ?destination_facility - destination_facility)
+    (destination_facility_document_received ?destination_facility - destination_facility)
+    (destination_leg_cleared ?destination_leg - destination_leg)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_allocated ?transport_unit - transport_unit)
+    (transport_unit_assigned_to_origin_facility ?transport_unit - transport_unit ?origin_facility - origin_facility)
+    (transport_unit_assigned_to_destination_facility ?transport_unit - transport_unit ?destination_facility - destination_facility)
+    (transport_unit_origin_hold ?transport_unit - transport_unit)
+    (transport_unit_destination_hold ?transport_unit - transport_unit)
+    (transport_unit_inspected ?transport_unit - transport_unit)
+    (plan_includes_origin_leg ?contingency_plan_instance - contingency_plan_instance ?origin_leg - origin_leg)
+    (plan_includes_destination_leg ?contingency_plan_instance - contingency_plan_instance ?destination_leg - destination_leg)
+    (plan_includes_transport_unit ?contingency_plan_instance - contingency_plan_instance ?transport_unit - transport_unit)
+    (inspection_report_available ?inspection_report - inspection_report)
+    (plan_has_inspection_report ?contingency_plan_instance - contingency_plan_instance ?inspection_report - inspection_report)
+    (inspection_report_consumed ?inspection_report - inspection_report)
+    (inspection_report_attached_to_transport_unit ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    (plan_ready_for_deployment ?contingency_plan_instance - contingency_plan_instance)
+    (plan_execution_ready ?contingency_plan_instance - contingency_plan_instance)
+    (plan_resolution_ready ?contingency_plan_instance - contingency_plan_instance)
+    (special_clearance_certificate_assigned_to_plan ?contingency_plan_instance - contingency_plan_instance)
+    (special_certificate_application_recorded ?contingency_plan_instance - contingency_plan_instance)
+    (plan_validated_for_claims ?contingency_plan_instance - contingency_plan_instance)
+    (plan_execution_completed ?contingency_plan_instance - contingency_plan_instance)
+    (customs_authority_contact_available ?customs_authority_contact - customs_authority_contact)
+    (authority_contact_assigned_to_plan ?contingency_plan_instance - contingency_plan_instance ?customs_authority_contact - customs_authority_contact)
+    (authority_contact_engaged_for_plan ?contingency_plan_instance - contingency_plan_instance)
+    (authority_approval_initiated ?contingency_plan_instance - contingency_plan_instance)
+    (authority_approval_confirmed ?contingency_plan_instance - contingency_plan_instance)
+    (special_clearance_certificate_available ?special_clearance_certificate - special_clearance_certificate)
+    (plan_has_special_clearance_certificate ?contingency_plan_instance - contingency_plan_instance ?special_clearance_certificate - special_clearance_certificate)
+    (claim_account_available ?claim_account - claim_account)
+    (plan_assigned_claim_account ?contingency_plan_instance - contingency_plan_instance ?claim_account - claim_account)
+    (inspection_team_available ?inspection_team - inspection_team)
+    (inspection_team_assigned_to_plan ?contingency_plan_instance - contingency_plan_instance ?inspection_team - inspection_team)
+    (legal_advisor_available ?legal_advisor - legal_advisor)
+    (legal_advisor_assigned_to_plan ?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor)
+    (evidence_package_available ?evidence_package - evidence_package)
+    (case_has_evidence_package ?shipment_case - shipment_case ?evidence_package - evidence_package)
+    (origin_leg_ready ?origin_leg - origin_leg)
+    (destination_leg_ready ?destination_leg - destination_leg)
+    (plan_finalized ?contingency_plan_instance - contingency_plan_instance)
+  )
+  (:action detect_delay_and_open_shipment_case
+    :parameters (?shipment_case - shipment_case)
+    :precondition
+      (and
+        (not
+          (shipment_case_opened ?shipment_case)
+        )
+        (not
+          (service_restored ?shipment_case)
+        )
+      )
+    :effect (shipment_case_opened ?shipment_case)
+  )
+  (:action select_initial_alternate_route
+    :parameters (?shipment_case - shipment_case ?alternate_route - alternate_route)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (not
+          (case_has_assigned_alternate_route ?shipment_case)
+        )
+        (alternate_route_available ?alternate_route)
+      )
+    :effect
+      (and
+        (case_has_assigned_alternate_route ?shipment_case)
+        (shipment_case_assigned_alternate_route ?shipment_case ?alternate_route)
+        (not
+          (alternate_route_available ?alternate_route)
+        )
+      )
+  )
+  (:action assign_customs_task_to_case
+    :parameters (?shipment_case - shipment_case ?customs_task - customs_task)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (case_has_assigned_alternate_route ?shipment_case)
+        (customs_task_available ?customs_task)
+      )
+    :effect
+      (and
+        (customs_task_assigned_to_case ?shipment_case ?customs_task)
+        (not
+          (customs_task_available ?customs_task)
+        )
+      )
+  )
+  (:action confirm_customs_task_assignment
+    :parameters (?shipment_case - shipment_case ?customs_task - customs_task)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (case_has_assigned_alternate_route ?shipment_case)
+        (customs_task_assigned_to_case ?shipment_case ?customs_task)
+        (not
+          (case_confirmed ?shipment_case)
+        )
+      )
+    :effect (case_confirmed ?shipment_case)
+  )
+  (:action release_customs_task_from_case
+    :parameters (?shipment_case - shipment_case ?customs_task - customs_task)
+    :precondition
+      (and
+        (customs_task_assigned_to_case ?shipment_case ?customs_task)
+      )
+    :effect
+      (and
+        (customs_task_available ?customs_task)
+        (not
+          (customs_task_assigned_to_case ?shipment_case ?customs_task)
+        )
+      )
+  )
+  (:action assign_local_agent_to_case
+    :parameters (?shipment_case - shipment_case ?local_customs_agent - local_customs_agent)
+    :precondition
+      (and
+        (case_confirmed ?shipment_case)
+        (local_customs_agent_available ?local_customs_agent)
+      )
+    :effect
+      (and
+        (local_customs_agent_assigned_to_case ?shipment_case ?local_customs_agent)
+        (not
+          (local_customs_agent_available ?local_customs_agent)
+        )
+      )
+  )
+  (:action release_local_agent_from_case
+    :parameters (?shipment_case - shipment_case ?local_customs_agent - local_customs_agent)
+    :precondition
+      (and
+        (local_customs_agent_assigned_to_case ?shipment_case ?local_customs_agent)
+      )
+    :effect
+      (and
+        (local_customs_agent_available ?local_customs_agent)
+        (not
+          (local_customs_agent_assigned_to_case ?shipment_case ?local_customs_agent)
+        )
+      )
+  )
+  (:action assign_inspection_team_to_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_team - inspection_team)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (inspection_team_available ?inspection_team)
+      )
+    :effect
+      (and
+        (inspection_team_assigned_to_plan ?contingency_plan_instance ?inspection_team)
+        (not
+          (inspection_team_available ?inspection_team)
+        )
+      )
+  )
+  (:action release_inspection_team_from_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_team - inspection_team)
+    :precondition
+      (and
+        (inspection_team_assigned_to_plan ?contingency_plan_instance ?inspection_team)
+      )
+    :effect
+      (and
+        (inspection_team_available ?inspection_team)
+        (not
+          (inspection_team_assigned_to_plan ?contingency_plan_instance ?inspection_team)
+        )
+      )
+  )
+  (:action assign_legal_advisor_to_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (legal_advisor_available ?legal_advisor)
+      )
+    :effect
+      (and
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (not
+          (legal_advisor_available ?legal_advisor)
+        )
+      )
+  )
+  (:action release_legal_advisor_from_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor)
+    :precondition
+      (and
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+      )
+    :effect
+      (and
+        (legal_advisor_available ?legal_advisor)
+        (not
+          (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        )
+      )
+  )
+  (:action request_origin_facility_inspection
+    :parameters (?origin_leg - origin_leg ?origin_facility - origin_facility ?customs_task - customs_task)
+    :precondition
+      (and
+        (case_confirmed ?origin_leg)
+        (customs_task_assigned_to_case ?origin_leg ?customs_task)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (not
+          (origin_facility_inspection_requested ?origin_facility)
+        )
+        (not
+          (origin_facility_document_received ?origin_facility)
+        )
+      )
+    :effect (origin_facility_inspection_requested ?origin_facility)
+  )
+  (:action confirm_origin_leg_readiness_with_agent
+    :parameters (?origin_leg - origin_leg ?origin_facility - origin_facility ?local_customs_agent - local_customs_agent)
+    :precondition
+      (and
+        (case_confirmed ?origin_leg)
+        (local_customs_agent_assigned_to_case ?origin_leg ?local_customs_agent)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (origin_facility_inspection_requested ?origin_facility)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_ready ?origin_leg)
+        (origin_leg_cleared ?origin_leg)
+      )
+  )
+  (:action submit_document_to_origin_facility
+    :parameters (?origin_leg - origin_leg ?origin_facility - origin_facility ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_confirmed ?origin_leg)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (supporting_document_available ?supporting_document)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_facility_document_received ?origin_facility)
+        (origin_leg_ready ?origin_leg)
+        (origin_leg_has_document ?origin_leg ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_origin_leg_documentation
+    :parameters (?origin_leg - origin_leg ?origin_facility - origin_facility ?customs_task - customs_task ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_confirmed ?origin_leg)
+        (customs_task_assigned_to_case ?origin_leg ?customs_task)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (origin_facility_document_received ?origin_facility)
+        (origin_leg_has_document ?origin_leg ?supporting_document)
+        (not
+          (origin_leg_cleared ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_facility_inspection_requested ?origin_facility)
+        (origin_leg_cleared ?origin_leg)
+        (supporting_document_available ?supporting_document)
+        (not
+          (origin_leg_has_document ?origin_leg ?supporting_document)
+        )
+      )
+  )
+  (:action request_destination_facility_inspection
+    :parameters (?destination_leg - destination_leg ?destination_facility - destination_facility ?customs_task - customs_task)
+    :precondition
+      (and
+        (case_confirmed ?destination_leg)
+        (customs_task_assigned_to_case ?destination_leg ?customs_task)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (not
+          (destination_facility_inspection_requested ?destination_facility)
+        )
+        (not
+          (destination_facility_document_received ?destination_facility)
+        )
+      )
+    :effect (destination_facility_inspection_requested ?destination_facility)
+  )
+  (:action confirm_destination_leg_readiness_with_agent
+    :parameters (?destination_leg - destination_leg ?destination_facility - destination_facility ?local_customs_agent - local_customs_agent)
+    :precondition
+      (and
+        (case_confirmed ?destination_leg)
+        (local_customs_agent_assigned_to_case ?destination_leg ?local_customs_agent)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (destination_facility_inspection_requested ?destination_facility)
+        (not
+          (destination_leg_ready ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_ready ?destination_leg)
+        (destination_leg_cleared ?destination_leg)
+      )
+  )
+  (:action submit_document_to_destination_facility
+    :parameters (?destination_leg - destination_leg ?destination_facility - destination_facility ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_confirmed ?destination_leg)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (supporting_document_available ?supporting_document)
+        (not
+          (destination_leg_ready ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_facility_document_received ?destination_facility)
+        (destination_leg_ready ?destination_leg)
+        (destination_leg_has_document ?destination_leg ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_destination_leg_documentation
+    :parameters (?destination_leg - destination_leg ?destination_facility - destination_facility ?customs_task - customs_task ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_confirmed ?destination_leg)
+        (customs_task_assigned_to_case ?destination_leg ?customs_task)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (destination_facility_document_received ?destination_facility)
+        (destination_leg_has_document ?destination_leg ?supporting_document)
+        (not
+          (destination_leg_cleared ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_facility_inspection_requested ?destination_facility)
+        (destination_leg_cleared ?destination_leg)
+        (supporting_document_available ?supporting_document)
+        (not
+          (destination_leg_has_document ?destination_leg ?supporting_document)
+        )
+      )
+  )
+  (:action allocate_transport_unit_and_assign_facilities
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_facility - origin_facility ?destination_facility - destination_facility ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (origin_facility_inspection_requested ?origin_facility)
+        (destination_facility_inspection_requested ?destination_facility)
+        (origin_leg_cleared ?origin_leg)
+        (destination_leg_cleared ?destination_leg)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_to_origin_facility ?transport_unit ?origin_facility)
+        (transport_unit_assigned_to_destination_facility ?transport_unit ?destination_facility)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_with_origin_hold
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_facility - origin_facility ?destination_facility - destination_facility ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (origin_facility_document_received ?origin_facility)
+        (destination_facility_inspection_requested ?destination_facility)
+        (not
+          (origin_leg_cleared ?origin_leg)
+        )
+        (destination_leg_cleared ?destination_leg)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_to_origin_facility ?transport_unit ?origin_facility)
+        (transport_unit_assigned_to_destination_facility ?transport_unit ?destination_facility)
+        (transport_unit_origin_hold ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_with_destination_hold
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_facility - origin_facility ?destination_facility - destination_facility ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (origin_facility_inspection_requested ?origin_facility)
+        (destination_facility_document_received ?destination_facility)
+        (origin_leg_cleared ?origin_leg)
+        (not
+          (destination_leg_cleared ?destination_leg)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_to_origin_facility ?transport_unit ?origin_facility)
+        (transport_unit_assigned_to_destination_facility ?transport_unit ?destination_facility)
+        (transport_unit_destination_hold ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action allocate_transport_unit_with_both_holds
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_facility - origin_facility ?destination_facility - destination_facility ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_leg_ready ?origin_leg)
+        (destination_leg_ready ?destination_leg)
+        (origin_leg_linked_to_facility ?origin_leg ?origin_facility)
+        (destination_leg_linked_to_facility ?destination_leg ?destination_facility)
+        (origin_facility_document_received ?origin_facility)
+        (destination_facility_document_received ?destination_facility)
+        (not
+          (origin_leg_cleared ?origin_leg)
+        )
+        (not
+          (destination_leg_cleared ?destination_leg)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_assigned_to_origin_facility ?transport_unit ?origin_facility)
+        (transport_unit_assigned_to_destination_facility ?transport_unit ?destination_facility)
+        (transport_unit_origin_hold ?transport_unit)
+        (transport_unit_destination_hold ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action perform_transport_unit_inspection
+    :parameters (?transport_unit - transport_unit ?origin_leg - origin_leg ?customs_task - customs_task)
+    :precondition
+      (and
+        (transport_unit_allocated ?transport_unit)
+        (origin_leg_ready ?origin_leg)
+        (customs_task_assigned_to_case ?origin_leg ?customs_task)
+        (not
+          (transport_unit_inspected ?transport_unit)
+        )
+      )
+    :effect (transport_unit_inspected ?transport_unit)
+  )
+  (:action attach_inspection_report_to_transport_unit
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (plan_includes_transport_unit ?contingency_plan_instance ?transport_unit)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_available ?inspection_report)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_inspected ?transport_unit)
+        (not
+          (inspection_report_consumed ?inspection_report)
+        )
+      )
+    :effect
+      (and
+        (inspection_report_consumed ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (not
+          (inspection_report_available ?inspection_report)
+        )
+      )
+  )
+  (:action mark_plan_ready_for_deployment
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_report - inspection_report ?transport_unit - transport_unit ?customs_task - customs_task)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_consumed ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (customs_task_assigned_to_case ?contingency_plan_instance ?customs_task)
+        (not
+          (transport_unit_origin_hold ?transport_unit)
+        )
+        (not
+          (plan_ready_for_deployment ?contingency_plan_instance)
+        )
+      )
+    :effect (plan_ready_for_deployment ?contingency_plan_instance)
+  )
+  (:action assign_special_clearance_certificate_to_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?special_clearance_certificate - special_clearance_certificate)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (special_clearance_certificate_available ?special_clearance_certificate)
+        (not
+          (special_clearance_certificate_assigned_to_plan ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (special_clearance_certificate_assigned_to_plan ?contingency_plan_instance)
+        (plan_has_special_clearance_certificate ?contingency_plan_instance ?special_clearance_certificate)
+        (not
+          (special_clearance_certificate_available ?special_clearance_certificate)
+        )
+      )
+  )
+  (:action apply_special_clearance_certificate
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_report - inspection_report ?transport_unit - transport_unit ?customs_task - customs_task ?special_clearance_certificate - special_clearance_certificate)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_consumed ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (customs_task_assigned_to_case ?contingency_plan_instance ?customs_task)
+        (transport_unit_origin_hold ?transport_unit)
+        (special_clearance_certificate_assigned_to_plan ?contingency_plan_instance)
+        (plan_has_special_clearance_certificate ?contingency_plan_instance ?special_clearance_certificate)
+        (not
+          (plan_ready_for_deployment ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_deployment ?contingency_plan_instance)
+        (special_certificate_application_recorded ?contingency_plan_instance)
+      )
+  )
+  (:action start_recovery_execution_primary
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_team - inspection_team ?local_customs_agent - local_customs_agent ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_ready_for_deployment ?contingency_plan_instance)
+        (inspection_team_assigned_to_plan ?contingency_plan_instance ?inspection_team)
+        (local_customs_agent_assigned_to_case ?contingency_plan_instance ?local_customs_agent)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (not
+          (transport_unit_destination_hold ?transport_unit)
+        )
+        (not
+          (plan_execution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect (plan_execution_ready ?contingency_plan_instance)
+  )
+  (:action start_recovery_execution_secondary
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?inspection_team - inspection_team ?local_customs_agent - local_customs_agent ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_ready_for_deployment ?contingency_plan_instance)
+        (inspection_team_assigned_to_plan ?contingency_plan_instance ?inspection_team)
+        (local_customs_agent_assigned_to_case ?contingency_plan_instance ?local_customs_agent)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (transport_unit_destination_hold ?transport_unit)
+        (not
+          (plan_execution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect (plan_execution_ready ?contingency_plan_instance)
+  )
+  (:action authorize_recovery_with_legal_review
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_execution_ready ?contingency_plan_instance)
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (not
+          (transport_unit_origin_hold ?transport_unit)
+        )
+        (not
+          (transport_unit_destination_hold ?transport_unit)
+        )
+        (not
+          (plan_resolution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect (plan_resolution_ready ?contingency_plan_instance)
+  )
+  (:action authorize_and_validate_recovery_with_legal_review
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_execution_ready ?contingency_plan_instance)
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (transport_unit_origin_hold ?transport_unit)
+        (not
+          (transport_unit_destination_hold ?transport_unit)
+        )
+        (not
+          (plan_resolution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_validated_for_claims ?contingency_plan_instance)
+      )
+  )
+  (:action authorize_and_validate_recovery_alternate_flow
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_execution_ready ?contingency_plan_instance)
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (not
+          (transport_unit_origin_hold ?transport_unit)
+        )
+        (transport_unit_destination_hold ?transport_unit)
+        (not
+          (plan_resolution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_validated_for_claims ?contingency_plan_instance)
+      )
+  )
+  (:action authorize_and_validate_recovery_comprehensive
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor ?inspection_report - inspection_report ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (plan_execution_ready ?contingency_plan_instance)
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (plan_has_inspection_report ?contingency_plan_instance ?inspection_report)
+        (inspection_report_attached_to_transport_unit ?inspection_report ?transport_unit)
+        (transport_unit_origin_hold ?transport_unit)
+        (transport_unit_destination_hold ?transport_unit)
+        (not
+          (plan_resolution_ready ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_validated_for_claims ?contingency_plan_instance)
+      )
+  )
+  (:action finalize_plan_and_close_case
+    :parameters (?contingency_plan_instance - contingency_plan_instance)
+    :precondition
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (not
+          (plan_validated_for_claims ?contingency_plan_instance)
+        )
+        (not
+          (plan_finalized ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?contingency_plan_instance)
+        (case_resolved ?contingency_plan_instance)
+      )
+  )
+  (:action attach_claim_account_to_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?claim_account - claim_account)
+    :precondition
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_validated_for_claims ?contingency_plan_instance)
+        (claim_account_available ?claim_account)
+      )
+    :effect
+      (and
+        (plan_assigned_claim_account ?contingency_plan_instance ?claim_account)
+        (not
+          (claim_account_available ?claim_account)
+        )
+      )
+  )
+  (:action deploy_recovery_team_and_execute
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?origin_leg - origin_leg ?destination_leg - destination_leg ?customs_task - customs_task ?claim_account - claim_account)
+    :precondition
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_validated_for_claims ?contingency_plan_instance)
+        (plan_assigned_claim_account ?contingency_plan_instance ?claim_account)
+        (plan_includes_origin_leg ?contingency_plan_instance ?origin_leg)
+        (plan_includes_destination_leg ?contingency_plan_instance ?destination_leg)
+        (origin_leg_cleared ?origin_leg)
+        (destination_leg_cleared ?destination_leg)
+        (customs_task_assigned_to_case ?contingency_plan_instance ?customs_task)
+        (not
+          (plan_execution_completed ?contingency_plan_instance)
+        )
+      )
+    :effect (plan_execution_completed ?contingency_plan_instance)
+  )
+  (:action confirm_plan_finalization_and_close_case
+    :parameters (?contingency_plan_instance - contingency_plan_instance)
+    :precondition
+      (and
+        (plan_resolution_ready ?contingency_plan_instance)
+        (plan_execution_completed ?contingency_plan_instance)
+        (not
+          (plan_finalized ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?contingency_plan_instance)
+        (case_resolved ?contingency_plan_instance)
+      )
+  )
+  (:action engage_authority_contact_for_plan
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?customs_authority_contact - customs_authority_contact ?customs_task - customs_task)
+    :precondition
+      (and
+        (case_confirmed ?contingency_plan_instance)
+        (customs_task_assigned_to_case ?contingency_plan_instance ?customs_task)
+        (customs_authority_contact_available ?customs_authority_contact)
+        (authority_contact_assigned_to_plan ?contingency_plan_instance ?customs_authority_contact)
+        (not
+          (authority_contact_engaged_for_plan ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (authority_contact_engaged_for_plan ?contingency_plan_instance)
+        (not
+          (customs_authority_contact_available ?customs_authority_contact)
+        )
+      )
+  )
+  (:action initiate_authority_approval
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?local_customs_agent - local_customs_agent)
+    :precondition
+      (and
+        (authority_contact_engaged_for_plan ?contingency_plan_instance)
+        (local_customs_agent_assigned_to_case ?contingency_plan_instance ?local_customs_agent)
+        (not
+          (authority_approval_initiated ?contingency_plan_instance)
+        )
+      )
+    :effect (authority_approval_initiated ?contingency_plan_instance)
+  )
+  (:action confirm_authority_approval
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?legal_advisor - legal_advisor)
+    :precondition
+      (and
+        (authority_approval_initiated ?contingency_plan_instance)
+        (legal_advisor_assigned_to_plan ?contingency_plan_instance ?legal_advisor)
+        (not
+          (authority_approval_confirmed ?contingency_plan_instance)
+        )
+      )
+    :effect (authority_approval_confirmed ?contingency_plan_instance)
+  )
+  (:action finalize_authority_approval_and_close_case
+    :parameters (?contingency_plan_instance - contingency_plan_instance)
+    :precondition
+      (and
+        (authority_approval_confirmed ?contingency_plan_instance)
+        (not
+          (plan_finalized ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?contingency_plan_instance)
+        (case_resolved ?contingency_plan_instance)
+      )
+  )
+  (:action finalize_origin_leg_recovery
+    :parameters (?origin_leg - origin_leg ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (origin_leg_ready ?origin_leg)
+        (origin_leg_cleared ?origin_leg)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_inspected ?transport_unit)
+        (not
+          (case_resolved ?origin_leg)
+        )
+      )
+    :effect (case_resolved ?origin_leg)
+  )
+  (:action finalize_destination_leg_recovery
+    :parameters (?destination_leg - destination_leg ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (destination_leg_ready ?destination_leg)
+        (destination_leg_cleared ?destination_leg)
+        (transport_unit_allocated ?transport_unit)
+        (transport_unit_inspected ?transport_unit)
+        (not
+          (case_resolved ?destination_leg)
+        )
+      )
+    :effect (case_resolved ?destination_leg)
+  )
+  (:action initiate_claim_and_attach_evidence
+    :parameters (?shipment_case - shipment_case ?evidence_package - evidence_package ?customs_task - customs_task)
+    :precondition
+      (and
+        (case_resolved ?shipment_case)
+        (customs_task_assigned_to_case ?shipment_case ?customs_task)
+        (evidence_package_available ?evidence_package)
+        (not
+          (claim_initiated ?shipment_case)
+        )
+      )
+    :effect
+      (and
+        (claim_initiated ?shipment_case)
+        (case_has_evidence_package ?shipment_case ?evidence_package)
+        (not
+          (evidence_package_available ?evidence_package)
+        )
+      )
+  )
+  (:action reassign_origin_leg_due_to_claim
+    :parameters (?origin_leg - origin_leg ?alternate_route - alternate_route ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (claim_initiated ?origin_leg)
+        (shipment_case_assigned_alternate_route ?origin_leg ?alternate_route)
+        (case_has_evidence_package ?origin_leg ?evidence_package)
+        (not
+          (service_restored ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?origin_leg)
+        (alternate_route_available ?alternate_route)
+        (evidence_package_available ?evidence_package)
+      )
+  )
+  (:action reassign_destination_leg_due_to_claim
+    :parameters (?destination_leg - destination_leg ?alternate_route - alternate_route ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (claim_initiated ?destination_leg)
+        (shipment_case_assigned_alternate_route ?destination_leg ?alternate_route)
+        (case_has_evidence_package ?destination_leg ?evidence_package)
+        (not
+          (service_restored ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?destination_leg)
+        (alternate_route_available ?alternate_route)
+        (evidence_package_available ?evidence_package)
+      )
+  )
+  (:action reassign_plan_due_to_claim
+    :parameters (?contingency_plan_instance - contingency_plan_instance ?alternate_route - alternate_route ?evidence_package - evidence_package)
+    :precondition
+      (and
+        (claim_initiated ?contingency_plan_instance)
+        (shipment_case_assigned_alternate_route ?contingency_plan_instance ?alternate_route)
+        (case_has_evidence_package ?contingency_plan_instance ?evidence_package)
+        (not
+          (service_restored ?contingency_plan_instance)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?contingency_plan_instance)
+        (alternate_route_available ?alternate_route)
+        (evidence_package_available ?evidence_package)
+      )
+  )
+)

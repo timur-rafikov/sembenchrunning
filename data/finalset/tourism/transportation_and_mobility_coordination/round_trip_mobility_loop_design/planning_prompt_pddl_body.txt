@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain round_trip_mobility_loop_design_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types infrastructure_type - object temporal_type - object asset_type - object domain_entity - object trip_segment - domain_entity transport_resource - infrastructure_type time_slot - infrastructure_type transfer_node - infrastructure_type route_option - infrastructure_type service_option - infrastructure_type return_resource - infrastructure_type vehicle_capability - infrastructure_type safety_certificate - infrastructure_type passenger_group - temporal_type boarding_asset - temporal_type operator_credential - temporal_type outbound_transfer_edge - asset_type inbound_transfer_edge - asset_type vehicle_asset - asset_type segment_category - trip_segment segment_category_alt - trip_segment outbound_leg - segment_category inbound_leg - segment_category mobility_loop - segment_category_alt)
+  (:predicates
+    (segment_declared ?trip_segment - trip_segment)
+    (segment_confirmed ?trip_segment - trip_segment)
+    (segment_transport_resource_selected ?trip_segment - trip_segment)
+    (segment_closed ?trip_segment - trip_segment)
+    (segment_ready ?trip_segment - trip_segment)
+    (segment_return_allocated ?trip_segment - trip_segment)
+    (transport_resource_available ?transport_resource - transport_resource)
+    (segment_assigned_resource ?trip_segment - trip_segment ?transport_resource - transport_resource)
+    (time_slot_available ?time_slot - time_slot)
+    (segment_assigned_time_slot ?trip_segment - trip_segment ?time_slot - time_slot)
+    (transfer_node_available ?transfer_node - transfer_node)
+    (segment_assigned_transfer_node ?trip_segment - trip_segment ?transfer_node - transfer_node)
+    (passenger_group_waiting ?passenger_group - passenger_group)
+    (outbound_leg_assigned_passenger_group ?outbound_leg - outbound_leg ?passenger_group - passenger_group)
+    (inbound_leg_assigned_passenger_group ?inbound_leg - inbound_leg ?passenger_group - passenger_group)
+    (outbound_leg_assigned_outbound_edge ?outbound_leg - outbound_leg ?outbound_transfer_edge - outbound_transfer_edge)
+    (outbound_edge_ready ?outbound_transfer_edge - outbound_transfer_edge)
+    (outbound_edge_allocated ?outbound_transfer_edge - outbound_transfer_edge)
+    (outbound_leg_edge_confirmed ?outbound_leg - outbound_leg)
+    (inbound_leg_assigned_inbound_edge ?inbound_leg - inbound_leg ?inbound_transfer_edge - inbound_transfer_edge)
+    (inbound_edge_ready ?inbound_transfer_edge - inbound_transfer_edge)
+    (inbound_edge_allocated ?inbound_transfer_edge - inbound_transfer_edge)
+    (inbound_leg_staged ?inbound_leg - inbound_leg)
+    (vehicle_available ?vehicle_asset - vehicle_asset)
+    (vehicle_reserved ?vehicle_asset - vehicle_asset)
+    (vehicle_assigned_outbound_edge ?vehicle_asset - vehicle_asset ?outbound_transfer_edge - outbound_transfer_edge)
+    (vehicle_assigned_inbound_edge ?vehicle_asset - vehicle_asset ?inbound_transfer_edge - inbound_transfer_edge)
+    (vehicle_boarding_asset_attached_flag ?vehicle_asset - vehicle_asset)
+    (vehicle_service_option_attached ?vehicle_asset - vehicle_asset)
+    (vehicle_deployed ?vehicle_asset - vehicle_asset)
+    (loop_has_outbound_leg ?mobility_loop - mobility_loop ?outbound_leg - outbound_leg)
+    (loop_has_inbound_leg ?mobility_loop - mobility_loop ?inbound_leg - inbound_leg)
+    (loop_has_vehicle_assigned ?mobility_loop - mobility_loop ?vehicle_asset - vehicle_asset)
+    (boarding_asset_available ?boarding_asset - boarding_asset)
+    (loop_assigned_boarding_asset ?mobility_loop - mobility_loop ?boarding_asset - boarding_asset)
+    (boarding_asset_allocated ?boarding_asset - boarding_asset)
+    (boarding_asset_attached_to_vehicle ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    (loop_vehicle_capability_set ?mobility_loop - mobility_loop)
+    (loop_vehicle_prepared_for_boarding ?mobility_loop - mobility_loop)
+    (loop_inspection_passed ?mobility_loop - mobility_loop)
+    (loop_route_option_active ?mobility_loop - mobility_loop)
+    (loop_route_option_confirmed ?mobility_loop - mobility_loop)
+    (loop_service_option_bound ?mobility_loop - mobility_loop)
+    (loop_boarding_ready ?mobility_loop - mobility_loop)
+    (operator_credential_available ?operator_credential - operator_credential)
+    (loop_assigned_operator_credential ?mobility_loop - mobility_loop ?operator_credential - operator_credential)
+    (operator_bound_to_loop ?mobility_loop - mobility_loop)
+    (operator_prepared ?mobility_loop - mobility_loop)
+    (operator_cleared_for_operation ?mobility_loop - mobility_loop)
+    (route_option_available ?route_option - route_option)
+    (loop_assigned_route_option ?mobility_loop - mobility_loop ?route_option - route_option)
+    (service_option_available ?service_option - service_option)
+    (loop_assigned_service_option ?mobility_loop - mobility_loop ?service_option - service_option)
+    (vehicle_capability_available ?vehicle_capability - vehicle_capability)
+    (loop_assigned_vehicle_capability ?mobility_loop - mobility_loop ?vehicle_capability - vehicle_capability)
+    (safety_certificate_available ?safety_certificate - safety_certificate)
+    (loop_assigned_safety_certificate ?mobility_loop - mobility_loop ?safety_certificate - safety_certificate)
+    (return_resource_available ?return_resource - return_resource)
+    (segment_assigned_return_resource ?trip_segment - trip_segment ?return_resource - return_resource)
+    (outbound_leg_ready ?outbound_leg - outbound_leg)
+    (inbound_leg_ready ?inbound_leg - inbound_leg)
+    (loop_finalized ?mobility_loop - mobility_loop)
+  )
+  (:action declare_trip_segment
+    :parameters (?trip_segment - trip_segment)
+    :precondition
+      (and
+        (not
+          (segment_declared ?trip_segment)
+        )
+        (not
+          (segment_closed ?trip_segment)
+        )
+      )
+    :effect (segment_declared ?trip_segment)
+  )
+  (:action assign_transport_resource_to_segment
+    :parameters (?trip_segment - trip_segment ?transport_resource - transport_resource)
+    :precondition
+      (and
+        (segment_declared ?trip_segment)
+        (not
+          (segment_transport_resource_selected ?trip_segment)
+        )
+        (transport_resource_available ?transport_resource)
+      )
+    :effect
+      (and
+        (segment_transport_resource_selected ?trip_segment)
+        (segment_assigned_resource ?trip_segment ?transport_resource)
+        (not
+          (transport_resource_available ?transport_resource)
+        )
+      )
+  )
+  (:action assign_time_slot_to_segment
+    :parameters (?trip_segment - trip_segment ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_declared ?trip_segment)
+        (segment_transport_resource_selected ?trip_segment)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (segment_assigned_time_slot ?trip_segment ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_segment_schedule
+    :parameters (?trip_segment - trip_segment ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_declared ?trip_segment)
+        (segment_transport_resource_selected ?trip_segment)
+        (segment_assigned_time_slot ?trip_segment ?time_slot)
+        (not
+          (segment_confirmed ?trip_segment)
+        )
+      )
+    :effect (segment_confirmed ?trip_segment)
+  )
+  (:action release_time_slot_from_segment
+    :parameters (?trip_segment - trip_segment ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_assigned_time_slot ?trip_segment ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (segment_assigned_time_slot ?trip_segment ?time_slot)
+        )
+      )
+  )
+  (:action reserve_transfer_node_for_segment
+    :parameters (?trip_segment - trip_segment ?transfer_node - transfer_node)
+    :precondition
+      (and
+        (segment_confirmed ?trip_segment)
+        (transfer_node_available ?transfer_node)
+      )
+    :effect
+      (and
+        (segment_assigned_transfer_node ?trip_segment ?transfer_node)
+        (not
+          (transfer_node_available ?transfer_node)
+        )
+      )
+  )
+  (:action release_transfer_node_from_segment
+    :parameters (?trip_segment - trip_segment ?transfer_node - transfer_node)
+    :precondition
+      (and
+        (segment_assigned_transfer_node ?trip_segment ?transfer_node)
+      )
+    :effect
+      (and
+        (transfer_node_available ?transfer_node)
+        (not
+          (segment_assigned_transfer_node ?trip_segment ?transfer_node)
+        )
+      )
+  )
+  (:action assign_vehicle_capability_to_loop
+    :parameters (?mobility_loop - mobility_loop ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (vehicle_capability_available ?vehicle_capability)
+      )
+    :effect
+      (and
+        (loop_assigned_vehicle_capability ?mobility_loop ?vehicle_capability)
+        (not
+          (vehicle_capability_available ?vehicle_capability)
+        )
+      )
+  )
+  (:action release_vehicle_capability_from_loop
+    :parameters (?mobility_loop - mobility_loop ?vehicle_capability - vehicle_capability)
+    :precondition
+      (and
+        (loop_assigned_vehicle_capability ?mobility_loop ?vehicle_capability)
+      )
+    :effect
+      (and
+        (vehicle_capability_available ?vehicle_capability)
+        (not
+          (loop_assigned_vehicle_capability ?mobility_loop ?vehicle_capability)
+        )
+      )
+  )
+  (:action assign_safety_certificate_to_loop
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (safety_certificate_available ?safety_certificate)
+      )
+    :effect
+      (and
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (not
+          (safety_certificate_available ?safety_certificate)
+        )
+      )
+  )
+  (:action release_safety_certificate_from_loop
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+      )
+    :effect
+      (and
+        (safety_certificate_available ?safety_certificate)
+        (not
+          (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        )
+      )
+  )
+  (:action reserve_outbound_transfer_edge
+    :parameters (?outbound_leg - outbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_confirmed ?outbound_leg)
+        (segment_assigned_time_slot ?outbound_leg ?time_slot)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (not
+          (outbound_edge_ready ?outbound_transfer_edge)
+        )
+        (not
+          (outbound_edge_allocated ?outbound_transfer_edge)
+        )
+      )
+    :effect (outbound_edge_ready ?outbound_transfer_edge)
+  )
+  (:action finalize_outbound_leg_readiness
+    :parameters (?outbound_leg - outbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?transfer_node - transfer_node)
+    :precondition
+      (and
+        (segment_confirmed ?outbound_leg)
+        (segment_assigned_transfer_node ?outbound_leg ?transfer_node)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (outbound_edge_ready ?outbound_transfer_edge)
+        (not
+          (outbound_leg_ready ?outbound_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+      )
+  )
+  (:action assign_passenger_group_to_outbound_leg
+    :parameters (?outbound_leg - outbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?passenger_group - passenger_group)
+    :precondition
+      (and
+        (segment_confirmed ?outbound_leg)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (passenger_group_waiting ?passenger_group)
+        (not
+          (outbound_leg_ready ?outbound_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_edge_allocated ?outbound_transfer_edge)
+        (outbound_leg_ready ?outbound_leg)
+        (outbound_leg_assigned_passenger_group ?outbound_leg ?passenger_group)
+        (not
+          (passenger_group_waiting ?passenger_group)
+        )
+      )
+  )
+  (:action board_passenger_group_on_outbound_leg
+    :parameters (?outbound_leg - outbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?time_slot - time_slot ?passenger_group - passenger_group)
+    :precondition
+      (and
+        (segment_confirmed ?outbound_leg)
+        (segment_assigned_time_slot ?outbound_leg ?time_slot)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (outbound_edge_allocated ?outbound_transfer_edge)
+        (outbound_leg_assigned_passenger_group ?outbound_leg ?passenger_group)
+        (not
+          (outbound_leg_edge_confirmed ?outbound_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_edge_ready ?outbound_transfer_edge)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+        (passenger_group_waiting ?passenger_group)
+        (not
+          (outbound_leg_assigned_passenger_group ?outbound_leg ?passenger_group)
+        )
+      )
+  )
+  (:action reserve_inbound_transfer_edge_for_leg
+    :parameters (?inbound_leg - inbound_leg ?inbound_transfer_edge - inbound_transfer_edge ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_confirmed ?inbound_leg)
+        (segment_assigned_time_slot ?inbound_leg ?time_slot)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (not
+          (inbound_edge_ready ?inbound_transfer_edge)
+        )
+        (not
+          (inbound_edge_allocated ?inbound_transfer_edge)
+        )
+      )
+    :effect (inbound_edge_ready ?inbound_transfer_edge)
+  )
+  (:action finalize_inbound_leg_readiness
+    :parameters (?inbound_leg - inbound_leg ?inbound_transfer_edge - inbound_transfer_edge ?transfer_node - transfer_node)
+    :precondition
+      (and
+        (segment_confirmed ?inbound_leg)
+        (segment_assigned_transfer_node ?inbound_leg ?transfer_node)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (inbound_edge_ready ?inbound_transfer_edge)
+        (not
+          (inbound_leg_ready ?inbound_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_leg_ready ?inbound_leg)
+        (inbound_leg_staged ?inbound_leg)
+      )
+  )
+  (:action assign_passenger_group_to_inbound_leg
+    :parameters (?inbound_leg - inbound_leg ?inbound_transfer_edge - inbound_transfer_edge ?passenger_group - passenger_group)
+    :precondition
+      (and
+        (segment_confirmed ?inbound_leg)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (passenger_group_waiting ?passenger_group)
+        (not
+          (inbound_leg_ready ?inbound_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_edge_allocated ?inbound_transfer_edge)
+        (inbound_leg_ready ?inbound_leg)
+        (inbound_leg_assigned_passenger_group ?inbound_leg ?passenger_group)
+        (not
+          (passenger_group_waiting ?passenger_group)
+        )
+      )
+  )
+  (:action board_passenger_group_on_inbound_leg
+    :parameters (?inbound_leg - inbound_leg ?inbound_transfer_edge - inbound_transfer_edge ?time_slot - time_slot ?passenger_group - passenger_group)
+    :precondition
+      (and
+        (segment_confirmed ?inbound_leg)
+        (segment_assigned_time_slot ?inbound_leg ?time_slot)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (inbound_edge_allocated ?inbound_transfer_edge)
+        (inbound_leg_assigned_passenger_group ?inbound_leg ?passenger_group)
+        (not
+          (inbound_leg_staged ?inbound_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_edge_ready ?inbound_transfer_edge)
+        (inbound_leg_staged ?inbound_leg)
+        (passenger_group_waiting ?passenger_group)
+        (not
+          (inbound_leg_assigned_passenger_group ?inbound_leg ?passenger_group)
+        )
+      )
+  )
+  (:action assign_vehicle_asset_to_transfer_pair
+    :parameters (?outbound_leg - outbound_leg ?inbound_leg - inbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?inbound_transfer_edge - inbound_transfer_edge ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (inbound_leg_ready ?inbound_leg)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (outbound_edge_ready ?outbound_transfer_edge)
+        (inbound_edge_ready ?inbound_transfer_edge)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+        (inbound_leg_staged ?inbound_leg)
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_assigned_outbound_edge ?vehicle_asset ?outbound_transfer_edge)
+        (vehicle_assigned_inbound_edge ?vehicle_asset ?inbound_transfer_edge)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_and_attach_boarding_asset_to_vehicle
+    :parameters (?outbound_leg - outbound_leg ?inbound_leg - inbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?inbound_transfer_edge - inbound_transfer_edge ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (inbound_leg_ready ?inbound_leg)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (outbound_edge_allocated ?outbound_transfer_edge)
+        (inbound_edge_ready ?inbound_transfer_edge)
+        (not
+          (outbound_leg_edge_confirmed ?outbound_leg)
+        )
+        (inbound_leg_staged ?inbound_leg)
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_assigned_outbound_edge ?vehicle_asset ?outbound_transfer_edge)
+        (vehicle_assigned_inbound_edge ?vehicle_asset ?inbound_transfer_edge)
+        (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_and_attach_service_option_to_vehicle
+    :parameters (?outbound_leg - outbound_leg ?inbound_leg - inbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?inbound_transfer_edge - inbound_transfer_edge ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (inbound_leg_ready ?inbound_leg)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (outbound_edge_ready ?outbound_transfer_edge)
+        (inbound_edge_allocated ?inbound_transfer_edge)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+        (not
+          (inbound_leg_staged ?inbound_leg)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_assigned_outbound_edge ?vehicle_asset ?outbound_transfer_edge)
+        (vehicle_assigned_inbound_edge ?vehicle_asset ?inbound_transfer_edge)
+        (vehicle_service_option_attached ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_vehicle_with_boarding_and_service_options
+    :parameters (?outbound_leg - outbound_leg ?inbound_leg - inbound_leg ?outbound_transfer_edge - outbound_transfer_edge ?inbound_transfer_edge - inbound_transfer_edge ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (inbound_leg_ready ?inbound_leg)
+        (outbound_leg_assigned_outbound_edge ?outbound_leg ?outbound_transfer_edge)
+        (inbound_leg_assigned_inbound_edge ?inbound_leg ?inbound_transfer_edge)
+        (outbound_edge_allocated ?outbound_transfer_edge)
+        (inbound_edge_allocated ?inbound_transfer_edge)
+        (not
+          (outbound_leg_edge_confirmed ?outbound_leg)
+        )
+        (not
+          (inbound_leg_staged ?inbound_leg)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_assigned_outbound_edge ?vehicle_asset ?outbound_transfer_edge)
+        (vehicle_assigned_inbound_edge ?vehicle_asset ?inbound_transfer_edge)
+        (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        (vehicle_service_option_attached ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action deploy_vehicle_for_leg
+    :parameters (?vehicle_asset - vehicle_asset ?outbound_leg - outbound_leg ?time_slot - time_slot)
+    :precondition
+      (and
+        (vehicle_reserved ?vehicle_asset)
+        (outbound_leg_ready ?outbound_leg)
+        (segment_assigned_time_slot ?outbound_leg ?time_slot)
+        (not
+          (vehicle_deployed ?vehicle_asset)
+        )
+      )
+    :effect (vehicle_deployed ?vehicle_asset)
+  )
+  (:action allocate_boarding_asset_to_loop_and_vehicle
+    :parameters (?mobility_loop - mobility_loop ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (loop_has_vehicle_assigned ?mobility_loop ?vehicle_asset)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_available ?boarding_asset)
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_deployed ?vehicle_asset)
+        (not
+          (boarding_asset_allocated ?boarding_asset)
+        )
+      )
+    :effect
+      (and
+        (boarding_asset_allocated ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (not
+          (boarding_asset_available ?boarding_asset)
+        )
+      )
+  )
+  (:action attach_boarding_asset_and_mark_loop_vehicle_capability
+    :parameters (?mobility_loop - mobility_loop ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_allocated ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (segment_assigned_time_slot ?mobility_loop ?time_slot)
+        (not
+          (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        )
+        (not
+          (loop_vehicle_capability_set ?mobility_loop)
+        )
+      )
+    :effect (loop_vehicle_capability_set ?mobility_loop)
+  )
+  (:action assign_route_option_to_loop
+    :parameters (?mobility_loop - mobility_loop ?route_option - route_option)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (route_option_available ?route_option)
+        (not
+          (loop_route_option_active ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_route_option_active ?mobility_loop)
+        (loop_assigned_route_option ?mobility_loop ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action configure_route_option_and_prepare_loop
+    :parameters (?mobility_loop - mobility_loop ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset ?time_slot - time_slot ?route_option - route_option)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_allocated ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (segment_assigned_time_slot ?mobility_loop ?time_slot)
+        (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        (loop_route_option_active ?mobility_loop)
+        (loop_assigned_route_option ?mobility_loop ?route_option)
+        (not
+          (loop_vehicle_capability_set ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_vehicle_capability_set ?mobility_loop)
+        (loop_route_option_confirmed ?mobility_loop)
+      )
+  )
+  (:action prepare_vehicle_with_capability_for_loop
+    :parameters (?mobility_loop - mobility_loop ?vehicle_capability - vehicle_capability ?transfer_node - transfer_node ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_capability_set ?mobility_loop)
+        (loop_assigned_vehicle_capability ?mobility_loop ?vehicle_capability)
+        (segment_assigned_transfer_node ?mobility_loop ?transfer_node)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (not
+          (vehicle_service_option_attached ?vehicle_asset)
+        )
+        (not
+          (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        )
+      )
+    :effect (loop_vehicle_prepared_for_boarding ?mobility_loop)
+  )
+  (:action confirm_vehicle_preparation_with_capability
+    :parameters (?mobility_loop - mobility_loop ?vehicle_capability - vehicle_capability ?transfer_node - transfer_node ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_capability_set ?mobility_loop)
+        (loop_assigned_vehicle_capability ?mobility_loop ?vehicle_capability)
+        (segment_assigned_transfer_node ?mobility_loop ?transfer_node)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (vehicle_service_option_attached ?vehicle_asset)
+        (not
+          (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        )
+      )
+    :effect (loop_vehicle_prepared_for_boarding ?mobility_loop)
+  )
+  (:action verify_safety_certificate_and_operator_for_loop
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (not
+          (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        )
+        (not
+          (vehicle_service_option_attached ?vehicle_asset)
+        )
+        (not
+          (loop_inspection_passed ?mobility_loop)
+        )
+      )
+    :effect (loop_inspection_passed ?mobility_loop)
+  )
+  (:action verify_safety_and_bind_service_options
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        (not
+          (vehicle_service_option_attached ?vehicle_asset)
+        )
+        (not
+          (loop_inspection_passed ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_service_option_bound ?mobility_loop)
+      )
+  )
+  (:action verify_safety_and_enable_service_options_variant1
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (not
+          (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        )
+        (vehicle_service_option_attached ?vehicle_asset)
+        (not
+          (loop_inspection_passed ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_service_option_bound ?mobility_loop)
+      )
+  )
+  (:action verify_safety_and_enable_service_options_variant2
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate ?boarding_asset - boarding_asset ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (loop_vehicle_prepared_for_boarding ?mobility_loop)
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (loop_assigned_boarding_asset ?mobility_loop ?boarding_asset)
+        (boarding_asset_attached_to_vehicle ?boarding_asset ?vehicle_asset)
+        (vehicle_boarding_asset_attached_flag ?vehicle_asset)
+        (vehicle_service_option_attached ?vehicle_asset)
+        (not
+          (loop_inspection_passed ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_service_option_bound ?mobility_loop)
+      )
+  )
+  (:action finalize_loop_readiness
+    :parameters (?mobility_loop - mobility_loop)
+    :precondition
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (not
+          (loop_service_option_bound ?mobility_loop)
+        )
+        (not
+          (loop_finalized ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_finalized ?mobility_loop)
+        (segment_ready ?mobility_loop)
+      )
+  )
+  (:action attach_service_option_to_loop
+    :parameters (?mobility_loop - mobility_loop ?service_option - service_option)
+    :precondition
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_service_option_bound ?mobility_loop)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (loop_assigned_service_option ?mobility_loop ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action consolidate_checks_and_mark_boarding_ready
+    :parameters (?mobility_loop - mobility_loop ?outbound_leg - outbound_leg ?inbound_leg - inbound_leg ?time_slot - time_slot ?service_option - service_option)
+    :precondition
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_service_option_bound ?mobility_loop)
+        (loop_assigned_service_option ?mobility_loop ?service_option)
+        (loop_has_outbound_leg ?mobility_loop ?outbound_leg)
+        (loop_has_inbound_leg ?mobility_loop ?inbound_leg)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+        (inbound_leg_staged ?inbound_leg)
+        (segment_assigned_time_slot ?mobility_loop ?time_slot)
+        (not
+          (loop_boarding_ready ?mobility_loop)
+        )
+      )
+    :effect (loop_boarding_ready ?mobility_loop)
+  )
+  (:action finalize_loop_readiness_with_boarding
+    :parameters (?mobility_loop - mobility_loop)
+    :precondition
+      (and
+        (loop_inspection_passed ?mobility_loop)
+        (loop_boarding_ready ?mobility_loop)
+        (not
+          (loop_finalized ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_finalized ?mobility_loop)
+        (segment_ready ?mobility_loop)
+      )
+  )
+  (:action assign_operator_credential_to_loop
+    :parameters (?mobility_loop - mobility_loop ?operator_credential - operator_credential ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_confirmed ?mobility_loop)
+        (segment_assigned_time_slot ?mobility_loop ?time_slot)
+        (operator_credential_available ?operator_credential)
+        (loop_assigned_operator_credential ?mobility_loop ?operator_credential)
+        (not
+          (operator_bound_to_loop ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (operator_bound_to_loop ?mobility_loop)
+        (not
+          (operator_credential_available ?operator_credential)
+        )
+      )
+  )
+  (:action prepare_operator_for_operation
+    :parameters (?mobility_loop - mobility_loop ?transfer_node - transfer_node)
+    :precondition
+      (and
+        (operator_bound_to_loop ?mobility_loop)
+        (segment_assigned_transfer_node ?mobility_loop ?transfer_node)
+        (not
+          (operator_prepared ?mobility_loop)
+        )
+      )
+    :effect (operator_prepared ?mobility_loop)
+  )
+  (:action authorize_operator_with_safety_certificate
+    :parameters (?mobility_loop - mobility_loop ?safety_certificate - safety_certificate)
+    :precondition
+      (and
+        (operator_prepared ?mobility_loop)
+        (loop_assigned_safety_certificate ?mobility_loop ?safety_certificate)
+        (not
+          (operator_cleared_for_operation ?mobility_loop)
+        )
+      )
+    :effect (operator_cleared_for_operation ?mobility_loop)
+  )
+  (:action finalize_loop_after_operator_authorization
+    :parameters (?mobility_loop - mobility_loop)
+    :precondition
+      (and
+        (operator_cleared_for_operation ?mobility_loop)
+        (not
+          (loop_finalized ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (loop_finalized ?mobility_loop)
+        (segment_ready ?mobility_loop)
+      )
+  )
+  (:action mark_outbound_leg_ready_for_closure
+    :parameters (?outbound_leg - outbound_leg ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (outbound_leg_ready ?outbound_leg)
+        (outbound_leg_edge_confirmed ?outbound_leg)
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_deployed ?vehicle_asset)
+        (not
+          (segment_ready ?outbound_leg)
+        )
+      )
+    :effect (segment_ready ?outbound_leg)
+  )
+  (:action mark_inbound_leg_ready_for_closure
+    :parameters (?inbound_leg - inbound_leg ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (inbound_leg_ready ?inbound_leg)
+        (inbound_leg_staged ?inbound_leg)
+        (vehicle_reserved ?vehicle_asset)
+        (vehicle_deployed ?vehicle_asset)
+        (not
+          (segment_ready ?inbound_leg)
+        )
+      )
+    :effect (segment_ready ?inbound_leg)
+  )
+  (:action assign_return_resource_to_segment
+    :parameters (?trip_segment - trip_segment ?return_resource - return_resource ?time_slot - time_slot)
+    :precondition
+      (and
+        (segment_ready ?trip_segment)
+        (segment_assigned_time_slot ?trip_segment ?time_slot)
+        (return_resource_available ?return_resource)
+        (not
+          (segment_return_allocated ?trip_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_return_allocated ?trip_segment)
+        (segment_assigned_return_resource ?trip_segment ?return_resource)
+        (not
+          (return_resource_available ?return_resource)
+        )
+      )
+  )
+  (:action close_outbound_leg_and_release_resources
+    :parameters (?outbound_leg - outbound_leg ?transport_resource - transport_resource ?return_resource - return_resource)
+    :precondition
+      (and
+        (segment_return_allocated ?outbound_leg)
+        (segment_assigned_resource ?outbound_leg ?transport_resource)
+        (segment_assigned_return_resource ?outbound_leg ?return_resource)
+        (not
+          (segment_closed ?outbound_leg)
+        )
+      )
+    :effect
+      (and
+        (segment_closed ?outbound_leg)
+        (transport_resource_available ?transport_resource)
+        (return_resource_available ?return_resource)
+      )
+  )
+  (:action close_inbound_leg_and_release_resources
+    :parameters (?inbound_leg - inbound_leg ?transport_resource - transport_resource ?return_resource - return_resource)
+    :precondition
+      (and
+        (segment_return_allocated ?inbound_leg)
+        (segment_assigned_resource ?inbound_leg ?transport_resource)
+        (segment_assigned_return_resource ?inbound_leg ?return_resource)
+        (not
+          (segment_closed ?inbound_leg)
+        )
+      )
+    :effect
+      (and
+        (segment_closed ?inbound_leg)
+        (transport_resource_available ?transport_resource)
+        (return_resource_available ?return_resource)
+      )
+  )
+  (:action close_mobility_loop_and_release_resources
+    :parameters (?mobility_loop - mobility_loop ?transport_resource - transport_resource ?return_resource - return_resource)
+    :precondition
+      (and
+        (segment_return_allocated ?mobility_loop)
+        (segment_assigned_resource ?mobility_loop ?transport_resource)
+        (segment_assigned_return_resource ?mobility_loop ?return_resource)
+        (not
+          (segment_closed ?mobility_loop)
+        )
+      )
+    :effect
+      (and
+        (segment_closed ?mobility_loop)
+        (transport_resource_available ?transport_resource)
+        (return_resource_available ?return_resource)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem round_trip_mobility_loop_design_problem)
+  (:domain round_trip_mobility_loop_design_domain)
+  (:objects outbound_leg_1 - outbound_leg inbound_leg_1 - inbound_leg mobility_loop_alpha - mobility_loop mobility_loop_bravo - mobility_loop transport_resource_bus_1 - transport_resource transport_resource_bus_2 - transport_resource transport_resource_bus_3 - transport_resource time_slot_0900 - time_slot transfer_node_main_hub - transfer_node passenger_group_1 - passenger_group outbound_transfer_edge_1 - outbound_transfer_edge inbound_transfer_edge_1 - inbound_transfer_edge vehicle_asset_1 - vehicle_asset boarding_gate_1 - boarding_asset boarding_gate_2 - boarding_asset route_option_scenic - route_option route_option_express - route_option service_option_premium - service_option service_option_extra_luggage - service_option return_resource_depot_slot_1 - return_resource vehicle_capability_accessible - vehicle_capability operator_credential_driver_1 - operator_credential operator_credential_driver_2 - operator_credential safety_certificate_inspection_1 - safety_certificate)
+  (:init
+    (transport_resource_available transport_resource_bus_1)
+    (transport_resource_available transport_resource_bus_2)
+    (transport_resource_available transport_resource_bus_3)
+    (time_slot_available time_slot_0900)
+    (transfer_node_available transfer_node_main_hub)
+    (passenger_group_waiting passenger_group_1)
+    (outbound_leg_assigned_outbound_edge outbound_leg_1 outbound_transfer_edge_1)
+    (inbound_leg_assigned_inbound_edge inbound_leg_1 inbound_transfer_edge_1)
+    (vehicle_available vehicle_asset_1)
+    (boarding_asset_available boarding_gate_1)
+    (boarding_asset_available boarding_gate_2)
+    (loop_has_outbound_leg mobility_loop_alpha outbound_leg_1)
+    (loop_has_outbound_leg mobility_loop_bravo outbound_leg_1)
+    (loop_has_inbound_leg mobility_loop_alpha inbound_leg_1)
+    (loop_has_inbound_leg mobility_loop_bravo inbound_leg_1)
+    (loop_has_vehicle_assigned mobility_loop_alpha vehicle_asset_1)
+    (loop_has_vehicle_assigned mobility_loop_bravo vehicle_asset_1)
+    (loop_assigned_boarding_asset mobility_loop_alpha boarding_gate_1)
+    (loop_assigned_boarding_asset mobility_loop_bravo boarding_gate_2)
+    (route_option_available route_option_scenic)
+    (route_option_available route_option_express)
+    (service_option_available service_option_premium)
+    (service_option_available service_option_extra_luggage)
+    (return_resource_available return_resource_depot_slot_1)
+    (vehicle_capability_available vehicle_capability_accessible)
+    (operator_credential_available operator_credential_driver_1)
+    (loop_assigned_operator_credential mobility_loop_alpha operator_credential_driver_1)
+    (loop_assigned_operator_credential mobility_loop_bravo operator_credential_driver_2)
+    (safety_certificate_available safety_certificate_inspection_1)
+  )
+  (:goal
+    (and
+      (segment_closed outbound_leg_1)
+      (segment_closed inbound_leg_1)
+      (segment_closed mobility_loop_alpha)
+      (segment_closed mobility_loop_bravo)
+    )
+  )
+)

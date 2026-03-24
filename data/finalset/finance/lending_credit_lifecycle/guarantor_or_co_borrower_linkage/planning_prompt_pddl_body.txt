@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain finance_guarantor_coborrower_linkage)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_entity_type_a - object auxiliary_entity_type_b - object auxiliary_entity_type_c - object domain_root_subtype_main - object party - domain_root_subtype_main guarantor_profile - auxiliary_entity_type_a consent_token - auxiliary_entity_type_a security_interest_offer - auxiliary_entity_type_a compliance_flag - auxiliary_entity_type_a servicing_instruction - auxiliary_entity_type_a guarantor_evidence - auxiliary_entity_type_a collateral_valuation_document - auxiliary_entity_type_a covenant_document - auxiliary_entity_type_a valuation_report - auxiliary_entity_type_b collateral_asset - auxiliary_entity_type_b policy_exception_request - auxiliary_entity_type_b exposure_profile - auxiliary_entity_type_c pricing_profile - auxiliary_entity_type_c credit_facility - auxiliary_entity_type_c party_role_container_a - party party_role_container_b_alt - party primary_borrower_role - party_role_container_a co_borrower_role - party_role_container_a loan_case - party_role_container_b_alt)
+  (:predicates
+    (entity_onboarded ?party - party)
+    (entity_consent_confirmed ?party - party)
+    (entity_has_reserved_guarantor ?party - party)
+    (guarantor_link_established ?party - party)
+    (underwriting_approval_recorded ?party - party)
+    (guarantor_evidence_attached ?party - party)
+    (guarantor_profile_available ?guarantor_profile - guarantor_profile)
+    (entity_reserved_guarantor ?party - party ?guarantor_profile - guarantor_profile)
+    (consent_token_available ?consent_token - consent_token)
+    (consent_token_linked_to_entity ?party - party ?consent_token - consent_token)
+    (security_interest_offer_available ?security_interest_offer - security_interest_offer)
+    (entity_security_offer_link ?party - party ?security_interest_offer - security_interest_offer)
+    (valuation_report_available ?valuation_report - valuation_report)
+    (primary_role_linked_valuation_report ?primary_borrower_role - primary_borrower_role ?valuation_report - valuation_report)
+    (co_borrower_role_linked_valuation_report ?co_borrower_role - co_borrower_role ?valuation_report - valuation_report)
+    (role_assigned_exposure_profile ?primary_borrower_role - primary_borrower_role ?exposure_profile - exposure_profile)
+    (exposure_profile_selected ?exposure_profile - exposure_profile)
+    (exposure_profile_requires_valuation ?exposure_profile - exposure_profile)
+    (role_exposure_validated ?primary_borrower_role - primary_borrower_role)
+    (role_assigned_pricing_profile ?co_borrower_role - co_borrower_role ?pricing_profile - pricing_profile)
+    (pricing_profile_selected ?pricing_profile - pricing_profile)
+    (pricing_profile_requires_valuation ?pricing_profile - pricing_profile)
+    (role_pricing_validated ?co_borrower_role - co_borrower_role)
+    (facility_proposal_pending ?credit_facility - credit_facility)
+    (facility_assembled ?credit_facility - credit_facility)
+    (facility_linked_exposure_profile ?credit_facility - credit_facility ?exposure_profile - exposure_profile)
+    (facility_linked_pricing_profile ?credit_facility - credit_facility ?pricing_profile - pricing_profile)
+    (facility_includes_collateral_flag ?credit_facility - credit_facility)
+    (facility_includes_valuation_flag ?credit_facility - credit_facility)
+    (facility_ready_for_collateral_registration ?credit_facility - credit_facility)
+    (loan_case_primary_borrower ?loan_case - loan_case ?primary_borrower_role - primary_borrower_role)
+    (loan_case_co_borrower ?loan_case - loan_case ?co_borrower_role - co_borrower_role)
+    (loan_case_assigned_facility ?loan_case - loan_case ?credit_facility - credit_facility)
+    (collateral_asset_available ?collateral_asset - collateral_asset)
+    (loan_case_has_collateral_asset ?loan_case - loan_case ?collateral_asset - collateral_asset)
+    (collateral_asset_registered ?collateral_asset - collateral_asset)
+    (collateral_asset_assigned_to_facility ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    (loan_case_underwriting_ready ?loan_case - loan_case)
+    (loan_case_collateral_registered ?loan_case - loan_case)
+    (loan_case_exception_flag_set ?loan_case - loan_case)
+    (loan_case_policy_exception_active ?loan_case - loan_case)
+    (loan_case_policy_exception_acknowledged ?loan_case - loan_case)
+    (policy_exception_approved ?loan_case - loan_case)
+    (loan_case_underwriting_finalized ?loan_case - loan_case)
+    (policy_exception_request_available ?policy_exception_request - policy_exception_request)
+    (loan_case_linked_policy_exception ?loan_case - loan_case ?policy_exception_request - policy_exception_request)
+    (loan_case_policy_exception_recorded ?loan_case - loan_case)
+    (loan_case_policy_exception_escalated ?loan_case - loan_case)
+    (loan_case_covenant_pending ?loan_case - loan_case)
+    (compliance_flag_available ?compliance_flag - compliance_flag)
+    (loan_case_linked_compliance_flag ?loan_case - loan_case ?compliance_flag - compliance_flag)
+    (servicing_instruction_available ?servicing_instruction - servicing_instruction)
+    (loan_case_servicing_instruction_attached ?loan_case - loan_case ?servicing_instruction - servicing_instruction)
+    (collateral_valuation_document_available ?collateral_valuation_document - collateral_valuation_document)
+    (loan_case_collateral_valuation_attached ?loan_case - loan_case ?collateral_valuation_document - collateral_valuation_document)
+    (covenant_document_available ?covenant_document - covenant_document)
+    (loan_case_covenant_attached ?loan_case - loan_case ?covenant_document - covenant_document)
+    (guarantor_evidence_available ?guarantor_evidence - guarantor_evidence)
+    (entity_has_guarantor_evidence ?party - party ?guarantor_evidence - guarantor_evidence)
+    (role_exposure_processed ?primary_borrower_role - primary_borrower_role)
+    (role_pricing_processed ?co_borrower_role - co_borrower_role)
+    (loan_case_decision_finalized ?loan_case - loan_case)
+  )
+  (:action create_entity_profile
+    :parameters (?party - party)
+    :precondition
+      (and
+        (not
+          (entity_onboarded ?party)
+        )
+        (not
+          (guarantor_link_established ?party)
+        )
+      )
+    :effect (entity_onboarded ?party)
+  )
+  (:action reserve_guarantor_candidate_for_entity
+    :parameters (?party - party ?guarantor_profile - guarantor_profile)
+    :precondition
+      (and
+        (entity_onboarded ?party)
+        (not
+          (entity_has_reserved_guarantor ?party)
+        )
+        (guarantor_profile_available ?guarantor_profile)
+      )
+    :effect
+      (and
+        (entity_has_reserved_guarantor ?party)
+        (entity_reserved_guarantor ?party ?guarantor_profile)
+        (not
+          (guarantor_profile_available ?guarantor_profile)
+        )
+      )
+  )
+  (:action attach_consent_token_to_entity
+    :parameters (?party - party ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_onboarded ?party)
+        (entity_has_reserved_guarantor ?party)
+        (consent_token_available ?consent_token)
+      )
+    :effect
+      (and
+        (consent_token_linked_to_entity ?party ?consent_token)
+        (not
+          (consent_token_available ?consent_token)
+        )
+      )
+  )
+  (:action confirm_entity_consent
+    :parameters (?party - party ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_onboarded ?party)
+        (entity_has_reserved_guarantor ?party)
+        (consent_token_linked_to_entity ?party ?consent_token)
+        (not
+          (entity_consent_confirmed ?party)
+        )
+      )
+    :effect (entity_consent_confirmed ?party)
+  )
+  (:action revoke_consent_from_entity
+    :parameters (?party - party ?consent_token - consent_token)
+    :precondition
+      (and
+        (consent_token_linked_to_entity ?party ?consent_token)
+      )
+    :effect
+      (and
+        (consent_token_available ?consent_token)
+        (not
+          (consent_token_linked_to_entity ?party ?consent_token)
+        )
+      )
+  )
+  (:action attach_security_offer_to_entity
+    :parameters (?party - party ?security_interest_offer - security_interest_offer)
+    :precondition
+      (and
+        (entity_consent_confirmed ?party)
+        (security_interest_offer_available ?security_interest_offer)
+      )
+    :effect
+      (and
+        (entity_security_offer_link ?party ?security_interest_offer)
+        (not
+          (security_interest_offer_available ?security_interest_offer)
+        )
+      )
+  )
+  (:action detach_security_offer_from_entity
+    :parameters (?party - party ?security_interest_offer - security_interest_offer)
+    :precondition
+      (and
+        (entity_security_offer_link ?party ?security_interest_offer)
+      )
+    :effect
+      (and
+        (security_interest_offer_available ?security_interest_offer)
+        (not
+          (entity_security_offer_link ?party ?security_interest_offer)
+        )
+      )
+  )
+  (:action attach_collateral_valuation_to_case
+    :parameters (?loan_case - loan_case ?collateral_valuation_document - collateral_valuation_document)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (collateral_valuation_document_available ?collateral_valuation_document)
+      )
+    :effect
+      (and
+        (loan_case_collateral_valuation_attached ?loan_case ?collateral_valuation_document)
+        (not
+          (collateral_valuation_document_available ?collateral_valuation_document)
+        )
+      )
+  )
+  (:action remove_collateral_valuation_from_case
+    :parameters (?loan_case - loan_case ?collateral_valuation_document - collateral_valuation_document)
+    :precondition
+      (and
+        (loan_case_collateral_valuation_attached ?loan_case ?collateral_valuation_document)
+      )
+    :effect
+      (and
+        (collateral_valuation_document_available ?collateral_valuation_document)
+        (not
+          (loan_case_collateral_valuation_attached ?loan_case ?collateral_valuation_document)
+        )
+      )
+  )
+  (:action attach_covenant_to_case
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (covenant_document_available ?covenant_document)
+      )
+    :effect
+      (and
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (not
+          (covenant_document_available ?covenant_document)
+        )
+      )
+  )
+  (:action remove_covenant_from_case
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document)
+    :precondition
+      (and
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+      )
+    :effect
+      (and
+        (covenant_document_available ?covenant_document)
+        (not
+          (loan_case_covenant_attached ?loan_case ?covenant_document)
+        )
+      )
+  )
+  (:action select_exposure_profile_for_primary_role
+    :parameters (?primary_borrower_role - primary_borrower_role ?exposure_profile - exposure_profile ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_consent_confirmed ?primary_borrower_role)
+        (consent_token_linked_to_entity ?primary_borrower_role ?consent_token)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (not
+          (exposure_profile_selected ?exposure_profile)
+        )
+        (not
+          (exposure_profile_requires_valuation ?exposure_profile)
+        )
+      )
+    :effect (exposure_profile_selected ?exposure_profile)
+  )
+  (:action process_primary_exposure_with_security_offer
+    :parameters (?primary_borrower_role - primary_borrower_role ?exposure_profile - exposure_profile ?security_interest_offer - security_interest_offer)
+    :precondition
+      (and
+        (entity_consent_confirmed ?primary_borrower_role)
+        (entity_security_offer_link ?primary_borrower_role ?security_interest_offer)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (exposure_profile_selected ?exposure_profile)
+        (not
+          (role_exposure_processed ?primary_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_exposure_validated ?primary_borrower_role)
+      )
+  )
+  (:action attach_valuation_to_primary_role
+    :parameters (?primary_borrower_role - primary_borrower_role ?exposure_profile - exposure_profile ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_consent_confirmed ?primary_borrower_role)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (valuation_report_available ?valuation_report)
+        (not
+          (role_exposure_processed ?primary_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (exposure_profile_requires_valuation ?exposure_profile)
+        (role_exposure_processed ?primary_borrower_role)
+        (primary_role_linked_valuation_report ?primary_borrower_role ?valuation_report)
+        (not
+          (valuation_report_available ?valuation_report)
+        )
+      )
+  )
+  (:action finalize_primary_exposure_with_valuation
+    :parameters (?primary_borrower_role - primary_borrower_role ?exposure_profile - exposure_profile ?consent_token - consent_token ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_consent_confirmed ?primary_borrower_role)
+        (consent_token_linked_to_entity ?primary_borrower_role ?consent_token)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (exposure_profile_requires_valuation ?exposure_profile)
+        (primary_role_linked_valuation_report ?primary_borrower_role ?valuation_report)
+        (not
+          (role_exposure_validated ?primary_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (exposure_profile_selected ?exposure_profile)
+        (role_exposure_validated ?primary_borrower_role)
+        (valuation_report_available ?valuation_report)
+        (not
+          (primary_role_linked_valuation_report ?primary_borrower_role ?valuation_report)
+        )
+      )
+  )
+  (:action select_pricing_profile_for_co_borrower
+    :parameters (?co_borrower_role - co_borrower_role ?pricing_profile - pricing_profile ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_consent_confirmed ?co_borrower_role)
+        (consent_token_linked_to_entity ?co_borrower_role ?consent_token)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (not
+          (pricing_profile_selected ?pricing_profile)
+        )
+        (not
+          (pricing_profile_requires_valuation ?pricing_profile)
+        )
+      )
+    :effect (pricing_profile_selected ?pricing_profile)
+  )
+  (:action process_co_borrower_pricing_with_security_offer
+    :parameters (?co_borrower_role - co_borrower_role ?pricing_profile - pricing_profile ?security_interest_offer - security_interest_offer)
+    :precondition
+      (and
+        (entity_consent_confirmed ?co_borrower_role)
+        (entity_security_offer_link ?co_borrower_role ?security_interest_offer)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (pricing_profile_selected ?pricing_profile)
+        (not
+          (role_pricing_processed ?co_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (role_pricing_processed ?co_borrower_role)
+        (role_pricing_validated ?co_borrower_role)
+      )
+  )
+  (:action attach_valuation_to_co_borrower_pricing
+    :parameters (?co_borrower_role - co_borrower_role ?pricing_profile - pricing_profile ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_consent_confirmed ?co_borrower_role)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (valuation_report_available ?valuation_report)
+        (not
+          (role_pricing_processed ?co_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (pricing_profile_requires_valuation ?pricing_profile)
+        (role_pricing_processed ?co_borrower_role)
+        (co_borrower_role_linked_valuation_report ?co_borrower_role ?valuation_report)
+        (not
+          (valuation_report_available ?valuation_report)
+        )
+      )
+  )
+  (:action finalize_co_borrower_pricing_with_valuation
+    :parameters (?co_borrower_role - co_borrower_role ?pricing_profile - pricing_profile ?consent_token - consent_token ?valuation_report - valuation_report)
+    :precondition
+      (and
+        (entity_consent_confirmed ?co_borrower_role)
+        (consent_token_linked_to_entity ?co_borrower_role ?consent_token)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (pricing_profile_requires_valuation ?pricing_profile)
+        (co_borrower_role_linked_valuation_report ?co_borrower_role ?valuation_report)
+        (not
+          (role_pricing_validated ?co_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (pricing_profile_selected ?pricing_profile)
+        (role_pricing_validated ?co_borrower_role)
+        (valuation_report_available ?valuation_report)
+        (not
+          (co_borrower_role_linked_valuation_report ?co_borrower_role ?valuation_report)
+        )
+      )
+  )
+  (:action assemble_credit_facility_standard
+    :parameters (?primary_borrower_role - primary_borrower_role ?co_borrower_role - co_borrower_role ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_pricing_processed ?co_borrower_role)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (exposure_profile_selected ?exposure_profile)
+        (pricing_profile_selected ?pricing_profile)
+        (role_exposure_validated ?primary_borrower_role)
+        (role_pricing_validated ?co_borrower_role)
+        (facility_proposal_pending ?credit_facility)
+      )
+    :effect
+      (and
+        (facility_assembled ?credit_facility)
+        (facility_linked_exposure_profile ?credit_facility ?exposure_profile)
+        (facility_linked_pricing_profile ?credit_facility ?pricing_profile)
+        (not
+          (facility_proposal_pending ?credit_facility)
+        )
+      )
+  )
+  (:action assemble_credit_facility_with_feature_a
+    :parameters (?primary_borrower_role - primary_borrower_role ?co_borrower_role - co_borrower_role ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_pricing_processed ?co_borrower_role)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (exposure_profile_requires_valuation ?exposure_profile)
+        (pricing_profile_selected ?pricing_profile)
+        (not
+          (role_exposure_validated ?primary_borrower_role)
+        )
+        (role_pricing_validated ?co_borrower_role)
+        (facility_proposal_pending ?credit_facility)
+      )
+    :effect
+      (and
+        (facility_assembled ?credit_facility)
+        (facility_linked_exposure_profile ?credit_facility ?exposure_profile)
+        (facility_linked_pricing_profile ?credit_facility ?pricing_profile)
+        (facility_includes_collateral_flag ?credit_facility)
+        (not
+          (facility_proposal_pending ?credit_facility)
+        )
+      )
+  )
+  (:action assemble_credit_facility_with_feature_b
+    :parameters (?primary_borrower_role - primary_borrower_role ?co_borrower_role - co_borrower_role ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_pricing_processed ?co_borrower_role)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (exposure_profile_selected ?exposure_profile)
+        (pricing_profile_requires_valuation ?pricing_profile)
+        (role_exposure_validated ?primary_borrower_role)
+        (not
+          (role_pricing_validated ?co_borrower_role)
+        )
+        (facility_proposal_pending ?credit_facility)
+      )
+    :effect
+      (and
+        (facility_assembled ?credit_facility)
+        (facility_linked_exposure_profile ?credit_facility ?exposure_profile)
+        (facility_linked_pricing_profile ?credit_facility ?pricing_profile)
+        (facility_includes_valuation_flag ?credit_facility)
+        (not
+          (facility_proposal_pending ?credit_facility)
+        )
+      )
+  )
+  (:action assemble_credit_facility_with_both_features
+    :parameters (?primary_borrower_role - primary_borrower_role ?co_borrower_role - co_borrower_role ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_pricing_processed ?co_borrower_role)
+        (role_assigned_exposure_profile ?primary_borrower_role ?exposure_profile)
+        (role_assigned_pricing_profile ?co_borrower_role ?pricing_profile)
+        (exposure_profile_requires_valuation ?exposure_profile)
+        (pricing_profile_requires_valuation ?pricing_profile)
+        (not
+          (role_exposure_validated ?primary_borrower_role)
+        )
+        (not
+          (role_pricing_validated ?co_borrower_role)
+        )
+        (facility_proposal_pending ?credit_facility)
+      )
+    :effect
+      (and
+        (facility_assembled ?credit_facility)
+        (facility_linked_exposure_profile ?credit_facility ?exposure_profile)
+        (facility_linked_pricing_profile ?credit_facility ?pricing_profile)
+        (facility_includes_collateral_flag ?credit_facility)
+        (facility_includes_valuation_flag ?credit_facility)
+        (not
+          (facility_proposal_pending ?credit_facility)
+        )
+      )
+  )
+  (:action enable_facility_for_collateral_registration
+    :parameters (?credit_facility - credit_facility ?primary_borrower_role - primary_borrower_role ?consent_token - consent_token)
+    :precondition
+      (and
+        (facility_assembled ?credit_facility)
+        (role_exposure_processed ?primary_borrower_role)
+        (consent_token_linked_to_entity ?primary_borrower_role ?consent_token)
+        (not
+          (facility_ready_for_collateral_registration ?credit_facility)
+        )
+      )
+    :effect (facility_ready_for_collateral_registration ?credit_facility)
+  )
+  (:action register_collateral_asset_to_facility
+    :parameters (?loan_case - loan_case ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (loan_case_assigned_facility ?loan_case ?credit_facility)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_available ?collateral_asset)
+        (facility_assembled ?credit_facility)
+        (facility_ready_for_collateral_registration ?credit_facility)
+        (not
+          (collateral_asset_registered ?collateral_asset)
+        )
+      )
+    :effect
+      (and
+        (collateral_asset_registered ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action finalize_collateral_registration_for_case
+    :parameters (?loan_case - loan_case ?collateral_asset - collateral_asset ?credit_facility - credit_facility ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_registered ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (consent_token_linked_to_entity ?loan_case ?consent_token)
+        (not
+          (facility_includes_collateral_flag ?credit_facility)
+        )
+        (not
+          (loan_case_underwriting_ready ?loan_case)
+        )
+      )
+    :effect (loan_case_underwriting_ready ?loan_case)
+  )
+  (:action record_compliance_flag_on_case
+    :parameters (?loan_case - loan_case ?compliance_flag - compliance_flag)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (compliance_flag_available ?compliance_flag)
+        (not
+          (loan_case_policy_exception_active ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_policy_exception_active ?loan_case)
+        (loan_case_linked_compliance_flag ?loan_case ?compliance_flag)
+        (not
+          (compliance_flag_available ?compliance_flag)
+        )
+      )
+  )
+  (:action process_policy_exception_and_acknowledge
+    :parameters (?loan_case - loan_case ?collateral_asset - collateral_asset ?credit_facility - credit_facility ?consent_token - consent_token ?compliance_flag - compliance_flag)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_registered ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (consent_token_linked_to_entity ?loan_case ?consent_token)
+        (facility_includes_collateral_flag ?credit_facility)
+        (loan_case_policy_exception_active ?loan_case)
+        (loan_case_linked_compliance_flag ?loan_case ?compliance_flag)
+        (not
+          (loan_case_underwriting_ready ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_underwriting_ready ?loan_case)
+        (loan_case_policy_exception_acknowledged ?loan_case)
+      )
+  )
+  (:action confirm_collateral_registration_for_case
+    :parameters (?loan_case - loan_case ?collateral_valuation_document - collateral_valuation_document ?security_interest_offer - security_interest_offer ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_underwriting_ready ?loan_case)
+        (loan_case_collateral_valuation_attached ?loan_case ?collateral_valuation_document)
+        (entity_security_offer_link ?loan_case ?security_interest_offer)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (not
+          (facility_includes_valuation_flag ?credit_facility)
+        )
+        (not
+          (loan_case_collateral_registered ?loan_case)
+        )
+      )
+    :effect (loan_case_collateral_registered ?loan_case)
+  )
+  (:action confirm_collateral_registration_for_case_variant
+    :parameters (?loan_case - loan_case ?collateral_valuation_document - collateral_valuation_document ?security_interest_offer - security_interest_offer ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_underwriting_ready ?loan_case)
+        (loan_case_collateral_valuation_attached ?loan_case ?collateral_valuation_document)
+        (entity_security_offer_link ?loan_case ?security_interest_offer)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (facility_includes_valuation_flag ?credit_facility)
+        (not
+          (loan_case_collateral_registered ?loan_case)
+        )
+      )
+    :effect (loan_case_collateral_registered ?loan_case)
+  )
+  (:action advance_case_to_underwriting_review
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_collateral_registered ?loan_case)
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (not
+          (facility_includes_collateral_flag ?credit_facility)
+        )
+        (not
+          (facility_includes_valuation_flag ?credit_facility)
+        )
+        (not
+          (loan_case_exception_flag_set ?loan_case)
+        )
+      )
+    :effect (loan_case_exception_flag_set ?loan_case)
+  )
+  (:action escalate_case_and_mark_for_servicing
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_collateral_registered ?loan_case)
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (facility_includes_collateral_flag ?credit_facility)
+        (not
+          (facility_includes_valuation_flag ?credit_facility)
+        )
+        (not
+          (loan_case_exception_flag_set ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (policy_exception_approved ?loan_case)
+      )
+  )
+  (:action approve_policy_exception_on_case
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_collateral_registered ?loan_case)
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (not
+          (facility_includes_collateral_flag ?credit_facility)
+        )
+        (facility_includes_valuation_flag ?credit_facility)
+        (not
+          (loan_case_exception_flag_set ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (policy_exception_approved ?loan_case)
+      )
+  )
+  (:action approve_case_with_policy_exception
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document ?collateral_asset - collateral_asset ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (loan_case_collateral_registered ?loan_case)
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (loan_case_has_collateral_asset ?loan_case ?collateral_asset)
+        (collateral_asset_assigned_to_facility ?collateral_asset ?credit_facility)
+        (facility_includes_collateral_flag ?credit_facility)
+        (facility_includes_valuation_flag ?credit_facility)
+        (not
+          (loan_case_exception_flag_set ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (policy_exception_approved ?loan_case)
+      )
+  )
+  (:action finalize_underwriting_decision
+    :parameters (?loan_case - loan_case)
+    :precondition
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (not
+          (policy_exception_approved ?loan_case)
+        )
+        (not
+          (loan_case_decision_finalized ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_decision_finalized ?loan_case)
+        (underwriting_approval_recorded ?loan_case)
+      )
+  )
+  (:action attach_servicing_instruction_to_case
+    :parameters (?loan_case - loan_case ?servicing_instruction - servicing_instruction)
+    :precondition
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (policy_exception_approved ?loan_case)
+        (servicing_instruction_available ?servicing_instruction)
+      )
+    :effect
+      (and
+        (loan_case_servicing_instruction_attached ?loan_case ?servicing_instruction)
+        (not
+          (servicing_instruction_available ?servicing_instruction)
+        )
+      )
+  )
+  (:action execute_underwriting_final_steps
+    :parameters (?loan_case - loan_case ?primary_borrower_role - primary_borrower_role ?co_borrower_role - co_borrower_role ?consent_token - consent_token ?servicing_instruction - servicing_instruction)
+    :precondition
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (policy_exception_approved ?loan_case)
+        (loan_case_servicing_instruction_attached ?loan_case ?servicing_instruction)
+        (loan_case_primary_borrower ?loan_case ?primary_borrower_role)
+        (loan_case_co_borrower ?loan_case ?co_borrower_role)
+        (role_exposure_validated ?primary_borrower_role)
+        (role_pricing_validated ?co_borrower_role)
+        (consent_token_linked_to_entity ?loan_case ?consent_token)
+        (not
+          (loan_case_underwriting_finalized ?loan_case)
+        )
+      )
+    :effect (loan_case_underwriting_finalized ?loan_case)
+  )
+  (:action lock_case_decision
+    :parameters (?loan_case - loan_case)
+    :precondition
+      (and
+        (loan_case_exception_flag_set ?loan_case)
+        (loan_case_underwriting_finalized ?loan_case)
+        (not
+          (loan_case_decision_finalized ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_decision_finalized ?loan_case)
+        (underwriting_approval_recorded ?loan_case)
+      )
+  )
+  (:action record_policy_exception_request_on_case
+    :parameters (?loan_case - loan_case ?policy_exception_request - policy_exception_request ?consent_token - consent_token)
+    :precondition
+      (and
+        (entity_consent_confirmed ?loan_case)
+        (consent_token_linked_to_entity ?loan_case ?consent_token)
+        (policy_exception_request_available ?policy_exception_request)
+        (loan_case_linked_policy_exception ?loan_case ?policy_exception_request)
+        (not
+          (loan_case_policy_exception_recorded ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_policy_exception_recorded ?loan_case)
+        (not
+          (policy_exception_request_available ?policy_exception_request)
+        )
+      )
+  )
+  (:action prepare_case_for_covenant_attachment
+    :parameters (?loan_case - loan_case ?security_interest_offer - security_interest_offer)
+    :precondition
+      (and
+        (loan_case_policy_exception_recorded ?loan_case)
+        (entity_security_offer_link ?loan_case ?security_interest_offer)
+        (not
+          (loan_case_policy_exception_escalated ?loan_case)
+        )
+      )
+    :effect (loan_case_policy_exception_escalated ?loan_case)
+  )
+  (:action attach_covenant_document_to_case
+    :parameters (?loan_case - loan_case ?covenant_document - covenant_document)
+    :precondition
+      (and
+        (loan_case_policy_exception_escalated ?loan_case)
+        (loan_case_covenant_attached ?loan_case ?covenant_document)
+        (not
+          (loan_case_covenant_pending ?loan_case)
+        )
+      )
+    :effect (loan_case_covenant_pending ?loan_case)
+  )
+  (:action finalize_case_post_covenant
+    :parameters (?loan_case - loan_case)
+    :precondition
+      (and
+        (loan_case_covenant_pending ?loan_case)
+        (not
+          (loan_case_decision_finalized ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (loan_case_decision_finalized ?loan_case)
+        (underwriting_approval_recorded ?loan_case)
+      )
+  )
+  (:action activate_primary_role_servicing_flag
+    :parameters (?primary_borrower_role - primary_borrower_role ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_exposure_processed ?primary_borrower_role)
+        (role_exposure_validated ?primary_borrower_role)
+        (facility_assembled ?credit_facility)
+        (facility_ready_for_collateral_registration ?credit_facility)
+        (not
+          (underwriting_approval_recorded ?primary_borrower_role)
+        )
+      )
+    :effect (underwriting_approval_recorded ?primary_borrower_role)
+  )
+  (:action activate_co_borrower_role_servicing_flag
+    :parameters (?co_borrower_role - co_borrower_role ?credit_facility - credit_facility)
+    :precondition
+      (and
+        (role_pricing_processed ?co_borrower_role)
+        (role_pricing_validated ?co_borrower_role)
+        (facility_assembled ?credit_facility)
+        (facility_ready_for_collateral_registration ?credit_facility)
+        (not
+          (underwriting_approval_recorded ?co_borrower_role)
+        )
+      )
+    :effect (underwriting_approval_recorded ?co_borrower_role)
+  )
+  (:action record_guarantor_evidence
+    :parameters (?party - party ?guarantor_evidence - guarantor_evidence ?consent_token - consent_token)
+    :precondition
+      (and
+        (underwriting_approval_recorded ?party)
+        (consent_token_linked_to_entity ?party ?consent_token)
+        (guarantor_evidence_available ?guarantor_evidence)
+        (not
+          (guarantor_evidence_attached ?party)
+        )
+      )
+    :effect
+      (and
+        (guarantor_evidence_attached ?party)
+        (entity_has_guarantor_evidence ?party ?guarantor_evidence)
+        (not
+          (guarantor_evidence_available ?guarantor_evidence)
+        )
+      )
+  )
+  (:action assign_guarantor_to_primary_role
+    :parameters (?primary_borrower_role - primary_borrower_role ?guarantor_profile - guarantor_profile ?guarantor_evidence - guarantor_evidence)
+    :precondition
+      (and
+        (guarantor_evidence_attached ?primary_borrower_role)
+        (entity_reserved_guarantor ?primary_borrower_role ?guarantor_profile)
+        (entity_has_guarantor_evidence ?primary_borrower_role ?guarantor_evidence)
+        (not
+          (guarantor_link_established ?primary_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (guarantor_link_established ?primary_borrower_role)
+        (guarantor_profile_available ?guarantor_profile)
+        (guarantor_evidence_available ?guarantor_evidence)
+      )
+  )
+  (:action assign_guarantor_to_co_borrower
+    :parameters (?co_borrower_role - co_borrower_role ?guarantor_profile - guarantor_profile ?guarantor_evidence - guarantor_evidence)
+    :precondition
+      (and
+        (guarantor_evidence_attached ?co_borrower_role)
+        (entity_reserved_guarantor ?co_borrower_role ?guarantor_profile)
+        (entity_has_guarantor_evidence ?co_borrower_role ?guarantor_evidence)
+        (not
+          (guarantor_link_established ?co_borrower_role)
+        )
+      )
+    :effect
+      (and
+        (guarantor_link_established ?co_borrower_role)
+        (guarantor_profile_available ?guarantor_profile)
+        (guarantor_evidence_available ?guarantor_evidence)
+      )
+  )
+  (:action assign_guarantor_to_loan_case
+    :parameters (?loan_case - loan_case ?guarantor_profile - guarantor_profile ?guarantor_evidence - guarantor_evidence)
+    :precondition
+      (and
+        (guarantor_evidence_attached ?loan_case)
+        (entity_reserved_guarantor ?loan_case ?guarantor_profile)
+        (entity_has_guarantor_evidence ?loan_case ?guarantor_evidence)
+        (not
+          (guarantor_link_established ?loan_case)
+        )
+      )
+    :effect
+      (and
+        (guarantor_link_established ?loan_case)
+        (guarantor_profile_available ?guarantor_profile)
+        (guarantor_evidence_available ?guarantor_evidence)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem guarantor_linkage_scenario)
+  (:domain finance_guarantor_coborrower_linkage)
+  (:objects primary_borrower_role_1 - primary_borrower_role co_borrower_role_1 - co_borrower_role loan_case_1 - loan_case loan_case_2 - loan_case guarantor_profile_1 - guarantor_profile guarantor_profile_2 - guarantor_profile guarantor_profile_3 - guarantor_profile consent_token_1 - consent_token security_interest_offer_1 - security_interest_offer valuation_report_1 - valuation_report exposure_profile_1 - exposure_profile pricing_profile_1 - pricing_profile credit_facility_1 - credit_facility collateral_asset_1 - collateral_asset collateral_asset_2 - collateral_asset compliance_flag_1 - compliance_flag compliance_flag_2 - compliance_flag servicing_instruction_1 - servicing_instruction servicing_instruction_2 - servicing_instruction guarantor_evidence_1 - guarantor_evidence collateral_valuation_document_1 - collateral_valuation_document policy_exception_request_1 - policy_exception_request policy_exception_request_2 - policy_exception_request covenant_document_1 - covenant_document)
+  (:init
+    (guarantor_profile_available guarantor_profile_1)
+    (guarantor_profile_available guarantor_profile_2)
+    (guarantor_profile_available guarantor_profile_3)
+    (consent_token_available consent_token_1)
+    (security_interest_offer_available security_interest_offer_1)
+    (valuation_report_available valuation_report_1)
+    (role_assigned_exposure_profile primary_borrower_role_1 exposure_profile_1)
+    (role_assigned_pricing_profile co_borrower_role_1 pricing_profile_1)
+    (facility_proposal_pending credit_facility_1)
+    (collateral_asset_available collateral_asset_1)
+    (collateral_asset_available collateral_asset_2)
+    (loan_case_primary_borrower loan_case_1 primary_borrower_role_1)
+    (loan_case_primary_borrower loan_case_2 primary_borrower_role_1)
+    (loan_case_co_borrower loan_case_1 co_borrower_role_1)
+    (loan_case_co_borrower loan_case_2 co_borrower_role_1)
+    (loan_case_assigned_facility loan_case_1 credit_facility_1)
+    (loan_case_assigned_facility loan_case_2 credit_facility_1)
+    (loan_case_has_collateral_asset loan_case_1 collateral_asset_1)
+    (loan_case_has_collateral_asset loan_case_2 collateral_asset_2)
+    (compliance_flag_available compliance_flag_1)
+    (compliance_flag_available compliance_flag_2)
+    (servicing_instruction_available servicing_instruction_1)
+    (servicing_instruction_available servicing_instruction_2)
+    (guarantor_evidence_available guarantor_evidence_1)
+    (collateral_valuation_document_available collateral_valuation_document_1)
+    (policy_exception_request_available policy_exception_request_1)
+    (loan_case_linked_policy_exception loan_case_1 policy_exception_request_1)
+    (loan_case_linked_policy_exception loan_case_2 policy_exception_request_2)
+    (covenant_document_available covenant_document_1)
+  )
+  (:goal
+    (and
+      (guarantor_link_established primary_borrower_role_1)
+      (guarantor_link_established co_borrower_role_1)
+      (guarantor_link_established loan_case_1)
+      (guarantor_link_established loan_case_2)
+    )
+  )
+)

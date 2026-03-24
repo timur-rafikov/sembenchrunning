@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain finance_drawdown_condition_check_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types party_supertype - object resource_supertype - object condition_supertype - object entity_supertype - object processing_entity - entity_supertype commitment_unit - party_supertype drawdown_request - party_supertype authorised_approver - party_supertype legal_provision - party_supertype pricing_profile - party_supertype condition_evidence - party_supertype pricing_component - party_supertype regulatory_confirmation - party_supertype supporting_document - resource_supertype collateral_item - resource_supertype exceptional_approval - resource_supertype covenant_rule - condition_supertype financial_condition - condition_supertype drawdown_package - condition_supertype party_role_subtype - processing_entity case_role_subtype - processing_entity lender_party - party_role_subtype borrower_party - party_role_subtype processing_case - case_role_subtype)
+  (:predicates
+    (drawdown_request_registered ?credit_facility - processing_entity)
+    (entity_processing_enabled ?credit_facility - processing_entity)
+    (commitment_allocated ?credit_facility - processing_entity)
+    (conditions_precedent_satisfied ?credit_facility - processing_entity)
+    (preapproval_granted_for_entity ?credit_facility - processing_entity)
+    (entity_conditions_recorded ?credit_facility - processing_entity)
+    (commitment_unit_available ?commitment_unit - commitment_unit)
+    (entity_commitment_link ?credit_facility - processing_entity ?commitment_unit - commitment_unit)
+    (drawdown_request_unallocated ?drawdown_request - drawdown_request)
+    (entity_drawdown_link ?credit_facility - processing_entity ?drawdown_request - drawdown_request)
+    (approver_available ?authorised_approver - authorised_approver)
+    (approver_assigned_to_facility ?credit_facility - processing_entity ?authorised_approver - authorised_approver)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (lender_has_document ?lender_party - lender_party ?supporting_document - supporting_document)
+    (borrower_has_document ?borrower_party - borrower_party ?supporting_document - supporting_document)
+    (lender_covenant_link ?lender_party - lender_party ?covenant_rule - covenant_rule)
+    (covenant_rule_verified ?covenant_rule - covenant_rule)
+    (covenant_rule_documented ?covenant_rule - covenant_rule)
+    (lender_condition_passed ?lender_party - lender_party)
+    (borrower_financial_condition_link ?borrower_party - borrower_party ?financial_condition - financial_condition)
+    (financial_condition_verified ?financial_condition - financial_condition)
+    (financial_condition_documented ?financial_condition - financial_condition)
+    (borrower_condition_passed ?borrower_party - borrower_party)
+    (drawdown_package_available ?drawdown_package - drawdown_package)
+    (drawdown_package_assembled ?drawdown_package - drawdown_package)
+    (package_includes_covenant ?drawdown_package - drawdown_package ?covenant_rule - covenant_rule)
+    (package_includes_financial_condition ?drawdown_package - drawdown_package ?financial_condition - financial_condition)
+    (package_has_lender_documentation ?drawdown_package - drawdown_package)
+    (package_has_borrower_documentation ?drawdown_package - drawdown_package)
+    (drawdown_package_activated ?drawdown_package - drawdown_package)
+    (case_associated_with_lender ?processing_case - processing_case ?lender_party - lender_party)
+    (case_associated_with_borrower ?processing_case - processing_case ?borrower_party - borrower_party)
+    (case_has_drawdown_package ?processing_case - processing_case ?drawdown_package - drawdown_package)
+    (collateral_item_available ?collateral_item - collateral_item)
+    (case_has_collateral_item ?processing_case - processing_case ?collateral_item - collateral_item)
+    (collateral_item_included ?collateral_item - collateral_item)
+    (collateral_included_in_package ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    (legal_attachment_initialized ?processing_case - processing_case)
+    (legal_review_engaged ?processing_case - processing_case)
+    (legal_review_cleared ?processing_case - processing_case)
+    (legal_provision_attached ?processing_case - processing_case)
+    (legal_attachment_acknowledged ?processing_case - processing_case)
+    (pricing_confirmation_obtained ?processing_case - processing_case)
+    (final_substantive_review_completed ?processing_case - processing_case)
+    (exceptional_approval_available ?exceptional_approval - exceptional_approval)
+    (case_exceptional_approval_link ?processing_case - processing_case ?exceptional_approval - exceptional_approval)
+    (case_exceptional_approval_registered ?processing_case - processing_case)
+    (case_exceptional_approval_actioned ?processing_case - processing_case)
+    (exceptional_approval_processed ?processing_case - processing_case)
+    (legal_provision_available ?legal_provision - legal_provision)
+    (case_has_legal_provision ?processing_case - processing_case ?legal_provision - legal_provision)
+    (pricing_profile_available ?pricing_profile - pricing_profile)
+    (case_pricing_profile_attached ?processing_case - processing_case ?pricing_profile - pricing_profile)
+    (pricing_component_available ?pricing_component - pricing_component)
+    (case_has_pricing_component ?processing_case - processing_case ?pricing_component - pricing_component)
+    (regulatory_confirmation_available ?regulatory_confirmation - regulatory_confirmation)
+    (case_has_regulatory_confirmation ?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation)
+    (condition_evidence_available ?condition_evidence - condition_evidence)
+    (entity_has_condition_evidence ?credit_facility - processing_entity ?condition_evidence - condition_evidence)
+    (lender_checks_completed ?lender_party - lender_party)
+    (borrower_checks_completed ?borrower_party - borrower_party)
+    (case_finalized ?processing_case - processing_case)
+  )
+  (:action register_drawdown_request
+    :parameters (?credit_facility - processing_entity)
+    :precondition
+      (and
+        (not
+          (drawdown_request_registered ?credit_facility)
+        )
+        (not
+          (conditions_precedent_satisfied ?credit_facility)
+        )
+      )
+    :effect (drawdown_request_registered ?credit_facility)
+  )
+  (:action allocate_commitment_unit_to_facility
+    :parameters (?credit_facility - processing_entity ?commitment_unit - commitment_unit)
+    :precondition
+      (and
+        (drawdown_request_registered ?credit_facility)
+        (not
+          (commitment_allocated ?credit_facility)
+        )
+        (commitment_unit_available ?commitment_unit)
+      )
+    :effect
+      (and
+        (commitment_allocated ?credit_facility)
+        (entity_commitment_link ?credit_facility ?commitment_unit)
+        (not
+          (commitment_unit_available ?commitment_unit)
+        )
+      )
+  )
+  (:action link_drawdown_request_to_facility
+    :parameters (?credit_facility - processing_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (drawdown_request_registered ?credit_facility)
+        (commitment_allocated ?credit_facility)
+        (drawdown_request_unallocated ?drawdown_request)
+      )
+    :effect
+      (and
+        (entity_drawdown_link ?credit_facility ?drawdown_request)
+        (not
+          (drawdown_request_unallocated ?drawdown_request)
+        )
+      )
+  )
+  (:action confirm_drawdown_request_allocation
+    :parameters (?credit_facility - processing_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (drawdown_request_registered ?credit_facility)
+        (commitment_allocated ?credit_facility)
+        (entity_drawdown_link ?credit_facility ?drawdown_request)
+        (not
+          (entity_processing_enabled ?credit_facility)
+        )
+      )
+    :effect (entity_processing_enabled ?credit_facility)
+  )
+  (:action unlink_drawdown_request_from_facility
+    :parameters (?credit_facility - processing_entity ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_drawdown_link ?credit_facility ?drawdown_request)
+      )
+    :effect
+      (and
+        (drawdown_request_unallocated ?drawdown_request)
+        (not
+          (entity_drawdown_link ?credit_facility ?drawdown_request)
+        )
+      )
+  )
+  (:action assign_approver_to_facility
+    :parameters (?credit_facility - processing_entity ?authorised_approver - authorised_approver)
+    :precondition
+      (and
+        (entity_processing_enabled ?credit_facility)
+        (approver_available ?authorised_approver)
+      )
+    :effect
+      (and
+        (approver_assigned_to_facility ?credit_facility ?authorised_approver)
+        (not
+          (approver_available ?authorised_approver)
+        )
+      )
+  )
+  (:action release_approver_from_facility
+    :parameters (?credit_facility - processing_entity ?authorised_approver - authorised_approver)
+    :precondition
+      (and
+        (approver_assigned_to_facility ?credit_facility ?authorised_approver)
+      )
+    :effect
+      (and
+        (approver_available ?authorised_approver)
+        (not
+          (approver_assigned_to_facility ?credit_facility ?authorised_approver)
+        )
+      )
+  )
+  (:action attach_pricing_component_to_case
+    :parameters (?processing_case - processing_case ?pricing_component - pricing_component)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (pricing_component_available ?pricing_component)
+      )
+    :effect
+      (and
+        (case_has_pricing_component ?processing_case ?pricing_component)
+        (not
+          (pricing_component_available ?pricing_component)
+        )
+      )
+  )
+  (:action detach_pricing_component_from_case
+    :parameters (?processing_case - processing_case ?pricing_component - pricing_component)
+    :precondition
+      (and
+        (case_has_pricing_component ?processing_case ?pricing_component)
+      )
+    :effect
+      (and
+        (pricing_component_available ?pricing_component)
+        (not
+          (case_has_pricing_component ?processing_case ?pricing_component)
+        )
+      )
+  )
+  (:action attach_regulatory_confirmation_to_case
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (regulatory_confirmation_available ?regulatory_confirmation)
+      )
+    :effect
+      (and
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (not
+          (regulatory_confirmation_available ?regulatory_confirmation)
+        )
+      )
+  )
+  (:action detach_regulatory_confirmation_from_case
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation)
+    :precondition
+      (and
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+      )
+    :effect
+      (and
+        (regulatory_confirmation_available ?regulatory_confirmation)
+        (not
+          (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        )
+      )
+  )
+  (:action evaluate_lender_covenant
+    :parameters (?lender_party - lender_party ?covenant_rule - covenant_rule ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_processing_enabled ?lender_party)
+        (entity_drawdown_link ?lender_party ?drawdown_request)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (not
+          (covenant_rule_verified ?covenant_rule)
+        )
+        (not
+          (covenant_rule_documented ?covenant_rule)
+        )
+      )
+    :effect (covenant_rule_verified ?covenant_rule)
+  )
+  (:action approve_lender_covenant_by_approver
+    :parameters (?lender_party - lender_party ?covenant_rule - covenant_rule ?authorised_approver - authorised_approver)
+    :precondition
+      (and
+        (entity_processing_enabled ?lender_party)
+        (approver_assigned_to_facility ?lender_party ?authorised_approver)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (covenant_rule_verified ?covenant_rule)
+        (not
+          (lender_checks_completed ?lender_party)
+        )
+      )
+    :effect
+      (and
+        (lender_checks_completed ?lender_party)
+        (lender_condition_passed ?lender_party)
+      )
+  )
+  (:action attach_lender_supporting_document
+    :parameters (?lender_party - lender_party ?covenant_rule - covenant_rule ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_processing_enabled ?lender_party)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (supporting_document_available ?supporting_document)
+        (not
+          (lender_checks_completed ?lender_party)
+        )
+      )
+    :effect
+      (and
+        (covenant_rule_documented ?covenant_rule)
+        (lender_checks_completed ?lender_party)
+        (lender_has_document ?lender_party ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action reconcile_lender_supporting_documentation
+    :parameters (?lender_party - lender_party ?covenant_rule - covenant_rule ?drawdown_request - drawdown_request ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_processing_enabled ?lender_party)
+        (entity_drawdown_link ?lender_party ?drawdown_request)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (covenant_rule_documented ?covenant_rule)
+        (lender_has_document ?lender_party ?supporting_document)
+        (not
+          (lender_condition_passed ?lender_party)
+        )
+      )
+    :effect
+      (and
+        (covenant_rule_verified ?covenant_rule)
+        (lender_condition_passed ?lender_party)
+        (supporting_document_available ?supporting_document)
+        (not
+          (lender_has_document ?lender_party ?supporting_document)
+        )
+      )
+  )
+  (:action evaluate_borrower_financial_condition
+    :parameters (?borrower_party - borrower_party ?financial_condition - financial_condition ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_processing_enabled ?borrower_party)
+        (entity_drawdown_link ?borrower_party ?drawdown_request)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (not
+          (financial_condition_verified ?financial_condition)
+        )
+        (not
+          (financial_condition_documented ?financial_condition)
+        )
+      )
+    :effect (financial_condition_verified ?financial_condition)
+  )
+  (:action approve_borrower_financial_condition_by_approver
+    :parameters (?borrower_party - borrower_party ?financial_condition - financial_condition ?authorised_approver - authorised_approver)
+    :precondition
+      (and
+        (entity_processing_enabled ?borrower_party)
+        (approver_assigned_to_facility ?borrower_party ?authorised_approver)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (financial_condition_verified ?financial_condition)
+        (not
+          (borrower_checks_completed ?borrower_party)
+        )
+      )
+    :effect
+      (and
+        (borrower_checks_completed ?borrower_party)
+        (borrower_condition_passed ?borrower_party)
+      )
+  )
+  (:action attach_borrower_supporting_document
+    :parameters (?borrower_party - borrower_party ?financial_condition - financial_condition ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_processing_enabled ?borrower_party)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (supporting_document_available ?supporting_document)
+        (not
+          (borrower_checks_completed ?borrower_party)
+        )
+      )
+    :effect
+      (and
+        (financial_condition_documented ?financial_condition)
+        (borrower_checks_completed ?borrower_party)
+        (borrower_has_document ?borrower_party ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action reconcile_borrower_supporting_documentation
+    :parameters (?borrower_party - borrower_party ?financial_condition - financial_condition ?drawdown_request - drawdown_request ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_processing_enabled ?borrower_party)
+        (entity_drawdown_link ?borrower_party ?drawdown_request)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (financial_condition_documented ?financial_condition)
+        (borrower_has_document ?borrower_party ?supporting_document)
+        (not
+          (borrower_condition_passed ?borrower_party)
+        )
+      )
+    :effect
+      (and
+        (financial_condition_verified ?financial_condition)
+        (borrower_condition_passed ?borrower_party)
+        (supporting_document_available ?supporting_document)
+        (not
+          (borrower_has_document ?borrower_party ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_drawdown_package_all_conditions_met
+    :parameters (?lender_party - lender_party ?borrower_party - borrower_party ?covenant_rule - covenant_rule ?financial_condition - financial_condition ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (lender_checks_completed ?lender_party)
+        (borrower_checks_completed ?borrower_party)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (covenant_rule_verified ?covenant_rule)
+        (financial_condition_verified ?financial_condition)
+        (lender_condition_passed ?lender_party)
+        (borrower_condition_passed ?borrower_party)
+        (drawdown_package_available ?drawdown_package)
+      )
+    :effect
+      (and
+        (drawdown_package_assembled ?drawdown_package)
+        (package_includes_covenant ?drawdown_package ?covenant_rule)
+        (package_includes_financial_condition ?drawdown_package ?financial_condition)
+        (not
+          (drawdown_package_available ?drawdown_package)
+        )
+      )
+  )
+  (:action assemble_drawdown_package_with_lender_documentation
+    :parameters (?lender_party - lender_party ?borrower_party - borrower_party ?covenant_rule - covenant_rule ?financial_condition - financial_condition ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (lender_checks_completed ?lender_party)
+        (borrower_checks_completed ?borrower_party)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (covenant_rule_documented ?covenant_rule)
+        (financial_condition_verified ?financial_condition)
+        (not
+          (lender_condition_passed ?lender_party)
+        )
+        (borrower_condition_passed ?borrower_party)
+        (drawdown_package_available ?drawdown_package)
+      )
+    :effect
+      (and
+        (drawdown_package_assembled ?drawdown_package)
+        (package_includes_covenant ?drawdown_package ?covenant_rule)
+        (package_includes_financial_condition ?drawdown_package ?financial_condition)
+        (package_has_lender_documentation ?drawdown_package)
+        (not
+          (drawdown_package_available ?drawdown_package)
+        )
+      )
+  )
+  (:action assemble_drawdown_package_with_borrower_documentation
+    :parameters (?lender_party - lender_party ?borrower_party - borrower_party ?covenant_rule - covenant_rule ?financial_condition - financial_condition ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (lender_checks_completed ?lender_party)
+        (borrower_checks_completed ?borrower_party)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (covenant_rule_verified ?covenant_rule)
+        (financial_condition_documented ?financial_condition)
+        (lender_condition_passed ?lender_party)
+        (not
+          (borrower_condition_passed ?borrower_party)
+        )
+        (drawdown_package_available ?drawdown_package)
+      )
+    :effect
+      (and
+        (drawdown_package_assembled ?drawdown_package)
+        (package_includes_covenant ?drawdown_package ?covenant_rule)
+        (package_includes_financial_condition ?drawdown_package ?financial_condition)
+        (package_has_borrower_documentation ?drawdown_package)
+        (not
+          (drawdown_package_available ?drawdown_package)
+        )
+      )
+  )
+  (:action assemble_drawdown_package_with_both_documentation
+    :parameters (?lender_party - lender_party ?borrower_party - borrower_party ?covenant_rule - covenant_rule ?financial_condition - financial_condition ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (lender_checks_completed ?lender_party)
+        (borrower_checks_completed ?borrower_party)
+        (lender_covenant_link ?lender_party ?covenant_rule)
+        (borrower_financial_condition_link ?borrower_party ?financial_condition)
+        (covenant_rule_documented ?covenant_rule)
+        (financial_condition_documented ?financial_condition)
+        (not
+          (lender_condition_passed ?lender_party)
+        )
+        (not
+          (borrower_condition_passed ?borrower_party)
+        )
+        (drawdown_package_available ?drawdown_package)
+      )
+    :effect
+      (and
+        (drawdown_package_assembled ?drawdown_package)
+        (package_includes_covenant ?drawdown_package ?covenant_rule)
+        (package_includes_financial_condition ?drawdown_package ?financial_condition)
+        (package_has_lender_documentation ?drawdown_package)
+        (package_has_borrower_documentation ?drawdown_package)
+        (not
+          (drawdown_package_available ?drawdown_package)
+        )
+      )
+  )
+  (:action activate_drawdown_package
+    :parameters (?drawdown_package - drawdown_package ?lender_party - lender_party ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (drawdown_package_assembled ?drawdown_package)
+        (lender_checks_completed ?lender_party)
+        (entity_drawdown_link ?lender_party ?drawdown_request)
+        (not
+          (drawdown_package_activated ?drawdown_package)
+        )
+      )
+    :effect (drawdown_package_activated ?drawdown_package)
+  )
+  (:action include_collateral_item_in_package
+    :parameters (?processing_case - processing_case ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (case_has_drawdown_package ?processing_case ?drawdown_package)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_item_available ?collateral_item)
+        (drawdown_package_assembled ?drawdown_package)
+        (drawdown_package_activated ?drawdown_package)
+        (not
+          (collateral_item_included ?collateral_item)
+        )
+      )
+    :effect
+      (and
+        (collateral_item_included ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (not
+          (collateral_item_available ?collateral_item)
+        )
+      )
+  )
+  (:action initialize_package_on_case
+    :parameters (?processing_case - processing_case ?collateral_item - collateral_item ?drawdown_package - drawdown_package ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_item_included ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (entity_drawdown_link ?processing_case ?drawdown_request)
+        (not
+          (package_has_lender_documentation ?drawdown_package)
+        )
+        (not
+          (legal_attachment_initialized ?processing_case)
+        )
+      )
+    :effect (legal_attachment_initialized ?processing_case)
+  )
+  (:action attach_legal_provision_to_case
+    :parameters (?processing_case - processing_case ?legal_provision - legal_provision)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (legal_provision_available ?legal_provision)
+        (not
+          (legal_provision_attached ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (legal_provision_attached ?processing_case)
+        (case_has_legal_provision ?processing_case ?legal_provision)
+        (not
+          (legal_provision_available ?legal_provision)
+        )
+      )
+  )
+  (:action validate_legal_provision_with_package
+    :parameters (?processing_case - processing_case ?collateral_item - collateral_item ?drawdown_package - drawdown_package ?drawdown_request - drawdown_request ?legal_provision - legal_provision)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_item_included ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (entity_drawdown_link ?processing_case ?drawdown_request)
+        (package_has_lender_documentation ?drawdown_package)
+        (legal_provision_attached ?processing_case)
+        (case_has_legal_provision ?processing_case ?legal_provision)
+        (not
+          (legal_attachment_initialized ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (legal_attachment_initialized ?processing_case)
+        (legal_attachment_acknowledged ?processing_case)
+      )
+  )
+  (:action request_legal_review_without_borrower_documentation
+    :parameters (?processing_case - processing_case ?pricing_component - pricing_component ?authorised_approver - authorised_approver ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_attachment_initialized ?processing_case)
+        (case_has_pricing_component ?processing_case ?pricing_component)
+        (approver_assigned_to_facility ?processing_case ?authorised_approver)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (not
+          (package_has_borrower_documentation ?drawdown_package)
+        )
+        (not
+          (legal_review_engaged ?processing_case)
+        )
+      )
+    :effect (legal_review_engaged ?processing_case)
+  )
+  (:action request_legal_review_with_borrower_documentation
+    :parameters (?processing_case - processing_case ?pricing_component - pricing_component ?authorised_approver - authorised_approver ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_attachment_initialized ?processing_case)
+        (case_has_pricing_component ?processing_case ?pricing_component)
+        (approver_assigned_to_facility ?processing_case ?authorised_approver)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (package_has_borrower_documentation ?drawdown_package)
+        (not
+          (legal_review_engaged ?processing_case)
+        )
+      )
+    :effect (legal_review_engaged ?processing_case)
+  )
+  (:action complete_regulatory_review_no_package_docs
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_review_engaged ?processing_case)
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (not
+          (package_has_lender_documentation ?drawdown_package)
+        )
+        (not
+          (package_has_borrower_documentation ?drawdown_package)
+        )
+        (not
+          (legal_review_cleared ?processing_case)
+        )
+      )
+    :effect (legal_review_cleared ?processing_case)
+  )
+  (:action complete_regulatory_review_with_lender_doc
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_review_engaged ?processing_case)
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (package_has_lender_documentation ?drawdown_package)
+        (not
+          (package_has_borrower_documentation ?drawdown_package)
+        )
+        (not
+          (legal_review_cleared ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (legal_review_cleared ?processing_case)
+        (pricing_confirmation_obtained ?processing_case)
+      )
+  )
+  (:action complete_regulatory_review_with_borrower_doc
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_review_engaged ?processing_case)
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (not
+          (package_has_lender_documentation ?drawdown_package)
+        )
+        (package_has_borrower_documentation ?drawdown_package)
+        (not
+          (legal_review_cleared ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (legal_review_cleared ?processing_case)
+        (pricing_confirmation_obtained ?processing_case)
+      )
+  )
+  (:action complete_regulatory_review_with_both_docs
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation ?collateral_item - collateral_item ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (legal_review_engaged ?processing_case)
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (case_has_collateral_item ?processing_case ?collateral_item)
+        (collateral_included_in_package ?collateral_item ?drawdown_package)
+        (package_has_lender_documentation ?drawdown_package)
+        (package_has_borrower_documentation ?drawdown_package)
+        (not
+          (legal_review_cleared ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (legal_review_cleared ?processing_case)
+        (pricing_confirmation_obtained ?processing_case)
+      )
+  )
+  (:action mark_case_preapproved
+    :parameters (?processing_case - processing_case)
+    :precondition
+      (and
+        (legal_review_cleared ?processing_case)
+        (not
+          (pricing_confirmation_obtained ?processing_case)
+        )
+        (not
+          (case_finalized ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?processing_case)
+        (preapproval_granted_for_entity ?processing_case)
+      )
+  )
+  (:action attach_pricing_profile_to_case
+    :parameters (?processing_case - processing_case ?pricing_profile - pricing_profile)
+    :precondition
+      (and
+        (legal_review_cleared ?processing_case)
+        (pricing_confirmation_obtained ?processing_case)
+        (pricing_profile_available ?pricing_profile)
+      )
+    :effect
+      (and
+        (case_pricing_profile_attached ?processing_case ?pricing_profile)
+        (not
+          (pricing_profile_available ?pricing_profile)
+        )
+      )
+  )
+  (:action perform_final_substantive_review
+    :parameters (?processing_case - processing_case ?lender_party - lender_party ?borrower_party - borrower_party ?drawdown_request - drawdown_request ?pricing_profile - pricing_profile)
+    :precondition
+      (and
+        (legal_review_cleared ?processing_case)
+        (pricing_confirmation_obtained ?processing_case)
+        (case_pricing_profile_attached ?processing_case ?pricing_profile)
+        (case_associated_with_lender ?processing_case ?lender_party)
+        (case_associated_with_borrower ?processing_case ?borrower_party)
+        (lender_condition_passed ?lender_party)
+        (borrower_condition_passed ?borrower_party)
+        (entity_drawdown_link ?processing_case ?drawdown_request)
+        (not
+          (final_substantive_review_completed ?processing_case)
+        )
+      )
+    :effect (final_substantive_review_completed ?processing_case)
+  )
+  (:action finalize_case_after_substantive_review
+    :parameters (?processing_case - processing_case)
+    :precondition
+      (and
+        (legal_review_cleared ?processing_case)
+        (final_substantive_review_completed ?processing_case)
+        (not
+          (case_finalized ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?processing_case)
+        (preapproval_granted_for_entity ?processing_case)
+      )
+  )
+  (:action register_exceptional_approval_on_case
+    :parameters (?processing_case - processing_case ?exceptional_approval - exceptional_approval ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (entity_processing_enabled ?processing_case)
+        (entity_drawdown_link ?processing_case ?drawdown_request)
+        (exceptional_approval_available ?exceptional_approval)
+        (case_exceptional_approval_link ?processing_case ?exceptional_approval)
+        (not
+          (case_exceptional_approval_registered ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (case_exceptional_approval_registered ?processing_case)
+        (not
+          (exceptional_approval_available ?exceptional_approval)
+        )
+      )
+  )
+  (:action apply_exceptional_approval_action
+    :parameters (?processing_case - processing_case ?authorised_approver - authorised_approver)
+    :precondition
+      (and
+        (case_exceptional_approval_registered ?processing_case)
+        (approver_assigned_to_facility ?processing_case ?authorised_approver)
+        (not
+          (case_exceptional_approval_actioned ?processing_case)
+        )
+      )
+    :effect (case_exceptional_approval_actioned ?processing_case)
+  )
+  (:action apply_regulatory_confirmation_for_exceptional_approval
+    :parameters (?processing_case - processing_case ?regulatory_confirmation - regulatory_confirmation)
+    :precondition
+      (and
+        (case_exceptional_approval_actioned ?processing_case)
+        (case_has_regulatory_confirmation ?processing_case ?regulatory_confirmation)
+        (not
+          (exceptional_approval_processed ?processing_case)
+        )
+      )
+    :effect (exceptional_approval_processed ?processing_case)
+  )
+  (:action finalize_case_after_exceptional_approval
+    :parameters (?processing_case - processing_case)
+    :precondition
+      (and
+        (exceptional_approval_processed ?processing_case)
+        (not
+          (case_finalized ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?processing_case)
+        (preapproval_granted_for_entity ?processing_case)
+      )
+  )
+  (:action lender_execute_confirmation
+    :parameters (?lender_party - lender_party ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (lender_checks_completed ?lender_party)
+        (lender_condition_passed ?lender_party)
+        (drawdown_package_assembled ?drawdown_package)
+        (drawdown_package_activated ?drawdown_package)
+        (not
+          (preapproval_granted_for_entity ?lender_party)
+        )
+      )
+    :effect (preapproval_granted_for_entity ?lender_party)
+  )
+  (:action borrower_execute_confirmation
+    :parameters (?borrower_party - borrower_party ?drawdown_package - drawdown_package)
+    :precondition
+      (and
+        (borrower_checks_completed ?borrower_party)
+        (borrower_condition_passed ?borrower_party)
+        (drawdown_package_assembled ?drawdown_package)
+        (drawdown_package_activated ?drawdown_package)
+        (not
+          (preapproval_granted_for_entity ?borrower_party)
+        )
+      )
+    :effect (preapproval_granted_for_entity ?borrower_party)
+  )
+  (:action record_facility_condition_satisfaction
+    :parameters (?credit_facility - processing_entity ?condition_evidence - condition_evidence ?drawdown_request - drawdown_request)
+    :precondition
+      (and
+        (preapproval_granted_for_entity ?credit_facility)
+        (entity_drawdown_link ?credit_facility ?drawdown_request)
+        (condition_evidence_available ?condition_evidence)
+        (not
+          (entity_conditions_recorded ?credit_facility)
+        )
+      )
+    :effect
+      (and
+        (entity_conditions_recorded ?credit_facility)
+        (entity_has_condition_evidence ?credit_facility ?condition_evidence)
+        (not
+          (condition_evidence_available ?condition_evidence)
+        )
+      )
+  )
+  (:action propagate_condition_satisfaction_to_lender
+    :parameters (?lender_party - lender_party ?commitment_unit - commitment_unit ?condition_evidence - condition_evidence)
+    :precondition
+      (and
+        (entity_conditions_recorded ?lender_party)
+        (entity_commitment_link ?lender_party ?commitment_unit)
+        (entity_has_condition_evidence ?lender_party ?condition_evidence)
+        (not
+          (conditions_precedent_satisfied ?lender_party)
+        )
+      )
+    :effect
+      (and
+        (conditions_precedent_satisfied ?lender_party)
+        (commitment_unit_available ?commitment_unit)
+        (condition_evidence_available ?condition_evidence)
+      )
+  )
+  (:action propagate_condition_satisfaction_to_borrower
+    :parameters (?borrower_party - borrower_party ?commitment_unit - commitment_unit ?condition_evidence - condition_evidence)
+    :precondition
+      (and
+        (entity_conditions_recorded ?borrower_party)
+        (entity_commitment_link ?borrower_party ?commitment_unit)
+        (entity_has_condition_evidence ?borrower_party ?condition_evidence)
+        (not
+          (conditions_precedent_satisfied ?borrower_party)
+        )
+      )
+    :effect
+      (and
+        (conditions_precedent_satisfied ?borrower_party)
+        (commitment_unit_available ?commitment_unit)
+        (condition_evidence_available ?condition_evidence)
+      )
+  )
+  (:action propagate_condition_satisfaction_to_case
+    :parameters (?processing_case - processing_case ?commitment_unit - commitment_unit ?condition_evidence - condition_evidence)
+    :precondition
+      (and
+        (entity_conditions_recorded ?processing_case)
+        (entity_commitment_link ?processing_case ?commitment_unit)
+        (entity_has_condition_evidence ?processing_case ?condition_evidence)
+        (not
+          (conditions_precedent_satisfied ?processing_case)
+        )
+      )
+    :effect
+      (and
+        (conditions_precedent_satisfied ?processing_case)
+        (commitment_unit_available ?commitment_unit)
+        (condition_evidence_available ?condition_evidence)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem drawdown_condition_check_problem)
+  (:domain finance_drawdown_condition_check_domain)
+  (:objects lender_party_a - lender_party borrower_party_a - borrower_party processing_case_1 - processing_case processing_case_2 - processing_case commitment_unit_a - commitment_unit commitment_unit_b - commitment_unit commitment_unit_c - commitment_unit drawdown_request_1 - drawdown_request authorised_approver_1 - authorised_approver supporting_document_1 - supporting_document covenant_rule_1 - covenant_rule financial_condition_1 - financial_condition drawdown_package_1 - drawdown_package collateral_item_1 - collateral_item collateral_item_2 - collateral_item legal_provision_1 - legal_provision legal_provision_2 - legal_provision pricing_profile_1 - pricing_profile pricing_profile_2 - pricing_profile condition_evidence_1 - condition_evidence pricing_component_1 - pricing_component exceptional_approval_1 - exceptional_approval exceptional_approval_2 - exceptional_approval regulatory_confirmation_1 - regulatory_confirmation)
+  (:init
+    (commitment_unit_available commitment_unit_a)
+    (commitment_unit_available commitment_unit_b)
+    (commitment_unit_available commitment_unit_c)
+    (drawdown_request_unallocated drawdown_request_1)
+    (approver_available authorised_approver_1)
+    (supporting_document_available supporting_document_1)
+    (lender_covenant_link lender_party_a covenant_rule_1)
+    (borrower_financial_condition_link borrower_party_a financial_condition_1)
+    (drawdown_package_available drawdown_package_1)
+    (collateral_item_available collateral_item_1)
+    (collateral_item_available collateral_item_2)
+    (case_associated_with_lender processing_case_1 lender_party_a)
+    (case_associated_with_lender processing_case_2 lender_party_a)
+    (case_associated_with_borrower processing_case_1 borrower_party_a)
+    (case_associated_with_borrower processing_case_2 borrower_party_a)
+    (case_has_drawdown_package processing_case_1 drawdown_package_1)
+    (case_has_drawdown_package processing_case_2 drawdown_package_1)
+    (case_has_collateral_item processing_case_1 collateral_item_1)
+    (case_has_collateral_item processing_case_2 collateral_item_2)
+    (legal_provision_available legal_provision_1)
+    (legal_provision_available legal_provision_2)
+    (pricing_profile_available pricing_profile_1)
+    (pricing_profile_available pricing_profile_2)
+    (condition_evidence_available condition_evidence_1)
+    (pricing_component_available pricing_component_1)
+    (exceptional_approval_available exceptional_approval_1)
+    (case_exceptional_approval_link processing_case_1 exceptional_approval_1)
+    (case_exceptional_approval_link processing_case_2 exceptional_approval_2)
+    (regulatory_confirmation_available regulatory_confirmation_1)
+  )
+  (:goal
+    (and
+      (conditions_precedent_satisfied lender_party_a)
+      (conditions_precedent_satisfied borrower_party_a)
+      (conditions_precedent_satisfied processing_case_1)
+      (conditions_precedent_satisfied processing_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_drawdown_request lender_party_a)
+(register_drawdown_request borrower_party_a)
+(register_drawdown_request processing_case_1)
+(register_drawdown_request processing_case_2)
+(allocate_commitment_unit_to_facility lender_party_a commitment_unit_a)
+(link_drawdown_request_to_facility lender_party_a drawdown_request_1)
+(confirm_drawdown_request_allocation lender_party_a drawdown_request_1)
+(assign_approver_to_facility lender_party_a authorised_approver_1)
+(evaluate_lender_covenant lender_party_a covenant_rule_1 drawdown_request_1)
+(approve_lender_covenant_by_approver lender_party_a covenant_rule_1 authorised_approver_1)
+(release_approver_from_facility lender_party_a authorised_approver_1)
+(unlink_drawdown_request_from_facility lender_party_a drawdown_request_1)
+(allocate_commitment_unit_to_facility borrower_party_a commitment_unit_b)
+(link_drawdown_request_to_facility borrower_party_a drawdown_request_1)
+(confirm_drawdown_request_allocation borrower_party_a drawdown_request_1)
+(assign_approver_to_facility borrower_party_a authorised_approver_1)
+(evaluate_borrower_financial_condition borrower_party_a financial_condition_1 drawdown_request_1)
+(approve_borrower_financial_condition_by_approver borrower_party_a financial_condition_1 authorised_approver_1)
+(release_approver_from_facility borrower_party_a authorised_approver_1)
+(unlink_drawdown_request_from_facility borrower_party_a drawdown_request_1)
+(assemble_drawdown_package_all_conditions_met lender_party_a borrower_party_a covenant_rule_1 financial_condition_1 drawdown_package_1)
+(link_drawdown_request_to_facility lender_party_a drawdown_request_1)
+(activate_drawdown_package drawdown_package_1 lender_party_a drawdown_request_1)
+(lender_execute_confirmation lender_party_a drawdown_package_1)
+(unlink_drawdown_request_from_facility lender_party_a drawdown_request_1)
+(borrower_execute_confirmation borrower_party_a drawdown_package_1)
+(link_drawdown_request_to_facility lender_party_a drawdown_request_1)
+(record_facility_condition_satisfaction lender_party_a condition_evidence_1 drawdown_request_1)
+(propagate_condition_satisfaction_to_lender lender_party_a commitment_unit_a condition_evidence_1)
+(unlink_drawdown_request_from_facility lender_party_a drawdown_request_1)
+(link_drawdown_request_to_facility borrower_party_a drawdown_request_1)
+(record_facility_condition_satisfaction borrower_party_a condition_evidence_1 drawdown_request_1)
+(propagate_condition_satisfaction_to_borrower borrower_party_a commitment_unit_b condition_evidence_1)
+(unlink_drawdown_request_from_facility borrower_party_a drawdown_request_1)
+(allocate_commitment_unit_to_facility processing_case_1 commitment_unit_a)
+(link_drawdown_request_to_facility processing_case_1 drawdown_request_1)
+(confirm_drawdown_request_allocation processing_case_1 drawdown_request_1)
+(include_collateral_item_in_package processing_case_1 collateral_item_1 drawdown_package_1)
+(initialize_package_on_case processing_case_1 collateral_item_1 drawdown_package_1 drawdown_request_1)
+(attach_pricing_component_to_case processing_case_1 pricing_component_1)
+(assign_approver_to_facility processing_case_1 authorised_approver_1)
+(request_legal_review_without_borrower_documentation processing_case_1 pricing_component_1 authorised_approver_1 collateral_item_1 drawdown_package_1)
+(attach_regulatory_confirmation_to_case processing_case_1 regulatory_confirmation_1)
+(complete_regulatory_review_no_package_docs processing_case_1 regulatory_confirmation_1 collateral_item_1 drawdown_package_1)
+(mark_case_preapproved processing_case_1)
+(record_facility_condition_satisfaction processing_case_1 condition_evidence_1 drawdown_request_1)
+(propagate_condition_satisfaction_to_case processing_case_1 commitment_unit_a condition_evidence_1)
+(unlink_drawdown_request_from_facility processing_case_1 drawdown_request_1)
+(detach_pricing_component_from_case processing_case_1 pricing_component_1)
+(detach_regulatory_confirmation_from_case processing_case_1 regulatory_confirmation_1)
+(release_approver_from_facility processing_case_1 authorised_approver_1)
+(allocate_commitment_unit_to_facility processing_case_2 commitment_unit_b)
+(link_drawdown_request_to_facility processing_case_2 drawdown_request_1)
+(confirm_drawdown_request_allocation processing_case_2 drawdown_request_1)
+(include_collateral_item_in_package processing_case_2 collateral_item_2 drawdown_package_1)
+(initialize_package_on_case processing_case_2 collateral_item_2 drawdown_package_1 drawdown_request_1)
+(attach_pricing_component_to_case processing_case_2 pricing_component_1)
+(assign_approver_to_facility processing_case_2 authorised_approver_1)
+(request_legal_review_without_borrower_documentation processing_case_2 pricing_component_1 authorised_approver_1 collateral_item_2 drawdown_package_1)
+(attach_regulatory_confirmation_to_case processing_case_2 regulatory_confirmation_1)
+(complete_regulatory_review_no_package_docs processing_case_2 regulatory_confirmation_1 collateral_item_2 drawdown_package_1)
+(mark_case_preapproved processing_case_2)
+(record_facility_condition_satisfaction processing_case_2 condition_evidence_1 drawdown_request_1)
+(propagate_condition_satisfaction_to_case processing_case_2 commitment_unit_b condition_evidence_1)
+(unlink_drawdown_request_from_facility processing_case_2 drawdown_request_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mc5ga5gf/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_mc5ga5gf/plan.pddl 65 
+
+
+
+--- stderr ---
+

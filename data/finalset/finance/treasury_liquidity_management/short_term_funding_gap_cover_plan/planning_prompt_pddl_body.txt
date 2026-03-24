@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain treasury_liquidity_management)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types finance_object - object funding_instrument_class - finance_object liquidity_leg_category - finance_object instruction_component - finance_object liquidity_workflow_root - finance_object treasury_workflow_subject - liquidity_workflow_root funding_source_option - funding_instrument_class maturity_bucket - funding_instrument_class approval_role - funding_instrument_class execution_parameter - funding_instrument_class execution_profile - funding_instrument_class shortfall_assessment_document - funding_instrument_class collateral_profile - funding_instrument_class compliance_check - funding_instrument_class liquidity_buffer - liquidity_leg_category settlement_batch - liquidity_leg_category external_authority_instruction - liquidity_leg_category internal_funding_leg - instruction_component external_funding_leg - instruction_component transfer_order - instruction_component workflow_subject_party - treasury_workflow_subject operator_workgroup - treasury_workflow_subject originating_entity - workflow_subject_party counterparty_entity - workflow_subject_party treasury_operator - operator_workgroup)
+
+  (:predicates
+    (workflow_subject_opened ?workflow_subject - treasury_workflow_subject)
+    (workflow_subject_authorized ?workflow_subject - treasury_workflow_subject)
+    (funding_option_selected ?workflow_subject - treasury_workflow_subject)
+    (funding_gap_covered ?workflow_subject - treasury_workflow_subject)
+    (workflow_completed ?workflow_subject - treasury_workflow_subject)
+    (assessment_document_linked ?workflow_subject - treasury_workflow_subject)
+    (funding_option_available ?funding_option - funding_source_option)
+    (workflow_subject_funding_option_link ?workflow_subject - treasury_workflow_subject ?funding_option - funding_source_option)
+    (maturity_bucket_available ?maturity_bucket - maturity_bucket)
+    (workflow_subject_maturity_bucket_link ?workflow_subject - treasury_workflow_subject ?maturity_bucket - maturity_bucket)
+    (approval_role_available ?approval_role - approval_role)
+    (workflow_subject_approval_role_link ?workflow_subject - treasury_workflow_subject ?approval_role - approval_role)
+    (liquidity_buffer_available ?liquidity_buffer - liquidity_buffer)
+    (originator_buffer_reservation ?originating_entity - originating_entity ?liquidity_buffer - liquidity_buffer)
+    (counterparty_buffer_reservation ?counterparty_entity - counterparty_entity ?liquidity_buffer - liquidity_buffer)
+    (originator_internal_leg_link ?originating_entity - originating_entity ?internal_funding_leg - internal_funding_leg)
+    (internal_leg_ready ?internal_funding_leg - internal_funding_leg)
+    (internal_leg_buffered ?internal_funding_leg - internal_funding_leg)
+    (originator_committed ?originating_entity - originating_entity)
+    (counterparty_external_leg_link ?counterparty_entity - counterparty_entity ?external_funding_leg - external_funding_leg)
+    (external_leg_ready ?external_funding_leg - external_funding_leg)
+    (external_leg_buffered ?external_funding_leg - external_funding_leg)
+    (counterparty_committed ?counterparty_entity - counterparty_entity)
+    (transfer_order_draft ?transfer_order - transfer_order)
+    (transfer_order_composed ?transfer_order - transfer_order)
+    (order_internal_leg_link ?transfer_order - transfer_order ?internal_funding_leg - internal_funding_leg)
+    (order_external_leg_link ?transfer_order - transfer_order ?external_funding_leg - external_funding_leg)
+    (internal_approval_mark ?transfer_order - transfer_order)
+    (external_approval_mark ?transfer_order - transfer_order)
+    (transfer_order_staged ?transfer_order - transfer_order)
+    (operator_originator_link ?treasury_operator - treasury_operator ?originating_entity - originating_entity)
+    (operator_counterparty_link ?treasury_operator - treasury_operator ?counterparty_entity - counterparty_entity)
+    (operator_order_link ?treasury_operator - treasury_operator ?transfer_order - transfer_order)
+    (settlement_batch_available ?settlement_batch - settlement_batch)
+    (operator_batch_link ?treasury_operator - treasury_operator ?settlement_batch - settlement_batch)
+    (settlement_batch_initialized ?settlement_batch - settlement_batch)
+    (batch_contains_order ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    (operator_execution_bundle_ready ?treasury_operator - treasury_operator)
+    (operator_collateralized ?treasury_operator - treasury_operator)
+    (operator_review_complete ?treasury_operator - treasury_operator)
+    (execution_parameter_loaded ?treasury_operator - treasury_operator)
+    (execution_mandate_enriched ?treasury_operator - treasury_operator)
+    (order_confirmed ?treasury_operator - treasury_operator)
+    (execution_trace_logged ?treasury_operator - treasury_operator)
+    (external_instruction_available ?external_instruction - external_authority_instruction)
+    (operator_instruction_link ?treasury_operator - treasury_operator ?external_instruction - external_authority_instruction)
+    (instruction_ingested ?treasury_operator - treasury_operator)
+    (instruction_reconciled ?treasury_operator - treasury_operator)
+    (instruction_approved ?treasury_operator - treasury_operator)
+    (execution_parameter_available ?execution_parameter - execution_parameter)
+    (operator_parameter_link ?treasury_operator - treasury_operator ?execution_parameter - execution_parameter)
+    (execution_profile_available ?execution_profile - execution_profile)
+    (operator_profile_link ?treasury_operator - treasury_operator ?execution_profile - execution_profile)
+    (collateral_profile_available ?collateral_profile - collateral_profile)
+    (operator_collateral_link ?treasury_operator - treasury_operator ?collateral_profile - collateral_profile)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (operator_compliance_link ?treasury_operator - treasury_operator ?compliance_check - compliance_check)
+    (shortfall_assessment_available ?shortfall_assessment_document - shortfall_assessment_document)
+    (workflow_subject_shortfall_assessment_link ?workflow_subject - treasury_workflow_subject ?shortfall_assessment_document - shortfall_assessment_document)
+    (originator_ready ?originating_entity - originating_entity)
+    (counterparty_ready ?counterparty_entity - counterparty_entity)
+    (execution_sealed ?treasury_operator - treasury_operator)
+  )
+  (:action register_workflow_subject
+    :parameters (?workflow_subject - treasury_workflow_subject)
+    :precondition
+      (and
+        (not
+          (workflow_subject_opened ?workflow_subject)
+        )
+        (not
+          (funding_gap_covered ?workflow_subject)
+        )
+      )
+    :effect (workflow_subject_opened ?workflow_subject)
+  )
+  (:action reserve_funding_option
+    :parameters (?workflow_subject - treasury_workflow_subject ?funding_option - funding_source_option)
+    :precondition
+      (and
+        (workflow_subject_opened ?workflow_subject)
+        (not
+          (funding_option_selected ?workflow_subject)
+        )
+        (funding_option_available ?funding_option)
+      )
+    :effect
+      (and
+        (funding_option_selected ?workflow_subject)
+        (workflow_subject_funding_option_link ?workflow_subject ?funding_option)
+        (not
+          (funding_option_available ?funding_option)
+        )
+      )
+  )
+  (:action attach_maturity_bucket
+    :parameters (?workflow_subject - treasury_workflow_subject ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_opened ?workflow_subject)
+        (funding_option_selected ?workflow_subject)
+        (maturity_bucket_available ?maturity_bucket)
+      )
+    :effect
+      (and
+        (workflow_subject_maturity_bucket_link ?workflow_subject ?maturity_bucket)
+        (not
+          (maturity_bucket_available ?maturity_bucket)
+        )
+      )
+  )
+  (:action authorize_workflow_subject
+    :parameters (?workflow_subject - treasury_workflow_subject ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_opened ?workflow_subject)
+        (funding_option_selected ?workflow_subject)
+        (workflow_subject_maturity_bucket_link ?workflow_subject ?maturity_bucket)
+        (not
+          (workflow_subject_authorized ?workflow_subject)
+        )
+      )
+    :effect (workflow_subject_authorized ?workflow_subject)
+  )
+  (:action release_maturity_bucket
+    :parameters (?workflow_subject - treasury_workflow_subject ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_maturity_bucket_link ?workflow_subject ?maturity_bucket)
+      )
+    :effect
+      (and
+        (maturity_bucket_available ?maturity_bucket)
+        (not
+          (workflow_subject_maturity_bucket_link ?workflow_subject ?maturity_bucket)
+        )
+      )
+  )
+  (:action assign_approval_role
+    :parameters (?workflow_subject - treasury_workflow_subject ?approval_role - approval_role)
+    :precondition
+      (and
+        (workflow_subject_authorized ?workflow_subject)
+        (approval_role_available ?approval_role)
+      )
+    :effect
+      (and
+        (workflow_subject_approval_role_link ?workflow_subject ?approval_role)
+        (not
+          (approval_role_available ?approval_role)
+        )
+      )
+  )
+  (:action release_approval_role
+    :parameters (?workflow_subject - treasury_workflow_subject ?approval_role - approval_role)
+    :precondition
+      (and
+        (workflow_subject_approval_role_link ?workflow_subject ?approval_role)
+      )
+    :effect
+      (and
+        (approval_role_available ?approval_role)
+        (not
+          (workflow_subject_approval_role_link ?workflow_subject ?approval_role)
+        )
+      )
+  )
+  (:action reserve_collateral_profile
+    :parameters (?treasury_operator - treasury_operator ?collateral_profile - collateral_profile)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (collateral_profile_available ?collateral_profile)
+      )
+    :effect
+      (and
+        (operator_collateral_link ?treasury_operator ?collateral_profile)
+        (not
+          (collateral_profile_available ?collateral_profile)
+        )
+      )
+  )
+  (:action release_collateral_profile
+    :parameters (?treasury_operator - treasury_operator ?collateral_profile - collateral_profile)
+    :precondition
+      (and
+        (operator_collateral_link ?treasury_operator ?collateral_profile)
+      )
+    :effect
+      (and
+        (collateral_profile_available ?collateral_profile)
+        (not
+          (operator_collateral_link ?treasury_operator ?collateral_profile)
+        )
+      )
+  )
+  (:action reserve_compliance_check
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action release_compliance_check
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+      )
+    :effect
+      (and
+        (compliance_check_available ?compliance_check)
+        (not
+          (operator_compliance_link ?treasury_operator ?compliance_check)
+        )
+      )
+  )
+  (:action validate_internal_leg
+    :parameters (?originating_entity - originating_entity ?internal_funding_leg - internal_funding_leg ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_authorized ?originating_entity)
+        (workflow_subject_maturity_bucket_link ?originating_entity ?maturity_bucket)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (not
+          (internal_leg_ready ?internal_funding_leg)
+        )
+        (not
+          (internal_leg_buffered ?internal_funding_leg)
+        )
+      )
+    :effect (internal_leg_ready ?internal_funding_leg)
+  )
+  (:action commit_originator_entity
+    :parameters (?originating_entity - originating_entity ?internal_funding_leg - internal_funding_leg ?approval_role - approval_role)
+    :precondition
+      (and
+        (workflow_subject_authorized ?originating_entity)
+        (workflow_subject_approval_role_link ?originating_entity ?approval_role)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (internal_leg_ready ?internal_funding_leg)
+        (not
+          (originator_ready ?originating_entity)
+        )
+      )
+    :effect
+      (and
+        (originator_ready ?originating_entity)
+        (originator_committed ?originating_entity)
+      )
+  )
+  (:action reserve_internal_liquidity_buffer
+    :parameters (?originating_entity - originating_entity ?internal_funding_leg - internal_funding_leg ?liquidity_buffer - liquidity_buffer)
+    :precondition
+      (and
+        (workflow_subject_authorized ?originating_entity)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (liquidity_buffer_available ?liquidity_buffer)
+        (not
+          (originator_ready ?originating_entity)
+        )
+      )
+    :effect
+      (and
+        (internal_leg_buffered ?internal_funding_leg)
+        (originator_ready ?originating_entity)
+        (originator_buffer_reservation ?originating_entity ?liquidity_buffer)
+        (not
+          (liquidity_buffer_available ?liquidity_buffer)
+        )
+      )
+  )
+  (:action release_internal_liquidity_buffer_and_commit_originator
+    :parameters (?originating_entity - originating_entity ?internal_funding_leg - internal_funding_leg ?maturity_bucket - maturity_bucket ?liquidity_buffer - liquidity_buffer)
+    :precondition
+      (and
+        (workflow_subject_authorized ?originating_entity)
+        (workflow_subject_maturity_bucket_link ?originating_entity ?maturity_bucket)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (internal_leg_buffered ?internal_funding_leg)
+        (originator_buffer_reservation ?originating_entity ?liquidity_buffer)
+        (not
+          (originator_committed ?originating_entity)
+        )
+      )
+    :effect
+      (and
+        (internal_leg_ready ?internal_funding_leg)
+        (originator_committed ?originating_entity)
+        (liquidity_buffer_available ?liquidity_buffer)
+        (not
+          (originator_buffer_reservation ?originating_entity ?liquidity_buffer)
+        )
+      )
+  )
+  (:action validate_external_leg
+    :parameters (?counterparty_entity - counterparty_entity ?external_funding_leg - external_funding_leg ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_authorized ?counterparty_entity)
+        (workflow_subject_maturity_bucket_link ?counterparty_entity ?maturity_bucket)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (not
+          (external_leg_ready ?external_funding_leg)
+        )
+        (not
+          (external_leg_buffered ?external_funding_leg)
+        )
+      )
+    :effect (external_leg_ready ?external_funding_leg)
+  )
+  (:action commit_counterparty_entity
+    :parameters (?counterparty_entity - counterparty_entity ?external_funding_leg - external_funding_leg ?approval_role - approval_role)
+    :precondition
+      (and
+        (workflow_subject_authorized ?counterparty_entity)
+        (workflow_subject_approval_role_link ?counterparty_entity ?approval_role)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (external_leg_ready ?external_funding_leg)
+        (not
+          (counterparty_ready ?counterparty_entity)
+        )
+      )
+    :effect
+      (and
+        (counterparty_ready ?counterparty_entity)
+        (counterparty_committed ?counterparty_entity)
+      )
+  )
+  (:action reserve_external_liquidity_buffer
+    :parameters (?counterparty_entity - counterparty_entity ?external_funding_leg - external_funding_leg ?liquidity_buffer - liquidity_buffer)
+    :precondition
+      (and
+        (workflow_subject_authorized ?counterparty_entity)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (liquidity_buffer_available ?liquidity_buffer)
+        (not
+          (counterparty_ready ?counterparty_entity)
+        )
+      )
+    :effect
+      (and
+        (external_leg_buffered ?external_funding_leg)
+        (counterparty_ready ?counterparty_entity)
+        (counterparty_buffer_reservation ?counterparty_entity ?liquidity_buffer)
+        (not
+          (liquidity_buffer_available ?liquidity_buffer)
+        )
+      )
+  )
+  (:action release_external_liquidity_buffer_and_commit_counterparty
+    :parameters (?counterparty_entity - counterparty_entity ?external_funding_leg - external_funding_leg ?maturity_bucket - maturity_bucket ?liquidity_buffer - liquidity_buffer)
+    :precondition
+      (and
+        (workflow_subject_authorized ?counterparty_entity)
+        (workflow_subject_maturity_bucket_link ?counterparty_entity ?maturity_bucket)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (external_leg_buffered ?external_funding_leg)
+        (counterparty_buffer_reservation ?counterparty_entity ?liquidity_buffer)
+        (not
+          (counterparty_committed ?counterparty_entity)
+        )
+      )
+    :effect
+      (and
+        (external_leg_ready ?external_funding_leg)
+        (counterparty_committed ?counterparty_entity)
+        (liquidity_buffer_available ?liquidity_buffer)
+        (not
+          (counterparty_buffer_reservation ?counterparty_entity ?liquidity_buffer)
+        )
+      )
+  )
+  (:action compose_transfer_order
+    :parameters (?originating_entity - originating_entity ?counterparty_entity - counterparty_entity ?internal_funding_leg - internal_funding_leg ?external_funding_leg - external_funding_leg ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (originator_ready ?originating_entity)
+        (counterparty_ready ?counterparty_entity)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (internal_leg_ready ?internal_funding_leg)
+        (external_leg_ready ?external_funding_leg)
+        (originator_committed ?originating_entity)
+        (counterparty_committed ?counterparty_entity)
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_composed ?transfer_order)
+        (order_internal_leg_link ?transfer_order ?internal_funding_leg)
+        (order_external_leg_link ?transfer_order ?external_funding_leg)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action authorize_transfer_order_internal
+    :parameters (?originating_entity - originating_entity ?counterparty_entity - counterparty_entity ?internal_funding_leg - internal_funding_leg ?external_funding_leg - external_funding_leg ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (originator_ready ?originating_entity)
+        (counterparty_ready ?counterparty_entity)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (internal_leg_buffered ?internal_funding_leg)
+        (external_leg_ready ?external_funding_leg)
+        (not
+          (originator_committed ?originating_entity)
+        )
+        (counterparty_committed ?counterparty_entity)
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_composed ?transfer_order)
+        (order_internal_leg_link ?transfer_order ?internal_funding_leg)
+        (order_external_leg_link ?transfer_order ?external_funding_leg)
+        (internal_approval_mark ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action authorize_transfer_order_external
+    :parameters (?originating_entity - originating_entity ?counterparty_entity - counterparty_entity ?internal_funding_leg - internal_funding_leg ?external_funding_leg - external_funding_leg ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (originator_ready ?originating_entity)
+        (counterparty_ready ?counterparty_entity)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (internal_leg_ready ?internal_funding_leg)
+        (external_leg_buffered ?external_funding_leg)
+        (originator_committed ?originating_entity)
+        (not
+          (counterparty_committed ?counterparty_entity)
+        )
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_composed ?transfer_order)
+        (order_internal_leg_link ?transfer_order ?internal_funding_leg)
+        (order_external_leg_link ?transfer_order ?external_funding_leg)
+        (external_approval_mark ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action authorize_transfer_order_full
+    :parameters (?originating_entity - originating_entity ?counterparty_entity - counterparty_entity ?internal_funding_leg - internal_funding_leg ?external_funding_leg - external_funding_leg ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (originator_ready ?originating_entity)
+        (counterparty_ready ?counterparty_entity)
+        (originator_internal_leg_link ?originating_entity ?internal_funding_leg)
+        (counterparty_external_leg_link ?counterparty_entity ?external_funding_leg)
+        (internal_leg_buffered ?internal_funding_leg)
+        (external_leg_buffered ?external_funding_leg)
+        (not
+          (originator_committed ?originating_entity)
+        )
+        (not
+          (counterparty_committed ?counterparty_entity)
+        )
+        (transfer_order_draft ?transfer_order)
+      )
+    :effect
+      (and
+        (transfer_order_composed ?transfer_order)
+        (order_internal_leg_link ?transfer_order ?internal_funding_leg)
+        (order_external_leg_link ?transfer_order ?external_funding_leg)
+        (internal_approval_mark ?transfer_order)
+        (external_approval_mark ?transfer_order)
+        (not
+          (transfer_order_draft ?transfer_order)
+        )
+      )
+  )
+  (:action stage_transfer_order
+    :parameters (?transfer_order - transfer_order ?originating_entity - originating_entity ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (transfer_order_composed ?transfer_order)
+        (originator_ready ?originating_entity)
+        (workflow_subject_maturity_bucket_link ?originating_entity ?maturity_bucket)
+        (not
+          (transfer_order_staged ?transfer_order)
+        )
+      )
+    :effect (transfer_order_staged ?transfer_order)
+  )
+  (:action create_settlement_batch
+    :parameters (?treasury_operator - treasury_operator ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (operator_order_link ?treasury_operator ?transfer_order)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (settlement_batch_available ?settlement_batch)
+        (transfer_order_composed ?transfer_order)
+        (transfer_order_staged ?transfer_order)
+        (not
+          (settlement_batch_initialized ?settlement_batch)
+        )
+      )
+    :effect
+      (and
+        (settlement_batch_initialized ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (not
+          (settlement_batch_available ?settlement_batch)
+        )
+      )
+  )
+  (:action certify_settlement_batch
+    :parameters (?treasury_operator - treasury_operator ?settlement_batch - settlement_batch ?transfer_order - transfer_order ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (settlement_batch_initialized ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (workflow_subject_maturity_bucket_link ?treasury_operator ?maturity_bucket)
+        (not
+          (internal_approval_mark ?transfer_order)
+        )
+        (not
+          (operator_execution_bundle_ready ?treasury_operator)
+        )
+      )
+    :effect (operator_execution_bundle_ready ?treasury_operator)
+  )
+  (:action assign_execution_parameter
+    :parameters (?treasury_operator - treasury_operator ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (execution_parameter_available ?execution_parameter)
+        (not
+          (execution_parameter_loaded ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (execution_parameter_loaded ?treasury_operator)
+        (operator_parameter_link ?treasury_operator ?execution_parameter)
+        (not
+          (execution_parameter_available ?execution_parameter)
+        )
+      )
+  )
+  (:action prepare_execution_mandate
+    :parameters (?treasury_operator - treasury_operator ?settlement_batch - settlement_batch ?transfer_order - transfer_order ?maturity_bucket - maturity_bucket ?execution_parameter - execution_parameter)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (settlement_batch_initialized ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (workflow_subject_maturity_bucket_link ?treasury_operator ?maturity_bucket)
+        (internal_approval_mark ?transfer_order)
+        (execution_parameter_loaded ?treasury_operator)
+        (operator_parameter_link ?treasury_operator ?execution_parameter)
+        (not
+          (operator_execution_bundle_ready ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_execution_bundle_ready ?treasury_operator)
+        (execution_mandate_enriched ?treasury_operator)
+      )
+  )
+  (:action attach_collateral_profile
+    :parameters (?treasury_operator - treasury_operator ?collateral_profile - collateral_profile ?approval_role - approval_role ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_execution_bundle_ready ?treasury_operator)
+        (operator_collateral_link ?treasury_operator ?collateral_profile)
+        (workflow_subject_approval_role_link ?treasury_operator ?approval_role)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (not
+          (external_approval_mark ?transfer_order)
+        )
+        (not
+          (operator_collateralized ?treasury_operator)
+        )
+      )
+    :effect (operator_collateralized ?treasury_operator)
+  )
+  (:action attach_collateral_profile_alternate
+    :parameters (?treasury_operator - treasury_operator ?collateral_profile - collateral_profile ?approval_role - approval_role ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_execution_bundle_ready ?treasury_operator)
+        (operator_collateral_link ?treasury_operator ?collateral_profile)
+        (workflow_subject_approval_role_link ?treasury_operator ?approval_role)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (external_approval_mark ?transfer_order)
+        (not
+          (operator_collateralized ?treasury_operator)
+        )
+      )
+    :effect (operator_collateralized ?treasury_operator)
+  )
+  (:action complete_operator_review
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_collateralized ?treasury_operator)
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (not
+          (internal_approval_mark ?transfer_order)
+        )
+        (not
+          (external_approval_mark ?transfer_order)
+        )
+        (not
+          (operator_review_complete ?treasury_operator)
+        )
+      )
+    :effect (operator_review_complete ?treasury_operator)
+  )
+  (:action complete_operator_review_internal
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_collateralized ?treasury_operator)
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (internal_approval_mark ?transfer_order)
+        (not
+          (external_approval_mark ?transfer_order)
+        )
+        (not
+          (operator_review_complete ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_review_complete ?treasury_operator)
+        (order_confirmed ?treasury_operator)
+      )
+  )
+  (:action complete_operator_review_external
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_collateralized ?treasury_operator)
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (not
+          (internal_approval_mark ?transfer_order)
+        )
+        (external_approval_mark ?transfer_order)
+        (not
+          (operator_review_complete ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_review_complete ?treasury_operator)
+        (order_confirmed ?treasury_operator)
+      )
+  )
+  (:action complete_operator_review_full
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check ?settlement_batch - settlement_batch ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (operator_collateralized ?treasury_operator)
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (operator_batch_link ?treasury_operator ?settlement_batch)
+        (batch_contains_order ?settlement_batch ?transfer_order)
+        (internal_approval_mark ?transfer_order)
+        (external_approval_mark ?transfer_order)
+        (not
+          (operator_review_complete ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (operator_review_complete ?treasury_operator)
+        (order_confirmed ?treasury_operator)
+      )
+  )
+  (:action seal_execution_case
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (operator_review_complete ?treasury_operator)
+        (not
+          (order_confirmed ?treasury_operator)
+        )
+        (not
+          (execution_sealed ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (execution_sealed ?treasury_operator)
+        (workflow_completed ?treasury_operator)
+      )
+  )
+  (:action assign_execution_profile
+    :parameters (?treasury_operator - treasury_operator ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (operator_review_complete ?treasury_operator)
+        (order_confirmed ?treasury_operator)
+        (execution_profile_available ?execution_profile)
+      )
+    :effect
+      (and
+        (operator_profile_link ?treasury_operator ?execution_profile)
+        (not
+          (execution_profile_available ?execution_profile)
+        )
+      )
+  )
+  (:action log_execution_trace
+    :parameters (?treasury_operator - treasury_operator ?originating_entity - originating_entity ?counterparty_entity - counterparty_entity ?maturity_bucket - maturity_bucket ?execution_profile - execution_profile)
+    :precondition
+      (and
+        (operator_review_complete ?treasury_operator)
+        (order_confirmed ?treasury_operator)
+        (operator_profile_link ?treasury_operator ?execution_profile)
+        (operator_originator_link ?treasury_operator ?originating_entity)
+        (operator_counterparty_link ?treasury_operator ?counterparty_entity)
+        (originator_committed ?originating_entity)
+        (counterparty_committed ?counterparty_entity)
+        (workflow_subject_maturity_bucket_link ?treasury_operator ?maturity_bucket)
+        (not
+          (execution_trace_logged ?treasury_operator)
+        )
+      )
+    :effect (execution_trace_logged ?treasury_operator)
+  )
+  (:action finalize_execution_case
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (operator_review_complete ?treasury_operator)
+        (execution_trace_logged ?treasury_operator)
+        (not
+          (execution_sealed ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (execution_sealed ?treasury_operator)
+        (workflow_completed ?treasury_operator)
+      )
+  )
+  (:action ingest_external_instruction
+    :parameters (?treasury_operator - treasury_operator ?external_instruction - external_authority_instruction ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_subject_authorized ?treasury_operator)
+        (workflow_subject_maturity_bucket_link ?treasury_operator ?maturity_bucket)
+        (external_instruction_available ?external_instruction)
+        (operator_instruction_link ?treasury_operator ?external_instruction)
+        (not
+          (instruction_ingested ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (instruction_ingested ?treasury_operator)
+        (not
+          (external_instruction_available ?external_instruction)
+        )
+      )
+  )
+  (:action reconcile_external_instruction
+    :parameters (?treasury_operator - treasury_operator ?approval_role - approval_role)
+    :precondition
+      (and
+        (instruction_ingested ?treasury_operator)
+        (workflow_subject_approval_role_link ?treasury_operator ?approval_role)
+        (not
+          (instruction_reconciled ?treasury_operator)
+        )
+      )
+    :effect (instruction_reconciled ?treasury_operator)
+  )
+  (:action approve_external_instruction
+    :parameters (?treasury_operator - treasury_operator ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (instruction_reconciled ?treasury_operator)
+        (operator_compliance_link ?treasury_operator ?compliance_check)
+        (not
+          (instruction_approved ?treasury_operator)
+        )
+      )
+    :effect (instruction_approved ?treasury_operator)
+  )
+  (:action close_execution_case
+    :parameters (?treasury_operator - treasury_operator)
+    :precondition
+      (and
+        (instruction_approved ?treasury_operator)
+        (not
+          (execution_sealed ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (execution_sealed ?treasury_operator)
+        (workflow_completed ?treasury_operator)
+      )
+  )
+  (:action mark_originator_covered
+    :parameters (?originating_entity - originating_entity ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (originator_ready ?originating_entity)
+        (originator_committed ?originating_entity)
+        (transfer_order_composed ?transfer_order)
+        (transfer_order_staged ?transfer_order)
+        (not
+          (workflow_completed ?originating_entity)
+        )
+      )
+    :effect (workflow_completed ?originating_entity)
+  )
+  (:action mark_counterparty_covered
+    :parameters (?counterparty_entity - counterparty_entity ?transfer_order - transfer_order)
+    :precondition
+      (and
+        (counterparty_ready ?counterparty_entity)
+        (counterparty_committed ?counterparty_entity)
+        (transfer_order_composed ?transfer_order)
+        (transfer_order_staged ?transfer_order)
+        (not
+          (workflow_completed ?counterparty_entity)
+        )
+      )
+    :effect (workflow_completed ?counterparty_entity)
+  )
+  (:action attach_shortfall_assessment
+    :parameters (?workflow_subject - treasury_workflow_subject ?shortfall_assessment_document - shortfall_assessment_document ?maturity_bucket - maturity_bucket)
+    :precondition
+      (and
+        (workflow_completed ?workflow_subject)
+        (workflow_subject_maturity_bucket_link ?workflow_subject ?maturity_bucket)
+        (shortfall_assessment_available ?shortfall_assessment_document)
+        (not
+          (assessment_document_linked ?workflow_subject)
+        )
+      )
+    :effect
+      (and
+        (assessment_document_linked ?workflow_subject)
+        (workflow_subject_shortfall_assessment_link ?workflow_subject ?shortfall_assessment_document)
+        (not
+          (shortfall_assessment_available ?shortfall_assessment_document)
+        )
+      )
+  )
+  (:action settle_originator_exposure
+    :parameters (?originating_entity - originating_entity ?funding_option - funding_source_option ?shortfall_assessment_document - shortfall_assessment_document)
+    :precondition
+      (and
+        (assessment_document_linked ?originating_entity)
+        (workflow_subject_funding_option_link ?originating_entity ?funding_option)
+        (workflow_subject_shortfall_assessment_link ?originating_entity ?shortfall_assessment_document)
+        (not
+          (funding_gap_covered ?originating_entity)
+        )
+      )
+    :effect
+      (and
+        (funding_gap_covered ?originating_entity)
+        (funding_option_available ?funding_option)
+        (shortfall_assessment_available ?shortfall_assessment_document)
+      )
+  )
+  (:action settle_counterparty_exposure
+    :parameters (?counterparty_entity - counterparty_entity ?funding_option - funding_source_option ?shortfall_assessment_document - shortfall_assessment_document)
+    :precondition
+      (and
+        (assessment_document_linked ?counterparty_entity)
+        (workflow_subject_funding_option_link ?counterparty_entity ?funding_option)
+        (workflow_subject_shortfall_assessment_link ?counterparty_entity ?shortfall_assessment_document)
+        (not
+          (funding_gap_covered ?counterparty_entity)
+        )
+      )
+    :effect
+      (and
+        (funding_gap_covered ?counterparty_entity)
+        (funding_option_available ?funding_option)
+        (shortfall_assessment_available ?shortfall_assessment_document)
+      )
+  )
+  (:action settle_operator_exposure
+    :parameters (?treasury_operator - treasury_operator ?funding_option - funding_source_option ?shortfall_assessment_document - shortfall_assessment_document)
+    :precondition
+      (and
+        (assessment_document_linked ?treasury_operator)
+        (workflow_subject_funding_option_link ?treasury_operator ?funding_option)
+        (workflow_subject_shortfall_assessment_link ?treasury_operator ?shortfall_assessment_document)
+        (not
+          (funding_gap_covered ?treasury_operator)
+        )
+      )
+    :effect
+      (and
+        (funding_gap_covered ?treasury_operator)
+        (funding_option_available ?funding_option)
+        (shortfall_assessment_available ?shortfall_assessment_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem short_term_funding_gap_cover_plan)
+  (:domain treasury_liquidity_management)
+  (:objects cash_shortfall_originator - originating_entity funding_counterparty - counterparty_entity treasury_operator_alpha - treasury_operator treasury_operator_beta - treasury_operator internal_liquidity_pool - funding_source_option committed_credit_facility - funding_source_option external_borrowing_line - funding_source_option overnight_tenor_bucket - maturity_bucket treasury_approver - approval_role liquidity_buffer_reserve - liquidity_buffer internal_leg_instance - internal_funding_leg external_leg_instance - external_funding_leg funding_transfer_order - transfer_order settlement_batch_alpha - settlement_batch settlement_batch_beta - settlement_batch execution_parameter_alpha - execution_parameter execution_parameter_beta - execution_parameter execution_profile_alpha - execution_profile execution_profile_beta - execution_profile shortfall_assessment_record - shortfall_assessment_document collateral_profile_standard - collateral_profile external_authority_instruction_alpha - external_authority_instruction external_authority_instruction_beta - external_authority_instruction compliance_check_template - compliance_check)
+  (:init
+    (funding_option_available internal_liquidity_pool)
+    (funding_option_available committed_credit_facility)
+    (funding_option_available external_borrowing_line)
+    (maturity_bucket_available overnight_tenor_bucket)
+    (approval_role_available treasury_approver)
+    (liquidity_buffer_available liquidity_buffer_reserve)
+    (originator_internal_leg_link cash_shortfall_originator internal_leg_instance)
+    (counterparty_external_leg_link funding_counterparty external_leg_instance)
+    (transfer_order_draft funding_transfer_order)
+    (settlement_batch_available settlement_batch_alpha)
+    (settlement_batch_available settlement_batch_beta)
+    (operator_originator_link treasury_operator_alpha cash_shortfall_originator)
+    (operator_originator_link treasury_operator_beta cash_shortfall_originator)
+    (operator_counterparty_link treasury_operator_alpha funding_counterparty)
+    (operator_counterparty_link treasury_operator_beta funding_counterparty)
+    (operator_order_link treasury_operator_alpha funding_transfer_order)
+    (operator_order_link treasury_operator_beta funding_transfer_order)
+    (operator_batch_link treasury_operator_alpha settlement_batch_alpha)
+    (operator_batch_link treasury_operator_beta settlement_batch_beta)
+    (execution_parameter_available execution_parameter_alpha)
+    (execution_parameter_available execution_parameter_beta)
+    (execution_profile_available execution_profile_alpha)
+    (execution_profile_available execution_profile_beta)
+    (shortfall_assessment_available shortfall_assessment_record)
+    (collateral_profile_available collateral_profile_standard)
+    (external_instruction_available external_authority_instruction_alpha)
+    (operator_instruction_link treasury_operator_alpha external_authority_instruction_alpha)
+    (operator_instruction_link treasury_operator_beta external_authority_instruction_beta)
+    (compliance_check_available compliance_check_template)
+  )
+  (:goal
+    (and
+      (funding_gap_covered cash_shortfall_originator)
+      (funding_gap_covered funding_counterparty)
+      (funding_gap_covered treasury_operator_alpha)
+      (funding_gap_covered treasury_operator_beta)
+    )
+  )
+)

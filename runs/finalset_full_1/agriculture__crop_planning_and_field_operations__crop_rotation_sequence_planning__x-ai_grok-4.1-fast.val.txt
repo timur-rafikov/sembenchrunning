@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain crop_rotation_sequence_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity - object logistics_entity - object schedule_entity - object field_type - object physical_field_plot - field_type equipment_unit - resource_entity seed_variety - resource_entity treatment_product - resource_entity certification_tag - resource_entity labor_shift - resource_entity market_slot - resource_entity nutrient_type - resource_entity weather_window - resource_entity input_batch - logistics_entity storage_site - logistics_entity regulatory_permit - logistics_entity irrigation_window - schedule_entity harvest_window - schedule_entity operation_job - schedule_entity meta_field_type - physical_field_plot meta_field_type_b - physical_field_plot plot_season - meta_field_type neighbor_plot_season - meta_field_type plan_slot - meta_field_type_b)
+  (:predicates
+    (field_registered ?field_plot - physical_field_plot)
+    (entity_confirmed ?field_plot - physical_field_plot)
+    (equipment_allocated ?field_plot - physical_field_plot)
+    (entity_rotation_completed ?field_plot - physical_field_plot)
+    (entity_ready_for_marketing ?field_plot - physical_field_plot)
+    (market_scheduled_for_entity ?field_plot - physical_field_plot)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (equipment_assigned_to_entity ?field_plot - physical_field_plot ?equipment_unit - equipment_unit)
+    (seed_available ?seed_variety - seed_variety)
+    (seed_variety_assigned_to_entity ?field_plot - physical_field_plot ?seed_variety - seed_variety)
+    (treatment_available ?treatment_product - treatment_product)
+    (treatment_assigned_to_entity ?field_plot - physical_field_plot ?treatment_product - treatment_product)
+    (input_batch_available ?input_batch - input_batch)
+    (input_allocated_to_plot_season ?field_season - plot_season ?input_batch - input_batch)
+    (input_allocated_to_neighbor_plot_season ?neighbor_field_season - neighbor_plot_season ?input_batch - input_batch)
+    (plot_season_irrigation_window_assigned ?field_season - plot_season ?irrigation_window - irrigation_window)
+    (irrigation_window_reserved ?irrigation_window - irrigation_window)
+    (irrigation_window_staged ?irrigation_window - irrigation_window)
+    (treatment_applied ?field_season - plot_season)
+    (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season - neighbor_plot_season ?harvest_window - harvest_window)
+    (harvest_window_reserved ?harvest_window - harvest_window)
+    (harvest_window_staged ?harvest_window - harvest_window)
+    (neighbor_treatment_applied ?neighbor_field_season - neighbor_plot_season)
+    (operation_job_slot_available ?operation_job - operation_job)
+    (operation_job_created ?operation_job - operation_job)
+    (operation_job_assigned_irrigation_window ?operation_job - operation_job ?irrigation_window - irrigation_window)
+    (operation_job_assigned_harvest_window ?operation_job - operation_job ?harvest_window - harvest_window)
+    (operation_job_input_staged ?operation_job - operation_job)
+    (operation_job_harvest_staged ?operation_job - operation_job)
+    (operation_job_executed ?operation_job - operation_job)
+    (slot_assigned_to_plot_season ?crop_plan_slot - plan_slot ?field_season - plot_season)
+    (slot_assigned_to_neighbor_plot_season ?crop_plan_slot - plan_slot ?neighbor_field_season - neighbor_plot_season)
+    (plan_slot_assigned_to_operation_job ?crop_plan_slot - plan_slot ?operation_job - operation_job)
+    (storage_site_available ?storage_site - storage_site)
+    (slot_has_storage_site ?crop_plan_slot - plan_slot ?storage_site - storage_site)
+    (storage_site_reserved ?storage_site - storage_site)
+    (storage_site_assigned_to_operation_job ?storage_site - storage_site ?operation_job - operation_job)
+    (qa_inspection_started ?crop_plan_slot - plan_slot)
+    (qa_inspection_completed ?crop_plan_slot - plan_slot)
+    (qa_primary_pass ?crop_plan_slot - plan_slot)
+    (certification_attached ?crop_plan_slot - plan_slot)
+    (qa_documentation_recorded ?crop_plan_slot - plan_slot)
+    (qa_additional_checks_required ?crop_plan_slot - plan_slot)
+    (qa_final_checks_done ?crop_plan_slot - plan_slot)
+    (permit_available ?regulatory_permit - regulatory_permit)
+    (slot_permit_assigned ?crop_plan_slot - plan_slot ?regulatory_permit - regulatory_permit)
+    (permit_attached ?crop_plan_slot - plan_slot)
+    (permit_approval ?crop_plan_slot - plan_slot)
+    (permit_finalized ?crop_plan_slot - plan_slot)
+    (certification_tag_available ?certification_tag - certification_tag)
+    (slot_has_certification_tag ?crop_plan_slot - plan_slot ?certification_tag - certification_tag)
+    (labor_shift_available ?labor_shift - labor_shift)
+    (slot_assigned_labor_shift ?crop_plan_slot - plan_slot ?labor_shift - labor_shift)
+    (nutrient_available ?nutrient_type - nutrient_type)
+    (slot_assigned_nutrient ?crop_plan_slot - plan_slot ?nutrient_type - nutrient_type)
+    (weather_window_available ?weather_window - weather_window)
+    (slot_assigned_weather_window ?crop_plan_slot - plan_slot ?weather_window - weather_window)
+    (market_slot_available ?market_slot - market_slot)
+    (entity_assigned_to_market_slot ?field_plot - physical_field_plot ?market_slot - market_slot)
+    (plot_season_inputs_staged ?field_season - plot_season)
+    (neighbor_plot_season_inputs_staged ?neighbor_field_season - neighbor_plot_season)
+    (final_release_flag ?crop_plan_slot - plan_slot)
+  )
+  (:action register_field_plot
+    :parameters (?field_plot - physical_field_plot)
+    :precondition
+      (and
+        (not
+          (field_registered ?field_plot)
+        )
+        (not
+          (entity_rotation_completed ?field_plot)
+        )
+      )
+    :effect (field_registered ?field_plot)
+  )
+  (:action allocate_equipment_to_plot
+    :parameters (?field_plot - physical_field_plot ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (field_registered ?field_plot)
+        (not
+          (equipment_allocated ?field_plot)
+        )
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_allocated ?field_plot)
+        (equipment_assigned_to_entity ?field_plot ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_seed_variety_to_plot
+    :parameters (?field_plot - physical_field_plot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (field_registered ?field_plot)
+        (equipment_allocated ?field_plot)
+        (seed_available ?seed_variety)
+      )
+    :effect
+      (and
+        (seed_variety_assigned_to_entity ?field_plot ?seed_variety)
+        (not
+          (seed_available ?seed_variety)
+        )
+      )
+  )
+  (:action finalize_planting_preparation_for_plot
+    :parameters (?field_plot - physical_field_plot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (field_registered ?field_plot)
+        (equipment_allocated ?field_plot)
+        (seed_variety_assigned_to_entity ?field_plot ?seed_variety)
+        (not
+          (entity_confirmed ?field_plot)
+        )
+      )
+    :effect (entity_confirmed ?field_plot)
+  )
+  (:action release_seed_assignment_from_plot
+    :parameters (?field_plot - physical_field_plot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (seed_variety_assigned_to_entity ?field_plot ?seed_variety)
+      )
+    :effect
+      (and
+        (seed_available ?seed_variety)
+        (not
+          (seed_variety_assigned_to_entity ?field_plot ?seed_variety)
+        )
+      )
+  )
+  (:action assign_treatment_to_plot
+    :parameters (?field_plot - physical_field_plot ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (entity_confirmed ?field_plot)
+        (treatment_available ?treatment_product)
+      )
+    :effect
+      (and
+        (treatment_assigned_to_entity ?field_plot ?treatment_product)
+        (not
+          (treatment_available ?treatment_product)
+        )
+      )
+  )
+  (:action release_treatment_from_plot
+    :parameters (?field_plot - physical_field_plot ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (treatment_assigned_to_entity ?field_plot ?treatment_product)
+      )
+    :effect
+      (and
+        (treatment_available ?treatment_product)
+        (not
+          (treatment_assigned_to_entity ?field_plot ?treatment_product)
+        )
+      )
+  )
+  (:action assign_nutrient_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?nutrient_type - nutrient_type)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (nutrient_available ?nutrient_type)
+      )
+    :effect
+      (and
+        (slot_assigned_nutrient ?crop_plan_slot ?nutrient_type)
+        (not
+          (nutrient_available ?nutrient_type)
+        )
+      )
+  )
+  (:action release_nutrient_from_slot
+    :parameters (?crop_plan_slot - plan_slot ?nutrient_type - nutrient_type)
+    :precondition
+      (and
+        (slot_assigned_nutrient ?crop_plan_slot ?nutrient_type)
+      )
+    :effect
+      (and
+        (nutrient_available ?nutrient_type)
+        (not
+          (slot_assigned_nutrient ?crop_plan_slot ?nutrient_type)
+        )
+      )
+  )
+  (:action assign_weather_window_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (weather_window_available ?weather_window)
+      )
+    :effect
+      (and
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (not
+          (weather_window_available ?weather_window)
+        )
+      )
+  )
+  (:action release_weather_from_slot
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window)
+    :precondition
+      (and
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+      )
+    :effect
+      (and
+        (weather_window_available ?weather_window)
+        (not
+          (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        )
+      )
+  )
+  (:action reserve_irrigation_window_for_field_season
+    :parameters (?field_season - plot_season ?irrigation_window - irrigation_window ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_confirmed ?field_season)
+        (seed_variety_assigned_to_entity ?field_season ?seed_variety)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (not
+          (irrigation_window_reserved ?irrigation_window)
+        )
+        (not
+          (irrigation_window_staged ?irrigation_window)
+        )
+      )
+    :effect (irrigation_window_reserved ?irrigation_window)
+  )
+  (:action apply_treatment_to_field_season
+    :parameters (?field_season - plot_season ?irrigation_window - irrigation_window ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (entity_confirmed ?field_season)
+        (treatment_assigned_to_entity ?field_season ?treatment_product)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (irrigation_window_reserved ?irrigation_window)
+        (not
+          (plot_season_inputs_staged ?field_season)
+        )
+      )
+    :effect
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (treatment_applied ?field_season)
+      )
+  )
+  (:action stage_input_batch_for_field_season
+    :parameters (?field_season - plot_season ?irrigation_window - irrigation_window ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_confirmed ?field_season)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (input_batch_available ?input_batch)
+        (not
+          (plot_season_inputs_staged ?field_season)
+        )
+      )
+    :effect
+      (and
+        (irrigation_window_staged ?irrigation_window)
+        (plot_season_inputs_staged ?field_season)
+        (input_allocated_to_plot_season ?field_season ?input_batch)
+        (not
+          (input_batch_available ?input_batch)
+        )
+      )
+  )
+  (:action execute_irrigation_and_process_inputs
+    :parameters (?field_season - plot_season ?irrigation_window - irrigation_window ?seed_variety - seed_variety ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_confirmed ?field_season)
+        (seed_variety_assigned_to_entity ?field_season ?seed_variety)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (irrigation_window_staged ?irrigation_window)
+        (input_allocated_to_plot_season ?field_season ?input_batch)
+        (not
+          (treatment_applied ?field_season)
+        )
+      )
+    :effect
+      (and
+        (irrigation_window_reserved ?irrigation_window)
+        (treatment_applied ?field_season)
+        (input_batch_available ?input_batch)
+        (not
+          (input_allocated_to_plot_season ?field_season ?input_batch)
+        )
+      )
+  )
+  (:action reserve_harvest_window_for_neighbor_field
+    :parameters (?neighbor_field_season - neighbor_plot_season ?harvest_window - harvest_window ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_confirmed ?neighbor_field_season)
+        (seed_variety_assigned_to_entity ?neighbor_field_season ?seed_variety)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (not
+          (harvest_window_reserved ?harvest_window)
+        )
+        (not
+          (harvest_window_staged ?harvest_window)
+        )
+      )
+    :effect (harvest_window_reserved ?harvest_window)
+  )
+  (:action apply_treatment_to_neighbor_field_season
+    :parameters (?neighbor_field_season - neighbor_plot_season ?harvest_window - harvest_window ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (entity_confirmed ?neighbor_field_season)
+        (treatment_assigned_to_entity ?neighbor_field_season ?treatment_product)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (harvest_window_reserved ?harvest_window)
+        (not
+          (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        )
+      )
+    :effect
+      (and
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (neighbor_treatment_applied ?neighbor_field_season)
+      )
+  )
+  (:action stage_input_batch_for_neighbor_field_season
+    :parameters (?neighbor_field_season - neighbor_plot_season ?harvest_window - harvest_window ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_confirmed ?neighbor_field_season)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (input_batch_available ?input_batch)
+        (not
+          (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        )
+      )
+    :effect
+      (and
+        (harvest_window_staged ?harvest_window)
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (input_allocated_to_neighbor_plot_season ?neighbor_field_season ?input_batch)
+        (not
+          (input_batch_available ?input_batch)
+        )
+      )
+  )
+  (:action prepare_harvest_with_staged_inputs_for_neighbor
+    :parameters (?neighbor_field_season - neighbor_plot_season ?harvest_window - harvest_window ?seed_variety - seed_variety ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_confirmed ?neighbor_field_season)
+        (seed_variety_assigned_to_entity ?neighbor_field_season ?seed_variety)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (harvest_window_staged ?harvest_window)
+        (input_allocated_to_neighbor_plot_season ?neighbor_field_season ?input_batch)
+        (not
+          (neighbor_treatment_applied ?neighbor_field_season)
+        )
+      )
+    :effect
+      (and
+        (harvest_window_reserved ?harvest_window)
+        (neighbor_treatment_applied ?neighbor_field_season)
+        (input_batch_available ?input_batch)
+        (not
+          (input_allocated_to_neighbor_plot_season ?neighbor_field_season ?input_batch)
+        )
+      )
+  )
+  (:action compose_operation_job
+    :parameters (?field_season - plot_season ?neighbor_field_season - neighbor_plot_season ?irrigation_window - irrigation_window ?harvest_window - harvest_window ?operation_job - operation_job)
+    :precondition
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (irrigation_window_reserved ?irrigation_window)
+        (harvest_window_reserved ?harvest_window)
+        (treatment_applied ?field_season)
+        (neighbor_treatment_applied ?neighbor_field_season)
+        (operation_job_slot_available ?operation_job)
+      )
+    :effect
+      (and
+        (operation_job_created ?operation_job)
+        (operation_job_assigned_irrigation_window ?operation_job ?irrigation_window)
+        (operation_job_assigned_harvest_window ?operation_job ?harvest_window)
+        (not
+          (operation_job_slot_available ?operation_job)
+        )
+      )
+  )
+  (:action compose_operation_job_with_staged_input
+    :parameters (?field_season - plot_season ?neighbor_field_season - neighbor_plot_season ?irrigation_window - irrigation_window ?harvest_window - harvest_window ?operation_job - operation_job)
+    :precondition
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (irrigation_window_staged ?irrigation_window)
+        (harvest_window_reserved ?harvest_window)
+        (not
+          (treatment_applied ?field_season)
+        )
+        (neighbor_treatment_applied ?neighbor_field_season)
+        (operation_job_slot_available ?operation_job)
+      )
+    :effect
+      (and
+        (operation_job_created ?operation_job)
+        (operation_job_assigned_irrigation_window ?operation_job ?irrigation_window)
+        (operation_job_assigned_harvest_window ?operation_job ?harvest_window)
+        (operation_job_input_staged ?operation_job)
+        (not
+          (operation_job_slot_available ?operation_job)
+        )
+      )
+  )
+  (:action compose_operation_job_with_staged_harvest
+    :parameters (?field_season - plot_season ?neighbor_field_season - neighbor_plot_season ?irrigation_window - irrigation_window ?harvest_window - harvest_window ?operation_job - operation_job)
+    :precondition
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (irrigation_window_reserved ?irrigation_window)
+        (harvest_window_staged ?harvest_window)
+        (treatment_applied ?field_season)
+        (not
+          (neighbor_treatment_applied ?neighbor_field_season)
+        )
+        (operation_job_slot_available ?operation_job)
+      )
+    :effect
+      (and
+        (operation_job_created ?operation_job)
+        (operation_job_assigned_irrigation_window ?operation_job ?irrigation_window)
+        (operation_job_assigned_harvest_window ?operation_job ?harvest_window)
+        (operation_job_harvest_staged ?operation_job)
+        (not
+          (operation_job_slot_available ?operation_job)
+        )
+      )
+  )
+  (:action compose_operation_job_with_staged_inputs_and_harvest
+    :parameters (?field_season - plot_season ?neighbor_field_season - neighbor_plot_season ?irrigation_window - irrigation_window ?harvest_window - harvest_window ?operation_job - operation_job)
+    :precondition
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (plot_season_irrigation_window_assigned ?field_season ?irrigation_window)
+        (neighbor_plot_season_harvest_window_assigned ?neighbor_field_season ?harvest_window)
+        (irrigation_window_staged ?irrigation_window)
+        (harvest_window_staged ?harvest_window)
+        (not
+          (treatment_applied ?field_season)
+        )
+        (not
+          (neighbor_treatment_applied ?neighbor_field_season)
+        )
+        (operation_job_slot_available ?operation_job)
+      )
+    :effect
+      (and
+        (operation_job_created ?operation_job)
+        (operation_job_assigned_irrigation_window ?operation_job ?irrigation_window)
+        (operation_job_assigned_harvest_window ?operation_job ?harvest_window)
+        (operation_job_input_staged ?operation_job)
+        (operation_job_harvest_staged ?operation_job)
+        (not
+          (operation_job_slot_available ?operation_job)
+        )
+      )
+  )
+  (:action execute_operation_job
+    :parameters (?operation_job - operation_job ?field_season - plot_season ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (operation_job_created ?operation_job)
+        (plot_season_inputs_staged ?field_season)
+        (seed_variety_assigned_to_entity ?field_season ?seed_variety)
+        (not
+          (operation_job_executed ?operation_job)
+        )
+      )
+    :effect (operation_job_executed ?operation_job)
+  )
+  (:action reserve_storage_and_assign_job_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (plan_slot_assigned_to_operation_job ?crop_plan_slot ?operation_job)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_available ?storage_site)
+        (operation_job_created ?operation_job)
+        (operation_job_executed ?operation_job)
+        (not
+          (storage_site_reserved ?storage_site)
+        )
+      )
+    :effect
+      (and
+        (storage_site_reserved ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (not
+          (storage_site_available ?storage_site)
+        )
+      )
+  )
+  (:action initiate_qa_inspection
+    :parameters (?crop_plan_slot - plan_slot ?storage_site - storage_site ?operation_job - operation_job ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_reserved ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (seed_variety_assigned_to_entity ?crop_plan_slot ?seed_variety)
+        (not
+          (operation_job_input_staged ?operation_job)
+        )
+        (not
+          (qa_inspection_started ?crop_plan_slot)
+        )
+      )
+    :effect (qa_inspection_started ?crop_plan_slot)
+  )
+  (:action attach_certification_tag_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?certification_tag - certification_tag)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (certification_tag_available ?certification_tag)
+        (not
+          (certification_attached ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (certification_attached ?crop_plan_slot)
+        (slot_has_certification_tag ?crop_plan_slot ?certification_tag)
+        (not
+          (certification_tag_available ?certification_tag)
+        )
+      )
+  )
+  (:action initiate_qa_inspection_with_certification
+    :parameters (?crop_plan_slot - plan_slot ?storage_site - storage_site ?operation_job - operation_job ?seed_variety - seed_variety ?certification_tag - certification_tag)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_reserved ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (seed_variety_assigned_to_entity ?crop_plan_slot ?seed_variety)
+        (operation_job_input_staged ?operation_job)
+        (certification_attached ?crop_plan_slot)
+        (slot_has_certification_tag ?crop_plan_slot ?certification_tag)
+        (not
+          (qa_inspection_started ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (qa_inspection_started ?crop_plan_slot)
+        (qa_documentation_recorded ?crop_plan_slot)
+      )
+  )
+  (:action complete_qa_inspection_standard
+    :parameters (?crop_plan_slot - plan_slot ?nutrient_type - nutrient_type ?treatment_product - treatment_product ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_started ?crop_plan_slot)
+        (slot_assigned_nutrient ?crop_plan_slot ?nutrient_type)
+        (treatment_assigned_to_entity ?crop_plan_slot ?treatment_product)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (not
+          (operation_job_harvest_staged ?operation_job)
+        )
+        (not
+          (qa_inspection_completed ?crop_plan_slot)
+        )
+      )
+    :effect (qa_inspection_completed ?crop_plan_slot)
+  )
+  (:action complete_qa_inspection_staged_harvest
+    :parameters (?crop_plan_slot - plan_slot ?nutrient_type - nutrient_type ?treatment_product - treatment_product ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_started ?crop_plan_slot)
+        (slot_assigned_nutrient ?crop_plan_slot ?nutrient_type)
+        (treatment_assigned_to_entity ?crop_plan_slot ?treatment_product)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (operation_job_harvest_staged ?operation_job)
+        (not
+          (qa_inspection_completed ?crop_plan_slot)
+        )
+      )
+    :effect (qa_inspection_completed ?crop_plan_slot)
+  )
+  (:action finalize_qa_stage_after_tests
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_completed ?crop_plan_slot)
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (not
+          (operation_job_input_staged ?operation_job)
+        )
+        (not
+          (operation_job_harvest_staged ?operation_job)
+        )
+        (not
+          (qa_primary_pass ?crop_plan_slot)
+        )
+      )
+    :effect (qa_primary_pass ?crop_plan_slot)
+  )
+  (:action finalize_qa_stage_with_secondary_pass
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_completed ?crop_plan_slot)
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (operation_job_input_staged ?operation_job)
+        (not
+          (operation_job_harvest_staged ?operation_job)
+        )
+        (not
+          (qa_primary_pass ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_additional_checks_required ?crop_plan_slot)
+      )
+  )
+  (:action finalize_qa_stage_with_secondary_pass_alt
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_completed ?crop_plan_slot)
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (not
+          (operation_job_input_staged ?operation_job)
+        )
+        (operation_job_harvest_staged ?operation_job)
+        (not
+          (qa_primary_pass ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_additional_checks_required ?crop_plan_slot)
+      )
+  )
+  (:action finalize_qa_with_additional_checks_both
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window ?storage_site - storage_site ?operation_job - operation_job)
+    :precondition
+      (and
+        (qa_inspection_completed ?crop_plan_slot)
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (slot_has_storage_site ?crop_plan_slot ?storage_site)
+        (storage_site_assigned_to_operation_job ?storage_site ?operation_job)
+        (operation_job_input_staged ?operation_job)
+        (operation_job_harvest_staged ?operation_job)
+        (not
+          (qa_primary_pass ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_additional_checks_required ?crop_plan_slot)
+      )
+  )
+  (:action finalize_slot_without_additional_checks
+    :parameters (?crop_plan_slot - plan_slot)
+    :precondition
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (not
+          (qa_additional_checks_required ?crop_plan_slot)
+        )
+        (not
+          (final_release_flag ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (final_release_flag ?crop_plan_slot)
+        (entity_ready_for_marketing ?crop_plan_slot)
+      )
+  )
+  (:action assign_labor_shift_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?labor_shift - labor_shift)
+    :precondition
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_additional_checks_required ?crop_plan_slot)
+        (labor_shift_available ?labor_shift)
+      )
+    :effect
+      (and
+        (slot_assigned_labor_shift ?crop_plan_slot ?labor_shift)
+        (not
+          (labor_shift_available ?labor_shift)
+        )
+      )
+  )
+  (:action perform_final_qc_and_prepare_release
+    :parameters (?crop_plan_slot - plan_slot ?field_season - plot_season ?neighbor_field_season - neighbor_plot_season ?seed_variety - seed_variety ?labor_shift - labor_shift)
+    :precondition
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_additional_checks_required ?crop_plan_slot)
+        (slot_assigned_labor_shift ?crop_plan_slot ?labor_shift)
+        (slot_assigned_to_plot_season ?crop_plan_slot ?field_season)
+        (slot_assigned_to_neighbor_plot_season ?crop_plan_slot ?neighbor_field_season)
+        (treatment_applied ?field_season)
+        (neighbor_treatment_applied ?neighbor_field_season)
+        (seed_variety_assigned_to_entity ?crop_plan_slot ?seed_variety)
+        (not
+          (qa_final_checks_done ?crop_plan_slot)
+        )
+      )
+    :effect (qa_final_checks_done ?crop_plan_slot)
+  )
+  (:action finalize_slot_after_final_qc
+    :parameters (?crop_plan_slot - plan_slot)
+    :precondition
+      (and
+        (qa_primary_pass ?crop_plan_slot)
+        (qa_final_checks_done ?crop_plan_slot)
+        (not
+          (final_release_flag ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (final_release_flag ?crop_plan_slot)
+        (entity_ready_for_marketing ?crop_plan_slot)
+      )
+  )
+  (:action attach_permit_to_slot
+    :parameters (?crop_plan_slot - plan_slot ?regulatory_permit - regulatory_permit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_confirmed ?crop_plan_slot)
+        (seed_variety_assigned_to_entity ?crop_plan_slot ?seed_variety)
+        (permit_available ?regulatory_permit)
+        (slot_permit_assigned ?crop_plan_slot ?regulatory_permit)
+        (not
+          (permit_attached ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (permit_attached ?crop_plan_slot)
+        (not
+          (permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action schedule_permit_action_for_slot
+    :parameters (?crop_plan_slot - plan_slot ?treatment_product - treatment_product)
+    :precondition
+      (and
+        (permit_attached ?crop_plan_slot)
+        (treatment_assigned_to_entity ?crop_plan_slot ?treatment_product)
+        (not
+          (permit_approval ?crop_plan_slot)
+        )
+      )
+    :effect (permit_approval ?crop_plan_slot)
+  )
+  (:action confirm_permit_for_slot
+    :parameters (?crop_plan_slot - plan_slot ?weather_window - weather_window)
+    :precondition
+      (and
+        (permit_approval ?crop_plan_slot)
+        (slot_assigned_weather_window ?crop_plan_slot ?weather_window)
+        (not
+          (permit_finalized ?crop_plan_slot)
+        )
+      )
+    :effect (permit_finalized ?crop_plan_slot)
+  )
+  (:action finalize_slot_after_permit
+    :parameters (?crop_plan_slot - plan_slot)
+    :precondition
+      (and
+        (permit_finalized ?crop_plan_slot)
+        (not
+          (final_release_flag ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (final_release_flag ?crop_plan_slot)
+        (entity_ready_for_marketing ?crop_plan_slot)
+      )
+  )
+  (:action complete_field_season_from_job
+    :parameters (?field_season - plot_season ?operation_job - operation_job)
+    :precondition
+      (and
+        (plot_season_inputs_staged ?field_season)
+        (treatment_applied ?field_season)
+        (operation_job_created ?operation_job)
+        (operation_job_executed ?operation_job)
+        (not
+          (entity_ready_for_marketing ?field_season)
+        )
+      )
+    :effect (entity_ready_for_marketing ?field_season)
+  )
+  (:action complete_neighbor_field_season_from_job
+    :parameters (?neighbor_field_season - neighbor_plot_season ?operation_job - operation_job)
+    :precondition
+      (and
+        (neighbor_plot_season_inputs_staged ?neighbor_field_season)
+        (neighbor_treatment_applied ?neighbor_field_season)
+        (operation_job_created ?operation_job)
+        (operation_job_executed ?operation_job)
+        (not
+          (entity_ready_for_marketing ?neighbor_field_season)
+        )
+      )
+    :effect (entity_ready_for_marketing ?neighbor_field_season)
+  )
+  (:action schedule_market_slot_for_plot
+    :parameters (?field_plot - physical_field_plot ?market_slot - market_slot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (entity_ready_for_marketing ?field_plot)
+        (seed_variety_assigned_to_entity ?field_plot ?seed_variety)
+        (market_slot_available ?market_slot)
+        (not
+          (market_scheduled_for_entity ?field_plot)
+        )
+      )
+    :effect
+      (and
+        (market_scheduled_for_entity ?field_plot)
+        (entity_assigned_to_market_slot ?field_plot ?market_slot)
+        (not
+          (market_slot_available ?market_slot)
+        )
+      )
+  )
+  (:action finalize_field_season_and_release_resources
+    :parameters (?field_season - plot_season ?equipment_unit - equipment_unit ?market_slot - market_slot)
+    :precondition
+      (and
+        (market_scheduled_for_entity ?field_season)
+        (equipment_assigned_to_entity ?field_season ?equipment_unit)
+        (entity_assigned_to_market_slot ?field_season ?market_slot)
+        (not
+          (entity_rotation_completed ?field_season)
+        )
+      )
+    :effect
+      (and
+        (entity_rotation_completed ?field_season)
+        (equipment_available ?equipment_unit)
+        (market_slot_available ?market_slot)
+      )
+  )
+  (:action finalize_neighbor_field_season_and_release_resources
+    :parameters (?neighbor_field_season - neighbor_plot_season ?equipment_unit - equipment_unit ?market_slot - market_slot)
+    :precondition
+      (and
+        (market_scheduled_for_entity ?neighbor_field_season)
+        (equipment_assigned_to_entity ?neighbor_field_season ?equipment_unit)
+        (entity_assigned_to_market_slot ?neighbor_field_season ?market_slot)
+        (not
+          (entity_rotation_completed ?neighbor_field_season)
+        )
+      )
+    :effect
+      (and
+        (entity_rotation_completed ?neighbor_field_season)
+        (equipment_available ?equipment_unit)
+        (market_slot_available ?market_slot)
+      )
+  )
+  (:action finalize_slot_and_release_resources
+    :parameters (?crop_plan_slot - plan_slot ?equipment_unit - equipment_unit ?market_slot - market_slot)
+    :precondition
+      (and
+        (market_scheduled_for_entity ?crop_plan_slot)
+        (equipment_assigned_to_entity ?crop_plan_slot ?equipment_unit)
+        (entity_assigned_to_market_slot ?crop_plan_slot ?market_slot)
+        (not
+          (entity_rotation_completed ?crop_plan_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_rotation_completed ?crop_plan_slot)
+        (equipment_available ?equipment_unit)
+        (market_slot_available ?market_slot)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem crop_rotation_sequence_planning_problem)
+  (:domain crop_rotation_sequence_planning_domain)
+  (:objects field1_season - plot_season field2_neighbor_season - neighbor_plot_season crop_slot_1 - plan_slot crop_slot_2 - plan_slot harvester_1 - equipment_unit harvester_2 - equipment_unit sprayer_1 - equipment_unit seed_variety_a - seed_variety treatment_product_a - treatment_product input_batch_a - input_batch irrigation_window_1 - irrigation_window harvest_window_1 - harvest_window operation_job_1 - operation_job storage_site_a - storage_site storage_site_b - storage_site certification_tag_1 - certification_tag certification_tag_2 - certification_tag labor_shift_morning - labor_shift labor_shift_evening - labor_shift market_slot_day1 - market_slot nutrient_type_standard - nutrient_type regulatory_permit_1 - regulatory_permit regulatory_permit_2 - regulatory_permit weather_window_good - weather_window)
+  (:init
+    (equipment_available harvester_1)
+    (equipment_available harvester_2)
+    (equipment_available sprayer_1)
+    (seed_available seed_variety_a)
+    (treatment_available treatment_product_a)
+    (input_batch_available input_batch_a)
+    (plot_season_irrigation_window_assigned field1_season irrigation_window_1)
+    (neighbor_plot_season_harvest_window_assigned field2_neighbor_season harvest_window_1)
+    (operation_job_slot_available operation_job_1)
+    (storage_site_available storage_site_a)
+    (storage_site_available storage_site_b)
+    (slot_assigned_to_plot_season crop_slot_1 field1_season)
+    (slot_assigned_to_plot_season crop_slot_2 field1_season)
+    (slot_assigned_to_neighbor_plot_season crop_slot_1 field2_neighbor_season)
+    (slot_assigned_to_neighbor_plot_season crop_slot_2 field2_neighbor_season)
+    (plan_slot_assigned_to_operation_job crop_slot_1 operation_job_1)
+    (plan_slot_assigned_to_operation_job crop_slot_2 operation_job_1)
+    (slot_has_storage_site crop_slot_1 storage_site_a)
+    (slot_has_storage_site crop_slot_2 storage_site_b)
+    (certification_tag_available certification_tag_1)
+    (certification_tag_available certification_tag_2)
+    (labor_shift_available labor_shift_morning)
+    (labor_shift_available labor_shift_evening)
+    (market_slot_available market_slot_day1)
+    (nutrient_available nutrient_type_standard)
+    (permit_available regulatory_permit_1)
+    (slot_permit_assigned crop_slot_1 regulatory_permit_1)
+    (slot_permit_assigned crop_slot_2 regulatory_permit_2)
+    (weather_window_available weather_window_good)
+  )
+  (:goal
+    (and
+      (entity_rotation_completed field1_season)
+      (entity_rotation_completed field2_neighbor_season)
+      (entity_rotation_completed crop_slot_1)
+      (entity_rotation_completed crop_slot_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_field_plot field1_season)
+(allocate_equipment_to_plot field1_season harvester_1)
+(assign_seed_variety_to_plot field1_season seed_variety_a)
+(finalize_planting_preparation_for_plot field1_season seed_variety_a)
+(reserve_irrigation_window_for_field_season field1_season irrigation_window_1 seed_variety_a)
+(assign_treatment_to_plot field1_season treatment_product_a)
+(apply_treatment_to_field_season field1_season irrigation_window_1 treatment_product_a)
+(register_field_plot field2_neighbor_season)
+(allocate_equipment_to_plot field2_neighbor_season sprayer_1)
+(release_seed_assignment_from_plot field1_season seed_variety_a)
+(assign_seed_variety_to_plot field2_neighbor_season seed_variety_a)
+(finalize_planting_preparation_for_plot field2_neighbor_season seed_variety_a)
+(reserve_harvest_window_for_neighbor_field field2_neighbor_season harvest_window_1 seed_variety_a)
+(release_treatment_from_plot field1_season treatment_product_a)
+(assign_treatment_to_plot field2_neighbor_season treatment_product_a)
+(apply_treatment_to_neighbor_field_season field2_neighbor_season harvest_window_1 treatment_product_a)
+(compose_operation_job field1_season field2_neighbor_season irrigation_window_1 harvest_window_1 operation_job_1)
+(release_seed_assignment_from_plot field2_neighbor_season seed_variety_a)
+(assign_seed_variety_to_plot field1_season seed_variety_a)
+(execute_operation_job operation_job_1 field1_season seed_variety_a)
+(complete_field_season_from_job field1_season operation_job_1)
+(complete_neighbor_field_season_from_job field2_neighbor_season operation_job_1)
+(schedule_market_slot_for_plot field1_season market_slot_day1 seed_variety_a)
+(finalize_field_season_and_release_resources field1_season harvester_1 market_slot_day1)
+(release_seed_assignment_from_plot field1_season seed_variety_a)
+(assign_seed_variety_to_plot field2_neighbor_season seed_variety_a)
+(schedule_market_slot_for_plot field2_neighbor_season market_slot_day1 seed_variety_a)
+(finalize_neighbor_field_season_and_release_resources field2_neighbor_season sprayer_1 market_slot_day1)
+(release_seed_assignment_from_plot field2_neighbor_season seed_variety_a)
+(release_treatment_from_plot field2_neighbor_season treatment_product_a)
+(register_field_plot crop_slot_1)
+(allocate_equipment_to_plot crop_slot_1 harvester_1)
+(assign_seed_variety_to_plot crop_slot_1 seed_variety_a)
+(finalize_planting_preparation_for_plot crop_slot_1 seed_variety_a)
+(assign_treatment_to_plot crop_slot_1 treatment_product_a)
+(assign_weather_window_to_slot crop_slot_1 weather_window_good)
+(attach_permit_to_slot crop_slot_1 regulatory_permit_1 seed_variety_a)
+(schedule_permit_action_for_slot crop_slot_1 treatment_product_a)
+(confirm_permit_for_slot crop_slot_1 weather_window_good)
+(finalize_slot_after_permit crop_slot_1)
+(schedule_market_slot_for_plot crop_slot_1 market_slot_day1 seed_variety_a)
+(finalize_slot_and_release_resources crop_slot_1 harvester_1 market_slot_day1)
+(release_seed_assignment_from_plot crop_slot_1 seed_variety_a)
+(release_treatment_from_plot crop_slot_1 treatment_product_a)
+(release_weather_from_slot crop_slot_1 weather_window_good)
+(register_field_plot crop_slot_2)
+(allocate_equipment_to_plot crop_slot_2 harvester_2)
+(assign_seed_variety_to_plot crop_slot_2 seed_variety_a)
+(finalize_planting_preparation_for_plot crop_slot_2 seed_variety_a)
+(reserve_storage_and_assign_job_to_slot crop_slot_2 storage_site_b operation_job_1)
+(initiate_qa_inspection crop_slot_2 storage_site_b operation_job_1 seed_variety_a)
+(assign_nutrient_to_slot crop_slot_2 nutrient_type_standard)
+(assign_treatment_to_plot crop_slot_2 treatment_product_a)
+(complete_qa_inspection_standard crop_slot_2 nutrient_type_standard treatment_product_a storage_site_b operation_job_1)
+(assign_weather_window_to_slot crop_slot_2 weather_window_good)
+(finalize_qa_stage_after_tests crop_slot_2 weather_window_good storage_site_b operation_job_1)
+(finalize_slot_without_additional_checks crop_slot_2)
+(schedule_market_slot_for_plot crop_slot_2 market_slot_day1 seed_variety_a)
+(finalize_slot_and_release_resources crop_slot_2 harvester_2 market_slot_day1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_avysciid/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 59 
+
+Successful plans:
+Value: 59
+ /tmp/val_avysciid/plan.pddl 59 
+
+
+
+--- stderr ---
+

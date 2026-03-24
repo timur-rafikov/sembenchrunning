@@ -1,0 +1,936 @@
+(define (domain pharmaceutics_specification_exception_evaluation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource - object document_family - object dependency_family - object domain_container - object evaluation_dossier - domain_container process_owner - actor_or_resource technical_assessor - actor_or_resource site_representative - actor_or_resource regulatory_justification - actor_or_resource impact_assessment - actor_or_resource regulatory_submission_document - actor_or_resource risk_assessment - actor_or_resource validation_approval_evidence - actor_or_resource evidence_document - document_family validation_protocol - document_family approver_delegation - document_family validation_requirement - dependency_family regulatory_dependency - dependency_family release_packet - dependency_family investigation_family - evaluation_dossier component_family - evaluation_dossier manufacturing_investigation - investigation_family quality_review_workstream - investigation_family dossier_component - component_family)
+  (:predicates
+    (dossier_registered ?dossier - evaluation_dossier)
+    (is_active_evaluation_item ?dossier - evaluation_dossier)
+    (process_owner_assigned ?dossier - evaluation_dossier)
+    (is_finalized ?dossier - evaluation_dossier)
+    (final_review_complete ?dossier - evaluation_dossier)
+    (regulatory_approval_recorded ?dossier - evaluation_dossier)
+    (process_owner_available ?process_owner - process_owner)
+    (assigned_process_owner ?dossier - evaluation_dossier ?process_owner - process_owner)
+    (technical_assessor_available ?technical_assessor - technical_assessor)
+    (assigned_technical_assessor ?dossier - evaluation_dossier ?technical_assessor - technical_assessor)
+    (site_representative_available ?site_representative - site_representative)
+    (assigned_site_representative ?dossier - evaluation_dossier ?site_representative - site_representative)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (investigation_linked_evidence ?manufacturing_investigation - manufacturing_investigation ?evidence_document - evidence_document)
+    (quality_review_linked_evidence ?quality_review_workstream - quality_review_workstream ?evidence_document - evidence_document)
+    (investigation_linked_validation_requirement ?manufacturing_investigation - manufacturing_investigation ?validation_requirement - validation_requirement)
+    (validation_requirement_ready ?validation_requirement - validation_requirement)
+    (validation_requirement_with_evidence ?validation_requirement - validation_requirement)
+    (investigation_requirements_satisfied ?manufacturing_investigation - manufacturing_investigation)
+    (quality_review_linked_regulatory_dependency ?quality_review_workstream - quality_review_workstream ?regulatory_dependency - regulatory_dependency)
+    (regulatory_dependency_ready ?regulatory_dependency - regulatory_dependency)
+    (regulatory_dependency_with_evidence ?regulatory_dependency - regulatory_dependency)
+    (quality_review_complete ?quality_review_workstream - quality_review_workstream)
+    (release_packet_registered ?release_packet - release_packet)
+    (release_packet_assembled ?release_packet - release_packet)
+    (packet_linked_validation_requirement ?release_packet - release_packet ?validation_requirement - validation_requirement)
+    (packet_linked_regulatory_dependency ?release_packet - release_packet ?regulatory_dependency - regulatory_dependency)
+    (release_packet_validation_flag ?release_packet - release_packet)
+    (release_packet_regulatory_flag ?release_packet - release_packet)
+    (release_packet_verified ?release_packet - release_packet)
+    (component_linked_investigation ?dossier_component - dossier_component ?manufacturing_investigation - manufacturing_investigation)
+    (component_linked_quality_review ?dossier_component - dossier_component ?quality_review_workstream - quality_review_workstream)
+    (component_linked_release_packet ?dossier_component - dossier_component ?release_packet - release_packet)
+    (validation_protocol_available ?validation_protocol - validation_protocol)
+    (component_linked_validation_protocol ?dossier_component - dossier_component ?validation_protocol - validation_protocol)
+    (validation_protocol_bound ?validation_protocol - validation_protocol)
+    (validation_protocol_linked_packet ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    (component_protocol_bound ?dossier_component - dossier_component)
+    (component_validation_evidence_collected ?dossier_component - dossier_component)
+    (component_validation_ready_for_final_review ?dossier_component - dossier_component)
+    (regulatory_justification_attached ?dossier_component - dossier_component)
+    (component_validation_documentation_ready ?dossier_component - dossier_component)
+    (validation_approval_recorded ?dossier_component - dossier_component)
+    (component_ready_for_certification ?dossier_component - dossier_component)
+    (approver_delegation_available ?approver_delegation - approver_delegation)
+    (component_linked_approver_delegation ?dossier_component - dossier_component ?approver_delegation - approver_delegation)
+    (approver_delegation_attached ?dossier_component - dossier_component)
+    (site_representative_confirmed ?dossier_component - dossier_component)
+    (final_approval_recorded ?dossier_component - dossier_component)
+    (regulatory_justification_available ?regulatory_justification - regulatory_justification)
+    (component_linked_regulatory_justification ?dossier_component - dossier_component ?regulatory_justification - regulatory_justification)
+    (impact_assessment_available ?impact_assessment - impact_assessment)
+    (component_linked_impact_assessment ?dossier_component - dossier_component ?impact_assessment - impact_assessment)
+    (risk_assessment_available ?risk_assessment - risk_assessment)
+    (component_linked_risk_assessment ?dossier_component - dossier_component ?risk_assessment - risk_assessment)
+    (validation_approval_evidence_available ?validation_approval_evidence - validation_approval_evidence)
+    (component_linked_validation_approval_evidence ?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence)
+    (regulatory_submission_document_available ?regulatory_submission_document - regulatory_submission_document)
+    (dossier_linked_regulatory_submission_document ?dossier - evaluation_dossier ?regulatory_submission_document - regulatory_submission_document)
+    (investigation_ready ?manufacturing_investigation - manufacturing_investigation)
+    (review_ready ?quality_review_workstream - quality_review_workstream)
+    (approval_certificate_created ?dossier_component - dossier_component)
+  )
+  (:action create_evaluation_dossier
+    :parameters (?dossier - evaluation_dossier)
+    :precondition
+      (and
+        (not
+          (dossier_registered ?dossier)
+        )
+        (not
+          (is_finalized ?dossier)
+        )
+      )
+    :effect (dossier_registered ?dossier)
+  )
+  (:action assign_process_owner
+    :parameters (?dossier - evaluation_dossier ?process_owner - process_owner)
+    :precondition
+      (and
+        (dossier_registered ?dossier)
+        (not
+          (process_owner_assigned ?dossier)
+        )
+        (process_owner_available ?process_owner)
+      )
+    :effect
+      (and
+        (process_owner_assigned ?dossier)
+        (assigned_process_owner ?dossier ?process_owner)
+        (not
+          (process_owner_available ?process_owner)
+        )
+      )
+  )
+  (:action assign_technical_assessor
+    :parameters (?dossier - evaluation_dossier ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (dossier_registered ?dossier)
+        (process_owner_assigned ?dossier)
+        (technical_assessor_available ?technical_assessor)
+      )
+    :effect
+      (and
+        (assigned_technical_assessor ?dossier ?technical_assessor)
+        (not
+          (technical_assessor_available ?technical_assessor)
+        )
+      )
+  )
+  (:action record_technical_assessment
+    :parameters (?dossier - evaluation_dossier ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (dossier_registered ?dossier)
+        (process_owner_assigned ?dossier)
+        (assigned_technical_assessor ?dossier ?technical_assessor)
+        (not
+          (is_active_evaluation_item ?dossier)
+        )
+      )
+    :effect (is_active_evaluation_item ?dossier)
+  )
+  (:action unassign_technical_assessor
+    :parameters (?dossier - evaluation_dossier ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (assigned_technical_assessor ?dossier ?technical_assessor)
+      )
+    :effect
+      (and
+        (technical_assessor_available ?technical_assessor)
+        (not
+          (assigned_technical_assessor ?dossier ?technical_assessor)
+        )
+      )
+  )
+  (:action assign_site_representative
+    :parameters (?dossier - evaluation_dossier ?site_representative - site_representative)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier)
+        (site_representative_available ?site_representative)
+      )
+    :effect
+      (and
+        (assigned_site_representative ?dossier ?site_representative)
+        (not
+          (site_representative_available ?site_representative)
+        )
+      )
+  )
+  (:action unassign_site_representative
+    :parameters (?dossier - evaluation_dossier ?site_representative - site_representative)
+    :precondition
+      (and
+        (assigned_site_representative ?dossier ?site_representative)
+      )
+    :effect
+      (and
+        (site_representative_available ?site_representative)
+        (not
+          (assigned_site_representative ?dossier ?site_representative)
+        )
+      )
+  )
+  (:action attach_risk_assessment_to_component
+    :parameters (?dossier_component - dossier_component ?risk_assessment - risk_assessment)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (risk_assessment_available ?risk_assessment)
+      )
+    :effect
+      (and
+        (component_linked_risk_assessment ?dossier_component ?risk_assessment)
+        (not
+          (risk_assessment_available ?risk_assessment)
+        )
+      )
+  )
+  (:action detach_risk_assessment_from_component
+    :parameters (?dossier_component - dossier_component ?risk_assessment - risk_assessment)
+    :precondition
+      (and
+        (component_linked_risk_assessment ?dossier_component ?risk_assessment)
+      )
+    :effect
+      (and
+        (risk_assessment_available ?risk_assessment)
+        (not
+          (component_linked_risk_assessment ?dossier_component ?risk_assessment)
+        )
+      )
+  )
+  (:action attach_validation_approval_evidence_to_component
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (validation_approval_evidence_available ?validation_approval_evidence)
+      )
+    :effect
+      (and
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (not
+          (validation_approval_evidence_available ?validation_approval_evidence)
+        )
+      )
+  )
+  (:action detach_validation_approval_evidence_from_component
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence)
+    :precondition
+      (and
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+      )
+    :effect
+      (and
+        (validation_approval_evidence_available ?validation_approval_evidence)
+        (not
+          (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        )
+      )
+  )
+  (:action mark_validation_requirement_ready
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?validation_requirement - validation_requirement ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (is_active_evaluation_item ?manufacturing_investigation)
+        (assigned_technical_assessor ?manufacturing_investigation ?technical_assessor)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (not
+          (validation_requirement_ready ?validation_requirement)
+        )
+        (not
+          (validation_requirement_with_evidence ?validation_requirement)
+        )
+      )
+    :effect (validation_requirement_ready ?validation_requirement)
+  )
+  (:action confirm_requirement_and_mark_investigation
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?validation_requirement - validation_requirement ?site_representative - site_representative)
+    :precondition
+      (and
+        (is_active_evaluation_item ?manufacturing_investigation)
+        (assigned_site_representative ?manufacturing_investigation ?site_representative)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (validation_requirement_ready ?validation_requirement)
+        (not
+          (investigation_ready ?manufacturing_investigation)
+        )
+      )
+    :effect
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+      )
+  )
+  (:action attach_evidence_to_investigation
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?validation_requirement - validation_requirement ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (is_active_evaluation_item ?manufacturing_investigation)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (evidence_document_available ?evidence_document)
+        (not
+          (investigation_ready ?manufacturing_investigation)
+        )
+      )
+    :effect
+      (and
+        (validation_requirement_with_evidence ?validation_requirement)
+        (investigation_ready ?manufacturing_investigation)
+        (investigation_linked_evidence ?manufacturing_investigation ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_evidence_in_investigation
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?validation_requirement - validation_requirement ?technical_assessor - technical_assessor ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (is_active_evaluation_item ?manufacturing_investigation)
+        (assigned_technical_assessor ?manufacturing_investigation ?technical_assessor)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (validation_requirement_with_evidence ?validation_requirement)
+        (investigation_linked_evidence ?manufacturing_investigation ?evidence_document)
+        (not
+          (investigation_requirements_satisfied ?manufacturing_investigation)
+        )
+      )
+    :effect
+      (and
+        (validation_requirement_ready ?validation_requirement)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+        (evidence_document_available ?evidence_document)
+        (not
+          (investigation_linked_evidence ?manufacturing_investigation ?evidence_document)
+        )
+      )
+  )
+  (:action mark_regulatory_dependency_ready
+    :parameters (?quality_review_workstream - quality_review_workstream ?regulatory_dependency - regulatory_dependency ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (is_active_evaluation_item ?quality_review_workstream)
+        (assigned_technical_assessor ?quality_review_workstream ?technical_assessor)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (not
+          (regulatory_dependency_ready ?regulatory_dependency)
+        )
+        (not
+          (regulatory_dependency_with_evidence ?regulatory_dependency)
+        )
+      )
+    :effect (regulatory_dependency_ready ?regulatory_dependency)
+  )
+  (:action activate_quality_review_for_dependency
+    :parameters (?quality_review_workstream - quality_review_workstream ?regulatory_dependency - regulatory_dependency ?site_representative - site_representative)
+    :precondition
+      (and
+        (is_active_evaluation_item ?quality_review_workstream)
+        (assigned_site_representative ?quality_review_workstream ?site_representative)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (regulatory_dependency_ready ?regulatory_dependency)
+        (not
+          (review_ready ?quality_review_workstream)
+        )
+      )
+    :effect
+      (and
+        (review_ready ?quality_review_workstream)
+        (quality_review_complete ?quality_review_workstream)
+      )
+  )
+  (:action attach_evidence_to_quality_review
+    :parameters (?quality_review_workstream - quality_review_workstream ?regulatory_dependency - regulatory_dependency ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (is_active_evaluation_item ?quality_review_workstream)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (evidence_document_available ?evidence_document)
+        (not
+          (review_ready ?quality_review_workstream)
+        )
+      )
+    :effect
+      (and
+        (regulatory_dependency_with_evidence ?regulatory_dependency)
+        (review_ready ?quality_review_workstream)
+        (quality_review_linked_evidence ?quality_review_workstream ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_evidence_in_quality_review
+    :parameters (?quality_review_workstream - quality_review_workstream ?regulatory_dependency - regulatory_dependency ?technical_assessor - technical_assessor ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (is_active_evaluation_item ?quality_review_workstream)
+        (assigned_technical_assessor ?quality_review_workstream ?technical_assessor)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (regulatory_dependency_with_evidence ?regulatory_dependency)
+        (quality_review_linked_evidence ?quality_review_workstream ?evidence_document)
+        (not
+          (quality_review_complete ?quality_review_workstream)
+        )
+      )
+    :effect
+      (and
+        (regulatory_dependency_ready ?regulatory_dependency)
+        (quality_review_complete ?quality_review_workstream)
+        (evidence_document_available ?evidence_document)
+        (not
+          (quality_review_linked_evidence ?quality_review_workstream ?evidence_document)
+        )
+      )
+  )
+  (:action assemble_release_packet
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?quality_review_workstream - quality_review_workstream ?validation_requirement - validation_requirement ?regulatory_dependency - regulatory_dependency ?release_packet - release_packet)
+    :precondition
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (review_ready ?quality_review_workstream)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (validation_requirement_ready ?validation_requirement)
+        (regulatory_dependency_ready ?regulatory_dependency)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+        (quality_review_complete ?quality_review_workstream)
+        (release_packet_registered ?release_packet)
+      )
+    :effect
+      (and
+        (release_packet_assembled ?release_packet)
+        (packet_linked_validation_requirement ?release_packet ?validation_requirement)
+        (packet_linked_regulatory_dependency ?release_packet ?regulatory_dependency)
+        (not
+          (release_packet_registered ?release_packet)
+        )
+      )
+  )
+  (:action assemble_release_packet_with_validation_flag
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?quality_review_workstream - quality_review_workstream ?validation_requirement - validation_requirement ?regulatory_dependency - regulatory_dependency ?release_packet - release_packet)
+    :precondition
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (review_ready ?quality_review_workstream)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (validation_requirement_with_evidence ?validation_requirement)
+        (regulatory_dependency_ready ?regulatory_dependency)
+        (not
+          (investigation_requirements_satisfied ?manufacturing_investigation)
+        )
+        (quality_review_complete ?quality_review_workstream)
+        (release_packet_registered ?release_packet)
+      )
+    :effect
+      (and
+        (release_packet_assembled ?release_packet)
+        (packet_linked_validation_requirement ?release_packet ?validation_requirement)
+        (packet_linked_regulatory_dependency ?release_packet ?regulatory_dependency)
+        (release_packet_validation_flag ?release_packet)
+        (not
+          (release_packet_registered ?release_packet)
+        )
+      )
+  )
+  (:action assemble_release_packet_with_regulatory_flag
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?quality_review_workstream - quality_review_workstream ?validation_requirement - validation_requirement ?regulatory_dependency - regulatory_dependency ?release_packet - release_packet)
+    :precondition
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (review_ready ?quality_review_workstream)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (validation_requirement_ready ?validation_requirement)
+        (regulatory_dependency_with_evidence ?regulatory_dependency)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+        (not
+          (quality_review_complete ?quality_review_workstream)
+        )
+        (release_packet_registered ?release_packet)
+      )
+    :effect
+      (and
+        (release_packet_assembled ?release_packet)
+        (packet_linked_validation_requirement ?release_packet ?validation_requirement)
+        (packet_linked_regulatory_dependency ?release_packet ?regulatory_dependency)
+        (release_packet_regulatory_flag ?release_packet)
+        (not
+          (release_packet_registered ?release_packet)
+        )
+      )
+  )
+  (:action assemble_release_packet_with_both_flags
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?quality_review_workstream - quality_review_workstream ?validation_requirement - validation_requirement ?regulatory_dependency - regulatory_dependency ?release_packet - release_packet)
+    :precondition
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (review_ready ?quality_review_workstream)
+        (investigation_linked_validation_requirement ?manufacturing_investigation ?validation_requirement)
+        (quality_review_linked_regulatory_dependency ?quality_review_workstream ?regulatory_dependency)
+        (validation_requirement_with_evidence ?validation_requirement)
+        (regulatory_dependency_with_evidence ?regulatory_dependency)
+        (not
+          (investigation_requirements_satisfied ?manufacturing_investigation)
+        )
+        (not
+          (quality_review_complete ?quality_review_workstream)
+        )
+        (release_packet_registered ?release_packet)
+      )
+    :effect
+      (and
+        (release_packet_assembled ?release_packet)
+        (packet_linked_validation_requirement ?release_packet ?validation_requirement)
+        (packet_linked_regulatory_dependency ?release_packet ?regulatory_dependency)
+        (release_packet_validation_flag ?release_packet)
+        (release_packet_regulatory_flag ?release_packet)
+        (not
+          (release_packet_registered ?release_packet)
+        )
+      )
+  )
+  (:action verify_release_packet
+    :parameters (?release_packet - release_packet ?manufacturing_investigation - manufacturing_investigation ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (release_packet_assembled ?release_packet)
+        (investigation_ready ?manufacturing_investigation)
+        (assigned_technical_assessor ?manufacturing_investigation ?technical_assessor)
+        (not
+          (release_packet_verified ?release_packet)
+        )
+      )
+    :effect (release_packet_verified ?release_packet)
+  )
+  (:action bind_validation_protocol_to_component
+    :parameters (?dossier_component - dossier_component ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (component_linked_release_packet ?dossier_component ?release_packet)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_available ?validation_protocol)
+        (release_packet_assembled ?release_packet)
+        (release_packet_verified ?release_packet)
+        (not
+          (validation_protocol_bound ?validation_protocol)
+        )
+      )
+    :effect
+      (and
+        (validation_protocol_bound ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (not
+          (validation_protocol_available ?validation_protocol)
+        )
+      )
+  )
+  (:action activate_component_protocol_binding
+    :parameters (?dossier_component - dossier_component ?validation_protocol - validation_protocol ?release_packet - release_packet ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_bound ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (assigned_technical_assessor ?dossier_component ?technical_assessor)
+        (not
+          (release_packet_validation_flag ?release_packet)
+        )
+        (not
+          (component_protocol_bound ?dossier_component)
+        )
+      )
+    :effect (component_protocol_bound ?dossier_component)
+  )
+  (:action attach_regulatory_justification_to_component
+    :parameters (?dossier_component - dossier_component ?regulatory_justification - regulatory_justification)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (regulatory_justification_available ?regulatory_justification)
+        (not
+          (regulatory_justification_attached ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (regulatory_justification_attached ?dossier_component)
+        (component_linked_regulatory_justification ?dossier_component ?regulatory_justification)
+        (not
+          (regulatory_justification_available ?regulatory_justification)
+        )
+      )
+  )
+  (:action prepare_component_for_validation_with_justification
+    :parameters (?dossier_component - dossier_component ?validation_protocol - validation_protocol ?release_packet - release_packet ?technical_assessor - technical_assessor ?regulatory_justification - regulatory_justification)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_bound ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (assigned_technical_assessor ?dossier_component ?technical_assessor)
+        (release_packet_validation_flag ?release_packet)
+        (regulatory_justification_attached ?dossier_component)
+        (component_linked_regulatory_justification ?dossier_component ?regulatory_justification)
+        (not
+          (component_protocol_bound ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (component_protocol_bound ?dossier_component)
+        (component_validation_documentation_ready ?dossier_component)
+      )
+  )
+  (:action initiate_component_validation_unflagged
+    :parameters (?dossier_component - dossier_component ?risk_assessment - risk_assessment ?site_representative - site_representative ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_protocol_bound ?dossier_component)
+        (component_linked_risk_assessment ?dossier_component ?risk_assessment)
+        (assigned_site_representative ?dossier_component ?site_representative)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (not
+          (release_packet_regulatory_flag ?release_packet)
+        )
+        (not
+          (component_validation_evidence_collected ?dossier_component)
+        )
+      )
+    :effect (component_validation_evidence_collected ?dossier_component)
+  )
+  (:action initiate_component_validation_flagged
+    :parameters (?dossier_component - dossier_component ?risk_assessment - risk_assessment ?site_representative - site_representative ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_protocol_bound ?dossier_component)
+        (component_linked_risk_assessment ?dossier_component ?risk_assessment)
+        (assigned_site_representative ?dossier_component ?site_representative)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (release_packet_regulatory_flag ?release_packet)
+        (not
+          (component_validation_evidence_collected ?dossier_component)
+        )
+      )
+    :effect (component_validation_evidence_collected ?dossier_component)
+  )
+  (:action record_validation_approval_submission
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_validation_evidence_collected ?dossier_component)
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (not
+          (release_packet_validation_flag ?release_packet)
+        )
+        (not
+          (release_packet_regulatory_flag ?release_packet)
+        )
+        (not
+          (component_validation_ready_for_final_review ?dossier_component)
+        )
+      )
+    :effect (component_validation_ready_for_final_review ?dossier_component)
+  )
+  (:action record_validation_approval_and_attach_evidence
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_validation_evidence_collected ?dossier_component)
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (release_packet_validation_flag ?release_packet)
+        (not
+          (release_packet_regulatory_flag ?release_packet)
+        )
+        (not
+          (component_validation_ready_for_final_review ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (validation_approval_recorded ?dossier_component)
+      )
+  )
+  (:action record_validation_approval_and_attach_summary
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_validation_evidence_collected ?dossier_component)
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (not
+          (release_packet_validation_flag ?release_packet)
+        )
+        (release_packet_regulatory_flag ?release_packet)
+        (not
+          (component_validation_ready_for_final_review ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (validation_approval_recorded ?dossier_component)
+      )
+  )
+  (:action record_validation_approval_and_attach_full_evidence
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence ?validation_protocol - validation_protocol ?release_packet - release_packet)
+    :precondition
+      (and
+        (component_validation_evidence_collected ?dossier_component)
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (component_linked_validation_protocol ?dossier_component ?validation_protocol)
+        (validation_protocol_linked_packet ?validation_protocol ?release_packet)
+        (release_packet_validation_flag ?release_packet)
+        (release_packet_regulatory_flag ?release_packet)
+        (not
+          (component_validation_ready_for_final_review ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (validation_approval_recorded ?dossier_component)
+      )
+  )
+  (:action finalize_component_review
+    :parameters (?dossier_component - dossier_component)
+    :precondition
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (not
+          (validation_approval_recorded ?dossier_component)
+        )
+        (not
+          (approval_certificate_created ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (approval_certificate_created ?dossier_component)
+        (final_review_complete ?dossier_component)
+      )
+  )
+  (:action attach_impact_assessment_to_component
+    :parameters (?dossier_component - dossier_component ?impact_assessment - impact_assessment)
+    :precondition
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (validation_approval_recorded ?dossier_component)
+        (impact_assessment_available ?impact_assessment)
+      )
+    :effect
+      (and
+        (component_linked_impact_assessment ?dossier_component ?impact_assessment)
+        (not
+          (impact_assessment_available ?impact_assessment)
+        )
+      )
+  )
+  (:action conduct_risk_and_validation_approvals
+    :parameters (?dossier_component - dossier_component ?manufacturing_investigation - manufacturing_investigation ?quality_review_workstream - quality_review_workstream ?technical_assessor - technical_assessor ?impact_assessment - impact_assessment)
+    :precondition
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (validation_approval_recorded ?dossier_component)
+        (component_linked_impact_assessment ?dossier_component ?impact_assessment)
+        (component_linked_investigation ?dossier_component ?manufacturing_investigation)
+        (component_linked_quality_review ?dossier_component ?quality_review_workstream)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+        (quality_review_complete ?quality_review_workstream)
+        (assigned_technical_assessor ?dossier_component ?technical_assessor)
+        (not
+          (component_ready_for_certification ?dossier_component)
+        )
+      )
+    :effect (component_ready_for_certification ?dossier_component)
+  )
+  (:action issue_approval_artifact_for_component
+    :parameters (?dossier_component - dossier_component)
+    :precondition
+      (and
+        (component_validation_ready_for_final_review ?dossier_component)
+        (component_ready_for_certification ?dossier_component)
+        (not
+          (approval_certificate_created ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (approval_certificate_created ?dossier_component)
+        (final_review_complete ?dossier_component)
+      )
+  )
+  (:action attach_approver_delegation_to_component
+    :parameters (?dossier_component - dossier_component ?approver_delegation - approver_delegation ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (is_active_evaluation_item ?dossier_component)
+        (assigned_technical_assessor ?dossier_component ?technical_assessor)
+        (approver_delegation_available ?approver_delegation)
+        (component_linked_approver_delegation ?dossier_component ?approver_delegation)
+        (not
+          (approver_delegation_attached ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (approver_delegation_attached ?dossier_component)
+        (not
+          (approver_delegation_available ?approver_delegation)
+        )
+      )
+  )
+  (:action confirm_site_representative
+    :parameters (?dossier_component - dossier_component ?site_representative - site_representative)
+    :precondition
+      (and
+        (approver_delegation_attached ?dossier_component)
+        (assigned_site_representative ?dossier_component ?site_representative)
+        (not
+          (site_representative_confirmed ?dossier_component)
+        )
+      )
+    :effect (site_representative_confirmed ?dossier_component)
+  )
+  (:action attach_validation_approval_evidence
+    :parameters (?dossier_component - dossier_component ?validation_approval_evidence - validation_approval_evidence)
+    :precondition
+      (and
+        (site_representative_confirmed ?dossier_component)
+        (component_linked_validation_approval_evidence ?dossier_component ?validation_approval_evidence)
+        (not
+          (final_approval_recorded ?dossier_component)
+        )
+      )
+    :effect (final_approval_recorded ?dossier_component)
+  )
+  (:action finalize_component_approval
+    :parameters (?dossier_component - dossier_component)
+    :precondition
+      (and
+        (final_approval_recorded ?dossier_component)
+        (not
+          (approval_certificate_created ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (approval_certificate_created ?dossier_component)
+        (final_review_complete ?dossier_component)
+      )
+  )
+  (:action finalize_investigation
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?release_packet - release_packet)
+    :precondition
+      (and
+        (investigation_ready ?manufacturing_investigation)
+        (investigation_requirements_satisfied ?manufacturing_investigation)
+        (release_packet_assembled ?release_packet)
+        (release_packet_verified ?release_packet)
+        (not
+          (final_review_complete ?manufacturing_investigation)
+        )
+      )
+    :effect (final_review_complete ?manufacturing_investigation)
+  )
+  (:action finalize_quality_review
+    :parameters (?quality_review_workstream - quality_review_workstream ?release_packet - release_packet)
+    :precondition
+      (and
+        (review_ready ?quality_review_workstream)
+        (quality_review_complete ?quality_review_workstream)
+        (release_packet_assembled ?release_packet)
+        (release_packet_verified ?release_packet)
+        (not
+          (final_review_complete ?quality_review_workstream)
+        )
+      )
+    :effect (final_review_complete ?quality_review_workstream)
+  )
+  (:action record_regulatory_submission_for_dossier
+    :parameters (?dossier - evaluation_dossier ?regulatory_submission_document - regulatory_submission_document ?technical_assessor - technical_assessor)
+    :precondition
+      (and
+        (final_review_complete ?dossier)
+        (assigned_technical_assessor ?dossier ?technical_assessor)
+        (regulatory_submission_document_available ?regulatory_submission_document)
+        (not
+          (regulatory_approval_recorded ?dossier)
+        )
+      )
+    :effect
+      (and
+        (regulatory_approval_recorded ?dossier)
+        (dossier_linked_regulatory_submission_document ?dossier ?regulatory_submission_document)
+        (not
+          (regulatory_submission_document_available ?regulatory_submission_document)
+        )
+      )
+  )
+  (:action close_investigation_and_reassign_owner
+    :parameters (?manufacturing_investigation - manufacturing_investigation ?process_owner - process_owner ?regulatory_submission_document - regulatory_submission_document)
+    :precondition
+      (and
+        (regulatory_approval_recorded ?manufacturing_investigation)
+        (assigned_process_owner ?manufacturing_investigation ?process_owner)
+        (dossier_linked_regulatory_submission_document ?manufacturing_investigation ?regulatory_submission_document)
+        (not
+          (is_finalized ?manufacturing_investigation)
+        )
+      )
+    :effect
+      (and
+        (is_finalized ?manufacturing_investigation)
+        (process_owner_available ?process_owner)
+        (regulatory_submission_document_available ?regulatory_submission_document)
+      )
+  )
+  (:action close_quality_review_and_reassign_owner
+    :parameters (?quality_review_workstream - quality_review_workstream ?process_owner - process_owner ?regulatory_submission_document - regulatory_submission_document)
+    :precondition
+      (and
+        (regulatory_approval_recorded ?quality_review_workstream)
+        (assigned_process_owner ?quality_review_workstream ?process_owner)
+        (dossier_linked_regulatory_submission_document ?quality_review_workstream ?regulatory_submission_document)
+        (not
+          (is_finalized ?quality_review_workstream)
+        )
+      )
+    :effect
+      (and
+        (is_finalized ?quality_review_workstream)
+        (process_owner_available ?process_owner)
+        (regulatory_submission_document_available ?regulatory_submission_document)
+      )
+  )
+  (:action close_component_and_reassign_owner
+    :parameters (?dossier_component - dossier_component ?process_owner - process_owner ?regulatory_submission_document - regulatory_submission_document)
+    :precondition
+      (and
+        (regulatory_approval_recorded ?dossier_component)
+        (assigned_process_owner ?dossier_component ?process_owner)
+        (dossier_linked_regulatory_submission_document ?dossier_component ?regulatory_submission_document)
+        (not
+          (is_finalized ?dossier_component)
+        )
+      )
+    :effect
+      (and
+        (is_finalized ?dossier_component)
+        (process_owner_available ?process_owner)
+        (regulatory_submission_document_available ?regulatory_submission_document)
+      )
+  )
+)

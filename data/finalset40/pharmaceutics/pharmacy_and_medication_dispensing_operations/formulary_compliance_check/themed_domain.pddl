@@ -1,0 +1,936 @@
+(define (domain pharmacy_formulary_compliance)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object asset - object profile_group - object order - object prescription - order formulary_option - resource clinical_rule - resource approver - resource aux_label_template - resource instruction_template - resource patient_instruction - resource safety_check_template - resource approval_document - resource substitution_token - asset packaging_component - asset authorization_request - asset patient_profile - profile_group packaging_spec - profile_group medication_package - profile_group work_item_group - prescription actor_group - prescription dispense_job - work_item_group dispensing_session - work_item_group pharmacist - actor_group)
+  (:predicates
+    (intake_registered ?prescription - prescription)
+    (screening_completed ?prescription - prescription)
+    (formulary_check_performed ?prescription - prescription)
+    (formulary_compliance_cleared ?prescription - prescription)
+    (entity_released ?prescription - prescription)
+    (patient_instruction_generated ?prescription - prescription)
+    (formulary_option_available ?formulary_option - formulary_option)
+    (has_formulary_option ?prescription - prescription ?formulary_option - formulary_option)
+    (clinical_rule_available ?clinical_rule - clinical_rule)
+    (rule_applied ?prescription - prescription ?clinical_rule - clinical_rule)
+    (approver_available ?approver - approver)
+    (assigned_to_approver ?prescription - prescription ?approver - approver)
+    (substitution_token_available ?substitution_token - substitution_token)
+    (dispense_job_has_substitution_token ?dispense_job - dispense_job ?substitution_token - substitution_token)
+    (session_has_substitution_token ?dispensing_session - dispensing_session ?substitution_token - substitution_token)
+    (dispense_job_has_patient_profile ?dispense_job - dispense_job ?patient_profile - patient_profile)
+    (patient_profile_selected ?patient_profile - patient_profile)
+    (patient_profile_marked_for_substitution ?patient_profile - patient_profile)
+    (dispense_job_substitution_confirmed ?dispense_job - dispense_job)
+    (session_has_packaging_spec ?dispensing_session - dispensing_session ?packaging_spec - packaging_spec)
+    (packaging_spec_selected ?packaging_spec - packaging_spec)
+    (packaging_spec_secondary_selected ?packaging_spec - packaging_spec)
+    (session_ready_for_packaging ?dispensing_session - dispensing_session)
+    (medication_package_available ?medication_package - medication_package)
+    (medication_package_reserved ?medication_package - medication_package)
+    (medication_package_for_patient_profile ?medication_package - medication_package ?patient_profile - patient_profile)
+    (medication_package_for_packaging_spec ?medication_package - medication_package ?packaging_spec - packaging_spec)
+    (medication_package_aux_label_applied ?medication_package - medication_package)
+    (medication_package_instruction_attached ?medication_package - medication_package)
+    (medication_package_ready ?medication_package - medication_package)
+    (pharmacist_assigned_to_dispense_job ?pharmacist - pharmacist ?dispense_job - dispense_job)
+    (pharmacist_assigned_to_session ?pharmacist - pharmacist ?dispensing_session - dispensing_session)
+    (pharmacist_assigned_to_package ?pharmacist - pharmacist ?medication_package - medication_package)
+    (packaging_component_available ?packaging_component - packaging_component)
+    (pharmacist_selected_packaging_component ?pharmacist - pharmacist ?packaging_component - packaging_component)
+    (packaging_component_attached ?packaging_component - packaging_component)
+    (packaging_component_in_medication_package ?packaging_component - packaging_component ?medication_package - medication_package)
+    (pharmacist_component_verified ?pharmacist - pharmacist)
+    (pharmacist_safety_check_completed ?pharmacist - pharmacist)
+    (labeling_complete ?pharmacist - pharmacist)
+    (pharmacist_aux_label_assigned ?pharmacist - pharmacist)
+    (pharmacist_aux_label_prepared ?pharmacist - pharmacist)
+    (pharmacist_instruction_attached ?pharmacist - pharmacist)
+    (pharmacist_final_verification ?pharmacist - pharmacist)
+    (authorization_request_available ?authorization_request - authorization_request)
+    (pharmacist_assigned_authorization_request ?pharmacist - pharmacist ?authorization_request - authorization_request)
+    (authorization_in_progress_for_pharmacist ?pharmacist - pharmacist)
+    (approval_document_prepared ?pharmacist - pharmacist)
+    (approval_document_attached ?pharmacist - pharmacist)
+    (aux_label_template_available ?aux_label_template - aux_label_template)
+    (pharmacist_assigned_aux_label_template ?pharmacist - pharmacist ?aux_label_template - aux_label_template)
+    (instruction_template_available ?instruction_template - instruction_template)
+    (pharmacist_assigned_instruction_template ?pharmacist - pharmacist ?instruction_template - instruction_template)
+    (safety_check_template_available ?safety_check_template - safety_check_template)
+    (pharmacist_assigned_safety_check_template ?pharmacist - pharmacist ?safety_check_template - safety_check_template)
+    (approval_document_available ?approval_document - approval_document)
+    (pharmacist_assigned_approval_document ?pharmacist - pharmacist ?approval_document - approval_document)
+    (patient_instruction_available ?patient_instruction - patient_instruction)
+    (has_patient_instruction ?prescription - prescription ?patient_instruction - patient_instruction)
+    (job_locked ?dispense_job - dispense_job)
+    (session_locked ?dispensing_session - dispensing_session)
+    (final_verification_recorded ?pharmacist - pharmacist)
+  )
+  (:action register_prescription
+    :parameters (?prescription - prescription)
+    :precondition
+      (and
+        (not
+          (intake_registered ?prescription)
+        )
+        (not
+          (formulary_compliance_cleared ?prescription)
+        )
+      )
+    :effect (intake_registered ?prescription)
+  )
+  (:action assign_formulary_option_to_prescription
+    :parameters (?prescription - prescription ?formulary_option - formulary_option)
+    :precondition
+      (and
+        (intake_registered ?prescription)
+        (not
+          (formulary_check_performed ?prescription)
+        )
+        (formulary_option_available ?formulary_option)
+      )
+    :effect
+      (and
+        (formulary_check_performed ?prescription)
+        (has_formulary_option ?prescription ?formulary_option)
+        (not
+          (formulary_option_available ?formulary_option)
+        )
+      )
+  )
+  (:action apply_clinical_rule_to_prescription
+    :parameters (?prescription - prescription ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (intake_registered ?prescription)
+        (formulary_check_performed ?prescription)
+        (clinical_rule_available ?clinical_rule)
+      )
+    :effect
+      (and
+        (rule_applied ?prescription ?clinical_rule)
+        (not
+          (clinical_rule_available ?clinical_rule)
+        )
+      )
+  )
+  (:action mark_prescription_screening_complete
+    :parameters (?prescription - prescription ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (intake_registered ?prescription)
+        (formulary_check_performed ?prescription)
+        (rule_applied ?prescription ?clinical_rule)
+        (not
+          (screening_completed ?prescription)
+        )
+      )
+    :effect (screening_completed ?prescription)
+  )
+  (:action release_clinical_rule_from_prescription
+    :parameters (?prescription - prescription ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (rule_applied ?prescription ?clinical_rule)
+      )
+    :effect
+      (and
+        (clinical_rule_available ?clinical_rule)
+        (not
+          (rule_applied ?prescription ?clinical_rule)
+        )
+      )
+  )
+  (:action assign_approver_to_prescription
+    :parameters (?prescription - prescription ?approver - approver)
+    :precondition
+      (and
+        (screening_completed ?prescription)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (assigned_to_approver ?prescription ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_prescription
+    :parameters (?prescription - prescription ?approver - approver)
+    :precondition
+      (and
+        (assigned_to_approver ?prescription ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (assigned_to_approver ?prescription ?approver)
+        )
+      )
+  )
+  (:action assign_safety_check_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?safety_check_template - safety_check_template)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (safety_check_template_available ?safety_check_template)
+      )
+    :effect
+      (and
+        (pharmacist_assigned_safety_check_template ?pharmacist ?safety_check_template)
+        (not
+          (safety_check_template_available ?safety_check_template)
+        )
+      )
+  )
+  (:action release_safety_check_from_pharmacist
+    :parameters (?pharmacist - pharmacist ?safety_check_template - safety_check_template)
+    :precondition
+      (and
+        (pharmacist_assigned_safety_check_template ?pharmacist ?safety_check_template)
+      )
+    :effect
+      (and
+        (safety_check_template_available ?safety_check_template)
+        (not
+          (pharmacist_assigned_safety_check_template ?pharmacist ?safety_check_template)
+        )
+      )
+  )
+  (:action assign_approval_document_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (approval_document_available ?approval_document)
+      )
+    :effect
+      (and
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action release_approval_document_from_pharmacist
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document)
+    :precondition
+      (and
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+      )
+    :effect
+      (and
+        (approval_document_available ?approval_document)
+        (not
+          (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        )
+      )
+  )
+  (:action select_patient_profile_for_dispense_job
+    :parameters (?dispense_job - dispense_job ?patient_profile - patient_profile ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (screening_completed ?dispense_job)
+        (rule_applied ?dispense_job ?clinical_rule)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (not
+          (patient_profile_selected ?patient_profile)
+        )
+        (not
+          (patient_profile_marked_for_substitution ?patient_profile)
+        )
+      )
+    :effect (patient_profile_selected ?patient_profile)
+  )
+  (:action lock_job_and_assign_substitution_review
+    :parameters (?dispense_job - dispense_job ?patient_profile - patient_profile ?approver - approver)
+    :precondition
+      (and
+        (screening_completed ?dispense_job)
+        (assigned_to_approver ?dispense_job ?approver)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (patient_profile_selected ?patient_profile)
+        (not
+          (job_locked ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (job_locked ?dispense_job)
+        (dispense_job_substitution_confirmed ?dispense_job)
+      )
+  )
+  (:action apply_substitution_token_to_job
+    :parameters (?dispense_job - dispense_job ?patient_profile - patient_profile ?substitution_token - substitution_token)
+    :precondition
+      (and
+        (screening_completed ?dispense_job)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (substitution_token_available ?substitution_token)
+        (not
+          (job_locked ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (patient_profile_marked_for_substitution ?patient_profile)
+        (job_locked ?dispense_job)
+        (dispense_job_has_substitution_token ?dispense_job ?substitution_token)
+        (not
+          (substitution_token_available ?substitution_token)
+        )
+      )
+  )
+  (:action confirm_substitution_for_job
+    :parameters (?dispense_job - dispense_job ?patient_profile - patient_profile ?clinical_rule - clinical_rule ?substitution_token - substitution_token)
+    :precondition
+      (and
+        (screening_completed ?dispense_job)
+        (rule_applied ?dispense_job ?clinical_rule)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (patient_profile_marked_for_substitution ?patient_profile)
+        (dispense_job_has_substitution_token ?dispense_job ?substitution_token)
+        (not
+          (dispense_job_substitution_confirmed ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (patient_profile_selected ?patient_profile)
+        (dispense_job_substitution_confirmed ?dispense_job)
+        (substitution_token_available ?substitution_token)
+        (not
+          (dispense_job_has_substitution_token ?dispense_job ?substitution_token)
+        )
+      )
+  )
+  (:action select_packaging_spec_for_session
+    :parameters (?dispensing_session - dispensing_session ?packaging_spec - packaging_spec ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (screening_completed ?dispensing_session)
+        (rule_applied ?dispensing_session ?clinical_rule)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (not
+          (packaging_spec_selected ?packaging_spec)
+        )
+        (not
+          (packaging_spec_secondary_selected ?packaging_spec)
+        )
+      )
+    :effect (packaging_spec_selected ?packaging_spec)
+  )
+  (:action assign_pharmacist_and_mark_session_ready
+    :parameters (?dispensing_session - dispensing_session ?packaging_spec - packaging_spec ?approver - approver)
+    :precondition
+      (and
+        (screening_completed ?dispensing_session)
+        (assigned_to_approver ?dispensing_session ?approver)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (packaging_spec_selected ?packaging_spec)
+        (not
+          (session_locked ?dispensing_session)
+        )
+      )
+    :effect
+      (and
+        (session_locked ?dispensing_session)
+        (session_ready_for_packaging ?dispensing_session)
+      )
+  )
+  (:action apply_substitution_token_to_session
+    :parameters (?dispensing_session - dispensing_session ?packaging_spec - packaging_spec ?substitution_token - substitution_token)
+    :precondition
+      (and
+        (screening_completed ?dispensing_session)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (substitution_token_available ?substitution_token)
+        (not
+          (session_locked ?dispensing_session)
+        )
+      )
+    :effect
+      (and
+        (packaging_spec_secondary_selected ?packaging_spec)
+        (session_locked ?dispensing_session)
+        (session_has_substitution_token ?dispensing_session ?substitution_token)
+        (not
+          (substitution_token_available ?substitution_token)
+        )
+      )
+  )
+  (:action confirm_substitution_for_session
+    :parameters (?dispensing_session - dispensing_session ?packaging_spec - packaging_spec ?clinical_rule - clinical_rule ?substitution_token - substitution_token)
+    :precondition
+      (and
+        (screening_completed ?dispensing_session)
+        (rule_applied ?dispensing_session ?clinical_rule)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (packaging_spec_secondary_selected ?packaging_spec)
+        (session_has_substitution_token ?dispensing_session ?substitution_token)
+        (not
+          (session_ready_for_packaging ?dispensing_session)
+        )
+      )
+    :effect
+      (and
+        (packaging_spec_selected ?packaging_spec)
+        (session_ready_for_packaging ?dispensing_session)
+        (substitution_token_available ?substitution_token)
+        (not
+          (session_has_substitution_token ?dispensing_session ?substitution_token)
+        )
+      )
+  )
+  (:action reserve_medication_package
+    :parameters (?dispense_job - dispense_job ?dispensing_session - dispensing_session ?patient_profile - patient_profile ?packaging_spec - packaging_spec ?medication_package - medication_package)
+    :precondition
+      (and
+        (job_locked ?dispense_job)
+        (session_locked ?dispensing_session)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (patient_profile_selected ?patient_profile)
+        (packaging_spec_selected ?packaging_spec)
+        (dispense_job_substitution_confirmed ?dispense_job)
+        (session_ready_for_packaging ?dispensing_session)
+        (medication_package_available ?medication_package)
+      )
+    :effect
+      (and
+        (medication_package_reserved ?medication_package)
+        (medication_package_for_patient_profile ?medication_package ?patient_profile)
+        (medication_package_for_packaging_spec ?medication_package ?packaging_spec)
+        (not
+          (medication_package_available ?medication_package)
+        )
+      )
+  )
+  (:action reserve_package_and_apply_aux_label
+    :parameters (?dispense_job - dispense_job ?dispensing_session - dispensing_session ?patient_profile - patient_profile ?packaging_spec - packaging_spec ?medication_package - medication_package)
+    :precondition
+      (and
+        (job_locked ?dispense_job)
+        (session_locked ?dispensing_session)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (patient_profile_marked_for_substitution ?patient_profile)
+        (packaging_spec_selected ?packaging_spec)
+        (not
+          (dispense_job_substitution_confirmed ?dispense_job)
+        )
+        (session_ready_for_packaging ?dispensing_session)
+        (medication_package_available ?medication_package)
+      )
+    :effect
+      (and
+        (medication_package_reserved ?medication_package)
+        (medication_package_for_patient_profile ?medication_package ?patient_profile)
+        (medication_package_for_packaging_spec ?medication_package ?packaging_spec)
+        (medication_package_aux_label_applied ?medication_package)
+        (not
+          (medication_package_available ?medication_package)
+        )
+      )
+  )
+  (:action reserve_package_and_attach_instruction
+    :parameters (?dispense_job - dispense_job ?dispensing_session - dispensing_session ?patient_profile - patient_profile ?packaging_spec - packaging_spec ?medication_package - medication_package)
+    :precondition
+      (and
+        (job_locked ?dispense_job)
+        (session_locked ?dispensing_session)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (patient_profile_selected ?patient_profile)
+        (packaging_spec_secondary_selected ?packaging_spec)
+        (dispense_job_substitution_confirmed ?dispense_job)
+        (not
+          (session_ready_for_packaging ?dispensing_session)
+        )
+        (medication_package_available ?medication_package)
+      )
+    :effect
+      (and
+        (medication_package_reserved ?medication_package)
+        (medication_package_for_patient_profile ?medication_package ?patient_profile)
+        (medication_package_for_packaging_spec ?medication_package ?packaging_spec)
+        (medication_package_instruction_attached ?medication_package)
+        (not
+          (medication_package_available ?medication_package)
+        )
+      )
+  )
+  (:action reserve_package_with_all_labels
+    :parameters (?dispense_job - dispense_job ?dispensing_session - dispensing_session ?patient_profile - patient_profile ?packaging_spec - packaging_spec ?medication_package - medication_package)
+    :precondition
+      (and
+        (job_locked ?dispense_job)
+        (session_locked ?dispensing_session)
+        (dispense_job_has_patient_profile ?dispense_job ?patient_profile)
+        (session_has_packaging_spec ?dispensing_session ?packaging_spec)
+        (patient_profile_marked_for_substitution ?patient_profile)
+        (packaging_spec_secondary_selected ?packaging_spec)
+        (not
+          (dispense_job_substitution_confirmed ?dispense_job)
+        )
+        (not
+          (session_ready_for_packaging ?dispensing_session)
+        )
+        (medication_package_available ?medication_package)
+      )
+    :effect
+      (and
+        (medication_package_reserved ?medication_package)
+        (medication_package_for_patient_profile ?medication_package ?patient_profile)
+        (medication_package_for_packaging_spec ?medication_package ?packaging_spec)
+        (medication_package_aux_label_applied ?medication_package)
+        (medication_package_instruction_attached ?medication_package)
+        (not
+          (medication_package_available ?medication_package)
+        )
+      )
+  )
+  (:action mark_medication_package_ready
+    :parameters (?medication_package - medication_package ?dispense_job - dispense_job ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (medication_package_reserved ?medication_package)
+        (job_locked ?dispense_job)
+        (rule_applied ?dispense_job ?clinical_rule)
+        (not
+          (medication_package_ready ?medication_package)
+        )
+      )
+    :effect (medication_package_ready ?medication_package)
+  )
+  (:action attach_packaging_component
+    :parameters (?pharmacist - pharmacist ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (pharmacist_assigned_to_package ?pharmacist ?medication_package)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_available ?packaging_component)
+        (medication_package_reserved ?medication_package)
+        (medication_package_ready ?medication_package)
+        (not
+          (packaging_component_attached ?packaging_component)
+        )
+      )
+    :effect
+      (and
+        (packaging_component_attached ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (not
+          (packaging_component_available ?packaging_component)
+        )
+      )
+  )
+  (:action verify_packaging_component
+    :parameters (?pharmacist - pharmacist ?packaging_component - packaging_component ?medication_package - medication_package ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_attached ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (rule_applied ?pharmacist ?clinical_rule)
+        (not
+          (medication_package_aux_label_applied ?medication_package)
+        )
+        (not
+          (pharmacist_component_verified ?pharmacist)
+        )
+      )
+    :effect (pharmacist_component_verified ?pharmacist)
+  )
+  (:action assign_aux_label_template_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?aux_label_template - aux_label_template)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (aux_label_template_available ?aux_label_template)
+        (not
+          (pharmacist_aux_label_assigned ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (pharmacist_aux_label_assigned ?pharmacist)
+        (pharmacist_assigned_aux_label_template ?pharmacist ?aux_label_template)
+        (not
+          (aux_label_template_available ?aux_label_template)
+        )
+      )
+  )
+  (:action apply_aux_label_to_component
+    :parameters (?pharmacist - pharmacist ?packaging_component - packaging_component ?medication_package - medication_package ?clinical_rule - clinical_rule ?aux_label_template - aux_label_template)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_attached ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (rule_applied ?pharmacist ?clinical_rule)
+        (medication_package_aux_label_applied ?medication_package)
+        (pharmacist_aux_label_assigned ?pharmacist)
+        (pharmacist_assigned_aux_label_template ?pharmacist ?aux_label_template)
+        (not
+          (pharmacist_component_verified ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (pharmacist_component_verified ?pharmacist)
+        (pharmacist_aux_label_prepared ?pharmacist)
+      )
+  )
+  (:action perform_initial_safety_check
+    :parameters (?pharmacist - pharmacist ?safety_check_template - safety_check_template ?approver - approver ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_component_verified ?pharmacist)
+        (pharmacist_assigned_safety_check_template ?pharmacist ?safety_check_template)
+        (assigned_to_approver ?pharmacist ?approver)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (not
+          (medication_package_instruction_attached ?medication_package)
+        )
+        (not
+          (pharmacist_safety_check_completed ?pharmacist)
+        )
+      )
+    :effect (pharmacist_safety_check_completed ?pharmacist)
+  )
+  (:action perform_followup_safety_check
+    :parameters (?pharmacist - pharmacist ?safety_check_template - safety_check_template ?approver - approver ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_component_verified ?pharmacist)
+        (pharmacist_assigned_safety_check_template ?pharmacist ?safety_check_template)
+        (assigned_to_approver ?pharmacist ?approver)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (medication_package_instruction_attached ?medication_package)
+        (not
+          (pharmacist_safety_check_completed ?pharmacist)
+        )
+      )
+    :effect (pharmacist_safety_check_completed ?pharmacist)
+  )
+  (:action initiate_labeling_finalization
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_safety_check_completed ?pharmacist)
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (not
+          (medication_package_aux_label_applied ?medication_package)
+        )
+        (not
+          (medication_package_instruction_attached ?medication_package)
+        )
+        (not
+          (labeling_complete ?pharmacist)
+        )
+      )
+    :effect (labeling_complete ?pharmacist)
+  )
+  (:action finalize_labeling_with_aux_label
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_safety_check_completed ?pharmacist)
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (medication_package_aux_label_applied ?medication_package)
+        (not
+          (medication_package_instruction_attached ?medication_package)
+        )
+        (not
+          (labeling_complete ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_instruction_attached ?pharmacist)
+      )
+  )
+  (:action finalize_labeling_with_instruction
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_safety_check_completed ?pharmacist)
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (not
+          (medication_package_aux_label_applied ?medication_package)
+        )
+        (medication_package_instruction_attached ?medication_package)
+        (not
+          (labeling_complete ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_instruction_attached ?pharmacist)
+      )
+  )
+  (:action finalize_labeling_with_all_labels
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document ?packaging_component - packaging_component ?medication_package - medication_package)
+    :precondition
+      (and
+        (pharmacist_safety_check_completed ?pharmacist)
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (pharmacist_selected_packaging_component ?pharmacist ?packaging_component)
+        (packaging_component_in_medication_package ?packaging_component ?medication_package)
+        (medication_package_aux_label_applied ?medication_package)
+        (medication_package_instruction_attached ?medication_package)
+        (not
+          (labeling_complete ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_instruction_attached ?pharmacist)
+      )
+  )
+  (:action pharmacist_final_verification_without_instructions
+    :parameters (?pharmacist - pharmacist)
+    :precondition
+      (and
+        (labeling_complete ?pharmacist)
+        (not
+          (pharmacist_instruction_attached ?pharmacist)
+        )
+        (not
+          (final_verification_recorded ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (final_verification_recorded ?pharmacist)
+        (entity_released ?pharmacist)
+      )
+  )
+  (:action assign_instruction_template_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?instruction_template - instruction_template)
+    :precondition
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_instruction_attached ?pharmacist)
+        (instruction_template_available ?instruction_template)
+      )
+    :effect
+      (and
+        (pharmacist_assigned_instruction_template ?pharmacist ?instruction_template)
+        (not
+          (instruction_template_available ?instruction_template)
+        )
+      )
+  )
+  (:action complete_final_verification_for_package
+    :parameters (?pharmacist - pharmacist ?dispense_job - dispense_job ?dispensing_session - dispensing_session ?clinical_rule - clinical_rule ?instruction_template - instruction_template)
+    :precondition
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_instruction_attached ?pharmacist)
+        (pharmacist_assigned_instruction_template ?pharmacist ?instruction_template)
+        (pharmacist_assigned_to_dispense_job ?pharmacist ?dispense_job)
+        (pharmacist_assigned_to_session ?pharmacist ?dispensing_session)
+        (dispense_job_substitution_confirmed ?dispense_job)
+        (session_ready_for_packaging ?dispensing_session)
+        (rule_applied ?pharmacist ?clinical_rule)
+        (not
+          (pharmacist_final_verification ?pharmacist)
+        )
+      )
+    :effect (pharmacist_final_verification ?pharmacist)
+  )
+  (:action pharmacist_record_final_verification
+    :parameters (?pharmacist - pharmacist)
+    :precondition
+      (and
+        (labeling_complete ?pharmacist)
+        (pharmacist_final_verification ?pharmacist)
+        (not
+          (final_verification_recorded ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (final_verification_recorded ?pharmacist)
+        (entity_released ?pharmacist)
+      )
+  )
+  (:action assign_authorization_request_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?authorization_request - authorization_request ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (screening_completed ?pharmacist)
+        (rule_applied ?pharmacist ?clinical_rule)
+        (authorization_request_available ?authorization_request)
+        (pharmacist_assigned_authorization_request ?pharmacist ?authorization_request)
+        (not
+          (authorization_in_progress_for_pharmacist ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (authorization_in_progress_for_pharmacist ?pharmacist)
+        (not
+          (authorization_request_available ?authorization_request)
+        )
+      )
+  )
+  (:action prepare_approval_document
+    :parameters (?pharmacist - pharmacist ?approver - approver)
+    :precondition
+      (and
+        (authorization_in_progress_for_pharmacist ?pharmacist)
+        (assigned_to_approver ?pharmacist ?approver)
+        (not
+          (approval_document_prepared ?pharmacist)
+        )
+      )
+    :effect (approval_document_prepared ?pharmacist)
+  )
+  (:action attach_approval_document_to_pharmacist
+    :parameters (?pharmacist - pharmacist ?approval_document - approval_document)
+    :precondition
+      (and
+        (approval_document_prepared ?pharmacist)
+        (pharmacist_assigned_approval_document ?pharmacist ?approval_document)
+        (not
+          (approval_document_attached ?pharmacist)
+        )
+      )
+    :effect (approval_document_attached ?pharmacist)
+  )
+  (:action finalize_authorization_and_record
+    :parameters (?pharmacist - pharmacist)
+    :precondition
+      (and
+        (approval_document_attached ?pharmacist)
+        (not
+          (final_verification_recorded ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (final_verification_recorded ?pharmacist)
+        (entity_released ?pharmacist)
+      )
+  )
+  (:action release_dispense_job
+    :parameters (?dispense_job - dispense_job ?medication_package - medication_package)
+    :precondition
+      (and
+        (job_locked ?dispense_job)
+        (dispense_job_substitution_confirmed ?dispense_job)
+        (medication_package_reserved ?medication_package)
+        (medication_package_ready ?medication_package)
+        (not
+          (entity_released ?dispense_job)
+        )
+      )
+    :effect (entity_released ?dispense_job)
+  )
+  (:action release_dispensing_session
+    :parameters (?dispensing_session - dispensing_session ?medication_package - medication_package)
+    :precondition
+      (and
+        (session_locked ?dispensing_session)
+        (session_ready_for_packaging ?dispensing_session)
+        (medication_package_reserved ?medication_package)
+        (medication_package_ready ?medication_package)
+        (not
+          (entity_released ?dispensing_session)
+        )
+      )
+    :effect (entity_released ?dispensing_session)
+  )
+  (:action generate_patient_instruction_for_prescription
+    :parameters (?prescription - prescription ?patient_instruction - patient_instruction ?clinical_rule - clinical_rule)
+    :precondition
+      (and
+        (entity_released ?prescription)
+        (rule_applied ?prescription ?clinical_rule)
+        (patient_instruction_available ?patient_instruction)
+        (not
+          (patient_instruction_generated ?prescription)
+        )
+      )
+    :effect
+      (and
+        (patient_instruction_generated ?prescription)
+        (has_patient_instruction ?prescription ?patient_instruction)
+        (not
+          (patient_instruction_available ?patient_instruction)
+        )
+      )
+  )
+  (:action finalize_dispense_job_and_publish_instruction
+    :parameters (?dispense_job - dispense_job ?formulary_option - formulary_option ?patient_instruction - patient_instruction)
+    :precondition
+      (and
+        (patient_instruction_generated ?dispense_job)
+        (has_formulary_option ?dispense_job ?formulary_option)
+        (has_patient_instruction ?dispense_job ?patient_instruction)
+        (not
+          (formulary_compliance_cleared ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (formulary_compliance_cleared ?dispense_job)
+        (formulary_option_available ?formulary_option)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+  (:action finalize_dispensing_session_and_publish_instruction
+    :parameters (?dispensing_session - dispensing_session ?formulary_option - formulary_option ?patient_instruction - patient_instruction)
+    :precondition
+      (and
+        (patient_instruction_generated ?dispensing_session)
+        (has_formulary_option ?dispensing_session ?formulary_option)
+        (has_patient_instruction ?dispensing_session ?patient_instruction)
+        (not
+          (formulary_compliance_cleared ?dispensing_session)
+        )
+      )
+    :effect
+      (and
+        (formulary_compliance_cleared ?dispensing_session)
+        (formulary_option_available ?formulary_option)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+  (:action finalize_pharmacist_and_publish_instruction
+    :parameters (?pharmacist - pharmacist ?formulary_option - formulary_option ?patient_instruction - patient_instruction)
+    :precondition
+      (and
+        (patient_instruction_generated ?pharmacist)
+        (has_formulary_option ?pharmacist ?formulary_option)
+        (has_patient_instruction ?pharmacist ?patient_instruction)
+        (not
+          (formulary_compliance_cleared ?pharmacist)
+        )
+      )
+    :effect
+      (and
+        (formulary_compliance_cleared ?pharmacist)
+        (formulary_option_available ?formulary_option)
+        (patient_instruction_available ?patient_instruction)
+      )
+  )
+)

@@ -1,0 +1,1076 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain material_release_under_quality_constraints_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity - object document_category - object operational_activity_category - object release_candidate_root - object release_candidate - release_candidate_root approver - resource_entity analytical_test_result - resource_entity qa_representative - resource_entity regulatory_checklist - resource_entity training_record - resource_entity regulatory_evidence - resource_entity technical_specialist_approval - resource_entity validation_specialist - resource_entity capa_item - document_category certificate_of_analysis - document_category stability_expert_approval - document_category validation_task - operational_activity_category inspection_activity - operational_activity_category release_record - operational_activity_category manufacturing_batch_group - release_candidate dossier_group - release_candidate production_batch - manufacturing_batch_group inbound_batch - manufacturing_batch_group release_dossier - dossier_group)
+  (:predicates
+    (release_requested ?release_candidate - release_candidate)
+    (entity_under_quality_review ?release_candidate - release_candidate)
+    (approver_assigned ?release_candidate - release_candidate)
+    (release_authorized ?release_candidate - release_candidate)
+    (final_readiness_confirmed ?release_candidate - release_candidate)
+    (entity_has_regulatory_evidence ?release_candidate - release_candidate)
+    (approver_available ?approver - approver)
+    (assigned_approver ?release_candidate - release_candidate ?approver - approver)
+    (test_result_available ?analytical_test_result - analytical_test_result)
+    (test_result_linked ?release_candidate - release_candidate ?analytical_test_result - analytical_test_result)
+    (qa_representative_available ?qa_representative - qa_representative)
+    (qa_representative_assigned ?release_candidate - release_candidate ?qa_representative - qa_representative)
+    (capa_item_available ?capa_item - capa_item)
+    (capa_assigned_to_production_batch ?production_batch - production_batch ?capa_item - capa_item)
+    (capa_assigned_to_inbound_batch ?inbound_batch - inbound_batch ?capa_item - capa_item)
+    (validation_task_assigned_to_batch ?production_batch - production_batch ?validation_task - validation_task)
+    (validation_task_declared ?validation_task - validation_task)
+    (validation_task_requires_capa ?validation_task - validation_task)
+    (batch_validated ?production_batch - production_batch)
+    (inspection_task_assigned_to_inbound_batch ?inbound_batch - inbound_batch ?inspection_activity - inspection_activity)
+    (inspection_task_declared ?inspection_activity - inspection_activity)
+    (inspection_task_requires_capa ?inspection_activity - inspection_activity)
+    (inbound_batch_inspection_passed ?inbound_batch - inbound_batch)
+    (release_record_available ?release_record - release_record)
+    (release_record_assembled ?release_record - release_record)
+    (release_record_contains_validation ?release_record - release_record ?validation_task - validation_task)
+    (release_record_contains_inspection ?release_record - release_record ?inspection_activity - inspection_activity)
+    (release_record_technical_review_complete ?release_record - release_record)
+    (release_record_stability_review_complete ?release_record - release_record)
+    (release_record_quality_verified ?release_record - release_record)
+    (dossier_covers_production_batch ?release_dossier - release_dossier ?production_batch - production_batch)
+    (dossier_covers_inbound_batch ?release_dossier - release_dossier ?inbound_batch - inbound_batch)
+    (dossier_linked_to_release_record ?release_dossier - release_dossier ?release_record - release_record)
+    (coa_available ?certificate_of_analysis - certificate_of_analysis)
+    (dossier_has_coa_attached ?release_dossier - release_dossier ?certificate_of_analysis - certificate_of_analysis)
+    (coa_processed ?certificate_of_analysis - certificate_of_analysis)
+    (coa_linked_to_release_record ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    (dossier_documents_reviewed ?release_dossier - release_dossier)
+    (dossier_technical_reviewed ?release_dossier - release_dossier)
+    (dossier_ready_for_final_signoff ?release_dossier - release_dossier)
+    (regulatory_checklist_assigned ?release_dossier - release_dossier)
+    (dossier_document_review_completed ?release_dossier - release_dossier)
+    (dossier_training_evidence_present ?release_dossier - release_dossier)
+    (dossier_all_checks_passed ?release_dossier - release_dossier)
+    (stability_approval_available ?stability_expert_approval - stability_expert_approval)
+    (dossier_has_stability_approval ?release_dossier - release_dossier ?stability_expert_approval - stability_expert_approval)
+    (dossier_stability_reviewed ?release_dossier - release_dossier)
+    (dossier_stability_review_ready ?release_dossier - release_dossier)
+    (dossier_stability_approval_recorded ?release_dossier - release_dossier)
+    (regulatory_checklist_available ?regulatory_checklist - regulatory_checklist)
+    (dossier_has_regulatory_checklist ?release_dossier - release_dossier ?regulatory_checklist - regulatory_checklist)
+    (training_record_available ?training_record - training_record)
+    (dossier_has_training_record ?release_dossier - release_dossier ?training_record - training_record)
+    (technical_specialist_approval_available ?technical_specialist_approval - technical_specialist_approval)
+    (dossier_has_technical_specialist_approval ?release_dossier - release_dossier ?technical_specialist_approval - technical_specialist_approval)
+    (validation_specialist_available ?validation_specialist - validation_specialist)
+    (dossier_has_validation_specialist ?release_dossier - release_dossier ?validation_specialist - validation_specialist)
+    (regulatory_evidence_available ?regulatory_evidence - regulatory_evidence)
+    (candidate_linked_to_regulatory_evidence ?release_candidate - release_candidate ?regulatory_evidence - regulatory_evidence)
+    (validation_evidence_recorded ?production_batch - production_batch)
+    (inspection_evidence_recorded ?inbound_batch - inbound_batch)
+    (final_signoff_recorded ?release_dossier - release_dossier)
+  )
+  (:action initiate_release_request
+    :parameters (?release_candidate - release_candidate)
+    :precondition
+      (and
+        (not
+          (release_requested ?release_candidate)
+        )
+        (not
+          (release_authorized ?release_candidate)
+        )
+      )
+    :effect (release_requested ?release_candidate)
+  )
+  (:action assign_approver_to_candidate
+    :parameters (?release_candidate - release_candidate ?approver - approver)
+    :precondition
+      (and
+        (release_requested ?release_candidate)
+        (not
+          (approver_assigned ?release_candidate)
+        )
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (approver_assigned ?release_candidate)
+        (assigned_approver ?release_candidate ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action attach_test_result_to_candidate
+    :parameters (?release_candidate - release_candidate ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (release_requested ?release_candidate)
+        (approver_assigned ?release_candidate)
+        (test_result_available ?analytical_test_result)
+      )
+    :effect
+      (and
+        (test_result_linked ?release_candidate ?analytical_test_result)
+        (not
+          (test_result_available ?analytical_test_result)
+        )
+      )
+  )
+  (:action start_qa_review
+    :parameters (?release_candidate - release_candidate ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (release_requested ?release_candidate)
+        (approver_assigned ?release_candidate)
+        (test_result_linked ?release_candidate ?analytical_test_result)
+        (not
+          (entity_under_quality_review ?release_candidate)
+        )
+      )
+    :effect (entity_under_quality_review ?release_candidate)
+  )
+  (:action unassign_test_result_from_candidate
+    :parameters (?release_candidate - release_candidate ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (test_result_linked ?release_candidate ?analytical_test_result)
+      )
+    :effect
+      (and
+        (test_result_available ?analytical_test_result)
+        (not
+          (test_result_linked ?release_candidate ?analytical_test_result)
+        )
+      )
+  )
+  (:action assign_qa_representative
+    :parameters (?release_candidate - release_candidate ?qa_representative - qa_representative)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_candidate)
+        (qa_representative_available ?qa_representative)
+      )
+    :effect
+      (and
+        (qa_representative_assigned ?release_candidate ?qa_representative)
+        (not
+          (qa_representative_available ?qa_representative)
+        )
+      )
+  )
+  (:action unassign_qa_representative
+    :parameters (?release_candidate - release_candidate ?qa_representative - qa_representative)
+    :precondition
+      (and
+        (qa_representative_assigned ?release_candidate ?qa_representative)
+      )
+    :effect
+      (and
+        (qa_representative_available ?qa_representative)
+        (not
+          (qa_representative_assigned ?release_candidate ?qa_representative)
+        )
+      )
+  )
+  (:action assign_technical_specialist_approval
+    :parameters (?release_dossier - release_dossier ?technical_specialist_approval - technical_specialist_approval)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (technical_specialist_approval_available ?technical_specialist_approval)
+      )
+    :effect
+      (and
+        (dossier_has_technical_specialist_approval ?release_dossier ?technical_specialist_approval)
+        (not
+          (technical_specialist_approval_available ?technical_specialist_approval)
+        )
+      )
+  )
+  (:action revoke_technical_specialist_approval
+    :parameters (?release_dossier - release_dossier ?technical_specialist_approval - technical_specialist_approval)
+    :precondition
+      (and
+        (dossier_has_technical_specialist_approval ?release_dossier ?technical_specialist_approval)
+      )
+    :effect
+      (and
+        (technical_specialist_approval_available ?technical_specialist_approval)
+        (not
+          (dossier_has_technical_specialist_approval ?release_dossier ?technical_specialist_approval)
+        )
+      )
+  )
+  (:action assign_validation_specialist_to_dossier
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (validation_specialist_available ?validation_specialist)
+      )
+    :effect
+      (and
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (not
+          (validation_specialist_available ?validation_specialist)
+        )
+      )
+  )
+  (:action revoke_validation_specialist_from_dossier
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist)
+    :precondition
+      (and
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+      )
+    :effect
+      (and
+        (validation_specialist_available ?validation_specialist)
+        (not
+          (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        )
+      )
+  )
+  (:action declare_validation_task
+    :parameters (?production_batch - production_batch ?validation_task - validation_task ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (entity_under_quality_review ?production_batch)
+        (test_result_linked ?production_batch ?analytical_test_result)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (not
+          (validation_task_declared ?validation_task)
+        )
+        (not
+          (validation_task_requires_capa ?validation_task)
+        )
+      )
+    :effect (validation_task_declared ?validation_task)
+  )
+  (:action complete_validation_activity
+    :parameters (?production_batch - production_batch ?validation_task - validation_task ?qa_representative - qa_representative)
+    :precondition
+      (and
+        (entity_under_quality_review ?production_batch)
+        (qa_representative_assigned ?production_batch ?qa_representative)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (validation_task_declared ?validation_task)
+        (not
+          (validation_evidence_recorded ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (batch_validated ?production_batch)
+      )
+  )
+  (:action open_capa_for_validation
+    :parameters (?production_batch - production_batch ?validation_task - validation_task ?capa_item - capa_item)
+    :precondition
+      (and
+        (entity_under_quality_review ?production_batch)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (capa_item_available ?capa_item)
+        (not
+          (validation_evidence_recorded ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (validation_task_requires_capa ?validation_task)
+        (validation_evidence_recorded ?production_batch)
+        (capa_assigned_to_production_batch ?production_batch ?capa_item)
+        (not
+          (capa_item_available ?capa_item)
+        )
+      )
+  )
+  (:action resolve_capa_and_revalidate
+    :parameters (?production_batch - production_batch ?validation_task - validation_task ?analytical_test_result - analytical_test_result ?capa_item - capa_item)
+    :precondition
+      (and
+        (entity_under_quality_review ?production_batch)
+        (test_result_linked ?production_batch ?analytical_test_result)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (validation_task_requires_capa ?validation_task)
+        (capa_assigned_to_production_batch ?production_batch ?capa_item)
+        (not
+          (batch_validated ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (validation_task_declared ?validation_task)
+        (batch_validated ?production_batch)
+        (capa_item_available ?capa_item)
+        (not
+          (capa_assigned_to_production_batch ?production_batch ?capa_item)
+        )
+      )
+  )
+  (:action declare_inspection_task
+    :parameters (?inbound_batch - inbound_batch ?inspection_activity - inspection_activity ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (entity_under_quality_review ?inbound_batch)
+        (test_result_linked ?inbound_batch ?analytical_test_result)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (not
+          (inspection_task_declared ?inspection_activity)
+        )
+        (not
+          (inspection_task_requires_capa ?inspection_activity)
+        )
+      )
+    :effect (inspection_task_declared ?inspection_activity)
+  )
+  (:action assign_qa_and_complete_inspection
+    :parameters (?inbound_batch - inbound_batch ?inspection_activity - inspection_activity ?qa_representative - qa_representative)
+    :precondition
+      (and
+        (entity_under_quality_review ?inbound_batch)
+        (qa_representative_assigned ?inbound_batch ?qa_representative)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (inspection_task_declared ?inspection_activity)
+        (not
+          (inspection_evidence_recorded ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (inspection_evidence_recorded ?inbound_batch)
+        (inbound_batch_inspection_passed ?inbound_batch)
+      )
+  )
+  (:action open_capa_for_inspection
+    :parameters (?inbound_batch - inbound_batch ?inspection_activity - inspection_activity ?capa_item - capa_item)
+    :precondition
+      (and
+        (entity_under_quality_review ?inbound_batch)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (capa_item_available ?capa_item)
+        (not
+          (inspection_evidence_recorded ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (inspection_task_requires_capa ?inspection_activity)
+        (inspection_evidence_recorded ?inbound_batch)
+        (capa_assigned_to_inbound_batch ?inbound_batch ?capa_item)
+        (not
+          (capa_item_available ?capa_item)
+        )
+      )
+  )
+  (:action resolve_inspection_capa_and_reassess
+    :parameters (?inbound_batch - inbound_batch ?inspection_activity - inspection_activity ?analytical_test_result - analytical_test_result ?capa_item - capa_item)
+    :precondition
+      (and
+        (entity_under_quality_review ?inbound_batch)
+        (test_result_linked ?inbound_batch ?analytical_test_result)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (inspection_task_requires_capa ?inspection_activity)
+        (capa_assigned_to_inbound_batch ?inbound_batch ?capa_item)
+        (not
+          (inbound_batch_inspection_passed ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (inspection_task_declared ?inspection_activity)
+        (inbound_batch_inspection_passed ?inbound_batch)
+        (capa_item_available ?capa_item)
+        (not
+          (capa_assigned_to_inbound_batch ?inbound_batch ?capa_item)
+        )
+      )
+  )
+  (:action assemble_release_record_standard
+    :parameters (?production_batch - production_batch ?inbound_batch - inbound_batch ?validation_task - validation_task ?inspection_activity - inspection_activity ?release_record - release_record)
+    :precondition
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (inspection_evidence_recorded ?inbound_batch)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (validation_task_declared ?validation_task)
+        (inspection_task_declared ?inspection_activity)
+        (batch_validated ?production_batch)
+        (inbound_batch_inspection_passed ?inbound_batch)
+        (release_record_available ?release_record)
+      )
+    :effect
+      (and
+        (release_record_assembled ?release_record)
+        (release_record_contains_validation ?release_record ?validation_task)
+        (release_record_contains_inspection ?release_record ?inspection_activity)
+        (not
+          (release_record_available ?release_record)
+        )
+      )
+  )
+  (:action assemble_release_record_with_technical_review
+    :parameters (?production_batch - production_batch ?inbound_batch - inbound_batch ?validation_task - validation_task ?inspection_activity - inspection_activity ?release_record - release_record)
+    :precondition
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (inspection_evidence_recorded ?inbound_batch)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (validation_task_requires_capa ?validation_task)
+        (inspection_task_declared ?inspection_activity)
+        (not
+          (batch_validated ?production_batch)
+        )
+        (inbound_batch_inspection_passed ?inbound_batch)
+        (release_record_available ?release_record)
+      )
+    :effect
+      (and
+        (release_record_assembled ?release_record)
+        (release_record_contains_validation ?release_record ?validation_task)
+        (release_record_contains_inspection ?release_record ?inspection_activity)
+        (release_record_technical_review_complete ?release_record)
+        (not
+          (release_record_available ?release_record)
+        )
+      )
+  )
+  (:action assemble_release_record_with_stability_review
+    :parameters (?production_batch - production_batch ?inbound_batch - inbound_batch ?validation_task - validation_task ?inspection_activity - inspection_activity ?release_record - release_record)
+    :precondition
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (inspection_evidence_recorded ?inbound_batch)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (validation_task_declared ?validation_task)
+        (inspection_task_requires_capa ?inspection_activity)
+        (batch_validated ?production_batch)
+        (not
+          (inbound_batch_inspection_passed ?inbound_batch)
+        )
+        (release_record_available ?release_record)
+      )
+    :effect
+      (and
+        (release_record_assembled ?release_record)
+        (release_record_contains_validation ?release_record ?validation_task)
+        (release_record_contains_inspection ?release_record ?inspection_activity)
+        (release_record_stability_review_complete ?release_record)
+        (not
+          (release_record_available ?release_record)
+        )
+      )
+  )
+  (:action assemble_release_record_full_review
+    :parameters (?production_batch - production_batch ?inbound_batch - inbound_batch ?validation_task - validation_task ?inspection_activity - inspection_activity ?release_record - release_record)
+    :precondition
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (inspection_evidence_recorded ?inbound_batch)
+        (validation_task_assigned_to_batch ?production_batch ?validation_task)
+        (inspection_task_assigned_to_inbound_batch ?inbound_batch ?inspection_activity)
+        (validation_task_requires_capa ?validation_task)
+        (inspection_task_requires_capa ?inspection_activity)
+        (not
+          (batch_validated ?production_batch)
+        )
+        (not
+          (inbound_batch_inspection_passed ?inbound_batch)
+        )
+        (release_record_available ?release_record)
+      )
+    :effect
+      (and
+        (release_record_assembled ?release_record)
+        (release_record_contains_validation ?release_record ?validation_task)
+        (release_record_contains_inspection ?release_record ?inspection_activity)
+        (release_record_technical_review_complete ?release_record)
+        (release_record_stability_review_complete ?release_record)
+        (not
+          (release_record_available ?release_record)
+        )
+      )
+  )
+  (:action verify_release_record_quality
+    :parameters (?release_record - release_record ?production_batch - production_batch ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (release_record_assembled ?release_record)
+        (validation_evidence_recorded ?production_batch)
+        (test_result_linked ?production_batch ?analytical_test_result)
+        (not
+          (release_record_quality_verified ?release_record)
+        )
+      )
+    :effect (release_record_quality_verified ?release_record)
+  )
+  (:action attach_coa_and_mark_processed
+    :parameters (?release_dossier - release_dossier ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (dossier_linked_to_release_record ?release_dossier ?release_record)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_available ?certificate_of_analysis)
+        (release_record_assembled ?release_record)
+        (release_record_quality_verified ?release_record)
+        (not
+          (coa_processed ?certificate_of_analysis)
+        )
+      )
+    :effect
+      (and
+        (coa_processed ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (not
+          (coa_available ?certificate_of_analysis)
+        )
+      )
+  )
+  (:action verify_coa_and_mark_dossier_review
+    :parameters (?release_dossier - release_dossier ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_processed ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (test_result_linked ?release_dossier ?analytical_test_result)
+        (not
+          (release_record_technical_review_complete ?release_record)
+        )
+        (not
+          (dossier_documents_reviewed ?release_dossier)
+        )
+      )
+    :effect (dossier_documents_reviewed ?release_dossier)
+  )
+  (:action assign_regulatory_checklist_to_dossier
+    :parameters (?release_dossier - release_dossier ?regulatory_checklist - regulatory_checklist)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (regulatory_checklist_available ?regulatory_checklist)
+        (not
+          (regulatory_checklist_assigned ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (regulatory_checklist_assigned ?release_dossier)
+        (dossier_has_regulatory_checklist ?release_dossier ?regulatory_checklist)
+        (not
+          (regulatory_checklist_available ?regulatory_checklist)
+        )
+      )
+  )
+  (:action apply_regulatory_checklist_and_record_review
+    :parameters (?release_dossier - release_dossier ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record ?analytical_test_result - analytical_test_result ?regulatory_checklist - regulatory_checklist)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_processed ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (test_result_linked ?release_dossier ?analytical_test_result)
+        (release_record_technical_review_complete ?release_record)
+        (regulatory_checklist_assigned ?release_dossier)
+        (dossier_has_regulatory_checklist ?release_dossier ?regulatory_checklist)
+        (not
+          (dossier_documents_reviewed ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_documents_reviewed ?release_dossier)
+        (dossier_document_review_completed ?release_dossier)
+      )
+  )
+  (:action apply_technical_approval_primary
+    :parameters (?release_dossier - release_dossier ?technical_specialist_approval - technical_specialist_approval ?qa_representative - qa_representative ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_documents_reviewed ?release_dossier)
+        (dossier_has_technical_specialist_approval ?release_dossier ?technical_specialist_approval)
+        (qa_representative_assigned ?release_dossier ?qa_representative)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (not
+          (release_record_stability_review_complete ?release_record)
+        )
+        (not
+          (dossier_technical_reviewed ?release_dossier)
+        )
+      )
+    :effect (dossier_technical_reviewed ?release_dossier)
+  )
+  (:action apply_technical_approval_secondary
+    :parameters (?release_dossier - release_dossier ?technical_specialist_approval - technical_specialist_approval ?qa_representative - qa_representative ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_documents_reviewed ?release_dossier)
+        (dossier_has_technical_specialist_approval ?release_dossier ?technical_specialist_approval)
+        (qa_representative_assigned ?release_dossier ?qa_representative)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (release_record_stability_review_complete ?release_record)
+        (not
+          (dossier_technical_reviewed ?release_dossier)
+        )
+      )
+    :effect (dossier_technical_reviewed ?release_dossier)
+  )
+  (:action apply_validation_specialist_approval_primary
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_technical_reviewed ?release_dossier)
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (not
+          (release_record_technical_review_complete ?release_record)
+        )
+        (not
+          (release_record_stability_review_complete ?release_record)
+        )
+        (not
+          (dossier_ready_for_final_signoff ?release_dossier)
+        )
+      )
+    :effect (dossier_ready_for_final_signoff ?release_dossier)
+  )
+  (:action apply_validation_specialist_approval_with_training
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_technical_reviewed ?release_dossier)
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (release_record_technical_review_complete ?release_record)
+        (not
+          (release_record_stability_review_complete ?release_record)
+        )
+        (not
+          (dossier_ready_for_final_signoff ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_training_evidence_present ?release_dossier)
+      )
+  )
+  (:action apply_validation_specialist_approval_secondary
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_technical_reviewed ?release_dossier)
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (not
+          (release_record_technical_review_complete ?release_record)
+        )
+        (release_record_stability_review_complete ?release_record)
+        (not
+          (dossier_ready_for_final_signoff ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_training_evidence_present ?release_dossier)
+      )
+  )
+  (:action apply_validation_specialist_approval_tertiary
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist ?certificate_of_analysis - certificate_of_analysis ?release_record - release_record)
+    :precondition
+      (and
+        (dossier_technical_reviewed ?release_dossier)
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (dossier_has_coa_attached ?release_dossier ?certificate_of_analysis)
+        (coa_linked_to_release_record ?certificate_of_analysis ?release_record)
+        (release_record_technical_review_complete ?release_record)
+        (release_record_stability_review_complete ?release_record)
+        (not
+          (dossier_ready_for_final_signoff ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_training_evidence_present ?release_dossier)
+      )
+  )
+  (:action record_dossier_readiness
+    :parameters (?release_dossier - release_dossier)
+    :precondition
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (not
+          (dossier_training_evidence_present ?release_dossier)
+        )
+        (not
+          (final_signoff_recorded ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (final_signoff_recorded ?release_dossier)
+        (final_readiness_confirmed ?release_dossier)
+      )
+  )
+  (:action attach_training_record
+    :parameters (?release_dossier - release_dossier ?training_record - training_record)
+    :precondition
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_training_evidence_present ?release_dossier)
+        (training_record_available ?training_record)
+      )
+    :effect
+      (and
+        (dossier_has_training_record ?release_dossier ?training_record)
+        (not
+          (training_record_available ?training_record)
+        )
+      )
+  )
+  (:action complete_dossier_compliance_checks
+    :parameters (?release_dossier - release_dossier ?production_batch - production_batch ?inbound_batch - inbound_batch ?analytical_test_result - analytical_test_result ?training_record - training_record)
+    :precondition
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_training_evidence_present ?release_dossier)
+        (dossier_has_training_record ?release_dossier ?training_record)
+        (dossier_covers_production_batch ?release_dossier ?production_batch)
+        (dossier_covers_inbound_batch ?release_dossier ?inbound_batch)
+        (batch_validated ?production_batch)
+        (inbound_batch_inspection_passed ?inbound_batch)
+        (test_result_linked ?release_dossier ?analytical_test_result)
+        (not
+          (dossier_all_checks_passed ?release_dossier)
+        )
+      )
+    :effect (dossier_all_checks_passed ?release_dossier)
+  )
+  (:action finalize_dossier_signoff
+    :parameters (?release_dossier - release_dossier)
+    :precondition
+      (and
+        (dossier_ready_for_final_signoff ?release_dossier)
+        (dossier_all_checks_passed ?release_dossier)
+        (not
+          (final_signoff_recorded ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (final_signoff_recorded ?release_dossier)
+        (final_readiness_confirmed ?release_dossier)
+      )
+  )
+  (:action apply_stability_expert_approval
+    :parameters (?release_dossier - release_dossier ?stability_expert_approval - stability_expert_approval ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (entity_under_quality_review ?release_dossier)
+        (test_result_linked ?release_dossier ?analytical_test_result)
+        (stability_approval_available ?stability_expert_approval)
+        (dossier_has_stability_approval ?release_dossier ?stability_expert_approval)
+        (not
+          (dossier_stability_reviewed ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (dossier_stability_reviewed ?release_dossier)
+        (not
+          (stability_approval_available ?stability_expert_approval)
+        )
+      )
+  )
+  (:action prepare_dossier_for_stability_signoff
+    :parameters (?release_dossier - release_dossier ?qa_representative - qa_representative)
+    :precondition
+      (and
+        (dossier_stability_reviewed ?release_dossier)
+        (qa_representative_assigned ?release_dossier ?qa_representative)
+        (not
+          (dossier_stability_review_ready ?release_dossier)
+        )
+      )
+    :effect (dossier_stability_review_ready ?release_dossier)
+  )
+  (:action record_stability_signoff
+    :parameters (?release_dossier - release_dossier ?validation_specialist - validation_specialist)
+    :precondition
+      (and
+        (dossier_stability_review_ready ?release_dossier)
+        (dossier_has_validation_specialist ?release_dossier ?validation_specialist)
+        (not
+          (dossier_stability_approval_recorded ?release_dossier)
+        )
+      )
+    :effect (dossier_stability_approval_recorded ?release_dossier)
+  )
+  (:action finalize_stability_signoff_and_mark_ready
+    :parameters (?release_dossier - release_dossier)
+    :precondition
+      (and
+        (dossier_stability_approval_recorded ?release_dossier)
+        (not
+          (final_signoff_recorded ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (final_signoff_recorded ?release_dossier)
+        (final_readiness_confirmed ?release_dossier)
+      )
+  )
+  (:action authorize_production_batch_release
+    :parameters (?production_batch - production_batch ?release_record - release_record)
+    :precondition
+      (and
+        (validation_evidence_recorded ?production_batch)
+        (batch_validated ?production_batch)
+        (release_record_assembled ?release_record)
+        (release_record_quality_verified ?release_record)
+        (not
+          (final_readiness_confirmed ?production_batch)
+        )
+      )
+    :effect (final_readiness_confirmed ?production_batch)
+  )
+  (:action authorize_inbound_batch_release
+    :parameters (?inbound_batch - inbound_batch ?release_record - release_record)
+    :precondition
+      (and
+        (inspection_evidence_recorded ?inbound_batch)
+        (inbound_batch_inspection_passed ?inbound_batch)
+        (release_record_assembled ?release_record)
+        (release_record_quality_verified ?release_record)
+        (not
+          (final_readiness_confirmed ?inbound_batch)
+        )
+      )
+    :effect (final_readiness_confirmed ?inbound_batch)
+  )
+  (:action attach_regulatory_evidence_to_candidate
+    :parameters (?release_candidate - release_candidate ?regulatory_evidence - regulatory_evidence ?analytical_test_result - analytical_test_result)
+    :precondition
+      (and
+        (final_readiness_confirmed ?release_candidate)
+        (test_result_linked ?release_candidate ?analytical_test_result)
+        (regulatory_evidence_available ?regulatory_evidence)
+        (not
+          (entity_has_regulatory_evidence ?release_candidate)
+        )
+      )
+    :effect
+      (and
+        (entity_has_regulatory_evidence ?release_candidate)
+        (candidate_linked_to_regulatory_evidence ?release_candidate ?regulatory_evidence)
+        (not
+          (regulatory_evidence_available ?regulatory_evidence)
+        )
+      )
+  )
+  (:action release_production_batch_to_inventory
+    :parameters (?production_batch - production_batch ?approver - approver ?regulatory_evidence - regulatory_evidence)
+    :precondition
+      (and
+        (entity_has_regulatory_evidence ?production_batch)
+        (assigned_approver ?production_batch ?approver)
+        (candidate_linked_to_regulatory_evidence ?production_batch ?regulatory_evidence)
+        (not
+          (release_authorized ?production_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorized ?production_batch)
+        (approver_available ?approver)
+        (regulatory_evidence_available ?regulatory_evidence)
+      )
+  )
+  (:action release_inbound_batch_to_inventory
+    :parameters (?inbound_batch - inbound_batch ?approver - approver ?regulatory_evidence - regulatory_evidence)
+    :precondition
+      (and
+        (entity_has_regulatory_evidence ?inbound_batch)
+        (assigned_approver ?inbound_batch ?approver)
+        (candidate_linked_to_regulatory_evidence ?inbound_batch ?regulatory_evidence)
+        (not
+          (release_authorized ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorized ?inbound_batch)
+        (approver_available ?approver)
+        (regulatory_evidence_available ?regulatory_evidence)
+      )
+  )
+  (:action execute_dossier_release
+    :parameters (?release_dossier - release_dossier ?approver - approver ?regulatory_evidence - regulatory_evidence)
+    :precondition
+      (and
+        (entity_has_regulatory_evidence ?release_dossier)
+        (assigned_approver ?release_dossier ?approver)
+        (candidate_linked_to_regulatory_evidence ?release_dossier ?regulatory_evidence)
+        (not
+          (release_authorized ?release_dossier)
+        )
+      )
+    :effect
+      (and
+        (release_authorized ?release_dossier)
+        (approver_available ?approver)
+        (regulatory_evidence_available ?regulatory_evidence)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem material_release_case)
+  (:domain material_release_under_quality_constraints_domain)
+  (:objects production_batch_1 - production_batch inbound_batch_1 - inbound_batch release_dossier_1 - release_dossier release_dossier_2 - release_dossier approver_1 - approver approver_2 - approver approver_3 - approver analytical_result_1 - analytical_test_result qa_representative_1 - qa_representative capa_item_1 - capa_item validation_task_1 - validation_task inspection_activity_1 - inspection_activity release_record_1 - release_record certificate_of_analysis_1 - certificate_of_analysis certificate_of_analysis_2 - certificate_of_analysis regulatory_checklist_1 - regulatory_checklist regulatory_checklist_2 - regulatory_checklist training_record_1 - training_record training_record_2 - training_record regulatory_evidence_1 - regulatory_evidence technical_specialist_approval_1 - technical_specialist_approval stability_expert_approval_1 - stability_expert_approval stability_expert_approval_2 - stability_expert_approval validation_specialist_1 - validation_specialist)
+  (:init
+    (approver_available approver_1)
+    (approver_available approver_2)
+    (approver_available approver_3)
+    (test_result_available analytical_result_1)
+    (qa_representative_available qa_representative_1)
+    (capa_item_available capa_item_1)
+    (validation_task_assigned_to_batch production_batch_1 validation_task_1)
+    (inspection_task_assigned_to_inbound_batch inbound_batch_1 inspection_activity_1)
+    (release_record_available release_record_1)
+    (coa_available certificate_of_analysis_1)
+    (coa_available certificate_of_analysis_2)
+    (dossier_covers_production_batch release_dossier_1 production_batch_1)
+    (dossier_covers_production_batch release_dossier_2 production_batch_1)
+    (dossier_covers_inbound_batch release_dossier_1 inbound_batch_1)
+    (dossier_covers_inbound_batch release_dossier_2 inbound_batch_1)
+    (dossier_linked_to_release_record release_dossier_1 release_record_1)
+    (dossier_linked_to_release_record release_dossier_2 release_record_1)
+    (dossier_has_coa_attached release_dossier_1 certificate_of_analysis_1)
+    (dossier_has_coa_attached release_dossier_2 certificate_of_analysis_2)
+    (regulatory_checklist_available regulatory_checklist_1)
+    (regulatory_checklist_available regulatory_checklist_2)
+    (training_record_available training_record_1)
+    (training_record_available training_record_2)
+    (regulatory_evidence_available regulatory_evidence_1)
+    (technical_specialist_approval_available technical_specialist_approval_1)
+    (stability_approval_available stability_expert_approval_1)
+    (dossier_has_stability_approval release_dossier_1 stability_expert_approval_1)
+    (dossier_has_stability_approval release_dossier_2 stability_expert_approval_2)
+    (validation_specialist_available validation_specialist_1)
+  )
+  (:goal
+    (and
+      (release_authorized production_batch_1)
+      (release_authorized inbound_batch_1)
+      (release_authorized release_dossier_1)
+      (release_authorized release_dossier_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_release_request production_batch_1)
+(assign_approver_to_candidate production_batch_1 approver_1)
+(attach_test_result_to_candidate production_batch_1 analytical_result_1)
+(start_qa_review production_batch_1 analytical_result_1)
+(assign_qa_representative production_batch_1 qa_representative_1)
+(declare_validation_task production_batch_1 validation_task_1 analytical_result_1)
+(complete_validation_activity production_batch_1 validation_task_1 qa_representative_1)
+(unassign_qa_representative production_batch_1 qa_representative_1)
+(unassign_test_result_from_candidate production_batch_1 analytical_result_1)
+(initiate_release_request inbound_batch_1)
+(assign_approver_to_candidate inbound_batch_1 approver_2)
+(attach_test_result_to_candidate inbound_batch_1 analytical_result_1)
+(start_qa_review inbound_batch_1 analytical_result_1)
+(assign_qa_representative inbound_batch_1 qa_representative_1)
+(declare_inspection_task inbound_batch_1 inspection_activity_1 analytical_result_1)
+(assign_qa_and_complete_inspection inbound_batch_1 inspection_activity_1 qa_representative_1)
+(unassign_qa_representative inbound_batch_1 qa_representative_1)
+(unassign_test_result_from_candidate inbound_batch_1 analytical_result_1)
+(assemble_release_record_standard production_batch_1 inbound_batch_1 validation_task_1 inspection_activity_1 release_record_1)
+(attach_test_result_to_candidate production_batch_1 analytical_result_1)
+(verify_release_record_quality release_record_1 production_batch_1 analytical_result_1)
+(unassign_test_result_from_candidate production_batch_1 analytical_result_1)
+(authorize_production_batch_release production_batch_1 release_record_1)
+(authorize_inbound_batch_release inbound_batch_1 release_record_1)
+(initiate_release_request release_dossier_1)
+(assign_approver_to_candidate release_dossier_1 approver_3)
+(attach_test_result_to_candidate release_dossier_1 analytical_result_1)
+(start_qa_review release_dossier_1 analytical_result_1)
+(attach_coa_and_mark_processed release_dossier_1 certificate_of_analysis_1 release_record_1)
+(verify_coa_and_mark_dossier_review release_dossier_1 certificate_of_analysis_1 release_record_1 analytical_result_1)
+(assign_qa_representative release_dossier_1 qa_representative_1)
+(assign_technical_specialist_approval release_dossier_1 technical_specialist_approval_1)
+(apply_technical_approval_primary release_dossier_1 technical_specialist_approval_1 qa_representative_1 certificate_of_analysis_1 release_record_1)
+(assign_validation_specialist_to_dossier release_dossier_1 validation_specialist_1)
+(apply_validation_specialist_approval_primary release_dossier_1 validation_specialist_1 certificate_of_analysis_1 release_record_1)
+(record_dossier_readiness release_dossier_1)
+(unassign_qa_representative release_dossier_1 qa_representative_1)
+(revoke_validation_specialist_from_dossier release_dossier_1 validation_specialist_1)
+(revoke_technical_specialist_approval release_dossier_1 technical_specialist_approval_1)
+(unassign_test_result_from_candidate release_dossier_1 analytical_result_1)
+(attach_test_result_to_candidate production_batch_1 analytical_result_1)
+(attach_regulatory_evidence_to_candidate production_batch_1 regulatory_evidence_1 analytical_result_1)
+(release_production_batch_to_inventory production_batch_1 approver_1 regulatory_evidence_1)
+(unassign_test_result_from_candidate production_batch_1 analytical_result_1)
+(attach_test_result_to_candidate inbound_batch_1 analytical_result_1)
+(attach_regulatory_evidence_to_candidate inbound_batch_1 regulatory_evidence_1 analytical_result_1)
+(release_inbound_batch_to_inventory inbound_batch_1 approver_2 regulatory_evidence_1)
+(unassign_test_result_from_candidate inbound_batch_1 analytical_result_1)
+(initiate_release_request release_dossier_2)
+(assign_approver_to_candidate release_dossier_2 approver_1)
+(attach_test_result_to_candidate release_dossier_2 analytical_result_1)
+(start_qa_review release_dossier_2 analytical_result_1)
+(attach_coa_and_mark_processed release_dossier_2 certificate_of_analysis_2 release_record_1)
+(verify_coa_and_mark_dossier_review release_dossier_2 certificate_of_analysis_2 release_record_1 analytical_result_1)
+(assign_qa_representative release_dossier_2 qa_representative_1)
+(assign_technical_specialist_approval release_dossier_2 technical_specialist_approval_1)
+(apply_technical_approval_primary release_dossier_2 technical_specialist_approval_1 qa_representative_1 certificate_of_analysis_2 release_record_1)
+(assign_validation_specialist_to_dossier release_dossier_2 validation_specialist_1)
+(apply_validation_specialist_approval_primary release_dossier_2 validation_specialist_1 certificate_of_analysis_2 release_record_1)
+(record_dossier_readiness release_dossier_2)
+(unassign_qa_representative release_dossier_2 qa_representative_1)
+(revoke_validation_specialist_from_dossier release_dossier_2 validation_specialist_1)
+(revoke_technical_specialist_approval release_dossier_2 technical_specialist_approval_1)
+(unassign_test_result_from_candidate release_dossier_2 analytical_result_1)
+(attach_test_result_to_candidate release_dossier_1 analytical_result_1)
+(attach_regulatory_evidence_to_candidate release_dossier_1 regulatory_evidence_1 analytical_result_1)
+(execute_dossier_release release_dossier_1 approver_3 regulatory_evidence_1)
+(unassign_test_result_from_candidate release_dossier_1 analytical_result_1)
+(attach_test_result_to_candidate release_dossier_2 analytical_result_1)
+(attach_regulatory_evidence_to_candidate release_dossier_2 regulatory_evidence_1 analytical_result_1)
+(execute_dossier_release release_dossier_2 approver_1 regulatory_evidence_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_kevqoyog/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 71 
+
+Successful plans:
+Value: 71
+ /tmp/val_kevqoyog/plan.pddl 71 
+
+
+
+--- stderr ---
+

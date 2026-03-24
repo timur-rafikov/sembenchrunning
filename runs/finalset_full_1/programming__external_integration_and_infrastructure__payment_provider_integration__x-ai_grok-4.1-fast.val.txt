@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain payment_provider_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types integration_resource_type - object artifact - object endpoint_type - object lifecycle_subject - object lifecycle_instance - lifecycle_subject connector_instance - integration_resource_type api_client_binding - integration_resource_type service_account - integration_resource_type feature_toggle - integration_resource_type operational_policy - integration_resource_type payment_instrument - integration_resource_type provider_capability - integration_resource_type partner_credential - integration_resource_type one_time_token - artifact certificate_artifact - artifact third_party_credential - artifact client_endpoint - endpoint_type server_endpoint - endpoint_type transaction_record - endpoint_type checkout_instance_class - lifecycle_instance service_instance_class - lifecycle_instance primary_checkout_instance - checkout_instance_class secondary_checkout_instance - checkout_instance_class checkout_service - service_instance_class)
+  (:predicates
+    (lifecycle_created ?lifecycle_subject - lifecycle_instance)
+    (lifecycle_configured ?lifecycle_subject - lifecycle_instance)
+    (lifecycle_connector_reserved ?lifecycle_subject - lifecycle_instance)
+    (lifecycle_finalized ?lifecycle_subject - lifecycle_instance)
+    (lifecycle_completed ?lifecycle_subject - lifecycle_instance)
+    (lifecycle_reconciled ?lifecycle_subject - lifecycle_instance)
+    (connector_available ?connector - connector_instance)
+    (lifecycle_assigned_connector ?lifecycle_subject - lifecycle_instance ?connector - connector_instance)
+    (api_client_available ?api_client - api_client_binding)
+    (lifecycle_bound_api_client ?lifecycle_subject - lifecycle_instance ?api_client - api_client_binding)
+    (service_account_available ?service_account - service_account)
+    (lifecycle_bound_service_account ?lifecycle_subject - lifecycle_instance ?service_account - service_account)
+    (one_time_token_available ?one_time_token - one_time_token)
+    (primary_checkout_has_token ?primary_checkout - primary_checkout_instance ?one_time_token - one_time_token)
+    (secondary_checkout_has_token ?secondary_checkout - secondary_checkout_instance ?one_time_token - one_time_token)
+    (primary_checkout_client_endpoint ?primary_checkout - primary_checkout_instance ?client_endpoint - client_endpoint)
+    (client_endpoint_ready ?client_endpoint - client_endpoint)
+    (client_endpoint_token_bound ?client_endpoint - client_endpoint)
+    (primary_checkout_client_endpoint_confirmed ?primary_checkout - primary_checkout_instance)
+    (secondary_checkout_server_endpoint ?secondary_checkout - secondary_checkout_instance ?server_endpoint - server_endpoint)
+    (server_endpoint_ready ?server_endpoint - server_endpoint)
+    (server_endpoint_token_bound ?server_endpoint - server_endpoint)
+    (secondary_checkout_server_endpoint_confirmed ?secondary_checkout - secondary_checkout_instance)
+    (transaction_pending ?transaction - transaction_record)
+    (transaction_dispatched ?transaction - transaction_record)
+    (transaction_attached_client_endpoint ?transaction - transaction_record ?client_endpoint - client_endpoint)
+    (transaction_attached_server_endpoint ?transaction - transaction_record ?server_endpoint - server_endpoint)
+    (transaction_client_processed ?transaction - transaction_record)
+    (transaction_server_processed ?transaction - transaction_record)
+    (transaction_committed ?transaction - transaction_record)
+    (service_associated_with_primary_checkout ?checkout_service - checkout_service ?primary_checkout - primary_checkout_instance)
+    (service_associated_with_secondary_checkout ?checkout_service - checkout_service ?secondary_checkout - secondary_checkout_instance)
+    (service_has_transaction ?checkout_service - checkout_service ?transaction - transaction_record)
+    (certificate_available ?certificate - certificate_artifact)
+    (service_has_certificate ?checkout_service - checkout_service ?certificate - certificate_artifact)
+    (certificate_installed ?certificate - certificate_artifact)
+    (certificate_attached_to_transaction ?certificate - certificate_artifact ?transaction - transaction_record)
+    (service_certificate_validated ?checkout_service - checkout_service)
+    (service_certificate_provisioned ?checkout_service - checkout_service)
+    (service_capability_binding_ready ?checkout_service - checkout_service)
+    (service_feature_applied ?checkout_service - checkout_service)
+    (service_feature_committed ?checkout_service - checkout_service)
+    (service_policy_attached ?checkout_service - checkout_service)
+    (service_provisioning_finalized ?checkout_service - checkout_service)
+    (third_party_credential_available ?third_party_credential - third_party_credential)
+    (service_has_third_party_credential ?checkout_service - checkout_service ?third_party_credential - third_party_credential)
+    (service_third_party_credential_bound ?checkout_service - checkout_service)
+    (service_third_party_credential_verified ?checkout_service - checkout_service)
+    (service_third_party_credential_committed ?checkout_service - checkout_service)
+    (feature_toggle_available ?feature_toggle - feature_toggle)
+    (service_has_feature_toggle ?checkout_service - checkout_service ?feature_toggle - feature_toggle)
+    (operational_policy_available ?operational_policy - operational_policy)
+    (service_has_operational_policy ?checkout_service - checkout_service ?operational_policy - operational_policy)
+    (provider_capability_available ?provider_capability - provider_capability)
+    (service_has_provider_capability ?checkout_service - checkout_service ?provider_capability - provider_capability)
+    (partner_credential_available ?partner_credential - partner_credential)
+    (service_has_partner_credential ?checkout_service - checkout_service ?partner_credential - partner_credential)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (lifecycle_has_payment_instrument ?lifecycle_subject - lifecycle_instance ?payment_instrument - payment_instrument)
+    (primary_checkout_endpoint_processed ?primary_checkout - primary_checkout_instance)
+    (secondary_checkout_endpoint_processed ?secondary_checkout - secondary_checkout_instance)
+    (service_provisioned ?checkout_service - checkout_service)
+  )
+  (:action create_lifecycle_instance
+    :parameters (?lifecycle_subject - lifecycle_instance)
+    :precondition
+      (and
+        (not
+          (lifecycle_created ?lifecycle_subject)
+        )
+        (not
+          (lifecycle_finalized ?lifecycle_subject)
+        )
+      )
+    :effect (lifecycle_created ?lifecycle_subject)
+  )
+  (:action reserve_connector_for_lifecycle
+    :parameters (?lifecycle_subject - lifecycle_instance ?connector - connector_instance)
+    :precondition
+      (and
+        (lifecycle_created ?lifecycle_subject)
+        (not
+          (lifecycle_connector_reserved ?lifecycle_subject)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (lifecycle_connector_reserved ?lifecycle_subject)
+        (lifecycle_assigned_connector ?lifecycle_subject ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action bind_api_client_to_lifecycle
+    :parameters (?lifecycle_subject - lifecycle_instance ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_created ?lifecycle_subject)
+        (lifecycle_connector_reserved ?lifecycle_subject)
+        (api_client_available ?api_client)
+      )
+    :effect
+      (and
+        (lifecycle_bound_api_client ?lifecycle_subject ?api_client)
+        (not
+          (api_client_available ?api_client)
+        )
+      )
+  )
+  (:action mark_lifecycle_configured
+    :parameters (?lifecycle_subject - lifecycle_instance ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_created ?lifecycle_subject)
+        (lifecycle_connector_reserved ?lifecycle_subject)
+        (lifecycle_bound_api_client ?lifecycle_subject ?api_client)
+        (not
+          (lifecycle_configured ?lifecycle_subject)
+        )
+      )
+    :effect (lifecycle_configured ?lifecycle_subject)
+  )
+  (:action release_api_client_binding
+    :parameters (?lifecycle_subject - lifecycle_instance ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_bound_api_client ?lifecycle_subject ?api_client)
+      )
+    :effect
+      (and
+        (api_client_available ?api_client)
+        (not
+          (lifecycle_bound_api_client ?lifecycle_subject ?api_client)
+        )
+      )
+  )
+  (:action bind_service_account_to_lifecycle
+    :parameters (?lifecycle_subject - lifecycle_instance ?service_account - service_account)
+    :precondition
+      (and
+        (lifecycle_configured ?lifecycle_subject)
+        (service_account_available ?service_account)
+      )
+    :effect
+      (and
+        (lifecycle_bound_service_account ?lifecycle_subject ?service_account)
+        (not
+          (service_account_available ?service_account)
+        )
+      )
+  )
+  (:action release_service_account_from_lifecycle
+    :parameters (?lifecycle_subject - lifecycle_instance ?service_account - service_account)
+    :precondition
+      (and
+        (lifecycle_bound_service_account ?lifecycle_subject ?service_account)
+      )
+    :effect
+      (and
+        (service_account_available ?service_account)
+        (not
+          (lifecycle_bound_service_account ?lifecycle_subject ?service_account)
+        )
+      )
+  )
+  (:action attach_provider_capability_to_service
+    :parameters (?checkout_service - checkout_service ?provider_capability - provider_capability)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (provider_capability_available ?provider_capability)
+      )
+    :effect
+      (and
+        (service_has_provider_capability ?checkout_service ?provider_capability)
+        (not
+          (provider_capability_available ?provider_capability)
+        )
+      )
+  )
+  (:action detach_provider_capability_from_service
+    :parameters (?checkout_service - checkout_service ?provider_capability - provider_capability)
+    :precondition
+      (and
+        (service_has_provider_capability ?checkout_service ?provider_capability)
+      )
+    :effect
+      (and
+        (provider_capability_available ?provider_capability)
+        (not
+          (service_has_provider_capability ?checkout_service ?provider_capability)
+        )
+      )
+  )
+  (:action attach_partner_credential_to_service
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (partner_credential_available ?partner_credential)
+      )
+    :effect
+      (and
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (not
+          (partner_credential_available ?partner_credential)
+        )
+      )
+  )
+  (:action detach_partner_credential_from_service
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential)
+    :precondition
+      (and
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+      )
+    :effect
+      (and
+        (partner_credential_available ?partner_credential)
+        (not
+          (service_has_partner_credential ?checkout_service ?partner_credential)
+        )
+      )
+  )
+  (:action start_client_endpoint_negotiation
+    :parameters (?primary_checkout - primary_checkout_instance ?client_endpoint - client_endpoint ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_configured ?primary_checkout)
+        (lifecycle_bound_api_client ?primary_checkout ?api_client)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (not
+          (client_endpoint_ready ?client_endpoint)
+        )
+        (not
+          (client_endpoint_token_bound ?client_endpoint)
+        )
+      )
+    :effect (client_endpoint_ready ?client_endpoint)
+  )
+  (:action complete_client_endpoint_handshake
+    :parameters (?primary_checkout - primary_checkout_instance ?client_endpoint - client_endpoint ?service_account - service_account)
+    :precondition
+      (and
+        (lifecycle_configured ?primary_checkout)
+        (lifecycle_bound_service_account ?primary_checkout ?service_account)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (client_endpoint_ready ?client_endpoint)
+        (not
+          (primary_checkout_endpoint_processed ?primary_checkout)
+        )
+      )
+    :effect
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+      )
+  )
+  (:action bind_one_time_token_to_client_endpoint
+    :parameters (?primary_checkout - primary_checkout_instance ?client_endpoint - client_endpoint ?one_time_token - one_time_token)
+    :precondition
+      (and
+        (lifecycle_configured ?primary_checkout)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (one_time_token_available ?one_time_token)
+        (not
+          (primary_checkout_endpoint_processed ?primary_checkout)
+        )
+      )
+    :effect
+      (and
+        (client_endpoint_token_bound ?client_endpoint)
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (primary_checkout_has_token ?primary_checkout ?one_time_token)
+        (not
+          (one_time_token_available ?one_time_token)
+        )
+      )
+  )
+  (:action finalize_client_endpoint_token_exchange
+    :parameters (?primary_checkout - primary_checkout_instance ?client_endpoint - client_endpoint ?api_client - api_client_binding ?one_time_token - one_time_token)
+    :precondition
+      (and
+        (lifecycle_configured ?primary_checkout)
+        (lifecycle_bound_api_client ?primary_checkout ?api_client)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (client_endpoint_token_bound ?client_endpoint)
+        (primary_checkout_has_token ?primary_checkout ?one_time_token)
+        (not
+          (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        )
+      )
+    :effect
+      (and
+        (client_endpoint_ready ?client_endpoint)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        (one_time_token_available ?one_time_token)
+        (not
+          (primary_checkout_has_token ?primary_checkout ?one_time_token)
+        )
+      )
+  )
+  (:action start_server_endpoint_negotiation
+    :parameters (?secondary_checkout - secondary_checkout_instance ?server_endpoint - server_endpoint ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_configured ?secondary_checkout)
+        (lifecycle_bound_api_client ?secondary_checkout ?api_client)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (not
+          (server_endpoint_ready ?server_endpoint)
+        )
+        (not
+          (server_endpoint_token_bound ?server_endpoint)
+        )
+      )
+    :effect (server_endpoint_ready ?server_endpoint)
+  )
+  (:action complete_server_endpoint_handshake
+    :parameters (?secondary_checkout - secondary_checkout_instance ?server_endpoint - server_endpoint ?service_account - service_account)
+    :precondition
+      (and
+        (lifecycle_configured ?secondary_checkout)
+        (lifecycle_bound_service_account ?secondary_checkout ?service_account)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (server_endpoint_ready ?server_endpoint)
+        (not
+          (secondary_checkout_endpoint_processed ?secondary_checkout)
+        )
+      )
+    :effect
+      (and
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+      )
+  )
+  (:action bind_one_time_token_to_server_endpoint
+    :parameters (?secondary_checkout - secondary_checkout_instance ?server_endpoint - server_endpoint ?one_time_token - one_time_token)
+    :precondition
+      (and
+        (lifecycle_configured ?secondary_checkout)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (one_time_token_available ?one_time_token)
+        (not
+          (secondary_checkout_endpoint_processed ?secondary_checkout)
+        )
+      )
+    :effect
+      (and
+        (server_endpoint_token_bound ?server_endpoint)
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (secondary_checkout_has_token ?secondary_checkout ?one_time_token)
+        (not
+          (one_time_token_available ?one_time_token)
+        )
+      )
+  )
+  (:action finalize_server_endpoint_token_exchange
+    :parameters (?secondary_checkout - secondary_checkout_instance ?server_endpoint - server_endpoint ?api_client - api_client_binding ?one_time_token - one_time_token)
+    :precondition
+      (and
+        (lifecycle_configured ?secondary_checkout)
+        (lifecycle_bound_api_client ?secondary_checkout ?api_client)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (server_endpoint_token_bound ?server_endpoint)
+        (secondary_checkout_has_token ?secondary_checkout ?one_time_token)
+        (not
+          (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        )
+      )
+    :effect
+      (and
+        (server_endpoint_ready ?server_endpoint)
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        (one_time_token_available ?one_time_token)
+        (not
+          (secondary_checkout_has_token ?secondary_checkout ?one_time_token)
+        )
+      )
+  )
+  (:action route_transaction_standard
+    :parameters (?primary_checkout - primary_checkout_instance ?secondary_checkout - secondary_checkout_instance ?client_endpoint - client_endpoint ?server_endpoint - server_endpoint ?transaction - transaction_record)
+    :precondition
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (client_endpoint_ready ?client_endpoint)
+        (server_endpoint_ready ?server_endpoint)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        (transaction_pending ?transaction)
+      )
+    :effect
+      (and
+        (transaction_dispatched ?transaction)
+        (transaction_attached_client_endpoint ?transaction ?client_endpoint)
+        (transaction_attached_server_endpoint ?transaction ?server_endpoint)
+        (not
+          (transaction_pending ?transaction)
+        )
+      )
+  )
+  (:action route_transaction_client_token
+    :parameters (?primary_checkout - primary_checkout_instance ?secondary_checkout - secondary_checkout_instance ?client_endpoint - client_endpoint ?server_endpoint - server_endpoint ?transaction - transaction_record)
+    :precondition
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (client_endpoint_token_bound ?client_endpoint)
+        (server_endpoint_ready ?server_endpoint)
+        (not
+          (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        )
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        (transaction_pending ?transaction)
+      )
+    :effect
+      (and
+        (transaction_dispatched ?transaction)
+        (transaction_attached_client_endpoint ?transaction ?client_endpoint)
+        (transaction_attached_server_endpoint ?transaction ?server_endpoint)
+        (transaction_client_processed ?transaction)
+        (not
+          (transaction_pending ?transaction)
+        )
+      )
+  )
+  (:action route_transaction_server_token
+    :parameters (?primary_checkout - primary_checkout_instance ?secondary_checkout - secondary_checkout_instance ?client_endpoint - client_endpoint ?server_endpoint - server_endpoint ?transaction - transaction_record)
+    :precondition
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (client_endpoint_ready ?client_endpoint)
+        (server_endpoint_token_bound ?server_endpoint)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        (not
+          (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        )
+        (transaction_pending ?transaction)
+      )
+    :effect
+      (and
+        (transaction_dispatched ?transaction)
+        (transaction_attached_client_endpoint ?transaction ?client_endpoint)
+        (transaction_attached_server_endpoint ?transaction ?server_endpoint)
+        (transaction_server_processed ?transaction)
+        (not
+          (transaction_pending ?transaction)
+        )
+      )
+  )
+  (:action route_transaction_client_and_server_token
+    :parameters (?primary_checkout - primary_checkout_instance ?secondary_checkout - secondary_checkout_instance ?client_endpoint - client_endpoint ?server_endpoint - server_endpoint ?transaction - transaction_record)
+    :precondition
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (primary_checkout_client_endpoint ?primary_checkout ?client_endpoint)
+        (secondary_checkout_server_endpoint ?secondary_checkout ?server_endpoint)
+        (client_endpoint_token_bound ?client_endpoint)
+        (server_endpoint_token_bound ?server_endpoint)
+        (not
+          (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        )
+        (not
+          (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        )
+        (transaction_pending ?transaction)
+      )
+    :effect
+      (and
+        (transaction_dispatched ?transaction)
+        (transaction_attached_client_endpoint ?transaction ?client_endpoint)
+        (transaction_attached_server_endpoint ?transaction ?server_endpoint)
+        (transaction_client_processed ?transaction)
+        (transaction_server_processed ?transaction)
+        (not
+          (transaction_pending ?transaction)
+        )
+      )
+  )
+  (:action acknowledge_transaction_commit
+    :parameters (?transaction - transaction_record ?primary_checkout - primary_checkout_instance ?api_client - api_client_binding)
+    :precondition
+      (and
+        (transaction_dispatched ?transaction)
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (lifecycle_bound_api_client ?primary_checkout ?api_client)
+        (not
+          (transaction_committed ?transaction)
+        )
+      )
+    :effect (transaction_committed ?transaction)
+  )
+  (:action install_certificate_on_service
+    :parameters (?checkout_service - checkout_service ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (service_has_transaction ?checkout_service ?transaction)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_available ?certificate)
+        (transaction_dispatched ?transaction)
+        (transaction_committed ?transaction)
+        (not
+          (certificate_installed ?certificate)
+        )
+      )
+    :effect
+      (and
+        (certificate_installed ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (not
+          (certificate_available ?certificate)
+        )
+      )
+  )
+  (:action validate_service_certificate
+    :parameters (?checkout_service - checkout_service ?certificate - certificate_artifact ?transaction - transaction_record ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_installed ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (lifecycle_bound_api_client ?checkout_service ?api_client)
+        (not
+          (transaction_client_processed ?transaction)
+        )
+        (not
+          (service_certificate_validated ?checkout_service)
+        )
+      )
+    :effect (service_certificate_validated ?checkout_service)
+  )
+  (:action apply_feature_toggle_to_service
+    :parameters (?checkout_service - checkout_service ?feature_toggle - feature_toggle)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (feature_toggle_available ?feature_toggle)
+        (not
+          (service_feature_applied ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_feature_applied ?checkout_service)
+        (service_has_feature_toggle ?checkout_service ?feature_toggle)
+        (not
+          (feature_toggle_available ?feature_toggle)
+        )
+      )
+  )
+  (:action commit_feature_toggle_on_service
+    :parameters (?checkout_service - checkout_service ?certificate - certificate_artifact ?transaction - transaction_record ?api_client - api_client_binding ?feature_toggle - feature_toggle)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_installed ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (lifecycle_bound_api_client ?checkout_service ?api_client)
+        (transaction_client_processed ?transaction)
+        (service_feature_applied ?checkout_service)
+        (service_has_feature_toggle ?checkout_service ?feature_toggle)
+        (not
+          (service_certificate_validated ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_certificate_validated ?checkout_service)
+        (service_feature_committed ?checkout_service)
+      )
+  )
+  (:action provision_service_with_capability
+    :parameters (?checkout_service - checkout_service ?provider_capability - provider_capability ?service_account - service_account ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_validated ?checkout_service)
+        (service_has_provider_capability ?checkout_service ?provider_capability)
+        (lifecycle_bound_service_account ?checkout_service ?service_account)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (not
+          (transaction_server_processed ?transaction)
+        )
+        (not
+          (service_certificate_provisioned ?checkout_service)
+        )
+      )
+    :effect (service_certificate_provisioned ?checkout_service)
+  )
+  (:action provision_service_with_capability_alt
+    :parameters (?checkout_service - checkout_service ?provider_capability - provider_capability ?service_account - service_account ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_validated ?checkout_service)
+        (service_has_provider_capability ?checkout_service ?provider_capability)
+        (lifecycle_bound_service_account ?checkout_service ?service_account)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (transaction_server_processed ?transaction)
+        (not
+          (service_certificate_provisioned ?checkout_service)
+        )
+      )
+    :effect (service_certificate_provisioned ?checkout_service)
+  )
+  (:action bind_partner_credential_to_service
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_provisioned ?checkout_service)
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (not
+          (transaction_client_processed ?transaction)
+        )
+        (not
+          (transaction_server_processed ?transaction)
+        )
+        (not
+          (service_capability_binding_ready ?checkout_service)
+        )
+      )
+    :effect (service_capability_binding_ready ?checkout_service)
+  )
+  (:action bind_partner_credential_and_record
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_provisioned ?checkout_service)
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (transaction_client_processed ?transaction)
+        (not
+          (transaction_server_processed ?transaction)
+        )
+        (not
+          (service_capability_binding_ready ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_policy_attached ?checkout_service)
+      )
+  )
+  (:action bind_partner_credential_and_record_alt
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_provisioned ?checkout_service)
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (not
+          (transaction_client_processed ?transaction)
+        )
+        (transaction_server_processed ?transaction)
+        (not
+          (service_capability_binding_ready ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_policy_attached ?checkout_service)
+      )
+  )
+  (:action bind_partner_credential_and_finalize
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential ?certificate - certificate_artifact ?transaction - transaction_record)
+    :precondition
+      (and
+        (service_certificate_provisioned ?checkout_service)
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (service_has_certificate ?checkout_service ?certificate)
+        (certificate_attached_to_transaction ?certificate ?transaction)
+        (transaction_client_processed ?transaction)
+        (transaction_server_processed ?transaction)
+        (not
+          (service_capability_binding_ready ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_policy_attached ?checkout_service)
+      )
+  )
+  (:action finalize_service_provisioning
+    :parameters (?checkout_service - checkout_service)
+    :precondition
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (not
+          (service_policy_attached ?checkout_service)
+        )
+        (not
+          (service_provisioned ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_provisioned ?checkout_service)
+        (lifecycle_completed ?checkout_service)
+      )
+  )
+  (:action attach_operational_policy_to_service
+    :parameters (?checkout_service - checkout_service ?operational_policy - operational_policy)
+    :precondition
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_policy_attached ?checkout_service)
+        (operational_policy_available ?operational_policy)
+      )
+    :effect
+      (and
+        (service_has_operational_policy ?checkout_service ?operational_policy)
+        (not
+          (operational_policy_available ?operational_policy)
+        )
+      )
+  )
+  (:action enable_service_for_processing
+    :parameters (?checkout_service - checkout_service ?primary_checkout - primary_checkout_instance ?secondary_checkout - secondary_checkout_instance ?api_client - api_client_binding ?operational_policy - operational_policy)
+    :precondition
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_policy_attached ?checkout_service)
+        (service_has_operational_policy ?checkout_service ?operational_policy)
+        (service_associated_with_primary_checkout ?checkout_service ?primary_checkout)
+        (service_associated_with_secondary_checkout ?checkout_service ?secondary_checkout)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        (lifecycle_bound_api_client ?checkout_service ?api_client)
+        (not
+          (service_provisioning_finalized ?checkout_service)
+        )
+      )
+    :effect (service_provisioning_finalized ?checkout_service)
+  )
+  (:action commit_service_provisioning
+    :parameters (?checkout_service - checkout_service)
+    :precondition
+      (and
+        (service_capability_binding_ready ?checkout_service)
+        (service_provisioning_finalized ?checkout_service)
+        (not
+          (service_provisioned ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_provisioned ?checkout_service)
+        (lifecycle_completed ?checkout_service)
+      )
+  )
+  (:action bind_third_party_credential_to_service
+    :parameters (?checkout_service - checkout_service ?third_party_credential - third_party_credential ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_configured ?checkout_service)
+        (lifecycle_bound_api_client ?checkout_service ?api_client)
+        (third_party_credential_available ?third_party_credential)
+        (service_has_third_party_credential ?checkout_service ?third_party_credential)
+        (not
+          (service_third_party_credential_bound ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_third_party_credential_bound ?checkout_service)
+        (not
+          (third_party_credential_available ?third_party_credential)
+        )
+      )
+  )
+  (:action verify_third_party_credential
+    :parameters (?checkout_service - checkout_service ?service_account - service_account)
+    :precondition
+      (and
+        (service_third_party_credential_bound ?checkout_service)
+        (lifecycle_bound_service_account ?checkout_service ?service_account)
+        (not
+          (service_third_party_credential_verified ?checkout_service)
+        )
+      )
+    :effect (service_third_party_credential_verified ?checkout_service)
+  )
+  (:action approve_third_party_credential
+    :parameters (?checkout_service - checkout_service ?partner_credential - partner_credential)
+    :precondition
+      (and
+        (service_third_party_credential_verified ?checkout_service)
+        (service_has_partner_credential ?checkout_service ?partner_credential)
+        (not
+          (service_third_party_credential_committed ?checkout_service)
+        )
+      )
+    :effect (service_third_party_credential_committed ?checkout_service)
+  )
+  (:action commit_third_party_credential
+    :parameters (?checkout_service - checkout_service)
+    :precondition
+      (and
+        (service_third_party_credential_committed ?checkout_service)
+        (not
+          (service_provisioned ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (service_provisioned ?checkout_service)
+        (lifecycle_completed ?checkout_service)
+      )
+  )
+  (:action finalize_primary_checkout_from_transaction
+    :parameters (?primary_checkout - primary_checkout_instance ?transaction - transaction_record)
+    :precondition
+      (and
+        (primary_checkout_endpoint_processed ?primary_checkout)
+        (primary_checkout_client_endpoint_confirmed ?primary_checkout)
+        (transaction_dispatched ?transaction)
+        (transaction_committed ?transaction)
+        (not
+          (lifecycle_completed ?primary_checkout)
+        )
+      )
+    :effect (lifecycle_completed ?primary_checkout)
+  )
+  (:action finalize_secondary_checkout_from_transaction
+    :parameters (?secondary_checkout - secondary_checkout_instance ?transaction - transaction_record)
+    :precondition
+      (and
+        (secondary_checkout_endpoint_processed ?secondary_checkout)
+        (secondary_checkout_server_endpoint_confirmed ?secondary_checkout)
+        (transaction_dispatched ?transaction)
+        (transaction_committed ?transaction)
+        (not
+          (lifecycle_completed ?secondary_checkout)
+        )
+      )
+    :effect (lifecycle_completed ?secondary_checkout)
+  )
+  (:action attach_payment_instrument_to_lifecycle
+    :parameters (?lifecycle_subject - lifecycle_instance ?payment_instrument - payment_instrument ?api_client - api_client_binding)
+    :precondition
+      (and
+        (lifecycle_completed ?lifecycle_subject)
+        (lifecycle_bound_api_client ?lifecycle_subject ?api_client)
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (lifecycle_reconciled ?lifecycle_subject)
+        )
+      )
+    :effect
+      (and
+        (lifecycle_reconciled ?lifecycle_subject)
+        (lifecycle_has_payment_instrument ?lifecycle_subject ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action finalize_primary_checkout_and_release_connector
+    :parameters (?primary_checkout - primary_checkout_instance ?connector - connector_instance ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (lifecycle_reconciled ?primary_checkout)
+        (lifecycle_assigned_connector ?primary_checkout ?connector)
+        (lifecycle_has_payment_instrument ?primary_checkout ?payment_instrument)
+        (not
+          (lifecycle_finalized ?primary_checkout)
+        )
+      )
+    :effect
+      (and
+        (lifecycle_finalized ?primary_checkout)
+        (connector_available ?connector)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action finalize_secondary_checkout_and_release_connector
+    :parameters (?secondary_checkout - secondary_checkout_instance ?connector - connector_instance ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (lifecycle_reconciled ?secondary_checkout)
+        (lifecycle_assigned_connector ?secondary_checkout ?connector)
+        (lifecycle_has_payment_instrument ?secondary_checkout ?payment_instrument)
+        (not
+          (lifecycle_finalized ?secondary_checkout)
+        )
+      )
+    :effect
+      (and
+        (lifecycle_finalized ?secondary_checkout)
+        (connector_available ?connector)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+  (:action finalize_service_and_release_connector
+    :parameters (?checkout_service - checkout_service ?connector - connector_instance ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (lifecycle_reconciled ?checkout_service)
+        (lifecycle_assigned_connector ?checkout_service ?connector)
+        (lifecycle_has_payment_instrument ?checkout_service ?payment_instrument)
+        (not
+          (lifecycle_finalized ?checkout_service)
+        )
+      )
+    :effect
+      (and
+        (lifecycle_finalized ?checkout_service)
+        (connector_available ?connector)
+        (payment_instrument_available ?payment_instrument)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem payment_provider_integration_scenario)
+  (:domain payment_provider_integration)
+  (:objects primary_checkout_1 - primary_checkout_instance secondary_checkout_1 - secondary_checkout_instance checkout_service_a - checkout_service checkout_service_b - checkout_service connector_gateway_1 - connector_instance connector_gateway_2 - connector_instance connector_gateway_3 - connector_instance api_client_binding_1 - api_client_binding service_account_1 - service_account one_time_token_1 - one_time_token client_endpoint_1 - client_endpoint server_endpoint_1 - server_endpoint transaction_1 - transaction_record certificate_1 - certificate_artifact certificate_2 - certificate_artifact feature_toggle_1 - feature_toggle feature_toggle_2 - feature_toggle operational_policy_1 - operational_policy operational_policy_2 - operational_policy payment_instrument_1 - payment_instrument provider_capability_1 - provider_capability third_party_credential_1 - third_party_credential third_party_credential_2 - third_party_credential partner_credential_1 - partner_credential)
+  (:init
+    (connector_available connector_gateway_1)
+    (connector_available connector_gateway_2)
+    (connector_available connector_gateway_3)
+    (api_client_available api_client_binding_1)
+    (service_account_available service_account_1)
+    (one_time_token_available one_time_token_1)
+    (primary_checkout_client_endpoint primary_checkout_1 client_endpoint_1)
+    (secondary_checkout_server_endpoint secondary_checkout_1 server_endpoint_1)
+    (transaction_pending transaction_1)
+    (certificate_available certificate_1)
+    (certificate_available certificate_2)
+    (service_associated_with_primary_checkout checkout_service_a primary_checkout_1)
+    (service_associated_with_primary_checkout checkout_service_b primary_checkout_1)
+    (service_associated_with_secondary_checkout checkout_service_a secondary_checkout_1)
+    (service_associated_with_secondary_checkout checkout_service_b secondary_checkout_1)
+    (service_has_transaction checkout_service_a transaction_1)
+    (service_has_transaction checkout_service_b transaction_1)
+    (service_has_certificate checkout_service_a certificate_1)
+    (service_has_certificate checkout_service_b certificate_2)
+    (feature_toggle_available feature_toggle_1)
+    (feature_toggle_available feature_toggle_2)
+    (operational_policy_available operational_policy_1)
+    (operational_policy_available operational_policy_2)
+    (payment_instrument_available payment_instrument_1)
+    (provider_capability_available provider_capability_1)
+    (third_party_credential_available third_party_credential_1)
+    (service_has_third_party_credential checkout_service_a third_party_credential_1)
+    (service_has_third_party_credential checkout_service_b third_party_credential_2)
+    (partner_credential_available partner_credential_1)
+  )
+  (:goal
+    (and
+      (lifecycle_finalized primary_checkout_1)
+      (lifecycle_finalized secondary_checkout_1)
+      (lifecycle_finalized checkout_service_a)
+      (lifecycle_finalized checkout_service_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_lifecycle_instance primary_checkout_1)
+(create_lifecycle_instance secondary_checkout_1)
+(create_lifecycle_instance checkout_service_a)
+(create_lifecycle_instance checkout_service_b)
+(reserve_connector_for_lifecycle primary_checkout_1 connector_gateway_1)
+(bind_api_client_to_lifecycle primary_checkout_1 api_client_binding_1)
+(mark_lifecycle_configured primary_checkout_1 api_client_binding_1)
+(bind_service_account_to_lifecycle primary_checkout_1 service_account_1)
+(start_client_endpoint_negotiation primary_checkout_1 client_endpoint_1 api_client_binding_1)
+(complete_client_endpoint_handshake primary_checkout_1 client_endpoint_1 service_account_1)
+(release_service_account_from_lifecycle primary_checkout_1 service_account_1)
+(release_api_client_binding primary_checkout_1 api_client_binding_1)
+(reserve_connector_for_lifecycle secondary_checkout_1 connector_gateway_2)
+(bind_api_client_to_lifecycle secondary_checkout_1 api_client_binding_1)
+(mark_lifecycle_configured secondary_checkout_1 api_client_binding_1)
+(bind_service_account_to_lifecycle secondary_checkout_1 service_account_1)
+(start_server_endpoint_negotiation secondary_checkout_1 server_endpoint_1 api_client_binding_1)
+(complete_server_endpoint_handshake secondary_checkout_1 server_endpoint_1 service_account_1)
+(route_transaction_standard primary_checkout_1 secondary_checkout_1 client_endpoint_1 server_endpoint_1 transaction_1)
+(release_api_client_binding secondary_checkout_1 api_client_binding_1)
+(bind_api_client_to_lifecycle primary_checkout_1 api_client_binding_1)
+(acknowledge_transaction_commit transaction_1 primary_checkout_1 api_client_binding_1)
+(finalize_primary_checkout_from_transaction primary_checkout_1 transaction_1)
+(finalize_secondary_checkout_from_transaction secondary_checkout_1 transaction_1)
+(reserve_connector_for_lifecycle checkout_service_a connector_gateway_3)
+(release_api_client_binding primary_checkout_1 api_client_binding_1)
+(bind_api_client_to_lifecycle checkout_service_a api_client_binding_1)
+(mark_lifecycle_configured checkout_service_a api_client_binding_1)
+(install_certificate_on_service checkout_service_a certificate_1 transaction_1)
+(validate_service_certificate checkout_service_a certificate_1 transaction_1 api_client_binding_1)
+(attach_provider_capability_to_service checkout_service_a provider_capability_1)
+(release_service_account_from_lifecycle secondary_checkout_1 service_account_1)
+(bind_service_account_to_lifecycle checkout_service_a service_account_1)
+(provision_service_with_capability checkout_service_a provider_capability_1 service_account_1 certificate_1 transaction_1)
+(attach_partner_credential_to_service checkout_service_a partner_credential_1)
+(bind_partner_credential_to_service checkout_service_a partner_credential_1 certificate_1 transaction_1)
+(detach_partner_credential_from_service checkout_service_a partner_credential_1)
+(detach_provider_capability_from_service checkout_service_a provider_capability_1)
+(finalize_service_provisioning checkout_service_a)
+(release_api_client_binding checkout_service_a api_client_binding_1)
+(bind_api_client_to_lifecycle primary_checkout_1 api_client_binding_1)
+(attach_payment_instrument_to_lifecycle primary_checkout_1 payment_instrument_1 api_client_binding_1)
+(finalize_primary_checkout_and_release_connector primary_checkout_1 connector_gateway_1 payment_instrument_1)
+(release_api_client_binding primary_checkout_1 api_client_binding_1)
+(reserve_connector_for_lifecycle checkout_service_b connector_gateway_1)
+(bind_api_client_to_lifecycle checkout_service_b api_client_binding_1)
+(mark_lifecycle_configured checkout_service_b api_client_binding_1)
+(install_certificate_on_service checkout_service_b certificate_2 transaction_1)
+(validate_service_certificate checkout_service_b certificate_2 transaction_1 api_client_binding_1)
+(attach_provider_capability_to_service checkout_service_b provider_capability_1)
+(release_service_account_from_lifecycle checkout_service_a service_account_1)
+(bind_service_account_to_lifecycle checkout_service_b service_account_1)
+(provision_service_with_capability checkout_service_b provider_capability_1 service_account_1 certificate_2 transaction_1)
+(attach_partner_credential_to_service checkout_service_b partner_credential_1)
+(bind_partner_credential_to_service checkout_service_b partner_credential_1 certificate_2 transaction_1)
+(detach_partner_credential_from_service checkout_service_b partner_credential_1)
+(detach_provider_capability_from_service checkout_service_b provider_capability_1)
+(finalize_service_provisioning checkout_service_b)
+(release_api_client_binding checkout_service_b api_client_binding_1)
+(bind_api_client_to_lifecycle secondary_checkout_1 api_client_binding_1)
+(attach_payment_instrument_to_lifecycle secondary_checkout_1 payment_instrument_1 api_client_binding_1)
+(finalize_secondary_checkout_and_release_connector secondary_checkout_1 connector_gateway_2 payment_instrument_1)
+(release_api_client_binding secondary_checkout_1 api_client_binding_1)
+(bind_api_client_to_lifecycle checkout_service_a api_client_binding_1)
+(attach_payment_instrument_to_lifecycle checkout_service_a payment_instrument_1 api_client_binding_1)
+(finalize_service_and_release_connector checkout_service_a connector_gateway_3 payment_instrument_1)
+(release_api_client_binding checkout_service_a api_client_binding_1)
+(bind_api_client_to_lifecycle checkout_service_b api_client_binding_1)
+(attach_payment_instrument_to_lifecycle checkout_service_b payment_instrument_1 api_client_binding_1)
+(finalize_service_and_release_connector checkout_service_b connector_gateway_1 payment_instrument_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mm1j70fo/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 70 
+
+Successful plans:
+Value: 70
+ /tmp/val_mm1j70fo/plan.pddl 70 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain animal_escape_or_loss_response_workflow)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object asset_category - object personnel_category - object case_category - object incident_case - case_category capture_equipment - resource_category tracking_device - resource_category responder_staff - resource_category permit_document - resource_category salvage_material - resource_category identification_token - resource_category veterinary_resource - resource_category decontamination_team - resource_category contingency_resource - asset_category inspection_checklist - asset_category external_inspector - asset_category search_sector - personnel_category search_route - personnel_category containment_asset - personnel_category unit_category - incident_case operation_category - incident_case origin_unit - unit_category receiving_unit - unit_category response_operation - operation_category)
+  (:predicates
+    (case_reported ?incident_case - incident_case)
+    (entity_response_authorized ?incident_case - incident_case)
+    (case_capture_allocated ?incident_case - incident_case)
+    (entity_operational_control_established ?incident_case - incident_case)
+    (entity_reintegration_verified ?incident_case - incident_case)
+    (entity_reintegration_clearance_recorded ?incident_case - incident_case)
+    (capture_equipment_available ?capture_equipment - capture_equipment)
+    (entity_capture_equipment_link ?incident_case - incident_case ?capture_equipment - capture_equipment)
+    (tracking_device_available ?tracking_device - tracking_device)
+    (entity_tracking_device_link ?incident_case - incident_case ?tracking_device - tracking_device)
+    (responder_available ?responder_staff - responder_staff)
+    (entity_responder_link ?incident_case - incident_case ?responder_staff - responder_staff)
+    (contingency_resource_available ?contingency_resource - contingency_resource)
+    (origin_unit_resource_link ?origin_unit - origin_unit ?contingency_resource - contingency_resource)
+    (receiving_unit_resource_link ?receiving_unit - receiving_unit ?contingency_resource - contingency_resource)
+    (origin_unit_search_sector_link ?origin_unit - origin_unit ?search_sector - search_sector)
+    (search_sector_active ?search_sector - search_sector)
+    (search_sector_resourced ?search_sector - search_sector)
+    (origin_unit_search_completed ?origin_unit - origin_unit)
+    (receiving_unit_search_route_link ?receiving_unit - receiving_unit ?search_route - search_route)
+    (search_route_active ?search_route - search_route)
+    (search_route_resourced ?search_route - search_route)
+    (receiving_unit_search_completed ?receiving_unit - receiving_unit)
+    (containment_asset_available ?containment_asset - containment_asset)
+    (containment_asset_staged ?containment_asset - containment_asset)
+    (containment_asset_linked_search_sector ?containment_asset - containment_asset ?search_sector - search_sector)
+    (containment_asset_linked_search_route ?containment_asset - containment_asset ?search_route - search_route)
+    (containment_asset_requires_permit ?containment_asset - containment_asset)
+    (containment_asset_requires_additional_handling ?containment_asset - containment_asset)
+    (containment_asset_deployed ?containment_asset - containment_asset)
+    (operation_targets_origin_unit ?response_operation - response_operation ?origin_unit - origin_unit)
+    (operation_targets_receiving_unit ?response_operation - response_operation ?receiving_unit - receiving_unit)
+    (operation_uses_containment_asset ?response_operation - response_operation ?containment_asset - containment_asset)
+    (inspection_checklist_available ?inspection_checklist - inspection_checklist)
+    (operation_has_inspection_checklist ?response_operation - response_operation ?inspection_checklist - inspection_checklist)
+    (inspection_checklist_used ?inspection_checklist - inspection_checklist)
+    (inspection_checklist_linked_asset ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    (operation_inspection_phase_one_complete ?response_operation - response_operation)
+    (operation_inspection_phase_two_complete ?response_operation - response_operation)
+    (operation_ready_for_verification ?response_operation - response_operation)
+    (operation_permit_attached ?response_operation - response_operation)
+    (operation_permit_inspection_logged ?response_operation - response_operation)
+    (operation_verification_documented ?response_operation - response_operation)
+    (operation_execution_commenced ?response_operation - response_operation)
+    (external_inspector_available ?external_inspector - external_inspector)
+    (operation_has_external_inspector ?response_operation - response_operation ?external_inspector - external_inspector)
+    (operation_permit_verified ?response_operation - response_operation)
+    (operation_documentation_authorized ?response_operation - response_operation)
+    (operation_decontamination_complete ?response_operation - response_operation)
+    (permit_document_available ?permit_document - permit_document)
+    (operation_has_permit_document ?response_operation - response_operation ?permit_document - permit_document)
+    (salvage_material_available ?salvage_material - salvage_material)
+    (operation_uses_salvage_material ?response_operation - response_operation ?salvage_material - salvage_material)
+    (veterinary_resource_available ?veterinary_resource - veterinary_resource)
+    (operation_has_veterinary_resource ?response_operation - response_operation ?veterinary_resource - veterinary_resource)
+    (decontamination_team_available ?decontamination_team - decontamination_team)
+    (operation_has_decontamination_team ?response_operation - response_operation ?decontamination_team - decontamination_team)
+    (identification_token_available ?identification_token - identification_token)
+    (entity_identification_token_linked ?incident_case - incident_case ?identification_token - identification_token)
+    (origin_unit_ready ?origin_unit - origin_unit)
+    (receiving_unit_ready ?receiving_unit - receiving_unit)
+    (operation_finalized_log_recorded ?response_operation - response_operation)
+  )
+  (:action register_incident_case
+    :parameters (?incident_case - incident_case)
+    :precondition
+      (and
+        (not
+          (case_reported ?incident_case)
+        )
+        (not
+          (entity_operational_control_established ?incident_case)
+        )
+      )
+    :effect (case_reported ?incident_case)
+  )
+  (:action allocate_capture_equipment
+    :parameters (?incident_case - incident_case ?capture_equipment - capture_equipment)
+    :precondition
+      (and
+        (case_reported ?incident_case)
+        (not
+          (case_capture_allocated ?incident_case)
+        )
+        (capture_equipment_available ?capture_equipment)
+      )
+    :effect
+      (and
+        (case_capture_allocated ?incident_case)
+        (entity_capture_equipment_link ?incident_case ?capture_equipment)
+        (not
+          (capture_equipment_available ?capture_equipment)
+        )
+      )
+  )
+  (:action allocate_tracking_device
+    :parameters (?incident_case - incident_case ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (case_reported ?incident_case)
+        (case_capture_allocated ?incident_case)
+        (tracking_device_available ?tracking_device)
+      )
+    :effect
+      (and
+        (entity_tracking_device_link ?incident_case ?tracking_device)
+        (not
+          (tracking_device_available ?tracking_device)
+        )
+      )
+  )
+  (:action validate_incident_case
+    :parameters (?incident_case - incident_case ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (case_reported ?incident_case)
+        (case_capture_allocated ?incident_case)
+        (entity_tracking_device_link ?incident_case ?tracking_device)
+        (not
+          (entity_response_authorized ?incident_case)
+        )
+      )
+    :effect (entity_response_authorized ?incident_case)
+  )
+  (:action release_tracking_device
+    :parameters (?incident_case - incident_case ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_tracking_device_link ?incident_case ?tracking_device)
+      )
+    :effect
+      (and
+        (tracking_device_available ?tracking_device)
+        (not
+          (entity_tracking_device_link ?incident_case ?tracking_device)
+        )
+      )
+  )
+  (:action deploy_responder_to_case
+    :parameters (?incident_case - incident_case ?responder_staff - responder_staff)
+    :precondition
+      (and
+        (entity_response_authorized ?incident_case)
+        (responder_available ?responder_staff)
+      )
+    :effect
+      (and
+        (entity_responder_link ?incident_case ?responder_staff)
+        (not
+          (responder_available ?responder_staff)
+        )
+      )
+  )
+  (:action release_responder_from_case
+    :parameters (?incident_case - incident_case ?responder_staff - responder_staff)
+    :precondition
+      (and
+        (entity_responder_link ?incident_case ?responder_staff)
+      )
+    :effect
+      (and
+        (responder_available ?responder_staff)
+        (not
+          (entity_responder_link ?incident_case ?responder_staff)
+        )
+      )
+  )
+  (:action allocate_veterinary_resource
+    :parameters (?response_operation - response_operation ?veterinary_resource - veterinary_resource)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (veterinary_resource_available ?veterinary_resource)
+      )
+    :effect
+      (and
+        (operation_has_veterinary_resource ?response_operation ?veterinary_resource)
+        (not
+          (veterinary_resource_available ?veterinary_resource)
+        )
+      )
+  )
+  (:action release_veterinary_resource
+    :parameters (?response_operation - response_operation ?veterinary_resource - veterinary_resource)
+    :precondition
+      (and
+        (operation_has_veterinary_resource ?response_operation ?veterinary_resource)
+      )
+    :effect
+      (and
+        (veterinary_resource_available ?veterinary_resource)
+        (not
+          (operation_has_veterinary_resource ?response_operation ?veterinary_resource)
+        )
+      )
+  )
+  (:action allocate_decontamination_team
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (decontamination_team_available ?decontamination_team)
+      )
+    :effect
+      (and
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (not
+          (decontamination_team_available ?decontamination_team)
+        )
+      )
+  )
+  (:action release_decontamination_team
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team)
+    :precondition
+      (and
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+      )
+    :effect
+      (and
+        (decontamination_team_available ?decontamination_team)
+        (not
+          (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        )
+      )
+  )
+  (:action activate_search_sector_for_unit
+    :parameters (?origin_unit - origin_unit ?search_sector - search_sector ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_response_authorized ?origin_unit)
+        (entity_tracking_device_link ?origin_unit ?tracking_device)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (not
+          (search_sector_active ?search_sector)
+        )
+        (not
+          (search_sector_resourced ?search_sector)
+        )
+      )
+    :effect (search_sector_active ?search_sector)
+  )
+  (:action deploy_responder_to_search_sector
+    :parameters (?origin_unit - origin_unit ?search_sector - search_sector ?responder_staff - responder_staff)
+    :precondition
+      (and
+        (entity_response_authorized ?origin_unit)
+        (entity_responder_link ?origin_unit ?responder_staff)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (search_sector_active ?search_sector)
+        (not
+          (origin_unit_ready ?origin_unit)
+        )
+      )
+    :effect
+      (and
+        (origin_unit_ready ?origin_unit)
+        (origin_unit_search_completed ?origin_unit)
+      )
+  )
+  (:action allocate_contingency_resource_to_origin_unit
+    :parameters (?origin_unit - origin_unit ?search_sector - search_sector ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (entity_response_authorized ?origin_unit)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (contingency_resource_available ?contingency_resource)
+        (not
+          (origin_unit_ready ?origin_unit)
+        )
+      )
+    :effect
+      (and
+        (search_sector_resourced ?search_sector)
+        (origin_unit_ready ?origin_unit)
+        (origin_unit_resource_link ?origin_unit ?contingency_resource)
+        (not
+          (contingency_resource_available ?contingency_resource)
+        )
+      )
+  )
+  (:action execute_search_sector_operation
+    :parameters (?origin_unit - origin_unit ?search_sector - search_sector ?tracking_device - tracking_device ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (entity_response_authorized ?origin_unit)
+        (entity_tracking_device_link ?origin_unit ?tracking_device)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (search_sector_resourced ?search_sector)
+        (origin_unit_resource_link ?origin_unit ?contingency_resource)
+        (not
+          (origin_unit_search_completed ?origin_unit)
+        )
+      )
+    :effect
+      (and
+        (search_sector_active ?search_sector)
+        (origin_unit_search_completed ?origin_unit)
+        (contingency_resource_available ?contingency_resource)
+        (not
+          (origin_unit_resource_link ?origin_unit ?contingency_resource)
+        )
+      )
+  )
+  (:action activate_search_route_for_unit
+    :parameters (?receiving_unit - receiving_unit ?search_route - search_route ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_response_authorized ?receiving_unit)
+        (entity_tracking_device_link ?receiving_unit ?tracking_device)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (not
+          (search_route_active ?search_route)
+        )
+        (not
+          (search_route_resourced ?search_route)
+        )
+      )
+    :effect (search_route_active ?search_route)
+  )
+  (:action deploy_responder_to_search_route
+    :parameters (?receiving_unit - receiving_unit ?search_route - search_route ?responder_staff - responder_staff)
+    :precondition
+      (and
+        (entity_response_authorized ?receiving_unit)
+        (entity_responder_link ?receiving_unit ?responder_staff)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_route_active ?search_route)
+        (not
+          (receiving_unit_ready ?receiving_unit)
+        )
+      )
+    :effect
+      (and
+        (receiving_unit_ready ?receiving_unit)
+        (receiving_unit_search_completed ?receiving_unit)
+      )
+  )
+  (:action allocate_resource_to_search_route
+    :parameters (?receiving_unit - receiving_unit ?search_route - search_route ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (entity_response_authorized ?receiving_unit)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (contingency_resource_available ?contingency_resource)
+        (not
+          (receiving_unit_ready ?receiving_unit)
+        )
+      )
+    :effect
+      (and
+        (search_route_resourced ?search_route)
+        (receiving_unit_ready ?receiving_unit)
+        (receiving_unit_resource_link ?receiving_unit ?contingency_resource)
+        (not
+          (contingency_resource_available ?contingency_resource)
+        )
+      )
+  )
+  (:action execute_search_route
+    :parameters (?receiving_unit - receiving_unit ?search_route - search_route ?tracking_device - tracking_device ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (entity_response_authorized ?receiving_unit)
+        (entity_tracking_device_link ?receiving_unit ?tracking_device)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_route_resourced ?search_route)
+        (receiving_unit_resource_link ?receiving_unit ?contingency_resource)
+        (not
+          (receiving_unit_search_completed ?receiving_unit)
+        )
+      )
+    :effect
+      (and
+        (search_route_active ?search_route)
+        (receiving_unit_search_completed ?receiving_unit)
+        (contingency_resource_available ?contingency_resource)
+        (not
+          (receiving_unit_resource_link ?receiving_unit ?contingency_resource)
+        )
+      )
+  )
+  (:action assemble_containment_asset_basic
+    :parameters (?origin_unit - origin_unit ?receiving_unit - receiving_unit ?search_sector - search_sector ?search_route - search_route ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_unit)
+        (receiving_unit_ready ?receiving_unit)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_sector_active ?search_sector)
+        (search_route_active ?search_route)
+        (origin_unit_search_completed ?origin_unit)
+        (receiving_unit_search_completed ?receiving_unit)
+        (containment_asset_available ?containment_asset)
+      )
+    :effect
+      (and
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_linked_search_sector ?containment_asset ?search_sector)
+        (containment_asset_linked_search_route ?containment_asset ?search_route)
+        (not
+          (containment_asset_available ?containment_asset)
+        )
+      )
+  )
+  (:action configure_and_stage_containment_asset_variant_a
+    :parameters (?origin_unit - origin_unit ?receiving_unit - receiving_unit ?search_sector - search_sector ?search_route - search_route ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_unit)
+        (receiving_unit_ready ?receiving_unit)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_sector_resourced ?search_sector)
+        (search_route_active ?search_route)
+        (not
+          (origin_unit_search_completed ?origin_unit)
+        )
+        (receiving_unit_search_completed ?receiving_unit)
+        (containment_asset_available ?containment_asset)
+      )
+    :effect
+      (and
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_linked_search_sector ?containment_asset ?search_sector)
+        (containment_asset_linked_search_route ?containment_asset ?search_route)
+        (containment_asset_requires_permit ?containment_asset)
+        (not
+          (containment_asset_available ?containment_asset)
+        )
+      )
+  )
+  (:action configure_and_stage_containment_asset_variant_b
+    :parameters (?origin_unit - origin_unit ?receiving_unit - receiving_unit ?search_sector - search_sector ?search_route - search_route ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_unit)
+        (receiving_unit_ready ?receiving_unit)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_sector_active ?search_sector)
+        (search_route_resourced ?search_route)
+        (origin_unit_search_completed ?origin_unit)
+        (not
+          (receiving_unit_search_completed ?receiving_unit)
+        )
+        (containment_asset_available ?containment_asset)
+      )
+    :effect
+      (and
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_linked_search_sector ?containment_asset ?search_sector)
+        (containment_asset_linked_search_route ?containment_asset ?search_route)
+        (containment_asset_requires_additional_handling ?containment_asset)
+        (not
+          (containment_asset_available ?containment_asset)
+        )
+      )
+  )
+  (:action configure_and_stage_containment_asset_full
+    :parameters (?origin_unit - origin_unit ?receiving_unit - receiving_unit ?search_sector - search_sector ?search_route - search_route ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_unit)
+        (receiving_unit_ready ?receiving_unit)
+        (origin_unit_search_sector_link ?origin_unit ?search_sector)
+        (receiving_unit_search_route_link ?receiving_unit ?search_route)
+        (search_sector_resourced ?search_sector)
+        (search_route_resourced ?search_route)
+        (not
+          (origin_unit_search_completed ?origin_unit)
+        )
+        (not
+          (receiving_unit_search_completed ?receiving_unit)
+        )
+        (containment_asset_available ?containment_asset)
+      )
+    :effect
+      (and
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_linked_search_sector ?containment_asset ?search_sector)
+        (containment_asset_linked_search_route ?containment_asset ?search_route)
+        (containment_asset_requires_permit ?containment_asset)
+        (containment_asset_requires_additional_handling ?containment_asset)
+        (not
+          (containment_asset_available ?containment_asset)
+        )
+      )
+  )
+  (:action deploy_containment_asset_to_unit
+    :parameters (?containment_asset - containment_asset ?origin_unit - origin_unit ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (containment_asset_staged ?containment_asset)
+        (origin_unit_ready ?origin_unit)
+        (entity_tracking_device_link ?origin_unit ?tracking_device)
+        (not
+          (containment_asset_deployed ?containment_asset)
+        )
+      )
+    :effect (containment_asset_deployed ?containment_asset)
+  )
+  (:action apply_inspection_checklist_to_operation
+    :parameters (?response_operation - response_operation ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (operation_uses_containment_asset ?response_operation ?containment_asset)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_available ?inspection_checklist)
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_deployed ?containment_asset)
+        (not
+          (inspection_checklist_used ?inspection_checklist)
+        )
+      )
+    :effect
+      (and
+        (inspection_checklist_used ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (not
+          (inspection_checklist_available ?inspection_checklist)
+        )
+      )
+  )
+  (:action perform_inspection_standard
+    :parameters (?response_operation - response_operation ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_used ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (entity_tracking_device_link ?response_operation ?tracking_device)
+        (not
+          (containment_asset_requires_permit ?containment_asset)
+        )
+        (not
+          (operation_inspection_phase_one_complete ?response_operation)
+        )
+      )
+    :effect (operation_inspection_phase_one_complete ?response_operation)
+  )
+  (:action attach_permit_to_operation
+    :parameters (?response_operation - response_operation ?permit_document - permit_document)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (permit_document_available ?permit_document)
+        (not
+          (operation_permit_attached ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_permit_attached ?response_operation)
+        (operation_has_permit_document ?response_operation ?permit_document)
+        (not
+          (permit_document_available ?permit_document)
+        )
+      )
+  )
+  (:action perform_permit_inspection
+    :parameters (?response_operation - response_operation ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset ?tracking_device - tracking_device ?permit_document - permit_document)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_used ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (entity_tracking_device_link ?response_operation ?tracking_device)
+        (containment_asset_requires_permit ?containment_asset)
+        (operation_permit_attached ?response_operation)
+        (operation_has_permit_document ?response_operation ?permit_document)
+        (not
+          (operation_inspection_phase_one_complete ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_inspection_phase_one_complete ?response_operation)
+        (operation_permit_inspection_logged ?response_operation)
+      )
+  )
+  (:action execute_operation_with_veterinary_support
+    :parameters (?response_operation - response_operation ?veterinary_resource - veterinary_resource ?responder_staff - responder_staff ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_one_complete ?response_operation)
+        (operation_has_veterinary_resource ?response_operation ?veterinary_resource)
+        (entity_responder_link ?response_operation ?responder_staff)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (not
+          (containment_asset_requires_additional_handling ?containment_asset)
+        )
+        (not
+          (operation_inspection_phase_two_complete ?response_operation)
+        )
+      )
+    :effect (operation_inspection_phase_two_complete ?response_operation)
+  )
+  (:action execute_operation_with_veterinary_and_additional_handling
+    :parameters (?response_operation - response_operation ?veterinary_resource - veterinary_resource ?responder_staff - responder_staff ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_one_complete ?response_operation)
+        (operation_has_veterinary_resource ?response_operation ?veterinary_resource)
+        (entity_responder_link ?response_operation ?responder_staff)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (containment_asset_requires_additional_handling ?containment_asset)
+        (not
+          (operation_inspection_phase_two_complete ?response_operation)
+        )
+      )
+    :effect (operation_inspection_phase_two_complete ?response_operation)
+  )
+  (:action prepare_operation_for_verification
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_two_complete ?response_operation)
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (not
+          (containment_asset_requires_permit ?containment_asset)
+        )
+        (not
+          (containment_asset_requires_additional_handling ?containment_asset)
+        )
+        (not
+          (operation_ready_for_verification ?response_operation)
+        )
+      )
+    :effect (operation_ready_for_verification ?response_operation)
+  )
+  (:action prepare_operation_for_verified_registration
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_two_complete ?response_operation)
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (containment_asset_requires_permit ?containment_asset)
+        (not
+          (containment_asset_requires_additional_handling ?containment_asset)
+        )
+        (not
+          (operation_ready_for_verification ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_verification_documented ?response_operation)
+      )
+  )
+  (:action prepare_operation_for_verification_alternate
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_two_complete ?response_operation)
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (not
+          (containment_asset_requires_permit ?containment_asset)
+        )
+        (containment_asset_requires_additional_handling ?containment_asset)
+        (not
+          (operation_ready_for_verification ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_verification_documented ?response_operation)
+      )
+  )
+  (:action prepare_operation_for_verification_full
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team ?inspection_checklist - inspection_checklist ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (operation_inspection_phase_two_complete ?response_operation)
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (operation_has_inspection_checklist ?response_operation ?inspection_checklist)
+        (inspection_checklist_linked_asset ?inspection_checklist ?containment_asset)
+        (containment_asset_requires_permit ?containment_asset)
+        (containment_asset_requires_additional_handling ?containment_asset)
+        (not
+          (operation_ready_for_verification ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_verification_documented ?response_operation)
+      )
+  )
+  (:action finalize_operation_verification
+    :parameters (?response_operation - response_operation)
+    :precondition
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (not
+          (operation_verification_documented ?response_operation)
+        )
+        (not
+          (operation_finalized_log_recorded ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized_log_recorded ?response_operation)
+        (entity_reintegration_verified ?response_operation)
+      )
+  )
+  (:action allocate_salvage_material_to_operation
+    :parameters (?response_operation - response_operation ?salvage_material - salvage_material)
+    :precondition
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_verification_documented ?response_operation)
+        (salvage_material_available ?salvage_material)
+      )
+    :effect
+      (and
+        (operation_uses_salvage_material ?response_operation ?salvage_material)
+        (not
+          (salvage_material_available ?salvage_material)
+        )
+      )
+  )
+  (:action execute_operation
+    :parameters (?response_operation - response_operation ?origin_unit - origin_unit ?receiving_unit - receiving_unit ?tracking_device - tracking_device ?salvage_material - salvage_material)
+    :precondition
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_verification_documented ?response_operation)
+        (operation_uses_salvage_material ?response_operation ?salvage_material)
+        (operation_targets_origin_unit ?response_operation ?origin_unit)
+        (operation_targets_receiving_unit ?response_operation ?receiving_unit)
+        (origin_unit_search_completed ?origin_unit)
+        (receiving_unit_search_completed ?receiving_unit)
+        (entity_tracking_device_link ?response_operation ?tracking_device)
+        (not
+          (operation_execution_commenced ?response_operation)
+        )
+      )
+    :effect (operation_execution_commenced ?response_operation)
+  )
+  (:action finalize_operation_execution
+    :parameters (?response_operation - response_operation)
+    :precondition
+      (and
+        (operation_ready_for_verification ?response_operation)
+        (operation_execution_commenced ?response_operation)
+        (not
+          (operation_finalized_log_recorded ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized_log_recorded ?response_operation)
+        (entity_reintegration_verified ?response_operation)
+      )
+  )
+  (:action attach_external_inspector_to_operation
+    :parameters (?response_operation - response_operation ?external_inspector - external_inspector ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_response_authorized ?response_operation)
+        (entity_tracking_device_link ?response_operation ?tracking_device)
+        (external_inspector_available ?external_inspector)
+        (operation_has_external_inspector ?response_operation ?external_inspector)
+        (not
+          (operation_permit_verified ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_permit_verified ?response_operation)
+        (not
+          (external_inspector_available ?external_inspector)
+        )
+      )
+  )
+  (:action authorize_operation_documentation
+    :parameters (?response_operation - response_operation ?responder_staff - responder_staff)
+    :precondition
+      (and
+        (operation_permit_verified ?response_operation)
+        (entity_responder_link ?response_operation ?responder_staff)
+        (not
+          (operation_documentation_authorized ?response_operation)
+        )
+      )
+    :effect (operation_documentation_authorized ?response_operation)
+  )
+  (:action record_decontamination_completion
+    :parameters (?response_operation - response_operation ?decontamination_team - decontamination_team)
+    :precondition
+      (and
+        (operation_documentation_authorized ?response_operation)
+        (operation_has_decontamination_team ?response_operation ?decontamination_team)
+        (not
+          (operation_decontamination_complete ?response_operation)
+        )
+      )
+    :effect (operation_decontamination_complete ?response_operation)
+  )
+  (:action finalize_decontamination_and_verify_operation
+    :parameters (?response_operation - response_operation)
+    :precondition
+      (and
+        (operation_decontamination_complete ?response_operation)
+        (not
+          (operation_finalized_log_recorded ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized_log_recorded ?response_operation)
+        (entity_reintegration_verified ?response_operation)
+      )
+  )
+  (:action finalize_origin_unit_reintegration
+    :parameters (?origin_unit - origin_unit ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (origin_unit_ready ?origin_unit)
+        (origin_unit_search_completed ?origin_unit)
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_deployed ?containment_asset)
+        (not
+          (entity_reintegration_verified ?origin_unit)
+        )
+      )
+    :effect (entity_reintegration_verified ?origin_unit)
+  )
+  (:action finalize_receiving_unit_reintegration
+    :parameters (?receiving_unit - receiving_unit ?containment_asset - containment_asset)
+    :precondition
+      (and
+        (receiving_unit_ready ?receiving_unit)
+        (receiving_unit_search_completed ?receiving_unit)
+        (containment_asset_staged ?containment_asset)
+        (containment_asset_deployed ?containment_asset)
+        (not
+          (entity_reintegration_verified ?receiving_unit)
+        )
+      )
+    :effect (entity_reintegration_verified ?receiving_unit)
+  )
+  (:action apply_identification_and_close_case
+    :parameters (?incident_case - incident_case ?identification_token - identification_token ?tracking_device - tracking_device)
+    :precondition
+      (and
+        (entity_reintegration_verified ?incident_case)
+        (entity_tracking_device_link ?incident_case ?tracking_device)
+        (identification_token_available ?identification_token)
+        (not
+          (entity_reintegration_clearance_recorded ?incident_case)
+        )
+      )
+    :effect
+      (and
+        (entity_reintegration_clearance_recorded ?incident_case)
+        (entity_identification_token_linked ?incident_case ?identification_token)
+        (not
+          (identification_token_available ?identification_token)
+        )
+      )
+  )
+  (:action finalize_origin_unit_control_and_release_resources
+    :parameters (?origin_unit - origin_unit ?capture_equipment - capture_equipment ?identification_token - identification_token)
+    :precondition
+      (and
+        (entity_reintegration_clearance_recorded ?origin_unit)
+        (entity_capture_equipment_link ?origin_unit ?capture_equipment)
+        (entity_identification_token_linked ?origin_unit ?identification_token)
+        (not
+          (entity_operational_control_established ?origin_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_operational_control_established ?origin_unit)
+        (capture_equipment_available ?capture_equipment)
+        (identification_token_available ?identification_token)
+      )
+  )
+  (:action finalize_receiving_unit_control_and_release_resources
+    :parameters (?receiving_unit - receiving_unit ?capture_equipment - capture_equipment ?identification_token - identification_token)
+    :precondition
+      (and
+        (entity_reintegration_clearance_recorded ?receiving_unit)
+        (entity_capture_equipment_link ?receiving_unit ?capture_equipment)
+        (entity_identification_token_linked ?receiving_unit ?identification_token)
+        (not
+          (entity_operational_control_established ?receiving_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_operational_control_established ?receiving_unit)
+        (capture_equipment_available ?capture_equipment)
+        (identification_token_available ?identification_token)
+      )
+  )
+  (:action finalize_operation_control_and_release_resources
+    :parameters (?response_operation - response_operation ?capture_equipment - capture_equipment ?identification_token - identification_token)
+    :precondition
+      (and
+        (entity_reintegration_clearance_recorded ?response_operation)
+        (entity_capture_equipment_link ?response_operation ?capture_equipment)
+        (entity_identification_token_linked ?response_operation ?identification_token)
+        (not
+          (entity_operational_control_established ?response_operation)
+        )
+      )
+    :effect
+      (and
+        (entity_operational_control_established ?response_operation)
+        (capture_equipment_available ?capture_equipment)
+        (identification_token_available ?identification_token)
+      )
+  )
+)

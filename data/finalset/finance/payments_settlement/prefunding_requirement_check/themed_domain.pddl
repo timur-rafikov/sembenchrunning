@@ -1,0 +1,936 @@
+(define (domain prefunding_requirement_check_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_entity - object channel_entity - object message_entity - object case_envelope - object payment_instruction - case_envelope funding_source - resource_entity liquidity_check_task - resource_entity operational_unit - resource_entity priority_profile - resource_entity execution_option - resource_entity prefunding_reference - resource_entity liquidity_parameter - resource_entity settlement_window - resource_entity fee_profile - channel_entity external_confirmation_type - channel_entity mandate_or_counterparty_flag - channel_entity debtor_settlement_channel - message_entity creditor_settlement_channel - message_entity settlement_message - message_entity account_entity - payment_instruction account_subtype - payment_instruction payer_account - account_entity payee_account - account_entity settlement_agent - account_subtype)
+  (:predicates
+    (instruction_registered ?payment_instruction - payment_instruction)
+    (entity_validated ?payment_instruction - payment_instruction)
+    (funding_allocated ?payment_instruction - payment_instruction)
+    (entity_finalized ?payment_instruction - payment_instruction)
+    (entity_ready_for_settlement ?payment_instruction - payment_instruction)
+    (entity_prefunding_confirmed ?payment_instruction - payment_instruction)
+    (funding_source_available ?funding_source - funding_source)
+    (funding_assigned ?payment_instruction - payment_instruction ?funding_source - funding_source)
+    (liquidity_check_available ?liquidity_check_task - liquidity_check_task)
+    (liquidity_check_assigned ?payment_instruction - payment_instruction ?liquidity_check_task - liquidity_check_task)
+    (operational_unit_available ?operational_unit - operational_unit)
+    (operational_unit_assigned ?payment_instruction - payment_instruction ?operational_unit - operational_unit)
+    (fee_profile_available ?fee_profile - fee_profile)
+    (payer_account_fee_assigned ?payer_account - payer_account ?fee_profile - fee_profile)
+    (payee_account_fee_assigned ?payee_account - payee_account ?fee_profile - fee_profile)
+    (payer_account_debtor_channel ?payer_account - payer_account ?debtor_settlement_channel - debtor_settlement_channel)
+    (debtor_channel_ready ?debtor_settlement_channel - debtor_settlement_channel)
+    (debtor_channel_reserved ?debtor_settlement_channel - debtor_settlement_channel)
+    (payer_prefunding_reserved ?payer_account - payer_account)
+    (payee_account_creditor_channel ?payee_account - payee_account ?creditor_settlement_channel - creditor_settlement_channel)
+    (creditor_channel_ready ?creditor_settlement_channel - creditor_settlement_channel)
+    (creditor_channel_reserved ?creditor_settlement_channel - creditor_settlement_channel)
+    (payee_prefunding_reserved ?payee_account - payee_account)
+    (settlement_message_template_available ?settlement_message - settlement_message)
+    (settlement_message_composed ?settlement_message - settlement_message)
+    (message_debtor_channel_assignment ?settlement_message - settlement_message ?debtor_settlement_channel - debtor_settlement_channel)
+    (message_creditor_channel_assignment ?settlement_message - settlement_message ?creditor_settlement_channel - creditor_settlement_channel)
+    (message_variant_requires_priority ?settlement_message - settlement_message)
+    (message_variant_requires_execution_option ?settlement_message - settlement_message)
+    (message_acknowledged ?settlement_message - settlement_message)
+    (agent_links_payer_account ?settlement_agent - settlement_agent ?payer_account - payer_account)
+    (agent_links_payee_account ?settlement_agent - settlement_agent ?payee_account - payee_account)
+    (agent_has_settlement_message ?settlement_agent - settlement_agent ?settlement_message - settlement_message)
+    (external_confirmation_available ?external_confirmation_type - external_confirmation_type)
+    (agent_external_confirmation_available ?settlement_agent - settlement_agent ?external_confirmation_type - external_confirmation_type)
+    (external_confirmation_reserved ?external_confirmation_type - external_confirmation_type)
+    (external_confirmation_attached_to_message ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    (agent_preprocessing_completed ?settlement_agent - settlement_agent)
+    (agent_prechecks_completed ?settlement_agent - settlement_agent)
+    (agent_approved_for_execution ?settlement_agent - settlement_agent)
+    (agent_priority_flag_set ?settlement_agent - settlement_agent)
+    (agent_priority_metadata_attached ?settlement_agent - settlement_agent)
+    (agent_has_execution_options ?settlement_agent - settlement_agent)
+    (agent_execution_finalized ?settlement_agent - settlement_agent)
+    (mandate_available ?mandate_or_counterparty_flag - mandate_or_counterparty_flag)
+    (agent_mandate_associated ?settlement_agent - settlement_agent ?mandate_or_counterparty_flag - mandate_or_counterparty_flag)
+    (agent_mandate_acknowledged ?settlement_agent - settlement_agent)
+    (agent_mandate_operator_assigned ?settlement_agent - settlement_agent)
+    (agent_mandate_approved ?settlement_agent - settlement_agent)
+    (priority_profile_available ?priority_profile - priority_profile)
+    (agent_priority_profile_assigned ?settlement_agent - settlement_agent ?priority_profile - priority_profile)
+    (execution_option_available ?execution_option - execution_option)
+    (agent_execution_option_assigned ?settlement_agent - settlement_agent ?execution_option - execution_option)
+    (liquidity_parameter_available ?liquidity_parameter - liquidity_parameter)
+    (agent_liquidity_parameter_assigned ?settlement_agent - settlement_agent ?liquidity_parameter - liquidity_parameter)
+    (settlement_window_available ?settlement_window - settlement_window)
+    (agent_settlement_window_assigned ?settlement_agent - settlement_agent ?settlement_window - settlement_window)
+    (prefunding_reference_available ?prefunding_reference - prefunding_reference)
+    (prefunding_reference_linked ?payment_instruction - payment_instruction ?prefunding_reference - prefunding_reference)
+    (payer_account_processing_ready ?payer_account - payer_account)
+    (payee_account_processing_ready ?payee_account - payee_account)
+    (agent_processing_finalized ?settlement_agent - settlement_agent)
+  )
+  (:action register_payment_instruction
+    :parameters (?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (instruction_registered ?payment_instruction)
+        )
+        (not
+          (entity_finalized ?payment_instruction)
+        )
+      )
+    :effect (instruction_registered ?payment_instruction)
+  )
+  (:action assign_funding_source_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?funding_source - funding_source)
+    :precondition
+      (and
+        (instruction_registered ?payment_instruction)
+        (not
+          (funding_allocated ?payment_instruction)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (funding_allocated ?payment_instruction)
+        (funding_assigned ?payment_instruction ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action assign_liquidity_check_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (instruction_registered ?payment_instruction)
+        (funding_allocated ?payment_instruction)
+        (liquidity_check_available ?liquidity_check_task)
+      )
+    :effect
+      (and
+        (liquidity_check_assigned ?payment_instruction ?liquidity_check_task)
+        (not
+          (liquidity_check_available ?liquidity_check_task)
+        )
+      )
+  )
+  (:action validate_instruction
+    :parameters (?payment_instruction - payment_instruction ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (instruction_registered ?payment_instruction)
+        (funding_allocated ?payment_instruction)
+        (liquidity_check_assigned ?payment_instruction ?liquidity_check_task)
+        (not
+          (entity_validated ?payment_instruction)
+        )
+      )
+    :effect (entity_validated ?payment_instruction)
+  )
+  (:action release_liquidity_check_task
+    :parameters (?payment_instruction - payment_instruction ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (liquidity_check_assigned ?payment_instruction ?liquidity_check_task)
+      )
+    :effect
+      (and
+        (liquidity_check_available ?liquidity_check_task)
+        (not
+          (liquidity_check_assigned ?payment_instruction ?liquidity_check_task)
+        )
+      )
+  )
+  (:action assign_operational_unit_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?operational_unit - operational_unit)
+    :precondition
+      (and
+        (entity_validated ?payment_instruction)
+        (operational_unit_available ?operational_unit)
+      )
+    :effect
+      (and
+        (operational_unit_assigned ?payment_instruction ?operational_unit)
+        (not
+          (operational_unit_available ?operational_unit)
+        )
+      )
+  )
+  (:action release_operational_unit_from_instruction
+    :parameters (?payment_instruction - payment_instruction ?operational_unit - operational_unit)
+    :precondition
+      (and
+        (operational_unit_assigned ?payment_instruction ?operational_unit)
+      )
+    :effect
+      (and
+        (operational_unit_available ?operational_unit)
+        (not
+          (operational_unit_assigned ?payment_instruction ?operational_unit)
+        )
+      )
+  )
+  (:action attach_liquidity_parameter_to_agent
+    :parameters (?settlement_agent - settlement_agent ?liquidity_parameter - liquidity_parameter)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (liquidity_parameter_available ?liquidity_parameter)
+      )
+    :effect
+      (and
+        (agent_liquidity_parameter_assigned ?settlement_agent ?liquidity_parameter)
+        (not
+          (liquidity_parameter_available ?liquidity_parameter)
+        )
+      )
+  )
+  (:action release_liquidity_parameter_from_agent
+    :parameters (?settlement_agent - settlement_agent ?liquidity_parameter - liquidity_parameter)
+    :precondition
+      (and
+        (agent_liquidity_parameter_assigned ?settlement_agent ?liquidity_parameter)
+      )
+    :effect
+      (and
+        (liquidity_parameter_available ?liquidity_parameter)
+        (not
+          (agent_liquidity_parameter_assigned ?settlement_agent ?liquidity_parameter)
+        )
+      )
+  )
+  (:action attach_settlement_window_to_agent
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (settlement_window_available ?settlement_window)
+      )
+    :effect
+      (and
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (not
+          (settlement_window_available ?settlement_window)
+        )
+      )
+  )
+  (:action release_settlement_window_from_agent
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+      )
+    :effect
+      (and
+        (settlement_window_available ?settlement_window)
+        (not
+          (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        )
+      )
+  )
+  (:action mark_debtor_channel_ready
+    :parameters (?payer_account - payer_account ?debtor_settlement_channel - debtor_settlement_channel ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (entity_validated ?payer_account)
+        (liquidity_check_assigned ?payer_account ?liquidity_check_task)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (not
+          (debtor_channel_ready ?debtor_settlement_channel)
+        )
+        (not
+          (debtor_channel_reserved ?debtor_settlement_channel)
+        )
+      )
+    :effect (debtor_channel_ready ?debtor_settlement_channel)
+  )
+  (:action reserve_prefunding_on_payer_account
+    :parameters (?payer_account - payer_account ?debtor_settlement_channel - debtor_settlement_channel ?operational_unit - operational_unit)
+    :precondition
+      (and
+        (entity_validated ?payer_account)
+        (operational_unit_assigned ?payer_account ?operational_unit)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (debtor_channel_ready ?debtor_settlement_channel)
+        (not
+          (payer_account_processing_ready ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payer_prefunding_reserved ?payer_account)
+      )
+  )
+  (:action assign_fee_profile_and_reserve_prefunding_for_payer_account
+    :parameters (?payer_account - payer_account ?debtor_settlement_channel - debtor_settlement_channel ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?payer_account)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (fee_profile_available ?fee_profile)
+        (not
+          (payer_account_processing_ready ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (debtor_channel_reserved ?debtor_settlement_channel)
+        (payer_account_processing_ready ?payer_account)
+        (payer_account_fee_assigned ?payer_account ?fee_profile)
+        (not
+          (fee_profile_available ?fee_profile)
+        )
+      )
+  )
+  (:action finalize_prefunding_reservation_for_payer_account
+    :parameters (?payer_account - payer_account ?debtor_settlement_channel - debtor_settlement_channel ?liquidity_check_task - liquidity_check_task ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?payer_account)
+        (liquidity_check_assigned ?payer_account ?liquidity_check_task)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (debtor_channel_reserved ?debtor_settlement_channel)
+        (payer_account_fee_assigned ?payer_account ?fee_profile)
+        (not
+          (payer_prefunding_reserved ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (debtor_channel_ready ?debtor_settlement_channel)
+        (payer_prefunding_reserved ?payer_account)
+        (fee_profile_available ?fee_profile)
+        (not
+          (payer_account_fee_assigned ?payer_account ?fee_profile)
+        )
+      )
+  )
+  (:action mark_creditor_channel_ready
+    :parameters (?payee_account - payee_account ?creditor_settlement_channel - creditor_settlement_channel ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (entity_validated ?payee_account)
+        (liquidity_check_assigned ?payee_account ?liquidity_check_task)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (not
+          (creditor_channel_ready ?creditor_settlement_channel)
+        )
+        (not
+          (creditor_channel_reserved ?creditor_settlement_channel)
+        )
+      )
+    :effect (creditor_channel_ready ?creditor_settlement_channel)
+  )
+  (:action reserve_prefunding_on_payee_account
+    :parameters (?payee_account - payee_account ?creditor_settlement_channel - creditor_settlement_channel ?operational_unit - operational_unit)
+    :precondition
+      (and
+        (entity_validated ?payee_account)
+        (operational_unit_assigned ?payee_account ?operational_unit)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (creditor_channel_ready ?creditor_settlement_channel)
+        (not
+          (payee_account_processing_ready ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (payee_account_processing_ready ?payee_account)
+        (payee_prefunding_reserved ?payee_account)
+      )
+  )
+  (:action assign_fee_profile_and_reserve_prefunding_for_payee_account
+    :parameters (?payee_account - payee_account ?creditor_settlement_channel - creditor_settlement_channel ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?payee_account)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (fee_profile_available ?fee_profile)
+        (not
+          (payee_account_processing_ready ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (creditor_channel_reserved ?creditor_settlement_channel)
+        (payee_account_processing_ready ?payee_account)
+        (payee_account_fee_assigned ?payee_account ?fee_profile)
+        (not
+          (fee_profile_available ?fee_profile)
+        )
+      )
+  )
+  (:action finalize_prefunding_reservation_for_payee_account
+    :parameters (?payee_account - payee_account ?creditor_settlement_channel - creditor_settlement_channel ?liquidity_check_task - liquidity_check_task ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_validated ?payee_account)
+        (liquidity_check_assigned ?payee_account ?liquidity_check_task)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (creditor_channel_reserved ?creditor_settlement_channel)
+        (payee_account_fee_assigned ?payee_account ?fee_profile)
+        (not
+          (payee_prefunding_reserved ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (creditor_channel_ready ?creditor_settlement_channel)
+        (payee_prefunding_reserved ?payee_account)
+        (fee_profile_available ?fee_profile)
+        (not
+          (payee_account_fee_assigned ?payee_account ?fee_profile)
+        )
+      )
+  )
+  (:action compose_settlement_message
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?debtor_settlement_channel - debtor_settlement_channel ?creditor_settlement_channel - creditor_settlement_channel ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payee_account_processing_ready ?payee_account)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (debtor_channel_ready ?debtor_settlement_channel)
+        (creditor_channel_ready ?creditor_settlement_channel)
+        (payer_prefunding_reserved ?payer_account)
+        (payee_prefunding_reserved ?payee_account)
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message)
+        (message_debtor_channel_assignment ?settlement_message ?debtor_settlement_channel)
+        (message_creditor_channel_assignment ?settlement_message ?creditor_settlement_channel)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_priority_variant
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?debtor_settlement_channel - debtor_settlement_channel ?creditor_settlement_channel - creditor_settlement_channel ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payee_account_processing_ready ?payee_account)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (debtor_channel_reserved ?debtor_settlement_channel)
+        (creditor_channel_ready ?creditor_settlement_channel)
+        (not
+          (payer_prefunding_reserved ?payer_account)
+        )
+        (payee_prefunding_reserved ?payee_account)
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message)
+        (message_debtor_channel_assignment ?settlement_message ?debtor_settlement_channel)
+        (message_creditor_channel_assignment ?settlement_message ?creditor_settlement_channel)
+        (message_variant_requires_priority ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_execution_variant
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?debtor_settlement_channel - debtor_settlement_channel ?creditor_settlement_channel - creditor_settlement_channel ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payee_account_processing_ready ?payee_account)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (debtor_channel_ready ?debtor_settlement_channel)
+        (creditor_channel_reserved ?creditor_settlement_channel)
+        (payer_prefunding_reserved ?payer_account)
+        (not
+          (payee_prefunding_reserved ?payee_account)
+        )
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message)
+        (message_debtor_channel_assignment ?settlement_message ?debtor_settlement_channel)
+        (message_creditor_channel_assignment ?settlement_message ?creditor_settlement_channel)
+        (message_variant_requires_execution_option ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action compose_settlement_message_priority_and_execution_variant
+    :parameters (?payer_account - payer_account ?payee_account - payee_account ?debtor_settlement_channel - debtor_settlement_channel ?creditor_settlement_channel - creditor_settlement_channel ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payee_account_processing_ready ?payee_account)
+        (payer_account_debtor_channel ?payer_account ?debtor_settlement_channel)
+        (payee_account_creditor_channel ?payee_account ?creditor_settlement_channel)
+        (debtor_channel_reserved ?debtor_settlement_channel)
+        (creditor_channel_reserved ?creditor_settlement_channel)
+        (not
+          (payer_prefunding_reserved ?payer_account)
+        )
+        (not
+          (payee_prefunding_reserved ?payee_account)
+        )
+        (settlement_message_template_available ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_composed ?settlement_message)
+        (message_debtor_channel_assignment ?settlement_message ?debtor_settlement_channel)
+        (message_creditor_channel_assignment ?settlement_message ?creditor_settlement_channel)
+        (message_variant_requires_priority ?settlement_message)
+        (message_variant_requires_execution_option ?settlement_message)
+        (not
+          (settlement_message_template_available ?settlement_message)
+        )
+      )
+  )
+  (:action acknowledge_settlement_message
+    :parameters (?settlement_message - settlement_message ?payer_account - payer_account ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (settlement_message_composed ?settlement_message)
+        (payer_account_processing_ready ?payer_account)
+        (liquidity_check_assigned ?payer_account ?liquidity_check_task)
+        (not
+          (message_acknowledged ?settlement_message)
+        )
+      )
+    :effect (message_acknowledged ?settlement_message)
+  )
+  (:action reserve_external_confirmation_for_message
+    :parameters (?settlement_agent - settlement_agent ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (agent_has_settlement_message ?settlement_agent ?settlement_message)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_available ?external_confirmation_type)
+        (settlement_message_composed ?settlement_message)
+        (message_acknowledged ?settlement_message)
+        (not
+          (external_confirmation_reserved ?external_confirmation_type)
+        )
+      )
+    :effect
+      (and
+        (external_confirmation_reserved ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (not
+          (external_confirmation_available ?external_confirmation_type)
+        )
+      )
+  )
+  (:action complete_agent_preprocessing_for_message
+    :parameters (?settlement_agent - settlement_agent ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_reserved ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (liquidity_check_assigned ?settlement_agent ?liquidity_check_task)
+        (not
+          (message_variant_requires_priority ?settlement_message)
+        )
+        (not
+          (agent_preprocessing_completed ?settlement_agent)
+        )
+      )
+    :effect (agent_preprocessing_completed ?settlement_agent)
+  )
+  (:action assign_priority_profile_to_agent
+    :parameters (?settlement_agent - settlement_agent ?priority_profile - priority_profile)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (priority_profile_available ?priority_profile)
+        (not
+          (agent_priority_flag_set ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_priority_flag_set ?settlement_agent)
+        (agent_priority_profile_assigned ?settlement_agent ?priority_profile)
+        (not
+          (priority_profile_available ?priority_profile)
+        )
+      )
+  )
+  (:action prepare_agent_with_priority_for_message
+    :parameters (?settlement_agent - settlement_agent ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message ?liquidity_check_task - liquidity_check_task ?priority_profile - priority_profile)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_reserved ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (liquidity_check_assigned ?settlement_agent ?liquidity_check_task)
+        (message_variant_requires_priority ?settlement_message)
+        (agent_priority_flag_set ?settlement_agent)
+        (agent_priority_profile_assigned ?settlement_agent ?priority_profile)
+        (not
+          (agent_preprocessing_completed ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_preprocessing_completed ?settlement_agent)
+        (agent_priority_metadata_attached ?settlement_agent)
+      )
+  )
+  (:action agent_execute_pre_checks
+    :parameters (?settlement_agent - settlement_agent ?liquidity_parameter - liquidity_parameter ?operational_unit - operational_unit ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_preprocessing_completed ?settlement_agent)
+        (agent_liquidity_parameter_assigned ?settlement_agent ?liquidity_parameter)
+        (operational_unit_assigned ?settlement_agent ?operational_unit)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (not
+          (message_variant_requires_execution_option ?settlement_message)
+        )
+        (not
+          (agent_prechecks_completed ?settlement_agent)
+        )
+      )
+    :effect (agent_prechecks_completed ?settlement_agent)
+  )
+  (:action agent_execute_pre_checks_for_execution_variant
+    :parameters (?settlement_agent - settlement_agent ?liquidity_parameter - liquidity_parameter ?operational_unit - operational_unit ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_preprocessing_completed ?settlement_agent)
+        (agent_liquidity_parameter_assigned ?settlement_agent ?liquidity_parameter)
+        (operational_unit_assigned ?settlement_agent ?operational_unit)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (message_variant_requires_execution_option ?settlement_message)
+        (not
+          (agent_prechecks_completed ?settlement_agent)
+        )
+      )
+    :effect (agent_prechecks_completed ?settlement_agent)
+  )
+  (:action agent_approve_for_execution_standard
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_prechecks_completed ?settlement_agent)
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (not
+          (message_variant_requires_priority ?settlement_message)
+        )
+        (not
+          (message_variant_requires_execution_option ?settlement_message)
+        )
+        (not
+          (agent_approved_for_execution ?settlement_agent)
+        )
+      )
+    :effect (agent_approved_for_execution ?settlement_agent)
+  )
+  (:action agent_approve_for_execution_with_priority
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_prechecks_completed ?settlement_agent)
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (message_variant_requires_priority ?settlement_message)
+        (not
+          (message_variant_requires_execution_option ?settlement_message)
+        )
+        (not
+          (agent_approved_for_execution ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_has_execution_options ?settlement_agent)
+      )
+  )
+  (:action agent_approve_for_execution_with_execution_option
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_prechecks_completed ?settlement_agent)
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (not
+          (message_variant_requires_priority ?settlement_message)
+        )
+        (message_variant_requires_execution_option ?settlement_message)
+        (not
+          (agent_approved_for_execution ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_has_execution_options ?settlement_agent)
+      )
+  )
+  (:action agent_approve_for_execution_with_priority_and_execution_option
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window ?external_confirmation_type - external_confirmation_type ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (agent_prechecks_completed ?settlement_agent)
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (agent_external_confirmation_available ?settlement_agent ?external_confirmation_type)
+        (external_confirmation_attached_to_message ?external_confirmation_type ?settlement_message)
+        (message_variant_requires_priority ?settlement_message)
+        (message_variant_requires_execution_option ?settlement_message)
+        (not
+          (agent_approved_for_execution ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_has_execution_options ?settlement_agent)
+      )
+  )
+  (:action finalize_agent_execution
+    :parameters (?settlement_agent - settlement_agent)
+    :precondition
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (not
+          (agent_has_execution_options ?settlement_agent)
+        )
+        (not
+          (agent_processing_finalized ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_processing_finalized ?settlement_agent)
+        (entity_ready_for_settlement ?settlement_agent)
+      )
+  )
+  (:action assign_execution_option_to_agent
+    :parameters (?settlement_agent - settlement_agent ?execution_option - execution_option)
+    :precondition
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_has_execution_options ?settlement_agent)
+        (execution_option_available ?execution_option)
+      )
+    :effect
+      (and
+        (agent_execution_option_assigned ?settlement_agent ?execution_option)
+        (not
+          (execution_option_available ?execution_option)
+        )
+      )
+  )
+  (:action perform_agent_final_execution_checks
+    :parameters (?settlement_agent - settlement_agent ?payer_account - payer_account ?payee_account - payee_account ?liquidity_check_task - liquidity_check_task ?execution_option - execution_option)
+    :precondition
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_has_execution_options ?settlement_agent)
+        (agent_execution_option_assigned ?settlement_agent ?execution_option)
+        (agent_links_payer_account ?settlement_agent ?payer_account)
+        (agent_links_payee_account ?settlement_agent ?payee_account)
+        (payer_prefunding_reserved ?payer_account)
+        (payee_prefunding_reserved ?payee_account)
+        (liquidity_check_assigned ?settlement_agent ?liquidity_check_task)
+        (not
+          (agent_execution_finalized ?settlement_agent)
+        )
+      )
+    :effect (agent_execution_finalized ?settlement_agent)
+  )
+  (:action finalize_agent_and_mark_ready
+    :parameters (?settlement_agent - settlement_agent)
+    :precondition
+      (and
+        (agent_approved_for_execution ?settlement_agent)
+        (agent_execution_finalized ?settlement_agent)
+        (not
+          (agent_processing_finalized ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_processing_finalized ?settlement_agent)
+        (entity_ready_for_settlement ?settlement_agent)
+      )
+  )
+  (:action acknowledge_agent_mandate
+    :parameters (?settlement_agent - settlement_agent ?mandate_or_counterparty_flag - mandate_or_counterparty_flag ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (entity_validated ?settlement_agent)
+        (liquidity_check_assigned ?settlement_agent ?liquidity_check_task)
+        (mandate_available ?mandate_or_counterparty_flag)
+        (agent_mandate_associated ?settlement_agent ?mandate_or_counterparty_flag)
+        (not
+          (agent_mandate_acknowledged ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_mandate_acknowledged ?settlement_agent)
+        (not
+          (mandate_available ?mandate_or_counterparty_flag)
+        )
+      )
+  )
+  (:action assign_operator_for_agent_mandate
+    :parameters (?settlement_agent - settlement_agent ?operational_unit - operational_unit)
+    :precondition
+      (and
+        (agent_mandate_acknowledged ?settlement_agent)
+        (operational_unit_assigned ?settlement_agent ?operational_unit)
+        (not
+          (agent_mandate_operator_assigned ?settlement_agent)
+        )
+      )
+    :effect (agent_mandate_operator_assigned ?settlement_agent)
+  )
+  (:action approve_agent_mandate
+    :parameters (?settlement_agent - settlement_agent ?settlement_window - settlement_window)
+    :precondition
+      (and
+        (agent_mandate_operator_assigned ?settlement_agent)
+        (agent_settlement_window_assigned ?settlement_agent ?settlement_window)
+        (not
+          (agent_mandate_approved ?settlement_agent)
+        )
+      )
+    :effect (agent_mandate_approved ?settlement_agent)
+  )
+  (:action finalize_agent_mandate_and_mark_ready
+    :parameters (?settlement_agent - settlement_agent)
+    :precondition
+      (and
+        (agent_mandate_approved ?settlement_agent)
+        (not
+          (agent_processing_finalized ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_processing_finalized ?settlement_agent)
+        (entity_ready_for_settlement ?settlement_agent)
+      )
+  )
+  (:action finalize_payer_account_bookkeeping
+    :parameters (?payer_account - payer_account ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payer_account_processing_ready ?payer_account)
+        (payer_prefunding_reserved ?payer_account)
+        (settlement_message_composed ?settlement_message)
+        (message_acknowledged ?settlement_message)
+        (not
+          (entity_ready_for_settlement ?payer_account)
+        )
+      )
+    :effect (entity_ready_for_settlement ?payer_account)
+  )
+  (:action finalize_payee_account_bookkeeping
+    :parameters (?payee_account - payee_account ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (payee_account_processing_ready ?payee_account)
+        (payee_prefunding_reserved ?payee_account)
+        (settlement_message_composed ?settlement_message)
+        (message_acknowledged ?settlement_message)
+        (not
+          (entity_ready_for_settlement ?payee_account)
+        )
+      )
+    :effect (entity_ready_for_settlement ?payee_account)
+  )
+  (:action attach_prefunding_reference_to_instruction
+    :parameters (?payment_instruction - payment_instruction ?prefunding_reference - prefunding_reference ?liquidity_check_task - liquidity_check_task)
+    :precondition
+      (and
+        (entity_ready_for_settlement ?payment_instruction)
+        (liquidity_check_assigned ?payment_instruction ?liquidity_check_task)
+        (prefunding_reference_available ?prefunding_reference)
+        (not
+          (entity_prefunding_confirmed ?payment_instruction)
+        )
+      )
+    :effect
+      (and
+        (entity_prefunding_confirmed ?payment_instruction)
+        (prefunding_reference_linked ?payment_instruction ?prefunding_reference)
+        (not
+          (prefunding_reference_available ?prefunding_reference)
+        )
+      )
+  )
+  (:action apply_prefunding_to_payer_account
+    :parameters (?payer_account - payer_account ?funding_source - funding_source ?prefunding_reference - prefunding_reference)
+    :precondition
+      (and
+        (entity_prefunding_confirmed ?payer_account)
+        (funding_assigned ?payer_account ?funding_source)
+        (prefunding_reference_linked ?payer_account ?prefunding_reference)
+        (not
+          (entity_finalized ?payer_account)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?payer_account)
+        (funding_source_available ?funding_source)
+        (prefunding_reference_available ?prefunding_reference)
+      )
+  )
+  (:action apply_prefunding_to_payee_account
+    :parameters (?payee_account - payee_account ?funding_source - funding_source ?prefunding_reference - prefunding_reference)
+    :precondition
+      (and
+        (entity_prefunding_confirmed ?payee_account)
+        (funding_assigned ?payee_account ?funding_source)
+        (prefunding_reference_linked ?payee_account ?prefunding_reference)
+        (not
+          (entity_finalized ?payee_account)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?payee_account)
+        (funding_source_available ?funding_source)
+        (prefunding_reference_available ?prefunding_reference)
+      )
+  )
+  (:action apply_prefunding_to_settlement_agent
+    :parameters (?settlement_agent - settlement_agent ?funding_source - funding_source ?prefunding_reference - prefunding_reference)
+    :precondition
+      (and
+        (entity_prefunding_confirmed ?settlement_agent)
+        (funding_assigned ?settlement_agent ?funding_source)
+        (prefunding_reference_linked ?settlement_agent ?prefunding_reference)
+        (not
+          (entity_finalized ?settlement_agent)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?settlement_agent)
+        (funding_source_available ?funding_source)
+        (prefunding_reference_available ?prefunding_reference)
+      )
+  )
+)

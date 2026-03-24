@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain interrupted_crafting_replanning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types inventory_category - object equipment_category - object consumable_category - object crafting_entity_category - object crafting_entity - crafting_entity_category loadout_item - inventory_category material_unit - inventory_category crafting_station - inventory_category attachment_token - inventory_category skill_module - inventory_category catalyst_condition - inventory_category optional_modifier_a - inventory_category optional_modifier_b - inventory_category component_item - equipment_category subcomponent_slot - equipment_category variant_token - equipment_category resource_node_ore - consumable_category resource_node_wood - consumable_category assembly_product - consumable_category crafter_role_group - crafting_entity actor_group - crafting_entity primary_crafter_slot - crafter_role_group secondary_crafter_slot - crafter_role_group crafting_actor - actor_group)
+  (:predicates
+    (entity_activated ?crafting_goal - crafting_entity)
+    (entity_ready ?crafting_goal - crafting_entity)
+    (entity_loadout_attached ?crafting_goal - crafting_entity)
+    (continuation_enabled ?crafting_goal - crafting_entity)
+    (validated_for_handoff ?crafting_goal - crafting_entity)
+    (entity_salvaged ?crafting_goal - crafting_entity)
+    (loadout_available ?loadout_item - loadout_item)
+    (entity_loadout_assigned ?crafting_goal - crafting_entity ?loadout_item - loadout_item)
+    (material_available ?material_unit - material_unit)
+    (entity_material_reserved ?crafting_goal - crafting_entity ?material_unit - material_unit)
+    (station_available ?crafting_station - crafting_station)
+    (entity_station_bound ?crafting_goal - crafting_entity ?crafting_station - crafting_station)
+    (component_available ?component_item - component_item)
+    (primary_slot_component_assigned ?primary_crafter_slot - primary_crafter_slot ?component_item - component_item)
+    (secondary_slot_component_assigned ?secondary_crafter_slot - secondary_crafter_slot ?component_item - component_item)
+    (primary_slot_resource_ore_assigned ?primary_crafter_slot - primary_crafter_slot ?resource_node_ore - resource_node_ore)
+    (resource_ore_reserved ?resource_node_ore - resource_node_ore)
+    (resource_ore_engaged ?resource_node_ore - resource_node_ore)
+    (primary_slot_resource_confirmed ?primary_crafter_slot - primary_crafter_slot)
+    (secondary_slot_resource_wood_assigned ?secondary_crafter_slot - secondary_crafter_slot ?resource_node_wood - resource_node_wood)
+    (resource_wood_reserved ?resource_node_wood - resource_node_wood)
+    (resource_wood_engaged ?resource_node_wood - resource_node_wood)
+    (secondary_slot_resource_confirmed ?secondary_crafter_slot - secondary_crafter_slot)
+    (product_blueprint_available ?assembly_product - assembly_product)
+    (product_staged ?assembly_product - assembly_product)
+    (product_linked_resource_ore ?assembly_product - assembly_product ?resource_node_ore - resource_node_ore)
+    (product_linked_resource_wood ?assembly_product - assembly_product ?resource_node_wood - resource_node_wood)
+    (product_modifier_a_present ?assembly_product - assembly_product)
+    (product_modifier_b_present ?assembly_product - assembly_product)
+    (product_ready_for_subassembly ?assembly_product - assembly_product)
+    (actor_primary_slot_link ?crafting_actor - crafting_actor ?primary_crafter_slot - primary_crafter_slot)
+    (actor_secondary_slot_link ?crafting_actor - crafting_actor ?secondary_crafter_slot - secondary_crafter_slot)
+    (actor_product_link ?crafting_actor - crafting_actor ?assembly_product - assembly_product)
+    (subcomponent_available ?subcomponent_slot - subcomponent_slot)
+    (actor_subcomponent_slot ?crafting_actor - crafting_actor ?subcomponent_slot - subcomponent_slot)
+    (subcomponent_staged ?subcomponent_slot - subcomponent_slot)
+    (subcomponent_slot_fitted ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    (actor_ready_for_integration ?crafting_actor - crafting_actor)
+    (actor_subassembly_ready ?crafting_actor - crafting_actor)
+    (actor_subassembly_validated ?crafting_actor - crafting_actor)
+    (actor_attachment_attached ?crafting_actor - crafting_actor)
+    (actor_attachment_staged ?crafting_actor - crafting_actor)
+    (actor_variants_staged ?crafting_actor - crafting_actor)
+    (actor_integration_finalized ?crafting_actor - crafting_actor)
+    (variant_available ?variant_token - variant_token)
+    (actor_variant_link ?crafting_actor - crafting_actor ?variant_token - variant_token)
+    (actor_variant_locked ?crafting_actor - crafting_actor)
+    (actor_variant_stage_complete ?crafting_actor - crafting_actor)
+    (actor_variant_validated ?crafting_actor - crafting_actor)
+    (attachment_available ?attachment_token - attachment_token)
+    (actor_attachment_link ?crafting_actor - crafting_actor ?attachment_token - attachment_token)
+    (skill_module_available ?skill_module - skill_module)
+    (actor_skill_module_attached ?crafting_actor - crafting_actor ?skill_module - skill_module)
+    (optional_modifier_a_available ?optional_modifier_a - optional_modifier_a)
+    (actor_optional_modifier_a_attached ?crafting_actor - crafting_actor ?optional_modifier_a - optional_modifier_a)
+    (optional_modifier_b_available ?optional_modifier_b - optional_modifier_b)
+    (actor_optional_modifier_b_attached ?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b)
+    (catalyst_available ?catalyst_condition - catalyst_condition)
+    (entity_catalyst_bound ?crafting_goal - crafting_entity ?catalyst_condition - catalyst_condition)
+    (primary_slot_ready ?primary_crafter_slot - primary_crafter_slot)
+    (secondary_slot_ready ?secondary_crafter_slot - secondary_crafter_slot)
+    (handoff_committed ?crafting_actor - crafting_actor)
+  )
+  (:action initialize_crafting_entity
+    :parameters (?crafting_goal - crafting_entity)
+    :precondition
+      (and
+        (not
+          (entity_activated ?crafting_goal)
+        )
+        (not
+          (continuation_enabled ?crafting_goal)
+        )
+      )
+    :effect (entity_activated ?crafting_goal)
+  )
+  (:action assign_loadout_item_to_entity
+    :parameters (?crafting_goal - crafting_entity ?loadout_item - loadout_item)
+    :precondition
+      (and
+        (entity_activated ?crafting_goal)
+        (not
+          (entity_loadout_attached ?crafting_goal)
+        )
+        (loadout_available ?loadout_item)
+      )
+    :effect
+      (and
+        (entity_loadout_attached ?crafting_goal)
+        (entity_loadout_assigned ?crafting_goal ?loadout_item)
+        (not
+          (loadout_available ?loadout_item)
+        )
+      )
+  )
+  (:action reserve_material_unit_for_entity
+    :parameters (?crafting_goal - crafting_entity ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_activated ?crafting_goal)
+        (entity_loadout_attached ?crafting_goal)
+        (material_available ?material_unit)
+      )
+    :effect
+      (and
+        (entity_material_reserved ?crafting_goal ?material_unit)
+        (not
+          (material_available ?material_unit)
+        )
+      )
+  )
+  (:action finalize_material_reservation
+    :parameters (?crafting_goal - crafting_entity ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_activated ?crafting_goal)
+        (entity_loadout_attached ?crafting_goal)
+        (entity_material_reserved ?crafting_goal ?material_unit)
+        (not
+          (entity_ready ?crafting_goal)
+        )
+      )
+    :effect (entity_ready ?crafting_goal)
+  )
+  (:action release_reserved_material
+    :parameters (?crafting_goal - crafting_entity ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_material_reserved ?crafting_goal ?material_unit)
+      )
+    :effect
+      (and
+        (material_available ?material_unit)
+        (not
+          (entity_material_reserved ?crafting_goal ?material_unit)
+        )
+      )
+  )
+  (:action bind_station_to_entity
+    :parameters (?crafting_goal - crafting_entity ?crafting_station - crafting_station)
+    :precondition
+      (and
+        (entity_ready ?crafting_goal)
+        (station_available ?crafting_station)
+      )
+    :effect
+      (and
+        (entity_station_bound ?crafting_goal ?crafting_station)
+        (not
+          (station_available ?crafting_station)
+        )
+      )
+  )
+  (:action unbind_station_from_entity
+    :parameters (?crafting_goal - crafting_entity ?crafting_station - crafting_station)
+    :precondition
+      (and
+        (entity_station_bound ?crafting_goal ?crafting_station)
+      )
+    :effect
+      (and
+        (station_available ?crafting_station)
+        (not
+          (entity_station_bound ?crafting_goal ?crafting_station)
+        )
+      )
+  )
+  (:action attach_optional_modifier_a_to_actor
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_a - optional_modifier_a)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (optional_modifier_a_available ?optional_modifier_a)
+      )
+    :effect
+      (and
+        (actor_optional_modifier_a_attached ?crafting_actor ?optional_modifier_a)
+        (not
+          (optional_modifier_a_available ?optional_modifier_a)
+        )
+      )
+  )
+  (:action detach_optional_modifier_a_from_actor
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_a - optional_modifier_a)
+    :precondition
+      (and
+        (actor_optional_modifier_a_attached ?crafting_actor ?optional_modifier_a)
+      )
+    :effect
+      (and
+        (optional_modifier_a_available ?optional_modifier_a)
+        (not
+          (actor_optional_modifier_a_attached ?crafting_actor ?optional_modifier_a)
+        )
+      )
+  )
+  (:action attach_optional_modifier_b_to_actor
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (optional_modifier_b_available ?optional_modifier_b)
+      )
+    :effect
+      (and
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (not
+          (optional_modifier_b_available ?optional_modifier_b)
+        )
+      )
+  )
+  (:action detach_optional_modifier_b_from_actor
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b)
+    :precondition
+      (and
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+      )
+    :effect
+      (and
+        (optional_modifier_b_available ?optional_modifier_b)
+        (not
+          (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        )
+      )
+  )
+  (:action reserve_resource_node_ore_for_primary_slot
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?resource_node_ore - resource_node_ore ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_ready ?primary_crafter_slot)
+        (entity_material_reserved ?primary_crafter_slot ?material_unit)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (not
+          (resource_ore_reserved ?resource_node_ore)
+        )
+        (not
+          (resource_ore_engaged ?resource_node_ore)
+        )
+      )
+    :effect (resource_ore_reserved ?resource_node_ore)
+  )
+  (:action confirm_primary_slot_resource
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?resource_node_ore - resource_node_ore ?crafting_station - crafting_station)
+    :precondition
+      (and
+        (entity_ready ?primary_crafter_slot)
+        (entity_station_bound ?primary_crafter_slot ?crafting_station)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (resource_ore_reserved ?resource_node_ore)
+        (not
+          (primary_slot_ready ?primary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+      )
+  )
+  (:action assign_component_to_primary_slot
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?resource_node_ore - resource_node_ore ?component_item - component_item)
+    :precondition
+      (and
+        (entity_ready ?primary_crafter_slot)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (component_available ?component_item)
+        (not
+          (primary_slot_ready ?primary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (resource_ore_engaged ?resource_node_ore)
+        (primary_slot_ready ?primary_crafter_slot)
+        (primary_slot_component_assigned ?primary_crafter_slot ?component_item)
+        (not
+          (component_available ?component_item)
+        )
+      )
+  )
+  (:action commit_primary_slot_component_swap
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?resource_node_ore - resource_node_ore ?material_unit - material_unit ?component_item - component_item)
+    :precondition
+      (and
+        (entity_ready ?primary_crafter_slot)
+        (entity_material_reserved ?primary_crafter_slot ?material_unit)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (resource_ore_engaged ?resource_node_ore)
+        (primary_slot_component_assigned ?primary_crafter_slot ?component_item)
+        (not
+          (primary_slot_resource_confirmed ?primary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (resource_ore_reserved ?resource_node_ore)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+        (component_available ?component_item)
+        (not
+          (primary_slot_component_assigned ?primary_crafter_slot ?component_item)
+        )
+      )
+  )
+  (:action reserve_resource_node_wood_for_secondary_slot
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?resource_node_wood - resource_node_wood ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_ready ?secondary_crafter_slot)
+        (entity_material_reserved ?secondary_crafter_slot ?material_unit)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (not
+          (resource_wood_reserved ?resource_node_wood)
+        )
+        (not
+          (resource_wood_engaged ?resource_node_wood)
+        )
+      )
+    :effect (resource_wood_reserved ?resource_node_wood)
+  )
+  (:action confirm_secondary_slot_resource
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?resource_node_wood - resource_node_wood ?crafting_station - crafting_station)
+    :precondition
+      (and
+        (entity_ready ?secondary_crafter_slot)
+        (entity_station_bound ?secondary_crafter_slot ?crafting_station)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_wood_reserved ?resource_node_wood)
+        (not
+          (secondary_slot_ready ?secondary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+      )
+  )
+  (:action assign_component_to_secondary_slot
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?resource_node_wood - resource_node_wood ?component_item - component_item)
+    :precondition
+      (and
+        (entity_ready ?secondary_crafter_slot)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (component_available ?component_item)
+        (not
+          (secondary_slot_ready ?secondary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (resource_wood_engaged ?resource_node_wood)
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (secondary_slot_component_assigned ?secondary_crafter_slot ?component_item)
+        (not
+          (component_available ?component_item)
+        )
+      )
+  )
+  (:action commit_secondary_slot_component_swap
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?resource_node_wood - resource_node_wood ?material_unit - material_unit ?component_item - component_item)
+    :precondition
+      (and
+        (entity_ready ?secondary_crafter_slot)
+        (entity_material_reserved ?secondary_crafter_slot ?material_unit)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_wood_engaged ?resource_node_wood)
+        (secondary_slot_component_assigned ?secondary_crafter_slot ?component_item)
+        (not
+          (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (resource_wood_reserved ?resource_node_wood)
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        (component_available ?component_item)
+        (not
+          (secondary_slot_component_assigned ?secondary_crafter_slot ?component_item)
+        )
+      )
+  )
+  (:action stage_assembly_product
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?secondary_crafter_slot - secondary_crafter_slot ?resource_node_ore - resource_node_ore ?resource_node_wood - resource_node_wood ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_ore_reserved ?resource_node_ore)
+        (resource_wood_reserved ?resource_node_wood)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        (product_blueprint_available ?assembly_product)
+      )
+    :effect
+      (and
+        (product_staged ?assembly_product)
+        (product_linked_resource_ore ?assembly_product ?resource_node_ore)
+        (product_linked_resource_wood ?assembly_product ?resource_node_wood)
+        (not
+          (product_blueprint_available ?assembly_product)
+        )
+      )
+  )
+  (:action stage_product_with_modifier_a
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?secondary_crafter_slot - secondary_crafter_slot ?resource_node_ore - resource_node_ore ?resource_node_wood - resource_node_wood ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_ore_engaged ?resource_node_ore)
+        (resource_wood_reserved ?resource_node_wood)
+        (not
+          (primary_slot_resource_confirmed ?primary_crafter_slot)
+        )
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        (product_blueprint_available ?assembly_product)
+      )
+    :effect
+      (and
+        (product_staged ?assembly_product)
+        (product_linked_resource_ore ?assembly_product ?resource_node_ore)
+        (product_linked_resource_wood ?assembly_product ?resource_node_wood)
+        (product_modifier_a_present ?assembly_product)
+        (not
+          (product_blueprint_available ?assembly_product)
+        )
+      )
+  )
+  (:action stage_product_with_modifier_b
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?secondary_crafter_slot - secondary_crafter_slot ?resource_node_ore - resource_node_ore ?resource_node_wood - resource_node_wood ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_ore_reserved ?resource_node_ore)
+        (resource_wood_engaged ?resource_node_wood)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+        (not
+          (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        )
+        (product_blueprint_available ?assembly_product)
+      )
+    :effect
+      (and
+        (product_staged ?assembly_product)
+        (product_linked_resource_ore ?assembly_product ?resource_node_ore)
+        (product_linked_resource_wood ?assembly_product ?resource_node_wood)
+        (product_modifier_b_present ?assembly_product)
+        (not
+          (product_blueprint_available ?assembly_product)
+        )
+      )
+  )
+  (:action stage_product_with_both_modifiers
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?secondary_crafter_slot - secondary_crafter_slot ?resource_node_ore - resource_node_ore ?resource_node_wood - resource_node_wood ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (primary_slot_resource_ore_assigned ?primary_crafter_slot ?resource_node_ore)
+        (secondary_slot_resource_wood_assigned ?secondary_crafter_slot ?resource_node_wood)
+        (resource_ore_engaged ?resource_node_ore)
+        (resource_wood_engaged ?resource_node_wood)
+        (not
+          (primary_slot_resource_confirmed ?primary_crafter_slot)
+        )
+        (not
+          (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        )
+        (product_blueprint_available ?assembly_product)
+      )
+    :effect
+      (and
+        (product_staged ?assembly_product)
+        (product_linked_resource_ore ?assembly_product ?resource_node_ore)
+        (product_linked_resource_wood ?assembly_product ?resource_node_wood)
+        (product_modifier_a_present ?assembly_product)
+        (product_modifier_b_present ?assembly_product)
+        (not
+          (product_blueprint_available ?assembly_product)
+        )
+      )
+  )
+  (:action mark_product_ready_for_subassembly
+    :parameters (?assembly_product - assembly_product ?primary_crafter_slot - primary_crafter_slot ?material_unit - material_unit)
+    :precondition
+      (and
+        (product_staged ?assembly_product)
+        (primary_slot_ready ?primary_crafter_slot)
+        (entity_material_reserved ?primary_crafter_slot ?material_unit)
+        (not
+          (product_ready_for_subassembly ?assembly_product)
+        )
+      )
+    :effect (product_ready_for_subassembly ?assembly_product)
+  )
+  (:action stage_subcomponent_on_actor
+    :parameters (?crafting_actor - crafting_actor ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (actor_product_link ?crafting_actor ?assembly_product)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_available ?subcomponent_slot)
+        (product_staged ?assembly_product)
+        (product_ready_for_subassembly ?assembly_product)
+        (not
+          (subcomponent_staged ?subcomponent_slot)
+        )
+      )
+    :effect
+      (and
+        (subcomponent_staged ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (not
+          (subcomponent_available ?subcomponent_slot)
+        )
+      )
+  )
+  (:action prepare_actor_for_integration
+    :parameters (?crafting_actor - crafting_actor ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_staged ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (entity_material_reserved ?crafting_actor ?material_unit)
+        (not
+          (product_modifier_a_present ?assembly_product)
+        )
+        (not
+          (actor_ready_for_integration ?crafting_actor)
+        )
+      )
+    :effect (actor_ready_for_integration ?crafting_actor)
+  )
+  (:action attach_attachment_to_actor
+    :parameters (?crafting_actor - crafting_actor ?attachment_token - attachment_token)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (attachment_available ?attachment_token)
+        (not
+          (actor_attachment_attached ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_attachment_attached ?crafting_actor)
+        (actor_attachment_link ?crafting_actor ?attachment_token)
+        (not
+          (attachment_available ?attachment_token)
+        )
+      )
+  )
+  (:action integrate_subcomponent_and_attachment
+    :parameters (?crafting_actor - crafting_actor ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product ?material_unit - material_unit ?attachment_token - attachment_token)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_staged ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (entity_material_reserved ?crafting_actor ?material_unit)
+        (product_modifier_a_present ?assembly_product)
+        (actor_attachment_attached ?crafting_actor)
+        (actor_attachment_link ?crafting_actor ?attachment_token)
+        (not
+          (actor_ready_for_integration ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_ready_for_integration ?crafting_actor)
+        (actor_attachment_staged ?crafting_actor)
+      )
+  )
+  (:action apply_optional_modifier_a_by_actor
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_a - optional_modifier_a ?crafting_station - crafting_station ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_ready_for_integration ?crafting_actor)
+        (actor_optional_modifier_a_attached ?crafting_actor ?optional_modifier_a)
+        (entity_station_bound ?crafting_actor ?crafting_station)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (not
+          (product_modifier_b_present ?assembly_product)
+        )
+        (not
+          (actor_subassembly_ready ?crafting_actor)
+        )
+      )
+    :effect (actor_subassembly_ready ?crafting_actor)
+  )
+  (:action apply_optional_modifier_a_alternative
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_a - optional_modifier_a ?crafting_station - crafting_station ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_ready_for_integration ?crafting_actor)
+        (actor_optional_modifier_a_attached ?crafting_actor ?optional_modifier_a)
+        (entity_station_bound ?crafting_actor ?crafting_station)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (product_modifier_b_present ?assembly_product)
+        (not
+          (actor_subassembly_ready ?crafting_actor)
+        )
+      )
+    :effect (actor_subassembly_ready ?crafting_actor)
+  )
+  (:action apply_optional_modifier_b_and_validate
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_subassembly_ready ?crafting_actor)
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (not
+          (product_modifier_a_present ?assembly_product)
+        )
+        (not
+          (product_modifier_b_present ?assembly_product)
+        )
+        (not
+          (actor_subassembly_validated ?crafting_actor)
+        )
+      )
+    :effect (actor_subassembly_validated ?crafting_actor)
+  )
+  (:action apply_optional_modifier_b_and_stage_variant
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_subassembly_ready ?crafting_actor)
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (product_modifier_a_present ?assembly_product)
+        (not
+          (product_modifier_b_present ?assembly_product)
+        )
+        (not
+          (actor_subassembly_validated ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_variants_staged ?crafting_actor)
+      )
+  )
+  (:action apply_optional_modifier_b_and_stage_variant_alt
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_subassembly_ready ?crafting_actor)
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (not
+          (product_modifier_a_present ?assembly_product)
+        )
+        (product_modifier_b_present ?assembly_product)
+        (not
+          (actor_subassembly_validated ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_variants_staged ?crafting_actor)
+      )
+  )
+  (:action apply_optional_modifier_b_and_stage_variant_alt2
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b ?subcomponent_slot - subcomponent_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (actor_subassembly_ready ?crafting_actor)
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (actor_subcomponent_slot ?crafting_actor ?subcomponent_slot)
+        (subcomponent_slot_fitted ?subcomponent_slot ?assembly_product)
+        (product_modifier_a_present ?assembly_product)
+        (product_modifier_b_present ?assembly_product)
+        (not
+          (actor_subassembly_validated ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_variants_staged ?crafting_actor)
+      )
+  )
+  (:action finalize_actor_and_claim_completion
+    :parameters (?crafting_actor - crafting_actor)
+    :precondition
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (not
+          (actor_variants_staged ?crafting_actor)
+        )
+        (not
+          (handoff_committed ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (handoff_committed ?crafting_actor)
+        (validated_for_handoff ?crafting_actor)
+      )
+  )
+  (:action attach_skill_module_to_actor
+    :parameters (?crafting_actor - crafting_actor ?skill_module - skill_module)
+    :precondition
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_variants_staged ?crafting_actor)
+        (skill_module_available ?skill_module)
+      )
+    :effect
+      (and
+        (actor_skill_module_attached ?crafting_actor ?skill_module)
+        (not
+          (skill_module_available ?skill_module)
+        )
+      )
+  )
+  (:action execute_actor_integration
+    :parameters (?crafting_actor - crafting_actor ?primary_crafter_slot - primary_crafter_slot ?secondary_crafter_slot - secondary_crafter_slot ?material_unit - material_unit ?skill_module - skill_module)
+    :precondition
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_variants_staged ?crafting_actor)
+        (actor_skill_module_attached ?crafting_actor ?skill_module)
+        (actor_primary_slot_link ?crafting_actor ?primary_crafter_slot)
+        (actor_secondary_slot_link ?crafting_actor ?secondary_crafter_slot)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        (entity_material_reserved ?crafting_actor ?material_unit)
+        (not
+          (actor_integration_finalized ?crafting_actor)
+        )
+      )
+    :effect (actor_integration_finalized ?crafting_actor)
+  )
+  (:action finalize_actor_handoff
+    :parameters (?crafting_actor - crafting_actor)
+    :precondition
+      (and
+        (actor_subassembly_validated ?crafting_actor)
+        (actor_integration_finalized ?crafting_actor)
+        (not
+          (handoff_committed ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (handoff_committed ?crafting_actor)
+        (validated_for_handoff ?crafting_actor)
+      )
+  )
+  (:action attach_variant_to_actor
+    :parameters (?crafting_actor - crafting_actor ?variant_token - variant_token ?material_unit - material_unit)
+    :precondition
+      (and
+        (entity_ready ?crafting_actor)
+        (entity_material_reserved ?crafting_actor ?material_unit)
+        (variant_available ?variant_token)
+        (actor_variant_link ?crafting_actor ?variant_token)
+        (not
+          (actor_variant_locked ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (actor_variant_locked ?crafting_actor)
+        (not
+          (variant_available ?variant_token)
+        )
+      )
+  )
+  (:action stage_variant_on_actor
+    :parameters (?crafting_actor - crafting_actor ?crafting_station - crafting_station)
+    :precondition
+      (and
+        (actor_variant_locked ?crafting_actor)
+        (entity_station_bound ?crafting_actor ?crafting_station)
+        (not
+          (actor_variant_stage_complete ?crafting_actor)
+        )
+      )
+    :effect (actor_variant_stage_complete ?crafting_actor)
+  )
+  (:action activate_variant_modifier
+    :parameters (?crafting_actor - crafting_actor ?optional_modifier_b - optional_modifier_b)
+    :precondition
+      (and
+        (actor_variant_stage_complete ?crafting_actor)
+        (actor_optional_modifier_b_attached ?crafting_actor ?optional_modifier_b)
+        (not
+          (actor_variant_validated ?crafting_actor)
+        )
+      )
+    :effect (actor_variant_validated ?crafting_actor)
+  )
+  (:action finalize_variant_handoff
+    :parameters (?crafting_actor - crafting_actor)
+    :precondition
+      (and
+        (actor_variant_validated ?crafting_actor)
+        (not
+          (handoff_committed ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (handoff_committed ?crafting_actor)
+        (validated_for_handoff ?crafting_actor)
+      )
+  )
+  (:action claim_completion_for_primary_slot
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (primary_slot_ready ?primary_crafter_slot)
+        (primary_slot_resource_confirmed ?primary_crafter_slot)
+        (product_staged ?assembly_product)
+        (product_ready_for_subassembly ?assembly_product)
+        (not
+          (validated_for_handoff ?primary_crafter_slot)
+        )
+      )
+    :effect (validated_for_handoff ?primary_crafter_slot)
+  )
+  (:action claim_completion_for_secondary_slot
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?assembly_product - assembly_product)
+    :precondition
+      (and
+        (secondary_slot_ready ?secondary_crafter_slot)
+        (secondary_slot_resource_confirmed ?secondary_crafter_slot)
+        (product_staged ?assembly_product)
+        (product_ready_for_subassembly ?assembly_product)
+        (not
+          (validated_for_handoff ?secondary_crafter_slot)
+        )
+      )
+    :effect (validated_for_handoff ?secondary_crafter_slot)
+  )
+  (:action apply_salvage_and_bind_catalyst_to_entity
+    :parameters (?crafting_goal - crafting_entity ?catalyst_condition - catalyst_condition ?material_unit - material_unit)
+    :precondition
+      (and
+        (validated_for_handoff ?crafting_goal)
+        (entity_material_reserved ?crafting_goal ?material_unit)
+        (catalyst_available ?catalyst_condition)
+        (not
+          (entity_salvaged ?crafting_goal)
+        )
+      )
+    :effect
+      (and
+        (entity_salvaged ?crafting_goal)
+        (entity_catalyst_bound ?crafting_goal ?catalyst_condition)
+        (not
+          (catalyst_available ?catalyst_condition)
+        )
+      )
+  )
+  (:action recover_primary_slot_and_return_loadout
+    :parameters (?primary_crafter_slot - primary_crafter_slot ?loadout_item - loadout_item ?catalyst_condition - catalyst_condition)
+    :precondition
+      (and
+        (entity_salvaged ?primary_crafter_slot)
+        (entity_loadout_assigned ?primary_crafter_slot ?loadout_item)
+        (entity_catalyst_bound ?primary_crafter_slot ?catalyst_condition)
+        (not
+          (continuation_enabled ?primary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (continuation_enabled ?primary_crafter_slot)
+        (loadout_available ?loadout_item)
+        (catalyst_available ?catalyst_condition)
+      )
+  )
+  (:action recover_secondary_slot_and_return_loadout
+    :parameters (?secondary_crafter_slot - secondary_crafter_slot ?loadout_item - loadout_item ?catalyst_condition - catalyst_condition)
+    :precondition
+      (and
+        (entity_salvaged ?secondary_crafter_slot)
+        (entity_loadout_assigned ?secondary_crafter_slot ?loadout_item)
+        (entity_catalyst_bound ?secondary_crafter_slot ?catalyst_condition)
+        (not
+          (continuation_enabled ?secondary_crafter_slot)
+        )
+      )
+    :effect
+      (and
+        (continuation_enabled ?secondary_crafter_slot)
+        (loadout_available ?loadout_item)
+        (catalyst_available ?catalyst_condition)
+      )
+  )
+  (:action recover_actor_and_return_loadout
+    :parameters (?crafting_actor - crafting_actor ?loadout_item - loadout_item ?catalyst_condition - catalyst_condition)
+    :precondition
+      (and
+        (entity_salvaged ?crafting_actor)
+        (entity_loadout_assigned ?crafting_actor ?loadout_item)
+        (entity_catalyst_bound ?crafting_actor ?catalyst_condition)
+        (not
+          (continuation_enabled ?crafting_actor)
+        )
+      )
+    :effect
+      (and
+        (continuation_enabled ?crafting_actor)
+        (loadout_available ?loadout_item)
+        (catalyst_available ?catalyst_condition)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem interrupted_crafting_scenario)
+  (:domain interrupted_crafting_replanning_domain)
+  (:objects primary_slot_1 - primary_crafter_slot secondary_slot_1 - secondary_crafter_slot crafting_actor_alpha - crafting_actor crafting_actor_beta - crafting_actor iron_hammer_tool - loadout_item steel_chisel_tool - loadout_item forge_tongs - loadout_item raw_iron_ore - material_unit forge_station - crafting_station component_plate - component_item iron_vein - resource_node_ore timber_stump - resource_node_wood sword_blueprint - assembly_product blade_slot - subcomponent_slot hilt_slot - subcomponent_slot rune_attachment_token - attachment_token engraving_attachment_token - attachment_token smithing_skill_module - skill_module tempering_skill_module - skill_module catalyst_crystal - catalyst_condition sharpening_modifier - optional_modifier_a gold_variant_token - variant_token runic_variant_token - variant_token balance_adjust_modifier - optional_modifier_b)
+  (:init
+    (loadout_available iron_hammer_tool)
+    (loadout_available steel_chisel_tool)
+    (loadout_available forge_tongs)
+    (material_available raw_iron_ore)
+    (station_available forge_station)
+    (component_available component_plate)
+    (primary_slot_resource_ore_assigned primary_slot_1 iron_vein)
+    (secondary_slot_resource_wood_assigned secondary_slot_1 timber_stump)
+    (product_blueprint_available sword_blueprint)
+    (subcomponent_available blade_slot)
+    (subcomponent_available hilt_slot)
+    (actor_primary_slot_link crafting_actor_alpha primary_slot_1)
+    (actor_primary_slot_link crafting_actor_beta primary_slot_1)
+    (actor_secondary_slot_link crafting_actor_alpha secondary_slot_1)
+    (actor_secondary_slot_link crafting_actor_beta secondary_slot_1)
+    (actor_product_link crafting_actor_alpha sword_blueprint)
+    (actor_product_link crafting_actor_beta sword_blueprint)
+    (actor_subcomponent_slot crafting_actor_alpha blade_slot)
+    (actor_subcomponent_slot crafting_actor_beta hilt_slot)
+    (attachment_available rune_attachment_token)
+    (attachment_available engraving_attachment_token)
+    (skill_module_available smithing_skill_module)
+    (skill_module_available tempering_skill_module)
+    (catalyst_available catalyst_crystal)
+    (optional_modifier_a_available sharpening_modifier)
+    (variant_available gold_variant_token)
+    (actor_variant_link crafting_actor_alpha gold_variant_token)
+    (actor_variant_link crafting_actor_beta runic_variant_token)
+    (optional_modifier_b_available balance_adjust_modifier)
+  )
+  (:goal
+    (and
+      (continuation_enabled primary_slot_1)
+      (continuation_enabled secondary_slot_1)
+      (continuation_enabled crafting_actor_alpha)
+      (continuation_enabled crafting_actor_beta)
+    )
+  )
+)

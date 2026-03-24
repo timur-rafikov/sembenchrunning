@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain late_game_cleanup_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object device_family - entity resource_family - entity slot_family - entity world_area - entity region - world_area anchor_device - device_family travel_permit - device_family mitigation_tool - device_family bonus_objective - device_family module - device_family return_marker - device_family special_tool - device_family encounter_marker - device_family consumable_item - resource_family resource_node - resource_family anchor_token - resource_family anchor_slot_primary - slot_family anchor_slot_secondary - slot_family cache_point - slot_family site_group - region route_container - region primary_site - site_group secondary_site - site_group route_region - route_container)
+
+  (:predicates
+    (region_discovered ?region - region)
+    (region_anchor_ready ?region - region)
+    (anchor_bound ?region - region)
+    (region_cleared ?region - region)
+    (completed ?region - region)
+    (hazard_cleared ?region - region)
+    (anchor_device_available ?anchor_device - anchor_device)
+    (region_anchor_device_assigned ?region - region ?anchor_device - anchor_device)
+    (travel_permit_available ?travel_permit - travel_permit)
+    (region_travel_permit_assigned ?region - region ?travel_permit - travel_permit)
+    (mitigation_tool_available ?mitigation_tool - mitigation_tool)
+    (region_mitigation_tool_assigned ?region - region ?mitigation_tool - mitigation_tool)
+    (consumable_item_available ?consumable_item - consumable_item)
+    (primary_site_consumable_assigned ?primary_site - primary_site ?consumable_item - consumable_item)
+    (secondary_site_consumable_assigned ?secondary_site - secondary_site ?consumable_item - consumable_item)
+    (site_slot_link_primary ?primary_site - primary_site ?anchor_slot_primary - anchor_slot_primary)
+    (anchor_slot_ready_primary ?anchor_slot_primary - anchor_slot_primary)
+    (anchor_slot_hazard_primary ?anchor_slot_primary - anchor_slot_primary)
+    (primary_site_ready ?primary_site - primary_site)
+    (site_slot_link_secondary ?secondary_site - secondary_site ?anchor_slot_secondary - anchor_slot_secondary)
+    (anchor_slot_ready_secondary ?anchor_slot_secondary - anchor_slot_secondary)
+    (anchor_slot_hazard_secondary ?anchor_slot_secondary - anchor_slot_secondary)
+    (secondary_site_ready ?secondary_site - secondary_site)
+    (cache_point_available ?cache_point - cache_point)
+    (cache_activated ?cache_point - cache_point)
+    (cache_slot_link_primary ?cache_point - cache_point ?anchor_slot_primary - anchor_slot_primary)
+    (cache_slot_link_secondary ?cache_point - cache_point ?anchor_slot_secondary - anchor_slot_secondary)
+    (cache_flag_primary_hazard ?cache_point - cache_point)
+    (cache_flag_secondary_hazard ?cache_point - cache_point)
+    (cache_verified ?cache_point - cache_point)
+    (route_plan_has_primary_site ?route_plan - route_region ?primary_site - primary_site)
+    (route_plan_has_secondary_site ?route_plan - route_region ?secondary_site - secondary_site)
+    (route_plan_has_cache ?route_plan - route_region ?cache_point - cache_point)
+    (resource_node_available ?resource_node - resource_node)
+    (route_plan_has_resource_node ?route_plan - route_region ?resource_node - resource_node)
+    (resource_node_staged ?resource_node - resource_node)
+    (resource_node_linked_cache ?resource_node - resource_node ?cache_point - cache_point)
+    (route_plan_resources_linked ?route_plan - route_region)
+    (route_plan_modules_allocated ?route_plan - route_region)
+    (route_plan_equipped ?route_plan - route_region)
+    (route_plan_anchor_token_attached ?route_plan - route_region)
+    (route_plan_anchor_token_confirmed ?route_plan - route_region)
+    (route_plan_module_slot_available ?route_plan - route_region)
+    (route_plan_ready_for_execution ?route_plan - route_region)
+    (anchor_token_available ?anchor_token - anchor_token)
+    (route_plan_anchor_token_link ?route_plan - route_region ?anchor_token - anchor_token)
+    (route_plan_anchor_token_claimed ?route_plan - route_region)
+    (route_plan_anchor_action_ready ?route_plan - route_region)
+    (route_plan_anchor_action_enabled ?route_plan - route_region)
+    (bonus_objective_available ?bonus_objective - bonus_objective)
+    (route_plan_bonus_attached ?route_plan - route_region ?bonus_objective - bonus_objective)
+    (module_available ?module - module)
+    (route_plan_module_attached ?route_plan - route_region ?module - module)
+    (special_tool_available ?special_tool - special_tool)
+    (route_plan_special_tool_attached ?route_plan - route_region ?special_tool - special_tool)
+    (encounter_marker_available ?encounter_marker - encounter_marker)
+    (route_plan_encounter_marker_attached ?route_plan - route_region ?encounter_marker - encounter_marker)
+    (return_marker_available ?return_marker - return_marker)
+    (region_return_marker_link ?region - region ?return_marker - return_marker)
+    (primary_site_cache_claimed ?primary_site - primary_site)
+    (secondary_site_cache_claimed ?secondary_site - secondary_site)
+    (route_plan_executed ?route_plan - route_region)
+  )
+  (:action discover_region
+    :parameters (?region - region)
+    :precondition
+      (and
+        (not
+          (region_discovered ?region)
+        )
+        (not
+          (region_cleared ?region)
+        )
+      )
+    :effect (region_discovered ?region)
+  )
+  (:action assign_anchor_device_to_region
+    :parameters (?region - region ?anchor_device - anchor_device)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (not
+          (anchor_bound ?region)
+        )
+        (anchor_device_available ?anchor_device)
+      )
+    :effect
+      (and
+        (anchor_bound ?region)
+        (region_anchor_device_assigned ?region ?anchor_device)
+        (not
+          (anchor_device_available ?anchor_device)
+        )
+      )
+  )
+  (:action assign_travel_permit_to_region
+    :parameters (?region - region ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (anchor_bound ?region)
+        (travel_permit_available ?travel_permit)
+      )
+    :effect
+      (and
+        (region_travel_permit_assigned ?region ?travel_permit)
+        (not
+          (travel_permit_available ?travel_permit)
+        )
+      )
+  )
+  (:action confirm_region_anchor_readiness
+    :parameters (?region - region ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_discovered ?region)
+        (anchor_bound ?region)
+        (region_travel_permit_assigned ?region ?travel_permit)
+        (not
+          (region_anchor_ready ?region)
+        )
+      )
+    :effect (region_anchor_ready ?region)
+  )
+  (:action release_travel_permit_from_region
+    :parameters (?region - region ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_travel_permit_assigned ?region ?travel_permit)
+      )
+    :effect
+      (and
+        (travel_permit_available ?travel_permit)
+        (not
+          (region_travel_permit_assigned ?region ?travel_permit)
+        )
+      )
+  )
+  (:action assign_mitigation_tool_to_region
+    :parameters (?region - region ?mitigation_tool - mitigation_tool)
+    :precondition
+      (and
+        (region_anchor_ready ?region)
+        (mitigation_tool_available ?mitigation_tool)
+      )
+    :effect
+      (and
+        (region_mitigation_tool_assigned ?region ?mitigation_tool)
+        (not
+          (mitigation_tool_available ?mitigation_tool)
+        )
+      )
+  )
+  (:action release_mitigation_tool_from_region
+    :parameters (?region - region ?mitigation_tool - mitigation_tool)
+    :precondition
+      (and
+        (region_mitigation_tool_assigned ?region ?mitigation_tool)
+      )
+    :effect
+      (and
+        (mitigation_tool_available ?mitigation_tool)
+        (not
+          (region_mitigation_tool_assigned ?region ?mitigation_tool)
+        )
+      )
+  )
+  (:action attach_special_tool_to_route_plan
+    :parameters (?route_plan - route_region ?special_tool - special_tool)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (special_tool_available ?special_tool)
+      )
+    :effect
+      (and
+        (route_plan_special_tool_attached ?route_plan ?special_tool)
+        (not
+          (special_tool_available ?special_tool)
+        )
+      )
+  )
+  (:action detach_special_tool_from_route_plan
+    :parameters (?route_plan - route_region ?special_tool - special_tool)
+    :precondition
+      (and
+        (route_plan_special_tool_attached ?route_plan ?special_tool)
+      )
+    :effect
+      (and
+        (special_tool_available ?special_tool)
+        (not
+          (route_plan_special_tool_attached ?route_plan ?special_tool)
+        )
+      )
+  )
+  (:action attach_encounter_marker_to_route_plan
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (encounter_marker_available ?encounter_marker)
+      )
+    :effect
+      (and
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (not
+          (encounter_marker_available ?encounter_marker)
+        )
+      )
+  )
+  (:action detach_encounter_marker_from_route_plan
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker)
+    :precondition
+      (and
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+      )
+    :effect
+      (and
+        (encounter_marker_available ?encounter_marker)
+        (not
+          (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        )
+      )
+  )
+  (:action mark_primary_slot_ready
+    :parameters (?primary_site - primary_site ?anchor_slot_primary - anchor_slot_primary ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_anchor_ready ?primary_site)
+        (region_travel_permit_assigned ?primary_site ?travel_permit)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (not
+          (anchor_slot_ready_primary ?anchor_slot_primary)
+        )
+        (not
+          (anchor_slot_hazard_primary ?anchor_slot_primary)
+        )
+      )
+    :effect (anchor_slot_ready_primary ?anchor_slot_primary)
+  )
+  (:action apply_mitigation_to_primary_site
+    :parameters (?primary_site - primary_site ?anchor_slot_primary - anchor_slot_primary ?mitigation_tool - mitigation_tool)
+    :precondition
+      (and
+        (region_anchor_ready ?primary_site)
+        (region_mitigation_tool_assigned ?primary_site ?mitigation_tool)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (anchor_slot_ready_primary ?anchor_slot_primary)
+        (not
+          (primary_site_cache_claimed ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (primary_site_ready ?primary_site)
+      )
+  )
+  (:action use_consumable_on_primary_slot
+    :parameters (?primary_site - primary_site ?anchor_slot_primary - anchor_slot_primary ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (region_anchor_ready ?primary_site)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (consumable_item_available ?consumable_item)
+        (not
+          (primary_site_cache_claimed ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (anchor_slot_hazard_primary ?anchor_slot_primary)
+        (primary_site_cache_claimed ?primary_site)
+        (primary_site_consumable_assigned ?primary_site ?consumable_item)
+        (not
+          (consumable_item_available ?consumable_item)
+        )
+      )
+  )
+  (:action resolve_primary_slot_hazard
+    :parameters (?primary_site - primary_site ?anchor_slot_primary - anchor_slot_primary ?travel_permit - travel_permit ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (region_anchor_ready ?primary_site)
+        (region_travel_permit_assigned ?primary_site ?travel_permit)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (anchor_slot_hazard_primary ?anchor_slot_primary)
+        (primary_site_consumable_assigned ?primary_site ?consumable_item)
+        (not
+          (primary_site_ready ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (anchor_slot_ready_primary ?anchor_slot_primary)
+        (primary_site_ready ?primary_site)
+        (consumable_item_available ?consumable_item)
+        (not
+          (primary_site_consumable_assigned ?primary_site ?consumable_item)
+        )
+      )
+  )
+  (:action mark_secondary_slot_ready
+    :parameters (?secondary_site - secondary_site ?anchor_slot_secondary - anchor_slot_secondary ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_anchor_ready ?secondary_site)
+        (region_travel_permit_assigned ?secondary_site ?travel_permit)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (not
+          (anchor_slot_ready_secondary ?anchor_slot_secondary)
+        )
+        (not
+          (anchor_slot_hazard_secondary ?anchor_slot_secondary)
+        )
+      )
+    :effect (anchor_slot_ready_secondary ?anchor_slot_secondary)
+  )
+  (:action apply_mitigation_to_secondary_site
+    :parameters (?secondary_site - secondary_site ?anchor_slot_secondary - anchor_slot_secondary ?mitigation_tool - mitigation_tool)
+    :precondition
+      (and
+        (region_anchor_ready ?secondary_site)
+        (region_mitigation_tool_assigned ?secondary_site ?mitigation_tool)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_ready_secondary ?anchor_slot_secondary)
+        (not
+          (secondary_site_cache_claimed ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_site_cache_claimed ?secondary_site)
+        (secondary_site_ready ?secondary_site)
+      )
+  )
+  (:action use_consumable_on_secondary_slot
+    :parameters (?secondary_site - secondary_site ?anchor_slot_secondary - anchor_slot_secondary ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (region_anchor_ready ?secondary_site)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (consumable_item_available ?consumable_item)
+        (not
+          (secondary_site_cache_claimed ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (anchor_slot_hazard_secondary ?anchor_slot_secondary)
+        (secondary_site_cache_claimed ?secondary_site)
+        (secondary_site_consumable_assigned ?secondary_site ?consumable_item)
+        (not
+          (consumable_item_available ?consumable_item)
+        )
+      )
+  )
+  (:action resolve_secondary_slot_hazard
+    :parameters (?secondary_site - secondary_site ?anchor_slot_secondary - anchor_slot_secondary ?travel_permit - travel_permit ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (region_anchor_ready ?secondary_site)
+        (region_travel_permit_assigned ?secondary_site ?travel_permit)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_hazard_secondary ?anchor_slot_secondary)
+        (secondary_site_consumable_assigned ?secondary_site ?consumable_item)
+        (not
+          (secondary_site_ready ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (anchor_slot_ready_secondary ?anchor_slot_secondary)
+        (secondary_site_ready ?secondary_site)
+        (consumable_item_available ?consumable_item)
+        (not
+          (secondary_site_consumable_assigned ?secondary_site ?consumable_item)
+        )
+      )
+  )
+  (:action activate_cache_point
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?anchor_slot_primary - anchor_slot_primary ?anchor_slot_secondary - anchor_slot_secondary ?cache_point - cache_point)
+    :precondition
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (secondary_site_cache_claimed ?secondary_site)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_ready_primary ?anchor_slot_primary)
+        (anchor_slot_ready_secondary ?anchor_slot_secondary)
+        (primary_site_ready ?primary_site)
+        (secondary_site_ready ?secondary_site)
+        (cache_point_available ?cache_point)
+      )
+    :effect
+      (and
+        (cache_activated ?cache_point)
+        (cache_slot_link_primary ?cache_point ?anchor_slot_primary)
+        (cache_slot_link_secondary ?cache_point ?anchor_slot_secondary)
+        (not
+          (cache_point_available ?cache_point)
+        )
+      )
+  )
+  (:action activate_cache_point_with_primary_hazard
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?anchor_slot_primary - anchor_slot_primary ?anchor_slot_secondary - anchor_slot_secondary ?cache_point - cache_point)
+    :precondition
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (secondary_site_cache_claimed ?secondary_site)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_hazard_primary ?anchor_slot_primary)
+        (anchor_slot_ready_secondary ?anchor_slot_secondary)
+        (not
+          (primary_site_ready ?primary_site)
+        )
+        (secondary_site_ready ?secondary_site)
+        (cache_point_available ?cache_point)
+      )
+    :effect
+      (and
+        (cache_activated ?cache_point)
+        (cache_slot_link_primary ?cache_point ?anchor_slot_primary)
+        (cache_slot_link_secondary ?cache_point ?anchor_slot_secondary)
+        (cache_flag_primary_hazard ?cache_point)
+        (not
+          (cache_point_available ?cache_point)
+        )
+      )
+  )
+  (:action activate_cache_point_with_secondary_hazard
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?anchor_slot_primary - anchor_slot_primary ?anchor_slot_secondary - anchor_slot_secondary ?cache_point - cache_point)
+    :precondition
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (secondary_site_cache_claimed ?secondary_site)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_ready_primary ?anchor_slot_primary)
+        (anchor_slot_hazard_secondary ?anchor_slot_secondary)
+        (primary_site_ready ?primary_site)
+        (not
+          (secondary_site_ready ?secondary_site)
+        )
+        (cache_point_available ?cache_point)
+      )
+    :effect
+      (and
+        (cache_activated ?cache_point)
+        (cache_slot_link_primary ?cache_point ?anchor_slot_primary)
+        (cache_slot_link_secondary ?cache_point ?anchor_slot_secondary)
+        (cache_flag_secondary_hazard ?cache_point)
+        (not
+          (cache_point_available ?cache_point)
+        )
+      )
+  )
+  (:action activate_cache_point_with_mixed_hazards
+    :parameters (?primary_site - primary_site ?secondary_site - secondary_site ?anchor_slot_primary - anchor_slot_primary ?anchor_slot_secondary - anchor_slot_secondary ?cache_point - cache_point)
+    :precondition
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (secondary_site_cache_claimed ?secondary_site)
+        (site_slot_link_primary ?primary_site ?anchor_slot_primary)
+        (site_slot_link_secondary ?secondary_site ?anchor_slot_secondary)
+        (anchor_slot_hazard_primary ?anchor_slot_primary)
+        (anchor_slot_hazard_secondary ?anchor_slot_secondary)
+        (not
+          (primary_site_ready ?primary_site)
+        )
+        (not
+          (secondary_site_ready ?secondary_site)
+        )
+        (cache_point_available ?cache_point)
+      )
+    :effect
+      (and
+        (cache_activated ?cache_point)
+        (cache_slot_link_primary ?cache_point ?anchor_slot_primary)
+        (cache_slot_link_secondary ?cache_point ?anchor_slot_secondary)
+        (cache_flag_primary_hazard ?cache_point)
+        (cache_flag_secondary_hazard ?cache_point)
+        (not
+          (cache_point_available ?cache_point)
+        )
+      )
+  )
+  (:action verify_cache_for_harvest
+    :parameters (?cache_point - cache_point ?primary_site - primary_site ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (cache_activated ?cache_point)
+        (primary_site_cache_claimed ?primary_site)
+        (region_travel_permit_assigned ?primary_site ?travel_permit)
+        (not
+          (cache_verified ?cache_point)
+        )
+      )
+    :effect (cache_verified ?cache_point)
+  )
+  (:action stage_resource_node_for_harvest
+    :parameters (?route_plan - route_region ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (route_plan_has_cache ?route_plan ?cache_point)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_available ?resource_node)
+        (cache_activated ?cache_point)
+        (cache_verified ?cache_point)
+        (not
+          (resource_node_staged ?resource_node)
+        )
+      )
+    :effect
+      (and
+        (resource_node_staged ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (not
+          (resource_node_available ?resource_node)
+        )
+      )
+  )
+  (:action link_resources_to_route_plan
+    :parameters (?route_plan - route_region ?resource_node - resource_node ?cache_point - cache_point ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_staged ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (region_travel_permit_assigned ?route_plan ?travel_permit)
+        (not
+          (cache_flag_primary_hazard ?cache_point)
+        )
+        (not
+          (route_plan_resources_linked ?route_plan)
+        )
+      )
+    :effect (route_plan_resources_linked ?route_plan)
+  )
+  (:action assign_bonus_objective_to_route_plan
+    :parameters (?route_plan - route_region ?bonus_objective - bonus_objective)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (bonus_objective_available ?bonus_objective)
+        (not
+          (route_plan_anchor_token_attached ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_anchor_token_attached ?route_plan)
+        (route_plan_bonus_attached ?route_plan ?bonus_objective)
+        (not
+          (bonus_objective_available ?bonus_objective)
+        )
+      )
+  )
+  (:action confirm_bonus_and_stage_route_plan
+    :parameters (?route_plan - route_region ?resource_node - resource_node ?cache_point - cache_point ?travel_permit - travel_permit ?bonus_objective - bonus_objective)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_staged ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (region_travel_permit_assigned ?route_plan ?travel_permit)
+        (cache_flag_primary_hazard ?cache_point)
+        (route_plan_anchor_token_attached ?route_plan)
+        (route_plan_bonus_attached ?route_plan ?bonus_objective)
+        (not
+          (route_plan_resources_linked ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_resources_linked ?route_plan)
+        (route_plan_anchor_token_confirmed ?route_plan)
+      )
+  )
+  (:action assign_special_tool_modules_to_route_plan
+    :parameters (?route_plan - route_region ?special_tool - special_tool ?mitigation_tool - mitigation_tool ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_resources_linked ?route_plan)
+        (route_plan_special_tool_attached ?route_plan ?special_tool)
+        (region_mitigation_tool_assigned ?route_plan ?mitigation_tool)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (not
+          (cache_flag_secondary_hazard ?cache_point)
+        )
+        (not
+          (route_plan_modules_allocated ?route_plan)
+        )
+      )
+    :effect (route_plan_modules_allocated ?route_plan)
+  )
+  (:action assign_special_tool_modules_to_route_plan_alternate
+    :parameters (?route_plan - route_region ?special_tool - special_tool ?mitigation_tool - mitigation_tool ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_resources_linked ?route_plan)
+        (route_plan_special_tool_attached ?route_plan ?special_tool)
+        (region_mitigation_tool_assigned ?route_plan ?mitigation_tool)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (cache_flag_secondary_hazard ?cache_point)
+        (not
+          (route_plan_modules_allocated ?route_plan)
+        )
+      )
+    :effect (route_plan_modules_allocated ?route_plan)
+  )
+  (:action attach_encounter_marker_to_route_plan_step1
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_modules_allocated ?route_plan)
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (not
+          (cache_flag_primary_hazard ?cache_point)
+        )
+        (not
+          (cache_flag_secondary_hazard ?cache_point)
+        )
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect (route_plan_equipped ?route_plan)
+  )
+  (:action attach_encounter_marker_and_mark_module_slot
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_modules_allocated ?route_plan)
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (cache_flag_primary_hazard ?cache_point)
+        (not
+          (cache_flag_secondary_hazard ?cache_point)
+        )
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_module_slot_available ?route_plan)
+      )
+  )
+  (:action attach_encounter_marker_and_mark_module_slot_variant
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_modules_allocated ?route_plan)
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (not
+          (cache_flag_primary_hazard ?cache_point)
+        )
+        (cache_flag_secondary_hazard ?cache_point)
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_module_slot_available ?route_plan)
+      )
+  )
+  (:action attach_encounter_marker_and_mark_module_slot_alt
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker ?resource_node - resource_node ?cache_point - cache_point)
+    :precondition
+      (and
+        (route_plan_modules_allocated ?route_plan)
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (route_plan_has_resource_node ?route_plan ?resource_node)
+        (resource_node_linked_cache ?resource_node ?cache_point)
+        (cache_flag_primary_hazard ?cache_point)
+        (cache_flag_secondary_hazard ?cache_point)
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_module_slot_available ?route_plan)
+      )
+  )
+  (:action finalize_route_plan
+    :parameters (?route_plan - route_region)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (not
+          (route_plan_module_slot_available ?route_plan)
+        )
+        (not
+          (route_plan_executed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_executed ?route_plan)
+        (completed ?route_plan)
+      )
+  )
+  (:action attach_module_to_route_plan
+    :parameters (?route_plan - route_region ?module - module)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_module_slot_available ?route_plan)
+        (module_available ?module)
+      )
+    :effect
+      (and
+        (route_plan_module_attached ?route_plan ?module)
+        (not
+          (module_available ?module)
+        )
+      )
+  )
+  (:action prepare_route_plan_execution
+    :parameters (?route_plan - route_region ?primary_site - primary_site ?secondary_site - secondary_site ?travel_permit - travel_permit ?module - module)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_module_slot_available ?route_plan)
+        (route_plan_module_attached ?route_plan ?module)
+        (route_plan_has_primary_site ?route_plan ?primary_site)
+        (route_plan_has_secondary_site ?route_plan ?secondary_site)
+        (primary_site_ready ?primary_site)
+        (secondary_site_ready ?secondary_site)
+        (region_travel_permit_assigned ?route_plan ?travel_permit)
+        (not
+          (route_plan_ready_for_execution ?route_plan)
+        )
+      )
+    :effect (route_plan_ready_for_execution ?route_plan)
+  )
+  (:action execute_route_plan
+    :parameters (?route_plan - route_region)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (route_plan_ready_for_execution ?route_plan)
+        (not
+          (route_plan_executed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_executed ?route_plan)
+        (completed ?route_plan)
+      )
+  )
+  (:action claim_anchor_token_for_route_plan
+    :parameters (?route_plan - route_region ?anchor_token - anchor_token ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (region_anchor_ready ?route_plan)
+        (region_travel_permit_assigned ?route_plan ?travel_permit)
+        (anchor_token_available ?anchor_token)
+        (route_plan_anchor_token_link ?route_plan ?anchor_token)
+        (not
+          (route_plan_anchor_token_claimed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_anchor_token_claimed ?route_plan)
+        (not
+          (anchor_token_available ?anchor_token)
+        )
+      )
+  )
+  (:action prepare_route_anchor_action
+    :parameters (?route_plan - route_region ?mitigation_tool - mitigation_tool)
+    :precondition
+      (and
+        (route_plan_anchor_token_claimed ?route_plan)
+        (region_mitigation_tool_assigned ?route_plan ?mitigation_tool)
+        (not
+          (route_plan_anchor_action_ready ?route_plan)
+        )
+      )
+    :effect (route_plan_anchor_action_ready ?route_plan)
+  )
+  (:action enable_anchor_action_encounter
+    :parameters (?route_plan - route_region ?encounter_marker - encounter_marker)
+    :precondition
+      (and
+        (route_plan_anchor_action_ready ?route_plan)
+        (route_plan_encounter_marker_attached ?route_plan ?encounter_marker)
+        (not
+          (route_plan_anchor_action_enabled ?route_plan)
+        )
+      )
+    :effect (route_plan_anchor_action_enabled ?route_plan)
+  )
+  (:action finalize_anchor_action_and_complete_route_plan
+    :parameters (?route_plan - route_region)
+    :precondition
+      (and
+        (route_plan_anchor_action_enabled ?route_plan)
+        (not
+          (route_plan_executed ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_executed ?route_plan)
+        (completed ?route_plan)
+      )
+  )
+  (:action harvest_cache_from_primary_site
+    :parameters (?primary_site - primary_site ?cache_point - cache_point)
+    :precondition
+      (and
+        (primary_site_cache_claimed ?primary_site)
+        (primary_site_ready ?primary_site)
+        (cache_activated ?cache_point)
+        (cache_verified ?cache_point)
+        (not
+          (completed ?primary_site)
+        )
+      )
+    :effect (completed ?primary_site)
+  )
+  (:action harvest_cache_from_secondary_site
+    :parameters (?secondary_site - secondary_site ?cache_point - cache_point)
+    :precondition
+      (and
+        (secondary_site_cache_claimed ?secondary_site)
+        (secondary_site_ready ?secondary_site)
+        (cache_activated ?cache_point)
+        (cache_verified ?cache_point)
+        (not
+          (completed ?secondary_site)
+        )
+      )
+    :effect (completed ?secondary_site)
+  )
+  (:action consume_return_marker_for_region_return_link
+    :parameters (?region - region ?return_marker - return_marker ?travel_permit - travel_permit)
+    :precondition
+      (and
+        (completed ?region)
+        (region_travel_permit_assigned ?region ?travel_permit)
+        (return_marker_available ?return_marker)
+        (not
+          (hazard_cleared ?region)
+        )
+      )
+    :effect
+      (and
+        (hazard_cleared ?region)
+        (region_return_marker_link ?region ?return_marker)
+        (not
+          (return_marker_available ?return_marker)
+        )
+      )
+  )
+  (:action finalize_primary_site_and_release_anchor_device
+    :parameters (?primary_site - primary_site ?anchor_device - anchor_device ?return_marker - return_marker)
+    :precondition
+      (and
+        (hazard_cleared ?primary_site)
+        (region_anchor_device_assigned ?primary_site ?anchor_device)
+        (region_return_marker_link ?primary_site ?return_marker)
+        (not
+          (region_cleared ?primary_site)
+        )
+      )
+    :effect
+      (and
+        (region_cleared ?primary_site)
+        (anchor_device_available ?anchor_device)
+        (return_marker_available ?return_marker)
+      )
+  )
+  (:action finalize_secondary_site_and_release_anchor_device
+    :parameters (?secondary_site - secondary_site ?anchor_device - anchor_device ?return_marker - return_marker)
+    :precondition
+      (and
+        (hazard_cleared ?secondary_site)
+        (region_anchor_device_assigned ?secondary_site ?anchor_device)
+        (region_return_marker_link ?secondary_site ?return_marker)
+        (not
+          (region_cleared ?secondary_site)
+        )
+      )
+    :effect
+      (and
+        (region_cleared ?secondary_site)
+        (anchor_device_available ?anchor_device)
+        (return_marker_available ?return_marker)
+      )
+  )
+  (:action finalize_route_plan_and_release_anchor_device
+    :parameters (?route_plan - route_region ?anchor_device - anchor_device ?return_marker - return_marker)
+    :precondition
+      (and
+        (hazard_cleared ?route_plan)
+        (region_anchor_device_assigned ?route_plan ?anchor_device)
+        (region_return_marker_link ?route_plan ?return_marker)
+        (not
+          (region_cleared ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (region_cleared ?route_plan)
+        (anchor_device_available ?anchor_device)
+        (return_marker_available ?return_marker)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem late_game_world_cleanup_problem)
+  (:domain late_game_cleanup_domain)
+  (:objects primary_site_1 - primary_site secondary_site_1 - secondary_site route_plan_alpha - route_region route_plan_beta - route_region anchor_device_1 - anchor_device anchor_device_2 - anchor_device anchor_device_3 - anchor_device travel_permit_1 - travel_permit mitigation_tool_1 - mitigation_tool consumable_item_1 - consumable_item anchor_slot_primary_1 - anchor_slot_primary anchor_slot_secondary_1 - anchor_slot_secondary cache_point_1 - cache_point resource_node_1 - resource_node resource_node_2 - resource_node bonus_objective_1 - bonus_objective bonus_objective_2 - bonus_objective module_1 - module module_2 - module return_marker_1 - return_marker special_tool_1 - special_tool anchor_token_1 - anchor_token anchor_token_2 - anchor_token encounter_marker_1 - encounter_marker)
+  (:init
+    (anchor_device_available anchor_device_1)
+    (anchor_device_available anchor_device_2)
+    (anchor_device_available anchor_device_3)
+    (travel_permit_available travel_permit_1)
+    (mitigation_tool_available mitigation_tool_1)
+    (consumable_item_available consumable_item_1)
+    (site_slot_link_primary primary_site_1 anchor_slot_primary_1)
+    (site_slot_link_secondary secondary_site_1 anchor_slot_secondary_1)
+    (cache_point_available cache_point_1)
+    (resource_node_available resource_node_1)
+    (resource_node_available resource_node_2)
+    (route_plan_has_primary_site route_plan_alpha primary_site_1)
+    (route_plan_has_primary_site route_plan_beta primary_site_1)
+    (route_plan_has_secondary_site route_plan_alpha secondary_site_1)
+    (route_plan_has_secondary_site route_plan_beta secondary_site_1)
+    (route_plan_has_cache route_plan_alpha cache_point_1)
+    (route_plan_has_cache route_plan_beta cache_point_1)
+    (route_plan_has_resource_node route_plan_alpha resource_node_1)
+    (route_plan_has_resource_node route_plan_beta resource_node_2)
+    (bonus_objective_available bonus_objective_1)
+    (bonus_objective_available bonus_objective_2)
+    (module_available module_1)
+    (module_available module_2)
+    (return_marker_available return_marker_1)
+    (special_tool_available special_tool_1)
+    (anchor_token_available anchor_token_1)
+    (route_plan_anchor_token_link route_plan_alpha anchor_token_1)
+    (route_plan_anchor_token_link route_plan_beta anchor_token_2)
+    (encounter_marker_available encounter_marker_1)
+  )
+  (:goal
+    (and
+      (region_cleared primary_site_1)
+      (region_cleared secondary_site_1)
+      (region_cleared route_plan_alpha)
+      (region_cleared route_plan_beta)
+    )
+  )
+)

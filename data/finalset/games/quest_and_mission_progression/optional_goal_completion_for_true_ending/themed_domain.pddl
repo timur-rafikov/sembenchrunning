@@ -1,0 +1,936 @@
+(define (domain quest_progression_true_ending)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types gameplay_element - object asset_supertype - object flag_supertype - object quest_root - object quest_instance - quest_root mission_giver - gameplay_element objective_token - gameplay_element npc_actor - gameplay_element challenge_token - gameplay_element unlock_modifier - gameplay_element true_ending_key - gameplay_element upgrade_token - gameplay_element ritual_component - gameplay_element consumable_resource - asset_supertype optional_artifact - asset_supertype ally_token - asset_supertype region_flag - flag_supertype side_flag - flag_supertype ending_trigger - flag_supertype quest_subtype_a - quest_instance quest_subtype_b - quest_instance region_branch - quest_subtype_a side_branch - quest_subtype_a player_profile - quest_subtype_b)
+  (:predicates
+    (quest_component_offered ?quest - quest_instance)
+    (quest_component_active ?quest - quest_instance)
+    (quest_component_accepted ?quest - quest_instance)
+    (quest_component_completed ?quest - quest_instance)
+    (quest_component_reward_eligible ?quest - quest_instance)
+    (quest_component_finalization_pending ?quest - quest_instance)
+    (mission_giver_available ?mission_giver - mission_giver)
+    (quest_assigned_to_mission_giver ?quest - quest_instance ?mission_giver - mission_giver)
+    (objective_available ?objective_token - objective_token)
+    (quest_has_objective ?quest - quest_instance ?objective_token - objective_token)
+    (npc_available ?npc_actor - npc_actor)
+    (quest_assigned_npc ?quest - quest_instance ?npc_actor - npc_actor)
+    (consumable_resource_available ?consumable_resource - consumable_resource)
+    (region_branch_has_resource ?region_branch - region_branch ?consumable_resource - consumable_resource)
+    (side_branch_has_resource ?side_branch - side_branch ?consumable_resource - consumable_resource)
+    (region_branch_has_flag ?region_branch - region_branch ?region_flag - region_flag)
+    (region_flag_stage_one ?region_flag - region_flag)
+    (region_flag_stage_two ?region_flag - region_flag)
+    (region_branch_contribution_ready ?region_branch - region_branch)
+    (side_branch_has_flag ?side_branch - side_branch ?side_flag - side_flag)
+    (side_flag_stage_one ?side_flag - side_flag)
+    (side_flag_stage_two ?side_flag - side_flag)
+    (side_branch_contribution_ready ?side_branch - side_branch)
+    (ending_trigger_available ?ending_trigger - ending_trigger)
+    (ending_trigger_assembled ?ending_trigger - ending_trigger)
+    (ending_trigger_includes_region_flag ?ending_trigger - ending_trigger ?region_flag - region_flag)
+    (ending_trigger_includes_side_flag ?ending_trigger - ending_trigger ?side_flag - side_flag)
+    (ending_trigger_variant_a ?ending_trigger - ending_trigger)
+    (ending_trigger_variant_b ?ending_trigger - ending_trigger)
+    (ending_trigger_facet_activated ?ending_trigger - ending_trigger)
+    (profile_link_region_branch ?player_profile - player_profile ?region_branch - region_branch)
+    (profile_link_side_branch ?player_profile - player_profile ?side_branch - side_branch)
+    (profile_link_ending_trigger ?player_profile - player_profile ?ending_trigger - ending_trigger)
+    (optional_artifact_available ?optional_artifact - optional_artifact)
+    (profile_has_artifact ?player_profile - player_profile ?optional_artifact - optional_artifact)
+    (artifact_bound ?optional_artifact - optional_artifact)
+    (artifact_linked_to_trigger ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    (profile_artifact_validated ?player_profile - player_profile)
+    (profile_artifact_processed ?player_profile - player_profile)
+    (profile_finalization_ready ?player_profile - player_profile)
+    (profile_challenge_enabled ?player_profile - player_profile)
+    (profile_challenge_progressed ?player_profile - player_profile)
+    (profile_modifier_ready ?player_profile - player_profile)
+    (profile_finalization_confirmed ?player_profile - player_profile)
+    (ally_token_available ?ally_token - ally_token)
+    (profile_has_ally_token ?player_profile - player_profile ?ally_token - ally_token)
+    (profile_special_challenge_active ?player_profile - player_profile)
+    (profile_special_challenge_progress ?player_profile - player_profile)
+    (profile_special_challenge_completed ?player_profile - player_profile)
+    (challenge_token_available ?challenge_token - challenge_token)
+    (profile_has_challenge_token ?player_profile - player_profile ?challenge_token - challenge_token)
+    (unlock_modifier_available ?unlock_modifier - unlock_modifier)
+    (profile_has_unlock_modifier ?player_profile - player_profile ?unlock_modifier - unlock_modifier)
+    (upgrade_token_available ?upgrade_token - upgrade_token)
+    (profile_has_upgrade_token ?player_profile - player_profile ?upgrade_token - upgrade_token)
+    (ritual_component_available ?ritual_component - ritual_component)
+    (profile_has_ritual_component ?player_profile - player_profile ?ritual_component - ritual_component)
+    (true_ending_key_available ?true_ending_key - true_ending_key)
+    (quest_linked_true_ending_key ?quest - quest_instance ?true_ending_key - true_ending_key)
+    (region_branch_ready ?region_branch - region_branch)
+    (side_branch_ready ?side_branch - side_branch)
+    (profile_endstate_marked ?player_profile - player_profile)
+  )
+  (:action offer_quest_instance
+    :parameters (?quest - quest_instance)
+    :precondition
+      (and
+        (not
+          (quest_component_offered ?quest)
+        )
+        (not
+          (quest_component_completed ?quest)
+        )
+      )
+    :effect (quest_component_offered ?quest)
+  )
+  (:action assign_mission_giver_to_quest
+    :parameters (?quest - quest_instance ?mission_giver - mission_giver)
+    :precondition
+      (and
+        (quest_component_offered ?quest)
+        (not
+          (quest_component_accepted ?quest)
+        )
+        (mission_giver_available ?mission_giver)
+      )
+    :effect
+      (and
+        (quest_component_accepted ?quest)
+        (quest_assigned_to_mission_giver ?quest ?mission_giver)
+        (not
+          (mission_giver_available ?mission_giver)
+        )
+      )
+  )
+  (:action attach_objective_to_quest
+    :parameters (?quest - quest_instance ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_offered ?quest)
+        (quest_component_accepted ?quest)
+        (objective_available ?objective_token)
+      )
+    :effect
+      (and
+        (quest_has_objective ?quest ?objective_token)
+        (not
+          (objective_available ?objective_token)
+        )
+      )
+  )
+  (:action activate_quest_stage
+    :parameters (?quest - quest_instance ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_offered ?quest)
+        (quest_component_accepted ?quest)
+        (quest_has_objective ?quest ?objective_token)
+        (not
+          (quest_component_active ?quest)
+        )
+      )
+    :effect (quest_component_active ?quest)
+  )
+  (:action detach_objective_from_quest
+    :parameters (?quest - quest_instance ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_has_objective ?quest ?objective_token)
+      )
+    :effect
+      (and
+        (objective_available ?objective_token)
+        (not
+          (quest_has_objective ?quest ?objective_token)
+        )
+      )
+  )
+  (:action attach_npc_to_quest
+    :parameters (?quest - quest_instance ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (quest_component_active ?quest)
+        (npc_available ?npc_actor)
+      )
+    :effect
+      (and
+        (quest_assigned_npc ?quest ?npc_actor)
+        (not
+          (npc_available ?npc_actor)
+        )
+      )
+  )
+  (:action detach_npc_from_quest
+    :parameters (?quest - quest_instance ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (quest_assigned_npc ?quest ?npc_actor)
+      )
+    :effect
+      (and
+        (npc_available ?npc_actor)
+        (not
+          (quest_assigned_npc ?quest ?npc_actor)
+        )
+      )
+  )
+  (:action bind_upgrade_to_profile
+    :parameters (?player_profile - player_profile ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (upgrade_token_available ?upgrade_token)
+      )
+    :effect
+      (and
+        (profile_has_upgrade_token ?player_profile ?upgrade_token)
+        (not
+          (upgrade_token_available ?upgrade_token)
+        )
+      )
+  )
+  (:action unbind_upgrade_from_profile
+    :parameters (?player_profile - player_profile ?upgrade_token - upgrade_token)
+    :precondition
+      (and
+        (profile_has_upgrade_token ?player_profile ?upgrade_token)
+      )
+    :effect
+      (and
+        (upgrade_token_available ?upgrade_token)
+        (not
+          (profile_has_upgrade_token ?player_profile ?upgrade_token)
+        )
+      )
+  )
+  (:action bind_ritual_component_to_profile
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (ritual_component_available ?ritual_component)
+      )
+    :effect
+      (and
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (not
+          (ritual_component_available ?ritual_component)
+        )
+      )
+  )
+  (:action unbind_ritual_from_profile
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component)
+    :precondition
+      (and
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+      )
+    :effect
+      (and
+        (ritual_component_available ?ritual_component)
+        (not
+          (profile_has_ritual_component ?player_profile ?ritual_component)
+        )
+      )
+  )
+  (:action activate_region_flag_stage_one
+    :parameters (?region_branch - region_branch ?region_flag - region_flag ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_active ?region_branch)
+        (quest_has_objective ?region_branch ?objective_token)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (not
+          (region_flag_stage_one ?region_flag)
+        )
+        (not
+          (region_flag_stage_two ?region_flag)
+        )
+      )
+    :effect (region_flag_stage_one ?region_flag)
+  )
+  (:action mark_region_branch_checkpoint
+    :parameters (?region_branch - region_branch ?region_flag - region_flag ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (quest_component_active ?region_branch)
+        (quest_assigned_npc ?region_branch ?npc_actor)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (region_flag_stage_one ?region_flag)
+        (not
+          (region_branch_ready ?region_branch)
+        )
+      )
+    :effect
+      (and
+        (region_branch_ready ?region_branch)
+        (region_branch_contribution_ready ?region_branch)
+      )
+  )
+  (:action assign_resource_to_region_branch
+    :parameters (?region_branch - region_branch ?region_flag - region_flag ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (quest_component_active ?region_branch)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (region_branch_ready ?region_branch)
+        )
+      )
+    :effect
+      (and
+        (region_flag_stage_two ?region_flag)
+        (region_branch_ready ?region_branch)
+        (region_branch_has_resource ?region_branch ?consumable_resource)
+        (not
+          (consumable_resource_available ?consumable_resource)
+        )
+      )
+  )
+  (:action complete_region_branch_progress
+    :parameters (?region_branch - region_branch ?region_flag - region_flag ?objective_token - objective_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (quest_component_active ?region_branch)
+        (quest_has_objective ?region_branch ?objective_token)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (region_flag_stage_two ?region_flag)
+        (region_branch_has_resource ?region_branch ?consumable_resource)
+        (not
+          (region_branch_contribution_ready ?region_branch)
+        )
+      )
+    :effect
+      (and
+        (region_flag_stage_one ?region_flag)
+        (region_branch_contribution_ready ?region_branch)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (region_branch_has_resource ?region_branch ?consumable_resource)
+        )
+      )
+  )
+  (:action activate_side_flag_stage_one
+    :parameters (?side_branch - side_branch ?side_flag - side_flag ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_active ?side_branch)
+        (quest_has_objective ?side_branch ?objective_token)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (not
+          (side_flag_stage_one ?side_flag)
+        )
+        (not
+          (side_flag_stage_two ?side_flag)
+        )
+      )
+    :effect (side_flag_stage_one ?side_flag)
+  )
+  (:action mark_side_branch_checkpoint
+    :parameters (?side_branch - side_branch ?side_flag - side_flag ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (quest_component_active ?side_branch)
+        (quest_assigned_npc ?side_branch ?npc_actor)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (side_flag_stage_one ?side_flag)
+        (not
+          (side_branch_ready ?side_branch)
+        )
+      )
+    :effect
+      (and
+        (side_branch_ready ?side_branch)
+        (side_branch_contribution_ready ?side_branch)
+      )
+  )
+  (:action assign_resource_to_side_branch
+    :parameters (?side_branch - side_branch ?side_flag - side_flag ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (quest_component_active ?side_branch)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (side_branch_ready ?side_branch)
+        )
+      )
+    :effect
+      (and
+        (side_flag_stage_two ?side_flag)
+        (side_branch_ready ?side_branch)
+        (side_branch_has_resource ?side_branch ?consumable_resource)
+        (not
+          (consumable_resource_available ?consumable_resource)
+        )
+      )
+  )
+  (:action complete_side_branch_progress
+    :parameters (?side_branch - side_branch ?side_flag - side_flag ?objective_token - objective_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (quest_component_active ?side_branch)
+        (quest_has_objective ?side_branch ?objective_token)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (side_flag_stage_two ?side_flag)
+        (side_branch_has_resource ?side_branch ?consumable_resource)
+        (not
+          (side_branch_contribution_ready ?side_branch)
+        )
+      )
+    :effect
+      (and
+        (side_flag_stage_one ?side_flag)
+        (side_branch_contribution_ready ?side_branch)
+        (consumable_resource_available ?consumable_resource)
+        (not
+          (side_branch_has_resource ?side_branch ?consumable_resource)
+        )
+      )
+  )
+  (:action assemble_ending_trigger_basic
+    :parameters (?region_branch - region_branch ?side_branch - side_branch ?region_flag - region_flag ?side_flag - side_flag ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (region_branch_ready ?region_branch)
+        (side_branch_ready ?side_branch)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (region_flag_stage_one ?region_flag)
+        (side_flag_stage_one ?side_flag)
+        (region_branch_contribution_ready ?region_branch)
+        (side_branch_contribution_ready ?side_branch)
+        (ending_trigger_available ?ending_trigger)
+      )
+    :effect
+      (and
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_includes_region_flag ?ending_trigger ?region_flag)
+        (ending_trigger_includes_side_flag ?ending_trigger ?side_flag)
+        (not
+          (ending_trigger_available ?ending_trigger)
+        )
+      )
+  )
+  (:action assemble_ending_trigger_variant_a
+    :parameters (?region_branch - region_branch ?side_branch - side_branch ?region_flag - region_flag ?side_flag - side_flag ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (region_branch_ready ?region_branch)
+        (side_branch_ready ?side_branch)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (region_flag_stage_two ?region_flag)
+        (side_flag_stage_one ?side_flag)
+        (not
+          (region_branch_contribution_ready ?region_branch)
+        )
+        (side_branch_contribution_ready ?side_branch)
+        (ending_trigger_available ?ending_trigger)
+      )
+    :effect
+      (and
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_includes_region_flag ?ending_trigger ?region_flag)
+        (ending_trigger_includes_side_flag ?ending_trigger ?side_flag)
+        (ending_trigger_variant_a ?ending_trigger)
+        (not
+          (ending_trigger_available ?ending_trigger)
+        )
+      )
+  )
+  (:action assemble_ending_trigger_variant_b
+    :parameters (?region_branch - region_branch ?side_branch - side_branch ?region_flag - region_flag ?side_flag - side_flag ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (region_branch_ready ?region_branch)
+        (side_branch_ready ?side_branch)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (region_flag_stage_one ?region_flag)
+        (side_flag_stage_two ?side_flag)
+        (region_branch_contribution_ready ?region_branch)
+        (not
+          (side_branch_contribution_ready ?side_branch)
+        )
+        (ending_trigger_available ?ending_trigger)
+      )
+    :effect
+      (and
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_includes_region_flag ?ending_trigger ?region_flag)
+        (ending_trigger_includes_side_flag ?ending_trigger ?side_flag)
+        (ending_trigger_variant_b ?ending_trigger)
+        (not
+          (ending_trigger_available ?ending_trigger)
+        )
+      )
+  )
+  (:action assemble_ending_trigger_variant_ab
+    :parameters (?region_branch - region_branch ?side_branch - side_branch ?region_flag - region_flag ?side_flag - side_flag ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (region_branch_ready ?region_branch)
+        (side_branch_ready ?side_branch)
+        (region_branch_has_flag ?region_branch ?region_flag)
+        (side_branch_has_flag ?side_branch ?side_flag)
+        (region_flag_stage_two ?region_flag)
+        (side_flag_stage_two ?side_flag)
+        (not
+          (region_branch_contribution_ready ?region_branch)
+        )
+        (not
+          (side_branch_contribution_ready ?side_branch)
+        )
+        (ending_trigger_available ?ending_trigger)
+      )
+    :effect
+      (and
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_includes_region_flag ?ending_trigger ?region_flag)
+        (ending_trigger_includes_side_flag ?ending_trigger ?side_flag)
+        (ending_trigger_variant_a ?ending_trigger)
+        (ending_trigger_variant_b ?ending_trigger)
+        (not
+          (ending_trigger_available ?ending_trigger)
+        )
+      )
+  )
+  (:action activate_ending_trigger_facet
+    :parameters (?ending_trigger - ending_trigger ?region_branch - region_branch ?objective_token - objective_token)
+    :precondition
+      (and
+        (ending_trigger_assembled ?ending_trigger)
+        (region_branch_ready ?region_branch)
+        (quest_has_objective ?region_branch ?objective_token)
+        (not
+          (ending_trigger_facet_activated ?ending_trigger)
+        )
+      )
+    :effect (ending_trigger_facet_activated ?ending_trigger)
+  )
+  (:action bind_artifact_to_profile_and_trigger
+    :parameters (?player_profile - player_profile ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (profile_link_ending_trigger ?player_profile ?ending_trigger)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (optional_artifact_available ?optional_artifact)
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_facet_activated ?ending_trigger)
+        (not
+          (artifact_bound ?optional_artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_bound ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (not
+          (optional_artifact_available ?optional_artifact)
+        )
+      )
+  )
+  (:action validate_artifact_on_profile
+    :parameters (?player_profile - player_profile ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_bound ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (quest_has_objective ?player_profile ?objective_token)
+        (not
+          (ending_trigger_variant_a ?ending_trigger)
+        )
+        (not
+          (profile_artifact_validated ?player_profile)
+        )
+      )
+    :effect (profile_artifact_validated ?player_profile)
+  )
+  (:action bind_challenge_token_to_profile
+    :parameters (?player_profile - player_profile ?challenge_token - challenge_token)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (challenge_token_available ?challenge_token)
+        (not
+          (profile_challenge_enabled ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_challenge_enabled ?player_profile)
+        (profile_has_challenge_token ?player_profile ?challenge_token)
+        (not
+          (challenge_token_available ?challenge_token)
+        )
+      )
+  )
+  (:action validate_artifact_and_progress_challenge
+    :parameters (?player_profile - player_profile ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger ?objective_token - objective_token ?challenge_token - challenge_token)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_bound ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (quest_has_objective ?player_profile ?objective_token)
+        (ending_trigger_variant_a ?ending_trigger)
+        (profile_challenge_enabled ?player_profile)
+        (profile_has_challenge_token ?player_profile ?challenge_token)
+        (not
+          (profile_artifact_validated ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_artifact_validated ?player_profile)
+        (profile_challenge_progressed ?player_profile)
+      )
+  )
+  (:action apply_upgrade_for_profile_progress
+    :parameters (?player_profile - player_profile ?upgrade_token - upgrade_token ?npc_actor - npc_actor ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_validated ?player_profile)
+        (profile_has_upgrade_token ?player_profile ?upgrade_token)
+        (quest_assigned_npc ?player_profile ?npc_actor)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (not
+          (ending_trigger_variant_b ?ending_trigger)
+        )
+        (not
+          (profile_artifact_processed ?player_profile)
+        )
+      )
+    :effect (profile_artifact_processed ?player_profile)
+  )
+  (:action apply_upgrade_for_profile_progress_secondary
+    :parameters (?player_profile - player_profile ?upgrade_token - upgrade_token ?npc_actor - npc_actor ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_validated ?player_profile)
+        (profile_has_upgrade_token ?player_profile ?upgrade_token)
+        (quest_assigned_npc ?player_profile ?npc_actor)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (ending_trigger_variant_b ?ending_trigger)
+        (not
+          (profile_artifact_processed ?player_profile)
+        )
+      )
+    :effect (profile_artifact_processed ?player_profile)
+  )
+  (:action apply_ritual_component_phase1
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_processed ?player_profile)
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (not
+          (ending_trigger_variant_a ?ending_trigger)
+        )
+        (not
+          (ending_trigger_variant_b ?ending_trigger)
+        )
+        (not
+          (profile_finalization_ready ?player_profile)
+        )
+      )
+    :effect (profile_finalization_ready ?player_profile)
+  )
+  (:action apply_ritual_component_phase2
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_processed ?player_profile)
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (ending_trigger_variant_a ?ending_trigger)
+        (not
+          (ending_trigger_variant_b ?ending_trigger)
+        )
+        (not
+          (profile_finalization_ready ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_modifier_ready ?player_profile)
+      )
+  )
+  (:action apply_ritual_component_phase3
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_processed ?player_profile)
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (not
+          (ending_trigger_variant_a ?ending_trigger)
+        )
+        (ending_trigger_variant_b ?ending_trigger)
+        (not
+          (profile_finalization_ready ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_modifier_ready ?player_profile)
+      )
+  )
+  (:action apply_ritual_component_phase4
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component ?optional_artifact - optional_artifact ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (profile_artifact_processed ?player_profile)
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (profile_has_artifact ?player_profile ?optional_artifact)
+        (artifact_linked_to_trigger ?optional_artifact ?ending_trigger)
+        (ending_trigger_variant_a ?ending_trigger)
+        (ending_trigger_variant_b ?ending_trigger)
+        (not
+          (profile_finalization_ready ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_modifier_ready ?player_profile)
+      )
+  )
+  (:action mark_profile_endstate
+    :parameters (?player_profile - player_profile)
+    :precondition
+      (and
+        (profile_finalization_ready ?player_profile)
+        (not
+          (profile_modifier_ready ?player_profile)
+        )
+        (not
+          (profile_endstate_marked ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_endstate_marked ?player_profile)
+        (quest_component_reward_eligible ?player_profile)
+      )
+  )
+  (:action attach_unlock_modifier_to_profile
+    :parameters (?player_profile - player_profile ?unlock_modifier - unlock_modifier)
+    :precondition
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_modifier_ready ?player_profile)
+        (unlock_modifier_available ?unlock_modifier)
+      )
+    :effect
+      (and
+        (profile_has_unlock_modifier ?player_profile ?unlock_modifier)
+        (not
+          (unlock_modifier_available ?unlock_modifier)
+        )
+      )
+  )
+  (:action finalize_profile_checks
+    :parameters (?player_profile - player_profile ?region_branch - region_branch ?side_branch - side_branch ?objective_token - objective_token ?unlock_modifier - unlock_modifier)
+    :precondition
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_modifier_ready ?player_profile)
+        (profile_has_unlock_modifier ?player_profile ?unlock_modifier)
+        (profile_link_region_branch ?player_profile ?region_branch)
+        (profile_link_side_branch ?player_profile ?side_branch)
+        (region_branch_contribution_ready ?region_branch)
+        (side_branch_contribution_ready ?side_branch)
+        (quest_has_objective ?player_profile ?objective_token)
+        (not
+          (profile_finalization_confirmed ?player_profile)
+        )
+      )
+    :effect (profile_finalization_confirmed ?player_profile)
+  )
+  (:action confirm_profile_endstate
+    :parameters (?player_profile - player_profile)
+    :precondition
+      (and
+        (profile_finalization_ready ?player_profile)
+        (profile_finalization_confirmed ?player_profile)
+        (not
+          (profile_endstate_marked ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_endstate_marked ?player_profile)
+        (quest_component_reward_eligible ?player_profile)
+      )
+  )
+  (:action start_special_challenge
+    :parameters (?player_profile - player_profile ?ally_token - ally_token ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_active ?player_profile)
+        (quest_has_objective ?player_profile ?objective_token)
+        (ally_token_available ?ally_token)
+        (profile_has_ally_token ?player_profile ?ally_token)
+        (not
+          (profile_special_challenge_active ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_special_challenge_active ?player_profile)
+        (not
+          (ally_token_available ?ally_token)
+        )
+      )
+  )
+  (:action progress_special_challenge
+    :parameters (?player_profile - player_profile ?npc_actor - npc_actor)
+    :precondition
+      (and
+        (profile_special_challenge_active ?player_profile)
+        (quest_assigned_npc ?player_profile ?npc_actor)
+        (not
+          (profile_special_challenge_progress ?player_profile)
+        )
+      )
+    :effect (profile_special_challenge_progress ?player_profile)
+  )
+  (:action complete_special_challenge_component
+    :parameters (?player_profile - player_profile ?ritual_component - ritual_component)
+    :precondition
+      (and
+        (profile_special_challenge_progress ?player_profile)
+        (profile_has_ritual_component ?player_profile ?ritual_component)
+        (not
+          (profile_special_challenge_completed ?player_profile)
+        )
+      )
+    :effect (profile_special_challenge_completed ?player_profile)
+  )
+  (:action finalize_special_challenge_and_mark_reward
+    :parameters (?player_profile - player_profile)
+    :precondition
+      (and
+        (profile_special_challenge_completed ?player_profile)
+        (not
+          (profile_endstate_marked ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_endstate_marked ?player_profile)
+        (quest_component_reward_eligible ?player_profile)
+      )
+  )
+  (:action grant_region_branch_reward
+    :parameters (?region_branch - region_branch ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (region_branch_ready ?region_branch)
+        (region_branch_contribution_ready ?region_branch)
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_facet_activated ?ending_trigger)
+        (not
+          (quest_component_reward_eligible ?region_branch)
+        )
+      )
+    :effect (quest_component_reward_eligible ?region_branch)
+  )
+  (:action grant_side_branch_reward
+    :parameters (?side_branch - side_branch ?ending_trigger - ending_trigger)
+    :precondition
+      (and
+        (side_branch_ready ?side_branch)
+        (side_branch_contribution_ready ?side_branch)
+        (ending_trigger_assembled ?ending_trigger)
+        (ending_trigger_facet_activated ?ending_trigger)
+        (not
+          (quest_component_reward_eligible ?side_branch)
+        )
+      )
+    :effect (quest_component_reward_eligible ?side_branch)
+  )
+  (:action attach_true_ending_key_to_quest
+    :parameters (?quest - quest_instance ?true_ending_key - true_ending_key ?objective_token - objective_token)
+    :precondition
+      (and
+        (quest_component_reward_eligible ?quest)
+        (quest_has_objective ?quest ?objective_token)
+        (true_ending_key_available ?true_ending_key)
+        (not
+          (quest_component_finalization_pending ?quest)
+        )
+      )
+    :effect
+      (and
+        (quest_component_finalization_pending ?quest)
+        (quest_linked_true_ending_key ?quest ?true_ending_key)
+        (not
+          (true_ending_key_available ?true_ending_key)
+        )
+      )
+  )
+  (:action finalize_quest_with_true_ending_key_on_region
+    :parameters (?region_branch - region_branch ?mission_giver - mission_giver ?true_ending_key - true_ending_key)
+    :precondition
+      (and
+        (quest_component_finalization_pending ?region_branch)
+        (quest_assigned_to_mission_giver ?region_branch ?mission_giver)
+        (quest_linked_true_ending_key ?region_branch ?true_ending_key)
+        (not
+          (quest_component_completed ?region_branch)
+        )
+      )
+    :effect
+      (and
+        (quest_component_completed ?region_branch)
+        (mission_giver_available ?mission_giver)
+        (true_ending_key_available ?true_ending_key)
+      )
+  )
+  (:action finalize_quest_with_true_ending_key_on_side
+    :parameters (?side_branch - side_branch ?mission_giver - mission_giver ?true_ending_key - true_ending_key)
+    :precondition
+      (and
+        (quest_component_finalization_pending ?side_branch)
+        (quest_assigned_to_mission_giver ?side_branch ?mission_giver)
+        (quest_linked_true_ending_key ?side_branch ?true_ending_key)
+        (not
+          (quest_component_completed ?side_branch)
+        )
+      )
+    :effect
+      (and
+        (quest_component_completed ?side_branch)
+        (mission_giver_available ?mission_giver)
+        (true_ending_key_available ?true_ending_key)
+      )
+  )
+  (:action finalize_quest_with_true_ending_key_on_profile
+    :parameters (?player_profile - player_profile ?mission_giver - mission_giver ?true_ending_key - true_ending_key)
+    :precondition
+      (and
+        (quest_component_finalization_pending ?player_profile)
+        (quest_assigned_to_mission_giver ?player_profile ?mission_giver)
+        (quest_linked_true_ending_key ?player_profile ?true_ending_key)
+        (not
+          (quest_component_completed ?player_profile)
+        )
+      )
+    :effect
+      (and
+        (quest_component_completed ?player_profile)
+        (mission_giver_available ?mission_giver)
+        (true_ending_key_available ?true_ending_key)
+      )
+  )
+)

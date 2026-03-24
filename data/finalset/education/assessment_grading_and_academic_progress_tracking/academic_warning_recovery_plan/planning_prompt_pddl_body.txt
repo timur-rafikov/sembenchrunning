@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain academic_warning_recovery_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object resource_type_group - object grade_category - object case_root_type - object learner_case - case_root_type staff_resource - domain_entity assessment_slot - domain_entity advisor - domain_entity policy_clause - domain_entity authorization_credential - domain_entity time_slot - domain_entity remediation_activity - domain_entity external_clearance - domain_entity intervention_token - resource_type_group evidence_artifact - resource_type_group endorsement - resource_type_group assessment_component - grade_category exam_session - grade_category submission_package - grade_category program_case_subtype - learner_case cohort_case_subtype - learner_case student_enrollment - program_case_subtype section_enrollment - program_case_subtype recovery_plan - cohort_case_subtype)
+  (:predicates
+    (case_opened ?learner_case - learner_case)
+    (case_eligibility_confirmed ?learner_case - learner_case)
+    (case_has_assigned_staff ?learner_case - learner_case)
+    (recovery_finalized ?learner_case - learner_case)
+    (verification_completed ?learner_case - learner_case)
+    (standing_update_authorized ?learner_case - learner_case)
+    (staff_resource_available ?staff_resource - staff_resource)
+    (assigned_staff_for_case ?learner_case - learner_case ?staff_resource - staff_resource)
+    (assessment_slot_available ?assessment_instance - assessment_slot)
+    (assessment_slot_reserved_for_case ?learner_case - learner_case ?assessment_instance - assessment_slot)
+    (advisor_available ?advisor - advisor)
+    (advisor_assigned_to_case ?learner_case - learner_case ?advisor - advisor)
+    (intervention_token_available ?intervention_token - intervention_token)
+    (enrollment_consumed_token ?student_enrollment - student_enrollment ?intervention_token - intervention_token)
+    (section_consumed_token ?section_enrollment - section_enrollment ?intervention_token - intervention_token)
+    (component_assigned_to_enrollment ?student_enrollment - student_enrollment ?assessment_component - assessment_component)
+    (component_ready_flag ?assessment_component - assessment_component)
+    (component_ready_via_intervention ?assessment_component - assessment_component)
+    (enrollment_component_confirmed ?student_enrollment - student_enrollment)
+    (section_has_exam_session ?section_enrollment - section_enrollment ?exam_session - exam_session)
+    (exam_session_ready_flag ?exam_session - exam_session)
+    (exam_session_ready_via_intervention ?exam_session - exam_session)
+    (section_component_confirmed ?section_enrollment - section_enrollment)
+    (submission_package_available ?submission_package - submission_package)
+    (submission_package_composed ?submission_package - submission_package)
+    (package_includes_component ?submission_package - submission_package ?assessment_component - assessment_component)
+    (package_includes_exam_session ?submission_package - submission_package ?exam_session - exam_session)
+    (package_requires_enrollment_confirmation ?submission_package - submission_package)
+    (package_requires_section_confirmation ?submission_package - submission_package)
+    (submission_package_executed ?submission_package - submission_package)
+    (plan_linked_to_enrollment ?recovery_plan - recovery_plan ?student_enrollment - student_enrollment)
+    (plan_linked_to_section ?recovery_plan - recovery_plan ?section_enrollment - section_enrollment)
+    (plan_linked_to_submission_package ?recovery_plan - recovery_plan ?submission_package - submission_package)
+    (evidence_artifact_available ?evidence_artifact - evidence_artifact)
+    (plan_has_evidence_artifact ?recovery_plan - recovery_plan ?evidence_artifact - evidence_artifact)
+    (artifact_verified ?evidence_artifact - evidence_artifact)
+    (artifact_linked_to_package ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    (plan_initial_artifact_reviewed ?recovery_plan - recovery_plan)
+    (plan_remediation_required ?recovery_plan - recovery_plan)
+    (plan_artifact_review_passed ?recovery_plan - recovery_plan)
+    (policy_attached_to_plan ?recovery_plan - recovery_plan)
+    (policy_review_flag ?recovery_plan - recovery_plan)
+    (plan_authorization_present ?recovery_plan - recovery_plan)
+    (plan_ready_for_finalization ?recovery_plan - recovery_plan)
+    (endorsement_available ?endorsement - endorsement)
+    (plan_has_endorsement ?recovery_plan - recovery_plan ?endorsement - endorsement)
+    (endorsement_attached_to_plan ?recovery_plan - recovery_plan)
+    (advisor_signoff_recorded ?recovery_plan - recovery_plan)
+    (external_clearance_recorded ?recovery_plan - recovery_plan)
+    (policy_clause_available ?policy_clause - policy_clause)
+    (policy_clause_attached_to_plan ?recovery_plan - recovery_plan ?policy_clause - policy_clause)
+    (authorization_credential_available ?authorization_credential - authorization_credential)
+    (plan_has_authorization_credential ?recovery_plan - recovery_plan ?authorization_credential - authorization_credential)
+    (remediation_activity_available ?remediation_activity - remediation_activity)
+    (plan_assigned_remediation_activity ?recovery_plan - recovery_plan ?remediation_activity - remediation_activity)
+    (external_clearance_available ?external_clearance - external_clearance)
+    (plan_assigned_external_clearance ?recovery_plan - recovery_plan ?external_clearance - external_clearance)
+    (time_slot_available ?time_slot - time_slot)
+    (case_scheduled_time_slot ?learner_case - learner_case ?time_slot - time_slot)
+    (enrollment_milestone_flag ?student_enrollment - student_enrollment)
+    (section_milestone_flag ?section_enrollment - section_enrollment)
+    (plan_finalization_token ?recovery_plan - recovery_plan)
+  )
+  (:action open_learner_recovery_case
+    :parameters (?learner_case - learner_case)
+    :precondition
+      (and
+        (not
+          (case_opened ?learner_case)
+        )
+        (not
+          (recovery_finalized ?learner_case)
+        )
+      )
+    :effect (case_opened ?learner_case)
+  )
+  (:action assign_staff_to_recovery_case
+    :parameters (?learner_case - learner_case ?staff_resource - staff_resource)
+    :precondition
+      (and
+        (case_opened ?learner_case)
+        (not
+          (case_has_assigned_staff ?learner_case)
+        )
+        (staff_resource_available ?staff_resource)
+      )
+    :effect
+      (and
+        (case_has_assigned_staff ?learner_case)
+        (assigned_staff_for_case ?learner_case ?staff_resource)
+        (not
+          (staff_resource_available ?staff_resource)
+        )
+      )
+  )
+  (:action reserve_assessment_slot_for_case
+    :parameters (?learner_case - learner_case ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_opened ?learner_case)
+        (case_has_assigned_staff ?learner_case)
+        (assessment_slot_available ?assessment_instance)
+      )
+    :effect
+      (and
+        (assessment_slot_reserved_for_case ?learner_case ?assessment_instance)
+        (not
+          (assessment_slot_available ?assessment_instance)
+        )
+      )
+  )
+  (:action confirm_case_eligibility
+    :parameters (?learner_case - learner_case ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_opened ?learner_case)
+        (case_has_assigned_staff ?learner_case)
+        (assessment_slot_reserved_for_case ?learner_case ?assessment_instance)
+        (not
+          (case_eligibility_confirmed ?learner_case)
+        )
+      )
+    :effect (case_eligibility_confirmed ?learner_case)
+  )
+  (:action release_assessment_slot_reservation_from_case
+    :parameters (?learner_case - learner_case ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (assessment_slot_reserved_for_case ?learner_case ?assessment_instance)
+      )
+    :effect
+      (and
+        (assessment_slot_available ?assessment_instance)
+        (not
+          (assessment_slot_reserved_for_case ?learner_case ?assessment_instance)
+        )
+      )
+  )
+  (:action assign_advisor_to_case
+    :parameters (?learner_case - learner_case ?advisor - advisor)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?learner_case)
+        (advisor_available ?advisor)
+      )
+    :effect
+      (and
+        (advisor_assigned_to_case ?learner_case ?advisor)
+        (not
+          (advisor_available ?advisor)
+        )
+      )
+  )
+  (:action unassign_advisor_from_case
+    :parameters (?learner_case - learner_case ?advisor - advisor)
+    :precondition
+      (and
+        (advisor_assigned_to_case ?learner_case ?advisor)
+      )
+    :effect
+      (and
+        (advisor_available ?advisor)
+        (not
+          (advisor_assigned_to_case ?learner_case ?advisor)
+        )
+      )
+  )
+  (:action attach_remediation_activity_to_plan
+    :parameters (?recovery_plan - recovery_plan ?remediation_activity - remediation_activity)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (remediation_activity_available ?remediation_activity)
+      )
+    :effect
+      (and
+        (plan_assigned_remediation_activity ?recovery_plan ?remediation_activity)
+        (not
+          (remediation_activity_available ?remediation_activity)
+        )
+      )
+  )
+  (:action detach_remediation_activity_from_plan
+    :parameters (?recovery_plan - recovery_plan ?remediation_activity - remediation_activity)
+    :precondition
+      (and
+        (plan_assigned_remediation_activity ?recovery_plan ?remediation_activity)
+      )
+    :effect
+      (and
+        (remediation_activity_available ?remediation_activity)
+        (not
+          (plan_assigned_remediation_activity ?recovery_plan ?remediation_activity)
+        )
+      )
+  )
+  (:action attach_external_clearance_to_plan
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (external_clearance_available ?external_clearance)
+      )
+    :effect
+      (and
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (not
+          (external_clearance_available ?external_clearance)
+        )
+      )
+  )
+  (:action detach_external_clearance_from_plan
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+      )
+    :effect
+      (and
+        (external_clearance_available ?external_clearance)
+        (not
+          (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        )
+      )
+  )
+  (:action flag_enrollment_component_ready
+    :parameters (?student_enrollment - student_enrollment ?assessment_component - assessment_component ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?student_enrollment)
+        (assessment_slot_reserved_for_case ?student_enrollment ?assessment_instance)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (not
+          (component_ready_flag ?assessment_component)
+        )
+        (not
+          (component_ready_via_intervention ?assessment_component)
+        )
+      )
+    :effect (component_ready_flag ?assessment_component)
+  )
+  (:action confirm_enrollment_component_with_advisor
+    :parameters (?student_enrollment - student_enrollment ?assessment_component - assessment_component ?advisor - advisor)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?student_enrollment)
+        (advisor_assigned_to_case ?student_enrollment ?advisor)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (component_ready_flag ?assessment_component)
+        (not
+          (enrollment_milestone_flag ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (enrollment_component_confirmed ?student_enrollment)
+      )
+  )
+  (:action consume_intervention_token_for_enrollment_component
+    :parameters (?student_enrollment - student_enrollment ?assessment_component - assessment_component ?intervention_token - intervention_token)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?student_enrollment)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (intervention_token_available ?intervention_token)
+        (not
+          (enrollment_milestone_flag ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (component_ready_via_intervention ?assessment_component)
+        (enrollment_milestone_flag ?student_enrollment)
+        (enrollment_consumed_token ?student_enrollment ?intervention_token)
+        (not
+          (intervention_token_available ?intervention_token)
+        )
+      )
+  )
+  (:action finalize_enrollment_component_activation
+    :parameters (?student_enrollment - student_enrollment ?assessment_component - assessment_component ?assessment_instance - assessment_slot ?intervention_token - intervention_token)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?student_enrollment)
+        (assessment_slot_reserved_for_case ?student_enrollment ?assessment_instance)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (component_ready_via_intervention ?assessment_component)
+        (enrollment_consumed_token ?student_enrollment ?intervention_token)
+        (not
+          (enrollment_component_confirmed ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (component_ready_flag ?assessment_component)
+        (enrollment_component_confirmed ?student_enrollment)
+        (intervention_token_available ?intervention_token)
+        (not
+          (enrollment_consumed_token ?student_enrollment ?intervention_token)
+        )
+      )
+  )
+  (:action flag_section_component_ready
+    :parameters (?section_enrollment - section_enrollment ?exam_session - exam_session ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?section_enrollment)
+        (assessment_slot_reserved_for_case ?section_enrollment ?assessment_instance)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (not
+          (exam_session_ready_flag ?exam_session)
+        )
+        (not
+          (exam_session_ready_via_intervention ?exam_session)
+        )
+      )
+    :effect (exam_session_ready_flag ?exam_session)
+  )
+  (:action confirm_section_component_with_advisor
+    :parameters (?section_enrollment - section_enrollment ?exam_session - exam_session ?advisor - advisor)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?section_enrollment)
+        (advisor_assigned_to_case ?section_enrollment ?advisor)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (exam_session_ready_flag ?exam_session)
+        (not
+          (section_milestone_flag ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (section_milestone_flag ?section_enrollment)
+        (section_component_confirmed ?section_enrollment)
+      )
+  )
+  (:action consume_intervention_token_for_section_component
+    :parameters (?section_enrollment - section_enrollment ?exam_session - exam_session ?intervention_token - intervention_token)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?section_enrollment)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (intervention_token_available ?intervention_token)
+        (not
+          (section_milestone_flag ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (exam_session_ready_via_intervention ?exam_session)
+        (section_milestone_flag ?section_enrollment)
+        (section_consumed_token ?section_enrollment ?intervention_token)
+        (not
+          (intervention_token_available ?intervention_token)
+        )
+      )
+  )
+  (:action finalize_section_component_activation
+    :parameters (?section_enrollment - section_enrollment ?exam_session - exam_session ?assessment_instance - assessment_slot ?intervention_token - intervention_token)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?section_enrollment)
+        (assessment_slot_reserved_for_case ?section_enrollment ?assessment_instance)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (exam_session_ready_via_intervention ?exam_session)
+        (section_consumed_token ?section_enrollment ?intervention_token)
+        (not
+          (section_component_confirmed ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (exam_session_ready_flag ?exam_session)
+        (section_component_confirmed ?section_enrollment)
+        (intervention_token_available ?intervention_token)
+        (not
+          (section_consumed_token ?section_enrollment ?intervention_token)
+        )
+      )
+  )
+  (:action compose_submission_package
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_component - assessment_component ?exam_session - exam_session ?submission_package - submission_package)
+    :precondition
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (section_milestone_flag ?section_enrollment)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (component_ready_flag ?assessment_component)
+        (exam_session_ready_flag ?exam_session)
+        (enrollment_component_confirmed ?student_enrollment)
+        (section_component_confirmed ?section_enrollment)
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_composed ?submission_package)
+        (package_includes_component ?submission_package ?assessment_component)
+        (package_includes_exam_session ?submission_package ?exam_session)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action compose_submission_package_requires_enrollment_confirmation
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_component - assessment_component ?exam_session - exam_session ?submission_package - submission_package)
+    :precondition
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (section_milestone_flag ?section_enrollment)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (component_ready_via_intervention ?assessment_component)
+        (exam_session_ready_flag ?exam_session)
+        (not
+          (enrollment_component_confirmed ?student_enrollment)
+        )
+        (section_component_confirmed ?section_enrollment)
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_composed ?submission_package)
+        (package_includes_component ?submission_package ?assessment_component)
+        (package_includes_exam_session ?submission_package ?exam_session)
+        (package_requires_enrollment_confirmation ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action compose_submission_package_requires_section_confirmation
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_component - assessment_component ?exam_session - exam_session ?submission_package - submission_package)
+    :precondition
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (section_milestone_flag ?section_enrollment)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (component_ready_flag ?assessment_component)
+        (exam_session_ready_via_intervention ?exam_session)
+        (enrollment_component_confirmed ?student_enrollment)
+        (not
+          (section_component_confirmed ?section_enrollment)
+        )
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_composed ?submission_package)
+        (package_includes_component ?submission_package ?assessment_component)
+        (package_includes_exam_session ?submission_package ?exam_session)
+        (package_requires_section_confirmation ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action compose_submission_package_requires_both_confirmations
+    :parameters (?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_component - assessment_component ?exam_session - exam_session ?submission_package - submission_package)
+    :precondition
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (section_milestone_flag ?section_enrollment)
+        (component_assigned_to_enrollment ?student_enrollment ?assessment_component)
+        (section_has_exam_session ?section_enrollment ?exam_session)
+        (component_ready_via_intervention ?assessment_component)
+        (exam_session_ready_via_intervention ?exam_session)
+        (not
+          (enrollment_component_confirmed ?student_enrollment)
+        )
+        (not
+          (section_component_confirmed ?section_enrollment)
+        )
+        (submission_package_available ?submission_package)
+      )
+    :effect
+      (and
+        (submission_package_composed ?submission_package)
+        (package_includes_component ?submission_package ?assessment_component)
+        (package_includes_exam_session ?submission_package ?exam_session)
+        (package_requires_enrollment_confirmation ?submission_package)
+        (package_requires_section_confirmation ?submission_package)
+        (not
+          (submission_package_available ?submission_package)
+        )
+      )
+  )
+  (:action record_submission_package_execution
+    :parameters (?submission_package - submission_package ?student_enrollment - student_enrollment ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (submission_package_composed ?submission_package)
+        (enrollment_milestone_flag ?student_enrollment)
+        (assessment_slot_reserved_for_case ?student_enrollment ?assessment_instance)
+        (not
+          (submission_package_executed ?submission_package)
+        )
+      )
+    :effect (submission_package_executed ?submission_package)
+  )
+  (:action verify_evidence_artifact_and_attach_to_package
+    :parameters (?recovery_plan - recovery_plan ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (plan_linked_to_submission_package ?recovery_plan ?submission_package)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (evidence_artifact_available ?evidence_artifact)
+        (submission_package_composed ?submission_package)
+        (submission_package_executed ?submission_package)
+        (not
+          (artifact_verified ?evidence_artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_verified ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (not
+          (evidence_artifact_available ?evidence_artifact)
+        )
+      )
+  )
+  (:action perform_initial_artifact_review
+    :parameters (?recovery_plan - recovery_plan ?evidence_artifact - evidence_artifact ?submission_package - submission_package ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_verified ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (assessment_slot_reserved_for_case ?recovery_plan ?assessment_instance)
+        (not
+          (package_requires_enrollment_confirmation ?submission_package)
+        )
+        (not
+          (plan_initial_artifact_reviewed ?recovery_plan)
+        )
+      )
+    :effect (plan_initial_artifact_reviewed ?recovery_plan)
+  )
+  (:action attach_policy_clause_to_plan
+    :parameters (?recovery_plan - recovery_plan ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (policy_clause_available ?policy_clause)
+        (not
+          (policy_attached_to_plan ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (policy_attached_to_plan ?recovery_plan)
+        (policy_clause_attached_to_plan ?recovery_plan ?policy_clause)
+        (not
+          (policy_clause_available ?policy_clause)
+        )
+      )
+  )
+  (:action apply_policy_conditions_and_initiate_review
+    :parameters (?recovery_plan - recovery_plan ?evidence_artifact - evidence_artifact ?submission_package - submission_package ?assessment_instance - assessment_slot ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_verified ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (assessment_slot_reserved_for_case ?recovery_plan ?assessment_instance)
+        (package_requires_enrollment_confirmation ?submission_package)
+        (policy_attached_to_plan ?recovery_plan)
+        (policy_clause_attached_to_plan ?recovery_plan ?policy_clause)
+        (not
+          (plan_initial_artifact_reviewed ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_initial_artifact_reviewed ?recovery_plan)
+        (policy_review_flag ?recovery_plan)
+      )
+  )
+  (:action initiate_remediation_iteration
+    :parameters (?recovery_plan - recovery_plan ?remediation_activity - remediation_activity ?advisor - advisor ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_initial_artifact_reviewed ?recovery_plan)
+        (plan_assigned_remediation_activity ?recovery_plan ?remediation_activity)
+        (advisor_assigned_to_case ?recovery_plan ?advisor)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (not
+          (package_requires_section_confirmation ?submission_package)
+        )
+        (not
+          (plan_remediation_required ?recovery_plan)
+        )
+      )
+    :effect (plan_remediation_required ?recovery_plan)
+  )
+  (:action continue_remediation_iteration
+    :parameters (?recovery_plan - recovery_plan ?remediation_activity - remediation_activity ?advisor - advisor ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_initial_artifact_reviewed ?recovery_plan)
+        (plan_assigned_remediation_activity ?recovery_plan ?remediation_activity)
+        (advisor_assigned_to_case ?recovery_plan ?advisor)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (package_requires_section_confirmation ?submission_package)
+        (not
+          (plan_remediation_required ?recovery_plan)
+        )
+      )
+    :effect (plan_remediation_required ?recovery_plan)
+  )
+  (:action complete_external_clearance_review
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_remediation_required ?recovery_plan)
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (not
+          (package_requires_enrollment_confirmation ?submission_package)
+        )
+        (not
+          (package_requires_section_confirmation ?submission_package)
+        )
+        (not
+          (plan_artifact_review_passed ?recovery_plan)
+        )
+      )
+    :effect (plan_artifact_review_passed ?recovery_plan)
+  )
+  (:action complete_external_clearance_and_attach_authorization_enrollment
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_remediation_required ?recovery_plan)
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (package_requires_enrollment_confirmation ?submission_package)
+        (not
+          (package_requires_section_confirmation ?submission_package)
+        )
+        (not
+          (plan_artifact_review_passed ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_authorization_present ?recovery_plan)
+      )
+  )
+  (:action complete_external_clearance_and_attach_authorization_section
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_remediation_required ?recovery_plan)
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (not
+          (package_requires_enrollment_confirmation ?submission_package)
+        )
+        (package_requires_section_confirmation ?submission_package)
+        (not
+          (plan_artifact_review_passed ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_authorization_present ?recovery_plan)
+      )
+  )
+  (:action complete_external_clearance_and_attach_authorization_both
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance ?evidence_artifact - evidence_artifact ?submission_package - submission_package)
+    :precondition
+      (and
+        (plan_remediation_required ?recovery_plan)
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (plan_has_evidence_artifact ?recovery_plan ?evidence_artifact)
+        (artifact_linked_to_package ?evidence_artifact ?submission_package)
+        (package_requires_enrollment_confirmation ?submission_package)
+        (package_requires_section_confirmation ?submission_package)
+        (not
+          (plan_artifact_review_passed ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_authorization_present ?recovery_plan)
+      )
+  )
+  (:action finalize_plan_without_authorization
+    :parameters (?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (not
+          (plan_authorization_present ?recovery_plan)
+        )
+        (not
+          (plan_finalization_token ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_token ?recovery_plan)
+        (verification_completed ?recovery_plan)
+      )
+  )
+  (:action attach_authorization_credential_to_plan
+    :parameters (?recovery_plan - recovery_plan ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_authorization_present ?recovery_plan)
+        (authorization_credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (plan_has_authorization_credential ?recovery_plan ?authorization_credential)
+        (not
+          (authorization_credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action record_plan_ready_for_finalization
+    :parameters (?recovery_plan - recovery_plan ?student_enrollment - student_enrollment ?section_enrollment - section_enrollment ?assessment_instance - assessment_slot ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_authorization_present ?recovery_plan)
+        (plan_has_authorization_credential ?recovery_plan ?authorization_credential)
+        (plan_linked_to_enrollment ?recovery_plan ?student_enrollment)
+        (plan_linked_to_section ?recovery_plan ?section_enrollment)
+        (enrollment_component_confirmed ?student_enrollment)
+        (section_component_confirmed ?section_enrollment)
+        (assessment_slot_reserved_for_case ?recovery_plan ?assessment_instance)
+        (not
+          (plan_ready_for_finalization ?recovery_plan)
+        )
+      )
+    :effect (plan_ready_for_finalization ?recovery_plan)
+  )
+  (:action finalize_plan
+    :parameters (?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (plan_artifact_review_passed ?recovery_plan)
+        (plan_ready_for_finalization ?recovery_plan)
+        (not
+          (plan_finalization_token ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_token ?recovery_plan)
+        (verification_completed ?recovery_plan)
+      )
+  )
+  (:action attach_endorsement_to_plan
+    :parameters (?recovery_plan - recovery_plan ?endorsement - endorsement ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (case_eligibility_confirmed ?recovery_plan)
+        (assessment_slot_reserved_for_case ?recovery_plan ?assessment_instance)
+        (endorsement_available ?endorsement)
+        (plan_has_endorsement ?recovery_plan ?endorsement)
+        (not
+          (endorsement_attached_to_plan ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (endorsement_attached_to_plan ?recovery_plan)
+        (not
+          (endorsement_available ?endorsement)
+        )
+      )
+  )
+  (:action record_advisor_signoff_for_endorsement
+    :parameters (?recovery_plan - recovery_plan ?advisor - advisor)
+    :precondition
+      (and
+        (endorsement_attached_to_plan ?recovery_plan)
+        (advisor_assigned_to_case ?recovery_plan ?advisor)
+        (not
+          (advisor_signoff_recorded ?recovery_plan)
+        )
+      )
+    :effect (advisor_signoff_recorded ?recovery_plan)
+  )
+  (:action record_external_clearance_for_endorsement
+    :parameters (?recovery_plan - recovery_plan ?external_clearance - external_clearance)
+    :precondition
+      (and
+        (advisor_signoff_recorded ?recovery_plan)
+        (plan_assigned_external_clearance ?recovery_plan ?external_clearance)
+        (not
+          (external_clearance_recorded ?recovery_plan)
+        )
+      )
+    :effect (external_clearance_recorded ?recovery_plan)
+  )
+  (:action finalize_endorsement_and_mark_verified
+    :parameters (?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (external_clearance_recorded ?recovery_plan)
+        (not
+          (plan_finalization_token ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalization_token ?recovery_plan)
+        (verification_completed ?recovery_plan)
+      )
+  )
+  (:action complete_enrollment_milestone
+    :parameters (?student_enrollment - student_enrollment ?submission_package - submission_package)
+    :precondition
+      (and
+        (enrollment_milestone_flag ?student_enrollment)
+        (enrollment_component_confirmed ?student_enrollment)
+        (submission_package_composed ?submission_package)
+        (submission_package_executed ?submission_package)
+        (not
+          (verification_completed ?student_enrollment)
+        )
+      )
+    :effect (verification_completed ?student_enrollment)
+  )
+  (:action complete_section_milestone
+    :parameters (?section_enrollment - section_enrollment ?submission_package - submission_package)
+    :precondition
+      (and
+        (section_milestone_flag ?section_enrollment)
+        (section_component_confirmed ?section_enrollment)
+        (submission_package_composed ?submission_package)
+        (submission_package_executed ?submission_package)
+        (not
+          (verification_completed ?section_enrollment)
+        )
+      )
+    :effect (verification_completed ?section_enrollment)
+  )
+  (:action authorize_academic_standing_update
+    :parameters (?learner_case - learner_case ?time_slot - time_slot ?assessment_instance - assessment_slot)
+    :precondition
+      (and
+        (verification_completed ?learner_case)
+        (assessment_slot_reserved_for_case ?learner_case ?assessment_instance)
+        (time_slot_available ?time_slot)
+        (not
+          (standing_update_authorized ?learner_case)
+        )
+      )
+    :effect
+      (and
+        (standing_update_authorized ?learner_case)
+        (case_scheduled_time_slot ?learner_case ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action apply_academic_standing_update_to_enrollment
+    :parameters (?student_enrollment - student_enrollment ?staff_resource - staff_resource ?time_slot - time_slot)
+    :precondition
+      (and
+        (standing_update_authorized ?student_enrollment)
+        (assigned_staff_for_case ?student_enrollment ?staff_resource)
+        (case_scheduled_time_slot ?student_enrollment ?time_slot)
+        (not
+          (recovery_finalized ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?student_enrollment)
+        (staff_resource_available ?staff_resource)
+        (time_slot_available ?time_slot)
+      )
+  )
+  (:action apply_academic_standing_update_to_section
+    :parameters (?section_enrollment - section_enrollment ?staff_resource - staff_resource ?time_slot - time_slot)
+    :precondition
+      (and
+        (standing_update_authorized ?section_enrollment)
+        (assigned_staff_for_case ?section_enrollment ?staff_resource)
+        (case_scheduled_time_slot ?section_enrollment ?time_slot)
+        (not
+          (recovery_finalized ?section_enrollment)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?section_enrollment)
+        (staff_resource_available ?staff_resource)
+        (time_slot_available ?time_slot)
+      )
+  )
+  (:action apply_academic_standing_update_to_plan
+    :parameters (?recovery_plan - recovery_plan ?staff_resource - staff_resource ?time_slot - time_slot)
+    :precondition
+      (and
+        (standing_update_authorized ?recovery_plan)
+        (assigned_staff_for_case ?recovery_plan ?staff_resource)
+        (case_scheduled_time_slot ?recovery_plan ?time_slot)
+        (not
+          (recovery_finalized ?recovery_plan)
+        )
+      )
+    :effect
+      (and
+        (recovery_finalized ?recovery_plan)
+        (staff_resource_available ?staff_resource)
+        (time_slot_available ?time_slot)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem academic_warning_recovery_plan_problem)
+  (:domain academic_warning_recovery_plan_domain)
+  (:objects student_enrollment_1 - student_enrollment section_enrollment_1 - section_enrollment recovery_plan_1 - recovery_plan recovery_plan_2 - recovery_plan staff_resource_tutor_a - staff_resource staff_resource_tutor_b - staff_resource staff_resource_coach_c - staff_resource assessment_slot_midterm - assessment_slot advisor_lead - advisor intervention_token_1 - intervention_token assessment_component_lab - assessment_component exam_session_final - exam_session submission_package_initial - submission_package evidence_artifact_assignment1 - evidence_artifact evidence_artifact_assignment2 - evidence_artifact policy_clause_concession - policy_clause policy_clause_exam_regulation - policy_clause authorization_credential_instructor - authorization_credential authorization_credential_department - authorization_credential time_slot_slot1 - time_slot remediation_activity_tutorial1 - remediation_activity endorsement_department_head - endorsement endorsement_program_director - endorsement external_clearance_proctoring - external_clearance)
+  (:init
+    (staff_resource_available staff_resource_tutor_a)
+    (staff_resource_available staff_resource_tutor_b)
+    (staff_resource_available staff_resource_coach_c)
+    (assessment_slot_available assessment_slot_midterm)
+    (advisor_available advisor_lead)
+    (intervention_token_available intervention_token_1)
+    (component_assigned_to_enrollment student_enrollment_1 assessment_component_lab)
+    (section_has_exam_session section_enrollment_1 exam_session_final)
+    (submission_package_available submission_package_initial)
+    (evidence_artifact_available evidence_artifact_assignment1)
+    (evidence_artifact_available evidence_artifact_assignment2)
+    (plan_linked_to_enrollment recovery_plan_1 student_enrollment_1)
+    (plan_linked_to_enrollment recovery_plan_2 student_enrollment_1)
+    (plan_linked_to_section recovery_plan_1 section_enrollment_1)
+    (plan_linked_to_section recovery_plan_2 section_enrollment_1)
+    (plan_linked_to_submission_package recovery_plan_1 submission_package_initial)
+    (plan_linked_to_submission_package recovery_plan_2 submission_package_initial)
+    (plan_has_evidence_artifact recovery_plan_1 evidence_artifact_assignment1)
+    (plan_has_evidence_artifact recovery_plan_2 evidence_artifact_assignment2)
+    (policy_clause_available policy_clause_concession)
+    (policy_clause_available policy_clause_exam_regulation)
+    (authorization_credential_available authorization_credential_instructor)
+    (authorization_credential_available authorization_credential_department)
+    (time_slot_available time_slot_slot1)
+    (remediation_activity_available remediation_activity_tutorial1)
+    (endorsement_available endorsement_department_head)
+    (plan_has_endorsement recovery_plan_1 endorsement_department_head)
+    (plan_has_endorsement recovery_plan_2 endorsement_program_director)
+    (external_clearance_available external_clearance_proctoring)
+  )
+  (:goal
+    (and
+      (recovery_finalized student_enrollment_1)
+      (recovery_finalized section_enrollment_1)
+      (recovery_finalized recovery_plan_1)
+      (recovery_finalized recovery_plan_2)
+    )
+  )
+)

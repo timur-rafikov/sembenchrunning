@@ -1,0 +1,1019 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain cross_border_transit_leg_planning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object cargo_category - object node_category - object planning_entity_root - object planning_entity - planning_entity_root transport_asset - resource_category time_slot - resource_category terminal_gate - resource_category routing_option - resource_category handling_profile - resource_category border_document - resource_category regulatory_certificate - resource_category inspection_manifest - resource_category cargo_unit - cargo_category container_asset - cargo_category transport_permit - cargo_category origin_transfer_point - node_category destination_transfer_point - node_category transit_leg_plan - node_category leg_category - planning_entity shipment_category - planning_entity origin_leg - leg_category destination_leg - leg_category shipment_order - shipment_category)
+  (:predicates
+    (planning_entity_initialized ?planning_entity - planning_entity)
+    (planning_entity_confirmed ?planning_entity - planning_entity)
+    (planning_entity_asset_reserved ?planning_entity - planning_entity)
+    (planning_entity_dispatched ?planning_entity - planning_entity)
+    (planning_entity_validated ?planning_entity - planning_entity)
+    (planning_entity_cleared ?planning_entity - planning_entity)
+    (transport_asset_available ?transport_asset - transport_asset)
+    (asset_assigned_to_entity ?planning_entity - planning_entity ?transport_asset - transport_asset)
+    (time_slot_available ?time_slot - time_slot)
+    (entity_assigned_time_slot ?planning_entity - planning_entity ?time_slot - time_slot)
+    (terminal_gate_available ?terminal_gate - terminal_gate)
+    (entity_assigned_gate ?planning_entity - planning_entity ?terminal_gate - terminal_gate)
+    (cargo_unit_available ?cargo_unit - cargo_unit)
+    (origin_leg_loaded_with_cargo ?origin_leg - origin_leg ?cargo_unit - cargo_unit)
+    (destination_leg_loaded_with_cargo ?destination_leg - destination_leg ?cargo_unit - cargo_unit)
+    (origin_leg_at_transfer_point ?origin_leg - origin_leg ?origin_transfer_point - origin_transfer_point)
+    (origin_transfer_point_reserved ?origin_transfer_point - origin_transfer_point)
+    (origin_transfer_point_staged ?origin_transfer_point - origin_transfer_point)
+    (origin_leg_ready_for_transit ?origin_leg - origin_leg)
+    (destination_leg_at_transfer_point ?destination_leg - destination_leg ?destination_transfer_point - destination_transfer_point)
+    (destination_transfer_point_reserved ?destination_transfer_point - destination_transfer_point)
+    (destination_transfer_point_staged ?destination_transfer_point - destination_transfer_point)
+    (destination_leg_ready_for_transit ?destination_leg - destination_leg)
+    (transit_leg_plan_available ?transit_leg_plan - transit_leg_plan)
+    (transit_leg_plan_committed ?transit_leg_plan - transit_leg_plan)
+    (transit_leg_plan_origin_point ?transit_leg_plan - transit_leg_plan ?origin_transfer_point - origin_transfer_point)
+    (transit_leg_plan_destination_point ?transit_leg_plan - transit_leg_plan ?destination_transfer_point - destination_transfer_point)
+    (transit_leg_plan_origin_staged ?transit_leg_plan - transit_leg_plan)
+    (transit_leg_plan_destination_staged ?transit_leg_plan - transit_leg_plan)
+    (transit_leg_plan_activated ?transit_leg_plan - transit_leg_plan)
+    (order_origin_leg ?shipment_order - shipment_order ?origin_leg - origin_leg)
+    (order_destination_leg ?shipment_order - shipment_order ?destination_leg - destination_leg)
+    (order_assigned_to_transit_leg ?shipment_order - shipment_order ?transit_leg_plan - transit_leg_plan)
+    (container_available ?container_asset - container_asset)
+    (order_has_container ?shipment_order - shipment_order ?container_asset - container_asset)
+    (container_committed_to_order ?container_asset - container_asset)
+    (container_assigned_to_transit_leg ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    (order_activated ?shipment_order - shipment_order)
+    (order_certificates_linked ?shipment_order - shipment_order)
+    (order_inspection_applied ?shipment_order - shipment_order)
+    (order_routing_selected ?shipment_order - shipment_order)
+    (order_routing_locked ?shipment_order - shipment_order)
+    (order_compliance_confirmed ?shipment_order - shipment_order)
+    (order_final_checks_passed ?shipment_order - shipment_order)
+    (transport_permit_available ?transport_permit - transport_permit)
+    (order_assigned_permit ?shipment_order - shipment_order ?transport_permit - transport_permit)
+    (order_permit_assigned ?shipment_order - shipment_order)
+    (order_permit_check_passed ?shipment_order - shipment_order)
+    (order_permit_validated ?shipment_order - shipment_order)
+    (routing_option_available ?routing_option - routing_option)
+    (order_assigned_routing_option ?shipment_order - shipment_order ?routing_option - routing_option)
+    (handling_profile_available ?handling_profile - handling_profile)
+    (order_assigned_handling_profile ?shipment_order - shipment_order ?handling_profile - handling_profile)
+    (regulatory_certificate_available ?regulatory_certificate - regulatory_certificate)
+    (order_has_certificate ?shipment_order - shipment_order ?regulatory_certificate - regulatory_certificate)
+    (inspection_manifest_available ?inspection_manifest - inspection_manifest)
+    (order_has_inspection_manifest ?shipment_order - shipment_order ?inspection_manifest - inspection_manifest)
+    (border_document_available ?border_document - border_document)
+    (planning_entity_has_border_document ?planning_entity - planning_entity ?border_document - border_document)
+    (origin_leg_loaded ?origin_leg - origin_leg)
+    (destination_leg_loaded ?destination_leg - destination_leg)
+    (order_finalized ?shipment_order - shipment_order)
+  )
+  (:action initialize_planning_entity
+    :parameters (?planning_entity - planning_entity)
+    :precondition
+      (and
+        (not
+          (planning_entity_initialized ?planning_entity)
+        )
+        (not
+          (planning_entity_dispatched ?planning_entity)
+        )
+      )
+    :effect (planning_entity_initialized ?planning_entity)
+  )
+  (:action assign_transport_asset_to_entity
+    :parameters (?planning_entity - planning_entity ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (planning_entity_initialized ?planning_entity)
+        (not
+          (planning_entity_asset_reserved ?planning_entity)
+        )
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (planning_entity_asset_reserved ?planning_entity)
+        (asset_assigned_to_entity ?planning_entity ?transport_asset)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action reserve_time_slot_for_entity
+    :parameters (?planning_entity - planning_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_initialized ?planning_entity)
+        (planning_entity_asset_reserved ?planning_entity)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (entity_assigned_time_slot ?planning_entity ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_entity_time_slot
+    :parameters (?planning_entity - planning_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_initialized ?planning_entity)
+        (planning_entity_asset_reserved ?planning_entity)
+        (entity_assigned_time_slot ?planning_entity ?time_slot)
+        (not
+          (planning_entity_confirmed ?planning_entity)
+        )
+      )
+    :effect (planning_entity_confirmed ?planning_entity)
+  )
+  (:action release_time_slot_from_entity
+    :parameters (?planning_entity - planning_entity ?time_slot - time_slot)
+    :precondition
+      (and
+        (entity_assigned_time_slot ?planning_entity ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (entity_assigned_time_slot ?planning_entity ?time_slot)
+        )
+      )
+  )
+  (:action assign_gate_to_entity
+    :parameters (?planning_entity - planning_entity ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (planning_entity_confirmed ?planning_entity)
+        (terminal_gate_available ?terminal_gate)
+      )
+    :effect
+      (and
+        (entity_assigned_gate ?planning_entity ?terminal_gate)
+        (not
+          (terminal_gate_available ?terminal_gate)
+        )
+      )
+  )
+  (:action release_gate_from_entity
+    :parameters (?planning_entity - planning_entity ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (entity_assigned_gate ?planning_entity ?terminal_gate)
+      )
+    :effect
+      (and
+        (terminal_gate_available ?terminal_gate)
+        (not
+          (entity_assigned_gate ?planning_entity ?terminal_gate)
+        )
+      )
+  )
+  (:action attach_regulatory_certificate_to_order
+    :parameters (?shipment_order - shipment_order ?regulatory_certificate - regulatory_certificate)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (regulatory_certificate_available ?regulatory_certificate)
+      )
+    :effect
+      (and
+        (order_has_certificate ?shipment_order ?regulatory_certificate)
+        (not
+          (regulatory_certificate_available ?regulatory_certificate)
+        )
+      )
+  )
+  (:action detach_regulatory_certificate_from_order
+    :parameters (?shipment_order - shipment_order ?regulatory_certificate - regulatory_certificate)
+    :precondition
+      (and
+        (order_has_certificate ?shipment_order ?regulatory_certificate)
+      )
+    :effect
+      (and
+        (regulatory_certificate_available ?regulatory_certificate)
+        (not
+          (order_has_certificate ?shipment_order ?regulatory_certificate)
+        )
+      )
+  )
+  (:action attach_inspection_manifest_to_order
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (inspection_manifest_available ?inspection_manifest)
+      )
+    :effect
+      (and
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (not
+          (inspection_manifest_available ?inspection_manifest)
+        )
+      )
+  )
+  (:action detach_inspection_manifest_from_order
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest)
+    :precondition
+      (and
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+      )
+    :effect
+      (and
+        (inspection_manifest_available ?inspection_manifest)
+        (not
+          (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        )
+      )
+  )
+  (:action prepare_origin_transfer_point_for_leg
+    :parameters (?origin_leg - origin_leg ?origin_transfer_point - origin_transfer_point ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_confirmed ?origin_leg)
+        (entity_assigned_time_slot ?origin_leg ?time_slot)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (not
+          (origin_transfer_point_reserved ?origin_transfer_point)
+        )
+        (not
+          (origin_transfer_point_staged ?origin_transfer_point)
+        )
+      )
+    :effect (origin_transfer_point_reserved ?origin_transfer_point)
+  )
+  (:action assign_gate_and_mark_origin_leg_loaded
+    :parameters (?origin_leg - origin_leg ?origin_transfer_point - origin_transfer_point ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (planning_entity_confirmed ?origin_leg)
+        (entity_assigned_gate ?origin_leg ?terminal_gate)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (origin_transfer_point_reserved ?origin_transfer_point)
+        (not
+          (origin_leg_loaded ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (origin_leg_ready_for_transit ?origin_leg)
+      )
+  )
+  (:action stage_cargo_on_origin_leg
+    :parameters (?origin_leg - origin_leg ?origin_transfer_point - origin_transfer_point ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (planning_entity_confirmed ?origin_leg)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_leg_loaded ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_transfer_point_staged ?origin_transfer_point)
+        (origin_leg_loaded ?origin_leg)
+        (origin_leg_loaded_with_cargo ?origin_leg ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action complete_origin_leg_cargo_transfer
+    :parameters (?origin_leg - origin_leg ?origin_transfer_point - origin_transfer_point ?time_slot - time_slot ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (planning_entity_confirmed ?origin_leg)
+        (entity_assigned_time_slot ?origin_leg ?time_slot)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (origin_transfer_point_staged ?origin_transfer_point)
+        (origin_leg_loaded_with_cargo ?origin_leg ?cargo_unit)
+        (not
+          (origin_leg_ready_for_transit ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_transfer_point_reserved ?origin_transfer_point)
+        (origin_leg_ready_for_transit ?origin_leg)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (origin_leg_loaded_with_cargo ?origin_leg ?cargo_unit)
+        )
+      )
+  )
+  (:action prepare_destination_transfer_point_for_leg
+    :parameters (?destination_leg - destination_leg ?destination_transfer_point - destination_transfer_point ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_confirmed ?destination_leg)
+        (entity_assigned_time_slot ?destination_leg ?time_slot)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (not
+          (destination_transfer_point_reserved ?destination_transfer_point)
+        )
+        (not
+          (destination_transfer_point_staged ?destination_transfer_point)
+        )
+      )
+    :effect (destination_transfer_point_reserved ?destination_transfer_point)
+  )
+  (:action assign_gate_and_mark_destination_leg_loaded
+    :parameters (?destination_leg - destination_leg ?destination_transfer_point - destination_transfer_point ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (planning_entity_confirmed ?destination_leg)
+        (entity_assigned_gate ?destination_leg ?terminal_gate)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (destination_transfer_point_reserved ?destination_transfer_point)
+        (not
+          (destination_leg_loaded ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_leg_loaded ?destination_leg)
+        (destination_leg_ready_for_transit ?destination_leg)
+      )
+  )
+  (:action stage_cargo_on_destination_leg
+    :parameters (?destination_leg - destination_leg ?destination_transfer_point - destination_transfer_point ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (planning_entity_confirmed ?destination_leg)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_leg_loaded ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_transfer_point_staged ?destination_transfer_point)
+        (destination_leg_loaded ?destination_leg)
+        (destination_leg_loaded_with_cargo ?destination_leg ?cargo_unit)
+        (not
+          (cargo_unit_available ?cargo_unit)
+        )
+      )
+  )
+  (:action complete_destination_leg_cargo_transfer
+    :parameters (?destination_leg - destination_leg ?destination_transfer_point - destination_transfer_point ?time_slot - time_slot ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (planning_entity_confirmed ?destination_leg)
+        (entity_assigned_time_slot ?destination_leg ?time_slot)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (destination_transfer_point_staged ?destination_transfer_point)
+        (destination_leg_loaded_with_cargo ?destination_leg ?cargo_unit)
+        (not
+          (destination_leg_ready_for_transit ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (destination_transfer_point_reserved ?destination_transfer_point)
+        (destination_leg_ready_for_transit ?destination_leg)
+        (cargo_unit_available ?cargo_unit)
+        (not
+          (destination_leg_loaded_with_cargo ?destination_leg ?cargo_unit)
+        )
+      )
+  )
+  (:action assemble_transit_leg_plan
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_transfer_point - origin_transfer_point ?destination_transfer_point - destination_transfer_point ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (destination_leg_loaded ?destination_leg)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (origin_transfer_point_reserved ?origin_transfer_point)
+        (destination_transfer_point_reserved ?destination_transfer_point)
+        (origin_leg_ready_for_transit ?origin_leg)
+        (destination_leg_ready_for_transit ?destination_leg)
+        (transit_leg_plan_available ?transit_leg_plan)
+      )
+    :effect
+      (and
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_origin_point ?transit_leg_plan ?origin_transfer_point)
+        (transit_leg_plan_destination_point ?transit_leg_plan ?destination_transfer_point)
+        (not
+          (transit_leg_plan_available ?transit_leg_plan)
+        )
+      )
+  )
+  (:action assemble_transit_leg_plan_origin_staged
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_transfer_point - origin_transfer_point ?destination_transfer_point - destination_transfer_point ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (destination_leg_loaded ?destination_leg)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (origin_transfer_point_staged ?origin_transfer_point)
+        (destination_transfer_point_reserved ?destination_transfer_point)
+        (not
+          (origin_leg_ready_for_transit ?origin_leg)
+        )
+        (destination_leg_ready_for_transit ?destination_leg)
+        (transit_leg_plan_available ?transit_leg_plan)
+      )
+    :effect
+      (and
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_origin_point ?transit_leg_plan ?origin_transfer_point)
+        (transit_leg_plan_destination_point ?transit_leg_plan ?destination_transfer_point)
+        (transit_leg_plan_origin_staged ?transit_leg_plan)
+        (not
+          (transit_leg_plan_available ?transit_leg_plan)
+        )
+      )
+  )
+  (:action assemble_transit_leg_plan_destination_staged
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_transfer_point - origin_transfer_point ?destination_transfer_point - destination_transfer_point ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (destination_leg_loaded ?destination_leg)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (origin_transfer_point_reserved ?origin_transfer_point)
+        (destination_transfer_point_staged ?destination_transfer_point)
+        (origin_leg_ready_for_transit ?origin_leg)
+        (not
+          (destination_leg_ready_for_transit ?destination_leg)
+        )
+        (transit_leg_plan_available ?transit_leg_plan)
+      )
+    :effect
+      (and
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_origin_point ?transit_leg_plan ?origin_transfer_point)
+        (transit_leg_plan_destination_point ?transit_leg_plan ?destination_transfer_point)
+        (transit_leg_plan_destination_staged ?transit_leg_plan)
+        (not
+          (transit_leg_plan_available ?transit_leg_plan)
+        )
+      )
+  )
+  (:action assemble_transit_leg_plan_both_staged
+    :parameters (?origin_leg - origin_leg ?destination_leg - destination_leg ?origin_transfer_point - origin_transfer_point ?destination_transfer_point - destination_transfer_point ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (destination_leg_loaded ?destination_leg)
+        (origin_leg_at_transfer_point ?origin_leg ?origin_transfer_point)
+        (destination_leg_at_transfer_point ?destination_leg ?destination_transfer_point)
+        (origin_transfer_point_staged ?origin_transfer_point)
+        (destination_transfer_point_staged ?destination_transfer_point)
+        (not
+          (origin_leg_ready_for_transit ?origin_leg)
+        )
+        (not
+          (destination_leg_ready_for_transit ?destination_leg)
+        )
+        (transit_leg_plan_available ?transit_leg_plan)
+      )
+    :effect
+      (and
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_origin_point ?transit_leg_plan ?origin_transfer_point)
+        (transit_leg_plan_destination_point ?transit_leg_plan ?destination_transfer_point)
+        (transit_leg_plan_origin_staged ?transit_leg_plan)
+        (transit_leg_plan_destination_staged ?transit_leg_plan)
+        (not
+          (transit_leg_plan_available ?transit_leg_plan)
+        )
+      )
+  )
+  (:action activate_transit_leg_plan
+    :parameters (?transit_leg_plan - transit_leg_plan ?origin_leg - origin_leg ?time_slot - time_slot)
+    :precondition
+      (and
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (origin_leg_loaded ?origin_leg)
+        (entity_assigned_time_slot ?origin_leg ?time_slot)
+        (not
+          (transit_leg_plan_activated ?transit_leg_plan)
+        )
+      )
+    :effect (transit_leg_plan_activated ?transit_leg_plan)
+  )
+  (:action attach_container_to_transit_leg_for_order
+    :parameters (?shipment_order - shipment_order ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (order_assigned_to_transit_leg ?shipment_order ?transit_leg_plan)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_available ?container_asset)
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_activated ?transit_leg_plan)
+        (not
+          (container_committed_to_order ?container_asset)
+        )
+      )
+    :effect
+      (and
+        (container_committed_to_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (not
+          (container_available ?container_asset)
+        )
+      )
+  )
+  (:action finalize_order_activation_for_transit
+    :parameters (?shipment_order - shipment_order ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_committed_to_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (entity_assigned_time_slot ?shipment_order ?time_slot)
+        (not
+          (transit_leg_plan_origin_staged ?transit_leg_plan)
+        )
+        (not
+          (order_activated ?shipment_order)
+        )
+      )
+    :effect (order_activated ?shipment_order)
+  )
+  (:action assign_routing_option_to_order
+    :parameters (?shipment_order - shipment_order ?routing_option - routing_option)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (routing_option_available ?routing_option)
+        (not
+          (order_routing_selected ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_routing_selected ?shipment_order)
+        (order_assigned_routing_option ?shipment_order ?routing_option)
+        (not
+          (routing_option_available ?routing_option)
+        )
+      )
+  )
+  (:action lock_routing_option_and_prepare_order
+    :parameters (?shipment_order - shipment_order ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan ?time_slot - time_slot ?routing_option - routing_option)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_committed_to_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (entity_assigned_time_slot ?shipment_order ?time_slot)
+        (transit_leg_plan_origin_staged ?transit_leg_plan)
+        (order_routing_selected ?shipment_order)
+        (order_assigned_routing_option ?shipment_order ?routing_option)
+        (not
+          (order_activated ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_activated ?shipment_order)
+        (order_routing_locked ?shipment_order)
+      )
+  )
+  (:action link_order_certificate_for_validation
+    :parameters (?shipment_order - shipment_order ?regulatory_certificate - regulatory_certificate ?terminal_gate - terminal_gate ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_activated ?shipment_order)
+        (order_has_certificate ?shipment_order ?regulatory_certificate)
+        (entity_assigned_gate ?shipment_order ?terminal_gate)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (not
+          (transit_leg_plan_destination_staged ?transit_leg_plan)
+        )
+        (not
+          (order_certificates_linked ?shipment_order)
+        )
+      )
+    :effect (order_certificates_linked ?shipment_order)
+  )
+  (:action link_order_certificate_variant
+    :parameters (?shipment_order - shipment_order ?regulatory_certificate - regulatory_certificate ?terminal_gate - terminal_gate ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_activated ?shipment_order)
+        (order_has_certificate ?shipment_order ?regulatory_certificate)
+        (entity_assigned_gate ?shipment_order ?terminal_gate)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (transit_leg_plan_destination_staged ?transit_leg_plan)
+        (not
+          (order_certificates_linked ?shipment_order)
+        )
+      )
+    :effect (order_certificates_linked ?shipment_order)
+  )
+  (:action apply_inspection_manifest_basic
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_certificates_linked ?shipment_order)
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (not
+          (transit_leg_plan_origin_staged ?transit_leg_plan)
+        )
+        (not
+          (transit_leg_plan_destination_staged ?transit_leg_plan)
+        )
+        (not
+          (order_inspection_applied ?shipment_order)
+        )
+      )
+    :effect (order_inspection_applied ?shipment_order)
+  )
+  (:action apply_inspection_manifest_and_confirm_compliance_origin
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_certificates_linked ?shipment_order)
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (transit_leg_plan_origin_staged ?transit_leg_plan)
+        (not
+          (transit_leg_plan_destination_staged ?transit_leg_plan)
+        )
+        (not
+          (order_inspection_applied ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_compliance_confirmed ?shipment_order)
+      )
+  )
+  (:action apply_inspection_manifest_and_confirm_compliance_destination
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_certificates_linked ?shipment_order)
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (not
+          (transit_leg_plan_origin_staged ?transit_leg_plan)
+        )
+        (transit_leg_plan_destination_staged ?transit_leg_plan)
+        (not
+          (order_inspection_applied ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_compliance_confirmed ?shipment_order)
+      )
+  )
+  (:action apply_inspection_manifest_and_confirm_compliance_both
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest ?container_asset - container_asset ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (order_certificates_linked ?shipment_order)
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (order_has_container ?shipment_order ?container_asset)
+        (container_assigned_to_transit_leg ?container_asset ?transit_leg_plan)
+        (transit_leg_plan_origin_staged ?transit_leg_plan)
+        (transit_leg_plan_destination_staged ?transit_leg_plan)
+        (not
+          (order_inspection_applied ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_compliance_confirmed ?shipment_order)
+      )
+  )
+  (:action mark_order_validated
+    :parameters (?shipment_order - shipment_order)
+    :precondition
+      (and
+        (order_inspection_applied ?shipment_order)
+        (not
+          (order_compliance_confirmed ?shipment_order)
+        )
+        (not
+          (order_finalized ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?shipment_order)
+        (planning_entity_validated ?shipment_order)
+      )
+  )
+  (:action assign_handling_profile_to_order
+    :parameters (?shipment_order - shipment_order ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_compliance_confirmed ?shipment_order)
+        (handling_profile_available ?handling_profile)
+      )
+    :effect
+      (and
+        (order_assigned_handling_profile ?shipment_order ?handling_profile)
+        (not
+          (handling_profile_available ?handling_profile)
+        )
+      )
+  )
+  (:action perform_order_final_checks
+    :parameters (?shipment_order - shipment_order ?origin_leg - origin_leg ?destination_leg - destination_leg ?time_slot - time_slot ?handling_profile - handling_profile)
+    :precondition
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_compliance_confirmed ?shipment_order)
+        (order_assigned_handling_profile ?shipment_order ?handling_profile)
+        (order_origin_leg ?shipment_order ?origin_leg)
+        (order_destination_leg ?shipment_order ?destination_leg)
+        (origin_leg_ready_for_transit ?origin_leg)
+        (destination_leg_ready_for_transit ?destination_leg)
+        (entity_assigned_time_slot ?shipment_order ?time_slot)
+        (not
+          (order_final_checks_passed ?shipment_order)
+        )
+      )
+    :effect (order_final_checks_passed ?shipment_order)
+  )
+  (:action accept_order_and_mark_entity_validated
+    :parameters (?shipment_order - shipment_order)
+    :precondition
+      (and
+        (order_inspection_applied ?shipment_order)
+        (order_final_checks_passed ?shipment_order)
+        (not
+          (order_finalized ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?shipment_order)
+        (planning_entity_validated ?shipment_order)
+      )
+  )
+  (:action assign_transport_permit_to_order
+    :parameters (?shipment_order - shipment_order ?transport_permit - transport_permit ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_confirmed ?shipment_order)
+        (entity_assigned_time_slot ?shipment_order ?time_slot)
+        (transport_permit_available ?transport_permit)
+        (order_assigned_permit ?shipment_order ?transport_permit)
+        (not
+          (order_permit_assigned ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_permit_assigned ?shipment_order)
+        (not
+          (transport_permit_available ?transport_permit)
+        )
+      )
+  )
+  (:action validate_order_permit_at_gate
+    :parameters (?shipment_order - shipment_order ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (order_permit_assigned ?shipment_order)
+        (entity_assigned_gate ?shipment_order ?terminal_gate)
+        (not
+          (order_permit_check_passed ?shipment_order)
+        )
+      )
+    :effect (order_permit_check_passed ?shipment_order)
+  )
+  (:action finalize_permit_validation_with_inspection
+    :parameters (?shipment_order - shipment_order ?inspection_manifest - inspection_manifest)
+    :precondition
+      (and
+        (order_permit_check_passed ?shipment_order)
+        (order_has_inspection_manifest ?shipment_order ?inspection_manifest)
+        (not
+          (order_permit_validated ?shipment_order)
+        )
+      )
+    :effect (order_permit_validated ?shipment_order)
+  )
+  (:action complete_permit_validation_and_validate_order
+    :parameters (?shipment_order - shipment_order)
+    :precondition
+      (and
+        (order_permit_validated ?shipment_order)
+        (not
+          (order_finalized ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (order_finalized ?shipment_order)
+        (planning_entity_validated ?shipment_order)
+      )
+  )
+  (:action mark_origin_leg_validated
+    :parameters (?origin_leg - origin_leg ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (origin_leg_loaded ?origin_leg)
+        (origin_leg_ready_for_transit ?origin_leg)
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_activated ?transit_leg_plan)
+        (not
+          (planning_entity_validated ?origin_leg)
+        )
+      )
+    :effect (planning_entity_validated ?origin_leg)
+  )
+  (:action mark_destination_leg_validated
+    :parameters (?destination_leg - destination_leg ?transit_leg_plan - transit_leg_plan)
+    :precondition
+      (and
+        (destination_leg_loaded ?destination_leg)
+        (destination_leg_ready_for_transit ?destination_leg)
+        (transit_leg_plan_committed ?transit_leg_plan)
+        (transit_leg_plan_activated ?transit_leg_plan)
+        (not
+          (planning_entity_validated ?destination_leg)
+        )
+      )
+    :effect (planning_entity_validated ?destination_leg)
+  )
+  (:action attach_border_document_to_entity
+    :parameters (?planning_entity - planning_entity ?border_document - border_document ?time_slot - time_slot)
+    :precondition
+      (and
+        (planning_entity_validated ?planning_entity)
+        (entity_assigned_time_slot ?planning_entity ?time_slot)
+        (border_document_available ?border_document)
+        (not
+          (planning_entity_cleared ?planning_entity)
+        )
+      )
+    :effect
+      (and
+        (planning_entity_cleared ?planning_entity)
+        (planning_entity_has_border_document ?planning_entity ?border_document)
+        (not
+          (border_document_available ?border_document)
+        )
+      )
+  )
+  (:action dispatch_origin_leg_and_release_asset
+    :parameters (?origin_leg - origin_leg ?transport_asset - transport_asset ?border_document - border_document)
+    :precondition
+      (and
+        (planning_entity_cleared ?origin_leg)
+        (asset_assigned_to_entity ?origin_leg ?transport_asset)
+        (planning_entity_has_border_document ?origin_leg ?border_document)
+        (not
+          (planning_entity_dispatched ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (planning_entity_dispatched ?origin_leg)
+        (transport_asset_available ?transport_asset)
+        (border_document_available ?border_document)
+      )
+  )
+  (:action dispatch_destination_leg_and_release_asset
+    :parameters (?destination_leg - destination_leg ?transport_asset - transport_asset ?border_document - border_document)
+    :precondition
+      (and
+        (planning_entity_cleared ?destination_leg)
+        (asset_assigned_to_entity ?destination_leg ?transport_asset)
+        (planning_entity_has_border_document ?destination_leg ?border_document)
+        (not
+          (planning_entity_dispatched ?destination_leg)
+        )
+      )
+    :effect
+      (and
+        (planning_entity_dispatched ?destination_leg)
+        (transport_asset_available ?transport_asset)
+        (border_document_available ?border_document)
+      )
+  )
+  (:action dispatch_shipment_order_and_release_asset
+    :parameters (?shipment_order - shipment_order ?transport_asset - transport_asset ?border_document - border_document)
+    :precondition
+      (and
+        (planning_entity_cleared ?shipment_order)
+        (asset_assigned_to_entity ?shipment_order ?transport_asset)
+        (planning_entity_has_border_document ?shipment_order ?border_document)
+        (not
+          (planning_entity_dispatched ?shipment_order)
+        )
+      )
+    :effect
+      (and
+        (planning_entity_dispatched ?shipment_order)
+        (transport_asset_available ?transport_asset)
+        (border_document_available ?border_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem cross_border_transit_leg_planning_problem)
+  (:domain cross_border_transit_leg_planning_domain)
+  (:objects origin_leg_hub_a - origin_leg destination_leg_hub_b - destination_leg shipment_order_1 - shipment_order shipment_order_2 - shipment_order transport_asset_truck_1 - transport_asset transport_asset_truck_2 - transport_asset transport_asset_trailer_1 - transport_asset time_slot_morning_1 - time_slot terminal_gate_alpha - terminal_gate cargo_unit_pallet_1 - cargo_unit origin_transfer_point_yard_1 - origin_transfer_point destination_transfer_point_yard_1 - destination_transfer_point transit_leg_plan_1 - transit_leg_plan container_asset_20ft_1 - container_asset container_asset_40ft_1 - container_asset routing_option_fastest - routing_option routing_option_cost_efficient - routing_option handling_profile_hazardous - handling_profile handling_profile_standard - handling_profile border_document_declaration_1 - border_document regulatory_certificate_insurance_1 - regulatory_certificate transport_permit_export_1 - transport_permit transport_permit_import_1 - transport_permit inspection_manifest_1 - inspection_manifest)
+  (:init
+    (transport_asset_available transport_asset_truck_1)
+    (transport_asset_available transport_asset_truck_2)
+    (transport_asset_available transport_asset_trailer_1)
+    (time_slot_available time_slot_morning_1)
+    (terminal_gate_available terminal_gate_alpha)
+    (cargo_unit_available cargo_unit_pallet_1)
+    (origin_leg_at_transfer_point origin_leg_hub_a origin_transfer_point_yard_1)
+    (destination_leg_at_transfer_point destination_leg_hub_b destination_transfer_point_yard_1)
+    (transit_leg_plan_available transit_leg_plan_1)
+    (container_available container_asset_20ft_1)
+    (container_available container_asset_40ft_1)
+    (order_origin_leg shipment_order_1 origin_leg_hub_a)
+    (order_origin_leg shipment_order_2 origin_leg_hub_a)
+    (order_destination_leg shipment_order_1 destination_leg_hub_b)
+    (order_destination_leg shipment_order_2 destination_leg_hub_b)
+    (order_assigned_to_transit_leg shipment_order_1 transit_leg_plan_1)
+    (order_assigned_to_transit_leg shipment_order_2 transit_leg_plan_1)
+    (order_has_container shipment_order_1 container_asset_20ft_1)
+    (order_has_container shipment_order_2 container_asset_40ft_1)
+    (routing_option_available routing_option_fastest)
+    (routing_option_available routing_option_cost_efficient)
+    (handling_profile_available handling_profile_hazardous)
+    (handling_profile_available handling_profile_standard)
+    (border_document_available border_document_declaration_1)
+    (regulatory_certificate_available regulatory_certificate_insurance_1)
+    (transport_permit_available transport_permit_export_1)
+    (order_assigned_permit shipment_order_1 transport_permit_export_1)
+    (order_assigned_permit shipment_order_2 transport_permit_import_1)
+    (inspection_manifest_available inspection_manifest_1)
+  )
+  (:goal
+    (and
+      (planning_entity_dispatched origin_leg_hub_a)
+      (planning_entity_dispatched destination_leg_hub_b)
+      (planning_entity_dispatched shipment_order_1)
+      (planning_entity_dispatched shipment_order_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_planning_entity origin_leg_hub_a)
+(assign_transport_asset_to_entity origin_leg_hub_a transport_asset_truck_1)
+(reserve_time_slot_for_entity origin_leg_hub_a time_slot_morning_1)
+(confirm_entity_time_slot origin_leg_hub_a time_slot_morning_1)
+(assign_gate_to_entity origin_leg_hub_a terminal_gate_alpha)
+(prepare_origin_transfer_point_for_leg origin_leg_hub_a origin_transfer_point_yard_1 time_slot_morning_1)
+(assign_gate_and_mark_origin_leg_loaded origin_leg_hub_a origin_transfer_point_yard_1 terminal_gate_alpha)
+(release_gate_from_entity origin_leg_hub_a terminal_gate_alpha)
+(release_time_slot_from_entity origin_leg_hub_a time_slot_morning_1)
+(initialize_planning_entity destination_leg_hub_b)
+(assign_transport_asset_to_entity destination_leg_hub_b transport_asset_truck_2)
+(reserve_time_slot_for_entity destination_leg_hub_b time_slot_morning_1)
+(confirm_entity_time_slot destination_leg_hub_b time_slot_morning_1)
+(assign_gate_to_entity destination_leg_hub_b terminal_gate_alpha)
+(prepare_destination_transfer_point_for_leg destination_leg_hub_b destination_transfer_point_yard_1 time_slot_morning_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_96_ai9t7/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_96_ai9t7/plan.pddl 
+
+
+--- stderr ---
+

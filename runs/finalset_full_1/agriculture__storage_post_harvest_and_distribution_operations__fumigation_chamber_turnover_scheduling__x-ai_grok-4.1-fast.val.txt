@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain fumigation_chamber_turnover_scheduling_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object physical_asset_group - generic_entity process_resource_group - generic_entity logistic_resource_group - generic_entity case_root - generic_entity workflow_item - case_root schedule_slot - physical_asset_group quality_test - physical_asset_group technician - physical_asset_group compliance_certificate - physical_asset_group carrier - physical_asset_group release_window - physical_asset_group fumigant_supply - physical_asset_group monitoring_instrument - physical_asset_group pallet - process_resource_group inspection_record - process_resource_group safety_protocol - process_resource_group treatment_profile - logistic_resource_group receiving_profile - logistic_resource_group container_unit - logistic_resource_group batch_category - workflow_item facility_category - workflow_item inbound_batch - batch_category outbound_batch - batch_category fumigation_chamber - facility_category)
+
+  (:predicates
+    (intake_registered ?batch - workflow_item)
+    (quality_approved ?batch - workflow_item)
+    (scheduled_for_fumigation ?batch - workflow_item)
+    (turnover_complete ?batch - workflow_item)
+    (ready_for_release ?workflow_item - workflow_item)
+    (release_scheduled ?workflow_item - workflow_item)
+    (slot_available ?schedule_slot - schedule_slot)
+    (assigned_slot ?batch - workflow_item ?schedule_slot - schedule_slot)
+    (quality_test_available ?quality_test - quality_test)
+    (tested_with ?batch - workflow_item ?quality_test - quality_test)
+    (technician_available ?technician - technician)
+    (technician_assigned ?batch - workflow_item ?technician - technician)
+    (pallet_available ?pallet - pallet)
+    (pallet_staged_for_batch ?inbound_batch - inbound_batch ?pallet - pallet)
+    (pallet_staged_for_outbound ?outbound_batch - outbound_batch ?pallet - pallet)
+    (assigned_treatment_profile ?inbound_batch - inbound_batch ?treatment_profile - treatment_profile)
+    (profile_reserved ?treatment_profile - treatment_profile)
+    (profile_pallets_staged ?treatment_profile - treatment_profile)
+    (batch_ready_for_treatment ?inbound_batch - inbound_batch)
+    (assigned_receiving_profile ?outbound_batch - outbound_batch ?receiving_profile - receiving_profile)
+    (receiving_profile_reserved ?receiving_profile - receiving_profile)
+    (receiving_profile_pallets_staged ?receiving_profile - receiving_profile)
+    (outbound_batch_ready ?outbound_batch - outbound_batch)
+    (container_available ?container_unit - container_unit)
+    (container_allocated ?container_unit - container_unit)
+    (container_assigned_to_treatment_profile ?container_unit - container_unit ?treatment_profile - treatment_profile)
+    (container_assigned_to_receiving_profile ?container_unit - container_unit ?receiving_profile - receiving_profile)
+    (container_loading_check_a ?container_unit - container_unit)
+    (container_loading_check_b ?container_unit - container_unit)
+    (container_loading_verified ?container_unit - container_unit)
+    (chamber_compatible_with_batch ?chamber - fumigation_chamber ?inbound_batch - inbound_batch)
+    (chamber_compatible_with_outbound_batch ?chamber - fumigation_chamber ?outbound_batch - outbound_batch)
+    (chamber_compatible_with_container_unit ?chamber - fumigation_chamber ?container_unit - container_unit)
+    (inspection_record_available ?inspection_record - inspection_record)
+    (chamber_has_inspection_record ?chamber - fumigation_chamber ?inspection_record - inspection_record)
+    (inspection_record_attached ?inspection_record - inspection_record)
+    (inspection_record_linked_to_container ?inspection_record - inspection_record ?container_unit - container_unit)
+    (chamber_preparation_verified ?chamber - fumigation_chamber)
+    (fumigant_deployed ?chamber - fumigation_chamber)
+    (treatment_monitoring_configured ?chamber - fumigation_chamber)
+    (certificate_attached ?chamber - fumigation_chamber)
+    (chamber_certification_flag ?chamber - fumigation_chamber)
+    (monitoring_compliance_confirmed ?chamber - fumigation_chamber)
+    (consolidation_finalized ?chamber - fumigation_chamber)
+    (safety_protocol_available ?safety_protocol - safety_protocol)
+    (chamber_has_safety_protocol ?chamber - fumigation_chamber ?safety_protocol - safety_protocol)
+    (chamber_safety_protocol_applied ?chamber - fumigation_chamber)
+    (safety_checks_completed ?chamber - fumigation_chamber)
+    (safety_confirmation_recorded ?chamber - fumigation_chamber)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (chamber_has_compliance_certificate ?chamber - fumigation_chamber ?compliance_certificate - compliance_certificate)
+    (carrier_available ?carrier - carrier)
+    (chamber_assigned_carrier ?chamber - fumigation_chamber ?carrier - carrier)
+    (fumigant_supply_available ?fumigant_supply - fumigant_supply)
+    (fumigant_assigned_to_chamber ?chamber - fumigation_chamber ?fumigant_supply - fumigant_supply)
+    (monitoring_instrument_available ?monitoring_instrument - monitoring_instrument)
+    (monitoring_instrument_assigned ?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument)
+    (release_window_available ?release_window - release_window)
+    (assigned_release_window ?batch - workflow_item ?release_window - release_window)
+    (batch_staged ?inbound_batch - inbound_batch)
+    (outbound_batch_staged ?outbound_batch - outbound_batch)
+    (finalized ?chamber - fumigation_chamber)
+  )
+  (:action receive_and_register_batch
+    :parameters (?batch - workflow_item)
+    :precondition
+      (and
+        (not
+          (intake_registered ?batch)
+        )
+        (not
+          (turnover_complete ?batch)
+        )
+      )
+    :effect (intake_registered ?batch)
+  )
+  (:action reserve_schedule_slot_for_batch
+    :parameters (?batch - workflow_item ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (intake_registered ?batch)
+        (not
+          (scheduled_for_fumigation ?batch)
+        )
+        (slot_available ?schedule_slot)
+      )
+    :effect
+      (and
+        (scheduled_for_fumigation ?batch)
+        (assigned_slot ?batch ?schedule_slot)
+        (not
+          (slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action conduct_quality_test
+    :parameters (?batch - workflow_item ?quality_test - quality_test)
+    :precondition
+      (and
+        (intake_registered ?batch)
+        (scheduled_for_fumigation ?batch)
+        (quality_test_available ?quality_test)
+      )
+    :effect
+      (and
+        (tested_with ?batch ?quality_test)
+        (not
+          (quality_test_available ?quality_test)
+        )
+      )
+  )
+  (:action record_quality_clearance
+    :parameters (?batch - workflow_item ?quality_test - quality_test)
+    :precondition
+      (and
+        (intake_registered ?batch)
+        (scheduled_for_fumigation ?batch)
+        (tested_with ?batch ?quality_test)
+        (not
+          (quality_approved ?batch)
+        )
+      )
+    :effect (quality_approved ?batch)
+  )
+  (:action release_quality_test_device
+    :parameters (?batch - workflow_item ?quality_test - quality_test)
+    :precondition
+      (and
+        (tested_with ?batch ?quality_test)
+      )
+    :effect
+      (and
+        (quality_test_available ?quality_test)
+        (not
+          (tested_with ?batch ?quality_test)
+        )
+      )
+  )
+  (:action assign_technician_to_batch
+    :parameters (?batch - workflow_item ?technician - technician)
+    :precondition
+      (and
+        (quality_approved ?batch)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (technician_assigned ?batch ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action unassign_technician_from_batch
+    :parameters (?batch - workflow_item ?technician - technician)
+    :precondition
+      (and
+        (technician_assigned ?batch ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (technician_assigned ?batch ?technician)
+        )
+      )
+  )
+  (:action allocate_fumigant_supply_to_chamber
+    :parameters (?chamber - fumigation_chamber ?fumigant_supply - fumigant_supply)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (fumigant_supply_available ?fumigant_supply)
+      )
+    :effect
+      (and
+        (fumigant_assigned_to_chamber ?chamber ?fumigant_supply)
+        (not
+          (fumigant_supply_available ?fumigant_supply)
+        )
+      )
+  )
+  (:action release_fumigant_supply_from_chamber
+    :parameters (?chamber - fumigation_chamber ?fumigant_supply - fumigant_supply)
+    :precondition
+      (and
+        (fumigant_assigned_to_chamber ?chamber ?fumigant_supply)
+      )
+    :effect
+      (and
+        (fumigant_supply_available ?fumigant_supply)
+        (not
+          (fumigant_assigned_to_chamber ?chamber ?fumigant_supply)
+        )
+      )
+  )
+  (:action assign_monitoring_instrument_to_chamber
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (monitoring_instrument_available ?monitoring_instrument)
+      )
+    :effect
+      (and
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (not
+          (monitoring_instrument_available ?monitoring_instrument)
+        )
+      )
+  )
+  (:action unassign_monitoring_instrument_from_chamber
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument)
+    :precondition
+      (and
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+      )
+    :effect
+      (and
+        (monitoring_instrument_available ?monitoring_instrument)
+        (not
+          (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        )
+      )
+  )
+  (:action reserve_treatment_profile_for_batch
+    :parameters (?inbound_batch - inbound_batch ?treatment_profile - treatment_profile ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_approved ?inbound_batch)
+        (tested_with ?inbound_batch ?quality_test)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (not
+          (profile_reserved ?treatment_profile)
+        )
+        (not
+          (profile_pallets_staged ?treatment_profile)
+        )
+      )
+    :effect (profile_reserved ?treatment_profile)
+  )
+  (:action prepare_chamber_with_technician
+    :parameters (?inbound_batch - inbound_batch ?treatment_profile - treatment_profile ?technician - technician)
+    :precondition
+      (and
+        (quality_approved ?inbound_batch)
+        (technician_assigned ?inbound_batch ?technician)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (profile_reserved ?treatment_profile)
+        (not
+          (batch_staged ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_staged ?inbound_batch)
+        (batch_ready_for_treatment ?inbound_batch)
+      )
+  )
+  (:action stage_pallet_for_batch
+    :parameters (?inbound_batch - inbound_batch ?treatment_profile - treatment_profile ?pallet - pallet)
+    :precondition
+      (and
+        (quality_approved ?inbound_batch)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (pallet_available ?pallet)
+        (not
+          (batch_staged ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (profile_pallets_staged ?treatment_profile)
+        (batch_staged ?inbound_batch)
+        (pallet_staged_for_batch ?inbound_batch ?pallet)
+        (not
+          (pallet_available ?pallet)
+        )
+      )
+  )
+  (:action finalize_pallet_staging_for_batch
+    :parameters (?inbound_batch - inbound_batch ?treatment_profile - treatment_profile ?quality_test - quality_test ?pallet - pallet)
+    :precondition
+      (and
+        (quality_approved ?inbound_batch)
+        (tested_with ?inbound_batch ?quality_test)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (profile_pallets_staged ?treatment_profile)
+        (pallet_staged_for_batch ?inbound_batch ?pallet)
+        (not
+          (batch_ready_for_treatment ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (profile_reserved ?treatment_profile)
+        (batch_ready_for_treatment ?inbound_batch)
+        (pallet_available ?pallet)
+        (not
+          (pallet_staged_for_batch ?inbound_batch ?pallet)
+        )
+      )
+  )
+  (:action reserve_receiving_profile_for_outbound_batch
+    :parameters (?outbound_batch - outbound_batch ?receiving_profile - receiving_profile ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_approved ?outbound_batch)
+        (tested_with ?outbound_batch ?quality_test)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (not
+          (receiving_profile_reserved ?receiving_profile)
+        )
+        (not
+          (receiving_profile_pallets_staged ?receiving_profile)
+        )
+      )
+    :effect (receiving_profile_reserved ?receiving_profile)
+  )
+  (:action assign_technician_to_outbound_batch
+    :parameters (?outbound_batch - outbound_batch ?receiving_profile - receiving_profile ?technician - technician)
+    :precondition
+      (and
+        (quality_approved ?outbound_batch)
+        (technician_assigned ?outbound_batch ?technician)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (receiving_profile_reserved ?receiving_profile)
+        (not
+          (outbound_batch_staged ?outbound_batch)
+        )
+      )
+    :effect
+      (and
+        (outbound_batch_staged ?outbound_batch)
+        (outbound_batch_ready ?outbound_batch)
+      )
+  )
+  (:action stage_pallet_for_outbound_batch
+    :parameters (?outbound_batch - outbound_batch ?receiving_profile - receiving_profile ?pallet - pallet)
+    :precondition
+      (and
+        (quality_approved ?outbound_batch)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (pallet_available ?pallet)
+        (not
+          (outbound_batch_staged ?outbound_batch)
+        )
+      )
+    :effect
+      (and
+        (receiving_profile_pallets_staged ?receiving_profile)
+        (outbound_batch_staged ?outbound_batch)
+        (pallet_staged_for_outbound ?outbound_batch ?pallet)
+        (not
+          (pallet_available ?pallet)
+        )
+      )
+  )
+  (:action finalize_pallet_staging_for_outbound_batch
+    :parameters (?outbound_batch - outbound_batch ?receiving_profile - receiving_profile ?quality_test - quality_test ?pallet - pallet)
+    :precondition
+      (and
+        (quality_approved ?outbound_batch)
+        (tested_with ?outbound_batch ?quality_test)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (receiving_profile_pallets_staged ?receiving_profile)
+        (pallet_staged_for_outbound ?outbound_batch ?pallet)
+        (not
+          (outbound_batch_ready ?outbound_batch)
+        )
+      )
+    :effect
+      (and
+        (receiving_profile_reserved ?receiving_profile)
+        (outbound_batch_ready ?outbound_batch)
+        (pallet_available ?pallet)
+        (not
+          (pallet_staged_for_outbound ?outbound_batch ?pallet)
+        )
+      )
+  )
+  (:action allocate_container_for_consolidation
+    :parameters (?inbound_batch - inbound_batch ?outbound_batch - outbound_batch ?treatment_profile - treatment_profile ?receiving_profile - receiving_profile ?container_unit - container_unit)
+    :precondition
+      (and
+        (batch_staged ?inbound_batch)
+        (outbound_batch_staged ?outbound_batch)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (profile_reserved ?treatment_profile)
+        (receiving_profile_reserved ?receiving_profile)
+        (batch_ready_for_treatment ?inbound_batch)
+        (outbound_batch_ready ?outbound_batch)
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_assigned_to_treatment_profile ?container_unit ?treatment_profile)
+        (container_assigned_to_receiving_profile ?container_unit ?receiving_profile)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_inbound_pallets
+    :parameters (?inbound_batch - inbound_batch ?outbound_batch - outbound_batch ?treatment_profile - treatment_profile ?receiving_profile - receiving_profile ?container_unit - container_unit)
+    :precondition
+      (and
+        (batch_staged ?inbound_batch)
+        (outbound_batch_staged ?outbound_batch)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (profile_pallets_staged ?treatment_profile)
+        (receiving_profile_reserved ?receiving_profile)
+        (not
+          (batch_ready_for_treatment ?inbound_batch)
+        )
+        (outbound_batch_ready ?outbound_batch)
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_assigned_to_treatment_profile ?container_unit ?treatment_profile)
+        (container_assigned_to_receiving_profile ?container_unit ?receiving_profile)
+        (container_loading_check_a ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_outbound_pallets
+    :parameters (?inbound_batch - inbound_batch ?outbound_batch - outbound_batch ?treatment_profile - treatment_profile ?receiving_profile - receiving_profile ?container_unit - container_unit)
+    :precondition
+      (and
+        (batch_staged ?inbound_batch)
+        (outbound_batch_staged ?outbound_batch)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (profile_reserved ?treatment_profile)
+        (receiving_profile_pallets_staged ?receiving_profile)
+        (batch_ready_for_treatment ?inbound_batch)
+        (not
+          (outbound_batch_ready ?outbound_batch)
+        )
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_assigned_to_treatment_profile ?container_unit ?treatment_profile)
+        (container_assigned_to_receiving_profile ?container_unit ?receiving_profile)
+        (container_loading_check_b ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action allocate_container_with_both_pallet_types
+    :parameters (?inbound_batch - inbound_batch ?outbound_batch - outbound_batch ?treatment_profile - treatment_profile ?receiving_profile - receiving_profile ?container_unit - container_unit)
+    :precondition
+      (and
+        (batch_staged ?inbound_batch)
+        (outbound_batch_staged ?outbound_batch)
+        (assigned_treatment_profile ?inbound_batch ?treatment_profile)
+        (assigned_receiving_profile ?outbound_batch ?receiving_profile)
+        (profile_pallets_staged ?treatment_profile)
+        (receiving_profile_pallets_staged ?receiving_profile)
+        (not
+          (batch_ready_for_treatment ?inbound_batch)
+        )
+        (not
+          (outbound_batch_ready ?outbound_batch)
+        )
+        (container_available ?container_unit)
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_assigned_to_treatment_profile ?container_unit ?treatment_profile)
+        (container_assigned_to_receiving_profile ?container_unit ?receiving_profile)
+        (container_loading_check_a ?container_unit)
+        (container_loading_check_b ?container_unit)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action verify_container_loading
+    :parameters (?container_unit - container_unit ?inbound_batch - inbound_batch ?quality_test - quality_test)
+    :precondition
+      (and
+        (container_allocated ?container_unit)
+        (batch_staged ?inbound_batch)
+        (tested_with ?inbound_batch ?quality_test)
+        (not
+          (container_loading_verified ?container_unit)
+        )
+      )
+    :effect (container_loading_verified ?container_unit)
+  )
+  (:action attach_inspection_record_to_container
+    :parameters (?chamber - fumigation_chamber ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (chamber_compatible_with_container_unit ?chamber ?container_unit)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_available ?inspection_record)
+        (container_allocated ?container_unit)
+        (container_loading_verified ?container_unit)
+        (not
+          (inspection_record_attached ?inspection_record)
+        )
+      )
+    :effect
+      (and
+        (inspection_record_attached ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (not
+          (inspection_record_available ?inspection_record)
+        )
+      )
+  )
+  (:action confirm_inspection_and_enable_chamber
+    :parameters (?chamber - fumigation_chamber ?inspection_record - inspection_record ?container_unit - container_unit ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_attached ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (tested_with ?chamber ?quality_test)
+        (not
+          (container_loading_check_a ?container_unit)
+        )
+        (not
+          (chamber_preparation_verified ?chamber)
+        )
+      )
+    :effect (chamber_preparation_verified ?chamber)
+  )
+  (:action attach_compliance_certificate_to_chamber
+    :parameters (?chamber - fumigation_chamber ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (compliance_certificate_available ?compliance_certificate)
+        (not
+          (certificate_attached ?chamber)
+        )
+      )
+    :effect
+      (and
+        (certificate_attached ?chamber)
+        (chamber_has_compliance_certificate ?chamber ?compliance_certificate)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action finalize_inspection_and_certification_for_chamber
+    :parameters (?chamber - fumigation_chamber ?inspection_record - inspection_record ?container_unit - container_unit ?quality_test - quality_test ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_attached ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (tested_with ?chamber ?quality_test)
+        (container_loading_check_a ?container_unit)
+        (certificate_attached ?chamber)
+        (chamber_has_compliance_certificate ?chamber ?compliance_certificate)
+        (not
+          (chamber_preparation_verified ?chamber)
+        )
+      )
+    :effect
+      (and
+        (chamber_preparation_verified ?chamber)
+        (chamber_certification_flag ?chamber)
+      )
+  )
+  (:action stage_fumigant_into_chamber
+    :parameters (?chamber - fumigation_chamber ?fumigant_supply - fumigant_supply ?technician - technician ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (chamber_preparation_verified ?chamber)
+        (fumigant_assigned_to_chamber ?chamber ?fumigant_supply)
+        (technician_assigned ?chamber ?technician)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (not
+          (container_loading_check_b ?container_unit)
+        )
+        (not
+          (fumigant_deployed ?chamber)
+        )
+      )
+    :effect (fumigant_deployed ?chamber)
+  )
+  (:action confirm_fumigant_in_chamber
+    :parameters (?chamber - fumigation_chamber ?fumigant_supply - fumigant_supply ?technician - technician ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (chamber_preparation_verified ?chamber)
+        (fumigant_assigned_to_chamber ?chamber ?fumigant_supply)
+        (technician_assigned ?chamber ?technician)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (container_loading_check_b ?container_unit)
+        (not
+          (fumigant_deployed ?chamber)
+        )
+      )
+    :effect (fumigant_deployed ?chamber)
+  )
+  (:action configure_treatment_monitoring
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (fumigant_deployed ?chamber)
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (not
+          (container_loading_check_a ?container_unit)
+        )
+        (not
+          (container_loading_check_b ?container_unit)
+        )
+        (not
+          (treatment_monitoring_configured ?chamber)
+        )
+      )
+    :effect (treatment_monitoring_configured ?chamber)
+  )
+  (:action configure_treatment_monitoring_with_additional_checks
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (fumigant_deployed ?chamber)
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (container_loading_check_a ?container_unit)
+        (not
+          (container_loading_check_b ?container_unit)
+        )
+        (not
+          (treatment_monitoring_configured ?chamber)
+        )
+      )
+    :effect
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (monitoring_compliance_confirmed ?chamber)
+      )
+  )
+  (:action configure_treatment_monitoring_alternate_path
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (fumigant_deployed ?chamber)
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (not
+          (container_loading_check_a ?container_unit)
+        )
+        (container_loading_check_b ?container_unit)
+        (not
+          (treatment_monitoring_configured ?chamber)
+        )
+      )
+    :effect
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (monitoring_compliance_confirmed ?chamber)
+      )
+  )
+  (:action configure_treatment_monitoring_full_checks
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument ?inspection_record - inspection_record ?container_unit - container_unit)
+    :precondition
+      (and
+        (fumigant_deployed ?chamber)
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (chamber_has_inspection_record ?chamber ?inspection_record)
+        (inspection_record_linked_to_container ?inspection_record ?container_unit)
+        (container_loading_check_a ?container_unit)
+        (container_loading_check_b ?container_unit)
+        (not
+          (treatment_monitoring_configured ?chamber)
+        )
+      )
+    :effect
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (monitoring_compliance_confirmed ?chamber)
+      )
+  )
+  (:action finalize_chamber_and_mark_ready
+    :parameters (?chamber - fumigation_chamber)
+    :precondition
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (not
+          (monitoring_compliance_confirmed ?chamber)
+        )
+        (not
+          (finalized ?chamber)
+        )
+      )
+    :effect
+      (and
+        (finalized ?chamber)
+        (ready_for_release ?chamber)
+      )
+  )
+  (:action attach_carrier_to_chamber
+    :parameters (?chamber - fumigation_chamber ?carrier - carrier)
+    :precondition
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (monitoring_compliance_confirmed ?chamber)
+        (carrier_available ?carrier)
+      )
+    :effect
+      (and
+        (chamber_assigned_carrier ?chamber ?carrier)
+        (not
+          (carrier_available ?carrier)
+        )
+      )
+  )
+  (:action consolidate_chamber_outputs_into_container
+    :parameters (?chamber - fumigation_chamber ?inbound_batch - inbound_batch ?outbound_batch - outbound_batch ?quality_test - quality_test ?carrier - carrier)
+    :precondition
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (monitoring_compliance_confirmed ?chamber)
+        (chamber_assigned_carrier ?chamber ?carrier)
+        (chamber_compatible_with_batch ?chamber ?inbound_batch)
+        (chamber_compatible_with_outbound_batch ?chamber ?outbound_batch)
+        (batch_ready_for_treatment ?inbound_batch)
+        (outbound_batch_ready ?outbound_batch)
+        (tested_with ?chamber ?quality_test)
+        (not
+          (consolidation_finalized ?chamber)
+        )
+      )
+    :effect (consolidation_finalized ?chamber)
+  )
+  (:action finalize_consolidation_and_mark_ready
+    :parameters (?chamber - fumigation_chamber)
+    :precondition
+      (and
+        (treatment_monitoring_configured ?chamber)
+        (consolidation_finalized ?chamber)
+        (not
+          (finalized ?chamber)
+        )
+      )
+    :effect
+      (and
+        (finalized ?chamber)
+        (ready_for_release ?chamber)
+      )
+  )
+  (:action apply_safety_protocol_to_chamber
+    :parameters (?chamber - fumigation_chamber ?safety_protocol - safety_protocol ?quality_test - quality_test)
+    :precondition
+      (and
+        (quality_approved ?chamber)
+        (tested_with ?chamber ?quality_test)
+        (safety_protocol_available ?safety_protocol)
+        (chamber_has_safety_protocol ?chamber ?safety_protocol)
+        (not
+          (chamber_safety_protocol_applied ?chamber)
+        )
+      )
+    :effect
+      (and
+        (chamber_safety_protocol_applied ?chamber)
+        (not
+          (safety_protocol_available ?safety_protocol)
+        )
+      )
+  )
+  (:action complete_safety_checks_for_chamber
+    :parameters (?chamber - fumigation_chamber ?technician - technician)
+    :precondition
+      (and
+        (chamber_safety_protocol_applied ?chamber)
+        (technician_assigned ?chamber ?technician)
+        (not
+          (safety_checks_completed ?chamber)
+        )
+      )
+    :effect (safety_checks_completed ?chamber)
+  )
+  (:action assign_monitoring_instrument_post_safety
+    :parameters (?chamber - fumigation_chamber ?monitoring_instrument - monitoring_instrument)
+    :precondition
+      (and
+        (safety_checks_completed ?chamber)
+        (monitoring_instrument_assigned ?chamber ?monitoring_instrument)
+        (not
+          (safety_confirmation_recorded ?chamber)
+        )
+      )
+    :effect (safety_confirmation_recorded ?chamber)
+  )
+  (:action finalize_safety_approval_and_mark_ready
+    :parameters (?chamber - fumigation_chamber)
+    :precondition
+      (and
+        (safety_confirmation_recorded ?chamber)
+        (not
+          (finalized ?chamber)
+        )
+      )
+    :effect
+      (and
+        (finalized ?chamber)
+        (ready_for_release ?chamber)
+      )
+  )
+  (:action finalize_inbound_batch_release
+    :parameters (?inbound_batch - inbound_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (batch_staged ?inbound_batch)
+        (batch_ready_for_treatment ?inbound_batch)
+        (container_allocated ?container_unit)
+        (container_loading_verified ?container_unit)
+        (not
+          (ready_for_release ?inbound_batch)
+        )
+      )
+    :effect (ready_for_release ?inbound_batch)
+  )
+  (:action finalize_outbound_batch_release
+    :parameters (?outbound_batch - outbound_batch ?container_unit - container_unit)
+    :precondition
+      (and
+        (outbound_batch_staged ?outbound_batch)
+        (outbound_batch_ready ?outbound_batch)
+        (container_allocated ?container_unit)
+        (container_loading_verified ?container_unit)
+        (not
+          (ready_for_release ?outbound_batch)
+        )
+      )
+    :effect (ready_for_release ?outbound_batch)
+  )
+  (:action schedule_release_window_for_batch
+    :parameters (?batch - workflow_item ?release_window - release_window ?quality_test - quality_test)
+    :precondition
+      (and
+        (ready_for_release ?batch)
+        (tested_with ?batch ?quality_test)
+        (release_window_available ?release_window)
+        (not
+          (release_scheduled ?batch)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled ?batch)
+        (assigned_release_window ?batch ?release_window)
+        (not
+          (release_window_available ?release_window)
+        )
+      )
+  )
+  (:action finalize_release_for_inbound_batch_and_free_slot
+    :parameters (?inbound_batch - inbound_batch ?schedule_slot - schedule_slot ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled ?inbound_batch)
+        (assigned_slot ?inbound_batch ?schedule_slot)
+        (assigned_release_window ?inbound_batch ?release_window)
+        (not
+          (turnover_complete ?inbound_batch)
+        )
+      )
+    :effect
+      (and
+        (turnover_complete ?inbound_batch)
+        (slot_available ?schedule_slot)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_for_outbound_batch_and_free_slot
+    :parameters (?outbound_batch - outbound_batch ?schedule_slot - schedule_slot ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled ?outbound_batch)
+        (assigned_slot ?outbound_batch ?schedule_slot)
+        (assigned_release_window ?outbound_batch ?release_window)
+        (not
+          (turnover_complete ?outbound_batch)
+        )
+      )
+    :effect
+      (and
+        (turnover_complete ?outbound_batch)
+        (slot_available ?schedule_slot)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_for_chamber_and_free_slot
+    :parameters (?chamber - fumigation_chamber ?schedule_slot - schedule_slot ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled ?chamber)
+        (assigned_slot ?chamber ?schedule_slot)
+        (assigned_release_window ?chamber ?release_window)
+        (not
+          (turnover_complete ?chamber)
+        )
+      )
+    :effect
+      (and
+        (turnover_complete ?chamber)
+        (slot_available ?schedule_slot)
+        (release_window_available ?release_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem fumigation_chamber_turnover_example_problem)
+  (:domain fumigation_chamber_turnover_scheduling_domain)
+  (:objects inbound_batch_1 - inbound_batch outbound_batch_1 - outbound_batch fumigation_chamber_a - fumigation_chamber fumigation_chamber_b - fumigation_chamber schedule_slot_1 - schedule_slot schedule_slot_2 - schedule_slot schedule_slot_3 - schedule_slot quality_test_device_1 - quality_test technician_1 - technician pallet_1 - pallet treatment_profile_1 - treatment_profile receiving_profile_1 - receiving_profile container_unit_1 - container_unit inspection_record_1 - inspection_record inspection_record_2 - inspection_record compliance_certificate_1 - compliance_certificate compliance_certificate_2 - compliance_certificate carrier_1 - carrier carrier_2 - carrier release_window_1 - release_window fumigant_supply_1 - fumigant_supply safety_protocol_1 - safety_protocol safety_protocol_2 - safety_protocol monitoring_instrument_1 - monitoring_instrument)
+  (:init
+    (slot_available schedule_slot_1)
+    (slot_available schedule_slot_2)
+    (slot_available schedule_slot_3)
+    (quality_test_available quality_test_device_1)
+    (technician_available technician_1)
+    (pallet_available pallet_1)
+    (assigned_treatment_profile inbound_batch_1 treatment_profile_1)
+    (assigned_receiving_profile outbound_batch_1 receiving_profile_1)
+    (container_available container_unit_1)
+    (inspection_record_available inspection_record_1)
+    (inspection_record_available inspection_record_2)
+    (chamber_compatible_with_batch fumigation_chamber_a inbound_batch_1)
+    (chamber_compatible_with_batch fumigation_chamber_b inbound_batch_1)
+    (chamber_compatible_with_outbound_batch fumigation_chamber_a outbound_batch_1)
+    (chamber_compatible_with_outbound_batch fumigation_chamber_b outbound_batch_1)
+    (chamber_compatible_with_container_unit fumigation_chamber_a container_unit_1)
+    (chamber_compatible_with_container_unit fumigation_chamber_b container_unit_1)
+    (chamber_has_inspection_record fumigation_chamber_a inspection_record_1)
+    (chamber_has_inspection_record fumigation_chamber_b inspection_record_2)
+    (compliance_certificate_available compliance_certificate_1)
+    (compliance_certificate_available compliance_certificate_2)
+    (carrier_available carrier_1)
+    (carrier_available carrier_2)
+    (release_window_available release_window_1)
+    (fumigant_supply_available fumigant_supply_1)
+    (safety_protocol_available safety_protocol_1)
+    (chamber_has_safety_protocol fumigation_chamber_a safety_protocol_1)
+    (chamber_has_safety_protocol fumigation_chamber_b safety_protocol_2)
+    (monitoring_instrument_available monitoring_instrument_1)
+  )
+  (:goal
+    (and
+      (turnover_complete inbound_batch_1)
+      (turnover_complete outbound_batch_1)
+      (turnover_complete fumigation_chamber_a)
+      (turnover_complete fumigation_chamber_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(receive_and_register_batch inbound_batch_1)
+(receive_and_register_batch outbound_batch_1)
+(receive_and_register_batch fumigation_chamber_b)
+(receive_and_register_batch fumigation_chamber_a)
+(reserve_schedule_slot_for_batch inbound_batch_1 schedule_slot_1)
+(reserve_schedule_slot_for_batch outbound_batch_1 schedule_slot_2)
+(reserve_schedule_slot_for_batch fumigation_chamber_b schedule_slot_3)
+(conduct_quality_test outbound_batch_1 quality_test_device_1)
+(record_quality_clearance outbound_batch_1 quality_test_device_1)
+(reserve_receiving_profile_for_outbound_batch outbound_batch_1 receiving_profile_1 quality_test_device_1)
+(assign_technician_to_batch outbound_batch_1 technician_1)
+(assign_technician_to_outbound_batch outbound_batch_1 receiving_profile_1 technician_1)
+(unassign_technician_from_batch outbound_batch_1 technician_1)
+(release_quality_test_device outbound_batch_1 quality_test_device_1)
+(conduct_quality_test inbound_batch_1 quality_test_device_1)
+(record_quality_clearance inbound_batch_1 quality_test_device_1)
+(reserve_treatment_profile_for_batch inbound_batch_1 treatment_profile_1 quality_test_device_1)
+(assign_technician_to_batch inbound_batch_1 technician_1)
+(prepare_chamber_with_technician inbound_batch_1 treatment_profile_1 technician_1)
+(unassign_technician_from_batch inbound_batch_1 technician_1)
+(allocate_container_for_consolidation inbound_batch_1 outbound_batch_1 treatment_profile_1 receiving_profile_1 container_unit_1)
+(verify_container_loading container_unit_1 inbound_batch_1 quality_test_device_1)
+(finalize_inbound_batch_release inbound_batch_1 container_unit_1)
+(finalize_outbound_batch_release outbound_batch_1 container_unit_1)
+(schedule_release_window_for_batch inbound_batch_1 release_window_1 quality_test_device_1)
+(finalize_release_for_inbound_batch_and_free_slot inbound_batch_1 schedule_slot_1 release_window_1)
+(release_quality_test_device inbound_batch_1 quality_test_device_1)
+(conduct_quality_test outbound_batch_1 quality_test_device_1)
+(schedule_release_window_for_batch outbound_batch_1 release_window_1 quality_test_device_1)
+(finalize_release_for_outbound_batch_and_free_slot outbound_batch_1 schedule_slot_2 release_window_1)
+(release_quality_test_device outbound_batch_1 quality_test_device_1)
+(conduct_quality_test fumigation_chamber_b quality_test_device_1)
+(record_quality_clearance fumigation_chamber_b quality_test_device_1)
+(allocate_fumigant_supply_to_chamber fumigation_chamber_b fumigant_supply_1)
+(assign_monitoring_instrument_to_chamber fumigation_chamber_b monitoring_instrument_1)
+(attach_inspection_record_to_container fumigation_chamber_b inspection_record_2 container_unit_1)
+(confirm_inspection_and_enable_chamber fumigation_chamber_b inspection_record_2 container_unit_1 quality_test_device_1)
+(assign_technician_to_batch fumigation_chamber_b technician_1)
+(stage_fumigant_into_chamber fumigation_chamber_b fumigant_supply_1 technician_1 inspection_record_2 container_unit_1)
+(unassign_technician_from_batch fumigation_chamber_b technician_1)
+(configure_treatment_monitoring fumigation_chamber_b monitoring_instrument_1 inspection_record_2 container_unit_1)
+(finalize_chamber_and_mark_ready fumigation_chamber_b)
+(schedule_release_window_for_batch fumigation_chamber_b release_window_1 quality_test_device_1)
+(finalize_release_for_chamber_and_free_slot fumigation_chamber_b schedule_slot_3 release_window_1)
+(unassign_monitoring_instrument_from_chamber fumigation_chamber_b monitoring_instrument_1)
+(release_quality_test_device fumigation_chamber_b quality_test_device_1)
+(reserve_schedule_slot_for_batch fumigation_chamber_a schedule_slot_1)
+(conduct_quality_test fumigation_chamber_a quality_test_device_1)
+(record_quality_clearance fumigation_chamber_a quality_test_device_1)
+(apply_safety_protocol_to_chamber fumigation_chamber_a safety_protocol_1 quality_test_device_1)
+(assign_technician_to_batch fumigation_chamber_a technician_1)
+(complete_safety_checks_for_chamber fumigation_chamber_a technician_1)
+(assign_monitoring_instrument_to_chamber fumigation_chamber_a monitoring_instrument_1)
+(assign_monitoring_instrument_post_safety fumigation_chamber_a monitoring_instrument_1)
+(finalize_safety_approval_and_mark_ready fumigation_chamber_a)
+(schedule_release_window_for_batch fumigation_chamber_a release_window_1 quality_test_device_1)
+(finalize_release_for_chamber_and_free_slot fumigation_chamber_a schedule_slot_1 release_window_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_pw9s9y8f/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 57 
+
+Successful plans:
+Value: 57
+ /tmp/val_pw9s9y8f/plan.pddl 57 
+
+
+
+--- stderr ---
+

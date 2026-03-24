@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain cold_storage_capacity_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object logistics_resource - object resource_group_equipment - object allocation_entity_supertype - object allocation_entity - allocation_entity_supertype transport_asset - operational_resource temperature_setting - operational_resource technician - operational_resource packaging_material - operational_resource validation_batch - operational_resource contingency_reserve_unit - operational_resource energy_unit - operational_resource quality_certificate - operational_resource input_item_unit - logistics_resource pallet_slot - logistics_resource regulatory_permit - logistics_resource storage_zone_a - resource_group_equipment storage_zone_b - resource_group_equipment storage_container - resource_group_equipment supply_site_supertype - allocation_entity facility_subtype - allocation_entity primary_supply_site - supply_site_supertype secondary_supply_site - supply_site_supertype cold_storage_facility - facility_subtype)
+  (:predicates
+    (allocation_entity_registered ?allocation_entity - allocation_entity)
+    (allocation_entity_validated ?allocation_entity - allocation_entity)
+    (transport_assignment_confirmed ?allocation_entity - allocation_entity)
+    (capacity_assigned ?allocation_entity - allocation_entity)
+    (ready_for_distribution ?allocation_entity - allocation_entity)
+    (contingency_allocated ?allocation_entity - allocation_entity)
+    (transport_available ?transport_asset - transport_asset)
+    (allocation_entity_assigned_transport ?allocation_entity - allocation_entity ?transport_asset - transport_asset)
+    (temperature_setting_available ?temperature_setting - temperature_setting)
+    (allocation_entity_assigned_temperature ?allocation_entity - allocation_entity ?temperature_setting - temperature_setting)
+    (technician_available ?technician - technician)
+    (allocation_entity_assigned_technician ?allocation_entity - allocation_entity ?technician - technician)
+    (input_unit_available ?input_item_unit - input_item_unit)
+    (primary_site_reserved_input_unit ?primary_supply_site - primary_supply_site ?input_item_unit - input_item_unit)
+    (secondary_site_reserved_input_unit ?secondary_supply_site - secondary_supply_site ?input_item_unit - input_item_unit)
+    (primary_site_assigned_zone_a ?primary_supply_site - primary_supply_site ?storage_zone_a - storage_zone_a)
+    (zone_a_marked_for_loading ?storage_zone_a - storage_zone_a)
+    (zone_a_staged ?storage_zone_a - storage_zone_a)
+    (primary_site_ready_for_loading ?primary_supply_site - primary_supply_site)
+    (secondary_site_assigned_zone_b ?secondary_supply_site - secondary_supply_site ?storage_zone_b - storage_zone_b)
+    (zone_b_marked_for_loading ?storage_zone_b - storage_zone_b)
+    (zone_b_staged ?storage_zone_b - storage_zone_b)
+    (secondary_site_ready_for_loading ?secondary_supply_site - secondary_supply_site)
+    (container_available ?storage_container - storage_container)
+    (container_reserved ?storage_container - storage_container)
+    (container_assigned_to_zone_a ?storage_container - storage_container ?storage_zone_a - storage_zone_a)
+    (container_assigned_to_zone_b ?storage_container - storage_container ?storage_zone_b - storage_zone_b)
+    (container_contains_zone_a_load ?storage_container - storage_container)
+    (container_contains_zone_b_load ?storage_container - storage_container)
+    (container_ready_for_palletization ?storage_container - storage_container)
+    (facility_serves_primary_site ?cold_storage_facility - cold_storage_facility ?primary_supply_site - primary_supply_site)
+    (facility_serves_secondary_site ?cold_storage_facility - cold_storage_facility ?secondary_supply_site - secondary_supply_site)
+    (facility_has_container ?cold_storage_facility - cold_storage_facility ?storage_container - storage_container)
+    (pallet_slot_available ?pallet_slot - pallet_slot)
+    (facility_has_pallet_slot ?cold_storage_facility - cold_storage_facility ?pallet_slot - pallet_slot)
+    (pallet_slot_reserved ?pallet_slot - pallet_slot)
+    (pallet_slot_assigned_to_container ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    (facility_pallet_slot_assignment_recorded ?cold_storage_facility - cold_storage_facility)
+    (pallet_consolidated ?cold_storage_facility - cold_storage_facility)
+    (quality_check_completed ?cold_storage_facility - cold_storage_facility)
+    (facility_packaging_assigned ?cold_storage_facility - cold_storage_facility)
+    (packaging_applied_to_pallet ?cold_storage_facility - cold_storage_facility)
+    (validation_attachment_flag ?cold_storage_facility - cold_storage_facility)
+    (facility_activated ?cold_storage_facility - cold_storage_facility)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (facility_has_regulatory_permit ?cold_storage_facility - cold_storage_facility ?regulatory_permit - regulatory_permit)
+    (regulatory_permit_applied ?cold_storage_facility - cold_storage_facility)
+    (regulatory_permit_processed ?cold_storage_facility - cold_storage_facility)
+    (regulatory_permit_validated ?cold_storage_facility - cold_storage_facility)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (facility_has_packaging_material ?cold_storage_facility - cold_storage_facility ?packaging_material - packaging_material)
+    (validation_batch_available ?validation_batch - validation_batch)
+    (facility_has_validation_batch ?cold_storage_facility - cold_storage_facility ?validation_batch - validation_batch)
+    (energy_unit_available ?energy_unit - energy_unit)
+    (facility_assigned_energy_unit ?cold_storage_facility - cold_storage_facility ?energy_unit - energy_unit)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (facility_assigned_quality_certificate ?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate)
+    (contingency_reserve_available ?contingency_reserve_unit - contingency_reserve_unit)
+    (allocation_entity_contingency_assigned ?allocation_entity - allocation_entity ?contingency_reserve_unit - contingency_reserve_unit)
+    (primary_site_processing_ready ?primary_supply_site - primary_supply_site)
+    (secondary_site_processing_ready ?secondary_supply_site - secondary_supply_site)
+    (facility_finalized_for_distribution ?cold_storage_facility - cold_storage_facility)
+  )
+  (:action register_incoming_batch
+    :parameters (?allocation_entity - allocation_entity)
+    :precondition
+      (and
+        (not
+          (allocation_entity_registered ?allocation_entity)
+        )
+        (not
+          (capacity_assigned ?allocation_entity)
+        )
+      )
+    :effect (allocation_entity_registered ?allocation_entity)
+  )
+  (:action pair_batch_with_transport
+    :parameters (?allocation_entity - allocation_entity ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (allocation_entity_registered ?allocation_entity)
+        (not
+          (transport_assignment_confirmed ?allocation_entity)
+        )
+        (transport_available ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_assignment_confirmed ?allocation_entity)
+        (allocation_entity_assigned_transport ?allocation_entity ?transport_asset)
+        (not
+          (transport_available ?transport_asset)
+        )
+      )
+  )
+  (:action assign_temperature_setting
+    :parameters (?allocation_entity - allocation_entity ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_registered ?allocation_entity)
+        (transport_assignment_confirmed ?allocation_entity)
+        (temperature_setting_available ?temperature_setting)
+      )
+    :effect
+      (and
+        (allocation_entity_assigned_temperature ?allocation_entity ?temperature_setting)
+        (not
+          (temperature_setting_available ?temperature_setting)
+        )
+      )
+  )
+  (:action confirm_intake_validation
+    :parameters (?allocation_entity - allocation_entity ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_registered ?allocation_entity)
+        (transport_assignment_confirmed ?allocation_entity)
+        (allocation_entity_assigned_temperature ?allocation_entity ?temperature_setting)
+        (not
+          (allocation_entity_validated ?allocation_entity)
+        )
+      )
+    :effect (allocation_entity_validated ?allocation_entity)
+  )
+  (:action release_temperature_setting
+    :parameters (?allocation_entity - allocation_entity ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_assigned_temperature ?allocation_entity ?temperature_setting)
+      )
+    :effect
+      (and
+        (temperature_setting_available ?temperature_setting)
+        (not
+          (allocation_entity_assigned_temperature ?allocation_entity ?temperature_setting)
+        )
+      )
+  )
+  (:action assign_technician_for_intake
+    :parameters (?allocation_entity - allocation_entity ?technician - technician)
+    :precondition
+      (and
+        (allocation_entity_validated ?allocation_entity)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (allocation_entity_assigned_technician ?allocation_entity ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action release_technician_from_intake
+    :parameters (?allocation_entity - allocation_entity ?technician - technician)
+    :precondition
+      (and
+        (allocation_entity_assigned_technician ?allocation_entity ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (allocation_entity_assigned_technician ?allocation_entity ?technician)
+        )
+      )
+  )
+  (:action assign_energy_to_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?energy_unit - energy_unit)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (energy_unit_available ?energy_unit)
+      )
+    :effect
+      (and
+        (facility_assigned_energy_unit ?cold_storage_facility ?energy_unit)
+        (not
+          (energy_unit_available ?energy_unit)
+        )
+      )
+  )
+  (:action release_energy_from_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?energy_unit - energy_unit)
+    :precondition
+      (and
+        (facility_assigned_energy_unit ?cold_storage_facility ?energy_unit)
+      )
+    :effect
+      (and
+        (energy_unit_available ?energy_unit)
+        (not
+          (facility_assigned_energy_unit ?cold_storage_facility ?energy_unit)
+        )
+      )
+  )
+  (:action assign_quality_certificate_to_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (quality_certificate_available ?quality_certificate)
+      )
+    :effect
+      (and
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action release_quality_certificate_from_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+      )
+    :effect
+      (and
+        (quality_certificate_available ?quality_certificate)
+        (not
+          (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        )
+      )
+  )
+  (:action reserve_zone_a_for_site
+    :parameters (?primary_supply_site - primary_supply_site ?storage_zone_a - storage_zone_a ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_validated ?primary_supply_site)
+        (allocation_entity_assigned_temperature ?primary_supply_site ?temperature_setting)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (not
+          (zone_a_marked_for_loading ?storage_zone_a)
+        )
+        (not
+          (zone_a_staged ?storage_zone_a)
+        )
+      )
+    :effect (zone_a_marked_for_loading ?storage_zone_a)
+  )
+  (:action secure_primary_site_for_loading
+    :parameters (?primary_supply_site - primary_supply_site ?storage_zone_a - storage_zone_a ?technician - technician)
+    :precondition
+      (and
+        (allocation_entity_validated ?primary_supply_site)
+        (allocation_entity_assigned_technician ?primary_supply_site ?technician)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (zone_a_marked_for_loading ?storage_zone_a)
+        (not
+          (primary_site_processing_ready ?primary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (primary_site_ready_for_loading ?primary_supply_site)
+      )
+  )
+  (:action stage_input_at_primary_site
+    :parameters (?primary_supply_site - primary_supply_site ?storage_zone_a - storage_zone_a ?input_item_unit - input_item_unit)
+    :precondition
+      (and
+        (allocation_entity_validated ?primary_supply_site)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (input_unit_available ?input_item_unit)
+        (not
+          (primary_site_processing_ready ?primary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (zone_a_staged ?storage_zone_a)
+        (primary_site_processing_ready ?primary_supply_site)
+        (primary_site_reserved_input_unit ?primary_supply_site ?input_item_unit)
+        (not
+          (input_unit_available ?input_item_unit)
+        )
+      )
+  )
+  (:action complete_primary_site_staging
+    :parameters (?primary_supply_site - primary_supply_site ?storage_zone_a - storage_zone_a ?temperature_setting - temperature_setting ?input_item_unit - input_item_unit)
+    :precondition
+      (and
+        (allocation_entity_validated ?primary_supply_site)
+        (allocation_entity_assigned_temperature ?primary_supply_site ?temperature_setting)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (zone_a_staged ?storage_zone_a)
+        (primary_site_reserved_input_unit ?primary_supply_site ?input_item_unit)
+        (not
+          (primary_site_ready_for_loading ?primary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (zone_a_marked_for_loading ?storage_zone_a)
+        (primary_site_ready_for_loading ?primary_supply_site)
+        (input_unit_available ?input_item_unit)
+        (not
+          (primary_site_reserved_input_unit ?primary_supply_site ?input_item_unit)
+        )
+      )
+  )
+  (:action reserve_zone_b_for_secondary_site
+    :parameters (?secondary_supply_site - secondary_supply_site ?storage_zone_b - storage_zone_b ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_validated ?secondary_supply_site)
+        (allocation_entity_assigned_temperature ?secondary_supply_site ?temperature_setting)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (not
+          (zone_b_marked_for_loading ?storage_zone_b)
+        )
+        (not
+          (zone_b_staged ?storage_zone_b)
+        )
+      )
+    :effect (zone_b_marked_for_loading ?storage_zone_b)
+  )
+  (:action secure_secondary_site_for_loading
+    :parameters (?secondary_supply_site - secondary_supply_site ?storage_zone_b - storage_zone_b ?technician - technician)
+    :precondition
+      (and
+        (allocation_entity_validated ?secondary_supply_site)
+        (allocation_entity_assigned_technician ?secondary_supply_site ?technician)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_b_marked_for_loading ?storage_zone_b)
+        (not
+          (secondary_site_processing_ready ?secondary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+      )
+  )
+  (:action stage_input_at_secondary_site
+    :parameters (?secondary_supply_site - secondary_supply_site ?storage_zone_b - storage_zone_b ?input_item_unit - input_item_unit)
+    :precondition
+      (and
+        (allocation_entity_validated ?secondary_supply_site)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (input_unit_available ?input_item_unit)
+        (not
+          (secondary_site_processing_ready ?secondary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (zone_b_staged ?storage_zone_b)
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (secondary_site_reserved_input_unit ?secondary_supply_site ?input_item_unit)
+        (not
+          (input_unit_available ?input_item_unit)
+        )
+      )
+  )
+  (:action complete_secondary_site_staging
+    :parameters (?secondary_supply_site - secondary_supply_site ?storage_zone_b - storage_zone_b ?temperature_setting - temperature_setting ?input_item_unit - input_item_unit)
+    :precondition
+      (and
+        (allocation_entity_validated ?secondary_supply_site)
+        (allocation_entity_assigned_temperature ?secondary_supply_site ?temperature_setting)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_b_staged ?storage_zone_b)
+        (secondary_site_reserved_input_unit ?secondary_supply_site ?input_item_unit)
+        (not
+          (secondary_site_ready_for_loading ?secondary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (zone_b_marked_for_loading ?storage_zone_b)
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+        (input_unit_available ?input_item_unit)
+        (not
+          (secondary_site_reserved_input_unit ?secondary_supply_site ?input_item_unit)
+        )
+      )
+  )
+  (:action assign_container_to_zone_a_and_b
+    :parameters (?primary_supply_site - primary_supply_site ?secondary_supply_site - secondary_supply_site ?storage_zone_a - storage_zone_a ?storage_zone_b - storage_zone_b ?storage_container - storage_container)
+    :precondition
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_a_marked_for_loading ?storage_zone_a)
+        (zone_b_marked_for_loading ?storage_zone_b)
+        (primary_site_ready_for_loading ?primary_supply_site)
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+        (container_available ?storage_container)
+      )
+    :effect
+      (and
+        (container_reserved ?storage_container)
+        (container_assigned_to_zone_a ?storage_container ?storage_zone_a)
+        (container_assigned_to_zone_b ?storage_container ?storage_zone_b)
+        (not
+          (container_available ?storage_container)
+        )
+      )
+  )
+  (:action assign_container_and_mark_zone_a_content
+    :parameters (?primary_supply_site - primary_supply_site ?secondary_supply_site - secondary_supply_site ?storage_zone_a - storage_zone_a ?storage_zone_b - storage_zone_b ?storage_container - storage_container)
+    :precondition
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_a_staged ?storage_zone_a)
+        (zone_b_marked_for_loading ?storage_zone_b)
+        (not
+          (primary_site_ready_for_loading ?primary_supply_site)
+        )
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+        (container_available ?storage_container)
+      )
+    :effect
+      (and
+        (container_reserved ?storage_container)
+        (container_assigned_to_zone_a ?storage_container ?storage_zone_a)
+        (container_assigned_to_zone_b ?storage_container ?storage_zone_b)
+        (container_contains_zone_a_load ?storage_container)
+        (not
+          (container_available ?storage_container)
+        )
+      )
+  )
+  (:action assign_container_and_mark_zone_b_content
+    :parameters (?primary_supply_site - primary_supply_site ?secondary_supply_site - secondary_supply_site ?storage_zone_a - storage_zone_a ?storage_zone_b - storage_zone_b ?storage_container - storage_container)
+    :precondition
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_a_marked_for_loading ?storage_zone_a)
+        (zone_b_staged ?storage_zone_b)
+        (primary_site_ready_for_loading ?primary_supply_site)
+        (not
+          (secondary_site_ready_for_loading ?secondary_supply_site)
+        )
+        (container_available ?storage_container)
+      )
+    :effect
+      (and
+        (container_reserved ?storage_container)
+        (container_assigned_to_zone_a ?storage_container ?storage_zone_a)
+        (container_assigned_to_zone_b ?storage_container ?storage_zone_b)
+        (container_contains_zone_b_load ?storage_container)
+        (not
+          (container_available ?storage_container)
+        )
+      )
+  )
+  (:action assign_container_and_mark_both_zone_contents
+    :parameters (?primary_supply_site - primary_supply_site ?secondary_supply_site - secondary_supply_site ?storage_zone_a - storage_zone_a ?storage_zone_b - storage_zone_b ?storage_container - storage_container)
+    :precondition
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (primary_site_assigned_zone_a ?primary_supply_site ?storage_zone_a)
+        (secondary_site_assigned_zone_b ?secondary_supply_site ?storage_zone_b)
+        (zone_a_staged ?storage_zone_a)
+        (zone_b_staged ?storage_zone_b)
+        (not
+          (primary_site_ready_for_loading ?primary_supply_site)
+        )
+        (not
+          (secondary_site_ready_for_loading ?secondary_supply_site)
+        )
+        (container_available ?storage_container)
+      )
+    :effect
+      (and
+        (container_reserved ?storage_container)
+        (container_assigned_to_zone_a ?storage_container ?storage_zone_a)
+        (container_assigned_to_zone_b ?storage_container ?storage_zone_b)
+        (container_contains_zone_a_load ?storage_container)
+        (container_contains_zone_b_load ?storage_container)
+        (not
+          (container_available ?storage_container)
+        )
+      )
+  )
+  (:action mark_container_ready_for_palletization
+    :parameters (?storage_container - storage_container ?primary_supply_site - primary_supply_site ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (container_reserved ?storage_container)
+        (primary_site_processing_ready ?primary_supply_site)
+        (allocation_entity_assigned_temperature ?primary_supply_site ?temperature_setting)
+        (not
+          (container_ready_for_palletization ?storage_container)
+        )
+      )
+    :effect (container_ready_for_palletization ?storage_container)
+  )
+  (:action reserve_pallet_slot_and_assign_container
+    :parameters (?cold_storage_facility - cold_storage_facility ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (facility_has_container ?cold_storage_facility ?storage_container)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_available ?pallet_slot)
+        (container_reserved ?storage_container)
+        (container_ready_for_palletization ?storage_container)
+        (not
+          (pallet_slot_reserved ?pallet_slot)
+        )
+      )
+    :effect
+      (and
+        (pallet_slot_reserved ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (not
+          (pallet_slot_available ?pallet_slot)
+        )
+      )
+  )
+  (:action record_pallet_assignment
+    :parameters (?cold_storage_facility - cold_storage_facility ?pallet_slot - pallet_slot ?storage_container - storage_container ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_reserved ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (allocation_entity_assigned_temperature ?cold_storage_facility ?temperature_setting)
+        (not
+          (container_contains_zone_a_load ?storage_container)
+        )
+        (not
+          (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+        )
+      )
+    :effect (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+  )
+  (:action assign_packaging_to_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (packaging_material_available ?packaging_material)
+        (not
+          (facility_packaging_assigned ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_packaging_assigned ?cold_storage_facility)
+        (facility_has_packaging_material ?cold_storage_facility ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action apply_packaging_to_pallet_at_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?pallet_slot - pallet_slot ?storage_container - storage_container ?temperature_setting - temperature_setting ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_reserved ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (allocation_entity_assigned_temperature ?cold_storage_facility ?temperature_setting)
+        (container_contains_zone_a_load ?storage_container)
+        (facility_packaging_assigned ?cold_storage_facility)
+        (facility_has_packaging_material ?cold_storage_facility ?packaging_material)
+        (not
+          (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+        (packaging_applied_to_pallet ?cold_storage_facility)
+      )
+  )
+  (:action consolidate_pallet_for_quality_check
+    :parameters (?cold_storage_facility - cold_storage_facility ?energy_unit - energy_unit ?technician - technician ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+        (facility_assigned_energy_unit ?cold_storage_facility ?energy_unit)
+        (allocation_entity_assigned_technician ?cold_storage_facility ?technician)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (not
+          (container_contains_zone_b_load ?storage_container)
+        )
+        (not
+          (pallet_consolidated ?cold_storage_facility)
+        )
+      )
+    :effect (pallet_consolidated ?cold_storage_facility)
+  )
+  (:action consolidate_pallet_for_quality_check_alternative
+    :parameters (?cold_storage_facility - cold_storage_facility ?energy_unit - energy_unit ?technician - technician ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (facility_pallet_slot_assignment_recorded ?cold_storage_facility)
+        (facility_assigned_energy_unit ?cold_storage_facility ?energy_unit)
+        (allocation_entity_assigned_technician ?cold_storage_facility ?technician)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (container_contains_zone_b_load ?storage_container)
+        (not
+          (pallet_consolidated ?cold_storage_facility)
+        )
+      )
+    :effect (pallet_consolidated ?cold_storage_facility)
+  )
+  (:action perform_quality_check_standard
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (pallet_consolidated ?cold_storage_facility)
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (not
+          (container_contains_zone_a_load ?storage_container)
+        )
+        (not
+          (container_contains_zone_b_load ?storage_container)
+        )
+        (not
+          (quality_check_completed ?cold_storage_facility)
+        )
+      )
+    :effect (quality_check_completed ?cold_storage_facility)
+  )
+  (:action perform_quality_check_and_flag
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (pallet_consolidated ?cold_storage_facility)
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (container_contains_zone_a_load ?storage_container)
+        (not
+          (container_contains_zone_b_load ?storage_container)
+        )
+        (not
+          (quality_check_completed ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (validation_attachment_flag ?cold_storage_facility)
+      )
+  )
+  (:action perform_quality_check_alternative
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (pallet_consolidated ?cold_storage_facility)
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (not
+          (container_contains_zone_a_load ?storage_container)
+        )
+        (container_contains_zone_b_load ?storage_container)
+        (not
+          (quality_check_completed ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (validation_attachment_flag ?cold_storage_facility)
+      )
+  )
+  (:action perform_quality_check_full
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate ?pallet_slot - pallet_slot ?storage_container - storage_container)
+    :precondition
+      (and
+        (pallet_consolidated ?cold_storage_facility)
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (facility_has_pallet_slot ?cold_storage_facility ?pallet_slot)
+        (pallet_slot_assigned_to_container ?pallet_slot ?storage_container)
+        (container_contains_zone_a_load ?storage_container)
+        (container_contains_zone_b_load ?storage_container)
+        (not
+          (quality_check_completed ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (validation_attachment_flag ?cold_storage_facility)
+      )
+  )
+  (:action finalize_pallet_without_validation
+    :parameters (?cold_storage_facility - cold_storage_facility)
+    :precondition
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (not
+          (validation_attachment_flag ?cold_storage_facility)
+        )
+        (not
+          (facility_finalized_for_distribution ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized_for_distribution ?cold_storage_facility)
+        (ready_for_distribution ?cold_storage_facility)
+      )
+  )
+  (:action attach_validation_batch_to_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?validation_batch - validation_batch)
+    :precondition
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (validation_attachment_flag ?cold_storage_facility)
+        (validation_batch_available ?validation_batch)
+      )
+    :effect
+      (and
+        (facility_has_validation_batch ?cold_storage_facility ?validation_batch)
+        (not
+          (validation_batch_available ?validation_batch)
+        )
+      )
+  )
+  (:action activate_facility_for_distribution
+    :parameters (?cold_storage_facility - cold_storage_facility ?primary_supply_site - primary_supply_site ?secondary_supply_site - secondary_supply_site ?temperature_setting - temperature_setting ?validation_batch - validation_batch)
+    :precondition
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (validation_attachment_flag ?cold_storage_facility)
+        (facility_has_validation_batch ?cold_storage_facility ?validation_batch)
+        (facility_serves_primary_site ?cold_storage_facility ?primary_supply_site)
+        (facility_serves_secondary_site ?cold_storage_facility ?secondary_supply_site)
+        (primary_site_ready_for_loading ?primary_supply_site)
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+        (allocation_entity_assigned_temperature ?cold_storage_facility ?temperature_setting)
+        (not
+          (facility_activated ?cold_storage_facility)
+        )
+      )
+    :effect (facility_activated ?cold_storage_facility)
+  )
+  (:action finalize_facility_activation
+    :parameters (?cold_storage_facility - cold_storage_facility)
+    :precondition
+      (and
+        (quality_check_completed ?cold_storage_facility)
+        (facility_activated ?cold_storage_facility)
+        (not
+          (facility_finalized_for_distribution ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized_for_distribution ?cold_storage_facility)
+        (ready_for_distribution ?cold_storage_facility)
+      )
+  )
+  (:action apply_regulatory_permit_to_facility
+    :parameters (?cold_storage_facility - cold_storage_facility ?regulatory_permit - regulatory_permit ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (allocation_entity_validated ?cold_storage_facility)
+        (allocation_entity_assigned_temperature ?cold_storage_facility ?temperature_setting)
+        (regulatory_permit_available ?regulatory_permit)
+        (facility_has_regulatory_permit ?cold_storage_facility ?regulatory_permit)
+        (not
+          (regulatory_permit_applied ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (regulatory_permit_applied ?cold_storage_facility)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action process_regulatory_permit
+    :parameters (?cold_storage_facility - cold_storage_facility ?technician - technician)
+    :precondition
+      (and
+        (regulatory_permit_applied ?cold_storage_facility)
+        (allocation_entity_assigned_technician ?cold_storage_facility ?technician)
+        (not
+          (regulatory_permit_processed ?cold_storage_facility)
+        )
+      )
+    :effect (regulatory_permit_processed ?cold_storage_facility)
+  )
+  (:action validate_permit_with_certificate
+    :parameters (?cold_storage_facility - cold_storage_facility ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (regulatory_permit_processed ?cold_storage_facility)
+        (facility_assigned_quality_certificate ?cold_storage_facility ?quality_certificate)
+        (not
+          (regulatory_permit_validated ?cold_storage_facility)
+        )
+      )
+    :effect (regulatory_permit_validated ?cold_storage_facility)
+  )
+  (:action finalize_facility_permit_validation
+    :parameters (?cold_storage_facility - cold_storage_facility)
+    :precondition
+      (and
+        (regulatory_permit_validated ?cold_storage_facility)
+        (not
+          (facility_finalized_for_distribution ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_finalized_for_distribution ?cold_storage_facility)
+        (ready_for_distribution ?cold_storage_facility)
+      )
+  )
+  (:action finalize_assignment_to_primary_site
+    :parameters (?primary_supply_site - primary_supply_site ?storage_container - storage_container)
+    :precondition
+      (and
+        (primary_site_processing_ready ?primary_supply_site)
+        (primary_site_ready_for_loading ?primary_supply_site)
+        (container_reserved ?storage_container)
+        (container_ready_for_palletization ?storage_container)
+        (not
+          (ready_for_distribution ?primary_supply_site)
+        )
+      )
+    :effect (ready_for_distribution ?primary_supply_site)
+  )
+  (:action finalize_assignment_to_secondary_site
+    :parameters (?secondary_supply_site - secondary_supply_site ?storage_container - storage_container)
+    :precondition
+      (and
+        (secondary_site_processing_ready ?secondary_supply_site)
+        (secondary_site_ready_for_loading ?secondary_supply_site)
+        (container_reserved ?storage_container)
+        (container_ready_for_palletization ?storage_container)
+        (not
+          (ready_for_distribution ?secondary_supply_site)
+        )
+      )
+    :effect (ready_for_distribution ?secondary_supply_site)
+  )
+  (:action assign_contingency_reserve_to_entity
+    :parameters (?allocation_entity - allocation_entity ?contingency_reserve_unit - contingency_reserve_unit ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (ready_for_distribution ?allocation_entity)
+        (allocation_entity_assigned_temperature ?allocation_entity ?temperature_setting)
+        (contingency_reserve_available ?contingency_reserve_unit)
+        (not
+          (contingency_allocated ?allocation_entity)
+        )
+      )
+    :effect
+      (and
+        (contingency_allocated ?allocation_entity)
+        (allocation_entity_contingency_assigned ?allocation_entity ?contingency_reserve_unit)
+        (not
+          (contingency_reserve_available ?contingency_reserve_unit)
+        )
+      )
+  )
+  (:action finalize_primary_site_assignment_and_release_resources
+    :parameters (?primary_supply_site - primary_supply_site ?transport_asset - transport_asset ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_allocated ?primary_supply_site)
+        (allocation_entity_assigned_transport ?primary_supply_site ?transport_asset)
+        (allocation_entity_contingency_assigned ?primary_supply_site ?contingency_reserve_unit)
+        (not
+          (capacity_assigned ?primary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (capacity_assigned ?primary_supply_site)
+        (transport_available ?transport_asset)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action finalize_secondary_site_assignment_and_release_resources
+    :parameters (?secondary_supply_site - secondary_supply_site ?transport_asset - transport_asset ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_allocated ?secondary_supply_site)
+        (allocation_entity_assigned_transport ?secondary_supply_site ?transport_asset)
+        (allocation_entity_contingency_assigned ?secondary_supply_site ?contingency_reserve_unit)
+        (not
+          (capacity_assigned ?secondary_supply_site)
+        )
+      )
+    :effect
+      (and
+        (capacity_assigned ?secondary_supply_site)
+        (transport_available ?transport_asset)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action finalize_facility_assignment_and_release_resources
+    :parameters (?cold_storage_facility - cold_storage_facility ?transport_asset - transport_asset ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_allocated ?cold_storage_facility)
+        (allocation_entity_assigned_transport ?cold_storage_facility ?transport_asset)
+        (allocation_entity_contingency_assigned ?cold_storage_facility ?contingency_reserve_unit)
+        (not
+          (capacity_assigned ?cold_storage_facility)
+        )
+      )
+    :effect
+      (and
+        (capacity_assigned ?cold_storage_facility)
+        (transport_available ?transport_asset)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem cold_storage_capacity_assignment_case)
+  (:domain cold_storage_capacity_assignment)
+  (:objects farm_depot_1 - primary_supply_site satellite_depot_1 - secondary_supply_site cold_storage_facility_1 - cold_storage_facility cold_storage_facility_2 - cold_storage_facility refrigerated_truck_1 - transport_asset refrigerated_truck_2 - transport_asset refrigerated_truck_3 - transport_asset temperature_setting_1 - temperature_setting technician_1 - technician seed_bag_unit_1 - input_item_unit storage_zone_a_1 - storage_zone_a storage_zone_b_1 - storage_zone_b storage_container_1 - storage_container pallet_slot_1 - pallet_slot pallet_slot_2 - pallet_slot packaging_material_1 - packaging_material packaging_material_2 - packaging_material validation_batch_1 - validation_batch validation_batch_2 - validation_batch contingency_reserve_unit_1 - contingency_reserve_unit energy_unit_1 - energy_unit regulatory_permit_1 - regulatory_permit regulatory_permit_2 - regulatory_permit quality_certificate_1 - quality_certificate)
+  (:init
+    (transport_available refrigerated_truck_1)
+    (transport_available refrigerated_truck_2)
+    (transport_available refrigerated_truck_3)
+    (temperature_setting_available temperature_setting_1)
+    (technician_available technician_1)
+    (input_unit_available seed_bag_unit_1)
+    (primary_site_assigned_zone_a farm_depot_1 storage_zone_a_1)
+    (secondary_site_assigned_zone_b satellite_depot_1 storage_zone_b_1)
+    (container_available storage_container_1)
+    (pallet_slot_available pallet_slot_1)
+    (pallet_slot_available pallet_slot_2)
+    (facility_serves_primary_site cold_storage_facility_1 farm_depot_1)
+    (facility_serves_primary_site cold_storage_facility_2 farm_depot_1)
+    (facility_serves_secondary_site cold_storage_facility_1 satellite_depot_1)
+    (facility_serves_secondary_site cold_storage_facility_2 satellite_depot_1)
+    (facility_has_container cold_storage_facility_1 storage_container_1)
+    (facility_has_container cold_storage_facility_2 storage_container_1)
+    (facility_has_pallet_slot cold_storage_facility_1 pallet_slot_1)
+    (facility_has_pallet_slot cold_storage_facility_2 pallet_slot_2)
+    (packaging_material_available packaging_material_1)
+    (packaging_material_available packaging_material_2)
+    (validation_batch_available validation_batch_1)
+    (validation_batch_available validation_batch_2)
+    (contingency_reserve_available contingency_reserve_unit_1)
+    (energy_unit_available energy_unit_1)
+    (regulatory_permit_available regulatory_permit_1)
+    (facility_has_regulatory_permit cold_storage_facility_1 regulatory_permit_1)
+    (facility_has_regulatory_permit cold_storage_facility_2 regulatory_permit_2)
+    (quality_certificate_available quality_certificate_1)
+  )
+  (:goal
+    (and
+      (capacity_assigned farm_depot_1)
+      (capacity_assigned satellite_depot_1)
+      (capacity_assigned cold_storage_facility_1)
+      (capacity_assigned cold_storage_facility_2)
+    )
+  )
+)

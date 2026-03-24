@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain multi_city_route_sequence_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types location - object node - object asset - object proposal_container - object trip_proposal - proposal_container transport_asset - location activity_category - location venue_or_service - location special_request - location accommodation_option - location time_window - location preference_tag_a - location preference_tag_b - location auxiliary_resource - node attraction_choice - node constraint_tag_b - node outbound_option - asset inbound_option - asset booking_candidate - asset occurrence_group_1 - trip_proposal occurrence_group_2 - trip_proposal city_occurrence_outbound - occurrence_group_1 city_occurrence_inbound - occurrence_group_1 itinerary_segment - occurrence_group_2)
+  (:predicates
+    (proposal_initialized ?trip_proposal - trip_proposal)
+    (validated_entity ?trip_proposal - trip_proposal)
+    (proposal_transport_attached ?trip_proposal - trip_proposal)
+    (reservation_confirmed ?trip_proposal - trip_proposal)
+    (ready_for_finalization ?trip_proposal - trip_proposal)
+    (entity_locked ?trip_proposal - trip_proposal)
+    (transport_resource_available ?transport_resource - transport_asset)
+    (transport_binding ?trip_proposal - trip_proposal ?transport_resource - transport_asset)
+    (activity_category_available ?activity_category - activity_category)
+    (activity_binding ?trip_proposal - trip_proposal ?activity_category - activity_category)
+    (venue_available ?venue_or_service - venue_or_service)
+    (venue_binding ?trip_proposal - trip_proposal ?venue_or_service - venue_or_service)
+    (auxiliary_resource_available ?auxiliary_resource - auxiliary_resource)
+    (occurrence_outbound_auxiliary_binding ?city_occurrence_a - city_occurrence_outbound ?auxiliary_resource - auxiliary_resource)
+    (occurrence_inbound_auxiliary_binding ?city_occurrence_b - city_occurrence_inbound ?auxiliary_resource - auxiliary_resource)
+    (occurrence_outbound_to_outbound_option ?city_occurrence_a - city_occurrence_outbound ?outbound_option - outbound_option)
+    (outbound_option_selected ?outbound_option - outbound_option)
+    (outbound_option_reserved ?outbound_option - outbound_option)
+    (occurrence_outbound_resources_allocated ?city_occurrence_a - city_occurrence_outbound)
+    (occurrence_inbound_to_inbound_option ?city_occurrence_b - city_occurrence_inbound ?inbound_option - inbound_option)
+    (inbound_option_selected ?inbound_option - inbound_option)
+    (inbound_option_reserved ?inbound_option - inbound_option)
+    (occurrence_inbound_resources_allocated ?city_occurrence_b - city_occurrence_inbound)
+    (booking_slot_available ?booking_candidate - booking_candidate)
+    (booking_slot_reserved ?booking_candidate - booking_candidate)
+    (booking_candidate_outbound_link ?booking_candidate - booking_candidate ?outbound_option - outbound_option)
+    (booking_candidate_inbound_link ?booking_candidate - booking_candidate ?inbound_option - inbound_option)
+    (booking_candidate_outbound_ready ?booking_candidate - booking_candidate)
+    (booking_candidate_inbound_ready ?booking_candidate - booking_candidate)
+    (booking_candidate_slot_confirmed ?booking_candidate - booking_candidate)
+    (segment_to_occurrence_outbound_compat ?itinerary_segment - itinerary_segment ?city_occurrence_a - city_occurrence_outbound)
+    (segment_to_occurrence_inbound_compat ?itinerary_segment - itinerary_segment ?city_occurrence_b - city_occurrence_inbound)
+    (segment_to_booking_candidate_compat ?itinerary_segment - itinerary_segment ?booking_candidate - booking_candidate)
+    (attraction_choice_available ?attraction_choice - attraction_choice)
+    (segment_attraction_compatibility ?itinerary_segment - itinerary_segment ?attraction_choice - attraction_choice)
+    (attraction_choice_selected ?attraction_choice - attraction_choice)
+    (attraction_assigned_to_booking ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    (segment_attraction_committed ?itinerary_segment - itinerary_segment)
+    (segment_addon_selected ?itinerary_segment - itinerary_segment)
+    (optional_feature_ready_pending ?itinerary_segment - itinerary_segment)
+    (special_request_attached ?itinerary_segment - itinerary_segment)
+    (special_request_integrated ?itinerary_segment - itinerary_segment)
+    (segment_optional_feature_confirmed ?itinerary_segment - itinerary_segment)
+    (segment_checks_passed ?itinerary_segment - itinerary_segment)
+    (constraint_tag_available ?constraint_tag_b - constraint_tag_b)
+    (segment_constraint_binding ?itinerary_segment - itinerary_segment ?constraint_tag_b - constraint_tag_b)
+    (optional_feature_applied ?itinerary_segment - itinerary_segment)
+    (optional_feature_activated ?itinerary_segment - itinerary_segment)
+    (optional_feature_ready_confirmed ?itinerary_segment - itinerary_segment)
+    (special_request_available ?special_request - special_request)
+    (segment_special_request_binding ?itinerary_segment - itinerary_segment ?special_request - special_request)
+    (accommodation_option_available ?accommodation_option - accommodation_option)
+    (segment_accommodation_binding ?itinerary_segment - itinerary_segment ?accommodation_option - accommodation_option)
+    (preference_tag_a_available ?preference_tag_a - preference_tag_a)
+    (segment_preference_a_binding ?itinerary_segment - itinerary_segment ?preference_tag_a - preference_tag_a)
+    (preference_tag_b_available ?preference_tag_b - preference_tag_b)
+    (segment_preference_b_binding ?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b)
+    (time_window_available ?time_window - time_window)
+    (time_window_binding ?trip_proposal - trip_proposal ?time_window - time_window)
+    (occurrence_outbound_ready ?city_occurrence_a - city_occurrence_outbound)
+    (occurrence_inbound_ready ?city_occurrence_b - city_occurrence_inbound)
+    (segment_finalized ?itinerary_segment - itinerary_segment)
+  )
+  (:action create_trip_proposal
+    :parameters (?trip_proposal - trip_proposal)
+    :precondition
+      (and
+        (not
+          (proposal_initialized ?trip_proposal)
+        )
+        (not
+          (reservation_confirmed ?trip_proposal)
+        )
+      )
+    :effect (proposal_initialized ?trip_proposal)
+  )
+  (:action assign_transport_to_proposal
+    :parameters (?trip_proposal - trip_proposal ?transport_resource - transport_asset)
+    :precondition
+      (and
+        (proposal_initialized ?trip_proposal)
+        (not
+          (proposal_transport_attached ?trip_proposal)
+        )
+        (transport_resource_available ?transport_resource)
+      )
+    :effect
+      (and
+        (proposal_transport_attached ?trip_proposal)
+        (transport_binding ?trip_proposal ?transport_resource)
+        (not
+          (transport_resource_available ?transport_resource)
+        )
+      )
+  )
+  (:action attach_activity_category_to_proposal
+    :parameters (?trip_proposal - trip_proposal ?activity_category - activity_category)
+    :precondition
+      (and
+        (proposal_initialized ?trip_proposal)
+        (proposal_transport_attached ?trip_proposal)
+        (activity_category_available ?activity_category)
+      )
+    :effect
+      (and
+        (activity_binding ?trip_proposal ?activity_category)
+        (not
+          (activity_category_available ?activity_category)
+        )
+      )
+  )
+  (:action confirm_activity_attachment
+    :parameters (?trip_proposal - trip_proposal ?activity_category - activity_category)
+    :precondition
+      (and
+        (proposal_initialized ?trip_proposal)
+        (proposal_transport_attached ?trip_proposal)
+        (activity_binding ?trip_proposal ?activity_category)
+        (not
+          (validated_entity ?trip_proposal)
+        )
+      )
+    :effect (validated_entity ?trip_proposal)
+  )
+  (:action unassign_activity_category_from_proposal
+    :parameters (?trip_proposal - trip_proposal ?activity_category - activity_category)
+    :precondition
+      (and
+        (activity_binding ?trip_proposal ?activity_category)
+      )
+    :effect
+      (and
+        (activity_category_available ?activity_category)
+        (not
+          (activity_binding ?trip_proposal ?activity_category)
+        )
+      )
+  )
+  (:action attach_venue_to_proposal
+    :parameters (?trip_proposal - trip_proposal ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (validated_entity ?trip_proposal)
+        (venue_available ?venue_or_service)
+      )
+    :effect
+      (and
+        (venue_binding ?trip_proposal ?venue_or_service)
+        (not
+          (venue_available ?venue_or_service)
+        )
+      )
+  )
+  (:action detach_venue_from_proposal
+    :parameters (?trip_proposal - trip_proposal ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (venue_binding ?trip_proposal ?venue_or_service)
+      )
+    :effect
+      (and
+        (venue_available ?venue_or_service)
+        (not
+          (venue_binding ?trip_proposal ?venue_or_service)
+        )
+      )
+  )
+  (:action assign_preference_tag_a_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_a - preference_tag_a)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (preference_tag_a_available ?preference_tag_a)
+      )
+    :effect
+      (and
+        (segment_preference_a_binding ?itinerary_segment ?preference_tag_a)
+        (not
+          (preference_tag_a_available ?preference_tag_a)
+        )
+      )
+  )
+  (:action unassign_preference_tag_a_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_a - preference_tag_a)
+    :precondition
+      (and
+        (segment_preference_a_binding ?itinerary_segment ?preference_tag_a)
+      )
+    :effect
+      (and
+        (preference_tag_a_available ?preference_tag_a)
+        (not
+          (segment_preference_a_binding ?itinerary_segment ?preference_tag_a)
+        )
+      )
+  )
+  (:action assign_preference_tag_b_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (preference_tag_b_available ?preference_tag_b)
+      )
+    :effect
+      (and
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (not
+          (preference_tag_b_available ?preference_tag_b)
+        )
+      )
+  )
+  (:action unassign_preference_tag_b_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b)
+    :precondition
+      (and
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+      )
+    :effect
+      (and
+        (preference_tag_b_available ?preference_tag_b)
+        (not
+          (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        )
+      )
+  )
+  (:action select_outbound_option_for_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?outbound_option - outbound_option ?activity_category - activity_category)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_a)
+        (activity_binding ?city_occurrence_a ?activity_category)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (not
+          (outbound_option_selected ?outbound_option)
+        )
+        (not
+          (outbound_option_reserved ?outbound_option)
+        )
+      )
+    :effect (outbound_option_selected ?outbound_option)
+  )
+  (:action assign_venue_to_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?outbound_option - outbound_option ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_a)
+        (venue_binding ?city_occurrence_a ?venue_or_service)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (outbound_option_selected ?outbound_option)
+        (not
+          (occurrence_outbound_ready ?city_occurrence_a)
+        )
+      )
+    :effect
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+      )
+  )
+  (:action assign_auxiliary_resource_to_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?outbound_option - outbound_option ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_a)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (occurrence_outbound_ready ?city_occurrence_a)
+        )
+      )
+    :effect
+      (and
+        (outbound_option_reserved ?outbound_option)
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_outbound_auxiliary_binding ?city_occurrence_a ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_outbound_and_auxiliary_for_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?outbound_option - outbound_option ?activity_category - activity_category ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_a)
+        (activity_binding ?city_occurrence_a ?activity_category)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (outbound_option_reserved ?outbound_option)
+        (occurrence_outbound_auxiliary_binding ?city_occurrence_a ?auxiliary_resource)
+        (not
+          (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        )
+      )
+    :effect
+      (and
+        (outbound_option_selected ?outbound_option)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (occurrence_outbound_auxiliary_binding ?city_occurrence_a ?auxiliary_resource)
+        )
+      )
+  )
+  (:action select_inbound_option_for_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?inbound_option - inbound_option ?activity_category - activity_category)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_b)
+        (activity_binding ?city_occurrence_b ?activity_category)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (not
+          (inbound_option_selected ?inbound_option)
+        )
+        (not
+          (inbound_option_reserved ?inbound_option)
+        )
+      )
+    :effect (inbound_option_selected ?inbound_option)
+  )
+  (:action assign_venue_to_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?inbound_option - inbound_option ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_b)
+        (venue_binding ?city_occurrence_b ?venue_or_service)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (inbound_option_selected ?inbound_option)
+        (not
+          (occurrence_inbound_ready ?city_occurrence_b)
+        )
+      )
+    :effect
+      (and
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+      )
+  )
+  (:action assign_auxiliary_resource_to_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?inbound_option - inbound_option ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_b)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (occurrence_inbound_ready ?city_occurrence_b)
+        )
+      )
+    :effect
+      (and
+        (inbound_option_reserved ?inbound_option)
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_inbound_auxiliary_binding ?city_occurrence_b ?auxiliary_resource)
+        (not
+          (auxiliary_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action finalize_inbound_and_auxiliary_for_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?inbound_option - inbound_option ?activity_category - activity_category ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (validated_entity ?city_occurrence_b)
+        (activity_binding ?city_occurrence_b ?activity_category)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (inbound_option_reserved ?inbound_option)
+        (occurrence_inbound_auxiliary_binding ?city_occurrence_b ?auxiliary_resource)
+        (not
+          (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        )
+      )
+    :effect
+      (and
+        (inbound_option_selected ?inbound_option)
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        (auxiliary_resource_available ?auxiliary_resource)
+        (not
+          (occurrence_inbound_auxiliary_binding ?city_occurrence_b ?auxiliary_resource)
+        )
+      )
+  )
+  (:action create_booking_candidate
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?city_occurrence_b - city_occurrence_inbound ?outbound_option - outbound_option ?inbound_option - inbound_option ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (outbound_option_selected ?outbound_option)
+        (inbound_option_selected ?inbound_option)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        (booking_slot_available ?booking_candidate)
+      )
+    :effect
+      (and
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_outbound_link ?booking_candidate ?outbound_option)
+        (booking_candidate_inbound_link ?booking_candidate ?inbound_option)
+        (not
+          (booking_slot_available ?booking_candidate)
+        )
+      )
+  )
+  (:action create_booking_candidate_outbound_reserved
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?city_occurrence_b - city_occurrence_inbound ?outbound_option - outbound_option ?inbound_option - inbound_option ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (outbound_option_reserved ?outbound_option)
+        (inbound_option_selected ?inbound_option)
+        (not
+          (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        )
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        (booking_slot_available ?booking_candidate)
+      )
+    :effect
+      (and
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_outbound_link ?booking_candidate ?outbound_option)
+        (booking_candidate_inbound_link ?booking_candidate ?inbound_option)
+        (booking_candidate_outbound_ready ?booking_candidate)
+        (not
+          (booking_slot_available ?booking_candidate)
+        )
+      )
+  )
+  (:action create_booking_candidate_inbound_reserved
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?city_occurrence_b - city_occurrence_inbound ?outbound_option - outbound_option ?inbound_option - inbound_option ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (outbound_option_selected ?outbound_option)
+        (inbound_option_reserved ?inbound_option)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        (not
+          (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        )
+        (booking_slot_available ?booking_candidate)
+      )
+    :effect
+      (and
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_outbound_link ?booking_candidate ?outbound_option)
+        (booking_candidate_inbound_link ?booking_candidate ?inbound_option)
+        (booking_candidate_inbound_ready ?booking_candidate)
+        (not
+          (booking_slot_available ?booking_candidate)
+        )
+      )
+  )
+  (:action create_booking_candidate_both_reserved
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?city_occurrence_b - city_occurrence_inbound ?outbound_option - outbound_option ?inbound_option - inbound_option ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_outbound_to_outbound_option ?city_occurrence_a ?outbound_option)
+        (occurrence_inbound_to_inbound_option ?city_occurrence_b ?inbound_option)
+        (outbound_option_reserved ?outbound_option)
+        (inbound_option_reserved ?inbound_option)
+        (not
+          (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        )
+        (not
+          (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        )
+        (booking_slot_available ?booking_candidate)
+      )
+    :effect
+      (and
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_outbound_link ?booking_candidate ?outbound_option)
+        (booking_candidate_inbound_link ?booking_candidate ?inbound_option)
+        (booking_candidate_outbound_ready ?booking_candidate)
+        (booking_candidate_inbound_ready ?booking_candidate)
+        (not
+          (booking_slot_available ?booking_candidate)
+        )
+      )
+  )
+  (:action confirm_booking_slot_for_candidate
+    :parameters (?booking_candidate - booking_candidate ?city_occurrence_a - city_occurrence_outbound ?activity_category - activity_category)
+    :precondition
+      (and
+        (booking_slot_reserved ?booking_candidate)
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (activity_binding ?city_occurrence_a ?activity_category)
+        (not
+          (booking_candidate_slot_confirmed ?booking_candidate)
+        )
+      )
+    :effect (booking_candidate_slot_confirmed ?booking_candidate)
+  )
+  (:action assign_attraction_to_booking_candidate
+    :parameters (?itinerary_segment - itinerary_segment ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (segment_to_booking_candidate_compat ?itinerary_segment ?booking_candidate)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_choice_available ?attraction_choice)
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_slot_confirmed ?booking_candidate)
+        (not
+          (attraction_choice_selected ?attraction_choice)
+        )
+      )
+    :effect
+      (and
+        (attraction_choice_selected ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (not
+          (attraction_choice_available ?attraction_choice)
+        )
+      )
+  )
+  (:action commit_attraction_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate ?activity_category - activity_category)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_choice_selected ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (activity_binding ?itinerary_segment ?activity_category)
+        (not
+          (booking_candidate_outbound_ready ?booking_candidate)
+        )
+        (not
+          (segment_attraction_committed ?itinerary_segment)
+        )
+      )
+    :effect (segment_attraction_committed ?itinerary_segment)
+  )
+  (:action attach_special_request_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?special_request - special_request)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (special_request_available ?special_request)
+        (not
+          (special_request_attached ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (special_request_attached ?itinerary_segment)
+        (segment_special_request_binding ?itinerary_segment ?special_request)
+        (not
+          (special_request_available ?special_request)
+        )
+      )
+  )
+  (:action integrate_special_request_with_attraction_and_booking
+    :parameters (?itinerary_segment - itinerary_segment ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate ?activity_category - activity_category ?special_request - special_request)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_choice_selected ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (activity_binding ?itinerary_segment ?activity_category)
+        (booking_candidate_outbound_ready ?booking_candidate)
+        (special_request_attached ?itinerary_segment)
+        (segment_special_request_binding ?itinerary_segment ?special_request)
+        (not
+          (segment_attraction_committed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_attraction_committed ?itinerary_segment)
+        (special_request_integrated ?itinerary_segment)
+      )
+  )
+  (:action apply_preference_a_and_commit_attraction
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_a - preference_tag_a ?venue_or_service - venue_or_service ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_attraction_committed ?itinerary_segment)
+        (segment_preference_a_binding ?itinerary_segment ?preference_tag_a)
+        (venue_binding ?itinerary_segment ?venue_or_service)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (not
+          (booking_candidate_inbound_ready ?booking_candidate)
+        )
+        (not
+          (segment_addon_selected ?itinerary_segment)
+        )
+      )
+    :effect (segment_addon_selected ?itinerary_segment)
+  )
+  (:action apply_preference_a_and_commit_attraction_variant
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_a - preference_tag_a ?venue_or_service - venue_or_service ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_attraction_committed ?itinerary_segment)
+        (segment_preference_a_binding ?itinerary_segment ?preference_tag_a)
+        (venue_binding ?itinerary_segment ?venue_or_service)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (booking_candidate_inbound_ready ?booking_candidate)
+        (not
+          (segment_addon_selected ?itinerary_segment)
+        )
+      )
+    :effect (segment_addon_selected ?itinerary_segment)
+  )
+  (:action apply_preference_b_and_mark_segment
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_addon_selected ?itinerary_segment)
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (not
+          (booking_candidate_outbound_ready ?booking_candidate)
+        )
+        (not
+          (booking_candidate_inbound_ready ?booking_candidate)
+        )
+        (not
+          (optional_feature_ready_pending ?itinerary_segment)
+        )
+      )
+    :effect (optional_feature_ready_pending ?itinerary_segment)
+  )
+  (:action apply_preference_b_and_confirm_optional_feature
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_addon_selected ?itinerary_segment)
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (booking_candidate_outbound_ready ?booking_candidate)
+        (not
+          (booking_candidate_inbound_ready ?booking_candidate)
+        )
+        (not
+          (optional_feature_ready_pending ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_optional_feature_confirmed ?itinerary_segment)
+      )
+  )
+  (:action apply_preference_b_and_confirm_optional_feature_variant
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_addon_selected ?itinerary_segment)
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (not
+          (booking_candidate_outbound_ready ?booking_candidate)
+        )
+        (booking_candidate_inbound_ready ?booking_candidate)
+        (not
+          (optional_feature_ready_pending ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_optional_feature_confirmed ?itinerary_segment)
+      )
+  )
+  (:action apply_preference_b_and_confirm_optional_feature_alternate
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b ?attraction_choice - attraction_choice ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (segment_addon_selected ?itinerary_segment)
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (segment_attraction_compatibility ?itinerary_segment ?attraction_choice)
+        (attraction_assigned_to_booking ?attraction_choice ?booking_candidate)
+        (booking_candidate_outbound_ready ?booking_candidate)
+        (booking_candidate_inbound_ready ?booking_candidate)
+        (not
+          (optional_feature_ready_pending ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_optional_feature_confirmed ?itinerary_segment)
+      )
+  )
+  (:action finalize_segment_from_optional_feature
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (not
+          (segment_optional_feature_confirmed ?itinerary_segment)
+        )
+        (not
+          (segment_finalized ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_finalized ?itinerary_segment)
+        (ready_for_finalization ?itinerary_segment)
+      )
+  )
+  (:action assign_accommodation_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_optional_feature_confirmed ?itinerary_segment)
+        (accommodation_option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (segment_accommodation_binding ?itinerary_segment ?accommodation_option)
+        (not
+          (accommodation_option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action perform_segment_final_checks
+    :parameters (?itinerary_segment - itinerary_segment ?city_occurrence_a - city_occurrence_outbound ?city_occurrence_b - city_occurrence_inbound ?activity_category - activity_category ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_optional_feature_confirmed ?itinerary_segment)
+        (segment_accommodation_binding ?itinerary_segment ?accommodation_option)
+        (segment_to_occurrence_outbound_compat ?itinerary_segment ?city_occurrence_a)
+        (segment_to_occurrence_inbound_compat ?itinerary_segment ?city_occurrence_b)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        (activity_binding ?itinerary_segment ?activity_category)
+        (not
+          (segment_checks_passed ?itinerary_segment)
+        )
+      )
+    :effect (segment_checks_passed ?itinerary_segment)
+  )
+  (:action finalize_segment
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (optional_feature_ready_pending ?itinerary_segment)
+        (segment_checks_passed ?itinerary_segment)
+        (not
+          (segment_finalized ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_finalized ?itinerary_segment)
+        (ready_for_finalization ?itinerary_segment)
+      )
+  )
+  (:action apply_optional_feature
+    :parameters (?itinerary_segment - itinerary_segment ?constraint_tag_b - constraint_tag_b ?activity_category - activity_category)
+    :precondition
+      (and
+        (validated_entity ?itinerary_segment)
+        (activity_binding ?itinerary_segment ?activity_category)
+        (constraint_tag_available ?constraint_tag_b)
+        (segment_constraint_binding ?itinerary_segment ?constraint_tag_b)
+        (not
+          (optional_feature_applied ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (optional_feature_applied ?itinerary_segment)
+        (not
+          (constraint_tag_available ?constraint_tag_b)
+        )
+      )
+  )
+  (:action attach_optional_feature_venue
+    :parameters (?itinerary_segment - itinerary_segment ?venue_or_service - venue_or_service)
+    :precondition
+      (and
+        (optional_feature_applied ?itinerary_segment)
+        (venue_binding ?itinerary_segment ?venue_or_service)
+        (not
+          (optional_feature_activated ?itinerary_segment)
+        )
+      )
+    :effect (optional_feature_activated ?itinerary_segment)
+  )
+  (:action mark_optional_feature_ready
+    :parameters (?itinerary_segment - itinerary_segment ?preference_tag_b - preference_tag_b)
+    :precondition
+      (and
+        (optional_feature_activated ?itinerary_segment)
+        (segment_preference_b_binding ?itinerary_segment ?preference_tag_b)
+        (not
+          (optional_feature_ready_confirmed ?itinerary_segment)
+        )
+      )
+    :effect (optional_feature_ready_confirmed ?itinerary_segment)
+  )
+  (:action finalize_optional_feature
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (optional_feature_ready_confirmed ?itinerary_segment)
+        (not
+          (segment_finalized ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_finalized ?itinerary_segment)
+        (ready_for_finalization ?itinerary_segment)
+      )
+  )
+  (:action confirm_city_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_outbound_ready ?city_occurrence_a)
+        (occurrence_outbound_resources_allocated ?city_occurrence_a)
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_slot_confirmed ?booking_candidate)
+        (not
+          (ready_for_finalization ?city_occurrence_a)
+        )
+      )
+    :effect (ready_for_finalization ?city_occurrence_a)
+  )
+  (:action confirm_city_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?booking_candidate - booking_candidate)
+    :precondition
+      (and
+        (occurrence_inbound_ready ?city_occurrence_b)
+        (occurrence_inbound_resources_allocated ?city_occurrence_b)
+        (booking_slot_reserved ?booking_candidate)
+        (booking_candidate_slot_confirmed ?booking_candidate)
+        (not
+          (ready_for_finalization ?city_occurrence_b)
+        )
+      )
+    :effect (ready_for_finalization ?city_occurrence_b)
+  )
+  (:action apply_time_window_and_lock_proposal
+    :parameters (?trip_proposal - trip_proposal ?time_window - time_window ?activity_category - activity_category)
+    :precondition
+      (and
+        (ready_for_finalization ?trip_proposal)
+        (activity_binding ?trip_proposal ?activity_category)
+        (time_window_available ?time_window)
+        (not
+          (entity_locked ?trip_proposal)
+        )
+      )
+    :effect
+      (and
+        (entity_locked ?trip_proposal)
+        (time_window_binding ?trip_proposal ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action reserve_transport_and_confirm_occurrence_a
+    :parameters (?city_occurrence_a - city_occurrence_outbound ?transport_resource - transport_asset ?time_window - time_window)
+    :precondition
+      (and
+        (entity_locked ?city_occurrence_a)
+        (transport_binding ?city_occurrence_a ?transport_resource)
+        (time_window_binding ?city_occurrence_a ?time_window)
+        (not
+          (reservation_confirmed ?city_occurrence_a)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?city_occurrence_a)
+        (transport_resource_available ?transport_resource)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action reserve_transport_and_confirm_occurrence_b
+    :parameters (?city_occurrence_b - city_occurrence_inbound ?transport_resource - transport_asset ?time_window - time_window)
+    :precondition
+      (and
+        (entity_locked ?city_occurrence_b)
+        (transport_binding ?city_occurrence_b ?transport_resource)
+        (time_window_binding ?city_occurrence_b ?time_window)
+        (not
+          (reservation_confirmed ?city_occurrence_b)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?city_occurrence_b)
+        (transport_resource_available ?transport_resource)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action reserve_transport_and_confirm_segment
+    :parameters (?itinerary_segment - itinerary_segment ?transport_resource - transport_asset ?time_window - time_window)
+    :precondition
+      (and
+        (entity_locked ?itinerary_segment)
+        (transport_binding ?itinerary_segment ?transport_resource)
+        (time_window_binding ?itinerary_segment ?time_window)
+        (not
+          (reservation_confirmed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (reservation_confirmed ?itinerary_segment)
+        (transport_resource_available ?transport_resource)
+        (time_window_available ?time_window)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem multi_city_itinerary_problem)
+  (:domain multi_city_route_sequence_planning)
+  (:objects city_occurrence_a_1 - city_occurrence_outbound city_occurrence_b_1 - city_occurrence_inbound itinerary_segment_1 - itinerary_segment itinerary_segment_2 - itinerary_segment transport_resource_1 - transport_asset transport_resource_2 - transport_asset transport_resource_3 - transport_asset activity_category_1 - activity_category venue_1 - venue_or_service auxiliary_resource_1 - auxiliary_resource outbound_option_1 - outbound_option inbound_option_1 - inbound_option booking_candidate_1 - booking_candidate attraction_choice_1 - attraction_choice attraction_choice_2 - attraction_choice special_request_1 - special_request special_request_2 - special_request accommodation_option_1 - accommodation_option accommodation_option_2 - accommodation_option time_window_1 - time_window preference_tag_a_1 - preference_tag_a constraint_tag_b_1 - constraint_tag_b constraint_tag_b_2 - constraint_tag_b preference_tag_b_1 - preference_tag_b)
+  (:init
+    (transport_resource_available transport_resource_1)
+    (transport_resource_available transport_resource_2)
+    (transport_resource_available transport_resource_3)
+    (activity_category_available activity_category_1)
+    (venue_available venue_1)
+    (auxiliary_resource_available auxiliary_resource_1)
+    (occurrence_outbound_to_outbound_option city_occurrence_a_1 outbound_option_1)
+    (occurrence_inbound_to_inbound_option city_occurrence_b_1 inbound_option_1)
+    (booking_slot_available booking_candidate_1)
+    (attraction_choice_available attraction_choice_1)
+    (attraction_choice_available attraction_choice_2)
+    (segment_to_occurrence_outbound_compat itinerary_segment_1 city_occurrence_a_1)
+    (segment_to_occurrence_outbound_compat itinerary_segment_2 city_occurrence_a_1)
+    (segment_to_occurrence_inbound_compat itinerary_segment_1 city_occurrence_b_1)
+    (segment_to_occurrence_inbound_compat itinerary_segment_2 city_occurrence_b_1)
+    (segment_to_booking_candidate_compat itinerary_segment_1 booking_candidate_1)
+    (segment_to_booking_candidate_compat itinerary_segment_2 booking_candidate_1)
+    (segment_attraction_compatibility itinerary_segment_1 attraction_choice_1)
+    (segment_attraction_compatibility itinerary_segment_2 attraction_choice_2)
+    (special_request_available special_request_1)
+    (special_request_available special_request_2)
+    (accommodation_option_available accommodation_option_1)
+    (accommodation_option_available accommodation_option_2)
+    (time_window_available time_window_1)
+    (preference_tag_a_available preference_tag_a_1)
+    (constraint_tag_available constraint_tag_b_1)
+    (segment_constraint_binding itinerary_segment_1 constraint_tag_b_1)
+    (segment_constraint_binding itinerary_segment_2 constraint_tag_b_2)
+    (preference_tag_b_available preference_tag_b_1)
+  )
+  (:goal
+    (and
+      (reservation_confirmed city_occurrence_a_1)
+      (reservation_confirmed city_occurrence_b_1)
+      (reservation_confirmed itinerary_segment_1)
+      (reservation_confirmed itinerary_segment_2)
+    )
+  )
+)

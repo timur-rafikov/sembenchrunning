@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain conflict_free_schedule_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_root - object attribute_root - object slot_type_root - object task_root - object task - task_root resource_pool - resource_root time_slot - resource_root workstation - resource_root priority_token - resource_root qualification - resource_root location_marker - resource_root equipment - resource_root operation_mode - resource_root consumable_item - attribute_root material_unit - attribute_root supervisor_token - attribute_root machine_slot - slot_type_root human_slot - slot_type_root assignment_candidate - slot_type_root task_group - task schedule_frame_root - task machine_agent - task_group human_agent - task_group schedule_frame - schedule_frame_root)
+  (:predicates
+    (activated ?task - task)
+    (ready_for_assignment ?task - task)
+    (resource_claimed ?task - task)
+    (scheduled ?task - task)
+    (readiness_flag ?task - task)
+    (commit_token ?task - task)
+    (resource_pool_available ?resource_pool - resource_pool)
+    (reserved_resource ?task - task ?resource_pool - resource_pool)
+    (time_slot_available ?time_slot - time_slot)
+    (assigned_time_slot ?task - task ?time_slot - time_slot)
+    (workstation_available ?workstation - workstation)
+    (assigned_workstation ?task - task ?workstation - workstation)
+    (consumable_available ?consumable_item - consumable_item)
+    (machine_reserved_material ?machine_agent - machine_agent ?consumable_item - consumable_item)
+    (human_reserved_material ?human_agent - human_agent ?consumable_item - consumable_item)
+    (machine_has_slot ?machine_agent - machine_agent ?machine_slot - machine_slot)
+    (machine_slot_proposed ?machine_slot - machine_slot)
+    (machine_slot_reserved ?machine_slot - machine_slot)
+    (machine_engaged ?machine_agent - machine_agent)
+    (human_has_slot ?human_agent - human_agent ?human_slot - human_slot)
+    (human_slot_proposed ?human_slot - human_slot)
+    (human_slot_reserved ?human_slot - human_slot)
+    (human_engaged ?human_agent - human_agent)
+    (candidate_open ?assignment_candidate - assignment_candidate)
+    (candidate_active ?assignment_candidate - assignment_candidate)
+    (candidate_has_machine_slot ?assignment_candidate - assignment_candidate ?machine_slot - machine_slot)
+    (candidate_has_human_slot ?assignment_candidate - assignment_candidate ?human_slot - human_slot)
+    (candidate_machine_slot_preferred ?assignment_candidate - assignment_candidate)
+    (candidate_machine_slot_alternate ?assignment_candidate - assignment_candidate)
+    (candidate_slot_locked ?assignment_candidate - assignment_candidate)
+    (frame_requires_machine ?schedule_frame - schedule_frame ?machine_agent - machine_agent)
+    (frame_requires_human ?schedule_frame - schedule_frame ?human_agent - human_agent)
+    (frame_has_assignment_candidate ?schedule_frame - schedule_frame ?assignment_candidate - assignment_candidate)
+    (material_unit_available ?material_unit - material_unit)
+    (frame_has_material_unit ?schedule_frame - schedule_frame ?material_unit - material_unit)
+    (material_unit_attached ?material_unit - material_unit)
+    (material_assigned_to_candidate ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    (frame_materials_verified ?schedule_frame - schedule_frame)
+    (frame_equipment_verified ?schedule_frame - schedule_frame)
+    (frame_validated ?schedule_frame - schedule_frame)
+    (frame_priority_flag ?schedule_frame - schedule_frame)
+    (frame_priority_applied ?schedule_frame - schedule_frame)
+    (frame_has_qualification_slot ?schedule_frame - schedule_frame)
+    (frame_final_checks_passed ?schedule_frame - schedule_frame)
+    (supervisor_available ?supervisor_token - supervisor_token)
+    (frame_has_supervisor_token ?schedule_frame - schedule_frame ?supervisor_token - supervisor_token)
+    (frame_supervisor_assigned ?schedule_frame - schedule_frame)
+    (frame_supervisor_reviewed ?schedule_frame - schedule_frame)
+    (frame_supervisor_approved ?schedule_frame - schedule_frame)
+    (priority_token_available ?priority_token - priority_token)
+    (frame_assigned_priority ?schedule_frame - schedule_frame ?priority_token - priority_token)
+    (qualification_available ?qualification - qualification)
+    (frame_has_qualification ?schedule_frame - schedule_frame ?qualification - qualification)
+    (equipment_available ?equipment - equipment)
+    (frame_has_equipment ?schedule_frame - schedule_frame ?equipment - equipment)
+    (operation_mode_available ?operation_mode - operation_mode)
+    (frame_has_operation_mode ?schedule_frame - schedule_frame ?operation_mode - operation_mode)
+    (location_token_available ?location_marker - location_marker)
+    (assigned_location ?task - task ?location_marker - location_marker)
+    (machine_prepared ?machine_agent - machine_agent)
+    (human_prepared ?human_agent - human_agent)
+    (frame_committed ?schedule_frame - schedule_frame)
+  )
+  (:action initialize_task
+    :parameters (?task - task)
+    :precondition
+      (and
+        (not
+          (activated ?task)
+        )
+        (not
+          (scheduled ?task)
+        )
+      )
+    :effect (activated ?task)
+  )
+  (:action claim_resource_for_task
+    :parameters (?task - task ?resource_pool - resource_pool)
+    :precondition
+      (and
+        (activated ?task)
+        (not
+          (resource_claimed ?task)
+        )
+        (resource_pool_available ?resource_pool)
+      )
+    :effect
+      (and
+        (resource_claimed ?task)
+        (reserved_resource ?task ?resource_pool)
+        (not
+          (resource_pool_available ?resource_pool)
+        )
+      )
+  )
+  (:action propose_time_slot_for_task
+    :parameters (?task - task ?time_slot - time_slot)
+    :precondition
+      (and
+        (activated ?task)
+        (resource_claimed ?task)
+        (time_slot_available ?time_slot)
+      )
+    :effect
+      (and
+        (assigned_time_slot ?task ?time_slot)
+        (not
+          (time_slot_available ?time_slot)
+        )
+      )
+  )
+  (:action confirm_time_slot_for_task
+    :parameters (?task - task ?time_slot - time_slot)
+    :precondition
+      (and
+        (activated ?task)
+        (resource_claimed ?task)
+        (assigned_time_slot ?task ?time_slot)
+        (not
+          (ready_for_assignment ?task)
+        )
+      )
+    :effect (ready_for_assignment ?task)
+  )
+  (:action revert_time_slot_assignment
+    :parameters (?task - task ?time_slot - time_slot)
+    :precondition
+      (and
+        (assigned_time_slot ?task ?time_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_slot)
+        (not
+          (assigned_time_slot ?task ?time_slot)
+        )
+      )
+  )
+  (:action bind_task_to_workstation
+    :parameters (?task - task ?workstation - workstation)
+    :precondition
+      (and
+        (ready_for_assignment ?task)
+        (workstation_available ?workstation)
+      )
+    :effect
+      (and
+        (assigned_workstation ?task ?workstation)
+        (not
+          (workstation_available ?workstation)
+        )
+      )
+  )
+  (:action release_workstation_binding
+    :parameters (?task - task ?workstation - workstation)
+    :precondition
+      (and
+        (assigned_workstation ?task ?workstation)
+      )
+    :effect
+      (and
+        (workstation_available ?workstation)
+        (not
+          (assigned_workstation ?task ?workstation)
+        )
+      )
+  )
+  (:action attach_equipment_to_frame
+    :parameters (?schedule_frame - schedule_frame ?equipment - equipment)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (frame_has_equipment ?schedule_frame ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action detach_equipment_from_frame
+    :parameters (?schedule_frame - schedule_frame ?equipment - equipment)
+    :precondition
+      (and
+        (frame_has_equipment ?schedule_frame ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (frame_has_equipment ?schedule_frame ?equipment)
+        )
+      )
+  )
+  (:action attach_operation_mode_to_frame
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (operation_mode_available ?operation_mode)
+      )
+    :effect
+      (and
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (not
+          (operation_mode_available ?operation_mode)
+        )
+      )
+  )
+  (:action detach_operation_mode_from_frame
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode)
+    :precondition
+      (and
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+      )
+    :effect
+      (and
+        (operation_mode_available ?operation_mode)
+        (not
+          (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        )
+      )
+  )
+  (:action propose_machine_slot
+    :parameters (?machine_agent - machine_agent ?machine_slot - machine_slot ?time_slot - time_slot)
+    :precondition
+      (and
+        (ready_for_assignment ?machine_agent)
+        (assigned_time_slot ?machine_agent ?time_slot)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (not
+          (machine_slot_proposed ?machine_slot)
+        )
+        (not
+          (machine_slot_reserved ?machine_slot)
+        )
+      )
+    :effect (machine_slot_proposed ?machine_slot)
+  )
+  (:action machine_confirm_slot_with_workstation
+    :parameters (?machine_agent - machine_agent ?machine_slot - machine_slot ?workstation - workstation)
+    :precondition
+      (and
+        (ready_for_assignment ?machine_agent)
+        (assigned_workstation ?machine_agent ?workstation)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (machine_slot_proposed ?machine_slot)
+        (not
+          (machine_prepared ?machine_agent)
+        )
+      )
+    :effect
+      (and
+        (machine_prepared ?machine_agent)
+        (machine_engaged ?machine_agent)
+      )
+  )
+  (:action reserve_material_for_machine_slot
+    :parameters (?machine_agent - machine_agent ?machine_slot - machine_slot ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (ready_for_assignment ?machine_agent)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (machine_prepared ?machine_agent)
+        )
+      )
+    :effect
+      (and
+        (machine_slot_reserved ?machine_slot)
+        (machine_prepared ?machine_agent)
+        (machine_reserved_material ?machine_agent ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action confirm_material_allocation_for_machine_slot
+    :parameters (?machine_agent - machine_agent ?machine_slot - machine_slot ?time_slot - time_slot ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (ready_for_assignment ?machine_agent)
+        (assigned_time_slot ?machine_agent ?time_slot)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (machine_slot_reserved ?machine_slot)
+        (machine_reserved_material ?machine_agent ?consumable_item)
+        (not
+          (machine_engaged ?machine_agent)
+        )
+      )
+    :effect
+      (and
+        (machine_slot_proposed ?machine_slot)
+        (machine_engaged ?machine_agent)
+        (consumable_available ?consumable_item)
+        (not
+          (machine_reserved_material ?machine_agent ?consumable_item)
+        )
+      )
+  )
+  (:action propose_human_slot
+    :parameters (?human_agent - human_agent ?human_slot - human_slot ?time_slot - time_slot)
+    :precondition
+      (and
+        (ready_for_assignment ?human_agent)
+        (assigned_time_slot ?human_agent ?time_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (not
+          (human_slot_proposed ?human_slot)
+        )
+        (not
+          (human_slot_reserved ?human_slot)
+        )
+      )
+    :effect (human_slot_proposed ?human_slot)
+  )
+  (:action human_confirm_slot_with_workstation
+    :parameters (?human_agent - human_agent ?human_slot - human_slot ?workstation - workstation)
+    :precondition
+      (and
+        (ready_for_assignment ?human_agent)
+        (assigned_workstation ?human_agent ?workstation)
+        (human_has_slot ?human_agent ?human_slot)
+        (human_slot_proposed ?human_slot)
+        (not
+          (human_prepared ?human_agent)
+        )
+      )
+    :effect
+      (and
+        (human_prepared ?human_agent)
+        (human_engaged ?human_agent)
+      )
+  )
+  (:action reserve_material_for_human_slot
+    :parameters (?human_agent - human_agent ?human_slot - human_slot ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (ready_for_assignment ?human_agent)
+        (human_has_slot ?human_agent ?human_slot)
+        (consumable_available ?consumable_item)
+        (not
+          (human_prepared ?human_agent)
+        )
+      )
+    :effect
+      (and
+        (human_slot_reserved ?human_slot)
+        (human_prepared ?human_agent)
+        (human_reserved_material ?human_agent ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action confirm_material_allocation_for_human_slot
+    :parameters (?human_agent - human_agent ?human_slot - human_slot ?time_slot - time_slot ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (ready_for_assignment ?human_agent)
+        (assigned_time_slot ?human_agent ?time_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (human_slot_reserved ?human_slot)
+        (human_reserved_material ?human_agent ?consumable_item)
+        (not
+          (human_engaged ?human_agent)
+        )
+      )
+    :effect
+      (and
+        (human_slot_proposed ?human_slot)
+        (human_engaged ?human_agent)
+        (consumable_available ?consumable_item)
+        (not
+          (human_reserved_material ?human_agent ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_assignment_candidate
+    :parameters (?machine_agent - machine_agent ?human_agent - human_agent ?machine_slot - machine_slot ?human_slot - human_slot ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (machine_prepared ?machine_agent)
+        (human_prepared ?human_agent)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (machine_slot_proposed ?machine_slot)
+        (human_slot_proposed ?human_slot)
+        (machine_engaged ?machine_agent)
+        (human_engaged ?human_agent)
+        (candidate_open ?assignment_candidate)
+      )
+    :effect
+      (and
+        (candidate_active ?assignment_candidate)
+        (candidate_has_machine_slot ?assignment_candidate ?machine_slot)
+        (candidate_has_human_slot ?assignment_candidate ?human_slot)
+        (not
+          (candidate_open ?assignment_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_machine_reserved_slot
+    :parameters (?machine_agent - machine_agent ?human_agent - human_agent ?machine_slot - machine_slot ?human_slot - human_slot ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (machine_prepared ?machine_agent)
+        (human_prepared ?human_agent)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (machine_slot_reserved ?machine_slot)
+        (human_slot_proposed ?human_slot)
+        (not
+          (machine_engaged ?machine_agent)
+        )
+        (human_engaged ?human_agent)
+        (candidate_open ?assignment_candidate)
+      )
+    :effect
+      (and
+        (candidate_active ?assignment_candidate)
+        (candidate_has_machine_slot ?assignment_candidate ?machine_slot)
+        (candidate_has_human_slot ?assignment_candidate ?human_slot)
+        (candidate_machine_slot_preferred ?assignment_candidate)
+        (not
+          (candidate_open ?assignment_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_human_reserved_slot
+    :parameters (?machine_agent - machine_agent ?human_agent - human_agent ?machine_slot - machine_slot ?human_slot - human_slot ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (machine_prepared ?machine_agent)
+        (human_prepared ?human_agent)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (machine_slot_proposed ?machine_slot)
+        (human_slot_reserved ?human_slot)
+        (machine_engaged ?machine_agent)
+        (not
+          (human_engaged ?human_agent)
+        )
+        (candidate_open ?assignment_candidate)
+      )
+    :effect
+      (and
+        (candidate_active ?assignment_candidate)
+        (candidate_has_machine_slot ?assignment_candidate ?machine_slot)
+        (candidate_has_human_slot ?assignment_candidate ?human_slot)
+        (candidate_machine_slot_alternate ?assignment_candidate)
+        (not
+          (candidate_open ?assignment_candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_both_reserved_slots
+    :parameters (?machine_agent - machine_agent ?human_agent - human_agent ?machine_slot - machine_slot ?human_slot - human_slot ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (machine_prepared ?machine_agent)
+        (human_prepared ?human_agent)
+        (machine_has_slot ?machine_agent ?machine_slot)
+        (human_has_slot ?human_agent ?human_slot)
+        (machine_slot_reserved ?machine_slot)
+        (human_slot_reserved ?human_slot)
+        (not
+          (machine_engaged ?machine_agent)
+        )
+        (not
+          (human_engaged ?human_agent)
+        )
+        (candidate_open ?assignment_candidate)
+      )
+    :effect
+      (and
+        (candidate_active ?assignment_candidate)
+        (candidate_has_machine_slot ?assignment_candidate ?machine_slot)
+        (candidate_has_human_slot ?assignment_candidate ?human_slot)
+        (candidate_machine_slot_preferred ?assignment_candidate)
+        (candidate_machine_slot_alternate ?assignment_candidate)
+        (not
+          (candidate_open ?assignment_candidate)
+        )
+      )
+  )
+  (:action lock_candidate_slot
+    :parameters (?assignment_candidate - assignment_candidate ?machine_agent - machine_agent ?time_slot - time_slot)
+    :precondition
+      (and
+        (candidate_active ?assignment_candidate)
+        (machine_prepared ?machine_agent)
+        (assigned_time_slot ?machine_agent ?time_slot)
+        (not
+          (candidate_slot_locked ?assignment_candidate)
+        )
+      )
+    :effect (candidate_slot_locked ?assignment_candidate)
+  )
+  (:action attach_material_to_candidate
+    :parameters (?schedule_frame - schedule_frame ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (frame_has_assignment_candidate ?schedule_frame ?assignment_candidate)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_unit_available ?material_unit)
+        (candidate_active ?assignment_candidate)
+        (candidate_slot_locked ?assignment_candidate)
+        (not
+          (material_unit_attached ?material_unit)
+        )
+      )
+    :effect
+      (and
+        (material_unit_attached ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (not
+          (material_unit_available ?material_unit)
+        )
+      )
+  )
+  (:action verify_frame_materials
+    :parameters (?schedule_frame - schedule_frame ?material_unit - material_unit ?assignment_candidate - assignment_candidate ?time_slot - time_slot)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_unit_attached ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (assigned_time_slot ?schedule_frame ?time_slot)
+        (not
+          (candidate_machine_slot_preferred ?assignment_candidate)
+        )
+        (not
+          (frame_materials_verified ?schedule_frame)
+        )
+      )
+    :effect (frame_materials_verified ?schedule_frame)
+  )
+  (:action assign_priority_to_frame
+    :parameters (?schedule_frame - schedule_frame ?priority_token - priority_token)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (priority_token_available ?priority_token)
+        (not
+          (frame_priority_flag ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_priority_flag ?schedule_frame)
+        (frame_assigned_priority ?schedule_frame ?priority_token)
+        (not
+          (priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action apply_priority_and_prepare_frame
+    :parameters (?schedule_frame - schedule_frame ?material_unit - material_unit ?assignment_candidate - assignment_candidate ?time_slot - time_slot ?priority_token - priority_token)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_unit_attached ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (assigned_time_slot ?schedule_frame ?time_slot)
+        (candidate_machine_slot_preferred ?assignment_candidate)
+        (frame_priority_flag ?schedule_frame)
+        (frame_assigned_priority ?schedule_frame ?priority_token)
+        (not
+          (frame_materials_verified ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_materials_verified ?schedule_frame)
+        (frame_priority_applied ?schedule_frame)
+      )
+  )
+  (:action validate_frame_equipment_stage1
+    :parameters (?schedule_frame - schedule_frame ?equipment - equipment ?workstation - workstation ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_materials_verified ?schedule_frame)
+        (frame_has_equipment ?schedule_frame ?equipment)
+        (assigned_workstation ?schedule_frame ?workstation)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (not
+          (candidate_machine_slot_alternate ?assignment_candidate)
+        )
+        (not
+          (frame_equipment_verified ?schedule_frame)
+        )
+      )
+    :effect (frame_equipment_verified ?schedule_frame)
+  )
+  (:action validate_frame_equipment_stage2
+    :parameters (?schedule_frame - schedule_frame ?equipment - equipment ?workstation - workstation ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_materials_verified ?schedule_frame)
+        (frame_has_equipment ?schedule_frame ?equipment)
+        (assigned_workstation ?schedule_frame ?workstation)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (candidate_machine_slot_alternate ?assignment_candidate)
+        (not
+          (frame_equipment_verified ?schedule_frame)
+        )
+      )
+    :effect (frame_equipment_verified ?schedule_frame)
+  )
+  (:action validate_frame_for_operation_mode_1
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_equipment_verified ?schedule_frame)
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (not
+          (candidate_machine_slot_preferred ?assignment_candidate)
+        )
+        (not
+          (candidate_machine_slot_alternate ?assignment_candidate)
+        )
+        (not
+          (frame_validated ?schedule_frame)
+        )
+      )
+    :effect (frame_validated ?schedule_frame)
+  )
+  (:action validate_frame_for_operation_mode_2
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_equipment_verified ?schedule_frame)
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (candidate_machine_slot_preferred ?assignment_candidate)
+        (not
+          (candidate_machine_slot_alternate ?assignment_candidate)
+        )
+        (not
+          (frame_validated ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_has_qualification_slot ?schedule_frame)
+      )
+  )
+  (:action validate_frame_for_operation_mode_3
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_equipment_verified ?schedule_frame)
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (not
+          (candidate_machine_slot_preferred ?assignment_candidate)
+        )
+        (candidate_machine_slot_alternate ?assignment_candidate)
+        (not
+          (frame_validated ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_has_qualification_slot ?schedule_frame)
+      )
+  )
+  (:action validate_frame_for_operation_mode_4
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode ?material_unit - material_unit ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (frame_equipment_verified ?schedule_frame)
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (frame_has_material_unit ?schedule_frame ?material_unit)
+        (material_assigned_to_candidate ?material_unit ?assignment_candidate)
+        (candidate_machine_slot_preferred ?assignment_candidate)
+        (candidate_machine_slot_alternate ?assignment_candidate)
+        (not
+          (frame_validated ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_has_qualification_slot ?schedule_frame)
+      )
+  )
+  (:action commit_schedule_frame
+    :parameters (?schedule_frame - schedule_frame)
+    :precondition
+      (and
+        (frame_validated ?schedule_frame)
+        (not
+          (frame_has_qualification_slot ?schedule_frame)
+        )
+        (not
+          (frame_committed ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_committed ?schedule_frame)
+        (readiness_flag ?schedule_frame)
+      )
+  )
+  (:action attach_qualification_to_frame
+    :parameters (?schedule_frame - schedule_frame ?qualification - qualification)
+    :precondition
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_has_qualification_slot ?schedule_frame)
+        (qualification_available ?qualification)
+      )
+    :effect
+      (and
+        (frame_has_qualification ?schedule_frame ?qualification)
+        (not
+          (qualification_available ?qualification)
+        )
+      )
+  )
+  (:action verify_frame_readiness
+    :parameters (?schedule_frame - schedule_frame ?machine_agent - machine_agent ?human_agent - human_agent ?time_slot - time_slot ?qualification - qualification)
+    :precondition
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_has_qualification_slot ?schedule_frame)
+        (frame_has_qualification ?schedule_frame ?qualification)
+        (frame_requires_machine ?schedule_frame ?machine_agent)
+        (frame_requires_human ?schedule_frame ?human_agent)
+        (machine_engaged ?machine_agent)
+        (human_engaged ?human_agent)
+        (assigned_time_slot ?schedule_frame ?time_slot)
+        (not
+          (frame_final_checks_passed ?schedule_frame)
+        )
+      )
+    :effect (frame_final_checks_passed ?schedule_frame)
+  )
+  (:action finalize_frame_after_checks
+    :parameters (?schedule_frame - schedule_frame)
+    :precondition
+      (and
+        (frame_validated ?schedule_frame)
+        (frame_final_checks_passed ?schedule_frame)
+        (not
+          (frame_committed ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_committed ?schedule_frame)
+        (readiness_flag ?schedule_frame)
+      )
+  )
+  (:action assign_supervisor_to_frame
+    :parameters (?schedule_frame - schedule_frame ?supervisor_token - supervisor_token ?time_slot - time_slot)
+    :precondition
+      (and
+        (ready_for_assignment ?schedule_frame)
+        (assigned_time_slot ?schedule_frame ?time_slot)
+        (supervisor_available ?supervisor_token)
+        (frame_has_supervisor_token ?schedule_frame ?supervisor_token)
+        (not
+          (frame_supervisor_assigned ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_supervisor_assigned ?schedule_frame)
+        (not
+          (supervisor_available ?supervisor_token)
+        )
+      )
+  )
+  (:action supervisor_review_frame
+    :parameters (?schedule_frame - schedule_frame ?workstation - workstation)
+    :precondition
+      (and
+        (frame_supervisor_assigned ?schedule_frame)
+        (assigned_workstation ?schedule_frame ?workstation)
+        (not
+          (frame_supervisor_reviewed ?schedule_frame)
+        )
+      )
+    :effect (frame_supervisor_reviewed ?schedule_frame)
+  )
+  (:action supervisor_approve_frame
+    :parameters (?schedule_frame - schedule_frame ?operation_mode - operation_mode)
+    :precondition
+      (and
+        (frame_supervisor_reviewed ?schedule_frame)
+        (frame_has_operation_mode ?schedule_frame ?operation_mode)
+        (not
+          (frame_supervisor_approved ?schedule_frame)
+        )
+      )
+    :effect (frame_supervisor_approved ?schedule_frame)
+  )
+  (:action finalize_frame_with_supervisor_approval
+    :parameters (?schedule_frame - schedule_frame)
+    :precondition
+      (and
+        (frame_supervisor_approved ?schedule_frame)
+        (not
+          (frame_committed ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (frame_committed ?schedule_frame)
+        (readiness_flag ?schedule_frame)
+      )
+  )
+  (:action mark_machine_ready_for_commitment
+    :parameters (?machine_agent - machine_agent ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (machine_prepared ?machine_agent)
+        (machine_engaged ?machine_agent)
+        (candidate_active ?assignment_candidate)
+        (candidate_slot_locked ?assignment_candidate)
+        (not
+          (readiness_flag ?machine_agent)
+        )
+      )
+    :effect (readiness_flag ?machine_agent)
+  )
+  (:action mark_human_ready_for_commitment
+    :parameters (?human_agent - human_agent ?assignment_candidate - assignment_candidate)
+    :precondition
+      (and
+        (human_prepared ?human_agent)
+        (human_engaged ?human_agent)
+        (candidate_active ?assignment_candidate)
+        (candidate_slot_locked ?assignment_candidate)
+        (not
+          (readiness_flag ?human_agent)
+        )
+      )
+    :effect (readiness_flag ?human_agent)
+  )
+  (:action assign_task_location_and_reserve_commit
+    :parameters (?task - task ?location_marker - location_marker ?time_slot - time_slot)
+    :precondition
+      (and
+        (readiness_flag ?task)
+        (assigned_time_slot ?task ?time_slot)
+        (location_token_available ?location_marker)
+        (not
+          (commit_token ?task)
+        )
+      )
+    :effect
+      (and
+        (commit_token ?task)
+        (assigned_location ?task ?location_marker)
+        (not
+          (location_token_available ?location_marker)
+        )
+      )
+  )
+  (:action commit_assignment_and_release_resources
+    :parameters (?machine_agent - machine_agent ?resource_pool - resource_pool ?location_marker - location_marker)
+    :precondition
+      (and
+        (commit_token ?machine_agent)
+        (reserved_resource ?machine_agent ?resource_pool)
+        (assigned_location ?machine_agent ?location_marker)
+        (not
+          (scheduled ?machine_agent)
+        )
+      )
+    :effect
+      (and
+        (scheduled ?machine_agent)
+        (resource_pool_available ?resource_pool)
+        (location_token_available ?location_marker)
+      )
+  )
+  (:action commit_human_assignment_and_release_resources
+    :parameters (?human_agent - human_agent ?resource_pool - resource_pool ?location_marker - location_marker)
+    :precondition
+      (and
+        (commit_token ?human_agent)
+        (reserved_resource ?human_agent ?resource_pool)
+        (assigned_location ?human_agent ?location_marker)
+        (not
+          (scheduled ?human_agent)
+        )
+      )
+    :effect
+      (and
+        (scheduled ?human_agent)
+        (resource_pool_available ?resource_pool)
+        (location_token_available ?location_marker)
+      )
+  )
+  (:action commit_frame_assignment_and_release_resources
+    :parameters (?schedule_frame - schedule_frame ?resource_pool - resource_pool ?location_marker - location_marker)
+    :precondition
+      (and
+        (commit_token ?schedule_frame)
+        (reserved_resource ?schedule_frame ?resource_pool)
+        (assigned_location ?schedule_frame ?location_marker)
+        (not
+          (scheduled ?schedule_frame)
+        )
+      )
+    :effect
+      (and
+        (scheduled ?schedule_frame)
+        (resource_pool_available ?resource_pool)
+        (location_token_available ?location_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem conflict_free_schedule_problem)
+  (:domain conflict_free_schedule_domain)
+  (:objects machine_1 - machine_agent human_1 - human_agent schedule_frame_1 - schedule_frame schedule_frame_2 - schedule_frame resource_pool_1 - resource_pool resource_pool_2 - resource_pool resource_pool_3 - resource_pool time_slot_1 - time_slot workstation_1 - workstation consumable_1 - consumable_item machine_slot_1 - machine_slot human_slot_1 - human_slot assignment_candidate_1 - assignment_candidate material_unit_1 - material_unit material_unit_2 - material_unit priority_token_1 - priority_token priority_token_2 - priority_token qualification_1 - qualification qualification_2 - qualification location_marker_1 - location_marker equipment_1 - equipment supervisor_token_1 - supervisor_token supervisor_token_2 - supervisor_token operation_mode_1 - operation_mode)
+  (:init
+    (resource_pool_available resource_pool_1)
+    (resource_pool_available resource_pool_2)
+    (resource_pool_available resource_pool_3)
+    (time_slot_available time_slot_1)
+    (workstation_available workstation_1)
+    (consumable_available consumable_1)
+    (machine_has_slot machine_1 machine_slot_1)
+    (human_has_slot human_1 human_slot_1)
+    (candidate_open assignment_candidate_1)
+    (material_unit_available material_unit_1)
+    (material_unit_available material_unit_2)
+    (frame_requires_machine schedule_frame_1 machine_1)
+    (frame_requires_machine schedule_frame_2 machine_1)
+    (frame_requires_human schedule_frame_1 human_1)
+    (frame_requires_human schedule_frame_2 human_1)
+    (frame_has_assignment_candidate schedule_frame_1 assignment_candidate_1)
+    (frame_has_assignment_candidate schedule_frame_2 assignment_candidate_1)
+    (frame_has_material_unit schedule_frame_1 material_unit_1)
+    (frame_has_material_unit schedule_frame_2 material_unit_2)
+    (priority_token_available priority_token_1)
+    (priority_token_available priority_token_2)
+    (qualification_available qualification_1)
+    (qualification_available qualification_2)
+    (location_token_available location_marker_1)
+    (equipment_available equipment_1)
+    (supervisor_available supervisor_token_1)
+    (frame_has_supervisor_token schedule_frame_1 supervisor_token_1)
+    (frame_has_supervisor_token schedule_frame_2 supervisor_token_2)
+    (operation_mode_available operation_mode_1)
+  )
+  (:goal
+    (and
+      (scheduled machine_1)
+      (scheduled human_1)
+      (scheduled schedule_frame_1)
+      (scheduled schedule_frame_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_task machine_1)
+(initialize_task human_1)
+(initialize_task schedule_frame_1)
+(initialize_task schedule_frame_2)
+(claim_resource_for_task machine_1 resource_pool_1)
+(claim_resource_for_task human_1 resource_pool_2)
+(claim_resource_for_task schedule_frame_1 resource_pool_3)
+(propose_time_slot_for_task machine_1 time_slot_1)
+(confirm_time_slot_for_task machine_1 time_slot_1)
+(propose_machine_slot machine_1 machine_slot_1 time_slot_1)
+(bind_task_to_workstation machine_1 workstation_1)
+(machine_confirm_slot_with_workstation machine_1 machine_slot_1 workstation_1)
+(revert_time_slot_assignment machine_1 time_slot_1)
+(release_workstation_binding machine_1 workstation_1)
+(propose_time_slot_for_task human_1 time_slot_1)
+(confirm_time_slot_for_task human_1 time_slot_1)
+(propose_human_slot human_1 human_slot_1 time_slot_1)
+(bind_task_to_workstation human_1 workstation_1)
+(human_confirm_slot_with_workstation human_1 human_slot_1 workstation_1)
+(revert_time_slot_assignment human_1 time_slot_1)
+(release_workstation_binding human_1 workstation_1)
+(assemble_assignment_candidate machine_1 human_1 machine_slot_1 human_slot_1 assignment_candidate_1)
+(propose_time_slot_for_task machine_1 time_slot_1)
+(lock_candidate_slot assignment_candidate_1 machine_1 time_slot_1)
+(revert_time_slot_assignment machine_1 time_slot_1)
+(propose_time_slot_for_task schedule_frame_1 time_slot_1)
+(confirm_time_slot_for_task schedule_frame_1 time_slot_1)
+(attach_material_to_candidate schedule_frame_1 material_unit_1 assignment_candidate_1)
+(verify_frame_materials schedule_frame_1 material_unit_1 assignment_candidate_1 time_slot_1)
+(attach_equipment_to_frame schedule_frame_1 equipment_1)
+(bind_task_to_workstation schedule_frame_1 workstation_1)
+(validate_frame_equipment_stage1 schedule_frame_1 equipment_1 workstation_1 material_unit_1 assignment_candidate_1)
+(attach_operation_mode_to_frame schedule_frame_1 operation_mode_1)
+(validate_frame_for_operation_mode_1 schedule_frame_1 operation_mode_1 material_unit_1 assignment_candidate_1)
+(commit_schedule_frame schedule_frame_1)
+(assign_task_location_and_reserve_commit schedule_frame_1 location_marker_1 time_slot_1)
+(commit_frame_assignment_and_release_resources schedule_frame_1 resource_pool_3 location_marker_1)
+(revert_time_slot_assignment schedule_frame_1 time_slot_1)
+(release_workstation_binding schedule_frame_1 workstation_1)
+(detach_equipment_from_frame schedule_frame_1 equipment_1)
+(detach_operation_mode_from_frame schedule_frame_1 operation_mode_1)
+(claim_resource_for_task schedule_frame_2 resource_pool_3)
+(propose_time_slot_for_task schedule_frame_2 time_slot_1)
+(confirm_time_slot_for_task schedule_frame_2 time_slot_1)
+(attach_material_to_candidate schedule_frame_2 material_unit_2 assignment_candidate_1)
+(verify_frame_materials schedule_frame_2 material_unit_2 assignment_candidate_1 time_slot_1)
+(attach_equipment_to_frame schedule_frame_2 equipment_1)
+(bind_task_to_workstation schedule_frame_2 workstation_1)
+(validate_frame_equipment_stage1 schedule_frame_2 equipment_1 workstation_1 material_unit_2 assignment_candidate_1)
+(attach_operation_mode_to_frame schedule_frame_2 operation_mode_1)
+(validate_frame_for_operation_mode_1 schedule_frame_2 operation_mode_1 material_unit_2 assignment_candidate_1)
+(commit_schedule_frame schedule_frame_2)
+(assign_task_location_and_reserve_commit schedule_frame_2 location_marker_1 time_slot_1)
+(commit_frame_assignment_and_release_resources schedule_frame_2 resource_pool_3 location_marker_1)
+(revert_time_slot_assignment schedule_frame_2 time_slot_1)
+(release_workstation_binding schedule_frame_2 workstation_1)
+(detach_equipment_from_frame schedule_frame_2 equipment_1)
+(detach_operation_mode_from_frame schedule_frame_2 operation_mode_1)
+(mark_machine_ready_for_commitment machine_1 assignment_candidate_1)
+(mark_human_ready_for_commitment human_1 assignment_candidate_1)
+(propose_time_slot_for_task machine_1 time_slot_1)
+(assign_task_location_and_reserve_commit machine_1 location_marker_1 time_slot_1)
+(commit_assignment_and_release_resources machine_1 resource_pool_1 location_marker_1)
+(revert_time_slot_assignment machine_1 time_slot_1)
+(propose_time_slot_for_task human_1 time_slot_1)
+(assign_task_location_and_reserve_commit human_1 location_marker_1 time_slot_1)
+(commit_human_assignment_and_release_resources human_1 resource_pool_2 location_marker_1)
+(revert_time_slot_assignment human_1 time_slot_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_7re9apd3/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 68 
+
+Successful plans:
+Value: 68
+ /tmp/val_7re9apd3/plan.pddl 68 
+
+
+
+--- stderr ---
+

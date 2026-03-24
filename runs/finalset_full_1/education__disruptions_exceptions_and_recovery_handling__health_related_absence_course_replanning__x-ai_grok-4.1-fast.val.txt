@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain health_related_absence_course_replanning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types case_resource - object case_attachment - object scheduling_and_proposal_resource - object case_category - object case_subject - case_category case_handler_staff - case_resource medical_document - case_resource faculty_representative - case_resource policy_reference - case_resource approval_token - case_resource medical_certificate_type - case_resource availability_token - case_resource external_authority_reference - case_resource supporting_evidence - case_attachment approval_document - case_attachment policy_attachment - case_attachment schedule_slot_type_a - scheduling_and_proposal_resource schedule_slot_type_b - scheduling_and_proposal_resource replan_proposal - scheduling_and_proposal_resource enrollment_parent - case_subject enrollment_variant - case_subject student_enrollment - enrollment_parent module_enrollment - enrollment_parent administrative_case_record - enrollment_variant)
+  (:predicates
+    (case_registered ?case_subject - case_subject)
+    (case_validated ?case_subject - case_subject)
+    (case_assigned ?case_subject - case_subject)
+    (replan_applied ?case_subject - case_subject)
+    (ready_for_certificate_binding ?case_subject - case_subject)
+    (medical_certificate_attached ?case_subject - case_subject)
+    (handler_available ?case_handler_staff - case_handler_staff)
+    (case_assigned_to ?case_subject - case_subject ?case_handler_staff - case_handler_staff)
+    (medical_document_available ?medical_document - medical_document)
+    (attached_medical_document ?case_subject - case_subject ?medical_document - medical_document)
+    (faculty_available ?faculty_representative - faculty_representative)
+    (faculty_assigned_to_case ?case_subject - case_subject ?faculty_representative - faculty_representative)
+    (supporting_evidence_available ?supporting_evidence - supporting_evidence)
+    (student_evidence_attached ?student_enrollment - student_enrollment ?supporting_evidence - supporting_evidence)
+    (module_evidence_attached ?module_enrollment - module_enrollment ?supporting_evidence - supporting_evidence)
+    (enrollment_slot_type_a_reserved ?student_enrollment - student_enrollment ?schedule_slot_type_a - schedule_slot_type_a)
+    (slot_a_confirmed ?schedule_slot_type_a - schedule_slot_type_a)
+    (slot_a_tentatively_reserved ?schedule_slot_type_a - schedule_slot_type_a)
+    (student_negotiation_confirmed ?student_enrollment - student_enrollment)
+    (enrollment_slot_type_b_reserved ?module_enrollment - module_enrollment ?schedule_slot_type_b - schedule_slot_type_b)
+    (slot_b_confirmed ?schedule_slot_type_b - schedule_slot_type_b)
+    (slot_b_tentatively_reserved ?schedule_slot_type_b - schedule_slot_type_b)
+    (module_negotiation_confirmed ?module_enrollment - module_enrollment)
+    (proposal_placeholder_available ?replan_proposal - replan_proposal)
+    (proposal_reserved ?replan_proposal - replan_proposal)
+    (proposal_includes_slot_a ?replan_proposal - replan_proposal ?schedule_slot_type_a - schedule_slot_type_a)
+    (proposal_includes_slot_b ?replan_proposal - replan_proposal ?schedule_slot_type_b - schedule_slot_type_b)
+    (proposal_option_a_locked ?replan_proposal - replan_proposal)
+    (proposal_option_b_locked ?replan_proposal - replan_proposal)
+    (proposal_finalized ?replan_proposal - replan_proposal)
+    (case_linked_to_student_enrollment ?administrative_case_record - administrative_case_record ?student_enrollment - student_enrollment)
+    (case_linked_to_module_enrollment ?administrative_case_record - administrative_case_record ?module_enrollment - module_enrollment)
+    (case_linked_to_proposal ?administrative_case_record - administrative_case_record ?replan_proposal - replan_proposal)
+    (approval_document_available ?approval_document - approval_document)
+    (case_has_approval_document ?administrative_case_record - administrative_case_record ?approval_document - approval_document)
+    (approval_document_consumed ?approval_document - approval_document)
+    (approval_document_linked_to_proposal ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    (compliance_stage_one_passed ?administrative_case_record - administrative_case_record)
+    (compliance_stage_two_passed ?administrative_case_record - administrative_case_record)
+    (compliance_ready_for_final_review ?administrative_case_record - administrative_case_record)
+    (policy_reference_assigned ?administrative_case_record - administrative_case_record)
+    (policy_attachment_verified ?administrative_case_record - administrative_case_record)
+    (compliance_documentation_verified ?administrative_case_record - administrative_case_record)
+    (final_compliance_check_passed ?administrative_case_record - administrative_case_record)
+    (policy_attachment_available ?policy_attachment - policy_attachment)
+    (case_has_policy_attachment ?administrative_case_record - administrative_case_record ?policy_attachment - policy_attachment)
+    (policy_validation_initiated ?administrative_case_record - administrative_case_record)
+    (policy_review_assigned ?administrative_case_record - administrative_case_record)
+    (policy_review_completed ?administrative_case_record - administrative_case_record)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (case_has_policy_reference ?administrative_case_record - administrative_case_record ?policy_reference - policy_reference)
+    (approval_token_available ?approval_token - approval_token)
+    (case_has_approval_token ?administrative_case_record - administrative_case_record ?approval_token - approval_token)
+    (availability_token_available ?availability_token - availability_token)
+    (case_has_availability_token ?administrative_case_record - administrative_case_record ?availability_token - availability_token)
+    (external_authority_available ?external_authority_reference - external_authority_reference)
+    (external_authority_linked_to_case ?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference)
+    (medical_certificate_type_available ?medical_certificate_type - medical_certificate_type)
+    (case_bound_to_medical_certificate_type ?case_subject - case_subject ?medical_certificate_type - medical_certificate_type)
+    (student_negotiation_initiated ?student_enrollment - student_enrollment)
+    (module_negotiation_initiated ?module_enrollment - module_enrollment)
+    (case_finalized ?administrative_case_record - administrative_case_record)
+  )
+  (:action register_case
+    :parameters (?case_subject - case_subject)
+    :precondition
+      (and
+        (not
+          (case_registered ?case_subject)
+        )
+        (not
+          (replan_applied ?case_subject)
+        )
+      )
+    :effect (case_registered ?case_subject)
+  )
+  (:action assign_case_handler
+    :parameters (?case_subject - case_subject ?case_handler_staff - case_handler_staff)
+    :precondition
+      (and
+        (case_registered ?case_subject)
+        (not
+          (case_assigned ?case_subject)
+        )
+        (handler_available ?case_handler_staff)
+      )
+    :effect
+      (and
+        (case_assigned ?case_subject)
+        (case_assigned_to ?case_subject ?case_handler_staff)
+        (not
+          (handler_available ?case_handler_staff)
+        )
+      )
+  )
+  (:action attach_medical_document
+    :parameters (?case_subject - case_subject ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_registered ?case_subject)
+        (case_assigned ?case_subject)
+        (medical_document_available ?medical_document)
+      )
+    :effect
+      (and
+        (attached_medical_document ?case_subject ?medical_document)
+        (not
+          (medical_document_available ?medical_document)
+        )
+      )
+  )
+  (:action validate_medical_evidence
+    :parameters (?case_subject - case_subject ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_registered ?case_subject)
+        (case_assigned ?case_subject)
+        (attached_medical_document ?case_subject ?medical_document)
+        (not
+          (case_validated ?case_subject)
+        )
+      )
+    :effect (case_validated ?case_subject)
+  )
+  (:action unlink_medical_document
+    :parameters (?case_subject - case_subject ?medical_document - medical_document)
+    :precondition
+      (and
+        (attached_medical_document ?case_subject ?medical_document)
+      )
+    :effect
+      (and
+        (medical_document_available ?medical_document)
+        (not
+          (attached_medical_document ?case_subject ?medical_document)
+        )
+      )
+  )
+  (:action assign_faculty_to_case
+    :parameters (?case_subject - case_subject ?faculty_representative - faculty_representative)
+    :precondition
+      (and
+        (case_validated ?case_subject)
+        (faculty_available ?faculty_representative)
+      )
+    :effect
+      (and
+        (faculty_assigned_to_case ?case_subject ?faculty_representative)
+        (not
+          (faculty_available ?faculty_representative)
+        )
+      )
+  )
+  (:action unassign_faculty_from_case
+    :parameters (?case_subject - case_subject ?faculty_representative - faculty_representative)
+    :precondition
+      (and
+        (faculty_assigned_to_case ?case_subject ?faculty_representative)
+      )
+    :effect
+      (and
+        (faculty_available ?faculty_representative)
+        (not
+          (faculty_assigned_to_case ?case_subject ?faculty_representative)
+        )
+      )
+  )
+  (:action assign_availability_token_to_case
+    :parameters (?administrative_case_record - administrative_case_record ?availability_token - availability_token)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (availability_token_available ?availability_token)
+      )
+    :effect
+      (and
+        (case_has_availability_token ?administrative_case_record ?availability_token)
+        (not
+          (availability_token_available ?availability_token)
+        )
+      )
+  )
+  (:action release_availability_token_from_case
+    :parameters (?administrative_case_record - administrative_case_record ?availability_token - availability_token)
+    :precondition
+      (and
+        (case_has_availability_token ?administrative_case_record ?availability_token)
+      )
+    :effect
+      (and
+        (availability_token_available ?availability_token)
+        (not
+          (case_has_availability_token ?administrative_case_record ?availability_token)
+        )
+      )
+  )
+  (:action link_external_authority_reference
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (external_authority_available ?external_authority_reference)
+      )
+    :effect
+      (and
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (not
+          (external_authority_available ?external_authority_reference)
+        )
+      )
+  )
+  (:action unlink_external_authority_reference
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference)
+    :precondition
+      (and
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+      )
+    :effect
+      (and
+        (external_authority_available ?external_authority_reference)
+        (not
+          (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        )
+      )
+  )
+  (:action confirm_student_slot_a
+    :parameters (?student_enrollment - student_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_validated ?student_enrollment)
+        (attached_medical_document ?student_enrollment ?medical_document)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (not
+          (slot_a_confirmed ?schedule_slot_type_a)
+        )
+        (not
+          (slot_a_tentatively_reserved ?schedule_slot_type_a)
+        )
+      )
+    :effect (slot_a_confirmed ?schedule_slot_type_a)
+  )
+  (:action finalize_student_negotiation_with_faculty
+    :parameters (?student_enrollment - student_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?faculty_representative - faculty_representative)
+    :precondition
+      (and
+        (case_validated ?student_enrollment)
+        (faculty_assigned_to_case ?student_enrollment ?faculty_representative)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (slot_a_confirmed ?schedule_slot_type_a)
+        (not
+          (student_negotiation_initiated ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (student_negotiation_confirmed ?student_enrollment)
+      )
+  )
+  (:action submit_supporting_evidence_student
+    :parameters (?student_enrollment - student_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_validated ?student_enrollment)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (student_negotiation_initiated ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (slot_a_tentatively_reserved ?schedule_slot_type_a)
+        (student_negotiation_initiated ?student_enrollment)
+        (student_evidence_attached ?student_enrollment ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action progress_student_negotiation
+    :parameters (?student_enrollment - student_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?medical_document - medical_document ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_validated ?student_enrollment)
+        (attached_medical_document ?student_enrollment ?medical_document)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (slot_a_tentatively_reserved ?schedule_slot_type_a)
+        (student_evidence_attached ?student_enrollment ?supporting_evidence)
+        (not
+          (student_negotiation_confirmed ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (slot_a_confirmed ?schedule_slot_type_a)
+        (student_negotiation_confirmed ?student_enrollment)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (student_evidence_attached ?student_enrollment ?supporting_evidence)
+        )
+      )
+  )
+  (:action confirm_module_slot_b
+    :parameters (?module_enrollment - module_enrollment ?schedule_slot_type_b - schedule_slot_type_b ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_validated ?module_enrollment)
+        (attached_medical_document ?module_enrollment ?medical_document)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (not
+          (slot_b_confirmed ?schedule_slot_type_b)
+        )
+        (not
+          (slot_b_tentatively_reserved ?schedule_slot_type_b)
+        )
+      )
+    :effect (slot_b_confirmed ?schedule_slot_type_b)
+  )
+  (:action finalize_module_negotiation_with_faculty
+    :parameters (?module_enrollment - module_enrollment ?schedule_slot_type_b - schedule_slot_type_b ?faculty_representative - faculty_representative)
+    :precondition
+      (and
+        (case_validated ?module_enrollment)
+        (faculty_assigned_to_case ?module_enrollment ?faculty_representative)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_b_confirmed ?schedule_slot_type_b)
+        (not
+          (module_negotiation_initiated ?module_enrollment)
+        )
+      )
+    :effect
+      (and
+        (module_negotiation_initiated ?module_enrollment)
+        (module_negotiation_confirmed ?module_enrollment)
+      )
+  )
+  (:action submit_supporting_evidence_module
+    :parameters (?module_enrollment - module_enrollment ?schedule_slot_type_b - schedule_slot_type_b ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_validated ?module_enrollment)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (module_negotiation_initiated ?module_enrollment)
+        )
+      )
+    :effect
+      (and
+        (slot_b_tentatively_reserved ?schedule_slot_type_b)
+        (module_negotiation_initiated ?module_enrollment)
+        (module_evidence_attached ?module_enrollment ?supporting_evidence)
+        (not
+          (supporting_evidence_available ?supporting_evidence)
+        )
+      )
+  )
+  (:action progress_module_negotiation
+    :parameters (?module_enrollment - module_enrollment ?schedule_slot_type_b - schedule_slot_type_b ?medical_document - medical_document ?supporting_evidence - supporting_evidence)
+    :precondition
+      (and
+        (case_validated ?module_enrollment)
+        (attached_medical_document ?module_enrollment ?medical_document)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_b_tentatively_reserved ?schedule_slot_type_b)
+        (module_evidence_attached ?module_enrollment ?supporting_evidence)
+        (not
+          (module_negotiation_confirmed ?module_enrollment)
+        )
+      )
+    :effect
+      (and
+        (slot_b_confirmed ?schedule_slot_type_b)
+        (module_negotiation_confirmed ?module_enrollment)
+        (supporting_evidence_available ?supporting_evidence)
+        (not
+          (module_evidence_attached ?module_enrollment ?supporting_evidence)
+        )
+      )
+  )
+  (:action synthesize_proposal_standard
+    :parameters (?student_enrollment - student_enrollment ?module_enrollment - module_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?schedule_slot_type_b - schedule_slot_type_b ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (module_negotiation_initiated ?module_enrollment)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_a_confirmed ?schedule_slot_type_a)
+        (slot_b_confirmed ?schedule_slot_type_b)
+        (student_negotiation_confirmed ?student_enrollment)
+        (module_negotiation_confirmed ?module_enrollment)
+        (proposal_placeholder_available ?replan_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?replan_proposal)
+        (proposal_includes_slot_a ?replan_proposal ?schedule_slot_type_a)
+        (proposal_includes_slot_b ?replan_proposal ?schedule_slot_type_b)
+        (not
+          (proposal_placeholder_available ?replan_proposal)
+        )
+      )
+  )
+  (:action synthesize_proposal_with_option_a
+    :parameters (?student_enrollment - student_enrollment ?module_enrollment - module_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?schedule_slot_type_b - schedule_slot_type_b ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (module_negotiation_initiated ?module_enrollment)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_a_tentatively_reserved ?schedule_slot_type_a)
+        (slot_b_confirmed ?schedule_slot_type_b)
+        (not
+          (student_negotiation_confirmed ?student_enrollment)
+        )
+        (module_negotiation_confirmed ?module_enrollment)
+        (proposal_placeholder_available ?replan_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?replan_proposal)
+        (proposal_includes_slot_a ?replan_proposal ?schedule_slot_type_a)
+        (proposal_includes_slot_b ?replan_proposal ?schedule_slot_type_b)
+        (proposal_option_a_locked ?replan_proposal)
+        (not
+          (proposal_placeholder_available ?replan_proposal)
+        )
+      )
+  )
+  (:action synthesize_proposal_with_option_b
+    :parameters (?student_enrollment - student_enrollment ?module_enrollment - module_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?schedule_slot_type_b - schedule_slot_type_b ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (module_negotiation_initiated ?module_enrollment)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_a_confirmed ?schedule_slot_type_a)
+        (slot_b_tentatively_reserved ?schedule_slot_type_b)
+        (student_negotiation_confirmed ?student_enrollment)
+        (not
+          (module_negotiation_confirmed ?module_enrollment)
+        )
+        (proposal_placeholder_available ?replan_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?replan_proposal)
+        (proposal_includes_slot_a ?replan_proposal ?schedule_slot_type_a)
+        (proposal_includes_slot_b ?replan_proposal ?schedule_slot_type_b)
+        (proposal_option_b_locked ?replan_proposal)
+        (not
+          (proposal_placeholder_available ?replan_proposal)
+        )
+      )
+  )
+  (:action synthesize_proposal_with_options_ab
+    :parameters (?student_enrollment - student_enrollment ?module_enrollment - module_enrollment ?schedule_slot_type_a - schedule_slot_type_a ?schedule_slot_type_b - schedule_slot_type_b ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (module_negotiation_initiated ?module_enrollment)
+        (enrollment_slot_type_a_reserved ?student_enrollment ?schedule_slot_type_a)
+        (enrollment_slot_type_b_reserved ?module_enrollment ?schedule_slot_type_b)
+        (slot_a_tentatively_reserved ?schedule_slot_type_a)
+        (slot_b_tentatively_reserved ?schedule_slot_type_b)
+        (not
+          (student_negotiation_confirmed ?student_enrollment)
+        )
+        (not
+          (module_negotiation_confirmed ?module_enrollment)
+        )
+        (proposal_placeholder_available ?replan_proposal)
+      )
+    :effect
+      (and
+        (proposal_reserved ?replan_proposal)
+        (proposal_includes_slot_a ?replan_proposal ?schedule_slot_type_a)
+        (proposal_includes_slot_b ?replan_proposal ?schedule_slot_type_b)
+        (proposal_option_a_locked ?replan_proposal)
+        (proposal_option_b_locked ?replan_proposal)
+        (not
+          (proposal_placeholder_available ?replan_proposal)
+        )
+      )
+  )
+  (:action finalize_proposal
+    :parameters (?replan_proposal - replan_proposal ?student_enrollment - student_enrollment ?medical_document - medical_document)
+    :precondition
+      (and
+        (proposal_reserved ?replan_proposal)
+        (student_negotiation_initiated ?student_enrollment)
+        (attached_medical_document ?student_enrollment ?medical_document)
+        (not
+          (proposal_finalized ?replan_proposal)
+        )
+      )
+    :effect (proposal_finalized ?replan_proposal)
+  )
+  (:action attach_approval_document_to_proposal
+    :parameters (?administrative_case_record - administrative_case_record ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (case_linked_to_proposal ?administrative_case_record ?replan_proposal)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_available ?approval_document)
+        (proposal_reserved ?replan_proposal)
+        (proposal_finalized ?replan_proposal)
+        (not
+          (approval_document_consumed ?approval_document)
+        )
+      )
+    :effect
+      (and
+        (approval_document_consumed ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action run_compliance_stage_one_check
+    :parameters (?administrative_case_record - administrative_case_record ?approval_document - approval_document ?replan_proposal - replan_proposal ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_consumed ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (attached_medical_document ?administrative_case_record ?medical_document)
+        (not
+          (proposal_option_a_locked ?replan_proposal)
+        )
+        (not
+          (compliance_stage_one_passed ?administrative_case_record)
+        )
+      )
+    :effect (compliance_stage_one_passed ?administrative_case_record)
+  )
+  (:action assign_policy_reference_to_case
+    :parameters (?administrative_case_record - administrative_case_record ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (policy_reference_available ?policy_reference)
+        (not
+          (policy_reference_assigned ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (policy_reference_assigned ?administrative_case_record)
+        (case_has_policy_reference ?administrative_case_record ?policy_reference)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action run_policy_informed_compliance_check
+    :parameters (?administrative_case_record - administrative_case_record ?approval_document - approval_document ?replan_proposal - replan_proposal ?medical_document - medical_document ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_consumed ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (attached_medical_document ?administrative_case_record ?medical_document)
+        (proposal_option_a_locked ?replan_proposal)
+        (policy_reference_assigned ?administrative_case_record)
+        (case_has_policy_reference ?administrative_case_record ?policy_reference)
+        (not
+          (compliance_stage_one_passed ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_stage_one_passed ?administrative_case_record)
+        (policy_attachment_verified ?administrative_case_record)
+      )
+  )
+  (:action run_compliance_stage_two
+    :parameters (?administrative_case_record - administrative_case_record ?availability_token - availability_token ?faculty_representative - faculty_representative ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_one_passed ?administrative_case_record)
+        (case_has_availability_token ?administrative_case_record ?availability_token)
+        (faculty_assigned_to_case ?administrative_case_record ?faculty_representative)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (not
+          (proposal_option_b_locked ?replan_proposal)
+        )
+        (not
+          (compliance_stage_two_passed ?administrative_case_record)
+        )
+      )
+    :effect (compliance_stage_two_passed ?administrative_case_record)
+  )
+  (:action run_compliance_stage_two_with_option_b
+    :parameters (?administrative_case_record - administrative_case_record ?availability_token - availability_token ?faculty_representative - faculty_representative ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_one_passed ?administrative_case_record)
+        (case_has_availability_token ?administrative_case_record ?availability_token)
+        (faculty_assigned_to_case ?administrative_case_record ?faculty_representative)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (proposal_option_b_locked ?replan_proposal)
+        (not
+          (compliance_stage_two_passed ?administrative_case_record)
+        )
+      )
+    :effect (compliance_stage_two_passed ?administrative_case_record)
+  )
+  (:action perform_external_authority_review_basic
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_two_passed ?administrative_case_record)
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (not
+          (proposal_option_a_locked ?replan_proposal)
+        )
+        (not
+          (proposal_option_b_locked ?replan_proposal)
+        )
+        (not
+          (compliance_ready_for_final_review ?administrative_case_record)
+        )
+      )
+    :effect (compliance_ready_for_final_review ?administrative_case_record)
+  )
+  (:action perform_external_authority_review_with_option_a
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_two_passed ?administrative_case_record)
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (proposal_option_a_locked ?replan_proposal)
+        (not
+          (proposal_option_b_locked ?replan_proposal)
+        )
+        (not
+          (compliance_ready_for_final_review ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (compliance_documentation_verified ?administrative_case_record)
+      )
+  )
+  (:action perform_external_authority_review_with_option_b
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_two_passed ?administrative_case_record)
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (not
+          (proposal_option_a_locked ?replan_proposal)
+        )
+        (proposal_option_b_locked ?replan_proposal)
+        (not
+          (compliance_ready_for_final_review ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (compliance_documentation_verified ?administrative_case_record)
+      )
+  )
+  (:action perform_external_authority_review_comprehensive
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference ?approval_document - approval_document ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (compliance_stage_two_passed ?administrative_case_record)
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (case_has_approval_document ?administrative_case_record ?approval_document)
+        (approval_document_linked_to_proposal ?approval_document ?replan_proposal)
+        (proposal_option_a_locked ?replan_proposal)
+        (proposal_option_b_locked ?replan_proposal)
+        (not
+          (compliance_ready_for_final_review ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (compliance_documentation_verified ?administrative_case_record)
+      )
+  )
+  (:action mark_case_ready_for_certificate_binding
+    :parameters (?administrative_case_record - administrative_case_record)
+    :precondition
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (not
+          (compliance_documentation_verified ?administrative_case_record)
+        )
+        (not
+          (case_finalized ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?administrative_case_record)
+        (ready_for_certificate_binding ?administrative_case_record)
+      )
+  )
+  (:action assign_approval_token_to_case
+    :parameters (?administrative_case_record - administrative_case_record ?approval_token - approval_token)
+    :precondition
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (compliance_documentation_verified ?administrative_case_record)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (case_has_approval_token ?administrative_case_record ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action perform_final_compliance_check
+    :parameters (?administrative_case_record - administrative_case_record ?student_enrollment - student_enrollment ?module_enrollment - module_enrollment ?medical_document - medical_document ?approval_token - approval_token)
+    :precondition
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (compliance_documentation_verified ?administrative_case_record)
+        (case_has_approval_token ?administrative_case_record ?approval_token)
+        (case_linked_to_student_enrollment ?administrative_case_record ?student_enrollment)
+        (case_linked_to_module_enrollment ?administrative_case_record ?module_enrollment)
+        (student_negotiation_confirmed ?student_enrollment)
+        (module_negotiation_confirmed ?module_enrollment)
+        (attached_medical_document ?administrative_case_record ?medical_document)
+        (not
+          (final_compliance_check_passed ?administrative_case_record)
+        )
+      )
+    :effect (final_compliance_check_passed ?administrative_case_record)
+  )
+  (:action finalize_case_compliance
+    :parameters (?administrative_case_record - administrative_case_record)
+    :precondition
+      (and
+        (compliance_ready_for_final_review ?administrative_case_record)
+        (final_compliance_check_passed ?administrative_case_record)
+        (not
+          (case_finalized ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?administrative_case_record)
+        (ready_for_certificate_binding ?administrative_case_record)
+      )
+  )
+  (:action initiate_policy_validation
+    :parameters (?administrative_case_record - administrative_case_record ?policy_attachment - policy_attachment ?medical_document - medical_document)
+    :precondition
+      (and
+        (case_validated ?administrative_case_record)
+        (attached_medical_document ?administrative_case_record ?medical_document)
+        (policy_attachment_available ?policy_attachment)
+        (case_has_policy_attachment ?administrative_case_record ?policy_attachment)
+        (not
+          (policy_validation_initiated ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (policy_validation_initiated ?administrative_case_record)
+        (not
+          (policy_attachment_available ?policy_attachment)
+        )
+      )
+  )
+  (:action assign_policy_reviewer
+    :parameters (?administrative_case_record - administrative_case_record ?faculty_representative - faculty_representative)
+    :precondition
+      (and
+        (policy_validation_initiated ?administrative_case_record)
+        (faculty_assigned_to_case ?administrative_case_record ?faculty_representative)
+        (not
+          (policy_review_assigned ?administrative_case_record)
+        )
+      )
+    :effect (policy_review_assigned ?administrative_case_record)
+  )
+  (:action complete_policy_review_with_external_authority
+    :parameters (?administrative_case_record - administrative_case_record ?external_authority_reference - external_authority_reference)
+    :precondition
+      (and
+        (policy_review_assigned ?administrative_case_record)
+        (external_authority_linked_to_case ?administrative_case_record ?external_authority_reference)
+        (not
+          (policy_review_completed ?administrative_case_record)
+        )
+      )
+    :effect (policy_review_completed ?administrative_case_record)
+  )
+  (:action finalize_policy_review
+    :parameters (?administrative_case_record - administrative_case_record)
+    :precondition
+      (and
+        (policy_review_completed ?administrative_case_record)
+        (not
+          (case_finalized ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?administrative_case_record)
+        (ready_for_certificate_binding ?administrative_case_record)
+      )
+  )
+  (:action mark_student_enrollment_ready_for_certificate_binding
+    :parameters (?student_enrollment - student_enrollment ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (student_negotiation_initiated ?student_enrollment)
+        (student_negotiation_confirmed ?student_enrollment)
+        (proposal_reserved ?replan_proposal)
+        (proposal_finalized ?replan_proposal)
+        (not
+          (ready_for_certificate_binding ?student_enrollment)
+        )
+      )
+    :effect (ready_for_certificate_binding ?student_enrollment)
+  )
+  (:action mark_module_enrollment_ready_for_certificate_binding
+    :parameters (?module_enrollment - module_enrollment ?replan_proposal - replan_proposal)
+    :precondition
+      (and
+        (module_negotiation_initiated ?module_enrollment)
+        (module_negotiation_confirmed ?module_enrollment)
+        (proposal_reserved ?replan_proposal)
+        (proposal_finalized ?replan_proposal)
+        (not
+          (ready_for_certificate_binding ?module_enrollment)
+        )
+      )
+    :effect (ready_for_certificate_binding ?module_enrollment)
+  )
+  (:action bind_medical_certificate_type
+    :parameters (?case_subject - case_subject ?medical_certificate_type - medical_certificate_type ?medical_document - medical_document)
+    :precondition
+      (and
+        (ready_for_certificate_binding ?case_subject)
+        (attached_medical_document ?case_subject ?medical_document)
+        (medical_certificate_type_available ?medical_certificate_type)
+        (not
+          (medical_certificate_attached ?case_subject)
+        )
+      )
+    :effect
+      (and
+        (medical_certificate_attached ?case_subject)
+        (case_bound_to_medical_certificate_type ?case_subject ?medical_certificate_type)
+        (not
+          (medical_certificate_type_available ?medical_certificate_type)
+        )
+      )
+  )
+  (:action apply_replan_to_student_enrollment
+    :parameters (?student_enrollment - student_enrollment ?case_handler_staff - case_handler_staff ?medical_certificate_type - medical_certificate_type)
+    :precondition
+      (and
+        (medical_certificate_attached ?student_enrollment)
+        (case_assigned_to ?student_enrollment ?case_handler_staff)
+        (case_bound_to_medical_certificate_type ?student_enrollment ?medical_certificate_type)
+        (not
+          (replan_applied ?student_enrollment)
+        )
+      )
+    :effect
+      (and
+        (replan_applied ?student_enrollment)
+        (handler_available ?case_handler_staff)
+        (medical_certificate_type_available ?medical_certificate_type)
+      )
+  )
+  (:action apply_replan_to_module_enrollment
+    :parameters (?module_enrollment - module_enrollment ?case_handler_staff - case_handler_staff ?medical_certificate_type - medical_certificate_type)
+    :precondition
+      (and
+        (medical_certificate_attached ?module_enrollment)
+        (case_assigned_to ?module_enrollment ?case_handler_staff)
+        (case_bound_to_medical_certificate_type ?module_enrollment ?medical_certificate_type)
+        (not
+          (replan_applied ?module_enrollment)
+        )
+      )
+    :effect
+      (and
+        (replan_applied ?module_enrollment)
+        (handler_available ?case_handler_staff)
+        (medical_certificate_type_available ?medical_certificate_type)
+      )
+  )
+  (:action apply_replan_to_case_record
+    :parameters (?administrative_case_record - administrative_case_record ?case_handler_staff - case_handler_staff ?medical_certificate_type - medical_certificate_type)
+    :precondition
+      (and
+        (medical_certificate_attached ?administrative_case_record)
+        (case_assigned_to ?administrative_case_record ?case_handler_staff)
+        (case_bound_to_medical_certificate_type ?administrative_case_record ?medical_certificate_type)
+        (not
+          (replan_applied ?administrative_case_record)
+        )
+      )
+    :effect
+      (and
+        (replan_applied ?administrative_case_record)
+        (handler_available ?case_handler_staff)
+        (medical_certificate_type_available ?medical_certificate_type)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem student_absence_replanning_case)
+  (:domain health_related_absence_course_replanning)
+  (:objects student_enrollment_1 - student_enrollment module_enrollment_1 - module_enrollment administrative_case_record_1 - administrative_case_record administrative_case_record_2 - administrative_case_record case_handler_1 - case_handler_staff case_handler_2 - case_handler_staff case_handler_3 - case_handler_staff medical_document_1 - medical_document faculty_representative_1 - faculty_representative supporting_evidence_1 - supporting_evidence slot_a_1 - schedule_slot_type_a slot_b_1 - schedule_slot_type_b replan_proposal_1 - replan_proposal approval_document_1 - approval_document approval_document_2 - approval_document policy_reference_1 - policy_reference policy_reference_2 - policy_reference approval_token_1 - approval_token approval_token_2 - approval_token medical_certificate_type_1 - medical_certificate_type availability_token_1 - availability_token policy_attachment_1 - policy_attachment policy_attachment_2 - policy_attachment external_authority_1 - external_authority_reference)
+  (:init
+    (handler_available case_handler_1)
+    (handler_available case_handler_2)
+    (handler_available case_handler_3)
+    (medical_document_available medical_document_1)
+    (faculty_available faculty_representative_1)
+    (supporting_evidence_available supporting_evidence_1)
+    (enrollment_slot_type_a_reserved student_enrollment_1 slot_a_1)
+    (enrollment_slot_type_b_reserved module_enrollment_1 slot_b_1)
+    (proposal_placeholder_available replan_proposal_1)
+    (approval_document_available approval_document_1)
+    (approval_document_available approval_document_2)
+    (case_linked_to_student_enrollment administrative_case_record_1 student_enrollment_1)
+    (case_linked_to_student_enrollment administrative_case_record_2 student_enrollment_1)
+    (case_linked_to_module_enrollment administrative_case_record_1 module_enrollment_1)
+    (case_linked_to_module_enrollment administrative_case_record_2 module_enrollment_1)
+    (case_linked_to_proposal administrative_case_record_1 replan_proposal_1)
+    (case_linked_to_proposal administrative_case_record_2 replan_proposal_1)
+    (case_has_approval_document administrative_case_record_1 approval_document_1)
+    (case_has_approval_document administrative_case_record_2 approval_document_2)
+    (policy_reference_available policy_reference_1)
+    (policy_reference_available policy_reference_2)
+    (approval_token_available approval_token_1)
+    (approval_token_available approval_token_2)
+    (medical_certificate_type_available medical_certificate_type_1)
+    (availability_token_available availability_token_1)
+    (policy_attachment_available policy_attachment_1)
+    (case_has_policy_attachment administrative_case_record_1 policy_attachment_1)
+    (case_has_policy_attachment administrative_case_record_2 policy_attachment_2)
+    (external_authority_available external_authority_1)
+  )
+  (:goal
+    (and
+      (replan_applied student_enrollment_1)
+      (replan_applied module_enrollment_1)
+      (replan_applied administrative_case_record_1)
+      (replan_applied administrative_case_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_case student_enrollment_1)
+(register_case module_enrollment_1)
+(register_case administrative_case_record_1)
+(register_case administrative_case_record_2)
+(assign_case_handler student_enrollment_1 case_handler_1)
+(assign_case_handler module_enrollment_1 case_handler_2)
+(attach_medical_document student_enrollment_1 medical_document_1)
+(validate_medical_evidence student_enrollment_1 medical_document_1)
+(submit_supporting_evidence_student student_enrollment_1 slot_a_1 supporting_evidence_1)
+(progress_student_negotiation student_enrollment_1 slot_a_1 medical_document_1 supporting_evidence_1)
+(unlink_medical_document student_enrollment_1 medical_document_1)
+(attach_medical_document module_enrollment_1 medical_document_1)
+(validate_medical_evidence module_enrollment_1 medical_document_1)
+(submit_supporting_evidence_module module_enrollment_1 slot_b_1 supporting_evidence_1)
+(progress_module_negotiation module_enrollment_1 slot_b_1 medical_document_1 supporting_evidence_1)
+(unlink_medical_document module_enrollment_1 medical_document_1)
+(synthesize_proposal_standard student_enrollment_1 module_enrollment_1 slot_a_1 slot_b_1 replan_proposal_1)
+(attach_medical_document student_enrollment_1 medical_document_1)
+(finalize_proposal replan_proposal_1 student_enrollment_1 medical_document_1)
+(mark_student_enrollment_ready_for_certificate_binding student_enrollment_1 replan_proposal_1)
+(mark_module_enrollment_ready_for_certificate_binding module_enrollment_1 replan_proposal_1)
+(bind_medical_certificate_type student_enrollment_1 medical_certificate_type_1 medical_document_1)
+(apply_replan_to_student_enrollment student_enrollment_1 case_handler_1 medical_certificate_type_1)
+(unlink_medical_document student_enrollment_1 medical_document_1)
+(attach_medical_document module_enrollment_1 medical_document_1)
+(bind_medical_certificate_type module_enrollment_1 medical_certificate_type_1 medical_document_1)
+(apply_replan_to_module_enrollment module_enrollment_1 case_handler_2 medical_certificate_type_1)
+(unlink_medical_document module_enrollment_1 medical_document_1)
+(assign_case_handler administrative_case_record_1 case_handler_1)
+(attach_medical_document administrative_case_record_1 medical_document_1)
+(validate_medical_evidence administrative_case_record_1 medical_document_1)
+(assign_availability_token_to_case administrative_case_record_1 availability_token_1)
+(link_external_authority_reference administrative_case_record_1 external_authority_1)
+(assign_faculty_to_case administrative_case_record_1 faculty_representative_1)
+(attach_approval_document_to_proposal administrative_case_record_1 approval_document_1 replan_proposal_1)
+(run_compliance_stage_one_check administrative_case_record_1 approval_document_1 replan_proposal_1 medical_document_1)
+(run_compliance_stage_two administrative_case_record_1 availability_token_1 faculty_representative_1 approval_document_1 replan_proposal_1)
+(perform_external_authority_review_basic administrative_case_record_1 external_authority_1 approval_document_1 replan_proposal_1)
+(mark_case_ready_for_certificate_binding administrative_case_record_1)
+(bind_medical_certificate_type administrative_case_record_1 medical_certificate_type_1 medical_document_1)
+(apply_replan_to_case_record administrative_case_record_1 case_handler_1 medical_certificate_type_1)
+(unlink_medical_document administrative_case_record_1 medical_document_1)
+(release_availability_token_from_case administrative_case_record_1 availability_token_1)
+(unassign_faculty_from_case administrative_case_record_1 faculty_representative_1)
+(unlink_external_authority_reference administrative_case_record_1 external_authority_1)
+(assign_case_handler administrative_case_record_2 case_handler_2)
+(attach_medical_document administrative_case_record_2 medical_document_1)
+(validate_medical_evidence administrative_case_record_2 medical_document_1)
+(assign_availability_token_to_case administrative_case_record_2 availability_token_1)
+(link_external_authority_reference administrative_case_record_2 external_authority_1)
+(assign_faculty_to_case administrative_case_record_2 faculty_representative_1)
+(attach_approval_document_to_proposal administrative_case_record_2 approval_document_2 replan_proposal_1)
+(run_compliance_stage_one_check administrative_case_record_2 approval_document_2 replan_proposal_1 medical_document_1)
+(run_compliance_stage_two administrative_case_record_2 availability_token_1 faculty_representative_1 approval_document_2 replan_proposal_1)
+(perform_external_authority_review_basic administrative_case_record_2 external_authority_1 approval_document_2 replan_proposal_1)
+(mark_case_ready_for_certificate_binding administrative_case_record_2)
+(bind_medical_certificate_type administrative_case_record_2 medical_certificate_type_1 medical_document_1)
+(apply_replan_to_case_record administrative_case_record_2 case_handler_2 medical_certificate_type_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_unikk1oi/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_unikk1oi/plan.pddl 58 
+
+
+
+--- stderr ---
+

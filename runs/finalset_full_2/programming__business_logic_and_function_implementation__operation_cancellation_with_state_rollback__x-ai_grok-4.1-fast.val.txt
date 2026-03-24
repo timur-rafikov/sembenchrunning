@@ -1,0 +1,1006 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain operation_cancellation_saga)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_resource_kind - object asset_kind - object endpoint_kind - object domain_entity - object operation_request - domain_entity executor_slot - auxiliary_resource_kind payload - auxiliary_resource_kind auth_token - auxiliary_resource_kind feature_flag - auxiliary_resource_kind audit_record - auxiliary_resource_kind cancellation_reason - auxiliary_resource_kind compensation_plan - auxiliary_resource_kind timeout_policy - auxiliary_resource_kind attachment - asset_kind document - asset_kind policy - asset_kind source_resource - endpoint_kind target_resource - endpoint_kind external_request - endpoint_kind participant_context - operation_request coordinator_context - operation_request participant_a - participant_context participant_b - participant_context saga_coordinator - coordinator_context)
+  (:predicates
+    (request_initialized ?operation_request - operation_request)
+    (request_validated ?operation_request - operation_request)
+    (request_executor_assigned ?operation_request - operation_request)
+    (rollback_applied ?operation_request - operation_request)
+    (finalization_ready ?operation_request - operation_request)
+    (cancellation_prepared ?operation_request - operation_request)
+    (executor_slot_available ?executor_slot - executor_slot)
+    (request_executor_link ?operation_request - operation_request ?executor_slot - executor_slot)
+    (payload_available ?payload - payload)
+    (request_payload_link ?operation_request - operation_request ?payload - payload)
+    (auth_token_available ?auth_token - auth_token)
+    (request_auth_token_link ?operation_request - operation_request ?auth_token - auth_token)
+    (attachment_available ?attachment - attachment)
+    (participant_a_attachment_link ?participant_a - participant_a ?attachment - attachment)
+    (participant_b_attachment_link ?participant_b - participant_b ?attachment - attachment)
+    (participant_a_source_link ?participant_a - participant_a ?source_resource - source_resource)
+    (source_resource_reserved ?source_resource - source_resource)
+    (source_resource_bound ?source_resource - source_resource)
+    (participant_a_ready ?participant_a - participant_a)
+    (participant_b_target_link ?participant_b - participant_b ?target_resource - target_resource)
+    (target_resource_reserved ?target_resource - target_resource)
+    (target_resource_bound ?target_resource - target_resource)
+    (participant_b_ready ?participant_b - participant_b)
+    (external_request_available ?external_request - external_request)
+    (external_request_staged ?external_request - external_request)
+    (external_request_source_binding ?external_request - external_request ?source_resource - source_resource)
+    (external_request_target_binding ?external_request - external_request ?target_resource - target_resource)
+    (external_request_flag_primary ?external_request - external_request)
+    (external_request_flag_secondary ?external_request - external_request)
+    (external_request_ready ?external_request - external_request)
+    (coordinator_participant_a_link ?saga_coordinator - saga_coordinator ?participant_a - participant_a)
+    (coordinator_participant_b_link ?saga_coordinator - saga_coordinator ?participant_b - participant_b)
+    (coordinator_external_request_link ?saga_coordinator - saga_coordinator ?external_request - external_request)
+    (document_available ?document - document)
+    (coordinator_document_link ?saga_coordinator - saga_coordinator ?document - document)
+    (document_processed ?document - document)
+    (document_external_request_link ?document - document ?external_request - external_request)
+    (coordinator_documents_validated ?saga_coordinator - saga_coordinator)
+    (coordinator_policy_check_passed ?saga_coordinator - saga_coordinator)
+    (coordinator_ready_for_finalization ?saga_coordinator - saga_coordinator)
+    (coordinator_feature_flag_bound ?saga_coordinator - saga_coordinator)
+    (coordinator_policy_staged ?saga_coordinator - saga_coordinator)
+    (coordinator_policy_attached ?saga_coordinator - saga_coordinator)
+    (coordinator_finalization_locked ?saga_coordinator - saga_coordinator)
+    (policy_available ?policy - policy)
+    (coordinator_policy_link ?saga_coordinator - saga_coordinator ?policy - policy)
+    (coordinator_policy_applied ?saga_coordinator - saga_coordinator)
+    (coordinator_feature_flag_enabled ?saga_coordinator - saga_coordinator)
+    (coordinator_timeout_policy_applied ?saga_coordinator - saga_coordinator)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (coordinator_feature_flag_link ?saga_coordinator - saga_coordinator ?feature_flag - feature_flag)
+    (audit_record_available ?audit_record - audit_record)
+    (coordinator_audit_record_link ?saga_coordinator - saga_coordinator ?audit_record - audit_record)
+    (compensation_plan_available ?compensation_plan - compensation_plan)
+    (coordinator_compensation_plan_link ?saga_coordinator - saga_coordinator ?compensation_plan - compensation_plan)
+    (timeout_policy_available ?timeout_policy - timeout_policy)
+    (coordinator_timeout_policy_link ?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy)
+    (cancellation_reason_available ?cancellation_reason - cancellation_reason)
+    (request_cancellation_reason_link ?operation_request - operation_request ?cancellation_reason - cancellation_reason)
+    (participant_a_allocated ?participant_a - participant_a)
+    (participant_b_allocated ?participant_b - participant_b)
+    (coordinator_finalized ?saga_coordinator - saga_coordinator)
+  )
+  (:action initialize_operation_request
+    :parameters (?operation_request - operation_request)
+    :precondition
+      (and
+        (not
+          (request_initialized ?operation_request)
+        )
+        (not
+          (rollback_applied ?operation_request)
+        )
+      )
+    :effect (request_initialized ?operation_request)
+  )
+  (:action assign_executor_slot
+    :parameters (?operation_request - operation_request ?executor_slot - executor_slot)
+    :precondition
+      (and
+        (request_initialized ?operation_request)
+        (not
+          (request_executor_assigned ?operation_request)
+        )
+        (executor_slot_available ?executor_slot)
+      )
+    :effect
+      (and
+        (request_executor_assigned ?operation_request)
+        (request_executor_link ?operation_request ?executor_slot)
+        (not
+          (executor_slot_available ?executor_slot)
+        )
+      )
+  )
+  (:action attach_payload_to_operation
+    :parameters (?operation_request - operation_request ?payload - payload)
+    :precondition
+      (and
+        (request_initialized ?operation_request)
+        (request_executor_assigned ?operation_request)
+        (payload_available ?payload)
+      )
+    :effect
+      (and
+        (request_payload_link ?operation_request ?payload)
+        (not
+          (payload_available ?payload)
+        )
+      )
+  )
+  (:action validate_operation_request
+    :parameters (?operation_request - operation_request ?payload - payload)
+    :precondition
+      (and
+        (request_initialized ?operation_request)
+        (request_executor_assigned ?operation_request)
+        (request_payload_link ?operation_request ?payload)
+        (not
+          (request_validated ?operation_request)
+        )
+      )
+    :effect (request_validated ?operation_request)
+  )
+  (:action detach_payload_from_operation
+    :parameters (?operation_request - operation_request ?payload - payload)
+    :precondition
+      (and
+        (request_payload_link ?operation_request ?payload)
+      )
+    :effect
+      (and
+        (payload_available ?payload)
+        (not
+          (request_payload_link ?operation_request ?payload)
+        )
+      )
+  )
+  (:action bind_auth_token_to_operation
+    :parameters (?operation_request - operation_request ?auth_token - auth_token)
+    :precondition
+      (and
+        (request_validated ?operation_request)
+        (auth_token_available ?auth_token)
+      )
+    :effect
+      (and
+        (request_auth_token_link ?operation_request ?auth_token)
+        (not
+          (auth_token_available ?auth_token)
+        )
+      )
+  )
+  (:action unbind_auth_token_from_operation
+    :parameters (?operation_request - operation_request ?auth_token - auth_token)
+    :precondition
+      (and
+        (request_auth_token_link ?operation_request ?auth_token)
+      )
+    :effect
+      (and
+        (auth_token_available ?auth_token)
+        (not
+          (request_auth_token_link ?operation_request ?auth_token)
+        )
+      )
+  )
+  (:action bind_compensation_plan_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?compensation_plan - compensation_plan)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (compensation_plan_available ?compensation_plan)
+      )
+    :effect
+      (and
+        (coordinator_compensation_plan_link ?saga_coordinator ?compensation_plan)
+        (not
+          (compensation_plan_available ?compensation_plan)
+        )
+      )
+  )
+  (:action unbind_compensation_plan_from_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?compensation_plan - compensation_plan)
+    :precondition
+      (and
+        (coordinator_compensation_plan_link ?saga_coordinator ?compensation_plan)
+      )
+    :effect
+      (and
+        (compensation_plan_available ?compensation_plan)
+        (not
+          (coordinator_compensation_plan_link ?saga_coordinator ?compensation_plan)
+        )
+      )
+  )
+  (:action bind_timeout_policy_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (timeout_policy_available ?timeout_policy)
+      )
+    :effect
+      (and
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (not
+          (timeout_policy_available ?timeout_policy)
+        )
+      )
+  )
+  (:action unbind_timeout_policy_from_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy)
+    :precondition
+      (and
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+      )
+    :effect
+      (and
+        (timeout_policy_available ?timeout_policy)
+        (not
+          (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        )
+      )
+  )
+  (:action reserve_source_resource
+    :parameters (?participant_a - participant_a ?source_resource - source_resource ?payload - payload)
+    :precondition
+      (and
+        (request_validated ?participant_a)
+        (request_payload_link ?participant_a ?payload)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (not
+          (source_resource_reserved ?source_resource)
+        )
+        (not
+          (source_resource_bound ?source_resource)
+        )
+      )
+    :effect (source_resource_reserved ?source_resource)
+  )
+  (:action authorize_and_allocate_participant_a
+    :parameters (?participant_a - participant_a ?source_resource - source_resource ?auth_token - auth_token)
+    :precondition
+      (and
+        (request_validated ?participant_a)
+        (request_auth_token_link ?participant_a ?auth_token)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (source_resource_reserved ?source_resource)
+        (not
+          (participant_a_allocated ?participant_a)
+        )
+      )
+    :effect
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_a_ready ?participant_a)
+      )
+  )
+  (:action attach_attachment_to_participant_a
+    :parameters (?participant_a - participant_a ?source_resource - source_resource ?attachment - attachment)
+    :precondition
+      (and
+        (request_validated ?participant_a)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (attachment_available ?attachment)
+        (not
+          (participant_a_allocated ?participant_a)
+        )
+      )
+    :effect
+      (and
+        (source_resource_bound ?source_resource)
+        (participant_a_allocated ?participant_a)
+        (participant_a_attachment_link ?participant_a ?attachment)
+        (not
+          (attachment_available ?attachment)
+        )
+      )
+  )
+  (:action commit_participant_a_attachment
+    :parameters (?participant_a - participant_a ?source_resource - source_resource ?payload - payload ?attachment - attachment)
+    :precondition
+      (and
+        (request_validated ?participant_a)
+        (request_payload_link ?participant_a ?payload)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (source_resource_bound ?source_resource)
+        (participant_a_attachment_link ?participant_a ?attachment)
+        (not
+          (participant_a_ready ?participant_a)
+        )
+      )
+    :effect
+      (and
+        (source_resource_reserved ?source_resource)
+        (participant_a_ready ?participant_a)
+        (attachment_available ?attachment)
+        (not
+          (participant_a_attachment_link ?participant_a ?attachment)
+        )
+      )
+  )
+  (:action reserve_target_resource_for_participant_b
+    :parameters (?participant_b - participant_b ?target_resource - target_resource ?payload - payload)
+    :precondition
+      (and
+        (request_validated ?participant_b)
+        (request_payload_link ?participant_b ?payload)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (not
+          (target_resource_reserved ?target_resource)
+        )
+        (not
+          (target_resource_bound ?target_resource)
+        )
+      )
+    :effect (target_resource_reserved ?target_resource)
+  )
+  (:action authorize_and_allocate_participant_b
+    :parameters (?participant_b - participant_b ?target_resource - target_resource ?auth_token - auth_token)
+    :precondition
+      (and
+        (request_validated ?participant_b)
+        (request_auth_token_link ?participant_b ?auth_token)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (target_resource_reserved ?target_resource)
+        (not
+          (participant_b_allocated ?participant_b)
+        )
+      )
+    :effect
+      (and
+        (participant_b_allocated ?participant_b)
+        (participant_b_ready ?participant_b)
+      )
+  )
+  (:action attach_attachment_to_participant_b
+    :parameters (?participant_b - participant_b ?target_resource - target_resource ?attachment - attachment)
+    :precondition
+      (and
+        (request_validated ?participant_b)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (attachment_available ?attachment)
+        (not
+          (participant_b_allocated ?participant_b)
+        )
+      )
+    :effect
+      (and
+        (target_resource_bound ?target_resource)
+        (participant_b_allocated ?participant_b)
+        (participant_b_attachment_link ?participant_b ?attachment)
+        (not
+          (attachment_available ?attachment)
+        )
+      )
+  )
+  (:action commit_participant_b_attachment
+    :parameters (?participant_b - participant_b ?target_resource - target_resource ?payload - payload ?attachment - attachment)
+    :precondition
+      (and
+        (request_validated ?participant_b)
+        (request_payload_link ?participant_b ?payload)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (target_resource_bound ?target_resource)
+        (participant_b_attachment_link ?participant_b ?attachment)
+        (not
+          (participant_b_ready ?participant_b)
+        )
+      )
+    :effect
+      (and
+        (target_resource_reserved ?target_resource)
+        (participant_b_ready ?participant_b)
+        (attachment_available ?attachment)
+        (not
+          (participant_b_attachment_link ?participant_b ?attachment)
+        )
+      )
+  )
+  (:action create_external_request_standard
+    :parameters (?participant_a - participant_a ?participant_b - participant_b ?source_resource - source_resource ?target_resource - target_resource ?external_request - external_request)
+    :precondition
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_b_allocated ?participant_b)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (source_resource_reserved ?source_resource)
+        (target_resource_reserved ?target_resource)
+        (participant_a_ready ?participant_a)
+        (participant_b_ready ?participant_b)
+        (external_request_available ?external_request)
+      )
+    :effect
+      (and
+        (external_request_staged ?external_request)
+        (external_request_source_binding ?external_request ?source_resource)
+        (external_request_target_binding ?external_request ?target_resource)
+        (not
+          (external_request_available ?external_request)
+        )
+      )
+  )
+  (:action create_external_request_primary_variant
+    :parameters (?participant_a - participant_a ?participant_b - participant_b ?source_resource - source_resource ?target_resource - target_resource ?external_request - external_request)
+    :precondition
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_b_allocated ?participant_b)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (source_resource_bound ?source_resource)
+        (target_resource_reserved ?target_resource)
+        (not
+          (participant_a_ready ?participant_a)
+        )
+        (participant_b_ready ?participant_b)
+        (external_request_available ?external_request)
+      )
+    :effect
+      (and
+        (external_request_staged ?external_request)
+        (external_request_source_binding ?external_request ?source_resource)
+        (external_request_target_binding ?external_request ?target_resource)
+        (external_request_flag_primary ?external_request)
+        (not
+          (external_request_available ?external_request)
+        )
+      )
+  )
+  (:action create_external_request_secondary_variant
+    :parameters (?participant_a - participant_a ?participant_b - participant_b ?source_resource - source_resource ?target_resource - target_resource ?external_request - external_request)
+    :precondition
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_b_allocated ?participant_b)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (source_resource_reserved ?source_resource)
+        (target_resource_bound ?target_resource)
+        (participant_a_ready ?participant_a)
+        (not
+          (participant_b_ready ?participant_b)
+        )
+        (external_request_available ?external_request)
+      )
+    :effect
+      (and
+        (external_request_staged ?external_request)
+        (external_request_source_binding ?external_request ?source_resource)
+        (external_request_target_binding ?external_request ?target_resource)
+        (external_request_flag_secondary ?external_request)
+        (not
+          (external_request_available ?external_request)
+        )
+      )
+  )
+  (:action create_external_request_combined_variant
+    :parameters (?participant_a - participant_a ?participant_b - participant_b ?source_resource - source_resource ?target_resource - target_resource ?external_request - external_request)
+    :precondition
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_b_allocated ?participant_b)
+        (participant_a_source_link ?participant_a ?source_resource)
+        (participant_b_target_link ?participant_b ?target_resource)
+        (source_resource_bound ?source_resource)
+        (target_resource_bound ?target_resource)
+        (not
+          (participant_a_ready ?participant_a)
+        )
+        (not
+          (participant_b_ready ?participant_b)
+        )
+        (external_request_available ?external_request)
+      )
+    :effect
+      (and
+        (external_request_staged ?external_request)
+        (external_request_source_binding ?external_request ?source_resource)
+        (external_request_target_binding ?external_request ?target_resource)
+        (external_request_flag_primary ?external_request)
+        (external_request_flag_secondary ?external_request)
+        (not
+          (external_request_available ?external_request)
+        )
+      )
+  )
+  (:action finalize_external_request
+    :parameters (?external_request - external_request ?participant_a - participant_a ?payload - payload)
+    :precondition
+      (and
+        (external_request_staged ?external_request)
+        (participant_a_allocated ?participant_a)
+        (request_payload_link ?participant_a ?payload)
+        (not
+          (external_request_ready ?external_request)
+        )
+      )
+    :effect (external_request_ready ?external_request)
+  )
+  (:action register_document_for_external_request
+    :parameters (?saga_coordinator - saga_coordinator ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (coordinator_external_request_link ?saga_coordinator ?external_request)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_available ?document)
+        (external_request_staged ?external_request)
+        (external_request_ready ?external_request)
+        (not
+          (document_processed ?document)
+        )
+      )
+    :effect
+      (and
+        (document_processed ?document)
+        (document_external_request_link ?document ?external_request)
+        (not
+          (document_available ?document)
+        )
+      )
+  )
+  (:action validate_document_for_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?document - document ?external_request - external_request ?payload - payload)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_processed ?document)
+        (document_external_request_link ?document ?external_request)
+        (request_payload_link ?saga_coordinator ?payload)
+        (not
+          (external_request_flag_primary ?external_request)
+        )
+        (not
+          (coordinator_documents_validated ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_documents_validated ?saga_coordinator)
+  )
+  (:action bind_feature_flag_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (feature_flag_available ?feature_flag)
+        (not
+          (coordinator_feature_flag_bound ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_feature_flag_bound ?saga_coordinator)
+        (coordinator_feature_flag_link ?saga_coordinator ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action apply_policies_and_attach_document
+    :parameters (?saga_coordinator - saga_coordinator ?document - document ?external_request - external_request ?payload - payload ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_processed ?document)
+        (document_external_request_link ?document ?external_request)
+        (request_payload_link ?saga_coordinator ?payload)
+        (external_request_flag_primary ?external_request)
+        (coordinator_feature_flag_bound ?saga_coordinator)
+        (coordinator_feature_flag_link ?saga_coordinator ?feature_flag)
+        (not
+          (coordinator_documents_validated ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_documents_validated ?saga_coordinator)
+        (coordinator_policy_staged ?saga_coordinator)
+      )
+  )
+  (:action bind_compensation_and_prepare_execution
+    :parameters (?saga_coordinator - saga_coordinator ?compensation_plan - compensation_plan ?auth_token - auth_token ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_documents_validated ?saga_coordinator)
+        (coordinator_compensation_plan_link ?saga_coordinator ?compensation_plan)
+        (request_auth_token_link ?saga_coordinator ?auth_token)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (not
+          (external_request_flag_secondary ?external_request)
+        )
+        (not
+          (coordinator_policy_check_passed ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_policy_check_passed ?saga_coordinator)
+  )
+  (:action bind_compensation_and_prepare_execution_secondary
+    :parameters (?saga_coordinator - saga_coordinator ?compensation_plan - compensation_plan ?auth_token - auth_token ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_documents_validated ?saga_coordinator)
+        (coordinator_compensation_plan_link ?saga_coordinator ?compensation_plan)
+        (request_auth_token_link ?saga_coordinator ?auth_token)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (external_request_flag_secondary ?external_request)
+        (not
+          (coordinator_policy_check_passed ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_policy_check_passed ?saga_coordinator)
+  )
+  (:action apply_timeout_policy_and_prepare_finalization
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_policy_check_passed ?saga_coordinator)
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (not
+          (external_request_flag_primary ?external_request)
+        )
+        (not
+          (external_request_flag_secondary ?external_request)
+        )
+        (not
+          (coordinator_ready_for_finalization ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_ready_for_finalization ?saga_coordinator)
+  )
+  (:action prepare_finalization_primary_path
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_policy_check_passed ?saga_coordinator)
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (external_request_flag_primary ?external_request)
+        (not
+          (external_request_flag_secondary ?external_request)
+        )
+        (not
+          (coordinator_ready_for_finalization ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_policy_attached ?saga_coordinator)
+      )
+  )
+  (:action prepare_finalization_secondary_path
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_policy_check_passed ?saga_coordinator)
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (not
+          (external_request_flag_primary ?external_request)
+        )
+        (external_request_flag_secondary ?external_request)
+        (not
+          (coordinator_ready_for_finalization ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_policy_attached ?saga_coordinator)
+      )
+  )
+  (:action prepare_finalization_combined_path
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy ?document - document ?external_request - external_request)
+    :precondition
+      (and
+        (coordinator_policy_check_passed ?saga_coordinator)
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (coordinator_document_link ?saga_coordinator ?document)
+        (document_external_request_link ?document ?external_request)
+        (external_request_flag_primary ?external_request)
+        (external_request_flag_secondary ?external_request)
+        (not
+          (coordinator_ready_for_finalization ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_policy_attached ?saga_coordinator)
+      )
+  )
+  (:action mark_coordinator_finalization_ready_simple
+    :parameters (?saga_coordinator - saga_coordinator)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (not
+          (coordinator_policy_attached ?saga_coordinator)
+        )
+        (not
+          (coordinator_finalized ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?saga_coordinator)
+        (finalization_ready ?saga_coordinator)
+      )
+  )
+  (:action attach_audit_record_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?audit_record - audit_record)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_policy_attached ?saga_coordinator)
+        (audit_record_available ?audit_record)
+      )
+    :effect
+      (and
+        (coordinator_audit_record_link ?saga_coordinator ?audit_record)
+        (not
+          (audit_record_available ?audit_record)
+        )
+      )
+  )
+  (:action lock_coordinator_for_execution
+    :parameters (?saga_coordinator - saga_coordinator ?participant_a - participant_a ?participant_b - participant_b ?payload - payload ?audit_record - audit_record)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_policy_attached ?saga_coordinator)
+        (coordinator_audit_record_link ?saga_coordinator ?audit_record)
+        (coordinator_participant_a_link ?saga_coordinator ?participant_a)
+        (coordinator_participant_b_link ?saga_coordinator ?participant_b)
+        (participant_a_ready ?participant_a)
+        (participant_b_ready ?participant_b)
+        (request_payload_link ?saga_coordinator ?payload)
+        (not
+          (coordinator_finalization_locked ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_finalization_locked ?saga_coordinator)
+  )
+  (:action finalize_coordinator_and_mark_ready
+    :parameters (?saga_coordinator - saga_coordinator)
+    :precondition
+      (and
+        (coordinator_ready_for_finalization ?saga_coordinator)
+        (coordinator_finalization_locked ?saga_coordinator)
+        (not
+          (coordinator_finalized ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?saga_coordinator)
+        (finalization_ready ?saga_coordinator)
+      )
+  )
+  (:action activate_coordinator_policy
+    :parameters (?saga_coordinator - saga_coordinator ?policy - policy ?payload - payload)
+    :precondition
+      (and
+        (request_validated ?saga_coordinator)
+        (request_payload_link ?saga_coordinator ?payload)
+        (policy_available ?policy)
+        (coordinator_policy_link ?saga_coordinator ?policy)
+        (not
+          (coordinator_policy_applied ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_policy_applied ?saga_coordinator)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action enable_feature_flag_for_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?auth_token - auth_token)
+    :precondition
+      (and
+        (coordinator_policy_applied ?saga_coordinator)
+        (request_auth_token_link ?saga_coordinator ?auth_token)
+        (not
+          (coordinator_feature_flag_enabled ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_feature_flag_enabled ?saga_coordinator)
+  )
+  (:action apply_timeout_policy_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?timeout_policy - timeout_policy)
+    :precondition
+      (and
+        (coordinator_feature_flag_enabled ?saga_coordinator)
+        (coordinator_timeout_policy_link ?saga_coordinator ?timeout_policy)
+        (not
+          (coordinator_timeout_policy_applied ?saga_coordinator)
+        )
+      )
+    :effect (coordinator_timeout_policy_applied ?saga_coordinator)
+  )
+  (:action mark_coordinator_finalization_ready
+    :parameters (?saga_coordinator - saga_coordinator)
+    :precondition
+      (and
+        (coordinator_timeout_policy_applied ?saga_coordinator)
+        (not
+          (coordinator_finalized ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?saga_coordinator)
+        (finalization_ready ?saga_coordinator)
+      )
+  )
+  (:action mark_participant_a_finalization_ready
+    :parameters (?participant_a - participant_a ?external_request - external_request)
+    :precondition
+      (and
+        (participant_a_allocated ?participant_a)
+        (participant_a_ready ?participant_a)
+        (external_request_staged ?external_request)
+        (external_request_ready ?external_request)
+        (not
+          (finalization_ready ?participant_a)
+        )
+      )
+    :effect (finalization_ready ?participant_a)
+  )
+  (:action mark_participant_b_finalization_ready
+    :parameters (?participant_b - participant_b ?external_request - external_request)
+    :precondition
+      (and
+        (participant_b_allocated ?participant_b)
+        (participant_b_ready ?participant_b)
+        (external_request_staged ?external_request)
+        (external_request_ready ?external_request)
+        (not
+          (finalization_ready ?participant_b)
+        )
+      )
+    :effect (finalization_ready ?participant_b)
+  )
+  (:action prepare_cancellation_for_operation
+    :parameters (?operation_request - operation_request ?cancellation_reason - cancellation_reason ?payload - payload)
+    :precondition
+      (and
+        (finalization_ready ?operation_request)
+        (request_payload_link ?operation_request ?payload)
+        (cancellation_reason_available ?cancellation_reason)
+        (not
+          (cancellation_prepared ?operation_request)
+        )
+      )
+    :effect
+      (and
+        (cancellation_prepared ?operation_request)
+        (request_cancellation_reason_link ?operation_request ?cancellation_reason)
+        (not
+          (cancellation_reason_available ?cancellation_reason)
+        )
+      )
+  )
+  (:action apply_rollback_to_participant_a
+    :parameters (?participant_a - participant_a ?executor_slot - executor_slot ?cancellation_reason - cancellation_reason)
+    :precondition
+      (and
+        (cancellation_prepared ?participant_a)
+        (request_executor_link ?participant_a ?executor_slot)
+        (request_cancellation_reason_link ?participant_a ?cancellation_reason)
+        (not
+          (rollback_applied ?participant_a)
+        )
+      )
+    :effect
+      (and
+        (rollback_applied ?participant_a)
+        (executor_slot_available ?executor_slot)
+        (cancellation_reason_available ?cancellation_reason)
+      )
+  )
+  (:action apply_rollback_to_participant_b
+    :parameters (?participant_b - participant_b ?executor_slot - executor_slot ?cancellation_reason - cancellation_reason)
+    :precondition
+      (and
+        (cancellation_prepared ?participant_b)
+        (request_executor_link ?participant_b ?executor_slot)
+        (request_cancellation_reason_link ?participant_b ?cancellation_reason)
+        (not
+          (rollback_applied ?participant_b)
+        )
+      )
+    :effect
+      (and
+        (rollback_applied ?participant_b)
+        (executor_slot_available ?executor_slot)
+        (cancellation_reason_available ?cancellation_reason)
+      )
+  )
+  (:action apply_rollback_to_coordinator
+    :parameters (?saga_coordinator - saga_coordinator ?executor_slot - executor_slot ?cancellation_reason - cancellation_reason)
+    :precondition
+      (and
+        (cancellation_prepared ?saga_coordinator)
+        (request_executor_link ?saga_coordinator ?executor_slot)
+        (request_cancellation_reason_link ?saga_coordinator ?cancellation_reason)
+        (not
+          (rollback_applied ?saga_coordinator)
+        )
+      )
+    :effect
+      (and
+        (rollback_applied ?saga_coordinator)
+        (executor_slot_available ?executor_slot)
+        (cancellation_reason_available ?cancellation_reason)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem cancel_operation_rollback_scenario)
+  (:domain operation_cancellation_saga)
+  (:objects participant_a_1 - participant_a participant_b_1 - participant_b saga_coordinator_1 - saga_coordinator saga_coordinator_2 - saga_coordinator executor_slot_1 - executor_slot executor_slot_2 - executor_slot executor_slot_3 - executor_slot payload_1 - payload auth_token_1 - auth_token attachment_1 - attachment source_resource_1 - source_resource target_resource_1 - target_resource external_request_1 - external_request document_1 - document document_2 - document feature_flag_1 - feature_flag feature_flag_2 - feature_flag audit_record_1 - audit_record audit_record_2 - audit_record cancellation_reason_1 - cancellation_reason compensation_plan_1 - compensation_plan policy_1 - policy policy_2 - policy timeout_policy_1 - timeout_policy)
+  (:init
+    (executor_slot_available executor_slot_1)
+    (executor_slot_available executor_slot_2)
+    (executor_slot_available executor_slot_3)
+    (payload_available payload_1)
+    (auth_token_available auth_token_1)
+    (attachment_available attachment_1)
+    (participant_a_source_link participant_a_1 source_resource_1)
+    (participant_b_target_link participant_b_1 target_resource_1)
+    (external_request_available external_request_1)
+    (document_available document_1)
+    (document_available document_2)
+    (coordinator_participant_a_link saga_coordinator_1 participant_a_1)
+    (coordinator_participant_a_link saga_coordinator_2 participant_a_1)
+    (coordinator_participant_b_link saga_coordinator_1 participant_b_1)
+    (coordinator_participant_b_link saga_coordinator_2 participant_b_1)
+    (coordinator_external_request_link saga_coordinator_1 external_request_1)
+    (coordinator_external_request_link saga_coordinator_2 external_request_1)
+    (coordinator_document_link saga_coordinator_1 document_1)
+    (coordinator_document_link saga_coordinator_2 document_2)
+    (feature_flag_available feature_flag_1)
+    (feature_flag_available feature_flag_2)
+    (audit_record_available audit_record_1)
+    (audit_record_available audit_record_2)
+    (cancellation_reason_available cancellation_reason_1)
+    (compensation_plan_available compensation_plan_1)
+    (policy_available policy_1)
+    (coordinator_policy_link saga_coordinator_1 policy_1)
+    (coordinator_policy_link saga_coordinator_2 policy_2)
+    (timeout_policy_available timeout_policy_1)
+  )
+  (:goal
+    (and
+      (rollback_applied participant_a_1)
+      (rollback_applied participant_b_1)
+      (rollback_applied saga_coordinator_1)
+      (rollback_applied saga_coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize-operation_request participant_a_1)
+(assign-executor_slot participant_a_1 executor_slot_1)
+(attach-payload_to_operation participant_a_1 payload_1)
+(validate-operation_request participant_a_1 payload_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_br3d5nnm/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_br3d5nnm/plan.pddl 
+
+
+--- stderr ---
+

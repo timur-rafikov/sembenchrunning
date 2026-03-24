@@ -1,0 +1,936 @@
+(define (domain perishable_transport_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_class - object material_resource_class - object monitoring_and_staging_class - object case_category_class - object recovery_case - case_category_class contingency_resource - operational_resource_class sampling_kit - operational_resource_class field_staff - operational_resource_class specialized_equipment - operational_resource_class third_party_service - operational_resource_class regulatory_document - operational_resource_class decontamination_agent - operational_resource_class laboratory_test_kit - operational_resource_class salvage_kit - material_resource_class salvage_material_unit - material_resource_class inspection_certificate - material_resource_class origin_temperature_reading - monitoring_and_staging_class destination_temperature_reading - monitoring_and_staging_class staging_container - monitoring_and_staging_class consignment_case_subclass - recovery_case response_facility_subclass - recovery_case origin_consignment_case - consignment_case_subclass destination_consignment_case - consignment_case_subclass response_unit_case - response_facility_subclass)
+  (:predicates
+    (recovery_entity_open ?recovery_case - recovery_case)
+    (recovery_entity_triaged ?recovery_case - recovery_case)
+    (recovery_entity_has_resource_assignment ?recovery_case - recovery_case)
+    (recovery_entity_released ?recovery_case - recovery_case)
+    (recovery_entity_release_eligible ?recovery_case - recovery_case)
+    (recovery_entity_regulatory_document_attached ?recovery_case - recovery_case)
+    (contingency_resource_available ?contingency_resource - contingency_resource)
+    (recovery_entity_assigned_contingency_resource ?recovery_case - recovery_case ?contingency_resource - contingency_resource)
+    (sampling_kit_available ?sampling_kit - sampling_kit)
+    (recovery_entity_assigned_sampling_kit ?recovery_case - recovery_case ?sampling_kit - sampling_kit)
+    (field_staff_available ?field_staff - field_staff)
+    (recovery_entity_assigned_field_staff ?recovery_case - recovery_case ?field_staff - field_staff)
+    (salvage_kit_available ?salvage_kit - salvage_kit)
+    (recovery_entity_origin_assigned_salvage_kit ?origin_case - origin_consignment_case ?salvage_kit - salvage_kit)
+    (recovery_entity_destination_assigned_salvage_kit ?destination_case - destination_consignment_case ?salvage_kit - salvage_kit)
+    (recovery_entity_origin_linked_temperature ?origin_case - origin_consignment_case ?origin_temp_reading - origin_temperature_reading)
+    (origin_temperature_alert ?origin_temp_reading - origin_temperature_reading)
+    (origin_temperature_stable ?origin_temp_reading - origin_temperature_reading)
+    (recovery_entity_origin_ready_for_staging ?origin_case - origin_consignment_case)
+    (recovery_entity_destination_linked_temperature ?destination_case - destination_consignment_case ?destination_temp_reading - destination_temperature_reading)
+    (destination_temperature_alert ?destination_temp_reading - destination_temperature_reading)
+    (destination_temperature_stable ?destination_temp_reading - destination_temperature_reading)
+    (recovery_entity_destination_ready_for_staging ?destination_case - destination_consignment_case)
+    (staging_container_available ?staging_container - staging_container)
+    (staging_container_prepared ?staging_container - staging_container)
+    (staging_container_linked_origin_temperature ?staging_container - staging_container ?origin_temp_reading - origin_temperature_reading)
+    (staging_container_linked_destination_temperature ?staging_container - staging_container ?destination_temp_reading - destination_temperature_reading)
+    (staging_container_origin_condition_flag ?staging_container - staging_container)
+    (staging_container_destination_condition_flag ?staging_container - staging_container)
+    (staging_container_inspected ?staging_container - staging_container)
+    (response_unit_assigned_origin_recovery_case ?response_unit - response_unit_case ?origin_case - origin_consignment_case)
+    (response_unit_assigned_destination_recovery_case ?response_unit - response_unit_case ?destination_case - destination_consignment_case)
+    (response_unit_assigned_staging_container ?response_unit - response_unit_case ?staging_container - staging_container)
+    (salvage_material_unit_available ?salvage_material - salvage_material_unit)
+    (response_unit_allocated_salvage_material ?response_unit - response_unit_case ?salvage_material - salvage_material_unit)
+    (salvage_material_unit_marked ?salvage_material - salvage_material_unit)
+    (salvage_material_assigned_to_container ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    (response_unit_prepared ?response_unit - response_unit_case)
+    (response_unit_ready_for_decontamination ?response_unit - response_unit_case)
+    (response_unit_decontamination_completed ?response_unit - response_unit_case)
+    (response_unit_equipment_attached ?response_unit - response_unit_case)
+    (response_unit_equipment_verified ?response_unit - response_unit_case)
+    (response_unit_ready_for_processing ?response_unit - response_unit_case)
+    (response_unit_processing_started ?response_unit - response_unit_case)
+    (inspection_certificate_available ?inspection_certificate - inspection_certificate)
+    (response_unit_assigned_inspection_certificate ?response_unit - response_unit_case ?inspection_certificate - inspection_certificate)
+    (response_unit_inspection_certificate_attached ?response_unit - response_unit_case)
+    (response_unit_inspection_documented ?response_unit - response_unit_case)
+    (response_unit_inspection_verified ?response_unit - response_unit_case)
+    (specialized_equipment_available ?specialized_equipment - specialized_equipment)
+    (response_unit_assigned_specialized_equipment ?response_unit - response_unit_case ?specialized_equipment - specialized_equipment)
+    (third_party_service_available ?third_party_service - third_party_service)
+    (response_unit_assigned_third_party_service ?response_unit - response_unit_case ?third_party_service - third_party_service)
+    (decontamination_agent_available ?decontamination_agent - decontamination_agent)
+    (response_unit_assigned_decontamination_agent ?response_unit - response_unit_case ?decontamination_agent - decontamination_agent)
+    (lab_test_kit_available ?lab_test_kit - laboratory_test_kit)
+    (response_unit_assigned_lab_test_kit ?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (recovery_entity_linked_regulatory_document ?recovery_case - recovery_case ?regulatory_document - regulatory_document)
+    (recovery_entity_origin_materials_ready ?origin_case - origin_consignment_case)
+    (recovery_entity_destination_materials_ready ?destination_case - destination_consignment_case)
+    (response_unit_finalized ?response_unit - response_unit_case)
+  )
+  (:action open_recovery_case
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (not
+          (recovery_entity_open ?recovery_case)
+        )
+        (not
+          (recovery_entity_released ?recovery_case)
+        )
+      )
+    :effect (recovery_entity_open ?recovery_case)
+  )
+  (:action assign_contingency_resource_to_case
+    :parameters (?recovery_case - recovery_case ?contingency_resource - contingency_resource)
+    :precondition
+      (and
+        (recovery_entity_open ?recovery_case)
+        (not
+          (recovery_entity_has_resource_assignment ?recovery_case)
+        )
+        (contingency_resource_available ?contingency_resource)
+      )
+    :effect
+      (and
+        (recovery_entity_has_resource_assignment ?recovery_case)
+        (recovery_entity_assigned_contingency_resource ?recovery_case ?contingency_resource)
+        (not
+          (contingency_resource_available ?contingency_resource)
+        )
+      )
+  )
+  (:action deploy_sampling_kit_to_case
+    :parameters (?recovery_case - recovery_case ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_open ?recovery_case)
+        (recovery_entity_has_resource_assignment ?recovery_case)
+        (sampling_kit_available ?sampling_kit)
+      )
+    :effect
+      (and
+        (recovery_entity_assigned_sampling_kit ?recovery_case ?sampling_kit)
+        (not
+          (sampling_kit_available ?sampling_kit)
+        )
+      )
+  )
+  (:action finalize_sampling_and_triage
+    :parameters (?recovery_case - recovery_case ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_open ?recovery_case)
+        (recovery_entity_has_resource_assignment ?recovery_case)
+        (recovery_entity_assigned_sampling_kit ?recovery_case ?sampling_kit)
+        (not
+          (recovery_entity_triaged ?recovery_case)
+        )
+      )
+    :effect (recovery_entity_triaged ?recovery_case)
+  )
+  (:action return_sampling_kit
+    :parameters (?recovery_case - recovery_case ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_assigned_sampling_kit ?recovery_case ?sampling_kit)
+      )
+    :effect
+      (and
+        (sampling_kit_available ?sampling_kit)
+        (not
+          (recovery_entity_assigned_sampling_kit ?recovery_case ?sampling_kit)
+        )
+      )
+  )
+  (:action assign_field_staff_to_case
+    :parameters (?recovery_case - recovery_case ?field_staff - field_staff)
+    :precondition
+      (and
+        (recovery_entity_triaged ?recovery_case)
+        (field_staff_available ?field_staff)
+      )
+    :effect
+      (and
+        (recovery_entity_assigned_field_staff ?recovery_case ?field_staff)
+        (not
+          (field_staff_available ?field_staff)
+        )
+      )
+  )
+  (:action release_field_staff_from_case
+    :parameters (?recovery_case - recovery_case ?field_staff - field_staff)
+    :precondition
+      (and
+        (recovery_entity_assigned_field_staff ?recovery_case ?field_staff)
+      )
+    :effect
+      (and
+        (field_staff_available ?field_staff)
+        (not
+          (recovery_entity_assigned_field_staff ?recovery_case ?field_staff)
+        )
+      )
+  )
+  (:action assign_decontamination_agent_to_response_unit
+    :parameters (?response_unit - response_unit_case ?decontamination_agent - decontamination_agent)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (decontamination_agent_available ?decontamination_agent)
+      )
+    :effect
+      (and
+        (response_unit_assigned_decontamination_agent ?response_unit ?decontamination_agent)
+        (not
+          (decontamination_agent_available ?decontamination_agent)
+        )
+      )
+  )
+  (:action release_decontamination_agent_from_response_unit
+    :parameters (?response_unit - response_unit_case ?decontamination_agent - decontamination_agent)
+    :precondition
+      (and
+        (response_unit_assigned_decontamination_agent ?response_unit ?decontamination_agent)
+      )
+    :effect
+      (and
+        (decontamination_agent_available ?decontamination_agent)
+        (not
+          (response_unit_assigned_decontamination_agent ?response_unit ?decontamination_agent)
+        )
+      )
+  )
+  (:action assign_lab_test_kit_to_response_unit
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (lab_test_kit_available ?lab_test_kit)
+      )
+    :effect
+      (and
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (not
+          (lab_test_kit_available ?lab_test_kit)
+        )
+      )
+  )
+  (:action release_lab_test_kit_from_response_unit
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit)
+    :precondition
+      (and
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+      )
+    :effect
+      (and
+        (lab_test_kit_available ?lab_test_kit)
+        (not
+          (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        )
+      )
+  )
+  (:action flag_origin_temperature_primary
+    :parameters (?origin_case - origin_consignment_case ?origin_temp_reading - origin_temperature_reading ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?origin_case)
+        (recovery_entity_assigned_sampling_kit ?origin_case ?sampling_kit)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (not
+          (origin_temperature_alert ?origin_temp_reading)
+        )
+        (not
+          (origin_temperature_stable ?origin_temp_reading)
+        )
+      )
+    :effect (origin_temperature_alert ?origin_temp_reading)
+  )
+  (:action prepare_origin_case_for_staging_with_staff
+    :parameters (?origin_case - origin_consignment_case ?origin_temp_reading - origin_temperature_reading ?field_staff - field_staff)
+    :precondition
+      (and
+        (recovery_entity_triaged ?origin_case)
+        (recovery_entity_assigned_field_staff ?origin_case ?field_staff)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (origin_temperature_alert ?origin_temp_reading)
+        (not
+          (recovery_entity_origin_materials_ready ?origin_case)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+      )
+  )
+  (:action assign_salvage_kit_to_origin_case
+    :parameters (?origin_case - origin_consignment_case ?origin_temp_reading - origin_temperature_reading ?salvage_kit - salvage_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?origin_case)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (salvage_kit_available ?salvage_kit)
+        (not
+          (recovery_entity_origin_materials_ready ?origin_case)
+        )
+      )
+    :effect
+      (and
+        (origin_temperature_stable ?origin_temp_reading)
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_origin_assigned_salvage_kit ?origin_case ?salvage_kit)
+        (not
+          (salvage_kit_available ?salvage_kit)
+        )
+      )
+  )
+  (:action execute_origin_salvage
+    :parameters (?origin_case - origin_consignment_case ?origin_temp_reading - origin_temperature_reading ?sampling_kit - sampling_kit ?salvage_kit - salvage_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?origin_case)
+        (recovery_entity_assigned_sampling_kit ?origin_case ?sampling_kit)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (origin_temperature_stable ?origin_temp_reading)
+        (recovery_entity_origin_assigned_salvage_kit ?origin_case ?salvage_kit)
+        (not
+          (recovery_entity_origin_ready_for_staging ?origin_case)
+        )
+      )
+    :effect
+      (and
+        (origin_temperature_alert ?origin_temp_reading)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+        (salvage_kit_available ?salvage_kit)
+        (not
+          (recovery_entity_origin_assigned_salvage_kit ?origin_case ?salvage_kit)
+        )
+      )
+  )
+  (:action flag_destination_temperature_primary
+    :parameters (?destination_case - destination_consignment_case ?destination_temp_reading - destination_temperature_reading ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?destination_case)
+        (recovery_entity_assigned_sampling_kit ?destination_case ?sampling_kit)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (not
+          (destination_temperature_alert ?destination_temp_reading)
+        )
+        (not
+          (destination_temperature_stable ?destination_temp_reading)
+        )
+      )
+    :effect (destination_temperature_alert ?destination_temp_reading)
+  )
+  (:action prepare_destination_case_for_staging_with_staff
+    :parameters (?destination_case - destination_consignment_case ?destination_temp_reading - destination_temperature_reading ?field_staff - field_staff)
+    :precondition
+      (and
+        (recovery_entity_triaged ?destination_case)
+        (recovery_entity_assigned_field_staff ?destination_case ?field_staff)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (destination_temperature_alert ?destination_temp_reading)
+        (not
+          (recovery_entity_destination_materials_ready ?destination_case)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+      )
+  )
+  (:action assign_salvage_kit_to_destination_case
+    :parameters (?destination_case - destination_consignment_case ?destination_temp_reading - destination_temperature_reading ?salvage_kit - salvage_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?destination_case)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (salvage_kit_available ?salvage_kit)
+        (not
+          (recovery_entity_destination_materials_ready ?destination_case)
+        )
+      )
+    :effect
+      (and
+        (destination_temperature_stable ?destination_temp_reading)
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_destination_assigned_salvage_kit ?destination_case ?salvage_kit)
+        (not
+          (salvage_kit_available ?salvage_kit)
+        )
+      )
+  )
+  (:action execute_destination_salvage
+    :parameters (?destination_case - destination_consignment_case ?destination_temp_reading - destination_temperature_reading ?sampling_kit - sampling_kit ?salvage_kit - salvage_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?destination_case)
+        (recovery_entity_assigned_sampling_kit ?destination_case ?sampling_kit)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (destination_temperature_stable ?destination_temp_reading)
+        (recovery_entity_destination_assigned_salvage_kit ?destination_case ?salvage_kit)
+        (not
+          (recovery_entity_destination_ready_for_staging ?destination_case)
+        )
+      )
+    :effect
+      (and
+        (destination_temperature_alert ?destination_temp_reading)
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+        (salvage_kit_available ?salvage_kit)
+        (not
+          (recovery_entity_destination_assigned_salvage_kit ?destination_case ?salvage_kit)
+        )
+      )
+  )
+  (:action assign_consignment_pair_to_staging_container
+    :parameters (?origin_case - origin_consignment_case ?destination_case - destination_consignment_case ?origin_temp_reading - origin_temperature_reading ?destination_temp_reading - destination_temperature_reading ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (origin_temperature_alert ?origin_temp_reading)
+        (destination_temperature_alert ?destination_temp_reading)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+        (staging_container_available ?staging_container)
+      )
+    :effect
+      (and
+        (staging_container_prepared ?staging_container)
+        (staging_container_linked_origin_temperature ?staging_container ?origin_temp_reading)
+        (staging_container_linked_destination_temperature ?staging_container ?destination_temp_reading)
+        (not
+          (staging_container_available ?staging_container)
+        )
+      )
+  )
+  (:action assign_consignment_pair_to_staging_container_origin_stable
+    :parameters (?origin_case - origin_consignment_case ?destination_case - destination_consignment_case ?origin_temp_reading - origin_temperature_reading ?destination_temp_reading - destination_temperature_reading ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (origin_temperature_stable ?origin_temp_reading)
+        (destination_temperature_alert ?destination_temp_reading)
+        (not
+          (recovery_entity_origin_ready_for_staging ?origin_case)
+        )
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+        (staging_container_available ?staging_container)
+      )
+    :effect
+      (and
+        (staging_container_prepared ?staging_container)
+        (staging_container_linked_origin_temperature ?staging_container ?origin_temp_reading)
+        (staging_container_linked_destination_temperature ?staging_container ?destination_temp_reading)
+        (staging_container_origin_condition_flag ?staging_container)
+        (not
+          (staging_container_available ?staging_container)
+        )
+      )
+  )
+  (:action assign_consignment_pair_to_staging_container_destination_stable
+    :parameters (?origin_case - origin_consignment_case ?destination_case - destination_consignment_case ?origin_temp_reading - origin_temperature_reading ?destination_temp_reading - destination_temperature_reading ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (origin_temperature_alert ?origin_temp_reading)
+        (destination_temperature_stable ?destination_temp_reading)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+        (not
+          (recovery_entity_destination_ready_for_staging ?destination_case)
+        )
+        (staging_container_available ?staging_container)
+      )
+    :effect
+      (and
+        (staging_container_prepared ?staging_container)
+        (staging_container_linked_origin_temperature ?staging_container ?origin_temp_reading)
+        (staging_container_linked_destination_temperature ?staging_container ?destination_temp_reading)
+        (staging_container_destination_condition_flag ?staging_container)
+        (not
+          (staging_container_available ?staging_container)
+        )
+      )
+  )
+  (:action assign_consignment_pair_to_staging_container_both_stable
+    :parameters (?origin_case - origin_consignment_case ?destination_case - destination_consignment_case ?origin_temp_reading - origin_temperature_reading ?destination_temp_reading - destination_temperature_reading ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_origin_linked_temperature ?origin_case ?origin_temp_reading)
+        (recovery_entity_destination_linked_temperature ?destination_case ?destination_temp_reading)
+        (origin_temperature_stable ?origin_temp_reading)
+        (destination_temperature_stable ?destination_temp_reading)
+        (not
+          (recovery_entity_origin_ready_for_staging ?origin_case)
+        )
+        (not
+          (recovery_entity_destination_ready_for_staging ?destination_case)
+        )
+        (staging_container_available ?staging_container)
+      )
+    :effect
+      (and
+        (staging_container_prepared ?staging_container)
+        (staging_container_linked_origin_temperature ?staging_container ?origin_temp_reading)
+        (staging_container_linked_destination_temperature ?staging_container ?destination_temp_reading)
+        (staging_container_origin_condition_flag ?staging_container)
+        (staging_container_destination_condition_flag ?staging_container)
+        (not
+          (staging_container_available ?staging_container)
+        )
+      )
+  )
+  (:action mark_staging_container_inspected
+    :parameters (?staging_container - staging_container ?origin_case - origin_consignment_case ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (staging_container_prepared ?staging_container)
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_assigned_sampling_kit ?origin_case ?sampling_kit)
+        (not
+          (staging_container_inspected ?staging_container)
+        )
+      )
+    :effect (staging_container_inspected ?staging_container)
+  )
+  (:action allocate_salvage_material_unit_to_response_unit
+    :parameters (?response_unit - response_unit_case ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (response_unit_assigned_staging_container ?response_unit ?staging_container)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_unit_available ?salvage_material)
+        (staging_container_prepared ?staging_container)
+        (staging_container_inspected ?staging_container)
+        (not
+          (salvage_material_unit_marked ?salvage_material)
+        )
+      )
+    :effect
+      (and
+        (salvage_material_unit_marked ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (not
+          (salvage_material_unit_available ?salvage_material)
+        )
+      )
+  )
+  (:action prepare_response_unit_for_processing
+    :parameters (?response_unit - response_unit_case ?salvage_material - salvage_material_unit ?staging_container - staging_container ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_unit_marked ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (recovery_entity_assigned_sampling_kit ?response_unit ?sampling_kit)
+        (not
+          (staging_container_origin_condition_flag ?staging_container)
+        )
+        (not
+          (response_unit_prepared ?response_unit)
+        )
+      )
+    :effect (response_unit_prepared ?response_unit)
+  )
+  (:action assign_specialized_equipment_to_response_unit
+    :parameters (?response_unit - response_unit_case ?specialized_equipment - specialized_equipment)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (specialized_equipment_available ?specialized_equipment)
+        (not
+          (response_unit_equipment_attached ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_equipment_attached ?response_unit)
+        (response_unit_assigned_specialized_equipment ?response_unit ?specialized_equipment)
+        (not
+          (specialized_equipment_available ?specialized_equipment)
+        )
+      )
+  )
+  (:action prepare_response_unit_with_staging_and_equipment
+    :parameters (?response_unit - response_unit_case ?salvage_material - salvage_material_unit ?staging_container - staging_container ?sampling_kit - sampling_kit ?specialized_equipment - specialized_equipment)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_unit_marked ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (recovery_entity_assigned_sampling_kit ?response_unit ?sampling_kit)
+        (staging_container_origin_condition_flag ?staging_container)
+        (response_unit_equipment_attached ?response_unit)
+        (response_unit_assigned_specialized_equipment ?response_unit ?specialized_equipment)
+        (not
+          (response_unit_prepared ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_prepared ?response_unit)
+        (response_unit_equipment_verified ?response_unit)
+      )
+  )
+  (:action initiate_decontamination
+    :parameters (?response_unit - response_unit_case ?decontamination_agent - decontamination_agent ?field_staff - field_staff ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_prepared ?response_unit)
+        (response_unit_assigned_decontamination_agent ?response_unit ?decontamination_agent)
+        (recovery_entity_assigned_field_staff ?response_unit ?field_staff)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (not
+          (staging_container_destination_condition_flag ?staging_container)
+        )
+        (not
+          (response_unit_ready_for_decontamination ?response_unit)
+        )
+      )
+    :effect (response_unit_ready_for_decontamination ?response_unit)
+  )
+  (:action continue_decontamination
+    :parameters (?response_unit - response_unit_case ?decontamination_agent - decontamination_agent ?field_staff - field_staff ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_prepared ?response_unit)
+        (response_unit_assigned_decontamination_agent ?response_unit ?decontamination_agent)
+        (recovery_entity_assigned_field_staff ?response_unit ?field_staff)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (staging_container_destination_condition_flag ?staging_container)
+        (not
+          (response_unit_ready_for_decontamination ?response_unit)
+        )
+      )
+    :effect (response_unit_ready_for_decontamination ?response_unit)
+  )
+  (:action complete_decontamination_verification
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_ready_for_decontamination ?response_unit)
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (not
+          (staging_container_origin_condition_flag ?staging_container)
+        )
+        (not
+          (staging_container_destination_condition_flag ?staging_container)
+        )
+        (not
+          (response_unit_decontamination_completed ?response_unit)
+        )
+      )
+    :effect (response_unit_decontamination_completed ?response_unit)
+  )
+  (:action complete_decontamination_with_origin_marker
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_ready_for_decontamination ?response_unit)
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (staging_container_origin_condition_flag ?staging_container)
+        (not
+          (staging_container_destination_condition_flag ?staging_container)
+        )
+        (not
+          (response_unit_decontamination_completed ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_ready_for_processing ?response_unit)
+      )
+  )
+  (:action complete_decontamination_with_destination_marker
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_ready_for_decontamination ?response_unit)
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (not
+          (staging_container_origin_condition_flag ?staging_container)
+        )
+        (staging_container_destination_condition_flag ?staging_container)
+        (not
+          (response_unit_decontamination_completed ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_ready_for_processing ?response_unit)
+      )
+  )
+  (:action complete_decontamination_with_both_markers
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit ?salvage_material - salvage_material_unit ?staging_container - staging_container)
+    :precondition
+      (and
+        (response_unit_ready_for_decontamination ?response_unit)
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (response_unit_allocated_salvage_material ?response_unit ?salvage_material)
+        (salvage_material_assigned_to_container ?salvage_material ?staging_container)
+        (staging_container_origin_condition_flag ?staging_container)
+        (staging_container_destination_condition_flag ?staging_container)
+        (not
+          (response_unit_decontamination_completed ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_ready_for_processing ?response_unit)
+      )
+  )
+  (:action finalize_response_unit_decontamination
+    :parameters (?response_unit - response_unit_case)
+    :precondition
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (not
+          (response_unit_ready_for_processing ?response_unit)
+        )
+        (not
+          (response_unit_finalized ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_finalized ?response_unit)
+        (recovery_entity_release_eligible ?response_unit)
+      )
+  )
+  (:action assign_third_party_service_to_response_unit
+    :parameters (?response_unit - response_unit_case ?third_party_service - third_party_service)
+    :precondition
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_ready_for_processing ?response_unit)
+        (third_party_service_available ?third_party_service)
+      )
+    :effect
+      (and
+        (response_unit_assigned_third_party_service ?response_unit ?third_party_service)
+        (not
+          (third_party_service_available ?third_party_service)
+        )
+      )
+  )
+  (:action start_response_unit_processing
+    :parameters (?response_unit - response_unit_case ?origin_case - origin_consignment_case ?destination_case - destination_consignment_case ?sampling_kit - sampling_kit ?third_party_service - third_party_service)
+    :precondition
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_ready_for_processing ?response_unit)
+        (response_unit_assigned_third_party_service ?response_unit ?third_party_service)
+        (response_unit_assigned_origin_recovery_case ?response_unit ?origin_case)
+        (response_unit_assigned_destination_recovery_case ?response_unit ?destination_case)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+        (recovery_entity_assigned_sampling_kit ?response_unit ?sampling_kit)
+        (not
+          (response_unit_processing_started ?response_unit)
+        )
+      )
+    :effect (response_unit_processing_started ?response_unit)
+  )
+  (:action finalize_response_unit_after_processing
+    :parameters (?response_unit - response_unit_case)
+    :precondition
+      (and
+        (response_unit_decontamination_completed ?response_unit)
+        (response_unit_processing_started ?response_unit)
+        (not
+          (response_unit_finalized ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_finalized ?response_unit)
+        (recovery_entity_release_eligible ?response_unit)
+      )
+  )
+  (:action assign_inspection_certificate_to_response_unit
+    :parameters (?response_unit - response_unit_case ?inspection_certificate - inspection_certificate ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_triaged ?response_unit)
+        (recovery_entity_assigned_sampling_kit ?response_unit ?sampling_kit)
+        (inspection_certificate_available ?inspection_certificate)
+        (response_unit_assigned_inspection_certificate ?response_unit ?inspection_certificate)
+        (not
+          (response_unit_inspection_certificate_attached ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_inspection_certificate_attached ?response_unit)
+        (not
+          (inspection_certificate_available ?inspection_certificate)
+        )
+      )
+  )
+  (:action start_response_unit_inspection_with_staff
+    :parameters (?response_unit - response_unit_case ?field_staff - field_staff)
+    :precondition
+      (and
+        (response_unit_inspection_certificate_attached ?response_unit)
+        (recovery_entity_assigned_field_staff ?response_unit ?field_staff)
+        (not
+          (response_unit_inspection_documented ?response_unit)
+        )
+      )
+    :effect (response_unit_inspection_documented ?response_unit)
+  )
+  (:action record_lab_test_result_for_response_unit
+    :parameters (?response_unit - response_unit_case ?lab_test_kit - laboratory_test_kit)
+    :precondition
+      (and
+        (response_unit_inspection_documented ?response_unit)
+        (response_unit_assigned_lab_test_kit ?response_unit ?lab_test_kit)
+        (not
+          (response_unit_inspection_verified ?response_unit)
+        )
+      )
+    :effect (response_unit_inspection_verified ?response_unit)
+  )
+  (:action finalize_response_unit_after_inspection
+    :parameters (?response_unit - response_unit_case)
+    :precondition
+      (and
+        (response_unit_inspection_verified ?response_unit)
+        (not
+          (response_unit_finalized ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (response_unit_finalized ?response_unit)
+        (recovery_entity_release_eligible ?response_unit)
+      )
+  )
+  (:action authorize_origin_recovery_case_release
+    :parameters (?origin_case - origin_consignment_case ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_origin_materials_ready ?origin_case)
+        (recovery_entity_origin_ready_for_staging ?origin_case)
+        (staging_container_prepared ?staging_container)
+        (staging_container_inspected ?staging_container)
+        (not
+          (recovery_entity_release_eligible ?origin_case)
+        )
+      )
+    :effect (recovery_entity_release_eligible ?origin_case)
+  )
+  (:action authorize_destination_recovery_case_release
+    :parameters (?destination_case - destination_consignment_case ?staging_container - staging_container)
+    :precondition
+      (and
+        (recovery_entity_destination_materials_ready ?destination_case)
+        (recovery_entity_destination_ready_for_staging ?destination_case)
+        (staging_container_prepared ?staging_container)
+        (staging_container_inspected ?staging_container)
+        (not
+          (recovery_entity_release_eligible ?destination_case)
+        )
+      )
+    :effect (recovery_entity_release_eligible ?destination_case)
+  )
+  (:action attach_regulatory_document_to_recovery_case
+    :parameters (?recovery_case - recovery_case ?regulatory_document - regulatory_document ?sampling_kit - sampling_kit)
+    :precondition
+      (and
+        (recovery_entity_release_eligible ?recovery_case)
+        (recovery_entity_assigned_sampling_kit ?recovery_case ?sampling_kit)
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (recovery_entity_regulatory_document_attached ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_regulatory_document_attached ?recovery_case)
+        (recovery_entity_linked_regulatory_document ?recovery_case ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action complete_origin_recovery_case_release
+    :parameters (?origin_case - origin_consignment_case ?contingency_resource - contingency_resource ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (recovery_entity_regulatory_document_attached ?origin_case)
+        (recovery_entity_assigned_contingency_resource ?origin_case ?contingency_resource)
+        (recovery_entity_linked_regulatory_document ?origin_case ?regulatory_document)
+        (not
+          (recovery_entity_released ?origin_case)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_released ?origin_case)
+        (contingency_resource_available ?contingency_resource)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+  (:action complete_destination_recovery_case_release
+    :parameters (?destination_case - destination_consignment_case ?contingency_resource - contingency_resource ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (recovery_entity_regulatory_document_attached ?destination_case)
+        (recovery_entity_assigned_contingency_resource ?destination_case ?contingency_resource)
+        (recovery_entity_linked_regulatory_document ?destination_case ?regulatory_document)
+        (not
+          (recovery_entity_released ?destination_case)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_released ?destination_case)
+        (contingency_resource_available ?contingency_resource)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+  (:action complete_response_unit_release
+    :parameters (?response_unit - response_unit_case ?contingency_resource - contingency_resource ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (recovery_entity_regulatory_document_attached ?response_unit)
+        (recovery_entity_assigned_contingency_resource ?response_unit ?contingency_resource)
+        (recovery_entity_linked_regulatory_document ?response_unit ?regulatory_document)
+        (not
+          (recovery_entity_released ?response_unit)
+        )
+      )
+    :effect
+      (and
+        (recovery_entity_released ?response_unit)
+        (contingency_resource_available ?contingency_resource)
+        (regulatory_document_available ?regulatory_document)
+      )
+  )
+)

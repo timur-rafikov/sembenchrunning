@@ -1,0 +1,937 @@
+(define (domain extension_architecture_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object impl_specialization_slot - base_object impl_specialization_context - base_object impl_specialization_resource - base_object extension_candidate_supertype - base_object extension_candidate - extension_candidate_supertype extension_slot - impl_specialization_slot capability_provider - impl_specialization_slot connector - impl_specialization_slot metadata_record - impl_specialization_slot policy_rule - impl_specialization_slot resource_quota - impl_specialization_slot binary_module - impl_specialization_slot feature_flag - impl_specialization_slot configuration_profile - impl_specialization_context resource_artifact - impl_specialization_context platform_binding - impl_specialization_context host_region - impl_specialization_resource host_zone - impl_specialization_resource extension_package - impl_specialization_resource clustered_host_type - extension_candidate cluster_variant - extension_candidate host_instance - clustered_host_type peer_host - clustered_host_type extension_manager - cluster_variant)
+
+  (:predicates
+    (actor_discovered ?extension_candidate - extension_candidate)
+    (actor_ready ?extension_candidate - extension_candidate)
+    (actor_slot_reserved ?extension_candidate - extension_candidate)
+    (actor_deployment_approved ?extension_candidate - extension_candidate)
+    (actor_finalized_for_publication ?extension_candidate - extension_candidate)
+    (actor_activation_granted ?extension_candidate - extension_candidate)
+    (extension_slot_available ?extension_slot - extension_slot)
+    (actor_slot_assignment ?extension_candidate - extension_candidate ?extension_slot - extension_slot)
+    (capability_available ?capability_provider - capability_provider)
+    (actor_capability_bound ?extension_candidate - extension_candidate ?capability_provider - capability_provider)
+    (connector_available ?connector - connector)
+    (actor_connector_bound ?extension_candidate - extension_candidate ?connector - connector)
+    (configuration_profile_available ?configuration_profile - configuration_profile)
+    (host_has_configuration ?host_instance - host_instance ?configuration_profile - configuration_profile)
+    (peer_host_has_configuration ?peer_host - peer_host ?configuration_profile - configuration_profile)
+    (host_region_assigned ?host_instance - host_instance ?host_region - host_region)
+    (host_region_claimed ?host_region - host_region)
+    (host_region_configured ?host_region - host_region)
+    (host_ready ?host_instance - host_instance)
+    (peer_host_zone_assigned ?peer_host - peer_host ?host_zone - host_zone)
+    (host_zone_claimed ?host_zone - host_zone)
+    (host_zone_configured ?host_zone - host_zone)
+    (peer_host_ready ?peer_host - peer_host)
+    (package_staged ?extension_package - extension_package)
+    (package_assembled ?extension_package - extension_package)
+    (package_region_association ?extension_package - extension_package ?host_region - host_region)
+    (package_zone_association ?extension_package - extension_package ?host_zone - host_zone)
+    (package_variant_a ?extension_package - extension_package)
+    (package_variant_b ?extension_package - extension_package)
+    (package_validated ?extension_package - extension_package)
+    (manager_controls_host ?extension_manager - extension_manager ?host_instance - host_instance)
+    (manager_controls_peer_host ?extension_manager - extension_manager ?peer_host - peer_host)
+    (manager_owns_package ?extension_manager - extension_manager ?extension_package - extension_package)
+    (artifact_available ?resource_artifact - resource_artifact)
+    (manager_staged_artifact ?extension_manager - extension_manager ?resource_artifact - resource_artifact)
+    (artifact_consumed ?resource_artifact - resource_artifact)
+    (artifact_linked_to_package ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    (manager_artifact_ingested ?extension_manager - extension_manager)
+    (manager_dependency_validated ?extension_manager - extension_manager)
+    (manager_ready_for_finalization ?extension_manager - extension_manager)
+    (manager_metadata_attached ?extension_manager - extension_manager)
+    (manager_metadata_linked ?extension_manager - extension_manager)
+    (manager_publish_ready ?extension_manager - extension_manager)
+    (manager_policies_applied ?extension_manager - extension_manager)
+    (platform_binding_available ?platform_binding - platform_binding)
+    (manager_platform_binding ?extension_manager - extension_manager ?platform_binding - platform_binding)
+    (manager_platform_bound ?extension_manager - extension_manager)
+    (manager_platform_binding_active ?extension_manager - extension_manager)
+    (manager_feature_applied ?extension_manager - extension_manager)
+    (metadata_record_available ?metadata_record - metadata_record)
+    (manager_metadata_link ?extension_manager - extension_manager ?metadata_record - metadata_record)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (manager_policy_attached ?extension_manager - extension_manager ?policy_rule - policy_rule)
+    (binary_module_available ?binary_module - binary_module)
+    (manager_binary_attached ?extension_manager - extension_manager ?binary_module - binary_module)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (manager_feature_link ?extension_manager - extension_manager ?feature_flag - feature_flag)
+    (resource_quota_available ?resource_quota - resource_quota)
+    (actor_quota_assigned ?extension_candidate - extension_candidate ?resource_quota - resource_quota)
+    (host_prepared ?host_instance - host_instance)
+    (peer_host_prepared ?peer_host - peer_host)
+    (manager_published ?extension_manager - extension_manager)
+  )
+  (:action discover_extension_candidate
+    :parameters (?extension_candidate - extension_candidate)
+    :precondition
+      (and
+        (not
+          (actor_discovered ?extension_candidate)
+        )
+        (not
+          (actor_deployment_approved ?extension_candidate)
+        )
+      )
+    :effect (actor_discovered ?extension_candidate)
+  )
+  (:action reserve_extension_slot
+    :parameters (?extension_candidate - extension_candidate ?extension_slot - extension_slot)
+    :precondition
+      (and
+        (actor_discovered ?extension_candidate)
+        (not
+          (actor_slot_reserved ?extension_candidate)
+        )
+        (extension_slot_available ?extension_slot)
+      )
+    :effect
+      (and
+        (actor_slot_reserved ?extension_candidate)
+        (actor_slot_assignment ?extension_candidate ?extension_slot)
+        (not
+          (extension_slot_available ?extension_slot)
+        )
+      )
+  )
+  (:action bind_capability_provider
+    :parameters (?extension_candidate - extension_candidate ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_discovered ?extension_candidate)
+        (actor_slot_reserved ?extension_candidate)
+        (capability_available ?capability_provider)
+      )
+    :effect
+      (and
+        (actor_capability_bound ?extension_candidate ?capability_provider)
+        (not
+          (capability_available ?capability_provider)
+        )
+      )
+  )
+  (:action mark_candidate_ready
+    :parameters (?extension_candidate - extension_candidate ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_discovered ?extension_candidate)
+        (actor_slot_reserved ?extension_candidate)
+        (actor_capability_bound ?extension_candidate ?capability_provider)
+        (not
+          (actor_ready ?extension_candidate)
+        )
+      )
+    :effect (actor_ready ?extension_candidate)
+  )
+  (:action unbind_capability_provider
+    :parameters (?extension_candidate - extension_candidate ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_capability_bound ?extension_candidate ?capability_provider)
+      )
+    :effect
+      (and
+        (capability_available ?capability_provider)
+        (not
+          (actor_capability_bound ?extension_candidate ?capability_provider)
+        )
+      )
+  )
+  (:action attach_connector
+    :parameters (?extension_candidate - extension_candidate ?connector - connector)
+    :precondition
+      (and
+        (actor_ready ?extension_candidate)
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (actor_connector_bound ?extension_candidate ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action detach_connector
+    :parameters (?extension_candidate - extension_candidate ?connector - connector)
+    :precondition
+      (and
+        (actor_connector_bound ?extension_candidate ?connector)
+      )
+    :effect
+      (and
+        (connector_available ?connector)
+        (not
+          (actor_connector_bound ?extension_candidate ?connector)
+        )
+      )
+  )
+  (:action manager_attach_binary_module
+    :parameters (?extension_manager - extension_manager ?binary_module - binary_module)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (binary_module_available ?binary_module)
+      )
+    :effect
+      (and
+        (manager_binary_attached ?extension_manager ?binary_module)
+        (not
+          (binary_module_available ?binary_module)
+        )
+      )
+  )
+  (:action manager_detach_binary_module
+    :parameters (?extension_manager - extension_manager ?binary_module - binary_module)
+    :precondition
+      (and
+        (manager_binary_attached ?extension_manager ?binary_module)
+      )
+    :effect
+      (and
+        (binary_module_available ?binary_module)
+        (not
+          (manager_binary_attached ?extension_manager ?binary_module)
+        )
+      )
+  )
+  (:action manager_attach_feature_flag
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (feature_flag_available ?feature_flag)
+      )
+    :effect
+      (and
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action manager_detach_feature_flag
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (manager_feature_link ?extension_manager ?feature_flag)
+      )
+    :effect
+      (and
+        (feature_flag_available ?feature_flag)
+        (not
+          (manager_feature_link ?extension_manager ?feature_flag)
+        )
+      )
+  )
+  (:action host_claim_region
+    :parameters (?host_instance - host_instance ?host_region - host_region ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_ready ?host_instance)
+        (actor_capability_bound ?host_instance ?capability_provider)
+        (host_region_assigned ?host_instance ?host_region)
+        (not
+          (host_region_claimed ?host_region)
+        )
+        (not
+          (host_region_configured ?host_region)
+        )
+      )
+    :effect (host_region_claimed ?host_region)
+  )
+  (:action host_bind_connector_and_prepare
+    :parameters (?host_instance - host_instance ?host_region - host_region ?connector - connector)
+    :precondition
+      (and
+        (actor_ready ?host_instance)
+        (actor_connector_bound ?host_instance ?connector)
+        (host_region_assigned ?host_instance ?host_region)
+        (host_region_claimed ?host_region)
+        (not
+          (host_prepared ?host_instance)
+        )
+      )
+    :effect
+      (and
+        (host_prepared ?host_instance)
+        (host_ready ?host_instance)
+      )
+  )
+  (:action apply_configuration_to_host
+    :parameters (?host_instance - host_instance ?host_region - host_region ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (actor_ready ?host_instance)
+        (host_region_assigned ?host_instance ?host_region)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (host_prepared ?host_instance)
+        )
+      )
+    :effect
+      (and
+        (host_region_configured ?host_region)
+        (host_prepared ?host_instance)
+        (host_has_configuration ?host_instance ?configuration_profile)
+        (not
+          (configuration_profile_available ?configuration_profile)
+        )
+      )
+  )
+  (:action finalize_host_region_configuration
+    :parameters (?host_instance - host_instance ?host_region - host_region ?capability_provider - capability_provider ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (actor_ready ?host_instance)
+        (actor_capability_bound ?host_instance ?capability_provider)
+        (host_region_assigned ?host_instance ?host_region)
+        (host_region_configured ?host_region)
+        (host_has_configuration ?host_instance ?configuration_profile)
+        (not
+          (host_ready ?host_instance)
+        )
+      )
+    :effect
+      (and
+        (host_region_claimed ?host_region)
+        (host_ready ?host_instance)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (host_has_configuration ?host_instance ?configuration_profile)
+        )
+      )
+  )
+  (:action peer_host_claim_zone
+    :parameters (?peer_host - peer_host ?host_zone - host_zone ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_ready ?peer_host)
+        (actor_capability_bound ?peer_host ?capability_provider)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (not
+          (host_zone_claimed ?host_zone)
+        )
+        (not
+          (host_zone_configured ?host_zone)
+        )
+      )
+    :effect (host_zone_claimed ?host_zone)
+  )
+  (:action bind_connector_to_peer_host
+    :parameters (?peer_host - peer_host ?host_zone - host_zone ?connector - connector)
+    :precondition
+      (and
+        (actor_ready ?peer_host)
+        (actor_connector_bound ?peer_host ?connector)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_zone_claimed ?host_zone)
+        (not
+          (peer_host_prepared ?peer_host)
+        )
+      )
+    :effect
+      (and
+        (peer_host_prepared ?peer_host)
+        (peer_host_ready ?peer_host)
+      )
+  )
+  (:action apply_configuration_to_peer_host
+    :parameters (?peer_host - peer_host ?host_zone - host_zone ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (actor_ready ?peer_host)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (peer_host_prepared ?peer_host)
+        )
+      )
+    :effect
+      (and
+        (host_zone_configured ?host_zone)
+        (peer_host_prepared ?peer_host)
+        (peer_host_has_configuration ?peer_host ?configuration_profile)
+        (not
+          (configuration_profile_available ?configuration_profile)
+        )
+      )
+  )
+  (:action finalize_peer_host_zone_configuration
+    :parameters (?peer_host - peer_host ?host_zone - host_zone ?capability_provider - capability_provider ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (actor_ready ?peer_host)
+        (actor_capability_bound ?peer_host ?capability_provider)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_zone_configured ?host_zone)
+        (peer_host_has_configuration ?peer_host ?configuration_profile)
+        (not
+          (peer_host_ready ?peer_host)
+        )
+      )
+    :effect
+      (and
+        (host_zone_claimed ?host_zone)
+        (peer_host_ready ?peer_host)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (peer_host_has_configuration ?peer_host ?configuration_profile)
+        )
+      )
+  )
+  (:action assemble_extension_package
+    :parameters (?host_instance - host_instance ?peer_host - peer_host ?host_region - host_region ?host_zone - host_zone ?extension_package - extension_package)
+    :precondition
+      (and
+        (host_prepared ?host_instance)
+        (peer_host_prepared ?peer_host)
+        (host_region_assigned ?host_instance ?host_region)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_region_claimed ?host_region)
+        (host_zone_claimed ?host_zone)
+        (host_ready ?host_instance)
+        (peer_host_ready ?peer_host)
+        (package_staged ?extension_package)
+      )
+    :effect
+      (and
+        (package_assembled ?extension_package)
+        (package_region_association ?extension_package ?host_region)
+        (package_zone_association ?extension_package ?host_zone)
+        (not
+          (package_staged ?extension_package)
+        )
+      )
+  )
+  (:action assemble_extension_package_variant_a
+    :parameters (?host_instance - host_instance ?peer_host - peer_host ?host_region - host_region ?host_zone - host_zone ?extension_package - extension_package)
+    :precondition
+      (and
+        (host_prepared ?host_instance)
+        (peer_host_prepared ?peer_host)
+        (host_region_assigned ?host_instance ?host_region)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_region_configured ?host_region)
+        (host_zone_claimed ?host_zone)
+        (not
+          (host_ready ?host_instance)
+        )
+        (peer_host_ready ?peer_host)
+        (package_staged ?extension_package)
+      )
+    :effect
+      (and
+        (package_assembled ?extension_package)
+        (package_region_association ?extension_package ?host_region)
+        (package_zone_association ?extension_package ?host_zone)
+        (package_variant_a ?extension_package)
+        (not
+          (package_staged ?extension_package)
+        )
+      )
+  )
+  (:action assemble_extension_package_variant_b
+    :parameters (?host_instance - host_instance ?peer_host - peer_host ?host_region - host_region ?host_zone - host_zone ?extension_package - extension_package)
+    :precondition
+      (and
+        (host_prepared ?host_instance)
+        (peer_host_prepared ?peer_host)
+        (host_region_assigned ?host_instance ?host_region)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_region_claimed ?host_region)
+        (host_zone_configured ?host_zone)
+        (host_ready ?host_instance)
+        (not
+          (peer_host_ready ?peer_host)
+        )
+        (package_staged ?extension_package)
+      )
+    :effect
+      (and
+        (package_assembled ?extension_package)
+        (package_region_association ?extension_package ?host_region)
+        (package_zone_association ?extension_package ?host_zone)
+        (package_variant_b ?extension_package)
+        (not
+          (package_staged ?extension_package)
+        )
+      )
+  )
+  (:action assemble_extension_package_variant_ab
+    :parameters (?host_instance - host_instance ?peer_host - peer_host ?host_region - host_region ?host_zone - host_zone ?extension_package - extension_package)
+    :precondition
+      (and
+        (host_prepared ?host_instance)
+        (peer_host_prepared ?peer_host)
+        (host_region_assigned ?host_instance ?host_region)
+        (peer_host_zone_assigned ?peer_host ?host_zone)
+        (host_region_configured ?host_region)
+        (host_zone_configured ?host_zone)
+        (not
+          (host_ready ?host_instance)
+        )
+        (not
+          (peer_host_ready ?peer_host)
+        )
+        (package_staged ?extension_package)
+      )
+    :effect
+      (and
+        (package_assembled ?extension_package)
+        (package_region_association ?extension_package ?host_region)
+        (package_zone_association ?extension_package ?host_zone)
+        (package_variant_a ?extension_package)
+        (package_variant_b ?extension_package)
+        (not
+          (package_staged ?extension_package)
+        )
+      )
+  )
+  (:action validate_extension_package
+    :parameters (?extension_package - extension_package ?host_instance - host_instance ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (package_assembled ?extension_package)
+        (host_prepared ?host_instance)
+        (actor_capability_bound ?host_instance ?capability_provider)
+        (not
+          (package_validated ?extension_package)
+        )
+      )
+    :effect (package_validated ?extension_package)
+  )
+  (:action stage_resource_artifact
+    :parameters (?extension_manager - extension_manager ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (manager_owns_package ?extension_manager ?extension_package)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_available ?resource_artifact)
+        (package_assembled ?extension_package)
+        (package_validated ?extension_package)
+        (not
+          (artifact_consumed ?resource_artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_consumed ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (not
+          (artifact_available ?resource_artifact)
+        )
+      )
+  )
+  (:action validate_and_ingest_artifact
+    :parameters (?extension_manager - extension_manager ?resource_artifact - resource_artifact ?extension_package - extension_package ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_consumed ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (actor_capability_bound ?extension_manager ?capability_provider)
+        (not
+          (package_variant_a ?extension_package)
+        )
+        (not
+          (manager_artifact_ingested ?extension_manager)
+        )
+      )
+    :effect (manager_artifact_ingested ?extension_manager)
+  )
+  (:action attach_metadata_to_manager
+    :parameters (?extension_manager - extension_manager ?metadata_record - metadata_record)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (metadata_record_available ?metadata_record)
+        (not
+          (manager_metadata_attached ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_metadata_attached ?extension_manager)
+        (manager_metadata_link ?extension_manager ?metadata_record)
+        (not
+          (metadata_record_available ?metadata_record)
+        )
+      )
+  )
+  (:action attach_metadata_and_finalize_artifact
+    :parameters (?extension_manager - extension_manager ?resource_artifact - resource_artifact ?extension_package - extension_package ?capability_provider - capability_provider ?metadata_record - metadata_record)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_consumed ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (actor_capability_bound ?extension_manager ?capability_provider)
+        (package_variant_a ?extension_package)
+        (manager_metadata_attached ?extension_manager)
+        (manager_metadata_link ?extension_manager ?metadata_record)
+        (not
+          (manager_artifact_ingested ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_artifact_ingested ?extension_manager)
+        (manager_metadata_linked ?extension_manager)
+      )
+  )
+  (:action validate_and_attach_binary_module
+    :parameters (?extension_manager - extension_manager ?binary_module - binary_module ?connector - connector ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_artifact_ingested ?extension_manager)
+        (manager_binary_attached ?extension_manager ?binary_module)
+        (actor_connector_bound ?extension_manager ?connector)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (not
+          (package_variant_b ?extension_package)
+        )
+        (not
+          (manager_dependency_validated ?extension_manager)
+        )
+      )
+    :effect (manager_dependency_validated ?extension_manager)
+  )
+  (:action validate_and_attach_binary_module_variant
+    :parameters (?extension_manager - extension_manager ?binary_module - binary_module ?connector - connector ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_artifact_ingested ?extension_manager)
+        (manager_binary_attached ?extension_manager ?binary_module)
+        (actor_connector_bound ?extension_manager ?connector)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (package_variant_b ?extension_package)
+        (not
+          (manager_dependency_validated ?extension_manager)
+        )
+      )
+    :effect (manager_dependency_validated ?extension_manager)
+  )
+  (:action validate_feature_flag_and_advance
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_dependency_validated ?extension_manager)
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (not
+          (package_variant_a ?extension_package)
+        )
+        (not
+          (package_variant_b ?extension_package)
+        )
+        (not
+          (manager_ready_for_finalization ?extension_manager)
+        )
+      )
+    :effect (manager_ready_for_finalization ?extension_manager)
+  )
+  (:action validate_feature_and_mark_publish_ready
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_dependency_validated ?extension_manager)
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (package_variant_a ?extension_package)
+        (not
+          (package_variant_b ?extension_package)
+        )
+        (not
+          (manager_ready_for_finalization ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_publish_ready ?extension_manager)
+      )
+  )
+  (:action validate_feature_and_mark_publish_ready_variant_b
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_dependency_validated ?extension_manager)
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (not
+          (package_variant_a ?extension_package)
+        )
+        (package_variant_b ?extension_package)
+        (not
+          (manager_ready_for_finalization ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_publish_ready ?extension_manager)
+      )
+  )
+  (:action consolidate_feature_validation
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag ?resource_artifact - resource_artifact ?extension_package - extension_package)
+    :precondition
+      (and
+        (manager_dependency_validated ?extension_manager)
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (manager_staged_artifact ?extension_manager ?resource_artifact)
+        (artifact_linked_to_package ?resource_artifact ?extension_package)
+        (package_variant_a ?extension_package)
+        (package_variant_b ?extension_package)
+        (not
+          (manager_ready_for_finalization ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_publish_ready ?extension_manager)
+      )
+  )
+  (:action finalize_manager_for_publication
+    :parameters (?extension_manager - extension_manager)
+    :precondition
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (not
+          (manager_publish_ready ?extension_manager)
+        )
+        (not
+          (manager_published ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_published ?extension_manager)
+        (actor_finalized_for_publication ?extension_manager)
+      )
+  )
+  (:action attach_policy_rule_to_manager
+    :parameters (?extension_manager - extension_manager ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_publish_ready ?extension_manager)
+        (policy_rule_available ?policy_rule)
+      )
+    :effect
+      (and
+        (manager_policy_attached ?extension_manager ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action apply_policies_and_finalize_manager
+    :parameters (?extension_manager - extension_manager ?host_instance - host_instance ?peer_host - peer_host ?capability_provider - capability_provider ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_publish_ready ?extension_manager)
+        (manager_policy_attached ?extension_manager ?policy_rule)
+        (manager_controls_host ?extension_manager ?host_instance)
+        (manager_controls_peer_host ?extension_manager ?peer_host)
+        (host_ready ?host_instance)
+        (peer_host_ready ?peer_host)
+        (actor_capability_bound ?extension_manager ?capability_provider)
+        (not
+          (manager_policies_applied ?extension_manager)
+        )
+      )
+    :effect (manager_policies_applied ?extension_manager)
+  )
+  (:action publish_manager_and_mark_final
+    :parameters (?extension_manager - extension_manager)
+    :precondition
+      (and
+        (manager_ready_for_finalization ?extension_manager)
+        (manager_policies_applied ?extension_manager)
+        (not
+          (manager_published ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_published ?extension_manager)
+        (actor_finalized_for_publication ?extension_manager)
+      )
+  )
+  (:action bind_manager_to_platform
+    :parameters (?extension_manager - extension_manager ?platform_binding - platform_binding ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_ready ?extension_manager)
+        (actor_capability_bound ?extension_manager ?capability_provider)
+        (platform_binding_available ?platform_binding)
+        (manager_platform_binding ?extension_manager ?platform_binding)
+        (not
+          (manager_platform_bound ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_platform_bound ?extension_manager)
+        (not
+          (platform_binding_available ?platform_binding)
+        )
+      )
+  )
+  (:action activate_manager_connector
+    :parameters (?extension_manager - extension_manager ?connector - connector)
+    :precondition
+      (and
+        (manager_platform_bound ?extension_manager)
+        (actor_connector_bound ?extension_manager ?connector)
+        (not
+          (manager_platform_binding_active ?extension_manager)
+        )
+      )
+    :effect (manager_platform_binding_active ?extension_manager)
+  )
+  (:action activate_manager_feature_flag
+    :parameters (?extension_manager - extension_manager ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (manager_platform_binding_active ?extension_manager)
+        (manager_feature_link ?extension_manager ?feature_flag)
+        (not
+          (manager_feature_applied ?extension_manager)
+        )
+      )
+    :effect (manager_feature_applied ?extension_manager)
+  )
+  (:action finalize_manager_publication_from_feature
+    :parameters (?extension_manager - extension_manager)
+    :precondition
+      (and
+        (manager_feature_applied ?extension_manager)
+        (not
+          (manager_published ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_published ?extension_manager)
+        (actor_finalized_for_publication ?extension_manager)
+      )
+  )
+  (:action deploy_package_to_host
+    :parameters (?host_instance - host_instance ?extension_package - extension_package)
+    :precondition
+      (and
+        (host_prepared ?host_instance)
+        (host_ready ?host_instance)
+        (package_assembled ?extension_package)
+        (package_validated ?extension_package)
+        (not
+          (actor_finalized_for_publication ?host_instance)
+        )
+      )
+    :effect (actor_finalized_for_publication ?host_instance)
+  )
+  (:action deploy_package_to_peer_host
+    :parameters (?peer_host - peer_host ?extension_package - extension_package)
+    :precondition
+      (and
+        (peer_host_prepared ?peer_host)
+        (peer_host_ready ?peer_host)
+        (package_assembled ?extension_package)
+        (package_validated ?extension_package)
+        (not
+          (actor_finalized_for_publication ?peer_host)
+        )
+      )
+    :effect (actor_finalized_for_publication ?peer_host)
+  )
+  (:action approve_candidate_deployment
+    :parameters (?extension_candidate - extension_candidate ?resource_quota - resource_quota ?capability_provider - capability_provider)
+    :precondition
+      (and
+        (actor_finalized_for_publication ?extension_candidate)
+        (actor_capability_bound ?extension_candidate ?capability_provider)
+        (resource_quota_available ?resource_quota)
+        (not
+          (actor_activation_granted ?extension_candidate)
+        )
+      )
+    :effect
+      (and
+        (actor_activation_granted ?extension_candidate)
+        (actor_quota_assigned ?extension_candidate ?resource_quota)
+        (not
+          (resource_quota_available ?resource_quota)
+        )
+      )
+  )
+  (:action approve_host_and_release_slot
+    :parameters (?host_instance - host_instance ?extension_slot - extension_slot ?resource_quota - resource_quota)
+    :precondition
+      (and
+        (actor_activation_granted ?host_instance)
+        (actor_slot_assignment ?host_instance ?extension_slot)
+        (actor_quota_assigned ?host_instance ?resource_quota)
+        (not
+          (actor_deployment_approved ?host_instance)
+        )
+      )
+    :effect
+      (and
+        (actor_deployment_approved ?host_instance)
+        (extension_slot_available ?extension_slot)
+        (resource_quota_available ?resource_quota)
+      )
+  )
+  (:action approve_peer_host_and_release_slot
+    :parameters (?peer_host - peer_host ?extension_slot - extension_slot ?resource_quota - resource_quota)
+    :precondition
+      (and
+        (actor_activation_granted ?peer_host)
+        (actor_slot_assignment ?peer_host ?extension_slot)
+        (actor_quota_assigned ?peer_host ?resource_quota)
+        (not
+          (actor_deployment_approved ?peer_host)
+        )
+      )
+    :effect
+      (and
+        (actor_deployment_approved ?peer_host)
+        (extension_slot_available ?extension_slot)
+        (resource_quota_available ?resource_quota)
+      )
+  )
+  (:action approve_manager_and_release_slot
+    :parameters (?extension_manager - extension_manager ?extension_slot - extension_slot ?resource_quota - resource_quota)
+    :precondition
+      (and
+        (actor_activation_granted ?extension_manager)
+        (actor_slot_assignment ?extension_manager ?extension_slot)
+        (actor_quota_assigned ?extension_manager ?resource_quota)
+        (not
+          (actor_deployment_approved ?extension_manager)
+        )
+      )
+    :effect
+      (and
+        (actor_deployment_approved ?extension_manager)
+        (extension_slot_available ?extension_slot)
+        (resource_quota_available ?resource_quota)
+      )
+  )
+)

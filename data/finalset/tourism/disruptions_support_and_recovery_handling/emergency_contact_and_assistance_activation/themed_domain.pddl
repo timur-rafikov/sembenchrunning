@@ -1,0 +1,936 @@
+(define (domain tourism_emergency_assistance_activation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types assistance_resource - object consumable_resource - object case_component - object root_type - object traveler_case - root_type contact_channel - assistance_resource contact_attempt - assistance_resource responder_team - assistance_resource external_authority - assistance_resource recovery_policy - assistance_resource assistance_asset - assistance_resource medical_resource - assistance_resource accommodation_option - assistance_resource support_package - consumable_resource verification_artifact - consumable_resource authorization_record - consumable_resource incident_location - case_component itinerary_segment - case_component assistance_request - case_component assignment_slot_group - traveler_case assignment_slot_group_remote - traveler_case local_responder_slot - assignment_slot_group remote_responder_slot - assignment_slot_group assistance_agent - assignment_slot_group_remote)
+  (:predicates
+    (entity_registered ?traveler_case - traveler_case)
+    (entity_contact_confirmed ?traveler_case - traveler_case)
+    (channel_allocated_to_entity ?traveler_case - traveler_case)
+    (assistance_activated_for_entity ?traveler_case - traveler_case)
+    (entity_operation_ready_marker ?traveler_case - traveler_case)
+    (entity_prepared_for_activation ?traveler_case - traveler_case)
+    (channel_available ?contact_channel - contact_channel)
+    (entity_assigned_to_contact_channel ?traveler_case - traveler_case ?contact_channel - contact_channel)
+    (contact_attempt_available ?contact_attempt - contact_attempt)
+    (entity_has_contact_attempt ?traveler_case - traveler_case ?contact_attempt - contact_attempt)
+    (responder_team_available ?responder_team - responder_team)
+    (entity_assigned_to_responder_team ?traveler_case - traveler_case ?responder_team - responder_team)
+    (support_package_available ?support_package - support_package)
+    (local_responder_slot_has_support_package ?local_responder_slot - local_responder_slot ?support_package - support_package)
+    (remote_responder_slot_has_support_package ?remote_responder_slot - remote_responder_slot ?support_package - support_package)
+    (responder_slot_at_location ?local_responder_slot - local_responder_slot ?incident_location - incident_location)
+    (location_primary_contacted ?incident_location - incident_location)
+    (location_secondary_contacted ?incident_location - incident_location)
+    (local_responder_slot_confirmed_ready ?local_responder_slot - local_responder_slot)
+    (remote_responder_slot_associated_with_segment ?remote_responder_slot - remote_responder_slot ?itinerary_segment - itinerary_segment)
+    (segment_primary_contacted ?itinerary_segment - itinerary_segment)
+    (segment_secondary_contacted ?itinerary_segment - itinerary_segment)
+    (remote_responder_slot_confirmed_ready ?remote_responder_slot - remote_responder_slot)
+    (assistance_request_draft ?assistance_request - assistance_request)
+    (assistance_request_committed ?assistance_request - assistance_request)
+    (assistance_request_includes_location ?assistance_request - assistance_request ?incident_location - incident_location)
+    (assistance_request_includes_segment ?assistance_request - assistance_request ?itinerary_segment - itinerary_segment)
+    (assistance_request_requires_verification_artifact ?assistance_request - assistance_request)
+    (assistance_request_requires_external_approval ?assistance_request - assistance_request)
+    (assistance_request_ready_for_execution ?assistance_request - assistance_request)
+    (agent_linked_to_local_responder_slot ?assistance_agent - assistance_agent ?local_responder_slot - local_responder_slot)
+    (agent_linked_to_remote_responder_slot ?assistance_agent - assistance_agent ?remote_responder_slot - remote_responder_slot)
+    (agent_linked_to_assistance_request ?assistance_agent - assistance_agent ?assistance_request - assistance_request)
+    (verification_artifact_available ?verification_artifact - verification_artifact)
+    (agent_has_verification_artifact ?assistance_agent - assistance_agent ?verification_artifact - verification_artifact)
+    (verification_artifact_consumed ?verification_artifact - verification_artifact)
+    (verification_artifact_attached_to_request ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    (agent_prepared_marker ?assistance_agent - assistance_agent)
+    (agent_resources_allocated ?assistance_agent - assistance_agent)
+    (agent_approved_for_operation ?assistance_agent - assistance_agent)
+    (agent_external_authority_available ?assistance_agent - assistance_agent)
+    (agent_external_approval_received ?assistance_agent - assistance_agent)
+    (agent_additional_conditions_met ?assistance_agent - assistance_agent)
+    (agent_execution_marker ?assistance_agent - assistance_agent)
+    (authorization_record_available ?authorization_record - authorization_record)
+    (agent_linked_to_authorization_record ?assistance_agent - assistance_agent ?authorization_record - authorization_record)
+    (agent_escalation_marker ?assistance_agent - assistance_agent)
+    (agent_escalation_approved ?assistance_agent - assistance_agent)
+    (agent_escalation_executed ?assistance_agent - assistance_agent)
+    (external_authority_unassigned ?external_authority - external_authority)
+    (agent_associated_with_external_authority ?assistance_agent - assistance_agent ?external_authority - external_authority)
+    (recovery_policy_available ?recovery_policy - recovery_policy)
+    (agent_assigned_recovery_policy ?assistance_agent - assistance_agent ?recovery_policy - recovery_policy)
+    (medical_resource_available ?medical_resource - medical_resource)
+    (agent_assigned_medical_resource ?assistance_agent - assistance_agent ?medical_resource - medical_resource)
+    (accommodation_option_available ?accommodation_option - accommodation_option)
+    (agent_assigned_accommodation_option ?assistance_agent - assistance_agent ?accommodation_option - accommodation_option)
+    (assistance_asset_available ?assistance_asset - assistance_asset)
+    (entity_allocated_asset ?traveler_case - traveler_case ?assistance_asset - assistance_asset)
+    (local_responder_slot_checks_complete ?local_responder_slot - local_responder_slot)
+    (remote_responder_slot_checks_complete ?remote_responder_slot - remote_responder_slot)
+    (closure_permission_marker ?assistance_agent - assistance_agent)
+  )
+  (:action register_traveler_case
+    :parameters (?traveler_case - traveler_case)
+    :precondition
+      (and
+        (not
+          (entity_registered ?traveler_case)
+        )
+        (not
+          (assistance_activated_for_entity ?traveler_case)
+        )
+      )
+    :effect (entity_registered ?traveler_case)
+  )
+  (:action assign_contact_channel_to_entity
+    :parameters (?traveler_case - traveler_case ?contact_channel - contact_channel)
+    :precondition
+      (and
+        (entity_registered ?traveler_case)
+        (not
+          (channel_allocated_to_entity ?traveler_case)
+        )
+        (channel_available ?contact_channel)
+      )
+    :effect
+      (and
+        (channel_allocated_to_entity ?traveler_case)
+        (entity_assigned_to_contact_channel ?traveler_case ?contact_channel)
+        (not
+          (channel_available ?contact_channel)
+        )
+      )
+  )
+  (:action attach_contact_attempt_to_entity
+    :parameters (?traveler_case - traveler_case ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_registered ?traveler_case)
+        (channel_allocated_to_entity ?traveler_case)
+        (contact_attempt_available ?contact_attempt)
+      )
+    :effect
+      (and
+        (entity_has_contact_attempt ?traveler_case ?contact_attempt)
+        (not
+          (contact_attempt_available ?contact_attempt)
+        )
+      )
+  )
+  (:action confirm_contact_for_entity
+    :parameters (?traveler_case - traveler_case ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_registered ?traveler_case)
+        (channel_allocated_to_entity ?traveler_case)
+        (entity_has_contact_attempt ?traveler_case ?contact_attempt)
+        (not
+          (entity_contact_confirmed ?traveler_case)
+        )
+      )
+    :effect (entity_contact_confirmed ?traveler_case)
+  )
+  (:action release_contact_attempt
+    :parameters (?traveler_case - traveler_case ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_has_contact_attempt ?traveler_case ?contact_attempt)
+      )
+    :effect
+      (and
+        (contact_attempt_available ?contact_attempt)
+        (not
+          (entity_has_contact_attempt ?traveler_case ?contact_attempt)
+        )
+      )
+  )
+  (:action assign_responder_team_to_entity
+    :parameters (?traveler_case - traveler_case ?responder_team - responder_team)
+    :precondition
+      (and
+        (entity_contact_confirmed ?traveler_case)
+        (responder_team_available ?responder_team)
+      )
+    :effect
+      (and
+        (entity_assigned_to_responder_team ?traveler_case ?responder_team)
+        (not
+          (responder_team_available ?responder_team)
+        )
+      )
+  )
+  (:action unassign_responder_team_from_entity
+    :parameters (?traveler_case - traveler_case ?responder_team - responder_team)
+    :precondition
+      (and
+        (entity_assigned_to_responder_team ?traveler_case ?responder_team)
+      )
+    :effect
+      (and
+        (responder_team_available ?responder_team)
+        (not
+          (entity_assigned_to_responder_team ?traveler_case ?responder_team)
+        )
+      )
+  )
+  (:action assign_medical_resource_to_agent
+    :parameters (?assistance_agent - assistance_agent ?medical_resource - medical_resource)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (medical_resource_available ?medical_resource)
+      )
+    :effect
+      (and
+        (agent_assigned_medical_resource ?assistance_agent ?medical_resource)
+        (not
+          (medical_resource_available ?medical_resource)
+        )
+      )
+  )
+  (:action unassign_medical_resource_from_agent
+    :parameters (?assistance_agent - assistance_agent ?medical_resource - medical_resource)
+    :precondition
+      (and
+        (agent_assigned_medical_resource ?assistance_agent ?medical_resource)
+      )
+    :effect
+      (and
+        (medical_resource_available ?medical_resource)
+        (not
+          (agent_assigned_medical_resource ?assistance_agent ?medical_resource)
+        )
+      )
+  )
+  (:action assign_accommodation_option_to_agent
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (accommodation_option_available ?accommodation_option)
+      )
+    :effect
+      (and
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (not
+          (accommodation_option_available ?accommodation_option)
+        )
+      )
+  )
+  (:action unassign_accommodation_option_from_agent
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+      )
+    :effect
+      (and
+        (accommodation_option_available ?accommodation_option)
+        (not
+          (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        )
+      )
+  )
+  (:action mark_location_primary_contacted
+    :parameters (?local_responder_slot - local_responder_slot ?incident_location - incident_location ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_contact_confirmed ?local_responder_slot)
+        (entity_has_contact_attempt ?local_responder_slot ?contact_attempt)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (not
+          (location_primary_contacted ?incident_location)
+        )
+        (not
+          (location_secondary_contacted ?incident_location)
+        )
+      )
+    :effect (location_primary_contacted ?incident_location)
+  )
+  (:action confirm_local_responder_slot_readiness
+    :parameters (?local_responder_slot - local_responder_slot ?incident_location - incident_location ?responder_team - responder_team)
+    :precondition
+      (and
+        (entity_contact_confirmed ?local_responder_slot)
+        (entity_assigned_to_responder_team ?local_responder_slot ?responder_team)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (location_primary_contacted ?incident_location)
+        (not
+          (local_responder_slot_checks_complete ?local_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+      )
+  )
+  (:action assign_support_package_to_local_responder_slot
+    :parameters (?local_responder_slot - local_responder_slot ?incident_location - incident_location ?support_package - support_package)
+    :precondition
+      (and
+        (entity_contact_confirmed ?local_responder_slot)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (support_package_available ?support_package)
+        (not
+          (local_responder_slot_checks_complete ?local_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (location_secondary_contacted ?incident_location)
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (local_responder_slot_has_support_package ?local_responder_slot ?support_package)
+        (not
+          (support_package_available ?support_package)
+        )
+      )
+  )
+  (:action finalize_local_responder_slot_checks_and_release_package
+    :parameters (?local_responder_slot - local_responder_slot ?incident_location - incident_location ?contact_attempt - contact_attempt ?support_package - support_package)
+    :precondition
+      (and
+        (entity_contact_confirmed ?local_responder_slot)
+        (entity_has_contact_attempt ?local_responder_slot ?contact_attempt)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (location_secondary_contacted ?incident_location)
+        (local_responder_slot_has_support_package ?local_responder_slot ?support_package)
+        (not
+          (local_responder_slot_confirmed_ready ?local_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (location_primary_contacted ?incident_location)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+        (support_package_available ?support_package)
+        (not
+          (local_responder_slot_has_support_package ?local_responder_slot ?support_package)
+        )
+      )
+  )
+  (:action mark_segment_primary_contacted
+    :parameters (?remote_responder_slot - remote_responder_slot ?itinerary_segment - itinerary_segment ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_contact_confirmed ?remote_responder_slot)
+        (entity_has_contact_attempt ?remote_responder_slot ?contact_attempt)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (not
+          (segment_primary_contacted ?itinerary_segment)
+        )
+        (not
+          (segment_secondary_contacted ?itinerary_segment)
+        )
+      )
+    :effect (segment_primary_contacted ?itinerary_segment)
+  )
+  (:action confirm_remote_responder_slot_readiness
+    :parameters (?remote_responder_slot - remote_responder_slot ?itinerary_segment - itinerary_segment ?responder_team - responder_team)
+    :precondition
+      (and
+        (entity_contact_confirmed ?remote_responder_slot)
+        (entity_assigned_to_responder_team ?remote_responder_slot ?responder_team)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (segment_primary_contacted ?itinerary_segment)
+        (not
+          (remote_responder_slot_checks_complete ?remote_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+      )
+  )
+  (:action assign_support_package_to_remote_responder_slot
+    :parameters (?remote_responder_slot - remote_responder_slot ?itinerary_segment - itinerary_segment ?support_package - support_package)
+    :precondition
+      (and
+        (entity_contact_confirmed ?remote_responder_slot)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (support_package_available ?support_package)
+        (not
+          (remote_responder_slot_checks_complete ?remote_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (segment_secondary_contacted ?itinerary_segment)
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (remote_responder_slot_has_support_package ?remote_responder_slot ?support_package)
+        (not
+          (support_package_available ?support_package)
+        )
+      )
+  )
+  (:action finalize_remote_responder_slot_checks_and_release_package
+    :parameters (?remote_responder_slot - remote_responder_slot ?itinerary_segment - itinerary_segment ?contact_attempt - contact_attempt ?support_package - support_package)
+    :precondition
+      (and
+        (entity_contact_confirmed ?remote_responder_slot)
+        (entity_has_contact_attempt ?remote_responder_slot ?contact_attempt)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (segment_secondary_contacted ?itinerary_segment)
+        (remote_responder_slot_has_support_package ?remote_responder_slot ?support_package)
+        (not
+          (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (segment_primary_contacted ?itinerary_segment)
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        (support_package_available ?support_package)
+        (not
+          (remote_responder_slot_has_support_package ?remote_responder_slot ?support_package)
+        )
+      )
+  )
+  (:action commit_assistance_request
+    :parameters (?local_responder_slot - local_responder_slot ?remote_responder_slot - remote_responder_slot ?incident_location - incident_location ?itinerary_segment - itinerary_segment ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (location_primary_contacted ?incident_location)
+        (segment_primary_contacted ?itinerary_segment)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        (assistance_request_draft ?assistance_request)
+      )
+    :effect
+      (and
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_includes_location ?assistance_request ?incident_location)
+        (assistance_request_includes_segment ?assistance_request ?itinerary_segment)
+        (not
+          (assistance_request_draft ?assistance_request)
+        )
+      )
+  )
+  (:action commit_assistance_request_requires_verification
+    :parameters (?local_responder_slot - local_responder_slot ?remote_responder_slot - remote_responder_slot ?incident_location - incident_location ?itinerary_segment - itinerary_segment ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (location_secondary_contacted ?incident_location)
+        (segment_primary_contacted ?itinerary_segment)
+        (not
+          (local_responder_slot_confirmed_ready ?local_responder_slot)
+        )
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        (assistance_request_draft ?assistance_request)
+      )
+    :effect
+      (and
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_includes_location ?assistance_request ?incident_location)
+        (assistance_request_includes_segment ?assistance_request ?itinerary_segment)
+        (assistance_request_requires_verification_artifact ?assistance_request)
+        (not
+          (assistance_request_draft ?assistance_request)
+        )
+      )
+  )
+  (:action commit_assistance_request_requires_external_approval
+    :parameters (?local_responder_slot - local_responder_slot ?remote_responder_slot - remote_responder_slot ?incident_location - incident_location ?itinerary_segment - itinerary_segment ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (location_primary_contacted ?incident_location)
+        (segment_secondary_contacted ?itinerary_segment)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+        (not
+          (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        )
+        (assistance_request_draft ?assistance_request)
+      )
+    :effect
+      (and
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_includes_location ?assistance_request ?incident_location)
+        (assistance_request_includes_segment ?assistance_request ?itinerary_segment)
+        (assistance_request_requires_external_approval ?assistance_request)
+        (not
+          (assistance_request_draft ?assistance_request)
+        )
+      )
+  )
+  (:action commit_assistance_request_requires_verification_and_approval
+    :parameters (?local_responder_slot - local_responder_slot ?remote_responder_slot - remote_responder_slot ?incident_location - incident_location ?itinerary_segment - itinerary_segment ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (responder_slot_at_location ?local_responder_slot ?incident_location)
+        (remote_responder_slot_associated_with_segment ?remote_responder_slot ?itinerary_segment)
+        (location_secondary_contacted ?incident_location)
+        (segment_secondary_contacted ?itinerary_segment)
+        (not
+          (local_responder_slot_confirmed_ready ?local_responder_slot)
+        )
+        (not
+          (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        )
+        (assistance_request_draft ?assistance_request)
+      )
+    :effect
+      (and
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_includes_location ?assistance_request ?incident_location)
+        (assistance_request_includes_segment ?assistance_request ?itinerary_segment)
+        (assistance_request_requires_verification_artifact ?assistance_request)
+        (assistance_request_requires_external_approval ?assistance_request)
+        (not
+          (assistance_request_draft ?assistance_request)
+        )
+      )
+  )
+  (:action mark_assistance_request_ready_for_execution
+    :parameters (?assistance_request - assistance_request ?local_responder_slot - local_responder_slot ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (assistance_request_committed ?assistance_request)
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (entity_has_contact_attempt ?local_responder_slot ?contact_attempt)
+        (not
+          (assistance_request_ready_for_execution ?assistance_request)
+        )
+      )
+    :effect (assistance_request_ready_for_execution ?assistance_request)
+  )
+  (:action consume_verification_artifact_and_attach_to_request
+    :parameters (?assistance_agent - assistance_agent ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (agent_linked_to_assistance_request ?assistance_agent ?assistance_request)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_available ?verification_artifact)
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_ready_for_execution ?assistance_request)
+        (not
+          (verification_artifact_consumed ?verification_artifact)
+        )
+      )
+    :effect
+      (and
+        (verification_artifact_consumed ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (not
+          (verification_artifact_available ?verification_artifact)
+        )
+      )
+  )
+  (:action mark_agent_prepared
+    :parameters (?assistance_agent - assistance_agent ?verification_artifact - verification_artifact ?assistance_request - assistance_request ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_consumed ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (entity_has_contact_attempt ?assistance_agent ?contact_attempt)
+        (not
+          (assistance_request_requires_verification_artifact ?assistance_request)
+        )
+        (not
+          (agent_prepared_marker ?assistance_agent)
+        )
+      )
+    :effect (agent_prepared_marker ?assistance_agent)
+  )
+  (:action assign_external_authority_to_agent
+    :parameters (?assistance_agent - assistance_agent ?external_authority - external_authority)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (external_authority_unassigned ?external_authority)
+        (not
+          (agent_external_authority_available ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_external_authority_available ?assistance_agent)
+        (agent_associated_with_external_authority ?assistance_agent ?external_authority)
+        (not
+          (external_authority_unassigned ?external_authority)
+        )
+      )
+  )
+  (:action apply_external_authority_and_prepare_agent
+    :parameters (?assistance_agent - assistance_agent ?verification_artifact - verification_artifact ?assistance_request - assistance_request ?contact_attempt - contact_attempt ?external_authority - external_authority)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_consumed ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (entity_has_contact_attempt ?assistance_agent ?contact_attempt)
+        (assistance_request_requires_verification_artifact ?assistance_request)
+        (agent_external_authority_available ?assistance_agent)
+        (agent_associated_with_external_authority ?assistance_agent ?external_authority)
+        (not
+          (agent_prepared_marker ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_prepared_marker ?assistance_agent)
+        (agent_external_approval_received ?assistance_agent)
+      )
+  )
+  (:action allocate_resources_to_agent_without_external_approval
+    :parameters (?assistance_agent - assistance_agent ?medical_resource - medical_resource ?responder_team - responder_team ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_prepared_marker ?assistance_agent)
+        (agent_assigned_medical_resource ?assistance_agent ?medical_resource)
+        (entity_assigned_to_responder_team ?assistance_agent ?responder_team)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (not
+          (assistance_request_requires_external_approval ?assistance_request)
+        )
+        (not
+          (agent_resources_allocated ?assistance_agent)
+        )
+      )
+    :effect (agent_resources_allocated ?assistance_agent)
+  )
+  (:action allocate_resources_to_agent_with_external_approval
+    :parameters (?assistance_agent - assistance_agent ?medical_resource - medical_resource ?responder_team - responder_team ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_prepared_marker ?assistance_agent)
+        (agent_assigned_medical_resource ?assistance_agent ?medical_resource)
+        (entity_assigned_to_responder_team ?assistance_agent ?responder_team)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (assistance_request_requires_external_approval ?assistance_request)
+        (not
+          (agent_resources_allocated ?assistance_agent)
+        )
+      )
+    :effect (agent_resources_allocated ?assistance_agent)
+  )
+  (:action approve_agent_for_operation
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_resources_allocated ?assistance_agent)
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (not
+          (assistance_request_requires_verification_artifact ?assistance_request)
+        )
+        (not
+          (assistance_request_requires_external_approval ?assistance_request)
+        )
+        (not
+          (agent_approved_for_operation ?assistance_agent)
+        )
+      )
+    :effect (agent_approved_for_operation ?assistance_agent)
+  )
+  (:action approve_agent_and_record_additional_conditions
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_resources_allocated ?assistance_agent)
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (assistance_request_requires_verification_artifact ?assistance_request)
+        (not
+          (assistance_request_requires_external_approval ?assistance_request)
+        )
+        (not
+          (agent_approved_for_operation ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_additional_conditions_met ?assistance_agent)
+      )
+  )
+  (:action approve_agent_and_record_additional_conditions_with_external_approval
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_resources_allocated ?assistance_agent)
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (not
+          (assistance_request_requires_verification_artifact ?assistance_request)
+        )
+        (assistance_request_requires_external_approval ?assistance_request)
+        (not
+          (agent_approved_for_operation ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_additional_conditions_met ?assistance_agent)
+      )
+  )
+  (:action approve_agent_and_record_additional_conditions_with_verification_and_external_approval
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option ?verification_artifact - verification_artifact ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (agent_resources_allocated ?assistance_agent)
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (agent_has_verification_artifact ?assistance_agent ?verification_artifact)
+        (verification_artifact_attached_to_request ?verification_artifact ?assistance_request)
+        (assistance_request_requires_verification_artifact ?assistance_request)
+        (assistance_request_requires_external_approval ?assistance_request)
+        (not
+          (agent_approved_for_operation ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_additional_conditions_met ?assistance_agent)
+      )
+  )
+  (:action record_closure_permission_and_operation_ready
+    :parameters (?assistance_agent - assistance_agent)
+    :precondition
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (not
+          (agent_additional_conditions_met ?assistance_agent)
+        )
+        (not
+          (closure_permission_marker ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (closure_permission_marker ?assistance_agent)
+        (entity_operation_ready_marker ?assistance_agent)
+      )
+  )
+  (:action assign_recovery_policy_to_agent
+    :parameters (?assistance_agent - assistance_agent ?recovery_policy - recovery_policy)
+    :precondition
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_additional_conditions_met ?assistance_agent)
+        (recovery_policy_available ?recovery_policy)
+      )
+    :effect
+      (and
+        (agent_assigned_recovery_policy ?assistance_agent ?recovery_policy)
+        (not
+          (recovery_policy_available ?recovery_policy)
+        )
+      )
+  )
+  (:action dispatch_agent_and_mark_execution
+    :parameters (?assistance_agent - assistance_agent ?local_responder_slot - local_responder_slot ?remote_responder_slot - remote_responder_slot ?contact_attempt - contact_attempt ?recovery_policy - recovery_policy)
+    :precondition
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_additional_conditions_met ?assistance_agent)
+        (agent_assigned_recovery_policy ?assistance_agent ?recovery_policy)
+        (agent_linked_to_local_responder_slot ?assistance_agent ?local_responder_slot)
+        (agent_linked_to_remote_responder_slot ?assistance_agent ?remote_responder_slot)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        (entity_has_contact_attempt ?assistance_agent ?contact_attempt)
+        (not
+          (agent_execution_marker ?assistance_agent)
+        )
+      )
+    :effect (agent_execution_marker ?assistance_agent)
+  )
+  (:action confirm_closure_permission_and_mark_operation_ready_for_agent
+    :parameters (?assistance_agent - assistance_agent)
+    :precondition
+      (and
+        (agent_approved_for_operation ?assistance_agent)
+        (agent_execution_marker ?assistance_agent)
+        (not
+          (closure_permission_marker ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (closure_permission_marker ?assistance_agent)
+        (entity_operation_ready_marker ?assistance_agent)
+      )
+  )
+  (:action escalate_agent_and_attach_authorization_record
+    :parameters (?assistance_agent - assistance_agent ?authorization_record - authorization_record ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_contact_confirmed ?assistance_agent)
+        (entity_has_contact_attempt ?assistance_agent ?contact_attempt)
+        (authorization_record_available ?authorization_record)
+        (agent_linked_to_authorization_record ?assistance_agent ?authorization_record)
+        (not
+          (agent_escalation_marker ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (agent_escalation_marker ?assistance_agent)
+        (not
+          (authorization_record_available ?authorization_record)
+        )
+      )
+  )
+  (:action approve_agent_escalation
+    :parameters (?assistance_agent - assistance_agent ?responder_team - responder_team)
+    :precondition
+      (and
+        (agent_escalation_marker ?assistance_agent)
+        (entity_assigned_to_responder_team ?assistance_agent ?responder_team)
+        (not
+          (agent_escalation_approved ?assistance_agent)
+        )
+      )
+    :effect (agent_escalation_approved ?assistance_agent)
+  )
+  (:action execute_agent_escalation
+    :parameters (?assistance_agent - assistance_agent ?accommodation_option - accommodation_option)
+    :precondition
+      (and
+        (agent_escalation_approved ?assistance_agent)
+        (agent_assigned_accommodation_option ?assistance_agent ?accommodation_option)
+        (not
+          (agent_escalation_executed ?assistance_agent)
+        )
+      )
+    :effect (agent_escalation_executed ?assistance_agent)
+  )
+  (:action record_closure_permission_and_operation_ready_post_escalation
+    :parameters (?assistance_agent - assistance_agent)
+    :precondition
+      (and
+        (agent_escalation_executed ?assistance_agent)
+        (not
+          (closure_permission_marker ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (closure_permission_marker ?assistance_agent)
+        (entity_operation_ready_marker ?assistance_agent)
+      )
+  )
+  (:action mark_operation_ready_for_local_responder_slot
+    :parameters (?local_responder_slot - local_responder_slot ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (local_responder_slot_checks_complete ?local_responder_slot)
+        (local_responder_slot_confirmed_ready ?local_responder_slot)
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_ready_for_execution ?assistance_request)
+        (not
+          (entity_operation_ready_marker ?local_responder_slot)
+        )
+      )
+    :effect (entity_operation_ready_marker ?local_responder_slot)
+  )
+  (:action mark_operation_ready_for_remote_responder_slot
+    :parameters (?remote_responder_slot - remote_responder_slot ?assistance_request - assistance_request)
+    :precondition
+      (and
+        (remote_responder_slot_checks_complete ?remote_responder_slot)
+        (remote_responder_slot_confirmed_ready ?remote_responder_slot)
+        (assistance_request_committed ?assistance_request)
+        (assistance_request_ready_for_execution ?assistance_request)
+        (not
+          (entity_operation_ready_marker ?remote_responder_slot)
+        )
+      )
+    :effect (entity_operation_ready_marker ?remote_responder_slot)
+  )
+  (:action assign_assistance_asset_and_mark_entity_prepared_for_activation
+    :parameters (?traveler_case - traveler_case ?assistance_asset - assistance_asset ?contact_attempt - contact_attempt)
+    :precondition
+      (and
+        (entity_operation_ready_marker ?traveler_case)
+        (entity_has_contact_attempt ?traveler_case ?contact_attempt)
+        (assistance_asset_available ?assistance_asset)
+        (not
+          (entity_prepared_for_activation ?traveler_case)
+        )
+      )
+    :effect
+      (and
+        (entity_prepared_for_activation ?traveler_case)
+        (entity_allocated_asset ?traveler_case ?assistance_asset)
+        (not
+          (assistance_asset_available ?assistance_asset)
+        )
+      )
+  )
+  (:action activate_assistance_for_local_responder_slot
+    :parameters (?local_responder_slot - local_responder_slot ?contact_channel - contact_channel ?assistance_asset - assistance_asset)
+    :precondition
+      (and
+        (entity_prepared_for_activation ?local_responder_slot)
+        (entity_assigned_to_contact_channel ?local_responder_slot ?contact_channel)
+        (entity_allocated_asset ?local_responder_slot ?assistance_asset)
+        (not
+          (assistance_activated_for_entity ?local_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (assistance_activated_for_entity ?local_responder_slot)
+        (channel_available ?contact_channel)
+        (assistance_asset_available ?assistance_asset)
+      )
+  )
+  (:action activate_assistance_for_remote_responder_slot
+    :parameters (?remote_responder_slot - remote_responder_slot ?contact_channel - contact_channel ?assistance_asset - assistance_asset)
+    :precondition
+      (and
+        (entity_prepared_for_activation ?remote_responder_slot)
+        (entity_assigned_to_contact_channel ?remote_responder_slot ?contact_channel)
+        (entity_allocated_asset ?remote_responder_slot ?assistance_asset)
+        (not
+          (assistance_activated_for_entity ?remote_responder_slot)
+        )
+      )
+    :effect
+      (and
+        (assistance_activated_for_entity ?remote_responder_slot)
+        (channel_available ?contact_channel)
+        (assistance_asset_available ?assistance_asset)
+      )
+  )
+  (:action activate_assistance_for_agent
+    :parameters (?assistance_agent - assistance_agent ?contact_channel - contact_channel ?assistance_asset - assistance_asset)
+    :precondition
+      (and
+        (entity_prepared_for_activation ?assistance_agent)
+        (entity_assigned_to_contact_channel ?assistance_agent ?contact_channel)
+        (entity_allocated_asset ?assistance_agent ?assistance_asset)
+        (not
+          (assistance_activated_for_entity ?assistance_agent)
+        )
+      )
+    :effect
+      (and
+        (assistance_activated_for_entity ?assistance_agent)
+        (channel_available ?contact_channel)
+        (assistance_asset_available ?assistance_asset)
+      )
+  )
+)

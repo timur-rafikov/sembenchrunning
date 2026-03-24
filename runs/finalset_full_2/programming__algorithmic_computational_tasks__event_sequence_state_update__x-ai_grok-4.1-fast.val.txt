@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain event_sequence_state_update)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types agent_supertype - object channel_supertype - object payload_supertype - object entity_supertype - object event_instance - entity_supertype channel_resource - agent_supertype event_descriptor - agent_supertype agent_capability - agent_supertype qualifier_tag - agent_supertype dispatch_attribute - agent_supertype reallocation_token - agent_supertype optional_feature - agent_supertype finalizer_flag - agent_supertype metadata_token - channel_supertype payload_fragment - channel_supertype priority_marker - channel_supertype producer_channel_instance - payload_supertype consumer_channel_instance - payload_supertype dispatch_ticket - payload_supertype producer_role_group - event_instance consumer_role_group - event_instance producer_agent - producer_role_group consumer_agent - producer_role_group handler_agent - consumer_role_group)
+  (:predicates
+    (event_registered ?event_instance - event_instance)
+    (entity_committed ?event_instance - event_instance)
+    (event_channel_allocated ?event_instance - event_instance)
+    (entity_allocation_mark ?event_instance - event_instance)
+    (entity_commit_recorded ?event_instance - event_instance)
+    (entity_finalizer_token ?event_instance - event_instance)
+    (channel_available ?channel_resource - channel_resource)
+    (entity_channel_binding ?event_instance - event_instance ?channel_resource - channel_resource)
+    (descriptor_available ?event_descriptor - event_descriptor)
+    (entity_descriptor_binding ?event_instance - event_instance ?event_descriptor - event_descriptor)
+    (capability_available ?agent_capability - agent_capability)
+    (event_capability_binding ?event_instance - event_instance ?agent_capability - agent_capability)
+    (metadata_token_available ?metadata_token - metadata_token)
+    (producer_metadata_binding ?producer_agent - producer_agent ?metadata_token - metadata_token)
+    (consumer_metadata_binding ?consumer_agent - consumer_agent ?metadata_token - metadata_token)
+    (producer_channel_instance_binding ?producer_agent - producer_agent ?producer_channel_instance - producer_channel_instance)
+    (producer_channel_ready ?producer_channel_instance - producer_channel_instance)
+    (producer_channel_tagged ?producer_channel_instance - producer_channel_instance)
+    (producer_ready_flag ?producer_agent - producer_agent)
+    (consumer_channel_instance_binding ?consumer_agent - consumer_agent ?consumer_channel_instance - consumer_channel_instance)
+    (consumer_channel_ready ?consumer_channel_instance - consumer_channel_instance)
+    (consumer_channel_tagged ?consumer_channel_instance - consumer_channel_instance)
+    (consumer_ready_flag ?consumer_agent - consumer_agent)
+    (ticket_available ?dispatch_ticket - dispatch_ticket)
+    (ticket_active ?dispatch_ticket - dispatch_ticket)
+    (ticket_bound_producer_channel ?dispatch_ticket - dispatch_ticket ?producer_channel_instance - producer_channel_instance)
+    (ticket_bound_consumer_channel ?dispatch_ticket - dispatch_ticket ?consumer_channel_instance - consumer_channel_instance)
+    (ticket_includes_producer_component ?dispatch_ticket - dispatch_ticket)
+    (ticket_includes_consumer_component ?dispatch_ticket - dispatch_ticket)
+    (ticket_checkpointed ?dispatch_ticket - dispatch_ticket)
+    (handler_assigned_to_producer ?handler_agent - handler_agent ?producer_agent - producer_agent)
+    (handler_assigned_to_consumer ?handler_agent - handler_agent ?consumer_agent - consumer_agent)
+    (handler_ticket_association ?handler_agent - handler_agent ?dispatch_ticket - dispatch_ticket)
+    (payload_fragment_available ?payload_fragment - payload_fragment)
+    (handler_has_payload_fragment ?handler_agent - handler_agent ?payload_fragment - payload_fragment)
+    (payload_fragment_active ?payload_fragment - payload_fragment)
+    (payload_fragment_attached_to_ticket ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    (handler_stage_prepared ?handler_agent - handler_agent)
+    (handler_ready_for_finalization ?handler_agent - handler_agent)
+    (handler_finalization_initiated ?handler_agent - handler_agent)
+    (handler_has_qualifier_tag ?handler_agent - handler_agent)
+    (handler_qualifier_tag_confirmed ?handler_agent - handler_agent)
+    (handler_ready_with_attributes ?handler_agent - handler_agent)
+    (handler_dispatch_approved ?handler_agent - handler_agent)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (handler_priority_binding ?handler_agent - handler_agent ?priority_marker - priority_marker)
+    (handler_priority_locked ?handler_agent - handler_agent)
+    (handler_attribute_stage ?handler_agent - handler_agent)
+    (handler_attribute_confirmed ?handler_agent - handler_agent)
+    (qualifier_tag_available ?qualifier_tag - qualifier_tag)
+    (handler_qualifier_tag_binding ?handler_agent - handler_agent ?qualifier_tag - qualifier_tag)
+    (dispatch_attribute_available ?dispatch_attribute - dispatch_attribute)
+    (handler_dispatch_attribute_binding ?handler_agent - handler_agent ?dispatch_attribute - dispatch_attribute)
+    (optional_feature_available ?optional_feature - optional_feature)
+    (handler_optional_feature_binding ?handler_agent - handler_agent ?optional_feature - optional_feature)
+    (finalizer_flag_available ?finalizer_flag - finalizer_flag)
+    (handler_finalizer_flag_binding ?handler_agent - handler_agent ?finalizer_flag - finalizer_flag)
+    (reallocation_token_available ?reallocation_token - reallocation_token)
+    (entity_reallocation_token_binding ?event_instance - event_instance ?reallocation_token - reallocation_token)
+    (producer_channel_activated ?producer_agent - producer_agent)
+    (consumer_channel_activated ?consumer_agent - consumer_agent)
+    (handler_finalizer_token ?handler_agent - handler_agent)
+  )
+  (:action register_event_instance
+    :parameters (?event_instance - event_instance)
+    :precondition
+      (and
+        (not
+          (event_registered ?event_instance)
+        )
+        (not
+          (entity_allocation_mark ?event_instance)
+        )
+      )
+    :effect (event_registered ?event_instance)
+  )
+  (:action allocate_channel_to_event
+    :parameters (?event_instance - event_instance ?channel_resource - channel_resource)
+    :precondition
+      (and
+        (event_registered ?event_instance)
+        (not
+          (event_channel_allocated ?event_instance)
+        )
+        (channel_available ?channel_resource)
+      )
+    :effect
+      (and
+        (event_channel_allocated ?event_instance)
+        (entity_channel_binding ?event_instance ?channel_resource)
+        (not
+          (channel_available ?channel_resource)
+        )
+      )
+  )
+  (:action attach_event_descriptor
+    :parameters (?event_instance - event_instance ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (event_registered ?event_instance)
+        (event_channel_allocated ?event_instance)
+        (descriptor_available ?event_descriptor)
+      )
+    :effect
+      (and
+        (entity_descriptor_binding ?event_instance ?event_descriptor)
+        (not
+          (descriptor_available ?event_descriptor)
+        )
+      )
+  )
+  (:action commit_event_descriptor
+    :parameters (?event_instance - event_instance ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (event_registered ?event_instance)
+        (event_channel_allocated ?event_instance)
+        (entity_descriptor_binding ?event_instance ?event_descriptor)
+        (not
+          (entity_committed ?event_instance)
+        )
+      )
+    :effect (entity_committed ?event_instance)
+  )
+  (:action release_event_descriptor
+    :parameters (?event_instance - event_instance ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_descriptor_binding ?event_instance ?event_descriptor)
+      )
+    :effect
+      (and
+        (descriptor_available ?event_descriptor)
+        (not
+          (entity_descriptor_binding ?event_instance ?event_descriptor)
+        )
+      )
+  )
+  (:action attach_capability_to_event
+    :parameters (?event_instance - event_instance ?agent_capability - agent_capability)
+    :precondition
+      (and
+        (entity_committed ?event_instance)
+        (capability_available ?agent_capability)
+      )
+    :effect
+      (and
+        (event_capability_binding ?event_instance ?agent_capability)
+        (not
+          (capability_available ?agent_capability)
+        )
+      )
+  )
+  (:action detach_capability_from_event
+    :parameters (?event_instance - event_instance ?agent_capability - agent_capability)
+    :precondition
+      (and
+        (event_capability_binding ?event_instance ?agent_capability)
+      )
+    :effect
+      (and
+        (capability_available ?agent_capability)
+        (not
+          (event_capability_binding ?event_instance ?agent_capability)
+        )
+      )
+  )
+  (:action claim_optional_feature_for_handler
+    :parameters (?handler_agent - handler_agent ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (optional_feature_available ?optional_feature)
+      )
+    :effect
+      (and
+        (handler_optional_feature_binding ?handler_agent ?optional_feature)
+        (not
+          (optional_feature_available ?optional_feature)
+        )
+      )
+  )
+  (:action release_optional_feature_from_handler
+    :parameters (?handler_agent - handler_agent ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (handler_optional_feature_binding ?handler_agent ?optional_feature)
+      )
+    :effect
+      (and
+        (optional_feature_available ?optional_feature)
+        (not
+          (handler_optional_feature_binding ?handler_agent ?optional_feature)
+        )
+      )
+  )
+  (:action claim_finalizer_flag_for_handler
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (finalizer_flag_available ?finalizer_flag)
+      )
+    :effect
+      (and
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (not
+          (finalizer_flag_available ?finalizer_flag)
+        )
+      )
+  )
+  (:action release_finalizer_flag_from_handler
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag)
+    :precondition
+      (and
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+      )
+    :effect
+      (and
+        (finalizer_flag_available ?finalizer_flag)
+        (not
+          (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        )
+      )
+  )
+  (:action activate_producer_channel
+    :parameters (?producer_agent - producer_agent ?producer_channel_instance - producer_channel_instance ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_committed ?producer_agent)
+        (entity_descriptor_binding ?producer_agent ?event_descriptor)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (not
+          (producer_channel_ready ?producer_channel_instance)
+        )
+        (not
+          (producer_channel_tagged ?producer_channel_instance)
+        )
+      )
+    :effect (producer_channel_ready ?producer_channel_instance)
+  )
+  (:action confirm_producer_channel_binding
+    :parameters (?producer_agent - producer_agent ?producer_channel_instance - producer_channel_instance ?agent_capability - agent_capability)
+    :precondition
+      (and
+        (entity_committed ?producer_agent)
+        (event_capability_binding ?producer_agent ?agent_capability)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (producer_channel_ready ?producer_channel_instance)
+        (not
+          (producer_channel_activated ?producer_agent)
+        )
+      )
+    :effect
+      (and
+        (producer_channel_activated ?producer_agent)
+        (producer_ready_flag ?producer_agent)
+      )
+  )
+  (:action attach_metadata_to_producer_channel
+    :parameters (?producer_agent - producer_agent ?producer_channel_instance - producer_channel_instance ?metadata_token - metadata_token)
+    :precondition
+      (and
+        (entity_committed ?producer_agent)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (metadata_token_available ?metadata_token)
+        (not
+          (producer_channel_activated ?producer_agent)
+        )
+      )
+    :effect
+      (and
+        (producer_channel_tagged ?producer_channel_instance)
+        (producer_channel_activated ?producer_agent)
+        (producer_metadata_binding ?producer_agent ?metadata_token)
+        (not
+          (metadata_token_available ?metadata_token)
+        )
+      )
+  )
+  (:action update_producer_channel_metadata
+    :parameters (?producer_agent - producer_agent ?producer_channel_instance - producer_channel_instance ?event_descriptor - event_descriptor ?metadata_token - metadata_token)
+    :precondition
+      (and
+        (entity_committed ?producer_agent)
+        (entity_descriptor_binding ?producer_agent ?event_descriptor)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (producer_channel_tagged ?producer_channel_instance)
+        (producer_metadata_binding ?producer_agent ?metadata_token)
+        (not
+          (producer_ready_flag ?producer_agent)
+        )
+      )
+    :effect
+      (and
+        (producer_channel_ready ?producer_channel_instance)
+        (producer_ready_flag ?producer_agent)
+        (metadata_token_available ?metadata_token)
+        (not
+          (producer_metadata_binding ?producer_agent ?metadata_token)
+        )
+      )
+  )
+  (:action activate_consumer_channel
+    :parameters (?consumer_agent - consumer_agent ?consumer_channel_instance - consumer_channel_instance ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_committed ?consumer_agent)
+        (entity_descriptor_binding ?consumer_agent ?event_descriptor)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (not
+          (consumer_channel_ready ?consumer_channel_instance)
+        )
+        (not
+          (consumer_channel_tagged ?consumer_channel_instance)
+        )
+      )
+    :effect (consumer_channel_ready ?consumer_channel_instance)
+  )
+  (:action confirm_consumer_channel_binding
+    :parameters (?consumer_agent - consumer_agent ?consumer_channel_instance - consumer_channel_instance ?agent_capability - agent_capability)
+    :precondition
+      (and
+        (entity_committed ?consumer_agent)
+        (event_capability_binding ?consumer_agent ?agent_capability)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (consumer_channel_ready ?consumer_channel_instance)
+        (not
+          (consumer_channel_activated ?consumer_agent)
+        )
+      )
+    :effect
+      (and
+        (consumer_channel_activated ?consumer_agent)
+        (consumer_ready_flag ?consumer_agent)
+      )
+  )
+  (:action attach_metadata_to_consumer_channel
+    :parameters (?consumer_agent - consumer_agent ?consumer_channel_instance - consumer_channel_instance ?metadata_token - metadata_token)
+    :precondition
+      (and
+        (entity_committed ?consumer_agent)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (metadata_token_available ?metadata_token)
+        (not
+          (consumer_channel_activated ?consumer_agent)
+        )
+      )
+    :effect
+      (and
+        (consumer_channel_tagged ?consumer_channel_instance)
+        (consumer_channel_activated ?consumer_agent)
+        (consumer_metadata_binding ?consumer_agent ?metadata_token)
+        (not
+          (metadata_token_available ?metadata_token)
+        )
+      )
+  )
+  (:action update_consumer_channel_metadata
+    :parameters (?consumer_agent - consumer_agent ?consumer_channel_instance - consumer_channel_instance ?event_descriptor - event_descriptor ?metadata_token - metadata_token)
+    :precondition
+      (and
+        (entity_committed ?consumer_agent)
+        (entity_descriptor_binding ?consumer_agent ?event_descriptor)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (consumer_channel_tagged ?consumer_channel_instance)
+        (consumer_metadata_binding ?consumer_agent ?metadata_token)
+        (not
+          (consumer_ready_flag ?consumer_agent)
+        )
+      )
+    :effect
+      (and
+        (consumer_channel_ready ?consumer_channel_instance)
+        (consumer_ready_flag ?consumer_agent)
+        (metadata_token_available ?metadata_token)
+        (not
+          (consumer_metadata_binding ?consumer_agent ?metadata_token)
+        )
+      )
+  )
+  (:action assemble_dispatch_ticket_candidate
+    :parameters (?producer_agent - producer_agent ?consumer_agent - consumer_agent ?producer_channel_instance - producer_channel_instance ?consumer_channel_instance - consumer_channel_instance ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (producer_channel_activated ?producer_agent)
+        (consumer_channel_activated ?consumer_agent)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (producer_channel_ready ?producer_channel_instance)
+        (consumer_channel_ready ?consumer_channel_instance)
+        (producer_ready_flag ?producer_agent)
+        (consumer_ready_flag ?consumer_agent)
+        (ticket_available ?dispatch_ticket)
+      )
+    :effect
+      (and
+        (ticket_active ?dispatch_ticket)
+        (ticket_bound_producer_channel ?dispatch_ticket ?producer_channel_instance)
+        (ticket_bound_consumer_channel ?dispatch_ticket ?consumer_channel_instance)
+        (not
+          (ticket_available ?dispatch_ticket)
+        )
+      )
+  )
+  (:action assemble_dispatch_ticket_with_producer_component
+    :parameters (?producer_agent - producer_agent ?consumer_agent - consumer_agent ?producer_channel_instance - producer_channel_instance ?consumer_channel_instance - consumer_channel_instance ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (producer_channel_activated ?producer_agent)
+        (consumer_channel_activated ?consumer_agent)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (producer_channel_tagged ?producer_channel_instance)
+        (consumer_channel_ready ?consumer_channel_instance)
+        (not
+          (producer_ready_flag ?producer_agent)
+        )
+        (consumer_ready_flag ?consumer_agent)
+        (ticket_available ?dispatch_ticket)
+      )
+    :effect
+      (and
+        (ticket_active ?dispatch_ticket)
+        (ticket_bound_producer_channel ?dispatch_ticket ?producer_channel_instance)
+        (ticket_bound_consumer_channel ?dispatch_ticket ?consumer_channel_instance)
+        (ticket_includes_producer_component ?dispatch_ticket)
+        (not
+          (ticket_available ?dispatch_ticket)
+        )
+      )
+  )
+  (:action assemble_dispatch_ticket_with_consumer_component
+    :parameters (?producer_agent - producer_agent ?consumer_agent - consumer_agent ?producer_channel_instance - producer_channel_instance ?consumer_channel_instance - consumer_channel_instance ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (producer_channel_activated ?producer_agent)
+        (consumer_channel_activated ?consumer_agent)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (producer_channel_ready ?producer_channel_instance)
+        (consumer_channel_tagged ?consumer_channel_instance)
+        (producer_ready_flag ?producer_agent)
+        (not
+          (consumer_ready_flag ?consumer_agent)
+        )
+        (ticket_available ?dispatch_ticket)
+      )
+    :effect
+      (and
+        (ticket_active ?dispatch_ticket)
+        (ticket_bound_producer_channel ?dispatch_ticket ?producer_channel_instance)
+        (ticket_bound_consumer_channel ?dispatch_ticket ?consumer_channel_instance)
+        (ticket_includes_consumer_component ?dispatch_ticket)
+        (not
+          (ticket_available ?dispatch_ticket)
+        )
+      )
+  )
+  (:action assemble_dispatch_ticket_with_both_components
+    :parameters (?producer_agent - producer_agent ?consumer_agent - consumer_agent ?producer_channel_instance - producer_channel_instance ?consumer_channel_instance - consumer_channel_instance ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (producer_channel_activated ?producer_agent)
+        (consumer_channel_activated ?consumer_agent)
+        (producer_channel_instance_binding ?producer_agent ?producer_channel_instance)
+        (consumer_channel_instance_binding ?consumer_agent ?consumer_channel_instance)
+        (producer_channel_tagged ?producer_channel_instance)
+        (consumer_channel_tagged ?consumer_channel_instance)
+        (not
+          (producer_ready_flag ?producer_agent)
+        )
+        (not
+          (consumer_ready_flag ?consumer_agent)
+        )
+        (ticket_available ?dispatch_ticket)
+      )
+    :effect
+      (and
+        (ticket_active ?dispatch_ticket)
+        (ticket_bound_producer_channel ?dispatch_ticket ?producer_channel_instance)
+        (ticket_bound_consumer_channel ?dispatch_ticket ?consumer_channel_instance)
+        (ticket_includes_producer_component ?dispatch_ticket)
+        (ticket_includes_consumer_component ?dispatch_ticket)
+        (not
+          (ticket_available ?dispatch_ticket)
+        )
+      )
+  )
+  (:action activate_ticket_checkpoint
+    :parameters (?dispatch_ticket - dispatch_ticket ?producer_agent - producer_agent ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (ticket_active ?dispatch_ticket)
+        (producer_channel_activated ?producer_agent)
+        (entity_descriptor_binding ?producer_agent ?event_descriptor)
+        (not
+          (ticket_checkpointed ?dispatch_ticket)
+        )
+      )
+    :effect (ticket_checkpointed ?dispatch_ticket)
+  )
+  (:action promote_payload_fragment_to_active
+    :parameters (?handler_agent - handler_agent ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (handler_ticket_association ?handler_agent ?dispatch_ticket)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_available ?payload_fragment)
+        (ticket_active ?dispatch_ticket)
+        (ticket_checkpointed ?dispatch_ticket)
+        (not
+          (payload_fragment_active ?payload_fragment)
+        )
+      )
+    :effect
+      (and
+        (payload_fragment_active ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (not
+          (payload_fragment_available ?payload_fragment)
+        )
+      )
+  )
+  (:action prepare_handler_for_fragment_processing
+    :parameters (?handler_agent - handler_agent ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_active ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (entity_descriptor_binding ?handler_agent ?event_descriptor)
+        (not
+          (ticket_includes_producer_component ?dispatch_ticket)
+        )
+        (not
+          (handler_stage_prepared ?handler_agent)
+        )
+      )
+    :effect (handler_stage_prepared ?handler_agent)
+  )
+  (:action attach_qualifier_tag_to_handler
+    :parameters (?handler_agent - handler_agent ?qualifier_tag - qualifier_tag)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (qualifier_tag_available ?qualifier_tag)
+        (not
+          (handler_has_qualifier_tag ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_has_qualifier_tag ?handler_agent)
+        (handler_qualifier_tag_binding ?handler_agent ?qualifier_tag)
+        (not
+          (qualifier_tag_available ?qualifier_tag)
+        )
+      )
+  )
+  (:action apply_qualifier_and_prepare_handler
+    :parameters (?handler_agent - handler_agent ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket ?event_descriptor - event_descriptor ?qualifier_tag - qualifier_tag)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_active ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (entity_descriptor_binding ?handler_agent ?event_descriptor)
+        (ticket_includes_producer_component ?dispatch_ticket)
+        (handler_has_qualifier_tag ?handler_agent)
+        (handler_qualifier_tag_binding ?handler_agent ?qualifier_tag)
+        (not
+          (handler_stage_prepared ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_stage_prepared ?handler_agent)
+        (handler_qualifier_tag_confirmed ?handler_agent)
+      )
+  )
+  (:action bind_optional_feature_and_prepare_handler
+    :parameters (?handler_agent - handler_agent ?optional_feature - optional_feature ?agent_capability - agent_capability ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_stage_prepared ?handler_agent)
+        (handler_optional_feature_binding ?handler_agent ?optional_feature)
+        (event_capability_binding ?handler_agent ?agent_capability)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (not
+          (ticket_includes_consumer_component ?dispatch_ticket)
+        )
+        (not
+          (handler_ready_for_finalization ?handler_agent)
+        )
+      )
+    :effect (handler_ready_for_finalization ?handler_agent)
+  )
+  (:action bind_optional_feature_and_prepare_handler_phase2
+    :parameters (?handler_agent - handler_agent ?optional_feature - optional_feature ?agent_capability - agent_capability ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_stage_prepared ?handler_agent)
+        (handler_optional_feature_binding ?handler_agent ?optional_feature)
+        (event_capability_binding ?handler_agent ?agent_capability)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (ticket_includes_consumer_component ?dispatch_ticket)
+        (not
+          (handler_ready_for_finalization ?handler_agent)
+        )
+      )
+    :effect (handler_ready_for_finalization ?handler_agent)
+  )
+  (:action stage_handler_finalization_phase_a
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_ready_for_finalization ?handler_agent)
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (not
+          (ticket_includes_producer_component ?dispatch_ticket)
+        )
+        (not
+          (ticket_includes_consumer_component ?dispatch_ticket)
+        )
+        (not
+          (handler_finalization_initiated ?handler_agent)
+        )
+      )
+    :effect (handler_finalization_initiated ?handler_agent)
+  )
+  (:action stage_handler_finalization_phase_b
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_ready_for_finalization ?handler_agent)
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (ticket_includes_producer_component ?dispatch_ticket)
+        (not
+          (ticket_includes_consumer_component ?dispatch_ticket)
+        )
+        (not
+          (handler_finalization_initiated ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_ready_with_attributes ?handler_agent)
+      )
+  )
+  (:action stage_handler_finalization_phase_c
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_ready_for_finalization ?handler_agent)
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (not
+          (ticket_includes_producer_component ?dispatch_ticket)
+        )
+        (ticket_includes_consumer_component ?dispatch_ticket)
+        (not
+          (handler_finalization_initiated ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_ready_with_attributes ?handler_agent)
+      )
+  )
+  (:action stage_handler_finalization_phase_d
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag ?payload_fragment - payload_fragment ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (handler_ready_for_finalization ?handler_agent)
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (handler_has_payload_fragment ?handler_agent ?payload_fragment)
+        (payload_fragment_attached_to_ticket ?payload_fragment ?dispatch_ticket)
+        (ticket_includes_producer_component ?dispatch_ticket)
+        (ticket_includes_consumer_component ?dispatch_ticket)
+        (not
+          (handler_finalization_initiated ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_ready_with_attributes ?handler_agent)
+      )
+  )
+  (:action finalize_handler_commit
+    :parameters (?handler_agent - handler_agent)
+    :precondition
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (not
+          (handler_ready_with_attributes ?handler_agent)
+        )
+        (not
+          (handler_finalizer_token ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalizer_token ?handler_agent)
+        (entity_commit_recorded ?handler_agent)
+      )
+  )
+  (:action attach_dispatch_attribute_to_handler
+    :parameters (?handler_agent - handler_agent ?dispatch_attribute - dispatch_attribute)
+    :precondition
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_ready_with_attributes ?handler_agent)
+        (dispatch_attribute_available ?dispatch_attribute)
+      )
+    :effect
+      (and
+        (handler_dispatch_attribute_binding ?handler_agent ?dispatch_attribute)
+        (not
+          (dispatch_attribute_available ?dispatch_attribute)
+        )
+      )
+  )
+  (:action execute_handler_dispatch_sequence
+    :parameters (?handler_agent - handler_agent ?producer_agent - producer_agent ?consumer_agent - consumer_agent ?event_descriptor - event_descriptor ?dispatch_attribute - dispatch_attribute)
+    :precondition
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_ready_with_attributes ?handler_agent)
+        (handler_dispatch_attribute_binding ?handler_agent ?dispatch_attribute)
+        (handler_assigned_to_producer ?handler_agent ?producer_agent)
+        (handler_assigned_to_consumer ?handler_agent ?consumer_agent)
+        (producer_ready_flag ?producer_agent)
+        (consumer_ready_flag ?consumer_agent)
+        (entity_descriptor_binding ?handler_agent ?event_descriptor)
+        (not
+          (handler_dispatch_approved ?handler_agent)
+        )
+      )
+    :effect (handler_dispatch_approved ?handler_agent)
+  )
+  (:action finalize_handler_post_approval
+    :parameters (?handler_agent - handler_agent)
+    :precondition
+      (and
+        (handler_finalization_initiated ?handler_agent)
+        (handler_dispatch_approved ?handler_agent)
+        (not
+          (handler_finalizer_token ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalizer_token ?handler_agent)
+        (entity_commit_recorded ?handler_agent)
+      )
+  )
+  (:action assign_priority_marker_to_handler
+    :parameters (?handler_agent - handler_agent ?priority_marker - priority_marker ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_committed ?handler_agent)
+        (entity_descriptor_binding ?handler_agent ?event_descriptor)
+        (priority_marker_available ?priority_marker)
+        (handler_priority_binding ?handler_agent ?priority_marker)
+        (not
+          (handler_priority_locked ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_priority_locked ?handler_agent)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action advance_handler_attribute_stage
+    :parameters (?handler_agent - handler_agent ?agent_capability - agent_capability)
+    :precondition
+      (and
+        (handler_priority_locked ?handler_agent)
+        (event_capability_binding ?handler_agent ?agent_capability)
+        (not
+          (handler_attribute_stage ?handler_agent)
+        )
+      )
+    :effect (handler_attribute_stage ?handler_agent)
+  )
+  (:action attach_finalizer_flag_to_handler
+    :parameters (?handler_agent - handler_agent ?finalizer_flag - finalizer_flag)
+    :precondition
+      (and
+        (handler_attribute_stage ?handler_agent)
+        (handler_finalizer_flag_binding ?handler_agent ?finalizer_flag)
+        (not
+          (handler_attribute_confirmed ?handler_agent)
+        )
+      )
+    :effect (handler_attribute_confirmed ?handler_agent)
+  )
+  (:action finalize_handler_attribute_commit
+    :parameters (?handler_agent - handler_agent)
+    :precondition
+      (and
+        (handler_attribute_confirmed ?handler_agent)
+        (not
+          (handler_finalizer_token ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (handler_finalizer_token ?handler_agent)
+        (entity_commit_recorded ?handler_agent)
+      )
+  )
+  (:action signal_producer_commit
+    :parameters (?producer_agent - producer_agent ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (producer_channel_activated ?producer_agent)
+        (producer_ready_flag ?producer_agent)
+        (ticket_active ?dispatch_ticket)
+        (ticket_checkpointed ?dispatch_ticket)
+        (not
+          (entity_commit_recorded ?producer_agent)
+        )
+      )
+    :effect (entity_commit_recorded ?producer_agent)
+  )
+  (:action signal_consumer_commit
+    :parameters (?consumer_agent - consumer_agent ?dispatch_ticket - dispatch_ticket)
+    :precondition
+      (and
+        (consumer_channel_activated ?consumer_agent)
+        (consumer_ready_flag ?consumer_agent)
+        (ticket_active ?dispatch_ticket)
+        (ticket_checkpointed ?dispatch_ticket)
+        (not
+          (entity_commit_recorded ?consumer_agent)
+        )
+      )
+    :effect (entity_commit_recorded ?consumer_agent)
+  )
+  (:action finalize_event_instance
+    :parameters (?event_instance - event_instance ?reallocation_token - reallocation_token ?event_descriptor - event_descriptor)
+    :precondition
+      (and
+        (entity_commit_recorded ?event_instance)
+        (entity_descriptor_binding ?event_instance ?event_descriptor)
+        (reallocation_token_available ?reallocation_token)
+        (not
+          (entity_finalizer_token ?event_instance)
+        )
+      )
+    :effect
+      (and
+        (entity_finalizer_token ?event_instance)
+        (entity_reallocation_token_binding ?event_instance ?reallocation_token)
+        (not
+          (reallocation_token_available ?reallocation_token)
+        )
+      )
+  )
+  (:action reallocate_channel_for_producer
+    :parameters (?producer_agent - producer_agent ?channel_resource - channel_resource ?reallocation_token - reallocation_token)
+    :precondition
+      (and
+        (entity_finalizer_token ?producer_agent)
+        (entity_channel_binding ?producer_agent ?channel_resource)
+        (entity_reallocation_token_binding ?producer_agent ?reallocation_token)
+        (not
+          (entity_allocation_mark ?producer_agent)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_mark ?producer_agent)
+        (channel_available ?channel_resource)
+        (reallocation_token_available ?reallocation_token)
+      )
+  )
+  (:action reallocate_channel_for_consumer
+    :parameters (?consumer_agent - consumer_agent ?channel_resource - channel_resource ?reallocation_token - reallocation_token)
+    :precondition
+      (and
+        (entity_finalizer_token ?consumer_agent)
+        (entity_channel_binding ?consumer_agent ?channel_resource)
+        (entity_reallocation_token_binding ?consumer_agent ?reallocation_token)
+        (not
+          (entity_allocation_mark ?consumer_agent)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_mark ?consumer_agent)
+        (channel_available ?channel_resource)
+        (reallocation_token_available ?reallocation_token)
+      )
+  )
+  (:action reallocate_channel_for_handler
+    :parameters (?handler_agent - handler_agent ?channel_resource - channel_resource ?reallocation_token - reallocation_token)
+    :precondition
+      (and
+        (entity_finalizer_token ?handler_agent)
+        (entity_channel_binding ?handler_agent ?channel_resource)
+        (entity_reallocation_token_binding ?handler_agent ?reallocation_token)
+        (not
+          (entity_allocation_mark ?handler_agent)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_mark ?handler_agent)
+        (channel_available ?channel_resource)
+        (reallocation_token_available ?reallocation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem event_sequence_state_update_problem)
+  (:domain event_sequence_state_update)
+  (:objects producer_agent_1 - producer_agent consumer_agent_1 - consumer_agent handler_agent_1 - handler_agent handler_agent_2 - handler_agent channel_resource_1 - channel_resource channel_resource_2 - channel_resource channel_resource_3 - channel_resource event_descriptor_1 - event_descriptor agent_capability_1 - agent_capability metadata_token_1 - metadata_token producer_channel_instance_1 - producer_channel_instance consumer_channel_instance_1 - consumer_channel_instance dispatch_ticket_1 - dispatch_ticket payload_fragment_1 - payload_fragment payload_fragment_2 - payload_fragment qualifier_tag_1 - qualifier_tag qualifier_tag_2 - qualifier_tag dispatch_attribute_1 - dispatch_attribute dispatch_attribute_2 - dispatch_attribute reallocation_token_1 - reallocation_token optional_feature_1 - optional_feature priority_marker_1 - priority_marker priority_marker_2 - priority_marker finalizer_flag_1 - finalizer_flag)
+  (:init
+    (channel_available channel_resource_1)
+    (channel_available channel_resource_2)
+    (channel_available channel_resource_3)
+    (descriptor_available event_descriptor_1)
+    (capability_available agent_capability_1)
+    (metadata_token_available metadata_token_1)
+    (producer_channel_instance_binding producer_agent_1 producer_channel_instance_1)
+    (consumer_channel_instance_binding consumer_agent_1 consumer_channel_instance_1)
+    (ticket_available dispatch_ticket_1)
+    (payload_fragment_available payload_fragment_1)
+    (payload_fragment_available payload_fragment_2)
+    (handler_assigned_to_producer handler_agent_1 producer_agent_1)
+    (handler_assigned_to_producer handler_agent_2 producer_agent_1)
+    (handler_assigned_to_consumer handler_agent_1 consumer_agent_1)
+    (handler_assigned_to_consumer handler_agent_2 consumer_agent_1)
+    (handler_ticket_association handler_agent_1 dispatch_ticket_1)
+    (handler_ticket_association handler_agent_2 dispatch_ticket_1)
+    (handler_has_payload_fragment handler_agent_1 payload_fragment_1)
+    (handler_has_payload_fragment handler_agent_2 payload_fragment_2)
+    (qualifier_tag_available qualifier_tag_1)
+    (qualifier_tag_available qualifier_tag_2)
+    (dispatch_attribute_available dispatch_attribute_1)
+    (dispatch_attribute_available dispatch_attribute_2)
+    (reallocation_token_available reallocation_token_1)
+    (optional_feature_available optional_feature_1)
+    (priority_marker_available priority_marker_1)
+    (handler_priority_binding handler_agent_1 priority_marker_1)
+    (handler_priority_binding handler_agent_2 priority_marker_2)
+    (finalizer_flag_available finalizer_flag_1)
+  )
+  (:goal
+    (and
+      (entity_allocation_mark producer_agent_1)
+      (entity_allocation_mark consumer_agent_1)
+      (entity_allocation_mark handler_agent_1)
+      (entity_allocation_mark handler_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_event_instance producer_agent_1)
+(register_event_instance consumer_agent_1)
+(register_event_instance handler_agent_1)
+(register_event_instance handler_agent_2)
+(allocate_channel_to_event producer_agent_1 channel_resource_1)
+(allocate_channel_to_event consumer_agent_1 channel_resource_2)
+(allocate_channel_to_event handler_agent_1 channel_resource_3)
+(attach_event_descriptor producer_agent_1 event_descriptor_1)
+(commit_event_descriptor producer_agent_1 event_descriptor_1)
+(attach_metadata_to_producer_channel producer_agent_1 producer_channel_instance_1 metadata_token_1)
+(update_producer_channel_metadata producer_agent_1 producer_channel_instance_1 event_descriptor_1 metadata_token_1)
+(release_event_descriptor producer_agent_1 event_descriptor_1)
+(attach_event_descriptor consumer_agent_1 event_descriptor_1)
+(commit_event_descriptor consumer_agent_1 event_descriptor_1)
+(attach_metadata_to_consumer_channel consumer_agent_1 consumer_channel_instance_1 metadata_token_1)
+(update_consumer_channel_metadata consumer_agent_1 consumer_channel_instance_1 event_descriptor_1 metadata_token_1)
+(assemble_dispatch_ticket_candidate producer_agent_1 consumer_agent_1 producer_channel_instance_1 consumer_channel_instance_1 dispatch_ticket_1)
+(release_event_descriptor consumer_agent_1 event_descriptor_1)
+(attach_event_descriptor producer_agent_1 event_descriptor_1)
+(activate_ticket_checkpoint dispatch_ticket_1 producer_agent_1 event_descriptor_1)
+(signal_producer_commit producer_agent_1 dispatch_ticket_1)
+(signal_consumer_commit consumer_agent_1 dispatch_ticket_1)
+(release_event_descriptor producer_agent_1 event_descriptor_1)
+(attach_event_descriptor handler_agent_1 event_descriptor_1)
+(commit_event_descriptor handler_agent_1 event_descriptor_1)
+(promote_payload_fragment_to_active handler_agent_1 payload_fragment_1 dispatch_ticket_1)
+(prepare_handler_for_fragment_processing handler_agent_1 payload_fragment_1 dispatch_ticket_1 event_descriptor_1)
+(attach_capability_to_event handler_agent_1 agent_capability_1)
+(claim_optional_feature_for_handler handler_agent_1 optional_feature_1)
+(bind_optional_feature_and_prepare_handler handler_agent_1 optional_feature_1 agent_capability_1 payload_fragment_1 dispatch_ticket_1)
+(claim_finalizer_flag_for_handler handler_agent_1 finalizer_flag_1)
+(stage_handler_finalization_phase_a handler_agent_1 finalizer_flag_1 payload_fragment_1 dispatch_ticket_1)
+(finalize_handler_commit handler_agent_1)
+(detach_capability_from_event handler_agent_1 agent_capability_1)
+(release_optional_feature_from_handler handler_agent_1 optional_feature_1)
+(release_finalizer_flag_from_handler handler_agent_1 finalizer_flag_1)
+(finalize_event_instance handler_agent_1 reallocation_token_1 event_descriptor_1)
+(reallocate_channel_for_handler handler_agent_1 channel_resource_3 reallocation_token_1)
+(release_event_descriptor handler_agent_1 event_descriptor_1)
+(allocate_channel_to_event handler_agent_2 channel_resource_3)
+(attach_event_descriptor handler_agent_2 event_descriptor_1)
+(commit_event_descriptor handler_agent_2 event_descriptor_1)
+(promote_payload_fragment_to_active handler_agent_2 payload_fragment_2 dispatch_ticket_1)
+(prepare_handler_for_fragment_processing handler_agent_2 payload_fragment_2 dispatch_ticket_1 event_descriptor_1)
+(attach_capability_to_event handler_agent_2 agent_capability_1)
+(claim_optional_feature_for_handler handler_agent_2 optional_feature_1)
+(bind_optional_feature_and_prepare_handler handler_agent_2 optional_feature_1 agent_capability_1 payload_fragment_2 dispatch_ticket_1)
+(claim_finalizer_flag_for_handler handler_agent_2 finalizer_flag_1)
+(stage_handler_finalization_phase_a handler_agent_2 finalizer_flag_1 payload_fragment_2 dispatch_ticket_1)
+(finalize_handler_commit handler_agent_2)
+(detach_capability_from_event handler_agent_2 agent_capability_1)
+(release_optional_feature_from_handler handler_agent_2 optional_feature_1)
+(release_finalizer_flag_from_handler handler_agent_2 finalizer_flag_1)
+(finalize_event_instance handler_agent_2 reallocation_token_1 event_descriptor_1)
+(reallocate_channel_for_handler handler_agent_2 channel_resource_3 reallocation_token_1)
+(release_event_descriptor handler_agent_2 event_descriptor_1)
+(attach_event_descriptor producer_agent_1 event_descriptor_1)
+(finalize_event_instance producer_agent_1 reallocation_token_1 event_descriptor_1)
+(reallocate_channel_for_producer producer_agent_1 channel_resource_1 reallocation_token_1)
+(attach_event_descriptor consumer_agent_1 event_descriptor_1)
+(finalize_event_instance consumer_agent_1 reallocation_token_1 event_descriptor_1)
+(reallocate_channel_for_consumer consumer_agent_1 channel_resource_2 reallocation_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_zqpxzkgs/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_zqpxzkgs/plan.pddl 
+
+
+--- stderr ---
+

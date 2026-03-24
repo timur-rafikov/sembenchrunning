@@ -1,0 +1,936 @@
+(define (domain domain_entity_model_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_asset_type - object component_type - object deployable_unit_type - object primary_type - object domain_entity_type - primary_type resource_token_type - resource_asset_type operation_descriptor_type - resource_asset_type handler_type - resource_asset_type configuration_profile_type - resource_asset_type policy_type - resource_asset_type credential_type - resource_asset_type plugin_type - resource_asset_type extension_descriptor_type - resource_asset_type asset_type - component_type module_fragment_type - component_type binding_token_type - component_type endpoint_instance - deployable_unit_type endpoint_variant_instance - deployable_unit_type composite_artifact_type - deployable_unit_type subtype_a - domain_entity_type subtype_b - domain_entity_type component_a_instance - subtype_a component_b_instance - subtype_a aggregate_instance - subtype_b)
+  (:predicates
+    (domain_entity_provisioned ?domain_entity - domain_entity_type)
+    (domain_entity_registered ?domain_entity - domain_entity_type)
+    (domain_entity_resource_allocated ?domain_entity - domain_entity_type)
+    (domain_entity_activated ?domain_entity - domain_entity_type)
+    (domain_entity_published ?domain_entity - domain_entity_type)
+    (domain_entity_enrolled ?domain_entity - domain_entity_type)
+    (resource_token_available ?resource_token - resource_token_type)
+    (domain_entity_has_resource ?domain_entity - domain_entity_type ?resource_token - resource_token_type)
+    (operation_descriptor_available ?operation_descriptor - operation_descriptor_type)
+    (operation_bound_to_domain_entity ?domain_entity - domain_entity_type ?operation_descriptor - operation_descriptor_type)
+    (handler_available ?handler - handler_type)
+    (handler_assigned_to_domain_entity ?domain_entity - domain_entity_type ?handler - handler_type)
+    (asset_available ?asset - asset_type)
+    (component_a_attached_asset ?component_a - component_a_instance ?asset - asset_type)
+    (component_b_attached_asset ?component_b - component_b_instance ?asset - asset_type)
+    (component_a_bound_endpoint ?component_a - component_a_instance ?endpoint - endpoint_instance)
+    (endpoint_reserved ?endpoint - endpoint_instance)
+    (endpoint_has_asset ?endpoint - endpoint_instance)
+    (component_a_ready ?component_a - component_a_instance)
+    (component_b_bound_endpoint_variant ?component_b - component_b_instance ?endpoint_variant - endpoint_variant_instance)
+    (endpoint_variant_reserved ?endpoint_variant - endpoint_variant_instance)
+    (endpoint_variant_has_asset ?endpoint_variant - endpoint_variant_instance)
+    (component_b_ready ?component_b - component_b_instance)
+    (composite_artifact_available ?composite_artifact - composite_artifact_type)
+    (composite_artifact_reserved ?composite_artifact - composite_artifact_type)
+    (composite_has_endpoint ?composite_artifact - composite_artifact_type ?endpoint - endpoint_instance)
+    (composite_has_endpoint_variant ?composite_artifact - composite_artifact_type ?endpoint_variant - endpoint_variant_instance)
+    (composite_endpoint_variant_confirmed ?composite_artifact - composite_artifact_type)
+    (composite_endpoint_confirmed ?composite_artifact - composite_artifact_type)
+    (composite_validated ?composite_artifact - composite_artifact_type)
+    (aggregate_has_component_a ?aggregate_instance - aggregate_instance ?component_a - component_a_instance)
+    (aggregate_has_component_b ?aggregate_instance - aggregate_instance ?component_b - component_b_instance)
+    (aggregate_has_composite_artifact ?aggregate_instance - aggregate_instance ?composite_artifact - composite_artifact_type)
+    (module_fragment_available ?module_fragment - module_fragment_type)
+    (aggregate_has_fragment ?aggregate_instance - aggregate_instance ?module_fragment - module_fragment_type)
+    (fragment_committed ?module_fragment - module_fragment_type)
+    (fragment_bound_to_composite ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    (aggregate_fragment_binding_committed ?aggregate_instance - aggregate_instance)
+    (aggregate_extension_stage1 ?aggregate_instance - aggregate_instance)
+    (aggregate_extension_stage2 ?aggregate_instance - aggregate_instance)
+    (aggregate_profile_applied ?aggregate_instance - aggregate_instance)
+    (aggregate_profile_binding_confirmed ?aggregate_instance - aggregate_instance)
+    (aggregate_extension_ready ?aggregate_instance - aggregate_instance)
+    (aggregate_final_checks_passed ?aggregate_instance - aggregate_instance)
+    (binding_token_available ?binding_token - binding_token_type)
+    (aggregate_has_binding_token ?aggregate_instance - aggregate_instance ?binding_token - binding_token_type)
+    (aggregate_binding_registered ?aggregate_instance - aggregate_instance)
+    (aggregate_binding_committed ?aggregate_instance - aggregate_instance)
+    (aggregate_binding_finalized ?aggregate_instance - aggregate_instance)
+    (configuration_profile_available ?configuration_profile - configuration_profile_type)
+    (aggregate_has_configuration_profile ?aggregate_instance - aggregate_instance ?configuration_profile - configuration_profile_type)
+    (policy_available ?policy - policy_type)
+    (aggregate_has_policy ?aggregate_instance - aggregate_instance ?policy - policy_type)
+    (plugin_available ?plugin - plugin_type)
+    (aggregate_has_plugin ?aggregate_instance - aggregate_instance ?plugin - plugin_type)
+    (extension_descriptor_available ?extension_descriptor - extension_descriptor_type)
+    (aggregate_has_extension_descriptor ?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type)
+    (credential_available ?credential - credential_type)
+    (domain_entity_has_credential ?domain_entity - domain_entity_type ?credential - credential_type)
+    (component_a_locked ?component_a - component_a_instance)
+    (component_b_locked ?component_b - component_b_instance)
+    (aggregate_published_flag ?aggregate_instance - aggregate_instance)
+  )
+  (:action provision_domain_entity
+    :parameters (?domain_entity - domain_entity_type)
+    :precondition
+      (and
+        (not
+          (domain_entity_provisioned ?domain_entity)
+        )
+        (not
+          (domain_entity_activated ?domain_entity)
+        )
+      )
+    :effect (domain_entity_provisioned ?domain_entity)
+  )
+  (:action assign_resource_to_domain_entity
+    :parameters (?domain_entity - domain_entity_type ?resource_token - resource_token_type)
+    :precondition
+      (and
+        (domain_entity_provisioned ?domain_entity)
+        (not
+          (domain_entity_resource_allocated ?domain_entity)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (domain_entity_resource_allocated ?domain_entity)
+        (domain_entity_has_resource ?domain_entity ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action bind_operation_to_domain_entity
+    :parameters (?domain_entity - domain_entity_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_provisioned ?domain_entity)
+        (domain_entity_resource_allocated ?domain_entity)
+        (operation_descriptor_available ?operation_descriptor)
+      )
+    :effect
+      (and
+        (operation_bound_to_domain_entity ?domain_entity ?operation_descriptor)
+        (not
+          (operation_descriptor_available ?operation_descriptor)
+        )
+      )
+  )
+  (:action activate_entity_registration
+    :parameters (?domain_entity - domain_entity_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_provisioned ?domain_entity)
+        (domain_entity_resource_allocated ?domain_entity)
+        (operation_bound_to_domain_entity ?domain_entity ?operation_descriptor)
+        (not
+          (domain_entity_registered ?domain_entity)
+        )
+      )
+    :effect (domain_entity_registered ?domain_entity)
+  )
+  (:action unbind_operation_from_entity
+    :parameters (?domain_entity - domain_entity_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (operation_bound_to_domain_entity ?domain_entity ?operation_descriptor)
+      )
+    :effect
+      (and
+        (operation_descriptor_available ?operation_descriptor)
+        (not
+          (operation_bound_to_domain_entity ?domain_entity ?operation_descriptor)
+        )
+      )
+  )
+  (:action assign_handler_to_domain_entity
+    :parameters (?domain_entity - domain_entity_type ?handler - handler_type)
+    :precondition
+      (and
+        (domain_entity_registered ?domain_entity)
+        (handler_available ?handler)
+      )
+    :effect
+      (and
+        (handler_assigned_to_domain_entity ?domain_entity ?handler)
+        (not
+          (handler_available ?handler)
+        )
+      )
+  )
+  (:action unassign_handler_from_entity
+    :parameters (?domain_entity - domain_entity_type ?handler - handler_type)
+    :precondition
+      (and
+        (handler_assigned_to_domain_entity ?domain_entity ?handler)
+      )
+    :effect
+      (and
+        (handler_available ?handler)
+        (not
+          (handler_assigned_to_domain_entity ?domain_entity ?handler)
+        )
+      )
+  )
+  (:action attach_plugin_to_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?plugin - plugin_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (plugin_available ?plugin)
+      )
+    :effect
+      (and
+        (aggregate_has_plugin ?aggregate_instance ?plugin)
+        (not
+          (plugin_available ?plugin)
+        )
+      )
+  )
+  (:action detach_plugin_from_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?plugin - plugin_type)
+    :precondition
+      (and
+        (aggregate_has_plugin ?aggregate_instance ?plugin)
+      )
+    :effect
+      (and
+        (plugin_available ?plugin)
+        (not
+          (aggregate_has_plugin ?aggregate_instance ?plugin)
+        )
+      )
+  )
+  (:action attach_extension_descriptor_to_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (extension_descriptor_available ?extension_descriptor)
+      )
+    :effect
+      (and
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (not
+          (extension_descriptor_available ?extension_descriptor)
+        )
+      )
+  )
+  (:action detach_extension_from_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type)
+    :precondition
+      (and
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+      )
+    :effect
+      (and
+        (extension_descriptor_available ?extension_descriptor)
+        (not
+          (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        )
+      )
+  )
+  (:action reserve_endpoint_for_component_a
+    :parameters (?component_a - component_a_instance ?endpoint - endpoint_instance ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_a)
+        (operation_bound_to_domain_entity ?component_a ?operation_descriptor)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (not
+          (endpoint_reserved ?endpoint)
+        )
+        (not
+          (endpoint_has_asset ?endpoint)
+        )
+      )
+    :effect (endpoint_reserved ?endpoint)
+  )
+  (:action confirm_endpoint_reservation_for_component_a
+    :parameters (?component_a - component_a_instance ?endpoint - endpoint_instance ?handler - handler_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_a)
+        (handler_assigned_to_domain_entity ?component_a ?handler)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (endpoint_reserved ?endpoint)
+        (not
+          (component_a_locked ?component_a)
+        )
+      )
+    :effect
+      (and
+        (component_a_locked ?component_a)
+        (component_a_ready ?component_a)
+      )
+  )
+  (:action attach_asset_to_endpoint_for_component_a
+    :parameters (?component_a - component_a_instance ?endpoint - endpoint_instance ?asset - asset_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_a)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (asset_available ?asset)
+        (not
+          (component_a_locked ?component_a)
+        )
+      )
+    :effect
+      (and
+        (endpoint_has_asset ?endpoint)
+        (component_a_locked ?component_a)
+        (component_a_attached_asset ?component_a ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action finalize_endpoint_asset_exchange_component_a
+    :parameters (?component_a - component_a_instance ?endpoint - endpoint_instance ?operation_descriptor - operation_descriptor_type ?asset - asset_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_a)
+        (operation_bound_to_domain_entity ?component_a ?operation_descriptor)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (endpoint_has_asset ?endpoint)
+        (component_a_attached_asset ?component_a ?asset)
+        (not
+          (component_a_ready ?component_a)
+        )
+      )
+    :effect
+      (and
+        (endpoint_reserved ?endpoint)
+        (component_a_ready ?component_a)
+        (asset_available ?asset)
+        (not
+          (component_a_attached_asset ?component_a ?asset)
+        )
+      )
+  )
+  (:action reserve_endpoint_for_component_b
+    :parameters (?component_b - component_b_instance ?endpoint_variant - endpoint_variant_instance ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_b)
+        (operation_bound_to_domain_entity ?component_b ?operation_descriptor)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (not
+          (endpoint_variant_reserved ?endpoint_variant)
+        )
+        (not
+          (endpoint_variant_has_asset ?endpoint_variant)
+        )
+      )
+    :effect (endpoint_variant_reserved ?endpoint_variant)
+  )
+  (:action confirm_endpoint_reservation_for_component_b
+    :parameters (?component_b - component_b_instance ?endpoint_variant - endpoint_variant_instance ?handler - handler_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_b)
+        (handler_assigned_to_domain_entity ?component_b ?handler)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_variant_reserved ?endpoint_variant)
+        (not
+          (component_b_locked ?component_b)
+        )
+      )
+    :effect
+      (and
+        (component_b_locked ?component_b)
+        (component_b_ready ?component_b)
+      )
+  )
+  (:action attach_asset_to_endpoint_for_component_b
+    :parameters (?component_b - component_b_instance ?endpoint_variant - endpoint_variant_instance ?asset - asset_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_b)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (asset_available ?asset)
+        (not
+          (component_b_locked ?component_b)
+        )
+      )
+    :effect
+      (and
+        (endpoint_variant_has_asset ?endpoint_variant)
+        (component_b_locked ?component_b)
+        (component_b_attached_asset ?component_b ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action finalize_endpoint_asset_exchange_component_b
+    :parameters (?component_b - component_b_instance ?endpoint_variant - endpoint_variant_instance ?operation_descriptor - operation_descriptor_type ?asset - asset_type)
+    :precondition
+      (and
+        (domain_entity_registered ?component_b)
+        (operation_bound_to_domain_entity ?component_b ?operation_descriptor)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_variant_has_asset ?endpoint_variant)
+        (component_b_attached_asset ?component_b ?asset)
+        (not
+          (component_b_ready ?component_b)
+        )
+      )
+    :effect
+      (and
+        (endpoint_variant_reserved ?endpoint_variant)
+        (component_b_ready ?component_b)
+        (asset_available ?asset)
+        (not
+          (component_b_attached_asset ?component_b ?asset)
+        )
+      )
+  )
+  (:action assemble_composite_artifact
+    :parameters (?component_a - component_a_instance ?component_b - component_b_instance ?endpoint - endpoint_instance ?endpoint_variant - endpoint_variant_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_a_locked ?component_a)
+        (component_b_locked ?component_b)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_reserved ?endpoint)
+        (endpoint_variant_reserved ?endpoint_variant)
+        (component_a_ready ?component_a)
+        (component_b_ready ?component_b)
+        (composite_artifact_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_has_endpoint ?composite_artifact ?endpoint)
+        (composite_has_endpoint_variant ?composite_artifact ?endpoint_variant)
+        (not
+          (composite_artifact_available ?composite_artifact)
+        )
+      )
+  )
+  (:action assemble_composite_with_endpoint_asset
+    :parameters (?component_a - component_a_instance ?component_b - component_b_instance ?endpoint - endpoint_instance ?endpoint_variant - endpoint_variant_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_a_locked ?component_a)
+        (component_b_locked ?component_b)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_has_asset ?endpoint)
+        (endpoint_variant_reserved ?endpoint_variant)
+        (not
+          (component_a_ready ?component_a)
+        )
+        (component_b_ready ?component_b)
+        (composite_artifact_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_has_endpoint ?composite_artifact ?endpoint)
+        (composite_has_endpoint_variant ?composite_artifact ?endpoint_variant)
+        (composite_endpoint_variant_confirmed ?composite_artifact)
+        (not
+          (composite_artifact_available ?composite_artifact)
+        )
+      )
+  )
+  (:action assemble_composite_with_endpoint_reservation
+    :parameters (?component_a - component_a_instance ?component_b - component_b_instance ?endpoint - endpoint_instance ?endpoint_variant - endpoint_variant_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_a_locked ?component_a)
+        (component_b_locked ?component_b)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_reserved ?endpoint)
+        (endpoint_variant_has_asset ?endpoint_variant)
+        (component_a_ready ?component_a)
+        (not
+          (component_b_ready ?component_b)
+        )
+        (composite_artifact_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_has_endpoint ?composite_artifact ?endpoint)
+        (composite_has_endpoint_variant ?composite_artifact ?endpoint_variant)
+        (composite_endpoint_confirmed ?composite_artifact)
+        (not
+          (composite_artifact_available ?composite_artifact)
+        )
+      )
+  )
+  (:action finalize_composite_assembly
+    :parameters (?component_a - component_a_instance ?component_b - component_b_instance ?endpoint - endpoint_instance ?endpoint_variant - endpoint_variant_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_a_locked ?component_a)
+        (component_b_locked ?component_b)
+        (component_a_bound_endpoint ?component_a ?endpoint)
+        (component_b_bound_endpoint_variant ?component_b ?endpoint_variant)
+        (endpoint_has_asset ?endpoint)
+        (endpoint_variant_has_asset ?endpoint_variant)
+        (not
+          (component_a_ready ?component_a)
+        )
+        (not
+          (component_b_ready ?component_b)
+        )
+        (composite_artifact_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_has_endpoint ?composite_artifact ?endpoint)
+        (composite_has_endpoint_variant ?composite_artifact ?endpoint_variant)
+        (composite_endpoint_variant_confirmed ?composite_artifact)
+        (composite_endpoint_confirmed ?composite_artifact)
+        (not
+          (composite_artifact_available ?composite_artifact)
+        )
+      )
+  )
+  (:action validate_composite_artifact
+    :parameters (?composite_artifact - composite_artifact_type ?component_a - component_a_instance ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (composite_artifact_reserved ?composite_artifact)
+        (component_a_locked ?component_a)
+        (operation_bound_to_domain_entity ?component_a ?operation_descriptor)
+        (not
+          (composite_validated ?composite_artifact)
+        )
+      )
+    :effect (composite_validated ?composite_artifact)
+  )
+  (:action install_module_fragment
+    :parameters (?aggregate_instance - aggregate_instance ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (aggregate_has_composite_artifact ?aggregate_instance ?composite_artifact)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (module_fragment_available ?module_fragment)
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_validated ?composite_artifact)
+        (not
+          (fragment_committed ?module_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_committed ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (not
+          (module_fragment_available ?module_fragment)
+        )
+      )
+  )
+  (:action enable_fragment_on_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_committed ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (operation_bound_to_domain_entity ?aggregate_instance ?operation_descriptor)
+        (not
+          (composite_endpoint_variant_confirmed ?composite_artifact)
+        )
+        (not
+          (aggregate_fragment_binding_committed ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_fragment_binding_committed ?aggregate_instance)
+  )
+  (:action apply_configuration_profile_to_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?configuration_profile - configuration_profile_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (aggregate_profile_applied ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_profile_applied ?aggregate_instance)
+        (aggregate_has_configuration_profile ?aggregate_instance ?configuration_profile)
+        (not
+          (configuration_profile_available ?configuration_profile)
+        )
+      )
+  )
+  (:action confirm_profile_and_fragment_binding
+    :parameters (?aggregate_instance - aggregate_instance ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type ?operation_descriptor - operation_descriptor_type ?configuration_profile - configuration_profile_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_committed ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (operation_bound_to_domain_entity ?aggregate_instance ?operation_descriptor)
+        (composite_endpoint_variant_confirmed ?composite_artifact)
+        (aggregate_profile_applied ?aggregate_instance)
+        (aggregate_has_configuration_profile ?aggregate_instance ?configuration_profile)
+        (not
+          (aggregate_fragment_binding_committed ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_fragment_binding_committed ?aggregate_instance)
+        (aggregate_profile_binding_confirmed ?aggregate_instance)
+      )
+  )
+  (:action initiate_plugin_attachment_stage1
+    :parameters (?aggregate_instance - aggregate_instance ?plugin - plugin_type ?handler - handler_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_fragment_binding_committed ?aggregate_instance)
+        (aggregate_has_plugin ?aggregate_instance ?plugin)
+        (handler_assigned_to_domain_entity ?aggregate_instance ?handler)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (not
+          (composite_endpoint_confirmed ?composite_artifact)
+        )
+        (not
+          (aggregate_extension_stage1 ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_extension_stage1 ?aggregate_instance)
+  )
+  (:action initiate_plugin_attachment_stage1_with_confirmation
+    :parameters (?aggregate_instance - aggregate_instance ?plugin - plugin_type ?handler - handler_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_fragment_binding_committed ?aggregate_instance)
+        (aggregate_has_plugin ?aggregate_instance ?plugin)
+        (handler_assigned_to_domain_entity ?aggregate_instance ?handler)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (composite_endpoint_confirmed ?composite_artifact)
+        (not
+          (aggregate_extension_stage1 ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_extension_stage1 ?aggregate_instance)
+  )
+  (:action activate_plugin_stage2
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_extension_stage1 ?aggregate_instance)
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (not
+          (composite_endpoint_variant_confirmed ?composite_artifact)
+        )
+        (not
+          (composite_endpoint_confirmed ?composite_artifact)
+        )
+        (not
+          (aggregate_extension_stage2 ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_extension_stage2 ?aggregate_instance)
+  )
+  (:action activate_plugin_stage2_with_variant_confirmation
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_extension_stage1 ?aggregate_instance)
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (composite_endpoint_variant_confirmed ?composite_artifact)
+        (not
+          (composite_endpoint_confirmed ?composite_artifact)
+        )
+        (not
+          (aggregate_extension_stage2 ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_extension_ready ?aggregate_instance)
+      )
+  )
+  (:action activate_plugin_stage2_variant_alternate
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_extension_stage1 ?aggregate_instance)
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (not
+          (composite_endpoint_variant_confirmed ?composite_artifact)
+        )
+        (composite_endpoint_confirmed ?composite_artifact)
+        (not
+          (aggregate_extension_stage2 ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_extension_ready ?aggregate_instance)
+      )
+  )
+  (:action activate_plugin_stage2_variant_finalization
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type ?module_fragment - module_fragment_type ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (aggregate_extension_stage1 ?aggregate_instance)
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (aggregate_has_fragment ?aggregate_instance ?module_fragment)
+        (fragment_bound_to_composite ?module_fragment ?composite_artifact)
+        (composite_endpoint_variant_confirmed ?composite_artifact)
+        (composite_endpoint_confirmed ?composite_artifact)
+        (not
+          (aggregate_extension_stage2 ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_extension_ready ?aggregate_instance)
+      )
+  )
+  (:action publish_aggregate
+    :parameters (?aggregate_instance - aggregate_instance)
+    :precondition
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (not
+          (aggregate_extension_ready ?aggregate_instance)
+        )
+        (not
+          (aggregate_published_flag ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_published_flag ?aggregate_instance)
+        (domain_entity_published ?aggregate_instance)
+      )
+  )
+  (:action attach_policy_to_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?policy - policy_type)
+    :precondition
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_extension_ready ?aggregate_instance)
+        (policy_available ?policy)
+      )
+    :effect
+      (and
+        (aggregate_has_policy ?aggregate_instance ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action finalize_aggregate_activation
+    :parameters (?aggregate_instance - aggregate_instance ?component_a - component_a_instance ?component_b - component_b_instance ?operation_descriptor - operation_descriptor_type ?policy - policy_type)
+    :precondition
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_extension_ready ?aggregate_instance)
+        (aggregate_has_policy ?aggregate_instance ?policy)
+        (aggregate_has_component_a ?aggregate_instance ?component_a)
+        (aggregate_has_component_b ?aggregate_instance ?component_b)
+        (component_a_ready ?component_a)
+        (component_b_ready ?component_b)
+        (operation_bound_to_domain_entity ?aggregate_instance ?operation_descriptor)
+        (not
+          (aggregate_final_checks_passed ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_final_checks_passed ?aggregate_instance)
+  )
+  (:action finalize_and_publish_aggregate
+    :parameters (?aggregate_instance - aggregate_instance)
+    :precondition
+      (and
+        (aggregate_extension_stage2 ?aggregate_instance)
+        (aggregate_final_checks_passed ?aggregate_instance)
+        (not
+          (aggregate_published_flag ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_published_flag ?aggregate_instance)
+        (domain_entity_published ?aggregate_instance)
+      )
+  )
+  (:action register_binding_token_on_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?binding_token - binding_token_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_registered ?aggregate_instance)
+        (operation_bound_to_domain_entity ?aggregate_instance ?operation_descriptor)
+        (binding_token_available ?binding_token)
+        (aggregate_has_binding_token ?aggregate_instance ?binding_token)
+        (not
+          (aggregate_binding_registered ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_binding_registered ?aggregate_instance)
+        (not
+          (binding_token_available ?binding_token)
+        )
+      )
+  )
+  (:action commit_binding_with_handler
+    :parameters (?aggregate_instance - aggregate_instance ?handler - handler_type)
+    :precondition
+      (and
+        (aggregate_binding_registered ?aggregate_instance)
+        (handler_assigned_to_domain_entity ?aggregate_instance ?handler)
+        (not
+          (aggregate_binding_committed ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_binding_committed ?aggregate_instance)
+  )
+  (:action finalize_binding_with_extension
+    :parameters (?aggregate_instance - aggregate_instance ?extension_descriptor - extension_descriptor_type)
+    :precondition
+      (and
+        (aggregate_binding_committed ?aggregate_instance)
+        (aggregate_has_extension_descriptor ?aggregate_instance ?extension_descriptor)
+        (not
+          (aggregate_binding_finalized ?aggregate_instance)
+        )
+      )
+    :effect (aggregate_binding_finalized ?aggregate_instance)
+  )
+  (:action publish_aggregate_from_binding
+    :parameters (?aggregate_instance - aggregate_instance)
+    :precondition
+      (and
+        (aggregate_binding_finalized ?aggregate_instance)
+        (not
+          (aggregate_published_flag ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (aggregate_published_flag ?aggregate_instance)
+        (domain_entity_published ?aggregate_instance)
+      )
+  )
+  (:action publish_component_a
+    :parameters (?component_a - component_a_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_a_locked ?component_a)
+        (component_a_ready ?component_a)
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_validated ?composite_artifact)
+        (not
+          (domain_entity_published ?component_a)
+        )
+      )
+    :effect (domain_entity_published ?component_a)
+  )
+  (:action publish_component_b
+    :parameters (?component_b - component_b_instance ?composite_artifact - composite_artifact_type)
+    :precondition
+      (and
+        (component_b_locked ?component_b)
+        (component_b_ready ?component_b)
+        (composite_artifact_reserved ?composite_artifact)
+        (composite_validated ?composite_artifact)
+        (not
+          (domain_entity_published ?component_b)
+        )
+      )
+    :effect (domain_entity_published ?component_b)
+  )
+  (:action enroll_credential_for_entity
+    :parameters (?domain_entity - domain_entity_type ?credential - credential_type ?operation_descriptor - operation_descriptor_type)
+    :precondition
+      (and
+        (domain_entity_published ?domain_entity)
+        (operation_bound_to_domain_entity ?domain_entity ?operation_descriptor)
+        (credential_available ?credential)
+        (not
+          (domain_entity_enrolled ?domain_entity)
+        )
+      )
+    :effect
+      (and
+        (domain_entity_enrolled ?domain_entity)
+        (domain_entity_has_credential ?domain_entity ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action finalize_activation_component_a
+    :parameters (?component_a - component_a_instance ?resource_token - resource_token_type ?credential - credential_type)
+    :precondition
+      (and
+        (domain_entity_enrolled ?component_a)
+        (domain_entity_has_resource ?component_a ?resource_token)
+        (domain_entity_has_credential ?component_a ?credential)
+        (not
+          (domain_entity_activated ?component_a)
+        )
+      )
+    :effect
+      (and
+        (domain_entity_activated ?component_a)
+        (resource_token_available ?resource_token)
+        (credential_available ?credential)
+      )
+  )
+  (:action finalize_activation_component_b
+    :parameters (?component_b - component_b_instance ?resource_token - resource_token_type ?credential - credential_type)
+    :precondition
+      (and
+        (domain_entity_enrolled ?component_b)
+        (domain_entity_has_resource ?component_b ?resource_token)
+        (domain_entity_has_credential ?component_b ?credential)
+        (not
+          (domain_entity_activated ?component_b)
+        )
+      )
+    :effect
+      (and
+        (domain_entity_activated ?component_b)
+        (resource_token_available ?resource_token)
+        (credential_available ?credential)
+      )
+  )
+  (:action finalize_activation_aggregate
+    :parameters (?aggregate_instance - aggregate_instance ?resource_token - resource_token_type ?credential - credential_type)
+    :precondition
+      (and
+        (domain_entity_enrolled ?aggregate_instance)
+        (domain_entity_has_resource ?aggregate_instance ?resource_token)
+        (domain_entity_has_credential ?aggregate_instance ?credential)
+        (not
+          (domain_entity_activated ?aggregate_instance)
+        )
+      )
+    :effect
+      (and
+        (domain_entity_activated ?aggregate_instance)
+        (resource_token_available ?resource_token)
+        (credential_available ?credential)
+      )
+  )
+)

@@ -1,0 +1,1007 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain lost_shipment_trace_and_recovery_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object document_resource - object checkpoint_resource_group - object case_category - object entity_record - case_category investigation_resource - operational_resource tracking_source - operational_resource carrier_contact - operational_resource escalation_template - operational_resource authorization_credential - operational_resource loss_cause_code - operational_resource insurance_policy - operational_resource external_authority - operational_resource contingency_option - document_resource evidence_document - document_resource claim_reference - document_resource origin_checkpoint - checkpoint_resource_group destination_checkpoint - checkpoint_resource_group recovery_shipment - checkpoint_resource_group logistics_actor - entity_record support_party_group - entity_record origin_logistics_actor - logistics_actor destination_logistics_actor - logistics_actor operations_center - support_party_group)
+  (:predicates
+    (shipment_case_opened ?shipment_case - entity_record)
+    (entity_validated ?shipment_case - entity_record)
+    (entity_investigation_assigned ?shipment_case - entity_record)
+    (recovery_action_initiated ?shipment_case - entity_record)
+    (entity_closure_recorded ?shipment_case - entity_record)
+    (entity_claim_initiated ?shipment_case - entity_record)
+    (investigation_resource_available ?investigation_resource - investigation_resource)
+    (entity_assigned_investigation_resource ?shipment_case - entity_record ?investigation_resource - investigation_resource)
+    (tracking_source_available ?tracking_source - tracking_source)
+    (entity_has_tracking_source ?shipment_case - entity_record ?tracking_source - tracking_source)
+    (carrier_contact_available ?carrier_contact - carrier_contact)
+    (entity_assigned_carrier_contact ?shipment_case - entity_record ?carrier_contact - carrier_contact)
+    (contingency_option_available ?contingency_option - contingency_option)
+    (origin_actor_assigned_contingency_option ?origin_actor - origin_logistics_actor ?contingency_option - contingency_option)
+    (destination_actor_assigned_contingency_option ?destination_actor - destination_logistics_actor ?contingency_option - contingency_option)
+    (origin_actor_has_checkpoint ?origin_actor - origin_logistics_actor ?origin_checkpoint - origin_checkpoint)
+    (origin_checkpoint_verified ?origin_checkpoint - origin_checkpoint)
+    (origin_checkpoint_flagged_for_contingency ?origin_checkpoint - origin_checkpoint)
+    (origin_actor_recovery_ready ?origin_actor - origin_logistics_actor)
+    (destination_actor_has_checkpoint ?destination_actor - destination_logistics_actor ?destination_checkpoint - destination_checkpoint)
+    (destination_checkpoint_verified ?destination_checkpoint - destination_checkpoint)
+    (destination_checkpoint_flagged_for_contingency ?destination_checkpoint - destination_checkpoint)
+    (destination_actor_recovery_ready ?destination_actor - destination_logistics_actor)
+    (recovery_shipment_pending ?recovery_shipment - recovery_shipment)
+    (recovery_shipment_created ?recovery_shipment - recovery_shipment)
+    (recovery_shipment_assigned_origin_checkpoint ?recovery_shipment - recovery_shipment ?origin_checkpoint - origin_checkpoint)
+    (recovery_shipment_assigned_destination_checkpoint ?recovery_shipment - recovery_shipment ?destination_checkpoint - destination_checkpoint)
+    (recovery_shipment_origin_requires_authorization ?recovery_shipment - recovery_shipment)
+    (recovery_shipment_destination_requires_authorization ?recovery_shipment - recovery_shipment)
+    (recovery_shipment_origin_checkin_complete ?recovery_shipment - recovery_shipment)
+    (operations_center_manages_origin_actor ?operations_center - operations_center ?origin_actor - origin_logistics_actor)
+    (operations_center_manages_destination_actor ?operations_center - operations_center ?destination_actor - destination_logistics_actor)
+    (operations_center_has_recovery_shipment ?operations_center - operations_center ?recovery_shipment - recovery_shipment)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (operations_center_has_evidence_document ?operations_center - operations_center ?evidence_document - evidence_document)
+    (evidence_document_attached ?evidence_document - evidence_document)
+    (evidence_document_linked_to_recovery_shipment ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    (operations_center_documentation_initiated ?operations_center - operations_center)
+    (operations_center_documents_reviewed ?operations_center - operations_center)
+    (operations_center_finalization_pending ?operations_center - operations_center)
+    (operations_center_has_escalation_template ?operations_center - operations_center)
+    (operations_center_escalation_triggered ?operations_center - operations_center)
+    (operations_center_authorizations_collected ?operations_center - operations_center)
+    (operations_center_approval_recorded ?operations_center - operations_center)
+    (claim_reference_available ?claim_reference - claim_reference)
+    (operations_center_has_claim_reference ?operations_center - operations_center ?claim_reference - claim_reference)
+    (operations_center_claim_registered ?operations_center - operations_center)
+    (operations_center_claim_process_started ?operations_center - operations_center)
+    (operations_center_claim_authorized ?operations_center - operations_center)
+    (escalation_template_available ?escalation_template - escalation_template)
+    (operations_center_assigned_escalation_template ?operations_center - operations_center ?escalation_template - escalation_template)
+    (authorization_credential_available ?authorization_credential - authorization_credential)
+    (operations_center_has_authorization_credential ?operations_center - operations_center ?authorization_credential - authorization_credential)
+    (insurance_policy_available ?insurance_policy - insurance_policy)
+    (operations_center_has_insurance_policy ?operations_center - operations_center ?insurance_policy - insurance_policy)
+    (external_authority_available ?external_authority - external_authority)
+    (operations_center_has_external_authority_contact ?operations_center - operations_center ?external_authority - external_authority)
+    (loss_cause_code_available ?loss_cause_code - loss_cause_code)
+    (entity_has_loss_cause_code ?shipment_case - entity_record ?loss_cause_code - loss_cause_code)
+    (origin_actor_activated ?origin_actor - origin_logistics_actor)
+    (destination_actor_activated ?destination_actor - destination_logistics_actor)
+    (operations_center_case_closed ?operations_center - operations_center)
+  )
+  (:action open_shipment_case
+    :parameters (?shipment_case - entity_record)
+    :precondition
+      (and
+        (not
+          (shipment_case_opened ?shipment_case)
+        )
+        (not
+          (recovery_action_initiated ?shipment_case)
+        )
+      )
+    :effect (shipment_case_opened ?shipment_case)
+  )
+  (:action assign_investigation_resource
+    :parameters (?shipment_case - entity_record ?investigation_resource - investigation_resource)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (not
+          (entity_investigation_assigned ?shipment_case)
+        )
+        (investigation_resource_available ?investigation_resource)
+      )
+    :effect
+      (and
+        (entity_investigation_assigned ?shipment_case)
+        (entity_assigned_investigation_resource ?shipment_case ?investigation_resource)
+        (not
+          (investigation_resource_available ?investigation_resource)
+        )
+      )
+  )
+  (:action attach_tracking_source_to_case
+    :parameters (?shipment_case - entity_record ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (entity_investigation_assigned ?shipment_case)
+        (tracking_source_available ?tracking_source)
+      )
+    :effect
+      (and
+        (entity_has_tracking_source ?shipment_case ?tracking_source)
+        (not
+          (tracking_source_available ?tracking_source)
+        )
+      )
+  )
+  (:action confirm_tracking_evidence_for_case
+    :parameters (?shipment_case - entity_record ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (shipment_case_opened ?shipment_case)
+        (entity_investigation_assigned ?shipment_case)
+        (entity_has_tracking_source ?shipment_case ?tracking_source)
+        (not
+          (entity_validated ?shipment_case)
+        )
+      )
+    :effect (entity_validated ?shipment_case)
+  )
+  (:action release_tracking_source
+    :parameters (?shipment_case - entity_record ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_has_tracking_source ?shipment_case ?tracking_source)
+      )
+    :effect
+      (and
+        (tracking_source_available ?tracking_source)
+        (not
+          (entity_has_tracking_source ?shipment_case ?tracking_source)
+        )
+      )
+  )
+  (:action assign_carrier_contact_to_case
+    :parameters (?shipment_case - entity_record ?carrier_contact - carrier_contact)
+    :precondition
+      (and
+        (entity_validated ?shipment_case)
+        (carrier_contact_available ?carrier_contact)
+      )
+    :effect
+      (and
+        (entity_assigned_carrier_contact ?shipment_case ?carrier_contact)
+        (not
+          (carrier_contact_available ?carrier_contact)
+        )
+      )
+  )
+  (:action release_carrier_contact_from_case
+    :parameters (?shipment_case - entity_record ?carrier_contact - carrier_contact)
+    :precondition
+      (and
+        (entity_assigned_carrier_contact ?shipment_case ?carrier_contact)
+      )
+    :effect
+      (and
+        (carrier_contact_available ?carrier_contact)
+        (not
+          (entity_assigned_carrier_contact ?shipment_case ?carrier_contact)
+        )
+      )
+  )
+  (:action assign_insurance_policy_to_ops_center
+    :parameters (?operations_center - operations_center ?insurance_policy - insurance_policy)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (insurance_policy_available ?insurance_policy)
+      )
+    :effect
+      (and
+        (operations_center_has_insurance_policy ?operations_center ?insurance_policy)
+        (not
+          (insurance_policy_available ?insurance_policy)
+        )
+      )
+  )
+  (:action release_insurance_policy_from_ops_center
+    :parameters (?operations_center - operations_center ?insurance_policy - insurance_policy)
+    :precondition
+      (and
+        (operations_center_has_insurance_policy ?operations_center ?insurance_policy)
+      )
+    :effect
+      (and
+        (insurance_policy_available ?insurance_policy)
+        (not
+          (operations_center_has_insurance_policy ?operations_center ?insurance_policy)
+        )
+      )
+  )
+  (:action assign_external_authority_contact
+    :parameters (?operations_center - operations_center ?external_authority - external_authority)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (external_authority_available ?external_authority)
+      )
+    :effect
+      (and
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (not
+          (external_authority_available ?external_authority)
+        )
+      )
+  )
+  (:action release_external_authority_contact
+    :parameters (?operations_center - operations_center ?external_authority - external_authority)
+    :precondition
+      (and
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+      )
+    :effect
+      (and
+        (external_authority_available ?external_authority)
+        (not
+          (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        )
+      )
+  )
+  (:action verify_origin_checkpoint_with_tracking
+    :parameters (?origin_actor - origin_logistics_actor ?origin_checkpoint - origin_checkpoint ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_validated ?origin_actor)
+        (entity_has_tracking_source ?origin_actor ?tracking_source)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (not
+          (origin_checkpoint_verified ?origin_checkpoint)
+        )
+        (not
+          (origin_checkpoint_flagged_for_contingency ?origin_checkpoint)
+        )
+      )
+    :effect (origin_checkpoint_verified ?origin_checkpoint)
+  )
+  (:action acknowledge_origin_recovery_readiness
+    :parameters (?origin_actor - origin_logistics_actor ?origin_checkpoint - origin_checkpoint ?carrier_contact - carrier_contact)
+    :precondition
+      (and
+        (entity_validated ?origin_actor)
+        (entity_assigned_carrier_contact ?origin_actor ?carrier_contact)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (origin_checkpoint_verified ?origin_checkpoint)
+        (not
+          (origin_actor_activated ?origin_actor)
+        )
+      )
+    :effect
+      (and
+        (origin_actor_activated ?origin_actor)
+        (origin_actor_recovery_ready ?origin_actor)
+      )
+  )
+  (:action assign_contingency_option_to_origin_actor
+    :parameters (?origin_actor - origin_logistics_actor ?origin_checkpoint - origin_checkpoint ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (entity_validated ?origin_actor)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (contingency_option_available ?contingency_option)
+        (not
+          (origin_actor_activated ?origin_actor)
+        )
+      )
+    :effect
+      (and
+        (origin_checkpoint_flagged_for_contingency ?origin_checkpoint)
+        (origin_actor_activated ?origin_actor)
+        (origin_actor_assigned_contingency_option ?origin_actor ?contingency_option)
+        (not
+          (contingency_option_available ?contingency_option)
+        )
+      )
+  )
+  (:action finalize_origin_checkpoint_contingency
+    :parameters (?origin_actor - origin_logistics_actor ?origin_checkpoint - origin_checkpoint ?tracking_source - tracking_source ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (entity_validated ?origin_actor)
+        (entity_has_tracking_source ?origin_actor ?tracking_source)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (origin_checkpoint_flagged_for_contingency ?origin_checkpoint)
+        (origin_actor_assigned_contingency_option ?origin_actor ?contingency_option)
+        (not
+          (origin_actor_recovery_ready ?origin_actor)
+        )
+      )
+    :effect
+      (and
+        (origin_checkpoint_verified ?origin_checkpoint)
+        (origin_actor_recovery_ready ?origin_actor)
+        (contingency_option_available ?contingency_option)
+        (not
+          (origin_actor_assigned_contingency_option ?origin_actor ?contingency_option)
+        )
+      )
+  )
+  (:action verify_destination_checkpoint_with_tracking
+    :parameters (?destination_actor - destination_logistics_actor ?destination_checkpoint - destination_checkpoint ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_validated ?destination_actor)
+        (entity_has_tracking_source ?destination_actor ?tracking_source)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (not
+          (destination_checkpoint_verified ?destination_checkpoint)
+        )
+        (not
+          (destination_checkpoint_flagged_for_contingency ?destination_checkpoint)
+        )
+      )
+    :effect (destination_checkpoint_verified ?destination_checkpoint)
+  )
+  (:action acknowledge_destination_recovery_readiness
+    :parameters (?destination_actor - destination_logistics_actor ?destination_checkpoint - destination_checkpoint ?carrier_contact - carrier_contact)
+    :precondition
+      (and
+        (entity_validated ?destination_actor)
+        (entity_assigned_carrier_contact ?destination_actor ?carrier_contact)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (destination_checkpoint_verified ?destination_checkpoint)
+        (not
+          (destination_actor_activated ?destination_actor)
+        )
+      )
+    :effect
+      (and
+        (destination_actor_activated ?destination_actor)
+        (destination_actor_recovery_ready ?destination_actor)
+      )
+  )
+  (:action assign_contingency_option_to_destination_actor
+    :parameters (?destination_actor - destination_logistics_actor ?destination_checkpoint - destination_checkpoint ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (entity_validated ?destination_actor)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (contingency_option_available ?contingency_option)
+        (not
+          (destination_actor_activated ?destination_actor)
+        )
+      )
+    :effect
+      (and
+        (destination_checkpoint_flagged_for_contingency ?destination_checkpoint)
+        (destination_actor_activated ?destination_actor)
+        (destination_actor_assigned_contingency_option ?destination_actor ?contingency_option)
+        (not
+          (contingency_option_available ?contingency_option)
+        )
+      )
+  )
+  (:action finalize_destination_checkpoint_contingency
+    :parameters (?destination_actor - destination_logistics_actor ?destination_checkpoint - destination_checkpoint ?tracking_source - tracking_source ?contingency_option - contingency_option)
+    :precondition
+      (and
+        (entity_validated ?destination_actor)
+        (entity_has_tracking_source ?destination_actor ?tracking_source)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (destination_checkpoint_flagged_for_contingency ?destination_checkpoint)
+        (destination_actor_assigned_contingency_option ?destination_actor ?contingency_option)
+        (not
+          (destination_actor_recovery_ready ?destination_actor)
+        )
+      )
+    :effect
+      (and
+        (destination_checkpoint_verified ?destination_checkpoint)
+        (destination_actor_recovery_ready ?destination_actor)
+        (contingency_option_available ?contingency_option)
+        (not
+          (destination_actor_assigned_contingency_option ?destination_actor ?contingency_option)
+        )
+      )
+  )
+  (:action instantiate_recovery_shipment_standard
+    :parameters (?origin_actor - origin_logistics_actor ?destination_actor - destination_logistics_actor ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (origin_actor_activated ?origin_actor)
+        (destination_actor_activated ?destination_actor)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (origin_checkpoint_verified ?origin_checkpoint)
+        (destination_checkpoint_verified ?destination_checkpoint)
+        (origin_actor_recovery_ready ?origin_actor)
+        (destination_actor_recovery_ready ?destination_actor)
+        (recovery_shipment_pending ?recovery_shipment)
+      )
+    :effect
+      (and
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_assigned_origin_checkpoint ?recovery_shipment ?origin_checkpoint)
+        (recovery_shipment_assigned_destination_checkpoint ?recovery_shipment ?destination_checkpoint)
+        (not
+          (recovery_shipment_pending ?recovery_shipment)
+        )
+      )
+  )
+  (:action instantiate_recovery_shipment_origin_requires_authorization
+    :parameters (?origin_actor - origin_logistics_actor ?destination_actor - destination_logistics_actor ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (origin_actor_activated ?origin_actor)
+        (destination_actor_activated ?destination_actor)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (origin_checkpoint_flagged_for_contingency ?origin_checkpoint)
+        (destination_checkpoint_verified ?destination_checkpoint)
+        (not
+          (origin_actor_recovery_ready ?origin_actor)
+        )
+        (destination_actor_recovery_ready ?destination_actor)
+        (recovery_shipment_pending ?recovery_shipment)
+      )
+    :effect
+      (and
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_assigned_origin_checkpoint ?recovery_shipment ?origin_checkpoint)
+        (recovery_shipment_assigned_destination_checkpoint ?recovery_shipment ?destination_checkpoint)
+        (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        (not
+          (recovery_shipment_pending ?recovery_shipment)
+        )
+      )
+  )
+  (:action instantiate_recovery_shipment_destination_requires_authorization
+    :parameters (?origin_actor - origin_logistics_actor ?destination_actor - destination_logistics_actor ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (origin_actor_activated ?origin_actor)
+        (destination_actor_activated ?destination_actor)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (origin_checkpoint_verified ?origin_checkpoint)
+        (destination_checkpoint_flagged_for_contingency ?destination_checkpoint)
+        (origin_actor_recovery_ready ?origin_actor)
+        (not
+          (destination_actor_recovery_ready ?destination_actor)
+        )
+        (recovery_shipment_pending ?recovery_shipment)
+      )
+    :effect
+      (and
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_assigned_origin_checkpoint ?recovery_shipment ?origin_checkpoint)
+        (recovery_shipment_assigned_destination_checkpoint ?recovery_shipment ?destination_checkpoint)
+        (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        (not
+          (recovery_shipment_pending ?recovery_shipment)
+        )
+      )
+  )
+  (:action instantiate_recovery_shipment_both_require_authorization
+    :parameters (?origin_actor - origin_logistics_actor ?destination_actor - destination_logistics_actor ?origin_checkpoint - origin_checkpoint ?destination_checkpoint - destination_checkpoint ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (origin_actor_activated ?origin_actor)
+        (destination_actor_activated ?destination_actor)
+        (origin_actor_has_checkpoint ?origin_actor ?origin_checkpoint)
+        (destination_actor_has_checkpoint ?destination_actor ?destination_checkpoint)
+        (origin_checkpoint_flagged_for_contingency ?origin_checkpoint)
+        (destination_checkpoint_flagged_for_contingency ?destination_checkpoint)
+        (not
+          (origin_actor_recovery_ready ?origin_actor)
+        )
+        (not
+          (destination_actor_recovery_ready ?destination_actor)
+        )
+        (recovery_shipment_pending ?recovery_shipment)
+      )
+    :effect
+      (and
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_assigned_origin_checkpoint ?recovery_shipment ?origin_checkpoint)
+        (recovery_shipment_assigned_destination_checkpoint ?recovery_shipment ?destination_checkpoint)
+        (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        (not
+          (recovery_shipment_pending ?recovery_shipment)
+        )
+      )
+  )
+  (:action checkin_recovery_shipment_at_origin
+    :parameters (?recovery_shipment - recovery_shipment ?origin_actor - origin_logistics_actor ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (recovery_shipment_created ?recovery_shipment)
+        (origin_actor_activated ?origin_actor)
+        (entity_has_tracking_source ?origin_actor ?tracking_source)
+        (not
+          (recovery_shipment_origin_checkin_complete ?recovery_shipment)
+        )
+      )
+    :effect (recovery_shipment_origin_checkin_complete ?recovery_shipment)
+  )
+  (:action attach_evidence_to_recovery_shipment
+    :parameters (?operations_center - operations_center ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (operations_center_has_recovery_shipment ?operations_center ?recovery_shipment)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_available ?evidence_document)
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_origin_checkin_complete ?recovery_shipment)
+        (not
+          (evidence_document_attached ?evidence_document)
+        )
+      )
+    :effect
+      (and
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action initiate_documentation_preparation
+    :parameters (?operations_center - operations_center ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (entity_has_tracking_source ?operations_center ?tracking_source)
+        (not
+          (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        )
+        (not
+          (operations_center_documentation_initiated ?operations_center)
+        )
+      )
+    :effect (operations_center_documentation_initiated ?operations_center)
+  )
+  (:action assign_escalation_template_to_ops_center
+    :parameters (?operations_center - operations_center ?escalation_template - escalation_template)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (escalation_template_available ?escalation_template)
+        (not
+          (operations_center_has_escalation_template ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_has_escalation_template ?operations_center)
+        (operations_center_assigned_escalation_template ?operations_center ?escalation_template)
+        (not
+          (escalation_template_available ?escalation_template)
+        )
+      )
+  )
+  (:action prepare_documentation_and_assign_escalation_template
+    :parameters (?operations_center - operations_center ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment ?tracking_source - tracking_source ?escalation_template - escalation_template)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (entity_has_tracking_source ?operations_center ?tracking_source)
+        (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        (operations_center_has_escalation_template ?operations_center)
+        (operations_center_assigned_escalation_template ?operations_center ?escalation_template)
+        (not
+          (operations_center_documentation_initiated ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_documentation_initiated ?operations_center)
+        (operations_center_escalation_triggered ?operations_center)
+      )
+  )
+  (:action initiate_insurance_review
+    :parameters (?operations_center - operations_center ?insurance_policy - insurance_policy ?carrier_contact - carrier_contact ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documentation_initiated ?operations_center)
+        (operations_center_has_insurance_policy ?operations_center ?insurance_policy)
+        (entity_assigned_carrier_contact ?operations_center ?carrier_contact)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (not
+          (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        )
+        (not
+          (operations_center_documents_reviewed ?operations_center)
+        )
+      )
+    :effect (operations_center_documents_reviewed ?operations_center)
+  )
+  (:action complete_insurance_review
+    :parameters (?operations_center - operations_center ?insurance_policy - insurance_policy ?carrier_contact - carrier_contact ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documentation_initiated ?operations_center)
+        (operations_center_has_insurance_policy ?operations_center ?insurance_policy)
+        (entity_assigned_carrier_contact ?operations_center ?carrier_contact)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        (not
+          (operations_center_documents_reviewed ?operations_center)
+        )
+      )
+    :effect (operations_center_documents_reviewed ?operations_center)
+  )
+  (:action finalize_ops_center_external_agreement
+    :parameters (?operations_center - operations_center ?external_authority - external_authority ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documents_reviewed ?operations_center)
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (not
+          (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        )
+        (not
+          (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        )
+        (not
+          (operations_center_finalization_pending ?operations_center)
+        )
+      )
+    :effect (operations_center_finalization_pending ?operations_center)
+  )
+  (:action finalize_ops_center_external_agreement_with_authorizations
+    :parameters (?operations_center - operations_center ?external_authority - external_authority ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documents_reviewed ?operations_center)
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        (not
+          (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        )
+        (not
+          (operations_center_finalization_pending ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_authorizations_collected ?operations_center)
+      )
+  )
+  (:action finalize_ops_center_external_agreement_and_collect_authorizations
+    :parameters (?operations_center - operations_center ?external_authority - external_authority ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documents_reviewed ?operations_center)
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (not
+          (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        )
+        (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        (not
+          (operations_center_finalization_pending ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_authorizations_collected ?operations_center)
+      )
+  )
+  (:action finalize_ops_center_external_agreement_and_confirm_authorizations
+    :parameters (?operations_center - operations_center ?external_authority - external_authority ?evidence_document - evidence_document ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (operations_center_documents_reviewed ?operations_center)
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (operations_center_has_evidence_document ?operations_center ?evidence_document)
+        (evidence_document_linked_to_recovery_shipment ?evidence_document ?recovery_shipment)
+        (recovery_shipment_origin_requires_authorization ?recovery_shipment)
+        (recovery_shipment_destination_requires_authorization ?recovery_shipment)
+        (not
+          (operations_center_finalization_pending ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_authorizations_collected ?operations_center)
+      )
+  )
+  (:action complete_ops_center_finalization
+    :parameters (?operations_center - operations_center)
+    :precondition
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (not
+          (operations_center_authorizations_collected ?operations_center)
+        )
+        (not
+          (operations_center_case_closed ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_case_closed ?operations_center)
+        (entity_closure_recorded ?operations_center)
+      )
+  )
+  (:action attach_authorization_credential
+    :parameters (?operations_center - operations_center ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_authorizations_collected ?operations_center)
+        (authorization_credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (operations_center_has_authorization_credential ?operations_center ?authorization_credential)
+        (not
+          (authorization_credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action record_ops_center_approval
+    :parameters (?operations_center - operations_center ?origin_actor - origin_logistics_actor ?destination_actor - destination_logistics_actor ?tracking_source - tracking_source ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_authorizations_collected ?operations_center)
+        (operations_center_has_authorization_credential ?operations_center ?authorization_credential)
+        (operations_center_manages_origin_actor ?operations_center ?origin_actor)
+        (operations_center_manages_destination_actor ?operations_center ?destination_actor)
+        (origin_actor_recovery_ready ?origin_actor)
+        (destination_actor_recovery_ready ?destination_actor)
+        (entity_has_tracking_source ?operations_center ?tracking_source)
+        (not
+          (operations_center_approval_recorded ?operations_center)
+        )
+      )
+    :effect (operations_center_approval_recorded ?operations_center)
+  )
+  (:action finalize_and_close_case_at_ops_center
+    :parameters (?operations_center - operations_center)
+    :precondition
+      (and
+        (operations_center_finalization_pending ?operations_center)
+        (operations_center_approval_recorded ?operations_center)
+        (not
+          (operations_center_case_closed ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_case_closed ?operations_center)
+        (entity_closure_recorded ?operations_center)
+      )
+  )
+  (:action register_claim_reference
+    :parameters (?operations_center - operations_center ?claim_reference - claim_reference ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_validated ?operations_center)
+        (entity_has_tracking_source ?operations_center ?tracking_source)
+        (claim_reference_available ?claim_reference)
+        (operations_center_has_claim_reference ?operations_center ?claim_reference)
+        (not
+          (operations_center_claim_registered ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_claim_registered ?operations_center)
+        (not
+          (claim_reference_available ?claim_reference)
+        )
+      )
+  )
+  (:action start_claim_process
+    :parameters (?operations_center - operations_center ?carrier_contact - carrier_contact)
+    :precondition
+      (and
+        (operations_center_claim_registered ?operations_center)
+        (entity_assigned_carrier_contact ?operations_center ?carrier_contact)
+        (not
+          (operations_center_claim_process_started ?operations_center)
+        )
+      )
+    :effect (operations_center_claim_process_started ?operations_center)
+  )
+  (:action authorize_claim_with_external_authority
+    :parameters (?operations_center - operations_center ?external_authority - external_authority)
+    :precondition
+      (and
+        (operations_center_claim_process_started ?operations_center)
+        (operations_center_has_external_authority_contact ?operations_center ?external_authority)
+        (not
+          (operations_center_claim_authorized ?operations_center)
+        )
+      )
+    :effect (operations_center_claim_authorized ?operations_center)
+  )
+  (:action finalize_claim_and_close_case
+    :parameters (?operations_center - operations_center)
+    :precondition
+      (and
+        (operations_center_claim_authorized ?operations_center)
+        (not
+          (operations_center_case_closed ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (operations_center_case_closed ?operations_center)
+        (entity_closure_recorded ?operations_center)
+      )
+  )
+  (:action record_origin_actor_closure
+    :parameters (?origin_actor - origin_logistics_actor ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (origin_actor_activated ?origin_actor)
+        (origin_actor_recovery_ready ?origin_actor)
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_origin_checkin_complete ?recovery_shipment)
+        (not
+          (entity_closure_recorded ?origin_actor)
+        )
+      )
+    :effect (entity_closure_recorded ?origin_actor)
+  )
+  (:action record_destination_actor_closure
+    :parameters (?destination_actor - destination_logistics_actor ?recovery_shipment - recovery_shipment)
+    :precondition
+      (and
+        (destination_actor_activated ?destination_actor)
+        (destination_actor_recovery_ready ?destination_actor)
+        (recovery_shipment_created ?recovery_shipment)
+        (recovery_shipment_origin_checkin_complete ?recovery_shipment)
+        (not
+          (entity_closure_recorded ?destination_actor)
+        )
+      )
+    :effect (entity_closure_recorded ?destination_actor)
+  )
+  (:action file_claim_with_loss_cause
+    :parameters (?shipment_case - entity_record ?loss_cause_code - loss_cause_code ?tracking_source - tracking_source)
+    :precondition
+      (and
+        (entity_closure_recorded ?shipment_case)
+        (entity_has_tracking_source ?shipment_case ?tracking_source)
+        (loss_cause_code_available ?loss_cause_code)
+        (not
+          (entity_claim_initiated ?shipment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_claim_initiated ?shipment_case)
+        (entity_has_loss_cause_code ?shipment_case ?loss_cause_code)
+        (not
+          (loss_cause_code_available ?loss_cause_code)
+        )
+      )
+  )
+  (:action initiate_recovery_action_at_origin_actor
+    :parameters (?origin_actor - origin_logistics_actor ?investigation_resource - investigation_resource ?loss_cause_code - loss_cause_code)
+    :precondition
+      (and
+        (entity_claim_initiated ?origin_actor)
+        (entity_assigned_investigation_resource ?origin_actor ?investigation_resource)
+        (entity_has_loss_cause_code ?origin_actor ?loss_cause_code)
+        (not
+          (recovery_action_initiated ?origin_actor)
+        )
+      )
+    :effect
+      (and
+        (recovery_action_initiated ?origin_actor)
+        (investigation_resource_available ?investigation_resource)
+        (loss_cause_code_available ?loss_cause_code)
+      )
+  )
+  (:action initiate_recovery_action_at_destination_actor
+    :parameters (?destination_actor - destination_logistics_actor ?investigation_resource - investigation_resource ?loss_cause_code - loss_cause_code)
+    :precondition
+      (and
+        (entity_claim_initiated ?destination_actor)
+        (entity_assigned_investigation_resource ?destination_actor ?investigation_resource)
+        (entity_has_loss_cause_code ?destination_actor ?loss_cause_code)
+        (not
+          (recovery_action_initiated ?destination_actor)
+        )
+      )
+    :effect
+      (and
+        (recovery_action_initiated ?destination_actor)
+        (investigation_resource_available ?investigation_resource)
+        (loss_cause_code_available ?loss_cause_code)
+      )
+  )
+  (:action initiate_recovery_action_at_ops_center
+    :parameters (?operations_center - operations_center ?investigation_resource - investigation_resource ?loss_cause_code - loss_cause_code)
+    :precondition
+      (and
+        (entity_claim_initiated ?operations_center)
+        (entity_assigned_investigation_resource ?operations_center ?investigation_resource)
+        (entity_has_loss_cause_code ?operations_center ?loss_cause_code)
+        (not
+          (recovery_action_initiated ?operations_center)
+        )
+      )
+    :effect
+      (and
+        (recovery_action_initiated ?operations_center)
+        (investigation_resource_available ?investigation_resource)
+        (loss_cause_code_available ?loss_cause_code)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem lost_shipment_case_scenario)
+  (:domain lost_shipment_trace_and_recovery_domain)
+  (:objects origin_depot_1 - origin_logistics_actor destination_depot_1 - destination_logistics_actor operations_center_primary - operations_center operations_center_secondary - operations_center investigation_team_alpha - investigation_resource investigation_team_bravo - investigation_resource investigation_team_charlie - investigation_resource tracker_device_1 - tracking_source carrier_contact_primary - carrier_contact contingency_replace_shipment - contingency_option origin_checkpoint_hub_1 - origin_checkpoint destination_checkpoint_hub_1 - destination_checkpoint recovery_shipment_alpha - recovery_shipment evidence_manifest_01 - evidence_document evidence_pod_photo_01 - evidence_document escalation_template_standard - escalation_template escalation_template_escalated - escalation_template authorization_credential_ops - authorization_credential authorization_credential_insurance - authorization_credential loss_cause_code_unknown - loss_cause_code insurance_policy_primary - insurance_policy claim_reference_001 - claim_reference claim_reference_002 - claim_reference external_authority_police - external_authority)
+  (:init
+    (investigation_resource_available investigation_team_alpha)
+    (investigation_resource_available investigation_team_bravo)
+    (investigation_resource_available investigation_team_charlie)
+    (tracking_source_available tracker_device_1)
+    (carrier_contact_available carrier_contact_primary)
+    (contingency_option_available contingency_replace_shipment)
+    (origin_actor_has_checkpoint origin_depot_1 origin_checkpoint_hub_1)
+    (destination_actor_has_checkpoint destination_depot_1 destination_checkpoint_hub_1)
+    (recovery_shipment_pending recovery_shipment_alpha)
+    (evidence_document_available evidence_manifest_01)
+    (evidence_document_available evidence_pod_photo_01)
+    (operations_center_manages_origin_actor operations_center_primary origin_depot_1)
+    (operations_center_manages_origin_actor operations_center_secondary origin_depot_1)
+    (operations_center_manages_destination_actor operations_center_primary destination_depot_1)
+    (operations_center_manages_destination_actor operations_center_secondary destination_depot_1)
+    (operations_center_has_recovery_shipment operations_center_primary recovery_shipment_alpha)
+    (operations_center_has_recovery_shipment operations_center_secondary recovery_shipment_alpha)
+    (operations_center_has_evidence_document operations_center_primary evidence_manifest_01)
+    (operations_center_has_evidence_document operations_center_secondary evidence_pod_photo_01)
+    (escalation_template_available escalation_template_standard)
+    (escalation_template_available escalation_template_escalated)
+    (authorization_credential_available authorization_credential_ops)
+    (authorization_credential_available authorization_credential_insurance)
+    (loss_cause_code_available loss_cause_code_unknown)
+    (insurance_policy_available insurance_policy_primary)
+    (claim_reference_available claim_reference_001)
+    (operations_center_has_claim_reference operations_center_primary claim_reference_001)
+    (operations_center_has_claim_reference operations_center_secondary claim_reference_002)
+    (external_authority_available external_authority_police)
+  )
+  (:goal
+    (and
+      (recovery_action_initiated origin_depot_1)
+      (recovery_action_initiated destination_depot_1)
+      (recovery_action_initiated operations_center_primary)
+      (recovery_action_initiated operations_center_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_shipment_case origin_depot_1)
+(assign_investigation_resource origin_depot_1 investigation_team_alpha)
+(attach_tracking_source_to_case origin_depot_1 tracker_device_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_s6nuotfn/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_s6nuotfn/plan.pddl 
+
+
+--- stderr ---
+

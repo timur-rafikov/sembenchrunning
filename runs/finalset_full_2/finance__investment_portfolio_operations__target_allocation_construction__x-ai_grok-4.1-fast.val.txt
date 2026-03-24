@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain target_allocation_construction_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types template_holder_type - object asset_classification_type - object execution_classification_type - object mandate_container_type - object investment_mandate - mandate_container_type allocation_template - template_holder_type instrument - template_holder_type execution_desk - template_holder_type benchmark_clause - template_holder_type execution_algorithm - template_holder_type allocation_round_token - template_holder_type broker_routing_instruction - template_holder_type venue_preference - template_holder_type allocation_constraint - asset_classification_type position_lot_record - asset_classification_type approval_token - asset_classification_type asset_slot - execution_classification_type execution_slot - execution_classification_type proposed_trade_ticket - execution_classification_type model_container_type - investment_mandate bucket_container_type - investment_mandate model_portfolio - model_container_type portfolio_bucket - model_container_type allocation_job - bucket_container_type)
+  (:predicates
+    (entity_registered ?mandate - investment_mandate)
+    (entity_onboarded ?mandate - investment_mandate)
+    (entity_template_bound ?mandate - investment_mandate)
+    (entity_assigned ?mandate - investment_mandate)
+    (entity_allocation_committed ?mandate - investment_mandate)
+    (entity_has_execution_fill ?mandate - investment_mandate)
+    (allocation_template_available ?allocation_template - allocation_template)
+    (entity_bound_to_allocation_template ?mandate - investment_mandate ?allocation_template - allocation_template)
+    (instrument_available ?instrument - instrument)
+    (entity_bound_to_instrument ?mandate - investment_mandate ?instrument - instrument)
+    (execution_desk_available ?execution_desk - execution_desk)
+    (entity_assigned_to_execution_desk ?mandate - investment_mandate ?execution_desk - execution_desk)
+    (allocation_constraint_available ?allocation_constraint - allocation_constraint)
+    (model_portfolio_has_constraint ?model_portfolio - model_portfolio ?allocation_constraint - allocation_constraint)
+    (portfolio_bucket_has_constraint ?portfolio_bucket - portfolio_bucket ?allocation_constraint - allocation_constraint)
+    (model_portfolio_targets_asset_slot ?model_portfolio - model_portfolio ?asset_slot - asset_slot)
+    (asset_slot_tagged_primary ?asset_slot - asset_slot)
+    (asset_slot_tagged_secondary ?asset_slot - asset_slot)
+    (model_portfolio_exposure_tagged ?model_portfolio - model_portfolio)
+    (portfolio_bucket_targets_execution_slot ?portfolio_bucket - portfolio_bucket ?execution_slot - execution_slot)
+    (execution_slot_tagged_primary ?execution_slot - execution_slot)
+    (execution_slot_tagged_secondary ?execution_slot - execution_slot)
+    (portfolio_bucket_exposure_tagged ?portfolio_bucket - portfolio_bucket)
+    (proposed_trade_ticket_available ?proposed_trade_ticket - proposed_trade_ticket)
+    (proposed_trade_ticket_prepared ?proposed_trade_ticket - proposed_trade_ticket)
+    (ticket_assigned_asset_slot ?proposed_trade_ticket - proposed_trade_ticket ?asset_slot - asset_slot)
+    (ticket_assigned_execution_slot ?proposed_trade_ticket - proposed_trade_ticket ?execution_slot - execution_slot)
+    (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket - proposed_trade_ticket)
+    (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket - proposed_trade_ticket)
+    (proposed_trade_ticket_validated ?proposed_trade_ticket - proposed_trade_ticket)
+    (entity_assigned_to_model_portfolio ?allocation_job - allocation_job ?model_portfolio - model_portfolio)
+    (entity_assigned_to_portfolio_bucket ?allocation_job - allocation_job ?portfolio_bucket - portfolio_bucket)
+    (entity_has_proposed_trade_ticket ?allocation_job - allocation_job ?proposed_trade_ticket - proposed_trade_ticket)
+    (position_lot_available ?position_lot - position_lot_record)
+    (entity_has_position_lot ?allocation_job - allocation_job ?position_lot - position_lot_record)
+    (position_lot_reserved ?position_lot - position_lot_record)
+    (position_lot_allocated_to_ticket ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    (allocation_job_enrichment_claimed ?allocation_job - allocation_job)
+    (entity_has_routing_instruction ?allocation_job - allocation_job)
+    (allocation_job_ready_for_finalization ?allocation_job - allocation_job)
+    (allocation_job_benchmark_attached ?allocation_job - allocation_job)
+    (allocation_job_benchmark_enriched ?allocation_job - allocation_job)
+    (allocation_job_enrichment_complete ?allocation_job - allocation_job)
+    (allocation_job_validated ?allocation_job - allocation_job)
+    (approval_token_available ?approval_token - approval_token)
+    (allocation_job_has_approval_token ?allocation_job - allocation_job ?approval_token - approval_token)
+    (allocation_job_approved ?allocation_job - allocation_job)
+    (allocation_job_ready_for_venue_attachment ?allocation_job - allocation_job)
+    (allocation_job_venue_attached ?allocation_job - allocation_job)
+    (benchmark_clause_available ?benchmark_clause - benchmark_clause)
+    (allocation_job_has_benchmark_clause ?allocation_job - allocation_job ?benchmark_clause - benchmark_clause)
+    (execution_algorithm_available ?execution_algorithm - execution_algorithm)
+    (entity_assigned_to_execution_algorithm ?allocation_job - allocation_job ?execution_algorithm - execution_algorithm)
+    (broker_routing_instruction_available ?broker_instruction - broker_routing_instruction)
+    (entity_assigned_to_broker_instruction ?allocation_job - allocation_job ?broker_instruction - broker_routing_instruction)
+    (venue_preference_available ?venue_preference - venue_preference)
+    (entity_assigned_to_venue_preference ?allocation_job - allocation_job ?venue_preference - venue_preference)
+    (allocation_round_token_available ?allocation_round_token - allocation_round_token)
+    (entity_assigned_allocation_round_token ?mandate - investment_mandate ?allocation_round_token - allocation_round_token)
+    (model_portfolio_ready_for_synthesis ?model_portfolio - model_portfolio)
+    (portfolio_bucket_ready_for_synthesis ?portfolio_bucket - portfolio_bucket)
+    (allocation_job_finalized ?allocation_job - allocation_job)
+  )
+  (:action register_investment_mandate
+    :parameters (?mandate - investment_mandate)
+    :precondition
+      (and
+        (not
+          (entity_registered ?mandate)
+        )
+        (not
+          (entity_assigned ?mandate)
+        )
+      )
+    :effect (entity_registered ?mandate)
+  )
+  (:action attach_allocation_template_to_mandate
+    :parameters (?mandate - investment_mandate ?allocation_template - allocation_template)
+    :precondition
+      (and
+        (entity_registered ?mandate)
+        (not
+          (entity_template_bound ?mandate)
+        )
+        (allocation_template_available ?allocation_template)
+      )
+    :effect
+      (and
+        (entity_template_bound ?mandate)
+        (entity_bound_to_allocation_template ?mandate ?allocation_template)
+        (not
+          (allocation_template_available ?allocation_template)
+        )
+      )
+  )
+  (:action reserve_instrument_for_mandate
+    :parameters (?mandate - investment_mandate ?instrument - instrument)
+    :precondition
+      (and
+        (entity_registered ?mandate)
+        (entity_template_bound ?mandate)
+        (instrument_available ?instrument)
+      )
+    :effect
+      (and
+        (entity_bound_to_instrument ?mandate ?instrument)
+        (not
+          (instrument_available ?instrument)
+        )
+      )
+  )
+  (:action complete_mandate_onboarding
+    :parameters (?mandate - investment_mandate ?instrument - instrument)
+    :precondition
+      (and
+        (entity_registered ?mandate)
+        (entity_template_bound ?mandate)
+        (entity_bound_to_instrument ?mandate ?instrument)
+        (not
+          (entity_onboarded ?mandate)
+        )
+      )
+    :effect (entity_onboarded ?mandate)
+  )
+  (:action release_instrument_reservation
+    :parameters (?mandate - investment_mandate ?instrument - instrument)
+    :precondition
+      (and
+        (entity_bound_to_instrument ?mandate ?instrument)
+      )
+    :effect
+      (and
+        (instrument_available ?instrument)
+        (not
+          (entity_bound_to_instrument ?mandate ?instrument)
+        )
+      )
+  )
+  (:action assign_execution_desk_to_mandate
+    :parameters (?mandate - investment_mandate ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_onboarded ?mandate)
+        (execution_desk_available ?execution_desk)
+      )
+    :effect
+      (and
+        (entity_assigned_to_execution_desk ?mandate ?execution_desk)
+        (not
+          (execution_desk_available ?execution_desk)
+        )
+      )
+  )
+  (:action release_execution_desk_from_mandate
+    :parameters (?mandate - investment_mandate ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_assigned_to_execution_desk ?mandate ?execution_desk)
+      )
+    :effect
+      (and
+        (execution_desk_available ?execution_desk)
+        (not
+          (entity_assigned_to_execution_desk ?mandate ?execution_desk)
+        )
+      )
+  )
+  (:action reserve_broker_for_allocation_job
+    :parameters (?allocation_job - allocation_job ?broker_instruction - broker_routing_instruction)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (broker_routing_instruction_available ?broker_instruction)
+      )
+    :effect
+      (and
+        (entity_assigned_to_broker_instruction ?allocation_job ?broker_instruction)
+        (not
+          (broker_routing_instruction_available ?broker_instruction)
+        )
+      )
+  )
+  (:action release_broker_from_allocation_job
+    :parameters (?allocation_job - allocation_job ?broker_instruction - broker_routing_instruction)
+    :precondition
+      (and
+        (entity_assigned_to_broker_instruction ?allocation_job ?broker_instruction)
+      )
+    :effect
+      (and
+        (broker_routing_instruction_available ?broker_instruction)
+        (not
+          (entity_assigned_to_broker_instruction ?allocation_job ?broker_instruction)
+        )
+      )
+  )
+  (:action assign_venue_preference_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (venue_preference_available ?venue_preference)
+      )
+    :effect
+      (and
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (not
+          (venue_preference_available ?venue_preference)
+        )
+      )
+  )
+  (:action release_venue_preference_from_allocation_job
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference)
+    :precondition
+      (and
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+      )
+    :effect
+      (and
+        (venue_preference_available ?venue_preference)
+        (not
+          (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        )
+      )
+  )
+  (:action tag_primary_asset_slot_for_model_portfolio
+    :parameters (?model_portfolio - model_portfolio ?asset_slot - asset_slot ?instrument - instrument)
+    :precondition
+      (and
+        (entity_onboarded ?model_portfolio)
+        (entity_bound_to_instrument ?model_portfolio ?instrument)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (not
+          (asset_slot_tagged_primary ?asset_slot)
+        )
+        (not
+          (asset_slot_tagged_secondary ?asset_slot)
+        )
+      )
+    :effect (asset_slot_tagged_primary ?asset_slot)
+  )
+  (:action reserve_model_portfolio_asset_slot_with_desk
+    :parameters (?model_portfolio - model_portfolio ?asset_slot - asset_slot ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_onboarded ?model_portfolio)
+        (entity_assigned_to_execution_desk ?model_portfolio ?execution_desk)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (asset_slot_tagged_primary ?asset_slot)
+        (not
+          (model_portfolio_ready_for_synthesis ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+      )
+  )
+  (:action attach_constraint_to_model_portfolio
+    :parameters (?model_portfolio - model_portfolio ?asset_slot - asset_slot ?allocation_constraint - allocation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?model_portfolio)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (allocation_constraint_available ?allocation_constraint)
+        (not
+          (model_portfolio_ready_for_synthesis ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (asset_slot_tagged_secondary ?asset_slot)
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (model_portfolio_has_constraint ?model_portfolio ?allocation_constraint)
+        (not
+          (allocation_constraint_available ?allocation_constraint)
+        )
+      )
+  )
+  (:action reconcile_model_portfolio_asset_slot_with_constraints
+    :parameters (?model_portfolio - model_portfolio ?asset_slot - asset_slot ?instrument - instrument ?allocation_constraint - allocation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?model_portfolio)
+        (entity_bound_to_instrument ?model_portfolio ?instrument)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (asset_slot_tagged_secondary ?asset_slot)
+        (model_portfolio_has_constraint ?model_portfolio ?allocation_constraint)
+        (not
+          (model_portfolio_exposure_tagged ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (asset_slot_tagged_primary ?asset_slot)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+        (allocation_constraint_available ?allocation_constraint)
+        (not
+          (model_portfolio_has_constraint ?model_portfolio ?allocation_constraint)
+        )
+      )
+  )
+  (:action tag_primary_execution_slot_for_portfolio_bucket
+    :parameters (?portfolio_bucket - portfolio_bucket ?execution_slot - execution_slot ?instrument - instrument)
+    :precondition
+      (and
+        (entity_onboarded ?portfolio_bucket)
+        (entity_bound_to_instrument ?portfolio_bucket ?instrument)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (not
+          (execution_slot_tagged_primary ?execution_slot)
+        )
+        (not
+          (execution_slot_tagged_secondary ?execution_slot)
+        )
+      )
+    :effect (execution_slot_tagged_primary ?execution_slot)
+  )
+  (:action reserve_portfolio_bucket_execution_with_desk
+    :parameters (?portfolio_bucket - portfolio_bucket ?execution_slot - execution_slot ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_onboarded ?portfolio_bucket)
+        (entity_assigned_to_execution_desk ?portfolio_bucket ?execution_desk)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (execution_slot_tagged_primary ?execution_slot)
+        (not
+          (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        )
+      )
+    :effect
+      (and
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+      )
+  )
+  (:action attach_constraint_to_portfolio_bucket
+    :parameters (?portfolio_bucket - portfolio_bucket ?execution_slot - execution_slot ?allocation_constraint - allocation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?portfolio_bucket)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (allocation_constraint_available ?allocation_constraint)
+        (not
+          (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        )
+      )
+    :effect
+      (and
+        (execution_slot_tagged_secondary ?execution_slot)
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (portfolio_bucket_has_constraint ?portfolio_bucket ?allocation_constraint)
+        (not
+          (allocation_constraint_available ?allocation_constraint)
+        )
+      )
+  )
+  (:action reconcile_portfolio_bucket_execution_slot_with_constraint
+    :parameters (?portfolio_bucket - portfolio_bucket ?execution_slot - execution_slot ?instrument - instrument ?allocation_constraint - allocation_constraint)
+    :precondition
+      (and
+        (entity_onboarded ?portfolio_bucket)
+        (entity_bound_to_instrument ?portfolio_bucket ?instrument)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (execution_slot_tagged_secondary ?execution_slot)
+        (portfolio_bucket_has_constraint ?portfolio_bucket ?allocation_constraint)
+        (not
+          (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        )
+      )
+    :effect
+      (and
+        (execution_slot_tagged_primary ?execution_slot)
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        (allocation_constraint_available ?allocation_constraint)
+        (not
+          (portfolio_bucket_has_constraint ?portfolio_bucket ?allocation_constraint)
+        )
+      )
+  )
+  (:action assemble_proposed_trade_ticket_basic
+    :parameters (?model_portfolio - model_portfolio ?portfolio_bucket - portfolio_bucket ?asset_slot - asset_slot ?execution_slot - execution_slot ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (asset_slot_tagged_primary ?asset_slot)
+        (execution_slot_tagged_primary ?execution_slot)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        (proposed_trade_ticket_available ?proposed_trade_ticket)
+      )
+    :effect
+      (and
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (ticket_assigned_asset_slot ?proposed_trade_ticket ?asset_slot)
+        (ticket_assigned_execution_slot ?proposed_trade_ticket ?execution_slot)
+        (not
+          (proposed_trade_ticket_available ?proposed_trade_ticket)
+        )
+      )
+  )
+  (:action assemble_proposed_trade_ticket_with_benchmark_path
+    :parameters (?model_portfolio - model_portfolio ?portfolio_bucket - portfolio_bucket ?asset_slot - asset_slot ?execution_slot - execution_slot ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (asset_slot_tagged_secondary ?asset_slot)
+        (execution_slot_tagged_primary ?execution_slot)
+        (not
+          (model_portfolio_exposure_tagged ?model_portfolio)
+        )
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        (proposed_trade_ticket_available ?proposed_trade_ticket)
+      )
+    :effect
+      (and
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (ticket_assigned_asset_slot ?proposed_trade_ticket ?asset_slot)
+        (ticket_assigned_execution_slot ?proposed_trade_ticket ?execution_slot)
+        (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_available ?proposed_trade_ticket)
+        )
+      )
+  )
+  (:action assemble_proposed_trade_ticket_with_broker_path
+    :parameters (?model_portfolio - model_portfolio ?portfolio_bucket - portfolio_bucket ?asset_slot - asset_slot ?execution_slot - execution_slot ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (asset_slot_tagged_primary ?asset_slot)
+        (execution_slot_tagged_secondary ?execution_slot)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+        (not
+          (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        )
+        (proposed_trade_ticket_available ?proposed_trade_ticket)
+      )
+    :effect
+      (and
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (ticket_assigned_asset_slot ?proposed_trade_ticket ?asset_slot)
+        (ticket_assigned_execution_slot ?proposed_trade_ticket ?execution_slot)
+        (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_available ?proposed_trade_ticket)
+        )
+      )
+  )
+  (:action assemble_proposed_trade_ticket_with_benchmark_and_broker
+    :parameters (?model_portfolio - model_portfolio ?portfolio_bucket - portfolio_bucket ?asset_slot - asset_slot ?execution_slot - execution_slot ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (model_portfolio_targets_asset_slot ?model_portfolio ?asset_slot)
+        (portfolio_bucket_targets_execution_slot ?portfolio_bucket ?execution_slot)
+        (asset_slot_tagged_secondary ?asset_slot)
+        (execution_slot_tagged_secondary ?execution_slot)
+        (not
+          (model_portfolio_exposure_tagged ?model_portfolio)
+        )
+        (not
+          (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        )
+        (proposed_trade_ticket_available ?proposed_trade_ticket)
+      )
+    :effect
+      (and
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (ticket_assigned_asset_slot ?proposed_trade_ticket ?asset_slot)
+        (ticket_assigned_execution_slot ?proposed_trade_ticket ?execution_slot)
+        (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_available ?proposed_trade_ticket)
+        )
+      )
+  )
+  (:action validate_proposed_trade_ticket_for_matching
+    :parameters (?proposed_trade_ticket - proposed_trade_ticket ?model_portfolio - model_portfolio ?instrument - instrument)
+    :precondition
+      (and
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (entity_bound_to_instrument ?model_portfolio ?instrument)
+        (not
+          (proposed_trade_ticket_validated ?proposed_trade_ticket)
+        )
+      )
+    :effect (proposed_trade_ticket_validated ?proposed_trade_ticket)
+  )
+  (:action match_position_lot_to_proposed_trade_ticket
+    :parameters (?allocation_job - allocation_job ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (entity_has_proposed_trade_ticket ?allocation_job ?proposed_trade_ticket)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_available ?position_lot)
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (proposed_trade_ticket_validated ?proposed_trade_ticket)
+        (not
+          (position_lot_reserved ?position_lot)
+        )
+      )
+    :effect
+      (and
+        (position_lot_reserved ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (not
+          (position_lot_available ?position_lot)
+        )
+      )
+  )
+  (:action claim_allocation_job_for_lot_processing
+    :parameters (?allocation_job - allocation_job ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket ?instrument - instrument)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_reserved ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (entity_bound_to_instrument ?allocation_job ?instrument)
+        (not
+          (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        )
+        (not
+          (allocation_job_enrichment_claimed ?allocation_job)
+        )
+      )
+    :effect (allocation_job_enrichment_claimed ?allocation_job)
+  )
+  (:action attach_benchmark_clause_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?benchmark_clause - benchmark_clause)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (benchmark_clause_available ?benchmark_clause)
+        (not
+          (allocation_job_benchmark_attached ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_benchmark_attached ?allocation_job)
+        (allocation_job_has_benchmark_clause ?allocation_job ?benchmark_clause)
+        (not
+          (benchmark_clause_available ?benchmark_clause)
+        )
+      )
+  )
+  (:action apply_benchmark_enrichment_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket ?instrument - instrument ?benchmark_clause - benchmark_clause)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_reserved ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (entity_bound_to_instrument ?allocation_job ?instrument)
+        (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        (allocation_job_benchmark_attached ?allocation_job)
+        (allocation_job_has_benchmark_clause ?allocation_job ?benchmark_clause)
+        (not
+          (allocation_job_enrichment_claimed ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_enrichment_claimed ?allocation_job)
+        (allocation_job_benchmark_enriched ?allocation_job)
+      )
+  )
+  (:action assign_broker_routing_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?broker_instruction - broker_routing_instruction ?execution_desk - execution_desk ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (allocation_job_enrichment_claimed ?allocation_job)
+        (entity_assigned_to_broker_instruction ?allocation_job ?broker_instruction)
+        (entity_assigned_to_execution_desk ?allocation_job ?execution_desk)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        )
+        (not
+          (entity_has_routing_instruction ?allocation_job)
+        )
+      )
+    :effect (entity_has_routing_instruction ?allocation_job)
+  )
+  (:action confirm_broker_routing_for_allocation_job
+    :parameters (?allocation_job - allocation_job ?broker_instruction - broker_routing_instruction ?execution_desk - execution_desk ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (allocation_job_enrichment_claimed ?allocation_job)
+        (entity_assigned_to_broker_instruction ?allocation_job ?broker_instruction)
+        (entity_assigned_to_execution_desk ?allocation_job ?execution_desk)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        (not
+          (entity_has_routing_instruction ?allocation_job)
+        )
+      )
+    :effect (entity_has_routing_instruction ?allocation_job)
+  )
+  (:action prepare_allocation_job_for_finalization
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (entity_has_routing_instruction ?allocation_job)
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        )
+        (not
+          (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        )
+        (not
+          (allocation_job_ready_for_finalization ?allocation_job)
+        )
+      )
+    :effect (allocation_job_ready_for_finalization ?allocation_job)
+  )
+  (:action prepare_allocation_job_for_finalization_with_benchmark_enrichment
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (entity_has_routing_instruction ?allocation_job)
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        )
+        (not
+          (allocation_job_ready_for_finalization ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_enrichment_complete ?allocation_job)
+      )
+  )
+  (:action prepare_allocation_job_for_finalization_with_broker_enrichment
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (entity_has_routing_instruction ?allocation_job)
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (not
+          (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        )
+        (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        (not
+          (allocation_job_ready_for_finalization ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_enrichment_complete ?allocation_job)
+      )
+  )
+  (:action prepare_allocation_job_for_finalization_with_broker_and_benchmark_enrichment
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference ?position_lot - position_lot_record ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (entity_has_routing_instruction ?allocation_job)
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (entity_has_position_lot ?allocation_job ?position_lot)
+        (position_lot_allocated_to_ticket ?position_lot ?proposed_trade_ticket)
+        (proposed_trade_ticket_requires_benchmark_enrichment ?proposed_trade_ticket)
+        (proposed_trade_ticket_requires_broker_enrichment ?proposed_trade_ticket)
+        (not
+          (allocation_job_ready_for_finalization ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_enrichment_complete ?allocation_job)
+      )
+  )
+  (:action finalize_allocation_job_without_additional_enrichments
+    :parameters (?allocation_job - allocation_job)
+    :precondition
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (not
+          (allocation_job_enrichment_complete ?allocation_job)
+        )
+        (not
+          (allocation_job_finalized ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_finalized ?allocation_job)
+        (entity_allocation_committed ?allocation_job)
+      )
+  )
+  (:action assign_execution_algorithm_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?execution_algorithm - execution_algorithm)
+    :precondition
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_enrichment_complete ?allocation_job)
+        (execution_algorithm_available ?execution_algorithm)
+      )
+    :effect
+      (and
+        (entity_assigned_to_execution_algorithm ?allocation_job ?execution_algorithm)
+        (not
+          (execution_algorithm_available ?execution_algorithm)
+        )
+      )
+  )
+  (:action validate_allocation_job_and_mark_ready
+    :parameters (?allocation_job - allocation_job ?model_portfolio - model_portfolio ?portfolio_bucket - portfolio_bucket ?instrument - instrument ?execution_algorithm - execution_algorithm)
+    :precondition
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_enrichment_complete ?allocation_job)
+        (entity_assigned_to_execution_algorithm ?allocation_job ?execution_algorithm)
+        (entity_assigned_to_model_portfolio ?allocation_job ?model_portfolio)
+        (entity_assigned_to_portfolio_bucket ?allocation_job ?portfolio_bucket)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        (entity_bound_to_instrument ?allocation_job ?instrument)
+        (not
+          (allocation_job_validated ?allocation_job)
+        )
+      )
+    :effect (allocation_job_validated ?allocation_job)
+  )
+  (:action finalize_allocation_job_after_validation
+    :parameters (?allocation_job - allocation_job)
+    :precondition
+      (and
+        (allocation_job_ready_for_finalization ?allocation_job)
+        (allocation_job_validated ?allocation_job)
+        (not
+          (allocation_job_finalized ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_finalized ?allocation_job)
+        (entity_allocation_committed ?allocation_job)
+      )
+  )
+  (:action attach_approval_token_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?approval_token - approval_token ?instrument - instrument)
+    :precondition
+      (and
+        (entity_onboarded ?allocation_job)
+        (entity_bound_to_instrument ?allocation_job ?instrument)
+        (approval_token_available ?approval_token)
+        (allocation_job_has_approval_token ?allocation_job ?approval_token)
+        (not
+          (allocation_job_approved ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_approved ?allocation_job)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action mark_allocation_job_ready_for_venue_attachment
+    :parameters (?allocation_job - allocation_job ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (allocation_job_approved ?allocation_job)
+        (entity_assigned_to_execution_desk ?allocation_job ?execution_desk)
+        (not
+          (allocation_job_ready_for_venue_attachment ?allocation_job)
+        )
+      )
+    :effect (allocation_job_ready_for_venue_attachment ?allocation_job)
+  )
+  (:action attach_venue_preference_to_allocation_job
+    :parameters (?allocation_job - allocation_job ?venue_preference - venue_preference)
+    :precondition
+      (and
+        (allocation_job_ready_for_venue_attachment ?allocation_job)
+        (entity_assigned_to_venue_preference ?allocation_job ?venue_preference)
+        (not
+          (allocation_job_venue_attached ?allocation_job)
+        )
+      )
+    :effect (allocation_job_venue_attached ?allocation_job)
+  )
+  (:action finalize_allocation_job_with_venue_preference
+    :parameters (?allocation_job - allocation_job)
+    :precondition
+      (and
+        (allocation_job_venue_attached ?allocation_job)
+        (not
+          (allocation_job_finalized ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_job_finalized ?allocation_job)
+        (entity_allocation_committed ?allocation_job)
+      )
+  )
+  (:action assign_proposed_ticket_to_model_portfolio
+    :parameters (?model_portfolio - model_portfolio ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (model_portfolio_ready_for_synthesis ?model_portfolio)
+        (model_portfolio_exposure_tagged ?model_portfolio)
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (proposed_trade_ticket_validated ?proposed_trade_ticket)
+        (not
+          (entity_allocation_committed ?model_portfolio)
+        )
+      )
+    :effect (entity_allocation_committed ?model_portfolio)
+  )
+  (:action assign_proposed_ticket_to_portfolio_bucket
+    :parameters (?portfolio_bucket - portfolio_bucket ?proposed_trade_ticket - proposed_trade_ticket)
+    :precondition
+      (and
+        (portfolio_bucket_ready_for_synthesis ?portfolio_bucket)
+        (portfolio_bucket_exposure_tagged ?portfolio_bucket)
+        (proposed_trade_ticket_prepared ?proposed_trade_ticket)
+        (proposed_trade_ticket_validated ?proposed_trade_ticket)
+        (not
+          (entity_allocation_committed ?portfolio_bucket)
+        )
+      )
+    :effect (entity_allocation_committed ?portfolio_bucket)
+  )
+  (:action record_post_trade_assignment_for_mandate
+    :parameters (?mandate - investment_mandate ?allocation_round_token - allocation_round_token ?instrument - instrument)
+    :precondition
+      (and
+        (entity_allocation_committed ?mandate)
+        (entity_bound_to_instrument ?mandate ?instrument)
+        (allocation_round_token_available ?allocation_round_token)
+        (not
+          (entity_has_execution_fill ?mandate)
+        )
+      )
+    :effect
+      (and
+        (entity_has_execution_fill ?mandate)
+        (entity_assigned_allocation_round_token ?mandate ?allocation_round_token)
+        (not
+          (allocation_round_token_available ?allocation_round_token)
+        )
+      )
+  )
+  (:action finalize_model_portfolio_post_trade_assignment
+    :parameters (?model_portfolio - model_portfolio ?allocation_template - allocation_template ?allocation_round_token - allocation_round_token)
+    :precondition
+      (and
+        (entity_has_execution_fill ?model_portfolio)
+        (entity_bound_to_allocation_template ?model_portfolio ?allocation_template)
+        (entity_assigned_allocation_round_token ?model_portfolio ?allocation_round_token)
+        (not
+          (entity_assigned ?model_portfolio)
+        )
+      )
+    :effect
+      (and
+        (entity_assigned ?model_portfolio)
+        (allocation_template_available ?allocation_template)
+        (allocation_round_token_available ?allocation_round_token)
+      )
+  )
+  (:action finalize_portfolio_bucket_post_trade_assignment
+    :parameters (?portfolio_bucket - portfolio_bucket ?allocation_template - allocation_template ?allocation_round_token - allocation_round_token)
+    :precondition
+      (and
+        (entity_has_execution_fill ?portfolio_bucket)
+        (entity_bound_to_allocation_template ?portfolio_bucket ?allocation_template)
+        (entity_assigned_allocation_round_token ?portfolio_bucket ?allocation_round_token)
+        (not
+          (entity_assigned ?portfolio_bucket)
+        )
+      )
+    :effect
+      (and
+        (entity_assigned ?portfolio_bucket)
+        (allocation_template_available ?allocation_template)
+        (allocation_round_token_available ?allocation_round_token)
+      )
+  )
+  (:action finalize_allocation_job_post_trade_assignment
+    :parameters (?allocation_job - allocation_job ?allocation_template - allocation_template ?allocation_round_token - allocation_round_token)
+    :precondition
+      (and
+        (entity_has_execution_fill ?allocation_job)
+        (entity_bound_to_allocation_template ?allocation_job ?allocation_template)
+        (entity_assigned_allocation_round_token ?allocation_job ?allocation_round_token)
+        (not
+          (entity_assigned ?allocation_job)
+        )
+      )
+    :effect
+      (and
+        (entity_assigned ?allocation_job)
+        (allocation_template_available ?allocation_template)
+        (allocation_round_token_available ?allocation_round_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem target_allocation_construction_problem)
+  (:domain target_allocation_construction_domain)
+  (:objects model_portfolio_core - model_portfolio portfolio_bucket_equities - portfolio_bucket allocation_job_a - allocation_job allocation_job_b - allocation_job allocation_template_conservative - allocation_template allocation_template_growth - allocation_template allocation_template_income - allocation_template instrument_equity_1 - instrument execution_desk_ny_trading - execution_desk constraint_max_weight - allocation_constraint asset_slot_equity_sleeve - asset_slot execution_slot_primary - execution_slot proposed_trade_ticket_1 - proposed_trade_ticket position_lot_1 - position_lot_record position_lot_2 - position_lot_record benchmark_clause_msci - benchmark_clause benchmark_clause_client_specific - benchmark_clause execution_algorithm_vwap - execution_algorithm execution_algorithm_twap - execution_algorithm allocation_round_token_1 - allocation_round_token broker_instruction_broker_a - broker_routing_instruction approval_token_ops - approval_token approval_token_manager - approval_token venue_preference_primary_exchange - venue_preference)
+  (:init
+    (allocation_template_available allocation_template_conservative)
+    (allocation_template_available allocation_template_growth)
+    (allocation_template_available allocation_template_income)
+    (instrument_available instrument_equity_1)
+    (execution_desk_available execution_desk_ny_trading)
+    (allocation_constraint_available constraint_max_weight)
+    (model_portfolio_targets_asset_slot model_portfolio_core asset_slot_equity_sleeve)
+    (portfolio_bucket_targets_execution_slot portfolio_bucket_equities execution_slot_primary)
+    (proposed_trade_ticket_available proposed_trade_ticket_1)
+    (position_lot_available position_lot_1)
+    (position_lot_available position_lot_2)
+    (entity_assigned_to_model_portfolio allocation_job_a model_portfolio_core)
+    (entity_assigned_to_model_portfolio allocation_job_b model_portfolio_core)
+    (entity_assigned_to_portfolio_bucket allocation_job_a portfolio_bucket_equities)
+    (entity_assigned_to_portfolio_bucket allocation_job_b portfolio_bucket_equities)
+    (entity_has_proposed_trade_ticket allocation_job_a proposed_trade_ticket_1)
+    (entity_has_proposed_trade_ticket allocation_job_b proposed_trade_ticket_1)
+    (entity_has_position_lot allocation_job_a position_lot_1)
+    (entity_has_position_lot allocation_job_b position_lot_2)
+    (benchmark_clause_available benchmark_clause_msci)
+    (benchmark_clause_available benchmark_clause_client_specific)
+    (execution_algorithm_available execution_algorithm_vwap)
+    (execution_algorithm_available execution_algorithm_twap)
+    (allocation_round_token_available allocation_round_token_1)
+    (broker_routing_instruction_available broker_instruction_broker_a)
+    (approval_token_available approval_token_ops)
+    (allocation_job_has_approval_token allocation_job_a approval_token_ops)
+    (allocation_job_has_approval_token allocation_job_b approval_token_manager)
+    (venue_preference_available venue_preference_primary_exchange)
+  )
+  (:goal
+    (and
+      (entity_assigned model_portfolio_core)
+      (entity_assigned portfolio_bucket_equities)
+      (entity_assigned allocation_job_a)
+      (entity_assigned allocation_job_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_investment_mandate model_portfolio_core)
+(attach_allocation_template_to_mandate model_portfolio_core allocation_template_conservative)
+(reserve_instrument_for_mandate model_portfolio_core instrument_equity_1)
+(complete_mandate_onboarding model_portfolio_core instrument_equity_1)
+(tag_primary_asset_slot_for_model_portfolio model_portfolio_core asset_slot_equity_sleeve instrument_equity_1)
+(assign_execution_desk_to_mandate model_portfolio_core execution_desk_ny_trading)
+(reserve_model_portfolio_asset_slot_with_desk model_portfolio_core asset_slot_equity_sleeve execution_desk_ny_trading)
+(release_execution_desk_from_mandate model_portfolio_core execution_desk_ny_trading)
+(release_instrument_reservation model_portfolio_core instrument_equity_1)
+(register_investment_mandate portfolio_bucket_equities)
+(attach_allocation_template_to_mandate portfolio_bucket_equities allocation_template_growth)
+(reserve_instrument_for_mandate portfolio_bucket_equities instrument_equity_1)
+(complete_mandate_onboarding portfolio_bucket_equities instrument_equity_1)
+(tag_primary_execution_slot_for_portfolio_bucket portfolio_bucket_equities execution_slot_primary instrument_equity_1)
+(assign_execution_desk_to_mandate portfolio_bucket_equities execution_desk_ny_trading)
+(reserve_portfolio_bucket_execution_with_desk portfolio_bucket_equities execution_slot_primary execution_desk_ny_trading)
+(release_execution_desk_from_mandate portfolio_bucket_equities execution_desk_ny_trading)
+(release_instrument_reservation portfolio_bucket_equities instrument_equity_1)
+(assemble_proposed_trade_ticket_basic model_portfolio_core portfolio_bucket_equities asset_slot_equity_sleeve execution_slot_primary proposed_trade_ticket_1)
+(reserve_instrument_for_mandate model_portfolio_core instrument_equity_1)
+(validate_proposed_trade_ticket_for_matching proposed_trade_ticket_1 model_portfolio_core instrument_equity_1)
+(release_instrument_reservation model_portfolio_core instrument_equity_1)
+(assign_proposed_ticket_to_model_portfolio model_portfolio_core proposed_trade_ticket_1)
+(assign_proposed_ticket_to_portfolio_bucket portfolio_bucket_equities proposed_trade_ticket_1)
+(register_investment_mandate allocation_job_a)
+(attach_allocation_template_to_mandate allocation_job_a allocation_template_income)
+(reserve_instrument_for_mandate allocation_job_a instrument_equity_1)
+(complete_mandate_onboarding allocation_job_a instrument_equity_1)
+(assign_execution_desk_to_mandate allocation_job_a execution_desk_ny_trading)
+(reserve_broker_for_allocation_job allocation_job_a broker_instruction_broker_a)
+(assign_venue_preference_to_allocation_job allocation_job_a venue_preference_primary_exchange)
+(match_position_lot_to_proposed_trade_ticket allocation_job_a position_lot_1 proposed_trade_ticket_1)
+(claim_allocation_job_for_lot_processing allocation_job_a position_lot_1 proposed_trade_ticket_1 instrument_equity_1)
+(assign_broker_routing_to_allocation_job allocation_job_a broker_instruction_broker_a execution_desk_ny_trading position_lot_1 proposed_trade_ticket_1)
+(prepare_allocation_job_for_finalization allocation_job_a venue_preference_primary_exchange position_lot_1 proposed_trade_ticket_1)
+(finalize_allocation_job_without_additional_enrichments allocation_job_a)
+(record_post_trade_assignment_for_mandate allocation_job_a allocation_round_token_1 instrument_equity_1)
+(finalize_allocation_job_post_trade_assignment allocation_job_a allocation_template_income allocation_round_token_1)
+(release_broker_from_allocation_job allocation_job_a broker_instruction_broker_a)
+(release_venue_preference_from_allocation_job allocation_job_a venue_preference_primary_exchange)
+(release_execution_desk_from_mandate allocation_job_a execution_desk_ny_trading)
+(release_instrument_reservation allocation_job_a instrument_equity_1)
+(register_investment_mandate allocation_job_b)
+(attach_allocation_template_to_mandate allocation_job_b allocation_template_income)
+(reserve_instrument_for_mandate allocation_job_b instrument_equity_1)
+(complete_mandate_onboarding allocation_job_b instrument_equity_1)
+(assign_execution_desk_to_mandate allocation_job_b execution_desk_ny_trading)
+(reserve_broker_for_allocation_job allocation_job_b broker_instruction_broker_a)
+(assign_venue_preference_to_allocation_job allocation_job_b venue_preference_primary_exchange)
+(match_position_lot_to_proposed_trade_ticket allocation_job_b position_lot_2 proposed_trade_ticket_1)
+(claim_allocation_job_for_lot_processing allocation_job_b position_lot_2 proposed_trade_ticket_1 instrument_equity_1)
+(assign_broker_routing_to_allocation_job allocation_job_b broker_instruction_broker_a execution_desk_ny_trading position_lot_2 proposed_trade_ticket_1)
+(prepare_allocation_job_for_finalization allocation_job_b venue_preference_primary_exchange position_lot_2 proposed_trade_ticket_1)
+(finalize_allocation_job_without_additional_enrichments allocation_job_b)
+(record_post_trade_assignment_for_mandate allocation_job_b allocation_round_token_1 instrument_equity_1)
+(finalize_allocation_job_post_trade_assignment allocation_job_b allocation_template_income allocation_round_token_1)
+(release_broker_from_allocation_job allocation_job_b broker_instruction_broker_a)
+(release_venue_preference_from_allocation_job allocation_job_b venue_preference_primary_exchange)
+(release_execution_desk_from_mandate allocation_job_b execution_desk_ny_trading)
+(release_instrument_reservation allocation_job_b instrument_equity_1)
+(reserve_instrument_for_mandate model_portfolio_core instrument_equity_1)
+(record_post_trade_assignment_for_mandate model_portfolio_core allocation_round_token_1 instrument_equity_1)
+(finalize_model_portfolio_post_trade_assignment model_portfolio_core allocation_template_conservative allocation_round_token_1)
+(reserve_instrument_for_mandate portfolio_bucket_equities instrument_equity_1)
+(record_post_trade_assignment_for_mandate portfolio_bucket_equities allocation_round_token_1 instrument_equity_1)
+(finalize_portfolio_bucket_post_trade_assignment portfolio_bucket_equities allocation_template_growth allocation_round_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_h1021kfi/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_h1021kfi/plan.pddl 
+
+
+--- stderr ---
+

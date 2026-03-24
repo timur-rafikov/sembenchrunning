@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain honors_eligibility_workflow)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object operational_resource - domain_object artifact_resource - domain_object workflow_component - domain_object student_root - domain_object student - student_root submission_slot - operational_resource assessment_event - operational_resource instructor - operational_resource faculty_endorsement - operational_resource administrative_stamp - operational_resource application_token - operational_resource verification_evidence - operational_resource external_certificate - operational_resource remediation_resource - artifact_resource milestone_document - artifact_resource portfolio_item - artifact_resource recovery_pathway - workflow_component assessment_sequence - workflow_component grade_record_package - workflow_component enrollment_role_group - student candidacy_role_group - student primary_enrollment - enrollment_role_group elective_enrollment - enrollment_role_group honors_candidacy_case - candidacy_role_group)
+
+  (:predicates
+    (submission_planning_initiated ?student - student)
+    (eligible_for_assessment ?student - student)
+    (submission_reserved ?student - student)
+    (honors_award_assigned ?student - student)
+    (honors_award_certified ?student - student)
+    (award_propagation_authorized ?student - student)
+    (submission_slot_available ?submission_slot - submission_slot)
+    (reserved_submission_slot ?student - student ?submission_slot - submission_slot)
+    (assessment_event_available ?assessment_event - assessment_event)
+    (assessment_scheduled ?student - student ?assessment_event - assessment_event)
+    (instructor_available ?instructor - instructor)
+    (assigned_instructor ?student - student ?instructor - instructor)
+    (remediation_resource_available ?remediation_resource - remediation_resource)
+    (primary_enrollment_remediation_allocated ?primary_enrollment - primary_enrollment ?remediation_resource - remediation_resource)
+    (elective_enrollment_remediation_allocated ?elective_enrollment - elective_enrollment ?remediation_resource - remediation_resource)
+    (primary_enrollment_recovery_pathway_assigned ?primary_enrollment - primary_enrollment ?recovery_pathway - recovery_pathway)
+    (recovery_pathway_active ?recovery_pathway - recovery_pathway)
+    (recovery_pathway_resource_allocated ?recovery_pathway - recovery_pathway)
+    (primary_recovery_completed ?primary_enrollment - primary_enrollment)
+    (elective_enrollment_assessment_sequence ?elective_enrollment - elective_enrollment ?assessment_sequence - assessment_sequence)
+    (assessment_sequence_active ?assessment_sequence - assessment_sequence)
+    (assessment_sequence_resource_allocated ?assessment_sequence - assessment_sequence)
+    (elective_recovery_completed ?elective_enrollment - elective_enrollment)
+    (grade_package_slot_available ?grade_record_package - grade_record_package)
+    (grade_package_created ?grade_record_package - grade_record_package)
+    (grade_package_includes_recovery_pathway ?grade_record_package - grade_record_package ?recovery_pathway - recovery_pathway)
+    (grade_package_includes_assessment_sequence ?grade_record_package - grade_record_package ?assessment_sequence - assessment_sequence)
+    (grade_package_primary_flag ?grade_record_package - grade_record_package)
+    (grade_package_elective_flag ?grade_record_package - grade_record_package)
+    (grade_package_marked_ready ?grade_record_package - grade_record_package)
+    (candidacy_primary_enrollment_link ?candidacy_case - honors_candidacy_case ?primary_enrollment - primary_enrollment)
+    (candidacy_elective_enrollment_link ?candidacy_case - honors_candidacy_case ?elective_enrollment - elective_enrollment)
+    (candidacy_has_grade_package ?candidacy_case - honors_candidacy_case ?grade_record_package - grade_record_package)
+    (milestone_document_available ?milestone_document - milestone_document)
+    (candidacy_has_milestone_document ?candidacy_case - honors_candidacy_case ?milestone_document - milestone_document)
+    (milestone_document_activated ?milestone_document - milestone_document)
+    (milestone_document_attached_to_package ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    (candidacy_milestone_verified ?candidacy_case - honors_candidacy_case)
+    (candidacy_evidence_verified ?candidacy_case - honors_candidacy_case)
+    (candidacy_review_approved ?candidacy_case - honors_candidacy_case)
+    (faculty_endorsement_assigned ?candidacy_case - honors_candidacy_case)
+    (endorsement_materialized ?candidacy_case - honors_candidacy_case)
+    (administrative_stamp_present ?candidacy_case - honors_candidacy_case)
+    (final_review_cleared ?candidacy_case - honors_candidacy_case)
+    (faculty_recommendation_available ?portfolio_item - portfolio_item)
+    (candidacy_portfolio_item_attached ?candidacy_case - honors_candidacy_case ?portfolio_item - portfolio_item)
+    (faculty_recommendation_assigned ?candidacy_case - honors_candidacy_case)
+    (faculty_recommendation_verified ?candidacy_case - honors_candidacy_case)
+    (faculty_recommendation_sealed ?candidacy_case - honors_candidacy_case)
+    (faculty_endorsement_available ?faculty_endorsement - faculty_endorsement)
+    (candidacy_endorsement_attached ?candidacy_case - honors_candidacy_case ?faculty_endorsement - faculty_endorsement)
+    (administrative_stamp_available ?administrative_stamp - administrative_stamp)
+    (candidacy_administrative_stamp_attached ?candidacy_case - honors_candidacy_case ?administrative_stamp - administrative_stamp)
+    (verification_evidence_available ?verification_evidence - verification_evidence)
+    (candidacy_verification_evidence_attached ?candidacy_case - honors_candidacy_case ?verification_evidence - verification_evidence)
+    (external_certificate_available ?external_certificate - external_certificate)
+    (candidacy_has_external_certificate ?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate)
+    (application_token_available ?application_token - application_token)
+    (application_token_attached ?student - student ?application_token - application_token)
+    (primary_recovery_active ?primary_enrollment - primary_enrollment)
+    (elective_recovery_active ?elective_enrollment - elective_enrollment)
+    (candidacy_admin_certified ?candidacy_case - honors_candidacy_case)
+  )
+  (:action initiate_submission_planning
+    :parameters (?student - student)
+    :precondition
+      (and
+        (not
+          (submission_planning_initiated ?student)
+        )
+        (not
+          (honors_award_assigned ?student)
+        )
+      )
+    :effect (submission_planning_initiated ?student)
+  )
+  (:action reserve_submission_slot
+    :parameters (?student - student ?submission_slot - submission_slot)
+    :precondition
+      (and
+        (submission_planning_initiated ?student)
+        (not
+          (submission_reserved ?student)
+        )
+        (submission_slot_available ?submission_slot)
+      )
+    :effect
+      (and
+        (submission_reserved ?student)
+        (reserved_submission_slot ?student ?submission_slot)
+        (not
+          (submission_slot_available ?submission_slot)
+        )
+      )
+  )
+  (:action schedule_assessment_event
+    :parameters (?student - student ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (submission_planning_initiated ?student)
+        (submission_reserved ?student)
+        (assessment_event_available ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_scheduled ?student ?assessment_event)
+        (not
+          (assessment_event_available ?assessment_event)
+        )
+      )
+  )
+  (:action confirm_assessment_eligibility
+    :parameters (?student - student ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (submission_planning_initiated ?student)
+        (submission_reserved ?student)
+        (assessment_scheduled ?student ?assessment_event)
+        (not
+          (eligible_for_assessment ?student)
+        )
+      )
+    :effect (eligible_for_assessment ?student)
+  )
+  (:action release_assessment_reservation
+    :parameters (?student - student ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (assessment_scheduled ?student ?assessment_event)
+      )
+    :effect
+      (and
+        (assessment_event_available ?assessment_event)
+        (not
+          (assessment_scheduled ?student ?assessment_event)
+        )
+      )
+  )
+  (:action assign_instructor
+    :parameters (?student - student ?instructor - instructor)
+    :precondition
+      (and
+        (eligible_for_assessment ?student)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (assigned_instructor ?student ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action unassign_instructor
+    :parameters (?student - student ?instructor - instructor)
+    :precondition
+      (and
+        (assigned_instructor ?student ?instructor)
+      )
+    :effect
+      (and
+        (instructor_available ?instructor)
+        (not
+          (assigned_instructor ?student ?instructor)
+        )
+      )
+  )
+  (:action attach_verification_evidence_to_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?verification_evidence - verification_evidence)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (verification_evidence_available ?verification_evidence)
+      )
+    :effect
+      (and
+        (candidacy_verification_evidence_attached ?candidacy_case ?verification_evidence)
+        (not
+          (verification_evidence_available ?verification_evidence)
+        )
+      )
+  )
+  (:action detach_verification_evidence_from_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?verification_evidence - verification_evidence)
+    :precondition
+      (and
+        (candidacy_verification_evidence_attached ?candidacy_case ?verification_evidence)
+      )
+    :effect
+      (and
+        (verification_evidence_available ?verification_evidence)
+        (not
+          (candidacy_verification_evidence_attached ?candidacy_case ?verification_evidence)
+        )
+      )
+  )
+  (:action attach_external_certificate_to_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (external_certificate_available ?external_certificate)
+      )
+    :effect
+      (and
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (not
+          (external_certificate_available ?external_certificate)
+        )
+      )
+  )
+  (:action detach_external_certificate_from_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate)
+    :precondition
+      (and
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+      )
+    :effect
+      (and
+        (external_certificate_available ?external_certificate)
+        (not
+          (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        )
+      )
+  )
+  (:action initiate_primary_recovery_pathway
+    :parameters (?primary_enrollment - primary_enrollment ?recovery_pathway - recovery_pathway ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (eligible_for_assessment ?primary_enrollment)
+        (assessment_scheduled ?primary_enrollment ?assessment_event)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (not
+          (recovery_pathway_active ?recovery_pathway)
+        )
+        (not
+          (recovery_pathway_resource_allocated ?recovery_pathway)
+        )
+      )
+    :effect (recovery_pathway_active ?recovery_pathway)
+  )
+  (:action apply_instructor_intervention_primary
+    :parameters (?primary_enrollment - primary_enrollment ?recovery_pathway - recovery_pathway ?instructor - instructor)
+    :precondition
+      (and
+        (eligible_for_assessment ?primary_enrollment)
+        (assigned_instructor ?primary_enrollment ?instructor)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (recovery_pathway_active ?recovery_pathway)
+        (not
+          (primary_recovery_active ?primary_enrollment)
+        )
+      )
+    :effect
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (primary_recovery_completed ?primary_enrollment)
+      )
+  )
+  (:action allocate_remediation_resource_to_primary_enrollment
+    :parameters (?primary_enrollment - primary_enrollment ?recovery_pathway - recovery_pathway ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (eligible_for_assessment ?primary_enrollment)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (primary_recovery_active ?primary_enrollment)
+        )
+      )
+    :effect
+      (and
+        (recovery_pathway_resource_allocated ?recovery_pathway)
+        (primary_recovery_active ?primary_enrollment)
+        (primary_enrollment_remediation_allocated ?primary_enrollment ?remediation_resource)
+        (not
+          (remediation_resource_available ?remediation_resource)
+        )
+      )
+  )
+  (:action advance_primary_recovery
+    :parameters (?primary_enrollment - primary_enrollment ?recovery_pathway - recovery_pathway ?assessment_event - assessment_event ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (eligible_for_assessment ?primary_enrollment)
+        (assessment_scheduled ?primary_enrollment ?assessment_event)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (recovery_pathway_resource_allocated ?recovery_pathway)
+        (primary_enrollment_remediation_allocated ?primary_enrollment ?remediation_resource)
+        (not
+          (primary_recovery_completed ?primary_enrollment)
+        )
+      )
+    :effect
+      (and
+        (recovery_pathway_active ?recovery_pathway)
+        (primary_recovery_completed ?primary_enrollment)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (primary_enrollment_remediation_allocated ?primary_enrollment ?remediation_resource)
+        )
+      )
+  )
+  (:action initiate_elective_recovery_pathway
+    :parameters (?elective_enrollment - elective_enrollment ?assessment_sequence - assessment_sequence ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (eligible_for_assessment ?elective_enrollment)
+        (assessment_scheduled ?elective_enrollment ?assessment_event)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (not
+          (assessment_sequence_active ?assessment_sequence)
+        )
+        (not
+          (assessment_sequence_resource_allocated ?assessment_sequence)
+        )
+      )
+    :effect (assessment_sequence_active ?assessment_sequence)
+  )
+  (:action apply_instructor_intervention_elective
+    :parameters (?elective_enrollment - elective_enrollment ?assessment_sequence - assessment_sequence ?instructor - instructor)
+    :precondition
+      (and
+        (eligible_for_assessment ?elective_enrollment)
+        (assigned_instructor ?elective_enrollment ?instructor)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (assessment_sequence_active ?assessment_sequence)
+        (not
+          (elective_recovery_active ?elective_enrollment)
+        )
+      )
+    :effect
+      (and
+        (elective_recovery_active ?elective_enrollment)
+        (elective_recovery_completed ?elective_enrollment)
+      )
+  )
+  (:action allocate_remediation_resource_to_elective_enrollment
+    :parameters (?elective_enrollment - elective_enrollment ?assessment_sequence - assessment_sequence ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (eligible_for_assessment ?elective_enrollment)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (elective_recovery_active ?elective_enrollment)
+        )
+      )
+    :effect
+      (and
+        (assessment_sequence_resource_allocated ?assessment_sequence)
+        (elective_recovery_active ?elective_enrollment)
+        (elective_enrollment_remediation_allocated ?elective_enrollment ?remediation_resource)
+        (not
+          (remediation_resource_available ?remediation_resource)
+        )
+      )
+  )
+  (:action advance_elective_recovery
+    :parameters (?elective_enrollment - elective_enrollment ?assessment_sequence - assessment_sequence ?assessment_event - assessment_event ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (eligible_for_assessment ?elective_enrollment)
+        (assessment_scheduled ?elective_enrollment ?assessment_event)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (assessment_sequence_resource_allocated ?assessment_sequence)
+        (elective_enrollment_remediation_allocated ?elective_enrollment ?remediation_resource)
+        (not
+          (elective_recovery_completed ?elective_enrollment)
+        )
+      )
+    :effect
+      (and
+        (assessment_sequence_active ?assessment_sequence)
+        (elective_recovery_completed ?elective_enrollment)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (elective_enrollment_remediation_allocated ?elective_enrollment ?remediation_resource)
+        )
+      )
+  )
+  (:action assemble_grade_package_base
+    :parameters (?primary_enrollment - primary_enrollment ?elective_enrollment - elective_enrollment ?recovery_pathway - recovery_pathway ?assessment_sequence - assessment_sequence ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (elective_recovery_active ?elective_enrollment)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (recovery_pathway_active ?recovery_pathway)
+        (assessment_sequence_active ?assessment_sequence)
+        (primary_recovery_completed ?primary_enrollment)
+        (elective_recovery_completed ?elective_enrollment)
+        (grade_package_slot_available ?grade_record_package)
+      )
+    :effect
+      (and
+        (grade_package_created ?grade_record_package)
+        (grade_package_includes_recovery_pathway ?grade_record_package ?recovery_pathway)
+        (grade_package_includes_assessment_sequence ?grade_record_package ?assessment_sequence)
+        (not
+          (grade_package_slot_available ?grade_record_package)
+        )
+      )
+  )
+  (:action assemble_grade_package_primary_qualified
+    :parameters (?primary_enrollment - primary_enrollment ?elective_enrollment - elective_enrollment ?recovery_pathway - recovery_pathway ?assessment_sequence - assessment_sequence ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (elective_recovery_active ?elective_enrollment)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (recovery_pathway_resource_allocated ?recovery_pathway)
+        (assessment_sequence_active ?assessment_sequence)
+        (not
+          (primary_recovery_completed ?primary_enrollment)
+        )
+        (elective_recovery_completed ?elective_enrollment)
+        (grade_package_slot_available ?grade_record_package)
+      )
+    :effect
+      (and
+        (grade_package_created ?grade_record_package)
+        (grade_package_includes_recovery_pathway ?grade_record_package ?recovery_pathway)
+        (grade_package_includes_assessment_sequence ?grade_record_package ?assessment_sequence)
+        (grade_package_primary_flag ?grade_record_package)
+        (not
+          (grade_package_slot_available ?grade_record_package)
+        )
+      )
+  )
+  (:action assemble_grade_package_elective_qualified
+    :parameters (?primary_enrollment - primary_enrollment ?elective_enrollment - elective_enrollment ?recovery_pathway - recovery_pathway ?assessment_sequence - assessment_sequence ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (elective_recovery_active ?elective_enrollment)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (recovery_pathway_active ?recovery_pathway)
+        (assessment_sequence_resource_allocated ?assessment_sequence)
+        (primary_recovery_completed ?primary_enrollment)
+        (not
+          (elective_recovery_completed ?elective_enrollment)
+        )
+        (grade_package_slot_available ?grade_record_package)
+      )
+    :effect
+      (and
+        (grade_package_created ?grade_record_package)
+        (grade_package_includes_recovery_pathway ?grade_record_package ?recovery_pathway)
+        (grade_package_includes_assessment_sequence ?grade_record_package ?assessment_sequence)
+        (grade_package_elective_flag ?grade_record_package)
+        (not
+          (grade_package_slot_available ?grade_record_package)
+        )
+      )
+  )
+  (:action assemble_grade_package_both_qualified
+    :parameters (?primary_enrollment - primary_enrollment ?elective_enrollment - elective_enrollment ?recovery_pathway - recovery_pathway ?assessment_sequence - assessment_sequence ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (elective_recovery_active ?elective_enrollment)
+        (primary_enrollment_recovery_pathway_assigned ?primary_enrollment ?recovery_pathway)
+        (elective_enrollment_assessment_sequence ?elective_enrollment ?assessment_sequence)
+        (recovery_pathway_resource_allocated ?recovery_pathway)
+        (assessment_sequence_resource_allocated ?assessment_sequence)
+        (not
+          (primary_recovery_completed ?primary_enrollment)
+        )
+        (not
+          (elective_recovery_completed ?elective_enrollment)
+        )
+        (grade_package_slot_available ?grade_record_package)
+      )
+    :effect
+      (and
+        (grade_package_created ?grade_record_package)
+        (grade_package_includes_recovery_pathway ?grade_record_package ?recovery_pathway)
+        (grade_package_includes_assessment_sequence ?grade_record_package ?assessment_sequence)
+        (grade_package_primary_flag ?grade_record_package)
+        (grade_package_elective_flag ?grade_record_package)
+        (not
+          (grade_package_slot_available ?grade_record_package)
+        )
+      )
+  )
+  (:action mark_grade_package_ready
+    :parameters (?grade_record_package - grade_record_package ?primary_enrollment - primary_enrollment ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (grade_package_created ?grade_record_package)
+        (primary_recovery_active ?primary_enrollment)
+        (assessment_scheduled ?primary_enrollment ?assessment_event)
+        (not
+          (grade_package_marked_ready ?grade_record_package)
+        )
+      )
+    :effect (grade_package_marked_ready ?grade_record_package)
+  )
+  (:action activate_milestone_document_for_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (candidacy_has_grade_package ?candidacy_case ?grade_record_package)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_available ?milestone_document)
+        (grade_package_created ?grade_record_package)
+        (grade_package_marked_ready ?grade_record_package)
+        (not
+          (milestone_document_activated ?milestone_document)
+        )
+      )
+    :effect
+      (and
+        (milestone_document_activated ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (not
+          (milestone_document_available ?milestone_document)
+        )
+      )
+  )
+  (:action verify_milestone_document_for_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?milestone_document - milestone_document ?grade_record_package - grade_record_package ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_activated ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (assessment_scheduled ?candidacy_case ?assessment_event)
+        (not
+          (grade_package_primary_flag ?grade_record_package)
+        )
+        (not
+          (candidacy_milestone_verified ?candidacy_case)
+        )
+      )
+    :effect (candidacy_milestone_verified ?candidacy_case)
+  )
+  (:action assign_faculty_endorsement_to_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?faculty_endorsement - faculty_endorsement)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (faculty_endorsement_available ?faculty_endorsement)
+        (not
+          (faculty_endorsement_assigned ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (faculty_endorsement_assigned ?candidacy_case)
+        (candidacy_endorsement_attached ?candidacy_case ?faculty_endorsement)
+        (not
+          (faculty_endorsement_available ?faculty_endorsement)
+        )
+      )
+  )
+  (:action materialize_faculty_endorsement_for_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?milestone_document - milestone_document ?grade_record_package - grade_record_package ?assessment_event - assessment_event ?faculty_endorsement - faculty_endorsement)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_activated ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (assessment_scheduled ?candidacy_case ?assessment_event)
+        (grade_package_primary_flag ?grade_record_package)
+        (faculty_endorsement_assigned ?candidacy_case)
+        (candidacy_endorsement_attached ?candidacy_case ?faculty_endorsement)
+        (not
+          (candidacy_milestone_verified ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_milestone_verified ?candidacy_case)
+        (endorsement_materialized ?candidacy_case)
+      )
+  )
+  (:action review_candidate_evidence_stage1
+    :parameters (?candidacy_case - honors_candidacy_case ?verification_evidence - verification_evidence ?instructor - instructor ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_milestone_verified ?candidacy_case)
+        (candidacy_verification_evidence_attached ?candidacy_case ?verification_evidence)
+        (assigned_instructor ?candidacy_case ?instructor)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (not
+          (grade_package_elective_flag ?grade_record_package)
+        )
+        (not
+          (candidacy_evidence_verified ?candidacy_case)
+        )
+      )
+    :effect (candidacy_evidence_verified ?candidacy_case)
+  )
+  (:action review_candidate_evidence_stage2
+    :parameters (?candidacy_case - honors_candidacy_case ?verification_evidence - verification_evidence ?instructor - instructor ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_milestone_verified ?candidacy_case)
+        (candidacy_verification_evidence_attached ?candidacy_case ?verification_evidence)
+        (assigned_instructor ?candidacy_case ?instructor)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (grade_package_elective_flag ?grade_record_package)
+        (not
+          (candidacy_evidence_verified ?candidacy_case)
+        )
+      )
+    :effect (candidacy_evidence_verified ?candidacy_case)
+  )
+  (:action approve_candidate_external_verification_neutral
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_evidence_verified ?candidacy_case)
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (not
+          (grade_package_primary_flag ?grade_record_package)
+        )
+        (not
+          (grade_package_elective_flag ?grade_record_package)
+        )
+        (not
+          (candidacy_review_approved ?candidacy_case)
+        )
+      )
+    :effect (candidacy_review_approved ?candidacy_case)
+  )
+  (:action approve_candidate_external_verification_with_stamp
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_evidence_verified ?candidacy_case)
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (grade_package_primary_flag ?grade_record_package)
+        (not
+          (grade_package_elective_flag ?grade_record_package)
+        )
+        (not
+          (candidacy_review_approved ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (administrative_stamp_present ?candidacy_case)
+      )
+  )
+  (:action approve_candidate_external_verification_with_stamp_alt
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_evidence_verified ?candidacy_case)
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (not
+          (grade_package_primary_flag ?grade_record_package)
+        )
+        (grade_package_elective_flag ?grade_record_package)
+        (not
+          (candidacy_review_approved ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (administrative_stamp_present ?candidacy_case)
+      )
+  )
+  (:action approve_candidate_external_verification_with_stamp_both
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate ?milestone_document - milestone_document ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (candidacy_evidence_verified ?candidacy_case)
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (candidacy_has_milestone_document ?candidacy_case ?milestone_document)
+        (milestone_document_attached_to_package ?milestone_document ?grade_record_package)
+        (grade_package_primary_flag ?grade_record_package)
+        (grade_package_elective_flag ?grade_record_package)
+        (not
+          (candidacy_review_approved ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (administrative_stamp_present ?candidacy_case)
+      )
+  )
+  (:action finalize_candidacy_decision
+    :parameters (?candidacy_case - honors_candidacy_case)
+    :precondition
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (not
+          (administrative_stamp_present ?candidacy_case)
+        )
+        (not
+          (candidacy_admin_certified ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_admin_certified ?candidacy_case)
+        (honors_award_certified ?candidacy_case)
+      )
+  )
+  (:action attach_administrative_stamp_to_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?administrative_stamp - administrative_stamp)
+    :precondition
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (administrative_stamp_present ?candidacy_case)
+        (administrative_stamp_available ?administrative_stamp)
+      )
+    :effect
+      (and
+        (candidacy_administrative_stamp_attached ?candidacy_case ?administrative_stamp)
+        (not
+          (administrative_stamp_available ?administrative_stamp)
+        )
+      )
+  )
+  (:action certify_candidacy_readiness
+    :parameters (?candidacy_case - honors_candidacy_case ?primary_enrollment - primary_enrollment ?elective_enrollment - elective_enrollment ?assessment_event - assessment_event ?administrative_stamp - administrative_stamp)
+    :precondition
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (administrative_stamp_present ?candidacy_case)
+        (candidacy_administrative_stamp_attached ?candidacy_case ?administrative_stamp)
+        (candidacy_primary_enrollment_link ?candidacy_case ?primary_enrollment)
+        (candidacy_elective_enrollment_link ?candidacy_case ?elective_enrollment)
+        (primary_recovery_completed ?primary_enrollment)
+        (elective_recovery_completed ?elective_enrollment)
+        (assessment_scheduled ?candidacy_case ?assessment_event)
+        (not
+          (final_review_cleared ?candidacy_case)
+        )
+      )
+    :effect (final_review_cleared ?candidacy_case)
+  )
+  (:action apply_final_admin_certification
+    :parameters (?candidacy_case - honors_candidacy_case)
+    :precondition
+      (and
+        (candidacy_review_approved ?candidacy_case)
+        (final_review_cleared ?candidacy_case)
+        (not
+          (candidacy_admin_certified ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_admin_certified ?candidacy_case)
+        (honors_award_certified ?candidacy_case)
+      )
+  )
+  (:action attach_faculty_recommendation_to_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case ?portfolio_item - portfolio_item ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (eligible_for_assessment ?candidacy_case)
+        (assessment_scheduled ?candidacy_case ?assessment_event)
+        (faculty_recommendation_available ?portfolio_item)
+        (candidacy_portfolio_item_attached ?candidacy_case ?portfolio_item)
+        (not
+          (faculty_recommendation_assigned ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (faculty_recommendation_assigned ?candidacy_case)
+        (not
+          (faculty_recommendation_available ?portfolio_item)
+        )
+      )
+  )
+  (:action verify_faculty_recommendation
+    :parameters (?candidacy_case - honors_candidacy_case ?instructor - instructor)
+    :precondition
+      (and
+        (faculty_recommendation_assigned ?candidacy_case)
+        (assigned_instructor ?candidacy_case ?instructor)
+        (not
+          (faculty_recommendation_verified ?candidacy_case)
+        )
+      )
+    :effect (faculty_recommendation_verified ?candidacy_case)
+  )
+  (:action finalize_recommendation_with_external_certificate
+    :parameters (?candidacy_case - honors_candidacy_case ?external_certificate - external_certificate)
+    :precondition
+      (and
+        (faculty_recommendation_verified ?candidacy_case)
+        (candidacy_has_external_certificate ?candidacy_case ?external_certificate)
+        (not
+          (faculty_recommendation_sealed ?candidacy_case)
+        )
+      )
+    :effect (faculty_recommendation_sealed ?candidacy_case)
+  )
+  (:action seal_recommendation_and_certify_candidacy
+    :parameters (?candidacy_case - honors_candidacy_case)
+    :precondition
+      (and
+        (faculty_recommendation_sealed ?candidacy_case)
+        (not
+          (candidacy_admin_certified ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (candidacy_admin_certified ?candidacy_case)
+        (honors_award_certified ?candidacy_case)
+      )
+  )
+  (:action emit_award_to_primary_enrollment
+    :parameters (?primary_enrollment - primary_enrollment ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (primary_recovery_active ?primary_enrollment)
+        (primary_recovery_completed ?primary_enrollment)
+        (grade_package_created ?grade_record_package)
+        (grade_package_marked_ready ?grade_record_package)
+        (not
+          (honors_award_certified ?primary_enrollment)
+        )
+      )
+    :effect (honors_award_certified ?primary_enrollment)
+  )
+  (:action emit_award_to_elective_enrollment
+    :parameters (?elective_enrollment - elective_enrollment ?grade_record_package - grade_record_package)
+    :precondition
+      (and
+        (elective_recovery_active ?elective_enrollment)
+        (elective_recovery_completed ?elective_enrollment)
+        (grade_package_created ?grade_record_package)
+        (grade_package_marked_ready ?grade_record_package)
+        (not
+          (honors_award_certified ?elective_enrollment)
+        )
+      )
+    :effect (honors_award_certified ?elective_enrollment)
+  )
+  (:action propagate_award_to_student
+    :parameters (?student - student ?application_token - application_token ?assessment_event - assessment_event)
+    :precondition
+      (and
+        (honors_award_certified ?student)
+        (assessment_scheduled ?student ?assessment_event)
+        (application_token_available ?application_token)
+        (not
+          (award_propagation_authorized ?student)
+        )
+      )
+    :effect
+      (and
+        (award_propagation_authorized ?student)
+        (application_token_attached ?student ?application_token)
+        (not
+          (application_token_available ?application_token)
+        )
+      )
+  )
+  (:action propagate_award_to_primary_enrollment
+    :parameters (?primary_enrollment - primary_enrollment ?submission_slot - submission_slot ?application_token - application_token)
+    :precondition
+      (and
+        (award_propagation_authorized ?primary_enrollment)
+        (reserved_submission_slot ?primary_enrollment ?submission_slot)
+        (application_token_attached ?primary_enrollment ?application_token)
+        (not
+          (honors_award_assigned ?primary_enrollment)
+        )
+      )
+    :effect
+      (and
+        (honors_award_assigned ?primary_enrollment)
+        (submission_slot_available ?submission_slot)
+        (application_token_available ?application_token)
+      )
+  )
+  (:action propagate_award_to_elective_enrollment
+    :parameters (?elective_enrollment - elective_enrollment ?submission_slot - submission_slot ?application_token - application_token)
+    :precondition
+      (and
+        (award_propagation_authorized ?elective_enrollment)
+        (reserved_submission_slot ?elective_enrollment ?submission_slot)
+        (application_token_attached ?elective_enrollment ?application_token)
+        (not
+          (honors_award_assigned ?elective_enrollment)
+        )
+      )
+    :effect
+      (and
+        (honors_award_assigned ?elective_enrollment)
+        (submission_slot_available ?submission_slot)
+        (application_token_available ?application_token)
+      )
+  )
+  (:action propagate_award_to_candidacy_case
+    :parameters (?candidacy_case - honors_candidacy_case ?submission_slot - submission_slot ?application_token - application_token)
+    :precondition
+      (and
+        (award_propagation_authorized ?candidacy_case)
+        (reserved_submission_slot ?candidacy_case ?submission_slot)
+        (application_token_attached ?candidacy_case ?application_token)
+        (not
+          (honors_award_assigned ?candidacy_case)
+        )
+      )
+    :effect
+      (and
+        (honors_award_assigned ?candidacy_case)
+        (submission_slot_available ?submission_slot)
+        (application_token_available ?application_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem honors_eligibility_instance)
+  (:domain honors_eligibility_workflow)
+  (:objects enrollment_primary_1 - primary_enrollment enrollment_elective_1 - elective_enrollment candidacy_case_1 - honors_candidacy_case candidacy_case_2 - honors_candidacy_case submission_slot_1 - submission_slot submission_slot_2 - submission_slot submission_slot_3 - submission_slot assessment_event_1 - assessment_event instructor_1 - instructor remediation_resource_1 - remediation_resource recovery_pathway_1 - recovery_pathway assessment_sequence_1 - assessment_sequence grade_package_1 - grade_record_package milestone_doc_1 - milestone_document milestone_doc_2 - milestone_document faculty_endorsement_1 - faculty_endorsement faculty_endorsement_2 - faculty_endorsement administrative_stamp_1 - administrative_stamp administrative_stamp_2 - administrative_stamp application_token_1 - application_token verification_evidence_1 - verification_evidence portfolio_item_1 - portfolio_item portfolio_item_2 - portfolio_item external_certificate_1 - external_certificate)
+  (:init
+    (submission_slot_available submission_slot_1)
+    (submission_slot_available submission_slot_2)
+    (submission_slot_available submission_slot_3)
+    (assessment_event_available assessment_event_1)
+    (instructor_available instructor_1)
+    (remediation_resource_available remediation_resource_1)
+    (primary_enrollment_recovery_pathway_assigned enrollment_primary_1 recovery_pathway_1)
+    (elective_enrollment_assessment_sequence enrollment_elective_1 assessment_sequence_1)
+    (grade_package_slot_available grade_package_1)
+    (milestone_document_available milestone_doc_1)
+    (milestone_document_available milestone_doc_2)
+    (candidacy_primary_enrollment_link candidacy_case_1 enrollment_primary_1)
+    (candidacy_primary_enrollment_link candidacy_case_2 enrollment_primary_1)
+    (candidacy_elective_enrollment_link candidacy_case_1 enrollment_elective_1)
+    (candidacy_elective_enrollment_link candidacy_case_2 enrollment_elective_1)
+    (candidacy_has_grade_package candidacy_case_1 grade_package_1)
+    (candidacy_has_grade_package candidacy_case_2 grade_package_1)
+    (candidacy_has_milestone_document candidacy_case_1 milestone_doc_1)
+    (candidacy_has_milestone_document candidacy_case_2 milestone_doc_2)
+    (faculty_endorsement_available faculty_endorsement_1)
+    (faculty_endorsement_available faculty_endorsement_2)
+    (administrative_stamp_available administrative_stamp_1)
+    (administrative_stamp_available administrative_stamp_2)
+    (application_token_available application_token_1)
+    (verification_evidence_available verification_evidence_1)
+    (faculty_recommendation_available portfolio_item_1)
+    (candidacy_portfolio_item_attached candidacy_case_1 portfolio_item_1)
+    (candidacy_portfolio_item_attached candidacy_case_2 portfolio_item_2)
+    (external_certificate_available external_certificate_1)
+  )
+  (:goal
+    (and
+      (honors_award_assigned enrollment_primary_1)
+      (honors_award_assigned enrollment_elective_1)
+      (honors_award_assigned candidacy_case_1)
+      (honors_award_assigned candidacy_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initiate_submission_planning enrollment_primary_1)
+(reserve_submission_slot enrollment_primary_1 submission_slot_1)
+(schedule_assessment_event enrollment_primary_1 assessment_event_1)
+(confirm_assessment_eligibility enrollment_primary_1 assessment_event_1)
+(assign_instructor enrollment_primary_1 instructor_1)
+(initiate_primary_recovery_pathway enrollment_primary_1 recovery_pathway_1 assessment_event_1)
+(apply_instructor_intervention_primary enrollment_primary_1 recovery_pathway_1 instructor_1)
+(unassign_instructor enrollment_primary_1 instructor_1)
+(release_assessment_reservation enrollment_primary_1 assessment_event_1)
+(initiate_submission_planning enrollment_elective_1)
+(reserve_submission_slot enrollment_elective_1 submission_slot_2)
+(schedule_assessment_event enrollment_elective_1 assessment_event_1)
+(confirm_assessment_eligibility enrollment_elective_1 assessment_event_1)
+(assign_instructor enrollment_elective_1 instructor_1)
+(initiate_elective_recovery_pathway enrollment_elective_1 assessment_sequence_1 assessment_event_1)
+(apply_instructor_intervention_elective enrollment_elective_1 assessment_sequence_1 instructor_1)
+(unassign_instructor enrollment_elective_1 instructor_1)
+(release_assessment_reservation enrollment_elective_1 assessment_event_1)
+(assemble_grade_package_base enrollment_primary_1 enrollment_elective_1 recovery_pathway_1 assessment_sequence_1 grade_package_1)
+(schedule_assessment_event enrollment_primary_1 assessment_event_1)
+(mark_grade_package_ready grade_package_1 enrollment_primary_1 assessment_event_1)
+(emit_award_to_primary_enrollment enrollment_primary_1 grade_package_1)
+(emit_award_to_elective_enrollment enrollment_elective_1 grade_package_1)
+(release_assessment_reservation enrollment_primary_1 assessment_event_1)
+(initiate_submission_planning candidacy_case_1)
+(reserve_submission_slot candidacy_case_1 submission_slot_3)
+(schedule_assessment_event candidacy_case_1 assessment_event_1)
+(confirm_assessment_eligibility candidacy_case_1 assessment_event_1)
+(attach_verification_evidence_to_candidacy candidacy_case_1 verification_evidence_1)
+(attach_external_certificate_to_candidacy candidacy_case_1 external_certificate_1)
+(activate_milestone_document_for_candidacy candidacy_case_1 milestone_doc_1 grade_package_1)
+(verify_milestone_document_for_candidacy candidacy_case_1 milestone_doc_1 grade_package_1 assessment_event_1)
+(assign_instructor candidacy_case_1 instructor_1)
+(review_candidate_evidence_stage1 candidacy_case_1 verification_evidence_1 instructor_1 milestone_doc_1 grade_package_1)
+(unassign_instructor candidacy_case_1 instructor_1)
+(approve_candidate_external_verification_neutral candidacy_case_1 external_certificate_1 milestone_doc_1 grade_package_1)
+(finalize_candidacy_decision candidacy_case_1)
+(propagate_award_to_student candidacy_case_1 application_token_1 assessment_event_1)
+(propagate_award_to_candidacy_case candidacy_case_1 submission_slot_3 application_token_1)
+(release_assessment_reservation candidacy_case_1 assessment_event_1)
+(detach_verification_evidence_from_candidacy candidacy_case_1 verification_evidence_1)
+(detach_external_certificate_from_candidacy candidacy_case_1 external_certificate_1)
+(initiate_submission_planning candidacy_case_2)
+(reserve_submission_slot candidacy_case_2 submission_slot_3)
+(schedule_assessment_event candidacy_case_2 assessment_event_1)
+(confirm_assessment_eligibility candidacy_case_2 assessment_event_1)
+(attach_verification_evidence_to_candidacy candidacy_case_2 verification_evidence_1)
+(attach_external_certificate_to_candidacy candidacy_case_2 external_certificate_1)
+(activate_milestone_document_for_candidacy candidacy_case_2 milestone_doc_2 grade_package_1)
+(verify_milestone_document_for_candidacy candidacy_case_2 milestone_doc_2 grade_package_1 assessment_event_1)
+(assign_instructor candidacy_case_2 instructor_1)
+(review_candidate_evidence_stage1 candidacy_case_2 verification_evidence_1 instructor_1 milestone_doc_2 grade_package_1)
+(unassign_instructor candidacy_case_2 instructor_1)
+(approve_candidate_external_verification_neutral candidacy_case_2 external_certificate_1 milestone_doc_2 grade_package_1)
+(finalize_candidacy_decision candidacy_case_2)
+(propagate_award_to_student candidacy_case_2 application_token_1 assessment_event_1)
+(propagate_award_to_candidacy_case candidacy_case_2 submission_slot_3 application_token_1)
+(release_assessment_reservation candidacy_case_2 assessment_event_1)
+(schedule_assessment_event enrollment_primary_1 assessment_event_1)
+(propagate_award_to_student enrollment_primary_1 application_token_1 assessment_event_1)
+(propagate_award_to_primary_enrollment enrollment_primary_1 submission_slot_1 application_token_1)
+(release_assessment_reservation enrollment_primary_1 assessment_event_1)
+(schedule_assessment_event enrollment_elective_1 assessment_event_1)
+(propagate_award_to_student enrollment_elective_1 application_token_1 assessment_event_1)
+(propagate_award_to_elective_enrollment enrollment_elective_1 submission_slot_2 application_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_0wcc07my/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 65 
+
+Successful plans:
+Value: 65
+ /tmp/val_0wcc07my/plan.pddl 65 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_partial_trip_salvage_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity_base - object domain_provider_base - object domain_resource_base - object domain_root - object salvage_case - domain_root alternative_service_option - domain_entity_base communication_channel - domain_entity_base service_agent - domain_entity_base documentation_item - domain_entity_base authorization_token - domain_entity_base refund_account - domain_entity_base replacement_asset - domain_entity_base policy_clause - domain_entity_base compensation_package - domain_provider_base service_package - domain_provider_base response_template - domain_provider_base itinerary_segment - domain_resource_base replacement_segment_option - domain_resource_base salvage_plan_proposal - domain_resource_base passenger_case_base - salvage_case operator_case_base - salvage_case passenger_case_individual - passenger_case_base passenger_case_group_member - passenger_case_base operator_case - operator_case_base)
+  (:predicates
+    (salvage_open ?salvage_case - salvage_case)
+    (salvage_validated ?salvage_case - salvage_case)
+    (salvage_option_assigned ?salvage_case - salvage_case)
+    (salvage_closed ?salvage_case - salvage_case)
+    (salvage_recovery_confirmed ?salvage_case - salvage_case)
+    (salvage_compensation_initiated ?salvage_case - salvage_case)
+    (alternative_service_option_available ?alternative_service_option - alternative_service_option)
+    (salvage_assigned_alternative_service_option ?salvage_case - salvage_case ?alternative_service_option - alternative_service_option)
+    (communication_channel_available ?communication_channel - communication_channel)
+    (salvage_assigned_channel ?salvage_case - salvage_case ?communication_channel - communication_channel)
+    (service_agent_available ?service_agent - service_agent)
+    (salvage_assigned_agent ?salvage_case - salvage_case ?service_agent - service_agent)
+    (compensation_package_available ?compensation_package - compensation_package)
+    (passenger_case_allocated_compensation ?passenger_case_individual - passenger_case_individual ?compensation_package - compensation_package)
+    (passenger_case_group_member_allocated_compensation ?passenger_case_group_member - passenger_case_group_member ?compensation_package - compensation_package)
+    (case_impacted_itinerary_segment ?passenger_case_individual - passenger_case_individual ?itinerary_segment - itinerary_segment)
+    (itinerary_segment_lock_pending ?itinerary_segment - itinerary_segment)
+    (itinerary_segment_lock_confirmed ?itinerary_segment - itinerary_segment)
+    (passenger_case_segment_confirmed ?passenger_case_individual - passenger_case_individual)
+    (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member - passenger_case_group_member ?replacement_segment_option - replacement_segment_option)
+    (replacement_option_lock_pending ?replacement_segment_option - replacement_segment_option)
+    (replacement_option_lock_confirmed ?replacement_segment_option - replacement_segment_option)
+    (passenger_case_group_member_segment_confirmed ?passenger_case_group_member - passenger_case_group_member)
+    (salvage_plan_slot_open ?salvage_plan_proposal - salvage_plan_proposal)
+    (salvage_plan_proposed ?salvage_plan_proposal - salvage_plan_proposal)
+    (salvage_plan_includes_segment ?salvage_plan_proposal - salvage_plan_proposal ?itinerary_segment - itinerary_segment)
+    (salvage_plan_includes_replacement_option ?salvage_plan_proposal - salvage_plan_proposal ?replacement_segment_option - replacement_segment_option)
+    (salvage_plan_vendor_confirmed ?salvage_plan_proposal - salvage_plan_proposal)
+    (salvage_plan_funding_confirmed ?salvage_plan_proposal - salvage_plan_proposal)
+    (salvage_plan_validated ?salvage_plan_proposal - salvage_plan_proposal)
+    (operator_case_covers_passenger_case ?operator_case - operator_case ?passenger_case_individual - passenger_case_individual)
+    (operator_case_covers_group_member ?operator_case - operator_case ?passenger_case_group_member - passenger_case_group_member)
+    (operator_case_includes_plan_proposal ?operator_case - operator_case ?salvage_plan_proposal - salvage_plan_proposal)
+    (service_package_available ?service_package - service_package)
+    (operator_case_assigned_service_package ?operator_case - operator_case ?service_package - service_package)
+    (service_package_allocated ?service_package - service_package)
+    (service_package_linked_to_plan ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    (operator_case_asset_allocated ?operator_case - operator_case)
+    (operator_case_asset_confirmed ?operator_case - operator_case)
+    (policy_clause_applied_to_operator_case ?operator_case - operator_case)
+    (response_template_selected_for_operator_case ?operator_case - operator_case)
+    (operator_case_template_applied ?operator_case - operator_case)
+    (operator_case_policy_escalation_flag ?operator_case - operator_case)
+    (operator_case_final_validation_done ?operator_case - operator_case)
+    (response_template_available ?response_template - response_template)
+    (operator_case_assigned_response_template ?operator_case - operator_case ?response_template - response_template)
+    (operator_case_escalated ?operator_case - operator_case)
+    (operator_case_agent_engaged ?operator_case - operator_case)
+    (operator_case_agent_engagement_confirmed ?operator_case - operator_case)
+    (documentation_item_available ?documentation_item - documentation_item)
+    (operator_case_documentation_attached ?operator_case - operator_case ?documentation_item - documentation_item)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (operator_case_authorized ?operator_case - operator_case ?authorization_token - authorization_token)
+    (replacement_asset_available ?replacement_asset - replacement_asset)
+    (operator_case_assigned_replacement_asset ?operator_case - operator_case ?replacement_asset - replacement_asset)
+    (policy_clause_available ?policy_clause - policy_clause)
+    (operator_case_applied_policy_clause ?operator_case - operator_case ?policy_clause - policy_clause)
+    (refund_account_available ?refund_account - refund_account)
+    (salvage_refund_account_assigned ?salvage_case - salvage_case ?refund_account - refund_account)
+    (passenger_case_segment_locked ?passenger_case_individual - passenger_case_individual)
+    (passenger_case_group_member_segment_locked ?passenger_case_group_member - passenger_case_group_member)
+    (operator_case_finalized_for_settlement ?operator_case - operator_case)
+  )
+  (:action create_salvage_case
+    :parameters (?salvage_case - salvage_case)
+    :precondition
+      (and
+        (not
+          (salvage_open ?salvage_case)
+        )
+        (not
+          (salvage_closed ?salvage_case)
+        )
+      )
+    :effect (salvage_open ?salvage_case)
+  )
+  (:action assign_alternative_option_to_case
+    :parameters (?salvage_case - salvage_case ?alternative_service_option - alternative_service_option)
+    :precondition
+      (and
+        (salvage_open ?salvage_case)
+        (not
+          (salvage_option_assigned ?salvage_case)
+        )
+        (alternative_service_option_available ?alternative_service_option)
+      )
+    :effect
+      (and
+        (salvage_option_assigned ?salvage_case)
+        (salvage_assigned_alternative_service_option ?salvage_case ?alternative_service_option)
+        (not
+          (alternative_service_option_available ?alternative_service_option)
+        )
+      )
+  )
+  (:action attach_communication_channel_to_case
+    :parameters (?salvage_case - salvage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_open ?salvage_case)
+        (salvage_option_assigned ?salvage_case)
+        (communication_channel_available ?communication_channel)
+      )
+    :effect
+      (and
+        (salvage_assigned_channel ?salvage_case ?communication_channel)
+        (not
+          (communication_channel_available ?communication_channel)
+        )
+      )
+  )
+  (:action validate_salvage_case_with_channel
+    :parameters (?salvage_case - salvage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_open ?salvage_case)
+        (salvage_option_assigned ?salvage_case)
+        (salvage_assigned_channel ?salvage_case ?communication_channel)
+        (not
+          (salvage_validated ?salvage_case)
+        )
+      )
+    :effect (salvage_validated ?salvage_case)
+  )
+  (:action release_communication_channel_from_case
+    :parameters (?salvage_case - salvage_case ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_assigned_channel ?salvage_case ?communication_channel)
+      )
+    :effect
+      (and
+        (communication_channel_available ?communication_channel)
+        (not
+          (salvage_assigned_channel ?salvage_case ?communication_channel)
+        )
+      )
+  )
+  (:action assign_service_agent_to_case
+    :parameters (?salvage_case - salvage_case ?service_agent - service_agent)
+    :precondition
+      (and
+        (salvage_validated ?salvage_case)
+        (service_agent_available ?service_agent)
+      )
+    :effect
+      (and
+        (salvage_assigned_agent ?salvage_case ?service_agent)
+        (not
+          (service_agent_available ?service_agent)
+        )
+      )
+  )
+  (:action release_service_agent_from_case
+    :parameters (?salvage_case - salvage_case ?service_agent - service_agent)
+    :precondition
+      (and
+        (salvage_assigned_agent ?salvage_case ?service_agent)
+      )
+    :effect
+      (and
+        (service_agent_available ?service_agent)
+        (not
+          (salvage_assigned_agent ?salvage_case ?service_agent)
+        )
+      )
+  )
+  (:action allocate_replacement_asset_to_operator_case
+    :parameters (?operator_case - operator_case ?replacement_asset - replacement_asset)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (replacement_asset_available ?replacement_asset)
+      )
+    :effect
+      (and
+        (operator_case_assigned_replacement_asset ?operator_case ?replacement_asset)
+        (not
+          (replacement_asset_available ?replacement_asset)
+        )
+      )
+  )
+  (:action release_replacement_asset_from_operator_case
+    :parameters (?operator_case - operator_case ?replacement_asset - replacement_asset)
+    :precondition
+      (and
+        (operator_case_assigned_replacement_asset ?operator_case ?replacement_asset)
+      )
+    :effect
+      (and
+        (replacement_asset_available ?replacement_asset)
+        (not
+          (operator_case_assigned_replacement_asset ?operator_case ?replacement_asset)
+        )
+      )
+  )
+  (:action apply_policy_clause_to_operator_case
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (policy_clause_available ?policy_clause)
+      )
+    :effect
+      (and
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (not
+          (policy_clause_available ?policy_clause)
+        )
+      )
+  )
+  (:action remove_policy_clause_from_operator_case
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+      )
+    :effect
+      (and
+        (policy_clause_available ?policy_clause)
+        (not
+          (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        )
+      )
+  )
+  (:action request_itinerary_segment_lock
+    :parameters (?passenger_case_individual - passenger_case_individual ?itinerary_segment - itinerary_segment ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_individual)
+        (salvage_assigned_channel ?passenger_case_individual ?communication_channel)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (not
+          (itinerary_segment_lock_pending ?itinerary_segment)
+        )
+        (not
+          (itinerary_segment_lock_confirmed ?itinerary_segment)
+        )
+      )
+    :effect (itinerary_segment_lock_pending ?itinerary_segment)
+  )
+  (:action confirm_segment_lock_with_agent
+    :parameters (?passenger_case_individual - passenger_case_individual ?itinerary_segment - itinerary_segment ?service_agent - service_agent)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_individual)
+        (salvage_assigned_agent ?passenger_case_individual ?service_agent)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (itinerary_segment_lock_pending ?itinerary_segment)
+        (not
+          (passenger_case_segment_locked ?passenger_case_individual)
+        )
+      )
+    :effect
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+      )
+  )
+  (:action reserve_compensation_and_lock_segment
+    :parameters (?passenger_case_individual - passenger_case_individual ?itinerary_segment - itinerary_segment ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_individual)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (compensation_package_available ?compensation_package)
+        (not
+          (passenger_case_segment_locked ?passenger_case_individual)
+        )
+      )
+    :effect
+      (and
+        (itinerary_segment_lock_confirmed ?itinerary_segment)
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_allocated_compensation ?passenger_case_individual ?compensation_package)
+        (not
+          (compensation_package_available ?compensation_package)
+        )
+      )
+  )
+  (:action finalize_segment_reservation
+    :parameters (?passenger_case_individual - passenger_case_individual ?itinerary_segment - itinerary_segment ?communication_channel - communication_channel ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_individual)
+        (salvage_assigned_channel ?passenger_case_individual ?communication_channel)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (itinerary_segment_lock_confirmed ?itinerary_segment)
+        (passenger_case_allocated_compensation ?passenger_case_individual ?compensation_package)
+        (not
+          (passenger_case_segment_confirmed ?passenger_case_individual)
+        )
+      )
+    :effect
+      (and
+        (itinerary_segment_lock_pending ?itinerary_segment)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+        (compensation_package_available ?compensation_package)
+        (not
+          (passenger_case_allocated_compensation ?passenger_case_individual ?compensation_package)
+        )
+      )
+  )
+  (:action request_replacement_option_lock_for_group_case
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?replacement_segment_option - replacement_segment_option ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_group_member)
+        (salvage_assigned_channel ?passenger_case_group_member ?communication_channel)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (not
+          (replacement_option_lock_pending ?replacement_segment_option)
+        )
+        (not
+          (replacement_option_lock_confirmed ?replacement_segment_option)
+        )
+      )
+    :effect (replacement_option_lock_pending ?replacement_segment_option)
+  )
+  (:action confirm_replacement_option_with_agent_for_group_case
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?replacement_segment_option - replacement_segment_option ?service_agent - service_agent)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_group_member)
+        (salvage_assigned_agent ?passenger_case_group_member ?service_agent)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (replacement_option_lock_pending ?replacement_segment_option)
+        (not
+          (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        )
+      )
+    :effect
+      (and
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+      )
+  )
+  (:action reserve_compensation_for_group_replacement_option
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?replacement_segment_option - replacement_segment_option ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_group_member)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (compensation_package_available ?compensation_package)
+        (not
+          (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        )
+      )
+    :effect
+      (and
+        (replacement_option_lock_confirmed ?replacement_segment_option)
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (passenger_case_group_member_allocated_compensation ?passenger_case_group_member ?compensation_package)
+        (not
+          (compensation_package_available ?compensation_package)
+        )
+      )
+  )
+  (:action finalize_group_replacement_reservation
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?replacement_segment_option - replacement_segment_option ?communication_channel - communication_channel ?compensation_package - compensation_package)
+    :precondition
+      (and
+        (salvage_validated ?passenger_case_group_member)
+        (salvage_assigned_channel ?passenger_case_group_member ?communication_channel)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (replacement_option_lock_confirmed ?replacement_segment_option)
+        (passenger_case_group_member_allocated_compensation ?passenger_case_group_member ?compensation_package)
+        (not
+          (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        )
+      )
+    :effect
+      (and
+        (replacement_option_lock_pending ?replacement_segment_option)
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        (compensation_package_available ?compensation_package)
+        (not
+          (passenger_case_group_member_allocated_compensation ?passenger_case_group_member ?compensation_package)
+        )
+      )
+  )
+  (:action compile_salvage_plan_proposal
+    :parameters (?passenger_case_individual - passenger_case_individual ?passenger_case_group_member - passenger_case_group_member ?itinerary_segment - itinerary_segment ?replacement_segment_option - replacement_segment_option ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (itinerary_segment_lock_pending ?itinerary_segment)
+        (replacement_option_lock_pending ?replacement_segment_option)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        (salvage_plan_slot_open ?salvage_plan_proposal)
+      )
+    :effect
+      (and
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_includes_segment ?salvage_plan_proposal ?itinerary_segment)
+        (salvage_plan_includes_replacement_option ?salvage_plan_proposal ?replacement_segment_option)
+        (not
+          (salvage_plan_slot_open ?salvage_plan_proposal)
+        )
+      )
+  )
+  (:action compile_salvage_plan_with_vendor_confirmation
+    :parameters (?passenger_case_individual - passenger_case_individual ?passenger_case_group_member - passenger_case_group_member ?itinerary_segment - itinerary_segment ?replacement_segment_option - replacement_segment_option ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (itinerary_segment_lock_confirmed ?itinerary_segment)
+        (replacement_option_lock_pending ?replacement_segment_option)
+        (not
+          (passenger_case_segment_confirmed ?passenger_case_individual)
+        )
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        (salvage_plan_slot_open ?salvage_plan_proposal)
+      )
+    :effect
+      (and
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_includes_segment ?salvage_plan_proposal ?itinerary_segment)
+        (salvage_plan_includes_replacement_option ?salvage_plan_proposal ?replacement_segment_option)
+        (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        (not
+          (salvage_plan_slot_open ?salvage_plan_proposal)
+        )
+      )
+  )
+  (:action compile_salvage_plan_with_funding_confirmation
+    :parameters (?passenger_case_individual - passenger_case_individual ?passenger_case_group_member - passenger_case_group_member ?itinerary_segment - itinerary_segment ?replacement_segment_option - replacement_segment_option ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (itinerary_segment_lock_pending ?itinerary_segment)
+        (replacement_option_lock_confirmed ?replacement_segment_option)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+        (not
+          (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        )
+        (salvage_plan_slot_open ?salvage_plan_proposal)
+      )
+    :effect
+      (and
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_includes_segment ?salvage_plan_proposal ?itinerary_segment)
+        (salvage_plan_includes_replacement_option ?salvage_plan_proposal ?replacement_segment_option)
+        (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        (not
+          (salvage_plan_slot_open ?salvage_plan_proposal)
+        )
+      )
+  )
+  (:action compile_complete_salvage_plan_proposal
+    :parameters (?passenger_case_individual - passenger_case_individual ?passenger_case_group_member - passenger_case_group_member ?itinerary_segment - itinerary_segment ?replacement_segment_option - replacement_segment_option ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (case_impacted_itinerary_segment ?passenger_case_individual ?itinerary_segment)
+        (passenger_case_group_member_assigned_replacement_option ?passenger_case_group_member ?replacement_segment_option)
+        (itinerary_segment_lock_confirmed ?itinerary_segment)
+        (replacement_option_lock_confirmed ?replacement_segment_option)
+        (not
+          (passenger_case_segment_confirmed ?passenger_case_individual)
+        )
+        (not
+          (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        )
+        (salvage_plan_slot_open ?salvage_plan_proposal)
+      )
+    :effect
+      (and
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_includes_segment ?salvage_plan_proposal ?itinerary_segment)
+        (salvage_plan_includes_replacement_option ?salvage_plan_proposal ?replacement_segment_option)
+        (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        (not
+          (salvage_plan_slot_open ?salvage_plan_proposal)
+        )
+      )
+  )
+  (:action validate_and_lock_salvage_plan
+    :parameters (?salvage_plan_proposal - salvage_plan_proposal ?passenger_case_individual - passenger_case_individual ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (salvage_assigned_channel ?passenger_case_individual ?communication_channel)
+        (not
+          (salvage_plan_validated ?salvage_plan_proposal)
+        )
+      )
+    :effect (salvage_plan_validated ?salvage_plan_proposal)
+  )
+  (:action reserve_service_package_for_operator_case
+    :parameters (?operator_case - operator_case ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (operator_case_includes_plan_proposal ?operator_case ?salvage_plan_proposal)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_available ?service_package)
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_validated ?salvage_plan_proposal)
+        (not
+          (service_package_allocated ?service_package)
+        )
+      )
+    :effect
+      (and
+        (service_package_allocated ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (not
+          (service_package_available ?service_package)
+        )
+      )
+  )
+  (:action confirm_service_package_and_mark_operator
+    :parameters (?operator_case - operator_case ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_allocated ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (salvage_assigned_channel ?operator_case ?communication_channel)
+        (not
+          (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        )
+        (not
+          (operator_case_asset_allocated ?operator_case)
+        )
+      )
+    :effect (operator_case_asset_allocated ?operator_case)
+  )
+  (:action assign_documentation_item_to_operator_case
+    :parameters (?operator_case - operator_case ?documentation_item - documentation_item)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (documentation_item_available ?documentation_item)
+        (not
+          (response_template_selected_for_operator_case ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (response_template_selected_for_operator_case ?operator_case)
+        (operator_case_documentation_attached ?operator_case ?documentation_item)
+        (not
+          (documentation_item_available ?documentation_item)
+        )
+      )
+  )
+  (:action finalize_service_package_and_attach_documentation
+    :parameters (?operator_case - operator_case ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal ?communication_channel - communication_channel ?documentation_item - documentation_item)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_allocated ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (salvage_assigned_channel ?operator_case ?communication_channel)
+        (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        (response_template_selected_for_operator_case ?operator_case)
+        (operator_case_documentation_attached ?operator_case ?documentation_item)
+        (not
+          (operator_case_asset_allocated ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (operator_case_asset_allocated ?operator_case)
+        (operator_case_template_applied ?operator_case)
+      )
+  )
+  (:action allocate_replacement_asset_with_agent_to_operator_case
+    :parameters (?operator_case - operator_case ?replacement_asset - replacement_asset ?service_agent - service_agent ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_allocated ?operator_case)
+        (operator_case_assigned_replacement_asset ?operator_case ?replacement_asset)
+        (salvage_assigned_agent ?operator_case ?service_agent)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (not
+          (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        )
+        (not
+          (operator_case_asset_confirmed ?operator_case)
+        )
+      )
+    :effect (operator_case_asset_confirmed ?operator_case)
+  )
+  (:action allocate_backup_replacement_asset_to_operator_case
+    :parameters (?operator_case - operator_case ?replacement_asset - replacement_asset ?service_agent - service_agent ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_allocated ?operator_case)
+        (operator_case_assigned_replacement_asset ?operator_case ?replacement_asset)
+        (salvage_assigned_agent ?operator_case ?service_agent)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        (not
+          (operator_case_asset_confirmed ?operator_case)
+        )
+      )
+    :effect (operator_case_asset_confirmed ?operator_case)
+  )
+  (:action apply_policy_clause_and_prepare_operator_confirmation
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_confirmed ?operator_case)
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (not
+          (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        )
+        (not
+          (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        )
+        (not
+          (policy_clause_applied_to_operator_case ?operator_case)
+        )
+      )
+    :effect (policy_clause_applied_to_operator_case ?operator_case)
+  )
+  (:action apply_policy_clause_and_attach_template_confirmations
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_confirmed ?operator_case)
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        (not
+          (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        )
+        (not
+          (policy_clause_applied_to_operator_case ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_policy_escalation_flag ?operator_case)
+      )
+  )
+  (:action apply_policy_clause_and_schedule_template_actions
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_confirmed ?operator_case)
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (not
+          (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        )
+        (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        (not
+          (policy_clause_applied_to_operator_case ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_policy_escalation_flag ?operator_case)
+      )
+  )
+  (:action apply_policy_clause_and_finalize_template_selection
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause ?service_package - service_package ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (operator_case_asset_confirmed ?operator_case)
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (operator_case_assigned_service_package ?operator_case ?service_package)
+        (service_package_linked_to_plan ?service_package ?salvage_plan_proposal)
+        (salvage_plan_vendor_confirmed ?salvage_plan_proposal)
+        (salvage_plan_funding_confirmed ?salvage_plan_proposal)
+        (not
+          (policy_clause_applied_to_operator_case ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_policy_escalation_flag ?operator_case)
+      )
+  )
+  (:action mark_operator_case_for_recovery_execution
+    :parameters (?operator_case - operator_case)
+    :precondition
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (not
+          (operator_case_policy_escalation_flag ?operator_case)
+        )
+        (not
+          (operator_case_finalized_for_settlement ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (operator_case_finalized_for_settlement ?operator_case)
+        (salvage_recovery_confirmed ?operator_case)
+      )
+  )
+  (:action attach_authorization_token_to_operator_case
+    :parameters (?operator_case - operator_case ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_policy_escalation_flag ?operator_case)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (operator_case_authorized ?operator_case ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action execute_operator_final_validations
+    :parameters (?operator_case - operator_case ?passenger_case_individual - passenger_case_individual ?passenger_case_group_member - passenger_case_group_member ?communication_channel - communication_channel ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_policy_escalation_flag ?operator_case)
+        (operator_case_authorized ?operator_case ?authorization_token)
+        (operator_case_covers_passenger_case ?operator_case ?passenger_case_individual)
+        (operator_case_covers_group_member ?operator_case ?passenger_case_group_member)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        (salvage_assigned_channel ?operator_case ?communication_channel)
+        (not
+          (operator_case_final_validation_done ?operator_case)
+        )
+      )
+    :effect (operator_case_final_validation_done ?operator_case)
+  )
+  (:action confirm_operator_case_execution
+    :parameters (?operator_case - operator_case)
+    :precondition
+      (and
+        (policy_clause_applied_to_operator_case ?operator_case)
+        (operator_case_final_validation_done ?operator_case)
+        (not
+          (operator_case_finalized_for_settlement ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (operator_case_finalized_for_settlement ?operator_case)
+        (salvage_recovery_confirmed ?operator_case)
+      )
+  )
+  (:action escalate_operator_case_with_response_template
+    :parameters (?operator_case - operator_case ?response_template - response_template ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_validated ?operator_case)
+        (salvage_assigned_channel ?operator_case ?communication_channel)
+        (response_template_available ?response_template)
+        (operator_case_assigned_response_template ?operator_case ?response_template)
+        (not
+          (operator_case_escalated ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (operator_case_escalated ?operator_case)
+        (not
+          (response_template_available ?response_template)
+        )
+      )
+  )
+  (:action engage_service_agent_for_escalation
+    :parameters (?operator_case - operator_case ?service_agent - service_agent)
+    :precondition
+      (and
+        (operator_case_escalated ?operator_case)
+        (salvage_assigned_agent ?operator_case ?service_agent)
+        (not
+          (operator_case_agent_engaged ?operator_case)
+        )
+      )
+    :effect (operator_case_agent_engaged ?operator_case)
+  )
+  (:action apply_policy_clause_during_escalation
+    :parameters (?operator_case - operator_case ?policy_clause - policy_clause)
+    :precondition
+      (and
+        (operator_case_agent_engaged ?operator_case)
+        (operator_case_applied_policy_clause ?operator_case ?policy_clause)
+        (not
+          (operator_case_agent_engagement_confirmed ?operator_case)
+        )
+      )
+    :effect (operator_case_agent_engagement_confirmed ?operator_case)
+  )
+  (:action finalize_operator_case_escalation
+    :parameters (?operator_case - operator_case)
+    :precondition
+      (and
+        (operator_case_agent_engagement_confirmed ?operator_case)
+        (not
+          (operator_case_finalized_for_settlement ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (operator_case_finalized_for_settlement ?operator_case)
+        (salvage_recovery_confirmed ?operator_case)
+      )
+  )
+  (:action finalize_passenger_case_recovery
+    :parameters (?passenger_case_individual - passenger_case_individual ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_segment_locked ?passenger_case_individual)
+        (passenger_case_segment_confirmed ?passenger_case_individual)
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_validated ?salvage_plan_proposal)
+        (not
+          (salvage_recovery_confirmed ?passenger_case_individual)
+        )
+      )
+    :effect (salvage_recovery_confirmed ?passenger_case_individual)
+  )
+  (:action finalize_group_case_recovery
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?salvage_plan_proposal - salvage_plan_proposal)
+    :precondition
+      (and
+        (passenger_case_group_member_segment_locked ?passenger_case_group_member)
+        (passenger_case_group_member_segment_confirmed ?passenger_case_group_member)
+        (salvage_plan_proposed ?salvage_plan_proposal)
+        (salvage_plan_validated ?salvage_plan_proposal)
+        (not
+          (salvage_recovery_confirmed ?passenger_case_group_member)
+        )
+      )
+    :effect (salvage_recovery_confirmed ?passenger_case_group_member)
+  )
+  (:action initiate_compensation_for_case
+    :parameters (?salvage_case - salvage_case ?refund_account - refund_account ?communication_channel - communication_channel)
+    :precondition
+      (and
+        (salvage_recovery_confirmed ?salvage_case)
+        (salvage_assigned_channel ?salvage_case ?communication_channel)
+        (refund_account_available ?refund_account)
+        (not
+          (salvage_compensation_initiated ?salvage_case)
+        )
+      )
+    :effect
+      (and
+        (salvage_compensation_initiated ?salvage_case)
+        (salvage_refund_account_assigned ?salvage_case ?refund_account)
+        (not
+          (refund_account_available ?refund_account)
+        )
+      )
+  )
+  (:action settle_passenger_case_and_release_option
+    :parameters (?passenger_case_individual - passenger_case_individual ?alternative_service_option - alternative_service_option ?refund_account - refund_account)
+    :precondition
+      (and
+        (salvage_compensation_initiated ?passenger_case_individual)
+        (salvage_assigned_alternative_service_option ?passenger_case_individual ?alternative_service_option)
+        (salvage_refund_account_assigned ?passenger_case_individual ?refund_account)
+        (not
+          (salvage_closed ?passenger_case_individual)
+        )
+      )
+    :effect
+      (and
+        (salvage_closed ?passenger_case_individual)
+        (alternative_service_option_available ?alternative_service_option)
+        (refund_account_available ?refund_account)
+      )
+  )
+  (:action settle_group_case_and_release_option
+    :parameters (?passenger_case_group_member - passenger_case_group_member ?alternative_service_option - alternative_service_option ?refund_account - refund_account)
+    :precondition
+      (and
+        (salvage_compensation_initiated ?passenger_case_group_member)
+        (salvage_assigned_alternative_service_option ?passenger_case_group_member ?alternative_service_option)
+        (salvage_refund_account_assigned ?passenger_case_group_member ?refund_account)
+        (not
+          (salvage_closed ?passenger_case_group_member)
+        )
+      )
+    :effect
+      (and
+        (salvage_closed ?passenger_case_group_member)
+        (alternative_service_option_available ?alternative_service_option)
+        (refund_account_available ?refund_account)
+      )
+  )
+  (:action settle_operator_case_and_release_option
+    :parameters (?operator_case - operator_case ?alternative_service_option - alternative_service_option ?refund_account - refund_account)
+    :precondition
+      (and
+        (salvage_compensation_initiated ?operator_case)
+        (salvage_assigned_alternative_service_option ?operator_case ?alternative_service_option)
+        (salvage_refund_account_assigned ?operator_case ?refund_account)
+        (not
+          (salvage_closed ?operator_case)
+        )
+      )
+    :effect
+      (and
+        (salvage_closed ?operator_case)
+        (alternative_service_option_available ?alternative_service_option)
+        (refund_account_available ?refund_account)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem partial_trip_salvage_planning_scenario)
+  (:domain tourism_partial_trip_salvage_planning)
+  (:objects passenger_case_1 - passenger_case_individual passenger_group_case_1 - passenger_case_group_member operator_case_1 - operator_case operator_case_2 - operator_case alt_option_1 - alternative_service_option alt_option_2 - alternative_service_option alt_option_3 - alternative_service_option communication_channel_1 - communication_channel service_agent_1 - service_agent compensation_package_1 - compensation_package itinerary_segment_1 - itinerary_segment replacement_option_1 - replacement_segment_option salvage_plan_slot_1 - salvage_plan_proposal service_package_1 - service_package service_package_2 - service_package documentation_item_1 - documentation_item documentation_item_2 - documentation_item authorization_token_1 - authorization_token authorization_token_2 - authorization_token refund_account_1 - refund_account replacement_asset_1 - replacement_asset response_template_1 - response_template response_template_2 - response_template policy_clause_1 - policy_clause)
+  (:init
+    (alternative_service_option_available alt_option_1)
+    (alternative_service_option_available alt_option_2)
+    (alternative_service_option_available alt_option_3)
+    (communication_channel_available communication_channel_1)
+    (service_agent_available service_agent_1)
+    (compensation_package_available compensation_package_1)
+    (case_impacted_itinerary_segment passenger_case_1 itinerary_segment_1)
+    (passenger_case_group_member_assigned_replacement_option passenger_group_case_1 replacement_option_1)
+    (salvage_plan_slot_open salvage_plan_slot_1)
+    (service_package_available service_package_1)
+    (service_package_available service_package_2)
+    (operator_case_covers_passenger_case operator_case_1 passenger_case_1)
+    (operator_case_covers_passenger_case operator_case_2 passenger_case_1)
+    (operator_case_covers_group_member operator_case_1 passenger_group_case_1)
+    (operator_case_covers_group_member operator_case_2 passenger_group_case_1)
+    (operator_case_includes_plan_proposal operator_case_1 salvage_plan_slot_1)
+    (operator_case_includes_plan_proposal operator_case_2 salvage_plan_slot_1)
+    (operator_case_assigned_service_package operator_case_1 service_package_1)
+    (operator_case_assigned_service_package operator_case_2 service_package_2)
+    (documentation_item_available documentation_item_1)
+    (documentation_item_available documentation_item_2)
+    (authorization_token_available authorization_token_1)
+    (authorization_token_available authorization_token_2)
+    (refund_account_available refund_account_1)
+    (replacement_asset_available replacement_asset_1)
+    (response_template_available response_template_1)
+    (operator_case_assigned_response_template operator_case_1 response_template_1)
+    (operator_case_assigned_response_template operator_case_2 response_template_2)
+    (policy_clause_available policy_clause_1)
+  )
+  (:goal
+    (and
+      (salvage_closed passenger_case_1)
+      (salvage_closed passenger_group_case_1)
+      (salvage_closed operator_case_1)
+      (salvage_closed operator_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_salvage_case passenger_case_1)
+(create_salvage_case passenger_group_case_1)
+(assign_alternative_option_to_case passenger_case_1 alt_option_1)
+(attach_communication_channel_to_case passenger_case_1 communication_channel_1)
+(validate_salvage_case_with_channel passenger_case_1 communication_channel_1)
+(request_itinerary_segment_lock passenger_case_1 itinerary_segment_1 communication_channel_1)
+(release_communication_channel_from_case passenger_case_1 communication_channel_1)
+(assign_alternative_option_to_case passenger_group_case_1 alt_option_2)
+(attach_communication_channel_to_case passenger_group_case_1 communication_channel_1)
+(validate_salvage_case_with_channel passenger_group_case_1 communication_channel_1)
+(request_replacement_option_lock_for_group_case passenger_group_case_1 replacement_option_1 communication_channel_1)
+(release_communication_channel_from_case passenger_group_case_1 communication_channel_1)
+(assign_service_agent_to_case passenger_case_1 service_agent_1)
+(confirm_segment_lock_with_agent passenger_case_1 itinerary_segment_1 service_agent_1)
+(release_service_agent_from_case passenger_case_1 service_agent_1)
+(assign_service_agent_to_case passenger_group_case_1 service_agent_1)
+(confirm_replacement_option_with_agent_for_group_case passenger_group_case_1 replacement_option_1 service_agent_1)
+(release_service_agent_from_case passenger_group_case_1 service_agent_1)
+(compile_salvage_plan_proposal passenger_case_1 passenger_group_case_1 itinerary_segment_1 replacement_option_1 salvage_plan_slot_1)
+(attach_communication_channel_to_case passenger_case_1 communication_channel_1)
+(validate_and_lock_salvage_plan salvage_plan_slot_1 passenger_case_1 communication_channel_1)
+(finalize_passenger_case_recovery passenger_case_1 salvage_plan_slot_1)
+(finalize_group_case_recovery passenger_group_case_1 salvage_plan_slot_1)
+(initiate_compensation_for_case passenger_case_1 refund_account_1 communication_channel_1)
+(settle_passenger_case_and_release_option passenger_case_1 alt_option_1 refund_account_1)
+(release_communication_channel_from_case passenger_case_1 communication_channel_1)
+(attach_communication_channel_to_case passenger_group_case_1 communication_channel_1)
+(initiate_compensation_for_case passenger_group_case_1 refund_account_1 communication_channel_1)
+(settle_group_case_and_release_option passenger_group_case_1 alt_option_2 refund_account_1)
+(release_communication_channel_from_case passenger_group_case_1 communication_channel_1)
+(create_salvage_case operator_case_1)
+(assign_alternative_option_to_case operator_case_1 alt_option_1)
+(attach_communication_channel_to_case operator_case_1 communication_channel_1)
+(validate_salvage_case_with_channel operator_case_1 communication_channel_1)
+(apply_policy_clause_to_operator_case operator_case_1 policy_clause_1)
+(escalate_operator_case_with_response_template operator_case_1 response_template_1 communication_channel_1)
+(assign_service_agent_to_case operator_case_1 service_agent_1)
+(engage_service_agent_for_escalation operator_case_1 service_agent_1)
+(apply_policy_clause_during_escalation operator_case_1 policy_clause_1)
+(remove_policy_clause_from_operator_case operator_case_1 policy_clause_1)
+(finalize_operator_case_escalation operator_case_1)
+(initiate_compensation_for_case operator_case_1 refund_account_1 communication_channel_1)
+(settle_operator_case_and_release_option operator_case_1 alt_option_1 refund_account_1)
+(release_communication_channel_from_case operator_case_1 communication_channel_1)
+(release_service_agent_from_case operator_case_1 service_agent_1)
+(create_salvage_case operator_case_2)
+(assign_alternative_option_to_case operator_case_2 alt_option_1)
+(attach_communication_channel_to_case operator_case_2 communication_channel_1)
+(validate_salvage_case_with_channel operator_case_2 communication_channel_1)
+(apply_policy_clause_to_operator_case operator_case_2 policy_clause_1)
+(escalate_operator_case_with_response_template operator_case_2 response_template_2 communication_channel_1)
+(assign_service_agent_to_case operator_case_2 service_agent_1)
+(engage_service_agent_for_escalation operator_case_2 service_agent_1)
+(apply_policy_clause_during_escalation operator_case_2 policy_clause_1)
+(finalize_operator_case_escalation operator_case_2)
+(initiate_compensation_for_case operator_case_2 refund_account_1 communication_channel_1)
+(settle_operator_case_and_release_option operator_case_2 alt_option_1 refund_account_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_pdk1yet3/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_pdk1yet3/plan.pddl 
+
+
+--- stderr ---
+

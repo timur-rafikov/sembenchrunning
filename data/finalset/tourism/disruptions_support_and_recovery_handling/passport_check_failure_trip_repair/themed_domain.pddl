@@ -1,0 +1,936 @@
+(define (domain tourism_disruptions_passport_check_repair)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types case_resource_group - object external_artifact_group - object remediation_option_group - object repairable_entity_group - object case_component - repairable_entity_group frontline_resource - case_resource_group authority_officer - case_resource_group support_staff - case_resource_group compensation_option - case_resource_group customer_consent - case_resource_group refund_policy_template - case_resource_group external_service_confirmation - case_resource_group escalation_token - case_resource_group supporting_document - external_artifact_group supplier_confirmation - external_artifact_group special_authorization - external_artifact_group transport_alternative - remediation_option_group accommodation_alternative - remediation_option_group repair_proposal - remediation_option_group booking_component_group - case_component case_group - case_component transport_segment - booking_component_group accommodation_segment - booking_component_group support_case - case_group)
+  (:predicates
+    (case_entity_reported ?case_component - case_component)
+    (case_entity_triaged ?case_component - case_component)
+    (case_entity_frontline_assigned ?case_component - case_component)
+    (case_entity_repaired ?case_component - case_component)
+    (case_entity_ready_for_resolution ?case_component - case_component)
+    (case_entity_resolution_executed ?case_component - case_component)
+    (frontline_resource_available ?frontline_resource - frontline_resource)
+    (case_entity_assigned_frontline_resource ?case_component - case_component ?frontline_resource - frontline_resource)
+    (authority_officer_available ?authority_officer - authority_officer)
+    (case_entity_assigned_authority_officer ?case_component - case_component ?authority_officer - authority_officer)
+    (support_staff_available ?support_staff - support_staff)
+    (case_entity_assigned_support_staff ?case_component - case_component ?support_staff - support_staff)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (transport_segment_has_document ?transport_segment - transport_segment ?supporting_document - supporting_document)
+    (accommodation_segment_has_document ?accommodation_segment - accommodation_segment ?supporting_document - supporting_document)
+    (transport_segment_candidate_alternative ?transport_segment - transport_segment ?transport_alternative - transport_alternative)
+    (transport_alternative_primary_selected ?transport_alternative - transport_alternative)
+    (transport_alternative_secondary_selected ?transport_alternative - transport_alternative)
+    (transport_segment_primary_selected ?transport_segment - transport_segment)
+    (accommodation_segment_candidate_alternative ?accommodation_segment - accommodation_segment ?accommodation_alternative - accommodation_alternative)
+    (accommodation_alternative_primary_selected ?accommodation_alternative - accommodation_alternative)
+    (accommodation_alternative_secondary_selected ?accommodation_alternative - accommodation_alternative)
+    (accommodation_segment_primary_selected ?accommodation_segment - accommodation_segment)
+    (repair_proposal_draft_available ?repair_proposal - repair_proposal)
+    (repair_proposal_created ?repair_proposal - repair_proposal)
+    (proposal_includes_transport_alternative ?repair_proposal - repair_proposal ?transport_alternative - transport_alternative)
+    (proposal_includes_accommodation_alternative ?repair_proposal - repair_proposal ?accommodation_alternative - accommodation_alternative)
+    (repair_proposal_variant_1 ?repair_proposal - repair_proposal)
+    (repair_proposal_variant_2 ?repair_proposal - repair_proposal)
+    (repair_proposal_ready_for_confirmation ?repair_proposal - repair_proposal)
+    (case_links_transport_segment ?support_case - support_case ?transport_segment - transport_segment)
+    (case_links_accommodation_segment ?support_case - support_case ?accommodation_segment - accommodation_segment)
+    (case_links_repair_proposal ?support_case - support_case ?repair_proposal - repair_proposal)
+    (supplier_confirmation_available ?supplier_confirmation - supplier_confirmation)
+    (case_has_supplier_confirmation ?support_case - support_case ?supplier_confirmation - supplier_confirmation)
+    (supplier_confirmation_claimed ?supplier_confirmation - supplier_confirmation)
+    (supplier_confirmation_for_proposal ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    (case_supplier_coordination_locked ?support_case - support_case)
+    (case_supplier_response_received ?support_case - support_case)
+    (case_ready_for_final_validation ?support_case - support_case)
+    (case_compensation_option_reserved ?support_case - support_case)
+    (case_compensation_option_attached ?support_case - support_case)
+    (case_compensation_option_confirmed ?support_case - support_case)
+    (case_internal_validations_completed ?support_case - support_case)
+    (special_authorization_available ?special_authorization - special_authorization)
+    (case_has_special_authorization ?support_case - support_case ?special_authorization - special_authorization)
+    (case_special_authorization_applied ?support_case - support_case)
+    (case_special_authorization_validated ?support_case - support_case)
+    (case_special_authorization_approved ?support_case - support_case)
+    (compensation_option_available ?compensation_option - compensation_option)
+    (case_has_compensation_option ?support_case - support_case ?compensation_option - compensation_option)
+    (customer_consent_available ?customer_consent - customer_consent)
+    (case_has_customer_consent ?support_case - support_case ?customer_consent - customer_consent)
+    (external_service_confirmation_available ?external_service_confirmation - external_service_confirmation)
+    (case_has_external_service_confirmation ?support_case - support_case ?external_service_confirmation - external_service_confirmation)
+    (escalation_token_available ?escalation_token - escalation_token)
+    (case_has_escalation_token ?support_case - support_case ?escalation_token - escalation_token)
+    (refund_policy_template_available ?refund_policy_template - refund_policy_template)
+    (case_entity_assigned_refund_policy_template ?case_component - case_component ?refund_policy_template - refund_policy_template)
+    (transport_segment_ready ?transport_segment - transport_segment)
+    (accommodation_segment_ready ?accommodation_segment - accommodation_segment)
+    (case_finalized ?support_case - support_case)
+  )
+  (:action register_passport_check_failure
+    :parameters (?case_component - case_component)
+    :precondition
+      (and
+        (not
+          (case_entity_reported ?case_component)
+        )
+        (not
+          (case_entity_repaired ?case_component)
+        )
+      )
+    :effect (case_entity_reported ?case_component)
+  )
+  (:action assign_frontline_resource
+    :parameters (?case_component - case_component ?frontline_resource - frontline_resource)
+    :precondition
+      (and
+        (case_entity_reported ?case_component)
+        (not
+          (case_entity_frontline_assigned ?case_component)
+        )
+        (frontline_resource_available ?frontline_resource)
+      )
+    :effect
+      (and
+        (case_entity_frontline_assigned ?case_component)
+        (case_entity_assigned_frontline_resource ?case_component ?frontline_resource)
+        (not
+          (frontline_resource_available ?frontline_resource)
+        )
+      )
+  )
+  (:action assign_authority_officer_for_verification
+    :parameters (?case_component - case_component ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_reported ?case_component)
+        (case_entity_frontline_assigned ?case_component)
+        (authority_officer_available ?authority_officer)
+      )
+    :effect
+      (and
+        (case_entity_assigned_authority_officer ?case_component ?authority_officer)
+        (not
+          (authority_officer_available ?authority_officer)
+        )
+      )
+  )
+  (:action confirm_authority_verification
+    :parameters (?case_component - case_component ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_reported ?case_component)
+        (case_entity_frontline_assigned ?case_component)
+        (case_entity_assigned_authority_officer ?case_component ?authority_officer)
+        (not
+          (case_entity_triaged ?case_component)
+        )
+      )
+    :effect (case_entity_triaged ?case_component)
+  )
+  (:action release_authority_officer
+    :parameters (?case_component - case_component ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_assigned_authority_officer ?case_component ?authority_officer)
+      )
+    :effect
+      (and
+        (authority_officer_available ?authority_officer)
+        (not
+          (case_entity_assigned_authority_officer ?case_component ?authority_officer)
+        )
+      )
+  )
+  (:action assign_support_staff
+    :parameters (?case_component - case_component ?support_staff - support_staff)
+    :precondition
+      (and
+        (case_entity_triaged ?case_component)
+        (support_staff_available ?support_staff)
+      )
+    :effect
+      (and
+        (case_entity_assigned_support_staff ?case_component ?support_staff)
+        (not
+          (support_staff_available ?support_staff)
+        )
+      )
+  )
+  (:action release_support_staff
+    :parameters (?case_component - case_component ?support_staff - support_staff)
+    :precondition
+      (and
+        (case_entity_assigned_support_staff ?case_component ?support_staff)
+      )
+    :effect
+      (and
+        (support_staff_available ?support_staff)
+        (not
+          (case_entity_assigned_support_staff ?case_component ?support_staff)
+        )
+      )
+  )
+  (:action attach_external_service_confirmation
+    :parameters (?support_case - support_case ?external_service_confirmation - external_service_confirmation)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (external_service_confirmation_available ?external_service_confirmation)
+      )
+    :effect
+      (and
+        (case_has_external_service_confirmation ?support_case ?external_service_confirmation)
+        (not
+          (external_service_confirmation_available ?external_service_confirmation)
+        )
+      )
+  )
+  (:action release_external_service_confirmation
+    :parameters (?support_case - support_case ?external_service_confirmation - external_service_confirmation)
+    :precondition
+      (and
+        (case_has_external_service_confirmation ?support_case ?external_service_confirmation)
+      )
+    :effect
+      (and
+        (external_service_confirmation_available ?external_service_confirmation)
+        (not
+          (case_has_external_service_confirmation ?support_case ?external_service_confirmation)
+        )
+      )
+  )
+  (:action attach_escalation_token_to_case
+    :parameters (?support_case - support_case ?escalation_token - escalation_token)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (escalation_token_available ?escalation_token)
+      )
+    :effect
+      (and
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (not
+          (escalation_token_available ?escalation_token)
+        )
+      )
+  )
+  (:action release_escalation_token
+    :parameters (?support_case - support_case ?escalation_token - escalation_token)
+    :precondition
+      (and
+        (case_has_escalation_token ?support_case ?escalation_token)
+      )
+    :effect
+      (and
+        (escalation_token_available ?escalation_token)
+        (not
+          (case_has_escalation_token ?support_case ?escalation_token)
+        )
+      )
+  )
+  (:action select_transport_alternative_primary
+    :parameters (?transport_segment - transport_segment ?transport_alternative - transport_alternative ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_triaged ?transport_segment)
+        (case_entity_assigned_authority_officer ?transport_segment ?authority_officer)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (not
+          (transport_alternative_primary_selected ?transport_alternative)
+        )
+        (not
+          (transport_alternative_secondary_selected ?transport_alternative)
+        )
+      )
+    :effect (transport_alternative_primary_selected ?transport_alternative)
+  )
+  (:action confirm_transport_alternative_for_segment
+    :parameters (?transport_segment - transport_segment ?transport_alternative - transport_alternative ?support_staff - support_staff)
+    :precondition
+      (and
+        (case_entity_triaged ?transport_segment)
+        (case_entity_assigned_support_staff ?transport_segment ?support_staff)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (transport_alternative_primary_selected ?transport_alternative)
+        (not
+          (transport_segment_ready ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (transport_segment_ready ?transport_segment)
+        (transport_segment_primary_selected ?transport_segment)
+      )
+  )
+  (:action attach_document_to_transport_alternative
+    :parameters (?transport_segment - transport_segment ?transport_alternative - transport_alternative ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_entity_triaged ?transport_segment)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (supporting_document_available ?supporting_document)
+        (not
+          (transport_segment_ready ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (transport_alternative_secondary_selected ?transport_alternative)
+        (transport_segment_ready ?transport_segment)
+        (transport_segment_has_document ?transport_segment ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_transport_alternative_selection
+    :parameters (?transport_segment - transport_segment ?transport_alternative - transport_alternative ?authority_officer - authority_officer ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_entity_triaged ?transport_segment)
+        (case_entity_assigned_authority_officer ?transport_segment ?authority_officer)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (transport_alternative_secondary_selected ?transport_alternative)
+        (transport_segment_has_document ?transport_segment ?supporting_document)
+        (not
+          (transport_segment_primary_selected ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (transport_alternative_primary_selected ?transport_alternative)
+        (transport_segment_primary_selected ?transport_segment)
+        (supporting_document_available ?supporting_document)
+        (not
+          (transport_segment_has_document ?transport_segment ?supporting_document)
+        )
+      )
+  )
+  (:action select_accommodation_alternative_primary
+    :parameters (?accommodation_segment - accommodation_segment ?accommodation_alternative - accommodation_alternative ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_triaged ?accommodation_segment)
+        (case_entity_assigned_authority_officer ?accommodation_segment ?authority_officer)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (not
+          (accommodation_alternative_primary_selected ?accommodation_alternative)
+        )
+        (not
+          (accommodation_alternative_secondary_selected ?accommodation_alternative)
+        )
+      )
+    :effect (accommodation_alternative_primary_selected ?accommodation_alternative)
+  )
+  (:action confirm_accommodation_alternative_for_segment
+    :parameters (?accommodation_segment - accommodation_segment ?accommodation_alternative - accommodation_alternative ?support_staff - support_staff)
+    :precondition
+      (and
+        (case_entity_triaged ?accommodation_segment)
+        (case_entity_assigned_support_staff ?accommodation_segment ?support_staff)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (accommodation_alternative_primary_selected ?accommodation_alternative)
+        (not
+          (accommodation_segment_ready ?accommodation_segment)
+        )
+      )
+    :effect
+      (and
+        (accommodation_segment_ready ?accommodation_segment)
+        (accommodation_segment_primary_selected ?accommodation_segment)
+      )
+  )
+  (:action attach_document_to_accommodation_alternative
+    :parameters (?accommodation_segment - accommodation_segment ?accommodation_alternative - accommodation_alternative ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_entity_triaged ?accommodation_segment)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (supporting_document_available ?supporting_document)
+        (not
+          (accommodation_segment_ready ?accommodation_segment)
+        )
+      )
+    :effect
+      (and
+        (accommodation_alternative_secondary_selected ?accommodation_alternative)
+        (accommodation_segment_ready ?accommodation_segment)
+        (accommodation_segment_has_document ?accommodation_segment ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_accommodation_alternative_selection
+    :parameters (?accommodation_segment - accommodation_segment ?accommodation_alternative - accommodation_alternative ?authority_officer - authority_officer ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (case_entity_triaged ?accommodation_segment)
+        (case_entity_assigned_authority_officer ?accommodation_segment ?authority_officer)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (accommodation_alternative_secondary_selected ?accommodation_alternative)
+        (accommodation_segment_has_document ?accommodation_segment ?supporting_document)
+        (not
+          (accommodation_segment_primary_selected ?accommodation_segment)
+        )
+      )
+    :effect
+      (and
+        (accommodation_alternative_primary_selected ?accommodation_alternative)
+        (accommodation_segment_primary_selected ?accommodation_segment)
+        (supporting_document_available ?supporting_document)
+        (not
+          (accommodation_segment_has_document ?accommodation_segment ?supporting_document)
+        )
+      )
+  )
+  (:action construct_repair_proposal
+    :parameters (?transport_segment - transport_segment ?accommodation_segment - accommodation_segment ?transport_alternative - transport_alternative ?accommodation_alternative - accommodation_alternative ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (transport_segment_ready ?transport_segment)
+        (accommodation_segment_ready ?accommodation_segment)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (transport_alternative_primary_selected ?transport_alternative)
+        (accommodation_alternative_primary_selected ?accommodation_alternative)
+        (transport_segment_primary_selected ?transport_segment)
+        (accommodation_segment_primary_selected ?accommodation_segment)
+        (repair_proposal_draft_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_created ?repair_proposal)
+        (proposal_includes_transport_alternative ?repair_proposal ?transport_alternative)
+        (proposal_includes_accommodation_alternative ?repair_proposal ?accommodation_alternative)
+        (not
+          (repair_proposal_draft_available ?repair_proposal)
+        )
+      )
+  )
+  (:action construct_repair_proposal_variant_1
+    :parameters (?transport_segment - transport_segment ?accommodation_segment - accommodation_segment ?transport_alternative - transport_alternative ?accommodation_alternative - accommodation_alternative ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (transport_segment_ready ?transport_segment)
+        (accommodation_segment_ready ?accommodation_segment)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (transport_alternative_secondary_selected ?transport_alternative)
+        (accommodation_alternative_primary_selected ?accommodation_alternative)
+        (not
+          (transport_segment_primary_selected ?transport_segment)
+        )
+        (accommodation_segment_primary_selected ?accommodation_segment)
+        (repair_proposal_draft_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_created ?repair_proposal)
+        (proposal_includes_transport_alternative ?repair_proposal ?transport_alternative)
+        (proposal_includes_accommodation_alternative ?repair_proposal ?accommodation_alternative)
+        (repair_proposal_variant_1 ?repair_proposal)
+        (not
+          (repair_proposal_draft_available ?repair_proposal)
+        )
+      )
+  )
+  (:action construct_repair_proposal_variant_2
+    :parameters (?transport_segment - transport_segment ?accommodation_segment - accommodation_segment ?transport_alternative - transport_alternative ?accommodation_alternative - accommodation_alternative ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (transport_segment_ready ?transport_segment)
+        (accommodation_segment_ready ?accommodation_segment)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (transport_alternative_primary_selected ?transport_alternative)
+        (accommodation_alternative_secondary_selected ?accommodation_alternative)
+        (transport_segment_primary_selected ?transport_segment)
+        (not
+          (accommodation_segment_primary_selected ?accommodation_segment)
+        )
+        (repair_proposal_draft_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_created ?repair_proposal)
+        (proposal_includes_transport_alternative ?repair_proposal ?transport_alternative)
+        (proposal_includes_accommodation_alternative ?repair_proposal ?accommodation_alternative)
+        (repair_proposal_variant_2 ?repair_proposal)
+        (not
+          (repair_proposal_draft_available ?repair_proposal)
+        )
+      )
+  )
+  (:action construct_repair_proposal_variant_3
+    :parameters (?transport_segment - transport_segment ?accommodation_segment - accommodation_segment ?transport_alternative - transport_alternative ?accommodation_alternative - accommodation_alternative ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (transport_segment_ready ?transport_segment)
+        (accommodation_segment_ready ?accommodation_segment)
+        (transport_segment_candidate_alternative ?transport_segment ?transport_alternative)
+        (accommodation_segment_candidate_alternative ?accommodation_segment ?accommodation_alternative)
+        (transport_alternative_secondary_selected ?transport_alternative)
+        (accommodation_alternative_secondary_selected ?accommodation_alternative)
+        (not
+          (transport_segment_primary_selected ?transport_segment)
+        )
+        (not
+          (accommodation_segment_primary_selected ?accommodation_segment)
+        )
+        (repair_proposal_draft_available ?repair_proposal)
+      )
+    :effect
+      (and
+        (repair_proposal_created ?repair_proposal)
+        (proposal_includes_transport_alternative ?repair_proposal ?transport_alternative)
+        (proposal_includes_accommodation_alternative ?repair_proposal ?accommodation_alternative)
+        (repair_proposal_variant_1 ?repair_proposal)
+        (repair_proposal_variant_2 ?repair_proposal)
+        (not
+          (repair_proposal_draft_available ?repair_proposal)
+        )
+      )
+  )
+  (:action mark_repair_proposal_ready_for_confirmation
+    :parameters (?repair_proposal - repair_proposal ?transport_segment - transport_segment ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (repair_proposal_created ?repair_proposal)
+        (transport_segment_ready ?transport_segment)
+        (case_entity_assigned_authority_officer ?transport_segment ?authority_officer)
+        (not
+          (repair_proposal_ready_for_confirmation ?repair_proposal)
+        )
+      )
+    :effect (repair_proposal_ready_for_confirmation ?repair_proposal)
+  )
+  (:action claim_supplier_confirmation_for_proposal
+    :parameters (?support_case - support_case ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (case_links_repair_proposal ?support_case ?repair_proposal)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_available ?supplier_confirmation)
+        (repair_proposal_created ?repair_proposal)
+        (repair_proposal_ready_for_confirmation ?repair_proposal)
+        (not
+          (supplier_confirmation_claimed ?supplier_confirmation)
+        )
+      )
+    :effect
+      (and
+        (supplier_confirmation_claimed ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (not
+          (supplier_confirmation_available ?supplier_confirmation)
+        )
+      )
+  )
+  (:action lock_case_for_supplier_coordination
+    :parameters (?support_case - support_case ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_claimed ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (case_entity_assigned_authority_officer ?support_case ?authority_officer)
+        (not
+          (repair_proposal_variant_1 ?repair_proposal)
+        )
+        (not
+          (case_supplier_coordination_locked ?support_case)
+        )
+      )
+    :effect (case_supplier_coordination_locked ?support_case)
+  )
+  (:action reserve_compensation_option_for_case
+    :parameters (?support_case - support_case ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (compensation_option_available ?compensation_option)
+        (not
+          (case_compensation_option_reserved ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_compensation_option_reserved ?support_case)
+        (case_has_compensation_option ?support_case ?compensation_option)
+        (not
+          (compensation_option_available ?compensation_option)
+        )
+      )
+  )
+  (:action attach_compensation_option_and_prepare_case
+    :parameters (?support_case - support_case ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal ?authority_officer - authority_officer ?compensation_option - compensation_option)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_claimed ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (case_entity_assigned_authority_officer ?support_case ?authority_officer)
+        (repair_proposal_variant_1 ?repair_proposal)
+        (case_compensation_option_reserved ?support_case)
+        (case_has_compensation_option ?support_case ?compensation_option)
+        (not
+          (case_supplier_coordination_locked ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_supplier_coordination_locked ?support_case)
+        (case_compensation_option_attached ?support_case)
+      )
+  )
+  (:action process_supplier_confirmation_for_case
+    :parameters (?support_case - support_case ?external_service_confirmation - external_service_confirmation ?support_staff - support_staff ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_coordination_locked ?support_case)
+        (case_has_external_service_confirmation ?support_case ?external_service_confirmation)
+        (case_entity_assigned_support_staff ?support_case ?support_staff)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (not
+          (repair_proposal_variant_2 ?repair_proposal)
+        )
+        (not
+          (case_supplier_response_received ?support_case)
+        )
+      )
+    :effect (case_supplier_response_received ?support_case)
+  )
+  (:action process_supplier_confirmation_for_case_variant
+    :parameters (?support_case - support_case ?external_service_confirmation - external_service_confirmation ?support_staff - support_staff ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_coordination_locked ?support_case)
+        (case_has_external_service_confirmation ?support_case ?external_service_confirmation)
+        (case_entity_assigned_support_staff ?support_case ?support_staff)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (repair_proposal_variant_2 ?repair_proposal)
+        (not
+          (case_supplier_response_received ?support_case)
+        )
+      )
+    :effect (case_supplier_response_received ?support_case)
+  )
+  (:action attach_escalation_and_flag_case_for_approval
+    :parameters (?support_case - support_case ?escalation_token - escalation_token ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_response_received ?support_case)
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (not
+          (repair_proposal_variant_1 ?repair_proposal)
+        )
+        (not
+          (repair_proposal_variant_2 ?repair_proposal)
+        )
+        (not
+          (case_ready_for_final_validation ?support_case)
+        )
+      )
+    :effect (case_ready_for_final_validation ?support_case)
+  )
+  (:action escalate_case_and_attach_compensation_flag
+    :parameters (?support_case - support_case ?escalation_token - escalation_token ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_response_received ?support_case)
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (repair_proposal_variant_1 ?repair_proposal)
+        (not
+          (repair_proposal_variant_2 ?repair_proposal)
+        )
+        (not
+          (case_ready_for_final_validation ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_compensation_option_confirmed ?support_case)
+      )
+  )
+  (:action escalate_case_and_attach_compensation_option_variant
+    :parameters (?support_case - support_case ?escalation_token - escalation_token ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_response_received ?support_case)
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (not
+          (repair_proposal_variant_1 ?repair_proposal)
+        )
+        (repair_proposal_variant_2 ?repair_proposal)
+        (not
+          (case_ready_for_final_validation ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_compensation_option_confirmed ?support_case)
+      )
+  )
+  (:action escalate_case_and_attach_compensation_option_variant_final
+    :parameters (?support_case - support_case ?escalation_token - escalation_token ?supplier_confirmation - supplier_confirmation ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (case_supplier_response_received ?support_case)
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (case_has_supplier_confirmation ?support_case ?supplier_confirmation)
+        (supplier_confirmation_for_proposal ?supplier_confirmation ?repair_proposal)
+        (repair_proposal_variant_1 ?repair_proposal)
+        (repair_proposal_variant_2 ?repair_proposal)
+        (not
+          (case_ready_for_final_validation ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_compensation_option_confirmed ?support_case)
+      )
+  )
+  (:action finalize_case_preparation_for_resolution
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (not
+          (case_compensation_option_confirmed ?support_case)
+        )
+        (not
+          (case_finalized ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?support_case)
+        (case_entity_ready_for_resolution ?support_case)
+      )
+  )
+  (:action attach_customer_consent_to_case
+    :parameters (?support_case - support_case ?customer_consent - customer_consent)
+    :precondition
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_compensation_option_confirmed ?support_case)
+        (customer_consent_available ?customer_consent)
+      )
+    :effect
+      (and
+        (case_has_customer_consent ?support_case ?customer_consent)
+        (not
+          (customer_consent_available ?customer_consent)
+        )
+      )
+  )
+  (:action perform_final_internal_validations
+    :parameters (?support_case - support_case ?transport_segment - transport_segment ?accommodation_segment - accommodation_segment ?authority_officer - authority_officer ?customer_consent - customer_consent)
+    :precondition
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_compensation_option_confirmed ?support_case)
+        (case_has_customer_consent ?support_case ?customer_consent)
+        (case_links_transport_segment ?support_case ?transport_segment)
+        (case_links_accommodation_segment ?support_case ?accommodation_segment)
+        (transport_segment_primary_selected ?transport_segment)
+        (accommodation_segment_primary_selected ?accommodation_segment)
+        (case_entity_assigned_authority_officer ?support_case ?authority_officer)
+        (not
+          (case_internal_validations_completed ?support_case)
+        )
+      )
+    :effect (case_internal_validations_completed ?support_case)
+  )
+  (:action finalize_case_post_validation
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (case_ready_for_final_validation ?support_case)
+        (case_internal_validations_completed ?support_case)
+        (not
+          (case_finalized ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?support_case)
+        (case_entity_ready_for_resolution ?support_case)
+      )
+  )
+  (:action apply_special_authorization_to_case
+    :parameters (?support_case - support_case ?special_authorization - special_authorization ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_triaged ?support_case)
+        (case_entity_assigned_authority_officer ?support_case ?authority_officer)
+        (special_authorization_available ?special_authorization)
+        (case_has_special_authorization ?support_case ?special_authorization)
+        (not
+          (case_special_authorization_applied ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_special_authorization_applied ?support_case)
+        (not
+          (special_authorization_available ?special_authorization)
+        )
+      )
+  )
+  (:action validate_special_authorization_on_case
+    :parameters (?support_case - support_case ?support_staff - support_staff)
+    :precondition
+      (and
+        (case_special_authorization_applied ?support_case)
+        (case_entity_assigned_support_staff ?support_case ?support_staff)
+        (not
+          (case_special_authorization_validated ?support_case)
+        )
+      )
+    :effect (case_special_authorization_validated ?support_case)
+  )
+  (:action apply_escalation_token_for_case_approval
+    :parameters (?support_case - support_case ?escalation_token - escalation_token)
+    :precondition
+      (and
+        (case_special_authorization_validated ?support_case)
+        (case_has_escalation_token ?support_case ?escalation_token)
+        (not
+          (case_special_authorization_approved ?support_case)
+        )
+      )
+    :effect (case_special_authorization_approved ?support_case)
+  )
+  (:action finalize_authorization_and_mark_case_ready
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (case_special_authorization_approved ?support_case)
+        (not
+          (case_finalized ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?support_case)
+        (case_entity_ready_for_resolution ?support_case)
+      )
+  )
+  (:action mark_transport_segment_ready_for_repair_execution
+    :parameters (?transport_segment - transport_segment ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (transport_segment_ready ?transport_segment)
+        (transport_segment_primary_selected ?transport_segment)
+        (repair_proposal_created ?repair_proposal)
+        (repair_proposal_ready_for_confirmation ?repair_proposal)
+        (not
+          (case_entity_ready_for_resolution ?transport_segment)
+        )
+      )
+    :effect (case_entity_ready_for_resolution ?transport_segment)
+  )
+  (:action mark_accommodation_segment_ready_for_repair_execution
+    :parameters (?accommodation_segment - accommodation_segment ?repair_proposal - repair_proposal)
+    :precondition
+      (and
+        (accommodation_segment_ready ?accommodation_segment)
+        (accommodation_segment_primary_selected ?accommodation_segment)
+        (repair_proposal_created ?repair_proposal)
+        (repair_proposal_ready_for_confirmation ?repair_proposal)
+        (not
+          (case_entity_ready_for_resolution ?accommodation_segment)
+        )
+      )
+    :effect (case_entity_ready_for_resolution ?accommodation_segment)
+  )
+  (:action apply_compensation_and_assign_refund_policy
+    :parameters (?case_component - case_component ?refund_policy_template - refund_policy_template ?authority_officer - authority_officer)
+    :precondition
+      (and
+        (case_entity_ready_for_resolution ?case_component)
+        (case_entity_assigned_authority_officer ?case_component ?authority_officer)
+        (refund_policy_template_available ?refund_policy_template)
+        (not
+          (case_entity_resolution_executed ?case_component)
+        )
+      )
+    :effect
+      (and
+        (case_entity_resolution_executed ?case_component)
+        (case_entity_assigned_refund_policy_template ?case_component ?refund_policy_template)
+        (not
+          (refund_policy_template_available ?refund_policy_template)
+        )
+      )
+  )
+  (:action apply_repair_to_transport_segment_and_release_resource
+    :parameters (?transport_segment - transport_segment ?frontline_resource - frontline_resource ?refund_policy_template - refund_policy_template)
+    :precondition
+      (and
+        (case_entity_resolution_executed ?transport_segment)
+        (case_entity_assigned_frontline_resource ?transport_segment ?frontline_resource)
+        (case_entity_assigned_refund_policy_template ?transport_segment ?refund_policy_template)
+        (not
+          (case_entity_repaired ?transport_segment)
+        )
+      )
+    :effect
+      (and
+        (case_entity_repaired ?transport_segment)
+        (frontline_resource_available ?frontline_resource)
+        (refund_policy_template_available ?refund_policy_template)
+      )
+  )
+  (:action apply_repair_to_accommodation_segment_and_release_resource
+    :parameters (?accommodation_segment - accommodation_segment ?frontline_resource - frontline_resource ?refund_policy_template - refund_policy_template)
+    :precondition
+      (and
+        (case_entity_resolution_executed ?accommodation_segment)
+        (case_entity_assigned_frontline_resource ?accommodation_segment ?frontline_resource)
+        (case_entity_assigned_refund_policy_template ?accommodation_segment ?refund_policy_template)
+        (not
+          (case_entity_repaired ?accommodation_segment)
+        )
+      )
+    :effect
+      (and
+        (case_entity_repaired ?accommodation_segment)
+        (frontline_resource_available ?frontline_resource)
+        (refund_policy_template_available ?refund_policy_template)
+      )
+  )
+  (:action apply_repair_to_support_case_and_release_resource
+    :parameters (?support_case - support_case ?frontline_resource - frontline_resource ?refund_policy_template - refund_policy_template)
+    :precondition
+      (and
+        (case_entity_resolution_executed ?support_case)
+        (case_entity_assigned_frontline_resource ?support_case ?frontline_resource)
+        (case_entity_assigned_refund_policy_template ?support_case ?refund_policy_template)
+        (not
+          (case_entity_repaired ?support_case)
+        )
+      )
+    :effect
+      (and
+        (case_entity_repaired ?support_case)
+        (frontline_resource_available ?frontline_resource)
+        (refund_policy_template_available ?refund_policy_template)
+      )
+  )
+)

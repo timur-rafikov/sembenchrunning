@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain treasury_funding_maturity_staggering)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types treasury_resource - object profile_type - object schedule_type - object funding_concept - object funding_request - funding_concept funding_option - treasury_resource tenor_profile - treasury_resource execution_desk - treasury_resource regulatory_flag - treasury_resource strategy_tag - treasury_resource transfer_channel - treasury_resource issuance_method - treasury_resource compliance_document - treasury_resource liquidity_buffer_profile - profile_type settlement_profile - profile_type approval_token - profile_type internal_maturity_slot - schedule_type external_maturity_slot - schedule_type funding_instrument - schedule_type request_segment - funding_request plan_segment - funding_request internal_request - request_segment external_request - request_segment maturity_stagger_plan - plan_segment)
+  (:predicates
+    (request_initialized ?funding_request - funding_request)
+    (tenor_confirmed_for_subject ?funding_request - funding_request)
+    (option_reserved ?funding_request - funding_request)
+    (request_executed_for_subject ?funding_request - funding_request)
+    (ready_for_execution_for_subject ?funding_request - funding_request)
+    (execution_authorized ?funding_request - funding_request)
+    (funding_option_available ?funding_option - funding_option)
+    (request_assigned_option_for_subject ?funding_request - funding_request ?funding_option - funding_option)
+    (tenor_profile_available ?tenor_profile - tenor_profile)
+    (request_tenor_assignment_for_subject ?funding_request - funding_request ?tenor_profile - tenor_profile)
+    (execution_desk_available ?execution_desk - execution_desk)
+    (request_assigned_desk_for_subject ?funding_request - funding_request ?execution_desk - execution_desk)
+    (buffer_profile_available ?liquidity_buffer_profile - liquidity_buffer_profile)
+    (internal_buffer_assigned ?internal_request - internal_request ?liquidity_buffer_profile - liquidity_buffer_profile)
+    (external_buffer_assigned ?external_request - external_request ?liquidity_buffer_profile - liquidity_buffer_profile)
+    (internal_slot_assigned ?internal_request - internal_request ?internal_maturity_slot - internal_maturity_slot)
+    (internal_slot_ready ?internal_maturity_slot - internal_maturity_slot)
+    (internal_slot_buffered ?internal_maturity_slot - internal_maturity_slot)
+    (internal_request_ready ?internal_request - internal_request)
+    (external_slot_assigned ?external_request - external_request ?external_maturity_slot - external_maturity_slot)
+    (external_slot_ready ?external_maturity_slot - external_maturity_slot)
+    (external_slot_buffered ?external_maturity_slot - external_maturity_slot)
+    (external_request_ready ?external_request - external_request)
+    (instrument_available ?funding_instrument - funding_instrument)
+    (instrument_allocated ?funding_instrument - funding_instrument)
+    (instrument_internal_slot_assigned ?funding_instrument - funding_instrument ?internal_maturity_slot - internal_maturity_slot)
+    (instrument_external_slot_assigned ?funding_instrument - funding_instrument ?external_maturity_slot - external_maturity_slot)
+    (allocation_depth_1 ?funding_instrument - funding_instrument)
+    (allocation_depth_2 ?funding_instrument - funding_instrument)
+    (instrument_locked ?funding_instrument - funding_instrument)
+    (plan_includes_internal_request ?maturity_stagger_plan - maturity_stagger_plan ?internal_request - internal_request)
+    (plan_includes_external_request ?maturity_stagger_plan - maturity_stagger_plan ?external_request - external_request)
+    (plan_includes_instrument ?maturity_stagger_plan - maturity_stagger_plan ?funding_instrument - funding_instrument)
+    (settlement_profile_available ?settlement_profile - settlement_profile)
+    (plan_settlement_profile_assigned ?maturity_stagger_plan - maturity_stagger_plan ?settlement_profile - settlement_profile)
+    (settlement_profile_reserved ?settlement_profile - settlement_profile)
+    (settlement_profile_linked_instrument ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    (plan_instrument_settlement_linked ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_issuance_method_confirmed ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_documentation_and_compliance_ready ?maturity_stagger_plan - maturity_stagger_plan)
+    (regulatory_flag_applied ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_regulatory_stage_acknowledged ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_strategy_stage_ready ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_execution_checks_passed ?maturity_stagger_plan - maturity_stagger_plan)
+    (approval_token_available ?approval_token - approval_token)
+    (plan_approval_token_linked ?maturity_stagger_plan - maturity_stagger_plan ?approval_token - approval_token)
+    (plan_approval_consumed ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_approval_initiated ?maturity_stagger_plan - maturity_stagger_plan)
+    (plan_approval_confirmed ?maturity_stagger_plan - maturity_stagger_plan)
+    (regulatory_flag_available ?regulatory_flag - regulatory_flag)
+    (plan_regulatory_flag_assigned ?maturity_stagger_plan - maturity_stagger_plan ?regulatory_flag - regulatory_flag)
+    (strategy_tag_available ?strategy_tag - strategy_tag)
+    (plan_strategy_assigned ?maturity_stagger_plan - maturity_stagger_plan ?strategy_tag - strategy_tag)
+    (issuance_method_available ?issuance_method - issuance_method)
+    (plan_issuance_method_linked ?maturity_stagger_plan - maturity_stagger_plan ?issuance_method - issuance_method)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (plan_compliance_document_assigned ?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document)
+    (transfer_channel_available ?transfer_channel - transfer_channel)
+    (request_transfer_channel_assigned_for_subject ?funding_request - funding_request ?transfer_channel - transfer_channel)
+    (internal_buffer_engaged ?internal_request - internal_request)
+    (external_buffer_engaged ?external_request - external_request)
+    (plan_finalized ?maturity_stagger_plan - maturity_stagger_plan)
+  )
+  (:action initialize_funding_request
+    :parameters (?funding_request - funding_request)
+    :precondition
+      (and
+        (not
+          (request_initialized ?funding_request)
+        )
+        (not
+          (request_executed_for_subject ?funding_request)
+        )
+      )
+    :effect (request_initialized ?funding_request)
+  )
+  (:action assign_funding_option
+    :parameters (?funding_request - funding_request ?funding_option - funding_option)
+    :precondition
+      (and
+        (request_initialized ?funding_request)
+        (not
+          (option_reserved ?funding_request)
+        )
+        (funding_option_available ?funding_option)
+      )
+    :effect
+      (and
+        (option_reserved ?funding_request)
+        (request_assigned_option_for_subject ?funding_request ?funding_option)
+        (not
+          (funding_option_available ?funding_option)
+        )
+      )
+  )
+  (:action assign_tenor_profile_to_request
+    :parameters (?funding_request - funding_request ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (request_initialized ?funding_request)
+        (option_reserved ?funding_request)
+        (tenor_profile_available ?tenor_profile)
+      )
+    :effect
+      (and
+        (request_tenor_assignment_for_subject ?funding_request ?tenor_profile)
+        (not
+          (tenor_profile_available ?tenor_profile)
+        )
+      )
+  )
+  (:action confirm_tenor_assignment
+    :parameters (?funding_request - funding_request ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (request_initialized ?funding_request)
+        (option_reserved ?funding_request)
+        (request_tenor_assignment_for_subject ?funding_request ?tenor_profile)
+        (not
+          (tenor_confirmed_for_subject ?funding_request)
+        )
+      )
+    :effect (tenor_confirmed_for_subject ?funding_request)
+  )
+  (:action revert_tenor_assignment
+    :parameters (?funding_request - funding_request ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (request_tenor_assignment_for_subject ?funding_request ?tenor_profile)
+      )
+    :effect
+      (and
+        (tenor_profile_available ?tenor_profile)
+        (not
+          (request_tenor_assignment_for_subject ?funding_request ?tenor_profile)
+        )
+      )
+  )
+  (:action assign_execution_desk
+    :parameters (?funding_request - funding_request ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?funding_request)
+        (execution_desk_available ?execution_desk)
+      )
+    :effect
+      (and
+        (request_assigned_desk_for_subject ?funding_request ?execution_desk)
+        (not
+          (execution_desk_available ?execution_desk)
+        )
+      )
+  )
+  (:action release_execution_desk
+    :parameters (?funding_request - funding_request ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (request_assigned_desk_for_subject ?funding_request ?execution_desk)
+      )
+    :effect
+      (and
+        (execution_desk_available ?execution_desk)
+        (not
+          (request_assigned_desk_for_subject ?funding_request ?execution_desk)
+        )
+      )
+  )
+  (:action assign_issuance_method_to_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?issuance_method - issuance_method)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (issuance_method_available ?issuance_method)
+      )
+    :effect
+      (and
+        (plan_issuance_method_linked ?maturity_stagger_plan ?issuance_method)
+        (not
+          (issuance_method_available ?issuance_method)
+        )
+      )
+  )
+  (:action retract_issuance_method_from_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?issuance_method - issuance_method)
+    :precondition
+      (and
+        (plan_issuance_method_linked ?maturity_stagger_plan ?issuance_method)
+      )
+    :effect
+      (and
+        (issuance_method_available ?issuance_method)
+        (not
+          (plan_issuance_method_linked ?maturity_stagger_plan ?issuance_method)
+        )
+      )
+  )
+  (:action attach_compliance_document_to_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (compliance_document_available ?compliance_document)
+      )
+    :effect
+      (and
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action detach_compliance_document_from_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+      )
+    :effect
+      (and
+        (compliance_document_available ?compliance_document)
+        (not
+          (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        )
+      )
+  )
+  (:action prepare_internal_slot
+    :parameters (?internal_request - internal_request ?internal_maturity_slot - internal_maturity_slot ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?internal_request)
+        (request_tenor_assignment_for_subject ?internal_request ?tenor_profile)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (not
+          (internal_slot_ready ?internal_maturity_slot)
+        )
+        (not
+          (internal_slot_buffered ?internal_maturity_slot)
+        )
+      )
+    :effect (internal_slot_ready ?internal_maturity_slot)
+  )
+  (:action activate_internal_slot
+    :parameters (?internal_request - internal_request ?internal_maturity_slot - internal_maturity_slot ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?internal_request)
+        (request_assigned_desk_for_subject ?internal_request ?execution_desk)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (internal_slot_ready ?internal_maturity_slot)
+        (not
+          (internal_buffer_engaged ?internal_request)
+        )
+      )
+    :effect
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (internal_request_ready ?internal_request)
+      )
+  )
+  (:action apply_internal_buffer
+    :parameters (?internal_request - internal_request ?internal_maturity_slot - internal_maturity_slot ?liquidity_buffer_profile - liquidity_buffer_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?internal_request)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (buffer_profile_available ?liquidity_buffer_profile)
+        (not
+          (internal_buffer_engaged ?internal_request)
+        )
+      )
+    :effect
+      (and
+        (internal_slot_buffered ?internal_maturity_slot)
+        (internal_buffer_engaged ?internal_request)
+        (internal_buffer_assigned ?internal_request ?liquidity_buffer_profile)
+        (not
+          (buffer_profile_available ?liquidity_buffer_profile)
+        )
+      )
+  )
+  (:action finalize_internal_slot_preparation
+    :parameters (?internal_request - internal_request ?internal_maturity_slot - internal_maturity_slot ?tenor_profile - tenor_profile ?liquidity_buffer_profile - liquidity_buffer_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?internal_request)
+        (request_tenor_assignment_for_subject ?internal_request ?tenor_profile)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (internal_slot_buffered ?internal_maturity_slot)
+        (internal_buffer_assigned ?internal_request ?liquidity_buffer_profile)
+        (not
+          (internal_request_ready ?internal_request)
+        )
+      )
+    :effect
+      (and
+        (internal_slot_ready ?internal_maturity_slot)
+        (internal_request_ready ?internal_request)
+        (buffer_profile_available ?liquidity_buffer_profile)
+        (not
+          (internal_buffer_assigned ?internal_request ?liquidity_buffer_profile)
+        )
+      )
+  )
+  (:action prepare_external_slot
+    :parameters (?external_request - external_request ?external_maturity_slot - external_maturity_slot ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?external_request)
+        (request_tenor_assignment_for_subject ?external_request ?tenor_profile)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (not
+          (external_slot_ready ?external_maturity_slot)
+        )
+        (not
+          (external_slot_buffered ?external_maturity_slot)
+        )
+      )
+    :effect (external_slot_ready ?external_maturity_slot)
+  )
+  (:action activate_external_slot
+    :parameters (?external_request - external_request ?external_maturity_slot - external_maturity_slot ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?external_request)
+        (request_assigned_desk_for_subject ?external_request ?execution_desk)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (external_slot_ready ?external_maturity_slot)
+        (not
+          (external_buffer_engaged ?external_request)
+        )
+      )
+    :effect
+      (and
+        (external_buffer_engaged ?external_request)
+        (external_request_ready ?external_request)
+      )
+  )
+  (:action apply_external_buffer
+    :parameters (?external_request - external_request ?external_maturity_slot - external_maturity_slot ?liquidity_buffer_profile - liquidity_buffer_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?external_request)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (buffer_profile_available ?liquidity_buffer_profile)
+        (not
+          (external_buffer_engaged ?external_request)
+        )
+      )
+    :effect
+      (and
+        (external_slot_buffered ?external_maturity_slot)
+        (external_buffer_engaged ?external_request)
+        (external_buffer_assigned ?external_request ?liquidity_buffer_profile)
+        (not
+          (buffer_profile_available ?liquidity_buffer_profile)
+        )
+      )
+  )
+  (:action finalize_external_slot_preparation
+    :parameters (?external_request - external_request ?external_maturity_slot - external_maturity_slot ?tenor_profile - tenor_profile ?liquidity_buffer_profile - liquidity_buffer_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?external_request)
+        (request_tenor_assignment_for_subject ?external_request ?tenor_profile)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (external_slot_buffered ?external_maturity_slot)
+        (external_buffer_assigned ?external_request ?liquidity_buffer_profile)
+        (not
+          (external_request_ready ?external_request)
+        )
+      )
+    :effect
+      (and
+        (external_slot_ready ?external_maturity_slot)
+        (external_request_ready ?external_request)
+        (buffer_profile_available ?liquidity_buffer_profile)
+        (not
+          (external_buffer_assigned ?external_request ?liquidity_buffer_profile)
+        )
+      )
+  )
+  (:action create_and_tag_funding_instrument
+    :parameters (?internal_request - internal_request ?external_request - external_request ?internal_maturity_slot - internal_maturity_slot ?external_maturity_slot - external_maturity_slot ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (external_buffer_engaged ?external_request)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (internal_slot_ready ?internal_maturity_slot)
+        (external_slot_ready ?external_maturity_slot)
+        (internal_request_ready ?internal_request)
+        (external_request_ready ?external_request)
+        (instrument_available ?funding_instrument)
+      )
+    :effect
+      (and
+        (instrument_allocated ?funding_instrument)
+        (instrument_internal_slot_assigned ?funding_instrument ?internal_maturity_slot)
+        (instrument_external_slot_assigned ?funding_instrument ?external_maturity_slot)
+        (not
+          (instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action create_and_tag_funding_instrument_with_allocation_depth_1
+    :parameters (?internal_request - internal_request ?external_request - external_request ?internal_maturity_slot - internal_maturity_slot ?external_maturity_slot - external_maturity_slot ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (external_buffer_engaged ?external_request)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (internal_slot_buffered ?internal_maturity_slot)
+        (external_slot_ready ?external_maturity_slot)
+        (not
+          (internal_request_ready ?internal_request)
+        )
+        (external_request_ready ?external_request)
+        (instrument_available ?funding_instrument)
+      )
+    :effect
+      (and
+        (instrument_allocated ?funding_instrument)
+        (instrument_internal_slot_assigned ?funding_instrument ?internal_maturity_slot)
+        (instrument_external_slot_assigned ?funding_instrument ?external_maturity_slot)
+        (allocation_depth_1 ?funding_instrument)
+        (not
+          (instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action create_and_tag_funding_instrument_with_allocation_depth_2
+    :parameters (?internal_request - internal_request ?external_request - external_request ?internal_maturity_slot - internal_maturity_slot ?external_maturity_slot - external_maturity_slot ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (external_buffer_engaged ?external_request)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (internal_slot_ready ?internal_maturity_slot)
+        (external_slot_buffered ?external_maturity_slot)
+        (internal_request_ready ?internal_request)
+        (not
+          (external_request_ready ?external_request)
+        )
+        (instrument_available ?funding_instrument)
+      )
+    :effect
+      (and
+        (instrument_allocated ?funding_instrument)
+        (instrument_internal_slot_assigned ?funding_instrument ?internal_maturity_slot)
+        (instrument_external_slot_assigned ?funding_instrument ?external_maturity_slot)
+        (allocation_depth_2 ?funding_instrument)
+        (not
+          (instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action create_and_tag_funding_instrument_with_allocation_depths_1_2
+    :parameters (?internal_request - internal_request ?external_request - external_request ?internal_maturity_slot - internal_maturity_slot ?external_maturity_slot - external_maturity_slot ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (external_buffer_engaged ?external_request)
+        (internal_slot_assigned ?internal_request ?internal_maturity_slot)
+        (external_slot_assigned ?external_request ?external_maturity_slot)
+        (internal_slot_buffered ?internal_maturity_slot)
+        (external_slot_buffered ?external_maturity_slot)
+        (not
+          (internal_request_ready ?internal_request)
+        )
+        (not
+          (external_request_ready ?external_request)
+        )
+        (instrument_available ?funding_instrument)
+      )
+    :effect
+      (and
+        (instrument_allocated ?funding_instrument)
+        (instrument_internal_slot_assigned ?funding_instrument ?internal_maturity_slot)
+        (instrument_external_slot_assigned ?funding_instrument ?external_maturity_slot)
+        (allocation_depth_1 ?funding_instrument)
+        (allocation_depth_2 ?funding_instrument)
+        (not
+          (instrument_available ?funding_instrument)
+        )
+      )
+  )
+  (:action lock_funding_instrument
+    :parameters (?funding_instrument - funding_instrument ?internal_request - internal_request ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (instrument_allocated ?funding_instrument)
+        (internal_buffer_engaged ?internal_request)
+        (request_tenor_assignment_for_subject ?internal_request ?tenor_profile)
+        (not
+          (instrument_locked ?funding_instrument)
+        )
+      )
+    :effect (instrument_locked ?funding_instrument)
+  )
+  (:action reserve_settlement_profile_for_instrument
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (plan_includes_instrument ?maturity_stagger_plan ?funding_instrument)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_available ?settlement_profile)
+        (instrument_allocated ?funding_instrument)
+        (instrument_locked ?funding_instrument)
+        (not
+          (settlement_profile_reserved ?settlement_profile)
+        )
+      )
+    :effect
+      (and
+        (settlement_profile_reserved ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (not
+          (settlement_profile_available ?settlement_profile)
+        )
+      )
+  )
+  (:action link_settlement_profile_and_mark_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_reserved ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (request_tenor_assignment_for_subject ?maturity_stagger_plan ?tenor_profile)
+        (not
+          (allocation_depth_1 ?funding_instrument)
+        )
+        (not
+          (plan_instrument_settlement_linked ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_instrument_settlement_linked ?maturity_stagger_plan)
+  )
+  (:action apply_regulatory_flag_to_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?regulatory_flag - regulatory_flag)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (regulatory_flag_available ?regulatory_flag)
+        (not
+          (regulatory_flag_applied ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (regulatory_flag_applied ?maturity_stagger_plan)
+        (plan_regulatory_flag_assigned ?maturity_stagger_plan ?regulatory_flag)
+        (not
+          (regulatory_flag_available ?regulatory_flag)
+        )
+      )
+  )
+  (:action apply_regulatory_flag_and_progress_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument ?tenor_profile - tenor_profile ?regulatory_flag - regulatory_flag)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_reserved ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (request_tenor_assignment_for_subject ?maturity_stagger_plan ?tenor_profile)
+        (allocation_depth_1 ?funding_instrument)
+        (regulatory_flag_applied ?maturity_stagger_plan)
+        (plan_regulatory_flag_assigned ?maturity_stagger_plan ?regulatory_flag)
+        (not
+          (plan_instrument_settlement_linked ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_instrument_settlement_linked ?maturity_stagger_plan)
+        (plan_regulatory_stage_acknowledged ?maturity_stagger_plan)
+      )
+  )
+  (:action assign_issuance_method_to_plan_and_mark_issuance_ready
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?issuance_method - issuance_method ?execution_desk - execution_desk ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_instrument_settlement_linked ?maturity_stagger_plan)
+        (plan_issuance_method_linked ?maturity_stagger_plan ?issuance_method)
+        (request_assigned_desk_for_subject ?maturity_stagger_plan ?execution_desk)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (not
+          (allocation_depth_2 ?funding_instrument)
+        )
+        (not
+          (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_issuance_method_confirmed ?maturity_stagger_plan)
+  )
+  (:action assign_issuance_method_to_plan_with_deeper_allocation
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?issuance_method - issuance_method ?execution_desk - execution_desk ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_instrument_settlement_linked ?maturity_stagger_plan)
+        (plan_issuance_method_linked ?maturity_stagger_plan ?issuance_method)
+        (request_assigned_desk_for_subject ?maturity_stagger_plan ?execution_desk)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (allocation_depth_2 ?funding_instrument)
+        (not
+          (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_issuance_method_confirmed ?maturity_stagger_plan)
+  )
+  (:action confirm_compliance_and_mark_plan_stage
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (not
+          (allocation_depth_1 ?funding_instrument)
+        )
+        (not
+          (allocation_depth_2 ?funding_instrument)
+        )
+        (not
+          (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+  )
+  (:action confirm_compliance_and_mark_plan_stage_with_strategy_ready
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (allocation_depth_1 ?funding_instrument)
+        (not
+          (allocation_depth_2 ?funding_instrument)
+        )
+        (not
+          (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_strategy_stage_ready ?maturity_stagger_plan)
+      )
+  )
+  (:action confirm_compliance_and_mark_plan_stage_alternate
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (not
+          (allocation_depth_1 ?funding_instrument)
+        )
+        (allocation_depth_2 ?funding_instrument)
+        (not
+          (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_strategy_stage_ready ?maturity_stagger_plan)
+      )
+  )
+  (:action confirm_compliance_and_mark_plan_stage_all_flags
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document ?settlement_profile - settlement_profile ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (plan_issuance_method_confirmed ?maturity_stagger_plan)
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (plan_settlement_profile_assigned ?maturity_stagger_plan ?settlement_profile)
+        (settlement_profile_linked_instrument ?settlement_profile ?funding_instrument)
+        (allocation_depth_1 ?funding_instrument)
+        (allocation_depth_2 ?funding_instrument)
+        (not
+          (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_strategy_stage_ready ?maturity_stagger_plan)
+      )
+  )
+  (:action finalize_plan_and_mark_ready
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan)
+    :precondition
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (not
+          (plan_strategy_stage_ready ?maturity_stagger_plan)
+        )
+        (not
+          (plan_finalized ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?maturity_stagger_plan)
+        (ready_for_execution_for_subject ?maturity_stagger_plan)
+      )
+  )
+  (:action assign_strategy_tag_to_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?strategy_tag - strategy_tag)
+    :precondition
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_strategy_stage_ready ?maturity_stagger_plan)
+        (strategy_tag_available ?strategy_tag)
+      )
+    :effect
+      (and
+        (plan_strategy_assigned ?maturity_stagger_plan ?strategy_tag)
+        (not
+          (strategy_tag_available ?strategy_tag)
+        )
+      )
+  )
+  (:action run_plan_execution_checks
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?internal_request - internal_request ?external_request - external_request ?tenor_profile - tenor_profile ?strategy_tag - strategy_tag)
+    :precondition
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_strategy_stage_ready ?maturity_stagger_plan)
+        (plan_strategy_assigned ?maturity_stagger_plan ?strategy_tag)
+        (plan_includes_internal_request ?maturity_stagger_plan ?internal_request)
+        (plan_includes_external_request ?maturity_stagger_plan ?external_request)
+        (internal_request_ready ?internal_request)
+        (external_request_ready ?external_request)
+        (request_tenor_assignment_for_subject ?maturity_stagger_plan ?tenor_profile)
+        (not
+          (plan_execution_checks_passed ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_execution_checks_passed ?maturity_stagger_plan)
+  )
+  (:action finalize_plan_after_execution_checks
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan)
+    :precondition
+      (and
+        (plan_documentation_and_compliance_ready ?maturity_stagger_plan)
+        (plan_execution_checks_passed ?maturity_stagger_plan)
+        (not
+          (plan_finalized ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?maturity_stagger_plan)
+        (ready_for_execution_for_subject ?maturity_stagger_plan)
+      )
+  )
+  (:action consume_approval_token_for_plan
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?approval_token - approval_token ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (tenor_confirmed_for_subject ?maturity_stagger_plan)
+        (request_tenor_assignment_for_subject ?maturity_stagger_plan ?tenor_profile)
+        (approval_token_available ?approval_token)
+        (plan_approval_token_linked ?maturity_stagger_plan ?approval_token)
+        (not
+          (plan_approval_consumed ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approval_consumed ?maturity_stagger_plan)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action initiate_plan_approval
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (plan_approval_consumed ?maturity_stagger_plan)
+        (request_assigned_desk_for_subject ?maturity_stagger_plan ?execution_desk)
+        (not
+          (plan_approval_initiated ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_approval_initiated ?maturity_stagger_plan)
+  )
+  (:action confirm_plan_approval
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (plan_approval_initiated ?maturity_stagger_plan)
+        (plan_compliance_document_assigned ?maturity_stagger_plan ?compliance_document)
+        (not
+          (plan_approval_confirmed ?maturity_stagger_plan)
+        )
+      )
+    :effect (plan_approval_confirmed ?maturity_stagger_plan)
+  )
+  (:action finalize_plan_after_approval
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan)
+    :precondition
+      (and
+        (plan_approval_confirmed ?maturity_stagger_plan)
+        (not
+          (plan_finalized ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?maturity_stagger_plan)
+        (ready_for_execution_for_subject ?maturity_stagger_plan)
+      )
+  )
+  (:action mark_internal_request_executed
+    :parameters (?internal_request - internal_request ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (internal_buffer_engaged ?internal_request)
+        (internal_request_ready ?internal_request)
+        (instrument_allocated ?funding_instrument)
+        (instrument_locked ?funding_instrument)
+        (not
+          (ready_for_execution_for_subject ?internal_request)
+        )
+      )
+    :effect (ready_for_execution_for_subject ?internal_request)
+  )
+  (:action mark_external_request_executed
+    :parameters (?external_request - external_request ?funding_instrument - funding_instrument)
+    :precondition
+      (and
+        (external_buffer_engaged ?external_request)
+        (external_request_ready ?external_request)
+        (instrument_allocated ?funding_instrument)
+        (instrument_locked ?funding_instrument)
+        (not
+          (ready_for_execution_for_subject ?external_request)
+        )
+      )
+    :effect (ready_for_execution_for_subject ?external_request)
+  )
+  (:action authorize_request_execution
+    :parameters (?funding_request - funding_request ?transfer_channel - transfer_channel ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (ready_for_execution_for_subject ?funding_request)
+        (request_tenor_assignment_for_subject ?funding_request ?tenor_profile)
+        (transfer_channel_available ?transfer_channel)
+        (not
+          (execution_authorized ?funding_request)
+        )
+      )
+    :effect
+      (and
+        (execution_authorized ?funding_request)
+        (request_transfer_channel_assigned_for_subject ?funding_request ?transfer_channel)
+        (not
+          (transfer_channel_available ?transfer_channel)
+        )
+      )
+  )
+  (:action finalize_execution_and_release_resources
+    :parameters (?internal_request - internal_request ?funding_option - funding_option ?transfer_channel - transfer_channel)
+    :precondition
+      (and
+        (execution_authorized ?internal_request)
+        (request_assigned_option_for_subject ?internal_request ?funding_option)
+        (request_transfer_channel_assigned_for_subject ?internal_request ?transfer_channel)
+        (not
+          (request_executed_for_subject ?internal_request)
+        )
+      )
+    :effect
+      (and
+        (request_executed_for_subject ?internal_request)
+        (funding_option_available ?funding_option)
+        (transfer_channel_available ?transfer_channel)
+      )
+  )
+  (:action finalize_external_execution_and_release_resources
+    :parameters (?external_request - external_request ?funding_option - funding_option ?transfer_channel - transfer_channel)
+    :precondition
+      (and
+        (execution_authorized ?external_request)
+        (request_assigned_option_for_subject ?external_request ?funding_option)
+        (request_transfer_channel_assigned_for_subject ?external_request ?transfer_channel)
+        (not
+          (request_executed_for_subject ?external_request)
+        )
+      )
+    :effect
+      (and
+        (request_executed_for_subject ?external_request)
+        (funding_option_available ?funding_option)
+        (transfer_channel_available ?transfer_channel)
+      )
+  )
+  (:action finalize_plan_execution_and_release_resources
+    :parameters (?maturity_stagger_plan - maturity_stagger_plan ?funding_option - funding_option ?transfer_channel - transfer_channel)
+    :precondition
+      (and
+        (execution_authorized ?maturity_stagger_plan)
+        (request_assigned_option_for_subject ?maturity_stagger_plan ?funding_option)
+        (request_transfer_channel_assigned_for_subject ?maturity_stagger_plan ?transfer_channel)
+        (not
+          (request_executed_for_subject ?maturity_stagger_plan)
+        )
+      )
+    :effect
+      (and
+        (request_executed_for_subject ?maturity_stagger_plan)
+        (funding_option_available ?funding_option)
+        (transfer_channel_available ?transfer_channel)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem funding_maturity_staggering_case)
+  (:domain treasury_funding_maturity_staggering)
+  (:objects internal_request_a - internal_request external_request_a - external_request maturity_stagger_plan_a - maturity_stagger_plan maturity_stagger_plan_b - maturity_stagger_plan funding_option_1 - funding_option funding_option_2 - funding_option funding_option_3 - funding_option tenor_profile_1 - tenor_profile execution_desk_1 - execution_desk liquidity_buffer_profile_1 - liquidity_buffer_profile internal_maturity_slot_1 - internal_maturity_slot external_maturity_slot_1 - external_maturity_slot funding_instrument_1 - funding_instrument settlement_profile_1 - settlement_profile settlement_profile_2 - settlement_profile regulatory_flag_a - regulatory_flag regulatory_flag_b - regulatory_flag strategy_tag_a - strategy_tag strategy_tag_b - strategy_tag transfer_channel_1 - transfer_channel issuance_method_1 - issuance_method approval_token_alpha - approval_token approval_token_beta - approval_token compliance_document_1 - compliance_document)
+  (:init
+    (funding_option_available funding_option_1)
+    (funding_option_available funding_option_2)
+    (funding_option_available funding_option_3)
+    (tenor_profile_available tenor_profile_1)
+    (execution_desk_available execution_desk_1)
+    (buffer_profile_available liquidity_buffer_profile_1)
+    (internal_slot_assigned internal_request_a internal_maturity_slot_1)
+    (external_slot_assigned external_request_a external_maturity_slot_1)
+    (instrument_available funding_instrument_1)
+    (settlement_profile_available settlement_profile_1)
+    (settlement_profile_available settlement_profile_2)
+    (plan_includes_internal_request maturity_stagger_plan_a internal_request_a)
+    (plan_includes_internal_request maturity_stagger_plan_b internal_request_a)
+    (plan_includes_external_request maturity_stagger_plan_a external_request_a)
+    (plan_includes_external_request maturity_stagger_plan_b external_request_a)
+    (plan_includes_instrument maturity_stagger_plan_a funding_instrument_1)
+    (plan_includes_instrument maturity_stagger_plan_b funding_instrument_1)
+    (plan_settlement_profile_assigned maturity_stagger_plan_a settlement_profile_1)
+    (plan_settlement_profile_assigned maturity_stagger_plan_b settlement_profile_2)
+    (regulatory_flag_available regulatory_flag_a)
+    (regulatory_flag_available regulatory_flag_b)
+    (strategy_tag_available strategy_tag_a)
+    (strategy_tag_available strategy_tag_b)
+    (transfer_channel_available transfer_channel_1)
+    (issuance_method_available issuance_method_1)
+    (approval_token_available approval_token_alpha)
+    (plan_approval_token_linked maturity_stagger_plan_a approval_token_alpha)
+    (plan_approval_token_linked maturity_stagger_plan_b approval_token_beta)
+    (compliance_document_available compliance_document_1)
+  )
+  (:goal
+    (and
+      (request_executed_for_subject internal_request_a)
+      (request_executed_for_subject external_request_a)
+      (request_executed_for_subject maturity_stagger_plan_a)
+      (request_executed_for_subject maturity_stagger_plan_b)
+    )
+  )
+)

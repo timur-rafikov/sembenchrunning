@@ -1,0 +1,1061 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmaceutics_batch_quarantine_and_release)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types human_resource_type_group - object artifact_type_group - object entity_group_for_nodes_and_dossiers - object batch_entity_group - object product_batch_record - batch_entity_group investigator_resource - human_resource_type_group laboratory_test - human_resource_type_group quality_representative - human_resource_type_group third_party_certificate - human_resource_type_group regulatory_guideline - human_resource_type_group shortage_mitigation_resource - human_resource_type_group technical_specialist - human_resource_type_group executive_approver - human_resource_type_group mitigation_resource - artifact_type_group sample_record - artifact_type_group clinical_representative - artifact_type_group contamination_indicator - entity_group_for_nodes_and_dossiers supply_node_record - entity_group_for_nodes_and_dossiers case_dossier - entity_group_for_nodes_and_dossiers operational_unit_group - product_batch_record decision_entity_group - product_batch_record manufacturing_batch_unit - operational_unit_group distribution_batch_unit - operational_unit_group decision_record - decision_entity_group)
+  (:predicates
+    (case_record_created ?product_batch_record - product_batch_record)
+    (ready_for_review ?product_batch_record - product_batch_record)
+    (investigation_assigned ?product_batch_record - product_batch_record)
+    (release_applied ?product_batch_record - product_batch_record)
+    (authorized_for_release ?product_batch_record - product_batch_record)
+    (release_recorded ?product_batch_record - product_batch_record)
+    (investigator_available ?investigator_resource - investigator_resource)
+    (investigator_assigned ?product_batch_record - product_batch_record ?investigator_resource - investigator_resource)
+    (laboratory_test_available ?laboratory_test - laboratory_test)
+    (test_scheduled ?product_batch_record - product_batch_record ?laboratory_test - laboratory_test)
+    (qa_representative_available ?quality_representative - quality_representative)
+    (qa_assigned_to_batch ?product_batch_record - product_batch_record ?quality_representative - quality_representative)
+    (mitigation_resource_available ?mitigation_resource - mitigation_resource)
+    (mitigation_assigned_to_mfg_unit ?manufacturing_batch_unit - manufacturing_batch_unit ?mitigation_resource - mitigation_resource)
+    (mitigation_assigned_to_distribution_unit ?distribution_batch_unit - distribution_batch_unit ?mitigation_resource - mitigation_resource)
+    (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit - manufacturing_batch_unit ?contamination_indicator - contamination_indicator)
+    (contamination_indicator_activated ?contamination_indicator - contamination_indicator)
+    (contamination_indicator_mitigation_present ?contamination_indicator - contamination_indicator)
+    (mfg_unit_contained ?manufacturing_batch_unit - manufacturing_batch_unit)
+    (distribution_unit_linked_to_supply_node ?distribution_batch_unit - distribution_batch_unit ?supply_node_record - supply_node_record)
+    (supply_node_indicator_activated ?supply_node_record - supply_node_record)
+    (supply_node_mitigation_present ?supply_node_record - supply_node_record)
+    (distribution_unit_contained ?distribution_batch_unit - distribution_batch_unit)
+    (dossier_available ?case_dossier - case_dossier)
+    (dossier_created ?case_dossier - case_dossier)
+    (dossier_contains_contamination_indicator ?case_dossier - case_dossier ?contamination_indicator - contamination_indicator)
+    (dossier_contains_supply_node ?case_dossier - case_dossier ?supply_node_record - supply_node_record)
+    (dossier_contains_manufacturing_evidence ?case_dossier - case_dossier)
+    (dossier_contains_distribution_evidence ?case_dossier - case_dossier)
+    (dossier_validated ?case_dossier - case_dossier)
+    (decision_links_to_mfg_unit ?decision_record - decision_record ?manufacturing_batch_unit - manufacturing_batch_unit)
+    (decision_links_to_distribution_unit ?decision_record - decision_record ?distribution_batch_unit - distribution_batch_unit)
+    (decision_links_to_dossier ?decision_record - decision_record ?case_dossier - case_dossier)
+    (sample_record_available ?sample_record - sample_record)
+    (decision_links_to_sample ?decision_record - decision_record ?sample_record - sample_record)
+    (sample_processed ?sample_record - sample_record)
+    (sample_linked_to_dossier ?sample_record - sample_record ?case_dossier - case_dossier)
+    (technical_review_ready ?decision_record - decision_record)
+    (technical_review_completed ?decision_record - decision_record)
+    (executive_approval_recorded ?decision_record - decision_record)
+    (third_party_certificate_attached ?decision_record - decision_record)
+    (third_party_certificate_verified ?decision_record - decision_record)
+    (regulatory_guidance_attached ?decision_record - decision_record)
+    (final_checks_passed ?decision_record - decision_record)
+    (clinical_representative_available ?clinical_representative - clinical_representative)
+    (decision_linked_to_clinical_representative ?decision_record - decision_record ?clinical_representative - clinical_representative)
+    (clinical_notification_recorded ?decision_record - decision_record)
+    (clinical_notification_acknowledged ?decision_record - decision_record)
+    (external_approval_received ?decision_record - decision_record)
+    (third_party_certificate_available ?third_party_certificate - third_party_certificate)
+    (decision_has_third_party_certificate ?decision_record - decision_record ?third_party_certificate - third_party_certificate)
+    (regulatory_guideline_available ?regulatory_guideline - regulatory_guideline)
+    (decision_has_regulatory_guidance ?decision_record - decision_record ?regulatory_guideline - regulatory_guideline)
+    (technical_specialist_available ?technical_specialist - technical_specialist)
+    (technical_specialist_assigned_to_decision ?decision_record - decision_record ?technical_specialist - technical_specialist)
+    (executive_approver_available ?executive_approver - executive_approver)
+    (executive_approval_assigned_to_decision ?decision_record - decision_record ?executive_approver - executive_approver)
+    (shortage_mitigation_resource_available ?shortage_mitigation_resource - shortage_mitigation_resource)
+    (batch_has_shortage_mitigation_resource ?product_batch_record - product_batch_record ?shortage_mitigation_resource - shortage_mitigation_resource)
+    (mfg_unit_ready_for_dossier ?manufacturing_batch_unit - manufacturing_batch_unit)
+    (distribution_unit_ready_for_dossier ?distribution_batch_unit - distribution_batch_unit)
+    (decision_record_locked ?decision_record - decision_record)
+  )
+  (:action create_case_for_batch
+    :parameters (?product_batch_record - product_batch_record)
+    :precondition
+      (and
+        (not
+          (case_record_created ?product_batch_record)
+        )
+        (not
+          (release_applied ?product_batch_record)
+        )
+      )
+    :effect (case_record_created ?product_batch_record)
+  )
+  (:action assign_investigator_to_case
+    :parameters (?product_batch_record - product_batch_record ?investigator_resource - investigator_resource)
+    :precondition
+      (and
+        (case_record_created ?product_batch_record)
+        (not
+          (investigation_assigned ?product_batch_record)
+        )
+        (investigator_available ?investigator_resource)
+      )
+    :effect
+      (and
+        (investigation_assigned ?product_batch_record)
+        (investigator_assigned ?product_batch_record ?investigator_resource)
+        (not
+          (investigator_available ?investigator_resource)
+        )
+      )
+  )
+  (:action schedule_laboratory_test
+    :parameters (?product_batch_record - product_batch_record ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (case_record_created ?product_batch_record)
+        (investigation_assigned ?product_batch_record)
+        (laboratory_test_available ?laboratory_test)
+      )
+    :effect
+      (and
+        (test_scheduled ?product_batch_record ?laboratory_test)
+        (not
+          (laboratory_test_available ?laboratory_test)
+        )
+      )
+  )
+  (:action record_test_result_and_mark_case_ready
+    :parameters (?product_batch_record - product_batch_record ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (case_record_created ?product_batch_record)
+        (investigation_assigned ?product_batch_record)
+        (test_scheduled ?product_batch_record ?laboratory_test)
+        (not
+          (ready_for_review ?product_batch_record)
+        )
+      )
+    :effect (ready_for_review ?product_batch_record)
+  )
+  (:action release_laboratory_test_resource
+    :parameters (?product_batch_record - product_batch_record ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (test_scheduled ?product_batch_record ?laboratory_test)
+      )
+    :effect
+      (and
+        (laboratory_test_available ?laboratory_test)
+        (not
+          (test_scheduled ?product_batch_record ?laboratory_test)
+        )
+      )
+  )
+  (:action assign_quality_representative_to_case
+    :parameters (?product_batch_record - product_batch_record ?quality_representative - quality_representative)
+    :precondition
+      (and
+        (ready_for_review ?product_batch_record)
+        (qa_representative_available ?quality_representative)
+      )
+    :effect
+      (and
+        (qa_assigned_to_batch ?product_batch_record ?quality_representative)
+        (not
+          (qa_representative_available ?quality_representative)
+        )
+      )
+  )
+  (:action unassign_quality_representative_from_case
+    :parameters (?product_batch_record - product_batch_record ?quality_representative - quality_representative)
+    :precondition
+      (and
+        (qa_assigned_to_batch ?product_batch_record ?quality_representative)
+      )
+    :effect
+      (and
+        (qa_representative_available ?quality_representative)
+        (not
+          (qa_assigned_to_batch ?product_batch_record ?quality_representative)
+        )
+      )
+  )
+  (:action assign_technical_specialist_to_decision
+    :parameters (?decision_record - decision_record ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (technical_specialist_available ?technical_specialist)
+      )
+    :effect
+      (and
+        (technical_specialist_assigned_to_decision ?decision_record ?technical_specialist)
+        (not
+          (technical_specialist_available ?technical_specialist)
+        )
+      )
+  )
+  (:action release_technical_specialist_from_decision
+    :parameters (?decision_record - decision_record ?technical_specialist - technical_specialist)
+    :precondition
+      (and
+        (technical_specialist_assigned_to_decision ?decision_record ?technical_specialist)
+      )
+    :effect
+      (and
+        (technical_specialist_available ?technical_specialist)
+        (not
+          (technical_specialist_assigned_to_decision ?decision_record ?technical_specialist)
+        )
+      )
+  )
+  (:action assign_executive_approver_to_decision
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (executive_approver_available ?executive_approver)
+      )
+    :effect
+      (and
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (not
+          (executive_approver_available ?executive_approver)
+        )
+      )
+  )
+  (:action release_executive_approver_from_decision
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver)
+    :precondition
+      (and
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+      )
+    :effect
+      (and
+        (executive_approver_available ?executive_approver)
+        (not
+          (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        )
+      )
+  )
+  (:action activate_contamination_indicator
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?contamination_indicator - contamination_indicator ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (ready_for_review ?manufacturing_batch_unit)
+        (test_scheduled ?manufacturing_batch_unit ?laboratory_test)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (not
+          (contamination_indicator_activated ?contamination_indicator)
+        )
+        (not
+          (contamination_indicator_mitigation_present ?contamination_indicator)
+        )
+      )
+    :effect (contamination_indicator_activated ?contamination_indicator)
+  )
+  (:action confirm_mfg_unit_containment
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?contamination_indicator - contamination_indicator ?quality_representative - quality_representative)
+    :precondition
+      (and
+        (ready_for_review ?manufacturing_batch_unit)
+        (qa_assigned_to_batch ?manufacturing_batch_unit ?quality_representative)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (contamination_indicator_activated ?contamination_indicator)
+        (not
+          (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+      )
+  )
+  (:action attach_mitigation_to_mfg_unit
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?contamination_indicator - contamination_indicator ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (ready_for_review ?manufacturing_batch_unit)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (contamination_indicator_mitigation_present ?contamination_indicator)
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (mitigation_assigned_to_mfg_unit ?manufacturing_batch_unit ?mitigation_resource)
+        (not
+          (mitigation_resource_available ?mitigation_resource)
+        )
+      )
+  )
+  (:action apply_mitigation_and_update_mfg_unit
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?contamination_indicator - contamination_indicator ?laboratory_test - laboratory_test ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (ready_for_review ?manufacturing_batch_unit)
+        (test_scheduled ?manufacturing_batch_unit ?laboratory_test)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (contamination_indicator_mitigation_present ?contamination_indicator)
+        (mitigation_assigned_to_mfg_unit ?manufacturing_batch_unit ?mitigation_resource)
+        (not
+          (mfg_unit_contained ?manufacturing_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (contamination_indicator_activated ?contamination_indicator)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (mitigation_assigned_to_mfg_unit ?manufacturing_batch_unit ?mitigation_resource)
+        )
+      )
+  )
+  (:action mark_supply_node_indicator_active
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?supply_node_record - supply_node_record ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (ready_for_review ?distribution_batch_unit)
+        (test_scheduled ?distribution_batch_unit ?laboratory_test)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (not
+          (supply_node_indicator_activated ?supply_node_record)
+        )
+        (not
+          (supply_node_mitigation_present ?supply_node_record)
+        )
+      )
+    :effect (supply_node_indicator_activated ?supply_node_record)
+  )
+  (:action confirm_distribution_unit_containment
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?supply_node_record - supply_node_record ?quality_representative - quality_representative)
+    :precondition
+      (and
+        (ready_for_review ?distribution_batch_unit)
+        (qa_assigned_to_batch ?distribution_batch_unit ?quality_representative)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (supply_node_indicator_activated ?supply_node_record)
+        (not
+          (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (distribution_unit_contained ?distribution_batch_unit)
+      )
+  )
+  (:action attach_mitigation_to_distribution_unit
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?supply_node_record - supply_node_record ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (ready_for_review ?distribution_batch_unit)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (supply_node_mitigation_present ?supply_node_record)
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (mitigation_assigned_to_distribution_unit ?distribution_batch_unit ?mitigation_resource)
+        (not
+          (mitigation_resource_available ?mitigation_resource)
+        )
+      )
+  )
+  (:action apply_mitigation_and_update_distribution_unit
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?supply_node_record - supply_node_record ?laboratory_test - laboratory_test ?mitigation_resource - mitigation_resource)
+    :precondition
+      (and
+        (ready_for_review ?distribution_batch_unit)
+        (test_scheduled ?distribution_batch_unit ?laboratory_test)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (supply_node_mitigation_present ?supply_node_record)
+        (mitigation_assigned_to_distribution_unit ?distribution_batch_unit ?mitigation_resource)
+        (not
+          (distribution_unit_contained ?distribution_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (supply_node_indicator_activated ?supply_node_record)
+        (distribution_unit_contained ?distribution_batch_unit)
+        (mitigation_resource_available ?mitigation_resource)
+        (not
+          (mitigation_assigned_to_distribution_unit ?distribution_batch_unit ?mitigation_resource)
+        )
+      )
+  )
+  (:action create_case_dossier_for_evidence
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?distribution_batch_unit - distribution_batch_unit ?contamination_indicator - contamination_indicator ?supply_node_record - supply_node_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (contamination_indicator_activated ?contamination_indicator)
+        (supply_node_indicator_activated ?supply_node_record)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+        (distribution_unit_contained ?distribution_batch_unit)
+        (dossier_available ?case_dossier)
+      )
+    :effect
+      (and
+        (dossier_created ?case_dossier)
+        (dossier_contains_contamination_indicator ?case_dossier ?contamination_indicator)
+        (dossier_contains_supply_node ?case_dossier ?supply_node_record)
+        (not
+          (dossier_available ?case_dossier)
+        )
+      )
+  )
+  (:action create_case_dossier_with_mitigation
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?distribution_batch_unit - distribution_batch_unit ?contamination_indicator - contamination_indicator ?supply_node_record - supply_node_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (contamination_indicator_mitigation_present ?contamination_indicator)
+        (supply_node_indicator_activated ?supply_node_record)
+        (not
+          (mfg_unit_contained ?manufacturing_batch_unit)
+        )
+        (distribution_unit_contained ?distribution_batch_unit)
+        (dossier_available ?case_dossier)
+      )
+    :effect
+      (and
+        (dossier_created ?case_dossier)
+        (dossier_contains_contamination_indicator ?case_dossier ?contamination_indicator)
+        (dossier_contains_supply_node ?case_dossier ?supply_node_record)
+        (dossier_contains_manufacturing_evidence ?case_dossier)
+        (not
+          (dossier_available ?case_dossier)
+        )
+      )
+  )
+  (:action create_case_dossier_with_supply_evidence
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?distribution_batch_unit - distribution_batch_unit ?contamination_indicator - contamination_indicator ?supply_node_record - supply_node_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (contamination_indicator_activated ?contamination_indicator)
+        (supply_node_mitigation_present ?supply_node_record)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+        (not
+          (distribution_unit_contained ?distribution_batch_unit)
+        )
+        (dossier_available ?case_dossier)
+      )
+    :effect
+      (and
+        (dossier_created ?case_dossier)
+        (dossier_contains_contamination_indicator ?case_dossier ?contamination_indicator)
+        (dossier_contains_supply_node ?case_dossier ?supply_node_record)
+        (dossier_contains_distribution_evidence ?case_dossier)
+        (not
+          (dossier_available ?case_dossier)
+        )
+      )
+  )
+  (:action create_case_dossier_combined_evidence
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?distribution_batch_unit - distribution_batch_unit ?contamination_indicator - contamination_indicator ?supply_node_record - supply_node_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (contamination_indicator_tagged_on_mfg_unit ?manufacturing_batch_unit ?contamination_indicator)
+        (distribution_unit_linked_to_supply_node ?distribution_batch_unit ?supply_node_record)
+        (contamination_indicator_mitigation_present ?contamination_indicator)
+        (supply_node_mitigation_present ?supply_node_record)
+        (not
+          (mfg_unit_contained ?manufacturing_batch_unit)
+        )
+        (not
+          (distribution_unit_contained ?distribution_batch_unit)
+        )
+        (dossier_available ?case_dossier)
+      )
+    :effect
+      (and
+        (dossier_created ?case_dossier)
+        (dossier_contains_contamination_indicator ?case_dossier ?contamination_indicator)
+        (dossier_contains_supply_node ?case_dossier ?supply_node_record)
+        (dossier_contains_manufacturing_evidence ?case_dossier)
+        (dossier_contains_distribution_evidence ?case_dossier)
+        (not
+          (dossier_available ?case_dossier)
+        )
+      )
+  )
+  (:action validate_case_dossier
+    :parameters (?case_dossier - case_dossier ?manufacturing_batch_unit - manufacturing_batch_unit ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (dossier_created ?case_dossier)
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (test_scheduled ?manufacturing_batch_unit ?laboratory_test)
+        (not
+          (dossier_validated ?case_dossier)
+        )
+      )
+    :effect (dossier_validated ?case_dossier)
+  )
+  (:action accept_sample_into_dossier
+    :parameters (?decision_record - decision_record ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (decision_links_to_dossier ?decision_record ?case_dossier)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_record_available ?sample_record)
+        (dossier_created ?case_dossier)
+        (dossier_validated ?case_dossier)
+        (not
+          (sample_processed ?sample_record)
+        )
+      )
+    :effect
+      (and
+        (sample_processed ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (not
+          (sample_record_available ?sample_record)
+        )
+      )
+  )
+  (:action process_sample_and_mark_technical_review_ready
+    :parameters (?decision_record - decision_record ?sample_record - sample_record ?case_dossier - case_dossier ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_processed ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (test_scheduled ?decision_record ?laboratory_test)
+        (not
+          (dossier_contains_manufacturing_evidence ?case_dossier)
+        )
+        (not
+          (technical_review_ready ?decision_record)
+        )
+      )
+    :effect (technical_review_ready ?decision_record)
+  )
+  (:action attach_third_party_certificate
+    :parameters (?decision_record - decision_record ?third_party_certificate - third_party_certificate)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (third_party_certificate_available ?third_party_certificate)
+        (not
+          (third_party_certificate_attached ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (third_party_certificate_attached ?decision_record)
+        (decision_has_third_party_certificate ?decision_record ?third_party_certificate)
+        (not
+          (third_party_certificate_available ?third_party_certificate)
+        )
+      )
+  )
+  (:action integrate_third_party_certificate
+    :parameters (?decision_record - decision_record ?sample_record - sample_record ?case_dossier - case_dossier ?laboratory_test - laboratory_test ?third_party_certificate - third_party_certificate)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_processed ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (test_scheduled ?decision_record ?laboratory_test)
+        (dossier_contains_manufacturing_evidence ?case_dossier)
+        (third_party_certificate_attached ?decision_record)
+        (decision_has_third_party_certificate ?decision_record ?third_party_certificate)
+        (not
+          (technical_review_ready ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (technical_review_ready ?decision_record)
+        (third_party_certificate_verified ?decision_record)
+      )
+  )
+  (:action conduct_technical_specialist_review
+    :parameters (?decision_record - decision_record ?technical_specialist - technical_specialist ?quality_representative - quality_representative ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_ready ?decision_record)
+        (technical_specialist_assigned_to_decision ?decision_record ?technical_specialist)
+        (qa_assigned_to_batch ?decision_record ?quality_representative)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (not
+          (dossier_contains_distribution_evidence ?case_dossier)
+        )
+        (not
+          (technical_review_completed ?decision_record)
+        )
+      )
+    :effect (technical_review_completed ?decision_record)
+  )
+  (:action conduct_technical_specialist_review_variant
+    :parameters (?decision_record - decision_record ?technical_specialist - technical_specialist ?quality_representative - quality_representative ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_ready ?decision_record)
+        (technical_specialist_assigned_to_decision ?decision_record ?technical_specialist)
+        (qa_assigned_to_batch ?decision_record ?quality_representative)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (dossier_contains_distribution_evidence ?case_dossier)
+        (not
+          (technical_review_completed ?decision_record)
+        )
+      )
+    :effect (technical_review_completed ?decision_record)
+  )
+  (:action record_executive_approval_path_a
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_completed ?decision_record)
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (not
+          (dossier_contains_manufacturing_evidence ?case_dossier)
+        )
+        (not
+          (dossier_contains_distribution_evidence ?case_dossier)
+        )
+        (not
+          (executive_approval_recorded ?decision_record)
+        )
+      )
+    :effect (executive_approval_recorded ?decision_record)
+  )
+  (:action record_executive_approval_and_attach_guidance
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_completed ?decision_record)
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (dossier_contains_manufacturing_evidence ?case_dossier)
+        (not
+          (dossier_contains_distribution_evidence ?case_dossier)
+        )
+        (not
+          (executive_approval_recorded ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (executive_approval_recorded ?decision_record)
+        (regulatory_guidance_attached ?decision_record)
+      )
+  )
+  (:action record_executive_approval_and_attach_guidance_variant
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_completed ?decision_record)
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (not
+          (dossier_contains_manufacturing_evidence ?case_dossier)
+        )
+        (dossier_contains_distribution_evidence ?case_dossier)
+        (not
+          (executive_approval_recorded ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (executive_approval_recorded ?decision_record)
+        (regulatory_guidance_attached ?decision_record)
+      )
+  )
+  (:action record_executive_approval_with_all_evidence
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver ?sample_record - sample_record ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (technical_review_completed ?decision_record)
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (decision_links_to_sample ?decision_record ?sample_record)
+        (sample_linked_to_dossier ?sample_record ?case_dossier)
+        (dossier_contains_manufacturing_evidence ?case_dossier)
+        (dossier_contains_distribution_evidence ?case_dossier)
+        (not
+          (executive_approval_recorded ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (executive_approval_recorded ?decision_record)
+        (regulatory_guidance_attached ?decision_record)
+      )
+  )
+  (:action finalize_decision_and_lock_record
+    :parameters (?decision_record - decision_record)
+    :precondition
+      (and
+        (executive_approval_recorded ?decision_record)
+        (not
+          (regulatory_guidance_attached ?decision_record)
+        )
+        (not
+          (decision_record_locked ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (decision_record_locked ?decision_record)
+        (authorized_for_release ?decision_record)
+      )
+  )
+  (:action attach_regulatory_guidance_to_decision
+    :parameters (?decision_record - decision_record ?regulatory_guideline - regulatory_guideline)
+    :precondition
+      (and
+        (executive_approval_recorded ?decision_record)
+        (regulatory_guidance_attached ?decision_record)
+        (regulatory_guideline_available ?regulatory_guideline)
+      )
+    :effect
+      (and
+        (decision_has_regulatory_guidance ?decision_record ?regulatory_guideline)
+        (not
+          (regulatory_guideline_available ?regulatory_guideline)
+        )
+      )
+  )
+  (:action perform_final_checks_and_mark_ready
+    :parameters (?decision_record - decision_record ?manufacturing_batch_unit - manufacturing_batch_unit ?distribution_batch_unit - distribution_batch_unit ?laboratory_test - laboratory_test ?regulatory_guideline - regulatory_guideline)
+    :precondition
+      (and
+        (executive_approval_recorded ?decision_record)
+        (regulatory_guidance_attached ?decision_record)
+        (decision_has_regulatory_guidance ?decision_record ?regulatory_guideline)
+        (decision_links_to_mfg_unit ?decision_record ?manufacturing_batch_unit)
+        (decision_links_to_distribution_unit ?decision_record ?distribution_batch_unit)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+        (distribution_unit_contained ?distribution_batch_unit)
+        (test_scheduled ?decision_record ?laboratory_test)
+        (not
+          (final_checks_passed ?decision_record)
+        )
+      )
+    :effect (final_checks_passed ?decision_record)
+  )
+  (:action lock_decision_and_authorize_release
+    :parameters (?decision_record - decision_record)
+    :precondition
+      (and
+        (executive_approval_recorded ?decision_record)
+        (final_checks_passed ?decision_record)
+        (not
+          (decision_record_locked ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (decision_record_locked ?decision_record)
+        (authorized_for_release ?decision_record)
+      )
+  )
+  (:action notify_clinical_representative_and_record_notification
+    :parameters (?decision_record - decision_record ?clinical_representative - clinical_representative ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (ready_for_review ?decision_record)
+        (test_scheduled ?decision_record ?laboratory_test)
+        (clinical_representative_available ?clinical_representative)
+        (decision_linked_to_clinical_representative ?decision_record ?clinical_representative)
+        (not
+          (clinical_notification_recorded ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (clinical_notification_recorded ?decision_record)
+        (not
+          (clinical_representative_available ?clinical_representative)
+        )
+      )
+  )
+  (:action acknowledge_clinical_notification
+    :parameters (?decision_record - decision_record ?quality_representative - quality_representative)
+    :precondition
+      (and
+        (clinical_notification_recorded ?decision_record)
+        (qa_assigned_to_batch ?decision_record ?quality_representative)
+        (not
+          (clinical_notification_acknowledged ?decision_record)
+        )
+      )
+    :effect (clinical_notification_acknowledged ?decision_record)
+  )
+  (:action record_external_approval
+    :parameters (?decision_record - decision_record ?executive_approver - executive_approver)
+    :precondition
+      (and
+        (clinical_notification_acknowledged ?decision_record)
+        (executive_approval_assigned_to_decision ?decision_record ?executive_approver)
+        (not
+          (external_approval_received ?decision_record)
+        )
+      )
+    :effect (external_approval_received ?decision_record)
+  )
+  (:action finalize_external_approval_and_lock
+    :parameters (?decision_record - decision_record)
+    :precondition
+      (and
+        (external_approval_received ?decision_record)
+        (not
+          (decision_record_locked ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (decision_record_locked ?decision_record)
+        (authorized_for_release ?decision_record)
+      )
+  )
+  (:action propagate_release_to_mfg_unit
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (mfg_unit_ready_for_dossier ?manufacturing_batch_unit)
+        (mfg_unit_contained ?manufacturing_batch_unit)
+        (dossier_created ?case_dossier)
+        (dossier_validated ?case_dossier)
+        (not
+          (authorized_for_release ?manufacturing_batch_unit)
+        )
+      )
+    :effect (authorized_for_release ?manufacturing_batch_unit)
+  )
+  (:action propagate_release_to_distribution_unit
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?case_dossier - case_dossier)
+    :precondition
+      (and
+        (distribution_unit_ready_for_dossier ?distribution_batch_unit)
+        (distribution_unit_contained ?distribution_batch_unit)
+        (dossier_created ?case_dossier)
+        (dossier_validated ?case_dossier)
+        (not
+          (authorized_for_release ?distribution_batch_unit)
+        )
+      )
+    :effect (authorized_for_release ?distribution_batch_unit)
+  )
+  (:action record_final_batch_release_and_mitigation
+    :parameters (?product_batch_record - product_batch_record ?shortage_mitigation_resource - shortage_mitigation_resource ?laboratory_test - laboratory_test)
+    :precondition
+      (and
+        (authorized_for_release ?product_batch_record)
+        (test_scheduled ?product_batch_record ?laboratory_test)
+        (shortage_mitigation_resource_available ?shortage_mitigation_resource)
+        (not
+          (release_recorded ?product_batch_record)
+        )
+      )
+    :effect
+      (and
+        (release_recorded ?product_batch_record)
+        (batch_has_shortage_mitigation_resource ?product_batch_record ?shortage_mitigation_resource)
+        (not
+          (shortage_mitigation_resource_available ?shortage_mitigation_resource)
+        )
+      )
+  )
+  (:action apply_final_release_to_mfg_unit
+    :parameters (?manufacturing_batch_unit - manufacturing_batch_unit ?investigator_resource - investigator_resource ?shortage_mitigation_resource - shortage_mitigation_resource)
+    :precondition
+      (and
+        (release_recorded ?manufacturing_batch_unit)
+        (investigator_assigned ?manufacturing_batch_unit ?investigator_resource)
+        (batch_has_shortage_mitigation_resource ?manufacturing_batch_unit ?shortage_mitigation_resource)
+        (not
+          (release_applied ?manufacturing_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (release_applied ?manufacturing_batch_unit)
+        (investigator_available ?investigator_resource)
+        (shortage_mitigation_resource_available ?shortage_mitigation_resource)
+      )
+  )
+  (:action apply_final_release_to_distribution_unit
+    :parameters (?distribution_batch_unit - distribution_batch_unit ?investigator_resource - investigator_resource ?shortage_mitigation_resource - shortage_mitigation_resource)
+    :precondition
+      (and
+        (release_recorded ?distribution_batch_unit)
+        (investigator_assigned ?distribution_batch_unit ?investigator_resource)
+        (batch_has_shortage_mitigation_resource ?distribution_batch_unit ?shortage_mitigation_resource)
+        (not
+          (release_applied ?distribution_batch_unit)
+        )
+      )
+    :effect
+      (and
+        (release_applied ?distribution_batch_unit)
+        (investigator_available ?investigator_resource)
+        (shortage_mitigation_resource_available ?shortage_mitigation_resource)
+      )
+  )
+  (:action apply_final_release_to_decision_record
+    :parameters (?decision_record - decision_record ?investigator_resource - investigator_resource ?shortage_mitigation_resource - shortage_mitigation_resource)
+    :precondition
+      (and
+        (release_recorded ?decision_record)
+        (investigator_assigned ?decision_record ?investigator_resource)
+        (batch_has_shortage_mitigation_resource ?decision_record ?shortage_mitigation_resource)
+        (not
+          (release_applied ?decision_record)
+        )
+      )
+    :effect
+      (and
+        (release_applied ?decision_record)
+        (investigator_available ?investigator_resource)
+        (shortage_mitigation_resource_available ?shortage_mitigation_resource)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem batch_quarantine_and_release_scenario)
+  (:domain pharmaceutics_batch_quarantine_and_release)
+  (:objects manufacturing_unit_1 - manufacturing_batch_unit distribution_unit_1 - distribution_batch_unit decision_record_1 - decision_record decision_record_2 - decision_record investigator_resource_1 - investigator_resource investigator_resource_2 - investigator_resource investigator_resource_3 - investigator_resource analytical_test_1 - laboratory_test quality_representative_1 - quality_representative mitigation_resource_1 - mitigation_resource contamination_indicator_1 - contamination_indicator supply_node_1 - supply_node_record case_dossier_1 - case_dossier sample_record_1 - sample_record sample_record_2 - sample_record third_party_certificate_1 - third_party_certificate third_party_certificate_2 - third_party_certificate regulatory_guideline_1 - regulatory_guideline regulatory_guideline_2 - regulatory_guideline shortage_mitigation_resource_1 - shortage_mitigation_resource technical_specialist_1 - technical_specialist clinical_representative_1 - clinical_representative clinical_representative_2 - clinical_representative executive_approver_1 - executive_approver)
+  (:init
+    (investigator_available investigator_resource_1)
+    (investigator_available investigator_resource_2)
+    (investigator_available investigator_resource_3)
+    (laboratory_test_available analytical_test_1)
+    (qa_representative_available quality_representative_1)
+    (mitigation_resource_available mitigation_resource_1)
+    (contamination_indicator_tagged_on_mfg_unit manufacturing_unit_1 contamination_indicator_1)
+    (distribution_unit_linked_to_supply_node distribution_unit_1 supply_node_1)
+    (dossier_available case_dossier_1)
+    (sample_record_available sample_record_1)
+    (sample_record_available sample_record_2)
+    (decision_links_to_mfg_unit decision_record_1 manufacturing_unit_1)
+    (decision_links_to_mfg_unit decision_record_2 manufacturing_unit_1)
+    (decision_links_to_distribution_unit decision_record_1 distribution_unit_1)
+    (decision_links_to_distribution_unit decision_record_2 distribution_unit_1)
+    (decision_links_to_dossier decision_record_1 case_dossier_1)
+    (decision_links_to_dossier decision_record_2 case_dossier_1)
+    (decision_links_to_sample decision_record_1 sample_record_1)
+    (decision_links_to_sample decision_record_2 sample_record_2)
+    (third_party_certificate_available third_party_certificate_1)
+    (third_party_certificate_available third_party_certificate_2)
+    (regulatory_guideline_available regulatory_guideline_1)
+    (regulatory_guideline_available regulatory_guideline_2)
+    (shortage_mitigation_resource_available shortage_mitigation_resource_1)
+    (technical_specialist_available technical_specialist_1)
+    (clinical_representative_available clinical_representative_1)
+    (decision_linked_to_clinical_representative decision_record_1 clinical_representative_1)
+    (decision_linked_to_clinical_representative decision_record_2 clinical_representative_2)
+    (executive_approver_available executive_approver_1)
+  )
+  (:goal
+    (and
+      (release_applied manufacturing_unit_1)
+      (release_applied distribution_unit_1)
+      (release_applied decision_record_1)
+      (release_applied decision_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_case_for_batch distribution_unit_1)
+(assign_investigator_to_case distribution_unit_1 investigator_resource_1)
+(schedule_laboratory_test distribution_unit_1 analytical_test_1)
+(mark_supply_node_indicator_active distribution_unit_1 supply_node_1 analytical_test_1)
+(record_test_result_and_mark_case_ready distribution_unit_1 analytical_test_1)
+(assign_quality_representative_to_case distribution_unit_1 quality_representative_1)
+(confirm_distribution_unit_containment distribution_unit_1 supply_node_1 quality_representative_1)
+(unassign_quality_representative_from_case distribution_unit_1 quality_representative_1)
+(release_laboratory_test_resource distribution_unit_1 analytical_test_1)
+(create_case_for_batch manufacturing_unit_1)
+(assign_investigator_to_case manufacturing_unit_1 investigator_resource_2)
+(schedule_laboratory_test manufacturing_unit_1 analytical_test_1)
+(record_test_result_and_mark_case_ready manufacturing_unit_1 analytical_test_1)
+(attach_mitigation_to_mfg_unit manufacturing_unit_1 contamination_indicator_1 mitigation_resource_1)
+(create_case_dossier_with_mitigation manufacturing_unit_1 distribution_unit_1 contamination_indicator_1 supply_node_1 case_dossier_1)
+(apply_mitigation_and_update_mfg_unit manufacturing_unit_1 contamination_indicator_1 analytical_test_1 mitigation_resource_1)
+(validate_case_dossier case_dossier_1 manufacturing_unit_1 analytical_test_1)
+(propagate_release_to_distribution_unit distribution_unit_1 case_dossier_1)
+(propagate_release_to_mfg_unit manufacturing_unit_1 case_dossier_1)
+(release_laboratory_test_resource manufacturing_unit_1 analytical_test_1)
+(create_case_for_batch decision_record_1)
+(assign_investigator_to_case decision_record_1 investigator_resource_3)
+(schedule_laboratory_test decision_record_1 analytical_test_1)
+(record_test_result_and_mark_case_ready decision_record_1 analytical_test_1)
+(assign_quality_representative_to_case decision_record_1 quality_representative_1)
+(assign_executive_approver_to_decision decision_record_1 executive_approver_1)
+(notify_clinical_representative_and_record_notification decision_record_1 clinical_representative_1 analytical_test_1)
+(acknowledge_clinical_notification decision_record_1 quality_representative_1)
+(unassign_quality_representative_from_case decision_record_1 quality_representative_1)
+(record_external_approval decision_record_1 executive_approver_1)
+(release_executive_approver_from_decision decision_record_1 executive_approver_1)
+(finalize_external_approval_and_lock decision_record_1)
+(record_final_batch_release_and_mitigation decision_record_1 shortage_mitigation_resource_1 analytical_test_1)
+(apply_final_release_to_decision_record decision_record_1 investigator_resource_3 shortage_mitigation_resource_1)
+(release_laboratory_test_resource decision_record_1 analytical_test_1)
+(create_case_for_batch decision_record_2)
+(assign_investigator_to_case decision_record_2 investigator_resource_3)
+(schedule_laboratory_test decision_record_2 analytical_test_1)
+(record_test_result_and_mark_case_ready decision_record_2 analytical_test_1)
+(accept_sample_into_dossier decision_record_2 sample_record_2 case_dossier_1)
+(attach_third_party_certificate decision_record_2 third_party_certificate_2)
+(integrate_third_party_certificate decision_record_2 sample_record_2 case_dossier_1 analytical_test_1 third_party_certificate_2)
+(assign_technical_specialist_to_decision decision_record_2 technical_specialist_1)
+(assign_quality_representative_to_case decision_record_2 quality_representative_1)
+(assign_executive_approver_to_decision decision_record_2 executive_approver_1)
+(conduct_technical_specialist_review decision_record_2 technical_specialist_1 quality_representative_1 sample_record_2 case_dossier_1)
+(record_executive_approval_and_attach_guidance decision_record_2 executive_approver_1 sample_record_2 case_dossier_1)
+(attach_regulatory_guidance decision_record_2 regulatory_guideline_1)
+(perform_final_checks_and_mark_ready decision_record_2 manufacturing_unit_1 distribution_unit_1 analytical_test_1 regulatory_guideline_1)
+(lock_decision_and_authorize_release decision_record_2)
+(record_final_batch_release_and_mitigation decision_record_2 shortage_mitigation_resource_1 analytical_test_1)
+(apply_final_release_to_decision_record decision_record_2 investigator_resource_3 shortage_mitigation_resource_1)
+(release_laboratory_test_resource decision_record_2 analytical_test_1)
+(schedule_laboratory_test distribution_unit_1 analytical_test_1)
+(record_final_batch_release_and_mitigation distribution_unit_1 shortage_mitigation_resource_1 analytical_test_1)
+(apply_final_release_to_distribution_unit distribution_unit_1 investigator_resource_1 shortage_mitigation_resource_1)
+(schedule_laboratory_test manufacturing_unit_1 analytical_test_1)
+(record_final_batch_release_and_mitigation manufacturing_unit_1 shortage_mitigation_resource_1 analytical_test_1)
+(apply_final_release_to_mfg_unit manufacturing_unit_1 investigator_resource_2 shortage_mitigation_resource_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_v8631r6d/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_v8631r6d/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain cold_chain_storage_slot_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_group - object infrastructure_resource_group - object transport_resource_group - object inventory_category - object inventory_entity - inventory_category grading_station - operational_resource_group inspection_device - operational_resource_group handling_team - operational_resource_group slot_configuration_attribute - operational_resource_group picking_profile - operational_resource_group release_window - operational_resource_group temperature_profile - operational_resource_group quality_certificate - operational_resource_group auxiliary_material - infrastructure_resource_group transfer_tray - infrastructure_resource_group carrier - infrastructure_resource_group temperature_zone - transport_resource_group distribution_channel - transport_resource_group storage_block - transport_resource_group pallet_inventory_group - inventory_entity storage_inventory_group - inventory_entity inbound_pallet - pallet_inventory_group outbound_pallet - pallet_inventory_group storage_slot - storage_inventory_group)
+  (:predicates
+    (intake_registered ?inventory_entity - inventory_entity)
+    (quality_approved_for_inventory_entity ?inventory_entity - inventory_entity)
+    (grading_reserved ?inventory_entity - inventory_entity)
+    (released_for_dispatch ?inventory_entity - inventory_entity)
+    (staged_for_inventory_entity ?inventory_entity - inventory_entity)
+    (release_scheduled_for_inventory_entity ?inventory_entity - inventory_entity)
+    (grader_available ?grading_station - grading_station)
+    (grading_assignment_for_inventory_entity ?inventory_entity - inventory_entity ?grading_station - grading_station)
+    (inspection_device_available ?inspection_device - inspection_device)
+    (inspection_assignment_for_inventory_entity ?inventory_entity - inventory_entity ?inspection_device - inspection_device)
+    (handler_available ?handling_team - handling_team)
+    (handler_assignment_for_inventory_entity ?inventory_entity - inventory_entity ?handling_team - handling_team)
+    (auxiliary_material_available ?auxiliary_material - auxiliary_material)
+    (auxiliary_material_allocated_inbound ?inbound_pallet - inbound_pallet ?auxiliary_material - auxiliary_material)
+    (auxiliary_material_allocated_outbound ?outbound_pallet - outbound_pallet ?auxiliary_material - auxiliary_material)
+    (inbound_compatible_with_zone ?inbound_pallet - inbound_pallet ?temperature_zone - temperature_zone)
+    (zone_candidate_basic ?temperature_zone - temperature_zone)
+    (zone_candidate_with_auxiliary ?temperature_zone - temperature_zone)
+    (inbound_zone_allocation_confirmed ?inbound_pallet - inbound_pallet)
+    (outbound_compatible_with_channel ?outbound_pallet - outbound_pallet ?distribution_channel - distribution_channel)
+    (channel_candidate_basic ?distribution_channel - distribution_channel)
+    (channel_candidate_with_auxiliary ?distribution_channel - distribution_channel)
+    (outbound_channel_allocation_confirmed ?outbound_pallet - outbound_pallet)
+    (storage_block_available ?storage_block - storage_block)
+    (storage_block_active ?storage_block - storage_block)
+    (storage_block_bound_to_zone ?storage_block - storage_block ?temperature_zone - temperature_zone)
+    (storage_block_bound_to_channel ?storage_block - storage_block ?distribution_channel - distribution_channel)
+    (storage_block_flag_sealed ?storage_block - storage_block)
+    (storage_block_flag_staged ?storage_block - storage_block)
+    (storage_block_placement_confirmed ?storage_block - storage_block)
+    (slot_associated_with_inbound_pallet ?storage_slot - storage_slot ?inbound_pallet - inbound_pallet)
+    (slot_associated_with_outbound_pallet ?storage_slot - storage_slot ?outbound_pallet - outbound_pallet)
+    (slot_within_storage_block ?storage_slot - storage_slot ?storage_block - storage_block)
+    (transfer_tray_available ?transfer_tray - transfer_tray)
+    (slot_has_transfer_tray ?storage_slot - storage_slot ?transfer_tray - transfer_tray)
+    (transfer_tray_allocated ?transfer_tray - transfer_tray)
+    (transfer_tray_assigned_to_storage_block ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    (slot_config_applied ?storage_slot - storage_slot)
+    (slot_profile_set ?storage_slot - storage_slot)
+    (slot_ready_for_labeling ?storage_slot - storage_slot)
+    (slot_configuration_claimed ?storage_slot - storage_slot)
+    (slot_configuration_verified ?storage_slot - storage_slot)
+    (slot_metadata_complete ?storage_slot - storage_slot)
+    (slot_consolidation_complete ?storage_slot - storage_slot)
+    (carrier_available ?carrier - carrier)
+    (slot_associated_with_carrier ?storage_slot - storage_slot ?carrier - carrier)
+    (slot_carrier_reserved ?storage_slot - storage_slot)
+    (slot_handler_engaged ?storage_slot - storage_slot)
+    (slot_certified ?storage_slot - storage_slot)
+    (slot_configuration_attribute_available ?slot_configuration_attribute - slot_configuration_attribute)
+    (slot_configuration_attached ?storage_slot - storage_slot ?slot_configuration_attribute - slot_configuration_attribute)
+    (picking_profile_available ?picking_profile - picking_profile)
+    (slot_picking_profile_assigned ?storage_slot - storage_slot ?picking_profile - picking_profile)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (slot_temperature_profile_assigned ?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (slot_quality_certificate_assigned ?storage_slot - storage_slot ?quality_certificate - quality_certificate)
+    (release_window_available ?release_window - release_window)
+    (release_window_assigned_for_inventory_entity ?inventory_entity - inventory_entity ?release_window - release_window)
+    (inbound_pallet_candidate_locked ?inbound_pallet - inbound_pallet)
+    (outbound_pallet_candidate_locked ?outbound_pallet - outbound_pallet)
+    (slot_ready_for_occupation ?storage_slot - storage_slot)
+  )
+  (:action register_inventory_receipt
+    :parameters (?inventory_entity - inventory_entity)
+    :precondition
+      (and
+        (not
+          (intake_registered ?inventory_entity)
+        )
+        (not
+          (released_for_dispatch ?inventory_entity)
+        )
+      )
+    :effect (intake_registered ?inventory_entity)
+  )
+  (:action assign_grading_station
+    :parameters (?inventory_entity - inventory_entity ?grading_station - grading_station)
+    :precondition
+      (and
+        (intake_registered ?inventory_entity)
+        (not
+          (grading_reserved ?inventory_entity)
+        )
+        (grader_available ?grading_station)
+      )
+    :effect
+      (and
+        (grading_reserved ?inventory_entity)
+        (grading_assignment_for_inventory_entity ?inventory_entity ?grading_station)
+        (not
+          (grader_available ?grading_station)
+        )
+      )
+  )
+  (:action assign_inspection_device
+    :parameters (?inventory_entity - inventory_entity ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (intake_registered ?inventory_entity)
+        (grading_reserved ?inventory_entity)
+        (inspection_device_available ?inspection_device)
+      )
+    :effect
+      (and
+        (inspection_assignment_for_inventory_entity ?inventory_entity ?inspection_device)
+        (not
+          (inspection_device_available ?inspection_device)
+        )
+      )
+  )
+  (:action complete_quality_inspection
+    :parameters (?inventory_entity - inventory_entity ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (intake_registered ?inventory_entity)
+        (grading_reserved ?inventory_entity)
+        (inspection_assignment_for_inventory_entity ?inventory_entity ?inspection_device)
+        (not
+          (quality_approved_for_inventory_entity ?inventory_entity)
+        )
+      )
+    :effect (quality_approved_for_inventory_entity ?inventory_entity)
+  )
+  (:action release_inspection_device
+    :parameters (?inventory_entity - inventory_entity ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (inspection_assignment_for_inventory_entity ?inventory_entity ?inspection_device)
+      )
+    :effect
+      (and
+        (inspection_device_available ?inspection_device)
+        (not
+          (inspection_assignment_for_inventory_entity ?inventory_entity ?inspection_device)
+        )
+      )
+  )
+  (:action assign_handling_team
+    :parameters (?inventory_entity - inventory_entity ?handling_team - handling_team)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?inventory_entity)
+        (handler_available ?handling_team)
+      )
+    :effect
+      (and
+        (handler_assignment_for_inventory_entity ?inventory_entity ?handling_team)
+        (not
+          (handler_available ?handling_team)
+        )
+      )
+  )
+  (:action release_handling_team
+    :parameters (?inventory_entity - inventory_entity ?handling_team - handling_team)
+    :precondition
+      (and
+        (handler_assignment_for_inventory_entity ?inventory_entity ?handling_team)
+      )
+    :effect
+      (and
+        (handler_available ?handling_team)
+        (not
+          (handler_assignment_for_inventory_entity ?inventory_entity ?handling_team)
+        )
+      )
+  )
+  (:action assign_temperature_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (slot_temperature_profile_assigned ?storage_slot ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action release_temperature_profile_from_slot
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (slot_temperature_profile_assigned ?storage_slot ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (slot_temperature_profile_assigned ?storage_slot ?temperature_profile)
+        )
+      )
+  )
+  (:action assign_quality_certificate_to_slot
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (quality_certificate_available ?quality_certificate)
+      )
+    :effect
+      (and
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action release_quality_certificate_from_slot
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+      )
+    :effect
+      (and
+        (quality_certificate_available ?quality_certificate)
+        (not
+          (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        )
+      )
+  )
+  (:action reserve_zone_for_inbound_pallet
+    :parameters (?inbound_pallet - inbound_pallet ?temperature_zone - temperature_zone ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?inbound_pallet)
+        (inspection_assignment_for_inventory_entity ?inbound_pallet ?inspection_device)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (not
+          (zone_candidate_basic ?temperature_zone)
+        )
+        (not
+          (zone_candidate_with_auxiliary ?temperature_zone)
+        )
+      )
+    :effect (zone_candidate_basic ?temperature_zone)
+  )
+  (:action lock_inbound_pallet_to_zone_candidate
+    :parameters (?inbound_pallet - inbound_pallet ?temperature_zone - temperature_zone ?handling_team - handling_team)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?inbound_pallet)
+        (handler_assignment_for_inventory_entity ?inbound_pallet ?handling_team)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (zone_candidate_basic ?temperature_zone)
+        (not
+          (inbound_pallet_candidate_locked ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+      )
+  )
+  (:action allocate_aux_material_and_prepare_zone_for_pallet
+    :parameters (?inbound_pallet - inbound_pallet ?temperature_zone - temperature_zone ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?inbound_pallet)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (auxiliary_material_available ?auxiliary_material)
+        (not
+          (inbound_pallet_candidate_locked ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (zone_candidate_with_auxiliary ?temperature_zone)
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (auxiliary_material_allocated_inbound ?inbound_pallet ?auxiliary_material)
+        (not
+          (auxiliary_material_available ?auxiliary_material)
+        )
+      )
+  )
+  (:action finalize_zone_assignment_for_pallet
+    :parameters (?inbound_pallet - inbound_pallet ?temperature_zone - temperature_zone ?inspection_device - inspection_device ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?inbound_pallet)
+        (inspection_assignment_for_inventory_entity ?inbound_pallet ?inspection_device)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (zone_candidate_with_auxiliary ?temperature_zone)
+        (auxiliary_material_allocated_inbound ?inbound_pallet ?auxiliary_material)
+        (not
+          (inbound_zone_allocation_confirmed ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (zone_candidate_basic ?temperature_zone)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+        (auxiliary_material_available ?auxiliary_material)
+        (not
+          (auxiliary_material_allocated_inbound ?inbound_pallet ?auxiliary_material)
+        )
+      )
+  )
+  (:action reserve_channel_for_outbound_pallet
+    :parameters (?outbound_pallet - outbound_pallet ?distribution_channel - distribution_channel ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?outbound_pallet)
+        (inspection_assignment_for_inventory_entity ?outbound_pallet ?inspection_device)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (not
+          (channel_candidate_basic ?distribution_channel)
+        )
+        (not
+          (channel_candidate_with_auxiliary ?distribution_channel)
+        )
+      )
+    :effect (channel_candidate_basic ?distribution_channel)
+  )
+  (:action lock_outbound_pallet_to_channel_candidate
+    :parameters (?outbound_pallet - outbound_pallet ?distribution_channel - distribution_channel ?handling_team - handling_team)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?outbound_pallet)
+        (handler_assignment_for_inventory_entity ?outbound_pallet ?handling_team)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (channel_candidate_basic ?distribution_channel)
+        (not
+          (outbound_pallet_candidate_locked ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+      )
+  )
+  (:action allocate_aux_material_for_channel
+    :parameters (?outbound_pallet - outbound_pallet ?distribution_channel - distribution_channel ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?outbound_pallet)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (auxiliary_material_available ?auxiliary_material)
+        (not
+          (outbound_pallet_candidate_locked ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (channel_candidate_with_auxiliary ?distribution_channel)
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (auxiliary_material_allocated_outbound ?outbound_pallet ?auxiliary_material)
+        (not
+          (auxiliary_material_available ?auxiliary_material)
+        )
+      )
+  )
+  (:action finalize_outbound_channel_assignment
+    :parameters (?outbound_pallet - outbound_pallet ?distribution_channel - distribution_channel ?inspection_device - inspection_device ?auxiliary_material - auxiliary_material)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?outbound_pallet)
+        (inspection_assignment_for_inventory_entity ?outbound_pallet ?inspection_device)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (channel_candidate_with_auxiliary ?distribution_channel)
+        (auxiliary_material_allocated_outbound ?outbound_pallet ?auxiliary_material)
+        (not
+          (outbound_channel_allocation_confirmed ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (channel_candidate_basic ?distribution_channel)
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+        (auxiliary_material_available ?auxiliary_material)
+        (not
+          (auxiliary_material_allocated_outbound ?outbound_pallet ?auxiliary_material)
+        )
+      )
+  )
+  (:action create_storage_block_and_bind_zone_channel
+    :parameters (?inbound_pallet - inbound_pallet ?outbound_pallet - outbound_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?storage_block - storage_block)
+    :precondition
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (zone_candidate_basic ?temperature_zone)
+        (channel_candidate_basic ?distribution_channel)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+        (storage_block_available ?storage_block)
+      )
+    :effect
+      (and
+        (storage_block_active ?storage_block)
+        (storage_block_bound_to_zone ?storage_block ?temperature_zone)
+        (storage_block_bound_to_channel ?storage_block ?distribution_channel)
+        (not
+          (storage_block_available ?storage_block)
+        )
+      )
+  )
+  (:action assemble_and_seal_storage_block
+    :parameters (?inbound_pallet - inbound_pallet ?outbound_pallet - outbound_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?storage_block - storage_block)
+    :precondition
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (zone_candidate_with_auxiliary ?temperature_zone)
+        (channel_candidate_basic ?distribution_channel)
+        (not
+          (inbound_zone_allocation_confirmed ?inbound_pallet)
+        )
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+        (storage_block_available ?storage_block)
+      )
+    :effect
+      (and
+        (storage_block_active ?storage_block)
+        (storage_block_bound_to_zone ?storage_block ?temperature_zone)
+        (storage_block_bound_to_channel ?storage_block ?distribution_channel)
+        (storage_block_flag_sealed ?storage_block)
+        (not
+          (storage_block_available ?storage_block)
+        )
+      )
+  )
+  (:action assemble_and_stage_storage_block
+    :parameters (?inbound_pallet - inbound_pallet ?outbound_pallet - outbound_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?storage_block - storage_block)
+    :precondition
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (zone_candidate_basic ?temperature_zone)
+        (channel_candidate_with_auxiliary ?distribution_channel)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+        (not
+          (outbound_channel_allocation_confirmed ?outbound_pallet)
+        )
+        (storage_block_available ?storage_block)
+      )
+    :effect
+      (and
+        (storage_block_active ?storage_block)
+        (storage_block_bound_to_zone ?storage_block ?temperature_zone)
+        (storage_block_bound_to_channel ?storage_block ?distribution_channel)
+        (storage_block_flag_staged ?storage_block)
+        (not
+          (storage_block_available ?storage_block)
+        )
+      )
+  )
+  (:action assemble_seal_and_stage_storage_block
+    :parameters (?inbound_pallet - inbound_pallet ?outbound_pallet - outbound_pallet ?temperature_zone - temperature_zone ?distribution_channel - distribution_channel ?storage_block - storage_block)
+    :precondition
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (inbound_compatible_with_zone ?inbound_pallet ?temperature_zone)
+        (outbound_compatible_with_channel ?outbound_pallet ?distribution_channel)
+        (zone_candidate_with_auxiliary ?temperature_zone)
+        (channel_candidate_with_auxiliary ?distribution_channel)
+        (not
+          (inbound_zone_allocation_confirmed ?inbound_pallet)
+        )
+        (not
+          (outbound_channel_allocation_confirmed ?outbound_pallet)
+        )
+        (storage_block_available ?storage_block)
+      )
+    :effect
+      (and
+        (storage_block_active ?storage_block)
+        (storage_block_bound_to_zone ?storage_block ?temperature_zone)
+        (storage_block_bound_to_channel ?storage_block ?distribution_channel)
+        (storage_block_flag_sealed ?storage_block)
+        (storage_block_flag_staged ?storage_block)
+        (not
+          (storage_block_available ?storage_block)
+        )
+      )
+  )
+  (:action confirm_storage_block_placement
+    :parameters (?storage_block - storage_block ?inbound_pallet - inbound_pallet ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (storage_block_active ?storage_block)
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (inspection_assignment_for_inventory_entity ?inbound_pallet ?inspection_device)
+        (not
+          (storage_block_placement_confirmed ?storage_block)
+        )
+      )
+    :effect (storage_block_placement_confirmed ?storage_block)
+  )
+  (:action assign_tray_to_slot_and_bind_to_block
+    :parameters (?storage_slot - storage_slot ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (slot_within_storage_block ?storage_slot ?storage_block)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_available ?transfer_tray)
+        (storage_block_active ?storage_block)
+        (storage_block_placement_confirmed ?storage_block)
+        (not
+          (transfer_tray_allocated ?transfer_tray)
+        )
+      )
+    :effect
+      (and
+        (transfer_tray_allocated ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (not
+          (transfer_tray_available ?transfer_tray)
+        )
+      )
+  )
+  (:action equip_slot_with_tray
+    :parameters (?storage_slot - storage_slot ?transfer_tray - transfer_tray ?storage_block - storage_block ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_allocated ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (inspection_assignment_for_inventory_entity ?storage_slot ?inspection_device)
+        (not
+          (storage_block_flag_sealed ?storage_block)
+        )
+        (not
+          (slot_config_applied ?storage_slot)
+        )
+      )
+    :effect (slot_config_applied ?storage_slot)
+  )
+  (:action claim_slot_configuration_attribute
+    :parameters (?storage_slot - storage_slot ?slot_configuration_attribute - slot_configuration_attribute)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (slot_configuration_attribute_available ?slot_configuration_attribute)
+        (not
+          (slot_configuration_claimed ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_configuration_claimed ?storage_slot)
+        (slot_configuration_attached ?storage_slot ?slot_configuration_attribute)
+        (not
+          (slot_configuration_attribute_available ?slot_configuration_attribute)
+        )
+      )
+  )
+  (:action apply_slot_configuration_with_tray_and_verify
+    :parameters (?storage_slot - storage_slot ?transfer_tray - transfer_tray ?storage_block - storage_block ?inspection_device - inspection_device ?slot_configuration_attribute - slot_configuration_attribute)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_allocated ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (inspection_assignment_for_inventory_entity ?storage_slot ?inspection_device)
+        (storage_block_flag_sealed ?storage_block)
+        (slot_configuration_claimed ?storage_slot)
+        (slot_configuration_attached ?storage_slot ?slot_configuration_attribute)
+        (not
+          (slot_config_applied ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_config_applied ?storage_slot)
+        (slot_configuration_verified ?storage_slot)
+      )
+  )
+  (:action apply_temperature_profile_and_mark_slot_profile
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile ?handling_team - handling_team ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_config_applied ?storage_slot)
+        (slot_temperature_profile_assigned ?storage_slot ?temperature_profile)
+        (handler_assignment_for_inventory_entity ?storage_slot ?handling_team)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (not
+          (storage_block_flag_staged ?storage_block)
+        )
+        (not
+          (slot_profile_set ?storage_slot)
+        )
+      )
+    :effect (slot_profile_set ?storage_slot)
+  )
+  (:action apply_temperature_profile_and_mark_slot_profile_alt
+    :parameters (?storage_slot - storage_slot ?temperature_profile - temperature_profile ?handling_team - handling_team ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_config_applied ?storage_slot)
+        (slot_temperature_profile_assigned ?storage_slot ?temperature_profile)
+        (handler_assignment_for_inventory_entity ?storage_slot ?handling_team)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (storage_block_flag_staged ?storage_block)
+        (not
+          (slot_profile_set ?storage_slot)
+        )
+      )
+    :effect (slot_profile_set ?storage_slot)
+  )
+  (:action apply_quality_certificate_to_slot_and_mark_profile
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_profile_set ?storage_slot)
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (not
+          (storage_block_flag_sealed ?storage_block)
+        )
+        (not
+          (storage_block_flag_staged ?storage_block)
+        )
+        (not
+          (slot_ready_for_labeling ?storage_slot)
+        )
+      )
+    :effect (slot_ready_for_labeling ?storage_slot)
+  )
+  (:action finalize_slot_profile_and_metadata
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_profile_set ?storage_slot)
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (storage_block_flag_sealed ?storage_block)
+        (not
+          (storage_block_flag_staged ?storage_block)
+        )
+        (not
+          (slot_ready_for_labeling ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_metadata_complete ?storage_slot)
+      )
+  )
+  (:action finalize_slot_profile_alternative
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_profile_set ?storage_slot)
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (not
+          (storage_block_flag_sealed ?storage_block)
+        )
+        (storage_block_flag_staged ?storage_block)
+        (not
+          (slot_ready_for_labeling ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_metadata_complete ?storage_slot)
+      )
+  )
+  (:action finalize_slot_profile_full
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate ?transfer_tray - transfer_tray ?storage_block - storage_block)
+    :precondition
+      (and
+        (slot_profile_set ?storage_slot)
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (slot_has_transfer_tray ?storage_slot ?transfer_tray)
+        (transfer_tray_assigned_to_storage_block ?transfer_tray ?storage_block)
+        (storage_block_flag_sealed ?storage_block)
+        (storage_block_flag_staged ?storage_block)
+        (not
+          (slot_ready_for_labeling ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_metadata_complete ?storage_slot)
+      )
+  )
+  (:action finalize_slot_readiness_and_stage
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (not
+          (slot_metadata_complete ?storage_slot)
+        )
+        (not
+          (slot_ready_for_occupation ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_occupation ?storage_slot)
+        (staged_for_inventory_entity ?storage_slot)
+      )
+  )
+  (:action assign_picking_profile_to_slot
+    :parameters (?storage_slot - storage_slot ?picking_profile - picking_profile)
+    :precondition
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_metadata_complete ?storage_slot)
+        (picking_profile_available ?picking_profile)
+      )
+    :effect
+      (and
+        (slot_picking_profile_assigned ?storage_slot ?picking_profile)
+        (not
+          (picking_profile_available ?picking_profile)
+        )
+      )
+  )
+  (:action consolidate_resources_for_slot_placement
+    :parameters (?storage_slot - storage_slot ?inbound_pallet - inbound_pallet ?outbound_pallet - outbound_pallet ?inspection_device - inspection_device ?picking_profile - picking_profile)
+    :precondition
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_metadata_complete ?storage_slot)
+        (slot_picking_profile_assigned ?storage_slot ?picking_profile)
+        (slot_associated_with_inbound_pallet ?storage_slot ?inbound_pallet)
+        (slot_associated_with_outbound_pallet ?storage_slot ?outbound_pallet)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+        (inspection_assignment_for_inventory_entity ?storage_slot ?inspection_device)
+        (not
+          (slot_consolidation_complete ?storage_slot)
+        )
+      )
+    :effect (slot_consolidation_complete ?storage_slot)
+  )
+  (:action finalize_slot_staging_and_mark_ready
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_ready_for_labeling ?storage_slot)
+        (slot_consolidation_complete ?storage_slot)
+        (not
+          (slot_ready_for_occupation ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_occupation ?storage_slot)
+        (staged_for_inventory_entity ?storage_slot)
+      )
+  )
+  (:action reserve_carrier_for_slot
+    :parameters (?storage_slot - storage_slot ?carrier - carrier ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (quality_approved_for_inventory_entity ?storage_slot)
+        (inspection_assignment_for_inventory_entity ?storage_slot ?inspection_device)
+        (carrier_available ?carrier)
+        (slot_associated_with_carrier ?storage_slot ?carrier)
+        (not
+          (slot_carrier_reserved ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_carrier_reserved ?storage_slot)
+        (not
+          (carrier_available ?carrier)
+        )
+      )
+  )
+  (:action engage_handler_on_slot
+    :parameters (?storage_slot - storage_slot ?handling_team - handling_team)
+    :precondition
+      (and
+        (slot_carrier_reserved ?storage_slot)
+        (handler_assignment_for_inventory_entity ?storage_slot ?handling_team)
+        (not
+          (slot_handler_engaged ?storage_slot)
+        )
+      )
+    :effect (slot_handler_engaged ?storage_slot)
+  )
+  (:action certify_slot
+    :parameters (?storage_slot - storage_slot ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (slot_handler_engaged ?storage_slot)
+        (slot_quality_certificate_assigned ?storage_slot ?quality_certificate)
+        (not
+          (slot_certified ?storage_slot)
+        )
+      )
+    :effect (slot_certified ?storage_slot)
+  )
+  (:action finalize_slot_certification_and_stage
+    :parameters (?storage_slot - storage_slot)
+    :precondition
+      (and
+        (slot_certified ?storage_slot)
+        (not
+          (slot_ready_for_occupation ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (slot_ready_for_occupation ?storage_slot)
+        (staged_for_inventory_entity ?storage_slot)
+      )
+  )
+  (:action confirm_inbound_pallet_placement
+    :parameters (?inbound_pallet - inbound_pallet ?storage_block - storage_block)
+    :precondition
+      (and
+        (inbound_pallet_candidate_locked ?inbound_pallet)
+        (inbound_zone_allocation_confirmed ?inbound_pallet)
+        (storage_block_active ?storage_block)
+        (storage_block_placement_confirmed ?storage_block)
+        (not
+          (staged_for_inventory_entity ?inbound_pallet)
+        )
+      )
+    :effect (staged_for_inventory_entity ?inbound_pallet)
+  )
+  (:action confirm_outbound_pallet_placement
+    :parameters (?outbound_pallet - outbound_pallet ?storage_block - storage_block)
+    :precondition
+      (and
+        (outbound_pallet_candidate_locked ?outbound_pallet)
+        (outbound_channel_allocation_confirmed ?outbound_pallet)
+        (storage_block_active ?storage_block)
+        (storage_block_placement_confirmed ?storage_block)
+        (not
+          (staged_for_inventory_entity ?outbound_pallet)
+        )
+      )
+    :effect (staged_for_inventory_entity ?outbound_pallet)
+  )
+  (:action assign_release_window_to_inventory
+    :parameters (?inventory_entity - inventory_entity ?release_window - release_window ?inspection_device - inspection_device)
+    :precondition
+      (and
+        (staged_for_inventory_entity ?inventory_entity)
+        (inspection_assignment_for_inventory_entity ?inventory_entity ?inspection_device)
+        (release_window_available ?release_window)
+        (not
+          (release_scheduled_for_inventory_entity ?inventory_entity)
+        )
+      )
+    :effect
+      (and
+        (release_scheduled_for_inventory_entity ?inventory_entity)
+        (release_window_assigned_for_inventory_entity ?inventory_entity ?release_window)
+        (not
+          (release_window_available ?release_window)
+        )
+      )
+  )
+  (:action finalize_release_for_inbound_pallet
+    :parameters (?inbound_pallet - inbound_pallet ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled_for_inventory_entity ?inbound_pallet)
+        (grading_assignment_for_inventory_entity ?inbound_pallet ?grading_station)
+        (release_window_assigned_for_inventory_entity ?inbound_pallet ?release_window)
+        (not
+          (released_for_dispatch ?inbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?inbound_pallet)
+        (grader_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_for_outbound_pallet
+    :parameters (?outbound_pallet - outbound_pallet ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled_for_inventory_entity ?outbound_pallet)
+        (grading_assignment_for_inventory_entity ?outbound_pallet ?grading_station)
+        (release_window_assigned_for_inventory_entity ?outbound_pallet ?release_window)
+        (not
+          (released_for_dispatch ?outbound_pallet)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?outbound_pallet)
+        (grader_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_release_for_slot
+    :parameters (?storage_slot - storage_slot ?grading_station - grading_station ?release_window - release_window)
+    :precondition
+      (and
+        (release_scheduled_for_inventory_entity ?storage_slot)
+        (grading_assignment_for_inventory_entity ?storage_slot ?grading_station)
+        (release_window_assigned_for_inventory_entity ?storage_slot ?release_window)
+        (not
+          (released_for_dispatch ?storage_slot)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?storage_slot)
+        (grader_available ?grading_station)
+        (release_window_available ?release_window)
+      )
+  )
+)

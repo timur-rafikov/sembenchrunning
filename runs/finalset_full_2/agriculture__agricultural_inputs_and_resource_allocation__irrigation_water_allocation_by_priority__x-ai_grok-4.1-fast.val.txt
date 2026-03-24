@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain irrigation_water_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object field_container - entity resource_container - entity delivery_container - entity request_container - entity parcel_request - request_container water_source_unit - field_container irrigation_time_slot - field_container distribution_valve - field_container regulatory_permit - field_container irrigation_method - field_container contingency_reserve - field_container equipment_unit - field_container quality_approval - field_container water_quota_token - resource_container field_sensor - resource_container emergency_priority_certificate - resource_container delivery_segment - delivery_container delivery_node - delivery_container allocation_record - delivery_container priority_group_a - parcel_request priority_group_b - parcel_request high_priority_field_unit - priority_group_a secondary_priority_field_unit - priority_group_a irrigation_planner - priority_group_b)
+
+  (:predicates
+    (entity_allocation_registered ?parcel_request - parcel_request)
+    (entity_allocation_confirmed ?parcel_request - parcel_request)
+    (entity_allocation_source_reserved ?parcel_request - parcel_request)
+    (entity_allocation_fulfilled ?parcel_request - parcel_request)
+    (delivery_confirmed ?parcel_request - parcel_request)
+    (entity_allocation_finalized ?parcel_request - parcel_request)
+    (water_source_available ?water_source_unit - water_source_unit)
+    (entity_allocation_assigned_source ?parcel_request - parcel_request ?water_source_unit - water_source_unit)
+    (timeslot_available ?irrigation_time_slot - irrigation_time_slot)
+    (entity_allocation_assigned_timeslot ?parcel_request - parcel_request ?irrigation_time_slot - irrigation_time_slot)
+    (valve_available ?distribution_valve - distribution_valve)
+    (entity_allocation_assigned_valve ?parcel_request - parcel_request ?distribution_valve - distribution_valve)
+    (quota_token_available ?water_quota_token - water_quota_token)
+    (high_priority_reserved_quota ?high_priority_field_unit - high_priority_field_unit ?water_quota_token - water_quota_token)
+    (secondary_priority_reserved_quota ?secondary_priority_field_unit - secondary_priority_field_unit ?water_quota_token - water_quota_token)
+    (high_priority_assigned_segment ?high_priority_field_unit - high_priority_field_unit ?delivery_segment - delivery_segment)
+    (segment_reserved_by_high_priority ?delivery_segment - delivery_segment)
+    (segment_reserved_with_quota_token ?delivery_segment - delivery_segment)
+    (high_priority_unit_staged ?high_priority_field_unit - high_priority_field_unit)
+    (secondary_assigned_node ?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_node - delivery_node)
+    (node_reserved_by_secondary ?delivery_node - delivery_node)
+    (node_reserved_with_quota ?delivery_node - delivery_node)
+    (secondary_unit_staged ?secondary_priority_field_unit - secondary_priority_field_unit)
+    (allocation_record_available ?allocation_record - allocation_record)
+    (allocation_record_assembled ?allocation_record - allocation_record)
+    (record_includes_segment ?allocation_record - allocation_record ?delivery_segment - delivery_segment)
+    (record_includes_node ?allocation_record - allocation_record ?delivery_node - delivery_node)
+    (record_includes_high_priority ?allocation_record - allocation_record)
+    (record_includes_secondary_priority ?allocation_record - allocation_record)
+    (record_marked_for_validation ?allocation_record - allocation_record)
+    (planner_assigned_high_unit ?irrigation_planner - irrigation_planner ?high_priority_field_unit - high_priority_field_unit)
+    (planner_assigned_secondary_unit ?irrigation_planner - irrigation_planner ?secondary_priority_field_unit - secondary_priority_field_unit)
+    (planner_linked_record ?irrigation_planner - irrigation_planner ?allocation_record - allocation_record)
+    (sensor_available ?field_sensor - field_sensor)
+    (planner_linked_sensor ?irrigation_planner - irrigation_planner ?field_sensor - field_sensor)
+    (sensor_claimed ?field_sensor - field_sensor)
+    (sensor_linked_record ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    (planner_initial_authorization ?irrigation_planner - irrigation_planner)
+    (planner_equipment_assigned ?irrigation_planner - irrigation_planner)
+    (planner_quality_validated ?irrigation_planner - irrigation_planner)
+    (planner_has_permit ?irrigation_planner - irrigation_planner)
+    (planner_permit_link_confirmed ?irrigation_planner - irrigation_planner)
+    (planner_method_authorized ?irrigation_planner - irrigation_planner)
+    (planner_ready_for_dispatch ?irrigation_planner - irrigation_planner)
+    (emergency_certificate_available ?emergency_priority_certificate - emergency_priority_certificate)
+    (planner_linked_emergency_certificate ?irrigation_planner - irrigation_planner ?emergency_priority_certificate - emergency_priority_certificate)
+    (planner_emergency_certified ?irrigation_planner - irrigation_planner)
+    (planner_emergency_action_authorized ?irrigation_planner - irrigation_planner)
+    (planner_emergency_action_confirmed ?irrigation_planner - irrigation_planner)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (planner_bound_permit ?irrigation_planner - irrigation_planner ?regulatory_permit - regulatory_permit)
+    (irrigation_method_available ?irrigation_method - irrigation_method)
+    (planner_assigned_method ?irrigation_planner - irrigation_planner ?irrigation_method - irrigation_method)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (planner_assigned_equipment ?irrigation_planner - irrigation_planner ?equipment_unit - equipment_unit)
+    (quality_approval_available ?quality_approval - quality_approval)
+    (planner_assigned_quality_approval ?irrigation_planner - irrigation_planner ?quality_approval - quality_approval)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (entity_allocation_assigned_contingency ?parcel_request - parcel_request ?contingency_reserve - contingency_reserve)
+    (high_priority_unit_committed ?high_priority_field_unit - high_priority_field_unit)
+    (secondary_unit_committed ?secondary_priority_field_unit - secondary_priority_field_unit)
+    (planner_dispatched ?irrigation_planner - irrigation_planner)
+  )
+  (:action register_parcel_request
+    :parameters (?parcel_request - parcel_request)
+    :precondition
+      (and
+        (not
+          (entity_allocation_registered ?parcel_request)
+        )
+        (not
+          (entity_allocation_fulfilled ?parcel_request)
+        )
+      )
+    :effect (entity_allocation_registered ?parcel_request)
+  )
+  (:action assign_request_to_source
+    :parameters (?parcel_request - parcel_request ?water_source_unit - water_source_unit)
+    :precondition
+      (and
+        (entity_allocation_registered ?parcel_request)
+        (not
+          (entity_allocation_source_reserved ?parcel_request)
+        )
+        (water_source_available ?water_source_unit)
+      )
+    :effect
+      (and
+        (entity_allocation_source_reserved ?parcel_request)
+        (entity_allocation_assigned_source ?parcel_request ?water_source_unit)
+        (not
+          (water_source_available ?water_source_unit)
+        )
+      )
+  )
+  (:action assign_request_to_timeslot
+    :parameters (?parcel_request - parcel_request ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_registered ?parcel_request)
+        (entity_allocation_source_reserved ?parcel_request)
+        (timeslot_available ?irrigation_time_slot)
+      )
+    :effect
+      (and
+        (entity_allocation_assigned_timeslot ?parcel_request ?irrigation_time_slot)
+        (not
+          (timeslot_available ?irrigation_time_slot)
+        )
+      )
+  )
+  (:action confirm_request_allocation
+    :parameters (?parcel_request - parcel_request ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_registered ?parcel_request)
+        (entity_allocation_source_reserved ?parcel_request)
+        (entity_allocation_assigned_timeslot ?parcel_request ?irrigation_time_slot)
+        (not
+          (entity_allocation_confirmed ?parcel_request)
+        )
+      )
+    :effect (entity_allocation_confirmed ?parcel_request)
+  )
+  (:action release_timeslot_from_request
+    :parameters (?parcel_request - parcel_request ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_assigned_timeslot ?parcel_request ?irrigation_time_slot)
+      )
+    :effect
+      (and
+        (timeslot_available ?irrigation_time_slot)
+        (not
+          (entity_allocation_assigned_timeslot ?parcel_request ?irrigation_time_slot)
+        )
+      )
+  )
+  (:action assign_valve_to_request
+    :parameters (?parcel_request - parcel_request ?distribution_valve - distribution_valve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?parcel_request)
+        (valve_available ?distribution_valve)
+      )
+    :effect
+      (and
+        (entity_allocation_assigned_valve ?parcel_request ?distribution_valve)
+        (not
+          (valve_available ?distribution_valve)
+        )
+      )
+  )
+  (:action release_valve_from_request
+    :parameters (?parcel_request - parcel_request ?distribution_valve - distribution_valve)
+    :precondition
+      (and
+        (entity_allocation_assigned_valve ?parcel_request ?distribution_valve)
+      )
+    :effect
+      (and
+        (valve_available ?distribution_valve)
+        (not
+          (entity_allocation_assigned_valve ?parcel_request ?distribution_valve)
+        )
+      )
+  )
+  (:action assign_equipment_to_planner
+    :parameters (?irrigation_planner - irrigation_planner ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (planner_assigned_equipment ?irrigation_planner ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action release_equipment_from_planner
+    :parameters (?irrigation_planner - irrigation_planner ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (planner_assigned_equipment ?irrigation_planner ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_unit)
+        (not
+          (planner_assigned_equipment ?irrigation_planner ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_quality_approval_to_planner
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (quality_approval_available ?quality_approval)
+      )
+    :effect
+      (and
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (not
+          (quality_approval_available ?quality_approval)
+        )
+      )
+  )
+  (:action release_quality_approval_from_planner
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval)
+    :precondition
+      (and
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+      )
+    :effect
+      (and
+        (quality_approval_available ?quality_approval)
+        (not
+          (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        )
+      )
+  )
+  (:action claim_delivery_segment_high_priority
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?delivery_segment - delivery_segment ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?high_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?high_priority_field_unit ?irrigation_time_slot)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (not
+          (segment_reserved_by_high_priority ?delivery_segment)
+        )
+        (not
+          (segment_reserved_with_quota_token ?delivery_segment)
+        )
+      )
+    :effect (segment_reserved_by_high_priority ?delivery_segment)
+  )
+  (:action commit_high_priority_claim
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?delivery_segment - delivery_segment ?distribution_valve - distribution_valve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?high_priority_field_unit)
+        (entity_allocation_assigned_valve ?high_priority_field_unit ?distribution_valve)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (segment_reserved_by_high_priority ?delivery_segment)
+        (not
+          (high_priority_unit_committed ?high_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (high_priority_unit_staged ?high_priority_field_unit)
+      )
+  )
+  (:action reserve_quota_high_priority
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?delivery_segment - delivery_segment ?water_quota_token - water_quota_token)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?high_priority_field_unit)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (quota_token_available ?water_quota_token)
+        (not
+          (high_priority_unit_committed ?high_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (segment_reserved_with_quota_token ?delivery_segment)
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (high_priority_reserved_quota ?high_priority_field_unit ?water_quota_token)
+        (not
+          (quota_token_available ?water_quota_token)
+        )
+      )
+  )
+  (:action finalize_high_priority_allocation
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?delivery_segment - delivery_segment ?irrigation_time_slot - irrigation_time_slot ?water_quota_token - water_quota_token)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?high_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?high_priority_field_unit ?irrigation_time_slot)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (segment_reserved_with_quota_token ?delivery_segment)
+        (high_priority_reserved_quota ?high_priority_field_unit ?water_quota_token)
+        (not
+          (high_priority_unit_staged ?high_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (segment_reserved_by_high_priority ?delivery_segment)
+        (high_priority_unit_staged ?high_priority_field_unit)
+        (quota_token_available ?water_quota_token)
+        (not
+          (high_priority_reserved_quota ?high_priority_field_unit ?water_quota_token)
+        )
+      )
+  )
+  (:action claim_delivery_node_secondary_priority
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_node - delivery_node ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?secondary_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?secondary_priority_field_unit ?irrigation_time_slot)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (not
+          (node_reserved_by_secondary ?delivery_node)
+        )
+        (not
+          (node_reserved_with_quota ?delivery_node)
+        )
+      )
+    :effect (node_reserved_by_secondary ?delivery_node)
+  )
+  (:action commit_secondary_claim
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_node - delivery_node ?distribution_valve - distribution_valve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?secondary_priority_field_unit)
+        (entity_allocation_assigned_valve ?secondary_priority_field_unit ?distribution_valve)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (node_reserved_by_secondary ?delivery_node)
+        (not
+          (secondary_unit_committed ?secondary_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (secondary_unit_staged ?secondary_priority_field_unit)
+      )
+  )
+  (:action reserve_quota_secondary_priority
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_node - delivery_node ?water_quota_token - water_quota_token)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?secondary_priority_field_unit)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (quota_token_available ?water_quota_token)
+        (not
+          (secondary_unit_committed ?secondary_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (node_reserved_with_quota ?delivery_node)
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (secondary_priority_reserved_quota ?secondary_priority_field_unit ?water_quota_token)
+        (not
+          (quota_token_available ?water_quota_token)
+        )
+      )
+  )
+  (:action finalize_secondary_allocation
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_node - delivery_node ?irrigation_time_slot - irrigation_time_slot ?water_quota_token - water_quota_token)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?secondary_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?secondary_priority_field_unit ?irrigation_time_slot)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (node_reserved_with_quota ?delivery_node)
+        (secondary_priority_reserved_quota ?secondary_priority_field_unit ?water_quota_token)
+        (not
+          (secondary_unit_staged ?secondary_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (node_reserved_by_secondary ?delivery_node)
+        (secondary_unit_staged ?secondary_priority_field_unit)
+        (quota_token_available ?water_quota_token)
+        (not
+          (secondary_priority_reserved_quota ?secondary_priority_field_unit ?water_quota_token)
+        )
+      )
+  )
+  (:action assemble_allocation_record_full
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_segment - delivery_segment ?delivery_node - delivery_node ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (segment_reserved_by_high_priority ?delivery_segment)
+        (node_reserved_by_secondary ?delivery_node)
+        (high_priority_unit_staged ?high_priority_field_unit)
+        (secondary_unit_staged ?secondary_priority_field_unit)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_assembled ?allocation_record)
+        (record_includes_segment ?allocation_record ?delivery_segment)
+        (record_includes_node ?allocation_record ?delivery_node)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action assemble_allocation_record_high_priority_quota
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_segment - delivery_segment ?delivery_node - delivery_node ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (segment_reserved_with_quota_token ?delivery_segment)
+        (node_reserved_by_secondary ?delivery_node)
+        (not
+          (high_priority_unit_staged ?high_priority_field_unit)
+        )
+        (secondary_unit_staged ?secondary_priority_field_unit)
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_assembled ?allocation_record)
+        (record_includes_segment ?allocation_record ?delivery_segment)
+        (record_includes_node ?allocation_record ?delivery_node)
+        (record_includes_high_priority ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action assemble_allocation_record_secondary_priority_quota
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_segment - delivery_segment ?delivery_node - delivery_node ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (segment_reserved_by_high_priority ?delivery_segment)
+        (node_reserved_with_quota ?delivery_node)
+        (high_priority_unit_staged ?high_priority_field_unit)
+        (not
+          (secondary_unit_staged ?secondary_priority_field_unit)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_assembled ?allocation_record)
+        (record_includes_segment ?allocation_record ?delivery_segment)
+        (record_includes_node ?allocation_record ?delivery_node)
+        (record_includes_secondary_priority ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action assemble_allocation_record_mixed_priorities
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?secondary_priority_field_unit - secondary_priority_field_unit ?delivery_segment - delivery_segment ?delivery_node - delivery_node ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (high_priority_assigned_segment ?high_priority_field_unit ?delivery_segment)
+        (secondary_assigned_node ?secondary_priority_field_unit ?delivery_node)
+        (segment_reserved_with_quota_token ?delivery_segment)
+        (node_reserved_with_quota ?delivery_node)
+        (not
+          (high_priority_unit_staged ?high_priority_field_unit)
+        )
+        (not
+          (secondary_unit_staged ?secondary_priority_field_unit)
+        )
+        (allocation_record_available ?allocation_record)
+      )
+    :effect
+      (and
+        (allocation_record_assembled ?allocation_record)
+        (record_includes_segment ?allocation_record ?delivery_segment)
+        (record_includes_node ?allocation_record ?delivery_node)
+        (record_includes_high_priority ?allocation_record)
+        (record_includes_secondary_priority ?allocation_record)
+        (not
+          (allocation_record_available ?allocation_record)
+        )
+      )
+  )
+  (:action mark_record_for_validation
+    :parameters (?allocation_record - allocation_record ?high_priority_field_unit - high_priority_field_unit ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (allocation_record_assembled ?allocation_record)
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?high_priority_field_unit ?irrigation_time_slot)
+        (not
+          (record_marked_for_validation ?allocation_record)
+        )
+      )
+    :effect (record_marked_for_validation ?allocation_record)
+  )
+  (:action assign_sensor_to_planner_and_record
+    :parameters (?irrigation_planner - irrigation_planner ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (planner_linked_record ?irrigation_planner ?allocation_record)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_available ?field_sensor)
+        (allocation_record_assembled ?allocation_record)
+        (record_marked_for_validation ?allocation_record)
+        (not
+          (sensor_claimed ?field_sensor)
+        )
+      )
+    :effect
+      (and
+        (sensor_claimed ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (not
+          (sensor_available ?field_sensor)
+        )
+      )
+  )
+  (:action initialize_planner_authorization
+    :parameters (?irrigation_planner - irrigation_planner ?field_sensor - field_sensor ?allocation_record - allocation_record ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_claimed ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (entity_allocation_assigned_timeslot ?irrigation_planner ?irrigation_time_slot)
+        (not
+          (record_includes_high_priority ?allocation_record)
+        )
+        (not
+          (planner_initial_authorization ?irrigation_planner)
+        )
+      )
+    :effect (planner_initial_authorization ?irrigation_planner)
+  )
+  (:action bind_regulatory_permit_to_planner
+    :parameters (?irrigation_planner - irrigation_planner ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (regulatory_permit_available ?regulatory_permit)
+        (not
+          (planner_has_permit ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_has_permit ?irrigation_planner)
+        (planner_bound_permit ?irrigation_planner ?regulatory_permit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action authorize_planner_with_permit
+    :parameters (?irrigation_planner - irrigation_planner ?field_sensor - field_sensor ?allocation_record - allocation_record ?irrigation_time_slot - irrigation_time_slot ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_claimed ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (entity_allocation_assigned_timeslot ?irrigation_planner ?irrigation_time_slot)
+        (record_includes_high_priority ?allocation_record)
+        (planner_has_permit ?irrigation_planner)
+        (planner_bound_permit ?irrigation_planner ?regulatory_permit)
+        (not
+          (planner_initial_authorization ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_initial_authorization ?irrigation_planner)
+        (planner_permit_link_confirmed ?irrigation_planner)
+      )
+  )
+  (:action assign_equipment_prepare_planner
+    :parameters (?irrigation_planner - irrigation_planner ?equipment_unit - equipment_unit ?distribution_valve - distribution_valve ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_initial_authorization ?irrigation_planner)
+        (planner_assigned_equipment ?irrigation_planner ?equipment_unit)
+        (entity_allocation_assigned_valve ?irrigation_planner ?distribution_valve)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (not
+          (record_includes_secondary_priority ?allocation_record)
+        )
+        (not
+          (planner_equipment_assigned ?irrigation_planner)
+        )
+      )
+    :effect (planner_equipment_assigned ?irrigation_planner)
+  )
+  (:action assign_equipment_finalize_planner
+    :parameters (?irrigation_planner - irrigation_planner ?equipment_unit - equipment_unit ?distribution_valve - distribution_valve ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_initial_authorization ?irrigation_planner)
+        (planner_assigned_equipment ?irrigation_planner ?equipment_unit)
+        (entity_allocation_assigned_valve ?irrigation_planner ?distribution_valve)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (record_includes_secondary_priority ?allocation_record)
+        (not
+          (planner_equipment_assigned ?irrigation_planner)
+        )
+      )
+    :effect (planner_equipment_assigned ?irrigation_planner)
+  )
+  (:action apply_quality_approval_stage1
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_equipment_assigned ?irrigation_planner)
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (not
+          (record_includes_high_priority ?allocation_record)
+        )
+        (not
+          (record_includes_secondary_priority ?allocation_record)
+        )
+        (not
+          (planner_quality_validated ?irrigation_planner)
+        )
+      )
+    :effect (planner_quality_validated ?irrigation_planner)
+  )
+  (:action apply_quality_approval_with_high_priority
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_equipment_assigned ?irrigation_planner)
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (record_includes_high_priority ?allocation_record)
+        (not
+          (record_includes_secondary_priority ?allocation_record)
+        )
+        (not
+          (planner_quality_validated ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_method_authorized ?irrigation_planner)
+      )
+  )
+  (:action apply_quality_approval_with_secondary_priority
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_equipment_assigned ?irrigation_planner)
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (not
+          (record_includes_high_priority ?allocation_record)
+        )
+        (record_includes_secondary_priority ?allocation_record)
+        (not
+          (planner_quality_validated ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_method_authorized ?irrigation_planner)
+      )
+  )
+  (:action apply_quality_approval_with_both_priorities
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval ?field_sensor - field_sensor ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (planner_equipment_assigned ?irrigation_planner)
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (planner_linked_sensor ?irrigation_planner ?field_sensor)
+        (sensor_linked_record ?field_sensor ?allocation_record)
+        (record_includes_high_priority ?allocation_record)
+        (record_includes_secondary_priority ?allocation_record)
+        (not
+          (planner_quality_validated ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_method_authorized ?irrigation_planner)
+      )
+  )
+  (:action finalize_planner_preparation
+    :parameters (?irrigation_planner - irrigation_planner)
+    :precondition
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (not
+          (planner_method_authorized ?irrigation_planner)
+        )
+        (not
+          (planner_dispatched ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_dispatched ?irrigation_planner)
+        (delivery_confirmed ?irrigation_planner)
+      )
+  )
+  (:action assign_irrigation_method_to_planner
+    :parameters (?irrigation_planner - irrigation_planner ?irrigation_method - irrigation_method)
+    :precondition
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_method_authorized ?irrigation_planner)
+        (irrigation_method_available ?irrigation_method)
+      )
+    :effect
+      (and
+        (planner_assigned_method ?irrigation_planner ?irrigation_method)
+        (not
+          (irrigation_method_available ?irrigation_method)
+        )
+      )
+  )
+  (:action execute_pre_dispatch_checks
+    :parameters (?irrigation_planner - irrigation_planner ?high_priority_field_unit - high_priority_field_unit ?secondary_priority_field_unit - secondary_priority_field_unit ?irrigation_time_slot - irrigation_time_slot ?irrigation_method - irrigation_method)
+    :precondition
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_method_authorized ?irrigation_planner)
+        (planner_assigned_method ?irrigation_planner ?irrigation_method)
+        (planner_assigned_high_unit ?irrigation_planner ?high_priority_field_unit)
+        (planner_assigned_secondary_unit ?irrigation_planner ?secondary_priority_field_unit)
+        (high_priority_unit_staged ?high_priority_field_unit)
+        (secondary_unit_staged ?secondary_priority_field_unit)
+        (entity_allocation_assigned_timeslot ?irrigation_planner ?irrigation_time_slot)
+        (not
+          (planner_ready_for_dispatch ?irrigation_planner)
+        )
+      )
+    :effect (planner_ready_for_dispatch ?irrigation_planner)
+  )
+  (:action dispatch_planner
+    :parameters (?irrigation_planner - irrigation_planner)
+    :precondition
+      (and
+        (planner_quality_validated ?irrigation_planner)
+        (planner_ready_for_dispatch ?irrigation_planner)
+        (not
+          (planner_dispatched ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_dispatched ?irrigation_planner)
+        (delivery_confirmed ?irrigation_planner)
+      )
+  )
+  (:action apply_emergency_certificate_to_planner
+    :parameters (?irrigation_planner - irrigation_planner ?emergency_priority_certificate - emergency_priority_certificate ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?irrigation_planner)
+        (entity_allocation_assigned_timeslot ?irrigation_planner ?irrigation_time_slot)
+        (emergency_certificate_available ?emergency_priority_certificate)
+        (planner_linked_emergency_certificate ?irrigation_planner ?emergency_priority_certificate)
+        (not
+          (planner_emergency_certified ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_emergency_certified ?irrigation_planner)
+        (not
+          (emergency_certificate_available ?emergency_priority_certificate)
+        )
+      )
+  )
+  (:action authorize_valve_control_by_planner
+    :parameters (?irrigation_planner - irrigation_planner ?distribution_valve - distribution_valve)
+    :precondition
+      (and
+        (planner_emergency_certified ?irrigation_planner)
+        (entity_allocation_assigned_valve ?irrigation_planner ?distribution_valve)
+        (not
+          (planner_emergency_action_authorized ?irrigation_planner)
+        )
+      )
+    :effect (planner_emergency_action_authorized ?irrigation_planner)
+  )
+  (:action confirm_quality_action_for_planner
+    :parameters (?irrigation_planner - irrigation_planner ?quality_approval - quality_approval)
+    :precondition
+      (and
+        (planner_emergency_action_authorized ?irrigation_planner)
+        (planner_assigned_quality_approval ?irrigation_planner ?quality_approval)
+        (not
+          (planner_emergency_action_confirmed ?irrigation_planner)
+        )
+      )
+    :effect (planner_emergency_action_confirmed ?irrigation_planner)
+  )
+  (:action confirm_planner_emergency_action
+    :parameters (?irrigation_planner - irrigation_planner)
+    :precondition
+      (and
+        (planner_emergency_action_confirmed ?irrigation_planner)
+        (not
+          (planner_dispatched ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (planner_dispatched ?irrigation_planner)
+        (delivery_confirmed ?irrigation_planner)
+      )
+  )
+  (:action confirm_delivery_high_priority_unit
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (high_priority_unit_committed ?high_priority_field_unit)
+        (high_priority_unit_staged ?high_priority_field_unit)
+        (allocation_record_assembled ?allocation_record)
+        (record_marked_for_validation ?allocation_record)
+        (not
+          (delivery_confirmed ?high_priority_field_unit)
+        )
+      )
+    :effect (delivery_confirmed ?high_priority_field_unit)
+  )
+  (:action confirm_delivery_secondary_unit
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?allocation_record - allocation_record)
+    :precondition
+      (and
+        (secondary_unit_committed ?secondary_priority_field_unit)
+        (secondary_unit_staged ?secondary_priority_field_unit)
+        (allocation_record_assembled ?allocation_record)
+        (record_marked_for_validation ?allocation_record)
+        (not
+          (delivery_confirmed ?secondary_priority_field_unit)
+        )
+      )
+    :effect (delivery_confirmed ?secondary_priority_field_unit)
+  )
+  (:action consume_contingency_and_record_delivery
+    :parameters (?parcel_request - parcel_request ?contingency_reserve - contingency_reserve ?irrigation_time_slot - irrigation_time_slot)
+    :precondition
+      (and
+        (delivery_confirmed ?parcel_request)
+        (entity_allocation_assigned_timeslot ?parcel_request ?irrigation_time_slot)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (entity_allocation_finalized ?parcel_request)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_finalized ?parcel_request)
+        (entity_allocation_assigned_contingency ?parcel_request ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action execute_delivery_high_priority
+    :parameters (?high_priority_field_unit - high_priority_field_unit ?water_source_unit - water_source_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_finalized ?high_priority_field_unit)
+        (entity_allocation_assigned_source ?high_priority_field_unit ?water_source_unit)
+        (entity_allocation_assigned_contingency ?high_priority_field_unit ?contingency_reserve)
+        (not
+          (entity_allocation_fulfilled ?high_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_fulfilled ?high_priority_field_unit)
+        (water_source_available ?water_source_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action execute_delivery_secondary_priority
+    :parameters (?secondary_priority_field_unit - secondary_priority_field_unit ?water_source_unit - water_source_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_finalized ?secondary_priority_field_unit)
+        (entity_allocation_assigned_source ?secondary_priority_field_unit ?water_source_unit)
+        (entity_allocation_assigned_contingency ?secondary_priority_field_unit ?contingency_reserve)
+        (not
+          (entity_allocation_fulfilled ?secondary_priority_field_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_fulfilled ?secondary_priority_field_unit)
+        (water_source_available ?water_source_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action execute_delivery_by_planner
+    :parameters (?irrigation_planner - irrigation_planner ?water_source_unit - water_source_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_finalized ?irrigation_planner)
+        (entity_allocation_assigned_source ?irrigation_planner ?water_source_unit)
+        (entity_allocation_assigned_contingency ?irrigation_planner ?contingency_reserve)
+        (not
+          (entity_allocation_fulfilled ?irrigation_planner)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_fulfilled ?irrigation_planner)
+        (water_source_available ?water_source_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem irrigation_water_allocation_problem)
+  (:domain irrigation_water_allocation)
+  (:objects high_priority_field_unit_1 - high_priority_field_unit secondary_field_unit_1 - secondary_priority_field_unit irrigation_planner_1 - irrigation_planner irrigation_planner_2 - irrigation_planner water_source_pump_1 - water_source_unit water_source_pump_2 - water_source_unit water_source_pump_3 - water_source_unit timeslot_1 - irrigation_time_slot distribution_valve_1 - distribution_valve quota_token_1 - water_quota_token delivery_segment_1 - delivery_segment delivery_node_1 - delivery_node allocation_record_1 - allocation_record field_sensor_1 - field_sensor field_sensor_2 - field_sensor regulatory_permit_1 - regulatory_permit regulatory_permit_2 - regulatory_permit irrigation_method_drip - irrigation_method irrigation_method_sprinkler - irrigation_method contingency_reserve_1 - contingency_reserve equipment_unit_pump_1 - equipment_unit emergency_certificate_1 - emergency_priority_certificate emergency_certificate_2 - emergency_priority_certificate quality_approval_1 - quality_approval)
+  (:init
+    (water_source_available water_source_pump_1)
+    (water_source_available water_source_pump_2)
+    (water_source_available water_source_pump_3)
+    (timeslot_available timeslot_1)
+    (valve_available distribution_valve_1)
+    (quota_token_available quota_token_1)
+    (high_priority_assigned_segment high_priority_field_unit_1 delivery_segment_1)
+    (secondary_assigned_node secondary_field_unit_1 delivery_node_1)
+    (allocation_record_available allocation_record_1)
+    (sensor_available field_sensor_1)
+    (sensor_available field_sensor_2)
+    (planner_assigned_high_unit irrigation_planner_1 high_priority_field_unit_1)
+    (planner_assigned_high_unit irrigation_planner_2 high_priority_field_unit_1)
+    (planner_assigned_secondary_unit irrigation_planner_1 secondary_field_unit_1)
+    (planner_assigned_secondary_unit irrigation_planner_2 secondary_field_unit_1)
+    (planner_linked_record irrigation_planner_1 allocation_record_1)
+    (planner_linked_record irrigation_planner_2 allocation_record_1)
+    (planner_linked_sensor irrigation_planner_1 field_sensor_1)
+    (planner_linked_sensor irrigation_planner_2 field_sensor_2)
+    (regulatory_permit_available regulatory_permit_1)
+    (regulatory_permit_available regulatory_permit_2)
+    (irrigation_method_available irrigation_method_drip)
+    (irrigation_method_available irrigation_method_sprinkler)
+    (contingency_reserve_available contingency_reserve_1)
+    (equipment_available equipment_unit_pump_1)
+    (emergency_certificate_available emergency_certificate_1)
+    (planner_linked_emergency_certificate irrigation_planner_1 emergency_certificate_1)
+    (planner_linked_emergency_certificate irrigation_planner_2 emergency_certificate_2)
+    (quality_approval_available quality_approval_1)
+  )
+  (:goal
+    (and
+      (entity_allocation_fulfilled high_priority_field_unit_1)
+      (entity_allocation_fulfilled secondary_field_unit_1)
+      (entity_allocation_fulfilled irrigation_planner_1)
+      (entity_allocation_fulfilled irrigation_planner_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_parcel_request high_priority_field_unit_1)
+(assign_request_to_source high_priority_field_unit_1 water_source_pump_1)
+(assign_request_to_timeslot high_priority_field_unit_1 timeslot_1)
+(confirm_request_allocation high_priority_field_unit_1 timeslot_1)
+(assign_valve_to_request high_priority_field_unit_1 distribution_valve_1)
+(claim_delivery_segment_high_priority high_priority_field_unit_1 delivery_segment_1 timeslot_1)
+(commit_high_priority_claim high_priority_field_unit_1 delivery_segment_1 distribution_valve_1)
+(release_valve_from_request high_priority_field_unit_1 distribution_valve_1)
+(release_timeslot_from_request high_priority_field_unit_1 timeslot_1)
+(register_parcel_request secondary_field_unit_1)
+(assign_request_to_source secondary_field_unit_1 water_source_pump_2)
+(assign_request_to_timeslot secondary_field_unit_1 timeslot_1)
+(confirm_request_allocation secondary_field_unit_1 timeslot_1)
+(assign_valve_to_request secondary_field_unit_1 distribution_valve_1)
+(claim_delivery_node_secondary_priority secondary_field_unit_1 delivery_node_1 timeslot_1)
+(commit_secondary_claim secondary_field_unit_1 delivery_node_1 distribution_valve_1)
+(release_valve_from_request secondary_field_unit_1 distribution_valve_1)
+(release_timeslot_from_request secondary_field_unit_1 timeslot_1)
+(assemble_allocation_record_full high_priority_field_unit_1 secondary_field_unit_1 delivery_segment_1 delivery_node_1 allocation_record_1)
+(assign_request_to_timeslot high_priority_field_unit_1 timeslot_1)
+(mark_record_for_validation allocation_record_1 high_priority_field_unit_1 timeslot_1)
+(confirm_delivery_high_priority high_priority_field_unit_1 allocation_record_1)
+(confirm_delivery_secondary_unit secondary_field_unit_1 allocation_record_1)
+(release_timeslot_from_request high_priority_field_unit_1 timeslot_1)
+(register_parcel_request irrigation_planner_1)
+(assign_request_to_source irrigation_planner_1 water_source_pump_3)
+(assign_request_to_timeslot irrigation_planner_1 timeslot_1)
+(confirm_request_allocation irrigation_planner_1 timeslot_1)
+(assign_valve_to_request irrigation_planner_1 distribution_valve_1)
+(assign_sensor_to_planner_and_record irrigation_planner_1 field_sensor_1 allocation_record_1)
+(initialize_planner_authorization irrigation_planner_1 field_sensor_1 allocation_record_1 timeslot_1)
+(assign_equipment_to_planner irrigation_planner_1 equipment_unit_pump_1)
+(assign_equipment_prepare_planner irrigation_planner_1 equipment_unit_pump_1 distribution_valve_1 field_sensor_1 allocation_record_1)
+(assign_quality_approval_to_planner irrigation_planner_1 quality_approval_1)
+(apply_quality_approval_stage1 irrigation_planner_1 quality_approval_1 field_sensor_1 allocation_record_1)
+(finalize_planner_preparation irrigation_planner_1)
+(consume_contingency_and_record_delivery irrigation_planner_1 contingency_reserve_1 timeslot_1)
+(execute_delivery_by_planner irrigation_planner_1 water_source_pump_3 contingency_reserve_1)
+(release_timeslot_from_request irrigation_planner_1 timeslot_1)
+(release_valve_from_request irrigation_planner_1 distribution_valve_1)
+(release_equipment_from_planner irrigation_planner_1 equipment_unit_pump_1)
+(release_quality_approval_from_planner irrigation_planner_1 quality_approval_1)
+(register_parcel_request irrigation_planner_2)
+(assign_request_to_source irrigation_planner_2 water_source_pump_3)
+(assign_request_to_timeslot irrigation_planner_2 timeslot_1)
+(confirm_request_allocation irrigation_planner_2 timeslot_1)
+(assign_valve_to_request irrigation_planner_2 distribution_valve_1)
+(assign_sensor_to_planner_and_record irrigation_planner_2 field_sensor_2 allocation_record_1)
+(initialize_planner_authorization irrigation_planner_2 field_sensor_2 allocation_record_1 timeslot_1)
+(assign_equipment_to_planner irrigation_planner_2 equipment_unit_pump_1)
+(assign_equipment_prepare_planner irrigation_planner_2 equipment_unit_pump_1 distribution_valve_1 field_sensor_2 allocation_record_1)
+(assign_quality_approval_to_planner irrigation_planner_2 quality_approval_1)
+(apply_quality_approval_stage1 irrigation_planner_2 quality_approval_1 field_sensor_2 allocation_record_1)
+(finalize_planner_preparation irrigation_planner_2)
+(consume_contingency_and_record_delivery irrigation_planner_2 contingency_reserve_1 timeslot_1)
+(execute_delivery_by_planner irrigation_planner_2 water_source_pump_3 contingency_reserve_1)
+(release_timeslot_from_request irrigation_planner_2 timeslot_1)
+(release_valve_from_request irrigation_planner_2 distribution_valve_1)
+(release_equipment_from_planner irrigation_planner_2 equipment_unit_pump_1)
+(release_quality_approval_from_planner irrigation_planner_2 quality_approval_1)
+(assign_request_to_timeslot high_priority_field_unit_1 timeslot_1)
+(consume_contingency_and_record_delivery high_priority_field_unit_1 contingency_reserve_1 timeslot_1)
+(execute_delivery_high_priority high_priority_field_unit_1 water_source_pump_1 contingency_reserve_1)
+(release_timeslot_from_request high_priority_field_unit_1 timeslot_1)
+(assign_request_to_timeslot secondary_field_unit_1 timeslot_1)
+(consume_contingency_and_record_delivery secondary_field_unit_1 contingency_reserve_1 timeslot_1)
+(execute_delivery_secondary_priority secondary_field_unit_1 water_source_pump_2 contingency_reserve_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_p_7xellr/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_p_7xellr/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain vehicle_capacity_constrained_load_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object physical_asset_group - object network_element_group - object plan_entity_root - object shipment - plan_entity_root vehicle_asset - operational_resource transport_mode - operational_resource loading_dock - operational_resource service_window - operational_resource load_profile - operational_resource time_window - operational_resource handling_equipment - operational_resource driver - operational_resource cargo_unit - physical_asset_group container - physical_asset_group permit - physical_asset_group origin_node - network_element_group destination_node - network_element_group transport_leg - network_element_group vehicle_role_group - shipment fleet_unit_group - shipment pickup_vehicle - vehicle_role_group delivery_vehicle - vehicle_role_group vehicle_unit - fleet_unit_group)
+  (:predicates
+    (plan_entity_registered ?shipment - shipment)
+    (plan_entity_ready ?shipment - shipment)
+    (plan_entity_asset_assigned ?shipment - shipment)
+    (returned_to_pool ?shipment - shipment)
+    (committed_for_dispatch ?shipment - shipment)
+    (plan_entity_scheduled ?shipment - shipment)
+    (vehicle_asset_available ?vehicle_asset - vehicle_asset)
+    (plan_entity_assigned_vehicle_asset ?shipment - shipment ?vehicle_asset - vehicle_asset)
+    (transport_mode_available ?transport_mode - transport_mode)
+    (plan_entity_assigned_transport_mode ?shipment - shipment ?transport_mode - transport_mode)
+    (loading_dock_available ?loading_dock - loading_dock)
+    (plan_entity_allocated_loading_dock ?shipment - shipment ?loading_dock - loading_dock)
+    (cargo_available ?cargo_unit - cargo_unit)
+    (staged_on_pickup_vehicle ?pickup_vehicle - pickup_vehicle ?cargo_unit - cargo_unit)
+    (staged_on_delivery_vehicle ?delivery_vehicle - delivery_vehicle ?cargo_unit - cargo_unit)
+    (pickup_assigned_origin_node ?pickup_vehicle - pickup_vehicle ?origin_node - origin_node)
+    (origin_node_reserved ?origin_node - origin_node)
+    (origin_node_staged ?origin_node - origin_node)
+    (pickup_vehicle_ready ?pickup_vehicle - pickup_vehicle)
+    (delivery_assigned_destination_node ?delivery_vehicle - delivery_vehicle ?destination_node - destination_node)
+    (destination_node_reserved ?destination_node - destination_node)
+    (destination_node_staged ?destination_node - destination_node)
+    (delivery_vehicle_ready ?delivery_vehicle - delivery_vehicle)
+    (leg_available ?transport_leg - transport_leg)
+    (leg_created ?transport_leg - transport_leg)
+    (leg_assigned_origin_node ?transport_leg - transport_leg ?origin_node - origin_node)
+    (leg_assigned_destination_node ?transport_leg - transport_leg ?destination_node - destination_node)
+    (leg_origin_requires_handling ?transport_leg - transport_leg)
+    (leg_destination_requires_handling ?transport_leg - transport_leg)
+    (leg_ready ?transport_leg - transport_leg)
+    (vehicle_unit_assigned_pickup_vehicle ?vehicle_unit - vehicle_unit ?pickup_vehicle - pickup_vehicle)
+    (vehicle_unit_assigned_delivery_vehicle ?vehicle_unit - vehicle_unit ?delivery_vehicle - delivery_vehicle)
+    (vehicle_assigned_to_leg ?vehicle_unit - vehicle_unit ?transport_leg - transport_leg)
+    (container_available ?container - container)
+    (vehicle_has_container ?vehicle_unit - vehicle_unit ?container - container)
+    (container_staged ?container - container)
+    (container_assigned_to_leg ?container - container ?transport_leg - transport_leg)
+    (vehicle_staging_confirmed ?vehicle_unit - vehicle_unit)
+    (handling_equipment_assigned_to_vehicle ?vehicle_unit - vehicle_unit)
+    (crew_assigned_to_vehicle ?vehicle_unit - vehicle_unit)
+    (vehicle_service_window_reserved ?vehicle_unit - vehicle_unit)
+    (vehicle_service_window_applied ?vehicle_unit - vehicle_unit)
+    (vehicle_ready_for_load_profile ?vehicle_unit - vehicle_unit)
+    (vehicle_loading_committed ?vehicle_unit - vehicle_unit)
+    (permit_available ?permit - permit)
+    (vehicle_assigned_permit ?vehicle_unit - vehicle_unit ?permit - permit)
+    (permit_reserved_for_vehicle ?vehicle_unit - vehicle_unit)
+    (permit_validated_for_vehicle ?vehicle_unit - vehicle_unit)
+    (permit_approved_for_vehicle ?vehicle_unit - vehicle_unit)
+    (service_window_available ?service_window - service_window)
+    (vehicle_assigned_service_window ?vehicle_unit - vehicle_unit ?service_window - service_window)
+    (load_profile_available ?load_profile - load_profile)
+    (vehicle_assigned_load_profile ?vehicle_unit - vehicle_unit ?load_profile - load_profile)
+    (handling_equipment_available ?handling_equipment - handling_equipment)
+    (vehicle_assigned_handling_equipment ?vehicle_unit - vehicle_unit ?handling_equipment - handling_equipment)
+    (driver_available ?driver - driver)
+    (vehicle_assigned_driver ?vehicle_unit - vehicle_unit ?driver - driver)
+    (time_window_available ?time_window - time_window)
+    (plan_entity_assigned_time_window ?shipment - shipment ?time_window - time_window)
+    (pickup_origin_confirmed ?pickup_vehicle - pickup_vehicle)
+    (delivery_destination_confirmed ?delivery_vehicle - delivery_vehicle)
+    (vehicle_ready_for_dispatch ?vehicle_unit - vehicle_unit)
+  )
+  (:action register_shipment
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (not
+          (plan_entity_registered ?shipment)
+        )
+        (not
+          (returned_to_pool ?shipment)
+        )
+      )
+    :effect (plan_entity_registered ?shipment)
+  )
+  (:action assign_vehicle_asset_to_shipment
+    :parameters (?shipment - shipment ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (plan_entity_registered ?shipment)
+        (not
+          (plan_entity_asset_assigned ?shipment)
+        )
+        (vehicle_asset_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (plan_entity_asset_assigned ?shipment)
+        (plan_entity_assigned_vehicle_asset ?shipment ?vehicle_asset)
+        (not
+          (vehicle_asset_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action assign_transport_mode_to_shipment
+    :parameters (?shipment - shipment ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_registered ?shipment)
+        (plan_entity_asset_assigned ?shipment)
+        (transport_mode_available ?transport_mode)
+      )
+    :effect
+      (and
+        (plan_entity_assigned_transport_mode ?shipment ?transport_mode)
+        (not
+          (transport_mode_available ?transport_mode)
+        )
+      )
+  )
+  (:action mark_shipment_ready
+    :parameters (?shipment - shipment ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_registered ?shipment)
+        (plan_entity_asset_assigned ?shipment)
+        (plan_entity_assigned_transport_mode ?shipment ?transport_mode)
+        (not
+          (plan_entity_ready ?shipment)
+        )
+      )
+    :effect (plan_entity_ready ?shipment)
+  )
+  (:action unassign_transport_mode_from_shipment
+    :parameters (?shipment - shipment ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_assigned_transport_mode ?shipment ?transport_mode)
+      )
+    :effect
+      (and
+        (transport_mode_available ?transport_mode)
+        (not
+          (plan_entity_assigned_transport_mode ?shipment ?transport_mode)
+        )
+      )
+  )
+  (:action allocate_loading_dock_for_shipment
+    :parameters (?shipment - shipment ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (plan_entity_ready ?shipment)
+        (loading_dock_available ?loading_dock)
+      )
+    :effect
+      (and
+        (plan_entity_allocated_loading_dock ?shipment ?loading_dock)
+        (not
+          (loading_dock_available ?loading_dock)
+        )
+      )
+  )
+  (:action release_loading_dock_from_shipment
+    :parameters (?shipment - shipment ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (plan_entity_allocated_loading_dock ?shipment ?loading_dock)
+      )
+    :effect
+      (and
+        (loading_dock_available ?loading_dock)
+        (not
+          (plan_entity_allocated_loading_dock ?shipment ?loading_dock)
+        )
+      )
+  )
+  (:action assign_handling_equipment_to_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (handling_equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (vehicle_assigned_handling_equipment ?vehicle_unit ?handling_equipment)
+        (not
+          (handling_equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action unassign_handling_equipment_from_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (vehicle_assigned_handling_equipment ?vehicle_unit ?handling_equipment)
+      )
+    :effect
+      (and
+        (handling_equipment_available ?handling_equipment)
+        (not
+          (vehicle_assigned_handling_equipment ?vehicle_unit ?handling_equipment)
+        )
+      )
+  )
+  (:action assign_driver_to_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (driver_available ?driver)
+      )
+    :effect
+      (and
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (not
+          (driver_available ?driver)
+        )
+      )
+  )
+  (:action unassign_driver_from_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver)
+    :precondition
+      (and
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+      )
+    :effect
+      (and
+        (driver_available ?driver)
+        (not
+          (vehicle_assigned_driver ?vehicle_unit ?driver)
+        )
+      )
+  )
+  (:action reserve_origin_node_for_pickup
+    :parameters (?pickup_vehicle - pickup_vehicle ?origin_node - origin_node ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_ready ?pickup_vehicle)
+        (plan_entity_assigned_transport_mode ?pickup_vehicle ?transport_mode)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (not
+          (origin_node_reserved ?origin_node)
+        )
+        (not
+          (origin_node_staged ?origin_node)
+        )
+      )
+    :effect (origin_node_reserved ?origin_node)
+  )
+  (:action confirm_pickup_preparation
+    :parameters (?pickup_vehicle - pickup_vehicle ?origin_node - origin_node ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (plan_entity_ready ?pickup_vehicle)
+        (plan_entity_allocated_loading_dock ?pickup_vehicle ?loading_dock)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (origin_node_reserved ?origin_node)
+        (not
+          (pickup_origin_confirmed ?pickup_vehicle)
+        )
+      )
+    :effect
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (pickup_vehicle_ready ?pickup_vehicle)
+      )
+  )
+  (:action stage_cargo_at_origin
+    :parameters (?pickup_vehicle - pickup_vehicle ?origin_node - origin_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_entity_ready ?pickup_vehicle)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (pickup_origin_confirmed ?pickup_vehicle)
+        )
+      )
+    :effect
+      (and
+        (origin_node_staged ?origin_node)
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (staged_on_pickup_vehicle ?pickup_vehicle ?cargo_unit)
+        (not
+          (cargo_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_origin_staging
+    :parameters (?pickup_vehicle - pickup_vehicle ?origin_node - origin_node ?transport_mode - transport_mode ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_entity_ready ?pickup_vehicle)
+        (plan_entity_assigned_transport_mode ?pickup_vehicle ?transport_mode)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (origin_node_staged ?origin_node)
+        (staged_on_pickup_vehicle ?pickup_vehicle ?cargo_unit)
+        (not
+          (pickup_vehicle_ready ?pickup_vehicle)
+        )
+      )
+    :effect
+      (and
+        (origin_node_reserved ?origin_node)
+        (pickup_vehicle_ready ?pickup_vehicle)
+        (cargo_available ?cargo_unit)
+        (not
+          (staged_on_pickup_vehicle ?pickup_vehicle ?cargo_unit)
+        )
+      )
+  )
+  (:action reserve_destination_node_for_delivery
+    :parameters (?delivery_vehicle - delivery_vehicle ?destination_node - destination_node ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_ready ?delivery_vehicle)
+        (plan_entity_assigned_transport_mode ?delivery_vehicle ?transport_mode)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (not
+          (destination_node_reserved ?destination_node)
+        )
+        (not
+          (destination_node_staged ?destination_node)
+        )
+      )
+    :effect (destination_node_reserved ?destination_node)
+  )
+  (:action confirm_delivery_preparation
+    :parameters (?delivery_vehicle - delivery_vehicle ?destination_node - destination_node ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (plan_entity_ready ?delivery_vehicle)
+        (plan_entity_allocated_loading_dock ?delivery_vehicle ?loading_dock)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (delivery_destination_confirmed ?delivery_vehicle)
+        )
+      )
+    :effect
+      (and
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (delivery_vehicle_ready ?delivery_vehicle)
+      )
+  )
+  (:action stage_cargo_at_destination
+    :parameters (?delivery_vehicle - delivery_vehicle ?destination_node - destination_node ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_entity_ready ?delivery_vehicle)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (cargo_available ?cargo_unit)
+        (not
+          (delivery_destination_confirmed ?delivery_vehicle)
+        )
+      )
+    :effect
+      (and
+        (destination_node_staged ?destination_node)
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (staged_on_delivery_vehicle ?delivery_vehicle ?cargo_unit)
+        (not
+          (cargo_available ?cargo_unit)
+        )
+      )
+  )
+  (:action finalize_destination_staging
+    :parameters (?delivery_vehicle - delivery_vehicle ?destination_node - destination_node ?transport_mode - transport_mode ?cargo_unit - cargo_unit)
+    :precondition
+      (and
+        (plan_entity_ready ?delivery_vehicle)
+        (plan_entity_assigned_transport_mode ?delivery_vehicle ?transport_mode)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (destination_node_staged ?destination_node)
+        (staged_on_delivery_vehicle ?delivery_vehicle ?cargo_unit)
+        (not
+          (delivery_vehicle_ready ?delivery_vehicle)
+        )
+      )
+    :effect
+      (and
+        (destination_node_reserved ?destination_node)
+        (delivery_vehicle_ready ?delivery_vehicle)
+        (cargo_available ?cargo_unit)
+        (not
+          (staged_on_delivery_vehicle ?delivery_vehicle ?cargo_unit)
+        )
+      )
+  )
+  (:action create_transport_leg
+    :parameters (?pickup_vehicle - pickup_vehicle ?delivery_vehicle - delivery_vehicle ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (pickup_vehicle_ready ?pickup_vehicle)
+        (delivery_vehicle_ready ?delivery_vehicle)
+        (leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (leg_created ?transport_leg)
+        (leg_assigned_origin_node ?transport_leg ?origin_node)
+        (leg_assigned_destination_node ?transport_leg ?destination_node)
+        (not
+          (leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action create_transport_leg_with_origin_staged
+    :parameters (?pickup_vehicle - pickup_vehicle ?delivery_vehicle - delivery_vehicle ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (origin_node_staged ?origin_node)
+        (destination_node_reserved ?destination_node)
+        (not
+          (pickup_vehicle_ready ?pickup_vehicle)
+        )
+        (delivery_vehicle_ready ?delivery_vehicle)
+        (leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (leg_created ?transport_leg)
+        (leg_assigned_origin_node ?transport_leg ?origin_node)
+        (leg_assigned_destination_node ?transport_leg ?destination_node)
+        (leg_origin_requires_handling ?transport_leg)
+        (not
+          (leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action create_transport_leg_with_destination_staged
+    :parameters (?pickup_vehicle - pickup_vehicle ?delivery_vehicle - delivery_vehicle ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (origin_node_reserved ?origin_node)
+        (destination_node_staged ?destination_node)
+        (pickup_vehicle_ready ?pickup_vehicle)
+        (not
+          (delivery_vehicle_ready ?delivery_vehicle)
+        )
+        (leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (leg_created ?transport_leg)
+        (leg_assigned_origin_node ?transport_leg ?origin_node)
+        (leg_assigned_destination_node ?transport_leg ?destination_node)
+        (leg_destination_requires_handling ?transport_leg)
+        (not
+          (leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action create_transport_leg_with_both_nodes_staged
+    :parameters (?pickup_vehicle - pickup_vehicle ?delivery_vehicle - delivery_vehicle ?origin_node - origin_node ?destination_node - destination_node ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (pickup_assigned_origin_node ?pickup_vehicle ?origin_node)
+        (delivery_assigned_destination_node ?delivery_vehicle ?destination_node)
+        (origin_node_staged ?origin_node)
+        (destination_node_staged ?destination_node)
+        (not
+          (pickup_vehicle_ready ?pickup_vehicle)
+        )
+        (not
+          (delivery_vehicle_ready ?delivery_vehicle)
+        )
+        (leg_available ?transport_leg)
+      )
+    :effect
+      (and
+        (leg_created ?transport_leg)
+        (leg_assigned_origin_node ?transport_leg ?origin_node)
+        (leg_assigned_destination_node ?transport_leg ?destination_node)
+        (leg_origin_requires_handling ?transport_leg)
+        (leg_destination_requires_handling ?transport_leg)
+        (not
+          (leg_available ?transport_leg)
+        )
+      )
+  )
+  (:action finalize_transport_leg_readiness
+    :parameters (?transport_leg - transport_leg ?pickup_vehicle - pickup_vehicle ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (leg_created ?transport_leg)
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (plan_entity_assigned_transport_mode ?pickup_vehicle ?transport_mode)
+        (not
+          (leg_ready ?transport_leg)
+        )
+      )
+    :effect (leg_ready ?transport_leg)
+  )
+  (:action stage_container_for_leg
+    :parameters (?vehicle_unit - vehicle_unit ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (vehicle_assigned_to_leg ?vehicle_unit ?transport_leg)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_available ?container)
+        (leg_created ?transport_leg)
+        (leg_ready ?transport_leg)
+        (not
+          (container_staged ?container)
+        )
+      )
+    :effect
+      (and
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action confirm_vehicle_unit_container_staging
+    :parameters (?vehicle_unit - vehicle_unit ?container - container ?transport_leg - transport_leg ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (plan_entity_assigned_transport_mode ?vehicle_unit ?transport_mode)
+        (not
+          (leg_origin_requires_handling ?transport_leg)
+        )
+        (not
+          (vehicle_staging_confirmed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_staging_confirmed ?vehicle_unit)
+  )
+  (:action reserve_service_window_for_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?service_window - service_window)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (service_window_available ?service_window)
+        (not
+          (vehicle_service_window_reserved ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_service_window_reserved ?vehicle_unit)
+        (vehicle_assigned_service_window ?vehicle_unit ?service_window)
+        (not
+          (service_window_available ?service_window)
+        )
+      )
+  )
+  (:action apply_service_window_and_stage_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?container - container ?transport_leg - transport_leg ?transport_mode - transport_mode ?service_window - service_window)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_staged ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (plan_entity_assigned_transport_mode ?vehicle_unit ?transport_mode)
+        (leg_origin_requires_handling ?transport_leg)
+        (vehicle_service_window_reserved ?vehicle_unit)
+        (vehicle_assigned_service_window ?vehicle_unit ?service_window)
+        (not
+          (vehicle_staging_confirmed ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_staging_confirmed ?vehicle_unit)
+        (vehicle_service_window_applied ?vehicle_unit)
+      )
+  )
+  (:action assign_handling_equipment_and_prepare_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?handling_equipment - handling_equipment ?loading_dock - loading_dock ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_staging_confirmed ?vehicle_unit)
+        (vehicle_assigned_handling_equipment ?vehicle_unit ?handling_equipment)
+        (plan_entity_allocated_loading_dock ?vehicle_unit ?loading_dock)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (leg_destination_requires_handling ?transport_leg)
+        )
+        (not
+          (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+  )
+  (:action assign_additional_handling_equipment_and_prepare_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?handling_equipment - handling_equipment ?loading_dock - loading_dock ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (vehicle_staging_confirmed ?vehicle_unit)
+        (vehicle_assigned_handling_equipment ?vehicle_unit ?handling_equipment)
+        (plan_entity_allocated_loading_dock ?vehicle_unit ?loading_dock)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (leg_destination_requires_handling ?transport_leg)
+        (not
+          (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+  )
+  (:action assign_driver_and_confirm_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (leg_origin_requires_handling ?transport_leg)
+        )
+        (not
+          (leg_destination_requires_handling ?transport_leg)
+        )
+        (not
+          (crew_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect (crew_assigned_to_vehicle ?vehicle_unit)
+  )
+  (:action assign_driver_and_prepare_vehicle_with_load_profile
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (leg_origin_requires_handling ?transport_leg)
+        (not
+          (leg_destination_requires_handling ?transport_leg)
+        )
+        (not
+          (crew_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_ready_for_load_profile ?vehicle_unit)
+      )
+  )
+  (:action assign_driver_and_start_loading_alternative1
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (not
+          (leg_origin_requires_handling ?transport_leg)
+        )
+        (leg_destination_requires_handling ?transport_leg)
+        (not
+          (crew_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_ready_for_load_profile ?vehicle_unit)
+      )
+  )
+  (:action assign_driver_and_start_loading_alternative2
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver ?container - container ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (handling_equipment_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (vehicle_has_container ?vehicle_unit ?container)
+        (container_assigned_to_leg ?container ?transport_leg)
+        (leg_origin_requires_handling ?transport_leg)
+        (leg_destination_requires_handling ?transport_leg)
+        (not
+          (crew_assigned_to_vehicle ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_ready_for_load_profile ?vehicle_unit)
+      )
+  )
+  (:action finalize_vehicle_dispatch_flag
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (not
+          (vehicle_ready_for_load_profile ?vehicle_unit)
+        )
+        (not
+          (vehicle_ready_for_dispatch ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_dispatch ?vehicle_unit)
+        (committed_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action assign_load_profile_to_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?load_profile - load_profile)
+    :precondition
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_ready_for_load_profile ?vehicle_unit)
+        (load_profile_available ?load_profile)
+      )
+    :effect
+      (and
+        (vehicle_assigned_load_profile ?vehicle_unit ?load_profile)
+        (not
+          (load_profile_available ?load_profile)
+        )
+      )
+  )
+  (:action sequence_loading_and_commit_to_vehicle
+    :parameters (?vehicle_unit - vehicle_unit ?pickup_vehicle - pickup_vehicle ?delivery_vehicle - delivery_vehicle ?transport_mode - transport_mode ?load_profile - load_profile)
+    :precondition
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_ready_for_load_profile ?vehicle_unit)
+        (vehicle_assigned_load_profile ?vehicle_unit ?load_profile)
+        (vehicle_unit_assigned_pickup_vehicle ?vehicle_unit ?pickup_vehicle)
+        (vehicle_unit_assigned_delivery_vehicle ?vehicle_unit ?delivery_vehicle)
+        (pickup_vehicle_ready ?pickup_vehicle)
+        (delivery_vehicle_ready ?delivery_vehicle)
+        (plan_entity_assigned_transport_mode ?vehicle_unit ?transport_mode)
+        (not
+          (vehicle_loading_committed ?vehicle_unit)
+        )
+      )
+    :effect (vehicle_loading_committed ?vehicle_unit)
+  )
+  (:action finalize_vehicle_dispatch_flag_after_loading
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (crew_assigned_to_vehicle ?vehicle_unit)
+        (vehicle_loading_committed ?vehicle_unit)
+        (not
+          (vehicle_ready_for_dispatch ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_dispatch ?vehicle_unit)
+        (committed_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action reserve_permit_for_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?permit - permit ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (plan_entity_ready ?vehicle_unit)
+        (plan_entity_assigned_transport_mode ?vehicle_unit ?transport_mode)
+        (permit_available ?permit)
+        (vehicle_assigned_permit ?vehicle_unit ?permit)
+        (not
+          (permit_reserved_for_vehicle ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (permit_reserved_for_vehicle ?vehicle_unit)
+        (not
+          (permit_available ?permit)
+        )
+      )
+  )
+  (:action validate_permit_for_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?loading_dock - loading_dock)
+    :precondition
+      (and
+        (permit_reserved_for_vehicle ?vehicle_unit)
+        (plan_entity_allocated_loading_dock ?vehicle_unit ?loading_dock)
+        (not
+          (permit_validated_for_vehicle ?vehicle_unit)
+        )
+      )
+    :effect (permit_validated_for_vehicle ?vehicle_unit)
+  )
+  (:action approve_permit_for_vehicle_unit
+    :parameters (?vehicle_unit - vehicle_unit ?driver - driver)
+    :precondition
+      (and
+        (permit_validated_for_vehicle ?vehicle_unit)
+        (vehicle_assigned_driver ?vehicle_unit ?driver)
+        (not
+          (permit_approved_for_vehicle ?vehicle_unit)
+        )
+      )
+    :effect (permit_approved_for_vehicle ?vehicle_unit)
+  )
+  (:action finalize_vehicle_dispatch_flag_with_permit
+    :parameters (?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (permit_approved_for_vehicle ?vehicle_unit)
+        (not
+          (vehicle_ready_for_dispatch ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_ready_for_dispatch ?vehicle_unit)
+        (committed_for_dispatch ?vehicle_unit)
+      )
+  )
+  (:action activate_pickup_vehicle_on_leg
+    :parameters (?pickup_vehicle - pickup_vehicle ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (pickup_origin_confirmed ?pickup_vehicle)
+        (pickup_vehicle_ready ?pickup_vehicle)
+        (leg_created ?transport_leg)
+        (leg_ready ?transport_leg)
+        (not
+          (committed_for_dispatch ?pickup_vehicle)
+        )
+      )
+    :effect (committed_for_dispatch ?pickup_vehicle)
+  )
+  (:action activate_delivery_vehicle_on_leg
+    :parameters (?delivery_vehicle - delivery_vehicle ?transport_leg - transport_leg)
+    :precondition
+      (and
+        (delivery_destination_confirmed ?delivery_vehicle)
+        (delivery_vehicle_ready ?delivery_vehicle)
+        (leg_created ?transport_leg)
+        (leg_ready ?transport_leg)
+        (not
+          (committed_for_dispatch ?delivery_vehicle)
+        )
+      )
+    :effect (committed_for_dispatch ?delivery_vehicle)
+  )
+  (:action assign_time_window_to_shipment
+    :parameters (?shipment - shipment ?time_window - time_window ?transport_mode - transport_mode)
+    :precondition
+      (and
+        (committed_for_dispatch ?shipment)
+        (plan_entity_assigned_transport_mode ?shipment ?transport_mode)
+        (time_window_available ?time_window)
+        (not
+          (plan_entity_scheduled ?shipment)
+        )
+      )
+    :effect
+      (and
+        (plan_entity_scheduled ?shipment)
+        (plan_entity_assigned_time_window ?shipment ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action reconcile_and_release_pickup_vehicle_asset
+    :parameters (?pickup_vehicle - pickup_vehicle ?vehicle_asset - vehicle_asset ?time_window - time_window)
+    :precondition
+      (and
+        (plan_entity_scheduled ?pickup_vehicle)
+        (plan_entity_assigned_vehicle_asset ?pickup_vehicle ?vehicle_asset)
+        (plan_entity_assigned_time_window ?pickup_vehicle ?time_window)
+        (not
+          (returned_to_pool ?pickup_vehicle)
+        )
+      )
+    :effect
+      (and
+        (returned_to_pool ?pickup_vehicle)
+        (vehicle_asset_available ?vehicle_asset)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action reconcile_and_release_delivery_vehicle_asset
+    :parameters (?delivery_vehicle - delivery_vehicle ?vehicle_asset - vehicle_asset ?time_window - time_window)
+    :precondition
+      (and
+        (plan_entity_scheduled ?delivery_vehicle)
+        (plan_entity_assigned_vehicle_asset ?delivery_vehicle ?vehicle_asset)
+        (plan_entity_assigned_time_window ?delivery_vehicle ?time_window)
+        (not
+          (returned_to_pool ?delivery_vehicle)
+        )
+      )
+    :effect
+      (and
+        (returned_to_pool ?delivery_vehicle)
+        (vehicle_asset_available ?vehicle_asset)
+        (time_window_available ?time_window)
+      )
+  )
+  (:action reconcile_and_release_vehicle_unit_asset
+    :parameters (?vehicle_unit - vehicle_unit ?vehicle_asset - vehicle_asset ?time_window - time_window)
+    :precondition
+      (and
+        (plan_entity_scheduled ?vehicle_unit)
+        (plan_entity_assigned_vehicle_asset ?vehicle_unit ?vehicle_asset)
+        (plan_entity_assigned_time_window ?vehicle_unit ?time_window)
+        (not
+          (returned_to_pool ?vehicle_unit)
+        )
+      )
+    :effect
+      (and
+        (returned_to_pool ?vehicle_unit)
+        (vehicle_asset_available ?vehicle_asset)
+        (time_window_available ?time_window)
+      )
+  )
+)

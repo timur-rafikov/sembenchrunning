@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain seed_allocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_supertype - object input_supertype - object actor_supertype - object site_supertype - object allocation_unit - site_supertype seed_batch - resource_supertype seed_variety - resource_supertype machinery_unit - resource_supertype compliance_certificate - resource_supertype logistics_team - resource_supertype contingency_reserve_unit - resource_supertype agronomist_assignment - resource_supertype contingency_reserve_variant - resource_supertype fertilizer_batch - input_supertype storage_container - input_supertype insurance_policy - input_supertype allocation_window_irrigated - actor_supertype allocation_window_rainfed - actor_supertype allocation_package - actor_supertype field_supertype_a - allocation_unit field_supertype_b - allocation_unit irrigated_field_unit - field_supertype_a rainfed_field_unit - field_supertype_a farm_site - field_supertype_b)
+  (:predicates
+    (plot_request_registered ?field_plot_request - allocation_unit)
+    (unit_allocation_approved ?field_plot_request - allocation_unit)
+    (request_seed_reserved ?field_plot_request - allocation_unit)
+    (unit_allocation_confirmed ?field_plot_request - allocation_unit)
+    (unit_allocation_finalized ?field_plot_request - allocation_unit)
+    (contingency_assigned ?field_plot_request - allocation_unit)
+    (seed_batch_available ?seed_batch - seed_batch)
+    (seed_batch_allocated_to_request ?field_plot_request - allocation_unit ?seed_batch - seed_batch)
+    (seed_variety_available ?seed_variety - seed_variety)
+    (assigned_seed_variety_for_unit ?field_plot_request - allocation_unit ?seed_variety - seed_variety)
+    (machinery_available ?machinery_unit - machinery_unit)
+    (machinery_assigned_to_unit ?field_plot_request - allocation_unit ?machinery_unit - machinery_unit)
+    (fertilizer_available ?fertilizer_batch - fertilizer_batch)
+    (fertilizer_assigned_to_irrigated_unit ?irrigated_field_unit - irrigated_field_unit ?fertilizer_batch - fertilizer_batch)
+    (fertilizer_assigned_to_rainfed_unit ?rainfed_field_unit - rainfed_field_unit ?fertilizer_batch - fertilizer_batch)
+    (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit - irrigated_field_unit ?allocation_window_irrigated - allocation_window_irrigated)
+    (allocation_window_irrigated_ready ?allocation_window_irrigated - allocation_window_irrigated)
+    (allocation_window_irrigated_engaged ?allocation_window_irrigated - allocation_window_irrigated)
+    (irrigated_unit_resources_confirmed ?irrigated_field_unit - irrigated_field_unit)
+    (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit - rainfed_field_unit ?allocation_window_rainfed - allocation_window_rainfed)
+    (allocation_window_rainfed_ready ?allocation_window_rainfed - allocation_window_rainfed)
+    (allocation_window_rainfed_engaged ?allocation_window_rainfed - allocation_window_rainfed)
+    (rainfed_unit_resources_confirmed ?rainfed_field_unit - rainfed_field_unit)
+    (allocation_package_available ?allocation_package - allocation_package)
+    (allocation_package_staged ?allocation_package - allocation_package)
+    (package_allocated_to_allocation_window_irrigated ?allocation_package - allocation_package ?allocation_window_irrigated - allocation_window_irrigated)
+    (package_allocated_to_allocation_window_rainfed ?allocation_package - allocation_package ?allocation_window_rainfed - allocation_window_rainfed)
+    (allocation_package_priority_flag ?allocation_package - allocation_package)
+    (allocation_package_secondary_flag ?allocation_package - allocation_package)
+    (allocation_package_inspected ?allocation_package - allocation_package)
+    (farm_site_manages_irrigated_unit ?farm_site - farm_site ?irrigated_field_unit - irrigated_field_unit)
+    (farm_site_manages_rainfed_unit ?farm_site - farm_site ?rainfed_field_unit - rainfed_field_unit)
+    (farm_site_has_package ?farm_site - farm_site ?allocation_package - allocation_package)
+    (storage_container_available ?storage_container - storage_container)
+    (farm_site_has_storage_container ?farm_site - farm_site ?storage_container - storage_container)
+    (storage_container_in_use ?storage_container - storage_container)
+    (storage_container_contains_package ?storage_container - storage_container ?allocation_package - allocation_package)
+    (farm_site_cleared_for_inspection ?farm_site - farm_site)
+    (farm_site_agronomist_reviewed ?farm_site - farm_site)
+    (farm_site_inspection_passed ?farm_site - farm_site)
+    (farm_site_certificate_attached_flag ?farm_site - farm_site)
+    (farm_site_certificate_bound ?farm_site - farm_site)
+    (farm_site_ready_for_logistics ?farm_site - farm_site)
+    (farm_site_ready_for_final_dispatch ?farm_site - farm_site)
+    (insurance_policy_available ?insurance_policy - insurance_policy)
+    (farm_site_has_insurance_policy ?farm_site - farm_site ?insurance_policy - insurance_policy)
+    (farm_site_insurance_attached ?farm_site - farm_site)
+    (farm_site_machinery_verified ?farm_site - farm_site)
+    (farm_site_insurance_check_passed ?farm_site - farm_site)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (farm_site_has_certificate ?farm_site - farm_site ?compliance_certificate - compliance_certificate)
+    (logistics_team_available ?logistics_team - logistics_team)
+    (logistics_team_assigned_to_site ?farm_site - farm_site ?logistics_team - logistics_team)
+    (agronomist_available ?agronomist_assignment - agronomist_assignment)
+    (agronomist_assigned_to_site ?farm_site - farm_site ?agronomist_assignment - agronomist_assignment)
+    (contingency_reserve_variant_available ?contingency_reserve_variant - contingency_reserve_variant)
+    (contingency_variant_assigned_to_site ?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant)
+    (contingency_reserve_available ?contingency_reserve_unit - contingency_reserve_unit)
+    (contingency_reserve_association ?field_plot_request - allocation_unit ?contingency_reserve_unit - contingency_reserve_unit)
+    (irrigated_unit_preparation_checked ?irrigated_field_unit - irrigated_field_unit)
+    (rainfed_unit_preparation_checked ?rainfed_field_unit - rainfed_field_unit)
+    (farm_site_finalization_recorded ?farm_site - farm_site)
+  )
+  (:action register_plot_request
+    :parameters (?field_plot_request - allocation_unit)
+    :precondition
+      (and
+        (not
+          (plot_request_registered ?field_plot_request)
+        )
+        (not
+          (unit_allocation_confirmed ?field_plot_request)
+        )
+      )
+    :effect (plot_request_registered ?field_plot_request)
+  )
+  (:action assign_seed_batch_to_request
+    :parameters (?field_plot_request - allocation_unit ?seed_batch - seed_batch)
+    :precondition
+      (and
+        (plot_request_registered ?field_plot_request)
+        (not
+          (request_seed_reserved ?field_plot_request)
+        )
+        (seed_batch_available ?seed_batch)
+      )
+    :effect
+      (and
+        (request_seed_reserved ?field_plot_request)
+        (seed_batch_allocated_to_request ?field_plot_request ?seed_batch)
+        (not
+          (seed_batch_available ?seed_batch)
+        )
+      )
+  )
+  (:action assign_seed_variety_to_request
+    :parameters (?field_plot_request - allocation_unit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (plot_request_registered ?field_plot_request)
+        (request_seed_reserved ?field_plot_request)
+        (seed_variety_available ?seed_variety)
+      )
+    :effect
+      (and
+        (assigned_seed_variety_for_unit ?field_plot_request ?seed_variety)
+        (not
+          (seed_variety_available ?seed_variety)
+        )
+      )
+  )
+  (:action approve_variety_assignment
+    :parameters (?field_plot_request - allocation_unit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (plot_request_registered ?field_plot_request)
+        (request_seed_reserved ?field_plot_request)
+        (assigned_seed_variety_for_unit ?field_plot_request ?seed_variety)
+        (not
+          (unit_allocation_approved ?field_plot_request)
+        )
+      )
+    :effect (unit_allocation_approved ?field_plot_request)
+  )
+  (:action unassign_seed_variety_from_request
+    :parameters (?field_plot_request - allocation_unit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (assigned_seed_variety_for_unit ?field_plot_request ?seed_variety)
+      )
+    :effect
+      (and
+        (seed_variety_available ?seed_variety)
+        (not
+          (assigned_seed_variety_for_unit ?field_plot_request ?seed_variety)
+        )
+      )
+  )
+  (:action assign_machinery_to_request
+    :parameters (?field_plot_request - allocation_unit ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (unit_allocation_approved ?field_plot_request)
+        (machinery_available ?machinery_unit)
+      )
+    :effect
+      (and
+        (machinery_assigned_to_unit ?field_plot_request ?machinery_unit)
+        (not
+          (machinery_available ?machinery_unit)
+        )
+      )
+  )
+  (:action release_machinery_from_request
+    :parameters (?field_plot_request - allocation_unit ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (machinery_assigned_to_unit ?field_plot_request ?machinery_unit)
+      )
+    :effect
+      (and
+        (machinery_available ?machinery_unit)
+        (not
+          (machinery_assigned_to_unit ?field_plot_request ?machinery_unit)
+        )
+      )
+  )
+  (:action assign_agronomist_to_site
+    :parameters (?farm_site - farm_site ?agronomist_assignment - agronomist_assignment)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (agronomist_available ?agronomist_assignment)
+      )
+    :effect
+      (and
+        (agronomist_assigned_to_site ?farm_site ?agronomist_assignment)
+        (not
+          (agronomist_available ?agronomist_assignment)
+        )
+      )
+  )
+  (:action release_agronomist_from_site
+    :parameters (?farm_site - farm_site ?agronomist_assignment - agronomist_assignment)
+    :precondition
+      (and
+        (agronomist_assigned_to_site ?farm_site ?agronomist_assignment)
+      )
+    :effect
+      (and
+        (agronomist_available ?agronomist_assignment)
+        (not
+          (agronomist_assigned_to_site ?farm_site ?agronomist_assignment)
+        )
+      )
+  )
+  (:action assign_contingency_variant_to_site
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (contingency_reserve_variant_available ?contingency_reserve_variant)
+      )
+    :effect
+      (and
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (not
+          (contingency_reserve_variant_available ?contingency_reserve_variant)
+        )
+      )
+  )
+  (:action release_contingency_variant_from_site
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant)
+    :precondition
+      (and
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+      )
+    :effect
+      (and
+        (contingency_reserve_variant_available ?contingency_reserve_variant)
+        (not
+          (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        )
+      )
+  )
+  (:action signal_irrigated_window_ready
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (unit_allocation_approved ?irrigated_field_unit)
+        (assigned_seed_variety_for_unit ?irrigated_field_unit ?seed_variety)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (not
+          (allocation_window_irrigated_ready ?allocation_window_irrigated)
+        )
+        (not
+          (allocation_window_irrigated_engaged ?allocation_window_irrigated)
+        )
+      )
+    :effect (allocation_window_irrigated_ready ?allocation_window_irrigated)
+  )
+  (:action prepare_irrigated_unit_with_machinery
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (unit_allocation_approved ?irrigated_field_unit)
+        (machinery_assigned_to_unit ?irrigated_field_unit ?machinery_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_irrigated_ready ?allocation_window_irrigated)
+        (not
+          (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        )
+      )
+    :effect
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+      )
+  )
+  (:action apply_fertilizer_to_irrigated_unit
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (unit_allocation_approved ?irrigated_field_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (fertilizer_available ?fertilizer_batch)
+        (not
+          (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_window_irrigated_engaged ?allocation_window_irrigated)
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (fertilizer_assigned_to_irrigated_unit ?irrigated_field_unit ?fertilizer_batch)
+        (not
+          (fertilizer_available ?fertilizer_batch)
+        )
+      )
+  )
+  (:action complete_irrigated_unit_preparation
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?seed_variety - seed_variety ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (unit_allocation_approved ?irrigated_field_unit)
+        (assigned_seed_variety_for_unit ?irrigated_field_unit ?seed_variety)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_irrigated_engaged ?allocation_window_irrigated)
+        (fertilizer_assigned_to_irrigated_unit ?irrigated_field_unit ?fertilizer_batch)
+        (not
+          (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_window_irrigated_ready ?allocation_window_irrigated)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        (fertilizer_available ?fertilizer_batch)
+        (not
+          (fertilizer_assigned_to_irrigated_unit ?irrigated_field_unit ?fertilizer_batch)
+        )
+      )
+  )
+  (:action signal_rainfed_window_ready
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?allocation_window_rainfed - allocation_window_rainfed ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (unit_allocation_approved ?rainfed_field_unit)
+        (assigned_seed_variety_for_unit ?rainfed_field_unit ?seed_variety)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (not
+          (allocation_window_rainfed_ready ?allocation_window_rainfed)
+        )
+        (not
+          (allocation_window_rainfed_engaged ?allocation_window_rainfed)
+        )
+      )
+    :effect (allocation_window_rainfed_ready ?allocation_window_rainfed)
+  )
+  (:action prepare_rainfed_unit_with_machinery
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?allocation_window_rainfed - allocation_window_rainfed ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (unit_allocation_approved ?rainfed_field_unit)
+        (machinery_assigned_to_unit ?rainfed_field_unit ?machinery_unit)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_rainfed_ready ?allocation_window_rainfed)
+        (not
+          (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        )
+      )
+    :effect
+      (and
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+      )
+  )
+  (:action apply_fertilizer_to_rainfed_unit
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?allocation_window_rainfed - allocation_window_rainfed ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (unit_allocation_approved ?rainfed_field_unit)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (fertilizer_available ?fertilizer_batch)
+        (not
+          (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_window_rainfed_engaged ?allocation_window_rainfed)
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (fertilizer_assigned_to_rainfed_unit ?rainfed_field_unit ?fertilizer_batch)
+        (not
+          (fertilizer_available ?fertilizer_batch)
+        )
+      )
+  )
+  (:action complete_rainfed_unit_preparation
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?allocation_window_rainfed - allocation_window_rainfed ?seed_variety - seed_variety ?fertilizer_batch - fertilizer_batch)
+    :precondition
+      (and
+        (unit_allocation_approved ?rainfed_field_unit)
+        (assigned_seed_variety_for_unit ?rainfed_field_unit ?seed_variety)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_rainfed_engaged ?allocation_window_rainfed)
+        (fertilizer_assigned_to_rainfed_unit ?rainfed_field_unit ?fertilizer_batch)
+        (not
+          (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        )
+      )
+    :effect
+      (and
+        (allocation_window_rainfed_ready ?allocation_window_rainfed)
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        (fertilizer_available ?fertilizer_batch)
+        (not
+          (fertilizer_assigned_to_rainfed_unit ?rainfed_field_unit ?fertilizer_batch)
+        )
+      )
+  )
+  (:action assemble_allocation_package
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?rainfed_field_unit - rainfed_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?allocation_window_rainfed - allocation_window_rainfed ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_irrigated_ready ?allocation_window_irrigated)
+        (allocation_window_rainfed_ready ?allocation_window_rainfed)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_staged ?allocation_package)
+        (package_allocated_to_allocation_window_irrigated ?allocation_package ?allocation_window_irrigated)
+        (package_allocated_to_allocation_window_rainfed ?allocation_package ?allocation_window_rainfed)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_priority_allocation_package
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?rainfed_field_unit - rainfed_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?allocation_window_rainfed - allocation_window_rainfed ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_irrigated_engaged ?allocation_window_irrigated)
+        (allocation_window_rainfed_ready ?allocation_window_rainfed)
+        (not
+          (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        )
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_staged ?allocation_package)
+        (package_allocated_to_allocation_window_irrigated ?allocation_package ?allocation_window_irrigated)
+        (package_allocated_to_allocation_window_rainfed ?allocation_package ?allocation_window_rainfed)
+        (allocation_package_priority_flag ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_secondary_allocation_package
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?rainfed_field_unit - rainfed_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?allocation_window_rainfed - allocation_window_rainfed ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_irrigated_ready ?allocation_window_irrigated)
+        (allocation_window_rainfed_engaged ?allocation_window_rainfed)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        (not
+          (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        )
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_staged ?allocation_package)
+        (package_allocated_to_allocation_window_irrigated ?allocation_package ?allocation_window_irrigated)
+        (package_allocated_to_allocation_window_rainfed ?allocation_package ?allocation_window_rainfed)
+        (allocation_package_secondary_flag ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action assemble_composite_allocation_package
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?rainfed_field_unit - rainfed_field_unit ?allocation_window_irrigated - allocation_window_irrigated ?allocation_window_rainfed - allocation_window_rainfed ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (allocation_window_assigned_to_irrigated_unit ?irrigated_field_unit ?allocation_window_irrigated)
+        (allocation_window_assigned_to_rainfed_unit ?rainfed_field_unit ?allocation_window_rainfed)
+        (allocation_window_irrigated_engaged ?allocation_window_irrigated)
+        (allocation_window_rainfed_engaged ?allocation_window_rainfed)
+        (not
+          (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        )
+        (not
+          (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        )
+        (allocation_package_available ?allocation_package)
+      )
+    :effect
+      (and
+        (allocation_package_staged ?allocation_package)
+        (package_allocated_to_allocation_window_irrigated ?allocation_package ?allocation_window_irrigated)
+        (package_allocated_to_allocation_window_rainfed ?allocation_package ?allocation_window_rainfed)
+        (allocation_package_priority_flag ?allocation_package)
+        (allocation_package_secondary_flag ?allocation_package)
+        (not
+          (allocation_package_available ?allocation_package)
+        )
+      )
+  )
+  (:action inspect_allocation_package
+    :parameters (?allocation_package - allocation_package ?irrigated_field_unit - irrigated_field_unit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (allocation_package_staged ?allocation_package)
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (assigned_seed_variety_for_unit ?irrigated_field_unit ?seed_variety)
+        (not
+          (allocation_package_inspected ?allocation_package)
+        )
+      )
+    :effect (allocation_package_inspected ?allocation_package)
+  )
+  (:action stage_package_in_storage_container
+    :parameters (?farm_site - farm_site ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (farm_site_has_package ?farm_site ?allocation_package)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_available ?storage_container)
+        (allocation_package_staged ?allocation_package)
+        (allocation_package_inspected ?allocation_package)
+        (not
+          (storage_container_in_use ?storage_container)
+        )
+      )
+    :effect
+      (and
+        (storage_container_in_use ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (not
+          (storage_container_available ?storage_container)
+        )
+      )
+  )
+  (:action bind_site_to_container_for_inspection
+    :parameters (?farm_site - farm_site ?storage_container - storage_container ?allocation_package - allocation_package ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_in_use ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (assigned_seed_variety_for_unit ?farm_site ?seed_variety)
+        (not
+          (allocation_package_priority_flag ?allocation_package)
+        )
+        (not
+          (farm_site_cleared_for_inspection ?farm_site)
+        )
+      )
+    :effect (farm_site_cleared_for_inspection ?farm_site)
+  )
+  (:action attach_certificate_to_site
+    :parameters (?farm_site - farm_site ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (compliance_certificate_available ?compliance_certificate)
+        (not
+          (farm_site_certificate_attached_flag ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_certificate_attached_flag ?farm_site)
+        (farm_site_has_certificate ?farm_site ?compliance_certificate)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action confirm_certificate_for_site
+    :parameters (?farm_site - farm_site ?storage_container - storage_container ?allocation_package - allocation_package ?seed_variety - seed_variety ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_in_use ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (assigned_seed_variety_for_unit ?farm_site ?seed_variety)
+        (allocation_package_priority_flag ?allocation_package)
+        (farm_site_certificate_attached_flag ?farm_site)
+        (farm_site_has_certificate ?farm_site ?compliance_certificate)
+        (not
+          (farm_site_cleared_for_inspection ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_cleared_for_inspection ?farm_site)
+        (farm_site_certificate_bound ?farm_site)
+      )
+  )
+  (:action perform_agronomist_inspection
+    :parameters (?farm_site - farm_site ?agronomist_assignment - agronomist_assignment ?machinery_unit - machinery_unit ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_cleared_for_inspection ?farm_site)
+        (agronomist_assigned_to_site ?farm_site ?agronomist_assignment)
+        (machinery_assigned_to_unit ?farm_site ?machinery_unit)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (not
+          (allocation_package_secondary_flag ?allocation_package)
+        )
+        (not
+          (farm_site_agronomist_reviewed ?farm_site)
+        )
+      )
+    :effect (farm_site_agronomist_reviewed ?farm_site)
+  )
+  (:action perform_agronomist_inspection_secondary
+    :parameters (?farm_site - farm_site ?agronomist_assignment - agronomist_assignment ?machinery_unit - machinery_unit ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_cleared_for_inspection ?farm_site)
+        (agronomist_assigned_to_site ?farm_site ?agronomist_assignment)
+        (machinery_assigned_to_unit ?farm_site ?machinery_unit)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (allocation_package_secondary_flag ?allocation_package)
+        (not
+          (farm_site_agronomist_reviewed ?farm_site)
+        )
+      )
+    :effect (farm_site_agronomist_reviewed ?farm_site)
+  )
+  (:action finalize_agronomist_inspection
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_agronomist_reviewed ?farm_site)
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (not
+          (allocation_package_priority_flag ?allocation_package)
+        )
+        (not
+          (allocation_package_secondary_flag ?allocation_package)
+        )
+        (not
+          (farm_site_inspection_passed ?farm_site)
+        )
+      )
+    :effect (farm_site_inspection_passed ?farm_site)
+  )
+  (:action finalize_inspection_and_mark_logistics_ready
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_agronomist_reviewed ?farm_site)
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (allocation_package_priority_flag ?allocation_package)
+        (not
+          (allocation_package_secondary_flag ?allocation_package)
+        )
+        (not
+          (farm_site_inspection_passed ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_logistics ?farm_site)
+      )
+  )
+  (:action finalize_inspection_and_mark_logistics_ready_alt
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_agronomist_reviewed ?farm_site)
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (not
+          (allocation_package_priority_flag ?allocation_package)
+        )
+        (allocation_package_secondary_flag ?allocation_package)
+        (not
+          (farm_site_inspection_passed ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_logistics ?farm_site)
+      )
+  )
+  (:action finalize_inspection_and_mark_logistics_ready_combined
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant ?storage_container - storage_container ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (farm_site_agronomist_reviewed ?farm_site)
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (farm_site_has_storage_container ?farm_site ?storage_container)
+        (storage_container_contains_package ?storage_container ?allocation_package)
+        (allocation_package_priority_flag ?allocation_package)
+        (allocation_package_secondary_flag ?allocation_package)
+        (not
+          (farm_site_inspection_passed ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_logistics ?farm_site)
+      )
+  )
+  (:action finalize_site_direct
+    :parameters (?farm_site - farm_site)
+    :precondition
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (not
+          (farm_site_ready_for_logistics ?farm_site)
+        )
+        (not
+          (farm_site_finalization_recorded ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_finalization_recorded ?farm_site)
+        (unit_allocation_finalized ?farm_site)
+      )
+  )
+  (:action assign_logistics_team_to_site
+    :parameters (?farm_site - farm_site ?logistics_team - logistics_team)
+    :precondition
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_logistics ?farm_site)
+        (logistics_team_available ?logistics_team)
+      )
+    :effect
+      (and
+        (logistics_team_assigned_to_site ?farm_site ?logistics_team)
+        (not
+          (logistics_team_available ?logistics_team)
+        )
+      )
+  )
+  (:action confirm_site_dispatch_readiness
+    :parameters (?farm_site - farm_site ?irrigated_field_unit - irrigated_field_unit ?rainfed_field_unit - rainfed_field_unit ?seed_variety - seed_variety ?logistics_team - logistics_team)
+    :precondition
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_logistics ?farm_site)
+        (logistics_team_assigned_to_site ?farm_site ?logistics_team)
+        (farm_site_manages_irrigated_unit ?farm_site ?irrigated_field_unit)
+        (farm_site_manages_rainfed_unit ?farm_site ?rainfed_field_unit)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        (assigned_seed_variety_for_unit ?farm_site ?seed_variety)
+        (not
+          (farm_site_ready_for_final_dispatch ?farm_site)
+        )
+      )
+    :effect (farm_site_ready_for_final_dispatch ?farm_site)
+  )
+  (:action finalize_site_after_dispatch_preparation
+    :parameters (?farm_site - farm_site)
+    :precondition
+      (and
+        (farm_site_inspection_passed ?farm_site)
+        (farm_site_ready_for_final_dispatch ?farm_site)
+        (not
+          (farm_site_finalization_recorded ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_finalization_recorded ?farm_site)
+        (unit_allocation_finalized ?farm_site)
+      )
+  )
+  (:action attach_insurance_policy_to_site
+    :parameters (?farm_site - farm_site ?insurance_policy - insurance_policy ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (unit_allocation_approved ?farm_site)
+        (assigned_seed_variety_for_unit ?farm_site ?seed_variety)
+        (insurance_policy_available ?insurance_policy)
+        (farm_site_has_insurance_policy ?farm_site ?insurance_policy)
+        (not
+          (farm_site_insurance_attached ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_insurance_attached ?farm_site)
+        (not
+          (insurance_policy_available ?insurance_policy)
+        )
+      )
+  )
+  (:action verify_site_machinery_for_insurance
+    :parameters (?farm_site - farm_site ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (farm_site_insurance_attached ?farm_site)
+        (machinery_assigned_to_unit ?farm_site ?machinery_unit)
+        (not
+          (farm_site_machinery_verified ?farm_site)
+        )
+      )
+    :effect (farm_site_machinery_verified ?farm_site)
+  )
+  (:action perform_insurance_variant_check
+    :parameters (?farm_site - farm_site ?contingency_reserve_variant - contingency_reserve_variant)
+    :precondition
+      (and
+        (farm_site_machinery_verified ?farm_site)
+        (contingency_variant_assigned_to_site ?farm_site ?contingency_reserve_variant)
+        (not
+          (farm_site_insurance_check_passed ?farm_site)
+        )
+      )
+    :effect (farm_site_insurance_check_passed ?farm_site)
+  )
+  (:action finalize_site_after_insurance_verification
+    :parameters (?farm_site - farm_site)
+    :precondition
+      (and
+        (farm_site_insurance_check_passed ?farm_site)
+        (not
+          (farm_site_finalization_recorded ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (farm_site_finalization_recorded ?farm_site)
+        (unit_allocation_finalized ?farm_site)
+      )
+  )
+  (:action confirm_irrigated_unit_dispatch
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (irrigated_unit_preparation_checked ?irrigated_field_unit)
+        (irrigated_unit_resources_confirmed ?irrigated_field_unit)
+        (allocation_package_staged ?allocation_package)
+        (allocation_package_inspected ?allocation_package)
+        (not
+          (unit_allocation_finalized ?irrigated_field_unit)
+        )
+      )
+    :effect (unit_allocation_finalized ?irrigated_field_unit)
+  )
+  (:action confirm_rainfed_unit_dispatch
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?allocation_package - allocation_package)
+    :precondition
+      (and
+        (rainfed_unit_preparation_checked ?rainfed_field_unit)
+        (rainfed_unit_resources_confirmed ?rainfed_field_unit)
+        (allocation_package_staged ?allocation_package)
+        (allocation_package_inspected ?allocation_package)
+        (not
+          (unit_allocation_finalized ?rainfed_field_unit)
+        )
+      )
+    :effect (unit_allocation_finalized ?rainfed_field_unit)
+  )
+  (:action assign_contingency_reserve_to_request
+    :parameters (?field_plot_request - allocation_unit ?contingency_reserve_unit - contingency_reserve_unit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (unit_allocation_finalized ?field_plot_request)
+        (assigned_seed_variety_for_unit ?field_plot_request ?seed_variety)
+        (contingency_reserve_available ?contingency_reserve_unit)
+        (not
+          (contingency_assigned ?field_plot_request)
+        )
+      )
+    :effect
+      (and
+        (contingency_assigned ?field_plot_request)
+        (contingency_reserve_association ?field_plot_request ?contingency_reserve_unit)
+        (not
+          (contingency_reserve_available ?contingency_reserve_unit)
+        )
+      )
+  )
+  (:action confirm_irrigated_unit_allocation_and_release_seed_batch
+    :parameters (?irrigated_field_unit - irrigated_field_unit ?seed_batch - seed_batch ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_assigned ?irrigated_field_unit)
+        (seed_batch_allocated_to_request ?irrigated_field_unit ?seed_batch)
+        (contingency_reserve_association ?irrigated_field_unit ?contingency_reserve_unit)
+        (not
+          (unit_allocation_confirmed ?irrigated_field_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_confirmed ?irrigated_field_unit)
+        (seed_batch_available ?seed_batch)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action confirm_rainfed_unit_allocation_and_release_seed_batch
+    :parameters (?rainfed_field_unit - rainfed_field_unit ?seed_batch - seed_batch ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_assigned ?rainfed_field_unit)
+        (seed_batch_allocated_to_request ?rainfed_field_unit ?seed_batch)
+        (contingency_reserve_association ?rainfed_field_unit ?contingency_reserve_unit)
+        (not
+          (unit_allocation_confirmed ?rainfed_field_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_confirmed ?rainfed_field_unit)
+        (seed_batch_available ?seed_batch)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+  (:action confirm_site_allocation_and_release_seed_batch
+    :parameters (?farm_site - farm_site ?seed_batch - seed_batch ?contingency_reserve_unit - contingency_reserve_unit)
+    :precondition
+      (and
+        (contingency_assigned ?farm_site)
+        (seed_batch_allocated_to_request ?farm_site ?seed_batch)
+        (contingency_reserve_association ?farm_site ?contingency_reserve_unit)
+        (not
+          (unit_allocation_confirmed ?farm_site)
+        )
+      )
+    :effect
+      (and
+        (unit_allocation_confirmed ?farm_site)
+        (seed_batch_available ?seed_batch)
+        (contingency_reserve_available ?contingency_reserve_unit)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem seed_allocation_problem)
+  (:domain seed_allocation_domain)
+  (:objects irrigated_field_unit_1 - irrigated_field_unit rainfed_field_unit_1 - rainfed_field_unit farm_site_1 - farm_site farm_site_2 - farm_site seed_batch_1 - seed_batch seed_batch_2 - seed_batch seed_batch_3 - seed_batch seed_variety_1 - seed_variety planter_unit_1 - machinery_unit fertilizer_batch_1 - fertilizer_batch allocation_window_irrigated_1 - allocation_window_irrigated allocation_window_rainfed_1 - allocation_window_rainfed allocation_package_1 - allocation_package storage_container_1 - storage_container storage_container_2 - storage_container compliance_certificate_1 - compliance_certificate compliance_certificate_2 - compliance_certificate logistics_team_1 - logistics_team logistics_team_2 - logistics_team contingency_reserve_unit_1 - contingency_reserve_unit agronomist_assignment_1 - agronomist_assignment insurance_policy_1 - insurance_policy insurance_policy_2 - insurance_policy contingency_reserve_variant_1 - contingency_reserve_variant)
+  (:init
+    (seed_batch_available seed_batch_1)
+    (seed_batch_available seed_batch_2)
+    (seed_batch_available seed_batch_3)
+    (seed_variety_available seed_variety_1)
+    (machinery_available planter_unit_1)
+    (fertilizer_available fertilizer_batch_1)
+    (allocation_window_assigned_to_irrigated_unit irrigated_field_unit_1 allocation_window_irrigated_1)
+    (allocation_window_assigned_to_rainfed_unit rainfed_field_unit_1 allocation_window_rainfed_1)
+    (allocation_package_available allocation_package_1)
+    (storage_container_available storage_container_1)
+    (storage_container_available storage_container_2)
+    (farm_site_manages_irrigated_unit farm_site_1 irrigated_field_unit_1)
+    (farm_site_manages_irrigated_unit farm_site_2 irrigated_field_unit_1)
+    (farm_site_manages_rainfed_unit farm_site_1 rainfed_field_unit_1)
+    (farm_site_manages_rainfed_unit farm_site_2 rainfed_field_unit_1)
+    (farm_site_has_package farm_site_1 allocation_package_1)
+    (farm_site_has_package farm_site_2 allocation_package_1)
+    (farm_site_has_storage_container farm_site_1 storage_container_1)
+    (farm_site_has_storage_container farm_site_2 storage_container_2)
+    (compliance_certificate_available compliance_certificate_1)
+    (compliance_certificate_available compliance_certificate_2)
+    (logistics_team_available logistics_team_1)
+    (logistics_team_available logistics_team_2)
+    (contingency_reserve_available contingency_reserve_unit_1)
+    (agronomist_available agronomist_assignment_1)
+    (insurance_policy_available insurance_policy_1)
+    (farm_site_has_insurance_policy farm_site_1 insurance_policy_1)
+    (farm_site_has_insurance_policy farm_site_2 insurance_policy_2)
+    (contingency_reserve_variant_available contingency_reserve_variant_1)
+  )
+  (:goal
+    (and
+      (unit_allocation_confirmed irrigated_field_unit_1)
+      (unit_allocation_confirmed rainfed_field_unit_1)
+      (unit_allocation_confirmed farm_site_1)
+      (unit_allocation_confirmed farm_site_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_plot_request irrigated_field_unit_1)
+(assign_seed_batch_to_request irrigated_field_unit_1 seed_batch_1)
+(assign_seed_variety_to_request irrigated_field_unit_1 seed_variety_1)
+(approve_variety_assignment irrigated_field_unit_1 seed_variety_1)
+(apply_fertilizer_to_irrigated_unit irrigated_field_unit_1 allocation_window_irrigated_1 fertilizer_batch_1)
+(complete_irrigated_unit_preparation irrigated_field_unit_1 allocation_window_irrigated_1 seed_variety_1 fertilizer_batch_1)
+(unassign_seed_variety_from_request irrigated_field_unit_1 seed_variety_1)
+(register_plot_request rainfed_field_unit_1)
+(assign_seed_batch_to_request rainfed_field_unit_1 seed_batch_2)
+(assign_seed_variety_to_request rainfed_field_unit_1 seed_variety_1)
+(approve_variety_assignment rainfed_field_unit_1 seed_variety_1)
+(apply_fertilizer_to_rainfed_unit rainfed_field_unit_1 allocation_window_rainfed_1 fertilizer_batch_1)
+(assemble_secondary_allocation_package irrigated_field_unit_1 rainfed_field_unit_1 allocation_window_irrigated_1 allocation_window_rainfed_1 allocation_package_1)
+(unassign_seed_variety_from_request rainfed_field_unit_1 seed_variety_1)
+(assign_seed_variety_to_request irrigated_field_unit_1 seed_variety_1)
+(inspect_allocation_package allocation_package_1 irrigated_field_unit_1 seed_variety_1)
+(unassign_seed_variety_from_request irrigated_field_unit_1 seed_variety_1)
+(assign_seed_variety_to_request rainfed_field_unit_1 seed_variety_1)
+(complete_rainfed_unit_preparation rainfed_field_unit_1 allocation_window_rainfed_1 seed_variety_1 fertilizer_batch_1)
+(confirm_irrigated_unit_dispatch irrigated_field_unit_1 allocation_package_1)
+(confirm_rainfed_unit_dispatch rainfed_field_unit_1 allocation_package_1)
+(unassign_seed_variety_from_request rainfed_field_unit_1 seed_variety_1)
+(assign_seed_variety_to_request irrigated_field_unit_1 seed_variety_1)
+(assign_contingency_reserve_to_request irrigated_field_unit_1 contingency_reserve_unit_1 seed_variety_1)
+(confirm_irrigated_unit_allocation_and_release_seed_batch irrigated_field_unit_1 seed_batch_1 contingency_reserve_unit_1)
+(unassign_seed_variety_from_request irrigated_field_unit_1 seed_variety_1)
+(assign_seed_variety_to_request rainfed_field_unit_1 seed_variety_1)
+(assign_contingency_reserve_to_request rainfed_field_unit_1 contingency_reserve_unit_1 seed_variety_1)
+(confirm_rainfed_unit_allocation_and_release_seed_batch rainfed_field_unit_1 seed_batch_2 contingency_reserve_unit_1)
+(unassign_seed_variety_from_request rainfed_field_unit_1 seed_variety_1)
+(register_plot_request farm_site_1)
+(assign_seed_batch_to_request farm_site_1 seed_batch_3)
+(assign_seed_variety_to_request farm_site_1 seed_variety_1)
+(approve_variety_assignment farm_site_1 seed_variety_1)
+(assign_machinery_to_request farm_site_1 planter_unit_1)
+(stage_package_in_storage_container farm_site_1 storage_container_1 allocation_package_1)
+(bind_site_to_container_for_inspection farm_site_1 storage_container_1 allocation_package_1 seed_variety_1)
+(assign_agronomist_to_site farm_site_1 agronomist_assignment_1)
+(perform_agronomist_inspection_secondary farm_site_1 agronomist_assignment_1 planter_unit_1 storage_container_1 allocation_package_1)
+(assign_contingency_variant_to_site farm_site_1 contingency_reserve_variant_1)
+(finalize_inspection_and_mark_logistics_ready_alt farm_site_1 contingency_reserve_variant_1 storage_container_1 allocation_package_1)
+(assign_logistics_team_to_site farm_site_1 logistics_team_1)
+(confirm_site_dispatch_readiness farm_site_1 irrigated_field_unit_1 rainfed_field_unit_1 seed_variety_1 logistics_team_1)
+(finalize_site_after_dispatch_preparation farm_site_1)
+(release_machinery_from_request farm_site_1 planter_unit_1)
+(release_agronomist_from_site farm_site_1 agronomist_assignment_1)
+(release_contingency_variant_from_site farm_site_1 contingency_reserve_variant_1)
+(assign_contingency_reserve_to_request farm_site_1 contingency_reserve_unit_1 seed_variety_1)
+(confirm_site_allocation_and_release_seed_batch farm_site_1 seed_batch_3 contingency_reserve_unit_1)
+(unassign_seed_variety_from_request farm_site_1 seed_variety_1)
+(register_plot_request farm_site_2)
+(assign_seed_batch_to_request farm_site_2 seed_batch_1)
+(assign_seed_variety_to_request farm_site_2 seed_variety_1)
+(approve_variety_assignment farm_site_2 seed_variety_1)
+(assign_machinery_to_request farm_site_2 planter_unit_1)
+(stage_package_in_storage_container farm_site_2 storage_container_2 allocation_package_1)
+(bind_site_to_container_for_inspection farm_site_2 storage_container_2 allocation_package_1 seed_variety_1)
+(assign_agronomist_to_site farm_site_2 agronomist_assignment_1)
+(perform_agronomist_inspection_secondary farm_site_2 agronomist_assignment_1 planter_unit_1 storage_container_2 allocation_package_1)
+(assign_contingency_variant_to_site farm_site_2 contingency_reserve_variant_1)
+(finalize_inspection_and_mark_logistics_ready_alt farm_site_2 contingency_reserve_variant_1 storage_container_2 allocation_package_1)
+(assign_logistics_team_to_site farm_site_2 logistics_team_2)
+(confirm_site_dispatch_readiness farm_site_2 irrigated_field_unit_1 rainfed_field_unit_1 seed_variety_1 logistics_team_2)
+(finalize_site_after_dispatch_preparation farm_site_2)
+(assign_contingency_reserve_to_request farm_site_2 contingency_reserve_unit_1 seed_variety_1)
+(confirm_site_allocation_and_release_seed_batch farm_site_2 seed_batch_1 contingency_reserve_unit_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_h1ps56x1/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 66 
+
+Successful plans:
+Value: 66
+ /tmp/val_h1ps56x1/plan.pddl 66 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,1065 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_split_stay_reservation_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object service_entity - domain_object option_entity - domain_object confirmation_entity - domain_object request_type - domain_object split_stay_request - request_type supplier_offer - service_entity rate_option - service_entity booking_channel - service_entity rate_plan - service_entity occupancy_profile - service_entity payment_method - service_entity supplementary_service_type - service_entity promotion_code - service_entity ancillary_service - option_entity payment_voucher - option_entity special_request - option_entity confirmation_a - confirmation_entity confirmation_b - confirmation_entity supplier_booking_record - confirmation_entity stay_segment_type - split_stay_request master_booking_type - split_stay_request stay_segment_a - stay_segment_type stay_segment_b - stay_segment_type master_booking - master_booking_type)
+
+  (:predicates
+    (booking_created ?split_stay_request - split_stay_request)
+    (booking_committed ?split_stay_request - split_stay_request)
+    (offer_selected ?split_stay_request - split_stay_request)
+    (booking_confirmed_with_supplier ?split_stay_request - split_stay_request)
+    (ready_for_payment ?split_stay_request - split_stay_request)
+    (payment_captured ?split_stay_request - split_stay_request)
+    (supplier_offer_available ?supplier_offer - supplier_offer)
+    (booking_selected_offer ?split_stay_request - split_stay_request ?supplier_offer - supplier_offer)
+    (rate_option_available ?rate_option - rate_option)
+    (booking_rate_option ?split_stay_request - split_stay_request ?rate_option - rate_option)
+    (booking_channel_available ?booking_channel - booking_channel)
+    (booking_channel_assigned ?split_stay_request - split_stay_request ?booking_channel - booking_channel)
+    (ancillary_available ?ancillary_service - ancillary_service)
+    (segment_a_has_ancillary ?stay_segment_a - stay_segment_a ?ancillary_service - ancillary_service)
+    (segment_b_has_ancillary ?stay_segment_b - stay_segment_b ?ancillary_service - ancillary_service)
+    (segment_a_confirmation_link ?stay_segment_a - stay_segment_a ?confirmation_a - confirmation_a)
+    (confirmation_a_received ?confirmation_a - confirmation_a)
+    (confirmation_a_ancillary_pending ?confirmation_a - confirmation_a)
+    (segment_a_confirmed ?stay_segment_a - stay_segment_a)
+    (segment_b_confirmation_link ?stay_segment_b - stay_segment_b ?confirmation_b - confirmation_b)
+    (confirmation_b_received ?confirmation_b - confirmation_b)
+    (confirmation_b_ancillary_pending ?confirmation_b - confirmation_b)
+    (segment_b_confirmed ?stay_segment_b - stay_segment_b)
+    (supplier_booking_slot_available ?supplier_booking - supplier_booking_record)
+    (supplier_booking_created ?supplier_booking - supplier_booking_record)
+    (supplier_booking_linked_confirmation_a ?supplier_booking - supplier_booking_record ?confirmation_a - confirmation_a)
+    (supplier_booking_linked_confirmation_b ?supplier_booking - supplier_booking_record ?confirmation_b - confirmation_b)
+    (supplier_booking_requires_ack_a ?supplier_booking - supplier_booking_record)
+    (supplier_booking_requires_ack_b ?supplier_booking - supplier_booking_record)
+    (supplier_booking_acknowledged ?supplier_booking - supplier_booking_record)
+    (master_booking_includes_segment_a ?master_booking - master_booking ?stay_segment_a - stay_segment_a)
+    (master_booking_includes_segment_b ?master_booking - master_booking ?stay_segment_b - stay_segment_b)
+    (master_booking_includes_supplier_booking ?master_booking - master_booking ?supplier_booking - supplier_booking_record)
+    (payment_voucher_available ?payment_voucher - payment_voucher)
+    (master_booking_has_payment_voucher ?master_booking - master_booking ?payment_voucher - payment_voucher)
+    (payment_voucher_assigned ?payment_voucher - payment_voucher)
+    (payment_voucher_linked_to_supplier_booking ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    (master_booking_payment_linked ?master_booking - master_booking)
+    (master_booking_service_attached ?master_booking - master_booking)
+    (master_booking_ready_for_finalization ?master_booking - master_booking)
+    (rate_plan_attached_flag ?master_booking - master_booking)
+    (master_booking_rate_plan_applied ?master_booking - master_booking)
+    (master_booking_enrichment_completed ?master_booking - master_booking)
+    (master_booking_finalization_locked ?master_booking - master_booking)
+    (special_request_available ?special_request - special_request)
+    (master_booking_has_special_request ?master_booking - master_booking ?special_request - special_request)
+    (special_request_requested ?master_booking - master_booking)
+    (special_request_assigned ?master_booking - master_booking)
+    (special_request_finalized ?master_booking - master_booking)
+    (rate_plan_available ?rate_plan - rate_plan)
+    (master_booking_rate_plan ?master_booking - master_booking ?rate_plan - rate_plan)
+    (occupancy_profile_available ?occupancy_profile - occupancy_profile)
+    (master_booking_occupancy_profile ?master_booking - master_booking ?occupancy_profile - occupancy_profile)
+    (supplementary_service_type_available ?supplementary_service_type - supplementary_service_type)
+    (master_booking_supplementary_service ?master_booking - master_booking ?supplementary_service_type - supplementary_service_type)
+    (promotion_code_available ?promotion_code - promotion_code)
+    (master_booking_promotion_code ?master_booking - master_booking ?promotion_code - promotion_code)
+    (payment_method_available ?payment_method - payment_method)
+    (booking_payment_method ?split_stay_request - split_stay_request ?payment_method - payment_method)
+    (segment_a_channel_hold ?stay_segment_a - stay_segment_a)
+    (segment_b_channel_hold ?stay_segment_b - stay_segment_b)
+    (master_booking_marked_complete ?master_booking - master_booking)
+  )
+  (:action create_split_stay_request
+    :parameters (?split_stay_request - split_stay_request)
+    :precondition
+      (and
+        (not
+          (booking_created ?split_stay_request)
+        )
+        (not
+          (booking_confirmed_with_supplier ?split_stay_request)
+        )
+      )
+    :effect (booking_created ?split_stay_request)
+  )
+  (:action select_supplier_offer
+    :parameters (?split_stay_request - split_stay_request ?supplier_offer - supplier_offer)
+    :precondition
+      (and
+        (booking_created ?split_stay_request)
+        (not
+          (offer_selected ?split_stay_request)
+        )
+        (supplier_offer_available ?supplier_offer)
+      )
+    :effect
+      (and
+        (offer_selected ?split_stay_request)
+        (booking_selected_offer ?split_stay_request ?supplier_offer)
+        (not
+          (supplier_offer_available ?supplier_offer)
+        )
+      )
+  )
+  (:action attach_rate_option
+    :parameters (?split_stay_request - split_stay_request ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_created ?split_stay_request)
+        (offer_selected ?split_stay_request)
+        (rate_option_available ?rate_option)
+      )
+    :effect
+      (and
+        (booking_rate_option ?split_stay_request ?rate_option)
+        (not
+          (rate_option_available ?rate_option)
+        )
+      )
+  )
+  (:action confirm_request_selection
+    :parameters (?split_stay_request - split_stay_request ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_created ?split_stay_request)
+        (offer_selected ?split_stay_request)
+        (booking_rate_option ?split_stay_request ?rate_option)
+        (not
+          (booking_committed ?split_stay_request)
+        )
+      )
+    :effect (booking_committed ?split_stay_request)
+  )
+  (:action release_rate_option
+    :parameters (?split_stay_request - split_stay_request ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_rate_option ?split_stay_request ?rate_option)
+      )
+    :effect
+      (and
+        (rate_option_available ?rate_option)
+        (not
+          (booking_rate_option ?split_stay_request ?rate_option)
+        )
+      )
+  )
+  (:action assign_booking_channel
+    :parameters (?split_stay_request - split_stay_request ?booking_channel - booking_channel)
+    :precondition
+      (and
+        (booking_committed ?split_stay_request)
+        (booking_channel_available ?booking_channel)
+      )
+    :effect
+      (and
+        (booking_channel_assigned ?split_stay_request ?booking_channel)
+        (not
+          (booking_channel_available ?booking_channel)
+        )
+      )
+  )
+  (:action release_booking_channel
+    :parameters (?split_stay_request - split_stay_request ?booking_channel - booking_channel)
+    :precondition
+      (and
+        (booking_channel_assigned ?split_stay_request ?booking_channel)
+      )
+    :effect
+      (and
+        (booking_channel_available ?booking_channel)
+        (not
+          (booking_channel_assigned ?split_stay_request ?booking_channel)
+        )
+      )
+  )
+  (:action attach_supplementary_service_type_to_master_booking
+    :parameters (?master_booking - master_booking ?supplementary_service_type - supplementary_service_type)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (supplementary_service_type_available ?supplementary_service_type)
+      )
+    :effect
+      (and
+        (master_booking_supplementary_service ?master_booking ?supplementary_service_type)
+        (not
+          (supplementary_service_type_available ?supplementary_service_type)
+        )
+      )
+  )
+  (:action detach_supplementary_service_type_from_master_booking
+    :parameters (?master_booking - master_booking ?supplementary_service_type - supplementary_service_type)
+    :precondition
+      (and
+        (master_booking_supplementary_service ?master_booking ?supplementary_service_type)
+      )
+    :effect
+      (and
+        (supplementary_service_type_available ?supplementary_service_type)
+        (not
+          (master_booking_supplementary_service ?master_booking ?supplementary_service_type)
+        )
+      )
+  )
+  (:action attach_promotion_code_to_master_booking
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (promotion_code_available ?promotion_code)
+      )
+    :effect
+      (and
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (not
+          (promotion_code_available ?promotion_code)
+        )
+      )
+  )
+  (:action detach_promotion_code_from_master_booking
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code)
+    :precondition
+      (and
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+      )
+    :effect
+      (and
+        (promotion_code_available ?promotion_code)
+        (not
+          (master_booking_promotion_code ?master_booking ?promotion_code)
+        )
+      )
+  )
+  (:action retrieve_confirmation_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?confirmation_a - confirmation_a ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_a)
+        (booking_rate_option ?stay_segment_a ?rate_option)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (not
+          (confirmation_a_received ?confirmation_a)
+        )
+        (not
+          (confirmation_a_ancillary_pending ?confirmation_a)
+        )
+      )
+    :effect (confirmation_a_received ?confirmation_a)
+  )
+  (:action acknowledge_confirmation_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?confirmation_a - confirmation_a ?booking_channel - booking_channel)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_a)
+        (booking_channel_assigned ?stay_segment_a ?booking_channel)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (confirmation_a_received ?confirmation_a)
+        (not
+          (segment_a_channel_hold ?stay_segment_a)
+        )
+      )
+    :effect
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_a_confirmed ?stay_segment_a)
+      )
+  )
+  (:action attach_ancillary_to_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?confirmation_a - confirmation_a ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_a)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (ancillary_available ?ancillary_service)
+        (not
+          (segment_a_channel_hold ?stay_segment_a)
+        )
+      )
+    :effect
+      (and
+        (confirmation_a_ancillary_pending ?confirmation_a)
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_a_has_ancillary ?stay_segment_a ?ancillary_service)
+        (not
+          (ancillary_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_ancillary_attachment_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?confirmation_a - confirmation_a ?rate_option - rate_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_a)
+        (booking_rate_option ?stay_segment_a ?rate_option)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (confirmation_a_ancillary_pending ?confirmation_a)
+        (segment_a_has_ancillary ?stay_segment_a ?ancillary_service)
+        (not
+          (segment_a_confirmed ?stay_segment_a)
+        )
+      )
+    :effect
+      (and
+        (confirmation_a_received ?confirmation_a)
+        (segment_a_confirmed ?stay_segment_a)
+        (ancillary_available ?ancillary_service)
+        (not
+          (segment_a_has_ancillary ?stay_segment_a ?ancillary_service)
+        )
+      )
+  )
+  (:action retrieve_confirmation_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?confirmation_b - confirmation_b ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_b)
+        (booking_rate_option ?stay_segment_b ?rate_option)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (not
+          (confirmation_b_received ?confirmation_b)
+        )
+        (not
+          (confirmation_b_ancillary_pending ?confirmation_b)
+        )
+      )
+    :effect (confirmation_b_received ?confirmation_b)
+  )
+  (:action acknowledge_confirmation_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?confirmation_b - confirmation_b ?booking_channel - booking_channel)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_b)
+        (booking_channel_assigned ?stay_segment_b ?booking_channel)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_b_received ?confirmation_b)
+        (not
+          (segment_b_channel_hold ?stay_segment_b)
+        )
+      )
+    :effect
+      (and
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_b_confirmed ?stay_segment_b)
+      )
+  )
+  (:action attach_ancillary_to_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?confirmation_b - confirmation_b ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_b)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (ancillary_available ?ancillary_service)
+        (not
+          (segment_b_channel_hold ?stay_segment_b)
+        )
+      )
+    :effect
+      (and
+        (confirmation_b_ancillary_pending ?confirmation_b)
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_b_has_ancillary ?stay_segment_b ?ancillary_service)
+        (not
+          (ancillary_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_ancillary_attachment_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?confirmation_b - confirmation_b ?rate_option - rate_option ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (booking_committed ?stay_segment_b)
+        (booking_rate_option ?stay_segment_b ?rate_option)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_b_ancillary_pending ?confirmation_b)
+        (segment_b_has_ancillary ?stay_segment_b ?ancillary_service)
+        (not
+          (segment_b_confirmed ?stay_segment_b)
+        )
+      )
+    :effect
+      (and
+        (confirmation_b_received ?confirmation_b)
+        (segment_b_confirmed ?stay_segment_b)
+        (ancillary_available ?ancillary_service)
+        (not
+          (segment_b_has_ancillary ?stay_segment_b ?ancillary_service)
+        )
+      )
+  )
+  (:action create_supplier_booking_record_standard
+    :parameters (?stay_segment_a - stay_segment_a ?stay_segment_b - stay_segment_b ?confirmation_a - confirmation_a ?confirmation_b - confirmation_b ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_a_received ?confirmation_a)
+        (confirmation_b_received ?confirmation_b)
+        (segment_a_confirmed ?stay_segment_a)
+        (segment_b_confirmed ?stay_segment_b)
+        (supplier_booking_slot_available ?supplier_booking)
+      )
+    :effect
+      (and
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_linked_confirmation_a ?supplier_booking ?confirmation_a)
+        (supplier_booking_linked_confirmation_b ?supplier_booking ?confirmation_b)
+        (not
+          (supplier_booking_slot_available ?supplier_booking)
+        )
+      )
+  )
+  (:action create_supplier_booking_with_confirmation_a_pending
+    :parameters (?stay_segment_a - stay_segment_a ?stay_segment_b - stay_segment_b ?confirmation_a - confirmation_a ?confirmation_b - confirmation_b ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_a_ancillary_pending ?confirmation_a)
+        (confirmation_b_received ?confirmation_b)
+        (not
+          (segment_a_confirmed ?stay_segment_a)
+        )
+        (segment_b_confirmed ?stay_segment_b)
+        (supplier_booking_slot_available ?supplier_booking)
+      )
+    :effect
+      (and
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_linked_confirmation_a ?supplier_booking ?confirmation_a)
+        (supplier_booking_linked_confirmation_b ?supplier_booking ?confirmation_b)
+        (supplier_booking_requires_ack_a ?supplier_booking)
+        (not
+          (supplier_booking_slot_available ?supplier_booking)
+        )
+      )
+  )
+  (:action create_supplier_booking_with_confirmation_b_pending
+    :parameters (?stay_segment_a - stay_segment_a ?stay_segment_b - stay_segment_b ?confirmation_a - confirmation_a ?confirmation_b - confirmation_b ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_a_received ?confirmation_a)
+        (confirmation_b_ancillary_pending ?confirmation_b)
+        (segment_a_confirmed ?stay_segment_a)
+        (not
+          (segment_b_confirmed ?stay_segment_b)
+        )
+        (supplier_booking_slot_available ?supplier_booking)
+      )
+    :effect
+      (and
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_linked_confirmation_a ?supplier_booking ?confirmation_a)
+        (supplier_booking_linked_confirmation_b ?supplier_booking ?confirmation_b)
+        (supplier_booking_requires_ack_b ?supplier_booking)
+        (not
+          (supplier_booking_slot_available ?supplier_booking)
+        )
+      )
+  )
+  (:action create_supplier_booking_with_both_confirmations_pending
+    :parameters (?stay_segment_a - stay_segment_a ?stay_segment_b - stay_segment_b ?confirmation_a - confirmation_a ?confirmation_b - confirmation_b ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_a_confirmation_link ?stay_segment_a ?confirmation_a)
+        (segment_b_confirmation_link ?stay_segment_b ?confirmation_b)
+        (confirmation_a_ancillary_pending ?confirmation_a)
+        (confirmation_b_ancillary_pending ?confirmation_b)
+        (not
+          (segment_a_confirmed ?stay_segment_a)
+        )
+        (not
+          (segment_b_confirmed ?stay_segment_b)
+        )
+        (supplier_booking_slot_available ?supplier_booking)
+      )
+    :effect
+      (and
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_linked_confirmation_a ?supplier_booking ?confirmation_a)
+        (supplier_booking_linked_confirmation_b ?supplier_booking ?confirmation_b)
+        (supplier_booking_requires_ack_a ?supplier_booking)
+        (supplier_booking_requires_ack_b ?supplier_booking)
+        (not
+          (supplier_booking_slot_available ?supplier_booking)
+        )
+      )
+  )
+  (:action acknowledge_supplier_booking
+    :parameters (?supplier_booking - supplier_booking_record ?stay_segment_a - stay_segment_a ?rate_option - rate_option)
+    :precondition
+      (and
+        (supplier_booking_created ?supplier_booking)
+        (segment_a_channel_hold ?stay_segment_a)
+        (booking_rate_option ?stay_segment_a ?rate_option)
+        (not
+          (supplier_booking_acknowledged ?supplier_booking)
+        )
+      )
+    :effect (supplier_booking_acknowledged ?supplier_booking)
+  )
+  (:action assign_payment_voucher_to_supplier_booking
+    :parameters (?master_booking - master_booking ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (master_booking_includes_supplier_booking ?master_booking ?supplier_booking)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_available ?payment_voucher)
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_acknowledged ?supplier_booking)
+        (not
+          (payment_voucher_assigned ?payment_voucher)
+        )
+      )
+    :effect
+      (and
+        (payment_voucher_assigned ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (not
+          (payment_voucher_available ?payment_voucher)
+        )
+      )
+  )
+  (:action finalize_master_booking_payment_link
+    :parameters (?master_booking - master_booking ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_assigned ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (booking_rate_option ?master_booking ?rate_option)
+        (not
+          (supplier_booking_requires_ack_a ?supplier_booking)
+        )
+        (not
+          (master_booking_payment_linked ?master_booking)
+        )
+      )
+    :effect (master_booking_payment_linked ?master_booking)
+  )
+  (:action attach_rate_plan_to_master_booking
+    :parameters (?master_booking - master_booking ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (rate_plan_available ?rate_plan)
+        (not
+          (rate_plan_attached_flag ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (rate_plan_attached_flag ?master_booking)
+        (master_booking_rate_plan ?master_booking ?rate_plan)
+        (not
+          (rate_plan_available ?rate_plan)
+        )
+      )
+  )
+  (:action apply_rate_plan_and_prepare_master_booking
+    :parameters (?master_booking - master_booking ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record ?rate_option - rate_option ?rate_plan - rate_plan)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_assigned ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (booking_rate_option ?master_booking ?rate_option)
+        (supplier_booking_requires_ack_a ?supplier_booking)
+        (rate_plan_attached_flag ?master_booking)
+        (master_booking_rate_plan ?master_booking ?rate_plan)
+        (not
+          (master_booking_payment_linked ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_payment_linked ?master_booking)
+        (master_booking_rate_plan_applied ?master_booking)
+      )
+  )
+  (:action attach_supplementary_service_type_initial
+    :parameters (?master_booking - master_booking ?supplementary_service_type - supplementary_service_type ?booking_channel - booking_channel ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_payment_linked ?master_booking)
+        (master_booking_supplementary_service ?master_booking ?supplementary_service_type)
+        (booking_channel_assigned ?master_booking ?booking_channel)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (not
+          (supplier_booking_requires_ack_b ?supplier_booking)
+        )
+        (not
+          (master_booking_service_attached ?master_booking)
+        )
+      )
+    :effect (master_booking_service_attached ?master_booking)
+  )
+  (:action attach_supplementary_service_type_confirmed
+    :parameters (?master_booking - master_booking ?supplementary_service_type - supplementary_service_type ?booking_channel - booking_channel ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_payment_linked ?master_booking)
+        (master_booking_supplementary_service ?master_booking ?supplementary_service_type)
+        (booking_channel_assigned ?master_booking ?booking_channel)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (supplier_booking_requires_ack_b ?supplier_booking)
+        (not
+          (master_booking_service_attached ?master_booking)
+        )
+      )
+    :effect (master_booking_service_attached ?master_booking)
+  )
+  (:action enable_master_booking_promotion_initial
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_service_attached ?master_booking)
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (not
+          (supplier_booking_requires_ack_a ?supplier_booking)
+        )
+        (not
+          (supplier_booking_requires_ack_b ?supplier_booking)
+        )
+        (not
+          (master_booking_ready_for_finalization ?master_booking)
+        )
+      )
+    :effect (master_booking_ready_for_finalization ?master_booking)
+  )
+  (:action enable_master_booking_promotion_and_flag
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_service_attached ?master_booking)
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (supplier_booking_requires_ack_a ?supplier_booking)
+        (not
+          (supplier_booking_requires_ack_b ?supplier_booking)
+        )
+        (not
+          (master_booking_ready_for_finalization ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_enrichment_completed ?master_booking)
+      )
+  )
+  (:action enable_master_booking_promotion_alternate
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_service_attached ?master_booking)
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (not
+          (supplier_booking_requires_ack_a ?supplier_booking)
+        )
+        (supplier_booking_requires_ack_b ?supplier_booking)
+        (not
+          (master_booking_ready_for_finalization ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_enrichment_completed ?master_booking)
+      )
+  )
+  (:action enable_master_booking_promotion_finalize
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code ?payment_voucher - payment_voucher ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (master_booking_service_attached ?master_booking)
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (master_booking_has_payment_voucher ?master_booking ?payment_voucher)
+        (payment_voucher_linked_to_supplier_booking ?payment_voucher ?supplier_booking)
+        (supplier_booking_requires_ack_a ?supplier_booking)
+        (supplier_booking_requires_ack_b ?supplier_booking)
+        (not
+          (master_booking_ready_for_finalization ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_enrichment_completed ?master_booking)
+      )
+  )
+  (:action prepare_master_booking_for_finalization
+    :parameters (?master_booking - master_booking)
+    :precondition
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (not
+          (master_booking_enrichment_completed ?master_booking)
+        )
+        (not
+          (master_booking_marked_complete ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_marked_complete ?master_booking)
+        (ready_for_payment ?master_booking)
+      )
+  )
+  (:action attach_occupancy_profile_to_master_booking
+    :parameters (?master_booking - master_booking ?occupancy_profile - occupancy_profile)
+    :precondition
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_enrichment_completed ?master_booking)
+        (occupancy_profile_available ?occupancy_profile)
+      )
+    :effect
+      (and
+        (master_booking_occupancy_profile ?master_booking ?occupancy_profile)
+        (not
+          (occupancy_profile_available ?occupancy_profile)
+        )
+      )
+  )
+  (:action lock_master_booking_for_submission
+    :parameters (?master_booking - master_booking ?stay_segment_a - stay_segment_a ?stay_segment_b - stay_segment_b ?rate_option - rate_option ?occupancy_profile - occupancy_profile)
+    :precondition
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_enrichment_completed ?master_booking)
+        (master_booking_occupancy_profile ?master_booking ?occupancy_profile)
+        (master_booking_includes_segment_a ?master_booking ?stay_segment_a)
+        (master_booking_includes_segment_b ?master_booking ?stay_segment_b)
+        (segment_a_confirmed ?stay_segment_a)
+        (segment_b_confirmed ?stay_segment_b)
+        (booking_rate_option ?master_booking ?rate_option)
+        (not
+          (master_booking_finalization_locked ?master_booking)
+        )
+      )
+    :effect (master_booking_finalization_locked ?master_booking)
+  )
+  (:action complete_master_booking_finalization
+    :parameters (?master_booking - master_booking)
+    :precondition
+      (and
+        (master_booking_ready_for_finalization ?master_booking)
+        (master_booking_finalization_locked ?master_booking)
+        (not
+          (master_booking_marked_complete ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_marked_complete ?master_booking)
+        (ready_for_payment ?master_booking)
+      )
+  )
+  (:action attach_special_request_to_master_booking
+    :parameters (?master_booking - master_booking ?special_request - special_request ?rate_option - rate_option)
+    :precondition
+      (and
+        (booking_committed ?master_booking)
+        (booking_rate_option ?master_booking ?rate_option)
+        (special_request_available ?special_request)
+        (master_booking_has_special_request ?master_booking ?special_request)
+        (not
+          (special_request_requested ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (special_request_requested ?master_booking)
+        (not
+          (special_request_available ?special_request)
+        )
+      )
+  )
+  (:action assign_special_request_channel
+    :parameters (?master_booking - master_booking ?booking_channel - booking_channel)
+    :precondition
+      (and
+        (special_request_requested ?master_booking)
+        (booking_channel_assigned ?master_booking ?booking_channel)
+        (not
+          (special_request_assigned ?master_booking)
+        )
+      )
+    :effect (special_request_assigned ?master_booking)
+  )
+  (:action submit_special_request_to_channel
+    :parameters (?master_booking - master_booking ?promotion_code - promotion_code)
+    :precondition
+      (and
+        (special_request_assigned ?master_booking)
+        (master_booking_promotion_code ?master_booking ?promotion_code)
+        (not
+          (special_request_finalized ?master_booking)
+        )
+      )
+    :effect (special_request_finalized ?master_booking)
+  )
+  (:action finalize_special_request
+    :parameters (?master_booking - master_booking)
+    :precondition
+      (and
+        (special_request_finalized ?master_booking)
+        (not
+          (master_booking_marked_complete ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (master_booking_marked_complete ?master_booking)
+        (ready_for_payment ?master_booking)
+      )
+  )
+  (:action finalize_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_a_channel_hold ?stay_segment_a)
+        (segment_a_confirmed ?stay_segment_a)
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_acknowledged ?supplier_booking)
+        (not
+          (ready_for_payment ?stay_segment_a)
+        )
+      )
+    :effect (ready_for_payment ?stay_segment_a)
+  )
+  (:action finalize_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?supplier_booking - supplier_booking_record)
+    :precondition
+      (and
+        (segment_b_channel_hold ?stay_segment_b)
+        (segment_b_confirmed ?stay_segment_b)
+        (supplier_booking_created ?supplier_booking)
+        (supplier_booking_acknowledged ?supplier_booking)
+        (not
+          (ready_for_payment ?stay_segment_b)
+        )
+      )
+    :effect (ready_for_payment ?stay_segment_b)
+  )
+  (:action capture_payment_for_request
+    :parameters (?split_stay_request - split_stay_request ?payment_method - payment_method ?rate_option - rate_option)
+    :precondition
+      (and
+        (ready_for_payment ?split_stay_request)
+        (booking_rate_option ?split_stay_request ?rate_option)
+        (payment_method_available ?payment_method)
+        (not
+          (payment_captured ?split_stay_request)
+        )
+      )
+    :effect
+      (and
+        (payment_captured ?split_stay_request)
+        (booking_payment_method ?split_stay_request ?payment_method)
+        (not
+          (payment_method_available ?payment_method)
+        )
+      )
+  )
+  (:action link_payment_and_confirm_supplier_offer_segment_a
+    :parameters (?stay_segment_a - stay_segment_a ?supplier_offer - supplier_offer ?payment_method - payment_method)
+    :precondition
+      (and
+        (payment_captured ?stay_segment_a)
+        (booking_selected_offer ?stay_segment_a ?supplier_offer)
+        (booking_payment_method ?stay_segment_a ?payment_method)
+        (not
+          (booking_confirmed_with_supplier ?stay_segment_a)
+        )
+      )
+    :effect
+      (and
+        (booking_confirmed_with_supplier ?stay_segment_a)
+        (supplier_offer_available ?supplier_offer)
+        (payment_method_available ?payment_method)
+      )
+  )
+  (:action link_payment_and_confirm_supplier_offer_segment_b
+    :parameters (?stay_segment_b - stay_segment_b ?supplier_offer - supplier_offer ?payment_method - payment_method)
+    :precondition
+      (and
+        (payment_captured ?stay_segment_b)
+        (booking_selected_offer ?stay_segment_b ?supplier_offer)
+        (booking_payment_method ?stay_segment_b ?payment_method)
+        (not
+          (booking_confirmed_with_supplier ?stay_segment_b)
+        )
+      )
+    :effect
+      (and
+        (booking_confirmed_with_supplier ?stay_segment_b)
+        (supplier_offer_available ?supplier_offer)
+        (payment_method_available ?payment_method)
+      )
+  )
+  (:action link_payment_and_confirm_supplier_offer_master_booking
+    :parameters (?master_booking - master_booking ?supplier_offer - supplier_offer ?payment_method - payment_method)
+    :precondition
+      (and
+        (payment_captured ?master_booking)
+        (booking_selected_offer ?master_booking ?supplier_offer)
+        (booking_payment_method ?master_booking ?payment_method)
+        (not
+          (booking_confirmed_with_supplier ?master_booking)
+        )
+      )
+    :effect
+      (and
+        (booking_confirmed_with_supplier ?master_booking)
+        (supplier_offer_available ?supplier_offer)
+        (payment_method_available ?payment_method)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem split_stay_booking_scenario)
+  (:domain tourism_split_stay_reservation_coordination)
+  (:objects stay_segment_a_1 - stay_segment_a stay_segment_b_1 - stay_segment_b master_booking_1 - master_booking master_booking_2 - master_booking supplier_offer_alpha - supplier_offer supplier_offer_beta - supplier_offer supplier_offer_gamma - supplier_offer rate_option_standard - rate_option booking_channel_api - booking_channel breakfast_service - ancillary_service confirmation_token_a1 - confirmation_a confirmation_token_b1 - confirmation_b supplier_booking_record_1 - supplier_booking_record payment_voucher_1 - payment_voucher payment_voucher_2 - payment_voucher rate_plan_standard - rate_plan rate_plan_promo - rate_plan occupancy_profile_double - occupancy_profile occupancy_profile_single - occupancy_profile payment_method_card - payment_method supplementary_service_breakfast - supplementary_service_type special_request_accessibility - special_request special_request_late_arrival - special_request promotion_code_spring - promotion_code)
+  (:init
+    (supplier_offer_available supplier_offer_alpha)
+    (supplier_offer_available supplier_offer_beta)
+    (supplier_offer_available supplier_offer_gamma)
+    (rate_option_available rate_option_standard)
+    (booking_channel_available booking_channel_api)
+    (ancillary_available breakfast_service)
+    (segment_a_confirmation_link stay_segment_a_1 confirmation_token_a1)
+    (segment_b_confirmation_link stay_segment_b_1 confirmation_token_b1)
+    (supplier_booking_slot_available supplier_booking_record_1)
+    (payment_voucher_available payment_voucher_1)
+    (payment_voucher_available payment_voucher_2)
+    (master_booking_includes_segment_a master_booking_1 stay_segment_a_1)
+    (master_booking_includes_segment_a master_booking_2 stay_segment_a_1)
+    (master_booking_includes_segment_b master_booking_1 stay_segment_b_1)
+    (master_booking_includes_segment_b master_booking_2 stay_segment_b_1)
+    (master_booking_includes_supplier_booking master_booking_1 supplier_booking_record_1)
+    (master_booking_includes_supplier_booking master_booking_2 supplier_booking_record_1)
+    (master_booking_has_payment_voucher master_booking_1 payment_voucher_1)
+    (master_booking_has_payment_voucher master_booking_2 payment_voucher_2)
+    (rate_plan_available rate_plan_standard)
+    (rate_plan_available rate_plan_promo)
+    (occupancy_profile_available occupancy_profile_double)
+    (occupancy_profile_available occupancy_profile_single)
+    (payment_method_available payment_method_card)
+    (supplementary_service_type_available supplementary_service_breakfast)
+    (special_request_available special_request_accessibility)
+    (master_booking_has_special_request master_booking_1 special_request_accessibility)
+    (master_booking_has_special_request master_booking_2 special_request_late_arrival)
+    (promotion_code_available promotion_code_spring)
+  )
+  (:goal
+    (and
+      (booking_confirmed_with_supplier stay_segment_a_1)
+      (booking_confirmed_with_supplier stay_segment_b_1)
+      (booking_confirmed_with_supplier master_booking_1)
+      (booking_confirmed_with_supplier master_booking_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_split_stay_request stay_segment_a_1)
+(create_split_stay_request stay_segment_b_1)
+(create_split_stay_request master_booking_1)
+(create_split_stay_request master_booking_2)
+(select_supplier_offer stay_segment_a_1 supplier_offer_alpha)
+(attach_rate_option stay_segment_a_1 rate_option_standard)
+(confirm_request_selection stay_segment_a_1 rate_option_standard)
+(assign_booking_channel stay_segment_a_1 booking_channel_api)
+(retrieve_confirmation_segment_a stay_segment_a_1 confirmation_token_a1 rate_option_standard)
+(acknowledge_confirmation_segment_a stay_segment_a_1 confirmation_token_a1 booking_channel_api)
+(release_booking_channel stay_segment_a_1 booking_channel_api)
+(release_rate_option stay_segment_a_1 rate_option_standard)
+(select_supplier_offer stay_segment_b_1 supplier_offer_beta)
+(attach_rate_option stay_segment_b_1 rate_option_standard)
+(confirm_request_selection stay_segment_b_1 rate_option_standard)
+(assign_booking_channel stay_segment_b_1 booking_channel_api)
+(retrieve_confirmation_segment_b stay_segment_b_1 confirmation_token_b1 rate_option_standard)
+(acknowledge_confirmation_segment_b stay_segment_b_1 confirmation_token_b1 booking_channel_api)
+(release_booking_channel stay_segment_b_1 booking_channel_api)
+(release_rate_option stay_segment_b_1 rate_option_standard)
+(create_supplier_booking_record_standard stay_segment_a_1 stay_segment_b_1 confirmation_token_a1 confirmation_token_b1 supplier_booking_record_1)
+(attach_rate_option stay_segment_a_1 rate_option_standard)
+(acknowledge_supplier_booking supplier_booking_record_1 stay_segment_a_1 rate_option_standard)
+(finalize_segment_a stay_segment_a_1 supplier_booking_record_1)
+(finalize_segment_b stay_segment_b_1 supplier_booking_record_1)
+(capture_payment_for_request stay_segment_a_1 payment_method_card rate_option_standard)
+(link_payment_and_confirm_supplier_offer_segment_a stay_segment_a_1 supplier_offer_alpha payment_method_card)
+(release_rate_option stay_segment_a_1 rate_option_standard)
+(attach_rate_option stay_segment_b_1 rate_option_standard)
+(capture_payment_for_request stay_segment_b_1 payment_method_card rate_option_standard)
+(link_payment_and_confirm_supplier_offer_segment_b stay_segment_b_1 supplier_offer_beta payment_method_card)
+(select_supplier_offer master_booking_1 supplier_offer_gamma)
+(attach_rate_option master_booking_1 rate_option_standard)
+(confirm_request_selection master_booking_1 rate_option_standard)
+(assign_payment_voucher_to_supplier_booking master_booking_1 payment_voucher_1 supplier_booking_record_1)
+(finalize_master_booking_payment_link master_booking_1 payment_voucher_1 supplier_booking_record_1 rate_option_standard)
+(assign_booking_channel master_booking_1 booking_channel_api)
+(attach_supplementary_service_type_to_master_booking master_booking_1 supplementary_service_breakfast)
+(attach_supplementary_service_type_initial master_booking_1 supplementary_service_breakfast booking_channel_api payment_voucher_1 supplier_booking_record_1)
+(attach_promotion_code_to_master_booking master_booking_1 promotion_code_spring)
+(enable_master_booking_promotion_initial master_booking_1 promotion_code_spring payment_voucher_1 supplier_booking_record_1)
+(prepare_master_booking_for_finalization master_booking_1)
+(capture_payment_for_request master_booking_1 payment_method_card rate_option_standard)
+(link_payment_and_confirm_supplier_offer_master_booking master_booking_1 supplier_offer_gamma payment_method_card)
+(release_booking_channel master_booking_1 booking_channel_api)
+(detach_supplementary_service_type_from_master_booking master_booking_1 supplementary_service_breakfast)
+(detach_promotion_code_from_master_booking master_booking_1 promotion_code_spring)
+(release_rate_option master_booking_1 rate_option_standard)
+(select_supplier_offer master_booking_2 supplier_offer_alpha)
+(attach_rate_option master_booking_2 rate_option_standard)
+(confirm_request_selection master_booking_2 rate_option_standard)
+(assign_payment_voucher_to_supplier_booking master_booking_2 payment_voucher_2 supplier_booking_record_1)
+(finalize_master_booking_payment_link master_booking_2 payment_voucher_2 supplier_booking_record_1 rate_option_standard)
+(assign_booking_channel master_booking_2 booking_channel_api)
+(attach_supplementary_service_type_to_master_booking master_booking_2 supplementary_service_breakfast)
+(attach_supplementary_service_type_initial master_booking_2 supplementary_service_breakfast booking_channel_api payment_voucher_2 supplier_booking_record_1)
+(attach_promotion_code_to_master_booking master_booking_2 promotion_code_spring)
+(enable_master_booking_promotion_initial master_booking_2 promotion_code_spring payment_voucher_2 supplier_booking_record_1)
+(prepare_master_booking_for_finalization master_booking_2)
+(capture_payment_for_request master_booking_2 payment_method_card rate_option_standard)
+(link_payment_and_confirm_supplier_offer_master_booking master_booking_2 supplier_offer_alpha payment_method_card)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_1_gbuupn/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_1_gbuupn/plan.pddl 
+
+
+--- stderr ---
+

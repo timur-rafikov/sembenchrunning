@@ -1,0 +1,936 @@
+(define (domain education_tutoring_support_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_entity - object resource_pool - object schedule_pool - object case_category - object support_case - case_category tutor_resource - administrative_entity subject_area - administrative_entity scheduling_coordinator - administrative_entity priority_tag - administrative_entity session_time_slot_type - administrative_entity accommodation_type - administrative_entity assessment_instrument - administrative_entity specialist_consultant - administrative_entity learning_resource - resource_pool diagnostic_assessment - resource_pool external_referral_source - resource_pool need_category - schedule_pool support_modality - schedule_pool tutoring_opportunity - schedule_pool student_case_group - support_case advisor_group - support_case student_case - student_case_group peer_student_case - student_case_group advisor_record - advisor_group)
+  (:predicates
+    (case_intake_open ?support_case - support_case)
+    (case_scheduling_confirmed ?support_case - support_case)
+    (case_tutor_reserved ?support_case - support_case)
+    (support_allocated ?support_case - support_case)
+    (ready_for_student_acceptance ?support_case - support_case)
+    (student_accepted ?support_case - support_case)
+    (tutor_available ?tutor_resource - tutor_resource)
+    (case_assigned_tutor ?support_case - support_case ?tutor_resource - tutor_resource)
+    (subject_area_available ?subject_area - subject_area)
+    (case_assigned_subject ?support_case - support_case ?subject_area - subject_area)
+    (coordinator_available ?scheduling_coordinator - scheduling_coordinator)
+    (case_assigned_coordinator ?support_case - support_case ?scheduling_coordinator - scheduling_coordinator)
+    (learning_resource_available ?learning_resource - learning_resource)
+    (student_case_assigned_learning_resource ?student_case - student_case ?learning_resource - learning_resource)
+    (peer_student_case_assigned_learning_resource ?peer_student_case - peer_student_case ?learning_resource - learning_resource)
+    (student_case_linked_need_category ?student_case - student_case ?need_category - need_category)
+    (need_flag_active ?need_category - need_category)
+    (need_flag_resourced ?need_category - need_category)
+    (student_case_intervention_flag ?student_case - student_case)
+    (peer_student_case_linked_modality ?peer_student_case - peer_student_case ?support_modality - support_modality)
+    (modality_flag_active ?support_modality - support_modality)
+    (modality_flag_resourced ?support_modality - support_modality)
+    (peer_student_case_intervention_flag ?peer_student_case - peer_student_case)
+    (opportunity_draft ?tutoring_opportunity - tutoring_opportunity)
+    (opportunity_published ?tutoring_opportunity - tutoring_opportunity)
+    (opportunity_targets_need_category ?tutoring_opportunity - tutoring_opportunity ?need_category - need_category)
+    (opportunity_targets_modality ?tutoring_opportunity - tutoring_opportunity ?support_modality - support_modality)
+    (opportunity_requires_timeslot ?tutoring_opportunity - tutoring_opportunity)
+    (opportunity_requires_modality ?tutoring_opportunity - tutoring_opportunity)
+    (opportunity_ready ?tutoring_opportunity - tutoring_opportunity)
+    (advisor_linked_studentcase ?advisor_record - advisor_record ?student_case - student_case)
+    (advisor_linked_peercase ?advisor_record - advisor_record ?peer_student_case - peer_student_case)
+    (advisor_linked_opportunity ?advisor_record - advisor_record ?tutoring_opportunity - tutoring_opportunity)
+    (diagnostic_assessment_available ?diagnostic_assessment - diagnostic_assessment)
+    (advisor_has_assessment ?advisor_record - advisor_record ?diagnostic_assessment - diagnostic_assessment)
+    (diagnostic_assessment_allocated ?diagnostic_assessment - diagnostic_assessment)
+    (assessment_associated_with_opportunity ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    (advisor_ready_for_session ?advisor_record - advisor_record)
+    (advisor_session_confirmed ?advisor_record - advisor_record)
+    (advisor_ready_to_release ?advisor_record - advisor_record)
+    (advisor_has_priority_tag ?advisor_record - advisor_record)
+    (advisor_priority_condition_met ?advisor_record - advisor_record)
+    (advisor_has_timeslot_type ?advisor_record - advisor_record)
+    (advisor_approval_completed ?advisor_record - advisor_record)
+    (referral_source_available ?external_referral_source - external_referral_source)
+    (advisor_has_external_referral ?advisor_record - advisor_record ?external_referral_source - external_referral_source)
+    (advisor_external_referral_assigned ?advisor_record - advisor_record)
+    (advisor_referral_coordinator_confirmed ?advisor_record - advisor_record)
+    (advisor_referral_specialist_signedoff ?advisor_record - advisor_record)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (advisor_assigned_priority_tag ?advisor_record - advisor_record ?priority_tag - priority_tag)
+    (timeslot_type_available ?session_time_slot_type - session_time_slot_type)
+    (advisor_assigned_timeslot_type ?advisor_record - advisor_record ?session_time_slot_type - session_time_slot_type)
+    (assessment_instrument_available ?assessment_instrument - assessment_instrument)
+    (advisor_has_assessment_instrument ?advisor_record - advisor_record ?assessment_instrument - assessment_instrument)
+    (specialist_consultant_available ?specialist_consultant - specialist_consultant)
+    (advisor_has_specialist_consult ?advisor_record - advisor_record ?specialist_consultant - specialist_consultant)
+    (accommodation_available ?accommodation_type - accommodation_type)
+    (case_assigned_accommodation ?support_case - support_case ?accommodation_type - accommodation_type)
+    (student_case_resource_committed ?student_case - student_case)
+    (peer_student_case_resource_committed ?peer_student_case - peer_student_case)
+    (advisor_authorization_completed ?advisor_record - advisor_record)
+  )
+  (:action register_support_case
+    :parameters (?support_case - support_case)
+    :precondition
+      (and
+        (not
+          (case_intake_open ?support_case)
+        )
+        (not
+          (support_allocated ?support_case)
+        )
+      )
+    :effect (case_intake_open ?support_case)
+  )
+  (:action reserve_tutor_for_case
+    :parameters (?support_case - support_case ?tutor_resource - tutor_resource)
+    :precondition
+      (and
+        (case_intake_open ?support_case)
+        (not
+          (case_tutor_reserved ?support_case)
+        )
+        (tutor_available ?tutor_resource)
+      )
+    :effect
+      (and
+        (case_tutor_reserved ?support_case)
+        (case_assigned_tutor ?support_case ?tutor_resource)
+        (not
+          (tutor_available ?tutor_resource)
+        )
+      )
+  )
+  (:action assign_subject_to_case
+    :parameters (?support_case - support_case ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_intake_open ?support_case)
+        (case_tutor_reserved ?support_case)
+        (subject_area_available ?subject_area)
+      )
+    :effect
+      (and
+        (case_assigned_subject ?support_case ?subject_area)
+        (not
+          (subject_area_available ?subject_area)
+        )
+      )
+  )
+  (:action confirm_case_scheduling
+    :parameters (?support_case - support_case ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_intake_open ?support_case)
+        (case_tutor_reserved ?support_case)
+        (case_assigned_subject ?support_case ?subject_area)
+        (not
+          (case_scheduling_confirmed ?support_case)
+        )
+      )
+    :effect (case_scheduling_confirmed ?support_case)
+  )
+  (:action unassign_subject_from_case
+    :parameters (?support_case - support_case ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_assigned_subject ?support_case ?subject_area)
+      )
+    :effect
+      (and
+        (subject_area_available ?subject_area)
+        (not
+          (case_assigned_subject ?support_case ?subject_area)
+        )
+      )
+  )
+  (:action assign_coordinator_to_case
+    :parameters (?support_case - support_case ?scheduling_coordinator - scheduling_coordinator)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?support_case)
+        (coordinator_available ?scheduling_coordinator)
+      )
+    :effect
+      (and
+        (case_assigned_coordinator ?support_case ?scheduling_coordinator)
+        (not
+          (coordinator_available ?scheduling_coordinator)
+        )
+      )
+  )
+  (:action unassign_coordinator_from_case
+    :parameters (?support_case - support_case ?scheduling_coordinator - scheduling_coordinator)
+    :precondition
+      (and
+        (case_assigned_coordinator ?support_case ?scheduling_coordinator)
+      )
+    :effect
+      (and
+        (coordinator_available ?scheduling_coordinator)
+        (not
+          (case_assigned_coordinator ?support_case ?scheduling_coordinator)
+        )
+      )
+  )
+  (:action attach_assessment_instrument_to_advisor_record
+    :parameters (?advisor_record - advisor_record ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (assessment_instrument_available ?assessment_instrument)
+      )
+    :effect
+      (and
+        (advisor_has_assessment_instrument ?advisor_record ?assessment_instrument)
+        (not
+          (assessment_instrument_available ?assessment_instrument)
+        )
+      )
+  )
+  (:action release_assessment_instrument_from_advisor_record
+    :parameters (?advisor_record - advisor_record ?assessment_instrument - assessment_instrument)
+    :precondition
+      (and
+        (advisor_has_assessment_instrument ?advisor_record ?assessment_instrument)
+      )
+    :effect
+      (and
+        (assessment_instrument_available ?assessment_instrument)
+        (not
+          (advisor_has_assessment_instrument ?advisor_record ?assessment_instrument)
+        )
+      )
+  )
+  (:action attach_specialist_consult_to_advisor_record
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (specialist_consultant_available ?specialist_consultant)
+      )
+    :effect
+      (and
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (not
+          (specialist_consultant_available ?specialist_consultant)
+        )
+      )
+  )
+  (:action release_specialist_consult_from_advisor_record
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+      )
+    :effect
+      (and
+        (specialist_consultant_available ?specialist_consultant)
+        (not
+          (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        )
+      )
+  )
+  (:action activate_need_flag_for_student_case
+    :parameters (?student_case - student_case ?need_category - need_category ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?student_case)
+        (case_assigned_subject ?student_case ?subject_area)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (not
+          (need_flag_active ?need_category)
+        )
+        (not
+          (need_flag_resourced ?need_category)
+        )
+      )
+    :effect (need_flag_active ?need_category)
+  )
+  (:action assign_learning_intervention_to_student_case
+    :parameters (?student_case - student_case ?need_category - need_category ?scheduling_coordinator - scheduling_coordinator)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?student_case)
+        (case_assigned_coordinator ?student_case ?scheduling_coordinator)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (need_flag_active ?need_category)
+        (not
+          (student_case_resource_committed ?student_case)
+        )
+      )
+    :effect
+      (and
+        (student_case_resource_committed ?student_case)
+        (student_case_intervention_flag ?student_case)
+      )
+  )
+  (:action assign_learning_resource_to_student_case
+    :parameters (?student_case - student_case ?need_category - need_category ?learning_resource - learning_resource)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?student_case)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (learning_resource_available ?learning_resource)
+        (not
+          (student_case_resource_committed ?student_case)
+        )
+      )
+    :effect
+      (and
+        (need_flag_resourced ?need_category)
+        (student_case_resource_committed ?student_case)
+        (student_case_assigned_learning_resource ?student_case ?learning_resource)
+        (not
+          (learning_resource_available ?learning_resource)
+        )
+      )
+  )
+  (:action process_student_assessment_results
+    :parameters (?student_case - student_case ?need_category - need_category ?subject_area - subject_area ?learning_resource - learning_resource)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?student_case)
+        (case_assigned_subject ?student_case ?subject_area)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (need_flag_resourced ?need_category)
+        (student_case_assigned_learning_resource ?student_case ?learning_resource)
+        (not
+          (student_case_intervention_flag ?student_case)
+        )
+      )
+    :effect
+      (and
+        (need_flag_active ?need_category)
+        (student_case_intervention_flag ?student_case)
+        (learning_resource_available ?learning_resource)
+        (not
+          (student_case_assigned_learning_resource ?student_case ?learning_resource)
+        )
+      )
+  )
+  (:action activate_need_flag_for_peer_case
+    :parameters (?peer_student_case - peer_student_case ?support_modality - support_modality ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?peer_student_case)
+        (case_assigned_subject ?peer_student_case ?subject_area)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (not
+          (modality_flag_active ?support_modality)
+        )
+        (not
+          (modality_flag_resourced ?support_modality)
+        )
+      )
+    :effect (modality_flag_active ?support_modality)
+  )
+  (:action assign_learning_intervention_to_peer_case
+    :parameters (?peer_student_case - peer_student_case ?support_modality - support_modality ?scheduling_coordinator - scheduling_coordinator)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?peer_student_case)
+        (case_assigned_coordinator ?peer_student_case ?scheduling_coordinator)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (modality_flag_active ?support_modality)
+        (not
+          (peer_student_case_resource_committed ?peer_student_case)
+        )
+      )
+    :effect
+      (and
+        (peer_student_case_resource_committed ?peer_student_case)
+        (peer_student_case_intervention_flag ?peer_student_case)
+      )
+  )
+  (:action assign_learning_resource_to_peer_case
+    :parameters (?peer_student_case - peer_student_case ?support_modality - support_modality ?learning_resource - learning_resource)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?peer_student_case)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (learning_resource_available ?learning_resource)
+        (not
+          (peer_student_case_resource_committed ?peer_student_case)
+        )
+      )
+    :effect
+      (and
+        (modality_flag_resourced ?support_modality)
+        (peer_student_case_resource_committed ?peer_student_case)
+        (peer_student_case_assigned_learning_resource ?peer_student_case ?learning_resource)
+        (not
+          (learning_resource_available ?learning_resource)
+        )
+      )
+  )
+  (:action process_peer_assessment_results
+    :parameters (?peer_student_case - peer_student_case ?support_modality - support_modality ?subject_area - subject_area ?learning_resource - learning_resource)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?peer_student_case)
+        (case_assigned_subject ?peer_student_case ?subject_area)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (modality_flag_resourced ?support_modality)
+        (peer_student_case_assigned_learning_resource ?peer_student_case ?learning_resource)
+        (not
+          (peer_student_case_intervention_flag ?peer_student_case)
+        )
+      )
+    :effect
+      (and
+        (modality_flag_active ?support_modality)
+        (peer_student_case_intervention_flag ?peer_student_case)
+        (learning_resource_available ?learning_resource)
+        (not
+          (peer_student_case_assigned_learning_resource ?peer_student_case ?learning_resource)
+        )
+      )
+  )
+  (:action create_tutoring_opportunity_basic
+    :parameters (?student_case - student_case ?peer_student_case - peer_student_case ?need_category - need_category ?support_modality - support_modality ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (student_case_resource_committed ?student_case)
+        (peer_student_case_resource_committed ?peer_student_case)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (need_flag_active ?need_category)
+        (modality_flag_active ?support_modality)
+        (student_case_intervention_flag ?student_case)
+        (peer_student_case_intervention_flag ?peer_student_case)
+        (opportunity_draft ?tutoring_opportunity)
+      )
+    :effect
+      (and
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_targets_need_category ?tutoring_opportunity ?need_category)
+        (opportunity_targets_modality ?tutoring_opportunity ?support_modality)
+        (not
+          (opportunity_draft ?tutoring_opportunity)
+        )
+      )
+  )
+  (:action create_tutoring_opportunity_with_timeslot
+    :parameters (?student_case - student_case ?peer_student_case - peer_student_case ?need_category - need_category ?support_modality - support_modality ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (student_case_resource_committed ?student_case)
+        (peer_student_case_resource_committed ?peer_student_case)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (need_flag_resourced ?need_category)
+        (modality_flag_active ?support_modality)
+        (not
+          (student_case_intervention_flag ?student_case)
+        )
+        (peer_student_case_intervention_flag ?peer_student_case)
+        (opportunity_draft ?tutoring_opportunity)
+      )
+    :effect
+      (and
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_targets_need_category ?tutoring_opportunity ?need_category)
+        (opportunity_targets_modality ?tutoring_opportunity ?support_modality)
+        (opportunity_requires_timeslot ?tutoring_opportunity)
+        (not
+          (opportunity_draft ?tutoring_opportunity)
+        )
+      )
+  )
+  (:action create_tutoring_opportunity_with_modality
+    :parameters (?student_case - student_case ?peer_student_case - peer_student_case ?need_category - need_category ?support_modality - support_modality ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (student_case_resource_committed ?student_case)
+        (peer_student_case_resource_committed ?peer_student_case)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (need_flag_active ?need_category)
+        (modality_flag_resourced ?support_modality)
+        (student_case_intervention_flag ?student_case)
+        (not
+          (peer_student_case_intervention_flag ?peer_student_case)
+        )
+        (opportunity_draft ?tutoring_opportunity)
+      )
+    :effect
+      (and
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_targets_need_category ?tutoring_opportunity ?need_category)
+        (opportunity_targets_modality ?tutoring_opportunity ?support_modality)
+        (opportunity_requires_modality ?tutoring_opportunity)
+        (not
+          (opportunity_draft ?tutoring_opportunity)
+        )
+      )
+  )
+  (:action create_tutoring_opportunity_with_timeslot_and_modality
+    :parameters (?student_case - student_case ?peer_student_case - peer_student_case ?need_category - need_category ?support_modality - support_modality ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (student_case_resource_committed ?student_case)
+        (peer_student_case_resource_committed ?peer_student_case)
+        (student_case_linked_need_category ?student_case ?need_category)
+        (peer_student_case_linked_modality ?peer_student_case ?support_modality)
+        (need_flag_resourced ?need_category)
+        (modality_flag_resourced ?support_modality)
+        (not
+          (student_case_intervention_flag ?student_case)
+        )
+        (not
+          (peer_student_case_intervention_flag ?peer_student_case)
+        )
+        (opportunity_draft ?tutoring_opportunity)
+      )
+    :effect
+      (and
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_targets_need_category ?tutoring_opportunity ?need_category)
+        (opportunity_targets_modality ?tutoring_opportunity ?support_modality)
+        (opportunity_requires_timeslot ?tutoring_opportunity)
+        (opportunity_requires_modality ?tutoring_opportunity)
+        (not
+          (opportunity_draft ?tutoring_opportunity)
+        )
+      )
+  )
+  (:action activate_tutoring_opportunity
+    :parameters (?tutoring_opportunity - tutoring_opportunity ?student_case - student_case ?subject_area - subject_area)
+    :precondition
+      (and
+        (opportunity_published ?tutoring_opportunity)
+        (student_case_resource_committed ?student_case)
+        (case_assigned_subject ?student_case ?subject_area)
+        (not
+          (opportunity_ready ?tutoring_opportunity)
+        )
+      )
+    :effect (opportunity_ready ?tutoring_opportunity)
+  )
+  (:action allocate_diagnostic_assessment_to_opportunity
+    :parameters (?advisor_record - advisor_record ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (advisor_linked_opportunity ?advisor_record ?tutoring_opportunity)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (diagnostic_assessment_available ?diagnostic_assessment)
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_ready ?tutoring_opportunity)
+        (not
+          (diagnostic_assessment_allocated ?diagnostic_assessment)
+        )
+      )
+    :effect
+      (and
+        (diagnostic_assessment_allocated ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (not
+          (diagnostic_assessment_available ?diagnostic_assessment)
+        )
+      )
+  )
+  (:action mark_advisor_ready_for_session
+    :parameters (?advisor_record - advisor_record ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (diagnostic_assessment_allocated ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (case_assigned_subject ?advisor_record ?subject_area)
+        (not
+          (opportunity_requires_timeslot ?tutoring_opportunity)
+        )
+        (not
+          (advisor_ready_for_session ?advisor_record)
+        )
+      )
+    :effect (advisor_ready_for_session ?advisor_record)
+  )
+  (:action assign_priority_tag_to_advisor_record
+    :parameters (?advisor_record - advisor_record ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (priority_tag_available ?priority_tag)
+        (not
+          (advisor_has_priority_tag ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_has_priority_tag ?advisor_record)
+        (advisor_assigned_priority_tag ?advisor_record ?priority_tag)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action enable_advisor_workflow_with_priority
+    :parameters (?advisor_record - advisor_record ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity ?subject_area - subject_area ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (diagnostic_assessment_allocated ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (case_assigned_subject ?advisor_record ?subject_area)
+        (opportunity_requires_timeslot ?tutoring_opportunity)
+        (advisor_has_priority_tag ?advisor_record)
+        (advisor_assigned_priority_tag ?advisor_record ?priority_tag)
+        (not
+          (advisor_ready_for_session ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_for_session ?advisor_record)
+        (advisor_priority_condition_met ?advisor_record)
+      )
+  )
+  (:action advisor_finalize_session_with_instrument
+    :parameters (?advisor_record - advisor_record ?assessment_instrument - assessment_instrument ?scheduling_coordinator - scheduling_coordinator ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_ready_for_session ?advisor_record)
+        (advisor_has_assessment_instrument ?advisor_record ?assessment_instrument)
+        (case_assigned_coordinator ?advisor_record ?scheduling_coordinator)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (not
+          (opportunity_requires_modality ?tutoring_opportunity)
+        )
+        (not
+          (advisor_session_confirmed ?advisor_record)
+        )
+      )
+    :effect (advisor_session_confirmed ?advisor_record)
+  )
+  (:action advisor_finalize_session_with_instrument_confirm
+    :parameters (?advisor_record - advisor_record ?assessment_instrument - assessment_instrument ?scheduling_coordinator - scheduling_coordinator ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_ready_for_session ?advisor_record)
+        (advisor_has_assessment_instrument ?advisor_record ?assessment_instrument)
+        (case_assigned_coordinator ?advisor_record ?scheduling_coordinator)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (opportunity_requires_modality ?tutoring_opportunity)
+        (not
+          (advisor_session_confirmed ?advisor_record)
+        )
+      )
+    :effect (advisor_session_confirmed ?advisor_record)
+  )
+  (:action advisor_request_approval
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_session_confirmed ?advisor_record)
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (not
+          (opportunity_requires_timeslot ?tutoring_opportunity)
+        )
+        (not
+          (opportunity_requires_modality ?tutoring_opportunity)
+        )
+        (not
+          (advisor_ready_to_release ?advisor_record)
+        )
+      )
+    :effect (advisor_ready_to_release ?advisor_record)
+  )
+  (:action advisor_request_approval_with_timeslot
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_session_confirmed ?advisor_record)
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (opportunity_requires_timeslot ?tutoring_opportunity)
+        (not
+          (opportunity_requires_modality ?tutoring_opportunity)
+        )
+        (not
+          (advisor_ready_to_release ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_has_timeslot_type ?advisor_record)
+      )
+  )
+  (:action advisor_request_approval_with_modality
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_session_confirmed ?advisor_record)
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (not
+          (opportunity_requires_timeslot ?tutoring_opportunity)
+        )
+        (opportunity_requires_modality ?tutoring_opportunity)
+        (not
+          (advisor_ready_to_release ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_has_timeslot_type ?advisor_record)
+      )
+  )
+  (:action advisor_request_approval_with_timeslot_and_modality
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant ?diagnostic_assessment - diagnostic_assessment ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (advisor_session_confirmed ?advisor_record)
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (advisor_has_assessment ?advisor_record ?diagnostic_assessment)
+        (assessment_associated_with_opportunity ?diagnostic_assessment ?tutoring_opportunity)
+        (opportunity_requires_timeslot ?tutoring_opportunity)
+        (opportunity_requires_modality ?tutoring_opportunity)
+        (not
+          (advisor_ready_to_release ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_has_timeslot_type ?advisor_record)
+      )
+  )
+  (:action finalize_advisor_record
+    :parameters (?advisor_record - advisor_record)
+    :precondition
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (not
+          (advisor_has_timeslot_type ?advisor_record)
+        )
+        (not
+          (advisor_authorization_completed ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_authorization_completed ?advisor_record)
+        (ready_for_student_acceptance ?advisor_record)
+      )
+  )
+  (:action assign_timeslot_type_to_advisor_record
+    :parameters (?advisor_record - advisor_record ?session_time_slot_type - session_time_slot_type)
+    :precondition
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_has_timeslot_type ?advisor_record)
+        (timeslot_type_available ?session_time_slot_type)
+      )
+    :effect
+      (and
+        (advisor_assigned_timeslot_type ?advisor_record ?session_time_slot_type)
+        (not
+          (timeslot_type_available ?session_time_slot_type)
+        )
+      )
+  )
+  (:action approve_advisor_session_and_enable_enrollment
+    :parameters (?advisor_record - advisor_record ?student_case - student_case ?peer_student_case - peer_student_case ?subject_area - subject_area ?session_time_slot_type - session_time_slot_type)
+    :precondition
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_has_timeslot_type ?advisor_record)
+        (advisor_assigned_timeslot_type ?advisor_record ?session_time_slot_type)
+        (advisor_linked_studentcase ?advisor_record ?student_case)
+        (advisor_linked_peercase ?advisor_record ?peer_student_case)
+        (student_case_intervention_flag ?student_case)
+        (peer_student_case_intervention_flag ?peer_student_case)
+        (case_assigned_subject ?advisor_record ?subject_area)
+        (not
+          (advisor_approval_completed ?advisor_record)
+        )
+      )
+    :effect (advisor_approval_completed ?advisor_record)
+  )
+  (:action release_advisor_record_for_student_assignment
+    :parameters (?advisor_record - advisor_record)
+    :precondition
+      (and
+        (advisor_ready_to_release ?advisor_record)
+        (advisor_approval_completed ?advisor_record)
+        (not
+          (advisor_authorization_completed ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_authorization_completed ?advisor_record)
+        (ready_for_student_acceptance ?advisor_record)
+      )
+  )
+  (:action process_external_referral_on_advisor_record
+    :parameters (?advisor_record - advisor_record ?external_referral_source - external_referral_source ?subject_area - subject_area)
+    :precondition
+      (and
+        (case_scheduling_confirmed ?advisor_record)
+        (case_assigned_subject ?advisor_record ?subject_area)
+        (referral_source_available ?external_referral_source)
+        (advisor_has_external_referral ?advisor_record ?external_referral_source)
+        (not
+          (advisor_external_referral_assigned ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_external_referral_assigned ?advisor_record)
+        (not
+          (referral_source_available ?external_referral_source)
+        )
+      )
+  )
+  (:action assign_coordinator_for_referral
+    :parameters (?advisor_record - advisor_record ?scheduling_coordinator - scheduling_coordinator)
+    :precondition
+      (and
+        (advisor_external_referral_assigned ?advisor_record)
+        (case_assigned_coordinator ?advisor_record ?scheduling_coordinator)
+        (not
+          (advisor_referral_coordinator_confirmed ?advisor_record)
+        )
+      )
+    :effect (advisor_referral_coordinator_confirmed ?advisor_record)
+  )
+  (:action request_specialist_signoff_for_referral
+    :parameters (?advisor_record - advisor_record ?specialist_consultant - specialist_consultant)
+    :precondition
+      (and
+        (advisor_referral_coordinator_confirmed ?advisor_record)
+        (advisor_has_specialist_consult ?advisor_record ?specialist_consultant)
+        (not
+          (advisor_referral_specialist_signedoff ?advisor_record)
+        )
+      )
+    :effect (advisor_referral_specialist_signedoff ?advisor_record)
+  )
+  (:action finalize_referral_and_mark_advisor_ready
+    :parameters (?advisor_record - advisor_record)
+    :precondition
+      (and
+        (advisor_referral_specialist_signedoff ?advisor_record)
+        (not
+          (advisor_authorization_completed ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (advisor_authorization_completed ?advisor_record)
+        (ready_for_student_acceptance ?advisor_record)
+      )
+  )
+  (:action finalize_student_case_activation
+    :parameters (?student_case - student_case ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (student_case_resource_committed ?student_case)
+        (student_case_intervention_flag ?student_case)
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_ready ?tutoring_opportunity)
+        (not
+          (ready_for_student_acceptance ?student_case)
+        )
+      )
+    :effect (ready_for_student_acceptance ?student_case)
+  )
+  (:action finalize_peer_case_activation
+    :parameters (?peer_student_case - peer_student_case ?tutoring_opportunity - tutoring_opportunity)
+    :precondition
+      (and
+        (peer_student_case_resource_committed ?peer_student_case)
+        (peer_student_case_intervention_flag ?peer_student_case)
+        (opportunity_published ?tutoring_opportunity)
+        (opportunity_ready ?tutoring_opportunity)
+        (not
+          (ready_for_student_acceptance ?peer_student_case)
+        )
+      )
+    :effect (ready_for_student_acceptance ?peer_student_case)
+  )
+  (:action record_student_acceptance_and_attach_accommodation
+    :parameters (?support_case - support_case ?accommodation_type - accommodation_type ?subject_area - subject_area)
+    :precondition
+      (and
+        (ready_for_student_acceptance ?support_case)
+        (case_assigned_subject ?support_case ?subject_area)
+        (accommodation_available ?accommodation_type)
+        (not
+          (student_accepted ?support_case)
+        )
+      )
+    :effect
+      (and
+        (student_accepted ?support_case)
+        (case_assigned_accommodation ?support_case ?accommodation_type)
+        (not
+          (accommodation_available ?accommodation_type)
+        )
+      )
+  )
+  (:action confirm_allocation_and_free_tutor
+    :parameters (?student_case - student_case ?tutor_resource - tutor_resource ?accommodation_type - accommodation_type)
+    :precondition
+      (and
+        (student_accepted ?student_case)
+        (case_assigned_tutor ?student_case ?tutor_resource)
+        (case_assigned_accommodation ?student_case ?accommodation_type)
+        (not
+          (support_allocated ?student_case)
+        )
+      )
+    :effect
+      (and
+        (support_allocated ?student_case)
+        (tutor_available ?tutor_resource)
+        (accommodation_available ?accommodation_type)
+      )
+  )
+  (:action confirm_allocation_and_free_tutor_for_peer_case
+    :parameters (?peer_student_case - peer_student_case ?tutor_resource - tutor_resource ?accommodation_type - accommodation_type)
+    :precondition
+      (and
+        (student_accepted ?peer_student_case)
+        (case_assigned_tutor ?peer_student_case ?tutor_resource)
+        (case_assigned_accommodation ?peer_student_case ?accommodation_type)
+        (not
+          (support_allocated ?peer_student_case)
+        )
+      )
+    :effect
+      (and
+        (support_allocated ?peer_student_case)
+        (tutor_available ?tutor_resource)
+        (accommodation_available ?accommodation_type)
+      )
+  )
+  (:action confirm_allocation_and_free_tutor_for_advisor_record
+    :parameters (?advisor_record - advisor_record ?tutor_resource - tutor_resource ?accommodation_type - accommodation_type)
+    :precondition
+      (and
+        (student_accepted ?advisor_record)
+        (case_assigned_tutor ?advisor_record ?tutor_resource)
+        (case_assigned_accommodation ?advisor_record ?accommodation_type)
+        (not
+          (support_allocated ?advisor_record)
+        )
+      )
+    :effect
+      (and
+        (support_allocated ?advisor_record)
+        (tutor_available ?tutor_resource)
+        (accommodation_available ?accommodation_type)
+      )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain escort_route_safety_optimization_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types tactical_resource_category - object world_feature_category - object segment_asset_category - object escort_entity_class - object escort_entity - escort_entity_class route_option - tactical_resource_category scout - tactical_resource_category support_unit - tactical_resource_category route_marker - tactical_resource_category capability_module - tactical_resource_category extraction_beacon - tactical_resource_category defensive_upgrade - tactical_resource_category dynamic_event - tactical_resource_category supply - world_feature_category landmark - world_feature_category secondary_objective - world_feature_category route_segment - segment_asset_category encounter_segment - segment_asset_category traversal_asset - segment_asset_category route_point_group - escort_entity controller_group - escort_entity start_point - route_point_group end_point - route_point_group controller - controller_group)
+  (:predicates
+    (escort_activated ?escort_entity - escort_entity)
+    (entity_recon_confirmed ?escort_entity - escort_entity)
+    (route_reserved ?escort_entity - escort_entity)
+    (mission_finalized ?escort_entity - escort_entity)
+    (entity_traversal_confirmed ?escort_entity - escort_entity)
+    (entity_prepared_for_extraction ?escort_entity - escort_entity)
+    (route_option_available ?route_option - route_option)
+    (entity_route_binding ?escort_entity - escort_entity ?route_option - route_option)
+    (scout_available ?scout - scout)
+    (entity_scout_binding ?escort_entity - escort_entity ?scout - scout)
+    (support_available ?support_unit - support_unit)
+    (entity_support_binding ?escort_entity - escort_entity ?support_unit - support_unit)
+    (supply_available ?supply - supply)
+    (supply_staged_start ?start_point - start_point ?supply - supply)
+    (supply_staged_end ?end_point - end_point ?supply - supply)
+    (route_point_segment_link ?start_point - start_point ?route_segment - route_segment)
+    (segment_revealed ?route_segment - route_segment)
+    (segment_flagged ?route_segment - route_segment)
+    (start_point_secured ?start_point - start_point)
+    (end_point_encounter_link ?end_point - end_point ?encounter_segment - encounter_segment)
+    (encounter_revealed ?encounter_segment - encounter_segment)
+    (encounter_flagged ?encounter_segment - encounter_segment)
+    (end_point_secured ?end_point - end_point)
+    (asset_available ?traversal_asset - traversal_asset)
+    (asset_allocated ?traversal_asset - traversal_asset)
+    (asset_assigned_segment ?traversal_asset - traversal_asset ?route_segment - route_segment)
+    (asset_assigned_encounter ?traversal_asset - traversal_asset ?encounter_segment - encounter_segment)
+    (asset_marker_primary ?traversal_asset - traversal_asset)
+    (asset_marker_secondary ?traversal_asset - traversal_asset)
+    (asset_validated ?traversal_asset - traversal_asset)
+    (controller_associated_start ?controller - controller ?start_point - start_point)
+    (controller_associated_end ?controller - controller ?end_point - end_point)
+    (controller_asset_binding ?controller - controller ?traversal_asset - traversal_asset)
+    (landmark_available ?landmark - landmark)
+    (controller_landmark_binding ?controller - controller ?landmark - landmark)
+    (landmark_registered ?landmark - landmark)
+    (landmark_asset_binding ?landmark - landmark ?traversal_asset - traversal_asset)
+    (controller_equipped ?controller - controller)
+    (controller_upgrade_ready ?controller - controller)
+    (controller_deploy_ready ?controller - controller)
+    (controller_checkpoint_verified ?controller - controller)
+    (controller_checkpoint_finalized ?controller - controller)
+    (controller_capability_attached ?controller - controller)
+    (controller_engaged ?controller - controller)
+    (secondary_objective_available ?secondary_objective - secondary_objective)
+    (controller_secondary_binding ?controller - controller ?secondary_objective - secondary_objective)
+    (controller_secondary_claimed ?controller - controller)
+    (controller_checkpoint_reached ?controller - controller)
+    (controller_assessed ?controller - controller)
+    (route_marker_available ?route_marker - route_marker)
+    (controller_marker_binding ?controller - controller ?route_marker - route_marker)
+    (capability_module_available ?capability_module - capability_module)
+    (controller_capability_binding ?controller - controller ?capability_module - capability_module)
+    (defensive_upgrade_available ?defensive_upgrade - defensive_upgrade)
+    (controller_defensive_binding ?controller - controller ?defensive_upgrade - defensive_upgrade)
+    (dynamic_event_available ?dynamic_event - dynamic_event)
+    (controller_event_binding ?controller - controller ?dynamic_event - dynamic_event)
+    (extraction_beacon_available ?extraction_beacon - extraction_beacon)
+    (entity_extraction_binding ?escort_entity - escort_entity ?extraction_beacon - extraction_beacon)
+    (start_point_ready ?start_point - start_point)
+    (end_point_ready ?end_point - end_point)
+    (controller_finalized ?controller - controller)
+  )
+  (:action activate_escort
+    :parameters (?escort_entity - escort_entity)
+    :precondition
+      (and
+        (not
+          (escort_activated ?escort_entity)
+        )
+        (not
+          (mission_finalized ?escort_entity)
+        )
+      )
+    :effect (escort_activated ?escort_entity)
+  )
+  (:action assign_route_option
+    :parameters (?escort_entity - escort_entity ?route_option - route_option)
+    :precondition
+      (and
+        (escort_activated ?escort_entity)
+        (not
+          (route_reserved ?escort_entity)
+        )
+        (route_option_available ?route_option)
+      )
+    :effect
+      (and
+        (route_reserved ?escort_entity)
+        (entity_route_binding ?escort_entity ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action assign_scout_to_escort
+    :parameters (?escort_entity - escort_entity ?scout - scout)
+    :precondition
+      (and
+        (escort_activated ?escort_entity)
+        (route_reserved ?escort_entity)
+        (scout_available ?scout)
+      )
+    :effect
+      (and
+        (entity_scout_binding ?escort_entity ?scout)
+        (not
+          (scout_available ?scout)
+        )
+      )
+  )
+  (:action confirm_escort_recon
+    :parameters (?escort_entity - escort_entity ?scout - scout)
+    :precondition
+      (and
+        (escort_activated ?escort_entity)
+        (route_reserved ?escort_entity)
+        (entity_scout_binding ?escort_entity ?scout)
+        (not
+          (entity_recon_confirmed ?escort_entity)
+        )
+      )
+    :effect (entity_recon_confirmed ?escort_entity)
+  )
+  (:action release_scout
+    :parameters (?escort_entity - escort_entity ?scout - scout)
+    :precondition
+      (and
+        (entity_scout_binding ?escort_entity ?scout)
+      )
+    :effect
+      (and
+        (scout_available ?scout)
+        (not
+          (entity_scout_binding ?escort_entity ?scout)
+        )
+      )
+  )
+  (:action assign_support_to_escort
+    :parameters (?escort_entity - escort_entity ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_recon_confirmed ?escort_entity)
+        (support_available ?support_unit)
+      )
+    :effect
+      (and
+        (entity_support_binding ?escort_entity ?support_unit)
+        (not
+          (support_available ?support_unit)
+        )
+      )
+  )
+  (:action release_support_from_escort
+    :parameters (?escort_entity - escort_entity ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_support_binding ?escort_entity ?support_unit)
+      )
+    :effect
+      (and
+        (support_available ?support_unit)
+        (not
+          (entity_support_binding ?escort_entity ?support_unit)
+        )
+      )
+  )
+  (:action apply_defensive_upgrade
+    :parameters (?controller - controller ?defensive_upgrade - defensive_upgrade)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (defensive_upgrade_available ?defensive_upgrade)
+      )
+    :effect
+      (and
+        (controller_defensive_binding ?controller ?defensive_upgrade)
+        (not
+          (defensive_upgrade_available ?defensive_upgrade)
+        )
+      )
+  )
+  (:action remove_defensive_upgrade
+    :parameters (?controller - controller ?defensive_upgrade - defensive_upgrade)
+    :precondition
+      (and
+        (controller_defensive_binding ?controller ?defensive_upgrade)
+      )
+    :effect
+      (and
+        (defensive_upgrade_available ?defensive_upgrade)
+        (not
+          (controller_defensive_binding ?controller ?defensive_upgrade)
+        )
+      )
+  )
+  (:action bind_dynamic_event
+    :parameters (?controller - controller ?dynamic_event - dynamic_event)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (dynamic_event_available ?dynamic_event)
+      )
+    :effect
+      (and
+        (controller_event_binding ?controller ?dynamic_event)
+        (not
+          (dynamic_event_available ?dynamic_event)
+        )
+      )
+  )
+  (:action unbind_dynamic_event
+    :parameters (?controller - controller ?dynamic_event - dynamic_event)
+    :precondition
+      (and
+        (controller_event_binding ?controller ?dynamic_event)
+      )
+    :effect
+      (and
+        (dynamic_event_available ?dynamic_event)
+        (not
+          (controller_event_binding ?controller ?dynamic_event)
+        )
+      )
+  )
+  (:action recon_segment
+    :parameters (?start_point - start_point ?route_segment - route_segment ?scout - scout)
+    :precondition
+      (and
+        (entity_recon_confirmed ?start_point)
+        (entity_scout_binding ?start_point ?scout)
+        (route_point_segment_link ?start_point ?route_segment)
+        (not
+          (segment_revealed ?route_segment)
+        )
+        (not
+          (segment_flagged ?route_segment)
+        )
+      )
+    :effect (segment_revealed ?route_segment)
+  )
+  (:action support_clear_segment
+    :parameters (?start_point - start_point ?route_segment - route_segment ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_recon_confirmed ?start_point)
+        (entity_support_binding ?start_point ?support_unit)
+        (route_point_segment_link ?start_point ?route_segment)
+        (segment_revealed ?route_segment)
+        (not
+          (start_point_ready ?start_point)
+        )
+      )
+    :effect
+      (and
+        (start_point_ready ?start_point)
+        (start_point_secured ?start_point)
+      )
+  )
+  (:action deploy_supply_to_segment
+    :parameters (?start_point - start_point ?route_segment - route_segment ?supply - supply)
+    :precondition
+      (and
+        (entity_recon_confirmed ?start_point)
+        (route_point_segment_link ?start_point ?route_segment)
+        (supply_available ?supply)
+        (not
+          (start_point_ready ?start_point)
+        )
+      )
+    :effect
+      (and
+        (segment_flagged ?route_segment)
+        (start_point_ready ?start_point)
+        (supply_staged_start ?start_point ?supply)
+        (not
+          (supply_available ?supply)
+        )
+      )
+  )
+  (:action finalize_segment_clearance
+    :parameters (?start_point - start_point ?route_segment - route_segment ?scout - scout ?supply - supply)
+    :precondition
+      (and
+        (entity_recon_confirmed ?start_point)
+        (entity_scout_binding ?start_point ?scout)
+        (route_point_segment_link ?start_point ?route_segment)
+        (segment_flagged ?route_segment)
+        (supply_staged_start ?start_point ?supply)
+        (not
+          (start_point_secured ?start_point)
+        )
+      )
+    :effect
+      (and
+        (segment_revealed ?route_segment)
+        (start_point_secured ?start_point)
+        (supply_available ?supply)
+        (not
+          (supply_staged_start ?start_point ?supply)
+        )
+      )
+  )
+  (:action recon_encounter
+    :parameters (?end_point - end_point ?encounter_segment - encounter_segment ?scout - scout)
+    :precondition
+      (and
+        (entity_recon_confirmed ?end_point)
+        (entity_scout_binding ?end_point ?scout)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (not
+          (encounter_revealed ?encounter_segment)
+        )
+        (not
+          (encounter_flagged ?encounter_segment)
+        )
+      )
+    :effect (encounter_revealed ?encounter_segment)
+  )
+  (:action support_clear_encounter
+    :parameters (?end_point - end_point ?encounter_segment - encounter_segment ?support_unit - support_unit)
+    :precondition
+      (and
+        (entity_recon_confirmed ?end_point)
+        (entity_support_binding ?end_point ?support_unit)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (encounter_revealed ?encounter_segment)
+        (not
+          (end_point_ready ?end_point)
+        )
+      )
+    :effect
+      (and
+        (end_point_ready ?end_point)
+        (end_point_secured ?end_point)
+      )
+  )
+  (:action deploy_supply_to_encounter
+    :parameters (?end_point - end_point ?encounter_segment - encounter_segment ?supply - supply)
+    :precondition
+      (and
+        (entity_recon_confirmed ?end_point)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (supply_available ?supply)
+        (not
+          (end_point_ready ?end_point)
+        )
+      )
+    :effect
+      (and
+        (encounter_flagged ?encounter_segment)
+        (end_point_ready ?end_point)
+        (supply_staged_end ?end_point ?supply)
+        (not
+          (supply_available ?supply)
+        )
+      )
+  )
+  (:action finalize_encounter_clearance
+    :parameters (?end_point - end_point ?encounter_segment - encounter_segment ?scout - scout ?supply - supply)
+    :precondition
+      (and
+        (entity_recon_confirmed ?end_point)
+        (entity_scout_binding ?end_point ?scout)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (encounter_flagged ?encounter_segment)
+        (supply_staged_end ?end_point ?supply)
+        (not
+          (end_point_secured ?end_point)
+        )
+      )
+    :effect
+      (and
+        (encounter_revealed ?encounter_segment)
+        (end_point_secured ?end_point)
+        (supply_available ?supply)
+        (not
+          (supply_staged_end ?end_point ?supply)
+        )
+      )
+  )
+  (:action allocate_traversal_asset
+    :parameters (?start_point - start_point ?end_point - end_point ?route_segment - route_segment ?encounter_segment - encounter_segment ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (start_point_ready ?start_point)
+        (end_point_ready ?end_point)
+        (route_point_segment_link ?start_point ?route_segment)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (segment_revealed ?route_segment)
+        (encounter_revealed ?encounter_segment)
+        (start_point_secured ?start_point)
+        (end_point_secured ?end_point)
+        (asset_available ?traversal_asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?traversal_asset)
+        (asset_assigned_segment ?traversal_asset ?route_segment)
+        (asset_assigned_encounter ?traversal_asset ?encounter_segment)
+        (not
+          (asset_available ?traversal_asset)
+        )
+      )
+  )
+  (:action allocate_traversal_asset_with_primary_marker
+    :parameters (?start_point - start_point ?end_point - end_point ?route_segment - route_segment ?encounter_segment - encounter_segment ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (start_point_ready ?start_point)
+        (end_point_ready ?end_point)
+        (route_point_segment_link ?start_point ?route_segment)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (segment_flagged ?route_segment)
+        (encounter_revealed ?encounter_segment)
+        (not
+          (start_point_secured ?start_point)
+        )
+        (end_point_secured ?end_point)
+        (asset_available ?traversal_asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?traversal_asset)
+        (asset_assigned_segment ?traversal_asset ?route_segment)
+        (asset_assigned_encounter ?traversal_asset ?encounter_segment)
+        (asset_marker_primary ?traversal_asset)
+        (not
+          (asset_available ?traversal_asset)
+        )
+      )
+  )
+  (:action allocate_traversal_asset_with_secondary_marker
+    :parameters (?start_point - start_point ?end_point - end_point ?route_segment - route_segment ?encounter_segment - encounter_segment ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (start_point_ready ?start_point)
+        (end_point_ready ?end_point)
+        (route_point_segment_link ?start_point ?route_segment)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (segment_revealed ?route_segment)
+        (encounter_flagged ?encounter_segment)
+        (start_point_secured ?start_point)
+        (not
+          (end_point_secured ?end_point)
+        )
+        (asset_available ?traversal_asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?traversal_asset)
+        (asset_assigned_segment ?traversal_asset ?route_segment)
+        (asset_assigned_encounter ?traversal_asset ?encounter_segment)
+        (asset_marker_secondary ?traversal_asset)
+        (not
+          (asset_available ?traversal_asset)
+        )
+      )
+  )
+  (:action allocate_traversal_asset_with_both_markers
+    :parameters (?start_point - start_point ?end_point - end_point ?route_segment - route_segment ?encounter_segment - encounter_segment ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (start_point_ready ?start_point)
+        (end_point_ready ?end_point)
+        (route_point_segment_link ?start_point ?route_segment)
+        (end_point_encounter_link ?end_point ?encounter_segment)
+        (segment_flagged ?route_segment)
+        (encounter_flagged ?encounter_segment)
+        (not
+          (start_point_secured ?start_point)
+        )
+        (not
+          (end_point_secured ?end_point)
+        )
+        (asset_available ?traversal_asset)
+      )
+    :effect
+      (and
+        (asset_allocated ?traversal_asset)
+        (asset_assigned_segment ?traversal_asset ?route_segment)
+        (asset_assigned_encounter ?traversal_asset ?encounter_segment)
+        (asset_marker_primary ?traversal_asset)
+        (asset_marker_secondary ?traversal_asset)
+        (not
+          (asset_available ?traversal_asset)
+        )
+      )
+  )
+  (:action validate_traversal_asset
+    :parameters (?traversal_asset - traversal_asset ?start_point - start_point ?scout - scout)
+    :precondition
+      (and
+        (asset_allocated ?traversal_asset)
+        (start_point_ready ?start_point)
+        (entity_scout_binding ?start_point ?scout)
+        (not
+          (asset_validated ?traversal_asset)
+        )
+      )
+    :effect (asset_validated ?traversal_asset)
+  )
+  (:action attach_landmark_to_asset
+    :parameters (?controller - controller ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (controller_asset_binding ?controller ?traversal_asset)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_available ?landmark)
+        (asset_allocated ?traversal_asset)
+        (asset_validated ?traversal_asset)
+        (not
+          (landmark_registered ?landmark)
+        )
+      )
+    :effect
+      (and
+        (landmark_registered ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (not
+          (landmark_available ?landmark)
+        )
+      )
+  )
+  (:action equip_controller_for_traversal
+    :parameters (?controller - controller ?landmark - landmark ?traversal_asset - traversal_asset ?scout - scout)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_registered ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (entity_scout_binding ?controller ?scout)
+        (not
+          (asset_marker_primary ?traversal_asset)
+        )
+        (not
+          (controller_equipped ?controller)
+        )
+      )
+    :effect (controller_equipped ?controller)
+  )
+  (:action attach_route_marker
+    :parameters (?controller - controller ?route_marker - route_marker)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (route_marker_available ?route_marker)
+        (not
+          (controller_checkpoint_verified ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_checkpoint_verified ?controller)
+        (controller_marker_binding ?controller ?route_marker)
+        (not
+          (route_marker_available ?route_marker)
+        )
+      )
+  )
+  (:action finalize_marker_landmark_binding
+    :parameters (?controller - controller ?landmark - landmark ?traversal_asset - traversal_asset ?scout - scout ?route_marker - route_marker)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_registered ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (entity_scout_binding ?controller ?scout)
+        (asset_marker_primary ?traversal_asset)
+        (controller_checkpoint_verified ?controller)
+        (controller_marker_binding ?controller ?route_marker)
+        (not
+          (controller_equipped ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_equipped ?controller)
+        (controller_checkpoint_finalized ?controller)
+      )
+  )
+  (:action prepare_controller_with_upgrade
+    :parameters (?controller - controller ?defensive_upgrade - defensive_upgrade ?support_unit - support_unit ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_equipped ?controller)
+        (controller_defensive_binding ?controller ?defensive_upgrade)
+        (entity_support_binding ?controller ?support_unit)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (not
+          (asset_marker_secondary ?traversal_asset)
+        )
+        (not
+          (controller_upgrade_ready ?controller)
+        )
+      )
+    :effect (controller_upgrade_ready ?controller)
+  )
+  (:action prepare_controller_with_upgrade_alternate
+    :parameters (?controller - controller ?defensive_upgrade - defensive_upgrade ?support_unit - support_unit ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_equipped ?controller)
+        (controller_defensive_binding ?controller ?defensive_upgrade)
+        (entity_support_binding ?controller ?support_unit)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (asset_marker_secondary ?traversal_asset)
+        (not
+          (controller_upgrade_ready ?controller)
+        )
+      )
+    :effect (controller_upgrade_ready ?controller)
+  )
+  (:action unlock_controller_deployment
+    :parameters (?controller - controller ?dynamic_event - dynamic_event ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_upgrade_ready ?controller)
+        (controller_event_binding ?controller ?dynamic_event)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (not
+          (asset_marker_primary ?traversal_asset)
+        )
+        (not
+          (asset_marker_secondary ?traversal_asset)
+        )
+        (not
+          (controller_deploy_ready ?controller)
+        )
+      )
+    :effect (controller_deploy_ready ?controller)
+  )
+  (:action unlock_controller_deployment_with_capability
+    :parameters (?controller - controller ?dynamic_event - dynamic_event ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_upgrade_ready ?controller)
+        (controller_event_binding ?controller ?dynamic_event)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (asset_marker_primary ?traversal_asset)
+        (not
+          (asset_marker_secondary ?traversal_asset)
+        )
+        (not
+          (controller_deploy_ready ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_capability_attached ?controller)
+      )
+  )
+  (:action unlock_controller_deployment_with_capability_alt
+    :parameters (?controller - controller ?dynamic_event - dynamic_event ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_upgrade_ready ?controller)
+        (controller_event_binding ?controller ?dynamic_event)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (not
+          (asset_marker_primary ?traversal_asset)
+        )
+        (asset_marker_secondary ?traversal_asset)
+        (not
+          (controller_deploy_ready ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_capability_attached ?controller)
+      )
+  )
+  (:action unlock_controller_deployment_with_capability_both
+    :parameters (?controller - controller ?dynamic_event - dynamic_event ?landmark - landmark ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (controller_upgrade_ready ?controller)
+        (controller_event_binding ?controller ?dynamic_event)
+        (controller_landmark_binding ?controller ?landmark)
+        (landmark_asset_binding ?landmark ?traversal_asset)
+        (asset_marker_primary ?traversal_asset)
+        (asset_marker_secondary ?traversal_asset)
+        (not
+          (controller_deploy_ready ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_capability_attached ?controller)
+      )
+  )
+  (:action finalize_controller_for_traversal
+    :parameters (?controller - controller)
+    :precondition
+      (and
+        (controller_deploy_ready ?controller)
+        (not
+          (controller_capability_attached ?controller)
+        )
+        (not
+          (controller_finalized ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_finalized ?controller)
+        (entity_traversal_confirmed ?controller)
+      )
+  )
+  (:action attach_capability_module
+    :parameters (?controller - controller ?capability_module - capability_module)
+    :precondition
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_capability_attached ?controller)
+        (capability_module_available ?capability_module)
+      )
+    :effect
+      (and
+        (controller_capability_binding ?controller ?capability_module)
+        (not
+          (capability_module_available ?capability_module)
+        )
+      )
+  )
+  (:action activate_controller_capabilities
+    :parameters (?controller - controller ?start_point - start_point ?end_point - end_point ?scout - scout ?capability_module - capability_module)
+    :precondition
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_capability_attached ?controller)
+        (controller_capability_binding ?controller ?capability_module)
+        (controller_associated_start ?controller ?start_point)
+        (controller_associated_end ?controller ?end_point)
+        (start_point_secured ?start_point)
+        (end_point_secured ?end_point)
+        (entity_scout_binding ?controller ?scout)
+        (not
+          (controller_engaged ?controller)
+        )
+      )
+    :effect (controller_engaged ?controller)
+  )
+  (:action finalize_controller_activation
+    :parameters (?controller - controller)
+    :precondition
+      (and
+        (controller_deploy_ready ?controller)
+        (controller_engaged ?controller)
+        (not
+          (controller_finalized ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_finalized ?controller)
+        (entity_traversal_confirmed ?controller)
+      )
+  )
+  (:action claim_secondary_objective
+    :parameters (?controller - controller ?secondary_objective - secondary_objective ?scout - scout)
+    :precondition
+      (and
+        (entity_recon_confirmed ?controller)
+        (entity_scout_binding ?controller ?scout)
+        (secondary_objective_available ?secondary_objective)
+        (controller_secondary_binding ?controller ?secondary_objective)
+        (not
+          (controller_secondary_claimed ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_secondary_claimed ?controller)
+        (not
+          (secondary_objective_available ?secondary_objective)
+        )
+      )
+  )
+  (:action reach_secondary_checkpoint
+    :parameters (?controller - controller ?support_unit - support_unit)
+    :precondition
+      (and
+        (controller_secondary_claimed ?controller)
+        (entity_support_binding ?controller ?support_unit)
+        (not
+          (controller_checkpoint_reached ?controller)
+        )
+      )
+    :effect (controller_checkpoint_reached ?controller)
+  )
+  (:action assess_dynamic_event
+    :parameters (?controller - controller ?dynamic_event - dynamic_event)
+    :precondition
+      (and
+        (controller_checkpoint_reached ?controller)
+        (controller_event_binding ?controller ?dynamic_event)
+        (not
+          (controller_assessed ?controller)
+        )
+      )
+    :effect (controller_assessed ?controller)
+  )
+  (:action finalize_checkpoint
+    :parameters (?controller - controller)
+    :precondition
+      (and
+        (controller_assessed ?controller)
+        (not
+          (controller_finalized ?controller)
+        )
+      )
+    :effect
+      (and
+        (controller_finalized ?controller)
+        (entity_traversal_confirmed ?controller)
+      )
+  )
+  (:action confirm_start_point_traversal
+    :parameters (?start_point - start_point ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (start_point_ready ?start_point)
+        (start_point_secured ?start_point)
+        (asset_allocated ?traversal_asset)
+        (asset_validated ?traversal_asset)
+        (not
+          (entity_traversal_confirmed ?start_point)
+        )
+      )
+    :effect (entity_traversal_confirmed ?start_point)
+  )
+  (:action confirm_end_point_traversal
+    :parameters (?end_point - end_point ?traversal_asset - traversal_asset)
+    :precondition
+      (and
+        (end_point_ready ?end_point)
+        (end_point_secured ?end_point)
+        (asset_allocated ?traversal_asset)
+        (asset_validated ?traversal_asset)
+        (not
+          (entity_traversal_confirmed ?end_point)
+        )
+      )
+    :effect (entity_traversal_confirmed ?end_point)
+  )
+  (:action assign_extraction_beacon_to_escort
+    :parameters (?escort_entity - escort_entity ?extraction_beacon - extraction_beacon ?scout - scout)
+    :precondition
+      (and
+        (entity_traversal_confirmed ?escort_entity)
+        (entity_scout_binding ?escort_entity ?scout)
+        (extraction_beacon_available ?extraction_beacon)
+        (not
+          (entity_prepared_for_extraction ?escort_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_prepared_for_extraction ?escort_entity)
+        (entity_extraction_binding ?escort_entity ?extraction_beacon)
+        (not
+          (extraction_beacon_available ?extraction_beacon)
+        )
+      )
+  )
+  (:action establish_extraction_point_for_start
+    :parameters (?start_point - start_point ?route_option - route_option ?extraction_beacon - extraction_beacon)
+    :precondition
+      (and
+        (entity_prepared_for_extraction ?start_point)
+        (entity_route_binding ?start_point ?route_option)
+        (entity_extraction_binding ?start_point ?extraction_beacon)
+        (not
+          (mission_finalized ?start_point)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?start_point)
+        (route_option_available ?route_option)
+        (extraction_beacon_available ?extraction_beacon)
+      )
+  )
+  (:action establish_extraction_point_for_end
+    :parameters (?end_point - end_point ?route_option - route_option ?extraction_beacon - extraction_beacon)
+    :precondition
+      (and
+        (entity_prepared_for_extraction ?end_point)
+        (entity_route_binding ?end_point ?route_option)
+        (entity_extraction_binding ?end_point ?extraction_beacon)
+        (not
+          (mission_finalized ?end_point)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?end_point)
+        (route_option_available ?route_option)
+        (extraction_beacon_available ?extraction_beacon)
+      )
+  )
+  (:action establish_extraction_point_for_controller
+    :parameters (?controller - controller ?route_option - route_option ?extraction_beacon - extraction_beacon)
+    :precondition
+      (and
+        (entity_prepared_for_extraction ?controller)
+        (entity_route_binding ?controller ?route_option)
+        (entity_extraction_binding ?controller ?extraction_beacon)
+        (not
+          (mission_finalized ?controller)
+        )
+      )
+    :effect
+      (and
+        (mission_finalized ?controller)
+        (route_option_available ?route_option)
+        (extraction_beacon_available ?extraction_beacon)
+      )
+  )
+)

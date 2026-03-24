@@ -1,0 +1,936 @@
+(define (domain administrative_document_submission_timing_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_entity - object resource_item - object container_resource - object case_root_type - object enrollment_case - case_root_type administrative_office - administrative_entity administrative_document - administrative_entity reviewer_staff - administrative_entity curriculum_code - administrative_entity instructor - administrative_entity payment_proof - administrative_entity equipment_certificate - administrative_entity clearance_form - administrative_entity supplementary_document - resource_item facility - resource_item waiver_document - resource_item primary_time_slot - container_resource secondary_time_slot - container_resource section_proposal - container_resource enrollment_role - enrollment_case assignment_role - enrollment_case student_record - enrollment_role course_request - enrollment_role department_admin_unit - assignment_role)
+  (:predicates
+    (entity_open ?enrollment_case - enrollment_case)
+    (entity_validated ?enrollment_case - enrollment_case)
+    (entity_has_office_assignment ?enrollment_case - enrollment_case)
+    (entity_finalized ?enrollment_case - enrollment_case)
+    (entity_finalization_flag ?enrollment_case - enrollment_case)
+    (entity_payment_confirmed ?enrollment_case - enrollment_case)
+    (office_available ?administrative_office - administrative_office)
+    (entity_assigned_office ?enrollment_case - enrollment_case ?administrative_office - administrative_office)
+    (document_available ?administrative_document - administrative_document)
+    (entity_has_document ?enrollment_case - enrollment_case ?administrative_document - administrative_document)
+    (reviewer_available ?reviewer_staff - reviewer_staff)
+    (entity_assigned_reviewer ?enrollment_case - enrollment_case ?reviewer_staff - reviewer_staff)
+    (supplementary_document_available ?supplementary_document - supplementary_document)
+    (student_has_supplementary_document ?student_record - student_record ?supplementary_document - supplementary_document)
+    (request_has_supplementary_document ?course_request - course_request ?supplementary_document - supplementary_document)
+    (student_prefers_primary_time ?student_record - student_record ?primary_time_slot - primary_time_slot)
+    (primary_timeslot_reserved ?primary_time_slot - primary_time_slot)
+    (primary_timeslot_pending_supplementary ?primary_time_slot - primary_time_slot)
+    (student_primary_slot_confirmed ?student_record - student_record)
+    (request_prefers_secondary_time ?course_request - course_request ?secondary_time_slot - secondary_time_slot)
+    (secondary_timeslot_reserved ?secondary_time_slot - secondary_time_slot)
+    (secondary_timeslot_pending_supplementary ?secondary_time_slot - secondary_time_slot)
+    (request_secondary_slot_confirmed ?course_request - course_request)
+    (proposal_token_available ?section_proposal - section_proposal)
+    (proposal_locked ?section_proposal - section_proposal)
+    (proposal_has_primary_timeslot ?section_proposal - section_proposal ?primary_time_slot - primary_time_slot)
+    (proposal_has_secondary_timeslot ?section_proposal - section_proposal ?secondary_time_slot - secondary_time_slot)
+    (proposal_requires_curriculum_approval ?section_proposal - section_proposal)
+    (proposal_requires_equipment_certificate ?section_proposal - section_proposal)
+    (proposal_time_confirmed ?section_proposal - section_proposal)
+    (admin_unit_has_student ?department_admin_unit - department_admin_unit ?student_record - student_record)
+    (admin_unit_has_course_request ?department_admin_unit - department_admin_unit ?course_request - course_request)
+    (admin_unit_has_proposal ?department_admin_unit - department_admin_unit ?section_proposal - section_proposal)
+    (facility_available ?facility - facility)
+    (admin_unit_has_facility ?department_admin_unit - department_admin_unit ?facility - facility)
+    (facility_reserved ?facility - facility)
+    (facility_allocated_to_proposal ?facility - facility ?section_proposal - section_proposal)
+    (admin_unit_ready ?department_admin_unit - department_admin_unit)
+    (admin_unit_equipment_verified ?department_admin_unit - department_admin_unit)
+    (admin_unit_certification_complete ?department_admin_unit - department_admin_unit)
+    (admin_unit_curriculum_attached ?department_admin_unit - department_admin_unit)
+    (admin_unit_curriculum_confirmed ?department_admin_unit - department_admin_unit)
+    (admin_unit_instructor_slot_created ?department_admin_unit - department_admin_unit)
+    (admin_unit_section_ready ?department_admin_unit - department_admin_unit)
+    (waiver_available ?waiver_document - waiver_document)
+    (admin_unit_has_waiver ?department_admin_unit - department_admin_unit ?waiver_document - waiver_document)
+    (admin_unit_waiver_attached ?department_admin_unit - department_admin_unit)
+    (admin_unit_waiver_processed ?department_admin_unit - department_admin_unit)
+    (admin_unit_waiver_confirmed ?department_admin_unit - department_admin_unit)
+    (curriculum_code_available ?curriculum_code - curriculum_code)
+    (admin_unit_has_curriculum_code ?department_admin_unit - department_admin_unit ?curriculum_code - curriculum_code)
+    (instructor_available ?instructor - instructor)
+    (admin_unit_assigned_instructor ?department_admin_unit - department_admin_unit ?instructor - instructor)
+    (equipment_certificate_available ?equipment_certificate - equipment_certificate)
+    (admin_unit_has_equipment_certificate ?department_admin_unit - department_admin_unit ?equipment_certificate - equipment_certificate)
+    (clearance_form_available ?clearance_form - clearance_form)
+    (admin_unit_has_clearance_form ?department_admin_unit - department_admin_unit ?clearance_form - clearance_form)
+    (payment_proof_available ?payment_proof - payment_proof)
+    (entity_has_payment_proof ?enrollment_case - enrollment_case ?payment_proof - payment_proof)
+    (student_record_ready ?student_record - student_record)
+    (course_request_ready ?course_request - course_request)
+    (admin_unit_ready_for_finalization ?department_admin_unit - department_admin_unit)
+  )
+  (:action open_enrollment_case
+    :parameters (?enrollment_case - enrollment_case)
+    :precondition
+      (and
+        (not
+          (entity_open ?enrollment_case)
+        )
+        (not
+          (entity_finalized ?enrollment_case)
+        )
+      )
+    :effect (entity_open ?enrollment_case)
+  )
+  (:action assign_office_to_case
+    :parameters (?enrollment_case - enrollment_case ?administrative_office - administrative_office)
+    :precondition
+      (and
+        (entity_open ?enrollment_case)
+        (not
+          (entity_has_office_assignment ?enrollment_case)
+        )
+        (office_available ?administrative_office)
+      )
+    :effect
+      (and
+        (entity_has_office_assignment ?enrollment_case)
+        (entity_assigned_office ?enrollment_case ?administrative_office)
+        (not
+          (office_available ?administrative_office)
+        )
+      )
+  )
+  (:action attach_primary_document_to_case
+    :parameters (?enrollment_case - enrollment_case ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_open ?enrollment_case)
+        (entity_has_office_assignment ?enrollment_case)
+        (document_available ?administrative_document)
+      )
+    :effect
+      (and
+        (entity_has_document ?enrollment_case ?administrative_document)
+        (not
+          (document_available ?administrative_document)
+        )
+      )
+  )
+  (:action perform_initial_validation
+    :parameters (?enrollment_case - enrollment_case ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_open ?enrollment_case)
+        (entity_has_office_assignment ?enrollment_case)
+        (entity_has_document ?enrollment_case ?administrative_document)
+        (not
+          (entity_validated ?enrollment_case)
+        )
+      )
+    :effect (entity_validated ?enrollment_case)
+  )
+  (:action retract_attached_document
+    :parameters (?enrollment_case - enrollment_case ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_has_document ?enrollment_case ?administrative_document)
+      )
+    :effect
+      (and
+        (document_available ?administrative_document)
+        (not
+          (entity_has_document ?enrollment_case ?administrative_document)
+        )
+      )
+  )
+  (:action assign_reviewer_to_case
+    :parameters (?enrollment_case - enrollment_case ?reviewer_staff - reviewer_staff)
+    :precondition
+      (and
+        (entity_validated ?enrollment_case)
+        (reviewer_available ?reviewer_staff)
+      )
+    :effect
+      (and
+        (entity_assigned_reviewer ?enrollment_case ?reviewer_staff)
+        (not
+          (reviewer_available ?reviewer_staff)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_case
+    :parameters (?enrollment_case - enrollment_case ?reviewer_staff - reviewer_staff)
+    :precondition
+      (and
+        (entity_assigned_reviewer ?enrollment_case ?reviewer_staff)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer_staff)
+        (not
+          (entity_assigned_reviewer ?enrollment_case ?reviewer_staff)
+        )
+      )
+  )
+  (:action attach_equipment_certificate
+    :parameters (?department_admin_unit - department_admin_unit ?equipment_certificate - equipment_certificate)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (equipment_certificate_available ?equipment_certificate)
+      )
+    :effect
+      (and
+        (admin_unit_has_equipment_certificate ?department_admin_unit ?equipment_certificate)
+        (not
+          (equipment_certificate_available ?equipment_certificate)
+        )
+      )
+  )
+  (:action detach_equipment_certificate
+    :parameters (?department_admin_unit - department_admin_unit ?equipment_certificate - equipment_certificate)
+    :precondition
+      (and
+        (admin_unit_has_equipment_certificate ?department_admin_unit ?equipment_certificate)
+      )
+    :effect
+      (and
+        (equipment_certificate_available ?equipment_certificate)
+        (not
+          (admin_unit_has_equipment_certificate ?department_admin_unit ?equipment_certificate)
+        )
+      )
+  )
+  (:action attach_clearance_form_to_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (clearance_form_available ?clearance_form)
+      )
+    :effect
+      (and
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (not
+          (clearance_form_available ?clearance_form)
+        )
+      )
+  )
+  (:action detach_clearance_form_from_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form)
+    :precondition
+      (and
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+      )
+    :effect
+      (and
+        (clearance_form_available ?clearance_form)
+        (not
+          (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        )
+      )
+  )
+  (:action reserve_primary_timeslot
+    :parameters (?student_record - student_record ?primary_time_slot - primary_time_slot ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_validated ?student_record)
+        (entity_has_document ?student_record ?administrative_document)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (not
+          (primary_timeslot_reserved ?primary_time_slot)
+        )
+        (not
+          (primary_timeslot_pending_supplementary ?primary_time_slot)
+        )
+      )
+    :effect (primary_timeslot_reserved ?primary_time_slot)
+  )
+  (:action confirm_primary_timeslot_for_student
+    :parameters (?student_record - student_record ?primary_time_slot - primary_time_slot ?reviewer_staff - reviewer_staff)
+    :precondition
+      (and
+        (entity_validated ?student_record)
+        (entity_assigned_reviewer ?student_record ?reviewer_staff)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (primary_timeslot_reserved ?primary_time_slot)
+        (not
+          (student_record_ready ?student_record)
+        )
+      )
+    :effect
+      (and
+        (student_record_ready ?student_record)
+        (student_primary_slot_confirmed ?student_record)
+      )
+  )
+  (:action request_supplementary_document_for_primary_slot
+    :parameters (?student_record - student_record ?primary_time_slot - primary_time_slot ?supplementary_document - supplementary_document)
+    :precondition
+      (and
+        (entity_validated ?student_record)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (supplementary_document_available ?supplementary_document)
+        (not
+          (student_record_ready ?student_record)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_pending_supplementary ?primary_time_slot)
+        (student_record_ready ?student_record)
+        (student_has_supplementary_document ?student_record ?supplementary_document)
+        (not
+          (supplementary_document_available ?supplementary_document)
+        )
+      )
+  )
+  (:action process_supplementary_document_for_primary_slot
+    :parameters (?student_record - student_record ?primary_time_slot - primary_time_slot ?administrative_document - administrative_document ?supplementary_document - supplementary_document)
+    :precondition
+      (and
+        (entity_validated ?student_record)
+        (entity_has_document ?student_record ?administrative_document)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (primary_timeslot_pending_supplementary ?primary_time_slot)
+        (student_has_supplementary_document ?student_record ?supplementary_document)
+        (not
+          (student_primary_slot_confirmed ?student_record)
+        )
+      )
+    :effect
+      (and
+        (primary_timeslot_reserved ?primary_time_slot)
+        (student_primary_slot_confirmed ?student_record)
+        (supplementary_document_available ?supplementary_document)
+        (not
+          (student_has_supplementary_document ?student_record ?supplementary_document)
+        )
+      )
+  )
+  (:action reserve_secondary_timeslot_for_request
+    :parameters (?course_request - course_request ?secondary_time_slot - secondary_time_slot ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_validated ?course_request)
+        (entity_has_document ?course_request ?administrative_document)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (not
+          (secondary_timeslot_reserved ?secondary_time_slot)
+        )
+        (not
+          (secondary_timeslot_pending_supplementary ?secondary_time_slot)
+        )
+      )
+    :effect (secondary_timeslot_reserved ?secondary_time_slot)
+  )
+  (:action confirm_secondary_timeslot_for_request
+    :parameters (?course_request - course_request ?secondary_time_slot - secondary_time_slot ?reviewer_staff - reviewer_staff)
+    :precondition
+      (and
+        (entity_validated ?course_request)
+        (entity_assigned_reviewer ?course_request ?reviewer_staff)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (secondary_timeslot_reserved ?secondary_time_slot)
+        (not
+          (course_request_ready ?course_request)
+        )
+      )
+    :effect
+      (and
+        (course_request_ready ?course_request)
+        (request_secondary_slot_confirmed ?course_request)
+      )
+  )
+  (:action request_supplementary_document_for_secondary_slot
+    :parameters (?course_request - course_request ?secondary_time_slot - secondary_time_slot ?supplementary_document - supplementary_document)
+    :precondition
+      (and
+        (entity_validated ?course_request)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (supplementary_document_available ?supplementary_document)
+        (not
+          (course_request_ready ?course_request)
+        )
+      )
+    :effect
+      (and
+        (secondary_timeslot_pending_supplementary ?secondary_time_slot)
+        (course_request_ready ?course_request)
+        (request_has_supplementary_document ?course_request ?supplementary_document)
+        (not
+          (supplementary_document_available ?supplementary_document)
+        )
+      )
+  )
+  (:action process_supplementary_document_for_secondary_slot
+    :parameters (?course_request - course_request ?secondary_time_slot - secondary_time_slot ?administrative_document - administrative_document ?supplementary_document - supplementary_document)
+    :precondition
+      (and
+        (entity_validated ?course_request)
+        (entity_has_document ?course_request ?administrative_document)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (secondary_timeslot_pending_supplementary ?secondary_time_slot)
+        (request_has_supplementary_document ?course_request ?supplementary_document)
+        (not
+          (request_secondary_slot_confirmed ?course_request)
+        )
+      )
+    :effect
+      (and
+        (secondary_timeslot_reserved ?secondary_time_slot)
+        (request_secondary_slot_confirmed ?course_request)
+        (supplementary_document_available ?supplementary_document)
+        (not
+          (request_has_supplementary_document ?course_request ?supplementary_document)
+        )
+      )
+  )
+  (:action assemble_section_proposal
+    :parameters (?student_record - student_record ?course_request - course_request ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_record_ready ?student_record)
+        (course_request_ready ?course_request)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (primary_timeslot_reserved ?primary_time_slot)
+        (secondary_timeslot_reserved ?secondary_time_slot)
+        (student_primary_slot_confirmed ?student_record)
+        (request_secondary_slot_confirmed ?course_request)
+        (proposal_token_available ?section_proposal)
+      )
+    :effect
+      (and
+        (proposal_locked ?section_proposal)
+        (proposal_has_primary_timeslot ?section_proposal ?primary_time_slot)
+        (proposal_has_secondary_timeslot ?section_proposal ?secondary_time_slot)
+        (not
+          (proposal_token_available ?section_proposal)
+        )
+      )
+  )
+  (:action assemble_section_proposal_with_curriculum_requirement
+    :parameters (?student_record - student_record ?course_request - course_request ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_record_ready ?student_record)
+        (course_request_ready ?course_request)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (primary_timeslot_pending_supplementary ?primary_time_slot)
+        (secondary_timeslot_reserved ?secondary_time_slot)
+        (not
+          (student_primary_slot_confirmed ?student_record)
+        )
+        (request_secondary_slot_confirmed ?course_request)
+        (proposal_token_available ?section_proposal)
+      )
+    :effect
+      (and
+        (proposal_locked ?section_proposal)
+        (proposal_has_primary_timeslot ?section_proposal ?primary_time_slot)
+        (proposal_has_secondary_timeslot ?section_proposal ?secondary_time_slot)
+        (proposal_requires_curriculum_approval ?section_proposal)
+        (not
+          (proposal_token_available ?section_proposal)
+        )
+      )
+  )
+  (:action assemble_section_proposal_with_equipment_requirement
+    :parameters (?student_record - student_record ?course_request - course_request ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_record_ready ?student_record)
+        (course_request_ready ?course_request)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (primary_timeslot_reserved ?primary_time_slot)
+        (secondary_timeslot_pending_supplementary ?secondary_time_slot)
+        (student_primary_slot_confirmed ?student_record)
+        (not
+          (request_secondary_slot_confirmed ?course_request)
+        )
+        (proposal_token_available ?section_proposal)
+      )
+    :effect
+      (and
+        (proposal_locked ?section_proposal)
+        (proposal_has_primary_timeslot ?section_proposal ?primary_time_slot)
+        (proposal_has_secondary_timeslot ?section_proposal ?secondary_time_slot)
+        (proposal_requires_equipment_certificate ?section_proposal)
+        (not
+          (proposal_token_available ?section_proposal)
+        )
+      )
+  )
+  (:action assemble_section_proposal_with_curriculum_and_equipment_requirements
+    :parameters (?student_record - student_record ?course_request - course_request ?primary_time_slot - primary_time_slot ?secondary_time_slot - secondary_time_slot ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_record_ready ?student_record)
+        (course_request_ready ?course_request)
+        (student_prefers_primary_time ?student_record ?primary_time_slot)
+        (request_prefers_secondary_time ?course_request ?secondary_time_slot)
+        (primary_timeslot_pending_supplementary ?primary_time_slot)
+        (secondary_timeslot_pending_supplementary ?secondary_time_slot)
+        (not
+          (student_primary_slot_confirmed ?student_record)
+        )
+        (not
+          (request_secondary_slot_confirmed ?course_request)
+        )
+        (proposal_token_available ?section_proposal)
+      )
+    :effect
+      (and
+        (proposal_locked ?section_proposal)
+        (proposal_has_primary_timeslot ?section_proposal ?primary_time_slot)
+        (proposal_has_secondary_timeslot ?section_proposal ?secondary_time_slot)
+        (proposal_requires_curriculum_approval ?section_proposal)
+        (proposal_requires_equipment_certificate ?section_proposal)
+        (not
+          (proposal_token_available ?section_proposal)
+        )
+      )
+  )
+  (:action confirm_proposal_time_for_section
+    :parameters (?section_proposal - section_proposal ?student_record - student_record ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (proposal_locked ?section_proposal)
+        (student_record_ready ?student_record)
+        (entity_has_document ?student_record ?administrative_document)
+        (not
+          (proposal_time_confirmed ?section_proposal)
+        )
+      )
+    :effect (proposal_time_confirmed ?section_proposal)
+  )
+  (:action allocate_facility_to_proposal
+    :parameters (?department_admin_unit - department_admin_unit ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (admin_unit_has_proposal ?department_admin_unit ?section_proposal)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_available ?facility)
+        (proposal_locked ?section_proposal)
+        (proposal_time_confirmed ?section_proposal)
+        (not
+          (facility_reserved ?facility)
+        )
+      )
+    :effect
+      (and
+        (facility_reserved ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (not
+          (facility_available ?facility)
+        )
+      )
+  )
+  (:action approve_facility_allocation
+    :parameters (?department_admin_unit - department_admin_unit ?facility - facility ?section_proposal - section_proposal ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_reserved ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (entity_has_document ?department_admin_unit ?administrative_document)
+        (not
+          (proposal_requires_curriculum_approval ?section_proposal)
+        )
+        (not
+          (admin_unit_ready ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_ready ?department_admin_unit)
+  )
+  (:action attach_curriculum_code_to_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?curriculum_code - curriculum_code)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (curriculum_code_available ?curriculum_code)
+        (not
+          (admin_unit_curriculum_attached ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_curriculum_attached ?department_admin_unit)
+        (admin_unit_has_curriculum_code ?department_admin_unit ?curriculum_code)
+        (not
+          (curriculum_code_available ?curriculum_code)
+        )
+      )
+  )
+  (:action finalize_curriculum_attachment_for_proposal
+    :parameters (?department_admin_unit - department_admin_unit ?facility - facility ?section_proposal - section_proposal ?administrative_document - administrative_document ?curriculum_code - curriculum_code)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_reserved ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (entity_has_document ?department_admin_unit ?administrative_document)
+        (proposal_requires_curriculum_approval ?section_proposal)
+        (admin_unit_curriculum_attached ?department_admin_unit)
+        (admin_unit_has_curriculum_code ?department_admin_unit ?curriculum_code)
+        (not
+          (admin_unit_ready ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_ready ?department_admin_unit)
+        (admin_unit_curriculum_confirmed ?department_admin_unit)
+      )
+  )
+  (:action verify_admin_unit_equipment_certificate
+    :parameters (?department_admin_unit - department_admin_unit ?equipment_certificate - equipment_certificate ?reviewer_staff - reviewer_staff ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_ready ?department_admin_unit)
+        (admin_unit_has_equipment_certificate ?department_admin_unit ?equipment_certificate)
+        (entity_assigned_reviewer ?department_admin_unit ?reviewer_staff)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (not
+          (proposal_requires_equipment_certificate ?section_proposal)
+        )
+        (not
+          (admin_unit_equipment_verified ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_equipment_verified ?department_admin_unit)
+  )
+  (:action confirm_equipment_certificate_for_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?equipment_certificate - equipment_certificate ?reviewer_staff - reviewer_staff ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_ready ?department_admin_unit)
+        (admin_unit_has_equipment_certificate ?department_admin_unit ?equipment_certificate)
+        (entity_assigned_reviewer ?department_admin_unit ?reviewer_staff)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (proposal_requires_equipment_certificate ?section_proposal)
+        (not
+          (admin_unit_equipment_verified ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_equipment_verified ?department_admin_unit)
+  )
+  (:action complete_clearance_for_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_equipment_verified ?department_admin_unit)
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (not
+          (proposal_requires_curriculum_approval ?section_proposal)
+        )
+        (not
+          (proposal_requires_equipment_certificate ?section_proposal)
+        )
+        (not
+          (admin_unit_certification_complete ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_certification_complete ?department_admin_unit)
+  )
+  (:action complete_clearance_and_grant_instructor_slot
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_equipment_verified ?department_admin_unit)
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (proposal_requires_curriculum_approval ?section_proposal)
+        (not
+          (proposal_requires_equipment_certificate ?section_proposal)
+        )
+        (not
+          (admin_unit_certification_complete ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_instructor_slot_created ?department_admin_unit)
+      )
+  )
+  (:action complete_clearance_and_confirm_instructor_slot
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_equipment_verified ?department_admin_unit)
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (not
+          (proposal_requires_curriculum_approval ?section_proposal)
+        )
+        (proposal_requires_equipment_certificate ?section_proposal)
+        (not
+          (admin_unit_certification_complete ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_instructor_slot_created ?department_admin_unit)
+      )
+  )
+  (:action complete_clearance_and_finalize_instructor_slot
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form ?facility - facility ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (admin_unit_equipment_verified ?department_admin_unit)
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (admin_unit_has_facility ?department_admin_unit ?facility)
+        (facility_allocated_to_proposal ?facility ?section_proposal)
+        (proposal_requires_curriculum_approval ?section_proposal)
+        (proposal_requires_equipment_certificate ?section_proposal)
+        (not
+          (admin_unit_certification_complete ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_instructor_slot_created ?department_admin_unit)
+      )
+  )
+  (:action finalize_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit)
+    :precondition
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (not
+          (admin_unit_instructor_slot_created ?department_admin_unit)
+        )
+        (not
+          (admin_unit_ready_for_finalization ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_ready_for_finalization ?department_admin_unit)
+        (entity_finalization_flag ?department_admin_unit)
+      )
+  )
+  (:action assign_instructor_to_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?instructor - instructor)
+    :precondition
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_instructor_slot_created ?department_admin_unit)
+        (instructor_available ?instructor)
+      )
+    :effect
+      (and
+        (admin_unit_assigned_instructor ?department_admin_unit ?instructor)
+        (not
+          (instructor_available ?instructor)
+        )
+      )
+  )
+  (:action confirm_unit_and_proposal_readiness
+    :parameters (?department_admin_unit - department_admin_unit ?student_record - student_record ?course_request - course_request ?administrative_document - administrative_document ?instructor - instructor)
+    :precondition
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_instructor_slot_created ?department_admin_unit)
+        (admin_unit_assigned_instructor ?department_admin_unit ?instructor)
+        (admin_unit_has_student ?department_admin_unit ?student_record)
+        (admin_unit_has_course_request ?department_admin_unit ?course_request)
+        (student_primary_slot_confirmed ?student_record)
+        (request_secondary_slot_confirmed ?course_request)
+        (entity_has_document ?department_admin_unit ?administrative_document)
+        (not
+          (admin_unit_section_ready ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_section_ready ?department_admin_unit)
+  )
+  (:action finalize_admin_unit_after_confirmation
+    :parameters (?department_admin_unit - department_admin_unit)
+    :precondition
+      (and
+        (admin_unit_certification_complete ?department_admin_unit)
+        (admin_unit_section_ready ?department_admin_unit)
+        (not
+          (admin_unit_ready_for_finalization ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_ready_for_finalization ?department_admin_unit)
+        (entity_finalization_flag ?department_admin_unit)
+      )
+  )
+  (:action attach_waiver_to_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?waiver_document - waiver_document ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_validated ?department_admin_unit)
+        (entity_has_document ?department_admin_unit ?administrative_document)
+        (waiver_available ?waiver_document)
+        (admin_unit_has_waiver ?department_admin_unit ?waiver_document)
+        (not
+          (admin_unit_waiver_attached ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_waiver_attached ?department_admin_unit)
+        (not
+          (waiver_available ?waiver_document)
+        )
+      )
+  )
+  (:action process_waiver_approval
+    :parameters (?department_admin_unit - department_admin_unit ?reviewer_staff - reviewer_staff)
+    :precondition
+      (and
+        (admin_unit_waiver_attached ?department_admin_unit)
+        (entity_assigned_reviewer ?department_admin_unit ?reviewer_staff)
+        (not
+          (admin_unit_waiver_processed ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_waiver_processed ?department_admin_unit)
+  )
+  (:action confirm_clearance_for_admin_unit
+    :parameters (?department_admin_unit - department_admin_unit ?clearance_form - clearance_form)
+    :precondition
+      (and
+        (admin_unit_waiver_processed ?department_admin_unit)
+        (admin_unit_has_clearance_form ?department_admin_unit ?clearance_form)
+        (not
+          (admin_unit_waiver_confirmed ?department_admin_unit)
+        )
+      )
+    :effect (admin_unit_waiver_confirmed ?department_admin_unit)
+  )
+  (:action finalize_admin_unit_after_waiver
+    :parameters (?department_admin_unit - department_admin_unit)
+    :precondition
+      (and
+        (admin_unit_waiver_confirmed ?department_admin_unit)
+        (not
+          (admin_unit_ready_for_finalization ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (admin_unit_ready_for_finalization ?department_admin_unit)
+        (entity_finalization_flag ?department_admin_unit)
+      )
+  )
+  (:action finalize_student_record_via_section_proposal
+    :parameters (?student_record - student_record ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (student_record_ready ?student_record)
+        (student_primary_slot_confirmed ?student_record)
+        (proposal_locked ?section_proposal)
+        (proposal_time_confirmed ?section_proposal)
+        (not
+          (entity_finalization_flag ?student_record)
+        )
+      )
+    :effect (entity_finalization_flag ?student_record)
+  )
+  (:action finalize_course_request_via_section_proposal
+    :parameters (?course_request - course_request ?section_proposal - section_proposal)
+    :precondition
+      (and
+        (course_request_ready ?course_request)
+        (request_secondary_slot_confirmed ?course_request)
+        (proposal_locked ?section_proposal)
+        (proposal_time_confirmed ?section_proposal)
+        (not
+          (entity_finalization_flag ?course_request)
+        )
+      )
+    :effect (entity_finalization_flag ?course_request)
+  )
+  (:action record_payment_proof_for_case
+    :parameters (?enrollment_case - enrollment_case ?payment_proof - payment_proof ?administrative_document - administrative_document)
+    :precondition
+      (and
+        (entity_finalization_flag ?enrollment_case)
+        (entity_has_document ?enrollment_case ?administrative_document)
+        (payment_proof_available ?payment_proof)
+        (not
+          (entity_payment_confirmed ?enrollment_case)
+        )
+      )
+    :effect
+      (and
+        (entity_payment_confirmed ?enrollment_case)
+        (entity_has_payment_proof ?enrollment_case ?payment_proof)
+        (not
+          (payment_proof_available ?payment_proof)
+        )
+      )
+  )
+  (:action finalize_student_record_and_release_office
+    :parameters (?student_record - student_record ?administrative_office - administrative_office ?payment_proof - payment_proof)
+    :precondition
+      (and
+        (entity_payment_confirmed ?student_record)
+        (entity_assigned_office ?student_record ?administrative_office)
+        (entity_has_payment_proof ?student_record ?payment_proof)
+        (not
+          (entity_finalized ?student_record)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?student_record)
+        (office_available ?administrative_office)
+        (payment_proof_available ?payment_proof)
+      )
+  )
+  (:action finalize_course_request_and_release_office
+    :parameters (?course_request - course_request ?administrative_office - administrative_office ?payment_proof - payment_proof)
+    :precondition
+      (and
+        (entity_payment_confirmed ?course_request)
+        (entity_assigned_office ?course_request ?administrative_office)
+        (entity_has_payment_proof ?course_request ?payment_proof)
+        (not
+          (entity_finalized ?course_request)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?course_request)
+        (office_available ?administrative_office)
+        (payment_proof_available ?payment_proof)
+      )
+  )
+  (:action finalize_admin_unit_and_release_office
+    :parameters (?department_admin_unit - department_admin_unit ?administrative_office - administrative_office ?payment_proof - payment_proof)
+    :precondition
+      (and
+        (entity_payment_confirmed ?department_admin_unit)
+        (entity_assigned_office ?department_admin_unit ?administrative_office)
+        (entity_has_payment_proof ?department_admin_unit ?payment_proof)
+        (not
+          (entity_finalized ?department_admin_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?department_admin_unit)
+        (office_available ?administrative_office)
+        (payment_proof_available ?payment_proof)
+      )
+  )
+)

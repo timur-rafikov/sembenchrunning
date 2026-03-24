@@ -1,0 +1,936 @@
+(define (domain cross_entity_invariant_repair)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types root_subtype_a - object root_subtype_b - object root_subtype_c - object system_entity_root - object repair_target - system_entity_root diagnostic_tool - root_subtype_a test_case - root_subtype_a execution_environment - root_subtype_a configuration - root_subtype_a label - root_subtype_a trace_record - root_subtype_a binary_artifact - root_subtype_a review_note - root_subtype_a test_data - root_subtype_b test_suite - root_subtype_b issue_marker - root_subtype_b interface_version - root_subtype_c protocol_state - root_subtype_c patch_bundle - root_subtype_c entity_variant_a - repair_target entity_variant_b - repair_target primary_component - entity_variant_a dependent_component - entity_variant_a repository_module - entity_variant_b)
+  (:predicates
+    (investigation_candidate ?entity - repair_target)
+    (analysis_prepared ?entity - repair_target)
+    (diagnostic_attached_flag ?entity - repair_target)
+    (invariant_restored ?entity - repair_target)
+    (diagnosed ?entity - repair_target)
+    (fix_assigned ?entity - repair_target)
+    (diagnostic_tool_available ?diagnostic_tool - diagnostic_tool)
+    (diagnostic_attachment ?entity - repair_target ?diagnostic_tool - diagnostic_tool)
+    (test_case_available ?test_case - test_case)
+    (test_attachment ?entity - repair_target ?test_case - test_case)
+    (execution_environment_available ?execution_environment - execution_environment)
+    (environment_attachment ?entity - repair_target ?execution_environment - execution_environment)
+    (test_data_available ?test_data - test_data)
+    (testdata_attachment_primary ?primary_component - primary_component ?test_data - test_data)
+    (testdata_attachment_dependent ?dependent_component - dependent_component ?test_data - test_data)
+    (has_interface_version ?primary_component - primary_component ?interface_version - interface_version)
+    (interface_stable ?interface_version - interface_version)
+    (interface_unstable ?interface_version - interface_version)
+    (component_ready ?primary_component - primary_component)
+    (has_protocol_state ?dependent_component - dependent_component ?protocol_state - protocol_state)
+    (protocol_stable ?protocol_state - protocol_state)
+    (protocol_unstable ?protocol_state - protocol_state)
+    (dependent_component_ready ?dependent_component - dependent_component)
+    (patch_bundle_available ?patch_bundle - patch_bundle)
+    (patch_bundle_assembled ?patch_bundle - patch_bundle)
+    (patch_bundle_interface_binding ?patch_bundle - patch_bundle ?interface_version - interface_version)
+    (patch_bundle_protocol_binding ?patch_bundle - patch_bundle ?protocol_state - protocol_state)
+    (interface_compatibility_flag ?patch_bundle - patch_bundle)
+    (protocol_compatibility_flag ?patch_bundle - patch_bundle)
+    (patch_bundle_tested ?patch_bundle - patch_bundle)
+    (module_primary_association ?repository_module - repository_module ?primary_component - primary_component)
+    (module_dependent_association ?repository_module - repository_module ?dependent_component - dependent_component)
+    (module_patchbundle_binding ?repository_module - repository_module ?patch_bundle - patch_bundle)
+    (test_suite_available ?test_suite - test_suite)
+    (module_testsuite_binding ?repository_module - repository_module ?test_suite - test_suite)
+    (test_suite_executed ?test_suite - test_suite)
+    (bundle_validated_by_tests ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    (module_preparation_flag ?repository_module - repository_module)
+    (module_build_ready ?repository_module - repository_module)
+    (module_reviewed ?repository_module - repository_module)
+    (configuration_attached ?repository_module - repository_module)
+    (configuration_integrated ?repository_module - repository_module)
+    (module_review_approved ?repository_module - repository_module)
+    (final_checks_passed ?repository_module - repository_module)
+    (issue_marker_available ?issue_marker - issue_marker)
+    (module_issue_binding ?repository_module - repository_module ?issue_marker - issue_marker)
+    (module_issue_bound ?repository_module - repository_module)
+    (module_configured ?repository_module - repository_module)
+    (module_config_verified ?repository_module - repository_module)
+    (configuration_available ?configuration - configuration)
+    (module_configuration_binding ?repository_module - repository_module ?configuration - configuration)
+    (label_available ?label - label)
+    (module_label_binding ?repository_module - repository_module ?label - label)
+    (binary_artifact_available ?binary_artifact - binary_artifact)
+    (module_binary_binding ?repository_module - repository_module ?binary_artifact - binary_artifact)
+    (review_note_available ?review_note - review_note)
+    (module_review_binding ?repository_module - repository_module ?review_note - review_note)
+    (trace_record_available ?trace_record - trace_record)
+    (entity_trace_binding ?entity - repair_target ?trace_record - trace_record)
+    (component_interface_evaluated ?primary_component - primary_component)
+    (dependent_component_interface_evaluated ?dependent_component - dependent_component)
+    (verification_flag ?repository_module - repository_module)
+  )
+  (:action register_investigation_candidate
+    :parameters (?entity - repair_target)
+    :precondition
+      (and
+        (not
+          (investigation_candidate ?entity)
+        )
+        (not
+          (invariant_restored ?entity)
+        )
+      )
+    :effect (investigation_candidate ?entity)
+  )
+  (:action attach_diagnostic_tool_to_entity
+    :parameters (?entity - repair_target ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (investigation_candidate ?entity)
+        (not
+          (diagnostic_attached_flag ?entity)
+        )
+        (diagnostic_tool_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_attached_flag ?entity)
+        (diagnostic_attachment ?entity ?diagnostic_tool)
+        (not
+          (diagnostic_tool_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action assign_test_case_to_entity
+    :parameters (?entity - repair_target ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_candidate ?entity)
+        (diagnostic_attached_flag ?entity)
+        (test_case_available ?test_case)
+      )
+    :effect
+      (and
+        (test_attachment ?entity ?test_case)
+        (not
+          (test_case_available ?test_case)
+        )
+      )
+  )
+  (:action prepare_analysis_for_entity
+    :parameters (?entity - repair_target ?test_case - test_case)
+    :precondition
+      (and
+        (investigation_candidate ?entity)
+        (diagnostic_attached_flag ?entity)
+        (test_attachment ?entity ?test_case)
+        (not
+          (analysis_prepared ?entity)
+        )
+      )
+    :effect (analysis_prepared ?entity)
+  )
+  (:action detach_test_case_from_entity
+    :parameters (?entity - repair_target ?test_case - test_case)
+    :precondition
+      (and
+        (test_attachment ?entity ?test_case)
+      )
+    :effect
+      (and
+        (test_case_available ?test_case)
+        (not
+          (test_attachment ?entity ?test_case)
+        )
+      )
+  )
+  (:action attach_execution_environment_to_entity
+    :parameters (?entity - repair_target ?execution_environment - execution_environment)
+    :precondition
+      (and
+        (analysis_prepared ?entity)
+        (execution_environment_available ?execution_environment)
+      )
+    :effect
+      (and
+        (environment_attachment ?entity ?execution_environment)
+        (not
+          (execution_environment_available ?execution_environment)
+        )
+      )
+  )
+  (:action detach_execution_environment_from_entity
+    :parameters (?entity - repair_target ?execution_environment - execution_environment)
+    :precondition
+      (and
+        (environment_attachment ?entity ?execution_environment)
+      )
+    :effect
+      (and
+        (execution_environment_available ?execution_environment)
+        (not
+          (environment_attachment ?entity ?execution_environment)
+        )
+      )
+  )
+  (:action attach_binary_artifact_to_module
+    :parameters (?repository_module - repository_module ?binary_artifact - binary_artifact)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (binary_artifact_available ?binary_artifact)
+      )
+    :effect
+      (and
+        (module_binary_binding ?repository_module ?binary_artifact)
+        (not
+          (binary_artifact_available ?binary_artifact)
+        )
+      )
+  )
+  (:action detach_binary_artifact_from_module
+    :parameters (?repository_module - repository_module ?binary_artifact - binary_artifact)
+    :precondition
+      (and
+        (module_binary_binding ?repository_module ?binary_artifact)
+      )
+    :effect
+      (and
+        (binary_artifact_available ?binary_artifact)
+        (not
+          (module_binary_binding ?repository_module ?binary_artifact)
+        )
+      )
+  )
+  (:action attach_review_note_to_module
+    :parameters (?repository_module - repository_module ?review_note - review_note)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (review_note_available ?review_note)
+      )
+    :effect
+      (and
+        (module_review_binding ?repository_module ?review_note)
+        (not
+          (review_note_available ?review_note)
+        )
+      )
+  )
+  (:action detach_review_note_from_module
+    :parameters (?repository_module - repository_module ?review_note - review_note)
+    :precondition
+      (and
+        (module_review_binding ?repository_module ?review_note)
+      )
+    :effect
+      (and
+        (review_note_available ?review_note)
+        (not
+          (module_review_binding ?repository_module ?review_note)
+        )
+      )
+  )
+  (:action mark_interface_stable
+    :parameters (?primary_component - primary_component ?interface_version - interface_version ?test_case - test_case)
+    :precondition
+      (and
+        (analysis_prepared ?primary_component)
+        (test_attachment ?primary_component ?test_case)
+        (has_interface_version ?primary_component ?interface_version)
+        (not
+          (interface_stable ?interface_version)
+        )
+        (not
+          (interface_unstable ?interface_version)
+        )
+      )
+    :effect (interface_stable ?interface_version)
+  )
+  (:action finalize_primary_component_ready
+    :parameters (?primary_component - primary_component ?interface_version - interface_version ?execution_environment - execution_environment)
+    :precondition
+      (and
+        (analysis_prepared ?primary_component)
+        (environment_attachment ?primary_component ?execution_environment)
+        (has_interface_version ?primary_component ?interface_version)
+        (interface_stable ?interface_version)
+        (not
+          (component_interface_evaluated ?primary_component)
+        )
+      )
+    :effect
+      (and
+        (component_interface_evaluated ?primary_component)
+        (component_ready ?primary_component)
+      )
+  )
+  (:action attach_testdata_and_mark_interface_unstable
+    :parameters (?primary_component - primary_component ?interface_version - interface_version ?test_data - test_data)
+    :precondition
+      (and
+        (analysis_prepared ?primary_component)
+        (has_interface_version ?primary_component ?interface_version)
+        (test_data_available ?test_data)
+        (not
+          (component_interface_evaluated ?primary_component)
+        )
+      )
+    :effect
+      (and
+        (interface_unstable ?interface_version)
+        (component_interface_evaluated ?primary_component)
+        (testdata_attachment_primary ?primary_component ?test_data)
+        (not
+          (test_data_available ?test_data)
+        )
+      )
+  )
+  (:action stabilize_interface_and_restore_testdata
+    :parameters (?primary_component - primary_component ?interface_version - interface_version ?test_case - test_case ?test_data - test_data)
+    :precondition
+      (and
+        (analysis_prepared ?primary_component)
+        (test_attachment ?primary_component ?test_case)
+        (has_interface_version ?primary_component ?interface_version)
+        (interface_unstable ?interface_version)
+        (testdata_attachment_primary ?primary_component ?test_data)
+        (not
+          (component_ready ?primary_component)
+        )
+      )
+    :effect
+      (and
+        (interface_stable ?interface_version)
+        (component_ready ?primary_component)
+        (test_data_available ?test_data)
+        (not
+          (testdata_attachment_primary ?primary_component ?test_data)
+        )
+      )
+  )
+  (:action mark_protocol_state_stable
+    :parameters (?dependent_component - dependent_component ?protocol_state - protocol_state ?test_case - test_case)
+    :precondition
+      (and
+        (analysis_prepared ?dependent_component)
+        (test_attachment ?dependent_component ?test_case)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (not
+          (protocol_stable ?protocol_state)
+        )
+        (not
+          (protocol_unstable ?protocol_state)
+        )
+      )
+    :effect (protocol_stable ?protocol_state)
+  )
+  (:action finalize_dependent_component_ready
+    :parameters (?dependent_component - dependent_component ?protocol_state - protocol_state ?execution_environment - execution_environment)
+    :precondition
+      (and
+        (analysis_prepared ?dependent_component)
+        (environment_attachment ?dependent_component ?execution_environment)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (protocol_stable ?protocol_state)
+        (not
+          (dependent_component_interface_evaluated ?dependent_component)
+        )
+      )
+    :effect
+      (and
+        (dependent_component_interface_evaluated ?dependent_component)
+        (dependent_component_ready ?dependent_component)
+      )
+  )
+  (:action attach_testdata_and_mark_protocol_unstable
+    :parameters (?dependent_component - dependent_component ?protocol_state - protocol_state ?test_data - test_data)
+    :precondition
+      (and
+        (analysis_prepared ?dependent_component)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (test_data_available ?test_data)
+        (not
+          (dependent_component_interface_evaluated ?dependent_component)
+        )
+      )
+    :effect
+      (and
+        (protocol_unstable ?protocol_state)
+        (dependent_component_interface_evaluated ?dependent_component)
+        (testdata_attachment_dependent ?dependent_component ?test_data)
+        (not
+          (test_data_available ?test_data)
+        )
+      )
+  )
+  (:action stabilize_protocol_and_restore_testdata
+    :parameters (?dependent_component - dependent_component ?protocol_state - protocol_state ?test_case - test_case ?test_data - test_data)
+    :precondition
+      (and
+        (analysis_prepared ?dependent_component)
+        (test_attachment ?dependent_component ?test_case)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (protocol_unstable ?protocol_state)
+        (testdata_attachment_dependent ?dependent_component ?test_data)
+        (not
+          (dependent_component_ready ?dependent_component)
+        )
+      )
+    :effect
+      (and
+        (protocol_stable ?protocol_state)
+        (dependent_component_ready ?dependent_component)
+        (test_data_available ?test_data)
+        (not
+          (testdata_attachment_dependent ?dependent_component ?test_data)
+        )
+      )
+  )
+  (:action assemble_patch_bundle
+    :parameters (?primary_component - primary_component ?dependent_component - dependent_component ?interface_version - interface_version ?protocol_state - protocol_state ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (component_interface_evaluated ?primary_component)
+        (dependent_component_interface_evaluated ?dependent_component)
+        (has_interface_version ?primary_component ?interface_version)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (interface_stable ?interface_version)
+        (protocol_stable ?protocol_state)
+        (component_ready ?primary_component)
+        (dependent_component_ready ?dependent_component)
+        (patch_bundle_available ?patch_bundle)
+      )
+    :effect
+      (and
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_interface_binding ?patch_bundle ?interface_version)
+        (patch_bundle_protocol_binding ?patch_bundle ?protocol_state)
+        (not
+          (patch_bundle_available ?patch_bundle)
+        )
+      )
+  )
+  (:action assemble_patch_bundle_with_interface_compatibility
+    :parameters (?primary_component - primary_component ?dependent_component - dependent_component ?interface_version - interface_version ?protocol_state - protocol_state ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (component_interface_evaluated ?primary_component)
+        (dependent_component_interface_evaluated ?dependent_component)
+        (has_interface_version ?primary_component ?interface_version)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (interface_unstable ?interface_version)
+        (protocol_stable ?protocol_state)
+        (not
+          (component_ready ?primary_component)
+        )
+        (dependent_component_ready ?dependent_component)
+        (patch_bundle_available ?patch_bundle)
+      )
+    :effect
+      (and
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_interface_binding ?patch_bundle ?interface_version)
+        (patch_bundle_protocol_binding ?patch_bundle ?protocol_state)
+        (interface_compatibility_flag ?patch_bundle)
+        (not
+          (patch_bundle_available ?patch_bundle)
+        )
+      )
+  )
+  (:action assemble_patch_bundle_with_protocol_compatibility
+    :parameters (?primary_component - primary_component ?dependent_component - dependent_component ?interface_version - interface_version ?protocol_state - protocol_state ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (component_interface_evaluated ?primary_component)
+        (dependent_component_interface_evaluated ?dependent_component)
+        (has_interface_version ?primary_component ?interface_version)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (interface_stable ?interface_version)
+        (protocol_unstable ?protocol_state)
+        (component_ready ?primary_component)
+        (not
+          (dependent_component_ready ?dependent_component)
+        )
+        (patch_bundle_available ?patch_bundle)
+      )
+    :effect
+      (and
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_interface_binding ?patch_bundle ?interface_version)
+        (patch_bundle_protocol_binding ?patch_bundle ?protocol_state)
+        (protocol_compatibility_flag ?patch_bundle)
+        (not
+          (patch_bundle_available ?patch_bundle)
+        )
+      )
+  )
+  (:action assemble_patch_bundle_with_both_compat_flags
+    :parameters (?primary_component - primary_component ?dependent_component - dependent_component ?interface_version - interface_version ?protocol_state - protocol_state ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (component_interface_evaluated ?primary_component)
+        (dependent_component_interface_evaluated ?dependent_component)
+        (has_interface_version ?primary_component ?interface_version)
+        (has_protocol_state ?dependent_component ?protocol_state)
+        (interface_unstable ?interface_version)
+        (protocol_unstable ?protocol_state)
+        (not
+          (component_ready ?primary_component)
+        )
+        (not
+          (dependent_component_ready ?dependent_component)
+        )
+        (patch_bundle_available ?patch_bundle)
+      )
+    :effect
+      (and
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_interface_binding ?patch_bundle ?interface_version)
+        (patch_bundle_protocol_binding ?patch_bundle ?protocol_state)
+        (interface_compatibility_flag ?patch_bundle)
+        (protocol_compatibility_flag ?patch_bundle)
+        (not
+          (patch_bundle_available ?patch_bundle)
+        )
+      )
+  )
+  (:action mark_patch_bundle_tested
+    :parameters (?patch_bundle - patch_bundle ?primary_component - primary_component ?test_case - test_case)
+    :precondition
+      (and
+        (patch_bundle_assembled ?patch_bundle)
+        (component_interface_evaluated ?primary_component)
+        (test_attachment ?primary_component ?test_case)
+        (not
+          (patch_bundle_tested ?patch_bundle)
+        )
+      )
+    :effect (patch_bundle_tested ?patch_bundle)
+  )
+  (:action execute_test_suite_against_bundle
+    :parameters (?repository_module - repository_module ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (module_patchbundle_binding ?repository_module ?patch_bundle)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (test_suite_available ?test_suite)
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_tested ?patch_bundle)
+        (not
+          (test_suite_executed ?test_suite)
+        )
+      )
+    :effect
+      (and
+        (test_suite_executed ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (not
+          (test_suite_available ?test_suite)
+        )
+      )
+  )
+  (:action flag_module_preparation
+    :parameters (?repository_module - repository_module ?test_suite - test_suite ?patch_bundle - patch_bundle ?test_case - test_case)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (test_suite_executed ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (test_attachment ?repository_module ?test_case)
+        (not
+          (interface_compatibility_flag ?patch_bundle)
+        )
+        (not
+          (module_preparation_flag ?repository_module)
+        )
+      )
+    :effect (module_preparation_flag ?repository_module)
+  )
+  (:action attach_configuration_to_module
+    :parameters (?repository_module - repository_module ?configuration - configuration)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (configuration_available ?configuration)
+        (not
+          (configuration_attached ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (configuration_attached ?repository_module)
+        (module_configuration_binding ?repository_module ?configuration)
+        (not
+          (configuration_available ?configuration)
+        )
+      )
+  )
+  (:action integrate_configuration_into_module
+    :parameters (?repository_module - repository_module ?test_suite - test_suite ?patch_bundle - patch_bundle ?test_case - test_case ?configuration - configuration)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (test_suite_executed ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (test_attachment ?repository_module ?test_case)
+        (interface_compatibility_flag ?patch_bundle)
+        (configuration_attached ?repository_module)
+        (module_configuration_binding ?repository_module ?configuration)
+        (not
+          (module_preparation_flag ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (module_preparation_flag ?repository_module)
+        (configuration_integrated ?repository_module)
+      )
+  )
+  (:action mark_module_build_ready_without_protocol_flag
+    :parameters (?repository_module - repository_module ?binary_artifact - binary_artifact ?execution_environment - execution_environment ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_preparation_flag ?repository_module)
+        (module_binary_binding ?repository_module ?binary_artifact)
+        (environment_attachment ?repository_module ?execution_environment)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (not
+          (protocol_compatibility_flag ?patch_bundle)
+        )
+        (not
+          (module_build_ready ?repository_module)
+        )
+      )
+    :effect (module_build_ready ?repository_module)
+  )
+  (:action mark_module_build_ready_with_protocol_flag
+    :parameters (?repository_module - repository_module ?binary_artifact - binary_artifact ?execution_environment - execution_environment ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_preparation_flag ?repository_module)
+        (module_binary_binding ?repository_module ?binary_artifact)
+        (environment_attachment ?repository_module ?execution_environment)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (protocol_compatibility_flag ?patch_bundle)
+        (not
+          (module_build_ready ?repository_module)
+        )
+      )
+    :effect (module_build_ready ?repository_module)
+  )
+  (:action start_module_review
+    :parameters (?repository_module - repository_module ?review_note - review_note ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_build_ready ?repository_module)
+        (module_review_binding ?repository_module ?review_note)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (not
+          (interface_compatibility_flag ?patch_bundle)
+        )
+        (not
+          (protocol_compatibility_flag ?patch_bundle)
+        )
+        (not
+          (module_reviewed ?repository_module)
+        )
+      )
+    :effect (module_reviewed ?repository_module)
+  )
+  (:action approve_module_review_variant_a
+    :parameters (?repository_module - repository_module ?review_note - review_note ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_build_ready ?repository_module)
+        (module_review_binding ?repository_module ?review_note)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (interface_compatibility_flag ?patch_bundle)
+        (not
+          (protocol_compatibility_flag ?patch_bundle)
+        )
+        (not
+          (module_reviewed ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (module_reviewed ?repository_module)
+        (module_review_approved ?repository_module)
+      )
+  )
+  (:action approve_module_review_variant_b
+    :parameters (?repository_module - repository_module ?review_note - review_note ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_build_ready ?repository_module)
+        (module_review_binding ?repository_module ?review_note)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (not
+          (interface_compatibility_flag ?patch_bundle)
+        )
+        (protocol_compatibility_flag ?patch_bundle)
+        (not
+          (module_reviewed ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (module_reviewed ?repository_module)
+        (module_review_approved ?repository_module)
+      )
+  )
+  (:action approve_module_review_variant_c
+    :parameters (?repository_module - repository_module ?review_note - review_note ?test_suite - test_suite ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (module_build_ready ?repository_module)
+        (module_review_binding ?repository_module ?review_note)
+        (module_testsuite_binding ?repository_module ?test_suite)
+        (bundle_validated_by_tests ?test_suite ?patch_bundle)
+        (interface_compatibility_flag ?patch_bundle)
+        (protocol_compatibility_flag ?patch_bundle)
+        (not
+          (module_reviewed ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (module_reviewed ?repository_module)
+        (module_review_approved ?repository_module)
+      )
+  )
+  (:action finalize_module_verification_without_label
+    :parameters (?repository_module - repository_module)
+    :precondition
+      (and
+        (module_reviewed ?repository_module)
+        (not
+          (module_review_approved ?repository_module)
+        )
+        (not
+          (verification_flag ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (verification_flag ?repository_module)
+        (diagnosed ?repository_module)
+      )
+  )
+  (:action attach_label_to_module
+    :parameters (?repository_module - repository_module ?label - label)
+    :precondition
+      (and
+        (module_reviewed ?repository_module)
+        (module_review_approved ?repository_module)
+        (label_available ?label)
+      )
+    :effect
+      (and
+        (module_label_binding ?repository_module ?label)
+        (not
+          (label_available ?label)
+        )
+      )
+  )
+  (:action finalize_module_approval
+    :parameters (?repository_module - repository_module ?primary_component - primary_component ?dependent_component - dependent_component ?test_case - test_case ?label - label)
+    :precondition
+      (and
+        (module_reviewed ?repository_module)
+        (module_review_approved ?repository_module)
+        (module_label_binding ?repository_module ?label)
+        (module_primary_association ?repository_module ?primary_component)
+        (module_dependent_association ?repository_module ?dependent_component)
+        (component_ready ?primary_component)
+        (dependent_component_ready ?dependent_component)
+        (test_attachment ?repository_module ?test_case)
+        (not
+          (final_checks_passed ?repository_module)
+        )
+      )
+    :effect (final_checks_passed ?repository_module)
+  )
+  (:action finalize_module_verification_with_final_checks
+    :parameters (?repository_module - repository_module)
+    :precondition
+      (and
+        (module_reviewed ?repository_module)
+        (final_checks_passed ?repository_module)
+        (not
+          (verification_flag ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (verification_flag ?repository_module)
+        (diagnosed ?repository_module)
+      )
+  )
+  (:action bind_issue_marker_to_module
+    :parameters (?repository_module - repository_module ?issue_marker - issue_marker ?test_case - test_case)
+    :precondition
+      (and
+        (analysis_prepared ?repository_module)
+        (test_attachment ?repository_module ?test_case)
+        (issue_marker_available ?issue_marker)
+        (module_issue_binding ?repository_module ?issue_marker)
+        (not
+          (module_issue_bound ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (module_issue_bound ?repository_module)
+        (not
+          (issue_marker_available ?issue_marker)
+        )
+      )
+  )
+  (:action configure_module_for_issue_review
+    :parameters (?repository_module - repository_module ?execution_environment - execution_environment)
+    :precondition
+      (and
+        (module_issue_bound ?repository_module)
+        (environment_attachment ?repository_module ?execution_environment)
+        (not
+          (module_configured ?repository_module)
+        )
+      )
+    :effect (module_configured ?repository_module)
+  )
+  (:action apply_review_verification
+    :parameters (?repository_module - repository_module ?review_note - review_note)
+    :precondition
+      (and
+        (module_configured ?repository_module)
+        (module_review_binding ?repository_module ?review_note)
+        (not
+          (module_config_verified ?repository_module)
+        )
+      )
+    :effect (module_config_verified ?repository_module)
+  )
+  (:action finalize_module_verification_after_config_review
+    :parameters (?repository_module - repository_module)
+    :precondition
+      (and
+        (module_config_verified ?repository_module)
+        (not
+          (verification_flag ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (verification_flag ?repository_module)
+        (diagnosed ?repository_module)
+      )
+  )
+  (:action mark_primary_component_diagnosed
+    :parameters (?primary_component - primary_component ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (component_interface_evaluated ?primary_component)
+        (component_ready ?primary_component)
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_tested ?patch_bundle)
+        (not
+          (diagnosed ?primary_component)
+        )
+      )
+    :effect (diagnosed ?primary_component)
+  )
+  (:action mark_dependent_component_diagnosed
+    :parameters (?dependent_component - dependent_component ?patch_bundle - patch_bundle)
+    :precondition
+      (and
+        (dependent_component_interface_evaluated ?dependent_component)
+        (dependent_component_ready ?dependent_component)
+        (patch_bundle_assembled ?patch_bundle)
+        (patch_bundle_tested ?patch_bundle)
+        (not
+          (diagnosed ?dependent_component)
+        )
+      )
+    :effect (diagnosed ?dependent_component)
+  )
+  (:action assign_fix_candidate_to_entity
+    :parameters (?entity - repair_target ?trace_record - trace_record ?test_case - test_case)
+    :precondition
+      (and
+        (diagnosed ?entity)
+        (test_attachment ?entity ?test_case)
+        (trace_record_available ?trace_record)
+        (not
+          (fix_assigned ?entity)
+        )
+      )
+    :effect
+      (and
+        (fix_assigned ?entity)
+        (entity_trace_binding ?entity ?trace_record)
+        (not
+          (trace_record_available ?trace_record)
+        )
+      )
+  )
+  (:action apply_fix_to_primary_component
+    :parameters (?primary_component - primary_component ?diagnostic_tool - diagnostic_tool ?trace_record - trace_record)
+    :precondition
+      (and
+        (fix_assigned ?primary_component)
+        (diagnostic_attachment ?primary_component ?diagnostic_tool)
+        (entity_trace_binding ?primary_component ?trace_record)
+        (not
+          (invariant_restored ?primary_component)
+        )
+      )
+    :effect
+      (and
+        (invariant_restored ?primary_component)
+        (diagnostic_tool_available ?diagnostic_tool)
+        (trace_record_available ?trace_record)
+      )
+  )
+  (:action apply_fix_to_dependent_component
+    :parameters (?dependent_component - dependent_component ?diagnostic_tool - diagnostic_tool ?trace_record - trace_record)
+    :precondition
+      (and
+        (fix_assigned ?dependent_component)
+        (diagnostic_attachment ?dependent_component ?diagnostic_tool)
+        (entity_trace_binding ?dependent_component ?trace_record)
+        (not
+          (invariant_restored ?dependent_component)
+        )
+      )
+    :effect
+      (and
+        (invariant_restored ?dependent_component)
+        (diagnostic_tool_available ?diagnostic_tool)
+        (trace_record_available ?trace_record)
+      )
+  )
+  (:action apply_fix_to_module
+    :parameters (?repository_module - repository_module ?diagnostic_tool - diagnostic_tool ?trace_record - trace_record)
+    :precondition
+      (and
+        (fix_assigned ?repository_module)
+        (diagnostic_attachment ?repository_module ?diagnostic_tool)
+        (entity_trace_binding ?repository_module ?trace_record)
+        (not
+          (invariant_restored ?repository_module)
+        )
+      )
+    :effect
+      (and
+        (invariant_restored ?repository_module)
+        (diagnostic_tool_available ?diagnostic_tool)
+        (trace_record_available ?trace_record)
+      )
+  )
+)

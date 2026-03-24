@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain perishables_delivery_window_alignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types facility_resource - object handling_asset - object outbound_artifact - object consignment_entity - object product_unit - consignment_entity grading_station - facility_resource quality_test_device - facility_resource conditioning_station - facility_resource document_template - facility_resource label_profile - facility_resource delivery_window_requirement - facility_resource temperature_profile - facility_resource route_preference - facility_resource packaging_resource - handling_asset container - handling_asset customer_allocation - handling_asset delivery_slot_type_a - outbound_artifact delivery_slot_type_b - outbound_artifact shipment_unit - outbound_artifact storage_location - product_unit processing_group - product_unit cold_storage_cell - storage_location ambient_storage_cell - storage_location processing_batch - processing_group)
+  (:predicates
+    (product_unit_received ?product_unit - product_unit)
+    (grading_completed ?product_unit - product_unit)
+    (product_unit_assigned_for_grading ?product_unit - product_unit)
+    (committed_to_shipment ?product_unit - product_unit)
+    (release_authorized ?product_unit - product_unit)
+    (dispatched ?product_unit - product_unit)
+    (grading_station_available ?grading_station - grading_station)
+    (grading_assignment ?product_unit - product_unit ?grading_station - grading_station)
+    (quality_test_device_available ?quality_test_device - quality_test_device)
+    (quality_test_assignment ?product_unit - product_unit ?quality_test_device - quality_test_device)
+    (conditioning_station_available ?conditioning_station - conditioning_station)
+    (conditioning_allocation ?product_unit - product_unit ?conditioning_station - conditioning_station)
+    (packaging_resource_available ?packaging_resource - packaging_resource)
+    (packaging_assignment_cold_cell ?cold_storage_cell - cold_storage_cell ?packaging_resource - packaging_resource)
+    (packaging_assignment_ambient_cell ?ambient_storage_cell - ambient_storage_cell ?packaging_resource - packaging_resource)
+    (cold_cell_slot_type_a_compatible ?cold_storage_cell - cold_storage_cell ?delivery_slot_type_a - delivery_slot_type_a)
+    (delivery_slot_type_a_flagged ?delivery_slot_type_a - delivery_slot_type_a)
+    (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a - delivery_slot_type_a)
+    (cold_cell_prepared_for_slot ?cold_storage_cell - cold_storage_cell)
+    (ambient_cell_slot_type_b_compatible ?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_b - delivery_slot_type_b)
+    (delivery_slot_type_b_flagged ?delivery_slot_type_b - delivery_slot_type_b)
+    (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b - delivery_slot_type_b)
+    (ambient_cell_prepared_for_slot ?ambient_storage_cell - ambient_storage_cell)
+    (shipment_unit_available ?shipment_unit - shipment_unit)
+    (shipment_unit_assembled ?shipment_unit - shipment_unit)
+    (shipment_unit_slot_a_assignment ?shipment_unit - shipment_unit ?delivery_slot_type_a - delivery_slot_type_a)
+    (shipment_unit_slot_b_assignment ?shipment_unit - shipment_unit ?delivery_slot_type_b - delivery_slot_type_b)
+    (shipment_unit_mark_cold ?shipment_unit - shipment_unit)
+    (shipment_unit_mark_ambient ?shipment_unit - shipment_unit)
+    (shipment_unit_ready_for_containerization ?shipment_unit - shipment_unit)
+    (processing_batch_assigned_to_cold_cell ?processing_batch - processing_batch ?cold_storage_cell - cold_storage_cell)
+    (processing_batch_assigned_to_ambient_cell ?processing_batch - processing_batch ?ambient_storage_cell - ambient_storage_cell)
+    (processing_batch_assigned_to_shipment_unit ?processing_batch - processing_batch ?shipment_unit - shipment_unit)
+    (container_available ?container - container)
+    (processing_batch_container_assignment ?processing_batch - processing_batch ?container - container)
+    (container_allocated ?container - container)
+    (container_assigned_to_shipment ?container - container ?shipment_unit - shipment_unit)
+    (batch_ready_for_consolidation ?processing_batch - processing_batch)
+    (batch_consolidated ?processing_batch - processing_batch)
+    (batch_final_checks_complete ?processing_batch - processing_batch)
+    (document_template_attached ?processing_batch - processing_batch)
+    (batch_document_verified ?processing_batch - processing_batch)
+    (batch_documentation_complete ?processing_batch - processing_batch)
+    (batch_release_checks_completed ?processing_batch - processing_batch)
+    (customer_allocation_available ?customer_allocation - customer_allocation)
+    (processing_batch_customer_allocation ?processing_batch - processing_batch ?customer_allocation - customer_allocation)
+    (customer_allocation_attached_to_batch ?processing_batch - processing_batch)
+    (conditioning_verified_for_batch ?processing_batch - processing_batch)
+    (routing_preference_verified_for_batch ?processing_batch - processing_batch)
+    (document_template_available ?document_template - document_template)
+    (processing_batch_document_assignment ?processing_batch - processing_batch ?document_template - document_template)
+    (label_profile_available ?label_profile - label_profile)
+    (processing_batch_label_assignment ?processing_batch - processing_batch ?label_profile - label_profile)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (processing_batch_temperature_profile_assignment ?processing_batch - processing_batch ?temperature_profile - temperature_profile)
+    (route_preference_available ?route_preference - route_preference)
+    (processing_batch_route_preference_assignment ?processing_batch - processing_batch ?route_preference - route_preference)
+    (delivery_window_requirement_available ?delivery_window_requirement - delivery_window_requirement)
+    (delivery_window_assignment ?product_unit - product_unit ?delivery_window_requirement - delivery_window_requirement)
+    (cold_cell_commissioned ?cold_storage_cell - cold_storage_cell)
+    (ambient_cell_commissioned ?ambient_storage_cell - ambient_storage_cell)
+    (release_authorization_flag ?processing_batch - processing_batch)
+  )
+  (:action register_harvest_lot
+    :parameters (?product_unit - product_unit)
+    :precondition
+      (and
+        (not
+          (product_unit_received ?product_unit)
+        )
+        (not
+          (committed_to_shipment ?product_unit)
+        )
+      )
+    :effect (product_unit_received ?product_unit)
+  )
+  (:action assign_to_grading_station
+    :parameters (?product_unit - product_unit ?grading_station - grading_station)
+    :precondition
+      (and
+        (product_unit_received ?product_unit)
+        (not
+          (product_unit_assigned_for_grading ?product_unit)
+        )
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (product_unit_assigned_for_grading ?product_unit)
+        (grading_assignment ?product_unit ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action assign_quality_test_device
+    :parameters (?product_unit - product_unit ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (product_unit_received ?product_unit)
+        (product_unit_assigned_for_grading ?product_unit)
+        (quality_test_device_available ?quality_test_device)
+      )
+    :effect
+      (and
+        (quality_test_assignment ?product_unit ?quality_test_device)
+        (not
+          (quality_test_device_available ?quality_test_device)
+        )
+      )
+  )
+  (:action finalize_grading
+    :parameters (?product_unit - product_unit ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (product_unit_received ?product_unit)
+        (product_unit_assigned_for_grading ?product_unit)
+        (quality_test_assignment ?product_unit ?quality_test_device)
+        (not
+          (grading_completed ?product_unit)
+        )
+      )
+    :effect (grading_completed ?product_unit)
+  )
+  (:action release_quality_test_device
+    :parameters (?product_unit - product_unit ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (quality_test_assignment ?product_unit ?quality_test_device)
+      )
+    :effect
+      (and
+        (quality_test_device_available ?quality_test_device)
+        (not
+          (quality_test_assignment ?product_unit ?quality_test_device)
+        )
+      )
+  )
+  (:action assign_conditioning_station
+    :parameters (?product_unit - product_unit ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grading_completed ?product_unit)
+        (conditioning_station_available ?conditioning_station)
+      )
+    :effect
+      (and
+        (conditioning_allocation ?product_unit ?conditioning_station)
+        (not
+          (conditioning_station_available ?conditioning_station)
+        )
+      )
+  )
+  (:action release_conditioning_station
+    :parameters (?product_unit - product_unit ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (conditioning_allocation ?product_unit ?conditioning_station)
+      )
+    :effect
+      (and
+        (conditioning_station_available ?conditioning_station)
+        (not
+          (conditioning_allocation ?product_unit ?conditioning_station)
+        )
+      )
+  )
+  (:action assign_temperature_profile_to_batch
+    :parameters (?processing_batch - processing_batch ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (processing_batch_temperature_profile_assignment ?processing_batch ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action release_temperature_profile_from_batch
+    :parameters (?processing_batch - processing_batch ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (processing_batch_temperature_profile_assignment ?processing_batch ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (processing_batch_temperature_profile_assignment ?processing_batch ?temperature_profile)
+        )
+      )
+  )
+  (:action assign_route_preference_to_batch
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (route_preference_available ?route_preference)
+      )
+    :effect
+      (and
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (not
+          (route_preference_available ?route_preference)
+        )
+      )
+  )
+  (:action release_route_preference_from_batch
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference)
+    :precondition
+      (and
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+      )
+    :effect
+      (and
+        (route_preference_available ?route_preference)
+        (not
+          (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        )
+      )
+  )
+  (:action flag_slot_type_a_for_cold_cell
+    :parameters (?cold_storage_cell - cold_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (grading_completed ?cold_storage_cell)
+        (quality_test_assignment ?cold_storage_cell ?quality_test_device)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (not
+          (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+        )
+        (not
+          (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a)
+        )
+      )
+    :effect (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+  )
+  (:action reserve_cold_cell_for_loading
+    :parameters (?cold_storage_cell - cold_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grading_completed ?cold_storage_cell)
+        (conditioning_allocation ?cold_storage_cell ?conditioning_station)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+        (not
+          (cold_cell_commissioned ?cold_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+      )
+  )
+  (:action assign_packaging_to_cold_cell
+    :parameters (?cold_storage_cell - cold_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?packaging_resource - packaging_resource)
+    :precondition
+      (and
+        (grading_completed ?cold_storage_cell)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (packaging_resource_available ?packaging_resource)
+        (not
+          (cold_cell_commissioned ?cold_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a)
+        (cold_cell_commissioned ?cold_storage_cell)
+        (packaging_assignment_cold_cell ?cold_storage_cell ?packaging_resource)
+        (not
+          (packaging_resource_available ?packaging_resource)
+        )
+      )
+  )
+  (:action finalize_cold_cell_slot_match
+    :parameters (?cold_storage_cell - cold_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?quality_test_device - quality_test_device ?packaging_resource - packaging_resource)
+    :precondition
+      (and
+        (grading_completed ?cold_storage_cell)
+        (quality_test_assignment ?cold_storage_cell ?quality_test_device)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a)
+        (packaging_assignment_cold_cell ?cold_storage_cell ?packaging_resource)
+        (not
+          (cold_cell_prepared_for_slot ?cold_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+        (packaging_resource_available ?packaging_resource)
+        (not
+          (packaging_assignment_cold_cell ?cold_storage_cell ?packaging_resource)
+        )
+      )
+  )
+  (:action flag_slot_type_b_for_ambient_cell
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_b - delivery_slot_type_b ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (grading_completed ?ambient_storage_cell)
+        (quality_test_assignment ?ambient_storage_cell ?quality_test_device)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (not
+          (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+        )
+        (not
+          (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b)
+        )
+      )
+    :effect (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+  )
+  (:action reserve_ambient_cell_for_loading
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_b - delivery_slot_type_b ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grading_completed ?ambient_storage_cell)
+        (conditioning_allocation ?ambient_storage_cell ?conditioning_station)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+        (not
+          (ambient_cell_commissioned ?ambient_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+      )
+  )
+  (:action assign_packaging_to_ambient_cell
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_b - delivery_slot_type_b ?packaging_resource - packaging_resource)
+    :precondition
+      (and
+        (grading_completed ?ambient_storage_cell)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (packaging_resource_available ?packaging_resource)
+        (not
+          (ambient_cell_commissioned ?ambient_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b)
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (packaging_assignment_ambient_cell ?ambient_storage_cell ?packaging_resource)
+        (not
+          (packaging_resource_available ?packaging_resource)
+        )
+      )
+  )
+  (:action finalize_ambient_cell_slot_match
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_b - delivery_slot_type_b ?quality_test_device - quality_test_device ?packaging_resource - packaging_resource)
+    :precondition
+      (and
+        (grading_completed ?ambient_storage_cell)
+        (quality_test_assignment ?ambient_storage_cell ?quality_test_device)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b)
+        (packaging_assignment_ambient_cell ?ambient_storage_cell ?packaging_resource)
+        (not
+          (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        (packaging_resource_available ?packaging_resource)
+        (not
+          (packaging_assignment_ambient_cell ?ambient_storage_cell ?packaging_resource)
+        )
+      )
+  )
+  (:action assemble_shipment_unit
+    :parameters (?cold_storage_cell - cold_storage_cell ?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?delivery_slot_type_b - delivery_slot_type_b ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+        (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_slot_a_assignment ?shipment_unit ?delivery_slot_type_a)
+        (shipment_unit_slot_b_assignment ?shipment_unit ?delivery_slot_type_b)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_cold_staging
+    :parameters (?cold_storage_cell - cold_storage_cell ?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?delivery_slot_type_b - delivery_slot_type_b ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a)
+        (delivery_slot_type_b_flagged ?delivery_slot_type_b)
+        (not
+          (cold_cell_prepared_for_slot ?cold_storage_cell)
+        )
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_slot_a_assignment ?shipment_unit ?delivery_slot_type_a)
+        (shipment_unit_slot_b_assignment ?shipment_unit ?delivery_slot_type_b)
+        (shipment_unit_mark_cold ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_ambient_staging
+    :parameters (?cold_storage_cell - cold_storage_cell ?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?delivery_slot_type_b - delivery_slot_type_b ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_a_flagged ?delivery_slot_type_a)
+        (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+        (not
+          (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_slot_a_assignment ?shipment_unit ?delivery_slot_type_a)
+        (shipment_unit_slot_b_assignment ?shipment_unit ?delivery_slot_type_b)
+        (shipment_unit_mark_ambient ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action assemble_shipment_unit_with_both_staging
+    :parameters (?cold_storage_cell - cold_storage_cell ?ambient_storage_cell - ambient_storage_cell ?delivery_slot_type_a - delivery_slot_type_a ?delivery_slot_type_b - delivery_slot_type_b ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (cold_cell_slot_type_a_compatible ?cold_storage_cell ?delivery_slot_type_a)
+        (ambient_cell_slot_type_b_compatible ?ambient_storage_cell ?delivery_slot_type_b)
+        (delivery_slot_type_a_requires_packaging ?delivery_slot_type_a)
+        (delivery_slot_type_b_requires_packaging ?delivery_slot_type_b)
+        (not
+          (cold_cell_prepared_for_slot ?cold_storage_cell)
+        )
+        (not
+          (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        )
+        (shipment_unit_available ?shipment_unit)
+      )
+    :effect
+      (and
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_slot_a_assignment ?shipment_unit ?delivery_slot_type_a)
+        (shipment_unit_slot_b_assignment ?shipment_unit ?delivery_slot_type_b)
+        (shipment_unit_mark_cold ?shipment_unit)
+        (shipment_unit_mark_ambient ?shipment_unit)
+        (not
+          (shipment_unit_available ?shipment_unit)
+        )
+      )
+  )
+  (:action mark_shipment_unit_ready_for_containerization
+    :parameters (?shipment_unit - shipment_unit ?cold_storage_cell - cold_storage_cell ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (shipment_unit_assembled ?shipment_unit)
+        (cold_cell_commissioned ?cold_storage_cell)
+        (quality_test_assignment ?cold_storage_cell ?quality_test_device)
+        (not
+          (shipment_unit_ready_for_containerization ?shipment_unit)
+        )
+      )
+    :effect (shipment_unit_ready_for_containerization ?shipment_unit)
+  )
+  (:action assign_container_to_batch
+    :parameters (?processing_batch - processing_batch ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (processing_batch_assigned_to_shipment_unit ?processing_batch ?shipment_unit)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_available ?container)
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_ready_for_containerization ?shipment_unit)
+        (not
+          (container_allocated ?container)
+        )
+      )
+    :effect
+      (and
+        (container_allocated ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action mark_batch_ready_for_consolidation
+    :parameters (?processing_batch - processing_batch ?container - container ?shipment_unit - shipment_unit ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_allocated ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (quality_test_assignment ?processing_batch ?quality_test_device)
+        (not
+          (shipment_unit_mark_cold ?shipment_unit)
+        )
+        (not
+          (batch_ready_for_consolidation ?processing_batch)
+        )
+      )
+    :effect (batch_ready_for_consolidation ?processing_batch)
+  )
+  (:action attach_document_template_to_batch
+    :parameters (?processing_batch - processing_batch ?document_template - document_template)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (document_template_available ?document_template)
+        (not
+          (document_template_attached ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (document_template_attached ?processing_batch)
+        (processing_batch_document_assignment ?processing_batch ?document_template)
+        (not
+          (document_template_available ?document_template)
+        )
+      )
+  )
+  (:action verify_documents_and_mark_batch_ready
+    :parameters (?processing_batch - processing_batch ?container - container ?shipment_unit - shipment_unit ?quality_test_device - quality_test_device ?document_template - document_template)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_allocated ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (quality_test_assignment ?processing_batch ?quality_test_device)
+        (shipment_unit_mark_cold ?shipment_unit)
+        (document_template_attached ?processing_batch)
+        (processing_batch_document_assignment ?processing_batch ?document_template)
+        (not
+          (batch_ready_for_consolidation ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_ready_for_consolidation ?processing_batch)
+        (batch_document_verified ?processing_batch)
+      )
+  )
+  (:action consolidate_batch_with_temperature_profile
+    :parameters (?processing_batch - processing_batch ?temperature_profile - temperature_profile ?conditioning_station - conditioning_station ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_consolidation ?processing_batch)
+        (processing_batch_temperature_profile_assignment ?processing_batch ?temperature_profile)
+        (conditioning_allocation ?processing_batch ?conditioning_station)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (not
+          (shipment_unit_mark_ambient ?shipment_unit)
+        )
+        (not
+          (batch_consolidated ?processing_batch)
+        )
+      )
+    :effect (batch_consolidated ?processing_batch)
+  )
+  (:action consolidate_batch_with_temperature_profile_alternate
+    :parameters (?processing_batch - processing_batch ?temperature_profile - temperature_profile ?conditioning_station - conditioning_station ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_ready_for_consolidation ?processing_batch)
+        (processing_batch_temperature_profile_assignment ?processing_batch ?temperature_profile)
+        (conditioning_allocation ?processing_batch ?conditioning_station)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (shipment_unit_mark_ambient ?shipment_unit)
+        (not
+          (batch_consolidated ?processing_batch)
+        )
+      )
+    :effect (batch_consolidated ?processing_batch)
+  )
+  (:action apply_route_preference_and_mark_final_check
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_consolidated ?processing_batch)
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (not
+          (shipment_unit_mark_cold ?shipment_unit)
+        )
+        (not
+          (shipment_unit_mark_ambient ?shipment_unit)
+        )
+        (not
+          (batch_final_checks_complete ?processing_batch)
+        )
+      )
+    :effect (batch_final_checks_complete ?processing_batch)
+  )
+  (:action apply_route_preference_and_finalize_with_documents
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_consolidated ?processing_batch)
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (shipment_unit_mark_cold ?shipment_unit)
+        (not
+          (shipment_unit_mark_ambient ?shipment_unit)
+        )
+        (not
+          (batch_final_checks_complete ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_documentation_complete ?processing_batch)
+      )
+  )
+  (:action apply_route_preference_and_finalize_after_ambient_staging
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_consolidated ?processing_batch)
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (not
+          (shipment_unit_mark_cold ?shipment_unit)
+        )
+        (shipment_unit_mark_ambient ?shipment_unit)
+        (not
+          (batch_final_checks_complete ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_documentation_complete ?processing_batch)
+      )
+  )
+  (:action apply_route_preference_and_finalize_after_both_staging
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference ?container - container ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (batch_consolidated ?processing_batch)
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (processing_batch_container_assignment ?processing_batch ?container)
+        (container_assigned_to_shipment ?container ?shipment_unit)
+        (shipment_unit_mark_cold ?shipment_unit)
+        (shipment_unit_mark_ambient ?shipment_unit)
+        (not
+          (batch_final_checks_complete ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_documentation_complete ?processing_batch)
+      )
+  )
+  (:action authorize_batch_release
+    :parameters (?processing_batch - processing_batch)
+    :precondition
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (not
+          (batch_documentation_complete ?processing_batch)
+        )
+        (not
+          (release_authorization_flag ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorization_flag ?processing_batch)
+        (release_authorized ?processing_batch)
+      )
+  )
+  (:action assign_label_profile_to_batch
+    :parameters (?processing_batch - processing_batch ?label_profile - label_profile)
+    :precondition
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_documentation_complete ?processing_batch)
+        (label_profile_available ?label_profile)
+      )
+    :effect
+      (and
+        (processing_batch_label_assignment ?processing_batch ?label_profile)
+        (not
+          (label_profile_available ?label_profile)
+        )
+      )
+  )
+  (:action complete_release_checks_for_batch
+    :parameters (?processing_batch - processing_batch ?cold_storage_cell - cold_storage_cell ?ambient_storage_cell - ambient_storage_cell ?quality_test_device - quality_test_device ?label_profile - label_profile)
+    :precondition
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_documentation_complete ?processing_batch)
+        (processing_batch_label_assignment ?processing_batch ?label_profile)
+        (processing_batch_assigned_to_cold_cell ?processing_batch ?cold_storage_cell)
+        (processing_batch_assigned_to_ambient_cell ?processing_batch ?ambient_storage_cell)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        (quality_test_assignment ?processing_batch ?quality_test_device)
+        (not
+          (batch_release_checks_completed ?processing_batch)
+        )
+      )
+    :effect (batch_release_checks_completed ?processing_batch)
+  )
+  (:action authorize_batch_release_after_checks
+    :parameters (?processing_batch - processing_batch)
+    :precondition
+      (and
+        (batch_final_checks_complete ?processing_batch)
+        (batch_release_checks_completed ?processing_batch)
+        (not
+          (release_authorization_flag ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorization_flag ?processing_batch)
+        (release_authorized ?processing_batch)
+      )
+  )
+  (:action attach_customer_allocation_to_batch
+    :parameters (?processing_batch - processing_batch ?customer_allocation - customer_allocation ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (grading_completed ?processing_batch)
+        (quality_test_assignment ?processing_batch ?quality_test_device)
+        (customer_allocation_available ?customer_allocation)
+        (processing_batch_customer_allocation ?processing_batch ?customer_allocation)
+        (not
+          (customer_allocation_attached_to_batch ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (customer_allocation_attached_to_batch ?processing_batch)
+        (not
+          (customer_allocation_available ?customer_allocation)
+        )
+      )
+  )
+  (:action confirm_conditioning_for_allocated_batch
+    :parameters (?processing_batch - processing_batch ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (customer_allocation_attached_to_batch ?processing_batch)
+        (conditioning_allocation ?processing_batch ?conditioning_station)
+        (not
+          (conditioning_verified_for_batch ?processing_batch)
+        )
+      )
+    :effect (conditioning_verified_for_batch ?processing_batch)
+  )
+  (:action verify_route_preference_for_allocated_batch
+    :parameters (?processing_batch - processing_batch ?route_preference - route_preference)
+    :precondition
+      (and
+        (conditioning_verified_for_batch ?processing_batch)
+        (processing_batch_route_preference_assignment ?processing_batch ?route_preference)
+        (not
+          (routing_preference_verified_for_batch ?processing_batch)
+        )
+      )
+    :effect (routing_preference_verified_for_batch ?processing_batch)
+  )
+  (:action authorize_batch_release_with_customer_and_route
+    :parameters (?processing_batch - processing_batch)
+    :precondition
+      (and
+        (routing_preference_verified_for_batch ?processing_batch)
+        (not
+          (release_authorization_flag ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (release_authorization_flag ?processing_batch)
+        (release_authorized ?processing_batch)
+      )
+  )
+  (:action mark_cold_cell_ready_for_dispatch
+    :parameters (?cold_storage_cell - cold_storage_cell ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (cold_cell_commissioned ?cold_storage_cell)
+        (cold_cell_prepared_for_slot ?cold_storage_cell)
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_ready_for_containerization ?shipment_unit)
+        (not
+          (release_authorized ?cold_storage_cell)
+        )
+      )
+    :effect (release_authorized ?cold_storage_cell)
+  )
+  (:action mark_ambient_cell_ready_for_dispatch
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?shipment_unit - shipment_unit)
+    :precondition
+      (and
+        (ambient_cell_commissioned ?ambient_storage_cell)
+        (ambient_cell_prepared_for_slot ?ambient_storage_cell)
+        (shipment_unit_assembled ?shipment_unit)
+        (shipment_unit_ready_for_containerization ?shipment_unit)
+        (not
+          (release_authorized ?ambient_storage_cell)
+        )
+      )
+    :effect (release_authorized ?ambient_storage_cell)
+  )
+  (:action record_delivery_window_for_product_unit
+    :parameters (?product_unit - product_unit ?delivery_window_requirement - delivery_window_requirement ?quality_test_device - quality_test_device)
+    :precondition
+      (and
+        (release_authorized ?product_unit)
+        (quality_test_assignment ?product_unit ?quality_test_device)
+        (delivery_window_requirement_available ?delivery_window_requirement)
+        (not
+          (dispatched ?product_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatched ?product_unit)
+        (delivery_window_assignment ?product_unit ?delivery_window_requirement)
+        (not
+          (delivery_window_requirement_available ?delivery_window_requirement)
+        )
+      )
+  )
+  (:action commit_cold_cell_to_shipment_slot
+    :parameters (?cold_storage_cell - cold_storage_cell ?grading_station - grading_station ?delivery_window_requirement - delivery_window_requirement)
+    :precondition
+      (and
+        (dispatched ?cold_storage_cell)
+        (grading_assignment ?cold_storage_cell ?grading_station)
+        (delivery_window_assignment ?cold_storage_cell ?delivery_window_requirement)
+        (not
+          (committed_to_shipment ?cold_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (committed_to_shipment ?cold_storage_cell)
+        (grading_station_available ?grading_station)
+        (delivery_window_requirement_available ?delivery_window_requirement)
+      )
+  )
+  (:action commit_ambient_cell_to_shipment_slot
+    :parameters (?ambient_storage_cell - ambient_storage_cell ?grading_station - grading_station ?delivery_window_requirement - delivery_window_requirement)
+    :precondition
+      (and
+        (dispatched ?ambient_storage_cell)
+        (grading_assignment ?ambient_storage_cell ?grading_station)
+        (delivery_window_assignment ?ambient_storage_cell ?delivery_window_requirement)
+        (not
+          (committed_to_shipment ?ambient_storage_cell)
+        )
+      )
+    :effect
+      (and
+        (committed_to_shipment ?ambient_storage_cell)
+        (grading_station_available ?grading_station)
+        (delivery_window_requirement_available ?delivery_window_requirement)
+      )
+  )
+  (:action commit_batch_to_shipment_slot
+    :parameters (?processing_batch - processing_batch ?grading_station - grading_station ?delivery_window_requirement - delivery_window_requirement)
+    :precondition
+      (and
+        (dispatched ?processing_batch)
+        (grading_assignment ?processing_batch ?grading_station)
+        (delivery_window_assignment ?processing_batch ?delivery_window_requirement)
+        (not
+          (committed_to_shipment ?processing_batch)
+        )
+      )
+    :effect
+      (and
+        (committed_to_shipment ?processing_batch)
+        (grading_station_available ?grading_station)
+        (delivery_window_requirement_available ?delivery_window_requirement)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem delivery_window_alignment_problem)
+  (:domain perishables_delivery_window_alignment)
+  (:objects cold_storage_cell_1 - cold_storage_cell ambient_storage_cell_1 - ambient_storage_cell processing_batch_1 - processing_batch processing_batch_2 - processing_batch grading_station_1 - grading_station grading_station_2 - grading_station grading_station_3 - grading_station quality_test_device_1 - quality_test_device conditioning_station_1 - conditioning_station packaging_resource_1 - packaging_resource delivery_slot_type_a_1 - delivery_slot_type_a delivery_slot_type_b_1 - delivery_slot_type_b shipment_unit_1 - shipment_unit container_1 - container container_2 - container document_template_1 - document_template document_template_2 - document_template label_profile_1 - label_profile label_profile_2 - label_profile delivery_window_requirement_1 - delivery_window_requirement temperature_profile_1 - temperature_profile customer_allocation_1 - customer_allocation customer_allocation_2 - customer_allocation route_preference_1 - route_preference)
+  (:init
+    (grading_station_available grading_station_1)
+    (grading_station_available grading_station_2)
+    (grading_station_available grading_station_3)
+    (quality_test_device_available quality_test_device_1)
+    (conditioning_station_available conditioning_station_1)
+    (packaging_resource_available packaging_resource_1)
+    (cold_cell_slot_type_a_compatible cold_storage_cell_1 delivery_slot_type_a_1)
+    (ambient_cell_slot_type_b_compatible ambient_storage_cell_1 delivery_slot_type_b_1)
+    (shipment_unit_available shipment_unit_1)
+    (container_available container_1)
+    (container_available container_2)
+    (processing_batch_assigned_to_cold_cell processing_batch_1 cold_storage_cell_1)
+    (processing_batch_assigned_to_cold_cell processing_batch_2 cold_storage_cell_1)
+    (processing_batch_assigned_to_ambient_cell processing_batch_1 ambient_storage_cell_1)
+    (processing_batch_assigned_to_ambient_cell processing_batch_2 ambient_storage_cell_1)
+    (processing_batch_assigned_to_shipment_unit processing_batch_1 shipment_unit_1)
+    (processing_batch_assigned_to_shipment_unit processing_batch_2 shipment_unit_1)
+    (processing_batch_container_assignment processing_batch_1 container_1)
+    (processing_batch_container_assignment processing_batch_2 container_2)
+    (document_template_available document_template_1)
+    (document_template_available document_template_2)
+    (label_profile_available label_profile_1)
+    (label_profile_available label_profile_2)
+    (delivery_window_requirement_available delivery_window_requirement_1)
+    (temperature_profile_available temperature_profile_1)
+    (customer_allocation_available customer_allocation_1)
+    (processing_batch_customer_allocation processing_batch_1 customer_allocation_1)
+    (processing_batch_customer_allocation processing_batch_2 customer_allocation_2)
+    (route_preference_available route_preference_1)
+  )
+  (:goal
+    (and
+      (committed_to_shipment cold_storage_cell_1)
+      (committed_to_shipment ambient_storage_cell_1)
+      (committed_to_shipment processing_batch_1)
+      (committed_to_shipment processing_batch_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_harvest_lot cold_storage_cell_1)
+(register_harvest_lot ambient_storage_cell_1)
+(register_harvest_lot processing_batch_1)
+(register_harvest_lot processing_batch_2)
+(assign_to_grading_station cold_storage_cell_1 grading_station_1)
+(assign_to_grading_station ambient_storage_cell_1 grading_station_2)
+(assign_quality_test_device cold_storage_cell_1 quality_test_device_1)
+(finalize_grading cold_storage_cell_1 quality_test_device_1)
+(flag_slot_type_a_for_cold_cell cold_storage_cell_1 delivery_slot_type_a_1 quality_test_device_1)
+(assign_conditioning_station cold_storage_cell_1 conditioning_station_1)
+(reserve_cold_cell_for_loading cold_storage_cell_1 delivery_slot_type_a_1 conditioning_station_1)
+(release_quality_test_device cold_storage_cell_1 quality_test_device_1)
+(release_conditioning_station cold_storage_cell_1 conditioning_station_1)
+(assign_quality_test_device ambient_storage_cell_1 quality_test_device_1)
+(finalize_grading ambient_storage_cell_1 quality_test_device_1)
+(flag_slot_type_b_for_ambient_cell ambient_storage_cell_1 delivery_slot_type_b_1 quality_test_device_1)
+(assign_conditioning_station ambient_storage_cell_1 conditioning_station_1)
+(reserve_ambient_cell_for_loading ambient_storage_cell_1 delivery_slot_type_b_1 conditioning_station_1)
+(release_quality_test_device ambient_storage_cell_1 quality_test_device_1)
+(release_conditioning_station ambient_storage_cell_1 conditioning_station_1)
+(assemble_shipment_unit cold_storage_cell_1 ambient_storage_cell_1 delivery_slot_type_a_1 delivery_slot_type_b_1 shipment_unit_1)
+(assign_quality_test_device cold_storage_cell_1 quality_test_device_1)
+(mark_shipment_unit_ready_for_containerization shipment_unit_1 cold_storage_cell_1 quality_test_device_1)
+(mark_cold_cell_ready_for_dispatch cold_storage_cell_1 shipment_unit_1)
+(mark_ambient_cell_ready_for_dispatch ambient_storage_cell_1 shipment_unit_1)
+(record_delivery_window_for_product_unit cold_storage_cell_1 delivery_window_requirement_1 quality_test_device_1)
+(commit_cold_cell_to_shipment_slot cold_storage_cell_1 grading_station_1 delivery_window_requirement_1)
+(release_quality_test_device cold_storage_cell_1 quality_test_device_1)
+(assign_quality_test_device ambient_storage_cell_1 quality_test_device_1)
+(record_delivery_window_for_product_unit ambient_storage_cell_1 delivery_window_requirement_1 quality_test_device_1)
+(commit_ambient_cell_to_shipment_slot ambient_storage_cell_1 grading_station_2 delivery_window_requirement_1)
+(release_quality_test_device ambient_storage_cell_1 quality_test_device_1)
+(assign_to_grading_station processing_batch_1 grading_station_1)
+(assign_quality_test_device processing_batch_1 quality_test_device_1)
+(finalize_grading processing_batch_1 quality_test_device_1)
+(assign_container_to_batch processing_batch_1 container_1 shipment_unit_1)
+(mark_batch_ready_for_consolidation processing_batch_1 container_1 shipment_unit_1 quality_test_device_1)
+(assign_conditioning_station processing_batch_1 conditioning_station_1)
+(assign_temperature_profile_to_batch processing_batch_1 temperature_profile_1)
+(consolidate_batch_with_temperature_profile processing_batch_1 temperature_profile_1 conditioning_station_1 container_1 shipment_unit_1)
+(assign_route_preference_to_batch processing_batch_1 route_preference_1)
+(apply_route_preference_and_mark_final_check processing_batch_1 route_preference_1 container_1 shipment_unit_1)
+(authorize_batch_release processing_batch_1)
+(record_delivery_window_for_product_unit processing_batch_1 delivery_window_requirement_1 quality_test_device_1)
+(commit_batch_to_shipment_slot processing_batch_1 grading_station_1 delivery_window_requirement_1)
+(release_quality_test_device processing_batch_1 quality_test_device_1)
+(release_conditioning_station processing_batch_1 conditioning_station_1)
+(release_temperature_profile_from_batch processing_batch_1 temperature_profile_1)
+(release_route_preference_from_batch processing_batch_1 route_preference_1)
+(assign_to_grading_station processing_batch_2 grading_station_1)
+(assign_quality_test_device processing_batch_2 quality_test_device_1)
+(finalize_grading processing_batch_2 quality_test_device_1)
+(assign_container_to_batch processing_batch_2 container_2 shipment_unit_1)
+(mark_batch_ready_for_consolidation processing_batch_2 container_2 shipment_unit_1 quality_test_device_1)
+(assign_conditioning_station processing_batch_2 conditioning_station_1)
+(assign_temperature_profile_to_batch processing_batch_2 temperature_profile_1)
+(consolidate_batch_with_temperature_profile processing_batch_2 temperature_profile_1 conditioning_station_1 container_2 shipment_unit_1)
+(assign_route_preference_to_batch processing_batch_2 route_preference_1)
+(apply_route_preference_and_mark_final_check processing_batch_2 route_preference_1 container_2 shipment_unit_1)
+(authorize_batch_release processing_batch_2)
+(record_delivery_window_for_product_unit processing_batch_2 delivery_window_requirement_1 quality_test_device_1)
+(commit_batch_to_shipment_slot processing_batch_2 grading_station_1 delivery_window_requirement_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_rrei16ew/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_rrei16ew/plan.pddl 62 
+
+
+
+--- stderr ---
+

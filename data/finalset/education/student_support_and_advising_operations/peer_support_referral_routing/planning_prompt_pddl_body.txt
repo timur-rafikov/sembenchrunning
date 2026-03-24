@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain peer_support_referral_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_group - object resource_group - object capability_group - object person_entity - object participant - person_entity referral_slot - service_group intake_channel - service_group supervising_staff - service_group program_code - service_group followup_activity - service_group accommodation_request - service_group specialist_resource - service_group escalation_channel - service_group service_option - resource_group assessment_document - resource_group community_partner - resource_group peer_specialty - capability_group staff_specialty - capability_group referral_package - capability_group student_subtype - participant student_status - participant peer_mentor_role - student_subtype peer_advocate_role - student_subtype case_coordinator_role - student_status)
+  (:predicates
+    (case_intake_recorded ?participant_entity - participant)
+    (triaged_entity ?participant_entity - participant)
+    (case_slot_reserved ?participant_entity - participant)
+    (assignment_confirmed ?participant_entity - participant)
+    (engagement_confirmed ?participant_entity - participant)
+    (accommodation_attached ?participant_entity - participant)
+    (slot_available ?referral_slot - referral_slot)
+    (case_reserved_slot ?participant_entity - participant ?referral_slot - referral_slot)
+    (intake_channel_available ?intake_channel - intake_channel)
+    (intake_channel_assigned ?participant_entity - participant ?intake_channel - intake_channel)
+    (supervisor_available ?supervising_staff - supervising_staff)
+    (entity_assigned_to_supervisor ?participant_entity - participant ?supervising_staff - supervising_staff)
+    (service_option_available ?service_option - service_option)
+    (peer_mentor_service_assigned ?peer_mentor - peer_mentor_role ?service_option - service_option)
+    (peer_advocate_service_assigned ?peer_advocate - peer_advocate_role ?service_option - service_option)
+    (peer_mentor_has_specialty ?peer_mentor - peer_mentor_role ?peer_specialty - peer_specialty)
+    (peer_specialty_flagged ?peer_specialty - peer_specialty)
+    (peer_specialty_reserved ?peer_specialty - peer_specialty)
+    (peer_mentor_confirmed ?peer_mentor - peer_mentor_role)
+    (peer_advocate_has_specialty ?peer_advocate - peer_advocate_role ?staff_specialty - staff_specialty)
+    (staff_specialty_flagged ?staff_specialty - staff_specialty)
+    (staff_specialty_reserved ?staff_specialty - staff_specialty)
+    (peer_advocate_confirmed ?peer_advocate - peer_advocate_role)
+    (referral_package_draft ?referral_package - referral_package)
+    (referral_package_claimed ?referral_package - referral_package)
+    (referral_package_has_peer_specialty ?referral_package - referral_package ?peer_specialty - peer_specialty)
+    (referral_package_has_staff_specialty ?referral_package - referral_package ?staff_specialty - staff_specialty)
+    (referral_package_has_mentor_contribution ?referral_package - referral_package)
+    (referral_package_has_advocate_contribution ?referral_package - referral_package)
+    (referral_package_peer_contributions_confirmed ?referral_package - referral_package)
+    (coordinator_assigned_mentor ?case_coordinator - case_coordinator_role ?peer_mentor - peer_mentor_role)
+    (coordinator_assigned_advocate ?case_coordinator - case_coordinator_role ?peer_advocate - peer_advocate_role)
+    (coordinator_manages_package ?case_coordinator - case_coordinator_role ?referral_package - referral_package)
+    (assessment_document_available ?assessment_document - assessment_document)
+    (coordinator_has_assessment_document ?case_coordinator - case_coordinator_role ?assessment_document - assessment_document)
+    (assessment_document_linked ?assessment_document - assessment_document)
+    (assessment_document_attached_to_package ?assessment_document - assessment_document ?referral_package - referral_package)
+    (coordinator_review_started ?case_coordinator - case_coordinator_role)
+    (coordinator_initiated_specialist_engagement ?case_coordinator - case_coordinator_role)
+    (coordinator_escalation_initiated ?case_coordinator - case_coordinator_role)
+    (coordinator_program_attached ?case_coordinator - case_coordinator_role)
+    (coordinator_program_confirmed ?case_coordinator - case_coordinator_role)
+    (coordinator_signoff_obtained ?case_coordinator - case_coordinator_role)
+    (coordinator_interventions_committed ?case_coordinator - case_coordinator_role)
+    (community_partner_available ?community_partner - community_partner)
+    (coordinator_has_partner_relation ?case_coordinator - case_coordinator_role ?community_partner - community_partner)
+    (coordinator_partner_assigned ?case_coordinator - case_coordinator_role)
+    (coordinator_partner_contacted ?case_coordinator - case_coordinator_role)
+    (coordinator_partner_escalation_initiated ?case_coordinator - case_coordinator_role)
+    (program_code_available ?program_code - program_code)
+    (coordinator_attached_program_code ?case_coordinator - case_coordinator_role ?program_code - program_code)
+    (followup_activity_available ?followup_activity - followup_activity)
+    (coordinator_attached_followup ?case_coordinator - case_coordinator_role ?followup_activity - followup_activity)
+    (specialist_resource_available ?specialist_resource - specialist_resource)
+    (coordinator_attached_specialist_resource ?case_coordinator - case_coordinator_role ?specialist_resource - specialist_resource)
+    (escalation_channel_available ?escalation_channel - escalation_channel)
+    (coordinator_attached_escalation_channel ?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel)
+    (accommodation_request_available ?accommodation_request - accommodation_request)
+    (case_has_accommodation ?participant_entity - participant ?accommodation_request - accommodation_request)
+    (peer_mentor_ready ?peer_mentor - peer_mentor_role)
+    (peer_advocate_ready ?peer_advocate - peer_advocate_role)
+    (coordinator_marked_complete ?case_coordinator - case_coordinator_role)
+  )
+  (:action create_case_intake
+    :parameters (?participant_entity - participant)
+    :precondition
+      (and
+        (not
+          (case_intake_recorded ?participant_entity)
+        )
+        (not
+          (assignment_confirmed ?participant_entity)
+        )
+      )
+    :effect (case_intake_recorded ?participant_entity)
+  )
+  (:action reserve_referral_slot
+    :parameters (?participant_entity - participant ?referral_slot - referral_slot)
+    :precondition
+      (and
+        (case_intake_recorded ?participant_entity)
+        (not
+          (case_slot_reserved ?participant_entity)
+        )
+        (slot_available ?referral_slot)
+      )
+    :effect
+      (and
+        (case_slot_reserved ?participant_entity)
+        (case_reserved_slot ?participant_entity ?referral_slot)
+        (not
+          (slot_available ?referral_slot)
+        )
+      )
+  )
+  (:action assign_intake_channel
+    :parameters (?participant_entity - participant ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (case_intake_recorded ?participant_entity)
+        (case_slot_reserved ?participant_entity)
+        (intake_channel_available ?intake_channel)
+      )
+    :effect
+      (and
+        (intake_channel_assigned ?participant_entity ?intake_channel)
+        (not
+          (intake_channel_available ?intake_channel)
+        )
+      )
+  )
+  (:action confirm_intake_channel_assignment
+    :parameters (?participant_entity - participant ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (case_intake_recorded ?participant_entity)
+        (case_slot_reserved ?participant_entity)
+        (intake_channel_assigned ?participant_entity ?intake_channel)
+        (not
+          (triaged_entity ?participant_entity)
+        )
+      )
+    :effect (triaged_entity ?participant_entity)
+  )
+  (:action release_intake_channel
+    :parameters (?participant_entity - participant ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (intake_channel_assigned ?participant_entity ?intake_channel)
+      )
+    :effect
+      (and
+        (intake_channel_available ?intake_channel)
+        (not
+          (intake_channel_assigned ?participant_entity ?intake_channel)
+        )
+      )
+  )
+  (:action assign_case_to_supervisor
+    :parameters (?participant_entity - participant ?supervising_staff - supervising_staff)
+    :precondition
+      (and
+        (triaged_entity ?participant_entity)
+        (supervisor_available ?supervising_staff)
+      )
+    :effect
+      (and
+        (entity_assigned_to_supervisor ?participant_entity ?supervising_staff)
+        (not
+          (supervisor_available ?supervising_staff)
+        )
+      )
+  )
+  (:action unassign_case_from_supervisor
+    :parameters (?participant_entity - participant ?supervising_staff - supervising_staff)
+    :precondition
+      (and
+        (entity_assigned_to_supervisor ?participant_entity ?supervising_staff)
+      )
+    :effect
+      (and
+        (supervisor_available ?supervising_staff)
+        (not
+          (entity_assigned_to_supervisor ?participant_entity ?supervising_staff)
+        )
+      )
+  )
+  (:action assign_specialist_resource_to_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?specialist_resource - specialist_resource)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (specialist_resource_available ?specialist_resource)
+      )
+    :effect
+      (and
+        (coordinator_attached_specialist_resource ?case_coordinator ?specialist_resource)
+        (not
+          (specialist_resource_available ?specialist_resource)
+        )
+      )
+  )
+  (:action unassign_specialist_resource_from_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?specialist_resource - specialist_resource)
+    :precondition
+      (and
+        (coordinator_attached_specialist_resource ?case_coordinator ?specialist_resource)
+      )
+    :effect
+      (and
+        (specialist_resource_available ?specialist_resource)
+        (not
+          (coordinator_attached_specialist_resource ?case_coordinator ?specialist_resource)
+        )
+      )
+  )
+  (:action assign_escalation_channel_to_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (escalation_channel_available ?escalation_channel)
+      )
+    :effect
+      (and
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (not
+          (escalation_channel_available ?escalation_channel)
+        )
+      )
+  )
+  (:action unassign_escalation_channel_from_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel)
+    :precondition
+      (and
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+      )
+    :effect
+      (and
+        (escalation_channel_available ?escalation_channel)
+        (not
+          (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        )
+      )
+  )
+  (:action flag_peer_specialty_for_matching
+    :parameters (?peer_mentor - peer_mentor_role ?peer_specialty - peer_specialty ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (triaged_entity ?peer_mentor)
+        (intake_channel_assigned ?peer_mentor ?intake_channel)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (not
+          (peer_specialty_flagged ?peer_specialty)
+        )
+        (not
+          (peer_specialty_reserved ?peer_specialty)
+        )
+      )
+    :effect (peer_specialty_flagged ?peer_specialty)
+  )
+  (:action confirm_peer_mentor_engagement
+    :parameters (?peer_mentor - peer_mentor_role ?peer_specialty - peer_specialty ?supervising_staff - supervising_staff)
+    :precondition
+      (and
+        (triaged_entity ?peer_mentor)
+        (entity_assigned_to_supervisor ?peer_mentor ?supervising_staff)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_specialty_flagged ?peer_specialty)
+        (not
+          (peer_mentor_ready ?peer_mentor)
+        )
+      )
+    :effect
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_mentor_confirmed ?peer_mentor)
+      )
+  )
+  (:action assign_service_option_to_mentor
+    :parameters (?peer_mentor - peer_mentor_role ?peer_specialty - peer_specialty ?service_option - service_option)
+    :precondition
+      (and
+        (triaged_entity ?peer_mentor)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (service_option_available ?service_option)
+        (not
+          (peer_mentor_ready ?peer_mentor)
+        )
+      )
+    :effect
+      (and
+        (peer_specialty_reserved ?peer_specialty)
+        (peer_mentor_ready ?peer_mentor)
+        (peer_mentor_service_assigned ?peer_mentor ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action finalize_peer_mentor_match
+    :parameters (?peer_mentor - peer_mentor_role ?peer_specialty - peer_specialty ?intake_channel - intake_channel ?service_option - service_option)
+    :precondition
+      (and
+        (triaged_entity ?peer_mentor)
+        (intake_channel_assigned ?peer_mentor ?intake_channel)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_specialty_reserved ?peer_specialty)
+        (peer_mentor_service_assigned ?peer_mentor ?service_option)
+        (not
+          (peer_mentor_confirmed ?peer_mentor)
+        )
+      )
+    :effect
+      (and
+        (peer_specialty_flagged ?peer_specialty)
+        (peer_mentor_confirmed ?peer_mentor)
+        (service_option_available ?service_option)
+        (not
+          (peer_mentor_service_assigned ?peer_mentor ?service_option)
+        )
+      )
+  )
+  (:action flag_staff_specialty_for_matching
+    :parameters (?peer_advocate - peer_advocate_role ?staff_specialty - staff_specialty ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (triaged_entity ?peer_advocate)
+        (intake_channel_assigned ?peer_advocate ?intake_channel)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (not
+          (staff_specialty_flagged ?staff_specialty)
+        )
+        (not
+          (staff_specialty_reserved ?staff_specialty)
+        )
+      )
+    :effect (staff_specialty_flagged ?staff_specialty)
+  )
+  (:action confirm_peer_advocate_engagement
+    :parameters (?peer_advocate - peer_advocate_role ?staff_specialty - staff_specialty ?supervising_staff - supervising_staff)
+    :precondition
+      (and
+        (triaged_entity ?peer_advocate)
+        (entity_assigned_to_supervisor ?peer_advocate ?supervising_staff)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (staff_specialty_flagged ?staff_specialty)
+        (not
+          (peer_advocate_ready ?peer_advocate)
+        )
+      )
+    :effect
+      (and
+        (peer_advocate_ready ?peer_advocate)
+        (peer_advocate_confirmed ?peer_advocate)
+      )
+  )
+  (:action assign_service_option_to_advocate
+    :parameters (?peer_advocate - peer_advocate_role ?staff_specialty - staff_specialty ?service_option - service_option)
+    :precondition
+      (and
+        (triaged_entity ?peer_advocate)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (service_option_available ?service_option)
+        (not
+          (peer_advocate_ready ?peer_advocate)
+        )
+      )
+    :effect
+      (and
+        (staff_specialty_reserved ?staff_specialty)
+        (peer_advocate_ready ?peer_advocate)
+        (peer_advocate_service_assigned ?peer_advocate ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action finalize_peer_advocate_match
+    :parameters (?peer_advocate - peer_advocate_role ?staff_specialty - staff_specialty ?intake_channel - intake_channel ?service_option - service_option)
+    :precondition
+      (and
+        (triaged_entity ?peer_advocate)
+        (intake_channel_assigned ?peer_advocate ?intake_channel)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (staff_specialty_reserved ?staff_specialty)
+        (peer_advocate_service_assigned ?peer_advocate ?service_option)
+        (not
+          (peer_advocate_confirmed ?peer_advocate)
+        )
+      )
+    :effect
+      (and
+        (staff_specialty_flagged ?staff_specialty)
+        (peer_advocate_confirmed ?peer_advocate)
+        (service_option_available ?service_option)
+        (not
+          (peer_advocate_service_assigned ?peer_advocate ?service_option)
+        )
+      )
+  )
+  (:action assemble_referral_package_from_peer_inputs
+    :parameters (?peer_mentor - peer_mentor_role ?peer_advocate - peer_advocate_role ?peer_specialty - peer_specialty ?staff_specialty - staff_specialty ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_advocate_ready ?peer_advocate)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (peer_specialty_flagged ?peer_specialty)
+        (staff_specialty_flagged ?staff_specialty)
+        (peer_mentor_confirmed ?peer_mentor)
+        (peer_advocate_confirmed ?peer_advocate)
+        (referral_package_draft ?referral_package)
+      )
+    :effect
+      (and
+        (referral_package_claimed ?referral_package)
+        (referral_package_has_peer_specialty ?referral_package ?peer_specialty)
+        (referral_package_has_staff_specialty ?referral_package ?staff_specialty)
+        (not
+          (referral_package_draft ?referral_package)
+        )
+      )
+  )
+  (:action assemble_referral_package_with_mentor_contribution
+    :parameters (?peer_mentor - peer_mentor_role ?peer_advocate - peer_advocate_role ?peer_specialty - peer_specialty ?staff_specialty - staff_specialty ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_advocate_ready ?peer_advocate)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (peer_specialty_reserved ?peer_specialty)
+        (staff_specialty_flagged ?staff_specialty)
+        (not
+          (peer_mentor_confirmed ?peer_mentor)
+        )
+        (peer_advocate_confirmed ?peer_advocate)
+        (referral_package_draft ?referral_package)
+      )
+    :effect
+      (and
+        (referral_package_claimed ?referral_package)
+        (referral_package_has_peer_specialty ?referral_package ?peer_specialty)
+        (referral_package_has_staff_specialty ?referral_package ?staff_specialty)
+        (referral_package_has_mentor_contribution ?referral_package)
+        (not
+          (referral_package_draft ?referral_package)
+        )
+      )
+  )
+  (:action assemble_referral_package_with_advocate_contribution
+    :parameters (?peer_mentor - peer_mentor_role ?peer_advocate - peer_advocate_role ?peer_specialty - peer_specialty ?staff_specialty - staff_specialty ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_advocate_ready ?peer_advocate)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (peer_specialty_flagged ?peer_specialty)
+        (staff_specialty_reserved ?staff_specialty)
+        (peer_mentor_confirmed ?peer_mentor)
+        (not
+          (peer_advocate_confirmed ?peer_advocate)
+        )
+        (referral_package_draft ?referral_package)
+      )
+    :effect
+      (and
+        (referral_package_claimed ?referral_package)
+        (referral_package_has_peer_specialty ?referral_package ?peer_specialty)
+        (referral_package_has_staff_specialty ?referral_package ?staff_specialty)
+        (referral_package_has_advocate_contribution ?referral_package)
+        (not
+          (referral_package_draft ?referral_package)
+        )
+      )
+  )
+  (:action assemble_referral_package_with_both_contributions
+    :parameters (?peer_mentor - peer_mentor_role ?peer_advocate - peer_advocate_role ?peer_specialty - peer_specialty ?staff_specialty - staff_specialty ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_advocate_ready ?peer_advocate)
+        (peer_mentor_has_specialty ?peer_mentor ?peer_specialty)
+        (peer_advocate_has_specialty ?peer_advocate ?staff_specialty)
+        (peer_specialty_reserved ?peer_specialty)
+        (staff_specialty_reserved ?staff_specialty)
+        (not
+          (peer_mentor_confirmed ?peer_mentor)
+        )
+        (not
+          (peer_advocate_confirmed ?peer_advocate)
+        )
+        (referral_package_draft ?referral_package)
+      )
+    :effect
+      (and
+        (referral_package_claimed ?referral_package)
+        (referral_package_has_peer_specialty ?referral_package ?peer_specialty)
+        (referral_package_has_staff_specialty ?referral_package ?staff_specialty)
+        (referral_package_has_mentor_contribution ?referral_package)
+        (referral_package_has_advocate_contribution ?referral_package)
+        (not
+          (referral_package_draft ?referral_package)
+        )
+      )
+  )
+  (:action confirm_peer_contributions_on_package
+    :parameters (?referral_package - referral_package ?peer_mentor - peer_mentor_role ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (referral_package_claimed ?referral_package)
+        (peer_mentor_ready ?peer_mentor)
+        (intake_channel_assigned ?peer_mentor ?intake_channel)
+        (not
+          (referral_package_peer_contributions_confirmed ?referral_package)
+        )
+      )
+    :effect (referral_package_peer_contributions_confirmed ?referral_package)
+  )
+  (:action attach_assessment_to_package
+    :parameters (?case_coordinator - case_coordinator_role ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (coordinator_manages_package ?case_coordinator ?referral_package)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_available ?assessment_document)
+        (referral_package_claimed ?referral_package)
+        (referral_package_peer_contributions_confirmed ?referral_package)
+        (not
+          (assessment_document_linked ?assessment_document)
+        )
+      )
+    :effect
+      (and
+        (assessment_document_linked ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (not
+          (assessment_document_available ?assessment_document)
+        )
+      )
+  )
+  (:action start_coordinator_package_review
+    :parameters (?case_coordinator - case_coordinator_role ?assessment_document - assessment_document ?referral_package - referral_package ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_linked ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (intake_channel_assigned ?case_coordinator ?intake_channel)
+        (not
+          (referral_package_has_mentor_contribution ?referral_package)
+        )
+        (not
+          (coordinator_review_started ?case_coordinator)
+        )
+      )
+    :effect (coordinator_review_started ?case_coordinator)
+  )
+  (:action assign_program_code_to_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?program_code - program_code)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (program_code_available ?program_code)
+        (not
+          (coordinator_program_attached ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_program_attached ?case_coordinator)
+        (coordinator_attached_program_code ?case_coordinator ?program_code)
+        (not
+          (program_code_available ?program_code)
+        )
+      )
+  )
+  (:action confirm_program_and_progress_review
+    :parameters (?case_coordinator - case_coordinator_role ?assessment_document - assessment_document ?referral_package - referral_package ?intake_channel - intake_channel ?program_code - program_code)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_linked ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (intake_channel_assigned ?case_coordinator ?intake_channel)
+        (referral_package_has_mentor_contribution ?referral_package)
+        (coordinator_program_attached ?case_coordinator)
+        (coordinator_attached_program_code ?case_coordinator ?program_code)
+        (not
+          (coordinator_review_started ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_review_started ?case_coordinator)
+        (coordinator_program_confirmed ?case_coordinator)
+      )
+  )
+  (:action initiate_specialist_engagement
+    :parameters (?case_coordinator - case_coordinator_role ?specialist_resource - specialist_resource ?supervising_staff - supervising_staff ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_review_started ?case_coordinator)
+        (coordinator_attached_specialist_resource ?case_coordinator ?specialist_resource)
+        (entity_assigned_to_supervisor ?case_coordinator ?supervising_staff)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (not
+          (referral_package_has_advocate_contribution ?referral_package)
+        )
+        (not
+          (coordinator_initiated_specialist_engagement ?case_coordinator)
+        )
+      )
+    :effect (coordinator_initiated_specialist_engagement ?case_coordinator)
+  )
+  (:action initiate_specialist_engagement_variant
+    :parameters (?case_coordinator - case_coordinator_role ?specialist_resource - specialist_resource ?supervising_staff - supervising_staff ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_review_started ?case_coordinator)
+        (coordinator_attached_specialist_resource ?case_coordinator ?specialist_resource)
+        (entity_assigned_to_supervisor ?case_coordinator ?supervising_staff)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (referral_package_has_advocate_contribution ?referral_package)
+        (not
+          (coordinator_initiated_specialist_engagement ?case_coordinator)
+        )
+      )
+    :effect (coordinator_initiated_specialist_engagement ?case_coordinator)
+  )
+  (:action initiate_escalation_channel
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_initiated_specialist_engagement ?case_coordinator)
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (not
+          (referral_package_has_mentor_contribution ?referral_package)
+        )
+        (not
+          (referral_package_has_advocate_contribution ?referral_package)
+        )
+        (not
+          (coordinator_escalation_initiated ?case_coordinator)
+        )
+      )
+    :effect (coordinator_escalation_initiated ?case_coordinator)
+  )
+  (:action confirm_escalation_and_signoff_variant_a
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_initiated_specialist_engagement ?case_coordinator)
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (referral_package_has_mentor_contribution ?referral_package)
+        (not
+          (referral_package_has_advocate_contribution ?referral_package)
+        )
+        (not
+          (coordinator_escalation_initiated ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_signoff_obtained ?case_coordinator)
+      )
+  )
+  (:action confirm_escalation_and_signoff_variant_b
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_initiated_specialist_engagement ?case_coordinator)
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (not
+          (referral_package_has_mentor_contribution ?referral_package)
+        )
+        (referral_package_has_advocate_contribution ?referral_package)
+        (not
+          (coordinator_escalation_initiated ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_signoff_obtained ?case_coordinator)
+      )
+  )
+  (:action confirm_escalation_and_signoff_variant_c
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel ?assessment_document - assessment_document ?referral_package - referral_package)
+    :precondition
+      (and
+        (coordinator_initiated_specialist_engagement ?case_coordinator)
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (coordinator_has_assessment_document ?case_coordinator ?assessment_document)
+        (assessment_document_attached_to_package ?assessment_document ?referral_package)
+        (referral_package_has_mentor_contribution ?referral_package)
+        (referral_package_has_advocate_contribution ?referral_package)
+        (not
+          (coordinator_escalation_initiated ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_signoff_obtained ?case_coordinator)
+      )
+  )
+  (:action finalize_coordinator_specialist_engagement
+    :parameters (?case_coordinator - case_coordinator_role)
+    :precondition
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (not
+          (coordinator_signoff_obtained ?case_coordinator)
+        )
+        (not
+          (coordinator_marked_complete ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_marked_complete ?case_coordinator)
+        (engagement_confirmed ?case_coordinator)
+      )
+  )
+  (:action assign_followup_activity_to_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?followup_activity - followup_activity)
+    :precondition
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_signoff_obtained ?case_coordinator)
+        (followup_activity_available ?followup_activity)
+      )
+    :effect
+      (and
+        (coordinator_attached_followup ?case_coordinator ?followup_activity)
+        (not
+          (followup_activity_available ?followup_activity)
+        )
+      )
+  )
+  (:action confirm_intervention_and_mark_coordinator
+    :parameters (?case_coordinator - case_coordinator_role ?peer_mentor - peer_mentor_role ?peer_advocate - peer_advocate_role ?intake_channel - intake_channel ?followup_activity - followup_activity)
+    :precondition
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_signoff_obtained ?case_coordinator)
+        (coordinator_attached_followup ?case_coordinator ?followup_activity)
+        (coordinator_assigned_mentor ?case_coordinator ?peer_mentor)
+        (coordinator_assigned_advocate ?case_coordinator ?peer_advocate)
+        (peer_mentor_confirmed ?peer_mentor)
+        (peer_advocate_confirmed ?peer_advocate)
+        (intake_channel_assigned ?case_coordinator ?intake_channel)
+        (not
+          (coordinator_interventions_committed ?case_coordinator)
+        )
+      )
+    :effect (coordinator_interventions_committed ?case_coordinator)
+  )
+  (:action complete_coordinator_workflow
+    :parameters (?case_coordinator - case_coordinator_role)
+    :precondition
+      (and
+        (coordinator_escalation_initiated ?case_coordinator)
+        (coordinator_interventions_committed ?case_coordinator)
+        (not
+          (coordinator_marked_complete ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_marked_complete ?case_coordinator)
+        (engagement_confirmed ?case_coordinator)
+      )
+  )
+  (:action engage_community_partner
+    :parameters (?case_coordinator - case_coordinator_role ?community_partner - community_partner ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (triaged_entity ?case_coordinator)
+        (intake_channel_assigned ?case_coordinator ?intake_channel)
+        (community_partner_available ?community_partner)
+        (coordinator_has_partner_relation ?case_coordinator ?community_partner)
+        (not
+          (coordinator_partner_assigned ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_partner_assigned ?case_coordinator)
+        (not
+          (community_partner_available ?community_partner)
+        )
+      )
+  )
+  (:action supervisor_contact_partner_on_behalf
+    :parameters (?case_coordinator - case_coordinator_role ?supervising_staff - supervising_staff)
+    :precondition
+      (and
+        (coordinator_partner_assigned ?case_coordinator)
+        (entity_assigned_to_supervisor ?case_coordinator ?supervising_staff)
+        (not
+          (coordinator_partner_contacted ?case_coordinator)
+        )
+      )
+    :effect (coordinator_partner_contacted ?case_coordinator)
+  )
+  (:action initiate_partner_escalation
+    :parameters (?case_coordinator - case_coordinator_role ?escalation_channel - escalation_channel)
+    :precondition
+      (and
+        (coordinator_partner_contacted ?case_coordinator)
+        (coordinator_attached_escalation_channel ?case_coordinator ?escalation_channel)
+        (not
+          (coordinator_partner_escalation_initiated ?case_coordinator)
+        )
+      )
+    :effect (coordinator_partner_escalation_initiated ?case_coordinator)
+  )
+  (:action finalize_partner_escalation_and_mark_complete
+    :parameters (?case_coordinator - case_coordinator_role)
+    :precondition
+      (and
+        (coordinator_partner_escalation_initiated ?case_coordinator)
+        (not
+          (coordinator_marked_complete ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_marked_complete ?case_coordinator)
+        (engagement_confirmed ?case_coordinator)
+      )
+  )
+  (:action peer_mentor_confirm_package_completion
+    :parameters (?peer_mentor - peer_mentor_role ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_mentor_ready ?peer_mentor)
+        (peer_mentor_confirmed ?peer_mentor)
+        (referral_package_claimed ?referral_package)
+        (referral_package_peer_contributions_confirmed ?referral_package)
+        (not
+          (engagement_confirmed ?peer_mentor)
+        )
+      )
+    :effect (engagement_confirmed ?peer_mentor)
+  )
+  (:action peer_advocate_confirm_package_completion
+    :parameters (?peer_advocate - peer_advocate_role ?referral_package - referral_package)
+    :precondition
+      (and
+        (peer_advocate_ready ?peer_advocate)
+        (peer_advocate_confirmed ?peer_advocate)
+        (referral_package_claimed ?referral_package)
+        (referral_package_peer_contributions_confirmed ?referral_package)
+        (not
+          (engagement_confirmed ?peer_advocate)
+        )
+      )
+    :effect (engagement_confirmed ?peer_advocate)
+  )
+  (:action attach_accommodation_request_to_case
+    :parameters (?participant_entity - participant ?accommodation_request - accommodation_request ?intake_channel - intake_channel)
+    :precondition
+      (and
+        (engagement_confirmed ?participant_entity)
+        (intake_channel_assigned ?participant_entity ?intake_channel)
+        (accommodation_request_available ?accommodation_request)
+        (not
+          (accommodation_attached ?participant_entity)
+        )
+      )
+    :effect
+      (and
+        (accommodation_attached ?participant_entity)
+        (case_has_accommodation ?participant_entity ?accommodation_request)
+        (not
+          (accommodation_request_available ?accommodation_request)
+        )
+      )
+  )
+  (:action assign_case_to_peer_mentor_and_release_slot
+    :parameters (?peer_mentor - peer_mentor_role ?referral_slot - referral_slot ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_attached ?peer_mentor)
+        (case_reserved_slot ?peer_mentor ?referral_slot)
+        (case_has_accommodation ?peer_mentor ?accommodation_request)
+        (not
+          (assignment_confirmed ?peer_mentor)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?peer_mentor)
+        (slot_available ?referral_slot)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+  (:action assign_case_to_peer_advocate_and_release_slot
+    :parameters (?peer_advocate - peer_advocate_role ?referral_slot - referral_slot ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_attached ?peer_advocate)
+        (case_reserved_slot ?peer_advocate ?referral_slot)
+        (case_has_accommodation ?peer_advocate ?accommodation_request)
+        (not
+          (assignment_confirmed ?peer_advocate)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?peer_advocate)
+        (slot_available ?referral_slot)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+  (:action assign_case_to_coordinator_and_release_slot
+    :parameters (?case_coordinator - case_coordinator_role ?referral_slot - referral_slot ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (accommodation_attached ?case_coordinator)
+        (case_reserved_slot ?case_coordinator ?referral_slot)
+        (case_has_accommodation ?case_coordinator ?accommodation_request)
+        (not
+          (assignment_confirmed ?case_coordinator)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?case_coordinator)
+        (slot_available ?referral_slot)
+        (accommodation_request_available ?accommodation_request)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem peer_support_referral_routing_problem)
+  (:domain peer_support_referral_routing)
+  (:objects peer_mentor_1 - peer_mentor_role peer_advocate_1 - peer_advocate_role case_coordinator_1 - case_coordinator_role case_coordinator_2 - case_coordinator_role referral_slot_a - referral_slot referral_slot_b - referral_slot referral_slot_c - referral_slot intake_channel_web - intake_channel supervising_staff_1 - supervising_staff service_option_peer_support - service_option peer_specialty_academic - peer_specialty staff_specialty_career - staff_specialty referral_package_1 - referral_package assessment_doc_initial_screen - assessment_document assessment_doc_followup - assessment_document program_code_peer_program - program_code program_code_special_initiative - program_code followup_activity_checkin - followup_activity followup_activity_referral_call - followup_activity accommodation_request_generic - accommodation_request specialist_resource_counselor - specialist_resource community_partner_local_clinic - community_partner community_partner_shelter - community_partner escalation_channel_urgent - escalation_channel)
+  (:init
+    (slot_available referral_slot_a)
+    (slot_available referral_slot_b)
+    (slot_available referral_slot_c)
+    (intake_channel_available intake_channel_web)
+    (supervisor_available supervising_staff_1)
+    (service_option_available service_option_peer_support)
+    (peer_mentor_has_specialty peer_mentor_1 peer_specialty_academic)
+    (peer_advocate_has_specialty peer_advocate_1 staff_specialty_career)
+    (referral_package_draft referral_package_1)
+    (assessment_document_available assessment_doc_initial_screen)
+    (assessment_document_available assessment_doc_followup)
+    (coordinator_assigned_mentor case_coordinator_1 peer_mentor_1)
+    (coordinator_assigned_mentor case_coordinator_2 peer_mentor_1)
+    (coordinator_assigned_advocate case_coordinator_1 peer_advocate_1)
+    (coordinator_assigned_advocate case_coordinator_2 peer_advocate_1)
+    (coordinator_manages_package case_coordinator_1 referral_package_1)
+    (coordinator_manages_package case_coordinator_2 referral_package_1)
+    (coordinator_has_assessment_document case_coordinator_1 assessment_doc_initial_screen)
+    (coordinator_has_assessment_document case_coordinator_2 assessment_doc_followup)
+    (program_code_available program_code_peer_program)
+    (program_code_available program_code_special_initiative)
+    (followup_activity_available followup_activity_checkin)
+    (followup_activity_available followup_activity_referral_call)
+    (accommodation_request_available accommodation_request_generic)
+    (specialist_resource_available specialist_resource_counselor)
+    (community_partner_available community_partner_local_clinic)
+    (coordinator_has_partner_relation case_coordinator_1 community_partner_local_clinic)
+    (coordinator_has_partner_relation case_coordinator_2 community_partner_shelter)
+    (escalation_channel_available escalation_channel_urgent)
+  )
+  (:goal
+    (and
+      (assignment_confirmed peer_mentor_1)
+      (assignment_confirmed peer_advocate_1)
+      (assignment_confirmed case_coordinator_1)
+      (assignment_confirmed case_coordinator_2)
+    )
+  )
+)

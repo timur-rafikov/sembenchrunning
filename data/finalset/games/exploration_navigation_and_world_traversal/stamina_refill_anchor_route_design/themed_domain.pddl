@@ -1,0 +1,936 @@
+(define (domain stamina_refill_anchor_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types world_asset - object environment_feature - object site_attribute - object node_category_root - object nav_node - node_category_root anchor_token - world_asset traversal_method - world_asset traversal_tool - world_asset objective_tag - world_asset deployment_token - world_asset refill_item - world_asset site_upgrade - world_asset design_modifier - world_asset supply_item - environment_feature map_marker - environment_feature node_tag - environment_feature hazard_type - site_attribute terrain_feature - site_attribute anchor_site - site_attribute player_node_base - nav_node designer_node_base - nav_node player_node_a - player_node_base player_node_b - player_node_base designer_node - designer_node_base)
+  (:predicates
+    (node_candidate ?nav_node - nav_node)
+    (node_validated ?nav_node - nav_node)
+    (node_token_reserved ?nav_node - nav_node)
+    (anchor_deployed ?nav_node - nav_node)
+    (node_primed ?nav_node - nav_node)
+    (refill_allocated ?nav_node - nav_node)
+    (anchor_token_available ?anchor_token - anchor_token)
+    (node_token_binding ?nav_node - nav_node ?anchor_token - anchor_token)
+    (traversal_method_available ?traversal_method - traversal_method)
+    (node_method_assigned ?nav_node - nav_node ?traversal_method - traversal_method)
+    (traversal_tool_available ?traversal_tool - traversal_tool)
+    (node_tool_assigned ?nav_node - nav_node ?traversal_tool - traversal_tool)
+    (supply_item_available ?supply_item - supply_item)
+    (player_node_a_has_supply ?player_node_type_a - player_node_a ?supply_item - supply_item)
+    (player_node_b_has_supply ?player_node_type_b - player_node_b ?supply_item - supply_item)
+    (player_node_a_hazard ?player_node_type_a - player_node_a ?hazard_type - hazard_type)
+    (hazard_validated ?hazard_type - hazard_type)
+    (hazard_supplied ?hazard_type - hazard_type)
+    (player_node_a_approach_valid ?player_node_type_a - player_node_a)
+    (player_node_b_terrain ?player_node_type_b - player_node_b ?terrain_feature - terrain_feature)
+    (terrain_validated ?terrain_feature - terrain_feature)
+    (terrain_supplied ?terrain_feature - terrain_feature)
+    (player_node_b_approach_valid ?player_node_type_b - player_node_b)
+    (anchor_site_available ?anchor_site - anchor_site)
+    (anchor_site_assembled ?anchor_site - anchor_site)
+    (anchor_site_hazard_link ?anchor_site - anchor_site ?hazard_type - hazard_type)
+    (anchor_site_terrain_link ?anchor_site - anchor_site ?terrain_feature - terrain_feature)
+    (anchor_site_has_marker ?anchor_site - anchor_site)
+    (anchor_site_has_upgrade ?anchor_site - anchor_site)
+    (anchor_site_ready_for_marker_attachment ?anchor_site - anchor_site)
+    (designer_links_player_node_a ?designer_node - designer_node ?player_node_type_a - player_node_a)
+    (designer_links_player_node_b ?designer_node - designer_node ?player_node_type_b - player_node_b)
+    (designer_links_anchor_site ?designer_node - designer_node ?anchor_site - anchor_site)
+    (map_marker_available ?map_marker - map_marker)
+    (designer_has_map_marker ?designer_node - designer_node ?map_marker - map_marker)
+    (map_marker_attached ?map_marker - map_marker)
+    (map_marker_link_site ?map_marker - map_marker ?anchor_site - anchor_site)
+    (designer_marker_processed ?designer_node - designer_node)
+    (designer_upgrade_ready ?designer_node - designer_node)
+    (designer_ready_for_production ?designer_node - designer_node)
+    (designer_objective_assigned ?designer_node - designer_node)
+    (designer_objective_marker_linked ?designer_node - designer_node)
+    (designer_modifier_attached ?designer_node - designer_node)
+    (designer_upgrade_applied ?designer_node - designer_node)
+    (node_tag_available ?node_tag - node_tag)
+    (designer_has_node_tag ?designer_node - designer_node ?node_tag - node_tag)
+    (designer_tag_claimed ?designer_node - designer_node)
+    (designer_tag_prepared ?designer_node - designer_node)
+    (designer_tag_finalized ?designer_node - designer_node)
+    (objective_tag_available ?objective_tag - objective_tag)
+    (designer_has_objective_tag ?designer_node - designer_node ?objective_tag - objective_tag)
+    (deployment_token_available ?deployment_token - deployment_token)
+    (designer_has_deployment_token ?designer_node - designer_node ?deployment_token - deployment_token)
+    (site_upgrade_available ?site_upgrade - site_upgrade)
+    (designer_has_site_upgrade ?designer_node - designer_node ?site_upgrade - site_upgrade)
+    (design_modifier_available ?design_modifier - design_modifier)
+    (designer_has_design_modifier ?designer_node - designer_node ?design_modifier - design_modifier)
+    (refill_item_available ?refill_item - refill_item)
+    (node_refill_link ?nav_node - nav_node ?refill_item - refill_item)
+    (player_node_a_ready ?player_node_type_a - player_node_a)
+    (player_node_b_ready ?player_node_type_b - player_node_b)
+    (designer_node_finalized ?designer_node - designer_node)
+  )
+  (:action discover_candidate_node
+    :parameters (?nav_node - nav_node)
+    :precondition
+      (and
+        (not
+          (node_candidate ?nav_node)
+        )
+        (not
+          (anchor_deployed ?nav_node)
+        )
+      )
+    :effect (node_candidate ?nav_node)
+  )
+  (:action reserve_anchor_token_for_node
+    :parameters (?nav_node - nav_node ?anchor_token - anchor_token)
+    :precondition
+      (and
+        (node_candidate ?nav_node)
+        (not
+          (node_token_reserved ?nav_node)
+        )
+        (anchor_token_available ?anchor_token)
+      )
+    :effect
+      (and
+        (node_token_reserved ?nav_node)
+        (node_token_binding ?nav_node ?anchor_token)
+        (not
+          (anchor_token_available ?anchor_token)
+        )
+      )
+  )
+  (:action assign_traversal_method_to_node
+    :parameters (?nav_node - nav_node ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_candidate ?nav_node)
+        (node_token_reserved ?nav_node)
+        (traversal_method_available ?traversal_method)
+      )
+    :effect
+      (and
+        (node_method_assigned ?nav_node ?traversal_method)
+        (not
+          (traversal_method_available ?traversal_method)
+        )
+      )
+  )
+  (:action validate_node_for_anchor
+    :parameters (?nav_node - nav_node ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_candidate ?nav_node)
+        (node_token_reserved ?nav_node)
+        (node_method_assigned ?nav_node ?traversal_method)
+        (not
+          (node_validated ?nav_node)
+        )
+      )
+    :effect (node_validated ?nav_node)
+  )
+  (:action release_traversal_method_from_node
+    :parameters (?nav_node - nav_node ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_method_assigned ?nav_node ?traversal_method)
+      )
+    :effect
+      (and
+        (traversal_method_available ?traversal_method)
+        (not
+          (node_method_assigned ?nav_node ?traversal_method)
+        )
+      )
+  )
+  (:action assign_traversal_tool_to_node
+    :parameters (?nav_node - nav_node ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (node_validated ?nav_node)
+        (traversal_tool_available ?traversal_tool)
+      )
+    :effect
+      (and
+        (node_tool_assigned ?nav_node ?traversal_tool)
+        (not
+          (traversal_tool_available ?traversal_tool)
+        )
+      )
+  )
+  (:action release_traversal_tool_from_node
+    :parameters (?nav_node - nav_node ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (node_tool_assigned ?nav_node ?traversal_tool)
+      )
+    :effect
+      (and
+        (traversal_tool_available ?traversal_tool)
+        (not
+          (node_tool_assigned ?nav_node ?traversal_tool)
+        )
+      )
+  )
+  (:action designer_claim_site_upgrade
+    :parameters (?designer_node - designer_node ?site_upgrade - site_upgrade)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (site_upgrade_available ?site_upgrade)
+      )
+    :effect
+      (and
+        (designer_has_site_upgrade ?designer_node ?site_upgrade)
+        (not
+          (site_upgrade_available ?site_upgrade)
+        )
+      )
+  )
+  (:action designer_release_site_upgrade
+    :parameters (?designer_node - designer_node ?site_upgrade - site_upgrade)
+    :precondition
+      (and
+        (designer_has_site_upgrade ?designer_node ?site_upgrade)
+      )
+    :effect
+      (and
+        (site_upgrade_available ?site_upgrade)
+        (not
+          (designer_has_site_upgrade ?designer_node ?site_upgrade)
+        )
+      )
+  )
+  (:action designer_claim_design_modifier
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (design_modifier_available ?design_modifier)
+      )
+    :effect
+      (and
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (not
+          (design_modifier_available ?design_modifier)
+        )
+      )
+  )
+  (:action designer_release_design_modifier
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier)
+    :precondition
+      (and
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+      )
+    :effect
+      (and
+        (design_modifier_available ?design_modifier)
+        (not
+          (designer_has_design_modifier ?designer_node ?design_modifier)
+        )
+      )
+  )
+  (:action validate_hazard_for_pnode_a
+    :parameters (?player_node_type_a - player_node_a ?hazard_type - hazard_type ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_validated ?player_node_type_a)
+        (node_method_assigned ?player_node_type_a ?traversal_method)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (not
+          (hazard_validated ?hazard_type)
+        )
+        (not
+          (hazard_supplied ?hazard_type)
+        )
+      )
+    :effect (hazard_validated ?hazard_type)
+  )
+  (:action process_hazard_for_pnode_a_with_tool
+    :parameters (?player_node_type_a - player_node_a ?hazard_type - hazard_type ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (node_validated ?player_node_type_a)
+        (node_tool_assigned ?player_node_type_a ?traversal_tool)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (hazard_validated ?hazard_type)
+        (not
+          (player_node_a_ready ?player_node_type_a)
+        )
+      )
+    :effect
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_a_approach_valid ?player_node_type_a)
+      )
+  )
+  (:action attach_supply_to_hazard_for_pnode_a
+    :parameters (?player_node_type_a - player_node_a ?hazard_type - hazard_type ?supply_item - supply_item)
+    :precondition
+      (and
+        (node_validated ?player_node_type_a)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (supply_item_available ?supply_item)
+        (not
+          (player_node_a_ready ?player_node_type_a)
+        )
+      )
+    :effect
+      (and
+        (hazard_supplied ?hazard_type)
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_a_has_supply ?player_node_type_a ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_hazard_supply_for_pnode_a
+    :parameters (?player_node_type_a - player_node_a ?hazard_type - hazard_type ?traversal_method - traversal_method ?supply_item - supply_item)
+    :precondition
+      (and
+        (node_validated ?player_node_type_a)
+        (node_method_assigned ?player_node_type_a ?traversal_method)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (hazard_supplied ?hazard_type)
+        (player_node_a_has_supply ?player_node_type_a ?supply_item)
+        (not
+          (player_node_a_approach_valid ?player_node_type_a)
+        )
+      )
+    :effect
+      (and
+        (hazard_validated ?hazard_type)
+        (player_node_a_approach_valid ?player_node_type_a)
+        (supply_item_available ?supply_item)
+        (not
+          (player_node_a_has_supply ?player_node_type_a ?supply_item)
+        )
+      )
+  )
+  (:action validate_terrain_for_pnode_b
+    :parameters (?player_node_type_b - player_node_b ?terrain_feature - terrain_feature ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_validated ?player_node_type_b)
+        (node_method_assigned ?player_node_type_b ?traversal_method)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (not
+          (terrain_validated ?terrain_feature)
+        )
+        (not
+          (terrain_supplied ?terrain_feature)
+        )
+      )
+    :effect (terrain_validated ?terrain_feature)
+  )
+  (:action process_terrain_for_pnode_b_with_tool
+    :parameters (?player_node_type_b - player_node_b ?terrain_feature - terrain_feature ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (node_validated ?player_node_type_b)
+        (node_tool_assigned ?player_node_type_b ?traversal_tool)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (terrain_validated ?terrain_feature)
+        (not
+          (player_node_b_ready ?player_node_type_b)
+        )
+      )
+    :effect
+      (and
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_b_approach_valid ?player_node_type_b)
+      )
+  )
+  (:action attach_supply_to_terrain_for_pnode_b
+    :parameters (?player_node_type_b - player_node_b ?terrain_feature - terrain_feature ?supply_item - supply_item)
+    :precondition
+      (and
+        (node_validated ?player_node_type_b)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (supply_item_available ?supply_item)
+        (not
+          (player_node_b_ready ?player_node_type_b)
+        )
+      )
+    :effect
+      (and
+        (terrain_supplied ?terrain_feature)
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_b_has_supply ?player_node_type_b ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action finalize_terrain_supply_for_pnode_b
+    :parameters (?player_node_type_b - player_node_b ?terrain_feature - terrain_feature ?traversal_method - traversal_method ?supply_item - supply_item)
+    :precondition
+      (and
+        (node_validated ?player_node_type_b)
+        (node_method_assigned ?player_node_type_b ?traversal_method)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (terrain_supplied ?terrain_feature)
+        (player_node_b_has_supply ?player_node_type_b ?supply_item)
+        (not
+          (player_node_b_approach_valid ?player_node_type_b)
+        )
+      )
+    :effect
+      (and
+        (terrain_validated ?terrain_feature)
+        (player_node_b_approach_valid ?player_node_type_b)
+        (supply_item_available ?supply_item)
+        (not
+          (player_node_b_has_supply ?player_node_type_b ?supply_item)
+        )
+      )
+  )
+  (:action assemble_anchor_site
+    :parameters (?player_node_type_a - player_node_a ?player_node_type_b - player_node_b ?hazard_type - hazard_type ?terrain_feature - terrain_feature ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (hazard_validated ?hazard_type)
+        (terrain_validated ?terrain_feature)
+        (player_node_a_approach_valid ?player_node_type_a)
+        (player_node_b_approach_valid ?player_node_type_b)
+        (anchor_site_available ?anchor_site)
+      )
+    :effect
+      (and
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_hazard_link ?anchor_site ?hazard_type)
+        (anchor_site_terrain_link ?anchor_site ?terrain_feature)
+        (not
+          (anchor_site_available ?anchor_site)
+        )
+      )
+  )
+  (:action assemble_anchor_site_attach_marker
+    :parameters (?player_node_type_a - player_node_a ?player_node_type_b - player_node_b ?hazard_type - hazard_type ?terrain_feature - terrain_feature ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (hazard_supplied ?hazard_type)
+        (terrain_validated ?terrain_feature)
+        (not
+          (player_node_a_approach_valid ?player_node_type_a)
+        )
+        (player_node_b_approach_valid ?player_node_type_b)
+        (anchor_site_available ?anchor_site)
+      )
+    :effect
+      (and
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_hazard_link ?anchor_site ?hazard_type)
+        (anchor_site_terrain_link ?anchor_site ?terrain_feature)
+        (anchor_site_has_marker ?anchor_site)
+        (not
+          (anchor_site_available ?anchor_site)
+        )
+      )
+  )
+  (:action assemble_anchor_site_attach_upgrade
+    :parameters (?player_node_type_a - player_node_a ?player_node_type_b - player_node_b ?hazard_type - hazard_type ?terrain_feature - terrain_feature ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (hazard_validated ?hazard_type)
+        (terrain_supplied ?terrain_feature)
+        (player_node_a_approach_valid ?player_node_type_a)
+        (not
+          (player_node_b_approach_valid ?player_node_type_b)
+        )
+        (anchor_site_available ?anchor_site)
+      )
+    :effect
+      (and
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_hazard_link ?anchor_site ?hazard_type)
+        (anchor_site_terrain_link ?anchor_site ?terrain_feature)
+        (anchor_site_has_upgrade ?anchor_site)
+        (not
+          (anchor_site_available ?anchor_site)
+        )
+      )
+  )
+  (:action assemble_anchor_site_full
+    :parameters (?player_node_type_a - player_node_a ?player_node_type_b - player_node_b ?hazard_type - hazard_type ?terrain_feature - terrain_feature ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_a_hazard ?player_node_type_a ?hazard_type)
+        (player_node_b_terrain ?player_node_type_b ?terrain_feature)
+        (hazard_supplied ?hazard_type)
+        (terrain_supplied ?terrain_feature)
+        (not
+          (player_node_a_approach_valid ?player_node_type_a)
+        )
+        (not
+          (player_node_b_approach_valid ?player_node_type_b)
+        )
+        (anchor_site_available ?anchor_site)
+      )
+    :effect
+      (and
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_hazard_link ?anchor_site ?hazard_type)
+        (anchor_site_terrain_link ?anchor_site ?terrain_feature)
+        (anchor_site_has_marker ?anchor_site)
+        (anchor_site_has_upgrade ?anchor_site)
+        (not
+          (anchor_site_available ?anchor_site)
+        )
+      )
+  )
+  (:action mark_anchor_site_ready
+    :parameters (?anchor_site - anchor_site ?player_node_type_a - player_node_a ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (anchor_site_assembled ?anchor_site)
+        (player_node_a_ready ?player_node_type_a)
+        (node_method_assigned ?player_node_type_a ?traversal_method)
+        (not
+          (anchor_site_ready_for_marker_attachment ?anchor_site)
+        )
+      )
+    :effect (anchor_site_ready_for_marker_attachment ?anchor_site)
+  )
+  (:action designer_attach_map_marker_to_site
+    :parameters (?designer_node - designer_node ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (designer_links_anchor_site ?designer_node ?anchor_site)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_available ?map_marker)
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_ready_for_marker_attachment ?anchor_site)
+        (not
+          (map_marker_attached ?map_marker)
+        )
+      )
+    :effect
+      (and
+        (map_marker_attached ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (not
+          (map_marker_available ?map_marker)
+        )
+      )
+  )
+  (:action designer_process_map_marker
+    :parameters (?designer_node - designer_node ?map_marker - map_marker ?anchor_site - anchor_site ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_attached ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (node_method_assigned ?designer_node ?traversal_method)
+        (not
+          (anchor_site_has_marker ?anchor_site)
+        )
+        (not
+          (designer_marker_processed ?designer_node)
+        )
+      )
+    :effect (designer_marker_processed ?designer_node)
+  )
+  (:action designer_claim_objective_tag
+    :parameters (?designer_node - designer_node ?objective_tag - objective_tag)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (objective_tag_available ?objective_tag)
+        (not
+          (designer_objective_assigned ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_objective_assigned ?designer_node)
+        (designer_has_objective_tag ?designer_node ?objective_tag)
+        (not
+          (objective_tag_available ?objective_tag)
+        )
+      )
+  )
+  (:action designer_bind_objective_to_marker
+    :parameters (?designer_node - designer_node ?map_marker - map_marker ?anchor_site - anchor_site ?traversal_method - traversal_method ?objective_tag - objective_tag)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_attached ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (node_method_assigned ?designer_node ?traversal_method)
+        (anchor_site_has_marker ?anchor_site)
+        (designer_objective_assigned ?designer_node)
+        (designer_has_objective_tag ?designer_node ?objective_tag)
+        (not
+          (designer_marker_processed ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_marker_processed ?designer_node)
+        (designer_objective_marker_linked ?designer_node)
+      )
+  )
+  (:action designer_prepare_site_upgrade
+    :parameters (?designer_node - designer_node ?site_upgrade - site_upgrade ?traversal_tool - traversal_tool ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_marker_processed ?designer_node)
+        (designer_has_site_upgrade ?designer_node ?site_upgrade)
+        (node_tool_assigned ?designer_node ?traversal_tool)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (not
+          (anchor_site_has_upgrade ?anchor_site)
+        )
+        (not
+          (designer_upgrade_ready ?designer_node)
+        )
+      )
+    :effect (designer_upgrade_ready ?designer_node)
+  )
+  (:action designer_prepare_site_upgrade_alternative
+    :parameters (?designer_node - designer_node ?site_upgrade - site_upgrade ?traversal_tool - traversal_tool ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_marker_processed ?designer_node)
+        (designer_has_site_upgrade ?designer_node ?site_upgrade)
+        (node_tool_assigned ?designer_node ?traversal_tool)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (anchor_site_has_upgrade ?anchor_site)
+        (not
+          (designer_upgrade_ready ?designer_node)
+        )
+      )
+    :effect (designer_upgrade_ready ?designer_node)
+  )
+  (:action designer_mark_ready_for_production
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_upgrade_ready ?designer_node)
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (not
+          (anchor_site_has_marker ?anchor_site)
+        )
+        (not
+          (anchor_site_has_upgrade ?anchor_site)
+        )
+        (not
+          (designer_ready_for_production ?designer_node)
+        )
+      )
+    :effect (designer_ready_for_production ?designer_node)
+  )
+  (:action designer_mark_ready_and_attach_modifier_with_marker
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_upgrade_ready ?designer_node)
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (anchor_site_has_marker ?anchor_site)
+        (not
+          (anchor_site_has_upgrade ?anchor_site)
+        )
+        (not
+          (designer_ready_for_production ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_modifier_attached ?designer_node)
+      )
+  )
+  (:action designer_mark_ready_and_attach_modifier_with_upgrade
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_upgrade_ready ?designer_node)
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (not
+          (anchor_site_has_marker ?anchor_site)
+        )
+        (anchor_site_has_upgrade ?anchor_site)
+        (not
+          (designer_ready_for_production ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_modifier_attached ?designer_node)
+      )
+  )
+  (:action designer_mark_ready_and_attach_modifier_with_marker_and_upgrade
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier ?map_marker - map_marker ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (designer_upgrade_ready ?designer_node)
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (designer_has_map_marker ?designer_node ?map_marker)
+        (map_marker_link_site ?map_marker ?anchor_site)
+        (anchor_site_has_marker ?anchor_site)
+        (anchor_site_has_upgrade ?anchor_site)
+        (not
+          (designer_ready_for_production ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_modifier_attached ?designer_node)
+      )
+  )
+  (:action commit_site_primer
+    :parameters (?designer_node - designer_node)
+    :precondition
+      (and
+        (designer_ready_for_production ?designer_node)
+        (not
+          (designer_modifier_attached ?designer_node)
+        )
+        (not
+          (designer_node_finalized ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_node_finalized ?designer_node)
+        (node_primed ?designer_node)
+      )
+  )
+  (:action designer_attach_deployment_token
+    :parameters (?designer_node - designer_node ?deployment_token - deployment_token)
+    :precondition
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_modifier_attached ?designer_node)
+        (deployment_token_available ?deployment_token)
+      )
+    :effect
+      (and
+        (designer_has_deployment_token ?designer_node ?deployment_token)
+        (not
+          (deployment_token_available ?deployment_token)
+        )
+      )
+  )
+  (:action designer_apply_site_upgrades
+    :parameters (?designer_node - designer_node ?player_node_type_a - player_node_a ?player_node_type_b - player_node_b ?traversal_method - traversal_method ?deployment_token - deployment_token)
+    :precondition
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_modifier_attached ?designer_node)
+        (designer_has_deployment_token ?designer_node ?deployment_token)
+        (designer_links_player_node_a ?designer_node ?player_node_type_a)
+        (designer_links_player_node_b ?designer_node ?player_node_type_b)
+        (player_node_a_approach_valid ?player_node_type_a)
+        (player_node_b_approach_valid ?player_node_type_b)
+        (node_method_assigned ?designer_node ?traversal_method)
+        (not
+          (designer_upgrade_applied ?designer_node)
+        )
+      )
+    :effect (designer_upgrade_applied ?designer_node)
+  )
+  (:action finalize_site_activation_after_upgrade
+    :parameters (?designer_node - designer_node)
+    :precondition
+      (and
+        (designer_ready_for_production ?designer_node)
+        (designer_upgrade_applied ?designer_node)
+        (not
+          (designer_node_finalized ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_node_finalized ?designer_node)
+        (node_primed ?designer_node)
+      )
+  )
+  (:action designer_claim_node_tag
+    :parameters (?designer_node - designer_node ?node_tag - node_tag ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_validated ?designer_node)
+        (node_method_assigned ?designer_node ?traversal_method)
+        (node_tag_available ?node_tag)
+        (designer_has_node_tag ?designer_node ?node_tag)
+        (not
+          (designer_tag_claimed ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_tag_claimed ?designer_node)
+        (not
+          (node_tag_available ?node_tag)
+        )
+      )
+  )
+  (:action designer_prepare_node_tag
+    :parameters (?designer_node - designer_node ?traversal_tool - traversal_tool)
+    :precondition
+      (and
+        (designer_tag_claimed ?designer_node)
+        (node_tool_assigned ?designer_node ?traversal_tool)
+        (not
+          (designer_tag_prepared ?designer_node)
+        )
+      )
+    :effect (designer_tag_prepared ?designer_node)
+  )
+  (:action designer_apply_modifier_to_node_tag
+    :parameters (?designer_node - designer_node ?design_modifier - design_modifier)
+    :precondition
+      (and
+        (designer_tag_prepared ?designer_node)
+        (designer_has_design_modifier ?designer_node ?design_modifier)
+        (not
+          (designer_tag_finalized ?designer_node)
+        )
+      )
+    :effect (designer_tag_finalized ?designer_node)
+  )
+  (:action finalize_site_activation_from_tag
+    :parameters (?designer_node - designer_node)
+    :precondition
+      (and
+        (designer_tag_finalized ?designer_node)
+        (not
+          (designer_node_finalized ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (designer_node_finalized ?designer_node)
+        (node_primed ?designer_node)
+      )
+  )
+  (:action prime_pnode_a_for_deployment
+    :parameters (?player_node_type_a - player_node_a ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_a_ready ?player_node_type_a)
+        (player_node_a_approach_valid ?player_node_type_a)
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_ready_for_marker_attachment ?anchor_site)
+        (not
+          (node_primed ?player_node_type_a)
+        )
+      )
+    :effect (node_primed ?player_node_type_a)
+  )
+  (:action prime_pnode_b_for_deployment
+    :parameters (?player_node_type_b - player_node_b ?anchor_site - anchor_site)
+    :precondition
+      (and
+        (player_node_b_ready ?player_node_type_b)
+        (player_node_b_approach_valid ?player_node_type_b)
+        (anchor_site_assembled ?anchor_site)
+        (anchor_site_ready_for_marker_attachment ?anchor_site)
+        (not
+          (node_primed ?player_node_type_b)
+        )
+      )
+    :effect (node_primed ?player_node_type_b)
+  )
+  (:action attach_refill_to_primed_node
+    :parameters (?nav_node - nav_node ?refill_item - refill_item ?traversal_method - traversal_method)
+    :precondition
+      (and
+        (node_primed ?nav_node)
+        (node_method_assigned ?nav_node ?traversal_method)
+        (refill_item_available ?refill_item)
+        (not
+          (refill_allocated ?nav_node)
+        )
+      )
+    :effect
+      (and
+        (refill_allocated ?nav_node)
+        (node_refill_link ?nav_node ?refill_item)
+        (not
+          (refill_item_available ?refill_item)
+        )
+      )
+  )
+  (:action deploy_anchor_on_player_node_a
+    :parameters (?player_node_type_a - player_node_a ?anchor_token - anchor_token ?refill_item - refill_item)
+    :precondition
+      (and
+        (refill_allocated ?player_node_type_a)
+        (node_token_binding ?player_node_type_a ?anchor_token)
+        (node_refill_link ?player_node_type_a ?refill_item)
+        (not
+          (anchor_deployed ?player_node_type_a)
+        )
+      )
+    :effect
+      (and
+        (anchor_deployed ?player_node_type_a)
+        (anchor_token_available ?anchor_token)
+        (refill_item_available ?refill_item)
+      )
+  )
+  (:action deploy_anchor_on_player_node_b
+    :parameters (?player_node_type_b - player_node_b ?anchor_token - anchor_token ?refill_item - refill_item)
+    :precondition
+      (and
+        (refill_allocated ?player_node_type_b)
+        (node_token_binding ?player_node_type_b ?anchor_token)
+        (node_refill_link ?player_node_type_b ?refill_item)
+        (not
+          (anchor_deployed ?player_node_type_b)
+        )
+      )
+    :effect
+      (and
+        (anchor_deployed ?player_node_type_b)
+        (anchor_token_available ?anchor_token)
+        (refill_item_available ?refill_item)
+      )
+  )
+  (:action deploy_anchor_on_designer_node
+    :parameters (?designer_node - designer_node ?anchor_token - anchor_token ?refill_item - refill_item)
+    :precondition
+      (and
+        (refill_allocated ?designer_node)
+        (node_token_binding ?designer_node ?anchor_token)
+        (node_refill_link ?designer_node ?refill_item)
+        (not
+          (anchor_deployed ?designer_node)
+        )
+      )
+    :effect
+      (and
+        (anchor_deployed ?designer_node)
+        (anchor_token_available ?anchor_token)
+        (refill_item_available ?refill_item)
+      )
+  )
+)

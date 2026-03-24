@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain time_window_constrained_delivery_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object item_type - object infrastructure_type - object domain_entity - object delivery_order - domain_entity vehicle_asset - resource_type time_window_slot - resource_type driver - resource_type priority_marker - resource_type assignment_profile - resource_type shipment_batch - resource_type equipment_item - resource_type special_constraint - resource_type package_unit - item_type container - item_type authorization_token - item_type origin_hub - infrastructure_type destination_hub - infrastructure_type transfer_leg - infrastructure_type task_subtype - delivery_order task_subtype_b - delivery_order pickup_stop - task_subtype delivery_stop - task_subtype route_plan - task_subtype_b)
+  (:predicates
+    (task_registered ?delivery_order - delivery_order)
+    (task_confirmed ?delivery_order - delivery_order)
+    (task_vehicle_assigned ?delivery_order - delivery_order)
+    (finalized ?delivery_order - delivery_order)
+    (ready_for_dispatch ?delivery_order - delivery_order)
+    (task_completed ?delivery_order - delivery_order)
+    (vehicle_available ?vehicle_asset - vehicle_asset)
+    (task_assigned_to_vehicle ?delivery_order - delivery_order ?vehicle_asset - vehicle_asset)
+    (time_slot_available ?time_window_slot - time_window_slot)
+    (task_time_slot_reserved ?delivery_order - delivery_order ?time_window_slot - time_window_slot)
+    (driver_available ?driver - driver)
+    (task_assigned_driver ?delivery_order - delivery_order ?driver - driver)
+    (package_available ?package_unit - package_unit)
+    (pickup_contains_package ?pickup_stop - pickup_stop ?package_unit - package_unit)
+    (delivery_contains_package ?delivery_stop - delivery_stop ?package_unit - package_unit)
+    (pickup_at_origin_hub ?pickup_stop - pickup_stop ?origin_hub - origin_hub)
+    (origin_hub_reserved ?origin_hub - origin_hub)
+    (origin_hub_staged ?origin_hub - origin_hub)
+    (pickup_stop_loaded ?pickup_stop - pickup_stop)
+    (delivery_at_destination_hub ?delivery_stop - delivery_stop ?destination_hub - destination_hub)
+    (destination_hub_reserved ?destination_hub - destination_hub)
+    (destination_hub_staged ?destination_hub - destination_hub)
+    (delivery_stop_loaded ?delivery_stop - delivery_stop)
+    (transfer_leg_pending ?transfer_leg - transfer_leg)
+    (transfer_leg_ready ?transfer_leg - transfer_leg)
+    (transfer_leg_origin_hub ?transfer_leg - transfer_leg ?origin_hub - origin_hub)
+    (transfer_leg_destination_hub ?transfer_leg - transfer_leg ?destination_hub - destination_hub)
+    (transfer_leg_origin_staged ?transfer_leg - transfer_leg)
+    (transfer_leg_destination_staged ?transfer_leg - transfer_leg)
+    (transfer_leg_loaded ?transfer_leg - transfer_leg)
+    (route_plan_includes_pickup ?route_plan - route_plan ?pickup_stop - pickup_stop)
+    (route_plan_includes_delivery ?route_plan - route_plan ?delivery_stop - delivery_stop)
+    (route_plan_includes_transfer_leg ?route_plan - route_plan ?transfer_leg - transfer_leg)
+    (container_available ?container - container)
+    (route_plan_includes_container ?route_plan - route_plan ?container - container)
+    (container_in_use ?container - container)
+    (container_assigned_to_leg ?container - container ?transfer_leg - transfer_leg)
+    (route_plan_sequenced ?route_plan - route_plan)
+    (route_plan_containerized ?route_plan - route_plan)
+    (route_plan_equipped ?route_plan - route_plan)
+    (priority_attached ?route_plan - route_plan)
+    (priority_sequence_confirmed ?route_plan - route_plan)
+    (assignment_profile_attached ?route_plan - route_plan)
+    (load_finalized ?route_plan - route_plan)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (route_plan_has_authorization ?route_plan - route_plan ?authorization_token - authorization_token)
+    (authorization_bound ?route_plan - route_plan)
+    (gate_check_initiated ?route_plan - route_plan)
+    (gate_cleared ?route_plan - route_plan)
+    (priority_marker_available ?priority_marker - priority_marker)
+    (route_plan_priority_marker ?route_plan - route_plan ?priority_marker - priority_marker)
+    (assignment_profile_available ?assignment_profile - assignment_profile)
+    (route_plan_assignment_profile ?route_plan - route_plan ?assignment_profile - assignment_profile)
+    (equipment_available ?equipment_item - equipment_item)
+    (route_plan_equipment_assigned ?route_plan - route_plan ?equipment_item - equipment_item)
+    (special_constraint_available ?special_constraint - special_constraint)
+    (route_plan_special_constraint ?route_plan - route_plan ?special_constraint - special_constraint)
+    (shipment_batch_available ?shipment_batch - shipment_batch)
+    (task_assigned_batch ?delivery_order - delivery_order ?shipment_batch - shipment_batch)
+    (pickup_stop_ready ?pickup_stop - pickup_stop)
+    (delivery_stop_ready ?delivery_stop - delivery_stop)
+    (route_plan_dispatched ?route_plan - route_plan)
+  )
+  (:action register_delivery_order
+    :parameters (?delivery_order - delivery_order)
+    :precondition
+      (and
+        (not
+          (task_registered ?delivery_order)
+        )
+        (not
+          (finalized ?delivery_order)
+        )
+      )
+    :effect (task_registered ?delivery_order)
+  )
+  (:action assign_vehicle_to_task
+    :parameters (?delivery_order - delivery_order ?vehicle_asset - vehicle_asset)
+    :precondition
+      (and
+        (task_registered ?delivery_order)
+        (not
+          (task_vehicle_assigned ?delivery_order)
+        )
+        (vehicle_available ?vehicle_asset)
+      )
+    :effect
+      (and
+        (task_vehicle_assigned ?delivery_order)
+        (task_assigned_to_vehicle ?delivery_order ?vehicle_asset)
+        (not
+          (vehicle_available ?vehicle_asset)
+        )
+      )
+  )
+  (:action reserve_time_slot
+    :parameters (?delivery_order - delivery_order ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_registered ?delivery_order)
+        (task_vehicle_assigned ?delivery_order)
+        (time_slot_available ?time_window_slot)
+      )
+    :effect
+      (and
+        (task_time_slot_reserved ?delivery_order ?time_window_slot)
+        (not
+          (time_slot_available ?time_window_slot)
+        )
+      )
+  )
+  (:action confirm_time_slot
+    :parameters (?delivery_order - delivery_order ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_registered ?delivery_order)
+        (task_vehicle_assigned ?delivery_order)
+        (task_time_slot_reserved ?delivery_order ?time_window_slot)
+        (not
+          (task_confirmed ?delivery_order)
+        )
+      )
+    :effect (task_confirmed ?delivery_order)
+  )
+  (:action release_time_slot
+    :parameters (?delivery_order - delivery_order ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_time_slot_reserved ?delivery_order ?time_window_slot)
+      )
+    :effect
+      (and
+        (time_slot_available ?time_window_slot)
+        (not
+          (task_time_slot_reserved ?delivery_order ?time_window_slot)
+        )
+      )
+  )
+  (:action assign_driver_to_task
+    :parameters (?delivery_order - delivery_order ?driver - driver)
+    :precondition
+      (and
+        (task_confirmed ?delivery_order)
+        (driver_available ?driver)
+      )
+    :effect
+      (and
+        (task_assigned_driver ?delivery_order ?driver)
+        (not
+          (driver_available ?driver)
+        )
+      )
+  )
+  (:action release_driver_from_task
+    :parameters (?delivery_order - delivery_order ?driver - driver)
+    :precondition
+      (and
+        (task_assigned_driver ?delivery_order ?driver)
+      )
+    :effect
+      (and
+        (driver_available ?driver)
+        (not
+          (task_assigned_driver ?delivery_order ?driver)
+        )
+      )
+  )
+  (:action attach_equipment_to_route_plan
+    :parameters (?route_plan - route_plan ?equipment_item - equipment_item)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (equipment_available ?equipment_item)
+      )
+    :effect
+      (and
+        (route_plan_equipment_assigned ?route_plan ?equipment_item)
+        (not
+          (equipment_available ?equipment_item)
+        )
+      )
+  )
+  (:action detach_equipment_from_route_plan
+    :parameters (?route_plan - route_plan ?equipment_item - equipment_item)
+    :precondition
+      (and
+        (route_plan_equipment_assigned ?route_plan ?equipment_item)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_item)
+        (not
+          (route_plan_equipment_assigned ?route_plan ?equipment_item)
+        )
+      )
+  )
+  (:action attach_special_constraint_to_route_plan
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (special_constraint_available ?special_constraint)
+      )
+    :effect
+      (and
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (not
+          (special_constraint_available ?special_constraint)
+        )
+      )
+  )
+  (:action detach_special_constraint_from_route_plan
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint)
+    :precondition
+      (and
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+      )
+    :effect
+      (and
+        (special_constraint_available ?special_constraint)
+        (not
+          (route_plan_special_constraint ?route_plan ?special_constraint)
+        )
+      )
+  )
+  (:action reserve_hub_slot_for_pickup
+    :parameters (?pickup_stop - pickup_stop ?origin_hub - origin_hub ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_confirmed ?pickup_stop)
+        (task_time_slot_reserved ?pickup_stop ?time_window_slot)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (not
+          (origin_hub_reserved ?origin_hub)
+        )
+        (not
+          (origin_hub_staged ?origin_hub)
+        )
+      )
+    :effect (origin_hub_reserved ?origin_hub)
+  )
+  (:action stage_pickup_with_driver
+    :parameters (?pickup_stop - pickup_stop ?origin_hub - origin_hub ?driver - driver)
+    :precondition
+      (and
+        (task_confirmed ?pickup_stop)
+        (task_assigned_driver ?pickup_stop ?driver)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (origin_hub_reserved ?origin_hub)
+        (not
+          (pickup_stop_ready ?pickup_stop)
+        )
+      )
+    :effect
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (pickup_stop_loaded ?pickup_stop)
+      )
+  )
+  (:action load_package_into_hub_for_pickup
+    :parameters (?pickup_stop - pickup_stop ?origin_hub - origin_hub ?package_unit - package_unit)
+    :precondition
+      (and
+        (task_confirmed ?pickup_stop)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (package_available ?package_unit)
+        (not
+          (pickup_stop_ready ?pickup_stop)
+        )
+      )
+    :effect
+      (and
+        (origin_hub_staged ?origin_hub)
+        (pickup_stop_ready ?pickup_stop)
+        (pickup_contains_package ?pickup_stop ?package_unit)
+        (not
+          (package_available ?package_unit)
+        )
+      )
+  )
+  (:action finalize_pickup_loading
+    :parameters (?pickup_stop - pickup_stop ?origin_hub - origin_hub ?time_window_slot - time_window_slot ?package_unit - package_unit)
+    :precondition
+      (and
+        (task_confirmed ?pickup_stop)
+        (task_time_slot_reserved ?pickup_stop ?time_window_slot)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (origin_hub_staged ?origin_hub)
+        (pickup_contains_package ?pickup_stop ?package_unit)
+        (not
+          (pickup_stop_loaded ?pickup_stop)
+        )
+      )
+    :effect
+      (and
+        (origin_hub_reserved ?origin_hub)
+        (pickup_stop_loaded ?pickup_stop)
+        (package_available ?package_unit)
+        (not
+          (pickup_contains_package ?pickup_stop ?package_unit)
+        )
+      )
+  )
+  (:action reserve_destination_hub_for_delivery
+    :parameters (?delivery_stop - delivery_stop ?destination_hub - destination_hub ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_confirmed ?delivery_stop)
+        (task_time_slot_reserved ?delivery_stop ?time_window_slot)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (not
+          (destination_hub_reserved ?destination_hub)
+        )
+        (not
+          (destination_hub_staged ?destination_hub)
+        )
+      )
+    :effect (destination_hub_reserved ?destination_hub)
+  )
+  (:action stage_delivery_with_driver
+    :parameters (?delivery_stop - delivery_stop ?destination_hub - destination_hub ?driver - driver)
+    :precondition
+      (and
+        (task_confirmed ?delivery_stop)
+        (task_assigned_driver ?delivery_stop ?driver)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (destination_hub_reserved ?destination_hub)
+        (not
+          (delivery_stop_ready ?delivery_stop)
+        )
+      )
+    :effect
+      (and
+        (delivery_stop_ready ?delivery_stop)
+        (delivery_stop_loaded ?delivery_stop)
+      )
+  )
+  (:action load_package_at_destination_hub
+    :parameters (?delivery_stop - delivery_stop ?destination_hub - destination_hub ?package_unit - package_unit)
+    :precondition
+      (and
+        (task_confirmed ?delivery_stop)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (package_available ?package_unit)
+        (not
+          (delivery_stop_ready ?delivery_stop)
+        )
+      )
+    :effect
+      (and
+        (destination_hub_staged ?destination_hub)
+        (delivery_stop_ready ?delivery_stop)
+        (delivery_contains_package ?delivery_stop ?package_unit)
+        (not
+          (package_available ?package_unit)
+        )
+      )
+  )
+  (:action finalize_delivery_loading
+    :parameters (?delivery_stop - delivery_stop ?destination_hub - destination_hub ?time_window_slot - time_window_slot ?package_unit - package_unit)
+    :precondition
+      (and
+        (task_confirmed ?delivery_stop)
+        (task_time_slot_reserved ?delivery_stop ?time_window_slot)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (destination_hub_staged ?destination_hub)
+        (delivery_contains_package ?delivery_stop ?package_unit)
+        (not
+          (delivery_stop_loaded ?delivery_stop)
+        )
+      )
+    :effect
+      (and
+        (destination_hub_reserved ?destination_hub)
+        (delivery_stop_loaded ?delivery_stop)
+        (package_available ?package_unit)
+        (not
+          (delivery_contains_package ?delivery_stop ?package_unit)
+        )
+      )
+  )
+  (:action construct_transfer_leg_both_reserved
+    :parameters (?pickup_stop - pickup_stop ?delivery_stop - delivery_stop ?origin_hub - origin_hub ?destination_hub - destination_hub ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (delivery_stop_ready ?delivery_stop)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (origin_hub_reserved ?origin_hub)
+        (destination_hub_reserved ?destination_hub)
+        (pickup_stop_loaded ?pickup_stop)
+        (delivery_stop_loaded ?delivery_stop)
+        (transfer_leg_pending ?transfer_leg)
+      )
+    :effect
+      (and
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_origin_hub ?transfer_leg ?origin_hub)
+        (transfer_leg_destination_hub ?transfer_leg ?destination_hub)
+        (not
+          (transfer_leg_pending ?transfer_leg)
+        )
+      )
+  )
+  (:action construct_transfer_leg_origin_staged
+    :parameters (?pickup_stop - pickup_stop ?delivery_stop - delivery_stop ?origin_hub - origin_hub ?destination_hub - destination_hub ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (delivery_stop_ready ?delivery_stop)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (origin_hub_staged ?origin_hub)
+        (destination_hub_reserved ?destination_hub)
+        (not
+          (pickup_stop_loaded ?pickup_stop)
+        )
+        (delivery_stop_loaded ?delivery_stop)
+        (transfer_leg_pending ?transfer_leg)
+      )
+    :effect
+      (and
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_origin_hub ?transfer_leg ?origin_hub)
+        (transfer_leg_destination_hub ?transfer_leg ?destination_hub)
+        (transfer_leg_origin_staged ?transfer_leg)
+        (not
+          (transfer_leg_pending ?transfer_leg)
+        )
+      )
+  )
+  (:action construct_transfer_leg_destination_staged
+    :parameters (?pickup_stop - pickup_stop ?delivery_stop - delivery_stop ?origin_hub - origin_hub ?destination_hub - destination_hub ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (delivery_stop_ready ?delivery_stop)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (origin_hub_reserved ?origin_hub)
+        (destination_hub_staged ?destination_hub)
+        (pickup_stop_loaded ?pickup_stop)
+        (not
+          (delivery_stop_loaded ?delivery_stop)
+        )
+        (transfer_leg_pending ?transfer_leg)
+      )
+    :effect
+      (and
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_origin_hub ?transfer_leg ?origin_hub)
+        (transfer_leg_destination_hub ?transfer_leg ?destination_hub)
+        (transfer_leg_destination_staged ?transfer_leg)
+        (not
+          (transfer_leg_pending ?transfer_leg)
+        )
+      )
+  )
+  (:action construct_transfer_leg_both_staged
+    :parameters (?pickup_stop - pickup_stop ?delivery_stop - delivery_stop ?origin_hub - origin_hub ?destination_hub - destination_hub ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (delivery_stop_ready ?delivery_stop)
+        (pickup_at_origin_hub ?pickup_stop ?origin_hub)
+        (delivery_at_destination_hub ?delivery_stop ?destination_hub)
+        (origin_hub_staged ?origin_hub)
+        (destination_hub_staged ?destination_hub)
+        (not
+          (pickup_stop_loaded ?pickup_stop)
+        )
+        (not
+          (delivery_stop_loaded ?delivery_stop)
+        )
+        (transfer_leg_pending ?transfer_leg)
+      )
+    :effect
+      (and
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_origin_hub ?transfer_leg ?origin_hub)
+        (transfer_leg_destination_hub ?transfer_leg ?destination_hub)
+        (transfer_leg_origin_staged ?transfer_leg)
+        (transfer_leg_destination_staged ?transfer_leg)
+        (not
+          (transfer_leg_pending ?transfer_leg)
+        )
+      )
+  )
+  (:action mark_transfer_leg_loaded
+    :parameters (?transfer_leg - transfer_leg ?pickup_stop - pickup_stop ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (transfer_leg_ready ?transfer_leg)
+        (pickup_stop_ready ?pickup_stop)
+        (task_time_slot_reserved ?pickup_stop ?time_window_slot)
+        (not
+          (transfer_leg_loaded ?transfer_leg)
+        )
+      )
+    :effect (transfer_leg_loaded ?transfer_leg)
+  )
+  (:action allocate_container_to_leg
+    :parameters (?route_plan - route_plan ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (route_plan_includes_transfer_leg ?route_plan ?transfer_leg)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_available ?container)
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_loaded ?transfer_leg)
+        (not
+          (container_in_use ?container)
+        )
+      )
+    :effect
+      (and
+        (container_in_use ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (not
+          (container_available ?container)
+        )
+      )
+  )
+  (:action sequence_route_plan
+    :parameters (?route_plan - route_plan ?container - container ?transfer_leg - transfer_leg ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_in_use ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (task_time_slot_reserved ?route_plan ?time_window_slot)
+        (not
+          (transfer_leg_origin_staged ?transfer_leg)
+        )
+        (not
+          (route_plan_sequenced ?route_plan)
+        )
+      )
+    :effect (route_plan_sequenced ?route_plan)
+  )
+  (:action reserve_priority_marker_for_route_plan
+    :parameters (?route_plan - route_plan ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (priority_marker_available ?priority_marker)
+        (not
+          (priority_attached ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (priority_attached ?route_plan)
+        (route_plan_priority_marker ?route_plan ?priority_marker)
+        (not
+          (priority_marker_available ?priority_marker)
+        )
+      )
+  )
+  (:action sequence_route_plan_with_priority
+    :parameters (?route_plan - route_plan ?container - container ?transfer_leg - transfer_leg ?time_window_slot - time_window_slot ?priority_marker - priority_marker)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_in_use ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (task_time_slot_reserved ?route_plan ?time_window_slot)
+        (transfer_leg_origin_staged ?transfer_leg)
+        (priority_attached ?route_plan)
+        (route_plan_priority_marker ?route_plan ?priority_marker)
+        (not
+          (route_plan_sequenced ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_sequenced ?route_plan)
+        (priority_sequence_confirmed ?route_plan)
+      )
+  )
+  (:action start_route_plan_containerization
+    :parameters (?route_plan - route_plan ?equipment_item - equipment_item ?driver - driver ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_sequenced ?route_plan)
+        (route_plan_equipment_assigned ?route_plan ?equipment_item)
+        (task_assigned_driver ?route_plan ?driver)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (not
+          (transfer_leg_destination_staged ?transfer_leg)
+        )
+        (not
+          (route_plan_containerized ?route_plan)
+        )
+      )
+    :effect (route_plan_containerized ?route_plan)
+  )
+  (:action continue_route_plan_containerization
+    :parameters (?route_plan - route_plan ?equipment_item - equipment_item ?driver - driver ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_sequenced ?route_plan)
+        (route_plan_equipment_assigned ?route_plan ?equipment_item)
+        (task_assigned_driver ?route_plan ?driver)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (transfer_leg_destination_staged ?transfer_leg)
+        (not
+          (route_plan_containerized ?route_plan)
+        )
+      )
+    :effect (route_plan_containerized ?route_plan)
+  )
+  (:action equip_route_plan_phase_a
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_containerized ?route_plan)
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (not
+          (transfer_leg_origin_staged ?transfer_leg)
+        )
+        (not
+          (transfer_leg_destination_staged ?transfer_leg)
+        )
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect (route_plan_equipped ?route_plan)
+  )
+  (:action equip_route_plan_phase_b
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_containerized ?route_plan)
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (transfer_leg_origin_staged ?transfer_leg)
+        (not
+          (transfer_leg_destination_staged ?transfer_leg)
+        )
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (assignment_profile_attached ?route_plan)
+      )
+  )
+  (:action equip_route_plan_phase_c
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_containerized ?route_plan)
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (not
+          (transfer_leg_origin_staged ?transfer_leg)
+        )
+        (transfer_leg_destination_staged ?transfer_leg)
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (assignment_profile_attached ?route_plan)
+      )
+  )
+  (:action equip_route_plan_phase_d
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint ?container - container ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (route_plan_containerized ?route_plan)
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (route_plan_includes_container ?route_plan ?container)
+        (container_assigned_to_leg ?container ?transfer_leg)
+        (transfer_leg_origin_staged ?transfer_leg)
+        (transfer_leg_destination_staged ?transfer_leg)
+        (not
+          (route_plan_equipped ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_equipped ?route_plan)
+        (assignment_profile_attached ?route_plan)
+      )
+  )
+  (:action finalize_route_plan_pre_dispatch
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (not
+          (assignment_profile_attached ?route_plan)
+        )
+        (not
+          (route_plan_dispatched ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_dispatched ?route_plan)
+        (ready_for_dispatch ?route_plan)
+      )
+  )
+  (:action attach_assignment_profile_to_route_plan
+    :parameters (?route_plan - route_plan ?assignment_profile - assignment_profile)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (assignment_profile_attached ?route_plan)
+        (assignment_profile_available ?assignment_profile)
+      )
+    :effect
+      (and
+        (route_plan_assignment_profile ?route_plan ?assignment_profile)
+        (not
+          (assignment_profile_available ?assignment_profile)
+        )
+      )
+  )
+  (:action finalize_route_plan_load_sequence
+    :parameters (?route_plan - route_plan ?pickup_stop - pickup_stop ?delivery_stop - delivery_stop ?time_window_slot - time_window_slot ?assignment_profile - assignment_profile)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (assignment_profile_attached ?route_plan)
+        (route_plan_assignment_profile ?route_plan ?assignment_profile)
+        (route_plan_includes_pickup ?route_plan ?pickup_stop)
+        (route_plan_includes_delivery ?route_plan ?delivery_stop)
+        (pickup_stop_loaded ?pickup_stop)
+        (delivery_stop_loaded ?delivery_stop)
+        (task_time_slot_reserved ?route_plan ?time_window_slot)
+        (not
+          (load_finalized ?route_plan)
+        )
+      )
+    :effect (load_finalized ?route_plan)
+  )
+  (:action dispatch_route_plan
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_plan_equipped ?route_plan)
+        (load_finalized ?route_plan)
+        (not
+          (route_plan_dispatched ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_dispatched ?route_plan)
+        (ready_for_dispatch ?route_plan)
+      )
+  )
+  (:action bind_authorization_to_route_plan
+    :parameters (?route_plan - route_plan ?authorization_token - authorization_token ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (task_confirmed ?route_plan)
+        (task_time_slot_reserved ?route_plan ?time_window_slot)
+        (authorization_token_available ?authorization_token)
+        (route_plan_has_authorization ?route_plan ?authorization_token)
+        (not
+          (authorization_bound ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (authorization_bound ?route_plan)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action initiate_gate_check_for_route_plan
+    :parameters (?route_plan - route_plan ?driver - driver)
+    :precondition
+      (and
+        (authorization_bound ?route_plan)
+        (task_assigned_driver ?route_plan ?driver)
+        (not
+          (gate_check_initiated ?route_plan)
+        )
+      )
+    :effect (gate_check_initiated ?route_plan)
+  )
+  (:action complete_gate_check
+    :parameters (?route_plan - route_plan ?special_constraint - special_constraint)
+    :precondition
+      (and
+        (gate_check_initiated ?route_plan)
+        (route_plan_special_constraint ?route_plan ?special_constraint)
+        (not
+          (gate_cleared ?route_plan)
+        )
+      )
+    :effect (gate_cleared ?route_plan)
+  )
+  (:action complete_authorization_and_mark_ready
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (gate_cleared ?route_plan)
+        (not
+          (route_plan_dispatched ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_plan_dispatched ?route_plan)
+        (ready_for_dispatch ?route_plan)
+      )
+  )
+  (:action mark_pickup_ready
+    :parameters (?pickup_stop - pickup_stop ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (pickup_stop_ready ?pickup_stop)
+        (pickup_stop_loaded ?pickup_stop)
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_loaded ?transfer_leg)
+        (not
+          (ready_for_dispatch ?pickup_stop)
+        )
+      )
+    :effect (ready_for_dispatch ?pickup_stop)
+  )
+  (:action mark_delivery_ready
+    :parameters (?delivery_stop - delivery_stop ?transfer_leg - transfer_leg)
+    :precondition
+      (and
+        (delivery_stop_ready ?delivery_stop)
+        (delivery_stop_loaded ?delivery_stop)
+        (transfer_leg_ready ?transfer_leg)
+        (transfer_leg_loaded ?transfer_leg)
+        (not
+          (ready_for_dispatch ?delivery_stop)
+        )
+      )
+    :effect (ready_for_dispatch ?delivery_stop)
+  )
+  (:action complete_task_and_assign_batch
+    :parameters (?delivery_order - delivery_order ?shipment_batch - shipment_batch ?time_window_slot - time_window_slot)
+    :precondition
+      (and
+        (ready_for_dispatch ?delivery_order)
+        (task_time_slot_reserved ?delivery_order ?time_window_slot)
+        (shipment_batch_available ?shipment_batch)
+        (not
+          (task_completed ?delivery_order)
+        )
+      )
+    :effect
+      (and
+        (task_completed ?delivery_order)
+        (task_assigned_batch ?delivery_order ?shipment_batch)
+        (not
+          (shipment_batch_available ?shipment_batch)
+        )
+      )
+  )
+  (:action finalize_pickup_and_release_vehicle
+    :parameters (?pickup_stop - pickup_stop ?vehicle_asset - vehicle_asset ?shipment_batch - shipment_batch)
+    :precondition
+      (and
+        (task_completed ?pickup_stop)
+        (task_assigned_to_vehicle ?pickup_stop ?vehicle_asset)
+        (task_assigned_batch ?pickup_stop ?shipment_batch)
+        (not
+          (finalized ?pickup_stop)
+        )
+      )
+    :effect
+      (and
+        (finalized ?pickup_stop)
+        (vehicle_available ?vehicle_asset)
+        (shipment_batch_available ?shipment_batch)
+      )
+  )
+  (:action finalize_delivery_and_release_vehicle
+    :parameters (?delivery_stop - delivery_stop ?vehicle_asset - vehicle_asset ?shipment_batch - shipment_batch)
+    :precondition
+      (and
+        (task_completed ?delivery_stop)
+        (task_assigned_to_vehicle ?delivery_stop ?vehicle_asset)
+        (task_assigned_batch ?delivery_stop ?shipment_batch)
+        (not
+          (finalized ?delivery_stop)
+        )
+      )
+    :effect
+      (and
+        (finalized ?delivery_stop)
+        (vehicle_available ?vehicle_asset)
+        (shipment_batch_available ?shipment_batch)
+      )
+  )
+  (:action finalize_task_and_release_resources
+    :parameters (?route_plan - route_plan ?vehicle_asset - vehicle_asset ?shipment_batch - shipment_batch)
+    :precondition
+      (and
+        (task_completed ?route_plan)
+        (task_assigned_to_vehicle ?route_plan ?vehicle_asset)
+        (task_assigned_batch ?route_plan ?shipment_batch)
+        (not
+          (finalized ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (finalized ?route_plan)
+        (vehicle_available ?vehicle_asset)
+        (shipment_batch_available ?shipment_batch)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem time_window_constrained_delivery_problem)
+  (:domain time_window_constrained_delivery_routing)
+  (:objects pickup_stop_1 - pickup_stop delivery_stop_1 - delivery_stop route_plan_alpha - route_plan route_plan_beta - route_plan vehicle_asset_1 - vehicle_asset vehicle_asset_2 - vehicle_asset vehicle_asset_3 - vehicle_asset time_window_slot_1 - time_window_slot driver_1 - driver package_unit_1 - package_unit origin_hub_primary - origin_hub destination_hub_primary - destination_hub transfer_leg_1 - transfer_leg container_1 - container container_2 - container priority_marker_high - priority_marker priority_marker_low - priority_marker assignment_profile_standard - assignment_profile assignment_profile_express - assignment_profile shipment_batch_1 - shipment_batch equipment_item_forklift - equipment_item authorization_token_1 - authorization_token authorization_token_2 - authorization_token special_constraint_1 - special_constraint)
+  (:init
+    (vehicle_available vehicle_asset_1)
+    (vehicle_available vehicle_asset_2)
+    (vehicle_available vehicle_asset_3)
+    (time_slot_available time_window_slot_1)
+    (driver_available driver_1)
+    (package_available package_unit_1)
+    (pickup_at_origin_hub pickup_stop_1 origin_hub_primary)
+    (delivery_at_destination_hub delivery_stop_1 destination_hub_primary)
+    (transfer_leg_pending transfer_leg_1)
+    (container_available container_1)
+    (container_available container_2)
+    (route_plan_includes_pickup route_plan_alpha pickup_stop_1)
+    (route_plan_includes_pickup route_plan_beta pickup_stop_1)
+    (route_plan_includes_delivery route_plan_alpha delivery_stop_1)
+    (route_plan_includes_delivery route_plan_beta delivery_stop_1)
+    (route_plan_includes_transfer_leg route_plan_alpha transfer_leg_1)
+    (route_plan_includes_transfer_leg route_plan_beta transfer_leg_1)
+    (route_plan_includes_container route_plan_alpha container_1)
+    (route_plan_includes_container route_plan_beta container_2)
+    (priority_marker_available priority_marker_high)
+    (priority_marker_available priority_marker_low)
+    (assignment_profile_available assignment_profile_standard)
+    (assignment_profile_available assignment_profile_express)
+    (shipment_batch_available shipment_batch_1)
+    (equipment_available equipment_item_forklift)
+    (authorization_token_available authorization_token_1)
+    (route_plan_has_authorization route_plan_alpha authorization_token_1)
+    (route_plan_has_authorization route_plan_beta authorization_token_2)
+    (special_constraint_available special_constraint_1)
+  )
+  (:goal
+    (and
+      (finalized pickup_stop_1)
+      (finalized delivery_stop_1)
+      (finalized route_plan_alpha)
+      (finalized route_plan_beta)
+    )
+  )
+)

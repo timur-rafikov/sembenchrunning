@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain performance_degradation_deduplication_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types runtime_role_class - object resource_class - object key_class - object execution_context_class - object execution_context - execution_context_class producer_endpoint - runtime_role_class input_record - runtime_role_class control_signal - runtime_role_class configuration_parameter - runtime_role_class policy - runtime_role_class trace_marker - runtime_role_class optional_dependency - runtime_role_class external_dependency - runtime_role_class auxiliary_resource - resource_class artifact - resource_class feature_toggle - resource_class key_type_a - key_class key_type_b - key_class aggregator_batch - key_class data_component_category - execution_context orchestration_component_category - execution_context producer_component - data_component_category consumer_component - data_component_category orchestrator_service - orchestration_component_category)
+  (:predicates
+    (execution_context_registered ?execution_context - execution_context)
+    (marked_for_processing ?execution_context - execution_context)
+    (producer_assigned ?execution_context - execution_context)
+    (processing_committed ?execution_context - execution_context)
+    (ready_for_finalization ?execution_context - execution_context)
+    (commit_in_progress ?execution_context - execution_context)
+    (producer_endpoint_available ?producer_endpoint - producer_endpoint)
+    (bound_to_producer_endpoint ?execution_context - execution_context ?producer_endpoint - producer_endpoint)
+    (input_record_available ?input_record - input_record)
+    (has_input_record ?execution_context - execution_context ?input_record - input_record)
+    (control_signal_available ?control_signal - control_signal)
+    (bound_control_signal ?execution_context - execution_context ?control_signal - control_signal)
+    (aux_resource_available ?auxiliary_resource - auxiliary_resource)
+    (producer_allocated_aux_resource ?producer_component - producer_component ?auxiliary_resource - auxiliary_resource)
+    (consumer_allocated_aux_resource ?consumer_component - consumer_component ?auxiliary_resource - auxiliary_resource)
+    (producer_associated_with_key_a ?producer_component - producer_component ?key_type_a - key_type_a)
+    (key_a_ready_flag ?key_type_a - key_type_a)
+    (key_a_aux_flag ?key_type_a - key_type_a)
+    (producer_ready_for_aggregation ?producer_component - producer_component)
+    (consumer_associated_with_key_b ?consumer_component - consumer_component ?key_type_b - key_type_b)
+    (key_b_ready_flag ?key_type_b - key_type_b)
+    (key_b_aux_flag ?key_type_b - key_type_b)
+    (consumer_ready_for_aggregation ?consumer_component - consumer_component)
+    (aggregator_available ?aggregator_batch - aggregator_batch)
+    (aggregator_prepared ?aggregator_batch - aggregator_batch)
+    (aggregator_bound_to_key_a ?aggregator_batch - aggregator_batch ?key_type_a - key_type_a)
+    (aggregator_bound_to_key_b ?aggregator_batch - aggregator_batch ?key_type_b - key_type_b)
+    (aggregator_has_key_a_flag ?aggregator_batch - aggregator_batch)
+    (aggregator_has_key_b_flag ?aggregator_batch - aggregator_batch)
+    (aggregator_materialized ?aggregator_batch - aggregator_batch)
+    (orchestrator_linked_to_producer ?orchestrator_service - orchestrator_service ?producer_component - producer_component)
+    (orchestrator_linked_to_consumer ?orchestrator_service - orchestrator_service ?consumer_component - consumer_component)
+    (orchestrator_linked_to_aggregator ?orchestrator_service - orchestrator_service ?aggregator_batch - aggregator_batch)
+    (artifact_available ?artifact - artifact)
+    (orchestrator_has_artifact ?orchestrator_service - orchestrator_service ?artifact - artifact)
+    (artifact_allocated ?artifact - artifact)
+    (artifact_associated_with_aggregator ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    (orchestrator_materialization_initiated ?orchestrator_service - orchestrator_service)
+    (orchestrator_optional_dependency_prepared ?orchestrator_service - orchestrator_service)
+    (orchestrator_feature_prepared ?orchestrator_service - orchestrator_service)
+    (orchestrator_config_installed ?orchestrator_service - orchestrator_service)
+    (orchestrator_config_validated ?orchestrator_service - orchestrator_service)
+    (orchestrator_optional_deps_confirmed ?orchestrator_service - orchestrator_service)
+    (orchestrator_progress_milestone ?orchestrator_service - orchestrator_service)
+    (feature_toggle_available ?feature_toggle - feature_toggle)
+    (orchestrator_bound_feature_toggle ?orchestrator_service - orchestrator_service ?feature_toggle - feature_toggle)
+    (orchestrator_feature_applied ?orchestrator_service - orchestrator_service)
+    (orchestrator_feature_validated ?orchestrator_service - orchestrator_service)
+    (orchestrator_feature_committable ?orchestrator_service - orchestrator_service)
+    (config_param_available ?config_param - configuration_parameter)
+    (orchestrator_config_param_binding ?orchestrator_service - orchestrator_service ?config_param - configuration_parameter)
+    (policy_available ?policy - policy)
+    (orchestrator_has_policy ?orchestrator_service - orchestrator_service ?policy - policy)
+    (optional_dependency_available ?optional_dependency - optional_dependency)
+    (orchestrator_has_optional_dependency ?orchestrator_service - orchestrator_service ?optional_dependency - optional_dependency)
+    (external_dependency_available ?external_dependency - external_dependency)
+    (orchestrator_has_external_dependency ?orchestrator_service - orchestrator_service ?external_dependency - external_dependency)
+    (trace_marker_available ?trace_marker - trace_marker)
+    (bound_to_trace_marker ?execution_context - execution_context ?trace_marker - trace_marker)
+    (producer_processing_flag ?producer_component - producer_component)
+    (consumer_processing_flag ?consumer_component - consumer_component)
+    (orchestrator_checkpointed ?orchestrator_service - orchestrator_service)
+  )
+  (:action register_execution_context
+    :parameters (?execution_context - execution_context)
+    :precondition
+      (and
+        (not
+          (execution_context_registered ?execution_context)
+        )
+        (not
+          (processing_committed ?execution_context)
+        )
+      )
+    :effect (execution_context_registered ?execution_context)
+  )
+  (:action associate_context_with_producer_endpoint
+    :parameters (?execution_context - execution_context ?producer_endpoint - producer_endpoint)
+    :precondition
+      (and
+        (execution_context_registered ?execution_context)
+        (not
+          (producer_assigned ?execution_context)
+        )
+        (producer_endpoint_available ?producer_endpoint)
+      )
+    :effect
+      (and
+        (producer_assigned ?execution_context)
+        (bound_to_producer_endpoint ?execution_context ?producer_endpoint)
+        (not
+          (producer_endpoint_available ?producer_endpoint)
+        )
+      )
+  )
+  (:action acquire_input_record_for_context
+    :parameters (?execution_context - execution_context ?input_record - input_record)
+    :precondition
+      (and
+        (execution_context_registered ?execution_context)
+        (producer_assigned ?execution_context)
+        (input_record_available ?input_record)
+      )
+    :effect
+      (and
+        (has_input_record ?execution_context ?input_record)
+        (not
+          (input_record_available ?input_record)
+        )
+      )
+  )
+  (:action mark_input_processed_for_context
+    :parameters (?execution_context - execution_context ?input_record - input_record)
+    :precondition
+      (and
+        (execution_context_registered ?execution_context)
+        (producer_assigned ?execution_context)
+        (has_input_record ?execution_context ?input_record)
+        (not
+          (marked_for_processing ?execution_context)
+        )
+      )
+    :effect (marked_for_processing ?execution_context)
+  )
+  (:action release_input_record_claim
+    :parameters (?execution_context - execution_context ?input_record - input_record)
+    :precondition
+      (and
+        (has_input_record ?execution_context ?input_record)
+      )
+    :effect
+      (and
+        (input_record_available ?input_record)
+        (not
+          (has_input_record ?execution_context ?input_record)
+        )
+      )
+  )
+  (:action attach_control_signal_to_context
+    :parameters (?execution_context - execution_context ?control_signal - control_signal)
+    :precondition
+      (and
+        (marked_for_processing ?execution_context)
+        (control_signal_available ?control_signal)
+      )
+    :effect
+      (and
+        (bound_control_signal ?execution_context ?control_signal)
+        (not
+          (control_signal_available ?control_signal)
+        )
+      )
+  )
+  (:action detach_control_signal_from_context
+    :parameters (?execution_context - execution_context ?control_signal - control_signal)
+    :precondition
+      (and
+        (bound_control_signal ?execution_context ?control_signal)
+      )
+    :effect
+      (and
+        (control_signal_available ?control_signal)
+        (not
+          (bound_control_signal ?execution_context ?control_signal)
+        )
+      )
+  )
+  (:action attach_optional_dependency_to_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?optional_dependency - optional_dependency)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (optional_dependency_available ?optional_dependency)
+      )
+    :effect
+      (and
+        (orchestrator_has_optional_dependency ?orchestrator_service ?optional_dependency)
+        (not
+          (optional_dependency_available ?optional_dependency)
+        )
+      )
+  )
+  (:action detach_optional_dependency_from_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?optional_dependency - optional_dependency)
+    :precondition
+      (and
+        (orchestrator_has_optional_dependency ?orchestrator_service ?optional_dependency)
+      )
+    :effect
+      (and
+        (optional_dependency_available ?optional_dependency)
+        (not
+          (orchestrator_has_optional_dependency ?orchestrator_service ?optional_dependency)
+        )
+      )
+  )
+  (:action attach_external_dependency_to_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (external_dependency_available ?external_dependency)
+      )
+    :effect
+      (and
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (not
+          (external_dependency_available ?external_dependency)
+        )
+      )
+  )
+  (:action detach_external_dependency_from_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+      )
+    :effect
+      (and
+        (external_dependency_available ?external_dependency)
+        (not
+          (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        )
+      )
+  )
+  (:action producer_set_key_a_ready_flag
+    :parameters (?producer_component - producer_component ?key_type_a - key_type_a ?input_record - input_record)
+    :precondition
+      (and
+        (marked_for_processing ?producer_component)
+        (has_input_record ?producer_component ?input_record)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (not
+          (key_a_ready_flag ?key_type_a)
+        )
+        (not
+          (key_a_aux_flag ?key_type_a)
+        )
+      )
+    :effect (key_a_ready_flag ?key_type_a)
+  )
+  (:action producer_confirm_key_and_mark_for_aggregation
+    :parameters (?producer_component - producer_component ?key_type_a - key_type_a ?control_signal - control_signal)
+    :precondition
+      (and
+        (marked_for_processing ?producer_component)
+        (bound_control_signal ?producer_component ?control_signal)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (key_a_ready_flag ?key_type_a)
+        (not
+          (producer_processing_flag ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (producer_processing_flag ?producer_component)
+        (producer_ready_for_aggregation ?producer_component)
+      )
+  )
+  (:action producer_allocate_aux_resource_and_set_key_aux_flag
+    :parameters (?producer_component - producer_component ?key_type_a - key_type_a ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (marked_for_processing ?producer_component)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (aux_resource_available ?auxiliary_resource)
+        (not
+          (producer_processing_flag ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (key_a_aux_flag ?key_type_a)
+        (producer_processing_flag ?producer_component)
+        (producer_allocated_aux_resource ?producer_component ?auxiliary_resource)
+        (not
+          (aux_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action producer_finalize_key_and_set_ready
+    :parameters (?producer_component - producer_component ?key_type_a - key_type_a ?input_record - input_record ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (marked_for_processing ?producer_component)
+        (has_input_record ?producer_component ?input_record)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (key_a_aux_flag ?key_type_a)
+        (producer_allocated_aux_resource ?producer_component ?auxiliary_resource)
+        (not
+          (producer_ready_for_aggregation ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (key_a_ready_flag ?key_type_a)
+        (producer_ready_for_aggregation ?producer_component)
+        (aux_resource_available ?auxiliary_resource)
+        (not
+          (producer_allocated_aux_resource ?producer_component ?auxiliary_resource)
+        )
+      )
+  )
+  (:action consumer_set_key_b_ready_flag
+    :parameters (?consumer_component - consumer_component ?key_type_b - key_type_b ?input_record - input_record)
+    :precondition
+      (and
+        (marked_for_processing ?consumer_component)
+        (has_input_record ?consumer_component ?input_record)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (not
+          (key_b_ready_flag ?key_type_b)
+        )
+        (not
+          (key_b_aux_flag ?key_type_b)
+        )
+      )
+    :effect (key_b_ready_flag ?key_type_b)
+  )
+  (:action consumer_confirm_key_and_mark_for_aggregation
+    :parameters (?consumer_component - consumer_component ?key_type_b - key_type_b ?control_signal - control_signal)
+    :precondition
+      (and
+        (marked_for_processing ?consumer_component)
+        (bound_control_signal ?consumer_component ?control_signal)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_b_ready_flag ?key_type_b)
+        (not
+          (consumer_processing_flag ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (consumer_processing_flag ?consumer_component)
+        (consumer_ready_for_aggregation ?consumer_component)
+      )
+  )
+  (:action consumer_allocate_aux_resource_and_set_key_aux_flag
+    :parameters (?consumer_component - consumer_component ?key_type_b - key_type_b ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (marked_for_processing ?consumer_component)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (aux_resource_available ?auxiliary_resource)
+        (not
+          (consumer_processing_flag ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (key_b_aux_flag ?key_type_b)
+        (consumer_processing_flag ?consumer_component)
+        (consumer_allocated_aux_resource ?consumer_component ?auxiliary_resource)
+        (not
+          (aux_resource_available ?auxiliary_resource)
+        )
+      )
+  )
+  (:action consumer_finalize_key_and_set_ready
+    :parameters (?consumer_component - consumer_component ?key_type_b - key_type_b ?input_record - input_record ?auxiliary_resource - auxiliary_resource)
+    :precondition
+      (and
+        (marked_for_processing ?consumer_component)
+        (has_input_record ?consumer_component ?input_record)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_b_aux_flag ?key_type_b)
+        (consumer_allocated_aux_resource ?consumer_component ?auxiliary_resource)
+        (not
+          (consumer_ready_for_aggregation ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (key_b_ready_flag ?key_type_b)
+        (consumer_ready_for_aggregation ?consumer_component)
+        (aux_resource_available ?auxiliary_resource)
+        (not
+          (consumer_allocated_aux_resource ?consumer_component ?auxiliary_resource)
+        )
+      )
+  )
+  (:action prepare_aggregator_for_materialization
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?key_type_a - key_type_a ?key_type_b - key_type_b ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_component)
+        (consumer_processing_flag ?consumer_component)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_a_ready_flag ?key_type_a)
+        (key_b_ready_flag ?key_type_b)
+        (producer_ready_for_aggregation ?producer_component)
+        (consumer_ready_for_aggregation ?consumer_component)
+        (aggregator_available ?aggregator_batch)
+      )
+    :effect
+      (and
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_bound_to_key_a ?aggregator_batch ?key_type_a)
+        (aggregator_bound_to_key_b ?aggregator_batch ?key_type_b)
+        (not
+          (aggregator_available ?aggregator_batch)
+        )
+      )
+  )
+  (:action prepare_aggregator_with_key_a_flag
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?key_type_a - key_type_a ?key_type_b - key_type_b ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_component)
+        (consumer_processing_flag ?consumer_component)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_a_aux_flag ?key_type_a)
+        (key_b_ready_flag ?key_type_b)
+        (not
+          (producer_ready_for_aggregation ?producer_component)
+        )
+        (consumer_ready_for_aggregation ?consumer_component)
+        (aggregator_available ?aggregator_batch)
+      )
+    :effect
+      (and
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_bound_to_key_a ?aggregator_batch ?key_type_a)
+        (aggregator_bound_to_key_b ?aggregator_batch ?key_type_b)
+        (aggregator_has_key_a_flag ?aggregator_batch)
+        (not
+          (aggregator_available ?aggregator_batch)
+        )
+      )
+  )
+  (:action prepare_aggregator_with_key_b_flag
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?key_type_a - key_type_a ?key_type_b - key_type_b ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_component)
+        (consumer_processing_flag ?consumer_component)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_a_ready_flag ?key_type_a)
+        (key_b_aux_flag ?key_type_b)
+        (producer_ready_for_aggregation ?producer_component)
+        (not
+          (consumer_ready_for_aggregation ?consumer_component)
+        )
+        (aggregator_available ?aggregator_batch)
+      )
+    :effect
+      (and
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_bound_to_key_a ?aggregator_batch ?key_type_a)
+        (aggregator_bound_to_key_b ?aggregator_batch ?key_type_b)
+        (aggregator_has_key_b_flag ?aggregator_batch)
+        (not
+          (aggregator_available ?aggregator_batch)
+        )
+      )
+  )
+  (:action prepare_aggregator_with_both_key_flags
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?key_type_a - key_type_a ?key_type_b - key_type_b ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_component)
+        (consumer_processing_flag ?consumer_component)
+        (producer_associated_with_key_a ?producer_component ?key_type_a)
+        (consumer_associated_with_key_b ?consumer_component ?key_type_b)
+        (key_a_aux_flag ?key_type_a)
+        (key_b_aux_flag ?key_type_b)
+        (not
+          (producer_ready_for_aggregation ?producer_component)
+        )
+        (not
+          (consumer_ready_for_aggregation ?consumer_component)
+        )
+        (aggregator_available ?aggregator_batch)
+      )
+    :effect
+      (and
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_bound_to_key_a ?aggregator_batch ?key_type_a)
+        (aggregator_bound_to_key_b ?aggregator_batch ?key_type_b)
+        (aggregator_has_key_a_flag ?aggregator_batch)
+        (aggregator_has_key_b_flag ?aggregator_batch)
+        (not
+          (aggregator_available ?aggregator_batch)
+        )
+      )
+  )
+  (:action mark_aggregator_materialized
+    :parameters (?aggregator_batch - aggregator_batch ?producer_component - producer_component ?input_record - input_record)
+    :precondition
+      (and
+        (aggregator_prepared ?aggregator_batch)
+        (producer_processing_flag ?producer_component)
+        (has_input_record ?producer_component ?input_record)
+        (not
+          (aggregator_materialized ?aggregator_batch)
+        )
+      )
+    :effect (aggregator_materialized ?aggregator_batch)
+  )
+  (:action allocate_artifact_from_aggregator
+    :parameters (?orchestrator_service - orchestrator_service ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (orchestrator_linked_to_aggregator ?orchestrator_service ?aggregator_batch)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_available ?artifact)
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_materialized ?aggregator_batch)
+        (not
+          (artifact_allocated ?artifact)
+        )
+      )
+    :effect
+      (and
+        (artifact_allocated ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (not
+          (artifact_available ?artifact)
+        )
+      )
+  )
+  (:action initiate_orchestrator_materialization
+    :parameters (?orchestrator_service - orchestrator_service ?artifact - artifact ?aggregator_batch - aggregator_batch ?input_record - input_record)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_allocated ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (has_input_record ?orchestrator_service ?input_record)
+        (not
+          (aggregator_has_key_a_flag ?aggregator_batch)
+        )
+        (not
+          (orchestrator_materialization_initiated ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_materialization_initiated ?orchestrator_service)
+  )
+  (:action install_config_param_on_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?config_param - configuration_parameter)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (config_param_available ?config_param)
+        (not
+          (orchestrator_config_installed ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_config_installed ?orchestrator_service)
+        (orchestrator_config_param_binding ?orchestrator_service ?config_param)
+        (not
+          (config_param_available ?config_param)
+        )
+      )
+  )
+  (:action validate_config_and_prepare_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?artifact - artifact ?aggregator_batch - aggregator_batch ?input_record - input_record ?config_param - configuration_parameter)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_allocated ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (has_input_record ?orchestrator_service ?input_record)
+        (aggregator_has_key_a_flag ?aggregator_batch)
+        (orchestrator_config_installed ?orchestrator_service)
+        (orchestrator_config_param_binding ?orchestrator_service ?config_param)
+        (not
+          (orchestrator_materialization_initiated ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_materialization_initiated ?orchestrator_service)
+        (orchestrator_config_validated ?orchestrator_service)
+      )
+  )
+  (:action enable_optional_dependency_and_prepare_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?optional_dependency - optional_dependency ?control_signal - control_signal ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_materialization_initiated ?orchestrator_service)
+        (orchestrator_has_optional_dependency ?orchestrator_service ?optional_dependency)
+        (bound_control_signal ?orchestrator_service ?control_signal)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (not
+          (aggregator_has_key_b_flag ?aggregator_batch)
+        )
+        (not
+          (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_optional_dependency_prepared ?orchestrator_service)
+  )
+  (:action enable_optional_dependency_and_prepare_orchestrator_variant
+    :parameters (?orchestrator_service - orchestrator_service ?optional_dependency - optional_dependency ?control_signal - control_signal ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_materialization_initiated ?orchestrator_service)
+        (orchestrator_has_optional_dependency ?orchestrator_service ?optional_dependency)
+        (bound_control_signal ?orchestrator_service ?control_signal)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (aggregator_has_key_b_flag ?aggregator_batch)
+        (not
+          (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_optional_dependency_prepared ?orchestrator_service)
+  )
+  (:action apply_external_dependency_step1
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (not
+          (aggregator_has_key_a_flag ?aggregator_batch)
+        )
+        (not
+          (aggregator_has_key_b_flag ?aggregator_batch)
+        )
+        (not
+          (orchestrator_feature_prepared ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_feature_prepared ?orchestrator_service)
+  )
+  (:action apply_external_dependency_and_confirm_config
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (aggregator_has_key_a_flag ?aggregator_batch)
+        (not
+          (aggregator_has_key_b_flag ?aggregator_batch)
+        )
+        (not
+          (orchestrator_feature_prepared ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_optional_deps_confirmed ?orchestrator_service)
+      )
+  )
+  (:action apply_external_dependency_variant
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (not
+          (aggregator_has_key_a_flag ?aggregator_batch)
+        )
+        (aggregator_has_key_b_flag ?aggregator_batch)
+        (not
+          (orchestrator_feature_prepared ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_optional_deps_confirmed ?orchestrator_service)
+      )
+  )
+  (:action apply_external_dependency_full_sequence
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency ?artifact - artifact ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (orchestrator_optional_dependency_prepared ?orchestrator_service)
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (orchestrator_has_artifact ?orchestrator_service ?artifact)
+        (artifact_associated_with_aggregator ?artifact ?aggregator_batch)
+        (aggregator_has_key_a_flag ?aggregator_batch)
+        (aggregator_has_key_b_flag ?aggregator_batch)
+        (not
+          (orchestrator_feature_prepared ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_optional_deps_confirmed ?orchestrator_service)
+      )
+  )
+  (:action checkpoint_orchestrator_progress
+    :parameters (?orchestrator_service - orchestrator_service)
+    :precondition
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (not
+          (orchestrator_optional_deps_confirmed ?orchestrator_service)
+        )
+        (not
+          (orchestrator_checkpointed ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_checkpointed ?orchestrator_service)
+        (ready_for_finalization ?orchestrator_service)
+      )
+  )
+  (:action bind_policy_to_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?policy - policy)
+    :precondition
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_optional_deps_confirmed ?orchestrator_service)
+        (policy_available ?policy)
+      )
+    :effect
+      (and
+        (orchestrator_has_policy ?orchestrator_service ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action sequence_orchestrator_materialization_steps
+    :parameters (?orchestrator_service - orchestrator_service ?producer_component - producer_component ?consumer_component - consumer_component ?input_record - input_record ?policy - policy)
+    :precondition
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_optional_deps_confirmed ?orchestrator_service)
+        (orchestrator_has_policy ?orchestrator_service ?policy)
+        (orchestrator_linked_to_producer ?orchestrator_service ?producer_component)
+        (orchestrator_linked_to_consumer ?orchestrator_service ?consumer_component)
+        (producer_ready_for_aggregation ?producer_component)
+        (consumer_ready_for_aggregation ?consumer_component)
+        (has_input_record ?orchestrator_service ?input_record)
+        (not
+          (orchestrator_progress_milestone ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_progress_milestone ?orchestrator_service)
+  )
+  (:action checkpoint_orchestrator_after_sequence
+    :parameters (?orchestrator_service - orchestrator_service)
+    :precondition
+      (and
+        (orchestrator_feature_prepared ?orchestrator_service)
+        (orchestrator_progress_milestone ?orchestrator_service)
+        (not
+          (orchestrator_checkpointed ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_checkpointed ?orchestrator_service)
+        (ready_for_finalization ?orchestrator_service)
+      )
+  )
+  (:action apply_feature_toggle_to_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service ?feature_toggle - feature_toggle ?input_record - input_record)
+    :precondition
+      (and
+        (marked_for_processing ?orchestrator_service)
+        (has_input_record ?orchestrator_service ?input_record)
+        (feature_toggle_available ?feature_toggle)
+        (orchestrator_bound_feature_toggle ?orchestrator_service ?feature_toggle)
+        (not
+          (orchestrator_feature_applied ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_feature_applied ?orchestrator_service)
+        (not
+          (feature_toggle_available ?feature_toggle)
+        )
+      )
+  )
+  (:action acknowledge_feature_and_prepare
+    :parameters (?orchestrator_service - orchestrator_service ?control_signal - control_signal)
+    :precondition
+      (and
+        (orchestrator_feature_applied ?orchestrator_service)
+        (bound_control_signal ?orchestrator_service ?control_signal)
+        (not
+          (orchestrator_feature_validated ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_feature_validated ?orchestrator_service)
+  )
+  (:action request_external_dependency_for_feature
+    :parameters (?orchestrator_service - orchestrator_service ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (orchestrator_feature_validated ?orchestrator_service)
+        (orchestrator_has_external_dependency ?orchestrator_service ?external_dependency)
+        (not
+          (orchestrator_feature_committable ?orchestrator_service)
+        )
+      )
+    :effect (orchestrator_feature_committable ?orchestrator_service)
+  )
+  (:action finalize_feature_and_checkpoint_orchestrator
+    :parameters (?orchestrator_service - orchestrator_service)
+    :precondition
+      (and
+        (orchestrator_feature_committable ?orchestrator_service)
+        (not
+          (orchestrator_checkpointed ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (orchestrator_checkpointed ?orchestrator_service)
+        (ready_for_finalization ?orchestrator_service)
+      )
+  )
+  (:action finalize_producer_component
+    :parameters (?producer_component - producer_component ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (producer_processing_flag ?producer_component)
+        (producer_ready_for_aggregation ?producer_component)
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_materialized ?aggregator_batch)
+        (not
+          (ready_for_finalization ?producer_component)
+        )
+      )
+    :effect (ready_for_finalization ?producer_component)
+  )
+  (:action finalize_consumer_component
+    :parameters (?consumer_component - consumer_component ?aggregator_batch - aggregator_batch)
+    :precondition
+      (and
+        (consumer_processing_flag ?consumer_component)
+        (consumer_ready_for_aggregation ?consumer_component)
+        (aggregator_prepared ?aggregator_batch)
+        (aggregator_materialized ?aggregator_batch)
+        (not
+          (ready_for_finalization ?consumer_component)
+        )
+      )
+    :effect (ready_for_finalization ?consumer_component)
+  )
+  (:action initiate_context_commit_claim
+    :parameters (?execution_context - execution_context ?trace_marker - trace_marker ?input_record - input_record)
+    :precondition
+      (and
+        (ready_for_finalization ?execution_context)
+        (has_input_record ?execution_context ?input_record)
+        (trace_marker_available ?trace_marker)
+        (not
+          (commit_in_progress ?execution_context)
+        )
+      )
+    :effect
+      (and
+        (commit_in_progress ?execution_context)
+        (bound_to_trace_marker ?execution_context ?trace_marker)
+        (not
+          (trace_marker_available ?trace_marker)
+        )
+      )
+  )
+  (:action commit_producer_and_release_endpoint
+    :parameters (?producer_component - producer_component ?producer_endpoint - producer_endpoint ?trace_marker - trace_marker)
+    :precondition
+      (and
+        (commit_in_progress ?producer_component)
+        (bound_to_producer_endpoint ?producer_component ?producer_endpoint)
+        (bound_to_trace_marker ?producer_component ?trace_marker)
+        (not
+          (processing_committed ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (processing_committed ?producer_component)
+        (producer_endpoint_available ?producer_endpoint)
+        (trace_marker_available ?trace_marker)
+      )
+  )
+  (:action commit_consumer_and_release_endpoint
+    :parameters (?consumer_component - consumer_component ?producer_endpoint - producer_endpoint ?trace_marker - trace_marker)
+    :precondition
+      (and
+        (commit_in_progress ?consumer_component)
+        (bound_to_producer_endpoint ?consumer_component ?producer_endpoint)
+        (bound_to_trace_marker ?consumer_component ?trace_marker)
+        (not
+          (processing_committed ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (processing_committed ?consumer_component)
+        (producer_endpoint_available ?producer_endpoint)
+        (trace_marker_available ?trace_marker)
+      )
+  )
+  (:action commit_orchestrator_and_release_endpoint
+    :parameters (?orchestrator_service - orchestrator_service ?producer_endpoint - producer_endpoint ?trace_marker - trace_marker)
+    :precondition
+      (and
+        (commit_in_progress ?orchestrator_service)
+        (bound_to_producer_endpoint ?orchestrator_service ?producer_endpoint)
+        (bound_to_trace_marker ?orchestrator_service ?trace_marker)
+        (not
+          (processing_committed ?orchestrator_service)
+        )
+      )
+    :effect
+      (and
+        (processing_committed ?orchestrator_service)
+        (producer_endpoint_available ?producer_endpoint)
+        (trace_marker_available ?trace_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem redundant_processing_fix_scenario)
+  (:domain performance_degradation_deduplication_domain)
+  (:objects producer_component_1 - producer_component consumer_component_1 - consumer_component orchestrator_service_1 - orchestrator_service orchestrator_service_2 - orchestrator_service producer_endpoint_a - producer_endpoint producer_endpoint_b - producer_endpoint producer_endpoint_c - producer_endpoint input_record_1 - input_record control_signal_1 - control_signal aux_resource_1 - auxiliary_resource key_a_1 - key_type_a key_b_1 - key_type_b aggregator_batch_1 - aggregator_batch artifact_template_1 - artifact artifact_template_2 - artifact config_param_1 - configuration_parameter config_param_2 - configuration_parameter policy_1 - policy policy_2 - policy trace_marker_1 - trace_marker optional_dependency_1 - optional_dependency feature_toggle_1 - feature_toggle feature_toggle_2 - feature_toggle external_dependency_1 - external_dependency)
+  (:init
+    (producer_endpoint_available producer_endpoint_a)
+    (producer_endpoint_available producer_endpoint_b)
+    (producer_endpoint_available producer_endpoint_c)
+    (input_record_available input_record_1)
+    (control_signal_available control_signal_1)
+    (aux_resource_available aux_resource_1)
+    (producer_associated_with_key_a producer_component_1 key_a_1)
+    (consumer_associated_with_key_b consumer_component_1 key_b_1)
+    (aggregator_available aggregator_batch_1)
+    (artifact_available artifact_template_1)
+    (artifact_available artifact_template_2)
+    (orchestrator_linked_to_producer orchestrator_service_1 producer_component_1)
+    (orchestrator_linked_to_producer orchestrator_service_2 producer_component_1)
+    (orchestrator_linked_to_consumer orchestrator_service_1 consumer_component_1)
+    (orchestrator_linked_to_consumer orchestrator_service_2 consumer_component_1)
+    (orchestrator_linked_to_aggregator orchestrator_service_1 aggregator_batch_1)
+    (orchestrator_linked_to_aggregator orchestrator_service_2 aggregator_batch_1)
+    (orchestrator_has_artifact orchestrator_service_1 artifact_template_1)
+    (orchestrator_has_artifact orchestrator_service_2 artifact_template_2)
+    (config_param_available config_param_1)
+    (config_param_available config_param_2)
+    (policy_available policy_1)
+    (policy_available policy_2)
+    (trace_marker_available trace_marker_1)
+    (optional_dependency_available optional_dependency_1)
+    (feature_toggle_available feature_toggle_1)
+    (orchestrator_bound_feature_toggle orchestrator_service_1 feature_toggle_1)
+    (orchestrator_bound_feature_toggle orchestrator_service_2 feature_toggle_2)
+    (external_dependency_available external_dependency_1)
+  )
+  (:goal
+    (and
+      (processing_committed producer_component_1)
+      (processing_committed consumer_component_1)
+      (processing_committed orchestrator_service_1)
+      (processing_committed orchestrator_service_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_execution_context producer_component_1)
+(register_execution_context consumer_component_1)
+(register_execution_context orchestrator_service_1)
+(register_execution_context orchestrator_service_2)
+(associate_context_with_producer_endpoint producer_component_1 producer_endpoint_a)
+(associate_context_with_producer_endpoint consumer_component_1 producer_endpoint_b)
+(associate_context_with_producer_endpoint orchestrator_service_1 producer_endpoint_c)
+(acquire_input_record_for_context producer_component_1 input_record_1)
+(mark_input_processed_for_context producer_component_1 input_record_1)
+(producer_set_key_a_ready_flag producer_component_1 key_a_1 input_record_1)
+(attach_control_signal_to_context producer_component_1 control_signal_1)
+(producer_confirm_key_and_mark_for_aggregation producer_component_1 key_a_1 control_signal_1)
+(detach_control_signal_from_context producer_component_1 control_signal_1)
+(release_input_record_claim producer_component_1 input_record_1)
+(acquire_input_record_for_context consumer_component_1 input_record_1)
+(mark_input_processed_for_context consumer_component_1 input_record_1)
+(consumer_set_key_b_ready_flag consumer_component_1 key_b_1 input_record_1)
+(attach_control_signal_to_context consumer_component_1 control_signal_1)
+(consumer_confirm_key_and_mark_for_aggregation consumer_component_1 key_b_1 control_signal_1)
+(prepare_aggregator_for_materialization producer_component_1 consumer_component_1 key_a_1 key_b_1 aggregator_batch_1)
+(release_input_record_claim consumer_component_1 input_record_1)
+(acquire_input_record_for_context producer_component_1 input_record_1)
+(mark_aggregator_materialized aggregator_batch_1 producer_component_1 input_record_1)
+(finalize_producer_component producer_component_1 aggregator_batch_1)
+(finalize_consumer_component consumer_component_1 aggregator_batch_1)
+(initiate_context_commit_claim producer_component_1 trace_marker_1 input_record_1)
+(commit_producer_and_release_endpoint producer_component_1 producer_endpoint_a trace_marker_1)
+(release_input_record_claim producer_component_1 input_record_1)
+(acquire_input_record_for_context consumer_component_1 input_record_1)
+(initiate_context_commit_claim consumer_component_1 trace_marker_1 input_record_1)
+(commit_consumer_and_release_endpoint consumer_component_1 producer_endpoint_b trace_marker_1)
+(release_input_record_claim consumer_component_1 input_record_1)
+(detach_control_signal_from_context consumer_component_1 control_signal_1)
+(acquire_input_record_for_context orchestrator_service_1 input_record_1)
+(mark_input_processed_for_context orchestrator_service_1 input_record_1)
+(allocate_artifact_from_aggregator orchestrator_service_1 artifact_template_1 aggregator_batch_1)
+(initiate_orchestrator_materialization orchestrator_service_1 artifact_template_1 aggregator_batch_1 input_record_1)
+(attach_optional_dependency_to_orchestrator orchestrator_service_1 optional_dependency_1)
+(attach_external_dependency_to_orchestrator orchestrator_service_1 external_dependency_1)
+(attach_control_signal_to_context orchestrator_service_1 control_signal_1)
+(enable_optional_dependency_and_prepare_orchestrator orchestrator_service_1 optional_dependency_1 control_signal_1 artifact_template_1 aggregator_batch_1)
+(apply_external_dependency_step1 orchestrator_service_1 external_dependency_1 artifact_template_1 aggregator_batch_1)
+(checkpoint_orchestrator_progress orchestrator_service_1)
+(detach_optional_dependency_from_orchestrator orchestrator_service_1 optional_dependency_1)
+(detach_external_dependency_from_orchestrator orchestrator_service_1 external_dependency_1)
+(detach_control_signal_from_context orchestrator_service_1 control_signal_1)
+(initiate_context_commit_claim orchestrator_service_1 trace_marker_1 input_record_1)
+(commit_orchestrator_and_release_endpoint orchestrator_service_1 producer_endpoint_c trace_marker_1)
+(release_input_record_claim orchestrator_service_1 input_record_1)
+(associate_context_with_producer_endpoint orchestrator_service_2 producer_endpoint_a)
+(acquire_input_record_for_context orchestrator_service_2 input_record_1)
+(mark_input_processed_for_context orchestrator_service_2 input_record_1)
+(allocate_artifact_from_aggregator orchestrator_service_2 artifact_template_2 aggregator_batch_1)
+(initiate_orchestrator_materialization orchestrator_service_2 artifact_template_2 aggregator_batch_1 input_record_1)
+(attach_optional_dependency_to_orchestrator orchestrator_service_2 optional_dependency_1)
+(attach_external_dependency_to_orchestrator orchestrator_service_2 external_dependency_1)
+(attach_control_signal_to_context orchestrator_service_2 control_signal_1)
+(enable_optional_dependency_and_prepare_orchestrator orchestrator_service_2 optional_dependency_1 control_signal_1 artifact_template_2 aggregator_batch_1)
+(apply_external_dependency_step1 orchestrator_service_2 external_dependency_1 artifact_template_2 aggregator_batch_1)
+(checkpoint_orchestrator_progress orchestrator_service_2)
+(initiate_context_commit_claim orchestrator_service_2 trace_marker_1 input_record_1)
+(commit_orchestrator_and_release_endpoint orchestrator_service_2 producer_endpoint_a trace_marker_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_t0xhf33b/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_t0xhf33b/plan.pddl 62 
+
+
+
+--- stderr ---
+

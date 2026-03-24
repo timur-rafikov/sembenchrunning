@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain end_of_season_transition_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object material_resource - object scheduling_resource - object field_entity - object field_parcel - field_entity equipment_unit - operational_resource operation_task - operational_resource crew_team - operational_resource site_inspection_kit - operational_resource compliance_certificate - operational_resource transition_checklist - operational_resource calibration_tool - operational_resource regulatory_approval - operational_resource input_material_batch - material_resource supply_container - material_resource inspection_report - material_resource primary_time_window - scheduling_resource secondary_time_window - scheduling_resource staging_unit - scheduling_resource field_section_group - field_parcel plan_assignment_group - field_parcel primary_field_section - field_section_group secondary_field_section - field_section_group transition_plan - plan_assignment_group)
+  (:predicates
+    (parcel_identified ?field_parcel - field_parcel)
+    (entity_ready_for_transition ?field_parcel - field_parcel)
+    (equipment_reserved_for_parcel ?field_parcel - field_parcel)
+    (transition_finalized ?field_parcel - field_parcel)
+    (handover_ready ?field_parcel - field_parcel)
+    (checklist_completed ?field_parcel - field_parcel)
+    (equipment_available ?equipment_unit - equipment_unit)
+    (equipment_assigned ?field_parcel - field_parcel ?equipment_unit - equipment_unit)
+    (operation_task_available ?operation_task - operation_task)
+    (task_assigned ?field_parcel - field_parcel ?operation_task - operation_task)
+    (crew_available ?crew_team - crew_team)
+    (crew_assigned ?field_parcel - field_parcel ?crew_team - crew_team)
+    (material_batch_available ?input_material_batch - input_material_batch)
+    (material_allocated_to_section ?primary_field_section - primary_field_section ?input_material_batch - input_material_batch)
+    (material_allocated_to_secondary_section ?secondary_field_section - secondary_field_section ?input_material_batch - input_material_batch)
+    (section_primary_time_window_assigned ?primary_field_section - primary_field_section ?time_window_a - primary_time_window)
+    (primary_time_window_reserved ?time_window_a - primary_time_window)
+    (primary_time_window_material_allocated ?time_window_a - primary_time_window)
+    (primary_section_ready ?primary_field_section - primary_field_section)
+    (section_secondary_time_window_assigned ?secondary_field_section - secondary_field_section ?time_window_b - secondary_time_window)
+    (secondary_time_window_reserved ?time_window_b - secondary_time_window)
+    (secondary_time_window_material_allocated ?time_window_b - secondary_time_window)
+    (secondary_section_ready ?secondary_field_section - secondary_field_section)
+    (staging_unit_available ?staging_unit - staging_unit)
+    (staging_unit_prepared ?staging_unit - staging_unit)
+    (staging_unit_time_window_primary_attached ?staging_unit - staging_unit ?time_window_a - primary_time_window)
+    (staging_unit_time_window_secondary_attached ?staging_unit - staging_unit ?time_window_b - secondary_time_window)
+    (staging_unit_tag_a ?staging_unit - staging_unit)
+    (staging_unit_tag_b ?staging_unit - staging_unit)
+    (staging_unit_confirmed_for_material_handling ?staging_unit - staging_unit)
+    (plan_associated_with_primary_section ?transition_plan - transition_plan ?primary_field_section - primary_field_section)
+    (plan_associated_with_secondary_section ?transition_plan - transition_plan ?secondary_field_section - secondary_field_section)
+    (plan_assigned_to_staging_unit ?transition_plan - transition_plan ?staging_unit - staging_unit)
+    (supply_container_available ?supply_container - supply_container)
+    (plan_has_supply_container ?transition_plan - transition_plan ?supply_container - supply_container)
+    (supply_container_prepared ?supply_container - supply_container)
+    (supply_container_staged_in_staging_unit ?supply_container - supply_container ?staging_unit - staging_unit)
+    (plan_validated ?transition_plan - transition_plan)
+    (plan_calibrated ?transition_plan - transition_plan)
+    (plan_ready_for_final_verification ?transition_plan - transition_plan)
+    (site_inspection_attached ?transition_plan - transition_plan)
+    (site_inspection_verified ?transition_plan - transition_plan)
+    (plan_ready_for_certification ?transition_plan - transition_plan)
+    (plan_final_checks_passed ?transition_plan - transition_plan)
+    (inspection_report_available ?inspection_report - inspection_report)
+    (plan_has_inspection_report ?transition_plan - transition_plan ?inspection_report - inspection_report)
+    (inspection_report_attached_to_plan ?transition_plan - transition_plan)
+    (inspection_review_complete ?transition_plan - transition_plan)
+    (regulatory_review_completed ?transition_plan - transition_plan)
+    (inspection_kit_available ?site_inspection_kit - site_inspection_kit)
+    (plan_has_inspectionkit ?transition_plan - transition_plan ?site_inspection_kit - site_inspection_kit)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (plan_has_compliance_certificate ?transition_plan - transition_plan ?compliance_certificate - compliance_certificate)
+    (calibration_tool_available ?calibration_tool - calibration_tool)
+    (plan_has_calibration_tool ?transition_plan - transition_plan ?calibration_tool - calibration_tool)
+    (regulatory_approval_available ?regulatory_approval - regulatory_approval)
+    (plan_has_regulatory_approval ?transition_plan - transition_plan ?regulatory_approval - regulatory_approval)
+    (transition_checklist_available ?transition_checklist - transition_checklist)
+    (entity_has_transition_checklist ?field_parcel - field_parcel ?transition_checklist - transition_checklist)
+    (primary_section_prepared ?primary_field_section - primary_field_section)
+    (secondary_section_prepared ?secondary_field_section - secondary_field_section)
+    (plan_handover_recorded ?transition_plan - transition_plan)
+  )
+  (:action identify_field_parcel
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (not
+          (parcel_identified ?field_parcel)
+        )
+        (not
+          (transition_finalized ?field_parcel)
+        )
+      )
+    :effect (parcel_identified ?field_parcel)
+  )
+  (:action reserve_equipment_for_parcel
+    :parameters (?field_parcel - field_parcel ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (parcel_identified ?field_parcel)
+        (not
+          (equipment_reserved_for_parcel ?field_parcel)
+        )
+        (equipment_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_reserved_for_parcel ?field_parcel)
+        (equipment_assigned ?field_parcel ?equipment_unit)
+        (not
+          (equipment_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_operation_task_to_parcel
+    :parameters (?field_parcel - field_parcel ?operation_task - operation_task)
+    :precondition
+      (and
+        (parcel_identified ?field_parcel)
+        (equipment_reserved_for_parcel ?field_parcel)
+        (operation_task_available ?operation_task)
+      )
+    :effect
+      (and
+        (task_assigned ?field_parcel ?operation_task)
+        (not
+          (operation_task_available ?operation_task)
+        )
+      )
+  )
+  (:action confirm_operation_schedule_for_parcel
+    :parameters (?field_parcel - field_parcel ?operation_task - operation_task)
+    :precondition
+      (and
+        (parcel_identified ?field_parcel)
+        (equipment_reserved_for_parcel ?field_parcel)
+        (task_assigned ?field_parcel ?operation_task)
+        (not
+          (entity_ready_for_transition ?field_parcel)
+        )
+      )
+    :effect (entity_ready_for_transition ?field_parcel)
+  )
+  (:action release_operation_task_from_parcel
+    :parameters (?field_parcel - field_parcel ?operation_task - operation_task)
+    :precondition
+      (and
+        (task_assigned ?field_parcel ?operation_task)
+      )
+    :effect
+      (and
+        (operation_task_available ?operation_task)
+        (not
+          (task_assigned ?field_parcel ?operation_task)
+        )
+      )
+  )
+  (:action assign_crew_to_parcel
+    :parameters (?field_parcel - field_parcel ?crew_team - crew_team)
+    :precondition
+      (and
+        (entity_ready_for_transition ?field_parcel)
+        (crew_available ?crew_team)
+      )
+    :effect
+      (and
+        (crew_assigned ?field_parcel ?crew_team)
+        (not
+          (crew_available ?crew_team)
+        )
+      )
+  )
+  (:action release_crew_from_parcel
+    :parameters (?field_parcel - field_parcel ?crew_team - crew_team)
+    :precondition
+      (and
+        (crew_assigned ?field_parcel ?crew_team)
+      )
+    :effect
+      (and
+        (crew_available ?crew_team)
+        (not
+          (crew_assigned ?field_parcel ?crew_team)
+        )
+      )
+  )
+  (:action attach_calibration_tool_to_plan
+    :parameters (?transition_plan - transition_plan ?calibration_tool - calibration_tool)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (calibration_tool_available ?calibration_tool)
+      )
+    :effect
+      (and
+        (plan_has_calibration_tool ?transition_plan ?calibration_tool)
+        (not
+          (calibration_tool_available ?calibration_tool)
+        )
+      )
+  )
+  (:action detach_calibration_tool_from_plan
+    :parameters (?transition_plan - transition_plan ?calibration_tool - calibration_tool)
+    :precondition
+      (and
+        (plan_has_calibration_tool ?transition_plan ?calibration_tool)
+      )
+    :effect
+      (and
+        (calibration_tool_available ?calibration_tool)
+        (not
+          (plan_has_calibration_tool ?transition_plan ?calibration_tool)
+        )
+      )
+  )
+  (:action attach_regulatory_approval_to_plan
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (regulatory_approval_available ?regulatory_approval)
+      )
+    :effect
+      (and
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (not
+          (regulatory_approval_available ?regulatory_approval)
+        )
+      )
+  )
+  (:action detach_regulatory_approval_from_plan
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+      )
+    :effect
+      (and
+        (regulatory_approval_available ?regulatory_approval)
+        (not
+          (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        )
+      )
+  )
+  (:action reserve_primary_time_window_for_section
+    :parameters (?primary_field_section - primary_field_section ?time_window_a - primary_time_window ?operation_task - operation_task)
+    :precondition
+      (and
+        (entity_ready_for_transition ?primary_field_section)
+        (task_assigned ?primary_field_section ?operation_task)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (not
+          (primary_time_window_reserved ?time_window_a)
+        )
+        (not
+          (primary_time_window_material_allocated ?time_window_a)
+        )
+      )
+    :effect (primary_time_window_reserved ?time_window_a)
+  )
+  (:action assign_crew_to_primary_section_for_primary_time_window
+    :parameters (?primary_field_section - primary_field_section ?time_window_a - primary_time_window ?crew_team - crew_team)
+    :precondition
+      (and
+        (entity_ready_for_transition ?primary_field_section)
+        (crew_assigned ?primary_field_section ?crew_team)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (primary_time_window_reserved ?time_window_a)
+        (not
+          (primary_section_prepared ?primary_field_section)
+        )
+      )
+    :effect
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (primary_section_ready ?primary_field_section)
+      )
+  )
+  (:action allocate_material_to_primary_section
+    :parameters (?primary_field_section - primary_field_section ?time_window_a - primary_time_window ?input_material_batch - input_material_batch)
+    :precondition
+      (and
+        (entity_ready_for_transition ?primary_field_section)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (material_batch_available ?input_material_batch)
+        (not
+          (primary_section_prepared ?primary_field_section)
+        )
+      )
+    :effect
+      (and
+        (primary_time_window_material_allocated ?time_window_a)
+        (primary_section_prepared ?primary_field_section)
+        (material_allocated_to_section ?primary_field_section ?input_material_batch)
+        (not
+          (material_batch_available ?input_material_batch)
+        )
+      )
+  )
+  (:action confirm_material_assignment_for_primary_section
+    :parameters (?primary_field_section - primary_field_section ?time_window_a - primary_time_window ?operation_task - operation_task ?input_material_batch - input_material_batch)
+    :precondition
+      (and
+        (entity_ready_for_transition ?primary_field_section)
+        (task_assigned ?primary_field_section ?operation_task)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (primary_time_window_material_allocated ?time_window_a)
+        (material_allocated_to_section ?primary_field_section ?input_material_batch)
+        (not
+          (primary_section_ready ?primary_field_section)
+        )
+      )
+    :effect
+      (and
+        (primary_time_window_reserved ?time_window_a)
+        (primary_section_ready ?primary_field_section)
+        (material_batch_available ?input_material_batch)
+        (not
+          (material_allocated_to_section ?primary_field_section ?input_material_batch)
+        )
+      )
+  )
+  (:action reserve_secondary_time_window_for_section
+    :parameters (?secondary_field_section - secondary_field_section ?time_window_b - secondary_time_window ?operation_task - operation_task)
+    :precondition
+      (and
+        (entity_ready_for_transition ?secondary_field_section)
+        (task_assigned ?secondary_field_section ?operation_task)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (not
+          (secondary_time_window_reserved ?time_window_b)
+        )
+        (not
+          (secondary_time_window_material_allocated ?time_window_b)
+        )
+      )
+    :effect (secondary_time_window_reserved ?time_window_b)
+  )
+  (:action assign_crew_to_secondary_section_for_secondary_time_window
+    :parameters (?secondary_field_section - secondary_field_section ?time_window_b - secondary_time_window ?crew_team - crew_team)
+    :precondition
+      (and
+        (entity_ready_for_transition ?secondary_field_section)
+        (crew_assigned ?secondary_field_section ?crew_team)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (secondary_time_window_reserved ?time_window_b)
+        (not
+          (secondary_section_prepared ?secondary_field_section)
+        )
+      )
+    :effect
+      (and
+        (secondary_section_prepared ?secondary_field_section)
+        (secondary_section_ready ?secondary_field_section)
+      )
+  )
+  (:action allocate_material_to_secondary_section
+    :parameters (?secondary_field_section - secondary_field_section ?time_window_b - secondary_time_window ?input_material_batch - input_material_batch)
+    :precondition
+      (and
+        (entity_ready_for_transition ?secondary_field_section)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (material_batch_available ?input_material_batch)
+        (not
+          (secondary_section_prepared ?secondary_field_section)
+        )
+      )
+    :effect
+      (and
+        (secondary_time_window_material_allocated ?time_window_b)
+        (secondary_section_prepared ?secondary_field_section)
+        (material_allocated_to_secondary_section ?secondary_field_section ?input_material_batch)
+        (not
+          (material_batch_available ?input_material_batch)
+        )
+      )
+  )
+  (:action confirm_material_assignment_for_secondary_section
+    :parameters (?secondary_field_section - secondary_field_section ?time_window_b - secondary_time_window ?operation_task - operation_task ?input_material_batch - input_material_batch)
+    :precondition
+      (and
+        (entity_ready_for_transition ?secondary_field_section)
+        (task_assigned ?secondary_field_section ?operation_task)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (secondary_time_window_material_allocated ?time_window_b)
+        (material_allocated_to_secondary_section ?secondary_field_section ?input_material_batch)
+        (not
+          (secondary_section_ready ?secondary_field_section)
+        )
+      )
+    :effect
+      (and
+        (secondary_time_window_reserved ?time_window_b)
+        (secondary_section_ready ?secondary_field_section)
+        (material_batch_available ?input_material_batch)
+        (not
+          (material_allocated_to_secondary_section ?secondary_field_section ?input_material_batch)
+        )
+      )
+  )
+  (:action assemble_staging_unit_standard
+    :parameters (?primary_field_section - primary_field_section ?secondary_field_section - secondary_field_section ?time_window_a - primary_time_window ?time_window_b - secondary_time_window ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (secondary_section_prepared ?secondary_field_section)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (primary_time_window_reserved ?time_window_a)
+        (secondary_time_window_reserved ?time_window_b)
+        (primary_section_ready ?primary_field_section)
+        (secondary_section_ready ?secondary_field_section)
+        (staging_unit_available ?staging_unit)
+      )
+    :effect
+      (and
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_time_window_primary_attached ?staging_unit ?time_window_a)
+        (staging_unit_time_window_secondary_attached ?staging_unit ?time_window_b)
+        (not
+          (staging_unit_available ?staging_unit)
+        )
+      )
+  )
+  (:action assemble_staging_unit_with_primary_material
+    :parameters (?primary_field_section - primary_field_section ?secondary_field_section - secondary_field_section ?time_window_a - primary_time_window ?time_window_b - secondary_time_window ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (secondary_section_prepared ?secondary_field_section)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (primary_time_window_material_allocated ?time_window_a)
+        (secondary_time_window_reserved ?time_window_b)
+        (not
+          (primary_section_ready ?primary_field_section)
+        )
+        (secondary_section_ready ?secondary_field_section)
+        (staging_unit_available ?staging_unit)
+      )
+    :effect
+      (and
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_time_window_primary_attached ?staging_unit ?time_window_a)
+        (staging_unit_time_window_secondary_attached ?staging_unit ?time_window_b)
+        (staging_unit_tag_a ?staging_unit)
+        (not
+          (staging_unit_available ?staging_unit)
+        )
+      )
+  )
+  (:action assemble_staging_unit_with_secondary_material
+    :parameters (?primary_field_section - primary_field_section ?secondary_field_section - secondary_field_section ?time_window_a - primary_time_window ?time_window_b - secondary_time_window ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (secondary_section_prepared ?secondary_field_section)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (primary_time_window_reserved ?time_window_a)
+        (secondary_time_window_material_allocated ?time_window_b)
+        (primary_section_ready ?primary_field_section)
+        (not
+          (secondary_section_ready ?secondary_field_section)
+        )
+        (staging_unit_available ?staging_unit)
+      )
+    :effect
+      (and
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_time_window_primary_attached ?staging_unit ?time_window_a)
+        (staging_unit_time_window_secondary_attached ?staging_unit ?time_window_b)
+        (staging_unit_tag_b ?staging_unit)
+        (not
+          (staging_unit_available ?staging_unit)
+        )
+      )
+  )
+  (:action assemble_staging_unit_with_both_materials
+    :parameters (?primary_field_section - primary_field_section ?secondary_field_section - secondary_field_section ?time_window_a - primary_time_window ?time_window_b - secondary_time_window ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (secondary_section_prepared ?secondary_field_section)
+        (section_primary_time_window_assigned ?primary_field_section ?time_window_a)
+        (section_secondary_time_window_assigned ?secondary_field_section ?time_window_b)
+        (primary_time_window_material_allocated ?time_window_a)
+        (secondary_time_window_material_allocated ?time_window_b)
+        (not
+          (primary_section_ready ?primary_field_section)
+        )
+        (not
+          (secondary_section_ready ?secondary_field_section)
+        )
+        (staging_unit_available ?staging_unit)
+      )
+    :effect
+      (and
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_time_window_primary_attached ?staging_unit ?time_window_a)
+        (staging_unit_time_window_secondary_attached ?staging_unit ?time_window_b)
+        (staging_unit_tag_a ?staging_unit)
+        (staging_unit_tag_b ?staging_unit)
+        (not
+          (staging_unit_available ?staging_unit)
+        )
+      )
+  )
+  (:action confirm_staging_unit_prepared
+    :parameters (?staging_unit - staging_unit ?primary_field_section - primary_field_section ?operation_task - operation_task)
+    :precondition
+      (and
+        (staging_unit_prepared ?staging_unit)
+        (primary_section_prepared ?primary_field_section)
+        (task_assigned ?primary_field_section ?operation_task)
+        (not
+          (staging_unit_confirmed_for_material_handling ?staging_unit)
+        )
+      )
+    :effect (staging_unit_confirmed_for_material_handling ?staging_unit)
+  )
+  (:action prepare_supply_container
+    :parameters (?transition_plan - transition_plan ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (plan_assigned_to_staging_unit ?transition_plan ?staging_unit)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_available ?supply_container)
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_confirmed_for_material_handling ?staging_unit)
+        (not
+          (supply_container_prepared ?supply_container)
+        )
+      )
+    :effect
+      (and
+        (supply_container_prepared ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (not
+          (supply_container_available ?supply_container)
+        )
+      )
+  )
+  (:action validate_supply_container_for_plan
+    :parameters (?transition_plan - transition_plan ?supply_container - supply_container ?staging_unit - staging_unit ?operation_task - operation_task)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_prepared ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (task_assigned ?transition_plan ?operation_task)
+        (not
+          (staging_unit_tag_a ?staging_unit)
+        )
+        (not
+          (plan_validated ?transition_plan)
+        )
+      )
+    :effect (plan_validated ?transition_plan)
+  )
+  (:action attach_site_inspection_kit_to_plan
+    :parameters (?transition_plan - transition_plan ?site_inspection_kit - site_inspection_kit)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (inspection_kit_available ?site_inspection_kit)
+        (not
+          (site_inspection_attached ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (site_inspection_attached ?transition_plan)
+        (plan_has_inspectionkit ?transition_plan ?site_inspection_kit)
+        (not
+          (inspection_kit_available ?site_inspection_kit)
+        )
+      )
+  )
+  (:action finalize_supply_container_attachment_to_plan
+    :parameters (?transition_plan - transition_plan ?supply_container - supply_container ?staging_unit - staging_unit ?operation_task - operation_task ?site_inspection_kit - site_inspection_kit)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_prepared ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (task_assigned ?transition_plan ?operation_task)
+        (staging_unit_tag_a ?staging_unit)
+        (site_inspection_attached ?transition_plan)
+        (plan_has_inspectionkit ?transition_plan ?site_inspection_kit)
+        (not
+          (plan_validated ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_validated ?transition_plan)
+        (site_inspection_verified ?transition_plan)
+      )
+  )
+  (:action attach_calibration_tool_and_prepare_container
+    :parameters (?transition_plan - transition_plan ?calibration_tool - calibration_tool ?crew_team - crew_team ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_validated ?transition_plan)
+        (plan_has_calibration_tool ?transition_plan ?calibration_tool)
+        (crew_assigned ?transition_plan ?crew_team)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (not
+          (staging_unit_tag_b ?staging_unit)
+        )
+        (not
+          (plan_calibrated ?transition_plan)
+        )
+      )
+    :effect (plan_calibrated ?transition_plan)
+  )
+  (:action attach_calibration_tool_and_finalize_container
+    :parameters (?transition_plan - transition_plan ?calibration_tool - calibration_tool ?crew_team - crew_team ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_validated ?transition_plan)
+        (plan_has_calibration_tool ?transition_plan ?calibration_tool)
+        (crew_assigned ?transition_plan ?crew_team)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (staging_unit_tag_b ?staging_unit)
+        (not
+          (plan_calibrated ?transition_plan)
+        )
+      )
+    :effect (plan_calibrated ?transition_plan)
+  )
+  (:action record_regulatory_approval_checkpoint_1
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_calibrated ?transition_plan)
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (not
+          (staging_unit_tag_a ?staging_unit)
+        )
+        (not
+          (staging_unit_tag_b ?staging_unit)
+        )
+        (not
+          (plan_ready_for_final_verification ?transition_plan)
+        )
+      )
+    :effect (plan_ready_for_final_verification ?transition_plan)
+  )
+  (:action record_regulatory_approval_checkpoint_2
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_calibrated ?transition_plan)
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (staging_unit_tag_a ?staging_unit)
+        (not
+          (staging_unit_tag_b ?staging_unit)
+        )
+        (not
+          (plan_ready_for_final_verification ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_ready_for_certification ?transition_plan)
+      )
+  )
+  (:action record_regulatory_approval_checkpoint_3
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_calibrated ?transition_plan)
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (not
+          (staging_unit_tag_a ?staging_unit)
+        )
+        (staging_unit_tag_b ?staging_unit)
+        (not
+          (plan_ready_for_final_verification ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_ready_for_certification ?transition_plan)
+      )
+  )
+  (:action record_regulatory_approval_checkpoint_4
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval ?supply_container - supply_container ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (plan_calibrated ?transition_plan)
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (plan_has_supply_container ?transition_plan ?supply_container)
+        (supply_container_staged_in_staging_unit ?supply_container ?staging_unit)
+        (staging_unit_tag_a ?staging_unit)
+        (staging_unit_tag_b ?staging_unit)
+        (not
+          (plan_ready_for_final_verification ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_ready_for_certification ?transition_plan)
+      )
+  )
+  (:action mark_plan_ready_for_handover
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (not
+          (plan_ready_for_certification ?transition_plan)
+        )
+        (not
+          (plan_handover_recorded ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_handover_recorded ?transition_plan)
+        (handover_ready ?transition_plan)
+      )
+  )
+  (:action attach_compliance_certificate_to_plan
+    :parameters (?transition_plan - transition_plan ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_ready_for_certification ?transition_plan)
+        (compliance_certificate_available ?compliance_certificate)
+      )
+    :effect
+      (and
+        (plan_has_compliance_certificate ?transition_plan ?compliance_certificate)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action run_final_checks_and_mark_plan
+    :parameters (?transition_plan - transition_plan ?primary_field_section - primary_field_section ?secondary_field_section - secondary_field_section ?operation_task - operation_task ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_ready_for_certification ?transition_plan)
+        (plan_has_compliance_certificate ?transition_plan ?compliance_certificate)
+        (plan_associated_with_primary_section ?transition_plan ?primary_field_section)
+        (plan_associated_with_secondary_section ?transition_plan ?secondary_field_section)
+        (primary_section_ready ?primary_field_section)
+        (secondary_section_ready ?secondary_field_section)
+        (task_assigned ?transition_plan ?operation_task)
+        (not
+          (plan_final_checks_passed ?transition_plan)
+        )
+      )
+    :effect (plan_final_checks_passed ?transition_plan)
+  )
+  (:action complete_plan_final_checks_and_close
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (plan_ready_for_final_verification ?transition_plan)
+        (plan_final_checks_passed ?transition_plan)
+        (not
+          (plan_handover_recorded ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_handover_recorded ?transition_plan)
+        (handover_ready ?transition_plan)
+      )
+  )
+  (:action attach_inspection_report_to_plan
+    :parameters (?transition_plan - transition_plan ?inspection_report - inspection_report ?operation_task - operation_task)
+    :precondition
+      (and
+        (entity_ready_for_transition ?transition_plan)
+        (task_assigned ?transition_plan ?operation_task)
+        (inspection_report_available ?inspection_report)
+        (plan_has_inspection_report ?transition_plan ?inspection_report)
+        (not
+          (inspection_report_attached_to_plan ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (inspection_report_attached_to_plan ?transition_plan)
+        (not
+          (inspection_report_available ?inspection_report)
+        )
+      )
+  )
+  (:action mark_plan_for_inspection_review
+    :parameters (?transition_plan - transition_plan ?crew_team - crew_team)
+    :precondition
+      (and
+        (inspection_report_attached_to_plan ?transition_plan)
+        (crew_assigned ?transition_plan ?crew_team)
+        (not
+          (inspection_review_complete ?transition_plan)
+        )
+      )
+    :effect (inspection_review_complete ?transition_plan)
+  )
+  (:action record_inspection_review_and_attach_approval
+    :parameters (?transition_plan - transition_plan ?regulatory_approval - regulatory_approval)
+    :precondition
+      (and
+        (inspection_review_complete ?transition_plan)
+        (plan_has_regulatory_approval ?transition_plan ?regulatory_approval)
+        (not
+          (regulatory_review_completed ?transition_plan)
+        )
+      )
+    :effect (regulatory_review_completed ?transition_plan)
+  )
+  (:action finalize_inspection_and_mark_plan_ready
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (regulatory_review_completed ?transition_plan)
+        (not
+          (plan_handover_recorded ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_handover_recorded ?transition_plan)
+        (handover_ready ?transition_plan)
+      )
+  )
+  (:action finalize_primary_section_handover
+    :parameters (?primary_field_section - primary_field_section ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (primary_section_prepared ?primary_field_section)
+        (primary_section_ready ?primary_field_section)
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_confirmed_for_material_handling ?staging_unit)
+        (not
+          (handover_ready ?primary_field_section)
+        )
+      )
+    :effect (handover_ready ?primary_field_section)
+  )
+  (:action finalize_secondary_section_handover
+    :parameters (?secondary_field_section - secondary_field_section ?staging_unit - staging_unit)
+    :precondition
+      (and
+        (secondary_section_prepared ?secondary_field_section)
+        (secondary_section_ready ?secondary_field_section)
+        (staging_unit_prepared ?staging_unit)
+        (staging_unit_confirmed_for_material_handling ?staging_unit)
+        (not
+          (handover_ready ?secondary_field_section)
+        )
+      )
+    :effect (handover_ready ?secondary_field_section)
+  )
+  (:action attach_transition_checklist_to_parcel
+    :parameters (?field_parcel - field_parcel ?transition_checklist - transition_checklist ?operation_task - operation_task)
+    :precondition
+      (and
+        (handover_ready ?field_parcel)
+        (task_assigned ?field_parcel ?operation_task)
+        (transition_checklist_available ?transition_checklist)
+        (not
+          (checklist_completed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (checklist_completed ?field_parcel)
+        (entity_has_transition_checklist ?field_parcel ?transition_checklist)
+        (not
+          (transition_checklist_available ?transition_checklist)
+        )
+      )
+  )
+  (:action complete_parcel_handover_and_release_resources
+    :parameters (?primary_field_section - primary_field_section ?equipment_unit - equipment_unit ?transition_checklist - transition_checklist)
+    :precondition
+      (and
+        (checklist_completed ?primary_field_section)
+        (equipment_assigned ?primary_field_section ?equipment_unit)
+        (entity_has_transition_checklist ?primary_field_section ?transition_checklist)
+        (not
+          (transition_finalized ?primary_field_section)
+        )
+      )
+    :effect
+      (and
+        (transition_finalized ?primary_field_section)
+        (equipment_available ?equipment_unit)
+        (transition_checklist_available ?transition_checklist)
+      )
+  )
+  (:action complete_secondary_section_handover_and_release_resources
+    :parameters (?secondary_field_section - secondary_field_section ?equipment_unit - equipment_unit ?transition_checklist - transition_checklist)
+    :precondition
+      (and
+        (checklist_completed ?secondary_field_section)
+        (equipment_assigned ?secondary_field_section ?equipment_unit)
+        (entity_has_transition_checklist ?secondary_field_section ?transition_checklist)
+        (not
+          (transition_finalized ?secondary_field_section)
+        )
+      )
+    :effect
+      (and
+        (transition_finalized ?secondary_field_section)
+        (equipment_available ?equipment_unit)
+        (transition_checklist_available ?transition_checklist)
+      )
+  )
+  (:action complete_plan_handover_and_release_resources
+    :parameters (?transition_plan - transition_plan ?equipment_unit - equipment_unit ?transition_checklist - transition_checklist)
+    :precondition
+      (and
+        (checklist_completed ?transition_plan)
+        (equipment_assigned ?transition_plan ?equipment_unit)
+        (entity_has_transition_checklist ?transition_plan ?transition_checklist)
+        (not
+          (transition_finalized ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (transition_finalized ?transition_plan)
+        (equipment_available ?equipment_unit)
+        (transition_checklist_available ?transition_checklist)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem field_transition_preparation_problem)
+  (:domain end_of_season_transition_domain)
+  (:objects primary_section_1 - primary_field_section secondary_section_1 - secondary_field_section transition_plan_1 - transition_plan transition_plan_2 - transition_plan equipment_unit_1 - equipment_unit equipment_unit_2 - equipment_unit equipment_unit_3 - equipment_unit operation_task_1 - operation_task crew_team_alpha - crew_team material_batch_1 - input_material_batch time_window_a_1 - primary_time_window time_window_b_1 - secondary_time_window staging_unit_1 - staging_unit supply_container_1 - supply_container supply_container_2 - supply_container inspection_kit_1 - site_inspection_kit inspection_kit_2 - site_inspection_kit compliance_certificate_1 - compliance_certificate compliance_certificate_2 - compliance_certificate transition_checklist_doc_1 - transition_checklist calibration_tool_1 - calibration_tool inspection_report_1 - inspection_report inspection_report_2 - inspection_report regulatory_approval_1 - regulatory_approval)
+  (:init
+    (equipment_available equipment_unit_1)
+    (equipment_available equipment_unit_2)
+    (equipment_available equipment_unit_3)
+    (operation_task_available operation_task_1)
+    (crew_available crew_team_alpha)
+    (material_batch_available material_batch_1)
+    (section_primary_time_window_assigned primary_section_1 time_window_a_1)
+    (section_secondary_time_window_assigned secondary_section_1 time_window_b_1)
+    (staging_unit_available staging_unit_1)
+    (supply_container_available supply_container_1)
+    (supply_container_available supply_container_2)
+    (plan_associated_with_primary_section transition_plan_1 primary_section_1)
+    (plan_associated_with_primary_section transition_plan_2 primary_section_1)
+    (plan_associated_with_secondary_section transition_plan_1 secondary_section_1)
+    (plan_associated_with_secondary_section transition_plan_2 secondary_section_1)
+    (plan_assigned_to_staging_unit transition_plan_1 staging_unit_1)
+    (plan_assigned_to_staging_unit transition_plan_2 staging_unit_1)
+    (plan_has_supply_container transition_plan_1 supply_container_1)
+    (plan_has_supply_container transition_plan_2 supply_container_2)
+    (inspection_kit_available inspection_kit_1)
+    (inspection_kit_available inspection_kit_2)
+    (compliance_certificate_available compliance_certificate_1)
+    (compliance_certificate_available compliance_certificate_2)
+    (transition_checklist_available transition_checklist_doc_1)
+    (calibration_tool_available calibration_tool_1)
+    (inspection_report_available inspection_report_1)
+    (plan_has_inspection_report transition_plan_1 inspection_report_1)
+    (plan_has_inspection_report transition_plan_2 inspection_report_2)
+    (regulatory_approval_available regulatory_approval_1)
+  )
+  (:goal
+    (and
+      (transition_finalized primary_section_1)
+      (transition_finalized secondary_section_1)
+      (transition_finalized transition_plan_1)
+      (transition_finalized transition_plan_2)
+    )
+  )
+)

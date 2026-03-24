@@ -1,0 +1,937 @@
+(define (domain webhook_event_handling_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object auxiliary_resource - generic_object artifact_or_storage - generic_object channel_or_job_category - generic_object external_endpoint_category - generic_object webhook_endpoint_config - external_endpoint_category credential_material - auxiliary_resource event_type - auxiliary_resource adapter_connector - auxiliary_resource feature_flag - auxiliary_resource observability_sink - auxiliary_resource retry_policy - auxiliary_resource resource_quota - auxiliary_resource secret_rotation_job - auxiliary_resource storage_artifact - artifact_or_storage transform_artifact - artifact_or_storage approval_token - artifact_or_storage source_channel_a - channel_or_job_category source_channel_b - channel_or_job_category delivery_job - channel_or_job_category endpoint_role_a - webhook_endpoint_config endpoint_role_b - webhook_endpoint_config downstream_handler_a - endpoint_role_a downstream_handler_b - endpoint_role_a integration_deployment_unit - endpoint_role_b)
+
+  (:predicates
+    (entity_registered ?webhook_endpoint_config - webhook_endpoint_config)
+    (entity_activated ?webhook_endpoint_config - webhook_endpoint_config)
+    (credentials_bound ?webhook_endpoint_config - webhook_endpoint_config)
+    (credentials_provisioned ?webhook_endpoint_config - webhook_endpoint_config)
+    (entity_ready_for_onboarding ?webhook_endpoint_config - webhook_endpoint_config)
+    (credential_onboarded ?webhook_endpoint_config - webhook_endpoint_config)
+    (credential_available ?credential_material - credential_material)
+    (entity_credential_binding ?webhook_endpoint_config - webhook_endpoint_config ?credential_material - credential_material)
+    (event_type_available ?event_type - event_type)
+    (entity_event_binding ?webhook_endpoint_config - webhook_endpoint_config ?event_type - event_type)
+    (connector_available ?adapter_connector - adapter_connector)
+    (entity_connector_binding ?webhook_endpoint_config - webhook_endpoint_config ?adapter_connector - adapter_connector)
+    (artifact_available ?storage_artifact - storage_artifact)
+    (handler_a_has_artifact ?downstream_handler_a - downstream_handler_a ?storage_artifact - storage_artifact)
+    (handler_b_has_artifact ?downstream_handler_b - downstream_handler_b ?storage_artifact - storage_artifact)
+    (handler_a_channel_a_binding ?downstream_handler_a - downstream_handler_a ?source_channel_a - source_channel_a)
+    (channel_a_ready ?source_channel_a - source_channel_a)
+    (channel_a_prepared ?source_channel_a - source_channel_a)
+    (handler_a_ready_for_delivery ?downstream_handler_a - downstream_handler_a)
+    (handler_b_channel_b_binding ?downstream_handler_b - downstream_handler_b ?source_channel_b - source_channel_b)
+    (channel_b_ready ?source_channel_b - source_channel_b)
+    (channel_b_prepared ?source_channel_b - source_channel_b)
+    (handler_b_ready_for_delivery ?downstream_handler_b - downstream_handler_b)
+    (delivery_job_pending ?delivery_job - delivery_job)
+    (delivery_job_allocated ?delivery_job - delivery_job)
+    (delivery_job_assigned_channel_a ?delivery_job - delivery_job ?source_channel_a - source_channel_a)
+    (delivery_job_assigned_channel_b ?delivery_job - delivery_job ?source_channel_b - source_channel_b)
+    (delivery_job_channel_a_ready_flag ?delivery_job - delivery_job)
+    (delivery_job_channel_b_ready_flag ?delivery_job - delivery_job)
+    (delivery_job_dispatched ?delivery_job - delivery_job)
+    (deployment_unit_assigned_handler_a ?integration_deployment_unit - integration_deployment_unit ?downstream_handler_a - downstream_handler_a)
+    (deployment_unit_assigned_handler_b ?integration_deployment_unit - integration_deployment_unit ?downstream_handler_b - downstream_handler_b)
+    (deployment_unit_associated_delivery_job ?integration_deployment_unit - integration_deployment_unit ?delivery_job - delivery_job)
+    (transform_artifact_available ?transform_artifact - transform_artifact)
+    (deployment_unit_has_transform_artifact ?integration_deployment_unit - integration_deployment_unit ?transform_artifact - transform_artifact)
+    (transform_artifact_persisted ?transform_artifact - transform_artifact)
+    (transform_artifact_for_job ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    (deployment_unit_artifact_registered ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_artifact_enriched ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_artifact_validated ?integration_deployment_unit - integration_deployment_unit)
+    (feature_flag_applied ?integration_deployment_unit - integration_deployment_unit)
+    (feature_flag_acknowledged ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_ready_for_finalization ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_commit_ready ?integration_deployment_unit - integration_deployment_unit)
+    (approval_token_available ?approval_token - approval_token)
+    (deployment_unit_approval_binding ?integration_deployment_unit - integration_deployment_unit ?approval_token - approval_token)
+    (deployment_unit_approved ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_approval_stage1 ?integration_deployment_unit - integration_deployment_unit)
+    (deployment_unit_approval_stage2 ?integration_deployment_unit - integration_deployment_unit)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (deployment_unit_feature_flag_binding ?integration_deployment_unit - integration_deployment_unit ?feature_flag - feature_flag)
+    (observability_sink_available ?observability_sink - observability_sink)
+    (deployment_unit_observability_binding ?integration_deployment_unit - integration_deployment_unit ?observability_sink - observability_sink)
+    (resource_quota_available ?resource_quota - resource_quota)
+    (deployment_unit_quota_allocated ?integration_deployment_unit - integration_deployment_unit ?resource_quota - resource_quota)
+    (secret_rotation_job_available ?secret_rotation_job - secret_rotation_job)
+    (deployment_unit_secret_rotation_binding ?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job)
+    (retry_policy_available ?retry_policy - retry_policy)
+    (entity_retry_policy_binding ?webhook_endpoint_config - webhook_endpoint_config ?retry_policy - retry_policy)
+    (handler_a_ready ?downstream_handler_a - downstream_handler_a)
+    (handler_b_ready ?downstream_handler_b - downstream_handler_b)
+    (deployment_unit_finalized ?integration_deployment_unit - integration_deployment_unit)
+  )
+  (:action register_webhook_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config)
+    :precondition
+      (and
+        (not
+          (entity_registered ?webhook_endpoint_config)
+        )
+        (not
+          (credentials_provisioned ?webhook_endpoint_config)
+        )
+      )
+    :effect (entity_registered ?webhook_endpoint_config)
+  )
+  (:action attach_credential_to_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?credential_material - credential_material)
+    :precondition
+      (and
+        (entity_registered ?webhook_endpoint_config)
+        (not
+          (credentials_bound ?webhook_endpoint_config)
+        )
+        (credential_available ?credential_material)
+      )
+    :effect
+      (and
+        (credentials_bound ?webhook_endpoint_config)
+        (entity_credential_binding ?webhook_endpoint_config ?credential_material)
+        (not
+          (credential_available ?credential_material)
+        )
+      )
+  )
+  (:action bind_event_type_to_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?event_type - event_type)
+    :precondition
+      (and
+        (entity_registered ?webhook_endpoint_config)
+        (credentials_bound ?webhook_endpoint_config)
+        (event_type_available ?event_type)
+      )
+    :effect
+      (and
+        (entity_event_binding ?webhook_endpoint_config ?event_type)
+        (not
+          (event_type_available ?event_type)
+        )
+      )
+  )
+  (:action activate_endpoint_subscription
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?event_type - event_type)
+    :precondition
+      (and
+        (entity_registered ?webhook_endpoint_config)
+        (credentials_bound ?webhook_endpoint_config)
+        (entity_event_binding ?webhook_endpoint_config ?event_type)
+        (not
+          (entity_activated ?webhook_endpoint_config)
+        )
+      )
+    :effect (entity_activated ?webhook_endpoint_config)
+  )
+  (:action unbind_event_type_from_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?event_type - event_type)
+    :precondition
+      (and
+        (entity_event_binding ?webhook_endpoint_config ?event_type)
+      )
+    :effect
+      (and
+        (event_type_available ?event_type)
+        (not
+          (entity_event_binding ?webhook_endpoint_config ?event_type)
+        )
+      )
+  )
+  (:action assign_adapter_connector_to_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?adapter_connector - adapter_connector)
+    :precondition
+      (and
+        (entity_activated ?webhook_endpoint_config)
+        (connector_available ?adapter_connector)
+      )
+    :effect
+      (and
+        (entity_connector_binding ?webhook_endpoint_config ?adapter_connector)
+        (not
+          (connector_available ?adapter_connector)
+        )
+      )
+  )
+  (:action detach_adapter_connector_from_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?adapter_connector - adapter_connector)
+    :precondition
+      (and
+        (entity_connector_binding ?webhook_endpoint_config ?adapter_connector)
+      )
+    :effect
+      (and
+        (connector_available ?adapter_connector)
+        (not
+          (entity_connector_binding ?webhook_endpoint_config ?adapter_connector)
+        )
+      )
+  )
+  (:action allocate_resource_quota_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?resource_quota - resource_quota)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (resource_quota_available ?resource_quota)
+      )
+    :effect
+      (and
+        (deployment_unit_quota_allocated ?integration_deployment_unit ?resource_quota)
+        (not
+          (resource_quota_available ?resource_quota)
+        )
+      )
+  )
+  (:action release_resource_quota_from_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?resource_quota - resource_quota)
+    :precondition
+      (and
+        (deployment_unit_quota_allocated ?integration_deployment_unit ?resource_quota)
+      )
+    :effect
+      (and
+        (resource_quota_available ?resource_quota)
+        (not
+          (deployment_unit_quota_allocated ?integration_deployment_unit ?resource_quota)
+        )
+      )
+  )
+  (:action assign_secret_rotation_job_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (secret_rotation_job_available ?secret_rotation_job)
+      )
+    :effect
+      (and
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (not
+          (secret_rotation_job_available ?secret_rotation_job)
+        )
+      )
+  )
+  (:action unassign_secret_rotation_job_from_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job)
+    :precondition
+      (and
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+      )
+    :effect
+      (and
+        (secret_rotation_job_available ?secret_rotation_job)
+        (not
+          (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        )
+      )
+  )
+  (:action probe_source_channel_a_for_handler
+    :parameters (?downstream_handler_a - downstream_handler_a ?source_channel_a - source_channel_a ?event_type - event_type)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_a)
+        (entity_event_binding ?downstream_handler_a ?event_type)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (not
+          (channel_a_ready ?source_channel_a)
+        )
+        (not
+          (channel_a_prepared ?source_channel_a)
+        )
+      )
+    :effect (channel_a_ready ?source_channel_a)
+  )
+  (:action confirm_handler_a_readiness
+    :parameters (?downstream_handler_a - downstream_handler_a ?source_channel_a - source_channel_a ?adapter_connector - adapter_connector)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_a)
+        (entity_connector_binding ?downstream_handler_a ?adapter_connector)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (channel_a_ready ?source_channel_a)
+        (not
+          (handler_a_ready ?downstream_handler_a)
+        )
+      )
+    :effect
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+      )
+  )
+  (:action stage_artifact_for_handler_a
+    :parameters (?downstream_handler_a - downstream_handler_a ?source_channel_a - source_channel_a ?storage_artifact - storage_artifact)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_a)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (artifact_available ?storage_artifact)
+        (not
+          (handler_a_ready ?downstream_handler_a)
+        )
+      )
+    :effect
+      (and
+        (channel_a_prepared ?source_channel_a)
+        (handler_a_ready ?downstream_handler_a)
+        (handler_a_has_artifact ?downstream_handler_a ?storage_artifact)
+        (not
+          (artifact_available ?storage_artifact)
+        )
+      )
+  )
+  (:action deploy_artifact_to_handler_a
+    :parameters (?downstream_handler_a - downstream_handler_a ?source_channel_a - source_channel_a ?event_type - event_type ?storage_artifact - storage_artifact)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_a)
+        (entity_event_binding ?downstream_handler_a ?event_type)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (channel_a_prepared ?source_channel_a)
+        (handler_a_has_artifact ?downstream_handler_a ?storage_artifact)
+        (not
+          (handler_a_ready_for_delivery ?downstream_handler_a)
+        )
+      )
+    :effect
+      (and
+        (channel_a_ready ?source_channel_a)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+        (artifact_available ?storage_artifact)
+        (not
+          (handler_a_has_artifact ?downstream_handler_a ?storage_artifact)
+        )
+      )
+  )
+  (:action probe_source_channel_b_for_handler
+    :parameters (?downstream_handler_b - downstream_handler_b ?source_channel_b - source_channel_b ?event_type - event_type)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_b)
+        (entity_event_binding ?downstream_handler_b ?event_type)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (not
+          (channel_b_ready ?source_channel_b)
+        )
+        (not
+          (channel_b_prepared ?source_channel_b)
+        )
+      )
+    :effect (channel_b_ready ?source_channel_b)
+  )
+  (:action confirm_handler_b_readiness
+    :parameters (?downstream_handler_b - downstream_handler_b ?source_channel_b - source_channel_b ?adapter_connector - adapter_connector)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_b)
+        (entity_connector_binding ?downstream_handler_b ?adapter_connector)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_b_ready ?source_channel_b)
+        (not
+          (handler_b_ready ?downstream_handler_b)
+        )
+      )
+    :effect
+      (and
+        (handler_b_ready ?downstream_handler_b)
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+      )
+  )
+  (:action stage_artifact_for_handler_b
+    :parameters (?downstream_handler_b - downstream_handler_b ?source_channel_b - source_channel_b ?storage_artifact - storage_artifact)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_b)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (artifact_available ?storage_artifact)
+        (not
+          (handler_b_ready ?downstream_handler_b)
+        )
+      )
+    :effect
+      (and
+        (channel_b_prepared ?source_channel_b)
+        (handler_b_ready ?downstream_handler_b)
+        (handler_b_has_artifact ?downstream_handler_b ?storage_artifact)
+        (not
+          (artifact_available ?storage_artifact)
+        )
+      )
+  )
+  (:action deploy_artifact_to_handler_b
+    :parameters (?downstream_handler_b - downstream_handler_b ?source_channel_b - source_channel_b ?event_type - event_type ?storage_artifact - storage_artifact)
+    :precondition
+      (and
+        (entity_activated ?downstream_handler_b)
+        (entity_event_binding ?downstream_handler_b ?event_type)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_b_prepared ?source_channel_b)
+        (handler_b_has_artifact ?downstream_handler_b ?storage_artifact)
+        (not
+          (handler_b_ready_for_delivery ?downstream_handler_b)
+        )
+      )
+    :effect
+      (and
+        (channel_b_ready ?source_channel_b)
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+        (artifact_available ?storage_artifact)
+        (not
+          (handler_b_has_artifact ?downstream_handler_b ?storage_artifact)
+        )
+      )
+  )
+  (:action compose_delivery_job
+    :parameters (?downstream_handler_a - downstream_handler_a ?downstream_handler_b - downstream_handler_b ?source_channel_a - source_channel_a ?source_channel_b - source_channel_b ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_b_ready ?downstream_handler_b)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_a_ready ?source_channel_a)
+        (channel_b_ready ?source_channel_b)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+        (delivery_job_pending ?delivery_job)
+      )
+    :effect
+      (and
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_assigned_channel_a ?delivery_job ?source_channel_a)
+        (delivery_job_assigned_channel_b ?delivery_job ?source_channel_b)
+        (not
+          (delivery_job_pending ?delivery_job)
+        )
+      )
+  )
+  (:action compose_delivery_job_channel_a_prepared
+    :parameters (?downstream_handler_a - downstream_handler_a ?downstream_handler_b - downstream_handler_b ?source_channel_a - source_channel_a ?source_channel_b - source_channel_b ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_b_ready ?downstream_handler_b)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_a_prepared ?source_channel_a)
+        (channel_b_ready ?source_channel_b)
+        (not
+          (handler_a_ready_for_delivery ?downstream_handler_a)
+        )
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+        (delivery_job_pending ?delivery_job)
+      )
+    :effect
+      (and
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_assigned_channel_a ?delivery_job ?source_channel_a)
+        (delivery_job_assigned_channel_b ?delivery_job ?source_channel_b)
+        (delivery_job_channel_a_ready_flag ?delivery_job)
+        (not
+          (delivery_job_pending ?delivery_job)
+        )
+      )
+  )
+  (:action compose_delivery_job_channel_b_prepared
+    :parameters (?downstream_handler_a - downstream_handler_a ?downstream_handler_b - downstream_handler_b ?source_channel_a - source_channel_a ?source_channel_b - source_channel_b ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_b_ready ?downstream_handler_b)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_a_ready ?source_channel_a)
+        (channel_b_prepared ?source_channel_b)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+        (not
+          (handler_b_ready_for_delivery ?downstream_handler_b)
+        )
+        (delivery_job_pending ?delivery_job)
+      )
+    :effect
+      (and
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_assigned_channel_a ?delivery_job ?source_channel_a)
+        (delivery_job_assigned_channel_b ?delivery_job ?source_channel_b)
+        (delivery_job_channel_b_ready_flag ?delivery_job)
+        (not
+          (delivery_job_pending ?delivery_job)
+        )
+      )
+  )
+  (:action compose_delivery_job_both_channels_prepared
+    :parameters (?downstream_handler_a - downstream_handler_a ?downstream_handler_b - downstream_handler_b ?source_channel_a - source_channel_a ?source_channel_b - source_channel_b ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_b_ready ?downstream_handler_b)
+        (handler_a_channel_a_binding ?downstream_handler_a ?source_channel_a)
+        (handler_b_channel_b_binding ?downstream_handler_b ?source_channel_b)
+        (channel_a_prepared ?source_channel_a)
+        (channel_b_prepared ?source_channel_b)
+        (not
+          (handler_a_ready_for_delivery ?downstream_handler_a)
+        )
+        (not
+          (handler_b_ready_for_delivery ?downstream_handler_b)
+        )
+        (delivery_job_pending ?delivery_job)
+      )
+    :effect
+      (and
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_assigned_channel_a ?delivery_job ?source_channel_a)
+        (delivery_job_assigned_channel_b ?delivery_job ?source_channel_b)
+        (delivery_job_channel_a_ready_flag ?delivery_job)
+        (delivery_job_channel_b_ready_flag ?delivery_job)
+        (not
+          (delivery_job_pending ?delivery_job)
+        )
+      )
+  )
+  (:action dispatch_delivery_job
+    :parameters (?delivery_job - delivery_job ?downstream_handler_a - downstream_handler_a ?event_type - event_type)
+    :precondition
+      (and
+        (delivery_job_allocated ?delivery_job)
+        (handler_a_ready ?downstream_handler_a)
+        (entity_event_binding ?downstream_handler_a ?event_type)
+        (not
+          (delivery_job_dispatched ?delivery_job)
+        )
+      )
+    :effect (delivery_job_dispatched ?delivery_job)
+  )
+  (:action persist_transform_artifact_for_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (deployment_unit_associated_delivery_job ?integration_deployment_unit ?delivery_job)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_available ?transform_artifact)
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_dispatched ?delivery_job)
+        (not
+          (transform_artifact_persisted ?transform_artifact)
+        )
+      )
+    :effect
+      (and
+        (transform_artifact_persisted ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (not
+          (transform_artifact_available ?transform_artifact)
+        )
+      )
+  )
+  (:action register_transform_artifact_with_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?transform_artifact - transform_artifact ?delivery_job - delivery_job ?event_type - event_type)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_persisted ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (entity_event_binding ?integration_deployment_unit ?event_type)
+        (not
+          (delivery_job_channel_a_ready_flag ?delivery_job)
+        )
+        (not
+          (deployment_unit_artifact_registered ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_artifact_registered ?integration_deployment_unit)
+  )
+  (:action apply_feature_flag_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (feature_flag_available ?feature_flag)
+        (not
+          (feature_flag_applied ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (feature_flag_applied ?integration_deployment_unit)
+        (deployment_unit_feature_flag_binding ?integration_deployment_unit ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action apply_feature_flag_and_register_artifact
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?transform_artifact - transform_artifact ?delivery_job - delivery_job ?event_type - event_type ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_persisted ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (entity_event_binding ?integration_deployment_unit ?event_type)
+        (delivery_job_channel_a_ready_flag ?delivery_job)
+        (feature_flag_applied ?integration_deployment_unit)
+        (deployment_unit_feature_flag_binding ?integration_deployment_unit ?feature_flag)
+        (not
+          (deployment_unit_artifact_registered ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_artifact_registered ?integration_deployment_unit)
+        (feature_flag_acknowledged ?integration_deployment_unit)
+      )
+  )
+  (:action enrich_transform_artifact_primary
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?resource_quota - resource_quota ?adapter_connector - adapter_connector ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_registered ?integration_deployment_unit)
+        (deployment_unit_quota_allocated ?integration_deployment_unit ?resource_quota)
+        (entity_connector_binding ?integration_deployment_unit ?adapter_connector)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (not
+          (delivery_job_channel_b_ready_flag ?delivery_job)
+        )
+        (not
+          (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_artifact_enriched ?integration_deployment_unit)
+  )
+  (:action enrich_transform_artifact_secondary
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?resource_quota - resource_quota ?adapter_connector - adapter_connector ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_registered ?integration_deployment_unit)
+        (deployment_unit_quota_allocated ?integration_deployment_unit ?resource_quota)
+        (entity_connector_binding ?integration_deployment_unit ?adapter_connector)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (delivery_job_channel_b_ready_flag ?delivery_job)
+        (not
+          (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_artifact_enriched ?integration_deployment_unit)
+  )
+  (:action validate_transform_artifact_with_rotation_job
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (not
+          (delivery_job_channel_a_ready_flag ?delivery_job)
+        )
+        (not
+          (delivery_job_channel_b_ready_flag ?delivery_job)
+        )
+        (not
+          (deployment_unit_artifact_validated ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_artifact_validated ?integration_deployment_unit)
+  )
+  (:action validate_and_mark_artifact_ready_channel_a
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (delivery_job_channel_a_ready_flag ?delivery_job)
+        (not
+          (delivery_job_channel_b_ready_flag ?delivery_job)
+        )
+        (not
+          (deployment_unit_artifact_validated ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+      )
+  )
+  (:action validate_and_mark_artifact_ready_channel_b
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (not
+          (delivery_job_channel_a_ready_flag ?delivery_job)
+        )
+        (delivery_job_channel_b_ready_flag ?delivery_job)
+        (not
+          (deployment_unit_artifact_validated ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+      )
+  )
+  (:action validate_and_mark_artifact_ready_for_both_channels
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job ?transform_artifact - transform_artifact ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (deployment_unit_artifact_enriched ?integration_deployment_unit)
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (deployment_unit_has_transform_artifact ?integration_deployment_unit ?transform_artifact)
+        (transform_artifact_for_job ?transform_artifact ?delivery_job)
+        (delivery_job_channel_a_ready_flag ?delivery_job)
+        (delivery_job_channel_b_ready_flag ?delivery_job)
+        (not
+          (deployment_unit_artifact_validated ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+      )
+  )
+  (:action finalize_deployment_unit_artifact
+    :parameters (?integration_deployment_unit - integration_deployment_unit)
+    :precondition
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (not
+          (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+        )
+        (not
+          (deployment_unit_finalized ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_finalized ?integration_deployment_unit)
+        (entity_ready_for_onboarding ?integration_deployment_unit)
+      )
+  )
+  (:action attach_observability_sink_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?observability_sink - observability_sink)
+    :precondition
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+        (observability_sink_available ?observability_sink)
+      )
+    :effect
+      (and
+        (deployment_unit_observability_binding ?integration_deployment_unit ?observability_sink)
+        (not
+          (observability_sink_available ?observability_sink)
+        )
+      )
+  )
+  (:action commit_deployment_unit_artifact
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?downstream_handler_a - downstream_handler_a ?downstream_handler_b - downstream_handler_b ?event_type - event_type ?observability_sink - observability_sink)
+    :precondition
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_ready_for_finalization ?integration_deployment_unit)
+        (deployment_unit_observability_binding ?integration_deployment_unit ?observability_sink)
+        (deployment_unit_assigned_handler_a ?integration_deployment_unit ?downstream_handler_a)
+        (deployment_unit_assigned_handler_b ?integration_deployment_unit ?downstream_handler_b)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+        (entity_event_binding ?integration_deployment_unit ?event_type)
+        (not
+          (deployment_unit_commit_ready ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_commit_ready ?integration_deployment_unit)
+  )
+  (:action finalize_deployment_unit_after_commit
+    :parameters (?integration_deployment_unit - integration_deployment_unit)
+    :precondition
+      (and
+        (deployment_unit_artifact_validated ?integration_deployment_unit)
+        (deployment_unit_commit_ready ?integration_deployment_unit)
+        (not
+          (deployment_unit_finalized ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_finalized ?integration_deployment_unit)
+        (entity_ready_for_onboarding ?integration_deployment_unit)
+      )
+  )
+  (:action apply_approval_token_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?approval_token - approval_token ?event_type - event_type)
+    :precondition
+      (and
+        (entity_activated ?integration_deployment_unit)
+        (entity_event_binding ?integration_deployment_unit ?event_type)
+        (approval_token_available ?approval_token)
+        (deployment_unit_approval_binding ?integration_deployment_unit ?approval_token)
+        (not
+          (deployment_unit_approved ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_approved ?integration_deployment_unit)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action apply_approval_stage1_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?adapter_connector - adapter_connector)
+    :precondition
+      (and
+        (deployment_unit_approved ?integration_deployment_unit)
+        (entity_connector_binding ?integration_deployment_unit ?adapter_connector)
+        (not
+          (deployment_unit_approval_stage1 ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_approval_stage1 ?integration_deployment_unit)
+  )
+  (:action apply_approval_stage2_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?secret_rotation_job - secret_rotation_job)
+    :precondition
+      (and
+        (deployment_unit_approval_stage1 ?integration_deployment_unit)
+        (deployment_unit_secret_rotation_binding ?integration_deployment_unit ?secret_rotation_job)
+        (not
+          (deployment_unit_approval_stage2 ?integration_deployment_unit)
+        )
+      )
+    :effect (deployment_unit_approval_stage2 ?integration_deployment_unit)
+  )
+  (:action finalize_deployment_unit_post_approval
+    :parameters (?integration_deployment_unit - integration_deployment_unit)
+    :precondition
+      (and
+        (deployment_unit_approval_stage2 ?integration_deployment_unit)
+        (not
+          (deployment_unit_finalized ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (deployment_unit_finalized ?integration_deployment_unit)
+        (entity_ready_for_onboarding ?integration_deployment_unit)
+      )
+  )
+  (:action mark_handler_a_ready_for_onboarding
+    :parameters (?downstream_handler_a - downstream_handler_a ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_a_ready ?downstream_handler_a)
+        (handler_a_ready_for_delivery ?downstream_handler_a)
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_dispatched ?delivery_job)
+        (not
+          (entity_ready_for_onboarding ?downstream_handler_a)
+        )
+      )
+    :effect (entity_ready_for_onboarding ?downstream_handler_a)
+  )
+  (:action mark_handler_b_ready_for_onboarding
+    :parameters (?downstream_handler_b - downstream_handler_b ?delivery_job - delivery_job)
+    :precondition
+      (and
+        (handler_b_ready ?downstream_handler_b)
+        (handler_b_ready_for_delivery ?downstream_handler_b)
+        (delivery_job_allocated ?delivery_job)
+        (delivery_job_dispatched ?delivery_job)
+        (not
+          (entity_ready_for_onboarding ?downstream_handler_b)
+        )
+      )
+    :effect (entity_ready_for_onboarding ?downstream_handler_b)
+  )
+  (:action attach_retry_policy_to_endpoint
+    :parameters (?webhook_endpoint_config - webhook_endpoint_config ?retry_policy - retry_policy ?event_type - event_type)
+    :precondition
+      (and
+        (entity_ready_for_onboarding ?webhook_endpoint_config)
+        (entity_event_binding ?webhook_endpoint_config ?event_type)
+        (retry_policy_available ?retry_policy)
+        (not
+          (credential_onboarded ?webhook_endpoint_config)
+        )
+      )
+    :effect
+      (and
+        (credential_onboarded ?webhook_endpoint_config)
+        (entity_retry_policy_binding ?webhook_endpoint_config ?retry_policy)
+        (not
+          (retry_policy_available ?retry_policy)
+        )
+      )
+  )
+  (:action propagate_credential_to_handler_a
+    :parameters (?downstream_handler_a - downstream_handler_a ?credential_material - credential_material ?retry_policy - retry_policy)
+    :precondition
+      (and
+        (credential_onboarded ?downstream_handler_a)
+        (entity_credential_binding ?downstream_handler_a ?credential_material)
+        (entity_retry_policy_binding ?downstream_handler_a ?retry_policy)
+        (not
+          (credentials_provisioned ?downstream_handler_a)
+        )
+      )
+    :effect
+      (and
+        (credentials_provisioned ?downstream_handler_a)
+        (credential_available ?credential_material)
+        (retry_policy_available ?retry_policy)
+      )
+  )
+  (:action propagate_credential_to_handler_b
+    :parameters (?downstream_handler_b - downstream_handler_b ?credential_material - credential_material ?retry_policy - retry_policy)
+    :precondition
+      (and
+        (credential_onboarded ?downstream_handler_b)
+        (entity_credential_binding ?downstream_handler_b ?credential_material)
+        (entity_retry_policy_binding ?downstream_handler_b ?retry_policy)
+        (not
+          (credentials_provisioned ?downstream_handler_b)
+        )
+      )
+    :effect
+      (and
+        (credentials_provisioned ?downstream_handler_b)
+        (credential_available ?credential_material)
+        (retry_policy_available ?retry_policy)
+      )
+  )
+  (:action propagate_credential_to_deployment_unit
+    :parameters (?integration_deployment_unit - integration_deployment_unit ?credential_material - credential_material ?retry_policy - retry_policy)
+    :precondition
+      (and
+        (credential_onboarded ?integration_deployment_unit)
+        (entity_credential_binding ?integration_deployment_unit ?credential_material)
+        (entity_retry_policy_binding ?integration_deployment_unit ?retry_policy)
+        (not
+          (credentials_provisioned ?integration_deployment_unit)
+        )
+      )
+    :effect
+      (and
+        (credentials_provisioned ?integration_deployment_unit)
+        (credential_available ?credential_material)
+        (retry_policy_available ?retry_policy)
+      )
+  )
+)

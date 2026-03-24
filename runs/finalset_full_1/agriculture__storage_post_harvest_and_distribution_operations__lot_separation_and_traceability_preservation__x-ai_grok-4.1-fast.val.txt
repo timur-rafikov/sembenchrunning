@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain agriculture_lot_separation_traceability)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_type - object label_or_tag_type - object logistics_unit_type - object core_lot_type - object lot - core_lot_type reception_slot - resource_type grading_station - resource_type conditioning_station - resource_type customer_order - resource_type carrier_service - resource_type release_document - resource_type temperature_profile - resource_type lab_test_result - resource_type traceability_tag - label_or_tag_type packaging_box - label_or_tag_type origin_certificate - label_or_tag_type storage_cell - logistics_unit_type distribution_channel - logistics_unit_type outbound_load - logistics_unit_type storage_view - lot deployment_view - lot storage_batch - storage_view picking_batch - storage_view pallet - deployment_view)
+  (:predicates
+    (received ?lot - lot)
+    (grade_completed ?lot - lot)
+    (staged ?lot - lot)
+    (released_for_dispatch ?lot - lot)
+    (ready_for_dispatch ?lot - lot)
+    (release_document_attached ?lot - lot)
+    (reception_slot_available ?reception_slot - reception_slot)
+    (in_reception_slot ?lot - lot ?reception_slot - reception_slot)
+    (grading_station_available ?grading_station - grading_station)
+    (assigned_to_grading_station ?lot - lot ?grading_station - grading_station)
+    (conditioning_station_available ?conditioning_station - conditioning_station)
+    (assigned_to_conditioning_station ?lot - lot ?conditioning_station - conditioning_station)
+    (traceability_tag_available ?traceability_tag - traceability_tag)
+    (storage_batch_assigned_traceability_tag ?storage_batch - storage_batch ?traceability_tag - traceability_tag)
+    (picking_batch_assigned_traceability_tag ?picking_batch - picking_batch ?traceability_tag - traceability_tag)
+    (storage_batch_assigned_to_storage_cell ?storage_batch - storage_batch ?storage_cell - storage_cell)
+    (storage_cell_reserved ?storage_cell - storage_cell)
+    (storage_cell_tagged ?storage_cell - storage_cell)
+    (storage_batch_available_for_outbound ?storage_batch - storage_batch)
+    (picking_batch_assigned_to_distribution_channel ?picking_batch - picking_batch ?distribution_channel - distribution_channel)
+    (distribution_channel_reserved ?distribution_channel - distribution_channel)
+    (distribution_channel_tagged ?distribution_channel - distribution_channel)
+    (picking_batch_available_for_outbound ?picking_batch - picking_batch)
+    (outbound_load_available ?outbound_load - outbound_load)
+    (outbound_load_reserved ?outbound_load - outbound_load)
+    (outbound_load_linked_to_storage_cell ?outbound_load - outbound_load ?storage_cell - storage_cell)
+    (outbound_load_linked_to_distribution_channel ?outbound_load - outbound_load ?distribution_channel - distribution_channel)
+    (outbound_load_requires_temperature_profile ?outbound_load - outbound_load)
+    (outbound_load_requires_origin_certificate ?outbound_load - outbound_load)
+    (outbound_load_ready_for_packing ?outbound_load - outbound_load)
+    (pallet_contains_storage_batch ?pallet - pallet ?storage_batch - storage_batch)
+    (pallet_contains_picking_batch ?pallet - pallet ?picking_batch - picking_batch)
+    (pallet_assigned_to_outbound_load ?pallet - pallet ?outbound_load - outbound_load)
+    (packaging_box_available ?packaging_box - packaging_box)
+    (pallet_has_packaging_box ?pallet - pallet ?packaging_box - packaging_box)
+    (packaging_box_used ?packaging_box - packaging_box)
+    (packaging_box_assigned_to_outbound_load ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    (pallet_packaging_initialized ?pallet - pallet)
+    (pallet_packaging_confirmed ?pallet - pallet)
+    (pallet_lab_result_linked ?pallet - pallet)
+    (pallet_has_order_applied ?pallet - pallet)
+    (pallet_order_confirmed ?pallet - pallet)
+    (pallet_documentation_complete ?pallet - pallet)
+    (pallet_final_inspection_passed ?pallet - pallet)
+    (origin_certificate_available ?origin_certificate - origin_certificate)
+    (pallet_assigned_origin_certificate ?pallet - pallet ?origin_certificate - origin_certificate)
+    (pallet_origin_check_started ?pallet - pallet)
+    (pallet_origin_validated ?pallet - pallet)
+    (pallet_origin_verified ?pallet - pallet)
+    (customer_order_available ?customer_order - customer_order)
+    (pallet_linked_to_customer_order ?pallet - pallet ?customer_order - customer_order)
+    (carrier_service_available ?carrier_service - carrier_service)
+    (pallet_assigned_carrier_service ?pallet - pallet ?carrier_service - carrier_service)
+    (temperature_profile_available ?temperature_profile - temperature_profile)
+    (pallet_assigned_temperature_profile ?pallet - pallet ?temperature_profile - temperature_profile)
+    (lab_test_result_available ?lab_test_result - lab_test_result)
+    (pallet_assigned_lab_test_result ?pallet - pallet ?lab_test_result - lab_test_result)
+    (release_document_available ?release_document - release_document)
+    (linked_to_release_document ?lot - lot ?release_document - release_document)
+    (storage_batch_placed ?storage_batch - storage_batch)
+    (picking_batch_placed ?picking_batch - picking_batch)
+    (pallet_ready_marker ?pallet - pallet)
+  )
+  (:action receive_and_register_lot
+    :parameters (?lot - lot)
+    :precondition
+      (and
+        (not
+          (received ?lot)
+        )
+        (not
+          (released_for_dispatch ?lot)
+        )
+      )
+    :effect (received ?lot)
+  )
+  (:action assign_lot_to_reception_slot
+    :parameters (?lot - lot ?reception_slot - reception_slot)
+    :precondition
+      (and
+        (received ?lot)
+        (not
+          (staged ?lot)
+        )
+        (reception_slot_available ?reception_slot)
+      )
+    :effect
+      (and
+        (staged ?lot)
+        (in_reception_slot ?lot ?reception_slot)
+        (not
+          (reception_slot_available ?reception_slot)
+        )
+      )
+  )
+  (:action assign_lot_to_grading_station
+    :parameters (?lot - lot ?grading_station - grading_station)
+    :precondition
+      (and
+        (received ?lot)
+        (staged ?lot)
+        (grading_station_available ?grading_station)
+      )
+    :effect
+      (and
+        (assigned_to_grading_station ?lot ?grading_station)
+        (not
+          (grading_station_available ?grading_station)
+        )
+      )
+  )
+  (:action complete_lot_grading
+    :parameters (?lot - lot ?grading_station - grading_station)
+    :precondition
+      (and
+        (received ?lot)
+        (staged ?lot)
+        (assigned_to_grading_station ?lot ?grading_station)
+        (not
+          (grade_completed ?lot)
+        )
+      )
+    :effect (grade_completed ?lot)
+  )
+  (:action release_grading_station
+    :parameters (?lot - lot ?grading_station - grading_station)
+    :precondition
+      (and
+        (assigned_to_grading_station ?lot ?grading_station)
+      )
+    :effect
+      (and
+        (grading_station_available ?grading_station)
+        (not
+          (assigned_to_grading_station ?lot ?grading_station)
+        )
+      )
+  )
+  (:action assign_lot_to_conditioning_station
+    :parameters (?lot - lot ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grade_completed ?lot)
+        (conditioning_station_available ?conditioning_station)
+      )
+    :effect
+      (and
+        (assigned_to_conditioning_station ?lot ?conditioning_station)
+        (not
+          (conditioning_station_available ?conditioning_station)
+        )
+      )
+  )
+  (:action release_conditioning_station
+    :parameters (?lot - lot ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (assigned_to_conditioning_station ?lot ?conditioning_station)
+      )
+    :effect
+      (and
+        (conditioning_station_available ?conditioning_station)
+        (not
+          (assigned_to_conditioning_station ?lot ?conditioning_station)
+        )
+      )
+  )
+  (:action attach_temperature_profile_to_pallet
+    :parameters (?pallet - pallet ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (temperature_profile_available ?temperature_profile)
+      )
+    :effect
+      (and
+        (pallet_assigned_temperature_profile ?pallet ?temperature_profile)
+        (not
+          (temperature_profile_available ?temperature_profile)
+        )
+      )
+  )
+  (:action detach_temperature_profile_from_pallet
+    :parameters (?pallet - pallet ?temperature_profile - temperature_profile)
+    :precondition
+      (and
+        (pallet_assigned_temperature_profile ?pallet ?temperature_profile)
+      )
+    :effect
+      (and
+        (temperature_profile_available ?temperature_profile)
+        (not
+          (pallet_assigned_temperature_profile ?pallet ?temperature_profile)
+        )
+      )
+  )
+  (:action attach_lab_test_result_to_pallet
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (lab_test_result_available ?lab_test_result)
+      )
+    :effect
+      (and
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (not
+          (lab_test_result_available ?lab_test_result)
+        )
+      )
+  )
+  (:action detach_lab_test_result_from_pallet
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result)
+    :precondition
+      (and
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+      )
+    :effect
+      (and
+        (lab_test_result_available ?lab_test_result)
+        (not
+          (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        )
+      )
+  )
+  (:action reserve_storage_cell_for_batch
+    :parameters (?storage_batch - storage_batch ?storage_cell - storage_cell ?grading_station - grading_station)
+    :precondition
+      (and
+        (grade_completed ?storage_batch)
+        (assigned_to_grading_station ?storage_batch ?grading_station)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (not
+          (storage_cell_reserved ?storage_cell)
+        )
+        (not
+          (storage_cell_tagged ?storage_cell)
+        )
+      )
+    :effect (storage_cell_reserved ?storage_cell)
+  )
+  (:action place_batch_into_storage_cell_and_mark
+    :parameters (?storage_batch - storage_batch ?storage_cell - storage_cell ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grade_completed ?storage_batch)
+        (assigned_to_conditioning_station ?storage_batch ?conditioning_station)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (storage_cell_reserved ?storage_cell)
+        (not
+          (storage_batch_placed ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_batch_placed ?storage_batch)
+        (storage_batch_available_for_outbound ?storage_batch)
+      )
+  )
+  (:action assign_traceability_tag_to_storage_batch
+    :parameters (?storage_batch - storage_batch ?storage_cell - storage_cell ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (grade_completed ?storage_batch)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (traceability_tag_available ?traceability_tag)
+        (not
+          (storage_batch_placed ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_cell_tagged ?storage_cell)
+        (storage_batch_placed ?storage_batch)
+        (storage_batch_assigned_traceability_tag ?storage_batch ?traceability_tag)
+        (not
+          (traceability_tag_available ?traceability_tag)
+        )
+      )
+  )
+  (:action confirm_tag_and_mark_storage_batch_available
+    :parameters (?storage_batch - storage_batch ?storage_cell - storage_cell ?grading_station - grading_station ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (grade_completed ?storage_batch)
+        (assigned_to_grading_station ?storage_batch ?grading_station)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (storage_cell_tagged ?storage_cell)
+        (storage_batch_assigned_traceability_tag ?storage_batch ?traceability_tag)
+        (not
+          (storage_batch_available_for_outbound ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (storage_cell_reserved ?storage_cell)
+        (storage_batch_available_for_outbound ?storage_batch)
+        (traceability_tag_available ?traceability_tag)
+        (not
+          (storage_batch_assigned_traceability_tag ?storage_batch ?traceability_tag)
+        )
+      )
+  )
+  (:action reserve_distribution_channel_for_picking_batch
+    :parameters (?picking_batch - picking_batch ?distribution_channel - distribution_channel ?grading_station - grading_station)
+    :precondition
+      (and
+        (grade_completed ?picking_batch)
+        (assigned_to_grading_station ?picking_batch ?grading_station)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (not
+          (distribution_channel_reserved ?distribution_channel)
+        )
+        (not
+          (distribution_channel_tagged ?distribution_channel)
+        )
+      )
+    :effect (distribution_channel_reserved ?distribution_channel)
+  )
+  (:action place_picking_batch_and_mark_available
+    :parameters (?picking_batch - picking_batch ?distribution_channel - distribution_channel ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (grade_completed ?picking_batch)
+        (assigned_to_conditioning_station ?picking_batch ?conditioning_station)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (distribution_channel_reserved ?distribution_channel)
+        (not
+          (picking_batch_placed ?picking_batch)
+        )
+      )
+    :effect
+      (and
+        (picking_batch_placed ?picking_batch)
+        (picking_batch_available_for_outbound ?picking_batch)
+      )
+  )
+  (:action assign_traceability_tag_to_picking_batch
+    :parameters (?picking_batch - picking_batch ?distribution_channel - distribution_channel ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (grade_completed ?picking_batch)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (traceability_tag_available ?traceability_tag)
+        (not
+          (picking_batch_placed ?picking_batch)
+        )
+      )
+    :effect
+      (and
+        (distribution_channel_tagged ?distribution_channel)
+        (picking_batch_placed ?picking_batch)
+        (picking_batch_assigned_traceability_tag ?picking_batch ?traceability_tag)
+        (not
+          (traceability_tag_available ?traceability_tag)
+        )
+      )
+  )
+  (:action confirm_tag_and_mark_picking_batch_available
+    :parameters (?picking_batch - picking_batch ?distribution_channel - distribution_channel ?grading_station - grading_station ?traceability_tag - traceability_tag)
+    :precondition
+      (and
+        (grade_completed ?picking_batch)
+        (assigned_to_grading_station ?picking_batch ?grading_station)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (distribution_channel_tagged ?distribution_channel)
+        (picking_batch_assigned_traceability_tag ?picking_batch ?traceability_tag)
+        (not
+          (picking_batch_available_for_outbound ?picking_batch)
+        )
+      )
+    :effect
+      (and
+        (distribution_channel_reserved ?distribution_channel)
+        (picking_batch_available_for_outbound ?picking_batch)
+        (traceability_tag_available ?traceability_tag)
+        (not
+          (picking_batch_assigned_traceability_tag ?picking_batch ?traceability_tag)
+        )
+      )
+  )
+  (:action initialize_outbound_load_reservation
+    :parameters (?storage_batch - storage_batch ?picking_batch - picking_batch ?storage_cell - storage_cell ?distribution_channel - distribution_channel ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (storage_batch_placed ?storage_batch)
+        (picking_batch_placed ?picking_batch)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (storage_cell_reserved ?storage_cell)
+        (distribution_channel_reserved ?distribution_channel)
+        (storage_batch_available_for_outbound ?storage_batch)
+        (picking_batch_available_for_outbound ?picking_batch)
+        (outbound_load_available ?outbound_load)
+      )
+    :effect
+      (and
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_linked_to_storage_cell ?outbound_load ?storage_cell)
+        (outbound_load_linked_to_distribution_channel ?outbound_load ?distribution_channel)
+        (not
+          (outbound_load_available ?outbound_load)
+        )
+      )
+  )
+  (:action initialize_outbound_load_with_cell_tagged
+    :parameters (?storage_batch - storage_batch ?picking_batch - picking_batch ?storage_cell - storage_cell ?distribution_channel - distribution_channel ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (storage_batch_placed ?storage_batch)
+        (picking_batch_placed ?picking_batch)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (storage_cell_tagged ?storage_cell)
+        (distribution_channel_reserved ?distribution_channel)
+        (not
+          (storage_batch_available_for_outbound ?storage_batch)
+        )
+        (picking_batch_available_for_outbound ?picking_batch)
+        (outbound_load_available ?outbound_load)
+      )
+    :effect
+      (and
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_linked_to_storage_cell ?outbound_load ?storage_cell)
+        (outbound_load_linked_to_distribution_channel ?outbound_load ?distribution_channel)
+        (outbound_load_requires_temperature_profile ?outbound_load)
+        (not
+          (outbound_load_available ?outbound_load)
+        )
+      )
+  )
+  (:action initialize_outbound_load_with_cell_reserved
+    :parameters (?storage_batch - storage_batch ?picking_batch - picking_batch ?storage_cell - storage_cell ?distribution_channel - distribution_channel ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (storage_batch_placed ?storage_batch)
+        (picking_batch_placed ?picking_batch)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (storage_cell_reserved ?storage_cell)
+        (distribution_channel_tagged ?distribution_channel)
+        (storage_batch_available_for_outbound ?storage_batch)
+        (not
+          (picking_batch_available_for_outbound ?picking_batch)
+        )
+        (outbound_load_available ?outbound_load)
+      )
+    :effect
+      (and
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_linked_to_storage_cell ?outbound_load ?storage_cell)
+        (outbound_load_linked_to_distribution_channel ?outbound_load ?distribution_channel)
+        (outbound_load_requires_origin_certificate ?outbound_load)
+        (not
+          (outbound_load_available ?outbound_load)
+        )
+      )
+  )
+  (:action initialize_outbound_load_with_both_requirements
+    :parameters (?storage_batch - storage_batch ?picking_batch - picking_batch ?storage_cell - storage_cell ?distribution_channel - distribution_channel ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (storage_batch_placed ?storage_batch)
+        (picking_batch_placed ?picking_batch)
+        (storage_batch_assigned_to_storage_cell ?storage_batch ?storage_cell)
+        (picking_batch_assigned_to_distribution_channel ?picking_batch ?distribution_channel)
+        (storage_cell_tagged ?storage_cell)
+        (distribution_channel_tagged ?distribution_channel)
+        (not
+          (storage_batch_available_for_outbound ?storage_batch)
+        )
+        (not
+          (picking_batch_available_for_outbound ?picking_batch)
+        )
+        (outbound_load_available ?outbound_load)
+      )
+    :effect
+      (and
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_linked_to_storage_cell ?outbound_load ?storage_cell)
+        (outbound_load_linked_to_distribution_channel ?outbound_load ?distribution_channel)
+        (outbound_load_requires_temperature_profile ?outbound_load)
+        (outbound_load_requires_origin_certificate ?outbound_load)
+        (not
+          (outbound_load_available ?outbound_load)
+        )
+      )
+  )
+  (:action confirm_outbound_load_ready_for_packing
+    :parameters (?outbound_load - outbound_load ?storage_batch - storage_batch ?grading_station - grading_station)
+    :precondition
+      (and
+        (outbound_load_reserved ?outbound_load)
+        (storage_batch_placed ?storage_batch)
+        (assigned_to_grading_station ?storage_batch ?grading_station)
+        (not
+          (outbound_load_ready_for_packing ?outbound_load)
+        )
+      )
+    :effect (outbound_load_ready_for_packing ?outbound_load)
+  )
+  (:action assign_packaging_box_to_pallet_and_link_to_load
+    :parameters (?pallet - pallet ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (pallet_assigned_to_outbound_load ?pallet ?outbound_load)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_available ?packaging_box)
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_ready_for_packing ?outbound_load)
+        (not
+          (packaging_box_used ?packaging_box)
+        )
+      )
+    :effect
+      (and
+        (packaging_box_used ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (not
+          (packaging_box_available ?packaging_box)
+        )
+      )
+  )
+  (:action initialize_pallet_packaging_process
+    :parameters (?pallet - pallet ?packaging_box - packaging_box ?outbound_load - outbound_load ?grading_station - grading_station)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_used ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (assigned_to_grading_station ?pallet ?grading_station)
+        (not
+          (outbound_load_requires_temperature_profile ?outbound_load)
+        )
+        (not
+          (pallet_packaging_initialized ?pallet)
+        )
+      )
+    :effect (pallet_packaging_initialized ?pallet)
+  )
+  (:action apply_customer_order_to_pallet
+    :parameters (?pallet - pallet ?customer_order - customer_order)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (customer_order_available ?customer_order)
+        (not
+          (pallet_has_order_applied ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_has_order_applied ?pallet)
+        (pallet_linked_to_customer_order ?pallet ?customer_order)
+        (not
+          (customer_order_available ?customer_order)
+        )
+      )
+  )
+  (:action confirm_packaging_and_order_binding
+    :parameters (?pallet - pallet ?packaging_box - packaging_box ?outbound_load - outbound_load ?grading_station - grading_station ?customer_order - customer_order)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_used ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (assigned_to_grading_station ?pallet ?grading_station)
+        (outbound_load_requires_temperature_profile ?outbound_load)
+        (pallet_has_order_applied ?pallet)
+        (pallet_linked_to_customer_order ?pallet ?customer_order)
+        (not
+          (pallet_packaging_initialized ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_packaging_initialized ?pallet)
+        (pallet_order_confirmed ?pallet)
+      )
+  )
+  (:action apply_temperature_profile_and_confirm_packaging_no_origin_requirement
+    :parameters (?pallet - pallet ?temperature_profile - temperature_profile ?conditioning_station - conditioning_station ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_initialized ?pallet)
+        (pallet_assigned_temperature_profile ?pallet ?temperature_profile)
+        (assigned_to_conditioning_station ?pallet ?conditioning_station)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (not
+          (outbound_load_requires_origin_certificate ?outbound_load)
+        )
+        (not
+          (pallet_packaging_confirmed ?pallet)
+        )
+      )
+    :effect (pallet_packaging_confirmed ?pallet)
+  )
+  (:action apply_temperature_profile_and_confirm_packaging_with_origin_requirement
+    :parameters (?pallet - pallet ?temperature_profile - temperature_profile ?conditioning_station - conditioning_station ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_initialized ?pallet)
+        (pallet_assigned_temperature_profile ?pallet ?temperature_profile)
+        (assigned_to_conditioning_station ?pallet ?conditioning_station)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (outbound_load_requires_origin_certificate ?outbound_load)
+        (not
+          (pallet_packaging_confirmed ?pallet)
+        )
+      )
+    :effect (pallet_packaging_confirmed ?pallet)
+  )
+  (:action apply_lab_result_and_confirm_packaging_no_load_flags
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_confirmed ?pallet)
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (not
+          (outbound_load_requires_temperature_profile ?outbound_load)
+        )
+        (not
+          (outbound_load_requires_origin_certificate ?outbound_load)
+        )
+        (not
+          (pallet_lab_result_linked ?pallet)
+        )
+      )
+    :effect (pallet_lab_result_linked ?pallet)
+  )
+  (:action apply_lab_result_and_confirm_packaging_with_temperature_flag
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_confirmed ?pallet)
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (outbound_load_requires_temperature_profile ?outbound_load)
+        (not
+          (outbound_load_requires_origin_certificate ?outbound_load)
+        )
+        (not
+          (pallet_lab_result_linked ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_documentation_complete ?pallet)
+      )
+  )
+  (:action apply_lab_result_and_confirm_packaging_with_origin_flag
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_confirmed ?pallet)
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (not
+          (outbound_load_requires_temperature_profile ?outbound_load)
+        )
+        (outbound_load_requires_origin_certificate ?outbound_load)
+        (not
+          (pallet_lab_result_linked ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_documentation_complete ?pallet)
+      )
+  )
+  (:action apply_lab_result_and_confirm_packaging_with_both_flags
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result ?packaging_box - packaging_box ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (pallet_packaging_confirmed ?pallet)
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (pallet_has_packaging_box ?pallet ?packaging_box)
+        (packaging_box_assigned_to_outbound_load ?packaging_box ?outbound_load)
+        (outbound_load_requires_temperature_profile ?outbound_load)
+        (outbound_load_requires_origin_certificate ?outbound_load)
+        (not
+          (pallet_lab_result_linked ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_documentation_complete ?pallet)
+      )
+  )
+  (:action mark_pallet_ready_without_additional_documents
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (not
+          (pallet_documentation_complete ?pallet)
+        )
+        (not
+          (pallet_ready_marker ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_ready_marker ?pallet)
+        (ready_for_dispatch ?pallet)
+      )
+  )
+  (:action assign_carrier_service_to_pallet
+    :parameters (?pallet - pallet ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_documentation_complete ?pallet)
+        (carrier_service_available ?carrier_service)
+      )
+    :effect
+      (and
+        (pallet_assigned_carrier_service ?pallet ?carrier_service)
+        (not
+          (carrier_service_available ?carrier_service)
+        )
+      )
+  )
+  (:action finalize_pallet_with_batches_and_carrier
+    :parameters (?pallet - pallet ?storage_batch - storage_batch ?picking_batch - picking_batch ?grading_station - grading_station ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_documentation_complete ?pallet)
+        (pallet_assigned_carrier_service ?pallet ?carrier_service)
+        (pallet_contains_storage_batch ?pallet ?storage_batch)
+        (pallet_contains_picking_batch ?pallet ?picking_batch)
+        (storage_batch_available_for_outbound ?storage_batch)
+        (picking_batch_available_for_outbound ?picking_batch)
+        (assigned_to_grading_station ?pallet ?grading_station)
+        (not
+          (pallet_final_inspection_passed ?pallet)
+        )
+      )
+    :effect (pallet_final_inspection_passed ?pallet)
+  )
+  (:action mark_pallet_ready_after_final_inspection
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_lab_result_linked ?pallet)
+        (pallet_final_inspection_passed ?pallet)
+        (not
+          (pallet_ready_marker ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_ready_marker ?pallet)
+        (ready_for_dispatch ?pallet)
+      )
+  )
+  (:action attach_origin_certificate_to_pallet
+    :parameters (?pallet - pallet ?origin_certificate - origin_certificate ?grading_station - grading_station)
+    :precondition
+      (and
+        (grade_completed ?pallet)
+        (assigned_to_grading_station ?pallet ?grading_station)
+        (origin_certificate_available ?origin_certificate)
+        (pallet_assigned_origin_certificate ?pallet ?origin_certificate)
+        (not
+          (pallet_origin_check_started ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_origin_check_started ?pallet)
+        (not
+          (origin_certificate_available ?origin_certificate)
+        )
+      )
+  )
+  (:action validate_origin_certificate_at_conditioning
+    :parameters (?pallet - pallet ?conditioning_station - conditioning_station)
+    :precondition
+      (and
+        (pallet_origin_check_started ?pallet)
+        (assigned_to_conditioning_station ?pallet ?conditioning_station)
+        (not
+          (pallet_origin_validated ?pallet)
+        )
+      )
+    :effect (pallet_origin_validated ?pallet)
+  )
+  (:action link_lab_result_during_origin_check
+    :parameters (?pallet - pallet ?lab_test_result - lab_test_result)
+    :precondition
+      (and
+        (pallet_origin_validated ?pallet)
+        (pallet_assigned_lab_test_result ?pallet ?lab_test_result)
+        (not
+          (pallet_origin_verified ?pallet)
+        )
+      )
+    :effect (pallet_origin_verified ?pallet)
+  )
+  (:action finalize_origin_certificate_check_and_mark_ready
+    :parameters (?pallet - pallet)
+    :precondition
+      (and
+        (pallet_origin_verified ?pallet)
+        (not
+          (pallet_ready_marker ?pallet)
+        )
+      )
+    :effect
+      (and
+        (pallet_ready_marker ?pallet)
+        (ready_for_dispatch ?pallet)
+      )
+  )
+  (:action finalize_storage_batch_readiness_flag
+    :parameters (?storage_batch - storage_batch ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (storage_batch_placed ?storage_batch)
+        (storage_batch_available_for_outbound ?storage_batch)
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_ready_for_packing ?outbound_load)
+        (not
+          (ready_for_dispatch ?storage_batch)
+        )
+      )
+    :effect (ready_for_dispatch ?storage_batch)
+  )
+  (:action finalize_picking_batch_readiness_flag
+    :parameters (?picking_batch - picking_batch ?outbound_load - outbound_load)
+    :precondition
+      (and
+        (picking_batch_placed ?picking_batch)
+        (picking_batch_available_for_outbound ?picking_batch)
+        (outbound_load_reserved ?outbound_load)
+        (outbound_load_ready_for_packing ?outbound_load)
+        (not
+          (ready_for_dispatch ?picking_batch)
+        )
+      )
+    :effect (ready_for_dispatch ?picking_batch)
+  )
+  (:action attach_release_document_to_lot
+    :parameters (?lot - lot ?release_document - release_document ?grading_station - grading_station)
+    :precondition
+      (and
+        (ready_for_dispatch ?lot)
+        (assigned_to_grading_station ?lot ?grading_station)
+        (release_document_available ?release_document)
+        (not
+          (release_document_attached ?lot)
+        )
+      )
+    :effect
+      (and
+        (release_document_attached ?lot)
+        (linked_to_release_document ?lot ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action release_storage_batch_and_free_reception_slot
+    :parameters (?storage_batch - storage_batch ?reception_slot - reception_slot ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?storage_batch)
+        (in_reception_slot ?storage_batch ?reception_slot)
+        (linked_to_release_document ?storage_batch ?release_document)
+        (not
+          (released_for_dispatch ?storage_batch)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?storage_batch)
+        (reception_slot_available ?reception_slot)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_picking_batch_and_free_reception_slot
+    :parameters (?picking_batch - picking_batch ?reception_slot - reception_slot ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?picking_batch)
+        (in_reception_slot ?picking_batch ?reception_slot)
+        (linked_to_release_document ?picking_batch ?release_document)
+        (not
+          (released_for_dispatch ?picking_batch)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?picking_batch)
+        (reception_slot_available ?reception_slot)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_pallet_and_free_reception_slot
+    :parameters (?pallet - pallet ?reception_slot - reception_slot ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?pallet)
+        (in_reception_slot ?pallet ?reception_slot)
+        (linked_to_release_document ?pallet ?release_document)
+        (not
+          (released_for_dispatch ?pallet)
+        )
+      )
+    :effect
+      (and
+        (released_for_dispatch ?pallet)
+        (reception_slot_available ?reception_slot)
+        (release_document_available ?release_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem lot_separation_and_traceability_problem)
+  (:domain agriculture_lot_separation_traceability)
+  (:objects storage_batch_1 - storage_batch picking_batch_1 - picking_batch pallet_1 - pallet pallet_2 - pallet reception_slot_1 - reception_slot reception_slot_2 - reception_slot reception_slot_3 - reception_slot grading_station_1 - grading_station conditioning_station_1 - conditioning_station traceability_tag_1 - traceability_tag storage_cell_1 - storage_cell distribution_channel_1 - distribution_channel outbound_load_1 - outbound_load packaging_box_1 - packaging_box packaging_box_2 - packaging_box customer_order_1 - customer_order customer_order_2 - customer_order carrier_service_1 - carrier_service carrier_service_2 - carrier_service release_document_1 - release_document temperature_profile_1 - temperature_profile origin_certificate_1 - origin_certificate origin_certificate_2 - origin_certificate lab_test_result_1 - lab_test_result)
+  (:init
+    (reception_slot_available reception_slot_1)
+    (reception_slot_available reception_slot_2)
+    (reception_slot_available reception_slot_3)
+    (grading_station_available grading_station_1)
+    (conditioning_station_available conditioning_station_1)
+    (traceability_tag_available traceability_tag_1)
+    (storage_batch_assigned_to_storage_cell storage_batch_1 storage_cell_1)
+    (picking_batch_assigned_to_distribution_channel picking_batch_1 distribution_channel_1)
+    (outbound_load_available outbound_load_1)
+    (packaging_box_available packaging_box_1)
+    (packaging_box_available packaging_box_2)
+    (pallet_contains_storage_batch pallet_1 storage_batch_1)
+    (pallet_contains_storage_batch pallet_2 storage_batch_1)
+    (pallet_contains_picking_batch pallet_1 picking_batch_1)
+    (pallet_contains_picking_batch pallet_2 picking_batch_1)
+    (pallet_assigned_to_outbound_load pallet_1 outbound_load_1)
+    (pallet_assigned_to_outbound_load pallet_2 outbound_load_1)
+    (pallet_has_packaging_box pallet_1 packaging_box_1)
+    (pallet_has_packaging_box pallet_2 packaging_box_2)
+    (customer_order_available customer_order_1)
+    (customer_order_available customer_order_2)
+    (carrier_service_available carrier_service_1)
+    (carrier_service_available carrier_service_2)
+    (release_document_available release_document_1)
+    (temperature_profile_available temperature_profile_1)
+    (origin_certificate_available origin_certificate_1)
+    (pallet_assigned_origin_certificate pallet_1 origin_certificate_1)
+    (pallet_assigned_origin_certificate pallet_2 origin_certificate_2)
+    (lab_test_result_available lab_test_result_1)
+  )
+  (:goal
+    (and
+      (released_for_dispatch storage_batch_1)
+      (released_for_dispatch picking_batch_1)
+      (released_for_dispatch pallet_1)
+      (released_for_dispatch pallet_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(receive_and_register_lot storage_batch_1)
+(assign_lot_to_reception_slot storage_batch_1 reception_slot_1)
+(assign_lot_to_grading_station storage_batch_1 grading_station_1)
+(complete_lot_grading storage_batch_1 grading_station_1)
+(reserve_storage_cell_for_batch storage_batch_1 storage_cell_1 grading_station_1)
+(assign_lot_to_conditioning_station storage_batch_1 conditioning_station_1)
+(place_batch_into_storage_cell_and_mark storage_batch_1 storage_cell_1 conditioning_station_1)
+(release_conditioning_station storage_batch_1 conditioning_station_1)
+(receive_and_register_lot picking_batch_1)
+(assign_lot_to_reception_slot picking_batch_1 reception_slot_2)
+(release_grading_station storage_batch_1 grading_station_1)
+(assign_lot_to_grading_station picking_batch_1 grading_station_1)
+(complete_lot_grading picking_batch_1 grading_station_1)
+(reserve_distribution_channel_for_picking_batch picking_batch_1 distribution_channel_1 grading_station_1)
+(assign_lot_to_conditioning_station picking_batch_1 conditioning_station_1)
+(place_picking_batch_and_mark_available picking_batch_1 distribution_channel_1 conditioning_station_1)
+(release_conditioning_station picking_batch_1 conditioning_station_1)
+(release_grading_station picking_batch_1 grading_station_1)
+(assign_lot_to_grading_station storage_batch_1 grading_station_1)
+(initialize_outbound_load_reservation storage_batch_1 picking_batch_1 storage_cell_1 distribution_channel_1 outbound_load_1)
+(confirm_outbound_load_ready_for_packing outbound_load_1 storage_batch_1 grading_station_1)
+(finalize_storage_batch_readiness_flag storage_batch_1 outbound_load_1)
+(finalize_picking_batch_readiness_flag picking_batch_1 outbound_load_1)
+(release_grading_station storage_batch_1 grading_station_1)
+(receive_and_register_lot pallet_1)
+(assign_lot_to_reception_slot pallet_1 reception_slot_3)
+(assign_lot_to_grading_station pallet_1 grading_station_1)
+(complete_lot_grading pallet_1 grading_station_1)
+(assign_packaging_box_to_pallet_and_link_to_load pallet_1 packaging_box_1 outbound_load_1)
+(initialize_pallet_packaging_process pallet_1 packaging_box_1 outbound_load_1 grading_station_1)
+(attach_temperature_profile_to_pallet pallet_1 temperature_profile_1)
+(assign_lot_to_conditioning_station pallet_1 conditioning_station_1)
+(apply_temperature_profile_and_confirm_packaging_no_origin_requirement pallet_1 temperature_profile_1 conditioning_station_1 packaging_box_1 outbound_load_1)
+(release_conditioning_station pallet_1 conditioning_station_1)
+(attach_lab_test_result_to_pallet pallet_1 lab_test_result_1)
+(apply_lab_result_and_confirm_packaging_no_load_flags pallet_1 lab_test_result_1 packaging_box_1 outbound_load_1)
+(detach_lab_test_result_from_pallet pallet_1 lab_test_result_1)
+(detach_temperature_profile_from_pallet pallet_1 temperature_profile_1)
+(mark_pallet_ready_without_additional_documents pallet_1)
+(attach_release_document_to_lot pallet_1 release_document_1 grading_station_1)
+(release_pallet_and_free_reception_slot pallet_1 reception_slot_3 release_document_1)
+(release_grading_station pallet_1 grading_station_1)
+(receive_and_register_lot pallet_2)
+(assign_lot_to_reception_slot pallet_2 reception_slot_3)
+(assign_lot_to_grading_station pallet_2 grading_station_1)
+(complete_lot_grading pallet_2 grading_station_1)
+(assign_packaging_box_to_pallet_and_link_to_load pallet_2 packaging_box_2 outbound_load_1)
+(initialize_pallet_packaging_process pallet_2 packaging_box_2 outbound_load_1 grading_station_1)
+(attach_temperature_profile_to_pallet pallet_2 temperature_profile_1)
+(assign_lot_to_conditioning_station pallet_2 conditioning_station_1)
+(apply_temperature_profile_and_confirm_packaging_no_origin_requirement pallet_2 temperature_profile_1 conditioning_station_1 packaging_box_2 outbound_load_1)
+(release_conditioning_station pallet_2 conditioning_station_1)
+(attach_lab_test_result_to_pallet pallet_2 lab_test_result_1)
+(apply_lab_result_and_confirm_packaging_no_load_flags pallet_2 lab_test_result_1 packaging_box_2 outbound_load_1)
+(detach_lab_test_result_from_pallet pallet_2 lab_test_result_1)
+(detach_temperature_profile_from_pallet pallet_2 temperature_profile_1)
+(mark_pallet_ready_without_additional_documents pallet_2)
+(attach_release_document_to_lot pallet_2 release_document_1 grading_station_1)
+(release_pallet_and_free_reception_slot pallet_2 reception_slot_3 release_document_1)
+(release_grading_station pallet_2 grading_station_1)
+(assign_lot_to_grading_station storage_batch_1 grading_station_1)
+(attach_release_document_to_lot storage_batch_1 release_document_1 grading_station_1)
+(release_storage_batch_and_free_reception_slot storage_batch_1 reception_slot_1 release_document_1)
+(release_grading_station storage_batch_1 grading_station_1)
+(assign_lot_to_grading_station picking_batch_1 grading_station_1)
+(attach_release_document_to_lot picking_batch_1 release_document_1 grading_station_1)
+(release_picking_batch_and_free_reception_slot picking_batch_1 reception_slot_2 release_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_4ypzrrgf/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_4ypzrrgf/plan.pddl 67 
+
+
+
+--- stderr ---
+

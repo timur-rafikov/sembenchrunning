@@ -1,0 +1,936 @@
+(define (domain backorder_allocation_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types asset_class - object location_entity - object network_node_class - object allocation_domain - object allocation_subject - allocation_domain sourcing_option - asset_class product_sku - asset_class fulfillment_resource - asset_class handling_instruction - asset_class packaging_material - asset_class service_level_profile - asset_class equipment_resource - asset_class time_window - asset_class pick_unit - location_entity inventory_unit - location_entity routing_preference - location_entity origin_facility - network_node_class destination_node - network_node_class transport_unit - network_node_class order_fragment_group - allocation_subject order_fragment_alternative_group - allocation_subject customer_order_segment - order_fragment_group backorder_segment - order_fragment_group fulfillment_job - order_fragment_alternative_group)
+  (:predicates
+    (allocation_released ?allocation_subject - allocation_subject)
+    (allocation_confirmed ?allocation_subject - allocation_subject)
+    (sourcing_registered ?allocation_subject - allocation_subject)
+    (allocation_closed ?allocation_subject - allocation_subject)
+    (ready_for_execution ?allocation_subject - allocation_subject)
+    (fulfillment_confirmed ?allocation_subject - allocation_subject)
+    (sourcing_option_available ?sourcing_option - sourcing_option)
+    (assigned_sourcing_option ?allocation_subject - allocation_subject ?sourcing_option - sourcing_option)
+    (sku_available ?product_sku - product_sku)
+    (subject_reserved_sku ?allocation_subject - allocation_subject ?product_sku - product_sku)
+    (resource_available ?fulfillment_resource - fulfillment_resource)
+    (assigned_resource ?allocation_subject - allocation_subject ?fulfillment_resource - fulfillment_resource)
+    (pick_unit_available ?pick_unit - pick_unit)
+    (order_segment_assigned_pick_unit ?customer_order_segment - customer_order_segment ?pick_unit - pick_unit)
+    (backorder_segment_assigned_pick_unit ?backorder_segment - backorder_segment ?pick_unit - pick_unit)
+    (eligible_origin_facility ?customer_order_segment - customer_order_segment ?origin_facility - origin_facility)
+    (origin_prepared ?origin_facility - origin_facility)
+    (origin_pick_reserved ?origin_facility - origin_facility)
+    (segment_ready_for_shipment ?customer_order_segment - customer_order_segment)
+    (eligible_destination_node ?backorder_segment - backorder_segment ?destination_node - destination_node)
+    (destination_prepared ?destination_node - destination_node)
+    (destination_pick_reserved ?destination_node - destination_node)
+    (backorder_ready_for_shipment ?backorder_segment - backorder_segment)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (transport_unit_committed ?transport_unit - transport_unit)
+    (transport_unit_origin ?transport_unit - transport_unit ?origin_facility - origin_facility)
+    (transport_unit_destination ?transport_unit - transport_unit ?destination_node - destination_node)
+    (transport_unit_origin_special_handling ?transport_unit - transport_unit)
+    (transport_unit_destination_special_handling ?transport_unit - transport_unit)
+    (transport_unit_ready_for_packing ?transport_unit - transport_unit)
+    (job_includes_order_segment ?fulfillment_job - fulfillment_job ?customer_order_segment - customer_order_segment)
+    (job_includes_backorder_segment ?fulfillment_job - fulfillment_job ?backorder_segment - backorder_segment)
+    (job_assigned_transport_unit ?fulfillment_job - fulfillment_job ?transport_unit - transport_unit)
+    (inventory_available ?inventory_unit - inventory_unit)
+    (job_has_inventory_unit ?fulfillment_job - fulfillment_job ?inventory_unit - inventory_unit)
+    (inventory_allocated ?inventory_unit - inventory_unit)
+    (inventory_allocated_to_transport_unit ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    (job_equipment_attached ?fulfillment_job - fulfillment_job)
+    (job_capability_confirmed ?fulfillment_job - fulfillment_job)
+    (job_validated ?fulfillment_job - fulfillment_job)
+    (job_handling_attached ?fulfillment_job - fulfillment_job)
+    (job_handling_tagged ?fulfillment_job - fulfillment_job)
+    (packaging_required ?fulfillment_job - fulfillment_job)
+    (job_final_check_passed ?fulfillment_job - fulfillment_job)
+    (routing_preference_available ?routing_preference - routing_preference)
+    (job_assigned_routing_preference ?fulfillment_job - fulfillment_job ?routing_preference - routing_preference)
+    (job_routing_applied ?fulfillment_job - fulfillment_job)
+    (job_routing_confirmed ?fulfillment_job - fulfillment_job)
+    (job_routing_validated ?fulfillment_job - fulfillment_job)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (job_assigned_handling_instruction ?fulfillment_job - fulfillment_job ?handling_instruction - handling_instruction)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (job_assigned_packaging_material ?fulfillment_job - fulfillment_job ?packaging_material - packaging_material)
+    (equipment_available ?equipment_resource - equipment_resource)
+    (job_assigned_equipment ?fulfillment_job - fulfillment_job ?equipment_resource - equipment_resource)
+    (time_window_available ?time_window - time_window)
+    (job_assigned_time_window ?fulfillment_job - fulfillment_job ?time_window - time_window)
+    (service_profile_available ?service_level_profile - service_level_profile)
+    (subject_assigned_service_profile ?allocation_subject - allocation_subject ?service_level_profile - service_level_profile)
+    (order_segment_prepared ?customer_order_segment - customer_order_segment)
+    (backorder_segment_prepared ?backorder_segment - backorder_segment)
+    (job_readiness_recorded ?fulfillment_job - fulfillment_job)
+  )
+  (:action release_allocation_subject
+    :parameters (?allocation_subject - allocation_subject)
+    :precondition
+      (and
+        (not
+          (allocation_released ?allocation_subject)
+        )
+        (not
+          (allocation_closed ?allocation_subject)
+        )
+      )
+    :effect (allocation_released ?allocation_subject)
+  )
+  (:action register_sourcing_option
+    :parameters (?allocation_subject - allocation_subject ?sourcing_option - sourcing_option)
+    :precondition
+      (and
+        (allocation_released ?allocation_subject)
+        (not
+          (sourcing_registered ?allocation_subject)
+        )
+        (sourcing_option_available ?sourcing_option)
+      )
+    :effect
+      (and
+        (sourcing_registered ?allocation_subject)
+        (assigned_sourcing_option ?allocation_subject ?sourcing_option)
+        (not
+          (sourcing_option_available ?sourcing_option)
+        )
+      )
+  )
+  (:action reserve_sku_for_subject
+    :parameters (?allocation_subject - allocation_subject ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_released ?allocation_subject)
+        (sourcing_registered ?allocation_subject)
+        (sku_available ?product_sku)
+      )
+    :effect
+      (and
+        (subject_reserved_sku ?allocation_subject ?product_sku)
+        (not
+          (sku_available ?product_sku)
+        )
+      )
+  )
+  (:action confirm_allocation_sourcing
+    :parameters (?allocation_subject - allocation_subject ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_released ?allocation_subject)
+        (sourcing_registered ?allocation_subject)
+        (subject_reserved_sku ?allocation_subject ?product_sku)
+        (not
+          (allocation_confirmed ?allocation_subject)
+        )
+      )
+    :effect (allocation_confirmed ?allocation_subject)
+  )
+  (:action rollback_sku_reservation
+    :parameters (?allocation_subject - allocation_subject ?product_sku - product_sku)
+    :precondition
+      (and
+        (subject_reserved_sku ?allocation_subject ?product_sku)
+      )
+    :effect
+      (and
+        (sku_available ?product_sku)
+        (not
+          (subject_reserved_sku ?allocation_subject ?product_sku)
+        )
+      )
+  )
+  (:action assign_fulfillment_resource
+    :parameters (?allocation_subject - allocation_subject ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (allocation_confirmed ?allocation_subject)
+        (resource_available ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (assigned_resource ?allocation_subject ?fulfillment_resource)
+        (not
+          (resource_available ?fulfillment_resource)
+        )
+      )
+  )
+  (:action release_fulfillment_resource
+    :parameters (?allocation_subject - allocation_subject ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (assigned_resource ?allocation_subject ?fulfillment_resource)
+      )
+    :effect
+      (and
+        (resource_available ?fulfillment_resource)
+        (not
+          (assigned_resource ?allocation_subject ?fulfillment_resource)
+        )
+      )
+  )
+  (:action attach_equipment_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (equipment_available ?equipment_resource)
+      )
+    :effect
+      (and
+        (job_assigned_equipment ?fulfillment_job ?equipment_resource)
+        (not
+          (equipment_available ?equipment_resource)
+        )
+      )
+  )
+  (:action detach_equipment_from_job
+    :parameters (?fulfillment_job - fulfillment_job ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (job_assigned_equipment ?fulfillment_job ?equipment_resource)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_resource)
+        (not
+          (job_assigned_equipment ?fulfillment_job ?equipment_resource)
+        )
+      )
+  )
+  (:action attach_time_window_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action detach_time_window_from_job
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window)
+    :precondition
+      (and
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (job_assigned_time_window ?fulfillment_job ?time_window)
+        )
+      )
+  )
+  (:action prepare_origin_for_segment_pick
+    :parameters (?customer_order_segment - customer_order_segment ?origin_facility - origin_facility ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_confirmed ?customer_order_segment)
+        (subject_reserved_sku ?customer_order_segment ?product_sku)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (not
+          (origin_prepared ?origin_facility)
+        )
+        (not
+          (origin_pick_reserved ?origin_facility)
+        )
+      )
+    :effect (origin_prepared ?origin_facility)
+  )
+  (:action reserve_origin_for_segment
+    :parameters (?customer_order_segment - customer_order_segment ?origin_facility - origin_facility ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (allocation_confirmed ?customer_order_segment)
+        (assigned_resource ?customer_order_segment ?fulfillment_resource)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (origin_prepared ?origin_facility)
+        (not
+          (order_segment_prepared ?customer_order_segment)
+        )
+      )
+    :effect
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (segment_ready_for_shipment ?customer_order_segment)
+      )
+  )
+  (:action reserve_pick_unit_for_segment
+    :parameters (?customer_order_segment - customer_order_segment ?origin_facility - origin_facility ?pick_unit - pick_unit)
+    :precondition
+      (and
+        (allocation_confirmed ?customer_order_segment)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (pick_unit_available ?pick_unit)
+        (not
+          (order_segment_prepared ?customer_order_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_pick_reserved ?origin_facility)
+        (order_segment_prepared ?customer_order_segment)
+        (order_segment_assigned_pick_unit ?customer_order_segment ?pick_unit)
+        (not
+          (pick_unit_available ?pick_unit)
+        )
+      )
+  )
+  (:action finalize_pick_for_segment
+    :parameters (?customer_order_segment - customer_order_segment ?origin_facility - origin_facility ?product_sku - product_sku ?pick_unit - pick_unit)
+    :precondition
+      (and
+        (allocation_confirmed ?customer_order_segment)
+        (subject_reserved_sku ?customer_order_segment ?product_sku)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (origin_pick_reserved ?origin_facility)
+        (order_segment_assigned_pick_unit ?customer_order_segment ?pick_unit)
+        (not
+          (segment_ready_for_shipment ?customer_order_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_prepared ?origin_facility)
+        (segment_ready_for_shipment ?customer_order_segment)
+        (pick_unit_available ?pick_unit)
+        (not
+          (order_segment_assigned_pick_unit ?customer_order_segment ?pick_unit)
+        )
+      )
+  )
+  (:action prepare_destination_for_backorder
+    :parameters (?backorder_segment - backorder_segment ?destination_node - destination_node ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_confirmed ?backorder_segment)
+        (subject_reserved_sku ?backorder_segment ?product_sku)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (not
+          (destination_prepared ?destination_node)
+        )
+        (not
+          (destination_pick_reserved ?destination_node)
+        )
+      )
+    :effect (destination_prepared ?destination_node)
+  )
+  (:action reserve_destination_for_backorder
+    :parameters (?backorder_segment - backorder_segment ?destination_node - destination_node ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (allocation_confirmed ?backorder_segment)
+        (assigned_resource ?backorder_segment ?fulfillment_resource)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (destination_prepared ?destination_node)
+        (not
+          (backorder_segment_prepared ?backorder_segment)
+        )
+      )
+    :effect
+      (and
+        (backorder_segment_prepared ?backorder_segment)
+        (backorder_ready_for_shipment ?backorder_segment)
+      )
+  )
+  (:action reserve_pick_unit_for_backorder
+    :parameters (?backorder_segment - backorder_segment ?destination_node - destination_node ?pick_unit - pick_unit)
+    :precondition
+      (and
+        (allocation_confirmed ?backorder_segment)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (pick_unit_available ?pick_unit)
+        (not
+          (backorder_segment_prepared ?backorder_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_pick_reserved ?destination_node)
+        (backorder_segment_prepared ?backorder_segment)
+        (backorder_segment_assigned_pick_unit ?backorder_segment ?pick_unit)
+        (not
+          (pick_unit_available ?pick_unit)
+        )
+      )
+  )
+  (:action finalize_pick_for_backorder
+    :parameters (?backorder_segment - backorder_segment ?destination_node - destination_node ?product_sku - product_sku ?pick_unit - pick_unit)
+    :precondition
+      (and
+        (allocation_confirmed ?backorder_segment)
+        (subject_reserved_sku ?backorder_segment ?product_sku)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (destination_pick_reserved ?destination_node)
+        (backorder_segment_assigned_pick_unit ?backorder_segment ?pick_unit)
+        (not
+          (backorder_ready_for_shipment ?backorder_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_prepared ?destination_node)
+        (backorder_ready_for_shipment ?backorder_segment)
+        (pick_unit_available ?pick_unit)
+        (not
+          (backorder_segment_assigned_pick_unit ?backorder_segment ?pick_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_standard
+    :parameters (?customer_order_segment - customer_order_segment ?backorder_segment - backorder_segment ?origin_facility - origin_facility ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (backorder_segment_prepared ?backorder_segment)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (origin_prepared ?origin_facility)
+        (destination_prepared ?destination_node)
+        (segment_ready_for_shipment ?customer_order_segment)
+        (backorder_ready_for_shipment ?backorder_segment)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_origin ?transport_unit ?origin_facility)
+        (transport_unit_destination ?transport_unit ?destination_node)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_origin_special_handling
+    :parameters (?customer_order_segment - customer_order_segment ?backorder_segment - backorder_segment ?origin_facility - origin_facility ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (backorder_segment_prepared ?backorder_segment)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (origin_pick_reserved ?origin_facility)
+        (destination_prepared ?destination_node)
+        (not
+          (segment_ready_for_shipment ?customer_order_segment)
+        )
+        (backorder_ready_for_shipment ?backorder_segment)
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_origin ?transport_unit ?origin_facility)
+        (transport_unit_destination ?transport_unit ?destination_node)
+        (transport_unit_origin_special_handling ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_destination_special_handling
+    :parameters (?customer_order_segment - customer_order_segment ?backorder_segment - backorder_segment ?origin_facility - origin_facility ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (backorder_segment_prepared ?backorder_segment)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (origin_prepared ?origin_facility)
+        (destination_pick_reserved ?destination_node)
+        (segment_ready_for_shipment ?customer_order_segment)
+        (not
+          (backorder_ready_for_shipment ?backorder_segment)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_origin ?transport_unit ?origin_facility)
+        (transport_unit_destination ?transport_unit ?destination_node)
+        (transport_unit_destination_special_handling ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action form_transport_unit_origin_and_destination_special_handling
+    :parameters (?customer_order_segment - customer_order_segment ?backorder_segment - backorder_segment ?origin_facility - origin_facility ?destination_node - destination_node ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (backorder_segment_prepared ?backorder_segment)
+        (eligible_origin_facility ?customer_order_segment ?origin_facility)
+        (eligible_destination_node ?backorder_segment ?destination_node)
+        (origin_pick_reserved ?origin_facility)
+        (destination_pick_reserved ?destination_node)
+        (not
+          (segment_ready_for_shipment ?customer_order_segment)
+        )
+        (not
+          (backorder_ready_for_shipment ?backorder_segment)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_origin ?transport_unit ?origin_facility)
+        (transport_unit_destination ?transport_unit ?destination_node)
+        (transport_unit_origin_special_handling ?transport_unit)
+        (transport_unit_destination_special_handling ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action mark_transport_unit_ready_for_packing
+    :parameters (?transport_unit - transport_unit ?customer_order_segment - customer_order_segment ?product_sku - product_sku)
+    :precondition
+      (and
+        (transport_unit_committed ?transport_unit)
+        (order_segment_prepared ?customer_order_segment)
+        (subject_reserved_sku ?customer_order_segment ?product_sku)
+        (not
+          (transport_unit_ready_for_packing ?transport_unit)
+        )
+      )
+    :effect (transport_unit_ready_for_packing ?transport_unit)
+  )
+  (:action bind_inventory_unit_to_transport_unit
+    :parameters (?fulfillment_job - fulfillment_job ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (job_assigned_transport_unit ?fulfillment_job ?transport_unit)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_available ?inventory_unit)
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_ready_for_packing ?transport_unit)
+        (not
+          (inventory_allocated ?inventory_unit)
+        )
+      )
+    :effect
+      (and
+        (inventory_allocated ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (not
+          (inventory_available ?inventory_unit)
+        )
+      )
+  )
+  (:action finalize_inventory_allocation_for_job
+    :parameters (?fulfillment_job - fulfillment_job ?inventory_unit - inventory_unit ?transport_unit - transport_unit ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (subject_reserved_sku ?fulfillment_job ?product_sku)
+        (not
+          (transport_unit_origin_special_handling ?transport_unit)
+        )
+        (not
+          (job_equipment_attached ?fulfillment_job)
+        )
+      )
+    :effect (job_equipment_attached ?fulfillment_job)
+  )
+  (:action attach_handling_instruction_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (handling_instruction_available ?handling_instruction)
+        (not
+          (job_handling_attached ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_handling_attached ?fulfillment_job)
+        (job_assigned_handling_instruction ?fulfillment_job ?handling_instruction)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action apply_handling_and_routing_constraints_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?inventory_unit - inventory_unit ?transport_unit - transport_unit ?product_sku - product_sku ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (subject_reserved_sku ?fulfillment_job ?product_sku)
+        (transport_unit_origin_special_handling ?transport_unit)
+        (job_handling_attached ?fulfillment_job)
+        (job_assigned_handling_instruction ?fulfillment_job ?handling_instruction)
+        (not
+          (job_equipment_attached ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_equipment_attached ?fulfillment_job)
+        (job_handling_tagged ?fulfillment_job)
+      )
+  )
+  (:action attach_equipment_and_confirm_job_no_dest_special
+    :parameters (?fulfillment_job - fulfillment_job ?equipment_resource - equipment_resource ?fulfillment_resource - fulfillment_resource ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_equipment_attached ?fulfillment_job)
+        (job_assigned_equipment ?fulfillment_job ?equipment_resource)
+        (assigned_resource ?fulfillment_job ?fulfillment_resource)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (not
+          (transport_unit_destination_special_handling ?transport_unit)
+        )
+        (not
+          (job_capability_confirmed ?fulfillment_job)
+        )
+      )
+    :effect (job_capability_confirmed ?fulfillment_job)
+  )
+  (:action attach_equipment_and_confirm_job_with_dest_special
+    :parameters (?fulfillment_job - fulfillment_job ?equipment_resource - equipment_resource ?fulfillment_resource - fulfillment_resource ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_equipment_attached ?fulfillment_job)
+        (job_assigned_equipment ?fulfillment_job ?equipment_resource)
+        (assigned_resource ?fulfillment_job ?fulfillment_resource)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (transport_unit_destination_special_handling ?transport_unit)
+        (not
+          (job_capability_confirmed ?fulfillment_job)
+        )
+      )
+    :effect (job_capability_confirmed ?fulfillment_job)
+  )
+  (:action validate_job_standard
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_capability_confirmed ?fulfillment_job)
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (not
+          (transport_unit_origin_special_handling ?transport_unit)
+        )
+        (not
+          (transport_unit_destination_special_handling ?transport_unit)
+        )
+        (not
+          (job_validated ?fulfillment_job)
+        )
+      )
+    :effect (job_validated ?fulfillment_job)
+  )
+  (:action validate_job_origin_special
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_capability_confirmed ?fulfillment_job)
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (transport_unit_origin_special_handling ?transport_unit)
+        (not
+          (transport_unit_destination_special_handling ?transport_unit)
+        )
+        (not
+          (job_validated ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_validated ?fulfillment_job)
+        (packaging_required ?fulfillment_job)
+      )
+  )
+  (:action validate_job_destination_special
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_capability_confirmed ?fulfillment_job)
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (not
+          (transport_unit_origin_special_handling ?transport_unit)
+        )
+        (transport_unit_destination_special_handling ?transport_unit)
+        (not
+          (job_validated ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_validated ?fulfillment_job)
+        (packaging_required ?fulfillment_job)
+      )
+  )
+  (:action validate_job_origin_and_destination_special
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window ?inventory_unit - inventory_unit ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (job_capability_confirmed ?fulfillment_job)
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (job_has_inventory_unit ?fulfillment_job ?inventory_unit)
+        (inventory_allocated_to_transport_unit ?inventory_unit ?transport_unit)
+        (transport_unit_origin_special_handling ?transport_unit)
+        (transport_unit_destination_special_handling ?transport_unit)
+        (not
+          (job_validated ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_validated ?fulfillment_job)
+        (packaging_required ?fulfillment_job)
+      )
+  )
+  (:action record_job_readiness
+    :parameters (?fulfillment_job - fulfillment_job)
+    :precondition
+      (and
+        (job_validated ?fulfillment_job)
+        (not
+          (packaging_required ?fulfillment_job)
+        )
+        (not
+          (job_readiness_recorded ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_readiness_recorded ?fulfillment_job)
+        (ready_for_execution ?fulfillment_job)
+      )
+  )
+  (:action assign_packaging_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (job_validated ?fulfillment_job)
+        (packaging_required ?fulfillment_job)
+        (packaging_material_available ?packaging_material)
+      )
+    :effect
+      (and
+        (job_assigned_packaging_material ?fulfillment_job ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action perform_job_final_check
+    :parameters (?fulfillment_job - fulfillment_job ?customer_order_segment - customer_order_segment ?backorder_segment - backorder_segment ?product_sku - product_sku ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (job_validated ?fulfillment_job)
+        (packaging_required ?fulfillment_job)
+        (job_assigned_packaging_material ?fulfillment_job ?packaging_material)
+        (job_includes_order_segment ?fulfillment_job ?customer_order_segment)
+        (job_includes_backorder_segment ?fulfillment_job ?backorder_segment)
+        (segment_ready_for_shipment ?customer_order_segment)
+        (backorder_ready_for_shipment ?backorder_segment)
+        (subject_reserved_sku ?fulfillment_job ?product_sku)
+        (not
+          (job_final_check_passed ?fulfillment_job)
+        )
+      )
+    :effect (job_final_check_passed ?fulfillment_job)
+  )
+  (:action record_job_readiness_after_final_check
+    :parameters (?fulfillment_job - fulfillment_job)
+    :precondition
+      (and
+        (job_validated ?fulfillment_job)
+        (job_final_check_passed ?fulfillment_job)
+        (not
+          (job_readiness_recorded ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_readiness_recorded ?fulfillment_job)
+        (ready_for_execution ?fulfillment_job)
+      )
+  )
+  (:action apply_routing_preference_to_job
+    :parameters (?fulfillment_job - fulfillment_job ?routing_preference - routing_preference ?product_sku - product_sku)
+    :precondition
+      (and
+        (allocation_confirmed ?fulfillment_job)
+        (subject_reserved_sku ?fulfillment_job ?product_sku)
+        (routing_preference_available ?routing_preference)
+        (job_assigned_routing_preference ?fulfillment_job ?routing_preference)
+        (not
+          (job_routing_applied ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_routing_applied ?fulfillment_job)
+        (not
+          (routing_preference_available ?routing_preference)
+        )
+      )
+  )
+  (:action confirm_job_routing_assignment
+    :parameters (?fulfillment_job - fulfillment_job ?fulfillment_resource - fulfillment_resource)
+    :precondition
+      (and
+        (job_routing_applied ?fulfillment_job)
+        (assigned_resource ?fulfillment_job ?fulfillment_resource)
+        (not
+          (job_routing_confirmed ?fulfillment_job)
+        )
+      )
+    :effect (job_routing_confirmed ?fulfillment_job)
+  )
+  (:action validate_job_time_window
+    :parameters (?fulfillment_job - fulfillment_job ?time_window - time_window)
+    :precondition
+      (and
+        (job_routing_confirmed ?fulfillment_job)
+        (job_assigned_time_window ?fulfillment_job ?time_window)
+        (not
+          (job_routing_validated ?fulfillment_job)
+        )
+      )
+    :effect (job_routing_validated ?fulfillment_job)
+  )
+  (:action record_job_readiness_after_routing
+    :parameters (?fulfillment_job - fulfillment_job)
+    :precondition
+      (and
+        (job_routing_validated ?fulfillment_job)
+        (not
+          (job_readiness_recorded ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (job_readiness_recorded ?fulfillment_job)
+        (ready_for_execution ?fulfillment_job)
+      )
+  )
+  (:action release_order_segment_for_execution
+    :parameters (?customer_order_segment - customer_order_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (order_segment_prepared ?customer_order_segment)
+        (segment_ready_for_shipment ?customer_order_segment)
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_ready_for_packing ?transport_unit)
+        (not
+          (ready_for_execution ?customer_order_segment)
+        )
+      )
+    :effect (ready_for_execution ?customer_order_segment)
+  )
+  (:action release_backorder_segment_for_execution
+    :parameters (?backorder_segment - backorder_segment ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (backorder_segment_prepared ?backorder_segment)
+        (backorder_ready_for_shipment ?backorder_segment)
+        (transport_unit_committed ?transport_unit)
+        (transport_unit_ready_for_packing ?transport_unit)
+        (not
+          (ready_for_execution ?backorder_segment)
+        )
+      )
+    :effect (ready_for_execution ?backorder_segment)
+  )
+  (:action confirm_execution_and_assign_service_profile
+    :parameters (?allocation_subject - allocation_subject ?service_level_profile - service_level_profile ?product_sku - product_sku)
+    :precondition
+      (and
+        (ready_for_execution ?allocation_subject)
+        (subject_reserved_sku ?allocation_subject ?product_sku)
+        (service_profile_available ?service_level_profile)
+        (not
+          (fulfillment_confirmed ?allocation_subject)
+        )
+      )
+    :effect
+      (and
+        (fulfillment_confirmed ?allocation_subject)
+        (subject_assigned_service_profile ?allocation_subject ?service_level_profile)
+        (not
+          (service_profile_available ?service_level_profile)
+        )
+      )
+  )
+  (:action finalize_allocation_and_restore_sourcing
+    :parameters (?customer_order_segment - customer_order_segment ?sourcing_option - sourcing_option ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (fulfillment_confirmed ?customer_order_segment)
+        (assigned_sourcing_option ?customer_order_segment ?sourcing_option)
+        (subject_assigned_service_profile ?customer_order_segment ?service_level_profile)
+        (not
+          (allocation_closed ?customer_order_segment)
+        )
+      )
+    :effect
+      (and
+        (allocation_closed ?customer_order_segment)
+        (sourcing_option_available ?sourcing_option)
+        (service_profile_available ?service_level_profile)
+      )
+  )
+  (:action finalize_backorder_allocation_and_restore_sourcing
+    :parameters (?backorder_segment - backorder_segment ?sourcing_option - sourcing_option ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (fulfillment_confirmed ?backorder_segment)
+        (assigned_sourcing_option ?backorder_segment ?sourcing_option)
+        (subject_assigned_service_profile ?backorder_segment ?service_level_profile)
+        (not
+          (allocation_closed ?backorder_segment)
+        )
+      )
+    :effect
+      (and
+        (allocation_closed ?backorder_segment)
+        (sourcing_option_available ?sourcing_option)
+        (service_profile_available ?service_level_profile)
+      )
+  )
+  (:action finalize_job_allocation_and_restore_sourcing
+    :parameters (?fulfillment_job - fulfillment_job ?sourcing_option - sourcing_option ?service_level_profile - service_level_profile)
+    :precondition
+      (and
+        (fulfillment_confirmed ?fulfillment_job)
+        (assigned_sourcing_option ?fulfillment_job ?sourcing_option)
+        (subject_assigned_service_profile ?fulfillment_job ?service_level_profile)
+        (not
+          (allocation_closed ?fulfillment_job)
+        )
+      )
+    :effect
+      (and
+        (allocation_closed ?fulfillment_job)
+        (sourcing_option_available ?sourcing_option)
+        (service_profile_available ?service_level_profile)
+      )
+  )
+)

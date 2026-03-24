@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain duplicate_event_processing_fix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types runtime_entity_group - object runtime_entity_type - object runtime_entity_category - object domain_entity - object processing_entity - domain_entity handler_slot - runtime_entity_group payload_descriptor - runtime_entity_group processing_resource - runtime_entity_group configuration_datum - runtime_entity_group policy_token - runtime_entity_group commit_record - runtime_entity_group external_metadata_a - runtime_entity_group external_metadata_c - runtime_entity_group auxiliary_token - runtime_entity_type dependency_token - runtime_entity_type external_metadata_b - runtime_entity_type correlation_key_a - runtime_entity_category correlation_key_b - runtime_entity_category work_item - runtime_entity_category event_processing_context - processing_entity component_context - processing_entity processing_shard_a - event_processing_context processing_shard_b - event_processing_context service_component - component_context)
+  (:predicates
+    (processing_entity_registered ?event - processing_entity)
+    (ready_for_processing ?event - processing_entity)
+    (handler_claimed ?event - processing_entity)
+    (committed ?event - processing_entity)
+    (entity_ready ?event - processing_entity)
+    (commit_recorded ?event - processing_entity)
+    (handler_slot_available ?handler_slot - handler_slot)
+    (handler_assigned ?event - processing_entity ?handler_slot - handler_slot)
+    (payload_descriptor_available ?payload_descriptor - payload_descriptor)
+    (payload_attached ?event - processing_entity ?payload_descriptor - payload_descriptor)
+    (processing_resource_available ?processing_resource - processing_resource)
+    (resource_attached ?event - processing_entity ?processing_resource - processing_resource)
+    (auxiliary_token_available ?auxiliary_token - auxiliary_token)
+    (aux_token_assigned_to_shard_a ?processing_shard_a - processing_shard_a ?auxiliary_token - auxiliary_token)
+    (aux_token_assigned_to_shard_b ?processing_shard_b - processing_shard_b ?auxiliary_token - auxiliary_token)
+    (shard_key_a_relation ?processing_shard_a - processing_shard_a ?correlation_key_a - correlation_key_a)
+    (correlation_key_a_claimed ?correlation_key_a - correlation_key_a)
+    (correlation_key_a_reserved ?correlation_key_a - correlation_key_a)
+    (shard_a_creation_confirmed ?processing_shard_a - processing_shard_a)
+    (shard_key_b_relation ?processing_shard_b - processing_shard_b ?correlation_key_b - correlation_key_b)
+    (correlation_key_b_claimed ?correlation_key_b - correlation_key_b)
+    (correlation_key_b_reserved ?correlation_key_b - correlation_key_b)
+    (shard_b_creation_confirmed ?processing_shard_b - processing_shard_b)
+    (workitem_pending_creation ?work_item - work_item)
+    (workitem_initialized ?work_item - work_item)
+    (workitem_linked_key_a ?work_item - work_item ?correlation_key_a - correlation_key_a)
+    (workitem_linked_key_b ?work_item - work_item ?correlation_key_b - correlation_key_b)
+    (workitem_flag_a ?work_item - work_item)
+    (workitem_flag_b ?work_item - work_item)
+    (workitem_finalized ?work_item - work_item)
+    (component_linked_shard_a ?service_component - service_component ?processing_shard_a - processing_shard_a)
+    (component_linked_shard_b ?service_component - service_component ?processing_shard_b - processing_shard_b)
+    (component_linked_workitem ?service_component - service_component ?work_item - work_item)
+    (dependency_token_available ?dependency_token - dependency_token)
+    (component_has_dependency_token ?service_component - service_component ?dependency_token - dependency_token)
+    (dependency_token_claimed ?dependency_token - dependency_token)
+    (dependency_token_linked_to_workitem ?dependency_token - dependency_token ?work_item - work_item)
+    (component_dependency_validated ?service_component - service_component)
+    (component_resources_provisioned ?service_component - service_component)
+    (component_metadata_attached ?service_component - service_component)
+    (component_configuration_applied ?service_component - service_component)
+    (component_configuration_validated ?service_component - service_component)
+    (component_policy_required ?service_component - service_component)
+    (component_precommit_checks_completed ?service_component - service_component)
+    (external_metadata_b_available ?external_metadata_b - external_metadata_b)
+    (component_has_external_metadata_b ?service_component - service_component ?external_metadata_b - external_metadata_b)
+    (component_external_metadata_b_registered ?service_component - service_component)
+    (component_metadata_commit_ready ?service_component - service_component)
+    (component_external_metadata_ready ?service_component - service_component)
+    (configuration_datum_available ?configuration_datum - configuration_datum)
+    (component_configuration_linked ?service_component - service_component ?configuration_datum - configuration_datum)
+    (policy_token_available ?policy_token - policy_token)
+    (component_policy_bound ?service_component - service_component ?policy_token - policy_token)
+    (external_metadata_a_available ?external_metadata_a - external_metadata_a)
+    (component_external_metadata_a_bound ?service_component - service_component ?external_metadata_a - external_metadata_a)
+    (external_metadata_c_available ?external_metadata_c - external_metadata_c)
+    (component_external_metadata_c_bound ?service_component - service_component ?external_metadata_c - external_metadata_c)
+    (commit_record_token_available ?commit_record - commit_record)
+    (processing_entity_commit_record_linked ?event - processing_entity ?commit_record - commit_record)
+    (shard_ready_for_creation ?processing_shard_a - processing_shard_a)
+    (shard_b_ready_for_creation ?processing_shard_b - processing_shard_b)
+    (component_finalized ?service_component - service_component)
+  )
+  (:action register_processing_entity
+    :parameters (?event - processing_entity)
+    :precondition
+      (and
+        (not
+          (processing_entity_registered ?event)
+        )
+        (not
+          (committed ?event)
+        )
+      )
+    :effect (processing_entity_registered ?event)
+  )
+  (:action assign_handler_slot_to_processing_entity
+    :parameters (?event - processing_entity ?handler_slot - handler_slot)
+    :precondition
+      (and
+        (processing_entity_registered ?event)
+        (not
+          (handler_claimed ?event)
+        )
+        (handler_slot_available ?handler_slot)
+      )
+    :effect
+      (and
+        (handler_claimed ?event)
+        (handler_assigned ?event ?handler_slot)
+        (not
+          (handler_slot_available ?handler_slot)
+        )
+      )
+  )
+  (:action bind_payload_to_processing_entity
+    :parameters (?event - processing_entity ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (processing_entity_registered ?event)
+        (handler_claimed ?event)
+        (payload_descriptor_available ?payload_descriptor)
+      )
+    :effect
+      (and
+        (payload_attached ?event ?payload_descriptor)
+        (not
+          (payload_descriptor_available ?payload_descriptor)
+        )
+      )
+  )
+  (:action mark_processing_entity_ready_for_processing
+    :parameters (?event - processing_entity ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (processing_entity_registered ?event)
+        (handler_claimed ?event)
+        (payload_attached ?event ?payload_descriptor)
+        (not
+          (ready_for_processing ?event)
+        )
+      )
+    :effect (ready_for_processing ?event)
+  )
+  (:action release_payload_descriptor
+    :parameters (?event - processing_entity ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (payload_attached ?event ?payload_descriptor)
+      )
+    :effect
+      (and
+        (payload_descriptor_available ?payload_descriptor)
+        (not
+          (payload_attached ?event ?payload_descriptor)
+        )
+      )
+  )
+  (:action attach_processing_resource_to_processing_entity
+    :parameters (?event - processing_entity ?processing_resource - processing_resource)
+    :precondition
+      (and
+        (ready_for_processing ?event)
+        (processing_resource_available ?processing_resource)
+      )
+    :effect
+      (and
+        (resource_attached ?event ?processing_resource)
+        (not
+          (processing_resource_available ?processing_resource)
+        )
+      )
+  )
+  (:action detach_processing_resource_from_processing_entity
+    :parameters (?event - processing_entity ?processing_resource - processing_resource)
+    :precondition
+      (and
+        (resource_attached ?event ?processing_resource)
+      )
+    :effect
+      (and
+        (processing_resource_available ?processing_resource)
+        (not
+          (resource_attached ?event ?processing_resource)
+        )
+      )
+  )
+  (:action attach_external_metadata_a_to_component
+    :parameters (?service_component - service_component ?external_metadata_a - external_metadata_a)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (external_metadata_a_available ?external_metadata_a)
+      )
+    :effect
+      (and
+        (component_external_metadata_a_bound ?service_component ?external_metadata_a)
+        (not
+          (external_metadata_a_available ?external_metadata_a)
+        )
+      )
+  )
+  (:action detach_external_metadata_a_from_component
+    :parameters (?service_component - service_component ?external_metadata_a - external_metadata_a)
+    :precondition
+      (and
+        (component_external_metadata_a_bound ?service_component ?external_metadata_a)
+      )
+    :effect
+      (and
+        (external_metadata_a_available ?external_metadata_a)
+        (not
+          (component_external_metadata_a_bound ?service_component ?external_metadata_a)
+        )
+      )
+  )
+  (:action attach_external_metadata_c_to_component
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (external_metadata_c_available ?external_metadata_c)
+      )
+    :effect
+      (and
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (not
+          (external_metadata_c_available ?external_metadata_c)
+        )
+      )
+  )
+  (:action detach_external_metadata_c_from_component
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c)
+    :precondition
+      (and
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+      )
+    :effect
+      (and
+        (external_metadata_c_available ?external_metadata_c)
+        (not
+          (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        )
+      )
+  )
+  (:action claim_correlation_key_a
+    :parameters (?processing_shard_a - processing_shard_a ?correlation_key_a - correlation_key_a ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_a)
+        (payload_attached ?processing_shard_a ?payload_descriptor)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (not
+          (correlation_key_a_claimed ?correlation_key_a)
+        )
+        (not
+          (correlation_key_a_reserved ?correlation_key_a)
+        )
+      )
+    :effect (correlation_key_a_claimed ?correlation_key_a)
+  )
+  (:action confirm_correlation_claim_shard_a
+    :parameters (?processing_shard_a - processing_shard_a ?correlation_key_a - correlation_key_a ?processing_resource - processing_resource)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_a)
+        (resource_attached ?processing_shard_a ?processing_resource)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (correlation_key_a_claimed ?correlation_key_a)
+        (not
+          (shard_ready_for_creation ?processing_shard_a)
+        )
+      )
+    :effect
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_a_creation_confirmed ?processing_shard_a)
+      )
+  )
+  (:action reserve_correlation_key_a_with_aux_token
+    :parameters (?processing_shard_a - processing_shard_a ?correlation_key_a - correlation_key_a ?auxiliary_token - auxiliary_token)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_a)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (auxiliary_token_available ?auxiliary_token)
+        (not
+          (shard_ready_for_creation ?processing_shard_a)
+        )
+      )
+    :effect
+      (and
+        (correlation_key_a_reserved ?correlation_key_a)
+        (shard_ready_for_creation ?processing_shard_a)
+        (aux_token_assigned_to_shard_a ?processing_shard_a ?auxiliary_token)
+        (not
+          (auxiliary_token_available ?auxiliary_token)
+        )
+      )
+  )
+  (:action finalize_correlation_claim_shard_a
+    :parameters (?processing_shard_a - processing_shard_a ?correlation_key_a - correlation_key_a ?payload_descriptor - payload_descriptor ?auxiliary_token - auxiliary_token)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_a)
+        (payload_attached ?processing_shard_a ?payload_descriptor)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (correlation_key_a_reserved ?correlation_key_a)
+        (aux_token_assigned_to_shard_a ?processing_shard_a ?auxiliary_token)
+        (not
+          (shard_a_creation_confirmed ?processing_shard_a)
+        )
+      )
+    :effect
+      (and
+        (correlation_key_a_claimed ?correlation_key_a)
+        (shard_a_creation_confirmed ?processing_shard_a)
+        (auxiliary_token_available ?auxiliary_token)
+        (not
+          (aux_token_assigned_to_shard_a ?processing_shard_a ?auxiliary_token)
+        )
+      )
+  )
+  (:action claim_correlation_key_b
+    :parameters (?processing_shard_b - processing_shard_b ?correlation_key_b - correlation_key_b ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_b)
+        (payload_attached ?processing_shard_b ?payload_descriptor)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (not
+          (correlation_key_b_claimed ?correlation_key_b)
+        )
+        (not
+          (correlation_key_b_reserved ?correlation_key_b)
+        )
+      )
+    :effect (correlation_key_b_claimed ?correlation_key_b)
+  )
+  (:action confirm_correlation_claim_shard_b
+    :parameters (?processing_shard_b - processing_shard_b ?correlation_key_b - correlation_key_b ?processing_resource - processing_resource)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_b)
+        (resource_attached ?processing_shard_b ?processing_resource)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_b_claimed ?correlation_key_b)
+        (not
+          (shard_b_ready_for_creation ?processing_shard_b)
+        )
+      )
+    :effect
+      (and
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_b_creation_confirmed ?processing_shard_b)
+      )
+  )
+  (:action reserve_correlation_key_b_with_aux_token
+    :parameters (?processing_shard_b - processing_shard_b ?correlation_key_b - correlation_key_b ?auxiliary_token - auxiliary_token)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_b)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (auxiliary_token_available ?auxiliary_token)
+        (not
+          (shard_b_ready_for_creation ?processing_shard_b)
+        )
+      )
+    :effect
+      (and
+        (correlation_key_b_reserved ?correlation_key_b)
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (aux_token_assigned_to_shard_b ?processing_shard_b ?auxiliary_token)
+        (not
+          (auxiliary_token_available ?auxiliary_token)
+        )
+      )
+  )
+  (:action finalize_correlation_claim_shard_b
+    :parameters (?processing_shard_b - processing_shard_b ?correlation_key_b - correlation_key_b ?payload_descriptor - payload_descriptor ?auxiliary_token - auxiliary_token)
+    :precondition
+      (and
+        (ready_for_processing ?processing_shard_b)
+        (payload_attached ?processing_shard_b ?payload_descriptor)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_b_reserved ?correlation_key_b)
+        (aux_token_assigned_to_shard_b ?processing_shard_b ?auxiliary_token)
+        (not
+          (shard_b_creation_confirmed ?processing_shard_b)
+        )
+      )
+    :effect
+      (and
+        (correlation_key_b_claimed ?correlation_key_b)
+        (shard_b_creation_confirmed ?processing_shard_b)
+        (auxiliary_token_available ?auxiliary_token)
+        (not
+          (aux_token_assigned_to_shard_b ?processing_shard_b ?auxiliary_token)
+        )
+      )
+  )
+  (:action instantiate_workitem_from_correlated_shards
+    :parameters (?processing_shard_a - processing_shard_a ?processing_shard_b - processing_shard_b ?correlation_key_a - correlation_key_a ?correlation_key_b - correlation_key_b ?work_item - work_item)
+    :precondition
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_a_claimed ?correlation_key_a)
+        (correlation_key_b_claimed ?correlation_key_b)
+        (shard_a_creation_confirmed ?processing_shard_a)
+        (shard_b_creation_confirmed ?processing_shard_b)
+        (workitem_pending_creation ?work_item)
+      )
+    :effect
+      (and
+        (workitem_initialized ?work_item)
+        (workitem_linked_key_a ?work_item ?correlation_key_a)
+        (workitem_linked_key_b ?work_item ?correlation_key_b)
+        (not
+          (workitem_pending_creation ?work_item)
+        )
+      )
+  )
+  (:action instantiate_workitem_with_keya_reservation
+    :parameters (?processing_shard_a - processing_shard_a ?processing_shard_b - processing_shard_b ?correlation_key_a - correlation_key_a ?correlation_key_b - correlation_key_b ?work_item - work_item)
+    :precondition
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_a_reserved ?correlation_key_a)
+        (correlation_key_b_claimed ?correlation_key_b)
+        (not
+          (shard_a_creation_confirmed ?processing_shard_a)
+        )
+        (shard_b_creation_confirmed ?processing_shard_b)
+        (workitem_pending_creation ?work_item)
+      )
+    :effect
+      (and
+        (workitem_initialized ?work_item)
+        (workitem_linked_key_a ?work_item ?correlation_key_a)
+        (workitem_linked_key_b ?work_item ?correlation_key_b)
+        (workitem_flag_a ?work_item)
+        (not
+          (workitem_pending_creation ?work_item)
+        )
+      )
+  )
+  (:action instantiate_workitem_with_keyb_reservation
+    :parameters (?processing_shard_a - processing_shard_a ?processing_shard_b - processing_shard_b ?correlation_key_a - correlation_key_a ?correlation_key_b - correlation_key_b ?work_item - work_item)
+    :precondition
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_a_claimed ?correlation_key_a)
+        (correlation_key_b_reserved ?correlation_key_b)
+        (shard_a_creation_confirmed ?processing_shard_a)
+        (not
+          (shard_b_creation_confirmed ?processing_shard_b)
+        )
+        (workitem_pending_creation ?work_item)
+      )
+    :effect
+      (and
+        (workitem_initialized ?work_item)
+        (workitem_linked_key_a ?work_item ?correlation_key_a)
+        (workitem_linked_key_b ?work_item ?correlation_key_b)
+        (workitem_flag_b ?work_item)
+        (not
+          (workitem_pending_creation ?work_item)
+        )
+      )
+  )
+  (:action instantiate_workitem_with_both_reservations
+    :parameters (?processing_shard_a - processing_shard_a ?processing_shard_b - processing_shard_b ?correlation_key_a - correlation_key_a ?correlation_key_b - correlation_key_b ?work_item - work_item)
+    :precondition
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_key_a_relation ?processing_shard_a ?correlation_key_a)
+        (shard_key_b_relation ?processing_shard_b ?correlation_key_b)
+        (correlation_key_a_reserved ?correlation_key_a)
+        (correlation_key_b_reserved ?correlation_key_b)
+        (not
+          (shard_a_creation_confirmed ?processing_shard_a)
+        )
+        (not
+          (shard_b_creation_confirmed ?processing_shard_b)
+        )
+        (workitem_pending_creation ?work_item)
+      )
+    :effect
+      (and
+        (workitem_initialized ?work_item)
+        (workitem_linked_key_a ?work_item ?correlation_key_a)
+        (workitem_linked_key_b ?work_item ?correlation_key_b)
+        (workitem_flag_a ?work_item)
+        (workitem_flag_b ?work_item)
+        (not
+          (workitem_pending_creation ?work_item)
+        )
+      )
+  )
+  (:action finalize_workitem_initialization
+    :parameters (?work_item - work_item ?processing_shard_a - processing_shard_a ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (workitem_initialized ?work_item)
+        (shard_ready_for_creation ?processing_shard_a)
+        (payload_attached ?processing_shard_a ?payload_descriptor)
+        (not
+          (workitem_finalized ?work_item)
+        )
+      )
+    :effect (workitem_finalized ?work_item)
+  )
+  (:action acquire_and_attach_dependency_token
+    :parameters (?service_component - service_component ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (component_linked_workitem ?service_component ?work_item)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_available ?dependency_token)
+        (workitem_initialized ?work_item)
+        (workitem_finalized ?work_item)
+        (not
+          (dependency_token_claimed ?dependency_token)
+        )
+      )
+    :effect
+      (and
+        (dependency_token_claimed ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (not
+          (dependency_token_available ?dependency_token)
+        )
+      )
+  )
+  (:action validate_dependency_and_mark_component
+    :parameters (?service_component - service_component ?dependency_token - dependency_token ?work_item - work_item ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_claimed ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (payload_attached ?service_component ?payload_descriptor)
+        (not
+          (workitem_flag_a ?work_item)
+        )
+        (not
+          (component_dependency_validated ?service_component)
+        )
+      )
+    :effect (component_dependency_validated ?service_component)
+  )
+  (:action apply_configuration_to_component
+    :parameters (?service_component - service_component ?configuration_datum - configuration_datum)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (configuration_datum_available ?configuration_datum)
+        (not
+          (component_configuration_applied ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_configuration_applied ?service_component)
+        (component_configuration_linked ?service_component ?configuration_datum)
+        (not
+          (configuration_datum_available ?configuration_datum)
+        )
+      )
+  )
+  (:action validate_configuration_and_mark_component
+    :parameters (?service_component - service_component ?dependency_token - dependency_token ?work_item - work_item ?payload_descriptor - payload_descriptor ?configuration_datum - configuration_datum)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_claimed ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (payload_attached ?service_component ?payload_descriptor)
+        (workitem_flag_a ?work_item)
+        (component_configuration_applied ?service_component)
+        (component_configuration_linked ?service_component ?configuration_datum)
+        (not
+          (component_dependency_validated ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_dependency_validated ?service_component)
+        (component_configuration_validated ?service_component)
+      )
+  )
+  (:action provision_component_resources_stage1
+    :parameters (?service_component - service_component ?external_metadata_a - external_metadata_a ?processing_resource - processing_resource ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_dependency_validated ?service_component)
+        (component_external_metadata_a_bound ?service_component ?external_metadata_a)
+        (resource_attached ?service_component ?processing_resource)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (not
+          (workitem_flag_b ?work_item)
+        )
+        (not
+          (component_resources_provisioned ?service_component)
+        )
+      )
+    :effect (component_resources_provisioned ?service_component)
+  )
+  (:action provision_component_resources_stage2
+    :parameters (?service_component - service_component ?external_metadata_a - external_metadata_a ?processing_resource - processing_resource ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_dependency_validated ?service_component)
+        (component_external_metadata_a_bound ?service_component ?external_metadata_a)
+        (resource_attached ?service_component ?processing_resource)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (workitem_flag_b ?work_item)
+        (not
+          (component_resources_provisioned ?service_component)
+        )
+      )
+    :effect (component_resources_provisioned ?service_component)
+  )
+  (:action attach_external_metadata_c_and_mark_component
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_resources_provisioned ?service_component)
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (not
+          (workitem_flag_a ?work_item)
+        )
+        (not
+          (workitem_flag_b ?work_item)
+        )
+        (not
+          (component_metadata_attached ?service_component)
+        )
+      )
+    :effect (component_metadata_attached ?service_component)
+  )
+  (:action attach_external_metadata_c_and_mark_component_variant
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_resources_provisioned ?service_component)
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (workitem_flag_a ?work_item)
+        (not
+          (workitem_flag_b ?work_item)
+        )
+        (not
+          (component_metadata_attached ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_metadata_attached ?service_component)
+        (component_policy_required ?service_component)
+      )
+  )
+  (:action attach_external_metadata_c_and_mark_component_alt
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_resources_provisioned ?service_component)
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (not
+          (workitem_flag_a ?work_item)
+        )
+        (workitem_flag_b ?work_item)
+        (not
+          (component_metadata_attached ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_metadata_attached ?service_component)
+        (component_policy_required ?service_component)
+      )
+  )
+  (:action attach_external_metadata_c_and_mark_component_alt2
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c ?dependency_token - dependency_token ?work_item - work_item)
+    :precondition
+      (and
+        (component_resources_provisioned ?service_component)
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (component_has_dependency_token ?service_component ?dependency_token)
+        (dependency_token_linked_to_workitem ?dependency_token ?work_item)
+        (workitem_flag_a ?work_item)
+        (workitem_flag_b ?work_item)
+        (not
+          (component_metadata_attached ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_metadata_attached ?service_component)
+        (component_policy_required ?service_component)
+      )
+  )
+  (:action finalize_component_without_policy
+    :parameters (?service_component - service_component)
+    :precondition
+      (and
+        (component_metadata_attached ?service_component)
+        (not
+          (component_policy_required ?service_component)
+        )
+        (not
+          (component_finalized ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?service_component)
+        (entity_ready ?service_component)
+      )
+  )
+  (:action bind_policy_to_component
+    :parameters (?service_component - service_component ?policy_token - policy_token)
+    :precondition
+      (and
+        (component_metadata_attached ?service_component)
+        (component_policy_required ?service_component)
+        (policy_token_available ?policy_token)
+      )
+    :effect
+      (and
+        (component_policy_bound ?service_component ?policy_token)
+        (not
+          (policy_token_available ?policy_token)
+        )
+      )
+  )
+  (:action complete_component_precommit_checks
+    :parameters (?service_component - service_component ?processing_shard_a - processing_shard_a ?processing_shard_b - processing_shard_b ?payload_descriptor - payload_descriptor ?policy_token - policy_token)
+    :precondition
+      (and
+        (component_metadata_attached ?service_component)
+        (component_policy_required ?service_component)
+        (component_policy_bound ?service_component ?policy_token)
+        (component_linked_shard_a ?service_component ?processing_shard_a)
+        (component_linked_shard_b ?service_component ?processing_shard_b)
+        (shard_a_creation_confirmed ?processing_shard_a)
+        (shard_b_creation_confirmed ?processing_shard_b)
+        (payload_attached ?service_component ?payload_descriptor)
+        (not
+          (component_precommit_checks_completed ?service_component)
+        )
+      )
+    :effect (component_precommit_checks_completed ?service_component)
+  )
+  (:action finalize_component_with_precommit
+    :parameters (?service_component - service_component)
+    :precondition
+      (and
+        (component_metadata_attached ?service_component)
+        (component_precommit_checks_completed ?service_component)
+        (not
+          (component_finalized ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?service_component)
+        (entity_ready ?service_component)
+      )
+  )
+  (:action register_external_metadata_b_for_component
+    :parameters (?service_component - service_component ?external_metadata_b - external_metadata_b ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (ready_for_processing ?service_component)
+        (payload_attached ?service_component ?payload_descriptor)
+        (external_metadata_b_available ?external_metadata_b)
+        (component_has_external_metadata_b ?service_component ?external_metadata_b)
+        (not
+          (component_external_metadata_b_registered ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_external_metadata_b_registered ?service_component)
+        (not
+          (external_metadata_b_available ?external_metadata_b)
+        )
+      )
+  )
+  (:action prepare_component_for_external_metadata_b
+    :parameters (?service_component - service_component ?processing_resource - processing_resource)
+    :precondition
+      (and
+        (component_external_metadata_b_registered ?service_component)
+        (resource_attached ?service_component ?processing_resource)
+        (not
+          (component_metadata_commit_ready ?service_component)
+        )
+      )
+    :effect (component_metadata_commit_ready ?service_component)
+  )
+  (:action attach_external_metadata_c_for_metadata_b_flow
+    :parameters (?service_component - service_component ?external_metadata_c - external_metadata_c)
+    :precondition
+      (and
+        (component_metadata_commit_ready ?service_component)
+        (component_external_metadata_c_bound ?service_component ?external_metadata_c)
+        (not
+          (component_external_metadata_ready ?service_component)
+        )
+      )
+    :effect (component_external_metadata_ready ?service_component)
+  )
+  (:action finalize_external_metadata_b_flow
+    :parameters (?service_component - service_component)
+    :precondition
+      (and
+        (component_external_metadata_ready ?service_component)
+        (not
+          (component_finalized ?service_component)
+        )
+      )
+    :effect
+      (and
+        (component_finalized ?service_component)
+        (entity_ready ?service_component)
+      )
+  )
+  (:action finalize_shard_a_component_ready
+    :parameters (?processing_shard_a - processing_shard_a ?work_item - work_item)
+    :precondition
+      (and
+        (shard_ready_for_creation ?processing_shard_a)
+        (shard_a_creation_confirmed ?processing_shard_a)
+        (workitem_initialized ?work_item)
+        (workitem_finalized ?work_item)
+        (not
+          (entity_ready ?processing_shard_a)
+        )
+      )
+    :effect (entity_ready ?processing_shard_a)
+  )
+  (:action finalize_shard_b_component_ready
+    :parameters (?processing_shard_b - processing_shard_b ?work_item - work_item)
+    :precondition
+      (and
+        (shard_b_ready_for_creation ?processing_shard_b)
+        (shard_b_creation_confirmed ?processing_shard_b)
+        (workitem_initialized ?work_item)
+        (workitem_finalized ?work_item)
+        (not
+          (entity_ready ?processing_shard_b)
+        )
+      )
+    :effect (entity_ready ?processing_shard_b)
+  )
+  (:action record_commit_for_processing_entity
+    :parameters (?event - processing_entity ?commit_record - commit_record ?payload_descriptor - payload_descriptor)
+    :precondition
+      (and
+        (entity_ready ?event)
+        (payload_attached ?event ?payload_descriptor)
+        (commit_record_token_available ?commit_record)
+        (not
+          (commit_recorded ?event)
+        )
+      )
+    :effect
+      (and
+        (commit_recorded ?event)
+        (processing_entity_commit_record_linked ?event ?commit_record)
+        (not
+          (commit_record_token_available ?commit_record)
+        )
+      )
+  )
+  (:action enact_commit_on_shard_a
+    :parameters (?processing_shard_a - processing_shard_a ?handler_slot - handler_slot ?commit_record - commit_record)
+    :precondition
+      (and
+        (commit_recorded ?processing_shard_a)
+        (handler_assigned ?processing_shard_a ?handler_slot)
+        (processing_entity_commit_record_linked ?processing_shard_a ?commit_record)
+        (not
+          (committed ?processing_shard_a)
+        )
+      )
+    :effect
+      (and
+        (committed ?processing_shard_a)
+        (handler_slot_available ?handler_slot)
+        (commit_record_token_available ?commit_record)
+      )
+  )
+  (:action enact_commit_on_shard_b
+    :parameters (?processing_shard_b - processing_shard_b ?handler_slot - handler_slot ?commit_record - commit_record)
+    :precondition
+      (and
+        (commit_recorded ?processing_shard_b)
+        (handler_assigned ?processing_shard_b ?handler_slot)
+        (processing_entity_commit_record_linked ?processing_shard_b ?commit_record)
+        (not
+          (committed ?processing_shard_b)
+        )
+      )
+    :effect
+      (and
+        (committed ?processing_shard_b)
+        (handler_slot_available ?handler_slot)
+        (commit_record_token_available ?commit_record)
+      )
+  )
+  (:action enact_commit_on_component
+    :parameters (?service_component - service_component ?handler_slot - handler_slot ?commit_record - commit_record)
+    :precondition
+      (and
+        (commit_recorded ?service_component)
+        (handler_assigned ?service_component ?handler_slot)
+        (processing_entity_commit_record_linked ?service_component ?commit_record)
+        (not
+          (committed ?service_component)
+        )
+      )
+    :effect
+      (and
+        (committed ?service_component)
+        (handler_slot_available ?handler_slot)
+        (commit_record_token_available ?commit_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem diagnose_and_fix_duplicate_event_processing)
+  (:domain duplicate_event_processing_fix)
+  (:objects processing_shard_a_1 - processing_shard_a processing_shard_b_1 - processing_shard_b service_component_1 - service_component service_component_2 - service_component handler_slot_1 - handler_slot handler_slot_2 - handler_slot handler_slot_3 - handler_slot payload_descriptor_1 - payload_descriptor processing_resource_1 - processing_resource auxiliary_token_1 - auxiliary_token correlation_key_a_1 - correlation_key_a correlation_key_b_1 - correlation_key_b work_item_1 - work_item dependency_token_1 - dependency_token dependency_token_2 - dependency_token configuration_datum_1 - configuration_datum configuration_datum_2 - configuration_datum policy_token_1 - policy_token policy_token_2 - policy_token commit_record_1 - commit_record external_metadata_a_1 - external_metadata_a external_metadata_b_1 - external_metadata_b external_metadata_b_2 - external_metadata_b external_metadata_c_1 - external_metadata_c)
+  (:init
+    (handler_slot_available handler_slot_1)
+    (handler_slot_available handler_slot_2)
+    (handler_slot_available handler_slot_3)
+    (payload_descriptor_available payload_descriptor_1)
+    (processing_resource_available processing_resource_1)
+    (auxiliary_token_available auxiliary_token_1)
+    (shard_key_a_relation processing_shard_a_1 correlation_key_a_1)
+    (shard_key_b_relation processing_shard_b_1 correlation_key_b_1)
+    (workitem_pending_creation work_item_1)
+    (dependency_token_available dependency_token_1)
+    (dependency_token_available dependency_token_2)
+    (component_linked_shard_a service_component_1 processing_shard_a_1)
+    (component_linked_shard_a service_component_2 processing_shard_a_1)
+    (component_linked_shard_b service_component_1 processing_shard_b_1)
+    (component_linked_shard_b service_component_2 processing_shard_b_1)
+    (component_linked_workitem service_component_1 work_item_1)
+    (component_linked_workitem service_component_2 work_item_1)
+    (component_has_dependency_token service_component_1 dependency_token_1)
+    (component_has_dependency_token service_component_2 dependency_token_2)
+    (configuration_datum_available configuration_datum_1)
+    (configuration_datum_available configuration_datum_2)
+    (policy_token_available policy_token_1)
+    (policy_token_available policy_token_2)
+    (commit_record_token_available commit_record_1)
+    (external_metadata_a_available external_metadata_a_1)
+    (external_metadata_b_available external_metadata_b_1)
+    (component_has_external_metadata_b service_component_1 external_metadata_b_1)
+    (component_has_external_metadata_b service_component_2 external_metadata_b_2)
+    (external_metadata_c_available external_metadata_c_1)
+  )
+  (:goal
+    (and
+      (committed processing_shard_a_1)
+      (committed processing_shard_b_1)
+      (committed service_component_1)
+      (committed service_component_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_processing_entity processing_shard_a_1)
+(assign_handler_slot_to_processing_entity processing_shard_a_1 handler_slot_1)
+(bind_payload_to_processing_entity processing_shard_a_1 payload_descriptor_1)
+(mark_processing_entity_ready_for_processing processing_shard_a_1 payload_descriptor_1)
+(attach_processing_resource_to_processing_entity processing_shard_a_1 processing_resource_1)
+(claim_correlation_key_a processing_shard_a_1 correlation_key_a_1 payload_descriptor_1)
+(confirm_correlation_claim_shard_a processing_shard_a_1 correlation_key_a_1 processing_resource_1)
+(release_payload_descriptor processing_shard_a_1 payload_descriptor_1)
+(detach_processing_resource_from_processing_entity processing_shard_a_1 processing_resource_1)
+(register_processing_entity processing_shard_b_1)
+(assign_handler_slot_to_processing_entity processing_shard_b_1 handler_slot_2)
+(bind_payload_to_processing_entity processing_shard_b_1 payload_descriptor_1)
+(mark_processing_entity_ready_for_processing processing_shard_b_1 payload_descriptor_1)
+(attach_processing_resource_to_processing_entity processing_shard_b_1 processing_resource_1)
+(claim_correlation_key_b processing_shard_b_1 correlation_key_b_1 payload_descriptor_1)
+(confirm_correlation_claim_shard_b processing_shard_b_1 correlation_key_b_1 processing_resource_1)
+(instantiate_workitem_from_correlated_shards processing_shard_a_1 processing_shard_b_1 correlation_key_a_1 correlation_key_b_1 work_item_1)
+(release_payload_descriptor processing_shard_b_1 payload_descriptor_1)
+(bind_payload_to_processing_entity processing_shard_a_1 payload_descriptor_1)
+(finalize_workitem_initialization work_item_1 processing_shard_a_1 payload_descriptor_1)
+(finalize_shard_a_component_ready processing_shard_a_1 work_item_1)
+(finalize_shard_b_component_ready processing_shard_b_1 work_item_1)
+(record_commit_for_processing_entity processing_shard_a_1 commit_record_1 payload_descriptor_1)
+(enact_commit_on_shard_a processing_shard_a_1 handler_slot_1 commit_record_1)
+(release_payload_descriptor processing_shard_a_1 payload_descriptor_1)
+(bind_payload_to_processing_entity processing_shard_b_1 payload_descriptor_1)
+(record_commit_for_processing_entity processing_shard_b_1 commit_record_1 payload_descriptor_1)
+(enact_commit_on_shard_b processing_shard_b_1 handler_slot_2 commit_record_1)
+(release_payload_descriptor processing_shard_b_1 payload_descriptor_1)
+(register_processing_entity service_component_1)
+(assign_handler_slot_to_processing_entity service_component_1 handler_slot_1)
+(bind_payload_to_processing_entity service_component_1 payload_descriptor_1)
+(mark_processing_entity_ready_for_processing service_component_1 payload_descriptor_1)
+(acquire_and_attach_dependency_token service_component_1 dependency_token_1 work_item_1)
+(validate_dependency_and_mark_component service_component_1 dependency_token_1 work_item_1 payload_descriptor_1)
+(attach_external_metadata_a_to_component service_component_1 external_metadata_a_1)
+(attach_processing_resource_to_processing_entity service_component_1 processing_resource_1)
+(provision_component_resources_stage1 service_component_1 external_metadata_a_1 processing_resource_1 dependency_token_1 work_item_1)
+(attach_external_metadata_c_to_component service_component_1 external_metadata_c_1)
+(attach_external_metadata_c_and_mark_component service_component_1 external_metadata_c_1 dependency_token_1 work_item_1)
+(finalize_component_without_policy service_component_1)
+(record_commit_for_processing_entity service_component_1 commit_record_1 payload_descriptor_1)
+(enact_commit_on_component service_component_1 handler_slot_1 commit_record_1)
+(release_payload_descriptor service_component_1 payload_descriptor_1)
+(detach_processing_resource_from_processing_entity service_component_1 processing_resource_1)
+(detach_external_metadata_a_from_component service_component_1 external_metadata_a_1)
+(detach_external_metadata_c_from_component service_component_1 external_metadata_c_1)
+(register_processing_entity service_component_2)
+(assign_handler_slot_to_processing_entity service_component_2 handler_slot_2)
+(bind_payload_to_processing_entity service_component_2 payload_descriptor_1)
+(mark_processing_entity_ready_for_processing service_component_2 payload_descriptor_1)
+(acquire_and_attach_dependency_token service_component_2 dependency_token_2 work_item_1)
+(validate_dependency_and_mark_component service_component_2 dependency_token_2 work_item_1 payload_descriptor_1)
+(attach_external_metadata_a_to_component service_component_2 external_metadata_a_1)
+(attach_processing_resource_to_processing_entity service_component_2 processing_resource_1)
+(provision_component_resources_stage1 service_component_2 external_metadata_a_1 processing_resource_1 dependency_token_2 work_item_1)
+(attach_external_metadata_c_to_component service_component_2 external_metadata_c_1)
+(attach_external_metadata_c_and_mark_component service_component_2 external_metadata_c_1 dependency_token_2 work_item_1)
+(finalize_component_without_policy service_component_2)
+(record_commit_for_processing_entity service_component_2 commit_record_1 payload_descriptor_1)
+(enact_commit_on_component service_component_2 handler_slot_2 commit_record_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_c5nqqce0/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_c5nqqce0/plan.pddl 
+
+
+--- stderr ---
+

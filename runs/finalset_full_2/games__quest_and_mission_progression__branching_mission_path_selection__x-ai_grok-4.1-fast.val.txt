@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain branching_mission_path_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types gameplay_entity - object gameplay_resource - object gameplay_flag - object mission_base - object mission_node - mission_base branch_token - gameplay_entity objective_marker - gameplay_entity support_agent - gameplay_entity variant_modifier - gameplay_entity reward_token - gameplay_entity gating_clue - gameplay_entity unlock_key - gameplay_entity requirement_key - gameplay_entity consumable_item - gameplay_resource checkpoint - gameplay_resource special_requirement - gameplay_resource branch_flag_a - gameplay_flag branch_flag_b - gameplay_flag outcome_container - gameplay_flag mission_subtype - mission_node mission_subtype_alt - mission_node branch_anchor_a - mission_subtype branch_anchor_b - mission_subtype quest_arc - mission_subtype_alt)
+  (:predicates
+    (mission_node_active ?mission_node - mission_node)
+    (mission_node_ready_for_assignment ?mission_node - mission_node)
+    (mission_node_branch_selected ?mission_node - mission_node)
+    (mission_node_resolved ?mission_node - mission_node)
+    (mission_node_ready_for_resolution ?mission_node - mission_node)
+    (mission_node_completed ?mission_node - mission_node)
+    (branch_token_available ?branch_token - branch_token)
+    (mission_node_token_assigned ?mission_node - mission_node ?branch_token - branch_token)
+    (objective_marker_available ?objective_marker - objective_marker)
+    (mission_node_objective_attached ?mission_node - mission_node ?objective_marker - objective_marker)
+    (agent_available ?support_agent - support_agent)
+    (mission_node_assigned_agent ?mission_node - mission_node ?support_agent - support_agent)
+    (consumable_item_available ?consumable_item - consumable_item)
+    (branch_anchor_a_consumable_attached ?branch_anchor_a - branch_anchor_a ?consumable_item - consumable_item)
+    (branch_anchor_b_consumable_attached ?branch_anchor_b - branch_anchor_b ?consumable_item - consumable_item)
+    (branch_anchor_a_has_flag ?branch_anchor_a - branch_anchor_a ?branch_flag_a - branch_flag_a)
+    (branch_flag_a_primary ?branch_flag_a - branch_flag_a)
+    (branch_flag_a_secondary ?branch_flag_a - branch_flag_a)
+    (branch_anchor_a_satisfied ?branch_anchor_a - branch_anchor_a)
+    (branch_anchor_b_has_flag ?branch_anchor_b - branch_anchor_b ?branch_flag_b - branch_flag_b)
+    (branch_flag_b_primary ?branch_flag_b - branch_flag_b)
+    (branch_flag_b_secondary ?branch_flag_b - branch_flag_b)
+    (branch_anchor_b_satisfied ?branch_anchor_b - branch_anchor_b)
+    (outcome_container_available ?outcome_container - outcome_container)
+    (outcome_container_assembled ?outcome_container - outcome_container)
+    (outcome_contains_flag_a ?outcome_container - outcome_container ?branch_flag_a - branch_flag_a)
+    (outcome_contains_flag_b ?outcome_container - outcome_container ?branch_flag_b - branch_flag_b)
+    (outcome_variant_enabled ?outcome_container - outcome_container)
+    (outcome_checkpoint_enabled ?outcome_container - outcome_container)
+    (outcome_validated ?outcome_container - outcome_container)
+    (quest_arc_has_branch_anchor_a ?quest_arc - quest_arc ?branch_anchor_a - branch_anchor_a)
+    (quest_arc_has_branch_anchor_b ?quest_arc - quest_arc ?branch_anchor_b - branch_anchor_b)
+    (quest_arc_has_outcome_container ?quest_arc - quest_arc ?outcome_container - outcome_container)
+    (checkpoint_available ?checkpoint - checkpoint)
+    (quest_arc_has_checkpoint ?quest_arc - quest_arc ?checkpoint - checkpoint)
+    (checkpoint_activated ?checkpoint - checkpoint)
+    (checkpoint_linked_to_outcome ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    (quest_arc_checkpoint_consumed ?quest_arc - quest_arc)
+    (quest_arc_modifier_staged ?quest_arc - quest_arc)
+    (quest_arc_ready_for_finalization ?quest_arc - quest_arc)
+    (quest_arc_modifier_attached ?quest_arc - quest_arc)
+    (quest_arc_modifier_activated ?quest_arc - quest_arc)
+    (quest_arc_reward_enabled ?quest_arc - quest_arc)
+    (quest_arc_final_check_passed ?quest_arc - quest_arc)
+    (special_requirement_available ?special_requirement - special_requirement)
+    (quest_arc_has_special_requirement ?quest_arc - quest_arc ?special_requirement - special_requirement)
+    (quest_arc_special_requirement_applied ?quest_arc - quest_arc)
+    (quest_arc_special_requirement_configured ?quest_arc - quest_arc)
+    (quest_arc_special_requirement_ready ?quest_arc - quest_arc)
+    (variant_modifier_available ?variant_modifier - variant_modifier)
+    (quest_arc_has_variant_modifier ?quest_arc - quest_arc ?variant_modifier - variant_modifier)
+    (reward_token_available ?reward_token - reward_token)
+    (quest_arc_has_reward_token ?quest_arc - quest_arc ?reward_token - reward_token)
+    (unlock_key_available ?unlock_key - unlock_key)
+    (quest_arc_has_unlock_key ?quest_arc - quest_arc ?unlock_key - unlock_key)
+    (requirement_key_available ?requirement_key - requirement_key)
+    (quest_arc_has_requirement_key ?quest_arc - quest_arc ?requirement_key - requirement_key)
+    (gating_clue_available ?gating_clue - gating_clue)
+    (mission_node_has_gating_clue ?mission_node - mission_node ?gating_clue - gating_clue)
+    (branch_anchor_a_ready ?branch_anchor_a - branch_anchor_a)
+    (branch_anchor_b_ready ?branch_anchor_b - branch_anchor_b)
+    (quest_arc_finalized ?quest_arc - quest_arc)
+  )
+  (:action activate_mission_node
+    :parameters (?mission_node - mission_node)
+    :precondition
+      (and
+        (not
+          (mission_node_active ?mission_node)
+        )
+        (not
+          (mission_node_resolved ?mission_node)
+        )
+      )
+    :effect (mission_node_active ?mission_node)
+  )
+  (:action claim_branch_token_for_mission
+    :parameters (?mission_node - mission_node ?branch_token - branch_token)
+    :precondition
+      (and
+        (mission_node_active ?mission_node)
+        (not
+          (mission_node_branch_selected ?mission_node)
+        )
+        (branch_token_available ?branch_token)
+      )
+    :effect
+      (and
+        (mission_node_branch_selected ?mission_node)
+        (mission_node_token_assigned ?mission_node ?branch_token)
+        (not
+          (branch_token_available ?branch_token)
+        )
+      )
+  )
+  (:action attach_objective_to_mission
+    :parameters (?mission_node - mission_node ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_active ?mission_node)
+        (mission_node_branch_selected ?mission_node)
+        (objective_marker_available ?objective_marker)
+      )
+    :effect
+      (and
+        (mission_node_objective_attached ?mission_node ?objective_marker)
+        (not
+          (objective_marker_available ?objective_marker)
+        )
+      )
+  )
+  (:action complete_mission_objective
+    :parameters (?mission_node - mission_node ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_active ?mission_node)
+        (mission_node_branch_selected ?mission_node)
+        (mission_node_objective_attached ?mission_node ?objective_marker)
+        (not
+          (mission_node_ready_for_assignment ?mission_node)
+        )
+      )
+    :effect (mission_node_ready_for_assignment ?mission_node)
+  )
+  (:action detach_objective_from_mission
+    :parameters (?mission_node - mission_node ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_objective_attached ?mission_node ?objective_marker)
+      )
+    :effect
+      (and
+        (objective_marker_available ?objective_marker)
+        (not
+          (mission_node_objective_attached ?mission_node ?objective_marker)
+        )
+      )
+  )
+  (:action assign_support_agent_to_mission
+    :parameters (?mission_node - mission_node ?support_agent - support_agent)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?mission_node)
+        (agent_available ?support_agent)
+      )
+    :effect
+      (and
+        (mission_node_assigned_agent ?mission_node ?support_agent)
+        (not
+          (agent_available ?support_agent)
+        )
+      )
+  )
+  (:action unassign_support_agent_from_mission
+    :parameters (?mission_node - mission_node ?support_agent - support_agent)
+    :precondition
+      (and
+        (mission_node_assigned_agent ?mission_node ?support_agent)
+      )
+    :effect
+      (and
+        (agent_available ?support_agent)
+        (not
+          (mission_node_assigned_agent ?mission_node ?support_agent)
+        )
+      )
+  )
+  (:action attach_unlock_key_to_quest_arc
+    :parameters (?quest_arc - quest_arc ?unlock_key - unlock_key)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (unlock_key_available ?unlock_key)
+      )
+    :effect
+      (and
+        (quest_arc_has_unlock_key ?quest_arc ?unlock_key)
+        (not
+          (unlock_key_available ?unlock_key)
+        )
+      )
+  )
+  (:action detach_unlock_key_from_quest_arc
+    :parameters (?quest_arc - quest_arc ?unlock_key - unlock_key)
+    :precondition
+      (and
+        (quest_arc_has_unlock_key ?quest_arc ?unlock_key)
+      )
+    :effect
+      (and
+        (unlock_key_available ?unlock_key)
+        (not
+          (quest_arc_has_unlock_key ?quest_arc ?unlock_key)
+        )
+      )
+  )
+  (:action attach_requirement_key_to_quest_arc
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (requirement_key_available ?requirement_key)
+      )
+    :effect
+      (and
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (not
+          (requirement_key_available ?requirement_key)
+        )
+      )
+  )
+  (:action detach_requirement_key_from_quest_arc
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key)
+    :precondition
+      (and
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+      )
+    :effect
+      (and
+        (requirement_key_available ?requirement_key)
+        (not
+          (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        )
+      )
+  )
+  (:action activate_branch_flag_a_by_objective
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_flag_a - branch_flag_a ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_a)
+        (mission_node_objective_attached ?branch_anchor_a ?objective_marker)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (not
+          (branch_flag_a_primary ?branch_flag_a)
+        )
+        (not
+          (branch_flag_a_secondary ?branch_flag_a)
+        )
+      )
+    :effect (branch_flag_a_primary ?branch_flag_a)
+  )
+  (:action satisfy_branch_anchor_a_with_agent
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_flag_a - branch_flag_a ?support_agent - support_agent)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_a)
+        (mission_node_assigned_agent ?branch_anchor_a ?support_agent)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_flag_a_primary ?branch_flag_a)
+        (not
+          (branch_anchor_a_ready ?branch_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+      )
+  )
+  (:action apply_consumable_to_branch_anchor_a
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_flag_a - branch_flag_a ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_a)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (consumable_item_available ?consumable_item)
+        (not
+          (branch_anchor_a_ready ?branch_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (branch_flag_a_secondary ?branch_flag_a)
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_a_consumable_attached ?branch_anchor_a ?consumable_item)
+        (not
+          (consumable_item_available ?consumable_item)
+        )
+      )
+  )
+  (:action resolve_branch_anchor_a_with_objective_and_consumable
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_flag_a - branch_flag_a ?objective_marker - objective_marker ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_a)
+        (mission_node_objective_attached ?branch_anchor_a ?objective_marker)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_flag_a_secondary ?branch_flag_a)
+        (branch_anchor_a_consumable_attached ?branch_anchor_a ?consumable_item)
+        (not
+          (branch_anchor_a_satisfied ?branch_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (branch_flag_a_primary ?branch_flag_a)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+        (consumable_item_available ?consumable_item)
+        (not
+          (branch_anchor_a_consumable_attached ?branch_anchor_a ?consumable_item)
+        )
+      )
+  )
+  (:action activate_branch_flag_b_by_objective
+    :parameters (?branch_anchor_b - branch_anchor_b ?branch_flag_b - branch_flag_b ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_b)
+        (mission_node_objective_attached ?branch_anchor_b ?objective_marker)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (not
+          (branch_flag_b_primary ?branch_flag_b)
+        )
+        (not
+          (branch_flag_b_secondary ?branch_flag_b)
+        )
+      )
+    :effect (branch_flag_b_primary ?branch_flag_b)
+  )
+  (:action satisfy_branch_anchor_b_with_agent
+    :parameters (?branch_anchor_b - branch_anchor_b ?branch_flag_b - branch_flag_b ?support_agent - support_agent)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_b)
+        (mission_node_assigned_agent ?branch_anchor_b ?support_agent)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_b_primary ?branch_flag_b)
+        (not
+          (branch_anchor_b_ready ?branch_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+      )
+  )
+  (:action apply_consumable_to_branch_anchor_b
+    :parameters (?branch_anchor_b - branch_anchor_b ?branch_flag_b - branch_flag_b ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_b)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (consumable_item_available ?consumable_item)
+        (not
+          (branch_anchor_b_ready ?branch_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (branch_flag_b_secondary ?branch_flag_b)
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_b_consumable_attached ?branch_anchor_b ?consumable_item)
+        (not
+          (consumable_item_available ?consumable_item)
+        )
+      )
+  )
+  (:action resolve_branch_anchor_b_with_objective_and_consumable
+    :parameters (?branch_anchor_b - branch_anchor_b ?branch_flag_b - branch_flag_b ?objective_marker - objective_marker ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?branch_anchor_b)
+        (mission_node_objective_attached ?branch_anchor_b ?objective_marker)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_b_secondary ?branch_flag_b)
+        (branch_anchor_b_consumable_attached ?branch_anchor_b ?consumable_item)
+        (not
+          (branch_anchor_b_satisfied ?branch_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (branch_flag_b_primary ?branch_flag_b)
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+        (consumable_item_available ?consumable_item)
+        (not
+          (branch_anchor_b_consumable_attached ?branch_anchor_b ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_outcome_from_branch_anchors
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_anchor_b - branch_anchor_b ?branch_flag_a - branch_flag_a ?branch_flag_b - branch_flag_b ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_a_primary ?branch_flag_a)
+        (branch_flag_b_primary ?branch_flag_b)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+        (outcome_container_available ?outcome_container)
+      )
+    :effect
+      (and
+        (outcome_container_assembled ?outcome_container)
+        (outcome_contains_flag_a ?outcome_container ?branch_flag_a)
+        (outcome_contains_flag_b ?outcome_container ?branch_flag_b)
+        (not
+          (outcome_container_available ?outcome_container)
+        )
+      )
+  )
+  (:action assemble_outcome_with_variant_a
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_anchor_b - branch_anchor_b ?branch_flag_a - branch_flag_a ?branch_flag_b - branch_flag_b ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_a_secondary ?branch_flag_a)
+        (branch_flag_b_primary ?branch_flag_b)
+        (not
+          (branch_anchor_a_satisfied ?branch_anchor_a)
+        )
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+        (outcome_container_available ?outcome_container)
+      )
+    :effect
+      (and
+        (outcome_container_assembled ?outcome_container)
+        (outcome_contains_flag_a ?outcome_container ?branch_flag_a)
+        (outcome_contains_flag_b ?outcome_container ?branch_flag_b)
+        (outcome_variant_enabled ?outcome_container)
+        (not
+          (outcome_container_available ?outcome_container)
+        )
+      )
+  )
+  (:action assemble_outcome_with_variant_b
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_anchor_b - branch_anchor_b ?branch_flag_a - branch_flag_a ?branch_flag_b - branch_flag_b ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_a_primary ?branch_flag_a)
+        (branch_flag_b_secondary ?branch_flag_b)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+        (not
+          (branch_anchor_b_satisfied ?branch_anchor_b)
+        )
+        (outcome_container_available ?outcome_container)
+      )
+    :effect
+      (and
+        (outcome_container_assembled ?outcome_container)
+        (outcome_contains_flag_a ?outcome_container ?branch_flag_a)
+        (outcome_contains_flag_b ?outcome_container ?branch_flag_b)
+        (outcome_checkpoint_enabled ?outcome_container)
+        (not
+          (outcome_container_available ?outcome_container)
+        )
+      )
+  )
+  (:action assemble_outcome_with_variants_both
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_anchor_b - branch_anchor_b ?branch_flag_a - branch_flag_a ?branch_flag_b - branch_flag_b ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_a_has_flag ?branch_anchor_a ?branch_flag_a)
+        (branch_anchor_b_has_flag ?branch_anchor_b ?branch_flag_b)
+        (branch_flag_a_secondary ?branch_flag_a)
+        (branch_flag_b_secondary ?branch_flag_b)
+        (not
+          (branch_anchor_a_satisfied ?branch_anchor_a)
+        )
+        (not
+          (branch_anchor_b_satisfied ?branch_anchor_b)
+        )
+        (outcome_container_available ?outcome_container)
+      )
+    :effect
+      (and
+        (outcome_container_assembled ?outcome_container)
+        (outcome_contains_flag_a ?outcome_container ?branch_flag_a)
+        (outcome_contains_flag_b ?outcome_container ?branch_flag_b)
+        (outcome_variant_enabled ?outcome_container)
+        (outcome_checkpoint_enabled ?outcome_container)
+        (not
+          (outcome_container_available ?outcome_container)
+        )
+      )
+  )
+  (:action validate_outcome_with_anchor_objective
+    :parameters (?outcome_container - outcome_container ?branch_anchor_a - branch_anchor_a ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (outcome_container_assembled ?outcome_container)
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (mission_node_objective_attached ?branch_anchor_a ?objective_marker)
+        (not
+          (outcome_validated ?outcome_container)
+        )
+      )
+    :effect (outcome_validated ?outcome_container)
+  )
+  (:action activate_checkpoint_and_link_to_outcome
+    :parameters (?quest_arc - quest_arc ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (quest_arc_has_outcome_container ?quest_arc ?outcome_container)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_available ?checkpoint)
+        (outcome_container_assembled ?outcome_container)
+        (outcome_validated ?outcome_container)
+        (not
+          (checkpoint_activated ?checkpoint)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_activated ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (not
+          (checkpoint_available ?checkpoint)
+        )
+      )
+  )
+  (:action stage_quest_arc_after_checkpoint_consumption
+    :parameters (?quest_arc - quest_arc ?checkpoint - checkpoint ?outcome_container - outcome_container ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_activated ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (mission_node_objective_attached ?quest_arc ?objective_marker)
+        (not
+          (outcome_variant_enabled ?outcome_container)
+        )
+        (not
+          (quest_arc_checkpoint_consumed ?quest_arc)
+        )
+      )
+    :effect (quest_arc_checkpoint_consumed ?quest_arc)
+  )
+  (:action attach_variant_modifier_to_quest_arc
+    :parameters (?quest_arc - quest_arc ?variant_modifier - variant_modifier)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (variant_modifier_available ?variant_modifier)
+        (not
+          (quest_arc_modifier_attached ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_modifier_attached ?quest_arc)
+        (quest_arc_has_variant_modifier ?quest_arc ?variant_modifier)
+        (not
+          (variant_modifier_available ?variant_modifier)
+        )
+      )
+  )
+  (:action activate_variant_modifier_on_quest_arc
+    :parameters (?quest_arc - quest_arc ?checkpoint - checkpoint ?outcome_container - outcome_container ?objective_marker - objective_marker ?variant_modifier - variant_modifier)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_activated ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (mission_node_objective_attached ?quest_arc ?objective_marker)
+        (outcome_variant_enabled ?outcome_container)
+        (quest_arc_modifier_attached ?quest_arc)
+        (quest_arc_has_variant_modifier ?quest_arc ?variant_modifier)
+        (not
+          (quest_arc_checkpoint_consumed ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_checkpoint_consumed ?quest_arc)
+        (quest_arc_modifier_activated ?quest_arc)
+      )
+  )
+  (:action apply_unlock_key_and_stage_arc_without_outcome_checkpoint
+    :parameters (?quest_arc - quest_arc ?unlock_key - unlock_key ?support_agent - support_agent ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_checkpoint_consumed ?quest_arc)
+        (quest_arc_has_unlock_key ?quest_arc ?unlock_key)
+        (mission_node_assigned_agent ?quest_arc ?support_agent)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (not
+          (outcome_checkpoint_enabled ?outcome_container)
+        )
+        (not
+          (quest_arc_modifier_staged ?quest_arc)
+        )
+      )
+    :effect (quest_arc_modifier_staged ?quest_arc)
+  )
+  (:action apply_unlock_key_and_stage_arc_with_outcome_checkpoint
+    :parameters (?quest_arc - quest_arc ?unlock_key - unlock_key ?support_agent - support_agent ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_checkpoint_consumed ?quest_arc)
+        (quest_arc_has_unlock_key ?quest_arc ?unlock_key)
+        (mission_node_assigned_agent ?quest_arc ?support_agent)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (outcome_checkpoint_enabled ?outcome_container)
+        (not
+          (quest_arc_modifier_staged ?quest_arc)
+        )
+      )
+    :effect (quest_arc_modifier_staged ?quest_arc)
+  )
+  (:action queue_quest_arc_for_finalization
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_modifier_staged ?quest_arc)
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (not
+          (outcome_variant_enabled ?outcome_container)
+        )
+        (not
+          (outcome_checkpoint_enabled ?outcome_container)
+        )
+        (not
+          (quest_arc_ready_for_finalization ?quest_arc)
+        )
+      )
+    :effect (quest_arc_ready_for_finalization ?quest_arc)
+  )
+  (:action queue_quest_arc_for_finalization_with_reward_enabled
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_modifier_staged ?quest_arc)
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (outcome_variant_enabled ?outcome_container)
+        (not
+          (outcome_checkpoint_enabled ?outcome_container)
+        )
+        (not
+          (quest_arc_ready_for_finalization ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_reward_enabled ?quest_arc)
+      )
+  )
+  (:action queue_quest_arc_for_finalization_with_reward_variant
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_modifier_staged ?quest_arc)
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (not
+          (outcome_variant_enabled ?outcome_container)
+        )
+        (outcome_checkpoint_enabled ?outcome_container)
+        (not
+          (quest_arc_ready_for_finalization ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_reward_enabled ?quest_arc)
+      )
+  )
+  (:action queue_quest_arc_for_finalization_with_all_reward_flags
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key ?checkpoint - checkpoint ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (quest_arc_modifier_staged ?quest_arc)
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (quest_arc_has_checkpoint ?quest_arc ?checkpoint)
+        (checkpoint_linked_to_outcome ?checkpoint ?outcome_container)
+        (outcome_variant_enabled ?outcome_container)
+        (outcome_checkpoint_enabled ?outcome_container)
+        (not
+          (quest_arc_ready_for_finalization ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_reward_enabled ?quest_arc)
+      )
+  )
+  (:action finalize_quest_arc_basic
+    :parameters (?quest_arc - quest_arc)
+    :precondition
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (not
+          (quest_arc_reward_enabled ?quest_arc)
+        )
+        (not
+          (quest_arc_finalized ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_finalized ?quest_arc)
+        (mission_node_ready_for_resolution ?quest_arc)
+      )
+  )
+  (:action attach_reward_token_to_quest_arc
+    :parameters (?quest_arc - quest_arc ?reward_token - reward_token)
+    :precondition
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_reward_enabled ?quest_arc)
+        (reward_token_available ?reward_token)
+      )
+    :effect
+      (and
+        (quest_arc_has_reward_token ?quest_arc ?reward_token)
+        (not
+          (reward_token_available ?reward_token)
+        )
+      )
+  )
+  (:action perform_quest_arc_final_checks
+    :parameters (?quest_arc - quest_arc ?branch_anchor_a - branch_anchor_a ?branch_anchor_b - branch_anchor_b ?objective_marker - objective_marker ?reward_token - reward_token)
+    :precondition
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_reward_enabled ?quest_arc)
+        (quest_arc_has_reward_token ?quest_arc ?reward_token)
+        (quest_arc_has_branch_anchor_a ?quest_arc ?branch_anchor_a)
+        (quest_arc_has_branch_anchor_b ?quest_arc ?branch_anchor_b)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+        (mission_node_objective_attached ?quest_arc ?objective_marker)
+        (not
+          (quest_arc_final_check_passed ?quest_arc)
+        )
+      )
+    :effect (quest_arc_final_check_passed ?quest_arc)
+  )
+  (:action finalize_quest_arc_after_checks
+    :parameters (?quest_arc - quest_arc)
+    :precondition
+      (and
+        (quest_arc_ready_for_finalization ?quest_arc)
+        (quest_arc_final_check_passed ?quest_arc)
+        (not
+          (quest_arc_finalized ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_finalized ?quest_arc)
+        (mission_node_ready_for_resolution ?quest_arc)
+      )
+  )
+  (:action apply_special_requirement_to_quest_arc
+    :parameters (?quest_arc - quest_arc ?special_requirement - special_requirement ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_ready_for_assignment ?quest_arc)
+        (mission_node_objective_attached ?quest_arc ?objective_marker)
+        (special_requirement_available ?special_requirement)
+        (quest_arc_has_special_requirement ?quest_arc ?special_requirement)
+        (not
+          (quest_arc_special_requirement_applied ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_special_requirement_applied ?quest_arc)
+        (not
+          (special_requirement_available ?special_requirement)
+        )
+      )
+  )
+  (:action configure_arc_special_requirement
+    :parameters (?quest_arc - quest_arc ?support_agent - support_agent)
+    :precondition
+      (and
+        (quest_arc_special_requirement_applied ?quest_arc)
+        (mission_node_assigned_agent ?quest_arc ?support_agent)
+        (not
+          (quest_arc_special_requirement_configured ?quest_arc)
+        )
+      )
+    :effect (quest_arc_special_requirement_configured ?quest_arc)
+  )
+  (:action apply_requirement_key_to_configured_arc
+    :parameters (?quest_arc - quest_arc ?requirement_key - requirement_key)
+    :precondition
+      (and
+        (quest_arc_special_requirement_configured ?quest_arc)
+        (quest_arc_has_requirement_key ?quest_arc ?requirement_key)
+        (not
+          (quest_arc_special_requirement_ready ?quest_arc)
+        )
+      )
+    :effect (quest_arc_special_requirement_ready ?quest_arc)
+  )
+  (:action finalize_quest_arc_from_special_requirement
+    :parameters (?quest_arc - quest_arc)
+    :precondition
+      (and
+        (quest_arc_special_requirement_ready ?quest_arc)
+        (not
+          (quest_arc_finalized ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (quest_arc_finalized ?quest_arc)
+        (mission_node_ready_for_resolution ?quest_arc)
+      )
+  )
+  (:action finalize_branch_anchor_a
+    :parameters (?branch_anchor_a - branch_anchor_a ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_a_ready ?branch_anchor_a)
+        (branch_anchor_a_satisfied ?branch_anchor_a)
+        (outcome_container_assembled ?outcome_container)
+        (outcome_validated ?outcome_container)
+        (not
+          (mission_node_ready_for_resolution ?branch_anchor_a)
+        )
+      )
+    :effect (mission_node_ready_for_resolution ?branch_anchor_a)
+  )
+  (:action finalize_branch_anchor_b
+    :parameters (?branch_anchor_b - branch_anchor_b ?outcome_container - outcome_container)
+    :precondition
+      (and
+        (branch_anchor_b_ready ?branch_anchor_b)
+        (branch_anchor_b_satisfied ?branch_anchor_b)
+        (outcome_container_assembled ?outcome_container)
+        (outcome_validated ?outcome_container)
+        (not
+          (mission_node_ready_for_resolution ?branch_anchor_b)
+        )
+      )
+    :effect (mission_node_ready_for_resolution ?branch_anchor_b)
+  )
+  (:action complete_mission_and_consume_gating_clue
+    :parameters (?mission_node - mission_node ?gating_clue - gating_clue ?objective_marker - objective_marker)
+    :precondition
+      (and
+        (mission_node_ready_for_resolution ?mission_node)
+        (mission_node_objective_attached ?mission_node ?objective_marker)
+        (gating_clue_available ?gating_clue)
+        (not
+          (mission_node_completed ?mission_node)
+        )
+      )
+    :effect
+      (and
+        (mission_node_completed ?mission_node)
+        (mission_node_has_gating_clue ?mission_node ?gating_clue)
+        (not
+          (gating_clue_available ?gating_clue)
+        )
+      )
+  )
+  (:action finalize_branch_anchor_a_and_return_token
+    :parameters (?branch_anchor_a - branch_anchor_a ?branch_token - branch_token ?gating_clue - gating_clue)
+    :precondition
+      (and
+        (mission_node_completed ?branch_anchor_a)
+        (mission_node_token_assigned ?branch_anchor_a ?branch_token)
+        (mission_node_has_gating_clue ?branch_anchor_a ?gating_clue)
+        (not
+          (mission_node_resolved ?branch_anchor_a)
+        )
+      )
+    :effect
+      (and
+        (mission_node_resolved ?branch_anchor_a)
+        (branch_token_available ?branch_token)
+        (gating_clue_available ?gating_clue)
+      )
+  )
+  (:action finalize_branch_anchor_b_and_return_token
+    :parameters (?branch_anchor_b - branch_anchor_b ?branch_token - branch_token ?gating_clue - gating_clue)
+    :precondition
+      (and
+        (mission_node_completed ?branch_anchor_b)
+        (mission_node_token_assigned ?branch_anchor_b ?branch_token)
+        (mission_node_has_gating_clue ?branch_anchor_b ?gating_clue)
+        (not
+          (mission_node_resolved ?branch_anchor_b)
+        )
+      )
+    :effect
+      (and
+        (mission_node_resolved ?branch_anchor_b)
+        (branch_token_available ?branch_token)
+        (gating_clue_available ?gating_clue)
+      )
+  )
+  (:action finalize_quest_arc_and_return_token
+    :parameters (?quest_arc - quest_arc ?branch_token - branch_token ?gating_clue - gating_clue)
+    :precondition
+      (and
+        (mission_node_completed ?quest_arc)
+        (mission_node_token_assigned ?quest_arc ?branch_token)
+        (mission_node_has_gating_clue ?quest_arc ?gating_clue)
+        (not
+          (mission_node_resolved ?quest_arc)
+        )
+      )
+    :effect
+      (and
+        (mission_node_resolved ?quest_arc)
+        (branch_token_available ?branch_token)
+        (gating_clue_available ?gating_clue)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem branching_mission_path_selection_problem)
+  (:domain branching_mission_path_selection_domain)
+  (:objects branch_anchor_a_1 - branch_anchor_a branch_anchor_b_1 - branch_anchor_b quest_arc_1 - quest_arc quest_arc_2 - quest_arc branch_token_1 - branch_token branch_token_2 - branch_token branch_token_3 - branch_token objective_marker_1 - objective_marker support_agent_1 - support_agent consumable_item_1 - consumable_item branch_flag_a_1 - branch_flag_a branch_flag_b_1 - branch_flag_b outcome_container_1 - outcome_container checkpoint_1 - checkpoint checkpoint_2 - checkpoint variant_modifier_1 - variant_modifier variant_modifier_2 - variant_modifier reward_token_1 - reward_token reward_token_2 - reward_token gating_clue_1 - gating_clue unlock_key_1 - unlock_key special_requirement_1 - special_requirement special_requirement_2 - special_requirement requirement_key_1 - requirement_key)
+  (:init
+    (branch_token_available branch_token_1)
+    (branch_token_available branch_token_2)
+    (branch_token_available branch_token_3)
+    (objective_marker_available objective_marker_1)
+    (agent_available support_agent_1)
+    (consumable_item_available consumable_item_1)
+    (branch_anchor_a_has_flag branch_anchor_a_1 branch_flag_a_1)
+    (branch_anchor_b_has_flag branch_anchor_b_1 branch_flag_b_1)
+    (outcome_container_available outcome_container_1)
+    (checkpoint_available checkpoint_1)
+    (checkpoint_available checkpoint_2)
+    (quest_arc_has_branch_anchor_a quest_arc_1 branch_anchor_a_1)
+    (quest_arc_has_branch_anchor_a quest_arc_2 branch_anchor_a_1)
+    (quest_arc_has_branch_anchor_b quest_arc_1 branch_anchor_b_1)
+    (quest_arc_has_branch_anchor_b quest_arc_2 branch_anchor_b_1)
+    (quest_arc_has_outcome_container quest_arc_1 outcome_container_1)
+    (quest_arc_has_outcome_container quest_arc_2 outcome_container_1)
+    (quest_arc_has_checkpoint quest_arc_1 checkpoint_1)
+    (quest_arc_has_checkpoint quest_arc_2 checkpoint_2)
+    (variant_modifier_available variant_modifier_1)
+    (variant_modifier_available variant_modifier_2)
+    (reward_token_available reward_token_1)
+    (reward_token_available reward_token_2)
+    (gating_clue_available gating_clue_1)
+    (unlock_key_available unlock_key_1)
+    (special_requirement_available special_requirement_1)
+    (quest_arc_has_special_requirement quest_arc_1 special_requirement_1)
+    (quest_arc_has_special_requirement quest_arc_2 special_requirement_2)
+    (requirement_key_available requirement_key_1)
+  )
+  (:goal
+    (and
+      (mission_node_resolved branch_anchor_a_1)
+      (mission_node_resolved branch_anchor_b_1)
+      (mission_node_resolved quest_arc_1)
+      (mission_node_resolved quest_arc_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(activate_mission_node branch_anchor_a_1)
+(claim_branch_token_for_mission branch_anchor_a_1 branch_token_1)
+(attach_objective_to_mission branch_anchor_a_1 objective_marker_1)
+(complete_mission_objective branch_anchor_a_1 objective_marker_1)
+(activate_branch_flag_a_by_objective branch_anchor_a_1 branch_flag_a_1 objective_marker_1)
+(assign_support_agent_to_mission branch_anchor_a_1 support_agent_1)
+(satisfy_branch_anchor_a_with_agent branch_anchor_a_1 branch_flag_a_1 support_agent_1)
+(unassign_support_agent_from_mission branch_anchor_a_1 support_agent_1)
+(detach_objective_from_mission branch_anchor_a_1 objective_marker_1)
+(activate_mission_node branch_anchor_b_1)
+(claim_branch_token_for_mission branch_anchor_b_1 branch_token_2)
+(attach_objective_to_mission branch_anchor_b_1 objective_marker_1)
+(complete_mission_objective branch_anchor_b_1 objective_marker_1)
+(activate_branch_flag_b_by_objective branch_anchor_b_1 branch_flag_b_1 objective_marker_1)
+(assign_support_agent_to_mission branch_anchor_b_1 support_agent_1)
+(satisfy_branch_anchor_b_with_agent branch_anchor_b_1 branch_flag_b_1 support_agent_1)
+(unassign_support_agent_from_mission branch_anchor_b_1 support_agent_1)
+(assemble_outcome_from_branch_anchors branch_anchor_a_1 branch_anchor_b_1 branch_flag_a_1 branch_flag_b_1 outcome_container_1)
+(detach_objective_from_mission branch_anchor_b_1 objective_marker_1)
+(attach_objective_to_mission branch_anchor_a_1 objective_marker_1)
+(validate_outcome_with_anchor_objective outcome_container_1 branch_anchor_a_1 objective_marker_1)
+(finalize_branch_anchor_a branch_anchor_a_1 outcome_container_1)
+(finalize_branch_anchor_b branch_anchor_b_1 outcome_container_1)
+(complete_mission_and_consume_gating_clue branch_anchor_a_1 gating_clue_1 objective_marker_1)
+(finalize_branch_anchor_a_and_return_token branch_anchor_a_1 branch_token_1 gating_clue_1)
+(detach_objective_from_mission branch_anchor_a_1 objective_marker_1)
+(attach_objective_to_mission branch_anchor_b_1 objective_marker_1)
+(complete_mission_and_consume_gating_clue branch_anchor_b_1 gating_clue_1 objective_marker_1)
+(finalize_branch_anchor_b_and_return_token branch_anchor_b_1 branch_token_2 gating_clue_1)
+(detach_objective_from_mission branch_anchor_b_1 objective_marker_1)
+(activate_mission_node quest_arc_1)
+(claim_branch_token_for_mission quest_arc_1 branch_token_3)
+(attach_objective_to_mission quest_arc_1 objective_marker_1)
+(complete_mission_objective quest_arc_1 objective_marker_1)
+(activate_checkpoint_and_link_to_outcome quest_arc_1 checkpoint_1 outcome_container_1)
+(stage_quest_arc_after_checkpoint_consumption quest_arc_1 checkpoint_1 outcome_container_1 objective_marker_1)
+(assign_support_agent_to_mission quest_arc_1 support_agent_1)
+(attach_unlock_key_to_quest_arc quest_arc_1 unlock_key_1)
+(apply_unlock_key_and_stage_arc_without_outcome_checkpoint quest_arc_1 unlock_key_1 support_agent_1 checkpoint_1 outcome_container_1)
+(attach_requirement_key_to_quest_arc quest_arc_1 requirement_key_1)
+(queue_quest_arc_for_finalization quest_arc_1 requirement_key_1 checkpoint_1 outcome_container_1)
+(finalize_quest_arc_basic quest_arc_1)
+(complete_mission_and_consume_gating_clue quest_arc_1 gating_clue_1 objective_marker_1)
+(finalize_quest_arc_and_return_token quest_arc_1 branch_token_3 gating_clue_1)
+(unassign_support_agent_from_mission quest_arc_1 support_agent_1)
+(detach_objective_from_mission quest_arc_1 objective_marker_1)
+(detach_unlock_key_from_quest_arc quest_arc_1 unlock_key_1)
+(detach_requirement_key_from_quest_arc quest_arc_1 requirement_key_1)
+(activate_mission_node quest_arc_2)
+(claim_branch_token_for_mission quest_arc_2 branch_token_1)
+(attach_objective_to_mission quest_arc_2 objective_marker_1)
+(complete_mission_objective quest_arc_2 objective_marker_1)
+(activate_checkpoint_and_link_to_outcome quest_arc_2 checkpoint_2 outcome_container_1)
+(stage_quest_arc_after_checkpoint_consumption quest_arc_2 checkpoint_2 outcome_container_1 objective_marker_1)
+(assign_support_agent_to_mission quest_arc_2 support_agent_1)
+(attach_unlock_key_to_quest_arc quest_arc_2 unlock_key_1)
+(apply_unlock_key_and_stage_arc_without_outcome_checkpoint quest_arc_2 unlock_key_1 support_agent_1 checkpoint_2 outcome_container_1)
+(attach_requirement_key_to_quest_arc quest_arc_2 requirement_key_1)
+(queue_quest_arc_for_finalization quest_arc_2 requirement_key_1 checkpoint_2 outcome_container_1)
+(finalize_quest_arc_basic quest_arc_2)
+(complete_mission_and_consume_gating_clue quest_arc_2 gating_clue_1 objective_marker_1)
+(finalize_quest_arc_and_return_token quest_arc_2 branch_token_1 gating_clue_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2yrh8fj1/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_2yrh8fj1/plan.pddl 62 
+
+
+
+--- stderr ---
+

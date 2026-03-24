@@ -1,0 +1,936 @@
+(define (domain deterministic_business_rule_evaluation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object condition_category - object context_category - object case_container - object evaluation_unit - case_container processor_slot - resource_category input_signal - resource_category tool - resource_category option_choice - resource_category adjustment - resource_category correlation_id - resource_category action_template - resource_category strategy - resource_category attribute_token - condition_category feature_flag - condition_category label - condition_category context_key_a - context_category context_key_b - context_category outcome_record - context_category evaluator_group - evaluation_unit case_role_group_b - evaluation_unit evaluator_stage_a - evaluator_group evaluator_stage_b - evaluator_group decision_document - case_role_group_b)
+  (:predicates
+    (evaluation_unit_registered ?case - evaluation_unit)
+    (ready_for_processing ?case - evaluation_unit)
+    (evaluation_unit_assigned ?case - evaluation_unit)
+    (evaluation_unit_finalized ?case - evaluation_unit)
+    (ready_for_outcome ?case - evaluation_unit)
+    (outcome_applied ?case - evaluation_unit)
+    (processor_slot_available ?slot - processor_slot)
+    (assigned_slot ?case - evaluation_unit ?slot - processor_slot)
+    (input_signal_available ?input_signal - input_signal)
+    (evaluation_unit_has_input_signal ?case - evaluation_unit ?input_signal - input_signal)
+    (tool_available ?tool - tool)
+    (evaluation_unit_attached_tool ?case - evaluation_unit ?tool - tool)
+    (attribute_token_available ?attribute_token - attribute_token)
+    (evaluator_a_has_token ?evaluator_a - evaluator_stage_a ?attribute_token - attribute_token)
+    (evaluator_b_has_token ?evaluator_b - evaluator_stage_b ?attribute_token - attribute_token)
+    (evaluator_a_has_context ?evaluator_a - evaluator_stage_a ?context_key_a - context_key_a)
+    (context_key_a_confirmed ?context_key_a - context_key_a)
+    (context_key_a_pending ?context_key_a - context_key_a)
+    (evaluator_a_completed ?evaluator_a - evaluator_stage_a)
+    (evaluator_b_has_context ?evaluator_b - evaluator_stage_b ?context_key_b - context_key_b)
+    (context_key_b_confirmed ?context_key_b - context_key_b)
+    (context_key_b_pending ?context_key_b - context_key_b)
+    (evaluator_b_completed ?evaluator_b - evaluator_stage_b)
+    (outcome_record_available ?outcome_record - outcome_record)
+    (outcome_record_ready ?outcome_record - outcome_record)
+    (outcome_has_context_key_a ?outcome_record - outcome_record ?context_key_a - context_key_a)
+    (outcome_has_context_key_b ?outcome_record - outcome_record ?context_key_b - context_key_b)
+    (outcome_flag_a ?outcome_record - outcome_record)
+    (outcome_flag_b ?outcome_record - outcome_record)
+    (outcome_finalized ?outcome_record - outcome_record)
+    (document_associated_with_evaluator_a ?decision_document - decision_document ?evaluator_a - evaluator_stage_a)
+    (document_associated_with_evaluator_b ?decision_document - decision_document ?evaluator_b - evaluator_stage_b)
+    (document_has_outcome_record ?decision_document - decision_document ?outcome_record - outcome_record)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (document_has_feature_flag ?decision_document - decision_document ?feature_flag - feature_flag)
+    (feature_flag_set ?feature_flag - feature_flag)
+    (feature_flag_applied_to_outcome ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    (document_validated ?decision_document - decision_document)
+    (document_enrichment_complete ?decision_document - decision_document)
+    (document_finalization_started ?decision_document - decision_document)
+    (document_option_assigned ?decision_document - decision_document)
+    (document_option_enriched ?decision_document - decision_document)
+    (document_has_labels ?decision_document - decision_document)
+    (document_finalized_for_outcome ?decision_document - decision_document)
+    (label_available ?label - label)
+    (document_has_label ?decision_document - decision_document ?label - label)
+    (document_label_applied ?decision_document - decision_document)
+    (document_label_validated ?decision_document - decision_document)
+    (document_label_finalized ?decision_document - decision_document)
+    (option_choice_available ?option_choice - option_choice)
+    (document_has_option_choice ?decision_document - decision_document ?option_choice - option_choice)
+    (adjustment_available ?adjustment - adjustment)
+    (document_has_adjustment ?decision_document - decision_document ?adjustment - adjustment)
+    (action_template_available ?action_template - action_template)
+    (document_has_action_template ?decision_document - decision_document ?action_template - action_template)
+    (strategy_available ?strategy - strategy)
+    (document_has_strategy ?decision_document - decision_document ?strategy - strategy)
+    (correlation_id_available ?correlation_id - correlation_id)
+    (evaluation_unit_has_correlation_id ?case - evaluation_unit ?correlation_id - correlation_id)
+    (evaluator_a_ready ?evaluator_a - evaluator_stage_a)
+    (evaluator_b_ready ?evaluator_b - evaluator_stage_b)
+    (document_finalized ?decision_document - decision_document)
+  )
+  (:action register_case
+    :parameters (?case - evaluation_unit)
+    :precondition
+      (and
+        (not
+          (evaluation_unit_registered ?case)
+        )
+        (not
+          (evaluation_unit_finalized ?case)
+        )
+      )
+    :effect (evaluation_unit_registered ?case)
+  )
+  (:action assign_processor_slot
+    :parameters (?case - evaluation_unit ?slot - processor_slot)
+    :precondition
+      (and
+        (evaluation_unit_registered ?case)
+        (not
+          (evaluation_unit_assigned ?case)
+        )
+        (processor_slot_available ?slot)
+      )
+    :effect
+      (and
+        (evaluation_unit_assigned ?case)
+        (assigned_slot ?case ?slot)
+        (not
+          (processor_slot_available ?slot)
+        )
+      )
+  )
+  (:action attach_input_signal
+    :parameters (?case - evaluation_unit ?input_signal - input_signal)
+    :precondition
+      (and
+        (evaluation_unit_registered ?case)
+        (evaluation_unit_assigned ?case)
+        (input_signal_available ?input_signal)
+      )
+    :effect
+      (and
+        (evaluation_unit_has_input_signal ?case ?input_signal)
+        (not
+          (input_signal_available ?input_signal)
+        )
+      )
+  )
+  (:action mark_case_ready
+    :parameters (?case - evaluation_unit ?input_signal - input_signal)
+    :precondition
+      (and
+        (evaluation_unit_registered ?case)
+        (evaluation_unit_assigned ?case)
+        (evaluation_unit_has_input_signal ?case ?input_signal)
+        (not
+          (ready_for_processing ?case)
+        )
+      )
+    :effect (ready_for_processing ?case)
+  )
+  (:action release_input_signal
+    :parameters (?case - evaluation_unit ?input_signal - input_signal)
+    :precondition
+      (and
+        (evaluation_unit_has_input_signal ?case ?input_signal)
+      )
+    :effect
+      (and
+        (input_signal_available ?input_signal)
+        (not
+          (evaluation_unit_has_input_signal ?case ?input_signal)
+        )
+      )
+  )
+  (:action attach_tool_to_case
+    :parameters (?case - evaluation_unit ?tool - tool)
+    :precondition
+      (and
+        (ready_for_processing ?case)
+        (tool_available ?tool)
+      )
+    :effect
+      (and
+        (evaluation_unit_attached_tool ?case ?tool)
+        (not
+          (tool_available ?tool)
+        )
+      )
+  )
+  (:action detach_tool_from_case
+    :parameters (?case - evaluation_unit ?tool - tool)
+    :precondition
+      (and
+        (evaluation_unit_attached_tool ?case ?tool)
+      )
+    :effect
+      (and
+        (tool_available ?tool)
+        (not
+          (evaluation_unit_attached_tool ?case ?tool)
+        )
+      )
+  )
+  (:action attach_action_template_to_document
+    :parameters (?decision_document - decision_document ?action_template - action_template)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (action_template_available ?action_template)
+      )
+    :effect
+      (and
+        (document_has_action_template ?decision_document ?action_template)
+        (not
+          (action_template_available ?action_template)
+        )
+      )
+  )
+  (:action detach_action_template_from_document
+    :parameters (?decision_document - decision_document ?action_template - action_template)
+    :precondition
+      (and
+        (document_has_action_template ?decision_document ?action_template)
+      )
+    :effect
+      (and
+        (action_template_available ?action_template)
+        (not
+          (document_has_action_template ?decision_document ?action_template)
+        )
+      )
+  )
+  (:action attach_strategy_to_document
+    :parameters (?decision_document - decision_document ?strategy - strategy)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (strategy_available ?strategy)
+      )
+    :effect
+      (and
+        (document_has_strategy ?decision_document ?strategy)
+        (not
+          (strategy_available ?strategy)
+        )
+      )
+  )
+  (:action detach_strategy_from_document
+    :parameters (?decision_document - decision_document ?strategy - strategy)
+    :precondition
+      (and
+        (document_has_strategy ?decision_document ?strategy)
+      )
+    :effect
+      (and
+        (strategy_available ?strategy)
+        (not
+          (document_has_strategy ?decision_document ?strategy)
+        )
+      )
+  )
+  (:action confirm_context_key_a
+    :parameters (?evaluator_a - evaluator_stage_a ?context_key_a - context_key_a ?input_signal - input_signal)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_a)
+        (evaluation_unit_has_input_signal ?evaluator_a ?input_signal)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (not
+          (context_key_a_confirmed ?context_key_a)
+        )
+        (not
+          (context_key_a_pending ?context_key_a)
+        )
+      )
+    :effect (context_key_a_confirmed ?context_key_a)
+  )
+  (:action complete_evaluator_a_with_tool
+    :parameters (?evaluator_a - evaluator_stage_a ?context_key_a - context_key_a ?tool - tool)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_a)
+        (evaluation_unit_attached_tool ?evaluator_a ?tool)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (context_key_a_confirmed ?context_key_a)
+        (not
+          (evaluator_a_ready ?evaluator_a)
+        )
+      )
+    :effect
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_a_completed ?evaluator_a)
+      )
+  )
+  (:action consume_attribute_token_for_evaluator_a
+    :parameters (?evaluator_a - evaluator_stage_a ?context_key_a - context_key_a ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_a)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (attribute_token_available ?attribute_token)
+        (not
+          (evaluator_a_ready ?evaluator_a)
+        )
+      )
+    :effect
+      (and
+        (context_key_a_pending ?context_key_a)
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_a_has_token ?evaluator_a ?attribute_token)
+        (not
+          (attribute_token_available ?attribute_token)
+        )
+      )
+  )
+  (:action consolidate_evaluator_a_result
+    :parameters (?evaluator_a - evaluator_stage_a ?context_key_a - context_key_a ?input_signal - input_signal ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_a)
+        (evaluation_unit_has_input_signal ?evaluator_a ?input_signal)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (context_key_a_pending ?context_key_a)
+        (evaluator_a_has_token ?evaluator_a ?attribute_token)
+        (not
+          (evaluator_a_completed ?evaluator_a)
+        )
+      )
+    :effect
+      (and
+        (context_key_a_confirmed ?context_key_a)
+        (evaluator_a_completed ?evaluator_a)
+        (attribute_token_available ?attribute_token)
+        (not
+          (evaluator_a_has_token ?evaluator_a ?attribute_token)
+        )
+      )
+  )
+  (:action confirm_context_key_b
+    :parameters (?evaluator_b - evaluator_stage_b ?context_key_b - context_key_b ?input_signal - input_signal)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_b)
+        (evaluation_unit_has_input_signal ?evaluator_b ?input_signal)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (not
+          (context_key_b_confirmed ?context_key_b)
+        )
+        (not
+          (context_key_b_pending ?context_key_b)
+        )
+      )
+    :effect (context_key_b_confirmed ?context_key_b)
+  )
+  (:action complete_evaluator_b_with_tool
+    :parameters (?evaluator_b - evaluator_stage_b ?context_key_b - context_key_b ?tool - tool)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_b)
+        (evaluation_unit_attached_tool ?evaluator_b ?tool)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_b_confirmed ?context_key_b)
+        (not
+          (evaluator_b_ready ?evaluator_b)
+        )
+      )
+    :effect
+      (and
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_b_completed ?evaluator_b)
+      )
+  )
+  (:action consume_attribute_token_for_evaluator_b
+    :parameters (?evaluator_b - evaluator_stage_b ?context_key_b - context_key_b ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_b)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (attribute_token_available ?attribute_token)
+        (not
+          (evaluator_b_ready ?evaluator_b)
+        )
+      )
+    :effect
+      (and
+        (context_key_b_pending ?context_key_b)
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_b_has_token ?evaluator_b ?attribute_token)
+        (not
+          (attribute_token_available ?attribute_token)
+        )
+      )
+  )
+  (:action consolidate_evaluator_b_result
+    :parameters (?evaluator_b - evaluator_stage_b ?context_key_b - context_key_b ?input_signal - input_signal ?attribute_token - attribute_token)
+    :precondition
+      (and
+        (ready_for_processing ?evaluator_b)
+        (evaluation_unit_has_input_signal ?evaluator_b ?input_signal)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_b_pending ?context_key_b)
+        (evaluator_b_has_token ?evaluator_b ?attribute_token)
+        (not
+          (evaluator_b_completed ?evaluator_b)
+        )
+      )
+    :effect
+      (and
+        (context_key_b_confirmed ?context_key_b)
+        (evaluator_b_completed ?evaluator_b)
+        (attribute_token_available ?attribute_token)
+        (not
+          (evaluator_b_has_token ?evaluator_b ?attribute_token)
+        )
+      )
+  )
+  (:action synthesize_outcome_record
+    :parameters (?evaluator_a - evaluator_stage_a ?evaluator_b - evaluator_stage_b ?context_key_a - context_key_a ?context_key_b - context_key_b ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_a_confirmed ?context_key_a)
+        (context_key_b_confirmed ?context_key_b)
+        (evaluator_a_completed ?evaluator_a)
+        (evaluator_b_completed ?evaluator_b)
+        (outcome_record_available ?outcome_record)
+      )
+    :effect
+      (and
+        (outcome_record_ready ?outcome_record)
+        (outcome_has_context_key_a ?outcome_record ?context_key_a)
+        (outcome_has_context_key_b ?outcome_record ?context_key_b)
+        (not
+          (outcome_record_available ?outcome_record)
+        )
+      )
+  )
+  (:action synthesize_outcome_record_with_flag_a
+    :parameters (?evaluator_a - evaluator_stage_a ?evaluator_b - evaluator_stage_b ?context_key_a - context_key_a ?context_key_b - context_key_b ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_a_pending ?context_key_a)
+        (context_key_b_confirmed ?context_key_b)
+        (not
+          (evaluator_a_completed ?evaluator_a)
+        )
+        (evaluator_b_completed ?evaluator_b)
+        (outcome_record_available ?outcome_record)
+      )
+    :effect
+      (and
+        (outcome_record_ready ?outcome_record)
+        (outcome_has_context_key_a ?outcome_record ?context_key_a)
+        (outcome_has_context_key_b ?outcome_record ?context_key_b)
+        (outcome_flag_a ?outcome_record)
+        (not
+          (outcome_record_available ?outcome_record)
+        )
+      )
+  )
+  (:action synthesize_outcome_record_with_flag_b
+    :parameters (?evaluator_a - evaluator_stage_a ?evaluator_b - evaluator_stage_b ?context_key_a - context_key_a ?context_key_b - context_key_b ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_a_confirmed ?context_key_a)
+        (context_key_b_pending ?context_key_b)
+        (evaluator_a_completed ?evaluator_a)
+        (not
+          (evaluator_b_completed ?evaluator_b)
+        )
+        (outcome_record_available ?outcome_record)
+      )
+    :effect
+      (and
+        (outcome_record_ready ?outcome_record)
+        (outcome_has_context_key_a ?outcome_record ?context_key_a)
+        (outcome_has_context_key_b ?outcome_record ?context_key_b)
+        (outcome_flag_b ?outcome_record)
+        (not
+          (outcome_record_available ?outcome_record)
+        )
+      )
+  )
+  (:action synthesize_outcome_record_with_flags_ab
+    :parameters (?evaluator_a - evaluator_stage_a ?evaluator_b - evaluator_stage_b ?context_key_a - context_key_a ?context_key_b - context_key_b ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_a_has_context ?evaluator_a ?context_key_a)
+        (evaluator_b_has_context ?evaluator_b ?context_key_b)
+        (context_key_a_pending ?context_key_a)
+        (context_key_b_pending ?context_key_b)
+        (not
+          (evaluator_a_completed ?evaluator_a)
+        )
+        (not
+          (evaluator_b_completed ?evaluator_b)
+        )
+        (outcome_record_available ?outcome_record)
+      )
+    :effect
+      (and
+        (outcome_record_ready ?outcome_record)
+        (outcome_has_context_key_a ?outcome_record ?context_key_a)
+        (outcome_has_context_key_b ?outcome_record ?context_key_b)
+        (outcome_flag_a ?outcome_record)
+        (outcome_flag_b ?outcome_record)
+        (not
+          (outcome_record_available ?outcome_record)
+        )
+      )
+  )
+  (:action finalize_outcome_record
+    :parameters (?outcome_record - outcome_record ?evaluator_a - evaluator_stage_a ?input_signal - input_signal)
+    :precondition
+      (and
+        (outcome_record_ready ?outcome_record)
+        (evaluator_a_ready ?evaluator_a)
+        (evaluation_unit_has_input_signal ?evaluator_a ?input_signal)
+        (not
+          (outcome_finalized ?outcome_record)
+        )
+      )
+    :effect (outcome_finalized ?outcome_record)
+  )
+  (:action assign_feature_flag_to_document
+    :parameters (?decision_document - decision_document ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (document_has_outcome_record ?decision_document ?outcome_record)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_available ?feature_flag)
+        (outcome_record_ready ?outcome_record)
+        (outcome_finalized ?outcome_record)
+        (not
+          (feature_flag_set ?feature_flag)
+        )
+      )
+    :effect
+      (and
+        (feature_flag_set ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action validate_feature_flag_and_mark_document
+    :parameters (?decision_document - decision_document ?feature_flag - feature_flag ?outcome_record - outcome_record ?input_signal - input_signal)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_set ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (evaluation_unit_has_input_signal ?decision_document ?input_signal)
+        (not
+          (outcome_flag_a ?outcome_record)
+        )
+        (not
+          (document_validated ?decision_document)
+        )
+      )
+    :effect (document_validated ?decision_document)
+  )
+  (:action assign_option_choice_to_document
+    :parameters (?decision_document - decision_document ?option_choice - option_choice)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (option_choice_available ?option_choice)
+        (not
+          (document_option_assigned ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_option_assigned ?decision_document)
+        (document_has_option_choice ?decision_document ?option_choice)
+        (not
+          (option_choice_available ?option_choice)
+        )
+      )
+  )
+  (:action apply_option_enrichment_to_document
+    :parameters (?decision_document - decision_document ?feature_flag - feature_flag ?outcome_record - outcome_record ?input_signal - input_signal ?option_choice - option_choice)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_set ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (evaluation_unit_has_input_signal ?decision_document ?input_signal)
+        (outcome_flag_a ?outcome_record)
+        (document_option_assigned ?decision_document)
+        (document_has_option_choice ?decision_document ?option_choice)
+        (not
+          (document_validated ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_validated ?decision_document)
+        (document_option_enriched ?decision_document)
+      )
+  )
+  (:action apply_action_template_enrichment_primary
+    :parameters (?decision_document - decision_document ?action_template - action_template ?tool - tool ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_validated ?decision_document)
+        (document_has_action_template ?decision_document ?action_template)
+        (evaluation_unit_attached_tool ?decision_document ?tool)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (not
+          (outcome_flag_b ?outcome_record)
+        )
+        (not
+          (document_enrichment_complete ?decision_document)
+        )
+      )
+    :effect (document_enrichment_complete ?decision_document)
+  )
+  (:action apply_action_template_enrichment_secondary
+    :parameters (?decision_document - decision_document ?action_template - action_template ?tool - tool ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_validated ?decision_document)
+        (document_has_action_template ?decision_document ?action_template)
+        (evaluation_unit_attached_tool ?decision_document ?tool)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (outcome_flag_b ?outcome_record)
+        (not
+          (document_enrichment_complete ?decision_document)
+        )
+      )
+    :effect (document_enrichment_complete ?decision_document)
+  )
+  (:action start_document_finalization_variant_1
+    :parameters (?decision_document - decision_document ?strategy - strategy ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_enrichment_complete ?decision_document)
+        (document_has_strategy ?decision_document ?strategy)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (not
+          (outcome_flag_a ?outcome_record)
+        )
+        (not
+          (outcome_flag_b ?outcome_record)
+        )
+        (not
+          (document_finalization_started ?decision_document)
+        )
+      )
+    :effect (document_finalization_started ?decision_document)
+  )
+  (:action start_document_finalization_variant_2
+    :parameters (?decision_document - decision_document ?strategy - strategy ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_enrichment_complete ?decision_document)
+        (document_has_strategy ?decision_document ?strategy)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (outcome_flag_a ?outcome_record)
+        (not
+          (outcome_flag_b ?outcome_record)
+        )
+        (not
+          (document_finalization_started ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalization_started ?decision_document)
+        (document_has_labels ?decision_document)
+      )
+  )
+  (:action start_document_finalization_variant_3
+    :parameters (?decision_document - decision_document ?strategy - strategy ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_enrichment_complete ?decision_document)
+        (document_has_strategy ?decision_document ?strategy)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (not
+          (outcome_flag_a ?outcome_record)
+        )
+        (outcome_flag_b ?outcome_record)
+        (not
+          (document_finalization_started ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalization_started ?decision_document)
+        (document_has_labels ?decision_document)
+      )
+  )
+  (:action start_document_finalization_variant_4
+    :parameters (?decision_document - decision_document ?strategy - strategy ?feature_flag - feature_flag ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (document_enrichment_complete ?decision_document)
+        (document_has_strategy ?decision_document ?strategy)
+        (document_has_feature_flag ?decision_document ?feature_flag)
+        (feature_flag_applied_to_outcome ?feature_flag ?outcome_record)
+        (outcome_flag_a ?outcome_record)
+        (outcome_flag_b ?outcome_record)
+        (not
+          (document_finalization_started ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalization_started ?decision_document)
+        (document_has_labels ?decision_document)
+      )
+  )
+  (:action finalize_document_and_mark_outcome_ready
+    :parameters (?decision_document - decision_document)
+    :precondition
+      (and
+        (document_finalization_started ?decision_document)
+        (not
+          (document_has_labels ?decision_document)
+        )
+        (not
+          (document_finalized ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?decision_document)
+        (ready_for_outcome ?decision_document)
+      )
+  )
+  (:action apply_adjustment_to_document
+    :parameters (?decision_document - decision_document ?adjustment - adjustment)
+    :precondition
+      (and
+        (document_finalization_started ?decision_document)
+        (document_has_labels ?decision_document)
+        (adjustment_available ?adjustment)
+      )
+    :effect
+      (and
+        (document_has_adjustment ?decision_document ?adjustment)
+        (not
+          (adjustment_available ?adjustment)
+        )
+      )
+  )
+  (:action complete_document_finalization
+    :parameters (?decision_document - decision_document ?evaluator_a - evaluator_stage_a ?evaluator_b - evaluator_stage_b ?input_signal - input_signal ?adjustment - adjustment)
+    :precondition
+      (and
+        (document_finalization_started ?decision_document)
+        (document_has_labels ?decision_document)
+        (document_has_adjustment ?decision_document ?adjustment)
+        (document_associated_with_evaluator_a ?decision_document ?evaluator_a)
+        (document_associated_with_evaluator_b ?decision_document ?evaluator_b)
+        (evaluator_a_completed ?evaluator_a)
+        (evaluator_b_completed ?evaluator_b)
+        (evaluation_unit_has_input_signal ?decision_document ?input_signal)
+        (not
+          (document_finalized_for_outcome ?decision_document)
+        )
+      )
+    :effect (document_finalized_for_outcome ?decision_document)
+  )
+  (:action finalize_document_and_mark_outcome_ready_secondary
+    :parameters (?decision_document - decision_document)
+    :precondition
+      (and
+        (document_finalization_started ?decision_document)
+        (document_finalized_for_outcome ?decision_document)
+        (not
+          (document_finalized ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?decision_document)
+        (ready_for_outcome ?decision_document)
+      )
+  )
+  (:action apply_label_to_document
+    :parameters (?decision_document - decision_document ?label - label ?input_signal - input_signal)
+    :precondition
+      (and
+        (ready_for_processing ?decision_document)
+        (evaluation_unit_has_input_signal ?decision_document ?input_signal)
+        (label_available ?label)
+        (document_has_label ?decision_document ?label)
+        (not
+          (document_label_applied ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_label_applied ?decision_document)
+        (not
+          (label_available ?label)
+        )
+      )
+  )
+  (:action validate_label_for_document
+    :parameters (?decision_document - decision_document ?tool - tool)
+    :precondition
+      (and
+        (document_label_applied ?decision_document)
+        (evaluation_unit_attached_tool ?decision_document ?tool)
+        (not
+          (document_label_validated ?decision_document)
+        )
+      )
+    :effect (document_label_validated ?decision_document)
+  )
+  (:action bind_strategy_for_labeled_document
+    :parameters (?decision_document - decision_document ?strategy - strategy)
+    :precondition
+      (and
+        (document_label_validated ?decision_document)
+        (document_has_strategy ?decision_document ?strategy)
+        (not
+          (document_label_finalized ?decision_document)
+        )
+      )
+    :effect (document_label_finalized ?decision_document)
+  )
+  (:action finalize_label_and_mark_outcome_ready
+    :parameters (?decision_document - decision_document)
+    :precondition
+      (and
+        (document_label_finalized ?decision_document)
+        (not
+          (document_finalized ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (document_finalized ?decision_document)
+        (ready_for_outcome ?decision_document)
+      )
+  )
+  (:action apply_outcome_to_evaluator_a
+    :parameters (?evaluator_a - evaluator_stage_a ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_a_ready ?evaluator_a)
+        (evaluator_a_completed ?evaluator_a)
+        (outcome_record_ready ?outcome_record)
+        (outcome_finalized ?outcome_record)
+        (not
+          (ready_for_outcome ?evaluator_a)
+        )
+      )
+    :effect (ready_for_outcome ?evaluator_a)
+  )
+  (:action apply_outcome_to_evaluator_b
+    :parameters (?evaluator_b - evaluator_stage_b ?outcome_record - outcome_record)
+    :precondition
+      (and
+        (evaluator_b_ready ?evaluator_b)
+        (evaluator_b_completed ?evaluator_b)
+        (outcome_record_ready ?outcome_record)
+        (outcome_finalized ?outcome_record)
+        (not
+          (ready_for_outcome ?evaluator_b)
+        )
+      )
+    :effect (ready_for_outcome ?evaluator_b)
+  )
+  (:action apply_outcome_to_case
+    :parameters (?case - evaluation_unit ?correlation_id - correlation_id ?input_signal - input_signal)
+    :precondition
+      (and
+        (ready_for_outcome ?case)
+        (evaluation_unit_has_input_signal ?case ?input_signal)
+        (correlation_id_available ?correlation_id)
+        (not
+          (outcome_applied ?case)
+        )
+      )
+    :effect
+      (and
+        (outcome_applied ?case)
+        (evaluation_unit_has_correlation_id ?case ?correlation_id)
+        (not
+          (correlation_id_available ?correlation_id)
+        )
+      )
+  )
+  (:action close_evaluator_a_and_release_slot
+    :parameters (?evaluator_a - evaluator_stage_a ?slot - processor_slot ?correlation_id - correlation_id)
+    :precondition
+      (and
+        (outcome_applied ?evaluator_a)
+        (assigned_slot ?evaluator_a ?slot)
+        (evaluation_unit_has_correlation_id ?evaluator_a ?correlation_id)
+        (not
+          (evaluation_unit_finalized ?evaluator_a)
+        )
+      )
+    :effect
+      (and
+        (evaluation_unit_finalized ?evaluator_a)
+        (processor_slot_available ?slot)
+        (correlation_id_available ?correlation_id)
+      )
+  )
+  (:action close_evaluator_b_and_release_slot
+    :parameters (?evaluator_b - evaluator_stage_b ?slot - processor_slot ?correlation_id - correlation_id)
+    :precondition
+      (and
+        (outcome_applied ?evaluator_b)
+        (assigned_slot ?evaluator_b ?slot)
+        (evaluation_unit_has_correlation_id ?evaluator_b ?correlation_id)
+        (not
+          (evaluation_unit_finalized ?evaluator_b)
+        )
+      )
+    :effect
+      (and
+        (evaluation_unit_finalized ?evaluator_b)
+        (processor_slot_available ?slot)
+        (correlation_id_available ?correlation_id)
+      )
+  )
+  (:action close_document_and_release_slot
+    :parameters (?decision_document - decision_document ?slot - processor_slot ?correlation_id - correlation_id)
+    :precondition
+      (and
+        (outcome_applied ?decision_document)
+        (assigned_slot ?decision_document ?slot)
+        (evaluation_unit_has_correlation_id ?decision_document ?correlation_id)
+        (not
+          (evaluation_unit_finalized ?decision_document)
+        )
+      )
+    :effect
+      (and
+        (evaluation_unit_finalized ?decision_document)
+        (processor_slot_available ?slot)
+        (correlation_id_available ?correlation_id)
+      )
+  )
+)

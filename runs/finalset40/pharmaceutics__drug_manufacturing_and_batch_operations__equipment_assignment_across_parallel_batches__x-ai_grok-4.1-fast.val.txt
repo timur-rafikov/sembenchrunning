@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain equipment_assignment_across_parallel_batches)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types equipment_resource_type - object station_type - object unit_type - object lot_root_type - object lot_entity - lot_root_type equipment_line - equipment_resource_type process_tool - equipment_resource_type operator_or_support_resource - equipment_resource_type label_tag - equipment_resource_type qa_document_package - equipment_resource_type release_document - equipment_resource_type calibration_tag - equipment_resource_type sterility_certificate - equipment_resource_type consumable_or_kit - station_type single_use_container - station_type validation_certificate - station_type station_a - unit_type station_b - unit_type equipment_unit - unit_type lot_subtype_group_a - lot_entity lot_subtype_group_b - lot_entity parallel_line_a_lot - lot_subtype_group_a parallel_line_b_lot - lot_subtype_group_a manufacturing_lot - lot_subtype_group_b)
+  (:predicates
+    (lot_registered ?lot_entity - lot_entity)
+    (lot_stage_ready ?lot_entity - lot_entity)
+    (lot_resource_reserved ?lot_entity - lot_entity)
+    (equipment_assignment_complete ?lot_entity - lot_entity)
+    (lot_pre_release_ready ?lot_entity - lot_entity)
+    (lot_released ?lot_entity - lot_entity)
+    (equipment_line_available ?equipment_group_or_line - equipment_line)
+    (lot_assigned_to_equipment_line ?lot_entity - lot_entity ?equipment_group_or_line - equipment_line)
+    (process_tool_available ?process_tool - process_tool)
+    (lot_tool_assigned ?lot_entity - lot_entity ?process_tool - process_tool)
+    (operator_available ?operator_or_support_resource - operator_or_support_resource)
+    (operator_assigned_to_lot ?lot_entity - lot_entity ?operator_or_support_resource - operator_or_support_resource)
+    (consumable_available ?consumable_or_kit - consumable_or_kit)
+    (consumable_loaded_line_a ?parallel_line_a_lot - parallel_line_a_lot ?consumable_or_kit - consumable_or_kit)
+    (consumable_loaded_line_b ?parallel_line_b_lot - parallel_line_b_lot ?consumable_or_kit - consumable_or_kit)
+    (batch_compatible_with_station_a ?parallel_line_a_lot - parallel_line_a_lot ?station_a - station_a)
+    (station_a_reserved ?station_a - station_a)
+    (station_a_loaded ?station_a - station_a)
+    (station_a_completed ?parallel_line_a_lot - parallel_line_a_lot)
+    (batch_compatible_with_station_b ?parallel_line_b_lot - parallel_line_b_lot ?station_b - station_b)
+    (station_b_reserved ?station_b - station_b)
+    (station_b_loaded ?station_b - station_b)
+    (station_b_completed ?parallel_line_b_lot - parallel_line_b_lot)
+    (equipment_unit_available ?equipment_unit - equipment_unit)
+    (equipment_unit_locked ?equipment_unit - equipment_unit)
+    (equipment_unit_placed_at_station_a ?equipment_unit - equipment_unit ?station_a - station_a)
+    (equipment_unit_placed_at_station_b ?equipment_unit - equipment_unit ?station_b - station_b)
+    (equipment_unit_usage_flag_a ?equipment_unit - equipment_unit)
+    (equipment_unit_usage_flag_b ?equipment_unit - equipment_unit)
+    (equipment_unit_loaded ?equipment_unit - equipment_unit)
+    (lot_mapped_to_parallel_line_a ?manufacturing_lot - manufacturing_lot ?parallel_line_a_lot - parallel_line_a_lot)
+    (lot_mapped_to_parallel_line_b ?manufacturing_lot - manufacturing_lot ?parallel_line_b_lot - parallel_line_b_lot)
+    (lot_mapped_to_equipment_unit ?manufacturing_lot - manufacturing_lot ?equipment_unit - equipment_unit)
+    (container_available ?single_use_container - single_use_container)
+    (lot_requires_container ?manufacturing_lot - manufacturing_lot ?single_use_container - single_use_container)
+    (container_in_use ?single_use_container - single_use_container)
+    (container_attached_to_equipment_unit ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    (lot_container_attachment_complete ?manufacturing_lot - manufacturing_lot)
+    (lot_container_verified ?manufacturing_lot - manufacturing_lot)
+    (lot_execution_ready ?manufacturing_lot - manufacturing_lot)
+    (label_attached_to_lot ?manufacturing_lot - manufacturing_lot)
+    (label_verified_for_lot ?manufacturing_lot - manufacturing_lot)
+    (qa_package_attached ?manufacturing_lot - manufacturing_lot)
+    (execution_permission_granted ?manufacturing_lot - manufacturing_lot)
+    (validation_certificate_available ?validation_certificate - validation_certificate)
+    (validation_certificate_assigned_to_lot ?manufacturing_lot - manufacturing_lot ?validation_certificate - validation_certificate)
+    (validation_applied_to_lot ?manufacturing_lot - manufacturing_lot)
+    (validation_step_confirmed ?manufacturing_lot - manufacturing_lot)
+    (sterility_validation_performed ?manufacturing_lot - manufacturing_lot)
+    (label_available ?label_tag - label_tag)
+    (label_assigned_to_lot ?manufacturing_lot - manufacturing_lot ?label_tag - label_tag)
+    (qa_package_available ?qa_document_package - qa_document_package)
+    (qa_package_attached_to_lot ?manufacturing_lot - manufacturing_lot ?qa_document_package - qa_document_package)
+    (calibration_tag_available ?calibration_tag - calibration_tag)
+    (calibration_tag_attached_to_lot ?manufacturing_lot - manufacturing_lot ?calibration_tag - calibration_tag)
+    (sterility_certificate_available ?sterility_certificate - sterility_certificate)
+    (sterility_certificate_attached_to_lot ?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate)
+    (release_document_available ?release_document - release_document)
+    (release_document_attached_to_lot ?lot_entity - lot_entity ?release_document - release_document)
+    (line_a_upstream_complete ?parallel_line_a_lot - parallel_line_a_lot)
+    (line_b_upstream_complete ?parallel_line_b_lot - parallel_line_b_lot)
+    (lot_final_qa_complete ?manufacturing_lot - manufacturing_lot)
+  )
+  (:action register_lot_slot
+    :parameters (?lot_entity - lot_entity)
+    :precondition
+      (and
+        (not
+          (lot_registered ?lot_entity)
+        )
+        (not
+          (equipment_assignment_complete ?lot_entity)
+        )
+      )
+    :effect (lot_registered ?lot_entity)
+  )
+  (:action assign_lot_to_equipment_line
+    :parameters (?lot_entity - lot_entity ?equipment_group_or_line - equipment_line)
+    :precondition
+      (and
+        (lot_registered ?lot_entity)
+        (not
+          (lot_resource_reserved ?lot_entity)
+        )
+        (equipment_line_available ?equipment_group_or_line)
+      )
+    :effect
+      (and
+        (lot_resource_reserved ?lot_entity)
+        (lot_assigned_to_equipment_line ?lot_entity ?equipment_group_or_line)
+        (not
+          (equipment_line_available ?equipment_group_or_line)
+        )
+      )
+  )
+  (:action reserve_process_tool_for_lot
+    :parameters (?lot_entity - lot_entity ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_registered ?lot_entity)
+        (lot_resource_reserved ?lot_entity)
+        (process_tool_available ?process_tool)
+      )
+    :effect
+      (and
+        (lot_tool_assigned ?lot_entity ?process_tool)
+        (not
+          (process_tool_available ?process_tool)
+        )
+      )
+  )
+  (:action mark_lot_stage_ready
+    :parameters (?lot_entity - lot_entity ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_registered ?lot_entity)
+        (lot_resource_reserved ?lot_entity)
+        (lot_tool_assigned ?lot_entity ?process_tool)
+        (not
+          (lot_stage_ready ?lot_entity)
+        )
+      )
+    :effect (lot_stage_ready ?lot_entity)
+  )
+  (:action release_process_tool_from_lot
+    :parameters (?lot_entity - lot_entity ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_tool_assigned ?lot_entity ?process_tool)
+      )
+    :effect
+      (and
+        (process_tool_available ?process_tool)
+        (not
+          (lot_tool_assigned ?lot_entity ?process_tool)
+        )
+      )
+  )
+  (:action assign_operator_to_lot
+    :parameters (?lot_entity - lot_entity ?operator_or_support_resource - operator_or_support_resource)
+    :precondition
+      (and
+        (lot_stage_ready ?lot_entity)
+        (operator_available ?operator_or_support_resource)
+      )
+    :effect
+      (and
+        (operator_assigned_to_lot ?lot_entity ?operator_or_support_resource)
+        (not
+          (operator_available ?operator_or_support_resource)
+        )
+      )
+  )
+  (:action release_operator_from_lot
+    :parameters (?lot_entity - lot_entity ?operator_or_support_resource - operator_or_support_resource)
+    :precondition
+      (and
+        (operator_assigned_to_lot ?lot_entity ?operator_or_support_resource)
+      )
+    :effect
+      (and
+        (operator_available ?operator_or_support_resource)
+        (not
+          (operator_assigned_to_lot ?lot_entity ?operator_or_support_resource)
+        )
+      )
+  )
+  (:action attach_calibration_tag_to_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?calibration_tag - calibration_tag)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (calibration_tag_available ?calibration_tag)
+      )
+    :effect
+      (and
+        (calibration_tag_attached_to_lot ?manufacturing_lot ?calibration_tag)
+        (not
+          (calibration_tag_available ?calibration_tag)
+        )
+      )
+  )
+  (:action detach_calibration_tag_from_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?calibration_tag - calibration_tag)
+    :precondition
+      (and
+        (calibration_tag_attached_to_lot ?manufacturing_lot ?calibration_tag)
+      )
+    :effect
+      (and
+        (calibration_tag_available ?calibration_tag)
+        (not
+          (calibration_tag_attached_to_lot ?manufacturing_lot ?calibration_tag)
+        )
+      )
+  )
+  (:action attach_sterility_certificate_to_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (sterility_certificate_available ?sterility_certificate)
+      )
+    :effect
+      (and
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (not
+          (sterility_certificate_available ?sterility_certificate)
+        )
+      )
+  )
+  (:action detach_sterility_certificate_from_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate)
+    :precondition
+      (and
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+      )
+    :effect
+      (and
+        (sterility_certificate_available ?sterility_certificate)
+        (not
+          (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        )
+      )
+  )
+  (:action reserve_station_a_for_line_a_lot
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?station_a - station_a ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_a_lot)
+        (lot_tool_assigned ?parallel_line_a_lot ?process_tool)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (not
+          (station_a_reserved ?station_a)
+        )
+        (not
+          (station_a_loaded ?station_a)
+        )
+      )
+    :effect (station_a_reserved ?station_a)
+  )
+  (:action assign_operator_and_complete_station_a
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?station_a - station_a ?operator_or_support_resource - operator_or_support_resource)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_a_lot)
+        (operator_assigned_to_lot ?parallel_line_a_lot ?operator_or_support_resource)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (station_a_reserved ?station_a)
+        (not
+          (line_a_upstream_complete ?parallel_line_a_lot)
+        )
+      )
+    :effect
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (station_a_completed ?parallel_line_a_lot)
+      )
+  )
+  (:action load_consumable_on_station_a
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?station_a - station_a ?consumable_or_kit - consumable_or_kit)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_a_lot)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (consumable_available ?consumable_or_kit)
+        (not
+          (line_a_upstream_complete ?parallel_line_a_lot)
+        )
+      )
+    :effect
+      (and
+        (station_a_loaded ?station_a)
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (consumable_loaded_line_a ?parallel_line_a_lot ?consumable_or_kit)
+        (not
+          (consumable_available ?consumable_or_kit)
+        )
+      )
+  )
+  (:action finalize_station_a_processing
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?station_a - station_a ?process_tool - process_tool ?consumable_or_kit - consumable_or_kit)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_a_lot)
+        (lot_tool_assigned ?parallel_line_a_lot ?process_tool)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (station_a_loaded ?station_a)
+        (consumable_loaded_line_a ?parallel_line_a_lot ?consumable_or_kit)
+        (not
+          (station_a_completed ?parallel_line_a_lot)
+        )
+      )
+    :effect
+      (and
+        (station_a_reserved ?station_a)
+        (station_a_completed ?parallel_line_a_lot)
+        (consumable_available ?consumable_or_kit)
+        (not
+          (consumable_loaded_line_a ?parallel_line_a_lot ?consumable_or_kit)
+        )
+      )
+  )
+  (:action reserve_station_b_for_line_b_lot
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?station_b - station_b ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_b_lot)
+        (lot_tool_assigned ?parallel_line_b_lot ?process_tool)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (not
+          (station_b_reserved ?station_b)
+        )
+        (not
+          (station_b_loaded ?station_b)
+        )
+      )
+    :effect (station_b_reserved ?station_b)
+  )
+  (:action assign_operator_and_complete_station_b
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?station_b - station_b ?operator_or_support_resource - operator_or_support_resource)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_b_lot)
+        (operator_assigned_to_lot ?parallel_line_b_lot ?operator_or_support_resource)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_b_reserved ?station_b)
+        (not
+          (line_b_upstream_complete ?parallel_line_b_lot)
+        )
+      )
+    :effect
+      (and
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (station_b_completed ?parallel_line_b_lot)
+      )
+  )
+  (:action load_consumable_on_station_b
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?station_b - station_b ?consumable_or_kit - consumable_or_kit)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_b_lot)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (consumable_available ?consumable_or_kit)
+        (not
+          (line_b_upstream_complete ?parallel_line_b_lot)
+        )
+      )
+    :effect
+      (and
+        (station_b_loaded ?station_b)
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (consumable_loaded_line_b ?parallel_line_b_lot ?consumable_or_kit)
+        (not
+          (consumable_available ?consumable_or_kit)
+        )
+      )
+  )
+  (:action finalize_station_b_processing
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?station_b - station_b ?process_tool - process_tool ?consumable_or_kit - consumable_or_kit)
+    :precondition
+      (and
+        (lot_stage_ready ?parallel_line_b_lot)
+        (lot_tool_assigned ?parallel_line_b_lot ?process_tool)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_b_loaded ?station_b)
+        (consumable_loaded_line_b ?parallel_line_b_lot ?consumable_or_kit)
+        (not
+          (station_b_completed ?parallel_line_b_lot)
+        )
+      )
+    :effect
+      (and
+        (station_b_reserved ?station_b)
+        (station_b_completed ?parallel_line_b_lot)
+        (consumable_available ?consumable_or_kit)
+        (not
+          (consumable_loaded_line_b ?parallel_line_b_lot ?consumable_or_kit)
+        )
+      )
+  )
+  (:action assign_equipment_unit_to_stations_and_lock
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?parallel_line_b_lot - parallel_line_b_lot ?station_a - station_a ?station_b - station_b ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_a_reserved ?station_a)
+        (station_b_reserved ?station_b)
+        (station_a_completed ?parallel_line_a_lot)
+        (station_b_completed ?parallel_line_b_lot)
+        (equipment_unit_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_placed_at_station_a ?equipment_unit ?station_a)
+        (equipment_unit_placed_at_station_b ?equipment_unit ?station_b)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_equipment_unit_to_stations_and_lock_flag_a
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?parallel_line_b_lot - parallel_line_b_lot ?station_a - station_a ?station_b - station_b ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_a_loaded ?station_a)
+        (station_b_reserved ?station_b)
+        (not
+          (station_a_completed ?parallel_line_a_lot)
+        )
+        (station_b_completed ?parallel_line_b_lot)
+        (equipment_unit_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_placed_at_station_a ?equipment_unit ?station_a)
+        (equipment_unit_placed_at_station_b ?equipment_unit ?station_b)
+        (equipment_unit_usage_flag_a ?equipment_unit)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_equipment_unit_to_stations_and_lock_flag_b
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?parallel_line_b_lot - parallel_line_b_lot ?station_a - station_a ?station_b - station_b ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_a_reserved ?station_a)
+        (station_b_loaded ?station_b)
+        (station_a_completed ?parallel_line_a_lot)
+        (not
+          (station_b_completed ?parallel_line_b_lot)
+        )
+        (equipment_unit_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_placed_at_station_a ?equipment_unit ?station_a)
+        (equipment_unit_placed_at_station_b ?equipment_unit ?station_b)
+        (equipment_unit_usage_flag_b ?equipment_unit)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_equipment_unit_to_stations_and_lock_dual_flag
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?parallel_line_b_lot - parallel_line_b_lot ?station_a - station_a ?station_b - station_b ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (batch_compatible_with_station_a ?parallel_line_a_lot ?station_a)
+        (batch_compatible_with_station_b ?parallel_line_b_lot ?station_b)
+        (station_a_loaded ?station_a)
+        (station_b_loaded ?station_b)
+        (not
+          (station_a_completed ?parallel_line_a_lot)
+        )
+        (not
+          (station_b_completed ?parallel_line_b_lot)
+        )
+        (equipment_unit_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_placed_at_station_a ?equipment_unit ?station_a)
+        (equipment_unit_placed_at_station_b ?equipment_unit ?station_b)
+        (equipment_unit_usage_flag_a ?equipment_unit)
+        (equipment_unit_usage_flag_b ?equipment_unit)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action mark_equipment_unit_loaded
+    :parameters (?equipment_unit - equipment_unit ?parallel_line_a_lot - parallel_line_a_lot ?process_tool - process_tool)
+    :precondition
+      (and
+        (equipment_unit_locked ?equipment_unit)
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (lot_tool_assigned ?parallel_line_a_lot ?process_tool)
+        (not
+          (equipment_unit_loaded ?equipment_unit)
+        )
+      )
+    :effect (equipment_unit_loaded ?equipment_unit)
+  )
+  (:action attach_container_to_unit_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (lot_mapped_to_equipment_unit ?manufacturing_lot ?equipment_unit)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_available ?single_use_container)
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_loaded ?equipment_unit)
+        (not
+          (container_in_use ?single_use_container)
+        )
+      )
+    :effect
+      (and
+        (container_in_use ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (not
+          (container_available ?single_use_container)
+        )
+      )
+  )
+  (:action finalize_container_preparation_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?single_use_container - single_use_container ?equipment_unit - equipment_unit ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_in_use ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (lot_tool_assigned ?manufacturing_lot ?process_tool)
+        (not
+          (equipment_unit_usage_flag_a ?equipment_unit)
+        )
+        (not
+          (lot_container_attachment_complete ?manufacturing_lot)
+        )
+      )
+    :effect (lot_container_attachment_complete ?manufacturing_lot)
+  )
+  (:action apply_label_to_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?label_tag - label_tag)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (label_available ?label_tag)
+        (not
+          (label_attached_to_lot ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (label_attached_to_lot ?manufacturing_lot)
+        (label_assigned_to_lot ?manufacturing_lot ?label_tag)
+        (not
+          (label_available ?label_tag)
+        )
+      )
+  )
+  (:action verify_label_and_confirm_container_preparation
+    :parameters (?manufacturing_lot - manufacturing_lot ?single_use_container - single_use_container ?equipment_unit - equipment_unit ?process_tool - process_tool ?label_tag - label_tag)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_in_use ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (lot_tool_assigned ?manufacturing_lot ?process_tool)
+        (equipment_unit_usage_flag_a ?equipment_unit)
+        (label_attached_to_lot ?manufacturing_lot)
+        (label_assigned_to_lot ?manufacturing_lot ?label_tag)
+        (not
+          (lot_container_attachment_complete ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_container_attachment_complete ?manufacturing_lot)
+        (label_verified_for_lot ?manufacturing_lot)
+      )
+  )
+  (:action start_lot_container_verification
+    :parameters (?manufacturing_lot - manufacturing_lot ?calibration_tag - calibration_tag ?operator_or_support_resource - operator_or_support_resource ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_attachment_complete ?manufacturing_lot)
+        (calibration_tag_attached_to_lot ?manufacturing_lot ?calibration_tag)
+        (operator_assigned_to_lot ?manufacturing_lot ?operator_or_support_resource)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (not
+          (equipment_unit_usage_flag_b ?equipment_unit)
+        )
+        (not
+          (lot_container_verified ?manufacturing_lot)
+        )
+      )
+    :effect (lot_container_verified ?manufacturing_lot)
+  )
+  (:action continue_lot_container_verification
+    :parameters (?manufacturing_lot - manufacturing_lot ?calibration_tag - calibration_tag ?operator_or_support_resource - operator_or_support_resource ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_attachment_complete ?manufacturing_lot)
+        (calibration_tag_attached_to_lot ?manufacturing_lot ?calibration_tag)
+        (operator_assigned_to_lot ?manufacturing_lot ?operator_or_support_resource)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (equipment_unit_usage_flag_b ?equipment_unit)
+        (not
+          (lot_container_verified ?manufacturing_lot)
+        )
+      )
+    :effect (lot_container_verified ?manufacturing_lot)
+  )
+  (:action attach_sterility_and_mark_lot_pre_execution_ready
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_verified ?manufacturing_lot)
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (not
+          (equipment_unit_usage_flag_a ?equipment_unit)
+        )
+        (not
+          (equipment_unit_usage_flag_b ?equipment_unit)
+        )
+        (not
+          (lot_execution_ready ?manufacturing_lot)
+        )
+      )
+    :effect (lot_execution_ready ?manufacturing_lot)
+  )
+  (:action attach_sterility_and_set_qa_attached_with_flag_a
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_verified ?manufacturing_lot)
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (equipment_unit_usage_flag_a ?equipment_unit)
+        (not
+          (equipment_unit_usage_flag_b ?equipment_unit)
+        )
+        (not
+          (lot_execution_ready ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (qa_package_attached ?manufacturing_lot)
+      )
+  )
+  (:action attach_sterility_and_set_qa_attached_with_flag_b
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_verified ?manufacturing_lot)
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (not
+          (equipment_unit_usage_flag_a ?equipment_unit)
+        )
+        (equipment_unit_usage_flag_b ?equipment_unit)
+        (not
+          (lot_execution_ready ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (qa_package_attached ?manufacturing_lot)
+      )
+  )
+  (:action attach_sterility_and_set_qa_attached_with_both_flags
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate ?single_use_container - single_use_container ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (lot_container_verified ?manufacturing_lot)
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (lot_requires_container ?manufacturing_lot ?single_use_container)
+        (container_attached_to_equipment_unit ?single_use_container ?equipment_unit)
+        (equipment_unit_usage_flag_a ?equipment_unit)
+        (equipment_unit_usage_flag_b ?equipment_unit)
+        (not
+          (lot_execution_ready ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (qa_package_attached ?manufacturing_lot)
+      )
+  )
+  (:action finalize_lot_pre_release_without_qa_package
+    :parameters (?manufacturing_lot - manufacturing_lot)
+    :precondition
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (not
+          (qa_package_attached ?manufacturing_lot)
+        )
+        (not
+          (lot_final_qa_complete ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_final_qa_complete ?manufacturing_lot)
+        (lot_pre_release_ready ?manufacturing_lot)
+      )
+  )
+  (:action attach_qa_package_to_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?qa_document_package - qa_document_package)
+    :precondition
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (qa_package_attached ?manufacturing_lot)
+        (qa_package_available ?qa_document_package)
+      )
+    :effect
+      (and
+        (qa_package_attached_to_lot ?manufacturing_lot ?qa_document_package)
+        (not
+          (qa_package_available ?qa_document_package)
+        )
+      )
+  )
+  (:action grant_execution_permission_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?parallel_line_a_lot - parallel_line_a_lot ?parallel_line_b_lot - parallel_line_b_lot ?process_tool - process_tool ?qa_document_package - qa_document_package)
+    :precondition
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (qa_package_attached ?manufacturing_lot)
+        (qa_package_attached_to_lot ?manufacturing_lot ?qa_document_package)
+        (lot_mapped_to_parallel_line_a ?manufacturing_lot ?parallel_line_a_lot)
+        (lot_mapped_to_parallel_line_b ?manufacturing_lot ?parallel_line_b_lot)
+        (station_a_completed ?parallel_line_a_lot)
+        (station_b_completed ?parallel_line_b_lot)
+        (lot_tool_assigned ?manufacturing_lot ?process_tool)
+        (not
+          (execution_permission_granted ?manufacturing_lot)
+        )
+      )
+    :effect (execution_permission_granted ?manufacturing_lot)
+  )
+  (:action finalize_lot_pre_release_after_execution
+    :parameters (?manufacturing_lot - manufacturing_lot)
+    :precondition
+      (and
+        (lot_execution_ready ?manufacturing_lot)
+        (execution_permission_granted ?manufacturing_lot)
+        (not
+          (lot_final_qa_complete ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_final_qa_complete ?manufacturing_lot)
+        (lot_pre_release_ready ?manufacturing_lot)
+      )
+  )
+  (:action apply_validation_certificate_to_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?validation_certificate - validation_certificate ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_stage_ready ?manufacturing_lot)
+        (lot_tool_assigned ?manufacturing_lot ?process_tool)
+        (validation_certificate_available ?validation_certificate)
+        (validation_certificate_assigned_to_lot ?manufacturing_lot ?validation_certificate)
+        (not
+          (validation_applied_to_lot ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (validation_applied_to_lot ?manufacturing_lot)
+        (not
+          (validation_certificate_available ?validation_certificate)
+        )
+      )
+  )
+  (:action confirm_validation_step_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?operator_or_support_resource - operator_or_support_resource)
+    :precondition
+      (and
+        (validation_applied_to_lot ?manufacturing_lot)
+        (operator_assigned_to_lot ?manufacturing_lot ?operator_or_support_resource)
+        (not
+          (validation_step_confirmed ?manufacturing_lot)
+        )
+      )
+    :effect (validation_step_confirmed ?manufacturing_lot)
+  )
+  (:action perform_sterility_validation_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?sterility_certificate - sterility_certificate)
+    :precondition
+      (and
+        (validation_step_confirmed ?manufacturing_lot)
+        (sterility_certificate_attached_to_lot ?manufacturing_lot ?sterility_certificate)
+        (not
+          (sterility_validation_performed ?manufacturing_lot)
+        )
+      )
+    :effect (sterility_validation_performed ?manufacturing_lot)
+  )
+  (:action finalize_lot_after_validation
+    :parameters (?manufacturing_lot - manufacturing_lot)
+    :precondition
+      (and
+        (sterility_validation_performed ?manufacturing_lot)
+        (not
+          (lot_final_qa_complete ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (lot_final_qa_complete ?manufacturing_lot)
+        (lot_pre_release_ready ?manufacturing_lot)
+      )
+  )
+  (:action mark_line_a_lot_ready
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_a_upstream_complete ?parallel_line_a_lot)
+        (station_a_completed ?parallel_line_a_lot)
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_loaded ?equipment_unit)
+        (not
+          (lot_pre_release_ready ?parallel_line_a_lot)
+        )
+      )
+    :effect (lot_pre_release_ready ?parallel_line_a_lot)
+  )
+  (:action mark_line_b_lot_ready
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (line_b_upstream_complete ?parallel_line_b_lot)
+        (station_b_completed ?parallel_line_b_lot)
+        (equipment_unit_locked ?equipment_unit)
+        (equipment_unit_loaded ?equipment_unit)
+        (not
+          (lot_pre_release_ready ?parallel_line_b_lot)
+        )
+      )
+    :effect (lot_pre_release_ready ?parallel_line_b_lot)
+  )
+  (:action attach_release_document_to_lot_and_mark_released
+    :parameters (?lot_entity - lot_entity ?release_document - release_document ?process_tool - process_tool)
+    :precondition
+      (and
+        (lot_pre_release_ready ?lot_entity)
+        (lot_tool_assigned ?lot_entity ?process_tool)
+        (release_document_available ?release_document)
+        (not
+          (lot_released ?lot_entity)
+        )
+      )
+    :effect
+      (and
+        (lot_released ?lot_entity)
+        (release_document_attached_to_lot ?lot_entity ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action finalize_equipment_line_assignment_for_line_a_lot
+    :parameters (?parallel_line_a_lot - parallel_line_a_lot ?equipment_group_or_line - equipment_line ?release_document - release_document)
+    :precondition
+      (and
+        (lot_released ?parallel_line_a_lot)
+        (lot_assigned_to_equipment_line ?parallel_line_a_lot ?equipment_group_or_line)
+        (release_document_attached_to_lot ?parallel_line_a_lot ?release_document)
+        (not
+          (equipment_assignment_complete ?parallel_line_a_lot)
+        )
+      )
+    :effect
+      (and
+        (equipment_assignment_complete ?parallel_line_a_lot)
+        (equipment_line_available ?equipment_group_or_line)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action finalize_equipment_line_assignment_for_line_b_lot
+    :parameters (?parallel_line_b_lot - parallel_line_b_lot ?equipment_group_or_line - equipment_line ?release_document - release_document)
+    :precondition
+      (and
+        (lot_released ?parallel_line_b_lot)
+        (lot_assigned_to_equipment_line ?parallel_line_b_lot ?equipment_group_or_line)
+        (release_document_attached_to_lot ?parallel_line_b_lot ?release_document)
+        (not
+          (equipment_assignment_complete ?parallel_line_b_lot)
+        )
+      )
+    :effect
+      (and
+        (equipment_assignment_complete ?parallel_line_b_lot)
+        (equipment_line_available ?equipment_group_or_line)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action finalize_equipment_line_assignment_for_lot
+    :parameters (?manufacturing_lot - manufacturing_lot ?equipment_group_or_line - equipment_line ?release_document - release_document)
+    :precondition
+      (and
+        (lot_released ?manufacturing_lot)
+        (lot_assigned_to_equipment_line ?manufacturing_lot ?equipment_group_or_line)
+        (release_document_attached_to_lot ?manufacturing_lot ?release_document)
+        (not
+          (equipment_assignment_complete ?manufacturing_lot)
+        )
+      )
+    :effect
+      (and
+        (equipment_assignment_complete ?manufacturing_lot)
+        (equipment_line_available ?equipment_group_or_line)
+        (release_document_available ?release_document)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem equipment_assignment_across_parallel_batches_scenario)
+  (:domain equipment_assignment_across_parallel_batches)
+  (:objects line_a_batch_1 - parallel_line_a_lot line_b_batch_1 - parallel_line_b_lot lot_1 - manufacturing_lot lot_2 - manufacturing_lot equipment_line_1 - equipment_line equipment_line_2 - equipment_line equipment_line_3 - equipment_line process_tool_1 - process_tool operator_1 - operator_or_support_resource consumable_kit_1 - consumable_or_kit station_a_1 - station_a station_b_1 - station_b equipment_unit_1 - equipment_unit single_use_container_1 - single_use_container single_use_container_2 - single_use_container label_tag_1 - label_tag label_tag_2 - label_tag qa_package_1 - qa_document_package qa_package_2 - qa_document_package release_document_1 - release_document calibration_tag_1 - calibration_tag validation_certificate_1 - validation_certificate validation_certificate_2 - validation_certificate sterility_certificate_1 - sterility_certificate)
+  (:init
+    (equipment_line_available equipment_line_1)
+    (equipment_line_available equipment_line_2)
+    (equipment_line_available equipment_line_3)
+    (process_tool_available process_tool_1)
+    (operator_available operator_1)
+    (consumable_available consumable_kit_1)
+    (batch_compatible_with_station_a line_a_batch_1 station_a_1)
+    (batch_compatible_with_station_b line_b_batch_1 station_b_1)
+    (equipment_unit_available equipment_unit_1)
+    (container_available single_use_container_1)
+    (container_available single_use_container_2)
+    (lot_mapped_to_parallel_line_a lot_1 line_a_batch_1)
+    (lot_mapped_to_parallel_line_a lot_2 line_a_batch_1)
+    (lot_mapped_to_parallel_line_b lot_1 line_b_batch_1)
+    (lot_mapped_to_parallel_line_b lot_2 line_b_batch_1)
+    (lot_mapped_to_equipment_unit lot_1 equipment_unit_1)
+    (lot_mapped_to_equipment_unit lot_2 equipment_unit_1)
+    (lot_requires_container lot_1 single_use_container_1)
+    (lot_requires_container lot_2 single_use_container_2)
+    (label_available label_tag_1)
+    (label_available label_tag_2)
+    (qa_package_available qa_package_1)
+    (qa_package_available qa_package_2)
+    (release_document_available release_document_1)
+    (calibration_tag_available calibration_tag_1)
+    (validation_certificate_available validation_certificate_1)
+    (validation_certificate_assigned_to_lot lot_1 validation_certificate_1)
+    (validation_certificate_assigned_to_lot lot_2 validation_certificate_2)
+    (sterility_certificate_available sterility_certificate_1)
+  )
+  (:goal
+    (and
+      (equipment_assignment_complete line_a_batch_1)
+      (equipment_assignment_complete line_b_batch_1)
+      (equipment_assignment_complete lot_1)
+      (equipment_assignment_complete lot_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_lot_slot line_a_batch_1)
+(register_lot_slot line_b_batch_1)
+(assign_lot_to_equipment_line line_a_batch_1 equipment_line_1)
+(assign_lot_to_equipment_line line_b_batch_1 equipment_line_2)
+(reserve_process_tool_for_lot line_a_batch_1 process_tool_1)
+(mark_lot_stage_ready line_a_batch_1 process_tool_1)
+(reserve_station_a_for_line_a_lot line_a_batch_1 station_a_1 process_tool_1)
+(assign_operator_to_lot line_a_batch_1 operator_1)
+(assign_operator_and_complete_station_a line_a_batch_1 station_a_1 operator_1)
+(release_operator_from_lot line_a_batch_1 operator_1)
+(release_process_tool_from_lot line_a_batch_1 process_tool_1)
+(reserve_process_tool_for_lot line_b_batch_1 process_tool_1)
+(mark_lot_stage_ready line_b_batch_1 process_tool_1)
+(reserve_station_b_for_line_b_lot line_b_batch_1 station_b_1 process_tool_1)
+(assign_operator_to_lot line_b_batch_1 operator_1)
+(assign_operator_and_complete_station_b line_b_batch_1 station_b_1 operator_1)
+(release_operator_from_lot line_b_batch_1 operator_1)
+(release_process_tool_from_lot line_b_batch_1 process_tool_1)
+(assign_equipment_unit_to_stations_and_lock line_a_batch_1 line_b_batch_1 station_a_1 station_b_1 equipment_unit_1)
+(reserve_process_tool_for_lot line_a_batch_1 process_tool_1)
+(mark_equipment_unit_loaded equipment_unit_1 line_a_batch_1 process_tool_1)
+(release_process_tool_from_lot line_a_batch_1 process_tool_1)
+(mark_line_a_lot_ready line_a_batch_1 equipment_unit_1)
+(mark_line_b_lot_ready line_b_batch_1 equipment_unit_1)
+(reserve_process_tool_for_lot line_a_batch_1 process_tool_1)
+(attach_release_document_to_lot_and_mark_released line_a_batch_1 release_document_1 process_tool_1)
+(finalize_equipment_line_assignment_for_line_a_lot line_a_batch_1 equipment_line_1 release_document_1)
+(release_process_tool_from_lot line_a_batch_1 process_tool_1)
+(reserve_process_tool_for_lot line_b_batch_1 process_tool_1)
+(attach_release_document_to_lot_and_mark_released line_b_batch_1 release_document_1 process_tool_1)
+(finalize_equipment_line_assignment_for_line_b_lot line_b_batch_1 equipment_line_2 release_document_1)
+(release_process_tool_from_lot line_b_batch_1 process_tool_1)
+(register_lot_slot lot_1)
+(register_lot_slot lot_2)
+(assign_lot_to_equipment_line lot_1 equipment_line_1)
+(assign_lot_to_equipment_line lot_2 equipment_line_2)
+(reserve_process_tool_for_lot lot_1 process_tool_1)
+(mark_lot_stage_ready lot_1 process_tool_1)
+(attach_container_to_unit_for_lot lot_1 single_use_container_1 equipment_unit_1)
+(finalize_container_preparation_for_lot lot_1 single_use_container_1 equipment_unit_1 process_tool_1)
+(attach_calibration_tag_to_lot lot_1 calibration_tag_1)
+(assign_operator_to_lot lot_1 operator_1)
+(start_lot_container_verification lot_1 calibration_tag_1 operator_1 single_use_container_1 equipment_unit_1)
+(attach_sterility_certificate_to_lot lot_1 sterility_certificate_1)
+(attach_sterility_and_mark_lot_pre_execution_ready lot_1 sterility_certificate_1 single_use_container_1 equipment_unit_1)
+(finalize_lot_pre_release_without_qa_package lot_1)
+(attach_release_document_to_lot_and_mark_released lot_1 release_document_1 process_tool_1)
+(finalize_equipment_line_assignment_for_lot lot_1 equipment_line_1 release_document_1)
+(detach_calibration_tag_from_lot lot_1 calibration_tag_1)
+(detach_sterility_certificate_from_lot lot_1 sterility_certificate_1)
+(release_operator_from_lot lot_1 operator_1)
+(release_process_tool_from_lot lot_1 process_tool_1)
+(reserve_process_tool_for_lot lot_2 process_tool_1)
+(mark_lot_stage_ready lot_2 process_tool_1)
+(attach_container_to_unit_for_lot lot_2 single_use_container_2 equipment_unit_1)
+(finalize_container_preparation_for_lot lot_2 single_use_container_2 equipment_unit_1 process_tool_1)
+(attach_calibration_tag_to_lot lot_2 calibration_tag_1)
+(assign_operator_to_lot lot_2 operator_1)
+(start_lot_container_verification lot_2 calibration_tag_1 operator_1 single_use_container_2 equipment_unit_1)
+(attach_sterility_certificate_to_lot lot_2 sterility_certificate_1)
+(attach_sterility_and_mark_lot_pre_execution_ready lot_2 sterility_certificate_1 single_use_container_2 equipment_unit_1)
+(finalize_lot_pre_release_without_qa_package lot_2)
+(attach_release_document_to_lot_and_mark_released lot_2 release_document_1 process_tool_1)
+(finalize_equipment_line_assignment_for_lot lot_2 equipment_line_2 release_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_fe5o9nn6/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_fe5o9nn6/plan.pddl 64 
+
+
+
+--- stderr ---
+

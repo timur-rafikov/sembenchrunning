@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain covenant_package_assignment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object_root - object resource_group - object_root asset_group - object_root package_component_group - object_root case_entity_root - object_root case_entity - case_entity_root covenant_package_template - resource_group pricing_model - resource_group credit_reviewer - resource_group clause_template - resource_group approval_document - resource_group assignment_evidence - resource_group security_action - resource_group external_condition - resource_group collateral_asset - asset_group document_bundle - asset_group regulatory_notice - asset_group exposure_profile - package_component_group drawdown_profile - package_component_group assignment_record - package_component_group obligor_role - case_entity package_instance_marker - case_entity borrower_obligor - obligor_role guarantor_obligor - obligor_role covenant_package_instance - package_instance_marker)
+
+  (:predicates
+    (credit_case_opened ?case_entity - case_entity)
+    (credit_review_cleared ?case_entity - case_entity)
+    (template_reserved ?case_entity - case_entity)
+    (assignment_confirmed ?case_entity - case_entity)
+    (assignment_authorized ?case_entity - case_entity)
+    (assignment_clearance_recorded ?case_entity - case_entity)
+    (covenant_template_available ?covenant_package_template - covenant_package_template)
+    (template_linked_to_case ?case_entity - case_entity ?covenant_package_template - covenant_package_template)
+    (pricing_model_available ?pricing_model - pricing_model)
+    (pricing_model_linked_to_case ?case_entity - case_entity ?pricing_model - pricing_model)
+    (reviewer_available ?credit_reviewer - credit_reviewer)
+    (reviewer_linked_to_case ?case_entity - case_entity ?credit_reviewer - credit_reviewer)
+    (collateral_asset_available ?collateral_asset - collateral_asset)
+    (borrower_collateral_linked ?borrower_obligor - borrower_obligor ?collateral_asset - collateral_asset)
+    (guarantor_collateral_linked ?guarantor_obligor - guarantor_obligor ?collateral_asset - collateral_asset)
+    (borrower_exposure_profile_assigned ?borrower_obligor - borrower_obligor ?exposure_profile - exposure_profile)
+    (borrower_exposure_profile_selected ?exposure_profile - exposure_profile)
+    (borrower_exposure_profile_adjusted ?exposure_profile - exposure_profile)
+    (borrower_control_confirmed ?borrower_obligor - borrower_obligor)
+    (guarantor_drawdown_profile_assigned ?guarantor_obligor - guarantor_obligor ?drawdown_profile - drawdown_profile)
+    (guarantor_drawdown_profile_selected ?drawdown_profile - drawdown_profile)
+    (guarantor_drawdown_profile_adjusted ?drawdown_profile - drawdown_profile)
+    (guarantor_control_confirmed ?guarantor_obligor - guarantor_obligor)
+    (assignment_record_available ?assignment_record - assignment_record)
+    (assignment_record_prepared ?assignment_record - assignment_record)
+    (assignment_record_borrower_profile_linked ?assignment_record - assignment_record ?exposure_profile - exposure_profile)
+    (assignment_record_guarantor_profile_linked ?assignment_record - assignment_record ?drawdown_profile - drawdown_profile)
+    (assignment_record_flag_alpha ?assignment_record - assignment_record)
+    (assignment_record_flag_beta ?assignment_record - assignment_record)
+    (assignment_record_locked ?assignment_record - assignment_record)
+    (borrower_linked_to_case ?covenant_package_instance - covenant_package_instance ?borrower_obligor - borrower_obligor)
+    (guarantor_linked_to_case ?covenant_package_instance - covenant_package_instance ?guarantor_obligor - guarantor_obligor)
+    (assignment_record_linked_to_case ?covenant_package_instance - covenant_package_instance ?assignment_record - assignment_record)
+    (document_bundle_available ?document_bundle - document_bundle)
+    (document_bundle_linked_to_case ?covenant_package_instance - covenant_package_instance ?document_bundle - document_bundle)
+    (document_bundle_reserved ?document_bundle - document_bundle)
+    (document_bundle_drawdown_linked ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    (package_documentation_complete ?covenant_package_instance - covenant_package_instance)
+    (package_security_action_recorded ?covenant_package_instance - covenant_package_instance)
+    (package_security_path_complete ?covenant_package_instance - covenant_package_instance)
+    (clause_template_selected ?covenant_package_instance - covenant_package_instance)
+    (package_clause_bundle_complete ?covenant_package_instance - covenant_package_instance)
+    (package_signoff_ready ?covenant_package_instance - covenant_package_instance)
+    (package_signoff_recorded ?covenant_package_instance - covenant_package_instance)
+    (regulatory_notice_available ?regulatory_notice - regulatory_notice)
+    (regulatory_notice_linked_to_case ?covenant_package_instance - covenant_package_instance ?regulatory_notice - regulatory_notice)
+    (regulatory_notice_recorded ?covenant_package_instance - covenant_package_instance)
+    (reviewer_clearance_recorded ?covenant_package_instance - covenant_package_instance)
+    (external_condition_clearance_recorded ?covenant_package_instance - covenant_package_instance)
+    (clause_template_available ?clause_template - clause_template)
+    (clause_template_linked_to_case ?covenant_package_instance - covenant_package_instance ?clause_template - clause_template)
+    (approval_document_available ?approval_document - approval_document)
+    (approval_document_linked_to_case ?covenant_package_instance - covenant_package_instance ?approval_document - approval_document)
+    (security_action_available ?security_action - security_action)
+    (security_action_linked_to_case ?covenant_package_instance - covenant_package_instance ?security_action - security_action)
+    (external_condition_available ?external_condition - external_condition)
+    (external_condition_linked_to_case ?covenant_package_instance - covenant_package_instance ?external_condition - external_condition)
+    (assignment_evidence_available ?assignment_evidence - assignment_evidence)
+    (assignment_evidence_linked_to_case ?case_entity - case_entity ?assignment_evidence - assignment_evidence)
+    (borrower_control_flagged ?borrower_obligor - borrower_obligor)
+    (guarantor_control_flagged ?guarantor_obligor - guarantor_obligor)
+    (package_final_approval_granted ?covenant_package_instance - covenant_package_instance)
+  )
+  (:action open_credit_case
+    :parameters (?case_entity - case_entity)
+    :precondition
+      (and
+        (not
+          (credit_case_opened ?case_entity)
+        )
+        (not
+          (assignment_confirmed ?case_entity)
+        )
+      )
+    :effect (credit_case_opened ?case_entity)
+  )
+  (:action reserve_covenant_template
+    :parameters (?case_entity - case_entity ?covenant_package_template - covenant_package_template)
+    :precondition
+      (and
+        (credit_case_opened ?case_entity)
+        (not
+          (template_reserved ?case_entity)
+        )
+        (covenant_template_available ?covenant_package_template)
+      )
+    :effect
+      (and
+        (template_reserved ?case_entity)
+        (template_linked_to_case ?case_entity ?covenant_package_template)
+        (not
+          (covenant_template_available ?covenant_package_template)
+        )
+      )
+  )
+  (:action apply_pricing_model
+    :parameters (?case_entity - case_entity ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_case_opened ?case_entity)
+        (template_reserved ?case_entity)
+        (pricing_model_available ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_linked_to_case ?case_entity ?pricing_model)
+        (not
+          (pricing_model_available ?pricing_model)
+        )
+      )
+  )
+  (:action confirm_pricing_model
+    :parameters (?case_entity - case_entity ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_case_opened ?case_entity)
+        (template_reserved ?case_entity)
+        (pricing_model_linked_to_case ?case_entity ?pricing_model)
+        (not
+          (credit_review_cleared ?case_entity)
+        )
+      )
+    :effect (credit_review_cleared ?case_entity)
+  )
+  (:action release_pricing_model
+    :parameters (?case_entity - case_entity ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (pricing_model_linked_to_case ?case_entity ?pricing_model)
+      )
+    :effect
+      (and
+        (pricing_model_available ?pricing_model)
+        (not
+          (pricing_model_linked_to_case ?case_entity ?pricing_model)
+        )
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?case_entity - case_entity ?credit_reviewer - credit_reviewer)
+    :precondition
+      (and
+        (credit_review_cleared ?case_entity)
+        (reviewer_available ?credit_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_linked_to_case ?case_entity ?credit_reviewer)
+        (not
+          (reviewer_available ?credit_reviewer)
+        )
+      )
+  )
+  (:action release_reviewer
+    :parameters (?case_entity - case_entity ?credit_reviewer - credit_reviewer)
+    :precondition
+      (and
+        (reviewer_linked_to_case ?case_entity ?credit_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?credit_reviewer)
+        (not
+          (reviewer_linked_to_case ?case_entity ?credit_reviewer)
+        )
+      )
+  )
+  (:action attach_security_action
+    :parameters (?covenant_package_instance - covenant_package_instance ?security_action - security_action)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (security_action_available ?security_action)
+      )
+    :effect
+      (and
+        (security_action_linked_to_case ?covenant_package_instance ?security_action)
+        (not
+          (security_action_available ?security_action)
+        )
+      )
+  )
+  (:action release_security_action
+    :parameters (?covenant_package_instance - covenant_package_instance ?security_action - security_action)
+    :precondition
+      (and
+        (security_action_linked_to_case ?covenant_package_instance ?security_action)
+      )
+    :effect
+      (and
+        (security_action_available ?security_action)
+        (not
+          (security_action_linked_to_case ?covenant_package_instance ?security_action)
+        )
+      )
+  )
+  (:action attach_external_condition
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (external_condition_available ?external_condition)
+      )
+    :effect
+      (and
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (not
+          (external_condition_available ?external_condition)
+        )
+      )
+  )
+  (:action release_external_condition
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition)
+    :precondition
+      (and
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+      )
+    :effect
+      (and
+        (external_condition_available ?external_condition)
+        (not
+          (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        )
+      )
+  )
+  (:action select_borrower_exposure_profile
+    :parameters (?borrower_obligor - borrower_obligor ?exposure_profile - exposure_profile ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_review_cleared ?borrower_obligor)
+        (pricing_model_linked_to_case ?borrower_obligor ?pricing_model)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (not
+          (borrower_exposure_profile_selected ?exposure_profile)
+        )
+        (not
+          (borrower_exposure_profile_adjusted ?exposure_profile)
+        )
+      )
+    :effect (borrower_exposure_profile_selected ?exposure_profile)
+  )
+  (:action confirm_borrower_controls
+    :parameters (?borrower_obligor - borrower_obligor ?exposure_profile - exposure_profile ?credit_reviewer - credit_reviewer)
+    :precondition
+      (and
+        (credit_review_cleared ?borrower_obligor)
+        (reviewer_linked_to_case ?borrower_obligor ?credit_reviewer)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (borrower_exposure_profile_selected ?exposure_profile)
+        (not
+          (borrower_control_flagged ?borrower_obligor)
+        )
+      )
+    :effect
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (borrower_control_confirmed ?borrower_obligor)
+      )
+  )
+  (:action attach_borrower_collateral
+    :parameters (?borrower_obligor - borrower_obligor ?exposure_profile - exposure_profile ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (credit_review_cleared ?borrower_obligor)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (borrower_control_flagged ?borrower_obligor)
+        )
+      )
+    :effect
+      (and
+        (borrower_exposure_profile_adjusted ?exposure_profile)
+        (borrower_control_flagged ?borrower_obligor)
+        (borrower_collateral_linked ?borrower_obligor ?collateral_asset)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action release_borrower_collateral
+    :parameters (?borrower_obligor - borrower_obligor ?exposure_profile - exposure_profile ?pricing_model - pricing_model ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (credit_review_cleared ?borrower_obligor)
+        (pricing_model_linked_to_case ?borrower_obligor ?pricing_model)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (borrower_exposure_profile_adjusted ?exposure_profile)
+        (borrower_collateral_linked ?borrower_obligor ?collateral_asset)
+        (not
+          (borrower_control_confirmed ?borrower_obligor)
+        )
+      )
+    :effect
+      (and
+        (borrower_exposure_profile_selected ?exposure_profile)
+        (borrower_control_confirmed ?borrower_obligor)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (borrower_collateral_linked ?borrower_obligor ?collateral_asset)
+        )
+      )
+  )
+  (:action select_guarantor_drawdown_profile
+    :parameters (?guarantor_obligor - guarantor_obligor ?drawdown_profile - drawdown_profile ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_review_cleared ?guarantor_obligor)
+        (pricing_model_linked_to_case ?guarantor_obligor ?pricing_model)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (not
+          (guarantor_drawdown_profile_selected ?drawdown_profile)
+        )
+        (not
+          (guarantor_drawdown_profile_adjusted ?drawdown_profile)
+        )
+      )
+    :effect (guarantor_drawdown_profile_selected ?drawdown_profile)
+  )
+  (:action confirm_guarantor_controls
+    :parameters (?guarantor_obligor - guarantor_obligor ?drawdown_profile - drawdown_profile ?credit_reviewer - credit_reviewer)
+    :precondition
+      (and
+        (credit_review_cleared ?guarantor_obligor)
+        (reviewer_linked_to_case ?guarantor_obligor ?credit_reviewer)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (guarantor_drawdown_profile_selected ?drawdown_profile)
+        (not
+          (guarantor_control_flagged ?guarantor_obligor)
+        )
+      )
+    :effect
+      (and
+        (guarantor_control_flagged ?guarantor_obligor)
+        (guarantor_control_confirmed ?guarantor_obligor)
+      )
+  )
+  (:action attach_guarantor_collateral
+    :parameters (?guarantor_obligor - guarantor_obligor ?drawdown_profile - drawdown_profile ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (credit_review_cleared ?guarantor_obligor)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (guarantor_control_flagged ?guarantor_obligor)
+        )
+      )
+    :effect
+      (and
+        (guarantor_drawdown_profile_adjusted ?drawdown_profile)
+        (guarantor_control_flagged ?guarantor_obligor)
+        (guarantor_collateral_linked ?guarantor_obligor ?collateral_asset)
+        (not
+          (collateral_asset_available ?collateral_asset)
+        )
+      )
+  )
+  (:action release_guarantor_collateral
+    :parameters (?guarantor_obligor - guarantor_obligor ?drawdown_profile - drawdown_profile ?pricing_model - pricing_model ?collateral_asset - collateral_asset)
+    :precondition
+      (and
+        (credit_review_cleared ?guarantor_obligor)
+        (pricing_model_linked_to_case ?guarantor_obligor ?pricing_model)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (guarantor_drawdown_profile_adjusted ?drawdown_profile)
+        (guarantor_collateral_linked ?guarantor_obligor ?collateral_asset)
+        (not
+          (guarantor_control_confirmed ?guarantor_obligor)
+        )
+      )
+    :effect
+      (and
+        (guarantor_drawdown_profile_selected ?drawdown_profile)
+        (guarantor_control_confirmed ?guarantor_obligor)
+        (collateral_asset_available ?collateral_asset)
+        (not
+          (guarantor_collateral_linked ?guarantor_obligor ?collateral_asset)
+        )
+      )
+  )
+  (:action assemble_assignment_record_standard
+    :parameters (?borrower_obligor - borrower_obligor ?guarantor_obligor - guarantor_obligor ?exposure_profile - exposure_profile ?drawdown_profile - drawdown_profile ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (guarantor_control_flagged ?guarantor_obligor)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (borrower_exposure_profile_selected ?exposure_profile)
+        (guarantor_drawdown_profile_selected ?drawdown_profile)
+        (borrower_control_confirmed ?borrower_obligor)
+        (guarantor_control_confirmed ?guarantor_obligor)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_borrower_profile_linked ?assignment_record ?exposure_profile)
+        (assignment_record_guarantor_profile_linked ?assignment_record ?drawdown_profile)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action assemble_assignment_record_borrower_adjusted
+    :parameters (?borrower_obligor - borrower_obligor ?guarantor_obligor - guarantor_obligor ?exposure_profile - exposure_profile ?drawdown_profile - drawdown_profile ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (guarantor_control_flagged ?guarantor_obligor)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (borrower_exposure_profile_adjusted ?exposure_profile)
+        (guarantor_drawdown_profile_selected ?drawdown_profile)
+        (not
+          (borrower_control_confirmed ?borrower_obligor)
+        )
+        (guarantor_control_confirmed ?guarantor_obligor)
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_borrower_profile_linked ?assignment_record ?exposure_profile)
+        (assignment_record_guarantor_profile_linked ?assignment_record ?drawdown_profile)
+        (assignment_record_flag_alpha ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action assemble_assignment_record_guarantor_adjusted
+    :parameters (?borrower_obligor - borrower_obligor ?guarantor_obligor - guarantor_obligor ?exposure_profile - exposure_profile ?drawdown_profile - drawdown_profile ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (guarantor_control_flagged ?guarantor_obligor)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (borrower_exposure_profile_selected ?exposure_profile)
+        (guarantor_drawdown_profile_adjusted ?drawdown_profile)
+        (borrower_control_confirmed ?borrower_obligor)
+        (not
+          (guarantor_control_confirmed ?guarantor_obligor)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_borrower_profile_linked ?assignment_record ?exposure_profile)
+        (assignment_record_guarantor_profile_linked ?assignment_record ?drawdown_profile)
+        (assignment_record_flag_beta ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action assemble_assignment_record_full
+    :parameters (?borrower_obligor - borrower_obligor ?guarantor_obligor - guarantor_obligor ?exposure_profile - exposure_profile ?drawdown_profile - drawdown_profile ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (guarantor_control_flagged ?guarantor_obligor)
+        (borrower_exposure_profile_assigned ?borrower_obligor ?exposure_profile)
+        (guarantor_drawdown_profile_assigned ?guarantor_obligor ?drawdown_profile)
+        (borrower_exposure_profile_adjusted ?exposure_profile)
+        (guarantor_drawdown_profile_adjusted ?drawdown_profile)
+        (not
+          (borrower_control_confirmed ?borrower_obligor)
+        )
+        (not
+          (guarantor_control_confirmed ?guarantor_obligor)
+        )
+        (assignment_record_available ?assignment_record)
+      )
+    :effect
+      (and
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_borrower_profile_linked ?assignment_record ?exposure_profile)
+        (assignment_record_guarantor_profile_linked ?assignment_record ?drawdown_profile)
+        (assignment_record_flag_alpha ?assignment_record)
+        (assignment_record_flag_beta ?assignment_record)
+        (not
+          (assignment_record_available ?assignment_record)
+        )
+      )
+  )
+  (:action lock_assignment_record
+    :parameters (?assignment_record - assignment_record ?borrower_obligor - borrower_obligor ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (assignment_record_prepared ?assignment_record)
+        (borrower_control_flagged ?borrower_obligor)
+        (pricing_model_linked_to_case ?borrower_obligor ?pricing_model)
+        (not
+          (assignment_record_locked ?assignment_record)
+        )
+      )
+    :effect (assignment_record_locked ?assignment_record)
+  )
+  (:action bundle_assignment_documents
+    :parameters (?covenant_package_instance - covenant_package_instance ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (assignment_record_linked_to_case ?covenant_package_instance ?assignment_record)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_available ?document_bundle)
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_locked ?assignment_record)
+        (not
+          (document_bundle_reserved ?document_bundle)
+        )
+      )
+    :effect
+      (and
+        (document_bundle_reserved ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (not
+          (document_bundle_available ?document_bundle)
+        )
+      )
+  )
+  (:action attach_document_bundle
+    :parameters (?covenant_package_instance - covenant_package_instance ?document_bundle - document_bundle ?assignment_record - assignment_record ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_reserved ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (pricing_model_linked_to_case ?covenant_package_instance ?pricing_model)
+        (not
+          (assignment_record_flag_alpha ?assignment_record)
+        )
+        (not
+          (package_documentation_complete ?covenant_package_instance)
+        )
+      )
+    :effect (package_documentation_complete ?covenant_package_instance)
+  )
+  (:action select_clause_template
+    :parameters (?covenant_package_instance - covenant_package_instance ?clause_template - clause_template)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (clause_template_available ?clause_template)
+        (not
+          (clause_template_selected ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (clause_template_selected ?covenant_package_instance)
+        (clause_template_linked_to_case ?covenant_package_instance ?clause_template)
+        (not
+          (clause_template_available ?clause_template)
+        )
+      )
+  )
+  (:action integrate_clause_package
+    :parameters (?covenant_package_instance - covenant_package_instance ?document_bundle - document_bundle ?assignment_record - assignment_record ?pricing_model - pricing_model ?clause_template - clause_template)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_reserved ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (pricing_model_linked_to_case ?covenant_package_instance ?pricing_model)
+        (assignment_record_flag_alpha ?assignment_record)
+        (clause_template_selected ?covenant_package_instance)
+        (clause_template_linked_to_case ?covenant_package_instance ?clause_template)
+        (not
+          (package_documentation_complete ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_documentation_complete ?covenant_package_instance)
+        (package_clause_bundle_complete ?covenant_package_instance)
+      )
+  )
+  (:action record_security_action_variant_a
+    :parameters (?covenant_package_instance - covenant_package_instance ?security_action - security_action ?credit_reviewer - credit_reviewer ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_documentation_complete ?covenant_package_instance)
+        (security_action_linked_to_case ?covenant_package_instance ?security_action)
+        (reviewer_linked_to_case ?covenant_package_instance ?credit_reviewer)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (not
+          (assignment_record_flag_beta ?assignment_record)
+        )
+        (not
+          (package_security_action_recorded ?covenant_package_instance)
+        )
+      )
+    :effect (package_security_action_recorded ?covenant_package_instance)
+  )
+  (:action record_security_action_variant_b
+    :parameters (?covenant_package_instance - covenant_package_instance ?security_action - security_action ?credit_reviewer - credit_reviewer ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_documentation_complete ?covenant_package_instance)
+        (security_action_linked_to_case ?covenant_package_instance ?security_action)
+        (reviewer_linked_to_case ?covenant_package_instance ?credit_reviewer)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (assignment_record_flag_beta ?assignment_record)
+        (not
+          (package_security_action_recorded ?covenant_package_instance)
+        )
+      )
+    :effect (package_security_action_recorded ?covenant_package_instance)
+  )
+  (:action finalize_security_path_base
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_security_action_recorded ?covenant_package_instance)
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (not
+          (assignment_record_flag_alpha ?assignment_record)
+        )
+        (not
+          (assignment_record_flag_beta ?assignment_record)
+        )
+        (not
+          (package_security_path_complete ?covenant_package_instance)
+        )
+      )
+    :effect (package_security_path_complete ?covenant_package_instance)
+  )
+  (:action finalize_security_path_alpha
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_security_action_recorded ?covenant_package_instance)
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (assignment_record_flag_alpha ?assignment_record)
+        (not
+          (assignment_record_flag_beta ?assignment_record)
+        )
+        (not
+          (package_security_path_complete ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_ready ?covenant_package_instance)
+      )
+  )
+  (:action finalize_security_path_beta
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_security_action_recorded ?covenant_package_instance)
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (not
+          (assignment_record_flag_alpha ?assignment_record)
+        )
+        (assignment_record_flag_beta ?assignment_record)
+        (not
+          (package_security_path_complete ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_ready ?covenant_package_instance)
+      )
+  )
+  (:action finalize_security_path_alpha_beta
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition ?document_bundle - document_bundle ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (package_security_action_recorded ?covenant_package_instance)
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (document_bundle_linked_to_case ?covenant_package_instance ?document_bundle)
+        (document_bundle_drawdown_linked ?document_bundle ?assignment_record)
+        (assignment_record_flag_alpha ?assignment_record)
+        (assignment_record_flag_beta ?assignment_record)
+        (not
+          (package_security_path_complete ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_ready ?covenant_package_instance)
+      )
+  )
+  (:action grant_standard_package_approval
+    :parameters (?covenant_package_instance - covenant_package_instance)
+    :precondition
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (not
+          (package_signoff_ready ?covenant_package_instance)
+        )
+        (not
+          (package_final_approval_granted ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_final_approval_granted ?covenant_package_instance)
+        (assignment_authorized ?covenant_package_instance)
+      )
+  )
+  (:action attach_approval_document
+    :parameters (?covenant_package_instance - covenant_package_instance ?approval_document - approval_document)
+    :precondition
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_ready ?covenant_package_instance)
+        (approval_document_available ?approval_document)
+      )
+    :effect
+      (and
+        (approval_document_linked_to_case ?covenant_package_instance ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action compile_party_signoff
+    :parameters (?covenant_package_instance - covenant_package_instance ?borrower_obligor - borrower_obligor ?guarantor_obligor - guarantor_obligor ?pricing_model - pricing_model ?approval_document - approval_document)
+    :precondition
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_ready ?covenant_package_instance)
+        (approval_document_linked_to_case ?covenant_package_instance ?approval_document)
+        (borrower_linked_to_case ?covenant_package_instance ?borrower_obligor)
+        (guarantor_linked_to_case ?covenant_package_instance ?guarantor_obligor)
+        (borrower_control_confirmed ?borrower_obligor)
+        (guarantor_control_confirmed ?guarantor_obligor)
+        (pricing_model_linked_to_case ?covenant_package_instance ?pricing_model)
+        (not
+          (package_signoff_recorded ?covenant_package_instance)
+        )
+      )
+    :effect (package_signoff_recorded ?covenant_package_instance)
+  )
+  (:action grant_reviewed_package_approval
+    :parameters (?covenant_package_instance - covenant_package_instance)
+    :precondition
+      (and
+        (package_security_path_complete ?covenant_package_instance)
+        (package_signoff_recorded ?covenant_package_instance)
+        (not
+          (package_final_approval_granted ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_final_approval_granted ?covenant_package_instance)
+        (assignment_authorized ?covenant_package_instance)
+      )
+  )
+  (:action attach_regulatory_notice
+    :parameters (?covenant_package_instance - covenant_package_instance ?regulatory_notice - regulatory_notice ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (credit_review_cleared ?covenant_package_instance)
+        (pricing_model_linked_to_case ?covenant_package_instance ?pricing_model)
+        (regulatory_notice_available ?regulatory_notice)
+        (regulatory_notice_linked_to_case ?covenant_package_instance ?regulatory_notice)
+        (not
+          (regulatory_notice_recorded ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (regulatory_notice_recorded ?covenant_package_instance)
+        (not
+          (regulatory_notice_available ?regulatory_notice)
+        )
+      )
+  )
+  (:action record_reviewer_clearance
+    :parameters (?covenant_package_instance - covenant_package_instance ?credit_reviewer - credit_reviewer)
+    :precondition
+      (and
+        (regulatory_notice_recorded ?covenant_package_instance)
+        (reviewer_linked_to_case ?covenant_package_instance ?credit_reviewer)
+        (not
+          (reviewer_clearance_recorded ?covenant_package_instance)
+        )
+      )
+    :effect (reviewer_clearance_recorded ?covenant_package_instance)
+  )
+  (:action record_external_condition_clearance
+    :parameters (?covenant_package_instance - covenant_package_instance ?external_condition - external_condition)
+    :precondition
+      (and
+        (reviewer_clearance_recorded ?covenant_package_instance)
+        (external_condition_linked_to_case ?covenant_package_instance ?external_condition)
+        (not
+          (external_condition_clearance_recorded ?covenant_package_instance)
+        )
+      )
+    :effect (external_condition_clearance_recorded ?covenant_package_instance)
+  )
+  (:action grant_final_package_approval
+    :parameters (?covenant_package_instance - covenant_package_instance)
+    :precondition
+      (and
+        (external_condition_clearance_recorded ?covenant_package_instance)
+        (not
+          (package_final_approval_granted ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (package_final_approval_granted ?covenant_package_instance)
+        (assignment_authorized ?covenant_package_instance)
+      )
+  )
+  (:action authorize_borrower_activation
+    :parameters (?borrower_obligor - borrower_obligor ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (borrower_control_flagged ?borrower_obligor)
+        (borrower_control_confirmed ?borrower_obligor)
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_locked ?assignment_record)
+        (not
+          (assignment_authorized ?borrower_obligor)
+        )
+      )
+    :effect (assignment_authorized ?borrower_obligor)
+  )
+  (:action authorize_guarantor_activation
+    :parameters (?guarantor_obligor - guarantor_obligor ?assignment_record - assignment_record)
+    :precondition
+      (and
+        (guarantor_control_flagged ?guarantor_obligor)
+        (guarantor_control_confirmed ?guarantor_obligor)
+        (assignment_record_prepared ?assignment_record)
+        (assignment_record_locked ?assignment_record)
+        (not
+          (assignment_authorized ?guarantor_obligor)
+        )
+      )
+    :effect (assignment_authorized ?guarantor_obligor)
+  )
+  (:action bind_assignment_evidence
+    :parameters (?case_entity - case_entity ?assignment_evidence - assignment_evidence ?pricing_model - pricing_model)
+    :precondition
+      (and
+        (assignment_authorized ?case_entity)
+        (pricing_model_linked_to_case ?case_entity ?pricing_model)
+        (assignment_evidence_available ?assignment_evidence)
+        (not
+          (assignment_clearance_recorded ?case_entity)
+        )
+      )
+    :effect
+      (and
+        (assignment_clearance_recorded ?case_entity)
+        (assignment_evidence_linked_to_case ?case_entity ?assignment_evidence)
+        (not
+          (assignment_evidence_available ?assignment_evidence)
+        )
+      )
+  )
+  (:action activate_borrower_assignment
+    :parameters (?borrower_obligor - borrower_obligor ?covenant_package_template - covenant_package_template ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_clearance_recorded ?borrower_obligor)
+        (template_linked_to_case ?borrower_obligor ?covenant_package_template)
+        (assignment_evidence_linked_to_case ?borrower_obligor ?assignment_evidence)
+        (not
+          (assignment_confirmed ?borrower_obligor)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?borrower_obligor)
+        (covenant_template_available ?covenant_package_template)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+  (:action activate_guarantor_assignment
+    :parameters (?guarantor_obligor - guarantor_obligor ?covenant_package_template - covenant_package_template ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_clearance_recorded ?guarantor_obligor)
+        (template_linked_to_case ?guarantor_obligor ?covenant_package_template)
+        (assignment_evidence_linked_to_case ?guarantor_obligor ?assignment_evidence)
+        (not
+          (assignment_confirmed ?guarantor_obligor)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?guarantor_obligor)
+        (covenant_template_available ?covenant_package_template)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+  (:action activate_package_assignment
+    :parameters (?covenant_package_instance - covenant_package_instance ?covenant_package_template - covenant_package_template ?assignment_evidence - assignment_evidence)
+    :precondition
+      (and
+        (assignment_clearance_recorded ?covenant_package_instance)
+        (template_linked_to_case ?covenant_package_instance ?covenant_package_template)
+        (assignment_evidence_linked_to_case ?covenant_package_instance ?assignment_evidence)
+        (not
+          (assignment_confirmed ?covenant_package_instance)
+        )
+      )
+    :effect
+      (and
+        (assignment_confirmed ?covenant_package_instance)
+        (covenant_template_available ?covenant_package_template)
+        (assignment_evidence_available ?assignment_evidence)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem covenant_package_assignment_problem)
+  (:domain covenant_package_assignment_domain)
+  (:objects borrower_obligor_alpha - borrower_obligor guarantor_obligor_alpha - guarantor_obligor covenant_package_alpha - covenant_package_instance covenant_package_beta - covenant_package_instance covenant_package_template_alpha - covenant_package_template covenant_package_template_beta - covenant_package_template covenant_package_template_gamma - covenant_package_template pricing_model_alpha - pricing_model credit_reviewer_alpha - credit_reviewer collateral_asset_alpha - collateral_asset exposure_profile_alpha - exposure_profile drawdown_profile_alpha - drawdown_profile assignment_record_alpha - assignment_record document_bundle_alpha - document_bundle document_bundle_beta - document_bundle clause_template_alpha - clause_template clause_template_beta - clause_template approval_document_alpha - approval_document approval_document_beta - approval_document assignment_evidence_alpha - assignment_evidence security_action_alpha - security_action regulatory_notice_alpha - regulatory_notice regulatory_notice_beta - regulatory_notice external_condition_alpha - external_condition)
+  (:init
+    (covenant_template_available covenant_package_template_alpha)
+    (covenant_template_available covenant_package_template_beta)
+    (covenant_template_available covenant_package_template_gamma)
+    (pricing_model_available pricing_model_alpha)
+    (reviewer_available credit_reviewer_alpha)
+    (collateral_asset_available collateral_asset_alpha)
+    (borrower_exposure_profile_assigned borrower_obligor_alpha exposure_profile_alpha)
+    (guarantor_drawdown_profile_assigned guarantor_obligor_alpha drawdown_profile_alpha)
+    (assignment_record_available assignment_record_alpha)
+    (document_bundle_available document_bundle_alpha)
+    (document_bundle_available document_bundle_beta)
+    (borrower_linked_to_case covenant_package_alpha borrower_obligor_alpha)
+    (borrower_linked_to_case covenant_package_beta borrower_obligor_alpha)
+    (guarantor_linked_to_case covenant_package_alpha guarantor_obligor_alpha)
+    (guarantor_linked_to_case covenant_package_beta guarantor_obligor_alpha)
+    (assignment_record_linked_to_case covenant_package_alpha assignment_record_alpha)
+    (assignment_record_linked_to_case covenant_package_beta assignment_record_alpha)
+    (document_bundle_linked_to_case covenant_package_alpha document_bundle_alpha)
+    (document_bundle_linked_to_case covenant_package_beta document_bundle_beta)
+    (clause_template_available clause_template_alpha)
+    (clause_template_available clause_template_beta)
+    (approval_document_available approval_document_alpha)
+    (approval_document_available approval_document_beta)
+    (assignment_evidence_available assignment_evidence_alpha)
+    (security_action_available security_action_alpha)
+    (regulatory_notice_available regulatory_notice_alpha)
+    (regulatory_notice_linked_to_case covenant_package_alpha regulatory_notice_alpha)
+    (regulatory_notice_linked_to_case covenant_package_beta regulatory_notice_beta)
+    (external_condition_available external_condition_alpha)
+  )
+  (:goal
+    (and
+      (assignment_confirmed borrower_obligor_alpha)
+      (assignment_confirmed guarantor_obligor_alpha)
+      (assignment_confirmed covenant_package_alpha)
+      (assignment_confirmed covenant_package_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_credit_case borrower_obligor_alpha)
+(reserve_covenant_template borrower_obligor_alpha covenant_package_template_alpha)
+(apply_pricing_model borrower_obligor_alpha pricing_model_alpha)
+(confirm_pricing_model borrower_obligor_alpha pricing_model_alpha)
+(assign_reviewer borrower_obligor_alpha credit_reviewer_alpha)
+(select_borrower_exposure_profile borrower_obligor_alpha exposure_profile_alpha pricing_model_alpha)
+(confirm_borrower_controls borrower_obligor_alpha exposure_profile_alpha credit_reviewer_alpha)
+(release_reviewer borrower_obligor_alpha credit_reviewer_alpha)
+(release_pricing_model borrower_obligor_alpha pricing_model_alpha)
+(open_credit_case guarantor_obligor_alpha)
+(reserve_covenant_template guarantor_obligor_alpha covenant_package_template_beta)
+(apply_pricing_model guarantor_obligor_alpha pricing_model_alpha)
+(confirm_pricing_model guarantor_obligor_alpha pricing_model_alpha)
+(assign_reviewer guarantor_obligor_alpha credit_reviewer_alpha)
+(select_guarantor_drawdown_profile guarantor_obligor_alpha drawdown_profile_alpha pricing_model_alpha)
+(confirm_guarantor_controls guarantor_obligor_alpha drawdown_profile_alpha credit_reviewer_alpha)
+(release_reviewer guarantor_obligor_alpha credit_reviewer_alpha)
+(release_pricing_model guarantor_obligor_alpha pricing_model_alpha)
+(apply_pricing_model borrower_obligor_alpha pricing_model_alpha)
+(assemble_assignment_record_standard borrower_obligor_alpha guarantor_obligor_alpha exposure_profile_alpha drawdown_profile_alpha assignment_record_alpha)
+(lock_assignment_record assignment_record_alpha borrower_obligor_alpha pricing_model_alpha)
+(authorize_borrower_activation borrower_obligor_alpha assignment_record_alpha)
+(authorize_guarantor_activation guarantor_obligor_alpha assignment_record_alpha)
+(bind_assignment_evidence borrower_obligor_alpha assignment_evidence_alpha pricing_model_alpha)
+(activate_borrower_assignment borrower_obligor_alpha covenant_package_template_alpha assignment_evidence_alpha)
+(release_pricing_model borrower_obligor_alpha pricing_model_alpha)
+(apply_pricing_model guarantor_obligor_alpha pricing_model_alpha)
+(bind_assignment_evidence guarantor_obligor_alpha assignment_evidence_alpha pricing_model_alpha)
+(activate_guarantor_assignment guarantor_obligor_alpha covenant_package_template_beta assignment_evidence_alpha)
+(release_pricing_model guarantor_obligor_alpha pricing_model_alpha)
+(open_credit_case covenant_package_alpha)
+(reserve_covenant_template covenant_package_alpha covenant_package_template_alpha)
+(apply_pricing_model covenant_package_alpha pricing_model_alpha)
+(confirm_pricing_model covenant_package_alpha pricing_model_alpha)
+(attach_security_action covenant_package_alpha security_action_alpha)
+(attach_external_condition covenant_package_alpha external_condition_alpha)
+(assign_reviewer covenant_package_alpha credit_reviewer_alpha)
+(bundle_assignment_documents covenant_package_alpha document_bundle_alpha assignment_record_alpha)
+(attach_document_bundle covenant_package_alpha document_bundle_alpha assignment_record_alpha pricing_model_alpha)
+(record_security_action_variant_a covenant_package_alpha security_action_alpha credit_reviewer_alpha document_bundle_alpha assignment_record_alpha)
+(release_reviewer covenant_package_alpha credit_reviewer_alpha)
+(finalize_security_path_base covenant_package_alpha external_condition_alpha document_bundle_alpha assignment_record_alpha)
+(grant_standard_package_approval covenant_package_alpha)
+(bind_assignment_evidence covenant_package_alpha assignment_evidence_alpha pricing_model_alpha)
+(activate_package_assignment covenant_package_alpha covenant_package_template_alpha assignment_evidence_alpha)
+(release_pricing_model covenant_package_alpha pricing_model_alpha)
+(release_security_action covenant_package_alpha security_action_alpha)
+(release_external_condition covenant_package_alpha external_condition_alpha)
+(open_credit_case covenant_package_beta)
+(reserve_covenant_template covenant_package_beta covenant_package_template_beta)
+(apply_pricing_model covenant_package_beta pricing_model_alpha)
+(confirm_pricing_model covenant_package_beta pricing_model_alpha)
+(attach_security_action covenant_package_beta security_action_alpha)
+(attach_external_condition covenant_package_beta external_condition_alpha)
+(assign_reviewer covenant_package_beta credit_reviewer_alpha)
+(bundle_assignment_documents covenant_package_beta document_bundle_beta assignment_record_alpha)
+(attach_document_bundle covenant_package_beta document_bundle_beta assignment_record_alpha pricing_model_alpha)
+(record_security_action_variant_a covenant_package_beta security_action_alpha credit_reviewer_alpha document_bundle_beta assignment_record_alpha)
+(release_reviewer covenant_package_beta credit_reviewer_alpha)
+(finalize_security_path_base covenant_package_beta external_condition_alpha document_bundle_beta assignment_record_alpha)
+(grant_standard_package_approval covenant_package_beta)
+(bind_assignment_evidence covenant_package_beta assignment_evidence_alpha pricing_model_alpha)
+(activate_package_assignment covenant_package_beta covenant_package_template_beta assignment_evidence_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_bd7w1trb/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_bd7w1trb/plan.pddl 63 
+
+
+
+--- stderr ---
+

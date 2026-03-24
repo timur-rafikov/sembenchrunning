@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain graduation_application_readiness_advising)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_item - object resource_meta_type - object clearance_meta_type - object institutional_entity - object institutional_profile - institutional_entity referral_resource - administrative_item appointment_slot - administrative_item staff_specialist - administrative_item external_authority_document - administrative_item authorization_token - administrative_item consent_form - administrative_item accommodation_request - administrative_item registrar_checklist_item - administrative_item intervention_service - resource_meta_type supporting_document - resource_meta_type endorsement_record - resource_meta_type academic_clearance_item - clearance_meta_type program_clearance_item - clearance_meta_type application_package - clearance_meta_type advising_unit - institutional_profile case_management_unit - institutional_profile academic_advisor_profile - advising_unit program_advisor_profile - advising_unit case_handler_profile - case_management_unit)
+  (:predicates
+    (intake_open ?student - institutional_profile)
+    (profile_engagement_confirmed ?student - institutional_profile)
+    (has_referral ?student - institutional_profile)
+    (handoff_finalized ?student - institutional_profile)
+    (profile_ready ?student - institutional_profile)
+    (profile_readiness_confirmed ?student - institutional_profile)
+    (referral_available ?referral_resource - referral_resource)
+    (referral_link ?student - institutional_profile ?referral_resource - referral_resource)
+    (appointment_slot_available ?appointment_slot - appointment_slot)
+    (appointment_booked ?student - institutional_profile ?appointment_slot - appointment_slot)
+    (specialist_available ?specialist - staff_specialist)
+    (specialist_link ?student - institutional_profile ?specialist - staff_specialist)
+    (intervention_available ?intervention - intervention_service)
+    (advisor_intervention_link ?academic_advisor - academic_advisor_profile ?intervention - intervention_service)
+    (program_intervention_link ?program_advisor - program_advisor_profile ?intervention - intervention_service)
+    (advisor_clearance_link ?academic_advisor - academic_advisor_profile ?academic_clearance_item - academic_clearance_item)
+    (clearance_item_flagged ?academic_clearance_item - academic_clearance_item)
+    (clearance_intervention_allocated ?academic_clearance_item - academic_clearance_item)
+    (advisor_pending_clearance ?academic_advisor - academic_advisor_profile)
+    (program_clearance_link ?program_advisor - program_advisor_profile ?program_clearance_item - program_clearance_item)
+    (program_clearance_flagged ?program_clearance_item - program_clearance_item)
+    (program_clearance_intervention_allocated ?program_clearance_item - program_clearance_item)
+    (program_advisor_pending_clearance ?program_advisor - program_advisor_profile)
+    (package_open ?application_package - application_package)
+    (package_assembled ?application_package - application_package)
+    (package_includes_academic_clearance ?application_package - application_package ?academic_clearance_item - academic_clearance_item)
+    (package_includes_program_clearance ?application_package - application_package ?program_clearance_item - program_clearance_item)
+    (package_needs_academic_followup ?application_package - application_package)
+    (package_needs_program_followup ?application_package - application_package)
+    (package_validated_by_advisor ?application_package - application_package)
+    (handler_link_academic_advisor ?case_handler - case_handler_profile ?academic_advisor - academic_advisor_profile)
+    (handler_link_program_advisor ?case_handler - case_handler_profile ?program_advisor - program_advisor_profile)
+    (handler_package_link ?case_handler - case_handler_profile ?application_package - application_package)
+    (document_available ?supporting_document - supporting_document)
+    (handler_document_link ?case_handler - case_handler_profile ?supporting_document - supporting_document)
+    (document_validated ?supporting_document - supporting_document)
+    (document_attached_to_package ?supporting_document - supporting_document ?application_package - application_package)
+    (handler_review_claimed ?case_handler - case_handler_profile)
+    (handler_review_started ?case_handler - case_handler_profile)
+    (handler_review_core_complete ?case_handler - case_handler_profile)
+    (handler_external_document_flag ?case_handler - case_handler_profile)
+    (handler_external_review_started ?case_handler - case_handler_profile)
+    (handler_requires_authorization ?case_handler - case_handler_profile)
+    (handler_validation_confirmed ?case_handler - case_handler_profile)
+    (endorsement_available ?endorsement_record - endorsement_record)
+    (handler_endorsement_link ?case_handler - case_handler_profile ?endorsement_record - endorsement_record)
+    (handler_endorsement_recorded ?case_handler - case_handler_profile)
+    (handler_endorsement_requested ?case_handler - case_handler_profile)
+    (handler_endorsement_in_progress ?case_handler - case_handler_profile)
+    (external_authority_document_available ?external_document - external_authority_document)
+    (handler_external_document_link ?case_handler - case_handler_profile ?external_document - external_authority_document)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (handler_authorization_link ?case_handler - case_handler_profile ?authorization_token - authorization_token)
+    (accommodation_request_available ?accommodation_request - accommodation_request)
+    (handler_accommodation_link ?case_handler - case_handler_profile ?accommodation_request - accommodation_request)
+    (registrar_checklist_item_available ?registrar_checklist_item - registrar_checklist_item)
+    (handler_checklist_link ?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item)
+    (consent_form_available ?consent_form - consent_form)
+    (profile_consent_link ?student - institutional_profile ?consent_form - consent_form)
+    (advisor_ready_for_assembly ?academic_advisor - academic_advisor_profile)
+    (program_advisor_ready_for_assembly ?program_advisor - program_advisor_profile)
+    (handler_marked_complete ?case_handler - case_handler_profile)
+  )
+  (:action initiate_student_intake
+    :parameters (?student - institutional_profile)
+    :precondition
+      (and
+        (not
+          (intake_open ?student)
+        )
+        (not
+          (handoff_finalized ?student)
+        )
+      )
+    :effect (intake_open ?student)
+  )
+  (:action assign_referral_to_student
+    :parameters (?student - institutional_profile ?referral_resource - referral_resource)
+    :precondition
+      (and
+        (intake_open ?student)
+        (not
+          (has_referral ?student)
+        )
+        (referral_available ?referral_resource)
+      )
+    :effect
+      (and
+        (has_referral ?student)
+        (referral_link ?student ?referral_resource)
+        (not
+          (referral_available ?referral_resource)
+        )
+      )
+  )
+  (:action book_appointment_for_student
+    :parameters (?student - institutional_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_open ?student)
+        (has_referral ?student)
+        (appointment_slot_available ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_booked ?student ?appointment_slot)
+        (not
+          (appointment_slot_available ?appointment_slot)
+        )
+      )
+  )
+  (:action confirm_advising_engagement
+    :parameters (?student - institutional_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (intake_open ?student)
+        (has_referral ?student)
+        (appointment_booked ?student ?appointment_slot)
+        (not
+          (profile_engagement_confirmed ?student)
+        )
+      )
+    :effect (profile_engagement_confirmed ?student)
+  )
+  (:action release_appointment_slot
+    :parameters (?student - institutional_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (appointment_booked ?student ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_slot_available ?appointment_slot)
+        (not
+          (appointment_booked ?student ?appointment_slot)
+        )
+      )
+  )
+  (:action assign_specialist_to_student
+    :parameters (?student - institutional_profile ?specialist - staff_specialist)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?student)
+        (specialist_available ?specialist)
+      )
+    :effect
+      (and
+        (specialist_link ?student ?specialist)
+        (not
+          (specialist_available ?specialist)
+        )
+      )
+  )
+  (:action unassign_specialist_from_student
+    :parameters (?student - institutional_profile ?specialist - staff_specialist)
+    :precondition
+      (and
+        (specialist_link ?student ?specialist)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist)
+        (not
+          (specialist_link ?student ?specialist)
+        )
+      )
+  )
+  (:action register_accommodation_request_with_handler
+    :parameters (?case_handler - case_handler_profile ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (accommodation_request_available ?accommodation_request)
+      )
+    :effect
+      (and
+        (handler_accommodation_link ?case_handler ?accommodation_request)
+        (not
+          (accommodation_request_available ?accommodation_request)
+        )
+      )
+  )
+  (:action release_accommodation_request_from_handler
+    :parameters (?case_handler - case_handler_profile ?accommodation_request - accommodation_request)
+    :precondition
+      (and
+        (handler_accommodation_link ?case_handler ?accommodation_request)
+      )
+    :effect
+      (and
+        (accommodation_request_available ?accommodation_request)
+        (not
+          (handler_accommodation_link ?case_handler ?accommodation_request)
+        )
+      )
+  )
+  (:action assign_checklist_item_to_handler
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (registrar_checklist_item_available ?registrar_checklist_item)
+      )
+    :effect
+      (and
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (not
+          (registrar_checklist_item_available ?registrar_checklist_item)
+        )
+      )
+  )
+  (:action release_checklist_item_from_handler
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item)
+    :precondition
+      (and
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+      )
+    :effect
+      (and
+        (registrar_checklist_item_available ?registrar_checklist_item)
+        (not
+          (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        )
+      )
+  )
+  (:action flag_academic_clearance_item
+    :parameters (?academic_advisor - academic_advisor_profile ?academic_clearance_item - academic_clearance_item ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?academic_advisor)
+        (appointment_booked ?academic_advisor ?appointment_slot)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (not
+          (clearance_item_flagged ?academic_clearance_item)
+        )
+        (not
+          (clearance_intervention_allocated ?academic_clearance_item)
+        )
+      )
+    :effect (clearance_item_flagged ?academic_clearance_item)
+  )
+  (:action request_specialist_for_academic_clearance
+    :parameters (?academic_advisor - academic_advisor_profile ?academic_clearance_item - academic_clearance_item ?specialist - staff_specialist)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?academic_advisor)
+        (specialist_link ?academic_advisor ?specialist)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (clearance_item_flagged ?academic_clearance_item)
+        (not
+          (advisor_ready_for_assembly ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (advisor_pending_clearance ?academic_advisor)
+      )
+  )
+  (:action allocate_intervention_for_academic_clearance
+    :parameters (?academic_advisor - academic_advisor_profile ?academic_clearance_item - academic_clearance_item ?intervention - intervention_service)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?academic_advisor)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (intervention_available ?intervention)
+        (not
+          (advisor_ready_for_assembly ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (clearance_intervention_allocated ?academic_clearance_item)
+        (advisor_ready_for_assembly ?academic_advisor)
+        (advisor_intervention_link ?academic_advisor ?intervention)
+        (not
+          (intervention_available ?intervention)
+        )
+      )
+  )
+  (:action resolve_academic_clearance_with_intervention
+    :parameters (?academic_advisor - academic_advisor_profile ?academic_clearance_item - academic_clearance_item ?appointment_slot - appointment_slot ?intervention - intervention_service)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?academic_advisor)
+        (appointment_booked ?academic_advisor ?appointment_slot)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (clearance_intervention_allocated ?academic_clearance_item)
+        (advisor_intervention_link ?academic_advisor ?intervention)
+        (not
+          (advisor_pending_clearance ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (clearance_item_flagged ?academic_clearance_item)
+        (advisor_pending_clearance ?academic_advisor)
+        (intervention_available ?intervention)
+        (not
+          (advisor_intervention_link ?academic_advisor ?intervention)
+        )
+      )
+  )
+  (:action flag_program_clearance_item
+    :parameters (?program_advisor - program_advisor_profile ?program_clearance_item - program_clearance_item ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?program_advisor)
+        (appointment_booked ?program_advisor ?appointment_slot)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (not
+          (program_clearance_flagged ?program_clearance_item)
+        )
+        (not
+          (program_clearance_intervention_allocated ?program_clearance_item)
+        )
+      )
+    :effect (program_clearance_flagged ?program_clearance_item)
+  )
+  (:action request_specialist_for_program_clearance
+    :parameters (?program_advisor - program_advisor_profile ?program_clearance_item - program_clearance_item ?specialist - staff_specialist)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?program_advisor)
+        (specialist_link ?program_advisor ?specialist)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (program_clearance_flagged ?program_clearance_item)
+        (not
+          (program_advisor_ready_for_assembly ?program_advisor)
+        )
+      )
+    :effect
+      (and
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (program_advisor_pending_clearance ?program_advisor)
+      )
+  )
+  (:action allocate_intervention_for_program_clearance
+    :parameters (?program_advisor - program_advisor_profile ?program_clearance_item - program_clearance_item ?intervention - intervention_service)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?program_advisor)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (intervention_available ?intervention)
+        (not
+          (program_advisor_ready_for_assembly ?program_advisor)
+        )
+      )
+    :effect
+      (and
+        (program_clearance_intervention_allocated ?program_clearance_item)
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (program_intervention_link ?program_advisor ?intervention)
+        (not
+          (intervention_available ?intervention)
+        )
+      )
+  )
+  (:action resolve_program_clearance_with_intervention
+    :parameters (?program_advisor - program_advisor_profile ?program_clearance_item - program_clearance_item ?appointment_slot - appointment_slot ?intervention - intervention_service)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?program_advisor)
+        (appointment_booked ?program_advisor ?appointment_slot)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (program_clearance_intervention_allocated ?program_clearance_item)
+        (program_intervention_link ?program_advisor ?intervention)
+        (not
+          (program_advisor_pending_clearance ?program_advisor)
+        )
+      )
+    :effect
+      (and
+        (program_clearance_flagged ?program_clearance_item)
+        (program_advisor_pending_clearance ?program_advisor)
+        (intervention_available ?intervention)
+        (not
+          (program_intervention_link ?program_advisor ?intervention)
+        )
+      )
+  )
+  (:action assemble_application_package
+    :parameters (?academic_advisor - academic_advisor_profile ?program_advisor - program_advisor_profile ?academic_clearance_item - academic_clearance_item ?program_clearance_item - program_clearance_item ?application_package - application_package)
+    :precondition
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (clearance_item_flagged ?academic_clearance_item)
+        (program_clearance_flagged ?program_clearance_item)
+        (advisor_pending_clearance ?academic_advisor)
+        (program_advisor_pending_clearance ?program_advisor)
+        (package_open ?application_package)
+      )
+    :effect
+      (and
+        (package_assembled ?application_package)
+        (package_includes_academic_clearance ?application_package ?academic_clearance_item)
+        (package_includes_program_clearance ?application_package ?program_clearance_item)
+        (not
+          (package_open ?application_package)
+        )
+      )
+  )
+  (:action assemble_application_package_with_accommodation
+    :parameters (?academic_advisor - academic_advisor_profile ?program_advisor - program_advisor_profile ?academic_clearance_item - academic_clearance_item ?program_clearance_item - program_clearance_item ?application_package - application_package)
+    :precondition
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (clearance_intervention_allocated ?academic_clearance_item)
+        (program_clearance_flagged ?program_clearance_item)
+        (not
+          (advisor_pending_clearance ?academic_advisor)
+        )
+        (program_advisor_pending_clearance ?program_advisor)
+        (package_open ?application_package)
+      )
+    :effect
+      (and
+        (package_assembled ?application_package)
+        (package_includes_academic_clearance ?application_package ?academic_clearance_item)
+        (package_includes_program_clearance ?application_package ?program_clearance_item)
+        (package_needs_academic_followup ?application_package)
+        (not
+          (package_open ?application_package)
+        )
+      )
+  )
+  (:action assemble_application_package_with_program_intervention
+    :parameters (?academic_advisor - academic_advisor_profile ?program_advisor - program_advisor_profile ?academic_clearance_item - academic_clearance_item ?program_clearance_item - program_clearance_item ?application_package - application_package)
+    :precondition
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (clearance_item_flagged ?academic_clearance_item)
+        (program_clearance_intervention_allocated ?program_clearance_item)
+        (advisor_pending_clearance ?academic_advisor)
+        (not
+          (program_advisor_pending_clearance ?program_advisor)
+        )
+        (package_open ?application_package)
+      )
+    :effect
+      (and
+        (package_assembled ?application_package)
+        (package_includes_academic_clearance ?application_package ?academic_clearance_item)
+        (package_includes_program_clearance ?application_package ?program_clearance_item)
+        (package_needs_program_followup ?application_package)
+        (not
+          (package_open ?application_package)
+        )
+      )
+  )
+  (:action assemble_application_package_with_interventions
+    :parameters (?academic_advisor - academic_advisor_profile ?program_advisor - program_advisor_profile ?academic_clearance_item - academic_clearance_item ?program_clearance_item - program_clearance_item ?application_package - application_package)
+    :precondition
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (advisor_clearance_link ?academic_advisor ?academic_clearance_item)
+        (program_clearance_link ?program_advisor ?program_clearance_item)
+        (clearance_intervention_allocated ?academic_clearance_item)
+        (program_clearance_intervention_allocated ?program_clearance_item)
+        (not
+          (advisor_pending_clearance ?academic_advisor)
+        )
+        (not
+          (program_advisor_pending_clearance ?program_advisor)
+        )
+        (package_open ?application_package)
+      )
+    :effect
+      (and
+        (package_assembled ?application_package)
+        (package_includes_academic_clearance ?application_package ?academic_clearance_item)
+        (package_includes_program_clearance ?application_package ?program_clearance_item)
+        (package_needs_academic_followup ?application_package)
+        (package_needs_program_followup ?application_package)
+        (not
+          (package_open ?application_package)
+        )
+      )
+  )
+  (:action mark_package_ready_for_document_validation
+    :parameters (?application_package - application_package ?academic_advisor - academic_advisor_profile ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (package_assembled ?application_package)
+        (advisor_ready_for_assembly ?academic_advisor)
+        (appointment_booked ?academic_advisor ?appointment_slot)
+        (not
+          (package_validated_by_advisor ?application_package)
+        )
+      )
+    :effect (package_validated_by_advisor ?application_package)
+  )
+  (:action validate_and_attach_supporting_document
+    :parameters (?case_handler - case_handler_profile ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (handler_package_link ?case_handler ?application_package)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_available ?supporting_document)
+        (package_assembled ?application_package)
+        (package_validated_by_advisor ?application_package)
+        (not
+          (document_validated ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (document_validated ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (not
+          (document_available ?supporting_document)
+        )
+      )
+  )
+  (:action claim_document_for_review
+    :parameters (?case_handler - case_handler_profile ?supporting_document - supporting_document ?application_package - application_package ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_validated ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (appointment_booked ?case_handler ?appointment_slot)
+        (not
+          (package_needs_academic_followup ?application_package)
+        )
+        (not
+          (handler_review_claimed ?case_handler)
+        )
+      )
+    :effect (handler_review_claimed ?case_handler)
+  )
+  (:action link_external_authority_document_to_handler
+    :parameters (?case_handler - case_handler_profile ?external_document - external_authority_document)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (external_authority_document_available ?external_document)
+        (not
+          (handler_external_document_flag ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_external_document_flag ?case_handler)
+        (handler_external_document_link ?case_handler ?external_document)
+        (not
+          (external_authority_document_available ?external_document)
+        )
+      )
+  )
+  (:action start_external_document_review
+    :parameters (?case_handler - case_handler_profile ?supporting_document - supporting_document ?application_package - application_package ?appointment_slot - appointment_slot ?external_document - external_authority_document)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_validated ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (appointment_booked ?case_handler ?appointment_slot)
+        (package_needs_academic_followup ?application_package)
+        (handler_external_document_flag ?case_handler)
+        (handler_external_document_link ?case_handler ?external_document)
+        (not
+          (handler_review_claimed ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_review_claimed ?case_handler)
+        (handler_external_review_started ?case_handler)
+      )
+  )
+  (:action initiate_handler_review_phase_one
+    :parameters (?case_handler - case_handler_profile ?accommodation_request - accommodation_request ?specialist - staff_specialist ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_claimed ?case_handler)
+        (handler_accommodation_link ?case_handler ?accommodation_request)
+        (specialist_link ?case_handler ?specialist)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (not
+          (package_needs_program_followup ?application_package)
+        )
+        (not
+          (handler_review_started ?case_handler)
+        )
+      )
+    :effect (handler_review_started ?case_handler)
+  )
+  (:action initiate_handler_review_phase_two
+    :parameters (?case_handler - case_handler_profile ?accommodation_request - accommodation_request ?specialist - staff_specialist ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_claimed ?case_handler)
+        (handler_accommodation_link ?case_handler ?accommodation_request)
+        (specialist_link ?case_handler ?specialist)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (package_needs_program_followup ?application_package)
+        (not
+          (handler_review_started ?case_handler)
+        )
+      )
+    :effect (handler_review_started ?case_handler)
+  )
+  (:action complete_review_prechecks
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_started ?case_handler)
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (not
+          (package_needs_academic_followup ?application_package)
+        )
+        (not
+          (package_needs_program_followup ?application_package)
+        )
+        (not
+          (handler_review_core_complete ?case_handler)
+        )
+      )
+    :effect (handler_review_core_complete ?case_handler)
+  )
+  (:action complete_review_with_primary_flag
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_started ?case_handler)
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (package_needs_academic_followup ?application_package)
+        (not
+          (package_needs_program_followup ?application_package)
+        )
+        (not
+          (handler_review_core_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_requires_authorization ?case_handler)
+      )
+  )
+  (:action complete_review_with_secondary_flag
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_started ?case_handler)
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (not
+          (package_needs_academic_followup ?application_package)
+        )
+        (package_needs_program_followup ?application_package)
+        (not
+          (handler_review_core_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_requires_authorization ?case_handler)
+      )
+  )
+  (:action complete_review_with_both_flags
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item ?supporting_document - supporting_document ?application_package - application_package)
+    :precondition
+      (and
+        (handler_review_started ?case_handler)
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (handler_document_link ?case_handler ?supporting_document)
+        (document_attached_to_package ?supporting_document ?application_package)
+        (package_needs_academic_followup ?application_package)
+        (package_needs_program_followup ?application_package)
+        (not
+          (handler_review_core_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_requires_authorization ?case_handler)
+      )
+  )
+  (:action finalize_handler_review_basic
+    :parameters (?case_handler - case_handler_profile)
+    :precondition
+      (and
+        (handler_review_core_complete ?case_handler)
+        (not
+          (handler_requires_authorization ?case_handler)
+        )
+        (not
+          (handler_marked_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_marked_complete ?case_handler)
+        (profile_ready ?case_handler)
+      )
+  )
+  (:action assign_authorization_token_to_handler
+    :parameters (?case_handler - case_handler_profile ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_requires_authorization ?case_handler)
+        (authorization_token_available ?authorization_token)
+      )
+    :effect
+      (and
+        (handler_authorization_link ?case_handler ?authorization_token)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action confirm_handler_validation
+    :parameters (?case_handler - case_handler_profile ?academic_advisor - academic_advisor_profile ?program_advisor - program_advisor_profile ?appointment_slot - appointment_slot ?authorization_token - authorization_token)
+    :precondition
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_requires_authorization ?case_handler)
+        (handler_authorization_link ?case_handler ?authorization_token)
+        (handler_link_academic_advisor ?case_handler ?academic_advisor)
+        (handler_link_program_advisor ?case_handler ?program_advisor)
+        (advisor_pending_clearance ?academic_advisor)
+        (program_advisor_pending_clearance ?program_advisor)
+        (appointment_booked ?case_handler ?appointment_slot)
+        (not
+          (handler_validation_confirmed ?case_handler)
+        )
+      )
+    :effect (handler_validation_confirmed ?case_handler)
+  )
+  (:action finalize_handler_review_validated
+    :parameters (?case_handler - case_handler_profile)
+    :precondition
+      (and
+        (handler_review_core_complete ?case_handler)
+        (handler_validation_confirmed ?case_handler)
+        (not
+          (handler_marked_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_marked_complete ?case_handler)
+        (profile_ready ?case_handler)
+      )
+  )
+  (:action record_endorsement
+    :parameters (?case_handler - case_handler_profile ?endorsement_record - endorsement_record ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (profile_engagement_confirmed ?case_handler)
+        (appointment_booked ?case_handler ?appointment_slot)
+        (endorsement_available ?endorsement_record)
+        (handler_endorsement_link ?case_handler ?endorsement_record)
+        (not
+          (handler_endorsement_recorded ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_endorsement_recorded ?case_handler)
+        (not
+          (endorsement_available ?endorsement_record)
+        )
+      )
+  )
+  (:action request_specialist_endorsement
+    :parameters (?case_handler - case_handler_profile ?specialist - staff_specialist)
+    :precondition
+      (and
+        (handler_endorsement_recorded ?case_handler)
+        (specialist_link ?case_handler ?specialist)
+        (not
+          (handler_endorsement_requested ?case_handler)
+        )
+      )
+    :effect (handler_endorsement_requested ?case_handler)
+  )
+  (:action assign_checklist_item_for_endorsement
+    :parameters (?case_handler - case_handler_profile ?registrar_checklist_item - registrar_checklist_item)
+    :precondition
+      (and
+        (handler_endorsement_requested ?case_handler)
+        (handler_checklist_link ?case_handler ?registrar_checklist_item)
+        (not
+          (handler_endorsement_in_progress ?case_handler)
+        )
+      )
+    :effect (handler_endorsement_in_progress ?case_handler)
+  )
+  (:action finalize_endorsement_confirmation
+    :parameters (?case_handler - case_handler_profile)
+    :precondition
+      (and
+        (handler_endorsement_in_progress ?case_handler)
+        (not
+          (handler_marked_complete ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handler_marked_complete ?case_handler)
+        (profile_ready ?case_handler)
+      )
+  )
+  (:action confirm_advisor_ready
+    :parameters (?academic_advisor - academic_advisor_profile ?application_package - application_package)
+    :precondition
+      (and
+        (advisor_ready_for_assembly ?academic_advisor)
+        (advisor_pending_clearance ?academic_advisor)
+        (package_assembled ?application_package)
+        (package_validated_by_advisor ?application_package)
+        (not
+          (profile_ready ?academic_advisor)
+        )
+      )
+    :effect (profile_ready ?academic_advisor)
+  )
+  (:action confirm_program_advisor_ready
+    :parameters (?program_advisor - program_advisor_profile ?application_package - application_package)
+    :precondition
+      (and
+        (program_advisor_ready_for_assembly ?program_advisor)
+        (program_advisor_pending_clearance ?program_advisor)
+        (package_assembled ?application_package)
+        (package_validated_by_advisor ?application_package)
+        (not
+          (profile_ready ?program_advisor)
+        )
+      )
+    :effect (profile_ready ?program_advisor)
+  )
+  (:action confirm_student_readiness_and_link_consent
+    :parameters (?student - institutional_profile ?consent_form - consent_form ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (profile_ready ?student)
+        (appointment_booked ?student ?appointment_slot)
+        (consent_form_available ?consent_form)
+        (not
+          (profile_readiness_confirmed ?student)
+        )
+      )
+    :effect
+      (and
+        (profile_readiness_confirmed ?student)
+        (profile_consent_link ?student ?consent_form)
+        (not
+          (consent_form_available ?consent_form)
+        )
+      )
+  )
+  (:action finalize_advisor_handoff
+    :parameters (?academic_advisor - academic_advisor_profile ?referral_resource - referral_resource ?consent_form - consent_form)
+    :precondition
+      (and
+        (profile_readiness_confirmed ?academic_advisor)
+        (referral_link ?academic_advisor ?referral_resource)
+        (profile_consent_link ?academic_advisor ?consent_form)
+        (not
+          (handoff_finalized ?academic_advisor)
+        )
+      )
+    :effect
+      (and
+        (handoff_finalized ?academic_advisor)
+        (referral_available ?referral_resource)
+        (consent_form_available ?consent_form)
+      )
+  )
+  (:action finalize_program_advisor_handoff
+    :parameters (?program_advisor - program_advisor_profile ?referral_resource - referral_resource ?consent_form - consent_form)
+    :precondition
+      (and
+        (profile_readiness_confirmed ?program_advisor)
+        (referral_link ?program_advisor ?referral_resource)
+        (profile_consent_link ?program_advisor ?consent_form)
+        (not
+          (handoff_finalized ?program_advisor)
+        )
+      )
+    :effect
+      (and
+        (handoff_finalized ?program_advisor)
+        (referral_available ?referral_resource)
+        (consent_form_available ?consent_form)
+      )
+  )
+  (:action finalize_handler_handoff
+    :parameters (?case_handler - case_handler_profile ?referral_resource - referral_resource ?consent_form - consent_form)
+    :precondition
+      (and
+        (profile_readiness_confirmed ?case_handler)
+        (referral_link ?case_handler ?referral_resource)
+        (profile_consent_link ?case_handler ?consent_form)
+        (not
+          (handoff_finalized ?case_handler)
+        )
+      )
+    :effect
+      (and
+        (handoff_finalized ?case_handler)
+        (referral_available ?referral_resource)
+        (consent_form_available ?consent_form)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem graduation_application_readiness_problem)
+  (:domain graduation_application_readiness_advising)
+  (:objects academic_advisor_1 - academic_advisor_profile program_advisor_1 - program_advisor_profile case_handler_1 - case_handler_profile case_handler_2 - case_handler_profile referral_service_1 - referral_resource referral_service_2 - referral_resource referral_service_3 - referral_resource appointment_slot_1 - appointment_slot staff_specialist_1 - staff_specialist intervention_service_1 - intervention_service academic_clearance_item_1 - academic_clearance_item program_clearance_item_1 - program_clearance_item application_package_1 - application_package supporting_document_1 - supporting_document supporting_document_2 - supporting_document external_authority_document_1 - external_authority_document external_authority_document_2 - external_authority_document authorization_token_1 - authorization_token authorization_token_2 - authorization_token consent_form_1 - consent_form accommodation_request_1 - accommodation_request endorsement_record_1 - endorsement_record endorsement_record_2 - endorsement_record registrar_checklist_item_1 - registrar_checklist_item)
+  (:init
+    (referral_available referral_service_1)
+    (referral_available referral_service_2)
+    (referral_available referral_service_3)
+    (appointment_slot_available appointment_slot_1)
+    (specialist_available staff_specialist_1)
+    (intervention_available intervention_service_1)
+    (advisor_clearance_link academic_advisor_1 academic_clearance_item_1)
+    (program_clearance_link program_advisor_1 program_clearance_item_1)
+    (package_open application_package_1)
+    (document_available supporting_document_1)
+    (document_available supporting_document_2)
+    (handler_link_academic_advisor case_handler_1 academic_advisor_1)
+    (handler_link_academic_advisor case_handler_2 academic_advisor_1)
+    (handler_link_program_advisor case_handler_1 program_advisor_1)
+    (handler_link_program_advisor case_handler_2 program_advisor_1)
+    (handler_package_link case_handler_1 application_package_1)
+    (handler_package_link case_handler_2 application_package_1)
+    (handler_document_link case_handler_1 supporting_document_1)
+    (handler_document_link case_handler_2 supporting_document_2)
+    (external_authority_document_available external_authority_document_1)
+    (external_authority_document_available external_authority_document_2)
+    (authorization_token_available authorization_token_1)
+    (authorization_token_available authorization_token_2)
+    (consent_form_available consent_form_1)
+    (accommodation_request_available accommodation_request_1)
+    (endorsement_available endorsement_record_1)
+    (handler_endorsement_link case_handler_1 endorsement_record_1)
+    (handler_endorsement_link case_handler_2 endorsement_record_2)
+    (registrar_checklist_item_available registrar_checklist_item_1)
+  )
+  (:goal
+    (and
+      (handoff_finalized academic_advisor_1)
+      (handoff_finalized program_advisor_1)
+      (handoff_finalized case_handler_1)
+      (handoff_finalized case_handler_2)
+    )
+  )
+)

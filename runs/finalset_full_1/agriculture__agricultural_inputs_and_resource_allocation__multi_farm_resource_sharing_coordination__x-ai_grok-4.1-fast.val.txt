@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain multi_farm_resource_sharing_coordination_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object material_category - object service_category - object domain_entity - object farm_unit - domain_entity resource_provider - resource_category input_batch - resource_category machinery_unit - resource_category land_parcel - resource_category support_grant - resource_category contingency_reserve - resource_category operational_task - resource_category special_permit - resource_category consumable_resource - material_category certification_record - material_category permission_token - material_category lender_allocation_slot - service_category borrower_allocation_slot - service_category shared_package - service_category lender_group - farm_unit borrower_group - farm_unit lender_farm - lender_group borrower_farm - lender_group coordination_entity - borrower_group)
+  (:predicates
+    (farm_registered ?farm_unit - farm_unit)
+    (entity_validated ?farm_unit - farm_unit)
+    (provisionally_matched ?farm_unit - farm_unit)
+    (transfer_completed ?farm_unit - farm_unit)
+    (entity_package_staged ?farm_unit - farm_unit)
+    (entity_package_claimed ?farm_unit - farm_unit)
+    (provider_available ?resource_provider - resource_provider)
+    (assigned_provider_to_entity ?farm_unit - farm_unit ?resource_provider - resource_provider)
+    (input_batch_available ?input_batch - input_batch)
+    (reserved_input_for_entity ?farm_unit - farm_unit ?input_batch - input_batch)
+    (machinery_available ?machinery_unit - machinery_unit)
+    (machinery_assigned_to_entity ?farm_unit - farm_unit ?machinery_unit - machinery_unit)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (lender_consumable_allocated ?lender_farm - lender_farm ?consumable_resource - consumable_resource)
+    (borrower_consumable_allocated ?borrower_farm - borrower_farm ?consumable_resource - consumable_resource)
+    (lender_slot_offered ?lender_farm - lender_farm ?lender_allocation_slot - lender_allocation_slot)
+    (lender_slot_ready ?lender_allocation_slot - lender_allocation_slot)
+    (lender_slot_supplied_with_consumable ?lender_allocation_slot - lender_allocation_slot)
+    (lender_ready ?lender_farm - lender_farm)
+    (borrower_slot_offered ?borrower_farm - borrower_farm ?borrower_allocation_slot - borrower_allocation_slot)
+    (borrower_slot_ready ?borrower_allocation_slot - borrower_allocation_slot)
+    (borrower_slot_supplied_with_consumable ?borrower_allocation_slot - borrower_allocation_slot)
+    (borrower_ready ?borrower_farm - borrower_farm)
+    (shared_package_available ?shared_package - shared_package)
+    (shared_package_staged ?shared_package - shared_package)
+    (package_linked_to_lender_slot ?shared_package - shared_package ?lender_allocation_slot - lender_allocation_slot)
+    (package_linked_to_borrower_slot ?shared_package - shared_package ?borrower_allocation_slot - borrower_allocation_slot)
+    (package_requires_parcel_permission ?shared_package - shared_package)
+    (package_requires_special_permit ?shared_package - shared_package)
+    (shared_package_verified ?shared_package - shared_package)
+    (coordination_entity_manages_lender ?coordination_entity - coordination_entity ?lender_farm - lender_farm)
+    (coordination_entity_manages_borrower ?coordination_entity - coordination_entity ?borrower_farm - borrower_farm)
+    (coordination_entity_links_package ?coordination_entity - coordination_entity ?shared_package - shared_package)
+    (certification_available ?certification_record - certification_record)
+    (coordination_entity_holds_certification ?coordination_entity - coordination_entity ?certification_record - certification_record)
+    (certification_validated ?certification_record - certification_record)
+    (certification_attached_to_package ?certification_record - certification_record ?shared_package - shared_package)
+    (entity_certification_ready ?coordination_entity - coordination_entity)
+    (entity_certified_stage1 ?coordination_entity - coordination_entity)
+    (entity_compliance_finalized ?coordination_entity - coordination_entity)
+    (entity_has_parcel_permission ?coordination_entity - coordination_entity)
+    (entity_parcel_permission_verified ?coordination_entity - coordination_entity)
+    (entity_requires_additional_permission ?coordination_entity - coordination_entity)
+    (entity_ready_for_dispatch ?coordination_entity - coordination_entity)
+    (permission_token_available ?permission_token - permission_token)
+    (coordination_entity_holds_permission_token ?coordination_entity - coordination_entity ?permission_token - permission_token)
+    (entity_permission_token_committed ?coordination_entity - coordination_entity)
+    (entity_permission_in_process ?coordination_entity - coordination_entity)
+    (entity_permission_finalized ?coordination_entity - coordination_entity)
+    (land_parcel_available ?land_parcel - land_parcel)
+    (coordination_entity_assigned_parcel ?coordination_entity - coordination_entity ?land_parcel - land_parcel)
+    (support_grant_available ?support_grant - support_grant)
+    (coordination_entity_assigned_grant ?coordination_entity - coordination_entity ?support_grant - support_grant)
+    (operational_task_available ?operational_task - operational_task)
+    (coordination_entity_assigned_task ?coordination_entity - coordination_entity ?operational_task - operational_task)
+    (special_permit_available ?special_permit - special_permit)
+    (coordination_entity_assigned_special_permit ?coordination_entity - coordination_entity ?special_permit - special_permit)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (entity_assigned_contingency_reserve ?farm_unit - farm_unit ?contingency_reserve - contingency_reserve)
+    (lender_slot_owner_verified ?lender_farm - lender_farm)
+    (borrower_slot_owner_verified ?borrower_farm - borrower_farm)
+    (entity_allocation_locked ?coordination_entity - coordination_entity)
+  )
+  (:action register_farm
+    :parameters (?farm_unit - farm_unit)
+    :precondition
+      (and
+        (not
+          (farm_registered ?farm_unit)
+        )
+        (not
+          (transfer_completed ?farm_unit)
+        )
+      )
+    :effect (farm_registered ?farm_unit)
+  )
+  (:action match_farm_with_provider
+    :parameters (?farm_unit - farm_unit ?resource_provider - resource_provider)
+    :precondition
+      (and
+        (farm_registered ?farm_unit)
+        (not
+          (provisionally_matched ?farm_unit)
+        )
+        (provider_available ?resource_provider)
+      )
+    :effect
+      (and
+        (provisionally_matched ?farm_unit)
+        (assigned_provider_to_entity ?farm_unit ?resource_provider)
+        (not
+          (provider_available ?resource_provider)
+        )
+      )
+  )
+  (:action reserve_input_batch_for_farm
+    :parameters (?farm_unit - farm_unit ?input_batch - input_batch)
+    :precondition
+      (and
+        (farm_registered ?farm_unit)
+        (provisionally_matched ?farm_unit)
+        (input_batch_available ?input_batch)
+      )
+    :effect
+      (and
+        (reserved_input_for_entity ?farm_unit ?input_batch)
+        (not
+          (input_batch_available ?input_batch)
+        )
+      )
+  )
+  (:action confirm_input_reservation
+    :parameters (?farm_unit - farm_unit ?input_batch - input_batch)
+    :precondition
+      (and
+        (farm_registered ?farm_unit)
+        (provisionally_matched ?farm_unit)
+        (reserved_input_for_entity ?farm_unit ?input_batch)
+        (not
+          (entity_validated ?farm_unit)
+        )
+      )
+    :effect (entity_validated ?farm_unit)
+  )
+  (:action release_reserved_input_batch
+    :parameters (?farm_unit - farm_unit ?input_batch - input_batch)
+    :precondition
+      (and
+        (reserved_input_for_entity ?farm_unit ?input_batch)
+      )
+    :effect
+      (and
+        (input_batch_available ?input_batch)
+        (not
+          (reserved_input_for_entity ?farm_unit ?input_batch)
+        )
+      )
+  )
+  (:action assign_machinery_to_farm
+    :parameters (?farm_unit - farm_unit ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (entity_validated ?farm_unit)
+        (machinery_available ?machinery_unit)
+      )
+    :effect
+      (and
+        (machinery_assigned_to_entity ?farm_unit ?machinery_unit)
+        (not
+          (machinery_available ?machinery_unit)
+        )
+      )
+  )
+  (:action release_machinery_from_farm
+    :parameters (?farm_unit - farm_unit ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (machinery_assigned_to_entity ?farm_unit ?machinery_unit)
+      )
+    :effect
+      (and
+        (machinery_available ?machinery_unit)
+        (not
+          (machinery_assigned_to_entity ?farm_unit ?machinery_unit)
+        )
+      )
+  )
+  (:action assign_operational_task_to_entity
+    :parameters (?coordination_entity - coordination_entity ?operational_task - operational_task)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (operational_task_available ?operational_task)
+      )
+    :effect
+      (and
+        (coordination_entity_assigned_task ?coordination_entity ?operational_task)
+        (not
+          (operational_task_available ?operational_task)
+        )
+      )
+  )
+  (:action release_operational_task_from_entity
+    :parameters (?coordination_entity - coordination_entity ?operational_task - operational_task)
+    :precondition
+      (and
+        (coordination_entity_assigned_task ?coordination_entity ?operational_task)
+      )
+    :effect
+      (and
+        (operational_task_available ?operational_task)
+        (not
+          (coordination_entity_assigned_task ?coordination_entity ?operational_task)
+        )
+      )
+  )
+  (:action assign_special_permit_to_entity
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (special_permit_available ?special_permit)
+      )
+    :effect
+      (and
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (not
+          (special_permit_available ?special_permit)
+        )
+      )
+  )
+  (:action release_special_permit_from_entity
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit)
+    :precondition
+      (and
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+      )
+    :effect
+      (and
+        (special_permit_available ?special_permit)
+        (not
+          (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        )
+      )
+  )
+  (:action prepare_lender_allocation_slot
+    :parameters (?lender_farm - lender_farm ?lender_allocation_slot - lender_allocation_slot ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_validated ?lender_farm)
+        (reserved_input_for_entity ?lender_farm ?input_batch)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (not
+          (lender_slot_ready ?lender_allocation_slot)
+        )
+        (not
+          (lender_slot_supplied_with_consumable ?lender_allocation_slot)
+        )
+      )
+    :effect (lender_slot_ready ?lender_allocation_slot)
+  )
+  (:action confirm_lender_slot
+    :parameters (?lender_farm - lender_farm ?lender_allocation_slot - lender_allocation_slot ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (entity_validated ?lender_farm)
+        (machinery_assigned_to_entity ?lender_farm ?machinery_unit)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (lender_slot_ready ?lender_allocation_slot)
+        (not
+          (lender_slot_owner_verified ?lender_farm)
+        )
+      )
+    :effect
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (lender_ready ?lender_farm)
+      )
+  )
+  (:action assign_consumable_to_lender_slot
+    :parameters (?lender_farm - lender_farm ?lender_allocation_slot - lender_allocation_slot ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_validated ?lender_farm)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (lender_slot_owner_verified ?lender_farm)
+        )
+      )
+    :effect
+      (and
+        (lender_slot_supplied_with_consumable ?lender_allocation_slot)
+        (lender_slot_owner_verified ?lender_farm)
+        (lender_consumable_allocated ?lender_farm ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_lender_slot
+    :parameters (?lender_farm - lender_farm ?lender_allocation_slot - lender_allocation_slot ?input_batch - input_batch ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_validated ?lender_farm)
+        (reserved_input_for_entity ?lender_farm ?input_batch)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (lender_slot_supplied_with_consumable ?lender_allocation_slot)
+        (lender_consumable_allocated ?lender_farm ?consumable_resource)
+        (not
+          (lender_ready ?lender_farm)
+        )
+      )
+    :effect
+      (and
+        (lender_slot_ready ?lender_allocation_slot)
+        (lender_ready ?lender_farm)
+        (consumable_available ?consumable_resource)
+        (not
+          (lender_consumable_allocated ?lender_farm ?consumable_resource)
+        )
+      )
+  )
+  (:action prepare_borrower_allocation_slot
+    :parameters (?borrower_farm - borrower_farm ?borrower_allocation_slot - borrower_allocation_slot ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_validated ?borrower_farm)
+        (reserved_input_for_entity ?borrower_farm ?input_batch)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (not
+          (borrower_slot_ready ?borrower_allocation_slot)
+        )
+        (not
+          (borrower_slot_supplied_with_consumable ?borrower_allocation_slot)
+        )
+      )
+    :effect (borrower_slot_ready ?borrower_allocation_slot)
+  )
+  (:action confirm_borrower_slot
+    :parameters (?borrower_farm - borrower_farm ?borrower_allocation_slot - borrower_allocation_slot ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (entity_validated ?borrower_farm)
+        (machinery_assigned_to_entity ?borrower_farm ?machinery_unit)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (borrower_slot_ready ?borrower_allocation_slot)
+        (not
+          (borrower_slot_owner_verified ?borrower_farm)
+        )
+      )
+    :effect
+      (and
+        (borrower_slot_owner_verified ?borrower_farm)
+        (borrower_ready ?borrower_farm)
+      )
+  )
+  (:action assign_consumable_to_borrower_slot
+    :parameters (?borrower_farm - borrower_farm ?borrower_allocation_slot - borrower_allocation_slot ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_validated ?borrower_farm)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (borrower_slot_owner_verified ?borrower_farm)
+        )
+      )
+    :effect
+      (and
+        (borrower_slot_supplied_with_consumable ?borrower_allocation_slot)
+        (borrower_slot_owner_verified ?borrower_farm)
+        (borrower_consumable_allocated ?borrower_farm ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_borrower_slot
+    :parameters (?borrower_farm - borrower_farm ?borrower_allocation_slot - borrower_allocation_slot ?input_batch - input_batch ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_validated ?borrower_farm)
+        (reserved_input_for_entity ?borrower_farm ?input_batch)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (borrower_slot_supplied_with_consumable ?borrower_allocation_slot)
+        (borrower_consumable_allocated ?borrower_farm ?consumable_resource)
+        (not
+          (borrower_ready ?borrower_farm)
+        )
+      )
+    :effect
+      (and
+        (borrower_slot_ready ?borrower_allocation_slot)
+        (borrower_ready ?borrower_farm)
+        (consumable_available ?consumable_resource)
+        (not
+          (borrower_consumable_allocated ?borrower_farm ?consumable_resource)
+        )
+      )
+  )
+  (:action stage_shared_package_basic
+    :parameters (?lender_farm - lender_farm ?borrower_farm - borrower_farm ?lender_allocation_slot - lender_allocation_slot ?borrower_allocation_slot - borrower_allocation_slot ?shared_package - shared_package)
+    :precondition
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (borrower_slot_owner_verified ?borrower_farm)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (lender_slot_ready ?lender_allocation_slot)
+        (borrower_slot_ready ?borrower_allocation_slot)
+        (lender_ready ?lender_farm)
+        (borrower_ready ?borrower_farm)
+        (shared_package_available ?shared_package)
+      )
+    :effect
+      (and
+        (shared_package_staged ?shared_package)
+        (package_linked_to_lender_slot ?shared_package ?lender_allocation_slot)
+        (package_linked_to_borrower_slot ?shared_package ?borrower_allocation_slot)
+        (not
+          (shared_package_available ?shared_package)
+        )
+      )
+  )
+  (:action stage_shared_package_with_parcel_permission
+    :parameters (?lender_farm - lender_farm ?borrower_farm - borrower_farm ?lender_allocation_slot - lender_allocation_slot ?borrower_allocation_slot - borrower_allocation_slot ?shared_package - shared_package)
+    :precondition
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (borrower_slot_owner_verified ?borrower_farm)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (lender_slot_supplied_with_consumable ?lender_allocation_slot)
+        (borrower_slot_ready ?borrower_allocation_slot)
+        (not
+          (lender_ready ?lender_farm)
+        )
+        (borrower_ready ?borrower_farm)
+        (shared_package_available ?shared_package)
+      )
+    :effect
+      (and
+        (shared_package_staged ?shared_package)
+        (package_linked_to_lender_slot ?shared_package ?lender_allocation_slot)
+        (package_linked_to_borrower_slot ?shared_package ?borrower_allocation_slot)
+        (package_requires_parcel_permission ?shared_package)
+        (not
+          (shared_package_available ?shared_package)
+        )
+      )
+  )
+  (:action stage_shared_package_with_special_permit
+    :parameters (?lender_farm - lender_farm ?borrower_farm - borrower_farm ?lender_allocation_slot - lender_allocation_slot ?borrower_allocation_slot - borrower_allocation_slot ?shared_package - shared_package)
+    :precondition
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (borrower_slot_owner_verified ?borrower_farm)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (lender_slot_ready ?lender_allocation_slot)
+        (borrower_slot_supplied_with_consumable ?borrower_allocation_slot)
+        (lender_ready ?lender_farm)
+        (not
+          (borrower_ready ?borrower_farm)
+        )
+        (shared_package_available ?shared_package)
+      )
+    :effect
+      (and
+        (shared_package_staged ?shared_package)
+        (package_linked_to_lender_slot ?shared_package ?lender_allocation_slot)
+        (package_linked_to_borrower_slot ?shared_package ?borrower_allocation_slot)
+        (package_requires_special_permit ?shared_package)
+        (not
+          (shared_package_available ?shared_package)
+        )
+      )
+  )
+  (:action stage_shared_package_with_both_permissions
+    :parameters (?lender_farm - lender_farm ?borrower_farm - borrower_farm ?lender_allocation_slot - lender_allocation_slot ?borrower_allocation_slot - borrower_allocation_slot ?shared_package - shared_package)
+    :precondition
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (borrower_slot_owner_verified ?borrower_farm)
+        (lender_slot_offered ?lender_farm ?lender_allocation_slot)
+        (borrower_slot_offered ?borrower_farm ?borrower_allocation_slot)
+        (lender_slot_supplied_with_consumable ?lender_allocation_slot)
+        (borrower_slot_supplied_with_consumable ?borrower_allocation_slot)
+        (not
+          (lender_ready ?lender_farm)
+        )
+        (not
+          (borrower_ready ?borrower_farm)
+        )
+        (shared_package_available ?shared_package)
+      )
+    :effect
+      (and
+        (shared_package_staged ?shared_package)
+        (package_linked_to_lender_slot ?shared_package ?lender_allocation_slot)
+        (package_linked_to_borrower_slot ?shared_package ?borrower_allocation_slot)
+        (package_requires_parcel_permission ?shared_package)
+        (package_requires_special_permit ?shared_package)
+        (not
+          (shared_package_available ?shared_package)
+        )
+      )
+  )
+  (:action verify_shared_package
+    :parameters (?shared_package - shared_package ?lender_farm - lender_farm ?input_batch - input_batch)
+    :precondition
+      (and
+        (shared_package_staged ?shared_package)
+        (lender_slot_owner_verified ?lender_farm)
+        (reserved_input_for_entity ?lender_farm ?input_batch)
+        (not
+          (shared_package_verified ?shared_package)
+        )
+      )
+    :effect (shared_package_verified ?shared_package)
+  )
+  (:action attach_certification_to_package
+    :parameters (?coordination_entity - coordination_entity ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (coordination_entity_links_package ?coordination_entity ?shared_package)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_available ?certification_record)
+        (shared_package_staged ?shared_package)
+        (shared_package_verified ?shared_package)
+        (not
+          (certification_validated ?certification_record)
+        )
+      )
+    :effect
+      (and
+        (certification_validated ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (not
+          (certification_available ?certification_record)
+        )
+      )
+  )
+  (:action validate_certification_for_entity
+    :parameters (?coordination_entity - coordination_entity ?certification_record - certification_record ?shared_package - shared_package ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_validated ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (reserved_input_for_entity ?coordination_entity ?input_batch)
+        (not
+          (package_requires_parcel_permission ?shared_package)
+        )
+        (not
+          (entity_certification_ready ?coordination_entity)
+        )
+      )
+    :effect (entity_certification_ready ?coordination_entity)
+  )
+  (:action assign_parcel_permission_to_entity
+    :parameters (?coordination_entity - coordination_entity ?land_parcel - land_parcel)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (land_parcel_available ?land_parcel)
+        (not
+          (entity_has_parcel_permission ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_has_parcel_permission ?coordination_entity)
+        (coordination_entity_assigned_parcel ?coordination_entity ?land_parcel)
+        (not
+          (land_parcel_available ?land_parcel)
+        )
+      )
+  )
+  (:action confirm_parcel_permission_and_escalate
+    :parameters (?coordination_entity - coordination_entity ?certification_record - certification_record ?shared_package - shared_package ?input_batch - input_batch ?land_parcel - land_parcel)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_validated ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (reserved_input_for_entity ?coordination_entity ?input_batch)
+        (package_requires_parcel_permission ?shared_package)
+        (entity_has_parcel_permission ?coordination_entity)
+        (coordination_entity_assigned_parcel ?coordination_entity ?land_parcel)
+        (not
+          (entity_certification_ready ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_certification_ready ?coordination_entity)
+        (entity_parcel_permission_verified ?coordination_entity)
+      )
+  )
+  (:action activate_entity_certification_stage1
+    :parameters (?coordination_entity - coordination_entity ?operational_task - operational_task ?machinery_unit - machinery_unit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certification_ready ?coordination_entity)
+        (coordination_entity_assigned_task ?coordination_entity ?operational_task)
+        (machinery_assigned_to_entity ?coordination_entity ?machinery_unit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (not
+          (package_requires_special_permit ?shared_package)
+        )
+        (not
+          (entity_certified_stage1 ?coordination_entity)
+        )
+      )
+    :effect (entity_certified_stage1 ?coordination_entity)
+  )
+  (:action activate_entity_certification_stage1_with_slot_flag
+    :parameters (?coordination_entity - coordination_entity ?operational_task - operational_task ?machinery_unit - machinery_unit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certification_ready ?coordination_entity)
+        (coordination_entity_assigned_task ?coordination_entity ?operational_task)
+        (machinery_assigned_to_entity ?coordination_entity ?machinery_unit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (package_requires_special_permit ?shared_package)
+        (not
+          (entity_certified_stage1 ?coordination_entity)
+        )
+      )
+    :effect (entity_certified_stage1 ?coordination_entity)
+  )
+  (:action finalize_compliance_without_additional_permissions
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certified_stage1 ?coordination_entity)
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (not
+          (package_requires_parcel_permission ?shared_package)
+        )
+        (not
+          (package_requires_special_permit ?shared_package)
+        )
+        (not
+          (entity_compliance_finalized ?coordination_entity)
+        )
+      )
+    :effect (entity_compliance_finalized ?coordination_entity)
+  )
+  (:action finalize_compliance_with_parcel_permission
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certified_stage1 ?coordination_entity)
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (package_requires_parcel_permission ?shared_package)
+        (not
+          (package_requires_special_permit ?shared_package)
+        )
+        (not
+          (entity_compliance_finalized ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_requires_additional_permission ?coordination_entity)
+      )
+  )
+  (:action finalize_compliance_with_special_permit
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certified_stage1 ?coordination_entity)
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (not
+          (package_requires_parcel_permission ?shared_package)
+        )
+        (package_requires_special_permit ?shared_package)
+        (not
+          (entity_compliance_finalized ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_requires_additional_permission ?coordination_entity)
+      )
+  )
+  (:action finalize_compliance_with_both_permissions
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit ?certification_record - certification_record ?shared_package - shared_package)
+    :precondition
+      (and
+        (entity_certified_stage1 ?coordination_entity)
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (coordination_entity_holds_certification ?coordination_entity ?certification_record)
+        (certification_attached_to_package ?certification_record ?shared_package)
+        (package_requires_parcel_permission ?shared_package)
+        (package_requires_special_permit ?shared_package)
+        (not
+          (entity_compliance_finalized ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_requires_additional_permission ?coordination_entity)
+      )
+  )
+  (:action lock_entity_allocation_and_stage
+    :parameters (?coordination_entity - coordination_entity)
+    :precondition
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (not
+          (entity_requires_additional_permission ?coordination_entity)
+        )
+        (not
+          (entity_allocation_locked ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_locked ?coordination_entity)
+        (entity_package_staged ?coordination_entity)
+      )
+  )
+  (:action assign_support_grant_to_entity
+    :parameters (?coordination_entity - coordination_entity ?support_grant - support_grant)
+    :precondition
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_requires_additional_permission ?coordination_entity)
+        (support_grant_available ?support_grant)
+      )
+    :effect
+      (and
+        (coordination_entity_assigned_grant ?coordination_entity ?support_grant)
+        (not
+          (support_grant_available ?support_grant)
+        )
+      )
+  )
+  (:action authorize_entity_dispatch
+    :parameters (?coordination_entity - coordination_entity ?lender_farm - lender_farm ?borrower_farm - borrower_farm ?input_batch - input_batch ?support_grant - support_grant)
+    :precondition
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_requires_additional_permission ?coordination_entity)
+        (coordination_entity_assigned_grant ?coordination_entity ?support_grant)
+        (coordination_entity_manages_lender ?coordination_entity ?lender_farm)
+        (coordination_entity_manages_borrower ?coordination_entity ?borrower_farm)
+        (lender_ready ?lender_farm)
+        (borrower_ready ?borrower_farm)
+        (reserved_input_for_entity ?coordination_entity ?input_batch)
+        (not
+          (entity_ready_for_dispatch ?coordination_entity)
+        )
+      )
+    :effect (entity_ready_for_dispatch ?coordination_entity)
+  )
+  (:action finalize_entity_dispatch
+    :parameters (?coordination_entity - coordination_entity)
+    :precondition
+      (and
+        (entity_compliance_finalized ?coordination_entity)
+        (entity_ready_for_dispatch ?coordination_entity)
+        (not
+          (entity_allocation_locked ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_locked ?coordination_entity)
+        (entity_package_staged ?coordination_entity)
+      )
+  )
+  (:action claim_permission_token_for_entity
+    :parameters (?coordination_entity - coordination_entity ?permission_token - permission_token ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_validated ?coordination_entity)
+        (reserved_input_for_entity ?coordination_entity ?input_batch)
+        (permission_token_available ?permission_token)
+        (coordination_entity_holds_permission_token ?coordination_entity ?permission_token)
+        (not
+          (entity_permission_token_committed ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_permission_token_committed ?coordination_entity)
+        (not
+          (permission_token_available ?permission_token)
+        )
+      )
+  )
+  (:action prepare_permission_for_entity
+    :parameters (?coordination_entity - coordination_entity ?machinery_unit - machinery_unit)
+    :precondition
+      (and
+        (entity_permission_token_committed ?coordination_entity)
+        (machinery_assigned_to_entity ?coordination_entity ?machinery_unit)
+        (not
+          (entity_permission_in_process ?coordination_entity)
+        )
+      )
+    :effect (entity_permission_in_process ?coordination_entity)
+  )
+  (:action finalize_special_permit_for_entity
+    :parameters (?coordination_entity - coordination_entity ?special_permit - special_permit)
+    :precondition
+      (and
+        (entity_permission_in_process ?coordination_entity)
+        (coordination_entity_assigned_special_permit ?coordination_entity ?special_permit)
+        (not
+          (entity_permission_finalized ?coordination_entity)
+        )
+      )
+    :effect (entity_permission_finalized ?coordination_entity)
+  )
+  (:action finalize_permission_and_stage
+    :parameters (?coordination_entity - coordination_entity)
+    :precondition
+      (and
+        (entity_permission_finalized ?coordination_entity)
+        (not
+          (entity_allocation_locked ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_locked ?coordination_entity)
+        (entity_package_staged ?coordination_entity)
+      )
+  )
+  (:action confirm_distribution_to_lender
+    :parameters (?lender_farm - lender_farm ?shared_package - shared_package)
+    :precondition
+      (and
+        (lender_slot_owner_verified ?lender_farm)
+        (lender_ready ?lender_farm)
+        (shared_package_staged ?shared_package)
+        (shared_package_verified ?shared_package)
+        (not
+          (entity_package_staged ?lender_farm)
+        )
+      )
+    :effect (entity_package_staged ?lender_farm)
+  )
+  (:action confirm_distribution_to_borrower
+    :parameters (?borrower_farm - borrower_farm ?shared_package - shared_package)
+    :precondition
+      (and
+        (borrower_slot_owner_verified ?borrower_farm)
+        (borrower_ready ?borrower_farm)
+        (shared_package_staged ?shared_package)
+        (shared_package_verified ?shared_package)
+        (not
+          (entity_package_staged ?borrower_farm)
+        )
+      )
+    :effect (entity_package_staged ?borrower_farm)
+  )
+  (:action claim_package_and_reserve_contingency
+    :parameters (?farm_unit - farm_unit ?contingency_reserve - contingency_reserve ?input_batch - input_batch)
+    :precondition
+      (and
+        (entity_package_staged ?farm_unit)
+        (reserved_input_for_entity ?farm_unit ?input_batch)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (entity_package_claimed ?farm_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_package_claimed ?farm_unit)
+        (entity_assigned_contingency_reserve ?farm_unit ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action execute_lender_transfer
+    :parameters (?lender_farm - lender_farm ?resource_provider - resource_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_package_claimed ?lender_farm)
+        (assigned_provider_to_entity ?lender_farm ?resource_provider)
+        (entity_assigned_contingency_reserve ?lender_farm ?contingency_reserve)
+        (not
+          (transfer_completed ?lender_farm)
+        )
+      )
+    :effect
+      (and
+        (transfer_completed ?lender_farm)
+        (provider_available ?resource_provider)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action execute_borrower_transfer
+    :parameters (?borrower_farm - borrower_farm ?resource_provider - resource_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_package_claimed ?borrower_farm)
+        (assigned_provider_to_entity ?borrower_farm ?resource_provider)
+        (entity_assigned_contingency_reserve ?borrower_farm ?contingency_reserve)
+        (not
+          (transfer_completed ?borrower_farm)
+        )
+      )
+    :effect
+      (and
+        (transfer_completed ?borrower_farm)
+        (provider_available ?resource_provider)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action execute_coordination_entity_transfer
+    :parameters (?coordination_entity - coordination_entity ?resource_provider - resource_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_package_claimed ?coordination_entity)
+        (assigned_provider_to_entity ?coordination_entity ?resource_provider)
+        (entity_assigned_contingency_reserve ?coordination_entity ?contingency_reserve)
+        (not
+          (transfer_completed ?coordination_entity)
+        )
+      )
+    :effect
+      (and
+        (transfer_completed ?coordination_entity)
+        (provider_available ?resource_provider)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem multi_farm_resource_sharing_scenario_01)
+  (:domain multi_farm_resource_sharing_coordination_domain)
+  (:objects lender_farm_alpha - lender_farm borrower_farm_beta - borrower_farm coord_entity_main - coordination_entity coord_entity_aux - coordination_entity provider_truck_1 - resource_provider provider_truck_2 - resource_provider provider_truck_3 - resource_provider seed_batch_01 - input_batch tractor_01 - machinery_unit fertilizer_01 - consumable_resource lender_slot_1 - lender_allocation_slot borrower_slot_1 - borrower_allocation_slot shared_package_standard - shared_package cert_record_quality_1 - certification_record cert_record_quality_2 - certification_record parcel_001 - land_parcel parcel_002 - land_parcel support_grant_1 - support_grant support_grant_2 - support_grant contingency_reserve_1 - contingency_reserve task_planting_1 - operational_task permission_token_1 - permission_token permission_token_2 - permission_token special_permit_1 - special_permit)
+  (:init
+    (provider_available provider_truck_1)
+    (provider_available provider_truck_2)
+    (provider_available provider_truck_3)
+    (input_batch_available seed_batch_01)
+    (machinery_available tractor_01)
+    (consumable_available fertilizer_01)
+    (lender_slot_offered lender_farm_alpha lender_slot_1)
+    (borrower_slot_offered borrower_farm_beta borrower_slot_1)
+    (shared_package_available shared_package_standard)
+    (certification_available cert_record_quality_1)
+    (certification_available cert_record_quality_2)
+    (coordination_entity_manages_lender coord_entity_main lender_farm_alpha)
+    (coordination_entity_manages_lender coord_entity_aux lender_farm_alpha)
+    (coordination_entity_manages_borrower coord_entity_main borrower_farm_beta)
+    (coordination_entity_manages_borrower coord_entity_aux borrower_farm_beta)
+    (coordination_entity_links_package coord_entity_main shared_package_standard)
+    (coordination_entity_links_package coord_entity_aux shared_package_standard)
+    (coordination_entity_holds_certification coord_entity_main cert_record_quality_1)
+    (coordination_entity_holds_certification coord_entity_aux cert_record_quality_2)
+    (land_parcel_available parcel_001)
+    (land_parcel_available parcel_002)
+    (support_grant_available support_grant_1)
+    (support_grant_available support_grant_2)
+    (contingency_reserve_available contingency_reserve_1)
+    (operational_task_available task_planting_1)
+    (permission_token_available permission_token_1)
+    (coordination_entity_holds_permission_token coord_entity_main permission_token_1)
+    (coordination_entity_holds_permission_token coord_entity_aux permission_token_2)
+    (special_permit_available special_permit_1)
+  )
+  (:goal
+    (and
+      (transfer_completed lender_farm_alpha)
+      (transfer_completed borrower_farm_beta)
+      (transfer_completed coord_entity_main)
+      (transfer_completed coord_entity_aux)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_farm lender_farm_alpha)
+(match_farm_with_provider lender_farm_alpha provider_truck_1)
+(reserve_input_batch_for_farm lender_farm_alpha seed_batch_01)
+(confirm_input_reservation lender_farm_alpha seed_batch_01)
+(release_reserved_input_batch lender_farm_alpha seed_batch_01)
+(register_farm borrower_farm_beta)
+(match_farm_with_provider borrower_farm_beta provider_truck_2)
+(reserve_input_batch_for_farm borrower_farm_beta seed_batch_01)
+(confirm_input_reservation borrower_farm_beta seed_batch_01)
+(release_reserved_input_batch borrower_farm_beta seed_batch_01)
+(assign_machinery_to_farm borrower_farm_beta tractor_01)
+(reserve_input_batch_for_farm borrower_farm_beta seed_batch_01)
+(prepare_borrower_allocation_slot borrower_farm_beta borrower_slot_1 seed_batch_01)
+(confirm_borrower_slot borrower_farm_beta borrower_slot_1 tractor_01)
+(release_reserved_input_batch borrower_farm_beta seed_batch_01)
+(assign_consumable_to_lender_slot lender_farm_alpha lender_slot_1 fertilizer_01)
+(stage_shared_package_with_parcel_permission lender_farm_alpha borrower_farm_beta lender_slot_1 borrower_slot_1 shared_package_standard)
+(reserve_input_batch_for_farm lender_farm_alpha seed_batch_01)
+(verify_shared_package shared_package_standard lender_farm_alpha seed_batch_01)
+(finalize_lender_slot lender_farm_alpha lender_slot_1 seed_batch_01 fertilizer_01)
+(confirm_distribution_to_lender lender_farm_alpha shared_package_standard)
+(confirm_distribution_to_borrower borrower_farm_beta shared_package_standard)
+(claim_package_and_reserve_contingency lender_farm_alpha contingency_reserve_1 seed_batch_01)
+(execute_lender_transfer lender_farm_alpha provider_truck_1 contingency_reserve_1)
+(release_reserved_input_batch lender_farm_alpha seed_batch_01)
+(reserve_input_batch_for_farm borrower_farm_beta seed_batch_01)
+(claim_package_and_reserve_contingency borrower_farm_beta contingency_reserve_1 seed_batch_01)
+(execute_borrower_transfer borrower_farm_beta provider_truck_2 contingency_reserve_1)
+(release_reserved_input_batch borrower_farm_beta seed_batch_01)
+(register_farm coord_entity_main)
+(match_farm_with_provider coord_entity_main provider_truck_3)
+(reserve_input_batch_for_farm coord_entity_main seed_batch_01)
+(confirm_input_reservation coord_entity_main seed_batch_01)
+(attach_certification_to_package coord_entity_main cert_record_quality_1 shared_package_standard)
+(assign_parcel_permission_to_entity coord_entity_main parcel_001)
+(confirm_parcel_permission_and_escalate coord_entity_main cert_record_quality_1 shared_package_standard seed_batch_01 parcel_001)
+(assign_operational_task_to_entity coord_entity_main task_planting_1)
+(release_machinery_from_farm borrower_farm_beta tractor_01)
+(assign_machinery_to_farm coord_entity_main tractor_01)
+(activate_entity_certification_stage1 coord_entity_main task_planting_1 tractor_01 cert_record_quality_1 shared_package_standard)
+(assign_special_permit_to_entity coord_entity_main special_permit_1)
+(finalize_compliance_with_parcel_permission coord_entity_main special_permit_1 cert_record_quality_1 shared_package_standard)
+(assign_support_grant_to_entity coord_entity_main support_grant_1)
+(authorize_entity_dispatch coord_entity_main lender_farm_alpha borrower_farm_beta seed_batch_01 support_grant_1)
+(finalize_entity_dispatch coord_entity_main)
+(claim_package_and_reserve_contingency coord_entity_main contingency_reserve_1 seed_batch_01)
+(execute_coordination_entity_transfer coord_entity_main provider_truck_3 contingency_reserve_1)
+(release_reserved_input_batch coord_entity_main seed_batch_01)
+(register_farm coord_entity_aux)
+(match_farm_with_provider coord_entity_aux provider_truck_1)
+(reserve_input_batch_for_farm coord_entity_aux seed_batch_01)
+(confirm_input_reservation coord_entity_aux seed_batch_01)
+(attach_certification_to_package coord_entity_aux cert_record_quality_2 shared_package_standard)
+(assign_parcel_permission_to_entity coord_entity_aux parcel_002)
+(confirm_parcel_permission_and_escalate coord_entity_aux cert_record_quality_2 shared_package_standard seed_batch_01 parcel_002)
+(release_operational_task_from_entity coord_entity_main task_planting_1)
+(assign_operational_task_to_entity coord_entity_aux task_planting_1)
+(release_machinery_from_farm coord_entity_main tractor_01)
+(assign_machinery_to_farm coord_entity_aux tractor_01)
+(release_special_permit_from_entity coord_entity_main special_permit_1)
+(assign_special_permit_to_entity coord_entity_aux special_permit_1)
+(activate_entity_certification_stage1 coord_entity_aux task_planting_1 tractor_01 cert_record_quality_2 shared_package_standard)
+(finalize_compliance_with_parcel_permission coord_entity_aux special_permit_1 cert_record_quality_2 shared_package_standard)
+(assign_support_grant_to_entity coord_entity_aux support_grant_2)
+(authorize_entity_dispatch coord_entity_aux lender_farm_alpha borrower_farm_beta seed_batch_01 support_grant_2)
+(finalize_entity_dispatch coord_entity_aux)
+(claim_package_and_reserve_contingency coord_entity_aux contingency_reserve_1 seed_batch_01)
+(execute_coordination_entity_transfer coord_entity_aux provider_truck_1 contingency_reserve_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_mv43coi_/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 68 
+
+Successful plans:
+Value: 68
+ /tmp/val_mv43coi_/plan.pddl 68 
+
+
+
+--- stderr ---
+

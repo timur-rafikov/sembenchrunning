@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain vertical_movement_route_construction)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types assembly_item_type - object part_category - object segment_category - object node_type - object node - node_type traversal_tool_type - assembly_item_type movement_ability - assembly_item_type anchor_point - assembly_item_type special_modifier - assembly_item_type activation_charge - assembly_item_type return_beacon - assembly_item_type power_cell - assembly_item_type validation_token - assembly_item_type consumable_part - part_category module_part - part_category objective_key - part_category vertical_segment - segment_category side_segment - segment_category route_module - segment_category anchor_type - node route_type - node lower_anchor - anchor_type upper_anchor - anchor_type vertical_route - route_type)
+  (:predicates
+    (node_discovered ?node - node)
+    (node_enabled ?node - node)
+    (node_tool_claimed ?node - node)
+    (installed ?node - node)
+    (ready_for_traversal ?node - node)
+    (beacon_bound ?node - node)
+    (tool_available ?traversal_tool_type - traversal_tool_type)
+    (node_assigned_tool ?node - node ?traversal_tool_type - traversal_tool_type)
+    (ability_available ?movement_ability - movement_ability)
+    (node_ability_verified ?node - node ?movement_ability - movement_ability)
+    (anchor_point_available ?anchor_point - anchor_point)
+    (node_anchor_attached ?node - node ?anchor_point - anchor_point)
+    (part_available ?consumable_part - consumable_part)
+    (lower_anchor_part_installed ?lower_anchor - lower_anchor ?consumable_part - consumable_part)
+    (upper_anchor_part_installed ?upper_anchor - upper_anchor ?consumable_part - consumable_part)
+    (lower_anchor_vertical_segment_link ?lower_anchor - lower_anchor ?vertical_segment - vertical_segment)
+    (segment_accessible ?vertical_segment - vertical_segment)
+    (segment_stabilized ?vertical_segment - vertical_segment)
+    (lower_anchor_ready ?lower_anchor - lower_anchor)
+    (upper_anchor_side_segment_link ?upper_anchor - upper_anchor ?side_segment - side_segment)
+    (side_segment_accessible ?side_segment - side_segment)
+    (side_segment_stabilized ?side_segment - side_segment)
+    (upper_anchor_ready ?upper_anchor - upper_anchor)
+    (module_staged ?route_module - route_module)
+    (module_assembled ?route_module - route_module)
+    (module_vertical_segment_link ?route_module - route_module ?vertical_segment - vertical_segment)
+    (module_side_segment_link ?route_module - route_module ?side_segment - side_segment)
+    (module_slot_a_filled ?route_module - route_module)
+    (module_slot_b_filled ?route_module - route_module)
+    (module_locked ?route_module - route_module)
+    (vertical_route_lower_anchor_link ?vertical_route - vertical_route ?lower_anchor - lower_anchor)
+    (vertical_route_upper_anchor_link ?vertical_route - vertical_route ?upper_anchor - upper_anchor)
+    (vertical_route_module_link ?vertical_route - vertical_route ?route_module - route_module)
+    (module_part_available ?module_part - module_part)
+    (vertical_route_part_link ?vertical_route - vertical_route ?module_part - module_part)
+    (module_part_installed ?module_part - module_part)
+    (part_assigned_to_module ?module_part - module_part ?route_module - route_module)
+    (vertical_route_integration_complete ?vertical_route - vertical_route)
+    (vertical_route_upgraded ?vertical_route - vertical_route)
+    (validation_ready ?vertical_route - vertical_route)
+    (modifier_reserved ?vertical_route - vertical_route)
+    (modifier_applied ?vertical_route - vertical_route)
+    (validation_secondary_flag ?vertical_route - vertical_route)
+    (integration_check_passed ?vertical_route - vertical_route)
+    (objective_key_available ?objective_key - objective_key)
+    (vertical_route_key_link ?vertical_route - vertical_route ?objective_key - objective_key)
+    (vertical_route_unlocked_by_key ?vertical_route - vertical_route)
+    (vertical_route_anchor_lock_attached ?vertical_route - vertical_route)
+    (vertical_route_validation_requested ?vertical_route - vertical_route)
+    (modifier_available ?special_modifier - special_modifier)
+    (vertical_route_modifier_link ?vertical_route - vertical_route ?special_modifier - special_modifier)
+    (activation_charge_available ?activation_charge - activation_charge)
+    (vertical_route_activation_charge_attached ?vertical_route - vertical_route ?activation_charge - activation_charge)
+    (power_cell_available ?power_cell - power_cell)
+    (vertical_route_power_cell_attached ?vertical_route - vertical_route ?power_cell - power_cell)
+    (validation_token_available ?validation_token - validation_token)
+    (vertical_route_validation_token_link ?vertical_route - vertical_route ?validation_token - validation_token)
+    (return_beacon_available ?return_beacon - return_beacon)
+    (node_return_beacon_link ?node - node ?return_beacon - return_beacon)
+    (lower_anchor_prepped ?lower_anchor - lower_anchor)
+    (upper_anchor_prepped ?upper_anchor - upper_anchor)
+    (vertical_route_certified ?vertical_route - vertical_route)
+  )
+  (:action discover_node
+    :parameters (?node - node)
+    :precondition
+      (and
+        (not
+          (node_discovered ?node)
+        )
+        (not
+          (installed ?node)
+        )
+      )
+    :effect (node_discovered ?node)
+  )
+  (:action assign_tool_to_node
+    :parameters (?node - node ?traversal_tool_type - traversal_tool_type)
+    :precondition
+      (and
+        (node_discovered ?node)
+        (not
+          (node_tool_claimed ?node)
+        )
+        (tool_available ?traversal_tool_type)
+      )
+    :effect
+      (and
+        (node_tool_claimed ?node)
+        (node_assigned_tool ?node ?traversal_tool_type)
+        (not
+          (tool_available ?traversal_tool_type)
+        )
+      )
+  )
+  (:action validate_node_with_ability
+    :parameters (?node - node ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_discovered ?node)
+        (node_tool_claimed ?node)
+        (ability_available ?movement_ability)
+      )
+    :effect
+      (and
+        (node_ability_verified ?node ?movement_ability)
+        (not
+          (ability_available ?movement_ability)
+        )
+      )
+  )
+  (:action enable_node_for_construction
+    :parameters (?node - node ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_discovered ?node)
+        (node_tool_claimed ?node)
+        (node_ability_verified ?node ?movement_ability)
+        (not
+          (node_enabled ?node)
+        )
+      )
+    :effect (node_enabled ?node)
+  )
+  (:action release_movement_ability
+    :parameters (?node - node ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_ability_verified ?node ?movement_ability)
+      )
+    :effect
+      (and
+        (ability_available ?movement_ability)
+        (not
+          (node_ability_verified ?node ?movement_ability)
+        )
+      )
+  )
+  (:action attach_anchor_point_to_node
+    :parameters (?node - node ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (node_enabled ?node)
+        (anchor_point_available ?anchor_point)
+      )
+    :effect
+      (and
+        (node_anchor_attached ?node ?anchor_point)
+        (not
+          (anchor_point_available ?anchor_point)
+        )
+      )
+  )
+  (:action detach_anchor_point_from_node
+    :parameters (?node - node ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (node_anchor_attached ?node ?anchor_point)
+      )
+    :effect
+      (and
+        (anchor_point_available ?anchor_point)
+        (not
+          (node_anchor_attached ?node ?anchor_point)
+        )
+      )
+  )
+  (:action install_power_cell_on_route
+    :parameters (?vertical_route - vertical_route ?power_cell - power_cell)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (power_cell_available ?power_cell)
+      )
+    :effect
+      (and
+        (vertical_route_power_cell_attached ?vertical_route ?power_cell)
+        (not
+          (power_cell_available ?power_cell)
+        )
+      )
+  )
+  (:action remove_power_cell_from_route
+    :parameters (?vertical_route - vertical_route ?power_cell - power_cell)
+    :precondition
+      (and
+        (vertical_route_power_cell_attached ?vertical_route ?power_cell)
+      )
+    :effect
+      (and
+        (power_cell_available ?power_cell)
+        (not
+          (vertical_route_power_cell_attached ?vertical_route ?power_cell)
+        )
+      )
+  )
+  (:action attach_validation_token_to_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (validation_token_available ?validation_token)
+      )
+    :effect
+      (and
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (not
+          (validation_token_available ?validation_token)
+        )
+      )
+  )
+  (:action remove_validation_token_from_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token)
+    :precondition
+      (and
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+      )
+    :effect
+      (and
+        (validation_token_available ?validation_token)
+        (not
+          (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        )
+      )
+  )
+  (:action scan_vertical_segment
+    :parameters (?lower_anchor - lower_anchor ?vertical_segment - vertical_segment ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_enabled ?lower_anchor)
+        (node_ability_verified ?lower_anchor ?movement_ability)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (not
+          (segment_accessible ?vertical_segment)
+        )
+        (not
+          (segment_stabilized ?vertical_segment)
+        )
+      )
+    :effect (segment_accessible ?vertical_segment)
+  )
+  (:action flag_lower_anchor_ready
+    :parameters (?lower_anchor - lower_anchor ?vertical_segment - vertical_segment ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (node_enabled ?lower_anchor)
+        (node_anchor_attached ?lower_anchor ?anchor_point)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (segment_accessible ?vertical_segment)
+        (not
+          (lower_anchor_prepped ?lower_anchor)
+        )
+      )
+    :effect
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (lower_anchor_ready ?lower_anchor)
+      )
+  )
+  (:action stabilize_segment_with_part
+    :parameters (?lower_anchor - lower_anchor ?vertical_segment - vertical_segment ?consumable_part - consumable_part)
+    :precondition
+      (and
+        (node_enabled ?lower_anchor)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (part_available ?consumable_part)
+        (not
+          (lower_anchor_prepped ?lower_anchor)
+        )
+      )
+    :effect
+      (and
+        (segment_stabilized ?vertical_segment)
+        (lower_anchor_prepped ?lower_anchor)
+        (lower_anchor_part_installed ?lower_anchor ?consumable_part)
+        (not
+          (part_available ?consumable_part)
+        )
+      )
+  )
+  (:action finalize_segment_stabilization
+    :parameters (?lower_anchor - lower_anchor ?vertical_segment - vertical_segment ?movement_ability - movement_ability ?consumable_part - consumable_part)
+    :precondition
+      (and
+        (node_enabled ?lower_anchor)
+        (node_ability_verified ?lower_anchor ?movement_ability)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (segment_stabilized ?vertical_segment)
+        (lower_anchor_part_installed ?lower_anchor ?consumable_part)
+        (not
+          (lower_anchor_ready ?lower_anchor)
+        )
+      )
+    :effect
+      (and
+        (segment_accessible ?vertical_segment)
+        (lower_anchor_ready ?lower_anchor)
+        (part_available ?consumable_part)
+        (not
+          (lower_anchor_part_installed ?lower_anchor ?consumable_part)
+        )
+      )
+  )
+  (:action scan_side_segment
+    :parameters (?upper_anchor - upper_anchor ?side_segment - side_segment ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_enabled ?upper_anchor)
+        (node_ability_verified ?upper_anchor ?movement_ability)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (not
+          (side_segment_accessible ?side_segment)
+        )
+        (not
+          (side_segment_stabilized ?side_segment)
+        )
+      )
+    :effect (side_segment_accessible ?side_segment)
+  )
+  (:action flag_upper_anchor_ready
+    :parameters (?upper_anchor - upper_anchor ?side_segment - side_segment ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (node_enabled ?upper_anchor)
+        (node_anchor_attached ?upper_anchor ?anchor_point)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (side_segment_accessible ?side_segment)
+        (not
+          (upper_anchor_prepped ?upper_anchor)
+        )
+      )
+    :effect
+      (and
+        (upper_anchor_prepped ?upper_anchor)
+        (upper_anchor_ready ?upper_anchor)
+      )
+  )
+  (:action stabilize_side_segment_with_part
+    :parameters (?upper_anchor - upper_anchor ?side_segment - side_segment ?consumable_part - consumable_part)
+    :precondition
+      (and
+        (node_enabled ?upper_anchor)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (part_available ?consumable_part)
+        (not
+          (upper_anchor_prepped ?upper_anchor)
+        )
+      )
+    :effect
+      (and
+        (side_segment_stabilized ?side_segment)
+        (upper_anchor_prepped ?upper_anchor)
+        (upper_anchor_part_installed ?upper_anchor ?consumable_part)
+        (not
+          (part_available ?consumable_part)
+        )
+      )
+  )
+  (:action finalize_side_segment_stabilization
+    :parameters (?upper_anchor - upper_anchor ?side_segment - side_segment ?movement_ability - movement_ability ?consumable_part - consumable_part)
+    :precondition
+      (and
+        (node_enabled ?upper_anchor)
+        (node_ability_verified ?upper_anchor ?movement_ability)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (side_segment_stabilized ?side_segment)
+        (upper_anchor_part_installed ?upper_anchor ?consumable_part)
+        (not
+          (upper_anchor_ready ?upper_anchor)
+        )
+      )
+    :effect
+      (and
+        (side_segment_accessible ?side_segment)
+        (upper_anchor_ready ?upper_anchor)
+        (part_available ?consumable_part)
+        (not
+          (upper_anchor_part_installed ?upper_anchor ?consumable_part)
+        )
+      )
+  )
+  (:action assemble_route_module
+    :parameters (?lower_anchor - lower_anchor ?upper_anchor - upper_anchor ?vertical_segment - vertical_segment ?side_segment - side_segment ?route_module - route_module)
+    :precondition
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (upper_anchor_prepped ?upper_anchor)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (segment_accessible ?vertical_segment)
+        (side_segment_accessible ?side_segment)
+        (lower_anchor_ready ?lower_anchor)
+        (upper_anchor_ready ?upper_anchor)
+        (module_staged ?route_module)
+      )
+    :effect
+      (and
+        (module_assembled ?route_module)
+        (module_vertical_segment_link ?route_module ?vertical_segment)
+        (module_side_segment_link ?route_module ?side_segment)
+        (not
+          (module_staged ?route_module)
+        )
+      )
+  )
+  (:action assemble_route_module_slot_a
+    :parameters (?lower_anchor - lower_anchor ?upper_anchor - upper_anchor ?vertical_segment - vertical_segment ?side_segment - side_segment ?route_module - route_module)
+    :precondition
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (upper_anchor_prepped ?upper_anchor)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (segment_stabilized ?vertical_segment)
+        (side_segment_accessible ?side_segment)
+        (not
+          (lower_anchor_ready ?lower_anchor)
+        )
+        (upper_anchor_ready ?upper_anchor)
+        (module_staged ?route_module)
+      )
+    :effect
+      (and
+        (module_assembled ?route_module)
+        (module_vertical_segment_link ?route_module ?vertical_segment)
+        (module_side_segment_link ?route_module ?side_segment)
+        (module_slot_a_filled ?route_module)
+        (not
+          (module_staged ?route_module)
+        )
+      )
+  )
+  (:action assemble_route_module_slot_b
+    :parameters (?lower_anchor - lower_anchor ?upper_anchor - upper_anchor ?vertical_segment - vertical_segment ?side_segment - side_segment ?route_module - route_module)
+    :precondition
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (upper_anchor_prepped ?upper_anchor)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (segment_accessible ?vertical_segment)
+        (side_segment_stabilized ?side_segment)
+        (lower_anchor_ready ?lower_anchor)
+        (not
+          (upper_anchor_ready ?upper_anchor)
+        )
+        (module_staged ?route_module)
+      )
+    :effect
+      (and
+        (module_assembled ?route_module)
+        (module_vertical_segment_link ?route_module ?vertical_segment)
+        (module_side_segment_link ?route_module ?side_segment)
+        (module_slot_b_filled ?route_module)
+        (not
+          (module_staged ?route_module)
+        )
+      )
+  )
+  (:action assemble_route_module_both_slots
+    :parameters (?lower_anchor - lower_anchor ?upper_anchor - upper_anchor ?vertical_segment - vertical_segment ?side_segment - side_segment ?route_module - route_module)
+    :precondition
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (upper_anchor_prepped ?upper_anchor)
+        (lower_anchor_vertical_segment_link ?lower_anchor ?vertical_segment)
+        (upper_anchor_side_segment_link ?upper_anchor ?side_segment)
+        (segment_stabilized ?vertical_segment)
+        (side_segment_stabilized ?side_segment)
+        (not
+          (lower_anchor_ready ?lower_anchor)
+        )
+        (not
+          (upper_anchor_ready ?upper_anchor)
+        )
+        (module_staged ?route_module)
+      )
+    :effect
+      (and
+        (module_assembled ?route_module)
+        (module_vertical_segment_link ?route_module ?vertical_segment)
+        (module_side_segment_link ?route_module ?side_segment)
+        (module_slot_a_filled ?route_module)
+        (module_slot_b_filled ?route_module)
+        (not
+          (module_staged ?route_module)
+        )
+      )
+  )
+  (:action lock_route_module
+    :parameters (?route_module - route_module ?lower_anchor - lower_anchor ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (module_assembled ?route_module)
+        (lower_anchor_prepped ?lower_anchor)
+        (node_ability_verified ?lower_anchor ?movement_ability)
+        (not
+          (module_locked ?route_module)
+        )
+      )
+    :effect (module_locked ?route_module)
+  )
+  (:action attach_part_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (vertical_route_module_link ?vertical_route ?route_module)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (module_part_available ?module_part)
+        (module_assembled ?route_module)
+        (module_locked ?route_module)
+        (not
+          (module_part_installed ?module_part)
+        )
+      )
+    :effect
+      (and
+        (module_part_installed ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (not
+          (module_part_available ?module_part)
+        )
+      )
+  )
+  (:action integrate_part_into_vertical_route_module
+    :parameters (?vertical_route - vertical_route ?module_part - module_part ?route_module - route_module ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (module_part_installed ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (node_ability_verified ?vertical_route ?movement_ability)
+        (not
+          (module_slot_a_filled ?route_module)
+        )
+        (not
+          (vertical_route_integration_complete ?vertical_route)
+        )
+      )
+    :effect (vertical_route_integration_complete ?vertical_route)
+  )
+  (:action reserve_modifier_for_module
+    :parameters (?vertical_route - vertical_route ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (modifier_available ?special_modifier)
+        (not
+          (modifier_reserved ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (modifier_reserved ?vertical_route)
+        (vertical_route_modifier_link ?vertical_route ?special_modifier)
+        (not
+          (modifier_available ?special_modifier)
+        )
+      )
+  )
+  (:action apply_modifier_and_integrate
+    :parameters (?vertical_route - vertical_route ?module_part - module_part ?route_module - route_module ?movement_ability - movement_ability ?special_modifier - special_modifier)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (module_part_installed ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (node_ability_verified ?vertical_route ?movement_ability)
+        (module_slot_a_filled ?route_module)
+        (modifier_reserved ?vertical_route)
+        (vertical_route_modifier_link ?vertical_route ?special_modifier)
+        (not
+          (vertical_route_integration_complete ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (vertical_route_integration_complete ?vertical_route)
+        (modifier_applied ?vertical_route)
+      )
+  )
+  (:action begin_vertical_route_power_upgrade
+    :parameters (?vertical_route - vertical_route ?power_cell - power_cell ?anchor_point - anchor_point ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_integration_complete ?vertical_route)
+        (vertical_route_power_cell_attached ?vertical_route ?power_cell)
+        (node_anchor_attached ?vertical_route ?anchor_point)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (not
+          (module_slot_b_filled ?route_module)
+        )
+        (not
+          (vertical_route_upgraded ?vertical_route)
+        )
+      )
+    :effect (vertical_route_upgraded ?vertical_route)
+  )
+  (:action complete_vertical_route_power_upgrade
+    :parameters (?vertical_route - vertical_route ?power_cell - power_cell ?anchor_point - anchor_point ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_integration_complete ?vertical_route)
+        (vertical_route_power_cell_attached ?vertical_route ?power_cell)
+        (node_anchor_attached ?vertical_route ?anchor_point)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (module_slot_b_filled ?route_module)
+        (not
+          (vertical_route_upgraded ?vertical_route)
+        )
+      )
+    :effect (vertical_route_upgraded ?vertical_route)
+  )
+  (:action apply_validation_token_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_upgraded ?vertical_route)
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (not
+          (module_slot_a_filled ?route_module)
+        )
+        (not
+          (module_slot_b_filled ?route_module)
+        )
+        (not
+          (validation_ready ?vertical_route)
+        )
+      )
+    :effect (validation_ready ?vertical_route)
+  )
+  (:action apply_validation_token_and_set_secondary_flag_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_upgraded ?vertical_route)
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (module_slot_a_filled ?route_module)
+        (not
+          (module_slot_b_filled ?route_module)
+        )
+        (not
+          (validation_ready ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (validation_ready ?vertical_route)
+        (validation_secondary_flag ?vertical_route)
+      )
+  )
+  (:action apply_validation_token_and_secondary_variant_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_upgraded ?vertical_route)
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (not
+          (module_slot_a_filled ?route_module)
+        )
+        (module_slot_b_filled ?route_module)
+        (not
+          (validation_ready ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (validation_ready ?vertical_route)
+        (validation_secondary_flag ?vertical_route)
+      )
+  )
+  (:action apply_validation_token_with_both_slots_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token ?module_part - module_part ?route_module - route_module)
+    :precondition
+      (and
+        (vertical_route_upgraded ?vertical_route)
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (vertical_route_part_link ?vertical_route ?module_part)
+        (part_assigned_to_module ?module_part ?route_module)
+        (module_slot_a_filled ?route_module)
+        (module_slot_b_filled ?route_module)
+        (not
+          (validation_ready ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (validation_ready ?vertical_route)
+        (validation_secondary_flag ?vertical_route)
+      )
+  )
+  (:action certify_vertical_route
+    :parameters (?vertical_route - vertical_route)
+    :precondition
+      (and
+        (validation_ready ?vertical_route)
+        (not
+          (validation_secondary_flag ?vertical_route)
+        )
+        (not
+          (vertical_route_certified ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (vertical_route_certified ?vertical_route)
+        (ready_for_traversal ?vertical_route)
+      )
+  )
+  (:action attach_activation_charge_to_vertical_route
+    :parameters (?vertical_route - vertical_route ?activation_charge - activation_charge)
+    :precondition
+      (and
+        (validation_ready ?vertical_route)
+        (validation_secondary_flag ?vertical_route)
+        (activation_charge_available ?activation_charge)
+      )
+    :effect
+      (and
+        (vertical_route_activation_charge_attached ?vertical_route ?activation_charge)
+        (not
+          (activation_charge_available ?activation_charge)
+        )
+      )
+  )
+  (:action perform_vertical_route_integration_check
+    :parameters (?vertical_route - vertical_route ?lower_anchor - lower_anchor ?upper_anchor - upper_anchor ?movement_ability - movement_ability ?activation_charge - activation_charge)
+    :precondition
+      (and
+        (validation_ready ?vertical_route)
+        (validation_secondary_flag ?vertical_route)
+        (vertical_route_activation_charge_attached ?vertical_route ?activation_charge)
+        (vertical_route_lower_anchor_link ?vertical_route ?lower_anchor)
+        (vertical_route_upper_anchor_link ?vertical_route ?upper_anchor)
+        (lower_anchor_ready ?lower_anchor)
+        (upper_anchor_ready ?upper_anchor)
+        (node_ability_verified ?vertical_route ?movement_ability)
+        (not
+          (integration_check_passed ?vertical_route)
+        )
+      )
+    :effect (integration_check_passed ?vertical_route)
+  )
+  (:action finalize_and_activate_vertical_route
+    :parameters (?vertical_route - vertical_route)
+    :precondition
+      (and
+        (validation_ready ?vertical_route)
+        (integration_check_passed ?vertical_route)
+        (not
+          (vertical_route_certified ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (vertical_route_certified ?vertical_route)
+        (ready_for_traversal ?vertical_route)
+      )
+  )
+  (:action use_objective_key_to_unlock_module
+    :parameters (?vertical_route - vertical_route ?objective_key - objective_key ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (node_enabled ?vertical_route)
+        (node_ability_verified ?vertical_route ?movement_ability)
+        (objective_key_available ?objective_key)
+        (vertical_route_key_link ?vertical_route ?objective_key)
+        (not
+          (vertical_route_unlocked_by_key ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (vertical_route_unlocked_by_key ?vertical_route)
+        (not
+          (objective_key_available ?objective_key)
+        )
+      )
+  )
+  (:action attach_module_anchor_lock
+    :parameters (?vertical_route - vertical_route ?anchor_point - anchor_point)
+    :precondition
+      (and
+        (vertical_route_unlocked_by_key ?vertical_route)
+        (node_anchor_attached ?vertical_route ?anchor_point)
+        (not
+          (vertical_route_anchor_lock_attached ?vertical_route)
+        )
+      )
+    :effect (vertical_route_anchor_lock_attached ?vertical_route)
+  )
+  (:action request_vertical_route_validation
+    :parameters (?vertical_route - vertical_route ?validation_token - validation_token)
+    :precondition
+      (and
+        (vertical_route_anchor_lock_attached ?vertical_route)
+        (vertical_route_validation_token_link ?vertical_route ?validation_token)
+        (not
+          (vertical_route_validation_requested ?vertical_route)
+        )
+      )
+    :effect (vertical_route_validation_requested ?vertical_route)
+  )
+  (:action complete_vertical_route_validation
+    :parameters (?vertical_route - vertical_route)
+    :precondition
+      (and
+        (vertical_route_validation_requested ?vertical_route)
+        (not
+          (vertical_route_certified ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (vertical_route_certified ?vertical_route)
+        (ready_for_traversal ?vertical_route)
+      )
+  )
+  (:action activate_lower_anchor_for_traversal
+    :parameters (?lower_anchor - lower_anchor ?route_module - route_module)
+    :precondition
+      (and
+        (lower_anchor_prepped ?lower_anchor)
+        (lower_anchor_ready ?lower_anchor)
+        (module_assembled ?route_module)
+        (module_locked ?route_module)
+        (not
+          (ready_for_traversal ?lower_anchor)
+        )
+      )
+    :effect (ready_for_traversal ?lower_anchor)
+  )
+  (:action activate_upper_anchor_for_traversal
+    :parameters (?upper_anchor - upper_anchor ?route_module - route_module)
+    :precondition
+      (and
+        (upper_anchor_prepped ?upper_anchor)
+        (upper_anchor_ready ?upper_anchor)
+        (module_assembled ?route_module)
+        (module_locked ?route_module)
+        (not
+          (ready_for_traversal ?upper_anchor)
+        )
+      )
+    :effect (ready_for_traversal ?upper_anchor)
+  )
+  (:action assign_return_beacon_to_node
+    :parameters (?node - node ?return_beacon - return_beacon ?movement_ability - movement_ability)
+    :precondition
+      (and
+        (ready_for_traversal ?node)
+        (node_ability_verified ?node ?movement_ability)
+        (return_beacon_available ?return_beacon)
+        (not
+          (beacon_bound ?node)
+        )
+      )
+    :effect
+      (and
+        (beacon_bound ?node)
+        (node_return_beacon_link ?node ?return_beacon)
+        (not
+          (return_beacon_available ?return_beacon)
+        )
+      )
+  )
+  (:action finalize_lower_anchor_installation
+    :parameters (?lower_anchor - lower_anchor ?traversal_tool_type - traversal_tool_type ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (beacon_bound ?lower_anchor)
+        (node_assigned_tool ?lower_anchor ?traversal_tool_type)
+        (node_return_beacon_link ?lower_anchor ?return_beacon)
+        (not
+          (installed ?lower_anchor)
+        )
+      )
+    :effect
+      (and
+        (installed ?lower_anchor)
+        (tool_available ?traversal_tool_type)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+  (:action finalize_upper_anchor_installation
+    :parameters (?upper_anchor - upper_anchor ?traversal_tool_type - traversal_tool_type ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (beacon_bound ?upper_anchor)
+        (node_assigned_tool ?upper_anchor ?traversal_tool_type)
+        (node_return_beacon_link ?upper_anchor ?return_beacon)
+        (not
+          (installed ?upper_anchor)
+        )
+      )
+    :effect
+      (and
+        (installed ?upper_anchor)
+        (tool_available ?traversal_tool_type)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+  (:action finalize_vertical_route_installation
+    :parameters (?vertical_route - vertical_route ?traversal_tool_type - traversal_tool_type ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (beacon_bound ?vertical_route)
+        (node_assigned_tool ?vertical_route ?traversal_tool_type)
+        (node_return_beacon_link ?vertical_route ?return_beacon)
+        (not
+          (installed ?vertical_route)
+        )
+      )
+    :effect
+      (and
+        (installed ?vertical_route)
+        (tool_available ?traversal_tool_type)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem vertical_route_construction_scenario)
+  (:domain vertical_movement_route_construction)
+  (:objects lower_anchor_1 - lower_anchor upper_anchor_1 - upper_anchor vertical_route_1 - vertical_route vertical_route_2 - vertical_route grapple_tool_type - traversal_tool_type hook_tool_type - traversal_tool_type winch_tool_type - traversal_tool_type climb_ability - movement_ability anchor_point_primary - anchor_point rope_coil - consumable_part vertical_segment_1 - vertical_segment side_segment_1 - side_segment route_module_1 - route_module module_plate_1 - module_part module_plate_2 - module_part modifier_windy - special_modifier modifier_slick - special_modifier activation_charge_1 - activation_charge activation_charge_2 - activation_charge return_beacon_1 - return_beacon power_cell_1 - power_cell objective_key_1 - objective_key objective_key_2 - objective_key validation_token_1 - validation_token)
+  (:init
+    (tool_available grapple_tool_type)
+    (tool_available hook_tool_type)
+    (tool_available winch_tool_type)
+    (ability_available climb_ability)
+    (anchor_point_available anchor_point_primary)
+    (part_available rope_coil)
+    (lower_anchor_vertical_segment_link lower_anchor_1 vertical_segment_1)
+    (upper_anchor_side_segment_link upper_anchor_1 side_segment_1)
+    (module_staged route_module_1)
+    (module_part_available module_plate_1)
+    (module_part_available module_plate_2)
+    (vertical_route_lower_anchor_link vertical_route_1 lower_anchor_1)
+    (vertical_route_lower_anchor_link vertical_route_2 lower_anchor_1)
+    (vertical_route_upper_anchor_link vertical_route_1 upper_anchor_1)
+    (vertical_route_upper_anchor_link vertical_route_2 upper_anchor_1)
+    (vertical_route_module_link vertical_route_1 route_module_1)
+    (vertical_route_module_link vertical_route_2 route_module_1)
+    (vertical_route_part_link vertical_route_1 module_plate_1)
+    (vertical_route_part_link vertical_route_2 module_plate_2)
+    (modifier_available modifier_windy)
+    (modifier_available modifier_slick)
+    (activation_charge_available activation_charge_1)
+    (activation_charge_available activation_charge_2)
+    (return_beacon_available return_beacon_1)
+    (power_cell_available power_cell_1)
+    (objective_key_available objective_key_1)
+    (vertical_route_key_link vertical_route_1 objective_key_1)
+    (vertical_route_key_link vertical_route_2 objective_key_2)
+    (validation_token_available validation_token_1)
+  )
+  (:goal
+    (and
+      (installed lower_anchor_1)
+      (installed upper_anchor_1)
+      (installed vertical_route_1)
+      (installed vertical_route_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_node lower_anchor_1)
+(assign_tool_to_node lower_anchor_1 grapple_tool_type)
+(validate_node_with_ability lower_anchor_1 climb_ability)
+(enable_node_for_construction lower_anchor_1 climb_ability)
+(scan_vertical_segment lower_anchor_1 vertical_segment_1 climb_ability)
+(attach_anchor_point_to_node lower_anchor_1 anchor_point_primary)
+(flag_lower_anchor_ready lower_anchor_1 vertical_segment_1 anchor_point_primary)
+(detach_anchor_point_from_node lower_anchor_1 anchor_point_primary)
+(release_movement_ability lower_anchor_1 climb_ability)
+(discover_node upper_anchor_1)
+(assign_tool_to_node upper_anchor_1 hook_tool_type)
+(validate_node_with_ability upper_anchor_1 climb_ability)
+(enable_node_for_construction upper_anchor_1 climb_ability)
+(scan_side_segment upper_anchor_1 side_segment_1 climb_ability)
+(attach_anchor_point_to_node upper_anchor_1 anchor_point_primary)
+(flag_upper_anchor_ready upper_anchor_1 side_segment_1 anchor_point_primary)
+(assemble_route_module lower_anchor_1 upper_anchor_1 vertical_segment_1 side_segment_1 route_module_1)
+(release_movement_ability upper_anchor_1 climb_ability)
+(validate_node_with_ability lower_anchor_1 climb_ability)
+(lock_route_module route_module_1 lower_anchor_1 climb_ability)
+(activate_lower_anchor_for_traversal lower_anchor_1 route_module_1)
+(activate_upper_anchor_for_traversal upper_anchor_1 route_module_1)
+(assign_return_beacon_to_node lower_anchor_1 return_beacon_1 climb_ability)
+(finalize_lower_anchor_installation lower_anchor_1 grapple_tool_type return_beacon_1)
+(release_movement_ability lower_anchor_1 climb_ability)
+(validate_node_with_ability upper_anchor_1 climb_ability)
+(assign_return_beacon_to_node upper_anchor_1 return_beacon_1 climb_ability)
+(finalize_upper_anchor_installation upper_anchor_1 hook_tool_type return_beacon_1)
+(release_movement_ability upper_anchor_1 climb_ability)
+(discover_node vertical_route_1)
+(assign_tool_to_node vertical_route_1 winch_tool_type)
+(validate_node_with_ability vertical_route_1 climb_ability)
+(enable_node_for_construction vertical_route_1 climb_ability)
+(attach_part_to_vertical_route vertical_route_1 module_plate_1 route_module_1)
+(integrate_part_into_vertical_route vertical_route_1 module_plate_1 route_module_1 climb_ability)
+(install_power_cell_on_route vertical_route_1 power_cell_1)
+(detach_anchor_point_from_node upper_anchor_1 anchor_point_primary)
+(attach_anchor_point_to_node vertical_route_1 anchor_point_primary)
+(begin_vertical_route_power_upgrade vertical_route_1 power_cell_1 anchor_point_primary module_plate_1 route_module_1)
+(attach_validation_token_to_route vertical_route_1 validation_token_1)
+(apply_validation_token_to_vertical_route vertical_route_1 validation_token_1 module_plate_1 route_module_1)
+(certify_vertical_route vertical_route_1)
+(assign_return_beacon_to_node vertical_route_1 return_beacon_1 climb_ability)
+(finalize_vertical_route_installation vertical_route_1 winch_tool_type return_beacon_1)
+(release_movement_ability vertical_route_1 climb_ability)
+(discover_node vertical_route_2)
+(assign_tool_to_node vertical_route_2 grapple_tool_type)
+(validate_node_with_ability vertical_route_2 climb_ability)
+(enable_node_for_construction vertical_route_2 climb_ability)
+(attach_part_to_vertical_route vertical_route_2 module_plate_2 route_module_1)
+(integrate_part_into_vertical_route vertical_route_2 module_plate_2 route_module_1 climb_ability)
+(remove_power_cell_from_route vertical_route_1 power_cell_1)
+(install_power_cell_on_route vertical_route_2 power_cell_1)
+(detach_anchor_point_from_node vertical_route_1 anchor_point_primary)
+(attach_anchor_point_to_node vertical_route_2 anchor_point_primary)
+(begin_vertical_route_power_upgrade vertical_route_2 power_cell_1 anchor_point_primary module_plate_2 route_module_1)
+(remove_validation_token_from_route vertical_route_1 validation_token_1)
+(attach_validation_token_to_route vertical_route_2 validation_token_1)
+(apply_validation_token_to_vertical_route vertical_route_2 validation_token_1 module_plate_2 route_module_1)
+(certify_vertical_route vertical_route_2)
+(assign_return_beacon_to_node vertical_route_2 return_beacon_1 climb_ability)
+(finalize_vertical_route_installation vertical_route_2 grapple_tool_type return_beacon_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_3t76ggjg/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_3t76ggjg/plan.pddl 
+
+
+--- stderr ---
+

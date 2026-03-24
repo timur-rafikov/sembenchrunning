@@ -1,0 +1,936 @@
+(define (domain finance_duplicate_or_unusual_entry_detection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types review_category - object artifact_category - object identifier_category - object entry_category - object review_subject - entry_category detection_rule - review_category detection_signature - review_category approver - review_category root_cause_code - review_category review_template - review_category remediation_action - review_category control_procedure - review_category audit_request - review_category supporting_document - artifact_category transaction_batch - artifact_category escalation_reason - artifact_category match_key_a - identifier_category match_key_b - identifier_category exception_record - identifier_category posting_group - review_subject posting_group_alt - review_subject posting_instance_side_a - posting_group posting_instance_side_b - posting_group investigation_case - posting_group_alt)
+  (:predicates
+    (flagged_for_review ?ledger_entry - review_subject)
+    (entity_signature_verified ?ledger_entry - review_subject)
+    (detection_rule_assigned ?ledger_entry - review_subject)
+    (marked_resolved ?ledger_entry - review_subject)
+    (ready_for_remediation ?ledger_entry - review_subject)
+    (remediation_authorized ?ledger_entry - review_subject)
+    (detection_rule_available ?detection_rule - detection_rule)
+    (detection_rule_assigned_to_entity ?ledger_entry - review_subject ?detection_rule - detection_rule)
+    (detection_signature_available ?detection_signature - detection_signature)
+    (entity_signature_associated ?ledger_entry - review_subject ?detection_signature - detection_signature)
+    (approver_available ?approver - approver)
+    (approver_assigned_to_entity ?ledger_entry - review_subject ?approver - approver)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (posting_a_supporting_document_link ?posting_a - posting_instance_side_a ?supporting_document - supporting_document)
+    (posting_b_supporting_document_link ?posting_b - posting_instance_side_b ?supporting_document - supporting_document)
+    (posting_match_key_a ?posting_a - posting_instance_side_a ?match_key_a - match_key_a)
+    (match_key_a_staged ?match_key_a - match_key_a)
+    (match_key_a_validated ?match_key_a - match_key_a)
+    (posting_a_enrichment_complete ?posting_a - posting_instance_side_a)
+    (posting_match_key_b ?posting_b - posting_instance_side_b ?match_key_b - match_key_b)
+    (match_key_b_staged ?match_key_b - match_key_b)
+    (match_key_b_validated ?match_key_b - match_key_b)
+    (posting_b_enrichment_complete ?posting_b - posting_instance_side_b)
+    (exception_record_pending ?exception_record - exception_record)
+    (exception_record_created ?exception_record - exception_record)
+    (exception_record_match_key_a_link ?exception_record - exception_record ?match_key_a - match_key_a)
+    (exception_record_match_key_b_link ?exception_record - exception_record ?match_key_b - match_key_b)
+    (exception_record_flag_key_a_validated ?exception_record - exception_record)
+    (exception_record_flag_key_b_validated ?exception_record - exception_record)
+    (exception_record_batch_attached ?exception_record - exception_record)
+    (case_contains_posting_a ?investigation_case - investigation_case ?posting_a - posting_instance_side_a)
+    (case_contains_posting_b ?investigation_case - investigation_case ?posting_b - posting_instance_side_b)
+    (case_linked_exception_record ?investigation_case - investigation_case ?exception_record - exception_record)
+    (transaction_batch_available ?transaction_batch - transaction_batch)
+    (case_linked_transaction_batch ?investigation_case - investigation_case ?transaction_batch - transaction_batch)
+    (transaction_batch_attached ?transaction_batch - transaction_batch)
+    (transaction_batch_linked_exception_record ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    (control_preconditions_met ?investigation_case - investigation_case)
+    (control_evidence_collected ?investigation_case - investigation_case)
+    (control_checks_performed ?investigation_case - investigation_case)
+    (case_root_cause_attached ?investigation_case - investigation_case)
+    (control_evidence_attached ?investigation_case - investigation_case)
+    (control_review_ready ?investigation_case - investigation_case)
+    (case_control_completed ?investigation_case - investigation_case)
+    (escalation_reason_available ?escalation_reason - escalation_reason)
+    (case_linked_escalation_reason ?investigation_case - investigation_case ?escalation_reason - escalation_reason)
+    (case_escalated ?investigation_case - investigation_case)
+    (escalation_assigned ?investigation_case - investigation_case)
+    (escalation_approval_completed ?investigation_case - investigation_case)
+    (root_cause_code_available ?root_cause_code - root_cause_code)
+    (case_root_cause_assigned ?investigation_case - investigation_case ?root_cause_code - root_cause_code)
+    (review_template_available ?review_template - review_template)
+    (case_review_template_attached ?investigation_case - investigation_case ?review_template - review_template)
+    (control_procedure_available ?control_procedure - control_procedure)
+    (case_control_procedure_assigned ?investigation_case - investigation_case ?control_procedure - control_procedure)
+    (audit_request_available ?audit_request - audit_request)
+    (case_audit_request_assigned ?investigation_case - investigation_case ?audit_request - audit_request)
+    (remediation_action_available ?remediation_action - remediation_action)
+    (remediation_assigned ?ledger_entry - review_subject ?remediation_action - remediation_action)
+    (posting_a_enrichment_mark ?posting_a - posting_instance_side_a)
+    (posting_b_enrichment_mark ?posting_b - posting_instance_side_b)
+    (case_finalized ?investigation_case - investigation_case)
+  )
+  (:action flag_entry_for_review
+    :parameters (?ledger_entry - review_subject)
+    :precondition
+      (and
+        (not
+          (flagged_for_review ?ledger_entry)
+        )
+        (not
+          (marked_resolved ?ledger_entry)
+        )
+      )
+    :effect (flagged_for_review ?ledger_entry)
+  )
+  (:action assign_detection_rule_to_entry
+    :parameters (?ledger_entry - review_subject ?detection_rule - detection_rule)
+    :precondition
+      (and
+        (flagged_for_review ?ledger_entry)
+        (not
+          (detection_rule_assigned ?ledger_entry)
+        )
+        (detection_rule_available ?detection_rule)
+      )
+    :effect
+      (and
+        (detection_rule_assigned ?ledger_entry)
+        (detection_rule_assigned_to_entity ?ledger_entry ?detection_rule)
+        (not
+          (detection_rule_available ?detection_rule)
+        )
+      )
+  )
+  (:action associate_signature_with_entry
+    :parameters (?ledger_entry - review_subject ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (flagged_for_review ?ledger_entry)
+        (detection_rule_assigned ?ledger_entry)
+        (detection_signature_available ?detection_signature)
+      )
+    :effect
+      (and
+        (entity_signature_associated ?ledger_entry ?detection_signature)
+        (not
+          (detection_signature_available ?detection_signature)
+        )
+      )
+  )
+  (:action verify_entry_signature
+    :parameters (?ledger_entry - review_subject ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (flagged_for_review ?ledger_entry)
+        (detection_rule_assigned ?ledger_entry)
+        (entity_signature_associated ?ledger_entry ?detection_signature)
+        (not
+          (entity_signature_verified ?ledger_entry)
+        )
+      )
+    :effect (entity_signature_verified ?ledger_entry)
+  )
+  (:action release_signature_association
+    :parameters (?ledger_entry - review_subject ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (entity_signature_associated ?ledger_entry ?detection_signature)
+      )
+    :effect
+      (and
+        (detection_signature_available ?detection_signature)
+        (not
+          (entity_signature_associated ?ledger_entry ?detection_signature)
+        )
+      )
+  )
+  (:action assign_approver_to_entry
+    :parameters (?ledger_entry - review_subject ?approver - approver)
+    :precondition
+      (and
+        (entity_signature_verified ?ledger_entry)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (approver_assigned_to_entity ?ledger_entry ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_entry
+    :parameters (?ledger_entry - review_subject ?approver - approver)
+    :precondition
+      (and
+        (approver_assigned_to_entity ?ledger_entry ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (approver_assigned_to_entity ?ledger_entry ?approver)
+        )
+      )
+  )
+  (:action assign_control_procedure_to_case
+    :parameters (?investigation_case - investigation_case ?control_procedure - control_procedure)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (control_procedure_available ?control_procedure)
+      )
+    :effect
+      (and
+        (case_control_procedure_assigned ?investigation_case ?control_procedure)
+        (not
+          (control_procedure_available ?control_procedure)
+        )
+      )
+  )
+  (:action unassign_control_procedure_from_case
+    :parameters (?investigation_case - investigation_case ?control_procedure - control_procedure)
+    :precondition
+      (and
+        (case_control_procedure_assigned ?investigation_case ?control_procedure)
+      )
+    :effect
+      (and
+        (control_procedure_available ?control_procedure)
+        (not
+          (case_control_procedure_assigned ?investigation_case ?control_procedure)
+        )
+      )
+  )
+  (:action assign_audit_request_to_case
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (audit_request_available ?audit_request)
+      )
+    :effect
+      (and
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (not
+          (audit_request_available ?audit_request)
+        )
+      )
+  )
+  (:action unassign_audit_request_from_case
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request)
+    :precondition
+      (and
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+      )
+    :effect
+      (and
+        (audit_request_available ?audit_request)
+        (not
+          (case_audit_request_assigned ?investigation_case ?audit_request)
+        )
+      )
+  )
+  (:action stage_match_key_a_for_posting
+    :parameters (?posting_a - posting_instance_side_a ?match_key_a - match_key_a ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_a)
+        (entity_signature_associated ?posting_a ?detection_signature)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (not
+          (match_key_a_staged ?match_key_a)
+        )
+        (not
+          (match_key_a_validated ?match_key_a)
+        )
+      )
+    :effect (match_key_a_staged ?match_key_a)
+  )
+  (:action apply_approver_verification_posting_a
+    :parameters (?posting_a - posting_instance_side_a ?match_key_a - match_key_a ?approver - approver)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_a)
+        (approver_assigned_to_entity ?posting_a ?approver)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (match_key_a_staged ?match_key_a)
+        (not
+          (posting_a_enrichment_mark ?posting_a)
+        )
+      )
+    :effect
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_a_enrichment_complete ?posting_a)
+      )
+  )
+  (:action attach_supporting_document_posting_a
+    :parameters (?posting_a - posting_instance_side_a ?match_key_a - match_key_a ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_a)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (supporting_document_available ?supporting_document)
+        (not
+          (posting_a_enrichment_mark ?posting_a)
+        )
+      )
+    :effect
+      (and
+        (match_key_a_validated ?match_key_a)
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_a_supporting_document_link ?posting_a ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_posting_a_enrichment
+    :parameters (?posting_a - posting_instance_side_a ?match_key_a - match_key_a ?detection_signature - detection_signature ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_a)
+        (entity_signature_associated ?posting_a ?detection_signature)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (match_key_a_validated ?match_key_a)
+        (posting_a_supporting_document_link ?posting_a ?supporting_document)
+        (not
+          (posting_a_enrichment_complete ?posting_a)
+        )
+      )
+    :effect
+      (and
+        (match_key_a_staged ?match_key_a)
+        (posting_a_enrichment_complete ?posting_a)
+        (supporting_document_available ?supporting_document)
+        (not
+          (posting_a_supporting_document_link ?posting_a ?supporting_document)
+        )
+      )
+  )
+  (:action stage_match_key_b_for_posting
+    :parameters (?posting_b - posting_instance_side_b ?match_key_b - match_key_b ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_b)
+        (entity_signature_associated ?posting_b ?detection_signature)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (not
+          (match_key_b_staged ?match_key_b)
+        )
+        (not
+          (match_key_b_validated ?match_key_b)
+        )
+      )
+    :effect (match_key_b_staged ?match_key_b)
+  )
+  (:action apply_approver_verification_posting_b
+    :parameters (?posting_b - posting_instance_side_b ?match_key_b - match_key_b ?approver - approver)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_b)
+        (approver_assigned_to_entity ?posting_b ?approver)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_b_staged ?match_key_b)
+        (not
+          (posting_b_enrichment_mark ?posting_b)
+        )
+      )
+    :effect
+      (and
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_b_enrichment_complete ?posting_b)
+      )
+  )
+  (:action attach_supporting_document_posting_b
+    :parameters (?posting_b - posting_instance_side_b ?match_key_b - match_key_b ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_b)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (supporting_document_available ?supporting_document)
+        (not
+          (posting_b_enrichment_mark ?posting_b)
+        )
+      )
+    :effect
+      (and
+        (match_key_b_validated ?match_key_b)
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_b_supporting_document_link ?posting_b ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_posting_b_enrichment
+    :parameters (?posting_b - posting_instance_side_b ?match_key_b - match_key_b ?detection_signature - detection_signature ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_signature_verified ?posting_b)
+        (entity_signature_associated ?posting_b ?detection_signature)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_b_validated ?match_key_b)
+        (posting_b_supporting_document_link ?posting_b ?supporting_document)
+        (not
+          (posting_b_enrichment_complete ?posting_b)
+        )
+      )
+    :effect
+      (and
+        (match_key_b_staged ?match_key_b)
+        (posting_b_enrichment_complete ?posting_b)
+        (supporting_document_available ?supporting_document)
+        (not
+          (posting_b_supporting_document_link ?posting_b ?supporting_document)
+        )
+      )
+  )
+  (:action create_exception_record_basic
+    :parameters (?posting_a - posting_instance_side_a ?posting_b - posting_instance_side_b ?match_key_a - match_key_a ?match_key_b - match_key_b ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_a_staged ?match_key_a)
+        (match_key_b_staged ?match_key_b)
+        (posting_a_enrichment_complete ?posting_a)
+        (posting_b_enrichment_complete ?posting_b)
+        (exception_record_pending ?exception_record)
+      )
+    :effect
+      (and
+        (exception_record_created ?exception_record)
+        (exception_record_match_key_a_link ?exception_record ?match_key_a)
+        (exception_record_match_key_b_link ?exception_record ?match_key_b)
+        (not
+          (exception_record_pending ?exception_record)
+        )
+      )
+  )
+  (:action create_exception_record_with_key_a_validated
+    :parameters (?posting_a - posting_instance_side_a ?posting_b - posting_instance_side_b ?match_key_a - match_key_a ?match_key_b - match_key_b ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_a_validated ?match_key_a)
+        (match_key_b_staged ?match_key_b)
+        (not
+          (posting_a_enrichment_complete ?posting_a)
+        )
+        (posting_b_enrichment_complete ?posting_b)
+        (exception_record_pending ?exception_record)
+      )
+    :effect
+      (and
+        (exception_record_created ?exception_record)
+        (exception_record_match_key_a_link ?exception_record ?match_key_a)
+        (exception_record_match_key_b_link ?exception_record ?match_key_b)
+        (exception_record_flag_key_a_validated ?exception_record)
+        (not
+          (exception_record_pending ?exception_record)
+        )
+      )
+  )
+  (:action create_exception_record_with_key_b_validated
+    :parameters (?posting_a - posting_instance_side_a ?posting_b - posting_instance_side_b ?match_key_a - match_key_a ?match_key_b - match_key_b ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_a_staged ?match_key_a)
+        (match_key_b_validated ?match_key_b)
+        (posting_a_enrichment_complete ?posting_a)
+        (not
+          (posting_b_enrichment_complete ?posting_b)
+        )
+        (exception_record_pending ?exception_record)
+      )
+    :effect
+      (and
+        (exception_record_created ?exception_record)
+        (exception_record_match_key_a_link ?exception_record ?match_key_a)
+        (exception_record_match_key_b_link ?exception_record ?match_key_b)
+        (exception_record_flag_key_b_validated ?exception_record)
+        (not
+          (exception_record_pending ?exception_record)
+        )
+      )
+  )
+  (:action create_exception_record_with_both_keys_validated
+    :parameters (?posting_a - posting_instance_side_a ?posting_b - posting_instance_side_b ?match_key_a - match_key_a ?match_key_b - match_key_b ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_match_key_a ?posting_a ?match_key_a)
+        (posting_match_key_b ?posting_b ?match_key_b)
+        (match_key_a_validated ?match_key_a)
+        (match_key_b_validated ?match_key_b)
+        (not
+          (posting_a_enrichment_complete ?posting_a)
+        )
+        (not
+          (posting_b_enrichment_complete ?posting_b)
+        )
+        (exception_record_pending ?exception_record)
+      )
+    :effect
+      (and
+        (exception_record_created ?exception_record)
+        (exception_record_match_key_a_link ?exception_record ?match_key_a)
+        (exception_record_match_key_b_link ?exception_record ?match_key_b)
+        (exception_record_flag_key_a_validated ?exception_record)
+        (exception_record_flag_key_b_validated ?exception_record)
+        (not
+          (exception_record_pending ?exception_record)
+        )
+      )
+  )
+  (:action attach_batch_to_exception_record
+    :parameters (?exception_record - exception_record ?posting_a - posting_instance_side_a ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (exception_record_created ?exception_record)
+        (posting_a_enrichment_mark ?posting_a)
+        (entity_signature_associated ?posting_a ?detection_signature)
+        (not
+          (exception_record_batch_attached ?exception_record)
+        )
+      )
+    :effect (exception_record_batch_attached ?exception_record)
+  )
+  (:action attach_transaction_batch_to_case
+    :parameters (?investigation_case - investigation_case ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (case_linked_exception_record ?investigation_case ?exception_record)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_available ?transaction_batch)
+        (exception_record_created ?exception_record)
+        (exception_record_batch_attached ?exception_record)
+        (not
+          (transaction_batch_attached ?transaction_batch)
+        )
+      )
+    :effect
+      (and
+        (transaction_batch_attached ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (not
+          (transaction_batch_available ?transaction_batch)
+        )
+      )
+  )
+  (:action prepare_case_for_control_procedures
+    :parameters (?investigation_case - investigation_case ?transaction_batch - transaction_batch ?exception_record - exception_record ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_attached ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (entity_signature_associated ?investigation_case ?detection_signature)
+        (not
+          (exception_record_flag_key_a_validated ?exception_record)
+        )
+        (not
+          (control_preconditions_met ?investigation_case)
+        )
+      )
+    :effect (control_preconditions_met ?investigation_case)
+  )
+  (:action assign_root_cause_code_to_case
+    :parameters (?investigation_case - investigation_case ?root_cause_code - root_cause_code)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (root_cause_code_available ?root_cause_code)
+        (not
+          (case_root_cause_attached ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (case_root_cause_attached ?investigation_case)
+        (case_root_cause_assigned ?investigation_case ?root_cause_code)
+        (not
+          (root_cause_code_available ?root_cause_code)
+        )
+      )
+  )
+  (:action apply_root_cause_and_attach_control_evidence
+    :parameters (?investigation_case - investigation_case ?transaction_batch - transaction_batch ?exception_record - exception_record ?detection_signature - detection_signature ?root_cause_code - root_cause_code)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_attached ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (entity_signature_associated ?investigation_case ?detection_signature)
+        (exception_record_flag_key_a_validated ?exception_record)
+        (case_root_cause_attached ?investigation_case)
+        (case_root_cause_assigned ?investigation_case ?root_cause_code)
+        (not
+          (control_preconditions_met ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (control_preconditions_met ?investigation_case)
+        (control_evidence_attached ?investigation_case)
+      )
+  )
+  (:action execute_control_procedure_with_approver
+    :parameters (?investigation_case - investigation_case ?control_procedure - control_procedure ?approver - approver ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_preconditions_met ?investigation_case)
+        (case_control_procedure_assigned ?investigation_case ?control_procedure)
+        (approver_assigned_to_entity ?investigation_case ?approver)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (not
+          (exception_record_flag_key_b_validated ?exception_record)
+        )
+        (not
+          (control_evidence_collected ?investigation_case)
+        )
+      )
+    :effect (control_evidence_collected ?investigation_case)
+  )
+  (:action execute_control_procedure_alternate
+    :parameters (?investigation_case - investigation_case ?control_procedure - control_procedure ?approver - approver ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_preconditions_met ?investigation_case)
+        (case_control_procedure_assigned ?investigation_case ?control_procedure)
+        (approver_assigned_to_entity ?investigation_case ?approver)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (exception_record_flag_key_b_validated ?exception_record)
+        (not
+          (control_evidence_collected ?investigation_case)
+        )
+      )
+    :effect (control_evidence_collected ?investigation_case)
+  )
+  (:action initiate_control_review
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_evidence_collected ?investigation_case)
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (not
+          (exception_record_flag_key_a_validated ?exception_record)
+        )
+        (not
+          (exception_record_flag_key_b_validated ?exception_record)
+        )
+        (not
+          (control_checks_performed ?investigation_case)
+        )
+      )
+    :effect (control_checks_performed ?investigation_case)
+  )
+  (:action initiate_control_review_and_flag_followup
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_evidence_collected ?investigation_case)
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (exception_record_flag_key_a_validated ?exception_record)
+        (not
+          (exception_record_flag_key_b_validated ?exception_record)
+        )
+        (not
+          (control_checks_performed ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (control_checks_performed ?investigation_case)
+        (control_review_ready ?investigation_case)
+      )
+  )
+  (:action initiate_control_review_and_schedule_followup
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_evidence_collected ?investigation_case)
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (not
+          (exception_record_flag_key_a_validated ?exception_record)
+        )
+        (exception_record_flag_key_b_validated ?exception_record)
+        (not
+          (control_checks_performed ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (control_checks_performed ?investigation_case)
+        (control_review_ready ?investigation_case)
+      )
+  )
+  (:action initiate_control_review_full
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request ?transaction_batch - transaction_batch ?exception_record - exception_record)
+    :precondition
+      (and
+        (control_evidence_collected ?investigation_case)
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (case_linked_transaction_batch ?investigation_case ?transaction_batch)
+        (transaction_batch_linked_exception_record ?transaction_batch ?exception_record)
+        (exception_record_flag_key_a_validated ?exception_record)
+        (exception_record_flag_key_b_validated ?exception_record)
+        (not
+          (control_checks_performed ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (control_checks_performed ?investigation_case)
+        (control_review_ready ?investigation_case)
+      )
+  )
+  (:action finalize_control_checks_mark_case_ready_for_remediation
+    :parameters (?investigation_case - investigation_case)
+    :precondition
+      (and
+        (control_checks_performed ?investigation_case)
+        (not
+          (control_review_ready ?investigation_case)
+        )
+        (not
+          (case_finalized ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?investigation_case)
+        (ready_for_remediation ?investigation_case)
+      )
+  )
+  (:action attach_review_template_to_case
+    :parameters (?investigation_case - investigation_case ?review_template - review_template)
+    :precondition
+      (and
+        (control_checks_performed ?investigation_case)
+        (control_review_ready ?investigation_case)
+        (review_template_available ?review_template)
+      )
+    :effect
+      (and
+        (case_review_template_attached ?investigation_case ?review_template)
+        (not
+          (review_template_available ?review_template)
+        )
+      )
+  )
+  (:action perform_investigation_checks
+    :parameters (?investigation_case - investigation_case ?posting_a - posting_instance_side_a ?posting_b - posting_instance_side_b ?detection_signature - detection_signature ?review_template - review_template)
+    :precondition
+      (and
+        (control_checks_performed ?investigation_case)
+        (control_review_ready ?investigation_case)
+        (case_review_template_attached ?investigation_case ?review_template)
+        (case_contains_posting_a ?investigation_case ?posting_a)
+        (case_contains_posting_b ?investigation_case ?posting_b)
+        (posting_a_enrichment_complete ?posting_a)
+        (posting_b_enrichment_complete ?posting_b)
+        (entity_signature_associated ?investigation_case ?detection_signature)
+        (not
+          (case_control_completed ?investigation_case)
+        )
+      )
+    :effect (case_control_completed ?investigation_case)
+  )
+  (:action complete_investigation_and_finalize_case
+    :parameters (?investigation_case - investigation_case)
+    :precondition
+      (and
+        (control_checks_performed ?investigation_case)
+        (case_control_completed ?investigation_case)
+        (not
+          (case_finalized ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?investigation_case)
+        (ready_for_remediation ?investigation_case)
+      )
+  )
+  (:action initiate_case_escalation
+    :parameters (?investigation_case - investigation_case ?escalation_reason - escalation_reason ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (entity_signature_verified ?investigation_case)
+        (entity_signature_associated ?investigation_case ?detection_signature)
+        (escalation_reason_available ?escalation_reason)
+        (case_linked_escalation_reason ?investigation_case ?escalation_reason)
+        (not
+          (case_escalated ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (case_escalated ?investigation_case)
+        (not
+          (escalation_reason_available ?escalation_reason)
+        )
+      )
+  )
+  (:action assign_escalation_approver
+    :parameters (?investigation_case - investigation_case ?approver - approver)
+    :precondition
+      (and
+        (case_escalated ?investigation_case)
+        (approver_assigned_to_entity ?investigation_case ?approver)
+        (not
+          (escalation_assigned ?investigation_case)
+        )
+      )
+    :effect (escalation_assigned ?investigation_case)
+  )
+  (:action record_escalation_approval
+    :parameters (?investigation_case - investigation_case ?audit_request - audit_request)
+    :precondition
+      (and
+        (escalation_assigned ?investigation_case)
+        (case_audit_request_assigned ?investigation_case ?audit_request)
+        (not
+          (escalation_approval_completed ?investigation_case)
+        )
+      )
+    :effect (escalation_approval_completed ?investigation_case)
+  )
+  (:action finalize_escalation_mark_case_for_remediation
+    :parameters (?investigation_case - investigation_case)
+    :precondition
+      (and
+        (escalation_approval_completed ?investigation_case)
+        (not
+          (case_finalized ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?investigation_case)
+        (ready_for_remediation ?investigation_case)
+      )
+  )
+  (:action mark_posting_a_ready_for_remediation
+    :parameters (?posting_a - posting_instance_side_a ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_a_enrichment_mark ?posting_a)
+        (posting_a_enrichment_complete ?posting_a)
+        (exception_record_created ?exception_record)
+        (exception_record_batch_attached ?exception_record)
+        (not
+          (ready_for_remediation ?posting_a)
+        )
+      )
+    :effect (ready_for_remediation ?posting_a)
+  )
+  (:action mark_posting_b_ready_for_remediation
+    :parameters (?posting_b - posting_instance_side_b ?exception_record - exception_record)
+    :precondition
+      (and
+        (posting_b_enrichment_mark ?posting_b)
+        (posting_b_enrichment_complete ?posting_b)
+        (exception_record_created ?exception_record)
+        (exception_record_batch_attached ?exception_record)
+        (not
+          (ready_for_remediation ?posting_b)
+        )
+      )
+    :effect (ready_for_remediation ?posting_b)
+  )
+  (:action authorize_remediation_for_entry
+    :parameters (?ledger_entry - review_subject ?remediation_action - remediation_action ?detection_signature - detection_signature)
+    :precondition
+      (and
+        (ready_for_remediation ?ledger_entry)
+        (entity_signature_associated ?ledger_entry ?detection_signature)
+        (remediation_action_available ?remediation_action)
+        (not
+          (remediation_authorized ?ledger_entry)
+        )
+      )
+    :effect
+      (and
+        (remediation_authorized ?ledger_entry)
+        (remediation_assigned ?ledger_entry ?remediation_action)
+        (not
+          (remediation_action_available ?remediation_action)
+        )
+      )
+  )
+  (:action apply_remediation_to_posting_a_and_resolve
+    :parameters (?posting_a - posting_instance_side_a ?detection_rule - detection_rule ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (remediation_authorized ?posting_a)
+        (detection_rule_assigned_to_entity ?posting_a ?detection_rule)
+        (remediation_assigned ?posting_a ?remediation_action)
+        (not
+          (marked_resolved ?posting_a)
+        )
+      )
+    :effect
+      (and
+        (marked_resolved ?posting_a)
+        (detection_rule_available ?detection_rule)
+        (remediation_action_available ?remediation_action)
+      )
+  )
+  (:action apply_remediation_to_posting_b_and_resolve
+    :parameters (?posting_b - posting_instance_side_b ?detection_rule - detection_rule ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (remediation_authorized ?posting_b)
+        (detection_rule_assigned_to_entity ?posting_b ?detection_rule)
+        (remediation_assigned ?posting_b ?remediation_action)
+        (not
+          (marked_resolved ?posting_b)
+        )
+      )
+    :effect
+      (and
+        (marked_resolved ?posting_b)
+        (detection_rule_available ?detection_rule)
+        (remediation_action_available ?remediation_action)
+      )
+  )
+  (:action apply_remediation_to_case_and_resolve
+    :parameters (?investigation_case - investigation_case ?detection_rule - detection_rule ?remediation_action - remediation_action)
+    :precondition
+      (and
+        (remediation_authorized ?investigation_case)
+        (detection_rule_assigned_to_entity ?investigation_case ?detection_rule)
+        (remediation_assigned ?investigation_case ?remediation_action)
+        (not
+          (marked_resolved ?investigation_case)
+        )
+      )
+    :effect
+      (and
+        (marked_resolved ?investigation_case)
+        (detection_rule_available ?detection_rule)
+        (remediation_action_available ?remediation_action)
+      )
+  )
+)

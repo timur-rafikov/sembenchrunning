@@ -1,0 +1,1072 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain report_generation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_resource - object indexing_key - object artifact - object report_request_root - object report_request - report_request_root data_source - auxiliary_resource metric_definition - auxiliary_resource processor_unit - auxiliary_resource signature_template - auxiliary_resource output_format - auxiliary_resource policy_token - auxiliary_resource content_block - auxiliary_resource reviewer - auxiliary_resource parameter_token - indexing_key content_fragment - indexing_key approval_token - indexing_key aggregation_key_a - artifact aggregation_key_b - artifact report_draft - artifact report_request_subtype_a - report_request report_request_subtype_b - report_request primary_aggregation_context - report_request_subtype_a secondary_aggregation_context - report_request_subtype_a report_processor - report_request_subtype_b)
+  (:predicates
+    (entity_created ?report_request - report_request)
+    (entity_ready_for_processing ?report_request - report_request)
+    (entity_has_data_source ?report_request - report_request)
+    (entity_finalized ?report_request - report_request)
+    (entity_ready_for_finalization ?report_request - report_request)
+    (policy_applied ?report_request - report_request)
+    (data_source_available ?data_source - data_source)
+    (entity_bound_to_data_source ?report_request - report_request ?data_source - data_source)
+    (metric_available ?metric_definition - metric_definition)
+    (entity_has_metric ?report_request - report_request ?metric_definition - metric_definition)
+    (processor_unit_available ?processor_unit - processor_unit)
+    (entity_assigned_processor ?report_request - report_request ?processor_unit - processor_unit)
+    (parameter_available ?parameter_token - parameter_token)
+    (primary_context_has_parameter ?primary_aggregation_context - primary_aggregation_context ?parameter_token - parameter_token)
+    (secondary_context_has_parameter ?secondary_aggregation_context - secondary_aggregation_context ?parameter_token - parameter_token)
+    (primary_context_has_key ?primary_aggregation_context - primary_aggregation_context ?aggregation_key_a - aggregation_key_a)
+    (aggregation_key_a_ready ?aggregation_key_a - aggregation_key_a)
+    (aggregation_key_a_parameter_assigned ?aggregation_key_a - aggregation_key_a)
+    (primary_context_ready ?primary_aggregation_context - primary_aggregation_context)
+    (secondary_context_has_key ?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_b - aggregation_key_b)
+    (aggregation_key_b_ready ?aggregation_key_b - aggregation_key_b)
+    (aggregation_key_b_parameter_assigned ?aggregation_key_b - aggregation_key_b)
+    (secondary_context_ready ?secondary_aggregation_context - secondary_aggregation_context)
+    (draft_slot_available ?report_draft - report_draft)
+    (draft_created ?report_draft - report_draft)
+    (draft_bound_to_key_a ?report_draft - report_draft ?aggregation_key_a - aggregation_key_a)
+    (draft_bound_to_key_b ?report_draft - report_draft ?aggregation_key_b - aggregation_key_b)
+    (draft_contains_block_type_a ?report_draft - report_draft)
+    (draft_contains_block_type_b ?report_draft - report_draft)
+    (draft_ready_for_fragments ?report_draft - report_draft)
+    (processor_assigned_to_primary_context ?report_processor - report_processor ?primary_aggregation_context - primary_aggregation_context)
+    (processor_assigned_to_secondary_context ?report_processor - report_processor ?secondary_aggregation_context - secondary_aggregation_context)
+    (processor_has_draft ?report_processor - report_processor ?report_draft - report_draft)
+    (fragment_available ?content_fragment - content_fragment)
+    (processor_has_fragment_template ?report_processor - report_processor ?content_fragment - content_fragment)
+    (fragment_consumed ?content_fragment - content_fragment)
+    (fragment_bound_to_draft ?content_fragment - content_fragment ?report_draft - report_draft)
+    (processor_fragment_attached ?report_processor - report_processor)
+    (processor_enrichment_ready ?report_processor - report_processor)
+    (processor_reviewed ?report_processor - report_processor)
+    (processor_signature_attached ?report_processor - report_processor)
+    (processor_signature_applied ?report_processor - report_processor)
+    (processor_content_enrichment_completed ?report_processor - report_processor)
+    (processor_finalization_ready ?report_processor - report_processor)
+    (approval_token_available ?approval_token - approval_token)
+    (processor_associated_with_approval_token ?report_processor - report_processor ?approval_token - approval_token)
+    (processor_approved ?report_processor - report_processor)
+    (processor_signature_initiated ?report_processor - report_processor)
+    (processor_signature_completed ?report_processor - report_processor)
+    (signature_template_available ?signature_template - signature_template)
+    (processor_has_signature_template ?report_processor - report_processor ?signature_template - signature_template)
+    (output_format_available ?output_format - output_format)
+    (processor_attached_output_format ?report_processor - report_processor ?output_format - output_format)
+    (content_block_available ?content_block - content_block)
+    (processor_attached_content_block ?report_processor - report_processor ?content_block - content_block)
+    (reviewer_available ?reviewer - reviewer)
+    (processor_assigned_reviewer ?report_processor - report_processor ?reviewer - reviewer)
+    (policy_token_available ?policy_token - policy_token)
+    (entity_policy_assigned ?report_request - report_request ?policy_token - policy_token)
+    (primary_context_processing_in_progress ?primary_aggregation_context - primary_aggregation_context)
+    (secondary_context_processing_in_progress ?secondary_aggregation_context - secondary_aggregation_context)
+    (processor_completion_recorded ?report_processor - report_processor)
+  )
+  (:action create_report_request
+    :parameters (?report_request - report_request)
+    :precondition
+      (and
+        (not
+          (entity_created ?report_request)
+        )
+        (not
+          (entity_finalized ?report_request)
+        )
+      )
+    :effect (entity_created ?report_request)
+  )
+  (:action bind_data_source_to_request
+    :parameters (?report_request - report_request ?data_source - data_source)
+    :precondition
+      (and
+        (entity_created ?report_request)
+        (not
+          (entity_has_data_source ?report_request)
+        )
+        (data_source_available ?data_source)
+      )
+    :effect
+      (and
+        (entity_has_data_source ?report_request)
+        (entity_bound_to_data_source ?report_request ?data_source)
+        (not
+          (data_source_available ?data_source)
+        )
+      )
+  )
+  (:action bind_metric_to_request
+    :parameters (?report_request - report_request ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_created ?report_request)
+        (entity_has_data_source ?report_request)
+        (metric_available ?metric_definition)
+      )
+    :effect
+      (and
+        (entity_has_metric ?report_request ?metric_definition)
+        (not
+          (metric_available ?metric_definition)
+        )
+      )
+  )
+  (:action confirm_request_metrics
+    :parameters (?report_request - report_request ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_created ?report_request)
+        (entity_has_data_source ?report_request)
+        (entity_has_metric ?report_request ?metric_definition)
+        (not
+          (entity_ready_for_processing ?report_request)
+        )
+      )
+    :effect (entity_ready_for_processing ?report_request)
+  )
+  (:action release_metric_from_request
+    :parameters (?report_request - report_request ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_has_metric ?report_request ?metric_definition)
+      )
+    :effect
+      (and
+        (metric_available ?metric_definition)
+        (not
+          (entity_has_metric ?report_request ?metric_definition)
+        )
+      )
+  )
+  (:action assign_processor_to_request
+    :parameters (?report_request - report_request ?processor_unit - processor_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_request)
+        (processor_unit_available ?processor_unit)
+      )
+    :effect
+      (and
+        (entity_assigned_processor ?report_request ?processor_unit)
+        (not
+          (processor_unit_available ?processor_unit)
+        )
+      )
+  )
+  (:action release_processor_from_request
+    :parameters (?report_request - report_request ?processor_unit - processor_unit)
+    :precondition
+      (and
+        (entity_assigned_processor ?report_request ?processor_unit)
+      )
+    :effect
+      (and
+        (processor_unit_available ?processor_unit)
+        (not
+          (entity_assigned_processor ?report_request ?processor_unit)
+        )
+      )
+  )
+  (:action attach_content_block_to_processor
+    :parameters (?report_processor - report_processor ?content_block - content_block)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (content_block_available ?content_block)
+      )
+    :effect
+      (and
+        (processor_attached_content_block ?report_processor ?content_block)
+        (not
+          (content_block_available ?content_block)
+        )
+      )
+  )
+  (:action release_content_block_from_processor
+    :parameters (?report_processor - report_processor ?content_block - content_block)
+    :precondition
+      (and
+        (processor_attached_content_block ?report_processor ?content_block)
+      )
+    :effect
+      (and
+        (content_block_available ?content_block)
+        (not
+          (processor_attached_content_block ?report_processor ?content_block)
+        )
+      )
+  )
+  (:action assign_reviewer_to_processor
+    :parameters (?report_processor - report_processor ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_processor
+    :parameters (?report_processor - report_processor ?reviewer - reviewer)
+    :precondition
+      (and
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (processor_assigned_reviewer ?report_processor ?reviewer)
+        )
+      )
+  )
+  (:action mark_aggregation_key_a_ready
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?aggregation_key_a - aggregation_key_a ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_ready_for_processing ?primary_aggregation_context)
+        (entity_has_metric ?primary_aggregation_context ?metric_definition)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (not
+          (aggregation_key_a_ready ?aggregation_key_a)
+        )
+        (not
+          (aggregation_key_a_parameter_assigned ?aggregation_key_a)
+        )
+      )
+    :effect (aggregation_key_a_ready ?aggregation_key_a)
+  )
+  (:action claim_primary_context_for_processor
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?aggregation_key_a - aggregation_key_a ?processor_unit - processor_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?primary_aggregation_context)
+        (entity_assigned_processor ?primary_aggregation_context ?processor_unit)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (aggregation_key_a_ready ?aggregation_key_a)
+        (not
+          (primary_context_processing_in_progress ?primary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (primary_context_ready ?primary_aggregation_context)
+      )
+  )
+  (:action assign_parameter_to_primary_context
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?aggregation_key_a - aggregation_key_a ?parameter_token - parameter_token)
+    :precondition
+      (and
+        (entity_ready_for_processing ?primary_aggregation_context)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (parameter_available ?parameter_token)
+        (not
+          (primary_context_processing_in_progress ?primary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (aggregation_key_a_parameter_assigned ?aggregation_key_a)
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (primary_context_has_parameter ?primary_aggregation_context ?parameter_token)
+        (not
+          (parameter_available ?parameter_token)
+        )
+      )
+  )
+  (:action complete_primary_context_aggregation
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?aggregation_key_a - aggregation_key_a ?metric_definition - metric_definition ?parameter_token - parameter_token)
+    :precondition
+      (and
+        (entity_ready_for_processing ?primary_aggregation_context)
+        (entity_has_metric ?primary_aggregation_context ?metric_definition)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (aggregation_key_a_parameter_assigned ?aggregation_key_a)
+        (primary_context_has_parameter ?primary_aggregation_context ?parameter_token)
+        (not
+          (primary_context_ready ?primary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (aggregation_key_a_ready ?aggregation_key_a)
+        (primary_context_ready ?primary_aggregation_context)
+        (parameter_available ?parameter_token)
+        (not
+          (primary_context_has_parameter ?primary_aggregation_context ?parameter_token)
+        )
+      )
+  )
+  (:action mark_aggregation_key_b_ready
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_b - aggregation_key_b ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_ready_for_processing ?secondary_aggregation_context)
+        (entity_has_metric ?secondary_aggregation_context ?metric_definition)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (not
+          (aggregation_key_b_ready ?aggregation_key_b)
+        )
+        (not
+          (aggregation_key_b_parameter_assigned ?aggregation_key_b)
+        )
+      )
+    :effect (aggregation_key_b_ready ?aggregation_key_b)
+  )
+  (:action claim_secondary_context_for_processor
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_b - aggregation_key_b ?processor_unit - processor_unit)
+    :precondition
+      (and
+        (entity_ready_for_processing ?secondary_aggregation_context)
+        (entity_assigned_processor ?secondary_aggregation_context ?processor_unit)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_b_ready ?aggregation_key_b)
+        (not
+          (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (secondary_context_ready ?secondary_aggregation_context)
+      )
+  )
+  (:action assign_parameter_to_secondary_context
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_b - aggregation_key_b ?parameter_token - parameter_token)
+    :precondition
+      (and
+        (entity_ready_for_processing ?secondary_aggregation_context)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (parameter_available ?parameter_token)
+        (not
+          (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (aggregation_key_b_parameter_assigned ?aggregation_key_b)
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (secondary_context_has_parameter ?secondary_aggregation_context ?parameter_token)
+        (not
+          (parameter_available ?parameter_token)
+        )
+      )
+  )
+  (:action complete_secondary_context_aggregation
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_b - aggregation_key_b ?metric_definition - metric_definition ?parameter_token - parameter_token)
+    :precondition
+      (and
+        (entity_ready_for_processing ?secondary_aggregation_context)
+        (entity_has_metric ?secondary_aggregation_context ?metric_definition)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_b_parameter_assigned ?aggregation_key_b)
+        (secondary_context_has_parameter ?secondary_aggregation_context ?parameter_token)
+        (not
+          (secondary_context_ready ?secondary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (aggregation_key_b_ready ?aggregation_key_b)
+        (secondary_context_ready ?secondary_aggregation_context)
+        (parameter_available ?parameter_token)
+        (not
+          (secondary_context_has_parameter ?secondary_aggregation_context ?parameter_token)
+        )
+      )
+  )
+  (:action assemble_report_draft
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_a - aggregation_key_a ?aggregation_key_b - aggregation_key_b ?report_draft - report_draft)
+    :precondition
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_a_ready ?aggregation_key_a)
+        (aggregation_key_b_ready ?aggregation_key_b)
+        (primary_context_ready ?primary_aggregation_context)
+        (secondary_context_ready ?secondary_aggregation_context)
+        (draft_slot_available ?report_draft)
+      )
+    :effect
+      (and
+        (draft_created ?report_draft)
+        (draft_bound_to_key_a ?report_draft ?aggregation_key_a)
+        (draft_bound_to_key_b ?report_draft ?aggregation_key_b)
+        (not
+          (draft_slot_available ?report_draft)
+        )
+      )
+  )
+  (:action assemble_report_draft_with_block_a
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_a - aggregation_key_a ?aggregation_key_b - aggregation_key_b ?report_draft - report_draft)
+    :precondition
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_a_parameter_assigned ?aggregation_key_a)
+        (aggregation_key_b_ready ?aggregation_key_b)
+        (not
+          (primary_context_ready ?primary_aggregation_context)
+        )
+        (secondary_context_ready ?secondary_aggregation_context)
+        (draft_slot_available ?report_draft)
+      )
+    :effect
+      (and
+        (draft_created ?report_draft)
+        (draft_bound_to_key_a ?report_draft ?aggregation_key_a)
+        (draft_bound_to_key_b ?report_draft ?aggregation_key_b)
+        (draft_contains_block_type_a ?report_draft)
+        (not
+          (draft_slot_available ?report_draft)
+        )
+      )
+  )
+  (:action assemble_report_draft_with_block_b
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_a - aggregation_key_a ?aggregation_key_b - aggregation_key_b ?report_draft - report_draft)
+    :precondition
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_a_ready ?aggregation_key_a)
+        (aggregation_key_b_parameter_assigned ?aggregation_key_b)
+        (primary_context_ready ?primary_aggregation_context)
+        (not
+          (secondary_context_ready ?secondary_aggregation_context)
+        )
+        (draft_slot_available ?report_draft)
+      )
+    :effect
+      (and
+        (draft_created ?report_draft)
+        (draft_bound_to_key_a ?report_draft ?aggregation_key_a)
+        (draft_bound_to_key_b ?report_draft ?aggregation_key_b)
+        (draft_contains_block_type_b ?report_draft)
+        (not
+          (draft_slot_available ?report_draft)
+        )
+      )
+  )
+  (:action assemble_report_draft_with_blocks_a_and_b
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?secondary_aggregation_context - secondary_aggregation_context ?aggregation_key_a - aggregation_key_a ?aggregation_key_b - aggregation_key_b ?report_draft - report_draft)
+    :precondition
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (primary_context_has_key ?primary_aggregation_context ?aggregation_key_a)
+        (secondary_context_has_key ?secondary_aggregation_context ?aggregation_key_b)
+        (aggregation_key_a_parameter_assigned ?aggregation_key_a)
+        (aggregation_key_b_parameter_assigned ?aggregation_key_b)
+        (not
+          (primary_context_ready ?primary_aggregation_context)
+        )
+        (not
+          (secondary_context_ready ?secondary_aggregation_context)
+        )
+        (draft_slot_available ?report_draft)
+      )
+    :effect
+      (and
+        (draft_created ?report_draft)
+        (draft_bound_to_key_a ?report_draft ?aggregation_key_a)
+        (draft_bound_to_key_b ?report_draft ?aggregation_key_b)
+        (draft_contains_block_type_a ?report_draft)
+        (draft_contains_block_type_b ?report_draft)
+        (not
+          (draft_slot_available ?report_draft)
+        )
+      )
+  )
+  (:action mark_draft_ready_for_fragments
+    :parameters (?report_draft - report_draft ?primary_aggregation_context - primary_aggregation_context ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (draft_created ?report_draft)
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (entity_has_metric ?primary_aggregation_context ?metric_definition)
+        (not
+          (draft_ready_for_fragments ?report_draft)
+        )
+      )
+    :effect (draft_ready_for_fragments ?report_draft)
+  )
+  (:action attach_fragment_to_draft
+    :parameters (?report_processor - report_processor ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (processor_has_draft ?report_processor ?report_draft)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_available ?content_fragment)
+        (draft_created ?report_draft)
+        (draft_ready_for_fragments ?report_draft)
+        (not
+          (fragment_consumed ?content_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_consumed ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (not
+          (fragment_available ?content_fragment)
+        )
+      )
+  )
+  (:action confirm_fragment_attachment
+    :parameters (?report_processor - report_processor ?content_fragment - content_fragment ?report_draft - report_draft ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_consumed ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (entity_has_metric ?report_processor ?metric_definition)
+        (not
+          (draft_contains_block_type_a ?report_draft)
+        )
+        (not
+          (processor_fragment_attached ?report_processor)
+        )
+      )
+    :effect (processor_fragment_attached ?report_processor)
+  )
+  (:action attach_signature_template_to_processor
+    :parameters (?report_processor - report_processor ?signature_template - signature_template)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (signature_template_available ?signature_template)
+        (not
+          (processor_signature_attached ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_signature_attached ?report_processor)
+        (processor_has_signature_template ?report_processor ?signature_template)
+        (not
+          (signature_template_available ?signature_template)
+        )
+      )
+  )
+  (:action apply_signature_and_attach_fragment_to_draft
+    :parameters (?report_processor - report_processor ?content_fragment - content_fragment ?report_draft - report_draft ?metric_definition - metric_definition ?signature_template - signature_template)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_consumed ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (entity_has_metric ?report_processor ?metric_definition)
+        (draft_contains_block_type_a ?report_draft)
+        (processor_signature_attached ?report_processor)
+        (processor_has_signature_template ?report_processor ?signature_template)
+        (not
+          (processor_fragment_attached ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_fragment_attached ?report_processor)
+        (processor_signature_applied ?report_processor)
+      )
+  )
+  (:action start_content_enrichment_by_processor
+    :parameters (?report_processor - report_processor ?content_block - content_block ?processor_unit - processor_unit ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_fragment_attached ?report_processor)
+        (processor_attached_content_block ?report_processor ?content_block)
+        (entity_assigned_processor ?report_processor ?processor_unit)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (not
+          (draft_contains_block_type_b ?report_draft)
+        )
+        (not
+          (processor_enrichment_ready ?report_processor)
+        )
+      )
+    :effect (processor_enrichment_ready ?report_processor)
+  )
+  (:action start_content_enrichment_by_processor_variant_b
+    :parameters (?report_processor - report_processor ?content_block - content_block ?processor_unit - processor_unit ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_fragment_attached ?report_processor)
+        (processor_attached_content_block ?report_processor ?content_block)
+        (entity_assigned_processor ?report_processor ?processor_unit)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (draft_contains_block_type_b ?report_draft)
+        (not
+          (processor_enrichment_ready ?report_processor)
+        )
+      )
+    :effect (processor_enrichment_ready ?report_processor)
+  )
+  (:action validate_and_mark_processor_review
+    :parameters (?report_processor - report_processor ?reviewer - reviewer ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_enrichment_ready ?report_processor)
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (not
+          (draft_contains_block_type_a ?report_draft)
+        )
+        (not
+          (draft_contains_block_type_b ?report_draft)
+        )
+        (not
+          (processor_reviewed ?report_processor)
+        )
+      )
+    :effect (processor_reviewed ?report_processor)
+  )
+  (:action validate_and_mark_processor_review_with_format_flag
+    :parameters (?report_processor - report_processor ?reviewer - reviewer ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_enrichment_ready ?report_processor)
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (draft_contains_block_type_a ?report_draft)
+        (not
+          (draft_contains_block_type_b ?report_draft)
+        )
+        (not
+          (processor_reviewed ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_content_enrichment_completed ?report_processor)
+      )
+  )
+  (:action validate_and_mark_processor_review_with_alternate_flags
+    :parameters (?report_processor - report_processor ?reviewer - reviewer ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_enrichment_ready ?report_processor)
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (not
+          (draft_contains_block_type_a ?report_draft)
+        )
+        (draft_contains_block_type_b ?report_draft)
+        (not
+          (processor_reviewed ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_content_enrichment_completed ?report_processor)
+      )
+  )
+  (:action validate_and_mark_processor_review_comprehensive
+    :parameters (?report_processor - report_processor ?reviewer - reviewer ?content_fragment - content_fragment ?report_draft - report_draft)
+    :precondition
+      (and
+        (processor_enrichment_ready ?report_processor)
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (processor_has_fragment_template ?report_processor ?content_fragment)
+        (fragment_bound_to_draft ?content_fragment ?report_draft)
+        (draft_contains_block_type_a ?report_draft)
+        (draft_contains_block_type_b ?report_draft)
+        (not
+          (processor_reviewed ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_content_enrichment_completed ?report_processor)
+      )
+  )
+  (:action record_processor_completion
+    :parameters (?report_processor - report_processor)
+    :precondition
+      (and
+        (processor_reviewed ?report_processor)
+        (not
+          (processor_content_enrichment_completed ?report_processor)
+        )
+        (not
+          (processor_completion_recorded ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_completion_recorded ?report_processor)
+        (entity_ready_for_finalization ?report_processor)
+      )
+  )
+  (:action attach_output_format_to_processor
+    :parameters (?report_processor - report_processor ?output_format - output_format)
+    :precondition
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_content_enrichment_completed ?report_processor)
+        (output_format_available ?output_format)
+      )
+    :effect
+      (and
+        (processor_attached_output_format ?report_processor ?output_format)
+        (not
+          (output_format_available ?output_format)
+        )
+      )
+  )
+  (:action finalize_processor_enrichment
+    :parameters (?report_processor - report_processor ?primary_aggregation_context - primary_aggregation_context ?secondary_aggregation_context - secondary_aggregation_context ?metric_definition - metric_definition ?output_format - output_format)
+    :precondition
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_content_enrichment_completed ?report_processor)
+        (processor_attached_output_format ?report_processor ?output_format)
+        (processor_assigned_to_primary_context ?report_processor ?primary_aggregation_context)
+        (processor_assigned_to_secondary_context ?report_processor ?secondary_aggregation_context)
+        (primary_context_ready ?primary_aggregation_context)
+        (secondary_context_ready ?secondary_aggregation_context)
+        (entity_has_metric ?report_processor ?metric_definition)
+        (not
+          (processor_finalization_ready ?report_processor)
+        )
+      )
+    :effect (processor_finalization_ready ?report_processor)
+  )
+  (:action finalize_processor_and_mark_ready
+    :parameters (?report_processor - report_processor)
+    :precondition
+      (and
+        (processor_reviewed ?report_processor)
+        (processor_finalization_ready ?report_processor)
+        (not
+          (processor_completion_recorded ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_completion_recorded ?report_processor)
+        (entity_ready_for_finalization ?report_processor)
+      )
+  )
+  (:action claim_approval_for_processor
+    :parameters (?report_processor - report_processor ?approval_token - approval_token ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_ready_for_processing ?report_processor)
+        (entity_has_metric ?report_processor ?metric_definition)
+        (approval_token_available ?approval_token)
+        (processor_associated_with_approval_token ?report_processor ?approval_token)
+        (not
+          (processor_approved ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_approved ?report_processor)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action initiate_processor_signature
+    :parameters (?report_processor - report_processor ?processor_unit - processor_unit)
+    :precondition
+      (and
+        (processor_approved ?report_processor)
+        (entity_assigned_processor ?report_processor ?processor_unit)
+        (not
+          (processor_signature_initiated ?report_processor)
+        )
+      )
+    :effect (processor_signature_initiated ?report_processor)
+  )
+  (:action complete_processor_signature
+    :parameters (?report_processor - report_processor ?reviewer - reviewer)
+    :precondition
+      (and
+        (processor_signature_initiated ?report_processor)
+        (processor_assigned_reviewer ?report_processor ?reviewer)
+        (not
+          (processor_signature_completed ?report_processor)
+        )
+      )
+    :effect (processor_signature_completed ?report_processor)
+  )
+  (:action finalize_signature_and_mark_processor_ready
+    :parameters (?report_processor - report_processor)
+    :precondition
+      (and
+        (processor_signature_completed ?report_processor)
+        (not
+          (processor_completion_recorded ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (processor_completion_recorded ?report_processor)
+        (entity_ready_for_finalization ?report_processor)
+      )
+  )
+  (:action mark_primary_context_ready_for_finalization
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?report_draft - report_draft)
+    :precondition
+      (and
+        (primary_context_processing_in_progress ?primary_aggregation_context)
+        (primary_context_ready ?primary_aggregation_context)
+        (draft_created ?report_draft)
+        (draft_ready_for_fragments ?report_draft)
+        (not
+          (entity_ready_for_finalization ?primary_aggregation_context)
+        )
+      )
+    :effect (entity_ready_for_finalization ?primary_aggregation_context)
+  )
+  (:action mark_secondary_context_ready_for_finalization
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?report_draft - report_draft)
+    :precondition
+      (and
+        (secondary_context_processing_in_progress ?secondary_aggregation_context)
+        (secondary_context_ready ?secondary_aggregation_context)
+        (draft_created ?report_draft)
+        (draft_ready_for_fragments ?report_draft)
+        (not
+          (entity_ready_for_finalization ?secondary_aggregation_context)
+        )
+      )
+    :effect (entity_ready_for_finalization ?secondary_aggregation_context)
+  )
+  (:action apply_policy_to_request
+    :parameters (?report_request - report_request ?policy_token - policy_token ?metric_definition - metric_definition)
+    :precondition
+      (and
+        (entity_ready_for_finalization ?report_request)
+        (entity_has_metric ?report_request ?metric_definition)
+        (policy_token_available ?policy_token)
+        (not
+          (policy_applied ?report_request)
+        )
+      )
+    :effect
+      (and
+        (policy_applied ?report_request)
+        (entity_policy_assigned ?report_request ?policy_token)
+        (not
+          (policy_token_available ?policy_token)
+        )
+      )
+  )
+  (:action finalize_context_and_release_data_source
+    :parameters (?primary_aggregation_context - primary_aggregation_context ?data_source - data_source ?policy_token - policy_token)
+    :precondition
+      (and
+        (policy_applied ?primary_aggregation_context)
+        (entity_bound_to_data_source ?primary_aggregation_context ?data_source)
+        (entity_policy_assigned ?primary_aggregation_context ?policy_token)
+        (not
+          (entity_finalized ?primary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?primary_aggregation_context)
+        (data_source_available ?data_source)
+        (policy_token_available ?policy_token)
+      )
+  )
+  (:action finalize_secondary_context_and_release_data_source
+    :parameters (?secondary_aggregation_context - secondary_aggregation_context ?data_source - data_source ?policy_token - policy_token)
+    :precondition
+      (and
+        (policy_applied ?secondary_aggregation_context)
+        (entity_bound_to_data_source ?secondary_aggregation_context ?data_source)
+        (entity_policy_assigned ?secondary_aggregation_context ?policy_token)
+        (not
+          (entity_finalized ?secondary_aggregation_context)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?secondary_aggregation_context)
+        (data_source_available ?data_source)
+        (policy_token_available ?policy_token)
+      )
+  )
+  (:action finalize_processor_and_release_resources
+    :parameters (?report_processor - report_processor ?data_source - data_source ?policy_token - policy_token)
+    :precondition
+      (and
+        (policy_applied ?report_processor)
+        (entity_bound_to_data_source ?report_processor ?data_source)
+        (entity_policy_assigned ?report_processor ?policy_token)
+        (not
+          (entity_finalized ?report_processor)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?report_processor)
+        (data_source_available ?data_source)
+        (policy_token_available ?policy_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem internal_report_generation_problem)
+  (:domain report_generation_domain)
+  (:objects primary_aggregation_context_instance - primary_aggregation_context secondary_aggregation_context_instance - secondary_aggregation_context report_processor_1 - report_processor report_processor_2 - report_processor data_source_1 - data_source data_source_2 - data_source data_source_3 - data_source metric_definition_1 - metric_definition processor_unit_1 - processor_unit parameter_1 - parameter_token aggregation_key_a_1 - aggregation_key_a aggregation_key_b_1 - aggregation_key_b report_draft_template_1 - report_draft content_fragment_1 - content_fragment content_fragment_2 - content_fragment signature_template_1 - signature_template signature_template_2 - signature_template output_format_pdf - output_format output_format_csv - output_format policy_token_1 - policy_token content_block_1 - content_block approval_token_1 - approval_token approval_token_2 - approval_token reviewer_1 - reviewer)
+  (:init
+    (data_source_available data_source_1)
+    (data_source_available data_source_2)
+    (data_source_available data_source_3)
+    (metric_available metric_definition_1)
+    (processor_unit_available processor_unit_1)
+    (parameter_available parameter_1)
+    (primary_context_has_key primary_aggregation_context_instance aggregation_key_a_1)
+    (secondary_context_has_key secondary_aggregation_context_instance aggregation_key_b_1)
+    (draft_slot_available report_draft_template_1)
+    (fragment_available content_fragment_1)
+    (fragment_available content_fragment_2)
+    (processor_assigned_to_primary_context report_processor_1 primary_aggregation_context_instance)
+    (processor_assigned_to_primary_context report_processor_2 primary_aggregation_context_instance)
+    (processor_assigned_to_secondary_context report_processor_1 secondary_aggregation_context_instance)
+    (processor_assigned_to_secondary_context report_processor_2 secondary_aggregation_context_instance)
+    (processor_has_draft report_processor_1 report_draft_template_1)
+    (processor_has_draft report_processor_2 report_draft_template_1)
+    (processor_has_fragment_template report_processor_1 content_fragment_1)
+    (processor_has_fragment_template report_processor_2 content_fragment_2)
+    (signature_template_available signature_template_1)
+    (signature_template_available signature_template_2)
+    (output_format_available output_format_pdf)
+    (output_format_available output_format_csv)
+    (policy_token_available policy_token_1)
+    (content_block_available content_block_1)
+    (approval_token_available approval_token_1)
+    (processor_associated_with_approval_token report_processor_1 approval_token_1)
+    (processor_associated_with_approval_token report_processor_2 approval_token_2)
+    (reviewer_available reviewer_1)
+  )
+  (:goal
+    (and
+      (entity_finalized primary_aggregation_context_instance)
+      (entity_finalized secondary_aggregation_context_instance)
+      (entity_finalized report_processor_1)
+      (entity_finalized report_processor_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_report_request primary_aggregation_context_instance)
+(create_report_request secondary_aggregation_context_instance)
+(create_report_request report_processor_1)
+(create_report_request report_processor_2)
+(bind_data_source_to_request primary_aggregation_context_instance data_source_1)
+(bind_metric_to_request primary_aggregation_context_instance metric_definition_1)
+(confirm_request_metrics primary_aggregation_context_instance metric_definition_1)
+(mark_aggregation_key_a_ready primary_aggregation_context_instance aggregation_key_a_1 metric_definition_1)
+(assign_processor_to_request primary_aggregation_context_instance processor_unit_1)
+(claim_primary_context_for_processor primary_aggregation_context_instance aggregation_key_a_1 processor_unit_1)
+(release_processor_from_request primary_aggregation_context_instance processor_unit_1)
+(release_metric_from_request primary_aggregation_context_instance metric_definition_1)
+(bind_data_source_to_request secondary_aggregation_context_instance data_source_2)
+(bind_metric_to_request secondary_aggregation_context_instance metric_definition_1)
+(confirm_request_metrics secondary_aggregation_context_instance metric_definition_1)
+(mark_aggregation_key_b_ready secondary_aggregation_context_instance aggregation_key_b_1 metric_definition_1)
+(assign_processor_to_request secondary_aggregation_context_instance processor_unit_1)
+(claim_secondary_context_for_processor secondary_aggregation_context_instance aggregation_key_b_1 processor_unit_1)
+(release_processor_from_request secondary_aggregation_context_instance processor_unit_1)
+(release_metric_from_request secondary_aggregation_context_instance metric_definition_1)
+(assemble_report_draft primary_aggregation_context_instance secondary_aggregation_context_instance aggregation_key_a_1 aggregation_key_b_1 report_draft_template_1)
+(bind_metric_to_request primary_aggregation_context_instance metric_definition_1)
+(mark_draft_ready_for_fragments report_draft_template_1 primary_aggregation_context_instance metric_definition_1)
+(mark_primary_context_ready_for_finalization primary_aggregation_context_instance report_draft_template_1)
+(mark_secondary_context_ready_for_finalization secondary_aggregation_context_instance report_draft_template_1)
+(release_metric_from_request primary_aggregation_context_instance metric_definition_1)
+(bind_data_source_to_request report_processor_1 data_source_3)
+(bind_metric_to_request report_processor_1 metric_definition_1)
+(confirm_request_metrics report_processor_1 metric_definition_1)
+(assign_processor_to_request report_processor_1 processor_unit_1)
+(attach_content_block_to_processor report_processor_1 content_block_1)
+(assign_reviewer_to_processor report_processor_1 reviewer_1)
+(attach_fragment_to_draft report_processor_1 content_fragment_1 report_draft_template_1)
+(confirm_fragment_attachment report_processor_1 content_fragment_1 report_draft_template_1 metric_definition_1)
+(start_content_enrichment_by_processor report_processor_1 content_block_1 processor_unit_1 content_fragment_1 report_draft_template_1)
+(validate_and_mark_processor_review report_processor_1 reviewer_1 content_fragment_1 report_draft_template_1)
+(record_processor_completion report_processor_1)
+(release_content_block_from_processor report_processor_1 content_block_1)
+(unassign_reviewer_from_processor report_processor_1 reviewer_1)
+(release_processor_from_request report_processor_1 processor_unit_1)
+(apply_policy_to_request report_processor_1 policy_token_1 metric_definition_1)
+(finalize_processor_and_release_resources report_processor_1 data_source_3 policy_token_1)
+(release_metric_from_request report_processor_1 metric_definition_1)
+(bind_data_source_to_request report_processor_2 data_source_3)
+(bind_metric_to_request report_processor_2 metric_definition_1)
+(confirm_request_metrics report_processor_2 metric_definition_1)
+(assign_processor_to_request report_processor_2 processor_unit_1)
+(attach_content_block_to_processor report_processor_2 content_block_1)
+(assign_reviewer_to_processor report_processor_2 reviewer_1)
+(attach_fragment_to_draft report_processor_2 content_fragment_2 report_draft_template_1)
+(confirm_fragment_attachment report_processor_2 content_fragment_2 report_draft_template_1 metric_definition_1)
+(start_content_enrichment_by_processor report_processor_2 content_block_1 processor_unit_1 content_fragment_2 report_draft_template_1)
+(validate_and_mark_processor_review report_processor_2 reviewer_1 content_fragment_2 report_draft_template_1)
+(record_processor_completion report_processor_2)
+(release_content_block_from_processor report_processor_2 content_block_1)
+(unassign_reviewer_from_processor report_processor_2 reviewer_1)
+(release_processor_from_request report_processor_2 processor_unit_1)
+(apply_policy_to_request report_processor_2 policy_token_1 metric_definition_1)
+(finalize_processor_and_release_resources report_processor_2 data_source_3 policy_token_1)
+(release_metric_from_request report_processor_2 metric_definition_1)
+(bind_metric_to_request primary_aggregation_context_instance metric_definition_1)
+(apply_policy_to_request primary_aggregation_context_instance policy_token_1 metric_definition_1)
+(finalize_context_and_release_data_source primary_aggregation_context_instance data_source_1 policy_token_1)
+(release_metric_from_request primary_aggregation_context_instance metric_definition_1)
+(bind_metric_to_request secondary_aggregation_context_instance metric_definition_1)
+(apply_policy_to_request secondary_aggregation_context_instance policy_token_1 metric_definition_1)
+(finalize_secondary_context_and_release_data_source secondary_aggregation_context_instance data_source_2 policy_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_vyy8gzad/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_vyy8gzad/plan.pddl 67 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain portfolio_transition_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object allocation_resource_type - object instrument_resource_type - object identifier_type - object portfolio - identifier_type transition_request - operational_resource_type target_model - operational_resource_type operator - operational_resource_type execution_venue - operational_resource_type execution_strategy - operational_resource_type transition_window - operational_resource_type settlement_instruction - operational_resource_type approval_document - operational_resource_type candidate_security - allocation_resource_type holding_lot - allocation_resource_type compliance_rule - allocation_resource_type source_asset_bucket - instrument_resource_type target_asset_bucket - instrument_resource_type trade_ticket - instrument_resource_type portfolio_account_group - portfolio portfolio_plan_group - portfolio source_account - portfolio_account_group target_account - portfolio_account_group transition_plan - portfolio_plan_group)
+  (:predicates
+    (registered ?portfolio - portfolio)
+    (validated_for_transition ?portfolio - portfolio)
+    (transition_request_attached ?portfolio - portfolio)
+    (assigned_for_transition ?portfolio - portfolio)
+    (ready_for_execution ?portfolio - portfolio)
+    (transition_window_attached ?portfolio - portfolio)
+    (request_available ?transition_request - transition_request)
+    (has_transition_request ?portfolio - portfolio ?transition_request - transition_request)
+    (target_model_available ?target_model - target_model)
+    (mapped_to_target_model ?portfolio - portfolio ?target_model - target_model)
+    (operator_available ?operator - operator)
+    (operator_assigned ?portfolio - portfolio ?operator - operator)
+    (candidate_security_available ?candidate_security - candidate_security)
+    (source_account_candidate_security_attached ?source_account - source_account ?candidate_security - candidate_security)
+    (target_account_candidate_security_attached ?target_account - target_account ?candidate_security - candidate_security)
+    (account_source_bucket_match ?source_account - source_account ?source_asset_bucket - source_asset_bucket)
+    (source_bucket_marked ?source_asset_bucket - source_asset_bucket)
+    (source_bucket_has_candidate ?source_asset_bucket - source_asset_bucket)
+    (source_account_ready_for_ticket_assembly ?source_account - source_account)
+    (target_account_bucket_match ?target_account - target_account ?target_asset_bucket - target_asset_bucket)
+    (target_bucket_marked ?target_asset_bucket - target_asset_bucket)
+    (target_bucket_has_candidate ?target_asset_bucket - target_asset_bucket)
+    (target_account_ready_for_ticket_assembly ?target_account - target_account)
+    (trade_ticket_unassigned ?trade_ticket - trade_ticket)
+    (trade_ticket_created ?trade_ticket - trade_ticket)
+    (trade_ticket_maps_source_bucket ?trade_ticket - trade_ticket ?source_asset_bucket - source_asset_bucket)
+    (trade_ticket_maps_target_bucket ?trade_ticket - trade_ticket ?target_asset_bucket - target_asset_bucket)
+    (trade_ticket_has_sell_leg ?trade_ticket - trade_ticket)
+    (trade_ticket_has_buy_leg ?trade_ticket - trade_ticket)
+    (trade_ticket_matched_to_holdings ?trade_ticket - trade_ticket)
+    (plan_includes_source_account ?transition_plan - transition_plan ?source_account - source_account)
+    (plan_includes_target_account ?transition_plan - transition_plan ?target_account - target_account)
+    (plan_includes_trade_ticket ?transition_plan - transition_plan ?trade_ticket - trade_ticket)
+    (holding_lot_available ?holding_lot - holding_lot)
+    (plan_has_holding_lot ?transition_plan - transition_plan ?holding_lot - holding_lot)
+    (holding_lot_consumed ?holding_lot - holding_lot)
+    (holding_lot_assigned_to_ticket ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    (plan_prepared_for_venue_assignment ?transition_plan - transition_plan)
+    (plan_ready_for_approval ?transition_plan - transition_plan)
+    (plan_approval_collected ?transition_plan - transition_plan)
+    (plan_has_execution_venue ?transition_plan - transition_plan)
+    (plan_venue_confirmed ?transition_plan - transition_plan)
+    (plan_compliance_cleared ?transition_plan - transition_plan)
+    (plan_readiness_check_passed ?transition_plan - transition_plan)
+    (compliance_rule_available ?compliance_rule - compliance_rule)
+    (plan_has_compliance_rule ?transition_plan - transition_plan ?compliance_rule - compliance_rule)
+    (plan_compliance_rule_applied ?transition_plan - transition_plan)
+    (plan_compliance_review_started ?transition_plan - transition_plan)
+    (plan_compliance_approved ?transition_plan - transition_plan)
+    (execution_venue_available ?execution_venue - execution_venue)
+    (plan_execution_venue_assigned ?transition_plan - transition_plan ?execution_venue - execution_venue)
+    (execution_strategy_available ?execution_strategy - execution_strategy)
+    (plan_execution_strategy_assigned ?transition_plan - transition_plan ?execution_strategy - execution_strategy)
+    (settlement_instruction_available ?settlement_instruction - settlement_instruction)
+    (plan_settlement_instruction_attached ?transition_plan - transition_plan ?settlement_instruction - settlement_instruction)
+    (approval_document_available ?approval_document - approval_document)
+    (plan_approval_attached ?transition_plan - transition_plan ?approval_document - approval_document)
+    (transition_window_available ?transition_window - transition_window)
+    (has_transition_window ?portfolio - portfolio ?transition_window - transition_window)
+    (source_account_ticket_marked ?source_account - source_account)
+    (target_account_ticket_marked ?target_account - target_account)
+    (plan_finalized ?transition_plan - transition_plan)
+  )
+  (:action detect_and_register_portfolio
+    :parameters (?portfolio - portfolio)
+    :precondition
+      (and
+        (not
+          (registered ?portfolio)
+        )
+        (not
+          (assigned_for_transition ?portfolio)
+        )
+      )
+    :effect (registered ?portfolio)
+  )
+  (:action attach_transition_request_to_portfolio
+    :parameters (?portfolio - portfolio ?transition_request - transition_request)
+    :precondition
+      (and
+        (registered ?portfolio)
+        (not
+          (transition_request_attached ?portfolio)
+        )
+        (request_available ?transition_request)
+      )
+    :effect
+      (and
+        (transition_request_attached ?portfolio)
+        (has_transition_request ?portfolio ?transition_request)
+        (not
+          (request_available ?transition_request)
+        )
+      )
+  )
+  (:action assign_target_model_to_portfolio
+    :parameters (?portfolio - portfolio ?target_model - target_model)
+    :precondition
+      (and
+        (registered ?portfolio)
+        (transition_request_attached ?portfolio)
+        (target_model_available ?target_model)
+      )
+    :effect
+      (and
+        (mapped_to_target_model ?portfolio ?target_model)
+        (not
+          (target_model_available ?target_model)
+        )
+      )
+  )
+  (:action validate_portfolio
+    :parameters (?portfolio - portfolio ?target_model - target_model)
+    :precondition
+      (and
+        (registered ?portfolio)
+        (transition_request_attached ?portfolio)
+        (mapped_to_target_model ?portfolio ?target_model)
+        (not
+          (validated_for_transition ?portfolio)
+        )
+      )
+    :effect (validated_for_transition ?portfolio)
+  )
+  (:action unassign_target_model_from_portfolio
+    :parameters (?portfolio - portfolio ?target_model - target_model)
+    :precondition
+      (and
+        (mapped_to_target_model ?portfolio ?target_model)
+      )
+    :effect
+      (and
+        (target_model_available ?target_model)
+        (not
+          (mapped_to_target_model ?portfolio ?target_model)
+        )
+      )
+  )
+  (:action assign_operator_to_portfolio
+    :parameters (?portfolio - portfolio ?operator - operator)
+    :precondition
+      (and
+        (validated_for_transition ?portfolio)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned ?portfolio ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action unassign_operator_from_portfolio
+    :parameters (?portfolio - portfolio ?operator - operator)
+    :precondition
+      (and
+        (operator_assigned ?portfolio ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned ?portfolio ?operator)
+        )
+      )
+  )
+  (:action attach_settlement_instruction_to_plan
+    :parameters (?transition_plan - transition_plan ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (settlement_instruction_available ?settlement_instruction)
+      )
+    :effect
+      (and
+        (plan_settlement_instruction_attached ?transition_plan ?settlement_instruction)
+        (not
+          (settlement_instruction_available ?settlement_instruction)
+        )
+      )
+  )
+  (:action detach_settlement_instruction_from_plan
+    :parameters (?transition_plan - transition_plan ?settlement_instruction - settlement_instruction)
+    :precondition
+      (and
+        (plan_settlement_instruction_attached ?transition_plan ?settlement_instruction)
+      )
+    :effect
+      (and
+        (settlement_instruction_available ?settlement_instruction)
+        (not
+          (plan_settlement_instruction_attached ?transition_plan ?settlement_instruction)
+        )
+      )
+  )
+  (:action attach_approval_document_to_plan
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (approval_document_available ?approval_document)
+      )
+    :effect
+      (and
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action detach_approval_document_from_plan
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document)
+    :precondition
+      (and
+        (plan_approval_attached ?transition_plan ?approval_document)
+      )
+    :effect
+      (and
+        (approval_document_available ?approval_document)
+        (not
+          (plan_approval_attached ?transition_plan ?approval_document)
+        )
+      )
+  )
+  (:action identify_eligible_source_bucket_for_account
+    :parameters (?source_account - source_account ?source_asset_bucket - source_asset_bucket ?target_model - target_model)
+    :precondition
+      (and
+        (validated_for_transition ?source_account)
+        (mapped_to_target_model ?source_account ?target_model)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (not
+          (source_bucket_marked ?source_asset_bucket)
+        )
+        (not
+          (source_bucket_has_candidate ?source_asset_bucket)
+        )
+      )
+    :effect (source_bucket_marked ?source_asset_bucket)
+  )
+  (:action reserve_source_account_for_lot_selection
+    :parameters (?source_account - source_account ?source_asset_bucket - source_asset_bucket ?operator - operator)
+    :precondition
+      (and
+        (validated_for_transition ?source_account)
+        (operator_assigned ?source_account ?operator)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (source_bucket_marked ?source_asset_bucket)
+        (not
+          (source_account_ticket_marked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_account_ticket_marked ?source_account)
+        (source_account_ready_for_ticket_assembly ?source_account)
+      )
+  )
+  (:action attach_candidate_security_to_source_bucket
+    :parameters (?source_account - source_account ?source_asset_bucket - source_asset_bucket ?candidate_security - candidate_security)
+    :precondition
+      (and
+        (validated_for_transition ?source_account)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (candidate_security_available ?candidate_security)
+        (not
+          (source_account_ticket_marked ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_has_candidate ?source_asset_bucket)
+        (source_account_ticket_marked ?source_account)
+        (source_account_candidate_security_attached ?source_account ?candidate_security)
+        (not
+          (candidate_security_available ?candidate_security)
+        )
+      )
+  )
+  (:action confirm_candidate_security_for_account_bucket
+    :parameters (?source_account - source_account ?source_asset_bucket - source_asset_bucket ?target_model - target_model ?candidate_security - candidate_security)
+    :precondition
+      (and
+        (validated_for_transition ?source_account)
+        (mapped_to_target_model ?source_account ?target_model)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (source_bucket_has_candidate ?source_asset_bucket)
+        (source_account_candidate_security_attached ?source_account ?candidate_security)
+        (not
+          (source_account_ready_for_ticket_assembly ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_bucket_marked ?source_asset_bucket)
+        (source_account_ready_for_ticket_assembly ?source_account)
+        (candidate_security_available ?candidate_security)
+        (not
+          (source_account_candidate_security_attached ?source_account ?candidate_security)
+        )
+      )
+  )
+  (:action identify_eligible_target_bucket_for_account
+    :parameters (?target_account - target_account ?target_asset_bucket - target_asset_bucket ?target_model - target_model)
+    :precondition
+      (and
+        (validated_for_transition ?target_account)
+        (mapped_to_target_model ?target_account ?target_model)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (not
+          (target_bucket_marked ?target_asset_bucket)
+        )
+        (not
+          (target_bucket_has_candidate ?target_asset_bucket)
+        )
+      )
+    :effect (target_bucket_marked ?target_asset_bucket)
+  )
+  (:action reserve_target_account_for_ticket_assembly
+    :parameters (?target_account - target_account ?target_asset_bucket - target_asset_bucket ?operator - operator)
+    :precondition
+      (and
+        (validated_for_transition ?target_account)
+        (operator_assigned ?target_account ?operator)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (target_bucket_marked ?target_asset_bucket)
+        (not
+          (target_account_ticket_marked ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_account_ticket_marked ?target_account)
+        (target_account_ready_for_ticket_assembly ?target_account)
+      )
+  )
+  (:action attach_candidate_security_to_target_bucket
+    :parameters (?target_account - target_account ?target_asset_bucket - target_asset_bucket ?candidate_security - candidate_security)
+    :precondition
+      (and
+        (validated_for_transition ?target_account)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (candidate_security_available ?candidate_security)
+        (not
+          (target_account_ticket_marked ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_has_candidate ?target_asset_bucket)
+        (target_account_ticket_marked ?target_account)
+        (target_account_candidate_security_attached ?target_account ?candidate_security)
+        (not
+          (candidate_security_available ?candidate_security)
+        )
+      )
+  )
+  (:action confirm_candidate_security_for_target_bucket
+    :parameters (?target_account - target_account ?target_asset_bucket - target_asset_bucket ?target_model - target_model ?candidate_security - candidate_security)
+    :precondition
+      (and
+        (validated_for_transition ?target_account)
+        (mapped_to_target_model ?target_account ?target_model)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (target_bucket_has_candidate ?target_asset_bucket)
+        (target_account_candidate_security_attached ?target_account ?candidate_security)
+        (not
+          (target_account_ready_for_ticket_assembly ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_bucket_marked ?target_asset_bucket)
+        (target_account_ready_for_ticket_assembly ?target_account)
+        (candidate_security_available ?candidate_security)
+        (not
+          (target_account_candidate_security_attached ?target_account ?candidate_security)
+        )
+      )
+  )
+  (:action assemble_trade_ticket
+    :parameters (?source_account - source_account ?target_account - target_account ?source_asset_bucket - source_asset_bucket ?target_asset_bucket - target_asset_bucket ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (source_account_ticket_marked ?source_account)
+        (target_account_ticket_marked ?target_account)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (source_bucket_marked ?source_asset_bucket)
+        (target_bucket_marked ?target_asset_bucket)
+        (source_account_ready_for_ticket_assembly ?source_account)
+        (target_account_ready_for_ticket_assembly ?target_account)
+        (trade_ticket_unassigned ?trade_ticket)
+      )
+    :effect
+      (and
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_maps_source_bucket ?trade_ticket ?source_asset_bucket)
+        (trade_ticket_maps_target_bucket ?trade_ticket ?target_asset_bucket)
+        (not
+          (trade_ticket_unassigned ?trade_ticket)
+        )
+      )
+  )
+  (:action assemble_trade_ticket_with_sell_leg
+    :parameters (?source_account - source_account ?target_account - target_account ?source_asset_bucket - source_asset_bucket ?target_asset_bucket - target_asset_bucket ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (source_account_ticket_marked ?source_account)
+        (target_account_ticket_marked ?target_account)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (source_bucket_has_candidate ?source_asset_bucket)
+        (target_bucket_marked ?target_asset_bucket)
+        (not
+          (source_account_ready_for_ticket_assembly ?source_account)
+        )
+        (target_account_ready_for_ticket_assembly ?target_account)
+        (trade_ticket_unassigned ?trade_ticket)
+      )
+    :effect
+      (and
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_maps_source_bucket ?trade_ticket ?source_asset_bucket)
+        (trade_ticket_maps_target_bucket ?trade_ticket ?target_asset_bucket)
+        (trade_ticket_has_sell_leg ?trade_ticket)
+        (not
+          (trade_ticket_unassigned ?trade_ticket)
+        )
+      )
+  )
+  (:action assemble_trade_ticket_with_buy_leg
+    :parameters (?source_account - source_account ?target_account - target_account ?source_asset_bucket - source_asset_bucket ?target_asset_bucket - target_asset_bucket ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (source_account_ticket_marked ?source_account)
+        (target_account_ticket_marked ?target_account)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (source_bucket_marked ?source_asset_bucket)
+        (target_bucket_has_candidate ?target_asset_bucket)
+        (source_account_ready_for_ticket_assembly ?source_account)
+        (not
+          (target_account_ready_for_ticket_assembly ?target_account)
+        )
+        (trade_ticket_unassigned ?trade_ticket)
+      )
+    :effect
+      (and
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_maps_source_bucket ?trade_ticket ?source_asset_bucket)
+        (trade_ticket_maps_target_bucket ?trade_ticket ?target_asset_bucket)
+        (trade_ticket_has_buy_leg ?trade_ticket)
+        (not
+          (trade_ticket_unassigned ?trade_ticket)
+        )
+      )
+  )
+  (:action assemble_trade_ticket_with_both_legs
+    :parameters (?source_account - source_account ?target_account - target_account ?source_asset_bucket - source_asset_bucket ?target_asset_bucket - target_asset_bucket ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (source_account_ticket_marked ?source_account)
+        (target_account_ticket_marked ?target_account)
+        (account_source_bucket_match ?source_account ?source_asset_bucket)
+        (target_account_bucket_match ?target_account ?target_asset_bucket)
+        (source_bucket_has_candidate ?source_asset_bucket)
+        (target_bucket_has_candidate ?target_asset_bucket)
+        (not
+          (source_account_ready_for_ticket_assembly ?source_account)
+        )
+        (not
+          (target_account_ready_for_ticket_assembly ?target_account)
+        )
+        (trade_ticket_unassigned ?trade_ticket)
+      )
+    :effect
+      (and
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_maps_source_bucket ?trade_ticket ?source_asset_bucket)
+        (trade_ticket_maps_target_bucket ?trade_ticket ?target_asset_bucket)
+        (trade_ticket_has_sell_leg ?trade_ticket)
+        (trade_ticket_has_buy_leg ?trade_ticket)
+        (not
+          (trade_ticket_unassigned ?trade_ticket)
+        )
+      )
+  )
+  (:action match_trade_ticket_to_holdings
+    :parameters (?trade_ticket - trade_ticket ?source_account - source_account ?target_model - target_model)
+    :precondition
+      (and
+        (trade_ticket_created ?trade_ticket)
+        (source_account_ticket_marked ?source_account)
+        (mapped_to_target_model ?source_account ?target_model)
+        (not
+          (trade_ticket_matched_to_holdings ?trade_ticket)
+        )
+      )
+    :effect (trade_ticket_matched_to_holdings ?trade_ticket)
+  )
+  (:action bind_holding_lot_to_plan_and_ticket
+    :parameters (?transition_plan - transition_plan ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (plan_includes_trade_ticket ?transition_plan ?trade_ticket)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_available ?holding_lot)
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_matched_to_holdings ?trade_ticket)
+        (not
+          (holding_lot_consumed ?holding_lot)
+        )
+      )
+    :effect
+      (and
+        (holding_lot_consumed ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (not
+          (holding_lot_available ?holding_lot)
+        )
+      )
+  )
+  (:action prepare_plan_for_venue_assignment
+    :parameters (?transition_plan - transition_plan ?holding_lot - holding_lot ?trade_ticket - trade_ticket ?target_model - target_model)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_consumed ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (mapped_to_target_model ?transition_plan ?target_model)
+        (not
+          (trade_ticket_has_sell_leg ?trade_ticket)
+        )
+        (not
+          (plan_prepared_for_venue_assignment ?transition_plan)
+        )
+      )
+    :effect (plan_prepared_for_venue_assignment ?transition_plan)
+  )
+  (:action assign_execution_venue_to_plan
+    :parameters (?transition_plan - transition_plan ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (execution_venue_available ?execution_venue)
+        (not
+          (plan_has_execution_venue ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_has_execution_venue ?transition_plan)
+        (plan_execution_venue_assigned ?transition_plan ?execution_venue)
+        (not
+          (execution_venue_available ?execution_venue)
+        )
+      )
+  )
+  (:action finalize_plan_venue_binding
+    :parameters (?transition_plan - transition_plan ?holding_lot - holding_lot ?trade_ticket - trade_ticket ?target_model - target_model ?execution_venue - execution_venue)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_consumed ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (mapped_to_target_model ?transition_plan ?target_model)
+        (trade_ticket_has_sell_leg ?trade_ticket)
+        (plan_has_execution_venue ?transition_plan)
+        (plan_execution_venue_assigned ?transition_plan ?execution_venue)
+        (not
+          (plan_prepared_for_venue_assignment ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_prepared_for_venue_assignment ?transition_plan)
+        (plan_venue_confirmed ?transition_plan)
+      )
+  )
+  (:action run_plan_execution_readiness_check_sell_leg
+    :parameters (?transition_plan - transition_plan ?settlement_instruction - settlement_instruction ?operator - operator ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_prepared_for_venue_assignment ?transition_plan)
+        (plan_settlement_instruction_attached ?transition_plan ?settlement_instruction)
+        (operator_assigned ?transition_plan ?operator)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (not
+          (trade_ticket_has_buy_leg ?trade_ticket)
+        )
+        (not
+          (plan_ready_for_approval ?transition_plan)
+        )
+      )
+    :effect (plan_ready_for_approval ?transition_plan)
+  )
+  (:action run_plan_execution_readiness_check_buy_leg
+    :parameters (?transition_plan - transition_plan ?settlement_instruction - settlement_instruction ?operator - operator ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_prepared_for_venue_assignment ?transition_plan)
+        (plan_settlement_instruction_attached ?transition_plan ?settlement_instruction)
+        (operator_assigned ?transition_plan ?operator)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (trade_ticket_has_buy_leg ?trade_ticket)
+        (not
+          (plan_ready_for_approval ?transition_plan)
+        )
+      )
+    :effect (plan_ready_for_approval ?transition_plan)
+  )
+  (:action collect_approval_for_plan
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_ready_for_approval ?transition_plan)
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (not
+          (trade_ticket_has_sell_leg ?trade_ticket)
+        )
+        (not
+          (trade_ticket_has_buy_leg ?trade_ticket)
+        )
+        (not
+          (plan_approval_collected ?transition_plan)
+        )
+      )
+    :effect (plan_approval_collected ?transition_plan)
+  )
+  (:action collect_approval_and_clear_compliance
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_ready_for_approval ?transition_plan)
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (trade_ticket_has_sell_leg ?trade_ticket)
+        (not
+          (trade_ticket_has_buy_leg ?trade_ticket)
+        )
+        (not
+          (plan_approval_collected ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_compliance_cleared ?transition_plan)
+      )
+  )
+  (:action collect_approval_and_confirm_compliance
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_ready_for_approval ?transition_plan)
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (not
+          (trade_ticket_has_sell_leg ?trade_ticket)
+        )
+        (trade_ticket_has_buy_leg ?trade_ticket)
+        (not
+          (plan_approval_collected ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_compliance_cleared ?transition_plan)
+      )
+  )
+  (:action collect_approval_and_finalize_compliance
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document ?holding_lot - holding_lot ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (plan_ready_for_approval ?transition_plan)
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (plan_has_holding_lot ?transition_plan ?holding_lot)
+        (holding_lot_assigned_to_ticket ?holding_lot ?trade_ticket)
+        (trade_ticket_has_sell_leg ?trade_ticket)
+        (trade_ticket_has_buy_leg ?trade_ticket)
+        (not
+          (plan_approval_collected ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_compliance_cleared ?transition_plan)
+      )
+  )
+  (:action finalize_plan_post_approval
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (plan_approval_collected ?transition_plan)
+        (not
+          (plan_compliance_cleared ?transition_plan)
+        )
+        (not
+          (plan_finalized ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transition_plan)
+        (ready_for_execution ?transition_plan)
+      )
+  )
+  (:action attach_execution_strategy_to_plan
+    :parameters (?transition_plan - transition_plan ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_compliance_cleared ?transition_plan)
+        (execution_strategy_available ?execution_strategy)
+      )
+    :effect
+      (and
+        (plan_execution_strategy_assigned ?transition_plan ?execution_strategy)
+        (not
+          (execution_strategy_available ?execution_strategy)
+        )
+      )
+  )
+  (:action perform_preexecution_readiness_checks
+    :parameters (?transition_plan - transition_plan ?source_account - source_account ?target_account - target_account ?target_model - target_model ?execution_strategy - execution_strategy)
+    :precondition
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_compliance_cleared ?transition_plan)
+        (plan_execution_strategy_assigned ?transition_plan ?execution_strategy)
+        (plan_includes_source_account ?transition_plan ?source_account)
+        (plan_includes_target_account ?transition_plan ?target_account)
+        (source_account_ready_for_ticket_assembly ?source_account)
+        (target_account_ready_for_ticket_assembly ?target_account)
+        (mapped_to_target_model ?transition_plan ?target_model)
+        (not
+          (plan_readiness_check_passed ?transition_plan)
+        )
+      )
+    :effect (plan_readiness_check_passed ?transition_plan)
+  )
+  (:action finalize_plan_post_readiness_checks
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (plan_approval_collected ?transition_plan)
+        (plan_readiness_check_passed ?transition_plan)
+        (not
+          (plan_finalized ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transition_plan)
+        (ready_for_execution ?transition_plan)
+      )
+  )
+  (:action apply_compliance_rule_to_plan
+    :parameters (?transition_plan - transition_plan ?compliance_rule - compliance_rule ?target_model - target_model)
+    :precondition
+      (and
+        (validated_for_transition ?transition_plan)
+        (mapped_to_target_model ?transition_plan ?target_model)
+        (compliance_rule_available ?compliance_rule)
+        (plan_has_compliance_rule ?transition_plan ?compliance_rule)
+        (not
+          (plan_compliance_rule_applied ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_compliance_rule_applied ?transition_plan)
+        (not
+          (compliance_rule_available ?compliance_rule)
+        )
+      )
+  )
+  (:action initiate_compliance_review_for_plan
+    :parameters (?transition_plan - transition_plan ?operator - operator)
+    :precondition
+      (and
+        (plan_compliance_rule_applied ?transition_plan)
+        (operator_assigned ?transition_plan ?operator)
+        (not
+          (plan_compliance_review_started ?transition_plan)
+        )
+      )
+    :effect (plan_compliance_review_started ?transition_plan)
+  )
+  (:action complete_compliance_review_for_plan
+    :parameters (?transition_plan - transition_plan ?approval_document - approval_document)
+    :precondition
+      (and
+        (plan_compliance_review_started ?transition_plan)
+        (plan_approval_attached ?transition_plan ?approval_document)
+        (not
+          (plan_compliance_approved ?transition_plan)
+        )
+      )
+    :effect (plan_compliance_approved ?transition_plan)
+  )
+  (:action finalize_plan_post_compliance
+    :parameters (?transition_plan - transition_plan)
+    :precondition
+      (and
+        (plan_compliance_approved ?transition_plan)
+        (not
+          (plan_finalized ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?transition_plan)
+        (ready_for_execution ?transition_plan)
+      )
+  )
+  (:action finalize_source_account_assignment
+    :parameters (?source_account - source_account ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (source_account_ticket_marked ?source_account)
+        (source_account_ready_for_ticket_assembly ?source_account)
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_matched_to_holdings ?trade_ticket)
+        (not
+          (ready_for_execution ?source_account)
+        )
+      )
+    :effect (ready_for_execution ?source_account)
+  )
+  (:action finalize_target_account_assignment
+    :parameters (?target_account - target_account ?trade_ticket - trade_ticket)
+    :precondition
+      (and
+        (target_account_ticket_marked ?target_account)
+        (target_account_ready_for_ticket_assembly ?target_account)
+        (trade_ticket_created ?trade_ticket)
+        (trade_ticket_matched_to_holdings ?trade_ticket)
+        (not
+          (ready_for_execution ?target_account)
+        )
+      )
+    :effect (ready_for_execution ?target_account)
+  )
+  (:action attach_transition_window_to_portfolio
+    :parameters (?portfolio - portfolio ?transition_window - transition_window ?target_model - target_model)
+    :precondition
+      (and
+        (ready_for_execution ?portfolio)
+        (mapped_to_target_model ?portfolio ?target_model)
+        (transition_window_available ?transition_window)
+        (not
+          (transition_window_attached ?portfolio)
+        )
+      )
+    :effect
+      (and
+        (transition_window_attached ?portfolio)
+        (has_transition_window ?portfolio ?transition_window)
+        (not
+          (transition_window_available ?transition_window)
+        )
+      )
+  )
+  (:action assign_transition_request_to_source_account
+    :parameters (?source_account - source_account ?transition_request - transition_request ?transition_window - transition_window)
+    :precondition
+      (and
+        (transition_window_attached ?source_account)
+        (has_transition_request ?source_account ?transition_request)
+        (has_transition_window ?source_account ?transition_window)
+        (not
+          (assigned_for_transition ?source_account)
+        )
+      )
+    :effect
+      (and
+        (assigned_for_transition ?source_account)
+        (request_available ?transition_request)
+        (transition_window_available ?transition_window)
+      )
+  )
+  (:action assign_transition_request_to_target_account
+    :parameters (?target_account - target_account ?transition_request - transition_request ?transition_window - transition_window)
+    :precondition
+      (and
+        (transition_window_attached ?target_account)
+        (has_transition_request ?target_account ?transition_request)
+        (has_transition_window ?target_account ?transition_window)
+        (not
+          (assigned_for_transition ?target_account)
+        )
+      )
+    :effect
+      (and
+        (assigned_for_transition ?target_account)
+        (request_available ?transition_request)
+        (transition_window_available ?transition_window)
+      )
+  )
+  (:action assign_transition_request_to_plan
+    :parameters (?transition_plan - transition_plan ?transition_request - transition_request ?transition_window - transition_window)
+    :precondition
+      (and
+        (transition_window_attached ?transition_plan)
+        (has_transition_request ?transition_plan ?transition_request)
+        (has_transition_window ?transition_plan ?transition_window)
+        (not
+          (assigned_for_transition ?transition_plan)
+        )
+      )
+    :effect
+      (and
+        (assigned_for_transition ?transition_plan)
+        (request_available ?transition_request)
+        (transition_window_available ?transition_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem portfolio_transition_plan_generation_problem)
+  (:domain portfolio_transition_plan_domain)
+  (:objects source_account_1 - source_account target_account_1 - target_account transition_plan_alpha - transition_plan transition_plan_beta - transition_plan transition_request_a - transition_request transition_request_b - transition_request transition_request_c - transition_request target_model_1 - target_model operator_1 - operator candidate_security_1 - candidate_security source_bucket_1 - source_asset_bucket target_bucket_1 - target_asset_bucket trade_ticket_1 - trade_ticket holding_lot_1 - holding_lot holding_lot_2 - holding_lot execution_venue_1 - execution_venue execution_venue_2 - execution_venue execution_strategy_vwap - execution_strategy execution_strategy_limit - execution_strategy transition_window_1 - transition_window settlement_instruction_primary - settlement_instruction compliance_rule_1 - compliance_rule compliance_rule_2 - compliance_rule approval_document_1 - approval_document)
+  (:init
+    (request_available transition_request_a)
+    (request_available transition_request_b)
+    (request_available transition_request_c)
+    (target_model_available target_model_1)
+    (operator_available operator_1)
+    (candidate_security_available candidate_security_1)
+    (account_source_bucket_match source_account_1 source_bucket_1)
+    (target_account_bucket_match target_account_1 target_bucket_1)
+    (trade_ticket_unassigned trade_ticket_1)
+    (holding_lot_available holding_lot_1)
+    (holding_lot_available holding_lot_2)
+    (plan_includes_source_account transition_plan_alpha source_account_1)
+    (plan_includes_source_account transition_plan_beta source_account_1)
+    (plan_includes_target_account transition_plan_alpha target_account_1)
+    (plan_includes_target_account transition_plan_beta target_account_1)
+    (plan_includes_trade_ticket transition_plan_alpha trade_ticket_1)
+    (plan_includes_trade_ticket transition_plan_beta trade_ticket_1)
+    (plan_has_holding_lot transition_plan_alpha holding_lot_1)
+    (plan_has_holding_lot transition_plan_beta holding_lot_2)
+    (execution_venue_available execution_venue_1)
+    (execution_venue_available execution_venue_2)
+    (execution_strategy_available execution_strategy_vwap)
+    (execution_strategy_available execution_strategy_limit)
+    (transition_window_available transition_window_1)
+    (settlement_instruction_available settlement_instruction_primary)
+    (compliance_rule_available compliance_rule_1)
+    (plan_has_compliance_rule transition_plan_alpha compliance_rule_1)
+    (plan_has_compliance_rule transition_plan_beta compliance_rule_2)
+    (approval_document_available approval_document_1)
+  )
+  (:goal
+    (and
+      (assigned_for_transition source_account_1)
+      (assigned_for_transition target_account_1)
+      (assigned_for_transition transition_plan_alpha)
+      (assigned_for_transition transition_plan_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(detect_and_register_portfolio source_account_1)
+(attach_transition_request_to_portfolio source_account_1 transition_request_a)
+(assign_target_model_to_portfolio source_account_1 target_model_1)
+(validate_portfolio source_account_1 target_model_1)
+(attach_candidate_security_to_source_bucket source_account_1 source_bucket_1 candidate_security_1)
+(confirm_candidate_security_for_account_bucket source_account_1 source_bucket_1 target_model_1 candidate_security_1)
+(unassign_target_model_from_portfolio source_account_1 target_model_1)
+(detect_and_register_portfolio target_account_1)
+(attach_transition_request_to_portfolio target_account_1 transition_request_b)
+(assign_target_model_to_portfolio target_account_1 target_model_1)
+(validate_portfolio target_account_1 target_model_1)
+(attach_candidate_security_to_target_bucket target_account_1 target_bucket_1 candidate_security_1)
+(confirm_candidate_security_for_target_bucket target_account_1 target_bucket_1 target_model_1 candidate_security_1)
+(unassign_target_model_from_portfolio target_account_1 target_model_1)
+(assemble_trade_ticket source_account_1 target_account_1 source_bucket_1 target_bucket_1 trade_ticket_1)
+(assign_target_model_to_portfolio source_account_1 target_model_1)
+(match_trade_ticket_to_holdings trade_ticket_1 source_account_1 target_model_1)
+(finalize_source_account_assignment source_account_1 trade_ticket_1)
+(finalize_target_account_assignment target_account_1 trade_ticket_1)
+(attach_transition_window_to_portfolio source_account_1 transition_window_1 target_model_1)
+(assign_transition_request_to_source_account source_account_1 transition_request_a transition_window_1)
+(unassign_target_model_from_portfolio source_account_1 target_model_1)
+(assign_target_model_to_portfolio target_account_1 target_model_1)
+(attach_transition_window_to_portfolio target_account_1 transition_window_1 target_model_1)
+(assign_transition_request_to_target_account target_account_1 transition_request_b transition_window_1)
+(unassign_target_model_from_portfolio target_account_1 target_model_1)
+(detect_and_register_portfolio transition_plan_alpha)
+(attach_transition_request_to_portfolio transition_plan_alpha transition_request_c)
+(assign_target_model_to_portfolio transition_plan_alpha target_model_1)
+(validate_portfolio transition_plan_alpha target_model_1)
+(assign_operator_to_portfolio transition_plan_alpha operator_1)
+(attach_approval_document_to_plan transition_plan_alpha approval_document_1)
+(apply_compliance_rule_to_plan transition_plan_alpha compliance_rule_1 target_model_1)
+(initiate_compliance_review_for_plan transition_plan_alpha operator_1)
+(complete_compliance_review_for_plan transition_plan_alpha approval_document_1)
+(finalize_plan_post_compliance transition_plan_alpha)
+(detach_approval_document_from_plan transition_plan_alpha approval_document_1)
+(unassign_operator_from_portfolio transition_plan_alpha operator_1)
+(unassign_target_model_from_portfolio transition_plan_alpha target_model_1)
+(detect_and_register_portfolio transition_plan_beta)
+(attach_transition_request_to_portfolio transition_plan_beta transition_request_a)
+(assign_target_model_to_portfolio transition_plan_beta target_model_1)
+(validate_portfolio transition_plan_beta target_model_1)
+(bind_holding_lot_to_plan_and_ticket transition_plan_beta holding_lot_2 trade_ticket_1)
+(attach_settlement_instruction_to_plan transition_plan_beta settlement_instruction_primary)
+(assign_operator_to_portfolio transition_plan_beta operator_1)
+(prepare_plan_for_venue_assignment transition_plan_beta holding_lot_2 trade_ticket_1 target_model_1)
+(run_plan_execution_readiness_check_sell_leg transition_plan_beta settlement_instruction_primary operator_1 holding_lot_2 trade_ticket_1)
+(attach_approval_document_to_plan transition_plan_beta approval_document_1)
+(collect_approval_for_plan transition_plan_beta approval_document_1 holding_lot_2 trade_ticket_1)
+(finalize_plan_post_approval transition_plan_beta)
+(unassign_target_model_from_portfolio transition_plan_beta target_model_1)
+(assign_target_model_to_portfolio transition_plan_alpha target_model_1)
+(attach_transition_window_to_portfolio transition_plan_alpha transition_window_1 target_model_1)
+(assign_transition_request_to_plan transition_plan_alpha transition_request_c transition_window_1)
+(unassign_target_model_from_portfolio transition_plan_alpha target_model_1)
+(assign_target_model_to_portfolio transition_plan_beta target_model_1)
+(attach_transition_window_to_portfolio transition_plan_beta transition_window_1 target_model_1)
+(assign_transition_request_to_plan transition_plan_beta transition_request_a transition_window_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val__qgn6wit/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 59 
+
+Successful plans:
+Value: 59
+ /tmp/val__qgn6wit/plan.pddl 59 
+
+
+
+--- stderr ---
+

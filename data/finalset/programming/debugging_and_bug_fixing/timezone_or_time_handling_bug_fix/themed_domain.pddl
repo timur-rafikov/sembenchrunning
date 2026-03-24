@@ -1,0 +1,936 @@
+(define (domain timezone_bug_fix_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_artifact_type - object artifact_category - object setting_or_patch_type - object system - object component_scope - system engineer - actor_or_artifact_type test_case - actor_or_artifact_type reviewer - actor_or_artifact_type platform - actor_or_artifact_type integration_test_profile - actor_or_artifact_type time_data_set - actor_or_artifact_type code_change - actor_or_artifact_type external_dependency - actor_or_artifact_type repro_artifact - artifact_category config_variant - artifact_category stakeholder_note - artifact_category timezone_setting - setting_or_patch_type locale_setting - setting_or_patch_type patch_candidate - setting_or_patch_type service_scope - component_scope module_scope - component_scope backend_service_instance - service_scope frontend_service_instance - service_scope code_version - module_scope)
+  (:predicates
+    (issue_reported ?component_scope - component_scope)
+    (triage_completed ?component_scope - component_scope)
+    (assigned_for_investigation ?component_scope - component_scope)
+    (fix_deployed ?component_scope - component_scope)
+    (approved_for_validation ?component_scope - component_scope)
+    (deployment_ready ?component_scope - component_scope)
+    (engineer_available ?engineer - engineer)
+    (assigned_engineer ?component_scope - component_scope ?engineer - engineer)
+    (test_case_available ?test_case - test_case)
+    (has_test_case ?component_scope - component_scope ?test_case - test_case)
+    (reviewer_available ?reviewer - reviewer)
+    (review_assigned ?component_scope - component_scope ?reviewer - reviewer)
+    (artifact_available ?repro_artifact - repro_artifact)
+    (backend_has_repro_artifact ?backend_service_instance - backend_service_instance ?repro_artifact - repro_artifact)
+    (frontend_has_repro_artifact ?frontend_service_instance - frontend_service_instance ?repro_artifact - repro_artifact)
+    (service_has_timezone_setting ?backend_service_instance - backend_service_instance ?timezone_setting - timezone_setting)
+    (timezone_collected ?timezone_setting - timezone_setting)
+    (timezone_associated ?timezone_setting - timezone_setting)
+    (backend_ready_for_patch ?backend_service_instance - backend_service_instance)
+    (frontend_has_locale_setting ?frontend_service_instance - frontend_service_instance ?locale_setting - locale_setting)
+    (locale_collected ?locale_setting - locale_setting)
+    (locale_associated ?locale_setting - locale_setting)
+    (frontend_ready_for_patch ?frontend_service_instance - frontend_service_instance)
+    (patch_candidate_available ?patch_candidate - patch_candidate)
+    (patch_built ?patch_candidate - patch_candidate)
+    (patch_has_timezone_setting ?patch_candidate - patch_candidate ?timezone_setting - timezone_setting)
+    (patch_has_locale_setting ?patch_candidate - patch_candidate ?locale_setting - locale_setting)
+    (patch_includes_backend_tests ?patch_candidate - patch_candidate)
+    (patch_includes_frontend_tests ?patch_candidate - patch_candidate)
+    (patch_backend_validated ?patch_candidate - patch_candidate)
+    (version_targets_backend ?code_version - code_version ?backend_service_instance - backend_service_instance)
+    (version_targets_frontend ?code_version - code_version ?frontend_service_instance - frontend_service_instance)
+    (version_in_patch_candidate ?code_version - code_version ?patch_candidate - patch_candidate)
+    (config_variant_available ?config_variant - config_variant)
+    (version_has_config_variant ?code_version - code_version ?config_variant - config_variant)
+    (config_variant_validated ?config_variant - config_variant)
+    (config_variant_applied_to_patch ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    (config_and_integration_validated ?code_version - code_version)
+    (version_ready_for_final_review ?code_version - code_version)
+    (qa_checks_passed ?code_version - code_version)
+    (platform_assigned ?code_version - code_version)
+    (platform_validated ?code_version - code_version)
+    (acceptance_checks_passed ?code_version - code_version)
+    (finalized_for_merge ?code_version - code_version)
+    (stakeholder_note_available ?stakeholder_note - stakeholder_note)
+    (version_has_stakeholder_note ?code_version - code_version ?stakeholder_note - stakeholder_note)
+    (stakeholder_acknowledged ?code_version - code_version)
+    (review_phase_two_started ?code_version - code_version)
+    (review_phase_three_completed ?code_version - code_version)
+    (platform_available ?platform - platform)
+    (version_target_platform ?code_version - code_version ?platform - platform)
+    (integration_test_profile_available ?integration_test_profile - integration_test_profile)
+    (version_has_integration_test_profile ?code_version - code_version ?integration_test_profile - integration_test_profile)
+    (code_change_available ?code_change - code_change)
+    (version_has_code_change ?code_version - code_version ?code_change - code_change)
+    (external_dependency_recorded ?external_dependency - external_dependency)
+    (version_has_external_dependency ?code_version - code_version ?external_dependency - external_dependency)
+    (time_data_set_available ?time_data_set - time_data_set)
+    (component_uses_time_data_set ?component_scope - component_scope ?time_data_set - time_data_set)
+    (backend_environment_configured ?backend_service_instance - backend_service_instance)
+    (frontend_environment_configured ?frontend_service_instance - frontend_service_instance)
+    (review_approved ?code_version - code_version)
+  )
+  (:action report_issue
+    :parameters (?component_scope - component_scope)
+    :precondition
+      (and
+        (not
+          (issue_reported ?component_scope)
+        )
+        (not
+          (fix_deployed ?component_scope)
+        )
+      )
+    :effect (issue_reported ?component_scope)
+  )
+  (:action assign_engineer
+    :parameters (?component_scope - component_scope ?engineer - engineer)
+    :precondition
+      (and
+        (issue_reported ?component_scope)
+        (not
+          (assigned_for_investigation ?component_scope)
+        )
+        (engineer_available ?engineer)
+      )
+    :effect
+      (and
+        (assigned_for_investigation ?component_scope)
+        (assigned_engineer ?component_scope ?engineer)
+        (not
+          (engineer_available ?engineer)
+        )
+      )
+  )
+  (:action attach_test_case
+    :parameters (?component_scope - component_scope ?test_case - test_case)
+    :precondition
+      (and
+        (issue_reported ?component_scope)
+        (assigned_for_investigation ?component_scope)
+        (test_case_available ?test_case)
+      )
+    :effect
+      (and
+        (has_test_case ?component_scope ?test_case)
+        (not
+          (test_case_available ?test_case)
+        )
+      )
+  )
+  (:action complete_triage
+    :parameters (?component_scope - component_scope ?test_case - test_case)
+    :precondition
+      (and
+        (issue_reported ?component_scope)
+        (assigned_for_investigation ?component_scope)
+        (has_test_case ?component_scope ?test_case)
+        (not
+          (triage_completed ?component_scope)
+        )
+      )
+    :effect (triage_completed ?component_scope)
+  )
+  (:action detach_test_case
+    :parameters (?component_scope - component_scope ?test_case - test_case)
+    :precondition
+      (and
+        (has_test_case ?component_scope ?test_case)
+      )
+    :effect
+      (and
+        (test_case_available ?test_case)
+        (not
+          (has_test_case ?component_scope ?test_case)
+        )
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?component_scope - component_scope ?reviewer - reviewer)
+    :precondition
+      (and
+        (triage_completed ?component_scope)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (review_assigned ?component_scope ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer
+    :parameters (?component_scope - component_scope ?reviewer - reviewer)
+    :precondition
+      (and
+        (review_assigned ?component_scope ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (review_assigned ?component_scope ?reviewer)
+        )
+      )
+  )
+  (:action attach_code_change
+    :parameters (?code_version - code_version ?code_change - code_change)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (code_change_available ?code_change)
+      )
+    :effect
+      (and
+        (version_has_code_change ?code_version ?code_change)
+        (not
+          (code_change_available ?code_change)
+        )
+      )
+  )
+  (:action detach_code_change
+    :parameters (?code_version - code_version ?code_change - code_change)
+    :precondition
+      (and
+        (version_has_code_change ?code_version ?code_change)
+      )
+    :effect
+      (and
+        (code_change_available ?code_change)
+        (not
+          (version_has_code_change ?code_version ?code_change)
+        )
+      )
+  )
+  (:action attach_external_dependency
+    :parameters (?code_version - code_version ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (external_dependency_recorded ?external_dependency)
+      )
+    :effect
+      (and
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (not
+          (external_dependency_recorded ?external_dependency)
+        )
+      )
+  )
+  (:action detach_external_dependency
+    :parameters (?code_version - code_version ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (version_has_external_dependency ?code_version ?external_dependency)
+      )
+    :effect
+      (and
+        (external_dependency_recorded ?external_dependency)
+        (not
+          (version_has_external_dependency ?code_version ?external_dependency)
+        )
+      )
+  )
+  (:action capture_timezone_setting
+    :parameters (?backend_service_instance - backend_service_instance ?timezone_setting - timezone_setting ?test_case - test_case)
+    :precondition
+      (and
+        (triage_completed ?backend_service_instance)
+        (has_test_case ?backend_service_instance ?test_case)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (not
+          (timezone_collected ?timezone_setting)
+        )
+        (not
+          (timezone_associated ?timezone_setting)
+        )
+      )
+    :effect (timezone_collected ?timezone_setting)
+  )
+  (:action configure_backend_environment
+    :parameters (?backend_service_instance - backend_service_instance ?timezone_setting - timezone_setting ?reviewer - reviewer)
+    :precondition
+      (and
+        (triage_completed ?backend_service_instance)
+        (review_assigned ?backend_service_instance ?reviewer)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (timezone_collected ?timezone_setting)
+        (not
+          (backend_environment_configured ?backend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (backend_ready_for_patch ?backend_service_instance)
+      )
+  )
+  (:action associate_repro_artifact_with_backend
+    :parameters (?backend_service_instance - backend_service_instance ?timezone_setting - timezone_setting ?repro_artifact - repro_artifact)
+    :precondition
+      (and
+        (triage_completed ?backend_service_instance)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (artifact_available ?repro_artifact)
+        (not
+          (backend_environment_configured ?backend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (timezone_associated ?timezone_setting)
+        (backend_environment_configured ?backend_service_instance)
+        (backend_has_repro_artifact ?backend_service_instance ?repro_artifact)
+        (not
+          (artifact_available ?repro_artifact)
+        )
+      )
+  )
+  (:action validate_backend_environment_with_artifact
+    :parameters (?backend_service_instance - backend_service_instance ?timezone_setting - timezone_setting ?test_case - test_case ?repro_artifact - repro_artifact)
+    :precondition
+      (and
+        (triage_completed ?backend_service_instance)
+        (has_test_case ?backend_service_instance ?test_case)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (timezone_associated ?timezone_setting)
+        (backend_has_repro_artifact ?backend_service_instance ?repro_artifact)
+        (not
+          (backend_ready_for_patch ?backend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (timezone_collected ?timezone_setting)
+        (backend_ready_for_patch ?backend_service_instance)
+        (artifact_available ?repro_artifact)
+        (not
+          (backend_has_repro_artifact ?backend_service_instance ?repro_artifact)
+        )
+      )
+  )
+  (:action capture_locale_setting
+    :parameters (?frontend_service_instance - frontend_service_instance ?locale_setting - locale_setting ?test_case - test_case)
+    :precondition
+      (and
+        (triage_completed ?frontend_service_instance)
+        (has_test_case ?frontend_service_instance ?test_case)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (not
+          (locale_collected ?locale_setting)
+        )
+        (not
+          (locale_associated ?locale_setting)
+        )
+      )
+    :effect (locale_collected ?locale_setting)
+  )
+  (:action configure_frontend_environment
+    :parameters (?frontend_service_instance - frontend_service_instance ?locale_setting - locale_setting ?reviewer - reviewer)
+    :precondition
+      (and
+        (triage_completed ?frontend_service_instance)
+        (review_assigned ?frontend_service_instance ?reviewer)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (locale_collected ?locale_setting)
+        (not
+          (frontend_environment_configured ?frontend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (frontend_environment_configured ?frontend_service_instance)
+        (frontend_ready_for_patch ?frontend_service_instance)
+      )
+  )
+  (:action associate_repro_artifact_with_frontend
+    :parameters (?frontend_service_instance - frontend_service_instance ?locale_setting - locale_setting ?repro_artifact - repro_artifact)
+    :precondition
+      (and
+        (triage_completed ?frontend_service_instance)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (artifact_available ?repro_artifact)
+        (not
+          (frontend_environment_configured ?frontend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (locale_associated ?locale_setting)
+        (frontend_environment_configured ?frontend_service_instance)
+        (frontend_has_repro_artifact ?frontend_service_instance ?repro_artifact)
+        (not
+          (artifact_available ?repro_artifact)
+        )
+      )
+  )
+  (:action validate_frontend_environment_with_artifact
+    :parameters (?frontend_service_instance - frontend_service_instance ?locale_setting - locale_setting ?test_case - test_case ?repro_artifact - repro_artifact)
+    :precondition
+      (and
+        (triage_completed ?frontend_service_instance)
+        (has_test_case ?frontend_service_instance ?test_case)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (locale_associated ?locale_setting)
+        (frontend_has_repro_artifact ?frontend_service_instance ?repro_artifact)
+        (not
+          (frontend_ready_for_patch ?frontend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (locale_collected ?locale_setting)
+        (frontend_ready_for_patch ?frontend_service_instance)
+        (artifact_available ?repro_artifact)
+        (not
+          (frontend_has_repro_artifact ?frontend_service_instance ?repro_artifact)
+        )
+      )
+  )
+  (:action build_patch_candidate_from_environment
+    :parameters (?backend_service_instance - backend_service_instance ?frontend_service_instance - frontend_service_instance ?timezone_setting - timezone_setting ?locale_setting - locale_setting ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (frontend_environment_configured ?frontend_service_instance)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (timezone_collected ?timezone_setting)
+        (locale_collected ?locale_setting)
+        (backend_ready_for_patch ?backend_service_instance)
+        (frontend_ready_for_patch ?frontend_service_instance)
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_built ?patch_candidate)
+        (patch_has_timezone_setting ?patch_candidate ?timezone_setting)
+        (patch_has_locale_setting ?patch_candidate ?locale_setting)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action build_patch_candidate_with_backend_tests
+    :parameters (?backend_service_instance - backend_service_instance ?frontend_service_instance - frontend_service_instance ?timezone_setting - timezone_setting ?locale_setting - locale_setting ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (frontend_environment_configured ?frontend_service_instance)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (timezone_associated ?timezone_setting)
+        (locale_collected ?locale_setting)
+        (not
+          (backend_ready_for_patch ?backend_service_instance)
+        )
+        (frontend_ready_for_patch ?frontend_service_instance)
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_built ?patch_candidate)
+        (patch_has_timezone_setting ?patch_candidate ?timezone_setting)
+        (patch_has_locale_setting ?patch_candidate ?locale_setting)
+        (patch_includes_backend_tests ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action build_patch_candidate_with_frontend_tests
+    :parameters (?backend_service_instance - backend_service_instance ?frontend_service_instance - frontend_service_instance ?timezone_setting - timezone_setting ?locale_setting - locale_setting ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (frontend_environment_configured ?frontend_service_instance)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (timezone_collected ?timezone_setting)
+        (locale_associated ?locale_setting)
+        (backend_ready_for_patch ?backend_service_instance)
+        (not
+          (frontend_ready_for_patch ?frontend_service_instance)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_built ?patch_candidate)
+        (patch_has_timezone_setting ?patch_candidate ?timezone_setting)
+        (patch_has_locale_setting ?patch_candidate ?locale_setting)
+        (patch_includes_frontend_tests ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action build_full_patch_candidate_with_tests
+    :parameters (?backend_service_instance - backend_service_instance ?frontend_service_instance - frontend_service_instance ?timezone_setting - timezone_setting ?locale_setting - locale_setting ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (frontend_environment_configured ?frontend_service_instance)
+        (service_has_timezone_setting ?backend_service_instance ?timezone_setting)
+        (frontend_has_locale_setting ?frontend_service_instance ?locale_setting)
+        (timezone_associated ?timezone_setting)
+        (locale_associated ?locale_setting)
+        (not
+          (backend_ready_for_patch ?backend_service_instance)
+        )
+        (not
+          (frontend_ready_for_patch ?frontend_service_instance)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_built ?patch_candidate)
+        (patch_has_timezone_setting ?patch_candidate ?timezone_setting)
+        (patch_has_locale_setting ?patch_candidate ?locale_setting)
+        (patch_includes_backend_tests ?patch_candidate)
+        (patch_includes_frontend_tests ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action validate_patch_backend_tests
+    :parameters (?patch_candidate - patch_candidate ?backend_service_instance - backend_service_instance ?test_case - test_case)
+    :precondition
+      (and
+        (patch_built ?patch_candidate)
+        (backend_environment_configured ?backend_service_instance)
+        (has_test_case ?backend_service_instance ?test_case)
+        (not
+          (patch_backend_validated ?patch_candidate)
+        )
+      )
+    :effect (patch_backend_validated ?patch_candidate)
+  )
+  (:action apply_config_variant_to_patch
+    :parameters (?code_version - code_version ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (version_in_patch_candidate ?code_version ?patch_candidate)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_available ?config_variant)
+        (patch_built ?patch_candidate)
+        (patch_backend_validated ?patch_candidate)
+        (not
+          (config_variant_validated ?config_variant)
+        )
+      )
+    :effect
+      (and
+        (config_variant_validated ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (not
+          (config_variant_available ?config_variant)
+        )
+      )
+  )
+  (:action validate_version_with_config_and_patch
+    :parameters (?code_version - code_version ?config_variant - config_variant ?patch_candidate - patch_candidate ?test_case - test_case)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_validated ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (has_test_case ?code_version ?test_case)
+        (not
+          (patch_includes_backend_tests ?patch_candidate)
+        )
+        (not
+          (config_and_integration_validated ?code_version)
+        )
+      )
+    :effect (config_and_integration_validated ?code_version)
+  )
+  (:action assign_platform_to_version
+    :parameters (?code_version - code_version ?platform - platform)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (platform_available ?platform)
+        (not
+          (platform_assigned ?code_version)
+        )
+      )
+    :effect
+      (and
+        (platform_assigned ?code_version)
+        (version_target_platform ?code_version ?platform)
+        (not
+          (platform_available ?platform)
+        )
+      )
+  )
+  (:action validate_platform_and_config_for_version
+    :parameters (?code_version - code_version ?config_variant - config_variant ?patch_candidate - patch_candidate ?test_case - test_case ?platform - platform)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_validated ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (has_test_case ?code_version ?test_case)
+        (patch_includes_backend_tests ?patch_candidate)
+        (platform_assigned ?code_version)
+        (version_target_platform ?code_version ?platform)
+        (not
+          (config_and_integration_validated ?code_version)
+        )
+      )
+    :effect
+      (and
+        (config_and_integration_validated ?code_version)
+        (platform_validated ?code_version)
+      )
+  )
+  (:action prepare_version_for_review
+    :parameters (?code_version - code_version ?code_change - code_change ?reviewer - reviewer ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (config_and_integration_validated ?code_version)
+        (version_has_code_change ?code_version ?code_change)
+        (review_assigned ?code_version ?reviewer)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (not
+          (patch_includes_frontend_tests ?patch_candidate)
+        )
+        (not
+          (version_ready_for_final_review ?code_version)
+        )
+      )
+    :effect (version_ready_for_final_review ?code_version)
+  )
+  (:action prepare_version_for_review_variant
+    :parameters (?code_version - code_version ?code_change - code_change ?reviewer - reviewer ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (config_and_integration_validated ?code_version)
+        (version_has_code_change ?code_version ?code_change)
+        (review_assigned ?code_version ?reviewer)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (patch_includes_frontend_tests ?patch_candidate)
+        (not
+          (version_ready_for_final_review ?code_version)
+        )
+      )
+    :effect (version_ready_for_final_review ?code_version)
+  )
+  (:action perform_qa_checks
+    :parameters (?code_version - code_version ?external_dependency - external_dependency ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (version_ready_for_final_review ?code_version)
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (not
+          (patch_includes_backend_tests ?patch_candidate)
+        )
+        (not
+          (patch_includes_frontend_tests ?patch_candidate)
+        )
+        (not
+          (qa_checks_passed ?code_version)
+        )
+      )
+    :effect (qa_checks_passed ?code_version)
+  )
+  (:action perform_qa_and_acceptance_checks
+    :parameters (?code_version - code_version ?external_dependency - external_dependency ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (version_ready_for_final_review ?code_version)
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (patch_includes_backend_tests ?patch_candidate)
+        (not
+          (patch_includes_frontend_tests ?patch_candidate)
+        )
+        (not
+          (qa_checks_passed ?code_version)
+        )
+      )
+    :effect
+      (and
+        (qa_checks_passed ?code_version)
+        (acceptance_checks_passed ?code_version)
+      )
+  )
+  (:action perform_qa_checks_variant
+    :parameters (?code_version - code_version ?external_dependency - external_dependency ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (version_ready_for_final_review ?code_version)
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (not
+          (patch_includes_backend_tests ?patch_candidate)
+        )
+        (patch_includes_frontend_tests ?patch_candidate)
+        (not
+          (qa_checks_passed ?code_version)
+        )
+      )
+    :effect
+      (and
+        (qa_checks_passed ?code_version)
+        (acceptance_checks_passed ?code_version)
+      )
+  )
+  (:action perform_qa_checks_variant_2
+    :parameters (?code_version - code_version ?external_dependency - external_dependency ?config_variant - config_variant ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (version_ready_for_final_review ?code_version)
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (version_has_config_variant ?code_version ?config_variant)
+        (config_variant_applied_to_patch ?config_variant ?patch_candidate)
+        (patch_includes_backend_tests ?patch_candidate)
+        (patch_includes_frontend_tests ?patch_candidate)
+        (not
+          (qa_checks_passed ?code_version)
+        )
+      )
+    :effect
+      (and
+        (qa_checks_passed ?code_version)
+        (acceptance_checks_passed ?code_version)
+      )
+  )
+  (:action approve_for_integration
+    :parameters (?code_version - code_version)
+    :precondition
+      (and
+        (qa_checks_passed ?code_version)
+        (not
+          (acceptance_checks_passed ?code_version)
+        )
+        (not
+          (review_approved ?code_version)
+        )
+      )
+    :effect
+      (and
+        (review_approved ?code_version)
+        (approved_for_validation ?code_version)
+      )
+  )
+  (:action attach_integration_test_profile_to_version
+    :parameters (?code_version - code_version ?integration_test_profile - integration_test_profile)
+    :precondition
+      (and
+        (qa_checks_passed ?code_version)
+        (acceptance_checks_passed ?code_version)
+        (integration_test_profile_available ?integration_test_profile)
+      )
+    :effect
+      (and
+        (version_has_integration_test_profile ?code_version ?integration_test_profile)
+        (not
+          (integration_test_profile_available ?integration_test_profile)
+        )
+      )
+  )
+  (:action finalize_version_for_release
+    :parameters (?code_version - code_version ?backend_service_instance - backend_service_instance ?frontend_service_instance - frontend_service_instance ?test_case - test_case ?integration_test_profile - integration_test_profile)
+    :precondition
+      (and
+        (qa_checks_passed ?code_version)
+        (acceptance_checks_passed ?code_version)
+        (version_has_integration_test_profile ?code_version ?integration_test_profile)
+        (version_targets_backend ?code_version ?backend_service_instance)
+        (version_targets_frontend ?code_version ?frontend_service_instance)
+        (backend_ready_for_patch ?backend_service_instance)
+        (frontend_ready_for_patch ?frontend_service_instance)
+        (has_test_case ?code_version ?test_case)
+        (not
+          (finalized_for_merge ?code_version)
+        )
+      )
+    :effect (finalized_for_merge ?code_version)
+  )
+  (:action approve_release_candidate
+    :parameters (?code_version - code_version)
+    :precondition
+      (and
+        (qa_checks_passed ?code_version)
+        (finalized_for_merge ?code_version)
+        (not
+          (review_approved ?code_version)
+        )
+      )
+    :effect
+      (and
+        (review_approved ?code_version)
+        (approved_for_validation ?code_version)
+      )
+  )
+  (:action acknowledge_stakeholder_note
+    :parameters (?code_version - code_version ?stakeholder_note - stakeholder_note ?test_case - test_case)
+    :precondition
+      (and
+        (triage_completed ?code_version)
+        (has_test_case ?code_version ?test_case)
+        (stakeholder_note_available ?stakeholder_note)
+        (version_has_stakeholder_note ?code_version ?stakeholder_note)
+        (not
+          (stakeholder_acknowledged ?code_version)
+        )
+      )
+    :effect
+      (and
+        (stakeholder_acknowledged ?code_version)
+        (not
+          (stakeholder_note_available ?stakeholder_note)
+        )
+      )
+  )
+  (:action begin_reviewer_review
+    :parameters (?code_version - code_version ?reviewer - reviewer)
+    :precondition
+      (and
+        (stakeholder_acknowledged ?code_version)
+        (review_assigned ?code_version ?reviewer)
+        (not
+          (review_phase_two_started ?code_version)
+        )
+      )
+    :effect (review_phase_two_started ?code_version)
+  )
+  (:action complete_review_with_dependency_checks
+    :parameters (?code_version - code_version ?external_dependency - external_dependency)
+    :precondition
+      (and
+        (review_phase_two_started ?code_version)
+        (version_has_external_dependency ?code_version ?external_dependency)
+        (not
+          (review_phase_three_completed ?code_version)
+        )
+      )
+    :effect (review_phase_three_completed ?code_version)
+  )
+  (:action final_review_approval
+    :parameters (?code_version - code_version)
+    :precondition
+      (and
+        (review_phase_three_completed ?code_version)
+        (not
+          (review_approved ?code_version)
+        )
+      )
+    :effect
+      (and
+        (review_approved ?code_version)
+        (approved_for_validation ?code_version)
+      )
+  )
+  (:action mark_backend_ready_for_integration
+    :parameters (?backend_service_instance - backend_service_instance ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (backend_environment_configured ?backend_service_instance)
+        (backend_ready_for_patch ?backend_service_instance)
+        (patch_built ?patch_candidate)
+        (patch_backend_validated ?patch_candidate)
+        (not
+          (approved_for_validation ?backend_service_instance)
+        )
+      )
+    :effect (approved_for_validation ?backend_service_instance)
+  )
+  (:action mark_frontend_ready_for_integration
+    :parameters (?frontend_service_instance - frontend_service_instance ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (frontend_environment_configured ?frontend_service_instance)
+        (frontend_ready_for_patch ?frontend_service_instance)
+        (patch_built ?patch_candidate)
+        (patch_backend_validated ?patch_candidate)
+        (not
+          (approved_for_validation ?frontend_service_instance)
+        )
+      )
+    :effect (approved_for_validation ?frontend_service_instance)
+  )
+  (:action apply_time_data_set
+    :parameters (?component_scope - component_scope ?time_data_set - time_data_set ?test_case - test_case)
+    :precondition
+      (and
+        (approved_for_validation ?component_scope)
+        (has_test_case ?component_scope ?test_case)
+        (time_data_set_available ?time_data_set)
+        (not
+          (deployment_ready ?component_scope)
+        )
+      )
+    :effect
+      (and
+        (deployment_ready ?component_scope)
+        (component_uses_time_data_set ?component_scope ?time_data_set)
+        (not
+          (time_data_set_available ?time_data_set)
+        )
+      )
+  )
+  (:action deploy_fix_to_backend
+    :parameters (?backend_service_instance - backend_service_instance ?engineer - engineer ?time_data_set - time_data_set)
+    :precondition
+      (and
+        (deployment_ready ?backend_service_instance)
+        (assigned_engineer ?backend_service_instance ?engineer)
+        (component_uses_time_data_set ?backend_service_instance ?time_data_set)
+        (not
+          (fix_deployed ?backend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (fix_deployed ?backend_service_instance)
+        (engineer_available ?engineer)
+        (time_data_set_available ?time_data_set)
+      )
+  )
+  (:action deploy_fix_to_frontend
+    :parameters (?frontend_service_instance - frontend_service_instance ?engineer - engineer ?time_data_set - time_data_set)
+    :precondition
+      (and
+        (deployment_ready ?frontend_service_instance)
+        (assigned_engineer ?frontend_service_instance ?engineer)
+        (component_uses_time_data_set ?frontend_service_instance ?time_data_set)
+        (not
+          (fix_deployed ?frontend_service_instance)
+        )
+      )
+    :effect
+      (and
+        (fix_deployed ?frontend_service_instance)
+        (engineer_available ?engineer)
+        (time_data_set_available ?time_data_set)
+      )
+  )
+  (:action deploy_fix_to_version
+    :parameters (?code_version - code_version ?engineer - engineer ?time_data_set - time_data_set)
+    :precondition
+      (and
+        (deployment_ready ?code_version)
+        (assigned_engineer ?code_version ?engineer)
+        (component_uses_time_data_set ?code_version ?time_data_set)
+        (not
+          (fix_deployed ?code_version)
+        )
+      )
+    :effect
+      (and
+        (fix_deployed ?code_version)
+        (engineer_available ?engineer)
+        (time_data_set_available ?time_data_set)
+      )
+  )
+)

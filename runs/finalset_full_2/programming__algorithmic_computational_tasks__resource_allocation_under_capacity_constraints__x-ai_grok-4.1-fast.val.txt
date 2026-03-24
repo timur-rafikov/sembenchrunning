@@ -1,0 +1,1076 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain resource_allocation_under_capacity)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_abstract - object feature_abstract - object candidate_abstract - object system_entity - object allocation_request - system_entity resource_pool - resource_abstract resource_instance - resource_abstract operator - resource_abstract optional_feature - resource_abstract attachment - resource_abstract external_claim - resource_abstract specialized_capability - resource_abstract policy_variant - resource_abstract consumable - feature_abstract component - feature_abstract tagged_policy - feature_abstract provider_feature - candidate_abstract placement_feature - candidate_abstract allocation_candidate - candidate_abstract provider_profile - allocation_request consumer_profile - allocation_request primary_provider - provider_profile secondary_provider - provider_profile allocator_agent - consumer_profile)
+  (:predicates
+    (request_created ?request - allocation_request)
+    (entity_verified ?request - allocation_request)
+    (entity_pool_reserved ?request - allocation_request)
+    (binding_committed ?request - allocation_request)
+    (ready_for_external_claim ?request - allocation_request)
+    (entity_external_claim_consumed ?request - allocation_request)
+    (resource_pool_available ?resource_pool - resource_pool)
+    (entity_reserved_pool ?request - allocation_request ?resource_pool - resource_pool)
+    (resource_instance_available ?resource_instance - resource_instance)
+    (entity_bound_instance ?request - allocation_request ?resource_instance - resource_instance)
+    (operator_available ?operator - operator)
+    (entity_assigned_operator ?request - allocation_request ?operator - operator)
+    (consumable_available ?consumable - consumable)
+    (primary_provider_consumable_assigned ?primary_provider - primary_provider ?consumable - consumable)
+    (secondary_provider_consumable_assigned ?secondary_provider - secondary_provider ?consumable - consumable)
+    (provider_has_feature ?primary_provider - primary_provider ?provider_feature - provider_feature)
+    (provider_feature_probed ?provider_feature - provider_feature)
+    (provider_feature_locked ?provider_feature - provider_feature)
+    (primary_provider_ready ?primary_provider - primary_provider)
+    (secondary_provider_has_placement_feature ?secondary_provider - secondary_provider ?placement_feature - placement_feature)
+    (placement_feature_probed ?placement_feature - placement_feature)
+    (placement_feature_locked ?placement_feature - placement_feature)
+    (secondary_provider_ready ?secondary_provider - secondary_provider)
+    (candidate_available ?candidate - allocation_candidate)
+    (candidate_prepared ?candidate - allocation_candidate)
+    (candidate_bound_provider_feature ?candidate - allocation_candidate ?provider_feature - provider_feature)
+    (candidate_bound_placement_feature ?candidate - allocation_candidate ?placement_feature - placement_feature)
+    (candidate_check_a_passed ?candidate - allocation_candidate)
+    (candidate_check_b_passed ?candidate - allocation_candidate)
+    (candidate_validated ?candidate - allocation_candidate)
+    (allocator_assigned_primary_provider ?allocator - allocator_agent ?primary_provider - primary_provider)
+    (allocator_assigned_secondary_provider ?allocator - allocator_agent ?secondary_provider - secondary_provider)
+    (allocator_binds_candidate ?allocator - allocator_agent ?candidate - allocation_candidate)
+    (component_available ?component - component)
+    (allocator_has_component ?allocator - allocator_agent ?component - component)
+    (component_allocated ?component - component)
+    (component_bound_to_candidate ?component - component ?candidate - allocation_candidate)
+    (allocator_component_ready ?allocator - allocator_agent)
+    (allocator_capability_attached ?allocator - allocator_agent)
+    (allocator_plan_ready ?allocator - allocator_agent)
+    (allocator_has_optional_feature_claim ?allocator - allocator_agent)
+    (allocator_optional_feature_applied ?allocator - allocator_agent)
+    (allocator_attachment_applied ?allocator - allocator_agent)
+    (allocator_final_checks_passed ?allocator - allocator_agent)
+    (tagged_policy_available ?tagged_policy - tagged_policy)
+    (allocator_bound_tagged_policy ?allocator - allocator_agent ?tagged_policy - tagged_policy)
+    (allocator_policy_selected ?allocator - allocator_agent)
+    (allocator_policy_configured ?allocator - allocator_agent)
+    (allocator_policy_applied ?allocator - allocator_agent)
+    (optional_feature_available ?optional_feature - optional_feature)
+    (allocator_bound_optional_feature ?allocator - allocator_agent ?optional_feature - optional_feature)
+    (attachment_available ?attachment - attachment)
+    (allocator_bound_attachment ?allocator - allocator_agent ?attachment - attachment)
+    (specialized_capability_available ?specialized_capability - specialized_capability)
+    (allocator_bound_specialized_capability ?allocator - allocator_agent ?specialized_capability - specialized_capability)
+    (policy_variant_available ?policy_variant - policy_variant)
+    (allocator_bound_policy_variant ?allocator - allocator_agent ?policy_variant - policy_variant)
+    (external_claim_available ?external_claim - external_claim)
+    (entity_has_external_claim ?request - allocation_request ?external_claim - external_claim)
+    (provider_processed ?primary_provider - primary_provider)
+    (secondary_provider_processed ?secondary_provider - secondary_provider)
+    (allocator_finalized ?allocator - allocator_agent)
+  )
+  (:action create_allocation_request
+    :parameters (?request - allocation_request)
+    :precondition
+      (and
+        (not
+          (request_created ?request)
+        )
+        (not
+          (binding_committed ?request)
+        )
+      )
+    :effect (request_created ?request)
+  )
+  (:action reserve_pool_for_request
+    :parameters (?request - allocation_request ?resource_pool - resource_pool)
+    :precondition
+      (and
+        (request_created ?request)
+        (not
+          (entity_pool_reserved ?request)
+        )
+        (resource_pool_available ?resource_pool)
+      )
+    :effect
+      (and
+        (entity_pool_reserved ?request)
+        (entity_reserved_pool ?request ?resource_pool)
+        (not
+          (resource_pool_available ?resource_pool)
+        )
+      )
+  )
+  (:action bind_resource_instance_to_request
+    :parameters (?request - allocation_request ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (request_created ?request)
+        (entity_pool_reserved ?request)
+        (resource_instance_available ?resource_instance)
+      )
+    :effect
+      (and
+        (entity_bound_instance ?request ?resource_instance)
+        (not
+          (resource_instance_available ?resource_instance)
+        )
+      )
+  )
+  (:action verify_request_instance_binding
+    :parameters (?request - allocation_request ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (request_created ?request)
+        (entity_pool_reserved ?request)
+        (entity_bound_instance ?request ?resource_instance)
+        (not
+          (entity_verified ?request)
+        )
+      )
+    :effect (entity_verified ?request)
+  )
+  (:action release_resource_instance_from_request
+    :parameters (?request - allocation_request ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (entity_bound_instance ?request ?resource_instance)
+      )
+    :effect
+      (and
+        (resource_instance_available ?resource_instance)
+        (not
+          (entity_bound_instance ?request ?resource_instance)
+        )
+      )
+  )
+  (:action assign_operator_to_request
+    :parameters (?request - allocation_request ?operator - operator)
+    :precondition
+      (and
+        (entity_verified ?request)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (entity_assigned_operator ?request ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action unassign_operator_from_request
+    :parameters (?request - allocation_request ?operator - operator)
+    :precondition
+      (and
+        (entity_assigned_operator ?request ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (entity_assigned_operator ?request ?operator)
+        )
+      )
+  )
+  (:action assign_specialized_capability_to_allocator
+    :parameters (?allocator - allocator_agent ?specialized_capability - specialized_capability)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (specialized_capability_available ?specialized_capability)
+      )
+    :effect
+      (and
+        (allocator_bound_specialized_capability ?allocator ?specialized_capability)
+        (not
+          (specialized_capability_available ?specialized_capability)
+        )
+      )
+  )
+  (:action release_specialized_capability_from_allocator
+    :parameters (?allocator - allocator_agent ?specialized_capability - specialized_capability)
+    :precondition
+      (and
+        (allocator_bound_specialized_capability ?allocator ?specialized_capability)
+      )
+    :effect
+      (and
+        (specialized_capability_available ?specialized_capability)
+        (not
+          (allocator_bound_specialized_capability ?allocator ?specialized_capability)
+        )
+      )
+  )
+  (:action assign_policy_variant_to_allocator
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (policy_variant_available ?policy_variant)
+      )
+    :effect
+      (and
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (not
+          (policy_variant_available ?policy_variant)
+        )
+      )
+  )
+  (:action release_policy_variant_from_allocator
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant)
+    :precondition
+      (and
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+      )
+    :effect
+      (and
+        (policy_variant_available ?policy_variant)
+        (not
+          (allocator_bound_policy_variant ?allocator ?policy_variant)
+        )
+      )
+  )
+  (:action probe_primary_provider_feature
+    :parameters (?primary_provider - primary_provider ?provider_feature - provider_feature ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (entity_verified ?primary_provider)
+        (entity_bound_instance ?primary_provider ?resource_instance)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (not
+          (provider_feature_probed ?provider_feature)
+        )
+        (not
+          (provider_feature_locked ?provider_feature)
+        )
+      )
+    :effect (provider_feature_probed ?provider_feature)
+  )
+  (:action activate_primary_provider_feature
+    :parameters (?primary_provider - primary_provider ?provider_feature - provider_feature ?operator - operator)
+    :precondition
+      (and
+        (entity_verified ?primary_provider)
+        (entity_assigned_operator ?primary_provider ?operator)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (provider_feature_probed ?provider_feature)
+        (not
+          (provider_processed ?primary_provider)
+        )
+      )
+    :effect
+      (and
+        (provider_processed ?primary_provider)
+        (primary_provider_ready ?primary_provider)
+      )
+  )
+  (:action assign_consumable_to_primary_provider_feature
+    :parameters (?primary_provider - primary_provider ?provider_feature - provider_feature ?consumable - consumable)
+    :precondition
+      (and
+        (entity_verified ?primary_provider)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (consumable_available ?consumable)
+        (not
+          (provider_processed ?primary_provider)
+        )
+      )
+    :effect
+      (and
+        (provider_feature_locked ?provider_feature)
+        (provider_processed ?primary_provider)
+        (primary_provider_consumable_assigned ?primary_provider ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_primary_provider_feature_assignment
+    :parameters (?primary_provider - primary_provider ?provider_feature - provider_feature ?resource_instance - resource_instance ?consumable - consumable)
+    :precondition
+      (and
+        (entity_verified ?primary_provider)
+        (entity_bound_instance ?primary_provider ?resource_instance)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (provider_feature_locked ?provider_feature)
+        (primary_provider_consumable_assigned ?primary_provider ?consumable)
+        (not
+          (primary_provider_ready ?primary_provider)
+        )
+      )
+    :effect
+      (and
+        (provider_feature_probed ?provider_feature)
+        (primary_provider_ready ?primary_provider)
+        (consumable_available ?consumable)
+        (not
+          (primary_provider_consumable_assigned ?primary_provider ?consumable)
+        )
+      )
+  )
+  (:action probe_secondary_placement_feature
+    :parameters (?secondary_provider - secondary_provider ?placement_feature - placement_feature ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (entity_verified ?secondary_provider)
+        (entity_bound_instance ?secondary_provider ?resource_instance)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (not
+          (placement_feature_probed ?placement_feature)
+        )
+        (not
+          (placement_feature_locked ?placement_feature)
+        )
+      )
+    :effect (placement_feature_probed ?placement_feature)
+  )
+  (:action activate_secondary_placement_feature
+    :parameters (?secondary_provider - secondary_provider ?placement_feature - placement_feature ?operator - operator)
+    :precondition
+      (and
+        (entity_verified ?secondary_provider)
+        (entity_assigned_operator ?secondary_provider ?operator)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (placement_feature_probed ?placement_feature)
+        (not
+          (secondary_provider_processed ?secondary_provider)
+        )
+      )
+    :effect
+      (and
+        (secondary_provider_processed ?secondary_provider)
+        (secondary_provider_ready ?secondary_provider)
+      )
+  )
+  (:action assign_consumable_to_secondary_placement_feature
+    :parameters (?secondary_provider - secondary_provider ?placement_feature - placement_feature ?consumable - consumable)
+    :precondition
+      (and
+        (entity_verified ?secondary_provider)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (consumable_available ?consumable)
+        (not
+          (secondary_provider_processed ?secondary_provider)
+        )
+      )
+    :effect
+      (and
+        (placement_feature_locked ?placement_feature)
+        (secondary_provider_processed ?secondary_provider)
+        (secondary_provider_consumable_assigned ?secondary_provider ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_secondary_placement_feature_assignment
+    :parameters (?secondary_provider - secondary_provider ?placement_feature - placement_feature ?resource_instance - resource_instance ?consumable - consumable)
+    :precondition
+      (and
+        (entity_verified ?secondary_provider)
+        (entity_bound_instance ?secondary_provider ?resource_instance)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (placement_feature_locked ?placement_feature)
+        (secondary_provider_consumable_assigned ?secondary_provider ?consumable)
+        (not
+          (secondary_provider_ready ?secondary_provider)
+        )
+      )
+    :effect
+      (and
+        (placement_feature_probed ?placement_feature)
+        (secondary_provider_ready ?secondary_provider)
+        (consumable_available ?consumable)
+        (not
+          (secondary_provider_consumable_assigned ?secondary_provider ?consumable)
+        )
+      )
+  )
+  (:action assemble_allocation_candidate
+    :parameters (?primary_provider - primary_provider ?secondary_provider - secondary_provider ?provider_feature - provider_feature ?placement_feature - placement_feature ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (provider_processed ?primary_provider)
+        (secondary_provider_processed ?secondary_provider)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (provider_feature_probed ?provider_feature)
+        (placement_feature_probed ?placement_feature)
+        (primary_provider_ready ?primary_provider)
+        (secondary_provider_ready ?secondary_provider)
+        (candidate_available ?candidate)
+      )
+    :effect
+      (and
+        (candidate_prepared ?candidate)
+        (candidate_bound_provider_feature ?candidate ?provider_feature)
+        (candidate_bound_placement_feature ?candidate ?placement_feature)
+        (not
+          (candidate_available ?candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_option_a
+    :parameters (?primary_provider - primary_provider ?secondary_provider - secondary_provider ?provider_feature - provider_feature ?placement_feature - placement_feature ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (provider_processed ?primary_provider)
+        (secondary_provider_processed ?secondary_provider)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (provider_feature_locked ?provider_feature)
+        (placement_feature_probed ?placement_feature)
+        (not
+          (primary_provider_ready ?primary_provider)
+        )
+        (secondary_provider_ready ?secondary_provider)
+        (candidate_available ?candidate)
+      )
+    :effect
+      (and
+        (candidate_prepared ?candidate)
+        (candidate_bound_provider_feature ?candidate ?provider_feature)
+        (candidate_bound_placement_feature ?candidate ?placement_feature)
+        (candidate_check_a_passed ?candidate)
+        (not
+          (candidate_available ?candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_alternate_check
+    :parameters (?primary_provider - primary_provider ?secondary_provider - secondary_provider ?provider_feature - provider_feature ?placement_feature - placement_feature ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (provider_processed ?primary_provider)
+        (secondary_provider_processed ?secondary_provider)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (provider_feature_probed ?provider_feature)
+        (placement_feature_locked ?placement_feature)
+        (primary_provider_ready ?primary_provider)
+        (not
+          (secondary_provider_ready ?secondary_provider)
+        )
+        (candidate_available ?candidate)
+      )
+    :effect
+      (and
+        (candidate_prepared ?candidate)
+        (candidate_bound_provider_feature ?candidate ?provider_feature)
+        (candidate_bound_placement_feature ?candidate ?placement_feature)
+        (candidate_check_b_passed ?candidate)
+        (not
+          (candidate_available ?candidate)
+        )
+      )
+  )
+  (:action assemble_candidate_with_full_checks
+    :parameters (?primary_provider - primary_provider ?secondary_provider - secondary_provider ?provider_feature - provider_feature ?placement_feature - placement_feature ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (provider_processed ?primary_provider)
+        (secondary_provider_processed ?secondary_provider)
+        (provider_has_feature ?primary_provider ?provider_feature)
+        (secondary_provider_has_placement_feature ?secondary_provider ?placement_feature)
+        (provider_feature_locked ?provider_feature)
+        (placement_feature_locked ?placement_feature)
+        (not
+          (primary_provider_ready ?primary_provider)
+        )
+        (not
+          (secondary_provider_ready ?secondary_provider)
+        )
+        (candidate_available ?candidate)
+      )
+    :effect
+      (and
+        (candidate_prepared ?candidate)
+        (candidate_bound_provider_feature ?candidate ?provider_feature)
+        (candidate_bound_placement_feature ?candidate ?placement_feature)
+        (candidate_check_a_passed ?candidate)
+        (candidate_check_b_passed ?candidate)
+        (not
+          (candidate_available ?candidate)
+        )
+      )
+  )
+  (:action validate_candidate_for_assignment
+    :parameters (?candidate - allocation_candidate ?primary_provider - primary_provider ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (candidate_prepared ?candidate)
+        (provider_processed ?primary_provider)
+        (entity_bound_instance ?primary_provider ?resource_instance)
+        (not
+          (candidate_validated ?candidate)
+        )
+      )
+    :effect (candidate_validated ?candidate)
+  )
+  (:action allocate_component_to_candidate
+    :parameters (?allocator - allocator_agent ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (allocator_binds_candidate ?allocator ?candidate)
+        (allocator_has_component ?allocator ?component)
+        (component_available ?component)
+        (candidate_prepared ?candidate)
+        (candidate_validated ?candidate)
+        (not
+          (component_allocated ?component)
+        )
+      )
+    :effect
+      (and
+        (component_allocated ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action mark_allocator_component_ready
+    :parameters (?allocator - allocator_agent ?component - component ?candidate - allocation_candidate ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (allocator_has_component ?allocator ?component)
+        (component_allocated ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (entity_bound_instance ?allocator ?resource_instance)
+        (not
+          (candidate_check_a_passed ?candidate)
+        )
+        (not
+          (allocator_component_ready ?allocator)
+        )
+      )
+    :effect (allocator_component_ready ?allocator)
+  )
+  (:action assign_optional_feature_to_allocator
+    :parameters (?allocator - allocator_agent ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (optional_feature_available ?optional_feature)
+        (not
+          (allocator_has_optional_feature_claim ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_has_optional_feature_claim ?allocator)
+        (allocator_bound_optional_feature ?allocator ?optional_feature)
+        (not
+          (optional_feature_available ?optional_feature)
+        )
+      )
+  )
+  (:action apply_optional_feature_and_prepare_allocator
+    :parameters (?allocator - allocator_agent ?component - component ?candidate - allocation_candidate ?resource_instance - resource_instance ?optional_feature - optional_feature)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (allocator_has_component ?allocator ?component)
+        (component_allocated ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (entity_bound_instance ?allocator ?resource_instance)
+        (candidate_check_a_passed ?candidate)
+        (allocator_has_optional_feature_claim ?allocator)
+        (allocator_bound_optional_feature ?allocator ?optional_feature)
+        (not
+          (allocator_component_ready ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_component_ready ?allocator)
+        (allocator_optional_feature_applied ?allocator)
+      )
+  )
+  (:action bind_specialized_capability_to_allocator
+    :parameters (?allocator - allocator_agent ?specialized_capability - specialized_capability ?operator - operator ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_component_ready ?allocator)
+        (allocator_bound_specialized_capability ?allocator ?specialized_capability)
+        (entity_assigned_operator ?allocator ?operator)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (not
+          (candidate_check_b_passed ?candidate)
+        )
+        (not
+          (allocator_capability_attached ?allocator)
+        )
+      )
+    :effect (allocator_capability_attached ?allocator)
+  )
+  (:action confirm_specialized_capability_binding
+    :parameters (?allocator - allocator_agent ?specialized_capability - specialized_capability ?operator - operator ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_component_ready ?allocator)
+        (allocator_bound_specialized_capability ?allocator ?specialized_capability)
+        (entity_assigned_operator ?allocator ?operator)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (candidate_check_b_passed ?candidate)
+        (not
+          (allocator_capability_attached ?allocator)
+        )
+      )
+    :effect (allocator_capability_attached ?allocator)
+  )
+  (:action bind_policy_variant_to_allocator
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_capability_attached ?allocator)
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (not
+          (candidate_check_a_passed ?candidate)
+        )
+        (not
+          (candidate_check_b_passed ?candidate)
+        )
+        (not
+          (allocator_plan_ready ?allocator)
+        )
+      )
+    :effect (allocator_plan_ready ?allocator)
+  )
+  (:action bind_policy_variant_with_candidate_flag
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_capability_attached ?allocator)
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (candidate_check_a_passed ?candidate)
+        (not
+          (candidate_check_b_passed ?candidate)
+        )
+        (not
+          (allocator_plan_ready ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_attachment_applied ?allocator)
+      )
+  )
+  (:action bind_policy_variant_alternate
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_capability_attached ?allocator)
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (not
+          (candidate_check_a_passed ?candidate)
+        )
+        (candidate_check_b_passed ?candidate)
+        (not
+          (allocator_plan_ready ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_attachment_applied ?allocator)
+      )
+  )
+  (:action bind_policy_variant_all
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant ?component - component ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (allocator_capability_attached ?allocator)
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (allocator_has_component ?allocator ?component)
+        (component_bound_to_candidate ?component ?candidate)
+        (candidate_check_a_passed ?candidate)
+        (candidate_check_b_passed ?candidate)
+        (not
+          (allocator_plan_ready ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_attachment_applied ?allocator)
+      )
+  )
+  (:action finalize_allocator_plan
+    :parameters (?allocator - allocator_agent)
+    :precondition
+      (and
+        (allocator_plan_ready ?allocator)
+        (not
+          (allocator_attachment_applied ?allocator)
+        )
+        (not
+          (allocator_finalized ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_finalized ?allocator)
+        (ready_for_external_claim ?allocator)
+      )
+  )
+  (:action attach_attachment_to_allocator
+    :parameters (?allocator - allocator_agent ?attachment - attachment)
+    :precondition
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_attachment_applied ?allocator)
+        (attachment_available ?attachment)
+      )
+    :effect
+      (and
+        (allocator_bound_attachment ?allocator ?attachment)
+        (not
+          (attachment_available ?attachment)
+        )
+      )
+  )
+  (:action perform_final_checks_on_allocator
+    :parameters (?allocator - allocator_agent ?primary_provider - primary_provider ?secondary_provider - secondary_provider ?resource_instance - resource_instance ?attachment - attachment)
+    :precondition
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_attachment_applied ?allocator)
+        (allocator_bound_attachment ?allocator ?attachment)
+        (allocator_assigned_primary_provider ?allocator ?primary_provider)
+        (allocator_assigned_secondary_provider ?allocator ?secondary_provider)
+        (primary_provider_ready ?primary_provider)
+        (secondary_provider_ready ?secondary_provider)
+        (entity_bound_instance ?allocator ?resource_instance)
+        (not
+          (allocator_final_checks_passed ?allocator)
+        )
+      )
+    :effect (allocator_final_checks_passed ?allocator)
+  )
+  (:action finalize_allocator_commit
+    :parameters (?allocator - allocator_agent)
+    :precondition
+      (and
+        (allocator_plan_ready ?allocator)
+        (allocator_final_checks_passed ?allocator)
+        (not
+          (allocator_finalized ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_finalized ?allocator)
+        (ready_for_external_claim ?allocator)
+      )
+  )
+  (:action select_tagged_policy_for_allocator
+    :parameters (?allocator - allocator_agent ?tagged_policy - tagged_policy ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (entity_verified ?allocator)
+        (entity_bound_instance ?allocator ?resource_instance)
+        (tagged_policy_available ?tagged_policy)
+        (allocator_bound_tagged_policy ?allocator ?tagged_policy)
+        (not
+          (allocator_policy_selected ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_policy_selected ?allocator)
+        (not
+          (tagged_policy_available ?tagged_policy)
+        )
+      )
+  )
+  (:action configure_allocator_policy
+    :parameters (?allocator - allocator_agent ?operator - operator)
+    :precondition
+      (and
+        (allocator_policy_selected ?allocator)
+        (entity_assigned_operator ?allocator ?operator)
+        (not
+          (allocator_policy_configured ?allocator)
+        )
+      )
+    :effect (allocator_policy_configured ?allocator)
+  )
+  (:action apply_policy_variant_to_allocator
+    :parameters (?allocator - allocator_agent ?policy_variant - policy_variant)
+    :precondition
+      (and
+        (allocator_policy_configured ?allocator)
+        (allocator_bound_policy_variant ?allocator ?policy_variant)
+        (not
+          (allocator_policy_applied ?allocator)
+        )
+      )
+    :effect (allocator_policy_applied ?allocator)
+  )
+  (:action commit_allocator
+    :parameters (?allocator - allocator_agent)
+    :precondition
+      (and
+        (allocator_policy_applied ?allocator)
+        (not
+          (allocator_finalized ?allocator)
+        )
+      )
+    :effect
+      (and
+        (allocator_finalized ?allocator)
+        (ready_for_external_claim ?allocator)
+      )
+  )
+  (:action commit_primary_provider
+    :parameters (?primary_provider - primary_provider ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (provider_processed ?primary_provider)
+        (primary_provider_ready ?primary_provider)
+        (candidate_prepared ?candidate)
+        (candidate_validated ?candidate)
+        (not
+          (ready_for_external_claim ?primary_provider)
+        )
+      )
+    :effect (ready_for_external_claim ?primary_provider)
+  )
+  (:action commit_secondary_provider
+    :parameters (?secondary_provider - secondary_provider ?candidate - allocation_candidate)
+    :precondition
+      (and
+        (secondary_provider_processed ?secondary_provider)
+        (secondary_provider_ready ?secondary_provider)
+        (candidate_prepared ?candidate)
+        (candidate_validated ?candidate)
+        (not
+          (ready_for_external_claim ?secondary_provider)
+        )
+      )
+    :effect (ready_for_external_claim ?secondary_provider)
+  )
+  (:action consume_external_claim_for_request
+    :parameters (?request - allocation_request ?external_claim - external_claim ?resource_instance - resource_instance)
+    :precondition
+      (and
+        (ready_for_external_claim ?request)
+        (entity_bound_instance ?request ?resource_instance)
+        (external_claim_available ?external_claim)
+        (not
+          (entity_external_claim_consumed ?request)
+        )
+      )
+    :effect
+      (and
+        (entity_external_claim_consumed ?request)
+        (entity_has_external_claim ?request ?external_claim)
+        (not
+          (external_claim_available ?external_claim)
+        )
+      )
+  )
+  (:action bind_primary_provider_to_request_with_claim
+    :parameters (?primary_provider - primary_provider ?resource_pool - resource_pool ?external_claim - external_claim)
+    :precondition
+      (and
+        (entity_external_claim_consumed ?primary_provider)
+        (entity_reserved_pool ?primary_provider ?resource_pool)
+        (entity_has_external_claim ?primary_provider ?external_claim)
+        (not
+          (binding_committed ?primary_provider)
+        )
+      )
+    :effect
+      (and
+        (binding_committed ?primary_provider)
+        (resource_pool_available ?resource_pool)
+        (external_claim_available ?external_claim)
+      )
+  )
+  (:action bind_secondary_provider_to_request_with_claim
+    :parameters (?secondary_provider - secondary_provider ?resource_pool - resource_pool ?external_claim - external_claim)
+    :precondition
+      (and
+        (entity_external_claim_consumed ?secondary_provider)
+        (entity_reserved_pool ?secondary_provider ?resource_pool)
+        (entity_has_external_claim ?secondary_provider ?external_claim)
+        (not
+          (binding_committed ?secondary_provider)
+        )
+      )
+    :effect
+      (and
+        (binding_committed ?secondary_provider)
+        (resource_pool_available ?resource_pool)
+        (external_claim_available ?external_claim)
+      )
+  )
+  (:action bind_allocator_to_request_with_claim
+    :parameters (?allocator - allocator_agent ?resource_pool - resource_pool ?external_claim - external_claim)
+    :precondition
+      (and
+        (entity_external_claim_consumed ?allocator)
+        (entity_reserved_pool ?allocator ?resource_pool)
+        (entity_has_external_claim ?allocator ?external_claim)
+        (not
+          (binding_committed ?allocator)
+        )
+      )
+    :effect
+      (and
+        (binding_committed ?allocator)
+        (resource_pool_available ?resource_pool)
+        (external_claim_available ?external_claim)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem resource_allocation_instance)
+  (:domain resource_allocation_under_capacity)
+  (:objects primary_provider_1 - primary_provider secondary_provider_1 - secondary_provider allocator_agent_1 - allocator_agent allocator_agent_2 - allocator_agent resource_pool_1 - resource_pool resource_pool_2 - resource_pool resource_pool_3 - resource_pool resource_instance_1 - resource_instance operator_1 - operator consumable_1 - consumable provider_feature_1 - provider_feature placement_feature_1 - placement_feature candidate_1 - allocation_candidate component_1 - component component_2 - component optional_feature_1 - optional_feature optional_feature_2 - optional_feature attachment_1 - attachment attachment_2 - attachment external_claim_1 - external_claim specialized_capability_1 - specialized_capability tagged_policy_1 - tagged_policy tagged_policy_2 - tagged_policy policy_variant_1 - policy_variant)
+  (:init
+    (resource_pool_available resource_pool_1)
+    (resource_pool_available resource_pool_2)
+    (resource_pool_available resource_pool_3)
+    (resource_instance_available resource_instance_1)
+    (operator_available operator_1)
+    (consumable_available consumable_1)
+    (provider_has_feature primary_provider_1 provider_feature_1)
+    (secondary_provider_has_placement_feature secondary_provider_1 placement_feature_1)
+    (candidate_available candidate_1)
+    (component_available component_1)
+    (component_available component_2)
+    (allocator_assigned_primary_provider allocator_agent_1 primary_provider_1)
+    (allocator_assigned_primary_provider allocator_agent_2 primary_provider_1)
+    (allocator_assigned_secondary_provider allocator_agent_1 secondary_provider_1)
+    (allocator_assigned_secondary_provider allocator_agent_2 secondary_provider_1)
+    (allocator_binds_candidate allocator_agent_1 candidate_1)
+    (allocator_binds_candidate allocator_agent_2 candidate_1)
+    (allocator_has_component allocator_agent_1 component_1)
+    (allocator_has_component allocator_agent_2 component_2)
+    (optional_feature_available optional_feature_1)
+    (optional_feature_available optional_feature_2)
+    (attachment_available attachment_1)
+    (attachment_available attachment_2)
+    (external_claim_available external_claim_1)
+    (specialized_capability_available specialized_capability_1)
+    (tagged_policy_available tagged_policy_1)
+    (allocator_bound_tagged_policy allocator_agent_1 tagged_policy_1)
+    (allocator_bound_tagged_policy allocator_agent_2 tagged_policy_2)
+    (policy_variant_available policy_variant_1)
+  )
+  (:goal
+    (and
+      (binding_committed primary_provider_1)
+      (binding_committed secondary_provider_1)
+      (binding_committed allocator_agent_1)
+      (binding_committed allocator_agent_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_allocation_request primary_provider_1)
+(reserve_pool_for_request primary_provider_1 resource_pool_1)
+(bind_resource_instance_to_request primary_provider_1 resource_instance_1)
+(verify_request_instance_binding primary_provider_1 resource_instance_1)
+(probe_primary_provider_feature primary_provider_1 provider_feature_1 resource_instance_1)
+(assign_operator_to_request primary_provider_1 operator_1)
+(activate_primary_provider_feature primary_provider_1 provider_feature_1 operator_1)
+(unassign_operator_from_request primary_provider_1 operator_1)
+(release_resource_instance_from_request primary_provider_1 resource_instance_1)
+(create_allocation_request secondary_provider_1)
+(reserve_pool_for_request secondary_provider_1 resource_pool_2)
+(bind_resource_instance_to_request secondary_provider_1 resource_instance_1)
+(verify_request_instance_binding secondary_provider_1 resource_instance_1)
+(probe_secondary_placement_feature secondary_provider_1 placement_feature_1 resource_instance_1)
+(assign_operator_to_request secondary_provider_1 operator_1)
+(activate_secondary_placement_feature secondary_provider_1 placement_feature_1 operator_1)
+(unassign_operator_from_request secondary_provider_1 operator_1)
+(release_resource_instance_from_request secondary_provider_1 resource_instance_1)
+(assemble_allocation_candidate primary_provider_1 secondary_provider_1 provider_feature_1 placement_feature_1 candidate_1)
+(bind_resource_instance_to_request primary_provider_1 resource_instance_1)
+(validate_candidate_for_assignment candidate_1 primary_provider_1 resource_instance_1)
+(release_resource_instance_from_request primary_provider_1 resource_instance_1)
+(commit_primary_provider primary_provider_1 candidate_1)
+(commit_secondary_provider secondary_provider_1 candidate_1)
+(create_allocation_request allocator_agent_1)
+(reserve_pool_for_request allocator_agent_1 resource_pool_3)
+(bind_resource_instance_to_request allocator_agent_1 resource_instance_1)
+(verify_request_instance_binding allocator_agent_1 resource_instance_1)
+(allocate_component_to_candidate allocator_agent_1 component_1 candidate_1)
+(mark_allocator_component_ready allocator_agent_1 component_1 candidate_1 resource_instance_1)
+(assign_specialized_capability_to_allocator allocator_agent_1 specialized_capability_1)
+(assign_operator_to_request allocator_agent_1 operator_1)
+(bind_specialized_capability_to_allocator allocator_agent_1 specialized_capability_1 operator_1 component_1 candidate_1)
+(assign_policy_variant_to_allocator allocator_agent_1 policy_variant_1)
+(bind_policy_variant_to_allocator allocator_agent_1 policy_variant_1 component_1 candidate_1)
+(finalize_allocator_plan allocator_agent_1)
+(release_resource_instance_from_request allocator_agent_1 resource_instance_1)
+(unassign_operator_from_request allocator_agent_1 operator_1)
+(release_specialized_capability_from_allocator allocator_agent_1 specialized_capability_1)
+(release_policy_variant_from_allocator allocator_agent_1 policy_variant_1)
+(bind_resource_instance_to_request primary_provider_1 resource_instance_1)
+(consume_external_claim_for_request primary_provider_1 external_claim_1 resource_instance_1)
+(bind_primary_provider_to_request_with_claim primary_provider_1 resource_pool_1 external_claim_1)
+(release_resource_instance_from_request primary_provider_1 resource_instance_1)
+(bind_resource_instance_to_request secondary_provider_1 resource_instance_1)
+(consume_external_claim_for_request secondary_provider_1 external_claim_1 resource_instance_1)
+(bind_secondary_provider_to_request_with_claim secondary_provider_1 resource_pool_2 external_claim_1)
+(release_resource_instance_from_request secondary_provider_1 resource_instance_1)
+(bind_resource_instance_to_request allocator_agent_1 resource_instance_1)
+(consume_external_claim_for_request allocator_agent_1 external_claim_1 resource_instance_1)
+(bind_allocator_to_request_with_claim allocator_agent_1 resource_pool_3 external_claim_1)
+(release_resource_instance_from_request allocator_agent_1 resource_instance_1)
+(create_allocation_request allocator_agent_2)
+(reserve_pool_for_request allocator_agent_2 resource_pool_1)
+(bind_resource_instance_to_request allocator_agent_2 resource_instance_1)
+(verify_request_instance_binding allocator_agent_2 resource_instance_1)
+(allocate_component_to_candidate allocator_agent_2 component_2 candidate_1)
+(mark_allocator_component_ready allocator_agent_2 component_2 candidate_1 resource_instance_1)
+(assign_specialized_capability_to_allocator allocator_agent_2 specialized_capability_1)
+(assign_operator_to_request allocator_agent_2 operator_1)
+(bind_specialized_capability_to_allocator allocator_agent_2 specialized_capability_1 operator_1 component_2 candidate_1)
+(assign_policy_variant_to_allocator allocator_agent_2 policy_variant_1)
+(bind_policy_variant_to_allocator allocator_agent_2 policy_variant_1 component_2 candidate_1)
+(finalize_allocator_plan allocator_agent_2)
+(release_resource_instance_from_request allocator_agent_2 resource_instance_1)
+(unassign_operator_from_request allocator_agent_2 operator_1)
+(release_specialized_capability_from_allocator allocator_agent_2 specialized_capability_1)
+(release_policy_variant_from_allocator allocator_agent_2 policy_variant_1)
+(bind_resource_instance_to_request allocator_agent_2 resource_instance_1)
+(consume_external_claim_for_request allocator_agent_2 external_claim_1 resource_instance_1)
+(bind_allocator_to_request_with_claim allocator_agent_2 resource_pool_1 external_claim_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_j1q569qn/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 71 
+
+Successful plans:
+Value: 71
+ /tmp/val_j1q569qn/plan.pddl 71 
+
+
+
+--- stderr ---
+

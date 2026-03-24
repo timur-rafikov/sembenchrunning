@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain fertilizer_delivery_delay_contingency_plan_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_type - object material_type - object logistics_type - object case_category - object incident_case - case_category supplier_entity - operational_resource_type delivery_estimate - operational_resource_type response_team - operational_resource_type approval_document - operational_resource_type recovery_equipment - operational_resource_type contingency_stock_item - operational_resource_type transport_asset - operational_resource_type specialist_service - operational_resource_type alternate_fertilizer_batch - material_type qc_sample_batch - material_type supplier_agreement - material_type transport_route_option - logistics_type transport_vehicle - logistics_type shipment - logistics_type execution_actor_group - incident_case coordination_actor_group - incident_case primary_farm_unit - execution_actor_group secondary_farm_unit - execution_actor_group regional_coordinator - coordination_actor_group)
+  (:predicates
+    (incident_reported ?incident_case - incident_case)
+    (incident_estimate_confirmed ?incident_case - incident_case)
+    (supplier_selected ?incident_case - incident_case)
+    (recovery_complete ?incident_case - incident_case)
+    (incident_ready_for_assignment ?incident_case - incident_case)
+    (incident_contingency_assigned ?incident_case - incident_case)
+    (supplier_available ?supplier_entity - supplier_entity)
+    (supplier_assigned_to_incident ?incident_case - incident_case ?supplier_entity - supplier_entity)
+    (delivery_estimate_available ?delivery_estimate - delivery_estimate)
+    (incident_delivery_estimate_assigned ?incident_case - incident_case ?delivery_estimate - delivery_estimate)
+    (response_team_available ?response_team - response_team)
+    (response_team_assigned_to_incident ?incident_case - incident_case ?response_team - response_team)
+    (alternate_fertilizer_batch_available ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    (unit_reserved_alternate_batch ?primary_farm_unit - primary_farm_unit ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    (secondary_unit_reserved_alternate_batch ?secondary_farm_unit - secondary_farm_unit ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    (unit_route_option_link ?primary_farm_unit - primary_farm_unit ?transport_route_option - transport_route_option)
+    (route_option_primary_selected ?transport_route_option - transport_route_option)
+    (route_option_backup_selected ?transport_route_option - transport_route_option)
+    (primary_unit_prepared ?primary_farm_unit - primary_farm_unit)
+    (secondary_unit_vehicle_link ?secondary_farm_unit - secondary_farm_unit ?transport_vehicle - transport_vehicle)
+    (vehicle_primary_selected ?transport_vehicle - transport_vehicle)
+    (vehicle_backup_selected ?transport_vehicle - transport_vehicle)
+    (secondary_unit_prepared ?secondary_farm_unit - secondary_farm_unit)
+    (shipment_available_for_dispatch ?shipment - shipment)
+    (shipment_reserved ?shipment - shipment)
+    (shipment_route_assigned ?shipment - shipment ?transport_route_option - transport_route_option)
+    (shipment_vehicle_assigned ?shipment - shipment ?transport_vehicle - transport_vehicle)
+    (shipment_assigned_with_backup_route ?shipment - shipment)
+    (shipment_assigned_with_backup_vehicle ?shipment - shipment)
+    (shipment_loaded ?shipment - shipment)
+    (coordinator_primary_unit_link ?regional_coordinator - regional_coordinator ?primary_farm_unit - primary_farm_unit)
+    (coordinator_secondary_unit_link ?regional_coordinator - regional_coordinator ?secondary_farm_unit - secondary_farm_unit)
+    (coordinator_shipment_link ?regional_coordinator - regional_coordinator ?shipment - shipment)
+    (qc_sample_available ?qc_sample_batch - qc_sample_batch)
+    (coordinator_qc_sample_link ?regional_coordinator - regional_coordinator ?qc_sample_batch - qc_sample_batch)
+    (qc_sample_collected ?qc_sample_batch - qc_sample_batch)
+    (qc_sample_assigned_to_shipment ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    (coordinator_predeployment_check_complete ?regional_coordinator - regional_coordinator)
+    (coordinator_authorization_stage1 ?regional_coordinator - regional_coordinator)
+    (deployment_authorized_by_coordinator ?regional_coordinator - regional_coordinator)
+    (coordinator_has_approval_document ?regional_coordinator - regional_coordinator)
+    (coordinator_authorization_stage2 ?regional_coordinator - regional_coordinator)
+    (coordinator_authorization_completed ?regional_coordinator - regional_coordinator)
+    (coordinator_deployment_executed ?regional_coordinator - regional_coordinator)
+    (supplier_agreement_available ?supplier_agreement - supplier_agreement)
+    (coordinator_supplier_agreement_link ?regional_coordinator - regional_coordinator ?supplier_agreement - supplier_agreement)
+    (coordinator_agreement_acknowledged ?regional_coordinator - regional_coordinator)
+    (coordinator_agreement_confirmed ?regional_coordinator - regional_coordinator)
+    (coordinator_agreement_finalized ?regional_coordinator - regional_coordinator)
+    (approval_document_available ?approval_document - approval_document)
+    (coordinator_approval_document_link ?regional_coordinator - regional_coordinator ?approval_document - approval_document)
+    (recovery_equipment_available ?recovery_equipment - recovery_equipment)
+    (coordinator_recovery_equipment_assigned ?regional_coordinator - regional_coordinator ?recovery_equipment - recovery_equipment)
+    (transport_asset_available ?transport_asset - transport_asset)
+    (coordinator_transport_asset_assigned ?regional_coordinator - regional_coordinator ?transport_asset - transport_asset)
+    (specialist_service_available ?specialist_service - specialist_service)
+    (coordinator_assigned_specialist_service ?regional_coordinator - regional_coordinator ?specialist_service - specialist_service)
+    (contingency_stock_item_available ?contingency_stock_item - contingency_stock_item)
+    (incident_assigned_contingency_stock ?incident_case - incident_case ?contingency_stock_item - contingency_stock_item)
+    (primary_site_ready_for_dispatch ?primary_farm_unit - primary_farm_unit)
+    (secondary_site_ready_for_dispatch ?secondary_farm_unit - secondary_farm_unit)
+    (coordinator_deployment_completed ?regional_coordinator - regional_coordinator)
+  )
+  (:action open_incident_case
+    :parameters (?incident_case - incident_case)
+    :precondition
+      (and
+        (not
+          (incident_reported ?incident_case)
+        )
+        (not
+          (recovery_complete ?incident_case)
+        )
+      )
+    :effect (incident_reported ?incident_case)
+  )
+  (:action assign_supplier_to_incident
+    :parameters (?incident_case - incident_case ?supplier_entity - supplier_entity)
+    :precondition
+      (and
+        (incident_reported ?incident_case)
+        (not
+          (supplier_selected ?incident_case)
+        )
+        (supplier_available ?supplier_entity)
+      )
+    :effect
+      (and
+        (supplier_selected ?incident_case)
+        (supplier_assigned_to_incident ?incident_case ?supplier_entity)
+        (not
+          (supplier_available ?supplier_entity)
+        )
+      )
+  )
+  (:action receive_delivery_estimate
+    :parameters (?incident_case - incident_case ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_reported ?incident_case)
+        (supplier_selected ?incident_case)
+        (delivery_estimate_available ?delivery_estimate)
+      )
+    :effect
+      (and
+        (incident_delivery_estimate_assigned ?incident_case ?delivery_estimate)
+        (not
+          (delivery_estimate_available ?delivery_estimate)
+        )
+      )
+  )
+  (:action confirm_delivery_estimate
+    :parameters (?incident_case - incident_case ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_reported ?incident_case)
+        (supplier_selected ?incident_case)
+        (incident_delivery_estimate_assigned ?incident_case ?delivery_estimate)
+        (not
+          (incident_estimate_confirmed ?incident_case)
+        )
+      )
+    :effect (incident_estimate_confirmed ?incident_case)
+  )
+  (:action retract_delivery_estimate
+    :parameters (?incident_case - incident_case ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_delivery_estimate_assigned ?incident_case ?delivery_estimate)
+      )
+    :effect
+      (and
+        (delivery_estimate_available ?delivery_estimate)
+        (not
+          (incident_delivery_estimate_assigned ?incident_case ?delivery_estimate)
+        )
+      )
+  )
+  (:action deploy_response_team_to_incident
+    :parameters (?incident_case - incident_case ?response_team - response_team)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?incident_case)
+        (response_team_available ?response_team)
+      )
+    :effect
+      (and
+        (response_team_assigned_to_incident ?incident_case ?response_team)
+        (not
+          (response_team_available ?response_team)
+        )
+      )
+  )
+  (:action recall_response_team_from_incident
+    :parameters (?incident_case - incident_case ?response_team - response_team)
+    :precondition
+      (and
+        (response_team_assigned_to_incident ?incident_case ?response_team)
+      )
+    :effect
+      (and
+        (response_team_available ?response_team)
+        (not
+          (response_team_assigned_to_incident ?incident_case ?response_team)
+        )
+      )
+  )
+  (:action assign_transport_asset_to_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (transport_asset_available ?transport_asset)
+      )
+    :effect
+      (and
+        (coordinator_transport_asset_assigned ?regional_coordinator ?transport_asset)
+        (not
+          (transport_asset_available ?transport_asset)
+        )
+      )
+  )
+  (:action release_transport_asset_from_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?transport_asset - transport_asset)
+    :precondition
+      (and
+        (coordinator_transport_asset_assigned ?regional_coordinator ?transport_asset)
+      )
+    :effect
+      (and
+        (transport_asset_available ?transport_asset)
+        (not
+          (coordinator_transport_asset_assigned ?regional_coordinator ?transport_asset)
+        )
+      )
+  )
+  (:action assign_specialist_to_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (specialist_service_available ?specialist_service)
+      )
+    :effect
+      (and
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (not
+          (specialist_service_available ?specialist_service)
+        )
+      )
+  )
+  (:action release_specialist_from_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service)
+    :precondition
+      (and
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+      )
+    :effect
+      (and
+        (specialist_service_available ?specialist_service)
+        (not
+          (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        )
+      )
+  )
+  (:action reserve_route_option_for_primary_unit
+    :parameters (?primary_farm_unit - primary_farm_unit ?transport_route_option - transport_route_option ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?primary_farm_unit)
+        (incident_delivery_estimate_assigned ?primary_farm_unit ?delivery_estimate)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (not
+          (route_option_primary_selected ?transport_route_option)
+        )
+        (not
+          (route_option_backup_selected ?transport_route_option)
+        )
+      )
+    :effect (route_option_primary_selected ?transport_route_option)
+  )
+  (:action prepare_primary_unit_with_team
+    :parameters (?primary_farm_unit - primary_farm_unit ?transport_route_option - transport_route_option ?response_team - response_team)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?primary_farm_unit)
+        (response_team_assigned_to_incident ?primary_farm_unit ?response_team)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (route_option_primary_selected ?transport_route_option)
+        (not
+          (primary_site_ready_for_dispatch ?primary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (primary_unit_prepared ?primary_farm_unit)
+      )
+  )
+  (:action reserve_alternate_batch_for_primary_unit
+    :parameters (?primary_farm_unit - primary_farm_unit ?transport_route_option - transport_route_option ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?primary_farm_unit)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        (not
+          (primary_site_ready_for_dispatch ?primary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (route_option_backup_selected ?transport_route_option)
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (unit_reserved_alternate_batch ?primary_farm_unit ?alternate_fertilizer_batch)
+        (not
+          (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        )
+      )
+  )
+  (:action finalize_primary_unit_preparation
+    :parameters (?primary_farm_unit - primary_farm_unit ?transport_route_option - transport_route_option ?delivery_estimate - delivery_estimate ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?primary_farm_unit)
+        (incident_delivery_estimate_assigned ?primary_farm_unit ?delivery_estimate)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (route_option_backup_selected ?transport_route_option)
+        (unit_reserved_alternate_batch ?primary_farm_unit ?alternate_fertilizer_batch)
+        (not
+          (primary_unit_prepared ?primary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (route_option_primary_selected ?transport_route_option)
+        (primary_unit_prepared ?primary_farm_unit)
+        (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        (not
+          (unit_reserved_alternate_batch ?primary_farm_unit ?alternate_fertilizer_batch)
+        )
+      )
+  )
+  (:action select_secondary_vehicle_option
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?transport_vehicle - transport_vehicle ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?secondary_farm_unit)
+        (incident_delivery_estimate_assigned ?secondary_farm_unit ?delivery_estimate)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (not
+          (vehicle_primary_selected ?transport_vehicle)
+        )
+        (not
+          (vehicle_backup_selected ?transport_vehicle)
+        )
+      )
+    :effect (vehicle_primary_selected ?transport_vehicle)
+  )
+  (:action assign_response_team_to_secondary_unit
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?transport_vehicle - transport_vehicle ?response_team - response_team)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?secondary_farm_unit)
+        (response_team_assigned_to_incident ?secondary_farm_unit ?response_team)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (vehicle_primary_selected ?transport_vehicle)
+        (not
+          (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (secondary_unit_prepared ?secondary_farm_unit)
+      )
+  )
+  (:action reserve_alternate_batch_for_secondary_unit
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?transport_vehicle - transport_vehicle ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?secondary_farm_unit)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        (not
+          (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_backup_selected ?transport_vehicle)
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (secondary_unit_reserved_alternate_batch ?secondary_farm_unit ?alternate_fertilizer_batch)
+        (not
+          (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        )
+      )
+  )
+  (:action finalize_secondary_unit_preparation
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?transport_vehicle - transport_vehicle ?delivery_estimate - delivery_estimate ?alternate_fertilizer_batch - alternate_fertilizer_batch)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?secondary_farm_unit)
+        (incident_delivery_estimate_assigned ?secondary_farm_unit ?delivery_estimate)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (vehicle_backup_selected ?transport_vehicle)
+        (secondary_unit_reserved_alternate_batch ?secondary_farm_unit ?alternate_fertilizer_batch)
+        (not
+          (secondary_unit_prepared ?secondary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (vehicle_primary_selected ?transport_vehicle)
+        (secondary_unit_prepared ?secondary_farm_unit)
+        (alternate_fertilizer_batch_available ?alternate_fertilizer_batch)
+        (not
+          (secondary_unit_reserved_alternate_batch ?secondary_farm_unit ?alternate_fertilizer_batch)
+        )
+      )
+  )
+  (:action reserve_shipment_primary_route_and_vehicle
+    :parameters (?primary_farm_unit - primary_farm_unit ?secondary_farm_unit - secondary_farm_unit ?transport_route_option - transport_route_option ?transport_vehicle - transport_vehicle ?shipment - shipment)
+    :precondition
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (route_option_primary_selected ?transport_route_option)
+        (vehicle_primary_selected ?transport_vehicle)
+        (primary_unit_prepared ?primary_farm_unit)
+        (secondary_unit_prepared ?secondary_farm_unit)
+        (shipment_available_for_dispatch ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_route_assigned ?shipment ?transport_route_option)
+        (shipment_vehicle_assigned ?shipment ?transport_vehicle)
+        (not
+          (shipment_available_for_dispatch ?shipment)
+        )
+      )
+  )
+  (:action reserve_shipment_backup_route_primary_vehicle
+    :parameters (?primary_farm_unit - primary_farm_unit ?secondary_farm_unit - secondary_farm_unit ?transport_route_option - transport_route_option ?transport_vehicle - transport_vehicle ?shipment - shipment)
+    :precondition
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (route_option_backup_selected ?transport_route_option)
+        (vehicle_primary_selected ?transport_vehicle)
+        (not
+          (primary_unit_prepared ?primary_farm_unit)
+        )
+        (secondary_unit_prepared ?secondary_farm_unit)
+        (shipment_available_for_dispatch ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_route_assigned ?shipment ?transport_route_option)
+        (shipment_vehicle_assigned ?shipment ?transport_vehicle)
+        (shipment_assigned_with_backup_route ?shipment)
+        (not
+          (shipment_available_for_dispatch ?shipment)
+        )
+      )
+  )
+  (:action reserve_shipment_primary_route_backup_vehicle
+    :parameters (?primary_farm_unit - primary_farm_unit ?secondary_farm_unit - secondary_farm_unit ?transport_route_option - transport_route_option ?transport_vehicle - transport_vehicle ?shipment - shipment)
+    :precondition
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (route_option_primary_selected ?transport_route_option)
+        (vehicle_backup_selected ?transport_vehicle)
+        (primary_unit_prepared ?primary_farm_unit)
+        (not
+          (secondary_unit_prepared ?secondary_farm_unit)
+        )
+        (shipment_available_for_dispatch ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_route_assigned ?shipment ?transport_route_option)
+        (shipment_vehicle_assigned ?shipment ?transport_vehicle)
+        (shipment_assigned_with_backup_vehicle ?shipment)
+        (not
+          (shipment_available_for_dispatch ?shipment)
+        )
+      )
+  )
+  (:action reserve_shipment_with_backup_route_and_vehicle
+    :parameters (?primary_farm_unit - primary_farm_unit ?secondary_farm_unit - secondary_farm_unit ?transport_route_option - transport_route_option ?transport_vehicle - transport_vehicle ?shipment - shipment)
+    :precondition
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (unit_route_option_link ?primary_farm_unit ?transport_route_option)
+        (secondary_unit_vehicle_link ?secondary_farm_unit ?transport_vehicle)
+        (route_option_backup_selected ?transport_route_option)
+        (vehicle_backup_selected ?transport_vehicle)
+        (not
+          (primary_unit_prepared ?primary_farm_unit)
+        )
+        (not
+          (secondary_unit_prepared ?secondary_farm_unit)
+        )
+        (shipment_available_for_dispatch ?shipment)
+      )
+    :effect
+      (and
+        (shipment_reserved ?shipment)
+        (shipment_route_assigned ?shipment ?transport_route_option)
+        (shipment_vehicle_assigned ?shipment ?transport_vehicle)
+        (shipment_assigned_with_backup_route ?shipment)
+        (shipment_assigned_with_backup_vehicle ?shipment)
+        (not
+          (shipment_available_for_dispatch ?shipment)
+        )
+      )
+  )
+  (:action mark_shipment_loaded
+    :parameters (?shipment - shipment ?primary_farm_unit - primary_farm_unit ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (shipment_reserved ?shipment)
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (incident_delivery_estimate_assigned ?primary_farm_unit ?delivery_estimate)
+        (not
+          (shipment_loaded ?shipment)
+        )
+      )
+    :effect (shipment_loaded ?shipment)
+  )
+  (:action collect_qc_sample_and_assign_to_shipment
+    :parameters (?regional_coordinator - regional_coordinator ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (coordinator_shipment_link ?regional_coordinator ?shipment)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_available ?qc_sample_batch)
+        (shipment_reserved ?shipment)
+        (shipment_loaded ?shipment)
+        (not
+          (qc_sample_collected ?qc_sample_batch)
+        )
+      )
+    :effect
+      (and
+        (qc_sample_collected ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (not
+          (qc_sample_available ?qc_sample_batch)
+        )
+      )
+  )
+  (:action coordinator_predeployment_check
+    :parameters (?regional_coordinator - regional_coordinator ?qc_sample_batch - qc_sample_batch ?shipment - shipment ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_collected ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (incident_delivery_estimate_assigned ?regional_coordinator ?delivery_estimate)
+        (not
+          (shipment_assigned_with_backup_route ?shipment)
+        )
+        (not
+          (coordinator_predeployment_check_complete ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_predeployment_check_complete ?regional_coordinator)
+  )
+  (:action attach_approval_document_to_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?approval_document - approval_document)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (approval_document_available ?approval_document)
+        (not
+          (coordinator_has_approval_document ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_has_approval_document ?regional_coordinator)
+        (coordinator_approval_document_link ?regional_coordinator ?approval_document)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action advance_coordinator_authorization_stage
+    :parameters (?regional_coordinator - regional_coordinator ?qc_sample_batch - qc_sample_batch ?shipment - shipment ?delivery_estimate - delivery_estimate ?approval_document - approval_document)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_collected ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (incident_delivery_estimate_assigned ?regional_coordinator ?delivery_estimate)
+        (shipment_assigned_with_backup_route ?shipment)
+        (coordinator_has_approval_document ?regional_coordinator)
+        (coordinator_approval_document_link ?regional_coordinator ?approval_document)
+        (not
+          (coordinator_predeployment_check_complete ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_predeployment_check_complete ?regional_coordinator)
+        (coordinator_authorization_stage2 ?regional_coordinator)
+      )
+  )
+  (:action coordinator_authorization_stage1_assign_asset
+    :parameters (?regional_coordinator - regional_coordinator ?transport_asset - transport_asset ?response_team - response_team ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_predeployment_check_complete ?regional_coordinator)
+        (coordinator_transport_asset_assigned ?regional_coordinator ?transport_asset)
+        (response_team_assigned_to_incident ?regional_coordinator ?response_team)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (not
+          (shipment_assigned_with_backup_vehicle ?shipment)
+        )
+        (not
+          (coordinator_authorization_stage1 ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_authorization_stage1 ?regional_coordinator)
+  )
+  (:action coordinator_authorization_stage1_confirm_asset
+    :parameters (?regional_coordinator - regional_coordinator ?transport_asset - transport_asset ?response_team - response_team ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_predeployment_check_complete ?regional_coordinator)
+        (coordinator_transport_asset_assigned ?regional_coordinator ?transport_asset)
+        (response_team_assigned_to_incident ?regional_coordinator ?response_team)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (shipment_assigned_with_backup_vehicle ?shipment)
+        (not
+          (coordinator_authorization_stage1 ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_authorization_stage1 ?regional_coordinator)
+  )
+  (:action coordinator_authorization_stage2_assign_specialist
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_authorization_stage1 ?regional_coordinator)
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (not
+          (shipment_assigned_with_backup_route ?shipment)
+        )
+        (not
+          (shipment_assigned_with_backup_vehicle ?shipment)
+        )
+        (not
+          (deployment_authorized_by_coordinator ?regional_coordinator)
+        )
+      )
+    :effect (deployment_authorized_by_coordinator ?regional_coordinator)
+  )
+  (:action coordinator_authorization_stage2_confirm_specialist
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_authorization_stage1 ?regional_coordinator)
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (shipment_assigned_with_backup_route ?shipment)
+        (not
+          (shipment_assigned_with_backup_vehicle ?shipment)
+        )
+        (not
+          (deployment_authorized_by_coordinator ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_authorization_completed ?regional_coordinator)
+      )
+  )
+  (:action coordinator_authorization_stage2_finalize
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_authorization_stage1 ?regional_coordinator)
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (not
+          (shipment_assigned_with_backup_route ?shipment)
+        )
+        (shipment_assigned_with_backup_vehicle ?shipment)
+        (not
+          (deployment_authorized_by_coordinator ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_authorization_completed ?regional_coordinator)
+      )
+  )
+  (:action coordinator_authorization_stage2_commit
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service ?qc_sample_batch - qc_sample_batch ?shipment - shipment)
+    :precondition
+      (and
+        (coordinator_authorization_stage1 ?regional_coordinator)
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (coordinator_qc_sample_link ?regional_coordinator ?qc_sample_batch)
+        (qc_sample_assigned_to_shipment ?qc_sample_batch ?shipment)
+        (shipment_assigned_with_backup_route ?shipment)
+        (shipment_assigned_with_backup_vehicle ?shipment)
+        (not
+          (deployment_authorized_by_coordinator ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_authorization_completed ?regional_coordinator)
+      )
+  )
+  (:action perform_salvage_deployment
+    :parameters (?regional_coordinator - regional_coordinator)
+    :precondition
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (not
+          (coordinator_authorization_completed ?regional_coordinator)
+        )
+        (not
+          (coordinator_deployment_completed ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_deployment_completed ?regional_coordinator)
+        (incident_ready_for_assignment ?regional_coordinator)
+      )
+  )
+  (:action assign_recovery_equipment_to_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?recovery_equipment - recovery_equipment)
+    :precondition
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_authorization_completed ?regional_coordinator)
+        (recovery_equipment_available ?recovery_equipment)
+      )
+    :effect
+      (and
+        (coordinator_recovery_equipment_assigned ?regional_coordinator ?recovery_equipment)
+        (not
+          (recovery_equipment_available ?recovery_equipment)
+        )
+      )
+  )
+  (:action deploy_recovery_operations_for_unit
+    :parameters (?regional_coordinator - regional_coordinator ?primary_farm_unit - primary_farm_unit ?secondary_farm_unit - secondary_farm_unit ?delivery_estimate - delivery_estimate ?recovery_equipment - recovery_equipment)
+    :precondition
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_authorization_completed ?regional_coordinator)
+        (coordinator_recovery_equipment_assigned ?regional_coordinator ?recovery_equipment)
+        (coordinator_primary_unit_link ?regional_coordinator ?primary_farm_unit)
+        (coordinator_secondary_unit_link ?regional_coordinator ?secondary_farm_unit)
+        (primary_unit_prepared ?primary_farm_unit)
+        (secondary_unit_prepared ?secondary_farm_unit)
+        (incident_delivery_estimate_assigned ?regional_coordinator ?delivery_estimate)
+        (not
+          (coordinator_deployment_executed ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_deployment_executed ?regional_coordinator)
+  )
+  (:action finalize_deployment_and_mark_recovery_ready
+    :parameters (?regional_coordinator - regional_coordinator)
+    :precondition
+      (and
+        (deployment_authorized_by_coordinator ?regional_coordinator)
+        (coordinator_deployment_executed ?regional_coordinator)
+        (not
+          (coordinator_deployment_completed ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_deployment_completed ?regional_coordinator)
+        (incident_ready_for_assignment ?regional_coordinator)
+      )
+  )
+  (:action apply_supplier_agreement_to_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?supplier_agreement - supplier_agreement ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_estimate_confirmed ?regional_coordinator)
+        (incident_delivery_estimate_assigned ?regional_coordinator ?delivery_estimate)
+        (supplier_agreement_available ?supplier_agreement)
+        (coordinator_supplier_agreement_link ?regional_coordinator ?supplier_agreement)
+        (not
+          (coordinator_agreement_acknowledged ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_agreement_acknowledged ?regional_coordinator)
+        (not
+          (supplier_agreement_available ?supplier_agreement)
+        )
+      )
+  )
+  (:action confirm_agreement_and_prepare_operations
+    :parameters (?regional_coordinator - regional_coordinator ?response_team - response_team)
+    :precondition
+      (and
+        (coordinator_agreement_acknowledged ?regional_coordinator)
+        (response_team_assigned_to_incident ?regional_coordinator ?response_team)
+        (not
+          (coordinator_agreement_confirmed ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_agreement_confirmed ?regional_coordinator)
+  )
+  (:action assign_specialist_after_agreement
+    :parameters (?regional_coordinator - regional_coordinator ?specialist_service - specialist_service)
+    :precondition
+      (and
+        (coordinator_agreement_confirmed ?regional_coordinator)
+        (coordinator_assigned_specialist_service ?regional_coordinator ?specialist_service)
+        (not
+          (coordinator_agreement_finalized ?regional_coordinator)
+        )
+      )
+    :effect (coordinator_agreement_finalized ?regional_coordinator)
+  )
+  (:action finalize_agreement_and_mark_case_ready
+    :parameters (?regional_coordinator - regional_coordinator)
+    :precondition
+      (and
+        (coordinator_agreement_finalized ?regional_coordinator)
+        (not
+          (coordinator_deployment_completed ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_deployment_completed ?regional_coordinator)
+        (incident_ready_for_assignment ?regional_coordinator)
+      )
+  )
+  (:action final_repair_and_release_primary_unit
+    :parameters (?primary_farm_unit - primary_farm_unit ?shipment - shipment)
+    :precondition
+      (and
+        (primary_site_ready_for_dispatch ?primary_farm_unit)
+        (primary_unit_prepared ?primary_farm_unit)
+        (shipment_reserved ?shipment)
+        (shipment_loaded ?shipment)
+        (not
+          (incident_ready_for_assignment ?primary_farm_unit)
+        )
+      )
+    :effect (incident_ready_for_assignment ?primary_farm_unit)
+  )
+  (:action final_repair_and_release_secondary_unit
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?shipment - shipment)
+    :precondition
+      (and
+        (secondary_site_ready_for_dispatch ?secondary_farm_unit)
+        (secondary_unit_prepared ?secondary_farm_unit)
+        (shipment_reserved ?shipment)
+        (shipment_loaded ?shipment)
+        (not
+          (incident_ready_for_assignment ?secondary_farm_unit)
+        )
+      )
+    :effect (incident_ready_for_assignment ?secondary_farm_unit)
+  )
+  (:action assign_contingency_stock_to_incident
+    :parameters (?incident_case - incident_case ?contingency_stock_item - contingency_stock_item ?delivery_estimate - delivery_estimate)
+    :precondition
+      (and
+        (incident_ready_for_assignment ?incident_case)
+        (incident_delivery_estimate_assigned ?incident_case ?delivery_estimate)
+        (contingency_stock_item_available ?contingency_stock_item)
+        (not
+          (incident_contingency_assigned ?incident_case)
+        )
+      )
+    :effect
+      (and
+        (incident_contingency_assigned ?incident_case)
+        (incident_assigned_contingency_stock ?incident_case ?contingency_stock_item)
+        (not
+          (contingency_stock_item_available ?contingency_stock_item)
+        )
+      )
+  )
+  (:action apply_assigned_contingency_stock_to_primary_unit
+    :parameters (?primary_farm_unit - primary_farm_unit ?supplier_entity - supplier_entity ?contingency_stock_item - contingency_stock_item)
+    :precondition
+      (and
+        (incident_contingency_assigned ?primary_farm_unit)
+        (supplier_assigned_to_incident ?primary_farm_unit ?supplier_entity)
+        (incident_assigned_contingency_stock ?primary_farm_unit ?contingency_stock_item)
+        (not
+          (recovery_complete ?primary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (recovery_complete ?primary_farm_unit)
+        (supplier_available ?supplier_entity)
+        (contingency_stock_item_available ?contingency_stock_item)
+      )
+  )
+  (:action apply_assigned_contingency_stock_to_secondary_unit
+    :parameters (?secondary_farm_unit - secondary_farm_unit ?supplier_entity - supplier_entity ?contingency_stock_item - contingency_stock_item)
+    :precondition
+      (and
+        (incident_contingency_assigned ?secondary_farm_unit)
+        (supplier_assigned_to_incident ?secondary_farm_unit ?supplier_entity)
+        (incident_assigned_contingency_stock ?secondary_farm_unit ?contingency_stock_item)
+        (not
+          (recovery_complete ?secondary_farm_unit)
+        )
+      )
+    :effect
+      (and
+        (recovery_complete ?secondary_farm_unit)
+        (supplier_available ?supplier_entity)
+        (contingency_stock_item_available ?contingency_stock_item)
+      )
+  )
+  (:action apply_assigned_contingency_stock_by_coordinator
+    :parameters (?regional_coordinator - regional_coordinator ?supplier_entity - supplier_entity ?contingency_stock_item - contingency_stock_item)
+    :precondition
+      (and
+        (incident_contingency_assigned ?regional_coordinator)
+        (supplier_assigned_to_incident ?regional_coordinator ?supplier_entity)
+        (incident_assigned_contingency_stock ?regional_coordinator ?contingency_stock_item)
+        (not
+          (recovery_complete ?regional_coordinator)
+        )
+      )
+    :effect
+      (and
+        (recovery_complete ?regional_coordinator)
+        (supplier_available ?supplier_entity)
+        (contingency_stock_item_available ?contingency_stock_item)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem fertilizer_delivery_delay_case_001)
+  (:domain fertilizer_delivery_delay_contingency_plan_domain)
+  (:objects primary_farm_unit_1 - primary_farm_unit secondary_farm_unit_1 - secondary_farm_unit regional_coordinator_north - regional_coordinator regional_coordinator_south - regional_coordinator supplier_northern_agri - supplier_entity supplier_southern_supplies - supplier_entity supplier_partner_coop - supplier_entity delivery_estimate_1 - delivery_estimate response_team_alpha - response_team batch_substitute_01 - alternate_fertilizer_batch route_option_1 - transport_route_option transport_vehicle_truck_1 - transport_vehicle shipment_manifest_001 - shipment qc_sample_batch_a - qc_sample_batch qc_sample_batch_b - qc_sample_batch approval_document_po_001 - approval_document approval_document_permit_002 - approval_document recovery_equipment_loader_01 - recovery_equipment recovery_equipment_spreader_02 - recovery_equipment contingency_stock_item_01 - contingency_stock_item transport_asset_trailer_01 - transport_asset supplier_agreement_acme - supplier_agreement supplier_agreement_partner2 - supplier_agreement specialist_service_lab_01 - specialist_service)
+  (:init
+    (supplier_available supplier_northern_agri)
+    (supplier_available supplier_southern_supplies)
+    (supplier_available supplier_partner_coop)
+    (delivery_estimate_available delivery_estimate_1)
+    (response_team_available response_team_alpha)
+    (alternate_fertilizer_batch_available batch_substitute_01)
+    (unit_route_option_link primary_farm_unit_1 route_option_1)
+    (secondary_unit_vehicle_link secondary_farm_unit_1 transport_vehicle_truck_1)
+    (shipment_available_for_dispatch shipment_manifest_001)
+    (qc_sample_available qc_sample_batch_a)
+    (qc_sample_available qc_sample_batch_b)
+    (coordinator_primary_unit_link regional_coordinator_north primary_farm_unit_1)
+    (coordinator_primary_unit_link regional_coordinator_south primary_farm_unit_1)
+    (coordinator_secondary_unit_link regional_coordinator_north secondary_farm_unit_1)
+    (coordinator_secondary_unit_link regional_coordinator_south secondary_farm_unit_1)
+    (coordinator_shipment_link regional_coordinator_north shipment_manifest_001)
+    (coordinator_shipment_link regional_coordinator_south shipment_manifest_001)
+    (coordinator_qc_sample_link regional_coordinator_north qc_sample_batch_a)
+    (coordinator_qc_sample_link regional_coordinator_south qc_sample_batch_b)
+    (approval_document_available approval_document_po_001)
+    (approval_document_available approval_document_permit_002)
+    (recovery_equipment_available recovery_equipment_loader_01)
+    (recovery_equipment_available recovery_equipment_spreader_02)
+    (contingency_stock_item_available contingency_stock_item_01)
+    (transport_asset_available transport_asset_trailer_01)
+    (supplier_agreement_available supplier_agreement_acme)
+    (coordinator_supplier_agreement_link regional_coordinator_north supplier_agreement_acme)
+    (coordinator_supplier_agreement_link regional_coordinator_south supplier_agreement_partner2)
+    (specialist_service_available specialist_service_lab_01)
+  )
+  (:goal
+    (and
+      (recovery_complete primary_farm_unit_1)
+      (recovery_complete secondary_farm_unit_1)
+      (recovery_complete regional_coordinator_north)
+      (recovery_complete regional_coordinator_south)
+    )
+  )
+)

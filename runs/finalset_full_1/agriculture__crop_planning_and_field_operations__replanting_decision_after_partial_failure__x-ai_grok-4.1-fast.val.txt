@@ -1,0 +1,1007 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain replanting_decision_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_object - object resource_category - generic_object equipment_service_group - generic_object schedule_slot_group - generic_object field_aggregate - generic_object field_segment - field_aggregate seed_lot - resource_category seed_variety - resource_category planting_crew - resource_category diagnostic_kit - resource_category lab_service_slot - resource_category sample_kit - resource_category agronomic_advisor - resource_category weather_forecast_slot - resource_category treatment_batch - equipment_service_group planting_unit_equipment - equipment_service_group service_provider_profile - equipment_service_group irrigation_slot - schedule_slot_group planting_window - schedule_slot_group operation_order - schedule_slot_group field_block - field_segment field_subblock - field_segment inhouse_replant_task - field_block contractor_replant_task - field_block management_plan - field_subblock)
+
+  (:predicates
+    (assessed ?field_segment - field_segment)
+    (replant_required ?field_segment - field_segment)
+    (seed_reserved ?field_segment - field_segment)
+    (replant_outcome_recorded ?field_segment - field_segment)
+    (candidate_for_replant_finalization ?field_segment - field_segment)
+    (replant_completed ?field_segment - field_segment)
+    (seed_lot_available ?seed_lot - seed_lot)
+    (seed_lot_assigned ?field_segment - field_segment ?seed_lot - seed_lot)
+    (seed_variety_available ?seed_variety - seed_variety)
+    (variety_assigned ?field_segment - field_segment ?seed_variety - seed_variety)
+    (planting_crew_available ?planting_crew - planting_crew)
+    (crew_assigned_to_segment ?field_segment - field_segment ?planting_crew - planting_crew)
+    (treatment_batch_available ?treatment_batch - treatment_batch)
+    (inhouse_task_treatment_assigned ?inhouse_replant_task - inhouse_replant_task ?treatment_batch - treatment_batch)
+    (contractor_task_treatment_assigned ?contractor_replant_task - contractor_replant_task ?treatment_batch - treatment_batch)
+    (task_irrigation_slot_link ?inhouse_replant_task - inhouse_replant_task ?irrigation_slot - irrigation_slot)
+    (irrigation_slot_primed ?irrigation_slot - irrigation_slot)
+    (irrigation_slot_treatment_staged ?irrigation_slot - irrigation_slot)
+    (inhouse_task_treatment_confirmed ?inhouse_replant_task - inhouse_replant_task)
+    (contractor_task_planting_window_link ?contractor_replant_task - contractor_replant_task ?planting_window - planting_window)
+    (planting_window_primed ?planting_window - planting_window)
+    (planting_window_treatment_staged ?planting_window - planting_window)
+    (contractor_task_treatment_confirmed ?contractor_replant_task - contractor_replant_task)
+    (operation_order_provisioned ?operation_order - operation_order)
+    (operation_order_created ?operation_order - operation_order)
+    (operation_order_irrigation_slot_link ?operation_order - operation_order ?irrigation_slot - irrigation_slot)
+    (operation_order_planting_window_link ?operation_order - operation_order ?planting_window - planting_window)
+    (operation_order_requires_equipment_assignment ?operation_order - operation_order)
+    (operation_order_requires_service_assignment ?operation_order - operation_order)
+    (operation_order_equipment_allocated ?operation_order - operation_order)
+    (plan_inhouse_task_link ?management_plan - management_plan ?inhouse_replant_task - inhouse_replant_task)
+    (plan_contractor_task_link ?management_plan - management_plan ?contractor_replant_task - contractor_replant_task)
+    (plan_operation_order_link ?management_plan - management_plan ?operation_order - operation_order)
+    (equipment_unit_available ?planting_unit_equipment - planting_unit_equipment)
+    (plan_equipment_link ?management_plan - management_plan ?planting_unit_equipment - planting_unit_equipment)
+    (equipment_unit_commissioned ?planting_unit_equipment - planting_unit_equipment)
+    (equipment_unit_bound_to_order ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    (plan_equipment_confirmed ?management_plan - management_plan)
+    (plan_execution_prequalified ?management_plan - management_plan)
+    (plan_ready_for_execution ?management_plan - management_plan)
+    (plan_diagnostic_kit_reserved ?management_plan - management_plan)
+    (plan_diagnostic_kit_verified ?management_plan - management_plan)
+    (plan_lab_service_confirmed ?management_plan - management_plan)
+    (plan_agronomic_inputs_applied ?management_plan - management_plan)
+    (service_provider_available ?service_provider_profile - service_provider_profile)
+    (plan_service_provider_assigned ?management_plan - management_plan ?service_provider_profile - service_provider_profile)
+    (plan_service_provider_engaged ?management_plan - management_plan)
+    (plan_service_provider_check_passed ?management_plan - management_plan)
+    (plan_service_provider_authorized ?management_plan - management_plan)
+    (diagnostic_kit_available ?diagnostic_kit - diagnostic_kit)
+    (plan_diagnostic_kit_assigned ?management_plan - management_plan ?diagnostic_kit - diagnostic_kit)
+    (lab_service_slot_available ?lab_service_slot - lab_service_slot)
+    (plan_lab_service_assigned ?management_plan - management_plan ?lab_service_slot - lab_service_slot)
+    (agronomic_advisor_available ?agronomic_advisor - agronomic_advisor)
+    (plan_advisor_assigned ?management_plan - management_plan ?agronomic_advisor - agronomic_advisor)
+    (weather_forecast_slot_available ?weather_forecast_slot - weather_forecast_slot)
+    (plan_forecast_assigned ?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot)
+    (sample_kit_available ?sample_kit - sample_kit)
+    (sample_assigned ?field_segment - field_segment ?sample_kit - sample_kit)
+    (inhouse_task_staged ?inhouse_replant_task - inhouse_replant_task)
+    (contractor_task_staged ?contractor_replant_task - contractor_replant_task)
+    (plan_finalized ?management_plan - management_plan)
+  )
+  (:action record_field_assessment
+    :parameters (?field_segment - field_segment)
+    :precondition
+      (and
+        (not
+          (assessed ?field_segment)
+        )
+        (not
+          (replant_outcome_recorded ?field_segment)
+        )
+      )
+    :effect (assessed ?field_segment)
+  )
+  (:action allocate_seed_lot_to_segment
+    :parameters (?field_segment - field_segment ?seed_lot - seed_lot)
+    :precondition
+      (and
+        (assessed ?field_segment)
+        (not
+          (seed_reserved ?field_segment)
+        )
+        (seed_lot_available ?seed_lot)
+      )
+    :effect
+      (and
+        (seed_reserved ?field_segment)
+        (seed_lot_assigned ?field_segment ?seed_lot)
+        (not
+          (seed_lot_available ?seed_lot)
+        )
+      )
+  )
+  (:action assign_seed_variety_to_segment
+    :parameters (?field_segment - field_segment ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (assessed ?field_segment)
+        (seed_reserved ?field_segment)
+        (seed_variety_available ?seed_variety)
+      )
+    :effect
+      (and
+        (variety_assigned ?field_segment ?seed_variety)
+        (not
+          (seed_variety_available ?seed_variety)
+        )
+      )
+  )
+  (:action record_replant_requirement
+    :parameters (?field_segment - field_segment ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (assessed ?field_segment)
+        (seed_reserved ?field_segment)
+        (variety_assigned ?field_segment ?seed_variety)
+        (not
+          (replant_required ?field_segment)
+        )
+      )
+    :effect (replant_required ?field_segment)
+  )
+  (:action release_seed_variety_assignment
+    :parameters (?field_segment - field_segment ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (variety_assigned ?field_segment ?seed_variety)
+      )
+    :effect
+      (and
+        (seed_variety_available ?seed_variety)
+        (not
+          (variety_assigned ?field_segment ?seed_variety)
+        )
+      )
+  )
+  (:action assign_planting_crew_to_segment
+    :parameters (?field_segment - field_segment ?planting_crew - planting_crew)
+    :precondition
+      (and
+        (replant_required ?field_segment)
+        (planting_crew_available ?planting_crew)
+      )
+    :effect
+      (and
+        (crew_assigned_to_segment ?field_segment ?planting_crew)
+        (not
+          (planting_crew_available ?planting_crew)
+        )
+      )
+  )
+  (:action release_planting_crew_from_segment
+    :parameters (?field_segment - field_segment ?planting_crew - planting_crew)
+    :precondition
+      (and
+        (crew_assigned_to_segment ?field_segment ?planting_crew)
+      )
+    :effect
+      (and
+        (planting_crew_available ?planting_crew)
+        (not
+          (crew_assigned_to_segment ?field_segment ?planting_crew)
+        )
+      )
+  )
+  (:action assign_agronomic_advisor_to_plan
+    :parameters (?management_plan - management_plan ?agronomic_advisor - agronomic_advisor)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (agronomic_advisor_available ?agronomic_advisor)
+      )
+    :effect
+      (and
+        (plan_advisor_assigned ?management_plan ?agronomic_advisor)
+        (not
+          (agronomic_advisor_available ?agronomic_advisor)
+        )
+      )
+  )
+  (:action unassign_agronomic_advisor_from_plan
+    :parameters (?management_plan - management_plan ?agronomic_advisor - agronomic_advisor)
+    :precondition
+      (and
+        (plan_advisor_assigned ?management_plan ?agronomic_advisor)
+      )
+    :effect
+      (and
+        (agronomic_advisor_available ?agronomic_advisor)
+        (not
+          (plan_advisor_assigned ?management_plan ?agronomic_advisor)
+        )
+      )
+  )
+  (:action assign_forecast_to_plan
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (weather_forecast_slot_available ?weather_forecast_slot)
+      )
+    :effect
+      (and
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (not
+          (weather_forecast_slot_available ?weather_forecast_slot)
+        )
+      )
+  )
+  (:action unassign_forecast_from_plan
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot)
+    :precondition
+      (and
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+      )
+    :effect
+      (and
+        (weather_forecast_slot_available ?weather_forecast_slot)
+        (not
+          (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        )
+      )
+  )
+  (:action prime_irrigation_slot_for_inhouse_task
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?irrigation_slot - irrigation_slot ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (replant_required ?inhouse_replant_task)
+        (variety_assigned ?inhouse_replant_task ?seed_variety)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (not
+          (irrigation_slot_primed ?irrigation_slot)
+        )
+        (not
+          (irrigation_slot_treatment_staged ?irrigation_slot)
+        )
+      )
+    :effect (irrigation_slot_primed ?irrigation_slot)
+  )
+  (:action confirm_inhouse_task_prerequisites
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?irrigation_slot - irrigation_slot ?planting_crew - planting_crew)
+    :precondition
+      (and
+        (replant_required ?inhouse_replant_task)
+        (crew_assigned_to_segment ?inhouse_replant_task ?planting_crew)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (irrigation_slot_primed ?irrigation_slot)
+        (not
+          (inhouse_task_staged ?inhouse_replant_task)
+        )
+      )
+    :effect
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+      )
+  )
+  (:action stage_treatment_for_inhouse_task
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?irrigation_slot - irrigation_slot ?treatment_batch - treatment_batch)
+    :precondition
+      (and
+        (replant_required ?inhouse_replant_task)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (treatment_batch_available ?treatment_batch)
+        (not
+          (inhouse_task_staged ?inhouse_replant_task)
+        )
+      )
+    :effect
+      (and
+        (irrigation_slot_treatment_staged ?irrigation_slot)
+        (inhouse_task_staged ?inhouse_replant_task)
+        (inhouse_task_treatment_assigned ?inhouse_replant_task ?treatment_batch)
+        (not
+          (treatment_batch_available ?treatment_batch)
+        )
+      )
+  )
+  (:action apply_treatment_and_mark_inhouse_slot
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?irrigation_slot - irrigation_slot ?seed_variety - seed_variety ?treatment_batch - treatment_batch)
+    :precondition
+      (and
+        (replant_required ?inhouse_replant_task)
+        (variety_assigned ?inhouse_replant_task ?seed_variety)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (irrigation_slot_treatment_staged ?irrigation_slot)
+        (inhouse_task_treatment_assigned ?inhouse_replant_task ?treatment_batch)
+        (not
+          (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        )
+      )
+    :effect
+      (and
+        (irrigation_slot_primed ?irrigation_slot)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        (treatment_batch_available ?treatment_batch)
+        (not
+          (inhouse_task_treatment_assigned ?inhouse_replant_task ?treatment_batch)
+        )
+      )
+  )
+  (:action prime_planting_window_for_contractor_task
+    :parameters (?contractor_replant_task - contractor_replant_task ?planting_window - planting_window ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (replant_required ?contractor_replant_task)
+        (variety_assigned ?contractor_replant_task ?seed_variety)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (not
+          (planting_window_primed ?planting_window)
+        )
+        (not
+          (planting_window_treatment_staged ?planting_window)
+        )
+      )
+    :effect (planting_window_primed ?planting_window)
+  )
+  (:action confirm_contractor_task_prerequisites
+    :parameters (?contractor_replant_task - contractor_replant_task ?planting_window - planting_window ?planting_crew - planting_crew)
+    :precondition
+      (and
+        (replant_required ?contractor_replant_task)
+        (crew_assigned_to_segment ?contractor_replant_task ?planting_crew)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (planting_window_primed ?planting_window)
+        (not
+          (contractor_task_staged ?contractor_replant_task)
+        )
+      )
+    :effect
+      (and
+        (contractor_task_staged ?contractor_replant_task)
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+      )
+  )
+  (:action stage_treatment_for_contractor_task
+    :parameters (?contractor_replant_task - contractor_replant_task ?planting_window - planting_window ?treatment_batch - treatment_batch)
+    :precondition
+      (and
+        (replant_required ?contractor_replant_task)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (treatment_batch_available ?treatment_batch)
+        (not
+          (contractor_task_staged ?contractor_replant_task)
+        )
+      )
+    :effect
+      (and
+        (planting_window_treatment_staged ?planting_window)
+        (contractor_task_staged ?contractor_replant_task)
+        (contractor_task_treatment_assigned ?contractor_replant_task ?treatment_batch)
+        (not
+          (treatment_batch_available ?treatment_batch)
+        )
+      )
+  )
+  (:action apply_treatment_and_mark_contractor_slot
+    :parameters (?contractor_replant_task - contractor_replant_task ?planting_window - planting_window ?seed_variety - seed_variety ?treatment_batch - treatment_batch)
+    :precondition
+      (and
+        (replant_required ?contractor_replant_task)
+        (variety_assigned ?contractor_replant_task ?seed_variety)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (planting_window_treatment_staged ?planting_window)
+        (contractor_task_treatment_assigned ?contractor_replant_task ?treatment_batch)
+        (not
+          (contractor_task_treatment_confirmed ?contractor_replant_task)
+        )
+      )
+    :effect
+      (and
+        (planting_window_primed ?planting_window)
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+        (treatment_batch_available ?treatment_batch)
+        (not
+          (contractor_task_treatment_assigned ?contractor_replant_task ?treatment_batch)
+        )
+      )
+  )
+  (:action assemble_operation_order_variant_1
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?contractor_replant_task - contractor_replant_task ?irrigation_slot - irrigation_slot ?planting_window - planting_window ?operation_order - operation_order)
+    :precondition
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (contractor_task_staged ?contractor_replant_task)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (irrigation_slot_primed ?irrigation_slot)
+        (planting_window_primed ?planting_window)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+        (operation_order_provisioned ?operation_order)
+      )
+    :effect
+      (and
+        (operation_order_created ?operation_order)
+        (operation_order_irrigation_slot_link ?operation_order ?irrigation_slot)
+        (operation_order_planting_window_link ?operation_order ?planting_window)
+        (not
+          (operation_order_provisioned ?operation_order)
+        )
+      )
+  )
+  (:action assemble_operation_order_variant_2
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?contractor_replant_task - contractor_replant_task ?irrigation_slot - irrigation_slot ?planting_window - planting_window ?operation_order - operation_order)
+    :precondition
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (contractor_task_staged ?contractor_replant_task)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (irrigation_slot_treatment_staged ?irrigation_slot)
+        (planting_window_primed ?planting_window)
+        (not
+          (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        )
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+        (operation_order_provisioned ?operation_order)
+      )
+    :effect
+      (and
+        (operation_order_created ?operation_order)
+        (operation_order_irrigation_slot_link ?operation_order ?irrigation_slot)
+        (operation_order_planting_window_link ?operation_order ?planting_window)
+        (operation_order_requires_equipment_assignment ?operation_order)
+        (not
+          (operation_order_provisioned ?operation_order)
+        )
+      )
+  )
+  (:action assemble_operation_order_variant_3
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?contractor_replant_task - contractor_replant_task ?irrigation_slot - irrigation_slot ?planting_window - planting_window ?operation_order - operation_order)
+    :precondition
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (contractor_task_staged ?contractor_replant_task)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (irrigation_slot_primed ?irrigation_slot)
+        (planting_window_treatment_staged ?planting_window)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        (not
+          (contractor_task_treatment_confirmed ?contractor_replant_task)
+        )
+        (operation_order_provisioned ?operation_order)
+      )
+    :effect
+      (and
+        (operation_order_created ?operation_order)
+        (operation_order_irrigation_slot_link ?operation_order ?irrigation_slot)
+        (operation_order_planting_window_link ?operation_order ?planting_window)
+        (operation_order_requires_service_assignment ?operation_order)
+        (not
+          (operation_order_provisioned ?operation_order)
+        )
+      )
+  )
+  (:action assemble_operation_order_variant_4
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?contractor_replant_task - contractor_replant_task ?irrigation_slot - irrigation_slot ?planting_window - planting_window ?operation_order - operation_order)
+    :precondition
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (contractor_task_staged ?contractor_replant_task)
+        (task_irrigation_slot_link ?inhouse_replant_task ?irrigation_slot)
+        (contractor_task_planting_window_link ?contractor_replant_task ?planting_window)
+        (irrigation_slot_treatment_staged ?irrigation_slot)
+        (planting_window_treatment_staged ?planting_window)
+        (not
+          (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        )
+        (not
+          (contractor_task_treatment_confirmed ?contractor_replant_task)
+        )
+        (operation_order_provisioned ?operation_order)
+      )
+    :effect
+      (and
+        (operation_order_created ?operation_order)
+        (operation_order_irrigation_slot_link ?operation_order ?irrigation_slot)
+        (operation_order_planting_window_link ?operation_order ?planting_window)
+        (operation_order_requires_equipment_assignment ?operation_order)
+        (operation_order_requires_service_assignment ?operation_order)
+        (not
+          (operation_order_provisioned ?operation_order)
+        )
+      )
+  )
+  (:action bind_equipment_to_operation_order
+    :parameters (?operation_order - operation_order ?inhouse_replant_task - inhouse_replant_task ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (operation_order_created ?operation_order)
+        (inhouse_task_staged ?inhouse_replant_task)
+        (variety_assigned ?inhouse_replant_task ?seed_variety)
+        (not
+          (operation_order_equipment_allocated ?operation_order)
+        )
+      )
+    :effect (operation_order_equipment_allocated ?operation_order)
+  )
+  (:action prepare_equipment_and_bind_to_order
+    :parameters (?management_plan - management_plan ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (plan_operation_order_link ?management_plan ?operation_order)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_available ?planting_unit_equipment)
+        (operation_order_created ?operation_order)
+        (operation_order_equipment_allocated ?operation_order)
+        (not
+          (equipment_unit_commissioned ?planting_unit_equipment)
+        )
+      )
+    :effect
+      (and
+        (equipment_unit_commissioned ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (not
+          (equipment_unit_available ?planting_unit_equipment)
+        )
+      )
+  )
+  (:action commission_equipment_for_plan
+    :parameters (?management_plan - management_plan ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_commissioned ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (variety_assigned ?management_plan ?seed_variety)
+        (not
+          (operation_order_requires_equipment_assignment ?operation_order)
+        )
+        (not
+          (plan_equipment_confirmed ?management_plan)
+        )
+      )
+    :effect (plan_equipment_confirmed ?management_plan)
+  )
+  (:action reserve_diagnostic_kit_for_plan
+    :parameters (?management_plan - management_plan ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (diagnostic_kit_available ?diagnostic_kit)
+        (not
+          (plan_diagnostic_kit_reserved ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_diagnostic_kit_reserved ?management_plan)
+        (plan_diagnostic_kit_assigned ?management_plan ?diagnostic_kit)
+        (not
+          (diagnostic_kit_available ?diagnostic_kit)
+        )
+      )
+  )
+  (:action verify_plan_with_equipment_and_kit
+    :parameters (?management_plan - management_plan ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order ?seed_variety - seed_variety ?diagnostic_kit - diagnostic_kit)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_commissioned ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (variety_assigned ?management_plan ?seed_variety)
+        (operation_order_requires_equipment_assignment ?operation_order)
+        (plan_diagnostic_kit_reserved ?management_plan)
+        (plan_diagnostic_kit_assigned ?management_plan ?diagnostic_kit)
+        (not
+          (plan_equipment_confirmed ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_equipment_confirmed ?management_plan)
+        (plan_diagnostic_kit_verified ?management_plan)
+      )
+  )
+  (:action activate_plan_with_advisor_and_equipment
+    :parameters (?management_plan - management_plan ?agronomic_advisor - agronomic_advisor ?planting_crew - planting_crew ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_equipment_confirmed ?management_plan)
+        (plan_advisor_assigned ?management_plan ?agronomic_advisor)
+        (crew_assigned_to_segment ?management_plan ?planting_crew)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (not
+          (operation_order_requires_service_assignment ?operation_order)
+        )
+        (not
+          (plan_execution_prequalified ?management_plan)
+        )
+      )
+    :effect (plan_execution_prequalified ?management_plan)
+  )
+  (:action activate_plan_with_alternate_equipment
+    :parameters (?management_plan - management_plan ?agronomic_advisor - agronomic_advisor ?planting_crew - planting_crew ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_equipment_confirmed ?management_plan)
+        (plan_advisor_assigned ?management_plan ?agronomic_advisor)
+        (crew_assigned_to_segment ?management_plan ?planting_crew)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (operation_order_requires_service_assignment ?operation_order)
+        (not
+          (plan_execution_prequalified ?management_plan)
+        )
+      )
+    :effect (plan_execution_prequalified ?management_plan)
+  )
+  (:action attach_forecast_and_mark_plan_variant
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_execution_prequalified ?management_plan)
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (not
+          (operation_order_requires_equipment_assignment ?operation_order)
+        )
+        (not
+          (operation_order_requires_service_assignment ?operation_order)
+        )
+        (not
+          (plan_ready_for_execution ?management_plan)
+        )
+      )
+    :effect (plan_ready_for_execution ?management_plan)
+  )
+  (:action attach_forecast_and_confirm_with_equipment_variant
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_execution_prequalified ?management_plan)
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (operation_order_requires_equipment_assignment ?operation_order)
+        (not
+          (operation_order_requires_service_assignment ?operation_order)
+        )
+        (not
+          (plan_ready_for_execution ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_lab_service_confirmed ?management_plan)
+      )
+  )
+  (:action attach_forecast_and_confirm_with_alternate_bindings
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_execution_prequalified ?management_plan)
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (not
+          (operation_order_requires_equipment_assignment ?operation_order)
+        )
+        (operation_order_requires_service_assignment ?operation_order)
+        (not
+          (plan_ready_for_execution ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_lab_service_confirmed ?management_plan)
+      )
+  )
+  (:action attach_forecast_and_confirm_with_full_bindings
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot ?planting_unit_equipment - planting_unit_equipment ?operation_order - operation_order)
+    :precondition
+      (and
+        (plan_execution_prequalified ?management_plan)
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (plan_equipment_link ?management_plan ?planting_unit_equipment)
+        (equipment_unit_bound_to_order ?planting_unit_equipment ?operation_order)
+        (operation_order_requires_equipment_assignment ?operation_order)
+        (operation_order_requires_service_assignment ?operation_order)
+        (not
+          (plan_ready_for_execution ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_lab_service_confirmed ?management_plan)
+      )
+  )
+  (:action record_plan_finalization_candidate
+    :parameters (?management_plan - management_plan)
+    :precondition
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (not
+          (plan_lab_service_confirmed ?management_plan)
+        )
+        (not
+          (plan_finalized ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?management_plan)
+        (candidate_for_replant_finalization ?management_plan)
+      )
+  )
+  (:action assign_lab_service_to_plan
+    :parameters (?management_plan - management_plan ?lab_service_slot - lab_service_slot)
+    :precondition
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_lab_service_confirmed ?management_plan)
+        (lab_service_slot_available ?lab_service_slot)
+      )
+    :effect
+      (and
+        (plan_lab_service_assigned ?management_plan ?lab_service_slot)
+        (not
+          (lab_service_slot_available ?lab_service_slot)
+        )
+      )
+  )
+  (:action authorize_plan_for_execution
+    :parameters (?management_plan - management_plan ?inhouse_replant_task - inhouse_replant_task ?contractor_replant_task - contractor_replant_task ?seed_variety - seed_variety ?lab_service_slot - lab_service_slot)
+    :precondition
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_lab_service_confirmed ?management_plan)
+        (plan_lab_service_assigned ?management_plan ?lab_service_slot)
+        (plan_inhouse_task_link ?management_plan ?inhouse_replant_task)
+        (plan_contractor_task_link ?management_plan ?contractor_replant_task)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+        (variety_assigned ?management_plan ?seed_variety)
+        (not
+          (plan_agronomic_inputs_applied ?management_plan)
+        )
+      )
+    :effect (plan_agronomic_inputs_applied ?management_plan)
+  )
+  (:action confirm_plan_execution_and_record
+    :parameters (?management_plan - management_plan)
+    :precondition
+      (and
+        (plan_ready_for_execution ?management_plan)
+        (plan_agronomic_inputs_applied ?management_plan)
+        (not
+          (plan_finalized ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?management_plan)
+        (candidate_for_replant_finalization ?management_plan)
+      )
+  )
+  (:action engage_service_provider_for_plan
+    :parameters (?management_plan - management_plan ?service_provider_profile - service_provider_profile ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (replant_required ?management_plan)
+        (variety_assigned ?management_plan ?seed_variety)
+        (service_provider_available ?service_provider_profile)
+        (plan_service_provider_assigned ?management_plan ?service_provider_profile)
+        (not
+          (plan_service_provider_engaged ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_service_provider_engaged ?management_plan)
+        (not
+          (service_provider_available ?service_provider_profile)
+        )
+      )
+  )
+  (:action prepare_plan_provider_tasks
+    :parameters (?management_plan - management_plan ?planting_crew - planting_crew)
+    :precondition
+      (and
+        (plan_service_provider_engaged ?management_plan)
+        (crew_assigned_to_segment ?management_plan ?planting_crew)
+        (not
+          (plan_service_provider_check_passed ?management_plan)
+        )
+      )
+    :effect (plan_service_provider_check_passed ?management_plan)
+  )
+  (:action authorize_provider_service
+    :parameters (?management_plan - management_plan ?weather_forecast_slot - weather_forecast_slot)
+    :precondition
+      (and
+        (plan_service_provider_check_passed ?management_plan)
+        (plan_forecast_assigned ?management_plan ?weather_forecast_slot)
+        (not
+          (plan_service_provider_authorized ?management_plan)
+        )
+      )
+    :effect (plan_service_provider_authorized ?management_plan)
+  )
+  (:action confirm_provider_execution_and_record
+    :parameters (?management_plan - management_plan)
+    :precondition
+      (and
+        (plan_service_provider_authorized ?management_plan)
+        (not
+          (plan_finalized ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?management_plan)
+        (candidate_for_replant_finalization ?management_plan)
+      )
+  )
+  (:action confirm_inhouse_task_completion
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?operation_order - operation_order)
+    :precondition
+      (and
+        (inhouse_task_staged ?inhouse_replant_task)
+        (inhouse_task_treatment_confirmed ?inhouse_replant_task)
+        (operation_order_created ?operation_order)
+        (operation_order_equipment_allocated ?operation_order)
+        (not
+          (candidate_for_replant_finalization ?inhouse_replant_task)
+        )
+      )
+    :effect (candidate_for_replant_finalization ?inhouse_replant_task)
+  )
+  (:action confirm_contractor_task_completion
+    :parameters (?contractor_replant_task - contractor_replant_task ?operation_order - operation_order)
+    :precondition
+      (and
+        (contractor_task_staged ?contractor_replant_task)
+        (contractor_task_treatment_confirmed ?contractor_replant_task)
+        (operation_order_created ?operation_order)
+        (operation_order_equipment_allocated ?operation_order)
+        (not
+          (candidate_for_replant_finalization ?contractor_replant_task)
+        )
+      )
+    :effect (candidate_for_replant_finalization ?contractor_replant_task)
+  )
+  (:action record_segment_sample_and_replant_status
+    :parameters (?field_segment - field_segment ?sample_kit - sample_kit ?seed_variety - seed_variety)
+    :precondition
+      (and
+        (candidate_for_replant_finalization ?field_segment)
+        (variety_assigned ?field_segment ?seed_variety)
+        (sample_kit_available ?sample_kit)
+        (not
+          (replant_completed ?field_segment)
+        )
+      )
+    :effect
+      (and
+        (replant_completed ?field_segment)
+        (sample_assigned ?field_segment ?sample_kit)
+        (not
+          (sample_kit_available ?sample_kit)
+        )
+      )
+  )
+  (:action propagate_replant_outcome_to_task_and_inventory
+    :parameters (?inhouse_replant_task - inhouse_replant_task ?seed_lot - seed_lot ?sample_kit - sample_kit)
+    :precondition
+      (and
+        (replant_completed ?inhouse_replant_task)
+        (seed_lot_assigned ?inhouse_replant_task ?seed_lot)
+        (sample_assigned ?inhouse_replant_task ?sample_kit)
+        (not
+          (replant_outcome_recorded ?inhouse_replant_task)
+        )
+      )
+    :effect
+      (and
+        (replant_outcome_recorded ?inhouse_replant_task)
+        (seed_lot_available ?seed_lot)
+        (sample_kit_available ?sample_kit)
+      )
+  )
+  (:action propagate_replant_outcome_to_contractor_task_and_inventory
+    :parameters (?contractor_replant_task - contractor_replant_task ?seed_lot - seed_lot ?sample_kit - sample_kit)
+    :precondition
+      (and
+        (replant_completed ?contractor_replant_task)
+        (seed_lot_assigned ?contractor_replant_task ?seed_lot)
+        (sample_assigned ?contractor_replant_task ?sample_kit)
+        (not
+          (replant_outcome_recorded ?contractor_replant_task)
+        )
+      )
+    :effect
+      (and
+        (replant_outcome_recorded ?contractor_replant_task)
+        (seed_lot_available ?seed_lot)
+        (sample_kit_available ?sample_kit)
+      )
+  )
+  (:action propagate_replant_outcome_to_plan_and_inventory
+    :parameters (?management_plan - management_plan ?seed_lot - seed_lot ?sample_kit - sample_kit)
+    :precondition
+      (and
+        (replant_completed ?management_plan)
+        (seed_lot_assigned ?management_plan ?seed_lot)
+        (sample_assigned ?management_plan ?sample_kit)
+        (not
+          (replant_outcome_recorded ?management_plan)
+        )
+      )
+    :effect
+      (and
+        (replant_outcome_recorded ?management_plan)
+        (seed_lot_available ?seed_lot)
+        (sample_kit_available ?sample_kit)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem replanting_partial_failure_case)
+  (:domain replanting_decision_domain)
+  (:objects inhouse_replant_task_1 - inhouse_replant_task contractor_replant_task_1 - contractor_replant_task management_plan_1 - management_plan management_plan_2 - management_plan seed_lot_01 - seed_lot seed_lot_02 - seed_lot seed_lot_03 - seed_lot seed_variety_1 - seed_variety planting_crew_alpha - planting_crew treatment_batch_1 - treatment_batch irrigation_slot_1 - irrigation_slot planting_window_1 - planting_window operation_order_provision_1 - operation_order planting_unit_equipment_1 - planting_unit_equipment planting_unit_equipment_2 - planting_unit_equipment diagnostic_kit_1 - diagnostic_kit diagnostic_kit_2 - diagnostic_kit lab_service_slot_1 - lab_service_slot lab_service_slot_2 - lab_service_slot sample_kit_1 - sample_kit agronomic_advisor_1 - agronomic_advisor service_provider_profile_a - service_provider_profile service_provider_profile_b - service_provider_profile weather_forecast_slot_1 - weather_forecast_slot)
+  (:init
+    (seed_lot_available seed_lot_01)
+    (seed_lot_available seed_lot_02)
+    (seed_lot_available seed_lot_03)
+    (seed_variety_available seed_variety_1)
+    (planting_crew_available planting_crew_alpha)
+    (treatment_batch_available treatment_batch_1)
+    (task_irrigation_slot_link inhouse_replant_task_1 irrigation_slot_1)
+    (contractor_task_planting_window_link contractor_replant_task_1 planting_window_1)
+    (operation_order_provisioned operation_order_provision_1)
+    (equipment_unit_available planting_unit_equipment_1)
+    (equipment_unit_available planting_unit_equipment_2)
+    (plan_inhouse_task_link management_plan_1 inhouse_replant_task_1)
+    (plan_inhouse_task_link management_plan_2 inhouse_replant_task_1)
+    (plan_contractor_task_link management_plan_1 contractor_replant_task_1)
+    (plan_contractor_task_link management_plan_2 contractor_replant_task_1)
+    (plan_operation_order_link management_plan_1 operation_order_provision_1)
+    (plan_operation_order_link management_plan_2 operation_order_provision_1)
+    (plan_equipment_link management_plan_1 planting_unit_equipment_1)
+    (plan_equipment_link management_plan_2 planting_unit_equipment_2)
+    (diagnostic_kit_available diagnostic_kit_1)
+    (diagnostic_kit_available diagnostic_kit_2)
+    (lab_service_slot_available lab_service_slot_1)
+    (lab_service_slot_available lab_service_slot_2)
+    (sample_kit_available sample_kit_1)
+    (agronomic_advisor_available agronomic_advisor_1)
+    (service_provider_available service_provider_profile_a)
+    (plan_service_provider_assigned management_plan_1 service_provider_profile_a)
+    (plan_service_provider_assigned management_plan_2 service_provider_profile_b)
+    (weather_forecast_slot_available weather_forecast_slot_1)
+  )
+  (:goal
+    (and
+      (replant_outcome_recorded inhouse_replant_task_1)
+      (replant_outcome_recorded contractor_replant_task_1)
+      (replant_outcome_recorded management_plan_1)
+      (replant_outcome_recorded management_plan_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(record_field_assessment inhouse_replant_task_1)
+(record_field_assessment contractor_replant_task_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_icta6ks8/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_icta6ks8/plan.pddl 
+
+
+--- stderr ---
+

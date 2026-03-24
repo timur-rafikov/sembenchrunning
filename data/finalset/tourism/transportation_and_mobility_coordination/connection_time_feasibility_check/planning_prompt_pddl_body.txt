@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain tourism_connection_time_feasibility_check)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types transfer_resource_type - object passenger_support_type - object connection_component_type - object itinerary_component - object itinerary_segment - itinerary_component local_transport_mode - transfer_resource_type time_window - transfer_resource_type terminal_gate - transfer_resource_type ticket_option - transfer_resource_type service_option - transfer_resource_type time_buffer - transfer_resource_type equipment_resource - transfer_resource_type operational_constraint - transfer_resource_type auxiliary_service - passenger_support_type passenger_profile - passenger_support_type special_request - passenger_support_type arrival_access_point - connection_component_type departure_access_point - connection_component_type connecting_vehicle - connection_component_type segment_event - itinerary_segment segment_transfer - itinerary_segment arrival_event - segment_event departure_event - segment_event transfer_option - segment_transfer)
+  (:predicates
+    (segment_registered ?itinerary_segment - itinerary_segment)
+    (segment_confirmed ?itinerary_segment - itinerary_segment)
+    (segment_local_mode_assigned ?itinerary_segment - itinerary_segment)
+    (connection_validated ?itinerary_segment - itinerary_segment)
+    (ready_for_buffer_assignment ?itinerary_segment - itinerary_segment)
+    (segment_buffer_allocated ?itinerary_segment - itinerary_segment)
+    (local_mode_available ?local_transport_mode - local_transport_mode)
+    (segment_assigned_local_mode ?itinerary_segment - itinerary_segment ?local_transport_mode - local_transport_mode)
+    (time_window_available ?time_window - time_window)
+    (segment_assigned_time_window ?itinerary_segment - itinerary_segment ?time_window - time_window)
+    (terminal_gate_available ?terminal_gate - terminal_gate)
+    (segment_assigned_terminal_gate ?itinerary_segment - itinerary_segment ?terminal_gate - terminal_gate)
+    (auxiliary_service_available ?auxiliary_service - auxiliary_service)
+    (arrival_event_assigned_aux_service ?arrival_event - arrival_event ?auxiliary_service - auxiliary_service)
+    (departure_event_assigned_aux_service ?departure_event - departure_event ?auxiliary_service - auxiliary_service)
+    (arrival_linked_access_point ?arrival_event - arrival_event ?arrival_access_point - arrival_access_point)
+    (arrival_access_point_active ?arrival_access_point - arrival_access_point)
+    (arrival_access_point_service_reserved ?arrival_access_point - arrival_access_point)
+    (arrival_event_ready ?arrival_event - arrival_event)
+    (departure_linked_access_point ?departure_event - departure_event ?departure_access_point - departure_access_point)
+    (departure_access_point_active ?departure_access_point - departure_access_point)
+    (departure_access_point_service_reserved ?departure_access_point - departure_access_point)
+    (departure_event_ready ?departure_event - departure_event)
+    (connecting_vehicle_available ?connecting_vehicle - connecting_vehicle)
+    (connecting_vehicle_reserved ?connecting_vehicle - connecting_vehicle)
+    (vehicle_links_to_arrival_access_point ?connecting_vehicle - connecting_vehicle ?arrival_access_point - arrival_access_point)
+    (vehicle_links_to_departure_access_point ?connecting_vehicle - connecting_vehicle ?departure_access_point - departure_access_point)
+    (vehicle_arrival_config_flag ?connecting_vehicle - connecting_vehicle)
+    (vehicle_departure_config_flag ?connecting_vehicle - connecting_vehicle)
+    (vehicle_boarding_ready ?connecting_vehicle - connecting_vehicle)
+    (transfer_option_linked_arrival_event ?transfer_option - transfer_option ?arrival_event - arrival_event)
+    (transfer_option_linked_departure_event ?transfer_option - transfer_option ?departure_event - departure_event)
+    (transfer_option_allocated_vehicle ?transfer_option - transfer_option ?connecting_vehicle - connecting_vehicle)
+    (passenger_profile_available ?passenger_profile - passenger_profile)
+    (transfer_option_linked_passenger_profile ?transfer_option - transfer_option ?passenger_profile - passenger_profile)
+    (passenger_profile_reserved ?passenger_profile - passenger_profile)
+    (passenger_profile_assigned_to_vehicle ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    (ticketing_compatibility_checked ?transfer_option - transfer_option)
+    (ticketing_and_equipment_verified ?transfer_option - transfer_option)
+    (final_checks_passed ?transfer_option - transfer_option)
+    (transfer_option_ticket_assigned ?transfer_option - transfer_option)
+    (ticket_assignment_verified ?transfer_option - transfer_option)
+    (transfer_option_manifest_confirmed ?transfer_option - transfer_option)
+    (transfer_option_manifest_ready ?transfer_option - transfer_option)
+    (special_request_available ?special_request - special_request)
+    (transfer_option_linked_special_request ?transfer_option - transfer_option ?special_request - special_request)
+    (special_request_acknowledged ?transfer_option - transfer_option)
+    (gate_workflow_step1_completed ?transfer_option - transfer_option)
+    (gate_workflow_step2_completed ?transfer_option - transfer_option)
+    (ticket_option_available ?ticket_option - ticket_option)
+    (transfer_option_linked_ticket_option ?transfer_option - transfer_option ?ticket_option - ticket_option)
+    (service_option_available ?service_option - service_option)
+    (transfer_option_linked_service_option ?transfer_option - transfer_option ?service_option - service_option)
+    (equipment_resource_available ?equipment_resource - equipment_resource)
+    (transfer_option_assigned_equipment ?transfer_option - transfer_option ?equipment_resource - equipment_resource)
+    (operational_constraint_available ?operational_constraint - operational_constraint)
+    (transfer_option_assigned_operational_constraint ?transfer_option - transfer_option ?operational_constraint - operational_constraint)
+    (time_buffer_available ?time_buffer - time_buffer)
+    (segment_assigned_time_buffer ?itinerary_segment - itinerary_segment ?time_buffer - time_buffer)
+    (arrival_event_processed ?arrival_event - arrival_event)
+    (departure_event_processed ?departure_event - departure_event)
+    (transfer_option_finalization_flag ?transfer_option - transfer_option)
+  )
+  (:action register_itinerary_segment
+    :parameters (?itinerary_segment - itinerary_segment)
+    :precondition
+      (and
+        (not
+          (segment_registered ?itinerary_segment)
+        )
+        (not
+          (connection_validated ?itinerary_segment)
+        )
+      )
+    :effect (segment_registered ?itinerary_segment)
+  )
+  (:action assign_local_transport_mode_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?local_transport_mode - local_transport_mode)
+    :precondition
+      (and
+        (segment_registered ?itinerary_segment)
+        (not
+          (segment_local_mode_assigned ?itinerary_segment)
+        )
+        (local_mode_available ?local_transport_mode)
+      )
+    :effect
+      (and
+        (segment_local_mode_assigned ?itinerary_segment)
+        (segment_assigned_local_mode ?itinerary_segment ?local_transport_mode)
+        (not
+          (local_mode_available ?local_transport_mode)
+        )
+      )
+  )
+  (:action reserve_time_window_for_segment
+    :parameters (?itinerary_segment - itinerary_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_registered ?itinerary_segment)
+        (segment_local_mode_assigned ?itinerary_segment)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (segment_assigned_time_window ?itinerary_segment ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action confirm_segment_schedule
+    :parameters (?itinerary_segment - itinerary_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_registered ?itinerary_segment)
+        (segment_local_mode_assigned ?itinerary_segment)
+        (segment_assigned_time_window ?itinerary_segment ?time_window)
+        (not
+          (segment_confirmed ?itinerary_segment)
+        )
+      )
+    :effect (segment_confirmed ?itinerary_segment)
+  )
+  (:action release_time_window_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?time_window - time_window)
+    :precondition
+      (and
+        (segment_assigned_time_window ?itinerary_segment ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (segment_assigned_time_window ?itinerary_segment ?time_window)
+        )
+      )
+  )
+  (:action reserve_terminal_gate_for_segment
+    :parameters (?itinerary_segment - itinerary_segment ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (segment_confirmed ?itinerary_segment)
+        (terminal_gate_available ?terminal_gate)
+      )
+    :effect
+      (and
+        (segment_assigned_terminal_gate ?itinerary_segment ?terminal_gate)
+        (not
+          (terminal_gate_available ?terminal_gate)
+        )
+      )
+  )
+  (:action release_terminal_gate_from_segment
+    :parameters (?itinerary_segment - itinerary_segment ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (segment_assigned_terminal_gate ?itinerary_segment ?terminal_gate)
+      )
+    :effect
+      (and
+        (terminal_gate_available ?terminal_gate)
+        (not
+          (segment_assigned_terminal_gate ?itinerary_segment ?terminal_gate)
+        )
+      )
+  )
+  (:action reserve_equipment_for_transfer_option
+    :parameters (?transfer_option - transfer_option ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (equipment_resource_available ?equipment_resource)
+      )
+    :effect
+      (and
+        (transfer_option_assigned_equipment ?transfer_option ?equipment_resource)
+        (not
+          (equipment_resource_available ?equipment_resource)
+        )
+      )
+  )
+  (:action release_equipment_from_transfer_option
+    :parameters (?transfer_option - transfer_option ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (transfer_option_assigned_equipment ?transfer_option ?equipment_resource)
+      )
+    :effect
+      (and
+        (equipment_resource_available ?equipment_resource)
+        (not
+          (transfer_option_assigned_equipment ?transfer_option ?equipment_resource)
+        )
+      )
+  )
+  (:action reserve_operational_constraint_for_transfer_option
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (operational_constraint_available ?operational_constraint)
+      )
+    :effect
+      (and
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (not
+          (operational_constraint_available ?operational_constraint)
+        )
+      )
+  )
+  (:action release_operational_constraint_from_transfer_option
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+      )
+    :effect
+      (and
+        (operational_constraint_available ?operational_constraint)
+        (not
+          (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        )
+      )
+  )
+  (:action assess_arrival_access_point
+    :parameters (?arrival_event - arrival_event ?arrival_access_point - arrival_access_point ?time_window - time_window)
+    :precondition
+      (and
+        (segment_confirmed ?arrival_event)
+        (segment_assigned_time_window ?arrival_event ?time_window)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (not
+          (arrival_access_point_active ?arrival_access_point)
+        )
+        (not
+          (arrival_access_point_service_reserved ?arrival_access_point)
+        )
+      )
+    :effect (arrival_access_point_active ?arrival_access_point)
+  )
+  (:action confirm_arrival_access_and_gate_assignment
+    :parameters (?arrival_event - arrival_event ?arrival_access_point - arrival_access_point ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (segment_confirmed ?arrival_event)
+        (segment_assigned_terminal_gate ?arrival_event ?terminal_gate)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (arrival_access_point_active ?arrival_access_point)
+        (not
+          (arrival_event_processed ?arrival_event)
+        )
+      )
+    :effect
+      (and
+        (arrival_event_processed ?arrival_event)
+        (arrival_event_ready ?arrival_event)
+      )
+  )
+  (:action allocate_arrival_auxiliary_service
+    :parameters (?arrival_event - arrival_event ?arrival_access_point - arrival_access_point ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (segment_confirmed ?arrival_event)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (auxiliary_service_available ?auxiliary_service)
+        (not
+          (arrival_event_processed ?arrival_event)
+        )
+      )
+    :effect
+      (and
+        (arrival_access_point_service_reserved ?arrival_access_point)
+        (arrival_event_processed ?arrival_event)
+        (arrival_event_assigned_aux_service ?arrival_event ?auxiliary_service)
+        (not
+          (auxiliary_service_available ?auxiliary_service)
+        )
+      )
+  )
+  (:action finalize_arrival_access_assessment
+    :parameters (?arrival_event - arrival_event ?arrival_access_point - arrival_access_point ?time_window - time_window ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (segment_confirmed ?arrival_event)
+        (segment_assigned_time_window ?arrival_event ?time_window)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (arrival_access_point_service_reserved ?arrival_access_point)
+        (arrival_event_assigned_aux_service ?arrival_event ?auxiliary_service)
+        (not
+          (arrival_event_ready ?arrival_event)
+        )
+      )
+    :effect
+      (and
+        (arrival_access_point_active ?arrival_access_point)
+        (arrival_event_ready ?arrival_event)
+        (auxiliary_service_available ?auxiliary_service)
+        (not
+          (arrival_event_assigned_aux_service ?arrival_event ?auxiliary_service)
+        )
+      )
+  )
+  (:action assess_departure_access_point
+    :parameters (?departure_event - departure_event ?departure_access_point - departure_access_point ?time_window - time_window)
+    :precondition
+      (and
+        (segment_confirmed ?departure_event)
+        (segment_assigned_time_window ?departure_event ?time_window)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (not
+          (departure_access_point_active ?departure_access_point)
+        )
+        (not
+          (departure_access_point_service_reserved ?departure_access_point)
+        )
+      )
+    :effect (departure_access_point_active ?departure_access_point)
+  )
+  (:action confirm_departure_access_and_gate_assignment
+    :parameters (?departure_event - departure_event ?departure_access_point - departure_access_point ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (segment_confirmed ?departure_event)
+        (segment_assigned_terminal_gate ?departure_event ?terminal_gate)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (departure_access_point_active ?departure_access_point)
+        (not
+          (departure_event_processed ?departure_event)
+        )
+      )
+    :effect
+      (and
+        (departure_event_processed ?departure_event)
+        (departure_event_ready ?departure_event)
+      )
+  )
+  (:action allocate_departure_auxiliary_service
+    :parameters (?departure_event - departure_event ?departure_access_point - departure_access_point ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (segment_confirmed ?departure_event)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (auxiliary_service_available ?auxiliary_service)
+        (not
+          (departure_event_processed ?departure_event)
+        )
+      )
+    :effect
+      (and
+        (departure_access_point_service_reserved ?departure_access_point)
+        (departure_event_processed ?departure_event)
+        (departure_event_assigned_aux_service ?departure_event ?auxiliary_service)
+        (not
+          (auxiliary_service_available ?auxiliary_service)
+        )
+      )
+  )
+  (:action finalize_departure_access_assessment
+    :parameters (?departure_event - departure_event ?departure_access_point - departure_access_point ?time_window - time_window ?auxiliary_service - auxiliary_service)
+    :precondition
+      (and
+        (segment_confirmed ?departure_event)
+        (segment_assigned_time_window ?departure_event ?time_window)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (departure_access_point_service_reserved ?departure_access_point)
+        (departure_event_assigned_aux_service ?departure_event ?auxiliary_service)
+        (not
+          (departure_event_ready ?departure_event)
+        )
+      )
+    :effect
+      (and
+        (departure_access_point_active ?departure_access_point)
+        (departure_event_ready ?departure_event)
+        (auxiliary_service_available ?auxiliary_service)
+        (not
+          (departure_event_assigned_aux_service ?departure_event ?auxiliary_service)
+        )
+      )
+  )
+  (:action match_connecting_vehicle_candidate
+    :parameters (?arrival_event - arrival_event ?departure_event - departure_event ?arrival_access_point - arrival_access_point ?departure_access_point - departure_access_point ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (arrival_event_processed ?arrival_event)
+        (departure_event_processed ?departure_event)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (arrival_access_point_active ?arrival_access_point)
+        (departure_access_point_active ?departure_access_point)
+        (arrival_event_ready ?arrival_event)
+        (departure_event_ready ?departure_event)
+        (connecting_vehicle_available ?connecting_vehicle)
+      )
+    :effect
+      (and
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_links_to_arrival_access_point ?connecting_vehicle ?arrival_access_point)
+        (vehicle_links_to_departure_access_point ?connecting_vehicle ?departure_access_point)
+        (not
+          (connecting_vehicle_available ?connecting_vehicle)
+        )
+      )
+  )
+  (:action match_connecting_vehicle_with_arrival_constraints
+    :parameters (?arrival_event - arrival_event ?departure_event - departure_event ?arrival_access_point - arrival_access_point ?departure_access_point - departure_access_point ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (arrival_event_processed ?arrival_event)
+        (departure_event_processed ?departure_event)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (arrival_access_point_service_reserved ?arrival_access_point)
+        (departure_access_point_active ?departure_access_point)
+        (not
+          (arrival_event_ready ?arrival_event)
+        )
+        (departure_event_ready ?departure_event)
+        (connecting_vehicle_available ?connecting_vehicle)
+      )
+    :effect
+      (and
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_links_to_arrival_access_point ?connecting_vehicle ?arrival_access_point)
+        (vehicle_links_to_departure_access_point ?connecting_vehicle ?departure_access_point)
+        (vehicle_arrival_config_flag ?connecting_vehicle)
+        (not
+          (connecting_vehicle_available ?connecting_vehicle)
+        )
+      )
+  )
+  (:action match_connecting_vehicle_with_departure_constraints
+    :parameters (?arrival_event - arrival_event ?departure_event - departure_event ?arrival_access_point - arrival_access_point ?departure_access_point - departure_access_point ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (arrival_event_processed ?arrival_event)
+        (departure_event_processed ?departure_event)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (arrival_access_point_active ?arrival_access_point)
+        (departure_access_point_service_reserved ?departure_access_point)
+        (arrival_event_ready ?arrival_event)
+        (not
+          (departure_event_ready ?departure_event)
+        )
+        (connecting_vehicle_available ?connecting_vehicle)
+      )
+    :effect
+      (and
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_links_to_arrival_access_point ?connecting_vehicle ?arrival_access_point)
+        (vehicle_links_to_departure_access_point ?connecting_vehicle ?departure_access_point)
+        (vehicle_departure_config_flag ?connecting_vehicle)
+        (not
+          (connecting_vehicle_available ?connecting_vehicle)
+        )
+      )
+  )
+  (:action match_connecting_vehicle_with_both_constraints
+    :parameters (?arrival_event - arrival_event ?departure_event - departure_event ?arrival_access_point - arrival_access_point ?departure_access_point - departure_access_point ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (arrival_event_processed ?arrival_event)
+        (departure_event_processed ?departure_event)
+        (arrival_linked_access_point ?arrival_event ?arrival_access_point)
+        (departure_linked_access_point ?departure_event ?departure_access_point)
+        (arrival_access_point_service_reserved ?arrival_access_point)
+        (departure_access_point_service_reserved ?departure_access_point)
+        (not
+          (arrival_event_ready ?arrival_event)
+        )
+        (not
+          (departure_event_ready ?departure_event)
+        )
+        (connecting_vehicle_available ?connecting_vehicle)
+      )
+    :effect
+      (and
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_links_to_arrival_access_point ?connecting_vehicle ?arrival_access_point)
+        (vehicle_links_to_departure_access_point ?connecting_vehicle ?departure_access_point)
+        (vehicle_arrival_config_flag ?connecting_vehicle)
+        (vehicle_departure_config_flag ?connecting_vehicle)
+        (not
+          (connecting_vehicle_available ?connecting_vehicle)
+        )
+      )
+  )
+  (:action prepare_vehicle_for_boarding
+    :parameters (?connecting_vehicle - connecting_vehicle ?arrival_event - arrival_event ?time_window - time_window)
+    :precondition
+      (and
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (arrival_event_processed ?arrival_event)
+        (segment_assigned_time_window ?arrival_event ?time_window)
+        (not
+          (vehicle_boarding_ready ?connecting_vehicle)
+        )
+      )
+    :effect (vehicle_boarding_ready ?connecting_vehicle)
+  )
+  (:action reserve_passenger_profile_on_transfer_option
+    :parameters (?transfer_option - transfer_option ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (transfer_option_allocated_vehicle ?transfer_option ?connecting_vehicle)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_available ?passenger_profile)
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_boarding_ready ?connecting_vehicle)
+        (not
+          (passenger_profile_reserved ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (passenger_profile_reserved ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (not
+          (passenger_profile_available ?passenger_profile)
+        )
+      )
+  )
+  (:action mark_ticketing_compatibility
+    :parameters (?transfer_option - transfer_option ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle ?time_window - time_window)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_reserved ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (segment_assigned_time_window ?transfer_option ?time_window)
+        (not
+          (vehicle_arrival_config_flag ?connecting_vehicle)
+        )
+        (not
+          (ticketing_compatibility_checked ?transfer_option)
+        )
+      )
+    :effect (ticketing_compatibility_checked ?transfer_option)
+  )
+  (:action assign_ticket_option_to_transfer_option
+    :parameters (?transfer_option - transfer_option ?ticket_option - ticket_option)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (ticket_option_available ?ticket_option)
+        (not
+          (transfer_option_ticket_assigned ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (transfer_option_ticket_assigned ?transfer_option)
+        (transfer_option_linked_ticket_option ?transfer_option ?ticket_option)
+        (not
+          (ticket_option_available ?ticket_option)
+        )
+      )
+  )
+  (:action verify_ticket_and_gate_workflow
+    :parameters (?transfer_option - transfer_option ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle ?time_window - time_window ?ticket_option - ticket_option)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_reserved ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (segment_assigned_time_window ?transfer_option ?time_window)
+        (vehicle_arrival_config_flag ?connecting_vehicle)
+        (transfer_option_ticket_assigned ?transfer_option)
+        (transfer_option_linked_ticket_option ?transfer_option ?ticket_option)
+        (not
+          (ticketing_compatibility_checked ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (ticketing_compatibility_checked ?transfer_option)
+        (ticket_assignment_verified ?transfer_option)
+      )
+  )
+  (:action reserve_equipment_and_mark_ticket_verified
+    :parameters (?transfer_option - transfer_option ?equipment_resource - equipment_resource ?terminal_gate - terminal_gate ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_compatibility_checked ?transfer_option)
+        (transfer_option_assigned_equipment ?transfer_option ?equipment_resource)
+        (segment_assigned_terminal_gate ?transfer_option ?terminal_gate)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (not
+          (vehicle_departure_config_flag ?connecting_vehicle)
+        )
+        (not
+          (ticketing_and_equipment_verified ?transfer_option)
+        )
+      )
+    :effect (ticketing_and_equipment_verified ?transfer_option)
+  )
+  (:action confirm_equipment_and_mark_ticket_verified_variant
+    :parameters (?transfer_option - transfer_option ?equipment_resource - equipment_resource ?terminal_gate - terminal_gate ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_compatibility_checked ?transfer_option)
+        (transfer_option_assigned_equipment ?transfer_option ?equipment_resource)
+        (segment_assigned_terminal_gate ?transfer_option ?terminal_gate)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (vehicle_departure_config_flag ?connecting_vehicle)
+        (not
+          (ticketing_and_equipment_verified ?transfer_option)
+        )
+      )
+    :effect (ticketing_and_equipment_verified ?transfer_option)
+  )
+  (:action apply_operational_constraint_and_mark
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_and_equipment_verified ?transfer_option)
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (not
+          (vehicle_arrival_config_flag ?connecting_vehicle)
+        )
+        (not
+          (vehicle_departure_config_flag ?connecting_vehicle)
+        )
+        (not
+          (final_checks_passed ?transfer_option)
+        )
+      )
+    :effect (final_checks_passed ?transfer_option)
+  )
+  (:action apply_operational_constraint_and_mark_with_arrival_flag
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_and_equipment_verified ?transfer_option)
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (vehicle_arrival_config_flag ?connecting_vehicle)
+        (not
+          (vehicle_departure_config_flag ?connecting_vehicle)
+        )
+        (not
+          (final_checks_passed ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_confirmed ?transfer_option)
+      )
+  )
+  (:action apply_operational_constraint_and_mark_with_departure_flag
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_and_equipment_verified ?transfer_option)
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (not
+          (vehicle_arrival_config_flag ?connecting_vehicle)
+        )
+        (vehicle_departure_config_flag ?connecting_vehicle)
+        (not
+          (final_checks_passed ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_confirmed ?transfer_option)
+      )
+  )
+  (:action apply_operational_constraint_and_mark_with_both_flags
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint ?passenger_profile - passenger_profile ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (ticketing_and_equipment_verified ?transfer_option)
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (transfer_option_linked_passenger_profile ?transfer_option ?passenger_profile)
+        (passenger_profile_assigned_to_vehicle ?passenger_profile ?connecting_vehicle)
+        (vehicle_arrival_config_flag ?connecting_vehicle)
+        (vehicle_departure_config_flag ?connecting_vehicle)
+        (not
+          (final_checks_passed ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_confirmed ?transfer_option)
+      )
+  )
+  (:action finalize_transfer_option_and_mark_ready
+    :parameters (?transfer_option - transfer_option)
+    :precondition
+      (and
+        (final_checks_passed ?transfer_option)
+        (not
+          (transfer_option_manifest_confirmed ?transfer_option)
+        )
+        (not
+          (transfer_option_finalization_flag ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (transfer_option_finalization_flag ?transfer_option)
+        (ready_for_buffer_assignment ?transfer_option)
+      )
+  )
+  (:action assign_service_option_to_transfer_option
+    :parameters (?transfer_option - transfer_option ?service_option - service_option)
+    :precondition
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_confirmed ?transfer_option)
+        (service_option_available ?service_option)
+      )
+    :effect
+      (and
+        (transfer_option_linked_service_option ?transfer_option ?service_option)
+        (not
+          (service_option_available ?service_option)
+        )
+      )
+  )
+  (:action authorize_manifest_and_allocate_to_option
+    :parameters (?transfer_option - transfer_option ?arrival_event - arrival_event ?departure_event - departure_event ?time_window - time_window ?service_option - service_option)
+    :precondition
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_confirmed ?transfer_option)
+        (transfer_option_linked_service_option ?transfer_option ?service_option)
+        (transfer_option_linked_arrival_event ?transfer_option ?arrival_event)
+        (transfer_option_linked_departure_event ?transfer_option ?departure_event)
+        (arrival_event_ready ?arrival_event)
+        (departure_event_ready ?departure_event)
+        (segment_assigned_time_window ?transfer_option ?time_window)
+        (not
+          (transfer_option_manifest_ready ?transfer_option)
+        )
+      )
+    :effect (transfer_option_manifest_ready ?transfer_option)
+  )
+  (:action finalize_manifest_and_queue_transfer_option
+    :parameters (?transfer_option - transfer_option)
+    :precondition
+      (and
+        (final_checks_passed ?transfer_option)
+        (transfer_option_manifest_ready ?transfer_option)
+        (not
+          (transfer_option_finalization_flag ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (transfer_option_finalization_flag ?transfer_option)
+        (ready_for_buffer_assignment ?transfer_option)
+      )
+  )
+  (:action register_special_request_for_transfer_option
+    :parameters (?transfer_option - transfer_option ?special_request - special_request ?time_window - time_window)
+    :precondition
+      (and
+        (segment_confirmed ?transfer_option)
+        (segment_assigned_time_window ?transfer_option ?time_window)
+        (special_request_available ?special_request)
+        (transfer_option_linked_special_request ?transfer_option ?special_request)
+        (not
+          (special_request_acknowledged ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (special_request_acknowledged ?transfer_option)
+        (not
+          (special_request_available ?special_request)
+        )
+      )
+  )
+  (:action advance_gate_workflow_step
+    :parameters (?transfer_option - transfer_option ?terminal_gate - terminal_gate)
+    :precondition
+      (and
+        (special_request_acknowledged ?transfer_option)
+        (segment_assigned_terminal_gate ?transfer_option ?terminal_gate)
+        (not
+          (gate_workflow_step1_completed ?transfer_option)
+        )
+      )
+    :effect (gate_workflow_step1_completed ?transfer_option)
+  )
+  (:action apply_operational_constraint_in_gate_workflow
+    :parameters (?transfer_option - transfer_option ?operational_constraint - operational_constraint)
+    :precondition
+      (and
+        (gate_workflow_step1_completed ?transfer_option)
+        (transfer_option_assigned_operational_constraint ?transfer_option ?operational_constraint)
+        (not
+          (gate_workflow_step2_completed ?transfer_option)
+        )
+      )
+    :effect (gate_workflow_step2_completed ?transfer_option)
+  )
+  (:action complete_gate_workflow_and_mark_ready
+    :parameters (?transfer_option - transfer_option)
+    :precondition
+      (and
+        (gate_workflow_step2_completed ?transfer_option)
+        (not
+          (transfer_option_finalization_flag ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (transfer_option_finalization_flag ?transfer_option)
+        (ready_for_buffer_assignment ?transfer_option)
+      )
+  )
+  (:action finalize_arrival_event_with_vehicle
+    :parameters (?arrival_event - arrival_event ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (arrival_event_processed ?arrival_event)
+        (arrival_event_ready ?arrival_event)
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_boarding_ready ?connecting_vehicle)
+        (not
+          (ready_for_buffer_assignment ?arrival_event)
+        )
+      )
+    :effect (ready_for_buffer_assignment ?arrival_event)
+  )
+  (:action finalize_departure_event_with_vehicle
+    :parameters (?departure_event - departure_event ?connecting_vehicle - connecting_vehicle)
+    :precondition
+      (and
+        (departure_event_processed ?departure_event)
+        (departure_event_ready ?departure_event)
+        (connecting_vehicle_reserved ?connecting_vehicle)
+        (vehicle_boarding_ready ?connecting_vehicle)
+        (not
+          (ready_for_buffer_assignment ?departure_event)
+        )
+      )
+    :effect (ready_for_buffer_assignment ?departure_event)
+  )
+  (:action allocate_time_buffer_to_segment
+    :parameters (?itinerary_segment - itinerary_segment ?time_buffer - time_buffer ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_buffer_assignment ?itinerary_segment)
+        (segment_assigned_time_window ?itinerary_segment ?time_window)
+        (time_buffer_available ?time_buffer)
+        (not
+          (segment_buffer_allocated ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (segment_buffer_allocated ?itinerary_segment)
+        (segment_assigned_time_buffer ?itinerary_segment ?time_buffer)
+        (not
+          (time_buffer_available ?time_buffer)
+        )
+      )
+  )
+  (:action assign_local_mode_and_confirm_arrival_transfer
+    :parameters (?arrival_event - arrival_event ?local_transport_mode - local_transport_mode ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (segment_buffer_allocated ?arrival_event)
+        (segment_assigned_local_mode ?arrival_event ?local_transport_mode)
+        (segment_assigned_time_buffer ?arrival_event ?time_buffer)
+        (not
+          (connection_validated ?arrival_event)
+        )
+      )
+    :effect
+      (and
+        (connection_validated ?arrival_event)
+        (local_mode_available ?local_transport_mode)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+  (:action assign_local_mode_and_confirm_departure_transfer
+    :parameters (?departure_event - departure_event ?local_transport_mode - local_transport_mode ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (segment_buffer_allocated ?departure_event)
+        (segment_assigned_local_mode ?departure_event ?local_transport_mode)
+        (segment_assigned_time_buffer ?departure_event ?time_buffer)
+        (not
+          (connection_validated ?departure_event)
+        )
+      )
+    :effect
+      (and
+        (connection_validated ?departure_event)
+        (local_mode_available ?local_transport_mode)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+  (:action assign_local_mode_and_confirm_transfer_option
+    :parameters (?transfer_option - transfer_option ?local_transport_mode - local_transport_mode ?time_buffer - time_buffer)
+    :precondition
+      (and
+        (segment_buffer_allocated ?transfer_option)
+        (segment_assigned_local_mode ?transfer_option ?local_transport_mode)
+        (segment_assigned_time_buffer ?transfer_option ?time_buffer)
+        (not
+          (connection_validated ?transfer_option)
+        )
+      )
+    :effect
+      (and
+        (connection_validated ?transfer_option)
+        (local_mode_available ?local_transport_mode)
+        (time_buffer_available ?time_buffer)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem itinerary_connection_feasibility_problem)
+  (:domain tourism_connection_time_feasibility_check)
+  (:objects arrival_event_1 - arrival_event departure_event_1 - departure_event transfer_option_1 - transfer_option transfer_option_2 - transfer_option local_mode_shuttle - local_transport_mode local_mode_taxi - local_transport_mode local_mode_bus - local_transport_mode time_window_1 - time_window terminal_gate_a - terminal_gate auxiliary_service_standard - auxiliary_service arrival_access_point_a - arrival_access_point departure_access_point_a - departure_access_point connecting_vehicle_v1 - connecting_vehicle passenger_profile_1 - passenger_profile passenger_profile_2 - passenger_profile ticket_option_standard - ticket_option ticket_option_flexible - ticket_option service_option_meal - service_option service_option_assistance - service_option time_buffer_standard - time_buffer equipment_resource_wheelchair - equipment_resource special_request_group - special_request special_request_assistance - special_request operational_constraint_staffing - operational_constraint)
+  (:init
+    (local_mode_available local_mode_shuttle)
+    (local_mode_available local_mode_taxi)
+    (local_mode_available local_mode_bus)
+    (time_window_available time_window_1)
+    (terminal_gate_available terminal_gate_a)
+    (auxiliary_service_available auxiliary_service_standard)
+    (arrival_linked_access_point arrival_event_1 arrival_access_point_a)
+    (departure_linked_access_point departure_event_1 departure_access_point_a)
+    (connecting_vehicle_available connecting_vehicle_v1)
+    (passenger_profile_available passenger_profile_1)
+    (passenger_profile_available passenger_profile_2)
+    (transfer_option_linked_arrival_event transfer_option_1 arrival_event_1)
+    (transfer_option_linked_arrival_event transfer_option_2 arrival_event_1)
+    (transfer_option_linked_departure_event transfer_option_1 departure_event_1)
+    (transfer_option_linked_departure_event transfer_option_2 departure_event_1)
+    (transfer_option_allocated_vehicle transfer_option_1 connecting_vehicle_v1)
+    (transfer_option_allocated_vehicle transfer_option_2 connecting_vehicle_v1)
+    (transfer_option_linked_passenger_profile transfer_option_1 passenger_profile_1)
+    (transfer_option_linked_passenger_profile transfer_option_2 passenger_profile_2)
+    (ticket_option_available ticket_option_standard)
+    (ticket_option_available ticket_option_flexible)
+    (service_option_available service_option_meal)
+    (service_option_available service_option_assistance)
+    (time_buffer_available time_buffer_standard)
+    (equipment_resource_available equipment_resource_wheelchair)
+    (special_request_available special_request_group)
+    (transfer_option_linked_special_request transfer_option_1 special_request_group)
+    (transfer_option_linked_special_request transfer_option_2 special_request_assistance)
+    (operational_constraint_available operational_constraint_staffing)
+  )
+  (:goal
+    (and
+      (connection_validated arrival_event_1)
+      (connection_validated departure_event_1)
+      (connection_validated transfer_option_1)
+      (connection_validated transfer_option_2)
+    )
+  )
+)

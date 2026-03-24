@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain day_night_traversal)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object env_object_category - object spatial_zone_category - object traversal_entity_parent - object traversal_entity - traversal_entity_parent route_permit - resource_category scout_report - resource_category companion_unit - resource_category landmark_modifier - resource_category activation_credential - resource_category return_marker - resource_category equipment_module - resource_category time_of_day_tool - resource_category consumable_resource - env_object_category map_fragment - env_object_category objective_token - env_object_category day_zone_token - spatial_zone_category night_zone_token - spatial_zone_category map_tile - spatial_zone_category traversal_subgroup - traversal_entity waypoint_subgroup - traversal_entity day_node - traversal_subgroup night_node - traversal_subgroup waypoint - waypoint_subgroup)
+  (:predicates
+    (discovered ?traversal_entity - traversal_entity)
+    (prepared ?traversal_entity - traversal_entity)
+    (permit_assignment ?traversal_entity - traversal_entity)
+    (traversal_unlocked ?traversal_entity - traversal_entity)
+    (completion_marker ?traversal_entity - traversal_entity)
+    (return_prepared ?traversal_entity - traversal_entity)
+    (permit_available ?route_permit - route_permit)
+    (has_permit ?traversal_entity - traversal_entity ?route_permit - route_permit)
+    (scout_available ?scout_report - scout_report)
+    (has_scout_report ?traversal_entity - traversal_entity ?scout_report - scout_report)
+    (companion_available ?companion_unit - companion_unit)
+    (companion_assigned ?traversal_entity - traversal_entity ?companion_unit - companion_unit)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (consumed_on_day_node ?day_node - day_node ?consumable_resource - consumable_resource)
+    (consumed_on_night_node ?night_node - night_node ?consumable_resource - consumable_resource)
+    (day_node_zone_link ?day_node - day_node ?day_zone_token - day_zone_token)
+    (day_zone_active ?day_zone_token - day_zone_token)
+    (day_zone_hazard_handled ?day_zone_token - day_zone_token)
+    (day_node_cleared ?day_node - day_node)
+    (night_node_zone_link ?night_node - night_node ?night_zone_token - night_zone_token)
+    (night_zone_active ?night_zone_token - night_zone_token)
+    (night_zone_hazard_handled ?night_zone_token - night_zone_token)
+    (night_node_cleared ?night_node - night_node)
+    (tile_unprocessed ?map_tile - map_tile)
+    (tile_registered ?map_tile - map_tile)
+    (tile_has_day_zone ?map_tile - map_tile ?day_zone_token - day_zone_token)
+    (tile_has_night_zone ?map_tile - map_tile ?night_zone_token - night_zone_token)
+    (tile_day_confirmed ?map_tile - map_tile)
+    (tile_night_confirmed ?map_tile - map_tile)
+    (tile_validated ?map_tile - map_tile)
+    (waypoint_link_day_node ?waypoint - waypoint ?day_node - day_node)
+    (waypoint_link_night_node ?waypoint - waypoint ?night_node - night_node)
+    (waypoint_on_tile ?waypoint - waypoint ?map_tile - map_tile)
+    (fragment_available ?map_fragment - map_fragment)
+    (waypoint_has_fragment ?waypoint - waypoint ?map_fragment - map_fragment)
+    (fragment_collected ?map_fragment - map_fragment)
+    (fragment_on_tile ?map_fragment - map_fragment ?map_tile - map_tile)
+    (waypoint_intermediate ?waypoint - waypoint)
+    (waypoint_pre_activation ?waypoint - waypoint)
+    (waypoint_inspection_ready ?waypoint - waypoint)
+    (landmark_modifier_applied ?waypoint - waypoint)
+    (landmark_secondary_active ?waypoint - waypoint)
+    (waypoint_fully_activated ?waypoint - waypoint)
+    (activation_executed ?waypoint - waypoint)
+    (objective_available ?objective_token - objective_token)
+    (waypoint_has_objective ?waypoint - waypoint ?objective_token - objective_token)
+    (objective_acknowledged ?waypoint - waypoint)
+    (objective_queued ?waypoint - waypoint)
+    (objective_completed ?waypoint - waypoint)
+    (landmark_modifier_available ?landmark_modifier - landmark_modifier)
+    (waypoint_has_landmark_modifier ?waypoint - waypoint ?landmark_modifier - landmark_modifier)
+    (credential_available ?activation_credential - activation_credential)
+    (credential_bound ?waypoint - waypoint ?activation_credential - activation_credential)
+    (equipment_available ?equipment_module - equipment_module)
+    (equipment_installed ?waypoint - waypoint ?equipment_module - equipment_module)
+    (time_tool_available ?time_of_day_tool - time_of_day_tool)
+    (time_tool_installed ?waypoint - waypoint ?time_of_day_tool - time_of_day_tool)
+    (return_marker_available ?return_marker - return_marker)
+    (return_marker_bound ?traversal_entity - traversal_entity ?return_marker - return_marker)
+    (day_node_contributed ?day_node - day_node)
+    (night_node_contributed ?night_node - night_node)
+    (waypoint_finalized ?waypoint - waypoint)
+  )
+  (:action discover_entity
+    :parameters (?traversal_entity - traversal_entity)
+    :precondition
+      (and
+        (not
+          (discovered ?traversal_entity)
+        )
+        (not
+          (traversal_unlocked ?traversal_entity)
+        )
+      )
+    :effect (discovered ?traversal_entity)
+  )
+  (:action attach_route_permit
+    :parameters (?traversal_entity - traversal_entity ?route_permit - route_permit)
+    :precondition
+      (and
+        (discovered ?traversal_entity)
+        (not
+          (permit_assignment ?traversal_entity)
+        )
+        (permit_available ?route_permit)
+      )
+    :effect
+      (and
+        (permit_assignment ?traversal_entity)
+        (has_permit ?traversal_entity ?route_permit)
+        (not
+          (permit_available ?route_permit)
+        )
+      )
+  )
+  (:action apply_scout_report
+    :parameters (?traversal_entity - traversal_entity ?scout_report - scout_report)
+    :precondition
+      (and
+        (discovered ?traversal_entity)
+        (permit_assignment ?traversal_entity)
+        (scout_available ?scout_report)
+      )
+    :effect
+      (and
+        (has_scout_report ?traversal_entity ?scout_report)
+        (not
+          (scout_available ?scout_report)
+        )
+      )
+  )
+  (:action prepare_entity
+    :parameters (?traversal_entity - traversal_entity ?scout_report - scout_report)
+    :precondition
+      (and
+        (discovered ?traversal_entity)
+        (permit_assignment ?traversal_entity)
+        (has_scout_report ?traversal_entity ?scout_report)
+        (not
+          (prepared ?traversal_entity)
+        )
+      )
+    :effect (prepared ?traversal_entity)
+  )
+  (:action release_scout_report
+    :parameters (?traversal_entity - traversal_entity ?scout_report - scout_report)
+    :precondition
+      (and
+        (has_scout_report ?traversal_entity ?scout_report)
+      )
+    :effect
+      (and
+        (scout_available ?scout_report)
+        (not
+          (has_scout_report ?traversal_entity ?scout_report)
+        )
+      )
+  )
+  (:action assign_companion
+    :parameters (?traversal_entity - traversal_entity ?companion_unit - companion_unit)
+    :precondition
+      (and
+        (prepared ?traversal_entity)
+        (companion_available ?companion_unit)
+      )
+    :effect
+      (and
+        (companion_assigned ?traversal_entity ?companion_unit)
+        (not
+          (companion_available ?companion_unit)
+        )
+      )
+  )
+  (:action release_companion
+    :parameters (?traversal_entity - traversal_entity ?companion_unit - companion_unit)
+    :precondition
+      (and
+        (companion_assigned ?traversal_entity ?companion_unit)
+      )
+    :effect
+      (and
+        (companion_available ?companion_unit)
+        (not
+          (companion_assigned ?traversal_entity ?companion_unit)
+        )
+      )
+  )
+  (:action install_equipment
+    :parameters (?waypoint - waypoint ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (equipment_available ?equipment_module)
+      )
+    :effect
+      (and
+        (equipment_installed ?waypoint ?equipment_module)
+        (not
+          (equipment_available ?equipment_module)
+        )
+      )
+  )
+  (:action remove_equipment
+    :parameters (?waypoint - waypoint ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (equipment_installed ?waypoint ?equipment_module)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_module)
+        (not
+          (equipment_installed ?waypoint ?equipment_module)
+        )
+      )
+  )
+  (:action install_time_tool
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (time_tool_available ?time_of_day_tool)
+      )
+    :effect
+      (and
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (not
+          (time_tool_available ?time_of_day_tool)
+        )
+      )
+  )
+  (:action remove_time_tool
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool)
+    :precondition
+      (and
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+      )
+    :effect
+      (and
+        (time_tool_available ?time_of_day_tool)
+        (not
+          (time_tool_installed ?waypoint ?time_of_day_tool)
+        )
+      )
+  )
+  (:action activate_day_zone
+    :parameters (?day_node - day_node ?day_zone_token - day_zone_token ?scout_report - scout_report)
+    :precondition
+      (and
+        (prepared ?day_node)
+        (has_scout_report ?day_node ?scout_report)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (not
+          (day_zone_active ?day_zone_token)
+        )
+        (not
+          (day_zone_hazard_handled ?day_zone_token)
+        )
+      )
+    :effect (day_zone_active ?day_zone_token)
+  )
+  (:action clear_day_node_with_companion
+    :parameters (?day_node - day_node ?day_zone_token - day_zone_token ?companion_unit - companion_unit)
+    :precondition
+      (and
+        (prepared ?day_node)
+        (companion_assigned ?day_node ?companion_unit)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (day_zone_active ?day_zone_token)
+        (not
+          (day_node_contributed ?day_node)
+        )
+      )
+    :effect
+      (and
+        (day_node_contributed ?day_node)
+        (day_node_cleared ?day_node)
+      )
+  )
+  (:action use_consumable_on_day_node
+    :parameters (?day_node - day_node ?day_zone_token - day_zone_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (prepared ?day_node)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (consumable_available ?consumable_resource)
+        (not
+          (day_node_contributed ?day_node)
+        )
+      )
+    :effect
+      (and
+        (day_zone_hazard_handled ?day_zone_token)
+        (day_node_contributed ?day_node)
+        (consumed_on_day_node ?day_node ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_day_node_clearing
+    :parameters (?day_node - day_node ?day_zone_token - day_zone_token ?scout_report - scout_report ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (prepared ?day_node)
+        (has_scout_report ?day_node ?scout_report)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (day_zone_hazard_handled ?day_zone_token)
+        (consumed_on_day_node ?day_node ?consumable_resource)
+        (not
+          (day_node_cleared ?day_node)
+        )
+      )
+    :effect
+      (and
+        (day_zone_active ?day_zone_token)
+        (day_node_cleared ?day_node)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumed_on_day_node ?day_node ?consumable_resource)
+        )
+      )
+  )
+  (:action activate_night_zone
+    :parameters (?night_node - night_node ?night_zone_token - night_zone_token ?scout_report - scout_report)
+    :precondition
+      (and
+        (prepared ?night_node)
+        (has_scout_report ?night_node ?scout_report)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (not
+          (night_zone_active ?night_zone_token)
+        )
+        (not
+          (night_zone_hazard_handled ?night_zone_token)
+        )
+      )
+    :effect (night_zone_active ?night_zone_token)
+  )
+  (:action clear_night_node_with_companion
+    :parameters (?night_node - night_node ?night_zone_token - night_zone_token ?companion_unit - companion_unit)
+    :precondition
+      (and
+        (prepared ?night_node)
+        (companion_assigned ?night_node ?companion_unit)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (night_zone_active ?night_zone_token)
+        (not
+          (night_node_contributed ?night_node)
+        )
+      )
+    :effect
+      (and
+        (night_node_contributed ?night_node)
+        (night_node_cleared ?night_node)
+      )
+  )
+  (:action use_consumable_on_night_node
+    :parameters (?night_node - night_node ?night_zone_token - night_zone_token ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (prepared ?night_node)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (consumable_available ?consumable_resource)
+        (not
+          (night_node_contributed ?night_node)
+        )
+      )
+    :effect
+      (and
+        (night_zone_hazard_handled ?night_zone_token)
+        (night_node_contributed ?night_node)
+        (consumed_on_night_node ?night_node ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_night_node_clearing
+    :parameters (?night_node - night_node ?night_zone_token - night_zone_token ?scout_report - scout_report ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (prepared ?night_node)
+        (has_scout_report ?night_node ?scout_report)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (night_zone_hazard_handled ?night_zone_token)
+        (consumed_on_night_node ?night_node ?consumable_resource)
+        (not
+          (night_node_cleared ?night_node)
+        )
+      )
+    :effect
+      (and
+        (night_zone_active ?night_zone_token)
+        (night_node_cleared ?night_node)
+        (consumable_available ?consumable_resource)
+        (not
+          (consumed_on_night_node ?night_node ?consumable_resource)
+        )
+      )
+  )
+  (:action register_map_tile
+    :parameters (?day_node - day_node ?night_node - night_node ?day_zone_token - day_zone_token ?night_zone_token - night_zone_token ?map_tile - map_tile)
+    :precondition
+      (and
+        (day_node_contributed ?day_node)
+        (night_node_contributed ?night_node)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (day_zone_active ?day_zone_token)
+        (night_zone_active ?night_zone_token)
+        (day_node_cleared ?day_node)
+        (night_node_cleared ?night_node)
+        (tile_unprocessed ?map_tile)
+      )
+    :effect
+      (and
+        (tile_registered ?map_tile)
+        (tile_has_day_zone ?map_tile ?day_zone_token)
+        (tile_has_night_zone ?map_tile ?night_zone_token)
+        (not
+          (tile_unprocessed ?map_tile)
+        )
+      )
+  )
+  (:action register_map_tile_day_variant
+    :parameters (?day_node - day_node ?night_node - night_node ?day_zone_token - day_zone_token ?night_zone_token - night_zone_token ?map_tile - map_tile)
+    :precondition
+      (and
+        (day_node_contributed ?day_node)
+        (night_node_contributed ?night_node)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (day_zone_hazard_handled ?day_zone_token)
+        (night_zone_active ?night_zone_token)
+        (not
+          (day_node_cleared ?day_node)
+        )
+        (night_node_cleared ?night_node)
+        (tile_unprocessed ?map_tile)
+      )
+    :effect
+      (and
+        (tile_registered ?map_tile)
+        (tile_has_day_zone ?map_tile ?day_zone_token)
+        (tile_has_night_zone ?map_tile ?night_zone_token)
+        (tile_day_confirmed ?map_tile)
+        (not
+          (tile_unprocessed ?map_tile)
+        )
+      )
+  )
+  (:action register_map_tile_night_variant
+    :parameters (?day_node - day_node ?night_node - night_node ?day_zone_token - day_zone_token ?night_zone_token - night_zone_token ?map_tile - map_tile)
+    :precondition
+      (and
+        (day_node_contributed ?day_node)
+        (night_node_contributed ?night_node)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (day_zone_active ?day_zone_token)
+        (night_zone_hazard_handled ?night_zone_token)
+        (day_node_cleared ?day_node)
+        (not
+          (night_node_cleared ?night_node)
+        )
+        (tile_unprocessed ?map_tile)
+      )
+    :effect
+      (and
+        (tile_registered ?map_tile)
+        (tile_has_day_zone ?map_tile ?day_zone_token)
+        (tile_has_night_zone ?map_tile ?night_zone_token)
+        (tile_night_confirmed ?map_tile)
+        (not
+          (tile_unprocessed ?map_tile)
+        )
+      )
+  )
+  (:action register_map_tile_both_variant
+    :parameters (?day_node - day_node ?night_node - night_node ?day_zone_token - day_zone_token ?night_zone_token - night_zone_token ?map_tile - map_tile)
+    :precondition
+      (and
+        (day_node_contributed ?day_node)
+        (night_node_contributed ?night_node)
+        (day_node_zone_link ?day_node ?day_zone_token)
+        (night_node_zone_link ?night_node ?night_zone_token)
+        (day_zone_hazard_handled ?day_zone_token)
+        (night_zone_hazard_handled ?night_zone_token)
+        (not
+          (day_node_cleared ?day_node)
+        )
+        (not
+          (night_node_cleared ?night_node)
+        )
+        (tile_unprocessed ?map_tile)
+      )
+    :effect
+      (and
+        (tile_registered ?map_tile)
+        (tile_has_day_zone ?map_tile ?day_zone_token)
+        (tile_has_night_zone ?map_tile ?night_zone_token)
+        (tile_day_confirmed ?map_tile)
+        (tile_night_confirmed ?map_tile)
+        (not
+          (tile_unprocessed ?map_tile)
+        )
+      )
+  )
+  (:action validate_map_tile
+    :parameters (?map_tile - map_tile ?day_node - day_node ?scout_report - scout_report)
+    :precondition
+      (and
+        (tile_registered ?map_tile)
+        (day_node_contributed ?day_node)
+        (has_scout_report ?day_node ?scout_report)
+        (not
+          (tile_validated ?map_tile)
+        )
+      )
+    :effect (tile_validated ?map_tile)
+  )
+  (:action collect_map_fragment
+    :parameters (?waypoint - waypoint ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (waypoint_on_tile ?waypoint ?map_tile)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_available ?map_fragment)
+        (tile_registered ?map_tile)
+        (tile_validated ?map_tile)
+        (not
+          (fragment_collected ?map_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_collected ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (not
+          (fragment_available ?map_fragment)
+        )
+      )
+  )
+  (:action enter_waypoint_intermediate
+    :parameters (?waypoint - waypoint ?map_fragment - map_fragment ?map_tile - map_tile ?scout_report - scout_report)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_collected ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (has_scout_report ?waypoint ?scout_report)
+        (not
+          (tile_day_confirmed ?map_tile)
+        )
+        (not
+          (waypoint_intermediate ?waypoint)
+        )
+      )
+    :effect (waypoint_intermediate ?waypoint)
+  )
+  (:action apply_landmark_modifier
+    :parameters (?waypoint - waypoint ?landmark_modifier - landmark_modifier)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (landmark_modifier_available ?landmark_modifier)
+        (not
+          (landmark_modifier_applied ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (landmark_modifier_applied ?waypoint)
+        (waypoint_has_landmark_modifier ?waypoint ?landmark_modifier)
+        (not
+          (landmark_modifier_available ?landmark_modifier)
+        )
+      )
+  )
+  (:action configure_waypoint_with_landmark
+    :parameters (?waypoint - waypoint ?map_fragment - map_fragment ?map_tile - map_tile ?scout_report - scout_report ?landmark_modifier - landmark_modifier)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_collected ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (has_scout_report ?waypoint ?scout_report)
+        (tile_day_confirmed ?map_tile)
+        (landmark_modifier_applied ?waypoint)
+        (waypoint_has_landmark_modifier ?waypoint ?landmark_modifier)
+        (not
+          (waypoint_intermediate ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_intermediate ?waypoint)
+        (landmark_secondary_active ?waypoint)
+      )
+  )
+  (:action start_waypoint_pre_activation
+    :parameters (?waypoint - waypoint ?equipment_module - equipment_module ?companion_unit - companion_unit ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_intermediate ?waypoint)
+        (equipment_installed ?waypoint ?equipment_module)
+        (companion_assigned ?waypoint ?companion_unit)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (not
+          (tile_night_confirmed ?map_tile)
+        )
+        (not
+          (waypoint_pre_activation ?waypoint)
+        )
+      )
+    :effect (waypoint_pre_activation ?waypoint)
+  )
+  (:action confirm_waypoint_pre_activation
+    :parameters (?waypoint - waypoint ?equipment_module - equipment_module ?companion_unit - companion_unit ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_intermediate ?waypoint)
+        (equipment_installed ?waypoint ?equipment_module)
+        (companion_assigned ?waypoint ?companion_unit)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (tile_night_confirmed ?map_tile)
+        (not
+          (waypoint_pre_activation ?waypoint)
+        )
+      )
+    :effect (waypoint_pre_activation ?waypoint)
+  )
+  (:action mark_waypoint_inspection_ready
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_pre_activation ?waypoint)
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (not
+          (tile_day_confirmed ?map_tile)
+        )
+        (not
+          (tile_night_confirmed ?map_tile)
+        )
+        (not
+          (waypoint_inspection_ready ?waypoint)
+        )
+      )
+    :effect (waypoint_inspection_ready ?waypoint)
+  )
+  (:action confirm_waypoint_full_activation_day
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_pre_activation ?waypoint)
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (tile_day_confirmed ?map_tile)
+        (not
+          (tile_night_confirmed ?map_tile)
+        )
+        (not
+          (waypoint_inspection_ready ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (waypoint_fully_activated ?waypoint)
+      )
+  )
+  (:action confirm_waypoint_full_activation_night
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_pre_activation ?waypoint)
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (not
+          (tile_day_confirmed ?map_tile)
+        )
+        (tile_night_confirmed ?map_tile)
+        (not
+          (waypoint_inspection_ready ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (waypoint_fully_activated ?waypoint)
+      )
+  )
+  (:action confirm_waypoint_full_activation_both
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool ?map_fragment - map_fragment ?map_tile - map_tile)
+    :precondition
+      (and
+        (waypoint_pre_activation ?waypoint)
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (waypoint_has_fragment ?waypoint ?map_fragment)
+        (fragment_on_tile ?map_fragment ?map_tile)
+        (tile_day_confirmed ?map_tile)
+        (tile_night_confirmed ?map_tile)
+        (not
+          (waypoint_inspection_ready ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (waypoint_fully_activated ?waypoint)
+      )
+  )
+  (:action finalize_waypoint_activation
+    :parameters (?waypoint - waypoint)
+    :precondition
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (not
+          (waypoint_fully_activated ?waypoint)
+        )
+        (not
+          (waypoint_finalized ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_finalized ?waypoint)
+        (completion_marker ?waypoint)
+      )
+  )
+  (:action apply_activation_credential
+    :parameters (?waypoint - waypoint ?activation_credential - activation_credential)
+    :precondition
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (waypoint_fully_activated ?waypoint)
+        (credential_available ?activation_credential)
+      )
+    :effect
+      (and
+        (credential_bound ?waypoint ?activation_credential)
+        (not
+          (credential_available ?activation_credential)
+        )
+      )
+  )
+  (:action execute_waypoint_activation
+    :parameters (?waypoint - waypoint ?day_node - day_node ?night_node - night_node ?scout_report - scout_report ?activation_credential - activation_credential)
+    :precondition
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (waypoint_fully_activated ?waypoint)
+        (credential_bound ?waypoint ?activation_credential)
+        (waypoint_link_day_node ?waypoint ?day_node)
+        (waypoint_link_night_node ?waypoint ?night_node)
+        (day_node_cleared ?day_node)
+        (night_node_cleared ?night_node)
+        (has_scout_report ?waypoint ?scout_report)
+        (not
+          (activation_executed ?waypoint)
+        )
+      )
+    :effect (activation_executed ?waypoint)
+  )
+  (:action finalize_waypoint_after_execution
+    :parameters (?waypoint - waypoint)
+    :precondition
+      (and
+        (waypoint_inspection_ready ?waypoint)
+        (activation_executed ?waypoint)
+        (not
+          (waypoint_finalized ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_finalized ?waypoint)
+        (completion_marker ?waypoint)
+      )
+  )
+  (:action acknowledge_waypoint_objective
+    :parameters (?waypoint - waypoint ?objective_token - objective_token ?scout_report - scout_report)
+    :precondition
+      (and
+        (prepared ?waypoint)
+        (has_scout_report ?waypoint ?scout_report)
+        (objective_available ?objective_token)
+        (waypoint_has_objective ?waypoint ?objective_token)
+        (not
+          (objective_acknowledged ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (objective_acknowledged ?waypoint)
+        (not
+          (objective_available ?objective_token)
+        )
+      )
+  )
+  (:action queue_waypoint_objective
+    :parameters (?waypoint - waypoint ?companion_unit - companion_unit)
+    :precondition
+      (and
+        (objective_acknowledged ?waypoint)
+        (companion_assigned ?waypoint ?companion_unit)
+        (not
+          (objective_queued ?waypoint)
+        )
+      )
+    :effect (objective_queued ?waypoint)
+  )
+  (:action complete_waypoint_objective_processing
+    :parameters (?waypoint - waypoint ?time_of_day_tool - time_of_day_tool)
+    :precondition
+      (and
+        (objective_queued ?waypoint)
+        (time_tool_installed ?waypoint ?time_of_day_tool)
+        (not
+          (objective_completed ?waypoint)
+        )
+      )
+    :effect (objective_completed ?waypoint)
+  )
+  (:action finalize_waypoint_objective
+    :parameters (?waypoint - waypoint)
+    :precondition
+      (and
+        (objective_completed ?waypoint)
+        (not
+          (waypoint_finalized ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (waypoint_finalized ?waypoint)
+        (completion_marker ?waypoint)
+      )
+  )
+  (:action finalize_day_node_completion
+    :parameters (?day_node - day_node ?map_tile - map_tile)
+    :precondition
+      (and
+        (day_node_contributed ?day_node)
+        (day_node_cleared ?day_node)
+        (tile_registered ?map_tile)
+        (tile_validated ?map_tile)
+        (not
+          (completion_marker ?day_node)
+        )
+      )
+    :effect (completion_marker ?day_node)
+  )
+  (:action finalize_night_node_completion
+    :parameters (?night_node - night_node ?map_tile - map_tile)
+    :precondition
+      (and
+        (night_node_contributed ?night_node)
+        (night_node_cleared ?night_node)
+        (tile_registered ?map_tile)
+        (tile_validated ?map_tile)
+        (not
+          (completion_marker ?night_node)
+        )
+      )
+    :effect (completion_marker ?night_node)
+  )
+  (:action assign_return_marker
+    :parameters (?traversal_entity - traversal_entity ?return_marker - return_marker ?scout_report - scout_report)
+    :precondition
+      (and
+        (completion_marker ?traversal_entity)
+        (has_scout_report ?traversal_entity ?scout_report)
+        (return_marker_available ?return_marker)
+        (not
+          (return_prepared ?traversal_entity)
+        )
+      )
+    :effect
+      (and
+        (return_prepared ?traversal_entity)
+        (return_marker_bound ?traversal_entity ?return_marker)
+        (not
+          (return_marker_available ?return_marker)
+        )
+      )
+  )
+  (:action use_return_marker_to_unlock_day_node
+    :parameters (?day_node - day_node ?route_permit - route_permit ?return_marker - return_marker)
+    :precondition
+      (and
+        (return_prepared ?day_node)
+        (has_permit ?day_node ?route_permit)
+        (return_marker_bound ?day_node ?return_marker)
+        (not
+          (traversal_unlocked ?day_node)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?day_node)
+        (permit_available ?route_permit)
+        (return_marker_available ?return_marker)
+      )
+  )
+  (:action use_return_marker_to_unlock_night_node
+    :parameters (?night_node - night_node ?route_permit - route_permit ?return_marker - return_marker)
+    :precondition
+      (and
+        (return_prepared ?night_node)
+        (has_permit ?night_node ?route_permit)
+        (return_marker_bound ?night_node ?return_marker)
+        (not
+          (traversal_unlocked ?night_node)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?night_node)
+        (permit_available ?route_permit)
+        (return_marker_available ?return_marker)
+      )
+  )
+  (:action use_return_marker_to_unlock_waypoint
+    :parameters (?waypoint - waypoint ?route_permit - route_permit ?return_marker - return_marker)
+    :precondition
+      (and
+        (return_prepared ?waypoint)
+        (has_permit ?waypoint ?route_permit)
+        (return_marker_bound ?waypoint ?return_marker)
+        (not
+          (traversal_unlocked ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?waypoint)
+        (permit_available ?route_permit)
+        (return_marker_available ?return_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem day_night_traversal_problem)
+  (:domain day_night_traversal)
+  (:objects day_node_1 - day_node night_node_1 - night_node waypoint_1 - waypoint waypoint_2 - waypoint permit_1 - route_permit permit_2 - route_permit permit_3 - route_permit scout_report_1 - scout_report companion_1 - companion_unit consumable_1 - consumable_resource day_zone_1 - day_zone_token night_zone_1 - night_zone_token map_tile_1 - map_tile fragment_1 - map_fragment fragment_2 - map_fragment landmark_modifier_1 - landmark_modifier landmark_modifier_2 - landmark_modifier activation_credential_1 - activation_credential activation_credential_2 - activation_credential return_marker_1 - return_marker equipment_module_1 - equipment_module objective_token_1 - objective_token objective_token_2 - objective_token time_tool_1 - time_of_day_tool)
+  (:init
+    (permit_available permit_1)
+    (permit_available permit_2)
+    (permit_available permit_3)
+    (scout_available scout_report_1)
+    (companion_available companion_1)
+    (consumable_available consumable_1)
+    (day_node_zone_link day_node_1 day_zone_1)
+    (night_node_zone_link night_node_1 night_zone_1)
+    (tile_unprocessed map_tile_1)
+    (fragment_available fragment_1)
+    (fragment_available fragment_2)
+    (waypoint_link_day_node waypoint_1 day_node_1)
+    (waypoint_link_day_node waypoint_2 day_node_1)
+    (waypoint_link_night_node waypoint_1 night_node_1)
+    (waypoint_link_night_node waypoint_2 night_node_1)
+    (waypoint_on_tile waypoint_1 map_tile_1)
+    (waypoint_on_tile waypoint_2 map_tile_1)
+    (waypoint_has_fragment waypoint_1 fragment_1)
+    (waypoint_has_fragment waypoint_2 fragment_2)
+    (landmark_modifier_available landmark_modifier_1)
+    (landmark_modifier_available landmark_modifier_2)
+    (credential_available activation_credential_1)
+    (credential_available activation_credential_2)
+    (return_marker_available return_marker_1)
+    (equipment_available equipment_module_1)
+    (objective_available objective_token_1)
+    (waypoint_has_objective waypoint_1 objective_token_1)
+    (waypoint_has_objective waypoint_2 objective_token_2)
+    (time_tool_available time_tool_1)
+  )
+  (:goal
+    (and
+      (traversal_unlocked day_node_1)
+      (traversal_unlocked night_node_1)
+      (traversal_unlocked waypoint_1)
+      (traversal_unlocked waypoint_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_entity day_node_1)
+(attach_route_permit day_node_1 permit_1)
+(apply_scout_report day_node_1 scout_report_1)
+(prepare_entity day_node_1 scout_report_1)
+(activate_day_zone day_node_1 day_zone_1 scout_report_1)
+(assign_companion day_node_1 companion_1)
+(clear_day_node_with_companion day_node_1 day_zone_1 companion_1)
+(release_companion day_node_1 companion_1)
+(discover_entity night_node_1)
+(attach_route_permit night_node_1 permit_2)
+(release_scout_report day_node_1 scout_report_1)
+(apply_scout_report night_node_1 scout_report_1)
+(prepare_entity night_node_1 scout_report_1)
+(activate_night_zone night_node_1 night_zone_1 scout_report_1)
+(assign_companion night_node_1 companion_1)
+(clear_night_node_with_companion night_node_1 night_zone_1 companion_1)
+(release_companion night_node_1 companion_1)
+(register_map_tile day_node_1 night_node_1 day_zone_1 night_zone_1 map_tile_1)
+(release_scout_report night_node_1 scout_report_1)
+(apply_scout_report day_node_1 scout_report_1)
+(validate_map_tile map_tile_1 day_node_1 scout_report_1)
+(finalize_day_node_completion day_node_1 map_tile_1)
+(finalize_night_node_completion night_node_1 map_tile_1)
+(assign_return_marker day_node_1 return_marker_1 scout_report_1)
+(use_return_marker_to_unlock_day_node day_node_1 permit_1 return_marker_1)
+(release_scout_report day_node_1 scout_report_1)
+(apply_scout_report night_node_1 scout_report_1)
+(assign_return_marker night_node_1 return_marker_1 scout_report_1)
+(use_return_marker_to_unlock_night_node night_node_1 permit_2 return_marker_1)
+(discover_entity waypoint_1)
+(attach_route_permit waypoint_1 permit_1)
+(release_scout_report night_node_1 scout_report_1)
+(apply_scout_report waypoint_1 scout_report_1)
+(prepare_entity waypoint_1 scout_report_1)
+(collect_map_fragment waypoint_1 fragment_1 map_tile_1)
+(enter_waypoint_intermediate waypoint_1 fragment_1 map_tile_1 scout_report_1)
+(install_equipment waypoint_1 equipment_module_1)
+(assign_companion waypoint_1 companion_1)
+(start_waypoint_pre_activation waypoint_1 equipment_module_1 companion_1 fragment_1 map_tile_1)
+(install_time_tool waypoint_1 time_tool_1)
+(mark_waypoint_inspection_ready waypoint_1 time_tool_1 fragment_1 map_tile_1)
+(finalize_waypoint_activation waypoint_1)
+(assign_return_marker waypoint_1 return_marker_1 scout_report_1)
+(use_return_marker_to_unlock_waypoint waypoint_1 permit_1 return_marker_1)
+(release_companion waypoint_1 companion_1)
+(release_scout_report waypoint_1 scout_report_1)
+(remove_equipment waypoint_1 equipment_module_1)
+(remove_time_tool waypoint_1 time_tool_1)
+(discover_entity waypoint_2)
+(attach_route_permit waypoint_2 permit_2)
+(apply_scout_report waypoint_2 scout_report_1)
+(prepare_entity waypoint_2 scout_report_1)
+(collect_map_fragment waypoint_2 fragment_2 map_tile_1)
+(enter_waypoint_intermediate waypoint_2 fragment_2 map_tile_1 scout_report_1)
+(install_equipment waypoint_2 equipment_module_1)
+(assign_companion waypoint_2 companion_1)
+(start_waypoint_pre_activation waypoint_2 equipment_module_1 companion_1 fragment_2 map_tile_1)
+(install_time_tool waypoint_2 time_tool_1)
+(mark_waypoint_inspection_ready waypoint_2 time_tool_1 fragment_2 map_tile_1)
+(finalize_waypoint_activation waypoint_2)
+(assign_return_marker waypoint_2 return_marker_1 scout_report_1)
+(use_return_marker_to_unlock_waypoint waypoint_2 permit_2 return_marker_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_dwfglb2q/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_dwfglb2q/plan.pddl 62 
+
+
+
+--- stderr ---
+

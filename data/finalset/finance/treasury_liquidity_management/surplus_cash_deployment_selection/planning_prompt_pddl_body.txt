@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain surplus_cash_deployment_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource - object instrument_group - object option_group - object position_scope - object surplus_position - position_scope execution_channel - actor_or_resource tenor_profile - actor_or_resource trading_desk - actor_or_resource asset_class_tag - actor_or_resource allocation_rule - actor_or_resource buffer_type - actor_or_resource investment_policy - actor_or_resource market_signal - actor_or_resource instrument - instrument_group settlement_account - instrument_group strategy_tag - instrument_group source_option - option_group target_option - option_group trade_instruction - option_group account_cluster - surplus_position entity_cluster - surplus_position source_account - account_cluster target_account - account_cluster treasury_entity - entity_cluster)
+  (:predicates
+    (identified ?surplus_position - surplus_position)
+    (approved_for_deployment ?surplus_position - surplus_position)
+    (channel_assigned ?surplus_position - surplus_position)
+    (executed ?surplus_position - surplus_position)
+    (deployment_posted ?surplus_position - surplus_position)
+    (earmarked ?surplus_position - surplus_position)
+    (execution_channel_available ?execution_channel - execution_channel)
+    (channel_binding ?surplus_position - surplus_position ?execution_channel - execution_channel)
+    (tenor_available ?tenor_profile - tenor_profile)
+    (tenor_profile_binding ?surplus_position - surplus_position ?tenor_profile - tenor_profile)
+    (trading_desk_available ?trading_desk - trading_desk)
+    (assigned_to_trading_desk ?surplus_position - surplus_position ?trading_desk - trading_desk)
+    (instrument_available ?instrument - instrument)
+    (source_account_instrument_option ?source_account - source_account ?instrument - instrument)
+    (target_account_instrument_option ?target_account - target_account ?instrument - instrument)
+    (source_account_option_binding ?source_account - source_account ?source_option - source_option)
+    (source_option_selected ?source_option - source_option)
+    (source_option_allocated ?source_option - source_option)
+    (source_account_confirmed ?source_account - source_account)
+    (target_account_option_binding ?target_account - target_account ?target_option - target_option)
+    (target_option_selected ?target_option - target_option)
+    (target_option_allocated ?target_option - target_option)
+    (target_account_confirmed ?target_account - target_account)
+    (trade_instruction_slot_available ?trade_instruction - trade_instruction)
+    (trade_instruction_assembled ?trade_instruction - trade_instruction)
+    (trade_instruction_source_option_binding ?trade_instruction - trade_instruction ?source_option - source_option)
+    (trade_instruction_target_option_binding ?trade_instruction - trade_instruction ?target_option - target_option)
+    (trade_instruction_flag_primary ?trade_instruction - trade_instruction)
+    (trade_instruction_flag_secondary ?trade_instruction - trade_instruction)
+    (trade_instruction_locked_for_settlement ?trade_instruction - trade_instruction)
+    (entity_source_account_link ?treasury_entity - treasury_entity ?source_account - source_account)
+    (entity_target_account_link ?treasury_entity - treasury_entity ?target_account - target_account)
+    (entity_trade_instruction_link ?treasury_entity - treasury_entity ?trade_instruction - trade_instruction)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (entity_settlement_account_binding ?treasury_entity - treasury_entity ?settlement_account - settlement_account)
+    (settlement_account_assigned ?settlement_account - settlement_account)
+    (settlement_account_bound_to_trade_instruction ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    (entity_policy_validated ?treasury_entity - treasury_entity)
+    (entity_eligibility_passed ?treasury_entity - treasury_entity)
+    (entity_validated_for_allocation ?treasury_entity - treasury_entity)
+    (entity_has_asset_tag ?treasury_entity - treasury_entity)
+    (entity_tag_confirmed ?treasury_entity - treasury_entity)
+    (entity_policy_attached ?treasury_entity - treasury_entity)
+    (entity_allocation_locked ?treasury_entity - treasury_entity)
+    (strategy_tag_available ?strategy_tag - strategy_tag)
+    (entity_strategy_tag_binding ?treasury_entity - treasury_entity ?strategy_tag - strategy_tag)
+    (entity_strategy_selected ?treasury_entity - treasury_entity)
+    (entity_strategy_initiated ?treasury_entity - treasury_entity)
+    (entity_strategy_ready ?treasury_entity - treasury_entity)
+    (asset_class_tag_available ?asset_class_tag - asset_class_tag)
+    (entity_asset_class_tag_binding ?treasury_entity - treasury_entity ?asset_class_tag - asset_class_tag)
+    (allocation_rule_available ?allocation_rule - allocation_rule)
+    (entity_allocation_rule_binding ?treasury_entity - treasury_entity ?allocation_rule - allocation_rule)
+    (investment_policy_available ?investment_policy - investment_policy)
+    (entity_investment_policy_binding ?treasury_entity - treasury_entity ?investment_policy - investment_policy)
+    (market_signal_available ?market_signal - market_signal)
+    (entity_market_signal_binding ?treasury_entity - treasury_entity ?market_signal - market_signal)
+    (buffer_type_available ?buffer_type - buffer_type)
+    (buffer_assigned ?surplus_position - surplus_position ?buffer_type - buffer_type)
+    (source_account_ready ?source_account - source_account)
+    (target_account_ready ?target_account - target_account)
+    (entity_allocation_committed ?treasury_entity - treasury_entity)
+  )
+  (:action identify_surplus_position
+    :parameters (?surplus_position - surplus_position)
+    :precondition
+      (and
+        (not
+          (identified ?surplus_position)
+        )
+        (not
+          (executed ?surplus_position)
+        )
+      )
+    :effect (identified ?surplus_position)
+  )
+  (:action assign_execution_channel_to_position
+    :parameters (?surplus_position - surplus_position ?execution_channel - execution_channel)
+    :precondition
+      (and
+        (identified ?surplus_position)
+        (not
+          (channel_assigned ?surplus_position)
+        )
+        (execution_channel_available ?execution_channel)
+      )
+    :effect
+      (and
+        (channel_assigned ?surplus_position)
+        (channel_binding ?surplus_position ?execution_channel)
+        (not
+          (execution_channel_available ?execution_channel)
+        )
+      )
+  )
+  (:action select_tenor_for_position
+    :parameters (?surplus_position - surplus_position ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (identified ?surplus_position)
+        (channel_assigned ?surplus_position)
+        (tenor_available ?tenor_profile)
+      )
+    :effect
+      (and
+        (tenor_profile_binding ?surplus_position ?tenor_profile)
+        (not
+          (tenor_available ?tenor_profile)
+        )
+      )
+  )
+  (:action finalize_tenor_selection
+    :parameters (?surplus_position - surplus_position ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (identified ?surplus_position)
+        (channel_assigned ?surplus_position)
+        (tenor_profile_binding ?surplus_position ?tenor_profile)
+        (not
+          (approved_for_deployment ?surplus_position)
+        )
+      )
+    :effect (approved_for_deployment ?surplus_position)
+  )
+  (:action unassign_tenor_from_position
+    :parameters (?surplus_position - surplus_position ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (tenor_profile_binding ?surplus_position ?tenor_profile)
+      )
+    :effect
+      (and
+        (tenor_available ?tenor_profile)
+        (not
+          (tenor_profile_binding ?surplus_position ?tenor_profile)
+        )
+      )
+  )
+  (:action assign_trading_desk_to_position
+    :parameters (?surplus_position - surplus_position ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (approved_for_deployment ?surplus_position)
+        (trading_desk_available ?trading_desk)
+      )
+    :effect
+      (and
+        (assigned_to_trading_desk ?surplus_position ?trading_desk)
+        (not
+          (trading_desk_available ?trading_desk)
+        )
+      )
+  )
+  (:action release_trading_desk_from_position
+    :parameters (?surplus_position - surplus_position ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (assigned_to_trading_desk ?surplus_position ?trading_desk)
+      )
+    :effect
+      (and
+        (trading_desk_available ?trading_desk)
+        (not
+          (assigned_to_trading_desk ?surplus_position ?trading_desk)
+        )
+      )
+  )
+  (:action assign_investment_policy_to_entity
+    :parameters (?treasury_entity - treasury_entity ?investment_policy - investment_policy)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (investment_policy_available ?investment_policy)
+      )
+    :effect
+      (and
+        (entity_investment_policy_binding ?treasury_entity ?investment_policy)
+        (not
+          (investment_policy_available ?investment_policy)
+        )
+      )
+  )
+  (:action remove_investment_policy_from_entity
+    :parameters (?treasury_entity - treasury_entity ?investment_policy - investment_policy)
+    :precondition
+      (and
+        (entity_investment_policy_binding ?treasury_entity ?investment_policy)
+      )
+    :effect
+      (and
+        (investment_policy_available ?investment_policy)
+        (not
+          (entity_investment_policy_binding ?treasury_entity ?investment_policy)
+        )
+      )
+  )
+  (:action assign_market_signal_to_entity
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (market_signal_available ?market_signal)
+      )
+    :effect
+      (and
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (not
+          (market_signal_available ?market_signal)
+        )
+      )
+  )
+  (:action remove_market_signal_from_entity
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+      )
+    :effect
+      (and
+        (market_signal_available ?market_signal)
+        (not
+          (entity_market_signal_binding ?treasury_entity ?market_signal)
+        )
+      )
+  )
+  (:action select_source_option_for_account
+    :parameters (?source_account - source_account ?source_option - source_option ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (approved_for_deployment ?source_account)
+        (tenor_profile_binding ?source_account ?tenor_profile)
+        (source_account_option_binding ?source_account ?source_option)
+        (not
+          (source_option_selected ?source_option)
+        )
+        (not
+          (source_option_allocated ?source_option)
+        )
+      )
+    :effect (source_option_selected ?source_option)
+  )
+  (:action confirm_source_option_with_desk
+    :parameters (?source_account - source_account ?source_option - source_option ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (approved_for_deployment ?source_account)
+        (assigned_to_trading_desk ?source_account ?trading_desk)
+        (source_account_option_binding ?source_account ?source_option)
+        (source_option_selected ?source_option)
+        (not
+          (source_account_ready ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_account_ready ?source_account)
+        (source_account_confirmed ?source_account)
+      )
+  )
+  (:action associate_instrument_with_source_option
+    :parameters (?source_account - source_account ?source_option - source_option ?instrument - instrument)
+    :precondition
+      (and
+        (approved_for_deployment ?source_account)
+        (source_account_option_binding ?source_account ?source_option)
+        (instrument_available ?instrument)
+        (not
+          (source_account_ready ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_option_allocated ?source_option)
+        (source_account_ready ?source_account)
+        (source_account_instrument_option ?source_account ?instrument)
+        (not
+          (instrument_available ?instrument)
+        )
+      )
+  )
+  (:action finalize_source_option_selection
+    :parameters (?source_account - source_account ?source_option - source_option ?tenor_profile - tenor_profile ?instrument - instrument)
+    :precondition
+      (and
+        (approved_for_deployment ?source_account)
+        (tenor_profile_binding ?source_account ?tenor_profile)
+        (source_account_option_binding ?source_account ?source_option)
+        (source_option_allocated ?source_option)
+        (source_account_instrument_option ?source_account ?instrument)
+        (not
+          (source_account_confirmed ?source_account)
+        )
+      )
+    :effect
+      (and
+        (source_option_selected ?source_option)
+        (source_account_confirmed ?source_account)
+        (instrument_available ?instrument)
+        (not
+          (source_account_instrument_option ?source_account ?instrument)
+        )
+      )
+  )
+  (:action select_target_option_for_account
+    :parameters (?target_account - target_account ?target_option - target_option ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (approved_for_deployment ?target_account)
+        (tenor_profile_binding ?target_account ?tenor_profile)
+        (target_account_option_binding ?target_account ?target_option)
+        (not
+          (target_option_selected ?target_option)
+        )
+        (not
+          (target_option_allocated ?target_option)
+        )
+      )
+    :effect (target_option_selected ?target_option)
+  )
+  (:action confirm_target_option_with_desk
+    :parameters (?target_account - target_account ?target_option - target_option ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (approved_for_deployment ?target_account)
+        (assigned_to_trading_desk ?target_account ?trading_desk)
+        (target_account_option_binding ?target_account ?target_option)
+        (target_option_selected ?target_option)
+        (not
+          (target_account_ready ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_account_ready ?target_account)
+        (target_account_confirmed ?target_account)
+      )
+  )
+  (:action associate_instrument_with_target_option
+    :parameters (?target_account - target_account ?target_option - target_option ?instrument - instrument)
+    :precondition
+      (and
+        (approved_for_deployment ?target_account)
+        (target_account_option_binding ?target_account ?target_option)
+        (instrument_available ?instrument)
+        (not
+          (target_account_ready ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_option_allocated ?target_option)
+        (target_account_ready ?target_account)
+        (target_account_instrument_option ?target_account ?instrument)
+        (not
+          (instrument_available ?instrument)
+        )
+      )
+  )
+  (:action finalize_target_option_selection
+    :parameters (?target_account - target_account ?target_option - target_option ?tenor_profile - tenor_profile ?instrument - instrument)
+    :precondition
+      (and
+        (approved_for_deployment ?target_account)
+        (tenor_profile_binding ?target_account ?tenor_profile)
+        (target_account_option_binding ?target_account ?target_option)
+        (target_option_allocated ?target_option)
+        (target_account_instrument_option ?target_account ?instrument)
+        (not
+          (target_account_confirmed ?target_account)
+        )
+      )
+    :effect
+      (and
+        (target_option_selected ?target_option)
+        (target_account_confirmed ?target_account)
+        (instrument_available ?instrument)
+        (not
+          (target_account_instrument_option ?target_account ?instrument)
+        )
+      )
+  )
+  (:action assemble_trade_instruction_standard
+    :parameters (?source_account - source_account ?target_account - target_account ?source_option - source_option ?target_option - target_option ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (source_account_ready ?source_account)
+        (target_account_ready ?target_account)
+        (source_account_option_binding ?source_account ?source_option)
+        (target_account_option_binding ?target_account ?target_option)
+        (source_option_selected ?source_option)
+        (target_option_selected ?target_option)
+        (source_account_confirmed ?source_account)
+        (target_account_confirmed ?target_account)
+        (trade_instruction_slot_available ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_source_option_binding ?trade_instruction ?source_option)
+        (trade_instruction_target_option_binding ?trade_instruction ?target_option)
+        (not
+          (trade_instruction_slot_available ?trade_instruction)
+        )
+      )
+  )
+  (:action assemble_trade_instruction_with_primary_source_flag
+    :parameters (?source_account - source_account ?target_account - target_account ?source_option - source_option ?target_option - target_option ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (source_account_ready ?source_account)
+        (target_account_ready ?target_account)
+        (source_account_option_binding ?source_account ?source_option)
+        (target_account_option_binding ?target_account ?target_option)
+        (source_option_allocated ?source_option)
+        (target_option_selected ?target_option)
+        (not
+          (source_account_confirmed ?source_account)
+        )
+        (target_account_confirmed ?target_account)
+        (trade_instruction_slot_available ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_source_option_binding ?trade_instruction ?source_option)
+        (trade_instruction_target_option_binding ?trade_instruction ?target_option)
+        (trade_instruction_flag_primary ?trade_instruction)
+        (not
+          (trade_instruction_slot_available ?trade_instruction)
+        )
+      )
+  )
+  (:action assemble_trade_instruction_with_primary_target_flag
+    :parameters (?source_account - source_account ?target_account - target_account ?source_option - source_option ?target_option - target_option ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (source_account_ready ?source_account)
+        (target_account_ready ?target_account)
+        (source_account_option_binding ?source_account ?source_option)
+        (target_account_option_binding ?target_account ?target_option)
+        (source_option_selected ?source_option)
+        (target_option_allocated ?target_option)
+        (source_account_confirmed ?source_account)
+        (not
+          (target_account_confirmed ?target_account)
+        )
+        (trade_instruction_slot_available ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_source_option_binding ?trade_instruction ?source_option)
+        (trade_instruction_target_option_binding ?trade_instruction ?target_option)
+        (trade_instruction_flag_secondary ?trade_instruction)
+        (not
+          (trade_instruction_slot_available ?trade_instruction)
+        )
+      )
+  )
+  (:action assemble_trade_instruction_with_both_flags
+    :parameters (?source_account - source_account ?target_account - target_account ?source_option - source_option ?target_option - target_option ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (source_account_ready ?source_account)
+        (target_account_ready ?target_account)
+        (source_account_option_binding ?source_account ?source_option)
+        (target_account_option_binding ?target_account ?target_option)
+        (source_option_allocated ?source_option)
+        (target_option_allocated ?target_option)
+        (not
+          (source_account_confirmed ?source_account)
+        )
+        (not
+          (target_account_confirmed ?target_account)
+        )
+        (trade_instruction_slot_available ?trade_instruction)
+      )
+    :effect
+      (and
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_source_option_binding ?trade_instruction ?source_option)
+        (trade_instruction_target_option_binding ?trade_instruction ?target_option)
+        (trade_instruction_flag_primary ?trade_instruction)
+        (trade_instruction_flag_secondary ?trade_instruction)
+        (not
+          (trade_instruction_slot_available ?trade_instruction)
+        )
+      )
+  )
+  (:action lock_trade_instruction_for_settlement
+    :parameters (?trade_instruction - trade_instruction ?source_account - source_account ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (trade_instruction_assembled ?trade_instruction)
+        (source_account_ready ?source_account)
+        (tenor_profile_binding ?source_account ?tenor_profile)
+        (not
+          (trade_instruction_locked_for_settlement ?trade_instruction)
+        )
+      )
+    :effect (trade_instruction_locked_for_settlement ?trade_instruction)
+  )
+  (:action reserve_settlement_account_for_instruction
+    :parameters (?treasury_entity - treasury_entity ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (entity_trade_instruction_link ?treasury_entity ?trade_instruction)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_available ?settlement_account)
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_locked_for_settlement ?trade_instruction)
+        (not
+          (settlement_account_assigned ?settlement_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action validate_settlement_and_mark_entity
+    :parameters (?treasury_entity - treasury_entity ?settlement_account - settlement_account ?trade_instruction - trade_instruction ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (tenor_profile_binding ?treasury_entity ?tenor_profile)
+        (not
+          (trade_instruction_flag_primary ?trade_instruction)
+        )
+        (not
+          (entity_policy_validated ?treasury_entity)
+        )
+      )
+    :effect (entity_policy_validated ?treasury_entity)
+  )
+  (:action assign_asset_class_tag_to_entity
+    :parameters (?treasury_entity - treasury_entity ?asset_class_tag - asset_class_tag)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (asset_class_tag_available ?asset_class_tag)
+        (not
+          (entity_has_asset_tag ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_has_asset_tag ?treasury_entity)
+        (entity_asset_class_tag_binding ?treasury_entity ?asset_class_tag)
+        (not
+          (asset_class_tag_available ?asset_class_tag)
+        )
+      )
+  )
+  (:action apply_asset_tag_and_validate_entity
+    :parameters (?treasury_entity - treasury_entity ?settlement_account - settlement_account ?trade_instruction - trade_instruction ?tenor_profile - tenor_profile ?asset_class_tag - asset_class_tag)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_assigned ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (tenor_profile_binding ?treasury_entity ?tenor_profile)
+        (trade_instruction_flag_primary ?trade_instruction)
+        (entity_has_asset_tag ?treasury_entity)
+        (entity_asset_class_tag_binding ?treasury_entity ?asset_class_tag)
+        (not
+          (entity_policy_validated ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_policy_validated ?treasury_entity)
+        (entity_tag_confirmed ?treasury_entity)
+      )
+  )
+  (:action adjudicate_policy_for_entity
+    :parameters (?treasury_entity - treasury_entity ?investment_policy - investment_policy ?trading_desk - trading_desk ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_policy_validated ?treasury_entity)
+        (entity_investment_policy_binding ?treasury_entity ?investment_policy)
+        (assigned_to_trading_desk ?treasury_entity ?trading_desk)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (not
+          (trade_instruction_flag_secondary ?trade_instruction)
+        )
+        (not
+          (entity_eligibility_passed ?treasury_entity)
+        )
+      )
+    :effect (entity_eligibility_passed ?treasury_entity)
+  )
+  (:action adjudicate_policy_for_entity_alternate
+    :parameters (?treasury_entity - treasury_entity ?investment_policy - investment_policy ?trading_desk - trading_desk ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_policy_validated ?treasury_entity)
+        (entity_investment_policy_binding ?treasury_entity ?investment_policy)
+        (assigned_to_trading_desk ?treasury_entity ?trading_desk)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (trade_instruction_flag_secondary ?trade_instruction)
+        (not
+          (entity_eligibility_passed ?treasury_entity)
+        )
+      )
+    :effect (entity_eligibility_passed ?treasury_entity)
+  )
+  (:action apply_market_signal_and_mark_entity_validated
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligibility_passed ?treasury_entity)
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (not
+          (trade_instruction_flag_primary ?trade_instruction)
+        )
+        (not
+          (trade_instruction_flag_secondary ?trade_instruction)
+        )
+        (not
+          (entity_validated_for_allocation ?treasury_entity)
+        )
+      )
+    :effect (entity_validated_for_allocation ?treasury_entity)
+  )
+  (:action apply_market_signal_and_attach_policy_tag
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligibility_passed ?treasury_entity)
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (trade_instruction_flag_primary ?trade_instruction)
+        (not
+          (trade_instruction_flag_secondary ?trade_instruction)
+        )
+        (not
+          (entity_validated_for_allocation ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_policy_attached ?treasury_entity)
+      )
+  )
+  (:action apply_market_signal_and_attach_policy_tag_variant
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligibility_passed ?treasury_entity)
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (not
+          (trade_instruction_flag_primary ?trade_instruction)
+        )
+        (trade_instruction_flag_secondary ?trade_instruction)
+        (not
+          (entity_validated_for_allocation ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_policy_attached ?treasury_entity)
+      )
+  )
+  (:action finalize_compliance_adjudication
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal ?settlement_account - settlement_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (entity_eligibility_passed ?treasury_entity)
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (entity_settlement_account_binding ?treasury_entity ?settlement_account)
+        (settlement_account_bound_to_trade_instruction ?settlement_account ?trade_instruction)
+        (trade_instruction_flag_primary ?trade_instruction)
+        (trade_instruction_flag_secondary ?trade_instruction)
+        (not
+          (entity_validated_for_allocation ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_policy_attached ?treasury_entity)
+      )
+  )
+  (:action commit_entity_allocation
+    :parameters (?treasury_entity - treasury_entity)
+    :precondition
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (not
+          (entity_policy_attached ?treasury_entity)
+        )
+        (not
+          (entity_allocation_committed ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?treasury_entity)
+        (deployment_posted ?treasury_entity)
+      )
+  )
+  (:action attach_allocation_rule_to_entity
+    :parameters (?treasury_entity - treasury_entity ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_policy_attached ?treasury_entity)
+        (allocation_rule_available ?allocation_rule)
+      )
+    :effect
+      (and
+        (entity_allocation_rule_binding ?treasury_entity ?allocation_rule)
+        (not
+          (allocation_rule_available ?allocation_rule)
+        )
+      )
+  )
+  (:action finalize_entity_allocation_validation
+    :parameters (?treasury_entity - treasury_entity ?source_account - source_account ?target_account - target_account ?tenor_profile - tenor_profile ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_policy_attached ?treasury_entity)
+        (entity_allocation_rule_binding ?treasury_entity ?allocation_rule)
+        (entity_source_account_link ?treasury_entity ?source_account)
+        (entity_target_account_link ?treasury_entity ?target_account)
+        (source_account_confirmed ?source_account)
+        (target_account_confirmed ?target_account)
+        (tenor_profile_binding ?treasury_entity ?tenor_profile)
+        (not
+          (entity_allocation_locked ?treasury_entity)
+        )
+      )
+    :effect (entity_allocation_locked ?treasury_entity)
+  )
+  (:action commit_entity_allocation_post_validation
+    :parameters (?treasury_entity - treasury_entity)
+    :precondition
+      (and
+        (entity_validated_for_allocation ?treasury_entity)
+        (entity_allocation_locked ?treasury_entity)
+        (not
+          (entity_allocation_committed ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?treasury_entity)
+        (deployment_posted ?treasury_entity)
+      )
+  )
+  (:action activate_strategy_for_entity
+    :parameters (?treasury_entity - treasury_entity ?strategy_tag - strategy_tag ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (approved_for_deployment ?treasury_entity)
+        (tenor_profile_binding ?treasury_entity ?tenor_profile)
+        (strategy_tag_available ?strategy_tag)
+        (entity_strategy_tag_binding ?treasury_entity ?strategy_tag)
+        (not
+          (entity_strategy_selected ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_strategy_selected ?treasury_entity)
+        (not
+          (strategy_tag_available ?strategy_tag)
+        )
+      )
+  )
+  (:action initiate_strategy_for_entity
+    :parameters (?treasury_entity - treasury_entity ?trading_desk - trading_desk)
+    :precondition
+      (and
+        (entity_strategy_selected ?treasury_entity)
+        (assigned_to_trading_desk ?treasury_entity ?trading_desk)
+        (not
+          (entity_strategy_initiated ?treasury_entity)
+        )
+      )
+    :effect (entity_strategy_initiated ?treasury_entity)
+  )
+  (:action prepare_strategy_with_market_signal
+    :parameters (?treasury_entity - treasury_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_strategy_initiated ?treasury_entity)
+        (entity_market_signal_binding ?treasury_entity ?market_signal)
+        (not
+          (entity_strategy_ready ?treasury_entity)
+        )
+      )
+    :effect (entity_strategy_ready ?treasury_entity)
+  )
+  (:action commit_strategy_and_post
+    :parameters (?treasury_entity - treasury_entity)
+    :precondition
+      (and
+        (entity_strategy_ready ?treasury_entity)
+        (not
+          (entity_allocation_committed ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?treasury_entity)
+        (deployment_posted ?treasury_entity)
+      )
+  )
+  (:action post_deployment_to_source_account
+    :parameters (?source_account - source_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (source_account_ready ?source_account)
+        (source_account_confirmed ?source_account)
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_locked_for_settlement ?trade_instruction)
+        (not
+          (deployment_posted ?source_account)
+        )
+      )
+    :effect (deployment_posted ?source_account)
+  )
+  (:action post_deployment_to_target_account
+    :parameters (?target_account - target_account ?trade_instruction - trade_instruction)
+    :precondition
+      (and
+        (target_account_ready ?target_account)
+        (target_account_confirmed ?target_account)
+        (trade_instruction_assembled ?trade_instruction)
+        (trade_instruction_locked_for_settlement ?trade_instruction)
+        (not
+          (deployment_posted ?target_account)
+        )
+      )
+    :effect (deployment_posted ?target_account)
+  )
+  (:action earmark_position_with_buffer_type
+    :parameters (?surplus_position - surplus_position ?buffer_type - buffer_type ?tenor_profile - tenor_profile)
+    :precondition
+      (and
+        (deployment_posted ?surplus_position)
+        (tenor_profile_binding ?surplus_position ?tenor_profile)
+        (buffer_type_available ?buffer_type)
+        (not
+          (earmarked ?surplus_position)
+        )
+      )
+    :effect
+      (and
+        (earmarked ?surplus_position)
+        (buffer_assigned ?surplus_position ?buffer_type)
+        (not
+          (buffer_type_available ?buffer_type)
+        )
+      )
+  )
+  (:action execute_and_release_channel_for_source_account
+    :parameters (?source_account - source_account ?execution_channel - execution_channel ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (earmarked ?source_account)
+        (channel_binding ?source_account ?execution_channel)
+        (buffer_assigned ?source_account ?buffer_type)
+        (not
+          (executed ?source_account)
+        )
+      )
+    :effect
+      (and
+        (executed ?source_account)
+        (execution_channel_available ?execution_channel)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+  (:action execute_and_release_channel_for_target_account
+    :parameters (?target_account - target_account ?execution_channel - execution_channel ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (earmarked ?target_account)
+        (channel_binding ?target_account ?execution_channel)
+        (buffer_assigned ?target_account ?buffer_type)
+        (not
+          (executed ?target_account)
+        )
+      )
+    :effect
+      (and
+        (executed ?target_account)
+        (execution_channel_available ?execution_channel)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+  (:action execute_and_release_channel_for_entity
+    :parameters (?treasury_entity - treasury_entity ?execution_channel - execution_channel ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (earmarked ?treasury_entity)
+        (channel_binding ?treasury_entity ?execution_channel)
+        (buffer_assigned ?treasury_entity ?buffer_type)
+        (not
+          (executed ?treasury_entity)
+        )
+      )
+    :effect
+      (and
+        (executed ?treasury_entity)
+        (execution_channel_available ?execution_channel)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem surplus_cash_deployment_scenario_1)
+  (:domain surplus_cash_deployment_selection_domain)
+  (:objects corp_source_account_1 - source_account corp_target_account_1 - target_account treasury_entity_1 - treasury_entity treasury_entity_2 - treasury_entity channel_internal_sweep - execution_channel channel_broker_a - execution_channel channel_broker_b - execution_channel tenor_profile_overnight - tenor_profile trading_desk_liquidity - trading_desk instrument_deposit - instrument source_option_internal_fund - source_option target_option_mm_fund - target_option trade_instruction_candidate_1 - trade_instruction settlement_account_a - settlement_account settlement_account_b - settlement_account asset_class_tag_liquidity - asset_class_tag asset_class_tag_yield - asset_class_tag allocation_rule_high_yield - allocation_rule allocation_rule_buffer_replenish - allocation_rule buffer_operational - buffer_type investment_policy_standard - investment_policy strategy_tag_liquidity_opt - strategy_tag strategy_tag_yield_seek - strategy_tag market_signal_rate_fall - market_signal)
+  (:init
+    (execution_channel_available channel_internal_sweep)
+    (execution_channel_available channel_broker_a)
+    (execution_channel_available channel_broker_b)
+    (tenor_available tenor_profile_overnight)
+    (trading_desk_available trading_desk_liquidity)
+    (instrument_available instrument_deposit)
+    (source_account_option_binding corp_source_account_1 source_option_internal_fund)
+    (target_account_option_binding corp_target_account_1 target_option_mm_fund)
+    (trade_instruction_slot_available trade_instruction_candidate_1)
+    (settlement_account_available settlement_account_a)
+    (settlement_account_available settlement_account_b)
+    (entity_source_account_link treasury_entity_1 corp_source_account_1)
+    (entity_source_account_link treasury_entity_2 corp_source_account_1)
+    (entity_target_account_link treasury_entity_1 corp_target_account_1)
+    (entity_target_account_link treasury_entity_2 corp_target_account_1)
+    (entity_trade_instruction_link treasury_entity_1 trade_instruction_candidate_1)
+    (entity_trade_instruction_link treasury_entity_2 trade_instruction_candidate_1)
+    (entity_settlement_account_binding treasury_entity_1 settlement_account_a)
+    (entity_settlement_account_binding treasury_entity_2 settlement_account_b)
+    (asset_class_tag_available asset_class_tag_liquidity)
+    (asset_class_tag_available asset_class_tag_yield)
+    (allocation_rule_available allocation_rule_high_yield)
+    (allocation_rule_available allocation_rule_buffer_replenish)
+    (buffer_type_available buffer_operational)
+    (investment_policy_available investment_policy_standard)
+    (strategy_tag_available strategy_tag_liquidity_opt)
+    (entity_strategy_tag_binding treasury_entity_1 strategy_tag_liquidity_opt)
+    (entity_strategy_tag_binding treasury_entity_2 strategy_tag_yield_seek)
+    (market_signal_available market_signal_rate_fall)
+  )
+  (:goal
+    (and
+      (executed corp_source_account_1)
+      (executed corp_target_account_1)
+      (executed treasury_entity_1)
+      (executed treasury_entity_2)
+    )
+  )
+)

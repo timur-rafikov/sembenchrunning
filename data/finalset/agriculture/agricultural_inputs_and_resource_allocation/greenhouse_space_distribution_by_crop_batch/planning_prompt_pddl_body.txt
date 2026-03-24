@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain greenhouse_space_distribution_by_crop_batch)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_supertype - object profile_supertype - object material_supertype - object actor_supertype - object crop_batch - actor_supertype space_slot - resource_supertype crop_variety - resource_supertype equipment - resource_supertype permit - resource_supertype labor_shift - resource_supertype contingency_reserve - resource_supertype nutrient_solution - resource_supertype climate_buffer - resource_supertype consumable - profile_supertype substrate_mix - profile_supertype seasonal_document - profile_supertype irrigation_profile - material_supertype lighting_profile - material_supertype production_bay - material_supertype bench_type - crop_batch rack_type - crop_batch bench_batch - bench_type rack_batch - bench_type greenhouse_facility - rack_type)
+  (:predicates
+    (allocation_registered ?crop_batch - crop_batch)
+    (allocation_confirmed ?crop_batch - crop_batch)
+    (allocation_slot_reserved ?crop_batch - crop_batch)
+    (allocation_finalized ?crop_batch - crop_batch)
+    (allocation_validation_passed ?crop_batch - crop_batch)
+    (allocation_contingency_assigned ?crop_batch - crop_batch)
+    (space_slot_available ?space_slot - space_slot)
+    (allocation_slot_binding ?crop_batch - crop_batch ?space_slot - space_slot)
+    (variety_available ?crop_variety - crop_variety)
+    (allocation_variety_binding ?crop_batch - crop_batch ?crop_variety - crop_variety)
+    (equipment_available ?equipment - equipment)
+    (allocation_equipment_binding ?crop_batch - crop_batch ?equipment - equipment)
+    (consumable_available ?consumable - consumable)
+    (bench_consumable_binding ?bench_batch - bench_batch ?consumable - consumable)
+    (rack_consumable_binding ?rack_batch - rack_batch ?consumable - consumable)
+    (bench_irrigation_binding ?bench_batch - bench_batch ?irrigation_profile - irrigation_profile)
+    (irrigation_profile_engaged ?irrigation_profile - irrigation_profile)
+    (irrigation_profile_prepared ?irrigation_profile - irrigation_profile)
+    (bench_ready_for_provisioning ?bench_batch - bench_batch)
+    (rack_lighting_binding ?rack_batch - rack_batch ?lighting_profile - lighting_profile)
+    (lighting_profile_engaged ?lighting_profile - lighting_profile)
+    (lighting_profile_prepared ?lighting_profile - lighting_profile)
+    (rack_ready_for_provisioning ?rack_batch - rack_batch)
+    (production_bay_available ?production_bay - production_bay)
+    (production_bay_provisioned ?production_bay - production_bay)
+    (bay_irrigation_binding ?production_bay - production_bay ?irrigation_profile - irrigation_profile)
+    (bay_lighting_binding ?production_bay - production_bay ?lighting_profile - lighting_profile)
+    (bay_irrigation_configured ?production_bay - production_bay)
+    (bay_lighting_configured ?production_bay - production_bay)
+    (bay_ready_for_substrate_loading ?production_bay - production_bay)
+    (facility_bench_assignment ?greenhouse_facility - greenhouse_facility ?bench_batch - bench_batch)
+    (facility_rack_assignment ?greenhouse_facility - greenhouse_facility ?rack_batch - rack_batch)
+    (facility_bay_binding ?greenhouse_facility - greenhouse_facility ?production_bay - production_bay)
+    (substrate_mix_available ?substrate_mix - substrate_mix)
+    (facility_substrate_binding ?greenhouse_facility - greenhouse_facility ?substrate_mix - substrate_mix)
+    (substrate_loaded ?substrate_mix - substrate_mix)
+    (substrate_bound_to_bay ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    (facility_substrate_assigned ?greenhouse_facility - greenhouse_facility)
+    (facility_nutrient_assigned ?greenhouse_facility - greenhouse_facility)
+    (facility_compliance_ready ?greenhouse_facility - greenhouse_facility)
+    (facility_permit_attached ?greenhouse_facility - greenhouse_facility)
+    (facility_permit_stage_completed ?greenhouse_facility - greenhouse_facility)
+    (facility_climate_buffer_verified ?greenhouse_facility - greenhouse_facility)
+    (facility_quality_validated ?greenhouse_facility - greenhouse_facility)
+    (seasonal_document_available ?seasonal_document - seasonal_document)
+    (facility_document_binding ?greenhouse_facility - greenhouse_facility ?seasonal_document - seasonal_document)
+    (facility_document_attached ?greenhouse_facility - greenhouse_facility)
+    (facility_equipment_activated ?greenhouse_facility - greenhouse_facility)
+    (facility_climate_buffer_applied ?greenhouse_facility - greenhouse_facility)
+    (permit_available ?permit - permit)
+    (facility_permit_binding ?greenhouse_facility - greenhouse_facility ?permit - permit)
+    (labor_shift_available ?labor_shift - labor_shift)
+    (facility_labor_assigned ?greenhouse_facility - greenhouse_facility ?labor_shift - labor_shift)
+    (nutrient_solution_available ?nutrient_solution - nutrient_solution)
+    (facility_nutrient_binding ?greenhouse_facility - greenhouse_facility ?nutrient_solution - nutrient_solution)
+    (climate_buffer_available ?climate_buffer - climate_buffer)
+    (facility_climate_buffer_binding ?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (allocation_contingency_binding ?crop_batch - crop_batch ?contingency_reserve - contingency_reserve)
+    (bench_prepared ?bench_batch - bench_batch)
+    (rack_prepared ?rack_batch - rack_batch)
+    (facility_validation_logged ?greenhouse_facility - greenhouse_facility)
+  )
+  (:action register_crop_batch
+    :parameters (?crop_batch - crop_batch)
+    :precondition
+      (and
+        (not
+          (allocation_registered ?crop_batch)
+        )
+        (not
+          (allocation_finalized ?crop_batch)
+        )
+      )
+    :effect (allocation_registered ?crop_batch)
+  )
+  (:action reserve_space_slot_for_batch
+    :parameters (?crop_batch - crop_batch ?space_slot - space_slot)
+    :precondition
+      (and
+        (allocation_registered ?crop_batch)
+        (not
+          (allocation_slot_reserved ?crop_batch)
+        )
+        (space_slot_available ?space_slot)
+      )
+    :effect
+      (and
+        (allocation_slot_reserved ?crop_batch)
+        (allocation_slot_binding ?crop_batch ?space_slot)
+        (not
+          (space_slot_available ?space_slot)
+        )
+      )
+  )
+  (:action assign_variety_to_batch
+    :parameters (?crop_batch - crop_batch ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_registered ?crop_batch)
+        (allocation_slot_reserved ?crop_batch)
+        (variety_available ?crop_variety)
+      )
+    :effect
+      (and
+        (allocation_variety_binding ?crop_batch ?crop_variety)
+        (not
+          (variety_available ?crop_variety)
+        )
+      )
+  )
+  (:action confirm_variety_for_batch
+    :parameters (?crop_batch - crop_batch ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_registered ?crop_batch)
+        (allocation_slot_reserved ?crop_batch)
+        (allocation_variety_binding ?crop_batch ?crop_variety)
+        (not
+          (allocation_confirmed ?crop_batch)
+        )
+      )
+    :effect (allocation_confirmed ?crop_batch)
+  )
+  (:action rollback_variety_assignment_for_batch
+    :parameters (?crop_batch - crop_batch ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_variety_binding ?crop_batch ?crop_variety)
+      )
+    :effect
+      (and
+        (variety_available ?crop_variety)
+        (not
+          (allocation_variety_binding ?crop_batch ?crop_variety)
+        )
+      )
+  )
+  (:action reserve_equipment_for_batch
+    :parameters (?crop_batch - crop_batch ?equipment - equipment)
+    :precondition
+      (and
+        (allocation_confirmed ?crop_batch)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (allocation_equipment_binding ?crop_batch ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_batch
+    :parameters (?crop_batch - crop_batch ?equipment - equipment)
+    :precondition
+      (and
+        (allocation_equipment_binding ?crop_batch ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (allocation_equipment_binding ?crop_batch ?equipment)
+        )
+      )
+  )
+  (:action provision_nutrient_to_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?nutrient_solution - nutrient_solution)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (nutrient_solution_available ?nutrient_solution)
+      )
+    :effect
+      (and
+        (facility_nutrient_binding ?greenhouse_facility ?nutrient_solution)
+        (not
+          (nutrient_solution_available ?nutrient_solution)
+        )
+      )
+  )
+  (:action revoke_nutrient_from_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?nutrient_solution - nutrient_solution)
+    :precondition
+      (and
+        (facility_nutrient_binding ?greenhouse_facility ?nutrient_solution)
+      )
+    :effect
+      (and
+        (nutrient_solution_available ?nutrient_solution)
+        (not
+          (facility_nutrient_binding ?greenhouse_facility ?nutrient_solution)
+        )
+      )
+  )
+  (:action provision_climate_buffer_to_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (climate_buffer_available ?climate_buffer)
+      )
+    :effect
+      (and
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (not
+          (climate_buffer_available ?climate_buffer)
+        )
+      )
+  )
+  (:action revoke_climate_buffer_from_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer)
+    :precondition
+      (and
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+      )
+    :effect
+      (and
+        (climate_buffer_available ?climate_buffer)
+        (not
+          (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        )
+      )
+  )
+  (:action engage_irrigation_profile_for_bench
+    :parameters (?bench_batch - bench_batch ?irrigation_profile - irrigation_profile ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_confirmed ?bench_batch)
+        (allocation_variety_binding ?bench_batch ?crop_variety)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (not
+          (irrigation_profile_engaged ?irrigation_profile)
+        )
+        (not
+          (irrigation_profile_prepared ?irrigation_profile)
+        )
+      )
+    :effect (irrigation_profile_engaged ?irrigation_profile)
+  )
+  (:action prepare_bench_with_equipment
+    :parameters (?bench_batch - bench_batch ?irrigation_profile - irrigation_profile ?equipment - equipment)
+    :precondition
+      (and
+        (allocation_confirmed ?bench_batch)
+        (allocation_equipment_binding ?bench_batch ?equipment)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (irrigation_profile_engaged ?irrigation_profile)
+        (not
+          (bench_prepared ?bench_batch)
+        )
+      )
+    :effect
+      (and
+        (bench_prepared ?bench_batch)
+        (bench_ready_for_provisioning ?bench_batch)
+      )
+  )
+  (:action prepare_bench_with_consumable
+    :parameters (?bench_batch - bench_batch ?irrigation_profile - irrigation_profile ?consumable - consumable)
+    :precondition
+      (and
+        (allocation_confirmed ?bench_batch)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (consumable_available ?consumable)
+        (not
+          (bench_prepared ?bench_batch)
+        )
+      )
+    :effect
+      (and
+        (irrigation_profile_prepared ?irrigation_profile)
+        (bench_prepared ?bench_batch)
+        (bench_consumable_binding ?bench_batch ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_bench_preparation
+    :parameters (?bench_batch - bench_batch ?irrigation_profile - irrigation_profile ?crop_variety - crop_variety ?consumable - consumable)
+    :precondition
+      (and
+        (allocation_confirmed ?bench_batch)
+        (allocation_variety_binding ?bench_batch ?crop_variety)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (irrigation_profile_prepared ?irrigation_profile)
+        (bench_consumable_binding ?bench_batch ?consumable)
+        (not
+          (bench_ready_for_provisioning ?bench_batch)
+        )
+      )
+    :effect
+      (and
+        (irrigation_profile_engaged ?irrigation_profile)
+        (bench_ready_for_provisioning ?bench_batch)
+        (consumable_available ?consumable)
+        (not
+          (bench_consumable_binding ?bench_batch ?consumable)
+        )
+      )
+  )
+  (:action engage_lighting_profile_for_rack
+    :parameters (?rack_batch - rack_batch ?lighting_profile - lighting_profile ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_confirmed ?rack_batch)
+        (allocation_variety_binding ?rack_batch ?crop_variety)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (not
+          (lighting_profile_engaged ?lighting_profile)
+        )
+        (not
+          (lighting_profile_prepared ?lighting_profile)
+        )
+      )
+    :effect (lighting_profile_engaged ?lighting_profile)
+  )
+  (:action prepare_rack_with_equipment
+    :parameters (?rack_batch - rack_batch ?lighting_profile - lighting_profile ?equipment - equipment)
+    :precondition
+      (and
+        (allocation_confirmed ?rack_batch)
+        (allocation_equipment_binding ?rack_batch ?equipment)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (lighting_profile_engaged ?lighting_profile)
+        (not
+          (rack_prepared ?rack_batch)
+        )
+      )
+    :effect
+      (and
+        (rack_prepared ?rack_batch)
+        (rack_ready_for_provisioning ?rack_batch)
+      )
+  )
+  (:action prepare_rack_with_consumable
+    :parameters (?rack_batch - rack_batch ?lighting_profile - lighting_profile ?consumable - consumable)
+    :precondition
+      (and
+        (allocation_confirmed ?rack_batch)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (consumable_available ?consumable)
+        (not
+          (rack_prepared ?rack_batch)
+        )
+      )
+    :effect
+      (and
+        (lighting_profile_prepared ?lighting_profile)
+        (rack_prepared ?rack_batch)
+        (rack_consumable_binding ?rack_batch ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_rack_preparation
+    :parameters (?rack_batch - rack_batch ?lighting_profile - lighting_profile ?crop_variety - crop_variety ?consumable - consumable)
+    :precondition
+      (and
+        (allocation_confirmed ?rack_batch)
+        (allocation_variety_binding ?rack_batch ?crop_variety)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (lighting_profile_prepared ?lighting_profile)
+        (rack_consumable_binding ?rack_batch ?consumable)
+        (not
+          (rack_ready_for_provisioning ?rack_batch)
+        )
+      )
+    :effect
+      (and
+        (lighting_profile_engaged ?lighting_profile)
+        (rack_ready_for_provisioning ?rack_batch)
+        (consumable_available ?consumable)
+        (not
+          (rack_consumable_binding ?rack_batch ?consumable)
+        )
+      )
+  )
+  (:action provision_production_bay_with_engaged_profiles
+    :parameters (?bench_batch - bench_batch ?rack_batch - rack_batch ?irrigation_profile - irrigation_profile ?lighting_profile - lighting_profile ?production_bay - production_bay)
+    :precondition
+      (and
+        (bench_prepared ?bench_batch)
+        (rack_prepared ?rack_batch)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (irrigation_profile_engaged ?irrigation_profile)
+        (lighting_profile_engaged ?lighting_profile)
+        (bench_ready_for_provisioning ?bench_batch)
+        (rack_ready_for_provisioning ?rack_batch)
+        (production_bay_available ?production_bay)
+      )
+    :effect
+      (and
+        (production_bay_provisioned ?production_bay)
+        (bay_irrigation_binding ?production_bay ?irrigation_profile)
+        (bay_lighting_binding ?production_bay ?lighting_profile)
+        (not
+          (production_bay_available ?production_bay)
+        )
+      )
+  )
+  (:action provision_production_bay_with_prepared_irrigation
+    :parameters (?bench_batch - bench_batch ?rack_batch - rack_batch ?irrigation_profile - irrigation_profile ?lighting_profile - lighting_profile ?production_bay - production_bay)
+    :precondition
+      (and
+        (bench_prepared ?bench_batch)
+        (rack_prepared ?rack_batch)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (irrigation_profile_prepared ?irrigation_profile)
+        (lighting_profile_engaged ?lighting_profile)
+        (not
+          (bench_ready_for_provisioning ?bench_batch)
+        )
+        (rack_ready_for_provisioning ?rack_batch)
+        (production_bay_available ?production_bay)
+      )
+    :effect
+      (and
+        (production_bay_provisioned ?production_bay)
+        (bay_irrigation_binding ?production_bay ?irrigation_profile)
+        (bay_lighting_binding ?production_bay ?lighting_profile)
+        (bay_irrigation_configured ?production_bay)
+        (not
+          (production_bay_available ?production_bay)
+        )
+      )
+  )
+  (:action provision_production_bay_with_prepared_lighting
+    :parameters (?bench_batch - bench_batch ?rack_batch - rack_batch ?irrigation_profile - irrigation_profile ?lighting_profile - lighting_profile ?production_bay - production_bay)
+    :precondition
+      (and
+        (bench_prepared ?bench_batch)
+        (rack_prepared ?rack_batch)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (irrigation_profile_engaged ?irrigation_profile)
+        (lighting_profile_prepared ?lighting_profile)
+        (bench_ready_for_provisioning ?bench_batch)
+        (not
+          (rack_ready_for_provisioning ?rack_batch)
+        )
+        (production_bay_available ?production_bay)
+      )
+    :effect
+      (and
+        (production_bay_provisioned ?production_bay)
+        (bay_irrigation_binding ?production_bay ?irrigation_profile)
+        (bay_lighting_binding ?production_bay ?lighting_profile)
+        (bay_lighting_configured ?production_bay)
+        (not
+          (production_bay_available ?production_bay)
+        )
+      )
+  )
+  (:action provision_production_bay_with_all_profiles_prepared
+    :parameters (?bench_batch - bench_batch ?rack_batch - rack_batch ?irrigation_profile - irrigation_profile ?lighting_profile - lighting_profile ?production_bay - production_bay)
+    :precondition
+      (and
+        (bench_prepared ?bench_batch)
+        (rack_prepared ?rack_batch)
+        (bench_irrigation_binding ?bench_batch ?irrigation_profile)
+        (rack_lighting_binding ?rack_batch ?lighting_profile)
+        (irrigation_profile_prepared ?irrigation_profile)
+        (lighting_profile_prepared ?lighting_profile)
+        (not
+          (bench_ready_for_provisioning ?bench_batch)
+        )
+        (not
+          (rack_ready_for_provisioning ?rack_batch)
+        )
+        (production_bay_available ?production_bay)
+      )
+    :effect
+      (and
+        (production_bay_provisioned ?production_bay)
+        (bay_irrigation_binding ?production_bay ?irrigation_profile)
+        (bay_lighting_binding ?production_bay ?lighting_profile)
+        (bay_irrigation_configured ?production_bay)
+        (bay_lighting_configured ?production_bay)
+        (not
+          (production_bay_available ?production_bay)
+        )
+      )
+  )
+  (:action mark_bay_ready_for_substrate_loading
+    :parameters (?production_bay - production_bay ?bench_batch - bench_batch ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (production_bay_provisioned ?production_bay)
+        (bench_prepared ?bench_batch)
+        (allocation_variety_binding ?bench_batch ?crop_variety)
+        (not
+          (bay_ready_for_substrate_loading ?production_bay)
+        )
+      )
+    :effect (bay_ready_for_substrate_loading ?production_bay)
+  )
+  (:action load_substrate_into_bay
+    :parameters (?greenhouse_facility - greenhouse_facility ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (facility_bay_binding ?greenhouse_facility ?production_bay)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_mix_available ?substrate_mix)
+        (production_bay_provisioned ?production_bay)
+        (bay_ready_for_substrate_loading ?production_bay)
+        (not
+          (substrate_loaded ?substrate_mix)
+        )
+      )
+    :effect
+      (and
+        (substrate_loaded ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (not
+          (substrate_mix_available ?substrate_mix)
+        )
+      )
+  )
+  (:action confirm_substrate_binding_to_bay
+    :parameters (?greenhouse_facility - greenhouse_facility ?substrate_mix - substrate_mix ?production_bay - production_bay ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_loaded ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (allocation_variety_binding ?greenhouse_facility ?crop_variety)
+        (not
+          (bay_irrigation_configured ?production_bay)
+        )
+        (not
+          (facility_substrate_assigned ?greenhouse_facility)
+        )
+      )
+    :effect (facility_substrate_assigned ?greenhouse_facility)
+  )
+  (:action attach_permit_to_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?permit - permit)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (permit_available ?permit)
+        (not
+          (facility_permit_attached ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_permit_attached ?greenhouse_facility)
+        (facility_permit_binding ?greenhouse_facility ?permit)
+        (not
+          (permit_available ?permit)
+        )
+      )
+  )
+  (:action apply_permit_and_advance_compliance_stage
+    :parameters (?greenhouse_facility - greenhouse_facility ?substrate_mix - substrate_mix ?production_bay - production_bay ?crop_variety - crop_variety ?permit - permit)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_loaded ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (allocation_variety_binding ?greenhouse_facility ?crop_variety)
+        (bay_irrigation_configured ?production_bay)
+        (facility_permit_attached ?greenhouse_facility)
+        (facility_permit_binding ?greenhouse_facility ?permit)
+        (not
+          (facility_substrate_assigned ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_substrate_assigned ?greenhouse_facility)
+        (facility_permit_stage_completed ?greenhouse_facility)
+      )
+  )
+  (:action assign_nutrient_and_confirm_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?nutrient_solution - nutrient_solution ?equipment - equipment ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_substrate_assigned ?greenhouse_facility)
+        (facility_nutrient_binding ?greenhouse_facility ?nutrient_solution)
+        (allocation_equipment_binding ?greenhouse_facility ?equipment)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (not
+          (bay_lighting_configured ?production_bay)
+        )
+        (not
+          (facility_nutrient_assigned ?greenhouse_facility)
+        )
+      )
+    :effect (facility_nutrient_assigned ?greenhouse_facility)
+  )
+  (:action reconfirm_nutrient_assignment_to_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?nutrient_solution - nutrient_solution ?equipment - equipment ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_substrate_assigned ?greenhouse_facility)
+        (facility_nutrient_binding ?greenhouse_facility ?nutrient_solution)
+        (allocation_equipment_binding ?greenhouse_facility ?equipment)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (bay_lighting_configured ?production_bay)
+        (not
+          (facility_nutrient_assigned ?greenhouse_facility)
+        )
+      )
+    :effect (facility_nutrient_assigned ?greenhouse_facility)
+  )
+  (:action apply_climate_buffer_and_mark
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_nutrient_assigned ?greenhouse_facility)
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (not
+          (bay_irrigation_configured ?production_bay)
+        )
+        (not
+          (bay_lighting_configured ?production_bay)
+        )
+        (not
+          (facility_compliance_ready ?greenhouse_facility)
+        )
+      )
+    :effect (facility_compliance_ready ?greenhouse_facility)
+  )
+  (:action apply_climate_buffer_and_confirm_profiles
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_nutrient_assigned ?greenhouse_facility)
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (bay_irrigation_configured ?production_bay)
+        (not
+          (bay_lighting_configured ?production_bay)
+        )
+        (not
+          (facility_compliance_ready ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_climate_buffer_verified ?greenhouse_facility)
+      )
+  )
+  (:action apply_climate_buffer_and_confirm_alternate
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_nutrient_assigned ?greenhouse_facility)
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (not
+          (bay_irrigation_configured ?production_bay)
+        )
+        (bay_lighting_configured ?production_bay)
+        (not
+          (facility_compliance_ready ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_climate_buffer_verified ?greenhouse_facility)
+      )
+  )
+  (:action finalize_facility_climate_validation
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer ?substrate_mix - substrate_mix ?production_bay - production_bay)
+    :precondition
+      (and
+        (facility_nutrient_assigned ?greenhouse_facility)
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (facility_substrate_binding ?greenhouse_facility ?substrate_mix)
+        (substrate_bound_to_bay ?substrate_mix ?production_bay)
+        (bay_irrigation_configured ?production_bay)
+        (bay_lighting_configured ?production_bay)
+        (not
+          (facility_compliance_ready ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_climate_buffer_verified ?greenhouse_facility)
+      )
+  )
+  (:action record_validation_and_stage_release
+    :parameters (?greenhouse_facility - greenhouse_facility)
+    :precondition
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (not
+          (facility_climate_buffer_verified ?greenhouse_facility)
+        )
+        (not
+          (facility_validation_logged ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_validation_logged ?greenhouse_facility)
+        (allocation_validation_passed ?greenhouse_facility)
+      )
+  )
+  (:action assign_labor_shift_to_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?labor_shift - labor_shift)
+    :precondition
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_climate_buffer_verified ?greenhouse_facility)
+        (labor_shift_available ?labor_shift)
+      )
+    :effect
+      (and
+        (facility_labor_assigned ?greenhouse_facility ?labor_shift)
+        (not
+          (labor_shift_available ?labor_shift)
+        )
+      )
+  )
+  (:action perform_final_quality_validation_for_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?bench_batch - bench_batch ?rack_batch - rack_batch ?crop_variety - crop_variety ?labor_shift - labor_shift)
+    :precondition
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_climate_buffer_verified ?greenhouse_facility)
+        (facility_labor_assigned ?greenhouse_facility ?labor_shift)
+        (facility_bench_assignment ?greenhouse_facility ?bench_batch)
+        (facility_rack_assignment ?greenhouse_facility ?rack_batch)
+        (bench_ready_for_provisioning ?bench_batch)
+        (rack_ready_for_provisioning ?rack_batch)
+        (allocation_variety_binding ?greenhouse_facility ?crop_variety)
+        (not
+          (facility_quality_validated ?greenhouse_facility)
+        )
+      )
+    :effect (facility_quality_validated ?greenhouse_facility)
+  )
+  (:action finalize_validation_and_release
+    :parameters (?greenhouse_facility - greenhouse_facility)
+    :precondition
+      (and
+        (facility_compliance_ready ?greenhouse_facility)
+        (facility_quality_validated ?greenhouse_facility)
+        (not
+          (facility_validation_logged ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_validation_logged ?greenhouse_facility)
+        (allocation_validation_passed ?greenhouse_facility)
+      )
+  )
+  (:action attach_seasonal_document_and_approve_facility
+    :parameters (?greenhouse_facility - greenhouse_facility ?seasonal_document - seasonal_document ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_confirmed ?greenhouse_facility)
+        (allocation_variety_binding ?greenhouse_facility ?crop_variety)
+        (seasonal_document_available ?seasonal_document)
+        (facility_document_binding ?greenhouse_facility ?seasonal_document)
+        (not
+          (facility_document_attached ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_document_attached ?greenhouse_facility)
+        (not
+          (seasonal_document_available ?seasonal_document)
+        )
+      )
+  )
+  (:action activate_facility_equipment_post_approval
+    :parameters (?greenhouse_facility - greenhouse_facility ?equipment - equipment)
+    :precondition
+      (and
+        (facility_document_attached ?greenhouse_facility)
+        (allocation_equipment_binding ?greenhouse_facility ?equipment)
+        (not
+          (facility_equipment_activated ?greenhouse_facility)
+        )
+      )
+    :effect (facility_equipment_activated ?greenhouse_facility)
+  )
+  (:action engage_climate_buffer_for_facility_post_equipment
+    :parameters (?greenhouse_facility - greenhouse_facility ?climate_buffer - climate_buffer)
+    :precondition
+      (and
+        (facility_equipment_activated ?greenhouse_facility)
+        (facility_climate_buffer_binding ?greenhouse_facility ?climate_buffer)
+        (not
+          (facility_climate_buffer_applied ?greenhouse_facility)
+        )
+      )
+    :effect (facility_climate_buffer_applied ?greenhouse_facility)
+  )
+  (:action finalize_facility_approval_and_release
+    :parameters (?greenhouse_facility - greenhouse_facility)
+    :precondition
+      (and
+        (facility_climate_buffer_applied ?greenhouse_facility)
+        (not
+          (facility_validation_logged ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (facility_validation_logged ?greenhouse_facility)
+        (allocation_validation_passed ?greenhouse_facility)
+      )
+  )
+  (:action finalize_bench_allocation_to_bay
+    :parameters (?bench_batch - bench_batch ?production_bay - production_bay)
+    :precondition
+      (and
+        (bench_prepared ?bench_batch)
+        (bench_ready_for_provisioning ?bench_batch)
+        (production_bay_provisioned ?production_bay)
+        (bay_ready_for_substrate_loading ?production_bay)
+        (not
+          (allocation_validation_passed ?bench_batch)
+        )
+      )
+    :effect (allocation_validation_passed ?bench_batch)
+  )
+  (:action finalize_rack_allocation_to_bay
+    :parameters (?rack_batch - rack_batch ?production_bay - production_bay)
+    :precondition
+      (and
+        (rack_prepared ?rack_batch)
+        (rack_ready_for_provisioning ?rack_batch)
+        (production_bay_provisioned ?production_bay)
+        (bay_ready_for_substrate_loading ?production_bay)
+        (not
+          (allocation_validation_passed ?rack_batch)
+        )
+      )
+    :effect (allocation_validation_passed ?rack_batch)
+  )
+  (:action assign_contingency_to_batch
+    :parameters (?crop_batch - crop_batch ?contingency_reserve - contingency_reserve ?crop_variety - crop_variety)
+    :precondition
+      (and
+        (allocation_validation_passed ?crop_batch)
+        (allocation_variety_binding ?crop_batch ?crop_variety)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (allocation_contingency_assigned ?crop_batch)
+        )
+      )
+    :effect
+      (and
+        (allocation_contingency_assigned ?crop_batch)
+        (allocation_contingency_binding ?crop_batch ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action finalize_bench_batch_and_return_slot
+    :parameters (?bench_batch - bench_batch ?space_slot - space_slot ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocation_contingency_assigned ?bench_batch)
+        (allocation_slot_binding ?bench_batch ?space_slot)
+        (allocation_contingency_binding ?bench_batch ?contingency_reserve)
+        (not
+          (allocation_finalized ?bench_batch)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?bench_batch)
+        (space_slot_available ?space_slot)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_rack_batch_and_return_slot
+    :parameters (?rack_batch - rack_batch ?space_slot - space_slot ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocation_contingency_assigned ?rack_batch)
+        (allocation_slot_binding ?rack_batch ?space_slot)
+        (allocation_contingency_binding ?rack_batch ?contingency_reserve)
+        (not
+          (allocation_finalized ?rack_batch)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?rack_batch)
+        (space_slot_available ?space_slot)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_facility_allocation_and_return_slot
+    :parameters (?greenhouse_facility - greenhouse_facility ?space_slot - space_slot ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocation_contingency_assigned ?greenhouse_facility)
+        (allocation_slot_binding ?greenhouse_facility ?space_slot)
+        (allocation_contingency_binding ?greenhouse_facility ?contingency_reserve)
+        (not
+          (allocation_finalized ?greenhouse_facility)
+        )
+      )
+    :effect
+      (and
+        (allocation_finalized ?greenhouse_facility)
+        (space_slot_available ?space_slot)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem greenhouse_batch_allocation_problem)
+  (:domain greenhouse_space_distribution_by_crop_batch)
+  (:objects bench_batch_1 - bench_batch rack_batch_1 - rack_batch greenhouse_facility_a - greenhouse_facility greenhouse_facility_b - greenhouse_facility space_slot_1 - space_slot space_slot_2 - space_slot space_slot_3 - space_slot crop_variety_1 - crop_variety equipment_1 - equipment consumable_fertilizer_1 - consumable irrigation_profile_zone_1 - irrigation_profile lighting_profile_zone_1 - lighting_profile production_bay_a - production_bay substrate_mix_a - substrate_mix substrate_mix_b - substrate_mix permit_a - permit permit_b - permit labor_shift_morning - labor_shift labor_shift_evening - labor_shift contingency_reserve_1 - contingency_reserve nutrient_solution_batch_1 - nutrient_solution seasonal_document_1 - seasonal_document seasonal_document_2 - seasonal_document climate_buffer_1 - climate_buffer)
+  (:init
+    (space_slot_available space_slot_1)
+    (space_slot_available space_slot_2)
+    (space_slot_available space_slot_3)
+    (variety_available crop_variety_1)
+    (equipment_available equipment_1)
+    (consumable_available consumable_fertilizer_1)
+    (bench_irrigation_binding bench_batch_1 irrigation_profile_zone_1)
+    (rack_lighting_binding rack_batch_1 lighting_profile_zone_1)
+    (production_bay_available production_bay_a)
+    (substrate_mix_available substrate_mix_a)
+    (substrate_mix_available substrate_mix_b)
+    (facility_bench_assignment greenhouse_facility_a bench_batch_1)
+    (facility_bench_assignment greenhouse_facility_b bench_batch_1)
+    (facility_rack_assignment greenhouse_facility_a rack_batch_1)
+    (facility_rack_assignment greenhouse_facility_b rack_batch_1)
+    (facility_bay_binding greenhouse_facility_a production_bay_a)
+    (facility_bay_binding greenhouse_facility_b production_bay_a)
+    (facility_substrate_binding greenhouse_facility_a substrate_mix_a)
+    (facility_substrate_binding greenhouse_facility_b substrate_mix_b)
+    (permit_available permit_a)
+    (permit_available permit_b)
+    (labor_shift_available labor_shift_morning)
+    (labor_shift_available labor_shift_evening)
+    (contingency_reserve_available contingency_reserve_1)
+    (nutrient_solution_available nutrient_solution_batch_1)
+    (seasonal_document_available seasonal_document_1)
+    (facility_document_binding greenhouse_facility_a seasonal_document_1)
+    (facility_document_binding greenhouse_facility_b seasonal_document_2)
+    (climate_buffer_available climate_buffer_1)
+  )
+  (:goal
+    (and
+      (allocation_finalized bench_batch_1)
+      (allocation_finalized rack_batch_1)
+      (allocation_finalized greenhouse_facility_a)
+      (allocation_finalized greenhouse_facility_b)
+    )
+  )
+)

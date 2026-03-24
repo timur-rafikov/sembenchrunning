@@ -1,0 +1,937 @@
+(define (domain harvest_batch_receipt_scheduling)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object physical_resource - entity service_resource - entity document_resource - entity batch_entity - entity harvest_batch - batch_entity intake_bay - physical_resource commodity - physical_resource operator - physical_resource quality_certificate - physical_resource handling_instruction - physical_resource release_window - physical_resource temperature_setting - physical_resource treatment_protocol - physical_resource conditioning_slot - service_resource packaging_material - service_resource shipping_document - service_resource storage_zone - document_resource outbound_channel - document_resource storage_unit - document_resource batch_group - harvest_batch internal_batch_class - harvest_batch producer_batch_segment - batch_group transit_batch_segment - batch_group warehouse_batch_record - internal_batch_class)
+
+  (:predicates
+    (record_registered ?harvest_batch - harvest_batch)
+    (commodity_confirmed ?harvest_batch - harvest_batch)
+    (record_intake_allocated ?harvest_batch - harvest_batch)
+    (record_release_scheduled ?harvest_batch - harvest_batch)
+    (ready_for_release ?harvest_batch - harvest_batch)
+    (record_release_slot_reserved ?harvest_batch - harvest_batch)
+    (intake_bay_available ?intake_bay - intake_bay)
+    (record_assigned_to_intake_bay ?harvest_batch - harvest_batch ?intake_bay - intake_bay)
+    (commodity_available ?commodity - commodity)
+    (has_commodity ?harvest_batch - harvest_batch ?commodity - commodity)
+    (operator_available ?operator - operator)
+    (record_assigned_operator ?harvest_batch - harvest_batch ?operator - operator)
+    (conditioning_slot_available ?conditioning_slot - conditioning_slot)
+    (producer_segment_conditioning_reserved ?producer_batch_segment - producer_batch_segment ?conditioning_slot - conditioning_slot)
+    (transit_segment_conditioning_reserved ?transit_batch_segment - transit_batch_segment ?conditioning_slot - conditioning_slot)
+    (producer_segment_zone_compatible ?producer_batch_segment - producer_batch_segment ?storage_zone - storage_zone)
+    (storage_zone_prepared ?storage_zone - storage_zone)
+    (storage_zone_booked ?storage_zone - storage_zone)
+    (producer_segment_conditioning_completed ?producer_batch_segment - producer_batch_segment)
+    (transit_segment_channel_compatible ?transit_batch_segment - transit_batch_segment ?outbound_channel - outbound_channel)
+    (outbound_channel_prepared ?outbound_channel - outbound_channel)
+    (outbound_channel_booked ?outbound_channel - outbound_channel)
+    (transit_segment_conditioning_completed ?transit_batch_segment - transit_batch_segment)
+    (storage_unit_available ?storage_unit - storage_unit)
+    (storage_unit_reserved ?storage_unit - storage_unit)
+    (storage_unit_assigned_to_zone ?storage_unit - storage_unit ?storage_zone - storage_zone)
+    (storage_unit_assigned_to_channel ?storage_unit - storage_unit ?outbound_channel - outbound_channel)
+    (storage_unit_has_unprocessed_producer_segment ?storage_unit - storage_unit)
+    (storage_unit_has_unprocessed_transit_segment ?storage_unit - storage_unit)
+    (storage_unit_checked_in ?storage_unit - storage_unit)
+    (record_includes_producer_segment ?warehouse_batch_record - warehouse_batch_record ?producer_batch_segment - producer_batch_segment)
+    (record_includes_transit_segment ?warehouse_batch_record - warehouse_batch_record ?transit_batch_segment - transit_batch_segment)
+    (record_stored_in_storage_unit ?warehouse_batch_record - warehouse_batch_record ?storage_unit - storage_unit)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (record_has_packaging_material ?warehouse_batch_record - warehouse_batch_record ?packaging_material - packaging_material)
+    (packaging_material_attached ?packaging_material - packaging_material)
+    (packaging_material_attached_to_storage_unit ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    (record_packaged ?warehouse_batch_record - warehouse_batch_record)
+    (record_conditioning_reserved ?warehouse_batch_record - warehouse_batch_record)
+    (record_conditioning_completed ?warehouse_batch_record - warehouse_batch_record)
+    (record_certificate_applied ?warehouse_batch_record - warehouse_batch_record)
+    (record_quality_tagged ?warehouse_batch_record - warehouse_batch_record)
+    (record_handling_code_attached ?warehouse_batch_record - warehouse_batch_record)
+    (record_ready_for_finalization ?warehouse_batch_record - warehouse_batch_record)
+    (shipping_document_available ?shipping_document - shipping_document)
+    (record_has_shipping_document ?warehouse_batch_record - warehouse_batch_record ?shipping_document - shipping_document)
+    (record_shipping_document_verified ?warehouse_batch_record - warehouse_batch_record)
+    (record_document_inspection_done ?warehouse_batch_record - warehouse_batch_record)
+    (record_document_approved ?warehouse_batch_record - warehouse_batch_record)
+    (quality_certificate_available ?quality_certificate - quality_certificate)
+    (record_has_quality_certificate ?warehouse_batch_record - warehouse_batch_record ?quality_certificate - quality_certificate)
+    (handling_instruction_available ?handling_instruction - handling_instruction)
+    (record_has_handling_instruction ?warehouse_batch_record - warehouse_batch_record ?handling_instruction - handling_instruction)
+    (temperature_setting_available ?temperature_setting - temperature_setting)
+    (record_assigned_temperature_setting ?warehouse_batch_record - warehouse_batch_record ?temperature_setting - temperature_setting)
+    (treatment_protocol_available ?treatment_protocol - treatment_protocol)
+    (record_assigned_treatment_protocol ?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol)
+    (release_window_available ?release_window - release_window)
+    (record_assigned_release_window ?harvest_batch - harvest_batch ?release_window - release_window)
+    (producer_segment_prepared ?producer_batch_segment - producer_batch_segment)
+    (transit_segment_prepared ?transit_batch_segment - transit_batch_segment)
+    (warehouse_record_finalized ?warehouse_batch_record - warehouse_batch_record)
+  )
+  (:action register_harvest_batch
+    :parameters (?harvest_batch - harvest_batch)
+    :precondition
+      (and
+        (not
+          (record_registered ?harvest_batch)
+        )
+        (not
+          (record_release_scheduled ?harvest_batch)
+        )
+      )
+    :effect (record_registered ?harvest_batch)
+  )
+  (:action allocate_intake_bay_to_batch
+    :parameters (?harvest_batch - harvest_batch ?intake_bay - intake_bay)
+    :precondition
+      (and
+        (record_registered ?harvest_batch)
+        (not
+          (record_intake_allocated ?harvest_batch)
+        )
+        (intake_bay_available ?intake_bay)
+      )
+    :effect
+      (and
+        (record_intake_allocated ?harvest_batch)
+        (record_assigned_to_intake_bay ?harvest_batch ?intake_bay)
+        (not
+          (intake_bay_available ?intake_bay)
+        )
+      )
+  )
+  (:action sample_and_assign_commodity_to_batch
+    :parameters (?harvest_batch - harvest_batch ?commodity - commodity)
+    :precondition
+      (and
+        (record_registered ?harvest_batch)
+        (record_intake_allocated ?harvest_batch)
+        (commodity_available ?commodity)
+      )
+    :effect
+      (and
+        (has_commodity ?harvest_batch ?commodity)
+        (not
+          (commodity_available ?commodity)
+        )
+      )
+  )
+  (:action confirm_batch_commodity
+    :parameters (?harvest_batch - harvest_batch ?commodity - commodity)
+    :precondition
+      (and
+        (record_registered ?harvest_batch)
+        (record_intake_allocated ?harvest_batch)
+        (has_commodity ?harvest_batch ?commodity)
+        (not
+          (commodity_confirmed ?harvest_batch)
+        )
+      )
+    :effect (commodity_confirmed ?harvest_batch)
+  )
+  (:action unassign_commodity_from_batch
+    :parameters (?harvest_batch - harvest_batch ?commodity - commodity)
+    :precondition
+      (and
+        (has_commodity ?harvest_batch ?commodity)
+      )
+    :effect
+      (and
+        (commodity_available ?commodity)
+        (not
+          (has_commodity ?harvest_batch ?commodity)
+        )
+      )
+  )
+  (:action assign_operator_for_grading
+    :parameters (?harvest_batch - harvest_batch ?operator - operator)
+    :precondition
+      (and
+        (commodity_confirmed ?harvest_batch)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (record_assigned_operator ?harvest_batch ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_batch
+    :parameters (?harvest_batch - harvest_batch ?operator - operator)
+    :precondition
+      (and
+        (record_assigned_operator ?harvest_batch ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (record_assigned_operator ?harvest_batch ?operator)
+        )
+      )
+  )
+  (:action assign_temperature_setting_to_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (temperature_setting_available ?temperature_setting)
+      )
+    :effect
+      (and
+        (record_assigned_temperature_setting ?warehouse_batch_record ?temperature_setting)
+        (not
+          (temperature_setting_available ?temperature_setting)
+        )
+      )
+  )
+  (:action release_temperature_setting_from_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?temperature_setting - temperature_setting)
+    :precondition
+      (and
+        (record_assigned_temperature_setting ?warehouse_batch_record ?temperature_setting)
+      )
+    :effect
+      (and
+        (temperature_setting_available ?temperature_setting)
+        (not
+          (record_assigned_temperature_setting ?warehouse_batch_record ?temperature_setting)
+        )
+      )
+  )
+  (:action assign_treatment_protocol_to_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (treatment_protocol_available ?treatment_protocol)
+      )
+    :effect
+      (and
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (not
+          (treatment_protocol_available ?treatment_protocol)
+        )
+      )
+  )
+  (:action release_treatment_protocol_from_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+      )
+    :effect
+      (and
+        (treatment_protocol_available ?treatment_protocol)
+        (not
+          (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        )
+      )
+  )
+  (:action prepare_storage_zone_for_producer_segment
+    :parameters (?producer_batch_segment - producer_batch_segment ?storage_zone - storage_zone ?commodity - commodity)
+    :precondition
+      (and
+        (commodity_confirmed ?producer_batch_segment)
+        (has_commodity ?producer_batch_segment ?commodity)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (not
+          (storage_zone_prepared ?storage_zone)
+        )
+        (not
+          (storage_zone_booked ?storage_zone)
+        )
+      )
+    :effect (storage_zone_prepared ?storage_zone)
+  )
+  (:action operator_complete_producer_segment_preparation
+    :parameters (?producer_batch_segment - producer_batch_segment ?storage_zone - storage_zone ?operator - operator)
+    :precondition
+      (and
+        (commodity_confirmed ?producer_batch_segment)
+        (record_assigned_operator ?producer_batch_segment ?operator)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (storage_zone_prepared ?storage_zone)
+        (not
+          (producer_segment_prepared ?producer_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+      )
+  )
+  (:action book_conditioning_slot_for_producer_segment
+    :parameters (?producer_batch_segment - producer_batch_segment ?storage_zone - storage_zone ?conditioning_slot - conditioning_slot)
+    :precondition
+      (and
+        (commodity_confirmed ?producer_batch_segment)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (conditioning_slot_available ?conditioning_slot)
+        (not
+          (producer_segment_prepared ?producer_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_booked ?storage_zone)
+        (producer_segment_prepared ?producer_batch_segment)
+        (producer_segment_conditioning_reserved ?producer_batch_segment ?conditioning_slot)
+        (not
+          (conditioning_slot_available ?conditioning_slot)
+        )
+      )
+  )
+  (:action complete_conditioning_for_producer_segment
+    :parameters (?producer_batch_segment - producer_batch_segment ?storage_zone - storage_zone ?commodity - commodity ?conditioning_slot - conditioning_slot)
+    :precondition
+      (and
+        (commodity_confirmed ?producer_batch_segment)
+        (has_commodity ?producer_batch_segment ?commodity)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (storage_zone_booked ?storage_zone)
+        (producer_segment_conditioning_reserved ?producer_batch_segment ?conditioning_slot)
+        (not
+          (producer_segment_conditioning_completed ?producer_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_prepared ?storage_zone)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+        (conditioning_slot_available ?conditioning_slot)
+        (not
+          (producer_segment_conditioning_reserved ?producer_batch_segment ?conditioning_slot)
+        )
+      )
+  )
+  (:action prepare_outbound_channel_for_transit_segment
+    :parameters (?transit_batch_segment - transit_batch_segment ?outbound_channel - outbound_channel ?commodity - commodity)
+    :precondition
+      (and
+        (commodity_confirmed ?transit_batch_segment)
+        (has_commodity ?transit_batch_segment ?commodity)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (not
+          (outbound_channel_prepared ?outbound_channel)
+        )
+        (not
+          (outbound_channel_booked ?outbound_channel)
+        )
+      )
+    :effect (outbound_channel_prepared ?outbound_channel)
+  )
+  (:action operator_complete_transit_segment_preparation
+    :parameters (?transit_batch_segment - transit_batch_segment ?outbound_channel - outbound_channel ?operator - operator)
+    :precondition
+      (and
+        (commodity_confirmed ?transit_batch_segment)
+        (record_assigned_operator ?transit_batch_segment ?operator)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (outbound_channel_prepared ?outbound_channel)
+        (not
+          (transit_segment_prepared ?transit_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (transit_segment_prepared ?transit_batch_segment)
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+      )
+  )
+  (:action book_conditioning_slot_for_transit_segment
+    :parameters (?transit_batch_segment - transit_batch_segment ?outbound_channel - outbound_channel ?conditioning_slot - conditioning_slot)
+    :precondition
+      (and
+        (commodity_confirmed ?transit_batch_segment)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (conditioning_slot_available ?conditioning_slot)
+        (not
+          (transit_segment_prepared ?transit_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (outbound_channel_booked ?outbound_channel)
+        (transit_segment_prepared ?transit_batch_segment)
+        (transit_segment_conditioning_reserved ?transit_batch_segment ?conditioning_slot)
+        (not
+          (conditioning_slot_available ?conditioning_slot)
+        )
+      )
+  )
+  (:action complete_conditioning_for_transit_segment
+    :parameters (?transit_batch_segment - transit_batch_segment ?outbound_channel - outbound_channel ?commodity - commodity ?conditioning_slot - conditioning_slot)
+    :precondition
+      (and
+        (commodity_confirmed ?transit_batch_segment)
+        (has_commodity ?transit_batch_segment ?commodity)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (outbound_channel_booked ?outbound_channel)
+        (transit_segment_conditioning_reserved ?transit_batch_segment ?conditioning_slot)
+        (not
+          (transit_segment_conditioning_completed ?transit_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (outbound_channel_prepared ?outbound_channel)
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+        (conditioning_slot_available ?conditioning_slot)
+        (not
+          (transit_segment_conditioning_reserved ?transit_batch_segment ?conditioning_slot)
+        )
+      )
+  )
+  (:action consolidate_segments_into_storage_unit_immediate
+    :parameters (?producer_batch_segment - producer_batch_segment ?transit_batch_segment - transit_batch_segment ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (transit_segment_prepared ?transit_batch_segment)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (storage_zone_prepared ?storage_zone)
+        (outbound_channel_prepared ?outbound_channel)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+        (storage_unit_available ?storage_unit)
+      )
+    :effect
+      (and
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_assigned_to_zone ?storage_unit ?storage_zone)
+        (storage_unit_assigned_to_channel ?storage_unit ?outbound_channel)
+        (not
+          (storage_unit_available ?storage_unit)
+        )
+      )
+  )
+  (:action consolidate_segments_with_producer_pending
+    :parameters (?producer_batch_segment - producer_batch_segment ?transit_batch_segment - transit_batch_segment ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (transit_segment_prepared ?transit_batch_segment)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (storage_zone_booked ?storage_zone)
+        (outbound_channel_prepared ?outbound_channel)
+        (not
+          (producer_segment_conditioning_completed ?producer_batch_segment)
+        )
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+        (storage_unit_available ?storage_unit)
+      )
+    :effect
+      (and
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_assigned_to_zone ?storage_unit ?storage_zone)
+        (storage_unit_assigned_to_channel ?storage_unit ?outbound_channel)
+        (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        (not
+          (storage_unit_available ?storage_unit)
+        )
+      )
+  )
+  (:action consolidate_segments_with_transit_pending
+    :parameters (?producer_batch_segment - producer_batch_segment ?transit_batch_segment - transit_batch_segment ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (transit_segment_prepared ?transit_batch_segment)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (storage_zone_prepared ?storage_zone)
+        (outbound_channel_booked ?outbound_channel)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+        (not
+          (transit_segment_conditioning_completed ?transit_batch_segment)
+        )
+        (storage_unit_available ?storage_unit)
+      )
+    :effect
+      (and
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_assigned_to_zone ?storage_unit ?storage_zone)
+        (storage_unit_assigned_to_channel ?storage_unit ?outbound_channel)
+        (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        (not
+          (storage_unit_available ?storage_unit)
+        )
+      )
+  )
+  (:action consolidate_segments_with_both_pending
+    :parameters (?producer_batch_segment - producer_batch_segment ?transit_batch_segment - transit_batch_segment ?storage_zone - storage_zone ?outbound_channel - outbound_channel ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (transit_segment_prepared ?transit_batch_segment)
+        (producer_segment_zone_compatible ?producer_batch_segment ?storage_zone)
+        (transit_segment_channel_compatible ?transit_batch_segment ?outbound_channel)
+        (storage_zone_booked ?storage_zone)
+        (outbound_channel_booked ?outbound_channel)
+        (not
+          (producer_segment_conditioning_completed ?producer_batch_segment)
+        )
+        (not
+          (transit_segment_conditioning_completed ?transit_batch_segment)
+        )
+        (storage_unit_available ?storage_unit)
+      )
+    :effect
+      (and
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_assigned_to_zone ?storage_unit ?storage_zone)
+        (storage_unit_assigned_to_channel ?storage_unit ?outbound_channel)
+        (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        (not
+          (storage_unit_available ?storage_unit)
+        )
+      )
+  )
+  (:action checkin_storage_unit
+    :parameters (?storage_unit - storage_unit ?producer_batch_segment - producer_batch_segment ?commodity - commodity)
+    :precondition
+      (and
+        (storage_unit_reserved ?storage_unit)
+        (producer_segment_prepared ?producer_batch_segment)
+        (has_commodity ?producer_batch_segment ?commodity)
+        (not
+          (storage_unit_checked_in ?storage_unit)
+        )
+      )
+    :effect (storage_unit_checked_in ?storage_unit)
+  )
+  (:action attach_packaging_material_to_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (record_stored_in_storage_unit ?warehouse_batch_record ?storage_unit)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_available ?packaging_material)
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_checked_in ?storage_unit)
+        (not
+          (packaging_material_attached ?packaging_material)
+        )
+      )
+    :effect
+      (and
+        (packaging_material_attached ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action mark_record_packaged
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?packaging_material - packaging_material ?storage_unit - storage_unit ?commodity - commodity)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (has_commodity ?warehouse_batch_record ?commodity)
+        (not
+          (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        )
+        (not
+          (record_packaged ?warehouse_batch_record)
+        )
+      )
+    :effect (record_packaged ?warehouse_batch_record)
+  )
+  (:action apply_quality_certificate_to_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (quality_certificate_available ?quality_certificate)
+        (not
+          (record_certificate_applied ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_certificate_applied ?warehouse_batch_record)
+        (record_has_quality_certificate ?warehouse_batch_record ?quality_certificate)
+        (not
+          (quality_certificate_available ?quality_certificate)
+        )
+      )
+  )
+  (:action apply_certificate_and_tag_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?packaging_material - packaging_material ?storage_unit - storage_unit ?commodity - commodity ?quality_certificate - quality_certificate)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (has_commodity ?warehouse_batch_record ?commodity)
+        (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        (record_certificate_applied ?warehouse_batch_record)
+        (record_has_quality_certificate ?warehouse_batch_record ?quality_certificate)
+        (not
+          (record_packaged ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_packaged ?warehouse_batch_record)
+        (record_quality_tagged ?warehouse_batch_record)
+      )
+  )
+  (:action reserve_record_for_conditioning_primary
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?temperature_setting - temperature_setting ?operator - operator ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_packaged ?warehouse_batch_record)
+        (record_assigned_temperature_setting ?warehouse_batch_record ?temperature_setting)
+        (record_assigned_operator ?warehouse_batch_record ?operator)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (not
+          (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        )
+        (not
+          (record_conditioning_reserved ?warehouse_batch_record)
+        )
+      )
+    :effect (record_conditioning_reserved ?warehouse_batch_record)
+  )
+  (:action reserve_record_for_conditioning_secondary
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?temperature_setting - temperature_setting ?operator - operator ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_packaged ?warehouse_batch_record)
+        (record_assigned_temperature_setting ?warehouse_batch_record ?temperature_setting)
+        (record_assigned_operator ?warehouse_batch_record ?operator)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        (not
+          (record_conditioning_reserved ?warehouse_batch_record)
+        )
+      )
+    :effect (record_conditioning_reserved ?warehouse_batch_record)
+  )
+  (:action verify_conditioning_and_mark_completed_variant_1
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_conditioning_reserved ?warehouse_batch_record)
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (not
+          (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        )
+        (not
+          (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        )
+        (not
+          (record_conditioning_completed ?warehouse_batch_record)
+        )
+      )
+    :effect (record_conditioning_completed ?warehouse_batch_record)
+  )
+  (:action verify_conditioning_and_mark_completed_variant_2
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_conditioning_reserved ?warehouse_batch_record)
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        (not
+          (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        )
+        (not
+          (record_conditioning_completed ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_handling_code_attached ?warehouse_batch_record)
+      )
+  )
+  (:action verify_conditioning_and_mark_completed_variant_3
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_conditioning_reserved ?warehouse_batch_record)
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (not
+          (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        )
+        (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        (not
+          (record_conditioning_completed ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_handling_code_attached ?warehouse_batch_record)
+      )
+  )
+  (:action verify_conditioning_and_mark_completed_variant_4
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol ?packaging_material - packaging_material ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (record_conditioning_reserved ?warehouse_batch_record)
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (record_has_packaging_material ?warehouse_batch_record ?packaging_material)
+        (packaging_material_attached_to_storage_unit ?packaging_material ?storage_unit)
+        (storage_unit_has_unprocessed_producer_segment ?storage_unit)
+        (storage_unit_has_unprocessed_transit_segment ?storage_unit)
+        (not
+          (record_conditioning_completed ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_handling_code_attached ?warehouse_batch_record)
+      )
+  )
+  (:action finalize_record_and_mark_ready
+    :parameters (?warehouse_batch_record - warehouse_batch_record)
+    :precondition
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (not
+          (record_handling_code_attached ?warehouse_batch_record)
+        )
+        (not
+          (warehouse_record_finalized ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (warehouse_record_finalized ?warehouse_batch_record)
+        (ready_for_release ?warehouse_batch_record)
+      )
+  )
+  (:action attach_handling_instruction_to_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_handling_code_attached ?warehouse_batch_record)
+        (handling_instruction_available ?handling_instruction)
+      )
+    :effect
+      (and
+        (record_has_handling_instruction ?warehouse_batch_record ?handling_instruction)
+        (not
+          (handling_instruction_available ?handling_instruction)
+        )
+      )
+  )
+  (:action finalize_record_precheck
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?producer_batch_segment - producer_batch_segment ?transit_batch_segment - transit_batch_segment ?commodity - commodity ?handling_instruction - handling_instruction)
+    :precondition
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_handling_code_attached ?warehouse_batch_record)
+        (record_has_handling_instruction ?warehouse_batch_record ?handling_instruction)
+        (record_includes_producer_segment ?warehouse_batch_record ?producer_batch_segment)
+        (record_includes_transit_segment ?warehouse_batch_record ?transit_batch_segment)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+        (has_commodity ?warehouse_batch_record ?commodity)
+        (not
+          (record_ready_for_finalization ?warehouse_batch_record)
+        )
+      )
+    :effect (record_ready_for_finalization ?warehouse_batch_record)
+  )
+  (:action finalize_record_after_precheck
+    :parameters (?warehouse_batch_record - warehouse_batch_record)
+    :precondition
+      (and
+        (record_conditioning_completed ?warehouse_batch_record)
+        (record_ready_for_finalization ?warehouse_batch_record)
+        (not
+          (warehouse_record_finalized ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (warehouse_record_finalized ?warehouse_batch_record)
+        (ready_for_release ?warehouse_batch_record)
+      )
+  )
+  (:action verify_and_lock_shipping_document
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?shipping_document - shipping_document ?commodity - commodity)
+    :precondition
+      (and
+        (commodity_confirmed ?warehouse_batch_record)
+        (has_commodity ?warehouse_batch_record ?commodity)
+        (shipping_document_available ?shipping_document)
+        (record_has_shipping_document ?warehouse_batch_record ?shipping_document)
+        (not
+          (record_shipping_document_verified ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_shipping_document_verified ?warehouse_batch_record)
+        (not
+          (shipping_document_available ?shipping_document)
+        )
+      )
+  )
+  (:action mark_record_document_inspection_done
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?operator - operator)
+    :precondition
+      (and
+        (record_shipping_document_verified ?warehouse_batch_record)
+        (record_assigned_operator ?warehouse_batch_record ?operator)
+        (not
+          (record_document_inspection_done ?warehouse_batch_record)
+        )
+      )
+    :effect (record_document_inspection_done ?warehouse_batch_record)
+  )
+  (:action authorize_document_for_record
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (record_document_inspection_done ?warehouse_batch_record)
+        (record_assigned_treatment_protocol ?warehouse_batch_record ?treatment_protocol)
+        (not
+          (record_document_approved ?warehouse_batch_record)
+        )
+      )
+    :effect (record_document_approved ?warehouse_batch_record)
+  )
+  (:action finalize_record_with_document_approval
+    :parameters (?warehouse_batch_record - warehouse_batch_record)
+    :precondition
+      (and
+        (record_document_approved ?warehouse_batch_record)
+        (not
+          (warehouse_record_finalized ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (warehouse_record_finalized ?warehouse_batch_record)
+        (ready_for_release ?warehouse_batch_record)
+      )
+  )
+  (:action authorize_producer_segment_release
+    :parameters (?producer_batch_segment - producer_batch_segment ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (producer_segment_prepared ?producer_batch_segment)
+        (producer_segment_conditioning_completed ?producer_batch_segment)
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_checked_in ?storage_unit)
+        (not
+          (ready_for_release ?producer_batch_segment)
+        )
+      )
+    :effect (ready_for_release ?producer_batch_segment)
+  )
+  (:action authorize_transit_segment_release
+    :parameters (?transit_batch_segment - transit_batch_segment ?storage_unit - storage_unit)
+    :precondition
+      (and
+        (transit_segment_prepared ?transit_batch_segment)
+        (transit_segment_conditioning_completed ?transit_batch_segment)
+        (storage_unit_reserved ?storage_unit)
+        (storage_unit_checked_in ?storage_unit)
+        (not
+          (ready_for_release ?transit_batch_segment)
+        )
+      )
+    :effect (ready_for_release ?transit_batch_segment)
+  )
+  (:action assign_release_window_to_batch
+    :parameters (?harvest_batch - harvest_batch ?release_window - release_window ?commodity - commodity)
+    :precondition
+      (and
+        (ready_for_release ?harvest_batch)
+        (has_commodity ?harvest_batch ?commodity)
+        (release_window_available ?release_window)
+        (not
+          (record_release_slot_reserved ?harvest_batch)
+        )
+      )
+    :effect
+      (and
+        (record_release_slot_reserved ?harvest_batch)
+        (record_assigned_release_window ?harvest_batch ?release_window)
+        (not
+          (release_window_available ?release_window)
+        )
+      )
+  )
+  (:action finalize_producer_segment_release_and_free_resources
+    :parameters (?producer_batch_segment - producer_batch_segment ?intake_bay - intake_bay ?release_window - release_window)
+    :precondition
+      (and
+        (record_release_slot_reserved ?producer_batch_segment)
+        (record_assigned_to_intake_bay ?producer_batch_segment ?intake_bay)
+        (record_assigned_release_window ?producer_batch_segment ?release_window)
+        (not
+          (record_release_scheduled ?producer_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (record_release_scheduled ?producer_batch_segment)
+        (intake_bay_available ?intake_bay)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_transit_segment_release_and_free_resources
+    :parameters (?transit_batch_segment - transit_batch_segment ?intake_bay - intake_bay ?release_window - release_window)
+    :precondition
+      (and
+        (record_release_slot_reserved ?transit_batch_segment)
+        (record_assigned_to_intake_bay ?transit_batch_segment ?intake_bay)
+        (record_assigned_release_window ?transit_batch_segment ?release_window)
+        (not
+          (record_release_scheduled ?transit_batch_segment)
+        )
+      )
+    :effect
+      (and
+        (record_release_scheduled ?transit_batch_segment)
+        (intake_bay_available ?intake_bay)
+        (release_window_available ?release_window)
+      )
+  )
+  (:action finalize_record_release_and_free_resources
+    :parameters (?warehouse_batch_record - warehouse_batch_record ?intake_bay - intake_bay ?release_window - release_window)
+    :precondition
+      (and
+        (record_release_slot_reserved ?warehouse_batch_record)
+        (record_assigned_to_intake_bay ?warehouse_batch_record ?intake_bay)
+        (record_assigned_release_window ?warehouse_batch_record ?release_window)
+        (not
+          (record_release_scheduled ?warehouse_batch_record)
+        )
+      )
+    :effect
+      (and
+        (record_release_scheduled ?warehouse_batch_record)
+        (intake_bay_available ?intake_bay)
+        (release_window_available ?release_window)
+      )
+  )
+)

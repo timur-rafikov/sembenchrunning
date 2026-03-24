@@ -1,0 +1,1005 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain incorrect_branch_logic_fix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object tool_or_asset_group - object artifact_category - object issue_category - object issue_record - issue_category patch_candidate - operational_resource diagnostic_tool - operational_resource reviewer - operational_resource configuration_profile - operational_resource quality_gate - operational_resource metadata_bundle - operational_resource binary_artifact - operational_resource approval_token - operational_resource test_artifact - tool_or_asset_group dependency - tool_or_asset_group owner_approval - tool_or_asset_group execution_environment - artifact_category platform_variant - artifact_category build_artifact - artifact_category component_instance_group - issue_record repository_entity_group - issue_record source_component - component_instance_group test_component - component_instance_group repository_entity - repository_entity_group)
+  (:predicates
+    (issue_reported ?issue_record - issue_record)
+    (entity_reproduced ?issue_record - issue_record)
+    (patch_assigned ?issue_record - issue_record)
+    (fix_applied ?issue_record - issue_record)
+    (integration_marked ?issue_record - issue_record)
+    (triage_complete ?issue_record - issue_record)
+    (patch_candidate_available ?patch_candidate - patch_candidate)
+    (linked_patch_candidate ?issue_record - issue_record ?patch_candidate - patch_candidate)
+    (diagnostic_tool_available ?diagnostic_tool - diagnostic_tool)
+    (diagnostic_attached_to_entity ?issue_record - issue_record ?diagnostic_tool - diagnostic_tool)
+    (reviewer_available ?reviewer - reviewer)
+    (reviewer_assigned ?issue_record - issue_record ?reviewer - reviewer)
+    (test_artifact_available ?test_artifact - test_artifact)
+    (component_test_artifact_link ?source_component - source_component ?test_artifact - test_artifact)
+    (test_component_test_artifact_link ?test_component - test_component ?test_artifact - test_artifact)
+    (component_environment_link ?source_component - source_component ?execution_environment - execution_environment)
+    (environment_provisioned ?execution_environment - execution_environment)
+    (environment_configured ?execution_environment - execution_environment)
+    (component_test_passed ?source_component - source_component)
+    (test_component_platform_link ?test_component - test_component ?platform_variant - platform_variant)
+    (platform_provisioned ?platform_variant - platform_variant)
+    (platform_configured ?platform_variant - platform_variant)
+    (test_component_test_passed ?test_component - test_component)
+    (build_artifact_available ?build_artifact - build_artifact)
+    (build_artifact_staged ?build_artifact - build_artifact)
+    (build_artifact_environment_link ?build_artifact - build_artifact ?execution_environment - execution_environment)
+    (build_artifact_platform_link ?build_artifact - build_artifact ?platform_variant - platform_variant)
+    (build_artifact_env_valid ?build_artifact - build_artifact)
+    (build_artifact_platform_valid ?build_artifact - build_artifact)
+    (build_artifact_tested ?build_artifact - build_artifact)
+    (repository_entity_source_component_link ?repository_entity - repository_entity ?source_component - source_component)
+    (repository_entity_test_component_link ?repository_entity - repository_entity ?test_component - test_component)
+    (repository_entity_build_artifact_link ?repository_entity - repository_entity ?build_artifact - build_artifact)
+    (dependency_available ?dependency - dependency)
+    (repository_entity_dependency_link ?repository_entity - repository_entity ?dependency - dependency)
+    (dependency_resolved ?dependency - dependency)
+    (dependency_build_artifact_link ?dependency - dependency ?build_artifact - build_artifact)
+    (repository_entity_enriched ?repository_entity - repository_entity)
+    (repository_entity_enrichment_complete ?repository_entity - repository_entity)
+    (repository_entity_ready_for_quality_gate ?repository_entity - repository_entity)
+    (repository_entity_has_configuration ?repository_entity - repository_entity)
+    (repository_entity_configuration_bound ?repository_entity - repository_entity)
+    (repository_entity_quality_gate_passed ?repository_entity - repository_entity)
+    (repository_entity_finalized ?repository_entity - repository_entity)
+    (owner_approval_available ?owner_approval - owner_approval)
+    (repository_entity_owner_approval_link ?repository_entity - repository_entity ?owner_approval - owner_approval)
+    (repository_entity_owner_recorded ?repository_entity - repository_entity)
+    (repository_entity_review_assigned ?repository_entity - repository_entity)
+    (repository_entity_approval_token_recorded ?repository_entity - repository_entity)
+    (configuration_profile_available ?configuration_profile - configuration_profile)
+    (repository_entity_configuration_profile_link ?repository_entity - repository_entity ?configuration_profile - configuration_profile)
+    (quality_gate_available ?quality_gate - quality_gate)
+    (repository_entity_quality_gate_link ?repository_entity - repository_entity ?quality_gate - quality_gate)
+    (binary_artifact_available ?binary_artifact - binary_artifact)
+    (repository_entity_binary_artifact_link ?repository_entity - repository_entity ?binary_artifact - binary_artifact)
+    (approval_token_available ?approval_token - approval_token)
+    (repository_entity_approval_token_link ?repository_entity - repository_entity ?approval_token - approval_token)
+    (metadata_bundle_available ?metadata_bundle - metadata_bundle)
+    (metadata_link ?issue_record - issue_record ?metadata_bundle - metadata_bundle)
+    (component_prepared ?source_component - source_component)
+    (test_component_prepared ?test_component - test_component)
+    (repository_entity_integration_committed ?repository_entity - repository_entity)
+  )
+  (:action register_issue
+    :parameters (?issue_record - issue_record)
+    :precondition
+      (and
+        (not
+          (issue_reported ?issue_record)
+        )
+        (not
+          (fix_applied ?issue_record)
+        )
+      )
+    :effect (issue_reported ?issue_record)
+  )
+  (:action assign_patch_candidate
+    :parameters (?issue_record - issue_record ?patch_candidate - patch_candidate)
+    :precondition
+      (and
+        (issue_reported ?issue_record)
+        (not
+          (patch_assigned ?issue_record)
+        )
+        (patch_candidate_available ?patch_candidate)
+      )
+    :effect
+      (and
+        (patch_assigned ?issue_record)
+        (linked_patch_candidate ?issue_record ?patch_candidate)
+        (not
+          (patch_candidate_available ?patch_candidate)
+        )
+      )
+  )
+  (:action attach_diagnostic_tool
+    :parameters (?issue_record - issue_record ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (issue_reported ?issue_record)
+        (patch_assigned ?issue_record)
+        (diagnostic_tool_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_attached_to_entity ?issue_record ?diagnostic_tool)
+        (not
+          (diagnostic_tool_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action confirm_reproduction
+    :parameters (?issue_record - issue_record ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (issue_reported ?issue_record)
+        (patch_assigned ?issue_record)
+        (diagnostic_attached_to_entity ?issue_record ?diagnostic_tool)
+        (not
+          (entity_reproduced ?issue_record)
+        )
+      )
+    :effect (entity_reproduced ?issue_record)
+  )
+  (:action release_diagnostic_tool
+    :parameters (?issue_record - issue_record ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (diagnostic_attached_to_entity ?issue_record ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_tool_available ?diagnostic_tool)
+        (not
+          (diagnostic_attached_to_entity ?issue_record ?diagnostic_tool)
+        )
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?issue_record - issue_record ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_reproduced ?issue_record)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_assigned ?issue_record ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer
+    :parameters (?issue_record - issue_record ?reviewer - reviewer)
+    :precondition
+      (and
+        (reviewer_assigned ?issue_record ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (reviewer_assigned ?issue_record ?reviewer)
+        )
+      )
+  )
+  (:action attach_binary_artifact
+    :parameters (?repository_entity - repository_entity ?binary_artifact - binary_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (binary_artifact_available ?binary_artifact)
+      )
+    :effect
+      (and
+        (repository_entity_binary_artifact_link ?repository_entity ?binary_artifact)
+        (not
+          (binary_artifact_available ?binary_artifact)
+        )
+      )
+  )
+  (:action detach_binary_artifact
+    :parameters (?repository_entity - repository_entity ?binary_artifact - binary_artifact)
+    :precondition
+      (and
+        (repository_entity_binary_artifact_link ?repository_entity ?binary_artifact)
+      )
+    :effect
+      (and
+        (binary_artifact_available ?binary_artifact)
+        (not
+          (repository_entity_binary_artifact_link ?repository_entity ?binary_artifact)
+        )
+      )
+  )
+  (:action attach_approval_token
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action detach_approval_token
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        )
+      )
+  )
+  (:action provision_execution_environment
+    :parameters (?source_component - source_component ?execution_environment - execution_environment ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (entity_reproduced ?source_component)
+        (diagnostic_attached_to_entity ?source_component ?diagnostic_tool)
+        (component_environment_link ?source_component ?execution_environment)
+        (not
+          (environment_provisioned ?execution_environment)
+        )
+        (not
+          (environment_configured ?execution_environment)
+        )
+      )
+    :effect (environment_provisioned ?execution_environment)
+  )
+  (:action finalize_component_validation
+    :parameters (?source_component - source_component ?execution_environment - execution_environment ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_reproduced ?source_component)
+        (reviewer_assigned ?source_component ?reviewer)
+        (component_environment_link ?source_component ?execution_environment)
+        (environment_provisioned ?execution_environment)
+        (not
+          (component_prepared ?source_component)
+        )
+      )
+    :effect
+      (and
+        (component_prepared ?source_component)
+        (component_test_passed ?source_component)
+      )
+  )
+  (:action apply_test_artifact_to_component
+    :parameters (?source_component - source_component ?execution_environment - execution_environment ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?source_component)
+        (component_environment_link ?source_component ?execution_environment)
+        (test_artifact_available ?test_artifact)
+        (not
+          (component_prepared ?source_component)
+        )
+      )
+    :effect
+      (and
+        (environment_configured ?execution_environment)
+        (component_prepared ?source_component)
+        (component_test_artifact_link ?source_component ?test_artifact)
+        (not
+          (test_artifact_available ?test_artifact)
+        )
+      )
+  )
+  (:action execute_component_test
+    :parameters (?source_component - source_component ?execution_environment - execution_environment ?diagnostic_tool - diagnostic_tool ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?source_component)
+        (diagnostic_attached_to_entity ?source_component ?diagnostic_tool)
+        (component_environment_link ?source_component ?execution_environment)
+        (environment_configured ?execution_environment)
+        (component_test_artifact_link ?source_component ?test_artifact)
+        (not
+          (component_test_passed ?source_component)
+        )
+      )
+    :effect
+      (and
+        (environment_provisioned ?execution_environment)
+        (component_test_passed ?source_component)
+        (test_artifact_available ?test_artifact)
+        (not
+          (component_test_artifact_link ?source_component ?test_artifact)
+        )
+      )
+  )
+  (:action provision_platform_variant
+    :parameters (?test_component - test_component ?platform_variant - platform_variant ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (entity_reproduced ?test_component)
+        (diagnostic_attached_to_entity ?test_component ?diagnostic_tool)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (not
+          (platform_provisioned ?platform_variant)
+        )
+        (not
+          (platform_configured ?platform_variant)
+        )
+      )
+    :effect (platform_provisioned ?platform_variant)
+  )
+  (:action finalize_test_component_validation
+    :parameters (?test_component - test_component ?platform_variant - platform_variant ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_reproduced ?test_component)
+        (reviewer_assigned ?test_component ?reviewer)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (platform_provisioned ?platform_variant)
+        (not
+          (test_component_prepared ?test_component)
+        )
+      )
+    :effect
+      (and
+        (test_component_prepared ?test_component)
+        (test_component_test_passed ?test_component)
+      )
+  )
+  (:action apply_test_artifact_to_test_component
+    :parameters (?test_component - test_component ?platform_variant - platform_variant ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?test_component)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (test_artifact_available ?test_artifact)
+        (not
+          (test_component_prepared ?test_component)
+        )
+      )
+    :effect
+      (and
+        (platform_configured ?platform_variant)
+        (test_component_prepared ?test_component)
+        (test_component_test_artifact_link ?test_component ?test_artifact)
+        (not
+          (test_artifact_available ?test_artifact)
+        )
+      )
+  )
+  (:action execute_test_component_test
+    :parameters (?test_component - test_component ?platform_variant - platform_variant ?diagnostic_tool - diagnostic_tool ?test_artifact - test_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?test_component)
+        (diagnostic_attached_to_entity ?test_component ?diagnostic_tool)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (platform_configured ?platform_variant)
+        (test_component_test_artifact_link ?test_component ?test_artifact)
+        (not
+          (test_component_test_passed ?test_component)
+        )
+      )
+    :effect
+      (and
+        (platform_provisioned ?platform_variant)
+        (test_component_test_passed ?test_component)
+        (test_artifact_available ?test_artifact)
+        (not
+          (test_component_test_artifact_link ?test_component ?test_artifact)
+        )
+      )
+  )
+  (:action stage_build_artifact
+    :parameters (?source_component - source_component ?test_component - test_component ?execution_environment - execution_environment ?platform_variant - platform_variant ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (component_prepared ?source_component)
+        (test_component_prepared ?test_component)
+        (component_environment_link ?source_component ?execution_environment)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (environment_provisioned ?execution_environment)
+        (platform_provisioned ?platform_variant)
+        (component_test_passed ?source_component)
+        (test_component_test_passed ?test_component)
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_environment_link ?build_artifact ?execution_environment)
+        (build_artifact_platform_link ?build_artifact ?platform_variant)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action stage_build_artifact_with_env_validation
+    :parameters (?source_component - source_component ?test_component - test_component ?execution_environment - execution_environment ?platform_variant - platform_variant ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (component_prepared ?source_component)
+        (test_component_prepared ?test_component)
+        (component_environment_link ?source_component ?execution_environment)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (environment_configured ?execution_environment)
+        (platform_provisioned ?platform_variant)
+        (not
+          (component_test_passed ?source_component)
+        )
+        (test_component_test_passed ?test_component)
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_environment_link ?build_artifact ?execution_environment)
+        (build_artifact_platform_link ?build_artifact ?platform_variant)
+        (build_artifact_env_valid ?build_artifact)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action stage_build_artifact_with_platform_validation
+    :parameters (?source_component - source_component ?test_component - test_component ?execution_environment - execution_environment ?platform_variant - platform_variant ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (component_prepared ?source_component)
+        (test_component_prepared ?test_component)
+        (component_environment_link ?source_component ?execution_environment)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (environment_provisioned ?execution_environment)
+        (platform_configured ?platform_variant)
+        (component_test_passed ?source_component)
+        (not
+          (test_component_test_passed ?test_component)
+        )
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_environment_link ?build_artifact ?execution_environment)
+        (build_artifact_platform_link ?build_artifact ?platform_variant)
+        (build_artifact_platform_valid ?build_artifact)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action stage_build_artifact_with_full_validation
+    :parameters (?source_component - source_component ?test_component - test_component ?execution_environment - execution_environment ?platform_variant - platform_variant ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (component_prepared ?source_component)
+        (test_component_prepared ?test_component)
+        (component_environment_link ?source_component ?execution_environment)
+        (test_component_platform_link ?test_component ?platform_variant)
+        (environment_configured ?execution_environment)
+        (platform_configured ?platform_variant)
+        (not
+          (component_test_passed ?source_component)
+        )
+        (not
+          (test_component_test_passed ?test_component)
+        )
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_environment_link ?build_artifact ?execution_environment)
+        (build_artifact_platform_link ?build_artifact ?platform_variant)
+        (build_artifact_env_valid ?build_artifact)
+        (build_artifact_platform_valid ?build_artifact)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action validate_build_artifact
+    :parameters (?build_artifact - build_artifact ?source_component - source_component ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (build_artifact_staged ?build_artifact)
+        (component_prepared ?source_component)
+        (diagnostic_attached_to_entity ?source_component ?diagnostic_tool)
+        (not
+          (build_artifact_tested ?build_artifact)
+        )
+      )
+    :effect (build_artifact_tested ?build_artifact)
+  )
+  (:action materialize_dependency
+    :parameters (?repository_entity - repository_entity ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (repository_entity_build_artifact_link ?repository_entity ?build_artifact)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_available ?dependency)
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_tested ?build_artifact)
+        (not
+          (dependency_resolved ?dependency)
+        )
+      )
+    :effect
+      (and
+        (dependency_resolved ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (not
+          (dependency_available ?dependency)
+        )
+      )
+  )
+  (:action finalize_repository_entity_enrichment
+    :parameters (?repository_entity - repository_entity ?dependency - dependency ?build_artifact - build_artifact ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_resolved ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (diagnostic_attached_to_entity ?repository_entity ?diagnostic_tool)
+        (not
+          (build_artifact_env_valid ?build_artifact)
+        )
+        (not
+          (repository_entity_enriched ?repository_entity)
+        )
+      )
+    :effect (repository_entity_enriched ?repository_entity)
+  )
+  (:action attach_configuration_profile
+    :parameters (?repository_entity - repository_entity ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (configuration_profile_available ?configuration_profile)
+        (not
+          (repository_entity_has_configuration ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_has_configuration ?repository_entity)
+        (repository_entity_configuration_profile_link ?repository_entity ?configuration_profile)
+        (not
+          (configuration_profile_available ?configuration_profile)
+        )
+      )
+  )
+  (:action apply_configuration_and_enrich_repo_entity
+    :parameters (?repository_entity - repository_entity ?dependency - dependency ?build_artifact - build_artifact ?diagnostic_tool - diagnostic_tool ?configuration_profile - configuration_profile)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_resolved ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (diagnostic_attached_to_entity ?repository_entity ?diagnostic_tool)
+        (build_artifact_env_valid ?build_artifact)
+        (repository_entity_has_configuration ?repository_entity)
+        (repository_entity_configuration_profile_link ?repository_entity ?configuration_profile)
+        (not
+          (repository_entity_enriched ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_enriched ?repository_entity)
+        (repository_entity_configuration_bound ?repository_entity)
+      )
+  )
+  (:action enrich_repository_entity_with_binary
+    :parameters (?repository_entity - repository_entity ?binary_artifact - binary_artifact ?reviewer - reviewer ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enriched ?repository_entity)
+        (repository_entity_binary_artifact_link ?repository_entity ?binary_artifact)
+        (reviewer_assigned ?repository_entity ?reviewer)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (not
+          (build_artifact_platform_valid ?build_artifact)
+        )
+        (not
+          (repository_entity_enrichment_complete ?repository_entity)
+        )
+      )
+    :effect (repository_entity_enrichment_complete ?repository_entity)
+  )
+  (:action enrich_repository_entity_with_binary_alternate
+    :parameters (?repository_entity - repository_entity ?binary_artifact - binary_artifact ?reviewer - reviewer ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enriched ?repository_entity)
+        (repository_entity_binary_artifact_link ?repository_entity ?binary_artifact)
+        (reviewer_assigned ?repository_entity ?reviewer)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (build_artifact_platform_valid ?build_artifact)
+        (not
+          (repository_entity_enrichment_complete ?repository_entity)
+        )
+      )
+    :effect (repository_entity_enrichment_complete ?repository_entity)
+  )
+  (:action flag_repository_entity_ready_for_quality_gate
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enrichment_complete ?repository_entity)
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (not
+          (build_artifact_env_valid ?build_artifact)
+        )
+        (not
+          (build_artifact_platform_valid ?build_artifact)
+        )
+        (not
+          (repository_entity_ready_for_quality_gate ?repository_entity)
+        )
+      )
+    :effect (repository_entity_ready_for_quality_gate ?repository_entity)
+  )
+  (:action flag_repository_entity_ready_and_pass_env_quality_gate
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enrichment_complete ?repository_entity)
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (build_artifact_env_valid ?build_artifact)
+        (not
+          (build_artifact_platform_valid ?build_artifact)
+        )
+        (not
+          (repository_entity_ready_for_quality_gate ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_quality_gate_passed ?repository_entity)
+      )
+  )
+  (:action flag_repository_entity_ready_and_pass_platform_quality_gate
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enrichment_complete ?repository_entity)
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (not
+          (build_artifact_env_valid ?build_artifact)
+        )
+        (build_artifact_platform_valid ?build_artifact)
+        (not
+          (repository_entity_ready_for_quality_gate ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_quality_gate_passed ?repository_entity)
+      )
+  )
+  (:action flag_repository_entity_ready_and_pass_all_quality_gates
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token ?dependency - dependency ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (repository_entity_enrichment_complete ?repository_entity)
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (repository_entity_dependency_link ?repository_entity ?dependency)
+        (dependency_build_artifact_link ?dependency ?build_artifact)
+        (build_artifact_env_valid ?build_artifact)
+        (build_artifact_platform_valid ?build_artifact)
+        (not
+          (repository_entity_ready_for_quality_gate ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_quality_gate_passed ?repository_entity)
+      )
+  )
+  (:action generate_integration_token
+    :parameters (?repository_entity - repository_entity)
+    :precondition
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (not
+          (repository_entity_quality_gate_passed ?repository_entity)
+        )
+        (not
+          (repository_entity_integration_committed ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_integration_committed ?repository_entity)
+        (integration_marked ?repository_entity)
+      )
+  )
+  (:action attach_quality_gate
+    :parameters (?repository_entity - repository_entity ?quality_gate - quality_gate)
+    :precondition
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_quality_gate_passed ?repository_entity)
+        (quality_gate_available ?quality_gate)
+      )
+    :effect
+      (and
+        (repository_entity_quality_gate_link ?repository_entity ?quality_gate)
+        (not
+          (quality_gate_available ?quality_gate)
+        )
+      )
+  )
+  (:action finalize_repository_entity_for_integration
+    :parameters (?repository_entity - repository_entity ?source_component - source_component ?test_component - test_component ?diagnostic_tool - diagnostic_tool ?quality_gate - quality_gate)
+    :precondition
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_quality_gate_passed ?repository_entity)
+        (repository_entity_quality_gate_link ?repository_entity ?quality_gate)
+        (repository_entity_source_component_link ?repository_entity ?source_component)
+        (repository_entity_test_component_link ?repository_entity ?test_component)
+        (component_test_passed ?source_component)
+        (test_component_test_passed ?test_component)
+        (diagnostic_attached_to_entity ?repository_entity ?diagnostic_tool)
+        (not
+          (repository_entity_finalized ?repository_entity)
+        )
+      )
+    :effect (repository_entity_finalized ?repository_entity)
+  )
+  (:action publish_repository_entity_integration
+    :parameters (?repository_entity - repository_entity)
+    :precondition
+      (and
+        (repository_entity_ready_for_quality_gate ?repository_entity)
+        (repository_entity_finalized ?repository_entity)
+        (not
+          (repository_entity_integration_committed ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_integration_committed ?repository_entity)
+        (integration_marked ?repository_entity)
+      )
+  )
+  (:action record_owner_approval_for_repository_entity
+    :parameters (?repository_entity - repository_entity ?owner_approval - owner_approval ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (entity_reproduced ?repository_entity)
+        (diagnostic_attached_to_entity ?repository_entity ?diagnostic_tool)
+        (owner_approval_available ?owner_approval)
+        (repository_entity_owner_approval_link ?repository_entity ?owner_approval)
+        (not
+          (repository_entity_owner_recorded ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_owner_recorded ?repository_entity)
+        (not
+          (owner_approval_available ?owner_approval)
+        )
+      )
+  )
+  (:action assign_reviewer_to_repository_entity
+    :parameters (?repository_entity - repository_entity ?reviewer - reviewer)
+    :precondition
+      (and
+        (repository_entity_owner_recorded ?repository_entity)
+        (reviewer_assigned ?repository_entity ?reviewer)
+        (not
+          (repository_entity_review_assigned ?repository_entity)
+        )
+      )
+    :effect (repository_entity_review_assigned ?repository_entity)
+  )
+  (:action record_approval_token_for_repository_entity
+    :parameters (?repository_entity - repository_entity ?approval_token - approval_token)
+    :precondition
+      (and
+        (repository_entity_review_assigned ?repository_entity)
+        (repository_entity_approval_token_link ?repository_entity ?approval_token)
+        (not
+          (repository_entity_approval_token_recorded ?repository_entity)
+        )
+      )
+    :effect (repository_entity_approval_token_recorded ?repository_entity)
+  )
+  (:action finalize_repository_entity_approval_and_mark_integration
+    :parameters (?repository_entity - repository_entity)
+    :precondition
+      (and
+        (repository_entity_approval_token_recorded ?repository_entity)
+        (not
+          (repository_entity_integration_committed ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (repository_entity_integration_committed ?repository_entity)
+        (integration_marked ?repository_entity)
+      )
+  )
+  (:action mark_source_component_integrated
+    :parameters (?source_component - source_component ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (component_prepared ?source_component)
+        (component_test_passed ?source_component)
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_tested ?build_artifact)
+        (not
+          (integration_marked ?source_component)
+        )
+      )
+    :effect (integration_marked ?source_component)
+  )
+  (:action mark_test_component_integrated
+    :parameters (?test_component - test_component ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (test_component_prepared ?test_component)
+        (test_component_test_passed ?test_component)
+        (build_artifact_staged ?build_artifact)
+        (build_artifact_tested ?build_artifact)
+        (not
+          (integration_marked ?test_component)
+        )
+      )
+    :effect (integration_marked ?test_component)
+  )
+  (:action triage_issue_with_metadata
+    :parameters (?issue_record - issue_record ?metadata_bundle - metadata_bundle ?diagnostic_tool - diagnostic_tool)
+    :precondition
+      (and
+        (integration_marked ?issue_record)
+        (diagnostic_attached_to_entity ?issue_record ?diagnostic_tool)
+        (metadata_bundle_available ?metadata_bundle)
+        (not
+          (triage_complete ?issue_record)
+        )
+      )
+    :effect
+      (and
+        (triage_complete ?issue_record)
+        (metadata_link ?issue_record ?metadata_bundle)
+        (not
+          (metadata_bundle_available ?metadata_bundle)
+        )
+      )
+  )
+  (:action apply_patch_candidate_to_source_component
+    :parameters (?source_component - source_component ?patch_candidate - patch_candidate ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (triage_complete ?source_component)
+        (linked_patch_candidate ?source_component ?patch_candidate)
+        (metadata_link ?source_component ?metadata_bundle)
+        (not
+          (fix_applied ?source_component)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?source_component)
+        (patch_candidate_available ?patch_candidate)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+  (:action apply_patch_candidate_to_test_component
+    :parameters (?test_component - test_component ?patch_candidate - patch_candidate ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (triage_complete ?test_component)
+        (linked_patch_candidate ?test_component ?patch_candidate)
+        (metadata_link ?test_component ?metadata_bundle)
+        (not
+          (fix_applied ?test_component)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?test_component)
+        (patch_candidate_available ?patch_candidate)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+  (:action apply_patch_candidate_to_repository_entity
+    :parameters (?repository_entity - repository_entity ?patch_candidate - patch_candidate ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (triage_complete ?repository_entity)
+        (linked_patch_candidate ?repository_entity ?patch_candidate)
+        (metadata_link ?repository_entity ?metadata_bundle)
+        (not
+          (fix_applied ?repository_entity)
+        )
+      )
+    :effect
+      (and
+        (fix_applied ?repository_entity)
+        (patch_candidate_available ?patch_candidate)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem incorrect_branch_logic_fix_problem)
+  (:domain incorrect_branch_logic_fix)
+  (:objects source_component_alpha - source_component test_component_alpha - test_component repository_entity_feature_branch - repository_entity repository_entity_release_branch - repository_entity patch_candidate_1 - patch_candidate patch_candidate_2 - patch_candidate patch_candidate_3 - patch_candidate diagnostic_tool_tracer - diagnostic_tool code_reviewer_1 - reviewer test_artifact_minimal_reproducer - test_artifact execution_environment_container_a - execution_environment platform_variant_linux_x86 - platform_variant build_artifact_v1 - build_artifact dependency_libfoo_v1 - dependency dependency_libbar_v2 - dependency config_profile_debug - configuration_profile config_profile_release - configuration_profile quality_gate_basic - quality_gate quality_gate_strict - quality_gate metadata_bundle_initial - metadata_bundle binary_artifact_core - binary_artifact owner_approval_primary - owner_approval owner_approval_secondary - owner_approval approval_token_session - approval_token)
+  (:init
+    (patch_candidate_available patch_candidate_1)
+    (patch_candidate_available patch_candidate_2)
+    (patch_candidate_available patch_candidate_3)
+    (diagnostic_tool_available diagnostic_tool_tracer)
+    (reviewer_available code_reviewer_1)
+    (test_artifact_available test_artifact_minimal_reproducer)
+    (component_environment_link source_component_alpha execution_environment_container_a)
+    (test_component_platform_link test_component_alpha platform_variant_linux_x86)
+    (build_artifact_available build_artifact_v1)
+    (dependency_available dependency_libfoo_v1)
+    (dependency_available dependency_libbar_v2)
+    (repository_entity_source_component_link repository_entity_feature_branch source_component_alpha)
+    (repository_entity_source_component_link repository_entity_release_branch source_component_alpha)
+    (repository_entity_test_component_link repository_entity_feature_branch test_component_alpha)
+    (repository_entity_test_component_link repository_entity_release_branch test_component_alpha)
+    (repository_entity_build_artifact_link repository_entity_feature_branch build_artifact_v1)
+    (repository_entity_build_artifact_link repository_entity_release_branch build_artifact_v1)
+    (repository_entity_dependency_link repository_entity_feature_branch dependency_libfoo_v1)
+    (repository_entity_dependency_link repository_entity_release_branch dependency_libbar_v2)
+    (configuration_profile_available config_profile_debug)
+    (configuration_profile_available config_profile_release)
+    (quality_gate_available quality_gate_basic)
+    (quality_gate_available quality_gate_strict)
+    (metadata_bundle_available metadata_bundle_initial)
+    (binary_artifact_available binary_artifact_core)
+    (owner_approval_available owner_approval_primary)
+    (repository_entity_owner_approval_link repository_entity_feature_branch owner_approval_primary)
+    (repository_entity_owner_approval_link repository_entity_release_branch owner_approval_secondary)
+    (approval_token_available approval_token_session)
+  )
+  (:goal
+    (and
+      (fix_applied source_component_alpha)
+      (fix_applied test_component_alpha)
+      (fix_applied repository_entity_feature_branch)
+      (fix_applied repository_entity_release_branch)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register-issue source_component_alpha)
+(assign-patch-candidate source_component_alpha patch_candidate_1)
+(attach-diagnostic-tool source_component_alpha diagnostic_tool_tracer)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_i8o6ydrl/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_i8o6ydrl/plan.pddl 
+
+
+--- stderr ---
+

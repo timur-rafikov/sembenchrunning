@@ -1,0 +1,936 @@
+(define (domain incomplete_grade_resolution_path_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types administrative_entity_group - object resource_group - object document_group - object case_component - object resolution_target - case_component examiner_slot - administrative_entity_group assessment_opportunity - administrative_entity_group reviewer_role - administrative_entity_group policy_document - administrative_entity_group scheduling_slot - administrative_entity_group administrative_form - administrative_entity_group administrative_action_type - administrative_entity_group external_reviewer - administrative_entity_group remediation_resource - resource_group evidence_document - resource_group appeal_reason - resource_group threshold_criterion - document_group recovery_plan_element - document_group resolution_file - document_group case_subject_group - resolution_target case_subcategory - resolution_target course_section_primary - case_subject_group course_section_secondary - case_subject_group staff_agent - case_subcategory)
+  (:predicates
+    (resolution_target_initiated ?resolution_target - resolution_target)
+    (assessment_attempt_completed ?resolution_target - resolution_target)
+    (examiner_assigned_for_target ?resolution_target - resolution_target)
+    (resolution_completed ?resolution_target - resolution_target)
+    (finalization_marker ?resolution_target - resolution_target)
+    (administrative_action_recorded ?resolution_target - resolution_target)
+    (examiner_slot_available ?examiner_slot - examiner_slot)
+    (target_assigned_to_examiner_slot ?resolution_target - resolution_target ?examiner_slot - examiner_slot)
+    (assessment_opportunity_available ?assessment_opportunity - assessment_opportunity)
+    (target_scheduled_for_assessment ?resolution_target - resolution_target ?assessment_opportunity - assessment_opportunity)
+    (reviewer_available ?reviewer_role - reviewer_role)
+    (target_assigned_reviewer ?resolution_target - resolution_target ?reviewer_role - reviewer_role)
+    (remediation_resource_available ?remediation_resource - remediation_resource)
+    (section_remediation_assigned ?course_section_primary - course_section_primary ?remediation_resource - remediation_resource)
+    (secondary_section_remediation_assigned ?course_section_secondary - course_section_secondary ?remediation_resource - remediation_resource)
+    (section_threshold_criterion ?course_section_primary - course_section_primary ?threshold_criterion - threshold_criterion)
+    (threshold_verified ?threshold_criterion - threshold_criterion)
+    (threshold_remediation_applied ?threshold_criterion - threshold_criterion)
+    (section_eligibility_confirmed ?course_section_primary - course_section_primary)
+    (section_recovery_plan_element ?course_section_secondary - course_section_secondary ?recovery_plan_element - recovery_plan_element)
+    (recovery_plan_element_active ?recovery_plan_element - recovery_plan_element)
+    (recovery_plan_element_pending ?recovery_plan_element - recovery_plan_element)
+    (secondary_section_recovery_confirmed ?course_section_secondary - course_section_secondary)
+    (resolution_file_available ?resolution_file - resolution_file)
+    (resolution_file_created ?resolution_file - resolution_file)
+    (file_includes_threshold ?resolution_file - resolution_file ?threshold_criterion - threshold_criterion)
+    (file_includes_recovery_plan_element ?resolution_file - resolution_file ?recovery_plan_element - recovery_plan_element)
+    (file_flag_policy_attachment_required ?resolution_file - resolution_file)
+    (file_flag_external_review_required ?resolution_file - resolution_file)
+    (file_verification_complete ?resolution_file - resolution_file)
+    (staff_assigned_to_primary_section ?staff_agent - staff_agent ?course_section_primary - course_section_primary)
+    (staff_assigned_to_secondary_section ?staff_agent - staff_agent ?course_section_secondary - course_section_secondary)
+    (staff_responsible_for_file ?staff_agent - staff_agent ?resolution_file - resolution_file)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (staff_holds_evidence_document ?staff_agent - staff_agent ?evidence_document - evidence_document)
+    (evidence_document_attached ?evidence_document - evidence_document)
+    (evidence_document_attached_to_file ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    (staff_evidence_binding_initiated ?staff_agent - staff_agent)
+    (staff_evidence_reviewed ?staff_agent - staff_agent)
+    (external_reviewer_engaged ?staff_agent - staff_agent)
+    (staff_policy_attached ?staff_agent - staff_agent)
+    (staff_policy_reviewed ?staff_agent - staff_agent)
+    (external_review_completed ?staff_agent - staff_agent)
+    (staff_internal_signoff_obtained ?staff_agent - staff_agent)
+    (appeal_reason_available ?appeal_reason - appeal_reason)
+    (staff_attached_appeal_reason ?staff_agent - staff_agent ?appeal_reason - appeal_reason)
+    (staff_appeal_acknowledged ?staff_agent - staff_agent)
+    (staff_preapproval_obtained ?staff_agent - staff_agent)
+    (staff_external_review_confirmed ?staff_agent - staff_agent)
+    (policy_document_available ?policy_document - policy_document)
+    (staff_attached_policy_document ?staff_agent - staff_agent ?policy_document - policy_document)
+    (scheduling_slot_available ?scheduling_slot - scheduling_slot)
+    (staff_scheduled ?staff_agent - staff_agent ?scheduling_slot - scheduling_slot)
+    (admin_action_type_available ?administrative_action_type - administrative_action_type)
+    (staff_assigned_admin_action_type ?staff_agent - staff_agent ?administrative_action_type - administrative_action_type)
+    (external_reviewer_available ?external_reviewer - external_reviewer)
+    (staff_assigned_external_reviewer ?staff_agent - staff_agent ?external_reviewer - external_reviewer)
+    (administrative_form_available ?administrative_form - administrative_form)
+    (target_assigned_administrative_form ?resolution_target - resolution_target ?administrative_form - administrative_form)
+    (primary_section_ready_for_file ?course_section_primary - course_section_primary)
+    (secondary_section_ready_for_file ?course_section_secondary - course_section_secondary)
+    (staff_signoff_recorded ?staff_agent - staff_agent)
+  )
+  (:action create_resolution_target
+    :parameters (?resolution_target - resolution_target)
+    :precondition
+      (and
+        (not
+          (resolution_target_initiated ?resolution_target)
+        )
+        (not
+          (resolution_completed ?resolution_target)
+        )
+      )
+    :effect (resolution_target_initiated ?resolution_target)
+  )
+  (:action assign_examiner_slot_to_target
+    :parameters (?resolution_target - resolution_target ?examiner_slot - examiner_slot)
+    :precondition
+      (and
+        (resolution_target_initiated ?resolution_target)
+        (not
+          (examiner_assigned_for_target ?resolution_target)
+        )
+        (examiner_slot_available ?examiner_slot)
+      )
+    :effect
+      (and
+        (examiner_assigned_for_target ?resolution_target)
+        (target_assigned_to_examiner_slot ?resolution_target ?examiner_slot)
+        (not
+          (examiner_slot_available ?examiner_slot)
+        )
+      )
+  )
+  (:action assign_assessment_opportunity_to_target
+    :parameters (?resolution_target - resolution_target ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (resolution_target_initiated ?resolution_target)
+        (examiner_assigned_for_target ?resolution_target)
+        (assessment_opportunity_available ?assessment_opportunity)
+      )
+    :effect
+      (and
+        (target_scheduled_for_assessment ?resolution_target ?assessment_opportunity)
+        (not
+          (assessment_opportunity_available ?assessment_opportunity)
+        )
+      )
+  )
+  (:action confirm_assessment_execution
+    :parameters (?resolution_target - resolution_target ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (resolution_target_initiated ?resolution_target)
+        (examiner_assigned_for_target ?resolution_target)
+        (target_scheduled_for_assessment ?resolution_target ?assessment_opportunity)
+        (not
+          (assessment_attempt_completed ?resolution_target)
+        )
+      )
+    :effect (assessment_attempt_completed ?resolution_target)
+  )
+  (:action release_assessment_opportunity
+    :parameters (?resolution_target - resolution_target ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (target_scheduled_for_assessment ?resolution_target ?assessment_opportunity)
+      )
+    :effect
+      (and
+        (assessment_opportunity_available ?assessment_opportunity)
+        (not
+          (target_scheduled_for_assessment ?resolution_target ?assessment_opportunity)
+        )
+      )
+  )
+  (:action assign_reviewer_to_target
+    :parameters (?resolution_target - resolution_target ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (assessment_attempt_completed ?resolution_target)
+        (reviewer_available ?reviewer_role)
+      )
+    :effect
+      (and
+        (target_assigned_reviewer ?resolution_target ?reviewer_role)
+        (not
+          (reviewer_available ?reviewer_role)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_target
+    :parameters (?resolution_target - resolution_target ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (target_assigned_reviewer ?resolution_target ?reviewer_role)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer_role)
+        (not
+          (target_assigned_reviewer ?resolution_target ?reviewer_role)
+        )
+      )
+  )
+  (:action assign_administrative_action_type_to_staff
+    :parameters (?staff_agent - staff_agent ?administrative_action_type - administrative_action_type)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (admin_action_type_available ?administrative_action_type)
+      )
+    :effect
+      (and
+        (staff_assigned_admin_action_type ?staff_agent ?administrative_action_type)
+        (not
+          (admin_action_type_available ?administrative_action_type)
+        )
+      )
+  )
+  (:action unassign_administrative_action_type_from_staff
+    :parameters (?staff_agent - staff_agent ?administrative_action_type - administrative_action_type)
+    :precondition
+      (and
+        (staff_assigned_admin_action_type ?staff_agent ?administrative_action_type)
+      )
+    :effect
+      (and
+        (admin_action_type_available ?administrative_action_type)
+        (not
+          (staff_assigned_admin_action_type ?staff_agent ?administrative_action_type)
+        )
+      )
+  )
+  (:action assign_external_reviewer
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (external_reviewer_available ?external_reviewer)
+      )
+    :effect
+      (and
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (not
+          (external_reviewer_available ?external_reviewer)
+        )
+      )
+  )
+  (:action unassign_external_reviewer
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+      )
+    :effect
+      (and
+        (external_reviewer_available ?external_reviewer)
+        (not
+          (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        )
+      )
+  )
+  (:action verify_section_threshold
+    :parameters (?course_section_primary - course_section_primary ?threshold_criterion - threshold_criterion ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_primary)
+        (target_scheduled_for_assessment ?course_section_primary ?assessment_opportunity)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (not
+          (threshold_verified ?threshold_criterion)
+        )
+        (not
+          (threshold_remediation_applied ?threshold_criterion)
+        )
+      )
+    :effect (threshold_verified ?threshold_criterion)
+  )
+  (:action apply_reviewer_confirmation_for_section
+    :parameters (?course_section_primary - course_section_primary ?threshold_criterion - threshold_criterion ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_primary)
+        (target_assigned_reviewer ?course_section_primary ?reviewer_role)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (threshold_verified ?threshold_criterion)
+        (not
+          (primary_section_ready_for_file ?course_section_primary)
+        )
+      )
+    :effect
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (section_eligibility_confirmed ?course_section_primary)
+      )
+  )
+  (:action apply_remediation_resource_to_section
+    :parameters (?course_section_primary - course_section_primary ?threshold_criterion - threshold_criterion ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_primary)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (primary_section_ready_for_file ?course_section_primary)
+        )
+      )
+    :effect
+      (and
+        (threshold_remediation_applied ?threshold_criterion)
+        (primary_section_ready_for_file ?course_section_primary)
+        (section_remediation_assigned ?course_section_primary ?remediation_resource)
+        (not
+          (remediation_resource_available ?remediation_resource)
+        )
+      )
+  )
+  (:action process_remediation_completion_for_section
+    :parameters (?course_section_primary - course_section_primary ?threshold_criterion - threshold_criterion ?assessment_opportunity - assessment_opportunity ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_primary)
+        (target_scheduled_for_assessment ?course_section_primary ?assessment_opportunity)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (threshold_remediation_applied ?threshold_criterion)
+        (section_remediation_assigned ?course_section_primary ?remediation_resource)
+        (not
+          (section_eligibility_confirmed ?course_section_primary)
+        )
+      )
+    :effect
+      (and
+        (threshold_verified ?threshold_criterion)
+        (section_eligibility_confirmed ?course_section_primary)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (section_remediation_assigned ?course_section_primary ?remediation_resource)
+        )
+      )
+  )
+  (:action verify_recovery_plan_element_for_section
+    :parameters (?course_section_secondary - course_section_secondary ?recovery_plan_element - recovery_plan_element ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_secondary)
+        (target_scheduled_for_assessment ?course_section_secondary ?assessment_opportunity)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (not
+          (recovery_plan_element_active ?recovery_plan_element)
+        )
+        (not
+          (recovery_plan_element_pending ?recovery_plan_element)
+        )
+      )
+    :effect (recovery_plan_element_active ?recovery_plan_element)
+  )
+  (:action apply_reviewer_confirmation_for_secondary_section
+    :parameters (?course_section_secondary - course_section_secondary ?recovery_plan_element - recovery_plan_element ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_secondary)
+        (target_assigned_reviewer ?course_section_secondary ?reviewer_role)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (recovery_plan_element_active ?recovery_plan_element)
+        (not
+          (secondary_section_ready_for_file ?course_section_secondary)
+        )
+      )
+    :effect
+      (and
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+      )
+  )
+  (:action apply_remediation_resource_to_secondary_section
+    :parameters (?course_section_secondary - course_section_secondary ?recovery_plan_element - recovery_plan_element ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_secondary)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (secondary_section_ready_for_file ?course_section_secondary)
+        )
+      )
+    :effect
+      (and
+        (recovery_plan_element_pending ?recovery_plan_element)
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (secondary_section_remediation_assigned ?course_section_secondary ?remediation_resource)
+        (not
+          (remediation_resource_available ?remediation_resource)
+        )
+      )
+  )
+  (:action complete_remediation_for_secondary_section
+    :parameters (?course_section_secondary - course_section_secondary ?recovery_plan_element - recovery_plan_element ?assessment_opportunity - assessment_opportunity ?remediation_resource - remediation_resource)
+    :precondition
+      (and
+        (assessment_attempt_completed ?course_section_secondary)
+        (target_scheduled_for_assessment ?course_section_secondary ?assessment_opportunity)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (recovery_plan_element_pending ?recovery_plan_element)
+        (secondary_section_remediation_assigned ?course_section_secondary ?remediation_resource)
+        (not
+          (secondary_section_recovery_confirmed ?course_section_secondary)
+        )
+      )
+    :effect
+      (and
+        (recovery_plan_element_active ?recovery_plan_element)
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+        (remediation_resource_available ?remediation_resource)
+        (not
+          (secondary_section_remediation_assigned ?course_section_secondary ?remediation_resource)
+        )
+      )
+  )
+  (:action assemble_resolution_file
+    :parameters (?course_section_primary - course_section_primary ?course_section_secondary - course_section_secondary ?threshold_criterion - threshold_criterion ?recovery_plan_element - recovery_plan_element ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (threshold_verified ?threshold_criterion)
+        (recovery_plan_element_active ?recovery_plan_element)
+        (section_eligibility_confirmed ?course_section_primary)
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+        (resolution_file_available ?resolution_file)
+      )
+    :effect
+      (and
+        (resolution_file_created ?resolution_file)
+        (file_includes_threshold ?resolution_file ?threshold_criterion)
+        (file_includes_recovery_plan_element ?resolution_file ?recovery_plan_element)
+        (not
+          (resolution_file_available ?resolution_file)
+        )
+      )
+  )
+  (:action create_resolution_file_policy_flagged
+    :parameters (?course_section_primary - course_section_primary ?course_section_secondary - course_section_secondary ?threshold_criterion - threshold_criterion ?recovery_plan_element - recovery_plan_element ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (threshold_remediation_applied ?threshold_criterion)
+        (recovery_plan_element_active ?recovery_plan_element)
+        (not
+          (section_eligibility_confirmed ?course_section_primary)
+        )
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+        (resolution_file_available ?resolution_file)
+      )
+    :effect
+      (and
+        (resolution_file_created ?resolution_file)
+        (file_includes_threshold ?resolution_file ?threshold_criterion)
+        (file_includes_recovery_plan_element ?resolution_file ?recovery_plan_element)
+        (file_flag_policy_attachment_required ?resolution_file)
+        (not
+          (resolution_file_available ?resolution_file)
+        )
+      )
+  )
+  (:action create_resolution_file_external_flagged
+    :parameters (?course_section_primary - course_section_primary ?course_section_secondary - course_section_secondary ?threshold_criterion - threshold_criterion ?recovery_plan_element - recovery_plan_element ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (threshold_verified ?threshold_criterion)
+        (recovery_plan_element_pending ?recovery_plan_element)
+        (section_eligibility_confirmed ?course_section_primary)
+        (not
+          (secondary_section_recovery_confirmed ?course_section_secondary)
+        )
+        (resolution_file_available ?resolution_file)
+      )
+    :effect
+      (and
+        (resolution_file_created ?resolution_file)
+        (file_includes_threshold ?resolution_file ?threshold_criterion)
+        (file_includes_recovery_plan_element ?resolution_file ?recovery_plan_element)
+        (file_flag_external_review_required ?resolution_file)
+        (not
+          (resolution_file_available ?resolution_file)
+        )
+      )
+  )
+  (:action create_resolution_file_with_full_flags
+    :parameters (?course_section_primary - course_section_primary ?course_section_secondary - course_section_secondary ?threshold_criterion - threshold_criterion ?recovery_plan_element - recovery_plan_element ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (section_threshold_criterion ?course_section_primary ?threshold_criterion)
+        (section_recovery_plan_element ?course_section_secondary ?recovery_plan_element)
+        (threshold_remediation_applied ?threshold_criterion)
+        (recovery_plan_element_pending ?recovery_plan_element)
+        (not
+          (section_eligibility_confirmed ?course_section_primary)
+        )
+        (not
+          (secondary_section_recovery_confirmed ?course_section_secondary)
+        )
+        (resolution_file_available ?resolution_file)
+      )
+    :effect
+      (and
+        (resolution_file_created ?resolution_file)
+        (file_includes_threshold ?resolution_file ?threshold_criterion)
+        (file_includes_recovery_plan_element ?resolution_file ?recovery_plan_element)
+        (file_flag_policy_attachment_required ?resolution_file)
+        (file_flag_external_review_required ?resolution_file)
+        (not
+          (resolution_file_available ?resolution_file)
+        )
+      )
+  )
+  (:action validate_resolution_file
+    :parameters (?resolution_file - resolution_file ?course_section_primary - course_section_primary ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (resolution_file_created ?resolution_file)
+        (primary_section_ready_for_file ?course_section_primary)
+        (target_scheduled_for_assessment ?course_section_primary ?assessment_opportunity)
+        (not
+          (file_verification_complete ?resolution_file)
+        )
+      )
+    :effect (file_verification_complete ?resolution_file)
+  )
+  (:action attach_evidence_document_to_file
+    :parameters (?staff_agent - staff_agent ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (staff_responsible_for_file ?staff_agent ?resolution_file)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_available ?evidence_document)
+        (resolution_file_created ?resolution_file)
+        (file_verification_complete ?resolution_file)
+        (not
+          (evidence_document_attached ?evidence_document)
+        )
+      )
+    :effect
+      (and
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action prepare_evidence_binding_by_staff
+    :parameters (?staff_agent - staff_agent ?evidence_document - evidence_document ?resolution_file - resolution_file ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (target_scheduled_for_assessment ?staff_agent ?assessment_opportunity)
+        (not
+          (file_flag_policy_attachment_required ?resolution_file)
+        )
+        (not
+          (staff_evidence_binding_initiated ?staff_agent)
+        )
+      )
+    :effect (staff_evidence_binding_initiated ?staff_agent)
+  )
+  (:action attach_policy_document_to_staff
+    :parameters (?staff_agent - staff_agent ?policy_document - policy_document)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (policy_document_available ?policy_document)
+        (not
+          (staff_policy_attached ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_policy_attached ?staff_agent)
+        (staff_attached_policy_document ?staff_agent ?policy_document)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action bind_policy_and_evidence_to_file
+    :parameters (?staff_agent - staff_agent ?evidence_document - evidence_document ?resolution_file - resolution_file ?assessment_opportunity - assessment_opportunity ?policy_document - policy_document)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (target_scheduled_for_assessment ?staff_agent ?assessment_opportunity)
+        (file_flag_policy_attachment_required ?resolution_file)
+        (staff_policy_attached ?staff_agent)
+        (staff_attached_policy_document ?staff_agent ?policy_document)
+        (not
+          (staff_evidence_binding_initiated ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_evidence_binding_initiated ?staff_agent)
+        (staff_policy_reviewed ?staff_agent)
+      )
+  )
+  (:action staff_review_and_mark_evidence
+    :parameters (?staff_agent - staff_agent ?administrative_action_type - administrative_action_type ?reviewer_role - reviewer_role ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_binding_initiated ?staff_agent)
+        (staff_assigned_admin_action_type ?staff_agent ?administrative_action_type)
+        (target_assigned_reviewer ?staff_agent ?reviewer_role)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (not
+          (file_flag_external_review_required ?resolution_file)
+        )
+        (not
+          (staff_evidence_reviewed ?staff_agent)
+        )
+      )
+    :effect (staff_evidence_reviewed ?staff_agent)
+  )
+  (:action staff_review_and_mark_evidence_post_binding
+    :parameters (?staff_agent - staff_agent ?administrative_action_type - administrative_action_type ?reviewer_role - reviewer_role ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_binding_initiated ?staff_agent)
+        (staff_assigned_admin_action_type ?staff_agent ?administrative_action_type)
+        (target_assigned_reviewer ?staff_agent ?reviewer_role)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (file_flag_external_review_required ?resolution_file)
+        (not
+          (staff_evidence_reviewed ?staff_agent)
+        )
+      )
+    :effect (staff_evidence_reviewed ?staff_agent)
+  )
+  (:action engage_external_reviewer
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_reviewed ?staff_agent)
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (not
+          (file_flag_policy_attachment_required ?resolution_file)
+        )
+        (not
+          (file_flag_external_review_required ?resolution_file)
+        )
+        (not
+          (external_reviewer_engaged ?staff_agent)
+        )
+      )
+    :effect (external_reviewer_engaged ?staff_agent)
+  )
+  (:action engage_external_reviewer_and_record_completion
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_reviewed ?staff_agent)
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (file_flag_policy_attachment_required ?resolution_file)
+        (not
+          (file_flag_external_review_required ?resolution_file)
+        )
+        (not
+          (external_reviewer_engaged ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (external_review_completed ?staff_agent)
+      )
+  )
+  (:action engage_external_reviewer_and_record_completion_variant
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_reviewed ?staff_agent)
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (not
+          (file_flag_policy_attachment_required ?resolution_file)
+        )
+        (file_flag_external_review_required ?resolution_file)
+        (not
+          (external_reviewer_engaged ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (external_review_completed ?staff_agent)
+      )
+  )
+  (:action engage_external_reviewer_and_record_completion_all_flags
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer ?evidence_document - evidence_document ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (staff_evidence_reviewed ?staff_agent)
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (staff_holds_evidence_document ?staff_agent ?evidence_document)
+        (evidence_document_attached_to_file ?evidence_document ?resolution_file)
+        (file_flag_policy_attachment_required ?resolution_file)
+        (file_flag_external_review_required ?resolution_file)
+        (not
+          (external_reviewer_engaged ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (external_review_completed ?staff_agent)
+      )
+  )
+  (:action record_initial_staff_signoff
+    :parameters (?staff_agent - staff_agent)
+    :precondition
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (not
+          (external_review_completed ?staff_agent)
+        )
+        (not
+          (staff_signoff_recorded ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_signoff_recorded ?staff_agent)
+        (finalization_marker ?staff_agent)
+      )
+  )
+  (:action schedule_staff_signoff
+    :parameters (?staff_agent - staff_agent ?scheduling_slot - scheduling_slot)
+    :precondition
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (external_review_completed ?staff_agent)
+        (scheduling_slot_available ?scheduling_slot)
+      )
+    :effect
+      (and
+        (staff_scheduled ?staff_agent ?scheduling_slot)
+        (not
+          (scheduling_slot_available ?scheduling_slot)
+        )
+      )
+  )
+  (:action complete_internal_signoff
+    :parameters (?staff_agent - staff_agent ?course_section_primary - course_section_primary ?course_section_secondary - course_section_secondary ?assessment_opportunity - assessment_opportunity ?scheduling_slot - scheduling_slot)
+    :precondition
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (external_review_completed ?staff_agent)
+        (staff_scheduled ?staff_agent ?scheduling_slot)
+        (staff_assigned_to_primary_section ?staff_agent ?course_section_primary)
+        (staff_assigned_to_secondary_section ?staff_agent ?course_section_secondary)
+        (section_eligibility_confirmed ?course_section_primary)
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+        (target_scheduled_for_assessment ?staff_agent ?assessment_opportunity)
+        (not
+          (staff_internal_signoff_obtained ?staff_agent)
+        )
+      )
+    :effect (staff_internal_signoff_obtained ?staff_agent)
+  )
+  (:action finalize_staff_signoff
+    :parameters (?staff_agent - staff_agent)
+    :precondition
+      (and
+        (external_reviewer_engaged ?staff_agent)
+        (staff_internal_signoff_obtained ?staff_agent)
+        (not
+          (staff_signoff_recorded ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_signoff_recorded ?staff_agent)
+        (finalization_marker ?staff_agent)
+      )
+  )
+  (:action acknowledge_appeal_reason
+    :parameters (?staff_agent - staff_agent ?appeal_reason - appeal_reason ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (assessment_attempt_completed ?staff_agent)
+        (target_scheduled_for_assessment ?staff_agent ?assessment_opportunity)
+        (appeal_reason_available ?appeal_reason)
+        (staff_attached_appeal_reason ?staff_agent ?appeal_reason)
+        (not
+          (staff_appeal_acknowledged ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_appeal_acknowledged ?staff_agent)
+        (not
+          (appeal_reason_available ?appeal_reason)
+        )
+      )
+  )
+  (:action obtain_staff_preapproval
+    :parameters (?staff_agent - staff_agent ?reviewer_role - reviewer_role)
+    :precondition
+      (and
+        (staff_appeal_acknowledged ?staff_agent)
+        (target_assigned_reviewer ?staff_agent ?reviewer_role)
+        (not
+          (staff_preapproval_obtained ?staff_agent)
+        )
+      )
+    :effect (staff_preapproval_obtained ?staff_agent)
+  )
+  (:action obtain_external_review_confirmation
+    :parameters (?staff_agent - staff_agent ?external_reviewer - external_reviewer)
+    :precondition
+      (and
+        (staff_preapproval_obtained ?staff_agent)
+        (staff_assigned_external_reviewer ?staff_agent ?external_reviewer)
+        (not
+          (staff_external_review_confirmed ?staff_agent)
+        )
+      )
+    :effect (staff_external_review_confirmed ?staff_agent)
+  )
+  (:action record_external_review_signoff
+    :parameters (?staff_agent - staff_agent)
+    :precondition
+      (and
+        (staff_external_review_confirmed ?staff_agent)
+        (not
+          (staff_signoff_recorded ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (staff_signoff_recorded ?staff_agent)
+        (finalization_marker ?staff_agent)
+      )
+  )
+  (:action finalize_primary_section_record
+    :parameters (?course_section_primary - course_section_primary ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (primary_section_ready_for_file ?course_section_primary)
+        (section_eligibility_confirmed ?course_section_primary)
+        (resolution_file_created ?resolution_file)
+        (file_verification_complete ?resolution_file)
+        (not
+          (finalization_marker ?course_section_primary)
+        )
+      )
+    :effect (finalization_marker ?course_section_primary)
+  )
+  (:action finalize_secondary_section_record
+    :parameters (?course_section_secondary - course_section_secondary ?resolution_file - resolution_file)
+    :precondition
+      (and
+        (secondary_section_ready_for_file ?course_section_secondary)
+        (secondary_section_recovery_confirmed ?course_section_secondary)
+        (resolution_file_created ?resolution_file)
+        (file_verification_complete ?resolution_file)
+        (not
+          (finalization_marker ?course_section_secondary)
+        )
+      )
+    :effect (finalization_marker ?course_section_secondary)
+  )
+  (:action create_administrative_form_for_target
+    :parameters (?resolution_target - resolution_target ?administrative_form - administrative_form ?assessment_opportunity - assessment_opportunity)
+    :precondition
+      (and
+        (finalization_marker ?resolution_target)
+        (target_scheduled_for_assessment ?resolution_target ?assessment_opportunity)
+        (administrative_form_available ?administrative_form)
+        (not
+          (administrative_action_recorded ?resolution_target)
+        )
+      )
+    :effect
+      (and
+        (administrative_action_recorded ?resolution_target)
+        (target_assigned_administrative_form ?resolution_target ?administrative_form)
+        (not
+          (administrative_form_available ?administrative_form)
+        )
+      )
+  )
+  (:action finalize_resolution_for_primary_section
+    :parameters (?course_section_primary - course_section_primary ?examiner_slot - examiner_slot ?administrative_form - administrative_form)
+    :precondition
+      (and
+        (administrative_action_recorded ?course_section_primary)
+        (target_assigned_to_examiner_slot ?course_section_primary ?examiner_slot)
+        (target_assigned_administrative_form ?course_section_primary ?administrative_form)
+        (not
+          (resolution_completed ?course_section_primary)
+        )
+      )
+    :effect
+      (and
+        (resolution_completed ?course_section_primary)
+        (examiner_slot_available ?examiner_slot)
+        (administrative_form_available ?administrative_form)
+      )
+  )
+  (:action finalize_resolution_for_secondary_section
+    :parameters (?course_section_secondary - course_section_secondary ?examiner_slot - examiner_slot ?administrative_form - administrative_form)
+    :precondition
+      (and
+        (administrative_action_recorded ?course_section_secondary)
+        (target_assigned_to_examiner_slot ?course_section_secondary ?examiner_slot)
+        (target_assigned_administrative_form ?course_section_secondary ?administrative_form)
+        (not
+          (resolution_completed ?course_section_secondary)
+        )
+      )
+    :effect
+      (and
+        (resolution_completed ?course_section_secondary)
+        (examiner_slot_available ?examiner_slot)
+        (administrative_form_available ?administrative_form)
+      )
+  )
+  (:action finalize_resolution_for_staff_and_release_resources
+    :parameters (?staff_agent - staff_agent ?examiner_slot - examiner_slot ?administrative_form - administrative_form)
+    :precondition
+      (and
+        (administrative_action_recorded ?staff_agent)
+        (target_assigned_to_examiner_slot ?staff_agent ?examiner_slot)
+        (target_assigned_administrative_form ?staff_agent ?administrative_form)
+        (not
+          (resolution_completed ?staff_agent)
+        )
+      )
+    :effect
+      (and
+        (resolution_completed ?staff_agent)
+        (examiner_slot_available ?examiner_slot)
+        (administrative_form_available ?administrative_form)
+      )
+  )
+)

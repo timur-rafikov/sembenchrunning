@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain travel_insurance_requirement_matching)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object domain_item - generic_entity resource_item - generic_entity product_item - generic_entity case_record_item - generic_entity case_participant - case_record_item insurance_policy_option - domain_item entry_requirement_rule - domain_item supporting_document - domain_item optional_addon - domain_item payment_or_preference_token - domain_item insurance_certificate - domain_item validation_token - domain_item secondary_validation_token - domain_item exception_proof - resource_item credential_template - resource_item special_authorisation - resource_item coverage_profile - product_item fare_category - product_item travel_product_offering - product_item traveler_subtype_a - case_participant traveler_subtype_b - case_participant traveler_individual - traveler_subtype_a traveler_group_member - traveler_subtype_a assessor_officer - traveler_subtype_b)
+
+  (:predicates
+    (entity_created ?travel_case_record - case_participant)
+    (requirements_identified ?travel_case_record - case_participant)
+    (policy_allocated ?travel_case_record - case_participant)
+    (travel_clearance_granted ?travel_case_record - case_participant)
+    (cleared_for_issuance ?travel_case_record - case_participant)
+    (insurance_certificate_bound ?travel_case_record - case_participant)
+    (policy_option_available ?insurance_policy_option - insurance_policy_option)
+    (assigned_policy ?travel_case_record - case_participant ?insurance_policy_option - insurance_policy_option)
+    (entry_rule_available ?entry_requirement_rule - entry_requirement_rule)
+    (matched_entry_rule ?travel_case_record - case_participant ?entry_requirement_rule - entry_requirement_rule)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (document_attached ?travel_case_record - case_participant ?supporting_document - supporting_document)
+    (exception_proof_available ?exception_proof - exception_proof)
+    (traveler_exception_linked ?traveler_individual - traveler_individual ?exception_proof - exception_proof)
+    (group_member_exception_linked ?traveler_group_member - traveler_group_member ?exception_proof - exception_proof)
+    (traveler_coverage_profile_match ?traveler_individual - traveler_individual ?coverage_profile - coverage_profile)
+    (coverage_profile_verified ?coverage_profile - coverage_profile)
+    (coverage_profile_exemption_marked ?coverage_profile - coverage_profile)
+    (traveler_requirement_detected ?traveler_individual - traveler_individual)
+    (group_member_fare_category ?traveler_group_member - traveler_group_member ?fare_category - fare_category)
+    (fare_category_flagged ?fare_category - fare_category)
+    (fare_category_exemption_marked ?fare_category - fare_category)
+    (group_member_requirement_detected ?traveler_group_member - traveler_group_member)
+    (product_offering_available ?travel_product_offering - travel_product_offering)
+    (product_offering_selected ?travel_product_offering - travel_product_offering)
+    (offering_matches_coverage_profile ?travel_product_offering - travel_product_offering ?coverage_profile - coverage_profile)
+    (offering_matches_fare_category ?travel_product_offering - travel_product_offering ?fare_category - fare_category)
+    (offering_requires_addon_selection ?travel_product_offering - travel_product_offering)
+    (offering_requires_secondary_validation ?travel_product_offering - travel_product_offering)
+    (offering_validated_for_credentials ?travel_product_offering - travel_product_offering)
+    (assessor_assigned_to_individual ?assessor_officer - assessor_officer ?traveler_individual - traveler_individual)
+    (assessor_assigned_to_group_member ?assessor_officer - assessor_officer ?traveler_group_member - traveler_group_member)
+    (assessor_assigned_to_product ?assessor_officer - assessor_officer ?travel_product_offering - travel_product_offering)
+    (credential_template_available ?credential_template - credential_template)
+    (assessor_has_credential_template ?assessor_officer - assessor_officer ?credential_template - credential_template)
+    (credential_template_allocated ?credential_template - credential_template)
+    (template_linked_to_offering ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    (assessor_documentation_linked ?assessor_officer - assessor_officer)
+    (assessor_endorsement_condition_met ?assessor_officer - assessor_officer)
+    (assessor_endorsement_applied ?assessor_officer - assessor_officer)
+    (assessor_addon_attached ?assessor_officer - assessor_officer)
+    (assessor_addon_verified ?assessor_officer - assessor_officer)
+    (assessor_endorsement_confirmed ?assessor_officer - assessor_officer)
+    (assessor_final_checks_completed ?assessor_officer - assessor_officer)
+    (special_authorisation_available ?special_authorisation - special_authorisation)
+    (assessor_has_special_authorisation ?assessor_officer - assessor_officer ?special_authorisation - special_authorisation)
+    (assessor_special_authorisation_applied ?assessor_officer - assessor_officer)
+    (assessor_special_authorisation_processed ?assessor_officer - assessor_officer)
+    (assessor_special_authorisation_finalised ?assessor_officer - assessor_officer)
+    (optional_addon_available ?optional_addon - optional_addon)
+    (assessor_attached_addon ?assessor_officer - assessor_officer ?optional_addon - optional_addon)
+    (payment_token_available ?payment_or_preference_token - payment_or_preference_token)
+    (assessor_has_payment_token ?assessor_officer - assessor_officer ?payment_or_preference_token - payment_or_preference_token)
+    (validation_token_available ?validation_token - validation_token)
+    (assessor_has_validation_token ?assessor_officer - assessor_officer ?validation_token - validation_token)
+    (secondary_validation_token_available ?secondary_validation_token - secondary_validation_token)
+    (assessor_has_secondary_validation_token ?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token)
+    (insurance_certificate_available ?insurance_certificate - insurance_certificate)
+    (bound_insurance_certificate ?travel_case_record - case_participant ?insurance_certificate - insurance_certificate)
+    (individual_requirement_processed ?traveler_individual - traveler_individual)
+    (group_member_requirement_processed ?traveler_group_member - traveler_group_member)
+    (assessor_marked_complete ?assessor_officer - assessor_officer)
+  )
+  (:action create_travel_case_record
+    :parameters (?travel_case_record - case_participant)
+    :precondition
+      (and
+        (not
+          (entity_created ?travel_case_record)
+        )
+        (not
+          (travel_clearance_granted ?travel_case_record)
+        )
+      )
+    :effect (entity_created ?travel_case_record)
+  )
+  (:action assign_policy_option_to_case
+    :parameters (?travel_case_record - case_participant ?insurance_policy_option - insurance_policy_option)
+    :precondition
+      (and
+        (entity_created ?travel_case_record)
+        (not
+          (policy_allocated ?travel_case_record)
+        )
+        (policy_option_available ?insurance_policy_option)
+      )
+    :effect
+      (and
+        (policy_allocated ?travel_case_record)
+        (assigned_policy ?travel_case_record ?insurance_policy_option)
+        (not
+          (policy_option_available ?insurance_policy_option)
+        )
+      )
+  )
+  (:action match_entry_rule_to_case
+    :parameters (?travel_case_record - case_participant ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (entity_created ?travel_case_record)
+        (policy_allocated ?travel_case_record)
+        (entry_rule_available ?entry_requirement_rule)
+      )
+    :effect
+      (and
+        (matched_entry_rule ?travel_case_record ?entry_requirement_rule)
+        (not
+          (entry_rule_available ?entry_requirement_rule)
+        )
+      )
+  )
+  (:action confirm_case_rule_interpretation
+    :parameters (?travel_case_record - case_participant ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (entity_created ?travel_case_record)
+        (policy_allocated ?travel_case_record)
+        (matched_entry_rule ?travel_case_record ?entry_requirement_rule)
+        (not
+          (requirements_identified ?travel_case_record)
+        )
+      )
+    :effect (requirements_identified ?travel_case_record)
+  )
+  (:action release_entry_rule_match
+    :parameters (?travel_case_record - case_participant ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (matched_entry_rule ?travel_case_record ?entry_requirement_rule)
+      )
+    :effect
+      (and
+        (entry_rule_available ?entry_requirement_rule)
+        (not
+          (matched_entry_rule ?travel_case_record ?entry_requirement_rule)
+        )
+      )
+  )
+  (:action attach_supporting_document_to_case
+    :parameters (?travel_case_record - case_participant ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (requirements_identified ?travel_case_record)
+        (supporting_document_available ?supporting_document)
+      )
+    :effect
+      (and
+        (document_attached ?travel_case_record ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action detach_supporting_document_from_case
+    :parameters (?travel_case_record - case_participant ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (document_attached ?travel_case_record ?supporting_document)
+      )
+    :effect
+      (and
+        (supporting_document_available ?supporting_document)
+        (not
+          (document_attached ?travel_case_record ?supporting_document)
+        )
+      )
+  )
+  (:action assign_validation_token_to_assessor
+    :parameters (?assessor_officer - assessor_officer ?validation_token - validation_token)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (validation_token_available ?validation_token)
+      )
+    :effect
+      (and
+        (assessor_has_validation_token ?assessor_officer ?validation_token)
+        (not
+          (validation_token_available ?validation_token)
+        )
+      )
+  )
+  (:action release_validation_token_from_assessor
+    :parameters (?assessor_officer - assessor_officer ?validation_token - validation_token)
+    :precondition
+      (and
+        (assessor_has_validation_token ?assessor_officer ?validation_token)
+      )
+    :effect
+      (and
+        (validation_token_available ?validation_token)
+        (not
+          (assessor_has_validation_token ?assessor_officer ?validation_token)
+        )
+      )
+  )
+  (:action assign_secondary_validation_token_to_assessor
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (secondary_validation_token_available ?secondary_validation_token)
+      )
+    :effect
+      (and
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (not
+          (secondary_validation_token_available ?secondary_validation_token)
+        )
+      )
+  )
+  (:action release_secondary_validation_token_from_assessor
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token)
+    :precondition
+      (and
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+      )
+    :effect
+      (and
+        (secondary_validation_token_available ?secondary_validation_token)
+        (not
+          (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        )
+      )
+  )
+  (:action flag_coverage_profile_for_individual
+    :parameters (?traveler_individual - traveler_individual ?coverage_profile - coverage_profile ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (requirements_identified ?traveler_individual)
+        (matched_entry_rule ?traveler_individual ?entry_requirement_rule)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (not
+          (coverage_profile_verified ?coverage_profile)
+        )
+        (not
+          (coverage_profile_exemption_marked ?coverage_profile)
+        )
+      )
+    :effect (coverage_profile_verified ?coverage_profile)
+  )
+  (:action confirm_individual_requirement_with_supporting_document
+    :parameters (?traveler_individual - traveler_individual ?coverage_profile - coverage_profile ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (requirements_identified ?traveler_individual)
+        (document_attached ?traveler_individual ?supporting_document)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (coverage_profile_verified ?coverage_profile)
+        (not
+          (individual_requirement_processed ?traveler_individual)
+        )
+      )
+    :effect
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (traveler_requirement_detected ?traveler_individual)
+      )
+  )
+  (:action apply_exception_proof_for_individual
+    :parameters (?traveler_individual - traveler_individual ?coverage_profile - coverage_profile ?exception_proof - exception_proof)
+    :precondition
+      (and
+        (requirements_identified ?traveler_individual)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (exception_proof_available ?exception_proof)
+        (not
+          (individual_requirement_processed ?traveler_individual)
+        )
+      )
+    :effect
+      (and
+        (coverage_profile_exemption_marked ?coverage_profile)
+        (individual_requirement_processed ?traveler_individual)
+        (traveler_exception_linked ?traveler_individual ?exception_proof)
+        (not
+          (exception_proof_available ?exception_proof)
+        )
+      )
+  )
+  (:action process_individual_requirement_with_rule_and_exception
+    :parameters (?traveler_individual - traveler_individual ?coverage_profile - coverage_profile ?entry_requirement_rule - entry_requirement_rule ?exception_proof - exception_proof)
+    :precondition
+      (and
+        (requirements_identified ?traveler_individual)
+        (matched_entry_rule ?traveler_individual ?entry_requirement_rule)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (coverage_profile_exemption_marked ?coverage_profile)
+        (traveler_exception_linked ?traveler_individual ?exception_proof)
+        (not
+          (traveler_requirement_detected ?traveler_individual)
+        )
+      )
+    :effect
+      (and
+        (coverage_profile_verified ?coverage_profile)
+        (traveler_requirement_detected ?traveler_individual)
+        (exception_proof_available ?exception_proof)
+        (not
+          (traveler_exception_linked ?traveler_individual ?exception_proof)
+        )
+      )
+  )
+  (:action flag_fare_category_for_group_member
+    :parameters (?traveler_group_member - traveler_group_member ?fare_category - fare_category ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (requirements_identified ?traveler_group_member)
+        (matched_entry_rule ?traveler_group_member ?entry_requirement_rule)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (not
+          (fare_category_flagged ?fare_category)
+        )
+        (not
+          (fare_category_exemption_marked ?fare_category)
+        )
+      )
+    :effect (fare_category_flagged ?fare_category)
+  )
+  (:action confirm_group_member_requirement_with_supporting_document
+    :parameters (?traveler_group_member - traveler_group_member ?fare_category - fare_category ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (requirements_identified ?traveler_group_member)
+        (document_attached ?traveler_group_member ?supporting_document)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (fare_category_flagged ?fare_category)
+        (not
+          (group_member_requirement_processed ?traveler_group_member)
+        )
+      )
+    :effect
+      (and
+        (group_member_requirement_processed ?traveler_group_member)
+        (group_member_requirement_detected ?traveler_group_member)
+      )
+  )
+  (:action apply_exception_proof_for_group_member
+    :parameters (?traveler_group_member - traveler_group_member ?fare_category - fare_category ?exception_proof - exception_proof)
+    :precondition
+      (and
+        (requirements_identified ?traveler_group_member)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (exception_proof_available ?exception_proof)
+        (not
+          (group_member_requirement_processed ?traveler_group_member)
+        )
+      )
+    :effect
+      (and
+        (fare_category_exemption_marked ?fare_category)
+        (group_member_requirement_processed ?traveler_group_member)
+        (group_member_exception_linked ?traveler_group_member ?exception_proof)
+        (not
+          (exception_proof_available ?exception_proof)
+        )
+      )
+  )
+  (:action process_group_member_requirement_with_rule_and_exception
+    :parameters (?traveler_group_member - traveler_group_member ?fare_category - fare_category ?entry_requirement_rule - entry_requirement_rule ?exception_proof - exception_proof)
+    :precondition
+      (and
+        (requirements_identified ?traveler_group_member)
+        (matched_entry_rule ?traveler_group_member ?entry_requirement_rule)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (fare_category_exemption_marked ?fare_category)
+        (group_member_exception_linked ?traveler_group_member ?exception_proof)
+        (not
+          (group_member_requirement_detected ?traveler_group_member)
+        )
+      )
+    :effect
+      (and
+        (fare_category_flagged ?fare_category)
+        (group_member_requirement_detected ?traveler_group_member)
+        (exception_proof_available ?exception_proof)
+        (not
+          (group_member_exception_linked ?traveler_group_member ?exception_proof)
+        )
+      )
+  )
+  (:action aggregate_requirements_and_select_product_offering
+    :parameters (?traveler_individual - traveler_individual ?traveler_group_member - traveler_group_member ?coverage_profile - coverage_profile ?fare_category - fare_category ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (group_member_requirement_processed ?traveler_group_member)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (coverage_profile_verified ?coverage_profile)
+        (fare_category_flagged ?fare_category)
+        (traveler_requirement_detected ?traveler_individual)
+        (group_member_requirement_detected ?traveler_group_member)
+        (product_offering_available ?travel_product_offering)
+      )
+    :effect
+      (and
+        (product_offering_selected ?travel_product_offering)
+        (offering_matches_coverage_profile ?travel_product_offering ?coverage_profile)
+        (offering_matches_fare_category ?travel_product_offering ?fare_category)
+        (not
+          (product_offering_available ?travel_product_offering)
+        )
+      )
+  )
+  (:action aggregate_requirements_and_select_offering_with_addon_requirement
+    :parameters (?traveler_individual - traveler_individual ?traveler_group_member - traveler_group_member ?coverage_profile - coverage_profile ?fare_category - fare_category ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (group_member_requirement_processed ?traveler_group_member)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (coverage_profile_exemption_marked ?coverage_profile)
+        (fare_category_flagged ?fare_category)
+        (not
+          (traveler_requirement_detected ?traveler_individual)
+        )
+        (group_member_requirement_detected ?traveler_group_member)
+        (product_offering_available ?travel_product_offering)
+      )
+    :effect
+      (and
+        (product_offering_selected ?travel_product_offering)
+        (offering_matches_coverage_profile ?travel_product_offering ?coverage_profile)
+        (offering_matches_fare_category ?travel_product_offering ?fare_category)
+        (offering_requires_addon_selection ?travel_product_offering)
+        (not
+          (product_offering_available ?travel_product_offering)
+        )
+      )
+  )
+  (:action aggregate_requirements_and_select_offering_requiring_secondary_validation
+    :parameters (?traveler_individual - traveler_individual ?traveler_group_member - traveler_group_member ?coverage_profile - coverage_profile ?fare_category - fare_category ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (group_member_requirement_processed ?traveler_group_member)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (coverage_profile_verified ?coverage_profile)
+        (fare_category_exemption_marked ?fare_category)
+        (traveler_requirement_detected ?traveler_individual)
+        (not
+          (group_member_requirement_detected ?traveler_group_member)
+        )
+        (product_offering_available ?travel_product_offering)
+      )
+    :effect
+      (and
+        (product_offering_selected ?travel_product_offering)
+        (offering_matches_coverage_profile ?travel_product_offering ?coverage_profile)
+        (offering_matches_fare_category ?travel_product_offering ?fare_category)
+        (offering_requires_secondary_validation ?travel_product_offering)
+        (not
+          (product_offering_available ?travel_product_offering)
+        )
+      )
+  )
+  (:action aggregate_requirements_and_select_offering_with_addon_and_secondary_validation
+    :parameters (?traveler_individual - traveler_individual ?traveler_group_member - traveler_group_member ?coverage_profile - coverage_profile ?fare_category - fare_category ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (group_member_requirement_processed ?traveler_group_member)
+        (traveler_coverage_profile_match ?traveler_individual ?coverage_profile)
+        (group_member_fare_category ?traveler_group_member ?fare_category)
+        (coverage_profile_exemption_marked ?coverage_profile)
+        (fare_category_exemption_marked ?fare_category)
+        (not
+          (traveler_requirement_detected ?traveler_individual)
+        )
+        (not
+          (group_member_requirement_detected ?traveler_group_member)
+        )
+        (product_offering_available ?travel_product_offering)
+      )
+    :effect
+      (and
+        (product_offering_selected ?travel_product_offering)
+        (offering_matches_coverage_profile ?travel_product_offering ?coverage_profile)
+        (offering_matches_fare_category ?travel_product_offering ?fare_category)
+        (offering_requires_addon_selection ?travel_product_offering)
+        (offering_requires_secondary_validation ?travel_product_offering)
+        (not
+          (product_offering_available ?travel_product_offering)
+        )
+      )
+  )
+  (:action validate_selected_offering_for_individual
+    :parameters (?travel_product_offering - travel_product_offering ?traveler_individual - traveler_individual ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (product_offering_selected ?travel_product_offering)
+        (individual_requirement_processed ?traveler_individual)
+        (matched_entry_rule ?traveler_individual ?entry_requirement_rule)
+        (not
+          (offering_validated_for_credentials ?travel_product_offering)
+        )
+      )
+    :effect (offering_validated_for_credentials ?travel_product_offering)
+  )
+  (:action allocate_credential_template_and_link_to_offering
+    :parameters (?assessor_officer - assessor_officer ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (assessor_assigned_to_product ?assessor_officer ?travel_product_offering)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (credential_template_available ?credential_template)
+        (product_offering_selected ?travel_product_offering)
+        (offering_validated_for_credentials ?travel_product_offering)
+        (not
+          (credential_template_allocated ?credential_template)
+        )
+      )
+    :effect
+      (and
+        (credential_template_allocated ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (not
+          (credential_template_available ?credential_template)
+        )
+      )
+  )
+  (:action link_template_and_mark_documentation_linked
+    :parameters (?assessor_officer - assessor_officer ?credential_template - credential_template ?travel_product_offering - travel_product_offering ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (credential_template_allocated ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (matched_entry_rule ?assessor_officer ?entry_requirement_rule)
+        (not
+          (offering_requires_addon_selection ?travel_product_offering)
+        )
+        (not
+          (assessor_documentation_linked ?assessor_officer)
+        )
+      )
+    :effect (assessor_documentation_linked ?assessor_officer)
+  )
+  (:action attach_optional_addon_to_assessor
+    :parameters (?assessor_officer - assessor_officer ?optional_addon - optional_addon)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (optional_addon_available ?optional_addon)
+        (not
+          (assessor_addon_attached ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_addon_attached ?assessor_officer)
+        (assessor_attached_addon ?assessor_officer ?optional_addon)
+        (not
+          (optional_addon_available ?optional_addon)
+        )
+      )
+  )
+  (:action process_addon_and_link_documents_for_assessor
+    :parameters (?assessor_officer - assessor_officer ?credential_template - credential_template ?travel_product_offering - travel_product_offering ?entry_requirement_rule - entry_requirement_rule ?optional_addon - optional_addon)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (credential_template_allocated ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (matched_entry_rule ?assessor_officer ?entry_requirement_rule)
+        (offering_requires_addon_selection ?travel_product_offering)
+        (assessor_addon_attached ?assessor_officer)
+        (assessor_attached_addon ?assessor_officer ?optional_addon)
+        (not
+          (assessor_documentation_linked ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_documentation_linked ?assessor_officer)
+        (assessor_addon_verified ?assessor_officer)
+      )
+  )
+  (:action apply_validation_token_endorsement
+    :parameters (?assessor_officer - assessor_officer ?validation_token - validation_token ?supporting_document - supporting_document ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_documentation_linked ?assessor_officer)
+        (assessor_has_validation_token ?assessor_officer ?validation_token)
+        (document_attached ?assessor_officer ?supporting_document)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (not
+          (offering_requires_secondary_validation ?travel_product_offering)
+        )
+        (not
+          (assessor_endorsement_condition_met ?assessor_officer)
+        )
+      )
+    :effect (assessor_endorsement_condition_met ?assessor_officer)
+  )
+  (:action apply_validation_token_endorsement_for_secondary_path
+    :parameters (?assessor_officer - assessor_officer ?validation_token - validation_token ?supporting_document - supporting_document ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_documentation_linked ?assessor_officer)
+        (assessor_has_validation_token ?assessor_officer ?validation_token)
+        (document_attached ?assessor_officer ?supporting_document)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (offering_requires_secondary_validation ?travel_product_offering)
+        (not
+          (assessor_endorsement_condition_met ?assessor_officer)
+        )
+      )
+    :effect (assessor_endorsement_condition_met ?assessor_officer)
+  )
+  (:action apply_secondary_validation_and_mark_endorsement
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_endorsement_condition_met ?assessor_officer)
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (not
+          (offering_requires_addon_selection ?travel_product_offering)
+        )
+        (not
+          (offering_requires_secondary_validation ?travel_product_offering)
+        )
+        (not
+          (assessor_endorsement_applied ?assessor_officer)
+        )
+      )
+    :effect (assessor_endorsement_applied ?assessor_officer)
+  )
+  (:action apply_secondary_validation_with_addon_and_confirm
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_endorsement_condition_met ?assessor_officer)
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (offering_requires_addon_selection ?travel_product_offering)
+        (not
+          (offering_requires_secondary_validation ?travel_product_offering)
+        )
+        (not
+          (assessor_endorsement_applied ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_endorsement_confirmed ?assessor_officer)
+      )
+  )
+  (:action apply_secondary_validation_secondary_path_and_confirm
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_endorsement_condition_met ?assessor_officer)
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (not
+          (offering_requires_addon_selection ?travel_product_offering)
+        )
+        (offering_requires_secondary_validation ?travel_product_offering)
+        (not
+          (assessor_endorsement_applied ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_endorsement_confirmed ?assessor_officer)
+      )
+  )
+  (:action apply_secondary_validation_with_addon_and_secondary_path_confirm
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token ?credential_template - credential_template ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (assessor_endorsement_condition_met ?assessor_officer)
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (assessor_has_credential_template ?assessor_officer ?credential_template)
+        (template_linked_to_offering ?credential_template ?travel_product_offering)
+        (offering_requires_addon_selection ?travel_product_offering)
+        (offering_requires_secondary_validation ?travel_product_offering)
+        (not
+          (assessor_endorsement_applied ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_endorsement_confirmed ?assessor_officer)
+      )
+  )
+  (:action final_assessment_and_mark_assessor_record
+    :parameters (?assessor_officer - assessor_officer)
+    :precondition
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (not
+          (assessor_endorsement_confirmed ?assessor_officer)
+        )
+        (not
+          (assessor_marked_complete ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_marked_complete ?assessor_officer)
+        (cleared_for_issuance ?assessor_officer)
+      )
+  )
+  (:action attach_payment_token_to_assessor
+    :parameters (?assessor_officer - assessor_officer ?payment_or_preference_token - payment_or_preference_token)
+    :precondition
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_endorsement_confirmed ?assessor_officer)
+        (payment_token_available ?payment_or_preference_token)
+      )
+    :effect
+      (and
+        (assessor_has_payment_token ?assessor_officer ?payment_or_preference_token)
+        (not
+          (payment_token_available ?payment_or_preference_token)
+        )
+      )
+  )
+  (:action perform_final_checks_and_mark_assessor
+    :parameters (?assessor_officer - assessor_officer ?traveler_individual - traveler_individual ?traveler_group_member - traveler_group_member ?entry_requirement_rule - entry_requirement_rule ?payment_or_preference_token - payment_or_preference_token)
+    :precondition
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_endorsement_confirmed ?assessor_officer)
+        (assessor_has_payment_token ?assessor_officer ?payment_or_preference_token)
+        (assessor_assigned_to_individual ?assessor_officer ?traveler_individual)
+        (assessor_assigned_to_group_member ?assessor_officer ?traveler_group_member)
+        (traveler_requirement_detected ?traveler_individual)
+        (group_member_requirement_detected ?traveler_group_member)
+        (matched_entry_rule ?assessor_officer ?entry_requirement_rule)
+        (not
+          (assessor_final_checks_completed ?assessor_officer)
+        )
+      )
+    :effect (assessor_final_checks_completed ?assessor_officer)
+  )
+  (:action complete_assessor_and_mark_cleared
+    :parameters (?assessor_officer - assessor_officer)
+    :precondition
+      (and
+        (assessor_endorsement_applied ?assessor_officer)
+        (assessor_final_checks_completed ?assessor_officer)
+        (not
+          (assessor_marked_complete ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_marked_complete ?assessor_officer)
+        (cleared_for_issuance ?assessor_officer)
+      )
+  )
+  (:action apply_special_authorisation_to_assessor
+    :parameters (?assessor_officer - assessor_officer ?special_authorisation - special_authorisation ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (requirements_identified ?assessor_officer)
+        (matched_entry_rule ?assessor_officer ?entry_requirement_rule)
+        (special_authorisation_available ?special_authorisation)
+        (assessor_has_special_authorisation ?assessor_officer ?special_authorisation)
+        (not
+          (assessor_special_authorisation_applied ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_special_authorisation_applied ?assessor_officer)
+        (not
+          (special_authorisation_available ?special_authorisation)
+        )
+      )
+  )
+  (:action confirm_special_authorisation_with_document
+    :parameters (?assessor_officer - assessor_officer ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (assessor_special_authorisation_applied ?assessor_officer)
+        (document_attached ?assessor_officer ?supporting_document)
+        (not
+          (assessor_special_authorisation_processed ?assessor_officer)
+        )
+      )
+    :effect (assessor_special_authorisation_processed ?assessor_officer)
+  )
+  (:action apply_secondary_validation_for_special_authorisation
+    :parameters (?assessor_officer - assessor_officer ?secondary_validation_token - secondary_validation_token)
+    :precondition
+      (and
+        (assessor_special_authorisation_processed ?assessor_officer)
+        (assessor_has_secondary_validation_token ?assessor_officer ?secondary_validation_token)
+        (not
+          (assessor_special_authorisation_finalised ?assessor_officer)
+        )
+      )
+    :effect (assessor_special_authorisation_finalised ?assessor_officer)
+  )
+  (:action finalize_special_authorisation_and_mark_assessor_cleared
+    :parameters (?assessor_officer - assessor_officer)
+    :precondition
+      (and
+        (assessor_special_authorisation_finalised ?assessor_officer)
+        (not
+          (assessor_marked_complete ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (assessor_marked_complete ?assessor_officer)
+        (cleared_for_issuance ?assessor_officer)
+      )
+  )
+  (:action issue_travel_clearance_for_individual
+    :parameters (?traveler_individual - traveler_individual ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (individual_requirement_processed ?traveler_individual)
+        (traveler_requirement_detected ?traveler_individual)
+        (product_offering_selected ?travel_product_offering)
+        (offering_validated_for_credentials ?travel_product_offering)
+        (not
+          (cleared_for_issuance ?traveler_individual)
+        )
+      )
+    :effect (cleared_for_issuance ?traveler_individual)
+  )
+  (:action issue_travel_clearance_for_group_member
+    :parameters (?traveler_group_member - traveler_group_member ?travel_product_offering - travel_product_offering)
+    :precondition
+      (and
+        (group_member_requirement_processed ?traveler_group_member)
+        (group_member_requirement_detected ?traveler_group_member)
+        (product_offering_selected ?travel_product_offering)
+        (offering_validated_for_credentials ?travel_product_offering)
+        (not
+          (cleared_for_issuance ?traveler_group_member)
+        )
+      )
+    :effect (cleared_for_issuance ?traveler_group_member)
+  )
+  (:action bind_insurance_certificate_to_case
+    :parameters (?travel_case_record - case_participant ?insurance_certificate - insurance_certificate ?entry_requirement_rule - entry_requirement_rule)
+    :precondition
+      (and
+        (cleared_for_issuance ?travel_case_record)
+        (matched_entry_rule ?travel_case_record ?entry_requirement_rule)
+        (insurance_certificate_available ?insurance_certificate)
+        (not
+          (insurance_certificate_bound ?travel_case_record)
+        )
+      )
+    :effect
+      (and
+        (insurance_certificate_bound ?travel_case_record)
+        (bound_insurance_certificate ?travel_case_record ?insurance_certificate)
+        (not
+          (insurance_certificate_available ?insurance_certificate)
+        )
+      )
+  )
+  (:action finalize_traveler_clearance_and_recycle_policy
+    :parameters (?traveler_individual - traveler_individual ?insurance_policy_option - insurance_policy_option ?insurance_certificate - insurance_certificate)
+    :precondition
+      (and
+        (insurance_certificate_bound ?traveler_individual)
+        (assigned_policy ?traveler_individual ?insurance_policy_option)
+        (bound_insurance_certificate ?traveler_individual ?insurance_certificate)
+        (not
+          (travel_clearance_granted ?traveler_individual)
+        )
+      )
+    :effect
+      (and
+        (travel_clearance_granted ?traveler_individual)
+        (policy_option_available ?insurance_policy_option)
+        (insurance_certificate_available ?insurance_certificate)
+      )
+  )
+  (:action finalize_group_member_clearance_and_recycle_policy
+    :parameters (?traveler_group_member - traveler_group_member ?insurance_policy_option - insurance_policy_option ?insurance_certificate - insurance_certificate)
+    :precondition
+      (and
+        (insurance_certificate_bound ?traveler_group_member)
+        (assigned_policy ?traveler_group_member ?insurance_policy_option)
+        (bound_insurance_certificate ?traveler_group_member ?insurance_certificate)
+        (not
+          (travel_clearance_granted ?traveler_group_member)
+        )
+      )
+    :effect
+      (and
+        (travel_clearance_granted ?traveler_group_member)
+        (policy_option_available ?insurance_policy_option)
+        (insurance_certificate_available ?insurance_certificate)
+      )
+  )
+  (:action finalize_assessor_clearance_and_recycle_policy
+    :parameters (?assessor_officer - assessor_officer ?insurance_policy_option - insurance_policy_option ?insurance_certificate - insurance_certificate)
+    :precondition
+      (and
+        (insurance_certificate_bound ?assessor_officer)
+        (assigned_policy ?assessor_officer ?insurance_policy_option)
+        (bound_insurance_certificate ?assessor_officer ?insurance_certificate)
+        (not
+          (travel_clearance_granted ?assessor_officer)
+        )
+      )
+    :effect
+      (and
+        (travel_clearance_granted ?assessor_officer)
+        (policy_option_available ?insurance_policy_option)
+        (insurance_certificate_available ?insurance_certificate)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem traveler_readiness_verification)
+  (:domain travel_insurance_requirement_matching)
+  (:objects traveler_individual_1 - traveler_individual traveler_group_member_1 - traveler_group_member assessor_officer_1 - assessor_officer assessor_officer_2 - assessor_officer insurance_policy_option_basic - insurance_policy_option insurance_policy_option_premium - insurance_policy_option insurance_policy_option_flex - insurance_policy_option entry_requirement_rule_minimum_coverage - entry_requirement_rule supporting_document_insurance_policy_pdf - supporting_document exception_proof_medical_waiver - exception_proof coverage_profile_standard - coverage_profile fare_category_economy - fare_category travel_product_offering_basic_fare - travel_product_offering credential_template_standard - credential_template credential_template_secondary - credential_template optional_addon_medical_rider - optional_addon optional_addon_trip_cancellation - optional_addon payment_token_voucher - payment_or_preference_token payment_token_credit_card - payment_or_preference_token insurance_certificate_sample - insurance_certificate validation_token_1 - validation_token special_authorisation_waiver - special_authorisation special_authorisation_override - special_authorisation secondary_validation_token_1 - secondary_validation_token)
+  (:init
+    (policy_option_available insurance_policy_option_basic)
+    (policy_option_available insurance_policy_option_premium)
+    (policy_option_available insurance_policy_option_flex)
+    (entry_rule_available entry_requirement_rule_minimum_coverage)
+    (supporting_document_available supporting_document_insurance_policy_pdf)
+    (exception_proof_available exception_proof_medical_waiver)
+    (traveler_coverage_profile_match traveler_individual_1 coverage_profile_standard)
+    (group_member_fare_category traveler_group_member_1 fare_category_economy)
+    (product_offering_available travel_product_offering_basic_fare)
+    (credential_template_available credential_template_standard)
+    (credential_template_available credential_template_secondary)
+    (assessor_assigned_to_individual assessor_officer_1 traveler_individual_1)
+    (assessor_assigned_to_individual assessor_officer_2 traveler_individual_1)
+    (assessor_assigned_to_group_member assessor_officer_1 traveler_group_member_1)
+    (assessor_assigned_to_group_member assessor_officer_2 traveler_group_member_1)
+    (assessor_assigned_to_product assessor_officer_1 travel_product_offering_basic_fare)
+    (assessor_assigned_to_product assessor_officer_2 travel_product_offering_basic_fare)
+    (assessor_has_credential_template assessor_officer_1 credential_template_standard)
+    (assessor_has_credential_template assessor_officer_2 credential_template_secondary)
+    (optional_addon_available optional_addon_medical_rider)
+    (optional_addon_available optional_addon_trip_cancellation)
+    (payment_token_available payment_token_voucher)
+    (payment_token_available payment_token_credit_card)
+    (insurance_certificate_available insurance_certificate_sample)
+    (validation_token_available validation_token_1)
+    (special_authorisation_available special_authorisation_waiver)
+    (assessor_has_special_authorisation assessor_officer_1 special_authorisation_waiver)
+    (assessor_has_special_authorisation assessor_officer_2 special_authorisation_override)
+    (secondary_validation_token_available secondary_validation_token_1)
+  )
+  (:goal
+    (and
+      (travel_clearance_granted traveler_individual_1)
+      (travel_clearance_granted traveler_group_member_1)
+      (travel_clearance_granted assessor_officer_1)
+      (travel_clearance_granted assessor_officer_2)
+    )
+  )
+)

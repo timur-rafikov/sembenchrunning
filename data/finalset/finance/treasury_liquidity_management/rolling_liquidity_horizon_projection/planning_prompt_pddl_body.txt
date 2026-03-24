@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain rolling_liquidity_horizon_projection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types aux_treasury_type - object aux_model_type - object aux_scenario_type - object projection_entity_base - object account_projection - projection_entity_base funding_facility - aux_treasury_type cashflow_forecast - aux_treasury_type approver - aux_treasury_type stakeholder - aux_treasury_type funding_limit - aux_treasury_type buffer_type - aux_treasury_type liquidity_instrument - aux_treasury_type approval_rule - aux_treasury_type liquidity_policy - aux_model_type account - aux_model_type report_template - aux_model_type time_bucket - aux_scenario_type scenario - aux_scenario_type transfer_instruction - aux_scenario_type account_projection_group - account_projection projection_job_group - account_projection legal_entity - account_projection_group cash_pool - account_projection_group projection_job - projection_job_group)
+  (:predicates
+    (projection_entity_created ?account_projection - account_projection)
+    (projection_entity_validated ?account_projection - account_projection)
+    (projection_entity_funding_attached ?account_projection - account_projection)
+    (funding_committed ?account_projection - account_projection)
+    (execution_authorized ?account_projection - account_projection)
+    (funding_allocated ?account_projection - account_projection)
+    (funding_facility_available ?funding_facility - funding_facility)
+    (projection_entity_linked_funding_facility ?account_projection - account_projection ?funding_facility - funding_facility)
+    (cashflow_forecast_available ?cashflow_forecast - cashflow_forecast)
+    (projection_entity_linked_cashflow_forecast ?account_projection - account_projection ?cashflow_forecast - cashflow_forecast)
+    (approver_available ?approver - approver)
+    (projection_entity_assigned_approver ?account_projection - account_projection ?approver - approver)
+    (liquidity_policy_available ?liquidity_policy - liquidity_policy)
+    (legal_entity_assigned_policy ?legal_entity - legal_entity ?liquidity_policy - liquidity_policy)
+    (cash_pool_assigned_policy ?cash_pool - cash_pool ?liquidity_policy - liquidity_policy)
+    (legal_entity_eligible_time_bucket ?legal_entity - legal_entity ?time_bucket - time_bucket)
+    (time_bucket_flagged_for_entity ?time_bucket - time_bucket)
+    (time_bucket_policy_applied ?time_bucket - time_bucket)
+    (legal_entity_ready_for_transfer ?legal_entity - legal_entity)
+    (cash_pool_has_scenario ?cash_pool - cash_pool ?scenario - scenario)
+    (scenario_flagged_for_planning ?scenario - scenario)
+    (scenario_policy_applied ?scenario - scenario)
+    (cash_pool_ready_for_transfer ?cash_pool - cash_pool)
+    (transfer_instruction_template_available ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_created ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_timebucket_link ?transfer_instruction - transfer_instruction ?time_bucket - time_bucket)
+    (transfer_instruction_scenario_link ?transfer_instruction - transfer_instruction ?scenario - scenario)
+    (transfer_instruction_entity_flag ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_pool_flag ?transfer_instruction - transfer_instruction)
+    (transfer_instruction_ready_for_account_mapping ?transfer_instruction - transfer_instruction)
+    (projection_job_includes_legal_entity ?projection_job - projection_job ?legal_entity - legal_entity)
+    (projection_job_includes_cash_pool ?projection_job - projection_job ?cash_pool - cash_pool)
+    (projection_job_linked_transfer_instruction ?projection_job - projection_job ?transfer_instruction - transfer_instruction)
+    (account_available ?account - account)
+    (projection_job_linked_account ?projection_job - projection_job ?account - account)
+    (account_assigned ?account - account)
+    (account_linked_transfer_instruction ?account - account ?transfer_instruction - transfer_instruction)
+    (projection_job_account_mapping_locked ?projection_job - projection_job)
+    (liquidity_instrument_assigned_to_job ?projection_job - projection_job)
+    (projection_job_prepared_for_authorization ?projection_job - projection_job)
+    (projection_job_has_assigned_stakeholder ?projection_job - projection_job)
+    (projection_job_stakeholder_verified ?projection_job - projection_job)
+    (projection_job_stakeholders_confirmed ?projection_job - projection_job)
+    (projection_job_ready_for_execution ?projection_job - projection_job)
+    (report_template_available ?report_template - report_template)
+    (projection_job_linked_report_template ?projection_job - projection_job ?report_template - report_template)
+    (projection_job_report_assigned ?projection_job - projection_job)
+    (projection_job_report_generated ?projection_job - projection_job)
+    (projection_job_report_submitted_for_approval ?projection_job - projection_job)
+    (stakeholder_available ?stakeholder - stakeholder)
+    (projection_job_linked_stakeholder ?projection_job - projection_job ?stakeholder - stakeholder)
+    (funding_limit_available ?funding_limit - funding_limit)
+    (projection_job_linked_funding_limit ?projection_job - projection_job ?funding_limit - funding_limit)
+    (liquidity_instrument_available ?liquidity_instrument - liquidity_instrument)
+    (projection_job_linked_liquidity_instrument ?projection_job - projection_job ?liquidity_instrument - liquidity_instrument)
+    (approval_rule_available ?approval_rule - approval_rule)
+    (projection_job_linked_approval_rule ?projection_job - projection_job ?approval_rule - approval_rule)
+    (buffer_type_available ?buffer_type - buffer_type)
+    (projection_entity_linked_buffer_type ?account_projection - account_projection ?buffer_type - buffer_type)
+    (legal_entity_bucket_flagged ?legal_entity - legal_entity)
+    (cash_pool_bucket_flagged ?cash_pool - cash_pool)
+    (projection_job_finalized ?projection_job - projection_job)
+  )
+  (:action create_account_projection
+    :parameters (?account_projection - account_projection)
+    :precondition
+      (and
+        (not
+          (projection_entity_created ?account_projection)
+        )
+        (not
+          (funding_committed ?account_projection)
+        )
+      )
+    :effect (projection_entity_created ?account_projection)
+  )
+  (:action attach_funding_facility_to_projection
+    :parameters (?account_projection - account_projection ?funding_facility - funding_facility)
+    :precondition
+      (and
+        (projection_entity_created ?account_projection)
+        (not
+          (projection_entity_funding_attached ?account_projection)
+        )
+        (funding_facility_available ?funding_facility)
+      )
+    :effect
+      (and
+        (projection_entity_funding_attached ?account_projection)
+        (projection_entity_linked_funding_facility ?account_projection ?funding_facility)
+        (not
+          (funding_facility_available ?funding_facility)
+        )
+      )
+  )
+  (:action attach_cashflow_forecast_to_projection
+    :parameters (?account_projection - account_projection ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_created ?account_projection)
+        (projection_entity_funding_attached ?account_projection)
+        (cashflow_forecast_available ?cashflow_forecast)
+      )
+    :effect
+      (and
+        (projection_entity_linked_cashflow_forecast ?account_projection ?cashflow_forecast)
+        (not
+          (cashflow_forecast_available ?cashflow_forecast)
+        )
+      )
+  )
+  (:action validate_account_projection
+    :parameters (?account_projection - account_projection ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_created ?account_projection)
+        (projection_entity_funding_attached ?account_projection)
+        (projection_entity_linked_cashflow_forecast ?account_projection ?cashflow_forecast)
+        (not
+          (projection_entity_validated ?account_projection)
+        )
+      )
+    :effect (projection_entity_validated ?account_projection)
+  )
+  (:action detach_cashflow_forecast_from_projection
+    :parameters (?account_projection - account_projection ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_linked_cashflow_forecast ?account_projection ?cashflow_forecast)
+      )
+    :effect
+      (and
+        (cashflow_forecast_available ?cashflow_forecast)
+        (not
+          (projection_entity_linked_cashflow_forecast ?account_projection ?cashflow_forecast)
+        )
+      )
+  )
+  (:action assign_approver_to_projection
+    :parameters (?account_projection - account_projection ?approver - approver)
+    :precondition
+      (and
+        (projection_entity_validated ?account_projection)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (projection_entity_assigned_approver ?account_projection ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_projection
+    :parameters (?account_projection - account_projection ?approver - approver)
+    :precondition
+      (and
+        (projection_entity_assigned_approver ?account_projection ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (projection_entity_assigned_approver ?account_projection ?approver)
+        )
+      )
+  )
+  (:action assign_liquidity_instrument_to_job
+    :parameters (?projection_job - projection_job ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (liquidity_instrument_available ?liquidity_instrument)
+      )
+    :effect
+      (and
+        (projection_job_linked_liquidity_instrument ?projection_job ?liquidity_instrument)
+        (not
+          (liquidity_instrument_available ?liquidity_instrument)
+        )
+      )
+  )
+  (:action remove_liquidity_instrument_from_job
+    :parameters (?projection_job - projection_job ?liquidity_instrument - liquidity_instrument)
+    :precondition
+      (and
+        (projection_job_linked_liquidity_instrument ?projection_job ?liquidity_instrument)
+      )
+    :effect
+      (and
+        (liquidity_instrument_available ?liquidity_instrument)
+        (not
+          (projection_job_linked_liquidity_instrument ?projection_job ?liquidity_instrument)
+        )
+      )
+  )
+  (:action assign_approval_rule_to_job
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (approval_rule_available ?approval_rule)
+      )
+    :effect
+      (and
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (not
+          (approval_rule_available ?approval_rule)
+        )
+      )
+  )
+  (:action remove_approval_rule_from_job
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule)
+    :precondition
+      (and
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+      )
+    :effect
+      (and
+        (approval_rule_available ?approval_rule)
+        (not
+          (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        )
+      )
+  )
+  (:action mark_timebucket_eligible_for_entity
+    :parameters (?legal_entity - legal_entity ?time_bucket - time_bucket ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_validated ?legal_entity)
+        (projection_entity_linked_cashflow_forecast ?legal_entity ?cashflow_forecast)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (not
+          (time_bucket_flagged_for_entity ?time_bucket)
+        )
+        (not
+          (time_bucket_policy_applied ?time_bucket)
+        )
+      )
+    :effect (time_bucket_flagged_for_entity ?time_bucket)
+  )
+  (:action assign_approver_to_entity_timebucket
+    :parameters (?legal_entity - legal_entity ?time_bucket - time_bucket ?approver - approver)
+    :precondition
+      (and
+        (projection_entity_validated ?legal_entity)
+        (projection_entity_assigned_approver ?legal_entity ?approver)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (time_bucket_flagged_for_entity ?time_bucket)
+        (not
+          (legal_entity_bucket_flagged ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (legal_entity_ready_for_transfer ?legal_entity)
+      )
+  )
+  (:action apply_policy_to_entity_timebucket
+    :parameters (?legal_entity - legal_entity ?time_bucket - time_bucket ?liquidity_policy - liquidity_policy)
+    :precondition
+      (and
+        (projection_entity_validated ?legal_entity)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (liquidity_policy_available ?liquidity_policy)
+        (not
+          (legal_entity_bucket_flagged ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (time_bucket_policy_applied ?time_bucket)
+        (legal_entity_bucket_flagged ?legal_entity)
+        (legal_entity_assigned_policy ?legal_entity ?liquidity_policy)
+        (not
+          (liquidity_policy_available ?liquidity_policy)
+        )
+      )
+  )
+  (:action select_entity_timebucket_for_transfer
+    :parameters (?legal_entity - legal_entity ?time_bucket - time_bucket ?cashflow_forecast - cashflow_forecast ?liquidity_policy - liquidity_policy)
+    :precondition
+      (and
+        (projection_entity_validated ?legal_entity)
+        (projection_entity_linked_cashflow_forecast ?legal_entity ?cashflow_forecast)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (time_bucket_policy_applied ?time_bucket)
+        (legal_entity_assigned_policy ?legal_entity ?liquidity_policy)
+        (not
+          (legal_entity_ready_for_transfer ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (time_bucket_flagged_for_entity ?time_bucket)
+        (legal_entity_ready_for_transfer ?legal_entity)
+        (liquidity_policy_available ?liquidity_policy)
+        (not
+          (legal_entity_assigned_policy ?legal_entity ?liquidity_policy)
+        )
+      )
+  )
+  (:action mark_scenario_for_cashpool
+    :parameters (?cash_pool - cash_pool ?scenario - scenario ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_validated ?cash_pool)
+        (projection_entity_linked_cashflow_forecast ?cash_pool ?cashflow_forecast)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (not
+          (scenario_flagged_for_planning ?scenario)
+        )
+        (not
+          (scenario_policy_applied ?scenario)
+        )
+      )
+    :effect (scenario_flagged_for_planning ?scenario)
+  )
+  (:action assign_approver_to_cashpool_scenario
+    :parameters (?cash_pool - cash_pool ?scenario - scenario ?approver - approver)
+    :precondition
+      (and
+        (projection_entity_validated ?cash_pool)
+        (projection_entity_assigned_approver ?cash_pool ?approver)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (scenario_flagged_for_planning ?scenario)
+        (not
+          (cash_pool_bucket_flagged ?cash_pool)
+        )
+      )
+    :effect
+      (and
+        (cash_pool_bucket_flagged ?cash_pool)
+        (cash_pool_ready_for_transfer ?cash_pool)
+      )
+  )
+  (:action apply_policy_to_cashpool_scenario
+    :parameters (?cash_pool - cash_pool ?scenario - scenario ?liquidity_policy - liquidity_policy)
+    :precondition
+      (and
+        (projection_entity_validated ?cash_pool)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (liquidity_policy_available ?liquidity_policy)
+        (not
+          (cash_pool_bucket_flagged ?cash_pool)
+        )
+      )
+    :effect
+      (and
+        (scenario_policy_applied ?scenario)
+        (cash_pool_bucket_flagged ?cash_pool)
+        (cash_pool_assigned_policy ?cash_pool ?liquidity_policy)
+        (not
+          (liquidity_policy_available ?liquidity_policy)
+        )
+      )
+  )
+  (:action select_cashpool_scenario_for_transfer
+    :parameters (?cash_pool - cash_pool ?scenario - scenario ?cashflow_forecast - cashflow_forecast ?liquidity_policy - liquidity_policy)
+    :precondition
+      (and
+        (projection_entity_validated ?cash_pool)
+        (projection_entity_linked_cashflow_forecast ?cash_pool ?cashflow_forecast)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (scenario_policy_applied ?scenario)
+        (cash_pool_assigned_policy ?cash_pool ?liquidity_policy)
+        (not
+          (cash_pool_ready_for_transfer ?cash_pool)
+        )
+      )
+    :effect
+      (and
+        (scenario_flagged_for_planning ?scenario)
+        (cash_pool_ready_for_transfer ?cash_pool)
+        (liquidity_policy_available ?liquidity_policy)
+        (not
+          (cash_pool_assigned_policy ?cash_pool ?liquidity_policy)
+        )
+      )
+  )
+  (:action synthesize_transfer_instruction
+    :parameters (?legal_entity - legal_entity ?cash_pool - cash_pool ?time_bucket - time_bucket ?scenario - scenario ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (cash_pool_bucket_flagged ?cash_pool)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (time_bucket_flagged_for_entity ?time_bucket)
+        (scenario_flagged_for_planning ?scenario)
+        (legal_entity_ready_for_transfer ?legal_entity)
+        (cash_pool_ready_for_transfer ?cash_pool)
+        (transfer_instruction_template_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_timebucket_link ?transfer_instruction ?time_bucket)
+        (transfer_instruction_scenario_link ?transfer_instruction ?scenario)
+        (not
+          (transfer_instruction_template_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action synthesize_transfer_instruction_entity_side
+    :parameters (?legal_entity - legal_entity ?cash_pool - cash_pool ?time_bucket - time_bucket ?scenario - scenario ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (cash_pool_bucket_flagged ?cash_pool)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (time_bucket_policy_applied ?time_bucket)
+        (scenario_flagged_for_planning ?scenario)
+        (not
+          (legal_entity_ready_for_transfer ?legal_entity)
+        )
+        (cash_pool_ready_for_transfer ?cash_pool)
+        (transfer_instruction_template_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_timebucket_link ?transfer_instruction ?time_bucket)
+        (transfer_instruction_scenario_link ?transfer_instruction ?scenario)
+        (transfer_instruction_entity_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_template_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action synthesize_transfer_instruction_pool_side
+    :parameters (?legal_entity - legal_entity ?cash_pool - cash_pool ?time_bucket - time_bucket ?scenario - scenario ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (cash_pool_bucket_flagged ?cash_pool)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (time_bucket_flagged_for_entity ?time_bucket)
+        (scenario_policy_applied ?scenario)
+        (legal_entity_ready_for_transfer ?legal_entity)
+        (not
+          (cash_pool_ready_for_transfer ?cash_pool)
+        )
+        (transfer_instruction_template_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_timebucket_link ?transfer_instruction ?time_bucket)
+        (transfer_instruction_scenario_link ?transfer_instruction ?scenario)
+        (transfer_instruction_pool_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_template_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action synthesize_transfer_instruction_both_sides
+    :parameters (?legal_entity - legal_entity ?cash_pool - cash_pool ?time_bucket - time_bucket ?scenario - scenario ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (cash_pool_bucket_flagged ?cash_pool)
+        (legal_entity_eligible_time_bucket ?legal_entity ?time_bucket)
+        (cash_pool_has_scenario ?cash_pool ?scenario)
+        (time_bucket_policy_applied ?time_bucket)
+        (scenario_policy_applied ?scenario)
+        (not
+          (legal_entity_ready_for_transfer ?legal_entity)
+        )
+        (not
+          (cash_pool_ready_for_transfer ?cash_pool)
+        )
+        (transfer_instruction_template_available ?transfer_instruction)
+      )
+    :effect
+      (and
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_timebucket_link ?transfer_instruction ?time_bucket)
+        (transfer_instruction_scenario_link ?transfer_instruction ?scenario)
+        (transfer_instruction_entity_flag ?transfer_instruction)
+        (transfer_instruction_pool_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_template_available ?transfer_instruction)
+        )
+      )
+  )
+  (:action finalize_transfer_instruction_for_account_mapping
+    :parameters (?transfer_instruction - transfer_instruction ?legal_entity - legal_entity ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (transfer_instruction_created ?transfer_instruction)
+        (legal_entity_bucket_flagged ?legal_entity)
+        (projection_entity_linked_cashflow_forecast ?legal_entity ?cashflow_forecast)
+        (not
+          (transfer_instruction_ready_for_account_mapping ?transfer_instruction)
+        )
+      )
+    :effect (transfer_instruction_ready_for_account_mapping ?transfer_instruction)
+  )
+  (:action assign_account_to_transfer_instruction
+    :parameters (?projection_job - projection_job ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (projection_job_linked_transfer_instruction ?projection_job ?transfer_instruction)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_available ?account)
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_ready_for_account_mapping ?transfer_instruction)
+        (not
+          (account_assigned ?account)
+        )
+      )
+    :effect
+      (and
+        (account_assigned ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (not
+          (account_available ?account)
+        )
+      )
+  )
+  (:action finalize_account_mapping_for_job
+    :parameters (?projection_job - projection_job ?account - account ?transfer_instruction - transfer_instruction ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_assigned ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (projection_entity_linked_cashflow_forecast ?projection_job ?cashflow_forecast)
+        (not
+          (transfer_instruction_entity_flag ?transfer_instruction)
+        )
+        (not
+          (projection_job_account_mapping_locked ?projection_job)
+        )
+      )
+    :effect (projection_job_account_mapping_locked ?projection_job)
+  )
+  (:action assign_stakeholder_to_job
+    :parameters (?projection_job - projection_job ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (stakeholder_available ?stakeholder)
+        (not
+          (projection_job_has_assigned_stakeholder ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_has_assigned_stakeholder ?projection_job)
+        (projection_job_linked_stakeholder ?projection_job ?stakeholder)
+        (not
+          (stakeholder_available ?stakeholder)
+        )
+      )
+  )
+  (:action finalize_account_and_stakeholder_mapping_for_job
+    :parameters (?projection_job - projection_job ?account - account ?transfer_instruction - transfer_instruction ?cashflow_forecast - cashflow_forecast ?stakeholder - stakeholder)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_assigned ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (projection_entity_linked_cashflow_forecast ?projection_job ?cashflow_forecast)
+        (transfer_instruction_entity_flag ?transfer_instruction)
+        (projection_job_has_assigned_stakeholder ?projection_job)
+        (projection_job_linked_stakeholder ?projection_job ?stakeholder)
+        (not
+          (projection_job_account_mapping_locked ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_account_mapping_locked ?projection_job)
+        (projection_job_stakeholder_verified ?projection_job)
+      )
+  )
+  (:action assign_instrument_to_job_and_mark
+    :parameters (?projection_job - projection_job ?liquidity_instrument - liquidity_instrument ?approver - approver ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (projection_job_account_mapping_locked ?projection_job)
+        (projection_job_linked_liquidity_instrument ?projection_job ?liquidity_instrument)
+        (projection_entity_assigned_approver ?projection_job ?approver)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (not
+          (transfer_instruction_pool_flag ?transfer_instruction)
+        )
+        (not
+          (liquidity_instrument_assigned_to_job ?projection_job)
+        )
+      )
+    :effect (liquidity_instrument_assigned_to_job ?projection_job)
+  )
+  (:action assign_instrument_to_job_and_mark_variant
+    :parameters (?projection_job - projection_job ?liquidity_instrument - liquidity_instrument ?approver - approver ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (projection_job_account_mapping_locked ?projection_job)
+        (projection_job_linked_liquidity_instrument ?projection_job ?liquidity_instrument)
+        (projection_entity_assigned_approver ?projection_job ?approver)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (transfer_instruction_pool_flag ?transfer_instruction)
+        (not
+          (liquidity_instrument_assigned_to_job ?projection_job)
+        )
+      )
+    :effect (liquidity_instrument_assigned_to_job ?projection_job)
+  )
+  (:action activate_approval_rule_for_job_no_instruction_flags
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (liquidity_instrument_assigned_to_job ?projection_job)
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (not
+          (transfer_instruction_entity_flag ?transfer_instruction)
+        )
+        (not
+          (transfer_instruction_pool_flag ?transfer_instruction)
+        )
+        (not
+          (projection_job_prepared_for_authorization ?projection_job)
+        )
+      )
+    :effect (projection_job_prepared_for_authorization ?projection_job)
+  )
+  (:action activate_approval_rule_for_job_with_entity_flag
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (liquidity_instrument_assigned_to_job ?projection_job)
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (transfer_instruction_entity_flag ?transfer_instruction)
+        (not
+          (transfer_instruction_pool_flag ?transfer_instruction)
+        )
+        (not
+          (projection_job_prepared_for_authorization ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_stakeholders_confirmed ?projection_job)
+      )
+  )
+  (:action activate_approval_rule_for_job_with_pool_flag
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (liquidity_instrument_assigned_to_job ?projection_job)
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (not
+          (transfer_instruction_entity_flag ?transfer_instruction)
+        )
+        (transfer_instruction_pool_flag ?transfer_instruction)
+        (not
+          (projection_job_prepared_for_authorization ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_stakeholders_confirmed ?projection_job)
+      )
+  )
+  (:action activate_approval_rule_for_job_with_both_flags
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule ?account - account ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (liquidity_instrument_assigned_to_job ?projection_job)
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (projection_job_linked_account ?projection_job ?account)
+        (account_linked_transfer_instruction ?account ?transfer_instruction)
+        (transfer_instruction_entity_flag ?transfer_instruction)
+        (transfer_instruction_pool_flag ?transfer_instruction)
+        (not
+          (projection_job_prepared_for_authorization ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_stakeholders_confirmed ?projection_job)
+      )
+  )
+  (:action authorize_projection_job_execution
+    :parameters (?projection_job - projection_job)
+    :precondition
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (not
+          (projection_job_stakeholders_confirmed ?projection_job)
+        )
+        (not
+          (projection_job_finalized ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_finalized ?projection_job)
+        (execution_authorized ?projection_job)
+      )
+  )
+  (:action assign_funding_limit_to_job
+    :parameters (?projection_job - projection_job ?funding_limit - funding_limit)
+    :precondition
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_stakeholders_confirmed ?projection_job)
+        (funding_limit_available ?funding_limit)
+      )
+    :effect
+      (and
+        (projection_job_linked_funding_limit ?projection_job ?funding_limit)
+        (not
+          (funding_limit_available ?funding_limit)
+        )
+      )
+  )
+  (:action prepare_job_for_execution
+    :parameters (?projection_job - projection_job ?legal_entity - legal_entity ?cash_pool - cash_pool ?cashflow_forecast - cashflow_forecast ?funding_limit - funding_limit)
+    :precondition
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_stakeholders_confirmed ?projection_job)
+        (projection_job_linked_funding_limit ?projection_job ?funding_limit)
+        (projection_job_includes_legal_entity ?projection_job ?legal_entity)
+        (projection_job_includes_cash_pool ?projection_job ?cash_pool)
+        (legal_entity_ready_for_transfer ?legal_entity)
+        (cash_pool_ready_for_transfer ?cash_pool)
+        (projection_entity_linked_cashflow_forecast ?projection_job ?cashflow_forecast)
+        (not
+          (projection_job_ready_for_execution ?projection_job)
+        )
+      )
+    :effect (projection_job_ready_for_execution ?projection_job)
+  )
+  (:action finalize_job_authorization
+    :parameters (?projection_job - projection_job)
+    :precondition
+      (and
+        (projection_job_prepared_for_authorization ?projection_job)
+        (projection_job_ready_for_execution ?projection_job)
+        (not
+          (projection_job_finalized ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_finalized ?projection_job)
+        (execution_authorized ?projection_job)
+      )
+  )
+  (:action attach_report_template_to_job
+    :parameters (?projection_job - projection_job ?report_template - report_template ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (projection_entity_validated ?projection_job)
+        (projection_entity_linked_cashflow_forecast ?projection_job ?cashflow_forecast)
+        (report_template_available ?report_template)
+        (projection_job_linked_report_template ?projection_job ?report_template)
+        (not
+          (projection_job_report_assigned ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_report_assigned ?projection_job)
+        (not
+          (report_template_available ?report_template)
+        )
+      )
+  )
+  (:action generate_report_and_marked_for_approval
+    :parameters (?projection_job - projection_job ?approver - approver)
+    :precondition
+      (and
+        (projection_job_report_assigned ?projection_job)
+        (projection_entity_assigned_approver ?projection_job ?approver)
+        (not
+          (projection_job_report_generated ?projection_job)
+        )
+      )
+    :effect (projection_job_report_generated ?projection_job)
+  )
+  (:action submit_job_for_approval
+    :parameters (?projection_job - projection_job ?approval_rule - approval_rule)
+    :precondition
+      (and
+        (projection_job_report_generated ?projection_job)
+        (projection_job_linked_approval_rule ?projection_job ?approval_rule)
+        (not
+          (projection_job_report_submitted_for_approval ?projection_job)
+        )
+      )
+    :effect (projection_job_report_submitted_for_approval ?projection_job)
+  )
+  (:action finalize_job_approval
+    :parameters (?projection_job - projection_job)
+    :precondition
+      (and
+        (projection_job_report_submitted_for_approval ?projection_job)
+        (not
+          (projection_job_finalized ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (projection_job_finalized ?projection_job)
+        (execution_authorized ?projection_job)
+      )
+  )
+  (:action authorize_entity_for_transfer_instruction
+    :parameters (?legal_entity - legal_entity ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (legal_entity_bucket_flagged ?legal_entity)
+        (legal_entity_ready_for_transfer ?legal_entity)
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_ready_for_account_mapping ?transfer_instruction)
+        (not
+          (execution_authorized ?legal_entity)
+        )
+      )
+    :effect (execution_authorized ?legal_entity)
+  )
+  (:action authorize_cashpool_for_transfer_instruction
+    :parameters (?cash_pool - cash_pool ?transfer_instruction - transfer_instruction)
+    :precondition
+      (and
+        (cash_pool_bucket_flagged ?cash_pool)
+        (cash_pool_ready_for_transfer ?cash_pool)
+        (transfer_instruction_created ?transfer_instruction)
+        (transfer_instruction_ready_for_account_mapping ?transfer_instruction)
+        (not
+          (execution_authorized ?cash_pool)
+        )
+      )
+    :effect (execution_authorized ?cash_pool)
+  )
+  (:action allocate_buffer_to_account_projection
+    :parameters (?account_projection - account_projection ?buffer_type - buffer_type ?cashflow_forecast - cashflow_forecast)
+    :precondition
+      (and
+        (execution_authorized ?account_projection)
+        (projection_entity_linked_cashflow_forecast ?account_projection ?cashflow_forecast)
+        (buffer_type_available ?buffer_type)
+        (not
+          (funding_allocated ?account_projection)
+        )
+      )
+    :effect
+      (and
+        (funding_allocated ?account_projection)
+        (projection_entity_linked_buffer_type ?account_projection ?buffer_type)
+        (not
+          (buffer_type_available ?buffer_type)
+        )
+      )
+  )
+  (:action activate_funding_facility_for_entity
+    :parameters (?legal_entity - legal_entity ?funding_facility - funding_facility ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (funding_allocated ?legal_entity)
+        (projection_entity_linked_funding_facility ?legal_entity ?funding_facility)
+        (projection_entity_linked_buffer_type ?legal_entity ?buffer_type)
+        (not
+          (funding_committed ?legal_entity)
+        )
+      )
+    :effect
+      (and
+        (funding_committed ?legal_entity)
+        (funding_facility_available ?funding_facility)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+  (:action activate_funding_facility_for_cashpool
+    :parameters (?cash_pool - cash_pool ?funding_facility - funding_facility ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (funding_allocated ?cash_pool)
+        (projection_entity_linked_funding_facility ?cash_pool ?funding_facility)
+        (projection_entity_linked_buffer_type ?cash_pool ?buffer_type)
+        (not
+          (funding_committed ?cash_pool)
+        )
+      )
+    :effect
+      (and
+        (funding_committed ?cash_pool)
+        (funding_facility_available ?funding_facility)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+  (:action activate_funding_facility_for_job
+    :parameters (?projection_job - projection_job ?funding_facility - funding_facility ?buffer_type - buffer_type)
+    :precondition
+      (and
+        (funding_allocated ?projection_job)
+        (projection_entity_linked_funding_facility ?projection_job ?funding_facility)
+        (projection_entity_linked_buffer_type ?projection_job ?buffer_type)
+        (not
+          (funding_committed ?projection_job)
+        )
+      )
+    :effect
+      (and
+        (funding_committed ?projection_job)
+        (funding_facility_available ?funding_facility)
+        (buffer_type_available ?buffer_type)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem rolling_liquidity_projection_problem)
+  (:domain rolling_liquidity_horizon_projection_domain)
+  (:objects legal_entity_1 - legal_entity cash_pool_1 - cash_pool projection_job_1 - projection_job projection_job_2 - projection_job funding_facility_1 - funding_facility funding_facility_2 - funding_facility funding_facility_3 - funding_facility cashflow_forecast_1 - cashflow_forecast approver_1 - approver liquidity_policy_1 - liquidity_policy time_bucket_1 - time_bucket scenario_1 - scenario transfer_instruction_template_1 - transfer_instruction account_1 - account account_2 - account stakeholder_1 - stakeholder stakeholder_2 - stakeholder funding_limit_1 - funding_limit funding_limit_2 - funding_limit buffer_type_1 - buffer_type liquidity_instrument_1 - liquidity_instrument report_template_1 - report_template report_template_2 - report_template approval_rule_1 - approval_rule)
+  (:init
+    (funding_facility_available funding_facility_1)
+    (funding_facility_available funding_facility_2)
+    (funding_facility_available funding_facility_3)
+    (cashflow_forecast_available cashflow_forecast_1)
+    (approver_available approver_1)
+    (liquidity_policy_available liquidity_policy_1)
+    (legal_entity_eligible_time_bucket legal_entity_1 time_bucket_1)
+    (cash_pool_has_scenario cash_pool_1 scenario_1)
+    (transfer_instruction_template_available transfer_instruction_template_1)
+    (account_available account_1)
+    (account_available account_2)
+    (projection_job_includes_legal_entity projection_job_1 legal_entity_1)
+    (projection_job_includes_legal_entity projection_job_2 legal_entity_1)
+    (projection_job_includes_cash_pool projection_job_1 cash_pool_1)
+    (projection_job_includes_cash_pool projection_job_2 cash_pool_1)
+    (projection_job_linked_transfer_instruction projection_job_1 transfer_instruction_template_1)
+    (projection_job_linked_transfer_instruction projection_job_2 transfer_instruction_template_1)
+    (projection_job_linked_account projection_job_1 account_1)
+    (projection_job_linked_account projection_job_2 account_2)
+    (stakeholder_available stakeholder_1)
+    (stakeholder_available stakeholder_2)
+    (funding_limit_available funding_limit_1)
+    (funding_limit_available funding_limit_2)
+    (buffer_type_available buffer_type_1)
+    (liquidity_instrument_available liquidity_instrument_1)
+    (report_template_available report_template_1)
+    (projection_job_linked_report_template projection_job_1 report_template_1)
+    (projection_job_linked_report_template projection_job_2 report_template_2)
+    (approval_rule_available approval_rule_1)
+  )
+  (:goal
+    (and
+      (funding_committed legal_entity_1)
+      (funding_committed cash_pool_1)
+      (funding_committed projection_job_1)
+      (funding_committed projection_job_2)
+    )
+  )
+)

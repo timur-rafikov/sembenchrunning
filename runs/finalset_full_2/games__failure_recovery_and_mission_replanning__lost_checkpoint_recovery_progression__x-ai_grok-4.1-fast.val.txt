@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain lost_checkpoint_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types meta_actor_group - object meta_item_group - object meta_asset_group - object entity_root - object participant - entity_root backup_resource - meta_actor_group loadout_option - meta_actor_group support_unit - meta_actor_group tactical_attachment - meta_actor_group strategic_modifier - meta_actor_group failure_marker - meta_actor_group equipment_module - meta_actor_group mission_modifier - meta_actor_group consumable_resource - meta_item_group progress_fragment - meta_item_group special_asset - meta_item_group route_segment - meta_asset_group objective_node - meta_asset_group checkpoint_bundle - meta_asset_group role_group - participant coordinator_group - participant primary_role - role_group secondary_role - role_group recovery_coordinator - coordinator_group)
+  (:predicates
+    (lost_checkpoint_detected ?participant - participant)
+    (recovery_committed ?participant - participant)
+    (backup_claimed ?participant - participant)
+    (checkpoint_restored ?participant - participant)
+    (role_ready ?participant - participant)
+    (failure_marker_applied ?participant - participant)
+    (backup_available ?backup_resource - backup_resource)
+    (backup_assigned ?participant - participant ?backup_resource - backup_resource)
+    (loadout_available ?loadout_option - loadout_option)
+    (loadout_assigned ?participant - participant ?loadout_option - loadout_option)
+    (support_available ?support_unit - support_unit)
+    (support_attached ?participant - participant ?support_unit - support_unit)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (primary_assigned_consumable ?primary_role - primary_role ?consumable_resource - consumable_resource)
+    (secondary_assigned_consumable ?secondary_role - secondary_role ?consumable_resource - consumable_resource)
+    (role_has_route_segment ?primary_role - primary_role ?route_segment - route_segment)
+    (route_segment_probed ?route_segment - route_segment)
+    (route_segment_tagged ?route_segment - route_segment)
+    (primary_route_validated ?primary_role - primary_role)
+    (role_has_objective_node ?secondary_role - secondary_role ?objective_node - objective_node)
+    (objective_node_probed ?objective_node - objective_node)
+    (objective_node_tagged ?objective_node - objective_node)
+    (secondary_route_validated ?secondary_role - secondary_role)
+    (bundle_available ?checkpoint_bundle - checkpoint_bundle)
+    (bundle_initialized ?checkpoint_bundle - checkpoint_bundle)
+    (bundle_includes_segment ?checkpoint_bundle - checkpoint_bundle ?route_segment - route_segment)
+    (bundle_includes_objective ?checkpoint_bundle - checkpoint_bundle ?objective_node - objective_node)
+    (bundle_flag_route_tagged ?checkpoint_bundle - checkpoint_bundle)
+    (bundle_flag_objective_tagged ?checkpoint_bundle - checkpoint_bundle)
+    (bundle_validated ?checkpoint_bundle - checkpoint_bundle)
+    (coordinator_has_primary ?coordinator - recovery_coordinator ?primary_role - primary_role)
+    (coordinator_has_secondary ?coordinator - recovery_coordinator ?secondary_role - secondary_role)
+    (coordinator_has_bundle ?coordinator - recovery_coordinator ?checkpoint_bundle - checkpoint_bundle)
+    (fragment_available ?progress_fragment - progress_fragment)
+    (coordinator_has_fragment ?coordinator - recovery_coordinator ?progress_fragment - progress_fragment)
+    (fragment_consumed ?progress_fragment - progress_fragment)
+    (fragment_in_bundle ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    (coordinator_module_attached ?coordinator - recovery_coordinator)
+    (coordinator_module_ready ?coordinator - recovery_coordinator)
+    (modifier_sequence_started ?coordinator - recovery_coordinator)
+    (attachment_engaged ?coordinator - recovery_coordinator)
+    (attachment_confirmed ?coordinator - recovery_coordinator)
+    (modifier_applied ?coordinator - recovery_coordinator)
+    (coordinator_finalized ?coordinator - recovery_coordinator)
+    (special_asset_available ?special_asset - special_asset)
+    (coordinator_has_asset ?coordinator - recovery_coordinator ?special_asset - special_asset)
+    (special_asset_locked ?coordinator - recovery_coordinator)
+    (special_asset_phase1_engaged ?coordinator - recovery_coordinator)
+    (special_asset_phase2_engaged ?coordinator - recovery_coordinator)
+    (tactical_attachment_available ?tactical_attachment - tactical_attachment)
+    (coordinator_has_attachment ?coordinator - recovery_coordinator ?tactical_attachment - tactical_attachment)
+    (strategic_modifier_available ?strategic_modifier - strategic_modifier)
+    (coordinator_has_strategic_modifier ?coordinator - recovery_coordinator ?strategic_modifier - strategic_modifier)
+    (equipment_module_available ?equipment_module - equipment_module)
+    (coordinator_has_equipment ?coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    (mission_modifier_available ?mission_modifier - mission_modifier)
+    (coordinator_has_mission_modifier ?coordinator - recovery_coordinator ?mission_modifier - mission_modifier)
+    (failure_marker_available ?failure_marker - failure_marker)
+    (participant_failure_marker ?participant - participant ?failure_marker - failure_marker)
+    (primary_probe_flag ?primary_role - primary_role)
+    (secondary_probe_flag ?secondary_role - secondary_role)
+    (coordinator_ready ?coordinator - recovery_coordinator)
+  )
+  (:action detect_lost_checkpoint
+    :parameters (?participant - participant)
+    :precondition
+      (and
+        (not
+          (lost_checkpoint_detected ?participant)
+        )
+        (not
+          (checkpoint_restored ?participant)
+        )
+      )
+    :effect (lost_checkpoint_detected ?participant)
+  )
+  (:action assign_backup_resource
+    :parameters (?participant - participant ?backup_resource - backup_resource)
+    :precondition
+      (and
+        (lost_checkpoint_detected ?participant)
+        (not
+          (backup_claimed ?participant)
+        )
+        (backup_available ?backup_resource)
+      )
+    :effect
+      (and
+        (backup_claimed ?participant)
+        (backup_assigned ?participant ?backup_resource)
+        (not
+          (backup_available ?backup_resource)
+        )
+      )
+  )
+  (:action propose_loadout_for_recovery
+    :parameters (?participant - participant ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (lost_checkpoint_detected ?participant)
+        (backup_claimed ?participant)
+        (loadout_available ?loadout_option)
+      )
+    :effect
+      (and
+        (loadout_assigned ?participant ?loadout_option)
+        (not
+          (loadout_available ?loadout_option)
+        )
+      )
+  )
+  (:action commit_loadout_selection
+    :parameters (?participant - participant ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (lost_checkpoint_detected ?participant)
+        (backup_claimed ?participant)
+        (loadout_assigned ?participant ?loadout_option)
+        (not
+          (recovery_committed ?participant)
+        )
+      )
+    :effect (recovery_committed ?participant)
+  )
+  (:action release_loadout_option
+    :parameters (?participant - participant ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (loadout_assigned ?participant ?loadout_option)
+      )
+    :effect
+      (and
+        (loadout_available ?loadout_option)
+        (not
+          (loadout_assigned ?participant ?loadout_option)
+        )
+      )
+  )
+  (:action attach_support_unit
+    :parameters (?participant - participant ?support_unit - support_unit)
+    :precondition
+      (and
+        (recovery_committed ?participant)
+        (support_available ?support_unit)
+      )
+    :effect
+      (and
+        (support_attached ?participant ?support_unit)
+        (not
+          (support_available ?support_unit)
+        )
+      )
+  )
+  (:action detach_support_unit
+    :parameters (?participant - participant ?support_unit - support_unit)
+    :precondition
+      (and
+        (support_attached ?participant ?support_unit)
+      )
+    :effect
+      (and
+        (support_available ?support_unit)
+        (not
+          (support_attached ?participant ?support_unit)
+        )
+      )
+  )
+  (:action attach_equipment_module
+    :parameters (?coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (equipment_module_available ?equipment_module)
+      )
+    :effect
+      (and
+        (coordinator_has_equipment ?coordinator ?equipment_module)
+        (not
+          (equipment_module_available ?equipment_module)
+        )
+      )
+  )
+  (:action detach_equipment_module
+    :parameters (?coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (coordinator_has_equipment ?coordinator ?equipment_module)
+      )
+    :effect
+      (and
+        (equipment_module_available ?equipment_module)
+        (not
+          (coordinator_has_equipment ?coordinator ?equipment_module)
+        )
+      )
+  )
+  (:action attach_mission_modifier
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (mission_modifier_available ?mission_modifier)
+      )
+    :effect
+      (and
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (not
+          (mission_modifier_available ?mission_modifier)
+        )
+      )
+  )
+  (:action detach_mission_modifier
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier)
+    :precondition
+      (and
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+      )
+    :effect
+      (and
+        (mission_modifier_available ?mission_modifier)
+        (not
+          (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        )
+      )
+  )
+  (:action probe_route_segment_primary
+    :parameters (?primary_role - primary_role ?route_segment - route_segment ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (recovery_committed ?primary_role)
+        (loadout_assigned ?primary_role ?loadout_option)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (not
+          (route_segment_probed ?route_segment)
+        )
+        (not
+          (route_segment_tagged ?route_segment)
+        )
+      )
+    :effect (route_segment_probed ?route_segment)
+  )
+  (:action validate_primary_segment_traversal
+    :parameters (?primary_role - primary_role ?route_segment - route_segment ?support_unit - support_unit)
+    :precondition
+      (and
+        (recovery_committed ?primary_role)
+        (support_attached ?primary_role ?support_unit)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (route_segment_probed ?route_segment)
+        (not
+          (primary_probe_flag ?primary_role)
+        )
+      )
+    :effect
+      (and
+        (primary_probe_flag ?primary_role)
+        (primary_route_validated ?primary_role)
+      )
+  )
+  (:action apply_consumable_to_segment_primary
+    :parameters (?primary_role - primary_role ?route_segment - route_segment ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (recovery_committed ?primary_role)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (consumable_available ?consumable_resource)
+        (not
+          (primary_probe_flag ?primary_role)
+        )
+      )
+    :effect
+      (and
+        (route_segment_tagged ?route_segment)
+        (primary_probe_flag ?primary_role)
+        (primary_assigned_consumable ?primary_role ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_primary_segment_traversal
+    :parameters (?primary_role - primary_role ?route_segment - route_segment ?loadout_option - loadout_option ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (recovery_committed ?primary_role)
+        (loadout_assigned ?primary_role ?loadout_option)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (route_segment_tagged ?route_segment)
+        (primary_assigned_consumable ?primary_role ?consumable_resource)
+        (not
+          (primary_route_validated ?primary_role)
+        )
+      )
+    :effect
+      (and
+        (route_segment_probed ?route_segment)
+        (primary_route_validated ?primary_role)
+        (consumable_available ?consumable_resource)
+        (not
+          (primary_assigned_consumable ?primary_role ?consumable_resource)
+        )
+      )
+  )
+  (:action probe_route_segment_secondary
+    :parameters (?secondary_role - secondary_role ?objective_node - objective_node ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (recovery_committed ?secondary_role)
+        (loadout_assigned ?secondary_role ?loadout_option)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (not
+          (objective_node_probed ?objective_node)
+        )
+        (not
+          (objective_node_tagged ?objective_node)
+        )
+      )
+    :effect (objective_node_probed ?objective_node)
+  )
+  (:action validate_secondary_segment_traversal
+    :parameters (?secondary_role - secondary_role ?objective_node - objective_node ?support_unit - support_unit)
+    :precondition
+      (and
+        (recovery_committed ?secondary_role)
+        (support_attached ?secondary_role ?support_unit)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (objective_node_probed ?objective_node)
+        (not
+          (secondary_probe_flag ?secondary_role)
+        )
+      )
+    :effect
+      (and
+        (secondary_probe_flag ?secondary_role)
+        (secondary_route_validated ?secondary_role)
+      )
+  )
+  (:action apply_consumable_to_segment_secondary
+    :parameters (?secondary_role - secondary_role ?objective_node - objective_node ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (recovery_committed ?secondary_role)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (consumable_available ?consumable_resource)
+        (not
+          (secondary_probe_flag ?secondary_role)
+        )
+      )
+    :effect
+      (and
+        (objective_node_tagged ?objective_node)
+        (secondary_probe_flag ?secondary_role)
+        (secondary_assigned_consumable ?secondary_role ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_secondary_segment_traversal
+    :parameters (?secondary_role - secondary_role ?objective_node - objective_node ?loadout_option - loadout_option ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (recovery_committed ?secondary_role)
+        (loadout_assigned ?secondary_role ?loadout_option)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (objective_node_tagged ?objective_node)
+        (secondary_assigned_consumable ?secondary_role ?consumable_resource)
+        (not
+          (secondary_route_validated ?secondary_role)
+        )
+      )
+    :effect
+      (and
+        (objective_node_probed ?objective_node)
+        (secondary_route_validated ?secondary_role)
+        (consumable_available ?consumable_resource)
+        (not
+          (secondary_assigned_consumable ?secondary_role ?consumable_resource)
+        )
+      )
+  )
+  (:action assemble_checkpoint_bundle_standard
+    :parameters (?primary_role - primary_role ?secondary_role - secondary_role ?route_segment - route_segment ?objective_node - objective_node ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (primary_probe_flag ?primary_role)
+        (secondary_probe_flag ?secondary_role)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (route_segment_probed ?route_segment)
+        (objective_node_probed ?objective_node)
+        (primary_route_validated ?primary_role)
+        (secondary_route_validated ?secondary_role)
+        (bundle_available ?checkpoint_bundle)
+      )
+    :effect
+      (and
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_includes_segment ?checkpoint_bundle ?route_segment)
+        (bundle_includes_objective ?checkpoint_bundle ?objective_node)
+        (not
+          (bundle_available ?checkpoint_bundle)
+        )
+      )
+  )
+  (:action assemble_checkpoint_bundle_with_route_tag
+    :parameters (?primary_role - primary_role ?secondary_role - secondary_role ?route_segment - route_segment ?objective_node - objective_node ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (primary_probe_flag ?primary_role)
+        (secondary_probe_flag ?secondary_role)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (route_segment_tagged ?route_segment)
+        (objective_node_probed ?objective_node)
+        (not
+          (primary_route_validated ?primary_role)
+        )
+        (secondary_route_validated ?secondary_role)
+        (bundle_available ?checkpoint_bundle)
+      )
+    :effect
+      (and
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_includes_segment ?checkpoint_bundle ?route_segment)
+        (bundle_includes_objective ?checkpoint_bundle ?objective_node)
+        (bundle_flag_route_tagged ?checkpoint_bundle)
+        (not
+          (bundle_available ?checkpoint_bundle)
+        )
+      )
+  )
+  (:action assemble_checkpoint_bundle_with_objective_tag
+    :parameters (?primary_role - primary_role ?secondary_role - secondary_role ?route_segment - route_segment ?objective_node - objective_node ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (primary_probe_flag ?primary_role)
+        (secondary_probe_flag ?secondary_role)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (route_segment_probed ?route_segment)
+        (objective_node_tagged ?objective_node)
+        (primary_route_validated ?primary_role)
+        (not
+          (secondary_route_validated ?secondary_role)
+        )
+        (bundle_available ?checkpoint_bundle)
+      )
+    :effect
+      (and
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_includes_segment ?checkpoint_bundle ?route_segment)
+        (bundle_includes_objective ?checkpoint_bundle ?objective_node)
+        (bundle_flag_objective_tagged ?checkpoint_bundle)
+        (not
+          (bundle_available ?checkpoint_bundle)
+        )
+      )
+  )
+  (:action assemble_checkpoint_bundle_with_route_and_objective_tags
+    :parameters (?primary_role - primary_role ?secondary_role - secondary_role ?route_segment - route_segment ?objective_node - objective_node ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (primary_probe_flag ?primary_role)
+        (secondary_probe_flag ?secondary_role)
+        (role_has_route_segment ?primary_role ?route_segment)
+        (role_has_objective_node ?secondary_role ?objective_node)
+        (route_segment_tagged ?route_segment)
+        (objective_node_tagged ?objective_node)
+        (not
+          (primary_route_validated ?primary_role)
+        )
+        (not
+          (secondary_route_validated ?secondary_role)
+        )
+        (bundle_available ?checkpoint_bundle)
+      )
+    :effect
+      (and
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_includes_segment ?checkpoint_bundle ?route_segment)
+        (bundle_includes_objective ?checkpoint_bundle ?objective_node)
+        (bundle_flag_route_tagged ?checkpoint_bundle)
+        (bundle_flag_objective_tagged ?checkpoint_bundle)
+        (not
+          (bundle_available ?checkpoint_bundle)
+        )
+      )
+  )
+  (:action validate_checkpoint_bundle
+    :parameters (?checkpoint_bundle - checkpoint_bundle ?primary_role - primary_role ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (bundle_initialized ?checkpoint_bundle)
+        (primary_probe_flag ?primary_role)
+        (loadout_assigned ?primary_role ?loadout_option)
+        (not
+          (bundle_validated ?checkpoint_bundle)
+        )
+      )
+    :effect (bundle_validated ?checkpoint_bundle)
+  )
+  (:action integrate_progress_fragment
+    :parameters (?coordinator - recovery_coordinator ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (coordinator_has_bundle ?coordinator ?checkpoint_bundle)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_available ?progress_fragment)
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_validated ?checkpoint_bundle)
+        (not
+          (fragment_consumed ?progress_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_consumed ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (not
+          (fragment_available ?progress_fragment)
+        )
+      )
+  )
+  (:action finalize_fragment_integration
+    :parameters (?coordinator - recovery_coordinator ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_consumed ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (loadout_assigned ?coordinator ?loadout_option)
+        (not
+          (bundle_flag_route_tagged ?checkpoint_bundle)
+        )
+        (not
+          (coordinator_module_attached ?coordinator)
+        )
+      )
+    :effect (coordinator_module_attached ?coordinator)
+  )
+  (:action attach_tactical_attachment
+    :parameters (?coordinator - recovery_coordinator ?tactical_attachment - tactical_attachment)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (tactical_attachment_available ?tactical_attachment)
+        (not
+          (attachment_engaged ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (attachment_engaged ?coordinator)
+        (coordinator_has_attachment ?coordinator ?tactical_attachment)
+        (not
+          (tactical_attachment_available ?tactical_attachment)
+        )
+      )
+  )
+  (:action integrate_attachment_and_prepare_coordinator
+    :parameters (?coordinator - recovery_coordinator ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle ?loadout_option - loadout_option ?tactical_attachment - tactical_attachment)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_consumed ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (loadout_assigned ?coordinator ?loadout_option)
+        (bundle_flag_route_tagged ?checkpoint_bundle)
+        (attachment_engaged ?coordinator)
+        (coordinator_has_attachment ?coordinator ?tactical_attachment)
+        (not
+          (coordinator_module_attached ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_module_attached ?coordinator)
+        (attachment_confirmed ?coordinator)
+      )
+  )
+  (:action apply_equipment_module_phase1
+    :parameters (?coordinator - recovery_coordinator ?equipment_module - equipment_module ?support_unit - support_unit ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_attached ?coordinator)
+        (coordinator_has_equipment ?coordinator ?equipment_module)
+        (support_attached ?coordinator ?support_unit)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (not
+          (bundle_flag_objective_tagged ?checkpoint_bundle)
+        )
+        (not
+          (coordinator_module_ready ?coordinator)
+        )
+      )
+    :effect (coordinator_module_ready ?coordinator)
+  )
+  (:action apply_equipment_module_phase2
+    :parameters (?coordinator - recovery_coordinator ?equipment_module - equipment_module ?support_unit - support_unit ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_attached ?coordinator)
+        (coordinator_has_equipment ?coordinator ?equipment_module)
+        (support_attached ?coordinator ?support_unit)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (bundle_flag_objective_tagged ?checkpoint_bundle)
+        (not
+          (coordinator_module_ready ?coordinator)
+        )
+      )
+    :effect (coordinator_module_ready ?coordinator)
+  )
+  (:action sequence_mission_modifier_step1
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_ready ?coordinator)
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (not
+          (bundle_flag_route_tagged ?checkpoint_bundle)
+        )
+        (not
+          (bundle_flag_objective_tagged ?checkpoint_bundle)
+        )
+        (not
+          (modifier_sequence_started ?coordinator)
+        )
+      )
+    :effect (modifier_sequence_started ?coordinator)
+  )
+  (:action sequence_mission_modifier_step2
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_ready ?coordinator)
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (bundle_flag_route_tagged ?checkpoint_bundle)
+        (not
+          (bundle_flag_objective_tagged ?checkpoint_bundle)
+        )
+        (not
+          (modifier_sequence_started ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (modifier_sequence_started ?coordinator)
+        (modifier_applied ?coordinator)
+      )
+  )
+  (:action sequence_mission_modifier_step3
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_ready ?coordinator)
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (not
+          (bundle_flag_route_tagged ?checkpoint_bundle)
+        )
+        (bundle_flag_objective_tagged ?checkpoint_bundle)
+        (not
+          (modifier_sequence_started ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (modifier_sequence_started ?coordinator)
+        (modifier_applied ?coordinator)
+      )
+  )
+  (:action sequence_mission_modifier_step4
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier ?progress_fragment - progress_fragment ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (coordinator_module_ready ?coordinator)
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (coordinator_has_fragment ?coordinator ?progress_fragment)
+        (fragment_in_bundle ?progress_fragment ?checkpoint_bundle)
+        (bundle_flag_route_tagged ?checkpoint_bundle)
+        (bundle_flag_objective_tagged ?checkpoint_bundle)
+        (not
+          (modifier_sequence_started ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (modifier_sequence_started ?coordinator)
+        (modifier_applied ?coordinator)
+      )
+  )
+  (:action finalize_modifier_and_mark_ready
+    :parameters (?coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (modifier_sequence_started ?coordinator)
+        (not
+          (modifier_applied ?coordinator)
+        )
+        (not
+          (coordinator_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?coordinator)
+        (role_ready ?coordinator)
+      )
+  )
+  (:action attach_strategic_modifier
+    :parameters (?coordinator - recovery_coordinator ?strategic_modifier - strategic_modifier)
+    :precondition
+      (and
+        (modifier_sequence_started ?coordinator)
+        (modifier_applied ?coordinator)
+        (strategic_modifier_available ?strategic_modifier)
+      )
+    :effect
+      (and
+        (coordinator_has_strategic_modifier ?coordinator ?strategic_modifier)
+        (not
+          (strategic_modifier_available ?strategic_modifier)
+        )
+      )
+  )
+  (:action finalize_coordinator_readiness
+    :parameters (?coordinator - recovery_coordinator ?primary_role - primary_role ?secondary_role - secondary_role ?loadout_option - loadout_option ?strategic_modifier - strategic_modifier)
+    :precondition
+      (and
+        (modifier_sequence_started ?coordinator)
+        (modifier_applied ?coordinator)
+        (coordinator_has_strategic_modifier ?coordinator ?strategic_modifier)
+        (coordinator_has_primary ?coordinator ?primary_role)
+        (coordinator_has_secondary ?coordinator ?secondary_role)
+        (primary_route_validated ?primary_role)
+        (secondary_route_validated ?secondary_role)
+        (loadout_assigned ?coordinator ?loadout_option)
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect (coordinator_finalized ?coordinator)
+  )
+  (:action confirm_coordinator_ready
+    :parameters (?coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (modifier_sequence_started ?coordinator)
+        (coordinator_finalized ?coordinator)
+        (not
+          (coordinator_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?coordinator)
+        (role_ready ?coordinator)
+      )
+  )
+  (:action lock_special_asset_on_coordinator
+    :parameters (?coordinator - recovery_coordinator ?special_asset - special_asset ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (recovery_committed ?coordinator)
+        (loadout_assigned ?coordinator ?loadout_option)
+        (special_asset_available ?special_asset)
+        (coordinator_has_asset ?coordinator ?special_asset)
+        (not
+          (special_asset_locked ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (special_asset_locked ?coordinator)
+        (not
+          (special_asset_available ?special_asset)
+        )
+      )
+  )
+  (:action engage_special_asset_phase1
+    :parameters (?coordinator - recovery_coordinator ?support_unit - support_unit)
+    :precondition
+      (and
+        (special_asset_locked ?coordinator)
+        (support_attached ?coordinator ?support_unit)
+        (not
+          (special_asset_phase1_engaged ?coordinator)
+        )
+      )
+    :effect (special_asset_phase1_engaged ?coordinator)
+  )
+  (:action activate_special_asset
+    :parameters (?coordinator - recovery_coordinator ?mission_modifier - mission_modifier)
+    :precondition
+      (and
+        (special_asset_phase1_engaged ?coordinator)
+        (coordinator_has_mission_modifier ?coordinator ?mission_modifier)
+        (not
+          (special_asset_phase2_engaged ?coordinator)
+        )
+      )
+    :effect (special_asset_phase2_engaged ?coordinator)
+  )
+  (:action finalize_asset_lock
+    :parameters (?coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (special_asset_phase2_engaged ?coordinator)
+        (not
+          (coordinator_ready ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?coordinator)
+        (role_ready ?coordinator)
+      )
+  )
+  (:action mark_primary_ready
+    :parameters (?primary_role - primary_role ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (primary_probe_flag ?primary_role)
+        (primary_route_validated ?primary_role)
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_validated ?checkpoint_bundle)
+        (not
+          (role_ready ?primary_role)
+        )
+      )
+    :effect (role_ready ?primary_role)
+  )
+  (:action mark_secondary_ready
+    :parameters (?secondary_role - secondary_role ?checkpoint_bundle - checkpoint_bundle)
+    :precondition
+      (and
+        (secondary_probe_flag ?secondary_role)
+        (secondary_route_validated ?secondary_role)
+        (bundle_initialized ?checkpoint_bundle)
+        (bundle_validated ?checkpoint_bundle)
+        (not
+          (role_ready ?secondary_role)
+        )
+      )
+    :effect (role_ready ?secondary_role)
+  )
+  (:action attach_failure_marker_to_participant
+    :parameters (?participant - participant ?failure_marker - failure_marker ?loadout_option - loadout_option)
+    :precondition
+      (and
+        (role_ready ?participant)
+        (loadout_assigned ?participant ?loadout_option)
+        (failure_marker_available ?failure_marker)
+        (not
+          (failure_marker_applied ?participant)
+        )
+      )
+    :effect
+      (and
+        (failure_marker_applied ?participant)
+        (participant_failure_marker ?participant ?failure_marker)
+        (not
+          (failure_marker_available ?failure_marker)
+        )
+      )
+  )
+  (:action bind_backup_to_primary_and_resume
+    :parameters (?primary_role - primary_role ?backup_resource - backup_resource ?failure_marker - failure_marker)
+    :precondition
+      (and
+        (failure_marker_applied ?primary_role)
+        (backup_assigned ?primary_role ?backup_resource)
+        (participant_failure_marker ?primary_role ?failure_marker)
+        (not
+          (checkpoint_restored ?primary_role)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_restored ?primary_role)
+        (backup_available ?backup_resource)
+        (failure_marker_available ?failure_marker)
+      )
+  )
+  (:action bind_backup_to_secondary_and_resume
+    :parameters (?secondary_role - secondary_role ?backup_resource - backup_resource ?failure_marker - failure_marker)
+    :precondition
+      (and
+        (failure_marker_applied ?secondary_role)
+        (backup_assigned ?secondary_role ?backup_resource)
+        (participant_failure_marker ?secondary_role ?failure_marker)
+        (not
+          (checkpoint_restored ?secondary_role)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_restored ?secondary_role)
+        (backup_available ?backup_resource)
+        (failure_marker_available ?failure_marker)
+      )
+  )
+  (:action bind_backup_to_coordinator_and_resume
+    :parameters (?coordinator - recovery_coordinator ?backup_resource - backup_resource ?failure_marker - failure_marker)
+    :precondition
+      (and
+        (failure_marker_applied ?coordinator)
+        (backup_assigned ?coordinator ?backup_resource)
+        (participant_failure_marker ?coordinator ?failure_marker)
+        (not
+          (checkpoint_restored ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (checkpoint_restored ?coordinator)
+        (backup_available ?backup_resource)
+        (failure_marker_available ?failure_marker)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem lost_checkpoint_recovery_scenario)
+  (:domain lost_checkpoint_recovery)
+  (:objects primary_role_1 - primary_role secondary_role_1 - secondary_role coordinator_alpha - recovery_coordinator coordinator_beta - recovery_coordinator backup_token_a - backup_resource backup_token_b - backup_resource backup_token_c - backup_resource loadout_option_alpha - loadout_option support_unit_alpha - support_unit consumable_fragment_a - consumable_resource route_segment_1 - route_segment objective_node_1 - objective_node checkpoint_bundle_alpha - checkpoint_bundle progress_fragment_alpha - progress_fragment progress_fragment_beta - progress_fragment tactical_attachment_alpha - tactical_attachment tactical_attachment_beta - tactical_attachment strategic_modifier_alpha - strategic_modifier strategic_modifier_beta - strategic_modifier failure_marker_alpha - failure_marker equipment_module_alpha - equipment_module special_asset_alpha - special_asset special_asset_beta - special_asset mission_modifier_alpha - mission_modifier)
+  (:init
+    (backup_available backup_token_a)
+    (backup_available backup_token_b)
+    (backup_available backup_token_c)
+    (loadout_available loadout_option_alpha)
+    (support_available support_unit_alpha)
+    (consumable_available consumable_fragment_a)
+    (role_has_route_segment primary_role_1 route_segment_1)
+    (role_has_objective_node secondary_role_1 objective_node_1)
+    (bundle_available checkpoint_bundle_alpha)
+    (fragment_available progress_fragment_alpha)
+    (fragment_available progress_fragment_beta)
+    (coordinator_has_primary coordinator_alpha primary_role_1)
+    (coordinator_has_primary coordinator_beta primary_role_1)
+    (coordinator_has_secondary coordinator_alpha secondary_role_1)
+    (coordinator_has_secondary coordinator_beta secondary_role_1)
+    (coordinator_has_bundle coordinator_alpha checkpoint_bundle_alpha)
+    (coordinator_has_bundle coordinator_beta checkpoint_bundle_alpha)
+    (coordinator_has_fragment coordinator_alpha progress_fragment_alpha)
+    (coordinator_has_fragment coordinator_beta progress_fragment_beta)
+    (tactical_attachment_available tactical_attachment_alpha)
+    (tactical_attachment_available tactical_attachment_beta)
+    (strategic_modifier_available strategic_modifier_alpha)
+    (strategic_modifier_available strategic_modifier_beta)
+    (failure_marker_available failure_marker_alpha)
+    (equipment_module_available equipment_module_alpha)
+    (special_asset_available special_asset_alpha)
+    (coordinator_has_asset coordinator_alpha special_asset_alpha)
+    (coordinator_has_asset coordinator_beta special_asset_beta)
+    (mission_modifier_available mission_modifier_alpha)
+  )
+  (:goal
+    (and
+      (checkpoint_restored primary_role_1)
+      (checkpoint_restored secondary_role_1)
+      (checkpoint_restored coordinator_alpha)
+      (checkpoint_restored coordinator_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(detect_lost_checkpoint primary_role_1)
+(assign_backup_resource primary_role_1 backup_token_a)
+(propose_loadout_for_recovery primary_role_1 loadout_option_alpha)
+(commit_loadout_selection primary_role_1 loadout_option_alpha)
+(probe_route_segment_primary primary_role_1 route_segment_1 loadout_option_alpha)
+(attach_support_unit primary_role_1 support_unit_alpha)
+(validate_primary_segment_traversal primary_role_1 route_segment_1 support_unit_alpha)
+(release_loadout_option primary_role_1 loadout_option_alpha)
+(detach_support_unit primary_role_1 support_unit_alpha)
+(detect_lost_checkpoint secondary_role_1)
+(assign_backup_resource secondary_role_1 backup_token_b)
+(propose_loadout_for_recovery secondary_role_1 loadout_option_alpha)
+(commit_loadout_selection secondary_role_1 loadout_option_alpha)
+(probe_route_segment_secondary secondary_role_1 objective_node_1 loadout_option_alpha)
+(attach_support_unit secondary_role_1 support_unit_alpha)
+(validate_secondary_segment_traversal secondary_role_1 objective_node_1 support_unit_alpha)
+(release_loadout_option secondary_role_1 loadout_option_alpha)
+(detach_support_unit secondary_role_1 support_unit_alpha)
+(assemble_checkpoint_bundle_standard primary_role_1 secondary_role_1 route_segment_1 objective_node_1 checkpoint_bundle_alpha)
+(propose_loadout_for_recovery primary_role_1 loadout_option_alpha)
+(validate_checkpoint_bundle checkpoint_bundle_alpha primary_role_1 loadout_option_alpha)
+(mark_primary_ready primary_role_1 checkpoint_bundle_alpha)
+(mark_secondary_ready secondary_role_1 checkpoint_bundle_alpha)
+(attach_failure_marker_to_participant primary_role_1 failure_marker_alpha loadout_option_alpha)
+(bind_backup_to_primary_and_resume primary_role_1 backup_token_a failure_marker_alpha)
+(release_loadout_option primary_role_1 loadout_option_alpha)
+(propose_loadout_for_recovery secondary_role_1 loadout_option_alpha)
+(attach_failure_marker_to_participant secondary_role_1 failure_marker_alpha loadout_option_alpha)
+(bind_backup_to_secondary_and_resume secondary_role_1 backup_token_b failure_marker_alpha)
+(release_loadout_option secondary_role_1 loadout_option_alpha)
+(detect_lost_checkpoint coordinator_alpha)
+(assign_backup_resource coordinator_alpha backup_token_a)
+(propose_loadout_for_recovery coordinator_alpha loadout_option_alpha)
+(commit_loadout_selection coordinator_alpha loadout_option_alpha)
+(lock_special_asset_on_coordinator coordinator_alpha special_asset_alpha loadout_option_alpha)
+(attach_support_unit coordinator_alpha support_unit_alpha)
+(attach_mission_modifier coordinator_alpha mission_modifier_alpha)
+(engage_special_asset_phase1 coordinator_alpha support_unit_alpha)
+(activate_special_asset coordinator_alpha mission_modifier_alpha)
+(finalize_asset_lock coordinator_alpha)
+(attach_failure_marker_to_participant coordinator_alpha failure_marker_alpha loadout_option_alpha)
+(bind_backup_to_coordinator_and_resume coordinator_alpha backup_token_a failure_marker_alpha)
+(release_loadout_option coordinator_alpha loadout_option_alpha)
+(detach_support_unit coordinator_alpha support_unit_alpha)
+(detach_mission_modifier coordinator_alpha mission_modifier_alpha)
+(detect_lost_checkpoint coordinator_beta)
+(assign_backup_resource coordinator_beta backup_token_b)
+(propose_loadout_for_recovery coordinator_beta loadout_option_alpha)
+(commit_loadout_selection coordinator_beta loadout_option_alpha)
+(integrate_progress_fragment coordinator_beta progress_fragment_beta checkpoint_bundle_alpha)
+(finalize_fragment_integration coordinator_beta progress_fragment_beta checkpoint_bundle_alpha loadout_option_alpha)
+(attach_equipment_module coordinator_beta equipment_module_alpha)
+(attach_support_unit coordinator_beta support_unit_alpha)
+(apply_equipment_module_phase1 coordinator_beta equipment_module_alpha support_unit_alpha progress_fragment_beta checkpoint_bundle_alpha)
+(attach_mission_modifier coordinator_beta mission_modifier_alpha)
+(sequence_mission_modifier_step1 coordinator_beta mission_modifier_alpha progress_fragment_beta checkpoint_bundle_alpha)
+(finalize_modifier_and_mark_ready coordinator_beta)
+(attach_failure_marker_to_participant coordinator_beta failure_marker_alpha loadout_option_alpha)
+(bind_backup_to_coordinator_and_resume coordinator_beta backup_token_b failure_marker_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ra5ev06f/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 59 
+
+Successful plans:
+Value: 59
+ /tmp/val_ra5ev06f/plan.pddl 59 
+
+
+
+--- stderr ---
+

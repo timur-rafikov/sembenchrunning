@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain paginated_result_generation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object entity_base - domain_object helper_base - domain_object slot_base - domain_object domain_root - domain_object query_context - domain_root cursor_token - entity_base filter_spec - entity_base permission_ticket - entity_base aggregation_key - entity_base output_modifier - entity_base client_context - entity_base serializer - entity_base formatter - entity_base item_descriptor - helper_base item_record - helper_base metadata_tag - helper_base page_slot_a - slot_base page_slot_b - slot_base page_buffer - slot_base query_partition - query_context response_partition - query_context primary_cursor - query_partition secondary_cursor - query_partition response_builder - response_partition)
+
+  (:predicates
+    (entity_registered ?query - query_context)
+    (entity_prepared ?query - query_context)
+    (entity_has_claimed_cursor ?query - query_context)
+    (entity_committed ?query - query_context)
+    (ready_for_composition ?query - query_context)
+    (entity_emitted ?query - query_context)
+    (cursor_token_available ?cursor_token - cursor_token)
+    (entity_binds_cursor_token ?query - query_context ?cursor_token - cursor_token)
+    (filter_spec_available ?filter_spec - filter_spec)
+    (entity_binds_filter_spec ?query - query_context ?filter_spec - filter_spec)
+    (permission_ticket_available ?permission_ticket - permission_ticket)
+    (entity_binds_permission_ticket ?query - query_context ?permission_ticket - permission_ticket)
+    (item_descriptor_available ?item_descriptor - item_descriptor)
+    (primary_cursor_item_candidate ?primary_cursor - primary_cursor ?item_descriptor - item_descriptor)
+    (secondary_cursor_item_candidate ?secondary_cursor - secondary_cursor ?item_descriptor - item_descriptor)
+    (primary_cursor_mapped_slot_a ?primary_cursor - primary_cursor ?slot_a - page_slot_a)
+    (page_slot_a_selected ?slot_a - page_slot_a)
+    (page_slot_a_alt_selected ?slot_a - page_slot_a)
+    (primary_cursor_candidate_ready ?primary_cursor - primary_cursor)
+    (secondary_cursor_mapped_slot_b ?secondary_cursor - secondary_cursor ?slot_b - page_slot_b)
+    (page_slot_b_selected ?slot_b - page_slot_b)
+    (page_slot_b_alt_selected ?slot_b - page_slot_b)
+    (secondary_cursor_candidate_ready ?secondary_cursor - secondary_cursor)
+    (page_buffer_available ?page_buffer - page_buffer)
+    (page_buffer_claimed ?page_buffer - page_buffer)
+    (page_buffer_slot_a_association ?page_buffer - page_buffer ?slot_a - page_slot_a)
+    (page_buffer_slot_b_association ?page_buffer - page_buffer ?slot_b - page_slot_b)
+    (page_buffer_marker_x ?page_buffer - page_buffer)
+    (page_buffer_marker_y ?page_buffer - page_buffer)
+    (page_buffer_populated ?page_buffer - page_buffer)
+    (builder_bound_primary_cursor ?builder - response_builder ?primary_cursor - primary_cursor)
+    (builder_bound_secondary_cursor ?builder - response_builder ?secondary_cursor - secondary_cursor)
+    (builder_targets_page_buffer ?builder - response_builder ?page_buffer - page_buffer)
+    (item_record_available ?item_record - item_record)
+    (builder_item_record_candidate ?builder - response_builder ?item_record - item_record)
+    (item_record_claimed ?item_record - item_record)
+    (item_record_bound_page_buffer ?item_record - item_record ?page_buffer - page_buffer)
+    (builder_pre_finalization ?builder - response_builder)
+    (builder_enrichment_completed ?builder - response_builder)
+    (builder_ready_for_finalization ?builder - response_builder)
+    (builder_aggregation_reserved ?builder - response_builder)
+    (builder_recorded_aggregation ?builder - response_builder)
+    (builder_secondary_finalization_metadata_recorded ?builder - response_builder)
+    (builder_finalized ?builder - response_builder)
+    (metadata_tag_available ?metadata_tag - metadata_tag)
+    (builder_has_metadata_slot ?builder - response_builder ?metadata_tag - metadata_tag)
+    (builder_metadata_binding_ready ?builder - response_builder)
+    (builder_metadata_validation_ready ?builder - response_builder)
+    (builder_metadata_validated ?builder - response_builder)
+    (aggregation_key_available ?aggregation_key - aggregation_key)
+    (builder_associated_aggregation_key ?builder - response_builder ?aggregation_key - aggregation_key)
+    (output_modifier_available ?output_modifier - output_modifier)
+    (builder_bound_output_modifier ?builder - response_builder ?output_modifier - output_modifier)
+    (serializer_available ?serializer - serializer)
+    (builder_bound_serializer ?builder - response_builder ?serializer - serializer)
+    (formatter_available ?formatter - formatter)
+    (builder_bound_formatter ?builder - response_builder ?formatter - formatter)
+    (client_context_available ?client_ctx - client_context)
+    (entity_associated_client_context ?query - query_context ?client_ctx - client_context)
+    (primary_cursor_has_candidates ?primary_cursor - primary_cursor)
+    (secondary_cursor_has_candidates ?secondary_cursor - secondary_cursor)
+    (builder_emitted ?builder - response_builder)
+  )
+  (:action initialize_query_context
+    :parameters (?query - query_context)
+    :precondition
+      (and
+        (not
+          (entity_registered ?query)
+        )
+        (not
+          (entity_committed ?query)
+        )
+      )
+    :effect (entity_registered ?query)
+  )
+  (:action claim_cursor_token_for_query
+    :parameters (?query - query_context ?cursor_token - cursor_token)
+    :precondition
+      (and
+        (entity_registered ?query)
+        (not
+          (entity_has_claimed_cursor ?query)
+        )
+        (cursor_token_available ?cursor_token)
+      )
+    :effect
+      (and
+        (entity_has_claimed_cursor ?query)
+        (entity_binds_cursor_token ?query ?cursor_token)
+        (not
+          (cursor_token_available ?cursor_token)
+        )
+      )
+  )
+  (:action bind_filter_spec_to_query
+    :parameters (?query - query_context ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_registered ?query)
+        (entity_has_claimed_cursor ?query)
+        (filter_spec_available ?filter_spec)
+      )
+    :effect
+      (and
+        (entity_binds_filter_spec ?query ?filter_spec)
+        (not
+          (filter_spec_available ?filter_spec)
+        )
+      )
+  )
+  (:action set_query_prepared
+    :parameters (?query - query_context ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_registered ?query)
+        (entity_has_claimed_cursor ?query)
+        (entity_binds_filter_spec ?query ?filter_spec)
+        (not
+          (entity_prepared ?query)
+        )
+      )
+    :effect (entity_prepared ?query)
+  )
+  (:action release_filter_spec_from_query
+    :parameters (?query - query_context ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_binds_filter_spec ?query ?filter_spec)
+      )
+    :effect
+      (and
+        (filter_spec_available ?filter_spec)
+        (not
+          (entity_binds_filter_spec ?query ?filter_spec)
+        )
+      )
+  )
+  (:action bind_permission_ticket_to_query
+    :parameters (?query - query_context ?permission_ticket - permission_ticket)
+    :precondition
+      (and
+        (entity_prepared ?query)
+        (permission_ticket_available ?permission_ticket)
+      )
+    :effect
+      (and
+        (entity_binds_permission_ticket ?query ?permission_ticket)
+        (not
+          (permission_ticket_available ?permission_ticket)
+        )
+      )
+  )
+  (:action release_permission_ticket_from_query
+    :parameters (?query - query_context ?permission_ticket - permission_ticket)
+    :precondition
+      (and
+        (entity_binds_permission_ticket ?query ?permission_ticket)
+      )
+    :effect
+      (and
+        (permission_ticket_available ?permission_ticket)
+        (not
+          (entity_binds_permission_ticket ?query ?permission_ticket)
+        )
+      )
+  )
+  (:action bind_serializer_to_builder
+    :parameters (?builder - response_builder ?serializer - serializer)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (serializer_available ?serializer)
+      )
+    :effect
+      (and
+        (builder_bound_serializer ?builder ?serializer)
+        (not
+          (serializer_available ?serializer)
+        )
+      )
+  )
+  (:action release_serializer_from_builder
+    :parameters (?builder - response_builder ?serializer - serializer)
+    :precondition
+      (and
+        (builder_bound_serializer ?builder ?serializer)
+      )
+    :effect
+      (and
+        (serializer_available ?serializer)
+        (not
+          (builder_bound_serializer ?builder ?serializer)
+        )
+      )
+  )
+  (:action bind_formatter_to_builder
+    :parameters (?builder - response_builder ?formatter - formatter)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (formatter_available ?formatter)
+      )
+    :effect
+      (and
+        (builder_bound_formatter ?builder ?formatter)
+        (not
+          (formatter_available ?formatter)
+        )
+      )
+  )
+  (:action release_formatter_from_builder
+    :parameters (?builder - response_builder ?formatter - formatter)
+    :precondition
+      (and
+        (builder_bound_formatter ?builder ?formatter)
+      )
+    :effect
+      (and
+        (formatter_available ?formatter)
+        (not
+          (builder_bound_formatter ?builder ?formatter)
+        )
+      )
+  )
+  (:action activate_page_slot_a_candidate
+    :parameters (?primary_cursor - primary_cursor ?slot_a - page_slot_a ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_prepared ?primary_cursor)
+        (entity_binds_filter_spec ?primary_cursor ?filter_spec)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (not
+          (page_slot_a_selected ?slot_a)
+        )
+        (not
+          (page_slot_a_alt_selected ?slot_a)
+        )
+      )
+    :effect (page_slot_a_selected ?slot_a)
+  )
+  (:action mark_primary_cursor_candidate_ready
+    :parameters (?primary_cursor - primary_cursor ?slot_a - page_slot_a ?permission_ticket - permission_ticket)
+    :precondition
+      (and
+        (entity_prepared ?primary_cursor)
+        (entity_binds_permission_ticket ?primary_cursor ?permission_ticket)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (page_slot_a_selected ?slot_a)
+        (not
+          (primary_cursor_has_candidates ?primary_cursor)
+        )
+      )
+    :effect
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (primary_cursor_candidate_ready ?primary_cursor)
+      )
+  )
+  (:action attach_item_descriptor_to_primary_cursor
+    :parameters (?primary_cursor - primary_cursor ?slot_a - page_slot_a ?item_descriptor - item_descriptor)
+    :precondition
+      (and
+        (entity_prepared ?primary_cursor)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (item_descriptor_available ?item_descriptor)
+        (not
+          (primary_cursor_has_candidates ?primary_cursor)
+        )
+      )
+    :effect
+      (and
+        (page_slot_a_alt_selected ?slot_a)
+        (primary_cursor_has_candidates ?primary_cursor)
+        (primary_cursor_item_candidate ?primary_cursor ?item_descriptor)
+        (not
+          (item_descriptor_available ?item_descriptor)
+        )
+      )
+  )
+  (:action finalize_primary_cursor_item_assignment
+    :parameters (?primary_cursor - primary_cursor ?slot_a - page_slot_a ?filter_spec - filter_spec ?item_descriptor - item_descriptor)
+    :precondition
+      (and
+        (entity_prepared ?primary_cursor)
+        (entity_binds_filter_spec ?primary_cursor ?filter_spec)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (page_slot_a_alt_selected ?slot_a)
+        (primary_cursor_item_candidate ?primary_cursor ?item_descriptor)
+        (not
+          (primary_cursor_candidate_ready ?primary_cursor)
+        )
+      )
+    :effect
+      (and
+        (page_slot_a_selected ?slot_a)
+        (primary_cursor_candidate_ready ?primary_cursor)
+        (item_descriptor_available ?item_descriptor)
+        (not
+          (primary_cursor_item_candidate ?primary_cursor ?item_descriptor)
+        )
+      )
+  )
+  (:action activate_page_slot_b_candidate
+    :parameters (?secondary_cursor - secondary_cursor ?slot_b - page_slot_b ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_prepared ?secondary_cursor)
+        (entity_binds_filter_spec ?secondary_cursor ?filter_spec)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (not
+          (page_slot_b_selected ?slot_b)
+        )
+        (not
+          (page_slot_b_alt_selected ?slot_b)
+        )
+      )
+    :effect (page_slot_b_selected ?slot_b)
+  )
+  (:action mark_secondary_cursor_candidate_ready
+    :parameters (?secondary_cursor - secondary_cursor ?slot_b - page_slot_b ?permission_ticket - permission_ticket)
+    :precondition
+      (and
+        (entity_prepared ?secondary_cursor)
+        (entity_binds_permission_ticket ?secondary_cursor ?permission_ticket)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_b_selected ?slot_b)
+        (not
+          (secondary_cursor_has_candidates ?secondary_cursor)
+        )
+      )
+    :effect
+      (and
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+      )
+  )
+  (:action attach_item_descriptor_to_secondary_cursor
+    :parameters (?secondary_cursor - secondary_cursor ?slot_b - page_slot_b ?item_descriptor - item_descriptor)
+    :precondition
+      (and
+        (entity_prepared ?secondary_cursor)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (item_descriptor_available ?item_descriptor)
+        (not
+          (secondary_cursor_has_candidates ?secondary_cursor)
+        )
+      )
+    :effect
+      (and
+        (page_slot_b_alt_selected ?slot_b)
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (secondary_cursor_item_candidate ?secondary_cursor ?item_descriptor)
+        (not
+          (item_descriptor_available ?item_descriptor)
+        )
+      )
+  )
+  (:action finalize_secondary_cursor_item_assignment
+    :parameters (?secondary_cursor - secondary_cursor ?slot_b - page_slot_b ?filter_spec - filter_spec ?item_descriptor - item_descriptor)
+    :precondition
+      (and
+        (entity_prepared ?secondary_cursor)
+        (entity_binds_filter_spec ?secondary_cursor ?filter_spec)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_b_alt_selected ?slot_b)
+        (secondary_cursor_item_candidate ?secondary_cursor ?item_descriptor)
+        (not
+          (secondary_cursor_candidate_ready ?secondary_cursor)
+        )
+      )
+    :effect
+      (and
+        (page_slot_b_selected ?slot_b)
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+        (item_descriptor_available ?item_descriptor)
+        (not
+          (secondary_cursor_item_candidate ?secondary_cursor ?item_descriptor)
+        )
+      )
+  )
+  (:action claim_page_buffer
+    :parameters (?primary_cursor - primary_cursor ?secondary_cursor - secondary_cursor ?slot_a - page_slot_a ?slot_b - page_slot_b ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_a_selected ?slot_a)
+        (page_slot_b_selected ?slot_b)
+        (primary_cursor_candidate_ready ?primary_cursor)
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+        (page_buffer_available ?page_buffer)
+      )
+    :effect
+      (and
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_slot_a_association ?page_buffer ?slot_a)
+        (page_buffer_slot_b_association ?page_buffer ?slot_b)
+        (not
+          (page_buffer_available ?page_buffer)
+        )
+      )
+  )
+  (:action claim_page_buffer_with_marker_x
+    :parameters (?primary_cursor - primary_cursor ?secondary_cursor - secondary_cursor ?slot_a - page_slot_a ?slot_b - page_slot_b ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_a_alt_selected ?slot_a)
+        (page_slot_b_selected ?slot_b)
+        (not
+          (primary_cursor_candidate_ready ?primary_cursor)
+        )
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+        (page_buffer_available ?page_buffer)
+      )
+    :effect
+      (and
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_slot_a_association ?page_buffer ?slot_a)
+        (page_buffer_slot_b_association ?page_buffer ?slot_b)
+        (page_buffer_marker_x ?page_buffer)
+        (not
+          (page_buffer_available ?page_buffer)
+        )
+      )
+  )
+  (:action claim_page_buffer_with_marker_y
+    :parameters (?primary_cursor - primary_cursor ?secondary_cursor - secondary_cursor ?slot_a - page_slot_a ?slot_b - page_slot_b ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_a_selected ?slot_a)
+        (page_slot_b_alt_selected ?slot_b)
+        (primary_cursor_candidate_ready ?primary_cursor)
+        (not
+          (secondary_cursor_candidate_ready ?secondary_cursor)
+        )
+        (page_buffer_available ?page_buffer)
+      )
+    :effect
+      (and
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_slot_a_association ?page_buffer ?slot_a)
+        (page_buffer_slot_b_association ?page_buffer ?slot_b)
+        (page_buffer_marker_y ?page_buffer)
+        (not
+          (page_buffer_available ?page_buffer)
+        )
+      )
+  )
+  (:action claim_page_buffer_with_both_markers
+    :parameters (?primary_cursor - primary_cursor ?secondary_cursor - secondary_cursor ?slot_a - page_slot_a ?slot_b - page_slot_b ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (primary_cursor_mapped_slot_a ?primary_cursor ?slot_a)
+        (secondary_cursor_mapped_slot_b ?secondary_cursor ?slot_b)
+        (page_slot_a_alt_selected ?slot_a)
+        (page_slot_b_alt_selected ?slot_b)
+        (not
+          (primary_cursor_candidate_ready ?primary_cursor)
+        )
+        (not
+          (secondary_cursor_candidate_ready ?secondary_cursor)
+        )
+        (page_buffer_available ?page_buffer)
+      )
+    :effect
+      (and
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_slot_a_association ?page_buffer ?slot_a)
+        (page_buffer_slot_b_association ?page_buffer ?slot_b)
+        (page_buffer_marker_x ?page_buffer)
+        (page_buffer_marker_y ?page_buffer)
+        (not
+          (page_buffer_available ?page_buffer)
+        )
+      )
+  )
+  (:action finalize_page_buffer_population
+    :parameters (?page_buffer - page_buffer ?primary_cursor - primary_cursor ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (page_buffer_claimed ?page_buffer)
+        (primary_cursor_has_candidates ?primary_cursor)
+        (entity_binds_filter_spec ?primary_cursor ?filter_spec)
+        (not
+          (page_buffer_populated ?page_buffer)
+        )
+      )
+    :effect (page_buffer_populated ?page_buffer)
+  )
+  (:action claim_and_bind_item_record_to_buffer
+    :parameters (?builder - response_builder ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (builder_targets_page_buffer ?builder ?page_buffer)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_available ?item_record)
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_populated ?page_buffer)
+        (not
+          (item_record_claimed ?item_record)
+        )
+      )
+    :effect
+      (and
+        (item_record_claimed ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (not
+          (item_record_available ?item_record)
+        )
+      )
+  )
+  (:action enter_builder_pre_finalization
+    :parameters (?builder - response_builder ?item_record - item_record ?page_buffer - page_buffer ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_claimed ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (entity_binds_filter_spec ?builder ?filter_spec)
+        (not
+          (page_buffer_marker_x ?page_buffer)
+        )
+        (not
+          (builder_pre_finalization ?builder)
+        )
+      )
+    :effect (builder_pre_finalization ?builder)
+  )
+  (:action bind_aggregation_key_to_builder
+    :parameters (?builder - response_builder ?aggregation_key - aggregation_key)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (aggregation_key_available ?aggregation_key)
+        (not
+          (builder_aggregation_reserved ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_aggregation_reserved ?builder)
+        (builder_associated_aggregation_key ?builder ?aggregation_key)
+        (not
+          (aggregation_key_available ?aggregation_key)
+        )
+      )
+  )
+  (:action record_aggregation_binding_for_builder
+    :parameters (?builder - response_builder ?item_record - item_record ?page_buffer - page_buffer ?filter_spec - filter_spec ?aggregation_key - aggregation_key)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_claimed ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (entity_binds_filter_spec ?builder ?filter_spec)
+        (page_buffer_marker_x ?page_buffer)
+        (builder_aggregation_reserved ?builder)
+        (builder_associated_aggregation_key ?builder ?aggregation_key)
+        (not
+          (builder_pre_finalization ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_pre_finalization ?builder)
+        (builder_recorded_aggregation ?builder)
+      )
+  )
+  (:action apply_serializer_and_mark_enrichment_variant_a
+    :parameters (?builder - response_builder ?serializer - serializer ?permission_ticket - permission_ticket ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_pre_finalization ?builder)
+        (builder_bound_serializer ?builder ?serializer)
+        (entity_binds_permission_ticket ?builder ?permission_ticket)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (not
+          (page_buffer_marker_y ?page_buffer)
+        )
+        (not
+          (builder_enrichment_completed ?builder)
+        )
+      )
+    :effect (builder_enrichment_completed ?builder)
+  )
+  (:action apply_serializer_and_mark_enrichment_variant_b
+    :parameters (?builder - response_builder ?serializer - serializer ?permission_ticket - permission_ticket ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_pre_finalization ?builder)
+        (builder_bound_serializer ?builder ?serializer)
+        (entity_binds_permission_ticket ?builder ?permission_ticket)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (page_buffer_marker_y ?page_buffer)
+        (not
+          (builder_enrichment_completed ?builder)
+        )
+      )
+    :effect (builder_enrichment_completed ?builder)
+  )
+  (:action prepare_builder_for_finalization
+    :parameters (?builder - response_builder ?formatter - formatter ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_enrichment_completed ?builder)
+        (builder_bound_formatter ?builder ?formatter)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (not
+          (page_buffer_marker_x ?page_buffer)
+        )
+        (not
+          (page_buffer_marker_y ?page_buffer)
+        )
+        (not
+          (builder_ready_for_finalization ?builder)
+        )
+      )
+    :effect (builder_ready_for_finalization ?builder)
+  )
+  (:action prepare_builder_with_secondary_metadata_variant_a
+    :parameters (?builder - response_builder ?formatter - formatter ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_enrichment_completed ?builder)
+        (builder_bound_formatter ?builder ?formatter)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (page_buffer_marker_x ?page_buffer)
+        (not
+          (page_buffer_marker_y ?page_buffer)
+        )
+        (not
+          (builder_ready_for_finalization ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_secondary_finalization_metadata_recorded ?builder)
+      )
+  )
+  (:action prepare_builder_with_secondary_metadata_variant_b
+    :parameters (?builder - response_builder ?formatter - formatter ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_enrichment_completed ?builder)
+        (builder_bound_formatter ?builder ?formatter)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (not
+          (page_buffer_marker_x ?page_buffer)
+        )
+        (page_buffer_marker_y ?page_buffer)
+        (not
+          (builder_ready_for_finalization ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_secondary_finalization_metadata_recorded ?builder)
+      )
+  )
+  (:action prepare_builder_with_secondary_metadata_variant_c
+    :parameters (?builder - response_builder ?formatter - formatter ?item_record - item_record ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (builder_enrichment_completed ?builder)
+        (builder_bound_formatter ?builder ?formatter)
+        (builder_item_record_candidate ?builder ?item_record)
+        (item_record_bound_page_buffer ?item_record ?page_buffer)
+        (page_buffer_marker_x ?page_buffer)
+        (page_buffer_marker_y ?page_buffer)
+        (not
+          (builder_ready_for_finalization ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_secondary_finalization_metadata_recorded ?builder)
+      )
+  )
+  (:action finalize_response_builder_internally
+    :parameters (?builder - response_builder)
+    :precondition
+      (and
+        (builder_ready_for_finalization ?builder)
+        (not
+          (builder_secondary_finalization_metadata_recorded ?builder)
+        )
+        (not
+          (builder_emitted ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_emitted ?builder)
+        (ready_for_composition ?builder)
+      )
+  )
+  (:action bind_output_modifier_to_builder
+    :parameters (?builder - response_builder ?output_modifier - output_modifier)
+    :precondition
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_secondary_finalization_metadata_recorded ?builder)
+        (output_modifier_available ?output_modifier)
+      )
+    :effect
+      (and
+        (builder_bound_output_modifier ?builder ?output_modifier)
+        (not
+          (output_modifier_available ?output_modifier)
+        )
+      )
+  )
+  (:action apply_enrichment_and_finalize_builder
+    :parameters (?builder - response_builder ?primary_cursor - primary_cursor ?secondary_cursor - secondary_cursor ?filter_spec - filter_spec ?output_modifier - output_modifier)
+    :precondition
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_secondary_finalization_metadata_recorded ?builder)
+        (builder_bound_output_modifier ?builder ?output_modifier)
+        (builder_bound_primary_cursor ?builder ?primary_cursor)
+        (builder_bound_secondary_cursor ?builder ?secondary_cursor)
+        (primary_cursor_candidate_ready ?primary_cursor)
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+        (entity_binds_filter_spec ?builder ?filter_spec)
+        (not
+          (builder_finalized ?builder)
+        )
+      )
+    :effect (builder_finalized ?builder)
+  )
+  (:action finalize_response_builder_post_enrichment
+    :parameters (?builder - response_builder)
+    :precondition
+      (and
+        (builder_ready_for_finalization ?builder)
+        (builder_finalized ?builder)
+        (not
+          (builder_emitted ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_emitted ?builder)
+        (ready_for_composition ?builder)
+      )
+  )
+  (:action claim_and_bind_metadata_tag
+    :parameters (?builder - response_builder ?metadata_tag - metadata_tag ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (entity_prepared ?builder)
+        (entity_binds_filter_spec ?builder ?filter_spec)
+        (metadata_tag_available ?metadata_tag)
+        (builder_has_metadata_slot ?builder ?metadata_tag)
+        (not
+          (builder_metadata_binding_ready ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_metadata_binding_ready ?builder)
+        (not
+          (metadata_tag_available ?metadata_tag)
+        )
+      )
+  )
+  (:action mark_builder_metadata_validation_ready
+    :parameters (?builder - response_builder ?permission_ticket - permission_ticket)
+    :precondition
+      (and
+        (builder_metadata_binding_ready ?builder)
+        (entity_binds_permission_ticket ?builder ?permission_ticket)
+        (not
+          (builder_metadata_validation_ready ?builder)
+        )
+      )
+    :effect (builder_metadata_validation_ready ?builder)
+  )
+  (:action complete_metadata_validation_for_builder
+    :parameters (?builder - response_builder ?formatter - formatter)
+    :precondition
+      (and
+        (builder_metadata_validation_ready ?builder)
+        (builder_bound_formatter ?builder ?formatter)
+        (not
+          (builder_metadata_validated ?builder)
+        )
+      )
+    :effect (builder_metadata_validated ?builder)
+  )
+  (:action finalize_response_builder_after_metadata_validation
+    :parameters (?builder - response_builder)
+    :precondition
+      (and
+        (builder_metadata_validated ?builder)
+        (not
+          (builder_emitted ?builder)
+        )
+      )
+    :effect
+      (and
+        (builder_emitted ?builder)
+        (ready_for_composition ?builder)
+      )
+  )
+  (:action mark_primary_cursor_ready_for_composition
+    :parameters (?primary_cursor - primary_cursor ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (primary_cursor_has_candidates ?primary_cursor)
+        (primary_cursor_candidate_ready ?primary_cursor)
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_populated ?page_buffer)
+        (not
+          (ready_for_composition ?primary_cursor)
+        )
+      )
+    :effect (ready_for_composition ?primary_cursor)
+  )
+  (:action mark_secondary_cursor_ready_for_composition
+    :parameters (?secondary_cursor - secondary_cursor ?page_buffer - page_buffer)
+    :precondition
+      (and
+        (secondary_cursor_has_candidates ?secondary_cursor)
+        (secondary_cursor_candidate_ready ?secondary_cursor)
+        (page_buffer_claimed ?page_buffer)
+        (page_buffer_populated ?page_buffer)
+        (not
+          (ready_for_composition ?secondary_cursor)
+        )
+      )
+    :effect (ready_for_composition ?secondary_cursor)
+  )
+  (:action emit_paginated_result_for_query
+    :parameters (?query - query_context ?client_ctx - client_context ?filter_spec - filter_spec)
+    :precondition
+      (and
+        (ready_for_composition ?query)
+        (entity_binds_filter_spec ?query ?filter_spec)
+        (client_context_available ?client_ctx)
+        (not
+          (entity_emitted ?query)
+        )
+      )
+    :effect
+      (and
+        (entity_emitted ?query)
+        (entity_associated_client_context ?query ?client_ctx)
+        (not
+          (client_context_available ?client_ctx)
+        )
+      )
+  )
+  (:action finalize_cursor_emission_and_release_token
+    :parameters (?primary_cursor - primary_cursor ?cursor_token - cursor_token ?client_ctx - client_context)
+    :precondition
+      (and
+        (entity_emitted ?primary_cursor)
+        (entity_binds_cursor_token ?primary_cursor ?cursor_token)
+        (entity_associated_client_context ?primary_cursor ?client_ctx)
+        (not
+          (entity_committed ?primary_cursor)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?primary_cursor)
+        (cursor_token_available ?cursor_token)
+        (client_context_available ?client_ctx)
+      )
+  )
+  (:action finalize_secondary_cursor_emission_and_release_token
+    :parameters (?secondary_cursor - secondary_cursor ?cursor_token - cursor_token ?client_ctx - client_context)
+    :precondition
+      (and
+        (entity_emitted ?secondary_cursor)
+        (entity_binds_cursor_token ?secondary_cursor ?cursor_token)
+        (entity_associated_client_context ?secondary_cursor ?client_ctx)
+        (not
+          (entity_committed ?secondary_cursor)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?secondary_cursor)
+        (cursor_token_available ?cursor_token)
+        (client_context_available ?client_ctx)
+      )
+  )
+  (:action finalize_builder_emission_and_release_token
+    :parameters (?builder - response_builder ?cursor_token - cursor_token ?client_ctx - client_context)
+    :precondition
+      (and
+        (entity_emitted ?builder)
+        (entity_binds_cursor_token ?builder ?cursor_token)
+        (entity_associated_client_context ?builder ?client_ctx)
+        (not
+          (entity_committed ?builder)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?builder)
+        (cursor_token_available ?cursor_token)
+        (client_context_available ?client_ctx)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem generate_paginated_result_problem)
+  (:domain paginated_result_generation_domain)
+  (:objects primary_cursor_1 - primary_cursor secondary_cursor_1 - secondary_cursor response_builder_1 - response_builder response_builder_2 - response_builder cursor_token_1 - cursor_token cursor_token_2 - cursor_token cursor_token_3 - cursor_token filter_spec_1 - filter_spec permission_ticket_1 - permission_ticket item_descriptor_1 - item_descriptor page_slot_a_1 - page_slot_a page_slot_b_1 - page_slot_b page_buffer_1 - page_buffer item_record_1 - item_record item_record_2 - item_record aggregation_key_1 - aggregation_key aggregation_key_2 - aggregation_key output_modifier_1 - output_modifier output_modifier_2 - output_modifier client_context_1 - client_context serializer_1 - serializer metadata_tag_1 - metadata_tag metadata_tag_2 - metadata_tag formatter_1 - formatter)
+  (:init
+    (cursor_token_available cursor_token_1)
+    (cursor_token_available cursor_token_2)
+    (cursor_token_available cursor_token_3)
+    (filter_spec_available filter_spec_1)
+    (permission_ticket_available permission_ticket_1)
+    (item_descriptor_available item_descriptor_1)
+    (primary_cursor_mapped_slot_a primary_cursor_1 page_slot_a_1)
+    (secondary_cursor_mapped_slot_b secondary_cursor_1 page_slot_b_1)
+    (page_buffer_available page_buffer_1)
+    (item_record_available item_record_1)
+    (item_record_available item_record_2)
+    (builder_bound_primary_cursor response_builder_1 primary_cursor_1)
+    (builder_bound_primary_cursor response_builder_2 primary_cursor_1)
+    (builder_bound_secondary_cursor response_builder_1 secondary_cursor_1)
+    (builder_bound_secondary_cursor response_builder_2 secondary_cursor_1)
+    (builder_targets_page_buffer response_builder_1 page_buffer_1)
+    (builder_targets_page_buffer response_builder_2 page_buffer_1)
+    (builder_item_record_candidate response_builder_1 item_record_1)
+    (builder_item_record_candidate response_builder_2 item_record_2)
+    (aggregation_key_available aggregation_key_1)
+    (aggregation_key_available aggregation_key_2)
+    (output_modifier_available output_modifier_1)
+    (output_modifier_available output_modifier_2)
+    (client_context_available client_context_1)
+    (serializer_available serializer_1)
+    (metadata_tag_available metadata_tag_1)
+    (builder_has_metadata_slot response_builder_1 metadata_tag_1)
+    (builder_has_metadata_slot response_builder_2 metadata_tag_2)
+    (formatter_available formatter_1)
+  )
+  (:goal
+    (and
+      (entity_committed primary_cursor_1)
+      (entity_committed secondary_cursor_1)
+      (entity_committed response_builder_1)
+      (entity_committed response_builder_2)
+    )
+  )
+)

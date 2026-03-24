@@ -1,0 +1,1009 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain multi_rail_payment_routing)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types service_endpoint - object channel_endpoint - object participant_endpoint - object domain_entity - object payment_instruction - domain_entity payment_rail - service_endpoint processing_worker - service_endpoint authorization_gateway - service_endpoint compliance_document - service_endpoint confirmation_provider - service_endpoint settlement_ticket - service_endpoint liquidity_source - service_endpoint counterparty_confirmation - service_endpoint fee_profile - channel_endpoint settlement_credential - channel_endpoint regulatory_approval_token - channel_endpoint origin_channel_option - participant_endpoint beneficiary_channel_option - participant_endpoint settlement_message - participant_endpoint settlement_leg - payment_instruction execution_context - payment_instruction originating_ledger_entry - settlement_leg beneficiary_ledger_entry - settlement_leg routing_engine - execution_context)
+  (:predicates
+    (instruction_ingested ?instruction - payment_instruction)
+    (entity_released ?instruction - payment_instruction)
+    (rail_selected ?instruction - payment_instruction)
+    (settlement_completed ?instruction - payment_instruction)
+    (entity_acknowledged ?subject - payment_instruction)
+    (entity_settlement_requested ?instruction - payment_instruction)
+    (rail_available ?payment_rail - payment_rail)
+    (entity_assigned_rail ?instruction - payment_instruction ?payment_rail - payment_rail)
+    (worker_available ?worker - processing_worker)
+    (entity_assigned_worker ?instruction - payment_instruction ?worker - processing_worker)
+    (gateway_available ?authorization_gateway - authorization_gateway)
+    (entity_assigned_gateway ?instruction - payment_instruction ?authorization_gateway - authorization_gateway)
+    (fee_profile_available ?fee_profile - fee_profile)
+    (origin_fee_profile_assigned ?origin_leg - originating_ledger_entry ?fee_profile - fee_profile)
+    (beneficiary_fee_profile_assigned ?beneficiary_leg - beneficiary_ledger_entry ?fee_profile - fee_profile)
+    (origin_channel_option_applicable ?origin_leg - originating_ledger_entry ?origin_channel_option - origin_channel_option)
+    (origin_channel_option_selected ?origin_channel_option - origin_channel_option)
+    (origin_channel_option_reserved ?origin_channel_option - origin_channel_option)
+    (origin_leg_ready ?origin_leg - originating_ledger_entry)
+    (beneficiary_channel_option_applicable ?beneficiary_leg - beneficiary_ledger_entry ?beneficiary_channel_option - beneficiary_channel_option)
+    (beneficiary_channel_option_selected ?beneficiary_channel_option - beneficiary_channel_option)
+    (beneficiary_channel_option_reserved ?beneficiary_channel_option - beneficiary_channel_option)
+    (beneficiary_leg_ready ?beneficiary_leg - beneficiary_ledger_entry)
+    (settlement_message_draft ?settlement_message - settlement_message)
+    (settlement_message_prepared ?settlement_message - settlement_message)
+    (message_attached_origin_channel ?settlement_message - settlement_message ?origin_channel_option - origin_channel_option)
+    (message_attached_beneficiary_channel ?settlement_message - settlement_message ?beneficiary_channel_option - beneficiary_channel_option)
+    (message_origin_priority_set ?settlement_message - settlement_message)
+    (message_beneficiary_priority_set ?settlement_message - settlement_message)
+    (message_ready_for_credential_binding ?settlement_message - settlement_message)
+    (engine_linked_origin_leg ?routing_engine - routing_engine ?origin_leg - originating_ledger_entry)
+    (engine_linked_beneficiary_leg ?routing_engine - routing_engine ?beneficiary_leg - beneficiary_ledger_entry)
+    (engine_bound_settlement_message ?routing_engine - routing_engine ?settlement_message - settlement_message)
+    (settlement_credential_available ?settlement_credential - settlement_credential)
+    (engine_has_credential ?routing_engine - routing_engine ?settlement_credential - settlement_credential)
+    (settlement_credential_consumed ?settlement_credential - settlement_credential)
+    (settlement_credential_attached_to_message ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    (engine_prepared_for_execution ?routing_engine - routing_engine)
+    (engine_liquidity_verified ?routing_engine - routing_engine)
+    (engine_execution_ready ?routing_engine - routing_engine)
+    (engine_compliance_flag ?routing_engine - routing_engine)
+    (engine_compliance_processing ?routing_engine - routing_engine)
+    (engine_confirmations_attached ?routing_engine - routing_engine)
+    (engine_final_checks_completed ?routing_engine - routing_engine)
+    (regulatory_token_available ?regulatory_approval_token - regulatory_approval_token)
+    (engine_has_regulatory_token ?routing_engine - routing_engine ?regulatory_approval_token - regulatory_approval_token)
+    (engine_regulatory_check_flag ?routing_engine - routing_engine)
+    (engine_regulatory_check_passed ?routing_engine - routing_engine)
+    (engine_regulatory_confirmation_complete ?routing_engine - routing_engine)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (engine_associated_compliance_document ?routing_engine - routing_engine ?compliance_document - compliance_document)
+    (confirmation_provider_available ?confirmation_provider - confirmation_provider)
+    (engine_has_confirmation_provider ?routing_engine - routing_engine ?confirmation_provider - confirmation_provider)
+    (liquidity_source_available ?liquidity_source - liquidity_source)
+    (engine_has_liquidity_source ?routing_engine - routing_engine ?liquidity_source - liquidity_source)
+    (counterparty_confirmation_available ?counterparty_confirmation - counterparty_confirmation)
+    (engine_has_counterparty_confirmation ?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation)
+    (settlement_ticket_available ?settlement_ticket - settlement_ticket)
+    (entity_bound_settlement_ticket ?instruction - payment_instruction ?settlement_ticket - settlement_ticket)
+    (origin_leg_resources_reserved ?origin_leg - originating_ledger_entry)
+    (beneficiary_leg_resources_reserved ?beneficiary_leg - beneficiary_ledger_entry)
+    (engine_acknowledgement_recorded ?routing_engine - routing_engine)
+  )
+  (:action ingest_payment_instruction
+    :parameters (?instruction - payment_instruction)
+    :precondition
+      (and
+        (not
+          (instruction_ingested ?instruction)
+        )
+        (not
+          (settlement_completed ?instruction)
+        )
+      )
+    :effect (instruction_ingested ?instruction)
+  )
+  (:action select_and_reserve_payment_rail
+    :parameters (?instruction - payment_instruction ?payment_rail - payment_rail)
+    :precondition
+      (and
+        (instruction_ingested ?instruction)
+        (not
+          (rail_selected ?instruction)
+        )
+        (rail_available ?payment_rail)
+      )
+    :effect
+      (and
+        (rail_selected ?instruction)
+        (entity_assigned_rail ?instruction ?payment_rail)
+        (not
+          (rail_available ?payment_rail)
+        )
+      )
+  )
+  (:action assign_processing_worker
+    :parameters (?instruction - payment_instruction ?worker - processing_worker)
+    :precondition
+      (and
+        (instruction_ingested ?instruction)
+        (rail_selected ?instruction)
+        (worker_available ?worker)
+      )
+    :effect
+      (and
+        (entity_assigned_worker ?instruction ?worker)
+        (not
+          (worker_available ?worker)
+        )
+      )
+  )
+  (:action complete_instruction_validation
+    :parameters (?instruction - payment_instruction ?worker - processing_worker)
+    :precondition
+      (and
+        (instruction_ingested ?instruction)
+        (rail_selected ?instruction)
+        (entity_assigned_worker ?instruction ?worker)
+        (not
+          (entity_released ?instruction)
+        )
+      )
+    :effect (entity_released ?instruction)
+  )
+  (:action release_processing_worker
+    :parameters (?instruction - payment_instruction ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_assigned_worker ?instruction ?worker)
+      )
+    :effect
+      (and
+        (worker_available ?worker)
+        (not
+          (entity_assigned_worker ?instruction ?worker)
+        )
+      )
+  )
+  (:action bind_authorization_gateway
+    :parameters (?instruction - payment_instruction ?authorization_gateway - authorization_gateway)
+    :precondition
+      (and
+        (entity_released ?instruction)
+        (gateway_available ?authorization_gateway)
+      )
+    :effect
+      (and
+        (entity_assigned_gateway ?instruction ?authorization_gateway)
+        (not
+          (gateway_available ?authorization_gateway)
+        )
+      )
+  )
+  (:action release_authorization_gateway
+    :parameters (?instruction - payment_instruction ?authorization_gateway - authorization_gateway)
+    :precondition
+      (and
+        (entity_assigned_gateway ?instruction ?authorization_gateway)
+      )
+    :effect
+      (and
+        (gateway_available ?authorization_gateway)
+        (not
+          (entity_assigned_gateway ?instruction ?authorization_gateway)
+        )
+      )
+  )
+  (:action bind_liquidity_source_to_engine
+    :parameters (?routing_engine - routing_engine ?liquidity_source - liquidity_source)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (liquidity_source_available ?liquidity_source)
+      )
+    :effect
+      (and
+        (engine_has_liquidity_source ?routing_engine ?liquidity_source)
+        (not
+          (liquidity_source_available ?liquidity_source)
+        )
+      )
+  )
+  (:action release_liquidity_source_from_engine
+    :parameters (?routing_engine - routing_engine ?liquidity_source - liquidity_source)
+    :precondition
+      (and
+        (engine_has_liquidity_source ?routing_engine ?liquidity_source)
+      )
+    :effect
+      (and
+        (liquidity_source_available ?liquidity_source)
+        (not
+          (engine_has_liquidity_source ?routing_engine ?liquidity_source)
+        )
+      )
+  )
+  (:action bind_counterparty_confirmation_to_engine
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (counterparty_confirmation_available ?counterparty_confirmation)
+      )
+    :effect
+      (and
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (not
+          (counterparty_confirmation_available ?counterparty_confirmation)
+        )
+      )
+  )
+  (:action release_counterparty_confirmation_from_engine
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation)
+    :precondition
+      (and
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+      )
+    :effect
+      (and
+        (counterparty_confirmation_available ?counterparty_confirmation)
+        (not
+          (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        )
+      )
+  )
+  (:action discover_origin_channel_option
+    :parameters (?origin_leg - originating_ledger_entry ?origin_channel_option - origin_channel_option ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_released ?origin_leg)
+        (entity_assigned_worker ?origin_leg ?worker)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (not
+          (origin_channel_option_selected ?origin_channel_option)
+        )
+        (not
+          (origin_channel_option_reserved ?origin_channel_option)
+        )
+      )
+    :effect (origin_channel_option_selected ?origin_channel_option)
+  )
+  (:action reserve_origin_leg_with_gateway
+    :parameters (?origin_leg - originating_ledger_entry ?origin_channel_option - origin_channel_option ?authorization_gateway - authorization_gateway)
+    :precondition
+      (and
+        (entity_released ?origin_leg)
+        (entity_assigned_gateway ?origin_leg ?authorization_gateway)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (origin_channel_option_selected ?origin_channel_option)
+        (not
+          (origin_leg_resources_reserved ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+      )
+  )
+  (:action reserve_origin_channel_with_fee_profile
+    :parameters (?origin_leg - originating_ledger_entry ?origin_channel_option - origin_channel_option ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_released ?origin_leg)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (fee_profile_available ?fee_profile)
+        (not
+          (origin_leg_resources_reserved ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_option_reserved ?origin_channel_option)
+        (origin_leg_resources_reserved ?origin_leg)
+        (origin_fee_profile_assigned ?origin_leg ?fee_profile)
+        (not
+          (fee_profile_available ?fee_profile)
+        )
+      )
+  )
+  (:action confirm_origin_channel_reservation
+    :parameters (?origin_leg - originating_ledger_entry ?origin_channel_option - origin_channel_option ?worker - processing_worker ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_released ?origin_leg)
+        (entity_assigned_worker ?origin_leg ?worker)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (origin_channel_option_reserved ?origin_channel_option)
+        (origin_fee_profile_assigned ?origin_leg ?fee_profile)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_channel_option_selected ?origin_channel_option)
+        (origin_leg_ready ?origin_leg)
+        (fee_profile_available ?fee_profile)
+        (not
+          (origin_fee_profile_assigned ?origin_leg ?fee_profile)
+        )
+      )
+  )
+  (:action discover_beneficiary_channel_option
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?beneficiary_channel_option - beneficiary_channel_option ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_released ?beneficiary_leg)
+        (entity_assigned_worker ?beneficiary_leg ?worker)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (not
+          (beneficiary_channel_option_selected ?beneficiary_channel_option)
+        )
+        (not
+          (beneficiary_channel_option_reserved ?beneficiary_channel_option)
+        )
+      )
+    :effect (beneficiary_channel_option_selected ?beneficiary_channel_option)
+  )
+  (:action reserve_beneficiary_leg_with_gateway
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?beneficiary_channel_option - beneficiary_channel_option ?authorization_gateway - authorization_gateway)
+    :precondition
+      (and
+        (entity_released ?beneficiary_leg)
+        (entity_assigned_gateway ?beneficiary_leg ?authorization_gateway)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (beneficiary_channel_option_selected ?beneficiary_channel_option)
+        (not
+          (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+      )
+  )
+  (:action reserve_beneficiary_channel_with_fee_profile
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?beneficiary_channel_option - beneficiary_channel_option ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_released ?beneficiary_leg)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (fee_profile_available ?fee_profile)
+        (not
+          (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_channel_option_reserved ?beneficiary_channel_option)
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (beneficiary_fee_profile_assigned ?beneficiary_leg ?fee_profile)
+        (not
+          (fee_profile_available ?fee_profile)
+        )
+      )
+  )
+  (:action confirm_beneficiary_channel_reservation
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?beneficiary_channel_option - beneficiary_channel_option ?worker - processing_worker ?fee_profile - fee_profile)
+    :precondition
+      (and
+        (entity_released ?beneficiary_leg)
+        (entity_assigned_worker ?beneficiary_leg ?worker)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (beneficiary_channel_option_reserved ?beneficiary_channel_option)
+        (beneficiary_fee_profile_assigned ?beneficiary_leg ?fee_profile)
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (beneficiary_channel_option_selected ?beneficiary_channel_option)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (fee_profile_available ?fee_profile)
+        (not
+          (beneficiary_fee_profile_assigned ?beneficiary_leg ?fee_profile)
+        )
+      )
+  )
+  (:action assemble_settlement_message
+    :parameters (?origin_leg - originating_ledger_entry ?beneficiary_leg - beneficiary_ledger_entry ?origin_channel_option - origin_channel_option ?beneficiary_channel_option - beneficiary_channel_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (origin_channel_option_selected ?origin_channel_option)
+        (beneficiary_channel_option_selected ?beneficiary_channel_option)
+        (origin_leg_ready ?origin_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (settlement_message_draft ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_prepared ?settlement_message)
+        (message_attached_origin_channel ?settlement_message ?origin_channel_option)
+        (message_attached_beneficiary_channel ?settlement_message ?beneficiary_channel_option)
+        (not
+          (settlement_message_draft ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_origin_reserved
+    :parameters (?origin_leg - originating_ledger_entry ?beneficiary_leg - beneficiary_ledger_entry ?origin_channel_option - origin_channel_option ?beneficiary_channel_option - beneficiary_channel_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (origin_channel_option_reserved ?origin_channel_option)
+        (beneficiary_channel_option_selected ?beneficiary_channel_option)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (settlement_message_draft ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_prepared ?settlement_message)
+        (message_attached_origin_channel ?settlement_message ?origin_channel_option)
+        (message_attached_beneficiary_channel ?settlement_message ?beneficiary_channel_option)
+        (message_origin_priority_set ?settlement_message)
+        (not
+          (settlement_message_draft ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_beneficiary_reserved
+    :parameters (?origin_leg - originating_ledger_entry ?beneficiary_leg - beneficiary_ledger_entry ?origin_channel_option - origin_channel_option ?beneficiary_channel_option - beneficiary_channel_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (origin_channel_option_selected ?origin_channel_option)
+        (beneficiary_channel_option_reserved ?beneficiary_channel_option)
+        (origin_leg_ready ?origin_leg)
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+        (settlement_message_draft ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_prepared ?settlement_message)
+        (message_attached_origin_channel ?settlement_message ?origin_channel_option)
+        (message_attached_beneficiary_channel ?settlement_message ?beneficiary_channel_option)
+        (message_beneficiary_priority_set ?settlement_message)
+        (not
+          (settlement_message_draft ?settlement_message)
+        )
+      )
+  )
+  (:action assemble_settlement_message_with_both_reserved
+    :parameters (?origin_leg - originating_ledger_entry ?beneficiary_leg - beneficiary_ledger_entry ?origin_channel_option - origin_channel_option ?beneficiary_channel_option - beneficiary_channel_option ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (origin_channel_option_applicable ?origin_leg ?origin_channel_option)
+        (beneficiary_channel_option_applicable ?beneficiary_leg ?beneficiary_channel_option)
+        (origin_channel_option_reserved ?origin_channel_option)
+        (beneficiary_channel_option_reserved ?beneficiary_channel_option)
+        (not
+          (origin_leg_ready ?origin_leg)
+        )
+        (not
+          (beneficiary_leg_ready ?beneficiary_leg)
+        )
+        (settlement_message_draft ?settlement_message)
+      )
+    :effect
+      (and
+        (settlement_message_prepared ?settlement_message)
+        (message_attached_origin_channel ?settlement_message ?origin_channel_option)
+        (message_attached_beneficiary_channel ?settlement_message ?beneficiary_channel_option)
+        (message_origin_priority_set ?settlement_message)
+        (message_beneficiary_priority_set ?settlement_message)
+        (not
+          (settlement_message_draft ?settlement_message)
+        )
+      )
+  )
+  (:action mark_message_ready_for_credential_binding
+    :parameters (?settlement_message - settlement_message ?origin_leg - originating_ledger_entry ?worker - processing_worker)
+    :precondition
+      (and
+        (settlement_message_prepared ?settlement_message)
+        (origin_leg_resources_reserved ?origin_leg)
+        (entity_assigned_worker ?origin_leg ?worker)
+        (not
+          (message_ready_for_credential_binding ?settlement_message)
+        )
+      )
+    :effect (message_ready_for_credential_binding ?settlement_message)
+  )
+  (:action bind_credential_to_engine_and_message
+    :parameters (?routing_engine - routing_engine ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (engine_bound_settlement_message ?routing_engine ?settlement_message)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_available ?settlement_credential)
+        (settlement_message_prepared ?settlement_message)
+        (message_ready_for_credential_binding ?settlement_message)
+        (not
+          (settlement_credential_consumed ?settlement_credential)
+        )
+      )
+    :effect
+      (and
+        (settlement_credential_consumed ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (not
+          (settlement_credential_available ?settlement_credential)
+        )
+      )
+  )
+  (:action prepare_engine_for_execution_with_credential
+    :parameters (?routing_engine - routing_engine ?settlement_credential - settlement_credential ?settlement_message - settlement_message ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_consumed ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (entity_assigned_worker ?routing_engine ?worker)
+        (not
+          (message_origin_priority_set ?settlement_message)
+        )
+        (not
+          (engine_prepared_for_execution ?routing_engine)
+        )
+      )
+    :effect (engine_prepared_for_execution ?routing_engine)
+  )
+  (:action attach_compliance_document_to_engine
+    :parameters (?routing_engine - routing_engine ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (compliance_document_available ?compliance_document)
+        (not
+          (engine_compliance_flag ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_compliance_flag ?routing_engine)
+        (engine_associated_compliance_document ?routing_engine ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action bind_credential_and_compliance_to_engine
+    :parameters (?routing_engine - routing_engine ?settlement_credential - settlement_credential ?settlement_message - settlement_message ?worker - processing_worker ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_consumed ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (entity_assigned_worker ?routing_engine ?worker)
+        (message_origin_priority_set ?settlement_message)
+        (engine_compliance_flag ?routing_engine)
+        (engine_associated_compliance_document ?routing_engine ?compliance_document)
+        (not
+          (engine_prepared_for_execution ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_prepared_for_execution ?routing_engine)
+        (engine_compliance_processing ?routing_engine)
+      )
+  )
+  (:action perform_engine_liquidity_and_compliance_checks
+    :parameters (?routing_engine - routing_engine ?liquidity_source - liquidity_source ?authorization_gateway - authorization_gateway ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_prepared_for_execution ?routing_engine)
+        (engine_has_liquidity_source ?routing_engine ?liquidity_source)
+        (entity_assigned_gateway ?routing_engine ?authorization_gateway)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (not
+          (message_beneficiary_priority_set ?settlement_message)
+        )
+        (not
+          (engine_liquidity_verified ?routing_engine)
+        )
+      )
+    :effect (engine_liquidity_verified ?routing_engine)
+  )
+  (:action perform_engine_liquidity_check_variant
+    :parameters (?routing_engine - routing_engine ?liquidity_source - liquidity_source ?authorization_gateway - authorization_gateway ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_prepared_for_execution ?routing_engine)
+        (engine_has_liquidity_source ?routing_engine ?liquidity_source)
+        (entity_assigned_gateway ?routing_engine ?authorization_gateway)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (message_beneficiary_priority_set ?settlement_message)
+        (not
+          (engine_liquidity_verified ?routing_engine)
+        )
+      )
+    :effect (engine_liquidity_verified ?routing_engine)
+  )
+  (:action finalize_engine_execution_readiness
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_liquidity_verified ?routing_engine)
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (not
+          (message_origin_priority_set ?settlement_message)
+        )
+        (not
+          (message_beneficiary_priority_set ?settlement_message)
+        )
+        (not
+          (engine_execution_ready ?routing_engine)
+        )
+      )
+    :effect (engine_execution_ready ?routing_engine)
+  )
+  (:action finalize_engine_execution_readiness_with_origin_priority
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_liquidity_verified ?routing_engine)
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (message_origin_priority_set ?settlement_message)
+        (not
+          (message_beneficiary_priority_set ?settlement_message)
+        )
+        (not
+          (engine_execution_ready ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_confirmations_attached ?routing_engine)
+      )
+  )
+  (:action finalize_engine_execution_readiness_with_beneficiary_priority
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_liquidity_verified ?routing_engine)
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (not
+          (message_origin_priority_set ?settlement_message)
+        )
+        (message_beneficiary_priority_set ?settlement_message)
+        (not
+          (engine_execution_ready ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_confirmations_attached ?routing_engine)
+      )
+  )
+  (:action finalize_engine_execution_readiness_with_both_priorities
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation ?settlement_credential - settlement_credential ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (engine_liquidity_verified ?routing_engine)
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (engine_has_credential ?routing_engine ?settlement_credential)
+        (settlement_credential_attached_to_message ?settlement_credential ?settlement_message)
+        (message_origin_priority_set ?settlement_message)
+        (message_beneficiary_priority_set ?settlement_message)
+        (not
+          (engine_execution_ready ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_confirmations_attached ?routing_engine)
+      )
+  )
+  (:action finalize_engine_acknowledgement
+    :parameters (?routing_engine - routing_engine)
+    :precondition
+      (and
+        (engine_execution_ready ?routing_engine)
+        (not
+          (engine_confirmations_attached ?routing_engine)
+        )
+        (not
+          (engine_acknowledgement_recorded ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_acknowledgement_recorded ?routing_engine)
+        (entity_acknowledged ?routing_engine)
+      )
+  )
+  (:action attach_confirmation_provider
+    :parameters (?routing_engine - routing_engine ?confirmation_provider - confirmation_provider)
+    :precondition
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_confirmations_attached ?routing_engine)
+        (confirmation_provider_available ?confirmation_provider)
+      )
+    :effect
+      (and
+        (engine_has_confirmation_provider ?routing_engine ?confirmation_provider)
+        (not
+          (confirmation_provider_available ?confirmation_provider)
+        )
+      )
+  )
+  (:action orchestrate_engine_final_checks_and_bindings
+    :parameters (?routing_engine - routing_engine ?origin_leg - originating_ledger_entry ?beneficiary_leg - beneficiary_ledger_entry ?worker - processing_worker ?confirmation_provider - confirmation_provider)
+    :precondition
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_confirmations_attached ?routing_engine)
+        (engine_has_confirmation_provider ?routing_engine ?confirmation_provider)
+        (engine_linked_origin_leg ?routing_engine ?origin_leg)
+        (engine_linked_beneficiary_leg ?routing_engine ?beneficiary_leg)
+        (origin_leg_ready ?origin_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (entity_assigned_worker ?routing_engine ?worker)
+        (not
+          (engine_final_checks_completed ?routing_engine)
+        )
+      )
+    :effect (engine_final_checks_completed ?routing_engine)
+  )
+  (:action record_engine_acknowledgement
+    :parameters (?routing_engine - routing_engine)
+    :precondition
+      (and
+        (engine_execution_ready ?routing_engine)
+        (engine_final_checks_completed ?routing_engine)
+        (not
+          (engine_acknowledgement_recorded ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_acknowledgement_recorded ?routing_engine)
+        (entity_acknowledged ?routing_engine)
+      )
+  )
+  (:action request_regulatory_approval_for_engine
+    :parameters (?routing_engine - routing_engine ?regulatory_approval_token - regulatory_approval_token ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_released ?routing_engine)
+        (entity_assigned_worker ?routing_engine ?worker)
+        (regulatory_token_available ?regulatory_approval_token)
+        (engine_has_regulatory_token ?routing_engine ?regulatory_approval_token)
+        (not
+          (engine_regulatory_check_flag ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_regulatory_check_flag ?routing_engine)
+        (not
+          (regulatory_token_available ?regulatory_approval_token)
+        )
+      )
+  )
+  (:action execute_regulatory_check_via_gateway
+    :parameters (?routing_engine - routing_engine ?authorization_gateway - authorization_gateway)
+    :precondition
+      (and
+        (engine_regulatory_check_flag ?routing_engine)
+        (entity_assigned_gateway ?routing_engine ?authorization_gateway)
+        (not
+          (engine_regulatory_check_passed ?routing_engine)
+        )
+      )
+    :effect (engine_regulatory_check_passed ?routing_engine)
+  )
+  (:action attach_counterparty_confirmation_to_engine
+    :parameters (?routing_engine - routing_engine ?counterparty_confirmation - counterparty_confirmation)
+    :precondition
+      (and
+        (engine_regulatory_check_passed ?routing_engine)
+        (engine_has_counterparty_confirmation ?routing_engine ?counterparty_confirmation)
+        (not
+          (engine_regulatory_confirmation_complete ?routing_engine)
+        )
+      )
+    :effect (engine_regulatory_confirmation_complete ?routing_engine)
+  )
+  (:action finalize_regulatory_acknowledgement
+    :parameters (?routing_engine - routing_engine)
+    :precondition
+      (and
+        (engine_regulatory_confirmation_complete ?routing_engine)
+        (not
+          (engine_acknowledgement_recorded ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (engine_acknowledgement_recorded ?routing_engine)
+        (entity_acknowledged ?routing_engine)
+      )
+  )
+  (:action execute_origin_ledger_leg
+    :parameters (?origin_leg - originating_ledger_entry ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (origin_leg_resources_reserved ?origin_leg)
+        (origin_leg_ready ?origin_leg)
+        (settlement_message_prepared ?settlement_message)
+        (message_ready_for_credential_binding ?settlement_message)
+        (not
+          (entity_acknowledged ?origin_leg)
+        )
+      )
+    :effect (entity_acknowledged ?origin_leg)
+  )
+  (:action execute_beneficiary_ledger_leg
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?settlement_message - settlement_message)
+    :precondition
+      (and
+        (beneficiary_leg_resources_reserved ?beneficiary_leg)
+        (beneficiary_leg_ready ?beneficiary_leg)
+        (settlement_message_prepared ?settlement_message)
+        (message_ready_for_credential_binding ?settlement_message)
+        (not
+          (entity_acknowledged ?beneficiary_leg)
+        )
+      )
+    :effect (entity_acknowledged ?beneficiary_leg)
+  )
+  (:action issue_settlement_ticket_for_instruction
+    :parameters (?instruction - payment_instruction ?settlement_ticket - settlement_ticket ?worker - processing_worker)
+    :precondition
+      (and
+        (entity_acknowledged ?instruction)
+        (entity_assigned_worker ?instruction ?worker)
+        (settlement_ticket_available ?settlement_ticket)
+        (not
+          (entity_settlement_requested ?instruction)
+        )
+      )
+    :effect
+      (and
+        (entity_settlement_requested ?instruction)
+        (entity_bound_settlement_ticket ?instruction ?settlement_ticket)
+        (not
+          (settlement_ticket_available ?settlement_ticket)
+        )
+      )
+  )
+  (:action consume_settlement_ticket_and_finalize_origin_leg
+    :parameters (?origin_leg - originating_ledger_entry ?payment_rail - payment_rail ?settlement_ticket - settlement_ticket)
+    :precondition
+      (and
+        (entity_settlement_requested ?origin_leg)
+        (entity_assigned_rail ?origin_leg ?payment_rail)
+        (entity_bound_settlement_ticket ?origin_leg ?settlement_ticket)
+        (not
+          (settlement_completed ?origin_leg)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?origin_leg)
+        (rail_available ?payment_rail)
+        (settlement_ticket_available ?settlement_ticket)
+      )
+  )
+  (:action consume_settlement_ticket_and_finalize_beneficiary_leg
+    :parameters (?beneficiary_leg - beneficiary_ledger_entry ?payment_rail - payment_rail ?settlement_ticket - settlement_ticket)
+    :precondition
+      (and
+        (entity_settlement_requested ?beneficiary_leg)
+        (entity_assigned_rail ?beneficiary_leg ?payment_rail)
+        (entity_bound_settlement_ticket ?beneficiary_leg ?settlement_ticket)
+        (not
+          (settlement_completed ?beneficiary_leg)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?beneficiary_leg)
+        (rail_available ?payment_rail)
+        (settlement_ticket_available ?settlement_ticket)
+      )
+  )
+  (:action consume_settlement_ticket_and_finalize_engine
+    :parameters (?routing_engine - routing_engine ?payment_rail - payment_rail ?settlement_ticket - settlement_ticket)
+    :precondition
+      (and
+        (entity_settlement_requested ?routing_engine)
+        (entity_assigned_rail ?routing_engine ?payment_rail)
+        (entity_bound_settlement_ticket ?routing_engine ?settlement_ticket)
+        (not
+          (settlement_completed ?routing_engine)
+        )
+      )
+    :effect
+      (and
+        (settlement_completed ?routing_engine)
+        (rail_available ?payment_rail)
+        (settlement_ticket_available ?settlement_ticket)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem multi_rail_payment_settlement_scenario)
+  (:domain multi_rail_payment_routing)
+  (:objects origin_leg_1 - originating_ledger_entry beneficiary_leg_1 - beneficiary_ledger_entry routing_engine_1 - routing_engine routing_engine_2 - routing_engine rail_ach - payment_rail rail_rtp - payment_rail rail_correspondent - payment_rail worker_validation - processing_worker auth_gateway_primary - authorization_gateway standard_fee_profile - fee_profile origin_channel_option_domestic - origin_channel_option beneficiary_channel_option_standard - beneficiary_channel_option settlement_message_1 - settlement_message settlement_credential_a - settlement_credential settlement_credential_b - settlement_credential compliance_document_aml - compliance_document compliance_document_sanctions - compliance_document confirmation_provider_1 - confirmation_provider confirmation_provider_2 - confirmation_provider settlement_ticket_1 - settlement_ticket liquidity_source_primary - liquidity_source regulatory_token_jurisdiction_a - regulatory_approval_token regulatory_token_jurisdiction_b - regulatory_approval_token counterparty_confirmation_1 - counterparty_confirmation)
+  (:init
+    (rail_available rail_ach)
+    (rail_available rail_rtp)
+    (rail_available rail_correspondent)
+    (worker_available worker_validation)
+    (gateway_available auth_gateway_primary)
+    (fee_profile_available standard_fee_profile)
+    (origin_channel_option_applicable origin_leg_1 origin_channel_option_domestic)
+    (beneficiary_channel_option_applicable beneficiary_leg_1 beneficiary_channel_option_standard)
+    (settlement_message_draft settlement_message_1)
+    (settlement_credential_available settlement_credential_a)
+    (settlement_credential_available settlement_credential_b)
+    (engine_linked_origin_leg routing_engine_1 origin_leg_1)
+    (engine_linked_origin_leg routing_engine_2 origin_leg_1)
+    (engine_linked_beneficiary_leg routing_engine_1 beneficiary_leg_1)
+    (engine_linked_beneficiary_leg routing_engine_2 beneficiary_leg_1)
+    (engine_bound_settlement_message routing_engine_1 settlement_message_1)
+    (engine_bound_settlement_message routing_engine_2 settlement_message_1)
+    (engine_has_credential routing_engine_1 settlement_credential_a)
+    (engine_has_credential routing_engine_2 settlement_credential_b)
+    (compliance_document_available compliance_document_aml)
+    (compliance_document_available compliance_document_sanctions)
+    (confirmation_provider_available confirmation_provider_1)
+    (confirmation_provider_available confirmation_provider_2)
+    (settlement_ticket_available settlement_ticket_1)
+    (liquidity_source_available liquidity_source_primary)
+    (regulatory_token_available regulatory_token_jurisdiction_a)
+    (engine_has_regulatory_token routing_engine_1 regulatory_token_jurisdiction_a)
+    (engine_has_regulatory_token routing_engine_2 regulatory_token_jurisdiction_b)
+    (counterparty_confirmation_available counterparty_confirmation_1)
+  )
+  (:goal
+    (and
+      (settlement_completed origin_leg_1)
+      (settlement_completed beneficiary_leg_1)
+      (settlement_completed routing_engine_1)
+      (settlement_completed routing_engine_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(ingest_payment_instruction origin_leg_1)
+(select_and_reserve_payment_rail origin_leg_1 rail_ach)
+(assign_processing_worker origin_leg_1 worker_validation)
+(complete_instruction_validation origin_leg_1 worker_validation)
+(release_processing_worker origin_leg_1 worker_validation)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_g8g9o_0s/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_g8g9o_0s/plan.pddl 
+
+
+--- stderr ---
+

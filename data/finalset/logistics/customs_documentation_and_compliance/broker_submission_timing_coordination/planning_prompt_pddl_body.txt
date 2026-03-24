@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain broker_submission_timing_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object service_component - object movement_component - object case_supertype - object consignment_case - case_supertype broker_resource - domain_entity classification_service - domain_entity compliance_officer - domain_entity regulatory_reference - domain_entity fee_instrument - domain_entity timing_token - domain_entity commercial_document - domain_entity inspection_authority - domain_entity permit_record - service_component supporting_document - service_component trade_policy_document - service_component origin_movement_segment - movement_component destination_movement_segment - movement_component submission_record - movement_component consignment_category - consignment_case consignment_group - consignment_case export_consignment - consignment_category import_consignment - consignment_category broker_file - consignment_group)
+  (:predicates
+    (case_registered ?consignment_case - consignment_case)
+    (classification_completed ?consignment_case - consignment_case)
+    (broker_assigned ?consignment_case - consignment_case)
+    (submission_recorded ?consignment_case - consignment_case)
+    (ready_for_submission ?consignment_case - consignment_case)
+    (final_validation_completed ?consignment_case - consignment_case)
+    (broker_resource_available ?broker_resource - broker_resource)
+    (assigned_broker_resource ?consignment_case - consignment_case ?broker_resource - broker_resource)
+    (classification_service_available ?classification_service - classification_service)
+    (classification_assigned_to_case ?consignment_case - consignment_case ?classification_service - classification_service)
+    (compliance_officer_available ?compliance_officer - compliance_officer)
+    (compliance_officer_assigned ?consignment_case - consignment_case ?compliance_officer - compliance_officer)
+    (permit_record_available ?permit_record - permit_record)
+    (export_permit_attached ?export_consignment - export_consignment ?permit_record - permit_record)
+    (import_permit_attached ?import_consignment - import_consignment ?permit_record - permit_record)
+    (has_origin_movement_segment ?export_consignment - export_consignment ?origin_movement_segment - origin_movement_segment)
+    (origin_segment_verified ?origin_movement_segment - origin_movement_segment)
+    (origin_segment_requires_permit ?origin_movement_segment - origin_movement_segment)
+    (origin_verification_complete ?export_consignment - export_consignment)
+    (has_destination_movement_segment ?import_consignment - import_consignment ?destination_movement_segment - destination_movement_segment)
+    (destination_segment_verified ?destination_movement_segment - destination_movement_segment)
+    (destination_segment_requires_permit ?destination_movement_segment - destination_movement_segment)
+    (destination_verification_complete ?import_consignment - import_consignment)
+    (submission_record_available ?submission_record - submission_record)
+    (submission_record_reserved ?submission_record - submission_record)
+    (submission_has_origin_segment ?submission_record - submission_record ?origin_movement_segment - origin_movement_segment)
+    (submission_has_destination_segment ?submission_record - submission_record ?destination_movement_segment - destination_movement_segment)
+    (submission_origin_segment_verified ?submission_record - submission_record)
+    (submission_destination_segment_verified ?submission_record - submission_record)
+    (submission_ready_for_documents ?submission_record - submission_record)
+    (broker_file_for_export_consignment ?broker_file - broker_file ?export_consignment - export_consignment)
+    (broker_file_for_import_consignment ?broker_file - broker_file ?import_consignment - import_consignment)
+    (broker_file_has_submission_record ?broker_file - broker_file ?submission_record - submission_record)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (broker_file_has_supporting_document ?broker_file - broker_file ?supporting_document - supporting_document)
+    (supporting_document_attached ?supporting_document - supporting_document)
+    (supporting_document_linked_to_submission ?supporting_document - supporting_document ?submission_record - submission_record)
+    (broker_file_documents_verified ?broker_file - broker_file)
+    (broker_file_documents_reviewed ?broker_file - broker_file)
+    (broker_file_regulatory_cleared ?broker_file - broker_file)
+    (broker_file_has_regulatory_reference ?broker_file - broker_file)
+    (broker_file_regulatory_reference_verified ?broker_file - broker_file)
+    (regulatory_prerequisites_satisfied ?broker_file - broker_file)
+    (broker_file_ready_for_submission_finalization ?broker_file - broker_file)
+    (trade_policy_document_available ?trade_policy_document - trade_policy_document)
+    (broker_file_trade_policy_document_linked ?broker_file - broker_file ?trade_policy_document - trade_policy_document)
+    (regulatory_reference_applied ?broker_file - broker_file)
+    (regulatory_reference_verified ?broker_file - broker_file)
+    (regulatory_reference_compliance_confirmed ?broker_file - broker_file)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (broker_file_regulatory_reference_linked ?broker_file - broker_file ?regulatory_reference - regulatory_reference)
+    (fee_instrument_available ?fee_instrument - fee_instrument)
+    (broker_file_fee_attached ?broker_file - broker_file ?fee_instrument - fee_instrument)
+    (commercial_document_available ?commercial_document - commercial_document)
+    (broker_file_commercial_document_attached ?broker_file - broker_file ?commercial_document - commercial_document)
+    (inspection_authority_available ?inspection_authority - inspection_authority)
+    (broker_file_inspection_authority_linked ?broker_file - broker_file ?inspection_authority - inspection_authority)
+    (timing_token_available ?timing_token - timing_token)
+    (timing_token_assigned ?consignment_case - consignment_case ?timing_token - timing_token)
+    (origin_eligibility_flag ?export_consignment - export_consignment)
+    (destination_eligibility_flag ?import_consignment - import_consignment)
+    (final_approval_recorded ?broker_file - broker_file)
+  )
+  (:action register_consignment_case
+    :parameters (?consignment_case - consignment_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?consignment_case)
+        )
+        (not
+          (submission_recorded ?consignment_case)
+        )
+      )
+    :effect (case_registered ?consignment_case)
+  )
+  (:action assign_broker_resource_to_case
+    :parameters (?consignment_case - consignment_case ?broker_resource - broker_resource)
+    :precondition
+      (and
+        (case_registered ?consignment_case)
+        (not
+          (broker_assigned ?consignment_case)
+        )
+        (broker_resource_available ?broker_resource)
+      )
+    :effect
+      (and
+        (broker_assigned ?consignment_case)
+        (assigned_broker_resource ?consignment_case ?broker_resource)
+        (not
+          (broker_resource_available ?broker_resource)
+        )
+      )
+  )
+  (:action assign_classification_service_to_case
+    :parameters (?consignment_case - consignment_case ?classification_service - classification_service)
+    :precondition
+      (and
+        (case_registered ?consignment_case)
+        (broker_assigned ?consignment_case)
+        (classification_service_available ?classification_service)
+      )
+    :effect
+      (and
+        (classification_assigned_to_case ?consignment_case ?classification_service)
+        (not
+          (classification_service_available ?classification_service)
+        )
+      )
+  )
+  (:action finalize_classification_for_case
+    :parameters (?consignment_case - consignment_case ?classification_service - classification_service)
+    :precondition
+      (and
+        (case_registered ?consignment_case)
+        (broker_assigned ?consignment_case)
+        (classification_assigned_to_case ?consignment_case ?classification_service)
+        (not
+          (classification_completed ?consignment_case)
+        )
+      )
+    :effect (classification_completed ?consignment_case)
+  )
+  (:action unassign_classification_service_from_case
+    :parameters (?consignment_case - consignment_case ?classification_service - classification_service)
+    :precondition
+      (and
+        (classification_assigned_to_case ?consignment_case ?classification_service)
+      )
+    :effect
+      (and
+        (classification_service_available ?classification_service)
+        (not
+          (classification_assigned_to_case ?consignment_case ?classification_service)
+        )
+      )
+  )
+  (:action assign_compliance_officer_to_case
+    :parameters (?consignment_case - consignment_case ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (classification_completed ?consignment_case)
+        (compliance_officer_available ?compliance_officer)
+      )
+    :effect
+      (and
+        (compliance_officer_assigned ?consignment_case ?compliance_officer)
+        (not
+          (compliance_officer_available ?compliance_officer)
+        )
+      )
+  )
+  (:action release_compliance_officer_from_case
+    :parameters (?consignment_case - consignment_case ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (compliance_officer_assigned ?consignment_case ?compliance_officer)
+      )
+    :effect
+      (and
+        (compliance_officer_available ?compliance_officer)
+        (not
+          (compliance_officer_assigned ?consignment_case ?compliance_officer)
+        )
+      )
+  )
+  (:action attach_commercial_document_to_broker_file
+    :parameters (?broker_file - broker_file ?commercial_document - commercial_document)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (commercial_document_available ?commercial_document)
+      )
+    :effect
+      (and
+        (broker_file_commercial_document_attached ?broker_file ?commercial_document)
+        (not
+          (commercial_document_available ?commercial_document)
+        )
+      )
+  )
+  (:action detach_commercial_document_from_broker_file
+    :parameters (?broker_file - broker_file ?commercial_document - commercial_document)
+    :precondition
+      (and
+        (broker_file_commercial_document_attached ?broker_file ?commercial_document)
+      )
+    :effect
+      (and
+        (commercial_document_available ?commercial_document)
+        (not
+          (broker_file_commercial_document_attached ?broker_file ?commercial_document)
+        )
+      )
+  )
+  (:action link_inspection_authority_to_broker_file
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (inspection_authority_available ?inspection_authority)
+      )
+    :effect
+      (and
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (not
+          (inspection_authority_available ?inspection_authority)
+        )
+      )
+  )
+  (:action unlink_inspection_authority_from_broker_file
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority)
+    :precondition
+      (and
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+      )
+    :effect
+      (and
+        (inspection_authority_available ?inspection_authority)
+        (not
+          (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        )
+      )
+  )
+  (:action mark_origin_movement_segment_verified
+    :parameters (?export_consignment - export_consignment ?origin_movement_segment - origin_movement_segment ?classification_service - classification_service)
+    :precondition
+      (and
+        (classification_completed ?export_consignment)
+        (classification_assigned_to_case ?export_consignment ?classification_service)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (not
+          (origin_segment_verified ?origin_movement_segment)
+        )
+        (not
+          (origin_segment_requires_permit ?origin_movement_segment)
+        )
+      )
+    :effect (origin_segment_verified ?origin_movement_segment)
+  )
+  (:action complete_origin_verification_with_officer
+    :parameters (?export_consignment - export_consignment ?origin_movement_segment - origin_movement_segment ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (classification_completed ?export_consignment)
+        (compliance_officer_assigned ?export_consignment ?compliance_officer)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (origin_segment_verified ?origin_movement_segment)
+        (not
+          (origin_eligibility_flag ?export_consignment)
+        )
+      )
+    :effect
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (origin_verification_complete ?export_consignment)
+      )
+  )
+  (:action attach_permit_record_to_origin_segment
+    :parameters (?export_consignment - export_consignment ?origin_movement_segment - origin_movement_segment ?permit_record - permit_record)
+    :precondition
+      (and
+        (classification_completed ?export_consignment)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (permit_record_available ?permit_record)
+        (not
+          (origin_eligibility_flag ?export_consignment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_requires_permit ?origin_movement_segment)
+        (origin_eligibility_flag ?export_consignment)
+        (export_permit_attached ?export_consignment ?permit_record)
+        (not
+          (permit_record_available ?permit_record)
+        )
+      )
+  )
+  (:action reconcile_origin_permit_and_verification
+    :parameters (?export_consignment - export_consignment ?origin_movement_segment - origin_movement_segment ?classification_service - classification_service ?permit_record - permit_record)
+    :precondition
+      (and
+        (classification_completed ?export_consignment)
+        (classification_assigned_to_case ?export_consignment ?classification_service)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (origin_segment_requires_permit ?origin_movement_segment)
+        (export_permit_attached ?export_consignment ?permit_record)
+        (not
+          (origin_verification_complete ?export_consignment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_verified ?origin_movement_segment)
+        (origin_verification_complete ?export_consignment)
+        (permit_record_available ?permit_record)
+        (not
+          (export_permit_attached ?export_consignment ?permit_record)
+        )
+      )
+  )
+  (:action mark_destination_movement_segment_verified
+    :parameters (?import_consignment - import_consignment ?destination_movement_segment - destination_movement_segment ?classification_service - classification_service)
+    :precondition
+      (and
+        (classification_completed ?import_consignment)
+        (classification_assigned_to_case ?import_consignment ?classification_service)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (not
+          (destination_segment_verified ?destination_movement_segment)
+        )
+        (not
+          (destination_segment_requires_permit ?destination_movement_segment)
+        )
+      )
+    :effect (destination_segment_verified ?destination_movement_segment)
+  )
+  (:action complete_destination_verification_with_officer
+    :parameters (?import_consignment - import_consignment ?destination_movement_segment - destination_movement_segment ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (classification_completed ?import_consignment)
+        (compliance_officer_assigned ?import_consignment ?compliance_officer)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (destination_segment_verified ?destination_movement_segment)
+        (not
+          (destination_eligibility_flag ?import_consignment)
+        )
+      )
+    :effect
+      (and
+        (destination_eligibility_flag ?import_consignment)
+        (destination_verification_complete ?import_consignment)
+      )
+  )
+  (:action attach_permit_record_to_destination_segment
+    :parameters (?import_consignment - import_consignment ?destination_movement_segment - destination_movement_segment ?permit_record - permit_record)
+    :precondition
+      (and
+        (classification_completed ?import_consignment)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (permit_record_available ?permit_record)
+        (not
+          (destination_eligibility_flag ?import_consignment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_requires_permit ?destination_movement_segment)
+        (destination_eligibility_flag ?import_consignment)
+        (import_permit_attached ?import_consignment ?permit_record)
+        (not
+          (permit_record_available ?permit_record)
+        )
+      )
+  )
+  (:action reconcile_destination_permit_and_verification
+    :parameters (?import_consignment - import_consignment ?destination_movement_segment - destination_movement_segment ?classification_service - classification_service ?permit_record - permit_record)
+    :precondition
+      (and
+        (classification_completed ?import_consignment)
+        (classification_assigned_to_case ?import_consignment ?classification_service)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (destination_segment_requires_permit ?destination_movement_segment)
+        (import_permit_attached ?import_consignment ?permit_record)
+        (not
+          (destination_verification_complete ?import_consignment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_verified ?destination_movement_segment)
+        (destination_verification_complete ?import_consignment)
+        (permit_record_available ?permit_record)
+        (not
+          (import_permit_attached ?import_consignment ?permit_record)
+        )
+      )
+  )
+  (:action reserve_submission_record_with_segments
+    :parameters (?export_consignment - export_consignment ?import_consignment - import_consignment ?origin_movement_segment - origin_movement_segment ?destination_movement_segment - destination_movement_segment ?submission_record - submission_record)
+    :precondition
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (destination_eligibility_flag ?import_consignment)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (origin_segment_verified ?origin_movement_segment)
+        (destination_segment_verified ?destination_movement_segment)
+        (origin_verification_complete ?export_consignment)
+        (destination_verification_complete ?import_consignment)
+        (submission_record_available ?submission_record)
+      )
+    :effect
+      (and
+        (submission_record_reserved ?submission_record)
+        (submission_has_origin_segment ?submission_record ?origin_movement_segment)
+        (submission_has_destination_segment ?submission_record ?destination_movement_segment)
+        (not
+          (submission_record_available ?submission_record)
+        )
+      )
+  )
+  (:action reserve_submission_record_with_origin_verified
+    :parameters (?export_consignment - export_consignment ?import_consignment - import_consignment ?origin_movement_segment - origin_movement_segment ?destination_movement_segment - destination_movement_segment ?submission_record - submission_record)
+    :precondition
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (destination_eligibility_flag ?import_consignment)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (origin_segment_requires_permit ?origin_movement_segment)
+        (destination_segment_verified ?destination_movement_segment)
+        (not
+          (origin_verification_complete ?export_consignment)
+        )
+        (destination_verification_complete ?import_consignment)
+        (submission_record_available ?submission_record)
+      )
+    :effect
+      (and
+        (submission_record_reserved ?submission_record)
+        (submission_has_origin_segment ?submission_record ?origin_movement_segment)
+        (submission_has_destination_segment ?submission_record ?destination_movement_segment)
+        (submission_origin_segment_verified ?submission_record)
+        (not
+          (submission_record_available ?submission_record)
+        )
+      )
+  )
+  (:action reserve_submission_record_with_destination_verified
+    :parameters (?export_consignment - export_consignment ?import_consignment - import_consignment ?origin_movement_segment - origin_movement_segment ?destination_movement_segment - destination_movement_segment ?submission_record - submission_record)
+    :precondition
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (destination_eligibility_flag ?import_consignment)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (origin_segment_verified ?origin_movement_segment)
+        (destination_segment_requires_permit ?destination_movement_segment)
+        (origin_verification_complete ?export_consignment)
+        (not
+          (destination_verification_complete ?import_consignment)
+        )
+        (submission_record_available ?submission_record)
+      )
+    :effect
+      (and
+        (submission_record_reserved ?submission_record)
+        (submission_has_origin_segment ?submission_record ?origin_movement_segment)
+        (submission_has_destination_segment ?submission_record ?destination_movement_segment)
+        (submission_destination_segment_verified ?submission_record)
+        (not
+          (submission_record_available ?submission_record)
+        )
+      )
+  )
+  (:action reserve_submission_record_with_both_segments_verified
+    :parameters (?export_consignment - export_consignment ?import_consignment - import_consignment ?origin_movement_segment - origin_movement_segment ?destination_movement_segment - destination_movement_segment ?submission_record - submission_record)
+    :precondition
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (destination_eligibility_flag ?import_consignment)
+        (has_origin_movement_segment ?export_consignment ?origin_movement_segment)
+        (has_destination_movement_segment ?import_consignment ?destination_movement_segment)
+        (origin_segment_requires_permit ?origin_movement_segment)
+        (destination_segment_requires_permit ?destination_movement_segment)
+        (not
+          (origin_verification_complete ?export_consignment)
+        )
+        (not
+          (destination_verification_complete ?import_consignment)
+        )
+        (submission_record_available ?submission_record)
+      )
+    :effect
+      (and
+        (submission_record_reserved ?submission_record)
+        (submission_has_origin_segment ?submission_record ?origin_movement_segment)
+        (submission_has_destination_segment ?submission_record ?destination_movement_segment)
+        (submission_origin_segment_verified ?submission_record)
+        (submission_destination_segment_verified ?submission_record)
+        (not
+          (submission_record_available ?submission_record)
+        )
+      )
+  )
+  (:action mark_submission_ready_for_document_attachment
+    :parameters (?submission_record - submission_record ?export_consignment - export_consignment ?classification_service - classification_service)
+    :precondition
+      (and
+        (submission_record_reserved ?submission_record)
+        (origin_eligibility_flag ?export_consignment)
+        (classification_assigned_to_case ?export_consignment ?classification_service)
+        (not
+          (submission_ready_for_documents ?submission_record)
+        )
+      )
+    :effect (submission_ready_for_documents ?submission_record)
+  )
+  (:action attach_supporting_document_to_submission
+    :parameters (?broker_file - broker_file ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (broker_file_has_submission_record ?broker_file ?submission_record)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_available ?supporting_document)
+        (submission_record_reserved ?submission_record)
+        (submission_ready_for_documents ?submission_record)
+        (not
+          (supporting_document_attached ?supporting_document)
+        )
+      )
+    :effect
+      (and
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action verify_supporting_document_and_mark_broker_file
+    :parameters (?broker_file - broker_file ?supporting_document - supporting_document ?submission_record - submission_record ?classification_service - classification_service)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (classification_assigned_to_case ?broker_file ?classification_service)
+        (not
+          (submission_origin_segment_verified ?submission_record)
+        )
+        (not
+          (broker_file_documents_verified ?broker_file)
+        )
+      )
+    :effect (broker_file_documents_verified ?broker_file)
+  )
+  (:action attach_regulatory_reference_to_broker_file
+    :parameters (?broker_file - broker_file ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (regulatory_reference_available ?regulatory_reference)
+        (not
+          (broker_file_has_regulatory_reference ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (broker_file_has_regulatory_reference ?broker_file)
+        (broker_file_regulatory_reference_linked ?broker_file ?regulatory_reference)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action verify_supporting_document_and_regulatory_reference
+    :parameters (?broker_file - broker_file ?supporting_document - supporting_document ?submission_record - submission_record ?classification_service - classification_service ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_attached ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (classification_assigned_to_case ?broker_file ?classification_service)
+        (submission_origin_segment_verified ?submission_record)
+        (broker_file_has_regulatory_reference ?broker_file)
+        (broker_file_regulatory_reference_linked ?broker_file ?regulatory_reference)
+        (not
+          (broker_file_documents_verified ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (broker_file_documents_verified ?broker_file)
+        (broker_file_regulatory_reference_verified ?broker_file)
+      )
+  )
+  (:action perform_document_review_by_officer_path_a
+    :parameters (?broker_file - broker_file ?commercial_document - commercial_document ?compliance_officer - compliance_officer ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_verified ?broker_file)
+        (broker_file_commercial_document_attached ?broker_file ?commercial_document)
+        (compliance_officer_assigned ?broker_file ?compliance_officer)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (not
+          (submission_destination_segment_verified ?submission_record)
+        )
+        (not
+          (broker_file_documents_reviewed ?broker_file)
+        )
+      )
+    :effect (broker_file_documents_reviewed ?broker_file)
+  )
+  (:action perform_document_review_by_officer_path_b
+    :parameters (?broker_file - broker_file ?commercial_document - commercial_document ?compliance_officer - compliance_officer ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_verified ?broker_file)
+        (broker_file_commercial_document_attached ?broker_file ?commercial_document)
+        (compliance_officer_assigned ?broker_file ?compliance_officer)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (submission_destination_segment_verified ?submission_record)
+        (not
+          (broker_file_documents_reviewed ?broker_file)
+        )
+      )
+    :effect (broker_file_documents_reviewed ?broker_file)
+  )
+  (:action verify_inspection_authority_and_mark
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_reviewed ?broker_file)
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (not
+          (submission_origin_segment_verified ?submission_record)
+        )
+        (not
+          (submission_destination_segment_verified ?submission_record)
+        )
+        (not
+          (broker_file_regulatory_cleared ?broker_file)
+        )
+      )
+    :effect (broker_file_regulatory_cleared ?broker_file)
+  )
+  (:action verify_inspection_authority_and_mark_with_submission_origin_flag
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_reviewed ?broker_file)
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (submission_origin_segment_verified ?submission_record)
+        (not
+          (submission_destination_segment_verified ?submission_record)
+        )
+        (not
+          (broker_file_regulatory_cleared ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (regulatory_prerequisites_satisfied ?broker_file)
+      )
+  )
+  (:action verify_inspection_authority_and_finalize_review_path_a
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_reviewed ?broker_file)
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (not
+          (submission_origin_segment_verified ?submission_record)
+        )
+        (submission_destination_segment_verified ?submission_record)
+        (not
+          (broker_file_regulatory_cleared ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (regulatory_prerequisites_satisfied ?broker_file)
+      )
+  )
+  (:action verify_inspection_authority_and_finalize_review_path_b
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority ?supporting_document - supporting_document ?submission_record - submission_record)
+    :precondition
+      (and
+        (broker_file_documents_reviewed ?broker_file)
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (broker_file_has_supporting_document ?broker_file ?supporting_document)
+        (supporting_document_linked_to_submission ?supporting_document ?submission_record)
+        (submission_origin_segment_verified ?submission_record)
+        (submission_destination_segment_verified ?submission_record)
+        (not
+          (broker_file_regulatory_cleared ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (regulatory_prerequisites_satisfied ?broker_file)
+      )
+  )
+  (:action record_final_approval_and_mark_ready
+    :parameters (?broker_file - broker_file)
+    :precondition
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (not
+          (regulatory_prerequisites_satisfied ?broker_file)
+        )
+        (not
+          (final_approval_recorded ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?broker_file)
+        (ready_for_submission ?broker_file)
+      )
+  )
+  (:action attach_fee_instrument_to_broker_file
+    :parameters (?broker_file - broker_file ?fee_instrument - fee_instrument)
+    :precondition
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (regulatory_prerequisites_satisfied ?broker_file)
+        (fee_instrument_available ?fee_instrument)
+      )
+    :effect
+      (and
+        (broker_file_fee_attached ?broker_file ?fee_instrument)
+        (not
+          (fee_instrument_available ?fee_instrument)
+        )
+      )
+  )
+  (:action finalize_broker_file_pre_submission_checks
+    :parameters (?broker_file - broker_file ?export_consignment - export_consignment ?import_consignment - import_consignment ?classification_service - classification_service ?fee_instrument - fee_instrument)
+    :precondition
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (regulatory_prerequisites_satisfied ?broker_file)
+        (broker_file_fee_attached ?broker_file ?fee_instrument)
+        (broker_file_for_export_consignment ?broker_file ?export_consignment)
+        (broker_file_for_import_consignment ?broker_file ?import_consignment)
+        (origin_verification_complete ?export_consignment)
+        (destination_verification_complete ?import_consignment)
+        (classification_assigned_to_case ?broker_file ?classification_service)
+        (not
+          (broker_file_ready_for_submission_finalization ?broker_file)
+        )
+      )
+    :effect (broker_file_ready_for_submission_finalization ?broker_file)
+  )
+  (:action finalize_broker_file_and_record_approval
+    :parameters (?broker_file - broker_file)
+    :precondition
+      (and
+        (broker_file_regulatory_cleared ?broker_file)
+        (broker_file_ready_for_submission_finalization ?broker_file)
+        (not
+          (final_approval_recorded ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?broker_file)
+        (ready_for_submission ?broker_file)
+      )
+  )
+  (:action apply_trade_policy_document_to_broker_file
+    :parameters (?broker_file - broker_file ?trade_policy_document - trade_policy_document ?classification_service - classification_service)
+    :precondition
+      (and
+        (classification_completed ?broker_file)
+        (classification_assigned_to_case ?broker_file ?classification_service)
+        (trade_policy_document_available ?trade_policy_document)
+        (broker_file_trade_policy_document_linked ?broker_file ?trade_policy_document)
+        (not
+          (regulatory_reference_applied ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (regulatory_reference_applied ?broker_file)
+        (not
+          (trade_policy_document_available ?trade_policy_document)
+        )
+      )
+  )
+  (:action mark_regulatory_reference_verified_by_officer
+    :parameters (?broker_file - broker_file ?compliance_officer - compliance_officer)
+    :precondition
+      (and
+        (regulatory_reference_applied ?broker_file)
+        (compliance_officer_assigned ?broker_file ?compliance_officer)
+        (not
+          (regulatory_reference_verified ?broker_file)
+        )
+      )
+    :effect (regulatory_reference_verified ?broker_file)
+  )
+  (:action record_inspection_authority_verification
+    :parameters (?broker_file - broker_file ?inspection_authority - inspection_authority)
+    :precondition
+      (and
+        (regulatory_reference_verified ?broker_file)
+        (broker_file_inspection_authority_linked ?broker_file ?inspection_authority)
+        (not
+          (regulatory_reference_compliance_confirmed ?broker_file)
+        )
+      )
+    :effect (regulatory_reference_compliance_confirmed ?broker_file)
+  )
+  (:action finalize_regulatory_reference_and_mark_ready
+    :parameters (?broker_file - broker_file)
+    :precondition
+      (and
+        (regulatory_reference_compliance_confirmed ?broker_file)
+        (not
+          (final_approval_recorded ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (final_approval_recorded ?broker_file)
+        (ready_for_submission ?broker_file)
+      )
+  )
+  (:action confirm_submission_and_mark_consignment_ready_export
+    :parameters (?export_consignment - export_consignment ?submission_record - submission_record)
+    :precondition
+      (and
+        (origin_eligibility_flag ?export_consignment)
+        (origin_verification_complete ?export_consignment)
+        (submission_record_reserved ?submission_record)
+        (submission_ready_for_documents ?submission_record)
+        (not
+          (ready_for_submission ?export_consignment)
+        )
+      )
+    :effect (ready_for_submission ?export_consignment)
+  )
+  (:action confirm_submission_and_mark_consignment_ready_import
+    :parameters (?import_consignment - import_consignment ?submission_record - submission_record)
+    :precondition
+      (and
+        (destination_eligibility_flag ?import_consignment)
+        (destination_verification_complete ?import_consignment)
+        (submission_record_reserved ?submission_record)
+        (submission_ready_for_documents ?submission_record)
+        (not
+          (ready_for_submission ?import_consignment)
+        )
+      )
+    :effect (ready_for_submission ?import_consignment)
+  )
+  (:action reserve_timing_token_for_case
+    :parameters (?consignment_case - consignment_case ?timing_token - timing_token ?classification_service - classification_service)
+    :precondition
+      (and
+        (ready_for_submission ?consignment_case)
+        (classification_assigned_to_case ?consignment_case ?classification_service)
+        (timing_token_available ?timing_token)
+        (not
+          (final_validation_completed ?consignment_case)
+        )
+      )
+    :effect
+      (and
+        (final_validation_completed ?consignment_case)
+        (timing_token_assigned ?consignment_case ?timing_token)
+        (not
+          (timing_token_available ?timing_token)
+        )
+      )
+  )
+  (:action execute_submission_and_release_resources_export
+    :parameters (?export_consignment - export_consignment ?broker_resource - broker_resource ?timing_token - timing_token)
+    :precondition
+      (and
+        (final_validation_completed ?export_consignment)
+        (assigned_broker_resource ?export_consignment ?broker_resource)
+        (timing_token_assigned ?export_consignment ?timing_token)
+        (not
+          (submission_recorded ?export_consignment)
+        )
+      )
+    :effect
+      (and
+        (submission_recorded ?export_consignment)
+        (broker_resource_available ?broker_resource)
+        (timing_token_available ?timing_token)
+      )
+  )
+  (:action execute_submission_and_release_resources_import
+    :parameters (?import_consignment - import_consignment ?broker_resource - broker_resource ?timing_token - timing_token)
+    :precondition
+      (and
+        (final_validation_completed ?import_consignment)
+        (assigned_broker_resource ?import_consignment ?broker_resource)
+        (timing_token_assigned ?import_consignment ?timing_token)
+        (not
+          (submission_recorded ?import_consignment)
+        )
+      )
+    :effect
+      (and
+        (submission_recorded ?import_consignment)
+        (broker_resource_available ?broker_resource)
+        (timing_token_available ?timing_token)
+      )
+  )
+  (:action execute_submission_and_release_resources_broker_file
+    :parameters (?broker_file - broker_file ?broker_resource - broker_resource ?timing_token - timing_token)
+    :precondition
+      (and
+        (final_validation_completed ?broker_file)
+        (assigned_broker_resource ?broker_file ?broker_resource)
+        (timing_token_assigned ?broker_file ?timing_token)
+        (not
+          (submission_recorded ?broker_file)
+        )
+      )
+    :effect
+      (and
+        (submission_recorded ?broker_file)
+        (broker_resource_available ?broker_resource)
+        (timing_token_available ?timing_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem broker_submission_timing_coordination_problem)
+  (:domain broker_submission_timing_coordination)
+  (:objects export_consignment_1 - export_consignment import_consignment_1 - import_consignment broker_file_1 - broker_file broker_file_2 - broker_file broker_resource_1 - broker_resource broker_resource_2 - broker_resource broker_resource_3 - broker_resource classification_service_1 - classification_service compliance_officer_1 - compliance_officer permit_record_1 - permit_record origin_segment_1 - origin_movement_segment destination_segment_1 - destination_movement_segment submission_record_1 - submission_record supporting_document_1 - supporting_document supporting_document_2 - supporting_document regulatory_reference_1 - regulatory_reference regulatory_reference_2 - regulatory_reference fee_instrument_1 - fee_instrument fee_instrument_2 - fee_instrument timing_token_1 - timing_token commercial_document_1 - commercial_document trade_policy_document_1 - trade_policy_document trade_policy_document_2 - trade_policy_document inspection_authority_1 - inspection_authority)
+  (:init
+    (broker_resource_available broker_resource_1)
+    (broker_resource_available broker_resource_2)
+    (broker_resource_available broker_resource_3)
+    (classification_service_available classification_service_1)
+    (compliance_officer_available compliance_officer_1)
+    (permit_record_available permit_record_1)
+    (has_origin_movement_segment export_consignment_1 origin_segment_1)
+    (has_destination_movement_segment import_consignment_1 destination_segment_1)
+    (submission_record_available submission_record_1)
+    (supporting_document_available supporting_document_1)
+    (supporting_document_available supporting_document_2)
+    (broker_file_for_export_consignment broker_file_1 export_consignment_1)
+    (broker_file_for_export_consignment broker_file_2 export_consignment_1)
+    (broker_file_for_import_consignment broker_file_1 import_consignment_1)
+    (broker_file_for_import_consignment broker_file_2 import_consignment_1)
+    (broker_file_has_submission_record broker_file_1 submission_record_1)
+    (broker_file_has_submission_record broker_file_2 submission_record_1)
+    (broker_file_has_supporting_document broker_file_1 supporting_document_1)
+    (broker_file_has_supporting_document broker_file_2 supporting_document_2)
+    (regulatory_reference_available regulatory_reference_1)
+    (regulatory_reference_available regulatory_reference_2)
+    (fee_instrument_available fee_instrument_1)
+    (fee_instrument_available fee_instrument_2)
+    (timing_token_available timing_token_1)
+    (commercial_document_available commercial_document_1)
+    (trade_policy_document_available trade_policy_document_1)
+    (broker_file_trade_policy_document_linked broker_file_1 trade_policy_document_1)
+    (broker_file_trade_policy_document_linked broker_file_2 trade_policy_document_2)
+    (inspection_authority_available inspection_authority_1)
+  )
+  (:goal
+    (and
+      (submission_recorded export_consignment_1)
+      (submission_recorded import_consignment_1)
+      (submission_recorded broker_file_1)
+      (submission_recorded broker_file_2)
+    )
+  )
+)

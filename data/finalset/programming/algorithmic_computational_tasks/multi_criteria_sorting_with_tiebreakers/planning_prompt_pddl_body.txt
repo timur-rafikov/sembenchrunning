@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain multi_criteria_sorting_with_tiebreakers_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_token_type - object entity_attribute_token_type - object entity_evaluation_slot_type - object entity_subject - object entity_item - entity_subject resource_tie_breaker_token - resource_token_type resource_criterion_token - resource_token_type resource_slot - resource_token_type attribute_type_aux1 - resource_token_type attribute_type_aux2 - resource_token_type tie_breaker_marker - resource_token_type comparator_aux_token_1 - resource_token_type comparator_aux_token_3 - resource_token_type attribute_token_primary - entity_attribute_token_type attribute_source - entity_attribute_token_type comparator_aux_token_2 - entity_attribute_token_type attribute_slot_primary - entity_evaluation_slot_type attribute_slot_secondary - entity_evaluation_slot_type evaluation_record - entity_evaluation_slot_type entity_group_base - entity_item entity_bucket_base - entity_item entity_group_a - entity_group_base entity_group_b - entity_group_base entity_bucket - entity_bucket_base)
+  (:predicates
+    (entity_registered ?entity_item - entity_item)
+    (entity_evaluation_enabled ?entity_item - entity_item)
+    (entity_tiebreak_assigned ?entity_item - entity_item)
+    (entity_finalized ?entity_item - entity_item)
+    (entity_output_selected ?entity_item - entity_item)
+    (entity_committed_for_placement ?entity_item - entity_item)
+    (resource_tie_breaker_available ?resource_tiebreak_token - resource_tie_breaker_token)
+    (entity_bound_tie_breaker_token ?entity_item - entity_item ?resource_tiebreak_token - resource_tie_breaker_token)
+    (resource_criterion_available ?resource_criterion_token - resource_criterion_token)
+    (entity_bound_criterion_token ?entity_item - entity_item ?resource_criterion_token - resource_criterion_token)
+    (resource_slot_available ?resource_slot - resource_slot)
+    (entity_assigned_slot ?entity_item - entity_item ?resource_slot - resource_slot)
+    (attribute_token_primary_available ?attribute_token_primary - attribute_token_primary)
+    (group_a_assigned_attribute_token ?entity_group_a - entity_group_a ?attribute_token_primary - attribute_token_primary)
+    (group_b_assigned_attribute_token ?entity_group_b - entity_group_b ?attribute_token_primary - attribute_token_primary)
+    (group_a_slot_primary_link ?entity_group_a - entity_group_a ?attribute_slot_primary - attribute_slot_primary)
+    (attribute_slot_primary_flag_provisional ?attribute_slot_primary - attribute_slot_primary)
+    (attribute_slot_primary_flag_confirmed ?attribute_slot_primary - attribute_slot_primary)
+    (group_a_attribute_finalized ?entity_group_a - entity_group_a)
+    (group_b_slot_secondary_link ?entity_group_b - entity_group_b ?attribute_slot_secondary - attribute_slot_secondary)
+    (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary - attribute_slot_secondary)
+    (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary - attribute_slot_secondary)
+    (group_b_attribute_finalized ?entity_group_b - entity_group_b)
+    (evaluation_record_available ?evaluation_record - evaluation_record)
+    (evaluation_record_allocated ?evaluation_record - evaluation_record)
+    (evaluation_record_slot_primary_link ?evaluation_record - evaluation_record ?attribute_slot_primary - attribute_slot_primary)
+    (evaluation_record_slot_secondary_link ?evaluation_record - evaluation_record ?attribute_slot_secondary - attribute_slot_secondary)
+    (evaluation_record_aux_comp1_present ?evaluation_record - evaluation_record)
+    (evaluation_record_aux_comp2_present ?evaluation_record - evaluation_record)
+    (evaluation_record_processing_marker ?evaluation_record - evaluation_record)
+    (bucket_group_a_link ?entity_bucket - entity_bucket ?entity_group_a - entity_group_a)
+    (bucket_group_b_link ?entity_bucket - entity_bucket ?entity_group_b - entity_group_b)
+    (bucket_evaluation_record_link ?entity_bucket - entity_bucket ?evaluation_record - evaluation_record)
+    (attribute_source_available ?attribute_source - attribute_source)
+    (bucket_attached_attribute_source ?entity_bucket - entity_bucket ?attribute_source - attribute_source)
+    (attribute_source_consumed ?attribute_source - attribute_source)
+    (attribute_source_attached_to_record ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    (bucket_attribute_stage1_ready ?entity_bucket - entity_bucket)
+    (bucket_attribute_stage2_ready ?entity_bucket - entity_bucket)
+    (bucket_attribute_stage3_ready ?entity_bucket - entity_bucket)
+    (bucket_aux_attribute_attached ?entity_bucket - entity_bucket)
+    (bucket_attribute_aux_flag ?entity_bucket - entity_bucket)
+    (bucket_attribute_stage3_flag ?entity_bucket - entity_bucket)
+    (bucket_attribute_finalized ?entity_bucket - entity_bucket)
+    (comparator_aux2_available ?comparator_aux_token_2 - comparator_aux_token_2)
+    (bucket_bound_comparator_aux2 ?entity_bucket - entity_bucket ?comparator_aux_token_2 - comparator_aux_token_2)
+    (bucket_comparator_aux2_reserved ?entity_bucket - entity_bucket)
+    (bucket_ready_for_comparator_aux3 ?entity_bucket - entity_bucket)
+    (bucket_comparator_aux3_reserved ?entity_bucket - entity_bucket)
+    (attribute_type_aux1_available ?attribute_type_aux1 - attribute_type_aux1)
+    (bucket_bound_attribute_aux1 ?entity_bucket - entity_bucket ?attribute_type_aux1 - attribute_type_aux1)
+    (attribute_type_aux2_available ?attribute_type_aux2 - attribute_type_aux2)
+    (bucket_bound_attribute_aux2 ?entity_bucket - entity_bucket ?attribute_type_aux2 - attribute_type_aux2)
+    (comparator_aux1_available ?comparator_aux_token_1 - comparator_aux_token_1)
+    (bucket_bound_comparator_aux1 ?entity_bucket - entity_bucket ?comparator_aux_token_1 - comparator_aux_token_1)
+    (comparator_aux3_available ?comparator_aux_token_3 - comparator_aux_token_3)
+    (bucket_bound_comparator_aux3 ?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3)
+    (tie_breaker_marker_available ?tie_breaker_marker - tie_breaker_marker)
+    (entity_bound_tie_breaker_marker ?entity_item - entity_item ?tie_breaker_marker - tie_breaker_marker)
+    (group_a_attribute_claimed ?entity_group_a - entity_group_a)
+    (group_b_attribute_claimed ?entity_group_b - entity_group_b)
+    (bucket_finalized_marker ?entity_bucket - entity_bucket)
+  )
+  (:action register_entity
+    :parameters (?entity_item - entity_item)
+    :precondition
+      (and
+        (not
+          (entity_registered ?entity_item)
+        )
+        (not
+          (entity_finalized ?entity_item)
+        )
+      )
+    :effect (entity_registered ?entity_item)
+  )
+  (:action assign_tie_breaker_to_entity
+    :parameters (?entity_item - entity_item ?resource_tiebreak_token - resource_tie_breaker_token)
+    :precondition
+      (and
+        (entity_registered ?entity_item)
+        (not
+          (entity_tiebreak_assigned ?entity_item)
+        )
+        (resource_tie_breaker_available ?resource_tiebreak_token)
+      )
+    :effect
+      (and
+        (entity_tiebreak_assigned ?entity_item)
+        (entity_bound_tie_breaker_token ?entity_item ?resource_tiebreak_token)
+        (not
+          (resource_tie_breaker_available ?resource_tiebreak_token)
+        )
+      )
+  )
+  (:action assign_criterion_to_entity
+    :parameters (?entity_item - entity_item ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_registered ?entity_item)
+        (entity_tiebreak_assigned ?entity_item)
+        (resource_criterion_available ?resource_criterion_token)
+      )
+    :effect
+      (and
+        (entity_bound_criterion_token ?entity_item ?resource_criterion_token)
+        (not
+          (resource_criterion_available ?resource_criterion_token)
+        )
+      )
+  )
+  (:action enable_entity_evaluation
+    :parameters (?entity_item - entity_item ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_registered ?entity_item)
+        (entity_tiebreak_assigned ?entity_item)
+        (entity_bound_criterion_token ?entity_item ?resource_criterion_token)
+        (not
+          (entity_evaluation_enabled ?entity_item)
+        )
+      )
+    :effect (entity_evaluation_enabled ?entity_item)
+  )
+  (:action release_criterion_from_entity
+    :parameters (?entity_item - entity_item ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_bound_criterion_token ?entity_item ?resource_criterion_token)
+      )
+    :effect
+      (and
+        (resource_criterion_available ?resource_criterion_token)
+        (not
+          (entity_bound_criterion_token ?entity_item ?resource_criterion_token)
+        )
+      )
+  )
+  (:action assign_slot_to_entity
+    :parameters (?entity_item - entity_item ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_item)
+        (resource_slot_available ?resource_slot)
+      )
+    :effect
+      (and
+        (entity_assigned_slot ?entity_item ?resource_slot)
+        (not
+          (resource_slot_available ?resource_slot)
+        )
+      )
+  )
+  (:action release_slot_from_entity
+    :parameters (?entity_item - entity_item ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (entity_assigned_slot ?entity_item ?resource_slot)
+      )
+    :effect
+      (and
+        (resource_slot_available ?resource_slot)
+        (not
+          (entity_assigned_slot ?entity_item ?resource_slot)
+        )
+      )
+  )
+  (:action assign_comparator_aux1_to_bucket
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_1 - comparator_aux_token_1)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (comparator_aux1_available ?comparator_aux_token_1)
+      )
+    :effect
+      (and
+        (bucket_bound_comparator_aux1 ?entity_bucket ?comparator_aux_token_1)
+        (not
+          (comparator_aux1_available ?comparator_aux_token_1)
+        )
+      )
+  )
+  (:action release_comparator_aux1_from_bucket
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_1 - comparator_aux_token_1)
+    :precondition
+      (and
+        (bucket_bound_comparator_aux1 ?entity_bucket ?comparator_aux_token_1)
+      )
+    :effect
+      (and
+        (comparator_aux1_available ?comparator_aux_token_1)
+        (not
+          (bucket_bound_comparator_aux1 ?entity_bucket ?comparator_aux_token_1)
+        )
+      )
+  )
+  (:action assign_comparator_aux3_to_bucket
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (comparator_aux3_available ?comparator_aux_token_3)
+      )
+    :effect
+      (and
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (not
+          (comparator_aux3_available ?comparator_aux_token_3)
+        )
+      )
+  )
+  (:action release_comparator_aux3_from_bucket
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3)
+    :precondition
+      (and
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+      )
+    :effect
+      (and
+        (comparator_aux3_available ?comparator_aux_token_3)
+        (not
+          (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        )
+      )
+  )
+  (:action set_slot_primary_provisional
+    :parameters (?entity_group_a - entity_group_a ?attribute_slot_primary - attribute_slot_primary ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_a)
+        (entity_bound_criterion_token ?entity_group_a ?resource_criterion_token)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (not
+          (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+        )
+        (not
+          (attribute_slot_primary_flag_confirmed ?attribute_slot_primary)
+        )
+      )
+    :effect (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+  )
+  (:action group_a_confirm_primary_slot
+    :parameters (?entity_group_a - entity_group_a ?attribute_slot_primary - attribute_slot_primary ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_a)
+        (entity_assigned_slot ?entity_group_a ?resource_slot)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+        (not
+          (group_a_attribute_claimed ?entity_group_a)
+        )
+      )
+    :effect
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_a_attribute_finalized ?entity_group_a)
+      )
+  )
+  (:action group_a_attach_attribute_token
+    :parameters (?entity_group_a - entity_group_a ?attribute_slot_primary - attribute_slot_primary ?attribute_token_primary - attribute_token_primary)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_a)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (attribute_token_primary_available ?attribute_token_primary)
+        (not
+          (group_a_attribute_claimed ?entity_group_a)
+        )
+      )
+    :effect
+      (and
+        (attribute_slot_primary_flag_confirmed ?attribute_slot_primary)
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_a_assigned_attribute_token ?entity_group_a ?attribute_token_primary)
+        (not
+          (attribute_token_primary_available ?attribute_token_primary)
+        )
+      )
+  )
+  (:action group_a_resolve_primary_assignment
+    :parameters (?entity_group_a - entity_group_a ?attribute_slot_primary - attribute_slot_primary ?resource_criterion_token - resource_criterion_token ?attribute_token_primary - attribute_token_primary)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_a)
+        (entity_bound_criterion_token ?entity_group_a ?resource_criterion_token)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (attribute_slot_primary_flag_confirmed ?attribute_slot_primary)
+        (group_a_assigned_attribute_token ?entity_group_a ?attribute_token_primary)
+        (not
+          (group_a_attribute_finalized ?entity_group_a)
+        )
+      )
+    :effect
+      (and
+        (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+        (group_a_attribute_finalized ?entity_group_a)
+        (attribute_token_primary_available ?attribute_token_primary)
+        (not
+          (group_a_assigned_attribute_token ?entity_group_a ?attribute_token_primary)
+        )
+      )
+  )
+  (:action set_slot_secondary_provisional
+    :parameters (?entity_group_b - entity_group_b ?attribute_slot_secondary - attribute_slot_secondary ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_b)
+        (entity_bound_criterion_token ?entity_group_b ?resource_criterion_token)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (not
+          (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+        )
+        (not
+          (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary)
+        )
+      )
+    :effect (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+  )
+  (:action group_b_confirm_secondary_slot
+    :parameters (?entity_group_b - entity_group_b ?attribute_slot_secondary - attribute_slot_secondary ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_b)
+        (entity_assigned_slot ?entity_group_b ?resource_slot)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+        (not
+          (group_b_attribute_claimed ?entity_group_b)
+        )
+      )
+    :effect
+      (and
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_b_attribute_finalized ?entity_group_b)
+      )
+  )
+  (:action group_b_attach_attribute_token
+    :parameters (?entity_group_b - entity_group_b ?attribute_slot_secondary - attribute_slot_secondary ?attribute_token_primary - attribute_token_primary)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_b)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_token_primary_available ?attribute_token_primary)
+        (not
+          (group_b_attribute_claimed ?entity_group_b)
+        )
+      )
+    :effect
+      (and
+        (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary)
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_b_assigned_attribute_token ?entity_group_b ?attribute_token_primary)
+        (not
+          (attribute_token_primary_available ?attribute_token_primary)
+        )
+      )
+  )
+  (:action group_b_resolve_secondary_assignment
+    :parameters (?entity_group_b - entity_group_b ?attribute_slot_secondary - attribute_slot_secondary ?resource_criterion_token - resource_criterion_token ?attribute_token_primary - attribute_token_primary)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_group_b)
+        (entity_bound_criterion_token ?entity_group_b ?resource_criterion_token)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary)
+        (group_b_assigned_attribute_token ?entity_group_b ?attribute_token_primary)
+        (not
+          (group_b_attribute_finalized ?entity_group_b)
+        )
+      )
+    :effect
+      (and
+        (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+        (group_b_attribute_finalized ?entity_group_b)
+        (attribute_token_primary_available ?attribute_token_primary)
+        (not
+          (group_b_assigned_attribute_token ?entity_group_b ?attribute_token_primary)
+        )
+      )
+  )
+  (:action allocate_evaluation_record
+    :parameters (?entity_group_a - entity_group_a ?entity_group_b - entity_group_b ?attribute_slot_primary - attribute_slot_primary ?attribute_slot_secondary - attribute_slot_secondary ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+        (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+        (group_a_attribute_finalized ?entity_group_a)
+        (group_b_attribute_finalized ?entity_group_b)
+        (evaluation_record_available ?evaluation_record)
+      )
+    :effect
+      (and
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_slot_primary_link ?evaluation_record ?attribute_slot_primary)
+        (evaluation_record_slot_secondary_link ?evaluation_record ?attribute_slot_secondary)
+        (not
+          (evaluation_record_available ?evaluation_record)
+        )
+      )
+  )
+  (:action allocate_evaluation_record_with_aux1
+    :parameters (?entity_group_a - entity_group_a ?entity_group_b - entity_group_b ?attribute_slot_primary - attribute_slot_primary ?attribute_slot_secondary - attribute_slot_secondary ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_primary_flag_confirmed ?attribute_slot_primary)
+        (attribute_slot_secondary_flag_provisional ?attribute_slot_secondary)
+        (not
+          (group_a_attribute_finalized ?entity_group_a)
+        )
+        (group_b_attribute_finalized ?entity_group_b)
+        (evaluation_record_available ?evaluation_record)
+      )
+    :effect
+      (and
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_slot_primary_link ?evaluation_record ?attribute_slot_primary)
+        (evaluation_record_slot_secondary_link ?evaluation_record ?attribute_slot_secondary)
+        (evaluation_record_aux_comp1_present ?evaluation_record)
+        (not
+          (evaluation_record_available ?evaluation_record)
+        )
+      )
+  )
+  (:action allocate_evaluation_record_with_aux2
+    :parameters (?entity_group_a - entity_group_a ?entity_group_b - entity_group_b ?attribute_slot_primary - attribute_slot_primary ?attribute_slot_secondary - attribute_slot_secondary ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_primary_flag_provisional ?attribute_slot_primary)
+        (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary)
+        (group_a_attribute_finalized ?entity_group_a)
+        (not
+          (group_b_attribute_finalized ?entity_group_b)
+        )
+        (evaluation_record_available ?evaluation_record)
+      )
+    :effect
+      (and
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_slot_primary_link ?evaluation_record ?attribute_slot_primary)
+        (evaluation_record_slot_secondary_link ?evaluation_record ?attribute_slot_secondary)
+        (evaluation_record_aux_comp2_present ?evaluation_record)
+        (not
+          (evaluation_record_available ?evaluation_record)
+        )
+      )
+  )
+  (:action allocate_evaluation_record_with_both_aux
+    :parameters (?entity_group_a - entity_group_a ?entity_group_b - entity_group_b ?attribute_slot_primary - attribute_slot_primary ?attribute_slot_secondary - attribute_slot_secondary ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_a_slot_primary_link ?entity_group_a ?attribute_slot_primary)
+        (group_b_slot_secondary_link ?entity_group_b ?attribute_slot_secondary)
+        (attribute_slot_primary_flag_confirmed ?attribute_slot_primary)
+        (attribute_slot_secondary_flag_confirmed ?attribute_slot_secondary)
+        (not
+          (group_a_attribute_finalized ?entity_group_a)
+        )
+        (not
+          (group_b_attribute_finalized ?entity_group_b)
+        )
+        (evaluation_record_available ?evaluation_record)
+      )
+    :effect
+      (and
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_slot_primary_link ?evaluation_record ?attribute_slot_primary)
+        (evaluation_record_slot_secondary_link ?evaluation_record ?attribute_slot_secondary)
+        (evaluation_record_aux_comp1_present ?evaluation_record)
+        (evaluation_record_aux_comp2_present ?evaluation_record)
+        (not
+          (evaluation_record_available ?evaluation_record)
+        )
+      )
+  )
+  (:action mark_evaluation_record_processed
+    :parameters (?evaluation_record - evaluation_record ?entity_group_a - entity_group_a ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (evaluation_record_allocated ?evaluation_record)
+        (group_a_attribute_claimed ?entity_group_a)
+        (entity_bound_criterion_token ?entity_group_a ?resource_criterion_token)
+        (not
+          (evaluation_record_processing_marker ?evaluation_record)
+        )
+      )
+    :effect (evaluation_record_processing_marker ?evaluation_record)
+  )
+  (:action consume_attribute_source_attach_to_record
+    :parameters (?entity_bucket - entity_bucket ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (bucket_evaluation_record_link ?entity_bucket ?evaluation_record)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_available ?attribute_source)
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_processing_marker ?evaluation_record)
+        (not
+          (attribute_source_consumed ?attribute_source)
+        )
+      )
+    :effect
+      (and
+        (attribute_source_consumed ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (not
+          (attribute_source_available ?attribute_source)
+        )
+      )
+  )
+  (:action mark_bucket_attribute_stage1
+    :parameters (?entity_bucket - entity_bucket ?attribute_source - attribute_source ?evaluation_record - evaluation_record ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_consumed ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (entity_bound_criterion_token ?entity_bucket ?resource_criterion_token)
+        (not
+          (evaluation_record_aux_comp1_present ?evaluation_record)
+        )
+        (not
+          (bucket_attribute_stage1_ready ?entity_bucket)
+        )
+      )
+    :effect (bucket_attribute_stage1_ready ?entity_bucket)
+  )
+  (:action attach_bucket_aux1_attribute
+    :parameters (?entity_bucket - entity_bucket ?attribute_type_aux1 - attribute_type_aux1)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (attribute_type_aux1_available ?attribute_type_aux1)
+        (not
+          (bucket_aux_attribute_attached ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_aux_attribute_attached ?entity_bucket)
+        (bucket_bound_attribute_aux1 ?entity_bucket ?attribute_type_aux1)
+        (not
+          (attribute_type_aux1_available ?attribute_type_aux1)
+        )
+      )
+  )
+  (:action mark_bucket_attribute_stage2
+    :parameters (?entity_bucket - entity_bucket ?attribute_source - attribute_source ?evaluation_record - evaluation_record ?resource_criterion_token - resource_criterion_token ?attribute_type_aux1 - attribute_type_aux1)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_consumed ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (entity_bound_criterion_token ?entity_bucket ?resource_criterion_token)
+        (evaluation_record_aux_comp1_present ?evaluation_record)
+        (bucket_aux_attribute_attached ?entity_bucket)
+        (bucket_bound_attribute_aux1 ?entity_bucket ?attribute_type_aux1)
+        (not
+          (bucket_attribute_stage1_ready ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_attribute_stage1_ready ?entity_bucket)
+        (bucket_attribute_aux_flag ?entity_bucket)
+      )
+  )
+  (:action advance_bucket_stage2_to_stage3
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_1 - comparator_aux_token_1 ?resource_slot - resource_slot ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage1_ready ?entity_bucket)
+        (bucket_bound_comparator_aux1 ?entity_bucket ?comparator_aux_token_1)
+        (entity_assigned_slot ?entity_bucket ?resource_slot)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (not
+          (evaluation_record_aux_comp2_present ?evaluation_record)
+        )
+        (not
+          (bucket_attribute_stage2_ready ?entity_bucket)
+        )
+      )
+    :effect (bucket_attribute_stage2_ready ?entity_bucket)
+  )
+  (:action advance_bucket_stage2_to_stage3_alt
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_1 - comparator_aux_token_1 ?resource_slot - resource_slot ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage1_ready ?entity_bucket)
+        (bucket_bound_comparator_aux1 ?entity_bucket ?comparator_aux_token_1)
+        (entity_assigned_slot ?entity_bucket ?resource_slot)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (evaluation_record_aux_comp2_present ?evaluation_record)
+        (not
+          (bucket_attribute_stage2_ready ?entity_bucket)
+        )
+      )
+    :effect (bucket_attribute_stage2_ready ?entity_bucket)
+  )
+  (:action mark_bucket_stage3_ready
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3 ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage2_ready ?entity_bucket)
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (not
+          (evaluation_record_aux_comp1_present ?evaluation_record)
+        )
+        (not
+          (evaluation_record_aux_comp2_present ?evaluation_record)
+        )
+        (not
+          (bucket_attribute_stage3_ready ?entity_bucket)
+        )
+      )
+    :effect (bucket_attribute_stage3_ready ?entity_bucket)
+  )
+  (:action mark_bucket_stage3_ready_with_aux
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3 ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage2_ready ?entity_bucket)
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (evaluation_record_aux_comp1_present ?evaluation_record)
+        (not
+          (evaluation_record_aux_comp2_present ?evaluation_record)
+        )
+        (not
+          (bucket_attribute_stage3_ready ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_stage3_flag ?entity_bucket)
+      )
+  )
+  (:action mark_bucket_stage3_ready_with_aux_alt
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3 ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage2_ready ?entity_bucket)
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (not
+          (evaluation_record_aux_comp1_present ?evaluation_record)
+        )
+        (evaluation_record_aux_comp2_present ?evaluation_record)
+        (not
+          (bucket_attribute_stage3_ready ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_stage3_flag ?entity_bucket)
+      )
+  )
+  (:action mark_bucket_stage3_ready_with_aux_both
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3 ?attribute_source - attribute_source ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (bucket_attribute_stage2_ready ?entity_bucket)
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (bucket_attached_attribute_source ?entity_bucket ?attribute_source)
+        (attribute_source_attached_to_record ?attribute_source ?evaluation_record)
+        (evaluation_record_aux_comp1_present ?evaluation_record)
+        (evaluation_record_aux_comp2_present ?evaluation_record)
+        (not
+          (bucket_attribute_stage3_ready ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_stage3_flag ?entity_bucket)
+      )
+  )
+  (:action finalize_bucket_candidate
+    :parameters (?entity_bucket - entity_bucket)
+    :precondition
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (not
+          (bucket_attribute_stage3_flag ?entity_bucket)
+        )
+        (not
+          (bucket_finalized_marker ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_finalized_marker ?entity_bucket)
+        (entity_output_selected ?entity_bucket)
+      )
+  )
+  (:action attach_bucket_aux2_attribute
+    :parameters (?entity_bucket - entity_bucket ?attribute_type_aux2 - attribute_type_aux2)
+    :precondition
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_stage3_flag ?entity_bucket)
+        (attribute_type_aux2_available ?attribute_type_aux2)
+      )
+    :effect
+      (and
+        (bucket_bound_attribute_aux2 ?entity_bucket ?attribute_type_aux2)
+        (not
+          (attribute_type_aux2_available ?attribute_type_aux2)
+        )
+      )
+  )
+  (:action lock_bucket_for_output
+    :parameters (?entity_bucket - entity_bucket ?entity_group_a - entity_group_a ?entity_group_b - entity_group_b ?resource_criterion_token - resource_criterion_token ?attribute_type_aux2 - attribute_type_aux2)
+    :precondition
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_stage3_flag ?entity_bucket)
+        (bucket_bound_attribute_aux2 ?entity_bucket ?attribute_type_aux2)
+        (bucket_group_a_link ?entity_bucket ?entity_group_a)
+        (bucket_group_b_link ?entity_bucket ?entity_group_b)
+        (group_a_attribute_finalized ?entity_group_a)
+        (group_b_attribute_finalized ?entity_group_b)
+        (entity_bound_criterion_token ?entity_bucket ?resource_criterion_token)
+        (not
+          (bucket_attribute_finalized ?entity_bucket)
+        )
+      )
+    :effect (bucket_attribute_finalized ?entity_bucket)
+  )
+  (:action commit_bucket_output
+    :parameters (?entity_bucket - entity_bucket)
+    :precondition
+      (and
+        (bucket_attribute_stage3_ready ?entity_bucket)
+        (bucket_attribute_finalized ?entity_bucket)
+        (not
+          (bucket_finalized_marker ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_finalized_marker ?entity_bucket)
+        (entity_output_selected ?entity_bucket)
+      )
+  )
+  (:action reserve_bucket_for_aux2_processing
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_2 - comparator_aux_token_2 ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_evaluation_enabled ?entity_bucket)
+        (entity_bound_criterion_token ?entity_bucket ?resource_criterion_token)
+        (comparator_aux2_available ?comparator_aux_token_2)
+        (bucket_bound_comparator_aux2 ?entity_bucket ?comparator_aux_token_2)
+        (not
+          (bucket_comparator_aux2_reserved ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_comparator_aux2_reserved ?entity_bucket)
+        (not
+          (comparator_aux2_available ?comparator_aux_token_2)
+        )
+      )
+  )
+  (:action mark_bucket_ready_for_comparator_aux3
+    :parameters (?entity_bucket - entity_bucket ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (bucket_comparator_aux2_reserved ?entity_bucket)
+        (entity_assigned_slot ?entity_bucket ?resource_slot)
+        (not
+          (bucket_ready_for_comparator_aux3 ?entity_bucket)
+        )
+      )
+    :effect (bucket_ready_for_comparator_aux3 ?entity_bucket)
+  )
+  (:action reserve_bucket_for_comparator_aux3
+    :parameters (?entity_bucket - entity_bucket ?comparator_aux_token_3 - comparator_aux_token_3)
+    :precondition
+      (and
+        (bucket_ready_for_comparator_aux3 ?entity_bucket)
+        (bucket_bound_comparator_aux3 ?entity_bucket ?comparator_aux_token_3)
+        (not
+          (bucket_comparator_aux3_reserved ?entity_bucket)
+        )
+      )
+    :effect (bucket_comparator_aux3_reserved ?entity_bucket)
+  )
+  (:action finalize_bucket_via_comparator_aux3
+    :parameters (?entity_bucket - entity_bucket)
+    :precondition
+      (and
+        (bucket_comparator_aux3_reserved ?entity_bucket)
+        (not
+          (bucket_finalized_marker ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (bucket_finalized_marker ?entity_bucket)
+        (entity_output_selected ?entity_bucket)
+      )
+  )
+  (:action mark_group_a_selected
+    :parameters (?entity_group_a - entity_group_a ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_a_attribute_claimed ?entity_group_a)
+        (group_a_attribute_finalized ?entity_group_a)
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_processing_marker ?evaluation_record)
+        (not
+          (entity_output_selected ?entity_group_a)
+        )
+      )
+    :effect (entity_output_selected ?entity_group_a)
+  )
+  (:action mark_group_b_selected
+    :parameters (?entity_group_b - entity_group_b ?evaluation_record - evaluation_record)
+    :precondition
+      (and
+        (group_b_attribute_claimed ?entity_group_b)
+        (group_b_attribute_finalized ?entity_group_b)
+        (evaluation_record_allocated ?evaluation_record)
+        (evaluation_record_processing_marker ?evaluation_record)
+        (not
+          (entity_output_selected ?entity_group_b)
+        )
+      )
+    :effect (entity_output_selected ?entity_group_b)
+  )
+  (:action apply_tie_break_marker_to_entity
+    :parameters (?entity_item - entity_item ?tie_breaker_marker - tie_breaker_marker ?resource_criterion_token - resource_criterion_token)
+    :precondition
+      (and
+        (entity_output_selected ?entity_item)
+        (entity_bound_criterion_token ?entity_item ?resource_criterion_token)
+        (tie_breaker_marker_available ?tie_breaker_marker)
+        (not
+          (entity_committed_for_placement ?entity_item)
+        )
+      )
+    :effect
+      (and
+        (entity_committed_for_placement ?entity_item)
+        (entity_bound_tie_breaker_marker ?entity_item ?tie_breaker_marker)
+        (not
+          (tie_breaker_marker_available ?tie_breaker_marker)
+        )
+      )
+  )
+  (:action finalize_group_a_with_tie_breaker
+    :parameters (?entity_group_a - entity_group_a ?resource_tiebreak_token - resource_tie_breaker_token ?tie_breaker_marker - tie_breaker_marker)
+    :precondition
+      (and
+        (entity_committed_for_placement ?entity_group_a)
+        (entity_bound_tie_breaker_token ?entity_group_a ?resource_tiebreak_token)
+        (entity_bound_tie_breaker_marker ?entity_group_a ?tie_breaker_marker)
+        (not
+          (entity_finalized ?entity_group_a)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?entity_group_a)
+        (resource_tie_breaker_available ?resource_tiebreak_token)
+        (tie_breaker_marker_available ?tie_breaker_marker)
+      )
+  )
+  (:action finalize_group_b_with_tie_breaker
+    :parameters (?entity_group_b - entity_group_b ?resource_tiebreak_token - resource_tie_breaker_token ?tie_breaker_marker - tie_breaker_marker)
+    :precondition
+      (and
+        (entity_committed_for_placement ?entity_group_b)
+        (entity_bound_tie_breaker_token ?entity_group_b ?resource_tiebreak_token)
+        (entity_bound_tie_breaker_marker ?entity_group_b ?tie_breaker_marker)
+        (not
+          (entity_finalized ?entity_group_b)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?entity_group_b)
+        (resource_tie_breaker_available ?resource_tiebreak_token)
+        (tie_breaker_marker_available ?tie_breaker_marker)
+      )
+  )
+  (:action finalize_bucket_with_tie_breaker
+    :parameters (?entity_bucket - entity_bucket ?resource_tiebreak_token - resource_tie_breaker_token ?tie_breaker_marker - tie_breaker_marker)
+    :precondition
+      (and
+        (entity_committed_for_placement ?entity_bucket)
+        (entity_bound_tie_breaker_token ?entity_bucket ?resource_tiebreak_token)
+        (entity_bound_tie_breaker_marker ?entity_bucket ?tie_breaker_marker)
+        (not
+          (entity_finalized ?entity_bucket)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?entity_bucket)
+        (resource_tie_breaker_available ?resource_tiebreak_token)
+        (tie_breaker_marker_available ?tie_breaker_marker)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem multi_criteria_sorting_with_tiebreakers_problem)
+  (:domain multi_criteria_sorting_with_tiebreakers_domain)
+  (:objects group_a_1 - entity_group_a group_b_1 - entity_group_b bucket_1 - entity_bucket bucket_2 - entity_bucket tie_breaker_token_1 - resource_tie_breaker_token tie_breaker_token_2 - resource_tie_breaker_token tie_breaker_token_3 - resource_tie_breaker_token criterion_token_1 - resource_criterion_token resource_slot_1 - resource_slot attribute_token_primary_1 - attribute_token_primary attribute_slot_primary_1 - attribute_slot_primary attribute_slot_secondary_1 - attribute_slot_secondary evaluation_record_1 - evaluation_record attribute_source_1 - attribute_source attribute_source_2 - attribute_source attribute_aux1_type_1 - attribute_type_aux1 attribute_aux1_type_2 - attribute_type_aux1 attribute_aux2_type_1 - attribute_type_aux2 attribute_aux2_type_2 - attribute_type_aux2 tie_breaker_marker_1 - tie_breaker_marker comparator_aux1_token_1 - comparator_aux_token_1 comparator_aux2_token_1 - comparator_aux_token_2 comparator_aux2_token_2 - comparator_aux_token_2 comparator_aux3_token_1 - comparator_aux_token_3)
+  (:init
+    (resource_tie_breaker_available tie_breaker_token_1)
+    (resource_tie_breaker_available tie_breaker_token_2)
+    (resource_tie_breaker_available tie_breaker_token_3)
+    (resource_criterion_available criterion_token_1)
+    (resource_slot_available resource_slot_1)
+    (attribute_token_primary_available attribute_token_primary_1)
+    (group_a_slot_primary_link group_a_1 attribute_slot_primary_1)
+    (group_b_slot_secondary_link group_b_1 attribute_slot_secondary_1)
+    (evaluation_record_available evaluation_record_1)
+    (attribute_source_available attribute_source_1)
+    (attribute_source_available attribute_source_2)
+    (bucket_group_a_link bucket_1 group_a_1)
+    (bucket_group_a_link bucket_2 group_a_1)
+    (bucket_group_b_link bucket_1 group_b_1)
+    (bucket_group_b_link bucket_2 group_b_1)
+    (bucket_evaluation_record_link bucket_1 evaluation_record_1)
+    (bucket_evaluation_record_link bucket_2 evaluation_record_1)
+    (bucket_attached_attribute_source bucket_1 attribute_source_1)
+    (bucket_attached_attribute_source bucket_2 attribute_source_2)
+    (attribute_type_aux1_available attribute_aux1_type_1)
+    (attribute_type_aux1_available attribute_aux1_type_2)
+    (attribute_type_aux2_available attribute_aux2_type_1)
+    (attribute_type_aux2_available attribute_aux2_type_2)
+    (tie_breaker_marker_available tie_breaker_marker_1)
+    (comparator_aux1_available comparator_aux1_token_1)
+    (comparator_aux2_available comparator_aux2_token_1)
+    (bucket_bound_comparator_aux2 bucket_1 comparator_aux2_token_1)
+    (bucket_bound_comparator_aux2 bucket_2 comparator_aux2_token_2)
+    (comparator_aux3_available comparator_aux3_token_1)
+  )
+  (:goal
+    (and
+      (entity_finalized group_a_1)
+      (entity_finalized group_b_1)
+      (entity_finalized bucket_1)
+      (entity_finalized bucket_2)
+    )
+  )
+)

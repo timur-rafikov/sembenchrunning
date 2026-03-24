@@ -1,0 +1,936 @@
+(define (domain finance_inflow_allocation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource - object domain_placeholder2 - object domain_placeholder3 - object allocation_case_root - object allocation_request - allocation_case_root funding_source - resource security - resource trader_desk - resource preferred_broker - resource execution_variant - resource post_trade_batch - resource compliance_check - resource execution_policy - resource allocation_preference - domain_placeholder2 settlement_account - domain_placeholder2 client_constraint - domain_placeholder2 execution_leg_type_a - domain_placeholder3 execution_leg_type_b - domain_placeholder3 order_instruction - domain_placeholder3 position_group - allocation_request account_group - allocation_request position_a - position_group position_b - position_group portfolio_account - account_group)
+  (:predicates
+    (registered ?allocation_request - allocation_request)
+    (confirmed ?allocation_request - allocation_request)
+    (funding_attached ?allocation_request - allocation_request)
+    (assignment_finalized ?allocation_request - allocation_request)
+    (ready_for_post_trade ?allocation_request - allocation_request)
+    (bound_to_post_trade_batch ?allocation_request - allocation_request)
+    (funding_source_available ?funding_source - funding_source)
+    (funding_source_linked ?allocation_request - allocation_request ?funding_source - funding_source)
+    (security_available ?security - security)
+    (security_linked ?allocation_request - allocation_request ?security - security)
+    (trader_desk_available ?trader_desk - trader_desk)
+    (trader_desk_assigned ?allocation_request - allocation_request ?trader_desk - trader_desk)
+    (allocation_preference_available ?allocation_preference - allocation_preference)
+    (position_a_preference_assigned ?position_a - position_a ?allocation_preference - allocation_preference)
+    (position_b_preference_assigned ?position_b - position_b ?allocation_preference - allocation_preference)
+    (position_a_leg_a_applicable ?position_a - position_a ?execution_leg_type_a - execution_leg_type_a)
+    (execution_leg_a_primary_flag ?execution_leg_type_a - execution_leg_type_a)
+    (execution_leg_a_preference_flag ?execution_leg_type_a - execution_leg_type_a)
+    (position_a_ready_for_execution ?position_a - position_a)
+    (position_b_leg_b_applicable ?position_b - position_b ?execution_leg_type_b - execution_leg_type_b)
+    (execution_leg_b_primary_flag ?execution_leg_type_b - execution_leg_type_b)
+    (execution_leg_b_preference_flag ?execution_leg_type_b - execution_leg_type_b)
+    (position_b_ready_for_execution ?position_b - position_b)
+    (order_instruction_available ?order_instruction - order_instruction)
+    (order_instruction_created ?order_instruction - order_instruction)
+    (order_instruction_linked_leg_a ?order_instruction - order_instruction ?execution_leg_type_a - execution_leg_type_a)
+    (order_instruction_linked_leg_b ?order_instruction - order_instruction ?execution_leg_type_b - execution_leg_type_b)
+    (order_instruction_flag_a ?order_instruction - order_instruction)
+    (order_instruction_flag_b ?order_instruction - order_instruction)
+    (order_instruction_confirmed ?order_instruction - order_instruction)
+    (portfolio_account_has_position_a ?portfolio_account - portfolio_account ?position_a - position_a)
+    (portfolio_account_has_position_b ?portfolio_account - portfolio_account ?position_b - position_b)
+    (portfolio_account_has_order_instruction ?portfolio_account - portfolio_account ?order_instruction - order_instruction)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (portfolio_account_has_settlement_account ?portfolio_account - portfolio_account ?settlement_account - settlement_account)
+    (settlement_account_allocated ?settlement_account - settlement_account)
+    (settlement_account_linked_to_order ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    (portfolio_account_settlement_enriched ?portfolio_account - portfolio_account)
+    (portfolio_account_ready_for_compliance ?portfolio_account - portfolio_account)
+    (portfolio_account_compliance_applied ?portfolio_account - portfolio_account)
+    (portfolio_account_preferred_broker_assigned ?portfolio_account - portfolio_account)
+    (portfolio_account_broker_confirmed ?portfolio_account - portfolio_account)
+    (portfolio_account_execution_variant_attached ?portfolio_account - portfolio_account)
+    (portfolio_account_execution_strategy_finalized ?portfolio_account - portfolio_account)
+    (client_constraint_available ?client_constraint - client_constraint)
+    (portfolio_account_has_client_constraint ?portfolio_account - portfolio_account ?client_constraint - client_constraint)
+    (portfolio_account_client_constraint_applied ?portfolio_account - portfolio_account)
+    (portfolio_account_constraint_desk_assigned ?portfolio_account - portfolio_account)
+    (portfolio_account_constraint_policy_confirmed ?portfolio_account - portfolio_account)
+    (preferred_broker_available ?preferred_broker - preferred_broker)
+    (portfolio_account_has_preferred_broker ?portfolio_account - portfolio_account ?preferred_broker - preferred_broker)
+    (execution_variant_available ?execution_variant - execution_variant)
+    (portfolio_account_execution_variant_assigned ?portfolio_account - portfolio_account ?execution_variant - execution_variant)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (portfolio_account_compliance_check_assigned ?portfolio_account - portfolio_account ?compliance_check - compliance_check)
+    (execution_policy_available ?execution_policy - execution_policy)
+    (portfolio_account_execution_policy_assigned ?portfolio_account - portfolio_account ?execution_policy - execution_policy)
+    (post_trade_batch_available ?post_trade_batch - post_trade_batch)
+    (post_trade_batch_assigned ?allocation_request - allocation_request ?post_trade_batch - post_trade_batch)
+    (position_a_flag_set ?position_a - position_a)
+    (position_b_flag_set ?position_b - position_b)
+    (portfolio_account_finalized ?portfolio_account - portfolio_account)
+  )
+  (:action register_allocation_request
+    :parameters (?allocation_request - allocation_request)
+    :precondition
+      (and
+        (not
+          (registered ?allocation_request)
+        )
+        (not
+          (assignment_finalized ?allocation_request)
+        )
+      )
+    :effect (registered ?allocation_request)
+  )
+  (:action assign_funding_source_to_request
+    :parameters (?allocation_request - allocation_request ?funding_source - funding_source)
+    :precondition
+      (and
+        (registered ?allocation_request)
+        (not
+          (funding_attached ?allocation_request)
+        )
+        (funding_source_available ?funding_source)
+      )
+    :effect
+      (and
+        (funding_attached ?allocation_request)
+        (funding_source_linked ?allocation_request ?funding_source)
+        (not
+          (funding_source_available ?funding_source)
+        )
+      )
+  )
+  (:action assign_security_candidate_to_request
+    :parameters (?allocation_request - allocation_request ?security - security)
+    :precondition
+      (and
+        (registered ?allocation_request)
+        (funding_attached ?allocation_request)
+        (security_available ?security)
+      )
+    :effect
+      (and
+        (security_linked ?allocation_request ?security)
+        (not
+          (security_available ?security)
+        )
+      )
+  )
+  (:action approve_allocation_request
+    :parameters (?allocation_request - allocation_request ?security - security)
+    :precondition
+      (and
+        (registered ?allocation_request)
+        (funding_attached ?allocation_request)
+        (security_linked ?allocation_request ?security)
+        (not
+          (confirmed ?allocation_request)
+        )
+      )
+    :effect (confirmed ?allocation_request)
+  )
+  (:action release_security_candidate_from_request
+    :parameters (?allocation_request - allocation_request ?security - security)
+    :precondition
+      (and
+        (security_linked ?allocation_request ?security)
+      )
+    :effect
+      (and
+        (security_available ?security)
+        (not
+          (security_linked ?allocation_request ?security)
+        )
+      )
+  )
+  (:action assign_trader_desk_to_request
+    :parameters (?allocation_request - allocation_request ?trader_desk - trader_desk)
+    :precondition
+      (and
+        (confirmed ?allocation_request)
+        (trader_desk_available ?trader_desk)
+      )
+    :effect
+      (and
+        (trader_desk_assigned ?allocation_request ?trader_desk)
+        (not
+          (trader_desk_available ?trader_desk)
+        )
+      )
+  )
+  (:action release_trader_desk_from_request
+    :parameters (?allocation_request - allocation_request ?trader_desk - trader_desk)
+    :precondition
+      (and
+        (trader_desk_assigned ?allocation_request ?trader_desk)
+      )
+    :effect
+      (and
+        (trader_desk_available ?trader_desk)
+        (not
+          (trader_desk_assigned ?allocation_request ?trader_desk)
+        )
+      )
+  )
+  (:action assign_compliance_check_to_account
+    :parameters (?portfolio_account - portfolio_account ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (portfolio_account_compliance_check_assigned ?portfolio_account ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action remove_compliance_check_from_account
+    :parameters (?portfolio_account - portfolio_account ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (portfolio_account_compliance_check_assigned ?portfolio_account ?compliance_check)
+      )
+    :effect
+      (and
+        (compliance_check_available ?compliance_check)
+        (not
+          (portfolio_account_compliance_check_assigned ?portfolio_account ?compliance_check)
+        )
+      )
+  )
+  (:action assign_execution_policy_to_account
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (execution_policy_available ?execution_policy)
+      )
+    :effect
+      (and
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (not
+          (execution_policy_available ?execution_policy)
+        )
+      )
+  )
+  (:action remove_execution_policy_from_account
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy)
+    :precondition
+      (and
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+      )
+    :effect
+      (and
+        (execution_policy_available ?execution_policy)
+        (not
+          (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        )
+      )
+  )
+  (:action flag_execution_leg_a_for_position
+    :parameters (?position_a - position_a ?execution_leg_type_a - execution_leg_type_a ?security - security)
+    :precondition
+      (and
+        (confirmed ?position_a)
+        (security_linked ?position_a ?security)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (not
+          (execution_leg_a_primary_flag ?execution_leg_type_a)
+        )
+        (not
+          (execution_leg_a_preference_flag ?execution_leg_type_a)
+        )
+      )
+    :effect (execution_leg_a_primary_flag ?execution_leg_type_a)
+  )
+  (:action confirm_position_a_for_order_generation
+    :parameters (?position_a - position_a ?execution_leg_type_a - execution_leg_type_a ?trader_desk - trader_desk)
+    :precondition
+      (and
+        (confirmed ?position_a)
+        (trader_desk_assigned ?position_a ?trader_desk)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (execution_leg_a_primary_flag ?execution_leg_type_a)
+        (not
+          (position_a_flag_set ?position_a)
+        )
+      )
+    :effect
+      (and
+        (position_a_flag_set ?position_a)
+        (position_a_ready_for_execution ?position_a)
+      )
+  )
+  (:action apply_allocation_preference_to_position_a
+    :parameters (?position_a - position_a ?execution_leg_type_a - execution_leg_type_a ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (confirmed ?position_a)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (position_a_flag_set ?position_a)
+        )
+      )
+    :effect
+      (and
+        (execution_leg_a_preference_flag ?execution_leg_type_a)
+        (position_a_flag_set ?position_a)
+        (position_a_preference_assigned ?position_a ?allocation_preference)
+        (not
+          (allocation_preference_available ?allocation_preference)
+        )
+      )
+  )
+  (:action finalize_position_a_leg_selection
+    :parameters (?position_a - position_a ?execution_leg_type_a - execution_leg_type_a ?security - security ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (confirmed ?position_a)
+        (security_linked ?position_a ?security)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (execution_leg_a_preference_flag ?execution_leg_type_a)
+        (position_a_preference_assigned ?position_a ?allocation_preference)
+        (not
+          (position_a_ready_for_execution ?position_a)
+        )
+      )
+    :effect
+      (and
+        (execution_leg_a_primary_flag ?execution_leg_type_a)
+        (position_a_ready_for_execution ?position_a)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (position_a_preference_assigned ?position_a ?allocation_preference)
+        )
+      )
+  )
+  (:action flag_execution_leg_b_for_position
+    :parameters (?position_b - position_b ?execution_leg_type_b - execution_leg_type_b ?security - security)
+    :precondition
+      (and
+        (confirmed ?position_b)
+        (security_linked ?position_b ?security)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (not
+          (execution_leg_b_primary_flag ?execution_leg_type_b)
+        )
+        (not
+          (execution_leg_b_preference_flag ?execution_leg_type_b)
+        )
+      )
+    :effect (execution_leg_b_primary_flag ?execution_leg_type_b)
+  )
+  (:action confirm_position_b_for_order_generation
+    :parameters (?position_b - position_b ?execution_leg_type_b - execution_leg_type_b ?trader_desk - trader_desk)
+    :precondition
+      (and
+        (confirmed ?position_b)
+        (trader_desk_assigned ?position_b ?trader_desk)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_b_primary_flag ?execution_leg_type_b)
+        (not
+          (position_b_flag_set ?position_b)
+        )
+      )
+    :effect
+      (and
+        (position_b_flag_set ?position_b)
+        (position_b_ready_for_execution ?position_b)
+      )
+  )
+  (:action apply_allocation_preference_to_position_b
+    :parameters (?position_b - position_b ?execution_leg_type_b - execution_leg_type_b ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (confirmed ?position_b)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (position_b_flag_set ?position_b)
+        )
+      )
+    :effect
+      (and
+        (execution_leg_b_preference_flag ?execution_leg_type_b)
+        (position_b_flag_set ?position_b)
+        (position_b_preference_assigned ?position_b ?allocation_preference)
+        (not
+          (allocation_preference_available ?allocation_preference)
+        )
+      )
+  )
+  (:action finalize_position_b_leg_selection
+    :parameters (?position_b - position_b ?execution_leg_type_b - execution_leg_type_b ?security - security ?allocation_preference - allocation_preference)
+    :precondition
+      (and
+        (confirmed ?position_b)
+        (security_linked ?position_b ?security)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_b_preference_flag ?execution_leg_type_b)
+        (position_b_preference_assigned ?position_b ?allocation_preference)
+        (not
+          (position_b_ready_for_execution ?position_b)
+        )
+      )
+    :effect
+      (and
+        (execution_leg_b_primary_flag ?execution_leg_type_b)
+        (position_b_ready_for_execution ?position_b)
+        (allocation_preference_available ?allocation_preference)
+        (not
+          (position_b_preference_assigned ?position_b ?allocation_preference)
+        )
+      )
+  )
+  (:action assemble_order_instruction_primary
+    :parameters (?position_a - position_a ?position_b - position_b ?execution_leg_type_a - execution_leg_type_a ?execution_leg_type_b - execution_leg_type_b ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_a_flag_set ?position_a)
+        (position_b_flag_set ?position_b)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_a_primary_flag ?execution_leg_type_a)
+        (execution_leg_b_primary_flag ?execution_leg_type_b)
+        (position_a_ready_for_execution ?position_a)
+        (position_b_ready_for_execution ?position_b)
+        (order_instruction_available ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_created ?order_instruction)
+        (order_instruction_linked_leg_a ?order_instruction ?execution_leg_type_a)
+        (order_instruction_linked_leg_b ?order_instruction ?execution_leg_type_b)
+        (not
+          (order_instruction_available ?order_instruction)
+        )
+      )
+  )
+  (:action assemble_order_instruction_leg_a_preference
+    :parameters (?position_a - position_a ?position_b - position_b ?execution_leg_type_a - execution_leg_type_a ?execution_leg_type_b - execution_leg_type_b ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_a_flag_set ?position_a)
+        (position_b_flag_set ?position_b)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_a_preference_flag ?execution_leg_type_a)
+        (execution_leg_b_primary_flag ?execution_leg_type_b)
+        (not
+          (position_a_ready_for_execution ?position_a)
+        )
+        (position_b_ready_for_execution ?position_b)
+        (order_instruction_available ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_created ?order_instruction)
+        (order_instruction_linked_leg_a ?order_instruction ?execution_leg_type_a)
+        (order_instruction_linked_leg_b ?order_instruction ?execution_leg_type_b)
+        (order_instruction_flag_a ?order_instruction)
+        (not
+          (order_instruction_available ?order_instruction)
+        )
+      )
+  )
+  (:action assemble_order_instruction_leg_b_preference
+    :parameters (?position_a - position_a ?position_b - position_b ?execution_leg_type_a - execution_leg_type_a ?execution_leg_type_b - execution_leg_type_b ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_a_flag_set ?position_a)
+        (position_b_flag_set ?position_b)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_a_primary_flag ?execution_leg_type_a)
+        (execution_leg_b_preference_flag ?execution_leg_type_b)
+        (position_a_ready_for_execution ?position_a)
+        (not
+          (position_b_ready_for_execution ?position_b)
+        )
+        (order_instruction_available ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_created ?order_instruction)
+        (order_instruction_linked_leg_a ?order_instruction ?execution_leg_type_a)
+        (order_instruction_linked_leg_b ?order_instruction ?execution_leg_type_b)
+        (order_instruction_flag_b ?order_instruction)
+        (not
+          (order_instruction_available ?order_instruction)
+        )
+      )
+  )
+  (:action assemble_order_instruction_both_preferences
+    :parameters (?position_a - position_a ?position_b - position_b ?execution_leg_type_a - execution_leg_type_a ?execution_leg_type_b - execution_leg_type_b ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_a_flag_set ?position_a)
+        (position_b_flag_set ?position_b)
+        (position_a_leg_a_applicable ?position_a ?execution_leg_type_a)
+        (position_b_leg_b_applicable ?position_b ?execution_leg_type_b)
+        (execution_leg_a_preference_flag ?execution_leg_type_a)
+        (execution_leg_b_preference_flag ?execution_leg_type_b)
+        (not
+          (position_a_ready_for_execution ?position_a)
+        )
+        (not
+          (position_b_ready_for_execution ?position_b)
+        )
+        (order_instruction_available ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_created ?order_instruction)
+        (order_instruction_linked_leg_a ?order_instruction ?execution_leg_type_a)
+        (order_instruction_linked_leg_b ?order_instruction ?execution_leg_type_b)
+        (order_instruction_flag_a ?order_instruction)
+        (order_instruction_flag_b ?order_instruction)
+        (not
+          (order_instruction_available ?order_instruction)
+        )
+      )
+  )
+  (:action confirm_order_instruction
+    :parameters (?order_instruction - order_instruction ?position_a - position_a ?security - security)
+    :precondition
+      (and
+        (order_instruction_created ?order_instruction)
+        (position_a_flag_set ?position_a)
+        (security_linked ?position_a ?security)
+        (not
+          (order_instruction_confirmed ?order_instruction)
+        )
+      )
+    :effect (order_instruction_confirmed ?order_instruction)
+  )
+  (:action attach_settlement_account_to_order
+    :parameters (?portfolio_account - portfolio_account ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (portfolio_account_has_order_instruction ?portfolio_account ?order_instruction)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_available ?settlement_account)
+        (order_instruction_created ?order_instruction)
+        (order_instruction_confirmed ?order_instruction)
+        (not
+          (settlement_account_allocated ?settlement_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action finalize_account_settlement_enrichment
+    :parameters (?portfolio_account - portfolio_account ?settlement_account - settlement_account ?order_instruction - order_instruction ?security - security)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (security_linked ?portfolio_account ?security)
+        (not
+          (order_instruction_flag_a ?order_instruction)
+        )
+        (not
+          (portfolio_account_settlement_enriched ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_settlement_enriched ?portfolio_account)
+  )
+  (:action assign_preferred_broker_to_account
+    :parameters (?portfolio_account - portfolio_account ?preferred_broker - preferred_broker)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (preferred_broker_available ?preferred_broker)
+        (not
+          (portfolio_account_preferred_broker_assigned ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_preferred_broker_assigned ?portfolio_account)
+        (portfolio_account_has_preferred_broker ?portfolio_account ?preferred_broker)
+        (not
+          (preferred_broker_available ?preferred_broker)
+        )
+      )
+  )
+  (:action attach_preferred_broker_and_mark_account
+    :parameters (?portfolio_account - portfolio_account ?settlement_account - settlement_account ?order_instruction - order_instruction ?security - security ?preferred_broker - preferred_broker)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (security_linked ?portfolio_account ?security)
+        (order_instruction_flag_a ?order_instruction)
+        (portfolio_account_preferred_broker_assigned ?portfolio_account)
+        (portfolio_account_has_preferred_broker ?portfolio_account ?preferred_broker)
+        (not
+          (portfolio_account_settlement_enriched ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_settlement_enriched ?portfolio_account)
+        (portfolio_account_broker_confirmed ?portfolio_account)
+      )
+  )
+  (:action apply_compliance_check_to_account
+    :parameters (?portfolio_account - portfolio_account ?compliance_check - compliance_check ?trader_desk - trader_desk ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_settlement_enriched ?portfolio_account)
+        (portfolio_account_compliance_check_assigned ?portfolio_account ?compliance_check)
+        (trader_desk_assigned ?portfolio_account ?trader_desk)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_instruction_flag_b ?order_instruction)
+        )
+        (not
+          (portfolio_account_ready_for_compliance ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_ready_for_compliance ?portfolio_account)
+  )
+  (:action apply_compliance_check_to_account_with_order_flag
+    :parameters (?portfolio_account - portfolio_account ?compliance_check - compliance_check ?trader_desk - trader_desk ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_settlement_enriched ?portfolio_account)
+        (portfolio_account_compliance_check_assigned ?portfolio_account ?compliance_check)
+        (trader_desk_assigned ?portfolio_account ?trader_desk)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (order_instruction_flag_b ?order_instruction)
+        (not
+          (portfolio_account_ready_for_compliance ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_ready_for_compliance ?portfolio_account)
+  )
+  (:action apply_execution_policy_to_account
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_ready_for_compliance ?portfolio_account)
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_instruction_flag_a ?order_instruction)
+        )
+        (not
+          (order_instruction_flag_b ?order_instruction)
+        )
+        (not
+          (portfolio_account_compliance_applied ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_compliance_applied ?portfolio_account)
+  )
+  (:action apply_execution_policy_and_attach_variant
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_ready_for_compliance ?portfolio_account)
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (order_instruction_flag_a ?order_instruction)
+        (not
+          (order_instruction_flag_b ?order_instruction)
+        )
+        (not
+          (portfolio_account_compliance_applied ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_variant_attached ?portfolio_account)
+      )
+  )
+  (:action apply_execution_policy_and_attach_variant_alt
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_ready_for_compliance ?portfolio_account)
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_instruction_flag_a ?order_instruction)
+        )
+        (order_instruction_flag_b ?order_instruction)
+        (not
+          (portfolio_account_compliance_applied ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_variant_attached ?portfolio_account)
+      )
+  )
+  (:action apply_execution_policy_and_attach_variant_combined
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (portfolio_account_ready_for_compliance ?portfolio_account)
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (portfolio_account_has_settlement_account ?portfolio_account ?settlement_account)
+        (settlement_account_linked_to_order ?settlement_account ?order_instruction)
+        (order_instruction_flag_a ?order_instruction)
+        (order_instruction_flag_b ?order_instruction)
+        (not
+          (portfolio_account_compliance_applied ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_variant_attached ?portfolio_account)
+      )
+  )
+  (:action finalize_account_execution_plan
+    :parameters (?portfolio_account - portfolio_account)
+    :precondition
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (not
+          (portfolio_account_execution_variant_attached ?portfolio_account)
+        )
+        (not
+          (portfolio_account_finalized ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_finalized ?portfolio_account)
+        (ready_for_post_trade ?portfolio_account)
+      )
+  )
+  (:action assign_execution_variant_to_account
+    :parameters (?portfolio_account - portfolio_account ?execution_variant - execution_variant)
+    :precondition
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_variant_attached ?portfolio_account)
+        (execution_variant_available ?execution_variant)
+      )
+    :effect
+      (and
+        (portfolio_account_execution_variant_assigned ?portfolio_account ?execution_variant)
+        (not
+          (execution_variant_available ?execution_variant)
+        )
+      )
+  )
+  (:action finalize_account_execution_strategy
+    :parameters (?portfolio_account - portfolio_account ?position_a - position_a ?position_b - position_b ?security - security ?execution_variant - execution_variant)
+    :precondition
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_variant_attached ?portfolio_account)
+        (portfolio_account_execution_variant_assigned ?portfolio_account ?execution_variant)
+        (portfolio_account_has_position_a ?portfolio_account ?position_a)
+        (portfolio_account_has_position_b ?portfolio_account ?position_b)
+        (position_a_ready_for_execution ?position_a)
+        (position_b_ready_for_execution ?position_b)
+        (security_linked ?portfolio_account ?security)
+        (not
+          (portfolio_account_execution_strategy_finalized ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_execution_strategy_finalized ?portfolio_account)
+  )
+  (:action finalize_account_execution_plan_with_variant
+    :parameters (?portfolio_account - portfolio_account)
+    :precondition
+      (and
+        (portfolio_account_compliance_applied ?portfolio_account)
+        (portfolio_account_execution_strategy_finalized ?portfolio_account)
+        (not
+          (portfolio_account_finalized ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_finalized ?portfolio_account)
+        (ready_for_post_trade ?portfolio_account)
+      )
+  )
+  (:action apply_client_constraint_to_account
+    :parameters (?portfolio_account - portfolio_account ?client_constraint - client_constraint ?security - security)
+    :precondition
+      (and
+        (confirmed ?portfolio_account)
+        (security_linked ?portfolio_account ?security)
+        (client_constraint_available ?client_constraint)
+        (portfolio_account_has_client_constraint ?portfolio_account ?client_constraint)
+        (not
+          (portfolio_account_client_constraint_applied ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_client_constraint_applied ?portfolio_account)
+        (not
+          (client_constraint_available ?client_constraint)
+        )
+      )
+  )
+  (:action assign_trader_desk_after_client_constraint
+    :parameters (?portfolio_account - portfolio_account ?trader_desk - trader_desk)
+    :precondition
+      (and
+        (portfolio_account_client_constraint_applied ?portfolio_account)
+        (trader_desk_assigned ?portfolio_account ?trader_desk)
+        (not
+          (portfolio_account_constraint_desk_assigned ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_constraint_desk_assigned ?portfolio_account)
+  )
+  (:action confirm_execution_policy_for_constrained_account
+    :parameters (?portfolio_account - portfolio_account ?execution_policy - execution_policy)
+    :precondition
+      (and
+        (portfolio_account_constraint_desk_assigned ?portfolio_account)
+        (portfolio_account_execution_policy_assigned ?portfolio_account ?execution_policy)
+        (not
+          (portfolio_account_constraint_policy_confirmed ?portfolio_account)
+        )
+      )
+    :effect (portfolio_account_constraint_policy_confirmed ?portfolio_account)
+  )
+  (:action finalize_constrained_account_execution_plan
+    :parameters (?portfolio_account - portfolio_account)
+    :precondition
+      (and
+        (portfolio_account_constraint_policy_confirmed ?portfolio_account)
+        (not
+          (portfolio_account_finalized ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (portfolio_account_finalized ?portfolio_account)
+        (ready_for_post_trade ?portfolio_account)
+      )
+  )
+  (:action mark_position_a_ready_for_post_trade
+    :parameters (?position_a - position_a ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_a_flag_set ?position_a)
+        (position_a_ready_for_execution ?position_a)
+        (order_instruction_created ?order_instruction)
+        (order_instruction_confirmed ?order_instruction)
+        (not
+          (ready_for_post_trade ?position_a)
+        )
+      )
+    :effect (ready_for_post_trade ?position_a)
+  )
+  (:action mark_position_b_ready_for_post_trade
+    :parameters (?position_b - position_b ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (position_b_flag_set ?position_b)
+        (position_b_ready_for_execution ?position_b)
+        (order_instruction_created ?order_instruction)
+        (order_instruction_confirmed ?order_instruction)
+        (not
+          (ready_for_post_trade ?position_b)
+        )
+      )
+    :effect (ready_for_post_trade ?position_b)
+  )
+  (:action bind_request_to_post_trade_batch
+    :parameters (?allocation_request - allocation_request ?post_trade_batch - post_trade_batch ?security - security)
+    :precondition
+      (and
+        (ready_for_post_trade ?allocation_request)
+        (security_linked ?allocation_request ?security)
+        (post_trade_batch_available ?post_trade_batch)
+        (not
+          (bound_to_post_trade_batch ?allocation_request)
+        )
+      )
+    :effect
+      (and
+        (bound_to_post_trade_batch ?allocation_request)
+        (post_trade_batch_assigned ?allocation_request ?post_trade_batch)
+        (not
+          (post_trade_batch_available ?post_trade_batch)
+        )
+      )
+  )
+  (:action finalize_assignment_to_position_a
+    :parameters (?position_a - position_a ?funding_source - funding_source ?post_trade_batch - post_trade_batch)
+    :precondition
+      (and
+        (bound_to_post_trade_batch ?position_a)
+        (funding_source_linked ?position_a ?funding_source)
+        (post_trade_batch_assigned ?position_a ?post_trade_batch)
+        (not
+          (assignment_finalized ?position_a)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?position_a)
+        (funding_source_available ?funding_source)
+        (post_trade_batch_available ?post_trade_batch)
+      )
+  )
+  (:action finalize_assignment_to_position_b
+    :parameters (?position_b - position_b ?funding_source - funding_source ?post_trade_batch - post_trade_batch)
+    :precondition
+      (and
+        (bound_to_post_trade_batch ?position_b)
+        (funding_source_linked ?position_b ?funding_source)
+        (post_trade_batch_assigned ?position_b ?post_trade_batch)
+        (not
+          (assignment_finalized ?position_b)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?position_b)
+        (funding_source_available ?funding_source)
+        (post_trade_batch_available ?post_trade_batch)
+      )
+  )
+  (:action finalize_assignment_to_portfolio_account
+    :parameters (?portfolio_account - portfolio_account ?funding_source - funding_source ?post_trade_batch - post_trade_batch)
+    :precondition
+      (and
+        (bound_to_post_trade_batch ?portfolio_account)
+        (funding_source_linked ?portfolio_account ?funding_source)
+        (post_trade_batch_assigned ?portfolio_account ?post_trade_batch)
+        (not
+          (assignment_finalized ?portfolio_account)
+        )
+      )
+    :effect
+      (and
+        (assignment_finalized ?portfolio_account)
+        (funding_source_available ?funding_source)
+        (post_trade_batch_available ?post_trade_batch)
+      )
+  )
+)

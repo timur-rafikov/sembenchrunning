@@ -1,0 +1,936 @@
+(define (domain calving_lambing_preparation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object supply_category - object equipment_category - object animal_category - object breeding_female_animal - animal_category birthing_pen - resource_category veterinary_check_slot - resource_category caretaker_staff - resource_category obstetric_instrument_set - resource_category assistant_personnel - resource_category identification_tag - resource_category vaccine_dose - resource_category emergency_equipment - resource_category consumable_supply - supply_category hygiene_supply_pack - supply_category medication_batch - supply_category monitoring_station - equipment_category observer_station - equipment_category birthing_kit - equipment_category breeding_female_category - breeding_female_animal management_unit_category - breeding_female_animal dam_cohort_a - breeding_female_category dam_cohort_b - breeding_female_category management_unit - management_unit_category)
+  (:predicates
+    (animal_registered ?breeding_female_animal - breeding_female_animal)
+    (pregnancy_confirmed_for_subject ?breeding_female_animal - breeding_female_animal)
+    (pen_reserved_for_dam ?breeding_female_animal - breeding_female_animal)
+    (ready_for_calving ?breeding_female_animal - breeding_female_animal)
+    (cleared_for_calving_supervision ?breeding_female_animal - breeding_female_animal)
+    (medical_preparation_complete ?breeding_female_animal - breeding_female_animal)
+    (birthing_pen_available ?birthing_pen - birthing_pen)
+    (assigned_to_birthing_pen ?breeding_female_animal - breeding_female_animal ?birthing_pen - birthing_pen)
+    (vet_slot_available ?veterinary_check_slot - veterinary_check_slot)
+    (scheduled_vet_check_for_subject ?breeding_female_animal - breeding_female_animal ?veterinary_check_slot - veterinary_check_slot)
+    (caretaker_available ?caretaker_staff - caretaker_staff)
+    (caretaker_assigned_to_subject ?breeding_female_animal - breeding_female_animal ?caretaker_staff - caretaker_staff)
+    (consumable_supply_available ?consumable_supply - consumable_supply)
+    (cohort_a_consumable_allocated ?dam_cohort_a - dam_cohort_a ?consumable_supply - consumable_supply)
+    (cohort_b_consumable_allocated ?dam_cohort_b - dam_cohort_b ?consumable_supply - consumable_supply)
+    (cohort_assigned_to_monitoring_station ?dam_cohort_a - dam_cohort_a ?monitoring_station - monitoring_station)
+    (monitoring_station_marked ?monitoring_station - monitoring_station)
+    (monitoring_station_marked_alt ?monitoring_station - monitoring_station)
+    (cohort_a_requires_kit ?dam_cohort_a - dam_cohort_a)
+    (cohort_assigned_to_observer_station ?dam_cohort_b - dam_cohort_b ?observer_station - observer_station)
+    (observer_station_marked ?observer_station - observer_station)
+    (observer_station_marked_alt ?observer_station - observer_station)
+    (cohort_b_requires_kit ?dam_cohort_b - dam_cohort_b)
+    (birthing_kit_available ?birthing_kit - birthing_kit)
+    (birthing_kit_staged ?birthing_kit - birthing_kit)
+    (kit_assigned_to_monitoring_station ?birthing_kit - birthing_kit ?monitoring_station - monitoring_station)
+    (kit_assigned_to_observer_station ?birthing_kit - birthing_kit ?observer_station - observer_station)
+    (kit_includes_monitoring_supplies ?birthing_kit - birthing_kit)
+    (kit_includes_observer_supplies ?birthing_kit - birthing_kit)
+    (kit_ready_for_hygiene_integration ?birthing_kit - birthing_kit)
+    (unit_assigned_cohort_a ?management_unit - management_unit ?dam_cohort_a - dam_cohort_a)
+    (unit_assigned_cohort_b ?management_unit - management_unit ?dam_cohort_b - dam_cohort_b)
+    (unit_assigned_kit ?management_unit - management_unit ?birthing_kit - birthing_kit)
+    (hygiene_pack_available ?hygiene_supply_pack - hygiene_supply_pack)
+    (unit_has_hygiene_pack ?management_unit - management_unit ?hygiene_supply_pack - hygiene_supply_pack)
+    (hygiene_pack_allocated ?hygiene_supply_pack - hygiene_supply_pack)
+    (hygiene_pack_assigned_to_kit ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    (unit_hygiene_ready ?management_unit - management_unit)
+    (unit_medical_prepared ?management_unit - management_unit)
+    (unit_medical_check_completed ?management_unit - management_unit)
+    (unit_instrument_reserved ?management_unit - management_unit)
+    (unit_instrument_configured ?management_unit - management_unit)
+    (unit_assistant_staged ?management_unit - management_unit)
+    (unit_operational_check_marked ?management_unit - management_unit)
+    (medication_batch_available ?medication_batch - medication_batch)
+    (unit_assigned_medication_batch ?management_unit - management_unit ?medication_batch - medication_batch)
+    (unit_medication_reserved ?management_unit - management_unit)
+    (unit_instrument_ready ?management_unit - management_unit)
+    (unit_emergency_equipment_confirmed ?management_unit - management_unit)
+    (instrument_set_available ?obstetric_instrument_set - obstetric_instrument_set)
+    (unit_assigned_instrument_set ?management_unit - management_unit ?obstetric_instrument_set - obstetric_instrument_set)
+    (assistant_personnel_available ?assistant_personnel - assistant_personnel)
+    (unit_assistant_personnel_assigned ?management_unit - management_unit ?assistant_personnel - assistant_personnel)
+    (vaccine_dose_available ?vaccine_dose - vaccine_dose)
+    (unit_assigned_vaccine_dose ?management_unit - management_unit ?vaccine_dose - vaccine_dose)
+    (emergency_equipment_available ?emergency_equipment - emergency_equipment)
+    (unit_assigned_emergency_equipment_item ?management_unit - management_unit ?emergency_equipment - emergency_equipment)
+    (identification_tag_available ?identification_tag - identification_tag)
+    (assigned_identification_tag ?breeding_female_animal - breeding_female_animal ?identification_tag - identification_tag)
+    (cohort_a_monitoring_confirmed ?dam_cohort_a - dam_cohort_a)
+    (cohort_b_monitoring_confirmed ?dam_cohort_b - dam_cohort_b)
+    (unit_final_ready ?management_unit - management_unit)
+  )
+  (:action register_animal
+    :parameters (?breeding_female_animal - breeding_female_animal)
+    :precondition
+      (and
+        (not
+          (animal_registered ?breeding_female_animal)
+        )
+        (not
+          (ready_for_calving ?breeding_female_animal)
+        )
+      )
+    :effect (animal_registered ?breeding_female_animal)
+  )
+  (:action assign_birthing_pen
+    :parameters (?breeding_female_animal - breeding_female_animal ?birthing_pen - birthing_pen)
+    :precondition
+      (and
+        (animal_registered ?breeding_female_animal)
+        (not
+          (pen_reserved_for_dam ?breeding_female_animal)
+        )
+        (birthing_pen_available ?birthing_pen)
+      )
+    :effect
+      (and
+        (pen_reserved_for_dam ?breeding_female_animal)
+        (assigned_to_birthing_pen ?breeding_female_animal ?birthing_pen)
+        (not
+          (birthing_pen_available ?birthing_pen)
+        )
+      )
+  )
+  (:action schedule_vet_check
+    :parameters (?breeding_female_animal - breeding_female_animal ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (animal_registered ?breeding_female_animal)
+        (pen_reserved_for_dam ?breeding_female_animal)
+        (vet_slot_available ?veterinary_check_slot)
+      )
+    :effect
+      (and
+        (scheduled_vet_check_for_subject ?breeding_female_animal ?veterinary_check_slot)
+        (not
+          (vet_slot_available ?veterinary_check_slot)
+        )
+      )
+  )
+  (:action complete_vet_check
+    :parameters (?breeding_female_animal - breeding_female_animal ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (animal_registered ?breeding_female_animal)
+        (pen_reserved_for_dam ?breeding_female_animal)
+        (scheduled_vet_check_for_subject ?breeding_female_animal ?veterinary_check_slot)
+        (not
+          (pregnancy_confirmed_for_subject ?breeding_female_animal)
+        )
+      )
+    :effect (pregnancy_confirmed_for_subject ?breeding_female_animal)
+  )
+  (:action cancel_vet_check
+    :parameters (?breeding_female_animal - breeding_female_animal ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (scheduled_vet_check_for_subject ?breeding_female_animal ?veterinary_check_slot)
+      )
+    :effect
+      (and
+        (vet_slot_available ?veterinary_check_slot)
+        (not
+          (scheduled_vet_check_for_subject ?breeding_female_animal ?veterinary_check_slot)
+        )
+      )
+  )
+  (:action assign_caretaker_to_animal
+    :parameters (?breeding_female_animal - breeding_female_animal ?caretaker_staff - caretaker_staff)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?breeding_female_animal)
+        (caretaker_available ?caretaker_staff)
+      )
+    :effect
+      (and
+        (caretaker_assigned_to_subject ?breeding_female_animal ?caretaker_staff)
+        (not
+          (caretaker_available ?caretaker_staff)
+        )
+      )
+  )
+  (:action release_caretaker_from_animal
+    :parameters (?breeding_female_animal - breeding_female_animal ?caretaker_staff - caretaker_staff)
+    :precondition
+      (and
+        (caretaker_assigned_to_subject ?breeding_female_animal ?caretaker_staff)
+      )
+    :effect
+      (and
+        (caretaker_available ?caretaker_staff)
+        (not
+          (caretaker_assigned_to_subject ?breeding_female_animal ?caretaker_staff)
+        )
+      )
+  )
+  (:action assign_vaccine_to_unit
+    :parameters (?management_unit - management_unit ?vaccine_dose - vaccine_dose)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (vaccine_dose_available ?vaccine_dose)
+      )
+    :effect
+      (and
+        (unit_assigned_vaccine_dose ?management_unit ?vaccine_dose)
+        (not
+          (vaccine_dose_available ?vaccine_dose)
+        )
+      )
+  )
+  (:action unassign_vaccine_from_unit
+    :parameters (?management_unit - management_unit ?vaccine_dose - vaccine_dose)
+    :precondition
+      (and
+        (unit_assigned_vaccine_dose ?management_unit ?vaccine_dose)
+      )
+    :effect
+      (and
+        (vaccine_dose_available ?vaccine_dose)
+        (not
+          (unit_assigned_vaccine_dose ?management_unit ?vaccine_dose)
+        )
+      )
+  )
+  (:action assign_emergency_equipment_to_unit
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (emergency_equipment_available ?emergency_equipment)
+      )
+    :effect
+      (and
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (not
+          (emergency_equipment_available ?emergency_equipment)
+        )
+      )
+  )
+  (:action release_emergency_equipment_from_unit
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment)
+    :precondition
+      (and
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+      )
+    :effect
+      (and
+        (emergency_equipment_available ?emergency_equipment)
+        (not
+          (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        )
+      )
+  )
+  (:action stage_monitoring_station_for_animal
+    :parameters (?dam_cohort_a - dam_cohort_a ?monitoring_station - monitoring_station ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_a)
+        (scheduled_vet_check_for_subject ?dam_cohort_a ?veterinary_check_slot)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (not
+          (monitoring_station_marked ?monitoring_station)
+        )
+        (not
+          (monitoring_station_marked_alt ?monitoring_station)
+        )
+      )
+    :effect (monitoring_station_marked ?monitoring_station)
+  )
+  (:action confirm_monitoring_and_request_kit_for_cohort_a
+    :parameters (?dam_cohort_a - dam_cohort_a ?monitoring_station - monitoring_station ?caretaker_staff - caretaker_staff)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_a)
+        (caretaker_assigned_to_subject ?dam_cohort_a ?caretaker_staff)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (monitoring_station_marked ?monitoring_station)
+        (not
+          (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        )
+      )
+    :effect
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_a_requires_kit ?dam_cohort_a)
+      )
+  )
+  (:action allocate_consumable_to_cohort_and_mark_station
+    :parameters (?dam_cohort_a - dam_cohort_a ?monitoring_station - monitoring_station ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_a)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (consumable_supply_available ?consumable_supply)
+        (not
+          (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        )
+      )
+    :effect
+      (and
+        (monitoring_station_marked_alt ?monitoring_station)
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_a_consumable_allocated ?dam_cohort_a ?consumable_supply)
+        (not
+          (consumable_supply_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_consumable_assignment_for_cohort_a
+    :parameters (?dam_cohort_a - dam_cohort_a ?monitoring_station - monitoring_station ?veterinary_check_slot - veterinary_check_slot ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_a)
+        (scheduled_vet_check_for_subject ?dam_cohort_a ?veterinary_check_slot)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (monitoring_station_marked_alt ?monitoring_station)
+        (cohort_a_consumable_allocated ?dam_cohort_a ?consumable_supply)
+        (not
+          (cohort_a_requires_kit ?dam_cohort_a)
+        )
+      )
+    :effect
+      (and
+        (monitoring_station_marked ?monitoring_station)
+        (cohort_a_requires_kit ?dam_cohort_a)
+        (consumable_supply_available ?consumable_supply)
+        (not
+          (cohort_a_consumable_allocated ?dam_cohort_a ?consumable_supply)
+        )
+      )
+  )
+  (:action stage_observer_station_for_animal
+    :parameters (?dam_cohort_b - dam_cohort_b ?observer_station - observer_station ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_b)
+        (scheduled_vet_check_for_subject ?dam_cohort_b ?veterinary_check_slot)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (not
+          (observer_station_marked ?observer_station)
+        )
+        (not
+          (observer_station_marked_alt ?observer_station)
+        )
+      )
+    :effect (observer_station_marked ?observer_station)
+  )
+  (:action assign_caretaker_and_confirm_monitoring_for_cohort_b
+    :parameters (?dam_cohort_b - dam_cohort_b ?observer_station - observer_station ?caretaker_staff - caretaker_staff)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_b)
+        (caretaker_assigned_to_subject ?dam_cohort_b ?caretaker_staff)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (observer_station_marked ?observer_station)
+        (not
+          (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        )
+      )
+    :effect
+      (and
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_b_requires_kit ?dam_cohort_b)
+      )
+  )
+  (:action allocate_consumable_to_cohort_b_and_mark_observer
+    :parameters (?dam_cohort_b - dam_cohort_b ?observer_station - observer_station ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_b)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (consumable_supply_available ?consumable_supply)
+        (not
+          (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        )
+      )
+    :effect
+      (and
+        (observer_station_marked_alt ?observer_station)
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_b_consumable_allocated ?dam_cohort_b ?consumable_supply)
+        (not
+          (consumable_supply_available ?consumable_supply)
+        )
+      )
+  )
+  (:action finalize_consumable_assignment_for_cohort_b
+    :parameters (?dam_cohort_b - dam_cohort_b ?observer_station - observer_station ?veterinary_check_slot - veterinary_check_slot ?consumable_supply - consumable_supply)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?dam_cohort_b)
+        (scheduled_vet_check_for_subject ?dam_cohort_b ?veterinary_check_slot)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (observer_station_marked_alt ?observer_station)
+        (cohort_b_consumable_allocated ?dam_cohort_b ?consumable_supply)
+        (not
+          (cohort_b_requires_kit ?dam_cohort_b)
+        )
+      )
+    :effect
+      (and
+        (observer_station_marked ?observer_station)
+        (cohort_b_requires_kit ?dam_cohort_b)
+        (consumable_supply_available ?consumable_supply)
+        (not
+          (cohort_b_consumable_allocated ?dam_cohort_b ?consumable_supply)
+        )
+      )
+  )
+  (:action assemble_and_stage_birthing_kit
+    :parameters (?dam_cohort_a - dam_cohort_a ?dam_cohort_b - dam_cohort_b ?monitoring_station - monitoring_station ?observer_station - observer_station ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (monitoring_station_marked ?monitoring_station)
+        (observer_station_marked ?observer_station)
+        (cohort_a_requires_kit ?dam_cohort_a)
+        (cohort_b_requires_kit ?dam_cohort_b)
+        (birthing_kit_available ?birthing_kit)
+      )
+    :effect
+      (and
+        (birthing_kit_staged ?birthing_kit)
+        (kit_assigned_to_monitoring_station ?birthing_kit ?monitoring_station)
+        (kit_assigned_to_observer_station ?birthing_kit ?observer_station)
+        (not
+          (birthing_kit_available ?birthing_kit)
+        )
+      )
+  )
+  (:action stage_birthing_kit_with_monitoring_supplies
+    :parameters (?dam_cohort_a - dam_cohort_a ?dam_cohort_b - dam_cohort_b ?monitoring_station - monitoring_station ?observer_station - observer_station ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (monitoring_station_marked_alt ?monitoring_station)
+        (observer_station_marked ?observer_station)
+        (not
+          (cohort_a_requires_kit ?dam_cohort_a)
+        )
+        (cohort_b_requires_kit ?dam_cohort_b)
+        (birthing_kit_available ?birthing_kit)
+      )
+    :effect
+      (and
+        (birthing_kit_staged ?birthing_kit)
+        (kit_assigned_to_monitoring_station ?birthing_kit ?monitoring_station)
+        (kit_assigned_to_observer_station ?birthing_kit ?observer_station)
+        (kit_includes_monitoring_supplies ?birthing_kit)
+        (not
+          (birthing_kit_available ?birthing_kit)
+        )
+      )
+  )
+  (:action stage_birthing_kit_with_observer_supplies
+    :parameters (?dam_cohort_a - dam_cohort_a ?dam_cohort_b - dam_cohort_b ?monitoring_station - monitoring_station ?observer_station - observer_station ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (monitoring_station_marked ?monitoring_station)
+        (observer_station_marked_alt ?observer_station)
+        (cohort_a_requires_kit ?dam_cohort_a)
+        (not
+          (cohort_b_requires_kit ?dam_cohort_b)
+        )
+        (birthing_kit_available ?birthing_kit)
+      )
+    :effect
+      (and
+        (birthing_kit_staged ?birthing_kit)
+        (kit_assigned_to_monitoring_station ?birthing_kit ?monitoring_station)
+        (kit_assigned_to_observer_station ?birthing_kit ?observer_station)
+        (kit_includes_observer_supplies ?birthing_kit)
+        (not
+          (birthing_kit_available ?birthing_kit)
+        )
+      )
+  )
+  (:action stage_birthing_kit_with_both_supplies
+    :parameters (?dam_cohort_a - dam_cohort_a ?dam_cohort_b - dam_cohort_b ?monitoring_station - monitoring_station ?observer_station - observer_station ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_assigned_to_monitoring_station ?dam_cohort_a ?monitoring_station)
+        (cohort_assigned_to_observer_station ?dam_cohort_b ?observer_station)
+        (monitoring_station_marked_alt ?monitoring_station)
+        (observer_station_marked_alt ?observer_station)
+        (not
+          (cohort_a_requires_kit ?dam_cohort_a)
+        )
+        (not
+          (cohort_b_requires_kit ?dam_cohort_b)
+        )
+        (birthing_kit_available ?birthing_kit)
+      )
+    :effect
+      (and
+        (birthing_kit_staged ?birthing_kit)
+        (kit_assigned_to_monitoring_station ?birthing_kit ?monitoring_station)
+        (kit_assigned_to_observer_station ?birthing_kit ?observer_station)
+        (kit_includes_monitoring_supplies ?birthing_kit)
+        (kit_includes_observer_supplies ?birthing_kit)
+        (not
+          (birthing_kit_available ?birthing_kit)
+        )
+      )
+  )
+  (:action mark_kit_ready_for_hygiene_integration
+    :parameters (?birthing_kit - birthing_kit ?dam_cohort_a - dam_cohort_a ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (birthing_kit_staged ?birthing_kit)
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (scheduled_vet_check_for_subject ?dam_cohort_a ?veterinary_check_slot)
+        (not
+          (kit_ready_for_hygiene_integration ?birthing_kit)
+        )
+      )
+    :effect (kit_ready_for_hygiene_integration ?birthing_kit)
+  )
+  (:action attach_hygiene_pack_to_kit
+    :parameters (?management_unit - management_unit ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (unit_assigned_kit ?management_unit ?birthing_kit)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_available ?hygiene_supply_pack)
+        (birthing_kit_staged ?birthing_kit)
+        (kit_ready_for_hygiene_integration ?birthing_kit)
+        (not
+          (hygiene_pack_allocated ?hygiene_supply_pack)
+        )
+      )
+    :effect
+      (and
+        (hygiene_pack_allocated ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (not
+          (hygiene_pack_available ?hygiene_supply_pack)
+        )
+      )
+  )
+  (:action finalize_unit_hygiene_integration
+    :parameters (?management_unit - management_unit ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_allocated ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (scheduled_vet_check_for_subject ?management_unit ?veterinary_check_slot)
+        (not
+          (kit_includes_monitoring_supplies ?birthing_kit)
+        )
+        (not
+          (unit_hygiene_ready ?management_unit)
+        )
+      )
+    :effect (unit_hygiene_ready ?management_unit)
+  )
+  (:action assign_instrument_set_to_unit
+    :parameters (?management_unit - management_unit ?obstetric_instrument_set - obstetric_instrument_set)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (instrument_set_available ?obstetric_instrument_set)
+        (not
+          (unit_instrument_reserved ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_instrument_reserved ?management_unit)
+        (unit_assigned_instrument_set ?management_unit ?obstetric_instrument_set)
+        (not
+          (instrument_set_available ?obstetric_instrument_set)
+        )
+      )
+  )
+  (:action configure_unit_with_instrument_and_kit
+    :parameters (?management_unit - management_unit ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit ?veterinary_check_slot - veterinary_check_slot ?obstetric_instrument_set - obstetric_instrument_set)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_allocated ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (scheduled_vet_check_for_subject ?management_unit ?veterinary_check_slot)
+        (kit_includes_monitoring_supplies ?birthing_kit)
+        (unit_instrument_reserved ?management_unit)
+        (unit_assigned_instrument_set ?management_unit ?obstetric_instrument_set)
+        (not
+          (unit_hygiene_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_hygiene_ready ?management_unit)
+        (unit_instrument_configured ?management_unit)
+      )
+  )
+  (:action stage_unit_for_vaccine_administration
+    :parameters (?management_unit - management_unit ?vaccine_dose - vaccine_dose ?caretaker_staff - caretaker_staff ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_hygiene_ready ?management_unit)
+        (unit_assigned_vaccine_dose ?management_unit ?vaccine_dose)
+        (caretaker_assigned_to_subject ?management_unit ?caretaker_staff)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (not
+          (kit_includes_observer_supplies ?birthing_kit)
+        )
+        (not
+          (unit_medical_prepared ?management_unit)
+        )
+      )
+    :effect (unit_medical_prepared ?management_unit)
+  )
+  (:action stage_unit_for_vaccine_administration_secondary
+    :parameters (?management_unit - management_unit ?vaccine_dose - vaccine_dose ?caretaker_staff - caretaker_staff ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_hygiene_ready ?management_unit)
+        (unit_assigned_vaccine_dose ?management_unit ?vaccine_dose)
+        (caretaker_assigned_to_subject ?management_unit ?caretaker_staff)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (kit_includes_observer_supplies ?birthing_kit)
+        (not
+          (unit_medical_prepared ?management_unit)
+        )
+      )
+    :effect (unit_medical_prepared ?management_unit)
+  )
+  (:action finalize_unit_medical_verification_primary
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_medical_prepared ?management_unit)
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (not
+          (kit_includes_monitoring_supplies ?birthing_kit)
+        )
+        (not
+          (kit_includes_observer_supplies ?birthing_kit)
+        )
+        (not
+          (unit_medical_check_completed ?management_unit)
+        )
+      )
+    :effect (unit_medical_check_completed ?management_unit)
+  )
+  (:action finalize_unit_medical_verification_secondary
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_medical_prepared ?management_unit)
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (kit_includes_monitoring_supplies ?birthing_kit)
+        (not
+          (kit_includes_observer_supplies ?birthing_kit)
+        )
+        (not
+          (unit_medical_check_completed ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_assistant_staged ?management_unit)
+      )
+  )
+  (:action finalize_unit_medical_verification_tertiary
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_medical_prepared ?management_unit)
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (not
+          (kit_includes_monitoring_supplies ?birthing_kit)
+        )
+        (kit_includes_observer_supplies ?birthing_kit)
+        (not
+          (unit_medical_check_completed ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_assistant_staged ?management_unit)
+      )
+  )
+  (:action finalize_unit_medical_verification_quaternary
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment ?hygiene_supply_pack - hygiene_supply_pack ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (unit_medical_prepared ?management_unit)
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (unit_has_hygiene_pack ?management_unit ?hygiene_supply_pack)
+        (hygiene_pack_assigned_to_kit ?hygiene_supply_pack ?birthing_kit)
+        (kit_includes_monitoring_supplies ?birthing_kit)
+        (kit_includes_observer_supplies ?birthing_kit)
+        (not
+          (unit_medical_check_completed ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_assistant_staged ?management_unit)
+      )
+  )
+  (:action finalize_unit_readiness
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (not
+          (unit_assistant_staged ?management_unit)
+        )
+        (not
+          (unit_final_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_final_ready ?management_unit)
+        (cleared_for_calving_supervision ?management_unit)
+      )
+  )
+  (:action assign_assistant_personnel_to_unit
+    :parameters (?management_unit - management_unit ?assistant_personnel - assistant_personnel)
+    :precondition
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_assistant_staged ?management_unit)
+        (assistant_personnel_available ?assistant_personnel)
+      )
+    :effect
+      (and
+        (unit_assistant_personnel_assigned ?management_unit ?assistant_personnel)
+        (not
+          (assistant_personnel_available ?assistant_personnel)
+        )
+      )
+  )
+  (:action perform_unit_operational_check
+    :parameters (?management_unit - management_unit ?dam_cohort_a - dam_cohort_a ?dam_cohort_b - dam_cohort_b ?veterinary_check_slot - veterinary_check_slot ?assistant_personnel - assistant_personnel)
+    :precondition
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_assistant_staged ?management_unit)
+        (unit_assistant_personnel_assigned ?management_unit ?assistant_personnel)
+        (unit_assigned_cohort_a ?management_unit ?dam_cohort_a)
+        (unit_assigned_cohort_b ?management_unit ?dam_cohort_b)
+        (cohort_a_requires_kit ?dam_cohort_a)
+        (cohort_b_requires_kit ?dam_cohort_b)
+        (scheduled_vet_check_for_subject ?management_unit ?veterinary_check_slot)
+        (not
+          (unit_operational_check_marked ?management_unit)
+        )
+      )
+    :effect (unit_operational_check_marked ?management_unit)
+  )
+  (:action finalize_and_mark_unit_ready
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (unit_medical_check_completed ?management_unit)
+        (unit_operational_check_marked ?management_unit)
+        (not
+          (unit_final_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_final_ready ?management_unit)
+        (cleared_for_calving_supervision ?management_unit)
+      )
+  )
+  (:action reserve_medication_batch_for_unit
+    :parameters (?management_unit - management_unit ?medication_batch - medication_batch ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (pregnancy_confirmed_for_subject ?management_unit)
+        (scheduled_vet_check_for_subject ?management_unit ?veterinary_check_slot)
+        (medication_batch_available ?medication_batch)
+        (unit_assigned_medication_batch ?management_unit ?medication_batch)
+        (not
+          (unit_medication_reserved ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_medication_reserved ?management_unit)
+        (not
+          (medication_batch_available ?medication_batch)
+        )
+      )
+  )
+  (:action mark_unit_instrument_ready
+    :parameters (?management_unit - management_unit ?caretaker_staff - caretaker_staff)
+    :precondition
+      (and
+        (unit_medication_reserved ?management_unit)
+        (caretaker_assigned_to_subject ?management_unit ?caretaker_staff)
+        (not
+          (unit_instrument_ready ?management_unit)
+        )
+      )
+    :effect (unit_instrument_ready ?management_unit)
+  )
+  (:action assign_emergency_equipment_for_unit
+    :parameters (?management_unit - management_unit ?emergency_equipment - emergency_equipment)
+    :precondition
+      (and
+        (unit_instrument_ready ?management_unit)
+        (unit_assigned_emergency_equipment_item ?management_unit ?emergency_equipment)
+        (not
+          (unit_emergency_equipment_confirmed ?management_unit)
+        )
+      )
+    :effect (unit_emergency_equipment_confirmed ?management_unit)
+  )
+  (:action finalize_unit_emergency_readiness
+    :parameters (?management_unit - management_unit)
+    :precondition
+      (and
+        (unit_emergency_equipment_confirmed ?management_unit)
+        (not
+          (unit_final_ready ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_final_ready ?management_unit)
+        (cleared_for_calving_supervision ?management_unit)
+      )
+  )
+  (:action finalize_animal_preparation_for_cohort_a
+    :parameters (?dam_cohort_a - dam_cohort_a ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_a_monitoring_confirmed ?dam_cohort_a)
+        (cohort_a_requires_kit ?dam_cohort_a)
+        (birthing_kit_staged ?birthing_kit)
+        (kit_ready_for_hygiene_integration ?birthing_kit)
+        (not
+          (cleared_for_calving_supervision ?dam_cohort_a)
+        )
+      )
+    :effect (cleared_for_calving_supervision ?dam_cohort_a)
+  )
+  (:action finalize_animal_preparation_for_cohort_b
+    :parameters (?dam_cohort_b - dam_cohort_b ?birthing_kit - birthing_kit)
+    :precondition
+      (and
+        (cohort_b_monitoring_confirmed ?dam_cohort_b)
+        (cohort_b_requires_kit ?dam_cohort_b)
+        (birthing_kit_staged ?birthing_kit)
+        (kit_ready_for_hygiene_integration ?birthing_kit)
+        (not
+          (cleared_for_calving_supervision ?dam_cohort_b)
+        )
+      )
+    :effect (cleared_for_calving_supervision ?dam_cohort_b)
+  )
+  (:action assign_medical_and_tag_to_animal
+    :parameters (?breeding_female_animal - breeding_female_animal ?identification_tag - identification_tag ?veterinary_check_slot - veterinary_check_slot)
+    :precondition
+      (and
+        (cleared_for_calving_supervision ?breeding_female_animal)
+        (scheduled_vet_check_for_subject ?breeding_female_animal ?veterinary_check_slot)
+        (identification_tag_available ?identification_tag)
+        (not
+          (medical_preparation_complete ?breeding_female_animal)
+        )
+      )
+    :effect
+      (and
+        (medical_preparation_complete ?breeding_female_animal)
+        (assigned_identification_tag ?breeding_female_animal ?identification_tag)
+        (not
+          (identification_tag_available ?identification_tag)
+        )
+      )
+  )
+  (:action deploy_animal_to_prepared_area
+    :parameters (?dam_cohort_a - dam_cohort_a ?birthing_pen - birthing_pen ?identification_tag - identification_tag)
+    :precondition
+      (and
+        (medical_preparation_complete ?dam_cohort_a)
+        (assigned_to_birthing_pen ?dam_cohort_a ?birthing_pen)
+        (assigned_identification_tag ?dam_cohort_a ?identification_tag)
+        (not
+          (ready_for_calving ?dam_cohort_a)
+        )
+      )
+    :effect
+      (and
+        (ready_for_calving ?dam_cohort_a)
+        (birthing_pen_available ?birthing_pen)
+        (identification_tag_available ?identification_tag)
+      )
+  )
+  (:action deploy_animal_to_prepared_area_b
+    :parameters (?dam_cohort_b - dam_cohort_b ?birthing_pen - birthing_pen ?identification_tag - identification_tag)
+    :precondition
+      (and
+        (medical_preparation_complete ?dam_cohort_b)
+        (assigned_to_birthing_pen ?dam_cohort_b ?birthing_pen)
+        (assigned_identification_tag ?dam_cohort_b ?identification_tag)
+        (not
+          (ready_for_calving ?dam_cohort_b)
+        )
+      )
+    :effect
+      (and
+        (ready_for_calving ?dam_cohort_b)
+        (birthing_pen_available ?birthing_pen)
+        (identification_tag_available ?identification_tag)
+      )
+  )
+  (:action deploy_unit_to_prepared_area
+    :parameters (?management_unit - management_unit ?birthing_pen - birthing_pen ?identification_tag - identification_tag)
+    :precondition
+      (and
+        (medical_preparation_complete ?management_unit)
+        (assigned_to_birthing_pen ?management_unit ?birthing_pen)
+        (assigned_identification_tag ?management_unit ?identification_tag)
+        (not
+          (ready_for_calving ?management_unit)
+        )
+      )
+    :effect
+      (and
+        (ready_for_calving ?management_unit)
+        (birthing_pen_available ?birthing_pen)
+        (identification_tag_available ?identification_tag)
+      )
+  )
+)

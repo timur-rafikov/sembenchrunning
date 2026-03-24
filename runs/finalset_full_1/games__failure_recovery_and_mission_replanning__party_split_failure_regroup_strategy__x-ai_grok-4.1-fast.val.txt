@@ -1,0 +1,1074 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain party_split_regroup_strategy_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types game_entity - object character_class - game_entity location_class - game_entity site_class - game_entity entity_root - game_entity actor_base - entity_root beacon_device - character_class route_segment - character_class support_unit - character_class tactic_card - character_class role_modifier - character_class signal_token - character_class equipment_module - character_class tactical_marker - character_class supply_item - location_class equipment_pack - location_class mission_brief - location_class alpha_rally_marker - site_class bravo_rally_marker - site_class rendezvous_site - site_class subgroup_role_type - actor_base coordinator_role_type - actor_base subgroup_alpha_member - subgroup_role_type subgroup_bravo_member - subgroup_role_type recovery_coordinator - coordinator_role_type)
+
+  (:predicates
+    (flagged_for_regroup ?actor_base - actor_base)
+    (route_confirmed ?actor_base - actor_base)
+    (beacon_attached ?actor_base - actor_base)
+    (regroup_complete ?actor_base - actor_base)
+    (regroup_finalized ?actor_base - actor_base)
+    (loadout_synced ?actor_base - actor_base)
+    (beacon_available ?beacon_device - beacon_device)
+    (actor_beacon_link ?actor_base - actor_base ?beacon_device - beacon_device)
+    (route_segment_available ?route_segment - route_segment)
+    (actor_route_assignment ?actor_base - actor_base ?route_segment - route_segment)
+    (support_unit_available ?support_unit - support_unit)
+    (actor_support_assignment ?actor_base - actor_base ?support_unit - support_unit)
+    (supply_item_available ?supply_item - supply_item)
+    (alpha_supply_assigned ?subgroup_alpha_member - subgroup_alpha_member ?supply_item - supply_item)
+    (bravo_supply_assigned ?subgroup_bravo_member - subgroup_bravo_member ?supply_item - supply_item)
+    (alpha_marker_link ?subgroup_alpha_member - subgroup_alpha_member ?alpha_rally_marker - alpha_rally_marker)
+    (alpha_marker_reserved ?alpha_rally_marker - alpha_rally_marker)
+    (alpha_marker_staged ?alpha_rally_marker - alpha_rally_marker)
+    (alpha_ready ?subgroup_alpha_member - subgroup_alpha_member)
+    (bravo_marker_link ?subgroup_bravo_member - subgroup_bravo_member ?bravo_rally_marker - bravo_rally_marker)
+    (bravo_marker_reserved ?bravo_rally_marker - bravo_rally_marker)
+    (bravo_marker_staged ?bravo_rally_marker - bravo_rally_marker)
+    (bravo_ready ?subgroup_bravo_member - subgroup_bravo_member)
+    (rendezvous_site_available ?rendezvous_site - rendezvous_site)
+    (rendezvous_site_reserved ?rendezvous_site - rendezvous_site)
+    (site_alpha_marker_link ?rendezvous_site - rendezvous_site ?alpha_rally_marker - alpha_rally_marker)
+    (site_bravo_marker_link ?rendezvous_site - rendezvous_site ?bravo_rally_marker - bravo_rally_marker)
+    (site_alpha_ready ?rendezvous_site - rendezvous_site)
+    (site_bravo_ready ?rendezvous_site - rendezvous_site)
+    (site_activated ?rendezvous_site - rendezvous_site)
+    (coordinator_alpha_link ?recovery_coordinator - recovery_coordinator ?subgroup_alpha_member - subgroup_alpha_member)
+    (coordinator_bravo_link ?recovery_coordinator - recovery_coordinator ?subgroup_bravo_member - subgroup_bravo_member)
+    (coordinator_site_link ?recovery_coordinator - recovery_coordinator ?rendezvous_site - rendezvous_site)
+    (equipment_pack_available ?equipment_pack - equipment_pack)
+    (coordinator_equipment_bound ?recovery_coordinator - recovery_coordinator ?equipment_pack - equipment_pack)
+    (equipment_pack_staged ?equipment_pack - equipment_pack)
+    (equipment_pack_bound_to_site ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    (coordinator_staged ?recovery_coordinator - recovery_coordinator)
+    (coordinator_modules_ready ?recovery_coordinator - recovery_coordinator)
+    (coordinator_ready ?recovery_coordinator - recovery_coordinator)
+    (tactic_applied ?recovery_coordinator - recovery_coordinator)
+    (coordinator_additional_staged ?recovery_coordinator - recovery_coordinator)
+    (coordinator_role_modifier_attached ?recovery_coordinator - recovery_coordinator)
+    (coordinator_commissioned ?recovery_coordinator - recovery_coordinator)
+    (brief_available ?mission_brief - mission_brief)
+    (coordinator_brief_link ?recovery_coordinator - recovery_coordinator ?mission_brief - mission_brief)
+    (brief_assigned ?recovery_coordinator - recovery_coordinator)
+    (brief_validated ?recovery_coordinator - recovery_coordinator)
+    (brief_committed ?recovery_coordinator - recovery_coordinator)
+    (tactic_card_available ?tactic_card - tactic_card)
+    (coordinator_tactic_link ?recovery_coordinator - recovery_coordinator ?tactic_card - tactic_card)
+    (role_modifier_available ?role_modifier - role_modifier)
+    (coordinator_role_modifier_link ?recovery_coordinator - recovery_coordinator ?role_modifier - role_modifier)
+    (equipment_module_available ?equipment_module - equipment_module)
+    (coordinator_module_attached ?recovery_coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    (tactical_marker_available ?tactical_marker - tactical_marker)
+    (coordinator_tactical_marker_link ?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker)
+    (signal_token_available ?signal_token - signal_token)
+    (actor_signal_assigned ?actor_base - actor_base ?signal_token - signal_token)
+    (alpha_member_prepared ?subgroup_alpha_member - subgroup_alpha_member)
+    (bravo_member_prepared ?subgroup_bravo_member - subgroup_bravo_member)
+    (coordinator_activated ?recovery_coordinator - recovery_coordinator)
+  )
+  (:action detect_and_flag_member
+    :parameters (?actor_base - actor_base)
+    :precondition
+      (and
+        (not
+          (flagged_for_regroup ?actor_base)
+        )
+        (not
+          (regroup_complete ?actor_base)
+        )
+      )
+    :effect (flagged_for_regroup ?actor_base)
+  )
+  (:action assign_beacon_to_flagged_member
+    :parameters (?actor_base - actor_base ?beacon_device - beacon_device)
+    :precondition
+      (and
+        (flagged_for_regroup ?actor_base)
+        (not
+          (beacon_attached ?actor_base)
+        )
+        (beacon_available ?beacon_device)
+      )
+    :effect
+      (and
+        (beacon_attached ?actor_base)
+        (actor_beacon_link ?actor_base ?beacon_device)
+        (not
+          (beacon_available ?beacon_device)
+        )
+      )
+  )
+  (:action assign_route_to_member
+    :parameters (?actor_base - actor_base ?route_segment - route_segment)
+    :precondition
+      (and
+        (flagged_for_regroup ?actor_base)
+        (beacon_attached ?actor_base)
+        (route_segment_available ?route_segment)
+      )
+    :effect
+      (and
+        (actor_route_assignment ?actor_base ?route_segment)
+        (not
+          (route_segment_available ?route_segment)
+        )
+      )
+  )
+  (:action confirm_member_route_assignment
+    :parameters (?actor_base - actor_base ?route_segment - route_segment)
+    :precondition
+      (and
+        (flagged_for_regroup ?actor_base)
+        (beacon_attached ?actor_base)
+        (actor_route_assignment ?actor_base ?route_segment)
+        (not
+          (route_confirmed ?actor_base)
+        )
+      )
+    :effect (route_confirmed ?actor_base)
+  )
+  (:action rollback_route_assignment
+    :parameters (?actor_base - actor_base ?route_segment - route_segment)
+    :precondition
+      (and
+        (actor_route_assignment ?actor_base ?route_segment)
+      )
+    :effect
+      (and
+        (route_segment_available ?route_segment)
+        (not
+          (actor_route_assignment ?actor_base ?route_segment)
+        )
+      )
+  )
+  (:action assign_support_to_member
+    :parameters (?actor_base - actor_base ?support_unit - support_unit)
+    :precondition
+      (and
+        (route_confirmed ?actor_base)
+        (support_unit_available ?support_unit)
+      )
+    :effect
+      (and
+        (actor_support_assignment ?actor_base ?support_unit)
+        (not
+          (support_unit_available ?support_unit)
+        )
+      )
+  )
+  (:action release_support_from_member
+    :parameters (?actor_base - actor_base ?support_unit - support_unit)
+    :precondition
+      (and
+        (actor_support_assignment ?actor_base ?support_unit)
+      )
+    :effect
+      (and
+        (support_unit_available ?support_unit)
+        (not
+          (actor_support_assignment ?actor_base ?support_unit)
+        )
+      )
+  )
+  (:action attach_equipment_module_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (equipment_module_available ?equipment_module)
+      )
+    :effect
+      (and
+        (coordinator_module_attached ?recovery_coordinator ?equipment_module)
+        (not
+          (equipment_module_available ?equipment_module)
+        )
+      )
+  )
+  (:action detach_equipment_module_from_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_module - equipment_module)
+    :precondition
+      (and
+        (coordinator_module_attached ?recovery_coordinator ?equipment_module)
+      )
+    :effect
+      (and
+        (equipment_module_available ?equipment_module)
+        (not
+          (coordinator_module_attached ?recovery_coordinator ?equipment_module)
+        )
+      )
+  )
+  (:action attach_tactical_marker_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (tactical_marker_available ?tactical_marker)
+      )
+    :effect
+      (and
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (not
+          (tactical_marker_available ?tactical_marker)
+        )
+      )
+  )
+  (:action detach_tactical_marker_from_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker)
+    :precondition
+      (and
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+      )
+    :effect
+      (and
+        (tactical_marker_available ?tactical_marker)
+        (not
+          (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        )
+      )
+  )
+  (:action reserve_alpha_rally_marker
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?alpha_rally_marker - alpha_rally_marker ?route_segment - route_segment)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_alpha_member)
+        (actor_route_assignment ?subgroup_alpha_member ?route_segment)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (not
+          (alpha_marker_reserved ?alpha_rally_marker)
+        )
+        (not
+          (alpha_marker_staged ?alpha_rally_marker)
+        )
+      )
+    :effect (alpha_marker_reserved ?alpha_rally_marker)
+  )
+  (:action confirm_alpha_marker_and_mark_ready
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?alpha_rally_marker - alpha_rally_marker ?support_unit - support_unit)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_alpha_member)
+        (actor_support_assignment ?subgroup_alpha_member ?support_unit)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (alpha_marker_reserved ?alpha_rally_marker)
+        (not
+          (alpha_member_prepared ?subgroup_alpha_member)
+        )
+      )
+    :effect
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (alpha_ready ?subgroup_alpha_member)
+      )
+  )
+  (:action stage_alpha_marker_with_supply
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?alpha_rally_marker - alpha_rally_marker ?supply_item - supply_item)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_alpha_member)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (supply_item_available ?supply_item)
+        (not
+          (alpha_member_prepared ?subgroup_alpha_member)
+        )
+      )
+    :effect
+      (and
+        (alpha_marker_staged ?alpha_rally_marker)
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (alpha_supply_assigned ?subgroup_alpha_member ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action activate_alpha_rally
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?alpha_rally_marker - alpha_rally_marker ?route_segment - route_segment ?supply_item - supply_item)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_alpha_member)
+        (actor_route_assignment ?subgroup_alpha_member ?route_segment)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (alpha_marker_staged ?alpha_rally_marker)
+        (alpha_supply_assigned ?subgroup_alpha_member ?supply_item)
+        (not
+          (alpha_ready ?subgroup_alpha_member)
+        )
+      )
+    :effect
+      (and
+        (alpha_marker_reserved ?alpha_rally_marker)
+        (alpha_ready ?subgroup_alpha_member)
+        (supply_item_available ?supply_item)
+        (not
+          (alpha_supply_assigned ?subgroup_alpha_member ?supply_item)
+        )
+      )
+  )
+  (:action reserve_bravo_rally_marker
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?bravo_rally_marker - bravo_rally_marker ?route_segment - route_segment)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_bravo_member)
+        (actor_route_assignment ?subgroup_bravo_member ?route_segment)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (not
+          (bravo_marker_reserved ?bravo_rally_marker)
+        )
+        (not
+          (bravo_marker_staged ?bravo_rally_marker)
+        )
+      )
+    :effect (bravo_marker_reserved ?bravo_rally_marker)
+  )
+  (:action confirm_bravo_marker_and_mark_ready
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?bravo_rally_marker - bravo_rally_marker ?support_unit - support_unit)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_bravo_member)
+        (actor_support_assignment ?subgroup_bravo_member ?support_unit)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (bravo_marker_reserved ?bravo_rally_marker)
+        (not
+          (bravo_member_prepared ?subgroup_bravo_member)
+        )
+      )
+    :effect
+      (and
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (bravo_ready ?subgroup_bravo_member)
+      )
+  )
+  (:action stage_bravo_marker_with_supply
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?bravo_rally_marker - bravo_rally_marker ?supply_item - supply_item)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_bravo_member)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (supply_item_available ?supply_item)
+        (not
+          (bravo_member_prepared ?subgroup_bravo_member)
+        )
+      )
+    :effect
+      (and
+        (bravo_marker_staged ?bravo_rally_marker)
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (bravo_supply_assigned ?subgroup_bravo_member ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action activate_bravo_rally
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?bravo_rally_marker - bravo_rally_marker ?route_segment - route_segment ?supply_item - supply_item)
+    :precondition
+      (and
+        (route_confirmed ?subgroup_bravo_member)
+        (actor_route_assignment ?subgroup_bravo_member ?route_segment)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (bravo_marker_staged ?bravo_rally_marker)
+        (bravo_supply_assigned ?subgroup_bravo_member ?supply_item)
+        (not
+          (bravo_ready ?subgroup_bravo_member)
+        )
+      )
+    :effect
+      (and
+        (bravo_marker_reserved ?bravo_rally_marker)
+        (bravo_ready ?subgroup_bravo_member)
+        (supply_item_available ?supply_item)
+        (not
+          (bravo_supply_assigned ?subgroup_bravo_member ?supply_item)
+        )
+      )
+  )
+  (:action select_and_reserve_rendezvous_site
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?subgroup_bravo_member - subgroup_bravo_member ?alpha_rally_marker - alpha_rally_marker ?bravo_rally_marker - bravo_rally_marker ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (alpha_marker_reserved ?alpha_rally_marker)
+        (bravo_marker_reserved ?bravo_rally_marker)
+        (alpha_ready ?subgroup_alpha_member)
+        (bravo_ready ?subgroup_bravo_member)
+        (rendezvous_site_available ?rendezvous_site)
+      )
+    :effect
+      (and
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_alpha_marker_link ?rendezvous_site ?alpha_rally_marker)
+        (site_bravo_marker_link ?rendezvous_site ?bravo_rally_marker)
+        (not
+          (rendezvous_site_available ?rendezvous_site)
+        )
+      )
+  )
+  (:action reserve_site_with_alpha_ready
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?subgroup_bravo_member - subgroup_bravo_member ?alpha_rally_marker - alpha_rally_marker ?bravo_rally_marker - bravo_rally_marker ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (alpha_marker_staged ?alpha_rally_marker)
+        (bravo_marker_reserved ?bravo_rally_marker)
+        (not
+          (alpha_ready ?subgroup_alpha_member)
+        )
+        (bravo_ready ?subgroup_bravo_member)
+        (rendezvous_site_available ?rendezvous_site)
+      )
+    :effect
+      (and
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_alpha_marker_link ?rendezvous_site ?alpha_rally_marker)
+        (site_bravo_marker_link ?rendezvous_site ?bravo_rally_marker)
+        (site_alpha_ready ?rendezvous_site)
+        (not
+          (rendezvous_site_available ?rendezvous_site)
+        )
+      )
+  )
+  (:action reserve_site_with_bravo_ready
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?subgroup_bravo_member - subgroup_bravo_member ?alpha_rally_marker - alpha_rally_marker ?bravo_rally_marker - bravo_rally_marker ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (alpha_marker_reserved ?alpha_rally_marker)
+        (bravo_marker_staged ?bravo_rally_marker)
+        (alpha_ready ?subgroup_alpha_member)
+        (not
+          (bravo_ready ?subgroup_bravo_member)
+        )
+        (rendezvous_site_available ?rendezvous_site)
+      )
+    :effect
+      (and
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_alpha_marker_link ?rendezvous_site ?alpha_rally_marker)
+        (site_bravo_marker_link ?rendezvous_site ?bravo_rally_marker)
+        (site_bravo_ready ?rendezvous_site)
+        (not
+          (rendezvous_site_available ?rendezvous_site)
+        )
+      )
+  )
+  (:action reserve_site_with_both_ready
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?subgroup_bravo_member - subgroup_bravo_member ?alpha_rally_marker - alpha_rally_marker ?bravo_rally_marker - bravo_rally_marker ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (alpha_marker_link ?subgroup_alpha_member ?alpha_rally_marker)
+        (bravo_marker_link ?subgroup_bravo_member ?bravo_rally_marker)
+        (alpha_marker_staged ?alpha_rally_marker)
+        (bravo_marker_staged ?bravo_rally_marker)
+        (not
+          (alpha_ready ?subgroup_alpha_member)
+        )
+        (not
+          (bravo_ready ?subgroup_bravo_member)
+        )
+        (rendezvous_site_available ?rendezvous_site)
+      )
+    :effect
+      (and
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_alpha_marker_link ?rendezvous_site ?alpha_rally_marker)
+        (site_bravo_marker_link ?rendezvous_site ?bravo_rally_marker)
+        (site_alpha_ready ?rendezvous_site)
+        (site_bravo_ready ?rendezvous_site)
+        (not
+          (rendezvous_site_available ?rendezvous_site)
+        )
+      )
+  )
+  (:action confirm_site_activation
+    :parameters (?rendezvous_site - rendezvous_site ?subgroup_alpha_member - subgroup_alpha_member ?route_segment - route_segment)
+    :precondition
+      (and
+        (rendezvous_site_reserved ?rendezvous_site)
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (actor_route_assignment ?subgroup_alpha_member ?route_segment)
+        (not
+          (site_activated ?rendezvous_site)
+        )
+      )
+    :effect (site_activated ?rendezvous_site)
+  )
+  (:action stage_equipment_pack_at_site
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (coordinator_site_link ?recovery_coordinator ?rendezvous_site)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_available ?equipment_pack)
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_activated ?rendezvous_site)
+        (not
+          (equipment_pack_staged ?equipment_pack)
+        )
+      )
+    :effect
+      (and
+        (equipment_pack_staged ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (not
+          (equipment_pack_available ?equipment_pack)
+        )
+      )
+  )
+  (:action prepare_coordinator_for_site_equipment
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site ?route_segment - route_segment)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_staged ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (actor_route_assignment ?recovery_coordinator ?route_segment)
+        (not
+          (site_alpha_ready ?rendezvous_site)
+        )
+        (not
+          (coordinator_staged ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_staged ?recovery_coordinator)
+  )
+  (:action apply_tactic_card_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactic_card - tactic_card)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (tactic_card_available ?tactic_card)
+        (not
+          (tactic_applied ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (tactic_applied ?recovery_coordinator)
+        (coordinator_tactic_link ?recovery_coordinator ?tactic_card)
+        (not
+          (tactic_card_available ?tactic_card)
+        )
+      )
+  )
+  (:action stage_coordinator_with_tactic_and_equipment
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site ?route_segment - route_segment ?tactic_card - tactic_card)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_staged ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (actor_route_assignment ?recovery_coordinator ?route_segment)
+        (site_alpha_ready ?rendezvous_site)
+        (tactic_applied ?recovery_coordinator)
+        (coordinator_tactic_link ?recovery_coordinator ?tactic_card)
+        (not
+          (coordinator_staged ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_staged ?recovery_coordinator)
+        (coordinator_additional_staged ?recovery_coordinator)
+      )
+  )
+  (:action attach_modules_prepare_coordinator_alpha_path
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_module - equipment_module ?support_unit - support_unit ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_staged ?recovery_coordinator)
+        (coordinator_module_attached ?recovery_coordinator ?equipment_module)
+        (actor_support_assignment ?recovery_coordinator ?support_unit)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (not
+          (site_bravo_ready ?rendezvous_site)
+        )
+        (not
+          (coordinator_modules_ready ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_modules_ready ?recovery_coordinator)
+  )
+  (:action attach_modules_prepare_coordinator_bravo_path
+    :parameters (?recovery_coordinator - recovery_coordinator ?equipment_module - equipment_module ?support_unit - support_unit ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_staged ?recovery_coordinator)
+        (coordinator_module_attached ?recovery_coordinator ?equipment_module)
+        (actor_support_assignment ?recovery_coordinator ?support_unit)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (site_bravo_ready ?rendezvous_site)
+        (not
+          (coordinator_modules_ready ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_modules_ready ?recovery_coordinator)
+  )
+  (:action set_coordinator_ready_state_phase1
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_modules_ready ?recovery_coordinator)
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (not
+          (site_alpha_ready ?rendezvous_site)
+        )
+        (not
+          (site_bravo_ready ?rendezvous_site)
+        )
+        (not
+          (coordinator_ready ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_ready ?recovery_coordinator)
+  )
+  (:action set_coordinator_ready_state_phase2
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_modules_ready ?recovery_coordinator)
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (site_alpha_ready ?rendezvous_site)
+        (not
+          (site_bravo_ready ?rendezvous_site)
+        )
+        (not
+          (coordinator_ready ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_role_modifier_attached ?recovery_coordinator)
+      )
+  )
+  (:action set_coordinator_ready_state_phase3
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_modules_ready ?recovery_coordinator)
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (not
+          (site_alpha_ready ?rendezvous_site)
+        )
+        (site_bravo_ready ?rendezvous_site)
+        (not
+          (coordinator_ready ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_role_modifier_attached ?recovery_coordinator)
+      )
+  )
+  (:action set_coordinator_ready_state_phase4
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker ?equipment_pack - equipment_pack ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (coordinator_modules_ready ?recovery_coordinator)
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (coordinator_equipment_bound ?recovery_coordinator ?equipment_pack)
+        (equipment_pack_bound_to_site ?equipment_pack ?rendezvous_site)
+        (site_alpha_ready ?rendezvous_site)
+        (site_bravo_ready ?rendezvous_site)
+        (not
+          (coordinator_ready ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_role_modifier_attached ?recovery_coordinator)
+      )
+  )
+  (:action issue_coordinator_regroup_command
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (not
+          (coordinator_role_modifier_attached ?recovery_coordinator)
+        )
+        (not
+          (coordinator_activated ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activated ?recovery_coordinator)
+        (regroup_finalized ?recovery_coordinator)
+      )
+  )
+  (:action apply_role_modifier_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?role_modifier - role_modifier)
+    :precondition
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_role_modifier_attached ?recovery_coordinator)
+        (role_modifier_available ?role_modifier)
+      )
+    :effect
+      (and
+        (coordinator_role_modifier_link ?recovery_coordinator ?role_modifier)
+        (not
+          (role_modifier_available ?role_modifier)
+        )
+      )
+  )
+  (:action finalize_coordinator_staging
+    :parameters (?recovery_coordinator - recovery_coordinator ?subgroup_alpha_member - subgroup_alpha_member ?subgroup_bravo_member - subgroup_bravo_member ?route_segment - route_segment ?role_modifier - role_modifier)
+    :precondition
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_role_modifier_attached ?recovery_coordinator)
+        (coordinator_role_modifier_link ?recovery_coordinator ?role_modifier)
+        (coordinator_alpha_link ?recovery_coordinator ?subgroup_alpha_member)
+        (coordinator_bravo_link ?recovery_coordinator ?subgroup_bravo_member)
+        (alpha_ready ?subgroup_alpha_member)
+        (bravo_ready ?subgroup_bravo_member)
+        (actor_route_assignment ?recovery_coordinator ?route_segment)
+        (not
+          (coordinator_commissioned ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_commissioned ?recovery_coordinator)
+  )
+  (:action confirm_coordinator_activation_and_issue_command
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_ready ?recovery_coordinator)
+        (coordinator_commissioned ?recovery_coordinator)
+        (not
+          (coordinator_activated ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activated ?recovery_coordinator)
+        (regroup_finalized ?recovery_coordinator)
+      )
+  )
+  (:action attach_mission_brief_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?mission_brief - mission_brief ?route_segment - route_segment)
+    :precondition
+      (and
+        (route_confirmed ?recovery_coordinator)
+        (actor_route_assignment ?recovery_coordinator ?route_segment)
+        (brief_available ?mission_brief)
+        (coordinator_brief_link ?recovery_coordinator ?mission_brief)
+        (not
+          (brief_assigned ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (brief_assigned ?recovery_coordinator)
+        (not
+          (brief_available ?mission_brief)
+        )
+      )
+  )
+  (:action validate_coordinator_brief
+    :parameters (?recovery_coordinator - recovery_coordinator ?support_unit - support_unit)
+    :precondition
+      (and
+        (brief_assigned ?recovery_coordinator)
+        (actor_support_assignment ?recovery_coordinator ?support_unit)
+        (not
+          (brief_validated ?recovery_coordinator)
+        )
+      )
+    :effect (brief_validated ?recovery_coordinator)
+  )
+  (:action commit_coordinator_brief
+    :parameters (?recovery_coordinator - recovery_coordinator ?tactical_marker - tactical_marker)
+    :precondition
+      (and
+        (brief_validated ?recovery_coordinator)
+        (coordinator_tactical_marker_link ?recovery_coordinator ?tactical_marker)
+        (not
+          (brief_committed ?recovery_coordinator)
+        )
+      )
+    :effect (brief_committed ?recovery_coordinator)
+  )
+  (:action finalize_brief_and_issue_command
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (brief_committed ?recovery_coordinator)
+        (not
+          (coordinator_activated ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activated ?recovery_coordinator)
+        (regroup_finalized ?recovery_coordinator)
+      )
+  )
+  (:action finalize_regroup_for_alpha_member
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (alpha_member_prepared ?subgroup_alpha_member)
+        (alpha_ready ?subgroup_alpha_member)
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_activated ?rendezvous_site)
+        (not
+          (regroup_finalized ?subgroup_alpha_member)
+        )
+      )
+    :effect (regroup_finalized ?subgroup_alpha_member)
+  )
+  (:action finalize_regroup_for_bravo_member
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?rendezvous_site - rendezvous_site)
+    :precondition
+      (and
+        (bravo_member_prepared ?subgroup_bravo_member)
+        (bravo_ready ?subgroup_bravo_member)
+        (rendezvous_site_reserved ?rendezvous_site)
+        (site_activated ?rendezvous_site)
+        (not
+          (regroup_finalized ?subgroup_bravo_member)
+        )
+      )
+    :effect (regroup_finalized ?subgroup_bravo_member)
+  )
+  (:action synchronize_loadout_and_assign_signal
+    :parameters (?actor_base - actor_base ?signal_token - signal_token ?route_segment - route_segment)
+    :precondition
+      (and
+        (regroup_finalized ?actor_base)
+        (actor_route_assignment ?actor_base ?route_segment)
+        (signal_token_available ?signal_token)
+        (not
+          (loadout_synced ?actor_base)
+        )
+      )
+    :effect
+      (and
+        (loadout_synced ?actor_base)
+        (actor_signal_assigned ?actor_base ?signal_token)
+        (not
+          (signal_token_available ?signal_token)
+        )
+      )
+  )
+  (:action complete_member_recovery_alpha
+    :parameters (?subgroup_alpha_member - subgroup_alpha_member ?beacon_device - beacon_device ?signal_token - signal_token)
+    :precondition
+      (and
+        (loadout_synced ?subgroup_alpha_member)
+        (actor_beacon_link ?subgroup_alpha_member ?beacon_device)
+        (actor_signal_assigned ?subgroup_alpha_member ?signal_token)
+        (not
+          (regroup_complete ?subgroup_alpha_member)
+        )
+      )
+    :effect
+      (and
+        (regroup_complete ?subgroup_alpha_member)
+        (beacon_available ?beacon_device)
+        (signal_token_available ?signal_token)
+      )
+  )
+  (:action complete_member_recovery_bravo
+    :parameters (?subgroup_bravo_member - subgroup_bravo_member ?beacon_device - beacon_device ?signal_token - signal_token)
+    :precondition
+      (and
+        (loadout_synced ?subgroup_bravo_member)
+        (actor_beacon_link ?subgroup_bravo_member ?beacon_device)
+        (actor_signal_assigned ?subgroup_bravo_member ?signal_token)
+        (not
+          (regroup_complete ?subgroup_bravo_member)
+        )
+      )
+    :effect
+      (and
+        (regroup_complete ?subgroup_bravo_member)
+        (beacon_available ?beacon_device)
+        (signal_token_available ?signal_token)
+      )
+  )
+  (:action complete_member_recovery_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?beacon_device - beacon_device ?signal_token - signal_token)
+    :precondition
+      (and
+        (loadout_synced ?recovery_coordinator)
+        (actor_beacon_link ?recovery_coordinator ?beacon_device)
+        (actor_signal_assigned ?recovery_coordinator ?signal_token)
+        (not
+          (regroup_complete ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (regroup_complete ?recovery_coordinator)
+        (beacon_available ?beacon_device)
+        (signal_token_available ?signal_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem party_split_regroup_scenario)
+  (:domain party_split_regroup_strategy_domain)
+  (:objects alpha_member_1 - subgroup_alpha_member bravo_member_1 - subgroup_bravo_member recovery_coordinator_1 - recovery_coordinator recovery_coordinator_2 - recovery_coordinator beacon_1 - beacon_device beacon_2 - beacon_device beacon_3 - beacon_device route_segment_1 - route_segment support_unit_1 - support_unit supply_item_1 - supply_item alpha_rally_marker_1 - alpha_rally_marker bravo_rally_marker_1 - bravo_rally_marker rendezvous_site_1 - rendezvous_site equipment_pack_1 - equipment_pack equipment_pack_2 - equipment_pack tactic_card_1 - tactic_card tactic_card_2 - tactic_card role_modifier_1 - role_modifier role_modifier_2 - role_modifier signal_token_1 - signal_token equipment_module_1 - equipment_module mission_brief_1 - mission_brief mission_brief_2 - mission_brief tactical_marker_1 - tactical_marker)
+  (:init
+    (beacon_available beacon_1)
+    (beacon_available beacon_2)
+    (beacon_available beacon_3)
+    (route_segment_available route_segment_1)
+    (support_unit_available support_unit_1)
+    (supply_item_available supply_item_1)
+    (alpha_marker_link alpha_member_1 alpha_rally_marker_1)
+    (bravo_marker_link bravo_member_1 bravo_rally_marker_1)
+    (rendezvous_site_available rendezvous_site_1)
+    (equipment_pack_available equipment_pack_1)
+    (equipment_pack_available equipment_pack_2)
+    (coordinator_alpha_link recovery_coordinator_1 alpha_member_1)
+    (coordinator_alpha_link recovery_coordinator_2 alpha_member_1)
+    (coordinator_bravo_link recovery_coordinator_1 bravo_member_1)
+    (coordinator_bravo_link recovery_coordinator_2 bravo_member_1)
+    (coordinator_site_link recovery_coordinator_1 rendezvous_site_1)
+    (coordinator_site_link recovery_coordinator_2 rendezvous_site_1)
+    (coordinator_equipment_bound recovery_coordinator_1 equipment_pack_1)
+    (coordinator_equipment_bound recovery_coordinator_2 equipment_pack_2)
+    (tactic_card_available tactic_card_1)
+    (tactic_card_available tactic_card_2)
+    (role_modifier_available role_modifier_1)
+    (role_modifier_available role_modifier_2)
+    (signal_token_available signal_token_1)
+    (equipment_module_available equipment_module_1)
+    (brief_available mission_brief_1)
+    (coordinator_brief_link recovery_coordinator_1 mission_brief_1)
+    (coordinator_brief_link recovery_coordinator_2 mission_brief_2)
+    (tactical_marker_available tactical_marker_1)
+  )
+  (:goal
+    (and
+      (regroup_complete alpha_member_1)
+      (regroup_complete bravo_member_1)
+      (regroup_complete recovery_coordinator_1)
+      (regroup_complete recovery_coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(detect_and_flag_member alpha_member_1)
+(assign_beacon_to_flagged_member alpha_member_1 beacon_1)
+(assign_route_to_member alpha_member_1 route_segment_1)
+(confirm_member_route_assignment alpha_member_1 route_segment_1)
+(reserve_alpha_rally_marker alpha_member_1 alpha_rally_marker_1 route_segment_1)
+(rollback_route_assignment alpha_member_1 route_segment_1)
+(assign_support_to_member alpha_member_1 support_unit_1)
+(confirm_alpha_marker_and_mark_ready alpha_member_1 alpha_rally_marker_1 support_unit_1)
+(detect_and_flag_member bravo_member_1)
+(assign_beacon_to_flagged_member bravo_member_1 beacon_2)
+(assign_route_to_member bravo_member_1 route_segment_1)
+(confirm_member_route_assignment bravo_member_1 route_segment_1)
+(rollback_route_assignment bravo_member_1 route_segment_1)
+(stage_bravo_marker_with_supply bravo_member_1 bravo_rally_marker_1 supply_item_1)
+(assign_route_to_member bravo_member_1 route_segment_1)
+(activate_bravo_rally bravo_member_1 bravo_rally_marker_1 route_segment_1 supply_item_1)
+(rollback_route_assignment bravo_member_1 route_segment_1)
+(release_support_from_member alpha_member_1 support_unit_1)
+(select_and_reserve_rendezvous_site alpha_member_1 bravo_member_1 alpha_rally_marker_1 bravo_rally_marker_1 rendezvous_site_1)
+(assign_route_to_member alpha_member_1 route_segment_1)
+(confirm_site_activation rendezvous_site_1 alpha_member_1 route_segment_1)
+(rollback_route_assignment alpha_member_1 route_segment_1)
+(finalize_regroup_for_alpha_member alpha_member_1 rendezvous_site_1)
+(finalize_regroup_for_bravo_member bravo_member_1 rendezvous_site_1)
+(detect_and_flag_member recovery_coordinator_1)
+(assign_beacon_to_flagged_member recovery_coordinator_1 beacon_3)
+(assign_route_to_member recovery_coordinator_1 route_segment_1)
+(confirm_member_route_assignment recovery_coordinator_1 route_segment_1)
+(rollback_route_assignment recovery_coordinator_1 route_segment_1)
+(stage_equipment_pack_at_site recovery_coordinator_1 equipment_pack_1 rendezvous_site_1)
+(assign_route_to_member recovery_coordinator_1 route_segment_1)
+(prepare_coordinator_for_site_equipment recovery_coordinator_1 equipment_pack_1 rendezvous_site_1 route_segment_1)
+(attach_equipment_module_to_coordinator recovery_coordinator_1 equipment_module_1)
+(assign_support_to_member recovery_coordinator_1 support_unit_1)
+(attach_modules_prepare_coordinator_alpha_path recovery_coordinator_1 equipment_module_1 support_unit_1 equipment_pack_1 rendezvous_site_1)
+(attach_tactical_marker_to_coordinator recovery_coordinator_1 tactical_marker_1)
+(set_coordinator_ready_state_phase1 recovery_coordinator_1 tactical_marker_1 equipment_pack_1 rendezvous_site_1)
+(issue_coordinator_regroup_command recovery_coordinator_1)
+(detach_tactical_marker_from_coordinator recovery_coordinator_1 tactical_marker_1)
+(detach_equipment_module_from_coordinator recovery_coordinator_1 equipment_module_1)
+(release_support_from_member recovery_coordinator_1 support_unit_1)
+(synchronize_loadout_and_assign_signal recovery_coordinator_1 signal_token_1 route_segment_1)
+(complete_member_recovery_coordinator recovery_coordinator_1 beacon_3 signal_token_1)
+(rollback_route_assignment recovery_coordinator_1 route_segment_1)
+(detect_and_flag_member recovery_coordinator_2)
+(assign_beacon_to_flagged_member recovery_coordinator_2 beacon_3)
+(assign_route_to_member recovery_coordinator_2 route_segment_1)
+(confirm_member_route_assignment recovery_coordinator_2 route_segment_1)
+(rollback_route_assignment recovery_coordinator_2 route_segment_1)
+(stage_equipment_pack_at_site recovery_coordinator_2 equipment_pack_2 rendezvous_site_1)
+(assign_route_to_member recovery_coordinator_2 route_segment_1)
+(prepare_coordinator_for_site_equipment recovery_coordinator_2 equipment_pack_2 rendezvous_site_1 route_segment_1)
+(attach_equipment_module_to_coordinator recovery_coordinator_2 equipment_module_1)
+(assign_support_to_member recovery_coordinator_2 support_unit_1)
+(attach_modules_prepare_coordinator_alpha_path recovery_coordinator_2 equipment_module_1 support_unit_1 equipment_pack_2 rendezvous_site_1)
+(attach_tactical_marker_to_coordinator recovery_coordinator_2 tactical_marker_1)
+(set_coordinator_ready_state_phase1 recovery_coordinator_2 tactical_marker_1 equipment_pack_2 rendezvous_site_1)
+(issue_coordinator_regroup_command recovery_coordinator_2)
+(detach_tactical_marker_from_coordinator recovery_coordinator_2 tactical_marker_1)
+(detach_equipment_module_from_coordinator recovery_coordinator_2 equipment_module_1)
+(release_support_from_member recovery_coordinator_2 support_unit_1)
+(synchronize_loadout_and_assign_signal recovery_coordinator_2 signal_token_1 route_segment_1)
+(complete_member_recovery_coordinator recovery_coordinator_2 beacon_3 signal_token_1)
+(rollback_route_assignment recovery_coordinator_2 route_segment_1)
+(assign_route_to_member alpha_member_1 route_segment_1)
+(synchronize_loadout_and_assign_signal alpha_member_1 signal_token_1 route_segment_1)
+(complete_member_recovery_alpha alpha_member_1 beacon_1 signal_token_1)
+(assign_route_to_member bravo_member_1 route_segment_1)
+(synchronize_loadout_and_assign_signal bravo_member_1 signal_token_1 route_segment_1)
+(complete_member_recovery_bravo bravo_member_1 beacon_2 signal_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ai_cstot/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_ai_cstot/plan.pddl 
+
+
+--- stderr ---
+

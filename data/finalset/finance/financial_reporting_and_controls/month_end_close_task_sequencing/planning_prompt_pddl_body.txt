@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain finance_month_end_close)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_or_artifact_base - object artifact_base - object system_component - object case_base - object work_item - case_base resource - resource_or_artifact_base workpaper - resource_or_artifact_base approver - resource_or_artifact_base signoff_document - resource_or_artifact_base control_checklist_item - resource_or_artifact_base audit_request - resource_or_artifact_base technical_attachment - resource_or_artifact_base executive_approval - resource_or_artifact_base issue_ticket - artifact_base schedule - artifact_base compliance_certificate - artifact_base reconciliation - system_component subledger_feed - system_component report_assembly - system_component task_group - work_item work_item_subtype - work_item ledger_account - task_group business_unit - task_group reporting_package - work_item_subtype)
+  (:predicates
+    (work_item_created ?close_task - work_item)
+    (work_item_ready_for_review ?close_task - work_item)
+    (work_item_assigned ?close_task - work_item)
+    (closed_for_period ?close_task - work_item)
+    (signed_off ?close_task - work_item)
+    (ready_for_finalization ?close_task - work_item)
+    (resource_available ?resource - resource)
+    (work_item_has_resource ?close_task - work_item ?resource - resource)
+    (workpaper_available ?workpaper - workpaper)
+    (work_item_has_workpaper ?close_task - work_item ?workpaper - workpaper)
+    (approver_available ?approver - approver)
+    (work_item_under_review_by ?close_task - work_item ?approver - approver)
+    (issue_ticket_open ?issue_ticket - issue_ticket)
+    (ledger_account_has_issue_ticket ?ledger_account - ledger_account ?issue_ticket - issue_ticket)
+    (business_unit_has_issue_ticket ?business_unit - business_unit ?issue_ticket - issue_ticket)
+    (ledger_account_has_reconciliation ?ledger_account - ledger_account ?reconciliation - reconciliation)
+    (reconciliation_prepared ?reconciliation - reconciliation)
+    (reconciliation_flagged ?reconciliation - reconciliation)
+    (ledger_account_reconciled ?ledger_account - ledger_account)
+    (business_unit_has_subledger_feed ?business_unit - business_unit ?subledger_feed - subledger_feed)
+    (subledger_feed_reserved ?subledger_feed - subledger_feed)
+    (subledger_feed_flagged ?subledger_feed - subledger_feed)
+    (business_unit_reconciled ?business_unit - business_unit)
+    (report_assembly_available ?report_assembly - report_assembly)
+    (report_assembly_collected ?report_assembly - report_assembly)
+    (report_assembly_includes_reconciliation ?report_assembly - report_assembly ?reconciliation - reconciliation)
+    (report_assembly_includes_subledger_feed ?report_assembly - report_assembly ?subledger_feed - subledger_feed)
+    (report_assembly_requires_schedule_validation ?report_assembly - report_assembly)
+    (report_assembly_requires_attachment_validation ?report_assembly - report_assembly)
+    (report_assembly_balance_validated ?report_assembly - report_assembly)
+    (reporting_package_includes_ledger_account ?reporting_package - reporting_package ?ledger_account - ledger_account)
+    (reporting_package_includes_business_unit ?reporting_package - reporting_package ?business_unit - business_unit)
+    (reporting_package_includes_report_assembly ?reporting_package - reporting_package ?report_assembly - report_assembly)
+    (schedule_available ?schedule - schedule)
+    (reporting_package_has_schedule ?reporting_package - reporting_package ?schedule - schedule)
+    (schedule_finalized ?schedule - schedule)
+    (schedule_attached_to_report_assembly ?schedule - schedule ?report_assembly - report_assembly)
+    (package_prepared ?reporting_package - reporting_package)
+    (package_has_attachments ?reporting_package - reporting_package)
+    (package_ready_for_validation ?reporting_package - reporting_package)
+    (signoff_document_attached ?reporting_package - reporting_package)
+    (package_schedule_validated ?reporting_package - reporting_package)
+    (package_ready_for_control_checklist ?reporting_package - reporting_package)
+    (package_control_checks_completed ?reporting_package - reporting_package)
+    (compliance_certificate_available ?compliance_certificate - compliance_certificate)
+    (reporting_package_has_compliance_certificate ?reporting_package - reporting_package ?compliance_certificate - compliance_certificate)
+    (package_compliance_attached ?reporting_package - reporting_package)
+    (package_pending_executive_approval ?reporting_package - reporting_package)
+    (package_executive_approved ?reporting_package - reporting_package)
+    (signoff_document_available ?signoff_document - signoff_document)
+    (reporting_package_has_signoff_document ?reporting_package - reporting_package ?signoff_document - signoff_document)
+    (control_checklist_item_available ?control_checklist_item - control_checklist_item)
+    (reporting_package_has_control_checklist_item ?reporting_package - reporting_package ?control_checklist_item - control_checklist_item)
+    (technical_attachment_available ?technical_attachment - technical_attachment)
+    (reporting_package_has_technical_attachment ?reporting_package - reporting_package ?technical_attachment - technical_attachment)
+    (executive_approval_available ?executive_approval - executive_approval)
+    (reporting_package_has_executive_approval ?reporting_package - reporting_package ?executive_approval - executive_approval)
+    (audit_request_available ?audit_request - audit_request)
+    (work_item_has_audit_request ?close_task - work_item ?audit_request - audit_request)
+    (ledger_account_ready ?ledger_account - ledger_account)
+    (business_unit_ready ?business_unit - business_unit)
+    (package_finalized ?reporting_package - reporting_package)
+  )
+  (:action create_close_work_item
+    :parameters (?close_task - work_item)
+    :precondition
+      (and
+        (not
+          (work_item_created ?close_task)
+        )
+        (not
+          (closed_for_period ?close_task)
+        )
+      )
+    :effect (work_item_created ?close_task)
+  )
+  (:action assign_resource_to_work_item
+    :parameters (?close_task - work_item ?resource - resource)
+    :precondition
+      (and
+        (work_item_created ?close_task)
+        (not
+          (work_item_assigned ?close_task)
+        )
+        (resource_available ?resource)
+      )
+    :effect
+      (and
+        (work_item_assigned ?close_task)
+        (work_item_has_resource ?close_task ?resource)
+        (not
+          (resource_available ?resource)
+        )
+      )
+  )
+  (:action attach_workpaper_to_work_item
+    :parameters (?close_task - work_item ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_created ?close_task)
+        (work_item_assigned ?close_task)
+        (workpaper_available ?workpaper)
+      )
+    :effect
+      (and
+        (work_item_has_workpaper ?close_task ?workpaper)
+        (not
+          (workpaper_available ?workpaper)
+        )
+      )
+  )
+  (:action mark_work_item_ready_for_review
+    :parameters (?close_task - work_item ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_created ?close_task)
+        (work_item_assigned ?close_task)
+        (work_item_has_workpaper ?close_task ?workpaper)
+        (not
+          (work_item_ready_for_review ?close_task)
+        )
+      )
+    :effect (work_item_ready_for_review ?close_task)
+  )
+  (:action release_workpaper_from_work_item
+    :parameters (?close_task - work_item ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_has_workpaper ?close_task ?workpaper)
+      )
+    :effect
+      (and
+        (workpaper_available ?workpaper)
+        (not
+          (work_item_has_workpaper ?close_task ?workpaper)
+        )
+      )
+  )
+  (:action assign_approver_to_work_item
+    :parameters (?close_task - work_item ?approver - approver)
+    :precondition
+      (and
+        (work_item_ready_for_review ?close_task)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (work_item_under_review_by ?close_task ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_work_item
+    :parameters (?close_task - work_item ?approver - approver)
+    :precondition
+      (and
+        (work_item_under_review_by ?close_task ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (work_item_under_review_by ?close_task ?approver)
+        )
+      )
+  )
+  (:action attach_technical_attachment_to_package
+    :parameters (?reporting_package - reporting_package ?technical_attachment - technical_attachment)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (technical_attachment_available ?technical_attachment)
+      )
+    :effect
+      (and
+        (reporting_package_has_technical_attachment ?reporting_package ?technical_attachment)
+        (not
+          (technical_attachment_available ?technical_attachment)
+        )
+      )
+  )
+  (:action detach_technical_attachment_from_package
+    :parameters (?reporting_package - reporting_package ?technical_attachment - technical_attachment)
+    :precondition
+      (and
+        (reporting_package_has_technical_attachment ?reporting_package ?technical_attachment)
+      )
+    :effect
+      (and
+        (technical_attachment_available ?technical_attachment)
+        (not
+          (reporting_package_has_technical_attachment ?reporting_package ?technical_attachment)
+        )
+      )
+  )
+  (:action attach_executive_approval_to_package
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (executive_approval_available ?executive_approval)
+      )
+    :effect
+      (and
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (not
+          (executive_approval_available ?executive_approval)
+        )
+      )
+  )
+  (:action detach_executive_approval_from_package
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+      )
+    :effect
+      (and
+        (executive_approval_available ?executive_approval)
+        (not
+          (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        )
+      )
+  )
+  (:action prepare_reconciliation_for_account
+    :parameters (?ledger_account - ledger_account ?reconciliation - reconciliation ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_ready_for_review ?ledger_account)
+        (work_item_has_workpaper ?ledger_account ?workpaper)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (not
+          (reconciliation_prepared ?reconciliation)
+        )
+        (not
+          (reconciliation_flagged ?reconciliation)
+        )
+      )
+    :effect (reconciliation_prepared ?reconciliation)
+  )
+  (:action approve_reconciliation_for_account
+    :parameters (?ledger_account - ledger_account ?reconciliation - reconciliation ?approver - approver)
+    :precondition
+      (and
+        (work_item_ready_for_review ?ledger_account)
+        (work_item_under_review_by ?ledger_account ?approver)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (reconciliation_prepared ?reconciliation)
+        (not
+          (ledger_account_ready ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (ledger_account_ready ?ledger_account)
+        (ledger_account_reconciled ?ledger_account)
+      )
+  )
+  (:action open_issue_for_reconciliation
+    :parameters (?ledger_account - ledger_account ?reconciliation - reconciliation ?issue_ticket - issue_ticket)
+    :precondition
+      (and
+        (work_item_ready_for_review ?ledger_account)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (issue_ticket_open ?issue_ticket)
+        (not
+          (ledger_account_ready ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_flagged ?reconciliation)
+        (ledger_account_ready ?ledger_account)
+        (ledger_account_has_issue_ticket ?ledger_account ?issue_ticket)
+        (not
+          (issue_ticket_open ?issue_ticket)
+        )
+      )
+  )
+  (:action resolve_reconciliation_issue_for_account
+    :parameters (?ledger_account - ledger_account ?reconciliation - reconciliation ?workpaper - workpaper ?issue_ticket - issue_ticket)
+    :precondition
+      (and
+        (work_item_ready_for_review ?ledger_account)
+        (work_item_has_workpaper ?ledger_account ?workpaper)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (reconciliation_flagged ?reconciliation)
+        (ledger_account_has_issue_ticket ?ledger_account ?issue_ticket)
+        (not
+          (ledger_account_reconciled ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_prepared ?reconciliation)
+        (ledger_account_reconciled ?ledger_account)
+        (issue_ticket_open ?issue_ticket)
+        (not
+          (ledger_account_has_issue_ticket ?ledger_account ?issue_ticket)
+        )
+      )
+  )
+  (:action reserve_subledger_feed
+    :parameters (?business_unit - business_unit ?subledger_feed - subledger_feed ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_ready_for_review ?business_unit)
+        (work_item_has_workpaper ?business_unit ?workpaper)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (not
+          (subledger_feed_reserved ?subledger_feed)
+        )
+        (not
+          (subledger_feed_flagged ?subledger_feed)
+        )
+      )
+    :effect (subledger_feed_reserved ?subledger_feed)
+  )
+  (:action approve_subledger_reconciliation
+    :parameters (?business_unit - business_unit ?subledger_feed - subledger_feed ?approver - approver)
+    :precondition
+      (and
+        (work_item_ready_for_review ?business_unit)
+        (work_item_under_review_by ?business_unit ?approver)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (subledger_feed_reserved ?subledger_feed)
+        (not
+          (business_unit_ready ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (business_unit_ready ?business_unit)
+        (business_unit_reconciled ?business_unit)
+      )
+  )
+  (:action open_issue_for_subledger_feed
+    :parameters (?business_unit - business_unit ?subledger_feed - subledger_feed ?issue_ticket - issue_ticket)
+    :precondition
+      (and
+        (work_item_ready_for_review ?business_unit)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (issue_ticket_open ?issue_ticket)
+        (not
+          (business_unit_ready ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (subledger_feed_flagged ?subledger_feed)
+        (business_unit_ready ?business_unit)
+        (business_unit_has_issue_ticket ?business_unit ?issue_ticket)
+        (not
+          (issue_ticket_open ?issue_ticket)
+        )
+      )
+  )
+  (:action resolve_subledger_issue
+    :parameters (?business_unit - business_unit ?subledger_feed - subledger_feed ?workpaper - workpaper ?issue_ticket - issue_ticket)
+    :precondition
+      (and
+        (work_item_ready_for_review ?business_unit)
+        (work_item_has_workpaper ?business_unit ?workpaper)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (subledger_feed_flagged ?subledger_feed)
+        (business_unit_has_issue_ticket ?business_unit ?issue_ticket)
+        (not
+          (business_unit_reconciled ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (subledger_feed_reserved ?subledger_feed)
+        (business_unit_reconciled ?business_unit)
+        (issue_ticket_open ?issue_ticket)
+        (not
+          (business_unit_has_issue_ticket ?business_unit ?issue_ticket)
+        )
+      )
+  )
+  (:action collect_report_assembly_into_package
+    :parameters (?ledger_account - ledger_account ?business_unit - business_unit ?reconciliation - reconciliation ?subledger_feed - subledger_feed ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (ledger_account_ready ?ledger_account)
+        (business_unit_ready ?business_unit)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (reconciliation_prepared ?reconciliation)
+        (subledger_feed_reserved ?subledger_feed)
+        (ledger_account_reconciled ?ledger_account)
+        (business_unit_reconciled ?business_unit)
+        (report_assembly_available ?report_assembly)
+      )
+    :effect
+      (and
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_includes_reconciliation ?report_assembly ?reconciliation)
+        (report_assembly_includes_subledger_feed ?report_assembly ?subledger_feed)
+        (not
+          (report_assembly_available ?report_assembly)
+        )
+      )
+  )
+  (:action collect_report_assembly_with_schedule_validation
+    :parameters (?ledger_account - ledger_account ?business_unit - business_unit ?reconciliation - reconciliation ?subledger_feed - subledger_feed ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (ledger_account_ready ?ledger_account)
+        (business_unit_ready ?business_unit)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (reconciliation_flagged ?reconciliation)
+        (subledger_feed_reserved ?subledger_feed)
+        (not
+          (ledger_account_reconciled ?ledger_account)
+        )
+        (business_unit_reconciled ?business_unit)
+        (report_assembly_available ?report_assembly)
+      )
+    :effect
+      (and
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_includes_reconciliation ?report_assembly ?reconciliation)
+        (report_assembly_includes_subledger_feed ?report_assembly ?subledger_feed)
+        (report_assembly_requires_schedule_validation ?report_assembly)
+        (not
+          (report_assembly_available ?report_assembly)
+        )
+      )
+  )
+  (:action collect_report_assembly_with_attachment_validation
+    :parameters (?ledger_account - ledger_account ?business_unit - business_unit ?reconciliation - reconciliation ?subledger_feed - subledger_feed ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (ledger_account_ready ?ledger_account)
+        (business_unit_ready ?business_unit)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (reconciliation_prepared ?reconciliation)
+        (subledger_feed_flagged ?subledger_feed)
+        (ledger_account_reconciled ?ledger_account)
+        (not
+          (business_unit_reconciled ?business_unit)
+        )
+        (report_assembly_available ?report_assembly)
+      )
+    :effect
+      (and
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_includes_reconciliation ?report_assembly ?reconciliation)
+        (report_assembly_includes_subledger_feed ?report_assembly ?subledger_feed)
+        (report_assembly_requires_attachment_validation ?report_assembly)
+        (not
+          (report_assembly_available ?report_assembly)
+        )
+      )
+  )
+  (:action collect_report_assembly_with_full_validation
+    :parameters (?ledger_account - ledger_account ?business_unit - business_unit ?reconciliation - reconciliation ?subledger_feed - subledger_feed ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (ledger_account_ready ?ledger_account)
+        (business_unit_ready ?business_unit)
+        (ledger_account_has_reconciliation ?ledger_account ?reconciliation)
+        (business_unit_has_subledger_feed ?business_unit ?subledger_feed)
+        (reconciliation_flagged ?reconciliation)
+        (subledger_feed_flagged ?subledger_feed)
+        (not
+          (ledger_account_reconciled ?ledger_account)
+        )
+        (not
+          (business_unit_reconciled ?business_unit)
+        )
+        (report_assembly_available ?report_assembly)
+      )
+    :effect
+      (and
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_includes_reconciliation ?report_assembly ?reconciliation)
+        (report_assembly_includes_subledger_feed ?report_assembly ?subledger_feed)
+        (report_assembly_requires_schedule_validation ?report_assembly)
+        (report_assembly_requires_attachment_validation ?report_assembly)
+        (not
+          (report_assembly_available ?report_assembly)
+        )
+      )
+  )
+  (:action validate_report_assembly_balance
+    :parameters (?report_assembly - report_assembly ?ledger_account - ledger_account ?workpaper - workpaper)
+    :precondition
+      (and
+        (report_assembly_collected ?report_assembly)
+        (ledger_account_ready ?ledger_account)
+        (work_item_has_workpaper ?ledger_account ?workpaper)
+        (not
+          (report_assembly_balance_validated ?report_assembly)
+        )
+      )
+    :effect (report_assembly_balance_validated ?report_assembly)
+  )
+  (:action finalize_schedule_and_attach_to_assembly
+    :parameters (?reporting_package - reporting_package ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (reporting_package_includes_report_assembly ?reporting_package ?report_assembly)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_available ?schedule)
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_balance_validated ?report_assembly)
+        (not
+          (schedule_finalized ?schedule)
+        )
+      )
+    :effect
+      (and
+        (schedule_finalized ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (not
+          (schedule_available ?schedule)
+        )
+      )
+  )
+  (:action prepare_reporting_package_standard_flow
+    :parameters (?reporting_package - reporting_package ?schedule - schedule ?report_assembly - report_assembly ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_finalized ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (work_item_has_workpaper ?reporting_package ?workpaper)
+        (not
+          (report_assembly_requires_schedule_validation ?report_assembly)
+        )
+        (not
+          (package_prepared ?reporting_package)
+        )
+      )
+    :effect (package_prepared ?reporting_package)
+  )
+  (:action attach_signoff_document_to_package
+    :parameters (?reporting_package - reporting_package ?signoff_document - signoff_document)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (signoff_document_available ?signoff_document)
+        (not
+          (signoff_document_attached ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (signoff_document_attached ?reporting_package)
+        (reporting_package_has_signoff_document ?reporting_package ?signoff_document)
+        (not
+          (signoff_document_available ?signoff_document)
+        )
+      )
+  )
+  (:action prepare_reporting_package_with_schedule_validation
+    :parameters (?reporting_package - reporting_package ?schedule - schedule ?report_assembly - report_assembly ?workpaper - workpaper ?signoff_document - signoff_document)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_finalized ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (work_item_has_workpaper ?reporting_package ?workpaper)
+        (report_assembly_requires_schedule_validation ?report_assembly)
+        (signoff_document_attached ?reporting_package)
+        (reporting_package_has_signoff_document ?reporting_package ?signoff_document)
+        (not
+          (package_prepared ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_prepared ?reporting_package)
+        (package_schedule_validated ?reporting_package)
+      )
+  )
+  (:action apply_technical_attachment_to_package
+    :parameters (?reporting_package - reporting_package ?technical_attachment - technical_attachment ?approver - approver ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_prepared ?reporting_package)
+        (reporting_package_has_technical_attachment ?reporting_package ?technical_attachment)
+        (work_item_under_review_by ?reporting_package ?approver)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (not
+          (report_assembly_requires_attachment_validation ?report_assembly)
+        )
+        (not
+          (package_has_attachments ?reporting_package)
+        )
+      )
+    :effect (package_has_attachments ?reporting_package)
+  )
+  (:action apply_technical_attachment_with_attachment_validation
+    :parameters (?reporting_package - reporting_package ?technical_attachment - technical_attachment ?approver - approver ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_prepared ?reporting_package)
+        (reporting_package_has_technical_attachment ?reporting_package ?technical_attachment)
+        (work_item_under_review_by ?reporting_package ?approver)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (report_assembly_requires_attachment_validation ?report_assembly)
+        (not
+          (package_has_attachments ?reporting_package)
+        )
+      )
+    :effect (package_has_attachments ?reporting_package)
+  )
+  (:action apply_executive_approval_and_prepare_package
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_has_attachments ?reporting_package)
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (not
+          (report_assembly_requires_schedule_validation ?report_assembly)
+        )
+        (not
+          (report_assembly_requires_attachment_validation ?report_assembly)
+        )
+        (not
+          (package_ready_for_validation ?reporting_package)
+        )
+      )
+    :effect (package_ready_for_validation ?reporting_package)
+  )
+  (:action apply_executive_approval_with_schedule_validation
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_has_attachments ?reporting_package)
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (report_assembly_requires_schedule_validation ?report_assembly)
+        (not
+          (report_assembly_requires_attachment_validation ?report_assembly)
+        )
+        (not
+          (package_ready_for_validation ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_ready_for_control_checklist ?reporting_package)
+      )
+  )
+  (:action apply_executive_approval_with_attachment_validation
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_has_attachments ?reporting_package)
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (not
+          (report_assembly_requires_schedule_validation ?report_assembly)
+        )
+        (report_assembly_requires_attachment_validation ?report_assembly)
+        (not
+          (package_ready_for_validation ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_ready_for_control_checklist ?reporting_package)
+      )
+  )
+  (:action apply_executive_approval_with_full_validation
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval ?schedule - schedule ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (package_has_attachments ?reporting_package)
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (reporting_package_has_schedule ?reporting_package ?schedule)
+        (schedule_attached_to_report_assembly ?schedule ?report_assembly)
+        (report_assembly_requires_schedule_validation ?report_assembly)
+        (report_assembly_requires_attachment_validation ?report_assembly)
+        (not
+          (package_ready_for_validation ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_ready_for_control_checklist ?reporting_package)
+      )
+  )
+  (:action finalize_reporting_package
+    :parameters (?reporting_package - reporting_package)
+    :precondition
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (not
+          (package_ready_for_control_checklist ?reporting_package)
+        )
+        (not
+          (package_finalized ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_finalized ?reporting_package)
+        (signed_off ?reporting_package)
+      )
+  )
+  (:action attach_control_checklist_item_to_package
+    :parameters (?reporting_package - reporting_package ?control_checklist_item - control_checklist_item)
+    :precondition
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_ready_for_control_checklist ?reporting_package)
+        (control_checklist_item_available ?control_checklist_item)
+      )
+    :effect
+      (and
+        (reporting_package_has_control_checklist_item ?reporting_package ?control_checklist_item)
+        (not
+          (control_checklist_item_available ?control_checklist_item)
+        )
+      )
+  )
+  (:action execute_control_checklist_validation
+    :parameters (?reporting_package - reporting_package ?ledger_account - ledger_account ?business_unit - business_unit ?workpaper - workpaper ?control_checklist_item - control_checklist_item)
+    :precondition
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_ready_for_control_checklist ?reporting_package)
+        (reporting_package_has_control_checklist_item ?reporting_package ?control_checklist_item)
+        (reporting_package_includes_ledger_account ?reporting_package ?ledger_account)
+        (reporting_package_includes_business_unit ?reporting_package ?business_unit)
+        (ledger_account_reconciled ?ledger_account)
+        (business_unit_reconciled ?business_unit)
+        (work_item_has_workpaper ?reporting_package ?workpaper)
+        (not
+          (package_control_checks_completed ?reporting_package)
+        )
+      )
+    :effect (package_control_checks_completed ?reporting_package)
+  )
+  (:action finalize_reporting_package_after_control_checks
+    :parameters (?reporting_package - reporting_package)
+    :precondition
+      (and
+        (package_ready_for_validation ?reporting_package)
+        (package_control_checks_completed ?reporting_package)
+        (not
+          (package_finalized ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_finalized ?reporting_package)
+        (signed_off ?reporting_package)
+      )
+  )
+  (:action attach_compliance_certificate_to_package
+    :parameters (?reporting_package - reporting_package ?compliance_certificate - compliance_certificate ?workpaper - workpaper)
+    :precondition
+      (and
+        (work_item_ready_for_review ?reporting_package)
+        (work_item_has_workpaper ?reporting_package ?workpaper)
+        (compliance_certificate_available ?compliance_certificate)
+        (reporting_package_has_compliance_certificate ?reporting_package ?compliance_certificate)
+        (not
+          (package_compliance_attached ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_compliance_attached ?reporting_package)
+        (not
+          (compliance_certificate_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action request_executive_approval_for_package
+    :parameters (?reporting_package - reporting_package ?approver - approver)
+    :precondition
+      (and
+        (package_compliance_attached ?reporting_package)
+        (work_item_under_review_by ?reporting_package ?approver)
+        (not
+          (package_pending_executive_approval ?reporting_package)
+        )
+      )
+    :effect (package_pending_executive_approval ?reporting_package)
+  )
+  (:action record_executive_approval_for_package
+    :parameters (?reporting_package - reporting_package ?executive_approval - executive_approval)
+    :precondition
+      (and
+        (package_pending_executive_approval ?reporting_package)
+        (reporting_package_has_executive_approval ?reporting_package ?executive_approval)
+        (not
+          (package_executive_approved ?reporting_package)
+        )
+      )
+    :effect (package_executive_approved ?reporting_package)
+  )
+  (:action finalize_reporting_package_after_executive_approval
+    :parameters (?reporting_package - reporting_package)
+    :precondition
+      (and
+        (package_executive_approved ?reporting_package)
+        (not
+          (package_finalized ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (package_finalized ?reporting_package)
+        (signed_off ?reporting_package)
+      )
+  )
+  (:action finalize_ledger_account
+    :parameters (?ledger_account - ledger_account ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (ledger_account_ready ?ledger_account)
+        (ledger_account_reconciled ?ledger_account)
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_balance_validated ?report_assembly)
+        (not
+          (signed_off ?ledger_account)
+        )
+      )
+    :effect (signed_off ?ledger_account)
+  )
+  (:action finalize_business_unit
+    :parameters (?business_unit - business_unit ?report_assembly - report_assembly)
+    :precondition
+      (and
+        (business_unit_ready ?business_unit)
+        (business_unit_reconciled ?business_unit)
+        (report_assembly_collected ?report_assembly)
+        (report_assembly_balance_validated ?report_assembly)
+        (not
+          (signed_off ?business_unit)
+        )
+      )
+    :effect (signed_off ?business_unit)
+  )
+  (:action reserve_audit_request_for_work_item
+    :parameters (?close_task - work_item ?audit_request - audit_request ?workpaper - workpaper)
+    :precondition
+      (and
+        (signed_off ?close_task)
+        (work_item_has_workpaper ?close_task ?workpaper)
+        (audit_request_available ?audit_request)
+        (not
+          (ready_for_finalization ?close_task)
+        )
+      )
+    :effect
+      (and
+        (ready_for_finalization ?close_task)
+        (work_item_has_audit_request ?close_task ?audit_request)
+        (not
+          (audit_request_available ?audit_request)
+        )
+      )
+  )
+  (:action close_ledger_account_and_release_resource
+    :parameters (?ledger_account - ledger_account ?resource - resource ?audit_request - audit_request)
+    :precondition
+      (and
+        (ready_for_finalization ?ledger_account)
+        (work_item_has_resource ?ledger_account ?resource)
+        (work_item_has_audit_request ?ledger_account ?audit_request)
+        (not
+          (closed_for_period ?ledger_account)
+        )
+      )
+    :effect
+      (and
+        (closed_for_period ?ledger_account)
+        (resource_available ?resource)
+        (audit_request_available ?audit_request)
+      )
+  )
+  (:action close_business_unit_and_release_resource
+    :parameters (?business_unit - business_unit ?resource - resource ?audit_request - audit_request)
+    :precondition
+      (and
+        (ready_for_finalization ?business_unit)
+        (work_item_has_resource ?business_unit ?resource)
+        (work_item_has_audit_request ?business_unit ?audit_request)
+        (not
+          (closed_for_period ?business_unit)
+        )
+      )
+    :effect
+      (and
+        (closed_for_period ?business_unit)
+        (resource_available ?resource)
+        (audit_request_available ?audit_request)
+      )
+  )
+  (:action close_reporting_package_and_release_resource
+    :parameters (?reporting_package - reporting_package ?resource - resource ?audit_request - audit_request)
+    :precondition
+      (and
+        (ready_for_finalization ?reporting_package)
+        (work_item_has_resource ?reporting_package ?resource)
+        (work_item_has_audit_request ?reporting_package ?audit_request)
+        (not
+          (closed_for_period ?reporting_package)
+        )
+      )
+    :effect
+      (and
+        (closed_for_period ?reporting_package)
+        (resource_available ?resource)
+        (audit_request_available ?audit_request)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem month_end_close_task_sequencing_problem)
+  (:domain finance_month_end_close)
+  (:objects ledger_account_1 - ledger_account business_unit_secondary - business_unit reporting_package_1 - reporting_package reporting_package_2 - reporting_package resource_preparer - resource resource_reconciler - resource resource_analyst - resource workpaper_supporting_schedule - workpaper approver_finance_manager - approver issue_ticket_variance_1 - issue_ticket reconciliation_1 - reconciliation subledger_feed_sales - subledger_feed report_assembly_main - report_assembly schedule_income_statement - schedule schedule_balance_sheet - schedule signoff_document_finance_lead - signoff_document signoff_document_controller - signoff_document control_checklist_item_reconciliation - control_checklist_item control_checklist_item_signoffs - control_checklist_item audit_request_period_end - audit_request technical_attachment_system_extract - technical_attachment compliance_certificate_tax - compliance_certificate compliance_certificate_gaap - compliance_certificate executive_approval_cfo - executive_approval)
+  (:init
+    (resource_available resource_preparer)
+    (resource_available resource_reconciler)
+    (resource_available resource_analyst)
+    (workpaper_available workpaper_supporting_schedule)
+    (approver_available approver_finance_manager)
+    (issue_ticket_open issue_ticket_variance_1)
+    (ledger_account_has_reconciliation ledger_account_1 reconciliation_1)
+    (business_unit_has_subledger_feed business_unit_secondary subledger_feed_sales)
+    (report_assembly_available report_assembly_main)
+    (schedule_available schedule_income_statement)
+    (schedule_available schedule_balance_sheet)
+    (reporting_package_includes_ledger_account reporting_package_1 ledger_account_1)
+    (reporting_package_includes_ledger_account reporting_package_2 ledger_account_1)
+    (reporting_package_includes_business_unit reporting_package_1 business_unit_secondary)
+    (reporting_package_includes_business_unit reporting_package_2 business_unit_secondary)
+    (reporting_package_includes_report_assembly reporting_package_1 report_assembly_main)
+    (reporting_package_includes_report_assembly reporting_package_2 report_assembly_main)
+    (reporting_package_has_schedule reporting_package_1 schedule_income_statement)
+    (reporting_package_has_schedule reporting_package_2 schedule_balance_sheet)
+    (signoff_document_available signoff_document_finance_lead)
+    (signoff_document_available signoff_document_controller)
+    (control_checklist_item_available control_checklist_item_reconciliation)
+    (control_checklist_item_available control_checklist_item_signoffs)
+    (audit_request_available audit_request_period_end)
+    (technical_attachment_available technical_attachment_system_extract)
+    (compliance_certificate_available compliance_certificate_tax)
+    (reporting_package_has_compliance_certificate reporting_package_1 compliance_certificate_tax)
+    (reporting_package_has_compliance_certificate reporting_package_2 compliance_certificate_gaap)
+    (executive_approval_available executive_approval_cfo)
+  )
+  (:goal
+    (and
+      (closed_for_period ledger_account_1)
+      (closed_for_period business_unit_secondary)
+      (closed_for_period reporting_package_1)
+      (closed_for_period reporting_package_2)
+    )
+  )
+)

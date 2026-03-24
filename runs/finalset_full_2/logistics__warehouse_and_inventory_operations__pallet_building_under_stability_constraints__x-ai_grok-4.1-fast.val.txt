@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pallet_assembly)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types warehouse_resource - object assembly_asset - object palleting_artifact - object order_record - object build_order - order_record packaging_resource - warehouse_resource sku - warehouse_resource operator - warehouse_resource packaging_configuration - warehouse_resource handling_equipment - warehouse_resource identity_tag - warehouse_resource stabilizer_material - warehouse_resource inspection_stamp - warehouse_resource case_unit - assembly_asset layer_template - assembly_asset inspection_tool - assembly_asset layer_stability_profile - palleting_artifact pallet_stability_profile - palleting_artifact pallet_unit - palleting_artifact work_unit - build_order assembly_context - build_order picker_work_unit - work_unit stager_work_unit - work_unit assembly_station - assembly_context)
+  (:predicates
+    (build_order_registered ?build_order - build_order)
+    (entity_confirmed ?build_order - build_order)
+    (build_order_packaging_allocated ?build_order - build_order)
+    (handover_complete ?build_order - build_order)
+    (entity_completed ?build_order - build_order)
+    (entity_tagged ?build_order - build_order)
+    (packaging_resource_available ?packaging_resource - packaging_resource)
+    (entity_assigned_packaging_resource ?build_order - build_order ?packaging_resource - packaging_resource)
+    (sku_available ?sku - sku)
+    (entity_reserved_sku ?build_order - build_order ?sku - sku)
+    (operator_available ?operator - operator)
+    (entity_assigned_operator ?build_order - build_order ?operator - operator)
+    (case_unit_available ?case_unit - case_unit)
+    (work_unit_has_case_unit ?picker_work_unit - picker_work_unit ?case_unit - case_unit)
+    (stager_work_unit_has_case_unit ?stager_work_unit - stager_work_unit ?case_unit - case_unit)
+    (work_unit_assigned_layer_profile ?picker_work_unit - picker_work_unit ?layer_stability_profile - layer_stability_profile)
+    (layer_stability_profile_ready ?layer_stability_profile - layer_stability_profile)
+    (layer_stability_profile_populated ?layer_stability_profile - layer_stability_profile)
+    (picker_work_unit_layer_complete ?picker_work_unit - picker_work_unit)
+    (stager_assigned_pallet_profile ?stager_work_unit - stager_work_unit ?pallet_stability_profile - pallet_stability_profile)
+    (pallet_stability_profile_ready ?pallet_stability_profile - pallet_stability_profile)
+    (pallet_stability_profile_populated ?pallet_stability_profile - pallet_stability_profile)
+    (stager_work_unit_layer_complete ?stager_work_unit - stager_work_unit)
+    (pallet_unit_available ?pallet_unit - pallet_unit)
+    (pallet_unit_selected ?pallet_unit - pallet_unit)
+    (pallet_unit_has_layer_profile ?pallet_unit - pallet_unit ?layer_stability_profile - layer_stability_profile)
+    (pallet_unit_has_pallet_profile ?pallet_unit - pallet_unit ?pallet_stability_profile - pallet_stability_profile)
+    (pallet_unit_variant_flag_a ?pallet_unit - pallet_unit)
+    (pallet_unit_variant_flag_b ?pallet_unit - pallet_unit)
+    (pallet_unit_layer_composed ?pallet_unit - pallet_unit)
+    (assembly_station_assigned_picker_work_unit ?assembly_station - assembly_station ?picker_work_unit - picker_work_unit)
+    (assembly_station_assigned_stager_work_unit ?assembly_station - assembly_station ?stager_work_unit - stager_work_unit)
+    (assembly_station_assigned_pallet_unit ?assembly_station - assembly_station ?pallet_unit - pallet_unit)
+    (layer_template_available ?layer_template - layer_template)
+    (assembly_station_has_layer_template ?assembly_station - assembly_station ?layer_template - layer_template)
+    (layer_template_claimed ?layer_template - layer_template)
+    (layer_template_assigned_to_pallet ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    (assembly_station_enabled ?assembly_station - assembly_station)
+    (assembly_station_stabilizer_applied ?assembly_station - assembly_station)
+    (assembly_station_inspection_applied ?assembly_station - assembly_station)
+    (assembly_station_has_packaging_configuration ?assembly_station - assembly_station)
+    (assembly_station_configuration_attached ?assembly_station - assembly_station)
+    (assembly_station_ready_for_handling_equipment ?assembly_station - assembly_station)
+    (assembly_station_attachment_finalized ?assembly_station - assembly_station)
+    (inspection_tool_available ?inspection_tool - inspection_tool)
+    (assembly_station_assigned_inspection_tool ?assembly_station - assembly_station ?inspection_tool - inspection_tool)
+    (assembly_station_prepared_for_configuration ?assembly_station - assembly_station)
+    (assembly_station_visual_inspection_recorded ?assembly_station - assembly_station)
+    (assembly_station_inspection_stamp_recorded ?assembly_station - assembly_station)
+    (packaging_configuration_available ?packaging_configuration - packaging_configuration)
+    (assembly_station_assigned_packaging_configuration ?assembly_station - assembly_station ?packaging_configuration - packaging_configuration)
+    (handling_equipment_available ?handling_equipment - handling_equipment)
+    (assembly_station_assigned_handling_equipment ?assembly_station - assembly_station ?handling_equipment - handling_equipment)
+    (stabilizer_material_available ?stabilizer_material - stabilizer_material)
+    (assembly_station_assigned_stabilizer ?assembly_station - assembly_station ?stabilizer_material - stabilizer_material)
+    (inspection_stamp_available ?inspection_stamp - inspection_stamp)
+    (assembly_station_assigned_inspection_stamp ?assembly_station - assembly_station ?inspection_stamp - inspection_stamp)
+    (identity_tag_available ?identity_tag - identity_tag)
+    (entity_assigned_identity_tag ?build_order - build_order ?identity_tag - identity_tag)
+    (picker_work_unit_prepared ?picker_work_unit - picker_work_unit)
+    (stager_work_unit_prepared ?stager_work_unit - stager_work_unit)
+    (assembly_station_handover_recorded ?assembly_station - assembly_station)
+  )
+  (:action register_build_order
+    :parameters (?build_order - build_order)
+    :precondition
+      (and
+        (not
+          (build_order_registered ?build_order)
+        )
+        (not
+          (handover_complete ?build_order)
+        )
+      )
+    :effect (build_order_registered ?build_order)
+  )
+  (:action assign_packaging_to_order
+    :parameters (?build_order - build_order ?packaging_resource - packaging_resource)
+    :precondition
+      (and
+        (build_order_registered ?build_order)
+        (not
+          (build_order_packaging_allocated ?build_order)
+        )
+        (packaging_resource_available ?packaging_resource)
+      )
+    :effect
+      (and
+        (build_order_packaging_allocated ?build_order)
+        (entity_assigned_packaging_resource ?build_order ?packaging_resource)
+        (not
+          (packaging_resource_available ?packaging_resource)
+        )
+      )
+  )
+  (:action reserve_sku_for_order
+    :parameters (?build_order - build_order ?sku - sku)
+    :precondition
+      (and
+        (build_order_registered ?build_order)
+        (build_order_packaging_allocated ?build_order)
+        (sku_available ?sku)
+      )
+    :effect
+      (and
+        (entity_reserved_sku ?build_order ?sku)
+        (not
+          (sku_available ?sku)
+        )
+      )
+  )
+  (:action confirm_order_sku_reservation
+    :parameters (?build_order - build_order ?sku - sku)
+    :precondition
+      (and
+        (build_order_registered ?build_order)
+        (build_order_packaging_allocated ?build_order)
+        (entity_reserved_sku ?build_order ?sku)
+        (not
+          (entity_confirmed ?build_order)
+        )
+      )
+    :effect (entity_confirmed ?build_order)
+  )
+  (:action release_sku_reservation
+    :parameters (?build_order - build_order ?sku - sku)
+    :precondition
+      (and
+        (entity_reserved_sku ?build_order ?sku)
+      )
+    :effect
+      (and
+        (sku_available ?sku)
+        (not
+          (entity_reserved_sku ?build_order ?sku)
+        )
+      )
+  )
+  (:action assign_operator_to_order
+    :parameters (?build_order - build_order ?operator - operator)
+    :precondition
+      (and
+        (entity_confirmed ?build_order)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (entity_assigned_operator ?build_order ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_order
+    :parameters (?build_order - build_order ?operator - operator)
+    :precondition
+      (and
+        (entity_assigned_operator ?build_order ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (entity_assigned_operator ?build_order ?operator)
+        )
+      )
+  )
+  (:action allocate_stabilizer_to_station
+    :parameters (?assembly_station - assembly_station ?stabilizer_material - stabilizer_material)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (stabilizer_material_available ?stabilizer_material)
+      )
+    :effect
+      (and
+        (assembly_station_assigned_stabilizer ?assembly_station ?stabilizer_material)
+        (not
+          (stabilizer_material_available ?stabilizer_material)
+        )
+      )
+  )
+  (:action release_stabilizer_from_station
+    :parameters (?assembly_station - assembly_station ?stabilizer_material - stabilizer_material)
+    :precondition
+      (and
+        (assembly_station_assigned_stabilizer ?assembly_station ?stabilizer_material)
+      )
+    :effect
+      (and
+        (stabilizer_material_available ?stabilizer_material)
+        (not
+          (assembly_station_assigned_stabilizer ?assembly_station ?stabilizer_material)
+        )
+      )
+  )
+  (:action assign_inspection_stamp_to_station
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (inspection_stamp_available ?inspection_stamp)
+      )
+    :effect
+      (and
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (not
+          (inspection_stamp_available ?inspection_stamp)
+        )
+      )
+  )
+  (:action release_inspection_stamp_from_station
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp)
+    :precondition
+      (and
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+      )
+    :effect
+      (and
+        (inspection_stamp_available ?inspection_stamp)
+        (not
+          (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        )
+      )
+  )
+  (:action reserve_layer_profile_for_picker_work_unit
+    :parameters (?picker_work_unit - picker_work_unit ?layer_stability_profile - layer_stability_profile ?sku - sku)
+    :precondition
+      (and
+        (entity_confirmed ?picker_work_unit)
+        (entity_reserved_sku ?picker_work_unit ?sku)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (not
+          (layer_stability_profile_ready ?layer_stability_profile)
+        )
+        (not
+          (layer_stability_profile_populated ?layer_stability_profile)
+        )
+      )
+    :effect (layer_stability_profile_ready ?layer_stability_profile)
+  )
+  (:action prepare_picker_work_unit_for_layer
+    :parameters (?picker_work_unit - picker_work_unit ?layer_stability_profile - layer_stability_profile ?operator - operator)
+    :precondition
+      (and
+        (entity_confirmed ?picker_work_unit)
+        (entity_assigned_operator ?picker_work_unit ?operator)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (layer_stability_profile_ready ?layer_stability_profile)
+        (not
+          (picker_work_unit_prepared ?picker_work_unit)
+        )
+      )
+    :effect
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+      )
+  )
+  (:action stage_case_unit_on_picker_work_unit
+    :parameters (?picker_work_unit - picker_work_unit ?layer_stability_profile - layer_stability_profile ?case_unit - case_unit)
+    :precondition
+      (and
+        (entity_confirmed ?picker_work_unit)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (case_unit_available ?case_unit)
+        (not
+          (picker_work_unit_prepared ?picker_work_unit)
+        )
+      )
+    :effect
+      (and
+        (layer_stability_profile_populated ?layer_stability_profile)
+        (picker_work_unit_prepared ?picker_work_unit)
+        (work_unit_has_case_unit ?picker_work_unit ?case_unit)
+        (not
+          (case_unit_available ?case_unit)
+        )
+      )
+  )
+  (:action complete_picker_layer_preparation
+    :parameters (?picker_work_unit - picker_work_unit ?layer_stability_profile - layer_stability_profile ?sku - sku ?case_unit - case_unit)
+    :precondition
+      (and
+        (entity_confirmed ?picker_work_unit)
+        (entity_reserved_sku ?picker_work_unit ?sku)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (layer_stability_profile_populated ?layer_stability_profile)
+        (work_unit_has_case_unit ?picker_work_unit ?case_unit)
+        (not
+          (picker_work_unit_layer_complete ?picker_work_unit)
+        )
+      )
+    :effect
+      (and
+        (layer_stability_profile_ready ?layer_stability_profile)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+        (case_unit_available ?case_unit)
+        (not
+          (work_unit_has_case_unit ?picker_work_unit ?case_unit)
+        )
+      )
+  )
+  (:action reserve_pallet_profile_for_stager_work_unit
+    :parameters (?stager_work_unit - stager_work_unit ?pallet_stability_profile - pallet_stability_profile ?sku - sku)
+    :precondition
+      (and
+        (entity_confirmed ?stager_work_unit)
+        (entity_reserved_sku ?stager_work_unit ?sku)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (not
+          (pallet_stability_profile_ready ?pallet_stability_profile)
+        )
+        (not
+          (pallet_stability_profile_populated ?pallet_stability_profile)
+        )
+      )
+    :effect (pallet_stability_profile_ready ?pallet_stability_profile)
+  )
+  (:action prepare_stager_work_unit_for_layer
+    :parameters (?stager_work_unit - stager_work_unit ?pallet_stability_profile - pallet_stability_profile ?operator - operator)
+    :precondition
+      (and
+        (entity_confirmed ?stager_work_unit)
+        (entity_assigned_operator ?stager_work_unit ?operator)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (pallet_stability_profile_ready ?pallet_stability_profile)
+        (not
+          (stager_work_unit_prepared ?stager_work_unit)
+        )
+      )
+    :effect
+      (and
+        (stager_work_unit_prepared ?stager_work_unit)
+        (stager_work_unit_layer_complete ?stager_work_unit)
+      )
+  )
+  (:action stage_case_unit_on_stager_work_unit
+    :parameters (?stager_work_unit - stager_work_unit ?pallet_stability_profile - pallet_stability_profile ?case_unit - case_unit)
+    :precondition
+      (and
+        (entity_confirmed ?stager_work_unit)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (case_unit_available ?case_unit)
+        (not
+          (stager_work_unit_prepared ?stager_work_unit)
+        )
+      )
+    :effect
+      (and
+        (pallet_stability_profile_populated ?pallet_stability_profile)
+        (stager_work_unit_prepared ?stager_work_unit)
+        (stager_work_unit_has_case_unit ?stager_work_unit ?case_unit)
+        (not
+          (case_unit_available ?case_unit)
+        )
+      )
+  )
+  (:action complete_stager_layer_preparation
+    :parameters (?stager_work_unit - stager_work_unit ?pallet_stability_profile - pallet_stability_profile ?sku - sku ?case_unit - case_unit)
+    :precondition
+      (and
+        (entity_confirmed ?stager_work_unit)
+        (entity_reserved_sku ?stager_work_unit ?sku)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (pallet_stability_profile_populated ?pallet_stability_profile)
+        (stager_work_unit_has_case_unit ?stager_work_unit ?case_unit)
+        (not
+          (stager_work_unit_layer_complete ?stager_work_unit)
+        )
+      )
+    :effect
+      (and
+        (pallet_stability_profile_ready ?pallet_stability_profile)
+        (stager_work_unit_layer_complete ?stager_work_unit)
+        (case_unit_available ?case_unit)
+        (not
+          (stager_work_unit_has_case_unit ?stager_work_unit ?case_unit)
+        )
+      )
+  )
+  (:action compose_and_attach_layer_to_pallet_unit
+    :parameters (?picker_work_unit - picker_work_unit ?stager_work_unit - stager_work_unit ?layer_stability_profile - layer_stability_profile ?pallet_stability_profile - pallet_stability_profile ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (stager_work_unit_prepared ?stager_work_unit)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (layer_stability_profile_ready ?layer_stability_profile)
+        (pallet_stability_profile_ready ?pallet_stability_profile)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+        (stager_work_unit_layer_complete ?stager_work_unit)
+        (pallet_unit_available ?pallet_unit)
+      )
+    :effect
+      (and
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_has_layer_profile ?pallet_unit ?layer_stability_profile)
+        (pallet_unit_has_pallet_profile ?pallet_unit ?pallet_stability_profile)
+        (not
+          (pallet_unit_available ?pallet_unit)
+        )
+      )
+  )
+  (:action compose_and_attach_layer_to_pallet_unit_variant_a
+    :parameters (?picker_work_unit - picker_work_unit ?stager_work_unit - stager_work_unit ?layer_stability_profile - layer_stability_profile ?pallet_stability_profile - pallet_stability_profile ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (stager_work_unit_prepared ?stager_work_unit)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (layer_stability_profile_populated ?layer_stability_profile)
+        (pallet_stability_profile_ready ?pallet_stability_profile)
+        (not
+          (picker_work_unit_layer_complete ?picker_work_unit)
+        )
+        (stager_work_unit_layer_complete ?stager_work_unit)
+        (pallet_unit_available ?pallet_unit)
+      )
+    :effect
+      (and
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_has_layer_profile ?pallet_unit ?layer_stability_profile)
+        (pallet_unit_has_pallet_profile ?pallet_unit ?pallet_stability_profile)
+        (pallet_unit_variant_flag_a ?pallet_unit)
+        (not
+          (pallet_unit_available ?pallet_unit)
+        )
+      )
+  )
+  (:action compose_and_attach_layer_to_pallet_unit_variant_b
+    :parameters (?picker_work_unit - picker_work_unit ?stager_work_unit - stager_work_unit ?layer_stability_profile - layer_stability_profile ?pallet_stability_profile - pallet_stability_profile ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (stager_work_unit_prepared ?stager_work_unit)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (layer_stability_profile_ready ?layer_stability_profile)
+        (pallet_stability_profile_populated ?pallet_stability_profile)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+        (not
+          (stager_work_unit_layer_complete ?stager_work_unit)
+        )
+        (pallet_unit_available ?pallet_unit)
+      )
+    :effect
+      (and
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_has_layer_profile ?pallet_unit ?layer_stability_profile)
+        (pallet_unit_has_pallet_profile ?pallet_unit ?pallet_stability_profile)
+        (pallet_unit_variant_flag_b ?pallet_unit)
+        (not
+          (pallet_unit_available ?pallet_unit)
+        )
+      )
+  )
+  (:action compose_and_attach_layer_to_pallet_unit_variants_ab
+    :parameters (?picker_work_unit - picker_work_unit ?stager_work_unit - stager_work_unit ?layer_stability_profile - layer_stability_profile ?pallet_stability_profile - pallet_stability_profile ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (stager_work_unit_prepared ?stager_work_unit)
+        (work_unit_assigned_layer_profile ?picker_work_unit ?layer_stability_profile)
+        (stager_assigned_pallet_profile ?stager_work_unit ?pallet_stability_profile)
+        (layer_stability_profile_populated ?layer_stability_profile)
+        (pallet_stability_profile_populated ?pallet_stability_profile)
+        (not
+          (picker_work_unit_layer_complete ?picker_work_unit)
+        )
+        (not
+          (stager_work_unit_layer_complete ?stager_work_unit)
+        )
+        (pallet_unit_available ?pallet_unit)
+      )
+    :effect
+      (and
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_has_layer_profile ?pallet_unit ?layer_stability_profile)
+        (pallet_unit_has_pallet_profile ?pallet_unit ?pallet_stability_profile)
+        (pallet_unit_variant_flag_a ?pallet_unit)
+        (pallet_unit_variant_flag_b ?pallet_unit)
+        (not
+          (pallet_unit_available ?pallet_unit)
+        )
+      )
+  )
+  (:action lock_pallet_unit_layer_composition
+    :parameters (?pallet_unit - pallet_unit ?picker_work_unit - picker_work_unit ?sku - sku)
+    :precondition
+      (and
+        (pallet_unit_selected ?pallet_unit)
+        (picker_work_unit_prepared ?picker_work_unit)
+        (entity_reserved_sku ?picker_work_unit ?sku)
+        (not
+          (pallet_unit_layer_composed ?pallet_unit)
+        )
+      )
+    :effect (pallet_unit_layer_composed ?pallet_unit)
+  )
+  (:action claim_layer_template_for_pallet_unit
+    :parameters (?assembly_station - assembly_station ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (assembly_station_assigned_pallet_unit ?assembly_station ?pallet_unit)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_available ?layer_template)
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_layer_composed ?pallet_unit)
+        (not
+          (layer_template_claimed ?layer_template)
+        )
+      )
+    :effect
+      (and
+        (layer_template_claimed ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (not
+          (layer_template_available ?layer_template)
+        )
+      )
+  )
+  (:action enable_station_for_template_attachment
+    :parameters (?assembly_station - assembly_station ?layer_template - layer_template ?pallet_unit - pallet_unit ?sku - sku)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_claimed ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (entity_reserved_sku ?assembly_station ?sku)
+        (not
+          (pallet_unit_variant_flag_a ?pallet_unit)
+        )
+        (not
+          (assembly_station_enabled ?assembly_station)
+        )
+      )
+    :effect (assembly_station_enabled ?assembly_station)
+  )
+  (:action assign_packaging_configuration_to_station
+    :parameters (?assembly_station - assembly_station ?packaging_configuration - packaging_configuration)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (packaging_configuration_available ?packaging_configuration)
+        (not
+          (assembly_station_has_packaging_configuration ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_has_packaging_configuration ?assembly_station)
+        (assembly_station_assigned_packaging_configuration ?assembly_station ?packaging_configuration)
+        (not
+          (packaging_configuration_available ?packaging_configuration)
+        )
+      )
+  )
+  (:action bind_template_and_configuration_on_station
+    :parameters (?assembly_station - assembly_station ?layer_template - layer_template ?pallet_unit - pallet_unit ?sku - sku ?packaging_configuration - packaging_configuration)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_claimed ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (entity_reserved_sku ?assembly_station ?sku)
+        (pallet_unit_variant_flag_a ?pallet_unit)
+        (assembly_station_has_packaging_configuration ?assembly_station)
+        (assembly_station_assigned_packaging_configuration ?assembly_station ?packaging_configuration)
+        (not
+          (assembly_station_enabled ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_enabled ?assembly_station)
+        (assembly_station_configuration_attached ?assembly_station)
+      )
+  )
+  (:action apply_stabilizer_via_station_variant1
+    :parameters (?assembly_station - assembly_station ?stabilizer_material - stabilizer_material ?operator - operator ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_enabled ?assembly_station)
+        (assembly_station_assigned_stabilizer ?assembly_station ?stabilizer_material)
+        (entity_assigned_operator ?assembly_station ?operator)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (not
+          (pallet_unit_variant_flag_b ?pallet_unit)
+        )
+        (not
+          (assembly_station_stabilizer_applied ?assembly_station)
+        )
+      )
+    :effect (assembly_station_stabilizer_applied ?assembly_station)
+  )
+  (:action apply_stabilizer_via_station_variant2
+    :parameters (?assembly_station - assembly_station ?stabilizer_material - stabilizer_material ?operator - operator ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_enabled ?assembly_station)
+        (assembly_station_assigned_stabilizer ?assembly_station ?stabilizer_material)
+        (entity_assigned_operator ?assembly_station ?operator)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (pallet_unit_variant_flag_b ?pallet_unit)
+        (not
+          (assembly_station_stabilizer_applied ?assembly_station)
+        )
+      )
+    :effect (assembly_station_stabilizer_applied ?assembly_station)
+  )
+  (:action reserve_inspection_stamp_for_station
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_stabilizer_applied ?assembly_station)
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (not
+          (pallet_unit_variant_flag_a ?pallet_unit)
+        )
+        (not
+          (pallet_unit_variant_flag_b ?pallet_unit)
+        )
+        (not
+          (assembly_station_inspection_applied ?assembly_station)
+        )
+      )
+    :effect (assembly_station_inspection_applied ?assembly_station)
+  )
+  (:action apply_inspection_stamp_and_flag
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_stabilizer_applied ?assembly_station)
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (pallet_unit_variant_flag_a ?pallet_unit)
+        (not
+          (pallet_unit_variant_flag_b ?pallet_unit)
+        )
+        (not
+          (assembly_station_inspection_applied ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_ready_for_handling_equipment ?assembly_station)
+      )
+  )
+  (:action apply_inspection_stamp_and_secondary_flag
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_stabilizer_applied ?assembly_station)
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (not
+          (pallet_unit_variant_flag_a ?pallet_unit)
+        )
+        (pallet_unit_variant_flag_b ?pallet_unit)
+        (not
+          (assembly_station_inspection_applied ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_ready_for_handling_equipment ?assembly_station)
+      )
+  )
+  (:action apply_all_inspection_stamp_and_flags
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp ?layer_template - layer_template ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (assembly_station_stabilizer_applied ?assembly_station)
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (assembly_station_has_layer_template ?assembly_station ?layer_template)
+        (layer_template_assigned_to_pallet ?layer_template ?pallet_unit)
+        (pallet_unit_variant_flag_a ?pallet_unit)
+        (pallet_unit_variant_flag_b ?pallet_unit)
+        (not
+          (assembly_station_inspection_applied ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_ready_for_handling_equipment ?assembly_station)
+      )
+  )
+  (:action record_station_handover_marker
+    :parameters (?assembly_station - assembly_station)
+    :precondition
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (not
+          (assembly_station_ready_for_handling_equipment ?assembly_station)
+        )
+        (not
+          (assembly_station_handover_recorded ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_handover_recorded ?assembly_station)
+        (entity_completed ?assembly_station)
+      )
+  )
+  (:action attach_handling_equipment_to_station
+    :parameters (?assembly_station - assembly_station ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_ready_for_handling_equipment ?assembly_station)
+        (handling_equipment_available ?handling_equipment)
+      )
+    :effect
+      (and
+        (assembly_station_assigned_handling_equipment ?assembly_station ?handling_equipment)
+        (not
+          (handling_equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action perform_station_layer_attachment
+    :parameters (?assembly_station - assembly_station ?picker_work_unit - picker_work_unit ?stager_work_unit - stager_work_unit ?sku - sku ?handling_equipment - handling_equipment)
+    :precondition
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_ready_for_handling_equipment ?assembly_station)
+        (assembly_station_assigned_handling_equipment ?assembly_station ?handling_equipment)
+        (assembly_station_assigned_picker_work_unit ?assembly_station ?picker_work_unit)
+        (assembly_station_assigned_stager_work_unit ?assembly_station ?stager_work_unit)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+        (stager_work_unit_layer_complete ?stager_work_unit)
+        (entity_reserved_sku ?assembly_station ?sku)
+        (not
+          (assembly_station_attachment_finalized ?assembly_station)
+        )
+      )
+    :effect (assembly_station_attachment_finalized ?assembly_station)
+  )
+  (:action finalize_station_and_record_handover
+    :parameters (?assembly_station - assembly_station)
+    :precondition
+      (and
+        (assembly_station_inspection_applied ?assembly_station)
+        (assembly_station_attachment_finalized ?assembly_station)
+        (not
+          (assembly_station_handover_recorded ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_handover_recorded ?assembly_station)
+        (entity_completed ?assembly_station)
+      )
+  )
+  (:action prepare_station_for_tool_inspection
+    :parameters (?assembly_station - assembly_station ?inspection_tool - inspection_tool ?sku - sku)
+    :precondition
+      (and
+        (entity_confirmed ?assembly_station)
+        (entity_reserved_sku ?assembly_station ?sku)
+        (inspection_tool_available ?inspection_tool)
+        (assembly_station_assigned_inspection_tool ?assembly_station ?inspection_tool)
+        (not
+          (assembly_station_prepared_for_configuration ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_prepared_for_configuration ?assembly_station)
+        (not
+          (inspection_tool_available ?inspection_tool)
+        )
+      )
+  )
+  (:action record_visual_inspection_by_operator
+    :parameters (?assembly_station - assembly_station ?operator - operator)
+    :precondition
+      (and
+        (assembly_station_prepared_for_configuration ?assembly_station)
+        (entity_assigned_operator ?assembly_station ?operator)
+        (not
+          (assembly_station_visual_inspection_recorded ?assembly_station)
+        )
+      )
+    :effect (assembly_station_visual_inspection_recorded ?assembly_station)
+  )
+  (:action record_inspection_stamp_application
+    :parameters (?assembly_station - assembly_station ?inspection_stamp - inspection_stamp)
+    :precondition
+      (and
+        (assembly_station_visual_inspection_recorded ?assembly_station)
+        (assembly_station_assigned_inspection_stamp ?assembly_station ?inspection_stamp)
+        (not
+          (assembly_station_inspection_stamp_recorded ?assembly_station)
+        )
+      )
+    :effect (assembly_station_inspection_stamp_recorded ?assembly_station)
+  )
+  (:action finalize_station_inspection_handover
+    :parameters (?assembly_station - assembly_station)
+    :precondition
+      (and
+        (assembly_station_inspection_stamp_recorded ?assembly_station)
+        (not
+          (assembly_station_handover_recorded ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (assembly_station_handover_recorded ?assembly_station)
+        (entity_completed ?assembly_station)
+      )
+  )
+  (:action finalize_picker_work_unit
+    :parameters (?picker_work_unit - picker_work_unit ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (picker_work_unit_prepared ?picker_work_unit)
+        (picker_work_unit_layer_complete ?picker_work_unit)
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_layer_composed ?pallet_unit)
+        (not
+          (entity_completed ?picker_work_unit)
+        )
+      )
+    :effect (entity_completed ?picker_work_unit)
+  )
+  (:action finalize_stager_work_unit
+    :parameters (?stager_work_unit - stager_work_unit ?pallet_unit - pallet_unit)
+    :precondition
+      (and
+        (stager_work_unit_prepared ?stager_work_unit)
+        (stager_work_unit_layer_complete ?stager_work_unit)
+        (pallet_unit_selected ?pallet_unit)
+        (pallet_unit_layer_composed ?pallet_unit)
+        (not
+          (entity_completed ?stager_work_unit)
+        )
+      )
+    :effect (entity_completed ?stager_work_unit)
+  )
+  (:action attach_identity_tag_to_build_order
+    :parameters (?build_order - build_order ?identity_tag - identity_tag ?sku - sku)
+    :precondition
+      (and
+        (entity_completed ?build_order)
+        (entity_reserved_sku ?build_order ?sku)
+        (identity_tag_available ?identity_tag)
+        (not
+          (entity_tagged ?build_order)
+        )
+      )
+    :effect
+      (and
+        (entity_tagged ?build_order)
+        (entity_assigned_identity_tag ?build_order ?identity_tag)
+        (not
+          (identity_tag_available ?identity_tag)
+        )
+      )
+  )
+  (:action assign_packaging_and_identity_to_picker_work_unit
+    :parameters (?picker_work_unit - picker_work_unit ?packaging_resource - packaging_resource ?identity_tag - identity_tag)
+    :precondition
+      (and
+        (entity_tagged ?picker_work_unit)
+        (entity_assigned_packaging_resource ?picker_work_unit ?packaging_resource)
+        (entity_assigned_identity_tag ?picker_work_unit ?identity_tag)
+        (not
+          (handover_complete ?picker_work_unit)
+        )
+      )
+    :effect
+      (and
+        (handover_complete ?picker_work_unit)
+        (packaging_resource_available ?packaging_resource)
+        (identity_tag_available ?identity_tag)
+      )
+  )
+  (:action assign_packaging_and_identity_to_stager_work_unit
+    :parameters (?stager_work_unit - stager_work_unit ?packaging_resource - packaging_resource ?identity_tag - identity_tag)
+    :precondition
+      (and
+        (entity_tagged ?stager_work_unit)
+        (entity_assigned_packaging_resource ?stager_work_unit ?packaging_resource)
+        (entity_assigned_identity_tag ?stager_work_unit ?identity_tag)
+        (not
+          (handover_complete ?stager_work_unit)
+        )
+      )
+    :effect
+      (and
+        (handover_complete ?stager_work_unit)
+        (packaging_resource_available ?packaging_resource)
+        (identity_tag_available ?identity_tag)
+      )
+  )
+  (:action assign_packaging_and_identity_to_assembly_station
+    :parameters (?assembly_station - assembly_station ?packaging_resource - packaging_resource ?identity_tag - identity_tag)
+    :precondition
+      (and
+        (entity_tagged ?assembly_station)
+        (entity_assigned_packaging_resource ?assembly_station ?packaging_resource)
+        (entity_assigned_identity_tag ?assembly_station ?identity_tag)
+        (not
+          (handover_complete ?assembly_station)
+        )
+      )
+    :effect
+      (and
+        (handover_complete ?assembly_station)
+        (packaging_resource_available ?packaging_resource)
+        (identity_tag_available ?identity_tag)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem pallet_building_scenario)
+  (:domain pallet_assembly)
+  (:objects picker_work_unit_1 - picker_work_unit stager_work_unit_1 - stager_work_unit assembly_station_a - assembly_station assembly_station_b - assembly_station shrink_wrap_roll_1 - packaging_resource shrink_wrap_roll_2 - packaging_resource corner_protector_1 - packaging_resource sku_1 - sku operator_1 - operator case_unit_1 - case_unit layer_profile_a - layer_stability_profile pallet_profile_a - pallet_stability_profile pallet_unit_1 - pallet_unit layer_template_a - layer_template layer_template_b - layer_template packaging_config_a - packaging_configuration packaging_config_b - packaging_configuration forklift_1 - handling_equipment pallet_jack_1 - handling_equipment identity_tag_1 - identity_tag stabilizer_strap_roll_1 - stabilizer_material inspection_tool_1 - inspection_tool inspection_tool_2 - inspection_tool inspection_stamp_1 - inspection_stamp)
+  (:init
+    (packaging_resource_available shrink_wrap_roll_1)
+    (packaging_resource_available shrink_wrap_roll_2)
+    (packaging_resource_available corner_protector_1)
+    (sku_available sku_1)
+    (operator_available operator_1)
+    (case_unit_available case_unit_1)
+    (work_unit_assigned_layer_profile picker_work_unit_1 layer_profile_a)
+    (stager_assigned_pallet_profile stager_work_unit_1 pallet_profile_a)
+    (pallet_unit_available pallet_unit_1)
+    (layer_template_available layer_template_a)
+    (layer_template_available layer_template_b)
+    (assembly_station_assigned_picker_work_unit assembly_station_a picker_work_unit_1)
+    (assembly_station_assigned_picker_work_unit assembly_station_b picker_work_unit_1)
+    (assembly_station_assigned_stager_work_unit assembly_station_a stager_work_unit_1)
+    (assembly_station_assigned_stager_work_unit assembly_station_b stager_work_unit_1)
+    (assembly_station_assigned_pallet_unit assembly_station_a pallet_unit_1)
+    (assembly_station_assigned_pallet_unit assembly_station_b pallet_unit_1)
+    (assembly_station_has_layer_template assembly_station_a layer_template_a)
+    (assembly_station_has_layer_template assembly_station_b layer_template_b)
+    (packaging_configuration_available packaging_config_a)
+    (packaging_configuration_available packaging_config_b)
+    (handling_equipment_available forklift_1)
+    (handling_equipment_available pallet_jack_1)
+    (identity_tag_available identity_tag_1)
+    (stabilizer_material_available stabilizer_strap_roll_1)
+    (inspection_tool_available inspection_tool_1)
+    (assembly_station_assigned_inspection_tool assembly_station_a inspection_tool_1)
+    (assembly_station_assigned_inspection_tool assembly_station_b inspection_tool_2)
+    (inspection_stamp_available inspection_stamp_1)
+  )
+  (:goal
+    (and
+      (handover_complete picker_work_unit_1)
+      (handover_complete stager_work_unit_1)
+      (handover_complete assembly_station_a)
+      (handover_complete assembly_station_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_build_order picker_work_unit_1)
+(register_build_order stager_work_unit_1)
+(assign_packaging_to_order picker_work_unit_1 shrink_wrap_roll_1)
+(reserve_sku_for_order picker_work_unit_1 sku_1)
+(confirm_order_sku_reservation picker_work_unit_1 sku_1)
+(reserve_layer_profile_for_picker_work_unit picker_work_unit_1 layer_profile_a sku_1)
+(release_sku_reservation picker_work_unit_1 sku_1)
+(assign_operator_to_order picker_work_unit_1 operator_1)
+(prepare_picker_work_unit_for_layer picker_work_unit_1 layer_profile_a operator_1)
+(release_operator_from_order picker_work_unit_1 operator_1)
+(assign_packaging_to_order stager_work_unit_1 shrink_wrap_roll_2)
+(reserve_sku_for_order stager_work_unit_1 sku_1)
+(confirm_order_sku_reservation stager_work_unit_1 sku_1)
+(reserve_pallet_profile_for_stager_work_unit stager_work_unit_1 pallet_profile_a sku_1)
+(release_sku_reservation stager_work_unit_1 sku_1)
+(assign_operator_to_order stager_work_unit_1 operator_1)
+(prepare_stager_work_unit_for_layer stager_work_unit_1 pallet_profile_a operator_1)
+(release_operator_from_order stager_work_unit_1 operator_1)
+(compose_and_attach_layer_to_pallet_unit picker_work_unit_1 stager_work_unit_1 layer_profile_a pallet_profile_a pallet_unit_1)
+(reserve_sku_for_order picker_work_unit_1 sku_1)
+(lock_pallet_unit_layer_composition pallet_unit_1 picker_work_unit_1 sku_1)
+(finalize_picker_work_unit picker_work_unit_1 pallet_unit_1)
+(finalize_stager_work_unit stager_work_unit_1 pallet_unit_1)
+(attach_identity_tag_to_build_order picker_work_unit_1 identity_tag_1 sku_1)
+(assign_packaging_and_identity_to_picker_work_unit picker_work_unit_1 shrink_wrap_roll_1 identity_tag_1)
+(release_sku_reservation picker_work_unit_1 sku_1)
+(reserve_sku_for_order stager_work_unit_1 sku_1)
+(attach_identity_tag_to_build_order stager_work_unit_1 identity_tag_1 sku_1)
+(assign_packaging_and_identity_to_stager_work_unit stager_work_unit_1 shrink_wrap_roll_2 identity_tag_1)
+(register_build_order assembly_station_a)
+(register_build_order assembly_station_b)
+(assign_packaging_to_order assembly_station_a corner_protector_1)
+(assign_packaging_to_order assembly_station_b shrink_wrap_roll_1)
+(reserve_sku_for_order assembly_station_a sku_1)
+(confirm_order_sku_reservation assembly_station_a sku_1)
+(claim_layer_template_for_pallet_unit assembly_station_a layer_template_a pallet_unit_1)
+(enable_station_for_template_attachment assembly_station_a layer_template_a pallet_unit_1 sku_1)
+(allocate_stabilizer_to_station assembly_station_a stabilizer_strap_roll_1)
+(assign_inspection_stamp_to_station assembly_station_a inspection_stamp_1)
+(assign_operator_to_order assembly_station_a operator_1)
+(apply_stabilizer_via_station_variant1 assembly_station_a stabilizer_strap_roll_1 operator_1 layer_template_a pallet_unit_1)
+(reserve_inspection_stamp_for_station assembly_station_a inspection_stamp_1 layer_template_a pallet_unit_1)
+(record_station_handover_marker assembly_station_a)
+(attach_identity_tag_to_build_order assembly_station_a identity_tag_1 sku_1)
+(assign_packaging_and_identity_to_assembly_station assembly_station_a corner_protector_1 identity_tag_1)
+(release_operator_from_order assembly_station_a operator_1)
+(release_stabilizer_from_station assembly_station_a stabilizer_strap_roll_1)
+(release_inspection_stamp_from_station assembly_station_a inspection_stamp_1)
+(release_sku_reservation assembly_station_a sku_1)
+(reserve_sku_for_order assembly_station_b sku_1)
+(confirm_order_sku_reservation assembly_station_b sku_1)
+(claim_layer_template_for_pallet_unit assembly_station_b layer_template_b pallet_unit_1)
+(enable_station_for_template_attachment assembly_station_b layer_template_b pallet_unit_1 sku_1)
+(allocate_stabilizer_to_station assembly_station_b stabilizer_strap_roll_1)
+(assign_inspection_stamp_to_station assembly_station_b inspection_stamp_1)
+(assign_operator_to_order assembly_station_b operator_1)
+(apply_stabilizer_via_station_variant1 assembly_station_b stabilizer_strap_roll_1 operator_1 layer_template_b pallet_unit_1)
+(reserve_inspection_stamp_for_station assembly_station_b inspection_stamp_1 layer_template_b pallet_unit_1)
+(record_station_handover_marker assembly_station_b)
+(attach_identity_tag_to_build_order assembly_station_b identity_tag_1 sku_1)
+(assign_packaging_and_identity_to_assembly_station assembly_station_b shrink_wrap_roll_1 identity_tag_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_5liis1jc/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_5liis1jc/plan.pddl 
+
+
+--- stderr ---
+

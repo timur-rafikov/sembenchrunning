@@ -1,0 +1,1005 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain warehouse_putaway_location_selection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_location - object organizational_unit - object logistics_resource - object entity_group - object inventory_unit - entity_group location_reservation_token - physical_location product_sku - physical_location handler_resource - physical_location special_handling_code - physical_location storage_profile - physical_location inventory_tag - physical_location equipment_unit - physical_location inspection_requirement - physical_location slot_attribute - organizational_unit pallet_type - organizational_unit asset_owner - organizational_unit storage_zone - logistics_resource subzone_or_bay - logistics_resource putaway_task - logistics_resource storage_unit_group - inventory_unit storage_unit_type - inventory_unit inbound_source_area - storage_unit_group alternate_source_area - storage_unit_group storage_location - storage_unit_type)
+  (:predicates
+    (putaway_entity_registered ?inventory_unit - inventory_unit)
+    (putaway_entity_ready_for_assignment ?inventory_unit - inventory_unit)
+    (putaway_entity_has_reservation ?inventory_unit - inventory_unit)
+    (putaway_entity_putaway_completed ?inventory_unit - inventory_unit)
+    (putaway_entity_ready_for_tagging ?inventory_unit - inventory_unit)
+    (putaway_entity_tag_assigned ?inventory_unit - inventory_unit)
+    (reservation_token_available ?location_reservation_token - location_reservation_token)
+    (putaway_entity_reservation_token_claimed ?inventory_unit - inventory_unit ?location_reservation_token - location_reservation_token)
+    (product_sku_available ?product_sku - product_sku)
+    (putaway_entity_has_sku ?inventory_unit - inventory_unit ?product_sku - product_sku)
+    (handler_resource_available ?handler_resource - handler_resource)
+    (handler_assigned_to_entity ?inventory_unit - inventory_unit ?handler_resource - handler_resource)
+    (slot_attribute_available ?slot_attribute - slot_attribute)
+    (inbound_source_area_has_attribute ?inbound_source_area - inbound_source_area ?slot_attribute - slot_attribute)
+    (alternate_source_area_has_attribute ?alternate_source_area - alternate_source_area ?slot_attribute - slot_attribute)
+    (inbound_source_area_assigned_zone ?inbound_source_area - inbound_source_area ?storage_zone - storage_zone)
+    (storage_zone_marked_suitable ?storage_zone - storage_zone)
+    (storage_zone_has_attribute ?storage_zone - storage_zone)
+    (inbound_source_area_confirmed ?inbound_source_area - inbound_source_area)
+    (alternate_source_area_assigned_subzone ?alternate_source_area - alternate_source_area ?subzone_or_bay - subzone_or_bay)
+    (subzone_marked_suitable ?subzone_or_bay - subzone_or_bay)
+    (subzone_has_attribute ?subzone_or_bay - subzone_or_bay)
+    (alternate_source_area_confirmed ?alternate_source_area - alternate_source_area)
+    (putaway_task_slot_available ?putaway_task - putaway_task)
+    (putaway_task_created ?putaway_task - putaway_task)
+    (putaway_task_assigned_zone ?putaway_task - putaway_task ?storage_zone - storage_zone)
+    (putaway_task_assigned_subzone ?putaway_task - putaway_task ?subzone_or_bay - subzone_or_bay)
+    (putaway_task_staged ?putaway_task - putaway_task)
+    (putaway_task_requires_additional_qualification ?putaway_task - putaway_task)
+    (putaway_task_validated_location ?putaway_task - putaway_task)
+    (storage_location_assigned_source_area ?storage_location - storage_location ?inbound_source_area - inbound_source_area)
+    (storage_location_assigned_alternate_area ?storage_location - storage_location ?alternate_source_area - alternate_source_area)
+    (storage_location_linked_to_task ?storage_location - storage_location ?putaway_task - putaway_task)
+    (pallet_type_available ?pallet_type - pallet_type)
+    (storage_location_supports_pallet_type ?storage_location - storage_location ?pallet_type - pallet_type)
+    (pallet_type_marked ?pallet_type - pallet_type)
+    (pallet_type_assigned_to_task ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    (storage_location_qualified ?storage_location - storage_location)
+    (storage_location_ready_for_storage ?storage_location - storage_location)
+    (storage_location_accepted ?storage_location - storage_location)
+    (storage_location_has_handling_code_flag ?storage_location - storage_location)
+    (storage_location_handling_code_bound ?storage_location - storage_location)
+    (storage_location_profile_applied ?storage_location - storage_location)
+    (storage_location_execution_completed ?storage_location - storage_location)
+    (asset_owner_available ?asset_owner - asset_owner)
+    (storage_location_restricted_to_owner ?storage_location - storage_location ?asset_owner - asset_owner)
+    (storage_location_owner_assigned ?storage_location - storage_location)
+    (storage_location_owner_verified ?storage_location - storage_location)
+    (storage_location_owner_accepted ?storage_location - storage_location)
+    (handling_code_available ?special_handling_code - special_handling_code)
+    (storage_location_has_handling_code ?storage_location - storage_location ?special_handling_code - special_handling_code)
+    (storage_profile_available ?storage_profile - storage_profile)
+    (storage_location_has_storage_profile ?storage_location - storage_location ?storage_profile - storage_profile)
+    (equipment_unit_available ?equipment_unit - equipment_unit)
+    (equipment_assigned_to_location ?storage_location - storage_location ?equipment_unit - equipment_unit)
+    (inspection_requirement_available ?inspection_requirement - inspection_requirement)
+    (storage_location_has_inspection_requirement ?storage_location - storage_location ?inspection_requirement - inspection_requirement)
+    (inventory_tag_available ?inventory_tag - inventory_tag)
+    (putaway_entity_has_inventory_tag ?inventory_unit - inventory_unit ?inventory_tag - inventory_tag)
+    (inbound_source_area_ready ?inbound_source_area - inbound_source_area)
+    (alternate_source_area_ready ?alternate_source_area - alternate_source_area)
+    (storage_location_finalized ?storage_location - storage_location)
+  )
+  (:action register_inventory_unit
+    :parameters (?inventory_unit - inventory_unit)
+    :precondition
+      (and
+        (not
+          (putaway_entity_registered ?inventory_unit)
+        )
+        (not
+          (putaway_entity_putaway_completed ?inventory_unit)
+        )
+      )
+    :effect (putaway_entity_registered ?inventory_unit)
+  )
+  (:action reserve_location_token_for_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?location_reservation_token - location_reservation_token)
+    :precondition
+      (and
+        (putaway_entity_registered ?inventory_unit)
+        (not
+          (putaway_entity_has_reservation ?inventory_unit)
+        )
+        (reservation_token_available ?location_reservation_token)
+      )
+    :effect
+      (and
+        (putaway_entity_has_reservation ?inventory_unit)
+        (putaway_entity_reservation_token_claimed ?inventory_unit ?location_reservation_token)
+        (not
+          (reservation_token_available ?location_reservation_token)
+        )
+      )
+  )
+  (:action assign_sku_to_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_registered ?inventory_unit)
+        (putaway_entity_has_reservation ?inventory_unit)
+        (product_sku_available ?product_sku)
+      )
+    :effect
+      (and
+        (putaway_entity_has_sku ?inventory_unit ?product_sku)
+        (not
+          (product_sku_available ?product_sku)
+        )
+      )
+  )
+  (:action confirm_putaway_for_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_registered ?inventory_unit)
+        (putaway_entity_has_reservation ?inventory_unit)
+        (putaway_entity_has_sku ?inventory_unit ?product_sku)
+        (not
+          (putaway_entity_ready_for_assignment ?inventory_unit)
+        )
+      )
+    :effect (putaway_entity_ready_for_assignment ?inventory_unit)
+  )
+  (:action release_sku_from_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_has_sku ?inventory_unit ?product_sku)
+      )
+    :effect
+      (and
+        (product_sku_available ?product_sku)
+        (not
+          (putaway_entity_has_sku ?inventory_unit ?product_sku)
+        )
+      )
+  )
+  (:action assign_handler_to_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?handler_resource - handler_resource)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?inventory_unit)
+        (handler_resource_available ?handler_resource)
+      )
+    :effect
+      (and
+        (handler_assigned_to_entity ?inventory_unit ?handler_resource)
+        (not
+          (handler_resource_available ?handler_resource)
+        )
+      )
+  )
+  (:action release_handler_from_inventory_unit
+    :parameters (?inventory_unit - inventory_unit ?handler_resource - handler_resource)
+    :precondition
+      (and
+        (handler_assigned_to_entity ?inventory_unit ?handler_resource)
+      )
+    :effect
+      (and
+        (handler_resource_available ?handler_resource)
+        (not
+          (handler_assigned_to_entity ?inventory_unit ?handler_resource)
+        )
+      )
+  )
+  (:action assign_equipment_to_location
+    :parameters (?storage_location - storage_location ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (equipment_unit_available ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_assigned_to_location ?storage_location ?equipment_unit)
+        (not
+          (equipment_unit_available ?equipment_unit)
+        )
+      )
+  )
+  (:action release_equipment_from_location
+    :parameters (?storage_location - storage_location ?equipment_unit - equipment_unit)
+    :precondition
+      (and
+        (equipment_assigned_to_location ?storage_location ?equipment_unit)
+      )
+    :effect
+      (and
+        (equipment_unit_available ?equipment_unit)
+        (not
+          (equipment_assigned_to_location ?storage_location ?equipment_unit)
+        )
+      )
+  )
+  (:action assign_inspection_requirement_to_location
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (inspection_requirement_available ?inspection_requirement)
+      )
+    :effect
+      (and
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (not
+          (inspection_requirement_available ?inspection_requirement)
+        )
+      )
+  )
+  (:action release_inspection_requirement_from_location
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement)
+    :precondition
+      (and
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+      )
+    :effect
+      (and
+        (inspection_requirement_available ?inspection_requirement)
+        (not
+          (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        )
+      )
+  )
+  (:action assess_zone_suitability_primary_source
+    :parameters (?inbound_source_area - inbound_source_area ?storage_zone - storage_zone ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?inbound_source_area)
+        (putaway_entity_has_sku ?inbound_source_area ?product_sku)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (not
+          (storage_zone_marked_suitable ?storage_zone)
+        )
+        (not
+          (storage_zone_has_attribute ?storage_zone)
+        )
+      )
+    :effect (storage_zone_marked_suitable ?storage_zone)
+  )
+  (:action allocate_handler_to_source_area
+    :parameters (?inbound_source_area - inbound_source_area ?storage_zone - storage_zone ?handler_resource - handler_resource)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?inbound_source_area)
+        (handler_assigned_to_entity ?inbound_source_area ?handler_resource)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (storage_zone_marked_suitable ?storage_zone)
+        (not
+          (inbound_source_area_ready ?inbound_source_area)
+        )
+      )
+    :effect
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (inbound_source_area_confirmed ?inbound_source_area)
+      )
+  )
+  (:action apply_slot_attribute_to_source_area
+    :parameters (?inbound_source_area - inbound_source_area ?storage_zone - storage_zone ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?inbound_source_area)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (slot_attribute_available ?slot_attribute)
+        (not
+          (inbound_source_area_ready ?inbound_source_area)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_has_attribute ?storage_zone)
+        (inbound_source_area_ready ?inbound_source_area)
+        (inbound_source_area_has_attribute ?inbound_source_area ?slot_attribute)
+        (not
+          (slot_attribute_available ?slot_attribute)
+        )
+      )
+  )
+  (:action finalize_zone_candidate_with_attribute
+    :parameters (?inbound_source_area - inbound_source_area ?storage_zone - storage_zone ?product_sku - product_sku ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?inbound_source_area)
+        (putaway_entity_has_sku ?inbound_source_area ?product_sku)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (storage_zone_has_attribute ?storage_zone)
+        (inbound_source_area_has_attribute ?inbound_source_area ?slot_attribute)
+        (not
+          (inbound_source_area_confirmed ?inbound_source_area)
+        )
+      )
+    :effect
+      (and
+        (storage_zone_marked_suitable ?storage_zone)
+        (inbound_source_area_confirmed ?inbound_source_area)
+        (slot_attribute_available ?slot_attribute)
+        (not
+          (inbound_source_area_has_attribute ?inbound_source_area ?slot_attribute)
+        )
+      )
+  )
+  (:action assess_zone_suitability_alternate_source
+    :parameters (?alternate_source_area - alternate_source_area ?subzone_or_bay - subzone_or_bay ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?alternate_source_area)
+        (putaway_entity_has_sku ?alternate_source_area ?product_sku)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (not
+          (subzone_marked_suitable ?subzone_or_bay)
+        )
+        (not
+          (subzone_has_attribute ?subzone_or_bay)
+        )
+      )
+    :effect (subzone_marked_suitable ?subzone_or_bay)
+  )
+  (:action allocate_handler_to_alternate_source_area
+    :parameters (?alternate_source_area - alternate_source_area ?subzone_or_bay - subzone_or_bay ?handler_resource - handler_resource)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?alternate_source_area)
+        (handler_assigned_to_entity ?alternate_source_area ?handler_resource)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (subzone_marked_suitable ?subzone_or_bay)
+        (not
+          (alternate_source_area_ready ?alternate_source_area)
+        )
+      )
+    :effect
+      (and
+        (alternate_source_area_ready ?alternate_source_area)
+        (alternate_source_area_confirmed ?alternate_source_area)
+      )
+  )
+  (:action apply_slot_attribute_to_alternate_source_area
+    :parameters (?alternate_source_area - alternate_source_area ?subzone_or_bay - subzone_or_bay ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?alternate_source_area)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (slot_attribute_available ?slot_attribute)
+        (not
+          (alternate_source_area_ready ?alternate_source_area)
+        )
+      )
+    :effect
+      (and
+        (subzone_has_attribute ?subzone_or_bay)
+        (alternate_source_area_ready ?alternate_source_area)
+        (alternate_source_area_has_attribute ?alternate_source_area ?slot_attribute)
+        (not
+          (slot_attribute_available ?slot_attribute)
+        )
+      )
+  )
+  (:action finalize_alternate_zone_candidate_with_attribute
+    :parameters (?alternate_source_area - alternate_source_area ?subzone_or_bay - subzone_or_bay ?product_sku - product_sku ?slot_attribute - slot_attribute)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?alternate_source_area)
+        (putaway_entity_has_sku ?alternate_source_area ?product_sku)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (subzone_has_attribute ?subzone_or_bay)
+        (alternate_source_area_has_attribute ?alternate_source_area ?slot_attribute)
+        (not
+          (alternate_source_area_confirmed ?alternate_source_area)
+        )
+      )
+    :effect
+      (and
+        (subzone_marked_suitable ?subzone_or_bay)
+        (alternate_source_area_confirmed ?alternate_source_area)
+        (slot_attribute_available ?slot_attribute)
+        (not
+          (alternate_source_area_has_attribute ?alternate_source_area ?slot_attribute)
+        )
+      )
+  )
+  (:action create_putaway_task_default
+    :parameters (?inbound_source_area - inbound_source_area ?alternate_source_area - alternate_source_area ?storage_zone - storage_zone ?subzone_or_bay - subzone_or_bay ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (alternate_source_area_ready ?alternate_source_area)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (storage_zone_marked_suitable ?storage_zone)
+        (subzone_marked_suitable ?subzone_or_bay)
+        (inbound_source_area_confirmed ?inbound_source_area)
+        (alternate_source_area_confirmed ?alternate_source_area)
+        (putaway_task_slot_available ?putaway_task)
+      )
+    :effect
+      (and
+        (putaway_task_created ?putaway_task)
+        (putaway_task_assigned_zone ?putaway_task ?storage_zone)
+        (putaway_task_assigned_subzone ?putaway_task ?subzone_or_bay)
+        (not
+          (putaway_task_slot_available ?putaway_task)
+        )
+      )
+  )
+  (:action create_putaway_task_zone_attribute_present
+    :parameters (?inbound_source_area - inbound_source_area ?alternate_source_area - alternate_source_area ?storage_zone - storage_zone ?subzone_or_bay - subzone_or_bay ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (alternate_source_area_ready ?alternate_source_area)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (storage_zone_has_attribute ?storage_zone)
+        (subzone_marked_suitable ?subzone_or_bay)
+        (not
+          (inbound_source_area_confirmed ?inbound_source_area)
+        )
+        (alternate_source_area_confirmed ?alternate_source_area)
+        (putaway_task_slot_available ?putaway_task)
+      )
+    :effect
+      (and
+        (putaway_task_created ?putaway_task)
+        (putaway_task_assigned_zone ?putaway_task ?storage_zone)
+        (putaway_task_assigned_subzone ?putaway_task ?subzone_or_bay)
+        (putaway_task_staged ?putaway_task)
+        (not
+          (putaway_task_slot_available ?putaway_task)
+        )
+      )
+  )
+  (:action create_putaway_task_subzone_attribute_present
+    :parameters (?inbound_source_area - inbound_source_area ?alternate_source_area - alternate_source_area ?storage_zone - storage_zone ?subzone_or_bay - subzone_or_bay ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (alternate_source_area_ready ?alternate_source_area)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (storage_zone_marked_suitable ?storage_zone)
+        (subzone_has_attribute ?subzone_or_bay)
+        (inbound_source_area_confirmed ?inbound_source_area)
+        (not
+          (alternate_source_area_confirmed ?alternate_source_area)
+        )
+        (putaway_task_slot_available ?putaway_task)
+      )
+    :effect
+      (and
+        (putaway_task_created ?putaway_task)
+        (putaway_task_assigned_zone ?putaway_task ?storage_zone)
+        (putaway_task_assigned_subzone ?putaway_task ?subzone_or_bay)
+        (putaway_task_requires_additional_qualification ?putaway_task)
+        (not
+          (putaway_task_slot_available ?putaway_task)
+        )
+      )
+  )
+  (:action create_putaway_task_zone_and_subzone_attributes_present
+    :parameters (?inbound_source_area - inbound_source_area ?alternate_source_area - alternate_source_area ?storage_zone - storage_zone ?subzone_or_bay - subzone_or_bay ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (alternate_source_area_ready ?alternate_source_area)
+        (inbound_source_area_assigned_zone ?inbound_source_area ?storage_zone)
+        (alternate_source_area_assigned_subzone ?alternate_source_area ?subzone_or_bay)
+        (storage_zone_has_attribute ?storage_zone)
+        (subzone_has_attribute ?subzone_or_bay)
+        (not
+          (inbound_source_area_confirmed ?inbound_source_area)
+        )
+        (not
+          (alternate_source_area_confirmed ?alternate_source_area)
+        )
+        (putaway_task_slot_available ?putaway_task)
+      )
+    :effect
+      (and
+        (putaway_task_created ?putaway_task)
+        (putaway_task_assigned_zone ?putaway_task ?storage_zone)
+        (putaway_task_assigned_subzone ?putaway_task ?subzone_or_bay)
+        (putaway_task_staged ?putaway_task)
+        (putaway_task_requires_additional_qualification ?putaway_task)
+        (not
+          (putaway_task_slot_available ?putaway_task)
+        )
+      )
+  )
+  (:action stage_putaway_task_for_execution
+    :parameters (?putaway_task - putaway_task ?inbound_source_area - inbound_source_area ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_task_created ?putaway_task)
+        (inbound_source_area_ready ?inbound_source_area)
+        (putaway_entity_has_sku ?inbound_source_area ?product_sku)
+        (not
+          (putaway_task_validated_location ?putaway_task)
+        )
+      )
+    :effect (putaway_task_validated_location ?putaway_task)
+  )
+  (:action validate_location_compatibility_and_prepare_placement
+    :parameters (?storage_location - storage_location ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (storage_location_linked_to_task ?storage_location ?putaway_task)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_available ?pallet_type)
+        (putaway_task_created ?putaway_task)
+        (putaway_task_validated_location ?putaway_task)
+        (not
+          (pallet_type_marked ?pallet_type)
+        )
+      )
+    :effect
+      (and
+        (pallet_type_marked ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (not
+          (pallet_type_available ?pallet_type)
+        )
+      )
+  )
+  (:action mark_location_as_qualified_for_task
+    :parameters (?storage_location - storage_location ?pallet_type - pallet_type ?putaway_task - putaway_task ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_marked ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (putaway_entity_has_sku ?storage_location ?product_sku)
+        (not
+          (putaway_task_staged ?putaway_task)
+        )
+        (not
+          (storage_location_qualified ?storage_location)
+        )
+      )
+    :effect (storage_location_qualified ?storage_location)
+  )
+  (:action assign_special_handling_code_to_location
+    :parameters (?storage_location - storage_location ?special_handling_code - special_handling_code)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (handling_code_available ?special_handling_code)
+        (not
+          (storage_location_has_handling_code_flag ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_has_handling_code_flag ?storage_location)
+        (storage_location_has_handling_code ?storage_location ?special_handling_code)
+        (not
+          (handling_code_available ?special_handling_code)
+        )
+      )
+  )
+  (:action bind_handling_code_and_mark_location
+    :parameters (?storage_location - storage_location ?pallet_type - pallet_type ?putaway_task - putaway_task ?product_sku - product_sku ?special_handling_code - special_handling_code)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_marked ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (putaway_entity_has_sku ?storage_location ?product_sku)
+        (putaway_task_staged ?putaway_task)
+        (storage_location_has_handling_code_flag ?storage_location)
+        (storage_location_has_handling_code ?storage_location ?special_handling_code)
+        (not
+          (storage_location_qualified ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_qualified ?storage_location)
+        (storage_location_handling_code_bound ?storage_location)
+      )
+  )
+  (:action assign_equipment_and_mark_location_ready
+    :parameters (?storage_location - storage_location ?equipment_unit - equipment_unit ?handler_resource - handler_resource ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_qualified ?storage_location)
+        (equipment_assigned_to_location ?storage_location ?equipment_unit)
+        (handler_assigned_to_entity ?storage_location ?handler_resource)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (not
+          (putaway_task_requires_additional_qualification ?putaway_task)
+        )
+        (not
+          (storage_location_ready_for_storage ?storage_location)
+        )
+      )
+    :effect (storage_location_ready_for_storage ?storage_location)
+  )
+  (:action confirm_equipment_assignment_and_mark_location
+    :parameters (?storage_location - storage_location ?equipment_unit - equipment_unit ?handler_resource - handler_resource ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_qualified ?storage_location)
+        (equipment_assigned_to_location ?storage_location ?equipment_unit)
+        (handler_assigned_to_entity ?storage_location ?handler_resource)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (putaway_task_requires_additional_qualification ?putaway_task)
+        (not
+          (storage_location_ready_for_storage ?storage_location)
+        )
+      )
+    :effect (storage_location_ready_for_storage ?storage_location)
+  )
+  (:action prepare_location_for_inspection_and_mark
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_ready_for_storage ?storage_location)
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (not
+          (putaway_task_staged ?putaway_task)
+        )
+        (not
+          (putaway_task_requires_additional_qualification ?putaway_task)
+        )
+        (not
+          (storage_location_accepted ?storage_location)
+        )
+      )
+    :effect (storage_location_accepted ?storage_location)
+  )
+  (:action apply_inspection_and_mark_with_profile
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_ready_for_storage ?storage_location)
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (putaway_task_staged ?putaway_task)
+        (not
+          (putaway_task_requires_additional_qualification ?putaway_task)
+        )
+        (not
+          (storage_location_accepted ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_profile_applied ?storage_location)
+      )
+  )
+  (:action apply_inspection_and_mark_variant
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_ready_for_storage ?storage_location)
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (not
+          (putaway_task_staged ?putaway_task)
+        )
+        (putaway_task_requires_additional_qualification ?putaway_task)
+        (not
+          (storage_location_accepted ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_profile_applied ?storage_location)
+      )
+  )
+  (:action apply_inspection_and_mark_full
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement ?pallet_type - pallet_type ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (storage_location_ready_for_storage ?storage_location)
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (storage_location_supports_pallet_type ?storage_location ?pallet_type)
+        (pallet_type_assigned_to_task ?pallet_type ?putaway_task)
+        (putaway_task_staged ?putaway_task)
+        (putaway_task_requires_additional_qualification ?putaway_task)
+        (not
+          (storage_location_accepted ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_profile_applied ?storage_location)
+      )
+  )
+  (:action finalize_location_acceptance
+    :parameters (?storage_location - storage_location)
+    :precondition
+      (and
+        (storage_location_accepted ?storage_location)
+        (not
+          (storage_location_profile_applied ?storage_location)
+        )
+        (not
+          (storage_location_finalized ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_finalized ?storage_location)
+        (putaway_entity_ready_for_tagging ?storage_location)
+      )
+  )
+  (:action bind_storage_profile_to_location
+    :parameters (?storage_location - storage_location ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_profile_applied ?storage_location)
+        (storage_profile_available ?storage_profile)
+      )
+    :effect
+      (and
+        (storage_location_has_storage_profile ?storage_location ?storage_profile)
+        (not
+          (storage_profile_available ?storage_profile)
+        )
+      )
+  )
+  (:action execute_putaway_and_update_location
+    :parameters (?storage_location - storage_location ?inbound_source_area - inbound_source_area ?alternate_source_area - alternate_source_area ?product_sku - product_sku ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_profile_applied ?storage_location)
+        (storage_location_has_storage_profile ?storage_location ?storage_profile)
+        (storage_location_assigned_source_area ?storage_location ?inbound_source_area)
+        (storage_location_assigned_alternate_area ?storage_location ?alternate_source_area)
+        (inbound_source_area_confirmed ?inbound_source_area)
+        (alternate_source_area_confirmed ?alternate_source_area)
+        (putaway_entity_has_sku ?storage_location ?product_sku)
+        (not
+          (storage_location_execution_completed ?storage_location)
+        )
+      )
+    :effect (storage_location_execution_completed ?storage_location)
+  )
+  (:action finalize_putaway_execution
+    :parameters (?storage_location - storage_location)
+    :precondition
+      (and
+        (storage_location_accepted ?storage_location)
+        (storage_location_execution_completed ?storage_location)
+        (not
+          (storage_location_finalized ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_finalized ?storage_location)
+        (putaway_entity_ready_for_tagging ?storage_location)
+      )
+  )
+  (:action assign_owner_restriction_to_location
+    :parameters (?storage_location - storage_location ?asset_owner - asset_owner ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_ready_for_assignment ?storage_location)
+        (putaway_entity_has_sku ?storage_location ?product_sku)
+        (asset_owner_available ?asset_owner)
+        (storage_location_restricted_to_owner ?storage_location ?asset_owner)
+        (not
+          (storage_location_owner_assigned ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_owner_assigned ?storage_location)
+        (not
+          (asset_owner_available ?asset_owner)
+        )
+      )
+  )
+  (:action verify_location_owner
+    :parameters (?storage_location - storage_location ?handler_resource - handler_resource)
+    :precondition
+      (and
+        (storage_location_owner_assigned ?storage_location)
+        (handler_assigned_to_entity ?storage_location ?handler_resource)
+        (not
+          (storage_location_owner_verified ?storage_location)
+        )
+      )
+    :effect (storage_location_owner_verified ?storage_location)
+  )
+  (:action apply_inspection_to_verified_location
+    :parameters (?storage_location - storage_location ?inspection_requirement - inspection_requirement)
+    :precondition
+      (and
+        (storage_location_owner_verified ?storage_location)
+        (storage_location_has_inspection_requirement ?storage_location ?inspection_requirement)
+        (not
+          (storage_location_owner_accepted ?storage_location)
+        )
+      )
+    :effect (storage_location_owner_accepted ?storage_location)
+  )
+  (:action finalize_owner_verified_location
+    :parameters (?storage_location - storage_location)
+    :precondition
+      (and
+        (storage_location_owner_accepted ?storage_location)
+        (not
+          (storage_location_finalized ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (storage_location_finalized ?storage_location)
+        (putaway_entity_ready_for_tagging ?storage_location)
+      )
+  )
+  (:action mark_inventory_unit_stored_from_source_area
+    :parameters (?inbound_source_area - inbound_source_area ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (inbound_source_area_ready ?inbound_source_area)
+        (inbound_source_area_confirmed ?inbound_source_area)
+        (putaway_task_created ?putaway_task)
+        (putaway_task_validated_location ?putaway_task)
+        (not
+          (putaway_entity_ready_for_tagging ?inbound_source_area)
+        )
+      )
+    :effect (putaway_entity_ready_for_tagging ?inbound_source_area)
+  )
+  (:action mark_inventory_unit_stored_from_alternate_area
+    :parameters (?alternate_source_area - alternate_source_area ?putaway_task - putaway_task)
+    :precondition
+      (and
+        (alternate_source_area_ready ?alternate_source_area)
+        (alternate_source_area_confirmed ?alternate_source_area)
+        (putaway_task_created ?putaway_task)
+        (putaway_task_validated_location ?putaway_task)
+        (not
+          (putaway_entity_ready_for_tagging ?alternate_source_area)
+        )
+      )
+    :effect (putaway_entity_ready_for_tagging ?alternate_source_area)
+  )
+  (:action assign_inventory_tag_to_unit
+    :parameters (?inventory_unit - inventory_unit ?inventory_tag - inventory_tag ?product_sku - product_sku)
+    :precondition
+      (and
+        (putaway_entity_ready_for_tagging ?inventory_unit)
+        (putaway_entity_has_sku ?inventory_unit ?product_sku)
+        (inventory_tag_available ?inventory_tag)
+        (not
+          (putaway_entity_tag_assigned ?inventory_unit)
+        )
+      )
+    :effect
+      (and
+        (putaway_entity_tag_assigned ?inventory_unit)
+        (putaway_entity_has_inventory_tag ?inventory_unit ?inventory_tag)
+        (not
+          (inventory_tag_available ?inventory_tag)
+        )
+      )
+  )
+  (:action finalize_storage_and_release_reservation_from_inbound
+    :parameters (?inbound_source_area - inbound_source_area ?location_reservation_token - location_reservation_token ?inventory_tag - inventory_tag)
+    :precondition
+      (and
+        (putaway_entity_tag_assigned ?inbound_source_area)
+        (putaway_entity_reservation_token_claimed ?inbound_source_area ?location_reservation_token)
+        (putaway_entity_has_inventory_tag ?inbound_source_area ?inventory_tag)
+        (not
+          (putaway_entity_putaway_completed ?inbound_source_area)
+        )
+      )
+    :effect
+      (and
+        (putaway_entity_putaway_completed ?inbound_source_area)
+        (reservation_token_available ?location_reservation_token)
+        (inventory_tag_available ?inventory_tag)
+      )
+  )
+  (:action finalize_storage_and_release_reservation_from_alternate
+    :parameters (?alternate_source_area - alternate_source_area ?location_reservation_token - location_reservation_token ?inventory_tag - inventory_tag)
+    :precondition
+      (and
+        (putaway_entity_tag_assigned ?alternate_source_area)
+        (putaway_entity_reservation_token_claimed ?alternate_source_area ?location_reservation_token)
+        (putaway_entity_has_inventory_tag ?alternate_source_area ?inventory_tag)
+        (not
+          (putaway_entity_putaway_completed ?alternate_source_area)
+        )
+      )
+    :effect
+      (and
+        (putaway_entity_putaway_completed ?alternate_source_area)
+        (reservation_token_available ?location_reservation_token)
+        (inventory_tag_available ?inventory_tag)
+      )
+  )
+  (:action finalize_storage_and_release_reservation_from_location
+    :parameters (?storage_location - storage_location ?location_reservation_token - location_reservation_token ?inventory_tag - inventory_tag)
+    :precondition
+      (and
+        (putaway_entity_tag_assigned ?storage_location)
+        (putaway_entity_reservation_token_claimed ?storage_location ?location_reservation_token)
+        (putaway_entity_has_inventory_tag ?storage_location ?inventory_tag)
+        (not
+          (putaway_entity_putaway_completed ?storage_location)
+        )
+      )
+    :effect
+      (and
+        (putaway_entity_putaway_completed ?storage_location)
+        (reservation_token_available ?location_reservation_token)
+        (inventory_tag_available ?inventory_tag)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem putaway_location_selection_problem)
+  (:domain warehouse_putaway_location_selection_domain)
+  (:objects receiving_dock_1 - inbound_source_area alternate_receiving_zone_1 - alternate_source_area storage_location_a1 - storage_location storage_location_a2 - storage_location reservation_token_1 - location_reservation_token reservation_token_2 - location_reservation_token reservation_token_3 - location_reservation_token sku_1001 - product_sku handler_operator_1 - handler_resource attribute_temperature_controlled - slot_attribute storage_zone_a - storage_zone bay_1 - subzone_or_bay putaway_task_1 - putaway_task pallet_type_standard - pallet_type pallet_type_large - pallet_type handling_code_priority - special_handling_code handling_code_fragile - special_handling_code storage_profile_standard - storage_profile storage_profile_cold_chain - storage_profile inventory_tag_1001 - inventory_tag forklift_01 - equipment_unit owner_acme - asset_owner owner_global - asset_owner inspection_qc_1 - inspection_requirement)
+  (:init
+    (reservation_token_available reservation_token_1)
+    (reservation_token_available reservation_token_2)
+    (reservation_token_available reservation_token_3)
+    (product_sku_available sku_1001)
+    (handler_resource_available handler_operator_1)
+    (slot_attribute_available attribute_temperature_controlled)
+    (inbound_source_area_assigned_zone receiving_dock_1 storage_zone_a)
+    (alternate_source_area_assigned_subzone alternate_receiving_zone_1 bay_1)
+    (putaway_task_slot_available putaway_task_1)
+    (pallet_type_available pallet_type_standard)
+    (pallet_type_available pallet_type_large)
+    (storage_location_assigned_source_area storage_location_a1 receiving_dock_1)
+    (storage_location_assigned_source_area storage_location_a2 receiving_dock_1)
+    (storage_location_assigned_alternate_area storage_location_a1 alternate_receiving_zone_1)
+    (storage_location_assigned_alternate_area storage_location_a2 alternate_receiving_zone_1)
+    (storage_location_linked_to_task storage_location_a1 putaway_task_1)
+    (storage_location_linked_to_task storage_location_a2 putaway_task_1)
+    (storage_location_supports_pallet_type storage_location_a1 pallet_type_standard)
+    (storage_location_supports_pallet_type storage_location_a2 pallet_type_large)
+    (handling_code_available handling_code_priority)
+    (handling_code_available handling_code_fragile)
+    (storage_profile_available storage_profile_standard)
+    (storage_profile_available storage_profile_cold_chain)
+    (inventory_tag_available inventory_tag_1001)
+    (equipment_unit_available forklift_01)
+    (asset_owner_available owner_acme)
+    (storage_location_restricted_to_owner storage_location_a1 owner_acme)
+    (storage_location_restricted_to_owner storage_location_a2 owner_global)
+    (inspection_requirement_available inspection_qc_1)
+  )
+  (:goal
+    (and
+      (putaway_entity_putaway_completed receiving_dock_1)
+      (putaway_entity_putaway_completed alternate_receiving_zone_1)
+      (putaway_entity_putaway_completed storage_location_a1)
+      (putaway_entity_putaway_completed storage_location_a2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_inventory_unit receiving_dock_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_j__5nq3p/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_j__5nq3p/plan.pddl 
+
+
+--- stderr ---
+

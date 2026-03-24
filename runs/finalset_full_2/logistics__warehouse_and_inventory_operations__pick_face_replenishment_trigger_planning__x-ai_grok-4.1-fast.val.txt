@@ -1,0 +1,1073 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain warehouse_pick_face_replenishment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_asset - entity container_or_unit - entity staging_or_task_group - entity facility_component - entity location - facility_component replenishment_source - operational_asset sku - operational_asset operator - operational_asset location_label_template - operational_asset replenishment_cart - operational_asset inventory_record - operational_asset consumable_kit - operational_asset supervisor_approval_tag - operational_asset replenish_tote - container_or_unit inventory_unit - container_or_unit inspection_tool - container_or_unit bulk_staging_point - staging_or_task_group pick_staging_point - staging_or_task_group replenishment_task - staging_or_task_group supply_slot_family - location pick_face_family - location bulk_slot - supply_slot_family pick_slot - supply_slot_family pick_face - pick_face_family)
+
+  (:predicates
+    (location_registered ?location - location)
+    (location_active ?location - location)
+    (location_assigned_to_replenishment_source ?location - location)
+    (replenishment_completed ?location - location)
+    (replenishment_executed ?location - location)
+    (replenishment_recorded ?location - location)
+    (replenishment_source_available ?replenishment_source - replenishment_source)
+    (location_bound_to_replenishment_source ?location - location ?replenishment_source - replenishment_source)
+    (sku_available ?sku - sku)
+    (location_assigned_sku ?location - location ?sku - sku)
+    (operator_available ?operator - operator)
+    (operator_assigned_to_location ?location - location ?operator - operator)
+    (replenish_tote_available ?replenish_tote - replenish_tote)
+    (bulk_slot_assigned_tote ?bulk_slot - bulk_slot ?replenish_tote - replenish_tote)
+    (pick_slot_assigned_tote ?pick_slot - pick_slot ?replenish_tote - replenish_tote)
+    (bulk_slot_assigned_staging_point ?bulk_slot - bulk_slot ?bulk_staging_point_var - bulk_staging_point)
+    (bulk_staging_point_ready ?bulk_staging_point_var - bulk_staging_point)
+    (bulk_staging_point_has_tote ?bulk_staging_point_var - bulk_staging_point)
+    (bulk_slot_claimed ?bulk_slot - bulk_slot)
+    (pick_slot_assigned_staging_point ?pick_slot - pick_slot ?pick_staging_point - pick_staging_point)
+    (pick_staging_point_ready ?pick_staging_point - pick_staging_point)
+    (pick_staging_point_has_tote ?pick_staging_point - pick_staging_point)
+    (pick_slot_claimed ?pick_slot - pick_slot)
+    (task_available ?replenishment_task - replenishment_task)
+    (task_active ?replenishment_task - replenishment_task)
+    (task_assigned_to_bulk_staging ?replenishment_task - replenishment_task ?bulk_staging_point_var - bulk_staging_point)
+    (task_assigned_to_pick_staging ?replenishment_task - replenishment_task ?pick_staging_point - pick_staging_point)
+    (task_requires_labeling ?replenishment_task - replenishment_task)
+    (task_requires_kit ?replenishment_task - replenishment_task)
+    (task_ready_for_inventory_assignment ?replenishment_task - replenishment_task)
+    (pick_face_supplied_by_bulk_slot ?pick_face - pick_face ?bulk_slot - bulk_slot)
+    (pick_face_contains_pick_slot ?pick_face - pick_face ?pick_slot - pick_slot)
+    (pick_face_assigned_to_task ?pick_face - pick_face ?replenishment_task - replenishment_task)
+    (inventory_unit_available ?inventory_unit - inventory_unit)
+    (pick_face_assigned_inventory_unit ?pick_face - pick_face ?inventory_unit - inventory_unit)
+    (inventory_unit_allocated ?inventory_unit - inventory_unit)
+    (inventory_unit_assigned_to_task ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    (pick_face_initial_prep_complete ?pick_face - pick_face)
+    (pick_face_resources_bound ?pick_face - pick_face)
+    (pick_face_ready_for_validation ?pick_face - pick_face)
+    (pick_face_has_label_template ?pick_face - pick_face)
+    (pick_face_label_applied ?pick_face - pick_face)
+    (pick_face_approved ?pick_face - pick_face)
+    (pick_face_prepped_for_finalize ?pick_face - pick_face)
+    (inspection_tool_available ?inspection_tool - inspection_tool)
+    (pick_face_assigned_inspection_tool ?pick_face - pick_face ?inspection_tool - inspection_tool)
+    (pick_face_inspection_assigned ?pick_face - pick_face)
+    (pick_face_inspection_in_progress ?pick_face - pick_face)
+    (pick_face_inspection_approved ?pick_face - pick_face)
+    (label_template_available ?location_label_template - location_label_template)
+    (pick_face_assigned_label_template ?pick_face - pick_face ?location_label_template - location_label_template)
+    (replenishment_cart_available ?replenishment_cart - replenishment_cart)
+    (pick_face_assigned_cart ?pick_face - pick_face ?replenishment_cart - replenishment_cart)
+    (consumable_kit_available ?consumable_kit - consumable_kit)
+    (pick_face_assigned_consumable_kit ?pick_face - pick_face ?consumable_kit - consumable_kit)
+    (approval_tag_available ?supervisor_approval_tag - supervisor_approval_tag)
+    (pick_face_assigned_approval_tag ?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag)
+    (inventory_record_available ?inventory_record - inventory_record)
+    (inventory_record_assigned_to_location ?location - location ?inventory_record - inventory_record)
+    (bulk_slot_ready_for_task ?bulk_slot - bulk_slot)
+    (pick_slot_ready_for_task ?pick_slot - pick_slot)
+    (pick_face_marked_complete ?pick_face - pick_face)
+  )
+  (:action register_location
+    :parameters (?location - location)
+    :precondition
+      (and
+        (not
+          (location_registered ?location)
+        )
+        (not
+          (replenishment_completed ?location)
+        )
+      )
+    :effect (location_registered ?location)
+  )
+  (:action assign_replenishment_source_to_location
+    :parameters (?location - location ?replenishment_source - replenishment_source)
+    :precondition
+      (and
+        (location_registered ?location)
+        (not
+          (location_assigned_to_replenishment_source ?location)
+        )
+        (replenishment_source_available ?replenishment_source)
+      )
+    :effect
+      (and
+        (location_assigned_to_replenishment_source ?location)
+        (location_bound_to_replenishment_source ?location ?replenishment_source)
+        (not
+          (replenishment_source_available ?replenishment_source)
+        )
+      )
+  )
+  (:action assign_sku_to_location
+    :parameters (?location - location ?sku - sku)
+    :precondition
+      (and
+        (location_registered ?location)
+        (location_assigned_to_replenishment_source ?location)
+        (sku_available ?sku)
+      )
+    :effect
+      (and
+        (location_assigned_sku ?location ?sku)
+        (not
+          (sku_available ?sku)
+        )
+      )
+  )
+  (:action mark_location_active
+    :parameters (?location - location ?sku - sku)
+    :precondition
+      (and
+        (location_registered ?location)
+        (location_assigned_to_replenishment_source ?location)
+        (location_assigned_sku ?location ?sku)
+        (not
+          (location_active ?location)
+        )
+      )
+    :effect (location_active ?location)
+  )
+  (:action release_sku_from_location
+    :parameters (?location - location ?sku - sku)
+    :precondition
+      (and
+        (location_assigned_sku ?location ?sku)
+      )
+    :effect
+      (and
+        (sku_available ?sku)
+        (not
+          (location_assigned_sku ?location ?sku)
+        )
+      )
+  )
+  (:action assign_operator_to_location
+    :parameters (?location - location ?operator - operator)
+    :precondition
+      (and
+        (location_active ?location)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_location ?location ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action release_operator_from_location
+    :parameters (?location - location ?operator - operator)
+    :precondition
+      (and
+        (operator_assigned_to_location ?location ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned_to_location ?location ?operator)
+        )
+      )
+  )
+  (:action bind_consumable_kit_to_pick_face
+    :parameters (?pick_face - pick_face ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (consumable_kit_available ?consumable_kit)
+      )
+    :effect
+      (and
+        (pick_face_assigned_consumable_kit ?pick_face ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action release_consumable_kit_from_pick_face
+    :parameters (?pick_face - pick_face ?consumable_kit - consumable_kit)
+    :precondition
+      (and
+        (pick_face_assigned_consumable_kit ?pick_face ?consumable_kit)
+      )
+    :effect
+      (and
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (pick_face_assigned_consumable_kit ?pick_face ?consumable_kit)
+        )
+      )
+  )
+  (:action assign_approval_tag_to_pick_face
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (approval_tag_available ?supervisor_approval_tag)
+      )
+    :effect
+      (and
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (not
+          (approval_tag_available ?supervisor_approval_tag)
+        )
+      )
+  )
+  (:action release_approval_tag_from_pick_face
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag)
+    :precondition
+      (and
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+      )
+    :effect
+      (and
+        (approval_tag_available ?supervisor_approval_tag)
+        (not
+          (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        )
+      )
+  )
+  (:action prepare_bulk_staging_point_for_replenishment
+    :parameters (?bulk_slot - bulk_slot ?bulk_staging_point_var - bulk_staging_point ?sku - sku)
+    :precondition
+      (and
+        (location_active ?bulk_slot)
+        (location_assigned_sku ?bulk_slot ?sku)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (not
+          (bulk_staging_point_ready ?bulk_staging_point_var)
+        )
+        (not
+          (bulk_staging_point_has_tote ?bulk_staging_point_var)
+        )
+      )
+    :effect (bulk_staging_point_ready ?bulk_staging_point_var)
+  )
+  (:action reserve_bulk_slot_for_replenishment
+    :parameters (?bulk_slot - bulk_slot ?bulk_staging_point_var - bulk_staging_point ?operator - operator)
+    :precondition
+      (and
+        (location_active ?bulk_slot)
+        (operator_assigned_to_location ?bulk_slot ?operator)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (bulk_staging_point_ready ?bulk_staging_point_var)
+        (not
+          (bulk_slot_ready_for_task ?bulk_slot)
+        )
+      )
+    :effect
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (bulk_slot_claimed ?bulk_slot)
+      )
+  )
+  (:action assign_tote_to_bulk_slot
+    :parameters (?bulk_slot - bulk_slot ?bulk_staging_point_var - bulk_staging_point ?replenish_tote - replenish_tote)
+    :precondition
+      (and
+        (location_active ?bulk_slot)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (replenish_tote_available ?replenish_tote)
+        (not
+          (bulk_slot_ready_for_task ?bulk_slot)
+        )
+      )
+    :effect
+      (and
+        (bulk_staging_point_has_tote ?bulk_staging_point_var)
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (bulk_slot_assigned_tote ?bulk_slot ?replenish_tote)
+        (not
+          (replenish_tote_available ?replenish_tote)
+        )
+      )
+  )
+  (:action transfer_tote_to_bulk_staging_from_bulk_slot
+    :parameters (?bulk_slot - bulk_slot ?bulk_staging_point_var - bulk_staging_point ?sku - sku ?replenish_tote - replenish_tote)
+    :precondition
+      (and
+        (location_active ?bulk_slot)
+        (location_assigned_sku ?bulk_slot ?sku)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (bulk_staging_point_has_tote ?bulk_staging_point_var)
+        (bulk_slot_assigned_tote ?bulk_slot ?replenish_tote)
+        (not
+          (bulk_slot_claimed ?bulk_slot)
+        )
+      )
+    :effect
+      (and
+        (bulk_staging_point_ready ?bulk_staging_point_var)
+        (bulk_slot_claimed ?bulk_slot)
+        (replenish_tote_available ?replenish_tote)
+        (not
+          (bulk_slot_assigned_tote ?bulk_slot ?replenish_tote)
+        )
+      )
+  )
+  (:action prepare_pick_staging_point_for_replenishment
+    :parameters (?pick_slot - pick_slot ?pick_staging_point - pick_staging_point ?sku - sku)
+    :precondition
+      (and
+        (location_active ?pick_slot)
+        (location_assigned_sku ?pick_slot ?sku)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (not
+          (pick_staging_point_ready ?pick_staging_point)
+        )
+        (not
+          (pick_staging_point_has_tote ?pick_staging_point)
+        )
+      )
+    :effect (pick_staging_point_ready ?pick_staging_point)
+  )
+  (:action reserve_pick_slot_for_replenishment
+    :parameters (?pick_slot - pick_slot ?pick_staging_point - pick_staging_point ?operator - operator)
+    :precondition
+      (and
+        (location_active ?pick_slot)
+        (operator_assigned_to_location ?pick_slot ?operator)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (pick_staging_point_ready ?pick_staging_point)
+        (not
+          (pick_slot_ready_for_task ?pick_slot)
+        )
+      )
+    :effect
+      (and
+        (pick_slot_ready_for_task ?pick_slot)
+        (pick_slot_claimed ?pick_slot)
+      )
+  )
+  (:action assign_tote_to_pick_slot
+    :parameters (?pick_slot - pick_slot ?pick_staging_point - pick_staging_point ?replenish_tote - replenish_tote)
+    :precondition
+      (and
+        (location_active ?pick_slot)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (replenish_tote_available ?replenish_tote)
+        (not
+          (pick_slot_ready_for_task ?pick_slot)
+        )
+      )
+    :effect
+      (and
+        (pick_staging_point_has_tote ?pick_staging_point)
+        (pick_slot_ready_for_task ?pick_slot)
+        (pick_slot_assigned_tote ?pick_slot ?replenish_tote)
+        (not
+          (replenish_tote_available ?replenish_tote)
+        )
+      )
+  )
+  (:action transfer_tote_to_pick_staging_from_pick_slot
+    :parameters (?pick_slot - pick_slot ?pick_staging_point - pick_staging_point ?sku - sku ?replenish_tote - replenish_tote)
+    :precondition
+      (and
+        (location_active ?pick_slot)
+        (location_assigned_sku ?pick_slot ?sku)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (pick_staging_point_has_tote ?pick_staging_point)
+        (pick_slot_assigned_tote ?pick_slot ?replenish_tote)
+        (not
+          (pick_slot_claimed ?pick_slot)
+        )
+      )
+    :effect
+      (and
+        (pick_staging_point_ready ?pick_staging_point)
+        (pick_slot_claimed ?pick_slot)
+        (replenish_tote_available ?replenish_tote)
+        (not
+          (pick_slot_assigned_tote ?pick_slot ?replenish_tote)
+        )
+      )
+  )
+  (:action create_replenishment_task_standard
+    :parameters (?bulk_slot - bulk_slot ?pick_slot - pick_slot ?bulk_staging_point_var - bulk_staging_point ?pick_staging_point - pick_staging_point ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (pick_slot_ready_for_task ?pick_slot)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (bulk_staging_point_ready ?bulk_staging_point_var)
+        (pick_staging_point_ready ?pick_staging_point)
+        (bulk_slot_claimed ?bulk_slot)
+        (pick_slot_claimed ?pick_slot)
+        (task_available ?replenishment_task)
+      )
+    :effect
+      (and
+        (task_active ?replenishment_task)
+        (task_assigned_to_bulk_staging ?replenishment_task ?bulk_staging_point_var)
+        (task_assigned_to_pick_staging ?replenishment_task ?pick_staging_point)
+        (not
+          (task_available ?replenishment_task)
+        )
+      )
+  )
+  (:action create_replenishment_task_requires_labeling
+    :parameters (?bulk_slot - bulk_slot ?pick_slot - pick_slot ?bulk_staging_point_var - bulk_staging_point ?pick_staging_point - pick_staging_point ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (pick_slot_ready_for_task ?pick_slot)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (bulk_staging_point_has_tote ?bulk_staging_point_var)
+        (pick_staging_point_ready ?pick_staging_point)
+        (not
+          (bulk_slot_claimed ?bulk_slot)
+        )
+        (pick_slot_claimed ?pick_slot)
+        (task_available ?replenishment_task)
+      )
+    :effect
+      (and
+        (task_active ?replenishment_task)
+        (task_assigned_to_bulk_staging ?replenishment_task ?bulk_staging_point_var)
+        (task_assigned_to_pick_staging ?replenishment_task ?pick_staging_point)
+        (task_requires_labeling ?replenishment_task)
+        (not
+          (task_available ?replenishment_task)
+        )
+      )
+  )
+  (:action create_replenishment_task_requires_kit
+    :parameters (?bulk_slot - bulk_slot ?pick_slot - pick_slot ?bulk_staging_point_var - bulk_staging_point ?pick_staging_point - pick_staging_point ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (pick_slot_ready_for_task ?pick_slot)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (bulk_staging_point_ready ?bulk_staging_point_var)
+        (pick_staging_point_has_tote ?pick_staging_point)
+        (bulk_slot_claimed ?bulk_slot)
+        (not
+          (pick_slot_claimed ?pick_slot)
+        )
+        (task_available ?replenishment_task)
+      )
+    :effect
+      (and
+        (task_active ?replenishment_task)
+        (task_assigned_to_bulk_staging ?replenishment_task ?bulk_staging_point_var)
+        (task_assigned_to_pick_staging ?replenishment_task ?pick_staging_point)
+        (task_requires_kit ?replenishment_task)
+        (not
+          (task_available ?replenishment_task)
+        )
+      )
+  )
+  (:action create_replenishment_task_requires_labeling_and_kit
+    :parameters (?bulk_slot - bulk_slot ?pick_slot - pick_slot ?bulk_staging_point_var - bulk_staging_point ?pick_staging_point - pick_staging_point ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (pick_slot_ready_for_task ?pick_slot)
+        (bulk_slot_assigned_staging_point ?bulk_slot ?bulk_staging_point_var)
+        (pick_slot_assigned_staging_point ?pick_slot ?pick_staging_point)
+        (bulk_staging_point_has_tote ?bulk_staging_point_var)
+        (pick_staging_point_has_tote ?pick_staging_point)
+        (not
+          (bulk_slot_claimed ?bulk_slot)
+        )
+        (not
+          (pick_slot_claimed ?pick_slot)
+        )
+        (task_available ?replenishment_task)
+      )
+    :effect
+      (and
+        (task_active ?replenishment_task)
+        (task_assigned_to_bulk_staging ?replenishment_task ?bulk_staging_point_var)
+        (task_assigned_to_pick_staging ?replenishment_task ?pick_staging_point)
+        (task_requires_labeling ?replenishment_task)
+        (task_requires_kit ?replenishment_task)
+        (not
+          (task_available ?replenishment_task)
+        )
+      )
+  )
+  (:action advance_task_to_inventory_assignment
+    :parameters (?replenishment_task - replenishment_task ?bulk_slot - bulk_slot ?sku - sku)
+    :precondition
+      (and
+        (task_active ?replenishment_task)
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (location_assigned_sku ?bulk_slot ?sku)
+        (not
+          (task_ready_for_inventory_assignment ?replenishment_task)
+        )
+      )
+    :effect (task_ready_for_inventory_assignment ?replenishment_task)
+  )
+  (:action assign_inventory_unit_to_task
+    :parameters (?pick_face - pick_face ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (pick_face_assigned_to_task ?pick_face ?replenishment_task)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_available ?inventory_unit)
+        (task_active ?replenishment_task)
+        (task_ready_for_inventory_assignment ?replenishment_task)
+        (not
+          (inventory_unit_allocated ?inventory_unit)
+        )
+      )
+    :effect
+      (and
+        (inventory_unit_allocated ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (not
+          (inventory_unit_available ?inventory_unit)
+        )
+      )
+  )
+  (:action complete_pick_face_initial_prep_no_label
+    :parameters (?pick_face - pick_face ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task ?sku - sku)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_allocated ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (location_assigned_sku ?pick_face ?sku)
+        (not
+          (task_requires_labeling ?replenishment_task)
+        )
+        (not
+          (pick_face_initial_prep_complete ?pick_face)
+        )
+      )
+    :effect (pick_face_initial_prep_complete ?pick_face)
+  )
+  (:action bind_label_template_to_pick_face
+    :parameters (?pick_face - pick_face ?location_label_template - location_label_template)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (label_template_available ?location_label_template)
+        (not
+          (pick_face_has_label_template ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_has_label_template ?pick_face)
+        (pick_face_assigned_label_template ?pick_face ?location_label_template)
+        (not
+          (label_template_available ?location_label_template)
+        )
+      )
+  )
+  (:action apply_label_template_to_pick_face
+    :parameters (?pick_face - pick_face ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task ?sku - sku ?location_label_template - location_label_template)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_allocated ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (location_assigned_sku ?pick_face ?sku)
+        (task_requires_labeling ?replenishment_task)
+        (pick_face_has_label_template ?pick_face)
+        (pick_face_assigned_label_template ?pick_face ?location_label_template)
+        (not
+          (pick_face_initial_prep_complete ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_initial_prep_complete ?pick_face)
+        (pick_face_label_applied ?pick_face)
+      )
+  )
+  (:action bind_pick_face_resources_standard
+    :parameters (?pick_face - pick_face ?consumable_kit - consumable_kit ?operator - operator ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_initial_prep_complete ?pick_face)
+        (pick_face_assigned_consumable_kit ?pick_face ?consumable_kit)
+        (operator_assigned_to_location ?pick_face ?operator)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (not
+          (task_requires_kit ?replenishment_task)
+        )
+        (not
+          (pick_face_resources_bound ?pick_face)
+        )
+      )
+    :effect (pick_face_resources_bound ?pick_face)
+  )
+  (:action bind_pick_face_resources_with_kit
+    :parameters (?pick_face - pick_face ?consumable_kit - consumable_kit ?operator - operator ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_initial_prep_complete ?pick_face)
+        (pick_face_assigned_consumable_kit ?pick_face ?consumable_kit)
+        (operator_assigned_to_location ?pick_face ?operator)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (task_requires_kit ?replenishment_task)
+        (not
+          (pick_face_resources_bound ?pick_face)
+        )
+      )
+    :effect (pick_face_resources_bound ?pick_face)
+  )
+  (:action validate_pick_face_preparations
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_resources_bound ?pick_face)
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (not
+          (task_requires_labeling ?replenishment_task)
+        )
+        (not
+          (task_requires_kit ?replenishment_task)
+        )
+        (not
+          (pick_face_ready_for_validation ?pick_face)
+        )
+      )
+    :effect (pick_face_ready_for_validation ?pick_face)
+  )
+  (:action validate_and_approve_pick_face_label_path
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_resources_bound ?pick_face)
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (task_requires_labeling ?replenishment_task)
+        (not
+          (task_requires_kit ?replenishment_task)
+        )
+        (not
+          (pick_face_ready_for_validation ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_approved ?pick_face)
+      )
+  )
+  (:action validate_and_approve_pick_face_kit_path
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_resources_bound ?pick_face)
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (not
+          (task_requires_labeling ?replenishment_task)
+        )
+        (task_requires_kit ?replenishment_task)
+        (not
+          (pick_face_ready_for_validation ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_approved ?pick_face)
+      )
+  )
+  (:action validate_and_approve_pick_face_label_and_kit_path
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag ?inventory_unit - inventory_unit ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_face_resources_bound ?pick_face)
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (pick_face_assigned_inventory_unit ?pick_face ?inventory_unit)
+        (inventory_unit_assigned_to_task ?inventory_unit ?replenishment_task)
+        (task_requires_labeling ?replenishment_task)
+        (task_requires_kit ?replenishment_task)
+        (not
+          (pick_face_ready_for_validation ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_approved ?pick_face)
+      )
+  )
+  (:action finalize_pick_face_without_approval
+    :parameters (?pick_face - pick_face)
+    :precondition
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (not
+          (pick_face_approved ?pick_face)
+        )
+        (not
+          (pick_face_marked_complete ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_marked_complete ?pick_face)
+        (replenishment_executed ?pick_face)
+      )
+  )
+  (:action assign_replenishment_cart_to_pick_face
+    :parameters (?pick_face - pick_face ?replenishment_cart - replenishment_cart)
+    :precondition
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_approved ?pick_face)
+        (replenishment_cart_available ?replenishment_cart)
+      )
+    :effect
+      (and
+        (pick_face_assigned_cart ?pick_face ?replenishment_cart)
+        (not
+          (replenishment_cart_available ?replenishment_cart)
+        )
+      )
+  )
+  (:action prepare_pick_face_for_execution
+    :parameters (?pick_face - pick_face ?bulk_slot - bulk_slot ?pick_slot - pick_slot ?sku - sku ?replenishment_cart - replenishment_cart)
+    :precondition
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_approved ?pick_face)
+        (pick_face_assigned_cart ?pick_face ?replenishment_cart)
+        (pick_face_supplied_by_bulk_slot ?pick_face ?bulk_slot)
+        (pick_face_contains_pick_slot ?pick_face ?pick_slot)
+        (bulk_slot_claimed ?bulk_slot)
+        (pick_slot_claimed ?pick_slot)
+        (location_assigned_sku ?pick_face ?sku)
+        (not
+          (pick_face_prepped_for_finalize ?pick_face)
+        )
+      )
+    :effect (pick_face_prepped_for_finalize ?pick_face)
+  )
+  (:action finalize_pick_face_after_preparation
+    :parameters (?pick_face - pick_face)
+    :precondition
+      (and
+        (pick_face_ready_for_validation ?pick_face)
+        (pick_face_prepped_for_finalize ?pick_face)
+        (not
+          (pick_face_marked_complete ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_marked_complete ?pick_face)
+        (replenishment_executed ?pick_face)
+      )
+  )
+  (:action assign_inspection_tool_to_pick_face
+    :parameters (?pick_face - pick_face ?inspection_tool - inspection_tool ?sku - sku)
+    :precondition
+      (and
+        (location_active ?pick_face)
+        (location_assigned_sku ?pick_face ?sku)
+        (inspection_tool_available ?inspection_tool)
+        (pick_face_assigned_inspection_tool ?pick_face ?inspection_tool)
+        (not
+          (pick_face_inspection_assigned ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_inspection_assigned ?pick_face)
+        (not
+          (inspection_tool_available ?inspection_tool)
+        )
+      )
+  )
+  (:action start_pick_face_inspection
+    :parameters (?pick_face - pick_face ?operator - operator)
+    :precondition
+      (and
+        (pick_face_inspection_assigned ?pick_face)
+        (operator_assigned_to_location ?pick_face ?operator)
+        (not
+          (pick_face_inspection_in_progress ?pick_face)
+        )
+      )
+    :effect (pick_face_inspection_in_progress ?pick_face)
+  )
+  (:action approve_pick_face_inspection
+    :parameters (?pick_face - pick_face ?supervisor_approval_tag - supervisor_approval_tag)
+    :precondition
+      (and
+        (pick_face_inspection_in_progress ?pick_face)
+        (pick_face_assigned_approval_tag ?pick_face ?supervisor_approval_tag)
+        (not
+          (pick_face_inspection_approved ?pick_face)
+        )
+      )
+    :effect (pick_face_inspection_approved ?pick_face)
+  )
+  (:action finalize_pick_face_after_inspection
+    :parameters (?pick_face - pick_face)
+    :precondition
+      (and
+        (pick_face_inspection_approved ?pick_face)
+        (not
+          (pick_face_marked_complete ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (pick_face_marked_complete ?pick_face)
+        (replenishment_executed ?pick_face)
+      )
+  )
+  (:action complete_replenishment_on_bulk_slot
+    :parameters (?bulk_slot - bulk_slot ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (bulk_slot_ready_for_task ?bulk_slot)
+        (bulk_slot_claimed ?bulk_slot)
+        (task_active ?replenishment_task)
+        (task_ready_for_inventory_assignment ?replenishment_task)
+        (not
+          (replenishment_executed ?bulk_slot)
+        )
+      )
+    :effect (replenishment_executed ?bulk_slot)
+  )
+  (:action complete_replenishment_on_pick_slot
+    :parameters (?pick_slot - pick_slot ?replenishment_task - replenishment_task)
+    :precondition
+      (and
+        (pick_slot_ready_for_task ?pick_slot)
+        (pick_slot_claimed ?pick_slot)
+        (task_active ?replenishment_task)
+        (task_ready_for_inventory_assignment ?replenishment_task)
+        (not
+          (replenishment_executed ?pick_slot)
+        )
+      )
+    :effect (replenishment_executed ?pick_slot)
+  )
+  (:action record_inventory_reconciliation_for_location
+    :parameters (?location - location ?inventory_record - inventory_record ?sku - sku)
+    :precondition
+      (and
+        (replenishment_executed ?location)
+        (location_assigned_sku ?location ?sku)
+        (inventory_record_available ?inventory_record)
+        (not
+          (replenishment_recorded ?location)
+        )
+      )
+    :effect
+      (and
+        (replenishment_recorded ?location)
+        (inventory_record_assigned_to_location ?location ?inventory_record)
+        (not
+          (inventory_record_available ?inventory_record)
+        )
+      )
+  )
+  (:action finalize_replenishment_and_release_source_for_bulk_slot
+    :parameters (?bulk_slot - bulk_slot ?replenishment_source - replenishment_source ?inventory_record - inventory_record)
+    :precondition
+      (and
+        (replenishment_recorded ?bulk_slot)
+        (location_bound_to_replenishment_source ?bulk_slot ?replenishment_source)
+        (inventory_record_assigned_to_location ?bulk_slot ?inventory_record)
+        (not
+          (replenishment_completed ?bulk_slot)
+        )
+      )
+    :effect
+      (and
+        (replenishment_completed ?bulk_slot)
+        (replenishment_source_available ?replenishment_source)
+        (inventory_record_available ?inventory_record)
+      )
+  )
+  (:action finalize_replenishment_and_release_source_for_pick_slot
+    :parameters (?pick_slot - pick_slot ?replenishment_source - replenishment_source ?inventory_record - inventory_record)
+    :precondition
+      (and
+        (replenishment_recorded ?pick_slot)
+        (location_bound_to_replenishment_source ?pick_slot ?replenishment_source)
+        (inventory_record_assigned_to_location ?pick_slot ?inventory_record)
+        (not
+          (replenishment_completed ?pick_slot)
+        )
+      )
+    :effect
+      (and
+        (replenishment_completed ?pick_slot)
+        (replenishment_source_available ?replenishment_source)
+        (inventory_record_available ?inventory_record)
+      )
+  )
+  (:action finalize_replenishment_and_release_source_for_pick_face
+    :parameters (?pick_face - pick_face ?replenishment_source - replenishment_source ?inventory_record - inventory_record)
+    :precondition
+      (and
+        (replenishment_recorded ?pick_face)
+        (location_bound_to_replenishment_source ?pick_face ?replenishment_source)
+        (inventory_record_assigned_to_location ?pick_face ?inventory_record)
+        (not
+          (replenishment_completed ?pick_face)
+        )
+      )
+    :effect
+      (and
+        (replenishment_completed ?pick_face)
+        (replenishment_source_available ?replenishment_source)
+        (inventory_record_available ?inventory_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem pick_face_replenishment_problem)
+  (:domain warehouse_pick_face_replenishment)
+  (:objects bulk_slot_1 - bulk_slot pick_slot_1 - pick_slot pick_face_1 - pick_face pick_face_2 - pick_face replenishment_source_1 - replenishment_source replenishment_source_2 - replenishment_source replenishment_source_3 - replenishment_source sku_1 - sku operator_1 - operator replenish_tote_1 - replenish_tote bulk_staging_point_1 - bulk_staging_point pick_staging_point_1 - pick_staging_point replenishment_task_template_1 - replenishment_task inventory_unit_1 - inventory_unit inventory_unit_2 - inventory_unit label_template_1 - location_label_template label_template_2 - location_label_template replenishment_cart_1 - replenishment_cart replenishment_cart_2 - replenishment_cart inventory_record_1 - inventory_record consumable_kit_1 - consumable_kit inspection_tool_1 - inspection_tool inspection_tool_2 - inspection_tool approval_tag_1 - supervisor_approval_tag)
+  (:init
+    (replenishment_source_available replenishment_source_1)
+    (replenishment_source_available replenishment_source_2)
+    (replenishment_source_available replenishment_source_3)
+    (sku_available sku_1)
+    (operator_available operator_1)
+    (replenish_tote_available replenish_tote_1)
+    (bulk_slot_assigned_staging_point bulk_slot_1 bulk_staging_point_1)
+    (pick_slot_assigned_staging_point pick_slot_1 pick_staging_point_1)
+    (task_available replenishment_task_template_1)
+    (inventory_unit_available inventory_unit_1)
+    (inventory_unit_available inventory_unit_2)
+    (pick_face_supplied_by_bulk_slot pick_face_1 bulk_slot_1)
+    (pick_face_supplied_by_bulk_slot pick_face_2 bulk_slot_1)
+    (pick_face_contains_pick_slot pick_face_1 pick_slot_1)
+    (pick_face_contains_pick_slot pick_face_2 pick_slot_1)
+    (pick_face_assigned_to_task pick_face_1 replenishment_task_template_1)
+    (pick_face_assigned_to_task pick_face_2 replenishment_task_template_1)
+    (pick_face_assigned_inventory_unit pick_face_1 inventory_unit_1)
+    (pick_face_assigned_inventory_unit pick_face_2 inventory_unit_2)
+    (label_template_available label_template_1)
+    (label_template_available label_template_2)
+    (replenishment_cart_available replenishment_cart_1)
+    (replenishment_cart_available replenishment_cart_2)
+    (inventory_record_available inventory_record_1)
+    (consumable_kit_available consumable_kit_1)
+    (inspection_tool_available inspection_tool_1)
+    (pick_face_assigned_inspection_tool pick_face_1 inspection_tool_1)
+    (pick_face_assigned_inspection_tool pick_face_2 inspection_tool_2)
+    (approval_tag_available approval_tag_1)
+  )
+  (:goal
+    (and
+      (replenishment_completed bulk_slot_1)
+      (replenishment_completed pick_slot_1)
+      (replenishment_completed pick_face_1)
+      (replenishment_completed pick_face_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_location bulk_slot_1)
+(register_location pick_slot_1)
+(register_location pick_face_1)
+(register_location pick_face_2)
+(assign_replenishment_source_to_location bulk_slot_1 replenishment_source_1)
+(assign_replenishment_source_to_location pick_slot_1 replenishment_source_2)
+(assign_replenishment_source_to_location pick_face_1 replenishment_source_3)
+(assign_sku_to_location pick_slot_1 sku_1)
+(mark_location_active pick_slot_1 sku_1)
+(prepare_pick_staging_point_for_replenishment pick_slot_1 pick_staging_point_1 sku_1)
+(release_sku_from_location pick_slot_1 sku_1)
+(assign_sku_to_location pick_face_1 sku_1)
+(mark_location_active pick_face_1 sku_1)
+(release_sku_from_location pick_face_1 sku_1)
+(assign_sku_to_location bulk_slot_1 sku_1)
+(mark_location_active bulk_slot_1 sku_1)
+(prepare_bulk_staging_point_for_replenishment bulk_slot_1 bulk_staging_point_1 sku_1)
+(assign_operator_to_location pick_slot_1 operator_1)
+(reserve_pick_slot_for_replenishment pick_slot_1 pick_staging_point_1 operator_1)
+(release_operator_from_location pick_slot_1 operator_1)
+(assign_operator_to_location bulk_slot_1 operator_1)
+(reserve_bulk_slot_for_replenishment bulk_slot_1 bulk_staging_point_1 operator_1)
+(release_operator_from_location bulk_slot_1 operator_1)
+(create_replenishment_task_standard bulk_slot_1 pick_slot_1 bulk_staging_point_1 pick_staging_point_1 replenishment_task_template_1)
+(advance_task_to_inventory_assignment replenishment_task_template_1 bulk_slot_1 sku_1)
+(release_sku_from_location bulk_slot_1 sku_1)
+(assign_sku_to_location pick_face_1 sku_1)
+(assign_inventory_unit_to_task pick_face_1 inventory_unit_1 replenishment_task_template_1)
+(complete_pick_face_initial_prep_no_label pick_face_1 inventory_unit_1 replenishment_task_template_1 sku_1)
+(bind_consumable_kit_to_pick_face pick_face_1 consumable_kit_1)
+(assign_approval_tag_to_pick_face pick_face_1 approval_tag_1)
+(assign_operator_to_location pick_face_1 operator_1)
+(bind_pick_face_resources_standard pick_face_1 consumable_kit_1 operator_1 inventory_unit_1 replenishment_task_template_1)
+(validate_pick_face_preparations pick_face_1 approval_tag_1 inventory_unit_1 replenishment_task_template_1)
+(finalize_pick_face_without_approval pick_face_1)
+(release_operator_from_location pick_face_1 operator_1)
+(release_consumable_kit_from_pick_face pick_face_1 consumable_kit_1)
+(release_approval_tag_from_pick_face pick_face_1 approval_tag_1)
+(record_inventory_reconciliation_for_location pick_face_1 inventory_record_1 sku_1)
+(finalize_replenishment_and_release_source_for_pick_face pick_face_1 replenishment_source_3 inventory_record_1)
+(assign_replenishment_source_to_location pick_face_2 replenishment_source_3)
+(release_sku_from_location pick_face_1 sku_1)
+(assign_sku_to_location pick_face_2 sku_1)
+(mark_location_active pick_face_2 sku_1)
+(assign_inventory_unit_to_task pick_face_2 inventory_unit_2 replenishment_task_template_1)
+(complete_pick_face_initial_prep_no_label pick_face_2 inventory_unit_2 replenishment_task_template_1 sku_1)
+(bind_consumable_kit_to_pick_face pick_face_2 consumable_kit_1)
+(assign_approval_tag_to_pick_face pick_face_2 approval_tag_1)
+(assign_operator_to_location pick_face_2 operator_1)
+(bind_pick_face_resources_standard pick_face_2 consumable_kit_1 operator_1 inventory_unit_2 replenishment_task_template_1)
+(validate_pick_face_preparations pick_face_2 approval_tag_1 inventory_unit_2 replenishment_task_template_1)
+(finalize_pick_face_without_approval pick_face_2)
+(release_operator_from_location pick_face_2 operator_1)
+(release_consumable_kit_from_pick_face pick_face_2 consumable_kit_1)
+(release_approval_tag_from_pick_face pick_face_2 approval_tag_1)
+(record_inventory_reconciliation_for_location pick_face_2 inventory_record_1 sku_1)
+(finalize_replenishment_and_release_source_for_pick_face pick_face_2 replenishment_source_3 inventory_record_1)
+(complete_replenishment_on_bulk_slot bulk_slot_1 replenishment_task_template_1)
+(complete_replenishment_on_pick_slot pick_slot_1 replenishment_task_template_1)
+(release_sku_from_location pick_face_2 sku_1)
+(assign_sku_to_location bulk_slot_1 sku_1)
+(record_inventory_reconciliation_for_location bulk_slot_1 inventory_record_1 sku_1)
+(finalize_replenishment_and_release_source_for_bulk_slot bulk_slot_1 replenishment_source_1 inventory_record_1)
+(release_sku_from_location bulk_slot_1 sku_1)
+(assign_sku_to_location pick_slot_1 sku_1)
+(record_inventory_reconciliation_for_location pick_slot_1 inventory_record_1 sku_1)
+(finalize_replenishment_and_release_source_for_pick_slot pick_slot_1 replenishment_source_2 inventory_record_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_ab4zygc1/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 67 
+
+Successful plans:
+Value: 67
+ /tmp/val_ab4zygc1/plan.pddl 67 
+
+
+
+--- stderr ---
+

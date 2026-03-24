@@ -1,0 +1,936 @@
+(define (domain severe_weather_harvest_salvage_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object consumable_category - object location_category - object operational_unit - object salvage_unit - operational_unit logistics_asset - resource_category assessor - resource_category response_crew - resource_category regulatory_permit_type - resource_category quality_certification - resource_category contingency_reserve - resource_category decontamination_kit - resource_category lab_capacity - resource_category supply_kit - consumable_category test_sample - consumable_category regulatory_permit - consumable_category salvage_zone - location_category processing_facility - location_category transport_container - location_category harvest_subunit - salvage_unit harvest_subunit_type - salvage_unit field_salvage_team - harvest_subunit processing_salvage_team - harvest_subunit salvage_plan - harvest_subunit_type)
+  (:predicates
+    (entity_reported ?harvest_unit - salvage_unit)
+    (assessment_completed ?harvest_unit - salvage_unit)
+    (unit_asset_allocated ?harvest_unit - salvage_unit)
+    (cleared_for_distribution ?harvest_unit - salvage_unit)
+    (entity_ready_for_recovery ?harvest_unit - salvage_unit)
+    (entity_release_authorization_granted ?harvest_unit - salvage_unit)
+    (asset_available ?logistics_asset - logistics_asset)
+    (entity_assigned_asset ?harvest_unit - salvage_unit ?logistics_asset - logistics_asset)
+    (assessor_available ?assessor - assessor)
+    (entity_assigned_assessor ?harvest_unit - salvage_unit ?assessor - assessor)
+    (response_crew_available ?response_crew - response_crew)
+    (entity_assigned_response_crew ?harvest_unit - salvage_unit ?response_crew - response_crew)
+    (supply_kit_available ?supply_kit - supply_kit)
+    (field_team_assigned_supply_kit ?field_salvage_team - field_salvage_team ?supply_kit - supply_kit)
+    (processing_team_assigned_supply_kit ?processing_salvage_team - processing_salvage_team ?supply_kit - supply_kit)
+    (field_team_assigned_zone ?field_salvage_team - field_salvage_team ?salvage_zone - salvage_zone)
+    (salvage_zone_flagged ?salvage_zone - salvage_zone)
+    (salvage_zone_decontamination_required ?salvage_zone - salvage_zone)
+    (field_team_cleared_zone ?field_salvage_team - field_salvage_team)
+    (processing_team_assigned_facility ?processing_salvage_team - processing_salvage_team ?processing_facility - processing_facility)
+    (processing_facility_flagged ?processing_facility - processing_facility)
+    (processing_facility_decontamination_required ?processing_facility - processing_facility)
+    (processing_team_cleared_facility ?processing_salvage_team - processing_salvage_team)
+    (transport_container_available ?transport_container - transport_container)
+    (transport_container_reserved ?transport_container - transport_container)
+    (container_assigned_to_zone ?transport_container - transport_container ?salvage_zone - salvage_zone)
+    (container_assigned_to_facility ?transport_container - transport_container ?processing_facility - processing_facility)
+    (container_ready_for_zone_dispatch ?transport_container - transport_container)
+    (container_ready_for_facility_dispatch ?transport_container - transport_container)
+    (container_sealed_for_transport ?transport_container - transport_container)
+    (plan_assigned_field_team ?salvage_plan - salvage_plan ?field_salvage_team - field_salvage_team)
+    (plan_assigned_processing_team ?salvage_plan - salvage_plan ?processing_salvage_team - processing_salvage_team)
+    (plan_assigned_container ?salvage_plan - salvage_plan ?transport_container - transport_container)
+    (test_sample_available ?test_sample - test_sample)
+    (plan_has_test_sample ?salvage_plan - salvage_plan ?test_sample - test_sample)
+    (test_sample_submitted ?test_sample - test_sample)
+    (test_sample_in_container ?test_sample - test_sample ?transport_container - transport_container)
+    (lab_submission_registered ?salvage_plan - salvage_plan)
+    (plan_queued_for_lab_processing ?salvage_plan - salvage_plan)
+    (lab_results_received_for_plan ?salvage_plan - salvage_plan)
+    (permit_type_allocated_to_plan ?salvage_plan - salvage_plan)
+    (permit_validated_for_plan ?salvage_plan - salvage_plan)
+    (plan_certification_ready ?salvage_plan - salvage_plan)
+    (plan_execution_authorized ?salvage_plan - salvage_plan)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (plan_has_regulatory_permit ?salvage_plan - salvage_plan ?regulatory_permit - regulatory_permit)
+    (permit_registered_on_plan ?salvage_plan - salvage_plan)
+    (permit_under_review_for_plan ?salvage_plan - salvage_plan)
+    (permit_approved_for_plan ?salvage_plan - salvage_plan)
+    (regulatory_permit_type_available ?regulatory_permit_type - regulatory_permit_type)
+    (plan_assigned_permit_type ?salvage_plan - salvage_plan ?regulatory_permit_type - regulatory_permit_type)
+    (quality_certification_available ?quality_certification - quality_certification)
+    (plan_assigned_quality_certification ?salvage_plan - salvage_plan ?quality_certification - quality_certification)
+    (decon_kit_available ?decontamination_kit - decontamination_kit)
+    (plan_assigned_decon_kit ?salvage_plan - salvage_plan ?decontamination_kit - decontamination_kit)
+    (lab_capacity_available ?lab_capacity - lab_capacity)
+    (plan_booked_lab_capacity ?salvage_plan - salvage_plan ?lab_capacity - lab_capacity)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (contingency_reserve_assigned_to_unit ?harvest_unit - salvage_unit ?contingency_reserve - contingency_reserve)
+    (field_team_engaged ?field_salvage_team - field_salvage_team)
+    (processing_team_engaged ?processing_salvage_team - processing_salvage_team)
+    (plan_finalized ?salvage_plan - salvage_plan)
+  )
+  (:action report_damaged_harvest_unit
+    :parameters (?harvest_unit - salvage_unit)
+    :precondition
+      (and
+        (not
+          (entity_reported ?harvest_unit)
+        )
+        (not
+          (cleared_for_distribution ?harvest_unit)
+        )
+      )
+    :effect (entity_reported ?harvest_unit)
+  )
+  (:action allocate_logistics_asset_to_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?logistics_asset - logistics_asset)
+    :precondition
+      (and
+        (entity_reported ?harvest_unit)
+        (not
+          (unit_asset_allocated ?harvest_unit)
+        )
+        (asset_available ?logistics_asset)
+      )
+    :effect
+      (and
+        (unit_asset_allocated ?harvest_unit)
+        (entity_assigned_asset ?harvest_unit ?logistics_asset)
+        (not
+          (asset_available ?logistics_asset)
+        )
+      )
+  )
+  (:action assign_assessor_to_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?assessor - assessor)
+    :precondition
+      (and
+        (entity_reported ?harvest_unit)
+        (unit_asset_allocated ?harvest_unit)
+        (assessor_available ?assessor)
+      )
+    :effect
+      (and
+        (entity_assigned_assessor ?harvest_unit ?assessor)
+        (not
+          (assessor_available ?assessor)
+        )
+      )
+  )
+  (:action complete_assessment_for_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?assessor - assessor)
+    :precondition
+      (and
+        (entity_reported ?harvest_unit)
+        (unit_asset_allocated ?harvest_unit)
+        (entity_assigned_assessor ?harvest_unit ?assessor)
+        (not
+          (assessment_completed ?harvest_unit)
+        )
+      )
+    :effect (assessment_completed ?harvest_unit)
+  )
+  (:action release_assessor_from_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?assessor - assessor)
+    :precondition
+      (and
+        (entity_assigned_assessor ?harvest_unit ?assessor)
+      )
+    :effect
+      (and
+        (assessor_available ?assessor)
+        (not
+          (entity_assigned_assessor ?harvest_unit ?assessor)
+        )
+      )
+  )
+  (:action assign_response_crew_to_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?response_crew - response_crew)
+    :precondition
+      (and
+        (assessment_completed ?harvest_unit)
+        (response_crew_available ?response_crew)
+      )
+    :effect
+      (and
+        (entity_assigned_response_crew ?harvest_unit ?response_crew)
+        (not
+          (response_crew_available ?response_crew)
+        )
+      )
+  )
+  (:action release_response_crew_from_harvest_unit
+    :parameters (?harvest_unit - salvage_unit ?response_crew - response_crew)
+    :precondition
+      (and
+        (entity_assigned_response_crew ?harvest_unit ?response_crew)
+      )
+    :effect
+      (and
+        (response_crew_available ?response_crew)
+        (not
+          (entity_assigned_response_crew ?harvest_unit ?response_crew)
+        )
+      )
+  )
+  (:action assign_decontamination_kit_to_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?decontamination_kit - decontamination_kit)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (decon_kit_available ?decontamination_kit)
+      )
+    :effect
+      (and
+        (plan_assigned_decon_kit ?salvage_plan ?decontamination_kit)
+        (not
+          (decon_kit_available ?decontamination_kit)
+        )
+      )
+  )
+  (:action release_decontamination_kit_from_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?decontamination_kit - decontamination_kit)
+    :precondition
+      (and
+        (plan_assigned_decon_kit ?salvage_plan ?decontamination_kit)
+      )
+    :effect
+      (and
+        (decon_kit_available ?decontamination_kit)
+        (not
+          (plan_assigned_decon_kit ?salvage_plan ?decontamination_kit)
+        )
+      )
+  )
+  (:action assign_lab_capacity_to_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (lab_capacity_available ?lab_capacity)
+      )
+    :effect
+      (and
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (not
+          (lab_capacity_available ?lab_capacity)
+        )
+      )
+  )
+  (:action release_lab_capacity_from_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity)
+    :precondition
+      (and
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+      )
+    :effect
+      (and
+        (lab_capacity_available ?lab_capacity)
+        (not
+          (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        )
+      )
+  )
+  (:action assess_and_flag_salvage_zone
+    :parameters (?field_salvage_team - field_salvage_team ?salvage_zone - salvage_zone ?assessor - assessor)
+    :precondition
+      (and
+        (assessment_completed ?field_salvage_team)
+        (entity_assigned_assessor ?field_salvage_team ?assessor)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (not
+          (salvage_zone_flagged ?salvage_zone)
+        )
+        (not
+          (salvage_zone_decontamination_required ?salvage_zone)
+        )
+      )
+    :effect (salvage_zone_flagged ?salvage_zone)
+  )
+  (:action start_zone_decontamination_operation
+    :parameters (?field_salvage_team - field_salvage_team ?salvage_zone - salvage_zone ?response_crew - response_crew)
+    :precondition
+      (and
+        (assessment_completed ?field_salvage_team)
+        (entity_assigned_response_crew ?field_salvage_team ?response_crew)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (salvage_zone_flagged ?salvage_zone)
+        (not
+          (field_team_engaged ?field_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (field_team_cleared_zone ?field_salvage_team)
+      )
+  )
+  (:action assign_supply_kit_and_mark_zone_for_decontamination
+    :parameters (?field_salvage_team - field_salvage_team ?salvage_zone - salvage_zone ?supply_kit - supply_kit)
+    :precondition
+      (and
+        (assessment_completed ?field_salvage_team)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (supply_kit_available ?supply_kit)
+        (not
+          (field_team_engaged ?field_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (salvage_zone_decontamination_required ?salvage_zone)
+        (field_team_engaged ?field_salvage_team)
+        (field_team_assigned_supply_kit ?field_salvage_team ?supply_kit)
+        (not
+          (supply_kit_available ?supply_kit)
+        )
+      )
+  )
+  (:action complete_zone_decontamination_and_return_supply_kit
+    :parameters (?field_salvage_team - field_salvage_team ?salvage_zone - salvage_zone ?assessor - assessor ?supply_kit - supply_kit)
+    :precondition
+      (and
+        (assessment_completed ?field_salvage_team)
+        (entity_assigned_assessor ?field_salvage_team ?assessor)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (salvage_zone_decontamination_required ?salvage_zone)
+        (field_team_assigned_supply_kit ?field_salvage_team ?supply_kit)
+        (not
+          (field_team_cleared_zone ?field_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (salvage_zone_flagged ?salvage_zone)
+        (field_team_cleared_zone ?field_salvage_team)
+        (supply_kit_available ?supply_kit)
+        (not
+          (field_team_assigned_supply_kit ?field_salvage_team ?supply_kit)
+        )
+      )
+  )
+  (:action assess_and_flag_processing_facility
+    :parameters (?processing_salvage_team - processing_salvage_team ?processing_facility - processing_facility ?assessor - assessor)
+    :precondition
+      (and
+        (assessment_completed ?processing_salvage_team)
+        (entity_assigned_assessor ?processing_salvage_team ?assessor)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (not
+          (processing_facility_flagged ?processing_facility)
+        )
+        (not
+          (processing_facility_decontamination_required ?processing_facility)
+        )
+      )
+    :effect (processing_facility_flagged ?processing_facility)
+  )
+  (:action start_facility_decontamination_operation
+    :parameters (?processing_salvage_team - processing_salvage_team ?processing_facility - processing_facility ?response_crew - response_crew)
+    :precondition
+      (and
+        (assessment_completed ?processing_salvage_team)
+        (entity_assigned_response_crew ?processing_salvage_team ?response_crew)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (processing_facility_flagged ?processing_facility)
+        (not
+          (processing_team_engaged ?processing_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (processing_team_engaged ?processing_salvage_team)
+        (processing_team_cleared_facility ?processing_salvage_team)
+      )
+  )
+  (:action assign_supply_kit_to_processing_facility
+    :parameters (?processing_salvage_team - processing_salvage_team ?processing_facility - processing_facility ?supply_kit - supply_kit)
+    :precondition
+      (and
+        (assessment_completed ?processing_salvage_team)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (supply_kit_available ?supply_kit)
+        (not
+          (processing_team_engaged ?processing_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (processing_facility_decontamination_required ?processing_facility)
+        (processing_team_engaged ?processing_salvage_team)
+        (processing_team_assigned_supply_kit ?processing_salvage_team ?supply_kit)
+        (not
+          (supply_kit_available ?supply_kit)
+        )
+      )
+  )
+  (:action complete_facility_decontamination_and_return_supply_kit
+    :parameters (?processing_salvage_team - processing_salvage_team ?processing_facility - processing_facility ?assessor - assessor ?supply_kit - supply_kit)
+    :precondition
+      (and
+        (assessment_completed ?processing_salvage_team)
+        (entity_assigned_assessor ?processing_salvage_team ?assessor)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (processing_facility_decontamination_required ?processing_facility)
+        (processing_team_assigned_supply_kit ?processing_salvage_team ?supply_kit)
+        (not
+          (processing_team_cleared_facility ?processing_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (processing_facility_flagged ?processing_facility)
+        (processing_team_cleared_facility ?processing_salvage_team)
+        (supply_kit_available ?supply_kit)
+        (not
+          (processing_team_assigned_supply_kit ?processing_salvage_team ?supply_kit)
+        )
+      )
+  )
+  (:action consolidate_salvage_into_transport_container_standard
+    :parameters (?field_salvage_team - field_salvage_team ?processing_salvage_team - processing_salvage_team ?salvage_zone - salvage_zone ?processing_facility - processing_facility ?transport_container - transport_container)
+    :precondition
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (processing_team_engaged ?processing_salvage_team)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (salvage_zone_flagged ?salvage_zone)
+        (processing_facility_flagged ?processing_facility)
+        (field_team_cleared_zone ?field_salvage_team)
+        (processing_team_cleared_facility ?processing_salvage_team)
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_reserved ?transport_container)
+        (container_assigned_to_zone ?transport_container ?salvage_zone)
+        (container_assigned_to_facility ?transport_container ?processing_facility)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action consolidate_salvage_into_transport_container_zone_decontaminated
+    :parameters (?field_salvage_team - field_salvage_team ?processing_salvage_team - processing_salvage_team ?salvage_zone - salvage_zone ?processing_facility - processing_facility ?transport_container - transport_container)
+    :precondition
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (processing_team_engaged ?processing_salvage_team)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (salvage_zone_decontamination_required ?salvage_zone)
+        (processing_facility_flagged ?processing_facility)
+        (not
+          (field_team_cleared_zone ?field_salvage_team)
+        )
+        (processing_team_cleared_facility ?processing_salvage_team)
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_reserved ?transport_container)
+        (container_assigned_to_zone ?transport_container ?salvage_zone)
+        (container_assigned_to_facility ?transport_container ?processing_facility)
+        (container_ready_for_zone_dispatch ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action consolidate_salvage_into_transport_container_facility_decontaminated
+    :parameters (?field_salvage_team - field_salvage_team ?processing_salvage_team - processing_salvage_team ?salvage_zone - salvage_zone ?processing_facility - processing_facility ?transport_container - transport_container)
+    :precondition
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (processing_team_engaged ?processing_salvage_team)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (salvage_zone_flagged ?salvage_zone)
+        (processing_facility_decontamination_required ?processing_facility)
+        (field_team_cleared_zone ?field_salvage_team)
+        (not
+          (processing_team_cleared_facility ?processing_salvage_team)
+        )
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_reserved ?transport_container)
+        (container_assigned_to_zone ?transport_container ?salvage_zone)
+        (container_assigned_to_facility ?transport_container ?processing_facility)
+        (container_ready_for_facility_dispatch ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action consolidate_salvage_into_transport_container_full_checks
+    :parameters (?field_salvage_team - field_salvage_team ?processing_salvage_team - processing_salvage_team ?salvage_zone - salvage_zone ?processing_facility - processing_facility ?transport_container - transport_container)
+    :precondition
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (processing_team_engaged ?processing_salvage_team)
+        (field_team_assigned_zone ?field_salvage_team ?salvage_zone)
+        (processing_team_assigned_facility ?processing_salvage_team ?processing_facility)
+        (salvage_zone_decontamination_required ?salvage_zone)
+        (processing_facility_decontamination_required ?processing_facility)
+        (not
+          (field_team_cleared_zone ?field_salvage_team)
+        )
+        (not
+          (processing_team_cleared_facility ?processing_salvage_team)
+        )
+        (transport_container_available ?transport_container)
+      )
+    :effect
+      (and
+        (transport_container_reserved ?transport_container)
+        (container_assigned_to_zone ?transport_container ?salvage_zone)
+        (container_assigned_to_facility ?transport_container ?processing_facility)
+        (container_ready_for_zone_dispatch ?transport_container)
+        (container_ready_for_facility_dispatch ?transport_container)
+        (not
+          (transport_container_available ?transport_container)
+        )
+      )
+  )
+  (:action mark_transport_container_loaded
+    :parameters (?transport_container - transport_container ?field_salvage_team - field_salvage_team ?assessor - assessor)
+    :precondition
+      (and
+        (transport_container_reserved ?transport_container)
+        (field_team_engaged ?field_salvage_team)
+        (entity_assigned_assessor ?field_salvage_team ?assessor)
+        (not
+          (container_sealed_for_transport ?transport_container)
+        )
+      )
+    :effect (container_sealed_for_transport ?transport_container)
+  )
+  (:action submit_test_sample_and_register_chain_of_custody
+    :parameters (?salvage_plan - salvage_plan ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (plan_assigned_container ?salvage_plan ?transport_container)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_available ?test_sample)
+        (transport_container_reserved ?transport_container)
+        (container_sealed_for_transport ?transport_container)
+        (not
+          (test_sample_submitted ?test_sample)
+        )
+      )
+    :effect
+      (and
+        (test_sample_submitted ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (not
+          (test_sample_available ?test_sample)
+        )
+      )
+  )
+  (:action register_lab_submission_for_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?test_sample - test_sample ?transport_container - transport_container ?assessor - assessor)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_submitted ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (entity_assigned_assessor ?salvage_plan ?assessor)
+        (not
+          (container_ready_for_zone_dispatch ?transport_container)
+        )
+        (not
+          (lab_submission_registered ?salvage_plan)
+        )
+      )
+    :effect (lab_submission_registered ?salvage_plan)
+  )
+  (:action allocate_regulatory_permit_type_to_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?regulatory_permit_type - regulatory_permit_type)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (regulatory_permit_type_available ?regulatory_permit_type)
+        (not
+          (permit_type_allocated_to_plan ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (permit_type_allocated_to_plan ?salvage_plan)
+        (plan_assigned_permit_type ?salvage_plan ?regulatory_permit_type)
+        (not
+          (regulatory_permit_type_available ?regulatory_permit_type)
+        )
+      )
+  )
+  (:action attach_permit_type_and_register_submission
+    :parameters (?salvage_plan - salvage_plan ?test_sample - test_sample ?transport_container - transport_container ?assessor - assessor ?regulatory_permit_type - regulatory_permit_type)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_submitted ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (entity_assigned_assessor ?salvage_plan ?assessor)
+        (container_ready_for_zone_dispatch ?transport_container)
+        (permit_type_allocated_to_plan ?salvage_plan)
+        (plan_assigned_permit_type ?salvage_plan ?regulatory_permit_type)
+        (not
+          (lab_submission_registered ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (lab_submission_registered ?salvage_plan)
+        (permit_validated_for_plan ?salvage_plan)
+      )
+  )
+  (:action queue_salvage_plan_for_lab_processing
+    :parameters (?salvage_plan - salvage_plan ?decontamination_kit - decontamination_kit ?response_crew - response_crew ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (lab_submission_registered ?salvage_plan)
+        (plan_assigned_decon_kit ?salvage_plan ?decontamination_kit)
+        (entity_assigned_response_crew ?salvage_plan ?response_crew)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (not
+          (container_ready_for_facility_dispatch ?transport_container)
+        )
+        (not
+          (plan_queued_for_lab_processing ?salvage_plan)
+        )
+      )
+    :effect (plan_queued_for_lab_processing ?salvage_plan)
+  )
+  (:action queue_salvage_plan_for_lab_processing_secondary
+    :parameters (?salvage_plan - salvage_plan ?decontamination_kit - decontamination_kit ?response_crew - response_crew ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (lab_submission_registered ?salvage_plan)
+        (plan_assigned_decon_kit ?salvage_plan ?decontamination_kit)
+        (entity_assigned_response_crew ?salvage_plan ?response_crew)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (container_ready_for_facility_dispatch ?transport_container)
+        (not
+          (plan_queued_for_lab_processing ?salvage_plan)
+        )
+      )
+    :effect (plan_queued_for_lab_processing ?salvage_plan)
+  )
+  (:action complete_lab_processing_for_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (plan_queued_for_lab_processing ?salvage_plan)
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (not
+          (container_ready_for_zone_dispatch ?transport_container)
+        )
+        (not
+          (container_ready_for_facility_dispatch ?transport_container)
+        )
+        (not
+          (lab_results_received_for_plan ?salvage_plan)
+        )
+      )
+    :effect (lab_results_received_for_plan ?salvage_plan)
+  )
+  (:action record_lab_results_and_flag_certification_ready
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (plan_queued_for_lab_processing ?salvage_plan)
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (container_ready_for_zone_dispatch ?transport_container)
+        (not
+          (container_ready_for_facility_dispatch ?transport_container)
+        )
+        (not
+          (lab_results_received_for_plan ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_certification_ready ?salvage_plan)
+      )
+  )
+  (:action record_lab_results_and_flag_certification_variant1
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (plan_queued_for_lab_processing ?salvage_plan)
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (not
+          (container_ready_for_zone_dispatch ?transport_container)
+        )
+        (container_ready_for_facility_dispatch ?transport_container)
+        (not
+          (lab_results_received_for_plan ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_certification_ready ?salvage_plan)
+      )
+  )
+  (:action record_lab_results_and_flag_certification_variant2
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity ?test_sample - test_sample ?transport_container - transport_container)
+    :precondition
+      (and
+        (plan_queued_for_lab_processing ?salvage_plan)
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (plan_has_test_sample ?salvage_plan ?test_sample)
+        (test_sample_in_container ?test_sample ?transport_container)
+        (container_ready_for_zone_dispatch ?transport_container)
+        (container_ready_for_facility_dispatch ?transport_container)
+        (not
+          (lab_results_received_for_plan ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_certification_ready ?salvage_plan)
+      )
+  )
+  (:action finalize_salvage_plan_activation
+    :parameters (?salvage_plan - salvage_plan)
+    :precondition
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (not
+          (plan_certification_ready ?salvage_plan)
+        )
+        (not
+          (plan_finalized ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?salvage_plan)
+        (entity_ready_for_recovery ?salvage_plan)
+      )
+  )
+  (:action assign_quality_certification_to_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?quality_certification - quality_certification)
+    :precondition
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_certification_ready ?salvage_plan)
+        (quality_certification_available ?quality_certification)
+      )
+    :effect
+      (and
+        (plan_assigned_quality_certification ?salvage_plan ?quality_certification)
+        (not
+          (quality_certification_available ?quality_certification)
+        )
+      )
+  )
+  (:action authorize_salvage_plan_execution
+    :parameters (?salvage_plan - salvage_plan ?field_salvage_team - field_salvage_team ?processing_salvage_team - processing_salvage_team ?assessor - assessor ?quality_certification - quality_certification)
+    :precondition
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_certification_ready ?salvage_plan)
+        (plan_assigned_quality_certification ?salvage_plan ?quality_certification)
+        (plan_assigned_field_team ?salvage_plan ?field_salvage_team)
+        (plan_assigned_processing_team ?salvage_plan ?processing_salvage_team)
+        (field_team_cleared_zone ?field_salvage_team)
+        (processing_team_cleared_facility ?processing_salvage_team)
+        (entity_assigned_assessor ?salvage_plan ?assessor)
+        (not
+          (plan_execution_authorized ?salvage_plan)
+        )
+      )
+    :effect (plan_execution_authorized ?salvage_plan)
+  )
+  (:action activate_authorized_salvage_plan
+    :parameters (?salvage_plan - salvage_plan)
+    :precondition
+      (and
+        (lab_results_received_for_plan ?salvage_plan)
+        (plan_execution_authorized ?salvage_plan)
+        (not
+          (plan_finalized ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?salvage_plan)
+        (entity_ready_for_recovery ?salvage_plan)
+      )
+  )
+  (:action register_regulatory_permit_for_salvage_plan
+    :parameters (?salvage_plan - salvage_plan ?regulatory_permit - regulatory_permit ?assessor - assessor)
+    :precondition
+      (and
+        (assessment_completed ?salvage_plan)
+        (entity_assigned_assessor ?salvage_plan ?assessor)
+        (regulatory_permit_available ?regulatory_permit)
+        (plan_has_regulatory_permit ?salvage_plan ?regulatory_permit)
+        (not
+          (permit_registered_on_plan ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (permit_registered_on_plan ?salvage_plan)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action submit_permit_for_review
+    :parameters (?salvage_plan - salvage_plan ?response_crew - response_crew)
+    :precondition
+      (and
+        (permit_registered_on_plan ?salvage_plan)
+        (entity_assigned_response_crew ?salvage_plan ?response_crew)
+        (not
+          (permit_under_review_for_plan ?salvage_plan)
+        )
+      )
+    :effect (permit_under_review_for_plan ?salvage_plan)
+  )
+  (:action approve_permit_based_on_lab_results
+    :parameters (?salvage_plan - salvage_plan ?lab_capacity - lab_capacity)
+    :precondition
+      (and
+        (permit_under_review_for_plan ?salvage_plan)
+        (plan_booked_lab_capacity ?salvage_plan ?lab_capacity)
+        (not
+          (permit_approved_for_plan ?salvage_plan)
+        )
+      )
+    :effect (permit_approved_for_plan ?salvage_plan)
+  )
+  (:action finalize_salvage_plan_after_permit_approval
+    :parameters (?salvage_plan - salvage_plan)
+    :precondition
+      (and
+        (permit_approved_for_plan ?salvage_plan)
+        (not
+          (plan_finalized ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (plan_finalized ?salvage_plan)
+        (entity_ready_for_recovery ?salvage_plan)
+      )
+  )
+  (:action complete_field_recovery_task
+    :parameters (?field_salvage_team - field_salvage_team ?transport_container - transport_container)
+    :precondition
+      (and
+        (field_team_engaged ?field_salvage_team)
+        (field_team_cleared_zone ?field_salvage_team)
+        (transport_container_reserved ?transport_container)
+        (container_sealed_for_transport ?transport_container)
+        (not
+          (entity_ready_for_recovery ?field_salvage_team)
+        )
+      )
+    :effect (entity_ready_for_recovery ?field_salvage_team)
+  )
+  (:action complete_processing_recovery_task
+    :parameters (?processing_salvage_team - processing_salvage_team ?transport_container - transport_container)
+    :precondition
+      (and
+        (processing_team_engaged ?processing_salvage_team)
+        (processing_team_cleared_facility ?processing_salvage_team)
+        (transport_container_reserved ?transport_container)
+        (container_sealed_for_transport ?transport_container)
+        (not
+          (entity_ready_for_recovery ?processing_salvage_team)
+        )
+      )
+    :effect (entity_ready_for_recovery ?processing_salvage_team)
+  )
+  (:action authorize_harvest_unit_for_release
+    :parameters (?harvest_unit - salvage_unit ?contingency_reserve - contingency_reserve ?assessor - assessor)
+    :precondition
+      (and
+        (entity_ready_for_recovery ?harvest_unit)
+        (entity_assigned_assessor ?harvest_unit ?assessor)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (entity_release_authorization_granted ?harvest_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_release_authorization_granted ?harvest_unit)
+        (contingency_reserve_assigned_to_unit ?harvest_unit ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action release_field_team_and_return_asset
+    :parameters (?field_salvage_team - field_salvage_team ?logistics_asset - logistics_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_release_authorization_granted ?field_salvage_team)
+        (entity_assigned_asset ?field_salvage_team ?logistics_asset)
+        (contingency_reserve_assigned_to_unit ?field_salvage_team ?contingency_reserve)
+        (not
+          (cleared_for_distribution ?field_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_distribution ?field_salvage_team)
+        (asset_available ?logistics_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action release_processing_team_and_return_asset
+    :parameters (?processing_salvage_team - processing_salvage_team ?logistics_asset - logistics_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_release_authorization_granted ?processing_salvage_team)
+        (entity_assigned_asset ?processing_salvage_team ?logistics_asset)
+        (contingency_reserve_assigned_to_unit ?processing_salvage_team ?contingency_reserve)
+        (not
+          (cleared_for_distribution ?processing_salvage_team)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_distribution ?processing_salvage_team)
+        (asset_available ?logistics_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action release_salvage_plan_and_return_asset
+    :parameters (?salvage_plan - salvage_plan ?logistics_asset - logistics_asset ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_release_authorization_granted ?salvage_plan)
+        (entity_assigned_asset ?salvage_plan ?logistics_asset)
+        (contingency_reserve_assigned_to_unit ?salvage_plan ?contingency_reserve)
+        (not
+          (cleared_for_distribution ?salvage_plan)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_distribution ?salvage_plan)
+        (asset_available ?logistics_asset)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)

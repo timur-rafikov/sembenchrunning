@@ -1,0 +1,936 @@
+(define (domain tourism_refundable_vs_nonrefundable_rate_selection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types booking_component - object auxiliary_component - object inventory_component - object reservation_root - object reservation_entity - reservation_root rate_plan_option - booking_component payment_instrument - booking_component service_agent - booking_component amendment_category - booking_component settlement_method - booking_component cancellation_authorization - booking_component supplier_acknowledgement - booking_component third_party_verification - booking_component add_on_package - auxiliary_component payment_authorization - auxiliary_component loyalty_credential - auxiliary_component inventory_offer - inventory_component inventory_offer_alt - inventory_component provisional_confirmation_token - inventory_component reservation_role - reservation_entity booking_container - reservation_entity customer_reservation - reservation_role supplier_reservation - reservation_role booking_record - booking_container)
+  (:predicates
+    (reservation_initiated ?reservation_entity - reservation_entity)
+    (entity_active ?reservation_entity - reservation_entity)
+    (reservation_rate_selected ?reservation_entity - reservation_entity)
+    (cancellation_committed ?reservation_entity - reservation_entity)
+    (entity_confirmed ?reservation_entity - reservation_entity)
+    (cancellation_authorization_issued ?reservation_entity - reservation_entity)
+    (rate_plan_option_available ?rate_plan_option - rate_plan_option)
+    (reservation_links_rate_plan_option ?reservation_entity - reservation_entity ?rate_plan_option - rate_plan_option)
+    (payment_instrument_available ?payment_instrument - payment_instrument)
+    (reservation_links_payment_instrument ?reservation_entity - reservation_entity ?payment_instrument - payment_instrument)
+    (service_agent_available ?service_agent - service_agent)
+    (reservation_assigned_agent ?reservation_entity - reservation_entity ?service_agent - service_agent)
+    (addon_available ?addon_package - add_on_package)
+    (customer_reservation_links_addon ?customer_reservation - customer_reservation ?addon_package - add_on_package)
+    (supplier_reservation_links_addon ?supplier_reservation - supplier_reservation ?addon_package - add_on_package)
+    (customer_reservation_links_inventory_offer ?customer_reservation - customer_reservation ?inventory_offer - inventory_offer)
+    (inventory_offer_held_by_customer ?inventory_offer - inventory_offer)
+    (inventory_offer_held_by_supplier ?inventory_offer - inventory_offer)
+    (customer_reservation_hold_confirmed ?customer_reservation - customer_reservation)
+    (supplier_reservation_links_inventory_offer_alt ?supplier_reservation - supplier_reservation ?inventory_offer_alt - inventory_offer_alt)
+    (inventory_offer_alt_held_by_supplier ?inventory_offer_alt - inventory_offer_alt)
+    (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt - inventory_offer_alt)
+    (supplier_reservation_hold_confirmed ?supplier_reservation - supplier_reservation)
+    (provisional_confirmation_token_available ?provisional_confirmation_token - provisional_confirmation_token)
+    (provisional_confirmation_token_created ?provisional_confirmation_token - provisional_confirmation_token)
+    (provisional_confirmation_token_links_inventory_offer ?provisional_confirmation_token - provisional_confirmation_token ?inventory_offer - inventory_offer)
+    (provisional_confirmation_token_links_inventory_offer_alt ?provisional_confirmation_token - provisional_confirmation_token ?inventory_offer_alt - inventory_offer_alt)
+    (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token - provisional_confirmation_token)
+    (provisional_confirmation_token_ack_pending ?provisional_confirmation_token - provisional_confirmation_token)
+    (provisional_confirmation_token_payment_attached ?provisional_confirmation_token - provisional_confirmation_token)
+    (booking_record_links_customer_reservation ?booking_record - booking_record ?customer_reservation - customer_reservation)
+    (booking_record_links_supplier_reservation ?booking_record - booking_record ?supplier_reservation - supplier_reservation)
+    (booking_record_links_provisional_confirmation_token ?booking_record - booking_record ?provisional_confirmation_token - provisional_confirmation_token)
+    (payment_authorization_available ?payment_authorization - payment_authorization)
+    (booking_record_links_payment_authorization ?booking_record - booking_record ?payment_authorization - payment_authorization)
+    (payment_authorization_bound_to_booking_record ?payment_authorization - payment_authorization)
+    (payment_authorization_links_provisional_confirmation_token ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    (booking_record_payment_bound ?booking_record - booking_record)
+    (supplier_acknowledgement_requested ?booking_record - booking_record)
+    (supplier_acknowledgement_confirmed ?booking_record - booking_record)
+    (booking_record_links_amendment ?booking_record - booking_record)
+    (booking_record_amendment_applied ?booking_record - booking_record)
+    (booking_record_additional_confirmations_applied ?booking_record - booking_record)
+    (booking_record_final_checks_passed ?booking_record - booking_record)
+    (loyalty_credential_available ?loyalty_credential - loyalty_credential)
+    (booking_record_links_loyalty_credential ?booking_record - booking_record ?loyalty_credential - loyalty_credential)
+    (booking_record_loyalty_applied ?booking_record - booking_record)
+    (booking_record_loyalty_agent_assigned ?booking_record - booking_record)
+    (booking_record_loyalty_verified ?booking_record - booking_record)
+    (amendment_category_available ?amendment_category - amendment_category)
+    (booking_record_links_amendment_category ?booking_record - booking_record ?amendment_category - amendment_category)
+    (settlement_method_available ?settlement_method - settlement_method)
+    (booking_record_links_settlement_method ?booking_record - booking_record ?settlement_method - settlement_method)
+    (supplier_acknowledgement_available ?supplier_acknowledgement - supplier_acknowledgement)
+    (booking_record_links_supplier_acknowledgement ?booking_record - booking_record ?supplier_acknowledgement - supplier_acknowledgement)
+    (third_party_verification_available ?third_party_verification - third_party_verification)
+    (booking_record_links_third_party_verification ?booking_record - booking_record ?third_party_verification - third_party_verification)
+    (cancellation_authorization_available ?cancellation_authorization - cancellation_authorization)
+    (reservation_links_cancellation_authorization ?reservation_entity - reservation_entity ?cancellation_authorization - cancellation_authorization)
+    (customer_reservation_hold_ready ?customer_reservation - customer_reservation)
+    (supplier_reservation_hold_ready ?supplier_reservation - supplier_reservation)
+    (booking_record_completed ?booking_record - booking_record)
+  )
+  (:action create_reservation_context
+    :parameters (?reservation_entity - reservation_entity)
+    :precondition
+      (and
+        (not
+          (reservation_initiated ?reservation_entity)
+        )
+        (not
+          (cancellation_committed ?reservation_entity)
+        )
+      )
+    :effect (reservation_initiated ?reservation_entity)
+  )
+  (:action select_rate_plan
+    :parameters (?reservation_entity - reservation_entity ?rate_plan_option - rate_plan_option)
+    :precondition
+      (and
+        (reservation_initiated ?reservation_entity)
+        (not
+          (reservation_rate_selected ?reservation_entity)
+        )
+        (rate_plan_option_available ?rate_plan_option)
+      )
+    :effect
+      (and
+        (reservation_rate_selected ?reservation_entity)
+        (reservation_links_rate_plan_option ?reservation_entity ?rate_plan_option)
+        (not
+          (rate_plan_option_available ?rate_plan_option)
+        )
+      )
+  )
+  (:action assign_payment_instrument
+    :parameters (?reservation_entity - reservation_entity ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (reservation_initiated ?reservation_entity)
+        (reservation_rate_selected ?reservation_entity)
+        (payment_instrument_available ?payment_instrument)
+      )
+    :effect
+      (and
+        (reservation_links_payment_instrument ?reservation_entity ?payment_instrument)
+        (not
+          (payment_instrument_available ?payment_instrument)
+        )
+      )
+  )
+  (:action confirm_payment_instrument
+    :parameters (?reservation_entity - reservation_entity ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (reservation_initiated ?reservation_entity)
+        (reservation_rate_selected ?reservation_entity)
+        (reservation_links_payment_instrument ?reservation_entity ?payment_instrument)
+        (not
+          (entity_active ?reservation_entity)
+        )
+      )
+    :effect (entity_active ?reservation_entity)
+  )
+  (:action release_payment_instrument
+    :parameters (?reservation_entity - reservation_entity ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (reservation_links_payment_instrument ?reservation_entity ?payment_instrument)
+      )
+    :effect
+      (and
+        (payment_instrument_available ?payment_instrument)
+        (not
+          (reservation_links_payment_instrument ?reservation_entity ?payment_instrument)
+        )
+      )
+  )
+  (:action assign_service_agent
+    :parameters (?reservation_entity - reservation_entity ?service_agent - service_agent)
+    :precondition
+      (and
+        (entity_active ?reservation_entity)
+        (service_agent_available ?service_agent)
+      )
+    :effect
+      (and
+        (reservation_assigned_agent ?reservation_entity ?service_agent)
+        (not
+          (service_agent_available ?service_agent)
+        )
+      )
+  )
+  (:action release_service_agent
+    :parameters (?reservation_entity - reservation_entity ?service_agent - service_agent)
+    :precondition
+      (and
+        (reservation_assigned_agent ?reservation_entity ?service_agent)
+      )
+    :effect
+      (and
+        (service_agent_available ?service_agent)
+        (not
+          (reservation_assigned_agent ?reservation_entity ?service_agent)
+        )
+      )
+  )
+  (:action attach_supplier_acknowledgement_to_booking_record
+    :parameters (?booking_record - booking_record ?supplier_acknowledgement - supplier_acknowledgement)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (supplier_acknowledgement_available ?supplier_acknowledgement)
+      )
+    :effect
+      (and
+        (booking_record_links_supplier_acknowledgement ?booking_record ?supplier_acknowledgement)
+        (not
+          (supplier_acknowledgement_available ?supplier_acknowledgement)
+        )
+      )
+  )
+  (:action detach_supplier_acknowledgement_from_booking_record
+    :parameters (?booking_record - booking_record ?supplier_acknowledgement - supplier_acknowledgement)
+    :precondition
+      (and
+        (booking_record_links_supplier_acknowledgement ?booking_record ?supplier_acknowledgement)
+      )
+    :effect
+      (and
+        (supplier_acknowledgement_available ?supplier_acknowledgement)
+        (not
+          (booking_record_links_supplier_acknowledgement ?booking_record ?supplier_acknowledgement)
+        )
+      )
+  )
+  (:action attach_third_party_verification_to_booking_record
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (third_party_verification_available ?third_party_verification)
+      )
+    :effect
+      (and
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (not
+          (third_party_verification_available ?third_party_verification)
+        )
+      )
+  )
+  (:action detach_third_party_verification_from_booking_record
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification)
+    :precondition
+      (and
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+      )
+    :effect
+      (and
+        (third_party_verification_available ?third_party_verification)
+        (not
+          (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        )
+      )
+  )
+  (:action hold_inventory_for_customer_reservation
+    :parameters (?customer_reservation - customer_reservation ?inventory_offer - inventory_offer ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_active ?customer_reservation)
+        (reservation_links_payment_instrument ?customer_reservation ?payment_instrument)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (not
+          (inventory_offer_held_by_customer ?inventory_offer)
+        )
+        (not
+          (inventory_offer_held_by_supplier ?inventory_offer)
+        )
+      )
+    :effect (inventory_offer_held_by_customer ?inventory_offer)
+  )
+  (:action confirm_customer_hold_with_agent
+    :parameters (?customer_reservation - customer_reservation ?inventory_offer - inventory_offer ?service_agent - service_agent)
+    :precondition
+      (and
+        (entity_active ?customer_reservation)
+        (reservation_assigned_agent ?customer_reservation ?service_agent)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (inventory_offer_held_by_customer ?inventory_offer)
+        (not
+          (customer_reservation_hold_ready ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+      )
+  )
+  (:action apply_addon_to_customer_reservation
+    :parameters (?customer_reservation - customer_reservation ?inventory_offer - inventory_offer ?addon_package - add_on_package)
+    :precondition
+      (and
+        (entity_active ?customer_reservation)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (addon_available ?addon_package)
+        (not
+          (customer_reservation_hold_ready ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_held_by_supplier ?inventory_offer)
+        (customer_reservation_hold_ready ?customer_reservation)
+        (customer_reservation_links_addon ?customer_reservation ?addon_package)
+        (not
+          (addon_available ?addon_package)
+        )
+      )
+  )
+  (:action process_customer_hold_and_addon
+    :parameters (?customer_reservation - customer_reservation ?inventory_offer - inventory_offer ?payment_instrument - payment_instrument ?addon_package - add_on_package)
+    :precondition
+      (and
+        (entity_active ?customer_reservation)
+        (reservation_links_payment_instrument ?customer_reservation ?payment_instrument)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (inventory_offer_held_by_supplier ?inventory_offer)
+        (customer_reservation_links_addon ?customer_reservation ?addon_package)
+        (not
+          (customer_reservation_hold_confirmed ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_held_by_customer ?inventory_offer)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+        (addon_available ?addon_package)
+        (not
+          (customer_reservation_links_addon ?customer_reservation ?addon_package)
+        )
+      )
+  )
+  (:action hold_inventory_for_supplier_reservation
+    :parameters (?supplier_reservation - supplier_reservation ?inventory_offer_alt - inventory_offer_alt ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_active ?supplier_reservation)
+        (reservation_links_payment_instrument ?supplier_reservation ?payment_instrument)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (not
+          (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+        )
+        (not
+          (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt)
+        )
+      )
+    :effect (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+  )
+  (:action confirm_supplier_hold_with_agent
+    :parameters (?supplier_reservation - supplier_reservation ?inventory_offer_alt - inventory_offer_alt ?service_agent - service_agent)
+    :precondition
+      (and
+        (entity_active ?supplier_reservation)
+        (reservation_assigned_agent ?supplier_reservation ?service_agent)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+        (not
+          (supplier_reservation_hold_ready ?supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+      )
+  )
+  (:action apply_addon_to_supplier_reservation
+    :parameters (?supplier_reservation - supplier_reservation ?inventory_offer_alt - inventory_offer_alt ?addon_package - add_on_package)
+    :precondition
+      (and
+        (entity_active ?supplier_reservation)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (addon_available ?addon_package)
+        (not
+          (supplier_reservation_hold_ready ?supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt)
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (supplier_reservation_links_addon ?supplier_reservation ?addon_package)
+        (not
+          (addon_available ?addon_package)
+        )
+      )
+  )
+  (:action process_supplier_hold_and_addon
+    :parameters (?supplier_reservation - supplier_reservation ?inventory_offer_alt - inventory_offer_alt ?payment_instrument - payment_instrument ?addon_package - add_on_package)
+    :precondition
+      (and
+        (entity_active ?supplier_reservation)
+        (reservation_links_payment_instrument ?supplier_reservation ?payment_instrument)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt)
+        (supplier_reservation_links_addon ?supplier_reservation ?addon_package)
+        (not
+          (supplier_reservation_hold_confirmed ?supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+        (addon_available ?addon_package)
+        (not
+          (supplier_reservation_links_addon ?supplier_reservation ?addon_package)
+        )
+      )
+  )
+  (:action create_provisional_confirmation_token
+    :parameters (?customer_reservation - customer_reservation ?supplier_reservation - supplier_reservation ?inventory_offer - inventory_offer ?inventory_offer_alt - inventory_offer_alt ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_held_by_customer ?inventory_offer)
+        (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+        (provisional_confirmation_token_available ?provisional_confirmation_token)
+      )
+    :effect
+      (and
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_links_inventory_offer ?provisional_confirmation_token ?inventory_offer)
+        (provisional_confirmation_token_links_inventory_offer_alt ?provisional_confirmation_token ?inventory_offer_alt)
+        (not
+          (provisional_confirmation_token_available ?provisional_confirmation_token)
+        )
+      )
+  )
+  (:action create_provisional_confirmation_token_with_secondary_flag
+    :parameters (?customer_reservation - customer_reservation ?supplier_reservation - supplier_reservation ?inventory_offer - inventory_offer ?inventory_offer_alt - inventory_offer_alt ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_held_by_supplier ?inventory_offer)
+        (inventory_offer_alt_held_by_supplier ?inventory_offer_alt)
+        (not
+          (customer_reservation_hold_confirmed ?customer_reservation)
+        )
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+        (provisional_confirmation_token_available ?provisional_confirmation_token)
+      )
+    :effect
+      (and
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_links_inventory_offer ?provisional_confirmation_token ?inventory_offer)
+        (provisional_confirmation_token_links_inventory_offer_alt ?provisional_confirmation_token ?inventory_offer_alt)
+        (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_available ?provisional_confirmation_token)
+        )
+      )
+  )
+  (:action create_provisional_confirmation_token_with_alt_hold
+    :parameters (?customer_reservation - customer_reservation ?supplier_reservation - supplier_reservation ?inventory_offer - inventory_offer ?inventory_offer_alt - inventory_offer_alt ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_held_by_customer ?inventory_offer)
+        (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+        (not
+          (supplier_reservation_hold_confirmed ?supplier_reservation)
+        )
+        (provisional_confirmation_token_available ?provisional_confirmation_token)
+      )
+    :effect
+      (and
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_links_inventory_offer ?provisional_confirmation_token ?inventory_offer)
+        (provisional_confirmation_token_links_inventory_offer_alt ?provisional_confirmation_token ?inventory_offer_alt)
+        (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_available ?provisional_confirmation_token)
+        )
+      )
+  )
+  (:action create_provisional_confirmation_token_with_both_holds
+    :parameters (?customer_reservation - customer_reservation ?supplier_reservation - supplier_reservation ?inventory_offer - inventory_offer ?inventory_offer_alt - inventory_offer_alt ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (customer_reservation_links_inventory_offer ?customer_reservation ?inventory_offer)
+        (supplier_reservation_links_inventory_offer_alt ?supplier_reservation ?inventory_offer_alt)
+        (inventory_offer_held_by_supplier ?inventory_offer)
+        (inventory_offer_alt_held_by_supplier_secondary ?inventory_offer_alt)
+        (not
+          (customer_reservation_hold_confirmed ?customer_reservation)
+        )
+        (not
+          (supplier_reservation_hold_confirmed ?supplier_reservation)
+        )
+        (provisional_confirmation_token_available ?provisional_confirmation_token)
+      )
+    :effect
+      (and
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_links_inventory_offer ?provisional_confirmation_token ?inventory_offer)
+        (provisional_confirmation_token_links_inventory_offer_alt ?provisional_confirmation_token ?inventory_offer_alt)
+        (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_available ?provisional_confirmation_token)
+        )
+      )
+  )
+  (:action attach_payment_to_provisional_confirmation_token
+    :parameters (?provisional_confirmation_token - provisional_confirmation_token ?customer_reservation - customer_reservation ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (customer_reservation_hold_ready ?customer_reservation)
+        (reservation_links_payment_instrument ?customer_reservation ?payment_instrument)
+        (not
+          (provisional_confirmation_token_payment_attached ?provisional_confirmation_token)
+        )
+      )
+    :effect (provisional_confirmation_token_payment_attached ?provisional_confirmation_token)
+  )
+  (:action capture_payment_authorization
+    :parameters (?booking_record - booking_record ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (booking_record_links_provisional_confirmation_token ?booking_record ?provisional_confirmation_token)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_available ?payment_authorization)
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_payment_attached ?provisional_confirmation_token)
+        (not
+          (payment_authorization_bound_to_booking_record ?payment_authorization)
+        )
+      )
+    :effect
+      (and
+        (payment_authorization_bound_to_booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (not
+          (payment_authorization_available ?payment_authorization)
+        )
+      )
+  )
+  (:action bind_payment_authorization_to_booking_record
+    :parameters (?booking_record - booking_record ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_bound_to_booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (reservation_links_payment_instrument ?booking_record ?payment_instrument)
+        (not
+          (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        )
+        (not
+          (booking_record_payment_bound ?booking_record)
+        )
+      )
+    :effect (booking_record_payment_bound ?booking_record)
+  )
+  (:action attach_amendment_category_to_booking
+    :parameters (?booking_record - booking_record ?amendment_category - amendment_category)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (amendment_category_available ?amendment_category)
+        (not
+          (booking_record_links_amendment ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_links_amendment ?booking_record)
+        (booking_record_links_amendment_category ?booking_record ?amendment_category)
+        (not
+          (amendment_category_available ?amendment_category)
+        )
+      )
+  )
+  (:action apply_amendment_to_booking_after_payment
+    :parameters (?booking_record - booking_record ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token ?payment_instrument - payment_instrument ?amendment_category - amendment_category)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_bound_to_booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (reservation_links_payment_instrument ?booking_record ?payment_instrument)
+        (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        (booking_record_links_amendment ?booking_record)
+        (booking_record_links_amendment_category ?booking_record ?amendment_category)
+        (not
+          (booking_record_payment_bound ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_payment_bound ?booking_record)
+        (booking_record_amendment_applied ?booking_record)
+      )
+  )
+  (:action request_supplier_acknowledgement
+    :parameters (?booking_record - booking_record ?supplier_acknowledgement - supplier_acknowledgement ?service_agent - service_agent ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (booking_record_payment_bound ?booking_record)
+        (booking_record_links_supplier_acknowledgement ?booking_record ?supplier_acknowledgement)
+        (reservation_assigned_agent ?booking_record ?service_agent)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        )
+        (not
+          (supplier_acknowledgement_requested ?booking_record)
+        )
+      )
+    :effect (supplier_acknowledgement_requested ?booking_record)
+  )
+  (:action request_supplier_acknowledgement_retry
+    :parameters (?booking_record - booking_record ?supplier_acknowledgement - supplier_acknowledgement ?service_agent - service_agent ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (booking_record_payment_bound ?booking_record)
+        (booking_record_links_supplier_acknowledgement ?booking_record ?supplier_acknowledgement)
+        (reservation_assigned_agent ?booking_record ?service_agent)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        (not
+          (supplier_acknowledgement_requested ?booking_record)
+        )
+      )
+    :effect (supplier_acknowledgement_requested ?booking_record)
+  )
+  (:action confirm_supplier_acknowledgement
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (supplier_acknowledgement_requested ?booking_record)
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        )
+        (not
+          (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        )
+        (not
+          (supplier_acknowledgement_confirmed ?booking_record)
+        )
+      )
+    :effect (supplier_acknowledgement_confirmed ?booking_record)
+  )
+  (:action confirm_supplier_acknowledgement_and_apply_additional_confirmations
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (supplier_acknowledgement_requested ?booking_record)
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        )
+        (not
+          (supplier_acknowledgement_confirmed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_additional_confirmations_applied ?booking_record)
+      )
+  )
+  (:action confirm_supplier_acknowledgement_and_apply_additional_confirmations_variant
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (supplier_acknowledgement_requested ?booking_record)
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (not
+          (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        )
+        (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        (not
+          (supplier_acknowledgement_confirmed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_additional_confirmations_applied ?booking_record)
+      )
+  )
+  (:action confirm_supplier_acknowledgement_and_apply_additional_confirmations_all
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification ?payment_authorization - payment_authorization ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (supplier_acknowledgement_requested ?booking_record)
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (booking_record_links_payment_authorization ?booking_record ?payment_authorization)
+        (payment_authorization_links_provisional_confirmation_token ?payment_authorization ?provisional_confirmation_token)
+        (provisional_confirmation_token_amendment_pending ?provisional_confirmation_token)
+        (provisional_confirmation_token_ack_pending ?provisional_confirmation_token)
+        (not
+          (supplier_acknowledgement_confirmed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_additional_confirmations_applied ?booking_record)
+      )
+  )
+  (:action finalize_booking_record
+    :parameters (?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (not
+          (booking_record_additional_confirmations_applied ?booking_record)
+        )
+        (not
+          (booking_record_completed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_completed ?booking_record)
+        (entity_confirmed ?booking_record)
+      )
+  )
+  (:action attach_settlement_method_to_booking
+    :parameters (?booking_record - booking_record ?settlement_method - settlement_method)
+    :precondition
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_additional_confirmations_applied ?booking_record)
+        (settlement_method_available ?settlement_method)
+      )
+    :effect
+      (and
+        (booking_record_links_settlement_method ?booking_record ?settlement_method)
+        (not
+          (settlement_method_available ?settlement_method)
+        )
+      )
+  )
+  (:action run_final_checks_and_mark_record_ready
+    :parameters (?booking_record - booking_record ?customer_reservation - customer_reservation ?supplier_reservation - supplier_reservation ?payment_instrument - payment_instrument ?settlement_method - settlement_method)
+    :precondition
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_additional_confirmations_applied ?booking_record)
+        (booking_record_links_settlement_method ?booking_record ?settlement_method)
+        (booking_record_links_customer_reservation ?booking_record ?customer_reservation)
+        (booking_record_links_supplier_reservation ?booking_record ?supplier_reservation)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+        (reservation_links_payment_instrument ?booking_record ?payment_instrument)
+        (not
+          (booking_record_final_checks_passed ?booking_record)
+        )
+      )
+    :effect (booking_record_final_checks_passed ?booking_record)
+  )
+  (:action complete_booking_record
+    :parameters (?booking_record - booking_record)
+    :precondition
+      (and
+        (supplier_acknowledgement_confirmed ?booking_record)
+        (booking_record_final_checks_passed ?booking_record)
+        (not
+          (booking_record_completed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_completed ?booking_record)
+        (entity_confirmed ?booking_record)
+      )
+  )
+  (:action apply_loyalty_credential_to_booking
+    :parameters (?booking_record - booking_record ?loyalty_credential - loyalty_credential ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_active ?booking_record)
+        (reservation_links_payment_instrument ?booking_record ?payment_instrument)
+        (loyalty_credential_available ?loyalty_credential)
+        (booking_record_links_loyalty_credential ?booking_record ?loyalty_credential)
+        (not
+          (booking_record_loyalty_applied ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_loyalty_applied ?booking_record)
+        (not
+          (loyalty_credential_available ?loyalty_credential)
+        )
+      )
+  )
+  (:action assign_agent_for_loyalty_application
+    :parameters (?booking_record - booking_record ?service_agent - service_agent)
+    :precondition
+      (and
+        (booking_record_loyalty_applied ?booking_record)
+        (reservation_assigned_agent ?booking_record ?service_agent)
+        (not
+          (booking_record_loyalty_agent_assigned ?booking_record)
+        )
+      )
+    :effect (booking_record_loyalty_agent_assigned ?booking_record)
+  )
+  (:action verify_loyalty_with_third_party
+    :parameters (?booking_record - booking_record ?third_party_verification - third_party_verification)
+    :precondition
+      (and
+        (booking_record_loyalty_agent_assigned ?booking_record)
+        (booking_record_links_third_party_verification ?booking_record ?third_party_verification)
+        (not
+          (booking_record_loyalty_verified ?booking_record)
+        )
+      )
+    :effect (booking_record_loyalty_verified ?booking_record)
+  )
+  (:action finalize_loyalty_application
+    :parameters (?booking_record - booking_record)
+    :precondition
+      (and
+        (booking_record_loyalty_verified ?booking_record)
+        (not
+          (booking_record_completed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (booking_record_completed ?booking_record)
+        (entity_confirmed ?booking_record)
+      )
+  )
+  (:action finalize_customer_reservation_flag
+    :parameters (?customer_reservation - customer_reservation ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (customer_reservation_hold_ready ?customer_reservation)
+        (customer_reservation_hold_confirmed ?customer_reservation)
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_payment_attached ?provisional_confirmation_token)
+        (not
+          (entity_confirmed ?customer_reservation)
+        )
+      )
+    :effect (entity_confirmed ?customer_reservation)
+  )
+  (:action finalize_supplier_reservation_flag
+    :parameters (?supplier_reservation - supplier_reservation ?provisional_confirmation_token - provisional_confirmation_token)
+    :precondition
+      (and
+        (supplier_reservation_hold_ready ?supplier_reservation)
+        (supplier_reservation_hold_confirmed ?supplier_reservation)
+        (provisional_confirmation_token_created ?provisional_confirmation_token)
+        (provisional_confirmation_token_payment_attached ?provisional_confirmation_token)
+        (not
+          (entity_confirmed ?supplier_reservation)
+        )
+      )
+    :effect (entity_confirmed ?supplier_reservation)
+  )
+  (:action issue_cancellation_authorization_for_entity
+    :parameters (?reservation_entity - reservation_entity ?cancellation_authorization - cancellation_authorization ?payment_instrument - payment_instrument)
+    :precondition
+      (and
+        (entity_confirmed ?reservation_entity)
+        (reservation_links_payment_instrument ?reservation_entity ?payment_instrument)
+        (cancellation_authorization_available ?cancellation_authorization)
+        (not
+          (cancellation_authorization_issued ?reservation_entity)
+        )
+      )
+    :effect
+      (and
+        (cancellation_authorization_issued ?reservation_entity)
+        (reservation_links_cancellation_authorization ?reservation_entity ?cancellation_authorization)
+        (not
+          (cancellation_authorization_available ?cancellation_authorization)
+        )
+      )
+  )
+  (:action commit_cancellation_to_customer_reservation
+    :parameters (?customer_reservation - customer_reservation ?rate_plan_option - rate_plan_option ?cancellation_authorization - cancellation_authorization)
+    :precondition
+      (and
+        (cancellation_authorization_issued ?customer_reservation)
+        (reservation_links_rate_plan_option ?customer_reservation ?rate_plan_option)
+        (reservation_links_cancellation_authorization ?customer_reservation ?cancellation_authorization)
+        (not
+          (cancellation_committed ?customer_reservation)
+        )
+      )
+    :effect
+      (and
+        (cancellation_committed ?customer_reservation)
+        (rate_plan_option_available ?rate_plan_option)
+        (cancellation_authorization_available ?cancellation_authorization)
+      )
+  )
+  (:action commit_cancellation_to_supplier_reservation
+    :parameters (?supplier_reservation - supplier_reservation ?rate_plan_option - rate_plan_option ?cancellation_authorization - cancellation_authorization)
+    :precondition
+      (and
+        (cancellation_authorization_issued ?supplier_reservation)
+        (reservation_links_rate_plan_option ?supplier_reservation ?rate_plan_option)
+        (reservation_links_cancellation_authorization ?supplier_reservation ?cancellation_authorization)
+        (not
+          (cancellation_committed ?supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (cancellation_committed ?supplier_reservation)
+        (rate_plan_option_available ?rate_plan_option)
+        (cancellation_authorization_available ?cancellation_authorization)
+      )
+  )
+  (:action commit_cancellation_to_booking_record
+    :parameters (?booking_record - booking_record ?rate_plan_option - rate_plan_option ?cancellation_authorization - cancellation_authorization)
+    :precondition
+      (and
+        (cancellation_authorization_issued ?booking_record)
+        (reservation_links_rate_plan_option ?booking_record ?rate_plan_option)
+        (reservation_links_cancellation_authorization ?booking_record ?cancellation_authorization)
+        (not
+          (cancellation_committed ?booking_record)
+        )
+      )
+    :effect
+      (and
+        (cancellation_committed ?booking_record)
+        (rate_plan_option_available ?rate_plan_option)
+        (cancellation_authorization_available ?cancellation_authorization)
+      )
+  )
+)

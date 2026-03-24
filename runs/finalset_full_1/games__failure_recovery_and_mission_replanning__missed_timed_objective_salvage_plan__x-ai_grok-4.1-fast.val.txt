@@ -1,0 +1,1075 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain missed_timed_objective_salvage_plan)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object asset_or_role_category - entity item_category - entity domain_resource - entity objective_container - entity mission_objective - objective_container deployable_asset - asset_or_role_category route_option - asset_or_role_category specialist - asset_or_role_category tactic_token - asset_or_role_category upgrade_module - asset_or_role_category time_credit - asset_or_role_category equipment_modifier - asset_or_role_category override_flag - asset_or_role_category consumable_item - item_category mission_fragment - item_category commander_token - item_category route_segment - domain_resource time_window - domain_resource salvage_package - domain_resource objective_variant - mission_objective objective_branch - mission_objective alpha_unit - objective_variant bravo_unit - objective_variant replan_module - objective_branch)
+
+  (:predicates
+    (mission_entity_registered ?objective - mission_objective)
+    (mission_entity_active ?objective - mission_objective)
+    (mission_entity_has_asset ?objective - mission_objective)
+    (continuation_ready ?objective - mission_objective)
+    (continuation_authorized ?objective - mission_objective)
+    (mission_entity_reinstated ?objective - mission_objective)
+    (asset_available ?asset - deployable_asset)
+    (asset_assigned ?objective - mission_objective ?asset - deployable_asset)
+    (route_option_available ?route_option - route_option)
+    (route_assigned ?objective - mission_objective ?route_option - route_option)
+    (specialist_available ?specialist - specialist)
+    (specialist_assigned ?objective - mission_objective ?specialist - specialist)
+    (consumable_available ?consumable - consumable_item)
+    (consumable_allocated_alpha ?alpha_unit - alpha_unit ?consumable - consumable_item)
+    (consumable_allocated_bravo ?bravo_unit - bravo_unit ?consumable - consumable_item)
+    (unit_staged_on_segment ?alpha_unit - alpha_unit ?route_segment - route_segment)
+    (segment_ready ?route_segment - route_segment)
+    (segment_prepared ?route_segment - route_segment)
+    (alpha_unit_ready ?alpha_unit - alpha_unit)
+    (bravo_unit_timewindow_assigned ?bravo_unit - bravo_unit ?time_window - time_window)
+    (time_window_ready ?time_window - time_window)
+    (time_window_prepared ?time_window - time_window)
+    (bravo_unit_ready ?bravo_unit - bravo_unit)
+    (package_available ?salvage_package - salvage_package)
+    (package_prepared ?salvage_package - salvage_package)
+    (package_includes_segment ?salvage_package - salvage_package ?route_segment - route_segment)
+    (package_includes_timewindow ?salvage_package - salvage_package ?time_window - time_window)
+    (package_primary_marker ?salvage_package - salvage_package)
+    (package_secondary_marker ?salvage_package - salvage_package)
+    (package_verified ?salvage_package - salvage_package)
+    (module_assigned_alpha_unit ?replan_module - replan_module ?alpha_unit - alpha_unit)
+    (module_assigned_bravo_unit ?replan_module - replan_module ?bravo_unit - bravo_unit)
+    (module_has_package ?replan_module - replan_module ?salvage_package - salvage_package)
+    (fragment_available ?mission_fragment - mission_fragment)
+    (module_has_fragment ?replan_module - replan_module ?mission_fragment - mission_fragment)
+    (fragment_reserved ?mission_fragment - mission_fragment)
+    (fragment_attached_to_package ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    (module_fragment_processed ?replan_module - replan_module)
+    (module_modifier_applied ?replan_module - replan_module)
+    (module_ready_for_validation ?replan_module - replan_module)
+    (module_tactic_locked ?replan_module - replan_module)
+    (module_tactic_engaged ?replan_module - replan_module)
+    (module_has_upgrade ?replan_module - replan_module)
+    (module_finalized ?replan_module - replan_module)
+    (commander_token_available ?commander_token - commander_token)
+    (module_has_commander_token ?replan_module - replan_module ?commander_token - commander_token)
+    (module_commander_engaged ?replan_module - replan_module)
+    (module_commander_acknowledged ?replan_module - replan_module)
+    (module_commander_validated ?replan_module - replan_module)
+    (tactic_token_available ?tactic_token - tactic_token)
+    (module_has_tactic ?replan_module - replan_module ?tactic_token - tactic_token)
+    (upgrade_module_available ?upgrade_module - upgrade_module)
+    (module_has_upgrade_module ?replan_module - replan_module ?upgrade_module - upgrade_module)
+    (equipment_modifier_available ?equipment_modifier - equipment_modifier)
+    (module_has_equipment_modifier ?replan_module - replan_module ?equipment_modifier - equipment_modifier)
+    (override_flag_available ?override_flag - override_flag)
+    (module_override_applied ?replan_module - replan_module ?override_flag - override_flag)
+    (time_credit_available ?time_credit - time_credit)
+    (mission_entity_has_time_credit ?objective - mission_objective ?time_credit - time_credit)
+    (alpha_unit_stage_flag ?alpha_unit - alpha_unit)
+    (bravo_unit_stage_flag ?bravo_unit - bravo_unit)
+    (module_committed ?replan_module - replan_module)
+  )
+  (:action register_missed_objective
+    :parameters (?objective - mission_objective)
+    :precondition
+      (and
+        (not
+          (mission_entity_registered ?objective)
+        )
+        (not
+          (continuation_ready ?objective)
+        )
+      )
+    :effect (mission_entity_registered ?objective)
+  )
+  (:action claim_asset_for_objective
+    :parameters (?objective - mission_objective ?asset - deployable_asset)
+    :precondition
+      (and
+        (mission_entity_registered ?objective)
+        (not
+          (mission_entity_has_asset ?objective)
+        )
+        (asset_available ?asset)
+      )
+    :effect
+      (and
+        (mission_entity_has_asset ?objective)
+        (asset_assigned ?objective ?asset)
+        (not
+          (asset_available ?asset)
+        )
+      )
+  )
+  (:action bind_route_option_to_objective
+    :parameters (?objective - mission_objective ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_registered ?objective)
+        (mission_entity_has_asset ?objective)
+        (route_option_available ?route_option)
+      )
+    :effect
+      (and
+        (route_assigned ?objective ?route_option)
+        (not
+          (route_option_available ?route_option)
+        )
+      )
+  )
+  (:action activate_objective_for_recovery
+    :parameters (?objective - mission_objective ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_registered ?objective)
+        (mission_entity_has_asset ?objective)
+        (route_assigned ?objective ?route_option)
+        (not
+          (mission_entity_active ?objective)
+        )
+      )
+    :effect (mission_entity_active ?objective)
+  )
+  (:action release_route_option
+    :parameters (?objective - mission_objective ?route_option - route_option)
+    :precondition
+      (and
+        (route_assigned ?objective ?route_option)
+      )
+    :effect
+      (and
+        (route_option_available ?route_option)
+        (not
+          (route_assigned ?objective ?route_option)
+        )
+      )
+  )
+  (:action attach_specialist_to_objective
+    :parameters (?objective - mission_objective ?specialist - specialist)
+    :precondition
+      (and
+        (mission_entity_active ?objective)
+        (specialist_available ?specialist)
+      )
+    :effect
+      (and
+        (specialist_assigned ?objective ?specialist)
+        (not
+          (specialist_available ?specialist)
+        )
+      )
+  )
+  (:action detach_specialist_from_objective
+    :parameters (?objective - mission_objective ?specialist - specialist)
+    :precondition
+      (and
+        (specialist_assigned ?objective ?specialist)
+      )
+    :effect
+      (and
+        (specialist_available ?specialist)
+        (not
+          (specialist_assigned ?objective ?specialist)
+        )
+      )
+  )
+  (:action install_equipment_modifier_on_replan_module
+    :parameters (?replan_module - replan_module ?equipment_modifier - equipment_modifier)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (equipment_modifier_available ?equipment_modifier)
+      )
+    :effect
+      (and
+        (module_has_equipment_modifier ?replan_module ?equipment_modifier)
+        (not
+          (equipment_modifier_available ?equipment_modifier)
+        )
+      )
+  )
+  (:action remove_equipment_modifier_from_replan_module
+    :parameters (?replan_module - replan_module ?equipment_modifier - equipment_modifier)
+    :precondition
+      (and
+        (module_has_equipment_modifier ?replan_module ?equipment_modifier)
+      )
+    :effect
+      (and
+        (equipment_modifier_available ?equipment_modifier)
+        (not
+          (module_has_equipment_modifier ?replan_module ?equipment_modifier)
+        )
+      )
+  )
+  (:action apply_override_flag_to_replan_module
+    :parameters (?replan_module - replan_module ?override_flag - override_flag)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (override_flag_available ?override_flag)
+      )
+    :effect
+      (and
+        (module_override_applied ?replan_module ?override_flag)
+        (not
+          (override_flag_available ?override_flag)
+        )
+      )
+  )
+  (:action remove_override_flag_from_replan_module
+    :parameters (?replan_module - replan_module ?override_flag - override_flag)
+    :precondition
+      (and
+        (module_override_applied ?replan_module ?override_flag)
+      )
+    :effect
+      (and
+        (override_flag_available ?override_flag)
+        (not
+          (module_override_applied ?replan_module ?override_flag)
+        )
+      )
+  )
+  (:action scout_route_segment
+    :parameters (?alpha_unit - alpha_unit ?route_segment - route_segment ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_active ?alpha_unit)
+        (route_assigned ?alpha_unit ?route_option)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (not
+          (segment_ready ?route_segment)
+        )
+        (not
+          (segment_prepared ?route_segment)
+        )
+      )
+    :effect (segment_ready ?route_segment)
+  )
+  (:action assign_specialist_and_stage_unit
+    :parameters (?alpha_unit - alpha_unit ?route_segment - route_segment ?specialist - specialist)
+    :precondition
+      (and
+        (mission_entity_active ?alpha_unit)
+        (specialist_assigned ?alpha_unit ?specialist)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (segment_ready ?route_segment)
+        (not
+          (alpha_unit_stage_flag ?alpha_unit)
+        )
+      )
+    :effect
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (alpha_unit_ready ?alpha_unit)
+      )
+  )
+  (:action allocate_consumable_to_unit_and_prepare_segment
+    :parameters (?alpha_unit - alpha_unit ?route_segment - route_segment ?consumable - consumable_item)
+    :precondition
+      (and
+        (mission_entity_active ?alpha_unit)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (consumable_available ?consumable)
+        (not
+          (alpha_unit_stage_flag ?alpha_unit)
+        )
+      )
+    :effect
+      (and
+        (segment_prepared ?route_segment)
+        (alpha_unit_stage_flag ?alpha_unit)
+        (consumable_allocated_alpha ?alpha_unit ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action confirm_segment_with_consumable
+    :parameters (?alpha_unit - alpha_unit ?route_segment - route_segment ?route_option - route_option ?consumable - consumable_item)
+    :precondition
+      (and
+        (mission_entity_active ?alpha_unit)
+        (route_assigned ?alpha_unit ?route_option)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (segment_prepared ?route_segment)
+        (consumable_allocated_alpha ?alpha_unit ?consumable)
+        (not
+          (alpha_unit_ready ?alpha_unit)
+        )
+      )
+    :effect
+      (and
+        (segment_ready ?route_segment)
+        (alpha_unit_ready ?alpha_unit)
+        (consumable_available ?consumable)
+        (not
+          (consumable_allocated_alpha ?alpha_unit ?consumable)
+        )
+      )
+  )
+  (:action scout_route_segment_bravo
+    :parameters (?bravo_unit - bravo_unit ?time_window - time_window ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_active ?bravo_unit)
+        (route_assigned ?bravo_unit ?route_option)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (not
+          (time_window_ready ?time_window)
+        )
+        (not
+          (time_window_prepared ?time_window)
+        )
+      )
+    :effect (time_window_ready ?time_window)
+  )
+  (:action assign_specialist_and_stage_bravo_unit
+    :parameters (?bravo_unit - bravo_unit ?time_window - time_window ?specialist - specialist)
+    :precondition
+      (and
+        (mission_entity_active ?bravo_unit)
+        (specialist_assigned ?bravo_unit ?specialist)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (time_window_ready ?time_window)
+        (not
+          (bravo_unit_stage_flag ?bravo_unit)
+        )
+      )
+    :effect
+      (and
+        (bravo_unit_stage_flag ?bravo_unit)
+        (bravo_unit_ready ?bravo_unit)
+      )
+  )
+  (:action allocate_consumable_to_bravo_and_prepare_timewindow
+    :parameters (?bravo_unit - bravo_unit ?time_window - time_window ?consumable - consumable_item)
+    :precondition
+      (and
+        (mission_entity_active ?bravo_unit)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (consumable_available ?consumable)
+        (not
+          (bravo_unit_stage_flag ?bravo_unit)
+        )
+      )
+    :effect
+      (and
+        (time_window_prepared ?time_window)
+        (bravo_unit_stage_flag ?bravo_unit)
+        (consumable_allocated_bravo ?bravo_unit ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action confirm_timewindow_with_consumable
+    :parameters (?bravo_unit - bravo_unit ?time_window - time_window ?route_option - route_option ?consumable - consumable_item)
+    :precondition
+      (and
+        (mission_entity_active ?bravo_unit)
+        (route_assigned ?bravo_unit ?route_option)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (time_window_prepared ?time_window)
+        (consumable_allocated_bravo ?bravo_unit ?consumable)
+        (not
+          (bravo_unit_ready ?bravo_unit)
+        )
+      )
+    :effect
+      (and
+        (time_window_ready ?time_window)
+        (bravo_unit_ready ?bravo_unit)
+        (consumable_available ?consumable)
+        (not
+          (consumable_allocated_bravo ?bravo_unit ?consumable)
+        )
+      )
+  )
+  (:action assemble_salvage_package
+    :parameters (?alpha_unit - alpha_unit ?bravo_unit - bravo_unit ?route_segment - route_segment ?time_window - time_window ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (bravo_unit_stage_flag ?bravo_unit)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (segment_ready ?route_segment)
+        (time_window_ready ?time_window)
+        (alpha_unit_ready ?alpha_unit)
+        (bravo_unit_ready ?bravo_unit)
+        (package_available ?salvage_package)
+      )
+    :effect
+      (and
+        (package_prepared ?salvage_package)
+        (package_includes_segment ?salvage_package ?route_segment)
+        (package_includes_timewindow ?salvage_package ?time_window)
+        (not
+          (package_available ?salvage_package)
+        )
+      )
+  )
+  (:action assemble_salvage_package_with_primary_marker
+    :parameters (?alpha_unit - alpha_unit ?bravo_unit - bravo_unit ?route_segment - route_segment ?time_window - time_window ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (bravo_unit_stage_flag ?bravo_unit)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (segment_prepared ?route_segment)
+        (time_window_ready ?time_window)
+        (not
+          (alpha_unit_ready ?alpha_unit)
+        )
+        (bravo_unit_ready ?bravo_unit)
+        (package_available ?salvage_package)
+      )
+    :effect
+      (and
+        (package_prepared ?salvage_package)
+        (package_includes_segment ?salvage_package ?route_segment)
+        (package_includes_timewindow ?salvage_package ?time_window)
+        (package_primary_marker ?salvage_package)
+        (not
+          (package_available ?salvage_package)
+        )
+      )
+  )
+  (:action assemble_salvage_package_with_secondary_marker
+    :parameters (?alpha_unit - alpha_unit ?bravo_unit - bravo_unit ?route_segment - route_segment ?time_window - time_window ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (bravo_unit_stage_flag ?bravo_unit)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (segment_ready ?route_segment)
+        (time_window_prepared ?time_window)
+        (alpha_unit_ready ?alpha_unit)
+        (not
+          (bravo_unit_ready ?bravo_unit)
+        )
+        (package_available ?salvage_package)
+      )
+    :effect
+      (and
+        (package_prepared ?salvage_package)
+        (package_includes_segment ?salvage_package ?route_segment)
+        (package_includes_timewindow ?salvage_package ?time_window)
+        (package_secondary_marker ?salvage_package)
+        (not
+          (package_available ?salvage_package)
+        )
+      )
+  )
+  (:action assemble_salvage_package_with_full_markers
+    :parameters (?alpha_unit - alpha_unit ?bravo_unit - bravo_unit ?route_segment - route_segment ?time_window - time_window ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (bravo_unit_stage_flag ?bravo_unit)
+        (unit_staged_on_segment ?alpha_unit ?route_segment)
+        (bravo_unit_timewindow_assigned ?bravo_unit ?time_window)
+        (segment_prepared ?route_segment)
+        (time_window_prepared ?time_window)
+        (not
+          (alpha_unit_ready ?alpha_unit)
+        )
+        (not
+          (bravo_unit_ready ?bravo_unit)
+        )
+        (package_available ?salvage_package)
+      )
+    :effect
+      (and
+        (package_prepared ?salvage_package)
+        (package_includes_segment ?salvage_package ?route_segment)
+        (package_includes_timewindow ?salvage_package ?time_window)
+        (package_primary_marker ?salvage_package)
+        (package_secondary_marker ?salvage_package)
+        (not
+          (package_available ?salvage_package)
+        )
+      )
+  )
+  (:action verify_package_by_unit
+    :parameters (?salvage_package - salvage_package ?alpha_unit - alpha_unit ?route_option - route_option)
+    :precondition
+      (and
+        (package_prepared ?salvage_package)
+        (alpha_unit_stage_flag ?alpha_unit)
+        (route_assigned ?alpha_unit ?route_option)
+        (not
+          (package_verified ?salvage_package)
+        )
+      )
+    :effect (package_verified ?salvage_package)
+  )
+  (:action reserve_and_attach_fragment
+    :parameters (?replan_module - replan_module ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (module_has_package ?replan_module ?salvage_package)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_available ?mission_fragment)
+        (package_prepared ?salvage_package)
+        (package_verified ?salvage_package)
+        (not
+          (fragment_reserved ?mission_fragment)
+        )
+      )
+    :effect
+      (and
+        (fragment_reserved ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (not
+          (fragment_available ?mission_fragment)
+        )
+      )
+  )
+  (:action process_fragment_in_replan_module
+    :parameters (?replan_module - replan_module ?mission_fragment - mission_fragment ?salvage_package - salvage_package ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_reserved ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (route_assigned ?replan_module ?route_option)
+        (not
+          (package_primary_marker ?salvage_package)
+        )
+        (not
+          (module_fragment_processed ?replan_module)
+        )
+      )
+    :effect (module_fragment_processed ?replan_module)
+  )
+  (:action install_tactic_token_on_replan_module
+    :parameters (?replan_module - replan_module ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (tactic_token_available ?tactic_token)
+        (not
+          (module_tactic_locked ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_tactic_locked ?replan_module)
+        (module_has_tactic ?replan_module ?tactic_token)
+        (not
+          (tactic_token_available ?tactic_token)
+        )
+      )
+  )
+  (:action engage_tactic_on_replan_module
+    :parameters (?replan_module - replan_module ?mission_fragment - mission_fragment ?salvage_package - salvage_package ?route_option - route_option ?tactic_token - tactic_token)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_reserved ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (route_assigned ?replan_module ?route_option)
+        (package_primary_marker ?salvage_package)
+        (module_tactic_locked ?replan_module)
+        (module_has_tactic ?replan_module ?tactic_token)
+        (not
+          (module_fragment_processed ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_fragment_processed ?replan_module)
+        (module_tactic_engaged ?replan_module)
+      )
+  )
+  (:action apply_modifier_to_replan_module
+    :parameters (?replan_module - replan_module ?equipment_modifier - equipment_modifier ?specialist - specialist ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_fragment_processed ?replan_module)
+        (module_has_equipment_modifier ?replan_module ?equipment_modifier)
+        (specialist_assigned ?replan_module ?specialist)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (not
+          (package_secondary_marker ?salvage_package)
+        )
+        (not
+          (module_modifier_applied ?replan_module)
+        )
+      )
+    :effect (module_modifier_applied ?replan_module)
+  )
+  (:action confirm_modifier_on_replan_module
+    :parameters (?replan_module - replan_module ?equipment_modifier - equipment_modifier ?specialist - specialist ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_fragment_processed ?replan_module)
+        (module_has_equipment_modifier ?replan_module ?equipment_modifier)
+        (specialist_assigned ?replan_module ?specialist)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (package_secondary_marker ?salvage_package)
+        (not
+          (module_modifier_applied ?replan_module)
+        )
+      )
+    :effect (module_modifier_applied ?replan_module)
+  )
+  (:action initiate_replan_module_validation
+    :parameters (?replan_module - replan_module ?override_flag - override_flag ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_modifier_applied ?replan_module)
+        (module_override_applied ?replan_module ?override_flag)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (not
+          (package_primary_marker ?salvage_package)
+        )
+        (not
+          (package_secondary_marker ?salvage_package)
+        )
+        (not
+          (module_ready_for_validation ?replan_module)
+        )
+      )
+    :effect (module_ready_for_validation ?replan_module)
+  )
+  (:action initiate_replan_module_validation_with_upgrade
+    :parameters (?replan_module - replan_module ?override_flag - override_flag ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_modifier_applied ?replan_module)
+        (module_override_applied ?replan_module ?override_flag)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (package_primary_marker ?salvage_package)
+        (not
+          (package_secondary_marker ?salvage_package)
+        )
+        (not
+          (module_ready_for_validation ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_has_upgrade ?replan_module)
+      )
+  )
+  (:action finalize_replan_module_validation_with_alternate_marker
+    :parameters (?replan_module - replan_module ?override_flag - override_flag ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_modifier_applied ?replan_module)
+        (module_override_applied ?replan_module ?override_flag)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (not
+          (package_primary_marker ?salvage_package)
+        )
+        (package_secondary_marker ?salvage_package)
+        (not
+          (module_ready_for_validation ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_has_upgrade ?replan_module)
+      )
+  )
+  (:action finalize_replan_module_validation_full
+    :parameters (?replan_module - replan_module ?override_flag - override_flag ?mission_fragment - mission_fragment ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (module_modifier_applied ?replan_module)
+        (module_override_applied ?replan_module ?override_flag)
+        (module_has_fragment ?replan_module ?mission_fragment)
+        (fragment_attached_to_package ?mission_fragment ?salvage_package)
+        (package_primary_marker ?salvage_package)
+        (package_secondary_marker ?salvage_package)
+        (not
+          (module_ready_for_validation ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_has_upgrade ?replan_module)
+      )
+  )
+  (:action commit_replan_module_for_continuation
+    :parameters (?replan_module - replan_module)
+    :precondition
+      (and
+        (module_ready_for_validation ?replan_module)
+        (not
+          (module_has_upgrade ?replan_module)
+        )
+        (not
+          (module_committed ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_committed ?replan_module)
+        (continuation_authorized ?replan_module)
+      )
+  )
+  (:action install_upgrade_on_replan_module
+    :parameters (?replan_module - replan_module ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_has_upgrade ?replan_module)
+        (upgrade_module_available ?upgrade_module)
+      )
+    :effect
+      (and
+        (module_has_upgrade_module ?replan_module ?upgrade_module)
+        (not
+          (upgrade_module_available ?upgrade_module)
+        )
+      )
+  )
+  (:action integrate_fragments_into_replan_module
+    :parameters (?replan_module - replan_module ?alpha_unit - alpha_unit ?bravo_unit - bravo_unit ?route_option - route_option ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_has_upgrade ?replan_module)
+        (module_has_upgrade_module ?replan_module ?upgrade_module)
+        (module_assigned_alpha_unit ?replan_module ?alpha_unit)
+        (module_assigned_bravo_unit ?replan_module ?bravo_unit)
+        (alpha_unit_ready ?alpha_unit)
+        (bravo_unit_ready ?bravo_unit)
+        (route_assigned ?replan_module ?route_option)
+        (not
+          (module_finalized ?replan_module)
+        )
+      )
+    :effect (module_finalized ?replan_module)
+  )
+  (:action finalize_replan_module_and_authorize_continuation
+    :parameters (?replan_module - replan_module)
+    :precondition
+      (and
+        (module_ready_for_validation ?replan_module)
+        (module_finalized ?replan_module)
+        (not
+          (module_committed ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_committed ?replan_module)
+        (continuation_authorized ?replan_module)
+      )
+  )
+  (:action engage_commander_token_on_replan_module
+    :parameters (?replan_module - replan_module ?commander_token - commander_token ?route_option - route_option)
+    :precondition
+      (and
+        (mission_entity_active ?replan_module)
+        (route_assigned ?replan_module ?route_option)
+        (commander_token_available ?commander_token)
+        (module_has_commander_token ?replan_module ?commander_token)
+        (not
+          (module_commander_engaged ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_commander_engaged ?replan_module)
+        (not
+          (commander_token_available ?commander_token)
+        )
+      )
+  )
+  (:action acknowledge_commander_on_replan_module
+    :parameters (?replan_module - replan_module ?specialist - specialist)
+    :precondition
+      (and
+        (module_commander_engaged ?replan_module)
+        (specialist_assigned ?replan_module ?specialist)
+        (not
+          (module_commander_acknowledged ?replan_module)
+        )
+      )
+    :effect (module_commander_acknowledged ?replan_module)
+  )
+  (:action validate_override_flag
+    :parameters (?replan_module - replan_module ?override_flag - override_flag)
+    :precondition
+      (and
+        (module_commander_acknowledged ?replan_module)
+        (module_override_applied ?replan_module ?override_flag)
+        (not
+          (module_commander_validated ?replan_module)
+        )
+      )
+    :effect (module_commander_validated ?replan_module)
+  )
+  (:action commit_replan_module_commander
+    :parameters (?replan_module - replan_module)
+    :precondition
+      (and
+        (module_commander_validated ?replan_module)
+        (not
+          (module_committed ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (module_committed ?replan_module)
+        (continuation_authorized ?replan_module)
+      )
+  )
+  (:action authorize_alpha_unit_for_continuation
+    :parameters (?alpha_unit - alpha_unit ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (alpha_unit_stage_flag ?alpha_unit)
+        (alpha_unit_ready ?alpha_unit)
+        (package_prepared ?salvage_package)
+        (package_verified ?salvage_package)
+        (not
+          (continuation_authorized ?alpha_unit)
+        )
+      )
+    :effect (continuation_authorized ?alpha_unit)
+  )
+  (:action authorize_bravo_unit_for_continuation
+    :parameters (?bravo_unit - bravo_unit ?salvage_package - salvage_package)
+    :precondition
+      (and
+        (bravo_unit_stage_flag ?bravo_unit)
+        (bravo_unit_ready ?bravo_unit)
+        (package_prepared ?salvage_package)
+        (package_verified ?salvage_package)
+        (not
+          (continuation_authorized ?bravo_unit)
+        )
+      )
+    :effect (continuation_authorized ?bravo_unit)
+  )
+  (:action consume_time_credit_and_reinstate_objective
+    :parameters (?objective - mission_objective ?time_credit - time_credit ?route_option - route_option)
+    :precondition
+      (and
+        (continuation_authorized ?objective)
+        (route_assigned ?objective ?route_option)
+        (time_credit_available ?time_credit)
+        (not
+          (mission_entity_reinstated ?objective)
+        )
+      )
+    :effect
+      (and
+        (mission_entity_reinstated ?objective)
+        (mission_entity_has_time_credit ?objective ?time_credit)
+        (not
+          (time_credit_available ?time_credit)
+        )
+      )
+  )
+  (:action reassign_asset_and_redeploy_alpha_unit
+    :parameters (?alpha_unit - alpha_unit ?asset - deployable_asset ?time_credit - time_credit)
+    :precondition
+      (and
+        (mission_entity_reinstated ?alpha_unit)
+        (asset_assigned ?alpha_unit ?asset)
+        (mission_entity_has_time_credit ?alpha_unit ?time_credit)
+        (not
+          (continuation_ready ?alpha_unit)
+        )
+      )
+    :effect
+      (and
+        (continuation_ready ?alpha_unit)
+        (asset_available ?asset)
+        (time_credit_available ?time_credit)
+      )
+  )
+  (:action reassign_asset_and_redeploy_bravo_unit
+    :parameters (?bravo_unit - bravo_unit ?asset - deployable_asset ?time_credit - time_credit)
+    :precondition
+      (and
+        (mission_entity_reinstated ?bravo_unit)
+        (asset_assigned ?bravo_unit ?asset)
+        (mission_entity_has_time_credit ?bravo_unit ?time_credit)
+        (not
+          (continuation_ready ?bravo_unit)
+        )
+      )
+    :effect
+      (and
+        (continuation_ready ?bravo_unit)
+        (asset_available ?asset)
+        (time_credit_available ?time_credit)
+      )
+  )
+  (:action reassign_asset_and_redeploy_replan_module
+    :parameters (?replan_module - replan_module ?asset - deployable_asset ?time_credit - time_credit)
+    :precondition
+      (and
+        (mission_entity_reinstated ?replan_module)
+        (asset_assigned ?replan_module ?asset)
+        (mission_entity_has_time_credit ?replan_module ?time_credit)
+        (not
+          (continuation_ready ?replan_module)
+        )
+      )
+    :effect
+      (and
+        (continuation_ready ?replan_module)
+        (asset_available ?asset)
+        (time_credit_available ?time_credit)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem missed_timed_objective_salvage_scenario)
+  (:domain missed_timed_objective_salvage_plan)
+  (:objects alpha_unit_1 - alpha_unit bravo_unit_1 - bravo_unit replan_module_primary - replan_module replan_module_secondary - replan_module extraction_beacon_1 - deployable_asset transport_vehicle_1 - deployable_asset docking_buoy_1 - deployable_asset route_option_1 - route_option specialist_engineer_1 - specialist repair_kit_1 - consumable_item route_segment_a - route_segment time_window_alpha - time_window salvage_package_1 - salvage_package fragment_a - mission_fragment fragment_b - mission_fragment tactic_token_a - tactic_token tactic_token_b - tactic_token upgrade_module_a - upgrade_module upgrade_module_b - upgrade_module time_credit_1 - time_credit equipment_modifier_1 - equipment_modifier commander_token_a - commander_token commander_token_b - commander_token override_flag_1 - override_flag)
+  (:init
+    (asset_available extraction_beacon_1)
+    (asset_available transport_vehicle_1)
+    (asset_available docking_buoy_1)
+    (route_option_available route_option_1)
+    (specialist_available specialist_engineer_1)
+    (consumable_available repair_kit_1)
+    (unit_staged_on_segment alpha_unit_1 route_segment_a)
+    (bravo_unit_timewindow_assigned bravo_unit_1 time_window_alpha)
+    (package_available salvage_package_1)
+    (fragment_available fragment_a)
+    (fragment_available fragment_b)
+    (module_assigned_alpha_unit replan_module_primary alpha_unit_1)
+    (module_assigned_alpha_unit replan_module_secondary alpha_unit_1)
+    (module_assigned_bravo_unit replan_module_primary bravo_unit_1)
+    (module_assigned_bravo_unit replan_module_secondary bravo_unit_1)
+    (module_has_package replan_module_primary salvage_package_1)
+    (module_has_package replan_module_secondary salvage_package_1)
+    (module_has_fragment replan_module_primary fragment_a)
+    (module_has_fragment replan_module_secondary fragment_b)
+    (tactic_token_available tactic_token_a)
+    (tactic_token_available tactic_token_b)
+    (upgrade_module_available upgrade_module_a)
+    (upgrade_module_available upgrade_module_b)
+    (time_credit_available time_credit_1)
+    (equipment_modifier_available equipment_modifier_1)
+    (commander_token_available commander_token_a)
+    (module_has_commander_token replan_module_primary commander_token_a)
+    (module_has_commander_token replan_module_secondary commander_token_b)
+    (override_flag_available override_flag_1)
+  )
+  (:goal
+    (and
+      (continuation_ready alpha_unit_1)
+      (continuation_ready bravo_unit_1)
+      (continuation_ready replan_module_primary)
+      (continuation_ready replan_module_secondary)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_missed_objective alpha_unit_1)
+(claim_asset_for_objective alpha_unit_1 extraction_beacon_1)
+(bind_route_option_to_objective alpha_unit_1 route_option_1)
+(activate_objective_for_recovery alpha_unit_1 route_option_1)
+(scout_route_segment alpha_unit_1 route_segment_a route_option_1)
+(attach_specialist_to_objective alpha_unit_1 specialist_engineer_1)
+(assign_specialist_and_stage_unit alpha_unit_1 route_segment_a specialist_engineer_1)
+(detach_specialist_from_objective alpha_unit_1 specialist_engineer_1)
+(register_missed_objective bravo_unit_1)
+(claim_asset_for_objective bravo_unit_1 transport_vehicle_1)
+(release_route_option alpha_unit_1 route_option_1)
+(bind_route_option_to_objective bravo_unit_1 route_option_1)
+(activate_objective_for_recovery bravo_unit_1 route_option_1)
+(scout_route_segment_bravo bravo_unit_1 time_window_alpha route_option_1)
+(attach_specialist_to_objective bravo_unit_1 specialist_engineer_1)
+(assign_specialist_and_stage_bravo_unit bravo_unit_1 time_window_alpha specialist_engineer_1)
+(detach_specialist_from_objective bravo_unit_1 specialist_engineer_1)
+(assemble_salvage_package alpha_unit_1 bravo_unit_1 route_segment_a time_window_alpha salvage_package_1)
+(release_route_option bravo_unit_1 route_option_1)
+(bind_route_option_to_objective alpha_unit_1 route_option_1)
+(verify_package_by_unit salvage_package_1 alpha_unit_1 route_option_1)
+(authorize_alpha_unit_for_continuation alpha_unit_1 salvage_package_1)
+(authorize_bravo_unit_for_continuation bravo_unit_1 salvage_package_1)
+(consume_time_credit_and_reinstate_objective alpha_unit_1 time_credit_1 route_option_1)
+(reassign_asset_and_redeploy_alpha_unit alpha_unit_1 extraction_beacon_1 time_credit_1)
+(release_route_option alpha_unit_1 route_option_1)
+(bind_route_option_to_objective bravo_unit_1 route_option_1)
+(consume_time_credit_and_reinstate_objective bravo_unit_1 time_credit_1 route_option_1)
+(reassign_asset_and_redeploy_bravo_unit bravo_unit_1 transport_vehicle_1 time_credit_1)
+(release_route_option bravo_unit_1 route_option_1)
+(register_missed_objective replan_module_primary)
+(claim_asset_for_objective replan_module_primary extraction_beacon_1)
+(bind_route_option_to_objective replan_module_primary route_option_1)
+(activate_objective_for_recovery replan_module_primary route_option_1)
+(reserve_and_attach_fragment replan_module_primary fragment_a salvage_package_1)
+(process_fragment_in_replan_module replan_module_primary fragment_a salvage_package_1 route_option_1)
+(install_equipment_modifier_on_replan_module replan_module_primary equipment_modifier_1)
+(attach_specialist_to_objective replan_module_primary specialist_engineer_1)
+(apply_modifier_to_replan_module replan_module_primary equipment_modifier_1 specialist_engineer_1 fragment_a salvage_package_1)
+(apply_override_flag_to_replan_module replan_module_primary override_flag_1)
+(initiate_replan_module_validation replan_module_primary override_flag_1 fragment_a salvage_package_1)
+(commit_replan_module_for_continuation replan_module_primary)
+(detach_specialist_from_objective replan_module_primary specialist_engineer_1)
+(remove_equipment_modifier_from_replan_module replan_module_primary equipment_modifier_1)
+(remove_override_flag_from_replan_module replan_module_primary override_flag_1)
+(release_route_option replan_module_primary route_option_1)
+(bind_route_option_to_objective replan_module_primary route_option_1)
+(consume_time_credit_and_reinstate_objective replan_module_primary time_credit_1 route_option_1)
+(reassign_asset_and_redeploy_replan_module replan_module_primary extraction_beacon_1 time_credit_1)
+(release_route_option replan_module_primary route_option_1)
+(register_missed_objective replan_module_secondary)
+(claim_asset_for_objective replan_module_secondary transport_vehicle_1)
+(bind_route_option_to_objective replan_module_secondary route_option_1)
+(activate_objective_for_recovery replan_module_secondary route_option_1)
+(reserve_and_attach_fragment replan_module_secondary fragment_b salvage_package_1)
+(process_fragment_in_replan_module replan_module_secondary fragment_b salvage_package_1 route_option_1)
+(install_equipment_modifier_on_replan_module replan_module_secondary equipment_modifier_1)
+(attach_specialist_to_objective replan_module_secondary specialist_engineer_1)
+(apply_modifier_to_replan_module replan_module_secondary equipment_modifier_1 specialist_engineer_1 fragment_b salvage_package_1)
+(apply_override_flag_to_replan_module replan_module_secondary override_flag_1)
+(initiate_replan_module_validation replan_module_secondary override_flag_1 fragment_b salvage_package_1)
+(commit_replan_module_for_continuation replan_module_secondary)
+(detach_specialist_from_objective replan_module_secondary specialist_engineer_1)
+(remove_equipment_modifier_from_replan_module replan_module_secondary equipment_modifier_1)
+(remove_override_flag_from_replan_module replan_module_secondary override_flag_1)
+(release_route_option replan_module_secondary route_option_1)
+(bind_route_option_to_objective replan_module_secondary route_option_1)
+(consume_time_credit_and_reinstate_objective replan_module_secondary time_credit_1 route_option_1)
+(reassign_asset_and_redeploy_replan_module replan_module_secondary transport_vehicle_1 time_credit_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_z_nl6l96/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 69 
+
+Successful plans:
+Value: 69
+ /tmp/val_z_nl6l96/plan.pddl 69 
+
+
+
+--- stderr ---
+

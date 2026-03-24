@@ -1,0 +1,1071 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain attendance_window_compatible_schedule_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types actor_or_resource - object physical_resource - object temporal_resource - object registration_artifact - object registrable - registration_artifact seat_unit - actor_or_resource course - actor_or_resource approver - actor_or_resource department - actor_or_resource compliance_document - actor_or_resource attendance_deadline - actor_or_resource teaching_assignment_token - actor_or_resource authorization_artifact - actor_or_resource room_request - physical_resource venue - physical_resource external_approval_token - physical_resource time_slot - temporal_resource attendance_window - temporal_resource timetable_candidate - temporal_resource participant_role_group - registrable offering_group - registrable student - participant_role_group instructor - participant_role_group course_section - offering_group)
+  (:predicates
+    (registrable_created ?registrable - registrable)
+    (registrable_validated ?registrable - registrable)
+    (registrable_seat_hold_placed ?registrable - registrable)
+    (registrable_enrollment_finalized ?registrable - registrable)
+    (registrable_ready_for_enrollment ?registrable - registrable)
+    (registrable_enrollment_committed ?registrable - registrable)
+    (seat_available ?seat_unit - seat_unit)
+    (registrable_holds_seat ?registrable - registrable ?seat_unit - seat_unit)
+    (course_available ?course - course)
+    (registrable_selected_course ?registrable - registrable ?course - course)
+    (approver_available ?approver - approver)
+    (registrable_assigned_approver ?registrable - registrable ?approver - approver)
+    (room_request_available ?room_request - room_request)
+    (student_has_room_request ?student - student ?room_request - room_request)
+    (instructor_has_room_request ?instructor - instructor ?room_request - room_request)
+    (student_available_time_slot ?student - student ?time_slot - time_slot)
+    (time_slot_marked_by_student ?time_slot - time_slot)
+    (time_slot_marked_by_room_request ?time_slot - time_slot)
+    (student_availability_confirmed ?student - student)
+    (instructor_has_attendance_window ?instructor - instructor ?attendance_window - attendance_window)
+    (attendance_window_reserved_by_instructor ?attendance_window - attendance_window)
+    (attendance_window_reserved_by_room_request ?attendance_window - attendance_window)
+    (instructor_availability_confirmed ?instructor - instructor)
+    (timetable_candidate_pending ?timetable_candidate - timetable_candidate)
+    (timetable_candidate_configured ?timetable_candidate - timetable_candidate)
+    (candidate_assigned_time_slot ?timetable_candidate - timetable_candidate ?time_slot - time_slot)
+    (candidate_assigned_attendance_window ?timetable_candidate - timetable_candidate ?attendance_window - attendance_window)
+    (candidate_requires_department_approval ?timetable_candidate - timetable_candidate)
+    (candidate_requires_external_approval ?timetable_candidate - timetable_candidate)
+    (timetable_candidate_ready_for_venue_assignment ?timetable_candidate - timetable_candidate)
+    (section_has_student ?course_section - course_section ?student - student)
+    (section_has_instructor ?course_section - course_section ?instructor - instructor)
+    (section_links_candidate ?course_section - course_section ?timetable_candidate - timetable_candidate)
+    (venue_available ?venue - venue)
+    (section_has_venue ?course_section - course_section ?venue - venue)
+    (venue_reserved ?venue - venue)
+    (venue_assigned_to_candidate ?venue - venue ?timetable_candidate - timetable_candidate)
+    (section_venue_assigned ?course_section - course_section)
+    (section_instructor_assigned ?course_section - course_section)
+    (section_compliance_passed ?course_section - course_section)
+    (department_approval_attached ?course_section - course_section)
+    (department_requirements_met ?course_section - course_section)
+    (section_compliance_document_attached ?course_section - course_section)
+    (section_validated ?course_section - course_section)
+    (external_approval_token_available ?external_approval_token - external_approval_token)
+    (section_has_external_approval_token ?course_section - course_section ?external_approval_token - external_approval_token)
+    (external_approval_attached ?course_section - course_section)
+    (authorization_requested ?course_section - course_section)
+    (authorization_granted ?course_section - course_section)
+    (department_token_available ?department - department)
+    (section_attached_to_department ?course_section - course_section ?department - department)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (section_attached_compliance_document ?course_section - course_section ?compliance_document - compliance_document)
+    (teaching_assignment_token_available ?teaching_assignment_token - teaching_assignment_token)
+    (section_assigned_teaching_token ?course_section - course_section ?teaching_assignment_token - teaching_assignment_token)
+    (authorization_artifact_available ?authorization_artifact - authorization_artifact)
+    (authorization_artifact_attached_to_section ?course_section - course_section ?authorization_artifact - authorization_artifact)
+    (attendance_deadline_available ?attendance_deadline - attendance_deadline)
+    (registrable_bound_to_attendance_deadline ?registrable - registrable ?attendance_deadline - attendance_deadline)
+    (student_ready_for_candidate ?student - student)
+    (instructor_ready_for_candidate ?instructor - instructor)
+    (finalization_locked ?course_section - course_section)
+  )
+  (:action submit_registrable
+    :parameters (?registrable - registrable)
+    :precondition
+      (and
+        (not
+          (registrable_created ?registrable)
+        )
+        (not
+          (registrable_enrollment_finalized ?registrable)
+        )
+      )
+    :effect (registrable_created ?registrable)
+  )
+  (:action place_registrable_seat_hold
+    :parameters (?registrable - registrable ?seat_unit - seat_unit)
+    :precondition
+      (and
+        (registrable_created ?registrable)
+        (not
+          (registrable_seat_hold_placed ?registrable)
+        )
+        (seat_available ?seat_unit)
+      )
+    :effect
+      (and
+        (registrable_seat_hold_placed ?registrable)
+        (registrable_holds_seat ?registrable ?seat_unit)
+        (not
+          (seat_available ?seat_unit)
+        )
+      )
+  )
+  (:action select_course_for_registrable
+    :parameters (?registrable - registrable ?course - course)
+    :precondition
+      (and
+        (registrable_created ?registrable)
+        (registrable_seat_hold_placed ?registrable)
+        (course_available ?course)
+      )
+    :effect
+      (and
+        (registrable_selected_course ?registrable ?course)
+        (not
+          (course_available ?course)
+        )
+      )
+  )
+  (:action validate_registrable
+    :parameters (?registrable - registrable ?course - course)
+    :precondition
+      (and
+        (registrable_created ?registrable)
+        (registrable_seat_hold_placed ?registrable)
+        (registrable_selected_course ?registrable ?course)
+        (not
+          (registrable_validated ?registrable)
+        )
+      )
+    :effect (registrable_validated ?registrable)
+  )
+  (:action deselect_course_for_registrable
+    :parameters (?registrable - registrable ?course - course)
+    :precondition
+      (and
+        (registrable_selected_course ?registrable ?course)
+      )
+    :effect
+      (and
+        (course_available ?course)
+        (not
+          (registrable_selected_course ?registrable ?course)
+        )
+      )
+  )
+  (:action assign_approver_to_registrable
+    :parameters (?registrable - registrable ?approver - approver)
+    :precondition
+      (and
+        (registrable_validated ?registrable)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (registrable_assigned_approver ?registrable ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action unassign_approver_from_registrable
+    :parameters (?registrable - registrable ?approver - approver)
+    :precondition
+      (and
+        (registrable_assigned_approver ?registrable ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (registrable_assigned_approver ?registrable ?approver)
+        )
+      )
+  )
+  (:action attach_teaching_assignment_token_to_section
+    :parameters (?course_section - course_section ?teaching_assignment_token - teaching_assignment_token)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (teaching_assignment_token_available ?teaching_assignment_token)
+      )
+    :effect
+      (and
+        (section_assigned_teaching_token ?course_section ?teaching_assignment_token)
+        (not
+          (teaching_assignment_token_available ?teaching_assignment_token)
+        )
+      )
+  )
+  (:action detach_teaching_assignment_token_from_section
+    :parameters (?course_section - course_section ?teaching_assignment_token - teaching_assignment_token)
+    :precondition
+      (and
+        (section_assigned_teaching_token ?course_section ?teaching_assignment_token)
+      )
+    :effect
+      (and
+        (teaching_assignment_token_available ?teaching_assignment_token)
+        (not
+          (section_assigned_teaching_token ?course_section ?teaching_assignment_token)
+        )
+      )
+  )
+  (:action attach_authorization_artifact_to_section
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (authorization_artifact_available ?authorization_artifact)
+      )
+    :effect
+      (and
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (not
+          (authorization_artifact_available ?authorization_artifact)
+        )
+      )
+  )
+  (:action detach_authorization_artifact_from_section
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact)
+    :precondition
+      (and
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+      )
+    :effect
+      (and
+        (authorization_artifact_available ?authorization_artifact)
+        (not
+          (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        )
+      )
+  )
+  (:action student_reserve_time_slot
+    :parameters (?student - student ?time_slot - time_slot ?course - course)
+    :precondition
+      (and
+        (registrable_validated ?student)
+        (registrable_selected_course ?student ?course)
+        (student_available_time_slot ?student ?time_slot)
+        (not
+          (time_slot_marked_by_student ?time_slot)
+        )
+        (not
+          (time_slot_marked_by_room_request ?time_slot)
+        )
+      )
+    :effect (time_slot_marked_by_student ?time_slot)
+  )
+  (:action confirm_student_availability_with_approver
+    :parameters (?student - student ?time_slot - time_slot ?approver - approver)
+    :precondition
+      (and
+        (registrable_validated ?student)
+        (registrable_assigned_approver ?student ?approver)
+        (student_available_time_slot ?student ?time_slot)
+        (time_slot_marked_by_student ?time_slot)
+        (not
+          (student_ready_for_candidate ?student)
+        )
+      )
+    :effect
+      (and
+        (student_ready_for_candidate ?student)
+        (student_availability_confirmed ?student)
+      )
+  )
+  (:action reserve_time_slot_for_room_request
+    :parameters (?student - student ?time_slot - time_slot ?room_request - room_request)
+    :precondition
+      (and
+        (registrable_validated ?student)
+        (student_available_time_slot ?student ?time_slot)
+        (room_request_available ?room_request)
+        (not
+          (student_ready_for_candidate ?student)
+        )
+      )
+    :effect
+      (and
+        (time_slot_marked_by_room_request ?time_slot)
+        (student_ready_for_candidate ?student)
+        (student_has_room_request ?student ?room_request)
+        (not
+          (room_request_available ?room_request)
+        )
+      )
+  )
+  (:action confirm_student_time_slot_assignment
+    :parameters (?student - student ?time_slot - time_slot ?course - course ?room_request - room_request)
+    :precondition
+      (and
+        (registrable_validated ?student)
+        (registrable_selected_course ?student ?course)
+        (student_available_time_slot ?student ?time_slot)
+        (time_slot_marked_by_room_request ?time_slot)
+        (student_has_room_request ?student ?room_request)
+        (not
+          (student_availability_confirmed ?student)
+        )
+      )
+    :effect
+      (and
+        (time_slot_marked_by_student ?time_slot)
+        (student_availability_confirmed ?student)
+        (room_request_available ?room_request)
+        (not
+          (student_has_room_request ?student ?room_request)
+        )
+      )
+  )
+  (:action instructor_reserve_time_slot
+    :parameters (?instructor - instructor ?attendance_window - attendance_window ?course - course)
+    :precondition
+      (and
+        (registrable_validated ?instructor)
+        (registrable_selected_course ?instructor ?course)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (not
+          (attendance_window_reserved_by_instructor ?attendance_window)
+        )
+        (not
+          (attendance_window_reserved_by_room_request ?attendance_window)
+        )
+      )
+    :effect (attendance_window_reserved_by_instructor ?attendance_window)
+  )
+  (:action confirm_instructor_availability
+    :parameters (?instructor - instructor ?attendance_window - attendance_window ?approver - approver)
+    :precondition
+      (and
+        (registrable_validated ?instructor)
+        (registrable_assigned_approver ?instructor ?approver)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (attendance_window_reserved_by_instructor ?attendance_window)
+        (not
+          (instructor_ready_for_candidate ?instructor)
+        )
+      )
+    :effect
+      (and
+        (instructor_ready_for_candidate ?instructor)
+        (instructor_availability_confirmed ?instructor)
+      )
+  )
+  (:action reserve_attendance_window_by_room_request
+    :parameters (?instructor - instructor ?attendance_window - attendance_window ?room_request - room_request)
+    :precondition
+      (and
+        (registrable_validated ?instructor)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (room_request_available ?room_request)
+        (not
+          (instructor_ready_for_candidate ?instructor)
+        )
+      )
+    :effect
+      (and
+        (attendance_window_reserved_by_room_request ?attendance_window)
+        (instructor_ready_for_candidate ?instructor)
+        (instructor_has_room_request ?instructor ?room_request)
+        (not
+          (room_request_available ?room_request)
+        )
+      )
+  )
+  (:action confirm_instructor_time_slot_assignment
+    :parameters (?instructor - instructor ?attendance_window - attendance_window ?course - course ?room_request - room_request)
+    :precondition
+      (and
+        (registrable_validated ?instructor)
+        (registrable_selected_course ?instructor ?course)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (attendance_window_reserved_by_room_request ?attendance_window)
+        (instructor_has_room_request ?instructor ?room_request)
+        (not
+          (instructor_availability_confirmed ?instructor)
+        )
+      )
+    :effect
+      (and
+        (attendance_window_reserved_by_instructor ?attendance_window)
+        (instructor_availability_confirmed ?instructor)
+        (room_request_available ?room_request)
+        (not
+          (instructor_has_room_request ?instructor ?room_request)
+        )
+      )
+  )
+  (:action create_timetable_candidate
+    :parameters (?student - student ?instructor - instructor ?time_slot - time_slot ?attendance_window - attendance_window ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (student_ready_for_candidate ?student)
+        (instructor_ready_for_candidate ?instructor)
+        (student_available_time_slot ?student ?time_slot)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (time_slot_marked_by_student ?time_slot)
+        (attendance_window_reserved_by_instructor ?attendance_window)
+        (student_availability_confirmed ?student)
+        (instructor_availability_confirmed ?instructor)
+        (timetable_candidate_pending ?timetable_candidate)
+      )
+    :effect
+      (and
+        (timetable_candidate_configured ?timetable_candidate)
+        (candidate_assigned_time_slot ?timetable_candidate ?time_slot)
+        (candidate_assigned_attendance_window ?timetable_candidate ?attendance_window)
+        (not
+          (timetable_candidate_pending ?timetable_candidate)
+        )
+      )
+  )
+  (:action create_timetable_candidate_with_room_claim
+    :parameters (?student - student ?instructor - instructor ?time_slot - time_slot ?attendance_window - attendance_window ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (student_ready_for_candidate ?student)
+        (instructor_ready_for_candidate ?instructor)
+        (student_available_time_slot ?student ?time_slot)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (time_slot_marked_by_room_request ?time_slot)
+        (attendance_window_reserved_by_instructor ?attendance_window)
+        (not
+          (student_availability_confirmed ?student)
+        )
+        (instructor_availability_confirmed ?instructor)
+        (timetable_candidate_pending ?timetable_candidate)
+      )
+    :effect
+      (and
+        (timetable_candidate_configured ?timetable_candidate)
+        (candidate_assigned_time_slot ?timetable_candidate ?time_slot)
+        (candidate_assigned_attendance_window ?timetable_candidate ?attendance_window)
+        (candidate_requires_department_approval ?timetable_candidate)
+        (not
+          (timetable_candidate_pending ?timetable_candidate)
+        )
+      )
+  )
+  (:action create_timetable_candidate_with_student_claim
+    :parameters (?student - student ?instructor - instructor ?time_slot - time_slot ?attendance_window - attendance_window ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (student_ready_for_candidate ?student)
+        (instructor_ready_for_candidate ?instructor)
+        (student_available_time_slot ?student ?time_slot)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (time_slot_marked_by_student ?time_slot)
+        (attendance_window_reserved_by_room_request ?attendance_window)
+        (student_availability_confirmed ?student)
+        (not
+          (instructor_availability_confirmed ?instructor)
+        )
+        (timetable_candidate_pending ?timetable_candidate)
+      )
+    :effect
+      (and
+        (timetable_candidate_configured ?timetable_candidate)
+        (candidate_assigned_time_slot ?timetable_candidate ?time_slot)
+        (candidate_assigned_attendance_window ?timetable_candidate ?attendance_window)
+        (candidate_requires_external_approval ?timetable_candidate)
+        (not
+          (timetable_candidate_pending ?timetable_candidate)
+        )
+      )
+  )
+  (:action create_timetable_candidate_full
+    :parameters (?student - student ?instructor - instructor ?time_slot - time_slot ?attendance_window - attendance_window ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (student_ready_for_candidate ?student)
+        (instructor_ready_for_candidate ?instructor)
+        (student_available_time_slot ?student ?time_slot)
+        (instructor_has_attendance_window ?instructor ?attendance_window)
+        (time_slot_marked_by_room_request ?time_slot)
+        (attendance_window_reserved_by_room_request ?attendance_window)
+        (not
+          (student_availability_confirmed ?student)
+        )
+        (not
+          (instructor_availability_confirmed ?instructor)
+        )
+        (timetable_candidate_pending ?timetable_candidate)
+      )
+    :effect
+      (and
+        (timetable_candidate_configured ?timetable_candidate)
+        (candidate_assigned_time_slot ?timetable_candidate ?time_slot)
+        (candidate_assigned_attendance_window ?timetable_candidate ?attendance_window)
+        (candidate_requires_department_approval ?timetable_candidate)
+        (candidate_requires_external_approval ?timetable_candidate)
+        (not
+          (timetable_candidate_pending ?timetable_candidate)
+        )
+      )
+  )
+  (:action mark_candidate_ready_for_venue_assignment
+    :parameters (?timetable_candidate - timetable_candidate ?student - student ?course - course)
+    :precondition
+      (and
+        (timetable_candidate_configured ?timetable_candidate)
+        (student_ready_for_candidate ?student)
+        (registrable_selected_course ?student ?course)
+        (not
+          (timetable_candidate_ready_for_venue_assignment ?timetable_candidate)
+        )
+      )
+    :effect (timetable_candidate_ready_for_venue_assignment ?timetable_candidate)
+  )
+  (:action reserve_venue_for_candidate
+    :parameters (?course_section - course_section ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (section_links_candidate ?course_section ?timetable_candidate)
+        (section_has_venue ?course_section ?venue)
+        (venue_available ?venue)
+        (timetable_candidate_configured ?timetable_candidate)
+        (timetable_candidate_ready_for_venue_assignment ?timetable_candidate)
+        (not
+          (venue_reserved ?venue)
+        )
+      )
+    :effect
+      (and
+        (venue_reserved ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (not
+          (venue_available ?venue)
+        )
+      )
+  )
+  (:action assign_venue_to_section
+    :parameters (?course_section - course_section ?venue - venue ?timetable_candidate - timetable_candidate ?course - course)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (section_has_venue ?course_section ?venue)
+        (venue_reserved ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (registrable_selected_course ?course_section ?course)
+        (not
+          (candidate_requires_department_approval ?timetable_candidate)
+        )
+        (not
+          (section_venue_assigned ?course_section)
+        )
+      )
+    :effect (section_venue_assigned ?course_section)
+  )
+  (:action attach_department_token_to_section
+    :parameters (?course_section - course_section ?department - department)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (department_token_available ?department)
+        (not
+          (department_approval_attached ?course_section)
+        )
+      )
+    :effect
+      (and
+        (department_approval_attached ?course_section)
+        (section_attached_to_department ?course_section ?department)
+        (not
+          (department_token_available ?department)
+        )
+      )
+  )
+  (:action assign_venue_with_department_approval
+    :parameters (?course_section - course_section ?venue - venue ?timetable_candidate - timetable_candidate ?course - course ?department - department)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (section_has_venue ?course_section ?venue)
+        (venue_reserved ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (registrable_selected_course ?course_section ?course)
+        (candidate_requires_department_approval ?timetable_candidate)
+        (department_approval_attached ?course_section)
+        (section_attached_to_department ?course_section ?department)
+        (not
+          (section_venue_assigned ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_venue_assigned ?course_section)
+        (department_requirements_met ?course_section)
+      )
+  )
+  (:action assign_teaching_token_phase1
+    :parameters (?course_section - course_section ?teaching_assignment_token - teaching_assignment_token ?approver - approver ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_venue_assigned ?course_section)
+        (section_assigned_teaching_token ?course_section ?teaching_assignment_token)
+        (registrable_assigned_approver ?course_section ?approver)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (not
+          (candidate_requires_external_approval ?timetable_candidate)
+        )
+        (not
+          (section_instructor_assigned ?course_section)
+        )
+      )
+    :effect (section_instructor_assigned ?course_section)
+  )
+  (:action assign_teaching_token_phase2
+    :parameters (?course_section - course_section ?teaching_assignment_token - teaching_assignment_token ?approver - approver ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_venue_assigned ?course_section)
+        (section_assigned_teaching_token ?course_section ?teaching_assignment_token)
+        (registrable_assigned_approver ?course_section ?approver)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (candidate_requires_external_approval ?timetable_candidate)
+        (not
+          (section_instructor_assigned ?course_section)
+        )
+      )
+    :effect (section_instructor_assigned ?course_section)
+  )
+  (:action initiate_section_compliance_validation
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_instructor_assigned ?course_section)
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (not
+          (candidate_requires_department_approval ?timetable_candidate)
+        )
+        (not
+          (candidate_requires_external_approval ?timetable_candidate)
+        )
+        (not
+          (section_compliance_passed ?course_section)
+        )
+      )
+    :effect (section_compliance_passed ?course_section)
+  )
+  (:action advance_section_compliance_stage_with_flag
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_instructor_assigned ?course_section)
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (candidate_requires_department_approval ?timetable_candidate)
+        (not
+          (candidate_requires_external_approval ?timetable_candidate)
+        )
+        (not
+          (section_compliance_passed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_compliance_passed ?course_section)
+        (section_compliance_document_attached ?course_section)
+      )
+  )
+  (:action advance_section_compliance_stage_alternate
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_instructor_assigned ?course_section)
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (not
+          (candidate_requires_department_approval ?timetable_candidate)
+        )
+        (candidate_requires_external_approval ?timetable_candidate)
+        (not
+          (section_compliance_passed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_compliance_passed ?course_section)
+        (section_compliance_document_attached ?course_section)
+      )
+  )
+  (:action advance_section_compliance_stage_final
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact ?venue - venue ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (section_instructor_assigned ?course_section)
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (section_has_venue ?course_section ?venue)
+        (venue_assigned_to_candidate ?venue ?timetable_candidate)
+        (candidate_requires_department_approval ?timetable_candidate)
+        (candidate_requires_external_approval ?timetable_candidate)
+        (not
+          (section_compliance_passed ?course_section)
+        )
+      )
+    :effect
+      (and
+        (section_compliance_passed ?course_section)
+        (section_compliance_document_attached ?course_section)
+      )
+  )
+  (:action lock_candidate_and_mark_section_ready
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (section_compliance_passed ?course_section)
+        (not
+          (section_compliance_document_attached ?course_section)
+        )
+        (not
+          (finalization_locked ?course_section)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?course_section)
+        (registrable_ready_for_enrollment ?course_section)
+      )
+  )
+  (:action attach_compliance_document_to_section
+    :parameters (?course_section - course_section ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (section_compliance_passed ?course_section)
+        (section_compliance_document_attached ?course_section)
+        (compliance_document_available ?compliance_document)
+      )
+    :effect
+      (and
+        (section_attached_compliance_document ?course_section ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action mark_section_validated_for_publication
+    :parameters (?course_section - course_section ?student - student ?instructor - instructor ?course - course ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (section_compliance_passed ?course_section)
+        (section_compliance_document_attached ?course_section)
+        (section_attached_compliance_document ?course_section ?compliance_document)
+        (section_has_student ?course_section ?student)
+        (section_has_instructor ?course_section ?instructor)
+        (student_availability_confirmed ?student)
+        (instructor_availability_confirmed ?instructor)
+        (registrable_selected_course ?course_section ?course)
+        (not
+          (section_validated ?course_section)
+        )
+      )
+    :effect (section_validated ?course_section)
+  )
+  (:action finalize_section_and_publish
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (section_compliance_passed ?course_section)
+        (section_validated ?course_section)
+        (not
+          (finalization_locked ?course_section)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?course_section)
+        (registrable_ready_for_enrollment ?course_section)
+      )
+  )
+  (:action attach_external_approval_token_to_section
+    :parameters (?course_section - course_section ?external_approval_token - external_approval_token ?course - course)
+    :precondition
+      (and
+        (registrable_validated ?course_section)
+        (registrable_selected_course ?course_section ?course)
+        (external_approval_token_available ?external_approval_token)
+        (section_has_external_approval_token ?course_section ?external_approval_token)
+        (not
+          (external_approval_attached ?course_section)
+        )
+      )
+    :effect
+      (and
+        (external_approval_attached ?course_section)
+        (not
+          (external_approval_token_available ?external_approval_token)
+        )
+      )
+  )
+  (:action request_authorization_for_section
+    :parameters (?course_section - course_section ?approver - approver)
+    :precondition
+      (and
+        (external_approval_attached ?course_section)
+        (registrable_assigned_approver ?course_section ?approver)
+        (not
+          (authorization_requested ?course_section)
+        )
+      )
+    :effect (authorization_requested ?course_section)
+  )
+  (:action grant_authorization_for_section
+    :parameters (?course_section - course_section ?authorization_artifact - authorization_artifact)
+    :precondition
+      (and
+        (authorization_requested ?course_section)
+        (authorization_artifact_attached_to_section ?course_section ?authorization_artifact)
+        (not
+          (authorization_granted ?course_section)
+        )
+      )
+    :effect (authorization_granted ?course_section)
+  )
+  (:action finalize_section_post_authorization
+    :parameters (?course_section - course_section)
+    :precondition
+      (and
+        (authorization_granted ?course_section)
+        (not
+          (finalization_locked ?course_section)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?course_section)
+        (registrable_ready_for_enrollment ?course_section)
+      )
+  )
+  (:action publish_enrollment_for_student
+    :parameters (?student - student ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (student_ready_for_candidate ?student)
+        (student_availability_confirmed ?student)
+        (timetable_candidate_configured ?timetable_candidate)
+        (timetable_candidate_ready_for_venue_assignment ?timetable_candidate)
+        (not
+          (registrable_ready_for_enrollment ?student)
+        )
+      )
+    :effect (registrable_ready_for_enrollment ?student)
+  )
+  (:action publish_enrollment_for_instructor
+    :parameters (?instructor - instructor ?timetable_candidate - timetable_candidate)
+    :precondition
+      (and
+        (instructor_ready_for_candidate ?instructor)
+        (instructor_availability_confirmed ?instructor)
+        (timetable_candidate_configured ?timetable_candidate)
+        (timetable_candidate_ready_for_venue_assignment ?timetable_candidate)
+        (not
+          (registrable_ready_for_enrollment ?instructor)
+        )
+      )
+    :effect (registrable_ready_for_enrollment ?instructor)
+  )
+  (:action enroll_registrable_with_attendance_deadline
+    :parameters (?registrable - registrable ?attendance_deadline - attendance_deadline ?course - course)
+    :precondition
+      (and
+        (registrable_ready_for_enrollment ?registrable)
+        (registrable_selected_course ?registrable ?course)
+        (attendance_deadline_available ?attendance_deadline)
+        (not
+          (registrable_enrollment_committed ?registrable)
+        )
+      )
+    :effect
+      (and
+        (registrable_enrollment_committed ?registrable)
+        (registrable_bound_to_attendance_deadline ?registrable ?attendance_deadline)
+        (not
+          (attendance_deadline_available ?attendance_deadline)
+        )
+      )
+  )
+  (:action finalize_enrollment_and_release_seat
+    :parameters (?student - student ?seat_unit - seat_unit ?attendance_deadline - attendance_deadline)
+    :precondition
+      (and
+        (registrable_enrollment_committed ?student)
+        (registrable_holds_seat ?student ?seat_unit)
+        (registrable_bound_to_attendance_deadline ?student ?attendance_deadline)
+        (not
+          (registrable_enrollment_finalized ?student)
+        )
+      )
+    :effect
+      (and
+        (registrable_enrollment_finalized ?student)
+        (seat_available ?seat_unit)
+        (attendance_deadline_available ?attendance_deadline)
+      )
+  )
+  (:action finalize_instructor_enrollment_and_release_seat
+    :parameters (?instructor - instructor ?seat_unit - seat_unit ?attendance_deadline - attendance_deadline)
+    :precondition
+      (and
+        (registrable_enrollment_committed ?instructor)
+        (registrable_holds_seat ?instructor ?seat_unit)
+        (registrable_bound_to_attendance_deadline ?instructor ?attendance_deadline)
+        (not
+          (registrable_enrollment_finalized ?instructor)
+        )
+      )
+    :effect
+      (and
+        (registrable_enrollment_finalized ?instructor)
+        (seat_available ?seat_unit)
+        (attendance_deadline_available ?attendance_deadline)
+      )
+  )
+  (:action finalize_section_enrollment_and_release_seat
+    :parameters (?course_section - course_section ?seat_unit - seat_unit ?attendance_deadline - attendance_deadline)
+    :precondition
+      (and
+        (registrable_enrollment_committed ?course_section)
+        (registrable_holds_seat ?course_section ?seat_unit)
+        (registrable_bound_to_attendance_deadline ?course_section ?attendance_deadline)
+        (not
+          (registrable_enrollment_finalized ?course_section)
+        )
+      )
+    :effect
+      (and
+        (registrable_enrollment_finalized ?course_section)
+        (seat_available ?seat_unit)
+        (attendance_deadline_available ?attendance_deadline)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem attendance_window_schedule_problem)
+  (:domain attendance_window_compatible_schedule_planning)
+  (:objects student_1 - student instructor_1 - instructor course_section_1 - course_section course_section_2 - course_section seat_1 - seat_unit seat_2 - seat_unit seat_3 - seat_unit course_cs101 - course approver_dept_admin - approver room_request_1 - room_request time_slot_1 - time_slot attendance_window_1 - attendance_window timetable_candidate_1 - timetable_candidate venue_room_101 - venue venue_room_102 - venue department_cs - department department_math - department compliance_doc_safety - compliance_document compliance_doc_accreditation - compliance_document attendance_deadline_standard - attendance_deadline teaching_assignment_token_1 - teaching_assignment_token external_approval_token_dean - external_approval_token external_approval_token_dept2 - external_approval_token authorization_artifact_signature_1 - authorization_artifact)
+  (:init
+    (seat_available seat_1)
+    (seat_available seat_2)
+    (seat_available seat_3)
+    (course_available course_cs101)
+    (approver_available approver_dept_admin)
+    (room_request_available room_request_1)
+    (student_available_time_slot student_1 time_slot_1)
+    (instructor_has_attendance_window instructor_1 attendance_window_1)
+    (timetable_candidate_pending timetable_candidate_1)
+    (venue_available venue_room_101)
+    (venue_available venue_room_102)
+    (section_has_student course_section_1 student_1)
+    (section_has_student course_section_2 student_1)
+    (section_has_instructor course_section_1 instructor_1)
+    (section_has_instructor course_section_2 instructor_1)
+    (section_links_candidate course_section_1 timetable_candidate_1)
+    (section_links_candidate course_section_2 timetable_candidate_1)
+    (section_has_venue course_section_1 venue_room_101)
+    (section_has_venue course_section_2 venue_room_102)
+    (department_token_available department_cs)
+    (department_token_available department_math)
+    (compliance_document_available compliance_doc_safety)
+    (compliance_document_available compliance_doc_accreditation)
+    (attendance_deadline_available attendance_deadline_standard)
+    (teaching_assignment_token_available teaching_assignment_token_1)
+    (external_approval_token_available external_approval_token_dean)
+    (section_has_external_approval_token course_section_1 external_approval_token_dean)
+    (section_has_external_approval_token course_section_2 external_approval_token_dept2)
+    (authorization_artifact_available authorization_artifact_signature_1)
+  )
+  (:goal
+    (and
+      (registrable_enrollment_finalized student_1)
+      (registrable_enrollment_finalized instructor_1)
+      (registrable_enrollment_finalized course_section_1)
+      (registrable_enrollment_finalized course_section_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(submit_registrable student_1)
+(place_registrable_seat_hold student_1 seat_1)
+(select_course_for_registrable student_1 course_cs101)
+(validate_registrable student_1 course_cs101)
+(student_reserve_time_slot student_1 time_slot_1 course_cs101)
+(assign_approver_to_registrable student_1 approver_dept_admin)
+(confirm_student_availability_with_approver student_1 time_slot_1 approver_dept_admin)
+(deselect_course_for_registrable student_1 course_cs101)
+(unassign_approver_from_registrable student_1 approver_dept_admin)
+(submit_registrable instructor_1)
+(place_registrable_seat_hold instructor_1 seat_2)
+(select_course_for_registrable instructor_1 course_cs101)
+(validate_registrable instructor_1 course_cs101)
+(instructor_reserve_time_slot instructor_1 attendance_window_1 course_cs101)
+(assign_approver_to_registrable instructor_1 approver_dept_admin)
+(confirm_instructor_availability instructor_1 attendance_window_1 approver_dept_admin)
+(deselect_course_for_registrable instructor_1 course_cs101)
+(unassign_approver_from_registrable instructor_1 approver_dept_admin)
+(create_timetable_candidate student_1 instructor_1 time_slot_1 attendance_window_1 timetable_candidate_1)
+(select_course_for_registrable student_1 course_cs101)
+(mark_candidate_ready_for_venue_assignment timetable_candidate_1 student_1 course_cs101)
+(deselect_course_for_registrable student_1 course_cs101)
+(publish_enrollment_for_student student_1 timetable_candidate_1)
+(publish_enrollment_for_instructor instructor_1 timetable_candidate_1)
+(submit_registrable course_section_1)
+(place_registrable_seat_hold course_section_1 seat_3)
+(select_course_for_registrable course_section_1 course_cs101)
+(validate_registrable course_section_1 course_cs101)
+(reserve_venue_for_candidate course_section_1 venue_room_101 timetable_candidate_1)
+(assign_venue_to_section course_section_1 venue_room_101 timetable_candidate_1 course_cs101)
+(attach_teaching_assignment_token_to_section course_section_1 teaching_assignment_token_1)
+(attach_authorization_artifact_to_section course_section_1 authorization_artifact_signature_1)
+(assign_approver_to_registrable course_section_1 approver_dept_admin)
+(assign_teaching_token_phase1 course_section_1 teaching_assignment_token_1 approver_dept_admin venue_room_101 timetable_candidate_1)
+(initiate_section_compliance_validation course_section_1 authorization_artifact_signature_1 venue_room_101 timetable_candidate_1)
+(lock_candidate_and_mark_section_ready course_section_1)
+(deselect_course_for_registrable course_section_1 course_cs101)
+(unassign_approver_from_registrable course_section_1 approver_dept_admin)
+(detach_teaching_assignment_token_from_section course_section_1 teaching_assignment_token_1)
+(detach_authorization_artifact_from_section course_section_1 authorization_artifact_signature_1)
+(select_course_for_registrable student_1 course_cs101)
+(enroll_registrable_with_attendance_deadline student_1 attendance_deadline_standard course_cs101)
+(finalize_enrollment_and_release_seat student_1 seat_1 attendance_deadline_standard)
+(submit_registrable course_section_2)
+(place_registrable_seat_hold course_section_2 seat_1)
+(select_course_for_registrable course_section_2 course_cs101)
+(validate_registrable course_section_2 course_cs101)
+(reserve_venue_for_candidate course_section_2 venue_room_102 timetable_candidate_1)
+(assign_venue_to_section course_section_2 venue_room_102 timetable_candidate_1 course_cs101)
+(attach_teaching_assignment_token_to_section course_section_2 teaching_assignment_token_1)
+(attach_authorization_artifact_to_section course_section_2 authorization_artifact_signature_1)
+(assign_approver_to_registrable course_section_2 approver_dept_admin)
+(assign_teaching_token_phase1 course_section_2 teaching_assignment_token_1 approver_dept_admin venue_room_102 timetable_candidate_1)
+(initiate_section_compliance_validation course_section_2 authorization_artifact_signature_1 venue_room_102 timetable_candidate_1)
+(lock_candidate_and_mark_section_ready course_section_2)
+(deselect_course_for_registrable course_section_2 course_cs101)
+(unassign_approver_from_registrable course_section_2 approver_dept_admin)
+(detach_teaching_assignment_token_from_section course_section_2 teaching_assignment_token_1)
+(detach_authorization_artifact_from_section course_section_2 authorization_artifact_signature_1)
+(select_course_for_registrable instructor_1 course_cs101)
+(enroll_registrable_with_attendance_deadline instructor_1 attendance_deadline_standard course_cs101)
+(finalize_instructor_enrollment_and_release_seat instructor_1 seat_2 attendance_deadline_standard)
+(select_course_for_registrable course_section_1 course_cs101)
+(enroll_registrable_with_attendance_deadline course_section_1 attendance_deadline_standard course_cs101)
+(finalize_section_enrollment_and_release_seat course_section_1 seat_3 attendance_deadline_standard)
+(select_course_for_registrable course_section_2 course_cs101)
+(enroll_registrable_with_attendance_deadline course_section_2 attendance_deadline_standard course_cs101)
+(finalize_section_enrollment_and_release_seat course_section_2 seat_1 attendance_deadline_standard)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_j854m6le/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_j854m6le/plan.pddl 
+
+
+--- stderr ---
+

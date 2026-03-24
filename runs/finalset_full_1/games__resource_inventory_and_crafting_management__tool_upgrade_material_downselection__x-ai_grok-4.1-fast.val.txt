@@ -1,0 +1,1060 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tool_upgrade_material_downselection)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_token - object material_token - object attachment_token - object equipment_root - object upgradeable_equipment - equipment_root raw_material - resource_token subcomponent - resource_token attachment_piece - resource_token optional_modifier - resource_token slot_modifier - resource_token preservative_item - resource_token attachment_type_a - resource_token attachment_type_c - resource_token consumable_bundle - material_token upgrade_blueprint - material_token attachment_type_b - material_token material_category - attachment_token material_variant - attachment_token upgrade_module - attachment_token tool_group_primary - upgradeable_equipment tool_group_auxiliary - upgradeable_equipment primary_tool - tool_group_primary secondary_tool - tool_group_primary auxiliary_tool - tool_group_auxiliary)
+  (:predicates
+    (equipment_is_candidate ?upgradeable_equipment - upgradeable_equipment)
+    (equipment_selection_confirmed ?upgradeable_equipment - upgradeable_equipment)
+    (equipment_material_proposed ?upgradeable_equipment - upgradeable_equipment)
+    (equipment_upgrade_applied ?upgradeable_equipment - upgradeable_equipment)
+    (equipment_ready_for_preservative ?upgradeable_equipment - upgradeable_equipment)
+    (equipment_preservative_applied ?upgradeable_equipment - upgradeable_equipment)
+    (raw_material_available ?raw_material - raw_material)
+    (raw_material_reserved_for_equipment ?upgradeable_equipment - upgradeable_equipment ?raw_material - raw_material)
+    (subcomponent_available ?subcomponent - subcomponent)
+    (subcomponent_reserved_for_equipment ?upgradeable_equipment - upgradeable_equipment ?subcomponent - subcomponent)
+    (attachment_piece_available ?attachment_piece - attachment_piece)
+    (attachment_reserved_on_equipment ?upgradeable_equipment - upgradeable_equipment ?attachment_piece - attachment_piece)
+    (consumable_bundle_available ?consumable_bundle - consumable_bundle)
+    (consumable_allocated_to_primary_tool ?primary_tool - primary_tool ?consumable_bundle - consumable_bundle)
+    (consumable_allocated_to_secondary_tool ?secondary_tool - secondary_tool ?consumable_bundle - consumable_bundle)
+    (primary_tool_material_category ?primary_tool - primary_tool ?material_category - material_category)
+    (material_category_marked ?material_category - material_category)
+    (material_category_assigned_to_consumable ?material_category - material_category)
+    (primary_tool_category_confirmed ?primary_tool - primary_tool)
+    (secondary_tool_material_variant ?secondary_tool - secondary_tool ?material_variant - material_variant)
+    (material_variant_marked ?material_variant - material_variant)
+    (material_variant_assigned_to_consumable ?material_variant - material_variant)
+    (secondary_tool_category_confirmed ?secondary_tool - secondary_tool)
+    (upgrade_module_unprepared ?upgrade_module - upgrade_module)
+    (upgrade_module_prepared ?upgrade_module - upgrade_module)
+    (upgrade_module_uses_material_category ?upgrade_module - upgrade_module ?material_category - material_category)
+    (upgrade_module_uses_material_variant ?upgrade_module - upgrade_module ?material_variant - material_variant)
+    (upgrade_module_option_flag_1 ?upgrade_module - upgrade_module)
+    (upgrade_module_option_flag_2 ?upgrade_module - upgrade_module)
+    (upgrade_module_finalized ?upgrade_module - upgrade_module)
+    (aux_tool_compatible_with_primary_tool ?auxiliary_tool - auxiliary_tool ?primary_tool - primary_tool)
+    (aux_tool_compatible_with_secondary_tool ?auxiliary_tool - auxiliary_tool ?secondary_tool - secondary_tool)
+    (aux_tool_compatible_with_module ?auxiliary_tool - auxiliary_tool ?upgrade_module - upgrade_module)
+    (upgrade_blueprint_available ?upgrade_blueprint - upgrade_blueprint)
+    (aux_tool_bound_to_blueprint ?auxiliary_tool - auxiliary_tool ?upgrade_blueprint - upgrade_blueprint)
+    (upgrade_blueprint_activated ?upgrade_blueprint - upgrade_blueprint)
+    (blueprint_bound_to_module ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    (aux_tool_prepared_with_blueprint ?auxiliary_tool - auxiliary_tool)
+    (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_attachment_verified ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_optional_modifier_reserved ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_optional_modifier_applied ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_slot_modifier_applied ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_slot_activated ?auxiliary_tool - auxiliary_tool)
+    (attachment_type_b_available ?attachment_type_b - attachment_type_b)
+    (auxiliary_tool_attachment_type_b_reserved_for ?auxiliary_tool - auxiliary_tool ?attachment_type_b - attachment_type_b)
+    (auxiliary_tool_attachment_type_b_reserved_marker ?auxiliary_tool - auxiliary_tool)
+    (auxiliary_tool_attachment_type_b_staged ?auxiliary_tool - auxiliary_tool)
+    (aux_tool_attachment_type_c_confirmed ?auxiliary_tool - auxiliary_tool)
+    (optional_modifier_available ?optional_modifier - optional_modifier)
+    (aux_tool_optional_modifier_bound ?auxiliary_tool - auxiliary_tool ?optional_modifier - optional_modifier)
+    (slot_modifier_available ?slot_modifier - slot_modifier)
+    (aux_tool_slot_modifier_bound ?auxiliary_tool - auxiliary_tool ?slot_modifier - slot_modifier)
+    (attachment_type_a_available ?attachment_type_a - attachment_type_a)
+    (aux_tool_attachment_type_a_reserved ?auxiliary_tool - auxiliary_tool ?attachment_type_a - attachment_type_a)
+    (attachment_type_c_available ?attachment_type_c - attachment_type_c)
+    (aux_tool_attachment_type_c_reserved ?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c)
+    (preservative_item_available ?preservative_item - preservative_item)
+    (equipment_preservative_reserved ?upgradeable_equipment - upgradeable_equipment ?preservative_item - preservative_item)
+    (primary_tool_local_ready ?primary_tool - primary_tool)
+    (secondary_tool_local_ready ?secondary_tool - secondary_tool)
+    (aux_tool_installation_finalized ?auxiliary_tool - auxiliary_tool)
+  )
+  (:action mark_equipment_as_candidate
+    :parameters (?upgradeable_equipment - upgradeable_equipment)
+    :precondition
+      (and
+        (not
+          (equipment_is_candidate ?upgradeable_equipment)
+        )
+        (not
+          (equipment_upgrade_applied ?upgradeable_equipment)
+        )
+      )
+    :effect (equipment_is_candidate ?upgradeable_equipment)
+  )
+  (:action propose_raw_material_for_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?raw_material - raw_material)
+    :precondition
+      (and
+        (equipment_is_candidate ?upgradeable_equipment)
+        (not
+          (equipment_material_proposed ?upgradeable_equipment)
+        )
+        (raw_material_available ?raw_material)
+      )
+    :effect
+      (and
+        (equipment_material_proposed ?upgradeable_equipment)
+        (raw_material_reserved_for_equipment ?upgradeable_equipment ?raw_material)
+        (not
+          (raw_material_available ?raw_material)
+        )
+      )
+  )
+  (:action reserve_subcomponent_for_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_is_candidate ?upgradeable_equipment)
+        (equipment_material_proposed ?upgradeable_equipment)
+        (subcomponent_available ?subcomponent)
+      )
+    :effect
+      (and
+        (subcomponent_reserved_for_equipment ?upgradeable_equipment ?subcomponent)
+        (not
+          (subcomponent_available ?subcomponent)
+        )
+      )
+  )
+  (:action confirm_equipment_selection
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_is_candidate ?upgradeable_equipment)
+        (equipment_material_proposed ?upgradeable_equipment)
+        (subcomponent_reserved_for_equipment ?upgradeable_equipment ?subcomponent)
+        (not
+          (equipment_selection_confirmed ?upgradeable_equipment)
+        )
+      )
+    :effect (equipment_selection_confirmed ?upgradeable_equipment)
+  )
+  (:action release_subcomponent_from_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (subcomponent_reserved_for_equipment ?upgradeable_equipment ?subcomponent)
+      )
+    :effect
+      (and
+        (subcomponent_available ?subcomponent)
+        (not
+          (subcomponent_reserved_for_equipment ?upgradeable_equipment ?subcomponent)
+        )
+      )
+  )
+  (:action reserve_attachment_piece_for_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?attachment_piece - attachment_piece)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?upgradeable_equipment)
+        (attachment_piece_available ?attachment_piece)
+      )
+    :effect
+      (and
+        (attachment_reserved_on_equipment ?upgradeable_equipment ?attachment_piece)
+        (not
+          (attachment_piece_available ?attachment_piece)
+        )
+      )
+  )
+  (:action release_attachment_from_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?attachment_piece - attachment_piece)
+    :precondition
+      (and
+        (attachment_reserved_on_equipment ?upgradeable_equipment ?attachment_piece)
+      )
+    :effect
+      (and
+        (attachment_piece_available ?attachment_piece)
+        (not
+          (attachment_reserved_on_equipment ?upgradeable_equipment ?attachment_piece)
+        )
+      )
+  )
+  (:action reserve_attachment_type_a_for_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_a - attachment_type_a)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (attachment_type_a_available ?attachment_type_a)
+      )
+    :effect
+      (and
+        (aux_tool_attachment_type_a_reserved ?auxiliary_tool ?attachment_type_a)
+        (not
+          (attachment_type_a_available ?attachment_type_a)
+        )
+      )
+  )
+  (:action release_attachment_type_a_from_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_a - attachment_type_a)
+    :precondition
+      (and
+        (aux_tool_attachment_type_a_reserved ?auxiliary_tool ?attachment_type_a)
+      )
+    :effect
+      (and
+        (attachment_type_a_available ?attachment_type_a)
+        (not
+          (aux_tool_attachment_type_a_reserved ?auxiliary_tool ?attachment_type_a)
+        )
+      )
+  )
+  (:action reserve_attachment_type_c_for_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (attachment_type_c_available ?attachment_type_c)
+      )
+    :effect
+      (and
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (not
+          (attachment_type_c_available ?attachment_type_c)
+        )
+      )
+  )
+  (:action release_attachment_type_c_from_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c)
+    :precondition
+      (and
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+      )
+    :effect
+      (and
+        (attachment_type_c_available ?attachment_type_c)
+        (not
+          (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        )
+      )
+  )
+  (:action mark_material_category_for_primary_tool
+    :parameters (?primary_tool - primary_tool ?material_category - material_category ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?primary_tool)
+        (subcomponent_reserved_for_equipment ?primary_tool ?subcomponent)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (not
+          (material_category_marked ?material_category)
+        )
+        (not
+          (material_category_assigned_to_consumable ?material_category)
+        )
+      )
+    :effect (material_category_marked ?material_category)
+  )
+  (:action allocate_material_category_with_attachment_for_primary_tool
+    :parameters (?primary_tool - primary_tool ?material_category - material_category ?attachment_piece - attachment_piece)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?primary_tool)
+        (attachment_reserved_on_equipment ?primary_tool ?attachment_piece)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (material_category_marked ?material_category)
+        (not
+          (primary_tool_local_ready ?primary_tool)
+        )
+      )
+    :effect
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (primary_tool_category_confirmed ?primary_tool)
+      )
+  )
+  (:action reserve_consumable_for_primary_tool_category
+    :parameters (?primary_tool - primary_tool ?material_category - material_category ?consumable_bundle - consumable_bundle)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?primary_tool)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (consumable_bundle_available ?consumable_bundle)
+        (not
+          (primary_tool_local_ready ?primary_tool)
+        )
+      )
+    :effect
+      (and
+        (material_category_assigned_to_consumable ?material_category)
+        (primary_tool_local_ready ?primary_tool)
+        (consumable_allocated_to_primary_tool ?primary_tool ?consumable_bundle)
+        (not
+          (consumable_bundle_available ?consumable_bundle)
+        )
+      )
+  )
+  (:action commit_consumable_and_mark_primary_tool_category
+    :parameters (?primary_tool - primary_tool ?material_category - material_category ?subcomponent - subcomponent ?consumable_bundle - consumable_bundle)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?primary_tool)
+        (subcomponent_reserved_for_equipment ?primary_tool ?subcomponent)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (material_category_assigned_to_consumable ?material_category)
+        (consumable_allocated_to_primary_tool ?primary_tool ?consumable_bundle)
+        (not
+          (primary_tool_category_confirmed ?primary_tool)
+        )
+      )
+    :effect
+      (and
+        (material_category_marked ?material_category)
+        (primary_tool_category_confirmed ?primary_tool)
+        (consumable_bundle_available ?consumable_bundle)
+        (not
+          (consumable_allocated_to_primary_tool ?primary_tool ?consumable_bundle)
+        )
+      )
+  )
+  (:action mark_material_variant_for_secondary_tool
+    :parameters (?secondary_tool - secondary_tool ?material_variant - material_variant ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?secondary_tool)
+        (subcomponent_reserved_for_equipment ?secondary_tool ?subcomponent)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (not
+          (material_variant_marked ?material_variant)
+        )
+        (not
+          (material_variant_assigned_to_consumable ?material_variant)
+        )
+      )
+    :effect (material_variant_marked ?material_variant)
+  )
+  (:action allocate_material_variant_with_attachment_for_secondary_tool
+    :parameters (?secondary_tool - secondary_tool ?material_variant - material_variant ?attachment_piece - attachment_piece)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?secondary_tool)
+        (attachment_reserved_on_equipment ?secondary_tool ?attachment_piece)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_variant_marked ?material_variant)
+        (not
+          (secondary_tool_local_ready ?secondary_tool)
+        )
+      )
+    :effect
+      (and
+        (secondary_tool_local_ready ?secondary_tool)
+        (secondary_tool_category_confirmed ?secondary_tool)
+      )
+  )
+  (:action reserve_consumable_for_secondary_tool_variant
+    :parameters (?secondary_tool - secondary_tool ?material_variant - material_variant ?consumable_bundle - consumable_bundle)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?secondary_tool)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (consumable_bundle_available ?consumable_bundle)
+        (not
+          (secondary_tool_local_ready ?secondary_tool)
+        )
+      )
+    :effect
+      (and
+        (material_variant_assigned_to_consumable ?material_variant)
+        (secondary_tool_local_ready ?secondary_tool)
+        (consumable_allocated_to_secondary_tool ?secondary_tool ?consumable_bundle)
+        (not
+          (consumable_bundle_available ?consumable_bundle)
+        )
+      )
+  )
+  (:action commit_consumable_and_mark_secondary_tool_variant
+    :parameters (?secondary_tool - secondary_tool ?material_variant - material_variant ?subcomponent - subcomponent ?consumable_bundle - consumable_bundle)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?secondary_tool)
+        (subcomponent_reserved_for_equipment ?secondary_tool ?subcomponent)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_variant_assigned_to_consumable ?material_variant)
+        (consumable_allocated_to_secondary_tool ?secondary_tool ?consumable_bundle)
+        (not
+          (secondary_tool_category_confirmed ?secondary_tool)
+        )
+      )
+    :effect
+      (and
+        (material_variant_marked ?material_variant)
+        (secondary_tool_category_confirmed ?secondary_tool)
+        (consumable_bundle_available ?consumable_bundle)
+        (not
+          (consumable_allocated_to_secondary_tool ?secondary_tool ?consumable_bundle)
+        )
+      )
+  )
+  (:action craft_upgrade_module_standard
+    :parameters (?primary_tool - primary_tool ?secondary_tool - secondary_tool ?material_category - material_category ?material_variant - material_variant ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (secondary_tool_local_ready ?secondary_tool)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_category_marked ?material_category)
+        (material_variant_marked ?material_variant)
+        (primary_tool_category_confirmed ?primary_tool)
+        (secondary_tool_category_confirmed ?secondary_tool)
+        (upgrade_module_unprepared ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_uses_material_category ?upgrade_module ?material_category)
+        (upgrade_module_uses_material_variant ?upgrade_module ?material_variant)
+        (not
+          (upgrade_module_unprepared ?upgrade_module)
+        )
+      )
+  )
+  (:action craft_upgrade_module_with_option_1
+    :parameters (?primary_tool - primary_tool ?secondary_tool - secondary_tool ?material_category - material_category ?material_variant - material_variant ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (secondary_tool_local_ready ?secondary_tool)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_category_assigned_to_consumable ?material_category)
+        (material_variant_marked ?material_variant)
+        (not
+          (primary_tool_category_confirmed ?primary_tool)
+        )
+        (secondary_tool_category_confirmed ?secondary_tool)
+        (upgrade_module_unprepared ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_uses_material_category ?upgrade_module ?material_category)
+        (upgrade_module_uses_material_variant ?upgrade_module ?material_variant)
+        (upgrade_module_option_flag_1 ?upgrade_module)
+        (not
+          (upgrade_module_unprepared ?upgrade_module)
+        )
+      )
+  )
+  (:action craft_upgrade_module_with_option_2
+    :parameters (?primary_tool - primary_tool ?secondary_tool - secondary_tool ?material_category - material_category ?material_variant - material_variant ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (secondary_tool_local_ready ?secondary_tool)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_category_marked ?material_category)
+        (material_variant_assigned_to_consumable ?material_variant)
+        (primary_tool_category_confirmed ?primary_tool)
+        (not
+          (secondary_tool_category_confirmed ?secondary_tool)
+        )
+        (upgrade_module_unprepared ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_uses_material_category ?upgrade_module ?material_category)
+        (upgrade_module_uses_material_variant ?upgrade_module ?material_variant)
+        (upgrade_module_option_flag_2 ?upgrade_module)
+        (not
+          (upgrade_module_unprepared ?upgrade_module)
+        )
+      )
+  )
+  (:action craft_upgrade_module_with_options_1_and_2
+    :parameters (?primary_tool - primary_tool ?secondary_tool - secondary_tool ?material_category - material_category ?material_variant - material_variant ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (secondary_tool_local_ready ?secondary_tool)
+        (primary_tool_material_category ?primary_tool ?material_category)
+        (secondary_tool_material_variant ?secondary_tool ?material_variant)
+        (material_category_assigned_to_consumable ?material_category)
+        (material_variant_assigned_to_consumable ?material_variant)
+        (not
+          (primary_tool_category_confirmed ?primary_tool)
+        )
+        (not
+          (secondary_tool_category_confirmed ?secondary_tool)
+        )
+        (upgrade_module_unprepared ?upgrade_module)
+      )
+    :effect
+      (and
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_uses_material_category ?upgrade_module ?material_category)
+        (upgrade_module_uses_material_variant ?upgrade_module ?material_variant)
+        (upgrade_module_option_flag_1 ?upgrade_module)
+        (upgrade_module_option_flag_2 ?upgrade_module)
+        (not
+          (upgrade_module_unprepared ?upgrade_module)
+        )
+      )
+  )
+  (:action finalize_upgrade_module
+    :parameters (?upgrade_module - upgrade_module ?primary_tool - primary_tool ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (upgrade_module_prepared ?upgrade_module)
+        (primary_tool_local_ready ?primary_tool)
+        (subcomponent_reserved_for_equipment ?primary_tool ?subcomponent)
+        (not
+          (upgrade_module_finalized ?upgrade_module)
+        )
+      )
+    :effect (upgrade_module_finalized ?upgrade_module)
+  )
+  (:action bind_blueprint_to_module_for_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (aux_tool_compatible_with_module ?auxiliary_tool ?upgrade_module)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (upgrade_blueprint_available ?upgrade_blueprint)
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_finalized ?upgrade_module)
+        (not
+          (upgrade_blueprint_activated ?upgrade_blueprint)
+        )
+      )
+    :effect
+      (and
+        (upgrade_blueprint_activated ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (not
+          (upgrade_blueprint_available ?upgrade_blueprint)
+        )
+      )
+  )
+  (:action prepare_aux_tool_with_blueprint_and_module
+    :parameters (?auxiliary_tool - auxiliary_tool ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (upgrade_blueprint_activated ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (subcomponent_reserved_for_equipment ?auxiliary_tool ?subcomponent)
+        (not
+          (upgrade_module_option_flag_1 ?upgrade_module)
+        )
+        (not
+          (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+        )
+      )
+    :effect (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+  )
+  (:action reserve_optional_modifier_for_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?optional_modifier - optional_modifier)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (optional_modifier_available ?optional_modifier)
+        (not
+          (aux_tool_optional_modifier_reserved ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_optional_modifier_reserved ?auxiliary_tool)
+        (aux_tool_optional_modifier_bound ?auxiliary_tool ?optional_modifier)
+        (not
+          (optional_modifier_available ?optional_modifier)
+        )
+      )
+  )
+  (:action apply_optional_modifier_to_aux_tool_preparation
+    :parameters (?auxiliary_tool - auxiliary_tool ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module ?subcomponent - subcomponent ?optional_modifier - optional_modifier)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (upgrade_blueprint_activated ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (subcomponent_reserved_for_equipment ?auxiliary_tool ?subcomponent)
+        (upgrade_module_option_flag_1 ?upgrade_module)
+        (aux_tool_optional_modifier_reserved ?auxiliary_tool)
+        (aux_tool_optional_modifier_bound ?auxiliary_tool ?optional_modifier)
+        (not
+          (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+        (aux_tool_optional_modifier_applied ?auxiliary_tool)
+      )
+  )
+  (:action prepare_aux_tool_with_attachment_a_stage1
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_a - attachment_type_a ?attachment_piece - attachment_piece ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+        (aux_tool_attachment_type_a_reserved ?auxiliary_tool ?attachment_type_a)
+        (attachment_reserved_on_equipment ?auxiliary_tool ?attachment_piece)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (not
+          (upgrade_module_option_flag_2 ?upgrade_module)
+        )
+        (not
+          (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        )
+      )
+    :effect (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+  )
+  (:action prepare_aux_tool_with_attachment_a_stage2
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_a - attachment_type_a ?attachment_piece - attachment_piece ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (aux_tool_prepared_with_blueprint ?auxiliary_tool)
+        (aux_tool_attachment_type_a_reserved ?auxiliary_tool ?attachment_type_a)
+        (attachment_reserved_on_equipment ?auxiliary_tool ?attachment_piece)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (upgrade_module_option_flag_2 ?upgrade_module)
+        (not
+          (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        )
+      )
+    :effect (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+  )
+  (:action verify_aux_tool_attachment_stage1
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (not
+          (upgrade_module_option_flag_1 ?upgrade_module)
+        )
+        (not
+          (upgrade_module_option_flag_2 ?upgrade_module)
+        )
+        (not
+          (aux_tool_attachment_verified ?auxiliary_tool)
+        )
+      )
+    :effect (aux_tool_attachment_verified ?auxiliary_tool)
+  )
+  (:action verify_aux_tool_attachment_and_apply_modifier_stage2
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (upgrade_module_option_flag_1 ?upgrade_module)
+        (not
+          (upgrade_module_option_flag_2 ?upgrade_module)
+        )
+        (not
+          (aux_tool_attachment_verified ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_modifier_applied ?auxiliary_tool)
+      )
+  )
+  (:action verify_aux_tool_attachment_and_apply_modifier_stage3
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (not
+          (upgrade_module_option_flag_1 ?upgrade_module)
+        )
+        (upgrade_module_option_flag_2 ?upgrade_module)
+        (not
+          (aux_tool_attachment_verified ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_modifier_applied ?auxiliary_tool)
+      )
+  )
+  (:action verify_aux_tool_attachment_and_apply_modifier_stage4
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c ?upgrade_blueprint - upgrade_blueprint ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_state ?auxiliary_tool)
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (aux_tool_bound_to_blueprint ?auxiliary_tool ?upgrade_blueprint)
+        (blueprint_bound_to_module ?upgrade_blueprint ?upgrade_module)
+        (upgrade_module_option_flag_1 ?upgrade_module)
+        (upgrade_module_option_flag_2 ?upgrade_module)
+        (not
+          (aux_tool_attachment_verified ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_modifier_applied ?auxiliary_tool)
+      )
+  )
+  (:action finalize_aux_tool_slot_verification
+    :parameters (?auxiliary_tool - auxiliary_tool)
+    :precondition
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (not
+          (aux_tool_slot_modifier_applied ?auxiliary_tool)
+        )
+        (not
+          (aux_tool_installation_finalized ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_installation_finalized ?auxiliary_tool)
+        (equipment_ready_for_preservative ?auxiliary_tool)
+      )
+  )
+  (:action bind_slot_modifier_to_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?slot_modifier - slot_modifier)
+    :precondition
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_modifier_applied ?auxiliary_tool)
+        (slot_modifier_available ?slot_modifier)
+      )
+    :effect
+      (and
+        (aux_tool_slot_modifier_bound ?auxiliary_tool ?slot_modifier)
+        (not
+          (slot_modifier_available ?slot_modifier)
+        )
+      )
+  )
+  (:action activate_aux_tool_slot
+    :parameters (?auxiliary_tool - auxiliary_tool ?primary_tool - primary_tool ?secondary_tool - secondary_tool ?subcomponent - subcomponent ?slot_modifier - slot_modifier)
+    :precondition
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_modifier_applied ?auxiliary_tool)
+        (aux_tool_slot_modifier_bound ?auxiliary_tool ?slot_modifier)
+        (aux_tool_compatible_with_primary_tool ?auxiliary_tool ?primary_tool)
+        (aux_tool_compatible_with_secondary_tool ?auxiliary_tool ?secondary_tool)
+        (primary_tool_category_confirmed ?primary_tool)
+        (secondary_tool_category_confirmed ?secondary_tool)
+        (subcomponent_reserved_for_equipment ?auxiliary_tool ?subcomponent)
+        (not
+          (aux_tool_slot_activated ?auxiliary_tool)
+        )
+      )
+    :effect (aux_tool_slot_activated ?auxiliary_tool)
+  )
+  (:action finalize_aux_tool_activation
+    :parameters (?auxiliary_tool - auxiliary_tool)
+    :precondition
+      (and
+        (aux_tool_attachment_verified ?auxiliary_tool)
+        (aux_tool_slot_activated ?auxiliary_tool)
+        (not
+          (aux_tool_installation_finalized ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_installation_finalized ?auxiliary_tool)
+        (equipment_ready_for_preservative ?auxiliary_tool)
+      )
+  )
+  (:action reserve_attachment_type_b_for_aux_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_b - attachment_type_b ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_selection_confirmed ?auxiliary_tool)
+        (subcomponent_reserved_for_equipment ?auxiliary_tool ?subcomponent)
+        (attachment_type_b_available ?attachment_type_b)
+        (auxiliary_tool_attachment_type_b_reserved_for ?auxiliary_tool ?attachment_type_b)
+        (not
+          (auxiliary_tool_attachment_type_b_reserved_marker ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_marker ?auxiliary_tool)
+        (not
+          (attachment_type_b_available ?attachment_type_b)
+        )
+      )
+  )
+  (:action stage_aux_tool_for_attachment_b
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_piece - attachment_piece)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_reserved_marker ?auxiliary_tool)
+        (attachment_reserved_on_equipment ?auxiliary_tool ?attachment_piece)
+        (not
+          (auxiliary_tool_attachment_type_b_staged ?auxiliary_tool)
+        )
+      )
+    :effect (auxiliary_tool_attachment_type_b_staged ?auxiliary_tool)
+  )
+  (:action confirm_aux_tool_attachment_c_readiness
+    :parameters (?auxiliary_tool - auxiliary_tool ?attachment_type_c - attachment_type_c)
+    :precondition
+      (and
+        (auxiliary_tool_attachment_type_b_staged ?auxiliary_tool)
+        (aux_tool_attachment_type_c_reserved ?auxiliary_tool ?attachment_type_c)
+        (not
+          (aux_tool_attachment_type_c_confirmed ?auxiliary_tool)
+        )
+      )
+    :effect (aux_tool_attachment_type_c_confirmed ?auxiliary_tool)
+  )
+  (:action finalize_aux_tool_attachment_confirmation
+    :parameters (?auxiliary_tool - auxiliary_tool)
+    :precondition
+      (and
+        (aux_tool_attachment_type_c_confirmed ?auxiliary_tool)
+        (not
+          (aux_tool_installation_finalized ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (aux_tool_installation_finalized ?auxiliary_tool)
+        (equipment_ready_for_preservative ?auxiliary_tool)
+      )
+  )
+  (:action mark_primary_tool_ready_for_preservative
+    :parameters (?primary_tool - primary_tool ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (primary_tool_local_ready ?primary_tool)
+        (primary_tool_category_confirmed ?primary_tool)
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_finalized ?upgrade_module)
+        (not
+          (equipment_ready_for_preservative ?primary_tool)
+        )
+      )
+    :effect (equipment_ready_for_preservative ?primary_tool)
+  )
+  (:action mark_secondary_tool_ready_for_preservative
+    :parameters (?secondary_tool - secondary_tool ?upgrade_module - upgrade_module)
+    :precondition
+      (and
+        (secondary_tool_local_ready ?secondary_tool)
+        (secondary_tool_category_confirmed ?secondary_tool)
+        (upgrade_module_prepared ?upgrade_module)
+        (upgrade_module_finalized ?upgrade_module)
+        (not
+          (equipment_ready_for_preservative ?secondary_tool)
+        )
+      )
+    :effect (equipment_ready_for_preservative ?secondary_tool)
+  )
+  (:action apply_preservative_to_equipment
+    :parameters (?upgradeable_equipment - upgradeable_equipment ?preservative_item - preservative_item ?subcomponent - subcomponent)
+    :precondition
+      (and
+        (equipment_ready_for_preservative ?upgradeable_equipment)
+        (subcomponent_reserved_for_equipment ?upgradeable_equipment ?subcomponent)
+        (preservative_item_available ?preservative_item)
+        (not
+          (equipment_preservative_applied ?upgradeable_equipment)
+        )
+      )
+    :effect
+      (and
+        (equipment_preservative_applied ?upgradeable_equipment)
+        (equipment_preservative_reserved ?upgradeable_equipment ?preservative_item)
+        (not
+          (preservative_item_available ?preservative_item)
+        )
+      )
+  )
+  (:action apply_upgrade_to_primary_tool
+    :parameters (?primary_tool - primary_tool ?raw_material - raw_material ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (equipment_preservative_applied ?primary_tool)
+        (raw_material_reserved_for_equipment ?primary_tool ?raw_material)
+        (equipment_preservative_reserved ?primary_tool ?preservative_item)
+        (not
+          (equipment_upgrade_applied ?primary_tool)
+        )
+      )
+    :effect
+      (and
+        (equipment_upgrade_applied ?primary_tool)
+        (raw_material_available ?raw_material)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+  (:action apply_upgrade_to_secondary_tool
+    :parameters (?secondary_tool - secondary_tool ?raw_material - raw_material ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (equipment_preservative_applied ?secondary_tool)
+        (raw_material_reserved_for_equipment ?secondary_tool ?raw_material)
+        (equipment_preservative_reserved ?secondary_tool ?preservative_item)
+        (not
+          (equipment_upgrade_applied ?secondary_tool)
+        )
+      )
+    :effect
+      (and
+        (equipment_upgrade_applied ?secondary_tool)
+        (raw_material_available ?raw_material)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+  (:action apply_upgrade_to_auxiliary_tool
+    :parameters (?auxiliary_tool - auxiliary_tool ?raw_material - raw_material ?preservative_item - preservative_item)
+    :precondition
+      (and
+        (equipment_preservative_applied ?auxiliary_tool)
+        (raw_material_reserved_for_equipment ?auxiliary_tool ?raw_material)
+        (equipment_preservative_reserved ?auxiliary_tool ?preservative_item)
+        (not
+          (equipment_upgrade_applied ?auxiliary_tool)
+        )
+      )
+    :effect
+      (and
+        (equipment_upgrade_applied ?auxiliary_tool)
+        (raw_material_available ?raw_material)
+        (preservative_item_available ?preservative_item)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem tool_upgrade_downselection_problem)
+  (:domain tool_upgrade_material_downselection)
+  (:objects primary_tool_alpha - primary_tool secondary_tool_alpha - secondary_tool auxiliary_tool_frame_a - auxiliary_tool auxiliary_tool_frame_b - auxiliary_tool raw_material_iron_ore - raw_material raw_material_copper_ore - raw_material raw_material_titanium_ore - raw_material subcomponent_core_plate - subcomponent attachment_plate_standard - attachment_piece consumable_bundle_small_pack - consumable_bundle material_category_metal - material_category material_variant_high_grade - material_variant upgrade_module_prototype - upgrade_module upgrade_blueprint_alpha - upgrade_blueprint upgrade_blueprint_beta - upgrade_blueprint optional_modifier_precision - optional_modifier optional_modifier_durability - optional_modifier slot_modifier_alpha - slot_modifier slot_modifier_beta - slot_modifier preservative_pack_basic - preservative_item attachment_type_a_standard - attachment_type_a attachment_type_b_variant_1 - attachment_type_b attachment_type_b_variant_2 - attachment_type_b attachment_type_c_rare - attachment_type_c)
+  (:init
+    (raw_material_available raw_material_iron_ore)
+    (raw_material_available raw_material_copper_ore)
+    (raw_material_available raw_material_titanium_ore)
+    (subcomponent_available subcomponent_core_plate)
+    (attachment_piece_available attachment_plate_standard)
+    (consumable_bundle_available consumable_bundle_small_pack)
+    (primary_tool_material_category primary_tool_alpha material_category_metal)
+    (secondary_tool_material_variant secondary_tool_alpha material_variant_high_grade)
+    (upgrade_module_unprepared upgrade_module_prototype)
+    (upgrade_blueprint_available upgrade_blueprint_alpha)
+    (upgrade_blueprint_available upgrade_blueprint_beta)
+    (aux_tool_compatible_with_primary_tool auxiliary_tool_frame_a primary_tool_alpha)
+    (aux_tool_compatible_with_primary_tool auxiliary_tool_frame_b primary_tool_alpha)
+    (aux_tool_compatible_with_secondary_tool auxiliary_tool_frame_a secondary_tool_alpha)
+    (aux_tool_compatible_with_secondary_tool auxiliary_tool_frame_b secondary_tool_alpha)
+    (aux_tool_compatible_with_module auxiliary_tool_frame_a upgrade_module_prototype)
+    (aux_tool_compatible_with_module auxiliary_tool_frame_b upgrade_module_prototype)
+    (aux_tool_bound_to_blueprint auxiliary_tool_frame_a upgrade_blueprint_alpha)
+    (aux_tool_bound_to_blueprint auxiliary_tool_frame_b upgrade_blueprint_beta)
+    (optional_modifier_available optional_modifier_precision)
+    (optional_modifier_available optional_modifier_durability)
+    (slot_modifier_available slot_modifier_alpha)
+    (slot_modifier_available slot_modifier_beta)
+    (preservative_item_available preservative_pack_basic)
+    (attachment_type_a_available attachment_type_a_standard)
+    (attachment_type_b_available attachment_type_b_variant_1)
+    (auxiliary_tool_attachment_type_b_reserved_for auxiliary_tool_frame_a attachment_type_b_variant_1)
+    (auxiliary_tool_attachment_type_b_reserved_for auxiliary_tool_frame_b attachment_type_b_variant_2)
+    (attachment_type_c_available attachment_type_c_rare)
+  )
+  (:goal
+    (and
+      (equipment_upgrade_applied primary_tool_alpha)
+      (equipment_upgrade_applied secondary_tool_alpha)
+      (equipment_upgrade_applied auxiliary_tool_frame_a)
+      (equipment_upgrade_applied auxiliary_tool_frame_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(mark_equipment_as_candidate primary_tool_alpha)
+(propose_raw_material_for_equipment primary_tool_alpha raw_material_iron_ore)
+(reserve_subcomponent_for_equipment primary_tool_alpha subcomponent_core_plate)
+(confirm_equipment_selection primary_tool_alpha subcomponent_core_plate)
+(reserve_consumable_for_primary_tool_category primary_tool_alpha material_category_metal consumable_bundle_small_pack)
+(commit_consumable_and_mark_primary_tool_category primary_tool_alpha material_category_metal subcomponent_core_plate consumable_bundle_small_pack)
+(release_subcomponent_from_equipment primary_tool_alpha subcomponent_core_plate)
+(mark_equipment_as_candidate secondary_tool_alpha)
+(propose_raw_material_for_equipment secondary_tool_alpha raw_material_copper_ore)
+(reserve_subcomponent_for_equipment secondary_tool_alpha subcomponent_core_plate)
+(confirm_equipment_selection secondary_tool_alpha subcomponent_core_plate)
+(reserve_consumable_for_secondary_tool_variant secondary_tool_alpha material_variant_high_grade consumable_bundle_small_pack)
+(commit_consumable_and_mark_secondary_tool_variant secondary_tool_alpha material_variant_high_grade subcomponent_core_plate consumable_bundle_small_pack)
+(release_subcomponent_from_equipment secondary_tool_alpha subcomponent_core_plate)
+(craft_upgrade_module_standard primary_tool_alpha secondary_tool_alpha material_category_metal material_variant_high_grade upgrade_module_prototype)
+(reserve_subcomponent_for_equipment primary_tool_alpha subcomponent_core_plate)
+(finalize_upgrade_module upgrade_module_prototype primary_tool_alpha subcomponent_core_plate)
+(mark_primary_tool_ready_for_preservative primary_tool_alpha upgrade_module_prototype)
+(mark_secondary_tool_ready_for_preservative secondary_tool_alpha upgrade_module_prototype)
+(apply_preservative_to_equipment primary_tool_alpha preservative_pack_basic subcomponent_core_plate)
+(apply_upgrade_to_primary_tool primary_tool_alpha raw_material_iron_ore preservative_pack_basic)
+(release_subcomponent_from_equipment primary_tool_alpha subcomponent_core_plate)
+(reserve_subcomponent_for_equipment secondary_tool_alpha subcomponent_core_plate)
+(apply_preservative_to_equipment secondary_tool_alpha preservative_pack_basic subcomponent_core_plate)
+(apply_upgrade_to_secondary_tool secondary_tool_alpha raw_material_copper_ore preservative_pack_basic)
+(release_subcomponent_from_equipment secondary_tool_alpha subcomponent_core_plate)
+(mark_equipment_as_candidate auxiliary_tool_frame_a)
+(propose_raw_material_for_equipment auxiliary_tool_frame_a raw_material_titanium_ore)
+(reserve_subcomponent_for_equipment auxiliary_tool_frame_a subcomponent_core_plate)
+(confirm_equipment_selection auxiliary_tool_frame_a subcomponent_core_plate)
+(reserve_attachment_piece_for_equipment auxiliary_tool_frame_a attachment_plate_standard)
+(reserve_attachment_type_a_for_aux_tool auxiliary_tool_frame_a attachment_type_a_standard)
+(reserve_attachment_type_c_for_aux_tool auxiliary_tool_frame_a attachment_type_c_rare)
+(bind_blueprint_to_module_for_aux_tool auxiliary_tool_frame_a upgrade_blueprint_alpha upgrade_module_prototype)
+(prepare_aux_tool_with_blueprint_and_module auxiliary_tool_frame_a upgrade_blueprint_alpha upgrade_module_prototype subcomponent_core_plate)
+(prepare_aux_tool_with_attachment_a_stage1 auxiliary_tool_frame_a attachment_type_a_standard attachment_plate_standard upgrade_blueprint_alpha upgrade_module_prototype)
+(verify_aux_tool_attachment_stage1 auxiliary_tool_frame_a attachment_type_c_rare upgrade_blueprint_alpha upgrade_module_prototype)
+(finalize_aux_tool_slot_verification auxiliary_tool_frame_a)
+(apply_preservative_to_equipment auxiliary_tool_frame_a preservative_pack_basic subcomponent_core_plate)
+(apply_upgrade_to_auxiliary_tool auxiliary_tool_frame_a raw_material_titanium_ore preservative_pack_basic)
+(release_subcomponent_from_equipment auxiliary_tool_frame_a subcomponent_core_plate)
+(release_attachment_piece_for_equipment auxiliary_tool_frame_a attachment_plate_standard)
+(release_attachment_type_a_from_aux_tool auxiliary_tool_frame_a attachment_type_a_standard)
+(release_attachment_type_c_from_aux_tool auxiliary_tool_frame_a attachment_type_c_rare)
+(mark_equipment_as_candidate auxiliary_tool_frame_b)
+(propose_raw_material_for_equipment auxiliary_tool_frame_b raw_material_iron_ore)
+(reserve_subcomponent_for_equipment auxiliary_tool_frame_b subcomponent_core_plate)
+(confirm_equipment_selection auxiliary_tool_frame_b subcomponent_core_plate)
+(reserve_attachment_piece_for_equipment auxiliary_tool_frame_b attachment_plate_standard)
+(reserve_attachment_type_a_for_aux_tool auxiliary_tool_frame_b attachment_type_a_standard)
+(reserve_attachment_type_c_for_aux_tool auxiliary_tool_frame_b attachment_type_c_rare)
+(bind_blueprint_to_module_for_aux_tool auxiliary_tool_frame_b upgrade_blueprint_beta upgrade_module_prototype)
+(prepare_aux_tool_with_blueprint_and_module auxiliary_tool_frame_b upgrade_blueprint_beta upgrade_module_prototype subcomponent_core_plate)
+(prepare_aux_tool_with_attachment_a_stage1 auxiliary_tool_frame_b attachment_type_a_standard attachment_plate_standard upgrade_blueprint_beta upgrade_module_prototype)
+(verify_aux_tool_attachment_stage1 auxiliary_tool_frame_b attachment_type_c_rare upgrade_blueprint_beta upgrade_module_prototype)
+(finalize_aux_tool_slot_verification auxiliary_tool_frame_b)
+(apply_preservative_to_equipment auxiliary_tool_frame_b preservative_pack_basic subcomponent_core_plate)
+(apply_upgrade_to_auxiliary_tool auxiliary_tool_frame_b raw_material_iron_ore preservative_pack_basic)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_k4doyory/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_k4doyory/plan.pddl 
+
+
+--- stderr ---
+

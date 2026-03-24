@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain tourism_name_match_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_object - object verification_asset - domain_object document_entity - domain_object resource_entity - domain_object case_container - domain_object name_verification_case - case_container matching_service_instance - verification_asset travel_document - verification_asset verifying_officer - verification_asset exception_code - verification_asset fare_eligibility_code - verification_asset travel_document_token - verification_asset payment_authorization - verification_asset external_authority_verdict - verification_asset supporting_document - document_entity policy_document - document_entity manual_override_note - document_entity exact_match_flag - resource_entity fuzzy_match_flag - resource_entity match_report - resource_entity applicant_group - name_verification_case linked_group - name_verification_case applicant_passenger_record - applicant_group linked_passenger_record - applicant_group passenger_profile - linked_group)
+
+  (:predicates
+    (verification_case_created ?name_verification_case - name_verification_case)
+    (automated_name_match_completed ?name_verification_case - name_verification_case)
+    (matching_service_allocated ?name_verification_case - name_verification_case)
+    (clearance_granted ?name_verification_case - name_verification_case)
+    (adjudication_complete ?name_verification_case - name_verification_case)
+    (clearance_eligible ?name_verification_case - name_verification_case)
+    (matching_service_available ?matching_service_instance - matching_service_instance)
+    (case_assigned_matching_service ?name_verification_case - name_verification_case ?matching_service_instance - matching_service_instance)
+    (document_available ?travel_document - travel_document)
+    (case_document_evaluation ?name_verification_case - name_verification_case ?travel_document - travel_document)
+    (verifier_available ?verifying_officer - verifying_officer)
+    (case_assigned_verifier ?name_verification_case - name_verification_case ?verifying_officer - verifying_officer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (applicant_attached_supporting_document ?applicant_passenger_record - applicant_passenger_record ?supporting_document - supporting_document)
+    (linked_attached_supporting_document ?linked_passenger_record - linked_passenger_record ?supporting_document - supporting_document)
+    (applicant_exact_flag_link ?applicant_passenger_record - applicant_passenger_record ?exact_match_flag - exact_match_flag)
+    (exact_match_indicator_set ?exact_match_flag - exact_match_flag)
+    (exact_match_supporting_doc_flag ?exact_match_flag - exact_match_flag)
+    (applicant_verification_confirmed ?applicant_passenger_record - applicant_passenger_record)
+    (linked_fuzzy_flag_link ?linked_passenger_record - linked_passenger_record ?fuzzy_match_flag - fuzzy_match_flag)
+    (fuzzy_match_indicator_set ?fuzzy_match_flag - fuzzy_match_flag)
+    (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag - fuzzy_match_flag)
+    (linked_verification_confirmed ?linked_passenger_record - linked_passenger_record)
+    (match_report_slot_available ?match_report - match_report)
+    (match_report_created ?match_report - match_report)
+    (match_report_links_exact_flag ?match_report - match_report ?exact_match_flag - exact_match_flag)
+    (match_report_links_fuzzy_flag ?match_report - match_report ?fuzzy_match_flag - fuzzy_match_flag)
+    (match_report_variant_flag_1 ?match_report - match_report)
+    (match_report_variant_flag_2 ?match_report - match_report)
+    (match_report_acknowledged ?match_report - match_report)
+    (profile_links_applicant_record ?passenger_profile - passenger_profile ?applicant_passenger_record - applicant_passenger_record)
+    (profile_links_linked_record ?passenger_profile - passenger_profile ?linked_passenger_record - linked_passenger_record)
+    (profile_links_match_report ?passenger_profile - passenger_profile ?match_report - match_report)
+    (policy_document_available ?policy_document - policy_document)
+    (profile_links_policy_document ?passenger_profile - passenger_profile ?policy_document - policy_document)
+    (policy_document_validated ?policy_document - policy_document)
+    (policy_document_referenced_by_report ?policy_document - policy_document ?match_report - match_report)
+    (profile_policy_validated ?passenger_profile - passenger_profile)
+    (profile_supporting_documents_validated ?passenger_profile - passenger_profile)
+    (profile_documents_policy_checks_completed ?passenger_profile - passenger_profile)
+    (profile_exception_applied ?passenger_profile - passenger_profile)
+    (profile_exception_processed_flag ?passenger_profile - passenger_profile)
+    (fare_eligibility_ready ?passenger_profile - passenger_profile)
+    (profile_final_checks_passed ?passenger_profile - passenger_profile)
+    (manual_override_note_available ?manual_override_note - manual_override_note)
+    (profile_links_manual_override_note ?passenger_profile - passenger_profile ?manual_override_note - manual_override_note)
+    (manual_override_applied ?passenger_profile - passenger_profile)
+    (manual_override_confirmed_by_officer ?passenger_profile - passenger_profile)
+    (manual_override_approved ?passenger_profile - passenger_profile)
+    (exception_code_available ?exception_code - exception_code)
+    (profile_has_exception_code ?passenger_profile - passenger_profile ?exception_code - exception_code)
+    (fare_eligibility_code_available ?fare_eligibility_code - fare_eligibility_code)
+    (profile_has_fare_eligibility_code ?passenger_profile - passenger_profile ?fare_eligibility_code - fare_eligibility_code)
+    (payment_authorization_available ?payment_authorization - payment_authorization)
+    (profile_link_payment_authorization ?passenger_profile - passenger_profile ?payment_authorization - payment_authorization)
+    (external_verdict_available ?external_authority_verdict - external_authority_verdict)
+    (profile_link_external_verdict ?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict)
+    (travel_document_token_available ?travel_document_token - travel_document_token)
+    (case_has_travel_document_token ?name_verification_case - name_verification_case ?travel_document_token - travel_document_token)
+    (applicant_indicators_ready ?applicant_passenger_record - applicant_passenger_record)
+    (linked_indicators_ready ?linked_passenger_record - linked_passenger_record)
+    (profile_processed_flag ?passenger_profile - passenger_profile)
+  )
+  (:action create_verification_case
+    :parameters (?name_verification_case - name_verification_case)
+    :precondition
+      (and
+        (not
+          (verification_case_created ?name_verification_case)
+        )
+        (not
+          (clearance_granted ?name_verification_case)
+        )
+      )
+    :effect (verification_case_created ?name_verification_case)
+  )
+  (:action assign_matching_service_to_case
+    :parameters (?name_verification_case - name_verification_case ?matching_service_instance - matching_service_instance)
+    :precondition
+      (and
+        (verification_case_created ?name_verification_case)
+        (not
+          (matching_service_allocated ?name_verification_case)
+        )
+        (matching_service_available ?matching_service_instance)
+      )
+    :effect
+      (and
+        (matching_service_allocated ?name_verification_case)
+        (case_assigned_matching_service ?name_verification_case ?matching_service_instance)
+        (not
+          (matching_service_available ?matching_service_instance)
+        )
+      )
+  )
+  (:action submit_document_for_matching
+    :parameters (?name_verification_case - name_verification_case ?travel_document - travel_document)
+    :precondition
+      (and
+        (verification_case_created ?name_verification_case)
+        (matching_service_allocated ?name_verification_case)
+        (document_available ?travel_document)
+      )
+    :effect
+      (and
+        (case_document_evaluation ?name_verification_case ?travel_document)
+        (not
+          (document_available ?travel_document)
+        )
+      )
+  )
+  (:action finalize_document_match_outcome
+    :parameters (?name_verification_case - name_verification_case ?travel_document - travel_document)
+    :precondition
+      (and
+        (verification_case_created ?name_verification_case)
+        (matching_service_allocated ?name_verification_case)
+        (case_document_evaluation ?name_verification_case ?travel_document)
+        (not
+          (automated_name_match_completed ?name_verification_case)
+        )
+      )
+    :effect (automated_name_match_completed ?name_verification_case)
+  )
+  (:action release_document_after_evaluation
+    :parameters (?name_verification_case - name_verification_case ?travel_document - travel_document)
+    :precondition
+      (and
+        (case_document_evaluation ?name_verification_case ?travel_document)
+      )
+    :effect
+      (and
+        (document_available ?travel_document)
+        (not
+          (case_document_evaluation ?name_verification_case ?travel_document)
+        )
+      )
+  )
+  (:action assign_verifying_officer_to_case
+    :parameters (?name_verification_case - name_verification_case ?verifying_officer - verifying_officer)
+    :precondition
+      (and
+        (automated_name_match_completed ?name_verification_case)
+        (verifier_available ?verifying_officer)
+      )
+    :effect
+      (and
+        (case_assigned_verifier ?name_verification_case ?verifying_officer)
+        (not
+          (verifier_available ?verifying_officer)
+        )
+      )
+  )
+  (:action release_verifying_officer_assignment
+    :parameters (?name_verification_case - name_verification_case ?verifying_officer - verifying_officer)
+    :precondition
+      (and
+        (case_assigned_verifier ?name_verification_case ?verifying_officer)
+      )
+    :effect
+      (and
+        (verifier_available ?verifying_officer)
+        (not
+          (case_assigned_verifier ?name_verification_case ?verifying_officer)
+        )
+      )
+  )
+  (:action attach_payment_authorization_to_profile
+    :parameters (?passenger_profile - passenger_profile ?payment_authorization - payment_authorization)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (payment_authorization_available ?payment_authorization)
+      )
+    :effect
+      (and
+        (profile_link_payment_authorization ?passenger_profile ?payment_authorization)
+        (not
+          (payment_authorization_available ?payment_authorization)
+        )
+      )
+  )
+  (:action detach_payment_authorization_from_profile
+    :parameters (?passenger_profile - passenger_profile ?payment_authorization - payment_authorization)
+    :precondition
+      (and
+        (profile_link_payment_authorization ?passenger_profile ?payment_authorization)
+      )
+    :effect
+      (and
+        (payment_authorization_available ?payment_authorization)
+        (not
+          (profile_link_payment_authorization ?passenger_profile ?payment_authorization)
+        )
+      )
+  )
+  (:action attach_external_verdict_to_profile
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (external_verdict_available ?external_authority_verdict)
+      )
+    :effect
+      (and
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (not
+          (external_verdict_available ?external_authority_verdict)
+        )
+      )
+  )
+  (:action detach_external_verdict_from_profile
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict)
+    :precondition
+      (and
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+      )
+    :effect
+      (and
+        (external_verdict_available ?external_authority_verdict)
+        (not
+          (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        )
+      )
+  )
+  (:action evaluate_applicant_exact_match_flag
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?exact_match_flag - exact_match_flag ?travel_document - travel_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?applicant_passenger_record)
+        (case_document_evaluation ?applicant_passenger_record ?travel_document)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (not
+          (exact_match_indicator_set ?exact_match_flag)
+        )
+        (not
+          (exact_match_supporting_doc_flag ?exact_match_flag)
+        )
+      )
+    :effect (exact_match_indicator_set ?exact_match_flag)
+  )
+  (:action officer_confirm_applicant_exact_match
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?exact_match_flag - exact_match_flag ?verifying_officer - verifying_officer)
+    :precondition
+      (and
+        (automated_name_match_completed ?applicant_passenger_record)
+        (case_assigned_verifier ?applicant_passenger_record ?verifying_officer)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (exact_match_indicator_set ?exact_match_flag)
+        (not
+          (applicant_indicators_ready ?applicant_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+      )
+  )
+  (:action attach_supporting_document_for_applicant_and_set_flag
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?exact_match_flag - exact_match_flag ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?applicant_passenger_record)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (supporting_document_available ?supporting_document)
+        (not
+          (applicant_indicators_ready ?applicant_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (exact_match_supporting_doc_flag ?exact_match_flag)
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (applicant_attached_supporting_document ?applicant_passenger_record ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_applicant_supporting_doc_verification
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?exact_match_flag - exact_match_flag ?travel_document - travel_document ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?applicant_passenger_record)
+        (case_document_evaluation ?applicant_passenger_record ?travel_document)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (exact_match_supporting_doc_flag ?exact_match_flag)
+        (applicant_attached_supporting_document ?applicant_passenger_record ?supporting_document)
+        (not
+          (applicant_verification_confirmed ?applicant_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (exact_match_indicator_set ?exact_match_flag)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+        (supporting_document_available ?supporting_document)
+        (not
+          (applicant_attached_supporting_document ?applicant_passenger_record ?supporting_document)
+        )
+      )
+  )
+  (:action evaluate_linked_fuzzy_match_flag
+    :parameters (?linked_passenger_record - linked_passenger_record ?fuzzy_match_flag - fuzzy_match_flag ?travel_document - travel_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?linked_passenger_record)
+        (case_document_evaluation ?linked_passenger_record ?travel_document)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (not
+          (fuzzy_match_indicator_set ?fuzzy_match_flag)
+        )
+        (not
+          (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag)
+        )
+      )
+    :effect (fuzzy_match_indicator_set ?fuzzy_match_flag)
+  )
+  (:action officer_confirm_linked_fuzzy_match
+    :parameters (?linked_passenger_record - linked_passenger_record ?fuzzy_match_flag - fuzzy_match_flag ?verifying_officer - verifying_officer)
+    :precondition
+      (and
+        (automated_name_match_completed ?linked_passenger_record)
+        (case_assigned_verifier ?linked_passenger_record ?verifying_officer)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (fuzzy_match_indicator_set ?fuzzy_match_flag)
+        (not
+          (linked_indicators_ready ?linked_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (linked_indicators_ready ?linked_passenger_record)
+        (linked_verification_confirmed ?linked_passenger_record)
+      )
+  )
+  (:action attach_supporting_document_for_linked_and_set_flag
+    :parameters (?linked_passenger_record - linked_passenger_record ?fuzzy_match_flag - fuzzy_match_flag ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?linked_passenger_record)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (supporting_document_available ?supporting_document)
+        (not
+          (linked_indicators_ready ?linked_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag)
+        (linked_indicators_ready ?linked_passenger_record)
+        (linked_attached_supporting_document ?linked_passenger_record ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_linked_supporting_doc_verification
+    :parameters (?linked_passenger_record - linked_passenger_record ?fuzzy_match_flag - fuzzy_match_flag ?travel_document - travel_document ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?linked_passenger_record)
+        (case_document_evaluation ?linked_passenger_record ?travel_document)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag)
+        (linked_attached_supporting_document ?linked_passenger_record ?supporting_document)
+        (not
+          (linked_verification_confirmed ?linked_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (fuzzy_match_indicator_set ?fuzzy_match_flag)
+        (linked_verification_confirmed ?linked_passenger_record)
+        (supporting_document_available ?supporting_document)
+        (not
+          (linked_attached_supporting_document ?linked_passenger_record ?supporting_document)
+        )
+      )
+  )
+  (:action generate_match_report
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?linked_passenger_record - linked_passenger_record ?exact_match_flag - exact_match_flag ?fuzzy_match_flag - fuzzy_match_flag ?match_report - match_report)
+    :precondition
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (linked_indicators_ready ?linked_passenger_record)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (exact_match_indicator_set ?exact_match_flag)
+        (fuzzy_match_indicator_set ?fuzzy_match_flag)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+        (linked_verification_confirmed ?linked_passenger_record)
+        (match_report_slot_available ?match_report)
+      )
+    :effect
+      (and
+        (match_report_created ?match_report)
+        (match_report_links_exact_flag ?match_report ?exact_match_flag)
+        (match_report_links_fuzzy_flag ?match_report ?fuzzy_match_flag)
+        (not
+          (match_report_slot_available ?match_report)
+        )
+      )
+  )
+  (:action generate_match_report_with_exact_supporting_doc_and_fuzzy_confirmed
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?linked_passenger_record - linked_passenger_record ?exact_match_flag - exact_match_flag ?fuzzy_match_flag - fuzzy_match_flag ?match_report - match_report)
+    :precondition
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (linked_indicators_ready ?linked_passenger_record)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (exact_match_supporting_doc_flag ?exact_match_flag)
+        (fuzzy_match_indicator_set ?fuzzy_match_flag)
+        (not
+          (applicant_verification_confirmed ?applicant_passenger_record)
+        )
+        (linked_verification_confirmed ?linked_passenger_record)
+        (match_report_slot_available ?match_report)
+      )
+    :effect
+      (and
+        (match_report_created ?match_report)
+        (match_report_links_exact_flag ?match_report ?exact_match_flag)
+        (match_report_links_fuzzy_flag ?match_report ?fuzzy_match_flag)
+        (match_report_variant_flag_1 ?match_report)
+        (not
+          (match_report_slot_available ?match_report)
+        )
+      )
+  )
+  (:action generate_match_report_with_exact_confirmed_and_fuzzy_supporting_doc
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?linked_passenger_record - linked_passenger_record ?exact_match_flag - exact_match_flag ?fuzzy_match_flag - fuzzy_match_flag ?match_report - match_report)
+    :precondition
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (linked_indicators_ready ?linked_passenger_record)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (exact_match_indicator_set ?exact_match_flag)
+        (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+        (not
+          (linked_verification_confirmed ?linked_passenger_record)
+        )
+        (match_report_slot_available ?match_report)
+      )
+    :effect
+      (and
+        (match_report_created ?match_report)
+        (match_report_links_exact_flag ?match_report ?exact_match_flag)
+        (match_report_links_fuzzy_flag ?match_report ?fuzzy_match_flag)
+        (match_report_variant_flag_2 ?match_report)
+        (not
+          (match_report_slot_available ?match_report)
+        )
+      )
+  )
+  (:action generate_match_report_with_supporting_docs_for_both
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?linked_passenger_record - linked_passenger_record ?exact_match_flag - exact_match_flag ?fuzzy_match_flag - fuzzy_match_flag ?match_report - match_report)
+    :precondition
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (linked_indicators_ready ?linked_passenger_record)
+        (applicant_exact_flag_link ?applicant_passenger_record ?exact_match_flag)
+        (linked_fuzzy_flag_link ?linked_passenger_record ?fuzzy_match_flag)
+        (exact_match_supporting_doc_flag ?exact_match_flag)
+        (fuzzy_match_supporting_doc_flag ?fuzzy_match_flag)
+        (not
+          (applicant_verification_confirmed ?applicant_passenger_record)
+        )
+        (not
+          (linked_verification_confirmed ?linked_passenger_record)
+        )
+        (match_report_slot_available ?match_report)
+      )
+    :effect
+      (and
+        (match_report_created ?match_report)
+        (match_report_links_exact_flag ?match_report ?exact_match_flag)
+        (match_report_links_fuzzy_flag ?match_report ?fuzzy_match_flag)
+        (match_report_variant_flag_1 ?match_report)
+        (match_report_variant_flag_2 ?match_report)
+        (not
+          (match_report_slot_available ?match_report)
+        )
+      )
+  )
+  (:action acknowledge_match_report_for_document
+    :parameters (?match_report - match_report ?applicant_passenger_record - applicant_passenger_record ?travel_document - travel_document)
+    :precondition
+      (and
+        (match_report_created ?match_report)
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (case_document_evaluation ?applicant_passenger_record ?travel_document)
+        (not
+          (match_report_acknowledged ?match_report)
+        )
+      )
+    :effect (match_report_acknowledged ?match_report)
+  )
+  (:action validate_policy_document_for_profile
+    :parameters (?passenger_profile - passenger_profile ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (profile_links_match_report ?passenger_profile ?match_report)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_available ?policy_document)
+        (match_report_created ?match_report)
+        (match_report_acknowledged ?match_report)
+        (not
+          (policy_document_validated ?policy_document)
+        )
+      )
+    :effect
+      (and
+        (policy_document_validated ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action finalize_policy_validation_on_profile
+    :parameters (?passenger_profile - passenger_profile ?policy_document - policy_document ?match_report - match_report ?travel_document - travel_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_validated ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (case_document_evaluation ?passenger_profile ?travel_document)
+        (not
+          (match_report_variant_flag_1 ?match_report)
+        )
+        (not
+          (profile_policy_validated ?passenger_profile)
+        )
+      )
+    :effect (profile_policy_validated ?passenger_profile)
+  )
+  (:action apply_exception_code_to_profile
+    :parameters (?passenger_profile - passenger_profile ?exception_code - exception_code)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (exception_code_available ?exception_code)
+        (not
+          (profile_exception_applied ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_exception_applied ?passenger_profile)
+        (profile_has_exception_code ?passenger_profile ?exception_code)
+        (not
+          (exception_code_available ?exception_code)
+        )
+      )
+  )
+  (:action process_exception_with_policy_and_report
+    :parameters (?passenger_profile - passenger_profile ?policy_document - policy_document ?match_report - match_report ?travel_document - travel_document ?exception_code - exception_code)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_validated ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (case_document_evaluation ?passenger_profile ?travel_document)
+        (match_report_variant_flag_1 ?match_report)
+        (profile_exception_applied ?passenger_profile)
+        (profile_has_exception_code ?passenger_profile ?exception_code)
+        (not
+          (profile_policy_validated ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_policy_validated ?passenger_profile)
+        (profile_exception_processed_flag ?passenger_profile)
+      )
+  )
+  (:action process_payment_and_validate_profile
+    :parameters (?passenger_profile - passenger_profile ?payment_authorization - payment_authorization ?verifying_officer - verifying_officer ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_policy_validated ?passenger_profile)
+        (profile_link_payment_authorization ?passenger_profile ?payment_authorization)
+        (case_assigned_verifier ?passenger_profile ?verifying_officer)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (not
+          (match_report_variant_flag_2 ?match_report)
+        )
+        (not
+          (profile_supporting_documents_validated ?passenger_profile)
+        )
+      )
+    :effect (profile_supporting_documents_validated ?passenger_profile)
+  )
+  (:action process_payment_and_validate_profile_variant
+    :parameters (?passenger_profile - passenger_profile ?payment_authorization - payment_authorization ?verifying_officer - verifying_officer ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_policy_validated ?passenger_profile)
+        (profile_link_payment_authorization ?passenger_profile ?payment_authorization)
+        (case_assigned_verifier ?passenger_profile ?verifying_officer)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (match_report_variant_flag_2 ?match_report)
+        (not
+          (profile_supporting_documents_validated ?passenger_profile)
+        )
+      )
+    :effect (profile_supporting_documents_validated ?passenger_profile)
+  )
+  (:action attach_external_verdict_and_set_profile_flag
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_supporting_documents_validated ?passenger_profile)
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (not
+          (match_report_variant_flag_1 ?match_report)
+        )
+        (not
+          (match_report_variant_flag_2 ?match_report)
+        )
+        (not
+          (profile_documents_policy_checks_completed ?passenger_profile)
+        )
+      )
+    :effect (profile_documents_policy_checks_completed ?passenger_profile)
+  )
+  (:action attach_external_verdict_and_set_fare_ready
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_supporting_documents_validated ?passenger_profile)
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (match_report_variant_flag_1 ?match_report)
+        (not
+          (match_report_variant_flag_2 ?match_report)
+        )
+        (not
+          (profile_documents_policy_checks_completed ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (fare_eligibility_ready ?passenger_profile)
+      )
+  )
+  (:action attach_external_verdict_and_prepare_fare_variant
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_supporting_documents_validated ?passenger_profile)
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (not
+          (match_report_variant_flag_1 ?match_report)
+        )
+        (match_report_variant_flag_2 ?match_report)
+        (not
+          (profile_documents_policy_checks_completed ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (fare_eligibility_ready ?passenger_profile)
+      )
+  )
+  (:action attach_external_verdict_and_prepare_fare_variant_b
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict ?policy_document - policy_document ?match_report - match_report)
+    :precondition
+      (and
+        (profile_supporting_documents_validated ?passenger_profile)
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (profile_links_policy_document ?passenger_profile ?policy_document)
+        (policy_document_referenced_by_report ?policy_document ?match_report)
+        (match_report_variant_flag_1 ?match_report)
+        (match_report_variant_flag_2 ?match_report)
+        (not
+          (profile_documents_policy_checks_completed ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (fare_eligibility_ready ?passenger_profile)
+      )
+  )
+  (:action finalize_profile_pre_adjudication
+    :parameters (?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (not
+          (fare_eligibility_ready ?passenger_profile)
+        )
+        (not
+          (profile_processed_flag ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_processed_flag ?passenger_profile)
+        (adjudication_complete ?passenger_profile)
+      )
+  )
+  (:action attach_fare_eligibility_code_to_profile
+    :parameters (?passenger_profile - passenger_profile ?fare_eligibility_code - fare_eligibility_code)
+    :precondition
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (fare_eligibility_ready ?passenger_profile)
+        (fare_eligibility_code_available ?fare_eligibility_code)
+      )
+    :effect
+      (and
+        (profile_has_fare_eligibility_code ?passenger_profile ?fare_eligibility_code)
+        (not
+          (fare_eligibility_code_available ?fare_eligibility_code)
+        )
+      )
+  )
+  (:action finalize_profile_policy_and_supporting_documents
+    :parameters (?passenger_profile - passenger_profile ?applicant_passenger_record - applicant_passenger_record ?linked_passenger_record - linked_passenger_record ?travel_document - travel_document ?fare_eligibility_code - fare_eligibility_code)
+    :precondition
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (fare_eligibility_ready ?passenger_profile)
+        (profile_has_fare_eligibility_code ?passenger_profile ?fare_eligibility_code)
+        (profile_links_applicant_record ?passenger_profile ?applicant_passenger_record)
+        (profile_links_linked_record ?passenger_profile ?linked_passenger_record)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+        (linked_verification_confirmed ?linked_passenger_record)
+        (case_document_evaluation ?passenger_profile ?travel_document)
+        (not
+          (profile_final_checks_passed ?passenger_profile)
+        )
+      )
+    :effect (profile_final_checks_passed ?passenger_profile)
+  )
+  (:action adjudicator_mark_profile_cleared
+    :parameters (?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (profile_documents_policy_checks_completed ?passenger_profile)
+        (profile_final_checks_passed ?passenger_profile)
+        (not
+          (profile_processed_flag ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_processed_flag ?passenger_profile)
+        (adjudication_complete ?passenger_profile)
+      )
+  )
+  (:action apply_manual_override_to_profile
+    :parameters (?passenger_profile - passenger_profile ?manual_override_note - manual_override_note ?travel_document - travel_document)
+    :precondition
+      (and
+        (automated_name_match_completed ?passenger_profile)
+        (case_document_evaluation ?passenger_profile ?travel_document)
+        (manual_override_note_available ?manual_override_note)
+        (profile_links_manual_override_note ?passenger_profile ?manual_override_note)
+        (not
+          (manual_override_applied ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (manual_override_applied ?passenger_profile)
+        (not
+          (manual_override_note_available ?manual_override_note)
+        )
+      )
+  )
+  (:action confirm_manual_override_assignment
+    :parameters (?passenger_profile - passenger_profile ?verifying_officer - verifying_officer)
+    :precondition
+      (and
+        (manual_override_applied ?passenger_profile)
+        (case_assigned_verifier ?passenger_profile ?verifying_officer)
+        (not
+          (manual_override_confirmed_by_officer ?passenger_profile)
+        )
+      )
+    :effect (manual_override_confirmed_by_officer ?passenger_profile)
+  )
+  (:action approve_manual_override_with_external_verdict
+    :parameters (?passenger_profile - passenger_profile ?external_authority_verdict - external_authority_verdict)
+    :precondition
+      (and
+        (manual_override_confirmed_by_officer ?passenger_profile)
+        (profile_link_external_verdict ?passenger_profile ?external_authority_verdict)
+        (not
+          (manual_override_approved ?passenger_profile)
+        )
+      )
+    :effect (manual_override_approved ?passenger_profile)
+  )
+  (:action finalize_manual_override_adjudication
+    :parameters (?passenger_profile - passenger_profile)
+    :precondition
+      (and
+        (manual_override_approved ?passenger_profile)
+        (not
+          (profile_processed_flag ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_processed_flag ?passenger_profile)
+        (adjudication_complete ?passenger_profile)
+      )
+  )
+  (:action mark_applicant_record_cleared
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?match_report - match_report)
+    :precondition
+      (and
+        (applicant_indicators_ready ?applicant_passenger_record)
+        (applicant_verification_confirmed ?applicant_passenger_record)
+        (match_report_created ?match_report)
+        (match_report_acknowledged ?match_report)
+        (not
+          (adjudication_complete ?applicant_passenger_record)
+        )
+      )
+    :effect (adjudication_complete ?applicant_passenger_record)
+  )
+  (:action mark_linked_record_cleared
+    :parameters (?linked_passenger_record - linked_passenger_record ?match_report - match_report)
+    :precondition
+      (and
+        (linked_indicators_ready ?linked_passenger_record)
+        (linked_verification_confirmed ?linked_passenger_record)
+        (match_report_created ?match_report)
+        (match_report_acknowledged ?match_report)
+        (not
+          (adjudication_complete ?linked_passenger_record)
+        )
+      )
+    :effect (adjudication_complete ?linked_passenger_record)
+  )
+  (:action issue_travel_document_token_to_case
+    :parameters (?name_verification_case - name_verification_case ?travel_document_token - travel_document_token ?travel_document - travel_document)
+    :precondition
+      (and
+        (adjudication_complete ?name_verification_case)
+        (case_document_evaluation ?name_verification_case ?travel_document)
+        (travel_document_token_available ?travel_document_token)
+        (not
+          (clearance_eligible ?name_verification_case)
+        )
+      )
+    :effect
+      (and
+        (clearance_eligible ?name_verification_case)
+        (case_has_travel_document_token ?name_verification_case ?travel_document_token)
+        (not
+          (travel_document_token_available ?travel_document_token)
+        )
+      )
+  )
+  (:action finalize_clearance_and_release_service_for_applicant
+    :parameters (?applicant_passenger_record - applicant_passenger_record ?matching_service_instance - matching_service_instance ?travel_document_token - travel_document_token)
+    :precondition
+      (and
+        (clearance_eligible ?applicant_passenger_record)
+        (case_assigned_matching_service ?applicant_passenger_record ?matching_service_instance)
+        (case_has_travel_document_token ?applicant_passenger_record ?travel_document_token)
+        (not
+          (clearance_granted ?applicant_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?applicant_passenger_record)
+        (matching_service_available ?matching_service_instance)
+        (travel_document_token_available ?travel_document_token)
+      )
+  )
+  (:action finalize_clearance_and_release_service_for_linked
+    :parameters (?linked_passenger_record - linked_passenger_record ?matching_service_instance - matching_service_instance ?travel_document_token - travel_document_token)
+    :precondition
+      (and
+        (clearance_eligible ?linked_passenger_record)
+        (case_assigned_matching_service ?linked_passenger_record ?matching_service_instance)
+        (case_has_travel_document_token ?linked_passenger_record ?travel_document_token)
+        (not
+          (clearance_granted ?linked_passenger_record)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?linked_passenger_record)
+        (matching_service_available ?matching_service_instance)
+        (travel_document_token_available ?travel_document_token)
+      )
+  )
+  (:action finalize_clearance_and_release_service_for_profile
+    :parameters (?passenger_profile - passenger_profile ?matching_service_instance - matching_service_instance ?travel_document_token - travel_document_token)
+    :precondition
+      (and
+        (clearance_eligible ?passenger_profile)
+        (case_assigned_matching_service ?passenger_profile ?matching_service_instance)
+        (case_has_travel_document_token ?passenger_profile ?travel_document_token)
+        (not
+          (clearance_granted ?passenger_profile)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?passenger_profile)
+        (matching_service_available ?matching_service_instance)
+        (travel_document_token_available ?travel_document_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem name_match_case_problem)
+  (:domain tourism_name_match_domain)
+  (:objects applicant_record_1 - applicant_passenger_record linked_record_1 - linked_passenger_record passenger_profile_1 - passenger_profile passenger_profile_2 - passenger_profile matching_service_instance_1 - matching_service_instance matching_service_instance_2 - matching_service_instance matching_service_instance_3 - matching_service_instance travel_document_1 - travel_document verifying_officer_1 - verifying_officer supporting_document_1 - supporting_document exact_flag_1 - exact_match_flag fuzzy_flag_1 - fuzzy_match_flag match_report_1 - match_report policy_document_1 - policy_document policy_document_2 - policy_document exception_code_1 - exception_code exception_code_2 - exception_code fare_code_1 - fare_eligibility_code fare_code_2 - fare_eligibility_code travel_doc_token_1 - travel_document_token payment_authorization_1 - payment_authorization manual_override_note_1 - manual_override_note manual_override_note_2 - manual_override_note external_verdict_1 - external_authority_verdict)
+  (:init
+    (matching_service_available matching_service_instance_1)
+    (matching_service_available matching_service_instance_2)
+    (matching_service_available matching_service_instance_3)
+    (document_available travel_document_1)
+    (verifier_available verifying_officer_1)
+    (supporting_document_available supporting_document_1)
+    (applicant_exact_flag_link applicant_record_1 exact_flag_1)
+    (linked_fuzzy_flag_link linked_record_1 fuzzy_flag_1)
+    (match_report_slot_available match_report_1)
+    (policy_document_available policy_document_1)
+    (policy_document_available policy_document_2)
+    (profile_links_applicant_record passenger_profile_1 applicant_record_1)
+    (profile_links_applicant_record passenger_profile_2 applicant_record_1)
+    (profile_links_linked_record passenger_profile_1 linked_record_1)
+    (profile_links_linked_record passenger_profile_2 linked_record_1)
+    (profile_links_match_report passenger_profile_1 match_report_1)
+    (profile_links_match_report passenger_profile_2 match_report_1)
+    (profile_links_policy_document passenger_profile_1 policy_document_1)
+    (profile_links_policy_document passenger_profile_2 policy_document_2)
+    (exception_code_available exception_code_1)
+    (exception_code_available exception_code_2)
+    (fare_eligibility_code_available fare_code_1)
+    (fare_eligibility_code_available fare_code_2)
+    (travel_document_token_available travel_doc_token_1)
+    (payment_authorization_available payment_authorization_1)
+    (manual_override_note_available manual_override_note_1)
+    (profile_links_manual_override_note passenger_profile_1 manual_override_note_1)
+    (profile_links_manual_override_note passenger_profile_2 manual_override_note_2)
+    (external_verdict_available external_verdict_1)
+  )
+  (:goal
+    (and
+      (clearance_granted applicant_record_1)
+      (clearance_granted linked_record_1)
+      (clearance_granted passenger_profile_1)
+      (clearance_granted passenger_profile_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_verification_case applicant_record_1)
+(create_verification_case linked_record_1)
+(assign_matching_service_to_case applicant_record_1 matching_service_instance_1)
+(assign_matching_service_to_case linked_record_1 matching_service_instance_2)
+(submit_document_for_matching applicant_record_1 travel_document_1)
+(evaluate_applicant_exact_match applicant_record_1 exact_flag_1 travel_document_1)
+(finalize_document_match_outcome applicant_record_1 travel_document_1)
+(release_document_after_evaluation applicant_record_1 travel_document_1)
+(submit_document_for_matching linked_record_1 travel_document_1)
+(evaluate_linked_fuzzy_match linked_record_1 fuzzy_flag_1 travel_document_1)
+(finalize_document_match_outcome linked_record_1 travel_document_1)
+(release_document_after_evaluation linked_record_1 travel_document_1)
+(assign_verifying_officer_to_case applicant_record_1 verifying_officer_1)
+(officer_confirm_applicant_exact_match applicant_record_1 exact_flag_1 verifying_officer_1)
+(release_verifying_officer_assignment applicant_record_1 verifying_officer_1)
+(assign_verifying_officer_to_case linked_record_1 verifying_officer_1)
+(officer_confirm_linked_fuzzy_match linked_record_1 fuzzy_flag_1 verifying_officer_1)
+(release_verifying_officer_assignment linked_record_1 verifying_officer_1)
+(generate_match_report applicant_record_1 linked_record_1 exact_flag_1 fuzzy_flag_1 match_report_1)
+(submit_document_for_matching applicant_record_1 travel_document_1)
+(acknowledge_match_report_for_document match_report_1 applicant_record_1 travel_document_1)
+(mark_applicant_record_cleared applicant_record_1 match_report_1)
+(mark_linked_record_cleared linked_record_1 match_report_1)
+(issue_travel_document_token_to_case applicant_record_1 travel_doc_token_1 travel_document_1)
+(finalize_clearance_and_release_service_for_applicant applicant_record_1 matching_service_instance_1 travel_doc_token_1)
+(release_document_after_evaluation applicant_record_1 travel_document_1)
+(submit_document_for_matching linked_record_1 travel_document_1)
+(issue_travel_document_token_to_case linked_record_1 travel_doc_token_1 travel_document_1)
+(finalize_clearance_and_release_service_for_linked linked_record_1 matching_service_instance_2 travel_doc_token_1)
+(release_document_after_evaluation linked_record_1 travel_document_1)
+(create_verification_case passenger_profile_1)
+(create_verification_case passenger_profile_2)
+(assign_matching_service_to_case passenger_profile_1 matching_service_instance_1)
+(assign_matching_service_to_case passenger_profile_2 matching_service_instance_2)
+(submit_document_for_matching passenger_profile_1 travel_document_1)
+(finalize_document_match_outcome passenger_profile_1 travel_document_1)
+(release_document_after_evaluation passenger_profile_1 travel_document_1)
+(submit_document_for_matching passenger_profile_2 travel_document_1)
+(finalize_document_match_outcome passenger_profile_2 travel_document_1)
+(release_document_after_evaluation passenger_profile_2 travel_document_1)
+(attach_external_verdict_to_profile passenger_profile_1 external_verdict_1)
+(attach_payment_authorization_to_profile passenger_profile_1 payment_authorization_1)
+(validate_policy_document_for_profile passenger_profile_1 policy_document_1 match_report_1)
+(submit_document_for_matching passenger_profile_1 travel_document_1)
+(assign_verifying_officer_to_case passenger_profile_1 verifying_officer_1)
+(finalize_policy_validation_on_profile passenger_profile_1 policy_document_1 match_report_1 travel_document_1)
+(process_payment_and_validate_profile passenger_profile_1 payment_authorization_1 verifying_officer_1 policy_document_1 match_report_1)
+(attach_external_verdict_and_set_profile_flag passenger_profile_1 external_verdict_1 policy_document_1 match_report_1)
+(finalize_profile_pre_adjudication passenger_profile_1)
+(issue_travel_document_token_to_case passenger_profile_1 travel_doc_token_1 travel_document_1)
+(finalize_clearance_and_release_service_for_profile passenger_profile_1 matching_service_instance_1 travel_doc_token_1)
+(release_document_after_evaluation passenger_profile_1 travel_document_1)
+(release_verifying_officer_assignment passenger_profile_1 verifying_officer_1)
+(detach_payment_authorization_from_profile passenger_profile_1 payment_authorization_1)
+(detach_external_verdict_from_profile passenger_profile_1 external_verdict_1)
+(validate_policy_document_for_profile passenger_profile_2 policy_document_2 match_report_1)
+(submit_document_for_matching passenger_profile_2 travel_document_1)
+(assign_verifying_officer_to_case passenger_profile_2 verifying_officer_1)
+(finalize_policy_validation_on_profile passenger_profile_2 policy_document_2 match_report_1 travel_document_1)
+(attach_external_verdict_to_profile passenger_profile_2 external_verdict_1)
+(attach_payment_authorization_to_profile passenger_profile_2 payment_authorization_1)
+(process_payment_and_validate_profile passenger_profile_2 payment_authorization_1 verifying_officer_1 policy_document_2 match_report_1)
+(attach_external_verdict_and_set_profile_flag passenger_profile_2 external_verdict_1 policy_document_2 match_report_1)
+(finalize_profile_pre_adjudication passenger_profile_2)
+(issue_travel_document_token_to_case passenger_profile_2 travel_doc_token_1 travel_document_1)
+(finalize_clearance_and_release_service_for_profile passenger_profile_2 matching_service_instance_2 travel_doc_token_1)
+(release_document_after_evaluation passenger_profile_2 travel_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_aomsa3x3/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_aomsa3x3/plan.pddl 
+
+
+--- stderr ---
+

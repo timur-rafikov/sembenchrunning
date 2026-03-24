@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain logistics_incorrect_shipping_document_correction)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types organization_unit - object artifact_collection - object logistics_option_group - object case_root - object shipping_document_case - case_root carrier_agent - organization_unit document_verifier - organization_unit approver - organization_unit regulatory_reference_document - organization_unit finance_instruction_record - organization_unit claim_file_record - organization_unit legal_review_request_document - organization_unit insurance_policy_document - organization_unit evidence_asset - artifact_collection supporting_attachment - artifact_collection customer_representative_contact - artifact_collection alternate_route - logistics_option_group alternate_carrier - logistics_option_group corrected_document - logistics_option_group shipment_segment_group - shipping_document_case correction_task_bundle - shipping_document_case origin_segment - shipment_segment_group destination_segment - shipment_segment_group correction_workflow - correction_task_bundle)
+  (:predicates
+    (entity_opened ?shipping_document_case - shipping_document_case)
+    (entity_verified ?shipping_document_case - shipping_document_case)
+    (agent_assigned_to_case ?shipping_document_case - shipping_document_case)
+    (service_restored ?shipping_document_case - shipping_document_case)
+    (entity_ready_for_release ?shipping_document_case - shipping_document_case)
+    (claim_registered ?shipping_document_case - shipping_document_case)
+    (carrier_agent_available ?carrier_agent - carrier_agent)
+    (entity_assigned_to_agent ?shipping_document_case - shipping_document_case ?carrier_agent - carrier_agent)
+    (verifier_available ?document_verifier - document_verifier)
+    (entity_verifier_assigned ?shipping_document_case - shipping_document_case ?document_verifier - document_verifier)
+    (approver_available ?approver - approver)
+    (entity_approver_assigned ?shipping_document_case - shipping_document_case ?approver - approver)
+    (evidence_available ?evidence_asset - evidence_asset)
+    (origin_evidence_attached ?origin_segment - origin_segment ?evidence_asset - evidence_asset)
+    (destination_evidence_attached ?destination_segment - destination_segment ?evidence_asset - evidence_asset)
+    (origin_alternate_route_linked ?origin_segment - origin_segment ?alternate_route - alternate_route)
+    (alternate_route_ready ?alternate_route - alternate_route)
+    (alternate_route_evidence_attached ?alternate_route - alternate_route)
+    (origin_segment_ready ?origin_segment - origin_segment)
+    (destination_alternate_carrier_linked ?destination_segment - destination_segment ?alternate_carrier - alternate_carrier)
+    (alternate_carrier_ready ?alternate_carrier - alternate_carrier)
+    (alternate_carrier_evidence_attached ?alternate_carrier - alternate_carrier)
+    (destination_segment_ready ?destination_segment - destination_segment)
+    (corrected_document_candidate_available ?corrected_document - corrected_document)
+    (corrected_document_registered ?corrected_document - corrected_document)
+    (corrected_doc_linked_route ?corrected_document - corrected_document ?alternate_route - alternate_route)
+    (corrected_doc_linked_carrier ?corrected_document - corrected_document ?alternate_carrier - alternate_carrier)
+    (requires_regulatory_review ?corrected_document - corrected_document)
+    (requires_specialist_review ?corrected_document - corrected_document)
+    (corrected_document_finalized ?corrected_document - corrected_document)
+    (workflow_associated_origin_segment ?correction_workflow - correction_workflow ?origin_segment - origin_segment)
+    (workflow_associated_destination_segment ?correction_workflow - correction_workflow ?destination_segment - destination_segment)
+    (workflow_has_corrected_document ?correction_workflow - correction_workflow ?corrected_document - corrected_document)
+    (attachment_available ?supporting_attachment - supporting_attachment)
+    (workflow_attachment_linked ?correction_workflow - correction_workflow ?supporting_attachment - supporting_attachment)
+    (attachment_attached ?supporting_attachment - supporting_attachment)
+    (attachment_linked_to_doc ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    (workflow_specialist_ready ?correction_workflow - correction_workflow)
+    (workflow_under_specialist_review ?correction_workflow - correction_workflow)
+    (specialist_reviews_completed ?correction_workflow - correction_workflow)
+    (regulatory_reference_applied ?correction_workflow - correction_workflow)
+    (regulatory_compliance_confirmed ?correction_workflow - correction_workflow)
+    (finance_instruction_required ?correction_workflow - correction_workflow)
+    (workflow_consolidated ?correction_workflow - correction_workflow)
+    (customer_representative_available ?customer_representative - customer_representative_contact)
+    (workflow_linked_to_customer_representative ?correction_workflow - correction_workflow ?customer_representative - customer_representative_contact)
+    (customer_engaged ?correction_workflow - correction_workflow)
+    (customer_acknowledgement_recorded ?correction_workflow - correction_workflow)
+    (customer_approval_confirmed ?correction_workflow - correction_workflow)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference_document)
+    (workflow_regulatory_reference_linked ?correction_workflow - correction_workflow ?regulatory_reference - regulatory_reference_document)
+    (finance_instruction_available ?finance_instruction - finance_instruction_record)
+    (workflow_finance_instruction_linked ?correction_workflow - correction_workflow ?finance_instruction - finance_instruction_record)
+    (legal_review_request_available ?legal_review_request - legal_review_request_document)
+    (workflow_legal_review_requested ?correction_workflow - correction_workflow ?legal_review_request - legal_review_request_document)
+    (insurance_policy_available ?insurance_policy - insurance_policy_document)
+    (workflow_insurance_linked ?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document)
+    (claim_file_available ?claim_file - claim_file_record)
+    (entity_linked_to_claim ?shipping_document_case - shipping_document_case ?claim_file - claim_file_record)
+    (origin_segment_ready_for_processing ?origin_segment - origin_segment)
+    (destination_segment_ready_for_processing ?destination_segment - destination_segment)
+    (workflow_finalized ?correction_workflow - correction_workflow)
+  )
+  (:action open_shipping_document_case
+    :parameters (?shipping_document_case - shipping_document_case)
+    :precondition
+      (and
+        (not
+          (entity_opened ?shipping_document_case)
+        )
+        (not
+          (service_restored ?shipping_document_case)
+        )
+      )
+    :effect (entity_opened ?shipping_document_case)
+  )
+  (:action assign_carrier_agent_to_case
+    :parameters (?shipping_document_case - shipping_document_case ?carrier_agent - carrier_agent)
+    :precondition
+      (and
+        (entity_opened ?shipping_document_case)
+        (not
+          (agent_assigned_to_case ?shipping_document_case)
+        )
+        (carrier_agent_available ?carrier_agent)
+      )
+    :effect
+      (and
+        (agent_assigned_to_case ?shipping_document_case)
+        (entity_assigned_to_agent ?shipping_document_case ?carrier_agent)
+        (not
+          (carrier_agent_available ?carrier_agent)
+        )
+      )
+  )
+  (:action start_document_verification
+    :parameters (?shipping_document_case - shipping_document_case ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_opened ?shipping_document_case)
+        (agent_assigned_to_case ?shipping_document_case)
+        (verifier_available ?document_verifier)
+      )
+    :effect
+      (and
+        (entity_verifier_assigned ?shipping_document_case ?document_verifier)
+        (not
+          (verifier_available ?document_verifier)
+        )
+      )
+  )
+  (:action confirm_document_verification
+    :parameters (?shipping_document_case - shipping_document_case ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_opened ?shipping_document_case)
+        (agent_assigned_to_case ?shipping_document_case)
+        (entity_verifier_assigned ?shipping_document_case ?document_verifier)
+        (not
+          (entity_verified ?shipping_document_case)
+        )
+      )
+    :effect (entity_verified ?shipping_document_case)
+  )
+  (:action rollback_document_verification
+    :parameters (?shipping_document_case - shipping_document_case ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_verifier_assigned ?shipping_document_case ?document_verifier)
+      )
+    :effect
+      (and
+        (verifier_available ?document_verifier)
+        (not
+          (entity_verifier_assigned ?shipping_document_case ?document_verifier)
+        )
+      )
+  )
+  (:action assign_approver_to_case
+    :parameters (?shipping_document_case - shipping_document_case ?approver - approver)
+    :precondition
+      (and
+        (entity_verified ?shipping_document_case)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (entity_approver_assigned ?shipping_document_case ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action revoke_approver_assignment
+    :parameters (?shipping_document_case - shipping_document_case ?approver - approver)
+    :precondition
+      (and
+        (entity_approver_assigned ?shipping_document_case ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (entity_approver_assigned ?shipping_document_case ?approver)
+        )
+      )
+  )
+  (:action link_legal_review_request_to_workflow
+    :parameters (?correction_workflow - correction_workflow ?legal_review_request - legal_review_request_document)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (legal_review_request_available ?legal_review_request)
+      )
+    :effect
+      (and
+        (workflow_legal_review_requested ?correction_workflow ?legal_review_request)
+        (not
+          (legal_review_request_available ?legal_review_request)
+        )
+      )
+  )
+  (:action unlink_legal_review_request_from_workflow
+    :parameters (?correction_workflow - correction_workflow ?legal_review_request - legal_review_request_document)
+    :precondition
+      (and
+        (workflow_legal_review_requested ?correction_workflow ?legal_review_request)
+      )
+    :effect
+      (and
+        (legal_review_request_available ?legal_review_request)
+        (not
+          (workflow_legal_review_requested ?correction_workflow ?legal_review_request)
+        )
+      )
+  )
+  (:action link_insurance_policy_to_workflow
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (insurance_policy_available ?insurance_policy)
+      )
+    :effect
+      (and
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (not
+          (insurance_policy_available ?insurance_policy)
+        )
+      )
+  )
+  (:action unlink_insurance_policy_from_workflow
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document)
+    :precondition
+      (and
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+      )
+    :effect
+      (and
+        (insurance_policy_available ?insurance_policy)
+        (not
+          (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        )
+      )
+  )
+  (:action mark_alternate_route_ready
+    :parameters (?origin_segment - origin_segment ?alternate_route - alternate_route ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_verified ?origin_segment)
+        (entity_verifier_assigned ?origin_segment ?document_verifier)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (not
+          (alternate_route_ready ?alternate_route)
+        )
+        (not
+          (alternate_route_evidence_attached ?alternate_route)
+        )
+      )
+    :effect (alternate_route_ready ?alternate_route)
+  )
+  (:action confirm_origin_segment_route_readiness
+    :parameters (?origin_segment - origin_segment ?alternate_route - alternate_route ?approver - approver)
+    :precondition
+      (and
+        (entity_verified ?origin_segment)
+        (entity_approver_assigned ?origin_segment ?approver)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (alternate_route_ready ?alternate_route)
+        (not
+          (origin_segment_ready_for_processing ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (origin_segment_ready ?origin_segment)
+      )
+  )
+  (:action attach_evidence_to_origin_segment
+    :parameters (?origin_segment - origin_segment ?alternate_route - alternate_route ?evidence_asset - evidence_asset)
+    :precondition
+      (and
+        (entity_verified ?origin_segment)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (evidence_available ?evidence_asset)
+        (not
+          (origin_segment_ready_for_processing ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_route_evidence_attached ?alternate_route)
+        (origin_segment_ready_for_processing ?origin_segment)
+        (origin_evidence_attached ?origin_segment ?evidence_asset)
+        (not
+          (evidence_available ?evidence_asset)
+        )
+      )
+  )
+  (:action finalize_origin_segment_route_with_evidence
+    :parameters (?origin_segment - origin_segment ?alternate_route - alternate_route ?document_verifier - document_verifier ?evidence_asset - evidence_asset)
+    :precondition
+      (and
+        (entity_verified ?origin_segment)
+        (entity_verifier_assigned ?origin_segment ?document_verifier)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (alternate_route_evidence_attached ?alternate_route)
+        (origin_evidence_attached ?origin_segment ?evidence_asset)
+        (not
+          (origin_segment_ready ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_route_ready ?alternate_route)
+        (origin_segment_ready ?origin_segment)
+        (evidence_available ?evidence_asset)
+        (not
+          (origin_evidence_attached ?origin_segment ?evidence_asset)
+        )
+      )
+  )
+  (:action mark_alternate_carrier_ready
+    :parameters (?destination_segment - destination_segment ?alternate_carrier - alternate_carrier ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_verified ?destination_segment)
+        (entity_verifier_assigned ?destination_segment ?document_verifier)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (not
+          (alternate_carrier_ready ?alternate_carrier)
+        )
+        (not
+          (alternate_carrier_evidence_attached ?alternate_carrier)
+        )
+      )
+    :effect (alternate_carrier_ready ?alternate_carrier)
+  )
+  (:action confirm_destination_segment_carrier_with_approver
+    :parameters (?destination_segment - destination_segment ?alternate_carrier - alternate_carrier ?approver - approver)
+    :precondition
+      (and
+        (entity_verified ?destination_segment)
+        (entity_approver_assigned ?destination_segment ?approver)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_carrier_ready ?alternate_carrier)
+        (not
+          (destination_segment_ready_for_processing ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (destination_segment_ready_for_processing ?destination_segment)
+        (destination_segment_ready ?destination_segment)
+      )
+  )
+  (:action attach_evidence_to_destination_segment
+    :parameters (?destination_segment - destination_segment ?alternate_carrier - alternate_carrier ?evidence_asset - evidence_asset)
+    :precondition
+      (and
+        (entity_verified ?destination_segment)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (evidence_available ?evidence_asset)
+        (not
+          (destination_segment_ready_for_processing ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_carrier_evidence_attached ?alternate_carrier)
+        (destination_segment_ready_for_processing ?destination_segment)
+        (destination_evidence_attached ?destination_segment ?evidence_asset)
+        (not
+          (evidence_available ?evidence_asset)
+        )
+      )
+  )
+  (:action finalize_destination_segment_carrier_with_evidence
+    :parameters (?destination_segment - destination_segment ?alternate_carrier - alternate_carrier ?document_verifier - document_verifier ?evidence_asset - evidence_asset)
+    :precondition
+      (and
+        (entity_verified ?destination_segment)
+        (entity_verifier_assigned ?destination_segment ?document_verifier)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_carrier_evidence_attached ?alternate_carrier)
+        (destination_evidence_attached ?destination_segment ?evidence_asset)
+        (not
+          (destination_segment_ready ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_carrier_ready ?alternate_carrier)
+        (destination_segment_ready ?destination_segment)
+        (evidence_available ?evidence_asset)
+        (not
+          (destination_evidence_attached ?destination_segment ?evidence_asset)
+        )
+      )
+  )
+  (:action select_and_bind_corrected_document_candidate
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?alternate_route - alternate_route ?alternate_carrier - alternate_carrier ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (destination_segment_ready_for_processing ?destination_segment)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_route_ready ?alternate_route)
+        (alternate_carrier_ready ?alternate_carrier)
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (corrected_document_candidate_available ?corrected_document)
+      )
+    :effect
+      (and
+        (corrected_document_registered ?corrected_document)
+        (corrected_doc_linked_route ?corrected_document ?alternate_route)
+        (corrected_doc_linked_carrier ?corrected_document ?alternate_carrier)
+        (not
+          (corrected_document_candidate_available ?corrected_document)
+        )
+      )
+  )
+  (:action select_and_bind_candidate_with_regulatory_flag
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?alternate_route - alternate_route ?alternate_carrier - alternate_carrier ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (destination_segment_ready_for_processing ?destination_segment)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_route_evidence_attached ?alternate_route)
+        (alternate_carrier_ready ?alternate_carrier)
+        (not
+          (origin_segment_ready ?origin_segment)
+        )
+        (destination_segment_ready ?destination_segment)
+        (corrected_document_candidate_available ?corrected_document)
+      )
+    :effect
+      (and
+        (corrected_document_registered ?corrected_document)
+        (corrected_doc_linked_route ?corrected_document ?alternate_route)
+        (corrected_doc_linked_carrier ?corrected_document ?alternate_carrier)
+        (requires_regulatory_review ?corrected_document)
+        (not
+          (corrected_document_candidate_available ?corrected_document)
+        )
+      )
+  )
+  (:action select_and_bind_candidate_with_specialist_review_flag
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?alternate_route - alternate_route ?alternate_carrier - alternate_carrier ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (destination_segment_ready_for_processing ?destination_segment)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_route_ready ?alternate_route)
+        (alternate_carrier_evidence_attached ?alternate_carrier)
+        (origin_segment_ready ?origin_segment)
+        (not
+          (destination_segment_ready ?destination_segment)
+        )
+        (corrected_document_candidate_available ?corrected_document)
+      )
+    :effect
+      (and
+        (corrected_document_registered ?corrected_document)
+        (corrected_doc_linked_route ?corrected_document ?alternate_route)
+        (corrected_doc_linked_carrier ?corrected_document ?alternate_carrier)
+        (requires_specialist_review ?corrected_document)
+        (not
+          (corrected_document_candidate_available ?corrected_document)
+        )
+      )
+  )
+  (:action select_and_bind_candidate_with_regulatory_and_specialist_flags
+    :parameters (?origin_segment - origin_segment ?destination_segment - destination_segment ?alternate_route - alternate_route ?alternate_carrier - alternate_carrier ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (destination_segment_ready_for_processing ?destination_segment)
+        (origin_alternate_route_linked ?origin_segment ?alternate_route)
+        (destination_alternate_carrier_linked ?destination_segment ?alternate_carrier)
+        (alternate_route_evidence_attached ?alternate_route)
+        (alternate_carrier_evidence_attached ?alternate_carrier)
+        (not
+          (origin_segment_ready ?origin_segment)
+        )
+        (not
+          (destination_segment_ready ?destination_segment)
+        )
+        (corrected_document_candidate_available ?corrected_document)
+      )
+    :effect
+      (and
+        (corrected_document_registered ?corrected_document)
+        (corrected_doc_linked_route ?corrected_document ?alternate_route)
+        (corrected_doc_linked_carrier ?corrected_document ?alternate_carrier)
+        (requires_regulatory_review ?corrected_document)
+        (requires_specialist_review ?corrected_document)
+        (not
+          (corrected_document_candidate_available ?corrected_document)
+        )
+      )
+  )
+  (:action finalize_corrected_document_candidate
+    :parameters (?corrected_document - corrected_document ?origin_segment - origin_segment ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (corrected_document_registered ?corrected_document)
+        (origin_segment_ready_for_processing ?origin_segment)
+        (entity_verifier_assigned ?origin_segment ?document_verifier)
+        (not
+          (corrected_document_finalized ?corrected_document)
+        )
+      )
+    :effect (corrected_document_finalized ?corrected_document)
+  )
+  (:action attach_supporting_attachment_to_corrected_document
+    :parameters (?correction_workflow - correction_workflow ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (workflow_has_corrected_document ?correction_workflow ?corrected_document)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_available ?supporting_attachment)
+        (corrected_document_registered ?corrected_document)
+        (corrected_document_finalized ?corrected_document)
+        (not
+          (attachment_attached ?supporting_attachment)
+        )
+      )
+    :effect
+      (and
+        (attachment_attached ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (not
+          (attachment_available ?supporting_attachment)
+        )
+      )
+  )
+  (:action mark_workflow_ready_for_specialist_review
+    :parameters (?correction_workflow - correction_workflow ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_attached ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (entity_verifier_assigned ?correction_workflow ?document_verifier)
+        (not
+          (requires_regulatory_review ?corrected_document)
+        )
+        (not
+          (workflow_specialist_ready ?correction_workflow)
+        )
+      )
+    :effect (workflow_specialist_ready ?correction_workflow)
+  )
+  (:action apply_regulatory_reference_to_workflow
+    :parameters (?correction_workflow - correction_workflow ?regulatory_reference - regulatory_reference_document)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (regulatory_reference_available ?regulatory_reference)
+        (not
+          (regulatory_reference_applied ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (regulatory_reference_applied ?correction_workflow)
+        (workflow_regulatory_reference_linked ?correction_workflow ?regulatory_reference)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action apply_regulatory_reference_and_mark_workflow
+    :parameters (?correction_workflow - correction_workflow ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document ?document_verifier - document_verifier ?regulatory_reference - regulatory_reference_document)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_attached ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (entity_verifier_assigned ?correction_workflow ?document_verifier)
+        (requires_regulatory_review ?corrected_document)
+        (regulatory_reference_applied ?correction_workflow)
+        (workflow_regulatory_reference_linked ?correction_workflow ?regulatory_reference)
+        (not
+          (workflow_specialist_ready ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_specialist_ready ?correction_workflow)
+        (regulatory_compliance_confirmed ?correction_workflow)
+      )
+  )
+  (:action start_legal_review_for_workflow
+    :parameters (?correction_workflow - correction_workflow ?legal_review_request - legal_review_request_document ?approver - approver ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_specialist_ready ?correction_workflow)
+        (workflow_legal_review_requested ?correction_workflow ?legal_review_request)
+        (entity_approver_assigned ?correction_workflow ?approver)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (not
+          (requires_specialist_review ?corrected_document)
+        )
+        (not
+          (workflow_under_specialist_review ?correction_workflow)
+        )
+      )
+    :effect (workflow_under_specialist_review ?correction_workflow)
+  )
+  (:action start_legal_review_for_flagged_candidate
+    :parameters (?correction_workflow - correction_workflow ?legal_review_request - legal_review_request_document ?approver - approver ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_specialist_ready ?correction_workflow)
+        (workflow_legal_review_requested ?correction_workflow ?legal_review_request)
+        (entity_approver_assigned ?correction_workflow ?approver)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (requires_specialist_review ?corrected_document)
+        (not
+          (workflow_under_specialist_review ?correction_workflow)
+        )
+      )
+    :effect (workflow_under_specialist_review ?correction_workflow)
+  )
+  (:action complete_insurance_link_for_workflow
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_under_specialist_review ?correction_workflow)
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (not
+          (requires_regulatory_review ?corrected_document)
+        )
+        (not
+          (requires_specialist_review ?corrected_document)
+        )
+        (not
+          (specialist_reviews_completed ?correction_workflow)
+        )
+      )
+    :effect (specialist_reviews_completed ?correction_workflow)
+  )
+  (:action complete_insurance_link_and_require_finance
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_under_specialist_review ?correction_workflow)
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (requires_regulatory_review ?corrected_document)
+        (not
+          (requires_specialist_review ?corrected_document)
+        )
+        (not
+          (specialist_reviews_completed ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (finance_instruction_required ?correction_workflow)
+      )
+  )
+  (:action complete_insurance_link_and_require_finance_variant_a
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_under_specialist_review ?correction_workflow)
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (not
+          (requires_regulatory_review ?corrected_document)
+        )
+        (requires_specialist_review ?corrected_document)
+        (not
+          (specialist_reviews_completed ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (finance_instruction_required ?correction_workflow)
+      )
+  )
+  (:action complete_insurance_link_and_require_finance_variant_b
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document ?supporting_attachment - supporting_attachment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (workflow_under_specialist_review ?correction_workflow)
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (workflow_attachment_linked ?correction_workflow ?supporting_attachment)
+        (attachment_linked_to_doc ?supporting_attachment ?corrected_document)
+        (requires_regulatory_review ?corrected_document)
+        (requires_specialist_review ?corrected_document)
+        (not
+          (specialist_reviews_completed ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (finance_instruction_required ?correction_workflow)
+      )
+  )
+  (:action finalize_workflow_without_finance
+    :parameters (?correction_workflow - correction_workflow)
+    :precondition
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (not
+          (finance_instruction_required ?correction_workflow)
+        )
+        (not
+          (workflow_finalized ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?correction_workflow)
+        (entity_ready_for_release ?correction_workflow)
+      )
+  )
+  (:action attach_finance_instruction
+    :parameters (?correction_workflow - correction_workflow ?finance_instruction - finance_instruction_record)
+    :precondition
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (finance_instruction_required ?correction_workflow)
+        (finance_instruction_available ?finance_instruction)
+      )
+    :effect
+      (and
+        (workflow_finance_instruction_linked ?correction_workflow ?finance_instruction)
+        (not
+          (finance_instruction_available ?finance_instruction)
+        )
+      )
+  )
+  (:action consolidate_workflow
+    :parameters (?correction_workflow - correction_workflow ?origin_segment - origin_segment ?destination_segment - destination_segment ?document_verifier - document_verifier ?finance_instruction - finance_instruction_record)
+    :precondition
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (finance_instruction_required ?correction_workflow)
+        (workflow_finance_instruction_linked ?correction_workflow ?finance_instruction)
+        (workflow_associated_origin_segment ?correction_workflow ?origin_segment)
+        (workflow_associated_destination_segment ?correction_workflow ?destination_segment)
+        (origin_segment_ready ?origin_segment)
+        (destination_segment_ready ?destination_segment)
+        (entity_verifier_assigned ?correction_workflow ?document_verifier)
+        (not
+          (workflow_consolidated ?correction_workflow)
+        )
+      )
+    :effect (workflow_consolidated ?correction_workflow)
+  )
+  (:action finalize_workflow_after_consolidation
+    :parameters (?correction_workflow - correction_workflow)
+    :precondition
+      (and
+        (specialist_reviews_completed ?correction_workflow)
+        (workflow_consolidated ?correction_workflow)
+        (not
+          (workflow_finalized ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?correction_workflow)
+        (entity_ready_for_release ?correction_workflow)
+      )
+  )
+  (:action engage_customer_representative
+    :parameters (?correction_workflow - correction_workflow ?customer_representative - customer_representative_contact ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_verified ?correction_workflow)
+        (entity_verifier_assigned ?correction_workflow ?document_verifier)
+        (customer_representative_available ?customer_representative)
+        (workflow_linked_to_customer_representative ?correction_workflow ?customer_representative)
+        (not
+          (customer_engaged ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (customer_engaged ?correction_workflow)
+        (not
+          (customer_representative_available ?customer_representative)
+        )
+      )
+  )
+  (:action record_customer_acknowledgement
+    :parameters (?correction_workflow - correction_workflow ?approver - approver)
+    :precondition
+      (and
+        (customer_engaged ?correction_workflow)
+        (entity_approver_assigned ?correction_workflow ?approver)
+        (not
+          (customer_acknowledgement_recorded ?correction_workflow)
+        )
+      )
+    :effect (customer_acknowledgement_recorded ?correction_workflow)
+  )
+  (:action confirm_customer_approval_with_insurance
+    :parameters (?correction_workflow - correction_workflow ?insurance_policy - insurance_policy_document)
+    :precondition
+      (and
+        (customer_acknowledgement_recorded ?correction_workflow)
+        (workflow_insurance_linked ?correction_workflow ?insurance_policy)
+        (not
+          (customer_approval_confirmed ?correction_workflow)
+        )
+      )
+    :effect (customer_approval_confirmed ?correction_workflow)
+  )
+  (:action finalize_workflow_after_customer_approval
+    :parameters (?correction_workflow - correction_workflow)
+    :precondition
+      (and
+        (customer_approval_confirmed ?correction_workflow)
+        (not
+          (workflow_finalized ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (workflow_finalized ?correction_workflow)
+        (entity_ready_for_release ?correction_workflow)
+      )
+  )
+  (:action close_origin_segment_operationally
+    :parameters (?origin_segment - origin_segment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (origin_segment_ready_for_processing ?origin_segment)
+        (origin_segment_ready ?origin_segment)
+        (corrected_document_registered ?corrected_document)
+        (corrected_document_finalized ?corrected_document)
+        (not
+          (entity_ready_for_release ?origin_segment)
+        )
+      )
+    :effect (entity_ready_for_release ?origin_segment)
+  )
+  (:action close_destination_segment_operationally
+    :parameters (?destination_segment - destination_segment ?corrected_document - corrected_document)
+    :precondition
+      (and
+        (destination_segment_ready_for_processing ?destination_segment)
+        (destination_segment_ready ?destination_segment)
+        (corrected_document_registered ?corrected_document)
+        (corrected_document_finalized ?corrected_document)
+        (not
+          (entity_ready_for_release ?destination_segment)
+        )
+      )
+    :effect (entity_ready_for_release ?destination_segment)
+  )
+  (:action create_claim_and_link_to_case
+    :parameters (?shipping_document_case - shipping_document_case ?claim_file - claim_file_record ?document_verifier - document_verifier)
+    :precondition
+      (and
+        (entity_ready_for_release ?shipping_document_case)
+        (entity_verifier_assigned ?shipping_document_case ?document_verifier)
+        (claim_file_available ?claim_file)
+        (not
+          (claim_registered ?shipping_document_case)
+        )
+      )
+    :effect
+      (and
+        (claim_registered ?shipping_document_case)
+        (entity_linked_to_claim ?shipping_document_case ?claim_file)
+        (not
+          (claim_file_available ?claim_file)
+        )
+      )
+  )
+  (:action restore_segment_service_and_reenable_agent
+    :parameters (?origin_segment - origin_segment ?carrier_agent - carrier_agent ?claim_file - claim_file_record)
+    :precondition
+      (and
+        (claim_registered ?origin_segment)
+        (entity_assigned_to_agent ?origin_segment ?carrier_agent)
+        (entity_linked_to_claim ?origin_segment ?claim_file)
+        (not
+          (service_restored ?origin_segment)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?origin_segment)
+        (carrier_agent_available ?carrier_agent)
+        (claim_file_available ?claim_file)
+      )
+  )
+  (:action restore_destination_service_and_reenable_agent
+    :parameters (?destination_segment - destination_segment ?carrier_agent - carrier_agent ?claim_file - claim_file_record)
+    :precondition
+      (and
+        (claim_registered ?destination_segment)
+        (entity_assigned_to_agent ?destination_segment ?carrier_agent)
+        (entity_linked_to_claim ?destination_segment ?claim_file)
+        (not
+          (service_restored ?destination_segment)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?destination_segment)
+        (carrier_agent_available ?carrier_agent)
+        (claim_file_available ?claim_file)
+      )
+  )
+  (:action restore_workflow_service_and_reenable_agent
+    :parameters (?correction_workflow - correction_workflow ?carrier_agent - carrier_agent ?claim_file - claim_file_record)
+    :precondition
+      (and
+        (claim_registered ?correction_workflow)
+        (entity_assigned_to_agent ?correction_workflow ?carrier_agent)
+        (entity_linked_to_claim ?correction_workflow ?claim_file)
+        (not
+          (service_restored ?correction_workflow)
+        )
+      )
+    :effect
+      (and
+        (service_restored ?correction_workflow)
+        (carrier_agent_available ?carrier_agent)
+        (claim_file_available ?claim_file)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem incorrect_shipping_document_correction_problem)
+  (:domain logistics_incorrect_shipping_document_correction)
+  (:objects origin_segment_1 - origin_segment destination_segment_1 - destination_segment correction_workflow_1 - correction_workflow correction_workflow_2 - correction_workflow carrier_agent_1 - carrier_agent carrier_agent_2 - carrier_agent carrier_agent_3 - carrier_agent document_verifier_system_1 - document_verifier approver_user_1 - approver evidence_asset_packing_list - evidence_asset alternate_route_1 - alternate_route alternate_carrier_option_1 - alternate_carrier corrected_document_candidate_1 - corrected_document supporting_attachment_photo_1 - supporting_attachment supporting_attachment_form_1 - supporting_attachment regulatory_reference_1 - regulatory_reference_document regulatory_reference_2 - regulatory_reference_document finance_instruction_invoice_1 - finance_instruction_record finance_instruction_invoice_2 - finance_instruction_record claim_file_1 - claim_file_record legal_review_request_1 - legal_review_request_document customer_representative_john_doe - customer_representative_contact customer_representative_jane_smith - customer_representative_contact insurance_policy_abc123 - insurance_policy_document)
+  (:init
+    (carrier_agent_available carrier_agent_1)
+    (carrier_agent_available carrier_agent_2)
+    (carrier_agent_available carrier_agent_3)
+    (verifier_available document_verifier_system_1)
+    (approver_available approver_user_1)
+    (evidence_available evidence_asset_packing_list)
+    (origin_alternate_route_linked origin_segment_1 alternate_route_1)
+    (destination_alternate_carrier_linked destination_segment_1 alternate_carrier_option_1)
+    (corrected_document_candidate_available corrected_document_candidate_1)
+    (attachment_available supporting_attachment_photo_1)
+    (attachment_available supporting_attachment_form_1)
+    (workflow_associated_origin_segment correction_workflow_1 origin_segment_1)
+    (workflow_associated_origin_segment correction_workflow_2 origin_segment_1)
+    (workflow_associated_destination_segment correction_workflow_1 destination_segment_1)
+    (workflow_associated_destination_segment correction_workflow_2 destination_segment_1)
+    (workflow_has_corrected_document correction_workflow_1 corrected_document_candidate_1)
+    (workflow_has_corrected_document correction_workflow_2 corrected_document_candidate_1)
+    (workflow_attachment_linked correction_workflow_1 supporting_attachment_photo_1)
+    (workflow_attachment_linked correction_workflow_2 supporting_attachment_form_1)
+    (regulatory_reference_available regulatory_reference_1)
+    (regulatory_reference_available regulatory_reference_2)
+    (finance_instruction_available finance_instruction_invoice_1)
+    (finance_instruction_available finance_instruction_invoice_2)
+    (claim_file_available claim_file_1)
+    (legal_review_request_available legal_review_request_1)
+    (customer_representative_available customer_representative_john_doe)
+    (workflow_linked_to_customer_representative correction_workflow_1 customer_representative_john_doe)
+    (workflow_linked_to_customer_representative correction_workflow_2 customer_representative_jane_smith)
+    (insurance_policy_available insurance_policy_abc123)
+  )
+  (:goal
+    (and
+      (service_restored origin_segment_1)
+      (service_restored destination_segment_1)
+      (service_restored correction_workflow_1)
+      (service_restored correction_workflow_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_shipping_document_case origin_segment_1)
+(assign_carrier_agent_to_case origin_segment_1 carrier_agent_1)
+(start_document_verification origin_segment_1 document_verifier_system_1)
+(confirm_document_verification origin_segment_1 document_verifier_system_1)
+(assign_approver_to_case origin_segment_1 approver_user_1)
+(mark_alternate_route_ready origin_segment_1 alternate_route_1 document_verifier_system_1)
+(confirm_origin_segment_route_readiness origin_segment_1 alternate_route_1 approver_user_1)
+(revoke_approver_assignment origin_segment_1 approver_user_1)
+(rollback_document_verification origin_segment_1 document_verifier_system_1)
+(open_shipping_document_case destination_segment_1)
+(assign_carrier_agent_to_case destination_segment_1 carrier_agent_2)
+(start_document_verification destination_segment_1 document_verifier_system_1)
+(confirm_document_verification destination_segment_1 document_verifier_system_1)
+(assign_approver_to_case destination_segment_1 approver_user_1)
+(mark_alternate_carrier_ready destination_segment_1 alternate_carrier_option_1 document_verifier_system_1)
+(confirm_destination_segment_carrier_with_approver destination_segment_1 alternate_carrier_option_1 approver_user_1)
+(revoke_approver_assignment destination_segment_1 approver_user_1)
+(rollback_document_verification destination_segment_1 document_verifier_system_1)
+(start_document_verification origin_segment_1 document_verifier_system_1)
+(select_and_bind_corrected_document_candidate origin_segment_1 destination_segment_1 alternate_route_1 alternate_carrier_option_1 corrected_document_candidate_1)
+(finalize_corrected_document_candidate corrected_document_candidate_1 origin_segment_1 document_verifier_system_1)
+(close_origin_segment_operationally origin_segment_1 corrected_document_candidate_1)
+(close_destination_segment_operationally destination_segment_1 corrected_document_candidate_1)
+(create_claim_and_link_to_case origin_segment_1 claim_file_1 document_verifier_system_1)
+(restore_segment_service_and_reenable_agent origin_segment_1 carrier_agent_1 claim_file_1)
+(rollback_document_verification origin_segment_1 document_verifier_system_1)
+(start_document_verification destination_segment_1 document_verifier_system_1)
+(create_claim_and_link_to_case destination_segment_1 claim_file_1 document_verifier_system_1)
+(restore_destination_service_and_reenable_agent destination_segment_1 carrier_agent_2 claim_file_1)
+(rollback_document_verification destination_segment_1 document_verifier_system_1)
+(open_shipping_document_case correction_workflow_1)
+(assign_carrier_agent_to_case correction_workflow_1 carrier_agent_1)
+(start_document_verification correction_workflow_1 document_verifier_system_1)
+(confirm_document_verification correction_workflow_1 document_verifier_system_1)
+(link_legal_review_request_to_workflow correction_workflow_1 legal_review_request_1)
+(attach_supporting_attachment_to_corrected_document correction_workflow_1 supporting_attachment_photo_1 corrected_document_candidate_1)
+(assign_approver_to_case correction_workflow_1 approver_user_1)
+(mark_workflow_ready_for_specialist_review correction_workflow_1 supporting_attachment_photo_1 corrected_document_candidate_1 document_verifier_system_1)
+(start_legal_review_for_workflow correction_workflow_1 legal_review_request_1 approver_user_1 supporting_attachment_photo_1 corrected_document_candidate_1)
+(revoke_approver_assignment correction_workflow_1 approver_user_1)
+(link_insurance_policy_to_workflow correction_workflow_1 insurance_policy_abc123)
+(complete_insurance_link_for_workflow correction_workflow_1 insurance_policy_abc123 supporting_attachment_photo_1 corrected_document_candidate_1)
+(finalize_workflow_without_finance correction_workflow_1)
+(create_claim_and_link_to_case correction_workflow_1 claim_file_1 document_verifier_system_1)
+(restore_workflow_service_and_reenable_agent correction_workflow_1 carrier_agent_1 claim_file_1)
+(rollback_document_verification correction_workflow_1 document_verifier_system_1)
+(unlink_legal_review_request_from_workflow correction_workflow_1 legal_review_request_1)
+(unlink_insurance_policy_from_workflow correction_workflow_1 insurance_policy_abc123)
+(open_shipping_document_case correction_workflow_2)
+(assign_carrier_agent_to_case correction_workflow_2 carrier_agent_2)
+(start_document_verification correction_workflow_2 document_verifier_system_1)
+(confirm_document_verification correction_workflow_2 document_verifier_system_1)
+(link_legal_review_request_to_workflow correction_workflow_2 legal_review_request_1)
+(attach_supporting_attachment_to_corrected_document correction_workflow_2 supporting_attachment_form_1 corrected_document_candidate_1)
+(assign_approver_to_case correction_workflow_2 approver_user_1)
+(mark_workflow_ready_for_specialist_review correction_workflow_2 supporting_attachment_form_1 corrected_document_candidate_1 document_verifier_system_1)
+(start_legal_review_for_workflow correction_workflow_2 legal_review_request_1 approver_user_1 supporting_attachment_form_1 corrected_document_candidate_1)
+(revoke_approver_assignment correction_workflow_2 approver_user_1)
+(link_insurance_policy_to_workflow correction_workflow_2 insurance_policy_abc123)
+(complete_insurance_link_for_workflow correction_workflow_2 insurance_policy_abc123 supporting_attachment_form_1 corrected_document_candidate_1)
+(finalize_workflow_without_finance correction_workflow_2)
+(create_claim_and_link_to_case correction_workflow_2 claim_file_1 document_verifier_system_1)
+(restore_workflow_service_and_reenable_agent correction_workflow_2 carrier_agent_2 claim_file_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_nurvq_vj/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_nurvq_vj/plan.pddl 63 
+
+
+
+--- stderr ---
+

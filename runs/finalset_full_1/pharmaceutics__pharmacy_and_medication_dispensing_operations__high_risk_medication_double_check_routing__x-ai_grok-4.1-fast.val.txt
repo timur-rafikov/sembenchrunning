@@ -1,0 +1,1006 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain pharmacy_high_risk_double_check_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object physical_item - object supply_item - object operational_entity - object workflow_entity - operational_entity verifier_slot - domain_entity medication_product - domain_entity checker_slot - domain_entity ancillary_supply - domain_entity patient_education_material - domain_entity counseling_topic - domain_entity clinical_check_flag - domain_entity override_token - domain_entity component_item - physical_item label_template - physical_item approval_token - physical_item dosage_form - supply_item package_type - supply_item medication_batch - supply_item preparer_role - workflow_entity checker_role - workflow_entity preparer_technician - preparer_role independent_check_technician - preparer_role dispensing_task - checker_role)
+  (:predicates
+    (prescription_review_task ?prescription_order - workflow_entity)
+    (clinical_clearance_granted ?prescription_order - workflow_entity)
+    (verifier_assigned ?prescription_order - workflow_entity)
+    (entity_released_to_patient ?prescription_order - workflow_entity)
+    (final_release_recorded ?prescription_order - workflow_entity)
+    (release_initiated ?prescription_order - workflow_entity)
+    (verifier_slot_available ?verifier_slot - verifier_slot)
+    (task_verifier_link ?prescription_order - workflow_entity ?verifier_slot - verifier_slot)
+    (medication_product_available ?medication_product - medication_product)
+    (medication_selected ?prescription_order - workflow_entity ?medication_product - medication_product)
+    (checker_slot_available ?checker_slot - checker_slot)
+    (task_checker_link ?prescription_order - workflow_entity ?checker_slot - checker_slot)
+    (component_available ?component_item - component_item)
+    (preparer_allocated_component ?preparer_technician - preparer_technician ?component_item - component_item)
+    (checker_allocated_component ?independent_check_technician - independent_check_technician ?component_item - component_item)
+    (preparer_selected_dosage_form ?preparer_technician - preparer_technician ?dosage_form - dosage_form)
+    (dosage_form_staged ?dosage_form - dosage_form)
+    (dosage_form_component_bound ?dosage_form - dosage_form)
+    (preparer_component_confirmed ?preparer_technician - preparer_technician)
+    (checker_assigned_package_type ?independent_check_technician - independent_check_technician ?package_type - package_type)
+    (package_type_staged ?package_type - package_type)
+    (package_type_component_bound ?package_type - package_type)
+    (checker_component_confirmed ?independent_check_technician - independent_check_technician)
+    (batch_pending ?medication_batch - medication_batch)
+    (batch_marked_for_packaging ?medication_batch - medication_batch)
+    (batch_dosage_form_link ?medication_batch - medication_batch ?dosage_form - dosage_form)
+    (batch_package_type_link ?medication_batch - medication_batch ?package_type - package_type)
+    (batch_requires_ancillary_supply ?medication_batch - medication_batch)
+    (batch_requires_patient_education ?medication_batch - medication_batch)
+    (batch_label_ready ?medication_batch - medication_batch)
+    (task_assigned_preparer ?dispensing_task - dispensing_task ?preparer_technician - preparer_technician)
+    (task_assigned_checker ?dispensing_task - dispensing_task ?independent_check_technician - independent_check_technician)
+    (task_assigned_batch ?dispensing_task - dispensing_task ?medication_batch - medication_batch)
+    (label_template_available ?label_template - label_template)
+    (task_assigned_label_template ?dispensing_task - dispensing_task ?label_template - label_template)
+    (label_template_bound ?label_template - label_template)
+    (label_template_assigned_to_batch ?label_template - label_template ?medication_batch - medication_batch)
+    (task_packaging_in_progress ?dispensing_task - dispensing_task)
+    (task_packaging_completed ?dispensing_task - dispensing_task)
+    (task_ready_for_final_check ?dispensing_task - dispensing_task)
+    (task_ancillary_reserved ?dispensing_task - dispensing_task)
+    (task_ancillary_added ?dispensing_task - dispensing_task)
+    (task_patient_education_attached ?dispensing_task - dispensing_task)
+    (task_independent_check_completed ?dispensing_task - dispensing_task)
+    (approval_token_available ?approval_token - approval_token)
+    (task_has_approval_token ?dispensing_task - dispensing_task ?approval_token - approval_token)
+    (task_approval_recorded ?dispensing_task - dispensing_task)
+    (task_authorization_granted ?dispensing_task - dispensing_task)
+    (task_override_applied ?dispensing_task - dispensing_task)
+    (ancillary_supply_available ?ancillary_supply - ancillary_supply)
+    (task_assigned_ancillary_supply ?dispensing_task - dispensing_task ?ancillary_supply - ancillary_supply)
+    (patient_education_available ?patient_education_material - patient_education_material)
+    (task_assigned_patient_education ?dispensing_task - dispensing_task ?patient_education_material - patient_education_material)
+    (clinical_check_flag_available ?clinical_check_flag - clinical_check_flag)
+    (task_assigned_clinical_check_flag ?dispensing_task - dispensing_task ?clinical_check_flag - clinical_check_flag)
+    (override_token_available ?override_token - override_token)
+    (task_override_link ?dispensing_task - dispensing_task ?override_token - override_token)
+    (counseling_topic_available ?counseling_topic - counseling_topic)
+    (prescription_counseling_link ?prescription_order - workflow_entity ?counseling_topic - counseling_topic)
+    (preparer_ready ?preparer_technician - preparer_technician)
+    (checker_ready ?independent_check_technician - independent_check_technician)
+    (task_released ?dispensing_task - dispensing_task)
+  )
+  (:action create_prescription_review_task
+    :parameters (?prescription_order - workflow_entity)
+    :precondition
+      (and
+        (not
+          (prescription_review_task ?prescription_order)
+        )
+        (not
+          (entity_released_to_patient ?prescription_order)
+        )
+      )
+    :effect (prescription_review_task ?prescription_order)
+  )
+  (:action allocate_verifier_slot_to_prescription
+    :parameters (?prescription_order - workflow_entity ?verifier_slot - verifier_slot)
+    :precondition
+      (and
+        (prescription_review_task ?prescription_order)
+        (not
+          (verifier_assigned ?prescription_order)
+        )
+        (verifier_slot_available ?verifier_slot)
+      )
+    :effect
+      (and
+        (verifier_assigned ?prescription_order)
+        (task_verifier_link ?prescription_order ?verifier_slot)
+        (not
+          (verifier_slot_available ?verifier_slot)
+        )
+      )
+  )
+  (:action select_medication_for_prescription
+    :parameters (?prescription_order - workflow_entity ?medication_product - medication_product)
+    :precondition
+      (and
+        (prescription_review_task ?prescription_order)
+        (verifier_assigned ?prescription_order)
+        (medication_product_available ?medication_product)
+      )
+    :effect
+      (and
+        (medication_selected ?prescription_order ?medication_product)
+        (not
+          (medication_product_available ?medication_product)
+        )
+      )
+  )
+  (:action authorize_prescription_clinical
+    :parameters (?prescription_order - workflow_entity ?medication_product - medication_product)
+    :precondition
+      (and
+        (prescription_review_task ?prescription_order)
+        (verifier_assigned ?prescription_order)
+        (medication_selected ?prescription_order ?medication_product)
+        (not
+          (clinical_clearance_granted ?prescription_order)
+        )
+      )
+    :effect (clinical_clearance_granted ?prescription_order)
+  )
+  (:action release_medication_allocation
+    :parameters (?prescription_order - workflow_entity ?medication_product - medication_product)
+    :precondition
+      (and
+        (medication_selected ?prescription_order ?medication_product)
+      )
+    :effect
+      (and
+        (medication_product_available ?medication_product)
+        (not
+          (medication_selected ?prescription_order ?medication_product)
+        )
+      )
+  )
+  (:action allocate_checker_slot_to_prescription
+    :parameters (?prescription_order - workflow_entity ?checker_slot - checker_slot)
+    :precondition
+      (and
+        (clinical_clearance_granted ?prescription_order)
+        (checker_slot_available ?checker_slot)
+      )
+    :effect
+      (and
+        (task_checker_link ?prescription_order ?checker_slot)
+        (not
+          (checker_slot_available ?checker_slot)
+        )
+      )
+  )
+  (:action release_checker_slot_from_prescription
+    :parameters (?prescription_order - workflow_entity ?checker_slot - checker_slot)
+    :precondition
+      (and
+        (task_checker_link ?prescription_order ?checker_slot)
+      )
+    :effect
+      (and
+        (checker_slot_available ?checker_slot)
+        (not
+          (task_checker_link ?prescription_order ?checker_slot)
+        )
+      )
+  )
+  (:action assign_clinical_check_flag_to_task
+    :parameters (?dispensing_task - dispensing_task ?clinical_check_flag - clinical_check_flag)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (clinical_check_flag_available ?clinical_check_flag)
+      )
+    :effect
+      (and
+        (task_assigned_clinical_check_flag ?dispensing_task ?clinical_check_flag)
+        (not
+          (clinical_check_flag_available ?clinical_check_flag)
+        )
+      )
+  )
+  (:action release_clinical_check_flag_from_task
+    :parameters (?dispensing_task - dispensing_task ?clinical_check_flag - clinical_check_flag)
+    :precondition
+      (and
+        (task_assigned_clinical_check_flag ?dispensing_task ?clinical_check_flag)
+      )
+    :effect
+      (and
+        (clinical_check_flag_available ?clinical_check_flag)
+        (not
+          (task_assigned_clinical_check_flag ?dispensing_task ?clinical_check_flag)
+        )
+      )
+  )
+  (:action assign_override_token_to_task
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (override_token_available ?override_token)
+      )
+    :effect
+      (and
+        (task_override_link ?dispensing_task ?override_token)
+        (not
+          (override_token_available ?override_token)
+        )
+      )
+  )
+  (:action release_override_token_from_task
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token)
+    :precondition
+      (and
+        (task_override_link ?dispensing_task ?override_token)
+      )
+    :effect
+      (and
+        (override_token_available ?override_token)
+        (not
+          (task_override_link ?dispensing_task ?override_token)
+        )
+      )
+  )
+  (:action stage_dosage_form_for_preparation
+    :parameters (?preparer_technician - preparer_technician ?dosage_form - dosage_form ?medication_product - medication_product)
+    :precondition
+      (and
+        (clinical_clearance_granted ?preparer_technician)
+        (medication_selected ?preparer_technician ?medication_product)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (not
+          (dosage_form_staged ?dosage_form)
+        )
+        (not
+          (dosage_form_component_bound ?dosage_form)
+        )
+      )
+    :effect (dosage_form_staged ?dosage_form)
+  )
+  (:action preparer_confirm_dosage_staging
+    :parameters (?preparer_technician - preparer_technician ?dosage_form - dosage_form ?checker_slot - checker_slot)
+    :precondition
+      (and
+        (clinical_clearance_granted ?preparer_technician)
+        (task_checker_link ?preparer_technician ?checker_slot)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (dosage_form_staged ?dosage_form)
+        (not
+          (preparer_ready ?preparer_technician)
+        )
+      )
+    :effect
+      (and
+        (preparer_ready ?preparer_technician)
+        (preparer_component_confirmed ?preparer_technician)
+      )
+  )
+  (:action preparer_allocate_component
+    :parameters (?preparer_technician - preparer_technician ?dosage_form - dosage_form ?component_item - component_item)
+    :precondition
+      (and
+        (clinical_clearance_granted ?preparer_technician)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (component_available ?component_item)
+        (not
+          (preparer_ready ?preparer_technician)
+        )
+      )
+    :effect
+      (and
+        (dosage_form_component_bound ?dosage_form)
+        (preparer_ready ?preparer_technician)
+        (preparer_allocated_component ?preparer_technician ?component_item)
+        (not
+          (component_available ?component_item)
+        )
+      )
+  )
+  (:action preparer_finalize_component_selection
+    :parameters (?preparer_technician - preparer_technician ?dosage_form - dosage_form ?medication_product - medication_product ?component_item - component_item)
+    :precondition
+      (and
+        (clinical_clearance_granted ?preparer_technician)
+        (medication_selected ?preparer_technician ?medication_product)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (dosage_form_component_bound ?dosage_form)
+        (preparer_allocated_component ?preparer_technician ?component_item)
+        (not
+          (preparer_component_confirmed ?preparer_technician)
+        )
+      )
+    :effect
+      (and
+        (dosage_form_staged ?dosage_form)
+        (preparer_component_confirmed ?preparer_technician)
+        (component_available ?component_item)
+        (not
+          (preparer_allocated_component ?preparer_technician ?component_item)
+        )
+      )
+  )
+  (:action stage_package_for_checker
+    :parameters (?independent_check_technician - independent_check_technician ?package_type - package_type ?medication_product - medication_product)
+    :precondition
+      (and
+        (clinical_clearance_granted ?independent_check_technician)
+        (medication_selected ?independent_check_technician ?medication_product)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (not
+          (package_type_staged ?package_type)
+        )
+        (not
+          (package_type_component_bound ?package_type)
+        )
+      )
+    :effect (package_type_staged ?package_type)
+  )
+  (:action checker_confirm_package_staging
+    :parameters (?independent_check_technician - independent_check_technician ?package_type - package_type ?checker_slot - checker_slot)
+    :precondition
+      (and
+        (clinical_clearance_granted ?independent_check_technician)
+        (task_checker_link ?independent_check_technician ?checker_slot)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (package_type_staged ?package_type)
+        (not
+          (checker_ready ?independent_check_technician)
+        )
+      )
+    :effect
+      (and
+        (checker_ready ?independent_check_technician)
+        (checker_component_confirmed ?independent_check_technician)
+      )
+  )
+  (:action checker_allocate_component
+    :parameters (?independent_check_technician - independent_check_technician ?package_type - package_type ?component_item - component_item)
+    :precondition
+      (and
+        (clinical_clearance_granted ?independent_check_technician)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (component_available ?component_item)
+        (not
+          (checker_ready ?independent_check_technician)
+        )
+      )
+    :effect
+      (and
+        (package_type_component_bound ?package_type)
+        (checker_ready ?independent_check_technician)
+        (checker_allocated_component ?independent_check_technician ?component_item)
+        (not
+          (component_available ?component_item)
+        )
+      )
+  )
+  (:action checker_finalize_component_selection
+    :parameters (?independent_check_technician - independent_check_technician ?package_type - package_type ?medication_product - medication_product ?component_item - component_item)
+    :precondition
+      (and
+        (clinical_clearance_granted ?independent_check_technician)
+        (medication_selected ?independent_check_technician ?medication_product)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (package_type_component_bound ?package_type)
+        (checker_allocated_component ?independent_check_technician ?component_item)
+        (not
+          (checker_component_confirmed ?independent_check_technician)
+        )
+      )
+    :effect
+      (and
+        (package_type_staged ?package_type)
+        (checker_component_confirmed ?independent_check_technician)
+        (component_available ?component_item)
+        (not
+          (checker_allocated_component ?independent_check_technician ?component_item)
+        )
+      )
+  )
+  (:action route_task_to_packaging
+    :parameters (?preparer_technician - preparer_technician ?independent_check_technician - independent_check_technician ?dosage_form - dosage_form ?package_type - package_type ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (preparer_ready ?preparer_technician)
+        (checker_ready ?independent_check_technician)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (dosage_form_staged ?dosage_form)
+        (package_type_staged ?package_type)
+        (preparer_component_confirmed ?preparer_technician)
+        (checker_component_confirmed ?independent_check_technician)
+        (batch_pending ?medication_batch)
+      )
+    :effect
+      (and
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_dosage_form_link ?medication_batch ?dosage_form)
+        (batch_package_type_link ?medication_batch ?package_type)
+        (not
+          (batch_pending ?medication_batch)
+        )
+      )
+  )
+  (:action route_task_to_packaging_with_ancillary
+    :parameters (?preparer_technician - preparer_technician ?independent_check_technician - independent_check_technician ?dosage_form - dosage_form ?package_type - package_type ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (preparer_ready ?preparer_technician)
+        (checker_ready ?independent_check_technician)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (dosage_form_component_bound ?dosage_form)
+        (package_type_staged ?package_type)
+        (not
+          (preparer_component_confirmed ?preparer_technician)
+        )
+        (checker_component_confirmed ?independent_check_technician)
+        (batch_pending ?medication_batch)
+      )
+    :effect
+      (and
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_dosage_form_link ?medication_batch ?dosage_form)
+        (batch_package_type_link ?medication_batch ?package_type)
+        (batch_requires_ancillary_supply ?medication_batch)
+        (not
+          (batch_pending ?medication_batch)
+        )
+      )
+  )
+  (:action route_task_to_packaging_with_education
+    :parameters (?preparer_technician - preparer_technician ?independent_check_technician - independent_check_technician ?dosage_form - dosage_form ?package_type - package_type ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (preparer_ready ?preparer_technician)
+        (checker_ready ?independent_check_technician)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (dosage_form_staged ?dosage_form)
+        (package_type_component_bound ?package_type)
+        (preparer_component_confirmed ?preparer_technician)
+        (not
+          (checker_component_confirmed ?independent_check_technician)
+        )
+        (batch_pending ?medication_batch)
+      )
+    :effect
+      (and
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_dosage_form_link ?medication_batch ?dosage_form)
+        (batch_package_type_link ?medication_batch ?package_type)
+        (batch_requires_patient_education ?medication_batch)
+        (not
+          (batch_pending ?medication_batch)
+        )
+      )
+  )
+  (:action route_task_to_packaging_with_ancillary_and_education
+    :parameters (?preparer_technician - preparer_technician ?independent_check_technician - independent_check_technician ?dosage_form - dosage_form ?package_type - package_type ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (preparer_ready ?preparer_technician)
+        (checker_ready ?independent_check_technician)
+        (preparer_selected_dosage_form ?preparer_technician ?dosage_form)
+        (checker_assigned_package_type ?independent_check_technician ?package_type)
+        (dosage_form_component_bound ?dosage_form)
+        (package_type_component_bound ?package_type)
+        (not
+          (preparer_component_confirmed ?preparer_technician)
+        )
+        (not
+          (checker_component_confirmed ?independent_check_technician)
+        )
+        (batch_pending ?medication_batch)
+      )
+    :effect
+      (and
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_dosage_form_link ?medication_batch ?dosage_form)
+        (batch_package_type_link ?medication_batch ?package_type)
+        (batch_requires_ancillary_supply ?medication_batch)
+        (batch_requires_patient_education ?medication_batch)
+        (not
+          (batch_pending ?medication_batch)
+        )
+      )
+  )
+  (:action mark_batch_label_ready
+    :parameters (?medication_batch - medication_batch ?preparer_technician - preparer_technician ?medication_product - medication_product)
+    :precondition
+      (and
+        (batch_marked_for_packaging ?medication_batch)
+        (preparer_ready ?preparer_technician)
+        (medication_selected ?preparer_technician ?medication_product)
+        (not
+          (batch_label_ready ?medication_batch)
+        )
+      )
+    :effect (batch_label_ready ?medication_batch)
+  )
+  (:action bind_label_template_to_batch_and_task
+    :parameters (?dispensing_task - dispensing_task ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (task_assigned_batch ?dispensing_task ?medication_batch)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_available ?label_template)
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_label_ready ?medication_batch)
+        (not
+          (label_template_bound ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action start_task_packaging
+    :parameters (?dispensing_task - dispensing_task ?label_template - label_template ?medication_batch - medication_batch ?medication_product - medication_product)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (medication_selected ?dispensing_task ?medication_product)
+        (not
+          (batch_requires_ancillary_supply ?medication_batch)
+        )
+        (not
+          (task_packaging_in_progress ?dispensing_task)
+        )
+      )
+    :effect (task_packaging_in_progress ?dispensing_task)
+  )
+  (:action assign_ancillary_supply_to_task
+    :parameters (?dispensing_task - dispensing_task ?ancillary_supply - ancillary_supply)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (ancillary_supply_available ?ancillary_supply)
+        (not
+          (task_ancillary_reserved ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_ancillary_reserved ?dispensing_task)
+        (task_assigned_ancillary_supply ?dispensing_task ?ancillary_supply)
+        (not
+          (ancillary_supply_available ?ancillary_supply)
+        )
+      )
+  )
+  (:action attach_ancillary_supply_and_start_packaging
+    :parameters (?dispensing_task - dispensing_task ?label_template - label_template ?medication_batch - medication_batch ?medication_product - medication_product ?ancillary_supply - ancillary_supply)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (medication_selected ?dispensing_task ?medication_product)
+        (batch_requires_ancillary_supply ?medication_batch)
+        (task_ancillary_reserved ?dispensing_task)
+        (task_assigned_ancillary_supply ?dispensing_task ?ancillary_supply)
+        (not
+          (task_packaging_in_progress ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_packaging_in_progress ?dispensing_task)
+        (task_ancillary_added ?dispensing_task)
+      )
+  )
+  (:action complete_packaging_check_with_clinical_flag
+    :parameters (?dispensing_task - dispensing_task ?clinical_check_flag - clinical_check_flag ?checker_slot - checker_slot ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_in_progress ?dispensing_task)
+        (task_assigned_clinical_check_flag ?dispensing_task ?clinical_check_flag)
+        (task_checker_link ?dispensing_task ?checker_slot)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (not
+          (batch_requires_patient_education ?medication_batch)
+        )
+        (not
+          (task_packaging_completed ?dispensing_task)
+        )
+      )
+    :effect (task_packaging_completed ?dispensing_task)
+  )
+  (:action complete_packaging_check_with_clinical_flag_alt
+    :parameters (?dispensing_task - dispensing_task ?clinical_check_flag - clinical_check_flag ?checker_slot - checker_slot ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_in_progress ?dispensing_task)
+        (task_assigned_clinical_check_flag ?dispensing_task ?clinical_check_flag)
+        (task_checker_link ?dispensing_task ?checker_slot)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (batch_requires_patient_education ?medication_batch)
+        (not
+          (task_packaging_completed ?dispensing_task)
+        )
+      )
+    :effect (task_packaging_completed ?dispensing_task)
+  )
+  (:action mark_task_ready_for_final_check_with_override
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_completed ?dispensing_task)
+        (task_override_link ?dispensing_task ?override_token)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (not
+          (batch_requires_ancillary_supply ?medication_batch)
+        )
+        (not
+          (batch_requires_patient_education ?medication_batch)
+        )
+        (not
+          (task_ready_for_final_check ?dispensing_task)
+        )
+      )
+    :effect (task_ready_for_final_check ?dispensing_task)
+  )
+  (:action mark_task_ready_for_final_check_and_attach_education
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_completed ?dispensing_task)
+        (task_override_link ?dispensing_task ?override_token)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (batch_requires_ancillary_supply ?medication_batch)
+        (not
+          (batch_requires_patient_education ?medication_batch)
+        )
+        (not
+          (task_ready_for_final_check ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_patient_education_attached ?dispensing_task)
+      )
+  )
+  (:action mark_task_ready_for_final_check_and_attach_education_alt
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_completed ?dispensing_task)
+        (task_override_link ?dispensing_task ?override_token)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (not
+          (batch_requires_ancillary_supply ?medication_batch)
+        )
+        (batch_requires_patient_education ?medication_batch)
+        (not
+          (task_ready_for_final_check ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_patient_education_attached ?dispensing_task)
+      )
+  )
+  (:action mark_task_ready_for_final_check_and_attach_education_all
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token ?label_template - label_template ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (task_packaging_completed ?dispensing_task)
+        (task_override_link ?dispensing_task ?override_token)
+        (task_assigned_label_template ?dispensing_task ?label_template)
+        (label_template_assigned_to_batch ?label_template ?medication_batch)
+        (batch_requires_ancillary_supply ?medication_batch)
+        (batch_requires_patient_education ?medication_batch)
+        (not
+          (task_ready_for_final_check ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_patient_education_attached ?dispensing_task)
+      )
+  )
+  (:action finalize_task_without_patient_education
+    :parameters (?dispensing_task - dispensing_task)
+    :precondition
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (not
+          (task_patient_education_attached ?dispensing_task)
+        )
+        (not
+          (task_released ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_released ?dispensing_task)
+        (final_release_recorded ?dispensing_task)
+      )
+  )
+  (:action attach_patient_education_to_task
+    :parameters (?dispensing_task - dispensing_task ?patient_education_material - patient_education_material)
+    :precondition
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_patient_education_attached ?dispensing_task)
+        (patient_education_available ?patient_education_material)
+      )
+    :effect
+      (and
+        (task_assigned_patient_education ?dispensing_task ?patient_education_material)
+        (not
+          (patient_education_available ?patient_education_material)
+        )
+      )
+  )
+  (:action complete_independent_double_check
+    :parameters (?dispensing_task - dispensing_task ?preparer_technician - preparer_technician ?independent_check_technician - independent_check_technician ?medication_product - medication_product ?patient_education_material - patient_education_material)
+    :precondition
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_patient_education_attached ?dispensing_task)
+        (task_assigned_patient_education ?dispensing_task ?patient_education_material)
+        (task_assigned_preparer ?dispensing_task ?preparer_technician)
+        (task_assigned_checker ?dispensing_task ?independent_check_technician)
+        (preparer_component_confirmed ?preparer_technician)
+        (checker_component_confirmed ?independent_check_technician)
+        (medication_selected ?dispensing_task ?medication_product)
+        (not
+          (task_independent_check_completed ?dispensing_task)
+        )
+      )
+    :effect (task_independent_check_completed ?dispensing_task)
+  )
+  (:action finalize_task_after_independent_check
+    :parameters (?dispensing_task - dispensing_task)
+    :precondition
+      (and
+        (task_ready_for_final_check ?dispensing_task)
+        (task_independent_check_completed ?dispensing_task)
+        (not
+          (task_released ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_released ?dispensing_task)
+        (final_release_recorded ?dispensing_task)
+      )
+  )
+  (:action record_task_approval
+    :parameters (?dispensing_task - dispensing_task ?approval_token - approval_token ?medication_product - medication_product)
+    :precondition
+      (and
+        (clinical_clearance_granted ?dispensing_task)
+        (medication_selected ?dispensing_task ?medication_product)
+        (approval_token_available ?approval_token)
+        (task_has_approval_token ?dispensing_task ?approval_token)
+        (not
+          (task_approval_recorded ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_approval_recorded ?dispensing_task)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action acknowledge_task_approval
+    :parameters (?dispensing_task - dispensing_task ?checker_slot - checker_slot)
+    :precondition
+      (and
+        (task_approval_recorded ?dispensing_task)
+        (task_checker_link ?dispensing_task ?checker_slot)
+        (not
+          (task_authorization_granted ?dispensing_task)
+        )
+      )
+    :effect (task_authorization_granted ?dispensing_task)
+  )
+  (:action apply_override_to_task
+    :parameters (?dispensing_task - dispensing_task ?override_token - override_token)
+    :precondition
+      (and
+        (task_authorization_granted ?dispensing_task)
+        (task_override_link ?dispensing_task ?override_token)
+        (not
+          (task_override_applied ?dispensing_task)
+        )
+      )
+    :effect (task_override_applied ?dispensing_task)
+  )
+  (:action finalize_task_after_override
+    :parameters (?dispensing_task - dispensing_task)
+    :precondition
+      (and
+        (task_override_applied ?dispensing_task)
+        (not
+          (task_released ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (task_released ?dispensing_task)
+        (final_release_recorded ?dispensing_task)
+      )
+  )
+  (:action preparer_release_medication
+    :parameters (?preparer_technician - preparer_technician ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (preparer_ready ?preparer_technician)
+        (preparer_component_confirmed ?preparer_technician)
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_label_ready ?medication_batch)
+        (not
+          (final_release_recorded ?preparer_technician)
+        )
+      )
+    :effect (final_release_recorded ?preparer_technician)
+  )
+  (:action checker_release_medication
+    :parameters (?independent_check_technician - independent_check_technician ?medication_batch - medication_batch)
+    :precondition
+      (and
+        (checker_ready ?independent_check_technician)
+        (checker_component_confirmed ?independent_check_technician)
+        (batch_marked_for_packaging ?medication_batch)
+        (batch_label_ready ?medication_batch)
+        (not
+          (final_release_recorded ?independent_check_technician)
+        )
+      )
+    :effect (final_release_recorded ?independent_check_technician)
+  )
+  (:action assign_counseling_topic_to_prescription
+    :parameters (?prescription_order - workflow_entity ?counseling_topic - counseling_topic ?medication_product - medication_product)
+    :precondition
+      (and
+        (final_release_recorded ?prescription_order)
+        (medication_selected ?prescription_order ?medication_product)
+        (counseling_topic_available ?counseling_topic)
+        (not
+          (release_initiated ?prescription_order)
+        )
+      )
+    :effect
+      (and
+        (release_initiated ?prescription_order)
+        (prescription_counseling_link ?prescription_order ?counseling_topic)
+        (not
+          (counseling_topic_available ?counseling_topic)
+        )
+      )
+  )
+  (:action preparer_complete_release_with_verifier
+    :parameters (?preparer_technician - preparer_technician ?verifier_slot - verifier_slot ?counseling_topic - counseling_topic)
+    :precondition
+      (and
+        (release_initiated ?preparer_technician)
+        (task_verifier_link ?preparer_technician ?verifier_slot)
+        (prescription_counseling_link ?preparer_technician ?counseling_topic)
+        (not
+          (entity_released_to_patient ?preparer_technician)
+        )
+      )
+    :effect
+      (and
+        (entity_released_to_patient ?preparer_technician)
+        (verifier_slot_available ?verifier_slot)
+        (counseling_topic_available ?counseling_topic)
+      )
+  )
+  (:action checker_complete_release_with_verifier
+    :parameters (?independent_check_technician - independent_check_technician ?verifier_slot - verifier_slot ?counseling_topic - counseling_topic)
+    :precondition
+      (and
+        (release_initiated ?independent_check_technician)
+        (task_verifier_link ?independent_check_technician ?verifier_slot)
+        (prescription_counseling_link ?independent_check_technician ?counseling_topic)
+        (not
+          (entity_released_to_patient ?independent_check_technician)
+        )
+      )
+    :effect
+      (and
+        (entity_released_to_patient ?independent_check_technician)
+        (verifier_slot_available ?verifier_slot)
+        (counseling_topic_available ?counseling_topic)
+      )
+  )
+  (:action task_complete_release_with_verifier
+    :parameters (?dispensing_task - dispensing_task ?verifier_slot - verifier_slot ?counseling_topic - counseling_topic)
+    :precondition
+      (and
+        (release_initiated ?dispensing_task)
+        (task_verifier_link ?dispensing_task ?verifier_slot)
+        (prescription_counseling_link ?dispensing_task ?counseling_topic)
+        (not
+          (entity_released_to_patient ?dispensing_task)
+        )
+      )
+    :effect
+      (and
+        (entity_released_to_patient ?dispensing_task)
+        (verifier_slot_available ?verifier_slot)
+        (counseling_topic_available ?counseling_topic)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem high_risk_double_check_scenario)
+  (:domain pharmacy_high_risk_double_check_domain)
+  (:objects prep_tech_1 - preparer_technician checker_tech_1 - independent_check_technician dispensing_task_1 - dispensing_task dispensing_task_2 - dispensing_task verifier_slot_pharm_1 - verifier_slot verifier_slot_pharm_2 - verifier_slot verifier_slot_pharm_3 - verifier_slot medication_product_high_risk - medication_product checker_slot_1 - checker_slot component_item_vial - component_item dosage_form_solution - dosage_form package_type_bottle - package_type medication_batch_001 - medication_batch label_template_standard_1 - label_template label_template_standard_2 - label_template ancillary_supply_1 - ancillary_supply ancillary_supply_2 - ancillary_supply patient_education_leaflet_1 - patient_education_material patient_education_leaflet_2 - patient_education_material counseling_topic_dispense_instructions - counseling_topic clinical_check_flag_allergy - clinical_check_flag approval_token_pharmacist_1 - approval_token approval_token_pharmacist_2 - approval_token override_token_senior_pharmacist - override_token)
+  (:init
+    (verifier_slot_available verifier_slot_pharm_1)
+    (verifier_slot_available verifier_slot_pharm_2)
+    (verifier_slot_available verifier_slot_pharm_3)
+    (medication_product_available medication_product_high_risk)
+    (checker_slot_available checker_slot_1)
+    (component_available component_item_vial)
+    (preparer_selected_dosage_form prep_tech_1 dosage_form_solution)
+    (checker_assigned_package_type checker_tech_1 package_type_bottle)
+    (batch_pending medication_batch_001)
+    (label_template_available label_template_standard_1)
+    (label_template_available label_template_standard_2)
+    (task_assigned_preparer dispensing_task_1 prep_tech_1)
+    (task_assigned_preparer dispensing_task_2 prep_tech_1)
+    (task_assigned_checker dispensing_task_1 checker_tech_1)
+    (task_assigned_checker dispensing_task_2 checker_tech_1)
+    (task_assigned_batch dispensing_task_1 medication_batch_001)
+    (task_assigned_batch dispensing_task_2 medication_batch_001)
+    (task_assigned_label_template dispensing_task_1 label_template_standard_1)
+    (task_assigned_label_template dispensing_task_2 label_template_standard_2)
+    (ancillary_supply_available ancillary_supply_1)
+    (ancillary_supply_available ancillary_supply_2)
+    (patient_education_available patient_education_leaflet_1)
+    (patient_education_available patient_education_leaflet_2)
+    (counseling_topic_available counseling_topic_dispense_instructions)
+    (clinical_check_flag_available clinical_check_flag_allergy)
+    (approval_token_available approval_token_pharmacist_1)
+    (task_has_approval_token dispensing_task_1 approval_token_pharmacist_1)
+    (task_has_approval_token dispensing_task_2 approval_token_pharmacist_2)
+    (override_token_available override_token_senior_pharmacist)
+  )
+  (:goal
+    (and
+      (entity_released_to_patient prep_tech_1)
+      (entity_released_to_patient checker_tech_1)
+      (entity_released_to_patient dispensing_task_1)
+      (entity_released_to_patient dispensing_task_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_prescription_review_task prep_tech_1)
+(allocate_verifier_slot_to_prescription prep_tech_1 verifier_slot_pharm_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_v0ypoc32/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_v0ypoc32/plan.pddl 
+
+
+--- stderr ---
+

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain dock_appointment_aligned_dispatch_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_group - object time_related_group - object asset_group - object dispatch_entity - object shipment_request - dispatch_entity vehicle_unit - resource_group appointment_slot - resource_group dock_door - resource_group special_service - resource_group driver_resource - resource_group shipping_document - resource_group container_equipment - resource_group regulatory_permit - resource_group load_unit - time_related_group handling_equipment - time_related_group consignee_authorization - time_related_group inbound_leg - asset_group outbound_leg - asset_group trailer_unit - asset_group stop_group - shipment_request stop_subgroup - shipment_request inbound_stop - stop_group outbound_stop - stop_group dispatch_job - stop_subgroup)
+  (:predicates
+    (shipment_created ?shipment_request - shipment_request)
+    (dispatch_entity_confirmed ?shipment_request - shipment_request)
+    (dispatch_entity_has_vehicle_assignment ?shipment_request - shipment_request)
+    (dispatch_entity_released_for_execution ?shipment_request - shipment_request)
+    (dispatch_entity_ready_for_dispatch ?shipment_request - shipment_request)
+    (dispatch_entity_has_attached_shipping_document ?shipment_request - shipment_request)
+    (vehicle_available ?vehicle_unit - vehicle_unit)
+    (dispatch_entity_assigned_vehicle ?shipment_request - shipment_request ?vehicle_unit - vehicle_unit)
+    (appointment_available ?appointment_slot - appointment_slot)
+    (dispatch_entity_assigned_appointment ?shipment_request - shipment_request ?appointment_slot - appointment_slot)
+    (door_available ?dock_door - dock_door)
+    (dispatch_entity_assigned_dock_door ?shipment_request - shipment_request ?dock_door - dock_door)
+    (load_unit_available ?load_unit - load_unit)
+    (load_assigned_to_inbound_stop ?inbound_stop - inbound_stop ?load_unit - load_unit)
+    (load_assigned_to_outbound_stop ?outbound_stop - outbound_stop ?load_unit - load_unit)
+    (inbound_leg_for_stop ?inbound_stop - inbound_stop ?inbound_leg - inbound_leg)
+    (inbound_leg_ready_for_loading ?inbound_leg - inbound_leg)
+    (inbound_leg_has_staged_loads ?inbound_leg - inbound_leg)
+    (inbound_stop_has_staged_loads ?inbound_stop - inbound_stop)
+    (outbound_leg_for_stop ?outbound_stop - outbound_stop ?outbound_leg - outbound_leg)
+    (outbound_leg_ready_for_loading ?outbound_leg - outbound_leg)
+    (outbound_leg_has_staged_loads ?outbound_leg - outbound_leg)
+    (outbound_stop_has_staged_loads ?outbound_stop - outbound_stop)
+    (trailer_available ?trailer_unit - trailer_unit)
+    (trailer_reserved ?trailer_unit - trailer_unit)
+    (trailer_assigned_to_inbound_leg ?trailer_unit - trailer_unit ?inbound_leg - inbound_leg)
+    (trailer_assigned_to_outbound_leg ?trailer_unit - trailer_unit ?outbound_leg - outbound_leg)
+    (trailer_has_inbound_load ?trailer_unit - trailer_unit)
+    (trailer_has_outbound_load ?trailer_unit - trailer_unit)
+    (trailer_loaded ?trailer_unit - trailer_unit)
+    (dispatch_job_includes_inbound_stop ?dispatch_job - dispatch_job ?inbound_stop - inbound_stop)
+    (dispatch_job_includes_outbound_stop ?dispatch_job - dispatch_job ?outbound_stop - outbound_stop)
+    (dispatch_job_assigned_trailer ?dispatch_job - dispatch_job ?trailer_unit - trailer_unit)
+    (equipment_available ?handling_equipment - handling_equipment)
+    (equipment_assigned_to_dispatch_job ?dispatch_job - dispatch_job ?handling_equipment - handling_equipment)
+    (equipment_staged ?handling_equipment - handling_equipment)
+    (equipment_assigned_to_trailer ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    (dispatch_job_has_attached_container ?dispatch_job - dispatch_job)
+    (dispatch_job_container_committed ?dispatch_job - dispatch_job)
+    (dispatch_job_container_locked_for_dispatch ?dispatch_job - dispatch_job)
+    (service_allocated_to_job ?dispatch_job - dispatch_job)
+    (service_staged ?dispatch_job - dispatch_job)
+    (ready_for_driver_assignment ?dispatch_job - dispatch_job)
+    (job_preparation_complete ?dispatch_job - dispatch_job)
+    (authorization_available ?consignee_authorization - consignee_authorization)
+    (job_has_consignee_authorization ?dispatch_job - dispatch_job ?consignee_authorization - consignee_authorization)
+    (authorization_attached_to_job ?dispatch_job - dispatch_job)
+    (authorization_validated_at_door ?dispatch_job - dispatch_job)
+    (permit_validated_for_job ?dispatch_job - dispatch_job)
+    (special_service_available ?special_service - special_service)
+    (job_assigned_special_service ?dispatch_job - dispatch_job ?special_service - special_service)
+    (driver_available ?driver_resource - driver_resource)
+    (driver_assigned_to_job ?dispatch_job - dispatch_job ?driver_resource - driver_resource)
+    (container_equipment_available ?container_equipment - container_equipment)
+    (container_equipment_assigned_to_job ?dispatch_job - dispatch_job ?container_equipment - container_equipment)
+    (regulatory_permit_available ?regulatory_permit - regulatory_permit)
+    (regulatory_permit_assigned_to_job ?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit)
+    (shipping_document_available ?shipping_document - shipping_document)
+    (shipping_document_attached_to_entity ?shipment_request - shipment_request ?shipping_document - shipping_document)
+    (inbound_stop_ready ?inbound_stop - inbound_stop)
+    (outbound_stop_ready ?outbound_stop - outbound_stop)
+    (finalized ?dispatch_job - dispatch_job)
+  )
+  (:action create_shipment
+    :parameters (?shipment_request - shipment_request)
+    :precondition
+      (and
+        (not
+          (shipment_created ?shipment_request)
+        )
+        (not
+          (dispatch_entity_released_for_execution ?shipment_request)
+        )
+      )
+    :effect (shipment_created ?shipment_request)
+  )
+  (:action assign_vehicle_to_shipment
+    :parameters (?shipment_request - shipment_request ?vehicle_unit - vehicle_unit)
+    :precondition
+      (and
+        (shipment_created ?shipment_request)
+        (not
+          (dispatch_entity_has_vehicle_assignment ?shipment_request)
+        )
+        (vehicle_available ?vehicle_unit)
+      )
+    :effect
+      (and
+        (dispatch_entity_has_vehicle_assignment ?shipment_request)
+        (dispatch_entity_assigned_vehicle ?shipment_request ?vehicle_unit)
+        (not
+          (vehicle_available ?vehicle_unit)
+        )
+      )
+  )
+  (:action book_appointment_slot
+    :parameters (?shipment_request - shipment_request ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (shipment_created ?shipment_request)
+        (dispatch_entity_has_vehicle_assignment ?shipment_request)
+        (appointment_available ?appointment_slot)
+      )
+    :effect
+      (and
+        (dispatch_entity_assigned_appointment ?shipment_request ?appointment_slot)
+        (not
+          (appointment_available ?appointment_slot)
+        )
+      )
+  )
+  (:action confirm_appointment_for_shipment
+    :parameters (?shipment_request - shipment_request ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (shipment_created ?shipment_request)
+        (dispatch_entity_has_vehicle_assignment ?shipment_request)
+        (dispatch_entity_assigned_appointment ?shipment_request ?appointment_slot)
+        (not
+          (dispatch_entity_confirmed ?shipment_request)
+        )
+      )
+    :effect (dispatch_entity_confirmed ?shipment_request)
+  )
+  (:action release_appointment_slot
+    :parameters (?shipment_request - shipment_request ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_assigned_appointment ?shipment_request ?appointment_slot)
+      )
+    :effect
+      (and
+        (appointment_available ?appointment_slot)
+        (not
+          (dispatch_entity_assigned_appointment ?shipment_request ?appointment_slot)
+        )
+      )
+  )
+  (:action assign_dock_door_to_shipment
+    :parameters (?shipment_request - shipment_request ?dock_door - dock_door)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?shipment_request)
+        (door_available ?dock_door)
+      )
+    :effect
+      (and
+        (dispatch_entity_assigned_dock_door ?shipment_request ?dock_door)
+        (not
+          (door_available ?dock_door)
+        )
+      )
+  )
+  (:action release_dock_door_from_shipment
+    :parameters (?shipment_request - shipment_request ?dock_door - dock_door)
+    :precondition
+      (and
+        (dispatch_entity_assigned_dock_door ?shipment_request ?dock_door)
+      )
+    :effect
+      (and
+        (door_available ?dock_door)
+        (not
+          (dispatch_entity_assigned_dock_door ?shipment_request ?dock_door)
+        )
+      )
+  )
+  (:action assign_container_equipment_to_job
+    :parameters (?dispatch_job - dispatch_job ?container_equipment - container_equipment)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (container_equipment_available ?container_equipment)
+      )
+    :effect
+      (and
+        (container_equipment_assigned_to_job ?dispatch_job ?container_equipment)
+        (not
+          (container_equipment_available ?container_equipment)
+        )
+      )
+  )
+  (:action remove_container_equipment_from_job
+    :parameters (?dispatch_job - dispatch_job ?container_equipment - container_equipment)
+    :precondition
+      (and
+        (container_equipment_assigned_to_job ?dispatch_job ?container_equipment)
+      )
+    :effect
+      (and
+        (container_equipment_available ?container_equipment)
+        (not
+          (container_equipment_assigned_to_job ?dispatch_job ?container_equipment)
+        )
+      )
+  )
+  (:action assign_regulatory_permit_to_job
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (regulatory_permit_available ?regulatory_permit)
+      )
+    :effect
+      (and
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (not
+          (regulatory_permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action remove_regulatory_permit_from_job
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+      )
+    :effect
+      (and
+        (regulatory_permit_available ?regulatory_permit)
+        (not
+          (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        )
+      )
+  )
+  (:action mark_inbound_leg_ready
+    :parameters (?inbound_stop - inbound_stop ?inbound_leg - inbound_leg ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?inbound_stop)
+        (dispatch_entity_assigned_appointment ?inbound_stop ?appointment_slot)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (not
+          (inbound_leg_ready_for_loading ?inbound_leg)
+        )
+        (not
+          (inbound_leg_has_staged_loads ?inbound_leg)
+        )
+      )
+    :effect (inbound_leg_ready_for_loading ?inbound_leg)
+  )
+  (:action stage_inbound_stop
+    :parameters (?inbound_stop - inbound_stop ?inbound_leg - inbound_leg ?dock_door - dock_door)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?inbound_stop)
+        (dispatch_entity_assigned_dock_door ?inbound_stop ?dock_door)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (inbound_leg_ready_for_loading ?inbound_leg)
+        (not
+          (inbound_stop_ready ?inbound_stop)
+        )
+      )
+    :effect
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+      )
+  )
+  (:action stage_load_unit_to_inbound_stop
+    :parameters (?inbound_stop - inbound_stop ?inbound_leg - inbound_leg ?load_unit - load_unit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?inbound_stop)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (load_unit_available ?load_unit)
+        (not
+          (inbound_stop_ready ?inbound_stop)
+        )
+      )
+    :effect
+      (and
+        (inbound_leg_has_staged_loads ?inbound_leg)
+        (inbound_stop_ready ?inbound_stop)
+        (load_assigned_to_inbound_stop ?inbound_stop ?load_unit)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action commit_load_from_stop_to_inbound_leg
+    :parameters (?inbound_stop - inbound_stop ?inbound_leg - inbound_leg ?appointment_slot - appointment_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?inbound_stop)
+        (dispatch_entity_assigned_appointment ?inbound_stop ?appointment_slot)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (inbound_leg_has_staged_loads ?inbound_leg)
+        (load_assigned_to_inbound_stop ?inbound_stop ?load_unit)
+        (not
+          (inbound_stop_has_staged_loads ?inbound_stop)
+        )
+      )
+    :effect
+      (and
+        (inbound_leg_ready_for_loading ?inbound_leg)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+        (load_unit_available ?load_unit)
+        (not
+          (load_assigned_to_inbound_stop ?inbound_stop ?load_unit)
+        )
+      )
+  )
+  (:action mark_outbound_leg_ready
+    :parameters (?outbound_stop - outbound_stop ?outbound_leg - outbound_leg ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?outbound_stop)
+        (dispatch_entity_assigned_appointment ?outbound_stop ?appointment_slot)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (not
+          (outbound_leg_ready_for_loading ?outbound_leg)
+        )
+        (not
+          (outbound_leg_has_staged_loads ?outbound_leg)
+        )
+      )
+    :effect (outbound_leg_ready_for_loading ?outbound_leg)
+  )
+  (:action stage_outbound_stop
+    :parameters (?outbound_stop - outbound_stop ?outbound_leg - outbound_leg ?dock_door - dock_door)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?outbound_stop)
+        (dispatch_entity_assigned_dock_door ?outbound_stop ?dock_door)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (outbound_leg_ready_for_loading ?outbound_leg)
+        (not
+          (outbound_stop_ready ?outbound_stop)
+        )
+      )
+    :effect
+      (and
+        (outbound_stop_ready ?outbound_stop)
+        (outbound_stop_has_staged_loads ?outbound_stop)
+      )
+  )
+  (:action stage_load_unit_to_outbound_stop
+    :parameters (?outbound_stop - outbound_stop ?outbound_leg - outbound_leg ?load_unit - load_unit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?outbound_stop)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (load_unit_available ?load_unit)
+        (not
+          (outbound_stop_ready ?outbound_stop)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_has_staged_loads ?outbound_leg)
+        (outbound_stop_ready ?outbound_stop)
+        (load_assigned_to_outbound_stop ?outbound_stop ?load_unit)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action commit_load_from_outbound_stop_to_outbound_leg
+    :parameters (?outbound_stop - outbound_stop ?outbound_leg - outbound_leg ?appointment_slot - appointment_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?outbound_stop)
+        (dispatch_entity_assigned_appointment ?outbound_stop ?appointment_slot)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (outbound_leg_has_staged_loads ?outbound_leg)
+        (load_assigned_to_outbound_stop ?outbound_stop ?load_unit)
+        (not
+          (outbound_stop_has_staged_loads ?outbound_stop)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_ready_for_loading ?outbound_leg)
+        (outbound_stop_has_staged_loads ?outbound_stop)
+        (load_unit_available ?load_unit)
+        (not
+          (load_assigned_to_outbound_stop ?outbound_stop ?load_unit)
+        )
+      )
+  )
+  (:action assign_trailer_to_legs
+    :parameters (?inbound_stop - inbound_stop ?outbound_stop - outbound_stop ?inbound_leg - inbound_leg ?outbound_leg - outbound_leg ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (outbound_stop_ready ?outbound_stop)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (inbound_leg_ready_for_loading ?inbound_leg)
+        (outbound_leg_ready_for_loading ?outbound_leg)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+        (outbound_stop_has_staged_loads ?outbound_stop)
+        (trailer_available ?trailer_unit)
+      )
+    :effect
+      (and
+        (trailer_reserved ?trailer_unit)
+        (trailer_assigned_to_inbound_leg ?trailer_unit ?inbound_leg)
+        (trailer_assigned_to_outbound_leg ?trailer_unit ?outbound_leg)
+        (not
+          (trailer_available ?trailer_unit)
+        )
+      )
+  )
+  (:action assign_trailer_with_inbound_priority
+    :parameters (?inbound_stop - inbound_stop ?outbound_stop - outbound_stop ?inbound_leg - inbound_leg ?outbound_leg - outbound_leg ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (outbound_stop_ready ?outbound_stop)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (inbound_leg_has_staged_loads ?inbound_leg)
+        (outbound_leg_ready_for_loading ?outbound_leg)
+        (not
+          (inbound_stop_has_staged_loads ?inbound_stop)
+        )
+        (outbound_stop_has_staged_loads ?outbound_stop)
+        (trailer_available ?trailer_unit)
+      )
+    :effect
+      (and
+        (trailer_reserved ?trailer_unit)
+        (trailer_assigned_to_inbound_leg ?trailer_unit ?inbound_leg)
+        (trailer_assigned_to_outbound_leg ?trailer_unit ?outbound_leg)
+        (trailer_has_inbound_load ?trailer_unit)
+        (not
+          (trailer_available ?trailer_unit)
+        )
+      )
+  )
+  (:action assign_trailer_with_outbound_priority
+    :parameters (?inbound_stop - inbound_stop ?outbound_stop - outbound_stop ?inbound_leg - inbound_leg ?outbound_leg - outbound_leg ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (outbound_stop_ready ?outbound_stop)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (inbound_leg_ready_for_loading ?inbound_leg)
+        (outbound_leg_has_staged_loads ?outbound_leg)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+        (not
+          (outbound_stop_has_staged_loads ?outbound_stop)
+        )
+        (trailer_available ?trailer_unit)
+      )
+    :effect
+      (and
+        (trailer_reserved ?trailer_unit)
+        (trailer_assigned_to_inbound_leg ?trailer_unit ?inbound_leg)
+        (trailer_assigned_to_outbound_leg ?trailer_unit ?outbound_leg)
+        (trailer_has_outbound_load ?trailer_unit)
+        (not
+          (trailer_available ?trailer_unit)
+        )
+      )
+  )
+  (:action assign_trailer_with_both_legs
+    :parameters (?inbound_stop - inbound_stop ?outbound_stop - outbound_stop ?inbound_leg - inbound_leg ?outbound_leg - outbound_leg ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (outbound_stop_ready ?outbound_stop)
+        (inbound_leg_for_stop ?inbound_stop ?inbound_leg)
+        (outbound_leg_for_stop ?outbound_stop ?outbound_leg)
+        (inbound_leg_has_staged_loads ?inbound_leg)
+        (outbound_leg_has_staged_loads ?outbound_leg)
+        (not
+          (inbound_stop_has_staged_loads ?inbound_stop)
+        )
+        (not
+          (outbound_stop_has_staged_loads ?outbound_stop)
+        )
+        (trailer_available ?trailer_unit)
+      )
+    :effect
+      (and
+        (trailer_reserved ?trailer_unit)
+        (trailer_assigned_to_inbound_leg ?trailer_unit ?inbound_leg)
+        (trailer_assigned_to_outbound_leg ?trailer_unit ?outbound_leg)
+        (trailer_has_inbound_load ?trailer_unit)
+        (trailer_has_outbound_load ?trailer_unit)
+        (not
+          (trailer_available ?trailer_unit)
+        )
+      )
+  )
+  (:action finalize_trailer_loading
+    :parameters (?trailer_unit - trailer_unit ?inbound_stop - inbound_stop ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (trailer_reserved ?trailer_unit)
+        (inbound_stop_ready ?inbound_stop)
+        (dispatch_entity_assigned_appointment ?inbound_stop ?appointment_slot)
+        (not
+          (trailer_loaded ?trailer_unit)
+        )
+      )
+    :effect (trailer_loaded ?trailer_unit)
+  )
+  (:action stage_equipment_to_trailer
+    :parameters (?dispatch_job - dispatch_job ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (dispatch_job_assigned_trailer ?dispatch_job ?trailer_unit)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_available ?handling_equipment)
+        (trailer_reserved ?trailer_unit)
+        (trailer_loaded ?trailer_unit)
+        (not
+          (equipment_staged ?handling_equipment)
+        )
+      )
+    :effect
+      (and
+        (equipment_staged ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (not
+          (equipment_available ?handling_equipment)
+        )
+      )
+  )
+  (:action attach_container_to_job
+    :parameters (?dispatch_job - dispatch_job ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_staged ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (dispatch_entity_assigned_appointment ?dispatch_job ?appointment_slot)
+        (not
+          (trailer_has_inbound_load ?trailer_unit)
+        )
+        (not
+          (dispatch_job_has_attached_container ?dispatch_job)
+        )
+      )
+    :effect (dispatch_job_has_attached_container ?dispatch_job)
+  )
+  (:action allocate_special_service_to_job
+    :parameters (?dispatch_job - dispatch_job ?special_service - special_service)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (special_service_available ?special_service)
+        (not
+          (service_allocated_to_job ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (service_allocated_to_job ?dispatch_job)
+        (job_assigned_special_service ?dispatch_job ?special_service)
+        (not
+          (special_service_available ?special_service)
+        )
+      )
+  )
+  (:action apply_service_and_attach_container
+    :parameters (?dispatch_job - dispatch_job ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit ?appointment_slot - appointment_slot ?special_service - special_service)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_staged ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (dispatch_entity_assigned_appointment ?dispatch_job ?appointment_slot)
+        (trailer_has_inbound_load ?trailer_unit)
+        (service_allocated_to_job ?dispatch_job)
+        (job_assigned_special_service ?dispatch_job ?special_service)
+        (not
+          (dispatch_job_has_attached_container ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (dispatch_job_has_attached_container ?dispatch_job)
+        (service_staged ?dispatch_job)
+      )
+  )
+  (:action commit_container_preload
+    :parameters (?dispatch_job - dispatch_job ?container_equipment - container_equipment ?dock_door - dock_door ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_has_attached_container ?dispatch_job)
+        (container_equipment_assigned_to_job ?dispatch_job ?container_equipment)
+        (dispatch_entity_assigned_dock_door ?dispatch_job ?dock_door)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (not
+          (trailer_has_outbound_load ?trailer_unit)
+        )
+        (not
+          (dispatch_job_container_committed ?dispatch_job)
+        )
+      )
+    :effect (dispatch_job_container_committed ?dispatch_job)
+  )
+  (:action commit_container_preload_secondary
+    :parameters (?dispatch_job - dispatch_job ?container_equipment - container_equipment ?dock_door - dock_door ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_has_attached_container ?dispatch_job)
+        (container_equipment_assigned_to_job ?dispatch_job ?container_equipment)
+        (dispatch_entity_assigned_dock_door ?dispatch_job ?dock_door)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (trailer_has_outbound_load ?trailer_unit)
+        (not
+          (dispatch_job_container_committed ?dispatch_job)
+        )
+      )
+    :effect (dispatch_job_container_committed ?dispatch_job)
+  )
+  (:action lock_container_for_dispatch
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_container_committed ?dispatch_job)
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (not
+          (trailer_has_inbound_load ?trailer_unit)
+        )
+        (not
+          (trailer_has_outbound_load ?trailer_unit)
+        )
+        (not
+          (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        )
+      )
+    :effect (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+  )
+  (:action lock_container_and_enable_driver_assignment
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_container_committed ?dispatch_job)
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (trailer_has_inbound_load ?trailer_unit)
+        (not
+          (trailer_has_outbound_load ?trailer_unit)
+        )
+        (not
+          (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (ready_for_driver_assignment ?dispatch_job)
+      )
+  )
+  (:action lock_container_and_enable_driver_assignment_secondary
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_container_committed ?dispatch_job)
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (not
+          (trailer_has_inbound_load ?trailer_unit)
+        )
+        (trailer_has_outbound_load ?trailer_unit)
+        (not
+          (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (ready_for_driver_assignment ?dispatch_job)
+      )
+  )
+  (:action lock_container_and_enable_driver_assignment_both
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit ?handling_equipment - handling_equipment ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (dispatch_job_container_committed ?dispatch_job)
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (equipment_assigned_to_dispatch_job ?dispatch_job ?handling_equipment)
+        (equipment_assigned_to_trailer ?handling_equipment ?trailer_unit)
+        (trailer_has_inbound_load ?trailer_unit)
+        (trailer_has_outbound_load ?trailer_unit)
+        (not
+          (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (ready_for_driver_assignment ?dispatch_job)
+      )
+  )
+  (:action finalize_job_readiness
+    :parameters (?dispatch_job - dispatch_job)
+    :precondition
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (not
+          (ready_for_driver_assignment ?dispatch_job)
+        )
+        (not
+          (finalized ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (finalized ?dispatch_job)
+        (dispatch_entity_ready_for_dispatch ?dispatch_job)
+      )
+  )
+  (:action assign_driver_to_job
+    :parameters (?dispatch_job - dispatch_job ?driver_resource - driver_resource)
+    :precondition
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (ready_for_driver_assignment ?dispatch_job)
+        (driver_available ?driver_resource)
+      )
+    :effect
+      (and
+        (driver_assigned_to_job ?dispatch_job ?driver_resource)
+        (not
+          (driver_available ?driver_resource)
+        )
+      )
+  )
+  (:action complete_job_preparation
+    :parameters (?dispatch_job - dispatch_job ?inbound_stop - inbound_stop ?outbound_stop - outbound_stop ?appointment_slot - appointment_slot ?driver_resource - driver_resource)
+    :precondition
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (ready_for_driver_assignment ?dispatch_job)
+        (driver_assigned_to_job ?dispatch_job ?driver_resource)
+        (dispatch_job_includes_inbound_stop ?dispatch_job ?inbound_stop)
+        (dispatch_job_includes_outbound_stop ?dispatch_job ?outbound_stop)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+        (outbound_stop_has_staged_loads ?outbound_stop)
+        (dispatch_entity_assigned_appointment ?dispatch_job ?appointment_slot)
+        (not
+          (job_preparation_complete ?dispatch_job)
+        )
+      )
+    :effect (job_preparation_complete ?dispatch_job)
+  )
+  (:action finalize_job_after_preparation
+    :parameters (?dispatch_job - dispatch_job)
+    :precondition
+      (and
+        (dispatch_job_container_locked_for_dispatch ?dispatch_job)
+        (job_preparation_complete ?dispatch_job)
+        (not
+          (finalized ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (finalized ?dispatch_job)
+        (dispatch_entity_ready_for_dispatch ?dispatch_job)
+      )
+  )
+  (:action apply_consignee_authorization_to_job
+    :parameters (?dispatch_job - dispatch_job ?consignee_authorization - consignee_authorization ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_confirmed ?dispatch_job)
+        (dispatch_entity_assigned_appointment ?dispatch_job ?appointment_slot)
+        (authorization_available ?consignee_authorization)
+        (job_has_consignee_authorization ?dispatch_job ?consignee_authorization)
+        (not
+          (authorization_attached_to_job ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (authorization_attached_to_job ?dispatch_job)
+        (not
+          (authorization_available ?consignee_authorization)
+        )
+      )
+  )
+  (:action validate_authorization_at_door
+    :parameters (?dispatch_job - dispatch_job ?dock_door - dock_door)
+    :precondition
+      (and
+        (authorization_attached_to_job ?dispatch_job)
+        (dispatch_entity_assigned_dock_door ?dispatch_job ?dock_door)
+        (not
+          (authorization_validated_at_door ?dispatch_job)
+        )
+      )
+    :effect (authorization_validated_at_door ?dispatch_job)
+  )
+  (:action validate_permit_for_job
+    :parameters (?dispatch_job - dispatch_job ?regulatory_permit - regulatory_permit)
+    :precondition
+      (and
+        (authorization_validated_at_door ?dispatch_job)
+        (regulatory_permit_assigned_to_job ?dispatch_job ?regulatory_permit)
+        (not
+          (permit_validated_for_job ?dispatch_job)
+        )
+      )
+    :effect (permit_validated_for_job ?dispatch_job)
+  )
+  (:action finalize_job_after_permit_validation
+    :parameters (?dispatch_job - dispatch_job)
+    :precondition
+      (and
+        (permit_validated_for_job ?dispatch_job)
+        (not
+          (finalized ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (finalized ?dispatch_job)
+        (dispatch_entity_ready_for_dispatch ?dispatch_job)
+      )
+  )
+  (:action mark_inbound_stop_ready
+    :parameters (?inbound_stop - inbound_stop ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (inbound_stop_ready ?inbound_stop)
+        (inbound_stop_has_staged_loads ?inbound_stop)
+        (trailer_reserved ?trailer_unit)
+        (trailer_loaded ?trailer_unit)
+        (not
+          (dispatch_entity_ready_for_dispatch ?inbound_stop)
+        )
+      )
+    :effect (dispatch_entity_ready_for_dispatch ?inbound_stop)
+  )
+  (:action mark_outbound_stop_ready
+    :parameters (?outbound_stop - outbound_stop ?trailer_unit - trailer_unit)
+    :precondition
+      (and
+        (outbound_stop_ready ?outbound_stop)
+        (outbound_stop_has_staged_loads ?outbound_stop)
+        (trailer_reserved ?trailer_unit)
+        (trailer_loaded ?trailer_unit)
+        (not
+          (dispatch_entity_ready_for_dispatch ?outbound_stop)
+        )
+      )
+    :effect (dispatch_entity_ready_for_dispatch ?outbound_stop)
+  )
+  (:action attach_shipping_document_to_shipment
+    :parameters (?shipment_request - shipment_request ?shipping_document - shipping_document ?appointment_slot - appointment_slot)
+    :precondition
+      (and
+        (dispatch_entity_ready_for_dispatch ?shipment_request)
+        (dispatch_entity_assigned_appointment ?shipment_request ?appointment_slot)
+        (shipping_document_available ?shipping_document)
+        (not
+          (dispatch_entity_has_attached_shipping_document ?shipment_request)
+        )
+      )
+    :effect
+      (and
+        (dispatch_entity_has_attached_shipping_document ?shipment_request)
+        (shipping_document_attached_to_entity ?shipment_request ?shipping_document)
+        (not
+          (shipping_document_available ?shipping_document)
+        )
+      )
+  )
+  (:action release_vehicle_from_inbound_stop
+    :parameters (?inbound_stop - inbound_stop ?vehicle_unit - vehicle_unit ?shipping_document - shipping_document)
+    :precondition
+      (and
+        (dispatch_entity_has_attached_shipping_document ?inbound_stop)
+        (dispatch_entity_assigned_vehicle ?inbound_stop ?vehicle_unit)
+        (shipping_document_attached_to_entity ?inbound_stop ?shipping_document)
+        (not
+          (dispatch_entity_released_for_execution ?inbound_stop)
+        )
+      )
+    :effect
+      (and
+        (dispatch_entity_released_for_execution ?inbound_stop)
+        (vehicle_available ?vehicle_unit)
+        (shipping_document_available ?shipping_document)
+      )
+  )
+  (:action release_vehicle_from_outbound_stop
+    :parameters (?outbound_stop - outbound_stop ?vehicle_unit - vehicle_unit ?shipping_document - shipping_document)
+    :precondition
+      (and
+        (dispatch_entity_has_attached_shipping_document ?outbound_stop)
+        (dispatch_entity_assigned_vehicle ?outbound_stop ?vehicle_unit)
+        (shipping_document_attached_to_entity ?outbound_stop ?shipping_document)
+        (not
+          (dispatch_entity_released_for_execution ?outbound_stop)
+        )
+      )
+    :effect
+      (and
+        (dispatch_entity_released_for_execution ?outbound_stop)
+        (vehicle_available ?vehicle_unit)
+        (shipping_document_available ?shipping_document)
+      )
+  )
+  (:action release_vehicle_from_job
+    :parameters (?dispatch_job - dispatch_job ?vehicle_unit - vehicle_unit ?shipping_document - shipping_document)
+    :precondition
+      (and
+        (dispatch_entity_has_attached_shipping_document ?dispatch_job)
+        (dispatch_entity_assigned_vehicle ?dispatch_job ?vehicle_unit)
+        (shipping_document_attached_to_entity ?dispatch_job ?shipping_document)
+        (not
+          (dispatch_entity_released_for_execution ?dispatch_job)
+        )
+      )
+    :effect
+      (and
+        (dispatch_entity_released_for_execution ?dispatch_job)
+        (vehicle_available ?vehicle_unit)
+        (shipping_document_available ?shipping_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem dock_appointment_dispatch_scenario)
+  (:domain dock_appointment_aligned_dispatch_planning)
+  (:objects inbound_stop_a - inbound_stop outbound_stop_a - outbound_stop dispatch_job_alpha - dispatch_job dispatch_job_bravo - dispatch_job vehicle_truck_1 - vehicle_unit vehicle_truck_2 - vehicle_unit vehicle_truck_3 - vehicle_unit appointment_slot_1 - appointment_slot dock_door_1 - dock_door pallet_1 - load_unit inbound_leg_1 - inbound_leg outbound_leg_1 - outbound_leg trailer_1 - trailer_unit forklift_1 - handling_equipment forklift_2 - handling_equipment special_service_refrigeration - special_service special_service_crossdock - special_service driver_1 - driver_resource driver_2 - driver_resource bol_1 - shipping_document container_1 - container_equipment consignee_auth_1 - consignee_authorization consignee_auth_2 - consignee_authorization regulatory_permit_1 - regulatory_permit)
+  (:init
+    (vehicle_available vehicle_truck_1)
+    (vehicle_available vehicle_truck_2)
+    (vehicle_available vehicle_truck_3)
+    (appointment_available appointment_slot_1)
+    (door_available dock_door_1)
+    (load_unit_available pallet_1)
+    (inbound_leg_for_stop inbound_stop_a inbound_leg_1)
+    (outbound_leg_for_stop outbound_stop_a outbound_leg_1)
+    (trailer_available trailer_1)
+    (equipment_available forklift_1)
+    (equipment_available forklift_2)
+    (dispatch_job_includes_inbound_stop dispatch_job_alpha inbound_stop_a)
+    (dispatch_job_includes_inbound_stop dispatch_job_bravo inbound_stop_a)
+    (dispatch_job_includes_outbound_stop dispatch_job_alpha outbound_stop_a)
+    (dispatch_job_includes_outbound_stop dispatch_job_bravo outbound_stop_a)
+    (dispatch_job_assigned_trailer dispatch_job_alpha trailer_1)
+    (dispatch_job_assigned_trailer dispatch_job_bravo trailer_1)
+    (equipment_assigned_to_dispatch_job dispatch_job_alpha forklift_1)
+    (equipment_assigned_to_dispatch_job dispatch_job_bravo forklift_2)
+    (special_service_available special_service_refrigeration)
+    (special_service_available special_service_crossdock)
+    (driver_available driver_1)
+    (driver_available driver_2)
+    (shipping_document_available bol_1)
+    (container_equipment_available container_1)
+    (authorization_available consignee_auth_1)
+    (job_has_consignee_authorization dispatch_job_alpha consignee_auth_1)
+    (job_has_consignee_authorization dispatch_job_bravo consignee_auth_2)
+    (regulatory_permit_available regulatory_permit_1)
+  )
+  (:goal
+    (and
+      (dispatch_entity_released_for_execution inbound_stop_a)
+      (dispatch_entity_released_for_execution outbound_stop_a)
+      (dispatch_entity_released_for_execution dispatch_job_alpha)
+      (dispatch_entity_released_for_execution dispatch_job_bravo)
+    )
+  )
+)

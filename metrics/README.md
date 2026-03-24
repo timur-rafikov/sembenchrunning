@@ -6,8 +6,8 @@ Four metrics (VAL + length):
 
 1. **Executability** — VAL: plan is executable (0/1).
 2. **Reachability** — VAL: goal reached (0/1).
-3. **Optimality ratio** — `len(plan_pred) / len(plan_ref)`.
-4. **First error step** — 1-based step where the plan first fails; 0 if valid and optimal.
+3. **Optimality ratio** — `len(plan_pred) / len(plan_ref)` when the goal is reached and a reference exists; if `len(plan_pred)==0` and `len(plan_ref)>0`, the ratio is `0.0`. Sentinel `-1` means “not applicable” (no reference, goal not reached, or missing data).
+4. **First error step** — Prefer VAL’s first failing step; else first step where the predicted plan deviates from the reference (1-based; `0` = prefix matches); if the plan is executable, matches the reference, but the goal is not reached, the last executed step index is reported. `-1` if not applicable.
 
 ## Dependencies
 

@@ -1,0 +1,936 @@
+(define (domain authorization_model_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types artifact_root - object policy_element_root - object context_entity_root - object principal_root - object principal - principal_root credential - artifact_root permission - artifact_root role - artifact_root constraint_definition - artifact_root feature_flag - artifact_root ownership_claim - artifact_root attribute_value - artifact_root approval_token - artifact_root attribute - policy_element_root policy_template - policy_element_root delegation_metadata - policy_element_root session_context - context_entity_root resource_context - context_entity_root resource - context_entity_root operational_principal_group - principal administrative_principal_group - principal service_principal - operational_principal_group user_principal - operational_principal_group policy_administrator - administrative_principal_group)
+  (:predicates
+    (principal_registered ?principal - principal)
+    (principal_activated ?principal - principal)
+    (principal_has_linked_credential ?principal - principal)
+    (principal_provisioned ?principal - principal)
+    (effective_policy_applied ?principal - principal)
+    (ownership_assigned ?principal - principal)
+    (credential_available ?credential - credential)
+    (principal_has_credential ?principal - principal ?credential - credential)
+    (permission_available ?permission - permission)
+    (principal_has_permission ?principal - principal ?permission - permission)
+    (role_available ?role - role)
+    (principal_has_role ?principal - principal ?role - role)
+    (attribute_available ?attribute - attribute)
+    (service_has_attribute ?service_principal - service_principal ?attribute - attribute)
+    (user_has_attribute ?user_principal - user_principal ?attribute - attribute)
+    (service_has_session_context ?service_principal - service_principal ?session_context - session_context)
+    (session_active ?session_context - session_context)
+    (session_attribute_bound ?session_context - session_context)
+    (service_context_ready ?service_principal - service_principal)
+    (user_has_resource_context ?user_principal - user_principal ?resource_context - resource_context)
+    (resource_context_active ?resource_context - resource_context)
+    (resource_context_attribute_bound ?resource_context - resource_context)
+    (user_context_ready ?user_principal - user_principal)
+    (resource_unassigned ?resource - resource)
+    (resource_provisioned ?resource - resource)
+    (resource_bound_to_session ?resource - resource ?session_context - session_context)
+    (resource_bound_to_resource_context ?resource - resource ?resource_context - resource_context)
+    (resource_has_session_flag ?resource - resource)
+    (resource_has_resource_context_flag ?resource - resource)
+    (resource_ready_for_templates ?resource - resource)
+    (admin_manages_service ?policy_administrator - policy_administrator ?service_principal - service_principal)
+    (admin_manages_user ?policy_administrator - policy_administrator ?user_principal - user_principal)
+    (admin_manages_resource ?policy_administrator - policy_administrator ?resource - resource)
+    (policy_template_available ?policy_template - policy_template)
+    (admin_has_template ?policy_administrator - policy_administrator ?policy_template - policy_template)
+    (template_instantiated ?policy_template - policy_template)
+    (template_applied_to_resource ?policy_template - policy_template ?resource - resource)
+    (admin_composition_ready ?policy_administrator - policy_administrator)
+    (admin_composition_locked ?policy_administrator - policy_administrator)
+    (admin_activation_ready ?policy_administrator - policy_administrator)
+    (admin_constraint_attached ?policy_administrator - policy_administrator)
+    (admin_constraint_committed ?policy_administrator - policy_administrator)
+    (admin_feature_attached ?policy_administrator - policy_administrator)
+    (admin_review_completed ?policy_administrator - policy_administrator)
+    (delegation_available ?delegation_metadata - delegation_metadata)
+    (admin_has_delegation ?policy_administrator - policy_administrator ?delegation_metadata - delegation_metadata)
+    (admin_delegation_engaged ?policy_administrator - policy_administrator)
+    (admin_delegation_stage1 ?policy_administrator - policy_administrator)
+    (admin_delegation_stage2 ?policy_administrator - policy_administrator)
+    (constraint_definition_available ?constraint_definition - constraint_definition)
+    (admin_has_constraint ?policy_administrator - policy_administrator ?constraint_definition - constraint_definition)
+    (feature_flag_available ?feature_flag - feature_flag)
+    (admin_has_feature ?policy_administrator - policy_administrator ?feature_flag - feature_flag)
+    (attribute_value_available ?attribute_value - attribute_value)
+    (admin_has_attribute_value ?policy_administrator - policy_administrator ?attribute_value - attribute_value)
+    (approval_token_available ?approval_token - approval_token)
+    (admin_has_approval_token ?policy_administrator - policy_administrator ?approval_token - approval_token)
+    (ownership_claim_available ?ownership_claim - ownership_claim)
+    (principal_has_ownership_claim ?principal - principal ?ownership_claim - ownership_claim)
+    (service_context_initialized ?service_principal - service_principal)
+    (user_context_initialized ?user_principal - user_principal)
+    (admin_finalized_marker ?policy_administrator - policy_administrator)
+  )
+  (:action register_principal
+    :parameters (?principal - principal)
+    :precondition
+      (and
+        (not
+          (principal_registered ?principal)
+        )
+        (not
+          (principal_provisioned ?principal)
+        )
+      )
+    :effect (principal_registered ?principal)
+  )
+  (:action attach_credential_to_principal
+    :parameters (?principal - principal ?credential - credential)
+    :precondition
+      (and
+        (principal_registered ?principal)
+        (not
+          (principal_has_linked_credential ?principal)
+        )
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (principal_has_linked_credential ?principal)
+        (principal_has_credential ?principal ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action allocate_permission_to_principal
+    :parameters (?principal - principal ?permission - permission)
+    :precondition
+      (and
+        (principal_registered ?principal)
+        (principal_has_linked_credential ?principal)
+        (permission_available ?permission)
+      )
+    :effect
+      (and
+        (principal_has_permission ?principal ?permission)
+        (not
+          (permission_available ?permission)
+        )
+      )
+  )
+  (:action finalize_principal_activation
+    :parameters (?principal - principal ?permission - permission)
+    :precondition
+      (and
+        (principal_registered ?principal)
+        (principal_has_linked_credential ?principal)
+        (principal_has_permission ?principal ?permission)
+        (not
+          (principal_activated ?principal)
+        )
+      )
+    :effect (principal_activated ?principal)
+  )
+  (:action release_permission_from_principal
+    :parameters (?principal - principal ?permission - permission)
+    :precondition
+      (and
+        (principal_has_permission ?principal ?permission)
+      )
+    :effect
+      (and
+        (permission_available ?permission)
+        (not
+          (principal_has_permission ?principal ?permission)
+        )
+      )
+  )
+  (:action assign_role_to_principal
+    :parameters (?principal - principal ?role - role)
+    :precondition
+      (and
+        (principal_activated ?principal)
+        (role_available ?role)
+      )
+    :effect
+      (and
+        (principal_has_role ?principal ?role)
+        (not
+          (role_available ?role)
+        )
+      )
+  )
+  (:action remove_role_from_principal
+    :parameters (?principal - principal ?role - role)
+    :precondition
+      (and
+        (principal_has_role ?principal ?role)
+      )
+    :effect
+      (and
+        (role_available ?role)
+        (not
+          (principal_has_role ?principal ?role)
+        )
+      )
+  )
+  (:action attach_attribute_value_to_admin
+    :parameters (?policy_administrator - policy_administrator ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (attribute_value_available ?attribute_value)
+      )
+    :effect
+      (and
+        (admin_has_attribute_value ?policy_administrator ?attribute_value)
+        (not
+          (attribute_value_available ?attribute_value)
+        )
+      )
+  )
+  (:action detach_attribute_value_from_admin
+    :parameters (?policy_administrator - policy_administrator ?attribute_value - attribute_value)
+    :precondition
+      (and
+        (admin_has_attribute_value ?policy_administrator ?attribute_value)
+      )
+    :effect
+      (and
+        (attribute_value_available ?attribute_value)
+        (not
+          (admin_has_attribute_value ?policy_administrator ?attribute_value)
+        )
+      )
+  )
+  (:action assign_approval_token_to_admin
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action revoke_approval_token_from_admin
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token)
+    :precondition
+      (and
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (admin_has_approval_token ?policy_administrator ?approval_token)
+        )
+      )
+  )
+  (:action activate_session_context_for_service
+    :parameters (?service_principal - service_principal ?session_context - session_context ?permission - permission)
+    :precondition
+      (and
+        (principal_activated ?service_principal)
+        (principal_has_permission ?service_principal ?permission)
+        (service_has_session_context ?service_principal ?session_context)
+        (not
+          (session_active ?session_context)
+        )
+        (not
+          (session_attribute_bound ?session_context)
+        )
+      )
+    :effect (session_active ?session_context)
+  )
+  (:action establish_service_context_with_role
+    :parameters (?service_principal - service_principal ?session_context - session_context ?role - role)
+    :precondition
+      (and
+        (principal_activated ?service_principal)
+        (principal_has_role ?service_principal ?role)
+        (service_has_session_context ?service_principal ?session_context)
+        (session_active ?session_context)
+        (not
+          (service_context_initialized ?service_principal)
+        )
+      )
+    :effect
+      (and
+        (service_context_initialized ?service_principal)
+        (service_context_ready ?service_principal)
+      )
+  )
+  (:action bind_service_attribute_and_mark_session
+    :parameters (?service_principal - service_principal ?session_context - session_context ?attribute - attribute)
+    :precondition
+      (and
+        (principal_activated ?service_principal)
+        (service_has_session_context ?service_principal ?session_context)
+        (attribute_available ?attribute)
+        (not
+          (service_context_initialized ?service_principal)
+        )
+      )
+    :effect
+      (and
+        (session_attribute_bound ?session_context)
+        (service_context_initialized ?service_principal)
+        (service_has_attribute ?service_principal ?attribute)
+        (not
+          (attribute_available ?attribute)
+        )
+      )
+  )
+  (:action finalize_service_context_with_attribute
+    :parameters (?service_principal - service_principal ?session_context - session_context ?permission - permission ?attribute - attribute)
+    :precondition
+      (and
+        (principal_activated ?service_principal)
+        (principal_has_permission ?service_principal ?permission)
+        (service_has_session_context ?service_principal ?session_context)
+        (session_attribute_bound ?session_context)
+        (service_has_attribute ?service_principal ?attribute)
+        (not
+          (service_context_ready ?service_principal)
+        )
+      )
+    :effect
+      (and
+        (session_active ?session_context)
+        (service_context_ready ?service_principal)
+        (attribute_available ?attribute)
+        (not
+          (service_has_attribute ?service_principal ?attribute)
+        )
+      )
+  )
+  (:action activate_resource_context_for_user
+    :parameters (?user_principal - user_principal ?resource_context - resource_context ?permission - permission)
+    :precondition
+      (and
+        (principal_activated ?user_principal)
+        (principal_has_permission ?user_principal ?permission)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (not
+          (resource_context_active ?resource_context)
+        )
+        (not
+          (resource_context_attribute_bound ?resource_context)
+        )
+      )
+    :effect (resource_context_active ?resource_context)
+  )
+  (:action establish_user_context_with_role
+    :parameters (?user_principal - user_principal ?resource_context - resource_context ?role - role)
+    :precondition
+      (and
+        (principal_activated ?user_principal)
+        (principal_has_role ?user_principal ?role)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (resource_context_active ?resource_context)
+        (not
+          (user_context_initialized ?user_principal)
+        )
+      )
+    :effect
+      (and
+        (user_context_initialized ?user_principal)
+        (user_context_ready ?user_principal)
+      )
+  )
+  (:action bind_user_attribute_and_mark_resource_context
+    :parameters (?user_principal - user_principal ?resource_context - resource_context ?attribute - attribute)
+    :precondition
+      (and
+        (principal_activated ?user_principal)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (attribute_available ?attribute)
+        (not
+          (user_context_initialized ?user_principal)
+        )
+      )
+    :effect
+      (and
+        (resource_context_attribute_bound ?resource_context)
+        (user_context_initialized ?user_principal)
+        (user_has_attribute ?user_principal ?attribute)
+        (not
+          (attribute_available ?attribute)
+        )
+      )
+  )
+  (:action finalize_user_context_with_attribute
+    :parameters (?user_principal - user_principal ?resource_context - resource_context ?permission - permission ?attribute - attribute)
+    :precondition
+      (and
+        (principal_activated ?user_principal)
+        (principal_has_permission ?user_principal ?permission)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (resource_context_attribute_bound ?resource_context)
+        (user_has_attribute ?user_principal ?attribute)
+        (not
+          (user_context_ready ?user_principal)
+        )
+      )
+    :effect
+      (and
+        (resource_context_active ?resource_context)
+        (user_context_ready ?user_principal)
+        (attribute_available ?attribute)
+        (not
+          (user_has_attribute ?user_principal ?attribute)
+        )
+      )
+  )
+  (:action provision_resource_with_contexts
+    :parameters (?service_principal - service_principal ?user_principal - user_principal ?session_context - session_context ?resource_context - resource_context ?resource - resource)
+    :precondition
+      (and
+        (service_context_initialized ?service_principal)
+        (user_context_initialized ?user_principal)
+        (service_has_session_context ?service_principal ?session_context)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (session_active ?session_context)
+        (resource_context_active ?resource_context)
+        (service_context_ready ?service_principal)
+        (user_context_ready ?user_principal)
+        (resource_unassigned ?resource)
+      )
+    :effect
+      (and
+        (resource_provisioned ?resource)
+        (resource_bound_to_session ?resource ?session_context)
+        (resource_bound_to_resource_context ?resource ?resource_context)
+        (not
+          (resource_unassigned ?resource)
+        )
+      )
+  )
+  (:action provision_resource_with_session_flag
+    :parameters (?service_principal - service_principal ?user_principal - user_principal ?session_context - session_context ?resource_context - resource_context ?resource - resource)
+    :precondition
+      (and
+        (service_context_initialized ?service_principal)
+        (user_context_initialized ?user_principal)
+        (service_has_session_context ?service_principal ?session_context)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (session_attribute_bound ?session_context)
+        (resource_context_active ?resource_context)
+        (not
+          (service_context_ready ?service_principal)
+        )
+        (user_context_ready ?user_principal)
+        (resource_unassigned ?resource)
+      )
+    :effect
+      (and
+        (resource_provisioned ?resource)
+        (resource_bound_to_session ?resource ?session_context)
+        (resource_bound_to_resource_context ?resource ?resource_context)
+        (resource_has_session_flag ?resource)
+        (not
+          (resource_unassigned ?resource)
+        )
+      )
+  )
+  (:action provision_resource_with_resource_context_flag
+    :parameters (?service_principal - service_principal ?user_principal - user_principal ?session_context - session_context ?resource_context - resource_context ?resource - resource)
+    :precondition
+      (and
+        (service_context_initialized ?service_principal)
+        (user_context_initialized ?user_principal)
+        (service_has_session_context ?service_principal ?session_context)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (session_active ?session_context)
+        (resource_context_attribute_bound ?resource_context)
+        (service_context_ready ?service_principal)
+        (not
+          (user_context_ready ?user_principal)
+        )
+        (resource_unassigned ?resource)
+      )
+    :effect
+      (and
+        (resource_provisioned ?resource)
+        (resource_bound_to_session ?resource ?session_context)
+        (resource_bound_to_resource_context ?resource ?resource_context)
+        (resource_has_resource_context_flag ?resource)
+        (not
+          (resource_unassigned ?resource)
+        )
+      )
+  )
+  (:action provision_resource_with_both_flags
+    :parameters (?service_principal - service_principal ?user_principal - user_principal ?session_context - session_context ?resource_context - resource_context ?resource - resource)
+    :precondition
+      (and
+        (service_context_initialized ?service_principal)
+        (user_context_initialized ?user_principal)
+        (service_has_session_context ?service_principal ?session_context)
+        (user_has_resource_context ?user_principal ?resource_context)
+        (session_attribute_bound ?session_context)
+        (resource_context_attribute_bound ?resource_context)
+        (not
+          (service_context_ready ?service_principal)
+        )
+        (not
+          (user_context_ready ?user_principal)
+        )
+        (resource_unassigned ?resource)
+      )
+    :effect
+      (and
+        (resource_provisioned ?resource)
+        (resource_bound_to_session ?resource ?session_context)
+        (resource_bound_to_resource_context ?resource ?resource_context)
+        (resource_has_session_flag ?resource)
+        (resource_has_resource_context_flag ?resource)
+        (not
+          (resource_unassigned ?resource)
+        )
+      )
+  )
+  (:action mark_resource_ready_for_templates
+    :parameters (?resource - resource ?service_principal - service_principal ?permission - permission)
+    :precondition
+      (and
+        (resource_provisioned ?resource)
+        (service_context_initialized ?service_principal)
+        (principal_has_permission ?service_principal ?permission)
+        (not
+          (resource_ready_for_templates ?resource)
+        )
+      )
+    :effect (resource_ready_for_templates ?resource)
+  )
+  (:action instantiate_policy_template_on_resource
+    :parameters (?policy_administrator - policy_administrator ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (admin_manages_resource ?policy_administrator ?resource)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (policy_template_available ?policy_template)
+        (resource_provisioned ?resource)
+        (resource_ready_for_templates ?resource)
+        (not
+          (template_instantiated ?policy_template)
+        )
+      )
+    :effect
+      (and
+        (template_instantiated ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (not
+          (policy_template_available ?policy_template)
+        )
+      )
+  )
+  (:action start_policy_composition_by_admin
+    :parameters (?policy_administrator - policy_administrator ?policy_template - policy_template ?resource - resource ?permission - permission)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_instantiated ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (principal_has_permission ?policy_administrator ?permission)
+        (not
+          (resource_has_session_flag ?resource)
+        )
+        (not
+          (admin_composition_ready ?policy_administrator)
+        )
+      )
+    :effect (admin_composition_ready ?policy_administrator)
+  )
+  (:action attach_constraint_by_admin
+    :parameters (?policy_administrator - policy_administrator ?constraint_definition - constraint_definition)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (constraint_definition_available ?constraint_definition)
+        (not
+          (admin_constraint_attached ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_constraint_attached ?policy_administrator)
+        (admin_has_constraint ?policy_administrator ?constraint_definition)
+        (not
+          (constraint_definition_available ?constraint_definition)
+        )
+      )
+  )
+  (:action apply_constraint_and_prepare_admin
+    :parameters (?policy_administrator - policy_administrator ?policy_template - policy_template ?resource - resource ?permission - permission ?constraint_definition - constraint_definition)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_instantiated ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (principal_has_permission ?policy_administrator ?permission)
+        (resource_has_session_flag ?resource)
+        (admin_constraint_attached ?policy_administrator)
+        (admin_has_constraint ?policy_administrator ?constraint_definition)
+        (not
+          (admin_composition_ready ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_composition_ready ?policy_administrator)
+        (admin_constraint_committed ?policy_administrator)
+      )
+  )
+  (:action acquire_composition_lock_without_resource_flag
+    :parameters (?policy_administrator - policy_administrator ?attribute_value - attribute_value ?role - role ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_ready ?policy_administrator)
+        (admin_has_attribute_value ?policy_administrator ?attribute_value)
+        (principal_has_role ?policy_administrator ?role)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (not
+          (resource_has_resource_context_flag ?resource)
+        )
+        (not
+          (admin_composition_locked ?policy_administrator)
+        )
+      )
+    :effect (admin_composition_locked ?policy_administrator)
+  )
+  (:action acquire_composition_lock_with_resource_flag
+    :parameters (?policy_administrator - policy_administrator ?attribute_value - attribute_value ?role - role ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_ready ?policy_administrator)
+        (admin_has_attribute_value ?policy_administrator ?attribute_value)
+        (principal_has_role ?policy_administrator ?role)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (resource_has_resource_context_flag ?resource)
+        (not
+          (admin_composition_locked ?policy_administrator)
+        )
+      )
+    :effect (admin_composition_locked ?policy_administrator)
+  )
+  (:action prepare_admin_activation_stage_without_flags
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_locked ?policy_administrator)
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (not
+          (resource_has_session_flag ?resource)
+        )
+        (not
+          (resource_has_resource_context_flag ?resource)
+        )
+        (not
+          (admin_activation_ready ?policy_administrator)
+        )
+      )
+    :effect (admin_activation_ready ?policy_administrator)
+  )
+  (:action prepare_admin_activation_stage_with_session_flag
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_locked ?policy_administrator)
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (resource_has_session_flag ?resource)
+        (not
+          (resource_has_resource_context_flag ?resource)
+        )
+        (not
+          (admin_activation_ready ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_feature_attached ?policy_administrator)
+      )
+  )
+  (:action prepare_admin_activation_stage_with_resource_flag
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_locked ?policy_administrator)
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (not
+          (resource_has_session_flag ?resource)
+        )
+        (resource_has_resource_context_flag ?resource)
+        (not
+          (admin_activation_ready ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_feature_attached ?policy_administrator)
+      )
+  )
+  (:action prepare_admin_activation_stage_with_both_flags
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token ?policy_template - policy_template ?resource - resource)
+    :precondition
+      (and
+        (admin_composition_locked ?policy_administrator)
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (admin_has_template ?policy_administrator ?policy_template)
+        (template_applied_to_resource ?policy_template ?resource)
+        (resource_has_session_flag ?resource)
+        (resource_has_resource_context_flag ?resource)
+        (not
+          (admin_activation_ready ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_feature_attached ?policy_administrator)
+      )
+  )
+  (:action finalize_policy_admin_activation
+    :parameters (?policy_administrator - policy_administrator)
+    :precondition
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (not
+          (admin_feature_attached ?policy_administrator)
+        )
+        (not
+          (admin_finalized_marker ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_finalized_marker ?policy_administrator)
+        (effective_policy_applied ?policy_administrator)
+      )
+  )
+  (:action attach_feature_flag_to_admin
+    :parameters (?policy_administrator - policy_administrator ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_feature_attached ?policy_administrator)
+        (feature_flag_available ?feature_flag)
+      )
+    :effect
+      (and
+        (admin_has_feature ?policy_administrator ?feature_flag)
+        (not
+          (feature_flag_available ?feature_flag)
+        )
+      )
+  )
+  (:action progress_admin_policy_deployment
+    :parameters (?policy_administrator - policy_administrator ?service_principal - service_principal ?user_principal - user_principal ?permission - permission ?feature_flag - feature_flag)
+    :precondition
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_feature_attached ?policy_administrator)
+        (admin_has_feature ?policy_administrator ?feature_flag)
+        (admin_manages_service ?policy_administrator ?service_principal)
+        (admin_manages_user ?policy_administrator ?user_principal)
+        (service_context_ready ?service_principal)
+        (user_context_ready ?user_principal)
+        (principal_has_permission ?policy_administrator ?permission)
+        (not
+          (admin_review_completed ?policy_administrator)
+        )
+      )
+    :effect (admin_review_completed ?policy_administrator)
+  )
+  (:action complete_policy_admin_deployment
+    :parameters (?policy_administrator - policy_administrator)
+    :precondition
+      (and
+        (admin_activation_ready ?policy_administrator)
+        (admin_review_completed ?policy_administrator)
+        (not
+          (admin_finalized_marker ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_finalized_marker ?policy_administrator)
+        (effective_policy_applied ?policy_administrator)
+      )
+  )
+  (:action engage_delegation_by_admin
+    :parameters (?policy_administrator - policy_administrator ?delegation_metadata - delegation_metadata ?permission - permission)
+    :precondition
+      (and
+        (principal_activated ?policy_administrator)
+        (principal_has_permission ?policy_administrator ?permission)
+        (delegation_available ?delegation_metadata)
+        (admin_has_delegation ?policy_administrator ?delegation_metadata)
+        (not
+          (admin_delegation_engaged ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_delegation_engaged ?policy_administrator)
+        (not
+          (delegation_available ?delegation_metadata)
+        )
+      )
+  )
+  (:action begin_delegation_stage_for_admin
+    :parameters (?policy_administrator - policy_administrator ?role - role)
+    :precondition
+      (and
+        (admin_delegation_engaged ?policy_administrator)
+        (principal_has_role ?policy_administrator ?role)
+        (not
+          (admin_delegation_stage1 ?policy_administrator)
+        )
+      )
+    :effect (admin_delegation_stage1 ?policy_administrator)
+  )
+  (:action advance_delegation_with_approval
+    :parameters (?policy_administrator - policy_administrator ?approval_token - approval_token)
+    :precondition
+      (and
+        (admin_delegation_stage1 ?policy_administrator)
+        (admin_has_approval_token ?policy_administrator ?approval_token)
+        (not
+          (admin_delegation_stage2 ?policy_administrator)
+        )
+      )
+    :effect (admin_delegation_stage2 ?policy_administrator)
+  )
+  (:action finalize_delegation_and_mark_admin
+    :parameters (?policy_administrator - policy_administrator)
+    :precondition
+      (and
+        (admin_delegation_stage2 ?policy_administrator)
+        (not
+          (admin_finalized_marker ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (admin_finalized_marker ?policy_administrator)
+        (effective_policy_applied ?policy_administrator)
+      )
+  )
+  (:action activate_policy_for_service
+    :parameters (?service_principal - service_principal ?resource - resource)
+    :precondition
+      (and
+        (service_context_initialized ?service_principal)
+        (service_context_ready ?service_principal)
+        (resource_provisioned ?resource)
+        (resource_ready_for_templates ?resource)
+        (not
+          (effective_policy_applied ?service_principal)
+        )
+      )
+    :effect (effective_policy_applied ?service_principal)
+  )
+  (:action activate_policy_for_user
+    :parameters (?user_principal - user_principal ?resource - resource)
+    :precondition
+      (and
+        (user_context_initialized ?user_principal)
+        (user_context_ready ?user_principal)
+        (resource_provisioned ?resource)
+        (resource_ready_for_templates ?resource)
+        (not
+          (effective_policy_applied ?user_principal)
+        )
+      )
+    :effect (effective_policy_applied ?user_principal)
+  )
+  (:action assign_ownership_claim_to_principal
+    :parameters (?principal - principal ?ownership_claim - ownership_claim ?permission - permission)
+    :precondition
+      (and
+        (effective_policy_applied ?principal)
+        (principal_has_permission ?principal ?permission)
+        (ownership_claim_available ?ownership_claim)
+        (not
+          (ownership_assigned ?principal)
+        )
+      )
+    :effect
+      (and
+        (ownership_assigned ?principal)
+        (principal_has_ownership_claim ?principal ?ownership_claim)
+        (not
+          (ownership_claim_available ?ownership_claim)
+        )
+      )
+  )
+  (:action propagate_ownership_to_service
+    :parameters (?service_principal - service_principal ?credential - credential ?ownership_claim - ownership_claim)
+    :precondition
+      (and
+        (ownership_assigned ?service_principal)
+        (principal_has_credential ?service_principal ?credential)
+        (principal_has_ownership_claim ?service_principal ?ownership_claim)
+        (not
+          (principal_provisioned ?service_principal)
+        )
+      )
+    :effect
+      (and
+        (principal_provisioned ?service_principal)
+        (credential_available ?credential)
+        (ownership_claim_available ?ownership_claim)
+      )
+  )
+  (:action propagate_ownership_to_user
+    :parameters (?user_principal - user_principal ?credential - credential ?ownership_claim - ownership_claim)
+    :precondition
+      (and
+        (ownership_assigned ?user_principal)
+        (principal_has_credential ?user_principal ?credential)
+        (principal_has_ownership_claim ?user_principal ?ownership_claim)
+        (not
+          (principal_provisioned ?user_principal)
+        )
+      )
+    :effect
+      (and
+        (principal_provisioned ?user_principal)
+        (credential_available ?credential)
+        (ownership_claim_available ?ownership_claim)
+      )
+  )
+  (:action propagate_ownership_to_admin
+    :parameters (?policy_administrator - policy_administrator ?credential - credential ?ownership_claim - ownership_claim)
+    :precondition
+      (and
+        (ownership_assigned ?policy_administrator)
+        (principal_has_credential ?policy_administrator ?credential)
+        (principal_has_ownership_claim ?policy_administrator ?ownership_claim)
+        (not
+          (principal_provisioned ?policy_administrator)
+        )
+      )
+    :effect
+      (and
+        (principal_provisioned ?policy_administrator)
+        (credential_available ?credential)
+        (ownership_claim_available ?ownership_claim)
+      )
+  )
+)

@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain pharmaceutics_batch_stage_sequence_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object asset_category - object component_category - object batch_root_type - object processing_entity - batch_root_type line_resource - resource_category operator - resource_category auxiliary_equipment - resource_category quality_document - resource_category qc_test_kit - resource_category release_document - resource_category cleaning_certificate - resource_category final_quality_approval - resource_category material_lot - asset_category container_unit - asset_category special_authorization - asset_category upstream_stage_slot - component_category downstream_stage_slot - component_category production_order - component_category stage_batch_instance_type - processing_entity stage_batch_definition_type - processing_entity upstream_stage_batch_instance - stage_batch_instance_type downstream_stage_batch_instance - stage_batch_instance_type process_stage - stage_batch_definition_type)
+  (:predicates
+    (batch_record_created ?manufacturing_batch - processing_entity)
+    (active_for_processing ?manufacturing_batch - processing_entity)
+    (line_allocation_recorded ?manufacturing_batch - processing_entity)
+    (released_for_processing ?manufacturing_batch - processing_entity)
+    (qa_finalized ?manufacturing_batch - processing_entity)
+    (release_document_attached ?manufacturing_batch - processing_entity)
+    (line_resource_available ?line_resource - line_resource)
+    (allocated_to_line ?manufacturing_batch - processing_entity ?line_resource - line_resource)
+    (operator_available ?operator - operator)
+    (operator_assigned_to_entity ?manufacturing_batch - processing_entity ?operator - operator)
+    (aux_equipment_available ?auxiliary_equipment - auxiliary_equipment)
+    (aux_equipment_assigned ?manufacturing_batch - processing_entity ?auxiliary_equipment - auxiliary_equipment)
+    (material_lot_available ?material_lot - material_lot)
+    (material_allocated_to_upstream_instance ?upstream_stage_batch_instance - upstream_stage_batch_instance ?material_lot - material_lot)
+    (material_allocated_to_downstream_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?material_lot - material_lot)
+    (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance - upstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot)
+    (upstream_slot_ready ?upstream_stage_slot - upstream_stage_slot)
+    (upstream_slot_occupied ?upstream_stage_slot - upstream_stage_slot)
+    (upstream_instance_ready ?upstream_stage_batch_instance - upstream_stage_batch_instance)
+    (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance - downstream_stage_batch_instance ?downstream_stage_slot - downstream_stage_slot)
+    (downstream_slot_ready ?downstream_stage_slot - downstream_stage_slot)
+    (downstream_slot_occupied ?downstream_stage_slot - downstream_stage_slot)
+    (downstream_instance_ready ?downstream_stage_batch_instance - downstream_stage_batch_instance)
+    (production_order_slot_available ?production_order - production_order)
+    (production_order_assembled ?production_order - production_order)
+    (production_order_attached_to_upstream_slot ?production_order - production_order ?upstream_stage_slot - upstream_stage_slot)
+    (production_order_attached_to_downstream_slot ?production_order - production_order ?downstream_stage_slot - downstream_stage_slot)
+    (production_order_upstream_inspection_flag ?production_order - production_order)
+    (production_order_downstream_inspection_flag ?production_order - production_order)
+    (production_order_inspection_complete ?production_order - production_order)
+    (stage_linked_to_upstream_instance ?stage_definition - process_stage ?upstream_stage_batch_instance - upstream_stage_batch_instance)
+    (stage_linked_to_downstream_instance ?stage_definition - process_stage ?downstream_stage_batch_instance - downstream_stage_batch_instance)
+    (stage_linked_to_production_order ?stage_definition - process_stage ?production_order - production_order)
+    (container_available ?container_unit - container_unit)
+    (stage_has_container_unit ?stage_definition - process_stage ?container_unit - container_unit)
+    (container_allocated ?container_unit - container_unit)
+    (container_assigned_to_order ?container_unit - container_unit ?production_order - production_order)
+    (stage_container_commissioned ?stage_definition - process_stage)
+    (stage_integration_complete ?stage_definition - process_stage)
+    (stage_ready_for_qa ?stage_definition - process_stage)
+    (quality_document_attached_to_stage ?stage_definition - process_stage)
+    (stage_container_quality_verified ?stage_definition - process_stage)
+    (stage_qa_evidence_attached ?stage_definition - process_stage)
+    (stage_qa_signoff_performed ?stage_definition - process_stage)
+    (special_authorization_available ?special_authorization - special_authorization)
+    (stage_has_special_authorization ?stage_definition - process_stage ?special_authorization - special_authorization)
+    (stage_special_authorized ?stage_definition - process_stage)
+    (stage_authorization_confirmed ?stage_definition - process_stage)
+    (stage_final_authorization_recorded ?stage_definition - process_stage)
+    (quality_document_available ?quality_document - quality_document)
+    (stage_quality_document_linked ?stage_definition - process_stage ?quality_document - quality_document)
+    (qc_test_kit_available ?qc_test_kit - qc_test_kit)
+    (stage_has_qc_test_kit ?stage_definition - process_stage ?qc_test_kit - qc_test_kit)
+    (cleaning_certificate_available ?cleaning_certificate - cleaning_certificate)
+    (stage_has_cleaning_certificate ?stage_definition - process_stage ?cleaning_certificate - cleaning_certificate)
+    (final_quality_approval_available ?final_quality_approval - final_quality_approval)
+    (stage_has_final_quality_approval ?stage_definition - process_stage ?final_quality_approval - final_quality_approval)
+    (release_document_available ?release_document - release_document)
+    (release_document_assigned_to_batch ?manufacturing_batch - processing_entity ?release_document - release_document)
+    (upstream_instance_cleared ?upstream_stage_batch_instance - upstream_stage_batch_instance)
+    (downstream_instance_cleared ?downstream_stage_batch_instance - downstream_stage_batch_instance)
+    (stage_activation_recorded ?stage_definition - process_stage)
+  )
+  (:action create_batch_record
+    :parameters (?manufacturing_batch - processing_entity)
+    :precondition
+      (and
+        (not
+          (batch_record_created ?manufacturing_batch)
+        )
+        (not
+          (released_for_processing ?manufacturing_batch)
+        )
+      )
+    :effect (batch_record_created ?manufacturing_batch)
+  )
+  (:action assign_line_resource_to_batch
+    :parameters (?manufacturing_batch - processing_entity ?line_resource - line_resource)
+    :precondition
+      (and
+        (batch_record_created ?manufacturing_batch)
+        (not
+          (line_allocation_recorded ?manufacturing_batch)
+        )
+        (line_resource_available ?line_resource)
+      )
+    :effect
+      (and
+        (line_allocation_recorded ?manufacturing_batch)
+        (allocated_to_line ?manufacturing_batch ?line_resource)
+        (not
+          (line_resource_available ?line_resource)
+        )
+      )
+  )
+  (:action assign_operator_to_batch
+    :parameters (?manufacturing_batch - processing_entity ?operator - operator)
+    :precondition
+      (and
+        (batch_record_created ?manufacturing_batch)
+        (line_allocation_recorded ?manufacturing_batch)
+        (operator_available ?operator)
+      )
+    :effect
+      (and
+        (operator_assigned_to_entity ?manufacturing_batch ?operator)
+        (not
+          (operator_available ?operator)
+        )
+      )
+  )
+  (:action set_batch_stage_ready
+    :parameters (?manufacturing_batch - processing_entity ?operator - operator)
+    :precondition
+      (and
+        (batch_record_created ?manufacturing_batch)
+        (line_allocation_recorded ?manufacturing_batch)
+        (operator_assigned_to_entity ?manufacturing_batch ?operator)
+        (not
+          (active_for_processing ?manufacturing_batch)
+        )
+      )
+    :effect (active_for_processing ?manufacturing_batch)
+  )
+  (:action release_operator_from_batch
+    :parameters (?manufacturing_batch - processing_entity ?operator - operator)
+    :precondition
+      (and
+        (operator_assigned_to_entity ?manufacturing_batch ?operator)
+      )
+    :effect
+      (and
+        (operator_available ?operator)
+        (not
+          (operator_assigned_to_entity ?manufacturing_batch ?operator)
+        )
+      )
+  )
+  (:action assign_auxiliary_equipment_to_batch
+    :parameters (?manufacturing_batch - processing_entity ?auxiliary_equipment - auxiliary_equipment)
+    :precondition
+      (and
+        (active_for_processing ?manufacturing_batch)
+        (aux_equipment_available ?auxiliary_equipment)
+      )
+    :effect
+      (and
+        (aux_equipment_assigned ?manufacturing_batch ?auxiliary_equipment)
+        (not
+          (aux_equipment_available ?auxiliary_equipment)
+        )
+      )
+  )
+  (:action release_auxiliary_equipment_from_batch
+    :parameters (?manufacturing_batch - processing_entity ?auxiliary_equipment - auxiliary_equipment)
+    :precondition
+      (and
+        (aux_equipment_assigned ?manufacturing_batch ?auxiliary_equipment)
+      )
+    :effect
+      (and
+        (aux_equipment_available ?auxiliary_equipment)
+        (not
+          (aux_equipment_assigned ?manufacturing_batch ?auxiliary_equipment)
+        )
+      )
+  )
+  (:action attach_cleaning_certificate_to_stage
+    :parameters (?stage_definition - process_stage ?cleaning_certificate - cleaning_certificate)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (cleaning_certificate_available ?cleaning_certificate)
+      )
+    :effect
+      (and
+        (stage_has_cleaning_certificate ?stage_definition ?cleaning_certificate)
+        (not
+          (cleaning_certificate_available ?cleaning_certificate)
+        )
+      )
+  )
+  (:action detach_cleaning_certificate_from_stage
+    :parameters (?stage_definition - process_stage ?cleaning_certificate - cleaning_certificate)
+    :precondition
+      (and
+        (stage_has_cleaning_certificate ?stage_definition ?cleaning_certificate)
+      )
+    :effect
+      (and
+        (cleaning_certificate_available ?cleaning_certificate)
+        (not
+          (stage_has_cleaning_certificate ?stage_definition ?cleaning_certificate)
+        )
+      )
+  )
+  (:action attach_final_quality_approval_to_stage
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (final_quality_approval_available ?final_quality_approval)
+      )
+    :effect
+      (and
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (not
+          (final_quality_approval_available ?final_quality_approval)
+        )
+      )
+  )
+  (:action detach_final_quality_approval_from_stage
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval)
+    :precondition
+      (and
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+      )
+    :effect
+      (and
+        (final_quality_approval_available ?final_quality_approval)
+        (not
+          (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        )
+      )
+  )
+  (:action mark_upstream_slot_ready
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?operator - operator)
+    :precondition
+      (and
+        (active_for_processing ?upstream_stage_batch_instance)
+        (operator_assigned_to_entity ?upstream_stage_batch_instance ?operator)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (not
+          (upstream_slot_ready ?upstream_stage_slot)
+        )
+        (not
+          (upstream_slot_occupied ?upstream_stage_slot)
+        )
+      )
+    :effect (upstream_slot_ready ?upstream_stage_slot)
+  )
+  (:action confirm_upstream_instance
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?auxiliary_equipment - auxiliary_equipment)
+    :precondition
+      (and
+        (active_for_processing ?upstream_stage_batch_instance)
+        (aux_equipment_assigned ?upstream_stage_batch_instance ?auxiliary_equipment)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (upstream_slot_ready ?upstream_stage_slot)
+        (not
+          (upstream_instance_cleared ?upstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+      )
+  )
+  (:action assign_material_to_upstream_instance
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?material_lot - material_lot)
+    :precondition
+      (and
+        (active_for_processing ?upstream_stage_batch_instance)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (material_lot_available ?material_lot)
+        (not
+          (upstream_instance_cleared ?upstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (upstream_slot_occupied ?upstream_stage_slot)
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (material_allocated_to_upstream_instance ?upstream_stage_batch_instance ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action complete_upstream_processing
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?operator - operator ?material_lot - material_lot)
+    :precondition
+      (and
+        (active_for_processing ?upstream_stage_batch_instance)
+        (operator_assigned_to_entity ?upstream_stage_batch_instance ?operator)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (upstream_slot_occupied ?upstream_stage_slot)
+        (material_allocated_to_upstream_instance ?upstream_stage_batch_instance ?material_lot)
+        (not
+          (upstream_instance_ready ?upstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (upstream_slot_ready ?upstream_stage_slot)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+        (material_lot_available ?material_lot)
+        (not
+          (material_allocated_to_upstream_instance ?upstream_stage_batch_instance ?material_lot)
+        )
+      )
+  )
+  (:action mark_downstream_slot_ready
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?downstream_stage_slot - downstream_stage_slot ?operator - operator)
+    :precondition
+      (and
+        (active_for_processing ?downstream_stage_batch_instance)
+        (operator_assigned_to_entity ?downstream_stage_batch_instance ?operator)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (not
+          (downstream_slot_ready ?downstream_stage_slot)
+        )
+        (not
+          (downstream_slot_occupied ?downstream_stage_slot)
+        )
+      )
+    :effect (downstream_slot_ready ?downstream_stage_slot)
+  )
+  (:action confirm_downstream_instance
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?downstream_stage_slot - downstream_stage_slot ?auxiliary_equipment - auxiliary_equipment)
+    :precondition
+      (and
+        (active_for_processing ?downstream_stage_batch_instance)
+        (aux_equipment_assigned ?downstream_stage_batch_instance ?auxiliary_equipment)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (downstream_slot_ready ?downstream_stage_slot)
+        (not
+          (downstream_instance_cleared ?downstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+      )
+  )
+  (:action assign_material_to_downstream_instance
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?downstream_stage_slot - downstream_stage_slot ?material_lot - material_lot)
+    :precondition
+      (and
+        (active_for_processing ?downstream_stage_batch_instance)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (material_lot_available ?material_lot)
+        (not
+          (downstream_instance_cleared ?downstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (downstream_slot_occupied ?downstream_stage_slot)
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (material_allocated_to_downstream_instance ?downstream_stage_batch_instance ?material_lot)
+        (not
+          (material_lot_available ?material_lot)
+        )
+      )
+  )
+  (:action complete_downstream_processing
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?downstream_stage_slot - downstream_stage_slot ?operator - operator ?material_lot - material_lot)
+    :precondition
+      (and
+        (active_for_processing ?downstream_stage_batch_instance)
+        (operator_assigned_to_entity ?downstream_stage_batch_instance ?operator)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (downstream_slot_occupied ?downstream_stage_slot)
+        (material_allocated_to_downstream_instance ?downstream_stage_batch_instance ?material_lot)
+        (not
+          (downstream_instance_ready ?downstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (downstream_slot_ready ?downstream_stage_slot)
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+        (material_lot_available ?material_lot)
+        (not
+          (material_allocated_to_downstream_instance ?downstream_stage_batch_instance ?material_lot)
+        )
+      )
+  )
+  (:action assemble_production_order
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?downstream_stage_slot - downstream_stage_slot ?production_order - production_order)
+    :precondition
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (upstream_slot_ready ?upstream_stage_slot)
+        (downstream_slot_ready ?downstream_stage_slot)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+        (production_order_slot_available ?production_order)
+      )
+    :effect
+      (and
+        (production_order_assembled ?production_order)
+        (production_order_attached_to_upstream_slot ?production_order ?upstream_stage_slot)
+        (production_order_attached_to_downstream_slot ?production_order ?downstream_stage_slot)
+        (not
+          (production_order_slot_available ?production_order)
+        )
+      )
+  )
+  (:action assemble_production_order_mark_upstream_inspection
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?downstream_stage_slot - downstream_stage_slot ?production_order - production_order)
+    :precondition
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (upstream_slot_occupied ?upstream_stage_slot)
+        (downstream_slot_ready ?downstream_stage_slot)
+        (not
+          (upstream_instance_ready ?upstream_stage_batch_instance)
+        )
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+        (production_order_slot_available ?production_order)
+      )
+    :effect
+      (and
+        (production_order_assembled ?production_order)
+        (production_order_attached_to_upstream_slot ?production_order ?upstream_stage_slot)
+        (production_order_attached_to_downstream_slot ?production_order ?downstream_stage_slot)
+        (production_order_upstream_inspection_flag ?production_order)
+        (not
+          (production_order_slot_available ?production_order)
+        )
+      )
+  )
+  (:action assemble_production_order_mark_downstream_inspection
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?downstream_stage_slot - downstream_stage_slot ?production_order - production_order)
+    :precondition
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (upstream_slot_ready ?upstream_stage_slot)
+        (downstream_slot_occupied ?downstream_stage_slot)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+        (not
+          (downstream_instance_ready ?downstream_stage_batch_instance)
+        )
+        (production_order_slot_available ?production_order)
+      )
+    :effect
+      (and
+        (production_order_assembled ?production_order)
+        (production_order_attached_to_upstream_slot ?production_order ?upstream_stage_slot)
+        (production_order_attached_to_downstream_slot ?production_order ?downstream_stage_slot)
+        (production_order_downstream_inspection_flag ?production_order)
+        (not
+          (production_order_slot_available ?production_order)
+        )
+      )
+  )
+  (:action assemble_production_order_mark_both_inspections
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?upstream_stage_slot - upstream_stage_slot ?downstream_stage_slot - downstream_stage_slot ?production_order - production_order)
+    :precondition
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (upstream_instance_assigned_to_slot ?upstream_stage_batch_instance ?upstream_stage_slot)
+        (downstream_instance_assigned_to_slot ?downstream_stage_batch_instance ?downstream_stage_slot)
+        (upstream_slot_occupied ?upstream_stage_slot)
+        (downstream_slot_occupied ?downstream_stage_slot)
+        (not
+          (upstream_instance_ready ?upstream_stage_batch_instance)
+        )
+        (not
+          (downstream_instance_ready ?downstream_stage_batch_instance)
+        )
+        (production_order_slot_available ?production_order)
+      )
+    :effect
+      (and
+        (production_order_assembled ?production_order)
+        (production_order_attached_to_upstream_slot ?production_order ?upstream_stage_slot)
+        (production_order_attached_to_downstream_slot ?production_order ?downstream_stage_slot)
+        (production_order_upstream_inspection_flag ?production_order)
+        (production_order_downstream_inspection_flag ?production_order)
+        (not
+          (production_order_slot_available ?production_order)
+        )
+      )
+  )
+  (:action complete_production_order_inspection
+    :parameters (?production_order - production_order ?upstream_stage_batch_instance - upstream_stage_batch_instance ?operator - operator)
+    :precondition
+      (and
+        (production_order_assembled ?production_order)
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (operator_assigned_to_entity ?upstream_stage_batch_instance ?operator)
+        (not
+          (production_order_inspection_complete ?production_order)
+        )
+      )
+    :effect (production_order_inspection_complete ?production_order)
+  )
+  (:action allocate_container_to_stage_and_order
+    :parameters (?stage_definition - process_stage ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (stage_linked_to_production_order ?stage_definition ?production_order)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_available ?container_unit)
+        (production_order_assembled ?production_order)
+        (production_order_inspection_complete ?production_order)
+        (not
+          (container_allocated ?container_unit)
+        )
+      )
+    :effect
+      (and
+        (container_allocated ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (not
+          (container_available ?container_unit)
+        )
+      )
+  )
+  (:action commission_stage_container
+    :parameters (?stage_definition - process_stage ?container_unit - container_unit ?production_order - production_order ?operator - operator)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_allocated ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (operator_assigned_to_entity ?stage_definition ?operator)
+        (not
+          (production_order_upstream_inspection_flag ?production_order)
+        )
+        (not
+          (stage_container_commissioned ?stage_definition)
+        )
+      )
+    :effect (stage_container_commissioned ?stage_definition)
+  )
+  (:action attach_quality_document_to_stage
+    :parameters (?stage_definition - process_stage ?quality_document - quality_document)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (quality_document_available ?quality_document)
+        (not
+          (quality_document_attached_to_stage ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (quality_document_attached_to_stage ?stage_definition)
+        (stage_quality_document_linked ?stage_definition ?quality_document)
+        (not
+          (quality_document_available ?quality_document)
+        )
+      )
+  )
+  (:action commission_stage_container_with_quality_document
+    :parameters (?stage_definition - process_stage ?container_unit - container_unit ?production_order - production_order ?operator - operator ?quality_document - quality_document)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_allocated ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (operator_assigned_to_entity ?stage_definition ?operator)
+        (production_order_upstream_inspection_flag ?production_order)
+        (quality_document_attached_to_stage ?stage_definition)
+        (stage_quality_document_linked ?stage_definition ?quality_document)
+        (not
+          (stage_container_commissioned ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_container_commissioned ?stage_definition)
+        (stage_container_quality_verified ?stage_definition)
+      )
+  )
+  (:action initiate_stage_component_integration
+    :parameters (?stage_definition - process_stage ?cleaning_certificate - cleaning_certificate ?auxiliary_equipment - auxiliary_equipment ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_container_commissioned ?stage_definition)
+        (stage_has_cleaning_certificate ?stage_definition ?cleaning_certificate)
+        (aux_equipment_assigned ?stage_definition ?auxiliary_equipment)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (not
+          (production_order_downstream_inspection_flag ?production_order)
+        )
+        (not
+          (stage_integration_complete ?stage_definition)
+        )
+      )
+    :effect (stage_integration_complete ?stage_definition)
+  )
+  (:action finalize_stage_component_integration
+    :parameters (?stage_definition - process_stage ?cleaning_certificate - cleaning_certificate ?auxiliary_equipment - auxiliary_equipment ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_container_commissioned ?stage_definition)
+        (stage_has_cleaning_certificate ?stage_definition ?cleaning_certificate)
+        (aux_equipment_assigned ?stage_definition ?auxiliary_equipment)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (production_order_downstream_inspection_flag ?production_order)
+        (not
+          (stage_integration_complete ?stage_definition)
+        )
+      )
+    :effect (stage_integration_complete ?stage_definition)
+  )
+  (:action set_stage_qc_ready_no_inspections_required
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_integration_complete ?stage_definition)
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (not
+          (production_order_upstream_inspection_flag ?production_order)
+        )
+        (not
+          (production_order_downstream_inspection_flag ?production_order)
+        )
+        (not
+          (stage_ready_for_qa ?stage_definition)
+        )
+      )
+    :effect (stage_ready_for_qa ?stage_definition)
+  )
+  (:action set_stage_qc_ready_upstream_inspection_present
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_integration_complete ?stage_definition)
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (production_order_upstream_inspection_flag ?production_order)
+        (not
+          (production_order_downstream_inspection_flag ?production_order)
+        )
+        (not
+          (stage_ready_for_qa ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_evidence_attached ?stage_definition)
+      )
+  )
+  (:action set_stage_qc_ready_downstream_inspection_present
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_integration_complete ?stage_definition)
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (not
+          (production_order_upstream_inspection_flag ?production_order)
+        )
+        (production_order_downstream_inspection_flag ?production_order)
+        (not
+          (stage_ready_for_qa ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_evidence_attached ?stage_definition)
+      )
+  )
+  (:action set_stage_qc_ready_both_inspections_present
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval ?container_unit - container_unit ?production_order - production_order)
+    :precondition
+      (and
+        (stage_integration_complete ?stage_definition)
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (stage_has_container_unit ?stage_definition ?container_unit)
+        (container_assigned_to_order ?container_unit ?production_order)
+        (production_order_upstream_inspection_flag ?production_order)
+        (production_order_downstream_inspection_flag ?production_order)
+        (not
+          (stage_ready_for_qa ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_evidence_attached ?stage_definition)
+      )
+  )
+  (:action finalize_stage_activation_and_record
+    :parameters (?stage_definition - process_stage)
+    :precondition
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (not
+          (stage_qa_evidence_attached ?stage_definition)
+        )
+        (not
+          (stage_activation_recorded ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_activation_recorded ?stage_definition)
+        (qa_finalized ?stage_definition)
+      )
+  )
+  (:action attach_qc_test_kit_to_stage
+    :parameters (?stage_definition - process_stage ?qc_test_kit - qc_test_kit)
+    :precondition
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_evidence_attached ?stage_definition)
+        (qc_test_kit_available ?qc_test_kit)
+      )
+    :effect
+      (and
+        (stage_has_qc_test_kit ?stage_definition ?qc_test_kit)
+        (not
+          (qc_test_kit_available ?qc_test_kit)
+        )
+      )
+  )
+  (:action perform_stage_qa_signoff
+    :parameters (?stage_definition - process_stage ?upstream_stage_batch_instance - upstream_stage_batch_instance ?downstream_stage_batch_instance - downstream_stage_batch_instance ?operator - operator ?qc_test_kit - qc_test_kit)
+    :precondition
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_evidence_attached ?stage_definition)
+        (stage_has_qc_test_kit ?stage_definition ?qc_test_kit)
+        (stage_linked_to_upstream_instance ?stage_definition ?upstream_stage_batch_instance)
+        (stage_linked_to_downstream_instance ?stage_definition ?downstream_stage_batch_instance)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+        (operator_assigned_to_entity ?stage_definition ?operator)
+        (not
+          (stage_qa_signoff_performed ?stage_definition)
+        )
+      )
+    :effect (stage_qa_signoff_performed ?stage_definition)
+  )
+  (:action activate_stage_post_qa_signoff
+    :parameters (?stage_definition - process_stage)
+    :precondition
+      (and
+        (stage_ready_for_qa ?stage_definition)
+        (stage_qa_signoff_performed ?stage_definition)
+        (not
+          (stage_activation_recorded ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_activation_recorded ?stage_definition)
+        (qa_finalized ?stage_definition)
+      )
+  )
+  (:action apply_special_authorization_to_stage
+    :parameters (?stage_definition - process_stage ?special_authorization - special_authorization ?operator - operator)
+    :precondition
+      (and
+        (active_for_processing ?stage_definition)
+        (operator_assigned_to_entity ?stage_definition ?operator)
+        (special_authorization_available ?special_authorization)
+        (stage_has_special_authorization ?stage_definition ?special_authorization)
+        (not
+          (stage_special_authorized ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_special_authorized ?stage_definition)
+        (not
+          (special_authorization_available ?special_authorization)
+        )
+      )
+  )
+  (:action confirm_stage_special_authorization
+    :parameters (?stage_definition - process_stage ?auxiliary_equipment - auxiliary_equipment)
+    :precondition
+      (and
+        (stage_special_authorized ?stage_definition)
+        (aux_equipment_assigned ?stage_definition ?auxiliary_equipment)
+        (not
+          (stage_authorization_confirmed ?stage_definition)
+        )
+      )
+    :effect (stage_authorization_confirmed ?stage_definition)
+  )
+  (:action record_stage_authorization_with_final_approval
+    :parameters (?stage_definition - process_stage ?final_quality_approval - final_quality_approval)
+    :precondition
+      (and
+        (stage_authorization_confirmed ?stage_definition)
+        (stage_has_final_quality_approval ?stage_definition ?final_quality_approval)
+        (not
+          (stage_final_authorization_recorded ?stage_definition)
+        )
+      )
+    :effect (stage_final_authorization_recorded ?stage_definition)
+  )
+  (:action activate_stage_after_final_authorization
+    :parameters (?stage_definition - process_stage)
+    :precondition
+      (and
+        (stage_final_authorization_recorded ?stage_definition)
+        (not
+          (stage_activation_recorded ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (stage_activation_recorded ?stage_definition)
+        (qa_finalized ?stage_definition)
+      )
+  )
+  (:action complete_upstream_batch_stage_finalization
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?production_order - production_order)
+    :precondition
+      (and
+        (upstream_instance_cleared ?upstream_stage_batch_instance)
+        (upstream_instance_ready ?upstream_stage_batch_instance)
+        (production_order_assembled ?production_order)
+        (production_order_inspection_complete ?production_order)
+        (not
+          (qa_finalized ?upstream_stage_batch_instance)
+        )
+      )
+    :effect (qa_finalized ?upstream_stage_batch_instance)
+  )
+  (:action complete_downstream_batch_stage_finalization
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?production_order - production_order)
+    :precondition
+      (and
+        (downstream_instance_cleared ?downstream_stage_batch_instance)
+        (downstream_instance_ready ?downstream_stage_batch_instance)
+        (production_order_assembled ?production_order)
+        (production_order_inspection_complete ?production_order)
+        (not
+          (qa_finalized ?downstream_stage_batch_instance)
+        )
+      )
+    :effect (qa_finalized ?downstream_stage_batch_instance)
+  )
+  (:action attach_release_document_to_batch
+    :parameters (?manufacturing_batch - processing_entity ?release_document - release_document ?operator - operator)
+    :precondition
+      (and
+        (qa_finalized ?manufacturing_batch)
+        (operator_assigned_to_entity ?manufacturing_batch ?operator)
+        (release_document_available ?release_document)
+        (not
+          (release_document_attached ?manufacturing_batch)
+        )
+      )
+    :effect
+      (and
+        (release_document_attached ?manufacturing_batch)
+        (release_document_assigned_to_batch ?manufacturing_batch ?release_document)
+        (not
+          (release_document_available ?release_document)
+        )
+      )
+  )
+  (:action release_upstream_instance_and_free_line_resource
+    :parameters (?upstream_stage_batch_instance - upstream_stage_batch_instance ?line_resource - line_resource ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?upstream_stage_batch_instance)
+        (allocated_to_line ?upstream_stage_batch_instance ?line_resource)
+        (release_document_assigned_to_batch ?upstream_stage_batch_instance ?release_document)
+        (not
+          (released_for_processing ?upstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (released_for_processing ?upstream_stage_batch_instance)
+        (line_resource_available ?line_resource)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_downstream_instance_and_free_line_resource
+    :parameters (?downstream_stage_batch_instance - downstream_stage_batch_instance ?line_resource - line_resource ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?downstream_stage_batch_instance)
+        (allocated_to_line ?downstream_stage_batch_instance ?line_resource)
+        (release_document_assigned_to_batch ?downstream_stage_batch_instance ?release_document)
+        (not
+          (released_for_processing ?downstream_stage_batch_instance)
+        )
+      )
+    :effect
+      (and
+        (released_for_processing ?downstream_stage_batch_instance)
+        (line_resource_available ?line_resource)
+        (release_document_available ?release_document)
+      )
+  )
+  (:action release_stage_and_free_line_resource
+    :parameters (?stage_definition - process_stage ?line_resource - line_resource ?release_document - release_document)
+    :precondition
+      (and
+        (release_document_attached ?stage_definition)
+        (allocated_to_line ?stage_definition ?line_resource)
+        (release_document_assigned_to_batch ?stage_definition ?release_document)
+        (not
+          (released_for_processing ?stage_definition)
+        )
+      )
+    :effect
+      (and
+        (released_for_processing ?stage_definition)
+        (line_resource_available ?line_resource)
+        (release_document_available ?release_document)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem batch_stage_sequence_coordination_problem)
+  (:domain pharmaceutics_batch_stage_sequence_coordination)
+  (:objects upstream_batch_instance_1 - upstream_stage_batch_instance downstream_batch_instance_1 - downstream_stage_batch_instance stage_reaction - process_stage stage_filtration - process_stage production_line_1 - line_resource production_line_2 - line_resource production_line_3 - line_resource operator_1 - operator auxiliary_equipment_1 - auxiliary_equipment material_lot_1 - material_lot upstream_stage_slot_1 - upstream_stage_slot downstream_stage_slot_1 - downstream_stage_slot production_order_1 - production_order container_unit_1 - container_unit container_unit_2 - container_unit quality_document_1 - quality_document quality_document_2 - quality_document qc_test_kit_1 - qc_test_kit qc_test_kit_2 - qc_test_kit release_document_1 - release_document cleaning_certificate_1 - cleaning_certificate special_authorization_1 - special_authorization special_authorization_2 - special_authorization final_quality_approval_1 - final_quality_approval)
+  (:init
+    (line_resource_available production_line_1)
+    (line_resource_available production_line_2)
+    (line_resource_available production_line_3)
+    (operator_available operator_1)
+    (aux_equipment_available auxiliary_equipment_1)
+    (material_lot_available material_lot_1)
+    (upstream_instance_assigned_to_slot upstream_batch_instance_1 upstream_stage_slot_1)
+    (downstream_instance_assigned_to_slot downstream_batch_instance_1 downstream_stage_slot_1)
+    (production_order_slot_available production_order_1)
+    (container_available container_unit_1)
+    (container_available container_unit_2)
+    (stage_linked_to_upstream_instance stage_reaction upstream_batch_instance_1)
+    (stage_linked_to_upstream_instance stage_filtration upstream_batch_instance_1)
+    (stage_linked_to_downstream_instance stage_reaction downstream_batch_instance_1)
+    (stage_linked_to_downstream_instance stage_filtration downstream_batch_instance_1)
+    (stage_linked_to_production_order stage_reaction production_order_1)
+    (stage_linked_to_production_order stage_filtration production_order_1)
+    (stage_has_container_unit stage_reaction container_unit_1)
+    (stage_has_container_unit stage_filtration container_unit_2)
+    (quality_document_available quality_document_1)
+    (quality_document_available quality_document_2)
+    (qc_test_kit_available qc_test_kit_1)
+    (qc_test_kit_available qc_test_kit_2)
+    (release_document_available release_document_1)
+    (cleaning_certificate_available cleaning_certificate_1)
+    (special_authorization_available special_authorization_1)
+    (stage_has_special_authorization stage_reaction special_authorization_1)
+    (stage_has_special_authorization stage_filtration special_authorization_2)
+    (final_quality_approval_available final_quality_approval_1)
+  )
+  (:goal
+    (and
+      (released_for_processing upstream_batch_instance_1)
+      (released_for_processing downstream_batch_instance_1)
+      (released_for_processing stage_reaction)
+      (released_for_processing stage_filtration)
+    )
+  )
+)

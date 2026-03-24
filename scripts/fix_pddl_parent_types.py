@@ -2,10 +2,14 @@
 """
 Добавляет недостающие родительские типы в PDDL домены для Tarski/AutoPlanBench.
 
-Типы вроде 'ach_batch - entity' требуют объявления 'entity - object'.
-Скрипт находит все *_domain.pddl в data/batch_samples, парсит блок :types,
-и добавляет "parent - object" для любого родителя, который используется, но не объявлен.
+Типы вроде 'foo - entity' требуют объявления 'entity - object' в том же блоке :types.
+Скрипт парсит строку (:types ...), находит родителей, которые используются, но не объявлены,
+и добавляет "parent - object" в начало списка типов.
+
+По умолчанию обходит data/batch_samples и data/finalset (если есть), файлы *_domain.pddl
+и themed_domain.pddl (копии в _apb_setup пропускаются).
 """
+import argparse
 import re
 from pathlib import Path
 
@@ -56,19 +60,50 @@ def fix_domain_file(path: Path) -> bool:
     return changed
 
 
-def main():
-    data_dir = Path(__file__).resolve().parent.parent / "data" / "batch_samples"
-    if not data_dir.is_dir():
-        print(f"Directory not found: {data_dir}")
+def iter_domain_files_under(root: Path) -> list:
+    out: list = []
+    if not root.is_dir():
+        return out
+    for pattern in ("*_domain.pddl", "themed_domain.pddl"):
+        out.extend(root.rglob(pattern))
+    return [f for f in out if "_apb_setup" not in str(f)]
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "roots",
+        nargs="*",
+        help="Корни датасета для обхода (по умолчанию: data/batch_samples и data/finalset)",
+    )
+    args = parser.parse_args()
+    base = Path(__file__).resolve().parent.parent / "data"
+    if args.roots:
+        roots = [Path(p).resolve() for p in args.roots]
+    else:
+        roots = []
+        for name in ("batch_samples", "finalset"):
+            p = base / name
+            if p.is_dir():
+                roots.append(p)
+
+    if not roots:
+        print("No data roots found. Pass paths explicitly, e.g. scripts/fix_pddl_parent_types.py data/finalset")
         return
-    domain_files = list(data_dir.rglob("*_domain.pddl"))
-    # исключаем копии в _apb_setup
-    domain_files = [f for f in domain_files if "_apb_setup" not in str(f)]
+
+    domain_files: list = []
+    for r in roots:
+        domain_files.extend(iter_domain_files_under(r))
+    domain_files = sorted(set(domain_files))
+
     fixed = 0
-    for path in sorted(domain_files):
-        if fix_domain_file(path):
-            print(f"Fixed: {path.relative_to(data_dir)}")
-            fixed += 1
+    for path in domain_files:
+        try:
+            if fix_domain_file(path):
+                print(f"Fixed: {path}")
+                fixed += 1
+        except OSError as e:
+            print(f"Skip {path}: {e}")
     print(f"Done. Fixed {fixed} of {len(domain_files)} domain files.")
 
 

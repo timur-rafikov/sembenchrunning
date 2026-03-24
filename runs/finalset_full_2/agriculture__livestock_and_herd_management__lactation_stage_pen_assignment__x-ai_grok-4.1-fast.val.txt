@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain lactation_stage_pen_assignment)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types facility_resource - object infrastructure_resource - object administrative_resource - object animal_root_type - object animal - animal_root_type pen - facility_resource milking_station - facility_resource staff_member - facility_resource supply_item - facility_resource treatment_protocol - facility_resource lactation_record - facility_resource milk_test_kit - facility_resource health_service_slot - facility_resource feed_ration - infrastructure_resource bedding_batch - infrastructure_resource service_token - infrastructure_resource stall_option_a - administrative_resource stall_option_b - administrative_resource pen_assignment_record - administrative_resource animal_category_a - animal animal_category_b - animal lactating_cow - animal_category_a recent_calfing_cow - animal_category_a herd_animal - animal_category_b)
+  (:predicates
+    (animal_registered ?animal - animal)
+    (animal_ready ?animal - animal)
+    (animal_has_pen_candidate ?animal - animal)
+    (animal_assigned_pen ?animal - animal)
+    (animal_placement_confirmed ?animal - animal)
+    (animal_lactation_recorded ?animal - animal)
+    (pen_available ?pen - pen)
+    (animal_pen_candidate ?animal - animal ?pen - pen)
+    (milking_station_available ?milking_station - milking_station)
+    (animal_assigned_milking_station ?animal - animal ?milking_station - milking_station)
+    (staff_available ?staff_member - staff_member)
+    (animal_assigned_staff ?animal - animal ?staff_member - staff_member)
+    (feed_ration_available ?feed_ration - feed_ration)
+    (lactating_cow_feed_allocated ?lactating_cow - lactating_cow ?feed_ration - feed_ration)
+    (recent_calfing_cow_feed_allocated ?recent_calfing_cow - recent_calfing_cow ?feed_ration - feed_ration)
+    (lactating_cow_compatible_with_stall_option ?lactating_cow - lactating_cow ?stall_option_a - stall_option_a)
+    (stall_option_a_marked ?stall_option_a - stall_option_a)
+    (stall_option_a_marked_alt ?stall_option_a - stall_option_a)
+    (lactating_cow_staff_confirmed ?lactating_cow - lactating_cow)
+    (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow - recent_calfing_cow ?stall_option_b - stall_option_b)
+    (stall_option_b_marked ?stall_option_b - stall_option_b)
+    (stall_option_b_marked_alt ?stall_option_b - stall_option_b)
+    (recent_calfing_cow_staff_confirmed ?recent_calfing_cow - recent_calfing_cow)
+    (pen_assignment_record_available ?pen_assignment_record - pen_assignment_record)
+    (pen_assignment_record_active ?pen_assignment_record - pen_assignment_record)
+    (pen_record_includes_stall_option_a ?pen_assignment_record - pen_assignment_record ?stall_option_a - stall_option_a)
+    (pen_record_includes_stall_option_b ?pen_assignment_record - pen_assignment_record ?stall_option_b - stall_option_b)
+    (pen_record_variant_alpha ?pen_assignment_record - pen_assignment_record)
+    (pen_record_variant_beta ?pen_assignment_record - pen_assignment_record)
+    (pen_assignment_record_verified ?pen_assignment_record - pen_assignment_record)
+    (animal_linked_to_lactating_cow ?herd_animal - herd_animal ?lactating_cow - lactating_cow)
+    (animal_linked_to_recent_calfing_cow ?herd_animal - herd_animal ?recent_calfing_cow - recent_calfing_cow)
+    (animal_linked_to_pen_record ?herd_animal - herd_animal ?pen_assignment_record - pen_assignment_record)
+    (bedding_batch_available ?bedding_batch - bedding_batch)
+    (animal_bedding_assigned ?herd_animal - herd_animal ?bedding_batch - bedding_batch)
+    (bedding_batch_reserved ?bedding_batch - bedding_batch)
+    (bedding_batch_assigned_to_pen_record ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    (animal_provision_verified ?herd_animal - herd_animal)
+    (animal_provision_approved ?herd_animal - herd_animal)
+    (animal_ready_for_finalization ?herd_animal - herd_animal)
+    (animal_supply_reserved ?herd_animal - herd_animal)
+    (animal_variant_flag ?herd_animal - herd_animal)
+    (animal_service_checks_passed ?herd_animal - herd_animal)
+    (animal_final_staff_check_passed ?herd_animal - herd_animal)
+    (service_token_available ?service_token - service_token)
+    (animal_service_token_link ?herd_animal - herd_animal ?service_token - service_token)
+    (animal_service_scheduled ?herd_animal - herd_animal)
+    (animal_service_in_progress ?herd_animal - herd_animal)
+    (animal_service_completed ?herd_animal - herd_animal)
+    (supply_item_available ?supply_item - supply_item)
+    (animal_supply_item_assigned ?herd_animal - herd_animal ?supply_item - supply_item)
+    (treatment_protocol_available ?treatment_protocol - treatment_protocol)
+    (animal_treatment_protocol_assigned ?herd_animal - herd_animal ?treatment_protocol - treatment_protocol)
+    (milk_test_kit_available ?milk_test_kit - milk_test_kit)
+    (animal_milk_test_assigned ?herd_animal - herd_animal ?milk_test_kit - milk_test_kit)
+    (health_service_slot_available ?health_service_slot - health_service_slot)
+    (animal_health_service_slot_assigned ?herd_animal - herd_animal ?health_service_slot - health_service_slot)
+    (lactation_record_available ?lactation_record - lactation_record)
+    (animal_lactation_record_link ?animal - animal ?lactation_record - lactation_record)
+    (lactating_cow_prepared ?lactating_cow - lactating_cow)
+    (recent_calfing_cow_prepared ?recent_calfing_cow - recent_calfing_cow)
+    (animal_finalized_placement ?herd_animal - herd_animal)
+  )
+  (:action register_animal
+    :parameters (?animal - animal)
+    :precondition
+      (and
+        (not
+          (animal_registered ?animal)
+        )
+        (not
+          (animal_assigned_pen ?animal)
+        )
+      )
+    :effect (animal_registered ?animal)
+  )
+  (:action reserve_pen_candidate
+    :parameters (?animal - animal ?pen - pen)
+    :precondition
+      (and
+        (animal_registered ?animal)
+        (not
+          (animal_has_pen_candidate ?animal)
+        )
+        (pen_available ?pen)
+      )
+    :effect
+      (and
+        (animal_has_pen_candidate ?animal)
+        (animal_pen_candidate ?animal ?pen)
+        (not
+          (pen_available ?pen)
+        )
+      )
+  )
+  (:action assign_milking_station
+    :parameters (?animal - animal ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_registered ?animal)
+        (animal_has_pen_candidate ?animal)
+        (milking_station_available ?milking_station)
+      )
+    :effect
+      (and
+        (animal_assigned_milking_station ?animal ?milking_station)
+        (not
+          (milking_station_available ?milking_station)
+        )
+      )
+  )
+  (:action mark_animal_ready
+    :parameters (?animal - animal ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_registered ?animal)
+        (animal_has_pen_candidate ?animal)
+        (animal_assigned_milking_station ?animal ?milking_station)
+        (not
+          (animal_ready ?animal)
+        )
+      )
+    :effect (animal_ready ?animal)
+  )
+  (:action release_milking_station
+    :parameters (?animal - animal ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_assigned_milking_station ?animal ?milking_station)
+      )
+    :effect
+      (and
+        (milking_station_available ?milking_station)
+        (not
+          (animal_assigned_milking_station ?animal ?milking_station)
+        )
+      )
+  )
+  (:action assign_staff_to_animal
+    :parameters (?animal - animal ?staff_member - staff_member)
+    :precondition
+      (and
+        (animal_ready ?animal)
+        (staff_available ?staff_member)
+      )
+    :effect
+      (and
+        (animal_assigned_staff ?animal ?staff_member)
+        (not
+          (staff_available ?staff_member)
+        )
+      )
+  )
+  (:action release_staff_from_animal
+    :parameters (?animal - animal ?staff_member - staff_member)
+    :precondition
+      (and
+        (animal_assigned_staff ?animal ?staff_member)
+      )
+    :effect
+      (and
+        (staff_available ?staff_member)
+        (not
+          (animal_assigned_staff ?animal ?staff_member)
+        )
+      )
+  )
+  (:action assign_milk_test_kit
+    :parameters (?herd_animal - herd_animal ?milk_test_kit - milk_test_kit)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (milk_test_kit_available ?milk_test_kit)
+      )
+    :effect
+      (and
+        (animal_milk_test_assigned ?herd_animal ?milk_test_kit)
+        (not
+          (milk_test_kit_available ?milk_test_kit)
+        )
+      )
+  )
+  (:action release_milk_test_kit
+    :parameters (?herd_animal - herd_animal ?milk_test_kit - milk_test_kit)
+    :precondition
+      (and
+        (animal_milk_test_assigned ?herd_animal ?milk_test_kit)
+      )
+    :effect
+      (and
+        (milk_test_kit_available ?milk_test_kit)
+        (not
+          (animal_milk_test_assigned ?herd_animal ?milk_test_kit)
+        )
+      )
+  )
+  (:action assign_health_service_slot
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (health_service_slot_available ?health_service_slot)
+      )
+    :effect
+      (and
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (not
+          (health_service_slot_available ?health_service_slot)
+        )
+      )
+  )
+  (:action release_health_service_slot
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot)
+    :precondition
+      (and
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+      )
+    :effect
+      (and
+        (health_service_slot_available ?health_service_slot)
+        (not
+          (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        )
+      )
+  )
+  (:action prepare_stall_option_a
+    :parameters (?lactating_cow - lactating_cow ?stall_option_a - stall_option_a ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_ready ?lactating_cow)
+        (animal_assigned_milking_station ?lactating_cow ?milking_station)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (not
+          (stall_option_a_marked ?stall_option_a)
+        )
+        (not
+          (stall_option_a_marked_alt ?stall_option_a)
+        )
+      )
+    :effect (stall_option_a_marked ?stall_option_a)
+  )
+  (:action staff_confirm_stall_option_a
+    :parameters (?lactating_cow - lactating_cow ?stall_option_a - stall_option_a ?staff_member - staff_member)
+    :precondition
+      (and
+        (animal_ready ?lactating_cow)
+        (animal_assigned_staff ?lactating_cow ?staff_member)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (stall_option_a_marked ?stall_option_a)
+        (not
+          (lactating_cow_prepared ?lactating_cow)
+        )
+      )
+    :effect
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+      )
+  )
+  (:action reserve_bedding_and_mark_stall_option
+    :parameters (?lactating_cow - lactating_cow ?stall_option_a - stall_option_a ?feed_ration - feed_ration)
+    :precondition
+      (and
+        (animal_ready ?lactating_cow)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (feed_ration_available ?feed_ration)
+        (not
+          (lactating_cow_prepared ?lactating_cow)
+        )
+      )
+    :effect
+      (and
+        (stall_option_a_marked_alt ?stall_option_a)
+        (lactating_cow_prepared ?lactating_cow)
+        (lactating_cow_feed_allocated ?lactating_cow ?feed_ration)
+        (not
+          (feed_ration_available ?feed_ration)
+        )
+      )
+  )
+  (:action finalize_bedding_assignment
+    :parameters (?lactating_cow - lactating_cow ?stall_option_a - stall_option_a ?milking_station - milking_station ?feed_ration - feed_ration)
+    :precondition
+      (and
+        (animal_ready ?lactating_cow)
+        (animal_assigned_milking_station ?lactating_cow ?milking_station)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (stall_option_a_marked_alt ?stall_option_a)
+        (lactating_cow_feed_allocated ?lactating_cow ?feed_ration)
+        (not
+          (lactating_cow_staff_confirmed ?lactating_cow)
+        )
+      )
+    :effect
+      (and
+        (stall_option_a_marked ?stall_option_a)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+        (feed_ration_available ?feed_ration)
+        (not
+          (lactating_cow_feed_allocated ?lactating_cow ?feed_ration)
+        )
+      )
+  )
+  (:action prepare_stall_option_b
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?stall_option_b - stall_option_b ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_ready ?recent_calfing_cow)
+        (animal_assigned_milking_station ?recent_calfing_cow ?milking_station)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (not
+          (stall_option_b_marked ?stall_option_b)
+        )
+        (not
+          (stall_option_b_marked_alt ?stall_option_b)
+        )
+      )
+    :effect (stall_option_b_marked ?stall_option_b)
+  )
+  (:action staff_confirm_stall_option_b
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?stall_option_b - stall_option_b ?staff_member - staff_member)
+    :precondition
+      (and
+        (animal_ready ?recent_calfing_cow)
+        (animal_assigned_staff ?recent_calfing_cow ?staff_member)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_b_marked ?stall_option_b)
+        (not
+          (recent_calfing_cow_prepared ?recent_calfing_cow)
+        )
+      )
+    :effect
+      (and
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+      )
+  )
+  (:action reserve_bedding_and_mark_stall_option_b
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?stall_option_b - stall_option_b ?feed_ration - feed_ration)
+    :precondition
+      (and
+        (animal_ready ?recent_calfing_cow)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (feed_ration_available ?feed_ration)
+        (not
+          (recent_calfing_cow_prepared ?recent_calfing_cow)
+        )
+      )
+    :effect
+      (and
+        (stall_option_b_marked_alt ?stall_option_b)
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (recent_calfing_cow_feed_allocated ?recent_calfing_cow ?feed_ration)
+        (not
+          (feed_ration_available ?feed_ration)
+        )
+      )
+  )
+  (:action finalize_bedding_assignment_b
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?stall_option_b - stall_option_b ?milking_station - milking_station ?feed_ration - feed_ration)
+    :precondition
+      (and
+        (animal_ready ?recent_calfing_cow)
+        (animal_assigned_milking_station ?recent_calfing_cow ?milking_station)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_b_marked_alt ?stall_option_b)
+        (recent_calfing_cow_feed_allocated ?recent_calfing_cow ?feed_ration)
+        (not
+          (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        )
+      )
+    :effect
+      (and
+        (stall_option_b_marked ?stall_option_b)
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        (feed_ration_available ?feed_ration)
+        (not
+          (recent_calfing_cow_feed_allocated ?recent_calfing_cow ?feed_ration)
+        )
+      )
+  )
+  (:action create_pen_assignment_record_variant_1
+    :parameters (?lactating_cow - lactating_cow ?recent_calfing_cow - recent_calfing_cow ?stall_option_a - stall_option_a ?stall_option_b - stall_option_b ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_a_marked ?stall_option_a)
+        (stall_option_b_marked ?stall_option_b)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        (pen_assignment_record_available ?pen_assignment_record)
+      )
+    :effect
+      (and
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_record_includes_stall_option_a ?pen_assignment_record ?stall_option_a)
+        (pen_record_includes_stall_option_b ?pen_assignment_record ?stall_option_b)
+        (not
+          (pen_assignment_record_available ?pen_assignment_record)
+        )
+      )
+  )
+  (:action create_pen_assignment_record_variant_2
+    :parameters (?lactating_cow - lactating_cow ?recent_calfing_cow - recent_calfing_cow ?stall_option_a - stall_option_a ?stall_option_b - stall_option_b ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_a_marked_alt ?stall_option_a)
+        (stall_option_b_marked ?stall_option_b)
+        (not
+          (lactating_cow_staff_confirmed ?lactating_cow)
+        )
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        (pen_assignment_record_available ?pen_assignment_record)
+      )
+    :effect
+      (and
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_record_includes_stall_option_a ?pen_assignment_record ?stall_option_a)
+        (pen_record_includes_stall_option_b ?pen_assignment_record ?stall_option_b)
+        (pen_record_variant_alpha ?pen_assignment_record)
+        (not
+          (pen_assignment_record_available ?pen_assignment_record)
+        )
+      )
+  )
+  (:action create_pen_assignment_record_variant_3
+    :parameters (?lactating_cow - lactating_cow ?recent_calfing_cow - recent_calfing_cow ?stall_option_a - stall_option_a ?stall_option_b - stall_option_b ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_a_marked ?stall_option_a)
+        (stall_option_b_marked_alt ?stall_option_b)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+        (not
+          (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        )
+        (pen_assignment_record_available ?pen_assignment_record)
+      )
+    :effect
+      (and
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_record_includes_stall_option_a ?pen_assignment_record ?stall_option_a)
+        (pen_record_includes_stall_option_b ?pen_assignment_record ?stall_option_b)
+        (pen_record_variant_beta ?pen_assignment_record)
+        (not
+          (pen_assignment_record_available ?pen_assignment_record)
+        )
+      )
+  )
+  (:action create_pen_assignment_record_variant_4
+    :parameters (?lactating_cow - lactating_cow ?recent_calfing_cow - recent_calfing_cow ?stall_option_a - stall_option_a ?stall_option_b - stall_option_b ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (lactating_cow_compatible_with_stall_option ?lactating_cow ?stall_option_a)
+        (recent_calfing_cow_compatible_with_stall_option ?recent_calfing_cow ?stall_option_b)
+        (stall_option_a_marked_alt ?stall_option_a)
+        (stall_option_b_marked_alt ?stall_option_b)
+        (not
+          (lactating_cow_staff_confirmed ?lactating_cow)
+        )
+        (not
+          (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        )
+        (pen_assignment_record_available ?pen_assignment_record)
+      )
+    :effect
+      (and
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_record_includes_stall_option_a ?pen_assignment_record ?stall_option_a)
+        (pen_record_includes_stall_option_b ?pen_assignment_record ?stall_option_b)
+        (pen_record_variant_alpha ?pen_assignment_record)
+        (pen_record_variant_beta ?pen_assignment_record)
+        (not
+          (pen_assignment_record_available ?pen_assignment_record)
+        )
+      )
+  )
+  (:action verify_pen_assignment_for_milking
+    :parameters (?pen_assignment_record - pen_assignment_record ?lactating_cow - lactating_cow ?milking_station - milking_station)
+    :precondition
+      (and
+        (pen_assignment_record_active ?pen_assignment_record)
+        (lactating_cow_prepared ?lactating_cow)
+        (animal_assigned_milking_station ?lactating_cow ?milking_station)
+        (not
+          (pen_assignment_record_verified ?pen_assignment_record)
+        )
+      )
+    :effect (pen_assignment_record_verified ?pen_assignment_record)
+  )
+  (:action reserve_bedding_for_pen_record
+    :parameters (?herd_animal - herd_animal ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (animal_linked_to_pen_record ?herd_animal ?pen_assignment_record)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_available ?bedding_batch)
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_assignment_record_verified ?pen_assignment_record)
+        (not
+          (bedding_batch_reserved ?bedding_batch)
+        )
+      )
+    :effect
+      (and
+        (bedding_batch_reserved ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (not
+          (bedding_batch_available ?bedding_batch)
+        )
+      )
+  )
+  (:action confirm_bedding_and_lock_animal
+    :parameters (?herd_animal - herd_animal ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_reserved ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (animal_assigned_milking_station ?herd_animal ?milking_station)
+        (not
+          (pen_record_variant_alpha ?pen_assignment_record)
+        )
+        (not
+          (animal_provision_verified ?herd_animal)
+        )
+      )
+    :effect (animal_provision_verified ?herd_animal)
+  )
+  (:action reserve_supply_item_for_animal
+    :parameters (?herd_animal - herd_animal ?supply_item - supply_item)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (supply_item_available ?supply_item)
+        (not
+          (animal_supply_reserved ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_supply_reserved ?herd_animal)
+        (animal_supply_item_assigned ?herd_animal ?supply_item)
+        (not
+          (supply_item_available ?supply_item)
+        )
+      )
+  )
+  (:action confirm_supply_and_variant_lock
+    :parameters (?herd_animal - herd_animal ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record ?milking_station - milking_station ?supply_item - supply_item)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_reserved ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (animal_assigned_milking_station ?herd_animal ?milking_station)
+        (pen_record_variant_alpha ?pen_assignment_record)
+        (animal_supply_reserved ?herd_animal)
+        (animal_supply_item_assigned ?herd_animal ?supply_item)
+        (not
+          (animal_provision_verified ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_provision_verified ?herd_animal)
+        (animal_variant_flag ?herd_animal)
+      )
+  )
+  (:action apply_provision_checks_stage_1
+    :parameters (?herd_animal - herd_animal ?milk_test_kit - milk_test_kit ?staff_member - staff_member ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_verified ?herd_animal)
+        (animal_milk_test_assigned ?herd_animal ?milk_test_kit)
+        (animal_assigned_staff ?herd_animal ?staff_member)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (not
+          (pen_record_variant_beta ?pen_assignment_record)
+        )
+        (not
+          (animal_provision_approved ?herd_animal)
+        )
+      )
+    :effect (animal_provision_approved ?herd_animal)
+  )
+  (:action apply_provision_checks_stage_2
+    :parameters (?herd_animal - herd_animal ?milk_test_kit - milk_test_kit ?staff_member - staff_member ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_verified ?herd_animal)
+        (animal_milk_test_assigned ?herd_animal ?milk_test_kit)
+        (animal_assigned_staff ?herd_animal ?staff_member)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (pen_record_variant_beta ?pen_assignment_record)
+        (not
+          (animal_provision_approved ?herd_animal)
+        )
+      )
+    :effect (animal_provision_approved ?herd_animal)
+  )
+  (:action apply_health_service_validation_1
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_approved ?herd_animal)
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (not
+          (pen_record_variant_alpha ?pen_assignment_record)
+        )
+        (not
+          (pen_record_variant_beta ?pen_assignment_record)
+        )
+        (not
+          (animal_ready_for_finalization ?herd_animal)
+        )
+      )
+    :effect (animal_ready_for_finalization ?herd_animal)
+  )
+  (:action apply_health_service_validation_2
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_approved ?herd_animal)
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (pen_record_variant_alpha ?pen_assignment_record)
+        (not
+          (pen_record_variant_beta ?pen_assignment_record)
+        )
+        (not
+          (animal_ready_for_finalization ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_service_checks_passed ?herd_animal)
+      )
+  )
+  (:action apply_health_service_validation_3
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_approved ?herd_animal)
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (not
+          (pen_record_variant_alpha ?pen_assignment_record)
+        )
+        (pen_record_variant_beta ?pen_assignment_record)
+        (not
+          (animal_ready_for_finalization ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_service_checks_passed ?herd_animal)
+      )
+  )
+  (:action apply_health_service_validation_4
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot ?bedding_batch - bedding_batch ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (animal_provision_approved ?herd_animal)
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (animal_bedding_assigned ?herd_animal ?bedding_batch)
+        (bedding_batch_assigned_to_pen_record ?bedding_batch ?pen_assignment_record)
+        (pen_record_variant_alpha ?pen_assignment_record)
+        (pen_record_variant_beta ?pen_assignment_record)
+        (not
+          (animal_ready_for_finalization ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_service_checks_passed ?herd_animal)
+      )
+  )
+  (:action apply_final_placement_marker
+    :parameters (?herd_animal - herd_animal)
+    :precondition
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (not
+          (animal_service_checks_passed ?herd_animal)
+        )
+        (not
+          (animal_finalized_placement ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_finalized_placement ?herd_animal)
+        (animal_placement_confirmed ?herd_animal)
+      )
+  )
+  (:action assign_treatment_protocol_to_animal
+    :parameters (?herd_animal - herd_animal ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_service_checks_passed ?herd_animal)
+        (treatment_protocol_available ?treatment_protocol)
+      )
+    :effect
+      (and
+        (animal_treatment_protocol_assigned ?herd_animal ?treatment_protocol)
+        (not
+          (treatment_protocol_available ?treatment_protocol)
+        )
+      )
+  )
+  (:action perform_final_staff_checks
+    :parameters (?herd_animal - herd_animal ?lactating_cow - lactating_cow ?recent_calfing_cow - recent_calfing_cow ?milking_station - milking_station ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_service_checks_passed ?herd_animal)
+        (animal_treatment_protocol_assigned ?herd_animal ?treatment_protocol)
+        (animal_linked_to_lactating_cow ?herd_animal ?lactating_cow)
+        (animal_linked_to_recent_calfing_cow ?herd_animal ?recent_calfing_cow)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        (animal_assigned_milking_station ?herd_animal ?milking_station)
+        (not
+          (animal_final_staff_check_passed ?herd_animal)
+        )
+      )
+    :effect (animal_final_staff_check_passed ?herd_animal)
+  )
+  (:action finalize_placement_after_staff_checks
+    :parameters (?herd_animal - herd_animal)
+    :precondition
+      (and
+        (animal_ready_for_finalization ?herd_animal)
+        (animal_final_staff_check_passed ?herd_animal)
+        (not
+          (animal_finalized_placement ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_finalized_placement ?herd_animal)
+        (animal_placement_confirmed ?herd_animal)
+      )
+  )
+  (:action schedule_service_for_animal
+    :parameters (?herd_animal - herd_animal ?service_token - service_token ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_ready ?herd_animal)
+        (animal_assigned_milking_station ?herd_animal ?milking_station)
+        (service_token_available ?service_token)
+        (animal_service_token_link ?herd_animal ?service_token)
+        (not
+          (animal_service_scheduled ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_service_scheduled ?herd_animal)
+        (not
+          (service_token_available ?service_token)
+        )
+      )
+  )
+  (:action start_service_for_animal
+    :parameters (?herd_animal - herd_animal ?staff_member - staff_member)
+    :precondition
+      (and
+        (animal_service_scheduled ?herd_animal)
+        (animal_assigned_staff ?herd_animal ?staff_member)
+        (not
+          (animal_service_in_progress ?herd_animal)
+        )
+      )
+    :effect (animal_service_in_progress ?herd_animal)
+  )
+  (:action confirm_service_component
+    :parameters (?herd_animal - herd_animal ?health_service_slot - health_service_slot)
+    :precondition
+      (and
+        (animal_service_in_progress ?herd_animal)
+        (animal_health_service_slot_assigned ?herd_animal ?health_service_slot)
+        (not
+          (animal_service_completed ?herd_animal)
+        )
+      )
+    :effect (animal_service_completed ?herd_animal)
+  )
+  (:action complete_service_and_mark_ready
+    :parameters (?herd_animal - herd_animal)
+    :precondition
+      (and
+        (animal_service_completed ?herd_animal)
+        (not
+          (animal_finalized_placement ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_finalized_placement ?herd_animal)
+        (animal_placement_confirmed ?herd_animal)
+      )
+  )
+  (:action finalize_lactating_cow_placement
+    :parameters (?lactating_cow - lactating_cow ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (lactating_cow_prepared ?lactating_cow)
+        (lactating_cow_staff_confirmed ?lactating_cow)
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_assignment_record_verified ?pen_assignment_record)
+        (not
+          (animal_placement_confirmed ?lactating_cow)
+        )
+      )
+    :effect (animal_placement_confirmed ?lactating_cow)
+  )
+  (:action finalize_recent_calfing_cow_placement
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?pen_assignment_record - pen_assignment_record)
+    :precondition
+      (and
+        (recent_calfing_cow_prepared ?recent_calfing_cow)
+        (recent_calfing_cow_staff_confirmed ?recent_calfing_cow)
+        (pen_assignment_record_active ?pen_assignment_record)
+        (pen_assignment_record_verified ?pen_assignment_record)
+        (not
+          (animal_placement_confirmed ?recent_calfing_cow)
+        )
+      )
+    :effect (animal_placement_confirmed ?recent_calfing_cow)
+  )
+  (:action record_lactation_stage
+    :parameters (?animal - animal ?lactation_record - lactation_record ?milking_station - milking_station)
+    :precondition
+      (and
+        (animal_placement_confirmed ?animal)
+        (animal_assigned_milking_station ?animal ?milking_station)
+        (lactation_record_available ?lactation_record)
+        (not
+          (animal_lactation_recorded ?animal)
+        )
+      )
+    :effect
+      (and
+        (animal_lactation_recorded ?animal)
+        (animal_lactation_record_link ?animal ?lactation_record)
+        (not
+          (lactation_record_available ?lactation_record)
+        )
+      )
+  )
+  (:action assign_pen_using_lactation_record_for_lactating_cow
+    :parameters (?lactating_cow - lactating_cow ?pen - pen ?lactation_record - lactation_record)
+    :precondition
+      (and
+        (animal_lactation_recorded ?lactating_cow)
+        (animal_pen_candidate ?lactating_cow ?pen)
+        (animal_lactation_record_link ?lactating_cow ?lactation_record)
+        (not
+          (animal_assigned_pen ?lactating_cow)
+        )
+      )
+    :effect
+      (and
+        (animal_assigned_pen ?lactating_cow)
+        (pen_available ?pen)
+        (lactation_record_available ?lactation_record)
+      )
+  )
+  (:action assign_pen_using_lactation_record_for_recent_calfing_cow
+    :parameters (?recent_calfing_cow - recent_calfing_cow ?pen - pen ?lactation_record - lactation_record)
+    :precondition
+      (and
+        (animal_lactation_recorded ?recent_calfing_cow)
+        (animal_pen_candidate ?recent_calfing_cow ?pen)
+        (animal_lactation_record_link ?recent_calfing_cow ?lactation_record)
+        (not
+          (animal_assigned_pen ?recent_calfing_cow)
+        )
+      )
+    :effect
+      (and
+        (animal_assigned_pen ?recent_calfing_cow)
+        (pen_available ?pen)
+        (lactation_record_available ?lactation_record)
+      )
+  )
+  (:action assign_pen_using_lactation_record_for_herd_animal
+    :parameters (?herd_animal - herd_animal ?pen - pen ?lactation_record - lactation_record)
+    :precondition
+      (and
+        (animal_lactation_recorded ?herd_animal)
+        (animal_pen_candidate ?herd_animal ?pen)
+        (animal_lactation_record_link ?herd_animal ?lactation_record)
+        (not
+          (animal_assigned_pen ?herd_animal)
+        )
+      )
+    :effect
+      (and
+        (animal_assigned_pen ?herd_animal)
+        (pen_available ?pen)
+        (lactation_record_available ?lactation_record)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem lactation_stage_pen_assignment_problem)
+  (:domain lactation_stage_pen_assignment)
+  (:objects lactating_cow_1 - lactating_cow recent_calfing_cow_1 - recent_calfing_cow herd_animal_1 - herd_animal herd_animal_2 - herd_animal pen_1 - pen pen_2 - pen pen_3 - pen milking_station_1 - milking_station staff_1 - staff_member feed_ration_1 - feed_ration stall_option_a_1 - stall_option_a stall_option_b_1 - stall_option_b pen_assignment_record_1 - pen_assignment_record bedding_batch_1 - bedding_batch bedding_batch_2 - bedding_batch supply_item_1 - supply_item supply_item_2 - supply_item treatment_protocol_1 - treatment_protocol treatment_protocol_2 - treatment_protocol lactation_record_1 - lactation_record milk_test_kit_1 - milk_test_kit service_token_1 - service_token service_token_2 - service_token health_service_slot_1 - health_service_slot)
+  (:init
+    (pen_available pen_1)
+    (pen_available pen_2)
+    (pen_available pen_3)
+    (milking_station_available milking_station_1)
+    (staff_available staff_1)
+    (feed_ration_available feed_ration_1)
+    (lactating_cow_compatible_with_stall_option lactating_cow_1 stall_option_a_1)
+    (recent_calfing_cow_compatible_with_stall_option recent_calfing_cow_1 stall_option_b_1)
+    (pen_assignment_record_available pen_assignment_record_1)
+    (bedding_batch_available bedding_batch_1)
+    (bedding_batch_available bedding_batch_2)
+    (animal_linked_to_lactating_cow herd_animal_1 lactating_cow_1)
+    (animal_linked_to_lactating_cow herd_animal_2 lactating_cow_1)
+    (animal_linked_to_recent_calfing_cow herd_animal_1 recent_calfing_cow_1)
+    (animal_linked_to_recent_calfing_cow herd_animal_2 recent_calfing_cow_1)
+    (animal_linked_to_pen_record herd_animal_1 pen_assignment_record_1)
+    (animal_linked_to_pen_record herd_animal_2 pen_assignment_record_1)
+    (animal_bedding_assigned herd_animal_1 bedding_batch_1)
+    (animal_bedding_assigned herd_animal_2 bedding_batch_2)
+    (supply_item_available supply_item_1)
+    (supply_item_available supply_item_2)
+    (treatment_protocol_available treatment_protocol_1)
+    (treatment_protocol_available treatment_protocol_2)
+    (lactation_record_available lactation_record_1)
+    (milk_test_kit_available milk_test_kit_1)
+    (service_token_available service_token_1)
+    (animal_service_token_link herd_animal_1 service_token_1)
+    (animal_service_token_link herd_animal_2 service_token_2)
+    (health_service_slot_available health_service_slot_1)
+  )
+  (:goal
+    (and
+      (animal_assigned_pen lactating_cow_1)
+      (animal_assigned_pen recent_calfing_cow_1)
+      (animal_assigned_pen herd_animal_1)
+      (animal_assigned_pen herd_animal_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_animal lactating_cow_1)
+(reserve_pen_candidate lactating_cow_1 pen_1)
+(assign_milking_station lactating_cow_1 milking_station_1)
+(mark_animal_ready lactating_cow_1 milking_station_1)
+(assign_staff_to_animal lactating_cow_1 staff_1)
+(prepare_stall_option_a lactating_cow_1 stall_option_a_1 milking_station_1)
+(staff_confirm_stall_option_a lactating_cow_1 stall_option_a_1 staff_1)
+(register_animal recent_calfing_cow_1)
+(reserve_pen_candidate recent_calfing_cow_1 pen_2)
+(release_milking_station lactating_cow_1 milking_station_1)
+(assign_milking_station recent_calfing_cow_1 milking_station_1)
+(mark_animal_ready recent_calfing_cow_1 milking_station_1)
+(release_staff_from_animal lactating_cow_1 staff_1)
+(assign_staff_to_animal recent_calfing_cow_1 staff_1)
+(prepare_stall_option_b recent_calfing_cow_1 stall_option_b_1 milking_station_1)
+(staff_confirm_stall_option_b recent_calfing_cow_1 stall_option_b_1 staff_1)
+(create_pen_assignment_record_variant_1 lactating_cow_1 recent_calfing_cow_1 stall_option_a_1 stall_option_b_1 pen_assignment_record_1)
+(release_milking_station recent_calfing_cow_1 milking_station_1)
+(assign_milking_station lactating_cow_1 milking_station_1)
+(verify_pen_assignment_for_milking pen_assignment_record_1 lactating_cow_1 milking_station_1)
+(finalize_lactating_cow_placement lactating_cow_1 pen_assignment_record_1)
+(finalize_recent_calfing_cow_placement recent_calfing_cow_1 pen_assignment_record_1)
+(record_lactation_stage lactating_cow_1 lactation_record_1 milking_station_1)
+(assign_pen_using_lactation_record_for_lactating_cow lactating_cow_1 pen_1 lactation_record_1)
+(release_milking_station lactating_cow_1 milking_station_1)
+(assign_milking_station recent_calfing_cow_1 milking_station_1)
+(record_lactation_stage recent_calfing_cow_1 lactation_record_1 milking_station_1)
+(assign_pen_using_lactation_record_for_recent_calfing_cow recent_calfing_cow_1 pen_2 lactation_record_1)
+(register_animal herd_animal_1)
+(reserve_pen_candidate herd_animal_1 pen_3)
+(release_milking_station recent_calfing_cow_1 milking_station_1)
+(assign_milking_station herd_animal_1 milking_station_1)
+(mark_animal_ready herd_animal_1 milking_station_1)
+(release_staff_from_animal recent_calfing_cow_1 staff_1)
+(assign_milk_test_kit herd_animal_1 milk_test_kit_1)
+(assign_staff_to_animal herd_animal_1 staff_1)
+(reserve_bedding_for_pen_record herd_animal_1 bedding_batch_1 pen_assignment_record_1)
+(confirm_bedding_and_lock_animal herd_animal_1 bedding_batch_1 pen_assignment_record_1 milking_station_1)
+(apply_provision_checks_stage_1 herd_animal_1 milk_test_kit_1 staff_1 bedding_batch_1 pen_assignment_record_1)
+(assign_health_service_slot herd_animal_1 health_service_slot_1)
+(apply_health_service_validation_1 herd_animal_1 health_service_slot_1 bedding_batch_1 pen_assignment_record_1)
+(apply_final_placement_marker herd_animal_1)
+(record_lactation_stage herd_animal_1 lactation_record_1 milking_station_1)
+(assign_pen_using_lactation_record_for_herd_animal herd_animal_1 pen_3 lactation_record_1)
+(release_milking_station herd_animal_1 milking_station_1)
+(register_animal herd_animal_2)
+(reserve_pen_candidate herd_animal_2 pen_1)
+(assign_milking_station herd_animal_2 milking_station_1)
+(mark_animal_ready herd_animal_2 milking_station_1)
+(release_milk_test_kit herd_animal_1 milk_test_kit_1)
+(assign_milk_test_kit herd_animal_2 milk_test_kit_1)
+(release_staff_from_animal herd_animal_1 staff_1)
+(assign_staff_to_animal herd_animal_2 staff_1)
+(reserve_bedding_for_pen_record herd_animal_2 bedding_batch_2 pen_assignment_record_1)
+(confirm_bedding_and_lock_animal herd_animal_2 bedding_batch_2 pen_assignment_record_1 milking_station_1)
+(apply_provision_checks_stage_1 herd_animal_2 milk_test_kit_1 staff_1 bedding_batch_2 pen_assignment_record_1)
+(release_health_service_slot herd_animal_1 health_service_slot_1)
+(assign_health_service_slot herd_animal_2 health_service_slot_1)
+(apply_health_service_validation_1 herd_animal_2 health_service_slot_1 bedding_batch_2 pen_assignment_record_1)
+(apply_final_placement_marker herd_animal_2)
+(record_lactation_stage herd_animal_2 lactation_record_1 milking_station_1)
+(assign_pen_using_lactation_record_for_herd_animal herd_animal_2 pen_1 lactation_record_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_jlnuf2uc/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_jlnuf2uc/plan.pddl 62 
+
+
+
+--- stderr ---
+

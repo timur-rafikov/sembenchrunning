@@ -1,0 +1,1064 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain campaign_shutdown_turnover_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types manufacturing_object - object resource_category - manufacturing_object procedure_category - manufacturing_object document_category - manufacturing_object root_category - manufacturing_object shutdown_scope - root_category assignable_resource - resource_category task_template - resource_category specialist_team - resource_category spare_component - resource_category inspection_evidence - resource_category release_certificate - resource_category cleaning_procedure_instance - resource_category compliance_audit_item - resource_category consumable_kit_resource - procedure_category checklist_document - procedure_category authorization_token - procedure_category line_hold_point - document_category support_hold_point - document_category turnover_record - document_category production_line_subtype - shutdown_scope turnover_zone_subtype - shutdown_scope production_line - production_line_subtype support_line - production_line_subtype turnover_zone - turnover_zone_subtype)
+
+  (:predicates
+    (shutdown_scope_registered ?campaign_entity - shutdown_scope)
+    (shutdown_scope_active ?campaign_entity - shutdown_scope)
+    (resource_allocation_committed ?campaign_entity - shutdown_scope)
+    (campaign_shutdown_complete ?campaign_entity - shutdown_scope)
+    (release_ready ?campaign_entity - shutdown_scope)
+    (release_certificate_issued ?campaign_entity - shutdown_scope)
+    (assignable_resource_available ?assignable_resource - assignable_resource)
+    (assignable_resource_allocated ?campaign_entity - shutdown_scope ?assignable_resource - assignable_resource)
+    (shutdown_task_template_available ?task_template - task_template)
+    (shutdown_task_template_reserved ?campaign_entity - shutdown_scope ?task_template - task_template)
+    (specialist_team_available ?specialist_team - specialist_team)
+    (specialist_team_assigned ?campaign_entity - shutdown_scope ?specialist_team - specialist_team)
+    (consumable_kit_available ?consumable_kit - consumable_kit_resource)
+    (primary_line_consumable_assigned ?production_line - production_line ?consumable_kit - consumable_kit_resource)
+    (support_line_consumable_assigned ?support_line - support_line ?consumable_kit - consumable_kit_resource)
+    (primary_line_hold_point_linked ?production_line - production_line ?line_hold_point - line_hold_point)
+    (primary_line_hold_open ?line_hold_point - line_hold_point)
+    (primary_line_hold_cleared ?line_hold_point - line_hold_point)
+    (primary_line_shutdown_ready ?production_line - production_line)
+    (support_line_hold_point_linked ?support_line - support_line ?support_hold_point - support_hold_point)
+    (support_line_hold_open ?support_hold_point - support_hold_point)
+    (support_line_hold_cleared ?support_hold_point - support_hold_point)
+    (support_line_shutdown_ready ?support_line - support_line)
+    (turnover_record_available ?turnover_record - turnover_record)
+    (turnover_record_compiled ?turnover_record - turnover_record)
+    (primary_hold_point_evidence_recorded ?turnover_record - turnover_record ?line_hold_point - line_hold_point)
+    (support_hold_point_evidence_recorded ?turnover_record - turnover_record ?support_hold_point - support_hold_point)
+    (primary_review_pending ?turnover_record - turnover_record)
+    (support_review_pending ?turnover_record - turnover_record)
+    (turnover_record_sealed ?turnover_record - turnover_record)
+    (zone_associated_with_primary_line ?turnover_zone - turnover_zone ?production_line - production_line)
+    (zone_associated_with_support_line ?turnover_zone - turnover_zone ?support_line - support_line)
+    (zone_associated_with_turnover_record ?turnover_zone - turnover_zone ?turnover_record - turnover_record)
+    (checklist_document_available ?checklist_document - checklist_document)
+    (zone_associated_with_checklist_document ?turnover_zone - turnover_zone ?checklist_document - checklist_document)
+    (checklist_document_bound ?checklist_document - checklist_document)
+    (checklist_document_logged ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    (zone_documentation_verified ?turnover_zone - turnover_zone)
+    (final_review_open ?turnover_zone - turnover_zone)
+    (final_review_complete ?turnover_zone - turnover_zone)
+    (spare_component_assigned ?turnover_zone - turnover_zone)
+    (spare_component_verified ?turnover_zone - turnover_zone)
+    (conditional_release_open ?turnover_zone - turnover_zone)
+    (conditional_release_resolved ?turnover_zone - turnover_zone)
+    (authorization_token_available ?authorization_token - authorization_token)
+    (zone_bound_to_authorization_token ?turnover_zone - turnover_zone ?authorization_token - authorization_token)
+    (zone_authorization_activated ?turnover_zone - turnover_zone)
+    (authorization_recorded ?turnover_zone - turnover_zone)
+    (zone_signoff_recorded ?turnover_zone - turnover_zone)
+    (spare_component_available ?spare_component - spare_component)
+    (zone_associated_with_spare_component ?turnover_zone - turnover_zone ?spare_component - spare_component)
+    (inspection_evidence_available ?inspection_evidence - inspection_evidence)
+    (inspection_evidence_attached ?turnover_zone - turnover_zone ?inspection_evidence - inspection_evidence)
+    (cleaning_procedure_available ?cleaning_procedure_instance - cleaning_procedure_instance)
+    (cleaning_procedure_attached ?turnover_zone - turnover_zone ?cleaning_procedure_instance - cleaning_procedure_instance)
+    (compliance_audit_item_available ?compliance_audit_item - compliance_audit_item)
+    (compliance_audit_item_attached ?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item)
+    (release_certificate_available ?release_certificate - release_certificate)
+    (release_certificate_associated_with_shutdown_scope ?campaign_entity - shutdown_scope ?release_certificate - release_certificate)
+    (primary_line_shutdown_started ?production_line - production_line)
+    (support_line_shutdown_started ?support_line - support_line)
+    (zone_release_finalized ?turnover_zone - turnover_zone)
+  )
+  (:action register_shutdown_scope
+    :parameters (?campaign_entity - shutdown_scope)
+    :precondition
+      (and
+        (not
+          (shutdown_scope_registered ?campaign_entity)
+        )
+        (not
+          (campaign_shutdown_complete ?campaign_entity)
+        )
+      )
+    :effect (shutdown_scope_registered ?campaign_entity)
+  )
+  (:action allocate_assignable_resource_to_campaign
+    :parameters (?campaign_entity - shutdown_scope ?assignable_resource - assignable_resource)
+    :precondition
+      (and
+        (shutdown_scope_registered ?campaign_entity)
+        (not
+          (resource_allocation_committed ?campaign_entity)
+        )
+        (assignable_resource_available ?assignable_resource)
+      )
+    :effect
+      (and
+        (resource_allocation_committed ?campaign_entity)
+        (assignable_resource_allocated ?campaign_entity ?assignable_resource)
+        (not
+          (assignable_resource_available ?assignable_resource)
+        )
+      )
+  )
+  (:action reserve_shutdown_task_template
+    :parameters (?campaign_entity - shutdown_scope ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_registered ?campaign_entity)
+        (resource_allocation_committed ?campaign_entity)
+        (shutdown_task_template_available ?task_template)
+      )
+    :effect
+      (and
+        (shutdown_task_template_reserved ?campaign_entity ?task_template)
+        (not
+          (shutdown_task_template_available ?task_template)
+        )
+      )
+  )
+  (:action activate_shutdown_scope
+    :parameters (?campaign_entity - shutdown_scope ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_registered ?campaign_entity)
+        (resource_allocation_committed ?campaign_entity)
+        (shutdown_task_template_reserved ?campaign_entity ?task_template)
+        (not
+          (shutdown_scope_active ?campaign_entity)
+        )
+      )
+    :effect (shutdown_scope_active ?campaign_entity)
+  )
+  (:action release_shutdown_task_template
+    :parameters (?campaign_entity - shutdown_scope ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_task_template_reserved ?campaign_entity ?task_template)
+      )
+    :effect
+      (and
+        (shutdown_task_template_available ?task_template)
+        (not
+          (shutdown_task_template_reserved ?campaign_entity ?task_template)
+        )
+      )
+  )
+  (:action assign_specialist_team_to_campaign
+    :parameters (?campaign_entity - shutdown_scope ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (shutdown_scope_active ?campaign_entity)
+        (specialist_team_available ?specialist_team)
+      )
+    :effect
+      (and
+        (specialist_team_assigned ?campaign_entity ?specialist_team)
+        (not
+          (specialist_team_available ?specialist_team)
+        )
+      )
+  )
+  (:action release_specialist_team_from_campaign
+    :parameters (?campaign_entity - shutdown_scope ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (specialist_team_assigned ?campaign_entity ?specialist_team)
+      )
+    :effect
+      (and
+        (specialist_team_available ?specialist_team)
+        (not
+          (specialist_team_assigned ?campaign_entity ?specialist_team)
+        )
+      )
+  )
+  (:action assign_cleaning_procedure_to_zone
+    :parameters (?turnover_zone - turnover_zone ?cleaning_procedure_instance - cleaning_procedure_instance)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (cleaning_procedure_available ?cleaning_procedure_instance)
+      )
+    :effect
+      (and
+        (cleaning_procedure_attached ?turnover_zone ?cleaning_procedure_instance)
+        (not
+          (cleaning_procedure_available ?cleaning_procedure_instance)
+        )
+      )
+  )
+  (:action release_cleaning_procedure_from_zone
+    :parameters (?turnover_zone - turnover_zone ?cleaning_procedure_instance - cleaning_procedure_instance)
+    :precondition
+      (and
+        (cleaning_procedure_attached ?turnover_zone ?cleaning_procedure_instance)
+      )
+    :effect
+      (and
+        (cleaning_procedure_available ?cleaning_procedure_instance)
+        (not
+          (cleaning_procedure_attached ?turnover_zone ?cleaning_procedure_instance)
+        )
+      )
+  )
+  (:action assign_compliance_audit_item_to_zone
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (compliance_audit_item_available ?compliance_audit_item)
+      )
+    :effect
+      (and
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (not
+          (compliance_audit_item_available ?compliance_audit_item)
+        )
+      )
+  )
+  (:action release_compliance_audit_item_from_zone
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item)
+    :precondition
+      (and
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+      )
+    :effect
+      (and
+        (compliance_audit_item_available ?compliance_audit_item)
+        (not
+          (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        )
+      )
+  )
+  (:action open_primary_line_hold_point
+    :parameters (?production_line - production_line ?line_hold_point - line_hold_point ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_active ?production_line)
+        (shutdown_task_template_reserved ?production_line ?task_template)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (not
+          (primary_line_hold_open ?line_hold_point)
+        )
+        (not
+          (primary_line_hold_cleared ?line_hold_point)
+        )
+      )
+    :effect (primary_line_hold_open ?line_hold_point)
+  )
+  (:action prepare_primary_line_shutdown
+    :parameters (?production_line - production_line ?line_hold_point - line_hold_point ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (shutdown_scope_active ?production_line)
+        (specialist_team_assigned ?production_line ?specialist_team)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (primary_line_hold_open ?line_hold_point)
+        (not
+          (primary_line_shutdown_started ?production_line)
+        )
+      )
+    :effect
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (primary_line_shutdown_ready ?production_line)
+      )
+  )
+  (:action stage_primary_line_consumable_kit
+    :parameters (?production_line - production_line ?line_hold_point - line_hold_point ?consumable_kit - consumable_kit_resource)
+    :precondition
+      (and
+        (shutdown_scope_active ?production_line)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (primary_line_shutdown_started ?production_line)
+        )
+      )
+    :effect
+      (and
+        (primary_line_hold_cleared ?line_hold_point)
+        (primary_line_shutdown_started ?production_line)
+        (primary_line_consumable_assigned ?production_line ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action complete_primary_line_shutdown
+    :parameters (?production_line - production_line ?line_hold_point - line_hold_point ?task_template - task_template ?consumable_kit - consumable_kit_resource)
+    :precondition
+      (and
+        (shutdown_scope_active ?production_line)
+        (shutdown_task_template_reserved ?production_line ?task_template)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (primary_line_hold_cleared ?line_hold_point)
+        (primary_line_consumable_assigned ?production_line ?consumable_kit)
+        (not
+          (primary_line_shutdown_ready ?production_line)
+        )
+      )
+    :effect
+      (and
+        (primary_line_hold_open ?line_hold_point)
+        (primary_line_shutdown_ready ?production_line)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (primary_line_consumable_assigned ?production_line ?consumable_kit)
+        )
+      )
+  )
+  (:action open_support_line_hold_point
+    :parameters (?support_line - support_line ?support_hold_point - support_hold_point ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_active ?support_line)
+        (shutdown_task_template_reserved ?support_line ?task_template)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (not
+          (support_line_hold_open ?support_hold_point)
+        )
+        (not
+          (support_line_hold_cleared ?support_hold_point)
+        )
+      )
+    :effect (support_line_hold_open ?support_hold_point)
+  )
+  (:action prepare_support_line_shutdown
+    :parameters (?support_line - support_line ?support_hold_point - support_hold_point ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (shutdown_scope_active ?support_line)
+        (specialist_team_assigned ?support_line ?specialist_team)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (support_line_hold_open ?support_hold_point)
+        (not
+          (support_line_shutdown_started ?support_line)
+        )
+      )
+    :effect
+      (and
+        (support_line_shutdown_started ?support_line)
+        (support_line_shutdown_ready ?support_line)
+      )
+  )
+  (:action stage_support_line_consumable_kit
+    :parameters (?support_line - support_line ?support_hold_point - support_hold_point ?consumable_kit - consumable_kit_resource)
+    :precondition
+      (and
+        (shutdown_scope_active ?support_line)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (support_line_shutdown_started ?support_line)
+        )
+      )
+    :effect
+      (and
+        (support_line_hold_cleared ?support_hold_point)
+        (support_line_shutdown_started ?support_line)
+        (support_line_consumable_assigned ?support_line ?consumable_kit)
+        (not
+          (consumable_kit_available ?consumable_kit)
+        )
+      )
+  )
+  (:action complete_support_line_shutdown
+    :parameters (?support_line - support_line ?support_hold_point - support_hold_point ?task_template - task_template ?consumable_kit - consumable_kit_resource)
+    :precondition
+      (and
+        (shutdown_scope_active ?support_line)
+        (shutdown_task_template_reserved ?support_line ?task_template)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (support_line_hold_cleared ?support_hold_point)
+        (support_line_consumable_assigned ?support_line ?consumable_kit)
+        (not
+          (support_line_shutdown_ready ?support_line)
+        )
+      )
+    :effect
+      (and
+        (support_line_hold_open ?support_hold_point)
+        (support_line_shutdown_ready ?support_line)
+        (consumable_kit_available ?consumable_kit)
+        (not
+          (support_line_consumable_assigned ?support_line ?consumable_kit)
+        )
+      )
+  )
+  (:action assemble_turnover_record
+    :parameters (?production_line - production_line ?support_line - support_line ?line_hold_point - line_hold_point ?support_hold_point - support_hold_point ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (support_line_shutdown_started ?support_line)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (primary_line_hold_open ?line_hold_point)
+        (support_line_hold_open ?support_hold_point)
+        (primary_line_shutdown_ready ?production_line)
+        (support_line_shutdown_ready ?support_line)
+        (turnover_record_available ?turnover_record)
+      )
+    :effect
+      (and
+        (turnover_record_compiled ?turnover_record)
+        (primary_hold_point_evidence_recorded ?turnover_record ?line_hold_point)
+        (support_hold_point_evidence_recorded ?turnover_record ?support_hold_point)
+        (not
+          (turnover_record_available ?turnover_record)
+        )
+      )
+  )
+  (:action record_primary_hold_point_status
+    :parameters (?production_line - production_line ?support_line - support_line ?line_hold_point - line_hold_point ?support_hold_point - support_hold_point ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (support_line_shutdown_started ?support_line)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (primary_line_hold_cleared ?line_hold_point)
+        (support_line_hold_open ?support_hold_point)
+        (not
+          (primary_line_shutdown_ready ?production_line)
+        )
+        (support_line_shutdown_ready ?support_line)
+        (turnover_record_available ?turnover_record)
+      )
+    :effect
+      (and
+        (turnover_record_compiled ?turnover_record)
+        (primary_hold_point_evidence_recorded ?turnover_record ?line_hold_point)
+        (support_hold_point_evidence_recorded ?turnover_record ?support_hold_point)
+        (primary_review_pending ?turnover_record)
+        (not
+          (turnover_record_available ?turnover_record)
+        )
+      )
+  )
+  (:action record_support_hold_point_status
+    :parameters (?production_line - production_line ?support_line - support_line ?line_hold_point - line_hold_point ?support_hold_point - support_hold_point ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (support_line_shutdown_started ?support_line)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (primary_line_hold_open ?line_hold_point)
+        (support_line_hold_cleared ?support_hold_point)
+        (primary_line_shutdown_ready ?production_line)
+        (not
+          (support_line_shutdown_ready ?support_line)
+        )
+        (turnover_record_available ?turnover_record)
+      )
+    :effect
+      (and
+        (turnover_record_compiled ?turnover_record)
+        (primary_hold_point_evidence_recorded ?turnover_record ?line_hold_point)
+        (support_hold_point_evidence_recorded ?turnover_record ?support_hold_point)
+        (support_review_pending ?turnover_record)
+        (not
+          (turnover_record_available ?turnover_record)
+        )
+      )
+  )
+  (:action consolidate_turnover_record
+    :parameters (?production_line - production_line ?support_line - support_line ?line_hold_point - line_hold_point ?support_hold_point - support_hold_point ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (support_line_shutdown_started ?support_line)
+        (primary_line_hold_point_linked ?production_line ?line_hold_point)
+        (support_line_hold_point_linked ?support_line ?support_hold_point)
+        (primary_line_hold_cleared ?line_hold_point)
+        (support_line_hold_cleared ?support_hold_point)
+        (not
+          (primary_line_shutdown_ready ?production_line)
+        )
+        (not
+          (support_line_shutdown_ready ?support_line)
+        )
+        (turnover_record_available ?turnover_record)
+      )
+    :effect
+      (and
+        (turnover_record_compiled ?turnover_record)
+        (primary_hold_point_evidence_recorded ?turnover_record ?line_hold_point)
+        (support_hold_point_evidence_recorded ?turnover_record ?support_hold_point)
+        (primary_review_pending ?turnover_record)
+        (support_review_pending ?turnover_record)
+        (not
+          (turnover_record_available ?turnover_record)
+        )
+      )
+  )
+  (:action seal_turnover_record
+    :parameters (?turnover_record - turnover_record ?production_line - production_line ?task_template - task_template)
+    :precondition
+      (and
+        (turnover_record_compiled ?turnover_record)
+        (primary_line_shutdown_started ?production_line)
+        (shutdown_task_template_reserved ?production_line ?task_template)
+        (not
+          (turnover_record_sealed ?turnover_record)
+        )
+      )
+    :effect (turnover_record_sealed ?turnover_record)
+  )
+  (:action bind_checklist_document_to_zone
+    :parameters (?turnover_zone - turnover_zone ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (zone_associated_with_turnover_record ?turnover_zone ?turnover_record)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_available ?checklist_document)
+        (turnover_record_compiled ?turnover_record)
+        (turnover_record_sealed ?turnover_record)
+        (not
+          (checklist_document_bound ?checklist_document)
+        )
+      )
+    :effect
+      (and
+        (checklist_document_bound ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (not
+          (checklist_document_available ?checklist_document)
+        )
+      )
+  )
+  (:action verify_checklist_document
+    :parameters (?turnover_zone - turnover_zone ?checklist_document - checklist_document ?turnover_record - turnover_record ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_bound ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (shutdown_task_template_reserved ?turnover_zone ?task_template)
+        (not
+          (primary_review_pending ?turnover_record)
+        )
+        (not
+          (zone_documentation_verified ?turnover_zone)
+        )
+      )
+    :effect (zone_documentation_verified ?turnover_zone)
+  )
+  (:action allocate_spare_component_to_zone
+    :parameters (?turnover_zone - turnover_zone ?spare_component - spare_component)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (spare_component_available ?spare_component)
+        (not
+          (spare_component_assigned ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (spare_component_assigned ?turnover_zone)
+        (zone_associated_with_spare_component ?turnover_zone ?spare_component)
+        (not
+          (spare_component_available ?spare_component)
+        )
+      )
+  )
+  (:action confirm_spare_component_deployment
+    :parameters (?turnover_zone - turnover_zone ?checklist_document - checklist_document ?turnover_record - turnover_record ?task_template - task_template ?spare_component - spare_component)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_bound ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (shutdown_task_template_reserved ?turnover_zone ?task_template)
+        (primary_review_pending ?turnover_record)
+        (spare_component_assigned ?turnover_zone)
+        (zone_associated_with_spare_component ?turnover_zone ?spare_component)
+        (not
+          (zone_documentation_verified ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_documentation_verified ?turnover_zone)
+        (spare_component_verified ?turnover_zone)
+      )
+  )
+  (:action open_zone_final_review
+    :parameters (?turnover_zone - turnover_zone ?cleaning_procedure_instance - cleaning_procedure_instance ?specialist_team - specialist_team ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (zone_documentation_verified ?turnover_zone)
+        (cleaning_procedure_attached ?turnover_zone ?cleaning_procedure_instance)
+        (specialist_team_assigned ?turnover_zone ?specialist_team)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (not
+          (support_review_pending ?turnover_record)
+        )
+        (not
+          (final_review_open ?turnover_zone)
+        )
+      )
+    :effect (final_review_open ?turnover_zone)
+  )
+  (:action open_zone_final_review_with_support_pending
+    :parameters (?turnover_zone - turnover_zone ?cleaning_procedure_instance - cleaning_procedure_instance ?specialist_team - specialist_team ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (zone_documentation_verified ?turnover_zone)
+        (cleaning_procedure_attached ?turnover_zone ?cleaning_procedure_instance)
+        (specialist_team_assigned ?turnover_zone ?specialist_team)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (support_review_pending ?turnover_record)
+        (not
+          (final_review_open ?turnover_zone)
+        )
+      )
+    :effect (final_review_open ?turnover_zone)
+  )
+  (:action approve_zone_final_review
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (final_review_open ?turnover_zone)
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (not
+          (primary_review_pending ?turnover_record)
+        )
+        (not
+          (support_review_pending ?turnover_record)
+        )
+        (not
+          (final_review_complete ?turnover_zone)
+        )
+      )
+    :effect (final_review_complete ?turnover_zone)
+  )
+  (:action approve_zone_final_review_with_primary_pending
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (final_review_open ?turnover_zone)
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (primary_review_pending ?turnover_record)
+        (not
+          (support_review_pending ?turnover_record)
+        )
+        (not
+          (final_review_complete ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_open ?turnover_zone)
+      )
+  )
+  (:action approve_zone_final_review_with_support_pending
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (final_review_open ?turnover_zone)
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (not
+          (primary_review_pending ?turnover_record)
+        )
+        (support_review_pending ?turnover_record)
+        (not
+          (final_review_complete ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_open ?turnover_zone)
+      )
+  )
+  (:action approve_zone_final_review_with_full_pending
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item ?checklist_document - checklist_document ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (final_review_open ?turnover_zone)
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (zone_associated_with_checklist_document ?turnover_zone ?checklist_document)
+        (checklist_document_logged ?checklist_document ?turnover_record)
+        (primary_review_pending ?turnover_record)
+        (support_review_pending ?turnover_record)
+        (not
+          (final_review_complete ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_open ?turnover_zone)
+      )
+  )
+  (:action finalize_zone_release
+    :parameters (?turnover_zone - turnover_zone)
+    :precondition
+      (and
+        (final_review_complete ?turnover_zone)
+        (not
+          (conditional_release_open ?turnover_zone)
+        )
+        (not
+          (zone_release_finalized ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_release_finalized ?turnover_zone)
+        (release_ready ?turnover_zone)
+      )
+  )
+  (:action attach_inspection_evidence_to_zone
+    :parameters (?turnover_zone - turnover_zone ?inspection_evidence - inspection_evidence)
+    :precondition
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_open ?turnover_zone)
+        (inspection_evidence_available ?inspection_evidence)
+      )
+    :effect
+      (and
+        (inspection_evidence_attached ?turnover_zone ?inspection_evidence)
+        (not
+          (inspection_evidence_available ?inspection_evidence)
+        )
+      )
+  )
+  (:action validate_zone_release_package
+    :parameters (?turnover_zone - turnover_zone ?production_line - production_line ?support_line - support_line ?task_template - task_template ?inspection_evidence - inspection_evidence)
+    :precondition
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_open ?turnover_zone)
+        (inspection_evidence_attached ?turnover_zone ?inspection_evidence)
+        (zone_associated_with_primary_line ?turnover_zone ?production_line)
+        (zone_associated_with_support_line ?turnover_zone ?support_line)
+        (primary_line_shutdown_ready ?production_line)
+        (support_line_shutdown_ready ?support_line)
+        (shutdown_task_template_reserved ?turnover_zone ?task_template)
+        (not
+          (conditional_release_resolved ?turnover_zone)
+        )
+      )
+    :effect (conditional_release_resolved ?turnover_zone)
+  )
+  (:action finalize_conditional_zone_release
+    :parameters (?turnover_zone - turnover_zone)
+    :precondition
+      (and
+        (final_review_complete ?turnover_zone)
+        (conditional_release_resolved ?turnover_zone)
+        (not
+          (zone_release_finalized ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_release_finalized ?turnover_zone)
+        (release_ready ?turnover_zone)
+      )
+  )
+  (:action activate_authorization_token
+    :parameters (?turnover_zone - turnover_zone ?authorization_token - authorization_token ?task_template - task_template)
+    :precondition
+      (and
+        (shutdown_scope_active ?turnover_zone)
+        (shutdown_task_template_reserved ?turnover_zone ?task_template)
+        (authorization_token_available ?authorization_token)
+        (zone_bound_to_authorization_token ?turnover_zone ?authorization_token)
+        (not
+          (zone_authorization_activated ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_authorization_activated ?turnover_zone)
+        (not
+          (authorization_token_available ?authorization_token)
+        )
+      )
+  )
+  (:action record_zone_authorization
+    :parameters (?turnover_zone - turnover_zone ?specialist_team - specialist_team)
+    :precondition
+      (and
+        (zone_authorization_activated ?turnover_zone)
+        (specialist_team_assigned ?turnover_zone ?specialist_team)
+        (not
+          (authorization_recorded ?turnover_zone)
+        )
+      )
+    :effect (authorization_recorded ?turnover_zone)
+  )
+  (:action record_zone_signoff
+    :parameters (?turnover_zone - turnover_zone ?compliance_audit_item - compliance_audit_item)
+    :precondition
+      (and
+        (authorization_recorded ?turnover_zone)
+        (compliance_audit_item_attached ?turnover_zone ?compliance_audit_item)
+        (not
+          (zone_signoff_recorded ?turnover_zone)
+        )
+      )
+    :effect (zone_signoff_recorded ?turnover_zone)
+  )
+  (:action close_zone_release
+    :parameters (?turnover_zone - turnover_zone)
+    :precondition
+      (and
+        (zone_signoff_recorded ?turnover_zone)
+        (not
+          (zone_release_finalized ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (zone_release_finalized ?turnover_zone)
+        (release_ready ?turnover_zone)
+      )
+  )
+  (:action mark_primary_line_release_ready
+    :parameters (?production_line - production_line ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (primary_line_shutdown_started ?production_line)
+        (primary_line_shutdown_ready ?production_line)
+        (turnover_record_compiled ?turnover_record)
+        (turnover_record_sealed ?turnover_record)
+        (not
+          (release_ready ?production_line)
+        )
+      )
+    :effect (release_ready ?production_line)
+  )
+  (:action mark_support_line_release_ready
+    :parameters (?support_line - support_line ?turnover_record - turnover_record)
+    :precondition
+      (and
+        (support_line_shutdown_started ?support_line)
+        (support_line_shutdown_ready ?support_line)
+        (turnover_record_compiled ?turnover_record)
+        (turnover_record_sealed ?turnover_record)
+        (not
+          (release_ready ?support_line)
+        )
+      )
+    :effect (release_ready ?support_line)
+  )
+  (:action issue_release_certificate
+    :parameters (?campaign_entity - shutdown_scope ?release_certificate - release_certificate ?task_template - task_template)
+    :precondition
+      (and
+        (release_ready ?campaign_entity)
+        (shutdown_task_template_reserved ?campaign_entity ?task_template)
+        (release_certificate_available ?release_certificate)
+        (not
+          (release_certificate_issued ?campaign_entity)
+        )
+      )
+    :effect
+      (and
+        (release_certificate_issued ?campaign_entity)
+        (release_certificate_associated_with_shutdown_scope ?campaign_entity ?release_certificate)
+        (not
+          (release_certificate_available ?release_certificate)
+        )
+      )
+  )
+  (:action return_primary_line_resource_to_pool
+    :parameters (?production_line - production_line ?assignable_resource - assignable_resource ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (release_certificate_issued ?production_line)
+        (assignable_resource_allocated ?production_line ?assignable_resource)
+        (release_certificate_associated_with_shutdown_scope ?production_line ?release_certificate)
+        (not
+          (campaign_shutdown_complete ?production_line)
+        )
+      )
+    :effect
+      (and
+        (campaign_shutdown_complete ?production_line)
+        (assignable_resource_available ?assignable_resource)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+  (:action return_support_line_resource_to_pool
+    :parameters (?support_line - support_line ?assignable_resource - assignable_resource ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (release_certificate_issued ?support_line)
+        (assignable_resource_allocated ?support_line ?assignable_resource)
+        (release_certificate_associated_with_shutdown_scope ?support_line ?release_certificate)
+        (not
+          (campaign_shutdown_complete ?support_line)
+        )
+      )
+    :effect
+      (and
+        (campaign_shutdown_complete ?support_line)
+        (assignable_resource_available ?assignable_resource)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+  (:action return_turnover_zone_resource_to_pool
+    :parameters (?turnover_zone - turnover_zone ?assignable_resource - assignable_resource ?release_certificate - release_certificate)
+    :precondition
+      (and
+        (release_certificate_issued ?turnover_zone)
+        (assignable_resource_allocated ?turnover_zone ?assignable_resource)
+        (release_certificate_associated_with_shutdown_scope ?turnover_zone ?release_certificate)
+        (not
+          (campaign_shutdown_complete ?turnover_zone)
+        )
+      )
+    :effect
+      (and
+        (campaign_shutdown_complete ?turnover_zone)
+        (assignable_resource_available ?assignable_resource)
+        (release_certificate_available ?release_certificate)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem end_of_campaign_shutdown_turnover_plan)
+  (:domain campaign_shutdown_turnover_domain)
+  (:objects primary_production_line - production_line support_production_line - support_line turnover_zone_alpha - turnover_zone turnover_zone_beta - turnover_zone turnover_resource_alpha - assignable_resource turnover_resource_beta - assignable_resource turnover_resource_gamma - assignable_resource shutdown_task_template - task_template engineering_support_team - specialist_team cleaning_kit - consumable_kit_resource primary_line_hold_point - line_hold_point support_line_hold_point - support_hold_point turnover_record_alpha - turnover_record turnover_checklist_alpha - checklist_document turnover_checklist_beta - checklist_document spare_component_alpha - spare_component spare_component_beta - spare_component inspection_evidence_alpha - inspection_evidence inspection_evidence_beta - inspection_evidence release_certificate_alpha - release_certificate cleaning_procedure_run - cleaning_procedure_instance authorization_token_alpha - authorization_token authorization_token_beta - authorization_token compliance_audit_item_alpha - compliance_audit_item)
+  (:init
+    (assignable_resource_available turnover_resource_alpha)
+    (assignable_resource_available turnover_resource_beta)
+    (assignable_resource_available turnover_resource_gamma)
+    (shutdown_task_template_available shutdown_task_template)
+    (specialist_team_available engineering_support_team)
+    (consumable_kit_available cleaning_kit)
+    (primary_line_hold_point_linked primary_production_line primary_line_hold_point)
+    (support_line_hold_point_linked support_production_line support_line_hold_point)
+    (turnover_record_available turnover_record_alpha)
+    (checklist_document_available turnover_checklist_alpha)
+    (checklist_document_available turnover_checklist_beta)
+    (zone_associated_with_primary_line turnover_zone_alpha primary_production_line)
+    (zone_associated_with_primary_line turnover_zone_beta primary_production_line)
+    (zone_associated_with_support_line turnover_zone_alpha support_production_line)
+    (zone_associated_with_support_line turnover_zone_beta support_production_line)
+    (zone_associated_with_turnover_record turnover_zone_alpha turnover_record_alpha)
+    (zone_associated_with_turnover_record turnover_zone_beta turnover_record_alpha)
+    (zone_associated_with_checklist_document turnover_zone_alpha turnover_checklist_alpha)
+    (zone_associated_with_checklist_document turnover_zone_beta turnover_checklist_beta)
+    (spare_component_available spare_component_alpha)
+    (spare_component_available spare_component_beta)
+    (inspection_evidence_available inspection_evidence_alpha)
+    (inspection_evidence_available inspection_evidence_beta)
+    (release_certificate_available release_certificate_alpha)
+    (cleaning_procedure_available cleaning_procedure_run)
+    (authorization_token_available authorization_token_alpha)
+    (zone_bound_to_authorization_token turnover_zone_alpha authorization_token_alpha)
+    (zone_bound_to_authorization_token turnover_zone_beta authorization_token_beta)
+    (compliance_audit_item_available compliance_audit_item_alpha)
+  )
+  (:goal
+    (and
+      (campaign_shutdown_complete primary_production_line)
+      (campaign_shutdown_complete support_production_line)
+      (campaign_shutdown_complete turnover_zone_alpha)
+      (campaign_shutdown_complete turnover_zone_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_shutdown_scope primary_production_line)
+(register_shutdown_scope support_production_line)
+(register_shutdown_scope turnover_zone_alpha)
+(register_shutdown_scope turnover_zone_beta)
+(allocate_assignable_resource_to_campaign primary_production_line turnover_resource_alpha)
+(reserve_shutdown_task_template primary_production_line shutdown_task_template)
+(activate_shutdown_scope primary_production_line shutdown_task_template)
+(stage_primary_line_consumable_kit primary_production_line primary_line_hold_point cleaning_kit)
+(complete_primary_line_shutdown primary_production_line primary_line_hold_point shutdown_task_template cleaning_kit)
+(release_shutdown_task_template primary_production_line shutdown_task_template)
+(allocate_assignable_resource_to_campaign support_production_line turnover_resource_beta)
+(reserve_shutdown_task_template support_production_line shutdown_task_template)
+(activate_shutdown_scope support_production_line shutdown_task_template)
+(stage_support_line_consumable_kit support_production_line support_line_hold_point cleaning_kit)
+(complete_support_line_shutdown support_production_line support_line_hold_point shutdown_task_template cleaning_kit)
+(assemble_turnover_record primary_production_line support_production_line primary_line_hold_point support_line_hold_point turnover_record_alpha)
+(release_shutdown_task_template support_production_line shutdown_task_template)
+(reserve_shutdown_task_template primary_production_line shutdown_task_template)
+(seal_turnover_record turnover_record_alpha primary_production_line shutdown_task_template)
+(mark_primary_line_release_ready primary_production_line turnover_record_alpha)
+(mark_support_line_release_ready support_production_line turnover_record_alpha)
+(issue_release_certificate primary_production_line release_certificate_alpha shutdown_task_template)
+(return_primary_line_resource_to_pool primary_production_line turnover_resource_alpha release_certificate_alpha)
+(release_shutdown_task_template primary_production_line shutdown_task_template)
+(reserve_shutdown_task_template support_production_line shutdown_task_template)
+(issue_release_certificate support_production_line release_certificate_alpha shutdown_task_template)
+(return_support_line_resource_to_pool support_production_line turnover_resource_beta release_certificate_alpha)
+(release_shutdown_task_template support_production_line shutdown_task_template)
+(allocate_assignable_resource_to_campaign turnover_zone_alpha turnover_resource_gamma)
+(reserve_shutdown_task_template turnover_zone_alpha shutdown_task_template)
+(activate_shutdown_scope turnover_zone_alpha shutdown_task_template)
+(assign_specialist_team_to_campaign turnover_zone_alpha engineering_support_team)
+(assign_cleaning_procedure_to_zone turnover_zone_alpha cleaning_procedure_run)
+(assign_compliance_audit_item_to_zone turnover_zone_alpha compliance_audit_item_alpha)
+(bind_checklist_document_to_zone turnover_zone_alpha turnover_checklist_alpha turnover_record_alpha)
+(verify_checklist_document turnover_zone_alpha turnover_checklist_alpha turnover_record_alpha shutdown_task_template)
+(open_zone_final_review turnover_zone_alpha cleaning_procedure_run engineering_support_team turnover_checklist_alpha turnover_record_alpha)
+(approve_zone_final_review turnover_zone_alpha compliance_audit_item_alpha turnover_checklist_alpha turnover_record_alpha)
+(finalize_zone_release turnover_zone_alpha)
+(issue_release_certificate turnover_zone_alpha release_certificate_alpha shutdown_task_template)
+(return_turnover_zone_resource_to_pool turnover_zone_alpha turnover_resource_gamma release_certificate_alpha)
+(release_specialist_team_from_campaign turnover_zone_alpha engineering_support_team)
+(release_cleaning_procedure_from_zone turnover_zone_alpha cleaning_procedure_run)
+(release_compliance_audit_item_from_zone turnover_zone_alpha compliance_audit_item_alpha)
+(release_shutdown_task_template turnover_zone_alpha shutdown_task_template)
+(allocate_assignable_resource_to_campaign turnover_zone_beta turnover_resource_alpha)
+(reserve_shutdown_task_template turnover_zone_beta shutdown_task_template)
+(activate_shutdown_scope turnover_zone_beta shutdown_task_template)
+(assign_specialist_team_to_campaign turnover_zone_beta engineering_support_team)
+(assign_cleaning_procedure_to_zone turnover_zone_beta cleaning_procedure_run)
+(assign_compliance_audit_item_to_zone turnover_zone_beta compliance_audit_item_alpha)
+(bind_checklist_document_to_zone turnover_zone_beta turnover_checklist_beta turnover_record_alpha)
+(verify_checklist_document turnover_zone_beta turnover_checklist_beta turnover_record_alpha shutdown_task_template)
+(open_zone_final_review turnover_zone_beta cleaning_procedure_run engineering_support_team turnover_checklist_beta turnover_record_alpha)
+(approve_zone_final_review turnover_zone_beta compliance_audit_item_alpha turnover_checklist_beta turnover_record_alpha)
+(finalize_zone_release turnover_zone_beta)
+(issue_release_certificate turnover_zone_beta release_certificate_alpha shutdown_task_template)
+(return_turnover_zone_resource_to_pool turnover_zone_beta turnover_resource_alpha release_certificate_alpha)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_v080afj9/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 58 
+
+Successful plans:
+Value: 58
+ /tmp/val_v080afj9/plan.pddl 58 
+
+
+
+--- stderr ---
+

@@ -1,0 +1,936 @@
+(define (domain liquidity_bucket_repositioning_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_meta_1 - object domain_meta_2 - object domain_meta_3 - object entity_supertype - object portfolio_entity - entity_supertype trade_idea_provider - domain_meta_1 market_signal - domain_meta_1 execution_desk - domain_meta_1 constraint_template - domain_meta_1 allocation_rule - domain_meta_1 post_trade_assignment_token - domain_meta_1 compliance_document - domain_meta_1 approval_ticket - domain_meta_1 security_candidate - domain_meta_2 settlement_account - domain_meta_2 counterparty_preference - domain_meta_2 liquidity_profile - domain_meta_3 execution_profile - domain_meta_3 order_instruction - domain_meta_3 bucket_supertype - portfolio_entity job_supertype - portfolio_entity source_liquidity_bucket - bucket_supertype target_liquidity_bucket - bucket_supertype transition_job - job_supertype)
+  (:predicates
+    (reposition_request_initiated ?portfolio_entity - portfolio_entity)
+    (entity_mandate_validated ?portfolio_entity - portfolio_entity)
+    (trade_idea_attached ?portfolio_entity - portfolio_entity)
+    (entity_reposition_finalized ?portfolio_entity - portfolio_entity)
+    (entity_ready_for_post_trade_assignment ?portfolio_entity - portfolio_entity)
+    (entity_post_trade_assignment_completed ?portfolio_entity - portfolio_entity)
+    (trade_idea_provider_available ?trade_idea_provider - trade_idea_provider)
+    (entity_bound_to_trade_provider ?portfolio_entity - portfolio_entity ?trade_idea_provider - trade_idea_provider)
+    (market_signal_available ?market_signal - market_signal)
+    (entity_bound_to_market_signal ?portfolio_entity - portfolio_entity ?market_signal - market_signal)
+    (execution_desk_available ?execution_desk - execution_desk)
+    (entity_assigned_execution_desk ?portfolio_entity - portfolio_entity ?execution_desk - execution_desk)
+    (security_candidate_available ?security_candidate - security_candidate)
+    (source_liquidity_bucket_candidate_assigned ?source_liquidity_bucket - source_liquidity_bucket ?security_candidate - security_candidate)
+    (target_liquidity_bucket_candidate_assigned ?target_liquidity_bucket - target_liquidity_bucket ?security_candidate - security_candidate)
+    (bucket_liquidity_profile_assigned ?source_liquidity_bucket - source_liquidity_bucket ?liquidity_profile - liquidity_profile)
+    (liquidity_profile_primary_flag ?liquidity_profile - liquidity_profile)
+    (liquidity_profile_secondary_flag ?liquidity_profile - liquidity_profile)
+    (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket - source_liquidity_bucket)
+    (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket - target_liquidity_bucket ?execution_profile - execution_profile)
+    (execution_profile_primary_flag ?execution_profile - execution_profile)
+    (execution_profile_secondary_flag ?execution_profile - execution_profile)
+    (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket - target_liquidity_bucket)
+    (order_instruction_draft ?order_instruction - order_instruction)
+    (order_instruction_constructed ?order_instruction - order_instruction)
+    (order_linked_to_liquidity_profile ?order_instruction - order_instruction ?liquidity_profile - liquidity_profile)
+    (order_linked_to_execution_profile ?order_instruction - order_instruction ?execution_profile - execution_profile)
+    (order_requires_constraint_template_flow ?order_instruction - order_instruction)
+    (order_requires_document_flow ?order_instruction - order_instruction)
+    (order_ready_for_allocation ?order_instruction - order_instruction)
+    (job_has_source_liquidity_bucket ?transition_job - transition_job ?source_liquidity_bucket - source_liquidity_bucket)
+    (job_has_target_liquidity_bucket ?transition_job - transition_job ?target_liquidity_bucket - target_liquidity_bucket)
+    (job_has_order_instruction ?transition_job - transition_job ?order_instruction - order_instruction)
+    (settlement_account_available ?settlement_account - settlement_account)
+    (job_has_settlement_account ?transition_job - transition_job ?settlement_account - settlement_account)
+    (settlement_account_allocated ?settlement_account - settlement_account)
+    (settlement_account_allocated_to_order ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    (job_allocation_initialized ?transition_job - transition_job)
+    (job_allocation_documents_submitted ?transition_job - transition_job)
+    (job_approval_received ?transition_job - transition_job)
+    (job_constraint_template_active ?transition_job - transition_job)
+    (job_constraint_template_applied ?transition_job - transition_job)
+    (job_ready_for_execution ?transition_job - transition_job)
+    (job_allocation_checks_passed ?transition_job - transition_job)
+    (counterparty_preference_available ?counterparty_preference - counterparty_preference)
+    (job_has_counterparty_preference ?transition_job - transition_job ?counterparty_preference - counterparty_preference)
+    (job_counterparty_preference_assigned ?transition_job - transition_job)
+    (job_desk_confirmation_after_counterparty ?transition_job - transition_job)
+    (job_approval_confirmed ?transition_job - transition_job)
+    (constraint_template_available ?constraint_template - constraint_template)
+    (job_constraint_template_assigned ?transition_job - transition_job ?constraint_template - constraint_template)
+    (allocation_rule_available ?allocation_rule - allocation_rule)
+    (job_has_allocation_rule ?transition_job - transition_job ?allocation_rule - allocation_rule)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (job_has_compliance_document ?transition_job - transition_job ?compliance_document - compliance_document)
+    (approval_ticket_available ?approval_ticket - approval_ticket)
+    (job_has_approval_ticket ?transition_job - transition_job ?approval_ticket - approval_ticket)
+    (post_trade_assignment_token_available ?post_trade_assignment_token - post_trade_assignment_token)
+    (entity_assigned_post_trade_token ?portfolio_entity - portfolio_entity ?post_trade_assignment_token - post_trade_assignment_token)
+    (source_liquidity_bucket_actionable ?source_liquidity_bucket - source_liquidity_bucket)
+    (target_liquidity_bucket_actionable ?target_liquidity_bucket - target_liquidity_bucket)
+    (job_finalized ?transition_job - transition_job)
+  )
+  (:action initiate_reposition_request
+    :parameters (?portfolio_entity - portfolio_entity)
+    :precondition
+      (and
+        (not
+          (reposition_request_initiated ?portfolio_entity)
+        )
+        (not
+          (entity_reposition_finalized ?portfolio_entity)
+        )
+      )
+    :effect (reposition_request_initiated ?portfolio_entity)
+  )
+  (:action bind_trade_idea_to_request
+    :parameters (?portfolio_entity - portfolio_entity ?trade_idea_provider - trade_idea_provider)
+    :precondition
+      (and
+        (reposition_request_initiated ?portfolio_entity)
+        (not
+          (trade_idea_attached ?portfolio_entity)
+        )
+        (trade_idea_provider_available ?trade_idea_provider)
+      )
+    :effect
+      (and
+        (trade_idea_attached ?portfolio_entity)
+        (entity_bound_to_trade_provider ?portfolio_entity ?trade_idea_provider)
+        (not
+          (trade_idea_provider_available ?trade_idea_provider)
+        )
+      )
+  )
+  (:action attach_market_signal_to_request
+    :parameters (?portfolio_entity - portfolio_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (reposition_request_initiated ?portfolio_entity)
+        (trade_idea_attached ?portfolio_entity)
+        (market_signal_available ?market_signal)
+      )
+    :effect
+      (and
+        (entity_bound_to_market_signal ?portfolio_entity ?market_signal)
+        (not
+          (market_signal_available ?market_signal)
+        )
+      )
+  )
+  (:action validate_mandate
+    :parameters (?portfolio_entity - portfolio_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (reposition_request_initiated ?portfolio_entity)
+        (trade_idea_attached ?portfolio_entity)
+        (entity_bound_to_market_signal ?portfolio_entity ?market_signal)
+        (not
+          (entity_mandate_validated ?portfolio_entity)
+        )
+      )
+    :effect (entity_mandate_validated ?portfolio_entity)
+  )
+  (:action release_market_signal
+    :parameters (?portfolio_entity - portfolio_entity ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_bound_to_market_signal ?portfolio_entity ?market_signal)
+      )
+    :effect
+      (and
+        (market_signal_available ?market_signal)
+        (not
+          (entity_bound_to_market_signal ?portfolio_entity ?market_signal)
+        )
+      )
+  )
+  (:action assign_execution_desk_to_request
+    :parameters (?portfolio_entity - portfolio_entity ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_mandate_validated ?portfolio_entity)
+        (execution_desk_available ?execution_desk)
+      )
+    :effect
+      (and
+        (entity_assigned_execution_desk ?portfolio_entity ?execution_desk)
+        (not
+          (execution_desk_available ?execution_desk)
+        )
+      )
+  )
+  (:action unassign_execution_desk
+    :parameters (?portfolio_entity - portfolio_entity ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_assigned_execution_desk ?portfolio_entity ?execution_desk)
+      )
+    :effect
+      (and
+        (execution_desk_available ?execution_desk)
+        (not
+          (entity_assigned_execution_desk ?portfolio_entity ?execution_desk)
+        )
+      )
+  )
+  (:action attach_compliance_document
+    :parameters (?transition_job - transition_job ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (compliance_document_available ?compliance_document)
+      )
+    :effect
+      (and
+        (job_has_compliance_document ?transition_job ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action detach_compliance_document
+    :parameters (?transition_job - transition_job ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (job_has_compliance_document ?transition_job ?compliance_document)
+      )
+    :effect
+      (and
+        (compliance_document_available ?compliance_document)
+        (not
+          (job_has_compliance_document ?transition_job ?compliance_document)
+        )
+      )
+  )
+  (:action attach_approval_ticket
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (approval_ticket_available ?approval_ticket)
+      )
+    :effect
+      (and
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (not
+          (approval_ticket_available ?approval_ticket)
+        )
+      )
+  )
+  (:action detach_approval_ticket
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket)
+    :precondition
+      (and
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+      )
+    :effect
+      (and
+        (approval_ticket_available ?approval_ticket)
+        (not
+          (job_has_approval_ticket ?transition_job ?approval_ticket)
+        )
+      )
+  )
+  (:action flag_liquidity_profile
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?liquidity_profile - liquidity_profile ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_mandate_validated ?source_liquidity_bucket)
+        (entity_bound_to_market_signal ?source_liquidity_bucket ?market_signal)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (not
+          (liquidity_profile_primary_flag ?liquidity_profile)
+        )
+        (not
+          (liquidity_profile_secondary_flag ?liquidity_profile)
+        )
+      )
+    :effect (liquidity_profile_primary_flag ?liquidity_profile)
+  )
+  (:action confirm_source_liquidity_bucket_for_order
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?liquidity_profile - liquidity_profile ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_mandate_validated ?source_liquidity_bucket)
+        (entity_assigned_execution_desk ?source_liquidity_bucket ?execution_desk)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (liquidity_profile_primary_flag ?liquidity_profile)
+        (not
+          (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+      )
+  )
+  (:action select_candidate_security_for_source_liquidity_bucket
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?liquidity_profile - liquidity_profile ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (entity_mandate_validated ?source_liquidity_bucket)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (security_candidate_available ?security_candidate)
+        (not
+          (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (liquidity_profile_secondary_flag ?liquidity_profile)
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (source_liquidity_bucket_candidate_assigned ?source_liquidity_bucket ?security_candidate)
+        (not
+          (security_candidate_available ?security_candidate)
+        )
+      )
+  )
+  (:action evaluate_candidate_for_source_liquidity_bucket
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?liquidity_profile - liquidity_profile ?market_signal - market_signal ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (entity_mandate_validated ?source_liquidity_bucket)
+        (entity_bound_to_market_signal ?source_liquidity_bucket ?market_signal)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (liquidity_profile_secondary_flag ?liquidity_profile)
+        (source_liquidity_bucket_candidate_assigned ?source_liquidity_bucket ?security_candidate)
+        (not
+          (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (liquidity_profile_primary_flag ?liquidity_profile)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        (security_candidate_available ?security_candidate)
+        (not
+          (source_liquidity_bucket_candidate_assigned ?source_liquidity_bucket ?security_candidate)
+        )
+      )
+  )
+  (:action flag_execution_profile
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?execution_profile - execution_profile ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_mandate_validated ?target_liquidity_bucket)
+        (entity_bound_to_market_signal ?target_liquidity_bucket ?market_signal)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (not
+          (execution_profile_primary_flag ?execution_profile)
+        )
+        (not
+          (execution_profile_secondary_flag ?execution_profile)
+        )
+      )
+    :effect (execution_profile_primary_flag ?execution_profile)
+  )
+  (:action confirm_target_liquidity_bucket_for_order
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?execution_profile - execution_profile ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (entity_mandate_validated ?target_liquidity_bucket)
+        (entity_assigned_execution_desk ?target_liquidity_bucket ?execution_desk)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (execution_profile_primary_flag ?execution_profile)
+        (not
+          (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+      )
+  )
+  (:action select_candidate_security_for_target_liquidity_bucket
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?execution_profile - execution_profile ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (entity_mandate_validated ?target_liquidity_bucket)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (security_candidate_available ?security_candidate)
+        (not
+          (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (execution_profile_secondary_flag ?execution_profile)
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (target_liquidity_bucket_candidate_assigned ?target_liquidity_bucket ?security_candidate)
+        (not
+          (security_candidate_available ?security_candidate)
+        )
+      )
+  )
+  (:action evaluate_candidate_for_target_liquidity_bucket
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?execution_profile - execution_profile ?market_signal - market_signal ?security_candidate - security_candidate)
+    :precondition
+      (and
+        (entity_mandate_validated ?target_liquidity_bucket)
+        (entity_bound_to_market_signal ?target_liquidity_bucket ?market_signal)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (execution_profile_secondary_flag ?execution_profile)
+        (target_liquidity_bucket_candidate_assigned ?target_liquidity_bucket ?security_candidate)
+        (not
+          (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (execution_profile_primary_flag ?execution_profile)
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        (security_candidate_available ?security_candidate)
+        (not
+          (target_liquidity_bucket_candidate_assigned ?target_liquidity_bucket ?security_candidate)
+        )
+      )
+  )
+  (:action construct_order_instruction
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?target_liquidity_bucket - target_liquidity_bucket ?liquidity_profile - liquidity_profile ?execution_profile - execution_profile ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (liquidity_profile_primary_flag ?liquidity_profile)
+        (execution_profile_primary_flag ?execution_profile)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        (order_instruction_draft ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_constructed ?order_instruction)
+        (order_linked_to_liquidity_profile ?order_instruction ?liquidity_profile)
+        (order_linked_to_execution_profile ?order_instruction ?execution_profile)
+        (not
+          (order_instruction_draft ?order_instruction)
+        )
+      )
+  )
+  (:action construct_order_with_constraint_template
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?target_liquidity_bucket - target_liquidity_bucket ?liquidity_profile - liquidity_profile ?execution_profile - execution_profile ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (liquidity_profile_secondary_flag ?liquidity_profile)
+        (execution_profile_primary_flag ?execution_profile)
+        (not
+          (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        )
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        (order_instruction_draft ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_constructed ?order_instruction)
+        (order_linked_to_liquidity_profile ?order_instruction ?liquidity_profile)
+        (order_linked_to_execution_profile ?order_instruction ?execution_profile)
+        (order_requires_constraint_template_flow ?order_instruction)
+        (not
+          (order_instruction_draft ?order_instruction)
+        )
+      )
+  )
+  (:action construct_order_with_document_requirement
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?target_liquidity_bucket - target_liquidity_bucket ?liquidity_profile - liquidity_profile ?execution_profile - execution_profile ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (liquidity_profile_primary_flag ?liquidity_profile)
+        (execution_profile_secondary_flag ?execution_profile)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        (not
+          (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        )
+        (order_instruction_draft ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_constructed ?order_instruction)
+        (order_linked_to_liquidity_profile ?order_instruction ?liquidity_profile)
+        (order_linked_to_execution_profile ?order_instruction ?execution_profile)
+        (order_requires_document_flow ?order_instruction)
+        (not
+          (order_instruction_draft ?order_instruction)
+        )
+      )
+  )
+  (:action construct_order_with_all_requirements
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?target_liquidity_bucket - target_liquidity_bucket ?liquidity_profile - liquidity_profile ?execution_profile - execution_profile ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (bucket_liquidity_profile_assigned ?source_liquidity_bucket ?liquidity_profile)
+        (target_liquidity_bucket_execution_profile_assigned ?target_liquidity_bucket ?execution_profile)
+        (liquidity_profile_secondary_flag ?liquidity_profile)
+        (execution_profile_secondary_flag ?execution_profile)
+        (not
+          (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        )
+        (not
+          (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        )
+        (order_instruction_draft ?order_instruction)
+      )
+    :effect
+      (and
+        (order_instruction_constructed ?order_instruction)
+        (order_linked_to_liquidity_profile ?order_instruction ?liquidity_profile)
+        (order_linked_to_execution_profile ?order_instruction ?execution_profile)
+        (order_requires_constraint_template_flow ?order_instruction)
+        (order_requires_document_flow ?order_instruction)
+        (not
+          (order_instruction_draft ?order_instruction)
+        )
+      )
+  )
+  (:action mark_order_ready_for_allocation
+    :parameters (?order_instruction - order_instruction ?source_liquidity_bucket - source_liquidity_bucket ?market_signal - market_signal)
+    :precondition
+      (and
+        (order_instruction_constructed ?order_instruction)
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (entity_bound_to_market_signal ?source_liquidity_bucket ?market_signal)
+        (not
+          (order_ready_for_allocation ?order_instruction)
+        )
+      )
+    :effect (order_ready_for_allocation ?order_instruction)
+  )
+  (:action assign_settlement_account
+    :parameters (?transition_job - transition_job ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (job_has_order_instruction ?transition_job ?order_instruction)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_available ?settlement_account)
+        (order_instruction_constructed ?order_instruction)
+        (order_ready_for_allocation ?order_instruction)
+        (not
+          (settlement_account_allocated ?settlement_account)
+        )
+      )
+    :effect
+      (and
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (not
+          (settlement_account_available ?settlement_account)
+        )
+      )
+  )
+  (:action initialize_job_allocation
+    :parameters (?transition_job - transition_job ?settlement_account - settlement_account ?order_instruction - order_instruction ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (entity_bound_to_market_signal ?transition_job ?market_signal)
+        (not
+          (order_requires_constraint_template_flow ?order_instruction)
+        )
+        (not
+          (job_allocation_initialized ?transition_job)
+        )
+      )
+    :effect (job_allocation_initialized ?transition_job)
+  )
+  (:action apply_constraint_template
+    :parameters (?transition_job - transition_job ?constraint_template - constraint_template)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (constraint_template_available ?constraint_template)
+        (not
+          (job_constraint_template_active ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_constraint_template_active ?transition_job)
+        (job_constraint_template_assigned ?transition_job ?constraint_template)
+        (not
+          (constraint_template_available ?constraint_template)
+        )
+      )
+  )
+  (:action process_constraint_template_for_job
+    :parameters (?transition_job - transition_job ?settlement_account - settlement_account ?order_instruction - order_instruction ?market_signal - market_signal ?constraint_template - constraint_template)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (entity_bound_to_market_signal ?transition_job ?market_signal)
+        (order_requires_constraint_template_flow ?order_instruction)
+        (job_constraint_template_active ?transition_job)
+        (job_constraint_template_assigned ?transition_job ?constraint_template)
+        (not
+          (job_allocation_initialized ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_allocation_initialized ?transition_job)
+        (job_constraint_template_applied ?transition_job)
+      )
+  )
+  (:action finalize_allocation_with_compliance_primary
+    :parameters (?transition_job - transition_job ?compliance_document - compliance_document ?execution_desk - execution_desk ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_initialized ?transition_job)
+        (job_has_compliance_document ?transition_job ?compliance_document)
+        (entity_assigned_execution_desk ?transition_job ?execution_desk)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_requires_document_flow ?order_instruction)
+        )
+        (not
+          (job_allocation_documents_submitted ?transition_job)
+        )
+      )
+    :effect (job_allocation_documents_submitted ?transition_job)
+  )
+  (:action finalize_allocation_with_compliance_secondary
+    :parameters (?transition_job - transition_job ?compliance_document - compliance_document ?execution_desk - execution_desk ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_initialized ?transition_job)
+        (job_has_compliance_document ?transition_job ?compliance_document)
+        (entity_assigned_execution_desk ?transition_job ?execution_desk)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (order_requires_document_flow ?order_instruction)
+        (not
+          (job_allocation_documents_submitted ?transition_job)
+        )
+      )
+    :effect (job_allocation_documents_submitted ?transition_job)
+  )
+  (:action initiate_job_approval
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_documents_submitted ?transition_job)
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_requires_constraint_template_flow ?order_instruction)
+        )
+        (not
+          (order_requires_document_flow ?order_instruction)
+        )
+        (not
+          (job_approval_received ?transition_job)
+        )
+      )
+    :effect (job_approval_received ?transition_job)
+  )
+  (:action approve_job_and_mark_ready
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_documents_submitted ?transition_job)
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (order_requires_constraint_template_flow ?order_instruction)
+        (not
+          (order_requires_document_flow ?order_instruction)
+        )
+        (not
+          (job_approval_received ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_approval_received ?transition_job)
+        (job_ready_for_execution ?transition_job)
+      )
+  )
+  (:action approve_job_and_mark_ready_alternate
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_documents_submitted ?transition_job)
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (not
+          (order_requires_constraint_template_flow ?order_instruction)
+        )
+        (order_requires_document_flow ?order_instruction)
+        (not
+          (job_approval_received ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_approval_received ?transition_job)
+        (job_ready_for_execution ?transition_job)
+      )
+  )
+  (:action approve_job_and_mark_ready_all_requirements
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket ?settlement_account - settlement_account ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (job_allocation_documents_submitted ?transition_job)
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (job_has_settlement_account ?transition_job ?settlement_account)
+        (settlement_account_allocated_to_order ?settlement_account ?order_instruction)
+        (order_requires_constraint_template_flow ?order_instruction)
+        (order_requires_document_flow ?order_instruction)
+        (not
+          (job_approval_received ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_approval_received ?transition_job)
+        (job_ready_for_execution ?transition_job)
+      )
+  )
+  (:action finalize_job_preparation
+    :parameters (?transition_job - transition_job)
+    :precondition
+      (and
+        (job_approval_received ?transition_job)
+        (not
+          (job_ready_for_execution ?transition_job)
+        )
+        (not
+          (job_finalized ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?transition_job)
+        (entity_ready_for_post_trade_assignment ?transition_job)
+      )
+  )
+  (:action attach_allocation_rule
+    :parameters (?transition_job - transition_job ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (job_approval_received ?transition_job)
+        (job_ready_for_execution ?transition_job)
+        (allocation_rule_available ?allocation_rule)
+      )
+    :effect
+      (and
+        (job_has_allocation_rule ?transition_job ?allocation_rule)
+        (not
+          (allocation_rule_available ?allocation_rule)
+        )
+      )
+  )
+  (:action perform_allocation_checks
+    :parameters (?transition_job - transition_job ?source_liquidity_bucket - source_liquidity_bucket ?target_liquidity_bucket - target_liquidity_bucket ?market_signal - market_signal ?allocation_rule - allocation_rule)
+    :precondition
+      (and
+        (job_approval_received ?transition_job)
+        (job_ready_for_execution ?transition_job)
+        (job_has_allocation_rule ?transition_job ?allocation_rule)
+        (job_has_source_liquidity_bucket ?transition_job ?source_liquidity_bucket)
+        (job_has_target_liquidity_bucket ?transition_job ?target_liquidity_bucket)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        (entity_bound_to_market_signal ?transition_job ?market_signal)
+        (not
+          (job_allocation_checks_passed ?transition_job)
+        )
+      )
+    :effect (job_allocation_checks_passed ?transition_job)
+  )
+  (:action complete_job_and_mark_ready
+    :parameters (?transition_job - transition_job)
+    :precondition
+      (and
+        (job_approval_received ?transition_job)
+        (job_allocation_checks_passed ?transition_job)
+        (not
+          (job_finalized ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?transition_job)
+        (entity_ready_for_post_trade_assignment ?transition_job)
+      )
+  )
+  (:action assign_counterparty_preference
+    :parameters (?transition_job - transition_job ?counterparty_preference - counterparty_preference ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_mandate_validated ?transition_job)
+        (entity_bound_to_market_signal ?transition_job ?market_signal)
+        (counterparty_preference_available ?counterparty_preference)
+        (job_has_counterparty_preference ?transition_job ?counterparty_preference)
+        (not
+          (job_counterparty_preference_assigned ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_counterparty_preference_assigned ?transition_job)
+        (not
+          (counterparty_preference_available ?counterparty_preference)
+        )
+      )
+  )
+  (:action confirm_desk_allocation_for_job
+    :parameters (?transition_job - transition_job ?execution_desk - execution_desk)
+    :precondition
+      (and
+        (job_counterparty_preference_assigned ?transition_job)
+        (entity_assigned_execution_desk ?transition_job ?execution_desk)
+        (not
+          (job_desk_confirmation_after_counterparty ?transition_job)
+        )
+      )
+    :effect (job_desk_confirmation_after_counterparty ?transition_job)
+  )
+  (:action confirm_approval_for_job
+    :parameters (?transition_job - transition_job ?approval_ticket - approval_ticket)
+    :precondition
+      (and
+        (job_desk_confirmation_after_counterparty ?transition_job)
+        (job_has_approval_ticket ?transition_job ?approval_ticket)
+        (not
+          (job_approval_confirmed ?transition_job)
+        )
+      )
+    :effect (job_approval_confirmed ?transition_job)
+  )
+  (:action finalize_job_after_approval
+    :parameters (?transition_job - transition_job)
+    :precondition
+      (and
+        (job_approval_confirmed ?transition_job)
+        (not
+          (job_finalized ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (job_finalized ?transition_job)
+        (entity_ready_for_post_trade_assignment ?transition_job)
+      )
+  )
+  (:action mark_source_liquidity_bucket_ready_for_post_trade_assignment
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (source_liquidity_bucket_actionable ?source_liquidity_bucket)
+        (source_liquidity_bucket_finalized_for_order ?source_liquidity_bucket)
+        (order_instruction_constructed ?order_instruction)
+        (order_ready_for_allocation ?order_instruction)
+        (not
+          (entity_ready_for_post_trade_assignment ?source_liquidity_bucket)
+        )
+      )
+    :effect (entity_ready_for_post_trade_assignment ?source_liquidity_bucket)
+  )
+  (:action mark_target_liquidity_bucket_ready_for_post_trade_assignment
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?order_instruction - order_instruction)
+    :precondition
+      (and
+        (target_liquidity_bucket_actionable ?target_liquidity_bucket)
+        (target_liquidity_bucket_finalized_for_order ?target_liquidity_bucket)
+        (order_instruction_constructed ?order_instruction)
+        (order_ready_for_allocation ?order_instruction)
+        (not
+          (entity_ready_for_post_trade_assignment ?target_liquidity_bucket)
+        )
+      )
+    :effect (entity_ready_for_post_trade_assignment ?target_liquidity_bucket)
+  )
+  (:action assign_post_trade_assignment_token
+    :parameters (?portfolio_entity - portfolio_entity ?post_trade_assignment_token - post_trade_assignment_token ?market_signal - market_signal)
+    :precondition
+      (and
+        (entity_ready_for_post_trade_assignment ?portfolio_entity)
+        (entity_bound_to_market_signal ?portfolio_entity ?market_signal)
+        (post_trade_assignment_token_available ?post_trade_assignment_token)
+        (not
+          (entity_post_trade_assignment_completed ?portfolio_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_post_trade_assignment_completed ?portfolio_entity)
+        (entity_assigned_post_trade_token ?portfolio_entity ?post_trade_assignment_token)
+        (not
+          (post_trade_assignment_token_available ?post_trade_assignment_token)
+        )
+      )
+  )
+  (:action complete_post_trade_assignment_for_source_liquidity_bucket
+    :parameters (?source_liquidity_bucket - source_liquidity_bucket ?trade_idea_provider - trade_idea_provider ?post_trade_assignment_token - post_trade_assignment_token)
+    :precondition
+      (and
+        (entity_post_trade_assignment_completed ?source_liquidity_bucket)
+        (entity_bound_to_trade_provider ?source_liquidity_bucket ?trade_idea_provider)
+        (entity_assigned_post_trade_token ?source_liquidity_bucket ?post_trade_assignment_token)
+        (not
+          (entity_reposition_finalized ?source_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (entity_reposition_finalized ?source_liquidity_bucket)
+        (trade_idea_provider_available ?trade_idea_provider)
+        (post_trade_assignment_token_available ?post_trade_assignment_token)
+      )
+  )
+  (:action complete_post_trade_assignment_for_target_liquidity_bucket
+    :parameters (?target_liquidity_bucket - target_liquidity_bucket ?trade_idea_provider - trade_idea_provider ?post_trade_assignment_token - post_trade_assignment_token)
+    :precondition
+      (and
+        (entity_post_trade_assignment_completed ?target_liquidity_bucket)
+        (entity_bound_to_trade_provider ?target_liquidity_bucket ?trade_idea_provider)
+        (entity_assigned_post_trade_token ?target_liquidity_bucket ?post_trade_assignment_token)
+        (not
+          (entity_reposition_finalized ?target_liquidity_bucket)
+        )
+      )
+    :effect
+      (and
+        (entity_reposition_finalized ?target_liquidity_bucket)
+        (trade_idea_provider_available ?trade_idea_provider)
+        (post_trade_assignment_token_available ?post_trade_assignment_token)
+      )
+  )
+  (:action complete_post_trade_assignment_for_job
+    :parameters (?transition_job - transition_job ?trade_idea_provider - trade_idea_provider ?post_trade_assignment_token - post_trade_assignment_token)
+    :precondition
+      (and
+        (entity_post_trade_assignment_completed ?transition_job)
+        (entity_bound_to_trade_provider ?transition_job ?trade_idea_provider)
+        (entity_assigned_post_trade_token ?transition_job ?post_trade_assignment_token)
+        (not
+          (entity_reposition_finalized ?transition_job)
+        )
+      )
+    :effect
+      (and
+        (entity_reposition_finalized ?transition_job)
+        (trade_idea_provider_available ?trade_idea_provider)
+        (post_trade_assignment_token_available ?post_trade_assignment_token)
+      )
+  )
+)

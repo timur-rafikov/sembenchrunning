@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain elevation_gain_minimizing_route_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object traversal_category - entity item_category - entity feature_category - entity world_node - entity waypoint - world_node traversal_permit - traversal_category elevation_sample - traversal_category traversal_ability - traversal_category landmark - traversal_category constraint_modifier - traversal_category return_beacon - traversal_category equipment - traversal_category weather_modifier - traversal_category consumable_resource - item_category objective_marker - item_category event_trigger - item_category climb_feature - feature_category descent_feature - feature_category map_region - feature_category waypoint_category - waypoint waypoint_subcategory - waypoint primary_segment - waypoint_category alternate_segment - waypoint_category route_plan - waypoint_subcategory)
+
+  (:predicates
+    (location_discovered ?waypoint - waypoint)
+    (location_enabled ?waypoint - waypoint)
+    (location_has_permit ?waypoint - waypoint)
+    (traversal_unlocked ?waypoint - waypoint)
+    (entity_finalized ?waypoint - waypoint)
+    (return_beacon_assigned ?waypoint - waypoint)
+    (permit_available ?traversal_permit - traversal_permit)
+    (permit_bound ?waypoint - waypoint ?traversal_permit - traversal_permit)
+    (elevation_sample_available ?elevation_sample - elevation_sample)
+    (location_has_elevation_sample ?waypoint - waypoint ?elevation_sample - elevation_sample)
+    (ability_available ?traversal_ability - traversal_ability)
+    (location_has_ability ?waypoint - waypoint ?traversal_ability - traversal_ability)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (primary_segment_has_consumable ?primary_segment - primary_segment ?consumable_resource - consumable_resource)
+    (alternate_segment_has_consumable ?alternate_segment - alternate_segment ?consumable_resource - consumable_resource)
+    (segment_has_climb_feature ?primary_segment - primary_segment ?climb_feature - climb_feature)
+    (climb_feature_validated ?climb_feature - climb_feature)
+    (climb_feature_flagged ?climb_feature - climb_feature)
+    (primary_segment_validated ?primary_segment - primary_segment)
+    (segment_has_descent_feature ?alternate_segment - alternate_segment ?descent_feature - descent_feature)
+    (descent_feature_validated ?descent_feature - descent_feature)
+    (descent_feature_flagged ?descent_feature - descent_feature)
+    (alternate_segment_validated ?alternate_segment - alternate_segment)
+    (region_available ?map_region - map_region)
+    (region_prepared ?map_region - map_region)
+    (region_has_climb_feature ?map_region - map_region ?climb_feature - climb_feature)
+    (region_has_descent_feature ?map_region - map_region ?descent_feature - descent_feature)
+    (region_climb_supported ?map_region - map_region)
+    (region_descent_supported ?map_region - map_region)
+    (region_finalized ?map_region - map_region)
+    (route_contains_primary_segment ?route_plan - route_plan ?primary_segment - primary_segment)
+    (route_contains_alternate_segment ?route_plan - route_plan ?alternate_segment - alternate_segment)
+    (route_contains_region ?route_plan - route_plan ?map_region - map_region)
+    (objective_available ?objective_marker - objective_marker)
+    (route_assigned_marker ?route_plan - route_plan ?objective_marker - objective_marker)
+    (objective_claimed ?objective_marker - objective_marker)
+    (marker_linked_to_region ?objective_marker - objective_marker ?map_region - map_region)
+    (route_marker_attached ?route_plan - route_plan)
+    (route_pending_validation ?route_plan - route_plan)
+    (route_milestone_ready ?route_plan - route_plan)
+    (route_has_landmark ?route_plan - route_plan)
+    (route_landmark_confirmed ?route_plan - route_plan)
+    (route_constraint_applied ?route_plan - route_plan)
+    (route_milestone_activated ?route_plan - route_plan)
+    (event_trigger_available ?event_trigger - event_trigger)
+    (route_has_event_trigger ?route_plan - route_plan ?event_trigger - event_trigger)
+    (route_event_bound ?route_plan - route_plan)
+    (route_event_active ?route_plan - route_plan)
+    (route_event_completed ?route_plan - route_plan)
+    (landmark_available ?landmark - landmark)
+    (route_bound_landmark ?route_plan - route_plan ?landmark - landmark)
+    (constraint_modifier_available ?constraint_modifier - constraint_modifier)
+    (route_has_constraint_modifier ?route_plan - route_plan ?constraint_modifier - constraint_modifier)
+    (equipment_available ?equipment - equipment)
+    (route_has_equipment ?route_plan - route_plan ?equipment - equipment)
+    (weather_modifier_available ?weather_modifier - weather_modifier)
+    (route_has_weather_modifier ?route_plan - route_plan ?weather_modifier - weather_modifier)
+    (return_beacon_available ?return_beacon - return_beacon)
+    (location_bound_return_beacon ?waypoint - waypoint ?return_beacon - return_beacon)
+    (primary_segment_ready ?primary_segment - primary_segment)
+    (alternate_segment_ready ?alternate_segment - alternate_segment)
+    (route_locked ?route_plan - route_plan)
+  )
+  (:action discover_waypoint
+    :parameters (?waypoint - waypoint)
+    :precondition
+      (and
+        (not
+          (location_discovered ?waypoint)
+        )
+        (not
+          (traversal_unlocked ?waypoint)
+        )
+      )
+    :effect (location_discovered ?waypoint)
+  )
+  (:action attach_traversal_permit
+    :parameters (?waypoint - waypoint ?traversal_permit - traversal_permit)
+    :precondition
+      (and
+        (location_discovered ?waypoint)
+        (not
+          (location_has_permit ?waypoint)
+        )
+        (permit_available ?traversal_permit)
+      )
+    :effect
+      (and
+        (location_has_permit ?waypoint)
+        (permit_bound ?waypoint ?traversal_permit)
+        (not
+          (permit_available ?traversal_permit)
+        )
+      )
+  )
+  (:action attach_elevation_sample
+    :parameters (?waypoint - waypoint ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_discovered ?waypoint)
+        (location_has_permit ?waypoint)
+        (elevation_sample_available ?elevation_sample)
+      )
+    :effect
+      (and
+        (location_has_elevation_sample ?waypoint ?elevation_sample)
+        (not
+          (elevation_sample_available ?elevation_sample)
+        )
+      )
+  )
+  (:action enable_waypoint_for_planning
+    :parameters (?waypoint - waypoint ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_discovered ?waypoint)
+        (location_has_permit ?waypoint)
+        (location_has_elevation_sample ?waypoint ?elevation_sample)
+        (not
+          (location_enabled ?waypoint)
+        )
+      )
+    :effect (location_enabled ?waypoint)
+  )
+  (:action detach_elevation_sample
+    :parameters (?waypoint - waypoint ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_has_elevation_sample ?waypoint ?elevation_sample)
+      )
+    :effect
+      (and
+        (elevation_sample_available ?elevation_sample)
+        (not
+          (location_has_elevation_sample ?waypoint ?elevation_sample)
+        )
+      )
+  )
+  (:action bind_traversal_ability
+    :parameters (?waypoint - waypoint ?traversal_ability - traversal_ability)
+    :precondition
+      (and
+        (location_enabled ?waypoint)
+        (ability_available ?traversal_ability)
+      )
+    :effect
+      (and
+        (location_has_ability ?waypoint ?traversal_ability)
+        (not
+          (ability_available ?traversal_ability)
+        )
+      )
+  )
+  (:action release_traversal_ability
+    :parameters (?waypoint - waypoint ?traversal_ability - traversal_ability)
+    :precondition
+      (and
+        (location_has_ability ?waypoint ?traversal_ability)
+      )
+    :effect
+      (and
+        (ability_available ?traversal_ability)
+        (not
+          (location_has_ability ?waypoint ?traversal_ability)
+        )
+      )
+  )
+  (:action attach_equipment_to_route
+    :parameters (?route_plan - route_plan ?equipment - equipment)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (route_has_equipment ?route_plan ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action detach_equipment_from_route
+    :parameters (?route_plan - route_plan ?equipment - equipment)
+    :precondition
+      (and
+        (route_has_equipment ?route_plan ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (route_has_equipment ?route_plan ?equipment)
+        )
+      )
+  )
+  (:action attach_weather_modifier_to_route
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (weather_modifier_available ?weather_modifier)
+      )
+    :effect
+      (and
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (not
+          (weather_modifier_available ?weather_modifier)
+        )
+      )
+  )
+  (:action detach_weather_modifier_from_route
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier)
+    :precondition
+      (and
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+      )
+    :effect
+      (and
+        (weather_modifier_available ?weather_modifier)
+        (not
+          (route_has_weather_modifier ?route_plan ?weather_modifier)
+        )
+      )
+  )
+  (:action validate_climb_feature_on_segment
+    :parameters (?primary_segment - primary_segment ?climb_feature - climb_feature ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_enabled ?primary_segment)
+        (location_has_elevation_sample ?primary_segment ?elevation_sample)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (not
+          (climb_feature_validated ?climb_feature)
+        )
+        (not
+          (climb_feature_flagged ?climb_feature)
+        )
+      )
+    :effect (climb_feature_validated ?climb_feature)
+  )
+  (:action use_ability_to_validate_primary_segment
+    :parameters (?primary_segment - primary_segment ?climb_feature - climb_feature ?traversal_ability - traversal_ability)
+    :precondition
+      (and
+        (location_enabled ?primary_segment)
+        (location_has_ability ?primary_segment ?traversal_ability)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (climb_feature_validated ?climb_feature)
+        (not
+          (primary_segment_ready ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (primary_segment_ready ?primary_segment)
+        (primary_segment_validated ?primary_segment)
+      )
+  )
+  (:action apply_resource_to_segment_feature
+    :parameters (?primary_segment - primary_segment ?climb_feature - climb_feature ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (location_enabled ?primary_segment)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (consumable_available ?consumable_resource)
+        (not
+          (primary_segment_ready ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (climb_feature_flagged ?climb_feature)
+        (primary_segment_ready ?primary_segment)
+        (primary_segment_has_consumable ?primary_segment ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_resource_validation_on_segment
+    :parameters (?primary_segment - primary_segment ?climb_feature - climb_feature ?elevation_sample - elevation_sample ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (location_enabled ?primary_segment)
+        (location_has_elevation_sample ?primary_segment ?elevation_sample)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (climb_feature_flagged ?climb_feature)
+        (primary_segment_has_consumable ?primary_segment ?consumable_resource)
+        (not
+          (primary_segment_validated ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (climb_feature_validated ?climb_feature)
+        (primary_segment_validated ?primary_segment)
+        (consumable_available ?consumable_resource)
+        (not
+          (primary_segment_has_consumable ?primary_segment ?consumable_resource)
+        )
+      )
+  )
+  (:action validate_descent_feature_on_alternate_segment
+    :parameters (?alternate_segment - alternate_segment ?descent_feature - descent_feature ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_enabled ?alternate_segment)
+        (location_has_elevation_sample ?alternate_segment ?elevation_sample)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (not
+          (descent_feature_validated ?descent_feature)
+        )
+        (not
+          (descent_feature_flagged ?descent_feature)
+        )
+      )
+    :effect (descent_feature_validated ?descent_feature)
+  )
+  (:action use_ability_to_validate_alternate_segment
+    :parameters (?alternate_segment - alternate_segment ?descent_feature - descent_feature ?traversal_ability - traversal_ability)
+    :precondition
+      (and
+        (location_enabled ?alternate_segment)
+        (location_has_ability ?alternate_segment ?traversal_ability)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (descent_feature_validated ?descent_feature)
+        (not
+          (alternate_segment_ready ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (alternate_segment_ready ?alternate_segment)
+        (alternate_segment_validated ?alternate_segment)
+      )
+  )
+  (:action apply_resource_to_alternate_segment_feature
+    :parameters (?alternate_segment - alternate_segment ?descent_feature - descent_feature ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (location_enabled ?alternate_segment)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (consumable_available ?consumable_resource)
+        (not
+          (alternate_segment_ready ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (descent_feature_flagged ?descent_feature)
+        (alternate_segment_ready ?alternate_segment)
+        (alternate_segment_has_consumable ?alternate_segment ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action finalize_resource_validation_on_alternate_segment
+    :parameters (?alternate_segment - alternate_segment ?descent_feature - descent_feature ?elevation_sample - elevation_sample ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (location_enabled ?alternate_segment)
+        (location_has_elevation_sample ?alternate_segment ?elevation_sample)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (descent_feature_flagged ?descent_feature)
+        (alternate_segment_has_consumable ?alternate_segment ?consumable_resource)
+        (not
+          (alternate_segment_validated ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (descent_feature_validated ?descent_feature)
+        (alternate_segment_validated ?alternate_segment)
+        (consumable_available ?consumable_resource)
+        (not
+          (alternate_segment_has_consumable ?alternate_segment ?consumable_resource)
+        )
+      )
+  )
+  (:action assemble_region_tile
+    :parameters (?primary_segment - primary_segment ?alternate_segment - alternate_segment ?climb_feature - climb_feature ?descent_feature - descent_feature ?map_region - map_region)
+    :precondition
+      (and
+        (primary_segment_ready ?primary_segment)
+        (alternate_segment_ready ?alternate_segment)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (climb_feature_validated ?climb_feature)
+        (descent_feature_validated ?descent_feature)
+        (primary_segment_validated ?primary_segment)
+        (alternate_segment_validated ?alternate_segment)
+        (region_available ?map_region)
+      )
+    :effect
+      (and
+        (region_prepared ?map_region)
+        (region_has_climb_feature ?map_region ?climb_feature)
+        (region_has_descent_feature ?map_region ?descent_feature)
+        (not
+          (region_available ?map_region)
+        )
+      )
+  )
+  (:action assemble_region_tile_with_climb_confirmation
+    :parameters (?primary_segment - primary_segment ?alternate_segment - alternate_segment ?climb_feature - climb_feature ?descent_feature - descent_feature ?map_region - map_region)
+    :precondition
+      (and
+        (primary_segment_ready ?primary_segment)
+        (alternate_segment_ready ?alternate_segment)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (climb_feature_flagged ?climb_feature)
+        (descent_feature_validated ?descent_feature)
+        (not
+          (primary_segment_validated ?primary_segment)
+        )
+        (alternate_segment_validated ?alternate_segment)
+        (region_available ?map_region)
+      )
+    :effect
+      (and
+        (region_prepared ?map_region)
+        (region_has_climb_feature ?map_region ?climb_feature)
+        (region_has_descent_feature ?map_region ?descent_feature)
+        (region_climb_supported ?map_region)
+        (not
+          (region_available ?map_region)
+        )
+      )
+  )
+  (:action assemble_region_tile_with_descent_confirmation
+    :parameters (?primary_segment - primary_segment ?alternate_segment - alternate_segment ?climb_feature - climb_feature ?descent_feature - descent_feature ?map_region - map_region)
+    :precondition
+      (and
+        (primary_segment_ready ?primary_segment)
+        (alternate_segment_ready ?alternate_segment)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (climb_feature_validated ?climb_feature)
+        (descent_feature_flagged ?descent_feature)
+        (primary_segment_validated ?primary_segment)
+        (not
+          (alternate_segment_validated ?alternate_segment)
+        )
+        (region_available ?map_region)
+      )
+    :effect
+      (and
+        (region_prepared ?map_region)
+        (region_has_climb_feature ?map_region ?climb_feature)
+        (region_has_descent_feature ?map_region ?descent_feature)
+        (region_descent_supported ?map_region)
+        (not
+          (region_available ?map_region)
+        )
+      )
+  )
+  (:action assemble_region_tile_with_both_confirmations
+    :parameters (?primary_segment - primary_segment ?alternate_segment - alternate_segment ?climb_feature - climb_feature ?descent_feature - descent_feature ?map_region - map_region)
+    :precondition
+      (and
+        (primary_segment_ready ?primary_segment)
+        (alternate_segment_ready ?alternate_segment)
+        (segment_has_climb_feature ?primary_segment ?climb_feature)
+        (segment_has_descent_feature ?alternate_segment ?descent_feature)
+        (climb_feature_flagged ?climb_feature)
+        (descent_feature_flagged ?descent_feature)
+        (not
+          (primary_segment_validated ?primary_segment)
+        )
+        (not
+          (alternate_segment_validated ?alternate_segment)
+        )
+        (region_available ?map_region)
+      )
+    :effect
+      (and
+        (region_prepared ?map_region)
+        (region_has_climb_feature ?map_region ?climb_feature)
+        (region_has_descent_feature ?map_region ?descent_feature)
+        (region_climb_supported ?map_region)
+        (region_descent_supported ?map_region)
+        (not
+          (region_available ?map_region)
+        )
+      )
+  )
+  (:action finalize_region_for_objectives
+    :parameters (?map_region - map_region ?primary_segment - primary_segment ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (region_prepared ?map_region)
+        (primary_segment_ready ?primary_segment)
+        (location_has_elevation_sample ?primary_segment ?elevation_sample)
+        (not
+          (region_finalized ?map_region)
+        )
+      )
+    :effect (region_finalized ?map_region)
+  )
+  (:action claim_objective_marker_for_route
+    :parameters (?route_plan - route_plan ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (route_contains_region ?route_plan ?map_region)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (objective_available ?objective_marker)
+        (region_prepared ?map_region)
+        (region_finalized ?map_region)
+        (not
+          (objective_claimed ?objective_marker)
+        )
+      )
+    :effect
+      (and
+        (objective_claimed ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (not
+          (objective_available ?objective_marker)
+        )
+      )
+  )
+  (:action attach_claimed_marker_to_route
+    :parameters (?route_plan - route_plan ?objective_marker - objective_marker ?map_region - map_region ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (objective_claimed ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (location_has_elevation_sample ?route_plan ?elevation_sample)
+        (not
+          (region_climb_supported ?map_region)
+        )
+        (not
+          (route_marker_attached ?route_plan)
+        )
+      )
+    :effect (route_marker_attached ?route_plan)
+  )
+  (:action bind_landmark_to_route
+    :parameters (?route_plan - route_plan ?landmark - landmark)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (landmark_available ?landmark)
+        (not
+          (route_has_landmark ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_has_landmark ?route_plan)
+        (route_bound_landmark ?route_plan ?landmark)
+        (not
+          (landmark_available ?landmark)
+        )
+      )
+  )
+  (:action validate_landmark_on_route
+    :parameters (?route_plan - route_plan ?objective_marker - objective_marker ?map_region - map_region ?elevation_sample - elevation_sample ?landmark - landmark)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (objective_claimed ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (location_has_elevation_sample ?route_plan ?elevation_sample)
+        (region_climb_supported ?map_region)
+        (route_has_landmark ?route_plan)
+        (route_bound_landmark ?route_plan ?landmark)
+        (not
+          (route_marker_attached ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_marker_attached ?route_plan)
+        (route_landmark_confirmed ?route_plan)
+      )
+  )
+  (:action activate_route_marker_with_equipment
+    :parameters (?route_plan - route_plan ?equipment - equipment ?traversal_ability - traversal_ability ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_marker_attached ?route_plan)
+        (route_has_equipment ?route_plan ?equipment)
+        (location_has_ability ?route_plan ?traversal_ability)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (not
+          (region_descent_supported ?map_region)
+        )
+        (not
+          (route_pending_validation ?route_plan)
+        )
+      )
+    :effect (route_pending_validation ?route_plan)
+  )
+  (:action activate_route_marker_with_equipment_alternate
+    :parameters (?route_plan - route_plan ?equipment - equipment ?traversal_ability - traversal_ability ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_marker_attached ?route_plan)
+        (route_has_equipment ?route_plan ?equipment)
+        (location_has_ability ?route_plan ?traversal_ability)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (region_descent_supported ?map_region)
+        (not
+          (route_pending_validation ?route_plan)
+        )
+      )
+    :effect (route_pending_validation ?route_plan)
+  )
+  (:action apply_weather_and_marker_to_route
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_pending_validation ?route_plan)
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (not
+          (region_climb_supported ?map_region)
+        )
+        (not
+          (region_descent_supported ?map_region)
+        )
+        (not
+          (route_milestone_ready ?route_plan)
+        )
+      )
+    :effect (route_milestone_ready ?route_plan)
+  )
+  (:action apply_weather_and_marker_to_route_and_apply_constraint
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_pending_validation ?route_plan)
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (region_climb_supported ?map_region)
+        (not
+          (region_descent_supported ?map_region)
+        )
+        (not
+          (route_milestone_ready ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_constraint_applied ?route_plan)
+      )
+  )
+  (:action apply_weather_and_marker_to_route_variant_a
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_pending_validation ?route_plan)
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (not
+          (region_climb_supported ?map_region)
+        )
+        (region_descent_supported ?map_region)
+        (not
+          (route_milestone_ready ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_constraint_applied ?route_plan)
+      )
+  )
+  (:action apply_weather_and_marker_to_route_variant_b
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier ?objective_marker - objective_marker ?map_region - map_region)
+    :precondition
+      (and
+        (route_pending_validation ?route_plan)
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (route_assigned_marker ?route_plan ?objective_marker)
+        (marker_linked_to_region ?objective_marker ?map_region)
+        (region_climb_supported ?map_region)
+        (region_descent_supported ?map_region)
+        (not
+          (route_milestone_ready ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_constraint_applied ?route_plan)
+      )
+  )
+  (:action finalize_and_lock_route
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_milestone_ready ?route_plan)
+        (not
+          (route_constraint_applied ?route_plan)
+        )
+        (not
+          (route_locked ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_locked ?route_plan)
+        (entity_finalized ?route_plan)
+      )
+  )
+  (:action apply_constraint_modifier_to_route
+    :parameters (?route_plan - route_plan ?constraint_modifier - constraint_modifier)
+    :precondition
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_constraint_applied ?route_plan)
+        (constraint_modifier_available ?constraint_modifier)
+      )
+    :effect
+      (and
+        (route_has_constraint_modifier ?route_plan ?constraint_modifier)
+        (not
+          (constraint_modifier_available ?constraint_modifier)
+        )
+      )
+  )
+  (:action activate_route_milestone
+    :parameters (?route_plan - route_plan ?primary_segment - primary_segment ?alternate_segment - alternate_segment ?elevation_sample - elevation_sample ?constraint_modifier - constraint_modifier)
+    :precondition
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_constraint_applied ?route_plan)
+        (route_has_constraint_modifier ?route_plan ?constraint_modifier)
+        (route_contains_primary_segment ?route_plan ?primary_segment)
+        (route_contains_alternate_segment ?route_plan ?alternate_segment)
+        (primary_segment_validated ?primary_segment)
+        (alternate_segment_validated ?alternate_segment)
+        (location_has_elevation_sample ?route_plan ?elevation_sample)
+        (not
+          (route_milestone_activated ?route_plan)
+        )
+      )
+    :effect (route_milestone_activated ?route_plan)
+  )
+  (:action apply_milestone_commit_to_route
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_milestone_ready ?route_plan)
+        (route_milestone_activated ?route_plan)
+        (not
+          (route_locked ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_locked ?route_plan)
+        (entity_finalized ?route_plan)
+      )
+  )
+  (:action bind_event_trigger_to_route
+    :parameters (?route_plan - route_plan ?event_trigger - event_trigger ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (location_enabled ?route_plan)
+        (location_has_elevation_sample ?route_plan ?elevation_sample)
+        (event_trigger_available ?event_trigger)
+        (route_has_event_trigger ?route_plan ?event_trigger)
+        (not
+          (route_event_bound ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_event_bound ?route_plan)
+        (not
+          (event_trigger_available ?event_trigger)
+        )
+      )
+  )
+  (:action activate_event_on_route
+    :parameters (?route_plan - route_plan ?traversal_ability - traversal_ability)
+    :precondition
+      (and
+        (route_event_bound ?route_plan)
+        (location_has_ability ?route_plan ?traversal_ability)
+        (not
+          (route_event_active ?route_plan)
+        )
+      )
+    :effect (route_event_active ?route_plan)
+  )
+  (:action apply_weather_modifier_to_event_on_route
+    :parameters (?route_plan - route_plan ?weather_modifier - weather_modifier)
+    :precondition
+      (and
+        (route_event_active ?route_plan)
+        (route_has_weather_modifier ?route_plan ?weather_modifier)
+        (not
+          (route_event_completed ?route_plan)
+        )
+      )
+    :effect (route_event_completed ?route_plan)
+  )
+  (:action complete_event_and_finalize_route
+    :parameters (?route_plan - route_plan)
+    :precondition
+      (and
+        (route_event_completed ?route_plan)
+        (not
+          (route_locked ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (route_locked ?route_plan)
+        (entity_finalized ?route_plan)
+      )
+  )
+  (:action finalize_primary_segment
+    :parameters (?primary_segment - primary_segment ?map_region - map_region)
+    :precondition
+      (and
+        (primary_segment_ready ?primary_segment)
+        (primary_segment_validated ?primary_segment)
+        (region_prepared ?map_region)
+        (region_finalized ?map_region)
+        (not
+          (entity_finalized ?primary_segment)
+        )
+      )
+    :effect (entity_finalized ?primary_segment)
+  )
+  (:action finalize_alternate_segment
+    :parameters (?alternate_segment - alternate_segment ?map_region - map_region)
+    :precondition
+      (and
+        (alternate_segment_ready ?alternate_segment)
+        (alternate_segment_validated ?alternate_segment)
+        (region_prepared ?map_region)
+        (region_finalized ?map_region)
+        (not
+          (entity_finalized ?alternate_segment)
+        )
+      )
+    :effect (entity_finalized ?alternate_segment)
+  )
+  (:action assign_return_beacon_to_waypoint
+    :parameters (?waypoint - waypoint ?return_beacon - return_beacon ?elevation_sample - elevation_sample)
+    :precondition
+      (and
+        (entity_finalized ?waypoint)
+        (location_has_elevation_sample ?waypoint ?elevation_sample)
+        (return_beacon_available ?return_beacon)
+        (not
+          (return_beacon_assigned ?waypoint)
+        )
+      )
+    :effect
+      (and
+        (return_beacon_assigned ?waypoint)
+        (location_bound_return_beacon ?waypoint ?return_beacon)
+        (not
+          (return_beacon_available ?return_beacon)
+        )
+      )
+  )
+  (:action unlock_segment_with_permit_and_return_beacon
+    :parameters (?primary_segment - primary_segment ?traversal_permit - traversal_permit ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (return_beacon_assigned ?primary_segment)
+        (permit_bound ?primary_segment ?traversal_permit)
+        (location_bound_return_beacon ?primary_segment ?return_beacon)
+        (not
+          (traversal_unlocked ?primary_segment)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?primary_segment)
+        (permit_available ?traversal_permit)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+  (:action unlock_alternate_segment_with_permit_and_return_beacon
+    :parameters (?alternate_segment - alternate_segment ?traversal_permit - traversal_permit ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (return_beacon_assigned ?alternate_segment)
+        (permit_bound ?alternate_segment ?traversal_permit)
+        (location_bound_return_beacon ?alternate_segment ?return_beacon)
+        (not
+          (traversal_unlocked ?alternate_segment)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?alternate_segment)
+        (permit_available ?traversal_permit)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+  (:action unlock_route_with_permit_and_return_beacon
+    :parameters (?route_plan - route_plan ?traversal_permit - traversal_permit ?return_beacon - return_beacon)
+    :precondition
+      (and
+        (return_beacon_assigned ?route_plan)
+        (permit_bound ?route_plan ?traversal_permit)
+        (location_bound_return_beacon ?route_plan ?return_beacon)
+        (not
+          (traversal_unlocked ?route_plan)
+        )
+      )
+    :effect
+      (and
+        (traversal_unlocked ?route_plan)
+        (permit_available ?traversal_permit)
+        (return_beacon_available ?return_beacon)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem minimize_elevation_gain_scenario)
+  (:domain elevation_gain_minimizing_route_design)
+  (:objects primary_segment_1 - primary_segment alternate_segment_1 - alternate_segment route_plan_alpha - route_plan route_plan_beta - route_plan traversal_permit_a - traversal_permit traversal_permit_b - traversal_permit traversal_permit_c - traversal_permit elevation_sample_a - elevation_sample traversal_ability_basic - traversal_ability consumable_resource_a - consumable_resource climb_feature_a - climb_feature descent_feature_a - descent_feature map_region_center - map_region objective_marker_1 - objective_marker objective_marker_2 - objective_marker landmark_a - landmark landmark_b - landmark constraint_modifier_a - constraint_modifier constraint_modifier_b - constraint_modifier return_beacon_alpha - return_beacon equipment_climbing_kit - equipment event_trigger_a - event_trigger event_trigger_b - event_trigger weather_modifier_a - weather_modifier)
+  (:init
+    (permit_available traversal_permit_a)
+    (permit_available traversal_permit_b)
+    (permit_available traversal_permit_c)
+    (elevation_sample_available elevation_sample_a)
+    (ability_available traversal_ability_basic)
+    (consumable_available consumable_resource_a)
+    (segment_has_climb_feature primary_segment_1 climb_feature_a)
+    (segment_has_descent_feature alternate_segment_1 descent_feature_a)
+    (region_available map_region_center)
+    (objective_available objective_marker_1)
+    (objective_available objective_marker_2)
+    (route_contains_primary_segment route_plan_alpha primary_segment_1)
+    (route_contains_primary_segment route_plan_beta primary_segment_1)
+    (route_contains_alternate_segment route_plan_alpha alternate_segment_1)
+    (route_contains_alternate_segment route_plan_beta alternate_segment_1)
+    (route_contains_region route_plan_alpha map_region_center)
+    (route_contains_region route_plan_beta map_region_center)
+    (route_assigned_marker route_plan_alpha objective_marker_1)
+    (route_assigned_marker route_plan_beta objective_marker_2)
+    (landmark_available landmark_a)
+    (landmark_available landmark_b)
+    (constraint_modifier_available constraint_modifier_a)
+    (constraint_modifier_available constraint_modifier_b)
+    (return_beacon_available return_beacon_alpha)
+    (equipment_available equipment_climbing_kit)
+    (event_trigger_available event_trigger_a)
+    (route_has_event_trigger route_plan_alpha event_trigger_a)
+    (route_has_event_trigger route_plan_beta event_trigger_b)
+    (weather_modifier_available weather_modifier_a)
+  )
+  (:goal
+    (and
+      (traversal_unlocked primary_segment_1)
+      (traversal_unlocked alternate_segment_1)
+      (traversal_unlocked route_plan_alpha)
+      (traversal_unlocked route_plan_beta)
+    )
+  )
+)

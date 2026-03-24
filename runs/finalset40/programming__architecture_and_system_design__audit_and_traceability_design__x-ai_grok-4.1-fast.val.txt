@@ -1,0 +1,1069 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain audit_traceability_design)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types role_group - object interface_type - object asset_class - object logical_scope - object entity - logical_scope log_channel - role_group event_schema - role_group operator_identity - role_group policy_template - role_group compliance_check - role_group credential - role_group encryption_key - role_group timestamp_token - role_group evidence_resource - interface_type evidence_fragment - interface_type external_reference - interface_type producer_stream - asset_class consumer_stream - asset_class audit_artifact - asset_class logical_partition - entity subpartition - entity producer_component - logical_partition consumer_component - logical_partition audit_coordinator - subpartition)
+  (:predicates
+    (entity_registered ?audit_subject - entity)
+    (entity_prepared ?audit_subject - entity)
+    (entity_channel_allocated ?audit_subject - entity)
+    (entity_finalized ?audit_subject - entity)
+    (eligible_for_credential_binding ?audit_subject - entity)
+    (credential_bound ?audit_subject - entity)
+    (channel_available ?log_channel - log_channel)
+    (entity_bound_to_channel ?audit_subject - entity ?log_channel - log_channel)
+    (event_schema_available ?event_schema - event_schema)
+    (entity_bound_to_schema ?audit_subject - entity ?event_schema - event_schema)
+    (operator_available ?operator_identity - operator_identity)
+    (entity_bound_to_operator ?audit_subject - entity ?operator_identity - operator_identity)
+    (evidence_resource_available ?evidence_resource - evidence_resource)
+    (producer_component_evidence_attached ?producer_component - producer_component ?evidence_resource - evidence_resource)
+    (consumer_component_evidence_attached ?consumer_component - consumer_component ?evidence_resource - evidence_resource)
+    (producer_component_bound_to_stream ?producer_component - producer_component ?producer_stream - producer_stream)
+    (producer_stream_ready ?producer_stream - producer_stream)
+    (producer_stream_evidence_locked ?producer_stream - producer_stream)
+    (producer_ready_for_composition ?producer_component - producer_component)
+    (consumer_component_bound_to_stream ?consumer_component - consumer_component ?consumer_stream - consumer_stream)
+    (consumer_stream_ready ?consumer_stream - consumer_stream)
+    (consumer_stream_evidence_locked ?consumer_stream - consumer_stream)
+    (consumer_ready_for_composition ?consumer_component - consumer_component)
+    (artifact_pending_composition ?audit_artifact - audit_artifact)
+    (artifact_composed ?audit_artifact - audit_artifact)
+    (artifact_bound_to_producer_stream ?audit_artifact - audit_artifact ?producer_stream - producer_stream)
+    (artifact_bound_to_consumer_stream ?audit_artifact - audit_artifact ?consumer_stream - consumer_stream)
+    (artifact_request_encryption ?audit_artifact - audit_artifact)
+    (artifact_request_timestamp ?audit_artifact - audit_artifact)
+    (artifact_sealed ?audit_artifact - audit_artifact)
+    (coordinator_bound_producer ?audit_coordinator - audit_coordinator ?producer_component - producer_component)
+    (coordinator_bound_consumer ?audit_coordinator - audit_coordinator ?consumer_component - consumer_component)
+    (coordinator_bound_artifact ?audit_coordinator - audit_coordinator ?audit_artifact - audit_artifact)
+    (evidence_fragment_available ?evidence_fragment - evidence_fragment)
+    (coordinator_has_evidence_fragment ?audit_coordinator - audit_coordinator ?evidence_fragment - evidence_fragment)
+    (evidence_fragment_ingested ?evidence_fragment - evidence_fragment)
+    (fragment_bound_to_artifact ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    (coordinator_policy_enforcement_started ?audit_coordinator - audit_coordinator)
+    (coordinator_encryption_applied ?audit_coordinator - audit_coordinator)
+    (coordinator_timestamp_applied ?audit_coordinator - audit_coordinator)
+    (policy_attached ?audit_coordinator - audit_coordinator)
+    (policy_attachment_recorded ?audit_coordinator - audit_coordinator)
+    (policy_check_passed ?audit_coordinator - audit_coordinator)
+    (coordinator_ready_for_finalization ?audit_coordinator - audit_coordinator)
+    (external_reference_available ?external_reference - external_reference)
+    (coordinator_bound_external_reference ?audit_coordinator - audit_coordinator ?external_reference - external_reference)
+    (external_reference_attested ?audit_coordinator - audit_coordinator)
+    (attestation_recorded ?audit_coordinator - audit_coordinator)
+    (attestation_timestamped ?audit_coordinator - audit_coordinator)
+    (policy_template_available ?policy_template - policy_template)
+    (coordinator_bound_policy_template ?audit_coordinator - audit_coordinator ?policy_template - policy_template)
+    (compliance_check_available ?compliance_check - compliance_check)
+    (coordinator_bound_compliance_check ?audit_coordinator - audit_coordinator ?compliance_check - compliance_check)
+    (encryption_key_available ?encryption_key - encryption_key)
+    (coordinator_bound_encryption_key ?audit_coordinator - audit_coordinator ?encryption_key - encryption_key)
+    (timestamp_token_available ?timestamp_token - timestamp_token)
+    (coordinator_bound_timestamp_token ?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token)
+    (credential_available ?credential - credential)
+    (entity_bound_to_credential ?audit_subject - entity ?credential - credential)
+    (partition_composition_locked ?producer_component - producer_component)
+    (consumer_partition_composition_locked ?consumer_component - consumer_component)
+    (coordinator_committed ?audit_coordinator - audit_coordinator)
+  )
+  (:action register_audit_entity
+    :parameters (?audit_subject - entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?audit_subject)
+        )
+        (not
+          (entity_finalized ?audit_subject)
+        )
+      )
+    :effect (entity_registered ?audit_subject)
+  )
+  (:action allocate_log_channel_to_entity
+    :parameters (?audit_subject - entity ?log_channel - log_channel)
+    :precondition
+      (and
+        (entity_registered ?audit_subject)
+        (not
+          (entity_channel_allocated ?audit_subject)
+        )
+        (channel_available ?log_channel)
+      )
+    :effect
+      (and
+        (entity_channel_allocated ?audit_subject)
+        (entity_bound_to_channel ?audit_subject ?log_channel)
+        (not
+          (channel_available ?log_channel)
+        )
+      )
+  )
+  (:action bind_event_schema_to_entity
+    :parameters (?audit_subject - entity ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_registered ?audit_subject)
+        (entity_channel_allocated ?audit_subject)
+        (event_schema_available ?event_schema)
+      )
+    :effect
+      (and
+        (entity_bound_to_schema ?audit_subject ?event_schema)
+        (not
+          (event_schema_available ?event_schema)
+        )
+      )
+  )
+  (:action authorize_entity_for_collection
+    :parameters (?audit_subject - entity ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_registered ?audit_subject)
+        (entity_channel_allocated ?audit_subject)
+        (entity_bound_to_schema ?audit_subject ?event_schema)
+        (not
+          (entity_prepared ?audit_subject)
+        )
+      )
+    :effect (entity_prepared ?audit_subject)
+  )
+  (:action release_event_schema_from_entity
+    :parameters (?audit_subject - entity ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_bound_to_schema ?audit_subject ?event_schema)
+      )
+    :effect
+      (and
+        (event_schema_available ?event_schema)
+        (not
+          (entity_bound_to_schema ?audit_subject ?event_schema)
+        )
+      )
+  )
+  (:action bind_operator_identity_to_entity
+    :parameters (?audit_subject - entity ?operator_identity - operator_identity)
+    :precondition
+      (and
+        (entity_prepared ?audit_subject)
+        (operator_available ?operator_identity)
+      )
+    :effect
+      (and
+        (entity_bound_to_operator ?audit_subject ?operator_identity)
+        (not
+          (operator_available ?operator_identity)
+        )
+      )
+  )
+  (:action release_operator_identity_from_entity
+    :parameters (?audit_subject - entity ?operator_identity - operator_identity)
+    :precondition
+      (and
+        (entity_bound_to_operator ?audit_subject ?operator_identity)
+      )
+    :effect
+      (and
+        (operator_available ?operator_identity)
+        (not
+          (entity_bound_to_operator ?audit_subject ?operator_identity)
+        )
+      )
+  )
+  (:action attach_encryption_key_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?encryption_key - encryption_key)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (encryption_key_available ?encryption_key)
+      )
+    :effect
+      (and
+        (coordinator_bound_encryption_key ?audit_coordinator ?encryption_key)
+        (not
+          (encryption_key_available ?encryption_key)
+        )
+      )
+  )
+  (:action release_encryption_key_from_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?encryption_key - encryption_key)
+    :precondition
+      (and
+        (coordinator_bound_encryption_key ?audit_coordinator ?encryption_key)
+      )
+    :effect
+      (and
+        (encryption_key_available ?encryption_key)
+        (not
+          (coordinator_bound_encryption_key ?audit_coordinator ?encryption_key)
+        )
+      )
+  )
+  (:action attach_timestamp_token_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (timestamp_token_available ?timestamp_token)
+      )
+    :effect
+      (and
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (not
+          (timestamp_token_available ?timestamp_token)
+        )
+      )
+  )
+  (:action release_timestamp_token_from_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+      )
+    :effect
+      (and
+        (timestamp_token_available ?timestamp_token)
+        (not
+          (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        )
+      )
+  )
+  (:action prepare_producer_stream_for_collection
+    :parameters (?producer_component - producer_component ?producer_stream - producer_stream ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_prepared ?producer_component)
+        (entity_bound_to_schema ?producer_component ?event_schema)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (not
+          (producer_stream_ready ?producer_stream)
+        )
+        (not
+          (producer_stream_evidence_locked ?producer_stream)
+        )
+      )
+    :effect (producer_stream_ready ?producer_stream)
+  )
+  (:action lock_producer_partition_for_composition
+    :parameters (?producer_component - producer_component ?producer_stream - producer_stream ?operator_identity - operator_identity)
+    :precondition
+      (and
+        (entity_prepared ?producer_component)
+        (entity_bound_to_operator ?producer_component ?operator_identity)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (producer_stream_ready ?producer_stream)
+        (not
+          (partition_composition_locked ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (partition_composition_locked ?producer_component)
+        (producer_ready_for_composition ?producer_component)
+      )
+  )
+  (:action attach_evidence_to_producer_partition
+    :parameters (?producer_component - producer_component ?producer_stream - producer_stream ?evidence_resource - evidence_resource)
+    :precondition
+      (and
+        (entity_prepared ?producer_component)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (evidence_resource_available ?evidence_resource)
+        (not
+          (partition_composition_locked ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (producer_stream_evidence_locked ?producer_stream)
+        (partition_composition_locked ?producer_component)
+        (producer_component_evidence_attached ?producer_component ?evidence_resource)
+        (not
+          (evidence_resource_available ?evidence_resource)
+        )
+      )
+  )
+  (:action ingest_producer_evidence_into_stream
+    :parameters (?producer_component - producer_component ?producer_stream - producer_stream ?event_schema - event_schema ?evidence_resource - evidence_resource)
+    :precondition
+      (and
+        (entity_prepared ?producer_component)
+        (entity_bound_to_schema ?producer_component ?event_schema)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (producer_stream_evidence_locked ?producer_stream)
+        (producer_component_evidence_attached ?producer_component ?evidence_resource)
+        (not
+          (producer_ready_for_composition ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (producer_stream_ready ?producer_stream)
+        (producer_ready_for_composition ?producer_component)
+        (evidence_resource_available ?evidence_resource)
+        (not
+          (producer_component_evidence_attached ?producer_component ?evidence_resource)
+        )
+      )
+  )
+  (:action prepare_consumer_stream_for_collection
+    :parameters (?consumer_component - consumer_component ?consumer_stream - consumer_stream ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_prepared ?consumer_component)
+        (entity_bound_to_schema ?consumer_component ?event_schema)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (not
+          (consumer_stream_ready ?consumer_stream)
+        )
+        (not
+          (consumer_stream_evidence_locked ?consumer_stream)
+        )
+      )
+    :effect (consumer_stream_ready ?consumer_stream)
+  )
+  (:action lock_consumer_partition_for_composition
+    :parameters (?consumer_component - consumer_component ?consumer_stream - consumer_stream ?operator_identity - operator_identity)
+    :precondition
+      (and
+        (entity_prepared ?consumer_component)
+        (entity_bound_to_operator ?consumer_component ?operator_identity)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (consumer_stream_ready ?consumer_stream)
+        (not
+          (consumer_partition_composition_locked ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (consumer_partition_composition_locked ?consumer_component)
+        (consumer_ready_for_composition ?consumer_component)
+      )
+  )
+  (:action attach_evidence_to_consumer_partition
+    :parameters (?consumer_component - consumer_component ?consumer_stream - consumer_stream ?evidence_resource - evidence_resource)
+    :precondition
+      (and
+        (entity_prepared ?consumer_component)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (evidence_resource_available ?evidence_resource)
+        (not
+          (consumer_partition_composition_locked ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (consumer_stream_evidence_locked ?consumer_stream)
+        (consumer_partition_composition_locked ?consumer_component)
+        (consumer_component_evidence_attached ?consumer_component ?evidence_resource)
+        (not
+          (evidence_resource_available ?evidence_resource)
+        )
+      )
+  )
+  (:action ingest_consumer_evidence_into_stream
+    :parameters (?consumer_component - consumer_component ?consumer_stream - consumer_stream ?event_schema - event_schema ?evidence_resource - evidence_resource)
+    :precondition
+      (and
+        (entity_prepared ?consumer_component)
+        (entity_bound_to_schema ?consumer_component ?event_schema)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (consumer_stream_evidence_locked ?consumer_stream)
+        (consumer_component_evidence_attached ?consumer_component ?evidence_resource)
+        (not
+          (consumer_ready_for_composition ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (consumer_stream_ready ?consumer_stream)
+        (consumer_ready_for_composition ?consumer_component)
+        (evidence_resource_available ?evidence_resource)
+        (not
+          (consumer_component_evidence_attached ?consumer_component ?evidence_resource)
+        )
+      )
+  )
+  (:action compose_audit_artifact
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?producer_stream - producer_stream ?consumer_stream - consumer_stream ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (partition_composition_locked ?producer_component)
+        (consumer_partition_composition_locked ?consumer_component)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (producer_stream_ready ?producer_stream)
+        (consumer_stream_ready ?consumer_stream)
+        (producer_ready_for_composition ?producer_component)
+        (consumer_ready_for_composition ?consumer_component)
+        (artifact_pending_composition ?audit_artifact)
+      )
+    :effect
+      (and
+        (artifact_composed ?audit_artifact)
+        (artifact_bound_to_producer_stream ?audit_artifact ?producer_stream)
+        (artifact_bound_to_consumer_stream ?audit_artifact ?consumer_stream)
+        (not
+          (artifact_pending_composition ?audit_artifact)
+        )
+      )
+  )
+  (:action compose_audit_artifact_request_encryption
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?producer_stream - producer_stream ?consumer_stream - consumer_stream ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (partition_composition_locked ?producer_component)
+        (consumer_partition_composition_locked ?consumer_component)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (producer_stream_evidence_locked ?producer_stream)
+        (consumer_stream_ready ?consumer_stream)
+        (not
+          (producer_ready_for_composition ?producer_component)
+        )
+        (consumer_ready_for_composition ?consumer_component)
+        (artifact_pending_composition ?audit_artifact)
+      )
+    :effect
+      (and
+        (artifact_composed ?audit_artifact)
+        (artifact_bound_to_producer_stream ?audit_artifact ?producer_stream)
+        (artifact_bound_to_consumer_stream ?audit_artifact ?consumer_stream)
+        (artifact_request_encryption ?audit_artifact)
+        (not
+          (artifact_pending_composition ?audit_artifact)
+        )
+      )
+  )
+  (:action compose_audit_artifact_request_timestamp
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?producer_stream - producer_stream ?consumer_stream - consumer_stream ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (partition_composition_locked ?producer_component)
+        (consumer_partition_composition_locked ?consumer_component)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (producer_stream_ready ?producer_stream)
+        (consumer_stream_evidence_locked ?consumer_stream)
+        (producer_ready_for_composition ?producer_component)
+        (not
+          (consumer_ready_for_composition ?consumer_component)
+        )
+        (artifact_pending_composition ?audit_artifact)
+      )
+    :effect
+      (and
+        (artifact_composed ?audit_artifact)
+        (artifact_bound_to_producer_stream ?audit_artifact ?producer_stream)
+        (artifact_bound_to_consumer_stream ?audit_artifact ?consumer_stream)
+        (artifact_request_timestamp ?audit_artifact)
+        (not
+          (artifact_pending_composition ?audit_artifact)
+        )
+      )
+  )
+  (:action compose_audit_artifact_request_encryption_and_timestamp
+    :parameters (?producer_component - producer_component ?consumer_component - consumer_component ?producer_stream - producer_stream ?consumer_stream - consumer_stream ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (partition_composition_locked ?producer_component)
+        (consumer_partition_composition_locked ?consumer_component)
+        (producer_component_bound_to_stream ?producer_component ?producer_stream)
+        (consumer_component_bound_to_stream ?consumer_component ?consumer_stream)
+        (producer_stream_evidence_locked ?producer_stream)
+        (consumer_stream_evidence_locked ?consumer_stream)
+        (not
+          (producer_ready_for_composition ?producer_component)
+        )
+        (not
+          (consumer_ready_for_composition ?consumer_component)
+        )
+        (artifact_pending_composition ?audit_artifact)
+      )
+    :effect
+      (and
+        (artifact_composed ?audit_artifact)
+        (artifact_bound_to_producer_stream ?audit_artifact ?producer_stream)
+        (artifact_bound_to_consumer_stream ?audit_artifact ?consumer_stream)
+        (artifact_request_encryption ?audit_artifact)
+        (artifact_request_timestamp ?audit_artifact)
+        (not
+          (artifact_pending_composition ?audit_artifact)
+        )
+      )
+  )
+  (:action seal_audit_artifact
+    :parameters (?audit_artifact - audit_artifact ?producer_component - producer_component ?event_schema - event_schema)
+    :precondition
+      (and
+        (artifact_composed ?audit_artifact)
+        (partition_composition_locked ?producer_component)
+        (entity_bound_to_schema ?producer_component ?event_schema)
+        (not
+          (artifact_sealed ?audit_artifact)
+        )
+      )
+    :effect (artifact_sealed ?audit_artifact)
+  )
+  (:action ingest_evidence_fragment_into_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (coordinator_bound_artifact ?audit_coordinator ?audit_artifact)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (evidence_fragment_available ?evidence_fragment)
+        (artifact_composed ?audit_artifact)
+        (artifact_sealed ?audit_artifact)
+        (not
+          (evidence_fragment_ingested ?evidence_fragment)
+        )
+      )
+    :effect
+      (and
+        (evidence_fragment_ingested ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (not
+          (evidence_fragment_available ?evidence_fragment)
+        )
+      )
+  )
+  (:action prepare_coordinator_with_fragment
+    :parameters (?audit_coordinator - audit_coordinator ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (evidence_fragment_ingested ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (entity_bound_to_schema ?audit_coordinator ?event_schema)
+        (not
+          (artifact_request_encryption ?audit_artifact)
+        )
+        (not
+          (coordinator_policy_enforcement_started ?audit_coordinator)
+        )
+      )
+    :effect (coordinator_policy_enforcement_started ?audit_coordinator)
+  )
+  (:action attach_policy_template_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?policy_template - policy_template)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (policy_template_available ?policy_template)
+        (not
+          (policy_attached ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (policy_attached ?audit_coordinator)
+        (coordinator_bound_policy_template ?audit_coordinator ?policy_template)
+        (not
+          (policy_template_available ?policy_template)
+        )
+      )
+  )
+  (:action activate_policy_on_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact ?event_schema - event_schema ?policy_template - policy_template)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (evidence_fragment_ingested ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (entity_bound_to_schema ?audit_coordinator ?event_schema)
+        (artifact_request_encryption ?audit_artifact)
+        (policy_attached ?audit_coordinator)
+        (coordinator_bound_policy_template ?audit_coordinator ?policy_template)
+        (not
+          (coordinator_policy_enforcement_started ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_policy_enforcement_started ?audit_coordinator)
+        (policy_attachment_recorded ?audit_coordinator)
+      )
+  )
+  (:action apply_encryption_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?encryption_key - encryption_key ?operator_identity - operator_identity ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_policy_enforcement_started ?audit_coordinator)
+        (coordinator_bound_encryption_key ?audit_coordinator ?encryption_key)
+        (entity_bound_to_operator ?audit_coordinator ?operator_identity)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (not
+          (artifact_request_timestamp ?audit_artifact)
+        )
+        (not
+          (coordinator_encryption_applied ?audit_coordinator)
+        )
+      )
+    :effect (coordinator_encryption_applied ?audit_coordinator)
+  )
+  (:action apply_encryption_to_coordinator_alternate
+    :parameters (?audit_coordinator - audit_coordinator ?encryption_key - encryption_key ?operator_identity - operator_identity ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_policy_enforcement_started ?audit_coordinator)
+        (coordinator_bound_encryption_key ?audit_coordinator ?encryption_key)
+        (entity_bound_to_operator ?audit_coordinator ?operator_identity)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (artifact_request_timestamp ?audit_artifact)
+        (not
+          (coordinator_encryption_applied ?audit_coordinator)
+        )
+      )
+    :effect (coordinator_encryption_applied ?audit_coordinator)
+  )
+  (:action apply_timestamp_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_encryption_applied ?audit_coordinator)
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (not
+          (artifact_request_encryption ?audit_artifact)
+        )
+        (not
+          (artifact_request_timestamp ?audit_artifact)
+        )
+        (not
+          (coordinator_timestamp_applied ?audit_coordinator)
+        )
+      )
+    :effect (coordinator_timestamp_applied ?audit_coordinator)
+  )
+  (:action apply_timestamp_and_record_policy_check
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_encryption_applied ?audit_coordinator)
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (artifact_request_encryption ?audit_artifact)
+        (not
+          (artifact_request_timestamp ?audit_artifact)
+        )
+        (not
+          (coordinator_timestamp_applied ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (policy_check_passed ?audit_coordinator)
+      )
+  )
+  (:action apply_timestamp_and_mark_policy
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_encryption_applied ?audit_coordinator)
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (not
+          (artifact_request_encryption ?audit_artifact)
+        )
+        (artifact_request_timestamp ?audit_artifact)
+        (not
+          (coordinator_timestamp_applied ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (policy_check_passed ?audit_coordinator)
+      )
+  )
+  (:action apply_timestamp_and_finalize_policy_steps
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token ?evidence_fragment - evidence_fragment ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (coordinator_encryption_applied ?audit_coordinator)
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (coordinator_has_evidence_fragment ?audit_coordinator ?evidence_fragment)
+        (fragment_bound_to_artifact ?evidence_fragment ?audit_artifact)
+        (artifact_request_encryption ?audit_artifact)
+        (artifact_request_timestamp ?audit_artifact)
+        (not
+          (coordinator_timestamp_applied ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (policy_check_passed ?audit_coordinator)
+      )
+  )
+  (:action commit_coordinator_phase1
+    :parameters (?audit_coordinator - audit_coordinator)
+    :precondition
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (not
+          (policy_check_passed ?audit_coordinator)
+        )
+        (not
+          (coordinator_committed ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?audit_coordinator)
+        (eligible_for_credential_binding ?audit_coordinator)
+      )
+  )
+  (:action attach_compliance_check_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (policy_check_passed ?audit_coordinator)
+        (compliance_check_available ?compliance_check)
+      )
+    :effect
+      (and
+        (coordinator_bound_compliance_check ?audit_coordinator ?compliance_check)
+        (not
+          (compliance_check_available ?compliance_check)
+        )
+      )
+  )
+  (:action execute_compliance_workflow_on_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?producer_component - producer_component ?consumer_component - consumer_component ?event_schema - event_schema ?compliance_check - compliance_check)
+    :precondition
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (policy_check_passed ?audit_coordinator)
+        (coordinator_bound_compliance_check ?audit_coordinator ?compliance_check)
+        (coordinator_bound_producer ?audit_coordinator ?producer_component)
+        (coordinator_bound_consumer ?audit_coordinator ?consumer_component)
+        (producer_ready_for_composition ?producer_component)
+        (consumer_ready_for_composition ?consumer_component)
+        (entity_bound_to_schema ?audit_coordinator ?event_schema)
+        (not
+          (coordinator_ready_for_finalization ?audit_coordinator)
+        )
+      )
+    :effect (coordinator_ready_for_finalization ?audit_coordinator)
+  )
+  (:action finalize_and_publish_coordinator
+    :parameters (?audit_coordinator - audit_coordinator)
+    :precondition
+      (and
+        (coordinator_timestamp_applied ?audit_coordinator)
+        (coordinator_ready_for_finalization ?audit_coordinator)
+        (not
+          (coordinator_committed ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?audit_coordinator)
+        (eligible_for_credential_binding ?audit_coordinator)
+      )
+  )
+  (:action attach_external_reference_to_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?external_reference - external_reference ?event_schema - event_schema)
+    :precondition
+      (and
+        (entity_prepared ?audit_coordinator)
+        (entity_bound_to_schema ?audit_coordinator ?event_schema)
+        (external_reference_available ?external_reference)
+        (coordinator_bound_external_reference ?audit_coordinator ?external_reference)
+        (not
+          (external_reference_attested ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (external_reference_attested ?audit_coordinator)
+        (not
+          (external_reference_available ?external_reference)
+        )
+      )
+  )
+  (:action record_attestation_on_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?operator_identity - operator_identity)
+    :precondition
+      (and
+        (external_reference_attested ?audit_coordinator)
+        (entity_bound_to_operator ?audit_coordinator ?operator_identity)
+        (not
+          (attestation_recorded ?audit_coordinator)
+        )
+      )
+    :effect (attestation_recorded ?audit_coordinator)
+  )
+  (:action timestamp_attestation_on_coordinator
+    :parameters (?audit_coordinator - audit_coordinator ?timestamp_token - timestamp_token)
+    :precondition
+      (and
+        (attestation_recorded ?audit_coordinator)
+        (coordinator_bound_timestamp_token ?audit_coordinator ?timestamp_token)
+        (not
+          (attestation_timestamped ?audit_coordinator)
+        )
+      )
+    :effect (attestation_timestamped ?audit_coordinator)
+  )
+  (:action commit_coordinator_post_attestation
+    :parameters (?audit_coordinator - audit_coordinator)
+    :precondition
+      (and
+        (attestation_timestamped ?audit_coordinator)
+        (not
+          (coordinator_committed ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_committed ?audit_coordinator)
+        (eligible_for_credential_binding ?audit_coordinator)
+      )
+  )
+  (:action finalize_producer_component
+    :parameters (?producer_component - producer_component ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (partition_composition_locked ?producer_component)
+        (producer_ready_for_composition ?producer_component)
+        (artifact_composed ?audit_artifact)
+        (artifact_sealed ?audit_artifact)
+        (not
+          (eligible_for_credential_binding ?producer_component)
+        )
+      )
+    :effect (eligible_for_credential_binding ?producer_component)
+  )
+  (:action finalize_consumer_component
+    :parameters (?consumer_component - consumer_component ?audit_artifact - audit_artifact)
+    :precondition
+      (and
+        (consumer_partition_composition_locked ?consumer_component)
+        (consumer_ready_for_composition ?consumer_component)
+        (artifact_composed ?audit_artifact)
+        (artifact_sealed ?audit_artifact)
+        (not
+          (eligible_for_credential_binding ?consumer_component)
+        )
+      )
+    :effect (eligible_for_credential_binding ?consumer_component)
+  )
+  (:action attach_credential_to_entity
+    :parameters (?audit_subject - entity ?credential - credential ?event_schema - event_schema)
+    :precondition
+      (and
+        (eligible_for_credential_binding ?audit_subject)
+        (entity_bound_to_schema ?audit_subject ?event_schema)
+        (credential_available ?credential)
+        (not
+          (credential_bound ?audit_subject)
+        )
+      )
+    :effect
+      (and
+        (credential_bound ?audit_subject)
+        (entity_bound_to_credential ?audit_subject ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action finalize_producer_with_credential
+    :parameters (?producer_component - producer_component ?log_channel - log_channel ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?producer_component)
+        (entity_bound_to_channel ?producer_component ?log_channel)
+        (entity_bound_to_credential ?producer_component ?credential)
+        (not
+          (entity_finalized ?producer_component)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?producer_component)
+        (channel_available ?log_channel)
+        (credential_available ?credential)
+      )
+  )
+  (:action finalize_consumer_with_credential
+    :parameters (?consumer_component - consumer_component ?log_channel - log_channel ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?consumer_component)
+        (entity_bound_to_channel ?consumer_component ?log_channel)
+        (entity_bound_to_credential ?consumer_component ?credential)
+        (not
+          (entity_finalized ?consumer_component)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?consumer_component)
+        (channel_available ?log_channel)
+        (credential_available ?credential)
+      )
+  )
+  (:action finalize_coordinator_with_credential
+    :parameters (?audit_coordinator - audit_coordinator ?log_channel - log_channel ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?audit_coordinator)
+        (entity_bound_to_channel ?audit_coordinator ?log_channel)
+        (entity_bound_to_credential ?audit_coordinator ?credential)
+        (not
+          (entity_finalized ?audit_coordinator)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?audit_coordinator)
+        (channel_available ?log_channel)
+        (credential_available ?credential)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem audit_traceability_scenario)
+  (:domain audit_traceability_design)
+  (:objects producer_component_p1 - producer_component consumer_component_c1 - consumer_component audit_coordinator_alpha - audit_coordinator audit_coordinator_beta - audit_coordinator log_channel_a - log_channel log_channel_b - log_channel log_channel_c - log_channel event_schema_v1 - event_schema operator_identity_ops - operator_identity evidence_resource_r1 - evidence_resource producer_stream_s1 - producer_stream consumer_stream_s1 - consumer_stream audit_artifact_a1 - audit_artifact evidence_fragment_f1 - evidence_fragment evidence_fragment_f2 - evidence_fragment policy_template_p1 - policy_template policy_template_p2 - policy_template compliance_check_c1 - compliance_check compliance_check_c2 - compliance_check credential_creds1 - credential encryption_key_k1 - encryption_key external_reference_xref1 - external_reference external_reference_xref2 - external_reference timestamp_token_t1 - timestamp_token)
+  (:init
+    (channel_available log_channel_a)
+    (channel_available log_channel_b)
+    (channel_available log_channel_c)
+    (event_schema_available event_schema_v1)
+    (operator_available operator_identity_ops)
+    (evidence_resource_available evidence_resource_r1)
+    (producer_component_bound_to_stream producer_component_p1 producer_stream_s1)
+    (consumer_component_bound_to_stream consumer_component_c1 consumer_stream_s1)
+    (artifact_pending_composition audit_artifact_a1)
+    (evidence_fragment_available evidence_fragment_f1)
+    (evidence_fragment_available evidence_fragment_f2)
+    (coordinator_bound_producer audit_coordinator_alpha producer_component_p1)
+    (coordinator_bound_producer audit_coordinator_beta producer_component_p1)
+    (coordinator_bound_consumer audit_coordinator_alpha consumer_component_c1)
+    (coordinator_bound_consumer audit_coordinator_beta consumer_component_c1)
+    (coordinator_bound_artifact audit_coordinator_alpha audit_artifact_a1)
+    (coordinator_bound_artifact audit_coordinator_beta audit_artifact_a1)
+    (coordinator_has_evidence_fragment audit_coordinator_alpha evidence_fragment_f1)
+    (coordinator_has_evidence_fragment audit_coordinator_beta evidence_fragment_f2)
+    (policy_template_available policy_template_p1)
+    (policy_template_available policy_template_p2)
+    (compliance_check_available compliance_check_c1)
+    (compliance_check_available compliance_check_c2)
+    (credential_available credential_creds1)
+    (encryption_key_available encryption_key_k1)
+    (external_reference_available external_reference_xref1)
+    (coordinator_bound_external_reference audit_coordinator_alpha external_reference_xref1)
+    (coordinator_bound_external_reference audit_coordinator_beta external_reference_xref2)
+    (timestamp_token_available timestamp_token_t1)
+  )
+  (:goal
+    (and
+      (entity_finalized producer_component_p1)
+      (entity_finalized consumer_component_c1)
+      (entity_finalized audit_coordinator_alpha)
+      (entity_finalized audit_coordinator_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_audit_entity producer_component_p1)
+(allocate_log_channel_to_entity producer_component_p1 log_channel_a)
+(bind_event_schema_to_entity producer_component_p1 event_schema_v1)
+(authorize_entity_for_collection producer_component_p1 event_schema_v1)
+(attach_evidence_to_producer_partition producer_component_p1 producer_stream_s1 evidence_resource_r1)
+(ingest_producer_evidence_into_stream producer_component_p1 producer_stream_s1 event_schema_v1 evidence_resource_r1)
+(register_audit_entity consumer_component_c1)
+(allocate_log_channel_to_entity consumer_component_c1 log_channel_b)
+(release_event_schema_from_entity producer_component_p1 event_schema_v1)
+(bind_event_schema_to_entity consumer_component_c1 event_schema_v1)
+(authorize_entity_for_collection consumer_component_c1 event_schema_v1)
+(attach_evidence_to_consumer_partition consumer_component_c1 consumer_stream_s1 evidence_resource_r1)
+(ingest_consumer_evidence_into_stream consumer_component_c1 consumer_stream_s1 event_schema_v1 evidence_resource_r1)
+(release_event_schema_from_entity consumer_component_c1 event_schema_v1)
+(bind_event_schema_to_entity producer_component_p1 event_schema_v1)
+(compose_audit_artifact producer_component_p1 consumer_component_c1 producer_stream_s1 consumer_stream_s1 audit_artifact_a1)
+(seal_audit_artifact audit_artifact_a1 producer_component_p1 event_schema_v1)
+(finalize_producer_component producer_component_p1 audit_artifact_a1)
+(finalize_consumer_component consumer_component_c1 audit_artifact_a1)
+(register_audit_entity audit_coordinator_alpha)
+(allocate_log_channel_to_entity audit_coordinator_alpha log_channel_c)
+(release_event_schema_from_entity producer_component_p1 event_schema_v1)
+(bind_event_schema_to_entity audit_coordinator_alpha event_schema_v1)
+(authorize_entity_for_collection audit_coordinator_alpha event_schema_v1)
+(ingest_evidence_fragment_into_coordinator audit_coordinator_alpha evidence_fragment_f1 audit_artifact_a1)
+(prepare_coordinator_with_fragment audit_coordinator_alpha evidence_fragment_f1 audit_artifact_a1 event_schema_v1)
+(attach_encryption_key_to_coordinator audit_coordinator_alpha encryption_key_k1)
+(bind_operator_identity_to_entity audit_coordinator_alpha operator_identity_ops)
+(apply_encryption_to_coordinator audit_coordinator_alpha encryption_key_k1 operator_identity_ops evidence_fragment_f1 audit_artifact_a1)
+(attach_timestamp_token_to_coordinator audit_coordinator_alpha timestamp_token_t1)
+(apply_timestamp_to_coordinator audit_coordinator_alpha timestamp_token_t1 evidence_fragment_f1 audit_artifact_a1)
+(commit_coordinator_phase1 audit_coordinator_alpha)
+(release_event_schema_from_entity audit_coordinator_alpha event_schema_v1)
+(bind_event_schema_to_entity producer_component_p1 event_schema_v1)
+(attach_credential_to_entity producer_component_p1 credential_creds1 event_schema_v1)
+(finalize_producer_with_credential producer_component_p1 log_channel_a credential_creds1)
+(release_event_schema_from_entity producer_component_p1 event_schema_v1)
+(register_audit_entity audit_coordinator_beta)
+(allocate_log_channel_to_entity audit_coordinator_beta log_channel_a)
+(bind_event_schema_to_entity audit_coordinator_beta event_schema_v1)
+(authorize_entity_for_collection audit_coordinator_beta event_schema_v1)
+(ingest_evidence_fragment_into_coordinator audit_coordinator_beta evidence_fragment_f2 audit_artifact_a1)
+(prepare_coordinator_with_fragment audit_coordinator_beta evidence_fragment_f2 audit_artifact_a1 event_schema_v1)
+(release_operator_identity_from_entity audit_coordinator_alpha operator_identity_ops)
+(release_encryption_key_from_coordinator audit_coordinator_alpha encryption_key_k1)
+(release_timestamp_token_from_coordinator audit_coordinator_alpha timestamp_token_t1)
+(bind_operator_identity_to_entity audit_coordinator_beta operator_identity_ops)
+(attach_encryption_key_to_coordinator audit_coordinator_beta encryption_key_k1)
+(apply_encryption_to_coordinator audit_coordinator_beta encryption_key_k1 operator_identity_ops evidence_fragment_f2 audit_artifact_a1)
+(attach_timestamp_token_to_coordinator audit_coordinator_beta timestamp_token_t1)
+(apply_timestamp_to_coordinator audit_coordinator_beta timestamp_token_t1 evidence_fragment_f2 audit_artifact_a1)
+(commit_coordinator_phase1 audit_coordinator_beta)
+(release_event_schema_from_entity audit_coordinator_beta event_schema_v1)
+(bind_event_schema_to_entity consumer_component_c1 event_schema_v1)
+(attach_credential_to_entity consumer_component_c1 credential_creds1 event_schema_v1)
+(finalize_consumer_with_credential consumer_component_c1 log_channel_b credential_creds1)
+(release_event_schema_from_entity consumer_component_c1 event_schema_v1)
+(bind_event_schema_to_entity audit_coordinator_alpha event_schema_v1)
+(attach_credential_to_entity audit_coordinator_alpha credential_creds1 event_schema_v1)
+(finalize_coordinator_with_credential audit_coordinator_alpha log_channel_c credential_creds1)
+(release_event_schema_from_entity audit_coordinator_alpha event_schema_v1)
+(bind_event_schema_to_entity audit_coordinator_beta event_schema_v1)
+(attach_credential_to_entity audit_coordinator_beta credential_creds1 event_schema_v1)
+(finalize_coordinator_with_credential audit_coordinator_beta log_channel_a credential_creds1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_qhw1s7hz/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 64 
+
+Successful plans:
+Value: 64
+ /tmp/val_qhw1s7hz/plan.pddl 64 
+
+
+
+--- stderr ---
+

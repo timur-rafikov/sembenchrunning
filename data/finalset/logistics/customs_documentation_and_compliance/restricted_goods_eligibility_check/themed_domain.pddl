@@ -1,0 +1,936 @@
+(define (domain restricted_goods_eligibility_check)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types artifact - object resource - object regulatory_record - object trade_entity - object consignment_item - trade_entity classification_resource - artifact regulatory_rule - artifact permit_template - artifact special_authorization_type - artifact third_party_certificate - artifact eligibility_code - artifact technical_standard_ref - artifact end_use_declaration - artifact evidence_document - resource inspection_template - resource sanctions_list_entry - resource risk_profile - regulatory_record destination_profile - regulatory_record filing_batch - regulatory_record declaration_group - consignment_item declaration_variant - consignment_item export_declaration - declaration_group import_declaration - declaration_group compliance_case - declaration_variant)
+  (:predicates
+    (consignment_item_registered ?consignment_item - consignment_item)
+    (ready_for_processing ?consignment_item - consignment_item)
+    (classification_assigned ?consignment_item - consignment_item)
+    (final_eligibility_confirmed ?consignment_item - consignment_item)
+    (review_approved ?consignment_item - consignment_item)
+    (eligibility_asserted ?consignment_item - consignment_item)
+    (classification_resource_available ?classification_resource - classification_resource)
+    (item_assigned_classification_resource ?consignment_item - consignment_item ?classification_resource - classification_resource)
+    (regulatory_rule_available ?regulatory_rule - regulatory_rule)
+    (item_assigned_regulatory_rule ?consignment_item - consignment_item ?regulatory_rule - regulatory_rule)
+    (permit_template_available ?permit_template - permit_template)
+    (permit_attached_to_item ?consignment_item - consignment_item ?permit_template - permit_template)
+    (evidence_document_available ?evidence_document - evidence_document)
+    (export_declaration_has_evidence ?export_declaration - export_declaration ?evidence_document - evidence_document)
+    (import_declaration_has_evidence ?import_declaration - import_declaration ?evidence_document - evidence_document)
+    (export_declaration_linked_risk_profile ?export_declaration - export_declaration ?risk_profile - risk_profile)
+    (risk_profile_validated ?risk_profile - risk_profile)
+    (risk_profile_secondary_flag ?risk_profile - risk_profile)
+    (export_declaration_ready ?export_declaration - export_declaration)
+    (import_declaration_linked_destination_profile ?import_declaration - import_declaration ?destination_profile - destination_profile)
+    (destination_profile_passed ?destination_profile - destination_profile)
+    (destination_profile_secondary_flag ?destination_profile - destination_profile)
+    (import_declaration_ready ?import_declaration - import_declaration)
+    (filing_batch_available ?filing_batch - filing_batch)
+    (filing_batch_reserved ?filing_batch - filing_batch)
+    (filing_batch_linked_risk_profile ?filing_batch - filing_batch ?risk_profile - risk_profile)
+    (filing_batch_linked_destination_profile ?filing_batch - filing_batch ?destination_profile - destination_profile)
+    (filing_quality_flag ?filing_batch - filing_batch)
+    (filing_secondary_quality_flag ?filing_batch - filing_batch)
+    (filing_execution_processed ?filing_batch - filing_batch)
+    (compliance_case_has_export_declaration ?compliance_case - compliance_case ?export_declaration - export_declaration)
+    (compliance_case_has_import_declaration ?compliance_case - compliance_case ?import_declaration - import_declaration)
+    (compliance_case_linked_filing_batch ?compliance_case - compliance_case ?filing_batch - filing_batch)
+    (inspection_template_available ?inspection_template - inspection_template)
+    (compliance_case_assigned_inspection_template ?compliance_case - compliance_case ?inspection_template - inspection_template)
+    (inspection_outcome_recorded ?inspection_template - inspection_template)
+    (inspection_outcome_linked_filing_batch ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    (case_in_specialist_queue ?compliance_case - compliance_case)
+    (specialist_assessment_initiated ?compliance_case - compliance_case)
+    (specialist_assessment_completed ?compliance_case - compliance_case)
+    (special_authorization_available_for_case ?compliance_case - compliance_case)
+    (case_has_special_authorization ?compliance_case - compliance_case)
+    (case_certificates_verified ?compliance_case - compliance_case)
+    (case_consolidation_ready ?compliance_case - compliance_case)
+    (sanctions_list_entry_available ?sanctions_list_entry - sanctions_list_entry)
+    (case_linked_sanctions_entry ?compliance_case - compliance_case ?sanctions_list_entry - sanctions_list_entry)
+    (sanctions_screening_in_progress ?compliance_case - compliance_case)
+    (sanctions_secondary_clearance ?compliance_case - compliance_case)
+    (sanctions_screening_completed ?compliance_case - compliance_case)
+    (special_authorization_candidate_available ?special_authorization_type - special_authorization_type)
+    (special_authorization_assigned_to_case ?compliance_case - compliance_case ?special_authorization_type - special_authorization_type)
+    (third_party_certificate_available ?third_party_certificate - third_party_certificate)
+    (third_party_certificate_attached_to_case ?compliance_case - compliance_case ?third_party_certificate - third_party_certificate)
+    (technical_standard_available ?technical_standard_ref - technical_standard_ref)
+    (technical_standard_linked_to_case ?compliance_case - compliance_case ?technical_standard_ref - technical_standard_ref)
+    (end_use_declaration_available ?end_use_declaration - end_use_declaration)
+    (end_use_declaration_associated_with_case ?compliance_case - compliance_case ?end_use_declaration - end_use_declaration)
+    (eligibility_code_candidate_available ?eligibility_code - eligibility_code)
+    (item_attached_eligibility_code ?consignment_item - consignment_item ?eligibility_code - eligibility_code)
+    (export_declaration_prepared_for_filing ?export_declaration - export_declaration)
+    (import_declaration_prepared_for_filing ?import_declaration - import_declaration)
+    (case_finalised ?compliance_case - compliance_case)
+  )
+  (:action register_consignment_item_case
+    :parameters (?consignment_item - consignment_item)
+    :precondition
+      (and
+        (not
+          (consignment_item_registered ?consignment_item)
+        )
+        (not
+          (final_eligibility_confirmed ?consignment_item)
+        )
+      )
+    :effect (consignment_item_registered ?consignment_item)
+  )
+  (:action attach_classification_resource_to_item
+    :parameters (?consignment_item - consignment_item ?classification_resource - classification_resource)
+    :precondition
+      (and
+        (consignment_item_registered ?consignment_item)
+        (not
+          (classification_assigned ?consignment_item)
+        )
+        (classification_resource_available ?classification_resource)
+      )
+    :effect
+      (and
+        (classification_assigned ?consignment_item)
+        (item_assigned_classification_resource ?consignment_item ?classification_resource)
+        (not
+          (classification_resource_available ?classification_resource)
+        )
+      )
+  )
+  (:action link_regulatory_rule_to_item
+    :parameters (?consignment_item - consignment_item ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (consignment_item_registered ?consignment_item)
+        (classification_assigned ?consignment_item)
+        (regulatory_rule_available ?regulatory_rule)
+      )
+    :effect
+      (and
+        (item_assigned_regulatory_rule ?consignment_item ?regulatory_rule)
+        (not
+          (regulatory_rule_available ?regulatory_rule)
+        )
+      )
+  )
+  (:action finalize_regulatory_rule_assignment
+    :parameters (?consignment_item - consignment_item ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (consignment_item_registered ?consignment_item)
+        (classification_assigned ?consignment_item)
+        (item_assigned_regulatory_rule ?consignment_item ?regulatory_rule)
+        (not
+          (ready_for_processing ?consignment_item)
+        )
+      )
+    :effect (ready_for_processing ?consignment_item)
+  )
+  (:action detach_regulatory_rule_from_item
+    :parameters (?consignment_item - consignment_item ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (item_assigned_regulatory_rule ?consignment_item ?regulatory_rule)
+      )
+    :effect
+      (and
+        (regulatory_rule_available ?regulatory_rule)
+        (not
+          (item_assigned_regulatory_rule ?consignment_item ?regulatory_rule)
+        )
+      )
+  )
+  (:action attach_permit_template_to_item
+    :parameters (?consignment_item - consignment_item ?permit_template - permit_template)
+    :precondition
+      (and
+        (ready_for_processing ?consignment_item)
+        (permit_template_available ?permit_template)
+      )
+    :effect
+      (and
+        (permit_attached_to_item ?consignment_item ?permit_template)
+        (not
+          (permit_template_available ?permit_template)
+        )
+      )
+  )
+  (:action detach_permit_template_from_item
+    :parameters (?consignment_item - consignment_item ?permit_template - permit_template)
+    :precondition
+      (and
+        (permit_attached_to_item ?consignment_item ?permit_template)
+      )
+    :effect
+      (and
+        (permit_template_available ?permit_template)
+        (not
+          (permit_attached_to_item ?consignment_item ?permit_template)
+        )
+      )
+  )
+  (:action attach_technical_standard_to_case
+    :parameters (?compliance_case - compliance_case ?technical_standard_ref - technical_standard_ref)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (technical_standard_available ?technical_standard_ref)
+      )
+    :effect
+      (and
+        (technical_standard_linked_to_case ?compliance_case ?technical_standard_ref)
+        (not
+          (technical_standard_available ?technical_standard_ref)
+        )
+      )
+  )
+  (:action detach_technical_standard_from_case
+    :parameters (?compliance_case - compliance_case ?technical_standard_ref - technical_standard_ref)
+    :precondition
+      (and
+        (technical_standard_linked_to_case ?compliance_case ?technical_standard_ref)
+      )
+    :effect
+      (and
+        (technical_standard_available ?technical_standard_ref)
+        (not
+          (technical_standard_linked_to_case ?compliance_case ?technical_standard_ref)
+        )
+      )
+  )
+  (:action attach_end_use_declaration_to_case
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (end_use_declaration_available ?end_use_declaration)
+      )
+    :effect
+      (and
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (not
+          (end_use_declaration_available ?end_use_declaration)
+        )
+      )
+  )
+  (:action detach_end_use_declaration_from_case
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration)
+    :precondition
+      (and
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+      )
+    :effect
+      (and
+        (end_use_declaration_available ?end_use_declaration)
+        (not
+          (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        )
+      )
+  )
+  (:action validate_risk_profile_for_declaration
+    :parameters (?export_declaration - export_declaration ?risk_profile - risk_profile ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (ready_for_processing ?export_declaration)
+        (item_assigned_regulatory_rule ?export_declaration ?regulatory_rule)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (not
+          (risk_profile_validated ?risk_profile)
+        )
+        (not
+          (risk_profile_secondary_flag ?risk_profile)
+        )
+      )
+    :effect (risk_profile_validated ?risk_profile)
+  )
+  (:action assign_permit_and_mark_declaration_ready
+    :parameters (?export_declaration - export_declaration ?risk_profile - risk_profile ?permit_template - permit_template)
+    :precondition
+      (and
+        (ready_for_processing ?export_declaration)
+        (permit_attached_to_item ?export_declaration ?permit_template)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (risk_profile_validated ?risk_profile)
+        (not
+          (export_declaration_prepared_for_filing ?export_declaration)
+        )
+      )
+    :effect
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (export_declaration_ready ?export_declaration)
+      )
+  )
+  (:action attach_evidence_and_mark_declaration_ready
+    :parameters (?export_declaration - export_declaration ?risk_profile - risk_profile ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_processing ?export_declaration)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (evidence_document_available ?evidence_document)
+        (not
+          (export_declaration_prepared_for_filing ?export_declaration)
+        )
+      )
+    :effect
+      (and
+        (risk_profile_secondary_flag ?risk_profile)
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (export_declaration_has_evidence ?export_declaration ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_evidence_and_update_declaration_readiness
+    :parameters (?export_declaration - export_declaration ?risk_profile - risk_profile ?regulatory_rule - regulatory_rule ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_processing ?export_declaration)
+        (item_assigned_regulatory_rule ?export_declaration ?regulatory_rule)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (risk_profile_secondary_flag ?risk_profile)
+        (export_declaration_has_evidence ?export_declaration ?evidence_document)
+        (not
+          (export_declaration_ready ?export_declaration)
+        )
+      )
+    :effect
+      (and
+        (risk_profile_validated ?risk_profile)
+        (export_declaration_ready ?export_declaration)
+        (evidence_document_available ?evidence_document)
+        (not
+          (export_declaration_has_evidence ?export_declaration ?evidence_document)
+        )
+      )
+  )
+  (:action validate_destination_profile_for_import_declaration
+    :parameters (?import_declaration - import_declaration ?destination_profile - destination_profile ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (ready_for_processing ?import_declaration)
+        (item_assigned_regulatory_rule ?import_declaration ?regulatory_rule)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (not
+          (destination_profile_passed ?destination_profile)
+        )
+        (not
+          (destination_profile_secondary_flag ?destination_profile)
+        )
+      )
+    :effect (destination_profile_passed ?destination_profile)
+  )
+  (:action assign_permit_and_mark_import_declaration_ready
+    :parameters (?import_declaration - import_declaration ?destination_profile - destination_profile ?permit_template - permit_template)
+    :precondition
+      (and
+        (ready_for_processing ?import_declaration)
+        (permit_attached_to_item ?import_declaration ?permit_template)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (destination_profile_passed ?destination_profile)
+        (not
+          (import_declaration_prepared_for_filing ?import_declaration)
+        )
+      )
+    :effect
+      (and
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (import_declaration_ready ?import_declaration)
+      )
+  )
+  (:action attach_evidence_and_mark_import_declaration_ready
+    :parameters (?import_declaration - import_declaration ?destination_profile - destination_profile ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_processing ?import_declaration)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (evidence_document_available ?evidence_document)
+        (not
+          (import_declaration_prepared_for_filing ?import_declaration)
+        )
+      )
+    :effect
+      (and
+        (destination_profile_secondary_flag ?destination_profile)
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (import_declaration_has_evidence ?import_declaration ?evidence_document)
+        (not
+          (evidence_document_available ?evidence_document)
+        )
+      )
+  )
+  (:action process_import_evidence_and_update_declaration_readiness
+    :parameters (?import_declaration - import_declaration ?destination_profile - destination_profile ?regulatory_rule - regulatory_rule ?evidence_document - evidence_document)
+    :precondition
+      (and
+        (ready_for_processing ?import_declaration)
+        (item_assigned_regulatory_rule ?import_declaration ?regulatory_rule)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (destination_profile_secondary_flag ?destination_profile)
+        (import_declaration_has_evidence ?import_declaration ?evidence_document)
+        (not
+          (import_declaration_ready ?import_declaration)
+        )
+      )
+    :effect
+      (and
+        (destination_profile_passed ?destination_profile)
+        (import_declaration_ready ?import_declaration)
+        (evidence_document_available ?evidence_document)
+        (not
+          (import_declaration_has_evidence ?import_declaration ?evidence_document)
+        )
+      )
+  )
+  (:action prepare_and_reserve_filing_batch
+    :parameters (?export_declaration - export_declaration ?import_declaration - import_declaration ?risk_profile - risk_profile ?destination_profile - destination_profile ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (risk_profile_validated ?risk_profile)
+        (destination_profile_passed ?destination_profile)
+        (export_declaration_ready ?export_declaration)
+        (import_declaration_ready ?import_declaration)
+        (filing_batch_available ?filing_batch)
+      )
+    :effect
+      (and
+        (filing_batch_reserved ?filing_batch)
+        (filing_batch_linked_risk_profile ?filing_batch ?risk_profile)
+        (filing_batch_linked_destination_profile ?filing_batch ?destination_profile)
+        (not
+          (filing_batch_available ?filing_batch)
+        )
+      )
+  )
+  (:action prepare_and_reserve_filing_batch_with_quality_flag
+    :parameters (?export_declaration - export_declaration ?import_declaration - import_declaration ?risk_profile - risk_profile ?destination_profile - destination_profile ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (risk_profile_secondary_flag ?risk_profile)
+        (destination_profile_passed ?destination_profile)
+        (not
+          (export_declaration_ready ?export_declaration)
+        )
+        (import_declaration_ready ?import_declaration)
+        (filing_batch_available ?filing_batch)
+      )
+    :effect
+      (and
+        (filing_batch_reserved ?filing_batch)
+        (filing_batch_linked_risk_profile ?filing_batch ?risk_profile)
+        (filing_batch_linked_destination_profile ?filing_batch ?destination_profile)
+        (filing_quality_flag ?filing_batch)
+        (not
+          (filing_batch_available ?filing_batch)
+        )
+      )
+  )
+  (:action prepare_and_reserve_filing_batch_with_secondary_quality_flag
+    :parameters (?export_declaration - export_declaration ?import_declaration - import_declaration ?risk_profile - risk_profile ?destination_profile - destination_profile ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (risk_profile_validated ?risk_profile)
+        (destination_profile_secondary_flag ?destination_profile)
+        (export_declaration_ready ?export_declaration)
+        (not
+          (import_declaration_ready ?import_declaration)
+        )
+        (filing_batch_available ?filing_batch)
+      )
+    :effect
+      (and
+        (filing_batch_reserved ?filing_batch)
+        (filing_batch_linked_risk_profile ?filing_batch ?risk_profile)
+        (filing_batch_linked_destination_profile ?filing_batch ?destination_profile)
+        (filing_secondary_quality_flag ?filing_batch)
+        (not
+          (filing_batch_available ?filing_batch)
+        )
+      )
+  )
+  (:action prepare_and_reserve_filing_batch_with_both_quality_flags
+    :parameters (?export_declaration - export_declaration ?import_declaration - import_declaration ?risk_profile - risk_profile ?destination_profile - destination_profile ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (export_declaration_linked_risk_profile ?export_declaration ?risk_profile)
+        (import_declaration_linked_destination_profile ?import_declaration ?destination_profile)
+        (risk_profile_secondary_flag ?risk_profile)
+        (destination_profile_secondary_flag ?destination_profile)
+        (not
+          (export_declaration_ready ?export_declaration)
+        )
+        (not
+          (import_declaration_ready ?import_declaration)
+        )
+        (filing_batch_available ?filing_batch)
+      )
+    :effect
+      (and
+        (filing_batch_reserved ?filing_batch)
+        (filing_batch_linked_risk_profile ?filing_batch ?risk_profile)
+        (filing_batch_linked_destination_profile ?filing_batch ?destination_profile)
+        (filing_quality_flag ?filing_batch)
+        (filing_secondary_quality_flag ?filing_batch)
+        (not
+          (filing_batch_available ?filing_batch)
+        )
+      )
+  )
+  (:action process_filing_execution_for_batch
+    :parameters (?filing_batch - filing_batch ?export_declaration - export_declaration ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (filing_batch_reserved ?filing_batch)
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (item_assigned_regulatory_rule ?export_declaration ?regulatory_rule)
+        (not
+          (filing_execution_processed ?filing_batch)
+        )
+      )
+    :effect (filing_execution_processed ?filing_batch)
+  )
+  (:action execute_inspection_and_record_outcome
+    :parameters (?compliance_case - compliance_case ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (compliance_case_linked_filing_batch ?compliance_case ?filing_batch)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_template_available ?inspection_template)
+        (filing_batch_reserved ?filing_batch)
+        (filing_execution_processed ?filing_batch)
+        (not
+          (inspection_outcome_recorded ?inspection_template)
+        )
+      )
+    :effect
+      (and
+        (inspection_outcome_recorded ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (not
+          (inspection_template_available ?inspection_template)
+        )
+      )
+  )
+  (:action move_case_to_specialist_assessment_queue
+    :parameters (?compliance_case - compliance_case ?inspection_template - inspection_template ?filing_batch - filing_batch ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_recorded ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (item_assigned_regulatory_rule ?compliance_case ?regulatory_rule)
+        (not
+          (filing_quality_flag ?filing_batch)
+        )
+        (not
+          (case_in_specialist_queue ?compliance_case)
+        )
+      )
+    :effect (case_in_specialist_queue ?compliance_case)
+  )
+  (:action assign_special_authorization_to_case
+    :parameters (?compliance_case - compliance_case ?special_authorization_type - special_authorization_type)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (special_authorization_candidate_available ?special_authorization_type)
+        (not
+          (special_authorization_available_for_case ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (special_authorization_available_for_case ?compliance_case)
+        (special_authorization_assigned_to_case ?compliance_case ?special_authorization_type)
+        (not
+          (special_authorization_candidate_available ?special_authorization_type)
+        )
+      )
+  )
+  (:action apply_special_authorization_and_progress_case
+    :parameters (?compliance_case - compliance_case ?inspection_template - inspection_template ?filing_batch - filing_batch ?regulatory_rule - regulatory_rule ?special_authorization_type - special_authorization_type)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_recorded ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (item_assigned_regulatory_rule ?compliance_case ?regulatory_rule)
+        (filing_quality_flag ?filing_batch)
+        (special_authorization_available_for_case ?compliance_case)
+        (special_authorization_assigned_to_case ?compliance_case ?special_authorization_type)
+        (not
+          (case_in_specialist_queue ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_in_specialist_queue ?compliance_case)
+        (case_has_special_authorization ?compliance_case)
+      )
+  )
+  (:action initiate_specialist_assessment
+    :parameters (?compliance_case - compliance_case ?technical_standard_ref - technical_standard_ref ?permit_template - permit_template ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (case_in_specialist_queue ?compliance_case)
+        (technical_standard_linked_to_case ?compliance_case ?technical_standard_ref)
+        (permit_attached_to_item ?compliance_case ?permit_template)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (not
+          (filing_secondary_quality_flag ?filing_batch)
+        )
+        (not
+          (specialist_assessment_initiated ?compliance_case)
+        )
+      )
+    :effect (specialist_assessment_initiated ?compliance_case)
+  )
+  (:action initiate_specialist_assessment_variant
+    :parameters (?compliance_case - compliance_case ?technical_standard_ref - technical_standard_ref ?permit_template - permit_template ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (case_in_specialist_queue ?compliance_case)
+        (technical_standard_linked_to_case ?compliance_case ?technical_standard_ref)
+        (permit_attached_to_item ?compliance_case ?permit_template)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (filing_secondary_quality_flag ?filing_batch)
+        (not
+          (specialist_assessment_initiated ?compliance_case)
+        )
+      )
+    :effect (specialist_assessment_initiated ?compliance_case)
+  )
+  (:action finalize_specialist_assessment
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (specialist_assessment_initiated ?compliance_case)
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (not
+          (filing_quality_flag ?filing_batch)
+        )
+        (not
+          (filing_secondary_quality_flag ?filing_batch)
+        )
+        (not
+          (specialist_assessment_completed ?compliance_case)
+        )
+      )
+    :effect (specialist_assessment_completed ?compliance_case)
+  )
+  (:action finalize_specialist_assessment_and_record_certificate_attachment
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (specialist_assessment_initiated ?compliance_case)
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (filing_quality_flag ?filing_batch)
+        (not
+          (filing_secondary_quality_flag ?filing_batch)
+        )
+        (not
+          (specialist_assessment_completed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_certificates_verified ?compliance_case)
+      )
+  )
+  (:action finalize_specialist_assessment_and_record_certificate_attachment_variant
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (specialist_assessment_initiated ?compliance_case)
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (not
+          (filing_quality_flag ?filing_batch)
+        )
+        (filing_secondary_quality_flag ?filing_batch)
+        (not
+          (specialist_assessment_completed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_certificates_verified ?compliance_case)
+      )
+  )
+  (:action finalize_specialist_assessment_and_record_certificate_attachment_both_flags
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration ?inspection_template - inspection_template ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (specialist_assessment_initiated ?compliance_case)
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (compliance_case_assigned_inspection_template ?compliance_case ?inspection_template)
+        (inspection_outcome_linked_filing_batch ?inspection_template ?filing_batch)
+        (filing_quality_flag ?filing_batch)
+        (filing_secondary_quality_flag ?filing_batch)
+        (not
+          (specialist_assessment_completed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_certificates_verified ?compliance_case)
+      )
+  )
+  (:action consolidate_case_and_record_review_approval
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (not
+          (case_certificates_verified ?compliance_case)
+        )
+        (not
+          (case_finalised ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalised ?compliance_case)
+        (review_approved ?compliance_case)
+      )
+  )
+  (:action attach_third_party_certificate_to_case
+    :parameters (?compliance_case - compliance_case ?third_party_certificate - third_party_certificate)
+    :precondition
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_certificates_verified ?compliance_case)
+        (third_party_certificate_available ?third_party_certificate)
+      )
+    :effect
+      (and
+        (third_party_certificate_attached_to_case ?compliance_case ?third_party_certificate)
+        (not
+          (third_party_certificate_available ?third_party_certificate)
+        )
+      )
+  )
+  (:action mark_case_consolidation_prerequisites_met
+    :parameters (?compliance_case - compliance_case ?export_declaration - export_declaration ?import_declaration - import_declaration ?regulatory_rule - regulatory_rule ?third_party_certificate - third_party_certificate)
+    :precondition
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_certificates_verified ?compliance_case)
+        (third_party_certificate_attached_to_case ?compliance_case ?third_party_certificate)
+        (compliance_case_has_export_declaration ?compliance_case ?export_declaration)
+        (compliance_case_has_import_declaration ?compliance_case ?import_declaration)
+        (export_declaration_ready ?export_declaration)
+        (import_declaration_ready ?import_declaration)
+        (item_assigned_regulatory_rule ?compliance_case ?regulatory_rule)
+        (not
+          (case_consolidation_ready ?compliance_case)
+        )
+      )
+    :effect (case_consolidation_ready ?compliance_case)
+  )
+  (:action finalize_case_and_record_review_approval
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (specialist_assessment_completed ?compliance_case)
+        (case_consolidation_ready ?compliance_case)
+        (not
+          (case_finalised ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalised ?compliance_case)
+        (review_approved ?compliance_case)
+      )
+  )
+  (:action initiate_sanctions_screening_for_case
+    :parameters (?compliance_case - compliance_case ?sanctions_list_entry - sanctions_list_entry ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (ready_for_processing ?compliance_case)
+        (item_assigned_regulatory_rule ?compliance_case ?regulatory_rule)
+        (sanctions_list_entry_available ?sanctions_list_entry)
+        (case_linked_sanctions_entry ?compliance_case ?sanctions_list_entry)
+        (not
+          (sanctions_screening_in_progress ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (sanctions_screening_in_progress ?compliance_case)
+        (not
+          (sanctions_list_entry_available ?sanctions_list_entry)
+        )
+      )
+  )
+  (:action apply_sanctions_remedial_clearance_for_case
+    :parameters (?compliance_case - compliance_case ?permit_template - permit_template)
+    :precondition
+      (and
+        (sanctions_screening_in_progress ?compliance_case)
+        (permit_attached_to_item ?compliance_case ?permit_template)
+        (not
+          (sanctions_secondary_clearance ?compliance_case)
+        )
+      )
+    :effect (sanctions_secondary_clearance ?compliance_case)
+  )
+  (:action complete_sanctions_screening_for_case
+    :parameters (?compliance_case - compliance_case ?end_use_declaration - end_use_declaration)
+    :precondition
+      (and
+        (sanctions_secondary_clearance ?compliance_case)
+        (end_use_declaration_associated_with_case ?compliance_case ?end_use_declaration)
+        (not
+          (sanctions_screening_completed ?compliance_case)
+        )
+      )
+    :effect (sanctions_screening_completed ?compliance_case)
+  )
+  (:action finalize_case_after_sanctions_and_record_review
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (sanctions_screening_completed ?compliance_case)
+        (not
+          (case_finalised ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalised ?compliance_case)
+        (review_approved ?compliance_case)
+      )
+  )
+  (:action approve_export_declaration_after_checks
+    :parameters (?export_declaration - export_declaration ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (export_declaration_prepared_for_filing ?export_declaration)
+        (export_declaration_ready ?export_declaration)
+        (filing_batch_reserved ?filing_batch)
+        (filing_execution_processed ?filing_batch)
+        (not
+          (review_approved ?export_declaration)
+        )
+      )
+    :effect (review_approved ?export_declaration)
+  )
+  (:action approve_import_declaration_after_checks
+    :parameters (?import_declaration - import_declaration ?filing_batch - filing_batch)
+    :precondition
+      (and
+        (import_declaration_prepared_for_filing ?import_declaration)
+        (import_declaration_ready ?import_declaration)
+        (filing_batch_reserved ?filing_batch)
+        (filing_execution_processed ?filing_batch)
+        (not
+          (review_approved ?import_declaration)
+        )
+      )
+    :effect (review_approved ?import_declaration)
+  )
+  (:action assign_eligibility_code_to_item
+    :parameters (?consignment_item - consignment_item ?eligibility_code - eligibility_code ?regulatory_rule - regulatory_rule)
+    :precondition
+      (and
+        (review_approved ?consignment_item)
+        (item_assigned_regulatory_rule ?consignment_item ?regulatory_rule)
+        (eligibility_code_candidate_available ?eligibility_code)
+        (not
+          (eligibility_asserted ?consignment_item)
+        )
+      )
+    :effect
+      (and
+        (eligibility_asserted ?consignment_item)
+        (item_attached_eligibility_code ?consignment_item ?eligibility_code)
+        (not
+          (eligibility_code_candidate_available ?eligibility_code)
+        )
+      )
+  )
+  (:action finalize_declaration_eligibility_and_reserve_classification_resource
+    :parameters (?export_declaration - export_declaration ?classification_resource - classification_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_asserted ?export_declaration)
+        (item_assigned_classification_resource ?export_declaration ?classification_resource)
+        (item_attached_eligibility_code ?export_declaration ?eligibility_code)
+        (not
+          (final_eligibility_confirmed ?export_declaration)
+        )
+      )
+    :effect
+      (and
+        (final_eligibility_confirmed ?export_declaration)
+        (classification_resource_available ?classification_resource)
+        (eligibility_code_candidate_available ?eligibility_code)
+      )
+  )
+  (:action finalize_import_declaration_eligibility_and_reserve_classification_resource
+    :parameters (?import_declaration - import_declaration ?classification_resource - classification_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_asserted ?import_declaration)
+        (item_assigned_classification_resource ?import_declaration ?classification_resource)
+        (item_attached_eligibility_code ?import_declaration ?eligibility_code)
+        (not
+          (final_eligibility_confirmed ?import_declaration)
+        )
+      )
+    :effect
+      (and
+        (final_eligibility_confirmed ?import_declaration)
+        (classification_resource_available ?classification_resource)
+        (eligibility_code_candidate_available ?eligibility_code)
+      )
+  )
+  (:action finalize_case_eligibility_and_reserve_classification_resource
+    :parameters (?compliance_case - compliance_case ?classification_resource - classification_resource ?eligibility_code - eligibility_code)
+    :precondition
+      (and
+        (eligibility_asserted ?compliance_case)
+        (item_assigned_classification_resource ?compliance_case ?classification_resource)
+        (item_attached_eligibility_code ?compliance_case ?eligibility_code)
+        (not
+          (final_eligibility_confirmed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (final_eligibility_confirmed ?compliance_case)
+        (classification_resource_available ?classification_resource)
+        (eligibility_code_candidate_available ?eligibility_code)
+      )
+  )
+)

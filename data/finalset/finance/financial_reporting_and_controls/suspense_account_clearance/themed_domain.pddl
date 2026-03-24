@@ -1,0 +1,937 @@
+(define (domain suspense_account_clearance)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object accounting_role - entity transaction_role - entity entity_role - entity suspense_entry_root - entity suspense_entry - suspense_entry_root ledger_account_candidate - accounting_role supporting_transaction - accounting_role approver_reviewer - accounting_role policy_reference - accounting_role escalation_level - accounting_role reason_code - accounting_role adjustment_type - accounting_role audit_reference - accounting_role supporting_document - transaction_role workpaper - transaction_role stakeholder - transaction_role reconciliation_key_source - entity_role reconciliation_key_target - entity_role proposed_journal_entry - entity_role entry_side_grouping - suspense_entry case_metadata_grouping - suspense_entry source_account_entry - entry_side_grouping counterparty_account_entry - entry_side_grouping suspense_case_file - case_metadata_grouping)
+
+  (:predicates
+    (suspense_entry_recorded ?suspense_entry - suspense_entry)
+    (triaged_for_clearance ?suspense_entry - suspense_entry)
+    (suspense_entry_candidate_assigned ?suspense_entry - suspense_entry)
+    (suspense_entry_cleared ?suspense_entry - suspense_entry)
+    (entry_posting_completed ?suspense_entry - suspense_entry)
+    (adjustment_authorized ?suspense_entry - suspense_entry)
+    (ledger_account_candidate_available ?ledger_account_candidate - ledger_account_candidate)
+    (suspense_entry_has_ledger_candidate ?suspense_entry - suspense_entry ?ledger_account_candidate - ledger_account_candidate)
+    (supporting_transaction_available ?supporting_transaction - supporting_transaction)
+    (supporting_transaction_linked ?suspense_entry - suspense_entry ?supporting_transaction - supporting_transaction)
+    (approver_reviewer_available ?approver_reviewer - approver_reviewer)
+    (suspense_entry_assigned_reviewer ?suspense_entry - suspense_entry ?approver_reviewer - approver_reviewer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (source_entry_document_linked ?source_account_entry - source_account_entry ?supporting_document - supporting_document)
+    (counterparty_entry_document_linked ?counterparty_account_entry - counterparty_account_entry ?supporting_document - supporting_document)
+    (source_entry_linked_to_reconciliation_key ?source_account_entry - source_account_entry ?reconciliation_key_source - reconciliation_key_source)
+    (reconciliation_key_source_validated ?reconciliation_key_source - reconciliation_key_source)
+    (reconciliation_key_source_documented ?reconciliation_key_source - reconciliation_key_source)
+    (source_reconciliation_complete ?source_account_entry - source_account_entry)
+    (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_target - reconciliation_key_target)
+    (reconciliation_key_target_validated ?reconciliation_key_target - reconciliation_key_target)
+    (reconciliation_key_target_documented ?reconciliation_key_target - reconciliation_key_target)
+    (counterparty_reconciliation_complete ?counterparty_account_entry - counterparty_account_entry)
+    (proposed_journal_available ?proposed_journal_entry - proposed_journal_entry)
+    (journal_entry_ready ?proposed_journal_entry - proposed_journal_entry)
+    (journal_entry_linked_to_source_recon_key ?proposed_journal_entry - proposed_journal_entry ?reconciliation_key_source - reconciliation_key_source)
+    (journal_entry_linked_to_target_recon_key ?proposed_journal_entry - proposed_journal_entry ?reconciliation_key_target - reconciliation_key_target)
+    (journal_requires_policy_review ?proposed_journal_entry - proposed_journal_entry)
+    (journal_requires_escalation_review ?proposed_journal_entry - proposed_journal_entry)
+    (journal_entry_validated ?proposed_journal_entry - proposed_journal_entry)
+    (case_file_linked_to_source_entry ?clearance_case_file - suspense_case_file ?source_account_entry - source_account_entry)
+    (case_file_linked_to_counterparty_entry ?clearance_case_file - suspense_case_file ?counterparty_account_entry - counterparty_account_entry)
+    (case_file_linked_to_proposed_journal ?clearance_case_file - suspense_case_file ?proposed_journal_entry - proposed_journal_entry)
+    (workpaper_available ?workpaper - workpaper)
+    (case_file_has_workpaper ?clearance_case_file - suspense_case_file ?workpaper - workpaper)
+    (workpaper_finalized ?workpaper - workpaper)
+    (workpaper_attached_to_journal_entry ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    (case_file_adjustment_type_applied ?clearance_case_file - suspense_case_file)
+    (case_file_adjustment_confirmed ?clearance_case_file - suspense_case_file)
+    (case_file_finalized ?clearance_case_file - suspense_case_file)
+    (case_file_policy_applied ?clearance_case_file - suspense_case_file)
+    (case_file_policy_confirmed ?clearance_case_file - suspense_case_file)
+    (case_file_ready_for_escalation ?clearance_case_file - suspense_case_file)
+    (case_file_assembly_complete ?clearance_case_file - suspense_case_file)
+    (stakeholder_available ?stakeholder - stakeholder)
+    (case_file_assigned_stakeholder ?clearance_case_file - suspense_case_file ?stakeholder - stakeholder)
+    (case_file_stakeholder_assigned ?clearance_case_file - suspense_case_file)
+    (case_file_stakeholder_reviewed ?clearance_case_file - suspense_case_file)
+    (case_file_stakeholder_approved ?clearance_case_file - suspense_case_file)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (case_file_policy_reference_link ?clearance_case_file - suspense_case_file ?policy_reference - policy_reference)
+    (escalation_level_available ?escalation_level - escalation_level)
+    (case_file_escalation_level_link ?clearance_case_file - suspense_case_file ?escalation_level - escalation_level)
+    (adjustment_type_available ?adjustment_type - adjustment_type)
+    (case_file_adjustment_type_link ?clearance_case_file - suspense_case_file ?adjustment_type - adjustment_type)
+    (audit_reference_available ?audit_reference - audit_reference)
+    (case_file_audit_reference_link ?clearance_case_file - suspense_case_file ?audit_reference - audit_reference)
+    (reason_code_available ?reason_code - reason_code)
+    (suspense_entry_reason_code_link ?suspense_entry - suspense_entry ?reason_code - reason_code)
+    (source_entry_prepared_for_posting ?source_account_entry - source_account_entry)
+    (counterparty_entry_prepared_for_posting ?counterparty_account_entry - counterparty_account_entry)
+    (case_file_posting_recorded ?clearance_case_file - suspense_case_file)
+  )
+  (:action intake_suspense_entry
+    :parameters (?suspense_entry - suspense_entry)
+    :precondition
+      (and
+        (not
+          (suspense_entry_recorded ?suspense_entry)
+        )
+        (not
+          (suspense_entry_cleared ?suspense_entry)
+        )
+      )
+    :effect (suspense_entry_recorded ?suspense_entry)
+  )
+  (:action assign_ledger_candidate
+    :parameters (?suspense_entry - suspense_entry ?ledger_account_candidate - ledger_account_candidate)
+    :precondition
+      (and
+        (suspense_entry_recorded ?suspense_entry)
+        (not
+          (suspense_entry_candidate_assigned ?suspense_entry)
+        )
+        (ledger_account_candidate_available ?ledger_account_candidate)
+      )
+    :effect
+      (and
+        (suspense_entry_candidate_assigned ?suspense_entry)
+        (suspense_entry_has_ledger_candidate ?suspense_entry ?ledger_account_candidate)
+        (not
+          (ledger_account_candidate_available ?ledger_account_candidate)
+        )
+      )
+  )
+  (:action attach_supporting_transaction_to_entry
+    :parameters (?suspense_entry - suspense_entry ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (suspense_entry_recorded ?suspense_entry)
+        (suspense_entry_candidate_assigned ?suspense_entry)
+        (supporting_transaction_available ?supporting_transaction)
+      )
+    :effect
+      (and
+        (supporting_transaction_linked ?suspense_entry ?supporting_transaction)
+        (not
+          (supporting_transaction_available ?supporting_transaction)
+        )
+      )
+  )
+  (:action complete_triage_for_entry
+    :parameters (?suspense_entry - suspense_entry ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (suspense_entry_recorded ?suspense_entry)
+        (suspense_entry_candidate_assigned ?suspense_entry)
+        (supporting_transaction_linked ?suspense_entry ?supporting_transaction)
+        (not
+          (triaged_for_clearance ?suspense_entry)
+        )
+      )
+    :effect (triaged_for_clearance ?suspense_entry)
+  )
+  (:action detach_supporting_transaction_from_entry
+    :parameters (?suspense_entry - suspense_entry ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (supporting_transaction_linked ?suspense_entry ?supporting_transaction)
+      )
+    :effect
+      (and
+        (supporting_transaction_available ?supporting_transaction)
+        (not
+          (supporting_transaction_linked ?suspense_entry ?supporting_transaction)
+        )
+      )
+  )
+  (:action assign_reviewer_to_entry
+    :parameters (?suspense_entry - suspense_entry ?approver_reviewer - approver_reviewer)
+    :precondition
+      (and
+        (triaged_for_clearance ?suspense_entry)
+        (approver_reviewer_available ?approver_reviewer)
+      )
+    :effect
+      (and
+        (suspense_entry_assigned_reviewer ?suspense_entry ?approver_reviewer)
+        (not
+          (approver_reviewer_available ?approver_reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer_from_entry
+    :parameters (?suspense_entry - suspense_entry ?approver_reviewer - approver_reviewer)
+    :precondition
+      (and
+        (suspense_entry_assigned_reviewer ?suspense_entry ?approver_reviewer)
+      )
+    :effect
+      (and
+        (approver_reviewer_available ?approver_reviewer)
+        (not
+          (suspense_entry_assigned_reviewer ?suspense_entry ?approver_reviewer)
+        )
+      )
+  )
+  (:action assign_adjustment_type_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?adjustment_type - adjustment_type)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (adjustment_type_available ?adjustment_type)
+      )
+    :effect
+      (and
+        (case_file_adjustment_type_link ?clearance_case_file ?adjustment_type)
+        (not
+          (adjustment_type_available ?adjustment_type)
+        )
+      )
+  )
+  (:action remove_adjustment_type_from_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?adjustment_type - adjustment_type)
+    :precondition
+      (and
+        (case_file_adjustment_type_link ?clearance_case_file ?adjustment_type)
+      )
+    :effect
+      (and
+        (adjustment_type_available ?adjustment_type)
+        (not
+          (case_file_adjustment_type_link ?clearance_case_file ?adjustment_type)
+        )
+      )
+  )
+  (:action assign_audit_reference_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (audit_reference_available ?audit_reference)
+      )
+    :effect
+      (and
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (not
+          (audit_reference_available ?audit_reference)
+        )
+      )
+  )
+  (:action remove_audit_reference_from_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+      )
+    :effect
+      (and
+        (audit_reference_available ?audit_reference)
+        (not
+          (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        )
+      )
+  )
+  (:action prepare_source_side_reconciliation
+    :parameters (?source_account_entry - source_account_entry ?reconciliation_key_source - reconciliation_key_source ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (triaged_for_clearance ?source_account_entry)
+        (supporting_transaction_linked ?source_account_entry ?supporting_transaction)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (not
+          (reconciliation_key_source_validated ?reconciliation_key_source)
+        )
+        (not
+          (reconciliation_key_source_documented ?reconciliation_key_source)
+        )
+      )
+    :effect (reconciliation_key_source_validated ?reconciliation_key_source)
+  )
+  (:action validate_source_reconciliation
+    :parameters (?source_account_entry - source_account_entry ?reconciliation_key_source - reconciliation_key_source ?approver_reviewer - approver_reviewer)
+    :precondition
+      (and
+        (triaged_for_clearance ?source_account_entry)
+        (suspense_entry_assigned_reviewer ?source_account_entry ?approver_reviewer)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (reconciliation_key_source_validated ?reconciliation_key_source)
+        (not
+          (source_entry_prepared_for_posting ?source_account_entry)
+        )
+      )
+    :effect
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (source_reconciliation_complete ?source_account_entry)
+      )
+  )
+  (:action attach_supporting_document_to_source_entry
+    :parameters (?source_account_entry - source_account_entry ?reconciliation_key_source - reconciliation_key_source ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (triaged_for_clearance ?source_account_entry)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (supporting_document_available ?supporting_document)
+        (not
+          (source_entry_prepared_for_posting ?source_account_entry)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_source_documented ?reconciliation_key_source)
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (source_entry_document_linked ?source_account_entry ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_source_reconciliation
+    :parameters (?source_account_entry - source_account_entry ?reconciliation_key_source - reconciliation_key_source ?supporting_transaction - supporting_transaction ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (triaged_for_clearance ?source_account_entry)
+        (supporting_transaction_linked ?source_account_entry ?supporting_transaction)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (reconciliation_key_source_documented ?reconciliation_key_source)
+        (source_entry_document_linked ?source_account_entry ?supporting_document)
+        (not
+          (source_reconciliation_complete ?source_account_entry)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_source_validated ?reconciliation_key_source)
+        (source_reconciliation_complete ?source_account_entry)
+        (supporting_document_available ?supporting_document)
+        (not
+          (source_entry_document_linked ?source_account_entry ?supporting_document)
+        )
+      )
+  )
+  (:action prepare_counterparty_side_reconciliation
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_target - reconciliation_key_target ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (triaged_for_clearance ?counterparty_account_entry)
+        (supporting_transaction_linked ?counterparty_account_entry ?supporting_transaction)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (not
+          (reconciliation_key_target_validated ?reconciliation_key_target)
+        )
+        (not
+          (reconciliation_key_target_documented ?reconciliation_key_target)
+        )
+      )
+    :effect (reconciliation_key_target_validated ?reconciliation_key_target)
+  )
+  (:action validate_counterparty_reconciliation
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_target - reconciliation_key_target ?approver_reviewer - approver_reviewer)
+    :precondition
+      (and
+        (triaged_for_clearance ?counterparty_account_entry)
+        (suspense_entry_assigned_reviewer ?counterparty_account_entry ?approver_reviewer)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_target_validated ?reconciliation_key_target)
+        (not
+          (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        )
+      )
+    :effect
+      (and
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+      )
+  )
+  (:action attach_supporting_document_to_counterparty_entry
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_target - reconciliation_key_target ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (triaged_for_clearance ?counterparty_account_entry)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (supporting_document_available ?supporting_document)
+        (not
+          (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_target_documented ?reconciliation_key_target)
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (counterparty_entry_document_linked ?counterparty_account_entry ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_counterparty_reconciliation
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_target - reconciliation_key_target ?supporting_transaction - supporting_transaction ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (triaged_for_clearance ?counterparty_account_entry)
+        (supporting_transaction_linked ?counterparty_account_entry ?supporting_transaction)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_target_documented ?reconciliation_key_target)
+        (counterparty_entry_document_linked ?counterparty_account_entry ?supporting_document)
+        (not
+          (counterparty_reconciliation_complete ?counterparty_account_entry)
+        )
+      )
+    :effect
+      (and
+        (reconciliation_key_target_validated ?reconciliation_key_target)
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+        (supporting_document_available ?supporting_document)
+        (not
+          (counterparty_entry_document_linked ?counterparty_account_entry ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_proposed_journal_entry
+    :parameters (?source_account_entry - source_account_entry ?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_source - reconciliation_key_source ?reconciliation_key_target - reconciliation_key_target ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_source_validated ?reconciliation_key_source)
+        (reconciliation_key_target_validated ?reconciliation_key_target)
+        (source_reconciliation_complete ?source_account_entry)
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+        (proposed_journal_available ?proposed_journal_entry)
+      )
+    :effect
+      (and
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_linked_to_source_recon_key ?proposed_journal_entry ?reconciliation_key_source)
+        (journal_entry_linked_to_target_recon_key ?proposed_journal_entry ?reconciliation_key_target)
+        (not
+          (proposed_journal_available ?proposed_journal_entry)
+        )
+      )
+  )
+  (:action assemble_proposed_journal_entry_with_source_flag
+    :parameters (?source_account_entry - source_account_entry ?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_source - reconciliation_key_source ?reconciliation_key_target - reconciliation_key_target ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_source_documented ?reconciliation_key_source)
+        (reconciliation_key_target_validated ?reconciliation_key_target)
+        (not
+          (source_reconciliation_complete ?source_account_entry)
+        )
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+        (proposed_journal_available ?proposed_journal_entry)
+      )
+    :effect
+      (and
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_linked_to_source_recon_key ?proposed_journal_entry ?reconciliation_key_source)
+        (journal_entry_linked_to_target_recon_key ?proposed_journal_entry ?reconciliation_key_target)
+        (journal_requires_policy_review ?proposed_journal_entry)
+        (not
+          (proposed_journal_available ?proposed_journal_entry)
+        )
+      )
+  )
+  (:action assemble_proposed_journal_entry_with_target_flag
+    :parameters (?source_account_entry - source_account_entry ?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_source - reconciliation_key_source ?reconciliation_key_target - reconciliation_key_target ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_source_validated ?reconciliation_key_source)
+        (reconciliation_key_target_documented ?reconciliation_key_target)
+        (source_reconciliation_complete ?source_account_entry)
+        (not
+          (counterparty_reconciliation_complete ?counterparty_account_entry)
+        )
+        (proposed_journal_available ?proposed_journal_entry)
+      )
+    :effect
+      (and
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_linked_to_source_recon_key ?proposed_journal_entry ?reconciliation_key_source)
+        (journal_entry_linked_to_target_recon_key ?proposed_journal_entry ?reconciliation_key_target)
+        (journal_requires_escalation_review ?proposed_journal_entry)
+        (not
+          (proposed_journal_available ?proposed_journal_entry)
+        )
+      )
+  )
+  (:action assemble_proposed_journal_entry_with_both_flags
+    :parameters (?source_account_entry - source_account_entry ?counterparty_account_entry - counterparty_account_entry ?reconciliation_key_source - reconciliation_key_source ?reconciliation_key_target - reconciliation_key_target ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (source_entry_linked_to_reconciliation_key ?source_account_entry ?reconciliation_key_source)
+        (counterparty_entry_linked_to_reconciliation_key ?counterparty_account_entry ?reconciliation_key_target)
+        (reconciliation_key_source_documented ?reconciliation_key_source)
+        (reconciliation_key_target_documented ?reconciliation_key_target)
+        (not
+          (source_reconciliation_complete ?source_account_entry)
+        )
+        (not
+          (counterparty_reconciliation_complete ?counterparty_account_entry)
+        )
+        (proposed_journal_available ?proposed_journal_entry)
+      )
+    :effect
+      (and
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_linked_to_source_recon_key ?proposed_journal_entry ?reconciliation_key_source)
+        (journal_entry_linked_to_target_recon_key ?proposed_journal_entry ?reconciliation_key_target)
+        (journal_requires_policy_review ?proposed_journal_entry)
+        (journal_requires_escalation_review ?proposed_journal_entry)
+        (not
+          (proposed_journal_available ?proposed_journal_entry)
+        )
+      )
+  )
+  (:action validate_proposed_journal_entry
+    :parameters (?proposed_journal_entry - proposed_journal_entry ?source_account_entry - source_account_entry ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (journal_entry_ready ?proposed_journal_entry)
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (supporting_transaction_linked ?source_account_entry ?supporting_transaction)
+        (not
+          (journal_entry_validated ?proposed_journal_entry)
+        )
+      )
+    :effect (journal_entry_validated ?proposed_journal_entry)
+  )
+  (:action attach_workpaper_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (case_file_linked_to_proposed_journal ?clearance_case_file ?proposed_journal_entry)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_available ?workpaper)
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_validated ?proposed_journal_entry)
+        (not
+          (workpaper_finalized ?workpaper)
+        )
+      )
+    :effect
+      (and
+        (workpaper_finalized ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (not
+          (workpaper_available ?workpaper)
+        )
+      )
+  )
+  (:action apply_workpaper_and_mark_case
+    :parameters (?clearance_case_file - suspense_case_file ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_finalized ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (supporting_transaction_linked ?clearance_case_file ?supporting_transaction)
+        (not
+          (journal_requires_policy_review ?proposed_journal_entry)
+        )
+        (not
+          (case_file_adjustment_type_applied ?clearance_case_file)
+        )
+      )
+    :effect (case_file_adjustment_type_applied ?clearance_case_file)
+  )
+  (:action apply_policy_reference_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (policy_reference_available ?policy_reference)
+        (not
+          (case_file_policy_applied ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_policy_applied ?clearance_case_file)
+        (case_file_policy_reference_link ?clearance_case_file ?policy_reference)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action finalize_case_with_policy_reference
+    :parameters (?clearance_case_file - suspense_case_file ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry ?supporting_transaction - supporting_transaction ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_finalized ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (supporting_transaction_linked ?clearance_case_file ?supporting_transaction)
+        (journal_requires_policy_review ?proposed_journal_entry)
+        (case_file_policy_applied ?clearance_case_file)
+        (case_file_policy_reference_link ?clearance_case_file ?policy_reference)
+        (not
+          (case_file_adjustment_type_applied ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_adjustment_type_applied ?clearance_case_file)
+        (case_file_policy_confirmed ?clearance_case_file)
+      )
+  )
+  (:action apply_adjustment_type_to_case
+    :parameters (?clearance_case_file - suspense_case_file ?adjustment_type - adjustment_type ?approver_reviewer - approver_reviewer ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_type_applied ?clearance_case_file)
+        (case_file_adjustment_type_link ?clearance_case_file ?adjustment_type)
+        (suspense_entry_assigned_reviewer ?clearance_case_file ?approver_reviewer)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (not
+          (journal_requires_escalation_review ?proposed_journal_entry)
+        )
+        (not
+          (case_file_adjustment_confirmed ?clearance_case_file)
+        )
+      )
+    :effect (case_file_adjustment_confirmed ?clearance_case_file)
+  )
+  (:action confirm_adjustment_type_on_case
+    :parameters (?clearance_case_file - suspense_case_file ?adjustment_type - adjustment_type ?approver_reviewer - approver_reviewer ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_type_applied ?clearance_case_file)
+        (case_file_adjustment_type_link ?clearance_case_file ?adjustment_type)
+        (suspense_entry_assigned_reviewer ?clearance_case_file ?approver_reviewer)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (journal_requires_escalation_review ?proposed_journal_entry)
+        (not
+          (case_file_adjustment_confirmed ?clearance_case_file)
+        )
+      )
+    :effect (case_file_adjustment_confirmed ?clearance_case_file)
+  )
+  (:action finalize_case_stage1_with_audit_reference
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_confirmed ?clearance_case_file)
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (not
+          (journal_requires_policy_review ?proposed_journal_entry)
+        )
+        (not
+          (journal_requires_escalation_review ?proposed_journal_entry)
+        )
+        (not
+          (case_file_finalized ?clearance_case_file)
+        )
+      )
+    :effect (case_file_finalized ?clearance_case_file)
+  )
+  (:action finalize_case_stage2_with_audit_reference
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_confirmed ?clearance_case_file)
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (journal_requires_policy_review ?proposed_journal_entry)
+        (not
+          (journal_requires_escalation_review ?proposed_journal_entry)
+        )
+        (not
+          (case_file_finalized ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_ready_for_escalation ?clearance_case_file)
+      )
+  )
+  (:action finalize_case_stage3_with_audit_reference
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_confirmed ?clearance_case_file)
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (not
+          (journal_requires_policy_review ?proposed_journal_entry)
+        )
+        (journal_requires_escalation_review ?proposed_journal_entry)
+        (not
+          (case_file_finalized ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_ready_for_escalation ?clearance_case_file)
+      )
+  )
+  (:action finalize_case_stage_full_with_audit_reference
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference ?workpaper - workpaper ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (case_file_adjustment_confirmed ?clearance_case_file)
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (case_file_has_workpaper ?clearance_case_file ?workpaper)
+        (workpaper_attached_to_journal_entry ?workpaper ?proposed_journal_entry)
+        (journal_requires_policy_review ?proposed_journal_entry)
+        (journal_requires_escalation_review ?proposed_journal_entry)
+        (not
+          (case_file_finalized ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_ready_for_escalation ?clearance_case_file)
+      )
+  )
+  (:action mark_case_file_ready_for_posting
+    :parameters (?clearance_case_file - suspense_case_file)
+    :precondition
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (not
+          (case_file_ready_for_escalation ?clearance_case_file)
+        )
+        (not
+          (case_file_posting_recorded ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_posting_recorded ?clearance_case_file)
+        (entry_posting_completed ?clearance_case_file)
+      )
+  )
+  (:action assign_escalation_level_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?escalation_level - escalation_level)
+    :precondition
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_ready_for_escalation ?clearance_case_file)
+        (escalation_level_available ?escalation_level)
+      )
+    :effect
+      (and
+        (case_file_escalation_level_link ?clearance_case_file ?escalation_level)
+        (not
+          (escalation_level_available ?escalation_level)
+        )
+      )
+  )
+  (:action complete_case_file_assembly
+    :parameters (?clearance_case_file - suspense_case_file ?source_account_entry - source_account_entry ?counterparty_account_entry - counterparty_account_entry ?supporting_transaction - supporting_transaction ?escalation_level - escalation_level)
+    :precondition
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_ready_for_escalation ?clearance_case_file)
+        (case_file_escalation_level_link ?clearance_case_file ?escalation_level)
+        (case_file_linked_to_source_entry ?clearance_case_file ?source_account_entry)
+        (case_file_linked_to_counterparty_entry ?clearance_case_file ?counterparty_account_entry)
+        (source_reconciliation_complete ?source_account_entry)
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+        (supporting_transaction_linked ?clearance_case_file ?supporting_transaction)
+        (not
+          (case_file_assembly_complete ?clearance_case_file)
+        )
+      )
+    :effect (case_file_assembly_complete ?clearance_case_file)
+  )
+  (:action close_case_post_assembly
+    :parameters (?clearance_case_file - suspense_case_file)
+    :precondition
+      (and
+        (case_file_finalized ?clearance_case_file)
+        (case_file_assembly_complete ?clearance_case_file)
+        (not
+          (case_file_posting_recorded ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_posting_recorded ?clearance_case_file)
+        (entry_posting_completed ?clearance_case_file)
+      )
+  )
+  (:action assign_stakeholder_to_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?stakeholder - stakeholder ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (triaged_for_clearance ?clearance_case_file)
+        (supporting_transaction_linked ?clearance_case_file ?supporting_transaction)
+        (stakeholder_available ?stakeholder)
+        (case_file_assigned_stakeholder ?clearance_case_file ?stakeholder)
+        (not
+          (case_file_stakeholder_assigned ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_stakeholder_assigned ?clearance_case_file)
+        (not
+          (stakeholder_available ?stakeholder)
+        )
+      )
+  )
+  (:action stakeholder_acknowledge_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?approver_reviewer - approver_reviewer)
+    :precondition
+      (and
+        (case_file_stakeholder_assigned ?clearance_case_file)
+        (suspense_entry_assigned_reviewer ?clearance_case_file ?approver_reviewer)
+        (not
+          (case_file_stakeholder_reviewed ?clearance_case_file)
+        )
+      )
+    :effect (case_file_stakeholder_reviewed ?clearance_case_file)
+  )
+  (:action stakeholder_assign_audit_reference
+    :parameters (?clearance_case_file - suspense_case_file ?audit_reference - audit_reference)
+    :precondition
+      (and
+        (case_file_stakeholder_reviewed ?clearance_case_file)
+        (case_file_audit_reference_link ?clearance_case_file ?audit_reference)
+        (not
+          (case_file_stakeholder_approved ?clearance_case_file)
+        )
+      )
+    :effect (case_file_stakeholder_approved ?clearance_case_file)
+  )
+  (:action finalize_case_after_stakeholder_approval
+    :parameters (?clearance_case_file - suspense_case_file)
+    :precondition
+      (and
+        (case_file_stakeholder_approved ?clearance_case_file)
+        (not
+          (case_file_posting_recorded ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (case_file_posting_recorded ?clearance_case_file)
+        (entry_posting_completed ?clearance_case_file)
+      )
+  )
+  (:action post_journal_entry_to_source_account_entry
+    :parameters (?source_account_entry - source_account_entry ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (source_entry_prepared_for_posting ?source_account_entry)
+        (source_reconciliation_complete ?source_account_entry)
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_validated ?proposed_journal_entry)
+        (not
+          (entry_posting_completed ?source_account_entry)
+        )
+      )
+    :effect (entry_posting_completed ?source_account_entry)
+  )
+  (:action post_journal_entry_to_counterparty_account_entry
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?proposed_journal_entry - proposed_journal_entry)
+    :precondition
+      (and
+        (counterparty_entry_prepared_for_posting ?counterparty_account_entry)
+        (counterparty_reconciliation_complete ?counterparty_account_entry)
+        (journal_entry_ready ?proposed_journal_entry)
+        (journal_entry_validated ?proposed_journal_entry)
+        (not
+          (entry_posting_completed ?counterparty_account_entry)
+        )
+      )
+    :effect (entry_posting_completed ?counterparty_account_entry)
+  )
+  (:action authorize_adjustment_for_suspense_entry
+    :parameters (?suspense_entry - suspense_entry ?reason_code - reason_code ?supporting_transaction - supporting_transaction)
+    :precondition
+      (and
+        (entry_posting_completed ?suspense_entry)
+        (supporting_transaction_linked ?suspense_entry ?supporting_transaction)
+        (reason_code_available ?reason_code)
+        (not
+          (adjustment_authorized ?suspense_entry)
+        )
+      )
+    :effect
+      (and
+        (adjustment_authorized ?suspense_entry)
+        (suspense_entry_reason_code_link ?suspense_entry ?reason_code)
+        (not
+          (reason_code_available ?reason_code)
+        )
+      )
+  )
+  (:action apply_adjustment_and_clear_source_entry
+    :parameters (?source_account_entry - source_account_entry ?ledger_account_candidate - ledger_account_candidate ?reason_code - reason_code)
+    :precondition
+      (and
+        (adjustment_authorized ?source_account_entry)
+        (suspense_entry_has_ledger_candidate ?source_account_entry ?ledger_account_candidate)
+        (suspense_entry_reason_code_link ?source_account_entry ?reason_code)
+        (not
+          (suspense_entry_cleared ?source_account_entry)
+        )
+      )
+    :effect
+      (and
+        (suspense_entry_cleared ?source_account_entry)
+        (ledger_account_candidate_available ?ledger_account_candidate)
+        (reason_code_available ?reason_code)
+      )
+  )
+  (:action apply_adjustment_and_clear_counterparty_entry
+    :parameters (?counterparty_account_entry - counterparty_account_entry ?ledger_account_candidate - ledger_account_candidate ?reason_code - reason_code)
+    :precondition
+      (and
+        (adjustment_authorized ?counterparty_account_entry)
+        (suspense_entry_has_ledger_candidate ?counterparty_account_entry ?ledger_account_candidate)
+        (suspense_entry_reason_code_link ?counterparty_account_entry ?reason_code)
+        (not
+          (suspense_entry_cleared ?counterparty_account_entry)
+        )
+      )
+    :effect
+      (and
+        (suspense_entry_cleared ?counterparty_account_entry)
+        (ledger_account_candidate_available ?ledger_account_candidate)
+        (reason_code_available ?reason_code)
+      )
+  )
+  (:action apply_adjustment_and_clear_case_file
+    :parameters (?clearance_case_file - suspense_case_file ?ledger_account_candidate - ledger_account_candidate ?reason_code - reason_code)
+    :precondition
+      (and
+        (adjustment_authorized ?clearance_case_file)
+        (suspense_entry_has_ledger_candidate ?clearance_case_file ?ledger_account_candidate)
+        (suspense_entry_reason_code_link ?clearance_case_file ?reason_code)
+        (not
+          (suspense_entry_cleared ?clearance_case_file)
+        )
+      )
+    :effect
+      (and
+        (suspense_entry_cleared ?clearance_case_file)
+        (ledger_account_candidate_available ?ledger_account_candidate)
+        (reason_code_available ?reason_code)
+      )
+  )
+)

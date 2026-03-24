@@ -1,0 +1,1063 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain import_permit_dependency_validation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types generic_entity - object resource_category - generic_entity document_category - generic_entity submission_category - generic_entity case_root - generic_entity import_case - case_root permit_type - resource_category tariff_classifier_role - resource_category compliance_officer_role - resource_category policy_reference - resource_category supplementary_evidence - resource_category permit_dependency_token - resource_category special_certificate - resource_category agency_authorization - resource_category supporting_document_artifact - document_category third_party_certificate_document - document_category endorsement_document - document_category regulation_clause_a - submission_category regulation_clause_b - submission_category broker_submission_package - submission_category consignment_grouping - import_case clearance_profile_group - import_case consignment_segment_a - consignment_grouping consignment_segment_b - consignment_grouping clearance_record - clearance_profile_group)
+
+  (:predicates
+    (entity_initiated ?import_case - import_case)
+    (entity_classification_completed ?import_case - import_case)
+    (permit_assessed ?import_case - import_case)
+    (clearance_granted ?import_case - import_case)
+    (entity_final_approval_recorded ?import_case - import_case)
+    (entity_permit_linked ?import_case - import_case)
+    (permit_resource_available ?permit_type - permit_type)
+    (entity_permit_binding ?import_case - import_case ?permit_type - permit_type)
+    (classifier_available ?tariff_classifier - tariff_classifier_role)
+    (entity_classified_by ?import_case - import_case ?tariff_classifier - tariff_classifier_role)
+    (officer_available ?compliance_officer - compliance_officer_role)
+    (entity_officer_assigned ?import_case - import_case ?compliance_officer - compliance_officer_role)
+    (document_available ?supporting_document - supporting_document_artifact)
+    (segment_a_document_attached ?segment_a - consignment_segment_a ?supporting_document - supporting_document_artifact)
+    (segment_b_document_attached ?segment_b - consignment_segment_b ?supporting_document - supporting_document_artifact)
+    (segment_a_clause_link ?segment_a - consignment_segment_a ?regulation_clause_a - regulation_clause_a)
+    (clause_a_validated ?regulation_clause_a - regulation_clause_a)
+    (clause_a_evidence_attached ?regulation_clause_a - regulation_clause_a)
+    (segment_a_validation_flag ?segment_a - consignment_segment_a)
+    (segment_b_clause_link ?segment_b - consignment_segment_b ?regulation_clause_b - regulation_clause_b)
+    (clause_b_validated ?regulation_clause_b - regulation_clause_b)
+    (clause_b_evidence_attached ?regulation_clause_b - regulation_clause_b)
+    (segment_b_validation_flag ?segment_b - consignment_segment_b)
+    (broker_package_ready ?broker_package - broker_submission_package)
+    (broker_package_consolidated ?broker_package - broker_submission_package)
+    (package_link_clause_a ?broker_package - broker_submission_package ?regulation_clause_a - regulation_clause_a)
+    (package_link_clause_b ?broker_package - broker_submission_package ?regulation_clause_b - regulation_clause_b)
+    (package_milestone_stage_1 ?broker_package - broker_submission_package)
+    (package_milestone_stage_2 ?broker_package - broker_submission_package)
+    (package_finalized ?broker_package - broker_submission_package)
+    (clearance_record_includes_segment_a ?clearance_record - clearance_record ?segment_a - consignment_segment_a)
+    (clearance_record_includes_segment_b ?clearance_record - clearance_record ?segment_b - consignment_segment_b)
+    (clearance_record_includes_submission ?clearance_record - clearance_record ?broker_package - broker_submission_package)
+    (certificate_available ?third_party_certificate - third_party_certificate_document)
+    (clearance_record_certificate_link ?clearance_record - clearance_record ?third_party_certificate - third_party_certificate_document)
+    (certificate_bound ?third_party_certificate - third_party_certificate_document)
+    (certificate_attached_to_package ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    (record_certificates_bound ?clearance_record - clearance_record)
+    (record_special_authorizations_bound ?clearance_record - clearance_record)
+    (record_authorizations_verified ?clearance_record - clearance_record)
+    (policy_reference_attached ?clearance_record - clearance_record)
+    (record_policy_confirmation ?clearance_record - clearance_record)
+    (record_evidence_attached ?clearance_record - clearance_record)
+    (record_finalized_preapproval ?clearance_record - clearance_record)
+    (endorsement_available ?endorsement_token - endorsement_document)
+    (clearance_record_endorsement_link ?clearance_record - clearance_record ?endorsement_token - endorsement_document)
+    (record_endorsement_attached ?clearance_record - clearance_record)
+    (record_endorsement_confirmed ?clearance_record - clearance_record)
+    (record_endorsement_authorized ?clearance_record - clearance_record)
+    (policy_reference_available ?policy_reference - policy_reference)
+    (clearance_record_policy_reference_link ?clearance_record - clearance_record ?policy_reference - policy_reference)
+    (supplementary_evidence_available ?supplementary_evidence - supplementary_evidence)
+    (clearance_record_evidence_link ?clearance_record - clearance_record ?supplementary_evidence - supplementary_evidence)
+    (special_certificate_available ?special_certificate - special_certificate)
+    (clearance_record_special_certificate_link ?clearance_record - clearance_record ?special_certificate - special_certificate)
+    (agency_authorization_available ?agency_authorization - agency_authorization)
+    (clearance_record_agency_authorization_link ?clearance_record - clearance_record ?agency_authorization - agency_authorization)
+    (permit_dependency_token_available ?permit_dependency_token - permit_dependency_token)
+    (entity_dependency_token_bound ?import_case - import_case ?permit_dependency_token - permit_dependency_token)
+    (segment_a_ready ?segment_a - consignment_segment_a)
+    (segment_b_ready ?segment_b - consignment_segment_b)
+    (record_marked_for_approval ?clearance_record - clearance_record)
+  )
+  (:action initialize_import_case
+    :parameters (?import_case - import_case)
+    :precondition
+      (and
+        (not
+          (entity_initiated ?import_case)
+        )
+        (not
+          (clearance_granted ?import_case)
+        )
+      )
+    :effect (entity_initiated ?import_case)
+  )
+  (:action assess_and_allocate_permit
+    :parameters (?import_case - import_case ?permit_type - permit_type)
+    :precondition
+      (and
+        (entity_initiated ?import_case)
+        (not
+          (permit_assessed ?import_case)
+        )
+        (permit_resource_available ?permit_type)
+      )
+    :effect
+      (and
+        (permit_assessed ?import_case)
+        (entity_permit_binding ?import_case ?permit_type)
+        (not
+          (permit_resource_available ?permit_type)
+        )
+      )
+  )
+  (:action assign_tariff_classifier
+    :parameters (?import_case - import_case ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_initiated ?import_case)
+        (permit_assessed ?import_case)
+        (classifier_available ?tariff_classifier)
+      )
+    :effect
+      (and
+        (entity_classified_by ?import_case ?tariff_classifier)
+        (not
+          (classifier_available ?tariff_classifier)
+        )
+      )
+  )
+  (:action confirm_classification_assignment
+    :parameters (?import_case - import_case ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_initiated ?import_case)
+        (permit_assessed ?import_case)
+        (entity_classified_by ?import_case ?tariff_classifier)
+        (not
+          (entity_classification_completed ?import_case)
+        )
+      )
+    :effect (entity_classification_completed ?import_case)
+  )
+  (:action unassign_tariff_classifier
+    :parameters (?import_case - import_case ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_classified_by ?import_case ?tariff_classifier)
+      )
+    :effect
+      (and
+        (classifier_available ?tariff_classifier)
+        (not
+          (entity_classified_by ?import_case ?tariff_classifier)
+        )
+      )
+  )
+  (:action assign_compliance_officer
+    :parameters (?import_case - import_case ?compliance_officer - compliance_officer_role)
+    :precondition
+      (and
+        (entity_classification_completed ?import_case)
+        (officer_available ?compliance_officer)
+      )
+    :effect
+      (and
+        (entity_officer_assigned ?import_case ?compliance_officer)
+        (not
+          (officer_available ?compliance_officer)
+        )
+      )
+  )
+  (:action unassign_compliance_officer
+    :parameters (?import_case - import_case ?compliance_officer - compliance_officer_role)
+    :precondition
+      (and
+        (entity_officer_assigned ?import_case ?compliance_officer)
+      )
+    :effect
+      (and
+        (officer_available ?compliance_officer)
+        (not
+          (entity_officer_assigned ?import_case ?compliance_officer)
+        )
+      )
+  )
+  (:action attach_special_certificate_to_record
+    :parameters (?clearance_record - clearance_record ?special_certificate - special_certificate)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (special_certificate_available ?special_certificate)
+      )
+    :effect
+      (and
+        (clearance_record_special_certificate_link ?clearance_record ?special_certificate)
+        (not
+          (special_certificate_available ?special_certificate)
+        )
+      )
+  )
+  (:action detach_special_certificate_from_record
+    :parameters (?clearance_record - clearance_record ?special_certificate - special_certificate)
+    :precondition
+      (and
+        (clearance_record_special_certificate_link ?clearance_record ?special_certificate)
+      )
+    :effect
+      (and
+        (special_certificate_available ?special_certificate)
+        (not
+          (clearance_record_special_certificate_link ?clearance_record ?special_certificate)
+        )
+      )
+  )
+  (:action attach_agency_authorization_to_record
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (agency_authorization_available ?agency_authorization)
+      )
+    :effect
+      (and
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (not
+          (agency_authorization_available ?agency_authorization)
+        )
+      )
+  )
+  (:action detach_agency_authorization_from_record
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization)
+    :precondition
+      (and
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+      )
+    :effect
+      (and
+        (agency_authorization_available ?agency_authorization)
+        (not
+          (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        )
+      )
+  )
+  (:action start_clause_a_validation
+    :parameters (?segment_a - consignment_segment_a ?regulation_clause_a - regulation_clause_a ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_a)
+        (entity_classified_by ?segment_a ?tariff_classifier)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (not
+          (clause_a_validated ?regulation_clause_a)
+        )
+        (not
+          (clause_a_evidence_attached ?regulation_clause_a)
+        )
+      )
+    :effect (clause_a_validated ?regulation_clause_a)
+  )
+  (:action apply_officer_review_to_clause_a
+    :parameters (?segment_a - consignment_segment_a ?regulation_clause_a - regulation_clause_a ?compliance_officer - compliance_officer_role)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_a)
+        (entity_officer_assigned ?segment_a ?compliance_officer)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (clause_a_validated ?regulation_clause_a)
+        (not
+          (segment_a_ready ?segment_a)
+        )
+      )
+    :effect
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_a_validation_flag ?segment_a)
+      )
+  )
+  (:action attach_document_to_segment_a
+    :parameters (?segment_a - consignment_segment_a ?regulation_clause_a - regulation_clause_a ?supporting_document - supporting_document_artifact)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_a)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (document_available ?supporting_document)
+        (not
+          (segment_a_ready ?segment_a)
+        )
+      )
+    :effect
+      (and
+        (clause_a_evidence_attached ?regulation_clause_a)
+        (segment_a_ready ?segment_a)
+        (segment_a_document_attached ?segment_a ?supporting_document)
+        (not
+          (document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_clause_a_validation
+    :parameters (?segment_a - consignment_segment_a ?regulation_clause_a - regulation_clause_a ?tariff_classifier - tariff_classifier_role ?supporting_document - supporting_document_artifact)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_a)
+        (entity_classified_by ?segment_a ?tariff_classifier)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (clause_a_evidence_attached ?regulation_clause_a)
+        (segment_a_document_attached ?segment_a ?supporting_document)
+        (not
+          (segment_a_validation_flag ?segment_a)
+        )
+      )
+    :effect
+      (and
+        (clause_a_validated ?regulation_clause_a)
+        (segment_a_validation_flag ?segment_a)
+        (document_available ?supporting_document)
+        (not
+          (segment_a_document_attached ?segment_a ?supporting_document)
+        )
+      )
+  )
+  (:action start_clause_b_validation
+    :parameters (?segment_b - consignment_segment_b ?regulation_clause_b - regulation_clause_b ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_b)
+        (entity_classified_by ?segment_b ?tariff_classifier)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (not
+          (clause_b_validated ?regulation_clause_b)
+        )
+        (not
+          (clause_b_evidence_attached ?regulation_clause_b)
+        )
+      )
+    :effect (clause_b_validated ?regulation_clause_b)
+  )
+  (:action apply_officer_review_to_clause_b
+    :parameters (?segment_b - consignment_segment_b ?regulation_clause_b - regulation_clause_b ?compliance_officer - compliance_officer_role)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_b)
+        (entity_officer_assigned ?segment_b ?compliance_officer)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_b_validated ?regulation_clause_b)
+        (not
+          (segment_b_ready ?segment_b)
+        )
+      )
+    :effect
+      (and
+        (segment_b_ready ?segment_b)
+        (segment_b_validation_flag ?segment_b)
+      )
+  )
+  (:action attach_document_to_segment_b
+    :parameters (?segment_b - consignment_segment_b ?regulation_clause_b - regulation_clause_b ?supporting_document - supporting_document_artifact)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_b)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (document_available ?supporting_document)
+        (not
+          (segment_b_ready ?segment_b)
+        )
+      )
+    :effect
+      (and
+        (clause_b_evidence_attached ?regulation_clause_b)
+        (segment_b_ready ?segment_b)
+        (segment_b_document_attached ?segment_b ?supporting_document)
+        (not
+          (document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_clause_b_validation
+    :parameters (?segment_b - consignment_segment_b ?regulation_clause_b - regulation_clause_b ?tariff_classifier - tariff_classifier_role ?supporting_document - supporting_document_artifact)
+    :precondition
+      (and
+        (entity_classification_completed ?segment_b)
+        (entity_classified_by ?segment_b ?tariff_classifier)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_b_evidence_attached ?regulation_clause_b)
+        (segment_b_document_attached ?segment_b ?supporting_document)
+        (not
+          (segment_b_validation_flag ?segment_b)
+        )
+      )
+    :effect
+      (and
+        (clause_b_validated ?regulation_clause_b)
+        (segment_b_validation_flag ?segment_b)
+        (document_available ?supporting_document)
+        (not
+          (segment_b_document_attached ?segment_b ?supporting_document)
+        )
+      )
+  )
+  (:action consolidate_broker_submission_basic
+    :parameters (?segment_a - consignment_segment_a ?segment_b - consignment_segment_b ?regulation_clause_a - regulation_clause_a ?regulation_clause_b - regulation_clause_b ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_b_ready ?segment_b)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_a_validated ?regulation_clause_a)
+        (clause_b_validated ?regulation_clause_b)
+        (segment_a_validation_flag ?segment_a)
+        (segment_b_validation_flag ?segment_b)
+        (broker_package_ready ?broker_package)
+      )
+    :effect
+      (and
+        (broker_package_consolidated ?broker_package)
+        (package_link_clause_a ?broker_package ?regulation_clause_a)
+        (package_link_clause_b ?broker_package ?regulation_clause_b)
+        (not
+          (broker_package_ready ?broker_package)
+        )
+      )
+  )
+  (:action consolidate_broker_submission_with_stage1
+    :parameters (?segment_a - consignment_segment_a ?segment_b - consignment_segment_b ?regulation_clause_a - regulation_clause_a ?regulation_clause_b - regulation_clause_b ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_b_ready ?segment_b)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_a_evidence_attached ?regulation_clause_a)
+        (clause_b_validated ?regulation_clause_b)
+        (not
+          (segment_a_validation_flag ?segment_a)
+        )
+        (segment_b_validation_flag ?segment_b)
+        (broker_package_ready ?broker_package)
+      )
+    :effect
+      (and
+        (broker_package_consolidated ?broker_package)
+        (package_link_clause_a ?broker_package ?regulation_clause_a)
+        (package_link_clause_b ?broker_package ?regulation_clause_b)
+        (package_milestone_stage_1 ?broker_package)
+        (not
+          (broker_package_ready ?broker_package)
+        )
+      )
+  )
+  (:action consolidate_broker_submission_with_stage2
+    :parameters (?segment_a - consignment_segment_a ?segment_b - consignment_segment_b ?regulation_clause_a - regulation_clause_a ?regulation_clause_b - regulation_clause_b ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_b_ready ?segment_b)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_a_validated ?regulation_clause_a)
+        (clause_b_evidence_attached ?regulation_clause_b)
+        (segment_a_validation_flag ?segment_a)
+        (not
+          (segment_b_validation_flag ?segment_b)
+        )
+        (broker_package_ready ?broker_package)
+      )
+    :effect
+      (and
+        (broker_package_consolidated ?broker_package)
+        (package_link_clause_a ?broker_package ?regulation_clause_a)
+        (package_link_clause_b ?broker_package ?regulation_clause_b)
+        (package_milestone_stage_2 ?broker_package)
+        (not
+          (broker_package_ready ?broker_package)
+        )
+      )
+  )
+  (:action consolidate_broker_submission_full
+    :parameters (?segment_a - consignment_segment_a ?segment_b - consignment_segment_b ?regulation_clause_a - regulation_clause_a ?regulation_clause_b - regulation_clause_b ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_b_ready ?segment_b)
+        (segment_a_clause_link ?segment_a ?regulation_clause_a)
+        (segment_b_clause_link ?segment_b ?regulation_clause_b)
+        (clause_a_evidence_attached ?regulation_clause_a)
+        (clause_b_evidence_attached ?regulation_clause_b)
+        (not
+          (segment_a_validation_flag ?segment_a)
+        )
+        (not
+          (segment_b_validation_flag ?segment_b)
+        )
+        (broker_package_ready ?broker_package)
+      )
+    :effect
+      (and
+        (broker_package_consolidated ?broker_package)
+        (package_link_clause_a ?broker_package ?regulation_clause_a)
+        (package_link_clause_b ?broker_package ?regulation_clause_b)
+        (package_milestone_stage_1 ?broker_package)
+        (package_milestone_stage_2 ?broker_package)
+        (not
+          (broker_package_ready ?broker_package)
+        )
+      )
+  )
+  (:action finalize_broker_submission_package
+    :parameters (?broker_package - broker_submission_package ?segment_a - consignment_segment_a ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (broker_package_consolidated ?broker_package)
+        (segment_a_ready ?segment_a)
+        (entity_classified_by ?segment_a ?tariff_classifier)
+        (not
+          (package_finalized ?broker_package)
+        )
+      )
+    :effect (package_finalized ?broker_package)
+  )
+  (:action attach_certificate_to_record_and_package
+    :parameters (?clearance_record - clearance_record ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (clearance_record_includes_submission ?clearance_record ?broker_package)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_available ?third_party_certificate)
+        (broker_package_consolidated ?broker_package)
+        (package_finalized ?broker_package)
+        (not
+          (certificate_bound ?third_party_certificate)
+        )
+      )
+    :effect
+      (and
+        (certificate_bound ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (not
+          (certificate_available ?third_party_certificate)
+        )
+      )
+  )
+  (:action mark_record_certificates_bound
+    :parameters (?clearance_record - clearance_record ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_bound ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (entity_classified_by ?clearance_record ?tariff_classifier)
+        (not
+          (package_milestone_stage_1 ?broker_package)
+        )
+        (not
+          (record_certificates_bound ?clearance_record)
+        )
+      )
+    :effect (record_certificates_bound ?clearance_record)
+  )
+  (:action attach_policy_reference_to_record
+    :parameters (?clearance_record - clearance_record ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (policy_reference_available ?policy_reference)
+        (not
+          (policy_reference_attached ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (policy_reference_attached ?clearance_record)
+        (clearance_record_policy_reference_link ?clearance_record ?policy_reference)
+        (not
+          (policy_reference_available ?policy_reference)
+        )
+      )
+  )
+  (:action confirm_record_policy_and_mark_certificates
+    :parameters (?clearance_record - clearance_record ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package ?tariff_classifier - tariff_classifier_role ?policy_reference - policy_reference)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_bound ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (entity_classified_by ?clearance_record ?tariff_classifier)
+        (package_milestone_stage_1 ?broker_package)
+        (policy_reference_attached ?clearance_record)
+        (clearance_record_policy_reference_link ?clearance_record ?policy_reference)
+        (not
+          (record_certificates_bound ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_certificates_bound ?clearance_record)
+        (record_policy_confirmation ?clearance_record)
+      )
+  )
+  (:action mark_record_special_authorization_bound
+    :parameters (?clearance_record - clearance_record ?special_certificate - special_certificate ?compliance_officer - compliance_officer_role ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_certificates_bound ?clearance_record)
+        (clearance_record_special_certificate_link ?clearance_record ?special_certificate)
+        (entity_officer_assigned ?clearance_record ?compliance_officer)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (not
+          (package_milestone_stage_2 ?broker_package)
+        )
+        (not
+          (record_special_authorizations_bound ?clearance_record)
+        )
+      )
+    :effect (record_special_authorizations_bound ?clearance_record)
+  )
+  (:action confirm_record_special_authorization
+    :parameters (?clearance_record - clearance_record ?special_certificate - special_certificate ?compliance_officer - compliance_officer_role ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_certificates_bound ?clearance_record)
+        (clearance_record_special_certificate_link ?clearance_record ?special_certificate)
+        (entity_officer_assigned ?clearance_record ?compliance_officer)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (package_milestone_stage_2 ?broker_package)
+        (not
+          (record_special_authorizations_bound ?clearance_record)
+        )
+      )
+    :effect (record_special_authorizations_bound ?clearance_record)
+  )
+  (:action verify_authorizations
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_special_authorizations_bound ?clearance_record)
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (not
+          (package_milestone_stage_1 ?broker_package)
+        )
+        (not
+          (package_milestone_stage_2 ?broker_package)
+        )
+        (not
+          (record_authorizations_verified ?clearance_record)
+        )
+      )
+    :effect (record_authorizations_verified ?clearance_record)
+  )
+  (:action verify_authorizations_and_attach_confirmation
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_special_authorizations_bound ?clearance_record)
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (package_milestone_stage_1 ?broker_package)
+        (not
+          (package_milestone_stage_2 ?broker_package)
+        )
+        (not
+          (record_authorizations_verified ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_evidence_attached ?clearance_record)
+      )
+  )
+  (:action verify_authorizations_and_attach_confirmation_alt
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_special_authorizations_bound ?clearance_record)
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (not
+          (package_milestone_stage_1 ?broker_package)
+        )
+        (package_milestone_stage_2 ?broker_package)
+        (not
+          (record_authorizations_verified ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_evidence_attached ?clearance_record)
+      )
+  )
+  (:action verify_authorizations_and_attach_confirmation_full
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization ?third_party_certificate - third_party_certificate_document ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (record_special_authorizations_bound ?clearance_record)
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (clearance_record_certificate_link ?clearance_record ?third_party_certificate)
+        (certificate_attached_to_package ?third_party_certificate ?broker_package)
+        (package_milestone_stage_1 ?broker_package)
+        (package_milestone_stage_2 ?broker_package)
+        (not
+          (record_authorizations_verified ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_evidence_attached ?clearance_record)
+      )
+  )
+  (:action mark_record_ready_for_final_approval
+    :parameters (?clearance_record - clearance_record)
+    :precondition
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (not
+          (record_evidence_attached ?clearance_record)
+        )
+        (not
+          (record_marked_for_approval ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_marked_for_approval ?clearance_record)
+        (entity_final_approval_recorded ?clearance_record)
+      )
+  )
+  (:action attach_supplementary_evidence_to_record
+    :parameters (?clearance_record - clearance_record ?supplementary_evidence - supplementary_evidence)
+    :precondition
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_evidence_attached ?clearance_record)
+        (supplementary_evidence_available ?supplementary_evidence)
+      )
+    :effect
+      (and
+        (clearance_record_evidence_link ?clearance_record ?supplementary_evidence)
+        (not
+          (supplementary_evidence_available ?supplementary_evidence)
+        )
+      )
+  )
+  (:action synthesize_final_clearance_record
+    :parameters (?clearance_record - clearance_record ?segment_a - consignment_segment_a ?segment_b - consignment_segment_b ?tariff_classifier - tariff_classifier_role ?supplementary_evidence - supplementary_evidence)
+    :precondition
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_evidence_attached ?clearance_record)
+        (clearance_record_evidence_link ?clearance_record ?supplementary_evidence)
+        (clearance_record_includes_segment_a ?clearance_record ?segment_a)
+        (clearance_record_includes_segment_b ?clearance_record ?segment_b)
+        (segment_a_validation_flag ?segment_a)
+        (segment_b_validation_flag ?segment_b)
+        (entity_classified_by ?clearance_record ?tariff_classifier)
+        (not
+          (record_finalized_preapproval ?clearance_record)
+        )
+      )
+    :effect (record_finalized_preapproval ?clearance_record)
+  )
+  (:action mark_record_for_approval_after_finalization
+    :parameters (?clearance_record - clearance_record)
+    :precondition
+      (and
+        (record_authorizations_verified ?clearance_record)
+        (record_finalized_preapproval ?clearance_record)
+        (not
+          (record_marked_for_approval ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_marked_for_approval ?clearance_record)
+        (entity_final_approval_recorded ?clearance_record)
+      )
+  )
+  (:action attach_endorsement_to_record
+    :parameters (?clearance_record - clearance_record ?endorsement_token - endorsement_document ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_classification_completed ?clearance_record)
+        (entity_classified_by ?clearance_record ?tariff_classifier)
+        (endorsement_available ?endorsement_token)
+        (clearance_record_endorsement_link ?clearance_record ?endorsement_token)
+        (not
+          (record_endorsement_attached ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_endorsement_attached ?clearance_record)
+        (not
+          (endorsement_available ?endorsement_token)
+        )
+      )
+  )
+  (:action confirm_endorsement
+    :parameters (?clearance_record - clearance_record ?compliance_officer - compliance_officer_role)
+    :precondition
+      (and
+        (record_endorsement_attached ?clearance_record)
+        (entity_officer_assigned ?clearance_record ?compliance_officer)
+        (not
+          (record_endorsement_confirmed ?clearance_record)
+        )
+      )
+    :effect (record_endorsement_confirmed ?clearance_record)
+  )
+  (:action authorize_endorsement
+    :parameters (?clearance_record - clearance_record ?agency_authorization - agency_authorization)
+    :precondition
+      (and
+        (record_endorsement_confirmed ?clearance_record)
+        (clearance_record_agency_authorization_link ?clearance_record ?agency_authorization)
+        (not
+          (record_endorsement_authorized ?clearance_record)
+        )
+      )
+    :effect (record_endorsement_authorized ?clearance_record)
+  )
+  (:action finalize_endorsement_and_mark_record_for_approval
+    :parameters (?clearance_record - clearance_record)
+    :precondition
+      (and
+        (record_endorsement_authorized ?clearance_record)
+        (not
+          (record_marked_for_approval ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (record_marked_for_approval ?clearance_record)
+        (entity_final_approval_recorded ?clearance_record)
+      )
+  )
+  (:action approve_segment_a_for_clearance
+    :parameters (?segment_a - consignment_segment_a ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_a_ready ?segment_a)
+        (segment_a_validation_flag ?segment_a)
+        (broker_package_consolidated ?broker_package)
+        (package_finalized ?broker_package)
+        (not
+          (entity_final_approval_recorded ?segment_a)
+        )
+      )
+    :effect (entity_final_approval_recorded ?segment_a)
+  )
+  (:action approve_segment_b_for_clearance
+    :parameters (?segment_b - consignment_segment_b ?broker_package - broker_submission_package)
+    :precondition
+      (and
+        (segment_b_ready ?segment_b)
+        (segment_b_validation_flag ?segment_b)
+        (broker_package_consolidated ?broker_package)
+        (package_finalized ?broker_package)
+        (not
+          (entity_final_approval_recorded ?segment_b)
+        )
+      )
+    :effect (entity_final_approval_recorded ?segment_b)
+  )
+  (:action bind_dependency_token_to_case
+    :parameters (?import_case - import_case ?permit_dependency_token - permit_dependency_token ?tariff_classifier - tariff_classifier_role)
+    :precondition
+      (and
+        (entity_final_approval_recorded ?import_case)
+        (entity_classified_by ?import_case ?tariff_classifier)
+        (permit_dependency_token_available ?permit_dependency_token)
+        (not
+          (entity_permit_linked ?import_case)
+        )
+      )
+    :effect
+      (and
+        (entity_permit_linked ?import_case)
+        (entity_dependency_token_bound ?import_case ?permit_dependency_token)
+        (not
+          (permit_dependency_token_available ?permit_dependency_token)
+        )
+      )
+  )
+  (:action allocate_permit_segment_a
+    :parameters (?segment_a - consignment_segment_a ?permit_type - permit_type ?permit_dependency_token - permit_dependency_token)
+    :precondition
+      (and
+        (entity_permit_linked ?segment_a)
+        (entity_permit_binding ?segment_a ?permit_type)
+        (entity_dependency_token_bound ?segment_a ?permit_dependency_token)
+        (not
+          (clearance_granted ?segment_a)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?segment_a)
+        (permit_resource_available ?permit_type)
+        (permit_dependency_token_available ?permit_dependency_token)
+      )
+  )
+  (:action allocate_permit_segment_b
+    :parameters (?segment_b - consignment_segment_b ?permit_type - permit_type ?permit_dependency_token - permit_dependency_token)
+    :precondition
+      (and
+        (entity_permit_linked ?segment_b)
+        (entity_permit_binding ?segment_b ?permit_type)
+        (entity_dependency_token_bound ?segment_b ?permit_dependency_token)
+        (not
+          (clearance_granted ?segment_b)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?segment_b)
+        (permit_resource_available ?permit_type)
+        (permit_dependency_token_available ?permit_dependency_token)
+      )
+  )
+  (:action allocate_permit_to_record
+    :parameters (?clearance_record - clearance_record ?permit_type - permit_type ?permit_dependency_token - permit_dependency_token)
+    :precondition
+      (and
+        (entity_permit_linked ?clearance_record)
+        (entity_permit_binding ?clearance_record ?permit_type)
+        (entity_dependency_token_bound ?clearance_record ?permit_dependency_token)
+        (not
+          (clearance_granted ?clearance_record)
+        )
+      )
+    :effect
+      (and
+        (clearance_granted ?clearance_record)
+        (permit_resource_available ?permit_type)
+        (permit_dependency_token_available ?permit_dependency_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem import_permit_validation_problem)
+  (:domain import_permit_dependency_validation_domain)
+  (:objects segment_a_1 - consignment_segment_a segment_b_1 - consignment_segment_b clearance_record_1 - clearance_record clearance_record_2 - clearance_record permit_slot_1 - permit_type permit_slot_2 - permit_type permit_slot_3 - permit_type tariff_classifier_system - tariff_classifier_role compliance_officer_1 - compliance_officer_role supporting_document_1 - supporting_document_artifact regulation_clause_a_1 - regulation_clause_a regulation_clause_b_1 - regulation_clause_b broker_package_1 - broker_submission_package certificate_1 - third_party_certificate_document certificate_2 - third_party_certificate_document policy_ref_1 - policy_reference policy_ref_2 - policy_reference supplementary_evidence_1 - supplementary_evidence supplementary_evidence_2 - supplementary_evidence dependency_token_1 - permit_dependency_token special_certificate_1 - special_certificate endorsement_1 - endorsement_document endorsement_2 - endorsement_document agency_authorization_1 - agency_authorization)
+  (:init
+    (permit_resource_available permit_slot_1)
+    (permit_resource_available permit_slot_2)
+    (permit_resource_available permit_slot_3)
+    (classifier_available tariff_classifier_system)
+    (officer_available compliance_officer_1)
+    (document_available supporting_document_1)
+    (segment_a_clause_link segment_a_1 regulation_clause_a_1)
+    (segment_b_clause_link segment_b_1 regulation_clause_b_1)
+    (broker_package_ready broker_package_1)
+    (certificate_available certificate_1)
+    (certificate_available certificate_2)
+    (clearance_record_includes_segment_a clearance_record_1 segment_a_1)
+    (clearance_record_includes_segment_a clearance_record_2 segment_a_1)
+    (clearance_record_includes_segment_b clearance_record_1 segment_b_1)
+    (clearance_record_includes_segment_b clearance_record_2 segment_b_1)
+    (clearance_record_includes_submission clearance_record_1 broker_package_1)
+    (clearance_record_includes_submission clearance_record_2 broker_package_1)
+    (clearance_record_certificate_link clearance_record_1 certificate_1)
+    (clearance_record_certificate_link clearance_record_2 certificate_2)
+    (policy_reference_available policy_ref_1)
+    (policy_reference_available policy_ref_2)
+    (supplementary_evidence_available supplementary_evidence_1)
+    (supplementary_evidence_available supplementary_evidence_2)
+    (permit_dependency_token_available dependency_token_1)
+    (special_certificate_available special_certificate_1)
+    (endorsement_available endorsement_1)
+    (clearance_record_endorsement_link clearance_record_1 endorsement_1)
+    (clearance_record_endorsement_link clearance_record_2 endorsement_2)
+    (agency_authorization_available agency_authorization_1)
+  )
+  (:goal
+    (and
+      (clearance_granted segment_a_1)
+      (clearance_granted segment_b_1)
+      (clearance_granted clearance_record_1)
+      (clearance_granted clearance_record_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(initialize_import_case segment_a_1)
+(initialize_import_case segment_b_1)
+(initialize_import_case clearance_record_1)
+(initialize_import_case clearance_record_2)
+(assess_and_allocate_permit segment_a_1 permit_slot_1)
+(assess_and_allocate_permit segment_b_1 permit_slot_2)
+(assign_tariff_classifier segment_b_1 tariff_classifier_system)
+(confirm_classification_assignment segment_b_1 tariff_classifier_system)
+(start_clause_b_validation segment_b_1 regulation_clause_b_1 tariff_classifier_system)
+(unassign_tariff_classifier segment_b_1 tariff_classifier_system)
+(assign_compliance_officer segment_b_1 compliance_officer_1)
+(apply_officer_review_to_clause_b segment_b_1 regulation_clause_b_1 compliance_officer_1)
+(unassign_compliance_officer segment_b_1 compliance_officer_1)
+(assign_tariff_classifier segment_a_1 tariff_classifier_system)
+(confirm_classification_assignment segment_a_1 tariff_classifier_system)
+(start_clause_a_validation segment_a_1 regulation_clause_a_1 tariff_classifier_system)
+(assign_compliance_officer segment_a_1 compliance_officer_1)
+(apply_officer_review_to_clause_a segment_a_1 regulation_clause_a_1 compliance_officer_1)
+(unassign_compliance_officer segment_a_1 compliance_officer_1)
+(consolidate_broker_submission_basic segment_a_1 segment_b_1 regulation_clause_a_1 regulation_clause_b_1 broker_package_1)
+(finalize_broker_submission_package broker_package_1 segment_a_1 tariff_classifier_system)
+(approve_segment_a_for_clearance segment_a_1 broker_package_1)
+(approve_segment_b_for_clearance segment_b_1 broker_package_1)
+(bind_dependency_token_to_case segment_a_1 dependency_token_1 tariff_classifier_system)
+(allocate_permit_segment_a segment_a_1 permit_slot_1 dependency_token_1)
+(unassign_tariff_classifier segment_a_1 tariff_classifier_system)
+(assign_tariff_classifier segment_b_1 tariff_classifier_system)
+(bind_dependency_token_to_case segment_b_1 dependency_token_1 tariff_classifier_system)
+(allocate_permit_segment_b segment_b_1 permit_slot_2 dependency_token_1)
+(unassign_tariff_classifier segment_b_1 tariff_classifier_system)
+(assess_and_allocate_permit clearance_record_1 permit_slot_1)
+(assign_tariff_classifier clearance_record_1 tariff_classifier_system)
+(confirm_classification_assignment clearance_record_1 tariff_classifier_system)
+(attach_certificate_to_record_and_package clearance_record_1 certificate_1 broker_package_1)
+(mark_record_certificates_bound clearance_record_1 certificate_1 broker_package_1 tariff_classifier_system)
+(attach_special_certificate_to_record clearance_record_1 special_certificate_1)
+(assign_compliance_officer clearance_record_1 compliance_officer_1)
+(mark_record_special_authorization_bound clearance_record_1 special_certificate_1 compliance_officer_1 certificate_1 broker_package_1)
+(attach_agency_authorization_to_record clearance_record_1 agency_authorization_1)
+(verify_authorizations clearance_record_1 agency_authorization_1 certificate_1 broker_package_1)
+(mark_record_ready_for_approval clearance_record_1)
+(bind_dependency_token_to_case clearance_record_1 dependency_token_1 tariff_classifier_system)
+(allocate_permit_to_record clearance_record_1 permit_slot_1 dependency_token_1)
+(unassign_compliance_officer clearance_record_1 compliance_officer_1)
+(detach_special_certificate_from_record clearance_record_1 special_certificate_1)
+(detach_agency_authorization_from_record clearance_record_1 agency_authorization_1)
+(unassign_tariff_classifier clearance_record_1 tariff_classifier_system)
+(assess_and_allocate_permit clearance_record_2 permit_slot_3)
+(assign_tariff_classifier clearance_record_2 tariff_classifier_system)
+(confirm_classification_assignment clearance_record_2 tariff_classifier_system)
+(attach_certificate_to_record_and_package clearance_record_2 certificate_2 broker_package_1)
+(mark_record_certificates_bound clearance_record_2 certificate_2 broker_package_1 tariff_classifier_system)
+(attach_special_certificate_to_record clearance_record_2 special_certificate_1)
+(assign_compliance_officer clearance_record_2 compliance_officer_1)
+(mark_record_special_authorization_bound clearance_record_2 special_certificate_1 compliance_officer_1 certificate_2 broker_package_1)
+(attach_agency_authorization_to_record clearance_record_2 agency_authorization_1)
+(verify_authorizations clearance_record_2 agency_authorization_1 certificate_2 broker_package_1)
+(mark_record_ready_for_approval clearance_record_2)
+(bind_dependency_token_to_case clearance_record_2 dependency_token_1 tariff_classifier_system)
+(allocate_permit_to_record clearance_record_2 permit_slot_3 dependency_token_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_s35j9chw/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_s35j9chw/plan.pddl 
+
+
+--- stderr ---
+

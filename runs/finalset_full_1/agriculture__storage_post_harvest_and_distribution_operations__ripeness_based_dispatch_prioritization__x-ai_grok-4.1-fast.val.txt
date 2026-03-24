@@ -1,0 +1,1011 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain ripeness_dispatch_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object technical_device_category - object logistics_component_category - object batch_category - object harvest_batch - batch_category resource_slot - resource_category inspection_sensor - resource_category conditioning_equipment - resource_category special_handling_flag - resource_category label_document - resource_category shipping_time_window - resource_category storage_profile - resource_category compliance_certificate - resource_category packaging_item - technical_device_category staging_label - technical_device_category priority_token - technical_device_category ripeness_class - logistics_component_category distribution_channel - logistics_component_category shipment_pallet - logistics_component_category inbound_slot_category - harvest_batch inbound_subslot_category - harvest_batch inbound_handling_unit - inbound_slot_category outbound_handling_unit - inbound_slot_category workstation - inbound_subslot_category)
+  (:predicates
+    (batch_registered ?harvest_batch - harvest_batch)
+    (entity_graded ?harvest_batch - harvest_batch)
+    (batch_assigned_to_inbound_slot ?harvest_batch - harvest_batch)
+    (dispatch_binding_confirmed_entity ?harvest_batch - harvest_batch)
+    (acknowledged_for_release ?harvest_batch - harvest_batch)
+    (cleared_for_dispatch_entity ?harvest_batch - harvest_batch)
+    (slot_available ?resource_slot - resource_slot)
+    (slot_allocated_for_entity ?harvest_batch - harvest_batch ?resource_slot - resource_slot)
+    (sensor_available ?inspection_sensor - inspection_sensor)
+    (inspection_assigned ?harvest_batch - harvest_batch ?inspection_sensor - inspection_sensor)
+    (conditioning_available ?conditioning_equipment - conditioning_equipment)
+    (conditioning_assigned ?harvest_batch - harvest_batch ?conditioning_equipment - conditioning_equipment)
+    (packaging_available ?packaging_item - packaging_item)
+    (inbound_packaging_assigned ?inbound_handling_unit - inbound_handling_unit ?packaging_item - packaging_item)
+    (outbound_packaging_assigned ?outbound_handling_unit - outbound_handling_unit ?packaging_item - packaging_item)
+    (inbound_assigned_ripeness ?inbound_handling_unit - inbound_handling_unit ?ripeness_class - ripeness_class)
+    (ripeness_flag_set ?ripeness_class - ripeness_class)
+    (ripeness_packaging_flag ?ripeness_class - ripeness_class)
+    (inbound_ready_for_dispatch ?inbound_handling_unit - inbound_handling_unit)
+    (outbound_unit_channel_assignment ?outbound_handling_unit - outbound_handling_unit ?distribution_channel - distribution_channel)
+    (channel_primed ?distribution_channel - distribution_channel)
+    (channel_packaging_assigned ?distribution_channel - distribution_channel)
+    (outbound_ready_for_dispatch ?outbound_handling_unit - outbound_handling_unit)
+    (pallet_available ?shipment_pallet - shipment_pallet)
+    (pallet_staged ?shipment_pallet - shipment_pallet)
+    (pallet_has_ripeness ?shipment_pallet - shipment_pallet ?ripeness_class - ripeness_class)
+    (pallet_has_channel ?shipment_pallet - shipment_pallet ?distribution_channel - distribution_channel)
+    (pallet_requires_labeling_type_a ?shipment_pallet - shipment_pallet)
+    (pallet_requires_labeling_type_b ?shipment_pallet - shipment_pallet)
+    (pallet_label_applied ?shipment_pallet - shipment_pallet)
+    (workstation_link_inbound_unit ?workstation - workstation ?inbound_handling_unit - inbound_handling_unit)
+    (workstation_link_outbound_unit ?workstation - workstation ?outbound_handling_unit - outbound_handling_unit)
+    (workstation_link_pallet ?workstation - workstation ?shipment_pallet - shipment_pallet)
+    (staging_label_available ?staging_label - staging_label)
+    (workstation_has_staging_label ?workstation - workstation ?staging_label - staging_label)
+    (staging_label_applied ?staging_label - staging_label)
+    (label_assigned_to_pallet ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    (workstation_ready ?workstation - workstation)
+    (workstation_qc_started ?workstation - workstation)
+    (workstation_verified ?workstation - workstation)
+    (workstation_special_handling_set ?workstation - workstation)
+    (workstation_labeling_complete ?workstation - workstation)
+    (workstation_attributes_attached ?workstation - workstation)
+    (workstation_final_verified ?workstation - workstation)
+    (priority_token_available ?priority_token - priority_token)
+    (workstation_has_priority_token ?workstation - workstation ?priority_token - priority_token)
+    (workstation_priority_claimed ?workstation - workstation)
+    (workstation_special_handling_prepared ?workstation - workstation)
+    (workstation_compliance_ready ?workstation - workstation)
+    (special_handling_flag_available ?special_handling_flag - special_handling_flag)
+    (workstation_has_special_handling_flag ?workstation - workstation ?special_handling_flag - special_handling_flag)
+    (label_document_available ?label_document - label_document)
+    (workstation_assigned_label_document ?workstation - workstation ?label_document - label_document)
+    (storage_profile_available ?storage_profile - storage_profile)
+    (workstation_assigned_storage_profile ?workstation - workstation ?storage_profile - storage_profile)
+    (compliance_document_available ?compliance_certificate - compliance_certificate)
+    (workstation_assigned_compliance_document ?workstation - workstation ?compliance_certificate - compliance_certificate)
+    (shipping_time_window_available ?shipping_time_window - shipping_time_window)
+    (time_window_assigned ?harvest_batch - harvest_batch ?shipping_time_window - shipping_time_window)
+    (inbound_unit_processing_started ?inbound_handling_unit - inbound_handling_unit)
+    (outbound_unit_processing_started ?outbound_handling_unit - outbound_handling_unit)
+    (workstation_release_marked ?workstation - workstation)
+  )
+  (:action register_harvest_batch
+    :parameters (?harvest_batch - harvest_batch)
+    :precondition
+      (and
+        (not
+          (batch_registered ?harvest_batch)
+        )
+        (not
+          (dispatch_binding_confirmed_entity ?harvest_batch)
+        )
+      )
+    :effect (batch_registered ?harvest_batch)
+  )
+  (:action assign_inbound_slot
+    :parameters (?harvest_batch - harvest_batch ?resource_slot - resource_slot)
+    :precondition
+      (and
+        (batch_registered ?harvest_batch)
+        (not
+          (batch_assigned_to_inbound_slot ?harvest_batch)
+        )
+        (slot_available ?resource_slot)
+      )
+    :effect
+      (and
+        (batch_assigned_to_inbound_slot ?harvest_batch)
+        (slot_allocated_for_entity ?harvest_batch ?resource_slot)
+        (not
+          (slot_available ?resource_slot)
+        )
+      )
+  )
+  (:action assign_inspection_device
+    :parameters (?harvest_batch - harvest_batch ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (batch_registered ?harvest_batch)
+        (batch_assigned_to_inbound_slot ?harvest_batch)
+        (sensor_available ?inspection_sensor)
+      )
+    :effect
+      (and
+        (inspection_assigned ?harvest_batch ?inspection_sensor)
+        (not
+          (sensor_available ?inspection_sensor)
+        )
+      )
+  )
+  (:action record_grading_result
+    :parameters (?harvest_batch - harvest_batch ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (batch_registered ?harvest_batch)
+        (batch_assigned_to_inbound_slot ?harvest_batch)
+        (inspection_assigned ?harvest_batch ?inspection_sensor)
+        (not
+          (entity_graded ?harvest_batch)
+        )
+      )
+    :effect (entity_graded ?harvest_batch)
+  )
+  (:action release_inspection_device
+    :parameters (?harvest_batch - harvest_batch ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (inspection_assigned ?harvest_batch ?inspection_sensor)
+      )
+    :effect
+      (and
+        (sensor_available ?inspection_sensor)
+        (not
+          (inspection_assigned ?harvest_batch ?inspection_sensor)
+        )
+      )
+  )
+  (:action assign_conditioning_equipment
+    :parameters (?harvest_batch - harvest_batch ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (entity_graded ?harvest_batch)
+        (conditioning_available ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (conditioning_assigned ?harvest_batch ?conditioning_equipment)
+        (not
+          (conditioning_available ?conditioning_equipment)
+        )
+      )
+  )
+  (:action release_conditioning_equipment
+    :parameters (?harvest_batch - harvest_batch ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (conditioning_assigned ?harvest_batch ?conditioning_equipment)
+      )
+    :effect
+      (and
+        (conditioning_available ?conditioning_equipment)
+        (not
+          (conditioning_assigned ?harvest_batch ?conditioning_equipment)
+        )
+      )
+  )
+  (:action assign_storage_profile
+    :parameters (?workstation - workstation ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (storage_profile_available ?storage_profile)
+      )
+    :effect
+      (and
+        (workstation_assigned_storage_profile ?workstation ?storage_profile)
+        (not
+          (storage_profile_available ?storage_profile)
+        )
+      )
+  )
+  (:action release_storage_profile
+    :parameters (?workstation - workstation ?storage_profile - storage_profile)
+    :precondition
+      (and
+        (workstation_assigned_storage_profile ?workstation ?storage_profile)
+      )
+    :effect
+      (and
+        (storage_profile_available ?storage_profile)
+        (not
+          (workstation_assigned_storage_profile ?workstation ?storage_profile)
+        )
+      )
+  )
+  (:action assign_compliance_document
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (compliance_document_available ?compliance_certificate)
+      )
+    :effect
+      (and
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (not
+          (compliance_document_available ?compliance_certificate)
+        )
+      )
+  )
+  (:action release_compliance_document
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+      )
+    :effect
+      (and
+        (compliance_document_available ?compliance_certificate)
+        (not
+          (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        )
+      )
+  )
+  (:action set_ripeness_flag
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?ripeness_class - ripeness_class ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (entity_graded ?inbound_handling_unit)
+        (inspection_assigned ?inbound_handling_unit ?inspection_sensor)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (not
+          (ripeness_flag_set ?ripeness_class)
+        )
+        (not
+          (ripeness_packaging_flag ?ripeness_class)
+        )
+      )
+    :effect (ripeness_flag_set ?ripeness_class)
+  )
+  (:action mark_inbound_conditioning_complete
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?ripeness_class - ripeness_class ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (entity_graded ?inbound_handling_unit)
+        (conditioning_assigned ?inbound_handling_unit ?conditioning_equipment)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (ripeness_flag_set ?ripeness_class)
+        (not
+          (inbound_unit_processing_started ?inbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+      )
+  )
+  (:action attach_packaging_to_inbound_unit
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?ripeness_class - ripeness_class ?packaging_item - packaging_item)
+    :precondition
+      (and
+        (entity_graded ?inbound_handling_unit)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (packaging_available ?packaging_item)
+        (not
+          (inbound_unit_processing_started ?inbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (ripeness_packaging_flag ?ripeness_class)
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (inbound_packaging_assigned ?inbound_handling_unit ?packaging_item)
+        (not
+          (packaging_available ?packaging_item)
+        )
+      )
+  )
+  (:action finalize_inbound_packaging
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?ripeness_class - ripeness_class ?inspection_sensor - inspection_sensor ?packaging_item - packaging_item)
+    :precondition
+      (and
+        (entity_graded ?inbound_handling_unit)
+        (inspection_assigned ?inbound_handling_unit ?inspection_sensor)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (ripeness_packaging_flag ?ripeness_class)
+        (inbound_packaging_assigned ?inbound_handling_unit ?packaging_item)
+        (not
+          (inbound_ready_for_dispatch ?inbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (ripeness_flag_set ?ripeness_class)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+        (packaging_available ?packaging_item)
+        (not
+          (inbound_packaging_assigned ?inbound_handling_unit ?packaging_item)
+        )
+      )
+  )
+  (:action evaluate_channel_eligibility
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?distribution_channel - distribution_channel ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (entity_graded ?outbound_handling_unit)
+        (inspection_assigned ?outbound_handling_unit ?inspection_sensor)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (not
+          (channel_primed ?distribution_channel)
+        )
+        (not
+          (channel_packaging_assigned ?distribution_channel)
+        )
+      )
+    :effect (channel_primed ?distribution_channel)
+  )
+  (:action confirm_channel_eligibility
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?distribution_channel - distribution_channel ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (entity_graded ?outbound_handling_unit)
+        (conditioning_assigned ?outbound_handling_unit ?conditioning_equipment)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (channel_primed ?distribution_channel)
+        (not
+          (outbound_unit_processing_started ?outbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+      )
+  )
+  (:action attach_packaging_to_outbound_unit
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?distribution_channel - distribution_channel ?packaging_item - packaging_item)
+    :precondition
+      (and
+        (entity_graded ?outbound_handling_unit)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (packaging_available ?packaging_item)
+        (not
+          (outbound_unit_processing_started ?outbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (channel_packaging_assigned ?distribution_channel)
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (outbound_packaging_assigned ?outbound_handling_unit ?packaging_item)
+        (not
+          (packaging_available ?packaging_item)
+        )
+      )
+  )
+  (:action finalize_outbound_packaging
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?distribution_channel - distribution_channel ?inspection_sensor - inspection_sensor ?packaging_item - packaging_item)
+    :precondition
+      (and
+        (entity_graded ?outbound_handling_unit)
+        (inspection_assigned ?outbound_handling_unit ?inspection_sensor)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (channel_packaging_assigned ?distribution_channel)
+        (outbound_packaging_assigned ?outbound_handling_unit ?packaging_item)
+        (not
+          (outbound_ready_for_dispatch ?outbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (channel_primed ?distribution_channel)
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+        (packaging_available ?packaging_item)
+        (not
+          (outbound_packaging_assigned ?outbound_handling_unit ?packaging_item)
+        )
+      )
+  )
+  (:action assemble_shipment_pallet_variant_1
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?outbound_handling_unit - outbound_handling_unit ?ripeness_class - ripeness_class ?distribution_channel - distribution_channel ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (ripeness_flag_set ?ripeness_class)
+        (channel_primed ?distribution_channel)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+        (pallet_available ?shipment_pallet)
+      )
+    :effect
+      (and
+        (pallet_staged ?shipment_pallet)
+        (pallet_has_ripeness ?shipment_pallet ?ripeness_class)
+        (pallet_has_channel ?shipment_pallet ?distribution_channel)
+        (not
+          (pallet_available ?shipment_pallet)
+        )
+      )
+  )
+  (:action assemble_shipment_pallet_variant_2
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?outbound_handling_unit - outbound_handling_unit ?ripeness_class - ripeness_class ?distribution_channel - distribution_channel ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (ripeness_packaging_flag ?ripeness_class)
+        (channel_primed ?distribution_channel)
+        (not
+          (inbound_ready_for_dispatch ?inbound_handling_unit)
+        )
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+        (pallet_available ?shipment_pallet)
+      )
+    :effect
+      (and
+        (pallet_staged ?shipment_pallet)
+        (pallet_has_ripeness ?shipment_pallet ?ripeness_class)
+        (pallet_has_channel ?shipment_pallet ?distribution_channel)
+        (pallet_requires_labeling_type_a ?shipment_pallet)
+        (not
+          (pallet_available ?shipment_pallet)
+        )
+      )
+  )
+  (:action assemble_shipment_pallet_variant_3
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?outbound_handling_unit - outbound_handling_unit ?ripeness_class - ripeness_class ?distribution_channel - distribution_channel ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (ripeness_flag_set ?ripeness_class)
+        (channel_packaging_assigned ?distribution_channel)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+        (not
+          (outbound_ready_for_dispatch ?outbound_handling_unit)
+        )
+        (pallet_available ?shipment_pallet)
+      )
+    :effect
+      (and
+        (pallet_staged ?shipment_pallet)
+        (pallet_has_ripeness ?shipment_pallet ?ripeness_class)
+        (pallet_has_channel ?shipment_pallet ?distribution_channel)
+        (pallet_requires_labeling_type_b ?shipment_pallet)
+        (not
+          (pallet_available ?shipment_pallet)
+        )
+      )
+  )
+  (:action assemble_shipment_pallet_variant_4
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?outbound_handling_unit - outbound_handling_unit ?ripeness_class - ripeness_class ?distribution_channel - distribution_channel ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (inbound_assigned_ripeness ?inbound_handling_unit ?ripeness_class)
+        (outbound_unit_channel_assignment ?outbound_handling_unit ?distribution_channel)
+        (ripeness_packaging_flag ?ripeness_class)
+        (channel_packaging_assigned ?distribution_channel)
+        (not
+          (inbound_ready_for_dispatch ?inbound_handling_unit)
+        )
+        (not
+          (outbound_ready_for_dispatch ?outbound_handling_unit)
+        )
+        (pallet_available ?shipment_pallet)
+      )
+    :effect
+      (and
+        (pallet_staged ?shipment_pallet)
+        (pallet_has_ripeness ?shipment_pallet ?ripeness_class)
+        (pallet_has_channel ?shipment_pallet ?distribution_channel)
+        (pallet_requires_labeling_type_a ?shipment_pallet)
+        (pallet_requires_labeling_type_b ?shipment_pallet)
+        (not
+          (pallet_available ?shipment_pallet)
+        )
+      )
+  )
+  (:action apply_pallet_label_marker
+    :parameters (?shipment_pallet - shipment_pallet ?inbound_handling_unit - inbound_handling_unit ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (pallet_staged ?shipment_pallet)
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (inspection_assigned ?inbound_handling_unit ?inspection_sensor)
+        (not
+          (pallet_label_applied ?shipment_pallet)
+        )
+      )
+    :effect (pallet_label_applied ?shipment_pallet)
+  )
+  (:action apply_staging_label_to_pallet
+    :parameters (?workstation - workstation ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (workstation_link_pallet ?workstation ?shipment_pallet)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (staging_label_available ?staging_label)
+        (pallet_staged ?shipment_pallet)
+        (pallet_label_applied ?shipment_pallet)
+        (not
+          (staging_label_applied ?staging_label)
+        )
+      )
+    :effect
+      (and
+        (staging_label_applied ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (not
+          (staging_label_available ?staging_label)
+        )
+      )
+  )
+  (:action bind_staging_label_to_pallet_at_workstation
+    :parameters (?workstation - workstation ?staging_label - staging_label ?shipment_pallet - shipment_pallet ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (staging_label_applied ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (inspection_assigned ?workstation ?inspection_sensor)
+        (not
+          (pallet_requires_labeling_type_a ?shipment_pallet)
+        )
+        (not
+          (workstation_ready ?workstation)
+        )
+      )
+    :effect (workstation_ready ?workstation)
+  )
+  (:action claim_special_handling_flag
+    :parameters (?workstation - workstation ?special_handling_flag - special_handling_flag)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (special_handling_flag_available ?special_handling_flag)
+        (not
+          (workstation_special_handling_set ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_special_handling_set ?workstation)
+        (workstation_has_special_handling_flag ?workstation ?special_handling_flag)
+        (not
+          (special_handling_flag_available ?special_handling_flag)
+        )
+      )
+  )
+  (:action prepare_workstation_for_labeling
+    :parameters (?workstation - workstation ?staging_label - staging_label ?shipment_pallet - shipment_pallet ?inspection_sensor - inspection_sensor ?special_handling_flag - special_handling_flag)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (staging_label_applied ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (inspection_assigned ?workstation ?inspection_sensor)
+        (pallet_requires_labeling_type_a ?shipment_pallet)
+        (workstation_special_handling_set ?workstation)
+        (workstation_has_special_handling_flag ?workstation ?special_handling_flag)
+        (not
+          (workstation_ready ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_ready ?workstation)
+        (workstation_labeling_complete ?workstation)
+      )
+  )
+  (:action attach_storage_profile_at_workstation
+    :parameters (?workstation - workstation ?storage_profile - storage_profile ?conditioning_equipment - conditioning_equipment ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_ready ?workstation)
+        (workstation_assigned_storage_profile ?workstation ?storage_profile)
+        (conditioning_assigned ?workstation ?conditioning_equipment)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (not
+          (pallet_requires_labeling_type_b ?shipment_pallet)
+        )
+        (not
+          (workstation_qc_started ?workstation)
+        )
+      )
+    :effect (workstation_qc_started ?workstation)
+  )
+  (:action attach_storage_profile_variant
+    :parameters (?workstation - workstation ?storage_profile - storage_profile ?conditioning_equipment - conditioning_equipment ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_ready ?workstation)
+        (workstation_assigned_storage_profile ?workstation ?storage_profile)
+        (conditioning_assigned ?workstation ?conditioning_equipment)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (pallet_requires_labeling_type_b ?shipment_pallet)
+        (not
+          (workstation_qc_started ?workstation)
+        )
+      )
+    :effect (workstation_qc_started ?workstation)
+  )
+  (:action attach_compliance_document_to_workstation
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_qc_started ?workstation)
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (not
+          (pallet_requires_labeling_type_a ?shipment_pallet)
+        )
+        (not
+          (pallet_requires_labeling_type_b ?shipment_pallet)
+        )
+        (not
+          (workstation_verified ?workstation)
+        )
+      )
+    :effect (workstation_verified ?workstation)
+  )
+  (:action finalize_compliance_and_attach_attributes
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_qc_started ?workstation)
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (pallet_requires_labeling_type_a ?shipment_pallet)
+        (not
+          (pallet_requires_labeling_type_b ?shipment_pallet)
+        )
+        (not
+          (workstation_verified ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_verified ?workstation)
+        (workstation_attributes_attached ?workstation)
+      )
+  )
+  (:action finalize_compliance_and_attach_attributes_variant_2
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_qc_started ?workstation)
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (not
+          (pallet_requires_labeling_type_a ?shipment_pallet)
+        )
+        (pallet_requires_labeling_type_b ?shipment_pallet)
+        (not
+          (workstation_verified ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_verified ?workstation)
+        (workstation_attributes_attached ?workstation)
+      )
+  )
+  (:action finalize_compliance_and_attach_attributes_variant_3
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate ?staging_label - staging_label ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (workstation_qc_started ?workstation)
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (workstation_has_staging_label ?workstation ?staging_label)
+        (label_assigned_to_pallet ?staging_label ?shipment_pallet)
+        (pallet_requires_labeling_type_a ?shipment_pallet)
+        (pallet_requires_labeling_type_b ?shipment_pallet)
+        (not
+          (workstation_verified ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_verified ?workstation)
+        (workstation_attributes_attached ?workstation)
+      )
+  )
+  (:action mark_workstation_release_and_flag_batch
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_verified ?workstation)
+        (not
+          (workstation_attributes_attached ?workstation)
+        )
+        (not
+          (workstation_release_marked ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_release_marked ?workstation)
+        (acknowledged_for_release ?workstation)
+      )
+  )
+  (:action assign_label_document_to_workstation
+    :parameters (?workstation - workstation ?label_document - label_document)
+    :precondition
+      (and
+        (workstation_verified ?workstation)
+        (workstation_attributes_attached ?workstation)
+        (label_document_available ?label_document)
+      )
+    :effect
+      (and
+        (workstation_assigned_label_document ?workstation ?label_document)
+        (not
+          (label_document_available ?label_document)
+        )
+      )
+  )
+  (:action final_quality_verification
+    :parameters (?workstation - workstation ?inbound_handling_unit - inbound_handling_unit ?outbound_handling_unit - outbound_handling_unit ?inspection_sensor - inspection_sensor ?label_document - label_document)
+    :precondition
+      (and
+        (workstation_verified ?workstation)
+        (workstation_attributes_attached ?workstation)
+        (workstation_assigned_label_document ?workstation ?label_document)
+        (workstation_link_inbound_unit ?workstation ?inbound_handling_unit)
+        (workstation_link_outbound_unit ?workstation ?outbound_handling_unit)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+        (inspection_assigned ?workstation ?inspection_sensor)
+        (not
+          (workstation_final_verified ?workstation)
+        )
+      )
+    :effect (workstation_final_verified ?workstation)
+  )
+  (:action finalize_verification_and_mark_release
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_verified ?workstation)
+        (workstation_final_verified ?workstation)
+        (not
+          (workstation_release_marked ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_release_marked ?workstation)
+        (acknowledged_for_release ?workstation)
+      )
+  )
+  (:action claim_priority_token
+    :parameters (?workstation - workstation ?priority_token - priority_token ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (entity_graded ?workstation)
+        (inspection_assigned ?workstation ?inspection_sensor)
+        (priority_token_available ?priority_token)
+        (workstation_has_priority_token ?workstation ?priority_token)
+        (not
+          (workstation_priority_claimed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_priority_claimed ?workstation)
+        (not
+          (priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action prepare_workstation_for_special_handling
+    :parameters (?workstation - workstation ?conditioning_equipment - conditioning_equipment)
+    :precondition
+      (and
+        (workstation_priority_claimed ?workstation)
+        (conditioning_assigned ?workstation ?conditioning_equipment)
+        (not
+          (workstation_special_handling_prepared ?workstation)
+        )
+      )
+    :effect (workstation_special_handling_prepared ?workstation)
+  )
+  (:action attach_compliance_verification
+    :parameters (?workstation - workstation ?compliance_certificate - compliance_certificate)
+    :precondition
+      (and
+        (workstation_special_handling_prepared ?workstation)
+        (workstation_assigned_compliance_document ?workstation ?compliance_certificate)
+        (not
+          (workstation_compliance_ready ?workstation)
+        )
+      )
+    :effect (workstation_compliance_ready ?workstation)
+  )
+  (:action finalize_compliance_and_mark_release
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_compliance_ready ?workstation)
+        (not
+          (workstation_release_marked ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_release_marked ?workstation)
+        (acknowledged_for_release ?workstation)
+      )
+  )
+  (:action release_inbound_handling_unit
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (inbound_unit_processing_started ?inbound_handling_unit)
+        (inbound_ready_for_dispatch ?inbound_handling_unit)
+        (pallet_staged ?shipment_pallet)
+        (pallet_label_applied ?shipment_pallet)
+        (not
+          (acknowledged_for_release ?inbound_handling_unit)
+        )
+      )
+    :effect (acknowledged_for_release ?inbound_handling_unit)
+  )
+  (:action release_outbound_handling_unit
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?shipment_pallet - shipment_pallet)
+    :precondition
+      (and
+        (outbound_unit_processing_started ?outbound_handling_unit)
+        (outbound_ready_for_dispatch ?outbound_handling_unit)
+        (pallet_staged ?shipment_pallet)
+        (pallet_label_applied ?shipment_pallet)
+        (not
+          (acknowledged_for_release ?outbound_handling_unit)
+        )
+      )
+    :effect (acknowledged_for_release ?outbound_handling_unit)
+  )
+  (:action assign_shipping_time_window_to_batch
+    :parameters (?harvest_batch - harvest_batch ?shipping_time_window - shipping_time_window ?inspection_sensor - inspection_sensor)
+    :precondition
+      (and
+        (acknowledged_for_release ?harvest_batch)
+        (inspection_assigned ?harvest_batch ?inspection_sensor)
+        (shipping_time_window_available ?shipping_time_window)
+        (not
+          (cleared_for_dispatch_entity ?harvest_batch)
+        )
+      )
+    :effect
+      (and
+        (cleared_for_dispatch_entity ?harvest_batch)
+        (time_window_assigned ?harvest_batch ?shipping_time_window)
+        (not
+          (shipping_time_window_available ?shipping_time_window)
+        )
+      )
+  )
+  (:action bind_inbound_to_outbound_slot
+    :parameters (?inbound_handling_unit - inbound_handling_unit ?resource_slot - resource_slot ?shipping_time_window - shipping_time_window)
+    :precondition
+      (and
+        (cleared_for_dispatch_entity ?inbound_handling_unit)
+        (slot_allocated_for_entity ?inbound_handling_unit ?resource_slot)
+        (time_window_assigned ?inbound_handling_unit ?shipping_time_window)
+        (not
+          (dispatch_binding_confirmed_entity ?inbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_binding_confirmed_entity ?inbound_handling_unit)
+        (slot_available ?resource_slot)
+        (shipping_time_window_available ?shipping_time_window)
+      )
+  )
+  (:action bind_outbound_unit_to_slot
+    :parameters (?outbound_handling_unit - outbound_handling_unit ?resource_slot - resource_slot ?shipping_time_window - shipping_time_window)
+    :precondition
+      (and
+        (cleared_for_dispatch_entity ?outbound_handling_unit)
+        (slot_allocated_for_entity ?outbound_handling_unit ?resource_slot)
+        (time_window_assigned ?outbound_handling_unit ?shipping_time_window)
+        (not
+          (dispatch_binding_confirmed_entity ?outbound_handling_unit)
+        )
+      )
+    :effect
+      (and
+        (dispatch_binding_confirmed_entity ?outbound_handling_unit)
+        (slot_available ?resource_slot)
+        (shipping_time_window_available ?shipping_time_window)
+      )
+  )
+  (:action bind_workstation_to_outbound_slot
+    :parameters (?workstation - workstation ?resource_slot - resource_slot ?shipping_time_window - shipping_time_window)
+    :precondition
+      (and
+        (cleared_for_dispatch_entity ?workstation)
+        (slot_allocated_for_entity ?workstation ?resource_slot)
+        (time_window_assigned ?workstation ?shipping_time_window)
+        (not
+          (dispatch_binding_confirmed_entity ?workstation)
+        )
+      )
+    :effect
+      (and
+        (dispatch_binding_confirmed_entity ?workstation)
+        (slot_available ?resource_slot)
+        (shipping_time_window_available ?shipping_time_window)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem ripeness_dispatch_scenario)
+  (:domain ripeness_dispatch_domain)
+  (:objects receiving_slot_1 - inbound_handling_unit outbound_lane_1 - outbound_handling_unit workstation_a - workstation workstation_b - workstation dock_slot_1 - resource_slot dock_slot_2 - resource_slot dock_slot_3 - resource_slot inspection_sensor_1 - inspection_sensor conditioning_chamber_1 - conditioning_equipment packaging_crate - packaging_item ripeness_optimal - ripeness_class distribution_retail - distribution_channel shipment_pallet_slot_1 - shipment_pallet staging_label_1 - staging_label staging_label_2 - staging_label flag_precool - special_handling_flag flag_fragile - special_handling_flag label_document_1 - label_document label_document_2 - label_document time_window_1 - shipping_time_window storage_profile_cold_chain - storage_profile priority_token_customer_a - priority_token priority_token_customer_b - priority_token compliance_cert_1 - compliance_certificate)
+  (:init
+    (slot_available dock_slot_1)
+    (slot_available dock_slot_2)
+    (slot_available dock_slot_3)
+    (sensor_available inspection_sensor_1)
+    (conditioning_available conditioning_chamber_1)
+    (packaging_available packaging_crate)
+    (inbound_assigned_ripeness receiving_slot_1 ripeness_optimal)
+    (outbound_unit_channel_assignment outbound_lane_1 distribution_retail)
+    (pallet_available shipment_pallet_slot_1)
+    (staging_label_available staging_label_1)
+    (staging_label_available staging_label_2)
+    (workstation_link_inbound_unit workstation_a receiving_slot_1)
+    (workstation_link_inbound_unit workstation_b receiving_slot_1)
+    (workstation_link_outbound_unit workstation_a outbound_lane_1)
+    (workstation_link_outbound_unit workstation_b outbound_lane_1)
+    (workstation_link_pallet workstation_a shipment_pallet_slot_1)
+    (workstation_link_pallet workstation_b shipment_pallet_slot_1)
+    (workstation_has_staging_label workstation_a staging_label_1)
+    (workstation_has_staging_label workstation_b staging_label_2)
+    (special_handling_flag_available flag_precool)
+    (special_handling_flag_available flag_fragile)
+    (label_document_available label_document_1)
+    (label_document_available label_document_2)
+    (shipping_time_window_available time_window_1)
+    (storage_profile_available storage_profile_cold_chain)
+    (priority_token_available priority_token_customer_a)
+    (workstation_has_priority_token workstation_a priority_token_customer_a)
+    (workstation_has_priority_token workstation_b priority_token_customer_b)
+    (compliance_document_available compliance_cert_1)
+  )
+  (:goal
+    (and
+      (dispatch_binding_confirmed_entity receiving_slot_1)
+      (dispatch_binding_confirmed_entity outbound_lane_1)
+      (dispatch_binding_confirmed_entity workstation_a)
+      (dispatch_binding_confirmed_entity workstation_b)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_harvest_batch receiving_slot_1)
+(assign_inbound_slot receiving_slot_1 dock_slot_1)
+(assign_inspection_device receiving_slot_1 inspection_sensor_1)
+(record_grading_result receiving_slot_1 inspection_sensor_1)
+(release_inspection_device receiving_slot_1 inspection_sensor_1)
+(assign_inspection_device receiving_slot_1 inspection_sensor_1)
+(set_ripeness_flag receiving_slot_1 ripeness_optimal inspection_sensor_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_8gf8zb8_/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_8gf8zb8_/plan.pddl 
+
+
+--- stderr ---
+

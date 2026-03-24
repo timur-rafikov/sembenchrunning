@@ -1,0 +1,1067 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain airport_transfer_breakdown_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object service_component - object logistical_entity - object case_root - object passenger_case - case_root replacement_vehicle - operational_resource transport_option - operational_resource third_party_provider - operational_resource policy_document - operational_resource authorization_credential - operational_resource payment_instruction - operational_resource maintenance_resource - operational_resource safety_report - operational_resource compensation_offer - service_component itinerary_segment - service_component insurer_claim - service_component pickup_location - logistical_entity dropoff_location - logistical_entity recovery_plan - logistical_entity transfer_provider_category - passenger_case transfer_provider_category_alt - passenger_case local_transfer_unit - transfer_provider_category partner_transfer_unit - transfer_provider_category recovery_coordinator - transfer_provider_category_alt)
+  (:predicates
+    (incident_logged ?passenger_case - passenger_case)
+    (entity_assignment_confirmed ?passenger_case - passenger_case)
+    (entity_replacement_reserved ?passenger_case - passenger_case)
+    (entity_closure_recorded ?passenger_case - passenger_case)
+    (entity_execution_confirmed ?passenger_case - passenger_case)
+    (entity_payment_instruction_created ?passenger_case - passenger_case)
+    (replacement_available ?replacement_vehicle - replacement_vehicle)
+    (entity_assigned_replacement ?passenger_case - passenger_case ?replacement_vehicle - replacement_vehicle)
+    (transport_option_available ?transport_option - transport_option)
+    (entity_assigned_transport ?passenger_case - passenger_case ?transport_option - transport_option)
+    (third_party_provider_available ?third_party_provider - third_party_provider)
+    (entity_engaged_provider ?passenger_case - passenger_case ?third_party_provider - third_party_provider)
+    (compensation_offer_available ?compensation_offer - compensation_offer)
+    (local_unit_assigned_compensation ?local_transfer_unit - local_transfer_unit ?compensation_offer - compensation_offer)
+    (partner_unit_assigned_compensation ?partner_transfer_unit - partner_transfer_unit ?compensation_offer - compensation_offer)
+    (local_unit_assigned_pickup ?local_transfer_unit - local_transfer_unit ?pickup_location - pickup_location)
+    (pickup_confirmed ?pickup_location - pickup_location)
+    (pickup_compensation_flag ?pickup_location - pickup_location)
+    (local_unit_ready ?local_transfer_unit - local_transfer_unit)
+    (partner_unit_assigned_dropoff ?partner_transfer_unit - partner_transfer_unit ?dropoff_location - dropoff_location)
+    (dropoff_confirmed ?dropoff_location - dropoff_location)
+    (dropoff_compensation_flag ?dropoff_location - dropoff_location)
+    (partner_unit_ready ?partner_transfer_unit - partner_transfer_unit)
+    (plan_pending ?recovery_plan - recovery_plan)
+    (plan_created ?recovery_plan - recovery_plan)
+    (plan_includes_pickup ?recovery_plan - recovery_plan ?pickup_location - pickup_location)
+    (plan_includes_dropoff ?recovery_plan - recovery_plan ?dropoff_location - dropoff_location)
+    (plan_needs_local_followup ?recovery_plan - recovery_plan)
+    (plan_needs_partner_followup ?recovery_plan - recovery_plan)
+    (plan_finalised ?recovery_plan - recovery_plan)
+    (coordinator_allocated_local_unit ?recovery_coordinator - recovery_coordinator ?local_transfer_unit - local_transfer_unit)
+    (coordinator_allocated_partner_unit ?recovery_coordinator - recovery_coordinator ?partner_transfer_unit - partner_transfer_unit)
+    (coordinator_linked_recovery_plan ?recovery_coordinator - recovery_coordinator ?recovery_plan - recovery_plan)
+    (itinerary_segment_pending ?itinerary_segment - itinerary_segment)
+    (coordinator_has_itinerary_segment ?recovery_coordinator - recovery_coordinator ?itinerary_segment - itinerary_segment)
+    (itinerary_segment_committed ?itinerary_segment - itinerary_segment)
+    (itinerary_segment_assigned_to_plan ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    (coordinator_documents_prepared ?recovery_coordinator - recovery_coordinator)
+    (coordinator_maintenance_authorized ?recovery_coordinator - recovery_coordinator)
+    (coordinator_activation_prepared ?recovery_coordinator - recovery_coordinator)
+    (coordinator_policy_attached ?recovery_coordinator - recovery_coordinator)
+    (coordinator_policy_verified ?recovery_coordinator - recovery_coordinator)
+    (coordinator_has_authorizations ?recovery_coordinator - recovery_coordinator)
+    (coordinator_validated ?recovery_coordinator - recovery_coordinator)
+    (insurer_claim_available ?insurer_claim - insurer_claim)
+    (coordinator_linked_claim ?recovery_coordinator - recovery_coordinator ?insurer_claim - insurer_claim)
+    (coordinator_claim_attached ?recovery_coordinator - recovery_coordinator)
+    (coordinator_claim_acknowledged ?recovery_coordinator - recovery_coordinator)
+    (claim_safety_attached ?recovery_coordinator - recovery_coordinator)
+    (policy_document_available ?policy_document - policy_document)
+    (coordinator_linked_policy ?recovery_coordinator - recovery_coordinator ?policy_document - policy_document)
+    (authorization_credential_available ?authorization_credential - authorization_credential)
+    (coordinator_attached_authorization ?recovery_coordinator - recovery_coordinator ?authorization_credential - authorization_credential)
+    (maintenance_resource_available ?maintenance_resource - maintenance_resource)
+    (coordinator_allocated_maintenance_resource ?recovery_coordinator - recovery_coordinator ?maintenance_resource - maintenance_resource)
+    (safety_report_available ?safety_report - safety_report)
+    (coordinator_attached_safety_report ?recovery_coordinator - recovery_coordinator ?safety_report - safety_report)
+    (payment_instruction_available ?payment_instruction - payment_instruction)
+    (entity_linked_payment_instruction ?passenger_case - passenger_case ?payment_instruction - payment_instruction)
+    (local_unit_checked_in ?local_transfer_unit - local_transfer_unit)
+    (partner_unit_checked_in ?partner_transfer_unit - partner_transfer_unit)
+    (activation_recorded ?recovery_coordinator - recovery_coordinator)
+  )
+  (:action log_incident_case
+    :parameters (?passenger_case - passenger_case)
+    :precondition
+      (and
+        (not
+          (incident_logged ?passenger_case)
+        )
+        (not
+          (entity_closure_recorded ?passenger_case)
+        )
+      )
+    :effect (incident_logged ?passenger_case)
+  )
+  (:action reserve_replacement_vehicle
+    :parameters (?passenger_case - passenger_case ?replacement_vehicle - replacement_vehicle)
+    :precondition
+      (and
+        (incident_logged ?passenger_case)
+        (not
+          (entity_replacement_reserved ?passenger_case)
+        )
+        (replacement_available ?replacement_vehicle)
+      )
+    :effect
+      (and
+        (entity_replacement_reserved ?passenger_case)
+        (entity_assigned_replacement ?passenger_case ?replacement_vehicle)
+        (not
+          (replacement_available ?replacement_vehicle)
+        )
+      )
+  )
+  (:action assign_transport_option
+    :parameters (?passenger_case - passenger_case ?transport_option - transport_option)
+    :precondition
+      (and
+        (incident_logged ?passenger_case)
+        (entity_replacement_reserved ?passenger_case)
+        (transport_option_available ?transport_option)
+      )
+    :effect
+      (and
+        (entity_assigned_transport ?passenger_case ?transport_option)
+        (not
+          (transport_option_available ?transport_option)
+        )
+      )
+  )
+  (:action confirm_transport_assignment
+    :parameters (?passenger_case - passenger_case ?transport_option - transport_option)
+    :precondition
+      (and
+        (incident_logged ?passenger_case)
+        (entity_replacement_reserved ?passenger_case)
+        (entity_assigned_transport ?passenger_case ?transport_option)
+        (not
+          (entity_assignment_confirmed ?passenger_case)
+        )
+      )
+    :effect (entity_assignment_confirmed ?passenger_case)
+  )
+  (:action release_transport_option
+    :parameters (?passenger_case - passenger_case ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_assigned_transport ?passenger_case ?transport_option)
+      )
+    :effect
+      (and
+        (transport_option_available ?transport_option)
+        (not
+          (entity_assigned_transport ?passenger_case ?transport_option)
+        )
+      )
+  )
+  (:action engage_third_party_provider
+    :parameters (?passenger_case - passenger_case ?third_party_provider - third_party_provider)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?passenger_case)
+        (third_party_provider_available ?third_party_provider)
+      )
+    :effect
+      (and
+        (entity_engaged_provider ?passenger_case ?third_party_provider)
+        (not
+          (third_party_provider_available ?third_party_provider)
+        )
+      )
+  )
+  (:action release_third_party_provider
+    :parameters (?passenger_case - passenger_case ?third_party_provider - third_party_provider)
+    :precondition
+      (and
+        (entity_engaged_provider ?passenger_case ?third_party_provider)
+      )
+    :effect
+      (and
+        (third_party_provider_available ?third_party_provider)
+        (not
+          (entity_engaged_provider ?passenger_case ?third_party_provider)
+        )
+      )
+  )
+  (:action assign_maintenance_resource
+    :parameters (?recovery_coordinator - recovery_coordinator ?maintenance_resource - maintenance_resource)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (maintenance_resource_available ?maintenance_resource)
+      )
+    :effect
+      (and
+        (coordinator_allocated_maintenance_resource ?recovery_coordinator ?maintenance_resource)
+        (not
+          (maintenance_resource_available ?maintenance_resource)
+        )
+      )
+  )
+  (:action release_maintenance_resource
+    :parameters (?recovery_coordinator - recovery_coordinator ?maintenance_resource - maintenance_resource)
+    :precondition
+      (and
+        (coordinator_allocated_maintenance_resource ?recovery_coordinator ?maintenance_resource)
+      )
+    :effect
+      (and
+        (maintenance_resource_available ?maintenance_resource)
+        (not
+          (coordinator_allocated_maintenance_resource ?recovery_coordinator ?maintenance_resource)
+        )
+      )
+  )
+  (:action attach_safety_report
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (safety_report_available ?safety_report)
+      )
+    :effect
+      (and
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (not
+          (safety_report_available ?safety_report)
+        )
+      )
+  )
+  (:action detach_safety_report
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report)
+    :precondition
+      (and
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+      )
+    :effect
+      (and
+        (safety_report_available ?safety_report)
+        (not
+          (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        )
+      )
+  )
+  (:action confirm_local_pickup
+    :parameters (?local_transfer_unit - local_transfer_unit ?pickup_location - pickup_location ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?local_transfer_unit)
+        (entity_assigned_transport ?local_transfer_unit ?transport_option)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (not
+          (pickup_confirmed ?pickup_location)
+        )
+        (not
+          (pickup_compensation_flag ?pickup_location)
+        )
+      )
+    :effect (pickup_confirmed ?pickup_location)
+  )
+  (:action confirm_local_unit_ready
+    :parameters (?local_transfer_unit - local_transfer_unit ?pickup_location - pickup_location ?third_party_provider - third_party_provider)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?local_transfer_unit)
+        (entity_engaged_provider ?local_transfer_unit ?third_party_provider)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (pickup_confirmed ?pickup_location)
+        (not
+          (local_unit_checked_in ?local_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (local_unit_ready ?local_transfer_unit)
+      )
+  )
+  (:action assign_compensation_offer_to_local_unit
+    :parameters (?local_transfer_unit - local_transfer_unit ?pickup_location - pickup_location ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?local_transfer_unit)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (compensation_offer_available ?compensation_offer)
+        (not
+          (local_unit_checked_in ?local_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (pickup_compensation_flag ?pickup_location)
+        (local_unit_checked_in ?local_transfer_unit)
+        (local_unit_assigned_compensation ?local_transfer_unit ?compensation_offer)
+        (not
+          (compensation_offer_available ?compensation_offer)
+        )
+      )
+  )
+  (:action finalize_local_pickup
+    :parameters (?local_transfer_unit - local_transfer_unit ?pickup_location - pickup_location ?transport_option - transport_option ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?local_transfer_unit)
+        (entity_assigned_transport ?local_transfer_unit ?transport_option)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (pickup_compensation_flag ?pickup_location)
+        (local_unit_assigned_compensation ?local_transfer_unit ?compensation_offer)
+        (not
+          (local_unit_ready ?local_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (pickup_confirmed ?pickup_location)
+        (local_unit_ready ?local_transfer_unit)
+        (compensation_offer_available ?compensation_offer)
+        (not
+          (local_unit_assigned_compensation ?local_transfer_unit ?compensation_offer)
+        )
+      )
+  )
+  (:action confirm_partner_dropoff
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?dropoff_location - dropoff_location ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?partner_transfer_unit)
+        (entity_assigned_transport ?partner_transfer_unit ?transport_option)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (not
+          (dropoff_confirmed ?dropoff_location)
+        )
+        (not
+          (dropoff_compensation_flag ?dropoff_location)
+        )
+      )
+    :effect (dropoff_confirmed ?dropoff_location)
+  )
+  (:action confirm_partner_unit_ready
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?dropoff_location - dropoff_location ?third_party_provider - third_party_provider)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?partner_transfer_unit)
+        (entity_engaged_provider ?partner_transfer_unit ?third_party_provider)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (dropoff_confirmed ?dropoff_location)
+        (not
+          (partner_unit_checked_in ?partner_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (partner_unit_ready ?partner_transfer_unit)
+      )
+  )
+  (:action assign_compensation_offer_to_partner_unit
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?dropoff_location - dropoff_location ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?partner_transfer_unit)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (compensation_offer_available ?compensation_offer)
+        (not
+          (partner_unit_checked_in ?partner_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (dropoff_compensation_flag ?dropoff_location)
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (partner_unit_assigned_compensation ?partner_transfer_unit ?compensation_offer)
+        (not
+          (compensation_offer_available ?compensation_offer)
+        )
+      )
+  )
+  (:action finalize_partner_dropoff
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?dropoff_location - dropoff_location ?transport_option - transport_option ?compensation_offer - compensation_offer)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?partner_transfer_unit)
+        (entity_assigned_transport ?partner_transfer_unit ?transport_option)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (dropoff_compensation_flag ?dropoff_location)
+        (partner_unit_assigned_compensation ?partner_transfer_unit ?compensation_offer)
+        (not
+          (partner_unit_ready ?partner_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (dropoff_confirmed ?dropoff_location)
+        (partner_unit_ready ?partner_transfer_unit)
+        (compensation_offer_available ?compensation_offer)
+        (not
+          (partner_unit_assigned_compensation ?partner_transfer_unit ?compensation_offer)
+        )
+      )
+  )
+  (:action compose_recovery_plan
+    :parameters (?local_transfer_unit - local_transfer_unit ?partner_transfer_unit - partner_transfer_unit ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (pickup_confirmed ?pickup_location)
+        (dropoff_confirmed ?dropoff_location)
+        (local_unit_ready ?local_transfer_unit)
+        (partner_unit_ready ?partner_transfer_unit)
+        (plan_pending ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_created ?recovery_plan)
+        (plan_includes_pickup ?recovery_plan ?pickup_location)
+        (plan_includes_dropoff ?recovery_plan ?dropoff_location)
+        (not
+          (plan_pending ?recovery_plan)
+        )
+      )
+  )
+  (:action compose_recovery_plan_local_followup
+    :parameters (?local_transfer_unit - local_transfer_unit ?partner_transfer_unit - partner_transfer_unit ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (pickup_compensation_flag ?pickup_location)
+        (dropoff_confirmed ?dropoff_location)
+        (not
+          (local_unit_ready ?local_transfer_unit)
+        )
+        (partner_unit_ready ?partner_transfer_unit)
+        (plan_pending ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_created ?recovery_plan)
+        (plan_includes_pickup ?recovery_plan ?pickup_location)
+        (plan_includes_dropoff ?recovery_plan ?dropoff_location)
+        (plan_needs_local_followup ?recovery_plan)
+        (not
+          (plan_pending ?recovery_plan)
+        )
+      )
+  )
+  (:action compose_recovery_plan_partner_followup
+    :parameters (?local_transfer_unit - local_transfer_unit ?partner_transfer_unit - partner_transfer_unit ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (pickup_confirmed ?pickup_location)
+        (dropoff_compensation_flag ?dropoff_location)
+        (local_unit_ready ?local_transfer_unit)
+        (not
+          (partner_unit_ready ?partner_transfer_unit)
+        )
+        (plan_pending ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_created ?recovery_plan)
+        (plan_includes_pickup ?recovery_plan ?pickup_location)
+        (plan_includes_dropoff ?recovery_plan ?dropoff_location)
+        (plan_needs_partner_followup ?recovery_plan)
+        (not
+          (plan_pending ?recovery_plan)
+        )
+      )
+  )
+  (:action compose_recovery_plan_full_followup
+    :parameters (?local_transfer_unit - local_transfer_unit ?partner_transfer_unit - partner_transfer_unit ?pickup_location - pickup_location ?dropoff_location - dropoff_location ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (local_unit_assigned_pickup ?local_transfer_unit ?pickup_location)
+        (partner_unit_assigned_dropoff ?partner_transfer_unit ?dropoff_location)
+        (pickup_compensation_flag ?pickup_location)
+        (dropoff_compensation_flag ?dropoff_location)
+        (not
+          (local_unit_ready ?local_transfer_unit)
+        )
+        (not
+          (partner_unit_ready ?partner_transfer_unit)
+        )
+        (plan_pending ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_created ?recovery_plan)
+        (plan_includes_pickup ?recovery_plan ?pickup_location)
+        (plan_includes_dropoff ?recovery_plan ?dropoff_location)
+        (plan_needs_local_followup ?recovery_plan)
+        (plan_needs_partner_followup ?recovery_plan)
+        (not
+          (plan_pending ?recovery_plan)
+        )
+      )
+  )
+  (:action finalize_recovery_plan
+    :parameters (?recovery_plan - recovery_plan ?local_transfer_unit - local_transfer_unit ?transport_option - transport_option)
+    :precondition
+      (and
+        (plan_created ?recovery_plan)
+        (local_unit_checked_in ?local_transfer_unit)
+        (entity_assigned_transport ?local_transfer_unit ?transport_option)
+        (not
+          (plan_finalised ?recovery_plan)
+        )
+      )
+    :effect (plan_finalised ?recovery_plan)
+  )
+  (:action attach_itinerary_segment_to_plan
+    :parameters (?recovery_coordinator - recovery_coordinator ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (coordinator_linked_recovery_plan ?recovery_coordinator ?recovery_plan)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_pending ?itinerary_segment)
+        (plan_created ?recovery_plan)
+        (plan_finalised ?recovery_plan)
+        (not
+          (itinerary_segment_committed ?itinerary_segment)
+        )
+      )
+    :effect
+      (and
+        (itinerary_segment_committed ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (not
+          (itinerary_segment_pending ?itinerary_segment)
+        )
+      )
+  )
+  (:action prepare_coordinator_for_activation
+    :parameters (?recovery_coordinator - recovery_coordinator ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_committed ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (entity_assigned_transport ?recovery_coordinator ?transport_option)
+        (not
+          (plan_needs_local_followup ?recovery_plan)
+        )
+        (not
+          (coordinator_documents_prepared ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_documents_prepared ?recovery_coordinator)
+  )
+  (:action attach_policy_document_to_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?policy_document - policy_document)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (policy_document_available ?policy_document)
+        (not
+          (coordinator_policy_attached ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_policy_attached ?recovery_coordinator)
+        (coordinator_linked_policy ?recovery_coordinator ?policy_document)
+        (not
+          (policy_document_available ?policy_document)
+        )
+      )
+  )
+  (:action verify_policy_and_prepare_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan ?transport_option - transport_option ?policy_document - policy_document)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_committed ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (entity_assigned_transport ?recovery_coordinator ?transport_option)
+        (plan_needs_local_followup ?recovery_plan)
+        (coordinator_policy_attached ?recovery_coordinator)
+        (coordinator_linked_policy ?recovery_coordinator ?policy_document)
+        (not
+          (coordinator_documents_prepared ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_documents_prepared ?recovery_coordinator)
+        (coordinator_policy_verified ?recovery_coordinator)
+      )
+  )
+  (:action assign_maintenance_and_authorize
+    :parameters (?recovery_coordinator - recovery_coordinator ?maintenance_resource - maintenance_resource ?third_party_provider - third_party_provider ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_documents_prepared ?recovery_coordinator)
+        (coordinator_allocated_maintenance_resource ?recovery_coordinator ?maintenance_resource)
+        (entity_engaged_provider ?recovery_coordinator ?third_party_provider)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (not
+          (plan_needs_partner_followup ?recovery_plan)
+        )
+        (not
+          (coordinator_maintenance_authorized ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_maintenance_authorized ?recovery_coordinator)
+  )
+  (:action assign_maintenance_and_authorize_followup
+    :parameters (?recovery_coordinator - recovery_coordinator ?maintenance_resource - maintenance_resource ?third_party_provider - third_party_provider ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_documents_prepared ?recovery_coordinator)
+        (coordinator_allocated_maintenance_resource ?recovery_coordinator ?maintenance_resource)
+        (entity_engaged_provider ?recovery_coordinator ?third_party_provider)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (plan_needs_partner_followup ?recovery_plan)
+        (not
+          (coordinator_maintenance_authorized ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_maintenance_authorized ?recovery_coordinator)
+  )
+  (:action attach_safety_report_and_prepare_activation
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_maintenance_authorized ?recovery_coordinator)
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (not
+          (plan_needs_local_followup ?recovery_plan)
+        )
+        (not
+          (plan_needs_partner_followup ?recovery_plan)
+        )
+        (not
+          (coordinator_activation_prepared ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_activation_prepared ?recovery_coordinator)
+  )
+  (:action attach_safety_with_local_followup
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_maintenance_authorized ?recovery_coordinator)
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (plan_needs_local_followup ?recovery_plan)
+        (not
+          (plan_needs_partner_followup ?recovery_plan)
+        )
+        (not
+          (coordinator_activation_prepared ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_has_authorizations ?recovery_coordinator)
+      )
+  )
+  (:action attach_safety_with_partner_followup
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_maintenance_authorized ?recovery_coordinator)
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (not
+          (plan_needs_local_followup ?recovery_plan)
+        )
+        (plan_needs_partner_followup ?recovery_plan)
+        (not
+          (coordinator_activation_prepared ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_has_authorizations ?recovery_coordinator)
+      )
+  )
+  (:action attach_safety_with_full_followup
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report ?itinerary_segment - itinerary_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (coordinator_maintenance_authorized ?recovery_coordinator)
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (coordinator_has_itinerary_segment ?recovery_coordinator ?itinerary_segment)
+        (itinerary_segment_assigned_to_plan ?itinerary_segment ?recovery_plan)
+        (plan_needs_local_followup ?recovery_plan)
+        (plan_needs_partner_followup ?recovery_plan)
+        (not
+          (coordinator_activation_prepared ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_has_authorizations ?recovery_coordinator)
+      )
+  )
+  (:action activate_recovery_package
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (not
+          (coordinator_has_authorizations ?recovery_coordinator)
+        )
+        (not
+          (activation_recorded ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_recorded ?recovery_coordinator)
+        (entity_execution_confirmed ?recovery_coordinator)
+      )
+  )
+  (:action apply_authorization_credential
+    :parameters (?recovery_coordinator - recovery_coordinator ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_has_authorizations ?recovery_coordinator)
+        (authorization_credential_available ?authorization_credential)
+      )
+    :effect
+      (and
+        (coordinator_attached_authorization ?recovery_coordinator ?authorization_credential)
+        (not
+          (authorization_credential_available ?authorization_credential)
+        )
+      )
+  )
+  (:action validate_and_mark_coordinator_active
+    :parameters (?recovery_coordinator - recovery_coordinator ?local_transfer_unit - local_transfer_unit ?partner_transfer_unit - partner_transfer_unit ?transport_option - transport_option ?authorization_credential - authorization_credential)
+    :precondition
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_has_authorizations ?recovery_coordinator)
+        (coordinator_attached_authorization ?recovery_coordinator ?authorization_credential)
+        (coordinator_allocated_local_unit ?recovery_coordinator ?local_transfer_unit)
+        (coordinator_allocated_partner_unit ?recovery_coordinator ?partner_transfer_unit)
+        (local_unit_ready ?local_transfer_unit)
+        (partner_unit_ready ?partner_transfer_unit)
+        (entity_assigned_transport ?recovery_coordinator ?transport_option)
+        (not
+          (coordinator_validated ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_validated ?recovery_coordinator)
+  )
+  (:action confirm_activation
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (coordinator_activation_prepared ?recovery_coordinator)
+        (coordinator_validated ?recovery_coordinator)
+        (not
+          (activation_recorded ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_recorded ?recovery_coordinator)
+        (entity_execution_confirmed ?recovery_coordinator)
+      )
+  )
+  (:action initiate_insurer_claim_handoff
+    :parameters (?recovery_coordinator - recovery_coordinator ?insurer_claim - insurer_claim ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_assignment_confirmed ?recovery_coordinator)
+        (entity_assigned_transport ?recovery_coordinator ?transport_option)
+        (insurer_claim_available ?insurer_claim)
+        (coordinator_linked_claim ?recovery_coordinator ?insurer_claim)
+        (not
+          (coordinator_claim_attached ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_claim_attached ?recovery_coordinator)
+        (not
+          (insurer_claim_available ?insurer_claim)
+        )
+      )
+  )
+  (:action acknowledge_claim
+    :parameters (?recovery_coordinator - recovery_coordinator ?third_party_provider - third_party_provider)
+    :precondition
+      (and
+        (coordinator_claim_attached ?recovery_coordinator)
+        (entity_engaged_provider ?recovery_coordinator ?third_party_provider)
+        (not
+          (coordinator_claim_acknowledged ?recovery_coordinator)
+        )
+      )
+    :effect (coordinator_claim_acknowledged ?recovery_coordinator)
+  )
+  (:action attach_safety_to_claim
+    :parameters (?recovery_coordinator - recovery_coordinator ?safety_report - safety_report)
+    :precondition
+      (and
+        (coordinator_claim_acknowledged ?recovery_coordinator)
+        (coordinator_attached_safety_report ?recovery_coordinator ?safety_report)
+        (not
+          (claim_safety_attached ?recovery_coordinator)
+        )
+      )
+    :effect (claim_safety_attached ?recovery_coordinator)
+  )
+  (:action complete_claim_handoff
+    :parameters (?recovery_coordinator - recovery_coordinator)
+    :precondition
+      (and
+        (claim_safety_attached ?recovery_coordinator)
+        (not
+          (activation_recorded ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_recorded ?recovery_coordinator)
+        (entity_execution_confirmed ?recovery_coordinator)
+      )
+  )
+  (:action confirm_local_execution
+    :parameters (?local_transfer_unit - local_transfer_unit ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (local_unit_checked_in ?local_transfer_unit)
+        (local_unit_ready ?local_transfer_unit)
+        (plan_created ?recovery_plan)
+        (plan_finalised ?recovery_plan)
+        (not
+          (entity_execution_confirmed ?local_transfer_unit)
+        )
+      )
+    :effect (entity_execution_confirmed ?local_transfer_unit)
+  )
+  (:action confirm_partner_execution
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (partner_unit_checked_in ?partner_transfer_unit)
+        (partner_unit_ready ?partner_transfer_unit)
+        (plan_created ?recovery_plan)
+        (plan_finalised ?recovery_plan)
+        (not
+          (entity_execution_confirmed ?partner_transfer_unit)
+        )
+      )
+    :effect (entity_execution_confirmed ?partner_transfer_unit)
+  )
+  (:action generate_payment_instruction
+    :parameters (?passenger_case - passenger_case ?payment_instruction - payment_instruction ?transport_option - transport_option)
+    :precondition
+      (and
+        (entity_execution_confirmed ?passenger_case)
+        (entity_assigned_transport ?passenger_case ?transport_option)
+        (payment_instruction_available ?payment_instruction)
+        (not
+          (entity_payment_instruction_created ?passenger_case)
+        )
+      )
+    :effect
+      (and
+        (entity_payment_instruction_created ?passenger_case)
+        (entity_linked_payment_instruction ?passenger_case ?payment_instruction)
+        (not
+          (payment_instruction_available ?payment_instruction)
+        )
+      )
+  )
+  (:action apply_payment_and_release_local_unit
+    :parameters (?local_transfer_unit - local_transfer_unit ?replacement_vehicle - replacement_vehicle ?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (entity_payment_instruction_created ?local_transfer_unit)
+        (entity_assigned_replacement ?local_transfer_unit ?replacement_vehicle)
+        (entity_linked_payment_instruction ?local_transfer_unit ?payment_instruction)
+        (not
+          (entity_closure_recorded ?local_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_closure_recorded ?local_transfer_unit)
+        (replacement_available ?replacement_vehicle)
+        (payment_instruction_available ?payment_instruction)
+      )
+  )
+  (:action apply_payment_and_release_partner_unit
+    :parameters (?partner_transfer_unit - partner_transfer_unit ?replacement_vehicle - replacement_vehicle ?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (entity_payment_instruction_created ?partner_transfer_unit)
+        (entity_assigned_replacement ?partner_transfer_unit ?replacement_vehicle)
+        (entity_linked_payment_instruction ?partner_transfer_unit ?payment_instruction)
+        (not
+          (entity_closure_recorded ?partner_transfer_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_closure_recorded ?partner_transfer_unit)
+        (replacement_available ?replacement_vehicle)
+        (payment_instruction_available ?payment_instruction)
+      )
+  )
+  (:action apply_payment_and_release_coordinator
+    :parameters (?recovery_coordinator - recovery_coordinator ?replacement_vehicle - replacement_vehicle ?payment_instruction - payment_instruction)
+    :precondition
+      (and
+        (entity_payment_instruction_created ?recovery_coordinator)
+        (entity_assigned_replacement ?recovery_coordinator ?replacement_vehicle)
+        (entity_linked_payment_instruction ?recovery_coordinator ?payment_instruction)
+        (not
+          (entity_closure_recorded ?recovery_coordinator)
+        )
+      )
+    :effect
+      (and
+        (entity_closure_recorded ?recovery_coordinator)
+        (replacement_available ?replacement_vehicle)
+        (payment_instruction_available ?payment_instruction)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem airport_transfer_breakdown_case)
+  (:domain airport_transfer_breakdown_recovery)
+  (:objects local_unit_1 - local_transfer_unit partner_unit_1 - partner_transfer_unit recovery_coordinator_1 - recovery_coordinator recovery_coordinator_2 - recovery_coordinator replacement_vehicle_1 - replacement_vehicle replacement_vehicle_2 - replacement_vehicle replacement_vehicle_3 - replacement_vehicle transport_option_1 - transport_option third_party_provider_1 - third_party_provider compensation_offer_1 - compensation_offer pickup_location_1 - pickup_location dropoff_location_1 - dropoff_location recovery_plan_1 - recovery_plan itinerary_segment_1 - itinerary_segment itinerary_segment_2 - itinerary_segment policy_document_1 - policy_document policy_document_2 - policy_document authorization_credential_1 - authorization_credential authorization_credential_2 - authorization_credential payment_instruction_1 - payment_instruction maintenance_resource_1 - maintenance_resource insurer_claim_1 - insurer_claim insurer_claim_2 - insurer_claim safety_report_1 - safety_report)
+  (:init
+    (replacement_available replacement_vehicle_1)
+    (replacement_available replacement_vehicle_2)
+    (replacement_available replacement_vehicle_3)
+    (transport_option_available transport_option_1)
+    (third_party_provider_available third_party_provider_1)
+    (compensation_offer_available compensation_offer_1)
+    (local_unit_assigned_pickup local_unit_1 pickup_location_1)
+    (partner_unit_assigned_dropoff partner_unit_1 dropoff_location_1)
+    (plan_pending recovery_plan_1)
+    (itinerary_segment_pending itinerary_segment_1)
+    (itinerary_segment_pending itinerary_segment_2)
+    (coordinator_allocated_local_unit recovery_coordinator_1 local_unit_1)
+    (coordinator_allocated_local_unit recovery_coordinator_2 local_unit_1)
+    (coordinator_allocated_partner_unit recovery_coordinator_1 partner_unit_1)
+    (coordinator_allocated_partner_unit recovery_coordinator_2 partner_unit_1)
+    (coordinator_linked_recovery_plan recovery_coordinator_1 recovery_plan_1)
+    (coordinator_linked_recovery_plan recovery_coordinator_2 recovery_plan_1)
+    (coordinator_has_itinerary_segment recovery_coordinator_1 itinerary_segment_1)
+    (coordinator_has_itinerary_segment recovery_coordinator_2 itinerary_segment_2)
+    (policy_document_available policy_document_1)
+    (policy_document_available policy_document_2)
+    (authorization_credential_available authorization_credential_1)
+    (authorization_credential_available authorization_credential_2)
+    (payment_instruction_available payment_instruction_1)
+    (maintenance_resource_available maintenance_resource_1)
+    (insurer_claim_available insurer_claim_1)
+    (coordinator_linked_claim recovery_coordinator_1 insurer_claim_1)
+    (coordinator_linked_claim recovery_coordinator_2 insurer_claim_2)
+    (safety_report_available safety_report_1)
+  )
+  (:goal
+    (and
+      (entity_closure_recorded local_unit_1)
+      (entity_closure_recorded partner_unit_1)
+      (entity_closure_recorded recovery_coordinator_1)
+      (entity_closure_recorded recovery_coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(log_incident_case local_unit_1)
+(reserve_replacement_vehicle local_unit_1 replacement_vehicle_1)
+(assign_transport_option local_unit_1 transport_option_1)
+(confirm_transport_assignment local_unit_1 transport_option_1)
+(engage_third_party_provider local_unit_1 third_party_provider_1)
+(confirm_local_pickup local_unit_1 pickup_location_1 transport_option_1)
+(confirm_local_unit_ready local_unit_1 pickup_location_1 third_party_provider_1)
+(release_transport_option local_unit_1 transport_option_1)
+(release_third_party_provider local_unit_1 third_party_provider_1)
+(log_incident_case partner_unit_1)
+(reserve_replacement_vehicle partner_unit_1 replacement_vehicle_2)
+(assign_transport_option partner_unit_1 transport_option_1)
+(confirm_transport_assignment partner_unit_1 transport_option_1)
+(engage_third_party_provider partner_unit_1 third_party_provider_1)
+(confirm_partner_dropoff partner_unit_1 dropoff_location_1 transport_option_1)
+(confirm_partner_unit_ready partner_unit_1 dropoff_location_1 third_party_provider_1)
+(compose_recovery_plan local_unit_1 partner_unit_1 pickup_location_1 dropoff_location_1 recovery_plan_1)
+(release_transport_option partner_unit_1 transport_option_1)
+(assign_transport_option local_unit_1 transport_option_1)
+(finalize_recovery_plan recovery_plan_1 local_unit_1 transport_option_1)
+(confirm_local_execution local_unit_1 recovery_plan_1)
+(confirm_partner_execution partner_unit_1 recovery_plan_1)
+(generate_payment_instruction local_unit_1 payment_instruction_1 transport_option_1)
+(apply_payment_and_release_local_unit local_unit_1 replacement_vehicle_1 payment_instruction_1)
+(release_transport_option local_unit_1 transport_option_1)
+(assign_transport_option partner_unit_1 transport_option_1)
+(generate_payment_instruction partner_unit_1 payment_instruction_1 transport_option_1)
+(apply_payment_and_release_partner_unit partner_unit_1 replacement_vehicle_2 payment_instruction_1)
+(release_transport_option partner_unit_1 transport_option_1)
+(release_third_party_provider partner_unit_1 third_party_provider_1)
+(log_incident_case recovery_coordinator_1)
+(reserve_replacement_vehicle recovery_coordinator_1 replacement_vehicle_3)
+(assign_transport_option recovery_coordinator_1 transport_option_1)
+(confirm_transport_assignment recovery_coordinator_1 transport_option_1)
+(attach_itinerary_segment_to_plan recovery_coordinator_1 itinerary_segment_1 recovery_plan_1)
+(prepare_coordinator_for_activation recovery_coordinator_1 itinerary_segment_1 recovery_plan_1 transport_option_1)
+(assign_maintenance_resource recovery_coordinator_1 maintenance_resource_1)
+(engage_third_party_provider recovery_coordinator_1 third_party_provider_1)
+(assign_maintenance_and_authorize recovery_coordinator_1 maintenance_resource_1 third_party_provider_1 itinerary_segment_1 recovery_plan_1)
+(attach_safety_report recovery_coordinator_1 safety_report_1)
+(attach_safety_report_and_prepare_activation recovery_coordinator_1 safety_report_1 itinerary_segment_1 recovery_plan_1)
+(activate_recovery_package recovery_coordinator_1)
+(generate_payment_instruction recovery_coordinator_1 payment_instruction_1 transport_option_1)
+(apply_payment_and_release_coordinator recovery_coordinator_1 replacement_vehicle_3 payment_instruction_1)
+(release_transport_option recovery_coordinator_1 transport_option_1)
+(release_third_party_provider recovery_coordinator_1 third_party_provider_1)
+(release_maintenance_resource recovery_coordinator_1 maintenance_resource_1)
+(detach_safety_report recovery_coordinator_1 safety_report_1)
+(log_incident_case recovery_coordinator_2)
+(reserve_replacement_vehicle recovery_coordinator_2 replacement_vehicle_3)
+(assign_transport_option recovery_coordinator_2 transport_option_1)
+(confirm_transport_assignment recovery_coordinator_2 transport_option_1)
+(attach_itinerary_segment_to_plan recovery_coordinator_2 itinerary_segment_2 recovery_plan_1)
+(prepare_coordinator_for_activation recovery_coordinator_2 itinerary_segment_2 recovery_plan_1 transport_option_1)
+(assign_maintenance_resource recovery_coordinator_2 maintenance_resource_1)
+(engage_third_party_provider recovery_coordinator_2 third_party_provider_1)
+(assign_maintenance_and_authorize recovery_coordinator_2 maintenance_resource_1 third_party_provider_1 itinerary_segment_2 recovery_plan_1)
+(attach_safety_report recovery_coordinator_2 safety_report_1)
+(attach_safety_report_and_prepare_activation recovery_coordinator_2 safety_report_1 itinerary_segment_2 recovery_plan_1)
+(activate_recovery_package recovery_coordinator_2)
+(generate_payment_instruction recovery_coordinator_2 payment_instruction_1 transport_option_1)
+(apply_payment_and_release_coordinator recovery_coordinator_2 replacement_vehicle_3 payment_instruction_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2mn615fh/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 62 
+
+Successful plans:
+Value: 62
+ /tmp/val_2mn615fh/plan.pddl 62 
+
+
+
+--- stderr ---
+

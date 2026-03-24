@@ -1,0 +1,1074 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain compliance_exception_escalation_for_clearance)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types domain_entity - object case_related_entity - domain_entity compliance_artifact - domain_entity jurisdictional_entity - domain_entity case_root - domain_entity clearance_case - case_root clearance_service_provider - case_related_entity supporting_document - case_related_entity reviewer - case_related_entity evidence_attachment_type - case_related_entity escalation_policy - case_related_entity exception_authorization - case_related_entity ticket_permit_license_record - case_related_entity regulatory_query_template - case_related_entity declaration_permit_record - compliance_artifact compliance_checklist - compliance_artifact external_regulatory_contact - compliance_artifact origin_jurisdiction - jurisdictional_entity destination_jurisdiction - jurisdictional_entity clearance_submission - jurisdictional_entity declaration_grouping - clearance_case ticket_grouping - clearance_case export_declaration - declaration_grouping import_declaration - declaration_grouping escalation_ticket - ticket_grouping)
+
+  (:predicates
+    (case_registered ?clearance_case - clearance_case)
+    (classification_completed ?clearance_case - clearance_case)
+    (service_provider_assigned ?clearance_case - clearance_case)
+    (clearance_finalized ?clearance_case - clearance_case)
+    (approval_granted ?clearance_case - clearance_case)
+    (exception_authorized ?clearance_case - clearance_case)
+    (service_provider_available ?clearance_service_provider - clearance_service_provider)
+    (service_provider_assigned_to_case ?clearance_case - clearance_case ?clearance_service_provider - clearance_service_provider)
+    (document_available ?supporting_document_var - supporting_document)
+    (case_document_linked ?clearance_case - clearance_case ?supporting_document_var - supporting_document)
+    (reviewer_available ?reviewer - reviewer)
+    (reviewer_assigned ?clearance_case - clearance_case ?reviewer - reviewer)
+    (declaration_permit_record_available ?declaration_permit_record - declaration_permit_record)
+    (export_declaration_permit_record_attached ?export_declaration_var - export_declaration ?declaration_permit_record - declaration_permit_record)
+    (import_declaration_permit_record_attached ?import_declaration_var - import_declaration ?declaration_permit_record - declaration_permit_record)
+    (export_declaration_origin_jurisdiction ?export_declaration_var - export_declaration ?origin_jurisdiction - origin_jurisdiction)
+    (origin_requirement_marked ?origin_jurisdiction - origin_jurisdiction)
+    (origin_permit_attached ?origin_jurisdiction - origin_jurisdiction)
+    (export_declaration_requirements_satisfied ?export_declaration_var - export_declaration)
+    (import_declaration_destination_jurisdiction ?import_declaration_var - import_declaration ?destination_jurisdiction - destination_jurisdiction)
+    (destination_requirement_marked ?destination_jurisdiction - destination_jurisdiction)
+    (destination_permit_attached ?destination_jurisdiction - destination_jurisdiction)
+    (import_declaration_requirements_satisfied ?import_declaration_var - import_declaration)
+    (submission_available ?clearance_submission - clearance_submission)
+    (submission_assembled ?clearance_submission - clearance_submission)
+    (submission_has_origin_jurisdiction ?clearance_submission - clearance_submission ?origin_jurisdiction - origin_jurisdiction)
+    (submission_has_destination_jurisdiction ?clearance_submission - clearance_submission ?destination_jurisdiction - destination_jurisdiction)
+    (submission_origin_permit_required ?clearance_submission - clearance_submission)
+    (submission_destination_permit_required ?clearance_submission - clearance_submission)
+    (submission_ready ?clearance_submission - clearance_submission)
+    (ticket_linked_to_export_declaration ?escalation_ticket - escalation_ticket ?export_declaration_var - export_declaration)
+    (ticket_linked_to_import_declaration ?escalation_ticket - escalation_ticket ?import_declaration_var - import_declaration)
+    (ticket_linked_to_submission ?escalation_ticket - escalation_ticket ?clearance_submission - clearance_submission)
+    (checklist_available ?compliance_checklist - compliance_checklist)
+    (ticket_has_checklist ?escalation_ticket - escalation_ticket ?compliance_checklist - compliance_checklist)
+    (checklist_attached ?compliance_checklist - compliance_checklist)
+    (checklist_associated_with_submission ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    (ticket_assessment_ready ?escalation_ticket - escalation_ticket)
+    (ticket_permit_validated ?escalation_ticket - escalation_ticket)
+    (ticket_assessment_finalized ?escalation_ticket - escalation_ticket)
+    (attachment_type_reserved_for_ticket ?escalation_ticket - escalation_ticket)
+    (attachment_verified ?escalation_ticket - escalation_ticket)
+    (ticket_prioritized_for_escalation ?escalation_ticket - escalation_ticket)
+    (escalation_executed ?escalation_ticket - escalation_ticket)
+    (external_contact_available ?external_regulatory_contact - external_regulatory_contact)
+    (external_contact_linked ?escalation_ticket - escalation_ticket ?external_regulatory_contact - external_regulatory_contact)
+    (external_contact_engaged ?escalation_ticket - escalation_ticket)
+    (external_query_sent ?escalation_ticket - escalation_ticket)
+    (external_response_received ?escalation_ticket - escalation_ticket)
+    (attachment_type_available ?evidence_attachment_type - evidence_attachment_type)
+    (ticket_has_attachment_type ?escalation_ticket - escalation_ticket ?evidence_attachment_type - evidence_attachment_type)
+    (escalation_policy_available ?escalation_policy_var - escalation_policy)
+    (ticket_escalation_policy_assigned ?escalation_ticket - escalation_ticket ?escalation_policy_var - escalation_policy)
+    (ticket_permit_license_record_available ?ticket_permit_license_record - ticket_permit_license_record)
+    (ticket_permit_license_record_assigned ?escalation_ticket - escalation_ticket ?ticket_permit_license_record - ticket_permit_license_record)
+    (query_template_available ?regulatory_query_template - regulatory_query_template)
+    (ticket_has_regulatory_query_template ?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template)
+    (exception_authorization_available ?exception_authorization - exception_authorization)
+    (case_has_exception_authorization ?clearance_case - clearance_case ?exception_authorization - exception_authorization)
+    (export_declaration_ready ?export_declaration_var - export_declaration)
+    (import_declaration_ready ?import_declaration_var - import_declaration)
+    (ticket_closed ?escalation_ticket - escalation_ticket)
+  )
+  (:action register_clearance_case
+    :parameters (?clearance_case - clearance_case)
+    :precondition
+      (and
+        (not
+          (case_registered ?clearance_case)
+        )
+        (not
+          (clearance_finalized ?clearance_case)
+        )
+      )
+    :effect (case_registered ?clearance_case)
+  )
+  (:action allocate_service_provider_to_case
+    :parameters (?clearance_case - clearance_case ?clearance_service_provider - clearance_service_provider)
+    :precondition
+      (and
+        (case_registered ?clearance_case)
+        (not
+          (service_provider_assigned ?clearance_case)
+        )
+        (service_provider_available ?clearance_service_provider)
+      )
+    :effect
+      (and
+        (service_provider_assigned ?clearance_case)
+        (service_provider_assigned_to_case ?clearance_case ?clearance_service_provider)
+        (not
+          (service_provider_available ?clearance_service_provider)
+        )
+      )
+  )
+  (:action link_supporting_document_to_case
+    :parameters (?clearance_case - clearance_case ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (case_registered ?clearance_case)
+        (service_provider_assigned ?clearance_case)
+        (document_available ?supporting_document_var)
+      )
+    :effect
+      (and
+        (case_document_linked ?clearance_case ?supporting_document_var)
+        (not
+          (document_available ?supporting_document_var)
+        )
+      )
+  )
+  (:action confirm_document_classification
+    :parameters (?clearance_case - clearance_case ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (case_registered ?clearance_case)
+        (service_provider_assigned ?clearance_case)
+        (case_document_linked ?clearance_case ?supporting_document_var)
+        (not
+          (classification_completed ?clearance_case)
+        )
+      )
+    :effect (classification_completed ?clearance_case)
+  )
+  (:action unlink_supporting_document_from_case
+    :parameters (?clearance_case - clearance_case ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (case_document_linked ?clearance_case ?supporting_document_var)
+      )
+    :effect
+      (and
+        (document_available ?supporting_document_var)
+        (not
+          (case_document_linked ?clearance_case ?supporting_document_var)
+        )
+      )
+  )
+  (:action assign_reviewer
+    :parameters (?clearance_case - clearance_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (classification_completed ?clearance_case)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_assigned ?clearance_case ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action unassign_reviewer
+    :parameters (?clearance_case - clearance_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (reviewer_assigned ?clearance_case ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (reviewer_assigned ?clearance_case ?reviewer)
+        )
+      )
+  )
+  (:action attach_permit_license_to_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?ticket_permit_license_record - ticket_permit_license_record)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (ticket_permit_license_record_available ?ticket_permit_license_record)
+      )
+    :effect
+      (and
+        (ticket_permit_license_record_assigned ?escalation_ticket ?ticket_permit_license_record)
+        (not
+          (ticket_permit_license_record_available ?ticket_permit_license_record)
+        )
+      )
+  )
+  (:action detach_permit_license_from_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?ticket_permit_license_record - ticket_permit_license_record)
+    :precondition
+      (and
+        (ticket_permit_license_record_assigned ?escalation_ticket ?ticket_permit_license_record)
+      )
+    :effect
+      (and
+        (ticket_permit_license_record_available ?ticket_permit_license_record)
+        (not
+          (ticket_permit_license_record_assigned ?escalation_ticket ?ticket_permit_license_record)
+        )
+      )
+  )
+  (:action attach_regulatory_query_template_to_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (query_template_available ?regulatory_query_template)
+      )
+    :effect
+      (and
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (not
+          (query_template_available ?regulatory_query_template)
+        )
+      )
+  )
+  (:action detach_regulatory_query_template_from_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template)
+    :precondition
+      (and
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+      )
+    :effect
+      (and
+        (query_template_available ?regulatory_query_template)
+        (not
+          (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        )
+      )
+  )
+  (:action initiate_origin_requirement_check
+    :parameters (?export_declaration_var - export_declaration ?origin_jurisdiction - origin_jurisdiction ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (classification_completed ?export_declaration_var)
+        (case_document_linked ?export_declaration_var ?supporting_document_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (not
+          (origin_requirement_marked ?origin_jurisdiction)
+        )
+        (not
+          (origin_permit_attached ?origin_jurisdiction)
+        )
+      )
+    :effect (origin_requirement_marked ?origin_jurisdiction)
+  )
+  (:action assign_reviewer_for_origin_requirement
+    :parameters (?export_declaration_var - export_declaration ?origin_jurisdiction - origin_jurisdiction ?reviewer - reviewer)
+    :precondition
+      (and
+        (classification_completed ?export_declaration_var)
+        (reviewer_assigned ?export_declaration_var ?reviewer)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (origin_requirement_marked ?origin_jurisdiction)
+        (not
+          (export_declaration_ready ?export_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+      )
+  )
+  (:action request_permit_for_export_declaration
+    :parameters (?export_declaration_var - export_declaration ?origin_jurisdiction - origin_jurisdiction ?declaration_permit_record - declaration_permit_record)
+    :precondition
+      (and
+        (classification_completed ?export_declaration_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (declaration_permit_record_available ?declaration_permit_record)
+        (not
+          (export_declaration_ready ?export_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (origin_permit_attached ?origin_jurisdiction)
+        (export_declaration_ready ?export_declaration_var)
+        (export_declaration_permit_record_attached ?export_declaration_var ?declaration_permit_record)
+        (not
+          (declaration_permit_record_available ?declaration_permit_record)
+        )
+      )
+  )
+  (:action fulfill_origin_requirement
+    :parameters (?export_declaration_var - export_declaration ?origin_jurisdiction - origin_jurisdiction ?supporting_document_var - supporting_document ?declaration_permit_record - declaration_permit_record)
+    :precondition
+      (and
+        (classification_completed ?export_declaration_var)
+        (case_document_linked ?export_declaration_var ?supporting_document_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (origin_permit_attached ?origin_jurisdiction)
+        (export_declaration_permit_record_attached ?export_declaration_var ?declaration_permit_record)
+        (not
+          (export_declaration_requirements_satisfied ?export_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (origin_requirement_marked ?origin_jurisdiction)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+        (declaration_permit_record_available ?declaration_permit_record)
+        (not
+          (export_declaration_permit_record_attached ?export_declaration_var ?declaration_permit_record)
+        )
+      )
+  )
+  (:action initiate_destination_requirement_check
+    :parameters (?import_declaration_var - import_declaration ?destination_jurisdiction - destination_jurisdiction ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (classification_completed ?import_declaration_var)
+        (case_document_linked ?import_declaration_var ?supporting_document_var)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (not
+          (destination_requirement_marked ?destination_jurisdiction)
+        )
+        (not
+          (destination_permit_attached ?destination_jurisdiction)
+        )
+      )
+    :effect (destination_requirement_marked ?destination_jurisdiction)
+  )
+  (:action assign_reviewer_for_destination_requirement
+    :parameters (?import_declaration_var - import_declaration ?destination_jurisdiction - destination_jurisdiction ?reviewer - reviewer)
+    :precondition
+      (and
+        (classification_completed ?import_declaration_var)
+        (reviewer_assigned ?import_declaration_var ?reviewer)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (destination_requirement_marked ?destination_jurisdiction)
+        (not
+          (import_declaration_ready ?import_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (import_declaration_ready ?import_declaration_var)
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+      )
+  )
+  (:action request_permit_for_import_declaration
+    :parameters (?import_declaration_var - import_declaration ?destination_jurisdiction - destination_jurisdiction ?declaration_permit_record - declaration_permit_record)
+    :precondition
+      (and
+        (classification_completed ?import_declaration_var)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (declaration_permit_record_available ?declaration_permit_record)
+        (not
+          (import_declaration_ready ?import_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (destination_permit_attached ?destination_jurisdiction)
+        (import_declaration_ready ?import_declaration_var)
+        (import_declaration_permit_record_attached ?import_declaration_var ?declaration_permit_record)
+        (not
+          (declaration_permit_record_available ?declaration_permit_record)
+        )
+      )
+  )
+  (:action fulfill_destination_requirement
+    :parameters (?import_declaration_var - import_declaration ?destination_jurisdiction - destination_jurisdiction ?supporting_document_var - supporting_document ?declaration_permit_record - declaration_permit_record)
+    :precondition
+      (and
+        (classification_completed ?import_declaration_var)
+        (case_document_linked ?import_declaration_var ?supporting_document_var)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (destination_permit_attached ?destination_jurisdiction)
+        (import_declaration_permit_record_attached ?import_declaration_var ?declaration_permit_record)
+        (not
+          (import_declaration_requirements_satisfied ?import_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (destination_requirement_marked ?destination_jurisdiction)
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+        (declaration_permit_record_available ?declaration_permit_record)
+        (not
+          (import_declaration_permit_record_attached ?import_declaration_var ?declaration_permit_record)
+        )
+      )
+  )
+  (:action assemble_clearance_submission
+    :parameters (?export_declaration_var - export_declaration ?import_declaration_var - import_declaration ?origin_jurisdiction - origin_jurisdiction ?destination_jurisdiction - destination_jurisdiction ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (import_declaration_ready ?import_declaration_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (origin_requirement_marked ?origin_jurisdiction)
+        (destination_requirement_marked ?destination_jurisdiction)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+        (submission_available ?clearance_submission)
+      )
+    :effect
+      (and
+        (submission_assembled ?clearance_submission)
+        (submission_has_origin_jurisdiction ?clearance_submission ?origin_jurisdiction)
+        (submission_has_destination_jurisdiction ?clearance_submission ?destination_jurisdiction)
+        (not
+          (submission_available ?clearance_submission)
+        )
+      )
+  )
+  (:action assemble_submission_with_origin_permit
+    :parameters (?export_declaration_var - export_declaration ?import_declaration_var - import_declaration ?origin_jurisdiction - origin_jurisdiction ?destination_jurisdiction - destination_jurisdiction ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (import_declaration_ready ?import_declaration_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (origin_permit_attached ?origin_jurisdiction)
+        (destination_requirement_marked ?destination_jurisdiction)
+        (not
+          (export_declaration_requirements_satisfied ?export_declaration_var)
+        )
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+        (submission_available ?clearance_submission)
+      )
+    :effect
+      (and
+        (submission_assembled ?clearance_submission)
+        (submission_has_origin_jurisdiction ?clearance_submission ?origin_jurisdiction)
+        (submission_has_destination_jurisdiction ?clearance_submission ?destination_jurisdiction)
+        (submission_origin_permit_required ?clearance_submission)
+        (not
+          (submission_available ?clearance_submission)
+        )
+      )
+  )
+  (:action assemble_submission_with_destination_permit
+    :parameters (?export_declaration_var - export_declaration ?import_declaration_var - import_declaration ?origin_jurisdiction - origin_jurisdiction ?destination_jurisdiction - destination_jurisdiction ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (import_declaration_ready ?import_declaration_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (origin_requirement_marked ?origin_jurisdiction)
+        (destination_permit_attached ?destination_jurisdiction)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+        (not
+          (import_declaration_requirements_satisfied ?import_declaration_var)
+        )
+        (submission_available ?clearance_submission)
+      )
+    :effect
+      (and
+        (submission_assembled ?clearance_submission)
+        (submission_has_origin_jurisdiction ?clearance_submission ?origin_jurisdiction)
+        (submission_has_destination_jurisdiction ?clearance_submission ?destination_jurisdiction)
+        (submission_destination_permit_required ?clearance_submission)
+        (not
+          (submission_available ?clearance_submission)
+        )
+      )
+  )
+  (:action assemble_submission_with_both_permits
+    :parameters (?export_declaration_var - export_declaration ?import_declaration_var - import_declaration ?origin_jurisdiction - origin_jurisdiction ?destination_jurisdiction - destination_jurisdiction ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (import_declaration_ready ?import_declaration_var)
+        (export_declaration_origin_jurisdiction ?export_declaration_var ?origin_jurisdiction)
+        (import_declaration_destination_jurisdiction ?import_declaration_var ?destination_jurisdiction)
+        (origin_permit_attached ?origin_jurisdiction)
+        (destination_permit_attached ?destination_jurisdiction)
+        (not
+          (export_declaration_requirements_satisfied ?export_declaration_var)
+        )
+        (not
+          (import_declaration_requirements_satisfied ?import_declaration_var)
+        )
+        (submission_available ?clearance_submission)
+      )
+    :effect
+      (and
+        (submission_assembled ?clearance_submission)
+        (submission_has_origin_jurisdiction ?clearance_submission ?origin_jurisdiction)
+        (submission_has_destination_jurisdiction ?clearance_submission ?destination_jurisdiction)
+        (submission_origin_permit_required ?clearance_submission)
+        (submission_destination_permit_required ?clearance_submission)
+        (not
+          (submission_available ?clearance_submission)
+        )
+      )
+  )
+  (:action mark_submission_ready_for_filing
+    :parameters (?clearance_submission - clearance_submission ?export_declaration_var - export_declaration ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (submission_assembled ?clearance_submission)
+        (export_declaration_ready ?export_declaration_var)
+        (case_document_linked ?export_declaration_var ?supporting_document_var)
+        (not
+          (submission_ready ?clearance_submission)
+        )
+      )
+    :effect (submission_ready ?clearance_submission)
+  )
+  (:action attach_checklist_to_ticket_and_submission
+    :parameters (?escalation_ticket - escalation_ticket ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (ticket_linked_to_submission ?escalation_ticket ?clearance_submission)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_available ?compliance_checklist)
+        (submission_assembled ?clearance_submission)
+        (submission_ready ?clearance_submission)
+        (not
+          (checklist_attached ?compliance_checklist)
+        )
+      )
+    :effect
+      (and
+        (checklist_attached ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (not
+          (checklist_available ?compliance_checklist)
+        )
+      )
+  )
+  (:action start_ticket_assessment
+    :parameters (?escalation_ticket - escalation_ticket ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_attached ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (case_document_linked ?escalation_ticket ?supporting_document_var)
+        (not
+          (submission_origin_permit_required ?clearance_submission)
+        )
+        (not
+          (ticket_assessment_ready ?escalation_ticket)
+        )
+      )
+    :effect (ticket_assessment_ready ?escalation_ticket)
+  )
+  (:action assign_attachment_type_to_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?evidence_attachment_type - evidence_attachment_type)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (attachment_type_available ?evidence_attachment_type)
+        (not
+          (attachment_type_reserved_for_ticket ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (attachment_type_reserved_for_ticket ?escalation_ticket)
+        (ticket_has_attachment_type ?escalation_ticket ?evidence_attachment_type)
+        (not
+          (attachment_type_available ?evidence_attachment_type)
+        )
+      )
+  )
+  (:action prepare_ticket_with_checklist_and_attachment
+    :parameters (?escalation_ticket - escalation_ticket ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission ?supporting_document_var - supporting_document ?evidence_attachment_type - evidence_attachment_type)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_attached ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (case_document_linked ?escalation_ticket ?supporting_document_var)
+        (submission_origin_permit_required ?clearance_submission)
+        (attachment_type_reserved_for_ticket ?escalation_ticket)
+        (ticket_has_attachment_type ?escalation_ticket ?evidence_attachment_type)
+        (not
+          (ticket_assessment_ready ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_assessment_ready ?escalation_ticket)
+        (attachment_verified ?escalation_ticket)
+      )
+  )
+  (:action validate_ticket_pre_submission
+    :parameters (?escalation_ticket - escalation_ticket ?ticket_permit_license_record - ticket_permit_license_record ?reviewer - reviewer ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_assessment_ready ?escalation_ticket)
+        (ticket_permit_license_record_assigned ?escalation_ticket ?ticket_permit_license_record)
+        (reviewer_assigned ?escalation_ticket ?reviewer)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (not
+          (submission_destination_permit_required ?clearance_submission)
+        )
+        (not
+          (ticket_permit_validated ?escalation_ticket)
+        )
+      )
+    :effect (ticket_permit_validated ?escalation_ticket)
+  )
+  (:action validate_ticket_post_submission
+    :parameters (?escalation_ticket - escalation_ticket ?ticket_permit_license_record - ticket_permit_license_record ?reviewer - reviewer ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_assessment_ready ?escalation_ticket)
+        (ticket_permit_license_record_assigned ?escalation_ticket ?ticket_permit_license_record)
+        (reviewer_assigned ?escalation_ticket ?reviewer)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (submission_destination_permit_required ?clearance_submission)
+        (not
+          (ticket_permit_validated ?escalation_ticket)
+        )
+      )
+    :effect (ticket_permit_validated ?escalation_ticket)
+  )
+  (:action finalize_ticket_assessment_with_query_template
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_permit_validated ?escalation_ticket)
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (not
+          (submission_origin_permit_required ?clearance_submission)
+        )
+        (not
+          (submission_destination_permit_required ?clearance_submission)
+        )
+        (not
+          (ticket_assessment_finalized ?escalation_ticket)
+        )
+      )
+    :effect (ticket_assessment_finalized ?escalation_ticket)
+  )
+  (:action finalize_and_prioritize_ticket_assessment
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_permit_validated ?escalation_ticket)
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (submission_origin_permit_required ?clearance_submission)
+        (not
+          (submission_destination_permit_required ?clearance_submission)
+        )
+        (not
+          (ticket_assessment_finalized ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (ticket_prioritized_for_escalation ?escalation_ticket)
+      )
+  )
+  (:action finalize_and_prioritize_ticket_assessment_variant
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_permit_validated ?escalation_ticket)
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (not
+          (submission_origin_permit_required ?clearance_submission)
+        )
+        (submission_destination_permit_required ?clearance_submission)
+        (not
+          (ticket_assessment_finalized ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (ticket_prioritized_for_escalation ?escalation_ticket)
+      )
+  )
+  (:action finalize_and_prioritize_ticket_assessment_both_flags
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template ?compliance_checklist - compliance_checklist ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (ticket_permit_validated ?escalation_ticket)
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (ticket_has_checklist ?escalation_ticket ?compliance_checklist)
+        (checklist_associated_with_submission ?compliance_checklist ?clearance_submission)
+        (submission_origin_permit_required ?clearance_submission)
+        (submission_destination_permit_required ?clearance_submission)
+        (not
+          (ticket_assessment_finalized ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (ticket_prioritized_for_escalation ?escalation_ticket)
+      )
+  )
+  (:action record_ticket_assessment_result
+    :parameters (?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (not
+          (ticket_prioritized_for_escalation ?escalation_ticket)
+        )
+        (not
+          (ticket_closed ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_closed ?escalation_ticket)
+        (approval_granted ?escalation_ticket)
+      )
+  )
+  (:action apply_escalation_policy_to_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?escalation_policy_var - escalation_policy)
+    :precondition
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (ticket_prioritized_for_escalation ?escalation_ticket)
+        (escalation_policy_available ?escalation_policy_var)
+      )
+    :effect
+      (and
+        (ticket_escalation_policy_assigned ?escalation_ticket ?escalation_policy_var)
+        (not
+          (escalation_policy_available ?escalation_policy_var)
+        )
+      )
+  )
+  (:action execute_escalation_policy_on_ticket
+    :parameters (?escalation_ticket - escalation_ticket ?export_declaration_var - export_declaration ?import_declaration_var - import_declaration ?supporting_document_var - supporting_document ?escalation_policy_var - escalation_policy)
+    :precondition
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (ticket_prioritized_for_escalation ?escalation_ticket)
+        (ticket_escalation_policy_assigned ?escalation_ticket ?escalation_policy_var)
+        (ticket_linked_to_export_declaration ?escalation_ticket ?export_declaration_var)
+        (ticket_linked_to_import_declaration ?escalation_ticket ?import_declaration_var)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+        (case_document_linked ?escalation_ticket ?supporting_document_var)
+        (not
+          (escalation_executed ?escalation_ticket)
+        )
+      )
+    :effect (escalation_executed ?escalation_ticket)
+  )
+  (:action close_ticket_after_escalation_execution
+    :parameters (?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (ticket_assessment_finalized ?escalation_ticket)
+        (escalation_executed ?escalation_ticket)
+        (not
+          (ticket_closed ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_closed ?escalation_ticket)
+        (approval_granted ?escalation_ticket)
+      )
+  )
+  (:action engage_external_regulatory_contact
+    :parameters (?escalation_ticket - escalation_ticket ?external_regulatory_contact - external_regulatory_contact ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (classification_completed ?escalation_ticket)
+        (case_document_linked ?escalation_ticket ?supporting_document_var)
+        (external_contact_available ?external_regulatory_contact)
+        (external_contact_linked ?escalation_ticket ?external_regulatory_contact)
+        (not
+          (external_contact_engaged ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (external_contact_engaged ?escalation_ticket)
+        (not
+          (external_contact_available ?external_regulatory_contact)
+        )
+      )
+  )
+  (:action assign_reviewer_for_external_engagement
+    :parameters (?escalation_ticket - escalation_ticket ?reviewer - reviewer)
+    :precondition
+      (and
+        (external_contact_engaged ?escalation_ticket)
+        (reviewer_assigned ?escalation_ticket ?reviewer)
+        (not
+          (external_query_sent ?escalation_ticket)
+        )
+      )
+    :effect (external_query_sent ?escalation_ticket)
+  )
+  (:action send_regulatory_query_to_external_contact
+    :parameters (?escalation_ticket - escalation_ticket ?regulatory_query_template - regulatory_query_template)
+    :precondition
+      (and
+        (external_query_sent ?escalation_ticket)
+        (ticket_has_regulatory_query_template ?escalation_ticket ?regulatory_query_template)
+        (not
+          (external_response_received ?escalation_ticket)
+        )
+      )
+    :effect (external_response_received ?escalation_ticket)
+  )
+  (:action record_external_response_and_close_ticket
+    :parameters (?escalation_ticket - escalation_ticket)
+    :precondition
+      (and
+        (external_response_received ?escalation_ticket)
+        (not
+          (ticket_closed ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (ticket_closed ?escalation_ticket)
+        (approval_granted ?escalation_ticket)
+      )
+  )
+  (:action finalize_export_declaration_clearance
+    :parameters (?export_declaration_var - export_declaration ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (export_declaration_ready ?export_declaration_var)
+        (export_declaration_requirements_satisfied ?export_declaration_var)
+        (submission_assembled ?clearance_submission)
+        (submission_ready ?clearance_submission)
+        (not
+          (approval_granted ?export_declaration_var)
+        )
+      )
+    :effect (approval_granted ?export_declaration_var)
+  )
+  (:action finalize_import_declaration_clearance
+    :parameters (?import_declaration_var - import_declaration ?clearance_submission - clearance_submission)
+    :precondition
+      (and
+        (import_declaration_ready ?import_declaration_var)
+        (import_declaration_requirements_satisfied ?import_declaration_var)
+        (submission_assembled ?clearance_submission)
+        (submission_ready ?clearance_submission)
+        (not
+          (approval_granted ?import_declaration_var)
+        )
+      )
+    :effect (approval_granted ?import_declaration_var)
+  )
+  (:action apply_exception_authorization_to_case
+    :parameters (?clearance_case - clearance_case ?exception_authorization - exception_authorization ?supporting_document_var - supporting_document)
+    :precondition
+      (and
+        (approval_granted ?clearance_case)
+        (case_document_linked ?clearance_case ?supporting_document_var)
+        (exception_authorization_available ?exception_authorization)
+        (not
+          (exception_authorized ?clearance_case)
+        )
+      )
+    :effect
+      (and
+        (exception_authorized ?clearance_case)
+        (case_has_exception_authorization ?clearance_case ?exception_authorization)
+        (not
+          (exception_authorization_available ?exception_authorization)
+        )
+      )
+  )
+  (:action apply_exception_to_export_declaration_and_return_provider
+    :parameters (?export_declaration_var - export_declaration ?clearance_service_provider - clearance_service_provider ?exception_authorization - exception_authorization)
+    :precondition
+      (and
+        (exception_authorized ?export_declaration_var)
+        (service_provider_assigned_to_case ?export_declaration_var ?clearance_service_provider)
+        (case_has_exception_authorization ?export_declaration_var ?exception_authorization)
+        (not
+          (clearance_finalized ?export_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (clearance_finalized ?export_declaration_var)
+        (service_provider_available ?clearance_service_provider)
+        (exception_authorization_available ?exception_authorization)
+      )
+  )
+  (:action apply_exception_to_import_declaration_and_return_provider
+    :parameters (?import_declaration_var - import_declaration ?clearance_service_provider - clearance_service_provider ?exception_authorization - exception_authorization)
+    :precondition
+      (and
+        (exception_authorized ?import_declaration_var)
+        (service_provider_assigned_to_case ?import_declaration_var ?clearance_service_provider)
+        (case_has_exception_authorization ?import_declaration_var ?exception_authorization)
+        (not
+          (clearance_finalized ?import_declaration_var)
+        )
+      )
+    :effect
+      (and
+        (clearance_finalized ?import_declaration_var)
+        (service_provider_available ?clearance_service_provider)
+        (exception_authorization_available ?exception_authorization)
+      )
+  )
+  (:action apply_exception_to_ticket_and_return_provider
+    :parameters (?escalation_ticket - escalation_ticket ?clearance_service_provider - clearance_service_provider ?exception_authorization - exception_authorization)
+    :precondition
+      (and
+        (exception_authorized ?escalation_ticket)
+        (service_provider_assigned_to_case ?escalation_ticket ?clearance_service_provider)
+        (case_has_exception_authorization ?escalation_ticket ?exception_authorization)
+        (not
+          (clearance_finalized ?escalation_ticket)
+        )
+      )
+    :effect
+      (and
+        (clearance_finalized ?escalation_ticket)
+        (service_provider_available ?clearance_service_provider)
+        (exception_authorization_available ?exception_authorization)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem compliance_exception_escalation_scenario)
+  (:domain compliance_exception_escalation_for_clearance)
+  (:objects export_declaration_1 - export_declaration import_declaration_1 - import_declaration escalation_ticket_1 - escalation_ticket escalation_ticket_2 - escalation_ticket service_provider_1 - clearance_service_provider service_provider_2 - clearance_service_provider service_provider_3 - clearance_service_provider supporting_document_1 - supporting_document reviewer_1 - reviewer declaration_permit_record_1 - declaration_permit_record origin_jurisdiction_1 - origin_jurisdiction destination_jurisdiction_1 - destination_jurisdiction submission_pool_1 - clearance_submission compliance_checklist_1 - compliance_checklist compliance_checklist_2 - compliance_checklist evidence_attachment_type_1 - evidence_attachment_type evidence_attachment_type_2 - evidence_attachment_type escalation_policy_1 - escalation_policy escalation_policy_2 - escalation_policy exception_authorization_1 - exception_authorization ticket_permit_license_record_1 - ticket_permit_license_record external_contact_1 - external_regulatory_contact external_contact_2 - external_regulatory_contact regulatory_query_template_1 - regulatory_query_template)
+  (:init
+    (service_provider_available service_provider_1)
+    (service_provider_available service_provider_2)
+    (service_provider_available service_provider_3)
+    (document_available supporting_document_1)
+    (reviewer_available reviewer_1)
+    (declaration_permit_record_available declaration_permit_record_1)
+    (export_declaration_origin_jurisdiction export_declaration_1 origin_jurisdiction_1)
+    (import_declaration_destination_jurisdiction import_declaration_1 destination_jurisdiction_1)
+    (submission_available submission_pool_1)
+    (checklist_available compliance_checklist_1)
+    (checklist_available compliance_checklist_2)
+    (ticket_linked_to_export_declaration escalation_ticket_1 export_declaration_1)
+    (ticket_linked_to_export_declaration escalation_ticket_2 export_declaration_1)
+    (ticket_linked_to_import_declaration escalation_ticket_1 import_declaration_1)
+    (ticket_linked_to_import_declaration escalation_ticket_2 import_declaration_1)
+    (ticket_linked_to_submission escalation_ticket_1 submission_pool_1)
+    (ticket_linked_to_submission escalation_ticket_2 submission_pool_1)
+    (ticket_has_checklist escalation_ticket_1 compliance_checklist_1)
+    (ticket_has_checklist escalation_ticket_2 compliance_checklist_2)
+    (attachment_type_available evidence_attachment_type_1)
+    (attachment_type_available evidence_attachment_type_2)
+    (escalation_policy_available escalation_policy_1)
+    (escalation_policy_available escalation_policy_2)
+    (exception_authorization_available exception_authorization_1)
+    (ticket_permit_license_record_available ticket_permit_license_record_1)
+    (external_contact_available external_contact_1)
+    (external_contact_linked escalation_ticket_1 external_contact_1)
+    (external_contact_linked escalation_ticket_2 external_contact_2)
+    (query_template_available regulatory_query_template_1)
+  )
+  (:goal
+    (and
+      (clearance_finalized export_declaration_1)
+      (clearance_finalized import_declaration_1)
+      (clearance_finalized escalation_ticket_1)
+      (clearance_finalized escalation_ticket_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_clearance_case export_declaration_1)
+(allocate_service_provider_to_case export_declaration_1 service_provider_1)
+(link_supporting_document_to_case export_declaration_1 supporting_document_1)
+(confirm_document_classification export_declaration_1 supporting_document_1)
+(assign_reviewer export_declaration_1 reviewer_1)
+(initiate_origin_requirement_check export_declaration_1 origin_jurisdiction_1 supporting_document_1)
+(assign_reviewer_for_origin_requirement export_declaration_1 origin_jurisdiction_1 reviewer_1)
+(unassign_reviewer export_declaration_1 reviewer_1)
+(unlink_supporting_document_from_case export_declaration_1 supporting_document_1)
+(register_clearance_case import_declaration_1)
+(allocate_service_provider_to_case import_declaration_1 service_provider_2)
+(link_supporting_document_to_case import_declaration_1 supporting_document_1)
+(confirm_document_classification import_declaration_1 supporting_document_1)
+(assign_reviewer import_declaration_1 reviewer_1)
+(initiate_destination_requirement_check import_declaration_1 destination_jurisdiction_1 supporting_document_1)
+(assign_reviewer_for_destination_requirement import_declaration_1 destination_jurisdiction_1 reviewer_1)
+(unassign_reviewer import_declaration_1 reviewer_1)
+(unlink_supporting_document_from_case import_declaration_1 supporting_document_1)
+(assemble_clearance_submission export_declaration_1 import_declaration_1 origin_jurisdiction_1 destination_jurisdiction_1 submission_pool_1)
+(link_supporting_document_to_case export_declaration_1 supporting_document_1)
+(mark_submission_ready_for_filing submission_pool_1 export_declaration_1 supporting_document_1)
+(unlink_supporting_document_from_case export_declaration_1 supporting_document_1)
+(finalize_export_declaration_clearance export_declaration_1 submission_pool_1)
+(finalize_import_declaration_clearance import_declaration_1 submission_pool_1)
+(register_clearance_case escalation_ticket_1)
+(allocate_service_provider_to_case escalation_ticket_1 service_provider_3)
+(link_supporting_document_to_case escalation_ticket_1 supporting_document_1)
+(confirm_document_classification escalation_ticket_1 supporting_document_1)
+(attach_checklist_to_ticket_and_submission escalation_ticket_1 compliance_checklist_1 submission_pool_1)
+(start_ticket_assessment escalation_ticket_1 compliance_checklist_1 submission_pool_1 supporting_document_1)
+(attach_permit_license_to_ticket escalation_ticket_1 ticket_permit_license_record_1)
+(assign_reviewer escalation_ticket_1 reviewer_1)
+(validate_ticket_pre_submission escalation_ticket_1 ticket_permit_license_record_1 reviewer_1 compliance_checklist_1 submission_pool_1)
+(detach_permit_license_from_ticket escalation_ticket_1 ticket_permit_license_record_1)
+(unassign_reviewer escalation_ticket_1 reviewer_1)
+(attach_regulatory_query_template_to_ticket escalation_ticket_1 regulatory_query_template_1)
+(finalize_ticket_assessment_with_query_template escalation_ticket_1 regulatory_query_template_1 compliance_checklist_1 submission_pool_1)
+(record_ticket_assessment_result escalation_ticket_1)
+(apply_exception_authorization_to_case escalation_ticket_1 exception_authorization_1 supporting_document_1)
+(apply_exception_to_ticket_and_return_provider escalation_ticket_1 service_provider_3 exception_authorization_1)
+(unlink_supporting_document_from_case escalation_ticket_1 supporting_document_1)
+(detach_regulatory_query_template_from_ticket escalation_ticket_1 regulatory_query_template_1)
+(register_clearance_case escalation_ticket_2)
+(allocate_service_provider_to_case escalation_ticket_2 service_provider_3)
+(link_supporting_document_to_case escalation_ticket_2 supporting_document_1)
+(confirm_document_classification escalation_ticket_2 supporting_document_1)
+(attach_checklist_to_ticket_and_submission escalation_ticket_2 compliance_checklist_2 submission_pool_1)
+(start_ticket_assessment escalation_ticket_2 compliance_checklist_2 submission_pool_1 supporting_document_1)
+(attach_permit_license_to_ticket escalation_ticket_2 ticket_permit_license_record_1)
+(assign_reviewer escalation_ticket_2 reviewer_1)
+(validate_ticket_pre_submission escalation_ticket_2 ticket_permit_license_record_1 reviewer_1 compliance_checklist_2 submission_pool_1)
+(detach_permit_license_from_ticket escalation_ticket_2 ticket_permit_license_record_1)
+(unassign_reviewer escalation_ticket_2 reviewer_1)
+(attach_regulatory_query_template_to_ticket escalation_ticket_2 regulatory_query_template_1)
+(finalize_ticket_assessment_with_query_template escalation_ticket_2 regulatory_query_template_1 compliance_checklist_2 submission_pool_1)
+(record_ticket_assessment_result escalation_ticket_2)
+(apply_exception_authorization_to_case escalation_ticket_2 exception_authorization_1 supporting_document_1)
+(apply_exception_to_ticket_and_return_provider escalation_ticket_2 service_provider_3 exception_authorization_1)
+(unlink_supporting_document_from_case escalation_ticket_2 supporting_document_1)
+(detach_regulatory_query_template_from_ticket escalation_ticket_2 regulatory_query_template_1)
+(link_supporting_document_to_case export_declaration_1 supporting_document_1)
+(apply_exception_authorization_to_case export_declaration_1 exception_authorization_1 supporting_document_1)
+(apply_exception_to_export_declaration_and_return_provider export_declaration_1 service_provider_1 exception_authorization_1)
+(unlink_supporting_document_from_case export_declaration_1 supporting_document_1)
+(link_supporting_document_to_case import_declaration_1 supporting_document_1)
+(apply_exception_authorization_to_case import_declaration_1 exception_authorization_1 supporting_document_1)
+(apply_exception_to_import_declaration_and_return_provider import_declaration_1 service_provider_2 exception_authorization_1)
+(unlink_supporting_document_from_case import_declaration_1 supporting_document_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_sp7za1w7/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 68 
+
+Successful plans:
+Value: 68
+ /tmp/val_sp7za1w7/plan.pddl 68 
+
+
+
+--- stderr ---
+

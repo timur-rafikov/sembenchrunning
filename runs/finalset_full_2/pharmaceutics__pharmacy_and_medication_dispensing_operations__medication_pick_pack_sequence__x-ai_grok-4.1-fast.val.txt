@@ -1,0 +1,1059 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain medication_pick_pack_sequence)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types pharmacy_resource - object supporting_resource - object location_or_container - object prescription_record_root - object prescription_order - prescription_record_root stock_unit - pharmacy_resource medication_product - pharmacy_resource staff - pharmacy_resource packaging_material - pharmacy_resource instruction_template - pharmacy_resource patient_profile - pharmacy_resource clinical_check - pharmacy_resource regulatory_document - pharmacy_resource accessory_item - supporting_resource label_template - supporting_resource prior_auth_document - supporting_resource pick_bin - location_or_container pack_station - location_or_container package - location_or_container dispensing_task - prescription_order dispense_job_container - prescription_order pick_task - dispensing_task pack_task - dispensing_task dispense_job - dispense_job_container)
+  (:predicates
+    (received ?prescription_order - prescription_order)
+    (verified ?prescription_order - prescription_order)
+    (has_allocated_stock ?prescription_order - prescription_order)
+    (ready_for_dispensing ?prescription_order - prescription_order)
+    (final_quality_check_passed ?prescription_order - prescription_order)
+    (patient_instructions_attached ?prescription_order - prescription_order)
+    (stock_unit_available ?stock_unit - stock_unit)
+    (has_allocated_stock_unit ?prescription_order - prescription_order ?stock_unit - stock_unit)
+    (medication_product_available ?medication_product - medication_product)
+    (has_medication_product ?prescription_order - prescription_order ?medication_product - medication_product)
+    (staff_available ?staff - staff)
+    (has_assigned_staff ?prescription_order - prescription_order ?staff - staff)
+    (accessory_item_available ?accessory_item - accessory_item)
+    (pick_task_assigned_accessory ?pick_task - pick_task ?accessory_item - accessory_item)
+    (pack_task_assigned_accessory ?pack_task - pack_task ?accessory_item - accessory_item)
+    (pick_task_assigned_bin ?pick_task - pick_task ?pick_bin - pick_bin)
+    (pick_bin_claimed ?pick_bin - pick_bin)
+    (pick_bin_marked_for_accessory ?pick_bin - pick_bin)
+    (pick_task_completed ?pick_task - pick_task)
+    (pack_task_assigned_station ?pack_task - pack_task ?pack_station - pack_station)
+    (pack_station_claimed ?pack_station - pack_station)
+    (pack_station_marked_for_accessory ?pack_station - pack_station)
+    (pack_task_completed ?pack_task - pack_task)
+    (package_available ?package - package)
+    (package_allocated ?package - package)
+    (package_assigned_pick_bin ?package - package ?pick_bin - pick_bin)
+    (package_assigned_pack_station ?package - package ?pack_station - pack_station)
+    (package_requires_label_template ?package - package)
+    (package_requires_packaging_material ?package - package)
+    (package_contents_verified ?package - package)
+    (dispense_job_has_pick_task ?dispense_job - dispense_job ?pick_task - pick_task)
+    (dispense_job_has_pack_task ?dispense_job - dispense_job ?pack_task - pack_task)
+    (dispense_job_assigned_package ?dispense_job - dispense_job ?package - package)
+    (label_template_available ?label_template - label_template)
+    (dispense_job_assigned_label_template ?dispense_job - dispense_job ?label_template - label_template)
+    (label_template_bound ?label_template - label_template)
+    (label_template_applied_to_package ?label_template - label_template ?package - package)
+    (dispense_job_ready_for_finalization ?dispense_job - dispense_job)
+    (materials_attached_to_job ?dispense_job - dispense_job)
+    (dispense_job_documentation_compiled ?dispense_job - dispense_job)
+    (packaging_material_allocated ?dispense_job - dispense_job)
+    (dispense_job_packaging_confirmed ?dispense_job - dispense_job)
+    (dispense_job_ready_for_instruction_binding ?dispense_job - dispense_job)
+    (final_checks_completed ?dispense_job - dispense_job)
+    (prior_auth_document_available ?prior_auth_document - prior_auth_document)
+    (dispense_job_attached_prior_auth ?dispense_job - dispense_job ?prior_auth_document - prior_auth_document)
+    (prior_auth_verified ?dispense_job - dispense_job)
+    (prior_authorization_applied ?dispense_job - dispense_job)
+    (prior_authorization_finalized ?dispense_job - dispense_job)
+    (packaging_material_available ?packaging_material - packaging_material)
+    (dispense_job_assigned_packaging_material ?dispense_job - dispense_job ?packaging_material - packaging_material)
+    (instruction_template_available ?instruction_template - instruction_template)
+    (dispense_job_assigned_instruction_template ?dispense_job - dispense_job ?instruction_template - instruction_template)
+    (clinical_check_available ?clinical_check - clinical_check)
+    (dispense_job_assigned_clinical_check ?dispense_job - dispense_job ?clinical_check - clinical_check)
+    (regulatory_document_available ?regulatory_document - regulatory_document)
+    (dispense_job_assigned_regulatory_document ?dispense_job - dispense_job ?regulatory_document - regulatory_document)
+    (patient_profile_available ?patient_profile - patient_profile)
+    (has_assigned_patient_profile ?prescription_order - prescription_order ?patient_profile - patient_profile)
+    (pick_task_claimed ?pick_task - pick_task)
+    (pack_task_claimed ?pack_task - pack_task)
+    (dispense_job_locked_for_release ?dispense_job - dispense_job)
+  )
+  (:action register_order
+    :parameters (?prescription_order - prescription_order)
+    :precondition
+      (and
+        (not
+          (received ?prescription_order)
+        )
+        (not
+          (ready_for_dispensing ?prescription_order)
+        )
+      )
+    :effect (received ?prescription_order)
+  )
+  (:action assign_stock_unit_to_order
+    :parameters (?prescription_order - prescription_order ?stock_unit - stock_unit)
+    :precondition
+      (and
+        (received ?prescription_order)
+        (not
+          (has_allocated_stock ?prescription_order)
+        )
+        (stock_unit_available ?stock_unit)
+      )
+    :effect
+      (and
+        (has_allocated_stock ?prescription_order)
+        (has_allocated_stock_unit ?prescription_order ?stock_unit)
+        (not
+          (stock_unit_available ?stock_unit)
+        )
+      )
+  )
+  (:action associate_medication_product_with_order
+    :parameters (?prescription_order - prescription_order ?medication_product - medication_product)
+    :precondition
+      (and
+        (received ?prescription_order)
+        (has_allocated_stock ?prescription_order)
+        (medication_product_available ?medication_product)
+      )
+    :effect
+      (and
+        (has_medication_product ?prescription_order ?medication_product)
+        (not
+          (medication_product_available ?medication_product)
+        )
+      )
+  )
+  (:action verify_order
+    :parameters (?prescription_order - prescription_order ?medication_product - medication_product)
+    :precondition
+      (and
+        (received ?prescription_order)
+        (has_allocated_stock ?prescription_order)
+        (has_medication_product ?prescription_order ?medication_product)
+        (not
+          (verified ?prescription_order)
+        )
+      )
+    :effect (verified ?prescription_order)
+  )
+  (:action release_medication_product_to_inventory
+    :parameters (?prescription_order - prescription_order ?medication_product - medication_product)
+    :precondition
+      (and
+        (has_medication_product ?prescription_order ?medication_product)
+      )
+    :effect
+      (and
+        (medication_product_available ?medication_product)
+        (not
+          (has_medication_product ?prescription_order ?medication_product)
+        )
+      )
+  )
+  (:action assign_staff_to_order
+    :parameters (?prescription_order - prescription_order ?staff - staff)
+    :precondition
+      (and
+        (verified ?prescription_order)
+        (staff_available ?staff)
+      )
+    :effect
+      (and
+        (has_assigned_staff ?prescription_order ?staff)
+        (not
+          (staff_available ?staff)
+        )
+      )
+  )
+  (:action unassign_staff_from_order
+    :parameters (?prescription_order - prescription_order ?staff - staff)
+    :precondition
+      (and
+        (has_assigned_staff ?prescription_order ?staff)
+      )
+    :effect
+      (and
+        (staff_available ?staff)
+        (not
+          (has_assigned_staff ?prescription_order ?staff)
+        )
+      )
+  )
+  (:action assign_clinical_check_to_dispense_job
+    :parameters (?dispense_job - dispense_job ?clinical_check - clinical_check)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (clinical_check_available ?clinical_check)
+      )
+    :effect
+      (and
+        (dispense_job_assigned_clinical_check ?dispense_job ?clinical_check)
+        (not
+          (clinical_check_available ?clinical_check)
+        )
+      )
+  )
+  (:action unassign_clinical_check_from_dispense_job
+    :parameters (?dispense_job - dispense_job ?clinical_check - clinical_check)
+    :precondition
+      (and
+        (dispense_job_assigned_clinical_check ?dispense_job ?clinical_check)
+      )
+    :effect
+      (and
+        (clinical_check_available ?clinical_check)
+        (not
+          (dispense_job_assigned_clinical_check ?dispense_job ?clinical_check)
+        )
+      )
+  )
+  (:action assign_regulatory_document_to_dispense_job
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (regulatory_document_available ?regulatory_document)
+      )
+    :effect
+      (and
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (not
+          (regulatory_document_available ?regulatory_document)
+        )
+      )
+  )
+  (:action unassign_regulatory_document_from_dispense_job
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+      )
+    :effect
+      (and
+        (regulatory_document_available ?regulatory_document)
+        (not
+          (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        )
+      )
+  )
+  (:action claim_pick_bin_for_task
+    :parameters (?pick_task - pick_task ?pick_bin - pick_bin ?medication_product - medication_product)
+    :precondition
+      (and
+        (verified ?pick_task)
+        (has_medication_product ?pick_task ?medication_product)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (not
+          (pick_bin_claimed ?pick_bin)
+        )
+        (not
+          (pick_bin_marked_for_accessory ?pick_bin)
+        )
+      )
+    :effect (pick_bin_claimed ?pick_bin)
+  )
+  (:action confirm_pick_task_completion
+    :parameters (?pick_task - pick_task ?pick_bin - pick_bin ?staff - staff)
+    :precondition
+      (and
+        (verified ?pick_task)
+        (has_assigned_staff ?pick_task ?staff)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pick_bin_claimed ?pick_bin)
+        (not
+          (pick_task_claimed ?pick_task)
+        )
+      )
+    :effect
+      (and
+        (pick_task_claimed ?pick_task)
+        (pick_task_completed ?pick_task)
+      )
+  )
+  (:action attach_accessory_to_pick_task
+    :parameters (?pick_task - pick_task ?pick_bin - pick_bin ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (verified ?pick_task)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (accessory_item_available ?accessory_item)
+        (not
+          (pick_task_claimed ?pick_task)
+        )
+      )
+    :effect
+      (and
+        (pick_bin_marked_for_accessory ?pick_bin)
+        (pick_task_claimed ?pick_task)
+        (pick_task_assigned_accessory ?pick_task ?accessory_item)
+        (not
+          (accessory_item_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_pick_with_accessory
+    :parameters (?pick_task - pick_task ?pick_bin - pick_bin ?medication_product - medication_product ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (verified ?pick_task)
+        (has_medication_product ?pick_task ?medication_product)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pick_bin_marked_for_accessory ?pick_bin)
+        (pick_task_assigned_accessory ?pick_task ?accessory_item)
+        (not
+          (pick_task_completed ?pick_task)
+        )
+      )
+    :effect
+      (and
+        (pick_bin_claimed ?pick_bin)
+        (pick_task_completed ?pick_task)
+        (accessory_item_available ?accessory_item)
+        (not
+          (pick_task_assigned_accessory ?pick_task ?accessory_item)
+        )
+      )
+  )
+  (:action claim_pack_station_for_task
+    :parameters (?pack_task - pack_task ?pack_station - pack_station ?medication_product - medication_product)
+    :precondition
+      (and
+        (verified ?pack_task)
+        (has_medication_product ?pack_task ?medication_product)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (not
+          (pack_station_claimed ?pack_station)
+        )
+        (not
+          (pack_station_marked_for_accessory ?pack_station)
+        )
+      )
+    :effect (pack_station_claimed ?pack_station)
+  )
+  (:action complete_pack_task_by_staff
+    :parameters (?pack_task - pack_task ?pack_station - pack_station ?staff - staff)
+    :precondition
+      (and
+        (verified ?pack_task)
+        (has_assigned_staff ?pack_task ?staff)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pack_station_claimed ?pack_station)
+        (not
+          (pack_task_claimed ?pack_task)
+        )
+      )
+    :effect
+      (and
+        (pack_task_claimed ?pack_task)
+        (pack_task_completed ?pack_task)
+      )
+  )
+  (:action attach_accessory_to_pack_task
+    :parameters (?pack_task - pack_task ?pack_station - pack_station ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (verified ?pack_task)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (accessory_item_available ?accessory_item)
+        (not
+          (pack_task_claimed ?pack_task)
+        )
+      )
+    :effect
+      (and
+        (pack_station_marked_for_accessory ?pack_station)
+        (pack_task_claimed ?pack_task)
+        (pack_task_assigned_accessory ?pack_task ?accessory_item)
+        (not
+          (accessory_item_available ?accessory_item)
+        )
+      )
+  )
+  (:action finalize_pack_with_accessory
+    :parameters (?pack_task - pack_task ?pack_station - pack_station ?medication_product - medication_product ?accessory_item - accessory_item)
+    :precondition
+      (and
+        (verified ?pack_task)
+        (has_medication_product ?pack_task ?medication_product)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pack_station_marked_for_accessory ?pack_station)
+        (pack_task_assigned_accessory ?pack_task ?accessory_item)
+        (not
+          (pack_task_completed ?pack_task)
+        )
+      )
+    :effect
+      (and
+        (pack_station_claimed ?pack_station)
+        (pack_task_completed ?pack_task)
+        (accessory_item_available ?accessory_item)
+        (not
+          (pack_task_assigned_accessory ?pack_task ?accessory_item)
+        )
+      )
+  )
+  (:action allocate_package_for_pick_pack
+    :parameters (?pick_task - pick_task ?pack_task - pack_task ?pick_bin - pick_bin ?pack_station - pack_station ?package - package)
+    :precondition
+      (and
+        (pick_task_claimed ?pick_task)
+        (pack_task_claimed ?pack_task)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pick_bin_claimed ?pick_bin)
+        (pack_station_claimed ?pack_station)
+        (pick_task_completed ?pick_task)
+        (pack_task_completed ?pack_task)
+        (package_available ?package)
+      )
+    :effect
+      (and
+        (package_allocated ?package)
+        (package_assigned_pick_bin ?package ?pick_bin)
+        (package_assigned_pack_station ?package ?pack_station)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action allocate_package_and_flag_for_label_template
+    :parameters (?pick_task - pick_task ?pack_task - pack_task ?pick_bin - pick_bin ?pack_station - pack_station ?package - package)
+    :precondition
+      (and
+        (pick_task_claimed ?pick_task)
+        (pack_task_claimed ?pack_task)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pick_bin_marked_for_accessory ?pick_bin)
+        (pack_station_claimed ?pack_station)
+        (not
+          (pick_task_completed ?pick_task)
+        )
+        (pack_task_completed ?pack_task)
+        (package_available ?package)
+      )
+    :effect
+      (and
+        (package_allocated ?package)
+        (package_assigned_pick_bin ?package ?pick_bin)
+        (package_assigned_pack_station ?package ?pack_station)
+        (package_requires_label_template ?package)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action allocate_package_and_flag_packaging_materials
+    :parameters (?pick_task - pick_task ?pack_task - pack_task ?pick_bin - pick_bin ?pack_station - pack_station ?package - package)
+    :precondition
+      (and
+        (pick_task_claimed ?pick_task)
+        (pack_task_claimed ?pack_task)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pick_bin_claimed ?pick_bin)
+        (pack_station_marked_for_accessory ?pack_station)
+        (pick_task_completed ?pick_task)
+        (not
+          (pack_task_completed ?pack_task)
+        )
+        (package_available ?package)
+      )
+    :effect
+      (and
+        (package_allocated ?package)
+        (package_assigned_pick_bin ?package ?pick_bin)
+        (package_assigned_pack_station ?package ?pack_station)
+        (package_requires_packaging_material ?package)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action allocate_package_and_flag_label_and_materials
+    :parameters (?pick_task - pick_task ?pack_task - pack_task ?pick_bin - pick_bin ?pack_station - pack_station ?package - package)
+    :precondition
+      (and
+        (pick_task_claimed ?pick_task)
+        (pack_task_claimed ?pack_task)
+        (pick_task_assigned_bin ?pick_task ?pick_bin)
+        (pack_task_assigned_station ?pack_task ?pack_station)
+        (pick_bin_marked_for_accessory ?pick_bin)
+        (pack_station_marked_for_accessory ?pack_station)
+        (not
+          (pick_task_completed ?pick_task)
+        )
+        (not
+          (pack_task_completed ?pack_task)
+        )
+        (package_available ?package)
+      )
+    :effect
+      (and
+        (package_allocated ?package)
+        (package_assigned_pick_bin ?package ?pick_bin)
+        (package_assigned_pack_station ?package ?pack_station)
+        (package_requires_label_template ?package)
+        (package_requires_packaging_material ?package)
+        (not
+          (package_available ?package)
+        )
+      )
+  )
+  (:action verify_package_contents
+    :parameters (?package - package ?pick_task - pick_task ?medication_product - medication_product)
+    :precondition
+      (and
+        (package_allocated ?package)
+        (pick_task_claimed ?pick_task)
+        (has_medication_product ?pick_task ?medication_product)
+        (not
+          (package_contents_verified ?package)
+        )
+      )
+    :effect (package_contents_verified ?package)
+  )
+  (:action bind_label_template_to_package_for_job
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (dispense_job_assigned_package ?dispense_job ?package)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_available ?label_template)
+        (package_allocated ?package)
+        (package_contents_verified ?package)
+        (not
+          (label_template_bound ?label_template)
+        )
+      )
+    :effect
+      (and
+        (label_template_bound ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (not
+          (label_template_available ?label_template)
+        )
+      )
+  )
+  (:action mark_dispense_job_ready_for_finalization
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?package - package ?medication_product - medication_product)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (has_medication_product ?dispense_job ?medication_product)
+        (not
+          (package_requires_label_template ?package)
+        )
+        (not
+          (dispense_job_ready_for_finalization ?dispense_job)
+        )
+      )
+    :effect (dispense_job_ready_for_finalization ?dispense_job)
+  )
+  (:action assign_packaging_material_to_job
+    :parameters (?dispense_job - dispense_job ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (packaging_material_available ?packaging_material)
+        (not
+          (packaging_material_allocated ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (packaging_material_allocated ?dispense_job)
+        (dispense_job_assigned_packaging_material ?dispense_job ?packaging_material)
+        (not
+          (packaging_material_available ?packaging_material)
+        )
+      )
+  )
+  (:action apply_packaging_material_to_job
+    :parameters (?dispense_job - dispense_job ?label_template - label_template ?package - package ?medication_product - medication_product ?packaging_material - packaging_material)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_bound ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (has_medication_product ?dispense_job ?medication_product)
+        (package_requires_label_template ?package)
+        (packaging_material_allocated ?dispense_job)
+        (dispense_job_assigned_packaging_material ?dispense_job ?packaging_material)
+        (not
+          (dispense_job_ready_for_finalization ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_ready_for_finalization ?dispense_job)
+        (dispense_job_packaging_confirmed ?dispense_job)
+      )
+  )
+  (:action attach_clinical_check_and_mark_materials
+    :parameters (?dispense_job - dispense_job ?clinical_check - clinical_check ?staff - staff ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (dispense_job_ready_for_finalization ?dispense_job)
+        (dispense_job_assigned_clinical_check ?dispense_job ?clinical_check)
+        (has_assigned_staff ?dispense_job ?staff)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (not
+          (package_requires_packaging_material ?package)
+        )
+        (not
+          (materials_attached_to_job ?dispense_job)
+        )
+      )
+    :effect (materials_attached_to_job ?dispense_job)
+  )
+  (:action attach_clinical_check_with_material_flag
+    :parameters (?dispense_job - dispense_job ?clinical_check - clinical_check ?staff - staff ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (dispense_job_ready_for_finalization ?dispense_job)
+        (dispense_job_assigned_clinical_check ?dispense_job ?clinical_check)
+        (has_assigned_staff ?dispense_job ?staff)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (package_requires_packaging_material ?package)
+        (not
+          (materials_attached_to_job ?dispense_job)
+        )
+      )
+    :effect (materials_attached_to_job ?dispense_job)
+  )
+  (:action attach_regulatory_document_to_job_basic
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (materials_attached_to_job ?dispense_job)
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (not
+          (package_requires_label_template ?package)
+        )
+        (not
+          (package_requires_packaging_material ?package)
+        )
+        (not
+          (dispense_job_documentation_compiled ?dispense_job)
+        )
+      )
+    :effect (dispense_job_documentation_compiled ?dispense_job)
+  )
+  (:action attach_regulatory_document_to_job_with_label
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (materials_attached_to_job ?dispense_job)
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (package_requires_label_template ?package)
+        (not
+          (package_requires_packaging_material ?package)
+        )
+        (not
+          (dispense_job_documentation_compiled ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (dispense_job_ready_for_instruction_binding ?dispense_job)
+      )
+  )
+  (:action attach_regulatory_document_to_job_with_packaging
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (materials_attached_to_job ?dispense_job)
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (not
+          (package_requires_label_template ?package)
+        )
+        (package_requires_packaging_material ?package)
+        (not
+          (dispense_job_documentation_compiled ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (dispense_job_ready_for_instruction_binding ?dispense_job)
+      )
+  )
+  (:action attach_regulatory_document_to_job_with_label_and_packaging
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document ?label_template - label_template ?package - package)
+    :precondition
+      (and
+        (materials_attached_to_job ?dispense_job)
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (dispense_job_assigned_label_template ?dispense_job ?label_template)
+        (label_template_applied_to_package ?label_template ?package)
+        (package_requires_label_template ?package)
+        (package_requires_packaging_material ?package)
+        (not
+          (dispense_job_documentation_compiled ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (dispense_job_ready_for_instruction_binding ?dispense_job)
+      )
+  )
+  (:action perform_final_quality_check_and_lock_job
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (not
+          (dispense_job_ready_for_instruction_binding ?dispense_job)
+        )
+        (not
+          (dispense_job_locked_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_locked_for_release ?dispense_job)
+        (final_quality_check_passed ?dispense_job)
+      )
+  )
+  (:action attach_instruction_template_to_job
+    :parameters (?dispense_job - dispense_job ?instruction_template - instruction_template)
+    :precondition
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (dispense_job_ready_for_instruction_binding ?dispense_job)
+        (instruction_template_available ?instruction_template)
+      )
+    :effect
+      (and
+        (dispense_job_assigned_instruction_template ?dispense_job ?instruction_template)
+        (not
+          (instruction_template_available ?instruction_template)
+        )
+      )
+  )
+  (:action perform_final_checks_and_mark_ready
+    :parameters (?dispense_job - dispense_job ?pick_task - pick_task ?pack_task - pack_task ?medication_product - medication_product ?instruction_template - instruction_template)
+    :precondition
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (dispense_job_ready_for_instruction_binding ?dispense_job)
+        (dispense_job_assigned_instruction_template ?dispense_job ?instruction_template)
+        (dispense_job_has_pick_task ?dispense_job ?pick_task)
+        (dispense_job_has_pack_task ?dispense_job ?pack_task)
+        (pick_task_completed ?pick_task)
+        (pack_task_completed ?pack_task)
+        (has_medication_product ?dispense_job ?medication_product)
+        (not
+          (final_checks_completed ?dispense_job)
+        )
+      )
+    :effect (final_checks_completed ?dispense_job)
+  )
+  (:action finalize_dispense_job_after_checks
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (dispense_job_documentation_compiled ?dispense_job)
+        (final_checks_completed ?dispense_job)
+        (not
+          (dispense_job_locked_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_locked_for_release ?dispense_job)
+        (final_quality_check_passed ?dispense_job)
+      )
+  )
+  (:action apply_prior_authorization_to_job
+    :parameters (?dispense_job - dispense_job ?prior_auth_document - prior_auth_document ?medication_product - medication_product)
+    :precondition
+      (and
+        (verified ?dispense_job)
+        (has_medication_product ?dispense_job ?medication_product)
+        (prior_auth_document_available ?prior_auth_document)
+        (dispense_job_attached_prior_auth ?dispense_job ?prior_auth_document)
+        (not
+          (prior_auth_verified ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (prior_auth_verified ?dispense_job)
+        (not
+          (prior_auth_document_available ?prior_auth_document)
+        )
+      )
+  )
+  (:action process_prior_auth_with_staff
+    :parameters (?dispense_job - dispense_job ?staff - staff)
+    :precondition
+      (and
+        (prior_auth_verified ?dispense_job)
+        (has_assigned_staff ?dispense_job ?staff)
+        (not
+          (prior_authorization_applied ?dispense_job)
+        )
+      )
+    :effect (prior_authorization_applied ?dispense_job)
+  )
+  (:action finalize_prior_authorization
+    :parameters (?dispense_job - dispense_job ?regulatory_document - regulatory_document)
+    :precondition
+      (and
+        (prior_authorization_applied ?dispense_job)
+        (dispense_job_assigned_regulatory_document ?dispense_job ?regulatory_document)
+        (not
+          (prior_authorization_finalized ?dispense_job)
+        )
+      )
+    :effect (prior_authorization_finalized ?dispense_job)
+  )
+  (:action finalize_job_after_prior_auth
+    :parameters (?dispense_job - dispense_job)
+    :precondition
+      (and
+        (prior_authorization_finalized ?dispense_job)
+        (not
+          (dispense_job_locked_for_release ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (dispense_job_locked_for_release ?dispense_job)
+        (final_quality_check_passed ?dispense_job)
+      )
+  )
+  (:action release_pick_task
+    :parameters (?pick_task - pick_task ?package - package)
+    :precondition
+      (and
+        (pick_task_claimed ?pick_task)
+        (pick_task_completed ?pick_task)
+        (package_allocated ?package)
+        (package_contents_verified ?package)
+        (not
+          (final_quality_check_passed ?pick_task)
+        )
+      )
+    :effect (final_quality_check_passed ?pick_task)
+  )
+  (:action release_pack_task
+    :parameters (?pack_task - pack_task ?package - package)
+    :precondition
+      (and
+        (pack_task_claimed ?pack_task)
+        (pack_task_completed ?pack_task)
+        (package_allocated ?package)
+        (package_contents_verified ?package)
+        (not
+          (final_quality_check_passed ?pack_task)
+        )
+      )
+    :effect (final_quality_check_passed ?pack_task)
+  )
+  (:action generate_patient_instruction_for_order
+    :parameters (?prescription_order - prescription_order ?patient_profile - patient_profile ?medication_product - medication_product)
+    :precondition
+      (and
+        (final_quality_check_passed ?prescription_order)
+        (has_medication_product ?prescription_order ?medication_product)
+        (patient_profile_available ?patient_profile)
+        (not
+          (patient_instructions_attached ?prescription_order)
+        )
+      )
+    :effect
+      (and
+        (patient_instructions_attached ?prescription_order)
+        (has_assigned_patient_profile ?prescription_order ?patient_profile)
+        (not
+          (patient_profile_available ?patient_profile)
+        )
+      )
+  )
+  (:action apply_patient_instructions_and_release_task
+    :parameters (?pick_task - pick_task ?stock_unit - stock_unit ?patient_profile - patient_profile)
+    :precondition
+      (and
+        (patient_instructions_attached ?pick_task)
+        (has_allocated_stock_unit ?pick_task ?stock_unit)
+        (has_assigned_patient_profile ?pick_task ?patient_profile)
+        (not
+          (ready_for_dispensing ?pick_task)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispensing ?pick_task)
+        (stock_unit_available ?stock_unit)
+        (patient_profile_available ?patient_profile)
+      )
+  )
+  (:action apply_patient_instructions_and_release_pack_task
+    :parameters (?pack_task - pack_task ?stock_unit - stock_unit ?patient_profile - patient_profile)
+    :precondition
+      (and
+        (patient_instructions_attached ?pack_task)
+        (has_allocated_stock_unit ?pack_task ?stock_unit)
+        (has_assigned_patient_profile ?pack_task ?patient_profile)
+        (not
+          (ready_for_dispensing ?pack_task)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispensing ?pack_task)
+        (stock_unit_available ?stock_unit)
+        (patient_profile_available ?patient_profile)
+      )
+  )
+  (:action apply_patient_instructions_and_release_dispense_job
+    :parameters (?dispense_job - dispense_job ?stock_unit - stock_unit ?patient_profile - patient_profile)
+    :precondition
+      (and
+        (patient_instructions_attached ?dispense_job)
+        (has_allocated_stock_unit ?dispense_job ?stock_unit)
+        (has_assigned_patient_profile ?dispense_job ?patient_profile)
+        (not
+          (ready_for_dispensing ?dispense_job)
+        )
+      )
+    :effect
+      (and
+        (ready_for_dispensing ?dispense_job)
+        (stock_unit_available ?stock_unit)
+        (patient_profile_available ?patient_profile)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem medication_pick_pack_case)
+  (:domain medication_pick_pack_sequence)
+  (:objects pick_task_obj - pick_task pack_task_obj - pack_task dispense_job_obj_1 - dispense_job dispense_job_obj_2 - dispense_job stock_unit_obj_1 - stock_unit stock_unit_obj_2 - stock_unit stock_unit_obj_3 - stock_unit medication_product_obj - medication_product staff_obj - staff accessory_item_obj - accessory_item pick_bin_obj - pick_bin pack_station_obj - pack_station package_obj - package label_template_obj_1 - label_template label_template_obj_2 - label_template packaging_material_obj_1 - packaging_material packaging_material_obj_2 - packaging_material instruction_template_obj_1 - instruction_template instruction_template_obj_2 - instruction_template patient_profile_obj - patient_profile clinical_check_obj - clinical_check prior_auth_document_obj_1 - prior_auth_document prior_auth_document_obj_2 - prior_auth_document regulatory_document_obj - regulatory_document)
+  (:init
+    (stock_unit_available stock_unit_obj_1)
+    (stock_unit_available stock_unit_obj_2)
+    (stock_unit_available stock_unit_obj_3)
+    (medication_product_available medication_product_obj)
+    (staff_available staff_obj)
+    (accessory_item_available accessory_item_obj)
+    (pick_task_assigned_bin pick_task_obj pick_bin_obj)
+    (pack_task_assigned_station pack_task_obj pack_station_obj)
+    (package_available package_obj)
+    (label_template_available label_template_obj_1)
+    (label_template_available label_template_obj_2)
+    (dispense_job_has_pick_task dispense_job_obj_1 pick_task_obj)
+    (dispense_job_has_pick_task dispense_job_obj_2 pick_task_obj)
+    (dispense_job_has_pack_task dispense_job_obj_1 pack_task_obj)
+    (dispense_job_has_pack_task dispense_job_obj_2 pack_task_obj)
+    (dispense_job_assigned_package dispense_job_obj_1 package_obj)
+    (dispense_job_assigned_package dispense_job_obj_2 package_obj)
+    (dispense_job_assigned_label_template dispense_job_obj_1 label_template_obj_1)
+    (dispense_job_assigned_label_template dispense_job_obj_2 label_template_obj_2)
+    (packaging_material_available packaging_material_obj_1)
+    (packaging_material_available packaging_material_obj_2)
+    (instruction_template_available instruction_template_obj_1)
+    (instruction_template_available instruction_template_obj_2)
+    (patient_profile_available patient_profile_obj)
+    (clinical_check_available clinical_check_obj)
+    (prior_auth_document_available prior_auth_document_obj_1)
+    (dispense_job_attached_prior_auth dispense_job_obj_1 prior_auth_document_obj_1)
+    (dispense_job_attached_prior_auth dispense_job_obj_2 prior_auth_document_obj_2)
+    (regulatory_document_available regulatory_document_obj)
+  )
+  (:goal
+    (and
+      (ready_for_dispensing pick_task_obj)
+      (ready_for_dispensing pack_task_obj)
+      (ready_for_dispensing dispense_job_obj_1)
+      (ready_for_dispensing dispense_job_obj_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register_order pick_task_obj)
+(assign_stock_unit_to_order pick_task_obj stock_unit_obj_1)
+(associate_medication_product_with_order pick_task_obj medication_product_obj)
+(verify_order pick_task_obj medication_product_obj)
+(assign_staff_to_order pick_task_obj staff_obj)
+(claim_pick_bin_for_task pick_task_obj pick_bin_obj medication_product_obj)
+(confirm_pick_task_completion pick_task_obj pick_bin_obj staff_obj)
+(unassign_staff_from_order pick_task_obj staff_obj)
+(release_medication_product_to_inventory pick_task_obj medication_product_obj)
+(register_order pack_task_obj)
+(assign_stock_unit_to_order pack_task_obj stock_unit_obj_2)
+(associate_medication_product_with_order pack_task_obj medication_product_obj)
+(verify_order pack_task_obj medication_product_obj)
+(assign_staff_to_order pack_task_obj staff_obj)
+(claim_pack_station_for_task pack_task_obj pack_station_obj medication_product_obj)
+(complete_pack_task_by_staff pack_task_obj pack_station_obj staff_obj)
+(unassign_staff_from_order pack_task_obj staff_obj)
+(release_medication_product_to_inventory pack_task_obj medication_product_obj)
+(allocate_package_for_pick_pack pick_task_obj pack_task_obj pick_bin_obj pack_station_obj package_obj)
+(associate_medication_product_with_order pick_task_obj medication_product_obj)
+(verify_package_contents package_obj pick_task_obj medication_product_obj)
+(release_pick_task pick_task_obj package_obj)
+(release_pack_task pack_task_obj package_obj)
+(generate_patient_instruction_for_order pick_task_obj patient_profile_obj medication_product_obj)
+(apply_patient_instructions_and_release_pick_task pick_task_obj stock_unit_obj_1 patient_profile_obj)
+(release_medication_product_to_inventory pick_task_obj medication_product_obj)
+(associate_medication_product_with_order pack_task_obj medication_product_obj)
+(generate_patient_instruction_for_order pack_task_obj patient_profile_obj medication_product_obj)
+(apply_patient_instructions_and_release_pack_task pack_task_obj stock_unit_obj_2 patient_profile_obj)
+(release_medication_product_to_inventory pack_task_obj medication_product_obj)
+(register_order dispense_job_obj_1)
+(assign_stock_unit_to_order dispense_job_obj_1 stock_unit_obj_1)
+(associate_medication_product_with_order dispense_job_obj_1 medication_product_obj)
+(verify_order dispense_job_obj_1 medication_product_obj)
+(assign_staff_to_order dispense_job_obj_1 staff_obj)
+(assign_regulatory_document_to_dispense_job dispense_job_obj_1 regulatory_document_obj)
+(apply_prior_authorization_to_job dispense_job_obj_1 prior_auth_document_obj_1 medication_product_obj)
+(process_prior_auth_with_staff dispense_job_obj_1 staff_obj)
+(finalize_prior_authorization dispense_job_obj_1 regulatory_document_obj)
+(finalize_job_after_prior_auth dispense_job_obj_1)
+(generate_patient_instruction_for_order dispense_job_obj_1 patient_profile_obj medication_product_obj)
+(apply_patient_instructions_and_release_dispense_job dispense_job_obj_1 stock_unit_obj_1 patient_profile_obj)
+(release_medication_product_to_inventory dispense_job_obj_1 medication_product_obj)
+(unassign_staff_from_order dispense_job_obj_1 staff_obj)
+(unassign_regulatory_document_from_dispense_job dispense_job_obj_1 regulatory_document_obj)
+(register_order dispense_job_obj_2)
+(assign_stock_unit_to_order dispense_job_obj_2 stock_unit_obj_2)
+(associate_medication_product_with_order dispense_job_obj_2 medication_product_obj)
+(verify_order dispense_job_obj_2 medication_product_obj)
+(assign_staff_to_order dispense_job_obj_2 staff_obj)
+(assign_regulatory_document_to_dispense_job dispense_job_obj_2 regulatory_document_obj)
+(apply_prior_authorization_to_job dispense_job_obj_2 prior_auth_document_obj_2 medication_product_obj)
+(process_prior_auth_with_staff dispense_job_obj_2 staff_obj)
+(finalize_prior_authorization dispense_job_obj_2 regulatory_document_obj)
+(finalize_job_after_prior_auth dispense_job_obj_2)
+(generate_patient_instruction_for_order dispense_job_obj_2 patient_profile_obj medication_product_obj)
+(apply_patient_instructions_and_release_dispense_job dispense_job_obj_2 stock_unit_obj_2 patient_profile_obj)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_o5se23nx/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_o5se23nx/plan.pddl 
+
+
+--- stderr ---
+

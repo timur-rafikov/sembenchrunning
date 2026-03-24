@@ -1,0 +1,936 @@
+(define (domain timed_mission_sequence_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types auxiliary_resource - object component - object sequence_element - object mission_category_root - object quest_node - mission_category_root activation_token - auxiliary_resource trigger_event - auxiliary_resource agent - auxiliary_resource modifier_token_a - auxiliary_resource modifier_token_b - auxiliary_resource timer_token - auxiliary_resource optional_objective_a - auxiliary_resource finalization_token - auxiliary_resource consumable - component sub_objective - component special_condition_token - component sync_channel_a - sequence_element sync_channel_b - sequence_element sequence_artifact - sequence_element operative_node - quest_node controller_node - quest_node branch_a_node - operative_node branch_b_node - operative_node master_mission - controller_node)
+  (:predicates
+    (node_unlocked ?quest_node - quest_node)
+    (node_started ?quest_node - quest_node)
+    (activation_token_bound_flag ?quest_node - quest_node)
+    (node_completed ?quest_node - quest_node)
+    (completion_flag ?quest_node - quest_node)
+    (ready_for_finalization ?quest_node - quest_node)
+    (activation_token_available ?activation_token - activation_token)
+    (activation_token_bound_to_node ?quest_node - quest_node ?activation_token - activation_token)
+    (trigger_available ?trigger_event - trigger_event)
+    (trigger_bound_to_node ?quest_node - quest_node ?trigger_event - trigger_event)
+    (agent_available ?agent - agent)
+    (agent_assigned_to_node ?quest_node - quest_node ?agent - agent)
+    (consumable_available ?consumable - consumable)
+    (branch_a_consumable_assigned ?branch_a_node - branch_a_node ?consumable - consumable)
+    (branch_b_consumable_assigned ?branch_b_node - branch_b_node ?consumable - consumable)
+    (branch_a_channel_link ?branch_a_node - branch_a_node ?sync_channel_a - sync_channel_a)
+    (sync_channel_a_ready ?sync_channel_a - sync_channel_a)
+    (sync_channel_a_locked ?sync_channel_a - sync_channel_a)
+    (branch_a_node_confirmed ?branch_a_node - branch_a_node)
+    (branch_b_channel_link ?branch_b_node - branch_b_node ?sync_channel_b - sync_channel_b)
+    (sync_channel_b_ready ?sync_channel_b - sync_channel_b)
+    (sync_channel_b_locked ?sync_channel_b - sync_channel_b)
+    (branch_b_node_confirmed ?branch_b_node - branch_b_node)
+    (sequence_artifact_available ?sequence_artifact - sequence_artifact)
+    (sequence_artifact_assembled ?sequence_artifact - sequence_artifact)
+    (artifact_linked_to_channel_a ?sequence_artifact - sequence_artifact ?sync_channel_a - sync_channel_a)
+    (artifact_linked_to_channel_b ?sequence_artifact - sequence_artifact ?sync_channel_b - sync_channel_b)
+    (artifact_channel_a_confirmed ?sequence_artifact - sequence_artifact)
+    (artifact_channel_b_confirmed ?sequence_artifact - sequence_artifact)
+    (artifact_secured ?sequence_artifact - sequence_artifact)
+    (master_requires_branch_a ?master_mission - master_mission ?branch_a_node - branch_a_node)
+    (master_requires_branch_b ?master_mission - master_mission ?branch_b_node - branch_b_node)
+    (master_has_sequence_artifact ?master_mission - master_mission ?sequence_artifact - sequence_artifact)
+    (sub_objective_available ?sub_objective - sub_objective)
+    (master_has_sub_objective ?master_mission - master_mission ?sub_objective - sub_objective)
+    (sub_objective_completed ?sub_objective - sub_objective)
+    (sub_objective_linked_artifact ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    (master_objectives_validated ?master_mission - master_mission)
+    (master_stage_one_complete ?master_mission - master_mission)
+    (master_stage_two_complete ?master_mission - master_mission)
+    (modifier_token_bound_flag ?master_mission - master_mission)
+    (modifier_applied ?master_mission - master_mission)
+    (modifier_pending_processing ?master_mission - master_mission)
+    (master_ready_for_processing ?master_mission - master_mission)
+    (special_condition_token_available ?special_condition_token - special_condition_token)
+    (master_has_special_condition ?master_mission - master_mission ?special_condition_token - special_condition_token)
+    (special_condition_bound_flag ?master_mission - master_mission)
+    (special_condition_progressed ?master_mission - master_mission)
+    (special_condition_final_stage ?master_mission - master_mission)
+    (modifier_token_a_available ?modifier_token_a - modifier_token_a)
+    (master_has_modifier_a ?master_mission - master_mission ?modifier_token_a - modifier_token_a)
+    (modifier_token_b_available ?modifier_token_b - modifier_token_b)
+    (master_has_modifier_b ?master_mission - master_mission ?modifier_token_b - modifier_token_b)
+    (optional_objective_a_available ?optional_objective_a - optional_objective_a)
+    (master_has_optional_objective_a ?master_mission - master_mission ?optional_objective_a - optional_objective_a)
+    (finalization_token_available ?finalization_token - finalization_token)
+    (finalization_token_bound ?master_mission - master_mission ?finalization_token - finalization_token)
+    (timer_token_available ?timer_token - timer_token)
+    (node_timer_bound ?quest_node - quest_node ?timer_token - timer_token)
+    (branch_a_ready ?branch_a_node - branch_a_node)
+    (branch_b_ready ?branch_b_node - branch_b_node)
+    (master_sealed ?master_mission - master_mission)
+  )
+  (:action unlock_quest_node
+    :parameters (?quest_node - quest_node)
+    :precondition
+      (and
+        (not
+          (node_unlocked ?quest_node)
+        )
+        (not
+          (node_completed ?quest_node)
+        )
+      )
+    :effect (node_unlocked ?quest_node)
+  )
+  (:action assign_activation_token_to_node
+    :parameters (?quest_node - quest_node ?activation_token - activation_token)
+    :precondition
+      (and
+        (node_unlocked ?quest_node)
+        (not
+          (activation_token_bound_flag ?quest_node)
+        )
+        (activation_token_available ?activation_token)
+      )
+    :effect
+      (and
+        (activation_token_bound_flag ?quest_node)
+        (activation_token_bound_to_node ?quest_node ?activation_token)
+        (not
+          (activation_token_available ?activation_token)
+        )
+      )
+  )
+  (:action bind_trigger_to_node
+    :parameters (?quest_node - quest_node ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_unlocked ?quest_node)
+        (activation_token_bound_flag ?quest_node)
+        (trigger_available ?trigger_event)
+      )
+    :effect
+      (and
+        (trigger_bound_to_node ?quest_node ?trigger_event)
+        (not
+          (trigger_available ?trigger_event)
+        )
+      )
+  )
+  (:action start_quest_node
+    :parameters (?quest_node - quest_node ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_unlocked ?quest_node)
+        (activation_token_bound_flag ?quest_node)
+        (trigger_bound_to_node ?quest_node ?trigger_event)
+        (not
+          (node_started ?quest_node)
+        )
+      )
+    :effect (node_started ?quest_node)
+  )
+  (:action return_trigger_to_pool
+    :parameters (?quest_node - quest_node ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (trigger_bound_to_node ?quest_node ?trigger_event)
+      )
+    :effect
+      (and
+        (trigger_available ?trigger_event)
+        (not
+          (trigger_bound_to_node ?quest_node ?trigger_event)
+        )
+      )
+  )
+  (:action assign_agent_to_node
+    :parameters (?quest_node - quest_node ?agent - agent)
+    :precondition
+      (and
+        (node_started ?quest_node)
+        (agent_available ?agent)
+      )
+    :effect
+      (and
+        (agent_assigned_to_node ?quest_node ?agent)
+        (not
+          (agent_available ?agent)
+        )
+      )
+  )
+  (:action release_agent_from_node
+    :parameters (?quest_node - quest_node ?agent - agent)
+    :precondition
+      (and
+        (agent_assigned_to_node ?quest_node ?agent)
+      )
+    :effect
+      (and
+        (agent_available ?agent)
+        (not
+          (agent_assigned_to_node ?quest_node ?agent)
+        )
+      )
+  )
+  (:action attach_optional_objective
+    :parameters (?master_mission - master_mission ?optional_objective_a - optional_objective_a)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (optional_objective_a_available ?optional_objective_a)
+      )
+    :effect
+      (and
+        (master_has_optional_objective_a ?master_mission ?optional_objective_a)
+        (not
+          (optional_objective_a_available ?optional_objective_a)
+        )
+      )
+  )
+  (:action detach_optional_objective
+    :parameters (?master_mission - master_mission ?optional_objective_a - optional_objective_a)
+    :precondition
+      (and
+        (master_has_optional_objective_a ?master_mission ?optional_objective_a)
+      )
+    :effect
+      (and
+        (optional_objective_a_available ?optional_objective_a)
+        (not
+          (master_has_optional_objective_a ?master_mission ?optional_objective_a)
+        )
+      )
+  )
+  (:action attach_finalization_token
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (finalization_token_available ?finalization_token)
+      )
+    :effect
+      (and
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (not
+          (finalization_token_available ?finalization_token)
+        )
+      )
+  )
+  (:action detach_finalization_token
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (finalization_token_bound ?master_mission ?finalization_token)
+      )
+    :effect
+      (and
+        (finalization_token_available ?finalization_token)
+        (not
+          (finalization_token_bound ?master_mission ?finalization_token)
+        )
+      )
+  )
+  (:action open_sync_channel_a
+    :parameters (?branch_a_node - branch_a_node ?sync_channel_a - sync_channel_a ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_started ?branch_a_node)
+        (trigger_bound_to_node ?branch_a_node ?trigger_event)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (not
+          (sync_channel_a_ready ?sync_channel_a)
+        )
+        (not
+          (sync_channel_a_locked ?sync_channel_a)
+        )
+      )
+    :effect (sync_channel_a_ready ?sync_channel_a)
+  )
+  (:action confirm_branch_a_ready
+    :parameters (?branch_a_node - branch_a_node ?sync_channel_a - sync_channel_a ?agent - agent)
+    :precondition
+      (and
+        (node_started ?branch_a_node)
+        (agent_assigned_to_node ?branch_a_node ?agent)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (sync_channel_a_ready ?sync_channel_a)
+        (not
+          (branch_a_ready ?branch_a_node)
+        )
+      )
+    :effect
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_a_node_confirmed ?branch_a_node)
+      )
+  )
+  (:action assign_consumable_to_branch_a
+    :parameters (?branch_a_node - branch_a_node ?sync_channel_a - sync_channel_a ?consumable - consumable)
+    :precondition
+      (and
+        (node_started ?branch_a_node)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (consumable_available ?consumable)
+        (not
+          (branch_a_ready ?branch_a_node)
+        )
+      )
+    :effect
+      (and
+        (sync_channel_a_locked ?sync_channel_a)
+        (branch_a_ready ?branch_a_node)
+        (branch_a_consumable_assigned ?branch_a_node ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action process_branch_a_consumable
+    :parameters (?branch_a_node - branch_a_node ?sync_channel_a - sync_channel_a ?trigger_event - trigger_event ?consumable - consumable)
+    :precondition
+      (and
+        (node_started ?branch_a_node)
+        (trigger_bound_to_node ?branch_a_node ?trigger_event)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (sync_channel_a_locked ?sync_channel_a)
+        (branch_a_consumable_assigned ?branch_a_node ?consumable)
+        (not
+          (branch_a_node_confirmed ?branch_a_node)
+        )
+      )
+    :effect
+      (and
+        (sync_channel_a_ready ?sync_channel_a)
+        (branch_a_node_confirmed ?branch_a_node)
+        (consumable_available ?consumable)
+        (not
+          (branch_a_consumable_assigned ?branch_a_node ?consumable)
+        )
+      )
+  )
+  (:action open_sync_channel_b
+    :parameters (?branch_b_node - branch_b_node ?sync_channel_b - sync_channel_b ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_started ?branch_b_node)
+        (trigger_bound_to_node ?branch_b_node ?trigger_event)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (not
+          (sync_channel_b_ready ?sync_channel_b)
+        )
+        (not
+          (sync_channel_b_locked ?sync_channel_b)
+        )
+      )
+    :effect (sync_channel_b_ready ?sync_channel_b)
+  )
+  (:action confirm_branch_b_ready
+    :parameters (?branch_b_node - branch_b_node ?sync_channel_b - sync_channel_b ?agent - agent)
+    :precondition
+      (and
+        (node_started ?branch_b_node)
+        (agent_assigned_to_node ?branch_b_node ?agent)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_b_ready ?sync_channel_b)
+        (not
+          (branch_b_ready ?branch_b_node)
+        )
+      )
+    :effect
+      (and
+        (branch_b_ready ?branch_b_node)
+        (branch_b_node_confirmed ?branch_b_node)
+      )
+  )
+  (:action assign_consumable_to_branch_b
+    :parameters (?branch_b_node - branch_b_node ?sync_channel_b - sync_channel_b ?consumable - consumable)
+    :precondition
+      (and
+        (node_started ?branch_b_node)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (consumable_available ?consumable)
+        (not
+          (branch_b_ready ?branch_b_node)
+        )
+      )
+    :effect
+      (and
+        (sync_channel_b_locked ?sync_channel_b)
+        (branch_b_ready ?branch_b_node)
+        (branch_b_consumable_assigned ?branch_b_node ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action process_branch_b_consumable
+    :parameters (?branch_b_node - branch_b_node ?sync_channel_b - sync_channel_b ?trigger_event - trigger_event ?consumable - consumable)
+    :precondition
+      (and
+        (node_started ?branch_b_node)
+        (trigger_bound_to_node ?branch_b_node ?trigger_event)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_b_locked ?sync_channel_b)
+        (branch_b_consumable_assigned ?branch_b_node ?consumable)
+        (not
+          (branch_b_node_confirmed ?branch_b_node)
+        )
+      )
+    :effect
+      (and
+        (sync_channel_b_ready ?sync_channel_b)
+        (branch_b_node_confirmed ?branch_b_node)
+        (consumable_available ?consumable)
+        (not
+          (branch_b_consumable_assigned ?branch_b_node ?consumable)
+        )
+      )
+  )
+  (:action assemble_sequence_artifact_open_channels
+    :parameters (?branch_a_node - branch_a_node ?branch_b_node - branch_b_node ?sync_channel_a - sync_channel_a ?sync_channel_b - sync_channel_b ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_b_ready ?branch_b_node)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_a_ready ?sync_channel_a)
+        (sync_channel_b_ready ?sync_channel_b)
+        (branch_a_node_confirmed ?branch_a_node)
+        (branch_b_node_confirmed ?branch_b_node)
+        (sequence_artifact_available ?sequence_artifact)
+      )
+    :effect
+      (and
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_linked_to_channel_a ?sequence_artifact ?sync_channel_a)
+        (artifact_linked_to_channel_b ?sequence_artifact ?sync_channel_b)
+        (not
+          (sequence_artifact_available ?sequence_artifact)
+        )
+      )
+  )
+  (:action assemble_sequence_artifact_channel_a_locked
+    :parameters (?branch_a_node - branch_a_node ?branch_b_node - branch_b_node ?sync_channel_a - sync_channel_a ?sync_channel_b - sync_channel_b ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_b_ready ?branch_b_node)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_a_locked ?sync_channel_a)
+        (sync_channel_b_ready ?sync_channel_b)
+        (not
+          (branch_a_node_confirmed ?branch_a_node)
+        )
+        (branch_b_node_confirmed ?branch_b_node)
+        (sequence_artifact_available ?sequence_artifact)
+      )
+    :effect
+      (and
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_linked_to_channel_a ?sequence_artifact ?sync_channel_a)
+        (artifact_linked_to_channel_b ?sequence_artifact ?sync_channel_b)
+        (artifact_channel_a_confirmed ?sequence_artifact)
+        (not
+          (sequence_artifact_available ?sequence_artifact)
+        )
+      )
+  )
+  (:action assemble_sequence_artifact_channel_b_locked
+    :parameters (?branch_a_node - branch_a_node ?branch_b_node - branch_b_node ?sync_channel_a - sync_channel_a ?sync_channel_b - sync_channel_b ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_b_ready ?branch_b_node)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_a_ready ?sync_channel_a)
+        (sync_channel_b_locked ?sync_channel_b)
+        (branch_a_node_confirmed ?branch_a_node)
+        (not
+          (branch_b_node_confirmed ?branch_b_node)
+        )
+        (sequence_artifact_available ?sequence_artifact)
+      )
+    :effect
+      (and
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_linked_to_channel_a ?sequence_artifact ?sync_channel_a)
+        (artifact_linked_to_channel_b ?sequence_artifact ?sync_channel_b)
+        (artifact_channel_b_confirmed ?sequence_artifact)
+        (not
+          (sequence_artifact_available ?sequence_artifact)
+        )
+      )
+  )
+  (:action assemble_sequence_artifact_both_channels_locked
+    :parameters (?branch_a_node - branch_a_node ?branch_b_node - branch_b_node ?sync_channel_a - sync_channel_a ?sync_channel_b - sync_channel_b ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_b_ready ?branch_b_node)
+        (branch_a_channel_link ?branch_a_node ?sync_channel_a)
+        (branch_b_channel_link ?branch_b_node ?sync_channel_b)
+        (sync_channel_a_locked ?sync_channel_a)
+        (sync_channel_b_locked ?sync_channel_b)
+        (not
+          (branch_a_node_confirmed ?branch_a_node)
+        )
+        (not
+          (branch_b_node_confirmed ?branch_b_node)
+        )
+        (sequence_artifact_available ?sequence_artifact)
+      )
+    :effect
+      (and
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_linked_to_channel_a ?sequence_artifact ?sync_channel_a)
+        (artifact_linked_to_channel_b ?sequence_artifact ?sync_channel_b)
+        (artifact_channel_a_confirmed ?sequence_artifact)
+        (artifact_channel_b_confirmed ?sequence_artifact)
+        (not
+          (sequence_artifact_available ?sequence_artifact)
+        )
+      )
+  )
+  (:action secure_sequence_artifact
+    :parameters (?sequence_artifact - sequence_artifact ?branch_a_node - branch_a_node ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (sequence_artifact_assembled ?sequence_artifact)
+        (branch_a_ready ?branch_a_node)
+        (trigger_bound_to_node ?branch_a_node ?trigger_event)
+        (not
+          (artifact_secured ?sequence_artifact)
+        )
+      )
+    :effect (artifact_secured ?sequence_artifact)
+  )
+  (:action apply_sub_objective_to_master
+    :parameters (?master_mission - master_mission ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (master_has_sequence_artifact ?master_mission ?sequence_artifact)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_available ?sub_objective)
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_secured ?sequence_artifact)
+        (not
+          (sub_objective_completed ?sub_objective)
+        )
+      )
+    :effect
+      (and
+        (sub_objective_completed ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (not
+          (sub_objective_available ?sub_objective)
+        )
+      )
+  )
+  (:action validate_master_objectives
+    :parameters (?master_mission - master_mission ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_completed ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (trigger_bound_to_node ?master_mission ?trigger_event)
+        (not
+          (artifact_channel_a_confirmed ?sequence_artifact)
+        )
+        (not
+          (master_objectives_validated ?master_mission)
+        )
+      )
+    :effect (master_objectives_validated ?master_mission)
+  )
+  (:action attach_modifier_a
+    :parameters (?master_mission - master_mission ?modifier_token_a - modifier_token_a)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (modifier_token_a_available ?modifier_token_a)
+        (not
+          (modifier_token_bound_flag ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (modifier_token_bound_flag ?master_mission)
+        (master_has_modifier_a ?master_mission ?modifier_token_a)
+        (not
+          (modifier_token_a_available ?modifier_token_a)
+        )
+      )
+  )
+  (:action apply_modifier_a_and_validate
+    :parameters (?master_mission - master_mission ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact ?trigger_event - trigger_event ?modifier_token_a - modifier_token_a)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_completed ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (trigger_bound_to_node ?master_mission ?trigger_event)
+        (artifact_channel_a_confirmed ?sequence_artifact)
+        (modifier_token_bound_flag ?master_mission)
+        (master_has_modifier_a ?master_mission ?modifier_token_a)
+        (not
+          (master_objectives_validated ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_objectives_validated ?master_mission)
+        (modifier_applied ?master_mission)
+      )
+  )
+  (:action process_optional_objective_a_stage
+    :parameters (?master_mission - master_mission ?optional_objective_a - optional_objective_a ?agent - agent ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_objectives_validated ?master_mission)
+        (master_has_optional_objective_a ?master_mission ?optional_objective_a)
+        (agent_assigned_to_node ?master_mission ?agent)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (not
+          (artifact_channel_b_confirmed ?sequence_artifact)
+        )
+        (not
+          (master_stage_one_complete ?master_mission)
+        )
+      )
+    :effect (master_stage_one_complete ?master_mission)
+  )
+  (:action process_optional_objective_a_variant
+    :parameters (?master_mission - master_mission ?optional_objective_a - optional_objective_a ?agent - agent ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_objectives_validated ?master_mission)
+        (master_has_optional_objective_a ?master_mission ?optional_objective_a)
+        (agent_assigned_to_node ?master_mission ?agent)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (artifact_channel_b_confirmed ?sequence_artifact)
+        (not
+          (master_stage_one_complete ?master_mission)
+        )
+      )
+    :effect (master_stage_one_complete ?master_mission)
+  )
+  (:action process_finalization_standard
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_stage_one_complete ?master_mission)
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (not
+          (artifact_channel_a_confirmed ?sequence_artifact)
+        )
+        (not
+          (artifact_channel_b_confirmed ?sequence_artifact)
+        )
+        (not
+          (master_stage_two_complete ?master_mission)
+        )
+      )
+    :effect (master_stage_two_complete ?master_mission)
+  )
+  (:action process_finalization_and_open_modifier_slot
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_stage_one_complete ?master_mission)
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (artifact_channel_a_confirmed ?sequence_artifact)
+        (not
+          (artifact_channel_b_confirmed ?sequence_artifact)
+        )
+        (not
+          (master_stage_two_complete ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_stage_two_complete ?master_mission)
+        (modifier_pending_processing ?master_mission)
+      )
+  )
+  (:action process_finalization_variant_b
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_stage_one_complete ?master_mission)
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (not
+          (artifact_channel_a_confirmed ?sequence_artifact)
+        )
+        (artifact_channel_b_confirmed ?sequence_artifact)
+        (not
+          (master_stage_two_complete ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_stage_two_complete ?master_mission)
+        (modifier_pending_processing ?master_mission)
+      )
+  )
+  (:action process_finalization_variant_both
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token ?sub_objective - sub_objective ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (master_stage_one_complete ?master_mission)
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (master_has_sub_objective ?master_mission ?sub_objective)
+        (sub_objective_linked_artifact ?sub_objective ?sequence_artifact)
+        (artifact_channel_a_confirmed ?sequence_artifact)
+        (artifact_channel_b_confirmed ?sequence_artifact)
+        (not
+          (master_stage_two_complete ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_stage_two_complete ?master_mission)
+        (modifier_pending_processing ?master_mission)
+      )
+  )
+  (:action seal_master_mission
+    :parameters (?master_mission - master_mission)
+    :precondition
+      (and
+        (master_stage_two_complete ?master_mission)
+        (not
+          (modifier_pending_processing ?master_mission)
+        )
+        (not
+          (master_sealed ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_sealed ?master_mission)
+        (completion_flag ?master_mission)
+      )
+  )
+  (:action attach_modifier_b
+    :parameters (?master_mission - master_mission ?modifier_token_b - modifier_token_b)
+    :precondition
+      (and
+        (master_stage_two_complete ?master_mission)
+        (modifier_pending_processing ?master_mission)
+        (modifier_token_b_available ?modifier_token_b)
+      )
+    :effect
+      (and
+        (master_has_modifier_b ?master_mission ?modifier_token_b)
+        (not
+          (modifier_token_b_available ?modifier_token_b)
+        )
+      )
+  )
+  (:action confirm_master_for_finalization
+    :parameters (?master_mission - master_mission ?branch_a_node - branch_a_node ?branch_b_node - branch_b_node ?trigger_event - trigger_event ?modifier_token_b - modifier_token_b)
+    :precondition
+      (and
+        (master_stage_two_complete ?master_mission)
+        (modifier_pending_processing ?master_mission)
+        (master_has_modifier_b ?master_mission ?modifier_token_b)
+        (master_requires_branch_a ?master_mission ?branch_a_node)
+        (master_requires_branch_b ?master_mission ?branch_b_node)
+        (branch_a_node_confirmed ?branch_a_node)
+        (branch_b_node_confirmed ?branch_b_node)
+        (trigger_bound_to_node ?master_mission ?trigger_event)
+        (not
+          (master_ready_for_processing ?master_mission)
+        )
+      )
+    :effect (master_ready_for_processing ?master_mission)
+  )
+  (:action seal_master_mission_with_modifiers
+    :parameters (?master_mission - master_mission)
+    :precondition
+      (and
+        (master_stage_two_complete ?master_mission)
+        (master_ready_for_processing ?master_mission)
+        (not
+          (master_sealed ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_sealed ?master_mission)
+        (completion_flag ?master_mission)
+      )
+  )
+  (:action attach_special_condition_to_master
+    :parameters (?master_mission - master_mission ?special_condition_token - special_condition_token ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (node_started ?master_mission)
+        (trigger_bound_to_node ?master_mission ?trigger_event)
+        (special_condition_token_available ?special_condition_token)
+        (master_has_special_condition ?master_mission ?special_condition_token)
+        (not
+          (special_condition_bound_flag ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (special_condition_bound_flag ?master_mission)
+        (not
+          (special_condition_token_available ?special_condition_token)
+        )
+      )
+  )
+  (:action progress_special_condition
+    :parameters (?master_mission - master_mission ?agent - agent)
+    :precondition
+      (and
+        (special_condition_bound_flag ?master_mission)
+        (agent_assigned_to_node ?master_mission ?agent)
+        (not
+          (special_condition_progressed ?master_mission)
+        )
+      )
+    :effect (special_condition_progressed ?master_mission)
+  )
+  (:action finalize_special_condition
+    :parameters (?master_mission - master_mission ?finalization_token - finalization_token)
+    :precondition
+      (and
+        (special_condition_progressed ?master_mission)
+        (finalization_token_bound ?master_mission ?finalization_token)
+        (not
+          (special_condition_final_stage ?master_mission)
+        )
+      )
+    :effect (special_condition_final_stage ?master_mission)
+  )
+  (:action seal_master_by_special_condition
+    :parameters (?master_mission - master_mission)
+    :precondition
+      (and
+        (special_condition_final_stage ?master_mission)
+        (not
+          (master_sealed ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (master_sealed ?master_mission)
+        (completion_flag ?master_mission)
+      )
+  )
+  (:action finalize_branch_a_node
+    :parameters (?branch_a_node - branch_a_node ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_a_ready ?branch_a_node)
+        (branch_a_node_confirmed ?branch_a_node)
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_secured ?sequence_artifact)
+        (not
+          (completion_flag ?branch_a_node)
+        )
+      )
+    :effect (completion_flag ?branch_a_node)
+  )
+  (:action finalize_branch_b_node
+    :parameters (?branch_b_node - branch_b_node ?sequence_artifact - sequence_artifact)
+    :precondition
+      (and
+        (branch_b_ready ?branch_b_node)
+        (branch_b_node_confirmed ?branch_b_node)
+        (sequence_artifact_assembled ?sequence_artifact)
+        (artifact_secured ?sequence_artifact)
+        (not
+          (completion_flag ?branch_b_node)
+        )
+      )
+    :effect (completion_flag ?branch_b_node)
+  )
+  (:action prepare_node_finalization_with_timer
+    :parameters (?quest_node - quest_node ?timer_token - timer_token ?trigger_event - trigger_event)
+    :precondition
+      (and
+        (completion_flag ?quest_node)
+        (trigger_bound_to_node ?quest_node ?trigger_event)
+        (timer_token_available ?timer_token)
+        (not
+          (ready_for_finalization ?quest_node)
+        )
+      )
+    :effect
+      (and
+        (ready_for_finalization ?quest_node)
+        (node_timer_bound ?quest_node ?timer_token)
+        (not
+          (timer_token_available ?timer_token)
+        )
+      )
+  )
+  (:action finalize_node_and_release_activation_token
+    :parameters (?branch_a_node - branch_a_node ?activation_token - activation_token ?timer_token - timer_token)
+    :precondition
+      (and
+        (ready_for_finalization ?branch_a_node)
+        (activation_token_bound_to_node ?branch_a_node ?activation_token)
+        (node_timer_bound ?branch_a_node ?timer_token)
+        (not
+          (node_completed ?branch_a_node)
+        )
+      )
+    :effect
+      (and
+        (node_completed ?branch_a_node)
+        (activation_token_available ?activation_token)
+        (timer_token_available ?timer_token)
+      )
+  )
+  (:action finalize_branch_b_node_and_release_activation_token
+    :parameters (?branch_b_node - branch_b_node ?activation_token - activation_token ?timer_token - timer_token)
+    :precondition
+      (and
+        (ready_for_finalization ?branch_b_node)
+        (activation_token_bound_to_node ?branch_b_node ?activation_token)
+        (node_timer_bound ?branch_b_node ?timer_token)
+        (not
+          (node_completed ?branch_b_node)
+        )
+      )
+    :effect
+      (and
+        (node_completed ?branch_b_node)
+        (activation_token_available ?activation_token)
+        (timer_token_available ?timer_token)
+      )
+  )
+  (:action finalize_master_and_release_activation_token
+    :parameters (?master_mission - master_mission ?activation_token - activation_token ?timer_token - timer_token)
+    :precondition
+      (and
+        (ready_for_finalization ?master_mission)
+        (activation_token_bound_to_node ?master_mission ?activation_token)
+        (node_timer_bound ?master_mission ?timer_token)
+        (not
+          (node_completed ?master_mission)
+        )
+      )
+    :effect
+      (and
+        (node_completed ?master_mission)
+        (activation_token_available ?activation_token)
+        (timer_token_available ?timer_token)
+      )
+  )
+)

@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain concurrent_constraint_violation_fix)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types agent_category - object tool_category - object lock_category - object entity_category - object system_entity - entity_category repair_agent - agent_category diagnostic_agent - agent_category exclusive_lock_agent - agent_category config_variant - agent_category review_token - agent_category trace_log - agent_category build_artifact - agent_category approval_token - agent_category test_fixture - tool_category test_case - tool_category dependency_token - tool_category service_constraint - lock_category subsystem_constraint - lock_category fix_candidate - lock_category component_category - system_entity subsystem_category - system_entity service_instance - component_category subsystem_instance - component_category code_module - subsystem_category)
+  (:predicates
+    (incident_reported ?entity - system_entity)
+    (under_investigation ?entity - system_entity)
+    (entity_assigned_agent_flag ?entity - system_entity)
+    (repaired ?entity - system_entity)
+    (ready_for_staging ?entity - system_entity)
+    (staged_fix_applied ?entity - system_entity)
+    (agent_available ?agent - repair_agent)
+    (assigned_agent ?entity - system_entity ?agent - repair_agent)
+    (diagnostic_agent_available ?diagnostic_tool - diagnostic_agent)
+    (diagnostic_agent_allocated ?entity - system_entity ?diagnostic_tool - diagnostic_agent)
+    (exclusive_lock_available ?exclusive_lock - exclusive_lock_agent)
+    (exclusive_lock_acquired ?entity - system_entity ?exclusive_lock - exclusive_lock_agent)
+    (fixture_available ?test_fixture - test_fixture)
+    (service_fixture_assigned ?service - service_instance ?test_fixture - test_fixture)
+    (subsystem_fixture_assigned ?subsystem - subsystem_instance ?test_fixture - test_fixture)
+    (service_has_constraint ?service - service_instance ?constraint_a - service_constraint)
+    (service_constraint_selected ?constraint_a - service_constraint)
+    (service_constraint_reserved ?constraint_a - service_constraint)
+    (service_confirmed_for_assembly ?service - service_instance)
+    (subsystem_has_constraint ?subsystem - subsystem_instance ?constraint_b - subsystem_constraint)
+    (subsystem_constraint_selected ?constraint_b - subsystem_constraint)
+    (subsystem_constraint_reserved ?constraint_b - subsystem_constraint)
+    (subsystem_confirmed_for_assembly ?subsystem - subsystem_instance)
+    (fix_candidate_available ?fix_candidate - fix_candidate)
+    (fix_candidate_reserved ?fix_candidate - fix_candidate)
+    (fix_candidate_includes_service_constraint ?fix_candidate - fix_candidate ?constraint_a - service_constraint)
+    (fix_candidate_includes_subsystem_constraint ?fix_candidate - fix_candidate ?constraint_b - subsystem_constraint)
+    (fix_candidate_includes_variant ?fix_candidate - fix_candidate)
+    (fix_candidate_includes_dependency ?fix_candidate - fix_candidate)
+    (candidate_built ?fix_candidate - fix_candidate)
+    (module_associated_with_service ?module - code_module ?service - service_instance)
+    (module_associated_with_subsystem ?module - code_module ?subsystem - subsystem_instance)
+    (module_has_fix_candidate ?module - code_module ?fix_candidate - fix_candidate)
+    (test_case_available ?test_case - test_case)
+    (module_has_test_case ?module - code_module ?test_case - test_case)
+    (test_case_reserved ?test_case - test_case)
+    (test_case_bound_to_candidate ?test_case - test_case ?fix_candidate - fix_candidate)
+    (module_build_ready ?module - code_module)
+    (module_built ?module - code_module)
+    (module_in_approval ?module - code_module)
+    (module_config_variant_pending ?module - code_module)
+    (module_config_variant_applied ?module - code_module)
+    (module_review_ready ?module - code_module)
+    (module_tests_passed ?module - code_module)
+    (dependency_available ?dependency - dependency_token)
+    (module_has_dependency ?module - code_module ?dependency - dependency_token)
+    (module_review_requested ?module - code_module)
+    (module_review_in_progress ?module - code_module)
+    (module_review_completed ?module - code_module)
+    (config_variant_available ?config_variant - config_variant)
+    (module_has_config_variant ?module - code_module ?config_variant - config_variant)
+    (review_token_available ?review_token - review_token)
+    (module_has_review_token ?module - code_module ?review_token - review_token)
+    (build_artifact_available ?build_artifact - build_artifact)
+    (module_bound_to_artifact ?module - code_module ?build_artifact - build_artifact)
+    (approval_token_available ?approval_token - approval_token)
+    (module_has_approval_token ?module - code_module ?approval_token - approval_token)
+    (trace_log_available ?trace_log - trace_log)
+    (entity_has_trace_log ?entity - system_entity ?trace_log - trace_log)
+    (service_ready ?service - service_instance)
+    (subsystem_ready ?subsystem - subsystem_instance)
+    (module_finalized ?module - code_module)
+  )
+  (:action report_incident
+    :parameters (?entity - system_entity)
+    :precondition
+      (and
+        (not
+          (incident_reported ?entity)
+        )
+        (not
+          (repaired ?entity)
+        )
+      )
+    :effect (incident_reported ?entity)
+  )
+  (:action assign_repair_agent
+    :parameters (?entity - system_entity ?agent - repair_agent)
+    :precondition
+      (and
+        (incident_reported ?entity)
+        (not
+          (entity_assigned_agent_flag ?entity)
+        )
+        (agent_available ?agent)
+      )
+    :effect
+      (and
+        (entity_assigned_agent_flag ?entity)
+        (assigned_agent ?entity ?agent)
+        (not
+          (agent_available ?agent)
+        )
+      )
+  )
+  (:action allocate_diagnostic_tool
+    :parameters (?entity - system_entity ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (incident_reported ?entity)
+        (entity_assigned_agent_flag ?entity)
+        (diagnostic_agent_available ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_agent_allocated ?entity ?diagnostic_tool)
+        (not
+          (diagnostic_agent_available ?diagnostic_tool)
+        )
+      )
+  )
+  (:action begin_investigation
+    :parameters (?entity - system_entity ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (incident_reported ?entity)
+        (entity_assigned_agent_flag ?entity)
+        (diagnostic_agent_allocated ?entity ?diagnostic_tool)
+        (not
+          (under_investigation ?entity)
+        )
+      )
+    :effect (under_investigation ?entity)
+  )
+  (:action release_diagnostic_tool
+    :parameters (?entity - system_entity ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (diagnostic_agent_allocated ?entity ?diagnostic_tool)
+      )
+    :effect
+      (and
+        (diagnostic_agent_available ?diagnostic_tool)
+        (not
+          (diagnostic_agent_allocated ?entity ?diagnostic_tool)
+        )
+      )
+  )
+  (:action acquire_exclusive_lock
+    :parameters (?entity - system_entity ?exclusive_lock - exclusive_lock_agent)
+    :precondition
+      (and
+        (under_investigation ?entity)
+        (exclusive_lock_available ?exclusive_lock)
+      )
+    :effect
+      (and
+        (exclusive_lock_acquired ?entity ?exclusive_lock)
+        (not
+          (exclusive_lock_available ?exclusive_lock)
+        )
+      )
+  )
+  (:action release_exclusive_lock
+    :parameters (?entity - system_entity ?exclusive_lock - exclusive_lock_agent)
+    :precondition
+      (and
+        (exclusive_lock_acquired ?entity ?exclusive_lock)
+      )
+    :effect
+      (and
+        (exclusive_lock_available ?exclusive_lock)
+        (not
+          (exclusive_lock_acquired ?entity ?exclusive_lock)
+        )
+      )
+  )
+  (:action attach_build_artifact_to_module
+    :parameters (?module - code_module ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (build_artifact_available ?build_artifact)
+      )
+    :effect
+      (and
+        (module_bound_to_artifact ?module ?build_artifact)
+        (not
+          (build_artifact_available ?build_artifact)
+        )
+      )
+  )
+  (:action detach_build_artifact_from_module
+    :parameters (?module - code_module ?build_artifact - build_artifact)
+    :precondition
+      (and
+        (module_bound_to_artifact ?module ?build_artifact)
+      )
+    :effect
+      (and
+        (build_artifact_available ?build_artifact)
+        (not
+          (module_bound_to_artifact ?module ?build_artifact)
+        )
+      )
+  )
+  (:action attach_approval_token_to_module
+    :parameters (?module - code_module ?approval_token - approval_token)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (approval_token_available ?approval_token)
+      )
+    :effect
+      (and
+        (module_has_approval_token ?module ?approval_token)
+        (not
+          (approval_token_available ?approval_token)
+        )
+      )
+  )
+  (:action detach_approval_token_from_module
+    :parameters (?module - code_module ?approval_token - approval_token)
+    :precondition
+      (and
+        (module_has_approval_token ?module ?approval_token)
+      )
+    :effect
+      (and
+        (approval_token_available ?approval_token)
+        (not
+          (module_has_approval_token ?module ?approval_token)
+        )
+      )
+  )
+  (:action select_constraint_a
+    :parameters (?service - service_instance ?constraint_a - service_constraint ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (under_investigation ?service)
+        (diagnostic_agent_allocated ?service ?diagnostic_tool)
+        (service_has_constraint ?service ?constraint_a)
+        (not
+          (service_constraint_selected ?constraint_a)
+        )
+        (not
+          (service_constraint_reserved ?constraint_a)
+        )
+      )
+    :effect (service_constraint_selected ?constraint_a)
+  )
+  (:action confirm_constraint_a_with_lock
+    :parameters (?service - service_instance ?constraint_a - service_constraint ?exclusive_lock - exclusive_lock_agent)
+    :precondition
+      (and
+        (under_investigation ?service)
+        (exclusive_lock_acquired ?service ?exclusive_lock)
+        (service_has_constraint ?service ?constraint_a)
+        (service_constraint_selected ?constraint_a)
+        (not
+          (service_ready ?service)
+        )
+      )
+    :effect
+      (and
+        (service_ready ?service)
+        (service_confirmed_for_assembly ?service)
+      )
+  )
+  (:action assign_fixture_to_service
+    :parameters (?service - service_instance ?constraint_a - service_constraint ?test_fixture - test_fixture)
+    :precondition
+      (and
+        (under_investigation ?service)
+        (service_has_constraint ?service ?constraint_a)
+        (fixture_available ?test_fixture)
+        (not
+          (service_ready ?service)
+        )
+      )
+    :effect
+      (and
+        (service_constraint_reserved ?constraint_a)
+        (service_ready ?service)
+        (service_fixture_assigned ?service ?test_fixture)
+        (not
+          (fixture_available ?test_fixture)
+        )
+      )
+  )
+  (:action finalize_service_fixture_assignment
+    :parameters (?service - service_instance ?constraint_a - service_constraint ?diagnostic_tool - diagnostic_agent ?test_fixture - test_fixture)
+    :precondition
+      (and
+        (under_investigation ?service)
+        (diagnostic_agent_allocated ?service ?diagnostic_tool)
+        (service_has_constraint ?service ?constraint_a)
+        (service_constraint_reserved ?constraint_a)
+        (service_fixture_assigned ?service ?test_fixture)
+        (not
+          (service_confirmed_for_assembly ?service)
+        )
+      )
+    :effect
+      (and
+        (service_constraint_selected ?constraint_a)
+        (service_confirmed_for_assembly ?service)
+        (fixture_available ?test_fixture)
+        (not
+          (service_fixture_assigned ?service ?test_fixture)
+        )
+      )
+  )
+  (:action select_constraint_b
+    :parameters (?subsystem - subsystem_instance ?constraint_b - subsystem_constraint ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (under_investigation ?subsystem)
+        (diagnostic_agent_allocated ?subsystem ?diagnostic_tool)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (not
+          (subsystem_constraint_selected ?constraint_b)
+        )
+        (not
+          (subsystem_constraint_reserved ?constraint_b)
+        )
+      )
+    :effect (subsystem_constraint_selected ?constraint_b)
+  )
+  (:action confirm_constraint_b_with_lock
+    :parameters (?subsystem - subsystem_instance ?constraint_b - subsystem_constraint ?exclusive_lock - exclusive_lock_agent)
+    :precondition
+      (and
+        (under_investigation ?subsystem)
+        (exclusive_lock_acquired ?subsystem ?exclusive_lock)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (subsystem_constraint_selected ?constraint_b)
+        (not
+          (subsystem_ready ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_ready ?subsystem)
+        (subsystem_confirmed_for_assembly ?subsystem)
+      )
+  )
+  (:action assign_fixture_to_subsystem
+    :parameters (?subsystem - subsystem_instance ?constraint_b - subsystem_constraint ?test_fixture - test_fixture)
+    :precondition
+      (and
+        (under_investigation ?subsystem)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (fixture_available ?test_fixture)
+        (not
+          (subsystem_ready ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_constraint_reserved ?constraint_b)
+        (subsystem_ready ?subsystem)
+        (subsystem_fixture_assigned ?subsystem ?test_fixture)
+        (not
+          (fixture_available ?test_fixture)
+        )
+      )
+  )
+  (:action finalize_subsystem_fixture_assignment
+    :parameters (?subsystem - subsystem_instance ?constraint_b - subsystem_constraint ?diagnostic_tool - diagnostic_agent ?test_fixture - test_fixture)
+    :precondition
+      (and
+        (under_investigation ?subsystem)
+        (diagnostic_agent_allocated ?subsystem ?diagnostic_tool)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (subsystem_constraint_reserved ?constraint_b)
+        (subsystem_fixture_assigned ?subsystem ?test_fixture)
+        (not
+          (subsystem_confirmed_for_assembly ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (subsystem_constraint_selected ?constraint_b)
+        (subsystem_confirmed_for_assembly ?subsystem)
+        (fixture_available ?test_fixture)
+        (not
+          (subsystem_fixture_assigned ?subsystem ?test_fixture)
+        )
+      )
+  )
+  (:action assemble_fix_candidate
+    :parameters (?service - service_instance ?subsystem - subsystem_instance ?constraint_a - service_constraint ?constraint_b - subsystem_constraint ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (service_ready ?service)
+        (subsystem_ready ?subsystem)
+        (service_has_constraint ?service ?constraint_a)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (service_constraint_selected ?constraint_a)
+        (subsystem_constraint_selected ?constraint_b)
+        (service_confirmed_for_assembly ?service)
+        (subsystem_confirmed_for_assembly ?subsystem)
+        (fix_candidate_available ?fix_candidate)
+      )
+    :effect
+      (and
+        (fix_candidate_reserved ?fix_candidate)
+        (fix_candidate_includes_service_constraint ?fix_candidate ?constraint_a)
+        (fix_candidate_includes_subsystem_constraint ?fix_candidate ?constraint_b)
+        (not
+          (fix_candidate_available ?fix_candidate)
+        )
+      )
+  )
+  (:action assemble_fix_candidate_with_variant
+    :parameters (?service - service_instance ?subsystem - subsystem_instance ?constraint_a - service_constraint ?constraint_b - subsystem_constraint ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (service_ready ?service)
+        (subsystem_ready ?subsystem)
+        (service_has_constraint ?service ?constraint_a)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (service_constraint_reserved ?constraint_a)
+        (subsystem_constraint_selected ?constraint_b)
+        (not
+          (service_confirmed_for_assembly ?service)
+        )
+        (subsystem_confirmed_for_assembly ?subsystem)
+        (fix_candidate_available ?fix_candidate)
+      )
+    :effect
+      (and
+        (fix_candidate_reserved ?fix_candidate)
+        (fix_candidate_includes_service_constraint ?fix_candidate ?constraint_a)
+        (fix_candidate_includes_subsystem_constraint ?fix_candidate ?constraint_b)
+        (fix_candidate_includes_variant ?fix_candidate)
+        (not
+          (fix_candidate_available ?fix_candidate)
+        )
+      )
+  )
+  (:action assemble_fix_candidate_with_dependency
+    :parameters (?service - service_instance ?subsystem - subsystem_instance ?constraint_a - service_constraint ?constraint_b - subsystem_constraint ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (service_ready ?service)
+        (subsystem_ready ?subsystem)
+        (service_has_constraint ?service ?constraint_a)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (service_constraint_selected ?constraint_a)
+        (subsystem_constraint_reserved ?constraint_b)
+        (service_confirmed_for_assembly ?service)
+        (not
+          (subsystem_confirmed_for_assembly ?subsystem)
+        )
+        (fix_candidate_available ?fix_candidate)
+      )
+    :effect
+      (and
+        (fix_candidate_reserved ?fix_candidate)
+        (fix_candidate_includes_service_constraint ?fix_candidate ?constraint_a)
+        (fix_candidate_includes_subsystem_constraint ?fix_candidate ?constraint_b)
+        (fix_candidate_includes_dependency ?fix_candidate)
+        (not
+          (fix_candidate_available ?fix_candidate)
+        )
+      )
+  )
+  (:action assemble_complete_fix_candidate
+    :parameters (?service - service_instance ?subsystem - subsystem_instance ?constraint_a - service_constraint ?constraint_b - subsystem_constraint ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (service_ready ?service)
+        (subsystem_ready ?subsystem)
+        (service_has_constraint ?service ?constraint_a)
+        (subsystem_has_constraint ?subsystem ?constraint_b)
+        (service_constraint_reserved ?constraint_a)
+        (subsystem_constraint_reserved ?constraint_b)
+        (not
+          (service_confirmed_for_assembly ?service)
+        )
+        (not
+          (subsystem_confirmed_for_assembly ?subsystem)
+        )
+        (fix_candidate_available ?fix_candidate)
+      )
+    :effect
+      (and
+        (fix_candidate_reserved ?fix_candidate)
+        (fix_candidate_includes_service_constraint ?fix_candidate ?constraint_a)
+        (fix_candidate_includes_subsystem_constraint ?fix_candidate ?constraint_b)
+        (fix_candidate_includes_variant ?fix_candidate)
+        (fix_candidate_includes_dependency ?fix_candidate)
+        (not
+          (fix_candidate_available ?fix_candidate)
+        )
+      )
+  )
+  (:action create_build_artifact_for_candidate
+    :parameters (?fix_candidate - fix_candidate ?service - service_instance ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (fix_candidate_reserved ?fix_candidate)
+        (service_ready ?service)
+        (diagnostic_agent_allocated ?service ?diagnostic_tool)
+        (not
+          (candidate_built ?fix_candidate)
+        )
+      )
+    :effect (candidate_built ?fix_candidate)
+  )
+  (:action bind_test_case_to_candidate
+    :parameters (?module - code_module ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (module_has_fix_candidate ?module ?fix_candidate)
+        (module_has_test_case ?module ?test_case)
+        (test_case_available ?test_case)
+        (fix_candidate_reserved ?fix_candidate)
+        (candidate_built ?fix_candidate)
+        (not
+          (test_case_reserved ?test_case)
+        )
+      )
+    :effect
+      (and
+        (test_case_reserved ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (not
+          (test_case_available ?test_case)
+        )
+      )
+  )
+  (:action mark_module_build_ready
+    :parameters (?module - code_module ?test_case - test_case ?fix_candidate - fix_candidate ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (module_has_test_case ?module ?test_case)
+        (test_case_reserved ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (diagnostic_agent_allocated ?module ?diagnostic_tool)
+        (not
+          (fix_candidate_includes_variant ?fix_candidate)
+        )
+        (not
+          (module_build_ready ?module)
+        )
+      )
+    :effect (module_build_ready ?module)
+  )
+  (:action apply_config_variant_to_module
+    :parameters (?module - code_module ?config_variant - config_variant)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (config_variant_available ?config_variant)
+        (not
+          (module_config_variant_pending ?module)
+        )
+      )
+    :effect
+      (and
+        (module_config_variant_pending ?module)
+        (module_has_config_variant ?module ?config_variant)
+        (not
+          (config_variant_available ?config_variant)
+        )
+      )
+  )
+  (:action attach_variant_and_mark_build_ready
+    :parameters (?module - code_module ?test_case - test_case ?fix_candidate - fix_candidate ?diagnostic_tool - diagnostic_agent ?config_variant - config_variant)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (module_has_test_case ?module ?test_case)
+        (test_case_reserved ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (diagnostic_agent_allocated ?module ?diagnostic_tool)
+        (fix_candidate_includes_variant ?fix_candidate)
+        (module_config_variant_pending ?module)
+        (module_has_config_variant ?module ?config_variant)
+        (not
+          (module_build_ready ?module)
+        )
+      )
+    :effect
+      (and
+        (module_build_ready ?module)
+        (module_config_variant_applied ?module)
+      )
+  )
+  (:action run_integration_build
+    :parameters (?module - code_module ?build_artifact - build_artifact ?exclusive_lock - exclusive_lock_agent ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_build_ready ?module)
+        (module_bound_to_artifact ?module ?build_artifact)
+        (exclusive_lock_acquired ?module ?exclusive_lock)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (not
+          (fix_candidate_includes_dependency ?fix_candidate)
+        )
+        (not
+          (module_built ?module)
+        )
+      )
+    :effect (module_built ?module)
+  )
+  (:action retry_integration_build
+    :parameters (?module - code_module ?build_artifact - build_artifact ?exclusive_lock - exclusive_lock_agent ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_build_ready ?module)
+        (module_bound_to_artifact ?module ?build_artifact)
+        (exclusive_lock_acquired ?module ?exclusive_lock)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (fix_candidate_includes_dependency ?fix_candidate)
+        (not
+          (module_built ?module)
+        )
+      )
+    :effect (module_built ?module)
+  )
+  (:action request_module_approval
+    :parameters (?module - code_module ?approval_token - approval_token ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_built ?module)
+        (module_has_approval_token ?module ?approval_token)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (not
+          (fix_candidate_includes_variant ?fix_candidate)
+        )
+        (not
+          (fix_candidate_includes_dependency ?fix_candidate)
+        )
+        (not
+          (module_in_approval ?module)
+        )
+      )
+    :effect (module_in_approval ?module)
+  )
+  (:action approve_module_and_mark_review_ready
+    :parameters (?module - code_module ?approval_token - approval_token ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_built ?module)
+        (module_has_approval_token ?module ?approval_token)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (fix_candidate_includes_variant ?fix_candidate)
+        (not
+          (fix_candidate_includes_dependency ?fix_candidate)
+        )
+        (not
+          (module_in_approval ?module)
+        )
+      )
+    :effect
+      (and
+        (module_in_approval ?module)
+        (module_review_ready ?module)
+      )
+  )
+  (:action approve_module_and_mark_review
+    :parameters (?module - code_module ?approval_token - approval_token ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_built ?module)
+        (module_has_approval_token ?module ?approval_token)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (not
+          (fix_candidate_includes_variant ?fix_candidate)
+        )
+        (fix_candidate_includes_dependency ?fix_candidate)
+        (not
+          (module_in_approval ?module)
+        )
+      )
+    :effect
+      (and
+        (module_in_approval ?module)
+        (module_review_ready ?module)
+      )
+  )
+  (:action approve_module_and_mark_review_full
+    :parameters (?module - code_module ?approval_token - approval_token ?test_case - test_case ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (module_built ?module)
+        (module_has_approval_token ?module ?approval_token)
+        (module_has_test_case ?module ?test_case)
+        (test_case_bound_to_candidate ?test_case ?fix_candidate)
+        (fix_candidate_includes_variant ?fix_candidate)
+        (fix_candidate_includes_dependency ?fix_candidate)
+        (not
+          (module_in_approval ?module)
+        )
+      )
+    :effect
+      (and
+        (module_in_approval ?module)
+        (module_review_ready ?module)
+      )
+  )
+  (:action finalize_module_predeployment
+    :parameters (?module - code_module)
+    :precondition
+      (and
+        (module_in_approval ?module)
+        (not
+          (module_review_ready ?module)
+        )
+        (not
+          (module_finalized ?module)
+        )
+      )
+    :effect
+      (and
+        (module_finalized ?module)
+        (ready_for_staging ?module)
+      )
+  )
+  (:action attach_review_token_to_module
+    :parameters (?module - code_module ?review_token - review_token)
+    :precondition
+      (and
+        (module_in_approval ?module)
+        (module_review_ready ?module)
+        (review_token_available ?review_token)
+      )
+    :effect
+      (and
+        (module_has_review_token ?module ?review_token)
+        (not
+          (review_token_available ?review_token)
+        )
+      )
+  )
+  (:action execute_quality_gate
+    :parameters (?module - code_module ?service - service_instance ?subsystem - subsystem_instance ?diagnostic_tool - diagnostic_agent ?review_token - review_token)
+    :precondition
+      (and
+        (module_in_approval ?module)
+        (module_review_ready ?module)
+        (module_has_review_token ?module ?review_token)
+        (module_associated_with_service ?module ?service)
+        (module_associated_with_subsystem ?module ?subsystem)
+        (service_confirmed_for_assembly ?service)
+        (subsystem_confirmed_for_assembly ?subsystem)
+        (diagnostic_agent_allocated ?module ?diagnostic_tool)
+        (not
+          (module_tests_passed ?module)
+        )
+      )
+    :effect (module_tests_passed ?module)
+  )
+  (:action finalize_module_after_tests
+    :parameters (?module - code_module)
+    :precondition
+      (and
+        (module_in_approval ?module)
+        (module_tests_passed ?module)
+        (not
+          (module_finalized ?module)
+        )
+      )
+    :effect
+      (and
+        (module_finalized ?module)
+        (ready_for_staging ?module)
+      )
+  )
+  (:action request_review
+    :parameters (?module - code_module ?dependency - dependency_token ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (under_investigation ?module)
+        (diagnostic_agent_allocated ?module ?diagnostic_tool)
+        (dependency_available ?dependency)
+        (module_has_dependency ?module ?dependency)
+        (not
+          (module_review_requested ?module)
+        )
+      )
+    :effect
+      (and
+        (module_review_requested ?module)
+        (not
+          (dependency_available ?dependency)
+        )
+      )
+  )
+  (:action start_review
+    :parameters (?module - code_module ?exclusive_lock - exclusive_lock_agent)
+    :precondition
+      (and
+        (module_review_requested ?module)
+        (exclusive_lock_acquired ?module ?exclusive_lock)
+        (not
+          (module_review_in_progress ?module)
+        )
+      )
+    :effect (module_review_in_progress ?module)
+  )
+  (:action apply_approval_token
+    :parameters (?module - code_module ?approval_token - approval_token)
+    :precondition
+      (and
+        (module_review_in_progress ?module)
+        (module_has_approval_token ?module ?approval_token)
+        (not
+          (module_review_completed ?module)
+        )
+      )
+    :effect (module_review_completed ?module)
+  )
+  (:action finalize_review
+    :parameters (?module - code_module)
+    :precondition
+      (and
+        (module_review_completed ?module)
+        (not
+          (module_finalized ?module)
+        )
+      )
+    :effect
+      (and
+        (module_finalized ?module)
+        (ready_for_staging ?module)
+      )
+  )
+  (:action mark_service_ready_for_deployment
+    :parameters (?service - service_instance ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (service_ready ?service)
+        (service_confirmed_for_assembly ?service)
+        (fix_candidate_reserved ?fix_candidate)
+        (candidate_built ?fix_candidate)
+        (not
+          (ready_for_staging ?service)
+        )
+      )
+    :effect (ready_for_staging ?service)
+  )
+  (:action mark_subsystem_ready_for_deployment
+    :parameters (?subsystem - subsystem_instance ?fix_candidate - fix_candidate)
+    :precondition
+      (and
+        (subsystem_ready ?subsystem)
+        (subsystem_confirmed_for_assembly ?subsystem)
+        (fix_candidate_reserved ?fix_candidate)
+        (candidate_built ?fix_candidate)
+        (not
+          (ready_for_staging ?subsystem)
+        )
+      )
+    :effect (ready_for_staging ?subsystem)
+  )
+  (:action stage_fix_with_trace
+    :parameters (?entity - system_entity ?trace_log - trace_log ?diagnostic_tool - diagnostic_agent)
+    :precondition
+      (and
+        (ready_for_staging ?entity)
+        (diagnostic_agent_allocated ?entity ?diagnostic_tool)
+        (trace_log_available ?trace_log)
+        (not
+          (staged_fix_applied ?entity)
+        )
+      )
+    :effect
+      (and
+        (staged_fix_applied ?entity)
+        (entity_has_trace_log ?entity ?trace_log)
+        (not
+          (trace_log_available ?trace_log)
+        )
+      )
+  )
+  (:action finalize_service_repair
+    :parameters (?service - service_instance ?agent - repair_agent ?trace_log - trace_log)
+    :precondition
+      (and
+        (staged_fix_applied ?service)
+        (assigned_agent ?service ?agent)
+        (entity_has_trace_log ?service ?trace_log)
+        (not
+          (repaired ?service)
+        )
+      )
+    :effect
+      (and
+        (repaired ?service)
+        (agent_available ?agent)
+        (trace_log_available ?trace_log)
+      )
+  )
+  (:action finalize_subsystem_repair
+    :parameters (?subsystem - subsystem_instance ?agent - repair_agent ?trace_log - trace_log)
+    :precondition
+      (and
+        (staged_fix_applied ?subsystem)
+        (assigned_agent ?subsystem ?agent)
+        (entity_has_trace_log ?subsystem ?trace_log)
+        (not
+          (repaired ?subsystem)
+        )
+      )
+    :effect
+      (and
+        (repaired ?subsystem)
+        (agent_available ?agent)
+        (trace_log_available ?trace_log)
+      )
+  )
+  (:action finalize_module_repair
+    :parameters (?module - code_module ?agent - repair_agent ?trace_log - trace_log)
+    :precondition
+      (and
+        (staged_fix_applied ?module)
+        (assigned_agent ?module ?agent)
+        (entity_has_trace_log ?module ?trace_log)
+        (not
+          (repaired ?module)
+        )
+      )
+    :effect
+      (and
+        (repaired ?module)
+        (agent_available ?agent)
+        (trace_log_available ?trace_log)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem concurrent_violation_repair_case)
+  (:domain concurrent_constraint_violation_fix)
+  (:objects service_alpha - service_instance subsystem_beta - subsystem_instance module_auth - code_module module_payment - code_module agent_alice - repair_agent agent_bob - repair_agent agent_ci - repair_agent diag_tool_tracer - diagnostic_agent lock_main - exclusive_lock_agent fixture_sandbox - test_fixture constraint_a1 - service_constraint constraint_b1 - subsystem_constraint candidate_patch_v1 - fix_candidate tc_regression_1 - test_case tc_concurrency_1 - test_case config_variant_debug - config_variant config_variant_release - config_variant review_token_qa_1 - review_token review_token_lead_1 - review_token trace_log_01 - trace_log build_artifact_v1 - build_artifact dependency_lib_a - dependency_token dependency_lib_b - dependency_token approval_token_team - approval_token)
+  (:init
+    (agent_available agent_alice)
+    (agent_available agent_bob)
+    (agent_available agent_ci)
+    (diagnostic_agent_available diag_tool_tracer)
+    (exclusive_lock_available lock_main)
+    (fixture_available fixture_sandbox)
+    (service_has_constraint service_alpha constraint_a1)
+    (subsystem_has_constraint subsystem_beta constraint_b1)
+    (fix_candidate_available candidate_patch_v1)
+    (test_case_available tc_regression_1)
+    (test_case_available tc_concurrency_1)
+    (module_associated_with_service module_auth service_alpha)
+    (module_associated_with_service module_payment service_alpha)
+    (module_associated_with_subsystem module_auth subsystem_beta)
+    (module_associated_with_subsystem module_payment subsystem_beta)
+    (module_has_fix_candidate module_auth candidate_patch_v1)
+    (module_has_fix_candidate module_payment candidate_patch_v1)
+    (module_has_test_case module_auth tc_regression_1)
+    (module_has_test_case module_payment tc_concurrency_1)
+    (config_variant_available config_variant_debug)
+    (config_variant_available config_variant_release)
+    (review_token_available review_token_qa_1)
+    (review_token_available review_token_lead_1)
+    (trace_log_available trace_log_01)
+    (build_artifact_available build_artifact_v1)
+    (dependency_available dependency_lib_a)
+    (module_has_dependency module_auth dependency_lib_a)
+    (module_has_dependency module_payment dependency_lib_b)
+    (approval_token_available approval_token_team)
+  )
+  (:goal
+    (and
+      (repaired service_alpha)
+      (repaired subsystem_beta)
+      (repaired module_auth)
+      (repaired module_payment)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(report_incident service_alpha)
+(assign_repair_agent service_alpha agent_alice)
+(allocate_diagnostic_tool service_alpha diag_tool_tracer)
+(begin_investigation service_alpha diag_tool_tracer)
+(assign_fixture_to_service service_alpha constraint_a1 fixture_sandbox)
+(finalize_service_fixture_assignment service_alpha constraint_a1 diag_tool_tracer fixture_sandbox)
+(report_incident subsystem_beta)
+(assign_repair_agent subsystem_beta agent_bob)
+(release_diagnostic_tool service_alpha diag_tool_tracer)
+(allocate_diagnostic_tool subsystem_beta diag_tool_tracer)
+(begin_investigation subsystem_beta diag_tool_tracer)
+(assign_fixture_to_subsystem subsystem_beta constraint_b1 fixture_sandbox)
+(finalize_subsystem_fixture_assignment subsystem_beta constraint_b1 diag_tool_tracer fixture_sandbox)
+(assemble_fix_candidate service_alpha subsystem_beta constraint_a1 constraint_b1 candidate_patch_v1)
+(release_diagnostic_tool subsystem_beta diag_tool_tracer)
+(allocate_diagnostic_tool service_alpha diag_tool_tracer)
+(create_build_artifact_for_candidate candidate_patch_v1 service_alpha diag_tool_tracer)
+(report_incident module_auth)
+(assign_repair_agent module_auth agent_ci)
+(release_diagnostic_tool service_alpha diag_tool_tracer)
+(allocate_diagnostic_tool module_auth diag_tool_tracer)
+(begin_investigation module_auth diag_tool_tracer)
+(bind_test_case_to_candidate module_auth tc_regression_1 candidate_patch_v1)
+(mark_module_build_ready module_auth tc_regression_1 candidate_patch_v1 diag_tool_tracer)
+(attach_build_artifact_to_module module_auth build_artifact_v1)
+(acquire_exclusive_lock module_auth lock_main)
+(run_integration_build module_auth build_artifact_v1 lock_main tc_regression_1 candidate_patch_v1)
+(attach_approval_token_to_module module_auth approval_token_team)
+(request_module_approval module_auth approval_token_team tc_regression_1 candidate_patch_v1)
+(finalize_module_predeployment module_auth)
+(stage_fix_with_trace module_auth trace_log_01 diag_tool_tracer)
+(finalize_module_repair module_auth agent_ci trace_log_01)
+(release_diagnostic_tool module_auth diag_tool_tracer)
+(release_exclusive_lock module_auth lock_main)
+(detach_build_artifact_from_module module_auth build_artifact_v1)
+(detach_approval_token_from_module module_auth approval_token_team)
+(report_incident module_payment)
+(assign_repair_agent module_payment agent_ci)
+(allocate_diagnostic_tool module_payment diag_tool_tracer)
+(begin_investigation module_payment diag_tool_tracer)
+(bind_test_case_to_candidate module_payment tc_concurrency_1 candidate_patch_v1)
+(mark_module_build_ready module_payment tc_concurrency_1 candidate_patch_v1 diag_tool_tracer)
+(attach_build_artifact_to_module module_payment build_artifact_v1)
+(acquire_exclusive_lock module_payment lock_main)
+(run_integration_build module_payment build_artifact_v1 lock_main tc_concurrency_1 candidate_patch_v1)
+(attach_approval_token_to_module module_payment approval_token_team)
+(request_module_approval module_payment approval_token_team tc_concurrency_1 candidate_patch_v1)
+(finalize_module_predeployment module_payment)
+(stage_fix_with_trace module_payment trace_log_01 diag_tool_tracer)
+(finalize_module_repair module_payment agent_ci trace_log_01)
+(release_diagnostic_tool module_payment diag_tool_tracer)
+(release_exclusive_lock module_payment lock_main)
+(detach_build_artifact_from_module module_payment build_artifact_v1)
+(detach_approval_token_from_module module_payment approval_token_team)
+(mark_service_ready_for_deployment service_alpha candidate_patch_v1)
+(mark_subsystem_ready_for_deployment subsystem_beta candidate_patch_v1)
+(allocate_diagnostic_tool service_alpha diag_tool_tracer)
+(stage_fix_with_trace service_alpha trace_log_01 diag_tool_tracer)
+(finalize_service_repair service_alpha agent_alice trace_log_01)
+(release_diagnostic_tool service_alpha diag_tool_tracer)
+(allocate_diagnostic_tool subsystem_beta diag_tool_tracer)
+(stage_fix_with_trace subsystem_beta trace_log_01 diag_tool_tracer)
+(finalize_subsystem_repair subsystem_beta agent_bob trace_log_01)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2jktabou/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_2jktabou/plan.pddl 63 
+
+
+
+--- stderr ---
+

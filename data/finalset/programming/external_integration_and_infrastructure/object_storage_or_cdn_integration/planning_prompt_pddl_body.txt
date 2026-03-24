@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain object_storage_cdn_integration)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types integration_resource - object package_resource_base - object deployment_asset_group - object integration_target_base - object integration_target - integration_target_base storage_backend - integration_resource static_asset - integration_resource credential - integration_resource cdn_config - integration_resource acceptance_test - integration_resource monitoring_probe - integration_resource access_role - integration_resource tls_certificate - integration_resource storage_policy - package_resource_base package_component - package_resource_base third_party_service - package_resource_base upload_endpoint - deployment_asset_group cdn_endpoint - deployment_asset_group deployable_package - deployment_asset_group service_target - integration_target pipeline_target - integration_target uploader_service - service_target edge_service - service_target integration_pipeline - pipeline_target)
+  (:predicates
+    (integration_subject_registered ?integration_target - integration_target)
+    (entity_authenticated ?integration_target - integration_target)
+    (backend_allocated ?integration_target - integration_target)
+    (integration_activated ?integration_target - integration_target)
+    (integration_operational ?integration_target - integration_target)
+    (activation_ready ?integration_target - integration_target)
+    (backend_available ?storage_backend - storage_backend)
+    (integration_subject_backend_binding ?integration_target - integration_target ?storage_backend - storage_backend)
+    (asset_available ?static_asset - static_asset)
+    (integration_subject_asset_association ?integration_target - integration_target ?static_asset - static_asset)
+    (credential_available ?credential - credential)
+    (credential_bound ?integration_target - integration_target ?credential - credential)
+    (policy_available ?storage_policy - storage_policy)
+    (uploader_policy_binding ?uploader_service - uploader_service ?storage_policy - storage_policy)
+    (edge_policy_binding ?edge_service - edge_service ?storage_policy - storage_policy)
+    (uploader_endpoint_binding ?uploader_service - uploader_service ?upload_endpoint - upload_endpoint)
+    (upload_endpoint_reserved ?upload_endpoint - upload_endpoint)
+    (upload_endpoint_policy_applied ?upload_endpoint - upload_endpoint)
+    (uploader_policy_applied ?uploader_service - uploader_service)
+    (edge_endpoint_binding ?edge_service - edge_service ?cdn_endpoint - cdn_endpoint)
+    (cdn_endpoint_reserved ?cdn_endpoint - cdn_endpoint)
+    (cdn_endpoint_policy_applied ?cdn_endpoint - cdn_endpoint)
+    (edge_policy_applied ?edge_service - edge_service)
+    (package_pending_assembly ?deployable_package - deployable_package)
+    (package_created ?deployable_package - deployable_package)
+    (package_upload_binding ?deployable_package - deployable_package ?upload_endpoint - upload_endpoint)
+    (package_cdn_binding ?deployable_package - deployable_package ?cdn_endpoint - cdn_endpoint)
+    (package_flag_alpha ?deployable_package - deployable_package)
+    (package_flag_beta ?deployable_package - deployable_package)
+    (package_ready ?deployable_package - deployable_package)
+    (pipeline_assigned_uploader ?integration_pipeline - integration_pipeline ?uploader_service - uploader_service)
+    (pipeline_assigned_edge ?integration_pipeline - integration_pipeline ?edge_service - edge_service)
+    (pipeline_package_binding ?integration_pipeline - integration_pipeline ?deployable_package - deployable_package)
+    (package_component_available ?package_component - package_component)
+    (pipeline_component_binding ?integration_pipeline - integration_pipeline ?package_component - package_component)
+    (component_marked ?package_component - package_component)
+    (component_package_binding ?package_component - package_component ?deployable_package - deployable_package)
+    (pipeline_component_prepared ?integration_pipeline - integration_pipeline)
+    (pipeline_stage_ready ?integration_pipeline - integration_pipeline)
+    (pipeline_ready_for_finalization ?integration_pipeline - integration_pipeline)
+    (cdn_config_attached ?integration_pipeline - integration_pipeline)
+    (pipeline_config_staged ?integration_pipeline - integration_pipeline)
+    (pipeline_acceptance_completed ?integration_pipeline - integration_pipeline)
+    (pipeline_postdeploy_tests_passed ?integration_pipeline - integration_pipeline)
+    (third_party_service_available ?third_party_service - third_party_service)
+    (pipeline_third_party_binding ?integration_pipeline - integration_pipeline ?third_party_service - third_party_service)
+    (pipeline_third_party_promoted ?integration_pipeline - integration_pipeline)
+    (pipeline_config_activation ?integration_pipeline - integration_pipeline)
+    (pipeline_third_party_validated ?integration_pipeline - integration_pipeline)
+    (cdn_config_available ?cdn_config - cdn_config)
+    (pipeline_cdn_config_binding ?integration_pipeline - integration_pipeline ?cdn_config - cdn_config)
+    (acceptance_test_available ?acceptance_test - acceptance_test)
+    (pipeline_acceptance_test_binding ?integration_pipeline - integration_pipeline ?acceptance_test - acceptance_test)
+    (access_role_available ?access_role - access_role)
+    (pipeline_access_role_bound ?integration_pipeline - integration_pipeline ?access_role - access_role)
+    (tls_certificate_available ?tls_certificate - tls_certificate)
+    (pipeline_tls_bound ?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate)
+    (monitoring_probe_available ?monitoring_probe - monitoring_probe)
+    (integration_subject_monitoring_binding ?integration_target - integration_target ?monitoring_probe - monitoring_probe)
+    (uploader_ready ?uploader_service - uploader_service)
+    (edge_ready ?edge_service - edge_service)
+    (pipeline_completed ?integration_pipeline - integration_pipeline)
+  )
+  (:action register_integration_target
+    :parameters (?integration_target - integration_target)
+    :precondition
+      (and
+        (not
+          (integration_subject_registered ?integration_target)
+        )
+        (not
+          (integration_activated ?integration_target)
+        )
+      )
+    :effect (integration_subject_registered ?integration_target)
+  )
+  (:action bind_storage_backend_to_target
+    :parameters (?integration_target - integration_target ?storage_backend - storage_backend)
+    :precondition
+      (and
+        (integration_subject_registered ?integration_target)
+        (not
+          (backend_allocated ?integration_target)
+        )
+        (backend_available ?storage_backend)
+      )
+    :effect
+      (and
+        (backend_allocated ?integration_target)
+        (integration_subject_backend_binding ?integration_target ?storage_backend)
+        (not
+          (backend_available ?storage_backend)
+        )
+      )
+  )
+  (:action stage_asset_for_target
+    :parameters (?integration_target - integration_target ?static_asset - static_asset)
+    :precondition
+      (and
+        (integration_subject_registered ?integration_target)
+        (backend_allocated ?integration_target)
+        (asset_available ?static_asset)
+      )
+    :effect
+      (and
+        (integration_subject_asset_association ?integration_target ?static_asset)
+        (not
+          (asset_available ?static_asset)
+        )
+      )
+  )
+  (:action confirm_asset_for_target
+    :parameters (?integration_target - integration_target ?static_asset - static_asset)
+    :precondition
+      (and
+        (integration_subject_registered ?integration_target)
+        (backend_allocated ?integration_target)
+        (integration_subject_asset_association ?integration_target ?static_asset)
+        (not
+          (entity_authenticated ?integration_target)
+        )
+      )
+    :effect (entity_authenticated ?integration_target)
+  )
+  (:action unstage_asset_from_target
+    :parameters (?integration_target - integration_target ?static_asset - static_asset)
+    :precondition
+      (and
+        (integration_subject_asset_association ?integration_target ?static_asset)
+      )
+    :effect
+      (and
+        (asset_available ?static_asset)
+        (not
+          (integration_subject_asset_association ?integration_target ?static_asset)
+        )
+      )
+  )
+  (:action bind_credential_to_target
+    :parameters (?integration_target - integration_target ?credential - credential)
+    :precondition
+      (and
+        (entity_authenticated ?integration_target)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (credential_bound ?integration_target ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action unbind_credential_from_target
+    :parameters (?integration_target - integration_target ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?integration_target ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (credential_bound ?integration_target ?credential)
+        )
+      )
+  )
+  (:action assign_access_role_to_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?access_role - access_role)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (access_role_available ?access_role)
+      )
+    :effect
+      (and
+        (pipeline_access_role_bound ?integration_pipeline ?access_role)
+        (not
+          (access_role_available ?access_role)
+        )
+      )
+  )
+  (:action revoke_access_role_from_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?access_role - access_role)
+    :precondition
+      (and
+        (pipeline_access_role_bound ?integration_pipeline ?access_role)
+      )
+    :effect
+      (and
+        (access_role_available ?access_role)
+        (not
+          (pipeline_access_role_bound ?integration_pipeline ?access_role)
+        )
+      )
+  )
+  (:action assign_tls_certificate_to_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (tls_certificate_available ?tls_certificate)
+      )
+    :effect
+      (and
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (not
+          (tls_certificate_available ?tls_certificate)
+        )
+      )
+  )
+  (:action revoke_tls_certificate_from_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+      )
+    :effect
+      (and
+        (tls_certificate_available ?tls_certificate)
+        (not
+          (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        )
+      )
+  )
+  (:action reserve_upload_endpoint
+    :parameters (?uploader_service - uploader_service ?upload_endpoint - upload_endpoint ?static_asset - static_asset)
+    :precondition
+      (and
+        (entity_authenticated ?uploader_service)
+        (integration_subject_asset_association ?uploader_service ?static_asset)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (not
+          (upload_endpoint_reserved ?upload_endpoint)
+        )
+        (not
+          (upload_endpoint_policy_applied ?upload_endpoint)
+        )
+      )
+    :effect (upload_endpoint_reserved ?upload_endpoint)
+  )
+  (:action finalize_uploader_configuration
+    :parameters (?uploader_service - uploader_service ?upload_endpoint - upload_endpoint ?credential - credential)
+    :precondition
+      (and
+        (entity_authenticated ?uploader_service)
+        (credential_bound ?uploader_service ?credential)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (upload_endpoint_reserved ?upload_endpoint)
+        (not
+          (uploader_ready ?uploader_service)
+        )
+      )
+    :effect
+      (and
+        (uploader_ready ?uploader_service)
+        (uploader_policy_applied ?uploader_service)
+      )
+  )
+  (:action apply_policy_to_uploader
+    :parameters (?uploader_service - uploader_service ?upload_endpoint - upload_endpoint ?storage_policy - storage_policy)
+    :precondition
+      (and
+        (entity_authenticated ?uploader_service)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (policy_available ?storage_policy)
+        (not
+          (uploader_ready ?uploader_service)
+        )
+      )
+    :effect
+      (and
+        (upload_endpoint_policy_applied ?upload_endpoint)
+        (uploader_ready ?uploader_service)
+        (uploader_policy_binding ?uploader_service ?storage_policy)
+        (not
+          (policy_available ?storage_policy)
+        )
+      )
+  )
+  (:action prepare_asset_upload
+    :parameters (?uploader_service - uploader_service ?upload_endpoint - upload_endpoint ?static_asset - static_asset ?storage_policy - storage_policy)
+    :precondition
+      (and
+        (entity_authenticated ?uploader_service)
+        (integration_subject_asset_association ?uploader_service ?static_asset)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (upload_endpoint_policy_applied ?upload_endpoint)
+        (uploader_policy_binding ?uploader_service ?storage_policy)
+        (not
+          (uploader_policy_applied ?uploader_service)
+        )
+      )
+    :effect
+      (and
+        (upload_endpoint_reserved ?upload_endpoint)
+        (uploader_policy_applied ?uploader_service)
+        (policy_available ?storage_policy)
+        (not
+          (uploader_policy_binding ?uploader_service ?storage_policy)
+        )
+      )
+  )
+  (:action reserve_cdn_endpoint
+    :parameters (?edge_service - edge_service ?cdn_endpoint - cdn_endpoint ?static_asset - static_asset)
+    :precondition
+      (and
+        (entity_authenticated ?edge_service)
+        (integration_subject_asset_association ?edge_service ?static_asset)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (not
+          (cdn_endpoint_reserved ?cdn_endpoint)
+        )
+        (not
+          (cdn_endpoint_policy_applied ?cdn_endpoint)
+        )
+      )
+    :effect (cdn_endpoint_reserved ?cdn_endpoint)
+  )
+  (:action finalize_edge_configuration
+    :parameters (?edge_service - edge_service ?cdn_endpoint - cdn_endpoint ?credential - credential)
+    :precondition
+      (and
+        (entity_authenticated ?edge_service)
+        (credential_bound ?edge_service ?credential)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (cdn_endpoint_reserved ?cdn_endpoint)
+        (not
+          (edge_ready ?edge_service)
+        )
+      )
+    :effect
+      (and
+        (edge_ready ?edge_service)
+        (edge_policy_applied ?edge_service)
+      )
+  )
+  (:action apply_policy_to_edge
+    :parameters (?edge_service - edge_service ?cdn_endpoint - cdn_endpoint ?storage_policy - storage_policy)
+    :precondition
+      (and
+        (entity_authenticated ?edge_service)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (policy_available ?storage_policy)
+        (not
+          (edge_ready ?edge_service)
+        )
+      )
+    :effect
+      (and
+        (cdn_endpoint_policy_applied ?cdn_endpoint)
+        (edge_ready ?edge_service)
+        (edge_policy_binding ?edge_service ?storage_policy)
+        (not
+          (policy_available ?storage_policy)
+        )
+      )
+  )
+  (:action prepare_edge_asset_deploy
+    :parameters (?edge_service - edge_service ?cdn_endpoint - cdn_endpoint ?static_asset - static_asset ?storage_policy - storage_policy)
+    :precondition
+      (and
+        (entity_authenticated ?edge_service)
+        (integration_subject_asset_association ?edge_service ?static_asset)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (cdn_endpoint_policy_applied ?cdn_endpoint)
+        (edge_policy_binding ?edge_service ?storage_policy)
+        (not
+          (edge_policy_applied ?edge_service)
+        )
+      )
+    :effect
+      (and
+        (cdn_endpoint_reserved ?cdn_endpoint)
+        (edge_policy_applied ?edge_service)
+        (policy_available ?storage_policy)
+        (not
+          (edge_policy_binding ?edge_service ?storage_policy)
+        )
+      )
+  )
+  (:action assemble_deployable_package_standard
+    :parameters (?uploader_service - uploader_service ?edge_service - edge_service ?upload_endpoint - upload_endpoint ?cdn_endpoint - cdn_endpoint ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (uploader_ready ?uploader_service)
+        (edge_ready ?edge_service)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (upload_endpoint_reserved ?upload_endpoint)
+        (cdn_endpoint_reserved ?cdn_endpoint)
+        (uploader_policy_applied ?uploader_service)
+        (edge_policy_applied ?edge_service)
+        (package_pending_assembly ?deployable_package)
+      )
+    :effect
+      (and
+        (package_created ?deployable_package)
+        (package_upload_binding ?deployable_package ?upload_endpoint)
+        (package_cdn_binding ?deployable_package ?cdn_endpoint)
+        (not
+          (package_pending_assembly ?deployable_package)
+        )
+      )
+  )
+  (:action assemble_deployable_package_with_alpha_flag
+    :parameters (?uploader_service - uploader_service ?edge_service - edge_service ?upload_endpoint - upload_endpoint ?cdn_endpoint - cdn_endpoint ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (uploader_ready ?uploader_service)
+        (edge_ready ?edge_service)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (upload_endpoint_policy_applied ?upload_endpoint)
+        (cdn_endpoint_reserved ?cdn_endpoint)
+        (not
+          (uploader_policy_applied ?uploader_service)
+        )
+        (edge_policy_applied ?edge_service)
+        (package_pending_assembly ?deployable_package)
+      )
+    :effect
+      (and
+        (package_created ?deployable_package)
+        (package_upload_binding ?deployable_package ?upload_endpoint)
+        (package_cdn_binding ?deployable_package ?cdn_endpoint)
+        (package_flag_alpha ?deployable_package)
+        (not
+          (package_pending_assembly ?deployable_package)
+        )
+      )
+  )
+  (:action assemble_deployable_package_with_beta_flag
+    :parameters (?uploader_service - uploader_service ?edge_service - edge_service ?upload_endpoint - upload_endpoint ?cdn_endpoint - cdn_endpoint ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (uploader_ready ?uploader_service)
+        (edge_ready ?edge_service)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (upload_endpoint_reserved ?upload_endpoint)
+        (cdn_endpoint_policy_applied ?cdn_endpoint)
+        (uploader_policy_applied ?uploader_service)
+        (not
+          (edge_policy_applied ?edge_service)
+        )
+        (package_pending_assembly ?deployable_package)
+      )
+    :effect
+      (and
+        (package_created ?deployable_package)
+        (package_upload_binding ?deployable_package ?upload_endpoint)
+        (package_cdn_binding ?deployable_package ?cdn_endpoint)
+        (package_flag_beta ?deployable_package)
+        (not
+          (package_pending_assembly ?deployable_package)
+        )
+      )
+  )
+  (:action assemble_deployable_package_with_alpha_beta_flags
+    :parameters (?uploader_service - uploader_service ?edge_service - edge_service ?upload_endpoint - upload_endpoint ?cdn_endpoint - cdn_endpoint ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (uploader_ready ?uploader_service)
+        (edge_ready ?edge_service)
+        (uploader_endpoint_binding ?uploader_service ?upload_endpoint)
+        (edge_endpoint_binding ?edge_service ?cdn_endpoint)
+        (upload_endpoint_policy_applied ?upload_endpoint)
+        (cdn_endpoint_policy_applied ?cdn_endpoint)
+        (not
+          (uploader_policy_applied ?uploader_service)
+        )
+        (not
+          (edge_policy_applied ?edge_service)
+        )
+        (package_pending_assembly ?deployable_package)
+      )
+    :effect
+      (and
+        (package_created ?deployable_package)
+        (package_upload_binding ?deployable_package ?upload_endpoint)
+        (package_cdn_binding ?deployable_package ?cdn_endpoint)
+        (package_flag_alpha ?deployable_package)
+        (package_flag_beta ?deployable_package)
+        (not
+          (package_pending_assembly ?deployable_package)
+        )
+      )
+  )
+  (:action mark_package_ready
+    :parameters (?deployable_package - deployable_package ?uploader_service - uploader_service ?static_asset - static_asset)
+    :precondition
+      (and
+        (package_created ?deployable_package)
+        (uploader_ready ?uploader_service)
+        (integration_subject_asset_association ?uploader_service ?static_asset)
+        (not
+          (package_ready ?deployable_package)
+        )
+      )
+    :effect (package_ready ?deployable_package)
+  )
+  (:action register_package_component
+    :parameters (?integration_pipeline - integration_pipeline ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (pipeline_package_binding ?integration_pipeline ?deployable_package)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (package_component_available ?package_component)
+        (package_created ?deployable_package)
+        (package_ready ?deployable_package)
+        (not
+          (component_marked ?package_component)
+        )
+      )
+    :effect
+      (and
+        (component_marked ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (not
+          (package_component_available ?package_component)
+        )
+      )
+  )
+  (:action validate_package_component_in_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?package_component - package_component ?deployable_package - deployable_package ?static_asset - static_asset)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_marked ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (integration_subject_asset_association ?integration_pipeline ?static_asset)
+        (not
+          (package_flag_alpha ?deployable_package)
+        )
+        (not
+          (pipeline_component_prepared ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_component_prepared ?integration_pipeline)
+  )
+  (:action attach_cdn_config_to_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?cdn_config - cdn_config)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (cdn_config_available ?cdn_config)
+        (not
+          (cdn_config_attached ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (cdn_config_attached ?integration_pipeline)
+        (pipeline_cdn_config_binding ?integration_pipeline ?cdn_config)
+        (not
+          (cdn_config_available ?cdn_config)
+        )
+      )
+  )
+  (:action stage_cdn_config_and_prepare_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?package_component - package_component ?deployable_package - deployable_package ?static_asset - static_asset ?cdn_config - cdn_config)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_marked ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (integration_subject_asset_association ?integration_pipeline ?static_asset)
+        (package_flag_alpha ?deployable_package)
+        (cdn_config_attached ?integration_pipeline)
+        (pipeline_cdn_config_binding ?integration_pipeline ?cdn_config)
+        (not
+          (pipeline_component_prepared ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_component_prepared ?integration_pipeline)
+        (pipeline_config_staged ?integration_pipeline)
+      )
+  )
+  (:action execute_pipeline_deploy_stage_variant1
+    :parameters (?integration_pipeline - integration_pipeline ?access_role - access_role ?credential - credential ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_component_prepared ?integration_pipeline)
+        (pipeline_access_role_bound ?integration_pipeline ?access_role)
+        (credential_bound ?integration_pipeline ?credential)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (not
+          (package_flag_beta ?deployable_package)
+        )
+        (not
+          (pipeline_stage_ready ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_stage_ready ?integration_pipeline)
+  )
+  (:action execute_pipeline_deploy_stage_variant2
+    :parameters (?integration_pipeline - integration_pipeline ?access_role - access_role ?credential - credential ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_component_prepared ?integration_pipeline)
+        (pipeline_access_role_bound ?integration_pipeline ?access_role)
+        (credential_bound ?integration_pipeline ?credential)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (package_flag_beta ?deployable_package)
+        (not
+          (pipeline_stage_ready ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_stage_ready ?integration_pipeline)
+  )
+  (:action advance_pipeline_stage_bind_tls_no_flags
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_stage_ready ?integration_pipeline)
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (not
+          (package_flag_alpha ?deployable_package)
+        )
+        (not
+          (package_flag_beta ?deployable_package)
+        )
+        (not
+          (pipeline_ready_for_finalization ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_ready_for_finalization ?integration_pipeline)
+  )
+  (:action advance_pipeline_stage_bind_tls_with_flag_a
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_stage_ready ?integration_pipeline)
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (package_flag_alpha ?deployable_package)
+        (not
+          (package_flag_beta ?deployable_package)
+        )
+        (not
+          (pipeline_ready_for_finalization ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_acceptance_completed ?integration_pipeline)
+      )
+  )
+  (:action advance_pipeline_stage_bind_tls_with_flag_b
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_stage_ready ?integration_pipeline)
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (not
+          (package_flag_alpha ?deployable_package)
+        )
+        (package_flag_beta ?deployable_package)
+        (not
+          (pipeline_ready_for_finalization ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_acceptance_completed ?integration_pipeline)
+      )
+  )
+  (:action advance_pipeline_stage_bind_tls_with_flags_ab
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate ?package_component - package_component ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (pipeline_stage_ready ?integration_pipeline)
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (pipeline_component_binding ?integration_pipeline ?package_component)
+        (component_package_binding ?package_component ?deployable_package)
+        (package_flag_alpha ?deployable_package)
+        (package_flag_beta ?deployable_package)
+        (not
+          (pipeline_ready_for_finalization ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_acceptance_completed ?integration_pipeline)
+      )
+  )
+  (:action finalize_pipeline_without_tests
+    :parameters (?integration_pipeline - integration_pipeline)
+    :precondition
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (not
+          (pipeline_acceptance_completed ?integration_pipeline)
+        )
+        (not
+          (pipeline_completed ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_completed ?integration_pipeline)
+        (integration_operational ?integration_pipeline)
+      )
+  )
+  (:action attach_acceptance_test
+    :parameters (?integration_pipeline - integration_pipeline ?acceptance_test - acceptance_test)
+    :precondition
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_acceptance_completed ?integration_pipeline)
+        (acceptance_test_available ?acceptance_test)
+      )
+    :effect
+      (and
+        (pipeline_acceptance_test_binding ?integration_pipeline ?acceptance_test)
+        (not
+          (acceptance_test_available ?acceptance_test)
+        )
+      )
+  )
+  (:action run_acceptance_tests
+    :parameters (?integration_pipeline - integration_pipeline ?uploader_service - uploader_service ?edge_service - edge_service ?static_asset - static_asset ?acceptance_test - acceptance_test)
+    :precondition
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_acceptance_completed ?integration_pipeline)
+        (pipeline_acceptance_test_binding ?integration_pipeline ?acceptance_test)
+        (pipeline_assigned_uploader ?integration_pipeline ?uploader_service)
+        (pipeline_assigned_edge ?integration_pipeline ?edge_service)
+        (uploader_policy_applied ?uploader_service)
+        (edge_policy_applied ?edge_service)
+        (integration_subject_asset_association ?integration_pipeline ?static_asset)
+        (not
+          (pipeline_postdeploy_tests_passed ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_postdeploy_tests_passed ?integration_pipeline)
+  )
+  (:action finalize_pipeline_after_tests
+    :parameters (?integration_pipeline - integration_pipeline)
+    :precondition
+      (and
+        (pipeline_ready_for_finalization ?integration_pipeline)
+        (pipeline_postdeploy_tests_passed ?integration_pipeline)
+        (not
+          (pipeline_completed ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_completed ?integration_pipeline)
+        (integration_operational ?integration_pipeline)
+      )
+  )
+  (:action promote_third_party_service_to_pipeline
+    :parameters (?integration_pipeline - integration_pipeline ?third_party_service - third_party_service ?static_asset - static_asset)
+    :precondition
+      (and
+        (entity_authenticated ?integration_pipeline)
+        (integration_subject_asset_association ?integration_pipeline ?static_asset)
+        (third_party_service_available ?third_party_service)
+        (pipeline_third_party_binding ?integration_pipeline ?third_party_service)
+        (not
+          (pipeline_third_party_promoted ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_third_party_promoted ?integration_pipeline)
+        (not
+          (third_party_service_available ?third_party_service)
+        )
+      )
+  )
+  (:action stage_pipeline_config_activation
+    :parameters (?integration_pipeline - integration_pipeline ?credential - credential)
+    :precondition
+      (and
+        (pipeline_third_party_promoted ?integration_pipeline)
+        (credential_bound ?integration_pipeline ?credential)
+        (not
+          (pipeline_config_activation ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_config_activation ?integration_pipeline)
+  )
+  (:action authorize_pipeline_config_with_tls
+    :parameters (?integration_pipeline - integration_pipeline ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (pipeline_config_activation ?integration_pipeline)
+        (pipeline_tls_bound ?integration_pipeline ?tls_certificate)
+        (not
+          (pipeline_third_party_validated ?integration_pipeline)
+        )
+      )
+    :effect (pipeline_third_party_validated ?integration_pipeline)
+  )
+  (:action finalize_pipeline_config_promotion
+    :parameters (?integration_pipeline - integration_pipeline)
+    :precondition
+      (and
+        (pipeline_third_party_validated ?integration_pipeline)
+        (not
+          (pipeline_completed ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (pipeline_completed ?integration_pipeline)
+        (integration_operational ?integration_pipeline)
+      )
+  )
+  (:action mark_uploader_service_ready
+    :parameters (?uploader_service - uploader_service ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (uploader_ready ?uploader_service)
+        (uploader_policy_applied ?uploader_service)
+        (package_created ?deployable_package)
+        (package_ready ?deployable_package)
+        (not
+          (integration_operational ?uploader_service)
+        )
+      )
+    :effect (integration_operational ?uploader_service)
+  )
+  (:action mark_edge_service_ready
+    :parameters (?edge_service - edge_service ?deployable_package - deployable_package)
+    :precondition
+      (and
+        (edge_ready ?edge_service)
+        (edge_policy_applied ?edge_service)
+        (package_created ?deployable_package)
+        (package_ready ?deployable_package)
+        (not
+          (integration_operational ?edge_service)
+        )
+      )
+    :effect (integration_operational ?edge_service)
+  )
+  (:action register_monitoring_and_mark_activation_ready
+    :parameters (?integration_target - integration_target ?monitoring_probe - monitoring_probe ?static_asset - static_asset)
+    :precondition
+      (and
+        (integration_operational ?integration_target)
+        (integration_subject_asset_association ?integration_target ?static_asset)
+        (monitoring_probe_available ?monitoring_probe)
+        (not
+          (activation_ready ?integration_target)
+        )
+      )
+    :effect
+      (and
+        (activation_ready ?integration_target)
+        (integration_subject_monitoring_binding ?integration_target ?monitoring_probe)
+        (not
+          (monitoring_probe_available ?monitoring_probe)
+        )
+      )
+  )
+  (:action activate_uploader_integration
+    :parameters (?uploader_service - uploader_service ?storage_backend - storage_backend ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (activation_ready ?uploader_service)
+        (integration_subject_backend_binding ?uploader_service ?storage_backend)
+        (integration_subject_monitoring_binding ?uploader_service ?monitoring_probe)
+        (not
+          (integration_activated ?uploader_service)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?uploader_service)
+        (backend_available ?storage_backend)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+  (:action activate_edge_integration
+    :parameters (?edge_service - edge_service ?storage_backend - storage_backend ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (activation_ready ?edge_service)
+        (integration_subject_backend_binding ?edge_service ?storage_backend)
+        (integration_subject_monitoring_binding ?edge_service ?monitoring_probe)
+        (not
+          (integration_activated ?edge_service)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?edge_service)
+        (backend_available ?storage_backend)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+  (:action activate_pipeline_integration
+    :parameters (?integration_pipeline - integration_pipeline ?storage_backend - storage_backend ?monitoring_probe - monitoring_probe)
+    :precondition
+      (and
+        (activation_ready ?integration_pipeline)
+        (integration_subject_backend_binding ?integration_pipeline ?storage_backend)
+        (integration_subject_monitoring_binding ?integration_pipeline ?monitoring_probe)
+        (not
+          (integration_activated ?integration_pipeline)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?integration_pipeline)
+        (backend_available ?storage_backend)
+        (monitoring_probe_available ?monitoring_probe)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem deploy_static_assets_integration)
+  (:domain object_storage_cdn_integration)
+  (:objects uploader_service_primary - uploader_service edge_service_primary - edge_service integration_pipeline_main - integration_pipeline integration_pipeline_secondary - integration_pipeline storage_backend_s3 - storage_backend storage_backend_gcs - storage_backend storage_backend_azure_blob - storage_backend static_asset_logo_png - static_asset credential_uploader_service_account - credential storage_policy_default - storage_policy upload_endpoint_origin - upload_endpoint cdn_endpoint_global - cdn_endpoint deployable_package_v1 - deployable_package package_component_main_css - package_component package_component_vendor_js - package_component cdn_config_default_rules - cdn_config cdn_config_custom_rules - cdn_config acceptance_test_smoke - acceptance_test acceptance_test_integration - acceptance_test monitoring_probe_http_check - monitoring_probe access_role_pipeline_executor - access_role third_party_identity_provider - third_party_service third_party_analytics_service - third_party_service tls_certificate_pipeline - tls_certificate)
+  (:init
+    (backend_available storage_backend_s3)
+    (backend_available storage_backend_gcs)
+    (backend_available storage_backend_azure_blob)
+    (asset_available static_asset_logo_png)
+    (credential_available credential_uploader_service_account)
+    (policy_available storage_policy_default)
+    (uploader_endpoint_binding uploader_service_primary upload_endpoint_origin)
+    (edge_endpoint_binding edge_service_primary cdn_endpoint_global)
+    (package_pending_assembly deployable_package_v1)
+    (package_component_available package_component_main_css)
+    (package_component_available package_component_vendor_js)
+    (pipeline_assigned_uploader integration_pipeline_main uploader_service_primary)
+    (pipeline_assigned_uploader integration_pipeline_secondary uploader_service_primary)
+    (pipeline_assigned_edge integration_pipeline_main edge_service_primary)
+    (pipeline_assigned_edge integration_pipeline_secondary edge_service_primary)
+    (pipeline_package_binding integration_pipeline_main deployable_package_v1)
+    (pipeline_package_binding integration_pipeline_secondary deployable_package_v1)
+    (pipeline_component_binding integration_pipeline_main package_component_main_css)
+    (pipeline_component_binding integration_pipeline_secondary package_component_vendor_js)
+    (cdn_config_available cdn_config_default_rules)
+    (cdn_config_available cdn_config_custom_rules)
+    (acceptance_test_available acceptance_test_smoke)
+    (acceptance_test_available acceptance_test_integration)
+    (monitoring_probe_available monitoring_probe_http_check)
+    (access_role_available access_role_pipeline_executor)
+    (third_party_service_available third_party_identity_provider)
+    (pipeline_third_party_binding integration_pipeline_main third_party_identity_provider)
+    (pipeline_third_party_binding integration_pipeline_secondary third_party_analytics_service)
+    (tls_certificate_available tls_certificate_pipeline)
+  )
+  (:goal
+    (and
+      (integration_activated uploader_service_primary)
+      (integration_activated edge_service_primary)
+      (integration_activated integration_pipeline_main)
+      (integration_activated integration_pipeline_secondary)
+    )
+  )
+)

@@ -1,0 +1,1068 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain logistics_missed_connection_recovery)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource_category - object supporting_asset_category - object service_component_category - object consignment_unit - object shipment - consignment_unit operator_resource - operational_resource_category schedule_slot - operational_resource_category ground_handling_unit - operational_resource_category approval_credential - operational_resource_category stakeholder_contact - operational_resource_category customer_contact - operational_resource_category alternate_carrier - operational_resource_category escalation_contact - operational_resource_category handling_container - supporting_asset_category shipping_document - supporting_asset_category claims_agent - supporting_asset_category inbound_service_instance - service_component_category outbound_service_instance - service_component_category contingency_plan - service_component_category shipment_leg_category - shipment case_category - shipment inbound_transport_leg - shipment_leg_category outbound_transport_leg - shipment_leg_category recovery_case - case_category)
+  (:predicates
+    (missed_connection_detected ?shipment - shipment)
+    (recovery_opened ?shipment - shipment)
+    (operator_resource_assigned_flag ?shipment - shipment)
+    (service_restored_flag ?shipment - shipment)
+    (recovery_action_completed_flag ?shipment - shipment)
+    (entity_customer_notified ?shipment - shipment)
+    (operator_resource_available ?operator_resource - operator_resource)
+    (operator_resource_assigned_to ?shipment - shipment ?operator_resource - operator_resource)
+    (schedule_slot_available ?schedule_slot - schedule_slot)
+    (assigned_schedule_slot ?shipment - shipment ?schedule_slot - schedule_slot)
+    (handling_unit_available ?ground_handling_unit - ground_handling_unit)
+    (handling_unit_assigned_to ?shipment - shipment ?ground_handling_unit - ground_handling_unit)
+    (container_available ?handling_container - handling_container)
+    (container_allocated_to_inbound_leg ?inbound_transport_leg - inbound_transport_leg ?handling_container - handling_container)
+    (container_allocated_to_outbound_leg ?outbound_transport_leg - outbound_transport_leg ?handling_container - handling_container)
+    (inbound_leg_linked_service ?inbound_transport_leg - inbound_transport_leg ?inbound_service - inbound_service_instance)
+    (inbound_service_selected ?inbound_service - inbound_service_instance)
+    (inbound_service_container_reserved ?inbound_service - inbound_service_instance)
+    (inbound_leg_ready ?inbound_transport_leg - inbound_transport_leg)
+    (outbound_leg_linked_service ?outbound_transport_leg - outbound_transport_leg ?outbound_service - outbound_service_instance)
+    (outbound_service_selected ?outbound_service - outbound_service_instance)
+    (outbound_service_container_reserved ?outbound_service - outbound_service_instance)
+    (outbound_leg_ready ?outbound_transport_leg - outbound_transport_leg)
+    (contingency_plan_available ?contingency_plan - contingency_plan)
+    (contingency_plan_selected ?contingency_plan - contingency_plan)
+    (plan_includes_inbound_service ?contingency_plan - contingency_plan ?inbound_service - inbound_service_instance)
+    (plan_includes_outbound_service ?contingency_plan - contingency_plan ?outbound_service - outbound_service_instance)
+    (contingency_plan_requires_approval ?contingency_plan - contingency_plan)
+    (contingency_plan_requires_additional_approval ?contingency_plan - contingency_plan)
+    (contingency_plan_confirmed ?contingency_plan - contingency_plan)
+    (case_has_inbound_leg ?recovery_case - recovery_case ?inbound_transport_leg - inbound_transport_leg)
+    (case_has_outbound_leg ?recovery_case - recovery_case ?outbound_transport_leg - outbound_transport_leg)
+    (case_assigned_contingency_plan ?recovery_case - recovery_case ?contingency_plan - contingency_plan)
+    (shipping_document_available ?shipping_document - shipping_document)
+    (case_has_document ?recovery_case - recovery_case ?shipping_document - shipping_document)
+    (document_attached_to_case ?shipping_document - shipping_document)
+    (document_linked_to_plan ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    (case_documents_validated ?recovery_case - recovery_case)
+    (case_carrier_confirmed ?recovery_case - recovery_case)
+    (case_execution_ready ?recovery_case - recovery_case)
+    (case_has_approval_credential ?recovery_case - recovery_case)
+    (case_approval_validated ?recovery_case - recovery_case)
+    (case_notifications_enabled ?recovery_case - recovery_case)
+    (case_transfer_executed ?recovery_case - recovery_case)
+    (claims_agent_available ?claims_agent - claims_agent)
+    (case_assigned_claims_agent ?recovery_case - recovery_case ?claims_agent - claims_agent)
+    (claims_agent_assigned ?recovery_case - recovery_case)
+    (case_claims_handling_initialized ?recovery_case - recovery_case)
+    (case_escalation_contact_attached ?recovery_case - recovery_case)
+    (approval_credential_available ?approval_credential - approval_credential)
+    (case_approval_credential_link ?recovery_case - recovery_case ?approval_credential - approval_credential)
+    (stakeholder_contact_available ?stakeholder_contact - stakeholder_contact)
+    (case_assigned_stakeholder_contact ?recovery_case - recovery_case ?stakeholder_contact - stakeholder_contact)
+    (alternate_carrier_available ?alternate_carrier - alternate_carrier)
+    (case_assigned_alternate_carrier ?recovery_case - recovery_case ?alternate_carrier - alternate_carrier)
+    (escalation_contact_available ?escalation_contact - escalation_contact)
+    (case_assigned_escalation_contact ?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    (customer_contact_available ?customer_contact - customer_contact)
+    (entity_linked_customer_contact ?shipment - shipment ?customer_contact - customer_contact)
+    (inbound_leg_resource_allocated ?inbound_transport_leg - inbound_transport_leg)
+    (outbound_leg_resource_allocated ?outbound_transport_leg - outbound_transport_leg)
+    (case_closed ?recovery_case - recovery_case)
+  )
+  (:action detect_missed_connection
+    :parameters (?shipment - shipment)
+    :precondition
+      (and
+        (not
+          (missed_connection_detected ?shipment)
+        )
+        (not
+          (service_restored_flag ?shipment)
+        )
+      )
+    :effect (missed_connection_detected ?shipment)
+  )
+  (:action allocate_operator_resource_to_shipment
+    :parameters (?shipment - shipment ?operator_resource - operator_resource)
+    :precondition
+      (and
+        (missed_connection_detected ?shipment)
+        (not
+          (operator_resource_assigned_flag ?shipment)
+        )
+        (operator_resource_available ?operator_resource)
+      )
+    :effect
+      (and
+        (operator_resource_assigned_flag ?shipment)
+        (operator_resource_assigned_to ?shipment ?operator_resource)
+        (not
+          (operator_resource_available ?operator_resource)
+        )
+      )
+  )
+  (:action assign_schedule_slot_to_shipment
+    :parameters (?shipment - shipment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (missed_connection_detected ?shipment)
+        (operator_resource_assigned_flag ?shipment)
+        (schedule_slot_available ?schedule_slot)
+      )
+    :effect
+      (and
+        (assigned_schedule_slot ?shipment ?schedule_slot)
+        (not
+          (schedule_slot_available ?schedule_slot)
+        )
+      )
+  )
+  (:action open_recovery_case
+    :parameters (?shipment - shipment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (missed_connection_detected ?shipment)
+        (operator_resource_assigned_flag ?shipment)
+        (assigned_schedule_slot ?shipment ?schedule_slot)
+        (not
+          (recovery_opened ?shipment)
+        )
+      )
+    :effect (recovery_opened ?shipment)
+  )
+  (:action rollback_schedule_slot_assignment
+    :parameters (?shipment - shipment ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (assigned_schedule_slot ?shipment ?schedule_slot)
+      )
+    :effect
+      (and
+        (schedule_slot_available ?schedule_slot)
+        (not
+          (assigned_schedule_slot ?shipment ?schedule_slot)
+        )
+      )
+  )
+  (:action assign_handling_unit_to_shipment
+    :parameters (?shipment - shipment ?ground_handling_unit - ground_handling_unit)
+    :precondition
+      (and
+        (recovery_opened ?shipment)
+        (handling_unit_available ?ground_handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_assigned_to ?shipment ?ground_handling_unit)
+        (not
+          (handling_unit_available ?ground_handling_unit)
+        )
+      )
+  )
+  (:action release_handling_unit_from_shipment
+    :parameters (?shipment - shipment ?ground_handling_unit - ground_handling_unit)
+    :precondition
+      (and
+        (handling_unit_assigned_to ?shipment ?ground_handling_unit)
+      )
+    :effect
+      (and
+        (handling_unit_available ?ground_handling_unit)
+        (not
+          (handling_unit_assigned_to ?shipment ?ground_handling_unit)
+        )
+      )
+  )
+  (:action assign_alternate_carrier_to_case
+    :parameters (?recovery_case - recovery_case ?alternate_carrier - alternate_carrier)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (alternate_carrier_available ?alternate_carrier)
+      )
+    :effect
+      (and
+        (case_assigned_alternate_carrier ?recovery_case ?alternate_carrier)
+        (not
+          (alternate_carrier_available ?alternate_carrier)
+        )
+      )
+  )
+  (:action remove_alternate_carrier_from_case
+    :parameters (?recovery_case - recovery_case ?alternate_carrier - alternate_carrier)
+    :precondition
+      (and
+        (case_assigned_alternate_carrier ?recovery_case ?alternate_carrier)
+      )
+    :effect
+      (and
+        (alternate_carrier_available ?alternate_carrier)
+        (not
+          (case_assigned_alternate_carrier ?recovery_case ?alternate_carrier)
+        )
+      )
+  )
+  (:action assign_escalation_contact_to_case
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (escalation_contact_available ?escalation_contact)
+      )
+    :effect
+      (and
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (not
+          (escalation_contact_available ?escalation_contact)
+        )
+      )
+  )
+  (:action remove_escalation_contact_from_case
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+      )
+    :effect
+      (and
+        (escalation_contact_available ?escalation_contact)
+        (not
+          (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        )
+      )
+  )
+  (:action confirm_inbound_service_for_leg
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?inbound_service - inbound_service_instance ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (recovery_opened ?inbound_transport_leg)
+        (assigned_schedule_slot ?inbound_transport_leg ?schedule_slot)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (not
+          (inbound_service_selected ?inbound_service)
+        )
+        (not
+          (inbound_service_container_reserved ?inbound_service)
+        )
+      )
+    :effect (inbound_service_selected ?inbound_service)
+  )
+  (:action deploy_handling_unit_to_inbound_leg
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?inbound_service - inbound_service_instance ?ground_handling_unit - ground_handling_unit)
+    :precondition
+      (and
+        (recovery_opened ?inbound_transport_leg)
+        (handling_unit_assigned_to ?inbound_transport_leg ?ground_handling_unit)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (inbound_service_selected ?inbound_service)
+        (not
+          (inbound_leg_resource_allocated ?inbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (inbound_leg_ready ?inbound_transport_leg)
+      )
+  )
+  (:action assign_container_to_inbound_leg
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?inbound_service - inbound_service_instance ?handling_container - handling_container)
+    :precondition
+      (and
+        (recovery_opened ?inbound_transport_leg)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (container_available ?handling_container)
+        (not
+          (inbound_leg_resource_allocated ?inbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_service_container_reserved ?inbound_service)
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (container_allocated_to_inbound_leg ?inbound_transport_leg ?handling_container)
+        (not
+          (container_available ?handling_container)
+        )
+      )
+  )
+  (:action finalize_inbound_container_assignment
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?inbound_service - inbound_service_instance ?schedule_slot - schedule_slot ?handling_container - handling_container)
+    :precondition
+      (and
+        (recovery_opened ?inbound_transport_leg)
+        (assigned_schedule_slot ?inbound_transport_leg ?schedule_slot)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (inbound_service_container_reserved ?inbound_service)
+        (container_allocated_to_inbound_leg ?inbound_transport_leg ?handling_container)
+        (not
+          (inbound_leg_ready ?inbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (inbound_service_selected ?inbound_service)
+        (inbound_leg_ready ?inbound_transport_leg)
+        (container_available ?handling_container)
+        (not
+          (container_allocated_to_inbound_leg ?inbound_transport_leg ?handling_container)
+        )
+      )
+  )
+  (:action select_outbound_service_for_leg
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?outbound_service - outbound_service_instance ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (recovery_opened ?outbound_transport_leg)
+        (assigned_schedule_slot ?outbound_transport_leg ?schedule_slot)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (not
+          (outbound_service_selected ?outbound_service)
+        )
+        (not
+          (outbound_service_container_reserved ?outbound_service)
+        )
+      )
+    :effect (outbound_service_selected ?outbound_service)
+  )
+  (:action deploy_handling_unit_to_outbound_leg
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?outbound_service - outbound_service_instance ?ground_handling_unit - ground_handling_unit)
+    :precondition
+      (and
+        (recovery_opened ?outbound_transport_leg)
+        (handling_unit_assigned_to ?outbound_transport_leg ?ground_handling_unit)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (outbound_service_selected ?outbound_service)
+        (not
+          (outbound_leg_resource_allocated ?outbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (outbound_leg_ready ?outbound_transport_leg)
+      )
+  )
+  (:action assign_container_to_outbound_leg
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?outbound_service - outbound_service_instance ?handling_container - handling_container)
+    :precondition
+      (and
+        (recovery_opened ?outbound_transport_leg)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (container_available ?handling_container)
+        (not
+          (outbound_leg_resource_allocated ?outbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_service_container_reserved ?outbound_service)
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (container_allocated_to_outbound_leg ?outbound_transport_leg ?handling_container)
+        (not
+          (container_available ?handling_container)
+        )
+      )
+  )
+  (:action finalize_outbound_container_assignment
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?outbound_service - outbound_service_instance ?schedule_slot - schedule_slot ?handling_container - handling_container)
+    :precondition
+      (and
+        (recovery_opened ?outbound_transport_leg)
+        (assigned_schedule_slot ?outbound_transport_leg ?schedule_slot)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (outbound_service_container_reserved ?outbound_service)
+        (container_allocated_to_outbound_leg ?outbound_transport_leg ?handling_container)
+        (not
+          (outbound_leg_ready ?outbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (outbound_service_selected ?outbound_service)
+        (outbound_leg_ready ?outbound_transport_leg)
+        (container_available ?handling_container)
+        (not
+          (container_allocated_to_outbound_leg ?outbound_transport_leg ?handling_container)
+        )
+      )
+  )
+  (:action assemble_contingency_plan
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?outbound_transport_leg - outbound_transport_leg ?inbound_service - inbound_service_instance ?outbound_service - outbound_service_instance ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (inbound_service_selected ?inbound_service)
+        (outbound_service_selected ?outbound_service)
+        (inbound_leg_ready ?inbound_transport_leg)
+        (outbound_leg_ready ?outbound_transport_leg)
+        (contingency_plan_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_includes_inbound_service ?contingency_plan ?inbound_service)
+        (plan_includes_outbound_service ?contingency_plan ?outbound_service)
+        (not
+          (contingency_plan_available ?contingency_plan)
+        )
+      )
+  )
+  (:action assemble_contingency_plan_with_inbound_container
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?outbound_transport_leg - outbound_transport_leg ?inbound_service - inbound_service_instance ?outbound_service - outbound_service_instance ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (inbound_service_container_reserved ?inbound_service)
+        (outbound_service_selected ?outbound_service)
+        (not
+          (inbound_leg_ready ?inbound_transport_leg)
+        )
+        (outbound_leg_ready ?outbound_transport_leg)
+        (contingency_plan_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_includes_inbound_service ?contingency_plan ?inbound_service)
+        (plan_includes_outbound_service ?contingency_plan ?outbound_service)
+        (contingency_plan_requires_approval ?contingency_plan)
+        (not
+          (contingency_plan_available ?contingency_plan)
+        )
+      )
+  )
+  (:action assemble_contingency_plan_with_outbound_container
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?outbound_transport_leg - outbound_transport_leg ?inbound_service - inbound_service_instance ?outbound_service - outbound_service_instance ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (inbound_service_selected ?inbound_service)
+        (outbound_service_container_reserved ?outbound_service)
+        (inbound_leg_ready ?inbound_transport_leg)
+        (not
+          (outbound_leg_ready ?outbound_transport_leg)
+        )
+        (contingency_plan_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_includes_inbound_service ?contingency_plan ?inbound_service)
+        (plan_includes_outbound_service ?contingency_plan ?outbound_service)
+        (contingency_plan_requires_additional_approval ?contingency_plan)
+        (not
+          (contingency_plan_available ?contingency_plan)
+        )
+      )
+  )
+  (:action assemble_comprehensive_contingency_plan
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?outbound_transport_leg - outbound_transport_leg ?inbound_service - inbound_service_instance ?outbound_service - outbound_service_instance ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (inbound_leg_linked_service ?inbound_transport_leg ?inbound_service)
+        (outbound_leg_linked_service ?outbound_transport_leg ?outbound_service)
+        (inbound_service_container_reserved ?inbound_service)
+        (outbound_service_container_reserved ?outbound_service)
+        (not
+          (inbound_leg_ready ?inbound_transport_leg)
+        )
+        (not
+          (outbound_leg_ready ?outbound_transport_leg)
+        )
+        (contingency_plan_available ?contingency_plan)
+      )
+    :effect
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (plan_includes_inbound_service ?contingency_plan ?inbound_service)
+        (plan_includes_outbound_service ?contingency_plan ?outbound_service)
+        (contingency_plan_requires_approval ?contingency_plan)
+        (contingency_plan_requires_additional_approval ?contingency_plan)
+        (not
+          (contingency_plan_available ?contingency_plan)
+        )
+      )
+  )
+  (:action validate_plan_schedule_compatibility
+    :parameters (?contingency_plan - contingency_plan ?inbound_transport_leg - inbound_transport_leg ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (contingency_plan_selected ?contingency_plan)
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (assigned_schedule_slot ?inbound_transport_leg ?schedule_slot)
+        (not
+          (contingency_plan_confirmed ?contingency_plan)
+        )
+      )
+    :effect (contingency_plan_confirmed ?contingency_plan)
+  )
+  (:action attach_document_to_case_and_link_to_plan
+    :parameters (?recovery_case - recovery_case ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (case_assigned_contingency_plan ?recovery_case ?contingency_plan)
+        (case_has_document ?recovery_case ?shipping_document)
+        (shipping_document_available ?shipping_document)
+        (contingency_plan_selected ?contingency_plan)
+        (contingency_plan_confirmed ?contingency_plan)
+        (not
+          (document_attached_to_case ?shipping_document)
+        )
+      )
+    :effect
+      (and
+        (document_attached_to_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (not
+          (shipping_document_available ?shipping_document)
+        )
+      )
+  )
+  (:action validate_case_documents
+    :parameters (?recovery_case - recovery_case ?shipping_document - shipping_document ?contingency_plan - contingency_plan ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_attached_to_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (assigned_schedule_slot ?recovery_case ?schedule_slot)
+        (not
+          (contingency_plan_requires_approval ?contingency_plan)
+        )
+        (not
+          (case_documents_validated ?recovery_case)
+        )
+      )
+    :effect (case_documents_validated ?recovery_case)
+  )
+  (:action attach_approval_credential_to_case
+    :parameters (?recovery_case - recovery_case ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (approval_credential_available ?approval_credential)
+        (not
+          (case_has_approval_credential ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_approval_credential ?recovery_case)
+        (case_approval_credential_link ?recovery_case ?approval_credential)
+        (not
+          (approval_credential_available ?approval_credential)
+        )
+      )
+  )
+  (:action validate_case_with_approval_credential
+    :parameters (?recovery_case - recovery_case ?shipping_document - shipping_document ?contingency_plan - contingency_plan ?schedule_slot - schedule_slot ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_attached_to_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (assigned_schedule_slot ?recovery_case ?schedule_slot)
+        (contingency_plan_requires_approval ?contingency_plan)
+        (case_has_approval_credential ?recovery_case)
+        (case_approval_credential_link ?recovery_case ?approval_credential)
+        (not
+          (case_documents_validated ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_documents_validated ?recovery_case)
+        (case_approval_validated ?recovery_case)
+      )
+  )
+  (:action confirm_alternate_carrier_allocation
+    :parameters (?recovery_case - recovery_case ?alternate_carrier - alternate_carrier ?ground_handling_unit - ground_handling_unit ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_documents_validated ?recovery_case)
+        (case_assigned_alternate_carrier ?recovery_case ?alternate_carrier)
+        (handling_unit_assigned_to ?recovery_case ?ground_handling_unit)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (not
+          (contingency_plan_requires_additional_approval ?contingency_plan)
+        )
+        (not
+          (case_carrier_confirmed ?recovery_case)
+        )
+      )
+    :effect (case_carrier_confirmed ?recovery_case)
+  )
+  (:action confirm_alternate_carrier_allocation_with_approval
+    :parameters (?recovery_case - recovery_case ?alternate_carrier - alternate_carrier ?ground_handling_unit - ground_handling_unit ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_documents_validated ?recovery_case)
+        (case_assigned_alternate_carrier ?recovery_case ?alternate_carrier)
+        (handling_unit_assigned_to ?recovery_case ?ground_handling_unit)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (contingency_plan_requires_additional_approval ?contingency_plan)
+        (not
+          (case_carrier_confirmed ?recovery_case)
+        )
+      )
+    :effect (case_carrier_confirmed ?recovery_case)
+  )
+  (:action finalize_case_execution_ready_no_approvals
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_carrier_confirmed ?recovery_case)
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (not
+          (contingency_plan_requires_approval ?contingency_plan)
+        )
+        (not
+          (contingency_plan_requires_additional_approval ?contingency_plan)
+        )
+        (not
+          (case_execution_ready ?recovery_case)
+        )
+      )
+    :effect (case_execution_ready ?recovery_case)
+  )
+  (:action finalize_case_execution_ready_with_inbound_approval
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_carrier_confirmed ?recovery_case)
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (contingency_plan_requires_approval ?contingency_plan)
+        (not
+          (contingency_plan_requires_additional_approval ?contingency_plan)
+        )
+        (not
+          (case_execution_ready ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_notifications_enabled ?recovery_case)
+      )
+  )
+  (:action finalize_case_execution_ready_with_outbound_approval
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_carrier_confirmed ?recovery_case)
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (not
+          (contingency_plan_requires_approval ?contingency_plan)
+        )
+        (contingency_plan_requires_additional_approval ?contingency_plan)
+        (not
+          (case_execution_ready ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_notifications_enabled ?recovery_case)
+      )
+  )
+  (:action finalize_case_execution_ready_with_both_approvals
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact ?shipping_document - shipping_document ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (case_carrier_confirmed ?recovery_case)
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (case_has_document ?recovery_case ?shipping_document)
+        (document_linked_to_plan ?shipping_document ?contingency_plan)
+        (contingency_plan_requires_approval ?contingency_plan)
+        (contingency_plan_requires_additional_approval ?contingency_plan)
+        (not
+          (case_execution_ready ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_notifications_enabled ?recovery_case)
+      )
+  )
+  (:action lock_case_and_complete_execution
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_execution_ready ?recovery_case)
+        (not
+          (case_notifications_enabled ?recovery_case)
+        )
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (recovery_action_completed_flag ?recovery_case)
+      )
+  )
+  (:action assign_stakeholder_contact_to_case
+    :parameters (?recovery_case - recovery_case ?stakeholder_contact - stakeholder_contact)
+    :precondition
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_notifications_enabled ?recovery_case)
+        (stakeholder_contact_available ?stakeholder_contact)
+      )
+    :effect
+      (and
+        (case_assigned_stakeholder_contact ?recovery_case ?stakeholder_contact)
+        (not
+          (stakeholder_contact_available ?stakeholder_contact)
+        )
+      )
+  )
+  (:action execute_physical_transfer
+    :parameters (?recovery_case - recovery_case ?inbound_transport_leg - inbound_transport_leg ?outbound_transport_leg - outbound_transport_leg ?schedule_slot - schedule_slot ?stakeholder_contact - stakeholder_contact)
+    :precondition
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_notifications_enabled ?recovery_case)
+        (case_assigned_stakeholder_contact ?recovery_case ?stakeholder_contact)
+        (case_has_inbound_leg ?recovery_case ?inbound_transport_leg)
+        (case_has_outbound_leg ?recovery_case ?outbound_transport_leg)
+        (inbound_leg_ready ?inbound_transport_leg)
+        (outbound_leg_ready ?outbound_transport_leg)
+        (assigned_schedule_slot ?recovery_case ?schedule_slot)
+        (not
+          (case_transfer_executed ?recovery_case)
+        )
+      )
+    :effect (case_transfer_executed ?recovery_case)
+  )
+  (:action finalize_case_after_transfer
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_execution_ready ?recovery_case)
+        (case_transfer_executed ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (recovery_action_completed_flag ?recovery_case)
+      )
+  )
+  (:action assign_claims_agent_to_case
+    :parameters (?recovery_case - recovery_case ?claims_agent - claims_agent ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (recovery_opened ?recovery_case)
+        (assigned_schedule_slot ?recovery_case ?schedule_slot)
+        (claims_agent_available ?claims_agent)
+        (case_assigned_claims_agent ?recovery_case ?claims_agent)
+        (not
+          (claims_agent_assigned ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (claims_agent_assigned ?recovery_case)
+        (not
+          (claims_agent_available ?claims_agent)
+        )
+      )
+  )
+  (:action initialize_claims_handling_for_case
+    :parameters (?recovery_case - recovery_case ?ground_handling_unit - ground_handling_unit)
+    :precondition
+      (and
+        (claims_agent_assigned ?recovery_case)
+        (handling_unit_assigned_to ?recovery_case ?ground_handling_unit)
+        (not
+          (case_claims_handling_initialized ?recovery_case)
+        )
+      )
+    :effect (case_claims_handling_initialized ?recovery_case)
+  )
+  (:action attach_escalation_contact_for_claims
+    :parameters (?recovery_case - recovery_case ?escalation_contact - escalation_contact)
+    :precondition
+      (and
+        (case_claims_handling_initialized ?recovery_case)
+        (case_assigned_escalation_contact ?recovery_case ?escalation_contact)
+        (not
+          (case_escalation_contact_attached ?recovery_case)
+        )
+      )
+    :effect (case_escalation_contact_attached ?recovery_case)
+  )
+  (:action complete_case_after_escalation
+    :parameters (?recovery_case - recovery_case)
+    :precondition
+      (and
+        (case_escalation_contact_attached ?recovery_case)
+        (not
+          (case_closed ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (case_closed ?recovery_case)
+        (recovery_action_completed_flag ?recovery_case)
+      )
+  )
+  (:action complete_inbound_leg_service
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (inbound_leg_resource_allocated ?inbound_transport_leg)
+        (inbound_leg_ready ?inbound_transport_leg)
+        (contingency_plan_selected ?contingency_plan)
+        (contingency_plan_confirmed ?contingency_plan)
+        (not
+          (recovery_action_completed_flag ?inbound_transport_leg)
+        )
+      )
+    :effect (recovery_action_completed_flag ?inbound_transport_leg)
+  )
+  (:action complete_outbound_leg_service
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?contingency_plan - contingency_plan)
+    :precondition
+      (and
+        (outbound_leg_resource_allocated ?outbound_transport_leg)
+        (outbound_leg_ready ?outbound_transport_leg)
+        (contingency_plan_selected ?contingency_plan)
+        (contingency_plan_confirmed ?contingency_plan)
+        (not
+          (recovery_action_completed_flag ?outbound_transport_leg)
+        )
+      )
+    :effect (recovery_action_completed_flag ?outbound_transport_leg)
+  )
+  (:action notify_customer_and_link_contact
+    :parameters (?shipment - shipment ?customer_contact - customer_contact ?schedule_slot - schedule_slot)
+    :precondition
+      (and
+        (recovery_action_completed_flag ?shipment)
+        (assigned_schedule_slot ?shipment ?schedule_slot)
+        (customer_contact_available ?customer_contact)
+        (not
+          (entity_customer_notified ?shipment)
+        )
+      )
+    :effect
+      (and
+        (entity_customer_notified ?shipment)
+        (entity_linked_customer_contact ?shipment ?customer_contact)
+        (not
+          (customer_contact_available ?customer_contact)
+        )
+      )
+  )
+  (:action finalize_inbound_leg_recovery_and_release_resource
+    :parameters (?inbound_transport_leg - inbound_transport_leg ?operator_resource - operator_resource ?customer_contact - customer_contact)
+    :precondition
+      (and
+        (entity_customer_notified ?inbound_transport_leg)
+        (operator_resource_assigned_to ?inbound_transport_leg ?operator_resource)
+        (entity_linked_customer_contact ?inbound_transport_leg ?customer_contact)
+        (not
+          (service_restored_flag ?inbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (service_restored_flag ?inbound_transport_leg)
+        (operator_resource_available ?operator_resource)
+        (customer_contact_available ?customer_contact)
+      )
+  )
+  (:action finalize_outbound_leg_recovery_and_release_resource
+    :parameters (?outbound_transport_leg - outbound_transport_leg ?operator_resource - operator_resource ?customer_contact - customer_contact)
+    :precondition
+      (and
+        (entity_customer_notified ?outbound_transport_leg)
+        (operator_resource_assigned_to ?outbound_transport_leg ?operator_resource)
+        (entity_linked_customer_contact ?outbound_transport_leg ?customer_contact)
+        (not
+          (service_restored_flag ?outbound_transport_leg)
+        )
+      )
+    :effect
+      (and
+        (service_restored_flag ?outbound_transport_leg)
+        (operator_resource_available ?operator_resource)
+        (customer_contact_available ?customer_contact)
+      )
+  )
+  (:action finalize_case_recovery_and_release_resource
+    :parameters (?recovery_case - recovery_case ?operator_resource - operator_resource ?customer_contact - customer_contact)
+    :precondition
+      (and
+        (entity_customer_notified ?recovery_case)
+        (operator_resource_assigned_to ?recovery_case ?operator_resource)
+        (entity_linked_customer_contact ?recovery_case ?customer_contact)
+        (not
+          (service_restored_flag ?recovery_case)
+        )
+      )
+    :effect
+      (and
+        (service_restored_flag ?recovery_case)
+        (operator_resource_available ?operator_resource)
+        (customer_contact_available ?customer_contact)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem missed_connection_at_hub_recovery_problem)
+  (:domain logistics_missed_connection_recovery)
+  (:objects inbound_leg_1 - inbound_transport_leg outbound_leg_1 - outbound_transport_leg recovery_case_1 - recovery_case recovery_case_2 - recovery_case operator_resource_1 - operator_resource operator_resource_2 - operator_resource operator_resource_3 - operator_resource schedule_slot_1 - schedule_slot ground_handling_unit_1 - ground_handling_unit container_1 - handling_container inbound_service_1 - inbound_service_instance outbound_service_1 - outbound_service_instance contingency_plan_1 - contingency_plan shipping_document_1 - shipping_document shipping_document_2 - shipping_document approval_credential_1 - approval_credential approval_credential_2 - approval_credential stakeholder_contact_1 - stakeholder_contact stakeholder_contact_2 - stakeholder_contact customer_contact_1 - customer_contact alternate_carrier_1 - alternate_carrier claims_agent_1 - claims_agent claims_agent_2 - claims_agent escalation_contact_1 - escalation_contact)
+  (:init
+    (operator_resource_available operator_resource_1)
+    (operator_resource_available operator_resource_2)
+    (operator_resource_available operator_resource_3)
+    (schedule_slot_available schedule_slot_1)
+    (handling_unit_available ground_handling_unit_1)
+    (container_available container_1)
+    (inbound_leg_linked_service inbound_leg_1 inbound_service_1)
+    (outbound_leg_linked_service outbound_leg_1 outbound_service_1)
+    (contingency_plan_available contingency_plan_1)
+    (shipping_document_available shipping_document_1)
+    (shipping_document_available shipping_document_2)
+    (case_has_inbound_leg recovery_case_1 inbound_leg_1)
+    (case_has_inbound_leg recovery_case_2 inbound_leg_1)
+    (case_has_outbound_leg recovery_case_1 outbound_leg_1)
+    (case_has_outbound_leg recovery_case_2 outbound_leg_1)
+    (case_assigned_contingency_plan recovery_case_1 contingency_plan_1)
+    (case_assigned_contingency_plan recovery_case_2 contingency_plan_1)
+    (case_has_document recovery_case_1 shipping_document_1)
+    (case_has_document recovery_case_2 shipping_document_2)
+    (approval_credential_available approval_credential_1)
+    (approval_credential_available approval_credential_2)
+    (stakeholder_contact_available stakeholder_contact_1)
+    (stakeholder_contact_available stakeholder_contact_2)
+    (customer_contact_available customer_contact_1)
+    (alternate_carrier_available alternate_carrier_1)
+    (claims_agent_available claims_agent_1)
+    (case_assigned_claims_agent recovery_case_1 claims_agent_1)
+    (case_assigned_claims_agent recovery_case_2 claims_agent_2)
+    (escalation_contact_available escalation_contact_1)
+  )
+  (:goal
+    (and
+      (service_restored_flag inbound_leg_1)
+      (service_restored_flag outbound_leg_1)
+      (service_restored_flag recovery_case_1)
+      (service_restored_flag recovery_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(detect_missed_connection inbound_leg_1)
+(allocate_operator_resource_to_shipment inbound_leg_1 operator_resource_1)
+(assign_schedule_slot_to_shipment inbound_leg_1 schedule_slot_1)
+(open_recovery_case inbound_leg_1 schedule_slot_1)
+(assign_container_to_inbound_leg inbound_leg_1 inbound_service_1 container_1)
+(finalize_inbound_container_assignment inbound_leg_1 inbound_service_1 schedule_slot_1 container_1)
+(rollback_schedule_slot_assignment inbound_leg_1 schedule_slot_1)
+(detect_missed_connection outbound_leg_1)
+(allocate_operator_resource_to_shipment outbound_leg_1 operator_resource_2)
+(assign_schedule_slot_to_shipment outbound_leg_1 schedule_slot_1)
+(open_recovery_case outbound_leg_1 schedule_slot_1)
+(assign_container_to_outbound_leg outbound_leg_1 outbound_service_1 container_1)
+(finalize_outbound_container_assignment outbound_leg_1 outbound_service_1 schedule_slot_1 container_1)
+(rollback_schedule_slot_assignment outbound_leg_1 schedule_slot_1)
+(assemble_contingency_plan inbound_leg_1 outbound_leg_1 inbound_service_1 outbound_service_1 contingency_plan_1)
+(assign_schedule_slot_to_shipment inbound_leg_1 schedule_slot_1)
+(validate_plan_schedule_compatibility contingency_plan_1 inbound_leg_1 schedule_slot_1)
+(rollback_schedule_slot_assignment inbound_leg_1 schedule_slot_1)
+(complete_inbound_leg_service inbound_leg_1 contingency_plan_1)
+(complete_outbound_leg_service outbound_leg_1 contingency_plan_1)
+(assign_schedule_slot_to_shipment inbound_leg_1 schedule_slot_1)
+(notify_customer_and_link_contact inbound_leg_1 customer_contact_1 schedule_slot_1)
+(finalize_inbound_leg_recovery_and_release_resource inbound_leg_1 operator_resource_1 customer_contact_1)
+(rollback_schedule_slot_assignment inbound_leg_1 schedule_slot_1)
+(assign_schedule_slot_to_shipment outbound_leg_1 schedule_slot_1)
+(notify_customer_and_link_contact outbound_leg_1 customer_contact_1 schedule_slot_1)
+(finalize_outbound_leg_recovery_and_release_resource outbound_leg_1 operator_resource_2 customer_contact_1)
+(rollback_schedule_slot_assignment outbound_leg_1 schedule_slot_1)
+(detect_missed_connection recovery_case_1)
+(allocate_operator_resource_to_shipment recovery_case_1 operator_resource_1)
+(assign_schedule_slot_to_shipment recovery_case_1 schedule_slot_1)
+(open_recovery_case recovery_case_1 schedule_slot_1)
+(assign_handling_unit_to_shipment recovery_case_1 ground_handling_unit_1)
+(assign_alternate_carrier_to_case recovery_case_1 alternate_carrier_1)
+(attach_document_to_case_and_link_to_plan recovery_case_1 shipping_document_1 contingency_plan_1)
+(validate_case_documents recovery_case_1 shipping_document_1 contingency_plan_1 schedule_slot_1)
+(confirm_alternate_carrier_allocation recovery_case_1 alternate_carrier_1 ground_handling_unit_1 shipping_document_1 contingency_plan_1)
+(release_handling_unit_from_shipment recovery_case_1 ground_handling_unit_1)
+(remove_alternate_carrier_from_case recovery_case_1 alternate_carrier_1)
+(assign_escalation_contact_to_case recovery_case_1 escalation_contact_1)
+(finalize_case_execution_ready_no_approvals recovery_case_1 escalation_contact_1 shipping_document_1 contingency_plan_1)
+(lock_case_and_complete_execution recovery_case_1)
+(remove_escalation_contact_from_case recovery_case_1 escalation_contact_1)
+(notify_customer_and_link_contact recovery_case_1 customer_contact_1 schedule_slot_1)
+(finalize_case_recovery_and_release_resource recovery_case_1 operator_resource_1 customer_contact_1)
+(rollback_schedule_slot_assignment recovery_case_1 schedule_slot_1)
+(detect_missed_connection recovery_case_2)
+(allocate_operator_resource_to_shipment recovery_case_2 operator_resource_1)
+(assign_schedule_slot_to_shipment recovery_case_2 schedule_slot_1)
+(open_recovery_case recovery_case_2 schedule_slot_1)
+(assign_handling_unit_to_shipment recovery_case_2 ground_handling_unit_1)
+(assign_alternate_carrier_to_case recovery_case_2 alternate_carrier_1)
+(attach_document_to_case_and_link_to_plan recovery_case_2 shipping_document_2 contingency_plan_1)
+(validate_case_documents recovery_case_2 shipping_document_2 contingency_plan_1 schedule_slot_1)
+(confirm_alternate_carrier_allocation recovery_case_2 alternate_carrier_1 ground_handling_unit_1 shipping_document_2 contingency_plan_1)
+(release_handling_unit_from_shipment recovery_case_2 ground_handling_unit_1)
+(remove_alternate_carrier_from_case recovery_case_2 alternate_carrier_1)
+(assign_escalation_contact_to_case recovery_case_2 escalation_contact_1)
+(finalize_case_execution_ready_no_approvals recovery_case_2 escalation_contact_1 shipping_document_2 contingency_plan_1)
+(lock_case_and_complete_execution recovery_case_2)
+(remove_escalation_contact_from_case recovery_case_2 escalation_contact_1)
+(notify_customer_and_link_contact recovery_case_2 customer_contact_1 schedule_slot_1)
+(finalize_case_recovery_and_release_resource recovery_case_2 operator_resource_1 customer_contact_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_w8ecvk61/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 63 
+
+Successful plans:
+Value: 63
+ /tmp/val_w8ecvk61/plan.pddl 63 
+
+
+
+--- stderr ---
+

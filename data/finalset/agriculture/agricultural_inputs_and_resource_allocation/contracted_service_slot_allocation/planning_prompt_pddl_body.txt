@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain contracted_service_slot_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object organizational_entity_type - entity temporal_entity_type - entity inventory_entity_type - entity root_contract_type - entity allocatable_entity - root_contract_type service_provider - organizational_entity_type input_specification - organizational_entity_type crew_unit - organizational_entity_type permit_certification - organizational_entity_type priority_tag - organizational_entity_type contingency_reserve - organizational_entity_type machinery_asset - organizational_entity_type specialist_tool - organizational_entity_type consumable_batch - temporal_entity_type material_batch - temporal_entity_type incentive_voucher - temporal_entity_type local_time_window - inventory_entity_type regional_time_window - inventory_entity_type service_slot_record - inventory_entity_type field_subtype - allocatable_entity field_subtype_alt - allocatable_entity field_unit - field_subtype crop_block - field_subtype service_operation - field_subtype_alt)
+
+  (:predicates
+    (request_registered ?allocatable_entity - allocatable_entity)
+    (entity_confirmed ?allocatable_entity - allocatable_entity)
+    (provider_provisionally_assigned ?allocatable_entity - allocatable_entity)
+    (entity_allocation_committed ?allocatable_entity - allocatable_entity)
+    (entity_dispatch_acknowledged ?allocatable_entity - allocatable_entity)
+    (entity_contingency_allocated ?allocatable_entity - allocatable_entity)
+    (provider_available ?service_provider - service_provider)
+    (provider_assigned_to_entity ?allocatable_entity - allocatable_entity ?service_provider - service_provider)
+    (input_spec_available ?input_specification - input_specification)
+    (entity_input_spec_attached ?allocatable_entity - allocatable_entity ?input_specification - input_specification)
+    (crew_unit_available ?crew_unit - crew_unit)
+    (crew_assigned_to_request ?allocatable_entity - allocatable_entity ?crew_unit - crew_unit)
+    (consumable_available ?consumable_batch - consumable_batch)
+    (consumable_allocated_to_field ?field_unit - field_unit ?consumable_batch - consumable_batch)
+    (consumable_allocated_to_block ?crop_block - crop_block ?consumable_batch - consumable_batch)
+    (local_window_for_field ?field_unit - field_unit ?local_time_window - local_time_window)
+    (local_window_selected ?local_time_window - local_time_window)
+    (local_window_material_reserved ?local_time_window - local_time_window)
+    (field_ready ?field_unit - field_unit)
+    (regional_window_for_block ?crop_block - crop_block ?regional_time_window - regional_time_window)
+    (regional_window_selected ?regional_time_window - regional_time_window)
+    (regional_window_material_reserved ?regional_time_window - regional_time_window)
+    (block_ready ?crop_block - crop_block)
+    (slot_pending_bundling ?service_slot_record - service_slot_record)
+    (slot_bundled ?service_slot_record - service_slot_record)
+    (slot_local_window_attached ?service_slot_record - service_slot_record ?local_time_window - local_time_window)
+    (slot_regional_window_attached ?service_slot_record - service_slot_record ?regional_time_window - regional_time_window)
+    (slot_local_readiness_marker ?service_slot_record - service_slot_record)
+    (slot_regional_readiness_marker ?service_slot_record - service_slot_record)
+    (slot_availability_confirmed ?service_slot_record - service_slot_record)
+    (operation_assigned_field ?service_operation - service_operation ?field_unit - field_unit)
+    (operation_assigned_block ?service_operation - service_operation ?crop_block - crop_block)
+    (operation_slot_link ?service_operation - service_operation ?service_slot_record - service_slot_record)
+    (material_batch_available ?material_batch - material_batch)
+    (operation_material_link ?service_operation - service_operation ?material_batch - material_batch)
+    (material_reserved ?material_batch - material_batch)
+    (material_allocated_to_slot ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    (operation_prepared ?service_operation - service_operation)
+    (operation_materials_confirmed ?service_operation - service_operation)
+    (operation_ready_for_final_checks ?service_operation - service_operation)
+    (operation_has_permit ?service_operation - service_operation)
+    (operation_permit_verified ?service_operation - service_operation)
+    (priority_tag_attached ?service_operation - service_operation)
+    (operation_final_checks_passed ?service_operation - service_operation)
+    (voucher_available ?incentive_voucher - incentive_voucher)
+    (voucher_attached_to_operation ?service_operation - service_operation ?incentive_voucher - incentive_voucher)
+    (voucher_allocated_to_operation ?service_operation - service_operation)
+    (operation_voucher_and_crew_confirmed ?service_operation - service_operation)
+    (operation_specialist_tool_confirmed ?service_operation - service_operation)
+    (permit_available ?permit_certification - permit_certification)
+    (operation_permit_attached ?service_operation - service_operation ?permit_certification - permit_certification)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (operation_priority_tag_attached ?service_operation - service_operation ?priority_tag - priority_tag)
+    (machinery_available ?machinery_asset - machinery_asset)
+    (operation_machinery_allocated ?service_operation - service_operation ?machinery_asset - machinery_asset)
+    (specialist_tool_available ?specialist_tool - specialist_tool)
+    (tool_allocated_to_operation ?service_operation - service_operation ?specialist_tool - specialist_tool)
+    (contingency_available ?contingency_reserve - contingency_reserve)
+    (contingency_allocated_to_entity ?allocatable_entity - allocatable_entity ?contingency_reserve - contingency_reserve)
+    (field_candidate_selected ?field_unit - field_unit)
+    (block_candidate_selected ?crop_block - crop_block)
+    (operation_finalized ?service_operation - service_operation)
+  )
+  (:action register_contract_request
+    :parameters (?allocatable_entity - allocatable_entity)
+    :precondition
+      (and
+        (not
+          (request_registered ?allocatable_entity)
+        )
+        (not
+          (entity_allocation_committed ?allocatable_entity)
+        )
+      )
+    :effect (request_registered ?allocatable_entity)
+  )
+  (:action provisionally_assign_provider
+    :parameters (?allocatable_entity - allocatable_entity ?service_provider - service_provider)
+    :precondition
+      (and
+        (request_registered ?allocatable_entity)
+        (not
+          (provider_provisionally_assigned ?allocatable_entity)
+        )
+        (provider_available ?service_provider)
+      )
+    :effect
+      (and
+        (provider_provisionally_assigned ?allocatable_entity)
+        (provider_assigned_to_entity ?allocatable_entity ?service_provider)
+        (not
+          (provider_available ?service_provider)
+        )
+      )
+  )
+  (:action attach_input_spec_to_request
+    :parameters (?allocatable_entity - allocatable_entity ?input_specification - input_specification)
+    :precondition
+      (and
+        (request_registered ?allocatable_entity)
+        (provider_provisionally_assigned ?allocatable_entity)
+        (input_spec_available ?input_specification)
+      )
+    :effect
+      (and
+        (entity_input_spec_attached ?allocatable_entity ?input_specification)
+        (not
+          (input_spec_available ?input_specification)
+        )
+      )
+  )
+  (:action confirm_input_spec_attachment
+    :parameters (?allocatable_entity - allocatable_entity ?input_specification - input_specification)
+    :precondition
+      (and
+        (request_registered ?allocatable_entity)
+        (provider_provisionally_assigned ?allocatable_entity)
+        (entity_input_spec_attached ?allocatable_entity ?input_specification)
+        (not
+          (entity_confirmed ?allocatable_entity)
+        )
+      )
+    :effect (entity_confirmed ?allocatable_entity)
+  )
+  (:action release_input_spec_from_request
+    :parameters (?allocatable_entity - allocatable_entity ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_input_spec_attached ?allocatable_entity ?input_specification)
+      )
+    :effect
+      (and
+        (input_spec_available ?input_specification)
+        (not
+          (entity_input_spec_attached ?allocatable_entity ?input_specification)
+        )
+      )
+  )
+  (:action assign_crew_unit_to_request
+    :parameters (?allocatable_entity - allocatable_entity ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_confirmed ?allocatable_entity)
+        (crew_unit_available ?crew_unit)
+      )
+    :effect
+      (and
+        (crew_assigned_to_request ?allocatable_entity ?crew_unit)
+        (not
+          (crew_unit_available ?crew_unit)
+        )
+      )
+  )
+  (:action release_crew_from_request
+    :parameters (?allocatable_entity - allocatable_entity ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (crew_assigned_to_request ?allocatable_entity ?crew_unit)
+      )
+    :effect
+      (and
+        (crew_unit_available ?crew_unit)
+        (not
+          (crew_assigned_to_request ?allocatable_entity ?crew_unit)
+        )
+      )
+  )
+  (:action reserve_machinery_for_operation
+    :parameters (?service_operation - service_operation ?machinery_asset - machinery_asset)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (machinery_available ?machinery_asset)
+      )
+    :effect
+      (and
+        (operation_machinery_allocated ?service_operation ?machinery_asset)
+        (not
+          (machinery_available ?machinery_asset)
+        )
+      )
+  )
+  (:action release_machinery_from_operation
+    :parameters (?service_operation - service_operation ?machinery_asset - machinery_asset)
+    :precondition
+      (and
+        (operation_machinery_allocated ?service_operation ?machinery_asset)
+      )
+    :effect
+      (and
+        (machinery_available ?machinery_asset)
+        (not
+          (operation_machinery_allocated ?service_operation ?machinery_asset)
+        )
+      )
+  )
+  (:action reserve_specialist_tool_for_operation
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (specialist_tool_available ?specialist_tool)
+      )
+    :effect
+      (and
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (not
+          (specialist_tool_available ?specialist_tool)
+        )
+      )
+  )
+  (:action release_specialist_tool_from_operation
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool)
+    :precondition
+      (and
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+      )
+    :effect
+      (and
+        (specialist_tool_available ?specialist_tool)
+        (not
+          (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        )
+      )
+  )
+  (:action create_field_level_window_candidate
+    :parameters (?field_unit - field_unit ?local_time_window - local_time_window ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_confirmed ?field_unit)
+        (entity_input_spec_attached ?field_unit ?input_specification)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (not
+          (local_window_selected ?local_time_window)
+        )
+        (not
+          (local_window_material_reserved ?local_time_window)
+        )
+      )
+    :effect (local_window_selected ?local_time_window)
+  )
+  (:action confirm_field_candidate_with_crew
+    :parameters (?field_unit - field_unit ?local_time_window - local_time_window ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_confirmed ?field_unit)
+        (crew_assigned_to_request ?field_unit ?crew_unit)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (local_window_selected ?local_time_window)
+        (not
+          (field_candidate_selected ?field_unit)
+        )
+      )
+    :effect
+      (and
+        (field_candidate_selected ?field_unit)
+        (field_ready ?field_unit)
+      )
+  )
+  (:action reserve_consumable_for_field_candidate
+    :parameters (?field_unit - field_unit ?local_time_window - local_time_window ?consumable_batch - consumable_batch)
+    :precondition
+      (and
+        (entity_confirmed ?field_unit)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (consumable_available ?consumable_batch)
+        (not
+          (field_candidate_selected ?field_unit)
+        )
+      )
+    :effect
+      (and
+        (local_window_material_reserved ?local_time_window)
+        (field_candidate_selected ?field_unit)
+        (consumable_allocated_to_field ?field_unit ?consumable_batch)
+        (not
+          (consumable_available ?consumable_batch)
+        )
+      )
+  )
+  (:action finalize_field_candidate_and_release_consumable
+    :parameters (?field_unit - field_unit ?local_time_window - local_time_window ?input_specification - input_specification ?consumable_batch - consumable_batch)
+    :precondition
+      (and
+        (entity_confirmed ?field_unit)
+        (entity_input_spec_attached ?field_unit ?input_specification)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (local_window_material_reserved ?local_time_window)
+        (consumable_allocated_to_field ?field_unit ?consumable_batch)
+        (not
+          (field_ready ?field_unit)
+        )
+      )
+    :effect
+      (and
+        (local_window_selected ?local_time_window)
+        (field_ready ?field_unit)
+        (consumable_available ?consumable_batch)
+        (not
+          (consumable_allocated_to_field ?field_unit ?consumable_batch)
+        )
+      )
+  )
+  (:action create_block_level_window_candidate
+    :parameters (?crop_block - crop_block ?regional_time_window - regional_time_window ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_confirmed ?crop_block)
+        (entity_input_spec_attached ?crop_block ?input_specification)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (not
+          (regional_window_selected ?regional_time_window)
+        )
+        (not
+          (regional_window_material_reserved ?regional_time_window)
+        )
+      )
+    :effect (regional_window_selected ?regional_time_window)
+  )
+  (:action confirm_block_candidate_with_crew
+    :parameters (?crop_block - crop_block ?regional_time_window - regional_time_window ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_confirmed ?crop_block)
+        (crew_assigned_to_request ?crop_block ?crew_unit)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (regional_window_selected ?regional_time_window)
+        (not
+          (block_candidate_selected ?crop_block)
+        )
+      )
+    :effect
+      (and
+        (block_candidate_selected ?crop_block)
+        (block_ready ?crop_block)
+      )
+  )
+  (:action reserve_consumable_for_block_candidate
+    :parameters (?crop_block - crop_block ?regional_time_window - regional_time_window ?consumable_batch - consumable_batch)
+    :precondition
+      (and
+        (entity_confirmed ?crop_block)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (consumable_available ?consumable_batch)
+        (not
+          (block_candidate_selected ?crop_block)
+        )
+      )
+    :effect
+      (and
+        (regional_window_material_reserved ?regional_time_window)
+        (block_candidate_selected ?crop_block)
+        (consumable_allocated_to_block ?crop_block ?consumable_batch)
+        (not
+          (consumable_available ?consumable_batch)
+        )
+      )
+  )
+  (:action finalize_block_candidate_and_release_consumable
+    :parameters (?crop_block - crop_block ?regional_time_window - regional_time_window ?input_specification - input_specification ?consumable_batch - consumable_batch)
+    :precondition
+      (and
+        (entity_confirmed ?crop_block)
+        (entity_input_spec_attached ?crop_block ?input_specification)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (regional_window_material_reserved ?regional_time_window)
+        (consumable_allocated_to_block ?crop_block ?consumable_batch)
+        (not
+          (block_ready ?crop_block)
+        )
+      )
+    :effect
+      (and
+        (regional_window_selected ?regional_time_window)
+        (block_ready ?crop_block)
+        (consumable_available ?consumable_batch)
+        (not
+          (consumable_allocated_to_block ?crop_block ?consumable_batch)
+        )
+      )
+  )
+  (:action bundle_service_slot_primary
+    :parameters (?field_unit - field_unit ?crop_block - crop_block ?local_time_window - local_time_window ?regional_time_window - regional_time_window ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (field_candidate_selected ?field_unit)
+        (block_candidate_selected ?crop_block)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (local_window_selected ?local_time_window)
+        (regional_window_selected ?regional_time_window)
+        (field_ready ?field_unit)
+        (block_ready ?crop_block)
+        (slot_pending_bundling ?service_slot_record)
+      )
+    :effect
+      (and
+        (slot_bundled ?service_slot_record)
+        (slot_local_window_attached ?service_slot_record ?local_time_window)
+        (slot_regional_window_attached ?service_slot_record ?regional_time_window)
+        (not
+          (slot_pending_bundling ?service_slot_record)
+        )
+      )
+  )
+  (:action bundle_service_slot_variant_local
+    :parameters (?field_unit - field_unit ?crop_block - crop_block ?local_time_window - local_time_window ?regional_time_window - regional_time_window ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (field_candidate_selected ?field_unit)
+        (block_candidate_selected ?crop_block)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (local_window_material_reserved ?local_time_window)
+        (regional_window_selected ?regional_time_window)
+        (not
+          (field_ready ?field_unit)
+        )
+        (block_ready ?crop_block)
+        (slot_pending_bundling ?service_slot_record)
+      )
+    :effect
+      (and
+        (slot_bundled ?service_slot_record)
+        (slot_local_window_attached ?service_slot_record ?local_time_window)
+        (slot_regional_window_attached ?service_slot_record ?regional_time_window)
+        (slot_local_readiness_marker ?service_slot_record)
+        (not
+          (slot_pending_bundling ?service_slot_record)
+        )
+      )
+  )
+  (:action bundle_service_slot_variant_regional
+    :parameters (?field_unit - field_unit ?crop_block - crop_block ?local_time_window - local_time_window ?regional_time_window - regional_time_window ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (field_candidate_selected ?field_unit)
+        (block_candidate_selected ?crop_block)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (local_window_selected ?local_time_window)
+        (regional_window_material_reserved ?regional_time_window)
+        (field_ready ?field_unit)
+        (not
+          (block_ready ?crop_block)
+        )
+        (slot_pending_bundling ?service_slot_record)
+      )
+    :effect
+      (and
+        (slot_bundled ?service_slot_record)
+        (slot_local_window_attached ?service_slot_record ?local_time_window)
+        (slot_regional_window_attached ?service_slot_record ?regional_time_window)
+        (slot_regional_readiness_marker ?service_slot_record)
+        (not
+          (slot_pending_bundling ?service_slot_record)
+        )
+      )
+  )
+  (:action bundle_service_slot_variant_local_and_regional
+    :parameters (?field_unit - field_unit ?crop_block - crop_block ?local_time_window - local_time_window ?regional_time_window - regional_time_window ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (field_candidate_selected ?field_unit)
+        (block_candidate_selected ?crop_block)
+        (local_window_for_field ?field_unit ?local_time_window)
+        (regional_window_for_block ?crop_block ?regional_time_window)
+        (local_window_material_reserved ?local_time_window)
+        (regional_window_material_reserved ?regional_time_window)
+        (not
+          (field_ready ?field_unit)
+        )
+        (not
+          (block_ready ?crop_block)
+        )
+        (slot_pending_bundling ?service_slot_record)
+      )
+    :effect
+      (and
+        (slot_bundled ?service_slot_record)
+        (slot_local_window_attached ?service_slot_record ?local_time_window)
+        (slot_regional_window_attached ?service_slot_record ?regional_time_window)
+        (slot_local_readiness_marker ?service_slot_record)
+        (slot_regional_readiness_marker ?service_slot_record)
+        (not
+          (slot_pending_bundling ?service_slot_record)
+        )
+      )
+  )
+  (:action validate_slot_availability_for_deployment
+    :parameters (?service_slot_record - service_slot_record ?field_unit - field_unit ?input_specification - input_specification)
+    :precondition
+      (and
+        (slot_bundled ?service_slot_record)
+        (field_candidate_selected ?field_unit)
+        (entity_input_spec_attached ?field_unit ?input_specification)
+        (not
+          (slot_availability_confirmed ?service_slot_record)
+        )
+      )
+    :effect (slot_availability_confirmed ?service_slot_record)
+  )
+  (:action attach_material_batch_to_slot
+    :parameters (?service_operation - service_operation ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (operation_slot_link ?service_operation ?service_slot_record)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_batch_available ?material_batch)
+        (slot_bundled ?service_slot_record)
+        (slot_availability_confirmed ?service_slot_record)
+        (not
+          (material_reserved ?material_batch)
+        )
+      )
+    :effect
+      (and
+        (material_reserved ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (not
+          (material_batch_available ?material_batch)
+        )
+      )
+  )
+  (:action confirm_operation_materials
+    :parameters (?service_operation - service_operation ?material_batch - material_batch ?service_slot_record - service_slot_record ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_reserved ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (entity_input_spec_attached ?service_operation ?input_specification)
+        (not
+          (slot_local_readiness_marker ?service_slot_record)
+        )
+        (not
+          (operation_prepared ?service_operation)
+        )
+      )
+    :effect (operation_prepared ?service_operation)
+  )
+  (:action assign_permit_to_operation
+    :parameters (?service_operation - service_operation ?permit_certification - permit_certification)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (permit_available ?permit_certification)
+        (not
+          (operation_has_permit ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_has_permit ?service_operation)
+        (operation_permit_attached ?service_operation ?permit_certification)
+        (not
+          (permit_available ?permit_certification)
+        )
+      )
+  )
+  (:action verify_operation_permit_and_readiness
+    :parameters (?service_operation - service_operation ?material_batch - material_batch ?service_slot_record - service_slot_record ?input_specification - input_specification ?permit_certification - permit_certification)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_reserved ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (entity_input_spec_attached ?service_operation ?input_specification)
+        (slot_local_readiness_marker ?service_slot_record)
+        (operation_has_permit ?service_operation)
+        (operation_permit_attached ?service_operation ?permit_certification)
+        (not
+          (operation_prepared ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_prepared ?service_operation)
+        (operation_permit_verified ?service_operation)
+      )
+  )
+  (:action confirm_operation_machinery_and_crew_local_flow
+    :parameters (?service_operation - service_operation ?machinery_asset - machinery_asset ?crew_unit - crew_unit ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_prepared ?service_operation)
+        (operation_machinery_allocated ?service_operation ?machinery_asset)
+        (crew_assigned_to_request ?service_operation ?crew_unit)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (not
+          (slot_regional_readiness_marker ?service_slot_record)
+        )
+        (not
+          (operation_materials_confirmed ?service_operation)
+        )
+      )
+    :effect (operation_materials_confirmed ?service_operation)
+  )
+  (:action confirm_operation_machinery_and_crew_regional_flow
+    :parameters (?service_operation - service_operation ?machinery_asset - machinery_asset ?crew_unit - crew_unit ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_prepared ?service_operation)
+        (operation_machinery_allocated ?service_operation ?machinery_asset)
+        (crew_assigned_to_request ?service_operation ?crew_unit)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (slot_regional_readiness_marker ?service_slot_record)
+        (not
+          (operation_materials_confirmed ?service_operation)
+        )
+      )
+    :effect (operation_materials_confirmed ?service_operation)
+  )
+  (:action confirm_operation_specialist_and_advance
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_materials_confirmed ?service_operation)
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (not
+          (slot_local_readiness_marker ?service_slot_record)
+        )
+        (not
+          (slot_regional_readiness_marker ?service_slot_record)
+        )
+        (not
+          (operation_ready_for_final_checks ?service_operation)
+        )
+      )
+    :effect (operation_ready_for_final_checks ?service_operation)
+  )
+  (:action confirm_operation_specialist_and_attach_priority
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_materials_confirmed ?service_operation)
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (slot_local_readiness_marker ?service_slot_record)
+        (not
+          (slot_regional_readiness_marker ?service_slot_record)
+        )
+        (not
+          (operation_ready_for_final_checks ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (priority_tag_attached ?service_operation)
+      )
+  )
+  (:action confirm_operation_specialist_and_attach_priority_variant
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_materials_confirmed ?service_operation)
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (not
+          (slot_local_readiness_marker ?service_slot_record)
+        )
+        (slot_regional_readiness_marker ?service_slot_record)
+        (not
+          (operation_ready_for_final_checks ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (priority_tag_attached ?service_operation)
+      )
+  )
+  (:action confirm_operation_specialist_and_attach_priority_full
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool ?material_batch - material_batch ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (operation_materials_confirmed ?service_operation)
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (operation_material_link ?service_operation ?material_batch)
+        (material_allocated_to_slot ?material_batch ?service_slot_record)
+        (slot_local_readiness_marker ?service_slot_record)
+        (slot_regional_readiness_marker ?service_slot_record)
+        (not
+          (operation_ready_for_final_checks ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (priority_tag_attached ?service_operation)
+      )
+  )
+  (:action finalize_operation_readiness
+    :parameters (?service_operation - service_operation)
+    :precondition
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (not
+          (priority_tag_attached ?service_operation)
+        )
+        (not
+          (operation_finalized ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized ?service_operation)
+        (entity_dispatch_acknowledged ?service_operation)
+      )
+  )
+  (:action attach_priority_tag_to_operation
+    :parameters (?service_operation - service_operation ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (priority_tag_attached ?service_operation)
+        (priority_tag_available ?priority_tag)
+      )
+    :effect
+      (and
+        (operation_priority_tag_attached ?service_operation ?priority_tag)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action confirm_operation_ready_for_deployment
+    :parameters (?service_operation - service_operation ?field_unit - field_unit ?crop_block - crop_block ?input_specification - input_specification ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (priority_tag_attached ?service_operation)
+        (operation_priority_tag_attached ?service_operation ?priority_tag)
+        (operation_assigned_field ?service_operation ?field_unit)
+        (operation_assigned_block ?service_operation ?crop_block)
+        (field_ready ?field_unit)
+        (block_ready ?crop_block)
+        (entity_input_spec_attached ?service_operation ?input_specification)
+        (not
+          (operation_final_checks_passed ?service_operation)
+        )
+      )
+    :effect (operation_final_checks_passed ?service_operation)
+  )
+  (:action acknowledge_operation_deployment
+    :parameters (?service_operation - service_operation)
+    :precondition
+      (and
+        (operation_ready_for_final_checks ?service_operation)
+        (operation_final_checks_passed ?service_operation)
+        (not
+          (operation_finalized ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized ?service_operation)
+        (entity_dispatch_acknowledged ?service_operation)
+      )
+  )
+  (:action apply_incentive_voucher_to_operation
+    :parameters (?service_operation - service_operation ?incentive_voucher - incentive_voucher ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_confirmed ?service_operation)
+        (entity_input_spec_attached ?service_operation ?input_specification)
+        (voucher_available ?incentive_voucher)
+        (voucher_attached_to_operation ?service_operation ?incentive_voucher)
+        (not
+          (voucher_allocated_to_operation ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (voucher_allocated_to_operation ?service_operation)
+        (not
+          (voucher_available ?incentive_voucher)
+        )
+      )
+  )
+  (:action confirm_voucher_and_crew
+    :parameters (?service_operation - service_operation ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (voucher_allocated_to_operation ?service_operation)
+        (crew_assigned_to_request ?service_operation ?crew_unit)
+        (not
+          (operation_voucher_and_crew_confirmed ?service_operation)
+        )
+      )
+    :effect (operation_voucher_and_crew_confirmed ?service_operation)
+  )
+  (:action finalize_specialist_assignment_after_voucher
+    :parameters (?service_operation - service_operation ?specialist_tool - specialist_tool)
+    :precondition
+      (and
+        (operation_voucher_and_crew_confirmed ?service_operation)
+        (tool_allocated_to_operation ?service_operation ?specialist_tool)
+        (not
+          (operation_specialist_tool_confirmed ?service_operation)
+        )
+      )
+    :effect (operation_specialist_tool_confirmed ?service_operation)
+  )
+  (:action acknowledge_operation_deployment_post_voucher
+    :parameters (?service_operation - service_operation)
+    :precondition
+      (and
+        (operation_specialist_tool_confirmed ?service_operation)
+        (not
+          (operation_finalized ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (operation_finalized ?service_operation)
+        (entity_dispatch_acknowledged ?service_operation)
+      )
+  )
+  (:action acknowledge_field_dispatch
+    :parameters (?field_unit - field_unit ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (field_candidate_selected ?field_unit)
+        (field_ready ?field_unit)
+        (slot_bundled ?service_slot_record)
+        (slot_availability_confirmed ?service_slot_record)
+        (not
+          (entity_dispatch_acknowledged ?field_unit)
+        )
+      )
+    :effect (entity_dispatch_acknowledged ?field_unit)
+  )
+  (:action acknowledge_block_dispatch
+    :parameters (?crop_block - crop_block ?service_slot_record - service_slot_record)
+    :precondition
+      (and
+        (block_candidate_selected ?crop_block)
+        (block_ready ?crop_block)
+        (slot_bundled ?service_slot_record)
+        (slot_availability_confirmed ?service_slot_record)
+        (not
+          (entity_dispatch_acknowledged ?crop_block)
+        )
+      )
+    :effect (entity_dispatch_acknowledged ?crop_block)
+  )
+  (:action allocate_contingency_reserve_to_request
+    :parameters (?allocatable_entity - allocatable_entity ?contingency_reserve - contingency_reserve ?input_specification - input_specification)
+    :precondition
+      (and
+        (entity_dispatch_acknowledged ?allocatable_entity)
+        (entity_input_spec_attached ?allocatable_entity ?input_specification)
+        (contingency_available ?contingency_reserve)
+        (not
+          (entity_contingency_allocated ?allocatable_entity)
+        )
+      )
+    :effect
+      (and
+        (entity_contingency_allocated ?allocatable_entity)
+        (contingency_allocated_to_entity ?allocatable_entity ?contingency_reserve)
+        (not
+          (contingency_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action commit_field_allocation_with_contingency
+    :parameters (?field_unit - field_unit ?service_provider - service_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_contingency_allocated ?field_unit)
+        (provider_assigned_to_entity ?field_unit ?service_provider)
+        (contingency_allocated_to_entity ?field_unit ?contingency_reserve)
+        (not
+          (entity_allocation_committed ?field_unit)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?field_unit)
+        (provider_available ?service_provider)
+        (contingency_available ?contingency_reserve)
+      )
+  )
+  (:action commit_block_allocation_with_contingency
+    :parameters (?crop_block - crop_block ?service_provider - service_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_contingency_allocated ?crop_block)
+        (provider_assigned_to_entity ?crop_block ?service_provider)
+        (contingency_allocated_to_entity ?crop_block ?contingency_reserve)
+        (not
+          (entity_allocation_committed ?crop_block)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?crop_block)
+        (provider_available ?service_provider)
+        (contingency_available ?contingency_reserve)
+      )
+  )
+  (:action commit_operation_allocation_with_contingency
+    :parameters (?service_operation - service_operation ?service_provider - service_provider ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_contingency_allocated ?service_operation)
+        (provider_assigned_to_entity ?service_operation ?service_provider)
+        (contingency_allocated_to_entity ?service_operation ?contingency_reserve)
+        (not
+          (entity_allocation_committed ?service_operation)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_committed ?service_operation)
+        (provider_available ?service_provider)
+        (contingency_available ?contingency_reserve)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem contracted_service_slot_allocation_problem)
+  (:domain contracted_service_slot_allocation)
+  (:objects field_unit_1 - field_unit crop_block_1 - crop_block service_operation_1 - service_operation service_operation_2 - service_operation service_provider_1 - service_provider service_provider_2 - service_provider service_provider_3 - service_provider input_spec_1 - input_specification crew_unit_1 - crew_unit consumable_batch_1 - consumable_batch local_time_window_1 - local_time_window regional_time_window_1 - regional_time_window service_slot_record_1 - service_slot_record material_batch_1 - material_batch material_batch_2 - material_batch permit_1 - permit_certification permit_2 - permit_certification priority_tag_1 - priority_tag priority_tag_2 - priority_tag contingency_reserve_token_1 - contingency_reserve machinery_asset_1 - machinery_asset incentive_voucher_1 - incentive_voucher incentive_voucher_2 - incentive_voucher specialist_tool_1 - specialist_tool)
+  (:init
+    (provider_available service_provider_1)
+    (provider_available service_provider_2)
+    (provider_available service_provider_3)
+    (input_spec_available input_spec_1)
+    (crew_unit_available crew_unit_1)
+    (consumable_available consumable_batch_1)
+    (local_window_for_field field_unit_1 local_time_window_1)
+    (regional_window_for_block crop_block_1 regional_time_window_1)
+    (slot_pending_bundling service_slot_record_1)
+    (material_batch_available material_batch_1)
+    (material_batch_available material_batch_2)
+    (operation_assigned_field service_operation_1 field_unit_1)
+    (operation_assigned_field service_operation_2 field_unit_1)
+    (operation_assigned_block service_operation_1 crop_block_1)
+    (operation_assigned_block service_operation_2 crop_block_1)
+    (operation_slot_link service_operation_1 service_slot_record_1)
+    (operation_slot_link service_operation_2 service_slot_record_1)
+    (operation_material_link service_operation_1 material_batch_1)
+    (operation_material_link service_operation_2 material_batch_2)
+    (permit_available permit_1)
+    (permit_available permit_2)
+    (priority_tag_available priority_tag_1)
+    (priority_tag_available priority_tag_2)
+    (contingency_available contingency_reserve_token_1)
+    (machinery_available machinery_asset_1)
+    (voucher_available incentive_voucher_1)
+    (voucher_attached_to_operation service_operation_1 incentive_voucher_1)
+    (voucher_attached_to_operation service_operation_2 incentive_voucher_2)
+    (specialist_tool_available specialist_tool_1)
+  )
+  (:goal
+    (and
+      (entity_allocation_committed field_unit_1)
+      (entity_allocation_committed crop_block_1)
+      (entity_allocation_committed service_operation_1)
+      (entity_allocation_committed service_operation_2)
+    )
+  )
+)

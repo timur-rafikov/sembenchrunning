@@ -1,0 +1,1015 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain discount_adjustment_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity_grouping - object resource_class - object slot_class - object session_subtype - object pricing_session - session_subtype discount_definition - entity_grouping pricing_request - entity_grouping approver - entity_grouping promotion_tag - entity_grouping reporting_profile - entity_grouping reason_code - entity_grouping monetary_attribute - entity_grouping policy_flag - entity_grouping coupon_token - resource_class pricing_component - resource_class entitlement_flag - resource_class order_adjustment_slot - slot_class invoice_adjustment_slot - slot_class adjustment_record - slot_class order_subtype - pricing_session invoice_subtype - pricing_session order_context - order_subtype invoice_context - order_subtype processor_session - invoice_subtype)
+  (:predicates
+    (entity_registered ?session - pricing_session)
+    (entity_evaluated ?session - pricing_session)
+    (discount_bound ?session - pricing_session)
+    (applied ?session - pricing_session)
+    (finalization_ready ?session - pricing_session)
+    (entity_committed ?session - pricing_session)
+    (discount_available ?discount_def - discount_definition)
+    (entity_discount_binding ?session - pricing_session ?discount_def - discount_definition)
+    (pricing_request_available ?pricing_request - pricing_request)
+    (entity_pricing_request_binding ?session - pricing_session ?pricing_request - pricing_request)
+    (approver_available ?approver - approver)
+    (entity_approver_binding ?session - pricing_session ?approver - approver)
+    (coupon_available ?coupon_token - coupon_token)
+    (order_coupon_binding ?order_context - order_context ?coupon_token - coupon_token)
+    (invoice_coupon_binding ?invoice_context - invoice_context ?coupon_token - coupon_token)
+    (order_has_adjustment_slot ?order_context - order_context ?order_slot - order_adjustment_slot)
+    (order_slot_selected ?order_slot - order_adjustment_slot)
+    (order_slot_coupon_attached ?order_slot - order_adjustment_slot)
+    (order_has_selected_slot ?order_context - order_context)
+    (invoice_has_adjustment_slot ?invoice_context - invoice_context ?invoice_slot - invoice_adjustment_slot)
+    (invoice_slot_selected ?invoice_slot - invoice_adjustment_slot)
+    (invoice_slot_coupon_attached ?invoice_slot - invoice_adjustment_slot)
+    (invoice_has_selected_slot ?invoice_context - invoice_context)
+    (adjustment_record_available ?adjustment_record - adjustment_record)
+    (adjustment_record_created ?adjustment_record - adjustment_record)
+    (adjustment_record_order_slot_binding ?adjustment_record - adjustment_record ?order_slot - order_adjustment_slot)
+    (adjustment_record_invoice_slot_binding ?adjustment_record - adjustment_record ?invoice_slot - invoice_adjustment_slot)
+    (adjustment_record_order_attribute ?adjustment_record - adjustment_record)
+    (adjustment_record_invoice_attribute ?adjustment_record - adjustment_record)
+    (adjustment_record_component_attached ?adjustment_record - adjustment_record)
+    (processor_bound_to_order_context ?processor - processor_session ?order_context - order_context)
+    (processor_bound_to_invoice_context ?processor - processor_session ?invoice_context - invoice_context)
+    (processor_has_adjustment_record ?processor - processor_session ?adjustment_record - adjustment_record)
+    (component_available ?component - pricing_component)
+    (processor_has_component ?processor - processor_session ?component - pricing_component)
+    (component_reserved ?component - pricing_component)
+    (component_attached_to_record ?component - pricing_component ?adjustment_record - adjustment_record)
+    (processor_initialized ?processor - processor_session)
+    (processor_monetary_attached ?processor - processor_session)
+    (processor_enriched ?processor - processor_session)
+    (processor_has_promotion_flag ?processor - processor_session)
+    (processor_promotion_applied ?processor - processor_session)
+    (processor_policy_enriched ?processor - processor_session)
+    (processor_validated ?processor - processor_session)
+    (entitlement_flag_available ?entitlement_flag - entitlement_flag)
+    (processor_entitlement_binding ?processor - processor_session ?entitlement_flag - entitlement_flag)
+    (processor_entitlement_flagged ?processor - processor_session)
+    (processor_ready_for_policy_flag ?processor - processor_session)
+    (processor_policy_flagged ?processor - processor_session)
+    (promotion_tag_available ?promotion_tag - promotion_tag)
+    (processor_promotion_binding ?processor - processor_session ?promotion_tag - promotion_tag)
+    (reporting_profile_available ?reporting_profile - reporting_profile)
+    (processor_reporting_profile_binding ?processor - processor_session ?reporting_profile - reporting_profile)
+    (monetary_attribute_available ?monetary_attribute - monetary_attribute)
+    (processor_monetary_attribute_binding ?processor - processor_session ?monetary_attribute - monetary_attribute)
+    (policy_flag_available ?policy_flag - policy_flag)
+    (processor_policy_flag_binding ?processor - processor_session ?policy_flag - policy_flag)
+    (reason_code_available ?reason_code - reason_code)
+    (entity_reason_code_binding ?session - pricing_session ?reason_code - reason_code)
+    (order_context_prepared ?order_context - order_context)
+    (invoice_context_prepared ?invoice_context - invoice_context)
+    (processor_finalized ?processor - processor_session)
+  )
+  (:action create_pricing_session
+    :parameters (?session - pricing_session)
+    :precondition
+      (and
+        (not
+          (entity_registered ?session)
+        )
+        (not
+          (applied ?session)
+        )
+      )
+    :effect (entity_registered ?session)
+  )
+  (:action bind_discount_to_session
+    :parameters (?session - pricing_session ?discount_def - discount_definition)
+    :precondition
+      (and
+        (entity_registered ?session)
+        (not
+          (discount_bound ?session)
+        )
+        (discount_available ?discount_def)
+      )
+    :effect
+      (and
+        (discount_bound ?session)
+        (entity_discount_binding ?session ?discount_def)
+        (not
+          (discount_available ?discount_def)
+        )
+      )
+  )
+  (:action attach_pricing_request_to_session
+    :parameters (?session - pricing_session ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_registered ?session)
+        (discount_bound ?session)
+        (pricing_request_available ?pricing_request)
+      )
+    :effect
+      (and
+        (entity_pricing_request_binding ?session ?pricing_request)
+        (not
+          (pricing_request_available ?pricing_request)
+        )
+      )
+  )
+  (:action mark_session_evaluated
+    :parameters (?session - pricing_session ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_registered ?session)
+        (discount_bound ?session)
+        (entity_pricing_request_binding ?session ?pricing_request)
+        (not
+          (entity_evaluated ?session)
+        )
+      )
+    :effect (entity_evaluated ?session)
+  )
+  (:action release_pricing_request_from_session
+    :parameters (?session - pricing_session ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_pricing_request_binding ?session ?pricing_request)
+      )
+    :effect
+      (and
+        (pricing_request_available ?pricing_request)
+        (not
+          (entity_pricing_request_binding ?session ?pricing_request)
+        )
+      )
+  )
+  (:action assign_approver_to_session
+    :parameters (?session - pricing_session ?approver - approver)
+    :precondition
+      (and
+        (entity_evaluated ?session)
+        (approver_available ?approver)
+      )
+    :effect
+      (and
+        (entity_approver_binding ?session ?approver)
+        (not
+          (approver_available ?approver)
+        )
+      )
+  )
+  (:action release_approver_from_session
+    :parameters (?session - pricing_session ?approver - approver)
+    :precondition
+      (and
+        (entity_approver_binding ?session ?approver)
+      )
+    :effect
+      (and
+        (approver_available ?approver)
+        (not
+          (entity_approver_binding ?session ?approver)
+        )
+      )
+  )
+  (:action bind_monetary_attribute_to_processor
+    :parameters (?processor - processor_session ?monetary_attribute - monetary_attribute)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (monetary_attribute_available ?monetary_attribute)
+      )
+    :effect
+      (and
+        (processor_monetary_attribute_binding ?processor ?monetary_attribute)
+        (not
+          (monetary_attribute_available ?monetary_attribute)
+        )
+      )
+  )
+  (:action unbind_monetary_attribute_from_processor
+    :parameters (?processor - processor_session ?monetary_attribute - monetary_attribute)
+    :precondition
+      (and
+        (processor_monetary_attribute_binding ?processor ?monetary_attribute)
+      )
+    :effect
+      (and
+        (monetary_attribute_available ?monetary_attribute)
+        (not
+          (processor_monetary_attribute_binding ?processor ?monetary_attribute)
+        )
+      )
+  )
+  (:action bind_policy_flag_to_processor
+    :parameters (?processor - processor_session ?policy_flag - policy_flag)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (policy_flag_available ?policy_flag)
+      )
+    :effect
+      (and
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (not
+          (policy_flag_available ?policy_flag)
+        )
+      )
+  )
+  (:action unbind_policy_flag_from_processor
+    :parameters (?processor - processor_session ?policy_flag - policy_flag)
+    :precondition
+      (and
+        (processor_policy_flag_binding ?processor ?policy_flag)
+      )
+    :effect
+      (and
+        (policy_flag_available ?policy_flag)
+        (not
+          (processor_policy_flag_binding ?processor ?policy_flag)
+        )
+      )
+  )
+  (:action select_order_slot_for_evaluation
+    :parameters (?order_context - order_context ?order_slot - order_adjustment_slot ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_evaluated ?order_context)
+        (entity_pricing_request_binding ?order_context ?pricing_request)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (not
+          (order_slot_selected ?order_slot)
+        )
+        (not
+          (order_slot_coupon_attached ?order_slot)
+        )
+      )
+    :effect (order_slot_selected ?order_slot)
+  )
+  (:action lock_order_context_for_processing
+    :parameters (?order_context - order_context ?order_slot - order_adjustment_slot ?approver - approver)
+    :precondition
+      (and
+        (entity_evaluated ?order_context)
+        (entity_approver_binding ?order_context ?approver)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (order_slot_selected ?order_slot)
+        (not
+          (order_context_prepared ?order_context)
+        )
+      )
+    :effect
+      (and
+        (order_context_prepared ?order_context)
+        (order_has_selected_slot ?order_context)
+      )
+  )
+  (:action apply_coupon_to_order_slot
+    :parameters (?order_context - order_context ?order_slot - order_adjustment_slot ?coupon_token - coupon_token)
+    :precondition
+      (and
+        (entity_evaluated ?order_context)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (coupon_available ?coupon_token)
+        (not
+          (order_context_prepared ?order_context)
+        )
+      )
+    :effect
+      (and
+        (order_slot_coupon_attached ?order_slot)
+        (order_context_prepared ?order_context)
+        (order_coupon_binding ?order_context ?coupon_token)
+        (not
+          (coupon_available ?coupon_token)
+        )
+      )
+  )
+  (:action confirm_order_slot
+    :parameters (?order_context - order_context ?order_slot - order_adjustment_slot ?pricing_request - pricing_request ?coupon_token - coupon_token)
+    :precondition
+      (and
+        (entity_evaluated ?order_context)
+        (entity_pricing_request_binding ?order_context ?pricing_request)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (order_slot_coupon_attached ?order_slot)
+        (order_coupon_binding ?order_context ?coupon_token)
+        (not
+          (order_has_selected_slot ?order_context)
+        )
+      )
+    :effect
+      (and
+        (order_slot_selected ?order_slot)
+        (order_has_selected_slot ?order_context)
+        (coupon_available ?coupon_token)
+        (not
+          (order_coupon_binding ?order_context ?coupon_token)
+        )
+      )
+  )
+  (:action select_invoice_slot_for_evaluation
+    :parameters (?invoice_context - invoice_context ?invoice_slot - invoice_adjustment_slot ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_evaluated ?invoice_context)
+        (entity_pricing_request_binding ?invoice_context ?pricing_request)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (not
+          (invoice_slot_selected ?invoice_slot)
+        )
+        (not
+          (invoice_slot_coupon_attached ?invoice_slot)
+        )
+      )
+    :effect (invoice_slot_selected ?invoice_slot)
+  )
+  (:action lock_invoice_context_for_processing
+    :parameters (?invoice_context - invoice_context ?invoice_slot - invoice_adjustment_slot ?approver - approver)
+    :precondition
+      (and
+        (entity_evaluated ?invoice_context)
+        (entity_approver_binding ?invoice_context ?approver)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (invoice_slot_selected ?invoice_slot)
+        (not
+          (invoice_context_prepared ?invoice_context)
+        )
+      )
+    :effect
+      (and
+        (invoice_context_prepared ?invoice_context)
+        (invoice_has_selected_slot ?invoice_context)
+      )
+  )
+  (:action apply_coupon_to_invoice_slot
+    :parameters (?invoice_context - invoice_context ?invoice_slot - invoice_adjustment_slot ?coupon_token - coupon_token)
+    :precondition
+      (and
+        (entity_evaluated ?invoice_context)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (coupon_available ?coupon_token)
+        (not
+          (invoice_context_prepared ?invoice_context)
+        )
+      )
+    :effect
+      (and
+        (invoice_slot_coupon_attached ?invoice_slot)
+        (invoice_context_prepared ?invoice_context)
+        (invoice_coupon_binding ?invoice_context ?coupon_token)
+        (not
+          (coupon_available ?coupon_token)
+        )
+      )
+  )
+  (:action confirm_invoice_slot
+    :parameters (?invoice_context - invoice_context ?invoice_slot - invoice_adjustment_slot ?pricing_request - pricing_request ?coupon_token - coupon_token)
+    :precondition
+      (and
+        (entity_evaluated ?invoice_context)
+        (entity_pricing_request_binding ?invoice_context ?pricing_request)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (invoice_slot_coupon_attached ?invoice_slot)
+        (invoice_coupon_binding ?invoice_context ?coupon_token)
+        (not
+          (invoice_has_selected_slot ?invoice_context)
+        )
+      )
+    :effect
+      (and
+        (invoice_slot_selected ?invoice_slot)
+        (invoice_has_selected_slot ?invoice_context)
+        (coupon_available ?coupon_token)
+        (not
+          (invoice_coupon_binding ?invoice_context ?coupon_token)
+        )
+      )
+  )
+  (:action assemble_adjustment_record_from_slots
+    :parameters (?order_context - order_context ?invoice_context - invoice_context ?order_slot - order_adjustment_slot ?invoice_slot - invoice_adjustment_slot ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (order_context_prepared ?order_context)
+        (invoice_context_prepared ?invoice_context)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (order_slot_selected ?order_slot)
+        (invoice_slot_selected ?invoice_slot)
+        (order_has_selected_slot ?order_context)
+        (invoice_has_selected_slot ?invoice_context)
+        (adjustment_record_available ?adjustment_record)
+      )
+    :effect
+      (and
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_order_slot_binding ?adjustment_record ?order_slot)
+        (adjustment_record_invoice_slot_binding ?adjustment_record ?invoice_slot)
+        (not
+          (adjustment_record_available ?adjustment_record)
+        )
+      )
+  )
+  (:action assemble_adjustment_record_with_order_coupon
+    :parameters (?order_context - order_context ?invoice_context - invoice_context ?order_slot - order_adjustment_slot ?invoice_slot - invoice_adjustment_slot ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (order_context_prepared ?order_context)
+        (invoice_context_prepared ?invoice_context)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (order_slot_coupon_attached ?order_slot)
+        (invoice_slot_selected ?invoice_slot)
+        (not
+          (order_has_selected_slot ?order_context)
+        )
+        (invoice_has_selected_slot ?invoice_context)
+        (adjustment_record_available ?adjustment_record)
+      )
+    :effect
+      (and
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_order_slot_binding ?adjustment_record ?order_slot)
+        (adjustment_record_invoice_slot_binding ?adjustment_record ?invoice_slot)
+        (adjustment_record_order_attribute ?adjustment_record)
+        (not
+          (adjustment_record_available ?adjustment_record)
+        )
+      )
+  )
+  (:action assemble_adjustment_record_with_invoice_coupon
+    :parameters (?order_context - order_context ?invoice_context - invoice_context ?order_slot - order_adjustment_slot ?invoice_slot - invoice_adjustment_slot ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (order_context_prepared ?order_context)
+        (invoice_context_prepared ?invoice_context)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (order_slot_selected ?order_slot)
+        (invoice_slot_coupon_attached ?invoice_slot)
+        (order_has_selected_slot ?order_context)
+        (not
+          (invoice_has_selected_slot ?invoice_context)
+        )
+        (adjustment_record_available ?adjustment_record)
+      )
+    :effect
+      (and
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_order_slot_binding ?adjustment_record ?order_slot)
+        (adjustment_record_invoice_slot_binding ?adjustment_record ?invoice_slot)
+        (adjustment_record_invoice_attribute ?adjustment_record)
+        (not
+          (adjustment_record_available ?adjustment_record)
+        )
+      )
+  )
+  (:action assemble_adjustment_record_with_both_coupons
+    :parameters (?order_context - order_context ?invoice_context - invoice_context ?order_slot - order_adjustment_slot ?invoice_slot - invoice_adjustment_slot ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (order_context_prepared ?order_context)
+        (invoice_context_prepared ?invoice_context)
+        (order_has_adjustment_slot ?order_context ?order_slot)
+        (invoice_has_adjustment_slot ?invoice_context ?invoice_slot)
+        (order_slot_coupon_attached ?order_slot)
+        (invoice_slot_coupon_attached ?invoice_slot)
+        (not
+          (order_has_selected_slot ?order_context)
+        )
+        (not
+          (invoice_has_selected_slot ?invoice_context)
+        )
+        (adjustment_record_available ?adjustment_record)
+      )
+    :effect
+      (and
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_order_slot_binding ?adjustment_record ?order_slot)
+        (adjustment_record_invoice_slot_binding ?adjustment_record ?invoice_slot)
+        (adjustment_record_order_attribute ?adjustment_record)
+        (adjustment_record_invoice_attribute ?adjustment_record)
+        (not
+          (adjustment_record_available ?adjustment_record)
+        )
+      )
+  )
+  (:action mark_record_ready_for_component_attachment
+    :parameters (?adjustment_record - adjustment_record ?order_context - order_context ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (adjustment_record_created ?adjustment_record)
+        (order_context_prepared ?order_context)
+        (entity_pricing_request_binding ?order_context ?pricing_request)
+        (not
+          (adjustment_record_component_attached ?adjustment_record)
+        )
+      )
+    :effect (adjustment_record_component_attached ?adjustment_record)
+  )
+  (:action attach_component_to_record
+    :parameters (?processor - processor_session ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (processor_has_adjustment_record ?processor ?adjustment_record)
+        (processor_has_component ?processor ?component)
+        (component_available ?component)
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_component_attached ?adjustment_record)
+        (not
+          (component_reserved ?component)
+        )
+      )
+    :effect
+      (and
+        (component_reserved ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action prepare_processor_for_record_assembly
+    :parameters (?processor - processor_session ?component - pricing_component ?adjustment_record - adjustment_record ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (processor_has_component ?processor ?component)
+        (component_reserved ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (entity_pricing_request_binding ?processor ?pricing_request)
+        (not
+          (adjustment_record_order_attribute ?adjustment_record)
+        )
+        (not
+          (processor_initialized ?processor)
+        )
+      )
+    :effect (processor_initialized ?processor)
+  )
+  (:action bind_promotion_tag_to_processor
+    :parameters (?processor - processor_session ?promotion_tag - promotion_tag)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (promotion_tag_available ?promotion_tag)
+        (not
+          (processor_has_promotion_flag ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_has_promotion_flag ?processor)
+        (processor_promotion_binding ?processor ?promotion_tag)
+        (not
+          (promotion_tag_available ?promotion_tag)
+        )
+      )
+  )
+  (:action apply_promotion_tag_to_processor
+    :parameters (?processor - processor_session ?component - pricing_component ?adjustment_record - adjustment_record ?pricing_request - pricing_request ?promotion_tag - promotion_tag)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (processor_has_component ?processor ?component)
+        (component_reserved ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (entity_pricing_request_binding ?processor ?pricing_request)
+        (adjustment_record_order_attribute ?adjustment_record)
+        (processor_has_promotion_flag ?processor)
+        (processor_promotion_binding ?processor ?promotion_tag)
+        (not
+          (processor_initialized ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_initialized ?processor)
+        (processor_promotion_applied ?processor)
+      )
+  )
+  (:action apply_monetary_attribute_to_processor
+    :parameters (?processor - processor_session ?monetary_attribute - monetary_attribute ?approver - approver ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_initialized ?processor)
+        (processor_monetary_attribute_binding ?processor ?monetary_attribute)
+        (entity_approver_binding ?processor ?approver)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (not
+          (adjustment_record_invoice_attribute ?adjustment_record)
+        )
+        (not
+          (processor_monetary_attached ?processor)
+        )
+      )
+    :effect (processor_monetary_attached ?processor)
+  )
+  (:action finalize_monetary_attribute_on_processor
+    :parameters (?processor - processor_session ?monetary_attribute - monetary_attribute ?approver - approver ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_initialized ?processor)
+        (processor_monetary_attribute_binding ?processor ?monetary_attribute)
+        (entity_approver_binding ?processor ?approver)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (adjustment_record_invoice_attribute ?adjustment_record)
+        (not
+          (processor_monetary_attached ?processor)
+        )
+      )
+    :effect (processor_monetary_attached ?processor)
+  )
+  (:action apply_policy_flag_to_processor
+    :parameters (?processor - processor_session ?policy_flag - policy_flag ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_monetary_attached ?processor)
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (not
+          (adjustment_record_order_attribute ?adjustment_record)
+        )
+        (not
+          (adjustment_record_invoice_attribute ?adjustment_record)
+        )
+        (not
+          (processor_enriched ?processor)
+        )
+      )
+    :effect (processor_enriched ?processor)
+  )
+  (:action apply_policy_flag_and_enrich_processor
+    :parameters (?processor - processor_session ?policy_flag - policy_flag ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_monetary_attached ?processor)
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (adjustment_record_order_attribute ?adjustment_record)
+        (not
+          (adjustment_record_invoice_attribute ?adjustment_record)
+        )
+        (not
+          (processor_enriched ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_enriched ?processor)
+        (processor_policy_enriched ?processor)
+      )
+  )
+  (:action apply_policy_flag_and_enrich_processor_alt
+    :parameters (?processor - processor_session ?policy_flag - policy_flag ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_monetary_attached ?processor)
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (not
+          (adjustment_record_order_attribute ?adjustment_record)
+        )
+        (adjustment_record_invoice_attribute ?adjustment_record)
+        (not
+          (processor_enriched ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_enriched ?processor)
+        (processor_policy_enriched ?processor)
+      )
+  )
+  (:action apply_policy_flag_and_enrich_processor_both
+    :parameters (?processor - processor_session ?policy_flag - policy_flag ?component - pricing_component ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (processor_monetary_attached ?processor)
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (processor_has_component ?processor ?component)
+        (component_attached_to_record ?component ?adjustment_record)
+        (adjustment_record_order_attribute ?adjustment_record)
+        (adjustment_record_invoice_attribute ?adjustment_record)
+        (not
+          (processor_enriched ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_enriched ?processor)
+        (processor_policy_enriched ?processor)
+      )
+  )
+  (:action stage_processor_for_finalization
+    :parameters (?processor - processor_session)
+    :precondition
+      (and
+        (processor_enriched ?processor)
+        (not
+          (processor_policy_enriched ?processor)
+        )
+        (not
+          (processor_finalized ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_finalized ?processor)
+        (finalization_ready ?processor)
+      )
+  )
+  (:action attach_reporting_profile_to_processor
+    :parameters (?processor - processor_session ?reporting_profile - reporting_profile)
+    :precondition
+      (and
+        (processor_enriched ?processor)
+        (processor_policy_enriched ?processor)
+        (reporting_profile_available ?reporting_profile)
+      )
+    :effect
+      (and
+        (processor_reporting_profile_binding ?processor ?reporting_profile)
+        (not
+          (reporting_profile_available ?reporting_profile)
+        )
+      )
+  )
+  (:action validate_processor_for_finalization
+    :parameters (?processor - processor_session ?order_context - order_context ?invoice_context - invoice_context ?pricing_request - pricing_request ?reporting_profile - reporting_profile)
+    :precondition
+      (and
+        (processor_enriched ?processor)
+        (processor_policy_enriched ?processor)
+        (processor_reporting_profile_binding ?processor ?reporting_profile)
+        (processor_bound_to_order_context ?processor ?order_context)
+        (processor_bound_to_invoice_context ?processor ?invoice_context)
+        (order_has_selected_slot ?order_context)
+        (invoice_has_selected_slot ?invoice_context)
+        (entity_pricing_request_binding ?processor ?pricing_request)
+        (not
+          (processor_validated ?processor)
+        )
+      )
+    :effect (processor_validated ?processor)
+  )
+  (:action finalize_processor_after_validation
+    :parameters (?processor - processor_session)
+    :precondition
+      (and
+        (processor_enriched ?processor)
+        (processor_validated ?processor)
+        (not
+          (processor_finalized ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_finalized ?processor)
+        (finalization_ready ?processor)
+      )
+  )
+  (:action activate_entitlement_flag_on_processor
+    :parameters (?processor - processor_session ?entitlement_flag - entitlement_flag ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (entity_evaluated ?processor)
+        (entity_pricing_request_binding ?processor ?pricing_request)
+        (entitlement_flag_available ?entitlement_flag)
+        (processor_entitlement_binding ?processor ?entitlement_flag)
+        (not
+          (processor_entitlement_flagged ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_entitlement_flagged ?processor)
+        (not
+          (entitlement_flag_available ?entitlement_flag)
+        )
+      )
+  )
+  (:action mark_processor_for_policy_flagging
+    :parameters (?processor - processor_session ?approver - approver)
+    :precondition
+      (and
+        (processor_entitlement_flagged ?processor)
+        (entity_approver_binding ?processor ?approver)
+        (not
+          (processor_ready_for_policy_flag ?processor)
+        )
+      )
+    :effect (processor_ready_for_policy_flag ?processor)
+  )
+  (:action flag_processor_with_policy
+    :parameters (?processor - processor_session ?policy_flag - policy_flag)
+    :precondition
+      (and
+        (processor_ready_for_policy_flag ?processor)
+        (processor_policy_flag_binding ?processor ?policy_flag)
+        (not
+          (processor_policy_flagged ?processor)
+        )
+      )
+    :effect (processor_policy_flagged ?processor)
+  )
+  (:action finalize_processor_after_policy_flagging
+    :parameters (?processor - processor_session)
+    :precondition
+      (and
+        (processor_policy_flagged ?processor)
+        (not
+          (processor_finalized ?processor)
+        )
+      )
+    :effect
+      (and
+        (processor_finalized ?processor)
+        (finalization_ready ?processor)
+      )
+  )
+  (:action finalize_order_context
+    :parameters (?order_context - order_context ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (order_context_prepared ?order_context)
+        (order_has_selected_slot ?order_context)
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_component_attached ?adjustment_record)
+        (not
+          (finalization_ready ?order_context)
+        )
+      )
+    :effect (finalization_ready ?order_context)
+  )
+  (:action finalize_invoice_context
+    :parameters (?invoice_context - invoice_context ?adjustment_record - adjustment_record)
+    :precondition
+      (and
+        (invoice_context_prepared ?invoice_context)
+        (invoice_has_selected_slot ?invoice_context)
+        (adjustment_record_created ?adjustment_record)
+        (adjustment_record_component_attached ?adjustment_record)
+        (not
+          (finalization_ready ?invoice_context)
+        )
+      )
+    :effect (finalization_ready ?invoice_context)
+  )
+  (:action commit_session_with_reason_code
+    :parameters (?session - pricing_session ?reason_code - reason_code ?pricing_request - pricing_request)
+    :precondition
+      (and
+        (finalization_ready ?session)
+        (entity_pricing_request_binding ?session ?pricing_request)
+        (reason_code_available ?reason_code)
+        (not
+          (entity_committed ?session)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?session)
+        (entity_reason_code_binding ?session ?reason_code)
+        (not
+          (reason_code_available ?reason_code)
+        )
+      )
+  )
+  (:action consume_resources_for_order_context
+    :parameters (?order_context - order_context ?discount_def - discount_definition ?reason_code - reason_code)
+    :precondition
+      (and
+        (entity_committed ?order_context)
+        (entity_discount_binding ?order_context ?discount_def)
+        (entity_reason_code_binding ?order_context ?reason_code)
+        (not
+          (applied ?order_context)
+        )
+      )
+    :effect
+      (and
+        (applied ?order_context)
+        (discount_available ?discount_def)
+        (reason_code_available ?reason_code)
+      )
+  )
+  (:action consume_resources_for_invoice_context
+    :parameters (?invoice_context - invoice_context ?discount_def - discount_definition ?reason_code - reason_code)
+    :precondition
+      (and
+        (entity_committed ?invoice_context)
+        (entity_discount_binding ?invoice_context ?discount_def)
+        (entity_reason_code_binding ?invoice_context ?reason_code)
+        (not
+          (applied ?invoice_context)
+        )
+      )
+    :effect
+      (and
+        (applied ?invoice_context)
+        (discount_available ?discount_def)
+        (reason_code_available ?reason_code)
+      )
+  )
+  (:action consume_resources_for_processor
+    :parameters (?processor - processor_session ?discount_def - discount_definition ?reason_code - reason_code)
+    :precondition
+      (and
+        (entity_committed ?processor)
+        (entity_discount_binding ?processor ?discount_def)
+        (entity_reason_code_binding ?processor ?reason_code)
+        (not
+          (applied ?processor)
+        )
+      )
+    :effect
+      (and
+        (applied ?processor)
+        (discount_available ?discount_def)
+        (reason_code_available ?reason_code)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem discount_adjustment_problem)
+  (:domain discount_adjustment_domain)
+  (:objects order_context_1 - order_context invoice_context_1 - invoice_context processor_alpha - processor_session processor_beta - processor_session discount_def_a - discount_definition discount_def_b - discount_definition discount_def_c - discount_definition pricing_request_1 - pricing_request approver_1 - approver coupon_token_1 - coupon_token order_slot_1 - order_adjustment_slot invoice_slot_1 - invoice_adjustment_slot adjustment_record_template - adjustment_record pricing_component_a - pricing_component pricing_component_b - pricing_component promotion_tag_a - promotion_tag promotion_tag_b - promotion_tag reporting_profile_a - reporting_profile reporting_profile_b - reporting_profile reason_code_standard - reason_code monetary_attribute_default - monetary_attribute entitlement_flag_a - entitlement_flag entitlement_flag_b - entitlement_flag policy_flag_default - policy_flag)
+  (:init
+    (discount_available discount_def_a)
+    (discount_available discount_def_b)
+    (discount_available discount_def_c)
+    (pricing_request_available pricing_request_1)
+    (approver_available approver_1)
+    (coupon_available coupon_token_1)
+    (order_has_adjustment_slot order_context_1 order_slot_1)
+    (invoice_has_adjustment_slot invoice_context_1 invoice_slot_1)
+    (adjustment_record_available adjustment_record_template)
+    (component_available pricing_component_a)
+    (component_available pricing_component_b)
+    (processor_bound_to_order_context processor_alpha order_context_1)
+    (processor_bound_to_order_context processor_beta order_context_1)
+    (processor_bound_to_invoice_context processor_alpha invoice_context_1)
+    (processor_bound_to_invoice_context processor_beta invoice_context_1)
+    (processor_has_adjustment_record processor_alpha adjustment_record_template)
+    (processor_has_adjustment_record processor_beta adjustment_record_template)
+    (processor_has_component processor_alpha pricing_component_a)
+    (processor_has_component processor_beta pricing_component_b)
+    (promotion_tag_available promotion_tag_a)
+    (promotion_tag_available promotion_tag_b)
+    (reporting_profile_available reporting_profile_a)
+    (reporting_profile_available reporting_profile_b)
+    (reason_code_available reason_code_standard)
+    (monetary_attribute_available monetary_attribute_default)
+    (entitlement_flag_available entitlement_flag_a)
+    (processor_entitlement_binding processor_alpha entitlement_flag_a)
+    (processor_entitlement_binding processor_beta entitlement_flag_b)
+    (policy_flag_available policy_flag_default)
+  )
+  (:goal
+    (and
+      (applied order_context_1)
+      (applied invoice_context_1)
+      (applied processor_alpha)
+      (applied processor_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(create_pricing_session order_context_1)
+(create_pricing_session invoice_context_1)
+(create_pricing_session processor_alpha)
+(create_pricing_session processor_beta)
+(bind_discount_to_session order_context_1 discount_def_a)
+(bind_discount_to_session invoice_context_1 discount_def_b)
+(bind_discount_to_session processor_alpha discount_def_c)
+(attach_pricing_request_to_session order_context_1 pricing_request_1)
+(mark_session_evaluated order_context_1 pricing_request_1)
+(release_pricing_request_from_session order_context_1 pricing_request_1)
+(attach_pricing_request_to_session invoice_context_1 pricing_request_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_kdfzz212/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_kdfzz212/plan.pddl 
+
+
+--- stderr ---
+

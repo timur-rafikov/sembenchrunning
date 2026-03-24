@@ -1,0 +1,1012 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain late_arrival_check_in_protection_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_entity - object transactional_entity - base_entity scheduling_entity - base_entity resource_entity - base_entity booking_root_category - base_entity reservation - booking_root_category payment_option - transactional_entity arrival_time_window - transactional_entity staff_assignment - transactional_entity loyalty_membership - transactional_entity corporate_account - transactional_entity contact_method - transactional_entity payment_authorization - transactional_entity manager_override - transactional_entity ancillary_service - scheduling_entity guest_profile - scheduling_entity waived_fee_approval - scheduling_entity supplier_slot_primary - resource_entity supplier_slot_secondary - resource_entity confirmation_document - resource_entity supplier_booking_category - reservation case_category - reservation primary_supplier_reservation - supplier_booking_category secondary_supplier_reservation - supplier_booking_category protection_case - case_category)
+
+  (:predicates
+    (protection_option_selected ?reservation - reservation)
+    (protection_option_committed ?reservation - reservation)
+    (payment_option_attached ?reservation - reservation)
+    (protection_applied ?reservation - reservation)
+    (protection_issued ?reservation - reservation)
+    (protection_enrolled ?reservation - reservation)
+    (payment_option_available ?payment_option - payment_option)
+    (entity_payment_link ?reservation - reservation ?payment_option - payment_option)
+    (arrival_window_available ?arrival_time_window - arrival_time_window)
+    (entity_arrival_assigned ?reservation - reservation ?arrival_time_window - arrival_time_window)
+    (staff_available ?staff_assignment - staff_assignment)
+    (entity_assigned_staff ?reservation - reservation ?staff_assignment - staff_assignment)
+    (ancillary_service_available ?ancillary_service - ancillary_service)
+    (primary_reservation_ancillary_attached ?primary_supplier_reservation - primary_supplier_reservation ?ancillary_service - ancillary_service)
+    (secondary_reservation_ancillary_attached ?secondary_supplier_reservation - secondary_supplier_reservation ?ancillary_service - ancillary_service)
+    (entity_slot_primary_link ?primary_supplier_reservation - primary_supplier_reservation ?supplier_slot_a - supplier_slot_primary)
+    (slot_primary_confirmed ?supplier_slot_a - supplier_slot_primary)
+    (slot_primary_pending ?supplier_slot_a - supplier_slot_primary)
+    (primary_supplier_reservation_ready ?primary_supplier_reservation - primary_supplier_reservation)
+    (entity_slot_secondary_link ?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_b - supplier_slot_secondary)
+    (slot_secondary_confirmed ?supplier_slot_b - supplier_slot_secondary)
+    (slot_secondary_pending ?supplier_slot_b - supplier_slot_secondary)
+    (secondary_supplier_reservation_ready ?secondary_supplier_reservation - secondary_supplier_reservation)
+    (confirmation_document_available ?confirmation_document - confirmation_document)
+    (confirmation_document_created ?confirmation_document - confirmation_document)
+    (confirmation_slot_primary_link ?confirmation_document - confirmation_document ?supplier_slot_a - supplier_slot_primary)
+    (confirmation_slot_secondary_link ?confirmation_document - confirmation_document ?supplier_slot_b - supplier_slot_secondary)
+    (confirmation_includes_slot_primary ?confirmation_document - confirmation_document)
+    (confirmation_includes_slot_secondary ?confirmation_document - confirmation_document)
+    (confirmation_validated ?confirmation_document - confirmation_document)
+    (case_links_primary_reservation ?protection_case - protection_case ?primary_supplier_reservation - primary_supplier_reservation)
+    (case_links_secondary_reservation ?protection_case - protection_case ?secondary_supplier_reservation - secondary_supplier_reservation)
+    (case_confirmation_link ?protection_case - protection_case ?confirmation_document - confirmation_document)
+    (guest_profile_available ?guest_profile - guest_profile)
+    (case_guest_profile_link ?protection_case - protection_case ?guest_profile - guest_profile)
+    (guest_profile_linked ?guest_profile - guest_profile)
+    (guest_profile_confirmation_link ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    (case_enrichment_ready ?protection_case - protection_case)
+    (case_loyalty_enriched ?protection_case - protection_case)
+    (case_verified ?protection_case - protection_case)
+    (case_loyalty_flag ?protection_case - protection_case)
+    (case_loyalty_processed ?protection_case - protection_case)
+    (case_enrichment_additional_applied ?protection_case - protection_case)
+    (case_ready_for_finalization ?protection_case - protection_case)
+    (waived_fee_approval_available ?waived_fee_approval - waived_fee_approval)
+    (case_waived_fee_link ?protection_case - protection_case ?waived_fee_approval - waived_fee_approval)
+    (case_targeted_approval_requested ?protection_case - protection_case)
+    (case_targeted_approval_pending ?protection_case - protection_case)
+    (case_targeted_approval_granted ?protection_case - protection_case)
+    (loyalty_membership_available ?loyalty_membership - loyalty_membership)
+    (case_loyalty_link ?protection_case - protection_case ?loyalty_membership - loyalty_membership)
+    (corporate_account_available ?corporate_account - corporate_account)
+    (case_corporate_account_link ?protection_case - protection_case ?corporate_account - corporate_account)
+    (payment_authorization_available ?payment_authorization - payment_authorization)
+    (case_payment_authorization_link ?protection_case - protection_case ?payment_authorization - payment_authorization)
+    (manager_override_available ?manager_override - manager_override)
+    (case_manager_override_link ?protection_case - protection_case ?manager_override - manager_override)
+    (contact_method_available ?contact_method - contact_method)
+    (entity_contact_method_link ?reservation - reservation ?contact_method - contact_method)
+    (primary_reservation_hold_flag ?primary_supplier_reservation - primary_supplier_reservation)
+    (secondary_reservation_hold_flag ?secondary_supplier_reservation - secondary_supplier_reservation)
+    (case_finalized ?protection_case - protection_case)
+  )
+  (:action select_protection_option
+    :parameters (?reservation - reservation)
+    :precondition
+      (and
+        (not
+          (protection_option_selected ?reservation)
+        )
+        (not
+          (protection_applied ?reservation)
+        )
+      )
+    :effect (protection_option_selected ?reservation)
+  )
+  (:action attach_payment_option_to_reservation
+    :parameters (?reservation - reservation ?payment_option - payment_option)
+    :precondition
+      (and
+        (protection_option_selected ?reservation)
+        (not
+          (payment_option_attached ?reservation)
+        )
+        (payment_option_available ?payment_option)
+      )
+    :effect
+      (and
+        (payment_option_attached ?reservation)
+        (entity_payment_link ?reservation ?payment_option)
+        (not
+          (payment_option_available ?payment_option)
+        )
+      )
+  )
+  (:action assign_arrival_window_to_reservation
+    :parameters (?reservation - reservation ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_selected ?reservation)
+        (payment_option_attached ?reservation)
+        (arrival_window_available ?arrival_time_window)
+      )
+    :effect
+      (and
+        (entity_arrival_assigned ?reservation ?arrival_time_window)
+        (not
+          (arrival_window_available ?arrival_time_window)
+        )
+      )
+  )
+  (:action confirm_protection_selection
+    :parameters (?reservation - reservation ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_selected ?reservation)
+        (payment_option_attached ?reservation)
+        (entity_arrival_assigned ?reservation ?arrival_time_window)
+        (not
+          (protection_option_committed ?reservation)
+        )
+      )
+    :effect (protection_option_committed ?reservation)
+  )
+  (:action release_arrival_window_from_reservation
+    :parameters (?reservation - reservation ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (entity_arrival_assigned ?reservation ?arrival_time_window)
+      )
+    :effect
+      (and
+        (arrival_window_available ?arrival_time_window)
+        (not
+          (entity_arrival_assigned ?reservation ?arrival_time_window)
+        )
+      )
+  )
+  (:action assign_staff_for_reservation
+    :parameters (?reservation - reservation ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (protection_option_committed ?reservation)
+        (staff_available ?staff_assignment)
+      )
+    :effect
+      (and
+        (entity_assigned_staff ?reservation ?staff_assignment)
+        (not
+          (staff_available ?staff_assignment)
+        )
+      )
+  )
+  (:action release_staff_from_reservation
+    :parameters (?reservation - reservation ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (entity_assigned_staff ?reservation ?staff_assignment)
+      )
+    :effect
+      (and
+        (staff_available ?staff_assignment)
+        (not
+          (entity_assigned_staff ?reservation ?staff_assignment)
+        )
+      )
+  )
+  (:action create_payment_authorization_for_case
+    :parameters (?protection_case - protection_case ?payment_authorization - payment_authorization)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (payment_authorization_available ?payment_authorization)
+      )
+    :effect
+      (and
+        (case_payment_authorization_link ?protection_case ?payment_authorization)
+        (not
+          (payment_authorization_available ?payment_authorization)
+        )
+      )
+  )
+  (:action release_payment_authorization_from_case
+    :parameters (?protection_case - protection_case ?payment_authorization - payment_authorization)
+    :precondition
+      (and
+        (case_payment_authorization_link ?protection_case ?payment_authorization)
+      )
+    :effect
+      (and
+        (payment_authorization_available ?payment_authorization)
+        (not
+          (case_payment_authorization_link ?protection_case ?payment_authorization)
+        )
+      )
+  )
+  (:action create_manager_override_for_case
+    :parameters (?protection_case - protection_case ?manager_override - manager_override)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (manager_override_available ?manager_override)
+      )
+    :effect
+      (and
+        (case_manager_override_link ?protection_case ?manager_override)
+        (not
+          (manager_override_available ?manager_override)
+        )
+      )
+  )
+  (:action release_manager_override_from_case
+    :parameters (?protection_case - protection_case ?manager_override - manager_override)
+    :precondition
+      (and
+        (case_manager_override_link ?protection_case ?manager_override)
+      )
+    :effect
+      (and
+        (manager_override_available ?manager_override)
+        (not
+          (case_manager_override_link ?protection_case ?manager_override)
+        )
+      )
+  )
+  (:action place_hold_on_supplier_slot_primary_for_reservation
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_committed ?primary_supplier_reservation)
+        (entity_arrival_assigned ?primary_supplier_reservation ?arrival_time_window)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (not
+          (slot_primary_confirmed ?supplier_slot_a)
+        )
+        (not
+          (slot_primary_pending ?supplier_slot_a)
+        )
+      )
+    :effect (slot_primary_confirmed ?supplier_slot_a)
+  )
+  (:action confirm_slot_primary_hold_with_staff
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (protection_option_committed ?primary_supplier_reservation)
+        (entity_assigned_staff ?primary_supplier_reservation ?staff_assignment)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (slot_primary_confirmed ?supplier_slot_a)
+        (not
+          (primary_reservation_hold_flag ?primary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+      )
+  )
+  (:action attach_ancillary_and_mark_slot_primary_pending
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (protection_option_committed ?primary_supplier_reservation)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (primary_reservation_hold_flag ?primary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_pending ?supplier_slot_a)
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (primary_reservation_ancillary_attached ?primary_supplier_reservation ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_slot_primary_hold
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?arrival_time_window - arrival_time_window ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (protection_option_committed ?primary_supplier_reservation)
+        (entity_arrival_assigned ?primary_supplier_reservation ?arrival_time_window)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (slot_primary_pending ?supplier_slot_a)
+        (primary_reservation_ancillary_attached ?primary_supplier_reservation ?ancillary_service)
+        (not
+          (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (slot_primary_confirmed ?supplier_slot_a)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (primary_reservation_ancillary_attached ?primary_supplier_reservation ?ancillary_service)
+        )
+      )
+  )
+  (:action place_hold_on_supplier_slot_secondary_for_reservation
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_b - supplier_slot_secondary ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_committed ?secondary_supplier_reservation)
+        (entity_arrival_assigned ?secondary_supplier_reservation ?arrival_time_window)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (not
+          (slot_secondary_confirmed ?supplier_slot_b)
+        )
+        (not
+          (slot_secondary_pending ?supplier_slot_b)
+        )
+      )
+    :effect (slot_secondary_confirmed ?supplier_slot_b)
+  )
+  (:action confirm_slot_secondary_hold_with_staff
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_b - supplier_slot_secondary ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (protection_option_committed ?secondary_supplier_reservation)
+        (entity_assigned_staff ?secondary_supplier_reservation ?staff_assignment)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_secondary_confirmed ?supplier_slot_b)
+        (not
+          (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+      )
+  )
+  (:action attach_ancillary_and_mark_slot_secondary_pending
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_b - supplier_slot_secondary ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (protection_option_committed ?secondary_supplier_reservation)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_pending ?supplier_slot_b)
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (secondary_reservation_ancillary_attached ?secondary_supplier_reservation ?ancillary_service)
+        (not
+          (ancillary_service_available ?ancillary_service)
+        )
+      )
+  )
+  (:action finalize_slot_secondary_hold
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_b - supplier_slot_secondary ?arrival_time_window - arrival_time_window ?ancillary_service - ancillary_service)
+    :precondition
+      (and
+        (protection_option_committed ?secondary_supplier_reservation)
+        (entity_arrival_assigned ?secondary_supplier_reservation ?arrival_time_window)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_secondary_pending ?supplier_slot_b)
+        (secondary_reservation_ancillary_attached ?secondary_supplier_reservation ?ancillary_service)
+        (not
+          (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (slot_secondary_confirmed ?supplier_slot_b)
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        (ancillary_service_available ?ancillary_service)
+        (not
+          (secondary_reservation_ancillary_attached ?secondary_supplier_reservation ?ancillary_service)
+        )
+      )
+  )
+  (:action assemble_confirmation_document_both_slots_confirmed
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?supplier_slot_b - supplier_slot_secondary ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_primary_confirmed ?supplier_slot_a)
+        (slot_secondary_confirmed ?supplier_slot_b)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_slot_primary_link ?confirmation_document ?supplier_slot_a)
+        (confirmation_slot_secondary_link ?confirmation_document ?supplier_slot_b)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action assemble_confirmation_document_slot_a_pending
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?supplier_slot_b - supplier_slot_secondary ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_primary_pending ?supplier_slot_a)
+        (slot_secondary_confirmed ?supplier_slot_b)
+        (not
+          (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        )
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_slot_primary_link ?confirmation_document ?supplier_slot_a)
+        (confirmation_slot_secondary_link ?confirmation_document ?supplier_slot_b)
+        (confirmation_includes_slot_primary ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action assemble_confirmation_document_slot_b_pending
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?supplier_slot_b - supplier_slot_secondary ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_primary_confirmed ?supplier_slot_a)
+        (slot_secondary_pending ?supplier_slot_b)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        (not
+          (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        )
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_slot_primary_link ?confirmation_document ?supplier_slot_a)
+        (confirmation_slot_secondary_link ?confirmation_document ?supplier_slot_b)
+        (confirmation_includes_slot_secondary ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action assemble_confirmation_document_slots_both_pending
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?secondary_supplier_reservation - secondary_supplier_reservation ?supplier_slot_a - supplier_slot_primary ?supplier_slot_b - supplier_slot_secondary ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (entity_slot_primary_link ?primary_supplier_reservation ?supplier_slot_a)
+        (entity_slot_secondary_link ?secondary_supplier_reservation ?supplier_slot_b)
+        (slot_primary_pending ?supplier_slot_a)
+        (slot_secondary_pending ?supplier_slot_b)
+        (not
+          (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        )
+        (not
+          (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        )
+        (confirmation_document_available ?confirmation_document)
+      )
+    :effect
+      (and
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_slot_primary_link ?confirmation_document ?supplier_slot_a)
+        (confirmation_slot_secondary_link ?confirmation_document ?supplier_slot_b)
+        (confirmation_includes_slot_primary ?confirmation_document)
+        (confirmation_includes_slot_secondary ?confirmation_document)
+        (not
+          (confirmation_document_available ?confirmation_document)
+        )
+      )
+  )
+  (:action validate_confirmation_against_reservation
+    :parameters (?confirmation_document - confirmation_document ?primary_supplier_reservation - primary_supplier_reservation ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (confirmation_document_created ?confirmation_document)
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (entity_arrival_assigned ?primary_supplier_reservation ?arrival_time_window)
+        (not
+          (confirmation_validated ?confirmation_document)
+        )
+      )
+    :effect (confirmation_validated ?confirmation_document)
+  )
+  (:action attach_confirmation_to_guest_profile_and_case
+    :parameters (?protection_case - protection_case ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (case_confirmation_link ?protection_case ?confirmation_document)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_available ?guest_profile)
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_validated ?confirmation_document)
+        (not
+          (guest_profile_linked ?guest_profile)
+        )
+      )
+    :effect
+      (and
+        (guest_profile_linked ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (not
+          (guest_profile_available ?guest_profile)
+        )
+      )
+  )
+  (:action validate_guest_profile_and_prepare_case
+    :parameters (?protection_case - protection_case ?guest_profile - guest_profile ?confirmation_document - confirmation_document ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_linked ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (entity_arrival_assigned ?protection_case ?arrival_time_window)
+        (not
+          (confirmation_includes_slot_primary ?confirmation_document)
+        )
+        (not
+          (case_enrichment_ready ?protection_case)
+        )
+      )
+    :effect (case_enrichment_ready ?protection_case)
+  )
+  (:action attach_loyalty_membership_to_case
+    :parameters (?protection_case - protection_case ?loyalty_membership - loyalty_membership)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (loyalty_membership_available ?loyalty_membership)
+        (not
+          (case_loyalty_flag ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_loyalty_flag ?protection_case)
+        (case_loyalty_link ?protection_case ?loyalty_membership)
+        (not
+          (loyalty_membership_available ?loyalty_membership)
+        )
+      )
+  )
+  (:action process_loyalty_and_prepare_case
+    :parameters (?protection_case - protection_case ?guest_profile - guest_profile ?confirmation_document - confirmation_document ?arrival_time_window - arrival_time_window ?loyalty_membership - loyalty_membership)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_linked ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (entity_arrival_assigned ?protection_case ?arrival_time_window)
+        (confirmation_includes_slot_primary ?confirmation_document)
+        (case_loyalty_flag ?protection_case)
+        (case_loyalty_link ?protection_case ?loyalty_membership)
+        (not
+          (case_enrichment_ready ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_enrichment_ready ?protection_case)
+        (case_loyalty_processed ?protection_case)
+      )
+  )
+  (:action apply_authorization_and_mark_case_loyalty
+    :parameters (?protection_case - protection_case ?payment_authorization - payment_authorization ?staff_assignment - staff_assignment ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_enrichment_ready ?protection_case)
+        (case_payment_authorization_link ?protection_case ?payment_authorization)
+        (entity_assigned_staff ?protection_case ?staff_assignment)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (not
+          (confirmation_includes_slot_secondary ?confirmation_document)
+        )
+        (not
+          (case_loyalty_enriched ?protection_case)
+        )
+      )
+    :effect (case_loyalty_enriched ?protection_case)
+  )
+  (:action apply_authorization_and_mark_case_loyalty_alternate
+    :parameters (?protection_case - protection_case ?payment_authorization - payment_authorization ?staff_assignment - staff_assignment ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_enrichment_ready ?protection_case)
+        (case_payment_authorization_link ?protection_case ?payment_authorization)
+        (entity_assigned_staff ?protection_case ?staff_assignment)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (confirmation_includes_slot_secondary ?confirmation_document)
+        (not
+          (case_loyalty_enriched ?protection_case)
+        )
+      )
+    :effect (case_loyalty_enriched ?protection_case)
+  )
+  (:action apply_manager_override_and_mark_case_verified
+    :parameters (?protection_case - protection_case ?manager_override - manager_override ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_loyalty_enriched ?protection_case)
+        (case_manager_override_link ?protection_case ?manager_override)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (not
+          (confirmation_includes_slot_primary ?confirmation_document)
+        )
+        (not
+          (confirmation_includes_slot_secondary ?confirmation_document)
+        )
+        (not
+          (case_verified ?protection_case)
+        )
+      )
+    :effect (case_verified ?protection_case)
+  )
+  (:action apply_manager_override_and_mark_case_verified_with_flag
+    :parameters (?protection_case - protection_case ?manager_override - manager_override ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_loyalty_enriched ?protection_case)
+        (case_manager_override_link ?protection_case ?manager_override)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (confirmation_includes_slot_primary ?confirmation_document)
+        (not
+          (confirmation_includes_slot_secondary ?confirmation_document)
+        )
+        (not
+          (case_verified ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_verified ?protection_case)
+        (case_enrichment_additional_applied ?protection_case)
+      )
+  )
+  (:action apply_manager_override_and_mark_case_verified_slot_variant
+    :parameters (?protection_case - protection_case ?manager_override - manager_override ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_loyalty_enriched ?protection_case)
+        (case_manager_override_link ?protection_case ?manager_override)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (not
+          (confirmation_includes_slot_primary ?confirmation_document)
+        )
+        (confirmation_includes_slot_secondary ?confirmation_document)
+        (not
+          (case_verified ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_verified ?protection_case)
+        (case_enrichment_additional_applied ?protection_case)
+      )
+  )
+  (:action apply_manager_override_and_mark_case_verified_all_flags_set
+    :parameters (?protection_case - protection_case ?manager_override - manager_override ?guest_profile - guest_profile ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (case_loyalty_enriched ?protection_case)
+        (case_manager_override_link ?protection_case ?manager_override)
+        (case_guest_profile_link ?protection_case ?guest_profile)
+        (guest_profile_confirmation_link ?guest_profile ?confirmation_document)
+        (confirmation_includes_slot_primary ?confirmation_document)
+        (confirmation_includes_slot_secondary ?confirmation_document)
+        (not
+          (case_verified ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_verified ?protection_case)
+        (case_enrichment_additional_applied ?protection_case)
+      )
+  )
+  (:action finalize_protection_case_standard
+    :parameters (?protection_case - protection_case)
+    :precondition
+      (and
+        (case_verified ?protection_case)
+        (not
+          (case_enrichment_additional_applied ?protection_case)
+        )
+        (not
+          (case_finalized ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?protection_case)
+        (protection_issued ?protection_case)
+      )
+  )
+  (:action attach_corporate_account_to_case
+    :parameters (?protection_case - protection_case ?corporate_account - corporate_account)
+    :precondition
+      (and
+        (case_verified ?protection_case)
+        (case_enrichment_additional_applied ?protection_case)
+        (corporate_account_available ?corporate_account)
+      )
+    :effect
+      (and
+        (case_corporate_account_link ?protection_case ?corporate_account)
+        (not
+          (corporate_account_available ?corporate_account)
+        )
+      )
+  )
+  (:action perform_case_verification_for_issue
+    :parameters (?protection_case - protection_case ?primary_supplier_reservation - primary_supplier_reservation ?secondary_supplier_reservation - secondary_supplier_reservation ?arrival_time_window - arrival_time_window ?corporate_account - corporate_account)
+    :precondition
+      (and
+        (case_verified ?protection_case)
+        (case_enrichment_additional_applied ?protection_case)
+        (case_corporate_account_link ?protection_case ?corporate_account)
+        (case_links_primary_reservation ?protection_case ?primary_supplier_reservation)
+        (case_links_secondary_reservation ?protection_case ?secondary_supplier_reservation)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        (entity_arrival_assigned ?protection_case ?arrival_time_window)
+        (not
+          (case_ready_for_finalization ?protection_case)
+        )
+      )
+    :effect (case_ready_for_finalization ?protection_case)
+  )
+  (:action finalize_protection_case_after_verification
+    :parameters (?protection_case - protection_case)
+    :precondition
+      (and
+        (case_verified ?protection_case)
+        (case_ready_for_finalization ?protection_case)
+        (not
+          (case_finalized ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?protection_case)
+        (protection_issued ?protection_case)
+      )
+  )
+  (:action request_waived_fee_approval
+    :parameters (?protection_case - protection_case ?waived_fee_approval - waived_fee_approval ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_option_committed ?protection_case)
+        (entity_arrival_assigned ?protection_case ?arrival_time_window)
+        (waived_fee_approval_available ?waived_fee_approval)
+        (case_waived_fee_link ?protection_case ?waived_fee_approval)
+        (not
+          (case_targeted_approval_requested ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_targeted_approval_requested ?protection_case)
+        (not
+          (waived_fee_approval_available ?waived_fee_approval)
+        )
+      )
+  )
+  (:action assign_staff_for_targeted_approval
+    :parameters (?protection_case - protection_case ?staff_assignment - staff_assignment)
+    :precondition
+      (and
+        (case_targeted_approval_requested ?protection_case)
+        (entity_assigned_staff ?protection_case ?staff_assignment)
+        (not
+          (case_targeted_approval_pending ?protection_case)
+        )
+      )
+    :effect (case_targeted_approval_pending ?protection_case)
+  )
+  (:action record_targeted_approval_granted
+    :parameters (?protection_case - protection_case ?manager_override - manager_override)
+    :precondition
+      (and
+        (case_targeted_approval_pending ?protection_case)
+        (case_manager_override_link ?protection_case ?manager_override)
+        (not
+          (case_targeted_approval_granted ?protection_case)
+        )
+      )
+    :effect (case_targeted_approval_granted ?protection_case)
+  )
+  (:action finalize_protection_case_after_targeted_approval
+    :parameters (?protection_case - protection_case)
+    :precondition
+      (and
+        (case_targeted_approval_granted ?protection_case)
+        (not
+          (case_finalized ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (case_finalized ?protection_case)
+        (protection_issued ?protection_case)
+      )
+  )
+  (:action issue_protection_to_primary_supplier_reservation
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (primary_reservation_hold_flag ?primary_supplier_reservation)
+        (primary_supplier_reservation_ready ?primary_supplier_reservation)
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_validated ?confirmation_document)
+        (not
+          (protection_issued ?primary_supplier_reservation)
+        )
+      )
+    :effect (protection_issued ?primary_supplier_reservation)
+  )
+  (:action issue_protection_to_secondary_supplier_reservation
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?confirmation_document - confirmation_document)
+    :precondition
+      (and
+        (secondary_reservation_hold_flag ?secondary_supplier_reservation)
+        (secondary_supplier_reservation_ready ?secondary_supplier_reservation)
+        (confirmation_document_created ?confirmation_document)
+        (confirmation_validated ?confirmation_document)
+        (not
+          (protection_issued ?secondary_supplier_reservation)
+        )
+      )
+    :effect (protection_issued ?secondary_supplier_reservation)
+  )
+  (:action enroll_reservation_into_protection
+    :parameters (?reservation - reservation ?contact_method - contact_method ?arrival_time_window - arrival_time_window)
+    :precondition
+      (and
+        (protection_issued ?reservation)
+        (entity_arrival_assigned ?reservation ?arrival_time_window)
+        (contact_method_available ?contact_method)
+        (not
+          (protection_enrolled ?reservation)
+        )
+      )
+    :effect
+      (and
+        (protection_enrolled ?reservation)
+        (entity_contact_method_link ?reservation ?contact_method)
+        (not
+          (contact_method_available ?contact_method)
+        )
+      )
+  )
+  (:action apply_protection_to_primary_and_bind_payment_contact
+    :parameters (?primary_supplier_reservation - primary_supplier_reservation ?payment_option - payment_option ?contact_method - contact_method)
+    :precondition
+      (and
+        (protection_enrolled ?primary_supplier_reservation)
+        (entity_payment_link ?primary_supplier_reservation ?payment_option)
+        (entity_contact_method_link ?primary_supplier_reservation ?contact_method)
+        (not
+          (protection_applied ?primary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (protection_applied ?primary_supplier_reservation)
+        (payment_option_available ?payment_option)
+        (contact_method_available ?contact_method)
+      )
+  )
+  (:action apply_protection_to_secondary_and_bind_payment_contact
+    :parameters (?secondary_supplier_reservation - secondary_supplier_reservation ?payment_option - payment_option ?contact_method - contact_method)
+    :precondition
+      (and
+        (protection_enrolled ?secondary_supplier_reservation)
+        (entity_payment_link ?secondary_supplier_reservation ?payment_option)
+        (entity_contact_method_link ?secondary_supplier_reservation ?contact_method)
+        (not
+          (protection_applied ?secondary_supplier_reservation)
+        )
+      )
+    :effect
+      (and
+        (protection_applied ?secondary_supplier_reservation)
+        (payment_option_available ?payment_option)
+        (contact_method_available ?contact_method)
+      )
+  )
+  (:action apply_protection_to_case_and_bind_payment_contact
+    :parameters (?protection_case - protection_case ?payment_option - payment_option ?contact_method - contact_method)
+    :precondition
+      (and
+        (protection_enrolled ?protection_case)
+        (entity_payment_link ?protection_case ?payment_option)
+        (entity_contact_method_link ?protection_case ?contact_method)
+        (not
+          (protection_applied ?protection_case)
+        )
+      )
+    :effect
+      (and
+        (protection_applied ?protection_case)
+        (payment_option_available ?payment_option)
+        (contact_method_available ?contact_method)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem late_arrival_check_in_protection_problem)
+  (:domain late_arrival_check_in_protection_domain)
+  (:objects primary_supplier_reservation_1 - primary_supplier_reservation secondary_supplier_reservation_1 - secondary_supplier_reservation protection_case_1 - protection_case protection_case_2 - protection_case payment_option_card_1 - payment_option payment_option_card_2 - payment_option payment_option_card_3 - payment_option arrival_window_estimate_1 - arrival_time_window front_desk_staff_1 - staff_assignment late_checkin_fee_waiver_1 - ancillary_service supplier_a_slot_1 - supplier_slot_primary supplier_b_slot_1 - supplier_slot_secondary confirmation_document_1 - confirmation_document guest_profile_1 - guest_profile guest_profile_2 - guest_profile loyalty_membership_gold_1 - loyalty_membership loyalty_membership_silver_1 - loyalty_membership corporate_account_1 - corporate_account corporate_account_2 - corporate_account guest_contact_method_email_1 - contact_method payment_authorization_token_1 - payment_authorization waived_fee_approval_1 - waived_fee_approval waived_fee_approval_2 - waived_fee_approval manager_override_token_1 - manager_override)
+  (:init
+    (payment_option_available payment_option_card_1)
+    (payment_option_available payment_option_card_2)
+    (payment_option_available payment_option_card_3)
+    (arrival_window_available arrival_window_estimate_1)
+    (staff_available front_desk_staff_1)
+    (ancillary_service_available late_checkin_fee_waiver_1)
+    (entity_slot_primary_link primary_supplier_reservation_1 supplier_a_slot_1)
+    (entity_slot_secondary_link secondary_supplier_reservation_1 supplier_b_slot_1)
+    (confirmation_document_available confirmation_document_1)
+    (guest_profile_available guest_profile_1)
+    (guest_profile_available guest_profile_2)
+    (case_links_primary_reservation protection_case_1 primary_supplier_reservation_1)
+    (case_links_primary_reservation protection_case_2 primary_supplier_reservation_1)
+    (case_links_secondary_reservation protection_case_1 secondary_supplier_reservation_1)
+    (case_links_secondary_reservation protection_case_2 secondary_supplier_reservation_1)
+    (case_confirmation_link protection_case_1 confirmation_document_1)
+    (case_confirmation_link protection_case_2 confirmation_document_1)
+    (case_guest_profile_link protection_case_1 guest_profile_1)
+    (case_guest_profile_link protection_case_2 guest_profile_2)
+    (loyalty_membership_available loyalty_membership_gold_1)
+    (loyalty_membership_available loyalty_membership_silver_1)
+    (corporate_account_available corporate_account_1)
+    (corporate_account_available corporate_account_2)
+    (contact_method_available guest_contact_method_email_1)
+    (payment_authorization_available payment_authorization_token_1)
+    (waived_fee_approval_available waived_fee_approval_1)
+    (case_waived_fee_link protection_case_1 waived_fee_approval_1)
+    (case_waived_fee_link protection_case_2 waived_fee_approval_2)
+    (manager_override_available manager_override_token_1)
+  )
+  (:goal
+    (and
+      (protection_applied primary_supplier_reservation_1)
+      (protection_applied secondary_supplier_reservation_1)
+      (protection_applied protection_case_1)
+      (protection_applied protection_case_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(select_protection_option primary_supplier_reservation_1)
+(attach_payment_option_to_reservation primary_supplier_reservation_1 payment_option_card_1)
+(assign_arrival_window_to_reservation primary_supplier_reservation_1 arrival_window_estimate_1)
+(confirm_protection_selection primary_supplier_reservation_1 arrival_window_estimate_1)
+(attach_ancillary_and_mark_slot_primary_pending primary_supplier_reservation_1 supplier_a_slot_1 late_checkin_fee_waiver_1)
+(finalize_slot_primary_hold primary_supplier_reservation_1 supplier_a_slot_1 arrival_window_estimate_1 late_checkin_fee_waiver_1)
+(select_protection_option secondary_supplier_reservation_1)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: True
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_4bhdjjxm/plan.pddl
+Plan executed successfully - checking goal
+Goal not satisfied
+Plan invalid
+
+
+Failed plans:
+ /tmp/val_4bhdjjxm/plan.pddl 
+
+
+--- stderr ---
+

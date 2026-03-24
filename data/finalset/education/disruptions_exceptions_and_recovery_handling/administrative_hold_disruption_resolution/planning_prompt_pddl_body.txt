@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain administrative_hold_disruption_resolution)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object actor_or_resource_type - entity resource_type - entity document_type - entity student_case_category - entity student_case - student_case_category administrative_resource_slot - actor_or_resource_type appointment_slot - actor_or_resource_type staff_member - actor_or_resource_type approval_credential - actor_or_resource_type allocated_support_resource - actor_or_resource_type regulatory_reference - actor_or_resource_type support_intervention - actor_or_resource_type appeal_outcome - actor_or_resource_type exception_request - resource_type evidence_item - resource_type external_authorization - resource_type affected_course_component - document_type alternative_course_component - document_type recovery_plan - document_type program_type - student_case subprogram_type - student_case home_academic_unit - program_type associated_academic_unit - program_type case_manager - subprogram_type)
+
+  (:predicates
+    (intake_registered ?student_case - student_case)
+    (eligibility_confirmed ?student_case - student_case)
+    (entity_slot_assigned ?student_case - student_case)
+    (hold_cleared ?student_case - student_case)
+    (implementation_confirmed ?student_case - student_case)
+    (entity_finalized ?student_case - student_case)
+    (resource_slot_available ?resource_slot - administrative_resource_slot)
+    (assigned_slot_to_entity ?student_case - student_case ?resource_slot - administrative_resource_slot)
+    (appointment_available ?appointment - appointment_slot)
+    (assigned_appointment_to_entity ?student_case - student_case ?appointment - appointment_slot)
+    (staff_available ?staff_member - staff_member)
+    (assigned_staff_to_entity ?student_case - student_case ?staff_member - staff_member)
+    (exception_request_submitted ?exception_request - exception_request)
+    (exception_attached_to_home_unit ?home_unit - home_academic_unit ?exception_request - exception_request)
+    (exception_attached_to_associated_unit ?associated_unit - associated_academic_unit ?exception_request - exception_request)
+    (unit_impacts_component ?home_unit - home_academic_unit ?affected_component - affected_course_component)
+    (component_review_mark ?affected_component - affected_course_component)
+    (component_exception_flag ?affected_component - affected_course_component)
+    (unit_ready_for_plan ?home_unit - home_academic_unit)
+    (associated_unit_offers_alternative ?associated_unit - associated_academic_unit ?alternative_component - alternative_course_component)
+    (alternative_component_review_mark ?alternative_component - alternative_course_component)
+    (alternative_component_exception_flag ?alternative_component - alternative_course_component)
+    (associated_unit_ready_for_plan ?associated_unit - associated_academic_unit)
+    (recovery_plan_draft_available ?recovery_plan - recovery_plan)
+    (recovery_plan_created ?recovery_plan - recovery_plan)
+    (plan_impacts_component ?recovery_plan - recovery_plan ?affected_component - affected_course_component)
+    (plan_includes_alternative_component ?recovery_plan - recovery_plan ?alternative_component - alternative_course_component)
+    (plan_includes_approval_credential ?recovery_plan - recovery_plan)
+    (plan_includes_external_authorization ?recovery_plan - recovery_plan)
+    (recovery_plan_validated ?recovery_plan - recovery_plan)
+    (manager_affiliated_home_unit ?case_manager - case_manager ?home_unit - home_academic_unit)
+    (manager_affiliated_associated_unit ?case_manager - case_manager ?associated_unit - associated_academic_unit)
+    (manager_assigned_recovery_plan ?case_manager - case_manager ?recovery_plan - recovery_plan)
+    (evidence_available ?evidence_item - evidence_item)
+    (manager_has_evidence ?case_manager - case_manager ?evidence_item - evidence_item)
+    (evidence_consumed ?evidence_item - evidence_item)
+    (evidence_linked_to_plan ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    (manager_plan_authorized ?case_manager - case_manager)
+    (manager_evidence_verified ?case_manager - case_manager)
+    (manager_ready_for_approval ?case_manager - case_manager)
+    (manager_has_approval_credential ?case_manager - case_manager)
+    (manager_secondary_approval_obtained ?case_manager - case_manager)
+    (manager_official_signoff ?case_manager - case_manager)
+    (implementation_initiated_by_manager ?case_manager - case_manager)
+    (external_authorization_available ?external_authorization - external_authorization)
+    (manager_has_external_authorization ?case_manager - case_manager ?external_authorization - external_authorization)
+    (external_authorization_recorded_by_manager ?case_manager - case_manager)
+    (manager_submitted_external_authorization ?case_manager - case_manager)
+    (manager_recorded_appeal_outcome ?case_manager - case_manager)
+    (approval_credential_available ?approval_credential - approval_credential)
+    (manager_assigned_approval_credential ?case_manager - case_manager ?approval_credential - approval_credential)
+    (support_resource_available ?allocated_support_resource - allocated_support_resource)
+    (manager_allocated_support_resource ?case_manager - case_manager ?allocated_support_resource - allocated_support_resource)
+    (support_intervention_available ?support_intervention - support_intervention)
+    (manager_assigned_support_intervention ?case_manager - case_manager ?support_intervention - support_intervention)
+    (appeal_outcome_available ?appeal_outcome - appeal_outcome)
+    (manager_has_appeal_outcome ?case_manager - case_manager ?appeal_outcome - appeal_outcome)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (entity_linked_regulatory_reference ?student_case - student_case ?regulatory_reference - regulatory_reference)
+    (unit_participation_confirmed ?home_unit - home_academic_unit)
+    (associated_unit_participation_confirmed ?associated_unit - associated_academic_unit)
+    (manager_finalization_recorded ?case_manager - case_manager)
+  )
+  (:action register_case_intake
+    :parameters (?student_case - student_case)
+    :precondition
+      (and
+        (not
+          (intake_registered ?student_case)
+        )
+        (not
+          (hold_cleared ?student_case)
+        )
+      )
+    :effect (intake_registered ?student_case)
+  )
+  (:action assign_administrative_slot_to_case
+    :parameters (?student_case - student_case ?resource_slot - administrative_resource_slot)
+    :precondition
+      (and
+        (intake_registered ?student_case)
+        (not
+          (entity_slot_assigned ?student_case)
+        )
+        (resource_slot_available ?resource_slot)
+      )
+    :effect
+      (and
+        (entity_slot_assigned ?student_case)
+        (assigned_slot_to_entity ?student_case ?resource_slot)
+        (not
+          (resource_slot_available ?resource_slot)
+        )
+      )
+  )
+  (:action schedule_case_appointment
+    :parameters (?student_case - student_case ?appointment - appointment_slot)
+    :precondition
+      (and
+        (intake_registered ?student_case)
+        (entity_slot_assigned ?student_case)
+        (appointment_available ?appointment)
+      )
+    :effect
+      (and
+        (assigned_appointment_to_entity ?student_case ?appointment)
+        (not
+          (appointment_available ?appointment)
+        )
+      )
+  )
+  (:action confirm_case_eligibility
+    :parameters (?student_case - student_case ?appointment - appointment_slot)
+    :precondition
+      (and
+        (intake_registered ?student_case)
+        (entity_slot_assigned ?student_case)
+        (assigned_appointment_to_entity ?student_case ?appointment)
+        (not
+          (eligibility_confirmed ?student_case)
+        )
+      )
+    :effect (eligibility_confirmed ?student_case)
+  )
+  (:action cancel_case_appointment
+    :parameters (?student_case - student_case ?appointment - appointment_slot)
+    :precondition
+      (and
+        (assigned_appointment_to_entity ?student_case ?appointment)
+      )
+    :effect
+      (and
+        (appointment_available ?appointment)
+        (not
+          (assigned_appointment_to_entity ?student_case ?appointment)
+        )
+      )
+  )
+  (:action assign_staff_to_case
+    :parameters (?student_case - student_case ?staff_member - staff_member)
+    :precondition
+      (and
+        (eligibility_confirmed ?student_case)
+        (staff_available ?staff_member)
+      )
+    :effect
+      (and
+        (assigned_staff_to_entity ?student_case ?staff_member)
+        (not
+          (staff_available ?staff_member)
+        )
+      )
+  )
+  (:action unassign_staff_from_case
+    :parameters (?student_case - student_case ?staff_member - staff_member)
+    :precondition
+      (and
+        (assigned_staff_to_entity ?student_case ?staff_member)
+      )
+    :effect
+      (and
+        (staff_available ?staff_member)
+        (not
+          (assigned_staff_to_entity ?student_case ?staff_member)
+        )
+      )
+  )
+  (:action allocate_support_intervention_to_manager
+    :parameters (?case_manager - case_manager ?support_intervention - support_intervention)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (support_intervention_available ?support_intervention)
+      )
+    :effect
+      (and
+        (manager_assigned_support_intervention ?case_manager ?support_intervention)
+        (not
+          (support_intervention_available ?support_intervention)
+        )
+      )
+  )
+  (:action release_support_intervention_from_manager
+    :parameters (?case_manager - case_manager ?support_intervention - support_intervention)
+    :precondition
+      (and
+        (manager_assigned_support_intervention ?case_manager ?support_intervention)
+      )
+    :effect
+      (and
+        (support_intervention_available ?support_intervention)
+        (not
+          (manager_assigned_support_intervention ?case_manager ?support_intervention)
+        )
+      )
+  )
+  (:action attach_appeal_outcome_to_manager
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (appeal_outcome_available ?appeal_outcome)
+      )
+    :effect
+      (and
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (not
+          (appeal_outcome_available ?appeal_outcome)
+        )
+      )
+  )
+  (:action detach_appeal_outcome_from_manager
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome)
+    :precondition
+      (and
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+      )
+    :effect
+      (and
+        (appeal_outcome_available ?appeal_outcome)
+        (not
+          (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        )
+      )
+  )
+  (:action initiate_component_review
+    :parameters (?home_unit - home_academic_unit ?affected_component - affected_course_component ?appointment - appointment_slot)
+    :precondition
+      (and
+        (eligibility_confirmed ?home_unit)
+        (assigned_appointment_to_entity ?home_unit ?appointment)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (not
+          (component_review_mark ?affected_component)
+        )
+        (not
+          (component_exception_flag ?affected_component)
+        )
+      )
+    :effect (component_review_mark ?affected_component)
+  )
+  (:action confirm_component_review_by_unit
+    :parameters (?home_unit - home_academic_unit ?affected_component - affected_course_component ?staff_member - staff_member)
+    :precondition
+      (and
+        (eligibility_confirmed ?home_unit)
+        (assigned_staff_to_entity ?home_unit ?staff_member)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (component_review_mark ?affected_component)
+        (not
+          (unit_participation_confirmed ?home_unit)
+        )
+      )
+    :effect
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (unit_ready_for_plan ?home_unit)
+      )
+  )
+  (:action attach_exception_request_to_unit_component
+    :parameters (?home_unit - home_academic_unit ?affected_component - affected_course_component ?exception_request - exception_request)
+    :precondition
+      (and
+        (eligibility_confirmed ?home_unit)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (exception_request_submitted ?exception_request)
+        (not
+          (unit_participation_confirmed ?home_unit)
+        )
+      )
+    :effect
+      (and
+        (component_exception_flag ?affected_component)
+        (unit_participation_confirmed ?home_unit)
+        (exception_attached_to_home_unit ?home_unit ?exception_request)
+        (not
+          (exception_request_submitted ?exception_request)
+        )
+      )
+  )
+  (:action complete_component_exception_review
+    :parameters (?home_unit - home_academic_unit ?affected_component - affected_course_component ?appointment - appointment_slot ?exception_request - exception_request)
+    :precondition
+      (and
+        (eligibility_confirmed ?home_unit)
+        (assigned_appointment_to_entity ?home_unit ?appointment)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (component_exception_flag ?affected_component)
+        (exception_attached_to_home_unit ?home_unit ?exception_request)
+        (not
+          (unit_ready_for_plan ?home_unit)
+        )
+      )
+    :effect
+      (and
+        (component_review_mark ?affected_component)
+        (unit_ready_for_plan ?home_unit)
+        (exception_request_submitted ?exception_request)
+        (not
+          (exception_attached_to_home_unit ?home_unit ?exception_request)
+        )
+      )
+  )
+  (:action initiate_alternative_component_review
+    :parameters (?associated_unit - associated_academic_unit ?alternative_component - alternative_course_component ?appointment - appointment_slot)
+    :precondition
+      (and
+        (eligibility_confirmed ?associated_unit)
+        (assigned_appointment_to_entity ?associated_unit ?appointment)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (not
+          (alternative_component_review_mark ?alternative_component)
+        )
+        (not
+          (alternative_component_exception_flag ?alternative_component)
+        )
+      )
+    :effect (alternative_component_review_mark ?alternative_component)
+  )
+  (:action confirm_alternative_component_review_by_unit
+    :parameters (?associated_unit - associated_academic_unit ?alternative_component - alternative_course_component ?staff_member - staff_member)
+    :precondition
+      (and
+        (eligibility_confirmed ?associated_unit)
+        (assigned_staff_to_entity ?associated_unit ?staff_member)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (alternative_component_review_mark ?alternative_component)
+        (not
+          (associated_unit_participation_confirmed ?associated_unit)
+        )
+      )
+    :effect
+      (and
+        (associated_unit_participation_confirmed ?associated_unit)
+        (associated_unit_ready_for_plan ?associated_unit)
+      )
+  )
+  (:action attach_exception_request_to_alternative_component
+    :parameters (?associated_unit - associated_academic_unit ?alternative_component - alternative_course_component ?exception_request - exception_request)
+    :precondition
+      (and
+        (eligibility_confirmed ?associated_unit)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (exception_request_submitted ?exception_request)
+        (not
+          (associated_unit_participation_confirmed ?associated_unit)
+        )
+      )
+    :effect
+      (and
+        (alternative_component_exception_flag ?alternative_component)
+        (associated_unit_participation_confirmed ?associated_unit)
+        (exception_attached_to_associated_unit ?associated_unit ?exception_request)
+        (not
+          (exception_request_submitted ?exception_request)
+        )
+      )
+  )
+  (:action complete_alternative_component_exception_review
+    :parameters (?associated_unit - associated_academic_unit ?alternative_component - alternative_course_component ?appointment - appointment_slot ?exception_request - exception_request)
+    :precondition
+      (and
+        (eligibility_confirmed ?associated_unit)
+        (assigned_appointment_to_entity ?associated_unit ?appointment)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (alternative_component_exception_flag ?alternative_component)
+        (exception_attached_to_associated_unit ?associated_unit ?exception_request)
+        (not
+          (associated_unit_ready_for_plan ?associated_unit)
+        )
+      )
+    :effect
+      (and
+        (alternative_component_review_mark ?alternative_component)
+        (associated_unit_ready_for_plan ?associated_unit)
+        (exception_request_submitted ?exception_request)
+        (not
+          (exception_attached_to_associated_unit ?associated_unit ?exception_request)
+        )
+      )
+  )
+  (:action construct_recovery_plan
+    :parameters (?home_unit - home_academic_unit ?associated_unit - associated_academic_unit ?affected_component - affected_course_component ?alternative_component - alternative_course_component ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (associated_unit_participation_confirmed ?associated_unit)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (component_review_mark ?affected_component)
+        (alternative_component_review_mark ?alternative_component)
+        (unit_ready_for_plan ?home_unit)
+        (associated_unit_ready_for_plan ?associated_unit)
+        (recovery_plan_draft_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_created ?recovery_plan)
+        (plan_impacts_component ?recovery_plan ?affected_component)
+        (plan_includes_alternative_component ?recovery_plan ?alternative_component)
+        (not
+          (recovery_plan_draft_available ?recovery_plan)
+        )
+      )
+  )
+  (:action construct_recovery_plan_with_approval_credential
+    :parameters (?home_unit - home_academic_unit ?associated_unit - associated_academic_unit ?affected_component - affected_course_component ?alternative_component - alternative_course_component ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (associated_unit_participation_confirmed ?associated_unit)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (component_exception_flag ?affected_component)
+        (alternative_component_review_mark ?alternative_component)
+        (not
+          (unit_ready_for_plan ?home_unit)
+        )
+        (associated_unit_ready_for_plan ?associated_unit)
+        (recovery_plan_draft_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_created ?recovery_plan)
+        (plan_impacts_component ?recovery_plan ?affected_component)
+        (plan_includes_alternative_component ?recovery_plan ?alternative_component)
+        (plan_includes_approval_credential ?recovery_plan)
+        (not
+          (recovery_plan_draft_available ?recovery_plan)
+        )
+      )
+  )
+  (:action construct_recovery_plan_with_external_authorization
+    :parameters (?home_unit - home_academic_unit ?associated_unit - associated_academic_unit ?affected_component - affected_course_component ?alternative_component - alternative_course_component ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (associated_unit_participation_confirmed ?associated_unit)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (component_review_mark ?affected_component)
+        (alternative_component_exception_flag ?alternative_component)
+        (unit_ready_for_plan ?home_unit)
+        (not
+          (associated_unit_ready_for_plan ?associated_unit)
+        )
+        (recovery_plan_draft_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_created ?recovery_plan)
+        (plan_impacts_component ?recovery_plan ?affected_component)
+        (plan_includes_alternative_component ?recovery_plan ?alternative_component)
+        (plan_includes_external_authorization ?recovery_plan)
+        (not
+          (recovery_plan_draft_available ?recovery_plan)
+        )
+      )
+  )
+  (:action construct_recovery_plan_with_credential_and_external_authorization
+    :parameters (?home_unit - home_academic_unit ?associated_unit - associated_academic_unit ?affected_component - affected_course_component ?alternative_component - alternative_course_component ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (associated_unit_participation_confirmed ?associated_unit)
+        (unit_impacts_component ?home_unit ?affected_component)
+        (associated_unit_offers_alternative ?associated_unit ?alternative_component)
+        (component_exception_flag ?affected_component)
+        (alternative_component_exception_flag ?alternative_component)
+        (not
+          (unit_ready_for_plan ?home_unit)
+        )
+        (not
+          (associated_unit_ready_for_plan ?associated_unit)
+        )
+        (recovery_plan_draft_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (recovery_plan_created ?recovery_plan)
+        (plan_impacts_component ?recovery_plan ?affected_component)
+        (plan_includes_alternative_component ?recovery_plan ?alternative_component)
+        (plan_includes_approval_credential ?recovery_plan)
+        (plan_includes_external_authorization ?recovery_plan)
+        (not
+          (recovery_plan_draft_available ?recovery_plan)
+        )
+      )
+  )
+  (:action validate_recovery_plan_by_unit
+    :parameters (?recovery_plan - recovery_plan ?home_unit - home_academic_unit ?appointment - appointment_slot)
+    :precondition
+      (and
+        (recovery_plan_created ?recovery_plan)
+        (unit_participation_confirmed ?home_unit)
+        (assigned_appointment_to_entity ?home_unit ?appointment)
+        (not
+          (recovery_plan_validated ?recovery_plan)
+        )
+      )
+    :effect (recovery_plan_validated ?recovery_plan)
+  )
+  (:action attach_evidence_to_plan
+    :parameters (?case_manager - case_manager ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (manager_assigned_recovery_plan ?case_manager ?recovery_plan)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_available ?evidence_item)
+        (recovery_plan_created ?recovery_plan)
+        (recovery_plan_validated ?recovery_plan)
+        (not
+          (evidence_consumed ?evidence_item)
+        )
+      )
+    :effect
+      (and
+        (evidence_consumed ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (not
+          (evidence_available ?evidence_item)
+        )
+      )
+  )
+  (:action manager_authorize_plan
+    :parameters (?case_manager - case_manager ?evidence_item - evidence_item ?recovery_plan - recovery_plan ?appointment - appointment_slot)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_consumed ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (assigned_appointment_to_entity ?case_manager ?appointment)
+        (not
+          (plan_includes_approval_credential ?recovery_plan)
+        )
+        (not
+          (manager_plan_authorized ?case_manager)
+        )
+      )
+    :effect (manager_plan_authorized ?case_manager)
+  )
+  (:action assign_approval_credential_to_manager
+    :parameters (?case_manager - case_manager ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (approval_credential_available ?approval_credential)
+        (not
+          (manager_has_approval_credential ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_has_approval_credential ?case_manager)
+        (manager_assigned_approval_credential ?case_manager ?approval_credential)
+        (not
+          (approval_credential_available ?approval_credential)
+        )
+      )
+  )
+  (:action apply_approval_and_record_secondary_signoff
+    :parameters (?case_manager - case_manager ?evidence_item - evidence_item ?recovery_plan - recovery_plan ?appointment - appointment_slot ?approval_credential - approval_credential)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_consumed ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (assigned_appointment_to_entity ?case_manager ?appointment)
+        (plan_includes_approval_credential ?recovery_plan)
+        (manager_has_approval_credential ?case_manager)
+        (manager_assigned_approval_credential ?case_manager ?approval_credential)
+        (not
+          (manager_plan_authorized ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_plan_authorized ?case_manager)
+        (manager_secondary_approval_obtained ?case_manager)
+      )
+  )
+  (:action manager_verify_evidence_before_signoff
+    :parameters (?case_manager - case_manager ?support_intervention - support_intervention ?staff_member - staff_member ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_plan_authorized ?case_manager)
+        (manager_assigned_support_intervention ?case_manager ?support_intervention)
+        (assigned_staff_to_entity ?case_manager ?staff_member)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (not
+          (plan_includes_external_authorization ?recovery_plan)
+        )
+        (not
+          (manager_evidence_verified ?case_manager)
+        )
+      )
+    :effect (manager_evidence_verified ?case_manager)
+  )
+  (:action manager_verify_evidence_after_secondary_approval
+    :parameters (?case_manager - case_manager ?support_intervention - support_intervention ?staff_member - staff_member ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_plan_authorized ?case_manager)
+        (manager_assigned_support_intervention ?case_manager ?support_intervention)
+        (assigned_staff_to_entity ?case_manager ?staff_member)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (plan_includes_external_authorization ?recovery_plan)
+        (not
+          (manager_evidence_verified ?case_manager)
+        )
+      )
+    :effect (manager_evidence_verified ?case_manager)
+  )
+  (:action manager_prepare_for_approval_based_on_appeal
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_evidence_verified ?case_manager)
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (not
+          (plan_includes_approval_credential ?recovery_plan)
+        )
+        (not
+          (plan_includes_external_authorization ?recovery_plan)
+        )
+        (not
+          (manager_ready_for_approval ?case_manager)
+        )
+      )
+    :effect (manager_ready_for_approval ?case_manager)
+  )
+  (:action manager_prepare_for_approval_with_secondary_signoff
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_evidence_verified ?case_manager)
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (plan_includes_approval_credential ?recovery_plan)
+        (not
+          (plan_includes_external_authorization ?recovery_plan)
+        )
+        (not
+          (manager_ready_for_approval ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (manager_official_signoff ?case_manager)
+      )
+  )
+  (:action manager_prepare_for_approval_with_external_authorization
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_evidence_verified ?case_manager)
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (not
+          (plan_includes_approval_credential ?recovery_plan)
+        )
+        (plan_includes_external_authorization ?recovery_plan)
+        (not
+          (manager_ready_for_approval ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (manager_official_signoff ?case_manager)
+      )
+  )
+  (:action manager_prepare_for_approval_with_full_signoff
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome ?evidence_item - evidence_item ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (manager_evidence_verified ?case_manager)
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (manager_has_evidence ?case_manager ?evidence_item)
+        (evidence_linked_to_plan ?evidence_item ?recovery_plan)
+        (plan_includes_approval_credential ?recovery_plan)
+        (plan_includes_external_authorization ?recovery_plan)
+        (not
+          (manager_ready_for_approval ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (manager_official_signoff ?case_manager)
+      )
+  )
+  (:action manager_finalize_case
+    :parameters (?case_manager - case_manager)
+    :precondition
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (not
+          (manager_official_signoff ?case_manager)
+        )
+        (not
+          (manager_finalization_recorded ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_finalization_recorded ?case_manager)
+        (implementation_confirmed ?case_manager)
+      )
+  )
+  (:action assign_support_resource_to_manager
+    :parameters (?case_manager - case_manager ?allocated_support_resource - allocated_support_resource)
+    :precondition
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (manager_official_signoff ?case_manager)
+        (support_resource_available ?allocated_support_resource)
+      )
+    :effect
+      (and
+        (manager_allocated_support_resource ?case_manager ?allocated_support_resource)
+        (not
+          (support_resource_available ?allocated_support_resource)
+        )
+      )
+  )
+  (:action initiate_implementation_and_monitor_by_manager
+    :parameters (?case_manager - case_manager ?home_unit - home_academic_unit ?associated_unit - associated_academic_unit ?appointment - appointment_slot ?allocated_support_resource - allocated_support_resource)
+    :precondition
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (manager_official_signoff ?case_manager)
+        (manager_allocated_support_resource ?case_manager ?allocated_support_resource)
+        (manager_affiliated_home_unit ?case_manager ?home_unit)
+        (manager_affiliated_associated_unit ?case_manager ?associated_unit)
+        (unit_ready_for_plan ?home_unit)
+        (associated_unit_ready_for_plan ?associated_unit)
+        (assigned_appointment_to_entity ?case_manager ?appointment)
+        (not
+          (implementation_initiated_by_manager ?case_manager)
+        )
+      )
+    :effect (implementation_initiated_by_manager ?case_manager)
+  )
+  (:action manager_confirm_implementation_completion
+    :parameters (?case_manager - case_manager)
+    :precondition
+      (and
+        (manager_ready_for_approval ?case_manager)
+        (implementation_initiated_by_manager ?case_manager)
+        (not
+          (manager_finalization_recorded ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_finalization_recorded ?case_manager)
+        (implementation_confirmed ?case_manager)
+      )
+  )
+  (:action record_external_authorization_with_manager
+    :parameters (?case_manager - case_manager ?external_authorization - external_authorization ?appointment - appointment_slot)
+    :precondition
+      (and
+        (eligibility_confirmed ?case_manager)
+        (assigned_appointment_to_entity ?case_manager ?appointment)
+        (external_authorization_available ?external_authorization)
+        (manager_has_external_authorization ?case_manager ?external_authorization)
+        (not
+          (external_authorization_recorded_by_manager ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (external_authorization_recorded_by_manager ?case_manager)
+        (not
+          (external_authorization_available ?external_authorization)
+        )
+      )
+  )
+  (:action manager_submit_external_authorization
+    :parameters (?case_manager - case_manager ?staff_member - staff_member)
+    :precondition
+      (and
+        (external_authorization_recorded_by_manager ?case_manager)
+        (assigned_staff_to_entity ?case_manager ?staff_member)
+        (not
+          (manager_submitted_external_authorization ?case_manager)
+        )
+      )
+    :effect (manager_submitted_external_authorization ?case_manager)
+  )
+  (:action manager_record_appeal_outcome
+    :parameters (?case_manager - case_manager ?appeal_outcome - appeal_outcome)
+    :precondition
+      (and
+        (manager_submitted_external_authorization ?case_manager)
+        (manager_has_appeal_outcome ?case_manager ?appeal_outcome)
+        (not
+          (manager_recorded_appeal_outcome ?case_manager)
+        )
+      )
+    :effect (manager_recorded_appeal_outcome ?case_manager)
+  )
+  (:action manager_finalize_post_external_authorization
+    :parameters (?case_manager - case_manager)
+    :precondition
+      (and
+        (manager_recorded_appeal_outcome ?case_manager)
+        (not
+          (manager_finalization_recorded ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (manager_finalization_recorded ?case_manager)
+        (implementation_confirmed ?case_manager)
+      )
+  )
+  (:action home_unit_confirm_implementation
+    :parameters (?home_unit - home_academic_unit ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_participation_confirmed ?home_unit)
+        (unit_ready_for_plan ?home_unit)
+        (recovery_plan_created ?recovery_plan)
+        (recovery_plan_validated ?recovery_plan)
+        (not
+          (implementation_confirmed ?home_unit)
+        )
+      )
+    :effect (implementation_confirmed ?home_unit)
+  )
+  (:action associated_unit_confirm_implementation
+    :parameters (?associated_unit - associated_academic_unit ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (associated_unit_participation_confirmed ?associated_unit)
+        (associated_unit_ready_for_plan ?associated_unit)
+        (recovery_plan_created ?recovery_plan)
+        (recovery_plan_validated ?recovery_plan)
+        (not
+          (implementation_confirmed ?associated_unit)
+        )
+      )
+    :effect (implementation_confirmed ?associated_unit)
+  )
+  (:action finalize_case_and_link_regulatory_reference
+    :parameters (?student_case - student_case ?regulatory_reference - regulatory_reference ?appointment - appointment_slot)
+    :precondition
+      (and
+        (implementation_confirmed ?student_case)
+        (assigned_appointment_to_entity ?student_case ?appointment)
+        (regulatory_reference_available ?regulatory_reference)
+        (not
+          (entity_finalized ?student_case)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized ?student_case)
+        (entity_linked_regulatory_reference ?student_case ?regulatory_reference)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action clear_hold_by_unit_and_release_resources
+    :parameters (?home_unit - home_academic_unit ?resource_slot - administrative_resource_slot ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (entity_finalized ?home_unit)
+        (assigned_slot_to_entity ?home_unit ?resource_slot)
+        (entity_linked_regulatory_reference ?home_unit ?regulatory_reference)
+        (not
+          (hold_cleared ?home_unit)
+        )
+      )
+    :effect
+      (and
+        (hold_cleared ?home_unit)
+        (resource_slot_available ?resource_slot)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+  (:action clear_hold_by_associated_unit_and_release_resources
+    :parameters (?associated_unit - associated_academic_unit ?resource_slot - administrative_resource_slot ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (entity_finalized ?associated_unit)
+        (assigned_slot_to_entity ?associated_unit ?resource_slot)
+        (entity_linked_regulatory_reference ?associated_unit ?regulatory_reference)
+        (not
+          (hold_cleared ?associated_unit)
+        )
+      )
+    :effect
+      (and
+        (hold_cleared ?associated_unit)
+        (resource_slot_available ?resource_slot)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+  (:action clear_hold_by_manager_and_release_resources
+    :parameters (?case_manager - case_manager ?resource_slot - administrative_resource_slot ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (entity_finalized ?case_manager)
+        (assigned_slot_to_entity ?case_manager ?resource_slot)
+        (entity_linked_regulatory_reference ?case_manager ?regulatory_reference)
+        (not
+          (hold_cleared ?case_manager)
+        )
+      )
+    :effect
+      (and
+        (hold_cleared ?case_manager)
+        (resource_slot_available ?resource_slot)
+        (regulatory_reference_available ?regulatory_reference)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem administrative_hold_case_problem)
+  (:domain administrative_hold_disruption_resolution)
+  (:objects home_academic_unit_1 - home_academic_unit associated_academic_unit_1 - associated_academic_unit case_manager_1 - case_manager case_manager_2 - case_manager administrative_slot_1 - administrative_resource_slot administrative_slot_2 - administrative_resource_slot administrative_slot_3 - administrative_resource_slot appointment_slot_1 - appointment_slot staff_member_1 - staff_member exception_request_1 - exception_request affected_component_1 - affected_course_component alternative_component_1 - alternative_course_component recovery_plan_template_1 - recovery_plan evidence_item_1 - evidence_item evidence_item_2 - evidence_item approval_credential_1 - approval_credential approval_credential_2 - approval_credential support_resource_1 - allocated_support_resource support_resource_2 - allocated_support_resource regulatory_reference_1 - regulatory_reference support_intervention_1 - support_intervention external_authorization_1 - external_authorization external_authorization_2 - external_authorization appeal_outcome_1 - appeal_outcome)
+  (:init
+    (resource_slot_available administrative_slot_1)
+    (resource_slot_available administrative_slot_2)
+    (resource_slot_available administrative_slot_3)
+    (appointment_available appointment_slot_1)
+    (staff_available staff_member_1)
+    (exception_request_submitted exception_request_1)
+    (unit_impacts_component home_academic_unit_1 affected_component_1)
+    (associated_unit_offers_alternative associated_academic_unit_1 alternative_component_1)
+    (recovery_plan_draft_available recovery_plan_template_1)
+    (evidence_available evidence_item_1)
+    (evidence_available evidence_item_2)
+    (manager_affiliated_home_unit case_manager_1 home_academic_unit_1)
+    (manager_affiliated_home_unit case_manager_2 home_academic_unit_1)
+    (manager_affiliated_associated_unit case_manager_1 associated_academic_unit_1)
+    (manager_affiliated_associated_unit case_manager_2 associated_academic_unit_1)
+    (manager_assigned_recovery_plan case_manager_1 recovery_plan_template_1)
+    (manager_assigned_recovery_plan case_manager_2 recovery_plan_template_1)
+    (manager_has_evidence case_manager_1 evidence_item_1)
+    (manager_has_evidence case_manager_2 evidence_item_2)
+    (approval_credential_available approval_credential_1)
+    (approval_credential_available approval_credential_2)
+    (support_resource_available support_resource_1)
+    (support_resource_available support_resource_2)
+    (regulatory_reference_available regulatory_reference_1)
+    (support_intervention_available support_intervention_1)
+    (external_authorization_available external_authorization_1)
+    (manager_has_external_authorization case_manager_1 external_authorization_1)
+    (manager_has_external_authorization case_manager_2 external_authorization_2)
+    (appeal_outcome_available appeal_outcome_1)
+  )
+  (:goal
+    (and
+      (hold_cleared home_academic_unit_1)
+      (hold_cleared associated_academic_unit_1)
+      (hold_cleared case_manager_1)
+      (hold_cleared case_manager_2)
+    )
+  )
+)

@@ -1,0 +1,1061 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain inventory_space_prioritization_under_loot_pressure)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types raw_object - object item_category - raw_object stack_category - raw_object container_category - raw_object holder_category - raw_object inventory_entity - holder_category loot_unit - item_category material_type - item_category tool_type - item_category special_attachment - item_category consumable_pack - item_category preservation_token - item_category upgrade_component - item_category modification_module - item_category resource_stack - stack_category assembly_component - stack_category configuration_token - stack_category primary_priority_tag - container_category secondary_priority_tag - container_category container_item - container_category mobile_inventory - inventory_entity static_inventory - inventory_entity player - mobile_inventory companion - mobile_inventory loadout_profile - static_inventory)
+
+  (:predicates
+    (reservation_open ?inventory_entity - inventory_entity)
+    (allocation_confirmed ?inventory_entity - inventory_entity)
+    (allocation_tentative ?inventory_entity - inventory_entity)
+    (is_secured ?inventory_entity - inventory_entity)
+    (is_finalized ?inventory_entity - inventory_entity)
+    (preservation_active ?inventory_entity - inventory_entity)
+    (loot_available ?loot_unit - loot_unit)
+    (assigned_loot ?inventory_entity - inventory_entity ?loot_unit - loot_unit)
+    (material_available ?material_type - material_type)
+    (material_assigned ?inventory_entity - inventory_entity ?material_type - material_type)
+    (tool_available ?tool_type - tool_type)
+    (tool_attached ?inventory_entity - inventory_entity ?tool_type - tool_type)
+    (resource_stack_available ?resource_stack - resource_stack)
+    (resource_stack_assigned_to_player ?player - player ?resource_stack - resource_stack)
+    (resource_stack_assigned_to_companion ?companion - companion ?resource_stack - resource_stack)
+    (primary_tag_assigned ?player - player ?primary_priority_tag - primary_priority_tag)
+    (primary_tag_confirmed ?primary_priority_tag - primary_priority_tag)
+    (primary_tag_reserved ?primary_priority_tag - primary_priority_tag)
+    (player_ready ?player - player)
+    (secondary_tag_assigned ?companion - companion ?secondary_priority_tag - secondary_priority_tag)
+    (secondary_tag_confirmed ?secondary_priority_tag - secondary_priority_tag)
+    (secondary_tag_reserved ?secondary_priority_tag - secondary_priority_tag)
+    (companion_ready ?companion - companion)
+    (container_available ?container_item - container_item)
+    (container_activated ?container_item - container_item)
+    (container_has_primary_tag ?container_item - container_item ?primary_priority_tag - primary_priority_tag)
+    (container_has_secondary_tag ?container_item - container_item ?secondary_priority_tag - secondary_priority_tag)
+    (container_includes_player_components ?container_item - container_item)
+    (container_includes_companion_components ?container_item - container_item)
+    (container_sealed ?container_item - container_item)
+    (loadout_assigned_to_player ?loadout_profile - loadout_profile ?player - player)
+    (loadout_assigned_to_companion ?loadout_profile - loadout_profile ?companion - companion)
+    (loadout_requires_container ?loadout_profile - loadout_profile ?container_item - container_item)
+    (component_available ?assembly_component - assembly_component)
+    (loadout_has_component ?loadout_profile - loadout_profile ?assembly_component - assembly_component)
+    (component_installed ?assembly_component - assembly_component)
+    (component_assigned_to_container ?assembly_component - assembly_component ?container_item - container_item)
+    (attachment_stage_initialized ?loadout_profile - loadout_profile)
+    (attachments_integrated ?loadout_profile - loadout_profile)
+    (configuration_stage_ready ?loadout_profile - loadout_profile)
+    (attachment_stage_active ?loadout_profile - loadout_profile)
+    (attachment_integration_completed ?loadout_profile - loadout_profile)
+    (configuration_applied_by_module ?loadout_profile - loadout_profile)
+    (provisioned ?loadout_profile - loadout_profile)
+    (configuration_token_available ?configuration_token - configuration_token)
+    (loadout_has_configuration_token ?loadout_profile - loadout_profile ?configuration_token - configuration_token)
+    (configuration_applied_by_token ?loadout_profile - loadout_profile)
+    (equip_attachment_marker ?loadout_profile - loadout_profile)
+    (modification_applied ?loadout_profile - loadout_profile)
+    (special_attachment_available ?special_attachment - special_attachment)
+    (attachment_assigned ?loadout_profile - loadout_profile ?special_attachment - special_attachment)
+    (consumable_pack_available ?consumable_pack - consumable_pack)
+    (consumable_pack_assigned ?loadout_profile - loadout_profile ?consumable_pack - consumable_pack)
+    (upgrade_component_available ?upgrade_component - upgrade_component)
+    (upgrade_component_assigned ?loadout_profile - loadout_profile ?upgrade_component - upgrade_component)
+    (modification_module_available ?modification_module - modification_module)
+    (modification_module_assigned ?loadout_profile - loadout_profile ?modification_module - modification_module)
+    (preservation_token_available ?preservation_token - preservation_token)
+    (preservation_assigned_to ?inventory_entity - inventory_entity ?preservation_token - preservation_token)
+    (player_tag_processed ?player - player)
+    (companion_tag_processed ?companion - companion)
+    (finalization_locked ?loadout_profile - loadout_profile)
+  )
+  (:action open_reservation_slot
+    :parameters (?inventory_entity - inventory_entity)
+    :precondition
+      (and
+        (not
+          (reservation_open ?inventory_entity)
+        )
+        (not
+          (is_secured ?inventory_entity)
+        )
+      )
+    :effect (reservation_open ?inventory_entity)
+  )
+  (:action claim_loot_for_inventory
+    :parameters (?inventory_entity - inventory_entity ?loot_unit - loot_unit)
+    :precondition
+      (and
+        (reservation_open ?inventory_entity)
+        (not
+          (allocation_tentative ?inventory_entity)
+        )
+        (loot_available ?loot_unit)
+      )
+    :effect
+      (and
+        (allocation_tentative ?inventory_entity)
+        (assigned_loot ?inventory_entity ?loot_unit)
+        (not
+          (loot_available ?loot_unit)
+        )
+      )
+  )
+  (:action attach_material_marker
+    :parameters (?inventory_entity - inventory_entity ?material_type - material_type)
+    :precondition
+      (and
+        (reservation_open ?inventory_entity)
+        (allocation_tentative ?inventory_entity)
+        (material_available ?material_type)
+      )
+    :effect
+      (and
+        (material_assigned ?inventory_entity ?material_type)
+        (not
+          (material_available ?material_type)
+        )
+      )
+  )
+  (:action confirm_allocation
+    :parameters (?inventory_entity - inventory_entity ?material_type - material_type)
+    :precondition
+      (and
+        (reservation_open ?inventory_entity)
+        (allocation_tentative ?inventory_entity)
+        (material_assigned ?inventory_entity ?material_type)
+        (not
+          (allocation_confirmed ?inventory_entity)
+        )
+      )
+    :effect (allocation_confirmed ?inventory_entity)
+  )
+  (:action revert_material_attachment
+    :parameters (?inventory_entity - inventory_entity ?material_type - material_type)
+    :precondition
+      (and
+        (material_assigned ?inventory_entity ?material_type)
+      )
+    :effect
+      (and
+        (material_available ?material_type)
+        (not
+          (material_assigned ?inventory_entity ?material_type)
+        )
+      )
+  )
+  (:action attach_tool
+    :parameters (?inventory_entity - inventory_entity ?tool_type - tool_type)
+    :precondition
+      (and
+        (allocation_confirmed ?inventory_entity)
+        (tool_available ?tool_type)
+      )
+    :effect
+      (and
+        (tool_attached ?inventory_entity ?tool_type)
+        (not
+          (tool_available ?tool_type)
+        )
+      )
+  )
+  (:action detach_tool
+    :parameters (?inventory_entity - inventory_entity ?tool_type - tool_type)
+    :precondition
+      (and
+        (tool_attached ?inventory_entity ?tool_type)
+      )
+    :effect
+      (and
+        (tool_available ?tool_type)
+        (not
+          (tool_attached ?inventory_entity ?tool_type)
+        )
+      )
+  )
+  (:action attach_upgrade_component
+    :parameters (?loadout_profile - loadout_profile ?upgrade_component - upgrade_component)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (upgrade_component_available ?upgrade_component)
+      )
+    :effect
+      (and
+        (upgrade_component_assigned ?loadout_profile ?upgrade_component)
+        (not
+          (upgrade_component_available ?upgrade_component)
+        )
+      )
+  )
+  (:action detach_upgrade_component
+    :parameters (?loadout_profile - loadout_profile ?upgrade_component - upgrade_component)
+    :precondition
+      (and
+        (upgrade_component_assigned ?loadout_profile ?upgrade_component)
+      )
+    :effect
+      (and
+        (upgrade_component_available ?upgrade_component)
+        (not
+          (upgrade_component_assigned ?loadout_profile ?upgrade_component)
+        )
+      )
+  )
+  (:action attach_modification_module
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (modification_module_available ?modification_module)
+      )
+    :effect
+      (and
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (not
+          (modification_module_available ?modification_module)
+        )
+      )
+  )
+  (:action detach_modification_module
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module)
+    :precondition
+      (and
+        (modification_module_assigned ?loadout_profile ?modification_module)
+      )
+    :effect
+      (and
+        (modification_module_available ?modification_module)
+        (not
+          (modification_module_assigned ?loadout_profile ?modification_module)
+        )
+      )
+  )
+  (:action apply_primary_priority_tag
+    :parameters (?player - player ?primary_priority_tag - primary_priority_tag ?material_type - material_type)
+    :precondition
+      (and
+        (allocation_confirmed ?player)
+        (material_assigned ?player ?material_type)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (not
+          (primary_tag_confirmed ?primary_priority_tag)
+        )
+        (not
+          (primary_tag_reserved ?primary_priority_tag)
+        )
+      )
+    :effect (primary_tag_confirmed ?primary_priority_tag)
+  )
+  (:action confirm_primary_tag
+    :parameters (?player - player ?primary_priority_tag - primary_priority_tag ?tool_type - tool_type)
+    :precondition
+      (and
+        (allocation_confirmed ?player)
+        (tool_attached ?player ?tool_type)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (primary_tag_confirmed ?primary_priority_tag)
+        (not
+          (player_tag_processed ?player)
+        )
+      )
+    :effect
+      (and
+        (player_tag_processed ?player)
+        (player_ready ?player)
+      )
+  )
+  (:action consume_stack_for_primary_tag
+    :parameters (?player - player ?primary_priority_tag - primary_priority_tag ?resource_stack - resource_stack)
+    :precondition
+      (and
+        (allocation_confirmed ?player)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (resource_stack_available ?resource_stack)
+        (not
+          (player_tag_processed ?player)
+        )
+      )
+    :effect
+      (and
+        (primary_tag_reserved ?primary_priority_tag)
+        (player_tag_processed ?player)
+        (resource_stack_assigned_to_player ?player ?resource_stack)
+        (not
+          (resource_stack_available ?resource_stack)
+        )
+      )
+  )
+  (:action finalize_primary_tag_application
+    :parameters (?player - player ?primary_priority_tag - primary_priority_tag ?material_type - material_type ?resource_stack - resource_stack)
+    :precondition
+      (and
+        (allocation_confirmed ?player)
+        (material_assigned ?player ?material_type)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (primary_tag_reserved ?primary_priority_tag)
+        (resource_stack_assigned_to_player ?player ?resource_stack)
+        (not
+          (player_ready ?player)
+        )
+      )
+    :effect
+      (and
+        (primary_tag_confirmed ?primary_priority_tag)
+        (player_ready ?player)
+        (resource_stack_available ?resource_stack)
+        (not
+          (resource_stack_assigned_to_player ?player ?resource_stack)
+        )
+      )
+  )
+  (:action apply_secondary_priority_tag
+    :parameters (?companion - companion ?secondary_priority_tag - secondary_priority_tag ?material_type - material_type)
+    :precondition
+      (and
+        (allocation_confirmed ?companion)
+        (material_assigned ?companion ?material_type)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (not
+          (secondary_tag_confirmed ?secondary_priority_tag)
+        )
+        (not
+          (secondary_tag_reserved ?secondary_priority_tag)
+        )
+      )
+    :effect (secondary_tag_confirmed ?secondary_priority_tag)
+  )
+  (:action confirm_secondary_tag
+    :parameters (?companion - companion ?secondary_priority_tag - secondary_priority_tag ?tool_type - tool_type)
+    :precondition
+      (and
+        (allocation_confirmed ?companion)
+        (tool_attached ?companion ?tool_type)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (secondary_tag_confirmed ?secondary_priority_tag)
+        (not
+          (companion_tag_processed ?companion)
+        )
+      )
+    :effect
+      (and
+        (companion_tag_processed ?companion)
+        (companion_ready ?companion)
+      )
+  )
+  (:action consume_stack_for_secondary_tag
+    :parameters (?companion - companion ?secondary_priority_tag - secondary_priority_tag ?resource_stack - resource_stack)
+    :precondition
+      (and
+        (allocation_confirmed ?companion)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (resource_stack_available ?resource_stack)
+        (not
+          (companion_tag_processed ?companion)
+        )
+      )
+    :effect
+      (and
+        (secondary_tag_reserved ?secondary_priority_tag)
+        (companion_tag_processed ?companion)
+        (resource_stack_assigned_to_companion ?companion ?resource_stack)
+        (not
+          (resource_stack_available ?resource_stack)
+        )
+      )
+  )
+  (:action finalize_secondary_tag_application
+    :parameters (?companion - companion ?secondary_priority_tag - secondary_priority_tag ?material_type - material_type ?resource_stack - resource_stack)
+    :precondition
+      (and
+        (allocation_confirmed ?companion)
+        (material_assigned ?companion ?material_type)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (secondary_tag_reserved ?secondary_priority_tag)
+        (resource_stack_assigned_to_companion ?companion ?resource_stack)
+        (not
+          (companion_ready ?companion)
+        )
+      )
+    :effect
+      (and
+        (secondary_tag_confirmed ?secondary_priority_tag)
+        (companion_ready ?companion)
+        (resource_stack_available ?resource_stack)
+        (not
+          (resource_stack_assigned_to_companion ?companion ?resource_stack)
+        )
+      )
+  )
+  (:action initiate_container_assembly
+    :parameters (?player - player ?companion - companion ?primary_priority_tag - primary_priority_tag ?secondary_priority_tag - secondary_priority_tag ?container_item - container_item)
+    :precondition
+      (and
+        (player_tag_processed ?player)
+        (companion_tag_processed ?companion)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (primary_tag_confirmed ?primary_priority_tag)
+        (secondary_tag_confirmed ?secondary_priority_tag)
+        (player_ready ?player)
+        (companion_ready ?companion)
+        (container_available ?container_item)
+      )
+    :effect
+      (and
+        (container_activated ?container_item)
+        (container_has_primary_tag ?container_item ?primary_priority_tag)
+        (container_has_secondary_tag ?container_item ?secondary_priority_tag)
+        (not
+          (container_available ?container_item)
+        )
+      )
+  )
+  (:action assemble_container_with_player_components
+    :parameters (?player - player ?companion - companion ?primary_priority_tag - primary_priority_tag ?secondary_priority_tag - secondary_priority_tag ?container_item - container_item)
+    :precondition
+      (and
+        (player_tag_processed ?player)
+        (companion_tag_processed ?companion)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (primary_tag_reserved ?primary_priority_tag)
+        (secondary_tag_confirmed ?secondary_priority_tag)
+        (not
+          (player_ready ?player)
+        )
+        (companion_ready ?companion)
+        (container_available ?container_item)
+      )
+    :effect
+      (and
+        (container_activated ?container_item)
+        (container_has_primary_tag ?container_item ?primary_priority_tag)
+        (container_has_secondary_tag ?container_item ?secondary_priority_tag)
+        (container_includes_player_components ?container_item)
+        (not
+          (container_available ?container_item)
+        )
+      )
+  )
+  (:action assemble_container_with_companion_components
+    :parameters (?player - player ?companion - companion ?primary_priority_tag - primary_priority_tag ?secondary_priority_tag - secondary_priority_tag ?container_item - container_item)
+    :precondition
+      (and
+        (player_tag_processed ?player)
+        (companion_tag_processed ?companion)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (primary_tag_confirmed ?primary_priority_tag)
+        (secondary_tag_reserved ?secondary_priority_tag)
+        (player_ready ?player)
+        (not
+          (companion_ready ?companion)
+        )
+        (container_available ?container_item)
+      )
+    :effect
+      (and
+        (container_activated ?container_item)
+        (container_has_primary_tag ?container_item ?primary_priority_tag)
+        (container_has_secondary_tag ?container_item ?secondary_priority_tag)
+        (container_includes_companion_components ?container_item)
+        (not
+          (container_available ?container_item)
+        )
+      )
+  )
+  (:action assemble_container_with_both_components
+    :parameters (?player - player ?companion - companion ?primary_priority_tag - primary_priority_tag ?secondary_priority_tag - secondary_priority_tag ?container_item - container_item)
+    :precondition
+      (and
+        (player_tag_processed ?player)
+        (companion_tag_processed ?companion)
+        (primary_tag_assigned ?player ?primary_priority_tag)
+        (secondary_tag_assigned ?companion ?secondary_priority_tag)
+        (primary_tag_reserved ?primary_priority_tag)
+        (secondary_tag_reserved ?secondary_priority_tag)
+        (not
+          (player_ready ?player)
+        )
+        (not
+          (companion_ready ?companion)
+        )
+        (container_available ?container_item)
+      )
+    :effect
+      (and
+        (container_activated ?container_item)
+        (container_has_primary_tag ?container_item ?primary_priority_tag)
+        (container_has_secondary_tag ?container_item ?secondary_priority_tag)
+        (container_includes_player_components ?container_item)
+        (container_includes_companion_components ?container_item)
+        (not
+          (container_available ?container_item)
+        )
+      )
+  )
+  (:action activate_container_for_packing
+    :parameters (?container_item - container_item ?player - player ?material_type - material_type)
+    :precondition
+      (and
+        (container_activated ?container_item)
+        (player_tag_processed ?player)
+        (material_assigned ?player ?material_type)
+        (not
+          (container_sealed ?container_item)
+        )
+      )
+    :effect (container_sealed ?container_item)
+  )
+  (:action register_component_for_container
+    :parameters (?loadout_profile - loadout_profile ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (loadout_requires_container ?loadout_profile ?container_item)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_available ?assembly_component)
+        (container_activated ?container_item)
+        (container_sealed ?container_item)
+        (not
+          (component_installed ?assembly_component)
+        )
+      )
+    :effect
+      (and
+        (component_installed ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (not
+          (component_available ?assembly_component)
+        )
+      )
+  )
+  (:action integrate_component_into_loadout
+    :parameters (?loadout_profile - loadout_profile ?assembly_component - assembly_component ?container_item - container_item ?material_type - material_type)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_installed ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (material_assigned ?loadout_profile ?material_type)
+        (not
+          (container_includes_player_components ?container_item)
+        )
+        (not
+          (attachment_stage_initialized ?loadout_profile)
+        )
+      )
+    :effect (attachment_stage_initialized ?loadout_profile)
+  )
+  (:action attach_special_attachment
+    :parameters (?loadout_profile - loadout_profile ?special_attachment - special_attachment)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (special_attachment_available ?special_attachment)
+        (not
+          (attachment_stage_active ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (attachment_stage_active ?loadout_profile)
+        (attachment_assigned ?loadout_profile ?special_attachment)
+        (not
+          (special_attachment_available ?special_attachment)
+        )
+      )
+  )
+  (:action finalize_attachment_integration
+    :parameters (?loadout_profile - loadout_profile ?assembly_component - assembly_component ?container_item - container_item ?material_type - material_type ?special_attachment - special_attachment)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_installed ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (material_assigned ?loadout_profile ?material_type)
+        (container_includes_player_components ?container_item)
+        (attachment_stage_active ?loadout_profile)
+        (attachment_assigned ?loadout_profile ?special_attachment)
+        (not
+          (attachment_stage_initialized ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (attachment_stage_initialized ?loadout_profile)
+        (attachment_integration_completed ?loadout_profile)
+      )
+  )
+  (:action apply_upgrade_sequence_stage1
+    :parameters (?loadout_profile - loadout_profile ?upgrade_component - upgrade_component ?tool_type - tool_type ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachment_stage_initialized ?loadout_profile)
+        (upgrade_component_assigned ?loadout_profile ?upgrade_component)
+        (tool_attached ?loadout_profile ?tool_type)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (not
+          (container_includes_companion_components ?container_item)
+        )
+        (not
+          (attachments_integrated ?loadout_profile)
+        )
+      )
+    :effect (attachments_integrated ?loadout_profile)
+  )
+  (:action apply_upgrade_sequence_stage2
+    :parameters (?loadout_profile - loadout_profile ?upgrade_component - upgrade_component ?tool_type - tool_type ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachment_stage_initialized ?loadout_profile)
+        (upgrade_component_assigned ?loadout_profile ?upgrade_component)
+        (tool_attached ?loadout_profile ?tool_type)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (container_includes_companion_components ?container_item)
+        (not
+          (attachments_integrated ?loadout_profile)
+        )
+      )
+    :effect (attachments_integrated ?loadout_profile)
+  )
+  (:action enable_modification_stage
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachments_integrated ?loadout_profile)
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (not
+          (container_includes_player_components ?container_item)
+        )
+        (not
+          (container_includes_companion_components ?container_item)
+        )
+        (not
+          (configuration_stage_ready ?loadout_profile)
+        )
+      )
+    :effect (configuration_stage_ready ?loadout_profile)
+  )
+  (:action enable_modification_with_configuration
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachments_integrated ?loadout_profile)
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (container_includes_player_components ?container_item)
+        (not
+          (container_includes_companion_components ?container_item)
+        )
+        (not
+          (configuration_stage_ready ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (configuration_applied_by_module ?loadout_profile)
+      )
+  )
+  (:action enable_modification_with_component_variant
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachments_integrated ?loadout_profile)
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (not
+          (container_includes_player_components ?container_item)
+        )
+        (container_includes_companion_components ?container_item)
+        (not
+          (configuration_stage_ready ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (configuration_applied_by_module ?loadout_profile)
+      )
+  )
+  (:action finalize_modification_integration
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module ?assembly_component - assembly_component ?container_item - container_item)
+    :precondition
+      (and
+        (attachments_integrated ?loadout_profile)
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (loadout_has_component ?loadout_profile ?assembly_component)
+        (component_assigned_to_container ?assembly_component ?container_item)
+        (container_includes_player_components ?container_item)
+        (container_includes_companion_components ?container_item)
+        (not
+          (configuration_stage_ready ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (configuration_applied_by_module ?loadout_profile)
+      )
+  )
+  (:action finalize_loadout_profile
+    :parameters (?loadout_profile - loadout_profile)
+    :precondition
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (not
+          (configuration_applied_by_module ?loadout_profile)
+        )
+        (not
+          (finalization_locked ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?loadout_profile)
+        (is_finalized ?loadout_profile)
+      )
+  )
+  (:action assign_consumable_pack_to_loadout
+    :parameters (?loadout_profile - loadout_profile ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (configuration_applied_by_module ?loadout_profile)
+        (consumable_pack_available ?consumable_pack)
+      )
+    :effect
+      (and
+        (consumable_pack_assigned ?loadout_profile ?consumable_pack)
+        (not
+          (consumable_pack_available ?consumable_pack)
+        )
+      )
+  )
+  (:action provision_and_confirm_loadout
+    :parameters (?loadout_profile - loadout_profile ?player - player ?companion - companion ?material_type - material_type ?consumable_pack - consumable_pack)
+    :precondition
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (configuration_applied_by_module ?loadout_profile)
+        (consumable_pack_assigned ?loadout_profile ?consumable_pack)
+        (loadout_assigned_to_player ?loadout_profile ?player)
+        (loadout_assigned_to_companion ?loadout_profile ?companion)
+        (player_ready ?player)
+        (companion_ready ?companion)
+        (material_assigned ?loadout_profile ?material_type)
+        (not
+          (provisioned ?loadout_profile)
+        )
+      )
+    :effect (provisioned ?loadout_profile)
+  )
+  (:action finalize_provisioned_loadout_profile
+    :parameters (?loadout_profile - loadout_profile)
+    :precondition
+      (and
+        (configuration_stage_ready ?loadout_profile)
+        (provisioned ?loadout_profile)
+        (not
+          (finalization_locked ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?loadout_profile)
+        (is_finalized ?loadout_profile)
+      )
+  )
+  (:action apply_configuration_token
+    :parameters (?loadout_profile - loadout_profile ?configuration_token - configuration_token ?material_type - material_type)
+    :precondition
+      (and
+        (allocation_confirmed ?loadout_profile)
+        (material_assigned ?loadout_profile ?material_type)
+        (configuration_token_available ?configuration_token)
+        (loadout_has_configuration_token ?loadout_profile ?configuration_token)
+        (not
+          (configuration_applied_by_token ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (configuration_applied_by_token ?loadout_profile)
+        (not
+          (configuration_token_available ?configuration_token)
+        )
+      )
+  )
+  (:action equip_attachment
+    :parameters (?loadout_profile - loadout_profile ?tool_type - tool_type)
+    :precondition
+      (and
+        (configuration_applied_by_token ?loadout_profile)
+        (tool_attached ?loadout_profile ?tool_type)
+        (not
+          (equip_attachment_marker ?loadout_profile)
+        )
+      )
+    :effect (equip_attachment_marker ?loadout_profile)
+  )
+  (:action apply_modification_to_attachment
+    :parameters (?loadout_profile - loadout_profile ?modification_module - modification_module)
+    :precondition
+      (and
+        (equip_attachment_marker ?loadout_profile)
+        (modification_module_assigned ?loadout_profile ?modification_module)
+        (not
+          (modification_applied ?loadout_profile)
+        )
+      )
+    :effect (modification_applied ?loadout_profile)
+  )
+  (:action finalize_equipment_configuration
+    :parameters (?loadout_profile - loadout_profile)
+    :precondition
+      (and
+        (modification_applied ?loadout_profile)
+        (not
+          (finalization_locked ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (finalization_locked ?loadout_profile)
+        (is_finalized ?loadout_profile)
+      )
+  )
+  (:action store_container_in_player_inventory
+    :parameters (?player - player ?container_item - container_item)
+    :precondition
+      (and
+        (player_tag_processed ?player)
+        (player_ready ?player)
+        (container_activated ?container_item)
+        (container_sealed ?container_item)
+        (not
+          (is_finalized ?player)
+        )
+      )
+    :effect (is_finalized ?player)
+  )
+  (:action store_container_in_companion_inventory
+    :parameters (?companion - companion ?container_item - container_item)
+    :precondition
+      (and
+        (companion_tag_processed ?companion)
+        (companion_ready ?companion)
+        (container_activated ?container_item)
+        (container_sealed ?container_item)
+        (not
+          (is_finalized ?companion)
+        )
+      )
+    :effect (is_finalized ?companion)
+  )
+  (:action apply_preservation_token_to_entity
+    :parameters (?inventory_entity - inventory_entity ?preservation_token - preservation_token ?material_type - material_type)
+    :precondition
+      (and
+        (is_finalized ?inventory_entity)
+        (material_assigned ?inventory_entity ?material_type)
+        (preservation_token_available ?preservation_token)
+        (not
+          (preservation_active ?inventory_entity)
+        )
+      )
+    :effect
+      (and
+        (preservation_active ?inventory_entity)
+        (preservation_assigned_to ?inventory_entity ?preservation_token)
+        (not
+          (preservation_token_available ?preservation_token)
+        )
+      )
+  )
+  (:action release_loot_and_token_for_player
+    :parameters (?player - player ?loot_unit - loot_unit ?preservation_token - preservation_token)
+    :precondition
+      (and
+        (preservation_active ?player)
+        (assigned_loot ?player ?loot_unit)
+        (preservation_assigned_to ?player ?preservation_token)
+        (not
+          (is_secured ?player)
+        )
+      )
+    :effect
+      (and
+        (is_secured ?player)
+        (loot_available ?loot_unit)
+        (preservation_token_available ?preservation_token)
+      )
+  )
+  (:action release_loot_and_token_for_companion
+    :parameters (?companion - companion ?loot_unit - loot_unit ?preservation_token - preservation_token)
+    :precondition
+      (and
+        (preservation_active ?companion)
+        (assigned_loot ?companion ?loot_unit)
+        (preservation_assigned_to ?companion ?preservation_token)
+        (not
+          (is_secured ?companion)
+        )
+      )
+    :effect
+      (and
+        (is_secured ?companion)
+        (loot_available ?loot_unit)
+        (preservation_token_available ?preservation_token)
+      )
+  )
+  (:action release_loot_and_token_for_loadout
+    :parameters (?loadout_profile - loadout_profile ?loot_unit - loot_unit ?preservation_token - preservation_token)
+    :precondition
+      (and
+        (preservation_active ?loadout_profile)
+        (assigned_loot ?loadout_profile ?loot_unit)
+        (preservation_assigned_to ?loadout_profile ?preservation_token)
+        (not
+          (is_secured ?loadout_profile)
+        )
+      )
+    :effect
+      (and
+        (is_secured ?loadout_profile)
+        (loot_available ?loot_unit)
+        (preservation_token_available ?preservation_token)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem loot_pressure_loadout_preparation)
+  (:domain inventory_space_prioritization_under_loot_pressure)
+  (:objects player_main - player companion_ally - companion loadout_alpha - loadout_profile loadout_beta - loadout_profile loot_crate_a - loot_unit loot_crate_b - loot_unit loot_crate_c - loot_unit material_scrap - material_type repair_tool - tool_type resource_stack_bandages - resource_stack primary_tag_blue - primary_priority_tag secondary_tag_green - secondary_priority_tag supply_pack_1 - container_item frame_plate - assembly_component latch_mechanism - assembly_component scope_attachment - special_attachment silencer_attachment - special_attachment med_pack_small - consumable_pack med_pack_large - consumable_pack preservation_chip - preservation_token reinforcement_brace - upgrade_component config_token_alpha - configuration_token config_token_beta - configuration_token mod_module_stabilizer - modification_module)
+  (:init
+    (loot_available loot_crate_a)
+    (loot_available loot_crate_b)
+    (loot_available loot_crate_c)
+    (material_available material_scrap)
+    (tool_available repair_tool)
+    (resource_stack_available resource_stack_bandages)
+    (primary_tag_assigned player_main primary_tag_blue)
+    (secondary_tag_assigned companion_ally secondary_tag_green)
+    (container_available supply_pack_1)
+    (component_available frame_plate)
+    (component_available latch_mechanism)
+    (loadout_assigned_to_player loadout_alpha player_main)
+    (loadout_assigned_to_player loadout_beta player_main)
+    (loadout_assigned_to_companion loadout_alpha companion_ally)
+    (loadout_assigned_to_companion loadout_beta companion_ally)
+    (loadout_requires_container loadout_alpha supply_pack_1)
+    (loadout_requires_container loadout_beta supply_pack_1)
+    (loadout_has_component loadout_alpha frame_plate)
+    (loadout_has_component loadout_beta latch_mechanism)
+    (special_attachment_available scope_attachment)
+    (special_attachment_available silencer_attachment)
+    (consumable_pack_available med_pack_small)
+    (consumable_pack_available med_pack_large)
+    (preservation_token_available preservation_chip)
+    (upgrade_component_available reinforcement_brace)
+    (configuration_token_available config_token_alpha)
+    (loadout_has_configuration_token loadout_alpha config_token_alpha)
+    (loadout_has_configuration_token loadout_beta config_token_beta)
+    (modification_module_available mod_module_stabilizer)
+  )
+  (:goal
+    (and
+      (is_secured player_main)
+      (is_secured companion_ally)
+      (is_secured loadout_alpha)
+      (is_secured loadout_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(open_reservation_slot player_main)
+(claim_loot_for_inventory player_main loot_crate_a)
+(attach_material_marker player_main material_scrap)
+(confirm_allocation player_main material_scrap)
+(attach_tool player_main repair_tool)
+(apply_primary_priority_tag player_main primary_tag_blue material_scrap)
+(confirm_primary_tag player_main primary_tag_blue repair_tool)
+(detach_tool player_main repair_tool)
+(revert_material_attachment player_main material_scrap)
+(open_reservation_slot companion_ally)
+(claim_loot_for_inventory companion_ally loot_crate_b)
+(attach_material_marker companion_ally material_scrap)
+(confirm_allocation companion_ally material_scrap)
+(attach_tool companion_ally repair_tool)
+(apply_secondary_priority_tag companion_ally secondary_tag_green material_scrap)
+(confirm_secondary_tag companion_ally secondary_tag_green repair_tool)
+(detach_tool companion_ally repair_tool)
+(revert_material_attachment companion_ally material_scrap)
+(initiate_container_assembly player_main companion_ally primary_tag_blue secondary_tag_green supply_pack_1)
+(attach_material_marker player_main material_scrap)
+(activate_container_for_packing supply_pack_1 player_main material_scrap)
+(store_container_in_player_inventory player_main supply_pack_1)
+(store_container_in_companion_inventory companion_ally supply_pack_1)
+(apply_preservation_token_to_entity player_main preservation_chip material_scrap)
+(release_loot_and_token_for_player player_main loot_crate_a preservation_chip)
+(revert_material_attachment player_main material_scrap)
+(attach_material_marker companion_ally material_scrap)
+(apply_preservation_token_to_entity companion_ally preservation_chip material_scrap)
+(release_loot_and_token_for_companion companion_ally loot_crate_b preservation_chip)
+(revert_material_attachment companion_ally material_scrap)
+(open_reservation_slot loadout_alpha)
+(claim_loot_for_inventory loadout_alpha loot_crate_a)
+(attach_material_marker loadout_alpha material_scrap)
+(confirm_allocation loadout_alpha material_scrap)
+(apply_configuration_token loadout_alpha config_token_alpha material_scrap)
+(attach_tool loadout_alpha repair_tool)
+(equip_attachment loadout_alpha repair_tool)
+(attach_modification_module loadout_alpha mod_module_stabilizer)
+(apply_modification_to_attachment loadout_alpha mod_module_stabilizer)
+(finalize_equipment_configuration loadout_alpha)
+(apply_preservation_token_to_entity loadout_alpha preservation_chip material_scrap)
+(release_loot_and_token_for_loadout loadout_alpha loot_crate_a preservation_chip)
+(revert_material_attachment loadout_alpha material_scrap)
+(detach_tool loadout_alpha repair_tool)
+(detach_modification_module loadout_alpha mod_module_stabilizer)
+(open_reservation_slot loadout_beta)
+(claim_loot_for_inventory loadout_beta loot_crate_c)
+(attach_material_marker loadout_beta material_scrap)
+(confirm_allocation loadout_beta material_scrap)
+(apply_configuration_token loadout_beta config_token_beta material_scrap)
+(attach_tool loadout_beta repair_tool)
+(equip_attachment loadout_beta repair_tool)
+(attach_modification_module loadout_beta mod_module_stabilizer)
+(apply_modification_to_attachment loadout_beta mod_module_stabilizer)
+(finalize_equipment_configuration loadout_beta)
+(apply_preservation_token_to_entity loadout_beta preservation_chip material_scrap)
+(release_loot_and_token_for_loadout loadout_beta loot_crate_c preservation_chip)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_x2z7i85c/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_x2z7i85c/plan.pddl 
+
+
+--- stderr ---
+

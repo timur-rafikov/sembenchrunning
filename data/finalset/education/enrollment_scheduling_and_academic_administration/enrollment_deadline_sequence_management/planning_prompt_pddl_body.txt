@@ -1,0 +1,984 @@
+## Planning domain (PDDL)
+
+(define (domain enrollment_deadline_sequence_management)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types subtype_container - object subtype_container_times - object subtype_container_slots - object root_enrollment_type - object enrollment_request - root_enrollment_type seat_pool - subtype_container section_slot - subtype_container administrative_reviewer - subtype_container room_feature - subtype_container instructor_preference - subtype_container enrollment_deadline_token - subtype_container compliance_document - subtype_container escalation_approval - subtype_container supporting_document - subtype_container_times room_resource - subtype_container_times prerequisite_document - subtype_container_times student_timeslot - subtype_container_slots course_timeslot - subtype_container_slots schedule_proposal - subtype_container_slots student_grouping - enrollment_request student_grouping_alt - enrollment_request student_record_primary - student_grouping student_record_secondary - student_grouping course_offering - student_grouping_alt)
+  (:predicates
+    (entity_application_created ?enrollment_request - enrollment_request)
+    (entity_provisionally_scheduled ?enrollment_request - enrollment_request)
+    (entity_assigned_to_section ?enrollment_request - enrollment_request)
+    (entity_enrollment_confirmed ?enrollment_request - enrollment_request)
+    (entity_administratively_processed ?enrollment_request - enrollment_request)
+    (entity_approval_granted ?enrollment_request - enrollment_request)
+    (seat_pool_available ?seat_pool - seat_pool)
+    (entity_linked_to_seat_pool ?enrollment_request - enrollment_request ?seat_pool - seat_pool)
+    (section_slot_available ?section_slot - section_slot)
+    (entity_reserved_slot ?enrollment_request - enrollment_request ?section_slot - section_slot)
+    (reviewer_available ?administrative_reviewer - administrative_reviewer)
+    (entity_assigned_reviewer ?enrollment_request - enrollment_request ?administrative_reviewer - administrative_reviewer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (resource_attached_to_student_record_primary ?student_record_primary - student_record_primary ?supporting_document - supporting_document)
+    (resource_attached_to_student_record_secondary ?student_record_secondary - student_record_secondary ?supporting_document - supporting_document)
+    (student_to_student_timeslot_link ?student_record_primary - student_record_primary ?student_timeslot - student_timeslot)
+    (student_timeslot_marked_ready ?student_timeslot - student_timeslot)
+    (room_or_alt_resource_marked ?student_timeslot - student_timeslot)
+    (student_schedule_flag ?student_record_primary - student_record_primary)
+    (offering_to_course_timeslot_link ?student_record_secondary - student_record_secondary ?course_timeslot - course_timeslot)
+    (course_timeslot_marked_ready ?course_timeslot - course_timeslot)
+    (alternative_course_timeslot_marker ?course_timeslot - course_timeslot)
+    (offering_schedule_flag ?student_record_secondary - student_record_secondary)
+    (schedule_proposal_slot_free ?schedule_proposal - schedule_proposal)
+    (schedule_proposal_created ?schedule_proposal - schedule_proposal)
+    (proposal_linked_student_timeslot ?schedule_proposal - schedule_proposal ?student_timeslot - student_timeslot)
+    (proposal_linked_course_timeslot ?schedule_proposal - schedule_proposal ?course_timeslot - course_timeslot)
+    (proposal_property_single_student_constraint ?schedule_proposal - schedule_proposal)
+    (proposal_property_single_course_constraint ?schedule_proposal - schedule_proposal)
+    (proposal_validated_for_student ?schedule_proposal - schedule_proposal)
+    (offering_supports_student_type_primary ?course_offering - course_offering ?student_record_primary - student_record_primary)
+    (offering_supports_student_type_secondary ?course_offering - course_offering ?student_record_secondary - student_record_secondary)
+    (offering_linked_to_proposal ?course_offering - course_offering ?schedule_proposal - schedule_proposal)
+    (room_resource_available ?room_resource - room_resource)
+    (offering_has_candidate_room ?course_offering - course_offering ?room_resource - room_resource)
+    (room_allocated ?room_resource - room_resource)
+    (room_linked_to_proposal ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    (offering_room_assignment_flag ?course_offering - course_offering)
+    (offering_resource_ready_for_approval ?course_offering - course_offering)
+    (offering_approval_stage_reached ?course_offering - course_offering)
+    (offering_room_feature_reserved ?course_offering - course_offering)
+    (offering_room_feature_confirmed ?course_offering - course_offering)
+    (offering_compliance_flag ?course_offering - course_offering)
+    (offering_operational_ready ?course_offering - course_offering)
+    (prerequisite_document_available ?prerequisite_document - prerequisite_document)
+    (offering_has_prereq_document ?course_offering - course_offering ?prerequisite_document - prerequisite_document)
+    (offering_prereq_assigned_flag ?course_offering - course_offering)
+    (offering_prereq_acknowledged ?course_offering - course_offering)
+    (offering_prereq_approved ?course_offering - course_offering)
+    (room_feature_token_available ?room_feature - room_feature)
+    (offering_room_feature_assigned ?course_offering - course_offering ?room_feature - room_feature)
+    (instructor_preference_available ?instructor_preference - instructor_preference)
+    (offering_instructor_preference_assigned ?course_offering - course_offering ?instructor_preference - instructor_preference)
+    (compliance_document_available ?compliance_document - compliance_document)
+    (offering_linked_compliance_document ?course_offering - course_offering ?compliance_document - compliance_document)
+    (escalation_approval_available ?escalation_approval - escalation_approval)
+    (offering_linked_escalation_approval ?course_offering - course_offering ?escalation_approval - escalation_approval)
+    (deadline_token_available ?enrollment_deadline_token - enrollment_deadline_token)
+    (entity_linked_deadline ?enrollment_request - enrollment_request ?enrollment_deadline_token - enrollment_deadline_token)
+    (student_ready_for_scheduling ?student_record_primary - student_record_primary)
+    (student_secondary_ready_for_scheduling ?student_record_secondary - student_record_secondary)
+    (entity_finalized_for_processing ?course_offering - course_offering)
+  )
+  (:action submit_enrollment_request
+    :parameters (?enrollment_request - enrollment_request)
+    :precondition
+      (and
+        (not
+          (entity_application_created ?enrollment_request)
+        )
+        (not
+          (entity_enrollment_confirmed ?enrollment_request)
+        )
+      )
+    :effect (entity_application_created ?enrollment_request)
+  )
+  (:action assign_request_to_seat_pool
+    :parameters (?enrollment_request - enrollment_request ?seat_pool - seat_pool)
+    :precondition
+      (and
+        (entity_application_created ?enrollment_request)
+        (not
+          (entity_assigned_to_section ?enrollment_request)
+        )
+        (seat_pool_available ?seat_pool)
+      )
+    :effect
+      (and
+        (entity_assigned_to_section ?enrollment_request)
+        (entity_linked_to_seat_pool ?enrollment_request ?seat_pool)
+        (not
+          (seat_pool_available ?seat_pool)
+        )
+      )
+  )
+  (:action reserve_section_slot_for_request
+    :parameters (?enrollment_request - enrollment_request ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_application_created ?enrollment_request)
+        (entity_assigned_to_section ?enrollment_request)
+        (section_slot_available ?section_slot)
+      )
+    :effect
+      (and
+        (entity_reserved_slot ?enrollment_request ?section_slot)
+        (not
+          (section_slot_available ?section_slot)
+        )
+      )
+  )
+  (:action provisionally_schedule_request
+    :parameters (?enrollment_request - enrollment_request ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_application_created ?enrollment_request)
+        (entity_assigned_to_section ?enrollment_request)
+        (entity_reserved_slot ?enrollment_request ?section_slot)
+        (not
+          (entity_provisionally_scheduled ?enrollment_request)
+        )
+      )
+    :effect (entity_provisionally_scheduled ?enrollment_request)
+  )
+  (:action release_section_reservation
+    :parameters (?enrollment_request - enrollment_request ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_reserved_slot ?enrollment_request ?section_slot)
+      )
+    :effect
+      (and
+        (section_slot_available ?section_slot)
+        (not
+          (entity_reserved_slot ?enrollment_request ?section_slot)
+        )
+      )
+  )
+  (:action assign_reviewer_to_request
+    :parameters (?enrollment_request - enrollment_request ?administrative_reviewer - administrative_reviewer)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?enrollment_request)
+        (reviewer_available ?administrative_reviewer)
+      )
+    :effect
+      (and
+        (entity_assigned_reviewer ?enrollment_request ?administrative_reviewer)
+        (not
+          (reviewer_available ?administrative_reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_request
+    :parameters (?enrollment_request - enrollment_request ?administrative_reviewer - administrative_reviewer)
+    :precondition
+      (and
+        (entity_assigned_reviewer ?enrollment_request ?administrative_reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?administrative_reviewer)
+        (not
+          (entity_assigned_reviewer ?enrollment_request ?administrative_reviewer)
+        )
+      )
+  )
+  (:action attach_compliance_document_to_offering
+    :parameters (?course_offering - course_offering ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (compliance_document_available ?compliance_document)
+      )
+    :effect
+      (and
+        (offering_linked_compliance_document ?course_offering ?compliance_document)
+        (not
+          (compliance_document_available ?compliance_document)
+        )
+      )
+  )
+  (:action detach_compliance_document_from_offering
+    :parameters (?course_offering - course_offering ?compliance_document - compliance_document)
+    :precondition
+      (and
+        (offering_linked_compliance_document ?course_offering ?compliance_document)
+      )
+    :effect
+      (and
+        (compliance_document_available ?compliance_document)
+        (not
+          (offering_linked_compliance_document ?course_offering ?compliance_document)
+        )
+      )
+  )
+  (:action attach_escalation_approval_to_offering
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (escalation_approval_available ?escalation_approval)
+      )
+    :effect
+      (and
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (not
+          (escalation_approval_available ?escalation_approval)
+        )
+      )
+  )
+  (:action detach_escalation_approval_from_offering
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+      )
+    :effect
+      (and
+        (escalation_approval_available ?escalation_approval)
+        (not
+          (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        )
+      )
+  )
+  (:action mark_student_timeslot_ready
+    :parameters (?student_record_primary - student_record_primary ?student_timeslot - student_timeslot ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_primary)
+        (entity_reserved_slot ?student_record_primary ?section_slot)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (not
+          (student_timeslot_marked_ready ?student_timeslot)
+        )
+        (not
+          (room_or_alt_resource_marked ?student_timeslot)
+        )
+      )
+    :effect (student_timeslot_marked_ready ?student_timeslot)
+  )
+  (:action mark_student_record_ready_for_scheduling
+    :parameters (?student_record_primary - student_record_primary ?student_timeslot - student_timeslot ?administrative_reviewer - administrative_reviewer)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_primary)
+        (entity_assigned_reviewer ?student_record_primary ?administrative_reviewer)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (student_timeslot_marked_ready ?student_timeslot)
+        (not
+          (student_ready_for_scheduling ?student_record_primary)
+        )
+      )
+    :effect
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_schedule_flag ?student_record_primary)
+      )
+  )
+  (:action attach_supporting_document_to_student_record
+    :parameters (?student_record_primary - student_record_primary ?student_timeslot - student_timeslot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_primary)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (supporting_document_available ?supporting_document)
+        (not
+          (student_ready_for_scheduling ?student_record_primary)
+        )
+      )
+    :effect
+      (and
+        (room_or_alt_resource_marked ?student_timeslot)
+        (student_ready_for_scheduling ?student_record_primary)
+        (resource_attached_to_student_record_primary ?student_record_primary ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action process_student_record_with_supporting_document
+    :parameters (?student_record_primary - student_record_primary ?student_timeslot - student_timeslot ?section_slot - section_slot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_primary)
+        (entity_reserved_slot ?student_record_primary ?section_slot)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (room_or_alt_resource_marked ?student_timeslot)
+        (resource_attached_to_student_record_primary ?student_record_primary ?supporting_document)
+        (not
+          (student_schedule_flag ?student_record_primary)
+        )
+      )
+    :effect
+      (and
+        (student_timeslot_marked_ready ?student_timeslot)
+        (student_schedule_flag ?student_record_primary)
+        (supporting_document_available ?supporting_document)
+        (not
+          (resource_attached_to_student_record_primary ?student_record_primary ?supporting_document)
+        )
+      )
+  )
+  (:action mark_course_timeslot_ready
+    :parameters (?student_record_secondary - student_record_secondary ?course_timeslot - course_timeslot ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_secondary)
+        (entity_reserved_slot ?student_record_secondary ?section_slot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (not
+          (course_timeslot_marked_ready ?course_timeslot)
+        )
+        (not
+          (alternative_course_timeslot_marker ?course_timeslot)
+        )
+      )
+    :effect (course_timeslot_marked_ready ?course_timeslot)
+  )
+  (:action assign_reviewer_and_mark_offering_schedule_ready
+    :parameters (?student_record_secondary - student_record_secondary ?course_timeslot - course_timeslot ?administrative_reviewer - administrative_reviewer)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_secondary)
+        (entity_assigned_reviewer ?student_record_secondary ?administrative_reviewer)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (course_timeslot_marked_ready ?course_timeslot)
+        (not
+          (student_secondary_ready_for_scheduling ?student_record_secondary)
+        )
+      )
+    :effect
+      (and
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (offering_schedule_flag ?student_record_secondary)
+      )
+  )
+  (:action attach_supporting_document_to_offering
+    :parameters (?student_record_secondary - student_record_secondary ?course_timeslot - course_timeslot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_secondary)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (supporting_document_available ?supporting_document)
+        (not
+          (student_secondary_ready_for_scheduling ?student_record_secondary)
+        )
+      )
+    :effect
+      (and
+        (alternative_course_timeslot_marker ?course_timeslot)
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (resource_attached_to_student_record_secondary ?student_record_secondary ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action process_offering_with_supporting_document
+    :parameters (?student_record_secondary - student_record_secondary ?course_timeslot - course_timeslot ?section_slot - section_slot ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?student_record_secondary)
+        (entity_reserved_slot ?student_record_secondary ?section_slot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (alternative_course_timeslot_marker ?course_timeslot)
+        (resource_attached_to_student_record_secondary ?student_record_secondary ?supporting_document)
+        (not
+          (offering_schedule_flag ?student_record_secondary)
+        )
+      )
+    :effect
+      (and
+        (course_timeslot_marked_ready ?course_timeslot)
+        (offering_schedule_flag ?student_record_secondary)
+        (supporting_document_available ?supporting_document)
+        (not
+          (resource_attached_to_student_record_secondary ?student_record_secondary ?supporting_document)
+        )
+      )
+  )
+  (:action create_schedule_proposal
+    :parameters (?student_record_primary - student_record_primary ?student_record_secondary - student_record_secondary ?student_timeslot - student_timeslot ?course_timeslot - course_timeslot ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (student_timeslot_marked_ready ?student_timeslot)
+        (course_timeslot_marked_ready ?course_timeslot)
+        (student_schedule_flag ?student_record_primary)
+        (offering_schedule_flag ?student_record_secondary)
+        (schedule_proposal_slot_free ?schedule_proposal)
+      )
+    :effect
+      (and
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_linked_student_timeslot ?schedule_proposal ?student_timeslot)
+        (proposal_linked_course_timeslot ?schedule_proposal ?course_timeslot)
+        (not
+          (schedule_proposal_slot_free ?schedule_proposal)
+        )
+      )
+  )
+  (:action create_schedule_proposal_single_student_constraint
+    :parameters (?student_record_primary - student_record_primary ?student_record_secondary - student_record_secondary ?student_timeslot - student_timeslot ?course_timeslot - course_timeslot ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (room_or_alt_resource_marked ?student_timeslot)
+        (course_timeslot_marked_ready ?course_timeslot)
+        (not
+          (student_schedule_flag ?student_record_primary)
+        )
+        (offering_schedule_flag ?student_record_secondary)
+        (schedule_proposal_slot_free ?schedule_proposal)
+      )
+    :effect
+      (and
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_linked_student_timeslot ?schedule_proposal ?student_timeslot)
+        (proposal_linked_course_timeslot ?schedule_proposal ?course_timeslot)
+        (proposal_property_single_student_constraint ?schedule_proposal)
+        (not
+          (schedule_proposal_slot_free ?schedule_proposal)
+        )
+      )
+  )
+  (:action create_schedule_proposal_single_course_constraint
+    :parameters (?student_record_primary - student_record_primary ?student_record_secondary - student_record_secondary ?student_timeslot - student_timeslot ?course_timeslot - course_timeslot ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (student_timeslot_marked_ready ?student_timeslot)
+        (alternative_course_timeslot_marker ?course_timeslot)
+        (student_schedule_flag ?student_record_primary)
+        (not
+          (offering_schedule_flag ?student_record_secondary)
+        )
+        (schedule_proposal_slot_free ?schedule_proposal)
+      )
+    :effect
+      (and
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_linked_student_timeslot ?schedule_proposal ?student_timeslot)
+        (proposal_linked_course_timeslot ?schedule_proposal ?course_timeslot)
+        (proposal_property_single_course_constraint ?schedule_proposal)
+        (not
+          (schedule_proposal_slot_free ?schedule_proposal)
+        )
+      )
+  )
+  (:action create_schedule_proposal_both_constraints
+    :parameters (?student_record_primary - student_record_primary ?student_record_secondary - student_record_secondary ?student_timeslot - student_timeslot ?course_timeslot - course_timeslot ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (student_to_student_timeslot_link ?student_record_primary ?student_timeslot)
+        (offering_to_course_timeslot_link ?student_record_secondary ?course_timeslot)
+        (room_or_alt_resource_marked ?student_timeslot)
+        (alternative_course_timeslot_marker ?course_timeslot)
+        (not
+          (student_schedule_flag ?student_record_primary)
+        )
+        (not
+          (offering_schedule_flag ?student_record_secondary)
+        )
+        (schedule_proposal_slot_free ?schedule_proposal)
+      )
+    :effect
+      (and
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_linked_student_timeslot ?schedule_proposal ?student_timeslot)
+        (proposal_linked_course_timeslot ?schedule_proposal ?course_timeslot)
+        (proposal_property_single_student_constraint ?schedule_proposal)
+        (proposal_property_single_course_constraint ?schedule_proposal)
+        (not
+          (schedule_proposal_slot_free ?schedule_proposal)
+        )
+      )
+  )
+  (:action validate_schedule_proposal_for_student
+    :parameters (?schedule_proposal - schedule_proposal ?student_record_primary - student_record_primary ?section_slot - section_slot)
+    :precondition
+      (and
+        (schedule_proposal_created ?schedule_proposal)
+        (student_ready_for_scheduling ?student_record_primary)
+        (entity_reserved_slot ?student_record_primary ?section_slot)
+        (not
+          (proposal_validated_for_student ?schedule_proposal)
+        )
+      )
+    :effect (proposal_validated_for_student ?schedule_proposal)
+  )
+  (:action allocate_room_to_proposal
+    :parameters (?course_offering - course_offering ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (offering_linked_to_proposal ?course_offering ?schedule_proposal)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_resource_available ?room_resource)
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_validated_for_student ?schedule_proposal)
+        (not
+          (room_allocated ?room_resource)
+        )
+      )
+    :effect
+      (and
+        (room_allocated ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (not
+          (room_resource_available ?room_resource)
+        )
+      )
+  )
+  (:action set_offering_room_assignment_flag
+    :parameters (?course_offering - course_offering ?room_resource - room_resource ?schedule_proposal - schedule_proposal ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_allocated ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (entity_reserved_slot ?course_offering ?section_slot)
+        (not
+          (proposal_property_single_student_constraint ?schedule_proposal)
+        )
+        (not
+          (offering_room_assignment_flag ?course_offering)
+        )
+      )
+    :effect (offering_room_assignment_flag ?course_offering)
+  )
+  (:action assign_room_feature_to_offering
+    :parameters (?course_offering - course_offering ?room_feature - room_feature)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (room_feature_token_available ?room_feature)
+        (not
+          (offering_room_feature_reserved ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_room_feature_reserved ?course_offering)
+        (offering_room_feature_assigned ?course_offering ?room_feature)
+        (not
+          (room_feature_token_available ?room_feature)
+        )
+      )
+  )
+  (:action confirm_offering_room_assignment_with_feature
+    :parameters (?course_offering - course_offering ?room_resource - room_resource ?schedule_proposal - schedule_proposal ?section_slot - section_slot ?room_feature - room_feature)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_allocated ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (entity_reserved_slot ?course_offering ?section_slot)
+        (proposal_property_single_student_constraint ?schedule_proposal)
+        (offering_room_feature_reserved ?course_offering)
+        (offering_room_feature_assigned ?course_offering ?room_feature)
+        (not
+          (offering_room_assignment_flag ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_room_assignment_flag ?course_offering)
+        (offering_room_feature_confirmed ?course_offering)
+      )
+  )
+  (:action mark_offering_resource_ready_for_approval
+    :parameters (?course_offering - course_offering ?compliance_document - compliance_document ?administrative_reviewer - administrative_reviewer ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_room_assignment_flag ?course_offering)
+        (offering_linked_compliance_document ?course_offering ?compliance_document)
+        (entity_assigned_reviewer ?course_offering ?administrative_reviewer)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (not
+          (proposal_property_single_course_constraint ?schedule_proposal)
+        )
+        (not
+          (offering_resource_ready_for_approval ?course_offering)
+        )
+      )
+    :effect (offering_resource_ready_for_approval ?course_offering)
+  )
+  (:action mark_offering_resource_ready_for_approval_alternate
+    :parameters (?course_offering - course_offering ?compliance_document - compliance_document ?administrative_reviewer - administrative_reviewer ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_room_assignment_flag ?course_offering)
+        (offering_linked_compliance_document ?course_offering ?compliance_document)
+        (entity_assigned_reviewer ?course_offering ?administrative_reviewer)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (proposal_property_single_course_constraint ?schedule_proposal)
+        (not
+          (offering_resource_ready_for_approval ?course_offering)
+        )
+      )
+    :effect (offering_resource_ready_for_approval ?course_offering)
+  )
+  (:action advance_offering_to_approval_stage
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_resource_ready_for_approval ?course_offering)
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (not
+          (proposal_property_single_student_constraint ?schedule_proposal)
+        )
+        (not
+          (proposal_property_single_course_constraint ?schedule_proposal)
+        )
+        (not
+          (offering_approval_stage_reached ?course_offering)
+        )
+      )
+    :effect (offering_approval_stage_reached ?course_offering)
+  )
+  (:action advance_offering_approval_and_set_compliance_flag
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_resource_ready_for_approval ?course_offering)
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (proposal_property_single_student_constraint ?schedule_proposal)
+        (not
+          (proposal_property_single_course_constraint ?schedule_proposal)
+        )
+        (not
+          (offering_approval_stage_reached ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_compliance_flag ?course_offering)
+      )
+  )
+  (:action advance_offering_approval_and_set_compliance_flag_secondary
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_resource_ready_for_approval ?course_offering)
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (not
+          (proposal_property_single_student_constraint ?schedule_proposal)
+        )
+        (proposal_property_single_course_constraint ?schedule_proposal)
+        (not
+          (offering_approval_stage_reached ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_compliance_flag ?course_offering)
+      )
+  )
+  (:action advance_offering_approval_and_set_compliance_flag_tertiary
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval ?room_resource - room_resource ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (offering_resource_ready_for_approval ?course_offering)
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (offering_has_candidate_room ?course_offering ?room_resource)
+        (room_linked_to_proposal ?room_resource ?schedule_proposal)
+        (proposal_property_single_student_constraint ?schedule_proposal)
+        (proposal_property_single_course_constraint ?schedule_proposal)
+        (not
+          (offering_approval_stage_reached ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_compliance_flag ?course_offering)
+      )
+  )
+  (:action finalize_offering_administratively
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (not
+          (offering_compliance_flag ?course_offering)
+        )
+        (not
+          (entity_finalized_for_processing ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_processing ?course_offering)
+        (entity_administratively_processed ?course_offering)
+      )
+  )
+  (:action assign_instructor_preference_to_offering
+    :parameters (?course_offering - course_offering ?instructor_preference - instructor_preference)
+    :precondition
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_compliance_flag ?course_offering)
+        (instructor_preference_available ?instructor_preference)
+      )
+    :effect
+      (and
+        (offering_instructor_preference_assigned ?course_offering ?instructor_preference)
+        (not
+          (instructor_preference_available ?instructor_preference)
+        )
+      )
+  )
+  (:action perform_operational_checks_and_mark_offering_ready
+    :parameters (?course_offering - course_offering ?student_record_primary - student_record_primary ?student_record_secondary - student_record_secondary ?section_slot - section_slot ?instructor_preference - instructor_preference)
+    :precondition
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_compliance_flag ?course_offering)
+        (offering_instructor_preference_assigned ?course_offering ?instructor_preference)
+        (offering_supports_student_type_primary ?course_offering ?student_record_primary)
+        (offering_supports_student_type_secondary ?course_offering ?student_record_secondary)
+        (student_schedule_flag ?student_record_primary)
+        (offering_schedule_flag ?student_record_secondary)
+        (entity_reserved_slot ?course_offering ?section_slot)
+        (not
+          (offering_operational_ready ?course_offering)
+        )
+      )
+    :effect (offering_operational_ready ?course_offering)
+  )
+  (:action finalize_offering_after_operational_checks
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_approval_stage_reached ?course_offering)
+        (offering_operational_ready ?course_offering)
+        (not
+          (entity_finalized_for_processing ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_processing ?course_offering)
+        (entity_administratively_processed ?course_offering)
+      )
+  )
+  (:action assign_prerequisite_document_to_offering
+    :parameters (?course_offering - course_offering ?prerequisite_document - prerequisite_document ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_provisionally_scheduled ?course_offering)
+        (entity_reserved_slot ?course_offering ?section_slot)
+        (prerequisite_document_available ?prerequisite_document)
+        (offering_has_prereq_document ?course_offering ?prerequisite_document)
+        (not
+          (offering_prereq_assigned_flag ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (offering_prereq_assigned_flag ?course_offering)
+        (not
+          (prerequisite_document_available ?prerequisite_document)
+        )
+      )
+  )
+  (:action acknowledge_offering_prerequisite
+    :parameters (?course_offering - course_offering ?administrative_reviewer - administrative_reviewer)
+    :precondition
+      (and
+        (offering_prereq_assigned_flag ?course_offering)
+        (entity_assigned_reviewer ?course_offering ?administrative_reviewer)
+        (not
+          (offering_prereq_acknowledged ?course_offering)
+        )
+      )
+    :effect (offering_prereq_acknowledged ?course_offering)
+  )
+  (:action approve_offering_prerequisite
+    :parameters (?course_offering - course_offering ?escalation_approval - escalation_approval)
+    :precondition
+      (and
+        (offering_prereq_acknowledged ?course_offering)
+        (offering_linked_escalation_approval ?course_offering ?escalation_approval)
+        (not
+          (offering_prereq_approved ?course_offering)
+        )
+      )
+    :effect (offering_prereq_approved ?course_offering)
+  )
+  (:action finalize_offering_post_prerequisite_approval
+    :parameters (?course_offering - course_offering)
+    :precondition
+      (and
+        (offering_prereq_approved ?course_offering)
+        (not
+          (entity_finalized_for_processing ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (entity_finalized_for_processing ?course_offering)
+        (entity_administratively_processed ?course_offering)
+      )
+  )
+  (:action confirm_student_enrollment
+    :parameters (?student_record_primary - student_record_primary ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_ready_for_scheduling ?student_record_primary)
+        (student_schedule_flag ?student_record_primary)
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_validated_for_student ?schedule_proposal)
+        (not
+          (entity_administratively_processed ?student_record_primary)
+        )
+      )
+    :effect (entity_administratively_processed ?student_record_primary)
+  )
+  (:action confirm_secondary_student_enrollment
+    :parameters (?student_record_secondary - student_record_secondary ?schedule_proposal - schedule_proposal)
+    :precondition
+      (and
+        (student_secondary_ready_for_scheduling ?student_record_secondary)
+        (offering_schedule_flag ?student_record_secondary)
+        (schedule_proposal_created ?schedule_proposal)
+        (proposal_validated_for_student ?schedule_proposal)
+        (not
+          (entity_administratively_processed ?student_record_secondary)
+        )
+      )
+    :effect (entity_administratively_processed ?student_record_secondary)
+  )
+  (:action grant_approval_and_consume_deadline_token
+    :parameters (?enrollment_request - enrollment_request ?enrollment_deadline_token - enrollment_deadline_token ?section_slot - section_slot)
+    :precondition
+      (and
+        (entity_administratively_processed ?enrollment_request)
+        (entity_reserved_slot ?enrollment_request ?section_slot)
+        (deadline_token_available ?enrollment_deadline_token)
+        (not
+          (entity_approval_granted ?enrollment_request)
+        )
+      )
+    :effect
+      (and
+        (entity_approval_granted ?enrollment_request)
+        (entity_linked_deadline ?enrollment_request ?enrollment_deadline_token)
+        (not
+          (deadline_token_available ?enrollment_deadline_token)
+        )
+      )
+  )
+  (:action confirm_enrollment_and_allocate_seat_from_pool
+    :parameters (?student_record_primary - student_record_primary ?seat_pool - seat_pool ?enrollment_deadline_token - enrollment_deadline_token)
+    :precondition
+      (and
+        (entity_approval_granted ?student_record_primary)
+        (entity_linked_to_seat_pool ?student_record_primary ?seat_pool)
+        (entity_linked_deadline ?student_record_primary ?enrollment_deadline_token)
+        (not
+          (entity_enrollment_confirmed ?student_record_primary)
+        )
+      )
+    :effect
+      (and
+        (entity_enrollment_confirmed ?student_record_primary)
+        (seat_pool_available ?seat_pool)
+        (deadline_token_available ?enrollment_deadline_token)
+      )
+  )
+  (:action confirm_secondary_enrollment_and_allocate_seat_from_pool
+    :parameters (?student_record_secondary - student_record_secondary ?seat_pool - seat_pool ?enrollment_deadline_token - enrollment_deadline_token)
+    :precondition
+      (and
+        (entity_approval_granted ?student_record_secondary)
+        (entity_linked_to_seat_pool ?student_record_secondary ?seat_pool)
+        (entity_linked_deadline ?student_record_secondary ?enrollment_deadline_token)
+        (not
+          (entity_enrollment_confirmed ?student_record_secondary)
+        )
+      )
+    :effect
+      (and
+        (entity_enrollment_confirmed ?student_record_secondary)
+        (seat_pool_available ?seat_pool)
+        (deadline_token_available ?enrollment_deadline_token)
+      )
+  )
+  (:action confirm_offering_and_allocate_seat_from_pool
+    :parameters (?course_offering - course_offering ?seat_pool - seat_pool ?enrollment_deadline_token - enrollment_deadline_token)
+    :precondition
+      (and
+        (entity_approval_granted ?course_offering)
+        (entity_linked_to_seat_pool ?course_offering ?seat_pool)
+        (entity_linked_deadline ?course_offering ?enrollment_deadline_token)
+        (not
+          (entity_enrollment_confirmed ?course_offering)
+        )
+      )
+    :effect
+      (and
+        (entity_enrollment_confirmed ?course_offering)
+        (seat_pool_available ?seat_pool)
+        (deadline_token_available ?enrollment_deadline_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem enrollment_deadline_sequence_problem)
+  (:domain enrollment_deadline_sequence_management)
+  (:objects student_primary_1 - student_record_primary student_secondary_1 - student_record_secondary course_offering_1 - course_offering course_offering_2 - course_offering seat_pool_1 - seat_pool seat_pool_2 - seat_pool seat_pool_3 - seat_pool section_slot_1 - section_slot administrative_reviewer_1 - administrative_reviewer supporting_document_1 - supporting_document student_timeslot_1 - student_timeslot course_timeslot_1 - course_timeslot schedule_proposal_1 - schedule_proposal room_resource_1 - room_resource room_resource_2 - room_resource room_feature_1 - room_feature room_feature_2 - room_feature instructor_preference_1 - instructor_preference instructor_preference_2 - instructor_preference deadline_token_1 - enrollment_deadline_token compliance_document_1 - compliance_document prerequisite_document_1 - prerequisite_document prerequisite_document_2 - prerequisite_document escalation_approval_1 - escalation_approval)
+  (:init
+    (seat_pool_available seat_pool_1)
+    (seat_pool_available seat_pool_2)
+    (seat_pool_available seat_pool_3)
+    (section_slot_available section_slot_1)
+    (reviewer_available administrative_reviewer_1)
+    (supporting_document_available supporting_document_1)
+    (student_to_student_timeslot_link student_primary_1 student_timeslot_1)
+    (offering_to_course_timeslot_link student_secondary_1 course_timeslot_1)
+    (schedule_proposal_slot_free schedule_proposal_1)
+    (room_resource_available room_resource_1)
+    (room_resource_available room_resource_2)
+    (offering_supports_student_type_primary course_offering_1 student_primary_1)
+    (offering_supports_student_type_primary course_offering_2 student_primary_1)
+    (offering_supports_student_type_secondary course_offering_1 student_secondary_1)
+    (offering_supports_student_type_secondary course_offering_2 student_secondary_1)
+    (offering_linked_to_proposal course_offering_1 schedule_proposal_1)
+    (offering_linked_to_proposal course_offering_2 schedule_proposal_1)
+    (offering_has_candidate_room course_offering_1 room_resource_1)
+    (offering_has_candidate_room course_offering_2 room_resource_2)
+    (room_feature_token_available room_feature_1)
+    (room_feature_token_available room_feature_2)
+    (instructor_preference_available instructor_preference_1)
+    (instructor_preference_available instructor_preference_2)
+    (deadline_token_available deadline_token_1)
+    (compliance_document_available compliance_document_1)
+    (prerequisite_document_available prerequisite_document_1)
+    (offering_has_prereq_document course_offering_1 prerequisite_document_1)
+    (offering_has_prereq_document course_offering_2 prerequisite_document_2)
+    (escalation_approval_available escalation_approval_1)
+  )
+  (:goal
+    (and
+      (entity_enrollment_confirmed student_primary_1)
+      (entity_enrollment_confirmed student_secondary_1)
+      (entity_enrollment_confirmed course_offering_1)
+      (entity_enrollment_confirmed course_offering_2)
+    )
+  )
+)

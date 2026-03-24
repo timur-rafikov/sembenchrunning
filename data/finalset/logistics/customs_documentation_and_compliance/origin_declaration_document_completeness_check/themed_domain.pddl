@@ -1,0 +1,936 @@
+(define (domain origin_declaration_completeness_check_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types party_resource - object document_type - object criteria_group - object document_base - object origin_declaration_document - document_base broker_agent - party_resource verification_rule - party_resource reviewer - party_resource regulatory_reference - party_resource inspector_credential - party_resource customs_office - party_resource commercial_credential - party_resource regulation_version - party_resource supporting_document - document_type document_form_template - document_type declaration_reference - document_type origin_criterion - criteria_group tariff_criterion - criteria_group declaration_submission - criteria_group shipment_record - origin_declaration_document package_unit - origin_declaration_document export_leg - shipment_record import_leg - shipment_record compliance_case - package_unit)
+  (:predicates
+    (entity_registered ?origin_declaration_document - origin_declaration_document)
+    (entity_classified ?origin_declaration_document - origin_declaration_document)
+    (entity_has_broker ?origin_declaration_document - origin_declaration_document)
+    (completeness_confirmed ?origin_declaration_document - origin_declaration_document)
+    (validation_ready ?origin_declaration_document - origin_declaration_document)
+    (customs_validated ?origin_declaration_document - origin_declaration_document)
+    (broker_available ?broker_agent - broker_agent)
+    (entity_assigned_to_broker ?origin_declaration_document - origin_declaration_document ?broker_agent - broker_agent)
+    (verification_rule_available ?verification_rule - verification_rule)
+    (verification_applied_to_entity ?origin_declaration_document - origin_declaration_document ?verification_rule - verification_rule)
+    (reviewer_available ?reviewer - reviewer)
+    (entity_assigned_to_reviewer ?origin_declaration_document - origin_declaration_document ?reviewer - reviewer)
+    (supporting_document_available ?supporting_document - supporting_document)
+    (export_leg_has_supporting_document ?export_leg - export_leg ?supporting_document - supporting_document)
+    (import_leg_has_supporting_document ?import_leg - import_leg ?supporting_document - supporting_document)
+    (export_leg_linked_to_origin_criterion ?export_leg - export_leg ?origin_criterion - origin_criterion)
+    (origin_criterion_satisfied ?origin_criterion - origin_criterion)
+    (origin_criterion_satisfied_by_supporting_document ?origin_criterion - origin_criterion)
+    (export_leg_origin_confirmed ?export_leg - export_leg)
+    (import_leg_linked_to_tariff_criterion ?import_leg - import_leg ?tariff_criterion - tariff_criterion)
+    (tariff_criterion_satisfied ?tariff_criterion - tariff_criterion)
+    (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion - tariff_criterion)
+    (import_leg_tariff_confirmed ?import_leg - import_leg)
+    (submission_slot_available ?declaration_submission - declaration_submission)
+    (declaration_submission_prepared ?declaration_submission - declaration_submission)
+    (submission_linked_to_origin_criterion ?declaration_submission - declaration_submission ?origin_criterion - origin_criterion)
+    (submission_linked_to_tariff_criterion ?declaration_submission - declaration_submission ?tariff_criterion - tariff_criterion)
+    (submission_has_origin_evidence ?declaration_submission - declaration_submission)
+    (submission_has_tariff_evidence ?declaration_submission - declaration_submission)
+    (submission_ready_for_templating ?declaration_submission - declaration_submission)
+    (case_includes_export_leg ?compliance_case - compliance_case ?export_leg - export_leg)
+    (case_includes_import_leg ?compliance_case - compliance_case ?import_leg - import_leg)
+    (case_linked_to_submission ?compliance_case - compliance_case ?declaration_submission - declaration_submission)
+    (template_available ?document_form_template - document_form_template)
+    (case_assigned_template ?compliance_case - compliance_case ?document_form_template - document_form_template)
+    (template_used ?document_form_template - document_form_template)
+    (template_linked_to_submission ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    (case_template_applied ?compliance_case - compliance_case)
+    (case_credentials_attached ?compliance_case - compliance_case)
+    (case_checks_passed ?compliance_case - compliance_case)
+    (case_has_regulatory_reference ?compliance_case - compliance_case)
+    (case_regulatory_binding_confirmed ?compliance_case - compliance_case)
+    (case_ready_for_credential_attachment ?compliance_case - compliance_case)
+    (case_final_checks_ok ?compliance_case - compliance_case)
+    (declaration_reference_available ?declaration_reference - declaration_reference)
+    (case_linked_to_declaration_reference ?compliance_case - compliance_case ?declaration_reference - declaration_reference)
+    (case_reference_bound ?compliance_case - compliance_case)
+    (case_reference_review_started ?compliance_case - compliance_case)
+    (case_reference_review_completed ?compliance_case - compliance_case)
+    (regulatory_reference_available ?regulatory_reference - regulatory_reference)
+    (case_linked_to_regulatory_reference ?compliance_case - compliance_case ?regulatory_reference - regulatory_reference)
+    (inspector_credential_available ?inspector_credential - inspector_credential)
+    (case_linked_to_inspector_credential ?compliance_case - compliance_case ?inspector_credential - inspector_credential)
+    (commercial_credential_available ?commercial_credential - commercial_credential)
+    (case_linked_to_commercial_credential ?compliance_case - compliance_case ?commercial_credential - commercial_credential)
+    (regulation_version_available ?regulation_version - regulation_version)
+    (case_linked_to_regulation_version ?compliance_case - compliance_case ?regulation_version - regulation_version)
+    (customs_office_available ?customs_office - customs_office)
+    (entity_linked_to_customs_office ?origin_declaration_document - origin_declaration_document ?customs_office - customs_office)
+    (export_leg_ready_for_submission ?export_leg - export_leg)
+    (import_leg_ready_for_submission ?import_leg - import_leg)
+    (case_validated ?compliance_case - compliance_case)
+  )
+  (:action intake_origin_declaration_document
+    :parameters (?origin_declaration_document - origin_declaration_document)
+    :precondition
+      (and
+        (not
+          (entity_registered ?origin_declaration_document)
+        )
+        (not
+          (completeness_confirmed ?origin_declaration_document)
+        )
+      )
+    :effect (entity_registered ?origin_declaration_document)
+  )
+  (:action assign_broker_to_document
+    :parameters (?origin_declaration_document - origin_declaration_document ?broker_agent - broker_agent)
+    :precondition
+      (and
+        (entity_registered ?origin_declaration_document)
+        (not
+          (entity_has_broker ?origin_declaration_document)
+        )
+        (broker_available ?broker_agent)
+      )
+    :effect
+      (and
+        (entity_has_broker ?origin_declaration_document)
+        (entity_assigned_to_broker ?origin_declaration_document ?broker_agent)
+        (not
+          (broker_available ?broker_agent)
+        )
+      )
+  )
+  (:action apply_verification_rule
+    :parameters (?origin_declaration_document - origin_declaration_document ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_registered ?origin_declaration_document)
+        (entity_has_broker ?origin_declaration_document)
+        (verification_rule_available ?verification_rule)
+      )
+    :effect
+      (and
+        (verification_applied_to_entity ?origin_declaration_document ?verification_rule)
+        (not
+          (verification_rule_available ?verification_rule)
+        )
+      )
+  )
+  (:action finalize_document_classification
+    :parameters (?origin_declaration_document - origin_declaration_document ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_registered ?origin_declaration_document)
+        (entity_has_broker ?origin_declaration_document)
+        (verification_applied_to_entity ?origin_declaration_document ?verification_rule)
+        (not
+          (entity_classified ?origin_declaration_document)
+        )
+      )
+    :effect (entity_classified ?origin_declaration_document)
+  )
+  (:action release_verification_rule
+    :parameters (?origin_declaration_document - origin_declaration_document ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (verification_applied_to_entity ?origin_declaration_document ?verification_rule)
+      )
+    :effect
+      (and
+        (verification_rule_available ?verification_rule)
+        (not
+          (verification_applied_to_entity ?origin_declaration_document ?verification_rule)
+        )
+      )
+  )
+  (:action assign_reviewer_to_document
+    :parameters (?origin_declaration_document - origin_declaration_document ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_classified ?origin_declaration_document)
+        (reviewer_available ?reviewer)
+      )
+    :effect
+      (and
+        (entity_assigned_to_reviewer ?origin_declaration_document ?reviewer)
+        (not
+          (reviewer_available ?reviewer)
+        )
+      )
+  )
+  (:action release_reviewer_from_document
+    :parameters (?origin_declaration_document - origin_declaration_document ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_assigned_to_reviewer ?origin_declaration_document ?reviewer)
+      )
+    :effect
+      (and
+        (reviewer_available ?reviewer)
+        (not
+          (entity_assigned_to_reviewer ?origin_declaration_document ?reviewer)
+        )
+      )
+  )
+  (:action attach_commercial_credential_to_case
+    :parameters (?compliance_case - compliance_case ?commercial_credential - commercial_credential)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (commercial_credential_available ?commercial_credential)
+      )
+    :effect
+      (and
+        (case_linked_to_commercial_credential ?compliance_case ?commercial_credential)
+        (not
+          (commercial_credential_available ?commercial_credential)
+        )
+      )
+  )
+  (:action release_commercial_credential_from_case
+    :parameters (?compliance_case - compliance_case ?commercial_credential - commercial_credential)
+    :precondition
+      (and
+        (case_linked_to_commercial_credential ?compliance_case ?commercial_credential)
+      )
+    :effect
+      (and
+        (commercial_credential_available ?commercial_credential)
+        (not
+          (case_linked_to_commercial_credential ?compliance_case ?commercial_credential)
+        )
+      )
+  )
+  (:action attach_regulation_version_to_case
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (regulation_version_available ?regulation_version)
+      )
+    :effect
+      (and
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (not
+          (regulation_version_available ?regulation_version)
+        )
+      )
+  )
+  (:action release_regulation_version_from_case
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version)
+    :precondition
+      (and
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+      )
+    :effect
+      (and
+        (regulation_version_available ?regulation_version)
+        (not
+          (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        )
+      )
+  )
+  (:action evaluate_origin_criterion_by_rule
+    :parameters (?export_leg - export_leg ?origin_criterion - origin_criterion ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_classified ?export_leg)
+        (verification_applied_to_entity ?export_leg ?verification_rule)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (not
+          (origin_criterion_satisfied ?origin_criterion)
+        )
+        (not
+          (origin_criterion_satisfied_by_supporting_document ?origin_criterion)
+        )
+      )
+    :effect (origin_criterion_satisfied ?origin_criterion)
+  )
+  (:action review_export_leg_origin_assessment
+    :parameters (?export_leg - export_leg ?origin_criterion - origin_criterion ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_classified ?export_leg)
+        (entity_assigned_to_reviewer ?export_leg ?reviewer)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (origin_criterion_satisfied ?origin_criterion)
+        (not
+          (export_leg_ready_for_submission ?export_leg)
+        )
+      )
+    :effect
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (export_leg_origin_confirmed ?export_leg)
+      )
+  )
+  (:action apply_supporting_document_to_export_leg_origin
+    :parameters (?export_leg - export_leg ?origin_criterion - origin_criterion ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_classified ?export_leg)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (supporting_document_available ?supporting_document)
+        (not
+          (export_leg_ready_for_submission ?export_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_criterion_satisfied_by_supporting_document ?origin_criterion)
+        (export_leg_ready_for_submission ?export_leg)
+        (export_leg_has_supporting_document ?export_leg ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_export_leg_origin_with_supporting_document
+    :parameters (?export_leg - export_leg ?origin_criterion - origin_criterion ?verification_rule - verification_rule ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_classified ?export_leg)
+        (verification_applied_to_entity ?export_leg ?verification_rule)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (origin_criterion_satisfied_by_supporting_document ?origin_criterion)
+        (export_leg_has_supporting_document ?export_leg ?supporting_document)
+        (not
+          (export_leg_origin_confirmed ?export_leg)
+        )
+      )
+    :effect
+      (and
+        (origin_criterion_satisfied ?origin_criterion)
+        (export_leg_origin_confirmed ?export_leg)
+        (supporting_document_available ?supporting_document)
+        (not
+          (export_leg_has_supporting_document ?export_leg ?supporting_document)
+        )
+      )
+  )
+  (:action evaluate_tariff_criterion_by_rule_for_import_leg
+    :parameters (?import_leg - import_leg ?tariff_criterion - tariff_criterion ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_classified ?import_leg)
+        (verification_applied_to_entity ?import_leg ?verification_rule)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (not
+          (tariff_criterion_satisfied ?tariff_criterion)
+        )
+        (not
+          (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion)
+        )
+      )
+    :effect (tariff_criterion_satisfied ?tariff_criterion)
+  )
+  (:action review_import_leg_tariff_assessment
+    :parameters (?import_leg - import_leg ?tariff_criterion - tariff_criterion ?reviewer - reviewer)
+    :precondition
+      (and
+        (entity_classified ?import_leg)
+        (entity_assigned_to_reviewer ?import_leg ?reviewer)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (tariff_criterion_satisfied ?tariff_criterion)
+        (not
+          (import_leg_ready_for_submission ?import_leg)
+        )
+      )
+    :effect
+      (and
+        (import_leg_ready_for_submission ?import_leg)
+        (import_leg_tariff_confirmed ?import_leg)
+      )
+  )
+  (:action apply_supporting_document_to_import_leg_tariff
+    :parameters (?import_leg - import_leg ?tariff_criterion - tariff_criterion ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_classified ?import_leg)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (supporting_document_available ?supporting_document)
+        (not
+          (import_leg_ready_for_submission ?import_leg)
+        )
+      )
+    :effect
+      (and
+        (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion)
+        (import_leg_ready_for_submission ?import_leg)
+        (import_leg_has_supporting_document ?import_leg ?supporting_document)
+        (not
+          (supporting_document_available ?supporting_document)
+        )
+      )
+  )
+  (:action finalize_import_leg_tariff_with_supporting_document
+    :parameters (?import_leg - import_leg ?tariff_criterion - tariff_criterion ?verification_rule - verification_rule ?supporting_document - supporting_document)
+    :precondition
+      (and
+        (entity_classified ?import_leg)
+        (verification_applied_to_entity ?import_leg ?verification_rule)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion)
+        (import_leg_has_supporting_document ?import_leg ?supporting_document)
+        (not
+          (import_leg_tariff_confirmed ?import_leg)
+        )
+      )
+    :effect
+      (and
+        (tariff_criterion_satisfied ?tariff_criterion)
+        (import_leg_tariff_confirmed ?import_leg)
+        (supporting_document_available ?supporting_document)
+        (not
+          (import_leg_has_supporting_document ?import_leg ?supporting_document)
+        )
+      )
+  )
+  (:action assemble_declaration_submission
+    :parameters (?export_leg - export_leg ?import_leg - import_leg ?origin_criterion - origin_criterion ?tariff_criterion - tariff_criterion ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (import_leg_ready_for_submission ?import_leg)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (origin_criterion_satisfied ?origin_criterion)
+        (tariff_criterion_satisfied ?tariff_criterion)
+        (export_leg_origin_confirmed ?export_leg)
+        (import_leg_tariff_confirmed ?import_leg)
+        (submission_slot_available ?declaration_submission)
+      )
+    :effect
+      (and
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_linked_to_origin_criterion ?declaration_submission ?origin_criterion)
+        (submission_linked_to_tariff_criterion ?declaration_submission ?tariff_criterion)
+        (not
+          (submission_slot_available ?declaration_submission)
+        )
+      )
+  )
+  (:action assemble_declaration_submission_with_origin_evidence
+    :parameters (?export_leg - export_leg ?import_leg - import_leg ?origin_criterion - origin_criterion ?tariff_criterion - tariff_criterion ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (import_leg_ready_for_submission ?import_leg)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (origin_criterion_satisfied_by_supporting_document ?origin_criterion)
+        (tariff_criterion_satisfied ?tariff_criterion)
+        (not
+          (export_leg_origin_confirmed ?export_leg)
+        )
+        (import_leg_tariff_confirmed ?import_leg)
+        (submission_slot_available ?declaration_submission)
+      )
+    :effect
+      (and
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_linked_to_origin_criterion ?declaration_submission ?origin_criterion)
+        (submission_linked_to_tariff_criterion ?declaration_submission ?tariff_criterion)
+        (submission_has_origin_evidence ?declaration_submission)
+        (not
+          (submission_slot_available ?declaration_submission)
+        )
+      )
+  )
+  (:action assemble_declaration_submission_with_tariff_evidence
+    :parameters (?export_leg - export_leg ?import_leg - import_leg ?origin_criterion - origin_criterion ?tariff_criterion - tariff_criterion ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (import_leg_ready_for_submission ?import_leg)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (origin_criterion_satisfied ?origin_criterion)
+        (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion)
+        (export_leg_origin_confirmed ?export_leg)
+        (not
+          (import_leg_tariff_confirmed ?import_leg)
+        )
+        (submission_slot_available ?declaration_submission)
+      )
+    :effect
+      (and
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_linked_to_origin_criterion ?declaration_submission ?origin_criterion)
+        (submission_linked_to_tariff_criterion ?declaration_submission ?tariff_criterion)
+        (submission_has_tariff_evidence ?declaration_submission)
+        (not
+          (submission_slot_available ?declaration_submission)
+        )
+      )
+  )
+  (:action assemble_declaration_submission_with_full_evidence
+    :parameters (?export_leg - export_leg ?import_leg - import_leg ?origin_criterion - origin_criterion ?tariff_criterion - tariff_criterion ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (import_leg_ready_for_submission ?import_leg)
+        (export_leg_linked_to_origin_criterion ?export_leg ?origin_criterion)
+        (import_leg_linked_to_tariff_criterion ?import_leg ?tariff_criterion)
+        (origin_criterion_satisfied_by_supporting_document ?origin_criterion)
+        (tariff_criterion_satisfied_by_supporting_document ?tariff_criterion)
+        (not
+          (export_leg_origin_confirmed ?export_leg)
+        )
+        (not
+          (import_leg_tariff_confirmed ?import_leg)
+        )
+        (submission_slot_available ?declaration_submission)
+      )
+    :effect
+      (and
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_linked_to_origin_criterion ?declaration_submission ?origin_criterion)
+        (submission_linked_to_tariff_criterion ?declaration_submission ?tariff_criterion)
+        (submission_has_origin_evidence ?declaration_submission)
+        (submission_has_tariff_evidence ?declaration_submission)
+        (not
+          (submission_slot_available ?declaration_submission)
+        )
+      )
+  )
+  (:action mark_submission_ready_for_templating
+    :parameters (?declaration_submission - declaration_submission ?export_leg - export_leg ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (declaration_submission_prepared ?declaration_submission)
+        (export_leg_ready_for_submission ?export_leg)
+        (verification_applied_to_entity ?export_leg ?verification_rule)
+        (not
+          (submission_ready_for_templating ?declaration_submission)
+        )
+      )
+    :effect (submission_ready_for_templating ?declaration_submission)
+  )
+  (:action bind_template_to_case_and_submission
+    :parameters (?compliance_case - compliance_case ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (case_linked_to_submission ?compliance_case ?declaration_submission)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_available ?document_form_template)
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_ready_for_templating ?declaration_submission)
+        (not
+          (template_used ?document_form_template)
+        )
+      )
+    :effect
+      (and
+        (template_used ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (not
+          (template_available ?document_form_template)
+        )
+      )
+  )
+  (:action generate_case_document_from_template
+    :parameters (?compliance_case - compliance_case ?document_form_template - document_form_template ?declaration_submission - declaration_submission ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_used ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (verification_applied_to_entity ?compliance_case ?verification_rule)
+        (not
+          (submission_has_origin_evidence ?declaration_submission)
+        )
+        (not
+          (case_template_applied ?compliance_case)
+        )
+      )
+    :effect (case_template_applied ?compliance_case)
+  )
+  (:action assign_regulatory_reference_to_case
+    :parameters (?compliance_case - compliance_case ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (regulatory_reference_available ?regulatory_reference)
+        (not
+          (case_has_regulatory_reference ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_has_regulatory_reference ?compliance_case)
+        (case_linked_to_regulatory_reference ?compliance_case ?regulatory_reference)
+        (not
+          (regulatory_reference_available ?regulatory_reference)
+        )
+      )
+  )
+  (:action apply_template_and_regulatory_reference_to_case
+    :parameters (?compliance_case - compliance_case ?document_form_template - document_form_template ?declaration_submission - declaration_submission ?verification_rule - verification_rule ?regulatory_reference - regulatory_reference)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_used ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (verification_applied_to_entity ?compliance_case ?verification_rule)
+        (submission_has_origin_evidence ?declaration_submission)
+        (case_has_regulatory_reference ?compliance_case)
+        (case_linked_to_regulatory_reference ?compliance_case ?regulatory_reference)
+        (not
+          (case_template_applied ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_template_applied ?compliance_case)
+        (case_regulatory_binding_confirmed ?compliance_case)
+      )
+  )
+  (:action attach_commercial_credential_and_prepare_case
+    :parameters (?compliance_case - compliance_case ?commercial_credential - commercial_credential ?reviewer - reviewer ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_template_applied ?compliance_case)
+        (case_linked_to_commercial_credential ?compliance_case ?commercial_credential)
+        (entity_assigned_to_reviewer ?compliance_case ?reviewer)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (not
+          (submission_has_tariff_evidence ?declaration_submission)
+        )
+        (not
+          (case_credentials_attached ?compliance_case)
+        )
+      )
+    :effect (case_credentials_attached ?compliance_case)
+  )
+  (:action attach_commercial_credential_and_prepare_case_with_submission_flag
+    :parameters (?compliance_case - compliance_case ?commercial_credential - commercial_credential ?reviewer - reviewer ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_template_applied ?compliance_case)
+        (case_linked_to_commercial_credential ?compliance_case ?commercial_credential)
+        (entity_assigned_to_reviewer ?compliance_case ?reviewer)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (submission_has_tariff_evidence ?declaration_submission)
+        (not
+          (case_credentials_attached ?compliance_case)
+        )
+      )
+    :effect (case_credentials_attached ?compliance_case)
+  )
+  (:action run_case_document_generation_checks
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_credentials_attached ?compliance_case)
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (not
+          (submission_has_origin_evidence ?declaration_submission)
+        )
+        (not
+          (submission_has_tariff_evidence ?declaration_submission)
+        )
+        (not
+          (case_checks_passed ?compliance_case)
+        )
+      )
+    :effect (case_checks_passed ?compliance_case)
+  )
+  (:action run_case_document_generation_checks_and_mark_credential_binding
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_credentials_attached ?compliance_case)
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (submission_has_origin_evidence ?declaration_submission)
+        (not
+          (submission_has_tariff_evidence ?declaration_submission)
+        )
+        (not
+          (case_checks_passed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_ready_for_credential_attachment ?compliance_case)
+      )
+  )
+  (:action run_case_document_generation_checks_and_mark_credential_binding_variant
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_credentials_attached ?compliance_case)
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (not
+          (submission_has_origin_evidence ?declaration_submission)
+        )
+        (submission_has_tariff_evidence ?declaration_submission)
+        (not
+          (case_checks_passed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_ready_for_credential_attachment ?compliance_case)
+      )
+  )
+  (:action run_case_document_generation_checks_and_mark_credential_binding_full
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version ?document_form_template - document_form_template ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (case_credentials_attached ?compliance_case)
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (case_assigned_template ?compliance_case ?document_form_template)
+        (template_linked_to_submission ?document_form_template ?declaration_submission)
+        (submission_has_origin_evidence ?declaration_submission)
+        (submission_has_tariff_evidence ?declaration_submission)
+        (not
+          (case_checks_passed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_ready_for_credential_attachment ?compliance_case)
+      )
+  )
+  (:action finalize_case_without_credentials
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (case_checks_passed ?compliance_case)
+        (not
+          (case_ready_for_credential_attachment ?compliance_case)
+        )
+        (not
+          (case_validated ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?compliance_case)
+        (validation_ready ?compliance_case)
+      )
+  )
+  (:action attach_inspector_credential_to_case
+    :parameters (?compliance_case - compliance_case ?inspector_credential - inspector_credential)
+    :precondition
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_ready_for_credential_attachment ?compliance_case)
+        (inspector_credential_available ?inspector_credential)
+      )
+    :effect
+      (and
+        (case_linked_to_inspector_credential ?compliance_case ?inspector_credential)
+        (not
+          (inspector_credential_available ?inspector_credential)
+        )
+      )
+  )
+  (:action perform_final_case_checks
+    :parameters (?compliance_case - compliance_case ?export_leg - export_leg ?import_leg - import_leg ?verification_rule - verification_rule ?inspector_credential - inspector_credential)
+    :precondition
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_ready_for_credential_attachment ?compliance_case)
+        (case_linked_to_inspector_credential ?compliance_case ?inspector_credential)
+        (case_includes_export_leg ?compliance_case ?export_leg)
+        (case_includes_import_leg ?compliance_case ?import_leg)
+        (export_leg_origin_confirmed ?export_leg)
+        (import_leg_tariff_confirmed ?import_leg)
+        (verification_applied_to_entity ?compliance_case ?verification_rule)
+        (not
+          (case_final_checks_ok ?compliance_case)
+        )
+      )
+    :effect (case_final_checks_ok ?compliance_case)
+  )
+  (:action finalize_case_after_checks
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (case_checks_passed ?compliance_case)
+        (case_final_checks_ok ?compliance_case)
+        (not
+          (case_validated ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?compliance_case)
+        (validation_ready ?compliance_case)
+      )
+  )
+  (:action attach_declaration_reference_to_case
+    :parameters (?compliance_case - compliance_case ?declaration_reference - declaration_reference ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (entity_classified ?compliance_case)
+        (verification_applied_to_entity ?compliance_case ?verification_rule)
+        (declaration_reference_available ?declaration_reference)
+        (case_linked_to_declaration_reference ?compliance_case ?declaration_reference)
+        (not
+          (case_reference_bound ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_reference_bound ?compliance_case)
+        (not
+          (declaration_reference_available ?declaration_reference)
+        )
+      )
+  )
+  (:action start_case_reference_review
+    :parameters (?compliance_case - compliance_case ?reviewer - reviewer)
+    :precondition
+      (and
+        (case_reference_bound ?compliance_case)
+        (entity_assigned_to_reviewer ?compliance_case ?reviewer)
+        (not
+          (case_reference_review_started ?compliance_case)
+        )
+      )
+    :effect (case_reference_review_started ?compliance_case)
+  )
+  (:action complete_case_reference_review
+    :parameters (?compliance_case - compliance_case ?regulation_version - regulation_version)
+    :precondition
+      (and
+        (case_reference_review_started ?compliance_case)
+        (case_linked_to_regulation_version ?compliance_case ?regulation_version)
+        (not
+          (case_reference_review_completed ?compliance_case)
+        )
+      )
+    :effect (case_reference_review_completed ?compliance_case)
+  )
+  (:action finalize_case_after_reference_review
+    :parameters (?compliance_case - compliance_case)
+    :precondition
+      (and
+        (case_reference_review_completed ?compliance_case)
+        (not
+          (case_validated ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (case_validated ?compliance_case)
+        (validation_ready ?compliance_case)
+      )
+  )
+  (:action finalize_export_leg
+    :parameters (?export_leg - export_leg ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (export_leg_ready_for_submission ?export_leg)
+        (export_leg_origin_confirmed ?export_leg)
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_ready_for_templating ?declaration_submission)
+        (not
+          (validation_ready ?export_leg)
+        )
+      )
+    :effect (validation_ready ?export_leg)
+  )
+  (:action finalize_import_leg
+    :parameters (?import_leg - import_leg ?declaration_submission - declaration_submission)
+    :precondition
+      (and
+        (import_leg_ready_for_submission ?import_leg)
+        (import_leg_tariff_confirmed ?import_leg)
+        (declaration_submission_prepared ?declaration_submission)
+        (submission_ready_for_templating ?declaration_submission)
+        (not
+          (validation_ready ?import_leg)
+        )
+      )
+    :effect (validation_ready ?import_leg)
+  )
+  (:action request_customs_validation_for_document
+    :parameters (?origin_declaration_document - origin_declaration_document ?customs_office - customs_office ?verification_rule - verification_rule)
+    :precondition
+      (and
+        (validation_ready ?origin_declaration_document)
+        (verification_applied_to_entity ?origin_declaration_document ?verification_rule)
+        (customs_office_available ?customs_office)
+        (not
+          (customs_validated ?origin_declaration_document)
+        )
+      )
+    :effect
+      (and
+        (customs_validated ?origin_declaration_document)
+        (entity_linked_to_customs_office ?origin_declaration_document ?customs_office)
+        (not
+          (customs_office_available ?customs_office)
+        )
+      )
+  )
+  (:action propagate_validation_to_export_leg
+    :parameters (?export_leg - export_leg ?broker_agent - broker_agent ?customs_office - customs_office)
+    :precondition
+      (and
+        (customs_validated ?export_leg)
+        (entity_assigned_to_broker ?export_leg ?broker_agent)
+        (entity_linked_to_customs_office ?export_leg ?customs_office)
+        (not
+          (completeness_confirmed ?export_leg)
+        )
+      )
+    :effect
+      (and
+        (completeness_confirmed ?export_leg)
+        (broker_available ?broker_agent)
+        (customs_office_available ?customs_office)
+      )
+  )
+  (:action propagate_validation_to_import_leg
+    :parameters (?import_leg - import_leg ?broker_agent - broker_agent ?customs_office - customs_office)
+    :precondition
+      (and
+        (customs_validated ?import_leg)
+        (entity_assigned_to_broker ?import_leg ?broker_agent)
+        (entity_linked_to_customs_office ?import_leg ?customs_office)
+        (not
+          (completeness_confirmed ?import_leg)
+        )
+      )
+    :effect
+      (and
+        (completeness_confirmed ?import_leg)
+        (broker_available ?broker_agent)
+        (customs_office_available ?customs_office)
+      )
+  )
+  (:action propagate_validation_to_case
+    :parameters (?compliance_case - compliance_case ?broker_agent - broker_agent ?customs_office - customs_office)
+    :precondition
+      (and
+        (customs_validated ?compliance_case)
+        (entity_assigned_to_broker ?compliance_case ?broker_agent)
+        (entity_linked_to_customs_office ?compliance_case ?customs_office)
+        (not
+          (completeness_confirmed ?compliance_case)
+        )
+      )
+    :effect
+      (and
+        (completeness_confirmed ?compliance_case)
+        (broker_available ?broker_agent)
+        (customs_office_available ?customs_office)
+      )
+  )
+)

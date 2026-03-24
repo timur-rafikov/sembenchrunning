@@ -1,0 +1,1012 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain fuel_allocation_daily_operations)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_class - object station_class - object transaction_class - object operation_container - object operation_slot - operation_container fuel_source - resource_class vehicle - resource_class operator_crew - resource_class priority_tag - resource_class fuel_grade - resource_class contingency_reserve - resource_class fuel_batch - resource_class safety_clearance - resource_class portable_fuel_canister - station_class flow_meter - station_class regulatory_permit - station_class refuel_bay_primary - transaction_class refuel_bay_secondary - transaction_class fuel_allocation_order - transaction_class asset_role_container - operation_slot manager_role_container - operation_slot primary_mobile_asset - asset_role_container secondary_mobile_asset - asset_role_container fuel_coordinator - manager_role_container)
+  (:predicates
+    (entity_registered ?operation_slot - operation_slot)
+    (entity_configured_for_fueling ?operation_slot - operation_slot)
+    (entity_has_assigned_source ?operation_slot - operation_slot)
+    (entity_fueling_finalized ?operation_slot - operation_slot)
+    (entity_dispensing_completed ?operation_slot - operation_slot)
+    (entity_allocation_confirmed ?operation_slot - operation_slot)
+    (fuel_source_available ?fuel_source - fuel_source)
+    (entity_assigned_source ?operation_slot - operation_slot ?fuel_source - fuel_source)
+    (vehicle_available ?vehicle - vehicle)
+    (entity_assigned_vehicle ?operation_slot - operation_slot ?vehicle - vehicle)
+    (operator_available ?operator_crew - operator_crew)
+    (entity_assigned_operator ?operation_slot - operation_slot ?operator_crew - operator_crew)
+    (canister_available ?portable_canister - portable_fuel_canister)
+    (primary_asset_assigned_canister ?primary_asset - primary_mobile_asset ?portable_canister - portable_fuel_canister)
+    (secondary_asset_assigned_canister ?secondary_asset - secondary_mobile_asset ?portable_canister - portable_fuel_canister)
+    (asset_link_primary_bay ?primary_asset - primary_mobile_asset ?primary_bay - refuel_bay_primary)
+    (primary_bay_reserved ?primary_bay - refuel_bay_primary)
+    (primary_bay_has_canister ?primary_bay - refuel_bay_primary)
+    (primary_asset_ready ?primary_asset - primary_mobile_asset)
+    (asset_link_secondary_bay ?secondary_asset - secondary_mobile_asset ?secondary_bay - refuel_bay_secondary)
+    (secondary_bay_reserved ?secondary_bay - refuel_bay_secondary)
+    (secondary_bay_has_canister ?secondary_bay - refuel_bay_secondary)
+    (secondary_asset_ready ?secondary_asset - secondary_mobile_asset)
+    (allocation_order_open ?allocation_order - fuel_allocation_order)
+    (allocation_order_active ?allocation_order - fuel_allocation_order)
+    (allocation_order_link_primary_bay ?allocation_order - fuel_allocation_order ?primary_bay - refuel_bay_primary)
+    (allocation_order_link_secondary_bay ?allocation_order - fuel_allocation_order ?secondary_bay - refuel_bay_secondary)
+    (allocation_order_primary_bay_has_canister ?allocation_order - fuel_allocation_order)
+    (allocation_order_secondary_bay_has_canister ?allocation_order - fuel_allocation_order)
+    (allocation_order_meter_initialized ?allocation_order - fuel_allocation_order)
+    (coordinator_assigned_primary_asset ?coordinator - fuel_coordinator ?primary_asset - primary_mobile_asset)
+    (coordinator_assigned_secondary_asset ?coordinator - fuel_coordinator ?secondary_asset - secondary_mobile_asset)
+    (coordinator_assigned_order ?coordinator - fuel_coordinator ?allocation_order - fuel_allocation_order)
+    (meter_available ?flow_meter - flow_meter)
+    (coordinator_assigned_meter ?coordinator - fuel_coordinator ?flow_meter - flow_meter)
+    (meter_engaged ?flow_meter - flow_meter)
+    (meter_linked_to_order ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    (coordinator_meter_verified ?coordinator - fuel_coordinator)
+    (coordinator_ready ?coordinator - fuel_coordinator)
+    (coordinator_safety_cleared ?coordinator - fuel_coordinator)
+    (coordinator_has_priority_tag ?coordinator - fuel_coordinator)
+    (coordinator_tag_confirmed ?coordinator - fuel_coordinator)
+    (coordinator_checks_complete ?coordinator - fuel_coordinator)
+    (coordinator_dispense_initiated ?coordinator - fuel_coordinator)
+    (permit_available ?regulatory_permit - regulatory_permit)
+    (coordinator_assigned_permit ?coordinator - fuel_coordinator ?regulatory_permit - regulatory_permit)
+    (coordinator_permit_attached ?coordinator - fuel_coordinator)
+    (coordinator_permit_validated ?coordinator - fuel_coordinator)
+    (coordinator_permit_confirmed ?coordinator - fuel_coordinator)
+    (priority_tag_available ?priority_tag - priority_tag)
+    (coordinator_assigned_priority_tag ?coordinator - fuel_coordinator ?priority_tag - priority_tag)
+    (fuel_grade_available ?fuel_grade - fuel_grade)
+    (coordinator_assigned_fuel_grade ?coordinator - fuel_coordinator ?fuel_grade - fuel_grade)
+    (fuel_batch_available ?fuel_batch - fuel_batch)
+    (coordinator_assigned_fuel_batch ?coordinator - fuel_coordinator ?fuel_batch - fuel_batch)
+    (safety_clearance_available ?safety_clearance - safety_clearance)
+    (coordinator_assigned_safety_clearance ?coordinator - fuel_coordinator ?safety_clearance - safety_clearance)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (entity_linked_contingency_reserve ?operation_slot - operation_slot ?contingency_reserve - contingency_reserve)
+    (primary_asset_staged ?primary_asset - primary_mobile_asset)
+    (secondary_asset_staged ?secondary_asset - secondary_mobile_asset)
+    (coordinator_finalized ?coordinator - fuel_coordinator)
+  )
+  (:action register_operation_slot
+    :parameters (?operation_slot - operation_slot)
+    :precondition
+      (and
+        (not
+          (entity_registered ?operation_slot)
+        )
+        (not
+          (entity_fueling_finalized ?operation_slot)
+        )
+      )
+    :effect (entity_registered ?operation_slot)
+  )
+  (:action assign_fuel_source_to_operation
+    :parameters (?operation_slot - operation_slot ?fuel_source - fuel_source)
+    :precondition
+      (and
+        (entity_registered ?operation_slot)
+        (not
+          (entity_has_assigned_source ?operation_slot)
+        )
+        (fuel_source_available ?fuel_source)
+      )
+    :effect
+      (and
+        (entity_has_assigned_source ?operation_slot)
+        (entity_assigned_source ?operation_slot ?fuel_source)
+        (not
+          (fuel_source_available ?fuel_source)
+        )
+      )
+  )
+  (:action assign_vehicle_to_operation
+    :parameters (?operation_slot - operation_slot ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_registered ?operation_slot)
+        (entity_has_assigned_source ?operation_slot)
+        (vehicle_available ?vehicle)
+      )
+    :effect
+      (and
+        (entity_assigned_vehicle ?operation_slot ?vehicle)
+        (not
+          (vehicle_available ?vehicle)
+        )
+      )
+  )
+  (:action confirm_operation_configuration
+    :parameters (?operation_slot - operation_slot ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_registered ?operation_slot)
+        (entity_has_assigned_source ?operation_slot)
+        (entity_assigned_vehicle ?operation_slot ?vehicle)
+        (not
+          (entity_configured_for_fueling ?operation_slot)
+        )
+      )
+    :effect (entity_configured_for_fueling ?operation_slot)
+  )
+  (:action release_vehicle_from_operation
+    :parameters (?operation_slot - operation_slot ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_assigned_vehicle ?operation_slot ?vehicle)
+      )
+    :effect
+      (and
+        (vehicle_available ?vehicle)
+        (not
+          (entity_assigned_vehicle ?operation_slot ?vehicle)
+        )
+      )
+  )
+  (:action assign_operator_to_operation
+    :parameters (?operation_slot - operation_slot ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?operation_slot)
+        (operator_available ?operator_crew)
+      )
+    :effect
+      (and
+        (entity_assigned_operator ?operation_slot ?operator_crew)
+        (not
+          (operator_available ?operator_crew)
+        )
+      )
+  )
+  (:action release_operator_from_operation
+    :parameters (?operation_slot - operation_slot ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (entity_assigned_operator ?operation_slot ?operator_crew)
+      )
+    :effect
+      (and
+        (operator_available ?operator_crew)
+        (not
+          (entity_assigned_operator ?operation_slot ?operator_crew)
+        )
+      )
+  )
+  (:action assign_fuel_batch_to_coordinator
+    :parameters (?coordinator - fuel_coordinator ?fuel_batch - fuel_batch)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (fuel_batch_available ?fuel_batch)
+      )
+    :effect
+      (and
+        (coordinator_assigned_fuel_batch ?coordinator ?fuel_batch)
+        (not
+          (fuel_batch_available ?fuel_batch)
+        )
+      )
+  )
+  (:action release_fuel_batch_from_coordinator
+    :parameters (?coordinator - fuel_coordinator ?fuel_batch - fuel_batch)
+    :precondition
+      (and
+        (coordinator_assigned_fuel_batch ?coordinator ?fuel_batch)
+      )
+    :effect
+      (and
+        (fuel_batch_available ?fuel_batch)
+        (not
+          (coordinator_assigned_fuel_batch ?coordinator ?fuel_batch)
+        )
+      )
+  )
+  (:action assign_safety_clearance_to_coordinator
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (safety_clearance_available ?safety_clearance)
+      )
+    :effect
+      (and
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (not
+          (safety_clearance_available ?safety_clearance)
+        )
+      )
+  )
+  (:action release_safety_clearance_from_coordinator
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance)
+    :precondition
+      (and
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+      )
+    :effect
+      (and
+        (safety_clearance_available ?safety_clearance)
+        (not
+          (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        )
+      )
+  )
+  (:action reserve_primary_bay_for_asset
+    :parameters (?primary_asset - primary_mobile_asset ?primary_bay - refuel_bay_primary ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?primary_asset)
+        (entity_assigned_vehicle ?primary_asset ?vehicle)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (not
+          (primary_bay_reserved ?primary_bay)
+        )
+        (not
+          (primary_bay_has_canister ?primary_bay)
+        )
+      )
+    :effect (primary_bay_reserved ?primary_bay)
+  )
+  (:action prepare_primary_asset_for_refuel
+    :parameters (?primary_asset - primary_mobile_asset ?primary_bay - refuel_bay_primary ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?primary_asset)
+        (entity_assigned_operator ?primary_asset ?operator_crew)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (primary_bay_reserved ?primary_bay)
+        (not
+          (primary_asset_staged ?primary_asset)
+        )
+      )
+    :effect
+      (and
+        (primary_asset_staged ?primary_asset)
+        (primary_asset_ready ?primary_asset)
+      )
+  )
+  (:action stage_canister_for_primary_asset
+    :parameters (?primary_asset - primary_mobile_asset ?primary_bay - refuel_bay_primary ?portable_canister - portable_fuel_canister)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?primary_asset)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (canister_available ?portable_canister)
+        (not
+          (primary_asset_staged ?primary_asset)
+        )
+      )
+    :effect
+      (and
+        (primary_bay_has_canister ?primary_bay)
+        (primary_asset_staged ?primary_asset)
+        (primary_asset_assigned_canister ?primary_asset ?portable_canister)
+        (not
+          (canister_available ?portable_canister)
+        )
+      )
+  )
+  (:action complete_primary_asset_staging
+    :parameters (?primary_asset - primary_mobile_asset ?primary_bay - refuel_bay_primary ?vehicle - vehicle ?portable_canister - portable_fuel_canister)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?primary_asset)
+        (entity_assigned_vehicle ?primary_asset ?vehicle)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (primary_bay_has_canister ?primary_bay)
+        (primary_asset_assigned_canister ?primary_asset ?portable_canister)
+        (not
+          (primary_asset_ready ?primary_asset)
+        )
+      )
+    :effect
+      (and
+        (primary_bay_reserved ?primary_bay)
+        (primary_asset_ready ?primary_asset)
+        (canister_available ?portable_canister)
+        (not
+          (primary_asset_assigned_canister ?primary_asset ?portable_canister)
+        )
+      )
+  )
+  (:action reserve_secondary_bay_for_asset
+    :parameters (?secondary_asset - secondary_mobile_asset ?secondary_bay - refuel_bay_secondary ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?secondary_asset)
+        (entity_assigned_vehicle ?secondary_asset ?vehicle)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (not
+          (secondary_bay_reserved ?secondary_bay)
+        )
+        (not
+          (secondary_bay_has_canister ?secondary_bay)
+        )
+      )
+    :effect (secondary_bay_reserved ?secondary_bay)
+  )
+  (:action prepare_secondary_asset_for_refuel
+    :parameters (?secondary_asset - secondary_mobile_asset ?secondary_bay - refuel_bay_secondary ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?secondary_asset)
+        (entity_assigned_operator ?secondary_asset ?operator_crew)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (secondary_bay_reserved ?secondary_bay)
+        (not
+          (secondary_asset_staged ?secondary_asset)
+        )
+      )
+    :effect
+      (and
+        (secondary_asset_staged ?secondary_asset)
+        (secondary_asset_ready ?secondary_asset)
+      )
+  )
+  (:action stage_canister_for_secondary_asset
+    :parameters (?secondary_asset - secondary_mobile_asset ?secondary_bay - refuel_bay_secondary ?portable_canister - portable_fuel_canister)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?secondary_asset)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (canister_available ?portable_canister)
+        (not
+          (secondary_asset_staged ?secondary_asset)
+        )
+      )
+    :effect
+      (and
+        (secondary_bay_has_canister ?secondary_bay)
+        (secondary_asset_staged ?secondary_asset)
+        (secondary_asset_assigned_canister ?secondary_asset ?portable_canister)
+        (not
+          (canister_available ?portable_canister)
+        )
+      )
+  )
+  (:action complete_secondary_asset_staging
+    :parameters (?secondary_asset - secondary_mobile_asset ?secondary_bay - refuel_bay_secondary ?vehicle - vehicle ?portable_canister - portable_fuel_canister)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?secondary_asset)
+        (entity_assigned_vehicle ?secondary_asset ?vehicle)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (secondary_bay_has_canister ?secondary_bay)
+        (secondary_asset_assigned_canister ?secondary_asset ?portable_canister)
+        (not
+          (secondary_asset_ready ?secondary_asset)
+        )
+      )
+    :effect
+      (and
+        (secondary_bay_reserved ?secondary_bay)
+        (secondary_asset_ready ?secondary_asset)
+        (canister_available ?portable_canister)
+        (not
+          (secondary_asset_assigned_canister ?secondary_asset ?portable_canister)
+        )
+      )
+  )
+  (:action create_fuel_allocation_order
+    :parameters (?primary_asset - primary_mobile_asset ?secondary_asset - secondary_mobile_asset ?primary_bay - refuel_bay_primary ?secondary_bay - refuel_bay_secondary ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (primary_asset_staged ?primary_asset)
+        (secondary_asset_staged ?secondary_asset)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (primary_bay_reserved ?primary_bay)
+        (secondary_bay_reserved ?secondary_bay)
+        (primary_asset_ready ?primary_asset)
+        (secondary_asset_ready ?secondary_asset)
+        (allocation_order_open ?allocation_order)
+      )
+    :effect
+      (and
+        (allocation_order_active ?allocation_order)
+        (allocation_order_link_primary_bay ?allocation_order ?primary_bay)
+        (allocation_order_link_secondary_bay ?allocation_order ?secondary_bay)
+        (not
+          (allocation_order_open ?allocation_order)
+        )
+      )
+  )
+  (:action create_allocation_order_with_primary_canister
+    :parameters (?primary_asset - primary_mobile_asset ?secondary_asset - secondary_mobile_asset ?primary_bay - refuel_bay_primary ?secondary_bay - refuel_bay_secondary ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (primary_asset_staged ?primary_asset)
+        (secondary_asset_staged ?secondary_asset)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (primary_bay_has_canister ?primary_bay)
+        (secondary_bay_reserved ?secondary_bay)
+        (not
+          (primary_asset_ready ?primary_asset)
+        )
+        (secondary_asset_ready ?secondary_asset)
+        (allocation_order_open ?allocation_order)
+      )
+    :effect
+      (and
+        (allocation_order_active ?allocation_order)
+        (allocation_order_link_primary_bay ?allocation_order ?primary_bay)
+        (allocation_order_link_secondary_bay ?allocation_order ?secondary_bay)
+        (allocation_order_primary_bay_has_canister ?allocation_order)
+        (not
+          (allocation_order_open ?allocation_order)
+        )
+      )
+  )
+  (:action create_allocation_order_with_secondary_canister
+    :parameters (?primary_asset - primary_mobile_asset ?secondary_asset - secondary_mobile_asset ?primary_bay - refuel_bay_primary ?secondary_bay - refuel_bay_secondary ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (primary_asset_staged ?primary_asset)
+        (secondary_asset_staged ?secondary_asset)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (primary_bay_reserved ?primary_bay)
+        (secondary_bay_has_canister ?secondary_bay)
+        (primary_asset_ready ?primary_asset)
+        (not
+          (secondary_asset_ready ?secondary_asset)
+        )
+        (allocation_order_open ?allocation_order)
+      )
+    :effect
+      (and
+        (allocation_order_active ?allocation_order)
+        (allocation_order_link_primary_bay ?allocation_order ?primary_bay)
+        (allocation_order_link_secondary_bay ?allocation_order ?secondary_bay)
+        (allocation_order_secondary_bay_has_canister ?allocation_order)
+        (not
+          (allocation_order_open ?allocation_order)
+        )
+      )
+  )
+  (:action create_allocation_order_with_both_canisters
+    :parameters (?primary_asset - primary_mobile_asset ?secondary_asset - secondary_mobile_asset ?primary_bay - refuel_bay_primary ?secondary_bay - refuel_bay_secondary ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (primary_asset_staged ?primary_asset)
+        (secondary_asset_staged ?secondary_asset)
+        (asset_link_primary_bay ?primary_asset ?primary_bay)
+        (asset_link_secondary_bay ?secondary_asset ?secondary_bay)
+        (primary_bay_has_canister ?primary_bay)
+        (secondary_bay_has_canister ?secondary_bay)
+        (not
+          (primary_asset_ready ?primary_asset)
+        )
+        (not
+          (secondary_asset_ready ?secondary_asset)
+        )
+        (allocation_order_open ?allocation_order)
+      )
+    :effect
+      (and
+        (allocation_order_active ?allocation_order)
+        (allocation_order_link_primary_bay ?allocation_order ?primary_bay)
+        (allocation_order_link_secondary_bay ?allocation_order ?secondary_bay)
+        (allocation_order_primary_bay_has_canister ?allocation_order)
+        (allocation_order_secondary_bay_has_canister ?allocation_order)
+        (not
+          (allocation_order_open ?allocation_order)
+        )
+      )
+  )
+  (:action initialize_order_metering
+    :parameters (?allocation_order - fuel_allocation_order ?primary_asset - primary_mobile_asset ?vehicle - vehicle)
+    :precondition
+      (and
+        (allocation_order_active ?allocation_order)
+        (primary_asset_staged ?primary_asset)
+        (entity_assigned_vehicle ?primary_asset ?vehicle)
+        (not
+          (allocation_order_meter_initialized ?allocation_order)
+        )
+      )
+    :effect (allocation_order_meter_initialized ?allocation_order)
+  )
+  (:action assign_meter_to_order_by_coordinator
+    :parameters (?coordinator - fuel_coordinator ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (coordinator_assigned_order ?coordinator ?allocation_order)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_available ?flow_meter)
+        (allocation_order_active ?allocation_order)
+        (allocation_order_meter_initialized ?allocation_order)
+        (not
+          (meter_engaged ?flow_meter)
+        )
+      )
+    :effect
+      (and
+        (meter_engaged ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (not
+          (meter_available ?flow_meter)
+        )
+      )
+  )
+  (:action verify_meter_reading_by_coordinator
+    :parameters (?coordinator - fuel_coordinator ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_engaged ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (entity_assigned_vehicle ?coordinator ?vehicle)
+        (not
+          (allocation_order_primary_bay_has_canister ?allocation_order)
+        )
+        (not
+          (coordinator_meter_verified ?coordinator)
+        )
+      )
+    :effect (coordinator_meter_verified ?coordinator)
+  )
+  (:action assign_priority_tag_to_coordinator
+    :parameters (?coordinator - fuel_coordinator ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (priority_tag_available ?priority_tag)
+        (not
+          (coordinator_has_priority_tag ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_has_priority_tag ?coordinator)
+        (coordinator_assigned_priority_tag ?coordinator ?priority_tag)
+        (not
+          (priority_tag_available ?priority_tag)
+        )
+      )
+  )
+  (:action apply_priority_tag_and_meter_confirmation
+    :parameters (?coordinator - fuel_coordinator ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order ?vehicle - vehicle ?priority_tag - priority_tag)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_engaged ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (entity_assigned_vehicle ?coordinator ?vehicle)
+        (allocation_order_primary_bay_has_canister ?allocation_order)
+        (coordinator_has_priority_tag ?coordinator)
+        (coordinator_assigned_priority_tag ?coordinator ?priority_tag)
+        (not
+          (coordinator_meter_verified ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_meter_verified ?coordinator)
+        (coordinator_tag_confirmed ?coordinator)
+      )
+  )
+  (:action authorize_coordinator_with_fuel_batch
+    :parameters (?coordinator - fuel_coordinator ?fuel_batch - fuel_batch ?operator_crew - operator_crew ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_meter_verified ?coordinator)
+        (coordinator_assigned_fuel_batch ?coordinator ?fuel_batch)
+        (entity_assigned_operator ?coordinator ?operator_crew)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (not
+          (allocation_order_secondary_bay_has_canister ?allocation_order)
+        )
+        (not
+          (coordinator_ready ?coordinator)
+        )
+      )
+    :effect (coordinator_ready ?coordinator)
+  )
+  (:action authorize_coordinator_with_fuel_batch_alternate
+    :parameters (?coordinator - fuel_coordinator ?fuel_batch - fuel_batch ?operator_crew - operator_crew ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_meter_verified ?coordinator)
+        (coordinator_assigned_fuel_batch ?coordinator ?fuel_batch)
+        (entity_assigned_operator ?coordinator ?operator_crew)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (allocation_order_secondary_bay_has_canister ?allocation_order)
+        (not
+          (coordinator_ready ?coordinator)
+        )
+      )
+    :effect (coordinator_ready ?coordinator)
+  )
+  (:action apply_safety_clearance_mark_coordinator
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator)
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (not
+          (allocation_order_primary_bay_has_canister ?allocation_order)
+        )
+        (not
+          (allocation_order_secondary_bay_has_canister ?allocation_order)
+        )
+        (not
+          (coordinator_safety_cleared ?coordinator)
+        )
+      )
+    :effect (coordinator_safety_cleared ?coordinator)
+  )
+  (:action apply_safety_clearance_and_record_meter_pass
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator)
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (allocation_order_primary_bay_has_canister ?allocation_order)
+        (not
+          (allocation_order_secondary_bay_has_canister ?allocation_order)
+        )
+        (not
+          (coordinator_safety_cleared ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_checks_complete ?coordinator)
+      )
+  )
+  (:action apply_safety_clearance_and_record_meter_pass_alt
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator)
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (not
+          (allocation_order_primary_bay_has_canister ?allocation_order)
+        )
+        (allocation_order_secondary_bay_has_canister ?allocation_order)
+        (not
+          (coordinator_safety_cleared ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_checks_complete ?coordinator)
+      )
+  )
+  (:action apply_safety_clearance_and_record_meter_pass_full
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance ?flow_meter - flow_meter ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (coordinator_ready ?coordinator)
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (coordinator_assigned_meter ?coordinator ?flow_meter)
+        (meter_linked_to_order ?flow_meter ?allocation_order)
+        (allocation_order_primary_bay_has_canister ?allocation_order)
+        (allocation_order_secondary_bay_has_canister ?allocation_order)
+        (not
+          (coordinator_safety_cleared ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_checks_complete ?coordinator)
+      )
+  )
+  (:action finalize_dispensing_and_record_completion
+    :parameters (?coordinator - fuel_coordinator)
+    :precondition
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (not
+          (coordinator_checks_complete ?coordinator)
+        )
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (entity_dispensing_completed ?coordinator)
+      )
+  )
+  (:action assign_fuel_grade_to_coordinator
+    :parameters (?coordinator - fuel_coordinator ?fuel_grade - fuel_grade)
+    :precondition
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_checks_complete ?coordinator)
+        (fuel_grade_available ?fuel_grade)
+      )
+    :effect
+      (and
+        (coordinator_assigned_fuel_grade ?coordinator ?fuel_grade)
+        (not
+          (fuel_grade_available ?fuel_grade)
+        )
+      )
+  )
+  (:action initiate_dispensing_by_coordinator
+    :parameters (?coordinator - fuel_coordinator ?primary_asset - primary_mobile_asset ?secondary_asset - secondary_mobile_asset ?vehicle - vehicle ?fuel_grade - fuel_grade)
+    :precondition
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_checks_complete ?coordinator)
+        (coordinator_assigned_fuel_grade ?coordinator ?fuel_grade)
+        (coordinator_assigned_primary_asset ?coordinator ?primary_asset)
+        (coordinator_assigned_secondary_asset ?coordinator ?secondary_asset)
+        (primary_asset_ready ?primary_asset)
+        (secondary_asset_ready ?secondary_asset)
+        (entity_assigned_vehicle ?coordinator ?vehicle)
+        (not
+          (coordinator_dispense_initiated ?coordinator)
+        )
+      )
+    :effect (coordinator_dispense_initiated ?coordinator)
+  )
+  (:action finalize_dispensing_and_close
+    :parameters (?coordinator - fuel_coordinator)
+    :precondition
+      (and
+        (coordinator_safety_cleared ?coordinator)
+        (coordinator_dispense_initiated ?coordinator)
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (entity_dispensing_completed ?coordinator)
+      )
+  )
+  (:action apply_permit_to_coordinator
+    :parameters (?coordinator - fuel_coordinator ?regulatory_permit - regulatory_permit ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_configured_for_fueling ?coordinator)
+        (entity_assigned_vehicle ?coordinator ?vehicle)
+        (permit_available ?regulatory_permit)
+        (coordinator_assigned_permit ?coordinator ?regulatory_permit)
+        (not
+          (coordinator_permit_attached ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_permit_attached ?coordinator)
+        (not
+          (permit_available ?regulatory_permit)
+        )
+      )
+  )
+  (:action validate_permit_for_coordinator
+    :parameters (?coordinator - fuel_coordinator ?operator_crew - operator_crew)
+    :precondition
+      (and
+        (coordinator_permit_attached ?coordinator)
+        (entity_assigned_operator ?coordinator ?operator_crew)
+        (not
+          (coordinator_permit_validated ?coordinator)
+        )
+      )
+    :effect (coordinator_permit_validated ?coordinator)
+  )
+  (:action confirm_safety_and_permit_for_coordinator
+    :parameters (?coordinator - fuel_coordinator ?safety_clearance - safety_clearance)
+    :precondition
+      (and
+        (coordinator_permit_validated ?coordinator)
+        (coordinator_assigned_safety_clearance ?coordinator ?safety_clearance)
+        (not
+          (coordinator_permit_confirmed ?coordinator)
+        )
+      )
+    :effect (coordinator_permit_confirmed ?coordinator)
+  )
+  (:action finalize_permit_authorization
+    :parameters (?coordinator - fuel_coordinator)
+    :precondition
+      (and
+        (coordinator_permit_confirmed ?coordinator)
+        (not
+          (coordinator_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_finalized ?coordinator)
+        (entity_dispensing_completed ?coordinator)
+      )
+  )
+  (:action record_dispense_for_primary_asset
+    :parameters (?primary_asset - primary_mobile_asset ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (primary_asset_staged ?primary_asset)
+        (primary_asset_ready ?primary_asset)
+        (allocation_order_active ?allocation_order)
+        (allocation_order_meter_initialized ?allocation_order)
+        (not
+          (entity_dispensing_completed ?primary_asset)
+        )
+      )
+    :effect (entity_dispensing_completed ?primary_asset)
+  )
+  (:action record_dispense_for_secondary_asset
+    :parameters (?secondary_asset - secondary_mobile_asset ?allocation_order - fuel_allocation_order)
+    :precondition
+      (and
+        (secondary_asset_staged ?secondary_asset)
+        (secondary_asset_ready ?secondary_asset)
+        (allocation_order_active ?allocation_order)
+        (allocation_order_meter_initialized ?allocation_order)
+        (not
+          (entity_dispensing_completed ?secondary_asset)
+        )
+      )
+    :effect (entity_dispensing_completed ?secondary_asset)
+  )
+  (:action assign_contingency_to_operation
+    :parameters (?operation_slot - operation_slot ?contingency_reserve - contingency_reserve ?vehicle - vehicle)
+    :precondition
+      (and
+        (entity_dispensing_completed ?operation_slot)
+        (entity_assigned_vehicle ?operation_slot ?vehicle)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (entity_allocation_confirmed ?operation_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_allocation_confirmed ?operation_slot)
+        (entity_linked_contingency_reserve ?operation_slot ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action finalize_primary_asset_and_release_source
+    :parameters (?primary_asset - primary_mobile_asset ?fuel_source - fuel_source ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?primary_asset)
+        (entity_assigned_source ?primary_asset ?fuel_source)
+        (entity_linked_contingency_reserve ?primary_asset ?contingency_reserve)
+        (not
+          (entity_fueling_finalized ?primary_asset)
+        )
+      )
+    :effect
+      (and
+        (entity_fueling_finalized ?primary_asset)
+        (fuel_source_available ?fuel_source)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_secondary_asset_and_release_source
+    :parameters (?secondary_asset - secondary_mobile_asset ?fuel_source - fuel_source ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?secondary_asset)
+        (entity_assigned_source ?secondary_asset ?fuel_source)
+        (entity_linked_contingency_reserve ?secondary_asset ?contingency_reserve)
+        (not
+          (entity_fueling_finalized ?secondary_asset)
+        )
+      )
+    :effect
+      (and
+        (entity_fueling_finalized ?secondary_asset)
+        (fuel_source_available ?fuel_source)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_coordinator_and_release_source
+    :parameters (?coordinator - fuel_coordinator ?fuel_source - fuel_source ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (entity_allocation_confirmed ?coordinator)
+        (entity_assigned_source ?coordinator ?fuel_source)
+        (entity_linked_contingency_reserve ?coordinator ?contingency_reserve)
+        (not
+          (entity_fueling_finalized ?coordinator)
+        )
+      )
+    :effect
+      (and
+        (entity_fueling_finalized ?coordinator)
+        (fuel_source_available ?fuel_source)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem daily_fuel_allocation_problem)
+  (:domain fuel_allocation_daily_operations)
+  (:objects primary_asset_1 - primary_mobile_asset secondary_asset_1 - secondary_mobile_asset coordinator_1 - fuel_coordinator coordinator_2 - fuel_coordinator fuel_source_1 - fuel_source fuel_source_2 - fuel_source fuel_source_3 - fuel_source vehicle_1 - vehicle operator_crew_1 - operator_crew portable_canister_1 - portable_fuel_canister primary_bay_1 - refuel_bay_primary secondary_bay_1 - refuel_bay_secondary allocation_order_1 - fuel_allocation_order flow_meter_1 - flow_meter flow_meter_2 - flow_meter priority_tag_1 - priority_tag priority_tag_2 - priority_tag fuel_grade_1 - fuel_grade fuel_grade_2 - fuel_grade contingency_reserve_1 - contingency_reserve fuel_batch_1 - fuel_batch permit_1 - regulatory_permit permit_2 - regulatory_permit safety_clearance_1 - safety_clearance)
+  (:init
+    (fuel_source_available fuel_source_1)
+    (fuel_source_available fuel_source_2)
+    (fuel_source_available fuel_source_3)
+    (vehicle_available vehicle_1)
+    (operator_available operator_crew_1)
+    (canister_available portable_canister_1)
+    (asset_link_primary_bay primary_asset_1 primary_bay_1)
+    (asset_link_secondary_bay secondary_asset_1 secondary_bay_1)
+    (allocation_order_open allocation_order_1)
+    (meter_available flow_meter_1)
+    (meter_available flow_meter_2)
+    (coordinator_assigned_primary_asset coordinator_1 primary_asset_1)
+    (coordinator_assigned_primary_asset coordinator_2 primary_asset_1)
+    (coordinator_assigned_secondary_asset coordinator_1 secondary_asset_1)
+    (coordinator_assigned_secondary_asset coordinator_2 secondary_asset_1)
+    (coordinator_assigned_order coordinator_1 allocation_order_1)
+    (coordinator_assigned_order coordinator_2 allocation_order_1)
+    (coordinator_assigned_meter coordinator_1 flow_meter_1)
+    (coordinator_assigned_meter coordinator_2 flow_meter_2)
+    (priority_tag_available priority_tag_1)
+    (priority_tag_available priority_tag_2)
+    (fuel_grade_available fuel_grade_1)
+    (fuel_grade_available fuel_grade_2)
+    (contingency_reserve_available contingency_reserve_1)
+    (fuel_batch_available fuel_batch_1)
+    (permit_available permit_1)
+    (coordinator_assigned_permit coordinator_1 permit_1)
+    (coordinator_assigned_permit coordinator_2 permit_2)
+    (safety_clearance_available safety_clearance_1)
+  )
+  (:goal
+    (and
+      (entity_fueling_finalized primary_asset_1)
+      (entity_fueling_finalized secondary_asset_1)
+      (entity_fueling_finalized coordinator_1)
+      (entity_fueling_finalized coordinator_2)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(register-operation_slot primary_asset_1)
+(assign_fuel_source_to_operation primary_asset_1 fuel_source_1)
+(assign_vehicle_to_operation primary_asset_1 vehicle_1)
+(confirm_operation_configuration primary_asset_1 vehicle_1)
+(assign_operator_to_operation primary_asset_1 operator_crew_1)
+(reserve_primary_bay_for_asset primary_asset_1 primary_bay_1 vehicle_1)
+(prepare_primary_asset_for_refuel primary_asset_1 primary_bay_1 operator_crew_1)
+(release_operator_from_operation primary_asset_1 operator_crew_1)
+(release_vehicle_from_operation primary_asset_1 vehicle_1)
+(register-operation_slot secondary_asset_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_0b4pqsm4/plan.pddl
+Bad plan description!
+
+
+Failed plans:
+ /tmp/val_0b4pqsm4/plan.pddl 
+
+
+--- stderr ---
+

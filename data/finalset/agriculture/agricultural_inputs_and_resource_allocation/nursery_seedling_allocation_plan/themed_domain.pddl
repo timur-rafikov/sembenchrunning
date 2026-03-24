@@ -1,0 +1,937 @@
+(define (domain nursery_seedling_allocation)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_group - entity inventory_item_group - entity physical_asset_group - entity allocation_category - entity allocation_record - allocation_category transport_unit - resource_group crop_variety - resource_group technician - resource_group priority_flag - resource_group treatment_protocol - resource_group contingency_reserve - resource_group input_batch - resource_group inspection_certificate - resource_group input_stock - inventory_item_group label_tag - inventory_item_group approval_document - inventory_item_group source_zone - physical_asset_group destination_zone - physical_asset_group transport_crate - physical_asset_group bench_category - allocation_record batch_category - allocation_record source_bench - bench_category destination_bench - bench_category seedling_batch - batch_category)
+
+  (:predicates
+    (allocation_created ?allocation - allocation_record)
+    (allocatable_confirmed ?allocation - allocation_record)
+    (allocation_transport_committed ?allocation - allocation_record)
+    (allocatable_fulfilled ?allocation - allocation_record)
+    (dispatch_ready ?allocation - allocation_record)
+    (allocatable_finalized ?allocation - allocation_record)
+    (transport_unit_available ?transport_unit - transport_unit)
+    (allocatable_assigned_transport ?allocation - allocation_record ?transport_unit - transport_unit)
+    (crop_variety_available ?variety - crop_variety)
+    (allocatable_reserved_variety ?allocation - allocation_record ?variety - crop_variety)
+    (technician_available ?technician - technician)
+    (allocatable_assigned_technician ?allocation - allocation_record ?technician - technician)
+    (input_stock_available ?input_stock - input_stock)
+    (source_bench_reserved_input_stock ?source_bench - source_bench ?input_stock - input_stock)
+    (destination_bench_reserved_input_stock ?destination_bench - destination_bench ?input_stock - input_stock)
+    (source_bench_has_zone ?source_bench - source_bench ?source_zone - source_zone)
+    (source_zone_locked ?source_zone - source_zone)
+    (source_zone_ready ?source_zone - source_zone)
+    (source_bench_input_allocated ?source_bench - source_bench)
+    (destination_bench_has_zone ?destination_bench - destination_bench ?destination_zone - destination_zone)
+    (destination_zone_locked ?destination_zone - destination_zone)
+    (destination_zone_ready ?destination_zone - destination_zone)
+    (destination_bench_input_allocated ?destination_bench - destination_bench)
+    (transport_crate_available ?transport_crate - transport_crate)
+    (transport_crate_reserved ?transport_crate - transport_crate)
+    (transport_crate_assigned_source_zone ?transport_crate - transport_crate ?source_zone - source_zone)
+    (transport_crate_assigned_destination_zone ?transport_crate - transport_crate ?destination_zone - destination_zone)
+    (transport_crate_source_staged ?transport_crate - transport_crate)
+    (transport_crate_destination_staged ?transport_crate - transport_crate)
+    (transport_crate_verified ?transport_crate - transport_crate)
+    (batch_origin_source_bench ?seedling_batch - seedling_batch ?source_bench - source_bench)
+    (batch_assigned_destination_bench ?seedling_batch - seedling_batch ?destination_bench - destination_bench)
+    (batch_assigned_crate ?seedling_batch - seedling_batch ?transport_crate - transport_crate)
+    (label_tag_available ?label_tag - label_tag)
+    (batch_has_label_tag ?seedling_batch - seedling_batch ?label_tag - label_tag)
+    (label_tag_used ?label_tag - label_tag)
+    (label_tag_assigned_to_crate ?label_tag - label_tag ?transport_crate - transport_crate)
+    (batch_packed ?seedling_batch - seedling_batch)
+    (batch_pack_reviewed ?seedling_batch - seedling_batch)
+    (batch_inspected ?seedling_batch - seedling_batch)
+    (batch_has_priority_flag ?seedling_batch - seedling_batch)
+    (batch_label_confirmed ?seedling_batch - seedling_batch)
+    (batch_ready_for_treatment ?seedling_batch - seedling_batch)
+    (batch_finalized ?seedling_batch - seedling_batch)
+    (approval_document_available ?approval_document - approval_document)
+    (batch_attached_approval ?seedling_batch - seedling_batch ?approval_document - approval_document)
+    (batch_approval_recorded ?seedling_batch - seedling_batch)
+    (batch_ready_for_inspection ?seedling_batch - seedling_batch)
+    (inspection_performed ?seedling_batch - seedling_batch)
+    (priority_flag_available ?priority_flag - priority_flag)
+    (batch_assigned_priority_flag ?seedling_batch - seedling_batch ?priority_flag - priority_flag)
+    (treatment_protocol_available ?treatment_protocol - treatment_protocol)
+    (batch_assigned_treatment_protocol ?seedling_batch - seedling_batch ?treatment_protocol - treatment_protocol)
+    (input_batch_available ?input_batch - input_batch)
+    (batch_assigned_input_batch ?seedling_batch - seedling_batch ?input_batch - input_batch)
+    (inspection_certificate_available ?inspection_certificate - inspection_certificate)
+    (batch_assigned_inspection_certificate ?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate)
+    (contingency_reserve_available ?contingency_reserve - contingency_reserve)
+    (allocatable_assigned_contingency_reserve ?allocation - allocation_record ?contingency_reserve - contingency_reserve)
+    (bench_prepared ?source_bench - source_bench)
+    (destination_bench_prepared ?destination_bench - destination_bench)
+    (batch_dispatch_authorized ?seedling_batch - seedling_batch)
+  )
+  (:action create_allocation_record
+    :parameters (?allocation - allocation_record)
+    :precondition
+      (and
+        (not
+          (allocation_created ?allocation)
+        )
+        (not
+          (allocatable_fulfilled ?allocation)
+        )
+      )
+    :effect (allocation_created ?allocation)
+  )
+  (:action assign_transport_to_allocation
+    :parameters (?allocation - allocation_record ?transport_unit - transport_unit)
+    :precondition
+      (and
+        (allocation_created ?allocation)
+        (not
+          (allocation_transport_committed ?allocation)
+        )
+        (transport_unit_available ?transport_unit)
+      )
+    :effect
+      (and
+        (allocation_transport_committed ?allocation)
+        (allocatable_assigned_transport ?allocation ?transport_unit)
+        (not
+          (transport_unit_available ?transport_unit)
+        )
+      )
+  )
+  (:action reserve_variety_for_allocation
+    :parameters (?allocation - allocation_record ?variety - crop_variety)
+    :precondition
+      (and
+        (allocation_created ?allocation)
+        (allocation_transport_committed ?allocation)
+        (crop_variety_available ?variety)
+      )
+    :effect
+      (and
+        (allocatable_reserved_variety ?allocation ?variety)
+        (not
+          (crop_variety_available ?variety)
+        )
+      )
+  )
+  (:action confirm_allocation
+    :parameters (?allocation - allocation_record ?variety - crop_variety)
+    :precondition
+      (and
+        (allocation_created ?allocation)
+        (allocation_transport_committed ?allocation)
+        (allocatable_reserved_variety ?allocation ?variety)
+        (not
+          (allocatable_confirmed ?allocation)
+        )
+      )
+    :effect (allocatable_confirmed ?allocation)
+  )
+  (:action release_variety_reservation
+    :parameters (?allocation - allocation_record ?variety - crop_variety)
+    :precondition
+      (and
+        (allocatable_reserved_variety ?allocation ?variety)
+      )
+    :effect
+      (and
+        (crop_variety_available ?variety)
+        (not
+          (allocatable_reserved_variety ?allocation ?variety)
+        )
+      )
+  )
+  (:action assign_technician_to_allocation
+    :parameters (?allocation - allocation_record ?technician - technician)
+    :precondition
+      (and
+        (allocatable_confirmed ?allocation)
+        (technician_available ?technician)
+      )
+    :effect
+      (and
+        (allocatable_assigned_technician ?allocation ?technician)
+        (not
+          (technician_available ?technician)
+        )
+      )
+  )
+  (:action release_technician_from_allocation
+    :parameters (?allocation - allocation_record ?technician - technician)
+    :precondition
+      (and
+        (allocatable_assigned_technician ?allocation ?technician)
+      )
+    :effect
+      (and
+        (technician_available ?technician)
+        (not
+          (allocatable_assigned_technician ?allocation ?technician)
+        )
+      )
+  )
+  (:action attach_input_batch_to_seedling_batch
+    :parameters (?seedling_batch - seedling_batch ?input_batch - input_batch)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (input_batch_available ?input_batch)
+      )
+    :effect
+      (and
+        (batch_assigned_input_batch ?seedling_batch ?input_batch)
+        (not
+          (input_batch_available ?input_batch)
+        )
+      )
+  )
+  (:action detach_input_batch_from_seedling_batch
+    :parameters (?seedling_batch - seedling_batch ?input_batch - input_batch)
+    :precondition
+      (and
+        (batch_assigned_input_batch ?seedling_batch ?input_batch)
+      )
+    :effect
+      (and
+        (input_batch_available ?input_batch)
+        (not
+          (batch_assigned_input_batch ?seedling_batch ?input_batch)
+        )
+      )
+  )
+  (:action attach_inspection_certificate_to_batch
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (inspection_certificate_available ?inspection_certificate)
+      )
+    :effect
+      (and
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (not
+          (inspection_certificate_available ?inspection_certificate)
+        )
+      )
+  )
+  (:action detach_inspection_certificate_from_batch
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate)
+    :precondition
+      (and
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+      )
+    :effect
+      (and
+        (inspection_certificate_available ?inspection_certificate)
+        (not
+          (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        )
+      )
+  )
+  (:action claim_source_zone_for_bench
+    :parameters (?source_bench - source_bench ?source_zone - source_zone ?variety - crop_variety)
+    :precondition
+      (and
+        (allocatable_confirmed ?source_bench)
+        (allocatable_reserved_variety ?source_bench ?variety)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (not
+          (source_zone_locked ?source_zone)
+        )
+        (not
+          (source_zone_ready ?source_zone)
+        )
+      )
+    :effect (source_zone_locked ?source_zone)
+  )
+  (:action prepare_source_bench
+    :parameters (?source_bench - source_bench ?source_zone - source_zone ?technician - technician)
+    :precondition
+      (and
+        (allocatable_confirmed ?source_bench)
+        (allocatable_assigned_technician ?source_bench ?technician)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (source_zone_locked ?source_zone)
+        (not
+          (bench_prepared ?source_bench)
+        )
+      )
+    :effect
+      (and
+        (bench_prepared ?source_bench)
+        (source_bench_input_allocated ?source_bench)
+      )
+  )
+  (:action reserve_input_stock_for_bench
+    :parameters (?source_bench - source_bench ?source_zone - source_zone ?input_stock - input_stock)
+    :precondition
+      (and
+        (allocatable_confirmed ?source_bench)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (input_stock_available ?input_stock)
+        (not
+          (bench_prepared ?source_bench)
+        )
+      )
+    :effect
+      (and
+        (source_zone_ready ?source_zone)
+        (bench_prepared ?source_bench)
+        (source_bench_reserved_input_stock ?source_bench ?input_stock)
+        (not
+          (input_stock_available ?input_stock)
+        )
+      )
+  )
+  (:action process_source_zone_pick
+    :parameters (?source_bench - source_bench ?source_zone - source_zone ?variety - crop_variety ?input_stock - input_stock)
+    :precondition
+      (and
+        (allocatable_confirmed ?source_bench)
+        (allocatable_reserved_variety ?source_bench ?variety)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (source_zone_ready ?source_zone)
+        (source_bench_reserved_input_stock ?source_bench ?input_stock)
+        (not
+          (source_bench_input_allocated ?source_bench)
+        )
+      )
+    :effect
+      (and
+        (source_zone_locked ?source_zone)
+        (source_bench_input_allocated ?source_bench)
+        (input_stock_available ?input_stock)
+        (not
+          (source_bench_reserved_input_stock ?source_bench ?input_stock)
+        )
+      )
+  )
+  (:action claim_destination_zone_for_bench
+    :parameters (?destination_bench - destination_bench ?destination_zone - destination_zone ?variety - crop_variety)
+    :precondition
+      (and
+        (allocatable_confirmed ?destination_bench)
+        (allocatable_reserved_variety ?destination_bench ?variety)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (not
+          (destination_zone_locked ?destination_zone)
+        )
+        (not
+          (destination_zone_ready ?destination_zone)
+        )
+      )
+    :effect (destination_zone_locked ?destination_zone)
+  )
+  (:action prepare_destination_bench
+    :parameters (?destination_bench - destination_bench ?destination_zone - destination_zone ?technician - technician)
+    :precondition
+      (and
+        (allocatable_confirmed ?destination_bench)
+        (allocatable_assigned_technician ?destination_bench ?technician)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (destination_zone_locked ?destination_zone)
+        (not
+          (destination_bench_prepared ?destination_bench)
+        )
+      )
+    :effect
+      (and
+        (destination_bench_prepared ?destination_bench)
+        (destination_bench_input_allocated ?destination_bench)
+      )
+  )
+  (:action reserve_input_stock_for_destination_bench
+    :parameters (?destination_bench - destination_bench ?destination_zone - destination_zone ?input_stock - input_stock)
+    :precondition
+      (and
+        (allocatable_confirmed ?destination_bench)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (input_stock_available ?input_stock)
+        (not
+          (destination_bench_prepared ?destination_bench)
+        )
+      )
+    :effect
+      (and
+        (destination_zone_ready ?destination_zone)
+        (destination_bench_prepared ?destination_bench)
+        (destination_bench_reserved_input_stock ?destination_bench ?input_stock)
+        (not
+          (input_stock_available ?input_stock)
+        )
+      )
+  )
+  (:action process_destination_zone_receive
+    :parameters (?destination_bench - destination_bench ?destination_zone - destination_zone ?variety - crop_variety ?input_stock - input_stock)
+    :precondition
+      (and
+        (allocatable_confirmed ?destination_bench)
+        (allocatable_reserved_variety ?destination_bench ?variety)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (destination_zone_ready ?destination_zone)
+        (destination_bench_reserved_input_stock ?destination_bench ?input_stock)
+        (not
+          (destination_bench_input_allocated ?destination_bench)
+        )
+      )
+    :effect
+      (and
+        (destination_zone_locked ?destination_zone)
+        (destination_bench_input_allocated ?destination_bench)
+        (input_stock_available ?input_stock)
+        (not
+          (destination_bench_reserved_input_stock ?destination_bench ?input_stock)
+        )
+      )
+  )
+  (:action reserve_transport_crate_for_transfer
+    :parameters (?source_bench - source_bench ?destination_bench - destination_bench ?source_zone - source_zone ?destination_zone - destination_zone ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (bench_prepared ?source_bench)
+        (destination_bench_prepared ?destination_bench)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (source_zone_locked ?source_zone)
+        (destination_zone_locked ?destination_zone)
+        (source_bench_input_allocated ?source_bench)
+        (destination_bench_input_allocated ?destination_bench)
+        (transport_crate_available ?transport_crate)
+      )
+    :effect
+      (and
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_assigned_source_zone ?transport_crate ?source_zone)
+        (transport_crate_assigned_destination_zone ?transport_crate ?destination_zone)
+        (not
+          (transport_crate_available ?transport_crate)
+        )
+      )
+  )
+  (:action stage_transport_crate_source_ready
+    :parameters (?source_bench - source_bench ?destination_bench - destination_bench ?source_zone - source_zone ?destination_zone - destination_zone ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (bench_prepared ?source_bench)
+        (destination_bench_prepared ?destination_bench)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (source_zone_ready ?source_zone)
+        (destination_zone_locked ?destination_zone)
+        (not
+          (source_bench_input_allocated ?source_bench)
+        )
+        (destination_bench_input_allocated ?destination_bench)
+        (transport_crate_available ?transport_crate)
+      )
+    :effect
+      (and
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_assigned_source_zone ?transport_crate ?source_zone)
+        (transport_crate_assigned_destination_zone ?transport_crate ?destination_zone)
+        (transport_crate_source_staged ?transport_crate)
+        (not
+          (transport_crate_available ?transport_crate)
+        )
+      )
+  )
+  (:action stage_transport_crate_destination_ready
+    :parameters (?source_bench - source_bench ?destination_bench - destination_bench ?source_zone - source_zone ?destination_zone - destination_zone ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (bench_prepared ?source_bench)
+        (destination_bench_prepared ?destination_bench)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (source_zone_locked ?source_zone)
+        (destination_zone_ready ?destination_zone)
+        (source_bench_input_allocated ?source_bench)
+        (not
+          (destination_bench_input_allocated ?destination_bench)
+        )
+        (transport_crate_available ?transport_crate)
+      )
+    :effect
+      (and
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_assigned_source_zone ?transport_crate ?source_zone)
+        (transport_crate_assigned_destination_zone ?transport_crate ?destination_zone)
+        (transport_crate_destination_staged ?transport_crate)
+        (not
+          (transport_crate_available ?transport_crate)
+        )
+      )
+  )
+  (:action stage_transport_crate_both_zones_ready
+    :parameters (?source_bench - source_bench ?destination_bench - destination_bench ?source_zone - source_zone ?destination_zone - destination_zone ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (bench_prepared ?source_bench)
+        (destination_bench_prepared ?destination_bench)
+        (source_bench_has_zone ?source_bench ?source_zone)
+        (destination_bench_has_zone ?destination_bench ?destination_zone)
+        (source_zone_ready ?source_zone)
+        (destination_zone_ready ?destination_zone)
+        (not
+          (source_bench_input_allocated ?source_bench)
+        )
+        (not
+          (destination_bench_input_allocated ?destination_bench)
+        )
+        (transport_crate_available ?transport_crate)
+      )
+    :effect
+      (and
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_assigned_source_zone ?transport_crate ?source_zone)
+        (transport_crate_assigned_destination_zone ?transport_crate ?destination_zone)
+        (transport_crate_source_staged ?transport_crate)
+        (transport_crate_destination_staged ?transport_crate)
+        (not
+          (transport_crate_available ?transport_crate)
+        )
+      )
+  )
+  (:action verify_crate_ready_for_packing
+    :parameters (?transport_crate - transport_crate ?source_bench - source_bench ?variety - crop_variety)
+    :precondition
+      (and
+        (transport_crate_reserved ?transport_crate)
+        (bench_prepared ?source_bench)
+        (allocatable_reserved_variety ?source_bench ?variety)
+        (not
+          (transport_crate_verified ?transport_crate)
+        )
+      )
+    :effect (transport_crate_verified ?transport_crate)
+  )
+  (:action apply_label_tag_to_batch
+    :parameters (?seedling_batch - seedling_batch ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (batch_assigned_crate ?seedling_batch ?transport_crate)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_available ?label_tag)
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_verified ?transport_crate)
+        (not
+          (label_tag_used ?label_tag)
+        )
+      )
+    :effect
+      (and
+        (label_tag_used ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (not
+          (label_tag_available ?label_tag)
+        )
+      )
+  )
+  (:action confirm_batch_packed
+    :parameters (?seedling_batch - seedling_batch ?label_tag - label_tag ?transport_crate - transport_crate ?variety - crop_variety)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_used ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (allocatable_reserved_variety ?seedling_batch ?variety)
+        (not
+          (transport_crate_source_staged ?transport_crate)
+        )
+        (not
+          (batch_packed ?seedling_batch)
+        )
+      )
+    :effect (batch_packed ?seedling_batch)
+  )
+  (:action attach_priority_flag_to_batch
+    :parameters (?seedling_batch - seedling_batch ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (priority_flag_available ?priority_flag)
+        (not
+          (batch_has_priority_flag ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_has_priority_flag ?seedling_batch)
+        (batch_assigned_priority_flag ?seedling_batch ?priority_flag)
+        (not
+          (priority_flag_available ?priority_flag)
+        )
+      )
+  )
+  (:action finalize_batch_label_and_priority
+    :parameters (?seedling_batch - seedling_batch ?label_tag - label_tag ?transport_crate - transport_crate ?variety - crop_variety ?priority_flag - priority_flag)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_used ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (allocatable_reserved_variety ?seedling_batch ?variety)
+        (transport_crate_source_staged ?transport_crate)
+        (batch_has_priority_flag ?seedling_batch)
+        (batch_assigned_priority_flag ?seedling_batch ?priority_flag)
+        (not
+          (batch_packed ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_packed ?seedling_batch)
+        (batch_label_confirmed ?seedling_batch)
+      )
+  )
+  (:action attach_input_batch_and_start_review
+    :parameters (?seedling_batch - seedling_batch ?input_batch - input_batch ?technician - technician ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_packed ?seedling_batch)
+        (batch_assigned_input_batch ?seedling_batch ?input_batch)
+        (allocatable_assigned_technician ?seedling_batch ?technician)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (not
+          (transport_crate_destination_staged ?transport_crate)
+        )
+        (not
+          (batch_pack_reviewed ?seedling_batch)
+        )
+      )
+    :effect (batch_pack_reviewed ?seedling_batch)
+  )
+  (:action attach_input_batch_and_continue_review
+    :parameters (?seedling_batch - seedling_batch ?input_batch - input_batch ?technician - technician ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_packed ?seedling_batch)
+        (batch_assigned_input_batch ?seedling_batch ?input_batch)
+        (allocatable_assigned_technician ?seedling_batch ?technician)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (transport_crate_destination_staged ?transport_crate)
+        (not
+          (batch_pack_reviewed ?seedling_batch)
+        )
+      )
+    :effect (batch_pack_reviewed ?seedling_batch)
+  )
+  (:action record_batch_inspection_no_stage
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_pack_reviewed ?seedling_batch)
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (not
+          (transport_crate_source_staged ?transport_crate)
+        )
+        (not
+          (transport_crate_destination_staged ?transport_crate)
+        )
+        (not
+          (batch_inspected ?seedling_batch)
+        )
+      )
+    :effect (batch_inspected ?seedling_batch)
+  )
+  (:action record_batch_inspection_with_source_stage
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_pack_reviewed ?seedling_batch)
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (transport_crate_source_staged ?transport_crate)
+        (not
+          (transport_crate_destination_staged ?transport_crate)
+        )
+        (not
+          (batch_inspected ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_ready_for_treatment ?seedling_batch)
+      )
+  )
+  (:action record_batch_inspection_with_destination_stage
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_pack_reviewed ?seedling_batch)
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (not
+          (transport_crate_source_staged ?transport_crate)
+        )
+        (transport_crate_destination_staged ?transport_crate)
+        (not
+          (batch_inspected ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_ready_for_treatment ?seedling_batch)
+      )
+  )
+  (:action record_batch_inspection_with_both_stages
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate ?label_tag - label_tag ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (batch_pack_reviewed ?seedling_batch)
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (batch_has_label_tag ?seedling_batch ?label_tag)
+        (label_tag_assigned_to_crate ?label_tag ?transport_crate)
+        (transport_crate_source_staged ?transport_crate)
+        (transport_crate_destination_staged ?transport_crate)
+        (not
+          (batch_inspected ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_ready_for_treatment ?seedling_batch)
+      )
+  )
+  (:action authorize_batch_dispatch
+    :parameters (?seedling_batch - seedling_batch)
+    :precondition
+      (and
+        (batch_inspected ?seedling_batch)
+        (not
+          (batch_ready_for_treatment ?seedling_batch)
+        )
+        (not
+          (batch_dispatch_authorized ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_dispatch_authorized ?seedling_batch)
+        (dispatch_ready ?seedling_batch)
+      )
+  )
+  (:action assign_treatment_protocol_to_batch
+    :parameters (?seedling_batch - seedling_batch ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_ready_for_treatment ?seedling_batch)
+        (treatment_protocol_available ?treatment_protocol)
+      )
+    :effect
+      (and
+        (batch_assigned_treatment_protocol ?seedling_batch ?treatment_protocol)
+        (not
+          (treatment_protocol_available ?treatment_protocol)
+        )
+      )
+  )
+  (:action apply_treatment_and_finalize_batch
+    :parameters (?seedling_batch - seedling_batch ?source_bench - source_bench ?destination_bench - destination_bench ?variety - crop_variety ?treatment_protocol - treatment_protocol)
+    :precondition
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_ready_for_treatment ?seedling_batch)
+        (batch_assigned_treatment_protocol ?seedling_batch ?treatment_protocol)
+        (batch_origin_source_bench ?seedling_batch ?source_bench)
+        (batch_assigned_destination_bench ?seedling_batch ?destination_bench)
+        (source_bench_input_allocated ?source_bench)
+        (destination_bench_input_allocated ?destination_bench)
+        (allocatable_reserved_variety ?seedling_batch ?variety)
+        (not
+          (batch_finalized ?seedling_batch)
+        )
+      )
+    :effect (batch_finalized ?seedling_batch)
+  )
+  (:action release_batch_for_dispatch
+    :parameters (?seedling_batch - seedling_batch)
+    :precondition
+      (and
+        (batch_inspected ?seedling_batch)
+        (batch_finalized ?seedling_batch)
+        (not
+          (batch_dispatch_authorized ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_dispatch_authorized ?seedling_batch)
+        (dispatch_ready ?seedling_batch)
+      )
+  )
+  (:action claim_approval_document_for_batch
+    :parameters (?seedling_batch - seedling_batch ?approval_document - approval_document ?variety - crop_variety)
+    :precondition
+      (and
+        (allocatable_confirmed ?seedling_batch)
+        (allocatable_reserved_variety ?seedling_batch ?variety)
+        (approval_document_available ?approval_document)
+        (batch_attached_approval ?seedling_batch ?approval_document)
+        (not
+          (batch_approval_recorded ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_approval_recorded ?seedling_batch)
+        (not
+          (approval_document_available ?approval_document)
+        )
+      )
+  )
+  (:action assign_technician_for_batch_approval
+    :parameters (?seedling_batch - seedling_batch ?technician - technician)
+    :precondition
+      (and
+        (batch_approval_recorded ?seedling_batch)
+        (allocatable_assigned_technician ?seedling_batch ?technician)
+        (not
+          (batch_ready_for_inspection ?seedling_batch)
+        )
+      )
+    :effect (batch_ready_for_inspection ?seedling_batch)
+  )
+  (:action perform_inspection_and_record
+    :parameters (?seedling_batch - seedling_batch ?inspection_certificate - inspection_certificate)
+    :precondition
+      (and
+        (batch_ready_for_inspection ?seedling_batch)
+        (batch_assigned_inspection_certificate ?seedling_batch ?inspection_certificate)
+        (not
+          (inspection_performed ?seedling_batch)
+        )
+      )
+    :effect (inspection_performed ?seedling_batch)
+  )
+  (:action finalize_batch_post_inspection
+    :parameters (?seedling_batch - seedling_batch)
+    :precondition
+      (and
+        (inspection_performed ?seedling_batch)
+        (not
+          (batch_dispatch_authorized ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (batch_dispatch_authorized ?seedling_batch)
+        (dispatch_ready ?seedling_batch)
+      )
+  )
+  (:action mark_source_bench_dispatch_ready
+    :parameters (?source_bench - source_bench ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (bench_prepared ?source_bench)
+        (source_bench_input_allocated ?source_bench)
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_verified ?transport_crate)
+        (not
+          (dispatch_ready ?source_bench)
+        )
+      )
+    :effect (dispatch_ready ?source_bench)
+  )
+  (:action mark_destination_bench_dispatch_ready
+    :parameters (?destination_bench - destination_bench ?transport_crate - transport_crate)
+    :precondition
+      (and
+        (destination_bench_prepared ?destination_bench)
+        (destination_bench_input_allocated ?destination_bench)
+        (transport_crate_reserved ?transport_crate)
+        (transport_crate_verified ?transport_crate)
+        (not
+          (dispatch_ready ?destination_bench)
+        )
+      )
+    :effect (dispatch_ready ?destination_bench)
+  )
+  (:action apply_contingency_reserve_to_allocation
+    :parameters (?allocation - allocation_record ?contingency_reserve - contingency_reserve ?variety - crop_variety)
+    :precondition
+      (and
+        (dispatch_ready ?allocation)
+        (allocatable_reserved_variety ?allocation ?variety)
+        (contingency_reserve_available ?contingency_reserve)
+        (not
+          (allocatable_finalized ?allocation)
+        )
+      )
+    :effect
+      (and
+        (allocatable_finalized ?allocation)
+        (allocatable_assigned_contingency_reserve ?allocation ?contingency_reserve)
+        (not
+          (contingency_reserve_available ?contingency_reserve)
+        )
+      )
+  )
+  (:action finalize_bench_allocation
+    :parameters (?source_bench - source_bench ?transport_unit - transport_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocatable_finalized ?source_bench)
+        (allocatable_assigned_transport ?source_bench ?transport_unit)
+        (allocatable_assigned_contingency_reserve ?source_bench ?contingency_reserve)
+        (not
+          (allocatable_fulfilled ?source_bench)
+        )
+      )
+    :effect
+      (and
+        (allocatable_fulfilled ?source_bench)
+        (transport_unit_available ?transport_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_destination_bench_allocation
+    :parameters (?destination_bench - destination_bench ?transport_unit - transport_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocatable_finalized ?destination_bench)
+        (allocatable_assigned_transport ?destination_bench ?transport_unit)
+        (allocatable_assigned_contingency_reserve ?destination_bench ?contingency_reserve)
+        (not
+          (allocatable_fulfilled ?destination_bench)
+        )
+      )
+    :effect
+      (and
+        (allocatable_fulfilled ?destination_bench)
+        (transport_unit_available ?transport_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+  (:action finalize_batch_allocation
+    :parameters (?seedling_batch - seedling_batch ?transport_unit - transport_unit ?contingency_reserve - contingency_reserve)
+    :precondition
+      (and
+        (allocatable_finalized ?seedling_batch)
+        (allocatable_assigned_transport ?seedling_batch ?transport_unit)
+        (allocatable_assigned_contingency_reserve ?seedling_batch ?contingency_reserve)
+        (not
+          (allocatable_fulfilled ?seedling_batch)
+        )
+      )
+    :effect
+      (and
+        (allocatable_fulfilled ?seedling_batch)
+        (transport_unit_available ?transport_unit)
+        (contingency_reserve_available ?contingency_reserve)
+      )
+  )
+)

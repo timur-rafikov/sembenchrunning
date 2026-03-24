@@ -1,0 +1,937 @@
+(define (domain key_artifact_recovery_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object entity_base - base_object asset_base - base_object route_base - base_object location_category - base_object operational_unit - location_category responder_asset - entity_base capability - entity_base equipment - entity_base upgrade_modifier - entity_base tactic_profile - entity_base artifact_token - entity_base module - entity_base credential - entity_base consumable_item - asset_base intel_node - asset_base asset_marker - asset_base subroute - route_base transit_segment - route_base recovery_plan - route_base agent_role - operational_unit unit_variant - operational_unit lead_agent - agent_role support_agent - agent_role squad - unit_variant)
+
+  (:predicates
+    (unit_registered ?operational_unit - operational_unit)
+    (unit_activated ?operational_unit - operational_unit)
+    (responder_assigned ?operational_unit - operational_unit)
+    (unit_recovered ?operational_unit - operational_unit)
+    (unit_deployment_ready ?operational_unit - operational_unit)
+    (authorization_granted ?operational_unit - operational_unit)
+    (asset_available ?responder_asset - responder_asset)
+    (asset_assigned ?operational_unit - operational_unit ?responder_asset - responder_asset)
+    (capability_available ?capability - capability)
+    (capability_bound ?operational_unit - operational_unit ?capability - capability)
+    (equipment_available ?equipment - equipment)
+    (equipment_bound ?operational_unit - operational_unit ?equipment - equipment)
+    (consumable_available ?consumable_item - consumable_item)
+    (consumable_allocated ?lead_agent - lead_agent ?consumable_item - consumable_item)
+    (consumable_allocated_support ?support_agent - support_agent ?consumable_item - consumable_item)
+    (agent_subroute_mapping ?lead_agent - lead_agent ?subroute - subroute)
+    (subroute_scouted ?subroute - subroute)
+    (subroute_provisioned ?subroute - subroute)
+    (agent_local_ready ?lead_agent - lead_agent)
+    (agent_transit_mapping ?support_agent - support_agent ?transit_segment - transit_segment)
+    (transit_scouted ?transit_segment - transit_segment)
+    (transit_provisioned ?transit_segment - transit_segment)
+    (support_agent_ready ?support_agent - support_agent)
+    (plan_candidate_available ?recovery_plan - recovery_plan)
+    (plan_selected ?recovery_plan - recovery_plan)
+    (plan_subroute_link ?recovery_plan - recovery_plan ?subroute - subroute)
+    (plan_transit_link ?recovery_plan - recovery_plan ?transit_segment - transit_segment)
+    (plan_attribute_flag_speed ?recovery_plan - recovery_plan)
+    (plan_attribute_flag_stealth ?recovery_plan - recovery_plan)
+    (plan_execution_locked ?recovery_plan - recovery_plan)
+    (squad_lead_binding ?squad - squad ?lead_agent - lead_agent)
+    (squad_support_binding ?squad - squad ?support_agent - support_agent)
+    (squad_plan_association ?squad - squad ?recovery_plan - recovery_plan)
+    (intel_node_available ?intel_node - intel_node)
+    (squad_intel_association ?squad - squad ?intel_node - intel_node)
+    (intel_node_validated ?intel_node - intel_node)
+    (intel_node_plan_link ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    (squad_validation_partial ?squad - squad)
+    (squad_validation_confirmed ?squad - squad)
+    (squad_configuration_finalized ?squad - squad)
+    (squad_modifier_flag ?squad - squad)
+    (squad_additional_validation ?squad - squad)
+    (squad_supplementary_checks_passed ?squad - squad)
+    (squad_deployment_authorized ?squad - squad)
+    (asset_marker_available ?asset_marker - asset_marker)
+    (squad_asset_marker_association ?squad - squad ?asset_marker - asset_marker)
+    (squad_asset_marker_claimed ?squad - squad)
+    (squad_equipment_verified ?squad - squad)
+    (squad_credential_verified ?squad - squad)
+    (modifier_available ?upgrade_modifier - upgrade_modifier)
+    (modifier_attached ?squad - squad ?upgrade_modifier - upgrade_modifier)
+    (tactic_profile_available ?tactic_profile - tactic_profile)
+    (tactic_profile_bound ?squad - squad ?tactic_profile - tactic_profile)
+    (module_available ?module - module)
+    (module_bound ?squad - squad ?module - module)
+    (credential_available ?credential - credential)
+    (credential_bound ?squad - squad ?credential - credential)
+    (artifact_token_available ?artifact_token - artifact_token)
+    (artifact_token_associated ?operational_unit - operational_unit ?artifact_token - artifact_token)
+    (lead_agent_ready ?lead_agent - lead_agent)
+    (support_agent_prepared ?support_agent - support_agent)
+    (squad_readiness_confirmed ?squad - squad)
+  )
+  (:action register_objective
+    :parameters (?operational_unit - operational_unit)
+    :precondition
+      (and
+        (not
+          (unit_registered ?operational_unit)
+        )
+        (not
+          (unit_recovered ?operational_unit)
+        )
+      )
+    :effect (unit_registered ?operational_unit)
+  )
+  (:action assign_responder_asset
+    :parameters (?operational_unit - operational_unit ?responder_asset - responder_asset)
+    :precondition
+      (and
+        (unit_registered ?operational_unit)
+        (not
+          (responder_assigned ?operational_unit)
+        )
+        (asset_available ?responder_asset)
+      )
+    :effect
+      (and
+        (responder_assigned ?operational_unit)
+        (asset_assigned ?operational_unit ?responder_asset)
+        (not
+          (asset_available ?responder_asset)
+        )
+      )
+  )
+  (:action bind_capability_to_objective
+    :parameters (?operational_unit - operational_unit ?capability - capability)
+    :precondition
+      (and
+        (unit_registered ?operational_unit)
+        (responder_assigned ?operational_unit)
+        (capability_available ?capability)
+      )
+    :effect
+      (and
+        (capability_bound ?operational_unit ?capability)
+        (not
+          (capability_available ?capability)
+        )
+      )
+  )
+  (:action activate_objective
+    :parameters (?operational_unit - operational_unit ?capability - capability)
+    :precondition
+      (and
+        (unit_registered ?operational_unit)
+        (responder_assigned ?operational_unit)
+        (capability_bound ?operational_unit ?capability)
+        (not
+          (unit_activated ?operational_unit)
+        )
+      )
+    :effect (unit_activated ?operational_unit)
+  )
+  (:action release_capability
+    :parameters (?operational_unit - operational_unit ?capability - capability)
+    :precondition
+      (and
+        (capability_bound ?operational_unit ?capability)
+      )
+    :effect
+      (and
+        (capability_available ?capability)
+        (not
+          (capability_bound ?operational_unit ?capability)
+        )
+      )
+  )
+  (:action bind_equipment_to_objective
+    :parameters (?operational_unit - operational_unit ?equipment - equipment)
+    :precondition
+      (and
+        (unit_activated ?operational_unit)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (equipment_bound ?operational_unit ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action release_equipment_from_objective
+    :parameters (?operational_unit - operational_unit ?equipment - equipment)
+    :precondition
+      (and
+        (equipment_bound ?operational_unit ?equipment)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment)
+        (not
+          (equipment_bound ?operational_unit ?equipment)
+        )
+      )
+  )
+  (:action bind_module_to_squad
+    :parameters (?squad - squad ?module - module)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (module_available ?module)
+      )
+    :effect
+      (and
+        (module_bound ?squad ?module)
+        (not
+          (module_available ?module)
+        )
+      )
+  )
+  (:action release_module_from_squad
+    :parameters (?squad - squad ?module - module)
+    :precondition
+      (and
+        (module_bound ?squad ?module)
+      )
+    :effect
+      (and
+        (module_available ?module)
+        (not
+          (module_bound ?squad ?module)
+        )
+      )
+  )
+  (:action bind_credential_to_squad
+    :parameters (?squad - squad ?credential - credential)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (credential_bound ?squad ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action release_credential_from_squad
+    :parameters (?squad - squad ?credential - credential)
+    :precondition
+      (and
+        (credential_bound ?squad ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (credential_bound ?squad ?credential)
+        )
+      )
+  )
+  (:action scout_subroute
+    :parameters (?lead_agent - lead_agent ?subroute - subroute ?capability - capability)
+    :precondition
+      (and
+        (unit_activated ?lead_agent)
+        (capability_bound ?lead_agent ?capability)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (not
+          (subroute_scouted ?subroute)
+        )
+        (not
+          (subroute_provisioned ?subroute)
+        )
+      )
+    :effect (subroute_scouted ?subroute)
+  )
+  (:action prepare_lead_agent_for_subroute
+    :parameters (?lead_agent - lead_agent ?subroute - subroute ?equipment - equipment)
+    :precondition
+      (and
+        (unit_activated ?lead_agent)
+        (equipment_bound ?lead_agent ?equipment)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (subroute_scouted ?subroute)
+        (not
+          (lead_agent_ready ?lead_agent)
+        )
+      )
+    :effect
+      (and
+        (lead_agent_ready ?lead_agent)
+        (agent_local_ready ?lead_agent)
+      )
+  )
+  (:action provision_subroute_with_consumable
+    :parameters (?lead_agent - lead_agent ?subroute - subroute ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (unit_activated ?lead_agent)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (consumable_available ?consumable_item)
+        (not
+          (lead_agent_ready ?lead_agent)
+        )
+      )
+    :effect
+      (and
+        (subroute_provisioned ?subroute)
+        (lead_agent_ready ?lead_agent)
+        (consumable_allocated ?lead_agent ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_subroute_preparation
+    :parameters (?lead_agent - lead_agent ?subroute - subroute ?capability - capability ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (unit_activated ?lead_agent)
+        (capability_bound ?lead_agent ?capability)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (subroute_provisioned ?subroute)
+        (consumable_allocated ?lead_agent ?consumable_item)
+        (not
+          (agent_local_ready ?lead_agent)
+        )
+      )
+    :effect
+      (and
+        (subroute_scouted ?subroute)
+        (agent_local_ready ?lead_agent)
+        (consumable_available ?consumable_item)
+        (not
+          (consumable_allocated ?lead_agent ?consumable_item)
+        )
+      )
+  )
+  (:action scout_transit_segment
+    :parameters (?support_agent - support_agent ?transit_segment - transit_segment ?capability - capability)
+    :precondition
+      (and
+        (unit_activated ?support_agent)
+        (capability_bound ?support_agent ?capability)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (not
+          (transit_scouted ?transit_segment)
+        )
+        (not
+          (transit_provisioned ?transit_segment)
+        )
+      )
+    :effect (transit_scouted ?transit_segment)
+  )
+  (:action prepare_support_agent_for_transit
+    :parameters (?support_agent - support_agent ?transit_segment - transit_segment ?equipment - equipment)
+    :precondition
+      (and
+        (unit_activated ?support_agent)
+        (equipment_bound ?support_agent ?equipment)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (transit_scouted ?transit_segment)
+        (not
+          (support_agent_prepared ?support_agent)
+        )
+      )
+    :effect
+      (and
+        (support_agent_prepared ?support_agent)
+        (support_agent_ready ?support_agent)
+      )
+  )
+  (:action provision_transit_with_consumable
+    :parameters (?support_agent - support_agent ?transit_segment - transit_segment ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (unit_activated ?support_agent)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (consumable_available ?consumable_item)
+        (not
+          (support_agent_prepared ?support_agent)
+        )
+      )
+    :effect
+      (and
+        (transit_provisioned ?transit_segment)
+        (support_agent_prepared ?support_agent)
+        (consumable_allocated_support ?support_agent ?consumable_item)
+        (not
+          (consumable_available ?consumable_item)
+        )
+      )
+  )
+  (:action finalize_transit_preparation
+    :parameters (?support_agent - support_agent ?transit_segment - transit_segment ?capability - capability ?consumable_item - consumable_item)
+    :precondition
+      (and
+        (unit_activated ?support_agent)
+        (capability_bound ?support_agent ?capability)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (transit_provisioned ?transit_segment)
+        (consumable_allocated_support ?support_agent ?consumable_item)
+        (not
+          (support_agent_ready ?support_agent)
+        )
+      )
+    :effect
+      (and
+        (transit_scouted ?transit_segment)
+        (support_agent_ready ?support_agent)
+        (consumable_available ?consumable_item)
+        (not
+          (consumable_allocated_support ?support_agent ?consumable_item)
+        )
+      )
+  )
+  (:action assemble_recovery_plan
+    :parameters (?lead_agent - lead_agent ?support_agent - support_agent ?subroute - subroute ?transit_segment - transit_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (lead_agent_ready ?lead_agent)
+        (support_agent_prepared ?support_agent)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (subroute_scouted ?subroute)
+        (transit_scouted ?transit_segment)
+        (agent_local_ready ?lead_agent)
+        (support_agent_ready ?support_agent)
+        (plan_candidate_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_selected ?recovery_plan)
+        (plan_subroute_link ?recovery_plan ?subroute)
+        (plan_transit_link ?recovery_plan ?transit_segment)
+        (not
+          (plan_candidate_available ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_flag_speed
+    :parameters (?lead_agent - lead_agent ?support_agent - support_agent ?subroute - subroute ?transit_segment - transit_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (lead_agent_ready ?lead_agent)
+        (support_agent_prepared ?support_agent)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (subroute_provisioned ?subroute)
+        (transit_scouted ?transit_segment)
+        (not
+          (agent_local_ready ?lead_agent)
+        )
+        (support_agent_ready ?support_agent)
+        (plan_candidate_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_selected ?recovery_plan)
+        (plan_subroute_link ?recovery_plan ?subroute)
+        (plan_transit_link ?recovery_plan ?transit_segment)
+        (plan_attribute_flag_speed ?recovery_plan)
+        (not
+          (plan_candidate_available ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_flag_stealth
+    :parameters (?lead_agent - lead_agent ?support_agent - support_agent ?subroute - subroute ?transit_segment - transit_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (lead_agent_ready ?lead_agent)
+        (support_agent_prepared ?support_agent)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (subroute_scouted ?subroute)
+        (transit_provisioned ?transit_segment)
+        (agent_local_ready ?lead_agent)
+        (not
+          (support_agent_ready ?support_agent)
+        )
+        (plan_candidate_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_selected ?recovery_plan)
+        (plan_subroute_link ?recovery_plan ?subroute)
+        (plan_transit_link ?recovery_plan ?transit_segment)
+        (plan_attribute_flag_stealth ?recovery_plan)
+        (not
+          (plan_candidate_available ?recovery_plan)
+        )
+      )
+  )
+  (:action assemble_recovery_plan_with_flags_speed_and_stealth
+    :parameters (?lead_agent - lead_agent ?support_agent - support_agent ?subroute - subroute ?transit_segment - transit_segment ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (lead_agent_ready ?lead_agent)
+        (support_agent_prepared ?support_agent)
+        (agent_subroute_mapping ?lead_agent ?subroute)
+        (agent_transit_mapping ?support_agent ?transit_segment)
+        (subroute_provisioned ?subroute)
+        (transit_provisioned ?transit_segment)
+        (not
+          (agent_local_ready ?lead_agent)
+        )
+        (not
+          (support_agent_ready ?support_agent)
+        )
+        (plan_candidate_available ?recovery_plan)
+      )
+    :effect
+      (and
+        (plan_selected ?recovery_plan)
+        (plan_subroute_link ?recovery_plan ?subroute)
+        (plan_transit_link ?recovery_plan ?transit_segment)
+        (plan_attribute_flag_speed ?recovery_plan)
+        (plan_attribute_flag_stealth ?recovery_plan)
+        (not
+          (plan_candidate_available ?recovery_plan)
+        )
+      )
+  )
+  (:action lock_plan_for_execution
+    :parameters (?recovery_plan - recovery_plan ?lead_agent - lead_agent ?capability - capability)
+    :precondition
+      (and
+        (plan_selected ?recovery_plan)
+        (lead_agent_ready ?lead_agent)
+        (capability_bound ?lead_agent ?capability)
+        (not
+          (plan_execution_locked ?recovery_plan)
+        )
+      )
+    :effect (plan_execution_locked ?recovery_plan)
+  )
+  (:action validate_intel_node_for_plan
+    :parameters (?squad - squad ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (squad_plan_association ?squad ?recovery_plan)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_available ?intel_node)
+        (plan_selected ?recovery_plan)
+        (plan_execution_locked ?recovery_plan)
+        (not
+          (intel_node_validated ?intel_node)
+        )
+      )
+    :effect
+      (and
+        (intel_node_validated ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (not
+          (intel_node_available ?intel_node)
+        )
+      )
+  )
+  (:action set_squad_validation_partial
+    :parameters (?squad - squad ?intel_node - intel_node ?recovery_plan - recovery_plan ?capability - capability)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_validated ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (capability_bound ?squad ?capability)
+        (not
+          (plan_attribute_flag_speed ?recovery_plan)
+        )
+        (not
+          (squad_validation_partial ?squad)
+        )
+      )
+    :effect (squad_validation_partial ?squad)
+  )
+  (:action attach_modifier_to_squad
+    :parameters (?squad - squad ?upgrade_modifier - upgrade_modifier)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (modifier_available ?upgrade_modifier)
+        (not
+          (squad_modifier_flag ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_modifier_flag ?squad)
+        (modifier_attached ?squad ?upgrade_modifier)
+        (not
+          (modifier_available ?upgrade_modifier)
+        )
+      )
+  )
+  (:action advance_squad_validation_with_modifier
+    :parameters (?squad - squad ?intel_node - intel_node ?recovery_plan - recovery_plan ?capability - capability ?upgrade_modifier - upgrade_modifier)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_validated ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (capability_bound ?squad ?capability)
+        (plan_attribute_flag_speed ?recovery_plan)
+        (squad_modifier_flag ?squad)
+        (modifier_attached ?squad ?upgrade_modifier)
+        (not
+          (squad_validation_partial ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_validation_partial ?squad)
+        (squad_additional_validation ?squad)
+      )
+  )
+  (:action confirm_squad_validation_with_module
+    :parameters (?squad - squad ?module - module ?equipment - equipment ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_partial ?squad)
+        (module_bound ?squad ?module)
+        (equipment_bound ?squad ?equipment)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (not
+          (plan_attribute_flag_stealth ?recovery_plan)
+        )
+        (not
+          (squad_validation_confirmed ?squad)
+        )
+      )
+    :effect (squad_validation_confirmed ?squad)
+  )
+  (:action confirm_squad_validation_with_module_variant
+    :parameters (?squad - squad ?module - module ?equipment - equipment ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_partial ?squad)
+        (module_bound ?squad ?module)
+        (equipment_bound ?squad ?equipment)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (plan_attribute_flag_stealth ?recovery_plan)
+        (not
+          (squad_validation_confirmed ?squad)
+        )
+      )
+    :effect (squad_validation_confirmed ?squad)
+  )
+  (:action finalize_squad_configuration_stage1
+    :parameters (?squad - squad ?credential - credential ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_confirmed ?squad)
+        (credential_bound ?squad ?credential)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (not
+          (plan_attribute_flag_speed ?recovery_plan)
+        )
+        (not
+          (plan_attribute_flag_stealth ?recovery_plan)
+        )
+        (not
+          (squad_configuration_finalized ?squad)
+        )
+      )
+    :effect (squad_configuration_finalized ?squad)
+  )
+  (:action finalize_squad_configuration_with_checks
+    :parameters (?squad - squad ?credential - credential ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_confirmed ?squad)
+        (credential_bound ?squad ?credential)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (plan_attribute_flag_speed ?recovery_plan)
+        (not
+          (plan_attribute_flag_stealth ?recovery_plan)
+        )
+        (not
+          (squad_configuration_finalized ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_supplementary_checks_passed ?squad)
+      )
+  )
+  (:action finalize_squad_configuration_with_checks_variant
+    :parameters (?squad - squad ?credential - credential ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_confirmed ?squad)
+        (credential_bound ?squad ?credential)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (not
+          (plan_attribute_flag_speed ?recovery_plan)
+        )
+        (plan_attribute_flag_stealth ?recovery_plan)
+        (not
+          (squad_configuration_finalized ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_supplementary_checks_passed ?squad)
+      )
+  )
+  (:action finalize_squad_configuration_with_checks_variant_b
+    :parameters (?squad - squad ?credential - credential ?intel_node - intel_node ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (squad_validation_confirmed ?squad)
+        (credential_bound ?squad ?credential)
+        (squad_intel_association ?squad ?intel_node)
+        (intel_node_plan_link ?intel_node ?recovery_plan)
+        (plan_attribute_flag_speed ?recovery_plan)
+        (plan_attribute_flag_stealth ?recovery_plan)
+        (not
+          (squad_configuration_finalized ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_supplementary_checks_passed ?squad)
+      )
+  )
+  (:action set_squad_ready_token
+    :parameters (?squad - squad)
+    :precondition
+      (and
+        (squad_configuration_finalized ?squad)
+        (not
+          (squad_supplementary_checks_passed ?squad)
+        )
+        (not
+          (squad_readiness_confirmed ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_readiness_confirmed ?squad)
+        (unit_deployment_ready ?squad)
+      )
+  )
+  (:action bind_tactic_profile_to_squad
+    :parameters (?squad - squad ?tactic_profile - tactic_profile)
+    :precondition
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_supplementary_checks_passed ?squad)
+        (tactic_profile_available ?tactic_profile)
+      )
+    :effect
+      (and
+        (tactic_profile_bound ?squad ?tactic_profile)
+        (not
+          (tactic_profile_available ?tactic_profile)
+        )
+      )
+  )
+  (:action authorize_squad_deployment
+    :parameters (?squad - squad ?lead_agent - lead_agent ?support_agent - support_agent ?capability - capability ?tactic_profile - tactic_profile)
+    :precondition
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_supplementary_checks_passed ?squad)
+        (tactic_profile_bound ?squad ?tactic_profile)
+        (squad_lead_binding ?squad ?lead_agent)
+        (squad_support_binding ?squad ?support_agent)
+        (agent_local_ready ?lead_agent)
+        (support_agent_ready ?support_agent)
+        (capability_bound ?squad ?capability)
+        (not
+          (squad_deployment_authorized ?squad)
+        )
+      )
+    :effect (squad_deployment_authorized ?squad)
+  )
+  (:action finalize_squad_deployment
+    :parameters (?squad - squad)
+    :precondition
+      (and
+        (squad_configuration_finalized ?squad)
+        (squad_deployment_authorized ?squad)
+        (not
+          (squad_readiness_confirmed ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_readiness_confirmed ?squad)
+        (unit_deployment_ready ?squad)
+      )
+  )
+  (:action claim_asset_marker
+    :parameters (?squad - squad ?asset_marker - asset_marker ?capability - capability)
+    :precondition
+      (and
+        (unit_activated ?squad)
+        (capability_bound ?squad ?capability)
+        (asset_marker_available ?asset_marker)
+        (squad_asset_marker_association ?squad ?asset_marker)
+        (not
+          (squad_asset_marker_claimed ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_asset_marker_claimed ?squad)
+        (not
+          (asset_marker_available ?asset_marker)
+        )
+      )
+  )
+  (:action verify_squad_equipment
+    :parameters (?squad - squad ?equipment - equipment)
+    :precondition
+      (and
+        (squad_asset_marker_claimed ?squad)
+        (equipment_bound ?squad ?equipment)
+        (not
+          (squad_equipment_verified ?squad)
+        )
+      )
+    :effect (squad_equipment_verified ?squad)
+  )
+  (:action verify_squad_credentials
+    :parameters (?squad - squad ?credential - credential)
+    :precondition
+      (and
+        (squad_equipment_verified ?squad)
+        (credential_bound ?squad ?credential)
+        (not
+          (squad_credential_verified ?squad)
+        )
+      )
+    :effect (squad_credential_verified ?squad)
+  )
+  (:action issue_unit_readiness_token
+    :parameters (?squad - squad)
+    :precondition
+      (and
+        (squad_credential_verified ?squad)
+        (not
+          (squad_readiness_confirmed ?squad)
+        )
+      )
+    :effect
+      (and
+        (squad_readiness_confirmed ?squad)
+        (unit_deployment_ready ?squad)
+      )
+  )
+  (:action mark_lead_agent_ready
+    :parameters (?lead_agent - lead_agent ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (lead_agent_ready ?lead_agent)
+        (agent_local_ready ?lead_agent)
+        (plan_selected ?recovery_plan)
+        (plan_execution_locked ?recovery_plan)
+        (not
+          (unit_deployment_ready ?lead_agent)
+        )
+      )
+    :effect (unit_deployment_ready ?lead_agent)
+  )
+  (:action mark_support_agent_ready
+    :parameters (?support_agent - support_agent ?recovery_plan - recovery_plan)
+    :precondition
+      (and
+        (support_agent_prepared ?support_agent)
+        (support_agent_ready ?support_agent)
+        (plan_selected ?recovery_plan)
+        (plan_execution_locked ?recovery_plan)
+        (not
+          (unit_deployment_ready ?support_agent)
+        )
+      )
+    :effect (unit_deployment_ready ?support_agent)
+  )
+  (:action assign_artifact_token
+    :parameters (?operational_unit - operational_unit ?artifact_token - artifact_token ?capability - capability)
+    :precondition
+      (and
+        (unit_deployment_ready ?operational_unit)
+        (capability_bound ?operational_unit ?capability)
+        (artifact_token_available ?artifact_token)
+        (not
+          (authorization_granted ?operational_unit)
+        )
+      )
+    :effect
+      (and
+        (authorization_granted ?operational_unit)
+        (artifact_token_associated ?operational_unit ?artifact_token)
+        (not
+          (artifact_token_available ?artifact_token)
+        )
+      )
+  )
+  (:action recover_objective_and_release_asset
+    :parameters (?lead_agent - lead_agent ?responder_asset - responder_asset ?artifact_token - artifact_token)
+    :precondition
+      (and
+        (authorization_granted ?lead_agent)
+        (asset_assigned ?lead_agent ?responder_asset)
+        (artifact_token_associated ?lead_agent ?artifact_token)
+        (not
+          (unit_recovered ?lead_agent)
+        )
+      )
+    :effect
+      (and
+        (unit_recovered ?lead_agent)
+        (asset_available ?responder_asset)
+        (artifact_token_available ?artifact_token)
+      )
+  )
+  (:action support_recover_objective_and_release_asset
+    :parameters (?support_agent - support_agent ?responder_asset - responder_asset ?artifact_token - artifact_token)
+    :precondition
+      (and
+        (authorization_granted ?support_agent)
+        (asset_assigned ?support_agent ?responder_asset)
+        (artifact_token_associated ?support_agent ?artifact_token)
+        (not
+          (unit_recovered ?support_agent)
+        )
+      )
+    :effect
+      (and
+        (unit_recovered ?support_agent)
+        (asset_available ?responder_asset)
+        (artifact_token_available ?artifact_token)
+      )
+  )
+  (:action squad_recover_objective_and_release_asset
+    :parameters (?squad - squad ?responder_asset - responder_asset ?artifact_token - artifact_token)
+    :precondition
+      (and
+        (authorization_granted ?squad)
+        (asset_assigned ?squad ?responder_asset)
+        (artifact_token_associated ?squad ?artifact_token)
+        (not
+          (unit_recovered ?squad)
+        )
+      )
+    :effect
+      (and
+        (unit_recovered ?squad)
+        (asset_available ?responder_asset)
+        (artifact_token_available ?artifact_token)
+      )
+  )
+)

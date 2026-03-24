@@ -1,0 +1,936 @@
+(define (domain cross_dock_vs_storage_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types physical_entity - object logistics_asset - object infrastructure_element - object domain_order_type - object order - domain_order_type supply_location - physical_entity inventory_item - physical_entity handling_resource - physical_entity routing_profile - physical_entity carrier_service - physical_entity delivery_slot - physical_entity equipment_capability - physical_entity time_window - physical_entity package_unit - logistics_asset staging_slot - logistics_asset appointment - logistics_asset inbound_dock - infrastructure_element outbound_dock - infrastructure_element load_unit - infrastructure_element order_subtype - order job_subtype - order inbound_shipment - order_subtype outbound_shipment - order_subtype transfer_job - job_subtype)
+  (:predicates
+    (order_entered_pipeline ?order - order)
+    (ready_for_handling ?order - order)
+    (source_allocated ?order - order)
+    (released_for_transport ?order - order)
+    (finalized ?order - order)
+    (release_requested ?order - order)
+    (supply_location_available ?supply_location - supply_location)
+    (order_assigned_supply_location ?order - order ?supply_location - supply_location)
+    (inventory_available ?inventory_item - inventory_item)
+    (item_allocated_to_order ?order - order ?inventory_item - inventory_item)
+    (handling_resource_available ?handling_resource - handling_resource)
+    (assigned_handling_resource ?order - order ?handling_resource - handling_resource)
+    (package_unit_available ?package_unit - package_unit)
+    (inbound_staged_package ?inbound_shipment - inbound_shipment ?package_unit - package_unit)
+    (outbound_staged_package ?outbound_shipment - outbound_shipment ?package_unit - package_unit)
+    (assigned_inbound_dock ?inbound_shipment - inbound_shipment ?inbound_dock - inbound_dock)
+    (inbound_dock_reserved ?inbound_dock - inbound_dock)
+    (inbound_dock_staged ?inbound_dock - inbound_dock)
+    (inbound_ready ?inbound_shipment - inbound_shipment)
+    (assigned_outbound_dock ?outbound_shipment - outbound_shipment ?outbound_dock - outbound_dock)
+    (outbound_dock_reserved ?outbound_dock - outbound_dock)
+    (outbound_dock_staged ?outbound_dock - outbound_dock)
+    (outbound_ready ?outbound_shipment - outbound_shipment)
+    (load_unit_available ?load_unit - load_unit)
+    (load_unit_reserved ?load_unit - load_unit)
+    (load_unit_assigned_inbound_dock ?load_unit - load_unit ?inbound_dock - inbound_dock)
+    (load_unit_assigned_outbound_dock ?load_unit - load_unit ?outbound_dock - outbound_dock)
+    (requires_routing_profile ?load_unit - load_unit)
+    (requires_additional_validation ?load_unit - load_unit)
+    (load_unit_activated ?load_unit - load_unit)
+    (transfer_job_has_inbound ?transfer_job - transfer_job ?inbound_shipment - inbound_shipment)
+    (transfer_job_has_outbound ?transfer_job - transfer_job ?outbound_shipment - outbound_shipment)
+    (transfer_job_assigned_to_load_unit ?transfer_job - transfer_job ?load_unit - load_unit)
+    (staging_slot_available ?staging_slot - staging_slot)
+    (transfer_job_assigned_staging_slot ?transfer_job - transfer_job ?staging_slot - staging_slot)
+    (staging_slot_allocated ?staging_slot - staging_slot)
+    (staging_slot_linked_to_load_unit ?staging_slot - staging_slot ?load_unit - load_unit)
+    (transfer_job_ready ?transfer_job - transfer_job)
+    (transfer_job_execution_started ?transfer_job - transfer_job)
+    (transfer_job_ready_for_finalization ?transfer_job - transfer_job)
+    (routing_profile_attached ?transfer_job - transfer_job)
+    (routing_profile_validated ?transfer_job - transfer_job)
+    (transfer_job_ready_for_carrier_assignment ?transfer_job - transfer_job)
+    (transfer_job_executed ?transfer_job - transfer_job)
+    (appointment_available ?appointment - appointment)
+    (transfer_job_has_appointment ?transfer_job - transfer_job ?appointment - appointment)
+    (appointment_assigned_to_transfer_job ?transfer_job - transfer_job)
+    (appointment_prepared ?transfer_job - transfer_job)
+    (appointment_confirmed ?transfer_job - transfer_job)
+    (routing_profile_available ?routing_profile - routing_profile)
+    (transfer_job_assigned_routing_profile ?transfer_job - transfer_job ?routing_profile - routing_profile)
+    (carrier_service_available ?carrier_service - carrier_service)
+    (transfer_job_assigned_carrier_service ?transfer_job - transfer_job ?carrier_service - carrier_service)
+    (equipment_capability_available ?equipment_capability - equipment_capability)
+    (transfer_job_has_capability ?transfer_job - transfer_job ?equipment_capability - equipment_capability)
+    (time_window_available ?time_window - time_window)
+    (transfer_job_time_window_assigned ?transfer_job - transfer_job ?time_window - time_window)
+    (delivery_slot_available ?delivery_slot - delivery_slot)
+    (order_assigned_delivery_slot ?order - order ?delivery_slot - delivery_slot)
+    (inbound_processing_confirmed ?inbound_shipment - inbound_shipment)
+    (outbound_processing_confirmed ?outbound_shipment - outbound_shipment)
+    (finalization_logged ?transfer_job - transfer_job)
+  )
+  (:action release_order_into_pipeline
+    :parameters (?order - order)
+    :precondition
+      (and
+        (not
+          (order_entered_pipeline ?order)
+        )
+        (not
+          (released_for_transport ?order)
+        )
+      )
+    :effect (order_entered_pipeline ?order)
+  )
+  (:action allocate_supply_location_for_order
+    :parameters (?order - order ?supply_location - supply_location)
+    :precondition
+      (and
+        (order_entered_pipeline ?order)
+        (not
+          (source_allocated ?order)
+        )
+        (supply_location_available ?supply_location)
+      )
+    :effect
+      (and
+        (source_allocated ?order)
+        (order_assigned_supply_location ?order ?supply_location)
+        (not
+          (supply_location_available ?supply_location)
+        )
+      )
+  )
+  (:action allocate_inventory_item_to_order
+    :parameters (?order - order ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (order_entered_pipeline ?order)
+        (source_allocated ?order)
+        (inventory_available ?inventory_item)
+      )
+    :effect
+      (and
+        (item_allocated_to_order ?order ?inventory_item)
+        (not
+          (inventory_available ?inventory_item)
+        )
+      )
+  )
+  (:action confirm_item_allocation
+    :parameters (?order - order ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (order_entered_pipeline ?order)
+        (source_allocated ?order)
+        (item_allocated_to_order ?order ?inventory_item)
+        (not
+          (ready_for_handling ?order)
+        )
+      )
+    :effect (ready_for_handling ?order)
+  )
+  (:action undo_item_allocation
+    :parameters (?order - order ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (item_allocated_to_order ?order ?inventory_item)
+      )
+    :effect
+      (and
+        (inventory_available ?inventory_item)
+        (not
+          (item_allocated_to_order ?order ?inventory_item)
+        )
+      )
+  )
+  (:action assign_handling_resource_to_order
+    :parameters (?order - order ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (ready_for_handling ?order)
+        (handling_resource_available ?handling_resource)
+      )
+    :effect
+      (and
+        (assigned_handling_resource ?order ?handling_resource)
+        (not
+          (handling_resource_available ?handling_resource)
+        )
+      )
+  )
+  (:action release_handling_resource_from_order
+    :parameters (?order - order ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (assigned_handling_resource ?order ?handling_resource)
+      )
+    :effect
+      (and
+        (handling_resource_available ?handling_resource)
+        (not
+          (assigned_handling_resource ?order ?handling_resource)
+        )
+      )
+  )
+  (:action attach_equipment_capability_to_job
+    :parameters (?transfer_job - transfer_job ?equipment_capability - equipment_capability)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (equipment_capability_available ?equipment_capability)
+      )
+    :effect
+      (and
+        (transfer_job_has_capability ?transfer_job ?equipment_capability)
+        (not
+          (equipment_capability_available ?equipment_capability)
+        )
+      )
+  )
+  (:action detach_equipment_capability_from_job
+    :parameters (?transfer_job - transfer_job ?equipment_capability - equipment_capability)
+    :precondition
+      (and
+        (transfer_job_has_capability ?transfer_job ?equipment_capability)
+      )
+    :effect
+      (and
+        (equipment_capability_available ?equipment_capability)
+        (not
+          (transfer_job_has_capability ?transfer_job ?equipment_capability)
+        )
+      )
+  )
+  (:action attach_time_window_to_job
+    :parameters (?transfer_job - transfer_job ?time_window - time_window)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (time_window_available ?time_window)
+      )
+    :effect
+      (and
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (not
+          (time_window_available ?time_window)
+        )
+      )
+  )
+  (:action detach_time_window_from_job
+    :parameters (?transfer_job - transfer_job ?time_window - time_window)
+    :precondition
+      (and
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+      )
+    :effect
+      (and
+        (time_window_available ?time_window)
+        (not
+          (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        )
+      )
+  )
+  (:action reserve_inbound_dock_for_shipment
+    :parameters (?inbound_shipment - inbound_shipment ?inbound_dock - inbound_dock ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (ready_for_handling ?inbound_shipment)
+        (item_allocated_to_order ?inbound_shipment ?inventory_item)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (not
+          (inbound_dock_reserved ?inbound_dock)
+        )
+        (not
+          (inbound_dock_staged ?inbound_dock)
+        )
+      )
+    :effect (inbound_dock_reserved ?inbound_dock)
+  )
+  (:action confirm_inbound_ready_for_consolidation
+    :parameters (?inbound_shipment - inbound_shipment ?inbound_dock - inbound_dock ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (ready_for_handling ?inbound_shipment)
+        (assigned_handling_resource ?inbound_shipment ?handling_resource)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (inbound_dock_reserved ?inbound_dock)
+        (not
+          (inbound_processing_confirmed ?inbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (inbound_ready ?inbound_shipment)
+      )
+  )
+  (:action stage_package_on_inbound_dock
+    :parameters (?inbound_shipment - inbound_shipment ?inbound_dock - inbound_dock ?package_unit - package_unit)
+    :precondition
+      (and
+        (ready_for_handling ?inbound_shipment)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (package_unit_available ?package_unit)
+        (not
+          (inbound_processing_confirmed ?inbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (inbound_dock_staged ?inbound_dock)
+        (inbound_processing_confirmed ?inbound_shipment)
+        (inbound_staged_package ?inbound_shipment ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action process_inbound_staged_package
+    :parameters (?inbound_shipment - inbound_shipment ?inbound_dock - inbound_dock ?inventory_item - inventory_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (ready_for_handling ?inbound_shipment)
+        (item_allocated_to_order ?inbound_shipment ?inventory_item)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (inbound_dock_staged ?inbound_dock)
+        (inbound_staged_package ?inbound_shipment ?package_unit)
+        (not
+          (inbound_ready ?inbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (inbound_dock_reserved ?inbound_dock)
+        (inbound_ready ?inbound_shipment)
+        (package_unit_available ?package_unit)
+        (not
+          (inbound_staged_package ?inbound_shipment ?package_unit)
+        )
+      )
+  )
+  (:action reserve_outbound_dock_for_shipment
+    :parameters (?outbound_shipment - outbound_shipment ?outbound_dock - outbound_dock ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (ready_for_handling ?outbound_shipment)
+        (item_allocated_to_order ?outbound_shipment ?inventory_item)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (not
+          (outbound_dock_reserved ?outbound_dock)
+        )
+        (not
+          (outbound_dock_staged ?outbound_dock)
+        )
+      )
+    :effect (outbound_dock_reserved ?outbound_dock)
+  )
+  (:action confirm_outbound_ready_for_consolidation
+    :parameters (?outbound_shipment - outbound_shipment ?outbound_dock - outbound_dock ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (ready_for_handling ?outbound_shipment)
+        (assigned_handling_resource ?outbound_shipment ?handling_resource)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (outbound_dock_reserved ?outbound_dock)
+        (not
+          (outbound_processing_confirmed ?outbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (outbound_processing_confirmed ?outbound_shipment)
+        (outbound_ready ?outbound_shipment)
+      )
+  )
+  (:action stage_package_on_outbound_dock
+    :parameters (?outbound_shipment - outbound_shipment ?outbound_dock - outbound_dock ?package_unit - package_unit)
+    :precondition
+      (and
+        (ready_for_handling ?outbound_shipment)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (package_unit_available ?package_unit)
+        (not
+          (outbound_processing_confirmed ?outbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (outbound_dock_staged ?outbound_dock)
+        (outbound_processing_confirmed ?outbound_shipment)
+        (outbound_staged_package ?outbound_shipment ?package_unit)
+        (not
+          (package_unit_available ?package_unit)
+        )
+      )
+  )
+  (:action process_outbound_staged_package
+    :parameters (?outbound_shipment - outbound_shipment ?outbound_dock - outbound_dock ?inventory_item - inventory_item ?package_unit - package_unit)
+    :precondition
+      (and
+        (ready_for_handling ?outbound_shipment)
+        (item_allocated_to_order ?outbound_shipment ?inventory_item)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (outbound_dock_staged ?outbound_dock)
+        (outbound_staged_package ?outbound_shipment ?package_unit)
+        (not
+          (outbound_ready ?outbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (outbound_dock_reserved ?outbound_dock)
+        (outbound_ready ?outbound_shipment)
+        (package_unit_available ?package_unit)
+        (not
+          (outbound_staged_package ?outbound_shipment ?package_unit)
+        )
+      )
+  )
+  (:action form_load_unit_standard
+    :parameters (?inbound_shipment - inbound_shipment ?outbound_shipment - outbound_shipment ?inbound_dock - inbound_dock ?outbound_dock - outbound_dock ?load_unit - load_unit)
+    :precondition
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (outbound_processing_confirmed ?outbound_shipment)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (inbound_dock_reserved ?inbound_dock)
+        (outbound_dock_reserved ?outbound_dock)
+        (inbound_ready ?inbound_shipment)
+        (outbound_ready ?outbound_shipment)
+        (load_unit_available ?load_unit)
+      )
+    :effect
+      (and
+        (load_unit_reserved ?load_unit)
+        (load_unit_assigned_inbound_dock ?load_unit ?inbound_dock)
+        (load_unit_assigned_outbound_dock ?load_unit ?outbound_dock)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action form_load_unit_with_routing_required
+    :parameters (?inbound_shipment - inbound_shipment ?outbound_shipment - outbound_shipment ?inbound_dock - inbound_dock ?outbound_dock - outbound_dock ?load_unit - load_unit)
+    :precondition
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (outbound_processing_confirmed ?outbound_shipment)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (inbound_dock_staged ?inbound_dock)
+        (outbound_dock_reserved ?outbound_dock)
+        (not
+          (inbound_ready ?inbound_shipment)
+        )
+        (outbound_ready ?outbound_shipment)
+        (load_unit_available ?load_unit)
+      )
+    :effect
+      (and
+        (load_unit_reserved ?load_unit)
+        (load_unit_assigned_inbound_dock ?load_unit ?inbound_dock)
+        (load_unit_assigned_outbound_dock ?load_unit ?outbound_dock)
+        (requires_routing_profile ?load_unit)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action form_load_unit_with_validation_required
+    :parameters (?inbound_shipment - inbound_shipment ?outbound_shipment - outbound_shipment ?inbound_dock - inbound_dock ?outbound_dock - outbound_dock ?load_unit - load_unit)
+    :precondition
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (outbound_processing_confirmed ?outbound_shipment)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (inbound_dock_reserved ?inbound_dock)
+        (outbound_dock_staged ?outbound_dock)
+        (inbound_ready ?inbound_shipment)
+        (not
+          (outbound_ready ?outbound_shipment)
+        )
+        (load_unit_available ?load_unit)
+      )
+    :effect
+      (and
+        (load_unit_reserved ?load_unit)
+        (load_unit_assigned_inbound_dock ?load_unit ?inbound_dock)
+        (load_unit_assigned_outbound_dock ?load_unit ?outbound_dock)
+        (requires_additional_validation ?load_unit)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action form_load_unit_with_routing_and_validation_required
+    :parameters (?inbound_shipment - inbound_shipment ?outbound_shipment - outbound_shipment ?inbound_dock - inbound_dock ?outbound_dock - outbound_dock ?load_unit - load_unit)
+    :precondition
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (outbound_processing_confirmed ?outbound_shipment)
+        (assigned_inbound_dock ?inbound_shipment ?inbound_dock)
+        (assigned_outbound_dock ?outbound_shipment ?outbound_dock)
+        (inbound_dock_staged ?inbound_dock)
+        (outbound_dock_staged ?outbound_dock)
+        (not
+          (inbound_ready ?inbound_shipment)
+        )
+        (not
+          (outbound_ready ?outbound_shipment)
+        )
+        (load_unit_available ?load_unit)
+      )
+    :effect
+      (and
+        (load_unit_reserved ?load_unit)
+        (load_unit_assigned_inbound_dock ?load_unit ?inbound_dock)
+        (load_unit_assigned_outbound_dock ?load_unit ?outbound_dock)
+        (requires_routing_profile ?load_unit)
+        (requires_additional_validation ?load_unit)
+        (not
+          (load_unit_available ?load_unit)
+        )
+      )
+  )
+  (:action activate_load_unit
+    :parameters (?load_unit - load_unit ?inbound_shipment - inbound_shipment ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (load_unit_reserved ?load_unit)
+        (inbound_processing_confirmed ?inbound_shipment)
+        (item_allocated_to_order ?inbound_shipment ?inventory_item)
+        (not
+          (load_unit_activated ?load_unit)
+        )
+      )
+    :effect (load_unit_activated ?load_unit)
+  )
+  (:action assign_staging_slot_to_job
+    :parameters (?transfer_job - transfer_job ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (transfer_job_assigned_to_load_unit ?transfer_job ?load_unit)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_available ?staging_slot)
+        (load_unit_reserved ?load_unit)
+        (load_unit_activated ?load_unit)
+        (not
+          (staging_slot_allocated ?staging_slot)
+        )
+      )
+    :effect
+      (and
+        (staging_slot_allocated ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (not
+          (staging_slot_available ?staging_slot)
+        )
+      )
+  )
+  (:action prime_transfer_job
+    :parameters (?transfer_job - transfer_job ?staging_slot - staging_slot ?load_unit - load_unit ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_allocated ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (item_allocated_to_order ?transfer_job ?inventory_item)
+        (not
+          (requires_routing_profile ?load_unit)
+        )
+        (not
+          (transfer_job_ready ?transfer_job)
+        )
+      )
+    :effect (transfer_job_ready ?transfer_job)
+  )
+  (:action assign_routing_profile_to_transfer_job
+    :parameters (?transfer_job - transfer_job ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (routing_profile_available ?routing_profile)
+        (not
+          (routing_profile_attached ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (routing_profile_attached ?transfer_job)
+        (transfer_job_assigned_routing_profile ?transfer_job ?routing_profile)
+        (not
+          (routing_profile_available ?routing_profile)
+        )
+      )
+  )
+  (:action apply_routing_profile_and_prime_transfer_job
+    :parameters (?transfer_job - transfer_job ?staging_slot - staging_slot ?load_unit - load_unit ?inventory_item - inventory_item ?routing_profile - routing_profile)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_allocated ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (item_allocated_to_order ?transfer_job ?inventory_item)
+        (requires_routing_profile ?load_unit)
+        (routing_profile_attached ?transfer_job)
+        (transfer_job_assigned_routing_profile ?transfer_job ?routing_profile)
+        (not
+          (transfer_job_ready ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (transfer_job_ready ?transfer_job)
+        (routing_profile_validated ?transfer_job)
+      )
+  )
+  (:action start_crossdock_transfer_without_validation
+    :parameters (?transfer_job - transfer_job ?equipment_capability - equipment_capability ?handling_resource - handling_resource ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_ready ?transfer_job)
+        (transfer_job_has_capability ?transfer_job ?equipment_capability)
+        (assigned_handling_resource ?transfer_job ?handling_resource)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (not
+          (requires_additional_validation ?load_unit)
+        )
+        (not
+          (transfer_job_execution_started ?transfer_job)
+        )
+      )
+    :effect (transfer_job_execution_started ?transfer_job)
+  )
+  (:action start_crossdock_transfer_with_validation
+    :parameters (?transfer_job - transfer_job ?equipment_capability - equipment_capability ?handling_resource - handling_resource ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_ready ?transfer_job)
+        (transfer_job_has_capability ?transfer_job ?equipment_capability)
+        (assigned_handling_resource ?transfer_job ?handling_resource)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (requires_additional_validation ?load_unit)
+        (not
+          (transfer_job_execution_started ?transfer_job)
+        )
+      )
+    :effect (transfer_job_execution_started ?transfer_job)
+  )
+  (:action complete_transfer_stage
+    :parameters (?transfer_job - transfer_job ?time_window - time_window ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_execution_started ?transfer_job)
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (not
+          (requires_routing_profile ?load_unit)
+        )
+        (not
+          (requires_additional_validation ?load_unit)
+        )
+        (not
+          (transfer_job_ready_for_finalization ?transfer_job)
+        )
+      )
+    :effect (transfer_job_ready_for_finalization ?transfer_job)
+  )
+  (:action complete_transfer_stage_with_routing
+    :parameters (?transfer_job - transfer_job ?time_window - time_window ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_execution_started ?transfer_job)
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (requires_routing_profile ?load_unit)
+        (not
+          (requires_additional_validation ?load_unit)
+        )
+        (not
+          (transfer_job_ready_for_finalization ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_ready_for_carrier_assignment ?transfer_job)
+      )
+  )
+  (:action complete_transfer_stage_with_validation
+    :parameters (?transfer_job - transfer_job ?time_window - time_window ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_execution_started ?transfer_job)
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (not
+          (requires_routing_profile ?load_unit)
+        )
+        (requires_additional_validation ?load_unit)
+        (not
+          (transfer_job_ready_for_finalization ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_ready_for_carrier_assignment ?transfer_job)
+      )
+  )
+  (:action complete_transfer_stage_with_routing_and_validation
+    :parameters (?transfer_job - transfer_job ?time_window - time_window ?staging_slot - staging_slot ?load_unit - load_unit)
+    :precondition
+      (and
+        (transfer_job_execution_started ?transfer_job)
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (transfer_job_assigned_staging_slot ?transfer_job ?staging_slot)
+        (staging_slot_linked_to_load_unit ?staging_slot ?load_unit)
+        (requires_routing_profile ?load_unit)
+        (requires_additional_validation ?load_unit)
+        (not
+          (transfer_job_ready_for_finalization ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_ready_for_carrier_assignment ?transfer_job)
+      )
+  )
+  (:action finalize_transfer_job
+    :parameters (?transfer_job - transfer_job)
+    :precondition
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (not
+          (transfer_job_ready_for_carrier_assignment ?transfer_job)
+        )
+        (not
+          (finalization_logged ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (finalization_logged ?transfer_job)
+        (finalized ?transfer_job)
+      )
+  )
+  (:action assign_carrier_service_to_transfer_job
+    :parameters (?transfer_job - transfer_job ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_ready_for_carrier_assignment ?transfer_job)
+        (carrier_service_available ?carrier_service)
+      )
+    :effect
+      (and
+        (transfer_job_assigned_carrier_service ?transfer_job ?carrier_service)
+        (not
+          (carrier_service_available ?carrier_service)
+        )
+      )
+  )
+  (:action execute_transfer_job_physical_move
+    :parameters (?transfer_job - transfer_job ?inbound_shipment - inbound_shipment ?outbound_shipment - outbound_shipment ?inventory_item - inventory_item ?carrier_service - carrier_service)
+    :precondition
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_ready_for_carrier_assignment ?transfer_job)
+        (transfer_job_assigned_carrier_service ?transfer_job ?carrier_service)
+        (transfer_job_has_inbound ?transfer_job ?inbound_shipment)
+        (transfer_job_has_outbound ?transfer_job ?outbound_shipment)
+        (inbound_ready ?inbound_shipment)
+        (outbound_ready ?outbound_shipment)
+        (item_allocated_to_order ?transfer_job ?inventory_item)
+        (not
+          (transfer_job_executed ?transfer_job)
+        )
+      )
+    :effect (transfer_job_executed ?transfer_job)
+  )
+  (:action finalize_executed_transfer_job
+    :parameters (?transfer_job - transfer_job)
+    :precondition
+      (and
+        (transfer_job_ready_for_finalization ?transfer_job)
+        (transfer_job_executed ?transfer_job)
+        (not
+          (finalization_logged ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (finalization_logged ?transfer_job)
+        (finalized ?transfer_job)
+      )
+  )
+  (:action assign_appointment_to_job
+    :parameters (?transfer_job - transfer_job ?appointment - appointment ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (ready_for_handling ?transfer_job)
+        (item_allocated_to_order ?transfer_job ?inventory_item)
+        (appointment_available ?appointment)
+        (transfer_job_has_appointment ?transfer_job ?appointment)
+        (not
+          (appointment_assigned_to_transfer_job ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (appointment_assigned_to_transfer_job ?transfer_job)
+        (not
+          (appointment_available ?appointment)
+        )
+      )
+  )
+  (:action prepare_job_for_appointment
+    :parameters (?transfer_job - transfer_job ?handling_resource - handling_resource)
+    :precondition
+      (and
+        (appointment_assigned_to_transfer_job ?transfer_job)
+        (assigned_handling_resource ?transfer_job ?handling_resource)
+        (not
+          (appointment_prepared ?transfer_job)
+        )
+      )
+    :effect (appointment_prepared ?transfer_job)
+  )
+  (:action confirm_job_appointment
+    :parameters (?transfer_job - transfer_job ?time_window - time_window)
+    :precondition
+      (and
+        (appointment_prepared ?transfer_job)
+        (transfer_job_time_window_assigned ?transfer_job ?time_window)
+        (not
+          (appointment_confirmed ?transfer_job)
+        )
+      )
+    :effect (appointment_confirmed ?transfer_job)
+  )
+  (:action finalize_job_post_appointment
+    :parameters (?transfer_job - transfer_job)
+    :precondition
+      (and
+        (appointment_confirmed ?transfer_job)
+        (not
+          (finalization_logged ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (finalization_logged ?transfer_job)
+        (finalized ?transfer_job)
+      )
+  )
+  (:action finalize_inbound_shipment
+    :parameters (?inbound_shipment - inbound_shipment ?load_unit - load_unit)
+    :precondition
+      (and
+        (inbound_processing_confirmed ?inbound_shipment)
+        (inbound_ready ?inbound_shipment)
+        (load_unit_reserved ?load_unit)
+        (load_unit_activated ?load_unit)
+        (not
+          (finalized ?inbound_shipment)
+        )
+      )
+    :effect (finalized ?inbound_shipment)
+  )
+  (:action finalize_outbound_shipment
+    :parameters (?outbound_shipment - outbound_shipment ?load_unit - load_unit)
+    :precondition
+      (and
+        (outbound_processing_confirmed ?outbound_shipment)
+        (outbound_ready ?outbound_shipment)
+        (load_unit_reserved ?load_unit)
+        (load_unit_activated ?load_unit)
+        (not
+          (finalized ?outbound_shipment)
+        )
+      )
+    :effect (finalized ?outbound_shipment)
+  )
+  (:action request_outbound_release
+    :parameters (?order - order ?delivery_slot - delivery_slot ?inventory_item - inventory_item)
+    :precondition
+      (and
+        (finalized ?order)
+        (item_allocated_to_order ?order ?inventory_item)
+        (delivery_slot_available ?delivery_slot)
+        (not
+          (release_requested ?order)
+        )
+      )
+    :effect
+      (and
+        (release_requested ?order)
+        (order_assigned_delivery_slot ?order ?delivery_slot)
+        (not
+          (delivery_slot_available ?delivery_slot)
+        )
+      )
+  )
+  (:action execute_inbound_release_and_allocate_transport
+    :parameters (?inbound_shipment - inbound_shipment ?supply_location - supply_location ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (release_requested ?inbound_shipment)
+        (order_assigned_supply_location ?inbound_shipment ?supply_location)
+        (order_assigned_delivery_slot ?inbound_shipment ?delivery_slot)
+        (not
+          (released_for_transport ?inbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (released_for_transport ?inbound_shipment)
+        (supply_location_available ?supply_location)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action execute_outbound_release_and_allocate_transport
+    :parameters (?outbound_shipment - outbound_shipment ?supply_location - supply_location ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (release_requested ?outbound_shipment)
+        (order_assigned_supply_location ?outbound_shipment ?supply_location)
+        (order_assigned_delivery_slot ?outbound_shipment ?delivery_slot)
+        (not
+          (released_for_transport ?outbound_shipment)
+        )
+      )
+    :effect
+      (and
+        (released_for_transport ?outbound_shipment)
+        (supply_location_available ?supply_location)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+  (:action execute_transfer_job_release_and_allocate_transport
+    :parameters (?transfer_job - transfer_job ?supply_location - supply_location ?delivery_slot - delivery_slot)
+    :precondition
+      (and
+        (release_requested ?transfer_job)
+        (order_assigned_supply_location ?transfer_job ?supply_location)
+        (order_assigned_delivery_slot ?transfer_job ?delivery_slot)
+        (not
+          (released_for_transport ?transfer_job)
+        )
+      )
+    :effect
+      (and
+        (released_for_transport ?transfer_job)
+        (supply_location_available ?supply_location)
+        (delivery_slot_available ?delivery_slot)
+      )
+  )
+)

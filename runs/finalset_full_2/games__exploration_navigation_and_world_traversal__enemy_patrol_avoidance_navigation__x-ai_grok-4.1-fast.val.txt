@@ -1,0 +1,1081 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain enemy_patrol_avoidance_navigation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object gameplay_entity - entity approach_category - entity asset_category - entity site_category - entity site_node - site_category patrol_token - gameplay_entity timing_window - gameplay_entity cover_spot - gameplay_entity aux_subgoal - gameplay_entity equipment - gameplay_entity beacon_marker - gameplay_entity consumable_tool_type - gameplay_entity objective_time_modifier - gameplay_entity distraction_item - approach_category scan_result - approach_category objective_flag - approach_category approach_marker_a - asset_category approach_marker_b - asset_category traversal_instance - asset_category ingress_category - site_node objective_category - site_node ingress_lane_a - ingress_category ingress_lane_b - ingress_category objective_container - objective_category)
+
+  (:predicates
+    (site_discovered ?site - site_node)
+    (site_unlocked ?site - site_node)
+    (site_prepared ?site - site_node)
+    (site_secured ?site - site_node)
+    (site_ready_for_exfiltration ?site - site_node)
+    (site_exfil_prepared ?site - site_node)
+    (patrol_available ?patrol_token - patrol_token)
+    (patrol_assigned ?site - site_node ?patrol_token - patrol_token)
+    (timing_window_available ?timing_window - timing_window)
+    (site_timing_assigned ?site - site_node ?timing_window - timing_window)
+    (cover_available ?cover_spot - cover_spot)
+    (cover_assigned ?site - site_node ?cover_spot - cover_spot)
+    (distraction_available ?distraction_item - distraction_item)
+    (ingress_a_distraction_attached ?ingress_a - ingress_lane_a ?distraction_item - distraction_item)
+    (ingress_b_distraction_attached ?ingress_b - ingress_lane_b ?distraction_item - distraction_item)
+    (ingress_a_has_marker_a ?ingress_a - ingress_lane_a ?approach_marker_a - approach_marker_a)
+    (approach_marker_a_claimed ?approach_marker_a - approach_marker_a)
+    (approach_marker_a_flagged ?approach_marker_a - approach_marker_a)
+    (ingress_a_cover_confirmed ?ingress_a - ingress_lane_a)
+    (ingress_b_has_marker_b ?ingress_b - ingress_lane_b ?approach_marker_b - approach_marker_b)
+    (approach_marker_b_claimed ?approach_marker_b - approach_marker_b)
+    (approach_marker_b_flagged ?approach_marker_b - approach_marker_b)
+    (ingress_b_cover_confirmed ?ingress_b - ingress_lane_b)
+    (traversal_slot_available ?traversal - traversal_instance)
+    (traversal_claimed ?traversal - traversal_instance)
+    (traversal_has_marker_a ?traversal - traversal_instance ?approach_marker_a - approach_marker_a)
+    (traversal_has_marker_b ?traversal - traversal_instance ?approach_marker_b - approach_marker_b)
+    (traversal_confirmed_a ?traversal - traversal_instance)
+    (traversal_confirmed_b ?traversal - traversal_instance)
+    (traversal_executed ?traversal - traversal_instance)
+    (objective_has_ingress_a ?objective - objective_container ?ingress_a - ingress_lane_a)
+    (objective_has_ingress_b ?objective - objective_container ?ingress_b - ingress_lane_b)
+    (objective_assigned_traversal ?objective - objective_container ?traversal - traversal_instance)
+    (scan_available ?scan_result - scan_result)
+    (objective_has_scan ?objective - objective_container ?scan_result - scan_result)
+    (scan_committed ?scan_result - scan_result)
+    (scan_linked_traversal ?scan_result - scan_result ?traversal - traversal_instance)
+    (objective_scan_traversal_validated ?objective - objective_container)
+    (objective_tool_attached ?objective - objective_container)
+    (objective_scan_and_tool_complete ?objective - objective_container)
+    (aux_subgoal_attached ?objective - objective_container)
+    (aux_subgoal_committed ?objective - objective_container)
+    (equipment_ready_for_attachment ?objective - objective_container)
+    (objective_processing_complete ?objective - objective_container)
+    (objective_flag_available ?objective_flag - objective_flag)
+    (objective_has_flag ?objective - objective_container ?objective_flag - objective_flag)
+    (objective_flag_active ?objective - objective_container)
+    (flag_stage_one ?objective - objective_container)
+    (flag_processed ?objective - objective_container)
+    (aux_subgoal_available ?aux_subgoal - aux_subgoal)
+    (objective_has_aux_subgoal ?objective - objective_container ?aux_subgoal - aux_subgoal)
+    (equipment_available ?equipment - equipment)
+    (objective_has_equipment ?objective - objective_container ?equipment - equipment)
+    (tool_consumable_available ?consumable_tool - consumable_tool_type)
+    (objective_has_consumable_tool ?objective - objective_container ?consumable_tool - consumable_tool_type)
+    (time_modifier_available ?time_modifier - objective_time_modifier)
+    (objective_has_time_modifier ?objective - objective_container ?time_modifier - objective_time_modifier)
+    (beacon_available ?beacon - beacon_marker)
+    (site_has_beacon ?site - site_node ?beacon - beacon_marker)
+    (ingress_a_claimed ?ingress_a - ingress_lane_a)
+    (ingress_b_claimed ?ingress_b - ingress_lane_b)
+    (objective_completion_flag ?objective - objective_container)
+  )
+  (:action discover_site
+    :parameters (?site - site_node)
+    :precondition
+      (and
+        (not
+          (site_discovered ?site)
+        )
+        (not
+          (site_secured ?site)
+        )
+      )
+    :effect (site_discovered ?site)
+  )
+  (:action assign_patrol_to_site
+    :parameters (?site - site_node ?patrol_token - patrol_token)
+    :precondition
+      (and
+        (site_discovered ?site)
+        (not
+          (site_prepared ?site)
+        )
+        (patrol_available ?patrol_token)
+      )
+    :effect
+      (and
+        (site_prepared ?site)
+        (patrol_assigned ?site ?patrol_token)
+        (not
+          (patrol_available ?patrol_token)
+        )
+      )
+  )
+  (:action assign_timing_window_to_site
+    :parameters (?site - site_node ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_discovered ?site)
+        (site_prepared ?site)
+        (timing_window_available ?timing_window)
+      )
+    :effect
+      (and
+        (site_timing_assigned ?site ?timing_window)
+        (not
+          (timing_window_available ?timing_window)
+        )
+      )
+  )
+  (:action unlock_site_with_timing
+    :parameters (?site - site_node ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_discovered ?site)
+        (site_prepared ?site)
+        (site_timing_assigned ?site ?timing_window)
+        (not
+          (site_unlocked ?site)
+        )
+      )
+    :effect (site_unlocked ?site)
+  )
+  (:action release_timing_window_from_site
+    :parameters (?site - site_node ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_timing_assigned ?site ?timing_window)
+      )
+    :effect
+      (and
+        (timing_window_available ?timing_window)
+        (not
+          (site_timing_assigned ?site ?timing_window)
+        )
+      )
+  )
+  (:action assign_cover_to_site
+    :parameters (?site - site_node ?cover_spot - cover_spot)
+    :precondition
+      (and
+        (site_unlocked ?site)
+        (cover_available ?cover_spot)
+      )
+    :effect
+      (and
+        (cover_assigned ?site ?cover_spot)
+        (not
+          (cover_available ?cover_spot)
+        )
+      )
+  )
+  (:action release_cover_from_site
+    :parameters (?site - site_node ?cover_spot - cover_spot)
+    :precondition
+      (and
+        (cover_assigned ?site ?cover_spot)
+      )
+    :effect
+      (and
+        (cover_available ?cover_spot)
+        (not
+          (cover_assigned ?site ?cover_spot)
+        )
+      )
+  )
+  (:action attach_consumable_tool_to_objective
+    :parameters (?objective - objective_container ?consumable_tool - consumable_tool_type)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (tool_consumable_available ?consumable_tool)
+      )
+    :effect
+      (and
+        (objective_has_consumable_tool ?objective ?consumable_tool)
+        (not
+          (tool_consumable_available ?consumable_tool)
+        )
+      )
+  )
+  (:action detach_consumable_tool_from_objective
+    :parameters (?objective - objective_container ?consumable_tool - consumable_tool_type)
+    :precondition
+      (and
+        (objective_has_consumable_tool ?objective ?consumable_tool)
+      )
+    :effect
+      (and
+        (tool_consumable_available ?consumable_tool)
+        (not
+          (objective_has_consumable_tool ?objective ?consumable_tool)
+        )
+      )
+  )
+  (:action attach_time_modifier_to_objective
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (time_modifier_available ?time_modifier)
+      )
+    :effect
+      (and
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (not
+          (time_modifier_available ?time_modifier)
+        )
+      )
+  )
+  (:action detach_time_modifier_from_objective
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier)
+    :precondition
+      (and
+        (objective_has_time_modifier ?objective ?time_modifier)
+      )
+    :effect
+      (and
+        (time_modifier_available ?time_modifier)
+        (not
+          (objective_has_time_modifier ?objective ?time_modifier)
+        )
+      )
+  )
+  (:action claim_approach_marker_a_for_ingress
+    :parameters (?ingress_a - ingress_lane_a ?approach_marker_a - approach_marker_a ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_unlocked ?ingress_a)
+        (site_timing_assigned ?ingress_a ?timing_window)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (not
+          (approach_marker_a_claimed ?approach_marker_a)
+        )
+        (not
+          (approach_marker_a_flagged ?approach_marker_a)
+        )
+      )
+    :effect (approach_marker_a_claimed ?approach_marker_a)
+  )
+  (:action prepare_ingress_a_with_cover
+    :parameters (?ingress_a - ingress_lane_a ?approach_marker_a - approach_marker_a ?cover_spot - cover_spot)
+    :precondition
+      (and
+        (site_unlocked ?ingress_a)
+        (cover_assigned ?ingress_a ?cover_spot)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (approach_marker_a_claimed ?approach_marker_a)
+        (not
+          (ingress_a_claimed ?ingress_a)
+        )
+      )
+    :effect
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_a_cover_confirmed ?ingress_a)
+      )
+  )
+  (:action apply_distraction_to_ingress_a
+    :parameters (?ingress_a - ingress_lane_a ?approach_marker_a - approach_marker_a ?distraction_item - distraction_item)
+    :precondition
+      (and
+        (site_unlocked ?ingress_a)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (distraction_available ?distraction_item)
+        (not
+          (ingress_a_claimed ?ingress_a)
+        )
+      )
+    :effect
+      (and
+        (approach_marker_a_flagged ?approach_marker_a)
+        (ingress_a_claimed ?ingress_a)
+        (ingress_a_distraction_attached ?ingress_a ?distraction_item)
+        (not
+          (distraction_available ?distraction_item)
+        )
+      )
+  )
+  (:action finalize_ingress_a_with_timing_and_distraction
+    :parameters (?ingress_a - ingress_lane_a ?approach_marker_a - approach_marker_a ?timing_window - timing_window ?distraction_item - distraction_item)
+    :precondition
+      (and
+        (site_unlocked ?ingress_a)
+        (site_timing_assigned ?ingress_a ?timing_window)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (approach_marker_a_flagged ?approach_marker_a)
+        (ingress_a_distraction_attached ?ingress_a ?distraction_item)
+        (not
+          (ingress_a_cover_confirmed ?ingress_a)
+        )
+      )
+    :effect
+      (and
+        (approach_marker_a_claimed ?approach_marker_a)
+        (ingress_a_cover_confirmed ?ingress_a)
+        (distraction_available ?distraction_item)
+        (not
+          (ingress_a_distraction_attached ?ingress_a ?distraction_item)
+        )
+      )
+  )
+  (:action claim_approach_marker_b_for_ingress
+    :parameters (?ingress_b - ingress_lane_b ?approach_marker_b - approach_marker_b ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_unlocked ?ingress_b)
+        (site_timing_assigned ?ingress_b ?timing_window)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (not
+          (approach_marker_b_claimed ?approach_marker_b)
+        )
+        (not
+          (approach_marker_b_flagged ?approach_marker_b)
+        )
+      )
+    :effect (approach_marker_b_claimed ?approach_marker_b)
+  )
+  (:action prepare_ingress_b_with_cover
+    :parameters (?ingress_b - ingress_lane_b ?approach_marker_b - approach_marker_b ?cover_spot - cover_spot)
+    :precondition
+      (and
+        (site_unlocked ?ingress_b)
+        (cover_assigned ?ingress_b ?cover_spot)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_b_claimed ?approach_marker_b)
+        (not
+          (ingress_b_claimed ?ingress_b)
+        )
+      )
+    :effect
+      (and
+        (ingress_b_claimed ?ingress_b)
+        (ingress_b_cover_confirmed ?ingress_b)
+      )
+  )
+  (:action apply_distraction_to_ingress_b
+    :parameters (?ingress_b - ingress_lane_b ?approach_marker_b - approach_marker_b ?distraction_item - distraction_item)
+    :precondition
+      (and
+        (site_unlocked ?ingress_b)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (distraction_available ?distraction_item)
+        (not
+          (ingress_b_claimed ?ingress_b)
+        )
+      )
+    :effect
+      (and
+        (approach_marker_b_flagged ?approach_marker_b)
+        (ingress_b_claimed ?ingress_b)
+        (ingress_b_distraction_attached ?ingress_b ?distraction_item)
+        (not
+          (distraction_available ?distraction_item)
+        )
+      )
+  )
+  (:action finalize_ingress_b_with_timing_and_distraction
+    :parameters (?ingress_b - ingress_lane_b ?approach_marker_b - approach_marker_b ?timing_window - timing_window ?distraction_item - distraction_item)
+    :precondition
+      (and
+        (site_unlocked ?ingress_b)
+        (site_timing_assigned ?ingress_b ?timing_window)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_b_flagged ?approach_marker_b)
+        (ingress_b_distraction_attached ?ingress_b ?distraction_item)
+        (not
+          (ingress_b_cover_confirmed ?ingress_b)
+        )
+      )
+    :effect
+      (and
+        (approach_marker_b_claimed ?approach_marker_b)
+        (ingress_b_cover_confirmed ?ingress_b)
+        (distraction_available ?distraction_item)
+        (not
+          (ingress_b_distraction_attached ?ingress_b ?distraction_item)
+        )
+      )
+  )
+  (:action instantiate_traversal_standard
+    :parameters (?ingress_a - ingress_lane_a ?ingress_b - ingress_lane_b ?approach_marker_a - approach_marker_a ?approach_marker_b - approach_marker_b ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_b_claimed ?ingress_b)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_a_claimed ?approach_marker_a)
+        (approach_marker_b_claimed ?approach_marker_b)
+        (ingress_a_cover_confirmed ?ingress_a)
+        (ingress_b_cover_confirmed ?ingress_b)
+        (traversal_slot_available ?traversal)
+      )
+    :effect
+      (and
+        (traversal_claimed ?traversal)
+        (traversal_has_marker_a ?traversal ?approach_marker_a)
+        (traversal_has_marker_b ?traversal ?approach_marker_b)
+        (not
+          (traversal_slot_available ?traversal)
+        )
+      )
+  )
+  (:action instantiate_traversal_with_a_flag
+    :parameters (?ingress_a - ingress_lane_a ?ingress_b - ingress_lane_b ?approach_marker_a - approach_marker_a ?approach_marker_b - approach_marker_b ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_b_claimed ?ingress_b)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_a_flagged ?approach_marker_a)
+        (approach_marker_b_claimed ?approach_marker_b)
+        (not
+          (ingress_a_cover_confirmed ?ingress_a)
+        )
+        (ingress_b_cover_confirmed ?ingress_b)
+        (traversal_slot_available ?traversal)
+      )
+    :effect
+      (and
+        (traversal_claimed ?traversal)
+        (traversal_has_marker_a ?traversal ?approach_marker_a)
+        (traversal_has_marker_b ?traversal ?approach_marker_b)
+        (traversal_confirmed_a ?traversal)
+        (not
+          (traversal_slot_available ?traversal)
+        )
+      )
+  )
+  (:action instantiate_traversal_with_b_flag
+    :parameters (?ingress_a - ingress_lane_a ?ingress_b - ingress_lane_b ?approach_marker_a - approach_marker_a ?approach_marker_b - approach_marker_b ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_b_claimed ?ingress_b)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_a_claimed ?approach_marker_a)
+        (approach_marker_b_flagged ?approach_marker_b)
+        (ingress_a_cover_confirmed ?ingress_a)
+        (not
+          (ingress_b_cover_confirmed ?ingress_b)
+        )
+        (traversal_slot_available ?traversal)
+      )
+    :effect
+      (and
+        (traversal_claimed ?traversal)
+        (traversal_has_marker_a ?traversal ?approach_marker_a)
+        (traversal_has_marker_b ?traversal ?approach_marker_b)
+        (traversal_confirmed_b ?traversal)
+        (not
+          (traversal_slot_available ?traversal)
+        )
+      )
+  )
+  (:action instantiate_traversal_with_a_and_b_flags
+    :parameters (?ingress_a - ingress_lane_a ?ingress_b - ingress_lane_b ?approach_marker_a - approach_marker_a ?approach_marker_b - approach_marker_b ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_b_claimed ?ingress_b)
+        (ingress_a_has_marker_a ?ingress_a ?approach_marker_a)
+        (ingress_b_has_marker_b ?ingress_b ?approach_marker_b)
+        (approach_marker_a_flagged ?approach_marker_a)
+        (approach_marker_b_flagged ?approach_marker_b)
+        (not
+          (ingress_a_cover_confirmed ?ingress_a)
+        )
+        (not
+          (ingress_b_cover_confirmed ?ingress_b)
+        )
+        (traversal_slot_available ?traversal)
+      )
+    :effect
+      (and
+        (traversal_claimed ?traversal)
+        (traversal_has_marker_a ?traversal ?approach_marker_a)
+        (traversal_has_marker_b ?traversal ?approach_marker_b)
+        (traversal_confirmed_a ?traversal)
+        (traversal_confirmed_b ?traversal)
+        (not
+          (traversal_slot_available ?traversal)
+        )
+      )
+  )
+  (:action execute_traversal_instance
+    :parameters (?traversal - traversal_instance ?ingress_a - ingress_lane_a ?timing_window - timing_window)
+    :precondition
+      (and
+        (traversal_claimed ?traversal)
+        (ingress_a_claimed ?ingress_a)
+        (site_timing_assigned ?ingress_a ?timing_window)
+        (not
+          (traversal_executed ?traversal)
+        )
+      )
+    :effect (traversal_executed ?traversal)
+  )
+  (:action attach_scan_to_objective
+    :parameters (?objective - objective_container ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (objective_assigned_traversal ?objective ?traversal)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_available ?scan_result)
+        (traversal_claimed ?traversal)
+        (traversal_executed ?traversal)
+        (not
+          (scan_committed ?scan_result)
+        )
+      )
+    :effect
+      (and
+        (scan_committed ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (not
+          (scan_available ?scan_result)
+        )
+      )
+  )
+  (:action validate_scan_and_traversal
+    :parameters (?objective - objective_container ?scan_result - scan_result ?traversal - traversal_instance ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_committed ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (site_timing_assigned ?objective ?timing_window)
+        (not
+          (traversal_confirmed_a ?traversal)
+        )
+        (not
+          (objective_scan_traversal_validated ?objective)
+        )
+      )
+    :effect (objective_scan_traversal_validated ?objective)
+  )
+  (:action attach_aux_subgoal_to_objective
+    :parameters (?objective - objective_container ?aux_subgoal - aux_subgoal)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (aux_subgoal_available ?aux_subgoal)
+        (not
+          (aux_subgoal_attached ?objective)
+        )
+      )
+    :effect
+      (and
+        (aux_subgoal_attached ?objective)
+        (objective_has_aux_subgoal ?objective ?aux_subgoal)
+        (not
+          (aux_subgoal_available ?aux_subgoal)
+        )
+      )
+  )
+  (:action attach_and_validate_aux_subgoal
+    :parameters (?objective - objective_container ?scan_result - scan_result ?traversal - traversal_instance ?timing_window - timing_window ?aux_subgoal - aux_subgoal)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_committed ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (site_timing_assigned ?objective ?timing_window)
+        (traversal_confirmed_a ?traversal)
+        (aux_subgoal_attached ?objective)
+        (objective_has_aux_subgoal ?objective ?aux_subgoal)
+        (not
+          (objective_scan_traversal_validated ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_scan_traversal_validated ?objective)
+        (aux_subgoal_committed ?objective)
+      )
+  )
+  (:action attach_tool_to_objective_primary
+    :parameters (?objective - objective_container ?consumable_tool - consumable_tool_type ?cover_spot - cover_spot ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_scan_traversal_validated ?objective)
+        (objective_has_consumable_tool ?objective ?consumable_tool)
+        (cover_assigned ?objective ?cover_spot)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (not
+          (traversal_confirmed_b ?traversal)
+        )
+        (not
+          (objective_tool_attached ?objective)
+        )
+      )
+    :effect (objective_tool_attached ?objective)
+  )
+  (:action attach_tool_to_objective_secondary
+    :parameters (?objective - objective_container ?consumable_tool - consumable_tool_type ?cover_spot - cover_spot ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_scan_traversal_validated ?objective)
+        (objective_has_consumable_tool ?objective ?consumable_tool)
+        (cover_assigned ?objective ?cover_spot)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (traversal_confirmed_b ?traversal)
+        (not
+          (objective_tool_attached ?objective)
+        )
+      )
+    :effect (objective_tool_attached ?objective)
+  )
+  (:action finalize_objective_no_traversal_flags
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_tool_attached ?objective)
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (not
+          (traversal_confirmed_a ?traversal)
+        )
+        (not
+          (traversal_confirmed_b ?traversal)
+        )
+        (not
+          (objective_scan_and_tool_complete ?objective)
+        )
+      )
+    :effect (objective_scan_and_tool_complete ?objective)
+  )
+  (:action finalize_objective_with_a_flag
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_tool_attached ?objective)
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (traversal_confirmed_a ?traversal)
+        (not
+          (traversal_confirmed_b ?traversal)
+        )
+        (not
+          (objective_scan_and_tool_complete ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (equipment_ready_for_attachment ?objective)
+      )
+  )
+  (:action finalize_objective_with_b_flag
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_tool_attached ?objective)
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (not
+          (traversal_confirmed_a ?traversal)
+        )
+        (traversal_confirmed_b ?traversal)
+        (not
+          (objective_scan_and_tool_complete ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (equipment_ready_for_attachment ?objective)
+      )
+  )
+  (:action finalize_objective_with_a_and_b_flags
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier ?scan_result - scan_result ?traversal - traversal_instance)
+    :precondition
+      (and
+        (objective_tool_attached ?objective)
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (objective_has_scan ?objective ?scan_result)
+        (scan_linked_traversal ?scan_result ?traversal)
+        (traversal_confirmed_a ?traversal)
+        (traversal_confirmed_b ?traversal)
+        (not
+          (objective_scan_and_tool_complete ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (equipment_ready_for_attachment ?objective)
+      )
+  )
+  (:action complete_objective_no_equipment
+    :parameters (?objective - objective_container)
+    :precondition
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (not
+          (equipment_ready_for_attachment ?objective)
+        )
+        (not
+          (objective_completion_flag ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_completion_flag ?objective)
+        (site_ready_for_exfiltration ?objective)
+      )
+  )
+  (:action attach_equipment_to_objective
+    :parameters (?objective - objective_container ?equipment - equipment)
+    :precondition
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (equipment_ready_for_attachment ?objective)
+        (equipment_available ?equipment)
+      )
+    :effect
+      (and
+        (objective_has_equipment ?objective ?equipment)
+        (not
+          (equipment_available ?equipment)
+        )
+      )
+  )
+  (:action process_objective_for_finalization
+    :parameters (?objective - objective_container ?ingress_a - ingress_lane_a ?ingress_b - ingress_lane_b ?timing_window - timing_window ?equipment - equipment)
+    :precondition
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (equipment_ready_for_attachment ?objective)
+        (objective_has_equipment ?objective ?equipment)
+        (objective_has_ingress_a ?objective ?ingress_a)
+        (objective_has_ingress_b ?objective ?ingress_b)
+        (ingress_a_cover_confirmed ?ingress_a)
+        (ingress_b_cover_confirmed ?ingress_b)
+        (site_timing_assigned ?objective ?timing_window)
+        (not
+          (objective_processing_complete ?objective)
+        )
+      )
+    :effect (objective_processing_complete ?objective)
+  )
+  (:action complete_objective_with_processing
+    :parameters (?objective - objective_container)
+    :precondition
+      (and
+        (objective_scan_and_tool_complete ?objective)
+        (objective_processing_complete ?objective)
+        (not
+          (objective_completion_flag ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_completion_flag ?objective)
+        (site_ready_for_exfiltration ?objective)
+      )
+  )
+  (:action attach_objective_flag
+    :parameters (?objective - objective_container ?objective_flag - objective_flag ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_unlocked ?objective)
+        (site_timing_assigned ?objective ?timing_window)
+        (objective_flag_available ?objective_flag)
+        (objective_has_flag ?objective ?objective_flag)
+        (not
+          (objective_flag_active ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_flag_active ?objective)
+        (not
+          (objective_flag_available ?objective_flag)
+        )
+      )
+  )
+  (:action advance_objective_flag_stage_one
+    :parameters (?objective - objective_container ?cover_spot - cover_spot)
+    :precondition
+      (and
+        (objective_flag_active ?objective)
+        (cover_assigned ?objective ?cover_spot)
+        (not
+          (flag_stage_one ?objective)
+        )
+      )
+    :effect (flag_stage_one ?objective)
+  )
+  (:action advance_objective_flag_stage_two
+    :parameters (?objective - objective_container ?time_modifier - objective_time_modifier)
+    :precondition
+      (and
+        (flag_stage_one ?objective)
+        (objective_has_time_modifier ?objective ?time_modifier)
+        (not
+          (flag_processed ?objective)
+        )
+      )
+    :effect (flag_processed ?objective)
+  )
+  (:action complete_objective_flag_sequence
+    :parameters (?objective - objective_container)
+    :precondition
+      (and
+        (flag_processed ?objective)
+        (not
+          (objective_completion_flag ?objective)
+        )
+      )
+    :effect
+      (and
+        (objective_completion_flag ?objective)
+        (site_ready_for_exfiltration ?objective)
+      )
+  )
+  (:action mark_ingress_a_ready_for_exfil
+    :parameters (?ingress_a - ingress_lane_a ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_a_claimed ?ingress_a)
+        (ingress_a_cover_confirmed ?ingress_a)
+        (traversal_claimed ?traversal)
+        (traversal_executed ?traversal)
+        (not
+          (site_ready_for_exfiltration ?ingress_a)
+        )
+      )
+    :effect (site_ready_for_exfiltration ?ingress_a)
+  )
+  (:action mark_ingress_b_ready_for_exfil
+    :parameters (?ingress_b - ingress_lane_b ?traversal - traversal_instance)
+    :precondition
+      (and
+        (ingress_b_claimed ?ingress_b)
+        (ingress_b_cover_confirmed ?ingress_b)
+        (traversal_claimed ?traversal)
+        (traversal_executed ?traversal)
+        (not
+          (site_ready_for_exfiltration ?ingress_b)
+        )
+      )
+    :effect (site_ready_for_exfiltration ?ingress_b)
+  )
+  (:action deploy_beacon_and_prepare_exfil
+    :parameters (?site - site_node ?beacon - beacon_marker ?timing_window - timing_window)
+    :precondition
+      (and
+        (site_ready_for_exfiltration ?site)
+        (site_timing_assigned ?site ?timing_window)
+        (beacon_available ?beacon)
+        (not
+          (site_exfil_prepared ?site)
+        )
+      )
+    :effect
+      (and
+        (site_exfil_prepared ?site)
+        (site_has_beacon ?site ?beacon)
+        (not
+          (beacon_available ?beacon)
+        )
+      )
+  )
+  (:action secure_ingress_a_and_release_resources
+    :parameters (?ingress_a - ingress_lane_a ?patrol_token - patrol_token ?beacon - beacon_marker)
+    :precondition
+      (and
+        (site_exfil_prepared ?ingress_a)
+        (patrol_assigned ?ingress_a ?patrol_token)
+        (site_has_beacon ?ingress_a ?beacon)
+        (not
+          (site_secured ?ingress_a)
+        )
+      )
+    :effect
+      (and
+        (site_secured ?ingress_a)
+        (patrol_available ?patrol_token)
+        (beacon_available ?beacon)
+      )
+  )
+  (:action secure_ingress_b_and_release_resources
+    :parameters (?ingress_b - ingress_lane_b ?patrol_token - patrol_token ?beacon - beacon_marker)
+    :precondition
+      (and
+        (site_exfil_prepared ?ingress_b)
+        (patrol_assigned ?ingress_b ?patrol_token)
+        (site_has_beacon ?ingress_b ?beacon)
+        (not
+          (site_secured ?ingress_b)
+        )
+      )
+    :effect
+      (and
+        (site_secured ?ingress_b)
+        (patrol_available ?patrol_token)
+        (beacon_available ?beacon)
+      )
+  )
+  (:action secure_objective_and_release_resources
+    :parameters (?objective - objective_container ?patrol_token - patrol_token ?beacon - beacon_marker)
+    :precondition
+      (and
+        (site_exfil_prepared ?objective)
+        (patrol_assigned ?objective ?patrol_token)
+        (site_has_beacon ?objective ?beacon)
+        (not
+          (site_secured ?objective)
+        )
+      )
+    :effect
+      (and
+        (site_secured ?objective)
+        (patrol_available ?patrol_token)
+        (beacon_available ?beacon)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem enemy_patrol_avoidance_navigation_problem)
+  (:domain enemy_patrol_avoidance_navigation_domain)
+  (:objects ingress_a_1 - ingress_lane_a ingress_b_1 - ingress_lane_b objective_alpha - objective_container objective_beta - objective_container patrol_1 - patrol_token patrol_2 - patrol_token patrol_3 - patrol_token timing_window_1 - timing_window cover_1 - cover_spot distraction_1 - distraction_item marker_a_1 - approach_marker_a marker_b_1 - approach_marker_b traversal_1 - traversal_instance scan_1 - scan_result scan_2 - scan_result aux_subgoal_1 - aux_subgoal aux_subgoal_2 - aux_subgoal equipment_1 - equipment equipment_2 - equipment beacon_1 - beacon_marker consumable_tool_1 - consumable_tool_type objective_flag_1 - objective_flag objective_flag_2 - objective_flag time_modifier_1 - objective_time_modifier)
+  (:init
+    (patrol_available patrol_1)
+    (patrol_available patrol_2)
+    (patrol_available patrol_3)
+    (timing_window_available timing_window_1)
+    (cover_available cover_1)
+    (distraction_available distraction_1)
+    (ingress_a_has_marker_a ingress_a_1 marker_a_1)
+    (ingress_b_has_marker_b ingress_b_1 marker_b_1)
+    (traversal_slot_available traversal_1)
+    (scan_available scan_1)
+    (scan_available scan_2)
+    (objective_has_ingress_a objective_alpha ingress_a_1)
+    (objective_has_ingress_a objective_beta ingress_a_1)
+    (objective_has_ingress_b objective_alpha ingress_b_1)
+    (objective_has_ingress_b objective_beta ingress_b_1)
+    (objective_assigned_traversal objective_alpha traversal_1)
+    (objective_assigned_traversal objective_beta traversal_1)
+    (objective_has_scan objective_alpha scan_1)
+    (objective_has_scan objective_beta scan_2)
+    (aux_subgoal_available aux_subgoal_1)
+    (aux_subgoal_available aux_subgoal_2)
+    (equipment_available equipment_1)
+    (equipment_available equipment_2)
+    (beacon_available beacon_1)
+    (tool_consumable_available consumable_tool_1)
+    (objective_flag_available objective_flag_1)
+    (objective_has_flag objective_alpha objective_flag_1)
+    (objective_has_flag objective_beta objective_flag_2)
+    (time_modifier_available time_modifier_1)
+  )
+  (:goal
+    (and
+      (site_secured ingress_a_1)
+      (site_secured ingress_b_1)
+      (site_secured objective_alpha)
+      (site_secured objective_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(discover_site ingress_a_1)
+(discover_site ingress_b_1)
+(discover_site objective_alpha)
+(discover_site objective_beta)
+(assign_patrol_to_site ingress_a_1 patrol_1)
+(assign_patrol_to_site ingress_b_1 patrol_2)
+(assign_patrol_to_site objective_alpha patrol_3)
+(assign_timing_window_to_site ingress_a_1 timing_window_1)
+(unlock_site_with_timing ingress_a_1 timing_window_1)
+(release_timing_window_from_site ingress_a_1 timing_window_1)
+(assign_timing_window_to_site ingress_b_1 timing_window_1)
+(unlock_site_with_timing ingress_b_1 timing_window_1)
+(release_timing_window_from_site ingress_b_1 timing_window_1)
+(assign_timing_window_to_site objective_alpha timing_window_1)
+(unlock_site_with_timing objective_alpha timing_window_1)
+(release_timing_window_from_site objective_alpha timing_window_1)
+(apply_distraction_to_ingress_a ingress_a_1 marker_a_1 distraction_1)
+(assign_timing_window_to_site ingress_a_1 timing_window_1)
+(finalize_ingress_a_with_timing_and_distraction ingress_a_1 marker_a_1 timing_window_1 distraction_1)
+(release_timing_window_from_site ingress_a_1 timing_window_1)
+(apply_distraction_to_ingress_b ingress_b_1 marker_b_1 distraction_1)
+(assign_timing_window_to_site ingress_b_1 timing_window_1)
+(finalize_ingress_b_with_timing_and_distraction ingress_b_1 marker_b_1 timing_window_1 distraction_1)
+(release_timing_window_from_site ingress_b_1 timing_window_1)
+(instantiate_traversal_standard ingress_a_1 ingress_b_1 marker_a_1 marker_b_1 traversal_1)
+(assign_timing_window_to_site ingress_a_1 timing_window_1)
+(execute_traversal_instance traversal_1 ingress_a_1 timing_window_1)
+(release_timing_window_from_site ingress_a_1 timing_window_1)
+(mark_ingress_a_ready_for_exfil ingress_a_1 traversal_1)
+(mark_ingress_b_ready_for_exfil ingress_b_1 traversal_1)
+(attach_consumable_tool_to_objective objective_alpha consumable_tool_1)
+(attach_scan_to_objective objective_alpha scan_1 traversal_1)
+(assign_timing_window_to_site objective_alpha timing_window_1)
+(validate_scan_and_traversal objective_alpha scan_1 traversal_1 timing_window_1)
+(release_timing_window_from_site objective_alpha timing_window_1)
+(assign_cover_to_site objective_alpha cover_1)
+(attach_tool_to_objective_primary objective_alpha consumable_tool_1 cover_1 scan_1 traversal_1)
+(attach_time_modifier_to_objective objective_alpha time_modifier_1)
+(finalize_objective_no_traversal_flags objective_alpha time_modifier_1 scan_1 traversal_1)
+(complete_objective_no_equipment objective_alpha)
+(release_cover_from_site objective_alpha cover_1)
+(detach_consumable_tool_from_objective objective_alpha consumable_tool_1)
+(detach_time_modifier_from_objective objective_alpha time_modifier_1)
+(assign_timing_window_to_site objective_alpha timing_window_1)
+(deploy_beacon_and_prepare_exfil objective_alpha beacon_1 timing_window_1)
+(secure_objective_and_release_resources objective_alpha patrol_3 beacon_1)
+(release_timing_window_from_site objective_alpha timing_window_1)
+(assign_patrol_to_site objective_beta patrol_3)
+(assign_timing_window_to_site objective_beta timing_window_1)
+(unlock_site_with_timing objective_beta timing_window_1)
+(release_timing_window_from_site objective_beta timing_window_1)
+(attach_consumable_tool_to_objective objective_beta consumable_tool_1)
+(attach_scan_to_objective objective_beta scan_2 traversal_1)
+(assign_timing_window_to_site objective_beta timing_window_1)
+(validate_scan_and_traversal objective_beta scan_2 traversal_1 timing_window_1)
+(release_timing_window_from_site objective_beta timing_window_1)
+(assign_cover_to_site objective_beta cover_1)
+(attach_tool_to_objective_primary objective_beta consumable_tool_1 cover_1 scan_2 traversal_1)
+(attach_time_modifier_to_objective objective_beta time_modifier_1)
+(finalize_objective_no_traversal_flags objective_beta time_modifier_1 scan_2 traversal_1)
+(complete_objective_no_equipment objective_beta)
+(release_cover_from_site objective_beta cover_1)
+(detach_consumable_tool_from_objective objective_beta consumable_tool_1)
+(detach_time_modifier_from_objective objective_beta time_modifier_1)
+(assign_timing_window_to_site objective_beta timing_window_1)
+(deploy_beacon_and_prepare_exfil objective_beta beacon_1 timing_window_1)
+(secure_objective_and_release_resources objective_beta patrol_3 beacon_1)
+(release_timing_window_from_site objective_beta timing_window_1)
+(assign_timing_window_to_site ingress_a_1 timing_window_1)
+(deploy_beacon_and_prepare_exfil ingress_a_1 beacon_1 timing_window_1)
+(secure_ingress_a_and_release_resources ingress_a_1 patrol_1 beacon_1)
+(release_timing_window_from_site ingress_a_1 timing_window_1)
+(assign_timing_window_to_site ingress_b_1 timing_window_1)
+(deploy_beacon_and_prepare_exfil ingress_b_1 beacon_1 timing_window_1)
+(secure_ingress_b_and_release_resources ingress_b_1 patrol_2 beacon_1)
+
+--- VAL parsed / exit ---
+exit_code: 0
+executable: True
+goal_reached: True
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_2h1eou6y/plan.pddl
+Plan executed successfully - checking goal
+Plan valid
+Final value: 75 
+
+Successful plans:
+Value: 75
+ /tmp/val_2h1eou6y/plan.pddl 75 
+
+
+
+--- stderr ---
+

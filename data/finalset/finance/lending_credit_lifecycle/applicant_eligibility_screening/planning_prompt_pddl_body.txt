@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain credit_lifecycle_applicant_eligibility_screening)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object operational_resource - entity document_type - entity asset_type - entity case_root - entity application_case - case_root screening_rule - operational_resource identity_document - operational_resource review_officer - operational_resource valuation_provider - operational_resource pricing_component - operational_resource consent_record - operational_resource jurisdiction_rule - operational_resource override_reason - operational_resource external_evidence - document_type collateral_item - document_type fraud_indicator - document_type exposure_profile - asset_type pricing_profile - asset_type decision_package - asset_type applicant_group - application_case case_group - application_case primary_applicant - applicant_group co_applicant - applicant_group underwriting_workitem - case_group)
+
+  (:predicates
+    (application_registered ?application_case - application_case)
+    (case_active ?application_case - application_case)
+    (screening_rule_attached ?application_case - application_case)
+    (admitted ?application_case - application_case)
+    (approval_granted ?application_case - application_case)
+    (admission_ready ?application_case - application_case)
+    (screening_rule_available ?screening_rule - screening_rule)
+    (application_screening_rule_link ?application_case - application_case ?screening_rule - screening_rule)
+    (identity_document_available ?identity_document - identity_document)
+    (application_identity_link ?application_case - application_case ?identity_document - identity_document)
+    (review_officer_available ?review_officer - review_officer)
+    (case_assigned_to_officer ?application_case - application_case ?review_officer - review_officer)
+    (external_evidence_available ?external_evidence - external_evidence)
+    (primary_applicant_evidence_link ?primary_applicant - primary_applicant ?external_evidence - external_evidence)
+    (coapplicant_evidence_link ?co_applicant - co_applicant ?external_evidence - external_evidence)
+    (applicant_exposure_link ?primary_applicant - primary_applicant ?exposure_profile - exposure_profile)
+    (exposure_profile_activated ?exposure_profile - exposure_profile)
+    (exposure_profile_has_evidence ?exposure_profile - exposure_profile)
+    (primary_applicant_profile_ready ?primary_applicant - primary_applicant)
+    (applicant_pricing_link ?co_applicant - co_applicant ?pricing_profile - pricing_profile)
+    (pricing_profile_activated ?pricing_profile - pricing_profile)
+    (pricing_profile_evidence_attached ?pricing_profile - pricing_profile)
+    (coapplicant_profile_ready ?co_applicant - co_applicant)
+    (decision_package_available ?decision_package - decision_package)
+    (decision_package_reserved ?decision_package - decision_package)
+    (decision_package_exposure_link ?decision_package - decision_package ?exposure_profile - exposure_profile)
+    (decision_package_pricing_link ?decision_package - decision_package ?pricing_profile - pricing_profile)
+    (decision_package_locked_for_valuation ?decision_package - decision_package)
+    (decision_package_requires_additional_valuation ?decision_package - decision_package)
+    (decision_package_finalized ?decision_package - decision_package)
+    (workitem_primary_applicant_link ?underwriting_workitem - underwriting_workitem ?primary_applicant - primary_applicant)
+    (workitem_coapplicant_link ?underwriting_workitem - underwriting_workitem ?co_applicant - co_applicant)
+    (workitem_decision_package_link ?underwriting_workitem - underwriting_workitem ?decision_package - decision_package)
+    (collateral_available ?collateral_item - collateral_item)
+    (workitem_collateral_link ?underwriting_workitem - underwriting_workitem ?collateral_item - collateral_item)
+    (collateral_registered ?collateral_item - collateral_item)
+    (collateral_attached_to_package ?collateral_item - collateral_item ?decision_package - decision_package)
+    (workitem_collateral_validated ?underwriting_workitem - underwriting_workitem)
+    (workitem_valuation_completed ?underwriting_workitem - underwriting_workitem)
+    (workitem_ready_for_decision ?underwriting_workitem - underwriting_workitem)
+    (valuation_provider_assigned ?underwriting_workitem - underwriting_workitem)
+    (valuation_request_sent ?underwriting_workitem - underwriting_workitem)
+    (workitem_pricing_component_present ?underwriting_workitem - underwriting_workitem)
+    (workitem_all_checks_completed ?underwriting_workitem - underwriting_workitem)
+    (fraud_indicator_present ?fraud_indicator - fraud_indicator)
+    (workitem_fraud_indicator_link ?underwriting_workitem - underwriting_workitem ?fraud_indicator - fraud_indicator)
+    (fraud_review_initiated ?underwriting_workitem - underwriting_workitem)
+    (fraud_review_assigned ?underwriting_workitem - underwriting_workitem)
+    (fraud_override_applied ?underwriting_workitem - underwriting_workitem)
+    (valuation_provider_available ?valuation_provider - valuation_provider)
+    (workitem_valuation_provider_link ?underwriting_workitem - underwriting_workitem ?valuation_provider - valuation_provider)
+    (pricing_component_available ?pricing_component - pricing_component)
+    (workitem_pricing_component_link ?underwriting_workitem - underwriting_workitem ?pricing_component - pricing_component)
+    (jurisdiction_rule_available ?jurisdiction_rule - jurisdiction_rule)
+    (workitem_jurisdiction_attached ?underwriting_workitem - underwriting_workitem ?jurisdiction_rule - jurisdiction_rule)
+    (override_reason_available ?override_reason - override_reason)
+    (workitem_override_link ?underwriting_workitem - underwriting_workitem ?override_reason - override_reason)
+    (consent_record_available ?consent_record - consent_record)
+    (case_consent_link ?application_case - application_case ?consent_record - consent_record)
+    (primary_profile_locked ?primary_applicant - primary_applicant)
+    (coapplicant_profile_locked ?co_applicant - co_applicant)
+    (workitem_finalized ?underwriting_workitem - underwriting_workitem)
+  )
+  (:action register_application
+    :parameters (?application_case - application_case)
+    :precondition
+      (and
+        (not
+          (application_registered ?application_case)
+        )
+        (not
+          (admitted ?application_case)
+        )
+      )
+    :effect (application_registered ?application_case)
+  )
+  (:action attach_screening_rule_to_application
+    :parameters (?application_case - application_case ?screening_rule - screening_rule)
+    :precondition
+      (and
+        (application_registered ?application_case)
+        (not
+          (screening_rule_attached ?application_case)
+        )
+        (screening_rule_available ?screening_rule)
+      )
+    :effect
+      (and
+        (screening_rule_attached ?application_case)
+        (application_screening_rule_link ?application_case ?screening_rule)
+        (not
+          (screening_rule_available ?screening_rule)
+        )
+      )
+  )
+  (:action attach_identity_document_to_application
+    :parameters (?application_case - application_case ?identity_document - identity_document)
+    :precondition
+      (and
+        (application_registered ?application_case)
+        (screening_rule_attached ?application_case)
+        (identity_document_available ?identity_document)
+      )
+    :effect
+      (and
+        (application_identity_link ?application_case ?identity_document)
+        (not
+          (identity_document_available ?identity_document)
+        )
+      )
+  )
+  (:action confirm_identity_verification
+    :parameters (?application_case - application_case ?identity_document - identity_document)
+    :precondition
+      (and
+        (application_registered ?application_case)
+        (screening_rule_attached ?application_case)
+        (application_identity_link ?application_case ?identity_document)
+        (not
+          (case_active ?application_case)
+        )
+      )
+    :effect (case_active ?application_case)
+  )
+  (:action release_identity_document
+    :parameters (?application_case - application_case ?identity_document - identity_document)
+    :precondition
+      (and
+        (application_identity_link ?application_case ?identity_document)
+      )
+    :effect
+      (and
+        (identity_document_available ?identity_document)
+        (not
+          (application_identity_link ?application_case ?identity_document)
+        )
+      )
+  )
+  (:action assign_review_officer_to_case
+    :parameters (?application_case - application_case ?review_officer - review_officer)
+    :precondition
+      (and
+        (case_active ?application_case)
+        (review_officer_available ?review_officer)
+      )
+    :effect
+      (and
+        (case_assigned_to_officer ?application_case ?review_officer)
+        (not
+          (review_officer_available ?review_officer)
+        )
+      )
+  )
+  (:action release_review_officer
+    :parameters (?application_case - application_case ?review_officer - review_officer)
+    :precondition
+      (and
+        (case_assigned_to_officer ?application_case ?review_officer)
+      )
+    :effect
+      (and
+        (review_officer_available ?review_officer)
+        (not
+          (case_assigned_to_officer ?application_case ?review_officer)
+        )
+      )
+  )
+  (:action attach_jurisdiction_rule_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?jurisdiction_rule - jurisdiction_rule)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (jurisdiction_rule_available ?jurisdiction_rule)
+      )
+    :effect
+      (and
+        (workitem_jurisdiction_attached ?underwriting_workitem ?jurisdiction_rule)
+        (not
+          (jurisdiction_rule_available ?jurisdiction_rule)
+        )
+      )
+  )
+  (:action detach_jurisdiction_rule_from_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?jurisdiction_rule - jurisdiction_rule)
+    :precondition
+      (and
+        (workitem_jurisdiction_attached ?underwriting_workitem ?jurisdiction_rule)
+      )
+    :effect
+      (and
+        (jurisdiction_rule_available ?jurisdiction_rule)
+        (not
+          (workitem_jurisdiction_attached ?underwriting_workitem ?jurisdiction_rule)
+        )
+      )
+  )
+  (:action attach_override_reason_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (override_reason_available ?override_reason)
+      )
+    :effect
+      (and
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (not
+          (override_reason_available ?override_reason)
+        )
+      )
+  )
+  (:action detach_override_reason_from_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason)
+    :precondition
+      (and
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+      )
+    :effect
+      (and
+        (override_reason_available ?override_reason)
+        (not
+          (workitem_override_link ?underwriting_workitem ?override_reason)
+        )
+      )
+  )
+  (:action activate_exposure_profile_for_applicant
+    :parameters (?primary_applicant - primary_applicant ?exposure_profile - exposure_profile ?identity_document - identity_document)
+    :precondition
+      (and
+        (case_active ?primary_applicant)
+        (application_identity_link ?primary_applicant ?identity_document)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (not
+          (exposure_profile_activated ?exposure_profile)
+        )
+        (not
+          (exposure_profile_has_evidence ?exposure_profile)
+        )
+      )
+    :effect (exposure_profile_activated ?exposure_profile)
+  )
+  (:action confirm_primary_profile_after_review
+    :parameters (?primary_applicant - primary_applicant ?exposure_profile - exposure_profile ?review_officer - review_officer)
+    :precondition
+      (and
+        (case_active ?primary_applicant)
+        (case_assigned_to_officer ?primary_applicant ?review_officer)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (exposure_profile_activated ?exposure_profile)
+        (not
+          (primary_profile_locked ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (primary_applicant_profile_ready ?primary_applicant)
+      )
+  )
+  (:action attach_external_evidence_to_primary_profile
+    :parameters (?primary_applicant - primary_applicant ?exposure_profile - exposure_profile ?external_evidence - external_evidence)
+    :precondition
+      (and
+        (case_active ?primary_applicant)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (external_evidence_available ?external_evidence)
+        (not
+          (primary_profile_locked ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (exposure_profile_has_evidence ?exposure_profile)
+        (primary_profile_locked ?primary_applicant)
+        (primary_applicant_evidence_link ?primary_applicant ?external_evidence)
+        (not
+          (external_evidence_available ?external_evidence)
+        )
+      )
+  )
+  (:action finalize_primary_profile_with_evidence
+    :parameters (?primary_applicant - primary_applicant ?exposure_profile - exposure_profile ?identity_document - identity_document ?external_evidence - external_evidence)
+    :precondition
+      (and
+        (case_active ?primary_applicant)
+        (application_identity_link ?primary_applicant ?identity_document)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (exposure_profile_has_evidence ?exposure_profile)
+        (primary_applicant_evidence_link ?primary_applicant ?external_evidence)
+        (not
+          (primary_applicant_profile_ready ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (exposure_profile_activated ?exposure_profile)
+        (primary_applicant_profile_ready ?primary_applicant)
+        (external_evidence_available ?external_evidence)
+        (not
+          (primary_applicant_evidence_link ?primary_applicant ?external_evidence)
+        )
+      )
+  )
+  (:action activate_pricing_profile_for_coapplicant
+    :parameters (?co_applicant - co_applicant ?pricing_profile - pricing_profile ?identity_document - identity_document)
+    :precondition
+      (and
+        (case_active ?co_applicant)
+        (application_identity_link ?co_applicant ?identity_document)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (not
+          (pricing_profile_activated ?pricing_profile)
+        )
+        (not
+          (pricing_profile_evidence_attached ?pricing_profile)
+        )
+      )
+    :effect (pricing_profile_activated ?pricing_profile)
+  )
+  (:action confirm_coapplicant_profile_after_review
+    :parameters (?co_applicant - co_applicant ?pricing_profile - pricing_profile ?review_officer - review_officer)
+    :precondition
+      (and
+        (case_active ?co_applicant)
+        (case_assigned_to_officer ?co_applicant ?review_officer)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (pricing_profile_activated ?pricing_profile)
+        (not
+          (coapplicant_profile_locked ?co_applicant)
+        )
+      )
+    :effect
+      (and
+        (coapplicant_profile_locked ?co_applicant)
+        (coapplicant_profile_ready ?co_applicant)
+      )
+  )
+  (:action attach_external_evidence_to_coapplicant
+    :parameters (?co_applicant - co_applicant ?pricing_profile - pricing_profile ?external_evidence - external_evidence)
+    :precondition
+      (and
+        (case_active ?co_applicant)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (external_evidence_available ?external_evidence)
+        (not
+          (coapplicant_profile_locked ?co_applicant)
+        )
+      )
+    :effect
+      (and
+        (pricing_profile_evidence_attached ?pricing_profile)
+        (coapplicant_profile_locked ?co_applicant)
+        (coapplicant_evidence_link ?co_applicant ?external_evidence)
+        (not
+          (external_evidence_available ?external_evidence)
+        )
+      )
+  )
+  (:action finalize_coapplicant_profile_with_evidence
+    :parameters (?co_applicant - co_applicant ?pricing_profile - pricing_profile ?identity_document - identity_document ?external_evidence - external_evidence)
+    :precondition
+      (and
+        (case_active ?co_applicant)
+        (application_identity_link ?co_applicant ?identity_document)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (pricing_profile_evidence_attached ?pricing_profile)
+        (coapplicant_evidence_link ?co_applicant ?external_evidence)
+        (not
+          (coapplicant_profile_ready ?co_applicant)
+        )
+      )
+    :effect
+      (and
+        (pricing_profile_activated ?pricing_profile)
+        (coapplicant_profile_ready ?co_applicant)
+        (external_evidence_available ?external_evidence)
+        (not
+          (coapplicant_evidence_link ?co_applicant ?external_evidence)
+        )
+      )
+  )
+  (:action assemble_decision_package_basic
+    :parameters (?primary_applicant - primary_applicant ?co_applicant - co_applicant ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (coapplicant_profile_locked ?co_applicant)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (exposure_profile_activated ?exposure_profile)
+        (pricing_profile_activated ?pricing_profile)
+        (primary_applicant_profile_ready ?primary_applicant)
+        (coapplicant_profile_ready ?co_applicant)
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_reserved ?decision_package)
+        (decision_package_exposure_link ?decision_package ?exposure_profile)
+        (decision_package_pricing_link ?decision_package ?pricing_profile)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_and_lock_decision_package_for_valuation
+    :parameters (?primary_applicant - primary_applicant ?co_applicant - co_applicant ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (coapplicant_profile_locked ?co_applicant)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (exposure_profile_has_evidence ?exposure_profile)
+        (pricing_profile_activated ?pricing_profile)
+        (not
+          (primary_applicant_profile_ready ?primary_applicant)
+        )
+        (coapplicant_profile_ready ?co_applicant)
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_reserved ?decision_package)
+        (decision_package_exposure_link ?decision_package ?exposure_profile)
+        (decision_package_pricing_link ?decision_package ?pricing_profile)
+        (decision_package_locked_for_valuation ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_and_flag_decision_package_for_appraisal
+    :parameters (?primary_applicant - primary_applicant ?co_applicant - co_applicant ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (coapplicant_profile_locked ?co_applicant)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (exposure_profile_activated ?exposure_profile)
+        (pricing_profile_evidence_attached ?pricing_profile)
+        (primary_applicant_profile_ready ?primary_applicant)
+        (not
+          (coapplicant_profile_ready ?co_applicant)
+        )
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_reserved ?decision_package)
+        (decision_package_exposure_link ?decision_package ?exposure_profile)
+        (decision_package_pricing_link ?decision_package ?pricing_profile)
+        (decision_package_requires_additional_valuation ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action assemble_and_lock_decision_package_full
+    :parameters (?primary_applicant - primary_applicant ?co_applicant - co_applicant ?exposure_profile - exposure_profile ?pricing_profile - pricing_profile ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (coapplicant_profile_locked ?co_applicant)
+        (applicant_exposure_link ?primary_applicant ?exposure_profile)
+        (applicant_pricing_link ?co_applicant ?pricing_profile)
+        (exposure_profile_has_evidence ?exposure_profile)
+        (pricing_profile_evidence_attached ?pricing_profile)
+        (not
+          (primary_applicant_profile_ready ?primary_applicant)
+        )
+        (not
+          (coapplicant_profile_ready ?co_applicant)
+        )
+        (decision_package_available ?decision_package)
+      )
+    :effect
+      (and
+        (decision_package_reserved ?decision_package)
+        (decision_package_exposure_link ?decision_package ?exposure_profile)
+        (decision_package_pricing_link ?decision_package ?pricing_profile)
+        (decision_package_locked_for_valuation ?decision_package)
+        (decision_package_requires_additional_valuation ?decision_package)
+        (not
+          (decision_package_available ?decision_package)
+        )
+      )
+  )
+  (:action finalize_decision_package
+    :parameters (?decision_package - decision_package ?primary_applicant - primary_applicant ?identity_document - identity_document)
+    :precondition
+      (and
+        (decision_package_reserved ?decision_package)
+        (primary_profile_locked ?primary_applicant)
+        (application_identity_link ?primary_applicant ?identity_document)
+        (not
+          (decision_package_finalized ?decision_package)
+        )
+      )
+    :effect (decision_package_finalized ?decision_package)
+  )
+  (:action register_collateral_item_to_package
+    :parameters (?underwriting_workitem - underwriting_workitem ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (workitem_decision_package_link ?underwriting_workitem ?decision_package)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_available ?collateral_item)
+        (decision_package_reserved ?decision_package)
+        (decision_package_finalized ?decision_package)
+        (not
+          (collateral_registered ?collateral_item)
+        )
+      )
+    :effect
+      (and
+        (collateral_registered ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (not
+          (collateral_available ?collateral_item)
+        )
+      )
+  )
+  (:action validate_collateral_for_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?collateral_item - collateral_item ?decision_package - decision_package ?identity_document - identity_document)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_registered ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (application_identity_link ?underwriting_workitem ?identity_document)
+        (not
+          (decision_package_locked_for_valuation ?decision_package)
+        )
+        (not
+          (workitem_collateral_validated ?underwriting_workitem)
+        )
+      )
+    :effect (workitem_collateral_validated ?underwriting_workitem)
+  )
+  (:action assign_valuation_provider_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?valuation_provider - valuation_provider)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (valuation_provider_available ?valuation_provider)
+        (not
+          (valuation_provider_assigned ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (valuation_provider_assigned ?underwriting_workitem)
+        (workitem_valuation_provider_link ?underwriting_workitem ?valuation_provider)
+        (not
+          (valuation_provider_available ?valuation_provider)
+        )
+      )
+  )
+  (:action initiate_valuation_for_collateral
+    :parameters (?underwriting_workitem - underwriting_workitem ?collateral_item - collateral_item ?decision_package - decision_package ?identity_document - identity_document ?valuation_provider - valuation_provider)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_registered ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (application_identity_link ?underwriting_workitem ?identity_document)
+        (decision_package_locked_for_valuation ?decision_package)
+        (valuation_provider_assigned ?underwriting_workitem)
+        (workitem_valuation_provider_link ?underwriting_workitem ?valuation_provider)
+        (not
+          (workitem_collateral_validated ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_collateral_validated ?underwriting_workitem)
+        (valuation_request_sent ?underwriting_workitem)
+      )
+  )
+  (:action complete_valuation_and_mark_workitem_a
+    :parameters (?underwriting_workitem - underwriting_workitem ?jurisdiction_rule - jurisdiction_rule ?review_officer - review_officer ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_collateral_validated ?underwriting_workitem)
+        (workitem_jurisdiction_attached ?underwriting_workitem ?jurisdiction_rule)
+        (case_assigned_to_officer ?underwriting_workitem ?review_officer)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (not
+          (decision_package_requires_additional_valuation ?decision_package)
+        )
+        (not
+          (workitem_valuation_completed ?underwriting_workitem)
+        )
+      )
+    :effect (workitem_valuation_completed ?underwriting_workitem)
+  )
+  (:action complete_valuation_and_mark_workitem_b
+    :parameters (?underwriting_workitem - underwriting_workitem ?jurisdiction_rule - jurisdiction_rule ?review_officer - review_officer ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_collateral_validated ?underwriting_workitem)
+        (workitem_jurisdiction_attached ?underwriting_workitem ?jurisdiction_rule)
+        (case_assigned_to_officer ?underwriting_workitem ?review_officer)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (decision_package_requires_additional_valuation ?decision_package)
+        (not
+          (workitem_valuation_completed ?underwriting_workitem)
+        )
+      )
+    :effect (workitem_valuation_completed ?underwriting_workitem)
+  )
+  (:action aggregate_checks_and_mark_ready
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_valuation_completed ?underwriting_workitem)
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (not
+          (decision_package_locked_for_valuation ?decision_package)
+        )
+        (not
+          (decision_package_requires_additional_valuation ?decision_package)
+        )
+        (not
+          (workitem_ready_for_decision ?underwriting_workitem)
+        )
+      )
+    :effect (workitem_ready_for_decision ?underwriting_workitem)
+  )
+  (:action aggregate_checks_and_mark_ready_with_pricing
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_valuation_completed ?underwriting_workitem)
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (decision_package_locked_for_valuation ?decision_package)
+        (not
+          (decision_package_requires_additional_valuation ?decision_package)
+        )
+        (not
+          (workitem_ready_for_decision ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_pricing_component_present ?underwriting_workitem)
+      )
+  )
+  (:action aggregate_checks_alternative_path
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_valuation_completed ?underwriting_workitem)
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (not
+          (decision_package_locked_for_valuation ?decision_package)
+        )
+        (decision_package_requires_additional_valuation ?decision_package)
+        (not
+          (workitem_ready_for_decision ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_pricing_component_present ?underwriting_workitem)
+      )
+  )
+  (:action aggregate_checks_full
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason ?collateral_item - collateral_item ?decision_package - decision_package)
+    :precondition
+      (and
+        (workitem_valuation_completed ?underwriting_workitem)
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (workitem_collateral_link ?underwriting_workitem ?collateral_item)
+        (collateral_attached_to_package ?collateral_item ?decision_package)
+        (decision_package_locked_for_valuation ?decision_package)
+        (decision_package_requires_additional_valuation ?decision_package)
+        (not
+          (workitem_ready_for_decision ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_pricing_component_present ?underwriting_workitem)
+      )
+  )
+  (:action finalize_workitem_and_grant_approval
+    :parameters (?underwriting_workitem - underwriting_workitem)
+    :precondition
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (not
+          (workitem_pricing_component_present ?underwriting_workitem)
+        )
+        (not
+          (workitem_finalized ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_finalized ?underwriting_workitem)
+        (approval_granted ?underwriting_workitem)
+      )
+  )
+  (:action attach_pricing_component_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?pricing_component - pricing_component)
+    :precondition
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_pricing_component_present ?underwriting_workitem)
+        (pricing_component_available ?pricing_component)
+      )
+    :effect
+      (and
+        (workitem_pricing_component_link ?underwriting_workitem ?pricing_component)
+        (not
+          (pricing_component_available ?pricing_component)
+        )
+      )
+  )
+  (:action approve_workitem_and_mark_for_finalization
+    :parameters (?underwriting_workitem - underwriting_workitem ?primary_applicant - primary_applicant ?co_applicant - co_applicant ?identity_document - identity_document ?pricing_component - pricing_component)
+    :precondition
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_pricing_component_present ?underwriting_workitem)
+        (workitem_pricing_component_link ?underwriting_workitem ?pricing_component)
+        (workitem_primary_applicant_link ?underwriting_workitem ?primary_applicant)
+        (workitem_coapplicant_link ?underwriting_workitem ?co_applicant)
+        (primary_applicant_profile_ready ?primary_applicant)
+        (coapplicant_profile_ready ?co_applicant)
+        (application_identity_link ?underwriting_workitem ?identity_document)
+        (not
+          (workitem_all_checks_completed ?underwriting_workitem)
+        )
+      )
+    :effect (workitem_all_checks_completed ?underwriting_workitem)
+  )
+  (:action finalize_workitem_and_grant_approval_post_checks
+    :parameters (?underwriting_workitem - underwriting_workitem)
+    :precondition
+      (and
+        (workitem_ready_for_decision ?underwriting_workitem)
+        (workitem_all_checks_completed ?underwriting_workitem)
+        (not
+          (workitem_finalized ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_finalized ?underwriting_workitem)
+        (approval_granted ?underwriting_workitem)
+      )
+  )
+  (:action apply_fraud_indicator_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?fraud_indicator - fraud_indicator ?identity_document - identity_document)
+    :precondition
+      (and
+        (case_active ?underwriting_workitem)
+        (application_identity_link ?underwriting_workitem ?identity_document)
+        (fraud_indicator_present ?fraud_indicator)
+        (workitem_fraud_indicator_link ?underwriting_workitem ?fraud_indicator)
+        (not
+          (fraud_review_initiated ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (fraud_review_initiated ?underwriting_workitem)
+        (not
+          (fraud_indicator_present ?fraud_indicator)
+        )
+      )
+  )
+  (:action assign_fraud_reviewer_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?review_officer - review_officer)
+    :precondition
+      (and
+        (fraud_review_initiated ?underwriting_workitem)
+        (case_assigned_to_officer ?underwriting_workitem ?review_officer)
+        (not
+          (fraud_review_assigned ?underwriting_workitem)
+        )
+      )
+    :effect (fraud_review_assigned ?underwriting_workitem)
+  )
+  (:action apply_override_reason_to_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?override_reason - override_reason)
+    :precondition
+      (and
+        (fraud_review_assigned ?underwriting_workitem)
+        (workitem_override_link ?underwriting_workitem ?override_reason)
+        (not
+          (fraud_override_applied ?underwriting_workitem)
+        )
+      )
+    :effect (fraud_override_applied ?underwriting_workitem)
+  )
+  (:action finalize_fraud_override_and_grant_approval
+    :parameters (?underwriting_workitem - underwriting_workitem)
+    :precondition
+      (and
+        (fraud_override_applied ?underwriting_workitem)
+        (not
+          (workitem_finalized ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (workitem_finalized ?underwriting_workitem)
+        (approval_granted ?underwriting_workitem)
+      )
+  )
+  (:action grant_primary_applicant_final_approval
+    :parameters (?primary_applicant - primary_applicant ?decision_package - decision_package)
+    :precondition
+      (and
+        (primary_profile_locked ?primary_applicant)
+        (primary_applicant_profile_ready ?primary_applicant)
+        (decision_package_reserved ?decision_package)
+        (decision_package_finalized ?decision_package)
+        (not
+          (approval_granted ?primary_applicant)
+        )
+      )
+    :effect (approval_granted ?primary_applicant)
+  )
+  (:action grant_coapplicant_final_approval
+    :parameters (?co_applicant - co_applicant ?decision_package - decision_package)
+    :precondition
+      (and
+        (coapplicant_profile_locked ?co_applicant)
+        (coapplicant_profile_ready ?co_applicant)
+        (decision_package_reserved ?decision_package)
+        (decision_package_finalized ?decision_package)
+        (not
+          (approval_granted ?co_applicant)
+        )
+      )
+    :effect (approval_granted ?co_applicant)
+  )
+  (:action record_consent_and_mark_admission_ready
+    :parameters (?application_case - application_case ?consent_record - consent_record ?identity_document - identity_document)
+    :precondition
+      (and
+        (approval_granted ?application_case)
+        (application_identity_link ?application_case ?identity_document)
+        (consent_record_available ?consent_record)
+        (not
+          (admission_ready ?application_case)
+        )
+      )
+    :effect
+      (and
+        (admission_ready ?application_case)
+        (case_consent_link ?application_case ?consent_record)
+        (not
+          (consent_record_available ?consent_record)
+        )
+      )
+  )
+  (:action enroll_primary_applicant
+    :parameters (?primary_applicant - primary_applicant ?screening_rule - screening_rule ?consent_record - consent_record)
+    :precondition
+      (and
+        (admission_ready ?primary_applicant)
+        (application_screening_rule_link ?primary_applicant ?screening_rule)
+        (case_consent_link ?primary_applicant ?consent_record)
+        (not
+          (admitted ?primary_applicant)
+        )
+      )
+    :effect
+      (and
+        (admitted ?primary_applicant)
+        (screening_rule_available ?screening_rule)
+        (consent_record_available ?consent_record)
+      )
+  )
+  (:action enroll_coapplicant
+    :parameters (?co_applicant - co_applicant ?screening_rule - screening_rule ?consent_record - consent_record)
+    :precondition
+      (and
+        (admission_ready ?co_applicant)
+        (application_screening_rule_link ?co_applicant ?screening_rule)
+        (case_consent_link ?co_applicant ?consent_record)
+        (not
+          (admitted ?co_applicant)
+        )
+      )
+    :effect
+      (and
+        (admitted ?co_applicant)
+        (screening_rule_available ?screening_rule)
+        (consent_record_available ?consent_record)
+      )
+  )
+  (:action enroll_workitem
+    :parameters (?underwriting_workitem - underwriting_workitem ?screening_rule - screening_rule ?consent_record - consent_record)
+    :precondition
+      (and
+        (admission_ready ?underwriting_workitem)
+        (application_screening_rule_link ?underwriting_workitem ?screening_rule)
+        (case_consent_link ?underwriting_workitem ?consent_record)
+        (not
+          (admitted ?underwriting_workitem)
+        )
+      )
+    :effect
+      (and
+        (admitted ?underwriting_workitem)
+        (screening_rule_available ?screening_rule)
+        (consent_record_available ?consent_record)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem applicant_eligibility_screening_problem)
+  (:domain credit_lifecycle_applicant_eligibility_screening)
+  (:objects primary_applicant_1 - primary_applicant co_applicant_1 - co_applicant underwriting_workitem_1 - underwriting_workitem underwriting_workitem_2 - underwriting_workitem screening_rule_channel_a - screening_rule screening_rule_channel_b - screening_rule screening_rule_channel_c - screening_rule identity_document_1 - identity_document review_officer_1 - review_officer external_evidence_bureau_1 - external_evidence exposure_profile_standard - exposure_profile pricing_profile_standard - pricing_profile decision_package_template_1 - decision_package collateral_item_property_1 - collateral_item collateral_item_vehicle_1 - collateral_item valuation_provider_a - valuation_provider valuation_provider_b - valuation_provider pricing_component_interest - pricing_component pricing_component_fee - pricing_component consent_record_1 - consent_record jurisdiction_rule_local - jurisdiction_rule fraud_indicator_flag_1 - fraud_indicator fraud_indicator_flag_2 - fraud_indicator override_reason_manager_approval - override_reason)
+  (:init
+    (screening_rule_available screening_rule_channel_a)
+    (screening_rule_available screening_rule_channel_b)
+    (screening_rule_available screening_rule_channel_c)
+    (identity_document_available identity_document_1)
+    (review_officer_available review_officer_1)
+    (external_evidence_available external_evidence_bureau_1)
+    (applicant_exposure_link primary_applicant_1 exposure_profile_standard)
+    (applicant_pricing_link co_applicant_1 pricing_profile_standard)
+    (decision_package_available decision_package_template_1)
+    (collateral_available collateral_item_property_1)
+    (collateral_available collateral_item_vehicle_1)
+    (workitem_primary_applicant_link underwriting_workitem_1 primary_applicant_1)
+    (workitem_primary_applicant_link underwriting_workitem_2 primary_applicant_1)
+    (workitem_coapplicant_link underwriting_workitem_1 co_applicant_1)
+    (workitem_coapplicant_link underwriting_workitem_2 co_applicant_1)
+    (workitem_decision_package_link underwriting_workitem_1 decision_package_template_1)
+    (workitem_decision_package_link underwriting_workitem_2 decision_package_template_1)
+    (workitem_collateral_link underwriting_workitem_1 collateral_item_property_1)
+    (workitem_collateral_link underwriting_workitem_2 collateral_item_vehicle_1)
+    (valuation_provider_available valuation_provider_a)
+    (valuation_provider_available valuation_provider_b)
+    (pricing_component_available pricing_component_interest)
+    (pricing_component_available pricing_component_fee)
+    (consent_record_available consent_record_1)
+    (jurisdiction_rule_available jurisdiction_rule_local)
+    (fraud_indicator_present fraud_indicator_flag_1)
+    (workitem_fraud_indicator_link underwriting_workitem_1 fraud_indicator_flag_1)
+    (workitem_fraud_indicator_link underwriting_workitem_2 fraud_indicator_flag_2)
+    (override_reason_available override_reason_manager_approval)
+  )
+  (:goal
+    (and
+      (admitted primary_applicant_1)
+      (admitted co_applicant_1)
+      (admitted underwriting_workitem_1)
+      (admitted underwriting_workitem_2)
+    )
+  )
+)

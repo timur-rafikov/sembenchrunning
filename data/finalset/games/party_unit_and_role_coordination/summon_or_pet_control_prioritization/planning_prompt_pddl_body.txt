@@ -1,0 +1,985 @@
+## Planning domain (PDDL)
+
+(define (domain summon_pet_control_prioritization)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object capability_group - entity attachment_group - entity summon_family - entity controller_root - entity controller_slot - controller_root summon_command_token - capability_group target_marker - capability_group support_ability_token - capability_group trait_token - capability_group assignment_modifier_token - capability_group priority_token - capability_group equipment_buff_token - capability_group tactical_module_token - capability_group consumable_resource - attachment_group companion_equipment - attachment_group tactical_marker - attachment_group summon_template_tank - summon_family summon_template_dps - summon_family summon_instance - summon_family role_slot_family - controller_slot party_member_family - controller_slot tank_role_slot - role_slot_family dps_role_slot - role_slot_family party_coordinator - party_member_family)
+
+  (:predicates
+    (controller_registered ?controller_slot - controller_slot)
+    (entity_engaged_for_assignment ?controller_slot - controller_slot)
+    (entity_summon_bound ?controller_slot - controller_slot)
+    (entity_committed ?controller_slot - controller_slot)
+    (entity_finalized ?controller_slot - controller_slot)
+    (entity_ready_for_commit ?controller_slot - controller_slot)
+    (summon_token_available ?summon_command_token - summon_command_token)
+    (entity_summon_binding ?controller_slot - controller_slot ?summon_command_token - summon_command_token)
+    (target_available ?target_marker - target_marker)
+    (entity_target_binding ?controller_slot - controller_slot ?target_marker - target_marker)
+    (support_ability_available ?support_ability_token - support_ability_token)
+    (entity_support_binding ?controller_slot - controller_slot ?support_ability_token - support_ability_token)
+    (consumable_available ?consumable_resource - consumable_resource)
+    (tank_role_consumable_binding ?tank_role_slot - tank_role_slot ?consumable_resource - consumable_resource)
+    (dps_consumable_binding ?dps_role_slot - dps_role_slot ?consumable_resource - consumable_resource)
+    (tank_role_template_compatible ?tank_role_slot - tank_role_slot ?summon_template_tank - summon_template_tank)
+    (tank_template_selected ?summon_template_tank - summon_template_tank)
+    (tank_template_buffered ?summon_template_tank - summon_template_tank)
+    (tank_role_executed_assignment ?tank_role_slot - tank_role_slot)
+    (dps_role_template_binding ?dps_role_slot - dps_role_slot ?summon_template_dps - summon_template_dps)
+    (dps_template_selected ?summon_template_dps - summon_template_dps)
+    (dps_template_buffered ?summon_template_dps - summon_template_dps)
+    (dps_role_executed_assignment ?dps_role_slot - dps_role_slot)
+    (summon_instance_available ?summon_instance - summon_instance)
+    (summon_instance_reserved ?summon_instance - summon_instance)
+    (instance_tank_template_link ?summon_instance - summon_instance ?summon_template_tank - summon_template_tank)
+    (instance_dps_template_link ?summon_instance - summon_instance ?summon_template_dps - summon_template_dps)
+    (instance_stage_a ?summon_instance - summon_instance)
+    (instance_stage_b ?summon_instance - summon_instance)
+    (instance_deploy_ready ?summon_instance - summon_instance)
+    (coordinator_tank_role_link ?party_coordinator - party_coordinator ?tank_role_slot - tank_role_slot)
+    (coordinator_dps_role_link ?party_coordinator - party_coordinator ?dps_role_slot - dps_role_slot)
+    (coordinator_instance_preference ?party_coordinator - party_coordinator ?summon_instance - summon_instance)
+    (equipment_available ?companion_equipment - companion_equipment)
+    (coordinator_equipment_binding ?party_coordinator - party_coordinator ?companion_equipment - companion_equipment)
+    (equipment_attached ?companion_equipment - companion_equipment)
+    (equipment_instance_binding ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    (coordinator_ready_for_specialization ?party_coordinator - party_coordinator)
+    (coordinator_specialization_in_progress ?party_coordinator - party_coordinator)
+    (coordinator_specialization_complete ?party_coordinator - party_coordinator)
+    (coordinator_trait_available ?party_coordinator - party_coordinator)
+    (coordinator_trait_applied ?party_coordinator - party_coordinator)
+    (coordinator_ready_for_execution ?party_coordinator - party_coordinator)
+    (coordinator_executable_marker ?party_coordinator - party_coordinator)
+    (tactical_marker_available ?tactical_marker - tactical_marker)
+    (coordinator_tactical_marker_binding ?party_coordinator - party_coordinator ?tactical_marker - tactical_marker)
+    (coordinator_trait_locked ?party_coordinator - party_coordinator)
+    (trait_stage_ready ?party_coordinator - party_coordinator)
+    (trait_finalized ?party_coordinator - party_coordinator)
+    (optional_trait_available ?trait_token - trait_token)
+    (coordinator_optional_trait_binding ?party_coordinator - party_coordinator ?trait_token - trait_token)
+    (assignment_modifier_available ?assignment_modifier_token - assignment_modifier_token)
+    (coordinator_assignment_modifier_binding ?party_coordinator - party_coordinator ?assignment_modifier_token - assignment_modifier_token)
+    (equipment_buff_available ?equipment_buff_token - equipment_buff_token)
+    (coordinator_equipment_buff_binding ?party_coordinator - party_coordinator ?equipment_buff_token - equipment_buff_token)
+    (tactical_module_available ?tactical_module_token - tactical_module_token)
+    (coordinator_tactical_module_binding ?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token)
+    (priority_token_available ?priority_token - priority_token)
+    (entity_priority_binding ?controller_slot - controller_slot ?priority_token - priority_token)
+    (tank_role_staged ?tank_role_slot - tank_role_slot)
+    (dps_role_staged ?dps_role_slot - dps_role_slot)
+    (activation_claimed ?party_coordinator - party_coordinator)
+  )
+  (:action register_controller_slot
+    :parameters (?controller_slot - controller_slot)
+    :precondition
+      (and
+        (not
+          (controller_registered ?controller_slot)
+        )
+        (not
+          (entity_committed ?controller_slot)
+        )
+      )
+    :effect (controller_registered ?controller_slot)
+  )
+  (:action bind_summon_token_to_controller
+    :parameters (?controller_slot - controller_slot ?summon_command_token - summon_command_token)
+    :precondition
+      (and
+        (controller_registered ?controller_slot)
+        (not
+          (entity_summon_bound ?controller_slot)
+        )
+        (summon_token_available ?summon_command_token)
+      )
+    :effect
+      (and
+        (entity_summon_bound ?controller_slot)
+        (entity_summon_binding ?controller_slot ?summon_command_token)
+        (not
+          (summon_token_available ?summon_command_token)
+        )
+      )
+  )
+  (:action bind_target_marker_to_controller
+    :parameters (?controller_slot - controller_slot ?target_marker - target_marker)
+    :precondition
+      (and
+        (controller_registered ?controller_slot)
+        (entity_summon_bound ?controller_slot)
+        (target_available ?target_marker)
+      )
+    :effect
+      (and
+        (entity_target_binding ?controller_slot ?target_marker)
+        (not
+          (target_available ?target_marker)
+        )
+      )
+  )
+  (:action engage_controller_for_assignment
+    :parameters (?controller_slot - controller_slot ?target_marker - target_marker)
+    :precondition
+      (and
+        (controller_registered ?controller_slot)
+        (entity_summon_bound ?controller_slot)
+        (entity_target_binding ?controller_slot ?target_marker)
+        (not
+          (entity_engaged_for_assignment ?controller_slot)
+        )
+      )
+    :effect (entity_engaged_for_assignment ?controller_slot)
+  )
+  (:action release_target_for_controller
+    :parameters (?controller_slot - controller_slot ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_target_binding ?controller_slot ?target_marker)
+      )
+    :effect
+      (and
+        (target_available ?target_marker)
+        (not
+          (entity_target_binding ?controller_slot ?target_marker)
+        )
+      )
+  )
+  (:action bind_support_to_controller
+    :parameters (?controller_slot - controller_slot ?support_ability_token - support_ability_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?controller_slot)
+        (support_ability_available ?support_ability_token)
+      )
+    :effect
+      (and
+        (entity_support_binding ?controller_slot ?support_ability_token)
+        (not
+          (support_ability_available ?support_ability_token)
+        )
+      )
+  )
+  (:action release_support_from_controller
+    :parameters (?controller_slot - controller_slot ?support_ability_token - support_ability_token)
+    :precondition
+      (and
+        (entity_support_binding ?controller_slot ?support_ability_token)
+      )
+    :effect
+      (and
+        (support_ability_available ?support_ability_token)
+        (not
+          (entity_support_binding ?controller_slot ?support_ability_token)
+        )
+      )
+  )
+  (:action bind_equipment_buff_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?equipment_buff_token - equipment_buff_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (equipment_buff_available ?equipment_buff_token)
+      )
+    :effect
+      (and
+        (coordinator_equipment_buff_binding ?party_coordinator ?equipment_buff_token)
+        (not
+          (equipment_buff_available ?equipment_buff_token)
+        )
+      )
+  )
+  (:action unbind_equipment_buff_from_coordinator
+    :parameters (?party_coordinator - party_coordinator ?equipment_buff_token - equipment_buff_token)
+    :precondition
+      (and
+        (coordinator_equipment_buff_binding ?party_coordinator ?equipment_buff_token)
+      )
+    :effect
+      (and
+        (equipment_buff_available ?equipment_buff_token)
+        (not
+          (coordinator_equipment_buff_binding ?party_coordinator ?equipment_buff_token)
+        )
+      )
+  )
+  (:action bind_tactical_module_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (tactical_module_available ?tactical_module_token)
+      )
+    :effect
+      (and
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (not
+          (tactical_module_available ?tactical_module_token)
+        )
+      )
+  )
+  (:action unbind_tactical_module_from_coordinator
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token)
+    :precondition
+      (and
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+      )
+    :effect
+      (and
+        (tactical_module_available ?tactical_module_token)
+        (not
+          (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        )
+      )
+  )
+  (:action select_tank_template
+    :parameters (?tank_role_slot - tank_role_slot ?summon_template_tank - summon_template_tank ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?tank_role_slot)
+        (entity_target_binding ?tank_role_slot ?target_marker)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (not
+          (tank_template_selected ?summon_template_tank)
+        )
+        (not
+          (tank_template_buffered ?summon_template_tank)
+        )
+      )
+    :effect (tank_template_selected ?summon_template_tank)
+  )
+  (:action finalize_tank_role_assignment_with_support
+    :parameters (?tank_role_slot - tank_role_slot ?summon_template_tank - summon_template_tank ?support_ability_token - support_ability_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?tank_role_slot)
+        (entity_support_binding ?tank_role_slot ?support_ability_token)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (tank_template_selected ?summon_template_tank)
+        (not
+          (tank_role_staged ?tank_role_slot)
+        )
+      )
+    :effect
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (tank_role_executed_assignment ?tank_role_slot)
+      )
+  )
+  (:action buffer_tank_template_with_consumable
+    :parameters (?tank_role_slot - tank_role_slot ?summon_template_tank - summon_template_tank ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?tank_role_slot)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (consumable_available ?consumable_resource)
+        (not
+          (tank_role_staged ?tank_role_slot)
+        )
+      )
+    :effect
+      (and
+        (tank_template_buffered ?summon_template_tank)
+        (tank_role_staged ?tank_role_slot)
+        (tank_role_consumable_binding ?tank_role_slot ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action activate_buffered_tank_template
+    :parameters (?tank_role_slot - tank_role_slot ?summon_template_tank - summon_template_tank ?target_marker - target_marker ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?tank_role_slot)
+        (entity_target_binding ?tank_role_slot ?target_marker)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (tank_template_buffered ?summon_template_tank)
+        (tank_role_consumable_binding ?tank_role_slot ?consumable_resource)
+        (not
+          (tank_role_executed_assignment ?tank_role_slot)
+        )
+      )
+    :effect
+      (and
+        (tank_template_selected ?summon_template_tank)
+        (tank_role_executed_assignment ?tank_role_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (tank_role_consumable_binding ?tank_role_slot ?consumable_resource)
+        )
+      )
+  )
+  (:action select_dps_template
+    :parameters (?dps_role_slot - dps_role_slot ?summon_template_dps - summon_template_dps ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?dps_role_slot)
+        (entity_target_binding ?dps_role_slot ?target_marker)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (not
+          (dps_template_selected ?summon_template_dps)
+        )
+        (not
+          (dps_template_buffered ?summon_template_dps)
+        )
+      )
+    :effect (dps_template_selected ?summon_template_dps)
+  )
+  (:action finalize_dps_role_assignment_with_support
+    :parameters (?dps_role_slot - dps_role_slot ?summon_template_dps - summon_template_dps ?support_ability_token - support_ability_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?dps_role_slot)
+        (entity_support_binding ?dps_role_slot ?support_ability_token)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (dps_template_selected ?summon_template_dps)
+        (not
+          (dps_role_staged ?dps_role_slot)
+        )
+      )
+    :effect
+      (and
+        (dps_role_staged ?dps_role_slot)
+        (dps_role_executed_assignment ?dps_role_slot)
+      )
+  )
+  (:action buffer_dps_template_with_consumable
+    :parameters (?dps_role_slot - dps_role_slot ?summon_template_dps - summon_template_dps ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?dps_role_slot)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (consumable_available ?consumable_resource)
+        (not
+          (dps_role_staged ?dps_role_slot)
+        )
+      )
+    :effect
+      (and
+        (dps_template_buffered ?summon_template_dps)
+        (dps_role_staged ?dps_role_slot)
+        (dps_consumable_binding ?dps_role_slot ?consumable_resource)
+        (not
+          (consumable_available ?consumable_resource)
+        )
+      )
+  )
+  (:action activate_buffered_dps_template
+    :parameters (?dps_role_slot - dps_role_slot ?summon_template_dps - summon_template_dps ?target_marker - target_marker ?consumable_resource - consumable_resource)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?dps_role_slot)
+        (entity_target_binding ?dps_role_slot ?target_marker)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (dps_template_buffered ?summon_template_dps)
+        (dps_consumable_binding ?dps_role_slot ?consumable_resource)
+        (not
+          (dps_role_executed_assignment ?dps_role_slot)
+        )
+      )
+    :effect
+      (and
+        (dps_template_selected ?summon_template_dps)
+        (dps_role_executed_assignment ?dps_role_slot)
+        (consumable_available ?consumable_resource)
+        (not
+          (dps_consumable_binding ?dps_role_slot ?consumable_resource)
+        )
+      )
+  )
+  (:action reserve_and_pair_summon_instance
+    :parameters (?tank_role_slot - tank_role_slot ?dps_role_slot - dps_role_slot ?summon_template_tank - summon_template_tank ?summon_template_dps - summon_template_dps ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (dps_role_staged ?dps_role_slot)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (tank_template_selected ?summon_template_tank)
+        (dps_template_selected ?summon_template_dps)
+        (tank_role_executed_assignment ?tank_role_slot)
+        (dps_role_executed_assignment ?dps_role_slot)
+        (summon_instance_available ?summon_instance)
+      )
+    :effect
+      (and
+        (summon_instance_reserved ?summon_instance)
+        (instance_tank_template_link ?summon_instance ?summon_template_tank)
+        (instance_dps_template_link ?summon_instance ?summon_template_dps)
+        (not
+          (summon_instance_available ?summon_instance)
+        )
+      )
+  )
+  (:action reserve_and_pair_summon_instance_set_stage_a
+    :parameters (?tank_role_slot - tank_role_slot ?dps_role_slot - dps_role_slot ?summon_template_tank - summon_template_tank ?summon_template_dps - summon_template_dps ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (dps_role_staged ?dps_role_slot)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (tank_template_buffered ?summon_template_tank)
+        (dps_template_selected ?summon_template_dps)
+        (not
+          (tank_role_executed_assignment ?tank_role_slot)
+        )
+        (dps_role_executed_assignment ?dps_role_slot)
+        (summon_instance_available ?summon_instance)
+      )
+    :effect
+      (and
+        (summon_instance_reserved ?summon_instance)
+        (instance_tank_template_link ?summon_instance ?summon_template_tank)
+        (instance_dps_template_link ?summon_instance ?summon_template_dps)
+        (instance_stage_a ?summon_instance)
+        (not
+          (summon_instance_available ?summon_instance)
+        )
+      )
+  )
+  (:action reserve_and_pair_summon_instance_set_stage_b
+    :parameters (?tank_role_slot - tank_role_slot ?dps_role_slot - dps_role_slot ?summon_template_tank - summon_template_tank ?summon_template_dps - summon_template_dps ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (dps_role_staged ?dps_role_slot)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (tank_template_selected ?summon_template_tank)
+        (dps_template_buffered ?summon_template_dps)
+        (tank_role_executed_assignment ?tank_role_slot)
+        (not
+          (dps_role_executed_assignment ?dps_role_slot)
+        )
+        (summon_instance_available ?summon_instance)
+      )
+    :effect
+      (and
+        (summon_instance_reserved ?summon_instance)
+        (instance_tank_template_link ?summon_instance ?summon_template_tank)
+        (instance_dps_template_link ?summon_instance ?summon_template_dps)
+        (instance_stage_b ?summon_instance)
+        (not
+          (summon_instance_available ?summon_instance)
+        )
+      )
+  )
+  (:action reserve_and_pair_summon_instance_set_both_stages
+    :parameters (?tank_role_slot - tank_role_slot ?dps_role_slot - dps_role_slot ?summon_template_tank - summon_template_tank ?summon_template_dps - summon_template_dps ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (dps_role_staged ?dps_role_slot)
+        (tank_role_template_compatible ?tank_role_slot ?summon_template_tank)
+        (dps_role_template_binding ?dps_role_slot ?summon_template_dps)
+        (tank_template_buffered ?summon_template_tank)
+        (dps_template_buffered ?summon_template_dps)
+        (not
+          (tank_role_executed_assignment ?tank_role_slot)
+        )
+        (not
+          (dps_role_executed_assignment ?dps_role_slot)
+        )
+        (summon_instance_available ?summon_instance)
+      )
+    :effect
+      (and
+        (summon_instance_reserved ?summon_instance)
+        (instance_tank_template_link ?summon_instance ?summon_template_tank)
+        (instance_dps_template_link ?summon_instance ?summon_template_dps)
+        (instance_stage_a ?summon_instance)
+        (instance_stage_b ?summon_instance)
+        (not
+          (summon_instance_available ?summon_instance)
+        )
+      )
+  )
+  (:action mark_instance_deploy_ready
+    :parameters (?summon_instance - summon_instance ?tank_role_slot - tank_role_slot ?target_marker - target_marker)
+    :precondition
+      (and
+        (summon_instance_reserved ?summon_instance)
+        (tank_role_staged ?tank_role_slot)
+        (entity_target_binding ?tank_role_slot ?target_marker)
+        (not
+          (instance_deploy_ready ?summon_instance)
+        )
+      )
+    :effect (instance_deploy_ready ?summon_instance)
+  )
+  (:action attach_equipment_to_instance
+    :parameters (?party_coordinator - party_coordinator ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (coordinator_instance_preference ?party_coordinator ?summon_instance)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_available ?companion_equipment)
+        (summon_instance_reserved ?summon_instance)
+        (instance_deploy_ready ?summon_instance)
+        (not
+          (equipment_attached ?companion_equipment)
+        )
+      )
+    :effect
+      (and
+        (equipment_attached ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (not
+          (equipment_available ?companion_equipment)
+        )
+      )
+  )
+  (:action mark_coordinator_ready_for_specialization
+    :parameters (?party_coordinator - party_coordinator ?companion_equipment - companion_equipment ?summon_instance - summon_instance ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_attached ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (entity_target_binding ?party_coordinator ?target_marker)
+        (not
+          (instance_stage_a ?summon_instance)
+        )
+        (not
+          (coordinator_ready_for_specialization ?party_coordinator)
+        )
+      )
+    :effect (coordinator_ready_for_specialization ?party_coordinator)
+  )
+  (:action bind_optional_trait_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?trait_token - trait_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (optional_trait_available ?trait_token)
+        (not
+          (coordinator_trait_available ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_trait_available ?party_coordinator)
+        (coordinator_optional_trait_binding ?party_coordinator ?trait_token)
+        (not
+          (optional_trait_available ?trait_token)
+        )
+      )
+  )
+  (:action apply_trait_and_mark_specialization
+    :parameters (?party_coordinator - party_coordinator ?companion_equipment - companion_equipment ?summon_instance - summon_instance ?target_marker - target_marker ?trait_token - trait_token)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_attached ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (entity_target_binding ?party_coordinator ?target_marker)
+        (instance_stage_a ?summon_instance)
+        (coordinator_trait_available ?party_coordinator)
+        (coordinator_optional_trait_binding ?party_coordinator ?trait_token)
+        (not
+          (coordinator_ready_for_specialization ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_ready_for_specialization ?party_coordinator)
+        (coordinator_trait_applied ?party_coordinator)
+      )
+  )
+  (:action start_coordinator_specialization
+    :parameters (?party_coordinator - party_coordinator ?equipment_buff_token - equipment_buff_token ?support_ability_token - support_ability_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_ready_for_specialization ?party_coordinator)
+        (coordinator_equipment_buff_binding ?party_coordinator ?equipment_buff_token)
+        (entity_support_binding ?party_coordinator ?support_ability_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (not
+          (instance_stage_b ?summon_instance)
+        )
+        (not
+          (coordinator_specialization_in_progress ?party_coordinator)
+        )
+      )
+    :effect (coordinator_specialization_in_progress ?party_coordinator)
+  )
+  (:action progress_coordinator_specialization
+    :parameters (?party_coordinator - party_coordinator ?equipment_buff_token - equipment_buff_token ?support_ability_token - support_ability_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_ready_for_specialization ?party_coordinator)
+        (coordinator_equipment_buff_binding ?party_coordinator ?equipment_buff_token)
+        (entity_support_binding ?party_coordinator ?support_ability_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (instance_stage_b ?summon_instance)
+        (not
+          (coordinator_specialization_in_progress ?party_coordinator)
+        )
+      )
+    :effect (coordinator_specialization_in_progress ?party_coordinator)
+  )
+  (:action finalize_coordinator_specialization_basic
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_specialization_in_progress ?party_coordinator)
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (not
+          (instance_stage_a ?summon_instance)
+        )
+        (not
+          (instance_stage_b ?summon_instance)
+        )
+        (not
+          (coordinator_specialization_complete ?party_coordinator)
+        )
+      )
+    :effect (coordinator_specialization_complete ?party_coordinator)
+  )
+  (:action finalize_coordinator_specialization_with_execution_ready
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_specialization_in_progress ?party_coordinator)
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (instance_stage_a ?summon_instance)
+        (not
+          (instance_stage_b ?summon_instance)
+        )
+        (not
+          (coordinator_specialization_complete ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_ready_for_execution ?party_coordinator)
+      )
+  )
+  (:action finalize_coordinator_specialization_alternate_ready
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_specialization_in_progress ?party_coordinator)
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (not
+          (instance_stage_a ?summon_instance)
+        )
+        (instance_stage_b ?summon_instance)
+        (not
+          (coordinator_specialization_complete ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_ready_for_execution ?party_coordinator)
+      )
+  )
+  (:action finalize_coordinator_specialization_full
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token ?companion_equipment - companion_equipment ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (coordinator_specialization_in_progress ?party_coordinator)
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (coordinator_equipment_binding ?party_coordinator ?companion_equipment)
+        (equipment_instance_binding ?companion_equipment ?summon_instance)
+        (instance_stage_a ?summon_instance)
+        (instance_stage_b ?summon_instance)
+        (not
+          (coordinator_specialization_complete ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_ready_for_execution ?party_coordinator)
+      )
+  )
+  (:action claim_activation_and_finalize_coordinator_basic
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (not
+          (coordinator_ready_for_execution ?party_coordinator)
+        )
+        (not
+          (activation_claimed ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_claimed ?party_coordinator)
+        (entity_finalized ?party_coordinator)
+      )
+  )
+  (:action bind_assignment_modifier_to_coordinator
+    :parameters (?party_coordinator - party_coordinator ?assignment_modifier_token - assignment_modifier_token)
+    :precondition
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_ready_for_execution ?party_coordinator)
+        (assignment_modifier_available ?assignment_modifier_token)
+      )
+    :effect
+      (and
+        (coordinator_assignment_modifier_binding ?party_coordinator ?assignment_modifier_token)
+        (not
+          (assignment_modifier_available ?assignment_modifier_token)
+        )
+      )
+  )
+  (:action mark_coordinator_executable
+    :parameters (?party_coordinator - party_coordinator ?tank_role_slot - tank_role_slot ?dps_role_slot - dps_role_slot ?target_marker - target_marker ?assignment_modifier_token - assignment_modifier_token)
+    :precondition
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_ready_for_execution ?party_coordinator)
+        (coordinator_assignment_modifier_binding ?party_coordinator ?assignment_modifier_token)
+        (coordinator_tank_role_link ?party_coordinator ?tank_role_slot)
+        (coordinator_dps_role_link ?party_coordinator ?dps_role_slot)
+        (tank_role_executed_assignment ?tank_role_slot)
+        (dps_role_executed_assignment ?dps_role_slot)
+        (entity_target_binding ?party_coordinator ?target_marker)
+        (not
+          (coordinator_executable_marker ?party_coordinator)
+        )
+      )
+    :effect (coordinator_executable_marker ?party_coordinator)
+  )
+  (:action claim_activation_and_finalize_coordinator_executable
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (coordinator_specialization_complete ?party_coordinator)
+        (coordinator_executable_marker ?party_coordinator)
+        (not
+          (activation_claimed ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_claimed ?party_coordinator)
+        (entity_finalized ?party_coordinator)
+      )
+  )
+  (:action lock_coordinator_trait_with_tactical_marker
+    :parameters (?party_coordinator - party_coordinator ?tactical_marker - tactical_marker ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_engaged_for_assignment ?party_coordinator)
+        (entity_target_binding ?party_coordinator ?target_marker)
+        (tactical_marker_available ?tactical_marker)
+        (coordinator_tactical_marker_binding ?party_coordinator ?tactical_marker)
+        (not
+          (coordinator_trait_locked ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (coordinator_trait_locked ?party_coordinator)
+        (not
+          (tactical_marker_available ?tactical_marker)
+        )
+      )
+  )
+  (:action stage_trait_for_coordinator
+    :parameters (?party_coordinator - party_coordinator ?support_ability_token - support_ability_token)
+    :precondition
+      (and
+        (coordinator_trait_locked ?party_coordinator)
+        (entity_support_binding ?party_coordinator ?support_ability_token)
+        (not
+          (trait_stage_ready ?party_coordinator)
+        )
+      )
+    :effect (trait_stage_ready ?party_coordinator)
+  )
+  (:action finalize_trait_for_coordinator
+    :parameters (?party_coordinator - party_coordinator ?tactical_module_token - tactical_module_token)
+    :precondition
+      (and
+        (trait_stage_ready ?party_coordinator)
+        (coordinator_tactical_module_binding ?party_coordinator ?tactical_module_token)
+        (not
+          (trait_finalized ?party_coordinator)
+        )
+      )
+    :effect (trait_finalized ?party_coordinator)
+  )
+  (:action claim_activation_post_trait
+    :parameters (?party_coordinator - party_coordinator)
+    :precondition
+      (and
+        (trait_finalized ?party_coordinator)
+        (not
+          (activation_claimed ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (activation_claimed ?party_coordinator)
+        (entity_finalized ?party_coordinator)
+      )
+  )
+  (:action finalize_tank_role_activation
+    :parameters (?tank_role_slot - tank_role_slot ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (tank_role_staged ?tank_role_slot)
+        (tank_role_executed_assignment ?tank_role_slot)
+        (summon_instance_reserved ?summon_instance)
+        (instance_deploy_ready ?summon_instance)
+        (not
+          (entity_finalized ?tank_role_slot)
+        )
+      )
+    :effect (entity_finalized ?tank_role_slot)
+  )
+  (:action finalize_dps_role_activation
+    :parameters (?dps_role_slot - dps_role_slot ?summon_instance - summon_instance)
+    :precondition
+      (and
+        (dps_role_staged ?dps_role_slot)
+        (dps_role_executed_assignment ?dps_role_slot)
+        (summon_instance_reserved ?summon_instance)
+        (instance_deploy_ready ?summon_instance)
+        (not
+          (entity_finalized ?dps_role_slot)
+        )
+      )
+    :effect (entity_finalized ?dps_role_slot)
+  )
+  (:action assign_priority_and_mark_ready
+    :parameters (?controller_slot - controller_slot ?priority_token - priority_token ?target_marker - target_marker)
+    :precondition
+      (and
+        (entity_finalized ?controller_slot)
+        (entity_target_binding ?controller_slot ?target_marker)
+        (priority_token_available ?priority_token)
+        (not
+          (entity_ready_for_commit ?controller_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_ready_for_commit ?controller_slot)
+        (entity_priority_binding ?controller_slot ?priority_token)
+        (not
+          (priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action commit_tank_role_with_priority
+    :parameters (?tank_role_slot - tank_role_slot ?summon_command_token - summon_command_token ?priority_token - priority_token)
+    :precondition
+      (and
+        (entity_ready_for_commit ?tank_role_slot)
+        (entity_summon_binding ?tank_role_slot ?summon_command_token)
+        (entity_priority_binding ?tank_role_slot ?priority_token)
+        (not
+          (entity_committed ?tank_role_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?tank_role_slot)
+        (summon_token_available ?summon_command_token)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action commit_dps_role_with_priority
+    :parameters (?dps_role_slot - dps_role_slot ?summon_command_token - summon_command_token ?priority_token - priority_token)
+    :precondition
+      (and
+        (entity_ready_for_commit ?dps_role_slot)
+        (entity_summon_binding ?dps_role_slot ?summon_command_token)
+        (entity_priority_binding ?dps_role_slot ?priority_token)
+        (not
+          (entity_committed ?dps_role_slot)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?dps_role_slot)
+        (summon_token_available ?summon_command_token)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action commit_coordinator_with_priority
+    :parameters (?party_coordinator - party_coordinator ?summon_command_token - summon_command_token ?priority_token - priority_token)
+    :precondition
+      (and
+        (entity_ready_for_commit ?party_coordinator)
+        (entity_summon_binding ?party_coordinator ?summon_command_token)
+        (entity_priority_binding ?party_coordinator ?priority_token)
+        (not
+          (entity_committed ?party_coordinator)
+        )
+      )
+    :effect
+      (and
+        (entity_committed ?party_coordinator)
+        (summon_token_available ?summon_command_token)
+        (priority_token_available ?priority_token)
+      )
+  )
+)
+
+## Planning problem (PDDL)
+
+(define (problem party_summon_prioritization_scenario)
+  (:domain summon_pet_control_prioritization)
+  (:objects tank_slot_1 - tank_role_slot dps_slot_1 - dps_role_slot coordinator_1 - party_coordinator coordinator_2 - party_coordinator summon_token_1 - summon_command_token summon_token_2 - summon_command_token summon_token_3 - summon_command_token target_marker_1 - target_marker support_ability_1 - support_ability_token consumable_1 - consumable_resource tank_template_1 - summon_template_tank dps_template_1 - summon_template_dps summon_instance_1 - summon_instance companion_equipment_1 - companion_equipment companion_equipment_2 - companion_equipment trait_token_1 - trait_token trait_token_2 - trait_token assignment_modifier_1 - assignment_modifier_token assignment_modifier_2 - assignment_modifier_token priority_token_1 - priority_token equipment_buff_1 - equipment_buff_token tactical_marker_1 - tactical_marker tactical_marker_2 - tactical_marker tactical_module_1 - tactical_module_token)
+  (:init
+    (summon_token_available summon_token_1)
+    (summon_token_available summon_token_2)
+    (summon_token_available summon_token_3)
+    (target_available target_marker_1)
+    (support_ability_available support_ability_1)
+    (consumable_available consumable_1)
+    (tank_role_template_compatible tank_slot_1 tank_template_1)
+    (dps_role_template_binding dps_slot_1 dps_template_1)
+    (summon_instance_available summon_instance_1)
+    (equipment_available companion_equipment_1)
+    (equipment_available companion_equipment_2)
+    (coordinator_tank_role_link coordinator_1 tank_slot_1)
+    (coordinator_tank_role_link coordinator_2 tank_slot_1)
+    (coordinator_dps_role_link coordinator_1 dps_slot_1)
+    (coordinator_dps_role_link coordinator_2 dps_slot_1)
+    (coordinator_instance_preference coordinator_1 summon_instance_1)
+    (coordinator_instance_preference coordinator_2 summon_instance_1)
+    (coordinator_equipment_binding coordinator_1 companion_equipment_1)
+    (coordinator_equipment_binding coordinator_2 companion_equipment_2)
+    (optional_trait_available trait_token_1)
+    (optional_trait_available trait_token_2)
+    (assignment_modifier_available assignment_modifier_1)
+    (assignment_modifier_available assignment_modifier_2)
+    (priority_token_available priority_token_1)
+    (equipment_buff_available equipment_buff_1)
+    (tactical_marker_available tactical_marker_1)
+    (coordinator_tactical_marker_binding coordinator_1 tactical_marker_1)
+    (coordinator_tactical_marker_binding coordinator_2 tactical_marker_2)
+    (tactical_module_available tactical_module_1)
+  )
+  (:goal
+    (and
+      (entity_committed tank_slot_1)
+      (entity_committed dps_slot_1)
+      (entity_committed coordinator_1)
+      (entity_committed coordinator_2)
+    )
+  )
+)

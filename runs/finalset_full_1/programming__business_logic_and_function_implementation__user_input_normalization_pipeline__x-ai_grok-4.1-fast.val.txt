@@ -1,0 +1,1070 @@
+--- domain.pddl (as passed to VAL) ---
+(define (domain user_input_normalization_pipeline_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types component_type - object config_type - object resource_type - object root_component - object input_submission - root_component processing_slot - component_type parser_rule - component_type validator_rule - component_type style_profile - component_type postprocess_action - component_type metadata_bundle - component_type transformer_module - component_type policy_rule - component_type canonical_value - config_type schema_element - config_type policy_binding - config_type field_key - resource_type field_format_profile - resource_type output_artifact - resource_type group_type - input_submission subgroup_type - input_submission field_group_context - group_type field_variant_context - group_type normalizer_context - subgroup_type)
+  (:predicates
+    (submission_ingested ?submission - input_submission)
+    (parsed_context ?submission - input_submission)
+    (submission_slot_assigned ?submission - input_submission)
+    (normalization_complete ?submission - input_submission)
+    (ready_for_finalization ?submission - input_submission)
+    (normalization_requested ?submission - input_submission)
+    (processing_slot_available ?processing_slot - processing_slot)
+    (processing_slot_allocated_for_context ?submission - input_submission ?processing_slot - processing_slot)
+    (parser_rule_available ?parser_rule - parser_rule)
+    (parser_applied_to_context ?submission - input_submission ?parser_rule - parser_rule)
+    (validator_rule_available ?validator_rule - validator_rule)
+    (validator_attached_to_context ?submission - input_submission ?validator_rule - validator_rule)
+    (canonical_value_available ?canonical_value - canonical_value)
+    (field_group_has_canonical ?field_group - field_group_context ?canonical_value - canonical_value)
+    (field_variant_has_canonical ?field_variant - field_variant_context ?canonical_value - canonical_value)
+    (field_group_resolves_key ?field_group - field_group_context ?field_key - field_key)
+    (field_key_ready ?field_key - field_key)
+    (field_key_pending_request ?field_key - field_key)
+    (field_group_confirmed ?field_group - field_group_context)
+    (field_variant_has_format_profile ?field_variant - field_variant_context ?format_profile - field_format_profile)
+    (format_profile_available ?format_profile - field_format_profile)
+    (format_profile_pending_request ?format_profile - field_format_profile)
+    (field_variant_confirmed ?field_variant - field_variant_context)
+    (artifact_registered_for_assembly ?output_artifact - output_artifact)
+    (artifact_prepared ?output_artifact - output_artifact)
+    (artifact_includes_field_key ?output_artifact - output_artifact ?field_key - field_key)
+    (artifact_includes_format_profile ?output_artifact - output_artifact ?format_profile - field_format_profile)
+    (artifact_has_transformer ?output_artifact - output_artifact)
+    (artifact_has_style_profile ?output_artifact - output_artifact)
+    (artifact_schema_applied ?output_artifact - output_artifact)
+    (normalizer_handles_field_group ?normalizer - normalizer_context ?field_group - field_group_context)
+    (normalizer_handles_field_variant ?normalizer - normalizer_context ?field_variant - field_variant_context)
+    (normalizer_assigned_artifact ?normalizer - normalizer_context ?output_artifact - output_artifact)
+    (schema_element_available ?schema_element - schema_element)
+    (normalizer_uses_schema_element ?normalizer - normalizer_context ?schema_element - schema_element)
+    (schema_element_applied ?schema_element - schema_element)
+    (schema_element_contributes_to_artifact ?schema_element - schema_element ?output_artifact - output_artifact)
+    (normalizer_has_transformer ?normalizer - normalizer_context)
+    (transformer_active ?normalizer - normalizer_context)
+    (normalizer_enrichment_ready ?normalizer - normalizer_context)
+    (style_profile_attached_flag ?normalizer - normalizer_context)
+    (style_profile_applied ?normalizer - normalizer_context)
+    (enrichment_tags_attached ?normalizer - normalizer_context)
+    (normalizer_postprocess_ready ?normalizer - normalizer_context)
+    (policy_binding_available ?policy_binding - policy_binding)
+    (normalizer_has_policy_binding ?normalizer - normalizer_context ?policy_binding - policy_binding)
+    (policy_binding_engaged ?normalizer - normalizer_context)
+    (policy_precheck_attached ?normalizer - normalizer_context)
+    (policy_rules_enforced ?normalizer - normalizer_context)
+    (style_profile_available ?style_profile - style_profile)
+    (normalizer_has_style_profile ?normalizer - normalizer_context ?style_profile - style_profile)
+    (postprocess_action_available ?postprocess_action - postprocess_action)
+    (normalizer_has_postprocess_action ?normalizer - normalizer_context ?postprocess_action - postprocess_action)
+    (transformer_module_available ?transformer_module - transformer_module)
+    (normalizer_has_transformer_module ?normalizer - normalizer_context ?transformer_module - transformer_module)
+    (policy_rule_available ?policy_rule - policy_rule)
+    (normalizer_has_policy_rule ?normalizer - normalizer_context ?policy_rule - policy_rule)
+    (metadata_bundle_available ?metadata_bundle - metadata_bundle)
+    (context_has_metadata_bundle ?submission - input_submission ?metadata_bundle - metadata_bundle)
+    (field_group_in_progress ?field_group - field_group_context)
+    (field_variant_in_progress ?field_variant - field_variant_context)
+    (normalizer_finalization_flag ?normalizer - normalizer_context)
+  )
+  (:action ingest_submission
+    :parameters (?submission - input_submission)
+    :precondition
+      (and
+        (not
+          (submission_ingested ?submission)
+        )
+        (not
+          (normalization_complete ?submission)
+        )
+      )
+    :effect (submission_ingested ?submission)
+  )
+  (:action allocate_processing_slot
+    :parameters (?submission - input_submission ?processing_slot - processing_slot)
+    :precondition
+      (and
+        (submission_ingested ?submission)
+        (not
+          (submission_slot_assigned ?submission)
+        )
+        (processing_slot_available ?processing_slot)
+      )
+    :effect
+      (and
+        (submission_slot_assigned ?submission)
+        (processing_slot_allocated_for_context ?submission ?processing_slot)
+        (not
+          (processing_slot_available ?processing_slot)
+        )
+      )
+  )
+  (:action apply_parser_rule
+    :parameters (?submission - input_submission ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (submission_ingested ?submission)
+        (submission_slot_assigned ?submission)
+        (parser_rule_available ?parser_rule)
+      )
+    :effect
+      (and
+        (parser_applied_to_context ?submission ?parser_rule)
+        (not
+          (parser_rule_available ?parser_rule)
+        )
+      )
+  )
+  (:action confirm_parse
+    :parameters (?submission - input_submission ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (submission_ingested ?submission)
+        (submission_slot_assigned ?submission)
+        (parser_applied_to_context ?submission ?parser_rule)
+        (not
+          (parsed_context ?submission)
+        )
+      )
+    :effect (parsed_context ?submission)
+  )
+  (:action release_parser_rule
+    :parameters (?submission - input_submission ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (parser_applied_to_context ?submission ?parser_rule)
+      )
+    :effect
+      (and
+        (parser_rule_available ?parser_rule)
+        (not
+          (parser_applied_to_context ?submission ?parser_rule)
+        )
+      )
+  )
+  (:action attach_validator_to_submission
+    :parameters (?submission - input_submission ?validator_rule - validator_rule)
+    :precondition
+      (and
+        (parsed_context ?submission)
+        (validator_rule_available ?validator_rule)
+      )
+    :effect
+      (and
+        (validator_attached_to_context ?submission ?validator_rule)
+        (not
+          (validator_rule_available ?validator_rule)
+        )
+      )
+  )
+  (:action detach_validator_from_submission
+    :parameters (?submission - input_submission ?validator_rule - validator_rule)
+    :precondition
+      (and
+        (validator_attached_to_context ?submission ?validator_rule)
+      )
+    :effect
+      (and
+        (validator_rule_available ?validator_rule)
+        (not
+          (validator_attached_to_context ?submission ?validator_rule)
+        )
+      )
+  )
+  (:action attach_transformer_module_to_normalizer
+    :parameters (?normalizer - normalizer_context ?transformer_module - transformer_module)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (transformer_module_available ?transformer_module)
+      )
+    :effect
+      (and
+        (normalizer_has_transformer_module ?normalizer ?transformer_module)
+        (not
+          (transformer_module_available ?transformer_module)
+        )
+      )
+  )
+  (:action detach_transformer_module_from_normalizer
+    :parameters (?normalizer - normalizer_context ?transformer_module - transformer_module)
+    :precondition
+      (and
+        (normalizer_has_transformer_module ?normalizer ?transformer_module)
+      )
+    :effect
+      (and
+        (transformer_module_available ?transformer_module)
+        (not
+          (normalizer_has_transformer_module ?normalizer ?transformer_module)
+        )
+      )
+  )
+  (:action attach_policy_rule_to_normalizer
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (policy_rule_available ?policy_rule)
+      )
+    :effect
+      (and
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (not
+          (policy_rule_available ?policy_rule)
+        )
+      )
+  )
+  (:action detach_policy_rule_from_normalizer
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+      )
+    :effect
+      (and
+        (policy_rule_available ?policy_rule)
+        (not
+          (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        )
+      )
+  )
+  (:action resolve_field_key_for_group
+    :parameters (?field_group - field_group_context ?field_key - field_key ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (parsed_context ?field_group)
+        (parser_applied_to_context ?field_group ?parser_rule)
+        (field_group_resolves_key ?field_group ?field_key)
+        (not
+          (field_key_ready ?field_key)
+        )
+        (not
+          (field_key_pending_request ?field_key)
+        )
+      )
+    :effect (field_key_ready ?field_key)
+  )
+  (:action assign_validator_to_field_group
+    :parameters (?field_group - field_group_context ?field_key - field_key ?validator_rule - validator_rule)
+    :precondition
+      (and
+        (parsed_context ?field_group)
+        (validator_attached_to_context ?field_group ?validator_rule)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_key_ready ?field_key)
+        (not
+          (field_group_in_progress ?field_group)
+        )
+      )
+    :effect
+      (and
+        (field_group_in_progress ?field_group)
+        (field_group_confirmed ?field_group)
+      )
+  )
+  (:action request_canonical_value_for_group
+    :parameters (?field_group - field_group_context ?field_key - field_key ?canonical_value - canonical_value)
+    :precondition
+      (and
+        (parsed_context ?field_group)
+        (field_group_resolves_key ?field_group ?field_key)
+        (canonical_value_available ?canonical_value)
+        (not
+          (field_group_in_progress ?field_group)
+        )
+      )
+    :effect
+      (and
+        (field_key_pending_request ?field_key)
+        (field_group_in_progress ?field_group)
+        (field_group_has_canonical ?field_group ?canonical_value)
+        (not
+          (canonical_value_available ?canonical_value)
+        )
+      )
+  )
+  (:action confirm_group_canonical_value
+    :parameters (?field_group - field_group_context ?field_key - field_key ?parser_rule - parser_rule ?canonical_value - canonical_value)
+    :precondition
+      (and
+        (parsed_context ?field_group)
+        (parser_applied_to_context ?field_group ?parser_rule)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_key_pending_request ?field_key)
+        (field_group_has_canonical ?field_group ?canonical_value)
+        (not
+          (field_group_confirmed ?field_group)
+        )
+      )
+    :effect
+      (and
+        (field_key_ready ?field_key)
+        (field_group_confirmed ?field_group)
+        (canonical_value_available ?canonical_value)
+        (not
+          (field_group_has_canonical ?field_group ?canonical_value)
+        )
+      )
+  )
+  (:action initiate_variant_key_resolution
+    :parameters (?field_variant - field_variant_context ?format_profile - field_format_profile ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (parsed_context ?field_variant)
+        (parser_applied_to_context ?field_variant ?parser_rule)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (not
+          (format_profile_available ?format_profile)
+        )
+        (not
+          (format_profile_pending_request ?format_profile)
+        )
+      )
+    :effect (format_profile_available ?format_profile)
+  )
+  (:action assign_validator_to_variant
+    :parameters (?field_variant - field_variant_context ?format_profile - field_format_profile ?validator_rule - validator_rule)
+    :precondition
+      (and
+        (parsed_context ?field_variant)
+        (validator_attached_to_context ?field_variant ?validator_rule)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (format_profile_available ?format_profile)
+        (not
+          (field_variant_in_progress ?field_variant)
+        )
+      )
+    :effect
+      (and
+        (field_variant_in_progress ?field_variant)
+        (field_variant_confirmed ?field_variant)
+      )
+  )
+  (:action request_canonical_for_variant
+    :parameters (?field_variant - field_variant_context ?format_profile - field_format_profile ?canonical_value - canonical_value)
+    :precondition
+      (and
+        (parsed_context ?field_variant)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (canonical_value_available ?canonical_value)
+        (not
+          (field_variant_in_progress ?field_variant)
+        )
+      )
+    :effect
+      (and
+        (format_profile_pending_request ?format_profile)
+        (field_variant_in_progress ?field_variant)
+        (field_variant_has_canonical ?field_variant ?canonical_value)
+        (not
+          (canonical_value_available ?canonical_value)
+        )
+      )
+  )
+  (:action confirm_variant_canonical_value
+    :parameters (?field_variant - field_variant_context ?format_profile - field_format_profile ?parser_rule - parser_rule ?canonical_value - canonical_value)
+    :precondition
+      (and
+        (parsed_context ?field_variant)
+        (parser_applied_to_context ?field_variant ?parser_rule)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (format_profile_pending_request ?format_profile)
+        (field_variant_has_canonical ?field_variant ?canonical_value)
+        (not
+          (field_variant_confirmed ?field_variant)
+        )
+      )
+    :effect
+      (and
+        (format_profile_available ?format_profile)
+        (field_variant_confirmed ?field_variant)
+        (canonical_value_available ?canonical_value)
+        (not
+          (field_variant_has_canonical ?field_variant ?canonical_value)
+        )
+      )
+  )
+  (:action assemble_output_artifact
+    :parameters (?field_group - field_group_context ?field_variant - field_variant_context ?field_key - field_key ?format_profile - field_format_profile ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_group_in_progress ?field_group)
+        (field_variant_in_progress ?field_variant)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (field_key_ready ?field_key)
+        (format_profile_available ?format_profile)
+        (field_group_confirmed ?field_group)
+        (field_variant_confirmed ?field_variant)
+        (artifact_registered_for_assembly ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_includes_field_key ?output_artifact ?field_key)
+        (artifact_includes_format_profile ?output_artifact ?format_profile)
+        (not
+          (artifact_registered_for_assembly ?output_artifact)
+        )
+      )
+  )
+  (:action assemble_output_artifact_with_transformer
+    :parameters (?field_group - field_group_context ?field_variant - field_variant_context ?field_key - field_key ?format_profile - field_format_profile ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_group_in_progress ?field_group)
+        (field_variant_in_progress ?field_variant)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (field_key_pending_request ?field_key)
+        (format_profile_available ?format_profile)
+        (not
+          (field_group_confirmed ?field_group)
+        )
+        (field_variant_confirmed ?field_variant)
+        (artifact_registered_for_assembly ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_includes_field_key ?output_artifact ?field_key)
+        (artifact_includes_format_profile ?output_artifact ?format_profile)
+        (artifact_has_transformer ?output_artifact)
+        (not
+          (artifact_registered_for_assembly ?output_artifact)
+        )
+      )
+  )
+  (:action assemble_output_artifact_with_style
+    :parameters (?field_group - field_group_context ?field_variant - field_variant_context ?field_key - field_key ?format_profile - field_format_profile ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_group_in_progress ?field_group)
+        (field_variant_in_progress ?field_variant)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (field_key_ready ?field_key)
+        (format_profile_pending_request ?format_profile)
+        (field_group_confirmed ?field_group)
+        (not
+          (field_variant_confirmed ?field_variant)
+        )
+        (artifact_registered_for_assembly ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_includes_field_key ?output_artifact ?field_key)
+        (artifact_includes_format_profile ?output_artifact ?format_profile)
+        (artifact_has_style_profile ?output_artifact)
+        (not
+          (artifact_registered_for_assembly ?output_artifact)
+        )
+      )
+  )
+  (:action assemble_output_artifact_full
+    :parameters (?field_group - field_group_context ?field_variant - field_variant_context ?field_key - field_key ?format_profile - field_format_profile ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_group_in_progress ?field_group)
+        (field_variant_in_progress ?field_variant)
+        (field_group_resolves_key ?field_group ?field_key)
+        (field_variant_has_format_profile ?field_variant ?format_profile)
+        (field_key_pending_request ?field_key)
+        (format_profile_pending_request ?format_profile)
+        (not
+          (field_group_confirmed ?field_group)
+        )
+        (not
+          (field_variant_confirmed ?field_variant)
+        )
+        (artifact_registered_for_assembly ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_includes_field_key ?output_artifact ?field_key)
+        (artifact_includes_format_profile ?output_artifact ?format_profile)
+        (artifact_has_transformer ?output_artifact)
+        (artifact_has_style_profile ?output_artifact)
+        (not
+          (artifact_registered_for_assembly ?output_artifact)
+        )
+      )
+  )
+  (:action apply_schema_to_artifact
+    :parameters (?output_artifact - output_artifact ?field_group - field_group_context ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (artifact_prepared ?output_artifact)
+        (field_group_in_progress ?field_group)
+        (parser_applied_to_context ?field_group ?parser_rule)
+        (not
+          (artifact_schema_applied ?output_artifact)
+        )
+      )
+    :effect (artifact_schema_applied ?output_artifact)
+  )
+  (:action apply_schema_element_to_artifact
+    :parameters (?normalizer - normalizer_context ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (normalizer_assigned_artifact ?normalizer ?output_artifact)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_available ?schema_element)
+        (artifact_prepared ?output_artifact)
+        (artifact_schema_applied ?output_artifact)
+        (not
+          (schema_element_applied ?schema_element)
+        )
+      )
+    :effect
+      (and
+        (schema_element_applied ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (not
+          (schema_element_available ?schema_element)
+        )
+      )
+  )
+  (:action enable_transformer_for_normalizer
+    :parameters (?normalizer - normalizer_context ?schema_element - schema_element ?output_artifact - output_artifact ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_applied ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (parser_applied_to_context ?normalizer ?parser_rule)
+        (not
+          (artifact_has_transformer ?output_artifact)
+        )
+        (not
+          (normalizer_has_transformer ?normalizer)
+        )
+      )
+    :effect (normalizer_has_transformer ?normalizer)
+  )
+  (:action attach_style_profile_to_normalizer
+    :parameters (?normalizer - normalizer_context ?style_profile - style_profile)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (style_profile_available ?style_profile)
+        (not
+          (style_profile_attached_flag ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (style_profile_attached_flag ?normalizer)
+        (normalizer_has_style_profile ?normalizer ?style_profile)
+        (not
+          (style_profile_available ?style_profile)
+        )
+      )
+  )
+  (:action enrich_artifact_with_style_and_schema
+    :parameters (?normalizer - normalizer_context ?schema_element - schema_element ?output_artifact - output_artifact ?parser_rule - parser_rule ?style_profile - style_profile)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_applied ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (parser_applied_to_context ?normalizer ?parser_rule)
+        (artifact_has_transformer ?output_artifact)
+        (style_profile_attached_flag ?normalizer)
+        (normalizer_has_style_profile ?normalizer ?style_profile)
+        (not
+          (normalizer_has_transformer ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_has_transformer ?normalizer)
+        (style_profile_applied ?normalizer)
+      )
+  )
+  (:action activate_transformer_on_normalizer
+    :parameters (?normalizer - normalizer_context ?transformer_module - transformer_module ?validator_rule - validator_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (normalizer_has_transformer ?normalizer)
+        (normalizer_has_transformer_module ?normalizer ?transformer_module)
+        (validator_attached_to_context ?normalizer ?validator_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (not
+          (artifact_has_style_profile ?output_artifact)
+        )
+        (not
+          (transformer_active ?normalizer)
+        )
+      )
+    :effect (transformer_active ?normalizer)
+  )
+  (:action force_activate_transformer_on_normalizer
+    :parameters (?normalizer - normalizer_context ?transformer_module - transformer_module ?validator_rule - validator_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (normalizer_has_transformer ?normalizer)
+        (normalizer_has_transformer_module ?normalizer ?transformer_module)
+        (validator_attached_to_context ?normalizer ?validator_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (artifact_has_style_profile ?output_artifact)
+        (not
+          (transformer_active ?normalizer)
+        )
+      )
+    :effect (transformer_active ?normalizer)
+  )
+  (:action apply_policy_rule_enrichment
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (transformer_active ?normalizer)
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (not
+          (artifact_has_transformer ?output_artifact)
+        )
+        (not
+          (artifact_has_style_profile ?output_artifact)
+        )
+        (not
+          (normalizer_enrichment_ready ?normalizer)
+        )
+      )
+    :effect (normalizer_enrichment_ready ?normalizer)
+  )
+  (:action apply_policy_rule_enrichment_with_attachment
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (transformer_active ?normalizer)
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (artifact_has_transformer ?output_artifact)
+        (not
+          (artifact_has_style_profile ?output_artifact)
+        )
+        (not
+          (normalizer_enrichment_ready ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (enrichment_tags_attached ?normalizer)
+      )
+  )
+  (:action apply_policy_rule_enrichment_alternate
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (transformer_active ?normalizer)
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (not
+          (artifact_has_transformer ?output_artifact)
+        )
+        (artifact_has_style_profile ?output_artifact)
+        (not
+          (normalizer_enrichment_ready ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (enrichment_tags_attached ?normalizer)
+      )
+  )
+  (:action apply_policy_rule_enrichment_full
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule ?schema_element - schema_element ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (transformer_active ?normalizer)
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (normalizer_uses_schema_element ?normalizer ?schema_element)
+        (schema_element_contributes_to_artifact ?schema_element ?output_artifact)
+        (artifact_has_transformer ?output_artifact)
+        (artifact_has_style_profile ?output_artifact)
+        (not
+          (normalizer_enrichment_ready ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (enrichment_tags_attached ?normalizer)
+      )
+  )
+  (:action mark_normalizer_ready_for_finalization
+    :parameters (?normalizer - normalizer_context)
+    :precondition
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (not
+          (enrichment_tags_attached ?normalizer)
+        )
+        (not
+          (normalizer_finalization_flag ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_finalization_flag ?normalizer)
+        (ready_for_finalization ?normalizer)
+      )
+  )
+  (:action attach_postprocess_action_to_normalizer
+    :parameters (?normalizer - normalizer_context ?postprocess_action - postprocess_action)
+    :precondition
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (enrichment_tags_attached ?normalizer)
+        (postprocess_action_available ?postprocess_action)
+      )
+    :effect
+      (and
+        (normalizer_has_postprocess_action ?normalizer ?postprocess_action)
+        (not
+          (postprocess_action_available ?postprocess_action)
+        )
+      )
+  )
+  (:action complete_normalizer_finalization
+    :parameters (?normalizer - normalizer_context ?field_group - field_group_context ?field_variant - field_variant_context ?parser_rule - parser_rule ?postprocess_action - postprocess_action)
+    :precondition
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (enrichment_tags_attached ?normalizer)
+        (normalizer_has_postprocess_action ?normalizer ?postprocess_action)
+        (normalizer_handles_field_group ?normalizer ?field_group)
+        (normalizer_handles_field_variant ?normalizer ?field_variant)
+        (field_group_confirmed ?field_group)
+        (field_variant_confirmed ?field_variant)
+        (parser_applied_to_context ?normalizer ?parser_rule)
+        (not
+          (normalizer_postprocess_ready ?normalizer)
+        )
+      )
+    :effect (normalizer_postprocess_ready ?normalizer)
+  )
+  (:action finalize_normalizer_and_flag
+    :parameters (?normalizer - normalizer_context)
+    :precondition
+      (and
+        (normalizer_enrichment_ready ?normalizer)
+        (normalizer_postprocess_ready ?normalizer)
+        (not
+          (normalizer_finalization_flag ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_finalization_flag ?normalizer)
+        (ready_for_finalization ?normalizer)
+      )
+  )
+  (:action bind_policy_to_normalizer
+    :parameters (?normalizer - normalizer_context ?policy_binding - policy_binding ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (parsed_context ?normalizer)
+        (parser_applied_to_context ?normalizer ?parser_rule)
+        (policy_binding_available ?policy_binding)
+        (normalizer_has_policy_binding ?normalizer ?policy_binding)
+        (not
+          (policy_binding_engaged ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (policy_binding_engaged ?normalizer)
+        (not
+          (policy_binding_available ?policy_binding)
+        )
+      )
+  )
+  (:action prepare_policy_binding_with_validator
+    :parameters (?normalizer - normalizer_context ?validator_rule - validator_rule)
+    :precondition
+      (and
+        (policy_binding_engaged ?normalizer)
+        (validator_attached_to_context ?normalizer ?validator_rule)
+        (not
+          (policy_precheck_attached ?normalizer)
+        )
+      )
+    :effect (policy_precheck_attached ?normalizer)
+  )
+  (:action activate_policy_rule_on_normalizer
+    :parameters (?normalizer - normalizer_context ?policy_rule - policy_rule)
+    :precondition
+      (and
+        (policy_precheck_attached ?normalizer)
+        (normalizer_has_policy_rule ?normalizer ?policy_rule)
+        (not
+          (policy_rules_enforced ?normalizer)
+        )
+      )
+    :effect (policy_rules_enforced ?normalizer)
+  )
+  (:action enforce_policy_and_mark_ready
+    :parameters (?normalizer - normalizer_context)
+    :precondition
+      (and
+        (policy_rules_enforced ?normalizer)
+        (not
+          (normalizer_finalization_flag ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalizer_finalization_flag ?normalizer)
+        (ready_for_finalization ?normalizer)
+      )
+  )
+  (:action finalize_field_group_artifact
+    :parameters (?field_group - field_group_context ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_group_in_progress ?field_group)
+        (field_group_confirmed ?field_group)
+        (artifact_prepared ?output_artifact)
+        (artifact_schema_applied ?output_artifact)
+        (not
+          (ready_for_finalization ?field_group)
+        )
+      )
+    :effect (ready_for_finalization ?field_group)
+  )
+  (:action finalize_field_variant_artifact
+    :parameters (?field_variant - field_variant_context ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (field_variant_in_progress ?field_variant)
+        (field_variant_confirmed ?field_variant)
+        (artifact_prepared ?output_artifact)
+        (artifact_schema_applied ?output_artifact)
+        (not
+          (ready_for_finalization ?field_variant)
+        )
+      )
+    :effect (ready_for_finalization ?field_variant)
+  )
+  (:action attach_metadata_and_request_normalization
+    :parameters (?submission - input_submission ?metadata_bundle - metadata_bundle ?parser_rule - parser_rule)
+    :precondition
+      (and
+        (ready_for_finalization ?submission)
+        (parser_applied_to_context ?submission ?parser_rule)
+        (metadata_bundle_available ?metadata_bundle)
+        (not
+          (normalization_requested ?submission)
+        )
+      )
+    :effect
+      (and
+        (normalization_requested ?submission)
+        (context_has_metadata_bundle ?submission ?metadata_bundle)
+        (not
+          (metadata_bundle_available ?metadata_bundle)
+        )
+      )
+  )
+  (:action complete_normalization_for_group_and_release_slot
+    :parameters (?field_group - field_group_context ?processing_slot - processing_slot ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (normalization_requested ?field_group)
+        (processing_slot_allocated_for_context ?field_group ?processing_slot)
+        (context_has_metadata_bundle ?field_group ?metadata_bundle)
+        (not
+          (normalization_complete ?field_group)
+        )
+      )
+    :effect
+      (and
+        (normalization_complete ?field_group)
+        (processing_slot_available ?processing_slot)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+  (:action complete_normalization_for_variant_and_release_slot
+    :parameters (?field_variant - field_variant_context ?processing_slot - processing_slot ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (normalization_requested ?field_variant)
+        (processing_slot_allocated_for_context ?field_variant ?processing_slot)
+        (context_has_metadata_bundle ?field_variant ?metadata_bundle)
+        (not
+          (normalization_complete ?field_variant)
+        )
+      )
+    :effect
+      (and
+        (normalization_complete ?field_variant)
+        (processing_slot_available ?processing_slot)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+  (:action complete_normalization_for_normalizer_and_release_slot
+    :parameters (?normalizer - normalizer_context ?processing_slot - processing_slot ?metadata_bundle - metadata_bundle)
+    :precondition
+      (and
+        (normalization_requested ?normalizer)
+        (processing_slot_allocated_for_context ?normalizer ?processing_slot)
+        (context_has_metadata_bundle ?normalizer ?metadata_bundle)
+        (not
+          (normalization_complete ?normalizer)
+        )
+      )
+    :effect
+      (and
+        (normalization_complete ?normalizer)
+        (processing_slot_available ?processing_slot)
+        (metadata_bundle_available ?metadata_bundle)
+      )
+  )
+)
+
+--- problem.pddl (as passed to VAL) ---
+(define (problem normalize_submissions_problem)
+  (:domain user_input_normalization_pipeline_domain)
+  (:objects primary_field_group - field_group_context locale_field_variant - field_variant_context normalizer_alpha - normalizer_context normalizer_beta - normalizer_context worker_slot_1 - processing_slot worker_slot_2 - processing_slot worker_slot_3 - processing_slot default_parser_rule - parser_rule default_validator_rule - validator_rule canonical_sample_value - canonical_value primary_field_key - field_key default_format_profile - field_format_profile artifact_alpha - output_artifact schema_element_a - schema_element schema_element_b - schema_element compact_style_profile - style_profile readable_style_profile - style_profile masking_postprocess_action - postprocess_action trimming_postprocess_action - postprocess_action initial_metadata_bundle - metadata_bundle default_transformer_module - transformer_module privacy_policy_binding_a - policy_binding privacy_policy_binding_b - policy_binding privacy_policy_rule - policy_rule)
+  (:init
+    (processing_slot_available worker_slot_1)
+    (processing_slot_available worker_slot_2)
+    (processing_slot_available worker_slot_3)
+    (parser_rule_available default_parser_rule)
+    (validator_rule_available default_validator_rule)
+    (canonical_value_available canonical_sample_value)
+    (field_group_resolves_key primary_field_group primary_field_key)
+    (field_variant_has_format_profile locale_field_variant default_format_profile)
+    (artifact_registered_for_assembly artifact_alpha)
+    (schema_element_available schema_element_a)
+    (schema_element_available schema_element_b)
+    (normalizer_handles_field_group normalizer_alpha primary_field_group)
+    (normalizer_handles_field_group normalizer_beta primary_field_group)
+    (normalizer_handles_field_variant normalizer_alpha locale_field_variant)
+    (normalizer_handles_field_variant normalizer_beta locale_field_variant)
+    (normalizer_assigned_artifact normalizer_alpha artifact_alpha)
+    (normalizer_assigned_artifact normalizer_beta artifact_alpha)
+    (normalizer_uses_schema_element normalizer_alpha schema_element_a)
+    (normalizer_uses_schema_element normalizer_beta schema_element_b)
+    (style_profile_available compact_style_profile)
+    (style_profile_available readable_style_profile)
+    (postprocess_action_available masking_postprocess_action)
+    (postprocess_action_available trimming_postprocess_action)
+    (metadata_bundle_available initial_metadata_bundle)
+    (transformer_module_available default_transformer_module)
+    (policy_binding_available privacy_policy_binding_a)
+    (normalizer_has_policy_binding normalizer_alpha privacy_policy_binding_a)
+    (normalizer_has_policy_binding normalizer_beta privacy_policy_binding_b)
+    (policy_rule_available privacy_policy_rule)
+  )
+  (:goal
+    (and
+      (normalization_complete primary_field_group)
+      (normalization_complete locale_field_variant)
+      (normalization_complete normalizer_alpha)
+      (normalization_complete normalizer_beta)
+    )
+  )
+)
+
+--- plan.pddl (as passed to VAL) ---
+(ingest_submission primary_field_group)
+(allocate_processing_slot primary_field_group worker_slot_1)
+(apply_parser_rule primary_field_group default_parser_rule)
+(confirm_parse primary_field_group default_parser_rule)
+(resolve_field_key_for_group primary_field_group primary_field_key default_parser_rule)
+(attach_validator_to_submission primary_field_group default_validator_rule)
+(assign_validator_to_field_group primary_field_group primary_field_key default_validator_rule)
+(detach_validator_from_submission primary_field_group default_validator_rule)
+(ingest_submission locale_field_variant)
+(allocate_processing_slot locale_field_variant worker_slot_2)
+(release_parser_rule primary_field_group default_parser_rule)
+(apply_parser_rule locale_field_variant default_parser_rule)
+(confirm_parse locale_field_variant default_parser_rule)
+(initiate_variant_key_resolution locale_field_variant default_format_profile default_parser_rule)
+(attach_validator_to_submission locale_field_variant default_validator_rule)
+(assign_validator_to_variant locale_field_variant default_format_profile default_validator_rule)
+(detach_validator_from_submission locale_field_variant default_validator_rule)
+(assemble_output_artifact primary_field_group locale_field_variant primary_field_key default_format_profile artifact_alpha)
+(apply_parser_rule primary_field_group default_parser_rule)
+(apply_schema_to_artifact artifact_alpha primary_field_group default_parser_rule)
+(finalize_field_group_artifact primary_field_group artifact_alpha)
+(finalize_field_variant_artifact locale_field_variant artifact_alpha)
+(release_parser_rule primary_field_group default_parser_rule)
+(apply_parser_rule locale_field_variant default_parser_rule)
+(attach_metadata_and_request_normalization locale_field_variant initial_metadata_bundle default_parser_rule)
+(complete_normalization_for_variant_and_release_slot locale_field_variant worker_slot_2 initial_metadata_bundle)
+(release_parser_rule locale_field_variant default_parser_rule)
+(apply_parser_rule primary_field_group default_parser_rule)
+(attach_metadata_and_request_normalization primary_field_group initial_metadata_bundle default_parser_rule)
+(complete_normalization_for_group_and_release_slot primary_field_group worker_slot_1 initial_metadata_bundle)
+(release_parser_rule primary_field_group default_parser_rule)
+(ingest_submission normalizer_alpha)
+(allocate_processing_slot normalizer_alpha worker_slot_1)
+(apply_parser_rule normalizer_alpha default_parser_rule)
+(confirm_parse normalizer_alpha default_parser_rule)
+(attach_transformer_module_to_normalizer normalizer_alpha default_transformer_module)
+(attach_validator_to_submission normalizer_alpha default_validator_rule)
+(apply_schema_element_to_artifact normalizer_alpha schema_element_a artifact_alpha)
+(enable_transformer_for_normalizer normalizer_alpha schema_element_a artifact_alpha default_parser_rule)
+(activate_transformer_on_normalizer normalizer_alpha default_transformer_module default_validator_rule schema_element_a artifact_alpha)
+(attach_policy_rule_to_normalizer normalizer_alpha privacy_policy_rule)
+(apply_policy_rule_enrichment normalizer_alpha privacy_policy_rule schema_element_a artifact_alpha)
+(mark_normalizer_ready_for_finalization normalizer_alpha)
+(attach_metadata_and_request_normalization normalizer_alpha initial_metadata_bundle default_parser_rule)
+(release_parser_rule normalizer_alpha default_parser_rule)
+(detach_policy_rule_from_normalizer normalizer_alpha privacy_policy_rule)
+(detach_transformer_module_from_normalizer normalizer_alpha default_transformer_module)
+(detach_validator_from_submission normalizer_alpha default_validator_rule)
+(complete_normalization_for_normalizer_and_release_slot normalizer_alpha worker_slot_1 initial_metadata_bundle)
+(ingest_submission normalizer_beta)
+(allocate_processing_slot normalizer_beta worker_slot_1)
+(apply_parser_rule normalizer_beta default_parser_rule)
+(confirm_parse normalizer_beta default_parser_rule)
+(attach_transformer_module_to_normalizer normalizer_beta default_transformer_module)
+(attach_validator_to_submission normalizer_beta default_validator_rule)
+(apply_schema_element_to_artifact normalizer_beta schema_element_b artifact_alpha)
+(enable_transformer_for_normalizer normalizer_beta schema_element_b artifact_alpha default_parser_rule)
+(activate_transformer_on_normalizer normalizer_beta default_transformer_module default_validator_rule schema_element_b artifact_alpha)
+(attach_policy_rule_to_normalizer normalizer_beta privacy_policy_rule)
+(apply_policy_rule_enrichment normalizer_beta privacy_policy_rule schema_element_b artifact_alpha)
+(mark_normalizer_ready_for_finalization normalizer_beta)
+(attach_metadata_and_request_normalization normalizer_beta initial_metadata_bundle default_parser_rule)
+(release_parser_rule normalizer_beta default_parser_rule)
+(detach_policy_rule_from_normalizer normalizer_beta privacy_policy_rule)
+(detach_transformer_module_from_normalizer normalizer_beta default_transformer_module)
+(detach_validator_from_submission normalizer_beta default_validator_rule)
+(complete_normalization_for_normalizer_and_release_slot normalizer_beta worker_slot_1 initial_metadata_bundle)
+
+--- VAL parsed / exit ---
+exit_code: 1
+executable: False
+goal_reached: False
+first_failing_step: None
+
+--- stdout ---
+Checking plan: /tmp/val_n_3_f7le/plan.pddl
+
+Plan failed to execute
+
+
+Failed plans:
+ /tmp/val_n_3_f7le/plan.pddl 
+
+
+--- stderr ---
+

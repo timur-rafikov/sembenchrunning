@@ -1,0 +1,937 @@
+(define (domain entity_relationship_binding_rules)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object entity_variant_group - base_object connector_group - base_object artifact_group - base_object entity_base_type - base_object business_entity - entity_base_type binding_token - entity_variant_group capability - entity_variant_group assignment_slot - entity_variant_group metadata_type - entity_variant_group policy_bundle - entity_variant_group external_key - entity_variant_group attachment - entity_variant_group credential - entity_variant_group auxiliary_attribute - connector_group component - connector_group tag - connector_group connector_left_role - artifact_group connector_right_role - artifact_group composite_artifact - artifact_group entity_family_a_container - business_entity entity_family_b_container - business_entity entity_family_a - entity_family_a_container entity_family_b - entity_family_a_container aggregate_profile - entity_family_b_container)
+
+  (:predicates
+    (entity_registered ?entity - business_entity)
+    (profile_active_marker ?entity - business_entity)
+    (configured_flag ?entity - business_entity)
+    (final_bound_flag ?entity - business_entity)
+    (publishable_flag ?entity - business_entity)
+    (pre_finalized_flag ?entity - business_entity)
+    (token_available ?binding_token - binding_token)
+    (token_binding ?entity - business_entity ?binding_token - binding_token)
+    (capability_available ?capability - capability)
+    (capability_binding ?entity - business_entity ?capability - capability)
+    (assignment_slot_available ?assignment_slot - assignment_slot)
+    (slot_binding ?entity - business_entity ?assignment_slot - assignment_slot)
+    (aux_attribute_available ?auxiliary_attribute - auxiliary_attribute)
+    (entity_attribute_link ?entity_family_a - entity_family_a ?auxiliary_attribute - auxiliary_attribute)
+    (entity_attribute_assignment ?entity_family_b - entity_family_b ?auxiliary_attribute - auxiliary_attribute)
+    (entity_connector_link ?entity_family_a - entity_family_a ?connector_left - connector_left_role)
+    (connector_left_ready ?connector_left - connector_left_role)
+    (connector_left_secondary_flag ?connector_left - connector_left_role)
+    (entity_family_a_secondary_flag ?entity_family_a - entity_family_a)
+    (entity_connector_right_link ?entity_family_b - entity_family_b ?connector_right - connector_right_role)
+    (connector_right_ready ?connector_right - connector_right_role)
+    (connector_right_secondary_flag ?connector_right - connector_right_role)
+    (entity_family_b_secondary_flag ?entity_family_b - entity_family_b)
+    (artifact_slot_available ?composite_artifact - composite_artifact)
+    (artifact_provisioned_flag ?composite_artifact - composite_artifact)
+    (artifact_bound_left_connector ?composite_artifact - composite_artifact ?connector_left - connector_left_role)
+    (artifact_bound_right_connector ?composite_artifact - composite_artifact ?connector_right - connector_right_role)
+    (artifact_flag_a ?composite_artifact - composite_artifact)
+    (artifact_flag_b ?composite_artifact - composite_artifact)
+    (artifact_ready_for_component ?composite_artifact - composite_artifact)
+    (aggregate_link_to_family_a ?aggregate_profile - aggregate_profile ?entity_family_a - entity_family_a)
+    (aggregate_link_to_family_b ?aggregate_profile - aggregate_profile ?entity_family_b - entity_family_b)
+    (aggregate_link_to_artifact ?aggregate_profile - aggregate_profile ?composite_artifact - composite_artifact)
+    (component_available ?component - component)
+    (aggregate_component_link ?aggregate_profile - aggregate_profile ?component - component)
+    (component_committed ?component - component)
+    (component_to_artifact_link ?component - component ?composite_artifact - composite_artifact)
+    (aggregate_component_validated_flag ?aggregate_profile - aggregate_profile)
+    (aggregate_component_staged_flag ?aggregate_profile - aggregate_profile)
+    (aggregate_policy_ready_flag ?aggregate_profile - aggregate_profile)
+    (metadata_reserved ?aggregate_profile - aggregate_profile)
+    (metadata_applied ?aggregate_profile - aggregate_profile)
+    (aggregate_postvalidation_flag ?aggregate_profile - aggregate_profile)
+    (aggregate_activation_flag ?aggregate_profile - aggregate_profile)
+    (tag_available ?tag - tag)
+    (aggregate_tag_link ?aggregate_profile - aggregate_profile ?tag - tag)
+    (aggregate_tagged_flag ?aggregate_profile - aggregate_profile)
+    (aggregate_tag_stage_flag ?aggregate_profile - aggregate_profile)
+    (aggregate_tag_approved_flag ?aggregate_profile - aggregate_profile)
+    (metadata_candidate ?metadata_type - metadata_type)
+    (aggregate_metadata_binding ?aggregate_profile - aggregate_profile ?metadata_type - metadata_type)
+    (policy_available ?policy_bundle - policy_bundle)
+    (aggregate_policy_binding ?aggregate_profile - aggregate_profile ?policy_bundle - policy_bundle)
+    (attachment_available ?attachment - attachment)
+    (aggregate_attachment_binding ?aggregate_profile - aggregate_profile ?attachment - attachment)
+    (credential_available ?credential - credential)
+    (aggregate_credential_binding ?aggregate_profile - aggregate_profile ?credential - credential)
+    (external_key_available ?external_key - external_key)
+    (external_key_link ?entity - business_entity ?external_key - external_key)
+    (entity_family_a_ready ?entity_family_a - entity_family_a)
+    (entity_family_b_ready ?entity_family_b - entity_family_b)
+    (aggregate_publish_flag ?aggregate_profile - aggregate_profile)
+  )
+  (:action register_entity
+    :parameters (?entity - business_entity)
+    :precondition
+      (and
+        (not
+          (entity_registered ?entity)
+        )
+        (not
+          (final_bound_flag ?entity)
+        )
+      )
+    :effect (entity_registered ?entity)
+  )
+  (:action assign_token_and_configure_entity
+    :parameters (?entity - business_entity ?binding_token - binding_token)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (not
+          (configured_flag ?entity)
+        )
+        (token_available ?binding_token)
+      )
+    :effect
+      (and
+        (configured_flag ?entity)
+        (token_binding ?entity ?binding_token)
+        (not
+          (token_available ?binding_token)
+        )
+      )
+  )
+  (:action attach_capability_to_entity
+    :parameters (?entity - business_entity ?capability - capability)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (configured_flag ?entity)
+        (capability_available ?capability)
+      )
+    :effect
+      (and
+        (capability_binding ?entity ?capability)
+        (not
+          (capability_available ?capability)
+        )
+      )
+  )
+  (:action activate_entity_profile
+    :parameters (?entity - business_entity ?capability - capability)
+    :precondition
+      (and
+        (entity_registered ?entity)
+        (configured_flag ?entity)
+        (capability_binding ?entity ?capability)
+        (not
+          (profile_active_marker ?entity)
+        )
+      )
+    :effect (profile_active_marker ?entity)
+  )
+  (:action detach_capability_from_entity
+    :parameters (?entity - business_entity ?capability - capability)
+    :precondition
+      (and
+        (capability_binding ?entity ?capability)
+      )
+    :effect
+      (and
+        (capability_available ?capability)
+        (not
+          (capability_binding ?entity ?capability)
+        )
+      )
+  )
+  (:action assign_slot_to_entity
+    :parameters (?entity - business_entity ?assignment_slot - assignment_slot)
+    :precondition
+      (and
+        (profile_active_marker ?entity)
+        (assignment_slot_available ?assignment_slot)
+      )
+    :effect
+      (and
+        (slot_binding ?entity ?assignment_slot)
+        (not
+          (assignment_slot_available ?assignment_slot)
+        )
+      )
+  )
+  (:action release_slot_from_entity
+    :parameters (?entity - business_entity ?assignment_slot - assignment_slot)
+    :precondition
+      (and
+        (slot_binding ?entity ?assignment_slot)
+      )
+    :effect
+      (and
+        (assignment_slot_available ?assignment_slot)
+        (not
+          (slot_binding ?entity ?assignment_slot)
+        )
+      )
+  )
+  (:action bind_attachment_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?attachment - attachment)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (attachment_available ?attachment)
+      )
+    :effect
+      (and
+        (aggregate_attachment_binding ?aggregate_profile ?attachment)
+        (not
+          (attachment_available ?attachment)
+        )
+      )
+  )
+  (:action unbind_attachment_from_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?attachment - attachment)
+    :precondition
+      (and
+        (aggregate_attachment_binding ?aggregate_profile ?attachment)
+      )
+    :effect
+      (and
+        (attachment_available ?attachment)
+        (not
+          (aggregate_attachment_binding ?aggregate_profile ?attachment)
+        )
+      )
+  )
+  (:action bind_credential_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (credential_available ?credential)
+      )
+    :effect
+      (and
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (not
+          (credential_available ?credential)
+        )
+      )
+  )
+  (:action unbind_credential_from_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential)
+    :precondition
+      (and
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+      )
+    :effect
+      (and
+        (credential_available ?credential)
+        (not
+          (aggregate_credential_binding ?aggregate_profile ?credential)
+        )
+      )
+  )
+  (:action mark_connector_left_ready
+    :parameters (?entity_family_a - entity_family_a ?connector_left - connector_left_role ?capability - capability)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_a)
+        (capability_binding ?entity_family_a ?capability)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (not
+          (connector_left_ready ?connector_left)
+        )
+        (not
+          (connector_left_secondary_flag ?connector_left)
+        )
+      )
+    :effect (connector_left_ready ?connector_left)
+  )
+  (:action confirm_family_a_ready_with_slot
+    :parameters (?entity_family_a - entity_family_a ?connector_left - connector_left_role ?assignment_slot - assignment_slot)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_a)
+        (slot_binding ?entity_family_a ?assignment_slot)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (connector_left_ready ?connector_left)
+        (not
+          (entity_family_a_ready ?entity_family_a)
+        )
+      )
+    :effect
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_a_secondary_flag ?entity_family_a)
+      )
+  )
+  (:action assign_aux_attribute_to_family_a
+    :parameters (?entity_family_a - entity_family_a ?connector_left - connector_left_role ?auxiliary_attribute - auxiliary_attribute)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_a)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (aux_attribute_available ?auxiliary_attribute)
+        (not
+          (entity_family_a_ready ?entity_family_a)
+        )
+      )
+    :effect
+      (and
+        (connector_left_secondary_flag ?connector_left)
+        (entity_family_a_ready ?entity_family_a)
+        (entity_attribute_link ?entity_family_a ?auxiliary_attribute)
+        (not
+          (aux_attribute_available ?auxiliary_attribute)
+        )
+      )
+  )
+  (:action consume_aux_attribute_and_toggle_family_a_flags
+    :parameters (?entity_family_a - entity_family_a ?connector_left - connector_left_role ?capability - capability ?auxiliary_attribute - auxiliary_attribute)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_a)
+        (capability_binding ?entity_family_a ?capability)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (connector_left_secondary_flag ?connector_left)
+        (entity_attribute_link ?entity_family_a ?auxiliary_attribute)
+        (not
+          (entity_family_a_secondary_flag ?entity_family_a)
+        )
+      )
+    :effect
+      (and
+        (connector_left_ready ?connector_left)
+        (entity_family_a_secondary_flag ?entity_family_a)
+        (aux_attribute_available ?auxiliary_attribute)
+        (not
+          (entity_attribute_link ?entity_family_a ?auxiliary_attribute)
+        )
+      )
+  )
+  (:action mark_connector_right_ready
+    :parameters (?entity_family_b - entity_family_b ?connector_right - connector_right_role ?capability - capability)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_b)
+        (capability_binding ?entity_family_b ?capability)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (not
+          (connector_right_ready ?connector_right)
+        )
+        (not
+          (connector_right_secondary_flag ?connector_right)
+        )
+      )
+    :effect (connector_right_ready ?connector_right)
+  )
+  (:action confirm_family_b_ready_with_slot
+    :parameters (?entity_family_b - entity_family_b ?connector_right - connector_right_role ?assignment_slot - assignment_slot)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_b)
+        (slot_binding ?entity_family_b ?assignment_slot)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_right_ready ?connector_right)
+        (not
+          (entity_family_b_ready ?entity_family_b)
+        )
+      )
+    :effect
+      (and
+        (entity_family_b_ready ?entity_family_b)
+        (entity_family_b_secondary_flag ?entity_family_b)
+      )
+  )
+  (:action assign_aux_attribute_to_family_b
+    :parameters (?entity_family_b - entity_family_b ?connector_right - connector_right_role ?auxiliary_attribute - auxiliary_attribute)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_b)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (aux_attribute_available ?auxiliary_attribute)
+        (not
+          (entity_family_b_ready ?entity_family_b)
+        )
+      )
+    :effect
+      (and
+        (connector_right_secondary_flag ?connector_right)
+        (entity_family_b_ready ?entity_family_b)
+        (entity_attribute_assignment ?entity_family_b ?auxiliary_attribute)
+        (not
+          (aux_attribute_available ?auxiliary_attribute)
+        )
+      )
+  )
+  (:action consume_aux_attribute_and_toggle_family_b_flags
+    :parameters (?entity_family_b - entity_family_b ?connector_right - connector_right_role ?capability - capability ?auxiliary_attribute - auxiliary_attribute)
+    :precondition
+      (and
+        (profile_active_marker ?entity_family_b)
+        (capability_binding ?entity_family_b ?capability)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_right_secondary_flag ?connector_right)
+        (entity_attribute_assignment ?entity_family_b ?auxiliary_attribute)
+        (not
+          (entity_family_b_secondary_flag ?entity_family_b)
+        )
+      )
+    :effect
+      (and
+        (connector_right_ready ?connector_right)
+        (entity_family_b_secondary_flag ?entity_family_b)
+        (aux_attribute_available ?auxiliary_attribute)
+        (not
+          (entity_attribute_assignment ?entity_family_b ?auxiliary_attribute)
+        )
+      )
+  )
+  (:action provision_artifact_and_bind_connectors
+    :parameters (?entity_family_a - entity_family_a ?entity_family_b - entity_family_b ?connector_left - connector_left_role ?connector_right - connector_right_role ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_b_ready ?entity_family_b)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_left_ready ?connector_left)
+        (connector_right_ready ?connector_right)
+        (entity_family_a_secondary_flag ?entity_family_a)
+        (entity_family_b_secondary_flag ?entity_family_b)
+        (artifact_slot_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_bound_left_connector ?composite_artifact ?connector_left)
+        (artifact_bound_right_connector ?composite_artifact ?connector_right)
+        (not
+          (artifact_slot_available ?composite_artifact)
+        )
+      )
+  )
+  (:action provision_artifact_with_flag_a
+    :parameters (?entity_family_a - entity_family_a ?entity_family_b - entity_family_b ?connector_left - connector_left_role ?connector_right - connector_right_role ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_b_ready ?entity_family_b)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_left_secondary_flag ?connector_left)
+        (connector_right_ready ?connector_right)
+        (not
+          (entity_family_a_secondary_flag ?entity_family_a)
+        )
+        (entity_family_b_secondary_flag ?entity_family_b)
+        (artifact_slot_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_bound_left_connector ?composite_artifact ?connector_left)
+        (artifact_bound_right_connector ?composite_artifact ?connector_right)
+        (artifact_flag_a ?composite_artifact)
+        (not
+          (artifact_slot_available ?composite_artifact)
+        )
+      )
+  )
+  (:action provision_artifact_with_flag_b
+    :parameters (?entity_family_a - entity_family_a ?entity_family_b - entity_family_b ?connector_left - connector_left_role ?connector_right - connector_right_role ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_b_ready ?entity_family_b)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_left_ready ?connector_left)
+        (connector_right_secondary_flag ?connector_right)
+        (entity_family_a_secondary_flag ?entity_family_a)
+        (not
+          (entity_family_b_secondary_flag ?entity_family_b)
+        )
+        (artifact_slot_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_bound_left_connector ?composite_artifact ?connector_left)
+        (artifact_bound_right_connector ?composite_artifact ?connector_right)
+        (artifact_flag_b ?composite_artifact)
+        (not
+          (artifact_slot_available ?composite_artifact)
+        )
+      )
+  )
+  (:action provision_artifact_with_flags_ab
+    :parameters (?entity_family_a - entity_family_a ?entity_family_b - entity_family_b ?connector_left - connector_left_role ?connector_right - connector_right_role ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_b_ready ?entity_family_b)
+        (entity_connector_link ?entity_family_a ?connector_left)
+        (entity_connector_right_link ?entity_family_b ?connector_right)
+        (connector_left_secondary_flag ?connector_left)
+        (connector_right_secondary_flag ?connector_right)
+        (not
+          (entity_family_a_secondary_flag ?entity_family_a)
+        )
+        (not
+          (entity_family_b_secondary_flag ?entity_family_b)
+        )
+        (artifact_slot_available ?composite_artifact)
+      )
+    :effect
+      (and
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_bound_left_connector ?composite_artifact ?connector_left)
+        (artifact_bound_right_connector ?composite_artifact ?connector_right)
+        (artifact_flag_a ?composite_artifact)
+        (artifact_flag_b ?composite_artifact)
+        (not
+          (artifact_slot_available ?composite_artifact)
+        )
+      )
+  )
+  (:action mark_artifact_ready_for_component
+    :parameters (?composite_artifact - composite_artifact ?entity_family_a - entity_family_a ?capability - capability)
+    :precondition
+      (and
+        (artifact_provisioned_flag ?composite_artifact)
+        (entity_family_a_ready ?entity_family_a)
+        (capability_binding ?entity_family_a ?capability)
+        (not
+          (artifact_ready_for_component ?composite_artifact)
+        )
+      )
+    :effect (artifact_ready_for_component ?composite_artifact)
+  )
+  (:action commit_component_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (aggregate_link_to_artifact ?aggregate_profile ?composite_artifact)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_available ?component)
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_ready_for_component ?composite_artifact)
+        (not
+          (component_committed ?component)
+        )
+      )
+    :effect
+      (and
+        (component_committed ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action validate_aggregate_component_binding
+    :parameters (?aggregate_profile - aggregate_profile ?component - component ?composite_artifact - composite_artifact ?capability - capability)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_committed ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (capability_binding ?aggregate_profile ?capability)
+        (not
+          (artifact_flag_a ?composite_artifact)
+        )
+        (not
+          (aggregate_component_validated_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_component_validated_flag ?aggregate_profile)
+  )
+  (:action reserve_and_bind_metadata_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?metadata_type - metadata_type)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (metadata_candidate ?metadata_type)
+        (not
+          (metadata_reserved ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (metadata_reserved ?aggregate_profile)
+        (aggregate_metadata_binding ?aggregate_profile ?metadata_type)
+        (not
+          (metadata_candidate ?metadata_type)
+        )
+      )
+  )
+  (:action apply_metadata_and_stage_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?component - component ?composite_artifact - composite_artifact ?capability - capability ?metadata_type - metadata_type)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_committed ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (capability_binding ?aggregate_profile ?capability)
+        (artifact_flag_a ?composite_artifact)
+        (metadata_reserved ?aggregate_profile)
+        (aggregate_metadata_binding ?aggregate_profile ?metadata_type)
+        (not
+          (aggregate_component_validated_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_component_validated_flag ?aggregate_profile)
+        (metadata_applied ?aggregate_profile)
+      )
+  )
+  (:action stage_aggregate_component_attach
+    :parameters (?aggregate_profile - aggregate_profile ?attachment - attachment ?assignment_slot - assignment_slot ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_validated_flag ?aggregate_profile)
+        (aggregate_attachment_binding ?aggregate_profile ?attachment)
+        (slot_binding ?aggregate_profile ?assignment_slot)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (not
+          (artifact_flag_b ?composite_artifact)
+        )
+        (not
+          (aggregate_component_staged_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_component_staged_flag ?aggregate_profile)
+  )
+  (:action stage_aggregate_component_commit
+    :parameters (?aggregate_profile - aggregate_profile ?attachment - attachment ?assignment_slot - assignment_slot ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_validated_flag ?aggregate_profile)
+        (aggregate_attachment_binding ?aggregate_profile ?attachment)
+        (slot_binding ?aggregate_profile ?assignment_slot)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (artifact_flag_b ?composite_artifact)
+        (not
+          (aggregate_component_staged_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_component_staged_flag ?aggregate_profile)
+  )
+  (:action mark_aggregate_policy_ready
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_staged_flag ?aggregate_profile)
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (not
+          (artifact_flag_a ?composite_artifact)
+        )
+        (not
+          (artifact_flag_b ?composite_artifact)
+        )
+        (not
+          (aggregate_policy_ready_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_policy_ready_flag ?aggregate_profile)
+  )
+  (:action mark_policy_ready_and_apply_postvalidation
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_staged_flag ?aggregate_profile)
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (artifact_flag_a ?composite_artifact)
+        (not
+          (artifact_flag_b ?composite_artifact)
+        )
+        (not
+          (aggregate_policy_ready_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_postvalidation_flag ?aggregate_profile)
+      )
+  )
+  (:action mark_policy_ready_and_apply_postvalidation_variant
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_staged_flag ?aggregate_profile)
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (not
+          (artifact_flag_a ?composite_artifact)
+        )
+        (artifact_flag_b ?composite_artifact)
+        (not
+          (aggregate_policy_ready_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_postvalidation_flag ?aggregate_profile)
+      )
+  )
+  (:action mark_policy_ready_and_apply_postvalidation_full
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential ?component - component ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (aggregate_component_staged_flag ?aggregate_profile)
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (aggregate_component_link ?aggregate_profile ?component)
+        (component_to_artifact_link ?component ?composite_artifact)
+        (artifact_flag_a ?composite_artifact)
+        (artifact_flag_b ?composite_artifact)
+        (not
+          (aggregate_policy_ready_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_postvalidation_flag ?aggregate_profile)
+      )
+  )
+  (:action set_aggregate_publishable_flag
+    :parameters (?aggregate_profile - aggregate_profile)
+    :precondition
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (not
+          (aggregate_postvalidation_flag ?aggregate_profile)
+        )
+        (not
+          (aggregate_publish_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_publish_flag ?aggregate_profile)
+        (publishable_flag ?aggregate_profile)
+      )
+  )
+  (:action bind_policy_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?policy_bundle - policy_bundle)
+    :precondition
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_postvalidation_flag ?aggregate_profile)
+        (policy_available ?policy_bundle)
+      )
+    :effect
+      (and
+        (aggregate_policy_binding ?aggregate_profile ?policy_bundle)
+        (not
+          (policy_available ?policy_bundle)
+        )
+      )
+  )
+  (:action activate_aggregate_profile
+    :parameters (?aggregate_profile - aggregate_profile ?entity_family_a - entity_family_a ?entity_family_b - entity_family_b ?capability - capability ?policy_bundle - policy_bundle)
+    :precondition
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_postvalidation_flag ?aggregate_profile)
+        (aggregate_policy_binding ?aggregate_profile ?policy_bundle)
+        (aggregate_link_to_family_a ?aggregate_profile ?entity_family_a)
+        (aggregate_link_to_family_b ?aggregate_profile ?entity_family_b)
+        (entity_family_a_secondary_flag ?entity_family_a)
+        (entity_family_b_secondary_flag ?entity_family_b)
+        (capability_binding ?aggregate_profile ?capability)
+        (not
+          (aggregate_activation_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_activation_flag ?aggregate_profile)
+  )
+  (:action finalize_and_publish_aggregate_profile
+    :parameters (?aggregate_profile - aggregate_profile)
+    :precondition
+      (and
+        (aggregate_policy_ready_flag ?aggregate_profile)
+        (aggregate_activation_flag ?aggregate_profile)
+        (not
+          (aggregate_publish_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_publish_flag ?aggregate_profile)
+        (publishable_flag ?aggregate_profile)
+      )
+  )
+  (:action apply_tag_to_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?tag - tag ?capability - capability)
+    :precondition
+      (and
+        (profile_active_marker ?aggregate_profile)
+        (capability_binding ?aggregate_profile ?capability)
+        (tag_available ?tag)
+        (aggregate_tag_link ?aggregate_profile ?tag)
+        (not
+          (aggregate_tagged_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_tagged_flag ?aggregate_profile)
+        (not
+          (tag_available ?tag)
+        )
+      )
+  )
+  (:action stage_tag_on_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?assignment_slot - assignment_slot)
+    :precondition
+      (and
+        (aggregate_tagged_flag ?aggregate_profile)
+        (slot_binding ?aggregate_profile ?assignment_slot)
+        (not
+          (aggregate_tag_stage_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_tag_stage_flag ?aggregate_profile)
+  )
+  (:action approve_tag_on_aggregate
+    :parameters (?aggregate_profile - aggregate_profile ?credential - credential)
+    :precondition
+      (and
+        (aggregate_tag_stage_flag ?aggregate_profile)
+        (aggregate_credential_binding ?aggregate_profile ?credential)
+        (not
+          (aggregate_tag_approved_flag ?aggregate_profile)
+        )
+      )
+    :effect (aggregate_tag_approved_flag ?aggregate_profile)
+  )
+  (:action publish_aggregate_from_tag_approval
+    :parameters (?aggregate_profile - aggregate_profile)
+    :precondition
+      (and
+        (aggregate_tag_approved_flag ?aggregate_profile)
+        (not
+          (aggregate_publish_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (aggregate_publish_flag ?aggregate_profile)
+        (publishable_flag ?aggregate_profile)
+      )
+  )
+  (:action publish_entity_family_a
+    :parameters (?entity_family_a - entity_family_a ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_a_ready ?entity_family_a)
+        (entity_family_a_secondary_flag ?entity_family_a)
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_ready_for_component ?composite_artifact)
+        (not
+          (publishable_flag ?entity_family_a)
+        )
+      )
+    :effect (publishable_flag ?entity_family_a)
+  )
+  (:action publish_entity_family_b
+    :parameters (?entity_family_b - entity_family_b ?composite_artifact - composite_artifact)
+    :precondition
+      (and
+        (entity_family_b_ready ?entity_family_b)
+        (entity_family_b_secondary_flag ?entity_family_b)
+        (artifact_provisioned_flag ?composite_artifact)
+        (artifact_ready_for_component ?composite_artifact)
+        (not
+          (publishable_flag ?entity_family_b)
+        )
+      )
+    :effect (publishable_flag ?entity_family_b)
+  )
+  (:action bind_external_key_to_entity
+    :parameters (?entity - business_entity ?external_key - external_key ?capability - capability)
+    :precondition
+      (and
+        (publishable_flag ?entity)
+        (capability_binding ?entity ?capability)
+        (external_key_available ?external_key)
+        (not
+          (pre_finalized_flag ?entity)
+        )
+      )
+    :effect
+      (and
+        (pre_finalized_flag ?entity)
+        (external_key_link ?entity ?external_key)
+        (not
+          (external_key_available ?external_key)
+        )
+      )
+  )
+  (:action finalize_entity_binding_family_a
+    :parameters (?entity_family_a - entity_family_a ?binding_token - binding_token ?external_key - external_key)
+    :precondition
+      (and
+        (pre_finalized_flag ?entity_family_a)
+        (token_binding ?entity_family_a ?binding_token)
+        (external_key_link ?entity_family_a ?external_key)
+        (not
+          (final_bound_flag ?entity_family_a)
+        )
+      )
+    :effect
+      (and
+        (final_bound_flag ?entity_family_a)
+        (token_available ?binding_token)
+        (external_key_available ?external_key)
+      )
+  )
+  (:action finalize_entity_binding_family_b
+    :parameters (?entity_family_b - entity_family_b ?binding_token - binding_token ?external_key - external_key)
+    :precondition
+      (and
+        (pre_finalized_flag ?entity_family_b)
+        (token_binding ?entity_family_b ?binding_token)
+        (external_key_link ?entity_family_b ?external_key)
+        (not
+          (final_bound_flag ?entity_family_b)
+        )
+      )
+    :effect
+      (and
+        (final_bound_flag ?entity_family_b)
+        (token_available ?binding_token)
+        (external_key_available ?external_key)
+      )
+  )
+  (:action finalize_aggregate_binding_and_release_resources
+    :parameters (?aggregate_profile - aggregate_profile ?binding_token - binding_token ?external_key - external_key)
+    :precondition
+      (and
+        (pre_finalized_flag ?aggregate_profile)
+        (token_binding ?aggregate_profile ?binding_token)
+        (external_key_link ?aggregate_profile ?external_key)
+        (not
+          (final_bound_flag ?aggregate_profile)
+        )
+      )
+    :effect
+      (and
+        (final_bound_flag ?aggregate_profile)
+        (token_available ?binding_token)
+        (external_key_available ?external_key)
+      )
+  )
+)

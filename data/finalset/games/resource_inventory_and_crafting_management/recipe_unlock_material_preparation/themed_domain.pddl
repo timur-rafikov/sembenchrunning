@@ -1,0 +1,937 @@
+(define (domain recipe_unlock_preparation_domain)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types entity - object resource_category_primary - entity resource_category_secondary - entity resource_category_tertiary - entity recipe_container - entity recipe - recipe_container supply_source - resource_category_primary tool_item - resource_category_primary attachment_item - resource_category_primary tuning_module - resource_category_primary quality_seal - resource_category_primary unlock_token - resource_category_primary maintenance_part - resource_category_primary specialist_cert - resource_category_primary consumable_reagent - resource_category_secondary component - resource_category_secondary specialist - resource_category_secondary ingredient_type_a - resource_category_tertiary ingredient_type_b - resource_category_tertiary prepared_packet - resource_category_tertiary recipe_base_type - recipe recipe_alt_type - recipe base_source - recipe_base_type supplement_source - recipe_base_type workstation - recipe_alt_type)
+
+  (:predicates
+    (preparation_queued ?recipe - recipe)
+    (preparation_ready ?recipe - recipe)
+    (preparation_supply_reserved ?recipe - recipe)
+    (preparation_unlocked ?recipe - recipe)
+    (preparation_ready_for_unlock ?recipe - recipe)
+    (preparation_unlock_initiated ?recipe - recipe)
+    (supply_available ?supply_source - supply_source)
+    (preparation_allocated_to_supply ?recipe - recipe ?supply_source - supply_source)
+    (tool_available ?tool_item - tool_item)
+    (preparation_has_tool_assignment ?recipe - recipe ?tool_item - tool_item)
+    (attachment_available ?attachment_item - attachment_item)
+    (preparation_has_attachment ?recipe - recipe ?attachment_item - attachment_item)
+    (reagent_available ?consumable_reagent - consumable_reagent)
+    (base_source_has_reagent ?base_source - base_source ?consumable_reagent - consumable_reagent)
+    (supplement_source_has_reagent ?supplement_source - supplement_source ?consumable_reagent - consumable_reagent)
+    (base_source_uses_ingredient ?base_source - base_source ?ingredient_type_a - ingredient_type_a)
+    (ingredient_a_prepared ?ingredient_type_a - ingredient_type_a)
+    (ingredient_a_processed ?ingredient_type_a - ingredient_type_a)
+    (base_source_ready ?base_source - base_source)
+    (supplement_source_uses_ingredient ?supplement_source - supplement_source ?ingredient_type_b - ingredient_type_b)
+    (ingredient_b_prepared ?ingredient_type_b - ingredient_type_b)
+    (ingredient_b_processed ?ingredient_type_b - ingredient_type_b)
+    (supplement_source_ready ?supplement_source - supplement_source)
+    (prepared_packet_slot ?prepared_packet - prepared_packet)
+    (prepared_packet_ready ?prepared_packet - prepared_packet)
+    (packet_has_ingredient_a ?prepared_packet - prepared_packet ?ingredient_type_a - ingredient_type_a)
+    (packet_has_ingredient_b ?prepared_packet - prepared_packet ?ingredient_type_b - ingredient_type_b)
+    (packet_feature_a ?prepared_packet - prepared_packet)
+    (packet_feature_b ?prepared_packet - prepared_packet)
+    (packet_inspected ?prepared_packet - prepared_packet)
+    (workstation_bound_to_base_source ?workstation - workstation ?base_source - base_source)
+    (workstation_bound_to_supplement_source ?workstation - workstation ?supplement_source - supplement_source)
+    (workstation_packet_slot ?workstation - workstation ?prepared_packet - prepared_packet)
+    (component_available ?component - component)
+    (workstation_has_component ?workstation - workstation ?component - component)
+    (component_installed ?component - component)
+    (component_attached_to_packet ?component - component ?prepared_packet - prepared_packet)
+    (workstation_configured ?workstation - workstation)
+    (workstation_module_ready ?workstation - workstation)
+    (workstation_certified_step ?workstation - workstation)
+    (workstation_tuning_module_installed ?workstation - workstation)
+    (workstation_tuning_applied ?workstation - workstation)
+    (workstation_quality_sealed ?workstation - workstation)
+    (workstation_finalized ?workstation - workstation)
+    (specialist_available ?specialist - specialist)
+    (workstation_assigned_specialist ?workstation - workstation ?specialist - specialist)
+    (workstation_specialist_authorized ?workstation - workstation)
+    (workstation_ready_for_specialist_operation ?workstation - workstation)
+    (workstation_maintenance_applied ?workstation - workstation)
+    (tuning_module_available ?tuning_module - tuning_module)
+    (workstation_assigned_tuning_module ?workstation - workstation ?tuning_module - tuning_module)
+    (quality_seal_available ?quality_seal - quality_seal)
+    (workstation_has_quality_seal ?workstation - workstation ?quality_seal - quality_seal)
+    (maintenance_part_available ?maintenance_part - maintenance_part)
+    (workstation_has_maintenance_part ?workstation - workstation ?maintenance_part - maintenance_part)
+    (specialist_cert_available ?specialist_cert - specialist_cert)
+    (workstation_has_specialist_cert ?workstation - workstation ?specialist_cert - specialist_cert)
+    (unlock_token_available ?unlock_token - unlock_token)
+    (preparation_assigned_unlock_token ?recipe - recipe ?unlock_token - unlock_token)
+    (base_source_prepared ?base_source - base_source)
+    (supplement_source_prepared ?supplement_source - supplement_source)
+    (workstation_completed ?workstation - workstation)
+  )
+  (:action queue_preparation
+    :parameters (?recipe - recipe)
+    :precondition
+      (and
+        (not
+          (preparation_queued ?recipe)
+        )
+        (not
+          (preparation_unlocked ?recipe)
+        )
+      )
+    :effect (preparation_queued ?recipe)
+  )
+  (:action reserve_supply_for_preparation
+    :parameters (?recipe - recipe ?supply_source - supply_source)
+    :precondition
+      (and
+        (preparation_queued ?recipe)
+        (not
+          (preparation_supply_reserved ?recipe)
+        )
+        (supply_available ?supply_source)
+      )
+    :effect
+      (and
+        (preparation_supply_reserved ?recipe)
+        (preparation_allocated_to_supply ?recipe ?supply_source)
+        (not
+          (supply_available ?supply_source)
+        )
+      )
+  )
+  (:action assign_tool_to_preparation
+    :parameters (?recipe - recipe ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_queued ?recipe)
+        (preparation_supply_reserved ?recipe)
+        (tool_available ?tool_item)
+      )
+    :effect
+      (and
+        (preparation_has_tool_assignment ?recipe ?tool_item)
+        (not
+          (tool_available ?tool_item)
+        )
+      )
+  )
+  (:action confirm_preparation_assignment
+    :parameters (?recipe - recipe ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_queued ?recipe)
+        (preparation_supply_reserved ?recipe)
+        (preparation_has_tool_assignment ?recipe ?tool_item)
+        (not
+          (preparation_ready ?recipe)
+        )
+      )
+    :effect (preparation_ready ?recipe)
+  )
+  (:action release_tool_from_preparation
+    :parameters (?recipe - recipe ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_has_tool_assignment ?recipe ?tool_item)
+      )
+    :effect
+      (and
+        (tool_available ?tool_item)
+        (not
+          (preparation_has_tool_assignment ?recipe ?tool_item)
+        )
+      )
+  )
+  (:action attach_attachment_to_preparation
+    :parameters (?recipe - recipe ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (preparation_ready ?recipe)
+        (attachment_available ?attachment_item)
+      )
+    :effect
+      (and
+        (preparation_has_attachment ?recipe ?attachment_item)
+        (not
+          (attachment_available ?attachment_item)
+        )
+      )
+  )
+  (:action detach_attachment_from_preparation
+    :parameters (?recipe - recipe ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (preparation_has_attachment ?recipe ?attachment_item)
+      )
+    :effect
+      (and
+        (attachment_available ?attachment_item)
+        (not
+          (preparation_has_attachment ?recipe ?attachment_item)
+        )
+      )
+  )
+  (:action install_maintenance_part
+    :parameters (?workstation - workstation ?maintenance_part - maintenance_part)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (maintenance_part_available ?maintenance_part)
+      )
+    :effect
+      (and
+        (workstation_has_maintenance_part ?workstation ?maintenance_part)
+        (not
+          (maintenance_part_available ?maintenance_part)
+        )
+      )
+  )
+  (:action remove_maintenance_part
+    :parameters (?workstation - workstation ?maintenance_part - maintenance_part)
+    :precondition
+      (and
+        (workstation_has_maintenance_part ?workstation ?maintenance_part)
+      )
+    :effect
+      (and
+        (maintenance_part_available ?maintenance_part)
+        (not
+          (workstation_has_maintenance_part ?workstation ?maintenance_part)
+        )
+      )
+  )
+  (:action apply_specialist_cert_to_workstation
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (specialist_cert_available ?specialist_cert)
+      )
+    :effect
+      (and
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (not
+          (specialist_cert_available ?specialist_cert)
+        )
+      )
+  )
+  (:action remove_specialist_cert_from_workstation
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert)
+    :precondition
+      (and
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+      )
+    :effect
+      (and
+        (specialist_cert_available ?specialist_cert)
+        (not
+          (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        )
+      )
+  )
+  (:action prepare_base_source_ingredient
+    :parameters (?base_source - base_source ?ingredient_type_a - ingredient_type_a ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_ready ?base_source)
+        (preparation_has_tool_assignment ?base_source ?tool_item)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (not
+          (ingredient_a_prepared ?ingredient_type_a)
+        )
+        (not
+          (ingredient_a_processed ?ingredient_type_a)
+        )
+      )
+    :effect (ingredient_a_prepared ?ingredient_type_a)
+  )
+  (:action finalize_base_source_ingredient
+    :parameters (?base_source - base_source ?ingredient_type_a - ingredient_type_a ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (preparation_ready ?base_source)
+        (preparation_has_attachment ?base_source ?attachment_item)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (ingredient_a_prepared ?ingredient_type_a)
+        (not
+          (base_source_prepared ?base_source)
+        )
+      )
+    :effect
+      (and
+        (base_source_prepared ?base_source)
+        (base_source_ready ?base_source)
+      )
+  )
+  (:action apply_reagent_to_base_source
+    :parameters (?base_source - base_source ?ingredient_type_a - ingredient_type_a ?consumable_reagent - consumable_reagent)
+    :precondition
+      (and
+        (preparation_ready ?base_source)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (reagent_available ?consumable_reagent)
+        (not
+          (base_source_prepared ?base_source)
+        )
+      )
+    :effect
+      (and
+        (ingredient_a_processed ?ingredient_type_a)
+        (base_source_prepared ?base_source)
+        (base_source_has_reagent ?base_source ?consumable_reagent)
+        (not
+          (reagent_available ?consumable_reagent)
+        )
+      )
+  )
+  (:action process_base_source_ingredient
+    :parameters (?base_source - base_source ?ingredient_type_a - ingredient_type_a ?tool_item - tool_item ?consumable_reagent - consumable_reagent)
+    :precondition
+      (and
+        (preparation_ready ?base_source)
+        (preparation_has_tool_assignment ?base_source ?tool_item)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (ingredient_a_processed ?ingredient_type_a)
+        (base_source_has_reagent ?base_source ?consumable_reagent)
+        (not
+          (base_source_ready ?base_source)
+        )
+      )
+    :effect
+      (and
+        (ingredient_a_prepared ?ingredient_type_a)
+        (base_source_ready ?base_source)
+        (reagent_available ?consumable_reagent)
+        (not
+          (base_source_has_reagent ?base_source ?consumable_reagent)
+        )
+      )
+  )
+  (:action prepare_supplement_source_ingredient
+    :parameters (?supplement_source - supplement_source ?ingredient_type_b - ingredient_type_b ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_ready ?supplement_source)
+        (preparation_has_tool_assignment ?supplement_source ?tool_item)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (not
+          (ingredient_b_prepared ?ingredient_type_b)
+        )
+        (not
+          (ingredient_b_processed ?ingredient_type_b)
+        )
+      )
+    :effect (ingredient_b_prepared ?ingredient_type_b)
+  )
+  (:action finalize_supplement_source_ingredient
+    :parameters (?supplement_source - supplement_source ?ingredient_type_b - ingredient_type_b ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (preparation_ready ?supplement_source)
+        (preparation_has_attachment ?supplement_source ?attachment_item)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_b_prepared ?ingredient_type_b)
+        (not
+          (supplement_source_prepared ?supplement_source)
+        )
+      )
+    :effect
+      (and
+        (supplement_source_prepared ?supplement_source)
+        (supplement_source_ready ?supplement_source)
+      )
+  )
+  (:action apply_reagent_to_supplement_source
+    :parameters (?supplement_source - supplement_source ?ingredient_type_b - ingredient_type_b ?consumable_reagent - consumable_reagent)
+    :precondition
+      (and
+        (preparation_ready ?supplement_source)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (reagent_available ?consumable_reagent)
+        (not
+          (supplement_source_prepared ?supplement_source)
+        )
+      )
+    :effect
+      (and
+        (ingredient_b_processed ?ingredient_type_b)
+        (supplement_source_prepared ?supplement_source)
+        (supplement_source_has_reagent ?supplement_source ?consumable_reagent)
+        (not
+          (reagent_available ?consumable_reagent)
+        )
+      )
+  )
+  (:action process_supplement_source_ingredient
+    :parameters (?supplement_source - supplement_source ?ingredient_type_b - ingredient_type_b ?tool_item - tool_item ?consumable_reagent - consumable_reagent)
+    :precondition
+      (and
+        (preparation_ready ?supplement_source)
+        (preparation_has_tool_assignment ?supplement_source ?tool_item)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_b_processed ?ingredient_type_b)
+        (supplement_source_has_reagent ?supplement_source ?consumable_reagent)
+        (not
+          (supplement_source_ready ?supplement_source)
+        )
+      )
+    :effect
+      (and
+        (ingredient_b_prepared ?ingredient_type_b)
+        (supplement_source_ready ?supplement_source)
+        (reagent_available ?consumable_reagent)
+        (not
+          (supplement_source_has_reagent ?supplement_source ?consumable_reagent)
+        )
+      )
+  )
+  (:action assemble_prepared_packet
+    :parameters (?base_source - base_source ?supplement_source - supplement_source ?ingredient_type_a - ingredient_type_a ?ingredient_type_b - ingredient_type_b ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (base_source_prepared ?base_source)
+        (supplement_source_prepared ?supplement_source)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_a_prepared ?ingredient_type_a)
+        (ingredient_b_prepared ?ingredient_type_b)
+        (base_source_ready ?base_source)
+        (supplement_source_ready ?supplement_source)
+        (prepared_packet_slot ?prepared_packet)
+      )
+    :effect
+      (and
+        (prepared_packet_ready ?prepared_packet)
+        (packet_has_ingredient_a ?prepared_packet ?ingredient_type_a)
+        (packet_has_ingredient_b ?prepared_packet ?ingredient_type_b)
+        (not
+          (prepared_packet_slot ?prepared_packet)
+        )
+      )
+  )
+  (:action assemble_prepared_packet_with_feature_a
+    :parameters (?base_source - base_source ?supplement_source - supplement_source ?ingredient_type_a - ingredient_type_a ?ingredient_type_b - ingredient_type_b ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (base_source_prepared ?base_source)
+        (supplement_source_prepared ?supplement_source)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_a_processed ?ingredient_type_a)
+        (ingredient_b_prepared ?ingredient_type_b)
+        (not
+          (base_source_ready ?base_source)
+        )
+        (supplement_source_ready ?supplement_source)
+        (prepared_packet_slot ?prepared_packet)
+      )
+    :effect
+      (and
+        (prepared_packet_ready ?prepared_packet)
+        (packet_has_ingredient_a ?prepared_packet ?ingredient_type_a)
+        (packet_has_ingredient_b ?prepared_packet ?ingredient_type_b)
+        (packet_feature_a ?prepared_packet)
+        (not
+          (prepared_packet_slot ?prepared_packet)
+        )
+      )
+  )
+  (:action assemble_prepared_packet_with_feature_b
+    :parameters (?base_source - base_source ?supplement_source - supplement_source ?ingredient_type_a - ingredient_type_a ?ingredient_type_b - ingredient_type_b ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (base_source_prepared ?base_source)
+        (supplement_source_prepared ?supplement_source)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_a_prepared ?ingredient_type_a)
+        (ingredient_b_processed ?ingredient_type_b)
+        (base_source_ready ?base_source)
+        (not
+          (supplement_source_ready ?supplement_source)
+        )
+        (prepared_packet_slot ?prepared_packet)
+      )
+    :effect
+      (and
+        (prepared_packet_ready ?prepared_packet)
+        (packet_has_ingredient_a ?prepared_packet ?ingredient_type_a)
+        (packet_has_ingredient_b ?prepared_packet ?ingredient_type_b)
+        (packet_feature_b ?prepared_packet)
+        (not
+          (prepared_packet_slot ?prepared_packet)
+        )
+      )
+  )
+  (:action assemble_prepared_packet_with_combined_features
+    :parameters (?base_source - base_source ?supplement_source - supplement_source ?ingredient_type_a - ingredient_type_a ?ingredient_type_b - ingredient_type_b ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (base_source_prepared ?base_source)
+        (supplement_source_prepared ?supplement_source)
+        (base_source_uses_ingredient ?base_source ?ingredient_type_a)
+        (supplement_source_uses_ingredient ?supplement_source ?ingredient_type_b)
+        (ingredient_a_processed ?ingredient_type_a)
+        (ingredient_b_processed ?ingredient_type_b)
+        (not
+          (base_source_ready ?base_source)
+        )
+        (not
+          (supplement_source_ready ?supplement_source)
+        )
+        (prepared_packet_slot ?prepared_packet)
+      )
+    :effect
+      (and
+        (prepared_packet_ready ?prepared_packet)
+        (packet_has_ingredient_a ?prepared_packet ?ingredient_type_a)
+        (packet_has_ingredient_b ?prepared_packet ?ingredient_type_b)
+        (packet_feature_a ?prepared_packet)
+        (packet_feature_b ?prepared_packet)
+        (not
+          (prepared_packet_slot ?prepared_packet)
+        )
+      )
+  )
+  (:action inspect_and_finalize_packet
+    :parameters (?prepared_packet - prepared_packet ?base_source - base_source ?tool_item - tool_item)
+    :precondition
+      (and
+        (prepared_packet_ready ?prepared_packet)
+        (base_source_prepared ?base_source)
+        (preparation_has_tool_assignment ?base_source ?tool_item)
+        (not
+          (packet_inspected ?prepared_packet)
+        )
+      )
+    :effect (packet_inspected ?prepared_packet)
+  )
+  (:action install_component_on_workstation
+    :parameters (?workstation - workstation ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (workstation_packet_slot ?workstation ?prepared_packet)
+        (workstation_has_component ?workstation ?component)
+        (component_available ?component)
+        (prepared_packet_ready ?prepared_packet)
+        (packet_inspected ?prepared_packet)
+        (not
+          (component_installed ?component)
+        )
+      )
+    :effect
+      (and
+        (component_installed ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (not
+          (component_available ?component)
+        )
+      )
+  )
+  (:action configure_workstation_after_component
+    :parameters (?workstation - workstation ?component - component ?prepared_packet - prepared_packet ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (workstation_has_component ?workstation ?component)
+        (component_installed ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (preparation_has_tool_assignment ?workstation ?tool_item)
+        (not
+          (packet_feature_a ?prepared_packet)
+        )
+        (not
+          (workstation_configured ?workstation)
+        )
+      )
+    :effect (workstation_configured ?workstation)
+  )
+  (:action attach_tuning_module_to_workstation
+    :parameters (?workstation - workstation ?tuning_module - tuning_module)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (tuning_module_available ?tuning_module)
+        (not
+          (workstation_tuning_module_installed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_tuning_module_installed ?workstation)
+        (workstation_assigned_tuning_module ?workstation ?tuning_module)
+        (not
+          (tuning_module_available ?tuning_module)
+        )
+      )
+  )
+  (:action apply_tuning_module_and_component
+    :parameters (?workstation - workstation ?component - component ?prepared_packet - prepared_packet ?tool_item - tool_item ?tuning_module - tuning_module)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (workstation_has_component ?workstation ?component)
+        (component_installed ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (preparation_has_tool_assignment ?workstation ?tool_item)
+        (packet_feature_a ?prepared_packet)
+        (workstation_tuning_module_installed ?workstation)
+        (workstation_assigned_tuning_module ?workstation ?tuning_module)
+        (not
+          (workstation_configured ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_configured ?workstation)
+        (workstation_tuning_applied ?workstation)
+      )
+  )
+  (:action apply_maintenance_part_to_workstation
+    :parameters (?workstation - workstation ?maintenance_part - maintenance_part ?attachment_item - attachment_item ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_configured ?workstation)
+        (workstation_has_maintenance_part ?workstation ?maintenance_part)
+        (preparation_has_attachment ?workstation ?attachment_item)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (not
+          (packet_feature_b ?prepared_packet)
+        )
+        (not
+          (workstation_module_ready ?workstation)
+        )
+      )
+    :effect (workstation_module_ready ?workstation)
+  )
+  (:action confirm_maintenance_application
+    :parameters (?workstation - workstation ?maintenance_part - maintenance_part ?attachment_item - attachment_item ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_configured ?workstation)
+        (workstation_has_maintenance_part ?workstation ?maintenance_part)
+        (preparation_has_attachment ?workstation ?attachment_item)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (packet_feature_b ?prepared_packet)
+        (not
+          (workstation_module_ready ?workstation)
+        )
+      )
+    :effect (workstation_module_ready ?workstation)
+  )
+  (:action authorize_workstation_with_specialist_cert
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_module_ready ?workstation)
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (not
+          (packet_feature_a ?prepared_packet)
+        )
+        (not
+          (packet_feature_b ?prepared_packet)
+        )
+        (not
+          (workstation_certified_step ?workstation)
+        )
+      )
+    :effect (workstation_certified_step ?workstation)
+  )
+  (:action authorize_and_apply_quality_seal
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_module_ready ?workstation)
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (packet_feature_a ?prepared_packet)
+        (not
+          (packet_feature_b ?prepared_packet)
+        )
+        (not
+          (workstation_certified_step ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_quality_sealed ?workstation)
+      )
+  )
+  (:action authorize_and_apply_quality_seal_alternate
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_module_ready ?workstation)
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (not
+          (packet_feature_a ?prepared_packet)
+        )
+        (packet_feature_b ?prepared_packet)
+        (not
+          (workstation_certified_step ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_quality_sealed ?workstation)
+      )
+  )
+  (:action authorize_and_apply_quality_seal_final
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert ?component - component ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (workstation_module_ready ?workstation)
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (workstation_has_component ?workstation ?component)
+        (component_attached_to_packet ?component ?prepared_packet)
+        (packet_feature_a ?prepared_packet)
+        (packet_feature_b ?prepared_packet)
+        (not
+          (workstation_certified_step ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_quality_sealed ?workstation)
+      )
+  )
+  (:action finalize_workstation_preparation
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_certified_step ?workstation)
+        (not
+          (workstation_quality_sealed ?workstation)
+        )
+        (not
+          (workstation_completed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_completed ?workstation)
+        (preparation_ready_for_unlock ?workstation)
+      )
+  )
+  (:action attach_quality_seal_to_workstation
+    :parameters (?workstation - workstation ?quality_seal - quality_seal)
+    :precondition
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_quality_sealed ?workstation)
+        (quality_seal_available ?quality_seal)
+      )
+    :effect
+      (and
+        (workstation_has_quality_seal ?workstation ?quality_seal)
+        (not
+          (quality_seal_available ?quality_seal)
+        )
+      )
+  )
+  (:action validate_workstation_configuration
+    :parameters (?workstation - workstation ?base_source - base_source ?supplement_source - supplement_source ?tool_item - tool_item ?quality_seal - quality_seal)
+    :precondition
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_quality_sealed ?workstation)
+        (workstation_has_quality_seal ?workstation ?quality_seal)
+        (workstation_bound_to_base_source ?workstation ?base_source)
+        (workstation_bound_to_supplement_source ?workstation ?supplement_source)
+        (base_source_ready ?base_source)
+        (supplement_source_ready ?supplement_source)
+        (preparation_has_tool_assignment ?workstation ?tool_item)
+        (not
+          (workstation_finalized ?workstation)
+        )
+      )
+    :effect (workstation_finalized ?workstation)
+  )
+  (:action complete_workstation_and_mark_recipe_ready
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_certified_step ?workstation)
+        (workstation_finalized ?workstation)
+        (not
+          (workstation_completed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_completed ?workstation)
+        (preparation_ready_for_unlock ?workstation)
+      )
+  )
+  (:action assign_specialist_and_authorize_workstation
+    :parameters (?workstation - workstation ?specialist - specialist ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_ready ?workstation)
+        (preparation_has_tool_assignment ?workstation ?tool_item)
+        (specialist_available ?specialist)
+        (workstation_assigned_specialist ?workstation ?specialist)
+        (not
+          (workstation_specialist_authorized ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_specialist_authorized ?workstation)
+        (not
+          (specialist_available ?specialist)
+        )
+      )
+  )
+  (:action apply_attachment_for_specialist_operation
+    :parameters (?workstation - workstation ?attachment_item - attachment_item)
+    :precondition
+      (and
+        (workstation_specialist_authorized ?workstation)
+        (preparation_has_attachment ?workstation ?attachment_item)
+        (not
+          (workstation_ready_for_specialist_operation ?workstation)
+        )
+      )
+    :effect (workstation_ready_for_specialist_operation ?workstation)
+  )
+  (:action finalize_specialist_authorization
+    :parameters (?workstation - workstation ?specialist_cert - specialist_cert)
+    :precondition
+      (and
+        (workstation_ready_for_specialist_operation ?workstation)
+        (workstation_has_specialist_cert ?workstation ?specialist_cert)
+        (not
+          (workstation_maintenance_applied ?workstation)
+        )
+      )
+    :effect (workstation_maintenance_applied ?workstation)
+  )
+  (:action finalize_specialist_operation
+    :parameters (?workstation - workstation)
+    :precondition
+      (and
+        (workstation_maintenance_applied ?workstation)
+        (not
+          (workstation_completed ?workstation)
+        )
+      )
+    :effect
+      (and
+        (workstation_completed ?workstation)
+        (preparation_ready_for_unlock ?workstation)
+      )
+  )
+  (:action approve_base_source_for_unlock
+    :parameters (?base_source - base_source ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (base_source_prepared ?base_source)
+        (base_source_ready ?base_source)
+        (prepared_packet_ready ?prepared_packet)
+        (packet_inspected ?prepared_packet)
+        (not
+          (preparation_ready_for_unlock ?base_source)
+        )
+      )
+    :effect (preparation_ready_for_unlock ?base_source)
+  )
+  (:action approve_supplement_source_for_unlock
+    :parameters (?supplement_source - supplement_source ?prepared_packet - prepared_packet)
+    :precondition
+      (and
+        (supplement_source_prepared ?supplement_source)
+        (supplement_source_ready ?supplement_source)
+        (prepared_packet_ready ?prepared_packet)
+        (packet_inspected ?prepared_packet)
+        (not
+          (preparation_ready_for_unlock ?supplement_source)
+        )
+      )
+    :effect (preparation_ready_for_unlock ?supplement_source)
+  )
+  (:action consume_unlock_token_for_preparation
+    :parameters (?recipe - recipe ?unlock_token - unlock_token ?tool_item - tool_item)
+    :precondition
+      (and
+        (preparation_ready_for_unlock ?recipe)
+        (preparation_has_tool_assignment ?recipe ?tool_item)
+        (unlock_token_available ?unlock_token)
+        (not
+          (preparation_unlock_initiated ?recipe)
+        )
+      )
+    :effect
+      (and
+        (preparation_unlock_initiated ?recipe)
+        (preparation_assigned_unlock_token ?recipe ?unlock_token)
+        (not
+          (unlock_token_available ?unlock_token)
+        )
+      )
+  )
+  (:action finalize_preparation_unlock_and_restore_supply
+    :parameters (?base_source - base_source ?supply_source - supply_source ?unlock_token - unlock_token)
+    :precondition
+      (and
+        (preparation_unlock_initiated ?base_source)
+        (preparation_allocated_to_supply ?base_source ?supply_source)
+        (preparation_assigned_unlock_token ?base_source ?unlock_token)
+        (not
+          (preparation_unlocked ?base_source)
+        )
+      )
+    :effect
+      (and
+        (preparation_unlocked ?base_source)
+        (supply_available ?supply_source)
+        (unlock_token_available ?unlock_token)
+      )
+  )
+  (:action finalize_supplement_preparation_unlock_and_restore_supply
+    :parameters (?supplement_source - supplement_source ?supply_source - supply_source ?unlock_token - unlock_token)
+    :precondition
+      (and
+        (preparation_unlock_initiated ?supplement_source)
+        (preparation_allocated_to_supply ?supplement_source ?supply_source)
+        (preparation_assigned_unlock_token ?supplement_source ?unlock_token)
+        (not
+          (preparation_unlocked ?supplement_source)
+        )
+      )
+    :effect
+      (and
+        (preparation_unlocked ?supplement_source)
+        (supply_available ?supply_source)
+        (unlock_token_available ?unlock_token)
+      )
+  )
+  (:action finalize_workstation_preparation_unlock_and_restore_supply
+    :parameters (?workstation - workstation ?supply_source - supply_source ?unlock_token - unlock_token)
+    :precondition
+      (and
+        (preparation_unlock_initiated ?workstation)
+        (preparation_allocated_to_supply ?workstation ?supply_source)
+        (preparation_assigned_unlock_token ?workstation ?unlock_token)
+        (not
+          (preparation_unlocked ?workstation)
+        )
+      )
+    :effect
+      (and
+        (preparation_unlocked ?workstation)
+        (supply_available ?supply_source)
+        (unlock_token_available ?unlock_token)
+      )
+  )
+)

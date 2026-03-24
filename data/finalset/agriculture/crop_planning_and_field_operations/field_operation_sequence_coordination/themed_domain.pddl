@@ -1,0 +1,936 @@
+(define (domain field_operation_sequence_coordination)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types operational_resource - object product_or_record - object temporal_entity - object field_unit - object field_parcel - field_unit equipment_resource - operational_resource operation_type - operational_resource crew_unit - operational_resource permit_document - operational_resource logistics_slot - operational_resource supply_unit - operational_resource equipment_setting - operational_resource compliance_clearance - operational_resource material_product - product_or_record batch_lot - product_or_record inspection_record - product_or_record agronomic_window - temporal_entity operational_window - temporal_entity work_order - temporal_entity team_assignment_slot - field_parcel sequence_container - field_parcel mechanical_team - team_assignment_slot labor_team - team_assignment_slot field_operation_sequence - sequence_container)
+  (:predicates
+    (field_registered ?field_parcel - field_parcel)
+    (entity_validated ?field_parcel - field_parcel)
+    (resource_assigned ?field_parcel - field_parcel)
+    (entity_operation_completed ?field_parcel - field_parcel)
+    (entity_released ?field_parcel - field_parcel)
+    (supply_consumed ?field_parcel - field_parcel)
+    (equipment_available ?equipment_resource - equipment_resource)
+    (equipment_assigned ?field_parcel - field_parcel ?equipment_resource - equipment_resource)
+    (operation_type_available ?operation_type - operation_type)
+    (assigned_operation ?field_parcel - field_parcel ?operation_type - operation_type)
+    (crew_available ?crew_unit - crew_unit)
+    (crew_assigned ?field_parcel - field_parcel ?crew_unit - crew_unit)
+    (material_available ?material_product - material_product)
+    (team_material_allocated ?mechanical_team - mechanical_team ?material_product - material_product)
+    (labor_team_material_allocated ?labor_team - labor_team ?material_product - material_product)
+    (team_assigned_agronomic_window ?mechanical_team - mechanical_team ?agronomic_window - agronomic_window)
+    (agronomic_window_claimed ?agronomic_window - agronomic_window)
+    (agronomic_window_prepared ?agronomic_window - agronomic_window)
+    (mechanical_team_ready ?mechanical_team - mechanical_team)
+    (labor_assigned_operational_window ?labor_team - labor_team ?operational_window - operational_window)
+    (operational_window_claimed ?operational_window - operational_window)
+    (operational_window_prepared ?operational_window - operational_window)
+    (labor_team_ready ?labor_team - labor_team)
+    (work_order_open ?work_order - work_order)
+    (work_order_staged ?work_order - work_order)
+    (work_order_linked_agronomic_window ?work_order - work_order ?agronomic_window - agronomic_window)
+    (work_order_linked_operational_window ?work_order - work_order ?operational_window - operational_window)
+    (work_order_requires_agronomic_ready ?work_order - work_order)
+    (work_order_requires_operational_ready ?work_order - work_order)
+    (work_order_time_confirmed ?work_order - work_order)
+    (sequence_assigned_mechanical_team ?field_operation_sequence - field_operation_sequence ?mechanical_team - mechanical_team)
+    (sequence_assigned_labor_team ?field_operation_sequence - field_operation_sequence ?labor_team - labor_team)
+    (sequence_linked_work_order ?field_operation_sequence - field_operation_sequence ?work_order - work_order)
+    (batch_lot_available ?batch_lot - batch_lot)
+    (sequence_assigned_batch_lot ?field_operation_sequence - field_operation_sequence ?batch_lot - batch_lot)
+    (batch_lot_reserved ?batch_lot - batch_lot)
+    (batch_lot_linked_work_order ?batch_lot - batch_lot ?work_order - work_order)
+    (sequence_ready_for_configuration ?field_operation_sequence - field_operation_sequence)
+    (configuration_acknowledged ?field_operation_sequence - field_operation_sequence)
+    (configuration_verified ?field_operation_sequence - field_operation_sequence)
+    (permit_attached ?field_operation_sequence - field_operation_sequence)
+    (permit_validated ?field_operation_sequence - field_operation_sequence)
+    (post_execution_qc_complete ?field_operation_sequence - field_operation_sequence)
+    (execution_prepared ?field_operation_sequence - field_operation_sequence)
+    (inspection_record_available ?inspection_record - inspection_record)
+    (sequence_has_inspection_record ?field_operation_sequence - field_operation_sequence ?inspection_record - inspection_record)
+    (inspection_attached ?field_operation_sequence - field_operation_sequence)
+    (inspection_ready_for_clearance ?field_operation_sequence - field_operation_sequence)
+    (inspection_cleared ?field_operation_sequence - field_operation_sequence)
+    (permit_document_available ?permit_document - permit_document)
+    (sequence_permit_linked ?field_operation_sequence - field_operation_sequence ?permit_document - permit_document)
+    (logistics_slot_available ?logistics_slot - logistics_slot)
+    (sequence_linked_logistics_slot ?field_operation_sequence - field_operation_sequence ?logistics_slot - logistics_slot)
+    (equipment_setting_available ?equipment_setting - equipment_setting)
+    (setting_assigned_to_sequence ?field_operation_sequence - field_operation_sequence ?equipment_setting - equipment_setting)
+    (compliance_clearance_available ?compliance_clearance - compliance_clearance)
+    (sequence_has_clearance ?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance)
+    (supply_unit_available ?supply_unit - supply_unit)
+    (assigned_supply ?field_parcel - field_parcel ?supply_unit - supply_unit)
+    (mechanical_team_engaged ?mechanical_team - mechanical_team)
+    (labor_team_engaged ?labor_team - labor_team)
+    (sequence_finalized ?field_operation_sequence - field_operation_sequence)
+  )
+  (:action register_field_for_planning
+    :parameters (?field_parcel - field_parcel)
+    :precondition
+      (and
+        (not
+          (field_registered ?field_parcel)
+        )
+        (not
+          (entity_operation_completed ?field_parcel)
+        )
+      )
+    :effect (field_registered ?field_parcel)
+  )
+  (:action assign_equipment_to_field
+    :parameters (?field_parcel - field_parcel ?equipment_resource - equipment_resource)
+    :precondition
+      (and
+        (field_registered ?field_parcel)
+        (not
+          (resource_assigned ?field_parcel)
+        )
+        (equipment_available ?equipment_resource)
+      )
+    :effect
+      (and
+        (resource_assigned ?field_parcel)
+        (equipment_assigned ?field_parcel ?equipment_resource)
+        (not
+          (equipment_available ?equipment_resource)
+        )
+      )
+  )
+  (:action assign_operation_type_to_field
+    :parameters (?field_parcel - field_parcel ?operation_type - operation_type)
+    :precondition
+      (and
+        (field_registered ?field_parcel)
+        (resource_assigned ?field_parcel)
+        (operation_type_available ?operation_type)
+      )
+    :effect
+      (and
+        (assigned_operation ?field_parcel ?operation_type)
+        (not
+          (operation_type_available ?operation_type)
+        )
+      )
+  )
+  (:action confirm_field_operation_type
+    :parameters (?field_parcel - field_parcel ?operation_type - operation_type)
+    :precondition
+      (and
+        (field_registered ?field_parcel)
+        (resource_assigned ?field_parcel)
+        (assigned_operation ?field_parcel ?operation_type)
+        (not
+          (entity_validated ?field_parcel)
+        )
+      )
+    :effect (entity_validated ?field_parcel)
+  )
+  (:action release_assigned_operation_type
+    :parameters (?field_parcel - field_parcel ?operation_type - operation_type)
+    :precondition
+      (and
+        (assigned_operation ?field_parcel ?operation_type)
+      )
+    :effect
+      (and
+        (operation_type_available ?operation_type)
+        (not
+          (assigned_operation ?field_parcel ?operation_type)
+        )
+      )
+  )
+  (:action assign_crew_to_field
+    :parameters (?field_parcel - field_parcel ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_validated ?field_parcel)
+        (crew_available ?crew_unit)
+      )
+    :effect
+      (and
+        (crew_assigned ?field_parcel ?crew_unit)
+        (not
+          (crew_available ?crew_unit)
+        )
+      )
+  )
+  (:action release_crew_from_field
+    :parameters (?field_parcel - field_parcel ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (crew_assigned ?field_parcel ?crew_unit)
+      )
+    :effect
+      (and
+        (crew_available ?crew_unit)
+        (not
+          (crew_assigned ?field_parcel ?crew_unit)
+        )
+      )
+  )
+  (:action assign_equipment_setting_to_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?equipment_setting - equipment_setting)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (equipment_setting_available ?equipment_setting)
+      )
+    :effect
+      (and
+        (setting_assigned_to_sequence ?field_operation_sequence ?equipment_setting)
+        (not
+          (equipment_setting_available ?equipment_setting)
+        )
+      )
+  )
+  (:action release_equipment_setting_from_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?equipment_setting - equipment_setting)
+    :precondition
+      (and
+        (setting_assigned_to_sequence ?field_operation_sequence ?equipment_setting)
+      )
+    :effect
+      (and
+        (equipment_setting_available ?equipment_setting)
+        (not
+          (setting_assigned_to_sequence ?field_operation_sequence ?equipment_setting)
+        )
+      )
+  )
+  (:action attach_compliance_clearance_to_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (compliance_clearance_available ?compliance_clearance)
+      )
+    :effect
+      (and
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (not
+          (compliance_clearance_available ?compliance_clearance)
+        )
+      )
+  )
+  (:action release_compliance_clearance_from_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance)
+    :precondition
+      (and
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+      )
+    :effect
+      (and
+        (compliance_clearance_available ?compliance_clearance)
+        (not
+          (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        )
+      )
+  )
+  (:action claim_agronomic_window_for_team
+    :parameters (?mechanical_team - mechanical_team ?agronomic_window - agronomic_window ?operation_type - operation_type)
+    :precondition
+      (and
+        (entity_validated ?mechanical_team)
+        (assigned_operation ?mechanical_team ?operation_type)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (not
+          (agronomic_window_claimed ?agronomic_window)
+        )
+        (not
+          (agronomic_window_prepared ?agronomic_window)
+        )
+      )
+    :effect (agronomic_window_claimed ?agronomic_window)
+  )
+  (:action prepare_mechanical_team_with_crew
+    :parameters (?mechanical_team - mechanical_team ?agronomic_window - agronomic_window ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_validated ?mechanical_team)
+        (crew_assigned ?mechanical_team ?crew_unit)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (agronomic_window_claimed ?agronomic_window)
+        (not
+          (mechanical_team_engaged ?mechanical_team)
+        )
+      )
+    :effect
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (mechanical_team_ready ?mechanical_team)
+      )
+  )
+  (:action assign_material_to_team_and_reserve_window
+    :parameters (?mechanical_team - mechanical_team ?agronomic_window - agronomic_window ?material_product - material_product)
+    :precondition
+      (and
+        (entity_validated ?mechanical_team)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (material_available ?material_product)
+        (not
+          (mechanical_team_engaged ?mechanical_team)
+        )
+      )
+    :effect
+      (and
+        (agronomic_window_prepared ?agronomic_window)
+        (mechanical_team_engaged ?mechanical_team)
+        (team_material_allocated ?mechanical_team ?material_product)
+        (not
+          (material_available ?material_product)
+        )
+      )
+  )
+  (:action apply_material_and_confirm
+    :parameters (?mechanical_team - mechanical_team ?agronomic_window - agronomic_window ?operation_type - operation_type ?material_product - material_product)
+    :precondition
+      (and
+        (entity_validated ?mechanical_team)
+        (assigned_operation ?mechanical_team ?operation_type)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (agronomic_window_prepared ?agronomic_window)
+        (team_material_allocated ?mechanical_team ?material_product)
+        (not
+          (mechanical_team_ready ?mechanical_team)
+        )
+      )
+    :effect
+      (and
+        (agronomic_window_claimed ?agronomic_window)
+        (mechanical_team_ready ?mechanical_team)
+        (material_available ?material_product)
+        (not
+          (team_material_allocated ?mechanical_team ?material_product)
+        )
+      )
+  )
+  (:action claim_operational_window_for_labor_team
+    :parameters (?labor_team - labor_team ?operational_window - operational_window ?operation_type - operation_type)
+    :precondition
+      (and
+        (entity_validated ?labor_team)
+        (assigned_operation ?labor_team ?operation_type)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (not
+          (operational_window_claimed ?operational_window)
+        )
+        (not
+          (operational_window_prepared ?operational_window)
+        )
+      )
+    :effect (operational_window_claimed ?operational_window)
+  )
+  (:action prepare_labor_team_with_crew
+    :parameters (?labor_team - labor_team ?operational_window - operational_window ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (entity_validated ?labor_team)
+        (crew_assigned ?labor_team ?crew_unit)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (operational_window_claimed ?operational_window)
+        (not
+          (labor_team_engaged ?labor_team)
+        )
+      )
+    :effect
+      (and
+        (labor_team_engaged ?labor_team)
+        (labor_team_ready ?labor_team)
+      )
+  )
+  (:action assign_material_to_labor_team_and_reserve_window
+    :parameters (?labor_team - labor_team ?operational_window - operational_window ?material_product - material_product)
+    :precondition
+      (and
+        (entity_validated ?labor_team)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (material_available ?material_product)
+        (not
+          (labor_team_engaged ?labor_team)
+        )
+      )
+    :effect
+      (and
+        (operational_window_prepared ?operational_window)
+        (labor_team_engaged ?labor_team)
+        (labor_team_material_allocated ?labor_team ?material_product)
+        (not
+          (material_available ?material_product)
+        )
+      )
+  )
+  (:action apply_material_by_labor_team
+    :parameters (?labor_team - labor_team ?operational_window - operational_window ?operation_type - operation_type ?material_product - material_product)
+    :precondition
+      (and
+        (entity_validated ?labor_team)
+        (assigned_operation ?labor_team ?operation_type)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (operational_window_prepared ?operational_window)
+        (labor_team_material_allocated ?labor_team ?material_product)
+        (not
+          (labor_team_ready ?labor_team)
+        )
+      )
+    :effect
+      (and
+        (operational_window_claimed ?operational_window)
+        (labor_team_ready ?labor_team)
+        (material_available ?material_product)
+        (not
+          (labor_team_material_allocated ?labor_team ?material_product)
+        )
+      )
+  )
+  (:action assemble_work_order_when_both_windows_claimed
+    :parameters (?mechanical_team - mechanical_team ?labor_team - labor_team ?agronomic_window - agronomic_window ?operational_window - operational_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (labor_team_engaged ?labor_team)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (agronomic_window_claimed ?agronomic_window)
+        (operational_window_claimed ?operational_window)
+        (mechanical_team_ready ?mechanical_team)
+        (labor_team_ready ?labor_team)
+        (work_order_open ?work_order)
+      )
+    :effect
+      (and
+        (work_order_staged ?work_order)
+        (work_order_linked_agronomic_window ?work_order ?agronomic_window)
+        (work_order_linked_operational_window ?work_order ?operational_window)
+        (not
+          (work_order_open ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_agronomic_prepared
+    :parameters (?mechanical_team - mechanical_team ?labor_team - labor_team ?agronomic_window - agronomic_window ?operational_window - operational_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (labor_team_engaged ?labor_team)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (agronomic_window_prepared ?agronomic_window)
+        (operational_window_claimed ?operational_window)
+        (not
+          (mechanical_team_ready ?mechanical_team)
+        )
+        (labor_team_ready ?labor_team)
+        (work_order_open ?work_order)
+      )
+    :effect
+      (and
+        (work_order_staged ?work_order)
+        (work_order_linked_agronomic_window ?work_order ?agronomic_window)
+        (work_order_linked_operational_window ?work_order ?operational_window)
+        (work_order_requires_agronomic_ready ?work_order)
+        (not
+          (work_order_open ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_operational_prepared
+    :parameters (?mechanical_team - mechanical_team ?labor_team - labor_team ?agronomic_window - agronomic_window ?operational_window - operational_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (labor_team_engaged ?labor_team)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (agronomic_window_claimed ?agronomic_window)
+        (operational_window_prepared ?operational_window)
+        (mechanical_team_ready ?mechanical_team)
+        (not
+          (labor_team_ready ?labor_team)
+        )
+        (work_order_open ?work_order)
+      )
+    :effect
+      (and
+        (work_order_staged ?work_order)
+        (work_order_linked_agronomic_window ?work_order ?agronomic_window)
+        (work_order_linked_operational_window ?work_order ?operational_window)
+        (work_order_requires_operational_ready ?work_order)
+        (not
+          (work_order_open ?work_order)
+        )
+      )
+  )
+  (:action assemble_work_order_with_both_prepared
+    :parameters (?mechanical_team - mechanical_team ?labor_team - labor_team ?agronomic_window - agronomic_window ?operational_window - operational_window ?work_order - work_order)
+    :precondition
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (labor_team_engaged ?labor_team)
+        (team_assigned_agronomic_window ?mechanical_team ?agronomic_window)
+        (labor_assigned_operational_window ?labor_team ?operational_window)
+        (agronomic_window_prepared ?agronomic_window)
+        (operational_window_prepared ?operational_window)
+        (not
+          (mechanical_team_ready ?mechanical_team)
+        )
+        (not
+          (labor_team_ready ?labor_team)
+        )
+        (work_order_open ?work_order)
+      )
+    :effect
+      (and
+        (work_order_staged ?work_order)
+        (work_order_linked_agronomic_window ?work_order ?agronomic_window)
+        (work_order_linked_operational_window ?work_order ?operational_window)
+        (work_order_requires_agronomic_ready ?work_order)
+        (work_order_requires_operational_ready ?work_order)
+        (not
+          (work_order_open ?work_order)
+        )
+      )
+  )
+  (:action lock_work_order_timing
+    :parameters (?work_order - work_order ?mechanical_team - mechanical_team ?operation_type - operation_type)
+    :precondition
+      (and
+        (work_order_staged ?work_order)
+        (mechanical_team_engaged ?mechanical_team)
+        (assigned_operation ?mechanical_team ?operation_type)
+        (not
+          (work_order_time_confirmed ?work_order)
+        )
+      )
+    :effect (work_order_time_confirmed ?work_order)
+  )
+  (:action reserve_batch_lot_for_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (sequence_linked_work_order ?field_operation_sequence ?work_order)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_available ?batch_lot)
+        (work_order_staged ?work_order)
+        (work_order_time_confirmed ?work_order)
+        (not
+          (batch_lot_reserved ?batch_lot)
+        )
+      )
+    :effect
+      (and
+        (batch_lot_reserved ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (not
+          (batch_lot_available ?batch_lot)
+        )
+      )
+  )
+  (:action authorize_sequence_configuration
+    :parameters (?field_operation_sequence - field_operation_sequence ?batch_lot - batch_lot ?work_order - work_order ?operation_type - operation_type)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_reserved ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (assigned_operation ?field_operation_sequence ?operation_type)
+        (not
+          (work_order_requires_agronomic_ready ?work_order)
+        )
+        (not
+          (sequence_ready_for_configuration ?field_operation_sequence)
+        )
+      )
+    :effect (sequence_ready_for_configuration ?field_operation_sequence)
+  )
+  (:action attach_permit_to_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?permit_document - permit_document)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (permit_document_available ?permit_document)
+        (not
+          (permit_attached ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (permit_attached ?field_operation_sequence)
+        (sequence_permit_linked ?field_operation_sequence ?permit_document)
+        (not
+          (permit_document_available ?permit_document)
+        )
+      )
+  )
+  (:action finalize_sequence_with_permit
+    :parameters (?field_operation_sequence - field_operation_sequence ?batch_lot - batch_lot ?work_order - work_order ?operation_type - operation_type ?permit_document - permit_document)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_reserved ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (assigned_operation ?field_operation_sequence ?operation_type)
+        (work_order_requires_agronomic_ready ?work_order)
+        (permit_attached ?field_operation_sequence)
+        (sequence_permit_linked ?field_operation_sequence ?permit_document)
+        (not
+          (sequence_ready_for_configuration ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (sequence_ready_for_configuration ?field_operation_sequence)
+        (permit_validated ?field_operation_sequence)
+      )
+  )
+  (:action apply_equipment_setting_for_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?equipment_setting - equipment_setting ?crew_unit - crew_unit ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (sequence_ready_for_configuration ?field_operation_sequence)
+        (setting_assigned_to_sequence ?field_operation_sequence ?equipment_setting)
+        (crew_assigned ?field_operation_sequence ?crew_unit)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (not
+          (work_order_requires_operational_ready ?work_order)
+        )
+        (not
+          (configuration_acknowledged ?field_operation_sequence)
+        )
+      )
+    :effect (configuration_acknowledged ?field_operation_sequence)
+  )
+  (:action apply_equipment_setting_for_sequence_confirmed
+    :parameters (?field_operation_sequence - field_operation_sequence ?equipment_setting - equipment_setting ?crew_unit - crew_unit ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (sequence_ready_for_configuration ?field_operation_sequence)
+        (setting_assigned_to_sequence ?field_operation_sequence ?equipment_setting)
+        (crew_assigned ?field_operation_sequence ?crew_unit)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (work_order_requires_operational_ready ?work_order)
+        (not
+          (configuration_acknowledged ?field_operation_sequence)
+        )
+      )
+    :effect (configuration_acknowledged ?field_operation_sequence)
+  )
+  (:action verify_sequence_configuration_for_clearance
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (configuration_acknowledged ?field_operation_sequence)
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (not
+          (work_order_requires_agronomic_ready ?work_order)
+        )
+        (not
+          (work_order_requires_operational_ready ?work_order)
+        )
+        (not
+          (configuration_verified ?field_operation_sequence)
+        )
+      )
+    :effect (configuration_verified ?field_operation_sequence)
+  )
+  (:action finalize_configuration_with_agronomic_timing
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (configuration_acknowledged ?field_operation_sequence)
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (work_order_requires_agronomic_ready ?work_order)
+        (not
+          (work_order_requires_operational_ready ?work_order)
+        )
+        (not
+          (configuration_verified ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (post_execution_qc_complete ?field_operation_sequence)
+      )
+  )
+  (:action finalize_configuration_with_operational_timing
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (configuration_acknowledged ?field_operation_sequence)
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (not
+          (work_order_requires_agronomic_ready ?work_order)
+        )
+        (work_order_requires_operational_ready ?work_order)
+        (not
+          (configuration_verified ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (post_execution_qc_complete ?field_operation_sequence)
+      )
+  )
+  (:action finalize_configuration_with_both_timings
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance ?batch_lot - batch_lot ?work_order - work_order)
+    :precondition
+      (and
+        (configuration_acknowledged ?field_operation_sequence)
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (sequence_assigned_batch_lot ?field_operation_sequence ?batch_lot)
+        (batch_lot_linked_work_order ?batch_lot ?work_order)
+        (work_order_requires_agronomic_ready ?work_order)
+        (work_order_requires_operational_ready ?work_order)
+        (not
+          (configuration_verified ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (post_execution_qc_complete ?field_operation_sequence)
+      )
+  )
+  (:action finalize_execution_and_mark_complete
+    :parameters (?field_operation_sequence - field_operation_sequence)
+    :precondition
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (not
+          (post_execution_qc_complete ?field_operation_sequence)
+        )
+        (not
+          (sequence_finalized ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (sequence_finalized ?field_operation_sequence)
+        (entity_released ?field_operation_sequence)
+      )
+  )
+  (:action attach_logistics_slot_to_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?logistics_slot - logistics_slot)
+    :precondition
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (post_execution_qc_complete ?field_operation_sequence)
+        (logistics_slot_available ?logistics_slot)
+      )
+    :effect
+      (and
+        (sequence_linked_logistics_slot ?field_operation_sequence ?logistics_slot)
+        (not
+          (logistics_slot_available ?logistics_slot)
+        )
+      )
+  )
+  (:action prepare_sequence_for_execution
+    :parameters (?field_operation_sequence - field_operation_sequence ?mechanical_team - mechanical_team ?labor_team - labor_team ?operation_type - operation_type ?logistics_slot - logistics_slot)
+    :precondition
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (post_execution_qc_complete ?field_operation_sequence)
+        (sequence_linked_logistics_slot ?field_operation_sequence ?logistics_slot)
+        (sequence_assigned_mechanical_team ?field_operation_sequence ?mechanical_team)
+        (sequence_assigned_labor_team ?field_operation_sequence ?labor_team)
+        (mechanical_team_ready ?mechanical_team)
+        (labor_team_ready ?labor_team)
+        (assigned_operation ?field_operation_sequence ?operation_type)
+        (not
+          (execution_prepared ?field_operation_sequence)
+        )
+      )
+    :effect (execution_prepared ?field_operation_sequence)
+  )
+  (:action finalize_execution_with_preparation
+    :parameters (?field_operation_sequence - field_operation_sequence)
+    :precondition
+      (and
+        (configuration_verified ?field_operation_sequence)
+        (execution_prepared ?field_operation_sequence)
+        (not
+          (sequence_finalized ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (sequence_finalized ?field_operation_sequence)
+        (entity_released ?field_operation_sequence)
+      )
+  )
+  (:action attach_inspection_record_to_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?inspection_record - inspection_record ?operation_type - operation_type)
+    :precondition
+      (and
+        (entity_validated ?field_operation_sequence)
+        (assigned_operation ?field_operation_sequence ?operation_type)
+        (inspection_record_available ?inspection_record)
+        (sequence_has_inspection_record ?field_operation_sequence ?inspection_record)
+        (not
+          (inspection_attached ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (inspection_attached ?field_operation_sequence)
+        (not
+          (inspection_record_available ?inspection_record)
+        )
+      )
+  )
+  (:action mark_sequence_inspection_ready
+    :parameters (?field_operation_sequence - field_operation_sequence ?crew_unit - crew_unit)
+    :precondition
+      (and
+        (inspection_attached ?field_operation_sequence)
+        (crew_assigned ?field_operation_sequence ?crew_unit)
+        (not
+          (inspection_ready_for_clearance ?field_operation_sequence)
+        )
+      )
+    :effect (inspection_ready_for_clearance ?field_operation_sequence)
+  )
+  (:action attach_inspection_clearance
+    :parameters (?field_operation_sequence - field_operation_sequence ?compliance_clearance - compliance_clearance)
+    :precondition
+      (and
+        (inspection_ready_for_clearance ?field_operation_sequence)
+        (sequence_has_clearance ?field_operation_sequence ?compliance_clearance)
+        (not
+          (inspection_cleared ?field_operation_sequence)
+        )
+      )
+    :effect (inspection_cleared ?field_operation_sequence)
+  )
+  (:action finalize_execution_after_inspection
+    :parameters (?field_operation_sequence - field_operation_sequence)
+    :precondition
+      (and
+        (inspection_cleared ?field_operation_sequence)
+        (not
+          (sequence_finalized ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (sequence_finalized ?field_operation_sequence)
+        (entity_released ?field_operation_sequence)
+      )
+  )
+  (:action release_mechanical_team
+    :parameters (?mechanical_team - mechanical_team ?work_order - work_order)
+    :precondition
+      (and
+        (mechanical_team_engaged ?mechanical_team)
+        (mechanical_team_ready ?mechanical_team)
+        (work_order_staged ?work_order)
+        (work_order_time_confirmed ?work_order)
+        (not
+          (entity_released ?mechanical_team)
+        )
+      )
+    :effect (entity_released ?mechanical_team)
+  )
+  (:action release_labor_team
+    :parameters (?labor_team - labor_team ?work_order - work_order)
+    :precondition
+      (and
+        (labor_team_engaged ?labor_team)
+        (labor_team_ready ?labor_team)
+        (work_order_staged ?work_order)
+        (work_order_time_confirmed ?work_order)
+        (not
+          (entity_released ?labor_team)
+        )
+      )
+    :effect (entity_released ?labor_team)
+  )
+  (:action assign_supply_to_field
+    :parameters (?field_parcel - field_parcel ?supply_unit - supply_unit ?operation_type - operation_type)
+    :precondition
+      (and
+        (entity_released ?field_parcel)
+        (assigned_operation ?field_parcel ?operation_type)
+        (supply_unit_available ?supply_unit)
+        (not
+          (supply_consumed ?field_parcel)
+        )
+      )
+    :effect
+      (and
+        (supply_consumed ?field_parcel)
+        (assigned_supply ?field_parcel ?supply_unit)
+        (not
+          (supply_unit_available ?supply_unit)
+        )
+      )
+  )
+  (:action release_equipment_and_restore_supply_from_mechanical_team
+    :parameters (?mechanical_team - mechanical_team ?equipment_resource - equipment_resource ?supply_unit - supply_unit)
+    :precondition
+      (and
+        (supply_consumed ?mechanical_team)
+        (equipment_assigned ?mechanical_team ?equipment_resource)
+        (assigned_supply ?mechanical_team ?supply_unit)
+        (not
+          (entity_operation_completed ?mechanical_team)
+        )
+      )
+    :effect
+      (and
+        (entity_operation_completed ?mechanical_team)
+        (equipment_available ?equipment_resource)
+        (supply_unit_available ?supply_unit)
+      )
+  )
+  (:action release_equipment_and_restore_supply_from_labor_team
+    :parameters (?labor_team - labor_team ?equipment_resource - equipment_resource ?supply_unit - supply_unit)
+    :precondition
+      (and
+        (supply_consumed ?labor_team)
+        (equipment_assigned ?labor_team ?equipment_resource)
+        (assigned_supply ?labor_team ?supply_unit)
+        (not
+          (entity_operation_completed ?labor_team)
+        )
+      )
+    :effect
+      (and
+        (entity_operation_completed ?labor_team)
+        (equipment_available ?equipment_resource)
+        (supply_unit_available ?supply_unit)
+      )
+  )
+  (:action release_equipment_and_restore_supply_from_sequence
+    :parameters (?field_operation_sequence - field_operation_sequence ?equipment_resource - equipment_resource ?supply_unit - supply_unit)
+    :precondition
+      (and
+        (supply_consumed ?field_operation_sequence)
+        (equipment_assigned ?field_operation_sequence ?equipment_resource)
+        (assigned_supply ?field_operation_sequence ?supply_unit)
+        (not
+          (entity_operation_completed ?field_operation_sequence)
+        )
+      )
+    :effect
+      (and
+        (entity_operation_completed ?field_operation_sequence)
+        (equipment_available ?equipment_resource)
+        (supply_unit_available ?supply_unit)
+      )
+  )
+)

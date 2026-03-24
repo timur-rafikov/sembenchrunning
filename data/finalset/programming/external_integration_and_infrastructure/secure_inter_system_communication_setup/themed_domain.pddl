@@ -1,0 +1,937 @@
+(define (domain secure_inter_system_communication_setup)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types base_object - object infrastructure_resource_group - base_object security_artifact_group - base_object identity_artifact_group - base_object participant_group - base_object system_participant - participant_group connector_resource - infrastructure_resource_group tls_certificate - infrastructure_resource_group service_credential - infrastructure_resource_group policy_module - infrastructure_resource_group observability_agent_config - infrastructure_resource_group audit_token - infrastructure_resource_group monitoring_integration - infrastructure_resource_group trust_anchor - infrastructure_resource_group secret_entry - security_artifact_group configuration_bundle - security_artifact_group authorization_grant - security_artifact_group network_route - identity_artifact_group peer_identity - identity_artifact_group integration_proxy - identity_artifact_group client_server_role_group - system_participant platform_role_group - system_participant internal_client - client_server_role_group internal_server - client_server_role_group external_platform - platform_role_group)
+
+  (:predicates
+    (participant_discovered ?participant - system_participant)
+    (participant_verified ?participant - system_participant)
+    (participant_has_connector ?participant - system_participant)
+    (integration_activated ?participant - system_participant)
+    (operational ?participant - system_participant)
+    (participant_audit_bound ?participant - system_participant)
+    (connector_available ?connector - connector_resource)
+    (participant_bound_to_connector ?participant - system_participant ?connector - connector_resource)
+    (tls_certificate_available ?tls_certificate - tls_certificate)
+    (participant_certificate_bound ?participant - system_participant ?tls_certificate - tls_certificate)
+    (service_credential_available ?service_credential - service_credential)
+    (participant_service_credential_bound ?participant - system_participant ?service_credential - service_credential)
+    (secret_available ?secret - secret_entry)
+    (client_secret_associated ?internal_client - internal_client ?secret - secret_entry)
+    (server_secret_associated ?internal_server - internal_server ?secret - secret_entry)
+    (client_route_assigned ?internal_client - internal_client ?network_route - network_route)
+    (route_verified ?network_route - network_route)
+    (route_secret_staged ?network_route - network_route)
+    (client_route_confirmed ?internal_client - internal_client)
+    (server_peer_assigned ?internal_server - internal_server ?peer_identity - peer_identity)
+    (peer_verified ?peer_identity - peer_identity)
+    (peer_secret_staged ?peer_identity - peer_identity)
+    (server_route_confirmed ?internal_server - internal_server)
+    (proxy_registered ?integration_proxy - integration_proxy)
+    (proxy_provisioned ?integration_proxy - integration_proxy)
+    (proxy_route_binding ?integration_proxy - integration_proxy ?network_route - network_route)
+    (proxy_peer_binding ?integration_proxy - integration_proxy ?peer_identity - peer_identity)
+    (proxy_client_binding_established ?integration_proxy - integration_proxy)
+    (proxy_server_binding_established ?integration_proxy - integration_proxy)
+    (proxy_health_checks_passed ?integration_proxy - integration_proxy)
+    (platform_client_mapping ?external_platform - external_platform ?internal_client - internal_client)
+    (platform_server_mapping ?external_platform - external_platform ?internal_server - internal_server)
+    (platform_proxy_associated ?external_platform - external_platform ?integration_proxy - integration_proxy)
+    (configuration_bundle_available ?configuration_bundle - configuration_bundle)
+    (platform_has_configuration_bundle ?external_platform - external_platform ?configuration_bundle - configuration_bundle)
+    (configuration_bundle_deployed ?configuration_bundle - configuration_bundle)
+    (configuration_bundle_bound_to_proxy ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    (platform_config_installed ?external_platform - external_platform)
+    (platform_config_activation_ready ?external_platform - external_platform)
+    (platform_configuration_verified ?external_platform - external_platform)
+    (platform_policy_applied ?external_platform - external_platform)
+    (platform_policy_committed ?external_platform - external_platform)
+    (platform_observability_registered ?external_platform - external_platform)
+    (platform_services_enabled ?external_platform - external_platform)
+    (authorization_grant_available ?authorization_grant - authorization_grant)
+    (platform_authorization_bound ?external_platform - external_platform ?authorization_grant - authorization_grant)
+    (platform_authorization_activated ?external_platform - external_platform)
+    (platform_authorization_verified ?external_platform - external_platform)
+    (platform_authorization_finalized ?external_platform - external_platform)
+    (policy_module_available ?policy_module - policy_module)
+    (platform_policy_module_bound ?external_platform - external_platform ?policy_module - policy_module)
+    (observability_config_available ?observability_config - observability_agent_config)
+    (platform_observability_config_bound ?external_platform - external_platform ?observability_config - observability_agent_config)
+    (monitoring_integration_available ?monitoring_integration - monitoring_integration)
+    (platform_monitoring_integration_bound ?external_platform - external_platform ?monitoring_integration - monitoring_integration)
+    (trust_anchor_available ?trust_anchor - trust_anchor)
+    (platform_trust_anchor_bound ?external_platform - external_platform ?trust_anchor - trust_anchor)
+    (audit_token_available ?audit_token - audit_token)
+    (participant_audit_token_bound ?participant - system_participant ?audit_token - audit_token)
+    (client_proxy_ready ?internal_client - internal_client)
+    (server_proxy_ready ?internal_server - internal_server)
+    (platform_finalized ?external_platform - external_platform)
+  )
+  (:action discover_participant
+    :parameters (?participant - system_participant)
+    :precondition
+      (and
+        (not
+          (participant_discovered ?participant)
+        )
+        (not
+          (integration_activated ?participant)
+        )
+      )
+    :effect (participant_discovered ?participant)
+  )
+  (:action assign_connector_to_participant
+    :parameters (?participant - system_participant ?connector - connector_resource)
+    :precondition
+      (and
+        (participant_discovered ?participant)
+        (not
+          (participant_has_connector ?participant)
+        )
+        (connector_available ?connector)
+      )
+    :effect
+      (and
+        (participant_has_connector ?participant)
+        (participant_bound_to_connector ?participant ?connector)
+        (not
+          (connector_available ?connector)
+        )
+      )
+  )
+  (:action bind_certificate_to_participant
+    :parameters (?participant - system_participant ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_discovered ?participant)
+        (participant_has_connector ?participant)
+        (tls_certificate_available ?tls_certificate)
+      )
+    :effect
+      (and
+        (participant_certificate_bound ?participant ?tls_certificate)
+        (not
+          (tls_certificate_available ?tls_certificate)
+        )
+      )
+  )
+  (:action verify_participant_certificate
+    :parameters (?participant - system_participant ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_discovered ?participant)
+        (participant_has_connector ?participant)
+        (participant_certificate_bound ?participant ?tls_certificate)
+        (not
+          (participant_verified ?participant)
+        )
+      )
+    :effect (participant_verified ?participant)
+  )
+  (:action release_certificate_from_participant
+    :parameters (?participant - system_participant ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_certificate_bound ?participant ?tls_certificate)
+      )
+    :effect
+      (and
+        (tls_certificate_available ?tls_certificate)
+        (not
+          (participant_certificate_bound ?participant ?tls_certificate)
+        )
+      )
+  )
+  (:action bind_service_credential_to_participant
+    :parameters (?participant - system_participant ?service_credential - service_credential)
+    :precondition
+      (and
+        (participant_verified ?participant)
+        (service_credential_available ?service_credential)
+      )
+    :effect
+      (and
+        (participant_service_credential_bound ?participant ?service_credential)
+        (not
+          (service_credential_available ?service_credential)
+        )
+      )
+  )
+  (:action release_service_credential_from_participant
+    :parameters (?participant - system_participant ?service_credential - service_credential)
+    :precondition
+      (and
+        (participant_service_credential_bound ?participant ?service_credential)
+      )
+    :effect
+      (and
+        (service_credential_available ?service_credential)
+        (not
+          (participant_service_credential_bound ?participant ?service_credential)
+        )
+      )
+  )
+  (:action bind_monitoring_integration_to_platform
+    :parameters (?external_platform - external_platform ?monitoring_integration - monitoring_integration)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (monitoring_integration_available ?monitoring_integration)
+      )
+    :effect
+      (and
+        (platform_monitoring_integration_bound ?external_platform ?monitoring_integration)
+        (not
+          (monitoring_integration_available ?monitoring_integration)
+        )
+      )
+  )
+  (:action unbind_monitoring_integration_from_platform
+    :parameters (?external_platform - external_platform ?monitoring_integration - monitoring_integration)
+    :precondition
+      (and
+        (platform_monitoring_integration_bound ?external_platform ?monitoring_integration)
+      )
+    :effect
+      (and
+        (monitoring_integration_available ?monitoring_integration)
+        (not
+          (platform_monitoring_integration_bound ?external_platform ?monitoring_integration)
+        )
+      )
+  )
+  (:action bind_trust_anchor_to_platform
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (trust_anchor_available ?trust_anchor)
+      )
+    :effect
+      (and
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (not
+          (trust_anchor_available ?trust_anchor)
+        )
+      )
+  )
+  (:action unbind_trust_anchor_from_platform
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor)
+    :precondition
+      (and
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+      )
+    :effect
+      (and
+        (trust_anchor_available ?trust_anchor)
+        (not
+          (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        )
+      )
+  )
+  (:action verify_client_route
+    :parameters (?internal_client - internal_client ?network_route - network_route ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_verified ?internal_client)
+        (participant_certificate_bound ?internal_client ?tls_certificate)
+        (client_route_assigned ?internal_client ?network_route)
+        (not
+          (route_verified ?network_route)
+        )
+        (not
+          (route_secret_staged ?network_route)
+        )
+      )
+    :effect (route_verified ?network_route)
+  )
+  (:action confirm_client_route
+    :parameters (?internal_client - internal_client ?network_route - network_route ?service_credential - service_credential)
+    :precondition
+      (and
+        (participant_verified ?internal_client)
+        (participant_service_credential_bound ?internal_client ?service_credential)
+        (client_route_assigned ?internal_client ?network_route)
+        (route_verified ?network_route)
+        (not
+          (client_proxy_ready ?internal_client)
+        )
+      )
+    :effect
+      (and
+        (client_proxy_ready ?internal_client)
+        (client_route_confirmed ?internal_client)
+      )
+  )
+  (:action provision_client_route_secret
+    :parameters (?internal_client - internal_client ?network_route - network_route ?secret - secret_entry)
+    :precondition
+      (and
+        (participant_verified ?internal_client)
+        (client_route_assigned ?internal_client ?network_route)
+        (secret_available ?secret)
+        (not
+          (client_proxy_ready ?internal_client)
+        )
+      )
+    :effect
+      (and
+        (route_secret_staged ?network_route)
+        (client_proxy_ready ?internal_client)
+        (client_secret_associated ?internal_client ?secret)
+        (not
+          (secret_available ?secret)
+        )
+      )
+  )
+  (:action finalize_client_route
+    :parameters (?internal_client - internal_client ?network_route - network_route ?tls_certificate - tls_certificate ?secret - secret_entry)
+    :precondition
+      (and
+        (participant_verified ?internal_client)
+        (participant_certificate_bound ?internal_client ?tls_certificate)
+        (client_route_assigned ?internal_client ?network_route)
+        (route_secret_staged ?network_route)
+        (client_secret_associated ?internal_client ?secret)
+        (not
+          (client_route_confirmed ?internal_client)
+        )
+      )
+    :effect
+      (and
+        (route_verified ?network_route)
+        (client_route_confirmed ?internal_client)
+        (secret_available ?secret)
+        (not
+          (client_secret_associated ?internal_client ?secret)
+        )
+      )
+  )
+  (:action verify_server_peer
+    :parameters (?internal_server - internal_server ?peer_identity - peer_identity ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_verified ?internal_server)
+        (participant_certificate_bound ?internal_server ?tls_certificate)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (not
+          (peer_verified ?peer_identity)
+        )
+        (not
+          (peer_secret_staged ?peer_identity)
+        )
+      )
+    :effect (peer_verified ?peer_identity)
+  )
+  (:action confirm_server_route
+    :parameters (?internal_server - internal_server ?peer_identity - peer_identity ?service_credential - service_credential)
+    :precondition
+      (and
+        (participant_verified ?internal_server)
+        (participant_service_credential_bound ?internal_server ?service_credential)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (peer_verified ?peer_identity)
+        (not
+          (server_proxy_ready ?internal_server)
+        )
+      )
+    :effect
+      (and
+        (server_proxy_ready ?internal_server)
+        (server_route_confirmed ?internal_server)
+      )
+  )
+  (:action provision_server_peer_secret
+    :parameters (?internal_server - internal_server ?peer_identity - peer_identity ?secret - secret_entry)
+    :precondition
+      (and
+        (participant_verified ?internal_server)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (secret_available ?secret)
+        (not
+          (server_proxy_ready ?internal_server)
+        )
+      )
+    :effect
+      (and
+        (peer_secret_staged ?peer_identity)
+        (server_proxy_ready ?internal_server)
+        (server_secret_associated ?internal_server ?secret)
+        (not
+          (secret_available ?secret)
+        )
+      )
+  )
+  (:action finalize_server_route
+    :parameters (?internal_server - internal_server ?peer_identity - peer_identity ?tls_certificate - tls_certificate ?secret - secret_entry)
+    :precondition
+      (and
+        (participant_verified ?internal_server)
+        (participant_certificate_bound ?internal_server ?tls_certificate)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (peer_secret_staged ?peer_identity)
+        (server_secret_associated ?internal_server ?secret)
+        (not
+          (server_route_confirmed ?internal_server)
+        )
+      )
+    :effect
+      (and
+        (peer_verified ?peer_identity)
+        (server_route_confirmed ?internal_server)
+        (secret_available ?secret)
+        (not
+          (server_secret_associated ?internal_server ?secret)
+        )
+      )
+  )
+  (:action provision_proxy_for_routes_and_peers
+    :parameters (?internal_client - internal_client ?internal_server - internal_server ?network_route - network_route ?peer_identity - peer_identity ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (client_proxy_ready ?internal_client)
+        (server_proxy_ready ?internal_server)
+        (client_route_assigned ?internal_client ?network_route)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (route_verified ?network_route)
+        (peer_verified ?peer_identity)
+        (client_route_confirmed ?internal_client)
+        (server_route_confirmed ?internal_server)
+        (proxy_registered ?integration_proxy)
+      )
+    :effect
+      (and
+        (proxy_provisioned ?integration_proxy)
+        (proxy_route_binding ?integration_proxy ?network_route)
+        (proxy_peer_binding ?integration_proxy ?peer_identity)
+        (not
+          (proxy_registered ?integration_proxy)
+        )
+      )
+  )
+  (:action provision_proxy_client_bind
+    :parameters (?internal_client - internal_client ?internal_server - internal_server ?network_route - network_route ?peer_identity - peer_identity ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (client_proxy_ready ?internal_client)
+        (server_proxy_ready ?internal_server)
+        (client_route_assigned ?internal_client ?network_route)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (route_secret_staged ?network_route)
+        (peer_verified ?peer_identity)
+        (not
+          (client_route_confirmed ?internal_client)
+        )
+        (server_route_confirmed ?internal_server)
+        (proxy_registered ?integration_proxy)
+      )
+    :effect
+      (and
+        (proxy_provisioned ?integration_proxy)
+        (proxy_route_binding ?integration_proxy ?network_route)
+        (proxy_peer_binding ?integration_proxy ?peer_identity)
+        (proxy_client_binding_established ?integration_proxy)
+        (not
+          (proxy_registered ?integration_proxy)
+        )
+      )
+  )
+  (:action provision_proxy_server_bind
+    :parameters (?internal_client - internal_client ?internal_server - internal_server ?network_route - network_route ?peer_identity - peer_identity ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (client_proxy_ready ?internal_client)
+        (server_proxy_ready ?internal_server)
+        (client_route_assigned ?internal_client ?network_route)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (route_verified ?network_route)
+        (peer_secret_staged ?peer_identity)
+        (client_route_confirmed ?internal_client)
+        (not
+          (server_route_confirmed ?internal_server)
+        )
+        (proxy_registered ?integration_proxy)
+      )
+    :effect
+      (and
+        (proxy_provisioned ?integration_proxy)
+        (proxy_route_binding ?integration_proxy ?network_route)
+        (proxy_peer_binding ?integration_proxy ?peer_identity)
+        (proxy_server_binding_established ?integration_proxy)
+        (not
+          (proxy_registered ?integration_proxy)
+        )
+      )
+  )
+  (:action provision_proxy_dual_bind
+    :parameters (?internal_client - internal_client ?internal_server - internal_server ?network_route - network_route ?peer_identity - peer_identity ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (client_proxy_ready ?internal_client)
+        (server_proxy_ready ?internal_server)
+        (client_route_assigned ?internal_client ?network_route)
+        (server_peer_assigned ?internal_server ?peer_identity)
+        (route_secret_staged ?network_route)
+        (peer_secret_staged ?peer_identity)
+        (not
+          (client_route_confirmed ?internal_client)
+        )
+        (not
+          (server_route_confirmed ?internal_server)
+        )
+        (proxy_registered ?integration_proxy)
+      )
+    :effect
+      (and
+        (proxy_provisioned ?integration_proxy)
+        (proxy_route_binding ?integration_proxy ?network_route)
+        (proxy_peer_binding ?integration_proxy ?peer_identity)
+        (proxy_client_binding_established ?integration_proxy)
+        (proxy_server_binding_established ?integration_proxy)
+        (not
+          (proxy_registered ?integration_proxy)
+        )
+      )
+  )
+  (:action verify_proxy_health
+    :parameters (?integration_proxy - integration_proxy ?internal_client - internal_client ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (proxy_provisioned ?integration_proxy)
+        (client_proxy_ready ?internal_client)
+        (participant_certificate_bound ?internal_client ?tls_certificate)
+        (not
+          (proxy_health_checks_passed ?integration_proxy)
+        )
+      )
+    :effect (proxy_health_checks_passed ?integration_proxy)
+  )
+  (:action deploy_configuration_bundle_to_proxy
+    :parameters (?external_platform - external_platform ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (platform_proxy_associated ?external_platform ?integration_proxy)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_available ?configuration_bundle)
+        (proxy_provisioned ?integration_proxy)
+        (proxy_health_checks_passed ?integration_proxy)
+        (not
+          (configuration_bundle_deployed ?configuration_bundle)
+        )
+      )
+    :effect
+      (and
+        (configuration_bundle_deployed ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (not
+          (configuration_bundle_available ?configuration_bundle)
+        )
+      )
+  )
+  (:action verify_platform_config_installation
+    :parameters (?external_platform - external_platform ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_deployed ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (participant_certificate_bound ?external_platform ?tls_certificate)
+        (not
+          (proxy_client_binding_established ?integration_proxy)
+        )
+        (not
+          (platform_config_installed ?external_platform)
+        )
+      )
+    :effect (platform_config_installed ?external_platform)
+  )
+  (:action apply_policy_module_to_platform
+    :parameters (?external_platform - external_platform ?policy_module - policy_module)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (policy_module_available ?policy_module)
+        (not
+          (platform_policy_applied ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_policy_applied ?external_platform)
+        (platform_policy_module_bound ?external_platform ?policy_module)
+        (not
+          (policy_module_available ?policy_module)
+        )
+      )
+  )
+  (:action prepare_platform_for_policy_and_config
+    :parameters (?external_platform - external_platform ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy ?tls_certificate - tls_certificate ?policy_module - policy_module)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_deployed ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (participant_certificate_bound ?external_platform ?tls_certificate)
+        (proxy_client_binding_established ?integration_proxy)
+        (platform_policy_applied ?external_platform)
+        (platform_policy_module_bound ?external_platform ?policy_module)
+        (not
+          (platform_config_installed ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_config_installed ?external_platform)
+        (platform_policy_committed ?external_platform)
+      )
+  )
+  (:action stage_platform_for_activation
+    :parameters (?external_platform - external_platform ?monitoring_integration - monitoring_integration ?service_credential - service_credential ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_installed ?external_platform)
+        (platform_monitoring_integration_bound ?external_platform ?monitoring_integration)
+        (participant_service_credential_bound ?external_platform ?service_credential)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (not
+          (proxy_server_binding_established ?integration_proxy)
+        )
+        (not
+          (platform_config_activation_ready ?external_platform)
+        )
+      )
+    :effect (platform_config_activation_ready ?external_platform)
+  )
+  (:action stage_platform_for_activation_secondary
+    :parameters (?external_platform - external_platform ?monitoring_integration - monitoring_integration ?service_credential - service_credential ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_installed ?external_platform)
+        (platform_monitoring_integration_bound ?external_platform ?monitoring_integration)
+        (participant_service_credential_bound ?external_platform ?service_credential)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (proxy_server_binding_established ?integration_proxy)
+        (not
+          (platform_config_activation_ready ?external_platform)
+        )
+      )
+    :effect (platform_config_activation_ready ?external_platform)
+  )
+  (:action apply_trust_anchor_and_verify_configuration
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_activation_ready ?external_platform)
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (not
+          (proxy_client_binding_established ?integration_proxy)
+        )
+        (not
+          (proxy_server_binding_established ?integration_proxy)
+        )
+        (not
+          (platform_configuration_verified ?external_platform)
+        )
+      )
+    :effect (platform_configuration_verified ?external_platform)
+  )
+  (:action apply_trust_anchor_and_attach_monitoring
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_activation_ready ?external_platform)
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (proxy_client_binding_established ?integration_proxy)
+        (not
+          (proxy_server_binding_established ?integration_proxy)
+        )
+        (not
+          (platform_configuration_verified ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_observability_registered ?external_platform)
+      )
+  )
+  (:action apply_trust_anchor_and_attach_monitoring_alt
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_activation_ready ?external_platform)
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (not
+          (proxy_client_binding_established ?integration_proxy)
+        )
+        (proxy_server_binding_established ?integration_proxy)
+        (not
+          (platform_configuration_verified ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_observability_registered ?external_platform)
+      )
+  )
+  (:action apply_trust_anchor_and_attach_monitoring_full
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor ?configuration_bundle - configuration_bundle ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (platform_config_activation_ready ?external_platform)
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (platform_has_configuration_bundle ?external_platform ?configuration_bundle)
+        (configuration_bundle_bound_to_proxy ?configuration_bundle ?integration_proxy)
+        (proxy_client_binding_established ?integration_proxy)
+        (proxy_server_binding_established ?integration_proxy)
+        (not
+          (platform_configuration_verified ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_observability_registered ?external_platform)
+      )
+  )
+  (:action finalize_platform_configuration
+    :parameters (?external_platform - external_platform)
+    :precondition
+      (and
+        (platform_configuration_verified ?external_platform)
+        (not
+          (platform_observability_registered ?external_platform)
+        )
+        (not
+          (platform_finalized ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_finalized ?external_platform)
+        (operational ?external_platform)
+      )
+  )
+  (:action attach_observability_config_to_platform
+    :parameters (?external_platform - external_platform ?observability_config - observability_agent_config)
+    :precondition
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_observability_registered ?external_platform)
+        (observability_config_available ?observability_config)
+      )
+    :effect
+      (and
+        (platform_observability_config_bound ?external_platform ?observability_config)
+        (not
+          (observability_config_available ?observability_config)
+        )
+      )
+  )
+  (:action activate_platform_services
+    :parameters (?external_platform - external_platform ?internal_client - internal_client ?internal_server - internal_server ?tls_certificate - tls_certificate ?observability_config - observability_agent_config)
+    :precondition
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_observability_registered ?external_platform)
+        (platform_observability_config_bound ?external_platform ?observability_config)
+        (platform_client_mapping ?external_platform ?internal_client)
+        (platform_server_mapping ?external_platform ?internal_server)
+        (client_route_confirmed ?internal_client)
+        (server_route_confirmed ?internal_server)
+        (participant_certificate_bound ?external_platform ?tls_certificate)
+        (not
+          (platform_services_enabled ?external_platform)
+        )
+      )
+    :effect (platform_services_enabled ?external_platform)
+  )
+  (:action finalize_and_activate_platform
+    :parameters (?external_platform - external_platform)
+    :precondition
+      (and
+        (platform_configuration_verified ?external_platform)
+        (platform_services_enabled ?external_platform)
+        (not
+          (platform_finalized ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_finalized ?external_platform)
+        (operational ?external_platform)
+      )
+  )
+  (:action activate_platform_authorization_grant
+    :parameters (?external_platform - external_platform ?authorization_grant - authorization_grant ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (participant_verified ?external_platform)
+        (participant_certificate_bound ?external_platform ?tls_certificate)
+        (authorization_grant_available ?authorization_grant)
+        (platform_authorization_bound ?external_platform ?authorization_grant)
+        (not
+          (platform_authorization_activated ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_authorization_activated ?external_platform)
+        (not
+          (authorization_grant_available ?authorization_grant)
+        )
+      )
+  )
+  (:action verify_authorization_and_bind_credential
+    :parameters (?external_platform - external_platform ?service_credential - service_credential)
+    :precondition
+      (and
+        (platform_authorization_activated ?external_platform)
+        (participant_service_credential_bound ?external_platform ?service_credential)
+        (not
+          (platform_authorization_verified ?external_platform)
+        )
+      )
+    :effect (platform_authorization_verified ?external_platform)
+  )
+  (:action finalize_authorization_with_trust_anchor
+    :parameters (?external_platform - external_platform ?trust_anchor - trust_anchor)
+    :precondition
+      (and
+        (platform_authorization_verified ?external_platform)
+        (platform_trust_anchor_bound ?external_platform ?trust_anchor)
+        (not
+          (platform_authorization_finalized ?external_platform)
+        )
+      )
+    :effect (platform_authorization_finalized ?external_platform)
+  )
+  (:action finalize_and_activate_platform_authorization
+    :parameters (?external_platform - external_platform)
+    :precondition
+      (and
+        (platform_authorization_finalized ?external_platform)
+        (not
+          (platform_finalized ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (platform_finalized ?external_platform)
+        (operational ?external_platform)
+      )
+  )
+  (:action finalize_and_activate_client
+    :parameters (?internal_client - internal_client ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (client_proxy_ready ?internal_client)
+        (client_route_confirmed ?internal_client)
+        (proxy_provisioned ?integration_proxy)
+        (proxy_health_checks_passed ?integration_proxy)
+        (not
+          (operational ?internal_client)
+        )
+      )
+    :effect (operational ?internal_client)
+  )
+  (:action finalize_and_activate_server
+    :parameters (?internal_server - internal_server ?integration_proxy - integration_proxy)
+    :precondition
+      (and
+        (server_proxy_ready ?internal_server)
+        (server_route_confirmed ?internal_server)
+        (proxy_provisioned ?integration_proxy)
+        (proxy_health_checks_passed ?integration_proxy)
+        (not
+          (operational ?internal_server)
+        )
+      )
+    :effect (operational ?internal_server)
+  )
+  (:action bind_audit_token_to_participant
+    :parameters (?participant - system_participant ?audit_token - audit_token ?tls_certificate - tls_certificate)
+    :precondition
+      (and
+        (operational ?participant)
+        (participant_certificate_bound ?participant ?tls_certificate)
+        (audit_token_available ?audit_token)
+        (not
+          (participant_audit_bound ?participant)
+        )
+      )
+    :effect
+      (and
+        (participant_audit_bound ?participant)
+        (participant_audit_token_bound ?participant ?audit_token)
+        (not
+          (audit_token_available ?audit_token)
+        )
+      )
+  )
+  (:action activate_internal_client_with_connector_and_audit
+    :parameters (?internal_client - internal_client ?connector - connector_resource ?audit_token - audit_token)
+    :precondition
+      (and
+        (participant_audit_bound ?internal_client)
+        (participant_bound_to_connector ?internal_client ?connector)
+        (participant_audit_token_bound ?internal_client ?audit_token)
+        (not
+          (integration_activated ?internal_client)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?internal_client)
+        (connector_available ?connector)
+        (audit_token_available ?audit_token)
+      )
+  )
+  (:action activate_internal_server_with_connector_and_audit
+    :parameters (?internal_server - internal_server ?connector - connector_resource ?audit_token - audit_token)
+    :precondition
+      (and
+        (participant_audit_bound ?internal_server)
+        (participant_bound_to_connector ?internal_server ?connector)
+        (participant_audit_token_bound ?internal_server ?audit_token)
+        (not
+          (integration_activated ?internal_server)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?internal_server)
+        (connector_available ?connector)
+        (audit_token_available ?audit_token)
+      )
+  )
+  (:action activate_platform_with_connector_and_audit
+    :parameters (?external_platform - external_platform ?connector - connector_resource ?audit_token - audit_token)
+    :precondition
+      (and
+        (participant_audit_bound ?external_platform)
+        (participant_bound_to_connector ?external_platform ?connector)
+        (participant_audit_token_bound ?external_platform ?audit_token)
+        (not
+          (integration_activated ?external_platform)
+        )
+      )
+    :effect
+      (and
+        (integration_activated ?external_platform)
+        (connector_available ?connector)
+        (audit_token_available ?audit_token)
+      )
+  )
+)

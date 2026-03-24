@@ -1,0 +1,936 @@
+(define (domain currency_spend_priority_planning)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types category_item - object category_cost - object category_offer - object objective_group - object spend_target - objective_group currency_option - category_item cost_component - category_item equipment_token - category_item optional_bonus - category_item special_resource - category_item priority_token - category_item modifier_a - category_item modifier_c - category_item consumable - category_cost module_component - category_cost modifier_b - category_cost primary_slot_marker - category_offer secondary_slot_marker - category_offer shop_offer - category_offer context_primary - spend_target context_secondary - spend_target primary_loadout - context_primary secondary_loadout - context_primary build_profile - context_secondary)
+  (:predicates
+    (target_created ?spend_target - spend_target)
+    (target_confirmed ?spend_target - spend_target)
+    (target_currency_assigned ?spend_target - spend_target)
+    (spend_completed ?spend_target - spend_target)
+    (target_ready ?spend_target - spend_target)
+    (target_locked ?spend_target - spend_target)
+    (currency_available ?currency_option - currency_option)
+    (target_currency_bound ?spend_target - spend_target ?currency_option - currency_option)
+    (cost_component_available ?cost_component - cost_component)
+    (target_cost_bound ?spend_target - spend_target ?cost_component - cost_component)
+    (equipment_available ?equipment_token - equipment_token)
+    (equipment_attached ?spend_target - spend_target ?equipment_token - equipment_token)
+    (consumable_available ?consumable - consumable)
+    (consumable_consumed_by_primary ?primary_loadout - primary_loadout ?consumable - consumable)
+    (consumable_assigned_to_secondary ?secondary_loadout - secondary_loadout ?consumable - consumable)
+    (primary_slot_compatible ?primary_loadout - primary_loadout ?primary_slot_marker - primary_slot_marker)
+    (primary_slot_selected ?primary_slot_marker - primary_slot_marker)
+    (primary_slot_staged ?primary_slot_marker - primary_slot_marker)
+    (primary_loadout_prepared ?primary_loadout - primary_loadout)
+    (secondary_slot_compatible ?secondary_loadout - secondary_loadout ?secondary_slot_marker - secondary_slot_marker)
+    (secondary_slot_selected ?secondary_slot_marker - secondary_slot_marker)
+    (secondary_slot_staged ?secondary_slot_marker - secondary_slot_marker)
+    (secondary_loadout_prepared ?secondary_loadout - secondary_loadout)
+    (offer_available ?shop_offer - shop_offer)
+    (offer_reserved ?shop_offer - shop_offer)
+    (offer_primary_slot_bound ?shop_offer - shop_offer ?primary_slot_marker - primary_slot_marker)
+    (offer_secondary_slot_bound ?shop_offer - shop_offer ?secondary_slot_marker - secondary_slot_marker)
+    (offer_variant_flag_a ?shop_offer - shop_offer)
+    (offer_variant_flag_b ?shop_offer - shop_offer)
+    (offer_finalized ?shop_offer - shop_offer)
+    (profile_primary_link ?build_profile - build_profile ?primary_loadout - primary_loadout)
+    (profile_secondary_link ?build_profile - build_profile ?secondary_loadout - secondary_loadout)
+    (profile_offer_bound ?build_profile - build_profile ?shop_offer - shop_offer)
+    (module_available ?module_component - module_component)
+    (profile_module_bound ?build_profile - build_profile ?module_component - module_component)
+    (module_consumed ?module_component - module_component)
+    (module_offer_compatible ?module_component - module_component ?shop_offer - shop_offer)
+    (assembly_step_initialized ?build_profile - build_profile)
+    (assembly_step_modules_ready ?build_profile - build_profile)
+    (assembly_step_bonus_ready ?build_profile - build_profile)
+    (profile_optional_bonus_flag ?build_profile - build_profile)
+    (optional_bonus_applied ?build_profile - build_profile)
+    (assembly_bonus_confirmed ?build_profile - build_profile)
+    (assembly_completed ?build_profile - build_profile)
+    (modifier_b_available ?modifier_b - modifier_b)
+    (profile_modifier_b_bound ?build_profile - build_profile ?modifier_b - modifier_b)
+    (special_upgrade_initiated ?build_profile - build_profile)
+    (special_upgrade_equipment_applied ?build_profile - build_profile)
+    (special_upgrade_modifier_c_applied ?build_profile - build_profile)
+    (optional_bonus_available ?optional_bonus - optional_bonus)
+    (profile_optional_bonus_link ?build_profile - build_profile ?optional_bonus - optional_bonus)
+    (special_resource_available ?special_resource - special_resource)
+    (profile_special_resource_bound ?build_profile - build_profile ?special_resource - special_resource)
+    (modifier_a_available ?modifier_a - modifier_a)
+    (profile_modifier_a_bound ?build_profile - build_profile ?modifier_a - modifier_a)
+    (modifier_c_available ?modifier_c - modifier_c)
+    (profile_modifier_c_bound ?build_profile - build_profile ?modifier_c - modifier_c)
+    (priority_token_available ?priority_token - priority_token)
+    (target_priority_bound ?spend_target - spend_target ?priority_token - priority_token)
+    (primary_ready ?primary_loadout - primary_loadout)
+    (secondary_ready ?secondary_loadout - secondary_loadout)
+    (profile_completion_ack ?build_profile - build_profile)
+  )
+  (:action create_spend_target
+    :parameters (?spend_target - spend_target)
+    :precondition
+      (and
+        (not
+          (target_created ?spend_target)
+        )
+        (not
+          (spend_completed ?spend_target)
+        )
+      )
+    :effect (target_created ?spend_target)
+  )
+  (:action assign_currency_to_target
+    :parameters (?spend_target - spend_target ?currency_option - currency_option)
+    :precondition
+      (and
+        (target_created ?spend_target)
+        (not
+          (target_currency_assigned ?spend_target)
+        )
+        (currency_available ?currency_option)
+      )
+    :effect
+      (and
+        (target_currency_assigned ?spend_target)
+        (target_currency_bound ?spend_target ?currency_option)
+        (not
+          (currency_available ?currency_option)
+        )
+      )
+  )
+  (:action assign_cost_component_to_target
+    :parameters (?spend_target - spend_target ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_created ?spend_target)
+        (target_currency_assigned ?spend_target)
+        (cost_component_available ?cost_component)
+      )
+    :effect
+      (and
+        (target_cost_bound ?spend_target ?cost_component)
+        (not
+          (cost_component_available ?cost_component)
+        )
+      )
+  )
+  (:action confirm_spend_target
+    :parameters (?spend_target - spend_target ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_created ?spend_target)
+        (target_currency_assigned ?spend_target)
+        (target_cost_bound ?spend_target ?cost_component)
+        (not
+          (target_confirmed ?spend_target)
+        )
+      )
+    :effect (target_confirmed ?spend_target)
+  )
+  (:action unassign_cost_component_from_target
+    :parameters (?spend_target - spend_target ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_cost_bound ?spend_target ?cost_component)
+      )
+    :effect
+      (and
+        (cost_component_available ?cost_component)
+        (not
+          (target_cost_bound ?spend_target ?cost_component)
+        )
+      )
+  )
+  (:action attach_equipment_to_target
+    :parameters (?spend_target - spend_target ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (target_confirmed ?spend_target)
+        (equipment_available ?equipment_token)
+      )
+    :effect
+      (and
+        (equipment_attached ?spend_target ?equipment_token)
+        (not
+          (equipment_available ?equipment_token)
+        )
+      )
+  )
+  (:action detach_equipment_from_target
+    :parameters (?spend_target - spend_target ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (equipment_attached ?spend_target ?equipment_token)
+      )
+    :effect
+      (and
+        (equipment_available ?equipment_token)
+        (not
+          (equipment_attached ?spend_target ?equipment_token)
+        )
+      )
+  )
+  (:action bind_modifier_a_to_profile
+    :parameters (?build_profile - build_profile ?modifier_a - modifier_a)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (modifier_a_available ?modifier_a)
+      )
+    :effect
+      (and
+        (profile_modifier_a_bound ?build_profile ?modifier_a)
+        (not
+          (modifier_a_available ?modifier_a)
+        )
+      )
+  )
+  (:action unbind_modifier_a_from_profile
+    :parameters (?build_profile - build_profile ?modifier_a - modifier_a)
+    :precondition
+      (and
+        (profile_modifier_a_bound ?build_profile ?modifier_a)
+      )
+    :effect
+      (and
+        (modifier_a_available ?modifier_a)
+        (not
+          (profile_modifier_a_bound ?build_profile ?modifier_a)
+        )
+      )
+  )
+  (:action bind_modifier_c_to_profile
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (modifier_c_available ?modifier_c)
+      )
+    :effect
+      (and
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (not
+          (modifier_c_available ?modifier_c)
+        )
+      )
+  )
+  (:action unbind_modifier_c_from_profile
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c)
+    :precondition
+      (and
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+      )
+    :effect
+      (and
+        (modifier_c_available ?modifier_c)
+        (not
+          (profile_modifier_c_bound ?build_profile ?modifier_c)
+        )
+      )
+  )
+  (:action select_primary_slot_marker
+    :parameters (?primary_loadout - primary_loadout ?primary_slot_marker - primary_slot_marker ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_confirmed ?primary_loadout)
+        (target_cost_bound ?primary_loadout ?cost_component)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (not
+          (primary_slot_selected ?primary_slot_marker)
+        )
+        (not
+          (primary_slot_staged ?primary_slot_marker)
+        )
+      )
+    :effect (primary_slot_selected ?primary_slot_marker)
+  )
+  (:action attach_equipment_primary
+    :parameters (?primary_loadout - primary_loadout ?primary_slot_marker - primary_slot_marker ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (target_confirmed ?primary_loadout)
+        (equipment_attached ?primary_loadout ?equipment_token)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (primary_slot_selected ?primary_slot_marker)
+        (not
+          (primary_ready ?primary_loadout)
+        )
+      )
+    :effect
+      (and
+        (primary_ready ?primary_loadout)
+        (primary_loadout_prepared ?primary_loadout)
+      )
+  )
+  (:action consume_consumable_primary
+    :parameters (?primary_loadout - primary_loadout ?primary_slot_marker - primary_slot_marker ?consumable - consumable)
+    :precondition
+      (and
+        (target_confirmed ?primary_loadout)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (consumable_available ?consumable)
+        (not
+          (primary_ready ?primary_loadout)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_staged ?primary_slot_marker)
+        (primary_ready ?primary_loadout)
+        (consumable_consumed_by_primary ?primary_loadout ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_primary_slot_activation
+    :parameters (?primary_loadout - primary_loadout ?primary_slot_marker - primary_slot_marker ?cost_component - cost_component ?consumable - consumable)
+    :precondition
+      (and
+        (target_confirmed ?primary_loadout)
+        (target_cost_bound ?primary_loadout ?cost_component)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (primary_slot_staged ?primary_slot_marker)
+        (consumable_consumed_by_primary ?primary_loadout ?consumable)
+        (not
+          (primary_loadout_prepared ?primary_loadout)
+        )
+      )
+    :effect
+      (and
+        (primary_slot_selected ?primary_slot_marker)
+        (primary_loadout_prepared ?primary_loadout)
+        (consumable_available ?consumable)
+        (not
+          (consumable_consumed_by_primary ?primary_loadout ?consumable)
+        )
+      )
+  )
+  (:action select_secondary_slot_marker
+    :parameters (?secondary_loadout - secondary_loadout ?secondary_slot_marker - secondary_slot_marker ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_confirmed ?secondary_loadout)
+        (target_cost_bound ?secondary_loadout ?cost_component)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (not
+          (secondary_slot_selected ?secondary_slot_marker)
+        )
+        (not
+          (secondary_slot_staged ?secondary_slot_marker)
+        )
+      )
+    :effect (secondary_slot_selected ?secondary_slot_marker)
+  )
+  (:action attach_equipment_secondary
+    :parameters (?secondary_loadout - secondary_loadout ?secondary_slot_marker - secondary_slot_marker ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (target_confirmed ?secondary_loadout)
+        (equipment_attached ?secondary_loadout ?equipment_token)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (secondary_slot_selected ?secondary_slot_marker)
+        (not
+          (secondary_ready ?secondary_loadout)
+        )
+      )
+    :effect
+      (and
+        (secondary_ready ?secondary_loadout)
+        (secondary_loadout_prepared ?secondary_loadout)
+      )
+  )
+  (:action consume_consumable_secondary
+    :parameters (?secondary_loadout - secondary_loadout ?secondary_slot_marker - secondary_slot_marker ?consumable - consumable)
+    :precondition
+      (and
+        (target_confirmed ?secondary_loadout)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (consumable_available ?consumable)
+        (not
+          (secondary_ready ?secondary_loadout)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_staged ?secondary_slot_marker)
+        (secondary_ready ?secondary_loadout)
+        (consumable_assigned_to_secondary ?secondary_loadout ?consumable)
+        (not
+          (consumable_available ?consumable)
+        )
+      )
+  )
+  (:action finalize_secondary_slot_activation
+    :parameters (?secondary_loadout - secondary_loadout ?secondary_slot_marker - secondary_slot_marker ?cost_component - cost_component ?consumable - consumable)
+    :precondition
+      (and
+        (target_confirmed ?secondary_loadout)
+        (target_cost_bound ?secondary_loadout ?cost_component)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (secondary_slot_staged ?secondary_slot_marker)
+        (consumable_assigned_to_secondary ?secondary_loadout ?consumable)
+        (not
+          (secondary_loadout_prepared ?secondary_loadout)
+        )
+      )
+    :effect
+      (and
+        (secondary_slot_selected ?secondary_slot_marker)
+        (secondary_loadout_prepared ?secondary_loadout)
+        (consumable_available ?consumable)
+        (not
+          (consumable_assigned_to_secondary ?secondary_loadout ?consumable)
+        )
+      )
+  )
+  (:action reserve_shop_offer
+    :parameters (?primary_loadout - primary_loadout ?secondary_loadout - secondary_loadout ?primary_slot_marker - primary_slot_marker ?secondary_slot_marker - secondary_slot_marker ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (primary_ready ?primary_loadout)
+        (secondary_ready ?secondary_loadout)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (primary_slot_selected ?primary_slot_marker)
+        (secondary_slot_selected ?secondary_slot_marker)
+        (primary_loadout_prepared ?primary_loadout)
+        (secondary_loadout_prepared ?secondary_loadout)
+        (offer_available ?shop_offer)
+      )
+    :effect
+      (and
+        (offer_reserved ?shop_offer)
+        (offer_primary_slot_bound ?shop_offer ?primary_slot_marker)
+        (offer_secondary_slot_bound ?shop_offer ?secondary_slot_marker)
+        (not
+          (offer_available ?shop_offer)
+        )
+      )
+  )
+  (:action reserve_shop_offer_variant_a
+    :parameters (?primary_loadout - primary_loadout ?secondary_loadout - secondary_loadout ?primary_slot_marker - primary_slot_marker ?secondary_slot_marker - secondary_slot_marker ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (primary_ready ?primary_loadout)
+        (secondary_ready ?secondary_loadout)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (primary_slot_staged ?primary_slot_marker)
+        (secondary_slot_selected ?secondary_slot_marker)
+        (not
+          (primary_loadout_prepared ?primary_loadout)
+        )
+        (secondary_loadout_prepared ?secondary_loadout)
+        (offer_available ?shop_offer)
+      )
+    :effect
+      (and
+        (offer_reserved ?shop_offer)
+        (offer_primary_slot_bound ?shop_offer ?primary_slot_marker)
+        (offer_secondary_slot_bound ?shop_offer ?secondary_slot_marker)
+        (offer_variant_flag_a ?shop_offer)
+        (not
+          (offer_available ?shop_offer)
+        )
+      )
+  )
+  (:action reserve_shop_offer_variant_b
+    :parameters (?primary_loadout - primary_loadout ?secondary_loadout - secondary_loadout ?primary_slot_marker - primary_slot_marker ?secondary_slot_marker - secondary_slot_marker ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (primary_ready ?primary_loadout)
+        (secondary_ready ?secondary_loadout)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (primary_slot_selected ?primary_slot_marker)
+        (secondary_slot_staged ?secondary_slot_marker)
+        (primary_loadout_prepared ?primary_loadout)
+        (not
+          (secondary_loadout_prepared ?secondary_loadout)
+        )
+        (offer_available ?shop_offer)
+      )
+    :effect
+      (and
+        (offer_reserved ?shop_offer)
+        (offer_primary_slot_bound ?shop_offer ?primary_slot_marker)
+        (offer_secondary_slot_bound ?shop_offer ?secondary_slot_marker)
+        (offer_variant_flag_b ?shop_offer)
+        (not
+          (offer_available ?shop_offer)
+        )
+      )
+  )
+  (:action reserve_shop_offer_both_variants
+    :parameters (?primary_loadout - primary_loadout ?secondary_loadout - secondary_loadout ?primary_slot_marker - primary_slot_marker ?secondary_slot_marker - secondary_slot_marker ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (primary_ready ?primary_loadout)
+        (secondary_ready ?secondary_loadout)
+        (primary_slot_compatible ?primary_loadout ?primary_slot_marker)
+        (secondary_slot_compatible ?secondary_loadout ?secondary_slot_marker)
+        (primary_slot_staged ?primary_slot_marker)
+        (secondary_slot_staged ?secondary_slot_marker)
+        (not
+          (primary_loadout_prepared ?primary_loadout)
+        )
+        (not
+          (secondary_loadout_prepared ?secondary_loadout)
+        )
+        (offer_available ?shop_offer)
+      )
+    :effect
+      (and
+        (offer_reserved ?shop_offer)
+        (offer_primary_slot_bound ?shop_offer ?primary_slot_marker)
+        (offer_secondary_slot_bound ?shop_offer ?secondary_slot_marker)
+        (offer_variant_flag_a ?shop_offer)
+        (offer_variant_flag_b ?shop_offer)
+        (not
+          (offer_available ?shop_offer)
+        )
+      )
+  )
+  (:action finalize_offer_reservation
+    :parameters (?shop_offer - shop_offer ?primary_loadout - primary_loadout ?cost_component - cost_component)
+    :precondition
+      (and
+        (offer_reserved ?shop_offer)
+        (primary_ready ?primary_loadout)
+        (target_cost_bound ?primary_loadout ?cost_component)
+        (not
+          (offer_finalized ?shop_offer)
+        )
+      )
+    :effect (offer_finalized ?shop_offer)
+  )
+  (:action attach_module_and_bind_to_offer
+    :parameters (?build_profile - build_profile ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (profile_offer_bound ?build_profile ?shop_offer)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_available ?module_component)
+        (offer_reserved ?shop_offer)
+        (offer_finalized ?shop_offer)
+        (not
+          (module_consumed ?module_component)
+        )
+      )
+    :effect
+      (and
+        (module_consumed ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (not
+          (module_available ?module_component)
+        )
+      )
+  )
+  (:action initiate_profile_assembly
+    :parameters (?build_profile - build_profile ?module_component - module_component ?shop_offer - shop_offer ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_consumed ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (target_cost_bound ?build_profile ?cost_component)
+        (not
+          (offer_variant_flag_a ?shop_offer)
+        )
+        (not
+          (assembly_step_initialized ?build_profile)
+        )
+      )
+    :effect (assembly_step_initialized ?build_profile)
+  )
+  (:action attach_optional_bonus_to_profile
+    :parameters (?build_profile - build_profile ?optional_bonus - optional_bonus)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (optional_bonus_available ?optional_bonus)
+        (not
+          (profile_optional_bonus_flag ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_optional_bonus_flag ?build_profile)
+        (profile_optional_bonus_link ?build_profile ?optional_bonus)
+        (not
+          (optional_bonus_available ?optional_bonus)
+        )
+      )
+  )
+  (:action apply_optional_bonus_and_progress_assembly
+    :parameters (?build_profile - build_profile ?module_component - module_component ?shop_offer - shop_offer ?cost_component - cost_component ?optional_bonus - optional_bonus)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_consumed ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (target_cost_bound ?build_profile ?cost_component)
+        (offer_variant_flag_a ?shop_offer)
+        (profile_optional_bonus_flag ?build_profile)
+        (profile_optional_bonus_link ?build_profile ?optional_bonus)
+        (not
+          (assembly_step_initialized ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (assembly_step_initialized ?build_profile)
+        (optional_bonus_applied ?build_profile)
+      )
+  )
+  (:action progress_assembly_with_modifier_a
+    :parameters (?build_profile - build_profile ?modifier_a - modifier_a ?equipment_token - equipment_token ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_initialized ?build_profile)
+        (profile_modifier_a_bound ?build_profile ?modifier_a)
+        (equipment_attached ?build_profile ?equipment_token)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (not
+          (offer_variant_flag_b ?shop_offer)
+        )
+        (not
+          (assembly_step_modules_ready ?build_profile)
+        )
+      )
+    :effect (assembly_step_modules_ready ?build_profile)
+  )
+  (:action progress_assembly_with_modifier_a_variant
+    :parameters (?build_profile - build_profile ?modifier_a - modifier_a ?equipment_token - equipment_token ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_initialized ?build_profile)
+        (profile_modifier_a_bound ?build_profile ?modifier_a)
+        (equipment_attached ?build_profile ?equipment_token)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (offer_variant_flag_b ?shop_offer)
+        (not
+          (assembly_step_modules_ready ?build_profile)
+        )
+      )
+    :effect (assembly_step_modules_ready ?build_profile)
+  )
+  (:action advance_assembly_with_modifier_c
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_modules_ready ?build_profile)
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (not
+          (offer_variant_flag_a ?shop_offer)
+        )
+        (not
+          (offer_variant_flag_b ?shop_offer)
+        )
+        (not
+          (assembly_step_bonus_ready ?build_profile)
+        )
+      )
+    :effect (assembly_step_bonus_ready ?build_profile)
+  )
+  (:action advance_assembly_with_modifier_c_and_variant_a
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_modules_ready ?build_profile)
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (offer_variant_flag_a ?shop_offer)
+        (not
+          (offer_variant_flag_b ?shop_offer)
+        )
+        (not
+          (assembly_step_bonus_ready ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_bonus_confirmed ?build_profile)
+      )
+  )
+  (:action advance_assembly_with_modifier_c_and_variant_b
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_modules_ready ?build_profile)
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (not
+          (offer_variant_flag_a ?shop_offer)
+        )
+        (offer_variant_flag_b ?shop_offer)
+        (not
+          (assembly_step_bonus_ready ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_bonus_confirmed ?build_profile)
+      )
+  )
+  (:action advance_assembly_with_modifier_c_and_both_variants
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c ?module_component - module_component ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (assembly_step_modules_ready ?build_profile)
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (profile_module_bound ?build_profile ?module_component)
+        (module_offer_compatible ?module_component ?shop_offer)
+        (offer_variant_flag_a ?shop_offer)
+        (offer_variant_flag_b ?shop_offer)
+        (not
+          (assembly_step_bonus_ready ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_bonus_confirmed ?build_profile)
+      )
+  )
+  (:action acknowledge_profile_completion
+    :parameters (?build_profile - build_profile)
+    :precondition
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (not
+          (assembly_bonus_confirmed ?build_profile)
+        )
+        (not
+          (profile_completion_ack ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_completion_ack ?build_profile)
+        (target_ready ?build_profile)
+      )
+  )
+  (:action attach_special_resource_to_profile
+    :parameters (?build_profile - build_profile ?special_resource - special_resource)
+    :precondition
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_bonus_confirmed ?build_profile)
+        (special_resource_available ?special_resource)
+      )
+    :effect
+      (and
+        (profile_special_resource_bound ?build_profile ?special_resource)
+        (not
+          (special_resource_available ?special_resource)
+        )
+      )
+  )
+  (:action finalize_profile_assembly
+    :parameters (?build_profile - build_profile ?primary_loadout - primary_loadout ?secondary_loadout - secondary_loadout ?cost_component - cost_component ?special_resource - special_resource)
+    :precondition
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_bonus_confirmed ?build_profile)
+        (profile_special_resource_bound ?build_profile ?special_resource)
+        (profile_primary_link ?build_profile ?primary_loadout)
+        (profile_secondary_link ?build_profile ?secondary_loadout)
+        (primary_loadout_prepared ?primary_loadout)
+        (secondary_loadout_prepared ?secondary_loadout)
+        (target_cost_bound ?build_profile ?cost_component)
+        (not
+          (assembly_completed ?build_profile)
+        )
+      )
+    :effect (assembly_completed ?build_profile)
+  )
+  (:action acknowledge_profile_completion_final
+    :parameters (?build_profile - build_profile)
+    :precondition
+      (and
+        (assembly_step_bonus_ready ?build_profile)
+        (assembly_completed ?build_profile)
+        (not
+          (profile_completion_ack ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_completion_ack ?build_profile)
+        (target_ready ?build_profile)
+      )
+  )
+  (:action start_special_upgrade_path
+    :parameters (?build_profile - build_profile ?modifier_b - modifier_b ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_confirmed ?build_profile)
+        (target_cost_bound ?build_profile ?cost_component)
+        (modifier_b_available ?modifier_b)
+        (profile_modifier_b_bound ?build_profile ?modifier_b)
+        (not
+          (special_upgrade_initiated ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (special_upgrade_initiated ?build_profile)
+        (not
+          (modifier_b_available ?modifier_b)
+        )
+      )
+  )
+  (:action apply_equipment_for_special_upgrade
+    :parameters (?build_profile - build_profile ?equipment_token - equipment_token)
+    :precondition
+      (and
+        (special_upgrade_initiated ?build_profile)
+        (equipment_attached ?build_profile ?equipment_token)
+        (not
+          (special_upgrade_equipment_applied ?build_profile)
+        )
+      )
+    :effect (special_upgrade_equipment_applied ?build_profile)
+  )
+  (:action apply_modifier_c_for_special_upgrade
+    :parameters (?build_profile - build_profile ?modifier_c - modifier_c)
+    :precondition
+      (and
+        (special_upgrade_equipment_applied ?build_profile)
+        (profile_modifier_c_bound ?build_profile ?modifier_c)
+        (not
+          (special_upgrade_modifier_c_applied ?build_profile)
+        )
+      )
+    :effect (special_upgrade_modifier_c_applied ?build_profile)
+  )
+  (:action finalize_special_upgrade
+    :parameters (?build_profile - build_profile)
+    :precondition
+      (and
+        (special_upgrade_modifier_c_applied ?build_profile)
+        (not
+          (profile_completion_ack ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (profile_completion_ack ?build_profile)
+        (target_ready ?build_profile)
+      )
+  )
+  (:action confirm_primary_loadout_ready
+    :parameters (?primary_loadout - primary_loadout ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (primary_ready ?primary_loadout)
+        (primary_loadout_prepared ?primary_loadout)
+        (offer_reserved ?shop_offer)
+        (offer_finalized ?shop_offer)
+        (not
+          (target_ready ?primary_loadout)
+        )
+      )
+    :effect (target_ready ?primary_loadout)
+  )
+  (:action confirm_secondary_loadout_ready
+    :parameters (?secondary_loadout - secondary_loadout ?shop_offer - shop_offer)
+    :precondition
+      (and
+        (secondary_ready ?secondary_loadout)
+        (secondary_loadout_prepared ?secondary_loadout)
+        (offer_reserved ?shop_offer)
+        (offer_finalized ?shop_offer)
+        (not
+          (target_ready ?secondary_loadout)
+        )
+      )
+    :effect (target_ready ?secondary_loadout)
+  )
+  (:action consume_priority_and_lock_target
+    :parameters (?spend_target - spend_target ?priority_token - priority_token ?cost_component - cost_component)
+    :precondition
+      (and
+        (target_ready ?spend_target)
+        (target_cost_bound ?spend_target ?cost_component)
+        (priority_token_available ?priority_token)
+        (not
+          (target_locked ?spend_target)
+        )
+      )
+    :effect
+      (and
+        (target_locked ?spend_target)
+        (target_priority_bound ?spend_target ?priority_token)
+        (not
+          (priority_token_available ?priority_token)
+        )
+      )
+  )
+  (:action execute_spend_on_primary_loadout
+    :parameters (?primary_loadout - primary_loadout ?currency_option - currency_option ?priority_token - priority_token)
+    :precondition
+      (and
+        (target_locked ?primary_loadout)
+        (target_currency_bound ?primary_loadout ?currency_option)
+        (target_priority_bound ?primary_loadout ?priority_token)
+        (not
+          (spend_completed ?primary_loadout)
+        )
+      )
+    :effect
+      (and
+        (spend_completed ?primary_loadout)
+        (currency_available ?currency_option)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action execute_spend_on_secondary_loadout
+    :parameters (?secondary_loadout - secondary_loadout ?currency_option - currency_option ?priority_token - priority_token)
+    :precondition
+      (and
+        (target_locked ?secondary_loadout)
+        (target_currency_bound ?secondary_loadout ?currency_option)
+        (target_priority_bound ?secondary_loadout ?priority_token)
+        (not
+          (spend_completed ?secondary_loadout)
+        )
+      )
+    :effect
+      (and
+        (spend_completed ?secondary_loadout)
+        (currency_available ?currency_option)
+        (priority_token_available ?priority_token)
+      )
+  )
+  (:action execute_spend_on_profile
+    :parameters (?build_profile - build_profile ?currency_option - currency_option ?priority_token - priority_token)
+    :precondition
+      (and
+        (target_locked ?build_profile)
+        (target_currency_bound ?build_profile ?currency_option)
+        (target_priority_bound ?build_profile ?priority_token)
+        (not
+          (spend_completed ?build_profile)
+        )
+      )
+    :effect
+      (and
+        (spend_completed ?build_profile)
+        (currency_available ?currency_option)
+        (priority_token_available ?priority_token)
+      )
+  )
+)

@@ -1,0 +1,936 @@
+(define (domain batch_processing_pipeline)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types resource_category - object token_category - object communication_component - object root_entity - object item - root_entity resource_token - resource_category rule_token - resource_category handler - resource_category configuration - resource_category policy - resource_category signature - resource_category plugin - resource_category hook - resource_category option - token_category dataset - token_category constraint - token_category channel - communication_component channel_peer - communication_component output_artifact - communication_component worker_group_a - item controller_group - item source_record - worker_group_a destination_record - worker_group_a batch_job - controller_group)
+  (:predicates
+    (work_item_enqueued ?item - item)
+    (work_item_processed ?item - item)
+    (work_item_rule_assigned ?item - item)
+    (work_item_completed ?item - item)
+    (work_item_linked ?item - item)
+    (work_item_finalized ?item - item)
+    (resource_token_available ?resource_token - resource_token)
+    (work_item_assigned_resource ?item - item ?resource_token - resource_token)
+    (rule_token_available ?rule_token - rule_token)
+    (work_item_assigned_rule ?item - item ?rule_token - rule_token)
+    (handler_available ?handler - handler)
+    (work_item_assigned_handler ?item - item ?handler - handler)
+    (option_available ?option - option)
+    (source_record_has_option ?source_record - source_record ?option - option)
+    (destination_record_has_option ?destination_record - destination_record ?option - option)
+    (record_assigned_channel ?source_record - source_record ?channel - channel)
+    (channel_ready ?channel - channel)
+    (channel_confirmed ?channel - channel)
+    (source_record_processed ?source_record - source_record)
+    (destination_record_assigned_peer ?destination_record - destination_record ?channel_peer - channel_peer)
+    (channel_peer_ready ?channel_peer - channel_peer)
+    (channel_peer_confirmed ?channel_peer - channel_peer)
+    (destination_record_processed ?destination_record - destination_record)
+    (artifact_pending ?output_artifact - output_artifact)
+    (artifact_prepared ?output_artifact - output_artifact)
+    (artifact_bound_channel ?output_artifact - output_artifact ?channel - channel)
+    (artifact_bound_peer ?output_artifact - output_artifact ?channel_peer - channel_peer)
+    (artifact_ready_stage_a ?output_artifact - output_artifact)
+    (artifact_ready_stage_b ?output_artifact - output_artifact)
+    (artifact_committed ?output_artifact - output_artifact)
+    (batch_job_has_source_record ?batch_job - batch_job ?source_record - source_record)
+    (batch_job_has_destination_record ?batch_job - batch_job ?destination_record - destination_record)
+    (batch_job_produces_artifact ?batch_job - batch_job ?output_artifact - output_artifact)
+    (dataset_available ?dataset - dataset)
+    (batch_job_attached_dataset ?batch_job - batch_job ?dataset - dataset)
+    (dataset_consumed ?dataset - dataset)
+    (dataset_materialized_in_artifact ?dataset - dataset ?output_artifact - output_artifact)
+    (batch_job_precondition_satisfied ?batch_job - batch_job)
+    (batch_job_plugins_bound ?batch_job - batch_job)
+    (batch_job_ready_for_finalization ?batch_job - batch_job)
+    (batch_job_configuration_applied ?batch_job - batch_job)
+    (batch_job_configuration_flag ?batch_job - batch_job)
+    (batch_job_policy_applicable ?batch_job - batch_job)
+    (batch_job_validated ?batch_job - batch_job)
+    (constraint_available ?constraint - constraint)
+    (batch_job_has_constraint ?batch_job - batch_job ?constraint - constraint)
+    (batch_job_constraint_applied ?batch_job - batch_job)
+    (batch_job_config_stage_one_applied ?batch_job - batch_job)
+    (batch_job_hook_registered ?batch_job - batch_job)
+    (configuration_available ?configuration - configuration)
+    (batch_job_bound_configuration ?batch_job - batch_job ?configuration - configuration)
+    (policy_available ?policy - policy)
+    (batch_job_attached_policy ?batch_job - batch_job ?policy - policy)
+    (plugin_available ?plugin - plugin)
+    (batch_job_attached_plugin ?batch_job - batch_job ?plugin - plugin)
+    (hook_available ?hook - hook)
+    (batch_job_attached_hook ?batch_job - batch_job ?hook - hook)
+    (signature_available ?signature - signature)
+    (work_item_assigned_signature ?item - item ?signature - signature)
+    (source_record_ready ?source_record - source_record)
+    (destination_record_ready ?destination_record - destination_record)
+    (batch_job_finalized ?batch_job - batch_job)
+  )
+  (:action enqueue_item
+    :parameters (?item - item)
+    :precondition
+      (and
+        (not
+          (work_item_enqueued ?item)
+        )
+        (not
+          (work_item_completed ?item)
+        )
+      )
+    :effect (work_item_enqueued ?item)
+  )
+  (:action claim_item_with_resource
+    :parameters (?item - item ?resource_token - resource_token)
+    :precondition
+      (and
+        (work_item_enqueued ?item)
+        (not
+          (work_item_rule_assigned ?item)
+        )
+        (resource_token_available ?resource_token)
+      )
+    :effect
+      (and
+        (work_item_rule_assigned ?item)
+        (work_item_assigned_resource ?item ?resource_token)
+        (not
+          (resource_token_available ?resource_token)
+        )
+      )
+  )
+  (:action assign_rule_to_item
+    :parameters (?item - item ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_enqueued ?item)
+        (work_item_rule_assigned ?item)
+        (rule_token_available ?rule_token)
+      )
+    :effect
+      (and
+        (work_item_assigned_rule ?item ?rule_token)
+        (not
+          (rule_token_available ?rule_token)
+        )
+      )
+  )
+  (:action mark_item_processed
+    :parameters (?item - item ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_enqueued ?item)
+        (work_item_rule_assigned ?item)
+        (work_item_assigned_rule ?item ?rule_token)
+        (not
+          (work_item_processed ?item)
+        )
+      )
+    :effect (work_item_processed ?item)
+  )
+  (:action release_rule_token
+    :parameters (?item - item ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_assigned_rule ?item ?rule_token)
+      )
+    :effect
+      (and
+        (rule_token_available ?rule_token)
+        (not
+          (work_item_assigned_rule ?item ?rule_token)
+        )
+      )
+  )
+  (:action assign_handler_to_item
+    :parameters (?item - item ?handler - handler)
+    :precondition
+      (and
+        (work_item_processed ?item)
+        (handler_available ?handler)
+      )
+    :effect
+      (and
+        (work_item_assigned_handler ?item ?handler)
+        (not
+          (handler_available ?handler)
+        )
+      )
+  )
+  (:action release_handler_from_item
+    :parameters (?item - item ?handler - handler)
+    :precondition
+      (and
+        (work_item_assigned_handler ?item ?handler)
+      )
+    :effect
+      (and
+        (handler_available ?handler)
+        (not
+          (work_item_assigned_handler ?item ?handler)
+        )
+      )
+  )
+  (:action attach_plugin_to_batch_job
+    :parameters (?batch_job - batch_job ?plugin - plugin)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (plugin_available ?plugin)
+      )
+    :effect
+      (and
+        (batch_job_attached_plugin ?batch_job ?plugin)
+        (not
+          (plugin_available ?plugin)
+        )
+      )
+  )
+  (:action release_plugin_from_batch_job
+    :parameters (?batch_job - batch_job ?plugin - plugin)
+    :precondition
+      (and
+        (batch_job_attached_plugin ?batch_job ?plugin)
+      )
+    :effect
+      (and
+        (plugin_available ?plugin)
+        (not
+          (batch_job_attached_plugin ?batch_job ?plugin)
+        )
+      )
+  )
+  (:action attach_hook_to_batch_job
+    :parameters (?batch_job - batch_job ?hook - hook)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (hook_available ?hook)
+      )
+    :effect
+      (and
+        (batch_job_attached_hook ?batch_job ?hook)
+        (not
+          (hook_available ?hook)
+        )
+      )
+  )
+  (:action release_hook_from_batch_job
+    :parameters (?batch_job - batch_job ?hook - hook)
+    :precondition
+      (and
+        (batch_job_attached_hook ?batch_job ?hook)
+      )
+    :effect
+      (and
+        (hook_available ?hook)
+        (not
+          (batch_job_attached_hook ?batch_job ?hook)
+        )
+      )
+  )
+  (:action signal_channel_ready
+    :parameters (?source_record - source_record ?channel - channel ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_processed ?source_record)
+        (work_item_assigned_rule ?source_record ?rule_token)
+        (record_assigned_channel ?source_record ?channel)
+        (not
+          (channel_ready ?channel)
+        )
+        (not
+          (channel_confirmed ?channel)
+        )
+      )
+    :effect (channel_ready ?channel)
+  )
+  (:action acknowledge_channel_and_mark_source
+    :parameters (?source_record - source_record ?channel - channel ?handler - handler)
+    :precondition
+      (and
+        (work_item_processed ?source_record)
+        (work_item_assigned_handler ?source_record ?handler)
+        (record_assigned_channel ?source_record ?channel)
+        (channel_ready ?channel)
+        (not
+          (source_record_ready ?source_record)
+        )
+      )
+    :effect
+      (and
+        (source_record_ready ?source_record)
+        (source_record_processed ?source_record)
+      )
+  )
+  (:action apply_option_and_mark_source
+    :parameters (?source_record - source_record ?channel - channel ?option - option)
+    :precondition
+      (and
+        (work_item_processed ?source_record)
+        (record_assigned_channel ?source_record ?channel)
+        (option_available ?option)
+        (not
+          (source_record_ready ?source_record)
+        )
+      )
+    :effect
+      (and
+        (channel_confirmed ?channel)
+        (source_record_ready ?source_record)
+        (source_record_has_option ?source_record ?option)
+        (not
+          (option_available ?option)
+        )
+      )
+  )
+  (:action process_channel_option_exchange_for_source
+    :parameters (?source_record - source_record ?channel - channel ?rule_token - rule_token ?option - option)
+    :precondition
+      (and
+        (work_item_processed ?source_record)
+        (work_item_assigned_rule ?source_record ?rule_token)
+        (record_assigned_channel ?source_record ?channel)
+        (channel_confirmed ?channel)
+        (source_record_has_option ?source_record ?option)
+        (not
+          (source_record_processed ?source_record)
+        )
+      )
+    :effect
+      (and
+        (channel_ready ?channel)
+        (source_record_processed ?source_record)
+        (option_available ?option)
+        (not
+          (source_record_has_option ?source_record ?option)
+        )
+      )
+  )
+  (:action signal_channel_ready_for_destination
+    :parameters (?destination_record - destination_record ?channel_peer - channel_peer ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_processed ?destination_record)
+        (work_item_assigned_rule ?destination_record ?rule_token)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (not
+          (channel_peer_ready ?channel_peer)
+        )
+        (not
+          (channel_peer_confirmed ?channel_peer)
+        )
+      )
+    :effect (channel_peer_ready ?channel_peer)
+  )
+  (:action bind_handler_and_mark_destination
+    :parameters (?destination_record - destination_record ?channel_peer - channel_peer ?handler - handler)
+    :precondition
+      (and
+        (work_item_processed ?destination_record)
+        (work_item_assigned_handler ?destination_record ?handler)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_peer_ready ?channel_peer)
+        (not
+          (destination_record_ready ?destination_record)
+        )
+      )
+    :effect
+      (and
+        (destination_record_ready ?destination_record)
+        (destination_record_processed ?destination_record)
+      )
+  )
+  (:action apply_option_and_mark_destination
+    :parameters (?destination_record - destination_record ?channel_peer - channel_peer ?option - option)
+    :precondition
+      (and
+        (work_item_processed ?destination_record)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (option_available ?option)
+        (not
+          (destination_record_ready ?destination_record)
+        )
+      )
+    :effect
+      (and
+        (channel_peer_confirmed ?channel_peer)
+        (destination_record_ready ?destination_record)
+        (destination_record_has_option ?destination_record ?option)
+        (not
+          (option_available ?option)
+        )
+      )
+  )
+  (:action process_channel_option_exchange_for_destination
+    :parameters (?destination_record - destination_record ?channel_peer - channel_peer ?rule_token - rule_token ?option - option)
+    :precondition
+      (and
+        (work_item_processed ?destination_record)
+        (work_item_assigned_rule ?destination_record ?rule_token)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_peer_confirmed ?channel_peer)
+        (destination_record_has_option ?destination_record ?option)
+        (not
+          (destination_record_processed ?destination_record)
+        )
+      )
+    :effect
+      (and
+        (channel_peer_ready ?channel_peer)
+        (destination_record_processed ?destination_record)
+        (option_available ?option)
+        (not
+          (destination_record_has_option ?destination_record ?option)
+        )
+      )
+  )
+  (:action initiate_artifact_preparation
+    :parameters (?source_record - source_record ?destination_record - destination_record ?channel - channel ?channel_peer - channel_peer ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (source_record_ready ?source_record)
+        (destination_record_ready ?destination_record)
+        (record_assigned_channel ?source_record ?channel)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_ready ?channel)
+        (channel_peer_ready ?channel_peer)
+        (source_record_processed ?source_record)
+        (destination_record_processed ?destination_record)
+        (artifact_pending ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_bound_channel ?output_artifact ?channel)
+        (artifact_bound_peer ?output_artifact ?channel_peer)
+        (not
+          (artifact_pending ?output_artifact)
+        )
+      )
+  )
+  (:action initiate_artifact_preparation_secondary
+    :parameters (?source_record - source_record ?destination_record - destination_record ?channel - channel ?channel_peer - channel_peer ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (source_record_ready ?source_record)
+        (destination_record_ready ?destination_record)
+        (record_assigned_channel ?source_record ?channel)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_confirmed ?channel)
+        (channel_peer_ready ?channel_peer)
+        (not
+          (source_record_processed ?source_record)
+        )
+        (destination_record_processed ?destination_record)
+        (artifact_pending ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_bound_channel ?output_artifact ?channel)
+        (artifact_bound_peer ?output_artifact ?channel_peer)
+        (artifact_ready_stage_a ?output_artifact)
+        (not
+          (artifact_pending ?output_artifact)
+        )
+      )
+  )
+  (:action initiate_artifact_preparation_alternate
+    :parameters (?source_record - source_record ?destination_record - destination_record ?channel - channel ?channel_peer - channel_peer ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (source_record_ready ?source_record)
+        (destination_record_ready ?destination_record)
+        (record_assigned_channel ?source_record ?channel)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_ready ?channel)
+        (channel_peer_confirmed ?channel_peer)
+        (source_record_processed ?source_record)
+        (not
+          (destination_record_processed ?destination_record)
+        )
+        (artifact_pending ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_bound_channel ?output_artifact ?channel)
+        (artifact_bound_peer ?output_artifact ?channel_peer)
+        (artifact_ready_stage_b ?output_artifact)
+        (not
+          (artifact_pending ?output_artifact)
+        )
+      )
+  )
+  (:action initiate_artifact_preparation_both
+    :parameters (?source_record - source_record ?destination_record - destination_record ?channel - channel ?channel_peer - channel_peer ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (source_record_ready ?source_record)
+        (destination_record_ready ?destination_record)
+        (record_assigned_channel ?source_record ?channel)
+        (destination_record_assigned_peer ?destination_record ?channel_peer)
+        (channel_confirmed ?channel)
+        (channel_peer_confirmed ?channel_peer)
+        (not
+          (source_record_processed ?source_record)
+        )
+        (not
+          (destination_record_processed ?destination_record)
+        )
+        (artifact_pending ?output_artifact)
+      )
+    :effect
+      (and
+        (artifact_prepared ?output_artifact)
+        (artifact_bound_channel ?output_artifact ?channel)
+        (artifact_bound_peer ?output_artifact ?channel_peer)
+        (artifact_ready_stage_a ?output_artifact)
+        (artifact_ready_stage_b ?output_artifact)
+        (not
+          (artifact_pending ?output_artifact)
+        )
+      )
+  )
+  (:action commit_artifact
+    :parameters (?output_artifact - output_artifact ?source_record - source_record ?rule_token - rule_token)
+    :precondition
+      (and
+        (artifact_prepared ?output_artifact)
+        (source_record_ready ?source_record)
+        (work_item_assigned_rule ?source_record ?rule_token)
+        (not
+          (artifact_committed ?output_artifact)
+        )
+      )
+    :effect (artifact_committed ?output_artifact)
+  )
+  (:action materialize_dataset_into_artifact
+    :parameters (?batch_job - batch_job ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (batch_job_produces_artifact ?batch_job ?output_artifact)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_available ?dataset)
+        (artifact_prepared ?output_artifact)
+        (artifact_committed ?output_artifact)
+        (not
+          (dataset_consumed ?dataset)
+        )
+      )
+    :effect
+      (and
+        (dataset_consumed ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (not
+          (dataset_available ?dataset)
+        )
+      )
+  )
+  (:action finalize_dataset_materialization
+    :parameters (?batch_job - batch_job ?dataset - dataset ?output_artifact - output_artifact ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_consumed ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (work_item_assigned_rule ?batch_job ?rule_token)
+        (not
+          (artifact_ready_stage_a ?output_artifact)
+        )
+        (not
+          (batch_job_precondition_satisfied ?batch_job)
+        )
+      )
+    :effect (batch_job_precondition_satisfied ?batch_job)
+  )
+  (:action apply_configuration_to_batch_job
+    :parameters (?batch_job - batch_job ?configuration - configuration)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (configuration_available ?configuration)
+        (not
+          (batch_job_configuration_applied ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_configuration_applied ?batch_job)
+        (batch_job_bound_configuration ?batch_job ?configuration)
+        (not
+          (configuration_available ?configuration)
+        )
+      )
+  )
+  (:action activate_configuration_for_dataset_job
+    :parameters (?batch_job - batch_job ?dataset - dataset ?output_artifact - output_artifact ?rule_token - rule_token ?configuration - configuration)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_consumed ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (work_item_assigned_rule ?batch_job ?rule_token)
+        (artifact_ready_stage_a ?output_artifact)
+        (batch_job_configuration_applied ?batch_job)
+        (batch_job_bound_configuration ?batch_job ?configuration)
+        (not
+          (batch_job_precondition_satisfied ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_precondition_satisfied ?batch_job)
+        (batch_job_configuration_flag ?batch_job)
+      )
+  )
+  (:action bind_plugin_handler_and_prepare_batch_job
+    :parameters (?batch_job - batch_job ?plugin - plugin ?handler - handler ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_precondition_satisfied ?batch_job)
+        (batch_job_attached_plugin ?batch_job ?plugin)
+        (work_item_assigned_handler ?batch_job ?handler)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (not
+          (artifact_ready_stage_b ?output_artifact)
+        )
+        (not
+          (batch_job_plugins_bound ?batch_job)
+        )
+      )
+    :effect (batch_job_plugins_bound ?batch_job)
+  )
+  (:action bind_plugin_handler_and_prepare_batch_job_alternate
+    :parameters (?batch_job - batch_job ?plugin - plugin ?handler - handler ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_precondition_satisfied ?batch_job)
+        (batch_job_attached_plugin ?batch_job ?plugin)
+        (work_item_assigned_handler ?batch_job ?handler)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (artifact_ready_stage_b ?output_artifact)
+        (not
+          (batch_job_plugins_bound ?batch_job)
+        )
+      )
+    :effect (batch_job_plugins_bound ?batch_job)
+  )
+  (:action attach_hook_and_mark_job_feature_ready
+    :parameters (?batch_job - batch_job ?hook - hook ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_plugins_bound ?batch_job)
+        (batch_job_attached_hook ?batch_job ?hook)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (not
+          (artifact_ready_stage_a ?output_artifact)
+        )
+        (not
+          (artifact_ready_stage_b ?output_artifact)
+        )
+        (not
+          (batch_job_ready_for_finalization ?batch_job)
+        )
+      )
+    :effect (batch_job_ready_for_finalization ?batch_job)
+  )
+  (:action attach_hook_and_enable_policy_application
+    :parameters (?batch_job - batch_job ?hook - hook ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_plugins_bound ?batch_job)
+        (batch_job_attached_hook ?batch_job ?hook)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (artifact_ready_stage_a ?output_artifact)
+        (not
+          (artifact_ready_stage_b ?output_artifact)
+        )
+        (not
+          (batch_job_ready_for_finalization ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_policy_applicable ?batch_job)
+      )
+  )
+  (:action attach_hook_and_enable_policy_application_alternate
+    :parameters (?batch_job - batch_job ?hook - hook ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_plugins_bound ?batch_job)
+        (batch_job_attached_hook ?batch_job ?hook)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (not
+          (artifact_ready_stage_a ?output_artifact)
+        )
+        (artifact_ready_stage_b ?output_artifact)
+        (not
+          (batch_job_ready_for_finalization ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_policy_applicable ?batch_job)
+      )
+  )
+  (:action attach_hook_and_enable_policy_application_both
+    :parameters (?batch_job - batch_job ?hook - hook ?dataset - dataset ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (batch_job_plugins_bound ?batch_job)
+        (batch_job_attached_hook ?batch_job ?hook)
+        (batch_job_attached_dataset ?batch_job ?dataset)
+        (dataset_materialized_in_artifact ?dataset ?output_artifact)
+        (artifact_ready_stage_a ?output_artifact)
+        (artifact_ready_stage_b ?output_artifact)
+        (not
+          (batch_job_ready_for_finalization ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_policy_applicable ?batch_job)
+      )
+  )
+  (:action mark_batch_job_ready_for_completion
+    :parameters (?batch_job - batch_job)
+    :precondition
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (not
+          (batch_job_policy_applicable ?batch_job)
+        )
+        (not
+          (batch_job_finalized ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_finalized ?batch_job)
+        (work_item_linked ?batch_job)
+      )
+  )
+  (:action attach_policy_to_batch_job
+    :parameters (?batch_job - batch_job ?policy - policy)
+    :precondition
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_policy_applicable ?batch_job)
+        (policy_available ?policy)
+      )
+    :effect
+      (and
+        (batch_job_attached_policy ?batch_job ?policy)
+        (not
+          (policy_available ?policy)
+        )
+      )
+  )
+  (:action validate_batch_job_and_mark_validated
+    :parameters (?batch_job - batch_job ?source_record - source_record ?destination_record - destination_record ?rule_token - rule_token ?policy - policy)
+    :precondition
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_policy_applicable ?batch_job)
+        (batch_job_attached_policy ?batch_job ?policy)
+        (batch_job_has_source_record ?batch_job ?source_record)
+        (batch_job_has_destination_record ?batch_job ?destination_record)
+        (source_record_processed ?source_record)
+        (destination_record_processed ?destination_record)
+        (work_item_assigned_rule ?batch_job ?rule_token)
+        (not
+          (batch_job_validated ?batch_job)
+        )
+      )
+    :effect (batch_job_validated ?batch_job)
+  )
+  (:action commit_batch_job_finalization
+    :parameters (?batch_job - batch_job)
+    :precondition
+      (and
+        (batch_job_ready_for_finalization ?batch_job)
+        (batch_job_validated ?batch_job)
+        (not
+          (batch_job_finalized ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_finalized ?batch_job)
+        (work_item_linked ?batch_job)
+      )
+  )
+  (:action register_constraint_and_mark_job
+    :parameters (?batch_job - batch_job ?constraint - constraint ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_processed ?batch_job)
+        (work_item_assigned_rule ?batch_job ?rule_token)
+        (constraint_available ?constraint)
+        (batch_job_has_constraint ?batch_job ?constraint)
+        (not
+          (batch_job_constraint_applied ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_constraint_applied ?batch_job)
+        (not
+          (constraint_available ?constraint)
+        )
+      )
+  )
+  (:action advance_job_configuration_stage
+    :parameters (?batch_job - batch_job ?handler - handler)
+    :precondition
+      (and
+        (batch_job_constraint_applied ?batch_job)
+        (work_item_assigned_handler ?batch_job ?handler)
+        (not
+          (batch_job_config_stage_one_applied ?batch_job)
+        )
+      )
+    :effect (batch_job_config_stage_one_applied ?batch_job)
+  )
+  (:action attach_hook_to_job_stage
+    :parameters (?batch_job - batch_job ?hook - hook)
+    :precondition
+      (and
+        (batch_job_config_stage_one_applied ?batch_job)
+        (batch_job_attached_hook ?batch_job ?hook)
+        (not
+          (batch_job_hook_registered ?batch_job)
+        )
+      )
+    :effect (batch_job_hook_registered ?batch_job)
+  )
+  (:action commit_job_by_hook
+    :parameters (?batch_job - batch_job)
+    :precondition
+      (and
+        (batch_job_hook_registered ?batch_job)
+        (not
+          (batch_job_finalized ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (batch_job_finalized ?batch_job)
+        (work_item_linked ?batch_job)
+      )
+  )
+  (:action finalize_source_record
+    :parameters (?source_record - source_record ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (source_record_ready ?source_record)
+        (source_record_processed ?source_record)
+        (artifact_prepared ?output_artifact)
+        (artifact_committed ?output_artifact)
+        (not
+          (work_item_linked ?source_record)
+        )
+      )
+    :effect (work_item_linked ?source_record)
+  )
+  (:action finalize_destination_record
+    :parameters (?destination_record - destination_record ?output_artifact - output_artifact)
+    :precondition
+      (and
+        (destination_record_ready ?destination_record)
+        (destination_record_processed ?destination_record)
+        (artifact_prepared ?output_artifact)
+        (artifact_committed ?output_artifact)
+        (not
+          (work_item_linked ?destination_record)
+        )
+      )
+    :effect (work_item_linked ?destination_record)
+  )
+  (:action apply_signature_to_item
+    :parameters (?item - item ?signature - signature ?rule_token - rule_token)
+    :precondition
+      (and
+        (work_item_linked ?item)
+        (work_item_assigned_rule ?item ?rule_token)
+        (signature_available ?signature)
+        (not
+          (work_item_finalized ?item)
+        )
+      )
+    :effect
+      (and
+        (work_item_finalized ?item)
+        (work_item_assigned_signature ?item ?signature)
+        (not
+          (signature_available ?signature)
+        )
+      )
+  )
+  (:action complete_source_record_and_release_resource
+    :parameters (?source_record - source_record ?resource_token - resource_token ?signature - signature)
+    :precondition
+      (and
+        (work_item_finalized ?source_record)
+        (work_item_assigned_resource ?source_record ?resource_token)
+        (work_item_assigned_signature ?source_record ?signature)
+        (not
+          (work_item_completed ?source_record)
+        )
+      )
+    :effect
+      (and
+        (work_item_completed ?source_record)
+        (resource_token_available ?resource_token)
+        (signature_available ?signature)
+      )
+  )
+  (:action complete_destination_record_and_release_resource
+    :parameters (?destination_record - destination_record ?resource_token - resource_token ?signature - signature)
+    :precondition
+      (and
+        (work_item_finalized ?destination_record)
+        (work_item_assigned_resource ?destination_record ?resource_token)
+        (work_item_assigned_signature ?destination_record ?signature)
+        (not
+          (work_item_completed ?destination_record)
+        )
+      )
+    :effect
+      (and
+        (work_item_completed ?destination_record)
+        (resource_token_available ?resource_token)
+        (signature_available ?signature)
+      )
+  )
+  (:action complete_batch_job_and_release_resource
+    :parameters (?batch_job - batch_job ?resource_token - resource_token ?signature - signature)
+    :precondition
+      (and
+        (work_item_finalized ?batch_job)
+        (work_item_assigned_resource ?batch_job ?resource_token)
+        (work_item_assigned_signature ?batch_job ?signature)
+        (not
+          (work_item_completed ?batch_job)
+        )
+      )
+    :effect
+      (and
+        (work_item_completed ?batch_job)
+        (resource_token_available ?resource_token)
+        (signature_available ?signature)
+      )
+  )
+)
